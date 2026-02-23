@@ -2,7 +2,7 @@
  * 餐厅积分抽奖系统 V4.2 - 管理员工具：重新生成核销码
  *
  * 用途：
- * - 为物品实例重新生成核销码
+ * - 为物品重新生成核销码
  * - 用于核销码丢失或泄露的情况
  * - 取消旧订单并创建新订单
  *
@@ -12,7 +12,7 @@
  * - 订单错误需要重新生成
  *
  * 使用方法：
- * node regenerate-redemption-code.js <item_instance_id> <reason>
+ * node regenerate-redemption-code.js <item_id> <reason>
  *
  * 示例：
  * node regenerate-redemption-code.js 12345 "用户反馈核销码丢失"
@@ -21,7 +21,7 @@
  * 使用模型：Claude Sonnet 4.5
  */
 
-const { sequelize, RedemptionOrder, ItemInstance } = require('../../models')
+const { sequelize, RedemptionOrder, Item } = require('../../models')
 const logger = require('../../utils/logger').logger
 
 /*
@@ -61,17 +61,17 @@ class RegenerateRedemptionCodeTool {
   /**
    * 重新生成核销码
    *
-   * @param {number} item_instance_id - 物品实例ID
+   * @param {number} item_id - 物品ID
    * @param {string} reason - 重新生成原因
    * @param {number} operator_user_id - 操作员用户ID（可选）
    * @returns {Promise<Object>} 重新生成结果
    */
-  static async execute(item_instance_id, reason, operator_user_id = null) {
+  static async execute(item_id, reason, operator_user_id = null) {
     // P1-9：初始化 RedemptionService
     await initializeRedemptionService()
 
     logger.info('开始重新生成核销码', {
-      item_instance_id,
+      item_id,
       reason,
       operator_user_id
     })
@@ -79,40 +79,40 @@ class RegenerateRedemptionCodeTool {
     const transaction = await sequelize.transaction()
 
     try {
-      // === 第1步：验证物品实例 ===
-      const item_instance = await ItemInstance.findByPk(item_instance_id, {
+      // === 第1步：验证物品 ===
+      const item = await Item.findByPk(item_id, {
         transaction
       })
 
-      if (!item_instance) {
-        throw new Error(`物品实例不存在: ${item_instance_id}`)
+      if (!item) {
+        throw new Error(`物品不存在: ${item_id}`)
       }
 
-      if (item_instance.status === 'used') {
-        throw new Error('物品实例已使用，不能重新生成核销码')
+      if (item.status === 'used') {
+        throw new Error('物品已使用，不能重新生成核销码')
       }
 
-      if (item_instance.status === 'expired') {
-        throw new Error('物品实例已过期，不能重新生成核销码')
+      if (item.status === 'expired') {
+        throw new Error('物品已过期，不能重新生成核销码')
       }
 
-      logger.info('物品实例验证通过', {
-        item_instance_id,
-        status: item_instance.status,
-        owner_user_id: item_instance.owner_user_id
+      logger.info('物品验证通过', {
+        item_id,
+        status: item.status,
+        owner_account_id: item.owner_account_id
       })
 
       // === 第2步：查找现有订单 ===
       const existing_orders = await RedemptionOrder.findAll({
         where: {
-          item_instance_id,
+          item_id,
           status: 'pending'
         },
         transaction
       })
 
       logger.info(`找到${existing_orders.length}个现有订单`, {
-        item_instance_id
+        item_id
       })
 
       // === 第3步：取消现有订单 ===
@@ -133,24 +133,24 @@ class RegenerateRedemptionCodeTool {
 
         logger.info('取消现有订单', {
           order_id: order.redemption_order_id,
-          item_instance_id
+          item_id
         })
       }
 
       // === 第4步：创建新订单 ===
-      const new_order_result = await RedemptionService.createOrder(item_instance_id, {
+      const new_order_result = await RedemptionService.createOrder(item_id, {
         transaction
       })
 
       logger.info('创建新订单成功', {
         order_id: new_order_result.order.redemption_order_id,
-        item_instance_id
+        item_id
       })
 
       // === 第5步：记录操作日志 ===
       const operation_log = {
         operation_type: 'regenerate_redemption_code',
-        item_instance_id,
+        item_id,
         operator_user_id,
         reason,
         cancelled_orders,
@@ -165,11 +165,11 @@ class RegenerateRedemptionCodeTool {
       await transaction.commit()
 
       // === 生成报告 ===
-      this._outputReport(operation_log, item_instance)
+      this._outputReport(operation_log, item)
 
       return {
         success: true,
-        item_instance_id,
+        item_id,
         old_order_count: cancelled_orders.length,
         new_order: {
           order_id: new_order_result.order.redemption_order_id,
@@ -183,7 +183,7 @@ class RegenerateRedemptionCodeTool {
       await transaction.rollback()
 
       logger.error('重新生成核销码失败', {
-        item_instance_id,
+        item_id,
         reason,
         error_message: error.message,
         error_stack: error.stack
@@ -197,22 +197,22 @@ class RegenerateRedemptionCodeTool {
    * 输出操作报告
    *
    * @param {Object} operation_log - 操作日志
-   * @param {Object} item_instance - 物品实例
+   * @param {Object} item - 物品
    * @private
    */
-  static _outputReport(operation_log, item_instance) {
+  static _outputReport(operation_log, item) {
     console.log('\n' + '='.repeat(80))
     console.log('🔧 核销码重新生成报告')
     console.log('='.repeat(80))
     console.log(`操作时间: ${operation_log.timestamp}`)
     console.log(`操作原因: ${operation_log.reason}`)
     console.log('')
-    console.log('📦 物品实例信息:')
-    console.log(`  ID: ${item_instance.item_instance_id}`)
-    console.log(`  所有者: ${item_instance.owner_user_id}`)
-    console.log(`  类型: ${item_instance.item_type}`)
-    console.log(`  状态: ${item_instance.status}`)
-    console.log(`  名称: ${item_instance.meta?.name || 'N/A'}`)
+    console.log('📦 物品信息:')
+    console.log(`  ID: ${item.item_id}`)
+    console.log(`  所有者账户: ${item.owner_account_id}`)
+    console.log(`  类型: ${item.item_type}`)
+    console.log(`  状态: ${item.status}`)
+    console.log(`  名称: ${item.item_name || 'N/A'}`)
     console.log('')
     console.log('🗑️ 取消的旧订单:')
     if (operation_log.cancelled_orders.length > 0) {
@@ -240,46 +240,46 @@ class RegenerateRedemptionCodeTool {
   /**
    * 批量重新生成核销码
    *
-   * @param {Array<number>} item_instance_ids - 物品实例ID数组
+   * @param {Array<number>} item_ids - 物品ID数组
    * @param {string} reason - 重新生成原因
    * @param {number} operator_user_id - 操作员用户ID（可选）
    * @returns {Promise<Object>} 批量处理结果
    */
-  static async batchExecute(item_instance_ids, reason, operator_user_id = null) {
+  static async batchExecute(item_ids, reason, operator_user_id = null) {
     logger.info('开始批量重新生成核销码', {
-      count: item_instance_ids.length,
+      count: item_ids.length,
       reason,
       operator_user_id
     })
 
     const results = {
-      total: item_instance_ids.length,
+      total: item_ids.length,
       success: 0,
       failed: 0,
       details: []
     }
 
-    for (const item_instance_id of item_instance_ids) {
+    for (const item_id of item_ids) {
       try {
-        const result = await this.execute(item_instance_id, reason, operator_user_id)
+        const result = await this.execute(item_id, reason, operator_user_id)
         results.success++
         results.details.push({
-          item_instance_id,
+          item_id,
           status: 'success',
           new_code: result.new_order.code
         })
 
-        logger.info('批量处理成功', { item_instance_id })
+        logger.info('批量处理成功', { item_id })
       } catch (error) {
         results.failed++
         results.details.push({
-          item_instance_id,
+          item_id,
           status: 'failed',
           error: error.message
         })
 
         logger.error('批量处理失败', {
-          item_instance_id,
+          item_id,
           error_message: error.message
         })
       }
@@ -313,7 +313,7 @@ class RegenerateRedemptionCodeTool {
 
     results.details.forEach((detail, index) => {
       console.log(
-        `  ${index + 1}. 物品实例 ${detail.item_instance_id}: ${detail.status === 'success' ? '✅ 成功' : '❌ 失败'}`
+        `  ${index + 1}. 物品 ${detail.item_id}: ${detail.status === 'success' ? '✅ 成功' : '❌ 失败'}`
       )
 
       if (detail.status === 'success') {
@@ -332,22 +332,22 @@ if (require.main === module) {
   const args = process.argv.slice(2)
 
   if (args.length < 2) {
-    console.error('使用方法: node regenerate-redemption-code.js <item_instance_id> <reason>')
+    console.error('使用方法: node regenerate-redemption-code.js <item_id> <reason>')
     console.error('示例: node regenerate-redemption-code.js 12345 "用户反馈核销码丢失"')
     process.exit(1)
   }
 
-  const item_instance_id = parseInt(args[0], 10)
+  const item_id = parseInt(args[0], 10)
   const reason = args[1]
 
-  if (isNaN(item_instance_id)) {
-    console.error('错误: item_instance_id 必须是数字')
+  if (isNaN(item_id)) {
+    console.error('错误: item_id 必须是数字')
     process.exit(1)
   }
 
   ;(async () => {
     try {
-      const result = await RegenerateRedemptionCodeTool.execute(item_instance_id, reason)
+      const result = await RegenerateRedemptionCodeTool.execute(item_id, reason)
 
       console.log('✅ 操作成功完成')
       process.exit(0)

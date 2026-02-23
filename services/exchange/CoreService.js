@@ -214,6 +214,10 @@ class CoreService {
       idempotency_key: `exchange_debit_${idempotency_key}`
     })
 
+    const burnAccount = await BalanceService.getOrCreateAccount(
+      { system_code: 'SYSTEM_BURN' },
+      { transaction }
+    )
     // eslint-disable-next-line no-restricted-syntax
     const materialResult = await BalanceService.changeBalance(
       {
@@ -222,6 +226,7 @@ class CoreService {
         delta_amount: -totalPayAmount,
         idempotency_key: `exchange_debit_${idempotency_key}`,
         business_type: 'exchange_debit',
+        counterpart_account_id: burnAccount.account_id,
         meta: {
           idempotency_key,
           exchange_item_id,

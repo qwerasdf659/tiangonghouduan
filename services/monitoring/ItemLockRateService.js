@@ -140,9 +140,9 @@ class ItemLockRateService {
    */
   async _getSummaryStats() {
     try {
-      const result = await this.models.ItemInstance.findOne({
+      const result = await this.models.Item.findOne({
         attributes: [
-          [fn('COUNT', col('item_instance_id')), 'total_items'],
+          [fn('COUNT', col('item_id')), 'total_items'],
           [fn('SUM', literal(`CASE WHEN status = 'locked' THEN 1 ELSE 0 END`)), 'locked_items']
         ],
         raw: true
@@ -175,10 +175,10 @@ class ItemLockRateService {
    */
   async _getStatsByTemplate() {
     try {
-      const results = await this.models.ItemInstance.findAll({
+      const results = await this.models.Item.findAll({
         attributes: [
           'item_template_id',
-          [fn('COUNT', col('item_instance_id')), 'total_items'],
+          [fn('COUNT', col('item_id')), 'total_items'],
           [fn('SUM', literal(`CASE WHEN status = 'locked' THEN 1 ELSE 0 END`)), 'locked_items']
         ],
         include: [

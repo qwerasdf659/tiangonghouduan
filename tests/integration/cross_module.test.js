@@ -20,7 +20,7 @@
 
 const {
   sequelize,
-  ItemInstance,
+  Item,
   LotteryDraw,
   LotteryCampaign,
   TradeOrder,
@@ -111,7 +111,7 @@ describe('阶段八：跨模块集成测试', () => {
    * 跨模块链路：
    * UnifiedLotteryEngine → BalanceService.changeBalance (扣费)
    *                     → ItemService.mintItem (发放物品)
-   *                     → ItemInstance 表写入
+   *                     → Item 表写入
    */
   describe('9.1 抽奖→资产→物品', () => {
     it('抽奖扣费成功后物品正确发放', async () => {
@@ -141,8 +141,8 @@ describe('阶段八：跨模块集成测试', () => {
         })
 
         // 2. 获取用户初始物品数量
-        const initial_items = await ItemInstance.count({
-          where: { owner_user_id: test_user_id },
+        const initial_items = await Item.count({
+          where: { owner_account_id: test_user_id },
           transaction
         })
 
@@ -257,8 +257,8 @@ describe('阶段八：跨模块集成测试', () => {
          */
         if (prize.prize && ['coupon', 'physical'].includes(prize.prize.type)) {
           // 验证物品实例已创建
-          const final_items = await ItemInstance.count({
-            where: { owner_user_id: test_user_id },
+          const final_items = await Item.count({
+            where: { owner_account_id: test_user_id },
             transaction
           })
           expect(final_items).toBeGreaterThan(initial_items)
@@ -397,7 +397,7 @@ describe('阶段八：跨模块集成测试', () => {
   describe('9.3 物品→市场→资产', () => {
     let seller_user_id
     let buyer_user_id
-    let test_item_instance_id
+    let test_item_id
 
     beforeEach(async () => {
       // 使用测试用户作为卖家
@@ -443,12 +443,12 @@ describe('阶段八：跨模块集成测试', () => {
         expect(mint_result).not.toBeNull()
         expect(mint_result.item_instance).toBeDefined()
         // mintItem 返回 { item_instance, is_duplicate }，需要从 item_instance 中获取 ID
-        test_item_instance_id = mint_result.item_instance.item_instance_id
+        test_item_id = mint_result.item_instance.item_id
         // 🔴 P0修复：使用统一清理器注册
-        testCleaner.registerById('ItemInstance', test_item_instance_id)
+        testCleaner.registerById('Item', test_item_id)
 
         console.log('🏭 物品铸造完成', {
-          item_instance_id: test_item_instance_id,
+          item_id: test_item_id,
           owner: seller_user_id
         })
 
@@ -459,7 +459,7 @@ describe('阶段八：跨模块集成测试', () => {
           listing_result = await MarketListingService.createListing(
             {
               seller_user_id,
-              item_instance_id: test_item_instance_id, // MarketListingService.createListing 期望 item_instance_id
+              item_id: test_item_id, // MarketListingService.createListing 期望 item_id
               price_asset_code: 'DIAMOND',
               price_amount: 50,
               idempotency_key: listing_idempotency_key
@@ -570,12 +570,12 @@ describe('阶段八：跨模块集成测试', () => {
         })
 
         // 6.2 验证物品所有权已转移
-        const transferred_item = await ItemInstance.findByPk(test_item_instance_id, { transaction })
-        expect(transferred_item.owner_user_id).toBe(buyer_user_id)
+        const transferred_item = await Item.findByPk(test_item_id, { transaction })
+        expect(transferred_item.owner_account_id).toBe(buyer_user_id)
 
         console.log('🔄 物品所有权转移验证', {
-          item_instance_id: test_item_instance_id,
-          new_owner: transferred_item.owner_user_id
+          item_id: test_item_id,
+          new_owner: transferred_item.owner_account_id
         })
 
         // 7. 验证订单状态

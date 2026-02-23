@@ -66,16 +66,15 @@ const PRIMARY_KEY_MAPPINGS = {
   'AssetTransaction.js': { oldPK: 'transaction_id', newPK: 'asset_transaction_id' },
   'AuthenticationSession.js': { oldPK: 'user_session_id', newPK: 'authentication_session_id' },
   'ChatMessage.js': { oldPK: 'message_id', newPK: 'chat_message_id' },
-  'ItemInstanceEvent.js': { oldPK: 'event_id', newPK: 'item_instance_event_id' },
   'LotteryAlert.js': { oldPK: 'alert_id', newPK: 'lottery_alert_id' },
   'LotteryDrawDecision.js': { oldPK: 'decision_id', newPK: 'lottery_draw_decision_id' },
-  'PopupBanner.js': { oldPK: 'banner_id', newPK: 'popup_banner_id' },
+  // [已合并+DROP] PopupBanner → ad_campaigns（campaign_category='operational'）
   'PresetBudgetDebt.js': { oldPK: 'debt_id', newPK: 'preset_budget_debt_id' },
   'PresetInventoryDebt.js': { oldPK: 'debt_id', newPK: 'preset_inventory_debt_id' },
   'PresetDebtLimit.js': { oldPK: 'limit_id', newPK: 'preset_debt_limit_id' },
   'RedemptionOrder.js': { oldPK: 'order_id', newPK: 'redemption_order_id' },
   'RiskAlert.js': { oldPK: 'alert_id', newPK: 'risk_alert_id' },
-  'SystemAnnouncement.js': { oldPK: 'announcement_id', newPK: 'system_announcement_id' },
+  // [已合并+DROP] SystemAnnouncement → ad_campaigns（campaign_category='system'）
   'SystemDictionaryHistory.js': { oldPK: 'history_id', newPK: 'system_dictionary_history_id' },
   'TradeOrder.js': { oldPK: 'order_id', newPK: 'trade_order_id' },
   'UserHierarchy.js': { oldPK: 'hierarchy_id', newPK: 'user_hierarchy_id' },

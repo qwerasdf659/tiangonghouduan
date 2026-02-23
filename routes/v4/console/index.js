@@ -139,7 +139,6 @@ router.use('/lottery-strategy-stats', lotteryStrategyStatsRoutes) // 🆕 抽奖
 router.use('/lottery-simulation', lotterySimulationRoutes) // 🆕 策略效果模拟分析路由（2026-02-20 Monte Carlo 模拟引擎）
 router.use('/sessions', sessionsRoutes) // 🆕 会话管理路由（2026-01-21 会话管理功能补齐）
 router.use('/lottery-campaigns', lotteryCampaignsRoutes) // 🆕 抽奖活动列表管理路由（2026-01-28 P1 运营后台 ROI/复购率/库存预警）
-router.use('/segment-rules', require('./segment-rules')) // 🆕 分群规则管理路由（2026-02-22 分群动态管理）
 router.use('/batch-operations', batchOperationsRoutes) // 🆕 批量操作路由（2026-01-30 阶段C 批量赠送/核销/状态切换/预算调整）
 router.use('/dashboard', dashboardRoutes) // 🆕 运营看板路由（2026-01-31 P0 待处理聚合）
 router.use('/pending', pendingRoutes) // 🆕 待处理中心路由（2026-01-31 P0 统一待处理管理）

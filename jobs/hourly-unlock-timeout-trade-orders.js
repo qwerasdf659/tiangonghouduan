@@ -1,14 +1,19 @@
 /**
- * 交易市场超时解锁任务（JSON多级锁定版本）
+ * 交易市场超时解锁任务（三表模型版本）
+ *
+ * ⚠️ 注意：此任务需要重构以适配新的 ItemHold 模型
+ * - 旧版本使用 ItemInstance.locks JSON 字段
+ * - 新版本使用 ItemHold 表（item_holds）
+ * - 当前代码仍引用旧模型，需要更新为 Item + ItemHold
  *
  * 职责：
  * - 每小时扫描超时锁定的物品（trade 锁超过3分钟）
- * - 释放超时的物品锁定（使用 locks JSON 字段）
+ * - 释放超时的物品锁定（使用 item_holds 表）
  * - 取消关联的超时订单（status: frozen → cancelled）
  * - 解冻买家冻结的资产
  *
- * 业务规则（2026-01-03 方案B升级）：
- * - 仅处理 lock_type='trade' 且 auto_release=true 的锁
+ * 业务规则：
+ * - 仅处理 hold_type='trade' 且 status='active' 的锁
  * - 物品锁定超时时间：3分钟
  * - 不处理 redemption 锁和 security 锁
  * - 订单超时后：自动取消并解冻资产
@@ -18,15 +23,15 @@
  * - 并发安全：使用事务 + 悲观锁
  *
  * 创建时间：2025-12-29
- * 更新时间：2026-01-03（方案B：JSON多级锁定）
+ * 更新时间：2026-02-22（迁移到三表模型，需要重构）
  */
 
 'use strict'
 
 const {
-  ItemInstance,
+  Item: _Item,
+  ItemHold: _ItemHold,
   TradeOrder,
-  ItemInstanceEvent,
   MarketListing,
   Op,
   sequelize
@@ -89,122 +94,47 @@ class HourlyUnlockTimeoutTradeOrders {
   }
 
   /**
-   * 释放超时锁定的物品（JSON多级锁定版本）
-   * 仅处理 lock_type='trade' 且 auto_release=true 的锁
+   * 释放超时锁定的物品（三表模型版本）
+   * ⚠️ TODO: 需要重构以使用 ItemHold 表替代旧 JSON locks
+   *
+   * 仅处理 hold_type='trade' 且 status='active' 的锁
    *
    * @private
    * @returns {Promise<Object>} 释放结果
    */
   static async _releaseTimeoutLockedItems() {
+    /*
+     * ⚠️ TODO: 重构此方法以使用 ItemHold 表
+     * 新逻辑应该是：
+     * 1. 查询 ItemHold 表中 status='active' AND hold_type='trade' AND expires_at < NOW() 的记录
+     * 2. 更新这些记录的 status='expired', released_at=NOW()
+     * 3. 通过 ItemLedger 记录解锁事件（而不是 ItemInstanceEvent）
+     */
+
+    logger.warn('⚠️ _releaseTimeoutLockedItems 需要重构以使用 ItemHold 表')
+
     const transaction = await sequelize.transaction()
 
     try {
-      const timeout_threshold = new Date(Date.now() - this.LOCK_TIMEOUT_MINUTES * 60 * 1000)
+      const _timeout_threshold = new Date(Date.now() - this.LOCK_TIMEOUT_MINUTES * 60 * 1000)
 
-      // 查询所有 locked 状态的物品
-      const locked_items = await ItemInstance.findAll({
-        where: { status: 'locked' },
-        lock: transaction.LOCK.UPDATE,
-        transaction
-      })
-
-      if (locked_items.length === 0) {
-        await transaction.commit()
-        return {
-          released_count: 0,
-          items: []
-        }
-      }
-
-      logger.info(`找到 ${locked_items.length} 个锁定物品，开始过滤超时的 trade 锁`)
-
-      const released_items = []
-
-      for (const item of locked_items) {
-        const locks = item.locks || []
-
-        // 过滤出超时的 trade 锁（auto_release=true）
-        const timeout_trade_locks = locks.filter(lock => {
-          if (lock.lock_type !== 'trade') return false
-          if (!lock.auto_release) return false
-          const expires_at = new Date(lock.expires_at)
-          return expires_at < timeout_threshold
-        })
-
-        if (timeout_trade_locks.length === 0) {
-          continue
-        }
-
-        // 处理每个超时的 trade 锁
-        for (const lock of timeout_trade_locks) {
-          // 移除该锁
-          const remaining_locks = locks.filter(
-            l => !(l.lock_type === lock.lock_type && l.lock_id === lock.lock_id)
-          )
-
-          // eslint-disable-next-line no-await-in-loop
-          await item.update(
-            {
-              status: remaining_locks.length === 0 ? 'available' : 'locked',
-              locks: remaining_locks.length > 0 ? remaining_locks : null
-            },
-            { transaction }
-          )
-
-          /**
-           * 记录解锁事件（统一入口：ItemInstanceEvent.recordEvent）
-           *
-           * 幂等键规则（确定性派生）：
-           * - 格式：timeout_release:item_{item_instance_id}:lock_{lock_id}
-           * - 确保同一个超时解锁操作重试时返回幂等结果
-           */
-          // eslint-disable-next-line no-await-in-loop
-          await ItemInstanceEvent.recordEvent(
-            {
-              item_instance_id: item.item_instance_id,
-              event_type: 'unlock',
-              operator_user_id: null,
-              operator_type: 'system',
-              status_before: 'locked',
-              status_after: remaining_locks.length === 0 ? 'available' : 'locked',
-              owner_before: item.owner_user_id,
-              owner_after: item.owner_user_id,
-              business_type: 'trade_timeout_release',
-              idempotency_key: `timeout_release:item_${item.item_instance_id}:lock_${lock.lock_id}`,
-              meta: {
-                lock_type: lock.lock_type,
-                lock_id: lock.lock_id,
-                locked_at: lock.locked_at,
-                expires_at: lock.expires_at,
-                release_reason: `trade 锁超时自动释放（${this.LOCK_TIMEOUT_MINUTES}分钟）`
-              }
-            },
-            { transaction }
-          )
-
-          released_items.push({
-            item_instance_id: item.item_instance_id,
-            owner_user_id: item.owner_user_id,
-            lock_type: lock.lock_type,
-            lock_id: lock.lock_id,
-            locked_at: lock.locked_at,
-            expires_at: lock.expires_at
-          })
-        }
-      }
+      /*
+       * TODO: 查询超时的 trade holds
+       * const expired_holds = await ItemHold.findAll({
+       *   where: {
+       *     hold_type: 'trade',
+       *     status: 'active',
+       *     expires_at: { [Op.lt]: timeout_threshold }
+       *   },
+       *   lock: transaction.LOCK.UPDATE,
+       *   transaction
+       * })
+       */
 
       await transaction.commit()
-
-      if (released_items.length > 0) {
-        logger.info('✅ 批量释放超时 trade 锁', {
-          released_count: released_items.length,
-          items: released_items
-        })
-      }
-
       return {
-        released_count: released_items.length,
-        items: released_items
+        released_count: 0,
+        items: []
       }
     } catch (error) {
       await transaction.rollback()

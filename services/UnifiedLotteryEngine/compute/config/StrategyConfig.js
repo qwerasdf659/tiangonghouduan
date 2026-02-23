@@ -799,6 +799,16 @@ class DynamicConfigLoader {
         ...PRESSURE_TIER_CONFIG,
         ...(db_config.pressure_tier || {})
       },
+      /** 活动压力策略开关（lottery_strategy_config 表 pressure.enabled） */
+      pressure: {
+        enabled: true, // 默认开启，保持现有行为
+        ...(db_config.pressure || {})
+      },
+      /** BxPx 矩阵策略开关（lottery_strategy_config 表 matrix.enabled） */
+      matrix: {
+        enabled: true, // 默认开启，保持现有行为
+        ...(db_config.matrix || {})
+      },
       pity: {
         ...PITY_CONFIG,
         ...(db_config.pity || {})

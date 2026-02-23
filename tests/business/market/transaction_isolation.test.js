@@ -23,7 +23,7 @@
 
 'use strict'
 
-const { sequelize, ItemInstance, User } = require('../../../models')
+const { sequelize, Item, User } = require('../../../models')
 const {
   createIsolatedTestContext,
   withTransactionRollback,
@@ -84,9 +84,9 @@ describe('🔬 事务隔离测试（Transaction Isolation）', () => {
       const transaction = txManager.getTransaction()
 
       // 在事务内创建测试物品
-      const testItem = await ItemInstance.create(
+      const testItem = await Item.create(
         {
-          owner_user_id: testUser.user_id,
+          owner_account_id: testUser.user_id,
           item_template_id: null,
           item_type: 'tradable_item',
           status: 'available',
@@ -99,13 +99,13 @@ describe('🔬 事务隔离测试（Transaction Isolation）', () => {
       )
 
       // 验证在事务内可以查到数据
-      const foundInTx = await ItemInstance.findByPk(testItem.item_instance_id, { transaction })
+      const foundInTx = await Item.findByPk(testItem.item_id, { transaction })
       expect(foundInTx).not.toBeNull()
       // 使用 == 比较，因为 Sequelize 可能返回字符串类型的 ID
-      expect(String(foundInTx.item_instance_id)).toBe(String(testItem.item_instance_id))
+      expect(String(foundInTx.item_id)).toBe(String(testItem.item_id))
 
       // 保存ID用于后续验证
-      const createdId = testItem.item_instance_id
+      const createdId = testItem.item_id
 
       /*
        * 事务回滚在 afterEach 中自动执行
@@ -133,9 +133,9 @@ describe('🔬 事务隔离测试（Transaction Isolation）', () => {
       await withTransactionRollback(
         async transaction => {
           // 在事务内创建测试物品
-          const testItem = await ItemInstance.create(
+          const testItem = await Item.create(
             {
-              owner_user_id: testUser.user_id,
+              owner_account_id: testUser.user_id,
               item_template_id: null,
               item_type: 'tradable_item',
               status: 'available',
@@ -147,17 +147,17 @@ describe('🔬 事务隔离测试（Transaction Isolation）', () => {
             { transaction }
           )
 
-          createdItemId = testItem.item_instance_id
+          createdItemId = testItem.item_id
 
           // 在事务内验证数据存在
-          const found = await ItemInstance.findByPk(createdItemId, { transaction })
+          const found = await Item.findByPk(createdItemId, { transaction })
           expect(found).not.toBeNull()
         },
         { verbose: true, description: 'withTransactionRollback测试' }
       )
 
       // 事务回滚后，数据应该不存在
-      const foundAfterRollback = await ItemInstance.findByPk(createdItemId)
+      const foundAfterRollback = await Item.findByPk(createdItemId)
       expect(foundAfterRollback).toBeNull()
       console.log(`✅ 验证通过：物品 ID=${createdItemId} 在回滚后不存在`)
     })
@@ -167,9 +167,9 @@ describe('🔬 事务隔离测试（Transaction Isolation）', () => {
 
       try {
         await withTransactionRollback(async transaction => {
-          const testItem = await ItemInstance.create(
+          const testItem = await Item.create(
             {
-              owner_user_id: testUser.user_id,
+              owner_account_id: testUser.user_id,
               item_template_id: null,
               item_type: 'tradable_item',
               status: 'available',
@@ -178,7 +178,7 @@ describe('🔬 事务隔离测试（Transaction Isolation）', () => {
             { transaction }
           )
 
-          createdItemId = testItem.item_instance_id
+          createdItemId = testItem.item_id
 
           // 故意抛出错误
           throw new Error('测试用错误')
@@ -189,7 +189,7 @@ describe('🔬 事务隔离测试（Transaction Isolation）', () => {
 
       // 验证回滚成功
       if (createdItemId) {
-        const found = await ItemInstance.findByPk(createdItemId)
+        const found = await Item.findByPk(createdItemId)
         expect(found).toBeNull()
         console.log(`✅ 验证通过：错误发生后事务正确回滚`)
       }
@@ -209,9 +209,9 @@ describe('🔬 事务隔离测试（Transaction Isolation）', () => {
 
       try {
         // 在事务内创建数据
-        const testItem = await ItemInstance.create(
+        const testItem = await Item.create(
           {
-            owner_user_id: testUser.user_id,
+            owner_account_id: testUser.user_id,
             item_template_id: null,
             item_type: 'tradable_item',
             status: 'available',
@@ -220,7 +220,7 @@ describe('🔬 事务隔离测试（Transaction Isolation）', () => {
           { transaction: testContext.transaction }
         )
 
-        createdItemId = testItem.item_instance_id
+        createdItemId = testItem.item_id
 
         // 验证上下文状态
         expect(testContext.isActive).toBe(true)
@@ -232,7 +232,7 @@ describe('🔬 事务隔离测试（Transaction Isolation）', () => {
 
       // 验证数据已回滚
       if (createdItemId) {
-        const found = await ItemInstance.findByPk(createdItemId)
+        const found = await Item.findByPk(createdItemId)
         expect(found).toBeNull()
         console.log(`✅ 验证通过：手动回滚成功`)
       }
@@ -246,9 +246,9 @@ describe('🔬 事务隔离测试（Transaction Isolation）', () => {
         async transaction => {
           const [item1, item2] = await batchCreateInTransaction(transaction, [
             tx =>
-              ItemInstance.create(
+              Item.create(
                 {
-                  owner_user_id: testUser.user_id,
+                  owner_account_id: testUser.user_id,
                   item_template_id: null,
                   item_type: 'tradable_item',
                   status: 'available',
@@ -257,9 +257,9 @@ describe('🔬 事务隔离测试（Transaction Isolation）', () => {
                 { transaction: tx }
               ),
             tx =>
-              ItemInstance.create(
+              Item.create(
                 {
-                  owner_user_id: testUser.user_id,
+                  owner_account_id: testUser.user_id,
                   item_template_id: null,
                   item_type: 'tradable_item',
                   status: 'available',
@@ -271,11 +271,9 @@ describe('🔬 事务隔离测试（Transaction Isolation）', () => {
 
           expect(item1).toBeDefined()
           expect(item2).toBeDefined()
-          expect(item1.item_instance_id).not.toBe(item2.item_instance_id)
+          expect(item1.item_id).not.toBe(item2.item_id)
 
-          console.log(
-            `✅ 批量创建成功：ID1=${item1.item_instance_id}, ID2=${item2.item_instance_id}`
-          )
+          console.log(`✅ 批量创建成功：ID1=${item1.item_id}, ID2=${item2.item_id}`)
         },
         { description: '批量创建测试' }
       )
@@ -285,9 +283,9 @@ describe('🔬 事务隔离测试（Transaction Isolation）', () => {
       await withTransactionRollback(
         async transaction => {
           // 创建测试数据
-          const testItem = await ItemInstance.create(
+          const testItem = await Item.create(
             {
-              owner_user_id: testUser.user_id,
+              owner_account_id: testUser.user_id,
               item_template_id: null,
               item_type: 'tradable_item',
               status: 'available',
@@ -300,14 +298,14 @@ describe('🔬 事务隔离测试（Transaction Isolation）', () => {
           const allValid = await validateInTransaction(transaction, [
             // 验证1：物品存在
             async tx => {
-              const found = await ItemInstance.findByPk(testItem.item_instance_id, {
+              const found = await Item.findByPk(testItem.item_id, {
                 transaction: tx
               })
               return found !== null
             },
             // 验证2：状态正确
             async tx => {
-              const found = await ItemInstance.findByPk(testItem.item_instance_id, {
+              const found = await Item.findByPk(testItem.item_id, {
                 transaction: tx
               })
               return found.status === 'available'
@@ -331,9 +329,9 @@ describe('🔬 事务隔离测试（Transaction Isolation）', () => {
 
       try {
         // 在事务1中创建数据
-        const item1 = await ItemInstance.create(
+        const item1 = await Item.create(
           {
-            owner_user_id: testUser.user_id,
+            owner_account_id: testUser.user_id,
             item_template_id: null,
             item_type: 'tradable_item',
             status: 'available',
@@ -343,7 +341,7 @@ describe('🔬 事务隔离测试（Transaction Isolation）', () => {
         )
 
         // 在事务2中尝试查找事务1的数据（应该查不到，因为事务1未提交）
-        const foundInTx2 = await ItemInstance.findByPk(item1.item_instance_id, {
+        const foundInTx2 = await Item.findByPk(item1.item_id, {
           transaction: context2.transaction
         })
 

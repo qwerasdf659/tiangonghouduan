@@ -335,6 +335,17 @@ class AssetConversionService {
       }
     }
 
+    // 获取双录所需的系统账户
+    const burnAccount = await BalanceService.getOrCreateAccount(
+      { system_code: 'SYSTEM_BURN' },
+      { transaction }
+    )
+    const mintAccount = await BalanceService.getOrCreateAccount(
+      { system_code: 'SYSTEM_MINT' },
+      { transaction }
+    )
+    const userAccount = await BalanceService.getOrCreateAccount({ user_id }, { transaction })
+
     /*
      * 步骤1：扣减源材料（使用统一账本 BalanceService）
      * business_type: material_convert_debit
@@ -344,9 +355,10 @@ class AssetConversionService {
       {
         user_id,
         asset_code: from_asset_code,
-        delta_amount: -from_amount, // 负数表示扣减
-        idempotency_key: `${idempotency_key}:debit`, // 幂等键：派生键（扣减）
-        business_type: 'material_convert_debit', // 业务类型：材料转换扣减
+        delta_amount: -from_amount,
+        idempotency_key: `${idempotency_key}:debit`,
+        business_type: 'material_convert_debit',
+        counterpart_account_id: burnAccount.account_id,
         meta: {
           ...meta,
           step: 'debit',
@@ -359,16 +371,16 @@ class AssetConversionService {
     /*
      * 步骤2：增加目标资产（使用统一账本 BalanceService）
      * business_type: material_convert_credit
-     * 注意：入账金额为 net_to_amount（已扣除手续费）
      */
     // eslint-disable-next-line no-restricted-syntax -- transaction 已正确传递
     const to_result = await BalanceService.changeBalance(
       {
         user_id,
         asset_code: to_asset_code,
-        delta_amount: net_to_amount, // 正数表示增加（已扣除手续费）
-        idempotency_key: `${idempotency_key}:credit`, // 幂等键：派生键（入账）
-        business_type: 'material_convert_credit', // 业务类型：材料转换入账
+        delta_amount: net_to_amount,
+        idempotency_key: `${idempotency_key}:credit`,
+        business_type: 'material_convert_credit',
+        counterpart_account_id: mintAccount.account_id,
         meta: {
           ...meta,
           step: 'credit',
@@ -381,23 +393,23 @@ class AssetConversionService {
     /*
      * 步骤3：系统手续费入账（如有配置）
      * business_type: material_convert_fee
-     * 入账到 SYSTEM_PLATFORM_FEE 系统账户
      */
     let fee_result = null
     if (fee_amount > 0) {
       // eslint-disable-next-line no-restricted-syntax -- transaction 已正确传递
       fee_result = await BalanceService.changeBalance(
         {
-          system_code: 'SYSTEM_PLATFORM_FEE', // 系统账户
+          system_code: 'SYSTEM_PLATFORM_FEE',
           asset_code: fee_asset_code,
-          delta_amount: fee_amount, // 正数表示增加
-          idempotency_key: `${idempotency_key}:fee`, // 幂等键：派生键（手续费）
-          business_type: 'material_convert_fee', // 业务类型：材料转换手续费
+          delta_amount: fee_amount,
+          idempotency_key: `${idempotency_key}:fee`,
+          business_type: 'material_convert_fee',
+          counterpart_account_id: userAccount.account_id,
           meta: {
             ...meta,
             step: 'fee',
             title: `${title}（手续费入账）`,
-            payer_user_id: user_id // 记录支付手续费的用户
+            payer_user_id: user_id
           }
         },
         { transaction }

@@ -571,7 +571,8 @@ router.post(
 
     // 🔌 WebSocket推送：通知所有在线用户商品已创建（2026-02-15 新增）
     try {
-      const ChatWebSocketService = require('../../../services/ChatWebSocketService')
+      /** 通过 ServiceManager 获取 ChatWebSocketService（不直接 require） */
+      const ChatWebSocketService = req.app.locals.services.getService('chat_web_socket')
       ChatWebSocketService.broadcastProductUpdated({
         action: 'created',
         exchange_item_id: transactionResult.item?.exchange_item_id,
@@ -803,9 +804,9 @@ router.delete(
         deleted_image_resource_id: result.deleted_image_resource_id
       })
 
-      // 🔌 WebSocket推送：通知所有在线用户商品已删除/下架（2026-02-15 新增）
+      /* WebSocket推送：通知所有在线用户商品已删除/下架（通过 ServiceManager 获取） */
       try {
-        const ChatWebSocketService = require('../../../services/ChatWebSocketService')
+        const ChatWebSocketService = req.app.locals.services.getService('chat_web_socket')
         ChatWebSocketService.broadcastProductUpdated({
           action: result.action === 'deactivated' ? 'status_changed' : 'deleted',
           exchange_item_id: itemId,

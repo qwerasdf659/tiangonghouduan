@@ -470,7 +470,7 @@ function registerLotteryManagementComponents() {
             `${API_PREFIX}/console/segment-rules`, {}, { showLoading: false }
           )
           const data = response?.success ? response.data : response
-          this.segmentRuleVersions = data?.versions || data || []
+          this.segmentRuleVersions = data?.configs || data?.versions || data || []
           // 加载字段注册表
           const regResponse = await this.apiGet(
             `${API_PREFIX}/console/segment-rules/field-registry`, {}, { showLoading: false }

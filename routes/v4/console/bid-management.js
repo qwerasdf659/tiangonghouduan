@@ -347,9 +347,9 @@ router.post(
         return await BidService.settleBidProduct(bidProductId, { transaction })
       })
 
-      // 🔔 事务提交后，异步发送结算通知（fire-and-forget）
+      /* 事务提交后，异步发送结算通知（通过 ServiceManager 获取，fire-and-forget） */
       if (result.status === 'settled') {
-        const NotificationService = require('../../../services/NotificationService')
+        const NotificationService = req.app.locals.services.getService('notification')
 
         // 中标通知
         NotificationService.notifyBidWon(result.winner_user_id, {

@@ -49,10 +49,10 @@ router.get('/:userId/summary', async (req, res) => {
     const UserContextService = req.app.locals.services.getService('cs_user_context')
     const result = await UserContextService.getSummary(models, userId)
 
-    res.apiSuccess(result, '获取用户画像摘要成功')
+    return res.apiSuccess(result, '获取用户画像摘要成功')
   } catch (error) {
     logger.error('获取用户画像摘要失败:', error)
-    res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
   }
 })
 
@@ -74,10 +74,10 @@ router.get('/:userId/assets', async (req, res) => {
     const UserContextService = req.app.locals.services.getService('cs_user_context')
     const result = await UserContextService.getAssets(models, userId, req.query)
 
-    res.apiSuccess(result, '获取用户资产信息成功')
+    return res.apiSuccess(result, '获取用户资产信息成功')
   } catch (error) {
     logger.error('获取用户资产信息失败:', error)
-    res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
   }
 })
 
@@ -100,10 +100,10 @@ router.get('/:userId/backpack', async (req, res) => {
     const UserContextService = req.app.locals.services.getService('cs_user_context')
     const result = await UserContextService.getBackpack(models, userId, req.query)
 
-    res.apiSuccess(result, '获取用户背包信息成功')
+    return res.apiSuccess(result, '获取用户背包信息成功')
   } catch (error) {
     logger.error('获取用户背包信息失败:', error)
-    res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
   }
 })
 
@@ -127,10 +127,10 @@ router.get('/:userId/lottery', async (req, res) => {
     const UserContextService = req.app.locals.services.getService('cs_user_context')
     const result = await UserContextService.getLottery(models, userId, req.query)
 
-    res.apiSuccess(result, '获取用户抽奖记录成功')
+    return res.apiSuccess(result, '获取用户抽奖记录成功')
   } catch (error) {
     logger.error('获取用户抽奖记录失败:', error)
-    res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
   }
 })
 
@@ -154,10 +154,10 @@ router.get('/:userId/trades', async (req, res) => {
     const UserContextService = req.app.locals.services.getService('cs_user_context')
     const result = await UserContextService.getTrades(models, userId, req.query)
 
-    res.apiSuccess(result, '获取用户交易信息成功')
+    return res.apiSuccess(result, '获取用户交易信息成功')
   } catch (error) {
     logger.error('获取用户交易信息失败:', error)
-    res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
   }
 })
 
@@ -179,10 +179,10 @@ router.get('/:userId/timeline', async (req, res) => {
     const UserContextService = req.app.locals.services.getService('cs_user_context')
     const result = await UserContextService.getTimeline(models, userId, req.query)
 
-    res.apiSuccess(result, '获取用户时间线成功')
+    return res.apiSuccess(result, '获取用户时间线成功')
   } catch (error) {
     logger.error('获取用户时间线失败:', error)
-    res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
   }
 })
 
@@ -202,10 +202,10 @@ router.get('/:userId/risk', async (req, res) => {
     const UserContextService = req.app.locals.services.getService('cs_user_context')
     const result = await UserContextService.getRisk(models, userId)
 
-    res.apiSuccess(result, '获取用户风控信息成功')
+    return res.apiSuccess(result, '获取用户风控信息成功')
   } catch (error) {
     logger.error('获取用户风控信息失败:', error)
-    res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
   }
 })
 
@@ -227,10 +227,77 @@ router.get('/:userId/history', async (req, res) => {
     const UserContextService = req.app.locals.services.getService('cs_user_context')
     const result = await UserContextService.getHistory(models, userId, req.query)
 
-    res.apiSuccess(result, '获取用户历史会话成功')
+    return res.apiSuccess(result, '获取用户历史会话成功')
   } catch (error) {
     logger.error('获取用户历史会话失败:', error)
-    res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+  }
+})
+
+/**
+ * GET /user-context/:userId/notes - 用户内部备注列表
+ *
+ * @route GET /api/v4/console/customer-service/user-context/:userId/notes
+ * @query {number} [page=1] - 页码
+ * @query {number} [page_size=20] - 每页数量
+ */
+router.get('/:userId/notes', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId)
+    if (isNaN(userId) || userId <= 0) {
+      return res.apiError('用户ID无效', 'BAD_REQUEST', null, 400)
+    }
+
+    const models = req.app.locals.models
+    const IssueService = req.app.locals.services.getService('cs_issue')
+    const result = await IssueService.getNotes(models, {
+      user_id: userId,
+      page: req.query.page,
+      page_size: req.query.page_size
+    })
+
+    return res.apiSuccess(result, '获取用户备注成功')
+  } catch (error) {
+    logger.error('获取用户备注失败:', error)
+    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+  }
+})
+
+/**
+ * POST /user-context/:userId/notes - 添加用户内部备注
+ *
+ * @route POST /api/v4/console/customer-service/user-context/:userId/notes
+ * @body {string} content - 备注内容
+ * @body {number} [issue_id] - 关联工单ID（可选）
+ * @body {number} [session_id] - 关联会话ID（可选）
+ */
+router.post('/:userId/notes', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId)
+    if (isNaN(userId) || userId <= 0) {
+      return res.apiError('用户ID无效', 'BAD_REQUEST', null, 400)
+    }
+
+    const { content, issue_id, session_id } = req.body
+    if (!content || !content.trim()) {
+      return res.apiError('备注内容不能为空', 'BAD_REQUEST', null, 400)
+    }
+
+    const models = req.app.locals.models
+    const IssueService = req.app.locals.services.getService('cs_issue')
+
+    const result = await IssueService.addNote(models, {
+      user_id: userId,
+      issue_id: issue_id ? parseInt(issue_id) : null,
+      session_id: session_id ? parseInt(session_id) : null,
+      author_id: req.user.user_id,
+      content: content.trim()
+    })
+
+    return res.apiSuccess(result, '备注添加成功')
+  } catch (error) {
+    logger.error('添加用户备注失败:', error)
+    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
   }
 })
 
@@ -251,10 +318,10 @@ router.get('/:userId/diagnose', async (req, res) => {
     const DiagnoseService = req.app.locals.services.getService('cs_diagnose')
     const result = await DiagnoseService.diagnose(models, userId)
 
-    res.apiSuccess(result, '一键诊断完成')
+    return res.apiSuccess(result, '一键诊断完成')
   } catch (error) {
     logger.error('一键诊断失败:', error)
-    res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
   }
 })
 

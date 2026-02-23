@@ -16,6 +16,10 @@
 
 const logger = require('../utils/logger').logger
 
+/**
+ * 客服工单管理服务
+ * 工单独立于会话存在，支持跨会话跨班次跟踪问题处理进度
+ */
 class CustomerServiceIssueService {
   /**
    * 创建工单
@@ -34,8 +38,17 @@ class CustomerServiceIssueService {
    * @param {Object} [options.transaction] - 事务对象
    * @returns {Object} 创建的工单
    */
-  static async create (models, params, options = {}) {
-    const { user_id, created_by, issue_type, title, description, priority, session_id, assigned_to } = params
+  static async create(models, params, options = {}) {
+    const {
+      user_id,
+      created_by,
+      issue_type,
+      title,
+      description,
+      priority,
+      session_id,
+      assigned_to
+    } = params
 
     /* 验证用户存在 */
     const user = await models.User.findByPk(user_id, { transaction: options.transaction })
@@ -88,7 +101,7 @@ class CustomerServiceIssueService {
    * @param {number} [params.page_size] - 每页数量（默认20）
    * @returns {Object} { rows, count, page, page_size }
    */
-  static async list (models, params = {}) {
+  static async list(models, params = {}) {
     const page = parseInt(params.page) || 1
     const pageSize = Math.min(parseInt(params.page_size) || 20, 100)
     const offset = (page - 1) * pageSize
@@ -130,7 +143,7 @@ class CustomerServiceIssueService {
    * @param {number} issueId - 工单ID
    * @returns {Object} 工单详情
    */
-  static async getDetail (models, issueId) {
+  static async getDetail(models, issueId) {
     const issue = await models.CustomerServiceIssue.findByPk(issueId, {
       include: [
         { model: models.User, as: 'user', attributes: ['user_id', 'nickname', 'mobile'] },
@@ -157,7 +170,13 @@ class CustomerServiceIssueService {
     /* 查询关联此工单的所有会话 */
     const relatedSessions = await models.CustomerServiceSession.findAll({
       where: { issue_id: issueId },
-      attributes: ['customer_service_session_id', 'status', 'created_at', 'closed_at', 'satisfaction_score'],
+      attributes: [
+        'customer_service_session_id',
+        'status',
+        'created_at',
+        'closed_at',
+        'satisfaction_score'
+      ],
       order: [['created_at', 'DESC']]
     })
 
@@ -181,7 +200,7 @@ class CustomerServiceIssueService {
    * @param {Object} [options.transaction] - 事务对象
    * @returns {Object} 更新后的工单
    */
-  static async update (models, issueId, updates, options = {}) {
+  static async update(models, issueId, updates, options = {}) {
     const issue = await models.CustomerServiceIssue.findByPk(issueId, {
       transaction: options.transaction
     })
@@ -225,7 +244,7 @@ class CustomerServiceIssueService {
    * @param {Object} [options.transaction] - 事务对象
    * @returns {Object} 创建的备注
    */
-  static async addNote (models, params, options = {}) {
+  static async addNote(models, params, options = {}) {
     const note = await models.CustomerServiceNote.create(
       {
         user_id: params.user_id,
@@ -251,7 +270,7 @@ class CustomerServiceIssueService {
    * @param {number} [params.page_size] - 每页数量
    * @returns {Object} { rows, count, page, page_size }
    */
-  static async getNotes (models, params = {}) {
+  static async getNotes(models, params = {}) {
     const page = parseInt(params.page) || 1
     const pageSize = parseInt(params.page_size) || 20
     const offset = (page - 1) * pageSize
@@ -262,9 +281,7 @@ class CustomerServiceIssueService {
 
     const { count, rows } = await models.CustomerServiceNote.findAndCountAll({
       where,
-      include: [
-        { model: models.User, as: 'author', attributes: ['user_id', 'nickname'] }
-      ],
+      include: [{ model: models.User, as: 'author', attributes: ['user_id', 'nickname'] }],
       order: [['created_at', 'DESC']],
       limit: pageSize,
       offset
@@ -286,14 +303,22 @@ class CustomerServiceIssueService {
    * @param {Object} params - 查询参数
    * @returns {Object} { rows, count, page, page_size }
    */
-  static async getUserIssues (models, userId, params = {}) {
+  static async getUserIssues(models, userId, params = {}) {
     const page = parseInt(params.page) || 1
     const pageSize = parseInt(params.page_size) || 10
     const offset = (page - 1) * pageSize
 
     const { count, rows } = await models.CustomerServiceIssue.findAndCountAll({
       where: { user_id: userId },
-      attributes: ['issue_id', 'issue_type', 'priority', 'status', 'title', 'resolved_at', 'created_at'],
+      attributes: [
+        'issue_id',
+        'issue_type',
+        'priority',
+        'status',
+        'title',
+        'resolved_at',
+        'created_at'
+      ],
       order: [['created_at', 'DESC']],
       limit: pageSize,
       offset

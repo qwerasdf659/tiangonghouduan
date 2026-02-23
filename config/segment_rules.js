@@ -235,8 +235,8 @@ class SegmentResolver {
    * @example
    * const segmentKey = SegmentResolver.resolveSegment('v1', user)
    */
-  static resolveSegment(version, user) {
-    return SegmentResolver._resolveFromBuiltinRules(version, user)
+  static async resolveSegment(version, user) {
+    return SegmentResolver.resolveSegmentAsync(version, user)
   }
 
   /**
@@ -379,11 +379,11 @@ class SegmentResolver {
    * @param {Array<Object>} users - 用户对象数组
    * @returns {Map<number, string>} user_id 到 segment_key 的映射
    */
-  static batchResolveSegments(version, users) {
+  static async batchResolveSegments(version, users) {
     const result = new Map()
 
     for (const user of users) {
-      const segmentKey = SegmentResolver.resolveSegment(version, user)
+      const segmentKey = await SegmentResolver.resolveSegmentAsync(version, user)
       result.set(user.user_id, segmentKey)
     }
 
@@ -397,11 +397,11 @@ class SegmentResolver {
    * @param {Array<Object>} users - 用户对象数组
    * @returns {Object} 各分层用户数量统计
    */
-  static getSegmentDistribution(version, users) {
+  static async getSegmentDistribution(version, users) {
     const distribution = {}
 
     for (const user of users) {
-      const segmentKey = SegmentResolver.resolveSegment(version, user)
+      const segmentKey = await SegmentResolver.resolveSegmentAsync(version, user)
       distribution[segmentKey] = (distribution[segmentKey] || 0) + 1
     }
 

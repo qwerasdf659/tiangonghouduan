@@ -55,13 +55,13 @@ export const ASSET_ENDPOINTS = {
   ITEM_TEMPLATE_DELETE: `${API_PREFIX}/console/item-templates/:id`,
   ITEM_TEMPLATE_STATS: `${API_PREFIX}/console/item-templates/stats`,
 
-  // 物品实例
+  // 物品管理（三表模型：items + item_ledger + item_holds）
   ITEM_INSTANCE_LIST: `${API_PREFIX}/console/item-instances`,
-  ITEM_INSTANCE_DETAIL: `${API_PREFIX}/console/item-instances/:instance_id`,
+  ITEM_INSTANCE_DETAIL: `${API_PREFIX}/console/item-instances/:id`,
   ITEM_INSTANCE_USER: `${API_PREFIX}/console/item-instances/user/:user_id`,
-  ITEM_INSTANCE_TRANSFER: `${API_PREFIX}/console/item-instances/:instance_id/transfer`,
-  ITEM_INSTANCE_FREEZE: `${API_PREFIX}/console/item-instances/:instance_id/freeze`,
-  ITEM_INSTANCE_UNFREEZE: `${API_PREFIX}/console/item-instances/:instance_id/unfreeze`,
+  ITEM_INSTANCE_TRANSFER: `${API_PREFIX}/console/item-instances/:id/transfer`,
+  ITEM_INSTANCE_FREEZE: `${API_PREFIX}/console/item-instances/:id/freeze`,
+  ITEM_INSTANCE_UNFREEZE: `${API_PREFIX}/console/item-instances/:id/unfreeze`,
 
   // 物品全链路追踪（三表模型 2026-02-22）
   ITEM_LIFECYCLE: `${API_PREFIX}/console/item-lifecycle/:identifier/lifecycle`,
@@ -625,50 +625,50 @@ export const AssetAPI = {
   },
 
   /**
-   * 获取用户物品实例
+   * 获取指定用户的物品列表
    * @param {number} userId - 用户 ID
-   * @param {Object} params - 查询参数
+   * @param {Object} params - 查询参数（page, page_size, status, item_type）
    * @async
-   * @returns {Promise<Object>}
+   * @returns {Promise<Object>} 物品列表（分页）
    */
-  async getUserItemInstances(userId, params = {}) {
+  async getUserItems(userId, params = {}) {
     const url =
       buildURL(ASSET_ENDPOINTS.ITEM_INSTANCE_USER, { user_id: userId }) + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 
   /**
-   * 转移物品
-   * @param {string} instanceId - 实例 ID
-   * @param {Object} data - 转移数据
+   * 管理员转移物品所有权（通过 item_ledger 双录）
+   * @param {number} itemId - 物品 ID（item_id）
+   * @param {Object} data - 转移数据 { target_user_id, reason }
    * @async
-   * @returns {Promise<Object>}
+   * @returns {Promise<Object>} 转移结果
    */
-  async transferItem(instanceId, data) {
-    const url = buildURL(ASSET_ENDPOINTS.ITEM_INSTANCE_TRANSFER, { instance_id: instanceId })
+  async transferItem(itemId, data) {
+    const url = buildURL(ASSET_ENDPOINTS.ITEM_INSTANCE_TRANSFER, { id: itemId })
     return await request({ url, method: 'POST', data })
   },
 
   /**
-   * 冻结物品
-   * @param {string} instanceId - 实例 ID
-   * @param {Object} data - 冻结数据
+   * 冻结物品（添加 security 锁定到 item_holds）
+   * @param {number} itemId - 物品 ID（item_id）
+   * @param {Object} data - 冻结数据 { reason }
    * @async
-   * @returns {Promise<Object>}
+   * @returns {Promise<Object>} 冻结结果
    */
-  async freezeItem(instanceId, data) {
-    const url = buildURL(ASSET_ENDPOINTS.ITEM_INSTANCE_FREEZE, { instance_id: instanceId })
+  async freezeItem(itemId, data) {
+    const url = buildURL(ASSET_ENDPOINTS.ITEM_INSTANCE_FREEZE, { id: itemId })
     return await request({ url, method: 'POST', data })
   },
 
   /**
-   * 解冻物品
-   * @param {string} instanceId - 实例 ID
+   * 解冻物品（释放 item_holds 中的 security 锁定）
+   * @param {number} itemId - 物品 ID（item_id）
    * @async
-   * @returns {Promise<Object>}
+   * @returns {Promise<Object>} 解冻结果
    */
-  async unfreezeItem(instanceId) {
-    const url = buildURL(ASSET_ENDPOINTS.ITEM_INSTANCE_UNFREEZE, { instance_id: instanceId })
+  async unfreezeItem(itemId) {
+    const url = buildURL(ASSET_ENDPOINTS.ITEM_INSTANCE_UNFREEZE, { id: itemId })
     return await request({ url, method: 'POST' })
   }
 }

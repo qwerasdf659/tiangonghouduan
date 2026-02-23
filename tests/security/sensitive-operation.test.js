@@ -64,7 +64,7 @@ describe('P1-7.3: 敏感操作二次认证测试', () => {
       method: 'POST',
       path: '/api/v4/market/list',
       description: '市场挂牌',
-      body: { item_instance_id: 1, price_points: 100 }
+      body: { item_id: 1, price_points: 100 }
     },
     {
       method: 'POST',
@@ -208,7 +208,7 @@ describe('P1-7.3: 敏感操作二次认证测试', () => {
       const sensitiveResponse = await request(app)
         .post('/api/v4/market/list')
         .set('Authorization', `Bearer ${freshToken}`)
-        .send({ item_instance_id: 1, price_points: 100 })
+        .send({ item_id: 1, price_points: 100 })
 
       /*
        * 会话失效后的预期行为：
@@ -463,7 +463,7 @@ describe('P1-7.3: 敏感操作二次认证测试', () => {
       const noSessionResponse = await request(app)
         .post('/api/v4/market/list')
         .set('Authorization', `Bearer ${tokenNoSession}`)
-        .send({ item_instance_id: 1, price_points: 100 })
+        .send({ item_id: 1, price_points: 100 })
 
       // 记录实际响应（用于验证中间件行为）
       console.log(

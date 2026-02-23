@@ -14,7 +14,7 @@ module.exports = {
       script: 'app.js',
 
       // 运行目录
-      cwd: '/home/devbox/.cursor/worktrees/project__SSH__bja.sealos.run_ns-br0za7uc_devbox2_/srq',
+      cwd: '/home/devbox/project',
 
       // 🔧 加载.env文件
       env_file: '.env',
@@ -59,6 +59,26 @@ module.exports = {
       merge_logs: true,
 
       // 时间戳
+      time: true
+    },
+
+    {
+      name: 'daily-asset-reconciliation',
+      script: 'jobs/daily-asset-reconciliation.js',
+      cwd: '/home/devbox/project',
+      env_file: '.env',
+      exec_mode: 'fork',
+      instances: 1,
+      cron_restart: '0 2 * * *',
+      autorestart: false,
+      watch: false,
+      log_file: './logs/reconciliation.log',
+      out_file: './logs/reconciliation-out.log',
+      error_file: './logs/reconciliation-error.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss [+08:00]',
+      max_memory_restart: '256M',
+      node_args: '--max-old-space-size=256',
+      merge_logs: true,
       time: true
     }
   ]

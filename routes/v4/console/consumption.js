@@ -425,11 +425,12 @@ router.get('/qrcode/:user_id', authenticateToken, requireRoleLevel(100), async (
       const { v4: uuidv4 } = require('uuid')
       userUuid = uuidv4()
       try {
+        /** 通过模型实例更新（不直接 require sequelize.models） */
         if (typeof user.update === 'function') {
           await user.update({ user_uuid: userUuid })
         } else {
-          const { sequelize } = require('../../../config/database')
-          await sequelize.models.User.update({ user_uuid: userUuid }, { where: { user_id } })
+          const { User } = req.app.locals.models
+          await User.update({ user_uuid: userUuid }, { where: { user_id } })
         }
 
         const { BusinessCacheHelper } = require('../../../utils/BusinessCacheHelper')

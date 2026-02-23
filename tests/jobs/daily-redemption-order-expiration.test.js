@@ -163,7 +163,7 @@ describe('P3-2: DailyRedemptionOrderExpiration - 每日兑换订单过期任务'
 
       // 验证必要字段存在（主键是 redemption_order_id，非 order_id）
       expect(expiredOrder.redemption_order_id).toBeDefined()
-      expect(expiredOrder.item_instance_id).toBeDefined()
+      expect(expiredOrder.item_id).toBeDefined()
       expect(expiredOrder.code_hash).toBeDefined()
       expect(expiredOrder.status).toBe('expired')
       expect(expiredOrder.expires_at).toBeDefined()

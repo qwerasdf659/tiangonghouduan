@@ -183,7 +183,7 @@ router.get(
  *
  * @query {number} [seller_user_id] - 卖家用户ID
  * @query {string} [status] - 挂牌状态（active/withdrawn/sold/expired/cancelled）
- * @query {string} [listing_kind] - 挂牌类型（item_instance/fungible_asset）
+ * @query {string} [listing_kind] - 挂牌类型（item/fungible_asset）
  * @query {string} [asset_code] - 资产代码（fungible_asset类型）
  * @query {string} [start_date] - 开始日期
  * @query {string} [end_date] - 结束日期
@@ -350,12 +350,12 @@ router.post(
     try {
       const campaignData = req.body
 
-      // 验证必填字段（路由层基础校验，快速失败）
+      /*
+       * 验证必填字段（路由层基础校验，快速失败）
+       * campaign_code 由后端 CRUDService 自动生成，前端不传
+       */
       if (!campaignData.campaign_name) {
         return res.apiError('活动名称不能为空', 'VALIDATION_ERROR', null, 400)
-      }
-      if (!campaignData.campaign_code) {
-        return res.apiError('活动代码不能为空', 'VALIDATION_ERROR', null, 400)
       }
       if (!campaignData.campaign_type) {
         return res.apiError('活动类型不能为空', 'VALIDATION_ERROR', null, 400)

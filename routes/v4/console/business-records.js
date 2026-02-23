@@ -219,8 +219,7 @@ router.get(
       const csvRows = orders
         .map(order => {
           const redeemer = order.redeemer || {}
-          const itemInstance = order.item_instance || {}
-          const meta = itemInstance.meta || {}
+          const item = order.item || {}
 
           // 状态映射
           const statusMap = {
@@ -236,8 +235,8 @@ router.get(
             redeemer.user_id || '-',
             redeemer.nickname || '-',
             redeemer.mobile || '-',
-            itemInstance.item_type || '-',
-            meta.prize_name || meta.name || '-',
+            item.item_type || '-',
+            item.item_name || '-',
             statusMap[order.status] || order.status,
             order.created_at ? new Date(order.created_at).toLocaleString('zh-CN') : '-',
             order.expires_at ? new Date(order.expires_at).toLocaleString('zh-CN') : '-',

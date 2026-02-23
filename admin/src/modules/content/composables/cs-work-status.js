@@ -6,7 +6,8 @@
  */
 
 import { logger } from '../../../utils/logger.js'
-import { ContentAPI } from '../../../api/content.js'
+import { request, buildQueryString } from '../../../api/base.js'
+import { CONTENT_ENDPOINTS } from '../../../api/content.js'
 
 /**
  * 工作状态栏状态
@@ -79,14 +80,15 @@ export function useCsWorkStatusMethods() {
     /**
      * 加载待处理工单数（定期轮询）
      */
-    async loadPendingIssueCount() {
+    async loadPendingIssueCount () {
       try {
-        const response = await ContentAPI.getIssues({ status: 'open', page_size: 1 })
+        const url = CONTENT_ENDPOINTS.CS_ISSUE_LIST + buildQueryString({ status: 'open', page_size: 1 })
+        const response = await request({ url, method: 'GET' })
         if (response?.success) {
-          this.pendingIssueCount = response.data?.total || 0
+          this.pendingIssueCount = response.data?.count || response.data?.total || 0
         }
       } catch (error) {
-        logger.warn('加载待处理工单数失败:', error.message)
+        logger.warn('[WorkStatus] 加载待处理工单数失败:', error.message)
       }
     },
 

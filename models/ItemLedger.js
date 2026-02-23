@@ -35,6 +35,7 @@ class ItemLedger extends Model {
    * 模型关联定义
    *
    * @param {Object} models - 所有模型的映射对象
+   * @returns {void}
    */
   static associate(models) {
     // 账本条目关联物品
@@ -96,8 +97,8 @@ class ItemLedger extends Model {
 /**
  * 模型初始化
  *
- * @param {import('sequelize').Sequelize} sequelize - Sequelize 实例
- * @returns {ItemLedger} 初始化后的模型
+ * @param {Object} sequelize - Sequelize 实例
+ * @returns {Model} 初始化后的模型
  */
 module.exports = sequelize => {
   ItemLedger.init(
@@ -168,6 +169,7 @@ module.exports = sequelize => {
         type: DataTypes.JSON,
         allowNull: true,
         comment: '扩展元数据（仅存真正动态的扩展信息，如来源详情）',
+        /** @returns {Object} 解析后的元数据对象 */
         get() {
           const value = this.getDataValue('meta')
           return value || {}

@@ -49,8 +49,9 @@ const ImageService = require('./ImageService') // 通用图片上传服务（202
 
 /*
  * 🔴 广告系统服务（Phase 2-6）
- * [已合并] PopupShowLogService + CarouselShowLogService → AdInteractionLog 模型 + ad-events/interaction-log 路由
+ * [已合并] PopupShowLogService + CarouselShowLogService → AdInteractionLogService
  */
+const AdInteractionLogService = require('./AdInteractionLogService') // 统一内容交互日志服务（D2 定论：替代 PopupShowLogService + CarouselShowLogService）
 const AdSlotService = require('./AdSlotService') // Phase 3: 广告位管理服务
 const AdCampaignService = require('./AdCampaignService') // Phase 3: 广告计划管理服务
 const AdCreativeService = require('./AdCreativeService') // Phase 3: 广告素材管理服务
@@ -418,6 +419,7 @@ class ServiceManager {
       this._services.set('image', ImageService)
 
       /* ========== 广告系统服务（Phase 2-6 广告平台，popup_show_log/carousel_show_log 已合并） ========== */
+      this._services.set('ad_interaction_log', AdInteractionLogService) // 内容交互日志（静态类，弹窗/轮播/公告交互事件记录与统计）
       this._services.set('ad_slot', AdSlotService) // Phase 3: 广告位管理
       this._services.set('ad_campaign', AdCampaignService) // Phase 3: 广告计划管理
       this._services.set('ad_creative', AdCreativeService) // Phase 3: 广告素材管理
@@ -430,6 +432,7 @@ class ServiceManager {
       this._services.set('ad_attribution', AdAttributionService) // Phase 6: 归因追踪
       this._services.set('ad_report', AdReportService) // Phase 6: 多维报表
       this._services.set('ad_campaign_query', AdCampaignQueryService) // 广告活动日志查询（路由层合规治理，静态类）
+      this._services.set('ad_interaction_log', AdInteractionLogService) // 统一内容交互日志（D2 定论：替代 popup_show_log + carousel_show_log）
 
       // ========== 架构重构服务（使用 snake_case key） ==========
 
@@ -447,7 +450,7 @@ class ServiceManager {
       this._services.set('asset_balance', BalanceService) // 资产余额服务（8个方法，静态类）
       this._services.set('asset_item', ItemService) // 资产物品服务（含三表模型双录，静态类）
       this._services.set('asset_query', QueryService) // 资产查询服务（7个方法，静态类）
-      this._services.set('item_lifecycle', ItemLifecycleService) // 物品全链路追踪服务（静态类）
+      this._services.set('asset_item_lifecycle', ItemLifecycleService) // 物品全链路追踪服务（静态类）
 
       this._services.set('asset_conversion', AssetConversionService)
 

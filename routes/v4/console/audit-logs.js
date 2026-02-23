@@ -95,11 +95,29 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
 })
 
 /**
+ * GET /api/v4/console/audit-logs/operation-types
+ * @desc 获取所有支持的操作类型列表（定义在通配参数路由之前，避免被 /:merchant_log_id 拦截）
+ * @access Admin only (role_level >= 100)
+ * @returns {Object} { operation_types: Array<{code, name, key}> }
+ */
+router.get('/operation-types', authenticateToken, requireRoleLevel(100), async (req, res) => {
+  try {
+    /** 通过 ServiceManager 获取商家操作日志服务，从中获取操作类型常量 */
+    const logService = getMerchantOperationLogService(req)
+    const operationTypes = logService.getOperationTypes()
+
+    return res.apiSuccess({ operation_types: operationTypes }, '获取操作类型列表成功')
+  } catch (error) {
+    return handleServiceError(error, res, '获取操作类型列表')
+  }
+})
+
+/**
  * GET /api/v4/console/audit-logs/:merchant_log_id
  * @desc 获取商家操作审计日志详情
  * @access Admin only (role_level >= 100)
  *
- * @param {number} merchant_log_id - 审计日志ID
+ * @param {number} merchant_log_id - 审计日志ID（事务实体，数字ID）
  */
 router.get('/:merchant_log_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   const { merchant_log_id } = req.params
@@ -235,23 +253,20 @@ router.post('/cleanup', authenticateToken, requireRoleLevel(100), async (req, re
  * @access Admin only (role_level >= 100)
  */
 router.get('/operation-types', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  const {
-    MERCHANT_OPERATION_TYPES,
-    OPERATION_TYPE_DESCRIPTIONS
-  } = require('../../../models/MerchantOperationLog')
+  try {
+    /** 通过 ServiceManager 获取商家操作日志服务，从中获取操作类型常量 */
+    const logService = getMerchantOperationLogService(req)
+    const operationTypes = logService.getOperationTypes()
 
-  const operationTypes = Object.entries(MERCHANT_OPERATION_TYPES).map(([key, value]) => ({
-    code: value,
-    name: OPERATION_TYPE_DESCRIPTIONS[value] || value,
-    key
-  }))
-
-  return res.apiSuccess(
-    {
-      operation_types: operationTypes
-    },
-    '获取操作类型列表成功'
-  )
+    return res.apiSuccess(
+      {
+        operation_types: operationTypes
+      },
+      '获取操作类型列表成功'
+    )
+  } catch (error) {
+    return handleServiceError(error, res, '获取操作类型列表')
+  }
 })
 
 module.exports = router

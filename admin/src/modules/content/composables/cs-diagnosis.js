@@ -8,6 +8,7 @@
 
 import { logger } from '../../../utils/logger.js'
 import { ContentAPI } from '../../../api/content.js'
+import Alpine from 'alpinejs'
 
 /**
  * 一键诊断状态
@@ -33,7 +34,7 @@ export function useCsDiagnosisMethods() {
      */
     async runDiagnosis(userId) {
       if (!userId) {
-        this.showError('请先选择一个用户')
+        Alpine.store('notification').show('请先选择一个用户', 'error')
         return
       }
 
@@ -45,11 +46,11 @@ export function useCsDiagnosisMethods() {
           this.diagnosisResult = response.data
           logger.info('一键诊断完成', response.data)
         } else {
-          this.showError(response?.message || '诊断执行失败')
+          Alpine.store('notification').show(response?.message || '诊断执行失败', 'error')
         }
       } catch (error) {
         logger.error('一键诊断失败:', error)
-        this.showError(error.message || '诊断执行失败')
+        Alpine.store('notification').show(error.message || '诊断执行失败', 'error')
       } finally {
         this.diagnosisLoading = false
       }

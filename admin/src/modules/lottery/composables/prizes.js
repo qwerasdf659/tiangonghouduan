@@ -76,6 +76,20 @@ export function usePrizesState() {
     /** @type {number} 批量奖品概率总和 */
     batchProbabilitySum: 0,
 
+    // ========== 活动级奖品管理状态（任务11-14） ==========
+    /** @type {boolean} 奖品管理面板是否可见 */
+    prizeManagerVisible: false,
+    /** @type {Object|null} 当前管理奖品的活动对象 */
+    managingCampaign: null,
+    /** @type {Array} 按档位分组的奖品列表 */
+    campaignPrizeGroups: [],
+    /** @type {Array} 风险警告列表 */
+    campaignPrizeWarnings: [],
+    /** @type {boolean} 排序模式开关 */
+    prizeManagerSortMode: false,
+    /** @type {Array} 批量库存调整项目 */
+    batchStockItems: [],
+
     // ========== P2新增: 奖品发放统计 ==========
     /** @type {Object} 奖品发放统计汇总 */
     prizeIssuedStats: {
@@ -477,6 +491,337 @@ export function usePrizesMethods() {
       const total = this.prizeIssuedStats.total_issued
       if (total === 0) return 0
       return (((stat.issued_count || stat.count || 0) / total) * 100).toFixed(1)
+    },
+
+    // ========== 活动级奖品管理（任务11-14） ==========
+
+    /**
+     * 打开某活动的奖品管理面板
+     * 加载按档位分组的奖品数据
+     * @param {Object} campaign - 活动对象
+     */
+    async openPrizeManager(campaign) {
+      this.managingCampaign = campaign
+      this.prizeManagerVisible = true
+      this.prizeManagerSortMode = false
+      await this.loadCampaignGroupedPrizes()
+    },
+
+    /** 关闭活动奖品管理面板 */
+    closePrizeManager() {
+      this.prizeManagerVisible = false
+      this.managingCampaign = null
+      this.campaignPrizeGroups = []
+      this.campaignPrizeWarnings = []
+    },
+
+    /**
+     * 加载活动奖品分组数据（调用 grouped API）
+     * 加载完成后自动执行档位权重校验
+     */
+    async loadCampaignGroupedPrizes() {
+      if (!this.managingCampaign?.campaign_code) return
+      try {
+        const response = await this.apiGet(
+          buildURL(LOTTERY_ENDPOINTS.PRIZE_GROUPED, { code: this.managingCampaign.campaign_code }),
+          {},
+          { showLoading: false }
+        )
+        const data = response?.success ? response.data : response
+        if (data) {
+          this.campaignPrizeGroups = data.prize_groups || []
+          this.campaignPrizeWarnings = data.warnings || []
+          this.validateTierWeights()
+        }
+      } catch (error) {
+        logger.error('[Prizes] 加载活动奖品分组失败:', error)
+        this.showError('加载奖品分组失败')
+      }
+    },
+
+    /**
+     * 档位权重校验（前端侧）
+     *
+     * 业务规则：每个档位内所有激活奖品的 win_weight 之和必须等于 1,000,000（百万分制）
+     * 不合规时在 campaignPrizeWarnings 中追加警告，不阻塞操作
+     */
+    validateTierWeights() {
+      const WEIGHT_SCALE = 1000000
+      const tierLabels = { high: '高档位 (high)', mid: '中档位 (mid)', low: '低档位 (low)' }
+
+      this.campaignPrizeGroups.forEach(group => {
+        const activePrizes = (group.prizes || []).filter(p => p.status === 'active')
+        if (activePrizes.length === 0) return
+
+        const totalWeight = activePrizes.reduce((sum, p) => sum + (parseInt(p.win_weight) || 0), 0)
+        const tierName = tierLabels[group.tier] || group.tier
+
+        if (totalWeight !== WEIGHT_SCALE) {
+          const diff = totalWeight - WEIGHT_SCALE
+          const diffText = diff > 0 ? `超出 ${diff.toLocaleString()}` : `不足 ${Math.abs(diff).toLocaleString()}`
+          const warning = `⚠️ ${tierName} 权重总和 ${totalWeight.toLocaleString()} ≠ ${WEIGHT_SCALE.toLocaleString()}（${diffText}），请调整后再上线活动`
+
+          if (!this.campaignPrizeWarnings.includes(warning)) {
+            this.campaignPrizeWarnings.push(warning)
+          }
+          logger.warn('[Prizes] 权重校验不通过:', warning)
+        }
+      })
+    },
+
+    /**
+     * 在活动奖品管理面板内新增奖品
+     * campaign_code 自动锁定为当前管理的活动
+     */
+    async addPrizeToCampaign() {
+      if (!this.managingCampaign?.campaign_code) return
+      this.editingLotteryPrizeId = null
+      this.isEditMode = false
+      this.prizeForm = {
+        lottery_campaign_id: this.managingCampaign.lottery_campaign_id,
+        prize_name: '',
+        prize_type: 'virtual',
+        win_probability: 0,
+        stock_quantity: 100,
+        status: 'active',
+        image_id: null,
+        prize_description: '',
+        rarity_code: 'common',
+        win_weight: 100000,
+        reward_tier: 'low'
+      }
+      this.showModal('campaignPrizeModal')
+    },
+
+    /**
+     * 提交活动级新增奖品（使用 add-prize 端点）
+     */
+    async submitCampaignPrize() {
+      if (!this.prizeForm.prize_name) {
+        this.showError('请输入奖品名称')
+        return
+      }
+      try {
+        this.saving = true
+        if (this.isEditMode) {
+          const winProbability = (this.prizeForm.win_probability || 0) / 100
+          const url = buildURL(LOTTERY_ENDPOINTS.PRIZE_UPDATE, { prize_id: this.editingLotteryPrizeId })
+          await this.apiCall(url, {
+            method: 'PUT',
+            data: {
+              prize_name: this.prizeForm.prize_name,
+              prize_type: this.prizeForm.prize_type,
+              win_probability: winProbability,
+              stock_quantity: this.prizeForm.stock_quantity,
+              status: this.prizeForm.status,
+              prize_description: this.prizeForm.prize_description,
+              rarity_code: this.prizeForm.rarity_code || 'common',
+              win_weight: parseInt(this.prizeForm.win_weight) || 100000,
+              reward_tier: this.prizeForm.reward_tier || 'low'
+            }
+          })
+        } else {
+          await this.apiCall(
+            buildURL(LOTTERY_ENDPOINTS.PRIZE_ADD_TO_CAMPAIGN, { code: this.managingCampaign.campaign_code }),
+            {
+              method: 'POST',
+              data: {
+                prize_name: this.prizeForm.prize_name,
+                prize_type: this.prizeForm.prize_type,
+                stock_quantity: this.prizeForm.stock_quantity === -1 ? 999999 : this.prizeForm.stock_quantity,
+                prize_description: this.prizeForm.prize_description,
+                rarity_code: this.prizeForm.rarity_code || 'common',
+                win_weight: parseInt(this.prizeForm.win_weight) || 100000,
+                reward_tier: this.prizeForm.reward_tier || 'low'
+              }
+            }
+          )
+        }
+        this.showSuccess(this.isEditMode ? '奖品更新成功' : '奖品添加成功')
+        this.hideModal('campaignPrizeModal')
+        await this.loadCampaignGroupedPrizes()
+      } catch (error) {
+        this.showError('操作失败: ' + (error.message || '未知错误'))
+      } finally {
+        this.saving = false
+      }
+    },
+
+    /**
+     * 在活动奖品管理面板内编辑奖品
+     * @param {Object} prize - 奖品对象
+     */
+    editCampaignPrize(prize) {
+      this.editingLotteryPrizeId = prize.lottery_prize_id
+      this.isEditMode = true
+      this.prizeForm = {
+        lottery_campaign_id: this.managingCampaign?.lottery_campaign_id,
+        prize_name: prize.prize_name || '',
+        prize_type: prize.prize_type || 'virtual',
+        win_probability: parseFloat(prize.win_probability || 0) * 100,
+        stock_quantity: prize.stock_quantity || 100,
+        status: prize.status || 'active',
+        image_id: prize.image_id || null,
+        prize_description: prize.prize_description || '',
+        rarity_code: prize.rarity_code || 'common',
+        win_weight: prize.win_weight || 100000,
+        reward_tier: prize.reward_tier || 'low'
+      }
+      this.showModal('campaignPrizeModal')
+    },
+
+    /**
+     * 删除活动奖品（软删除）
+     * @param {Object} prize - 奖品对象
+     */
+    async deleteCampaignPrize(prize) {
+      if (prize.is_fallback) {
+        this.showError('兜底奖品不可删除')
+        return
+      }
+      await this.confirmAndExecute(
+        `确认删除奖品「${prize.prize_name}」？删除后该档位的概率分布将自动调整。`,
+        async () => {
+          await this.apiCall(
+            buildURL(LOTTERY_ENDPOINTS.PRIZE_DELETE, { prize_id: prize.lottery_prize_id }),
+            { method: 'DELETE' }
+          )
+          await this.loadCampaignGroupedPrizes()
+        },
+        { successMessage: '奖品已删除' }
+      )
+    },
+
+    /**
+     * 行内更新单个奖品库存（绝对值）
+     * @param {Object} prize - 奖品对象
+     * @param {number} newStock - 新库存值
+     */
+    async updateInlineStock(prize, newStock) {
+      const stockValue = parseInt(newStock)
+      if (isNaN(stockValue) || stockValue < 0) {
+        this.showError('请输入有效的库存值')
+        return
+      }
+      try {
+        await this.apiCall(
+          buildURL(LOTTERY_ENDPOINTS.PRIZE_SET_STOCK, { prize_id: prize.lottery_prize_id }),
+          { method: 'PUT', data: { stock_quantity: stockValue } }
+        )
+        prize.stock_quantity = stockValue
+        if (stockValue === 0 && prize.win_weight > 0) {
+          this.showSuccess('库存已更新 ⚠️ 注意：库存为0但权重>0，算法选中后将触发降级')
+        } else {
+          this.showSuccess('库存已更新')
+        }
+      } catch (error) {
+        this.showError('库存更新失败: ' + (error.message || '未知错误'))
+      }
+    },
+
+    /** 快捷调整库存（增量） */
+    async quickAdjustStock(prize, delta) {
+      const newStock = Math.max(0, (prize.stock_quantity || 0) + delta)
+      await this.updateInlineStock(prize, newStock)
+    },
+
+    /** 设为无限库存 */
+    async setInfiniteStock(prize) {
+      await this.updateInlineStock(prize, 999999)
+    },
+
+    /** 清零库存 */
+    async clearStock(prize) {
+      await this.updateInlineStock(prize, 0)
+    },
+
+    /**
+     * 批量更新奖品排序
+     * @param {Array} prizeOrders - [{ lottery_prize_id, sort_order }, ...]
+     */
+    async savePrizeSortOrder(prizeOrders) {
+      if (!this.managingCampaign?.campaign_code || !prizeOrders?.length) return
+      try {
+        await this.apiCall(
+          buildURL(LOTTERY_ENDPOINTS.PRIZE_SORT_ORDER, { code: this.managingCampaign.campaign_code }),
+          { method: 'PUT', data: { updates: prizeOrders } }
+        )
+        this.showSuccess('排序已保存')
+        await this.loadCampaignGroupedPrizes()
+      } catch (error) {
+        this.showError('排序保存失败: ' + (error.message || '未知错误'))
+      }
+    },
+
+    /** 同档位内上移奖品 */
+    async movePrizeUp(group, prizeIndex) {
+      if (prizeIndex <= 0) return
+      const prizes = group.prizes
+      const updates = [
+        { lottery_prize_id: prizes[prizeIndex].lottery_prize_id, sort_order: prizes[prizeIndex - 1].sort_order },
+        { lottery_prize_id: prizes[prizeIndex - 1].lottery_prize_id, sort_order: prizes[prizeIndex].sort_order }
+      ]
+      await this.savePrizeSortOrder(updates)
+    },
+
+    /** 同档位内下移奖品 */
+    async movePrizeDown(group, prizeIndex) {
+      if (prizeIndex >= group.prizes.length - 1) return
+      const prizes = group.prizes
+      const updates = [
+        { lottery_prize_id: prizes[prizeIndex].lottery_prize_id, sort_order: prizes[prizeIndex + 1].sort_order },
+        { lottery_prize_id: prizes[prizeIndex + 1].lottery_prize_id, sort_order: prizes[prizeIndex].sort_order }
+      ]
+      await this.savePrizeSortOrder(updates)
+    },
+
+    /** 打开批量调库存弹窗 */
+    openBatchStockModal() {
+      this.batchStockItems = []
+      this.campaignPrizeGroups.forEach(group => {
+        group.prizes.forEach(prize => {
+          this.batchStockItems.push({
+            lottery_prize_id: prize.lottery_prize_id,
+            prize_name: prize.prize_name,
+            reward_tier: prize.reward_tier,
+            current_stock: prize.stock_quantity,
+            new_stock: prize.stock_quantity,
+            selected: false
+          })
+        })
+      })
+      this.showModal('batchStockModal')
+    },
+
+    /** 提交批量库存更新 */
+    async submitBatchStock() {
+      const selectedItems = this.batchStockItems.filter(item => item.selected && item.new_stock !== item.current_stock)
+      if (selectedItems.length === 0) {
+        this.showError('请勾选并修改至少一个奖品的库存')
+        return
+      }
+      try {
+        this.saving = true
+        await this.apiCall(
+          buildURL(LOTTERY_ENDPOINTS.PRIZE_BATCH_STOCK, { code: this.managingCampaign.campaign_code }),
+          {
+            method: 'PUT',
+            data: {
+              updates: selectedItems.map(item => ({
+                lottery_prize_id: item.lottery_prize_id,
+                stock_quantity: parseInt(item.new_stock)
+              }))
+            }
+          }
+        )
+        this.showSuccess(`已更新 ${selectedItems.length} 个奖品的库存`)
+        this.hideModal('batchStockModal')
+        await this.loadCampaignGroupedPrizes()
+      } catch (error) {
+        this.showError('批量更新失败: ' + (error.message || '未知错误'))
+      } finally {
+        this.saving = false
+      }
     },
 
     // ========== 批量添加奖品方法 ==========

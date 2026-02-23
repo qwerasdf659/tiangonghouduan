@@ -790,19 +790,6 @@ module.exports = sequelize => {
       // ======================== 预设欠账控制字段（统一架构V1.6） ========================
 
       /**
-       * [已废弃] 原 fallback 模式专用兜底奖品ID
-       * @type {number}
-       * @deprecated fallback 选奖模式已废弃（2026-02-22），功能被 tier_fallback_lottery_prize_id + is_fallback 替代
-       * @外键关联 lottery_prizes.lottery_prize_id
-       */
-      fallback_lottery_prize_id: {
-        type: DataTypes.INTEGER,
-        allowNull: true,
-        defaultValue: null,
-        comment: '[已废弃] 原 fallback 模式专用字段，功能已被 tier_fallback_lottery_prize_id + is_fallback 替代'
-      },
-
-      /**
        * 预设是否允许欠账
        * @type {boolean}
        * @业务含义 核心开关：TRUE-允许欠账发放，FALSE-资源不足直接失败

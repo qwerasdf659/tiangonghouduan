@@ -204,9 +204,10 @@ router.post(
         bid_amount: amount
       })
 
-      // 🔔 事务提交后，异步发送被超越通知（fire-and-forget，不阻塞响应）
+      /* 事务提交后，异步发送被超越通知（fire-and-forget，不阻塞响应） */
       if (result._outbid_info) {
-        const NotificationService = require('../../../services/NotificationService')
+        /** 通过 ServiceManager 获取 NotificationService（不直接 require） */
+        const NotificationService = req.app.locals.services.getService('notification')
         const BidQueryService = req.app.locals.services.getService('exchange_bid_query')
 
         // 查询商品名称用于通知内容

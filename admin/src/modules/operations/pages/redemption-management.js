@@ -498,9 +498,8 @@ function redemptionManagementPage() {
      * @returns {string} 奖品名称
      */
     getPrizeName(order) {
-      if (order.item_instance) {
-        const meta = order.item_instance.meta || {}
-        return meta.prize_name || order.item_instance.item_type || '--'
+      if (order.item) {
+        return order.item.item_name || order.item.item_type || '--'
       }
       return order.prize_name || '--'
     },
@@ -538,8 +537,8 @@ function redemptionManagementPage() {
      * @returns {string} 类型标签
      */
     getPrizeType(order) {
-      if (order.item_instance) {
-        const type = order.item_instance.item_type
+      if (order.item) {
+        const type = order.item.item_type
         if (type === 'product') return '实物'
         if (type === 'voucher') return '优惠券'
         return type || '--'
@@ -553,8 +552,8 @@ function redemptionManagementPage() {
      * @returns {string} CSS 类名
      */
     getPrizeTypeClass(order) {
-      if (order.item_instance) {
-        const type = order.item_instance.item_type
+      if (order.item) {
+        const type = order.item.item_type
         if (type === 'product') return 'bg-purple-100 text-purple-700'
         if (type === 'voucher') return 'bg-blue-100 text-blue-700'
       }

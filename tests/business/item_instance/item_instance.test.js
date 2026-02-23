@@ -10,9 +10,9 @@
  * 4. 物品实例事件记录
  *
  * 相关模型：
- * - ItemInstance: 物品实例主表
+ * - Item: 物品实例主表
  * - ItemTemplate: 物品模板
- * - ItemInstanceEvent: 物品事件日志
+ * - ItemLedger: 物品事件日志
  *
  * 相关服务：
  * - BackpackService: 背包服务
@@ -22,13 +22,7 @@
  * P2优先级：物品系统模块
  */
 
-const {
-  sequelize,
-  ItemInstance,
-  ItemTemplate,
-  ItemInstanceEvent,
-  User
-} = require('../../../models')
+const { sequelize, Item, ItemTemplate, ItemLedger, User, Account } = require('../../../models')
 const {
   initializeTestServiceManager,
   getTestService,
@@ -36,8 +30,13 @@ const {
 } = require('../../helpers/UnifiedTestManager')
 const { TEST_DATA } = require('../../helpers/test-data')
 
+// SYSTEM_MINT(id=2) 和 SYSTEM_BURN(id=3) 是系统账户
+const SYSTEM_MINT_ACCOUNT_ID = 2
+const SYSTEM_BURN_ACCOUNT_ID = 3
+
 // 测试数据
 let test_user_id = null
+let test_account_id = null
 let test_item_template = null
 let test_item_instance = null
 
@@ -61,13 +60,21 @@ describe('物品实例测试 - P2优先级', () => {
 
     test_user_id = test_user.user_id
 
-    // 3. 获取或创建测试用的物品模板
+    // 3. 获取测试用户的 account_id（三表模型使用 account_id 而非 user_id）
+    const test_account = await Account.findOne({
+      where: { user_id: test_user_id, account_type: 'user' }
+    })
+    if (!test_account) {
+      throw new Error(`测试用户的 Account 不存在：user_id=${test_user_id}`)
+    }
+    test_account_id = test_account.account_id
+
+    // 4. 获取或创建测试用的物品模板
     test_item_template = await ItemTemplate.findOne({
       where: { is_enabled: true }
     })
 
     if (!test_item_template) {
-      // 如果没有启用的模板，创建一个测试模板
       test_item_template = await ItemTemplate.create({
         template_code: `TEST_ITEM_TPL_${Date.now()}`,
         item_type: 'collectible',
@@ -80,66 +87,90 @@ describe('物品实例测试 - P2优先级', () => {
     }
 
     console.log(
-      `✅ 测试准备完成: user_id=${test_user_id}, template_id=${test_item_template.item_template_id}`
+      `✅ 测试准备完成: user_id=${test_user_id}, account_id=${test_account_id}, template_id=${test_item_template.item_template_id}`
     )
   }, 60000)
 
   // ===== 测试用例1：物品实例创建 =====
   describe('物品实例创建', () => {
     test('应该成功创建物品实例', async () => {
-      // 创建物品实例
-      test_item_instance = await ItemInstance.create({
-        item_template_id: test_item_template.item_template_id,
-        owner_user_id: test_user_id,
+      const now = new Date()
+      const yy = String(now.getFullYear()).slice(2)
+      const mm = String(now.getMonth() + 1).padStart(2, '0')
+      const dd = String(now.getDate()).padStart(2, '0')
+      const trackingCode = `TS${yy}${mm}${dd}${String(Date.now()).slice(-6)}`
+
+      test_item_instance = await Item.create({
+        tracking_code: trackingCode,
+        owner_account_id: test_account_id,
         item_type: 'voucher',
+        item_name: '测试物品实例',
+        item_value: 100,
         status: 'available',
-        acquisition_method: 'test',
-        acquisition_source_type: 'system',
-        acquisition_source_id: 'test_script'
+        source: 'test',
+        source_ref_id: 'test_script',
+        prize_definition_id: null
       })
 
       expect(test_item_instance).toBeDefined()
-      expect(test_item_instance.item_instance_id).toBeDefined()
-      expect(test_item_instance.owner_user_id).toBe(test_user_id)
+      expect(test_item_instance.item_id).toBeDefined()
+      expect(test_item_instance.owner_account_id).toBe(test_account_id)
       expect(test_item_instance.status).toBe('available')
+      expect(test_item_instance.tracking_code).toBe(trackingCode)
 
-      // 记录创建事件（符合模型要求：idempotency_key 必填）
-      await ItemInstanceEvent.create({
-        item_instance_id: test_item_instance.item_instance_id,
-        event_type: 'mint',
-        operator_type: 'system',
-        operator_user_id: null,
-        idempotency_key: `test_create_${test_item_instance.item_instance_id}_${Date.now()}`,
-        business_type: 'test',
-        meta: { method: 'test', source: 'unit_test' }
-      })
+      // 双录记账：SYSTEM_MINT(-1) + 用户(+1)
+      const idempKey = `test_mint_${test_item_instance.item_id}_${Date.now()}`
+      await ItemLedger.bulkCreate([
+        {
+          item_id: test_item_instance.item_id,
+          account_id: SYSTEM_MINT_ACCOUNT_ID,
+          delta: -1,
+          counterpart_id: test_account_id,
+          event_type: 'mint',
+          operator_type: 'system',
+          business_type: 'test',
+          idempotency_key: `${idempKey}_out`,
+          meta: { source: 'unit_test' }
+        },
+        {
+          item_id: test_item_instance.item_id,
+          account_id: test_account_id,
+          delta: 1,
+          counterpart_id: SYSTEM_MINT_ACCOUNT_ID,
+          event_type: 'mint',
+          operator_type: 'system',
+          business_type: 'test',
+          idempotency_key: `${idempKey}_in`,
+          meta: { source: 'unit_test' }
+        }
+      ])
     })
 
     test('应该验证必填字段', async () => {
       // 缺少必填字段应该失败
       await expect(
-        ItemInstance.create({
-          // 缺少 item_template_id 和 owner_user_id
+        Item.create({
+          // 缺少 item_template_id 和 owner_account_id
           status: 'available'
         })
       ).rejects.toThrow()
     })
 
     test('应该使用正确的关联别名', async () => {
-      // 验证模型关联别名是 itemTemplate 而不是 template
-      const instance = await ItemInstance.findOne({
-        where: { owner_user_id: test_user_id },
+      // 验证 Item 模型关联：ownerAccount / ledgerEntries / holds
+      const instance = await Item.findOne({
+        where: { owner_account_id: test_account_id },
         include: [
           {
-            model: ItemTemplate,
-            as: 'itemTemplate'
+            model: Account,
+            as: 'ownerAccount'
           }
         ]
       })
 
-      // 应该能正确加载关联
       if (instance) {
-        expect(instance.itemTemplate || instance.item_template_id).toBeDefined()
+        expect(instance.ownerAccount).toBeDefined()
+        expect(instance.ownerAccount.account_id).toBe(test_account_id)
       }
     })
   })
@@ -147,35 +178,27 @@ describe('物品实例测试 - P2优先级', () => {
   // ===== 测试用例2：物品实例查询 =====
   describe('物品实例查询', () => {
     test('应该按用户查询物品实例', async () => {
-      const instances = await ItemInstance.findAll({
-        where: { owner_user_id: test_user_id },
-        include: [
-          {
-            model: ItemTemplate,
-            as: 'itemTemplate' // 使用正确的关联别名
-          }
-        ]
+      const instances = await Item.findAll({
+        where: { owner_account_id: test_account_id }
       })
 
       expect(Array.isArray(instances)).toBe(true)
-      // 用户可能有或没有物品
       expect(instances.length).toBeGreaterThanOrEqual(0)
 
-      // 验证关联数据
+      // 验证查询结果中包含测试创建的物品
       if (instances.length > 0 && test_item_instance) {
-        const instance = instances.find(
-          i => i.item_instance_id === test_item_instance.item_instance_id
-        )
-        if (instance && instance.itemTemplate) {
-          expect(instance.itemTemplate.item_template_id).toBe(test_item_template.item_template_id)
+        const instance = instances.find(i => i.item_id === test_item_instance.item_id)
+        if (instance) {
+          expect(instance.item_name).toBe('测试物品实例')
+          expect(instance.source).toBe('test')
         }
       }
     })
 
     test('应该按状态筛选物品实例', async () => {
-      const availableInstances = await ItemInstance.findAll({
+      const availableInstances = await Item.findAll({
         where: {
-          owner_user_id: test_user_id,
+          owner_account_id: test_account_id,
           status: 'available'
         }
       })
@@ -188,8 +211,8 @@ describe('物品实例测试 - P2优先级', () => {
     })
 
     test('应该返回空数组对于不存在的用户', async () => {
-      const instances = await ItemInstance.findAll({
-        where: { owner_user_id: 999999999 }
+      const instances = await Item.findAll({
+        where: { owner_account_id: 999999999 }
       })
 
       expect(Array.isArray(instances)).toBe(true)
@@ -215,18 +238,7 @@ describe('物品实例测试 - P2优先级', () => {
 
       expect(test_item_instance.status).toBe('used')
 
-      // 记录使用事件（符合模型要求）
-      await ItemInstanceEvent.create({
-        item_instance_id: test_item_instance.item_instance_id,
-        event_type: 'use',
-        operator_type: 'user',
-        operator_user_id: test_user_id,
-        status_before: 'available',
-        status_after: 'used',
-        idempotency_key: `test_use_${test_item_instance.item_instance_id}_${Date.now()}`,
-        business_type: 'test',
-        meta: { reason: 'unit_test_use' }
-      })
+      // 状态变更不需要额外写 ledger（使用操作已在事件日志测试中覆盖）
     })
 
     test('应该记录状态变更事件', async () => {
@@ -235,8 +247,8 @@ describe('物品实例测试 - P2优先级', () => {
         return
       }
 
-      const events = await ItemInstanceEvent.findAll({
-        where: { item_instance_id: test_item_instance.item_instance_id },
+      const events = await ItemLedger.findAll({
+        where: { item_id: test_item_instance.item_id },
         order: [['created_at', 'DESC']]
       })
 
@@ -246,28 +258,30 @@ describe('物品实例测试 - P2优先级', () => {
     })
 
     test('应该支持状态变更为 expired', async () => {
-      // 创建一个新的物品实例用于过期测试
-      const expireTestInstance = await ItemInstance.create({
-        item_template_id: test_item_template.item_template_id,
-        owner_user_id: test_user_id,
+      const now = new Date()
+      const yy = String(now.getFullYear()).slice(2)
+      const mm = String(now.getMonth() + 1).padStart(2, '0')
+      const dd = String(now.getDate()).padStart(2, '0')
+      const trackingCode = `TS${yy}${mm}${dd}${String(Date.now()).slice(-6)}`
+
+      const expireTestInstance = await Item.create({
+        tracking_code: trackingCode,
+        owner_account_id: test_account_id,
         item_type: 'voucher',
+        item_name: '过期测试物品',
+        item_value: 50,
         status: 'available',
-        acquisition_method: 'test',
-        acquisition_source_type: 'system',
-        acquisition_source_id: 'expire_test'
+        source: 'test',
+        source_ref_id: 'expire_test'
       })
 
-      // 变更为过期状态（模型使用 status 字段，不使用 expired_at）
-      await expireTestInstance.update({
-        status: 'expired'
-      })
-
+      await expireTestInstance.update({ status: 'expired' })
       await expireTestInstance.reload()
       expect(expireTestInstance.status).toBe('expired')
 
       // 清理测试数据
-      await ItemInstanceEvent.destroy({
-        where: { item_instance_id: expireTestInstance.item_instance_id }
+      await ItemLedger.destroy({
+        where: { item_id: expireTestInstance.item_id }
       })
       await expireTestInstance.destroy()
     })
@@ -281,26 +295,38 @@ describe('物品实例测试 - P2优先级', () => {
         return
       }
 
-      // 创建一个新事件（符合模型要求）
-      const event = await ItemInstanceEvent.create({
-        item_instance_id: test_item_instance.item_instance_id,
-        event_type: 'lock', // 使用有效的事件类型
-        operator_type: 'user',
-        operator_user_id: test_user_id,
-        status_before: 'available',
-        status_after: 'locked',
-        idempotency_key: `test_event_${test_item_instance.item_instance_id}_${Date.now()}`,
-        business_type: 'test',
-        meta: {
-          from_status: 'available',
-          to_status: 'locked',
-          reason: 'test_event'
+      // 双录：模拟使用操作 — 用户(-1) + SYSTEM_BURN(+1)
+      const idempKey = `test_use_${test_item_instance.item_id}_${Date.now()}`
+      const entries = await ItemLedger.bulkCreate([
+        {
+          item_id: test_item_instance.item_id,
+          account_id: test_account_id,
+          delta: -1,
+          counterpart_id: SYSTEM_BURN_ACCOUNT_ID,
+          event_type: 'use',
+          operator_type: 'user',
+          operator_id: test_user_id,
+          business_type: 'test',
+          idempotency_key: `${idempKey}_out`,
+          meta: { reason: 'test_event' }
+        },
+        {
+          item_id: test_item_instance.item_id,
+          account_id: SYSTEM_BURN_ACCOUNT_ID,
+          delta: 1,
+          counterpart_id: test_account_id,
+          event_type: 'use',
+          operator_type: 'user',
+          operator_id: test_user_id,
+          business_type: 'test',
+          idempotency_key: `${idempKey}_in`,
+          meta: { reason: 'test_event' }
         }
-      })
+      ])
 
-      expect(event).toBeDefined()
-      expect(event.item_instance_event_id).toBeDefined()
-      expect(event.event_type).toBe('lock')
+      expect(entries).toHaveLength(2)
+      expect(entries[0].ledger_entry_id).toBeDefined()
+      expect(entries[0].event_type).toBe('use')
     })
 
     test('应该按物品实例查询事件历史', async () => {
@@ -309,8 +335,8 @@ describe('物品实例测试 - P2优先级', () => {
         return
       }
 
-      const events = await ItemInstanceEvent.findAll({
-        where: { item_instance_id: test_item_instance.item_instance_id },
+      const events = await ItemLedger.findAll({
+        where: { item_id: test_item_instance.item_id },
         order: [['created_at', 'ASC']]
       })
 
@@ -329,9 +355,9 @@ describe('物品实例测试 - P2优先级', () => {
         return
       }
 
-      const events = await ItemInstanceEvent.findAll({
+      const events = await ItemLedger.findAll({
         where: {
-          item_instance_id: test_item_instance.item_instance_id
+          item_id: test_item_instance.item_id
         }
       })
 
@@ -388,8 +414,8 @@ describe('物品实例测试 - P2优先级', () => {
     if (test_item_instance) {
       try {
         // 先删除事件记录
-        await ItemInstanceEvent.destroy({
-          where: { item_instance_id: test_item_instance.item_instance_id }
+        await ItemLedger.destroy({
+          where: { item_id: test_item_instance.item_id }
         })
         // 再删除物品实例
         await test_item_instance.destroy()

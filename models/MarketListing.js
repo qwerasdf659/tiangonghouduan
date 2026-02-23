@@ -4,7 +4,7 @@
  * 业务场景：管理交易市场的挂牌信息，支持不可叠加物品和可叠加资产的挂牌交易
  *
  * 核心功能：
- * 1. 挂牌类型区分（item_instance 不可叠加物品、fungible_asset 可叠加资产）
+ * 1. 挂牌类型区分（item 不可叠加物品、fungible_asset 可叠加资产）
  * 2. 标的资产管理（物品实例或可叠加资产数量）
  * 3. 定价管理（固定使用 DIAMOND 结算）
  * 4. 锁定机制（防止并发购买，支持超时解锁）
@@ -13,7 +13,7 @@
  *
  * 业务流程：
  * 1. 创建挂牌
- *    - 不可叠加物品：关联 item_instances，锁定物品实例 status=locked（物品所有权真相）
+ *    - 不可叠加物品：关联 items 表，通过 ItemService.holdItem() 锁定物品
  *    - 可叠加资产：冻结卖家资产（seller_offer_frozen=true），写入 offer_asset_code + offer_amount
  * 2. 购买挂牌
  *    - 锁定挂牌：status=on_sale → locked，记录 locked_by_order_id + locked_at
@@ -42,13 +42,13 @@
  * 主键：market_listing_id（BIGINT，自增）
  * 外键：
  * - seller_user_id（users.user_id，卖家用户）
- * - offer_item_instance_id（item_instances.item_instance_id，标的物品实例）
+ * - offer_item_id（items.item_id，标的物品）
  * - locked_by_order_id（trade_orders.trade_order_id，锁定订单）
  *
  * 集成服务：
  * - BalanceService：冻结/解冻卖家标的资产（可叠加资产挂牌）
  * - TradeOrderService：订单创建和状态管理
- * - InventoryService：物品实例状态更新
+ * - ItemService：物品状态管理（三表模型双录）
  *
  * 创建时间：2025年12月15日
  * 最后更新：2025年12月15日
@@ -72,10 +72,10 @@ module.exports = sequelize => {
 
       // 挂牌类型
       listing_kind: {
-        type: DataTypes.ENUM('item_instance', 'fungible_asset'),
+        type: DataTypes.ENUM('item', 'fungible_asset'),
         allowNull: false,
         comment:
-          '挂牌类型（Listing Kind）：item_instance-不可叠加物品实例（如装备、卡牌）| fungible_asset-可叠加资产（如材料、钻石）；业务规则：决定标的资产字段的填充规则'
+          '挂牌类型（Listing Kind）：item-不可叠加物品（如装备、卡牌）| fungible_asset-可叠加资产（如材料、钻石）；业务规则：决定标的资产字段的填充规则'
       },
 
       // 卖家信息
@@ -97,15 +97,15 @@ module.exports = sequelize => {
           '幂等键（业界标准命名）：所有写操作必须由客户端提供；用于防止重复挂牌与对账定位（同一 idempotency_key 重复请求返回同结果，参数不一致返回409）- 必填字段'
       },
 
-      // 标的资产（Offer）- 不可叠加物品
-      offer_item_instance_id: {
+      // 标的物品ID（三表模型 items 表）
+      offer_item_id: {
         type: DataTypes.BIGINT,
         allowNull: true,
         comment:
-          '标的物品实例ID（Offer Item Instance ID）：当 listing_kind=item_instance 时必填，外键关联 item_instances.item_instance_id；业务规则：挂牌时物品状态必须为 available，成交后物品所有权转移给买家',
+          '标的物品ID（Offer Item ID）：当 listing_kind=item 时必填，外键关联 items.item_id；业务规则：挂牌时物品状态必须为 available，成交后物品所有权转移给买家',
         references: {
-          model: 'item_instances',
-          key: 'item_instance_id'
+          model: 'items',
+          key: 'item_id'
         }
       },
 
@@ -117,7 +117,7 @@ module.exports = sequelize => {
         type: DataTypes.BIGINT,
         allowNull: true,
         comment:
-          '挂牌物品模板ID（快照 → item_templates.item_template_id）：仅 listing_kind=item_instance 时有值，挂牌时从物品实例关联的模板复制'
+          '挂牌物品模板ID（快照 → item_templates.item_template_id）：仅 listing_kind=item 时有值，挂牌时从物品实例关联的模板复制'
       },
 
       // 物品类目代码（快照）
@@ -198,7 +198,7 @@ module.exports = sequelize => {
         allowNull: false,
         defaultValue: false,
         comment:
-          '卖家标的是否已冻结（Seller Offer Frozen）：标记卖家标的资产是否已冻结；业务规则：listing_kind=fungible_asset 时必须为 true（挂牌时冻结卖家资产），listing_kind=item_instance 时为 false（物品实例不需要冻结）'
+          '卖家标的是否已冻结（Seller Offer Frozen）：标记卖家标的资产是否已冻结；业务规则：listing_kind=fungible_asset 时必须为 true（挂牌时冻结卖家资产），listing_kind=item 时为 false（物品不需要冻结）'
       },
 
       locked_by_order_id: {
@@ -253,7 +253,7 @@ module.exports = sequelize => {
           fields: ['listing_kind']
         },
         {
-          fields: ['offer_item_instance_id']
+          fields: ['offer_item_id']
         },
         {
           fields: ['offer_asset_code']
@@ -281,14 +281,11 @@ module.exports = sequelize => {
       comment: '卖家用户关联（Seller Association）- 关联挂牌创建者'
     })
 
-    /*
-     * 标的物品实例（仅 item_instance 类型）
-     * 🔴 P0-2 修复：切换到 ItemInstance 模型（物品所有权真相）
-     */
-    MarketListing.belongsTo(models.ItemInstance, {
-      foreignKey: 'offer_item_instance_id',
+    /** 标的物品（三表模型 items 表） */
+    MarketListing.belongsTo(models.Item, {
+      foreignKey: 'offer_item_id',
       as: 'offerItem',
-      comment: '标的物品实例关联（Offer Item Association）- 关联挂牌的物品实例（物品所有权真相）'
+      comment: '标的物品关联 — 关联 items 表（三表模型缓存层）'
     })
 
     // === 2026-01-15 新增：快照字段关联 ===

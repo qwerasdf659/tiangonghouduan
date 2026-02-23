@@ -21,6 +21,10 @@
 
 const logger = require('../utils/logger').logger
 
+/**
+ * 客服补偿发放服务
+ * 在事务中完成资产/物品补偿发放，自动记录审计日志和系统消息
+ */
 class CustomerServiceCompensateService {
   /**
    * 执行补偿发放（在事务内完成所有操作）
@@ -32,17 +36,11 @@ class CustomerServiceCompensateService {
    * @param {string} params.reason - 补偿原因
    * @param {number} [params.session_id] - 关联的客服会话ID
    * @param {number} [params.issue_id] - 关联的工单ID
-   * @param {Array<Object>} params.items - 补偿项目列表
-   * @param {string} params.items[].type - 补偿类型：'asset'（资产）或 'item'（物品）
-   * @param {string} [params.items[].asset_code] - 资产代码（type='asset' 时必填）
-   * @param {number} [params.items[].amount] - 资产数量（type='asset' 时必填）
-   * @param {string} [params.items[].item_type] - 物品类型（type='item' 时必填）
-   * @param {number} [params.items[].quantity] - 物品数量（type='item' 时必填，默认1）
-   * @param {Object} options - 选项
-   * @param {Object} options.transaction - 数据库事务对象（必填，由路由层 TransactionManager 传入）
+   * @param {Array<Object>} params.items - 补偿项目列表，每项包含 type/asset_code/amount 或 type/item_type/quantity
+   * @param {Object} options - 选项（必须包含 transaction）
    * @returns {Object} 补偿结果（包含所有发放明细）
    */
-  static async compensate (models, params, options = {}) {
+  static async compensate(models, params, options = {}) {
     const { user_id, operator_id, reason, session_id, issue_id, items } = params
     const transaction = options.transaction
 
@@ -69,6 +67,10 @@ class CustomerServiceCompensateService {
         const BalanceService = require('./asset/BalanceService')
         const idempotencyKey = `cs_compensate_${issue_id || session_id || Date.now()}_${compensateItem.asset_code}_${Date.now()}`
 
+        const reserveAccount = await BalanceService.getOrCreateAccount(
+          { system_code: 'SYSTEM_RESERVE' },
+          { transaction }
+        )
         await BalanceService.changeBalance(
           {
             user_id,
@@ -76,6 +78,7 @@ class CustomerServiceCompensateService {
             delta_amount: Math.abs(compensateItem.amount),
             business_type: 'cs_compensation',
             idempotency_key: idempotencyKey,
+            counterpart_account_id: reserveAccount.account_id,
             meta: {
               reason,
               operator_id,
@@ -93,7 +96,9 @@ class CustomerServiceCompensateService {
         }
         compensationLog.push(logEntry)
         results.push(logEntry)
-        logger.info(`补偿发放资产: user_id=${user_id}, ${compensateItem.asset_code} +${compensateItem.amount}`)
+        logger.info(
+          `补偿发放资产: user_id=${user_id}, ${compensateItem.asset_code} +${compensateItem.amount}`
+        )
       } else if (compensateItem.type === 'item') {
         /* 物品补偿：委托 ItemService */
         const ItemService = require('./asset/ItemService')

@@ -21,35 +21,30 @@
 const {
   sequelize,
   RedemptionOrder,
-  ItemInstance,
-  ItemInstanceEvent,
-  User
+  Item,
+  ItemLedger,
+  ItemHold,
+  User,
+  Account
 } = require('../../models')
 const RedemptionCodeGenerator = require('../../utils/RedemptionCodeGenerator')
 const TransactionManager = require('../../utils/TransactionManager')
 
-// 🔴 P1-9：通过 ServiceManager 获取服务（替代直接 require）
 let RedemptionService
 
-// 测试数据库配置
 jest.setTimeout(30000)
 
 describe('RedemptionService - 兑换订单服务', () => {
   let test_user
+  let test_account_id
   let test_item_instance
 
-  // 测试前准备
   beforeAll(async () => {
-    // 连接测试数据库
     await sequelize.authenticate()
-
-    // 🔴 P1-9：通过 ServiceManager 获取服务实例（snake_case key）
     RedemptionService = global.getTestService('redemption_order')
   })
 
-  // 每个测试前创建测试数据
   beforeEach(async () => {
-    // 创建测试用户
     test_user = await User.findOne({
       where: { mobile: '13612227930' }
     })
@@ -58,41 +53,47 @@ describe('RedemptionService - 兑换订单服务', () => {
       throw new Error('测试用户不存在，请先创建 mobile=13612227930 的用户')
     }
 
-    // 创建测试物品实例
-    test_item_instance = await ItemInstance.create({
-      owner_user_id: test_user.user_id,
+    /* 获取用户 account_id（三表模型使用 account_id） */
+    const account = await Account.findOne({
+      where: { user_id: test_user.user_id, account_type: 'user' }
+    })
+    if (!account) {
+      throw new Error(`测试用户 Account 不存在：user_id=${test_user.user_id}`)
+    }
+    test_account_id = account.account_id
+
+    const trackingCode = `TS${String(Date.now()).slice(-12)}`
+    test_item_instance = await Item.create({
+      tracking_code: trackingCode,
+      owner_account_id: test_account_id,
       item_type: 'voucher',
+      item_name: '测试优惠券',
+      item_description: '测试用优惠券',
+      item_value: 100,
       status: 'available',
-      meta: {
-        name: '测试优惠券',
-        value: 100,
-        description: '测试用优惠券'
-      }
+      source: 'test',
+      source_ref_id: 'redemption_test'
     })
   })
 
-  // 每个测试后清理数据
   afterEach(async () => {
-    // 清理测试兑换订单
     if (test_item_instance) {
       await RedemptionOrder.destroy({
-        where: {
-          item_instance_id: test_item_instance.item_instance_id
-        }
+        where: { item_id: test_item_instance.item_id }
       })
 
-      // 先清理物品实例事件（外键约束：onDelete: 'RESTRICT'）
-      await ItemInstanceEvent.destroy({
-        where: {
-          item_instance_id: test_item_instance.item_instance_id
-        }
+      // 清理锁定记录
+      await ItemHold.destroy({
+        where: { item_id: test_item_instance.item_id }
       })
 
-      // 再清理测试物品实例
-      await ItemInstance.destroy({
-        where: {
-          item_instance_id: test_item_instance.item_instance_id
-        }
+      // 清理账本条目
+      await ItemLedger.destroy({
+        where: { item_id: test_item_instance.item_id }
+      })
+
+      await Item.destroy({
+        where: { item_id: test_item_instance.item_id }
       })
     }
   })
@@ -108,7 +109,7 @@ describe('RedemptionService - 兑换订单服务', () => {
     it('应该成功创建兑换订单并返回12位Base32核销码', async () => {
       // 执行创建（使用事务包裹）
       const result = await TransactionManager.execute(async transaction => {
-        return await RedemptionService.createOrder(test_item_instance.item_instance_id, {
+        return await RedemptionService.createOrder(test_item_instance.item_id, {
           transaction
         })
       })
@@ -120,7 +121,7 @@ describe('RedemptionService - 兑换订单服务', () => {
       // 验证订单
       const order = result.order
       expect(order.redemption_order_id).toBeDefined()
-      expect(order.item_instance_id).toBe(test_item_instance.item_instance_id)
+      expect(order.item_id).toBe(test_item_instance.item_id)
       expect(order.status).toBe('pending')
       expect(order.expires_at).toBeDefined()
 
@@ -145,7 +146,7 @@ describe('RedemptionService - 兑换订单服务', () => {
       // 尝试创建订单（应该失败）
       await expect(
         TransactionManager.execute(async transaction => {
-          return await RedemptionService.createOrder(test_item_instance.item_instance_id, {
+          return await RedemptionService.createOrder(test_item_instance.item_id, {
             transaction
           })
         })
@@ -160,7 +161,7 @@ describe('RedemptionService - 兑换订单服务', () => {
         TransactionManager.execute(async transaction => {
           return await RedemptionService.createOrder(non_existent_id, { transaction })
         })
-      ).rejects.toThrow('物品实例不存在')
+      ).rejects.toThrow('物品不存在')
     })
   })
 
@@ -173,7 +174,7 @@ describe('RedemptionService - 兑换订单服务', () => {
     beforeEach(async () => {
       // 创建测试兑换订单（使用事务包裹）
       const result = await TransactionManager.execute(async transaction => {
-        return await RedemptionService.createOrder(test_item_instance.item_instance_id, {
+        return await RedemptionService.createOrder(test_item_instance.item_id, {
           transaction
         })
       })
@@ -261,7 +262,7 @@ describe('RedemptionService - 兑换订单服务', () => {
     beforeEach(async () => {
       // 创建测试兑换订单（使用事务包裹）
       const result = await TransactionManager.execute(async transaction => {
-        return await RedemptionService.createOrder(test_item_instance.item_instance_id, {
+        return await RedemptionService.createOrder(test_item_instance.item_id, {
           transaction
         })
       })
@@ -317,33 +318,39 @@ describe('RedemptionService - 兑换订单服务', () => {
     beforeEach(async () => {
       // 创建3个订单（使用事务包裹）
       const result1 = await TransactionManager.execute(async transaction => {
-        return await RedemptionService.createOrder(test_item_instance.item_instance_id, {
+        return await RedemptionService.createOrder(test_item_instance.item_id, {
           transaction
         })
       })
       expired_order_1 = result1.order
 
-      // 创建第二个物品实例和订单
-      const test_item_2 = await ItemInstance.create({
-        owner_user_id: test_user.user_id,
+      const trackingCode2 = `TS${String(Date.now()).slice(-12)}`
+      const test_item_2 = await Item.create({
+        tracking_code: trackingCode2,
+        owner_account_id: test_account_id,
         item_type: 'voucher',
+        item_name: '测试优惠券2',
+        item_value: 100,
         status: 'available',
-        meta: { name: '测试优惠券2' }
+        source: 'test'
       })
       const result2 = await TransactionManager.execute(async transaction => {
-        return await RedemptionService.createOrder(test_item_2.item_instance_id, { transaction })
+        return await RedemptionService.createOrder(test_item_2.item_id, { transaction })
       })
       expired_order_2 = result2.order
 
-      // 创建第三个物品实例和订单（不过期）
-      const test_item_3 = await ItemInstance.create({
-        owner_user_id: test_user.user_id,
+      const trackingCode3 = `TS${String(Date.now() + 1).slice(-12)}`
+      const test_item_3 = await Item.create({
+        tracking_code: trackingCode3,
+        owner_account_id: test_account_id,
         item_type: 'voucher',
+        item_name: '测试优惠券3',
+        item_value: 100,
         status: 'available',
-        meta: { name: '测试优惠券3' }
+        source: 'test'
       })
       const result3 = await TransactionManager.execute(async transaction => {
-        return await RedemptionService.createOrder(test_item_3.item_instance_id, { transaction })
+        return await RedemptionService.createOrder(test_item_3.item_id, { transaction })
       })
       valid_order = result3.order
 
@@ -405,7 +412,7 @@ describe('RedemptionService - 兑换订单服务', () => {
     beforeEach(async () => {
       // 创建测试兑换订单（使用事务包裹）
       const result = await TransactionManager.execute(async transaction => {
-        return await RedemptionService.createOrder(test_item_instance.item_instance_id, {
+        return await RedemptionService.createOrder(test_item_instance.item_id, {
           transaction
         })
       })

@@ -39,7 +39,7 @@ document.addEventListener('alpine:init', () => {
     async runItemReconciliation() {
       this.loading_items = true
       try {
-        const response = await request(ASSET_ENDPOINTS.RECONCILIATION_ITEMS)
+        const response = await request({ url: ASSET_ENDPOINTS.RECONCILIATION_ITEMS })
         if (response.success && response.data) {
           this.item_result = response.data
           Alpine.store('notification').show('物品对账完成', 'success')
@@ -59,18 +59,60 @@ document.addEventListener('alpine:init', () => {
     async runAssetReconciliation() {
       this.loading_assets = true
       try {
-        const response = await request(ASSET_ENDPOINTS.RECONCILIATION_ASSETS)
+        const response = await request({ url: ASSET_ENDPOINTS.RECONCILIATION_ASSETS })
         if (response.success && response.data) {
           this.asset_result = response.data
-          Alpine.store('notification').show('资产对账完成', 'success')
+          Alpine.store('notification').success('资产对账完成')
+          this.$nextTick(() => this.renderAssetChart())
         } else {
-          Alpine.store('notification').show(response.message || '对账失败', 'error')
+          Alpine.store('notification').error(response.message || '对账失败')
         }
       } catch (error) {
-        Alpine.store('notification').show(`资产对账失败：${error.message}`, 'error')
+        Alpine.store('notification').error(`资产对账失败：${error.message}`)
       } finally {
         this.loading_assets = false
       }
+    },
+
+    /**
+     * 渲染资产守恒 ECharts 柱状图
+     */
+    renderAssetChart() {
+      const container = document.getElementById('asset-conservation-chart')
+      if (!container || !this.asset_result?.global_conservation?.by_asset_code) return
+
+      const echarts = window.echarts
+      if (!echarts) {
+        console.warn('[reconciliation] ECharts 未加载，跳过图表渲染')
+        return
+      }
+
+      const chart = echarts.init(container)
+      const data = this.asset_result.global_conservation.by_asset_code
+
+      const option = {
+        title: { text: '资产全局守恒概览', left: 'center', textStyle: { fontSize: 14 } },
+        tooltip: { trigger: 'axis', formatter: '{b}: {c}' },
+        xAxis: {
+          type: 'category',
+          data: data.map(r => r.asset_code),
+          axisLabel: { rotate: 30 }
+        },
+        yAxis: { type: 'value', name: 'SUM(delta_amount)' },
+        series: [{
+          name: 'delta_amount',
+          type: 'bar',
+          data: data.map(r => ({
+            value: Number(r.total_delta) || 0,
+            itemStyle: { color: Number(r.total_delta) === 0 ? '#10b981' : '#ef4444' }
+          })),
+          label: { show: true, position: 'top', formatter: '{c}' }
+        }],
+        grid: { left: '10%', right: '5%', bottom: '15%', top: '15%' }
+      }
+
+      chart.setOption(option)
+      window.addEventListener('resize', () => chart.resize())
     }
   }))
 })

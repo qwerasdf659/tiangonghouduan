@@ -59,7 +59,12 @@ router.post('/compensate', requireRoleLevel(100), async (req, res) => {
           return res.apiError('物品补偿项缺少 item_type', 'BAD_REQUEST', null, 400)
         }
       } else {
-        return res.apiError(`不支持的补偿类型: ${item.type}，仅支持 asset/item`, 'BAD_REQUEST', null, 400)
+        return res.apiError(
+          `不支持的补偿类型: ${item.type}，仅支持 asset/item`,
+          'BAD_REQUEST',
+          null,
+          400
+        )
       }
     }
 
@@ -87,10 +92,10 @@ router.post('/compensate', requireRoleLevel(100), async (req, res) => {
       { description: 'csCompensate' }
     )
 
-    res.apiSuccess(result, '补偿发放成功')
+    return res.apiSuccess(result, '补偿发放成功')
   } catch (error) {
     logger.error('补偿发放失败:', error)
-    res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
   }
 })
 
@@ -102,22 +107,18 @@ router.post('/compensate', requireRoleLevel(100), async (req, res) => {
  */
 router.get('/templates', async (req, res) => {
   try {
-    const models = req.app.locals.models
+    /** 通过 ServiceManager 获取 SystemConfigService（不直连 models.SystemConfig） */
+    const SystemConfigService = req.app.locals.services.getService('system_config')
 
     /* 从 system_configs 表读取消息模板（config_key = 'cs_reply_templates'） */
     let templates = []
-    if (models.SystemConfig) {
-      const config = await models.SystemConfig.findOne({
-        where: { config_key: 'cs_reply_templates' },
-        raw: true
-      })
-      if (config && config.config_value) {
-        try {
-          templates = JSON.parse(config.config_value)
-        } catch (_e) {
-          templates = []
-        }
+    try {
+      const configValue = await SystemConfigService.getValue('cs_reply_templates')
+      if (configValue) {
+        templates = typeof configValue === 'string' ? JSON.parse(configValue) : configValue
       }
+    } catch (_e) {
+      templates = []
     }
 
     /* 如果数据库无模板，返回默认模板 */
@@ -129,14 +130,20 @@ router.get('/templates', async (req, res) => {
             { title: '问候语', content: '您好！感谢您的咨询，请问有什么可以帮您？' },
             { title: '请稍等', content: '收到您的问题，正在为您查询，请稍等片刻~' },
             { title: '感谢反馈', content: '感谢您的反馈！我们会持续改进，为您提供更好的服务。' },
-            { title: '祝您愉快', content: '问题已处理完毕，祝您使用愉快！如有其他问题随时联系我们。' }
+            {
+              title: '祝您愉快',
+              content: '问题已处理完毕，祝您使用愉快！如有其他问题随时联系我们。'
+            }
           ]
         },
         {
           category: '资产',
           items: [
             { title: '余额查询', content: '已为您查询到账户余额信息，请查看右侧面板的资产详情。' },
-            { title: '冻结说明', content: '您的资产冻结是由于进行中的交易订单，交易完成后将自动解冻。' }
+            {
+              title: '冻结说明',
+              content: '您的资产冻结是由于进行中的交易订单，交易完成后将自动解冻。'
+            }
           ]
         },
         {
@@ -149,17 +156,24 @@ router.get('/templates', async (req, res) => {
         {
           category: '抽奖',
           items: [
-            { title: '概率说明', content: '抽奖概率机制：每次抽奖100%获得奖品，奖品分为高中低三个档位，具体概率在活动页面公示。' },
-            { title: '保底规则', content: '系统设有保底机制，连续多次未获得高档位奖品时会触发保底，确保公平性。' }
+            {
+              title: '概率说明',
+              content:
+                '抽奖概率机制：每次抽奖100%获得奖品，奖品分为高中低三个档位，具体概率在活动页面公示。'
+            },
+            {
+              title: '保底规则',
+              content: '系统设有保底机制，连续多次未获得高档位奖品时会触发保底，确保公平性。'
+            }
           ]
         }
       ]
     }
 
-    res.apiSuccess(templates, '获取消息模板成功')
+    return res.apiSuccess(templates, '获取消息模板成功')
   } catch (error) {
     logger.error('获取消息模板失败:', error)
-    res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
   }
 })
 
@@ -187,10 +201,10 @@ router.put('/templates', requireRoleLevel(100), async (req, res) => {
       })
     }
 
-    res.apiSuccess(templates, '消息模板更新成功')
+    return res.apiSuccess(templates, '消息模板更新成功')
   } catch (error) {
     logger.error('更新消息模板失败:', error)
-    res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
   }
 })
 

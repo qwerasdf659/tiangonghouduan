@@ -74,7 +74,7 @@
  * - LotteryCampaign：抽奖活动表（活动配置、有效期、奖品池）
  * - LotteryPrize：奖品表（奖品信息、概率、库存）
  * - LotteryDraw：抽奖记录表（用户抽奖历史、中奖记录）
- * - ItemInstance：物品实例表（中奖奖品存储）
+ * - Item：物品表（中奖奖品存储）
  * - AssetTransaction：资产交易表（抽奖扣分记录）
  *
  * 性能指标：
@@ -996,15 +996,20 @@ class UnifiedLotteryEngine {
       )
 
       // 步骤1：统一扣除折扣后的总积分（在事务中执行）
+      const burnAccount = await BalanceService.getOrCreateAccount(
+        { system_code: 'SYSTEM_BURN' },
+        { transaction }
+      )
       // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction（见下方 options 参数）
       const assetChangeResult = await BalanceService.changeBalance(
         {
           user_id,
           asset_code: 'POINTS',
-          delta_amount: -requiredPoints, // 扣减为负数
+          delta_amount: -requiredPoints,
           business_type: 'lottery_consume',
-          idempotency_key: consumeIdempotencyKey, // 方案B：使用派生幂等键
-          lottery_session_id: lotterySessionId, // 方案B：关联抽奖会话
+          idempotency_key: consumeIdempotencyKey,
+          lottery_session_id: lotterySessionId,
+          counterpart_account_id: burnAccount.account_id,
           meta: {
             source_type: 'system',
             title: draw_count === 1 ? '抽奖消耗积分' : `${draw_count}连抽消耗积分`,

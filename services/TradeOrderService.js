@@ -5,7 +5,7 @@
  * - 订单域（Order Domain）核心服务
  * - 统一管理交易订单的创建、取消、完成
  * - 协调资产冻结/解冻/结算（调用 BalanceService/ItemService）
- * - 协调物品所有权变更（调用 ItemInstance）
+ * - 协调物品所有权变更（调用 Item）
  * - 提供强幂等性保证（idempotency_key）
  * - 管理后台订单查询（合并自 TradeOrderQueryService）
  *
@@ -16,7 +16,7 @@
  *    - 创建订单记录（TradeOrder.status = frozen）
  * 2. 完成订单（completeOrder）：
  *    - 从冻结资产结算（BalanceService.settleFromFrozen）
- *    - 转移物品所有权（ItemInstance.owner_user_id）
+ *    - 转移物品所有权（Item.owner_user_id）
  *    - 更新订单状态（TradeOrder.status = completed）
  * 3. 取消订单（cancelOrder）：
  *    - 解冻买家资产（BalanceService.unfreeze）
@@ -32,7 +32,7 @@
  */
 
 const { Op, fn, col } = require('sequelize')
-const { sequelize, TradeOrder, MarketListing, ItemInstance, User } = require('../models')
+const { sequelize, TradeOrder, MarketListing, Item, User } = require('../models')
 const { attachDisplayNames, DICT_TYPES } = require('../utils/displayNameHelper')
 // V4.7.0 AssetService 拆分：使用子服务替代原 AssetService（2026-01-31）
 const BalanceService = require('./asset/BalanceService')
@@ -246,7 +246,7 @@ class TradeOrderService {
       where: { market_listing_id },
       include: [
         {
-          model: ItemInstance,
+          model: Item,
           as: 'offerItem',
           required: false
         }
@@ -287,20 +287,20 @@ class TradeOrderService {
       }
     }
 
-    // 不可叠加物品购买时必须校验并锁定 item_instances（所有权真相）
-    if (listing.listing_kind === 'item_instance') {
-      if (!listing.offer_item_instance_id) {
-        throw new Error('挂牌缺少标的物品实例ID（offer_item_instance_id）')
+    // 不可叠加物品购买时必须校验并锁定 items（所有权真相）
+    if (listing.listing_kind === 'item') {
+      if (!listing.offer_item_id) {
+        throw new Error('挂牌缺少标的物品ID（offer_item_id）')
       }
 
-      const itemInstance = await ItemInstance.findOne({
-        where: { item_instance_id: listing.offer_item_instance_id },
+      const itemInstance = await Item.findOne({
+        where: { item_id: listing.offer_item_id },
         lock: transaction.LOCK.UPDATE,
         transaction
       })
 
       if (!itemInstance) {
-        throw new Error(`物品实例不存在: ${listing.offer_item_instance_id}`)
+        throw new Error(`物品不存在: ${listing.offer_item_id}`)
       }
       if (Number(itemInstance.owner_user_id) !== Number(listing.seller_user_id)) {
         throw new Error('物品所有权异常：物品不属于当前卖家，禁止购买')
@@ -334,11 +334,11 @@ class TradeOrderService {
        * - red_shard 等其他币种：单一费率模式（从 system_settings 读取费率和最低费）
        *
        * 价值锚点：
-       * - item_instance：优先取 ItemInstance.meta.value 作为"价值锚点"
+       * - item：优先取 Item.meta.value 作为"价值锚点"
        * - fungible_asset：用 price_amount 作为价值锚点
        */
       const itemValue =
-        listing.listing_kind === 'item_instance'
+        listing.listing_kind === 'item'
           ? listing.offerItem?.meta?.value || listing.price_amount
           : listing.price_amount
 
@@ -475,7 +475,7 @@ class TradeOrderService {
    * 业务流程：
    * 1. 验证订单状态（frozen）
    * 2. 从冻结资产结算（BalanceService.settleFromFrozen）
-   * 3. 转移物品所有权（ItemInstance.owner_user_id）
+   * 3. 转移物品所有权（Item.owner_user_id）
    * 4. 更新订单状态（completed）
    * 5. 更新挂牌状态（sold）
    *
@@ -525,6 +525,16 @@ class TradeOrderService {
 
     // 2. 从冻结资产结算（三笔：买家扣减、卖家入账、平台手续费）
 
+    // 获取双录所需的账户ID（买家、卖家）
+    const buyerAccount = await BalanceService.getOrCreateAccount(
+      { user_id: order.buyer_user_id },
+      { transaction }
+    )
+    const sellerAccount = await BalanceService.getOrCreateAccount(
+      { user_id: order.seller_user_id },
+      { transaction }
+    )
+
     // 2.1 买家从冻结资产扣减
     // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
     await BalanceService.settleFromFrozen(
@@ -550,11 +560,12 @@ class TradeOrderService {
       // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
       await BalanceService.changeBalance(
         {
-          idempotency_key: `${idempotency_key}:credit_seller`, // 派生子幂等键
+          idempotency_key: `${idempotency_key}:credit_seller`,
           business_type: 'order_settle_seller_credit',
           user_id: order.seller_user_id,
           asset_code: order.asset_code,
           delta_amount: order.net_amount,
+          counterpart_account_id: buyerAccount.account_id,
           meta: {
             trade_order_id: order.trade_order_id,
             market_listing_id: order.market_listing_id,
@@ -573,11 +584,12 @@ class TradeOrderService {
       // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
       await BalanceService.changeBalance(
         {
-          idempotency_key: `${idempotency_key}:credit_platform_fee`, // 派生子幂等键
+          idempotency_key: `${idempotency_key}:credit_platform_fee`,
           business_type: 'order_settle_platform_fee_credit',
           system_code: 'SYSTEM_PLATFORM_FEE',
           asset_code: order.asset_code,
           delta_amount: order.fee_amount,
+          counterpart_account_id: buyerAccount.account_id,
           meta: {
             trade_order_id: order.trade_order_id,
             market_listing_id: order.market_listing_id,
@@ -592,17 +604,16 @@ class TradeOrderService {
     }
 
     // 3. 转移物品所有权或交付可叠加资产
-    if (listing.listing_kind === 'item_instance' && listing.offer_item_instance_id) {
+    if (listing.listing_kind === 'item' && listing.offer_item_id) {
       // 统一资产域架构：使用 ItemService.transferItem() 转移物品所有权
-      const { ItemInstance } = require('../models')
-      const itemInstance = await ItemInstance.findOne({
-        where: { item_instance_id: listing.offer_item_instance_id },
+      const itemInstance = await Item.findOne({
+        where: { item_id: listing.offer_item_id },
         lock: transaction.LOCK.UPDATE,
         transaction
       })
 
       if (!itemInstance) {
-        throw new Error(`物品实例不存在: ${listing.offer_item_instance_id}`)
+        throw new Error(`物品不存在: ${listing.offer_item_id}`)
       }
 
       // 所有权一致性校验（防止异常数据导致越权转移）
@@ -614,7 +625,7 @@ class TradeOrderService {
       // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
       await ItemService.transferItem(
         {
-          item_instance_id: itemInstance.item_instance_id,
+          item_id: itemInstance.item_id,
           new_owner_id: order.buyer_user_id,
           business_type: 'market_transfer',
           idempotency_key: `${idempotency_key}:transfer_item`, // 派生子幂等键
@@ -631,7 +642,7 @@ class TradeOrderService {
       )
 
       logger.info('[TradeOrderService] 物品所有权已转移（通过 ItemService.transferItem）', {
-        item_instance_id: itemInstance.item_instance_id,
+        item_id: itemInstance.item_id,
         from: order.seller_user_id,
         to: order.buyer_user_id
       })
@@ -676,11 +687,12 @@ class TradeOrderService {
       // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
       await BalanceService.changeBalance(
         {
-          idempotency_key: `${idempotency_key}:credit_buyer_offer`, // 派生子幂等键
+          idempotency_key: `${idempotency_key}:credit_buyer_offer`,
           business_type: 'listing_transfer_buyer_offer_credit',
           user_id: order.buyer_user_id,
           asset_code: listing.offer_asset_code,
           delta_amount: listing.offer_amount,
+          counterpart_account_id: sellerAccount.account_id,
           meta: {
             trade_order_id: order.trade_order_id,
             market_listing_id: order.market_listing_id,
@@ -733,7 +745,7 @@ class TradeOrderService {
       // 通知卖家：挂牌已售出
       await NotificationService.notifyListingSold(order.seller_user_id, {
         market_listing_id: order.market_listing_id,
-        offer_asset_code: listing.offer_asset_code || listing.offer_item_instance_id?.toString(),
+        offer_asset_code: listing.offer_asset_code || listing.offer_item_id?.toString(),
         offer_amount: Number(listing.offer_amount) || 1,
         price_amount: Number(order.gross_amount),
         net_amount: Number(order.net_amount)
@@ -746,7 +758,7 @@ class TradeOrderService {
       // 通知买家：购买成功
       await NotificationService.notifyPurchaseCompleted(order.buyer_user_id, {
         trade_order_id: order.trade_order_id,
-        offer_asset_code: listing.offer_asset_code || listing.offer_item_instance_id?.toString(),
+        offer_asset_code: listing.offer_asset_code || listing.offer_item_id?.toString(),
         offer_amount: Number(listing.offer_amount) || 1,
         price_amount: Number(order.gross_amount)
       })
@@ -897,7 +909,7 @@ class TradeOrderService {
           as: 'listing',
           include: [
             {
-              model: ItemInstance,
+              model: Item,
               as: 'offerItem'
             }
           ]
@@ -1033,7 +1045,7 @@ class TradeOrderService {
           attributes: [
             'market_listing_id',
             'listing_kind',
-            'offer_item_instance_id',
+            'offer_item_id',
             'offer_asset_code',
             'offer_amount',
             'price_amount',
@@ -1100,7 +1112,7 @@ class TradeOrderService {
           attributes: [
             'market_listing_id',
             'listing_kind',
-            'offer_item_instance_id',
+            'offer_item_id',
             'offer_asset_code',
             'offer_amount',
             'price_amount',
@@ -1155,7 +1167,7 @@ class TradeOrderService {
           attributes: [
             'market_listing_id',
             'listing_kind',
-            'offer_item_instance_id',
+            'offer_item_id',
             'offer_asset_code',
             'offer_amount',
             'price_amount',

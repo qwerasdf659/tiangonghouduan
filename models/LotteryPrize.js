@@ -807,7 +807,8 @@ module.exports = sequelize => {
       updated_at: 'updated_at',
       deletedAt: 'deleted_at',
       underscored: true,
-      comment: '抽奖奖品配置表（paranoid 软删除：destroy() 设置 deleted_at，查询自动过滤已删除记录）',
+      comment:
+        '抽奖奖品配置表（paranoid 软删除：destroy() 设置 deleted_at，查询自动过滤已删除记录）',
       indexes: [
         {
           fields: ['lottery_campaign_id', 'status'],

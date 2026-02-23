@@ -50,7 +50,7 @@ document.addEventListener('alpine:init', () => {
 
       try {
         const url = buildURL(ASSET_ENDPOINTS.ITEM_LIFECYCLE, { identifier })
-        const response = await request(url)
+        const response = await request({ url })
 
         if (response.success && response.data) {
           this.lifecycle_data = response.data

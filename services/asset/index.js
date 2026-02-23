@@ -18,7 +18,7 @@
  *
  * - ItemService：物品操作（9个方法）
  *   - mintItem, lockItem, unlockItem, transferItem, consumeItem
- *   - recordItemEvent, getItemEvents, getUserItemInstances, getItemInstanceDetail
+ *   - recordItemEvent, getItemEvents, getUserItems, getItemDetail
  *
  * - QueryService：查询统计（7个方法）
  *   - getTotalBudgetPoints, getBudgetPointsByCampaigns, getTransactions

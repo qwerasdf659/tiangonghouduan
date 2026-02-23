@@ -183,9 +183,14 @@ export function useUserContextMethods () {
     },
 
     async _loadNotes (userId) {
-      const url = CONTENT_ENDPOINTS.CS_ISSUE_LIST + buildQueryString({ user_id: userId, page_size: 50 })
-      const res = await request({ url, method: 'GET' })
-      if (res.success) this.context_issues = res.data?.rows || []
+      const notesUrl = buildURL(CONTENT_ENDPOINTS.CS_USER_CONTEXT_NOTES, { userId }) + buildQueryString({ page_size: 50 })
+      const issuesUrl = CONTENT_ENDPOINTS.CS_ISSUE_LIST + buildQueryString({ user_id: userId, page_size: 50 })
+      const [notesRes, issuesRes] = await Promise.all([
+        request({ url: notesUrl, method: 'GET' }),
+        request({ url: issuesUrl, method: 'GET' })
+      ])
+      if (notesRes.success) this.context_notes = notesRes.data?.rows || []
+      if (issuesRes.success) this.context_issues = issuesRes.data?.rows || []
     },
 
     /**
@@ -223,7 +228,7 @@ export function useUserContextMethods () {
         const res = await request({
           url: CONTENT_ENDPOINTS.CS_ISSUE_LIST,
           method: 'POST',
-          body: {
+          data: {
             user_id: userId,
             session_id: this.selectedSession?.customer_service_session_id,
             issue_type: this.issue_form.issue_type,
@@ -251,27 +256,18 @@ export function useUserContextMethods () {
       if (!userId || !this.new_note_content.trim()) return
 
       try {
-        /* 查找用户关联的工单ID（取最新的） */
-        const issueId = this.context_issues.length > 0 ? this.context_issues[0].issue_id : null
-
-        const url = issueId
-          ? buildURL(CONTENT_ENDPOINTS.CS_ISSUE_NOTES, { id: issueId })
-          : CONTENT_ENDPOINTS.CS_ISSUE_LIST
-
-        if (!issueId) {
-          Alpine.store('notification').show('请先创建工单再添加备注', 'warning')
-          return
+        const url = buildURL(CONTENT_ENDPOINTS.CS_USER_CONTEXT_NOTES, { userId })
+        const data = {
+          content: this.new_note_content.trim(),
+          session_id: this.selectedSession?.customer_service_session_id || null
         }
 
-        const res = await request({
-          url,
-          method: 'POST',
-          body: { content: this.new_note_content.trim() }
-        })
+        const res = await request({ url, method: 'POST', data })
 
         if (res.success) {
           this.new_note_content = ''
           Alpine.store('notification').show('备注添加成功', 'success')
+          await this._loadNotes(userId)
         }
       } catch (error) {
         logger.error('[UserContext] 添加备注失败:', error)

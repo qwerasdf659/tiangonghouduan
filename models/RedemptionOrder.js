@@ -7,7 +7,7 @@
  * 1. 核销码哈希存储（SHA-256，不存明文）
  * 2. 订单状态管理（pending → fulfilled/expired/cancelled）
  * 3. 过期时间控制（30天TTL）
- * 4. 关联物品实例和核销人
+ * 4. 关联物品和核销人
  *
  * 状态流转：
  * - pending（待核销）→ fulfilled（已核销）：核销成功
@@ -46,14 +46,14 @@ module.exports = sequelize => {
         comment: '核销码哈希（Code Hash）：12位Base32核销码的SHA-256哈希值，用于验证核销码'
       },
 
-      // 关联物品实例
-      item_instance_id: {
+      // 关联物品（三表模型 items 表）
+      item_id: {
         type: DataTypes.BIGINT,
         allowNull: false,
-        comment: '物品实例ID（Item Instance ID）：关联的物品实例',
+        comment: '物品ID（Item ID）：关联 items.item_id（三表模型缓存层）',
         references: {
-          model: 'item_instances',
-          key: 'item_instance_id'
+          model: 'items',
+          key: 'item_id'
         }
       },
 
@@ -129,11 +129,11 @@ module.exports = sequelize => {
    * @returns {void}
    */
   RedemptionOrder.associate = models => {
-    // 关联物品实例
-    RedemptionOrder.belongsTo(models.ItemInstance, {
-      foreignKey: 'item_instance_id',
-      as: 'item_instance',
-      comment: '关联的物品实例'
+    /** 关联物品（三表模型 items 表） */
+    RedemptionOrder.belongsTo(models.Item, {
+      foreignKey: 'item_id',
+      as: 'item',
+      comment: '关联的物品 — 关联 items 表（三表模型缓存层）'
     })
 
     // 关联核销用户

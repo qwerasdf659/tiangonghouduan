@@ -201,7 +201,7 @@ async function main() {
       
       // 表名到路由文件的映射（常见模式）
       const tableToRouteMap = {
-        'popup_banners': 'popup-banners.js',
+        'ad_campaigns': 'ad-campaigns.js',
         'administrative_regions': 'regions.js',
         'item_templates': 'item-templates.js',
         'lottery_presets': 'lottery-presets.js',

@@ -158,7 +158,11 @@ class MerchantPointsService {
       throw new Error(`申请积分数量无效: audit_id=${auditId}, points_amount=${pointsAmount}`)
     }
 
-    // 4. 发放积分
+    // 4. 发放积分（双录：系统铸造 → 用户入账）
+    const mintAccount = await BalanceService.getOrCreateAccount(
+      { system_code: 'SYSTEM_MINT' },
+      { transaction }
+    )
     // eslint-disable-next-line no-restricted-syntax
     await BalanceService.changeBalance(
       {
@@ -167,6 +171,7 @@ class MerchantPointsService {
         delta_amount: pointsAmount,
         business_type: 'merchant_points_reward',
         idempotency_key: `merchant_points_reward:${auditId}`,
+        counterpart_account_id: mintAccount.account_id,
         meta: {
           audit_id: auditId,
           description: auditData.description || '商家积分申请通过',

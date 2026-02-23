@@ -26,10 +26,19 @@ const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
 const logger = require('../../../utils/logger').logger
-const AuditLogService = require('../../../services/AuditLogService')
 const { OPERATION_TYPES } = require('../../../constants/AuditOperationTypes')
 const { handleServiceError } = require('../../../middleware/validation')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
+
+/**
+ * 获取 AuditLogService（通过 ServiceManager 统一入口）
+ *
+ * @param {Object} req - Express 请求对象
+ * @returns {Object} AuditLogService 实例
+ */
+function getAuditLogService(req) {
+  return req.app.locals.services.getService('audit_log')
+}
 
 /**
  * 获取 UserAnalysisService 的辅助函数
@@ -538,22 +547,24 @@ router.get('/history/:user_id', authenticateToken, requireRoleLevel(100), async 
     })
 
     // 审计日志：记录管理员查看用户抽奖历史
-    AuditLogService.logOperation({
-      operator_id: req.user.user_id,
-      operation_type: OPERATION_TYPES.ADMIN_VIEW_USER_DATA,
-      target_type: 'User',
-      target_id: targetUserId,
-      action: 'view_lottery_history',
-      ip_address: req.ip,
-      user_agent: req.headers['user-agent']
-    }).catch(auditError => {
-      // 只读查看操作，审计失败不阻断业务
-      logger.warn('审计日志记录失败（查看用户抽奖历史）', {
-        error: auditError.message,
+    getAuditLogService(req)
+      .logOperation({
         operator_id: req.user.user_id,
-        target_user_id: targetUserId
+        operation_type: OPERATION_TYPES.ADMIN_VIEW_USER_DATA,
+        target_type: 'User',
+        target_id: targetUserId,
+        action: 'view_lottery_history',
+        ip_address: req.ip,
+        user_agent: req.headers['user-agent']
       })
-    })
+      .catch(auditError => {
+        // 只读查看操作，审计失败不阻断业务
+        logger.warn('审计日志记录失败（查看用户抽奖历史）', {
+          error: auditError.message,
+          operator_id: req.user.user_id,
+          target_user_id: targetUserId
+        })
+      })
 
     logger.info('管理员查看用户抽奖历史', {
       admin_id: req.user.user_id,
@@ -613,21 +624,23 @@ router.get('/points/:user_id', authenticateToken, requireRoleLevel(100), async (
     )
 
     // 审计日志：记录管理员查看用户积分
-    AuditLogService.logOperation({
-      operator_id: req.user.user_id,
-      operation_type: OPERATION_TYPES.ADMIN_VIEW_USER_DATA,
-      target_type: 'User',
-      target_id: targetUserId,
-      action: 'view_user_points',
-      ip_address: req.ip,
-      user_agent: req.headers['user-agent']
-    }).catch(auditError => {
-      logger.warn('审计日志记录失败（查看用户积分）', {
-        error: auditError.message,
+    getAuditLogService(req)
+      .logOperation({
         operator_id: req.user.user_id,
-        target_user_id: targetUserId
+        operation_type: OPERATION_TYPES.ADMIN_VIEW_USER_DATA,
+        target_type: 'User',
+        target_id: targetUserId,
+        action: 'view_user_points',
+        ip_address: req.ip,
+        user_agent: req.headers['user-agent']
       })
-    })
+      .catch(auditError => {
+        logger.warn('审计日志记录失败（查看用户积分）', {
+          error: auditError.message,
+          operator_id: req.user.user_id,
+          target_user_id: targetUserId
+        })
+      })
 
     logger.info('管理员查看用户积分', {
       admin_id: req.user.user_id,
@@ -678,21 +691,23 @@ router.get('/statistics/:user_id', authenticateToken, requireRoleLevel(100), asy
     const statistics = await LotteryQueryService.getUserStatistics(targetUserId)
 
     // 审计日志：记录管理员查看用户抽奖统计
-    AuditLogService.logOperation({
-      operator_id: req.user.user_id,
-      operation_type: OPERATION_TYPES.ADMIN_VIEW_USER_DATA,
-      target_type: 'User',
-      target_id: targetUserId,
-      action: 'view_lottery_statistics',
-      ip_address: req.ip,
-      user_agent: req.headers['user-agent']
-    }).catch(auditError => {
-      logger.warn('审计日志记录失败（查看用户抽奖统计）', {
-        error: auditError.message,
+    getAuditLogService(req)
+      .logOperation({
         operator_id: req.user.user_id,
-        target_user_id: targetUserId
+        operation_type: OPERATION_TYPES.ADMIN_VIEW_USER_DATA,
+        target_type: 'User',
+        target_id: targetUserId,
+        action: 'view_lottery_statistics',
+        ip_address: req.ip,
+        user_agent: req.headers['user-agent']
       })
-    })
+      .catch(auditError => {
+        logger.warn('审计日志记录失败（查看用户抽奖统计）', {
+          error: auditError.message,
+          operator_id: req.user.user_id,
+          target_user_id: targetUserId
+        })
+      })
 
     logger.info('管理员查看用户抽奖统计', {
       admin_id: req.user.user_id,

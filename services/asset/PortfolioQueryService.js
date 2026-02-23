@@ -57,7 +57,7 @@ class AssetPortfolioQueryService {
       return cached
     }
 
-    const { Account, AccountAssetBalance, ItemInstance } = require('../../models')
+    const { Account, AccountAssetBalance, Item } = require('../../models')
 
     // 获取用户账户
     const account = await Account.findOne({
@@ -92,7 +92,7 @@ class AssetPortfolioQueryService {
         order: [['balance', 'DESC']]
       }),
       // 获取物品实例
-      ItemInstance.findAll({
+      Item.findAll({
         where: {
           owner_user_id: parseInt(user_id),
           status: 'available'
@@ -112,7 +112,7 @@ class AssetPortfolioQueryService {
         frozen_balance: parseFloat(b.frozen_balance || 0)
       })),
       items: items.map(i => ({
-        item_instance_id: i.item_instance_id,
+        item_id: i.item_id,
         item_type: i.item_type,
         status: i.status,
         created_at: i.created_at
@@ -265,26 +265,26 @@ class AssetPortfolioQueryService {
    * @returns {Promise<Object>} 物品持有分析
    */
   static async getItemHoldingAnalysis(user_id) {
-    const { ItemInstance } = require('../../models')
+    const { Item } = require('../../models')
 
     // 按物品类型分组统计
     const [typeStats, statusStats, totalItems] = await Promise.all([
       // 按类型统计
-      ItemInstance.findAll({
-        attributes: ['item_type', [fn('COUNT', col('item_instance_id')), 'count']],
+      Item.findAll({
+        attributes: ['item_type', [fn('COUNT', col('item_id')), 'count']],
         where: { owner_user_id: parseInt(user_id) },
         group: ['item_type'],
         raw: true
       }),
       // 按状态统计
-      ItemInstance.findAll({
-        attributes: ['status', [fn('COUNT', col('item_instance_id')), 'count']],
+      Item.findAll({
+        attributes: ['status', [fn('COUNT', col('item_id')), 'count']],
         where: { owner_user_id: parseInt(user_id) },
         group: ['status'],
         raw: true
       }),
       // 总物品数
-      ItemInstance.count({
+      Item.count({
         where: { owner_user_id: parseInt(user_id) }
       })
     ])

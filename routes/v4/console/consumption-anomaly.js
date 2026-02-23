@@ -54,14 +54,14 @@ function getAnomalyService(req) {
 }
 
 /**
- * 获取 models
+ * 获取 models（通过 req.app.locals.models 传递给需要 models 参数的 Service）
+ *
  * @private
  * @param {Object} req - Express 请求对象
  * @returns {Object} Sequelize 模型集合
  */
 function getModels(req) {
-  // Phase 3 收口：通过 ServiceManager 获取 models，避免直连
-  return req.models || req.app.locals.models
+  return req.app.locals.models
 }
 
 /**

@@ -19,14 +19,7 @@
 
 'use strict'
 
-const {
-  sequelize,
-  User,
-  MarketListing,
-  ItemInstance,
-  TradeOrder,
-  ItemTemplate
-} = require('../../models')
+const { sequelize, User, MarketListing, Item, TradeOrder, ItemTemplate } = require('../../models')
 const { Op } = sequelize.Sequelize
 
 // 测试超时设置（市场交易涉及多服务调用，增加超时）
@@ -122,11 +115,11 @@ describe('市场交易流程测试（阶段四：P2）', () => {
     created_listings = []
 
     // 清理测试物品
-    for (const item_instance_id of created_items) {
+    for (const item_id of created_items) {
       try {
-        await ItemInstance.destroy({ where: { item_instance_id }, force: true })
+        await Item.destroy({ where: { item_id }, force: true })
       } catch (error) {
-        console.log(`清理物品 ${item_instance_id} 失败:`, error.message)
+        console.log(`清理物品 ${item_id} 失败:`, error.message)
       }
     }
     created_items = []
@@ -144,21 +137,21 @@ describe('市场交易流程测试（阶段四：P2）', () => {
 
   /**
    * 创建测试物品实例
-   * @param {number} owner_user_id - 物品所有者ID
+   * @param {number} owner_account_id - 物品所有者ID
    * @param {Object} options - 可选参数
-   * @returns {Promise<ItemInstance>} 创建的物品实例
+   * @returns {Promise<Item>} 创建的物品实例
    */
-  async function createTestItem(owner_user_id, options = {}) {
+  async function createTestItem(owner_account_id, options = {}) {
     const item_data = {
-      owner_user_id,
+      owner_account_id,
       item_template_id: test_item_template?.item_template_id || null,
       item_type: 'tradable_item',
       status: options.status || 'available',
       meta: options.meta || { name: `测试物品_${Date.now()}`, description: '市场交易测试用物品' }
     }
 
-    const item = await ItemInstance.create(item_data)
-    created_items.push(item.item_instance_id)
+    const item = await Item.create(item_data)
+    created_items.push(item.item_id)
     return item
   }
 
@@ -178,7 +171,7 @@ describe('市场交易流程测试（阶段四：P2）', () => {
       it('应成功创建物品实例挂牌', async () => {
         // 1. 创建测试物品
         const test_item = await createTestItem(test_seller.user_id)
-        console.log('✅ 测试物品创建成功:', test_item.item_instance_id)
+        console.log('✅ 测试物品创建成功:', test_item.item_id)
 
         // 2. 生成幂等键
         const idempotency_key = generateIdempotencyKey('listing')
@@ -190,7 +183,7 @@ describe('市场交易流程测试（阶段四：P2）', () => {
             {
               idempotency_key,
               seller_user_id: test_seller.user_id,
-              item_instance_id: test_item.item_instance_id,
+              item_id: test_item.item_id,
               price_amount: 100,
               price_asset_code: 'DIAMOND'
             },
@@ -205,14 +198,14 @@ describe('市场交易流程测试（阶段四：P2）', () => {
           // 4. 验证挂牌结果
           expect(result).toHaveProperty('listing')
           expect(result.listing).toHaveProperty('market_listing_id')
-          expect(result.listing.listing_kind).toBe('item_instance')
+          expect(result.listing.listing_kind).toBe('item')
           expect(result.listing.status).toBe('on_sale')
           expect(result.listing.seller_user_id).toBe(test_seller.user_id)
           expect(Number(result.listing.price_amount)).toBe(100)
           expect(result.listing.price_asset_code).toBe('DIAMOND')
 
           // 5. 验证物品状态已变为 locked
-          const updated_item = await ItemInstance.findByPk(test_item.item_instance_id)
+          const updated_item = await Item.findByPk(test_item.item_id)
           expect(updated_item.status).toBe('locked')
 
           console.log('✅ 物品实例挂牌创建成功:', result.listing.market_listing_id)
@@ -236,7 +229,7 @@ describe('市场交易流程测试（阶段四：P2）', () => {
         const listing_params = {
           idempotency_key,
           seller_user_id: Number(test_seller.user_id),
-          item_instance_id: Number(test_item.item_instance_id),
+          item_id: Number(test_item.item_id),
           price_amount: 200,
           price_asset_code: 'DIAMOND'
         }
@@ -268,7 +261,7 @@ describe('市场交易流程测试（阶段四：P2）', () => {
         const second_params = {
           idempotency_key,
           seller_user_id: existing_listing.seller_user_id,
-          item_instance_id: existing_listing.offer_item_instance_id,
+          item_id: existing_listing.offer_item_id,
           price_amount: Number(existing_listing.price_amount),
           price_asset_code: existing_listing.price_asset_code
         }
@@ -307,7 +300,7 @@ describe('市场交易流程测试（阶段四：P2）', () => {
             {
               idempotency_key,
               seller_user_id: test_seller.user_id,
-              item_instance_id: test_item.item_instance_id,
+              item_id: test_item.item_id,
               price_amount: 100,
               price_asset_code: 'DIAMOND'
             },
@@ -343,7 +336,7 @@ describe('市场交易流程测试（阶段四：P2）', () => {
             {
               idempotency_key,
               seller_user_id: test_buyer.user_id, // 买家试图挂牌
-              item_instance_id: test_item.item_instance_id,
+              item_id: test_item.item_id,
               price_amount: 100,
               price_asset_code: 'DIAMOND'
             },
@@ -474,7 +467,7 @@ describe('市场交易流程测试（阶段四：P2）', () => {
           {
             idempotency_key: listing_idempotency_key,
             seller_user_id: test_seller.user_id,
-            item_instance_id: test_item.item_instance_id,
+            item_id: test_item.item_id,
             price_amount: 100,
             price_asset_code: 'DIAMOND'
           },
@@ -529,7 +522,7 @@ describe('市场交易流程测试（阶段四：P2）', () => {
           {
             idempotency_key: listing_idempotency_key,
             seller_user_id: test_seller.user_id,
-            item_instance_id: test_item.item_instance_id,
+            item_id: test_item.item_id,
             price_amount: 150,
             price_asset_code: 'DIAMOND'
           },
@@ -575,7 +568,7 @@ describe('市场交易流程测试（阶段四：P2）', () => {
             {
               idempotency_key,
               seller_user_id: test_seller.user_id,
-              item_instance_id: test_item.item_instance_id,
+              item_id: test_item.item_id,
               price_amount: 100,
               price_asset_code: 'DIAMOND'
             },
@@ -606,7 +599,7 @@ describe('市场交易流程测试（阶段四：P2）', () => {
           expect(result.listing.status).toBe('withdrawn')
 
           // 4. 验证物品状态恢复
-          const updated_item = await ItemInstance.findByPk(test_item.item_instance_id)
+          const updated_item = await Item.findByPk(test_item.item_id)
           expect(updated_item.status).toBe('available')
 
           console.log('✅ 物品挂牌撤回成功')
@@ -634,7 +627,7 @@ describe('市场交易流程测试（阶段四：P2）', () => {
             {
               idempotency_key,
               seller_user_id: test_seller.user_id,
-              item_instance_id: test_item.item_instance_id,
+              item_id: test_item.item_id,
               price_amount: 100,
               price_asset_code: 'DIAMOND'
             },

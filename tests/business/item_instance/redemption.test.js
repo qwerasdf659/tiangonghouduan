@@ -10,7 +10,7 @@
  * 4. 重复核销防护
  *
  * 相关模型：
- * - ItemInstance: 物品实例
+ * - Item: 物品实例
  * - ItemTemplate: 物品模板
  *
  * 相关服务：
@@ -20,7 +20,15 @@
  * P2优先级：物品系统模块
  */
 
-const { sequelize, ItemInstance, ItemTemplate, User } = require('../../../models')
+const {
+  sequelize,
+  Item,
+  ItemTemplate,
+  ItemLedger,
+  ItemHold,
+  User,
+  Account
+} = require('../../../models')
 const {
   initializeTestServiceManager,
   getTestService,
@@ -28,8 +36,8 @@ const {
 } = require('../../helpers/UnifiedTestManager')
 const { TEST_DATA } = require('../../helpers/test-data')
 
-// 测试数据
 let test_user_id = null
+let test_account_id = null
 let test_item_template = null
 let test_item_instance = null
 let RedemptionService = null
@@ -60,6 +68,15 @@ describe('物品兑换核销测试 - P2优先级', () => {
     }
 
     test_user_id = test_user.user_id
+
+    // 3b. 获取 account_id（三表模型）
+    const account = await Account.findOne({
+      where: { user_id: test_user_id, account_type: 'user' }
+    })
+    if (!account) {
+      throw new Error(`测试用户 Account 不存在：user_id=${test_user_id}`)
+    }
+    test_account_id = account.account_id
 
     // 4. 获取或创建测试用的物品模板（可兑换类型）
     test_item_template = await ItemTemplate.findOne({
@@ -97,20 +114,22 @@ describe('物品兑换核销测试 - P2优先级', () => {
   // ===== 测试用例1：物品实例创建和兑换码 =====
   describe('物品实例创建和兑换码', () => {
     test('应该成功创建可兑换的物品实例', async () => {
-      // 创建物品实例
-      test_item_instance = await ItemInstance.create({
-        item_template_id: test_item_template.item_template_id,
-        owner_user_id: test_user_id,
+      const trackingCode = `TS${String(Date.now()).slice(-12)}`
+      test_item_instance = await Item.create({
+        tracking_code: trackingCode,
+        owner_account_id: test_account_id,
         item_type: 'voucher',
+        item_name: '测试兑换券',
+        item_value: 50,
         status: 'available',
-        acquisition_method: 'redemption_test',
-        acquisition_source_type: 'system',
-        acquisition_source_id: 'test_redemption_script'
+        source: 'test',
+        source_ref_id: 'redemption_test'
       })
 
       expect(test_item_instance).toBeDefined()
-      expect(test_item_instance.item_instance_id).toBeDefined()
+      expect(test_item_instance.item_id).toBeDefined()
       expect(test_item_instance.status).toBe('available')
+      expect(test_item_instance.tracking_code).toBe(trackingCode)
     })
 
     test('应该正确设置兑换码（如果有）', async () => {
@@ -168,7 +187,7 @@ describe('物品兑换核销测试 - P2优先级', () => {
       if (typeof RedemptionService.redeemItem === 'function') {
         try {
           const result = await RedemptionService.redeemItem({
-            item_instance_id: test_item_instance.item_instance_id,
+            item_id: test_item_instance.item_id,
             user_id: test_user_id
           })
 
@@ -189,15 +208,16 @@ describe('物品兑换核销测试 - P2优先级', () => {
   // ===== 测试用例3：核销状态验证 =====
   describe('核销状态验证', () => {
     test('已核销的物品状态应该是 used', async () => {
-      // 创建一个新的物品实例用于此测试
-      const usedInstance = await ItemInstance.create({
-        item_template_id: test_item_template.item_template_id,
-        owner_user_id: test_user_id,
+      const trackingCode = `TS${String(Date.now()).slice(-12)}`
+      const usedInstance = await Item.create({
+        tracking_code: trackingCode,
+        owner_account_id: test_account_id,
         item_type: 'voucher',
+        item_name: '核销状态测试物品',
+        item_value: 50,
         status: 'available',
-        acquisition_method: 'test',
-        acquisition_source_type: 'system',
-        acquisition_source_id: 'status_test'
+        source: 'test',
+        source_ref_id: 'status_test'
       })
 
       // 模拟核销（使用模型实例方法或直接更新状态）
@@ -215,22 +235,23 @@ describe('物品兑换核销测试 - P2优先级', () => {
     })
 
     test('不应该允许重复核销同一物品', async () => {
-      // 创建一个已核销的物品实例
-      const alreadyUsedInstance = await ItemInstance.create({
-        item_template_id: test_item_template.item_template_id,
-        owner_user_id: test_user_id,
+      const trackingCode = `TS${String(Date.now()).slice(-12)}`
+      const alreadyUsedInstance = await Item.create({
+        tracking_code: trackingCode,
+        owner_account_id: test_account_id,
         item_type: 'voucher',
+        item_name: '重复核销测试物品',
+        item_value: 50,
         status: 'used',
-        acquisition_method: 'test',
-        acquisition_source_type: 'system',
-        acquisition_source_id: 'duplicate_test'
+        source: 'test',
+        source_ref_id: 'duplicate_test'
       })
 
       // 尝试再次核销应该失败（验证业务逻辑）
       if (RedemptionService && typeof RedemptionService.redeemItem === 'function') {
         try {
           await RedemptionService.redeemItem({
-            item_instance_id: alreadyUsedInstance.item_instance_id,
+            item_id: alreadyUsedInstance.item_id,
             user_id: test_user_id
           })
           // 如果没有抛出错误，测试失败
@@ -250,46 +271,45 @@ describe('物品兑换核销测试 - P2优先级', () => {
   describe('物品状态流转', () => {
     test('物品状态应该只能按规定路径流转', async () => {
       /**
-       * 物品状态机定义（根据 ItemInstance 模型）：
+       * 物品状态机定义（三表模型）：
        * - available: 可用
-       * - locked: 锁定中
-       * - transferred: 已转移
+       * - held: 锁定中（替代旧的 locked）
        * - used: 已使用
        * - expired: 已过期
+       * - destroyed: 已销毁
        */
-      const validStatuses = ['available', 'locked', 'transferred', 'used', 'expired']
+      const validStatuses = ['available', 'held', 'used', 'expired', 'destroyed']
 
-      // 创建测试物品
-      const statusTestInstance = await ItemInstance.create({
-        item_template_id: test_item_template.item_template_id,
-        owner_user_id: test_user_id,
+      const trackingCode = `TS${String(Date.now()).slice(-12)}`
+      const statusTestInstance = await Item.create({
+        tracking_code: trackingCode,
+        owner_account_id: test_account_id,
         item_type: 'voucher',
+        item_name: '状态流转测试物品',
+        item_value: 50,
         status: 'available',
-        acquisition_method: 'test',
-        acquisition_source_type: 'system',
-        acquisition_source_id: 'status_flow_test'
+        source: 'test',
+        source_ref_id: 'status_flow_test'
       })
 
-      // 验证初始状态
       expect(validStatuses).toContain(statusTestInstance.status)
       expect(statusTestInstance.status).toBe('available')
 
-      // 测试状态流转：available -> locked（交易或兑换锁定）
-      await statusTestInstance.update({ status: 'locked' })
+      // available -> held（锁定）
+      await statusTestInstance.update({ status: 'held' })
       await statusTestInstance.reload()
-      expect(statusTestInstance.status).toBe('locked')
+      expect(statusTestInstance.status).toBe('held')
 
-      // 测试状态流转：locked -> available（解锁）
+      // held -> available（解锁）
       await statusTestInstance.update({ status: 'available' })
       await statusTestInstance.reload()
       expect(statusTestInstance.status).toBe('available')
 
-      // 测试状态流转：available -> used（使用/核销）
+      // available -> used（核销）
       await statusTestInstance.update({ status: 'used' })
       await statusTestInstance.reload()
       expect(statusTestInstance.status).toBe('used')
 
-      // 清理
       await statusTestInstance.destroy()
     })
   })
@@ -297,21 +317,21 @@ describe('物品兑换核销测试 - P2优先级', () => {
   // ===== 测试用例5：并发核销防护 =====
   describe('并发核销防护', () => {
     test('应该防止并发核销同一物品', async () => {
-      // 创建测试物品
-      const concurrentTestInstance = await ItemInstance.create({
-        item_template_id: test_item_template.item_template_id,
-        owner_user_id: test_user_id,
+      const trackingCode = `TS${String(Date.now()).slice(-12)}`
+      const concurrentTestInstance = await Item.create({
+        tracking_code: trackingCode,
+        owner_account_id: test_account_id,
         item_type: 'voucher',
+        item_name: '并发核销测试物品',
+        item_value: 50,
         status: 'available',
-        acquisition_method: 'test',
-        acquisition_source_type: 'system',
-        acquisition_source_id: 'concurrent_test'
+        source: 'test',
+        source_ref_id: 'concurrent_test'
       })
 
-      // 模拟并发核销（简化版本，实际需要更复杂的并发测试）
       const concurrentRedemptions = [
-        concurrentTestInstance.update({ status: 'used', used_at: new Date() }),
-        concurrentTestInstance.update({ status: 'used', used_at: new Date() })
+        concurrentTestInstance.update({ status: 'used' }),
+        concurrentTestInstance.update({ status: 'used' })
       ]
 
       // 等待所有操作完成

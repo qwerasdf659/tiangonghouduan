@@ -160,9 +160,9 @@ router.post('/', authenticateToken, async (req, res) => {
       pay_amount: result.order.pay_amount
     })
 
-    // 🔌 WebSocket推送：通知所有在线用户库存变更（2026-02-15 新增）
+    /* WebSocket推送：通知所有在线用户库存变更（通过 ServiceManager 获取） */
     try {
-      const ChatWebSocketService = require('../../../../services/ChatWebSocketService')
+      const ChatWebSocketService = req.app.locals.services.getService('chat_web_socket')
       ChatWebSocketService.broadcastExchangeStockChanged({
         exchange_item_id: itemId,
         name: result.order.item_name || null,

@@ -188,16 +188,6 @@ export function useCampaignsMethods(_context) {
     },
 
     /**
-     * 生成唯一的活动代码
-     * @returns {string} 活动代码
-     */
-    generateCampaignCode() {
-      const timestamp = Date.now()
-      const random = Math.random().toString(36).substring(2, 8).toUpperCase()
-      return `CAMP_${timestamp}_${random}`
-    },
-
-    /**
      * 打开创建活动模态框
      */
     openCreateCampaignModal() {
@@ -210,7 +200,7 @@ export function useCampaignsMethods(_context) {
 
       this.campaignForm = {
         campaign_name: '',
-        campaign_code: this.generateCampaignCode(),
+        campaign_code: '',
         campaign_type: 'event',
         description: '',
         start_time: this.formatDateTimeLocal(startTime),
@@ -221,6 +211,9 @@ export function useCampaignsMethods(_context) {
         remaining_prize_pool: 10000,
         status: 'draft',
         rules_text: '',
+        // 选奖配置默认值（任务10+3前端）
+        pick_method: 'tier_first',
+        segment_resolver_version: 'default',
         // 展示配置默认值
         display_mode: 'grid_3x3',
         grid_cols: 3,
@@ -308,10 +301,6 @@ export function useCampaignsMethods(_context) {
         this.showError('请输入活动名称')
         return
       }
-      if (!this.campaignForm.campaign_code) {
-        this.showError('请输入活动代码')
-        return
-      }
       if (!this.campaignForm.campaign_type) {
         this.showError('请选择活动类型')
         return
@@ -329,9 +318,9 @@ export function useCampaignsMethods(_context) {
           : LOTTERY_ENDPOINTS.CAMPAIGN_CREATE
 
         // 构建请求数据 - 直接使用后端 snake_case 字段名
+        // campaign_code 由后端 CampaignCodeGenerator 自动生成，前端不传
         const requestData = {
           campaign_name: this.campaignForm.campaign_name,
-          campaign_code: this.campaignForm.campaign_code,
           campaign_type: this.campaignForm.campaign_type,
           description: this.campaignForm.description || '',
           start_time: this.campaignForm.start_time,
@@ -354,6 +343,9 @@ export function useCampaignsMethods(_context) {
               { tier_id: 5, tier_name: '谢谢参与', weight: 500000 }
             ]
           },
+          // ======== 选奖配置（任务10+3前端） ========
+          pick_method: this.campaignForm.pick_method || 'tier_first',
+          segment_resolver_version: this.campaignForm.segment_resolver_version || 'default',
           // ======== 前端展示配置（多活动抽奖系统 2026-02-15） ========
           display_mode: this.campaignForm.display_mode || 'grid_3x3',
           grid_cols: parseInt(this.campaignForm.grid_cols) || 3,

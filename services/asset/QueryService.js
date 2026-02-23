@@ -23,7 +23,7 @@
  * - Account：账户
  * - AccountAssetBalance：账户余额
  * - AssetTransaction：资产交易记录
- * - ItemInstance：物品实例
+ * - Item：物品
  * - MaterialAssetType：材料资产类型
  *
  * 设计原则（继承自 AssetService）：
@@ -290,7 +290,7 @@ class QueryService {
     }
 
     // 需要动态引入模型（避免循环依赖）
-    const { ItemInstance, MaterialAssetType } = require('../../models')
+    const { Item, MaterialAssetType } = require('../../models')
     const BalanceService = require('./BalanceService')
 
     // 1. 获取或创建用户账户
@@ -357,11 +357,11 @@ class QueryService {
 
     // 3. 获取不可叠加物品统计
     const sequelize = require('sequelize')
-    const itemCounts = await ItemInstance.findAll({
+    const itemCounts = await Item.findAll({
       attributes: [
         'item_type',
         'status',
-        [sequelize.fn('COUNT', sequelize.col('item_instance_id')), 'count']
+        [sequelize.fn('COUNT', sequelize.col('item_id')), 'count']
       ],
       where: {
         owner_user_id: user_id,
@@ -399,7 +399,7 @@ class QueryService {
     // 4. 可选：获取物品详细列表
     let items_list = null
     if (include_items) {
-      items_list = await ItemInstance.findAll({
+      items_list = await Item.findAll({
         where: {
           owner_user_id: user_id,
           status: { [Op.in]: ['available', 'locked'] }

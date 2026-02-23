@@ -218,7 +218,7 @@ class SystemDataQueryService {
    * @returns {Promise<Object>} 市场挂牌列表和分页信息
    */
   static async getMarketListings(options = {}) {
-    const { MarketListing, User, ItemInstance } = require('../../models')
+    const { MarketListing, User, Item } = require('../../models')
 
     const {
       seller_user_id,
@@ -255,7 +255,7 @@ class SystemDataQueryService {
       where,
       include: [
         { model: User, as: 'seller', attributes: ['user_id', 'nickname', 'mobile'] },
-        { model: ItemInstance, as: 'offerItem', required: false }
+        { model: Item, as: 'offerItem', required: false }
       ],
       order,
       limit: pageSizeNum,
@@ -282,12 +282,12 @@ class SystemDataQueryService {
    * @returns {Promise<Object|null>} 市场挂牌详情
    */
   static async getMarketListingById(market_listing_id) {
-    const { MarketListing, User, ItemInstance } = require('../../models')
+    const { MarketListing, User, Item } = require('../../models')
 
     const listing = await MarketListing.findByPk(parseInt(market_listing_id), {
       include: [
         { model: User, as: 'seller', attributes: ['user_id', 'nickname', 'mobile'] },
-        { model: ItemInstance, as: 'offerItem' }
+        { model: Item, as: 'offerItem' }
       ]
     })
 

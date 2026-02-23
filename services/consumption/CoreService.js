@@ -261,6 +261,10 @@ class CoreService {
     }
 
     // 3. 先发放积分（满足数据库约束 chk_approved_has_reward）
+    const mintAccount = await BalanceService.getOrCreateAccount(
+      { system_code: 'SYSTEM_MINT' },
+      { transaction }
+    )
     // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
     const pointsResult = await BalanceService.changeBalance(
       {
@@ -269,6 +273,7 @@ class CoreService {
         delta_amount: record.points_to_award,
         business_type: 'consumption_reward',
         idempotency_key: `consumption_reward:approve:${recordId}`,
+        counterpart_account_id: mintAccount.account_id,
         meta: {
           reference_type: 'consumption',
           reference_id: recordId,
@@ -350,6 +355,7 @@ class CoreService {
           business_type: 'consumption_budget_allocation',
           idempotency_key: `consumption_budget:approve:${recordId}`,
           lottery_campaign_id: 'CONSUMPTION_DEFAULT',
+          counterpart_account_id: mintAccount.account_id,
           meta: {
             reference_type: 'consumption',
             reference_id: recordId,

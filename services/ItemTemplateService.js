@@ -6,7 +6,7 @@
  *
  * 业务场景：
  * - 定义不可叠加物品（NFT类物品）的模板
- * - 为 ItemInstance 提供模板定义
+ * - 为 Item 提供模板定义
  * - 为市场挂牌提供物品分类筛选维度
  *
  * 服务层职责：
@@ -400,8 +400,8 @@ class ItemTemplateService {
       }
 
       // 检查是否有关联的物品实例
-      if (this.models.ItemInstance) {
-        const instanceCount = await this.models.ItemInstance.count({
+      if (this.models.Item) {
+        const instanceCount = await this.models.Item.count({
           where: { item_template_id },
           transaction
         })

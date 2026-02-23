@@ -6,13 +6,13 @@
  * 功能覆盖：
  * 1. GET /api/v4/backpack - 获取用户背包（资产 + 物品）
  * 2. GET /api/v4/backpack/stats - 获取背包统计信息
- * 3. GET /api/v4/backpack/items/:item_instance_id - 获取物品详情
- * 4. POST /api/v4/backpack/items/:item_instance_id/redeem - 生成核销码
- * 5. POST /api/v4/backpack/items/:item_instance_id/use - 直接使用物品
+ * 3. GET /api/v4/backpack/items/:item_id - 获取物品详情
+ * 4. POST /api/v4/backpack/items/:item_id/redeem - 生成核销码
+ * 5. POST /api/v4/backpack/items/:item_id/use - 直接使用物品
  * 6. GET /api/v4/backpack/exchange/items - 用户端兑换商品列表
  *
  * 相关模型：
- * - ItemInstance: 物品实例
+ * - Item: 物品实例
  * - AccountAssetBalance: 资产余额
  * - RedemptionOrder: 核销订单
  *
@@ -164,7 +164,7 @@ describe('背包API测试 - P2优先级', () => {
       if (items.length > 0) {
         const item = items[0]
         // 物品应该包含以下字段
-        expect(item).toHaveProperty('item_instance_id')
+        expect(item).toHaveProperty('item_id')
         expect(item).toHaveProperty('status')
         // 可选但常见的字段
         if (item.item_type !== undefined) {
@@ -313,12 +313,12 @@ describe('背包API测试 - P2优先级', () => {
   })
 
   // ===== 测试用例6：物品详情 =====
-  describe('GET /api/v4/backpack/items/:item_instance_id - 获取物品详情', () => {
+  describe('GET /api/v4/backpack/items/:item_id - 获取物品详情', () => {
     /*
      * 业务场景：用户在背包中点击某个物品查看详情
      * 预期行为：返回物品类型、名称、状态、是否有核销码等信息
      */
-    let test_item_instance_id = null
+    let test_item_id = null
 
     beforeAll(async () => {
       // 从背包中获取一个真实的物品ID
@@ -327,30 +327,30 @@ describe('背包API测试 - P2优先级', () => {
         .set('Authorization', `Bearer ${user_token}`)
 
       if (backpackResponse.body.data?.items?.length > 0) {
-        test_item_instance_id = backpackResponse.body.data.items[0].item_instance_id
+        test_item_id = backpackResponse.body.data.items[0].item_id
       }
     })
 
     test('应该返回正确的物品详情结构', async () => {
-      if (!test_item_instance_id) {
+      if (!test_item_id) {
         console.log('⚠️ 跳过：用户背包中没有可用物品')
         return
       }
 
       const response = await request(app)
-        .get(`/api/v4/backpack/items/${test_item_instance_id}`)
+        .get(`/api/v4/backpack/items/${test_item_id}`)
         .set('Authorization', `Bearer ${user_token}`)
 
       expect(response.status).toBe(200)
       expect(response.body.success).toBe(true)
 
       const detail = response.body.data
-      expect(detail).toHaveProperty('item_instance_id')
+      expect(detail).toHaveProperty('item_id')
       expect(detail).toHaveProperty('item_type')
       expect(detail).toHaveProperty('status')
       expect(detail).toHaveProperty('is_owner')
       expect(detail).toHaveProperty('has_redemption_code')
-      expect(detail.item_instance_id).toBe(test_item_instance_id)
+      expect(detail.item_id).toBe(test_item_id)
     })
 
     test('不存在的物品应该返回404', async () => {
@@ -381,7 +381,7 @@ describe('背包API测试 - P2优先级', () => {
   })
 
   // ===== 测试用例7：生成核销码 =====
-  describe('POST /api/v4/backpack/items/:item_instance_id/redeem - 生成核销码', () => {
+  describe('POST /api/v4/backpack/items/:item_id/redeem - 生成核销码', () => {
     /*
      * 业务场景（美团模式）：
      * 用户在背包中选择一个 voucher/product 物品 → 生成核销码 → 到店出示
@@ -398,7 +398,7 @@ describe('背包API测试 - P2优先级', () => {
       const items = backpackResponse.body.data?.items || []
       const candidate = items.find(i => !i.has_redemption_code && i.status === 'available')
       if (candidate) {
-        redeemable_item_id = candidate.item_instance_id
+        redeemable_item_id = candidate.item_id
       }
     })
 

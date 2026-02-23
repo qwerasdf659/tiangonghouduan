@@ -32,7 +32,7 @@ const {
   User,
   MarketListing,
   TradeOrder
-  // ItemInstance, AccountAssetBalance 用于后续资产交割验证扩展
+  // Item, AccountAssetBalance 用于后续资产交割验证扩展
 } = require('../../../models')
 // V4.7.0 拆分：使用 market-listing/CoreService
 const MarketListingService = require('../../../services/market-listing/CoreService')

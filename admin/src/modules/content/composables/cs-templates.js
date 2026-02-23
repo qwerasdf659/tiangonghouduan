@@ -7,17 +7,22 @@
  */
 
 import { logger } from '../../../utils/logger.js'
-import { ContentAPI } from '../../../api/content.js'
+import { request } from '../../../api/base.js'
+import { CONTENT_ENDPOINTS } from '../../../api/content.js'
 
 /**
  * 消息模板状态
  * @returns {Object} 状态对象
  */
-export function useCsTemplatesState() {
+export function useCsTemplatesState () {
   return {
+    /** @type {Array} 模板分类列表 [{ category, templates: [{title, content}] }] */
     templateCategories: [],
+    /** @type {boolean} 加载中 */
     templatesLoading: false,
+    /** @type {boolean} 模板面板显示状态 */
     showTemplatePanel: false,
+    /** @type {string} 搜索过滤关键词 */
     templateFilter: ''
   }
 }
@@ -26,25 +31,25 @@ export function useCsTemplatesState() {
  * 消息模板方法
  * @returns {Object} 方法对象
  */
-export function useCsTemplatesMethods() {
+export function useCsTemplatesMethods () {
   return {
-    /** 加载消息模板库 */
-    async loadTemplates() {
+    /** 加载消息模板库（从 system_configs 获取） */
+    async loadTemplates () {
       this.templatesLoading = true
       try {
-        const response = await ContentAPI.getMessageTemplates()
+        const response = await request({ url: CONTENT_ENDPOINTS.CS_GM_TEMPLATES, method: 'GET' })
         if (response?.success) {
           this.templateCategories = response.data?.categories || response.data || []
         }
       } catch (error) {
-        logger.error('加载消息模板失败:', error)
+        logger.error('[Templates] 加载消息模板失败:', error)
       } finally {
         this.templatesLoading = false
       }
     },
 
-    /** 切换模板面板显示 */
-    toggleTemplatePanel() {
+    /** 切换模板面板显示/隐藏 */
+    toggleTemplatePanel () {
       this.showTemplatePanel = !this.showTemplatePanel
       if (this.showTemplatePanel && !this.templateCategories.length) {
         this.loadTemplates()
@@ -53,28 +58,28 @@ export function useCsTemplatesMethods() {
 
     /**
      * 选择模板内容插入到消息输入框
-     * @param {string} content - 模板内容
+     * @param {string} content - 模板文本
      */
-    selectTemplate(content) {
+    selectTemplate (content) {
       this.messageInput = content
       this.showTemplatePanel = false
     },
 
     /**
-     * 按关键词过滤模板
-     * @returns {Array} 过滤后的模板列表
+     * 获取按关键词过滤后的模板列表
+     * @returns {Array} 过滤结果
      */
-    get filteredTemplates() {
+    getFilteredTemplates () {
       if (!this.templateFilter) return this.templateCategories
       const keyword = this.templateFilter.toLowerCase()
       return this.templateCategories
         .map(cat => ({
           ...cat,
-          templates: (cat.templates || []).filter(
+          items: (cat.items || []).filter(
             t => t.title?.toLowerCase().includes(keyword) || t.content?.toLowerCase().includes(keyword)
           )
         }))
-        .filter(cat => cat.templates.length > 0)
+        .filter(cat => cat.items.length > 0)
     }
   }
 }

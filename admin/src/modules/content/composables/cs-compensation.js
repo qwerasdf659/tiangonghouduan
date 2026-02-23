@@ -8,6 +8,7 @@
 
 import { logger } from '../../../utils/logger.js'
 import { ContentAPI } from '../../../api/content.js'
+import Alpine from 'alpinejs'
 
 /**
  * 补偿工具状态
@@ -53,7 +54,13 @@ export function useCsCompensationMethods() {
     /** 关闭补偿弹窗 */
     closeCompensationModal() {
       this.showCompensationModal = false
-      this.compensationForm = { user_id: null, session_id: null, issue_id: null, reason: '', items: [] }
+      this.compensationForm = {
+        user_id: null,
+        session_id: null,
+        issue_id: null,
+        reason: '',
+        items: []
+      }
     },
 
     /** 添加补偿项 */
@@ -73,10 +80,16 @@ export function useCsCompensationMethods() {
     async submitCompensation() {
       const { user_id, reason, items, session_id, issue_id } = this.compensationForm
 
-      if (!user_id) { this.showError('用户ID不能为空'); return }
-      if (!reason.trim()) { this.showError('请填写补偿原因'); return }
+      if (!user_id) {
+        Alpine.store('notification').show('用户ID不能为空', 'error')
+        return
+      }
+      if (!reason.trim()) {
+        Alpine.store('notification').show('请填写补偿原因', 'error')
+        return
+      }
       if (!items.length || items.every(i => !i.amount || i.amount <= 0)) {
-        this.showError('请至少添加一项有效补偿')
+        Alpine.store('notification').show('请至少添加一项有效补偿', 'error')
         return
       }
 
@@ -91,19 +104,19 @@ export function useCsCompensationMethods() {
         })
 
         if (response?.success) {
-          this.showSuccess('补偿发放成功')
+          Alpine.store('notification').show('补偿发放成功', 'success')
           this.closeCompensationModal()
           /* 刷新用户资产数据 */
-          if (this.contextUserId === user_id) {
-            this.contextAssets = null
-            this.loadContextTabData('assets')
+          if (this._getContextUserId() === user_id) {
+            this.context_assets = null
+            this.loadContextTab('assets')
           }
         } else {
-          this.showError(response?.message || '补偿发放失败')
+          Alpine.store('notification').show(response?.message || '补偿发放失败', 'error')
         }
       } catch (error) {
         logger.error('补偿发放失败:', error)
-        this.showError(error.message || '补偿发放失败')
+        Alpine.store('notification').show(error.message || '补偿发放失败', 'error')
       } finally {
         this.compensationSubmitting = false
       }

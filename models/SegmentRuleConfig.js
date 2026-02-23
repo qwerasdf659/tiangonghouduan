@@ -1,7 +1,6 @@
 'use strict'
 
 const { Model, DataTypes } = require('sequelize')
-const BeijingTimeHelper = require('../utils/timeHelper')
 
 /**
  * 用户分群规则配置模型
@@ -9,12 +8,17 @@ const BeijingTimeHelper = require('../utils/timeHelper')
  * 业务场景：运营在管理后台自助配置分群条件，SegmentResolver 优先读取此表
  */
 class SegmentRuleConfig extends Model {
-  static associate(models) {
+  /**
+   * 模型关联定义
+   * @param {Object} _models - 全部已注册的 Sequelize 模型集合
+   * @returns {void}
+   */
+  static associate(_models) {
     /* 预留：创建人关联 User 模型 */
   }
 }
 
-module.exports = (sequelize) => {
+module.exports = sequelize => {
   SegmentRuleConfig.init(
     {
       /** 自增主键 */

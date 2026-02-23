@@ -99,8 +99,10 @@ class ItemService {
 
       if (existingEntry) {
         logger.info('⚠️ 幂等性检查：物品已铸造，返回原结果', {
-          service: 'ItemService', method: 'mintItem',
-          idempotency_key, item_id: existingEntry.item_id
+          service: 'ItemService',
+          method: 'mintItem',
+          idempotency_key,
+          item_id: existingEntry.item_id
         })
         const existingItem = await Item.findByPk(existingEntry.item_id, { transaction })
         return { item: existingItem, is_duplicate: true }
@@ -111,19 +113,22 @@ class ItemService {
       const mintAccount = await Account.getSystemAccount('SYSTEM_MINT', { transaction })
 
       // 1. 创建 items 缓存记录
-      const item = await Item.create({
-        tracking_code: 'TEMP', // 先占位，拿到 item_id 后回填
-        owner_account_id: userAccount.account_id,
-        status: 'available',
-        item_type,
-        item_name,
-        item_description: item_description || '',
-        item_value: Math.round(item_value) || 0,
-        prize_definition_id: prize_definition_id || null,
-        rarity_code,
-        source,
-        source_ref_id: source_ref_id || null
-      }, { transaction })
+      const item = await Item.create(
+        {
+          tracking_code: 'TEMP', // 先占位，拿到 item_id 后回填
+          owner_account_id: userAccount.account_id,
+          status: 'available',
+          item_type,
+          item_name,
+          item_description: item_description || '',
+          item_value: Math.round(item_value) || 0,
+          prize_definition_id: prize_definition_id || null,
+          rarity_code,
+          source,
+          source_ref_id: source_ref_id || null
+        },
+        { transaction }
+      )
 
       // 2. 生成 tracking_code 并回填
       const trackingCode = TrackingCodeGenerator.generate({
@@ -134,42 +139,54 @@ class ItemService {
       await item.update({ tracking_code: trackingCode }, { transaction })
 
       // 3. 双录写入 item_ledger（SYSTEM_MINT -1 + 用户 +1）
-      await ItemLedger.bulkCreate([
-        {
-          item_id: item.item_id,
-          account_id: mintAccount.account_id,
-          delta: -1,
-          counterpart_id: userAccount.account_id,
-          event_type: 'mint',
-          operator_type: 'system',
-          business_type,
-          idempotency_key: `${idempotency_key}:out`,
-          meta: { source, source_ref_id, ...meta }
-        },
-        {
-          item_id: item.item_id,
-          account_id: userAccount.account_id,
-          delta: 1,
-          counterpart_id: mintAccount.account_id,
-          event_type: 'mint',
-          operator_type: 'system',
-          business_type,
-          idempotency_key: `${idempotency_key}:in`,
-          meta: { source, source_ref_id, ...meta }
-        }
-      ], { transaction })
+      await ItemLedger.bulkCreate(
+        [
+          {
+            item_id: item.item_id,
+            account_id: mintAccount.account_id,
+            delta: -1,
+            counterpart_id: userAccount.account_id,
+            event_type: 'mint',
+            operator_type: 'system',
+            business_type,
+            idempotency_key: `${idempotency_key}:out`,
+            meta: { source, source_ref_id, ...meta }
+          },
+          {
+            item_id: item.item_id,
+            account_id: userAccount.account_id,
+            delta: 1,
+            counterpart_id: mintAccount.account_id,
+            event_type: 'mint',
+            operator_type: 'system',
+            business_type,
+            idempotency_key: `${idempotency_key}:in`,
+            meta: { source, source_ref_id, ...meta }
+          }
+        ],
+        { transaction }
+      )
 
       logger.info('✅ 物品铸造成功（双录）', {
-        service: 'ItemService', method: 'mintItem',
-        item_id: item.item_id, tracking_code: trackingCode,
-        user_id, item_type, source, business_type
+        service: 'ItemService',
+        method: 'mintItem',
+        item_id: item.item_id,
+        tracking_code: trackingCode,
+        user_id,
+        item_type,
+        source,
+        business_type
       })
 
       return { item, is_duplicate: false }
     } catch (error) {
       logger.error('❌ 物品铸造失败', {
-        service: 'ItemService', method: 'mintItem',
-        user_id, item_type, source, error: error.message
+        service: 'ItemService',
+        method: 'mintItem',
+        user_id,
+        item_type,
+        source,
+        error: error.message
       })
       throw error
     }
@@ -224,45 +241,63 @@ class ItemService {
       if (activeHold) {
         const { canOverride, reason: overrideReason } = activeHold.canBeOverriddenBy(hold_type)
         if (!canOverride) {
-          throw new Error(`物品已被 ${activeHold.hold_type} 锁定（ref: ${activeHold.holder_ref}），${overrideReason}`)
+          throw new Error(
+            `物品已被 ${activeHold.hold_type} 锁定（ref: ${activeHold.holder_ref}），${overrideReason}`
+          )
         }
         // 高优先级覆盖：标记旧锁为 overridden
-        await activeHold.update({
-          status: 'overridden',
-          released_at: new Date(),
-          reason: `被 ${hold_type} 覆盖`
-        }, { transaction })
+        await activeHold.update(
+          {
+            status: 'overridden',
+            released_at: new Date(),
+            reason: `被 ${hold_type} 覆盖`
+          },
+          { transaction }
+        )
 
         logger.warn('⚠️ 高优先级锁覆盖', {
-          service: 'ItemService', method: 'holdItem',
-          item_id, old_type: activeHold.hold_type, new_type: hold_type
+          service: 'ItemService',
+          method: 'holdItem',
+          item_id,
+          old_type: activeHold.hold_type,
+          new_type: hold_type
         })
       }
 
       // 创建新锁定记录
-      const hold = await ItemHold.create({
-        item_id,
-        hold_type,
-        holder_ref,
-        priority,
-        status: 'active',
-        reason: reason || `${hold_type} 锁定`,
-        expires_at: expires_at || null
-      }, { transaction })
+      const hold = await ItemHold.create(
+        {
+          item_id,
+          hold_type,
+          holder_ref,
+          priority,
+          status: 'active',
+          reason: reason || `${hold_type} 锁定`,
+          expires_at: expires_at || null
+        },
+        { transaction }
+      )
 
       // 更新 items 缓存状态
       await item.update({ status: 'held' }, { transaction })
 
       logger.info('✅ 物品锁定成功', {
-        service: 'ItemService', method: 'holdItem',
-        item_id, hold_type, holder_ref, hold_id: hold.hold_id
+        service: 'ItemService',
+        method: 'holdItem',
+        item_id,
+        hold_type,
+        holder_ref,
+        hold_id: hold.hold_id
       })
 
       return { item: await item.reload({ transaction }), hold }
     } catch (error) {
       logger.error('❌ 物品锁定失败', {
-        service: 'ItemService', method: 'holdItem',
-        item_id, hold_type, error: error.message
+        service: 'ItemService',
+        method: 'holdItem',
+        item_id,
+        hold_type,
+        error: error.message
       })
       throw error
     }
@@ -295,16 +330,22 @@ class ItemService {
 
       if (!hold) {
         logger.warn('⚠️ 未找到匹配的活跃锁', {
-          service: 'ItemService', method: 'releaseHold',
-          item_id, holder_ref, hold_type
+          service: 'ItemService',
+          method: 'releaseHold',
+          item_id,
+          holder_ref,
+          hold_type
         })
         return await Item.findByPk(item_id, { transaction })
       }
 
-      await hold.update({
-        status: 'released',
-        released_at: new Date()
-      }, { transaction })
+      await hold.update(
+        {
+          status: 'released',
+          released_at: new Date()
+        },
+        { transaction }
+      )
 
       // 检查是否还有其他活跃锁
       const remainingHolds = await ItemHold.count({
@@ -323,15 +364,21 @@ class ItemService {
       }
 
       logger.info('✅ 物品锁定释放成功', {
-        service: 'ItemService', method: 'releaseHold',
-        item_id, holder_ref, hold_type, new_status: item.status
+        service: 'ItemService',
+        method: 'releaseHold',
+        item_id,
+        holder_ref,
+        hold_type,
+        new_status: item.status
       })
 
       return await item.reload({ transaction })
     } catch (error) {
       logger.error('❌ 物品锁定释放失败', {
-        service: 'ItemService', method: 'releaseHold',
-        item_id, error: error.message
+        service: 'ItemService',
+        method: 'releaseHold',
+        item_id,
+        error: error.message
       })
       throw error
     }
@@ -353,7 +400,13 @@ class ItemService {
    * @returns {Promise<{ item: Object, is_duplicate: boolean }>} 转移结果
    */
   static async transferItem(params, options = {}) {
-    const { item_id, new_owner_user_id, business_type = 'market_transfer', idempotency_key, meta = {} } = params
+    const {
+      item_id,
+      new_owner_user_id,
+      business_type = 'market_transfer',
+      idempotency_key,
+      meta = {}
+    } = params
     const { transaction } = options
 
     requireTransaction(transaction, 'ItemService.transferItem')
@@ -391,50 +444,60 @@ class ItemService {
       const newOwnerAccount = await this._getUserAccount(new_owner_user_id, { transaction })
 
       // 双录写入（卖方 -1 + 买方 +1）
-      await ItemLedger.bulkCreate([
-        {
-          item_id,
-          account_id: oldOwnerAccount.account_id,
-          delta: -1,
-          counterpart_id: newOwnerAccount.account_id,
-          event_type: 'transfer',
-          operator_id: new_owner_user_id,
-          operator_type: 'user',
-          business_type,
-          idempotency_key: `${idempotency_key}:out`,
-          meta
-        },
-        {
-          item_id,
-          account_id: newOwnerAccount.account_id,
-          delta: 1,
-          counterpart_id: oldOwnerAccount.account_id,
-          event_type: 'transfer',
-          operator_id: new_owner_user_id,
-          operator_type: 'user',
-          business_type,
-          idempotency_key: `${idempotency_key}:in`,
-          meta
-        }
-      ], { transaction })
+      await ItemLedger.bulkCreate(
+        [
+          {
+            item_id,
+            account_id: oldOwnerAccount.account_id,
+            delta: -1,
+            counterpart_id: newOwnerAccount.account_id,
+            event_type: 'transfer',
+            operator_id: new_owner_user_id,
+            operator_type: 'user',
+            business_type,
+            idempotency_key: `${idempotency_key}:out`,
+            meta
+          },
+          {
+            item_id,
+            account_id: newOwnerAccount.account_id,
+            delta: 1,
+            counterpart_id: oldOwnerAccount.account_id,
+            event_type: 'transfer',
+            operator_id: new_owner_user_id,
+            operator_type: 'user',
+            business_type,
+            idempotency_key: `${idempotency_key}:in`,
+            meta
+          }
+        ],
+        { transaction }
+      )
 
       // 更新缓存：所有者变更 + 状态恢复
-      await item.update({
-        owner_account_id: newOwnerAccount.account_id,
-        status: 'available'
-      }, { transaction })
+      await item.update(
+        {
+          owner_account_id: newOwnerAccount.account_id,
+          status: 'available'
+        },
+        { transaction }
+      )
 
       logger.info('✅ 物品转移成功（双录）', {
-        service: 'ItemService', method: 'transferItem',
-        item_id, from_account: oldOwnerAccount.account_id,
+        service: 'ItemService',
+        method: 'transferItem',
+        item_id,
+        from_account: oldOwnerAccount.account_id,
         to_account: newOwnerAccount.account_id
       })
 
       return { item: await item.reload({ transaction }), is_duplicate: false }
     } catch (error) {
       logger.error('❌ 物品转移失败', {
-        service: 'ItemService', method: 'transferItem',
-        item_id, error: error.message
+        service: 'ItemService',
+        method: 'transferItem',
+        item_id,
+        error: error.message
       })
       throw error
     }
@@ -456,7 +519,13 @@ class ItemService {
    * @returns {Promise<{ item: Object, is_duplicate: boolean }>} 消耗结果
    */
   static async consumeItem(params, options = {}) {
-    const { item_id, operator_user_id, business_type = 'backpack_use', idempotency_key, meta = {} } = params
+    const {
+      item_id,
+      operator_user_id,
+      business_type = 'backpack_use',
+      idempotency_key,
+      meta = {}
+    } = params
     const { transaction } = options
 
     requireTransaction(transaction, 'ItemService.consumeItem')
@@ -493,46 +562,54 @@ class ItemService {
       const burnAccount = await Account.getSystemAccount('SYSTEM_BURN', { transaction })
 
       // 双录写入（用户 -1 + SYSTEM_BURN +1）
-      await ItemLedger.bulkCreate([
-        {
-          item_id,
-          account_id: ownerAccount.account_id,
-          delta: -1,
-          counterpart_id: burnAccount.account_id,
-          event_type: 'use',
-          operator_id: operator_user_id || null,
-          operator_type: operator_user_id ? 'user' : 'system',
-          business_type,
-          idempotency_key: `${idempotency_key}:out`,
-          meta
-        },
-        {
-          item_id,
-          account_id: burnAccount.account_id,
-          delta: 1,
-          counterpart_id: ownerAccount.account_id,
-          event_type: 'use',
-          operator_id: operator_user_id || null,
-          operator_type: operator_user_id ? 'user' : 'system',
-          business_type,
-          idempotency_key: `${idempotency_key}:in`,
-          meta
-        }
-      ], { transaction })
+      await ItemLedger.bulkCreate(
+        [
+          {
+            item_id,
+            account_id: ownerAccount.account_id,
+            delta: -1,
+            counterpart_id: burnAccount.account_id,
+            event_type: 'use',
+            operator_id: operator_user_id || null,
+            operator_type: operator_user_id ? 'user' : 'system',
+            business_type,
+            idempotency_key: `${idempotency_key}:out`,
+            meta
+          },
+          {
+            item_id,
+            account_id: burnAccount.account_id,
+            delta: 1,
+            counterpart_id: ownerAccount.account_id,
+            event_type: 'use',
+            operator_id: operator_user_id || null,
+            operator_type: operator_user_id ? 'user' : 'system',
+            business_type,
+            idempotency_key: `${idempotency_key}:in`,
+            meta
+          }
+        ],
+        { transaction }
+      )
 
       // 更新缓存：标记已使用
       await item.update({ status: 'used' }, { transaction })
 
       logger.info('✅ 物品消耗成功（双录）', {
-        service: 'ItemService', method: 'consumeItem',
-        item_id, operator_user_id, business_type
+        service: 'ItemService',
+        method: 'consumeItem',
+        item_id,
+        operator_user_id,
+        business_type
       })
 
       return { item: await item.reload({ transaction }), is_duplicate: false }
     } catch (error) {
       logger.error('❌ 物品消耗失败', {
-        service: 'ItemService', method: 'consumeItem',
-        item_id, error: error.message
+        service: 'ItemService',
+        method: 'consumeItem',
+        item_id,
+        error: error.message
       })
       throw error
     }
@@ -567,30 +644,33 @@ class ItemService {
     const ownerAccount = await this._getAccountById(item.owner_account_id, { transaction })
     const burnAccount = await Account.getSystemAccount('SYSTEM_BURN', { transaction })
 
-    await ItemLedger.bulkCreate([
-      {
-        item_id,
-        account_id: ownerAccount.account_id,
-        delta: -1,
-        counterpart_id: burnAccount.account_id,
-        event_type: 'expire',
-        operator_type: 'system',
-        business_type: 'auto_expire',
-        idempotency_key: `expire_${item_id}:out`,
-        meta: { reason }
-      },
-      {
-        item_id,
-        account_id: burnAccount.account_id,
-        delta: 1,
-        counterpart_id: ownerAccount.account_id,
-        event_type: 'expire',
-        operator_type: 'system',
-        business_type: 'auto_expire',
-        idempotency_key: `expire_${item_id}:in`,
-        meta: { reason }
-      }
-    ], { transaction })
+    await ItemLedger.bulkCreate(
+      [
+        {
+          item_id,
+          account_id: ownerAccount.account_id,
+          delta: -1,
+          counterpart_id: burnAccount.account_id,
+          event_type: 'expire',
+          operator_type: 'system',
+          business_type: 'auto_expire',
+          idempotency_key: `expire_${item_id}:out`,
+          meta: { reason }
+        },
+        {
+          item_id,
+          account_id: burnAccount.account_id,
+          delta: 1,
+          counterpart_id: ownerAccount.account_id,
+          event_type: 'expire',
+          operator_type: 'system',
+          business_type: 'auto_expire',
+          idempotency_key: `expire_${item_id}:in`,
+          meta: { reason }
+        }
+      ],
+      { transaction }
+    )
 
     await item.update({ status: 'expired' }, { transaction })
 
@@ -743,10 +823,7 @@ class ItemService {
    */
   static async _getUserAccount(userId, options = {}) {
     const BalanceService = require('./BalanceService')
-    return await BalanceService.getOrCreateAccount(
-      { user_id: userId },
-      options
-    )
+    return await BalanceService.getOrCreateAccount({ user_id: userId }, options)
   }
 
   /**

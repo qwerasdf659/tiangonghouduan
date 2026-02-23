@@ -5185,9 +5185,14 @@
                 <input type="text" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" x-model="campaignForm.campaign_name" placeholder="如：春节抽奖活动" required>
               </div>
               <div>
-                <label class="block text-sm font-medium themed-text-secondary mb-1">活动代码 <span class="text-red-500">*</span></label>
-                <input type="text" class="w-full px-3 py-2 border rounded themed-bg-subtle focus:ring-2 focus:ring-blue-500" x-model="campaignForm.campaign_code" :readonly="isEditMode" placeholder="自动生成" required>
-                <p class="text-xs themed-text-muted mt-1">唯一标识，创建后不可修改</p>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">活动代码</label>
+                <input type="text"
+                  class="w-full px-3 py-2 border rounded bg-gray-100 text-gray-500 cursor-not-allowed"
+                  :value="isEditMode ? campaignForm.campaign_code : ''"
+                  readonly
+                  :placeholder="isEditMode ? '' : '系统自动生成'"
+                >
+                <p class="text-xs themed-text-muted mt-1">后端自动生成，创建后不可修改</p>
               </div>
             </div>
             <div class="grid grid-cols-2 gap-4 mt-3">

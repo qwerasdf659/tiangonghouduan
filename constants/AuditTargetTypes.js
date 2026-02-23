@@ -77,7 +77,7 @@ const AUDIT_TARGET_TYPES = Object.freeze({
 
   // ========== 系统配置 ==========
   SYSTEM_SETTING: 'system_setting',
-  POPUP_BANNER: 'popup_banner',
+  AD_CAMPAIGN: 'ad_campaign',
   FEATURE_FLAG: 'feature_flag'
 })
 
@@ -165,7 +165,7 @@ function getTargetTypeDisplayName(targetType) {
     market_listing: '市场挂牌',
     trade_order: '交易订单',
     system_setting: '系统设置',
-    popup_banner: '弹窗广告',
+    ad_campaign: '广告计划',
     feature_flag: '功能开关'
   }
 

@@ -30,7 +30,7 @@
 require('dotenv').config()
 
 const HourlyUnlockTimeoutTradeOrders = require('../../jobs/hourly-unlock-timeout-trade-orders')
-const { ItemInstance, TradeOrder, ItemInstanceEvent } = require('../../models')
+const { Item, TradeOrder, ItemLedger } = require('../../models')
 // MarketListing 可用于关联挂单测试
 const { Op } = require('sequelize')
 
@@ -77,7 +77,7 @@ describe('P3-6b: HourlyUnlockTimeoutTradeOrders - 每小时超时交易订单解
       const threeMinutesAgo = new Date(Date.now() - 3 * 60 * 1000)
 
       // 查询有 trade 锁的物品实例
-      const lockedItems = await ItemInstance.findAll({
+      const lockedItems = await Item.findAll({
         where: {
           status: { [Op.in]: ['locked', 'trading'] }
         },
@@ -95,7 +95,7 @@ describe('P3-6b: HourlyUnlockTimeoutTradeOrders - 每小时超时交易订单解
             const isTimeout = lockedAt < threeMinutesAgo
 
             console.log(
-              `[P3-6b] 物品 ${item.item_instance_id}: locked_at=${lockedAt.toISOString()}, isTimeout=${isTimeout}`
+              `[P3-6b] 物品 ${item.item_id}: locked_at=${lockedAt.toISOString()}, isTimeout=${isTimeout}`
             )
           }
         }
@@ -118,7 +118,7 @@ describe('P3-6b: HourlyUnlockTimeoutTradeOrders - 每小时超时交易订单解
         expect(order.status).toBeDefined()
 
         console.log(
-          `[P3-6b] 订单 ${order.order_id}: status=${order.status}, item_instance_id=${order.item_instance_id}`
+          `[P3-6b] 订单 ${order.order_id}: status=${order.status}, item_id=${order.item_id}`
         )
       }
     })
@@ -142,7 +142,7 @@ describe('P3-6b: HourlyUnlockTimeoutTradeOrders - 每小时超时交易订单解
       await HourlyUnlockTimeoutTradeOrders.execute()
 
       // 查询最近的解锁事件
-      const recentEvents = await ItemInstanceEvent.findAll({
+      const recentEvents = await ItemLedger.findAll({
         where: {
           event_type: { [Op.in]: ['unlock', 'timeout_unlock', 'trade_cancelled'] }
         },
@@ -154,9 +154,9 @@ describe('P3-6b: HourlyUnlockTimeoutTradeOrders - 每小时超时交易订单解
 
       for (const event of recentEvents) {
         expect(event.event_type).toBeDefined()
-        expect(event.item_instance_id).toBeDefined()
+        expect(event.item_id).toBeDefined()
 
-        console.log(`[P3-6b] 事件: ${event.event_type}, item=${event.item_instance_id}`)
+        console.log(`[P3-6b] 事件: ${event.event_type}, item=${event.item_id}`)
       }
     })
 

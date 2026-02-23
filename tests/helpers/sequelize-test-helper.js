@@ -445,7 +445,7 @@ function createTestTransactionManager(options = {}) {
  *   [
  *     tx => User.create({ ... }, { transaction: tx }),
  *     tx => User.create({ ... }, { transaction: tx }),
- *     tx => ItemInstance.create({ ... }, { transaction: tx })
+ *     tx => Item.create({ ... }, { transaction: tx })
  *   ]
  * )
  */
@@ -479,7 +479,7 @@ async function batchCreateInTransaction(transaction, creators) {
  *     return listing.status === 'on_sale'
  *   },
  *   async tx => {
- *     const item = await ItemInstance.findOne({ where: { ... }, transaction: tx })
+ *     const item = await Item.findOne({ where: { ... }, transaction: tx })
  *     return item.status === 'listed'
  *   }
  * ])

@@ -44,6 +44,9 @@ const BeijingTimeHelper = require('../../../../utils/timeHelper')
 /* 抽奖计算引擎 */
 const LotteryComputeEngine = require('../../compute/LotteryComputeEngine')
 
+/* 动态配置加载器（读取活动级 pressure/matrix 开关） */
+const { DynamicConfigLoader } = require('../../compute/config/StrategyConfig')
+
 /**
  * 权重缩放比例（整数权重系统）
  * 例如：weight = 100000 表示 10% 的概率
@@ -189,11 +192,21 @@ class TierPickStage extends BaseStage {
         })
       }
 
-      // normal 模式：继续正常的档位抽取流程
+      // 获取活动配置（从 LoadCampaignStage 的结果中）
+      const campaign_data = this.getContextData(context, 'LoadCampaignStage.data')
+      if (!campaign_data || !campaign_data.campaign) {
+        throw this.createError(
+          '缺少活动配置数据，请确保 LoadCampaignStage 已执行',
+          'MISSING_CAMPAIGN_DATA',
+          true
+        )
+      }
+
+      const campaign = campaign_data.campaign
+      const tier_rules = campaign_data.tier_rules || []
 
       /* normalize 模式：跳过档位选择，由 PrizePickStage 直接按 win_probability 选奖 */
-      const campaign_check = this.getContextData(context, 'LoadCampaignStage.data')
-      if (campaign_check?.campaign?.pick_method === 'normalize') {
+      if (campaign.pick_method === 'normalize') {
         this.log('info', 'normalize 模式：跳过档位抽取，由 PrizePickStage 直接选奖', {
           user_id,
           pick_method: 'normalize'
@@ -208,42 +221,6 @@ class TierPickStage extends BaseStage {
           decision_source: 'normal',
           skipped: true,
           skip_reason: 'normalize_mode'
-        })
-      }
-
-      // 获取活动配置（从 LoadCampaignStage 的结果中）
-      const campaign_data = this.getContextData(context, 'LoadCampaignStage.data')
-      if (!campaign_data || !campaign_data.campaign) {
-        throw this.createError(
-          '缺少活动配置数据，请确保 LoadCampaignStage 已执行',
-          'MISSING_CAMPAIGN_DATA',
-          true
-        )
-      }
-
-      const campaign = campaign_data.campaign
-      const tier_rules = campaign_data.tier_rules || []
-
-      /**
-       * normalize 模式：跳过档位抽取，直接使用全量奖品池
-       * normalize 按 win_probability 百分比直接抽奖，不区分档位
-       */
-      if (campaign_data.pick_method === 'normalize') {
-        this.log('info', 'normalize模式：跳过档位抽取，使用全量奖品池', {
-          user_id,
-          pick_method: 'normalize'
-        })
-        return this.success({
-          selected_tier: null,
-          original_tier: null,
-          tier_downgrade_path: [],
-          random_value: 0,
-          tier_weights: {},
-          weight_scale: WEIGHT_SCALE,
-          decision_source,
-          skipped: true,
-          skip_reason: 'normalize_mode',
-          pick_method: 'normalize'
         })
       }
 
@@ -262,8 +239,21 @@ class TierPickStage extends BaseStage {
 
       /* 获取预算分层信息（来自 BudgetContextStage，经由 BuildPrizePoolStage 传递） */
       const budget_tier = prize_pool_data.budget_tier || 'B1'
-      const pressure_tier = prize_pool_data.pressure_tier || 'P1'
       const effective_budget = prize_pool_data.effective_budget || 0
+
+      /**
+       * 活动级 pressure.enabled 开关（lottery_strategy_config 表）
+       * 关闭后固定返回 P0，乘数恒为 1.0，不影响权重
+       */
+      const pressure_enabled = await DynamicConfigLoader.getValue('pressure_tier', 'enabled', true)
+      const pressure_tier = pressure_enabled ? prize_pool_data.pressure_tier || 'P1' : 'P0'
+
+      if (!pressure_enabled) {
+        this.log('info', '活动压力策略已关闭（pressure_tier.enabled=false），固定使用 P0', {
+          user_id,
+          lottery_campaign_id
+        })
+      }
 
       /* 1. 解析用户分群 */
       const user_segment = await this._resolveUserSegment(user_id, campaign)
@@ -271,22 +261,39 @@ class TierPickStage extends BaseStage {
       /* 2. 获取分群对应的基础档位权重 */
       const base_tier_weights = this._getTierWeights(user_segment, tier_rules, campaign)
 
-      /* 3. 应用 BxPx 矩阵权重调整（策略引擎集成） */
-      const weight_adjustment = this.computeEngine.computeWeightAdjustment({
-        budget_tier,
-        pressure_tier,
-        base_tier_weights
-      })
-      const adjusted_weights = weight_adjustment.adjusted_weights
+      /**
+       * 活动级 matrix.enabled 开关（lottery_strategy_config 表）
+       * 关闭后 computeWeightAdjustment() 直接返回原始权重，所有乘数恒为 1.0
+       */
+      const matrix_enabled = await DynamicConfigLoader.getValue('matrix', 'enabled', true)
 
-      this.log('info', 'BxPx 矩阵权重调整', {
-        user_id,
-        budget_tier,
-        pressure_tier,
-        base_weights: base_tier_weights,
-        adjusted_weights,
-        empty_weight_multiplier: weight_adjustment.empty_weight_multiplier
-      })
+      let adjusted_weights
+      let weight_adjustment = { adjusted_weights: null, empty_weight_multiplier: 1.0 }
+      if (matrix_enabled) {
+        /* 3. 应用 BxPx 矩阵权重调整（策略引擎集成） */
+        weight_adjustment = this.computeEngine.computeWeightAdjustment({
+          budget_tier,
+          pressure_tier,
+          base_tier_weights
+        })
+        adjusted_weights = weight_adjustment.adjusted_weights
+
+        this.log('info', 'BxPx 矩阵权重调整', {
+          user_id,
+          budget_tier,
+          pressure_tier,
+          base_weights: base_tier_weights,
+          adjusted_weights,
+          empty_weight_multiplier: weight_adjustment.empty_weight_multiplier
+        })
+      } else {
+        /* 矩阵关闭：直接使用基础档位权重，不做任何调整 */
+        adjusted_weights = { ...base_tier_weights }
+        this.log('info', 'BxPx 矩阵已关闭（matrix.enabled=false），使用原始权重', {
+          user_id,
+          base_weights: base_tier_weights
+        })
+      }
 
       /**
        * 🛡️ 4a. 强制概率硬上限（不可绕过的安全网 - 2026-02-15 新增）
@@ -475,8 +482,8 @@ class TierPickStage extends BaseStage {
         return 'default'
       }
 
-      // 调用 SegmentResolver.resolveSegment(version, user) 解析分群
-      const segment = SegmentResolver.resolveSegment(resolver_version, user.toJSON())
+      // 优先从数据库加载自定义分群规则，回退到内置规则
+      const segment = await SegmentResolver.resolveSegmentAsync(resolver_version, user.toJSON())
 
       this.log('info', '用户分群解析成功', {
         user_id,

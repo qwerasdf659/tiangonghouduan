@@ -58,9 +58,7 @@ router.get(
 
       const validSlotTypes = ['popup', 'carousel', 'announcement']
       if (!validSlotTypes.includes(slot_type)) {
-        return res.apiBadRequest(
-          'slot_type 必须是以下之一：' + validSlotTypes.join(', ')
-        )
+        return res.apiBadRequest('slot_type 必须是以下之一：' + validSlotTypes.join(', '))
       }
 
       // 构造 slot_key：{position}_{slot_type}（与 ad_slots 种子数据一致）

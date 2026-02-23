@@ -33,7 +33,7 @@ const {
   Account,
   AccountAssetBalance,
   MarketListing,
-  ItemInstance,
+  Item,
   TradeOrder,
   LotteryDraw,
   LotteryCampaign,
@@ -168,7 +168,7 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
     /* 清理测试物品 */
     for (const itemId of createdItems) {
       try {
-        await ItemInstance.destroy({ where: { item_instance_id: itemId }, force: true })
+        await Item.destroy({ where: { item_id: itemId }, force: true })
       } catch (error) {
         console.log(`清理物品 ${itemId} 失败:`, error.message)
       }
@@ -291,8 +291,8 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
 
       let testItem
       try {
-        testItem = await ItemInstance.create({
-          owner_user_id: sellerUserId,
+        testItem = await Item.create({
+          owner_account_id: sellerUserId,
           item_type: 'prize',
           status: 'available',
           meta: {
@@ -301,8 +301,8 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
           },
           locks: []
         })
-        createdItems.push(testItem.item_instance_id)
-        console.log('✅ 测试物品创建成功:', testItem.item_instance_id)
+        createdItems.push(testItem.item_id)
+        console.log('✅ 测试物品创建成功:', testItem.item_id)
       } catch (error) {
         console.log('⚠️ 物品创建失败:', error.message)
         return
@@ -318,7 +318,7 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
           return await MarketListingService.createListing(
             {
               seller_user_id: sellerUserId,
-              item_instance_id: testItem.item_instance_id,
+              item_id: testItem.item_id,
               price_amount: diamondPrice,
               idempotency_key: listingIdempotencyKey
             },
@@ -386,12 +386,12 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
 
       await testItem.reload()
       console.log('📊 物品最终状态:', {
-        owner_user_id: testItem.owner_user_id,
+        owner_account_id: testItem.owner_account_id,
         status: testItem.status
       })
 
       /* 验证物品所有权已转移给买家 */
-      expect(testItem.owner_user_id).toBe(buyerUserId)
+      expect(testItem.owner_account_id).toBe(buyerUserId)
       expect(testItem.status).toBe('transferred')
 
       /* 验证DIAMOND转移 */

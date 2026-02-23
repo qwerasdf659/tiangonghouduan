@@ -279,13 +279,18 @@ class ConsumptionBatchService {
       // 生成幂等键：业务类型_记录ID_操作员ID
       const idempotencyKey = `consumption_reward_${record.consumption_record_id}_${operator_id}`
 
+      const mintAccount = await BalanceService.getOrCreateAccount(
+        { system_code: 'SYSTEM_MINT' },
+        { transaction }
+      )
       await BalanceService.changeBalance(
         {
           user_id: record.user_id,
-          asset_code: 'POINTS', // 使用大写标准资产码
-          delta_amount: pointsToAward, // 正数表示增加
-          business_type: 'consumption_reward', // 业务类型
-          idempotency_key: idempotencyKey, // 幂等键
+          asset_code: 'POINTS',
+          delta_amount: pointsToAward,
+          business_type: 'consumption_reward',
+          idempotency_key: idempotencyKey,
+          counterpart_account_id: mintAccount.account_id,
           meta: {
             reference_id: record.consumption_record_id,
             reference_type: 'consumption_record',

@@ -3,7 +3,7 @@
  *
  * 业务场景：
  * - 定义不可叠加物品（NFT类物品）的模板
- * - 为 ItemInstance 提供模板定义（名称、类目、稀有度、图片等）
+ * - 为 Item 提供模板定义（名称、类目、稀有度、图片等）
  * - 为市场挂牌提供物品分类筛选维度
  *
  * 硬约束：
@@ -55,14 +55,10 @@ class ItemTemplate extends Model {
       })
     }
 
-    // 关联物品实例（一对多）
-    if (models.ItemInstance) {
-      ItemTemplate.hasMany(models.ItemInstance, {
-        foreignKey: 'item_template_id',
-        sourceKey: 'item_template_id',
-        as: 'item_instances'
-      })
-    }
+    /*
+     * 注意：items 表使用 prize_definition_id 关联 lottery_prizes，不再直接关联 item_templates
+     * 物品模板 → 物品的关系通过 lottery_prizes 间接建立
+     */
 
     // 关联市场挂牌（一对多）
     if (models.MarketListing) {
@@ -167,11 +163,11 @@ module.exports = sequelize => {
         comment: '模板代码（唯一业务标识）：如 prize_iphone_15_pro'
       },
 
-      // 物品类型（对应 item_instances.item_type）
+      // 物品类型（对应 items.item_type）
       item_type: {
         type: DataTypes.STRING(50),
         allowNull: false,
-        comment: '物品类型：对应 item_instances.item_type'
+        comment: '物品类型：对应 items.item_type'
       },
 
       // 类目代码（外键 → category_defs）

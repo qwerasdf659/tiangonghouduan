@@ -11,6 +11,7 @@ import { logger } from '../../../utils/logger.js'
 import { buildURL, request, getToken } from '../../../api/base.js'
 import { CONTENT_ENDPOINTS } from '../../../api/content.js'
 import { USER_ENDPOINTS } from '../../../api/user.js'
+import { Alpine } from '../../../alpine/index.js'
 import { io } from 'socket.io-client'
 
 /**
@@ -153,8 +154,11 @@ export function useCustomerServiceMethods() {
 
         if (response && response.success) {
           this.sessions = response.data.sessions || response.data.list || []
-          // #2 更新上次刷新时间
           this.lastUpdateTime = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
+          /* 更新顶部工作状态栏指标 */
+          if (typeof this.updateWorkStatus === 'function') {
+            this.updateWorkStatus()
+          }
         } else if (!silent) {
           this.showError(response?.message || '获取会话列表失败')
         }
@@ -329,12 +333,32 @@ export function useCustomerServiceMethods() {
       }
     },
 
-    closeCurrentChat() {
+    closeCurrentChat () {
       this.currentSessionId = null
       this.selectedSession = null
       this.messages = []
       this.currentChatUser = { nickname: '', mobile: '', avatar: '' }
       this.messageInput = ''
+    },
+
+    /**
+     * 请求用户满意度评价（通过WebSocket推送评分邀请给小程序端）
+     * 后端 closeSession 时会自动发起，此按钮用于客服手动补发
+     */
+    async requestSatisfaction () {
+      if (!this.currentSessionId) return
+      try {
+        if (this.wsConnection && this.wsConnection.connected) {
+          this.wsConnection.emit('satisfaction_request', {
+            session_id: this.currentSessionId
+          })
+          Alpine.store('notification').show('已向用户发送满意度评价邀请', 'success')
+        } else {
+          Alpine.store('notification').show('WebSocket未连接，无法发送评价邀请', 'warning')
+        }
+      } catch (error) {
+        logger.error('发送满意度评价邀请失败:', error)
+      }
     },
 
     // ==================== 用户信息 ====================

@@ -44,7 +44,7 @@ async function analyzeDatabase() {
       'consumption_records', 'exchange_records',
       'admin_operation_logs', 'system_settings',
       'customer_service_sessions', 'chat_messages',
-      'popup_banners', 'system_announcements',
+      'ad_campaigns', 'ad_interaction_logs',
       'feature_flags', 'system_dictionaries',
       'risk_alerts', 'user_risk_profiles'
     ]

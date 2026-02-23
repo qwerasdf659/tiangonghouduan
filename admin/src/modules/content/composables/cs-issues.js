@@ -8,6 +8,7 @@
 
 import { logger } from '../../../utils/logger.js'
 import { ContentAPI } from '../../../api/content.js'
+import Alpine from 'alpinejs'
 
 /** 工单类型中文映射 */
 const ISSUE_TYPE_LABELS = {
@@ -87,15 +88,28 @@ export function useCsIssuesMethods() {
     /** 关闭工单弹窗 */
     closeIssueModal() {
       this.showIssueModal = false
-      this.issueForm = { user_id: null, session_id: null, issue_type: 'other', priority: 'medium', title: '', description: '' }
+      this.issueForm = {
+        user_id: null,
+        session_id: null,
+        issue_type: 'other',
+        priority: 'medium',
+        title: '',
+        description: ''
+      }
     },
 
     /** 提交创建工单 */
     async submitCreateIssue() {
       const { user_id, title, issue_type, priority, description, session_id } = this.issueForm
 
-      if (!user_id) { this.showError('用户ID不能为空'); return }
-      if (!title.trim()) { this.showError('请填写问题标题'); return }
+      if (!user_id) {
+        Alpine.store('notification').show('用户ID不能为空', 'error')
+        return
+      }
+      if (!title.trim()) {
+        Alpine.store('notification').show('请填写问题标题', 'error')
+        return
+      }
 
       this.issueSubmitting = true
       try {
@@ -109,14 +123,14 @@ export function useCsIssuesMethods() {
         })
 
         if (response?.success) {
-          this.showSuccess('工单创建成功')
+          Alpine.store('notification').show('工单创建成功', 'success')
           this.closeIssueModal()
         } else {
-          this.showError(response?.message || '工单创建失败')
+          Alpine.store('notification').show(response?.message || '工单创建失败', 'error')
         }
       } catch (error) {
         logger.error('创建工单失败:', error)
-        this.showError(error.message || '创建工单失败')
+        Alpine.store('notification').show(error.message || '创建工单失败', 'error')
       } finally {
         this.issueSubmitting = false
       }
@@ -132,11 +146,11 @@ export function useCsIssuesMethods() {
         if (response?.success) {
           this.issueDetail = response.data
           const notesResp = await ContentAPI.getIssueNotes(issueId)
-          this.issueNotes = notesResp?.success ? (notesResp.data?.list || []) : []
+          this.issueNotes = notesResp?.success ? notesResp.data?.list || [] : []
         }
       } catch (error) {
         logger.error('获取工单详情失败:', error)
-        this.showError(error.message || '获取工单详情失败')
+        Alpine.store('notification').show(error.message || '获取工单详情失败', 'error')
       }
     },
 
@@ -152,16 +166,19 @@ export function useCsIssuesMethods() {
         if (resolution) data.resolution = resolution
         const response = await ContentAPI.updateIssue(issueId, data)
         if (response?.success) {
-          this.showSuccess(`工单状态已更新为${STATUS_LABELS[status] || status}`)
+          Alpine.store('notification').show(
+            `工单状态已更新为${STATUS_LABELS[status] || status}`,
+            'success'
+          )
           if (this.issueDetail?.issue_id === issueId) {
             this.issueDetail.status = status
           }
         } else {
-          this.showError(response?.message || '更新失败')
+          Alpine.store('notification').show(response?.message || '更新失败', 'error')
         }
       } catch (error) {
         logger.error('更新工单状态失败:', error)
-        this.showError(error.message || '更新失败')
+        Alpine.store('notification').show(error.message || '更新失败', 'error')
       }
     },
 
@@ -173,16 +190,18 @@ export function useCsIssuesMethods() {
       if (!this.issueNoteInput.trim()) return
 
       try {
-        const response = await ContentAPI.addIssueNote(issueId, { content: this.issueNoteInput.trim() })
+        const response = await ContentAPI.addIssueNote(issueId, {
+          content: this.issueNoteInput.trim()
+        })
         if (response?.success) {
           this.issueNoteInput = ''
           const notesResp = await ContentAPI.getIssueNotes(issueId)
-          this.issueNotes = notesResp?.success ? (notesResp.data?.list || []) : []
-          this.showSuccess('备注添加成功')
+          this.issueNotes = notesResp?.success ? notesResp.data?.list || [] : []
+          Alpine.store('notification').show('备注添加成功', 'success')
         }
       } catch (error) {
         logger.error('添加备注失败:', error)
-        this.showError(error.message || '添加备注失败')
+        Alpine.store('notification').show(error.message || '添加备注失败', 'error')
       }
     },
 

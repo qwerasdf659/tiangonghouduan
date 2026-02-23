@@ -90,7 +90,7 @@ class MarketQueryService {
     }
 
     // 延迟加载模型
-    const { MarketListing, User, ItemInstance } = require('../../models')
+    const { MarketListing, User, Item } = require('../../models')
 
     // 构建查询条件
     const where = { status: 'available' }
@@ -112,7 +112,7 @@ class MarketQueryService {
       where,
       include: [
         { model: User, as: 'seller', attributes: ['user_id', 'nickname'] },
-        { model: ItemInstance, as: 'offerItem', required: false }
+        { model: Item, as: 'offerItem', required: false }
       ],
       order,
       limit: pageSizeNum,
@@ -143,13 +143,13 @@ class MarketQueryService {
    * @returns {Promise<Object|null>} 挂牌详情
    */
   static async getListingById(market_listing_id) {
-    const { MarketListing, User, ItemInstance } = require('../../models')
+    const { MarketListing, User, Item } = require('../../models')
 
     const listing = await MarketListing.findByPk(parseInt(market_listing_id), {
       include: [
         { model: User, as: 'seller', attributes: ['user_id', 'nickname'] },
         { model: User, as: 'buyer', attributes: ['user_id', 'nickname'], required: false },
-        { model: ItemInstance, as: 'offerItem', required: false }
+        { model: Item, as: 'offerItem', required: false }
       ]
     })
 
@@ -234,7 +234,7 @@ class MarketQueryService {
    * @returns {Promise<Object>} 挂牌历史和分页信息
    */
   static async getUserListingHistory(user_id, options = {}) {
-    const { MarketListing, ItemInstance } = require('../../models')
+    const { MarketListing, Item } = require('../../models')
 
     const { status, page = 1, page_size = 20 } = options
 
@@ -249,7 +249,7 @@ class MarketQueryService {
 
     const { count, rows } = await MarketListing.findAndCountAll({
       where,
-      include: [{ model: ItemInstance, as: 'offerItem', required: false }],
+      include: [{ model: Item, as: 'offerItem', required: false }],
       order: [['created_at', 'DESC']],
       limit: pageSizeNum,
       offset
@@ -278,7 +278,7 @@ class MarketQueryService {
    * @returns {Promise<Object>} 购买历史和分页信息
    */
   static async getUserPurchaseHistory(user_id, options = {}) {
-    const { MarketListing, User, ItemInstance } = require('../../models')
+    const { MarketListing, User, Item } = require('../../models')
 
     const { page = 1, page_size = 20 } = options
 
@@ -297,7 +297,7 @@ class MarketQueryService {
       where,
       include: [
         { model: User, as: 'seller', attributes: ['user_id', 'nickname'] },
-        { model: ItemInstance, as: 'offerItem', required: false }
+        { model: Item, as: 'offerItem', required: false }
       ],
       order: [['sold_at', 'DESC']],
       limit: pageSizeNum,

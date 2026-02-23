@@ -21,6 +21,28 @@ import { request } from '../../../api/base.js'
 import { AssetAPI } from '../../../api/asset.js'
 import { SYSTEM_ADMIN_ENDPOINTS } from '../../../api/system/admin.js'
 
+/**
+ * 材料资产图标本地映射（零网络请求，优先于后端 icon_url）
+ * 与 public/assets/icons/materials/_mapping.js 保持同步
+ */
+const MATERIAL_ICON_MAP = {
+  DIAMOND: '/admin/assets/icons/materials/diamond.png',
+  POINTS: '/admin/assets/icons/materials/points.png',
+  BUDGET_POINTS: '/admin/assets/icons/materials/budget-points.png',
+  red_shard: '/admin/assets/icons/materials/red-shard.png',
+  red_crystal: '/admin/assets/icons/materials/red-crystal.png',
+  orange_shard: '/admin/assets/icons/materials/orange-shard.png',
+  orange_crystal: '/admin/assets/icons/materials/orange-crystal.png',
+  yellow_shard: '/admin/assets/icons/materials/yellow-shard.png',
+  yellow_crystal: '/admin/assets/icons/materials/yellow-crystal.png',
+  green_shard: '/admin/assets/icons/materials/green-shard.png',
+  green_crystal: '/admin/assets/icons/materials/green-crystal.png',
+  blue_shard: '/admin/assets/icons/materials/blue-shard.png',
+  blue_crystal: '/admin/assets/icons/materials/blue-crystal.png',
+  purple_shard: '/admin/assets/icons/materials/purple-shard.png',
+  purple_crystal: '/admin/assets/icons/materials/purple-crystal.png'
+}
+
 /** 风险等级中文映射 */
 const RISK_LEVEL_MAP = {
   low: { label: '低风险', color: 'bg-green-100 text-green-700' },
@@ -892,6 +914,16 @@ document.addEventListener('alpine:init', () => {
       getAssetDisplayName(assetCode) {
         const found = this.asset_types.find(t => t.asset_code === assetCode)
         return found ? found.display_name : assetCode
+      },
+
+      /**
+       * 获取资产类型图标URL（本地映射优先，后端 icon_url 作为 fallback）
+       * @param {Object} assetType - 资产类型对象
+       * @returns {string|null} 图标URL，无图标返回 null
+       */
+      getAssetIconUrl(assetType) {
+        if (!assetType) return null
+        return MATERIAL_ICON_MAP[assetType.asset_code] || assetType.icon_url || null
       }
     }
   })

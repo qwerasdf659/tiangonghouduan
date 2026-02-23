@@ -413,74 +413,11 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
     })
   })
 
-  /**
-   * B-5-7: 公告数据脱敏测试
-   *
-   * 业务场景：用户查看系统公告时，隐藏管理员ID等内部信息
-   * 安全要求：admin_id、internal_notes、target_groups 不对外暴露
+  /*
+   * [已移除] B-5-7 公告数据脱敏测试
+   * 原 SystemAnnouncement 已合并到 AdCampaign（campaign_category='system'）
+   * 公告脱敏逻辑由 ad-delivery 路由层直接处理（仅返回前端需要的字段）
    */
-  describe('B-5-7 公告数据脱敏（sanitizeAnnouncements）', () => {
-    // Mock 数据模拟 Sequelize toJSON() 输出，主键字段名为 system_announcement_id（数据库实际列名）
-    const mockAnnouncements = [
-      {
-        system_announcement_id: 1,
-        title: '系统公告',
-        content: '公告内容',
-        type: 'notice',
-        priority: 'high',
-        created_at: '2026-01-01',
-        expires_at: '2026-12-31',
-        is_active: true,
-        admin_id: 999,
-        internal_notes: '内部备注',
-        target_groups: ['vip'],
-        view_count: 100,
-        creator: {
-          user_id: 1,
-          nickname: '管理员'
-        }
-      }
-    ]
-
-    test('B-5-7-1 普通用户（public）不可见 admin_id', () => {
-      const result = DataSanitizer.sanitizeAnnouncements(mockAnnouncements, 'public')
-
-      expect(result[0]).not.toHaveProperty('admin_id')
-    })
-
-    test('B-5-7-2 普通用户（public）不可见 internal_notes', () => {
-      const result = DataSanitizer.sanitizeAnnouncements(mockAnnouncements, 'public')
-
-      expect(result[0]).not.toHaveProperty('internal_notes')
-    })
-
-    test('B-5-7-3 普通用户（public）不可见 target_groups', () => {
-      const result = DataSanitizer.sanitizeAnnouncements(mockAnnouncements, 'public')
-
-      expect(result[0]).not.toHaveProperty('target_groups')
-    })
-
-    test('B-5-7-4 普通用户（public）使用 announcement_id 字段（映射自 system_announcement_id）', () => {
-      const result = DataSanitizer.sanitizeAnnouncements(mockAnnouncements, 'public')
-
-      // DataSanitizer 将 system_announcement_id 映射为 announcement_id（与 popup_banner_id 命名模式一致）
-      expect(result[0].announcement_id).toBe(1)
-      // public 级别不暴露数据库内部主键名
-      expect(result[0]).not.toHaveProperty('system_announcement_id')
-    })
-
-    test('B-5-7-5 管理员（full）可见完整数据且包含 announcement_id 映射', () => {
-      const result = DataSanitizer.sanitizeAnnouncements(mockAnnouncements, 'full')
-
-      // full 级别：展开所有原始字段 + 添加 announcement_id（映射自 system_announcement_id）
-      expect(result[0].announcement_id).toBe(1)
-      expect(result[0].system_announcement_id).toBe(1)
-      // 管理员可见敏感字段
-      expect(result[0].admin_id).toBe(999)
-      expect(result[0].internal_notes).toBe('内部备注')
-      expect(result[0].target_groups).toEqual(['vip'])
-    })
-  })
 
   /**
    * B-5-8: 反馈数据脱敏测试
@@ -741,7 +678,7 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
     const mockListings = [
       {
         market_listing_id: 101,
-        listing_kind: 'item_instance',
+        listing_kind: 'item',
         seller_user_id: 31,
         seller_nickname: '张三丰',
         seller_avatar_url: 'https://example.com/avatar1.jpg',

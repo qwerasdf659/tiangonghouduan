@@ -12,7 +12,7 @@
  * 关键设计决策：
  * - 竞价资产白名单：动态查询 material_asset_types（决策9）+ 硬编码黑名单（决策1）
  * - 冻结/解冻/结算：复用 BalanceService 三个独立方法（L451/L638/L825）
- * - 中标入背包：ExchangeRecord(source='bid') + ItemInstance(meta快照)（决策5/7/10）
+ * - 中标入背包：ExchangeRecord(source='bid') + Item(meta快照)（决策5/7/10）
  * - 库存扣减：结算时 stock-1, sold_count+1（决策13）
  * - 事务边界：路由管理事务边界，Service通过 options.transaction 接收（禁止自管理事务）
  *
@@ -24,7 +24,6 @@
 
 const logger = require('../../utils/logger').logger
 const BalanceService = require('../asset/BalanceService')
-const BeijingTimeHelper = require('../../utils/timeHelper')
 const { Op, literal } = require('sequelize')
 
 /**
@@ -56,7 +55,7 @@ class BidService {
     this.BidRecord = models.BidRecord
     this.ExchangeItem = models.ExchangeItem
     this.ExchangeRecord = models.ExchangeRecord
-    this.ItemInstance = models.ItemInstance
+    this.Item = models.Item
     this.MaterialAssetType = models.MaterialAssetType
     this.sequelize = models.sequelize
   }
@@ -331,7 +330,7 @@ class BidService {
    * 结算竞价商品（定时任务调用）
    *
    * 结算流程（§5.4）：
-   * - 有出价：中标者扣除冻结 → 创建 ExchangeRecord + ItemInstance → 库存扣减 → 落选者解冻
+   * - 有出价：中标者扣除冻结 → 创建 ExchangeRecord + Item → 库存扣减 → 落选者解冻
    * - 无出价：标记为 no_bid（流拍）
    *
    * @param {number} bidProductId - 竞价商品ID

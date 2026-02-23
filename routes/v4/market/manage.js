@@ -47,7 +47,7 @@ const marketRiskMiddleware = getMarketRiskControlMiddleware()
  *
  * @returns {Object} 撤回结果
  * @returns {number} data.market_listing_id - 挂牌ID
- * @returns {number} data.item_instance_id - 物品实例ID
+ * @returns {number} data.item_id - 物品ID
  * @returns {string} data.withdrawn_at - 撤回时间
  *
  * 业务场景：卖家撤回已上架的商品
@@ -86,14 +86,14 @@ router.post(
       logger.info('市场挂牌撤回成功', {
         market_listing_id: listingId,
         seller_id: sellerId,
-        item_instance_id: result.listing.offer_item_instance_id,
+        item_id: result.listing.offer_item_id,
         withdraw_reason: withdraw_reason || '用户主动撤回'
       })
 
       return res.apiSuccess(
         {
           market_listing_id: listingId,
-          item_instance_id: result.listing.offer_item_instance_id,
+          item_id: result.listing.offer_item_id,
           withdrawn_at: new Date().toISOString()
         },
         '撤回成功。您可以重新编辑后再次上架。'

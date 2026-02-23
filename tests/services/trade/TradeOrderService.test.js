@@ -16,7 +16,7 @@
  *    - 创建订单记录（TradeOrder.status = frozen）
  * 2. 完成订单（completeOrder）：
  *    - 从冻结资产结算（BalanceService.settleFromFrozen）
- *    - 转移物品所有权（ItemInstance.owner_user_id）
+ *    - 转移物品所有权（Item.owner_account_id）
  *    - 更新订单状态（TradeOrder.status = completed）
  * 3. 取消订单（cancelOrder）：
  *    - 解冻买家资产（BalanceService.unfreeze）
@@ -32,7 +32,7 @@
  * - 遵循项目 snake_case 命名规范
  */
 
-const { sequelize, User, MarketListing, ItemInstance, TradeOrder } = require('../../../models')
+const { sequelize, User, MarketListing, Item, TradeOrder, Account } = require('../../../models')
 const { initRealTestData, getRealTestUserId } = require('../../helpers/test-setup')
 
 /**
@@ -49,6 +49,7 @@ describe('TradeOrderService - 交易订单服务', () => {
   // 测试用户和门店数据
   let test_buyer
   let test_seller
+  let test_seller_account_id
   let test_listing
   let test_item
 
@@ -107,7 +108,18 @@ describe('TradeOrderService - 交易订单服务', () => {
       console.warn('⚠️ 警告：买家和卖家使用相同的用户，部分测试将被跳过')
     }
 
-    console.log(`✅ 测试用户准备完成: 买家=${test_buyer.user_id}, 卖家=${test_seller.user_id}`)
+    // 获取卖家的 account_id（items.owner_account_id 外键引用 accounts.account_id）
+    const seller_account = await Account.findOne({
+      where: { user_id: test_seller.user_id, account_type: 'user' }
+    })
+    if (!seller_account) {
+      throw new Error(`卖家 Account 不存在：user_id=${test_seller.user_id}`)
+    }
+    test_seller_account_id = seller_account.account_id
+
+    console.log(
+      `✅ 测试用户准备完成: 买家=${test_buyer.user_id}, 卖家=${test_seller.user_id}, 卖家account_id=${test_seller_account_id}`
+    )
   })
 
   // 每个测试前准备测试挂牌和物品
@@ -115,17 +127,18 @@ describe('TradeOrderService - 交易订单服务', () => {
     // 重置幂等键计数器
     idempotency_counter = 0
 
-    // 为卖家创建测试物品实例
-    test_item = await ItemInstance.create({
-      owner_user_id: test_seller.user_id,
+    // 为卖家创建测试物品实例（三表模型必填字段：tracking_code, item_name, owner_account_id 引用 accounts.account_id）
+    const trackingCode = `TS${String(Date.now()).slice(-12)}`
+    test_item = await Item.create({
+      tracking_code: trackingCode,
+      owner_account_id: test_seller_account_id,
       item_type: 'voucher',
-      status: 'available', // 可用状态
-      meta: {
-        name: '交易测试物品',
-        description: '用于 TradeOrderService 测试',
-        rarity: 'common',
-        value: 100 // 价值锚点，用于手续费计算
-      }
+      item_name: '交易测试物品',
+      item_description: '用于 TradeOrderService 测试',
+      item_value: 100,
+      status: 'available',
+      source: 'test',
+      source_ref_id: 'trade_order_test'
     })
 
     // 生成挂牌幂等键
@@ -134,8 +147,8 @@ describe('TradeOrderService - 交易订单服务', () => {
     // 创建测试挂牌（on_sale 状态）
     test_listing = await MarketListing.create({
       seller_user_id: test_seller.user_id,
-      listing_kind: 'item_instance',
-      offer_item_instance_id: test_item.item_instance_id,
+      listing_kind: 'item',
+      offer_item_id: test_item.item_id,
       offer_item_display_name: '交易测试物品',
       price_asset_code: 'DIAMOND',
       price_amount: 100,
@@ -148,7 +161,7 @@ describe('TradeOrderService - 交易订单服务', () => {
     await test_item.update({ status: 'locked' })
 
     console.log(
-      `📦 测试数据准备完成: market_listing_id=${test_listing.market_listing_id}, item_instance_id=${test_item.item_instance_id}`
+      `📦 测试数据准备完成: market_listing_id=${test_listing.market_listing_id}, item_id=${test_item.item_id}`
     )
   })
 
@@ -410,17 +423,20 @@ describe('TradeOrderService - 交易订单服务', () => {
       }
 
       // 创建另一个测试挂牌
-      const another_item = await ItemInstance.create({
-        owner_user_id: test_seller.user_id,
+      const another_item = await Item.create({
+        tracking_code: `TS${String(Date.now()).slice(-12)}`,
+        owner_account_id: test_seller_account_id,
         item_type: 'voucher',
+        item_name: '另一个测试物品',
         status: 'locked',
-        meta: { name: '另一个测试物品' }
+        source: 'test',
+        source_ref_id: 'trade_conflict_test'
       })
 
       const another_listing = await MarketListing.create({
         seller_user_id: test_seller.user_id,
-        listing_kind: 'item_instance',
-        offer_item_instance_id: another_item.item_instance_id,
+        listing_kind: 'item',
+        offer_item_id: another_item.item_id,
         offer_item_display_name: '另一个测试物品',
         price_asset_code: 'DIAMOND',
         price_amount: 100,

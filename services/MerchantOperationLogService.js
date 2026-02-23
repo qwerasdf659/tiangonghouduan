@@ -707,6 +707,24 @@ class MerchantOperationLogService {
       throw error
     }
   }
+
+  /**
+   * 获取所有支持的操作类型列表（供路由层使用，避免路由直接 require 模型文件常量）
+   *
+   * @returns {Array<{code: string, name: string, key: string}>} 操作类型列表
+   */
+  static getOperationTypes() {
+    const {
+      MERCHANT_OPERATION_TYPES,
+      OPERATION_TYPE_DESCRIPTIONS
+    } = require('../models/MerchantOperationLog')
+
+    return Object.entries(MERCHANT_OPERATION_TYPES).map(([key, value]) => ({
+      code: value,
+      name: OPERATION_TYPE_DESCRIPTIONS[value] || value,
+      key
+    }))
+  }
 }
 
 module.exports = MerchantOperationLogService

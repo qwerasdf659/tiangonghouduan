@@ -2,7 +2,7 @@
  * 系统管理 API 模块
  *
  * @module api/system/admin
- * @description 公告、通知、Banner、告警、审计、会话、字典、功能开关相关的 API 调用
+ * @description 通知、告警、审计、会话、字典、功能开关、内容投放（广告活动/广告位/报表）相关的 API 调用
  * @version 2.0.0
  * @date 2026-01-29
  */
@@ -49,6 +49,9 @@ export const SYSTEM_ADMIN_ENDPOINTS = {
   AD_SLOT_UPDATE: `${API_PREFIX}/console/ad-slots/:id`,
   AD_SLOT_TOGGLE: `${API_PREFIX}/console/ad-slots/:id/toggle`,
   AD_SLOT_STATS: `${API_PREFIX}/console/ad-slots/statistics`,
+
+  // 统一内容投放获取（系统端只读接口，替代原 popup-banners/carousel-items/announcements）
+  AD_DELIVERY: `${API_PREFIX}/system/ad-delivery`,
 
   // 广告报表
   AD_REPORT_OVERVIEW: `${API_PREFIX}/console/ad-reports/overview`,
@@ -132,58 +135,6 @@ export const SYSTEM_ADMIN_ENDPOINTS = {
 // ========== API 调用方法 ==========
 
 export const SystemAdminAPI = {
-  // ===== 公告管理 =====
-
-  /**
-   * 获取公告列表
-   * @param {Object} [params={}] - 查询参数
-   * @returns {Promise<Object>} 公告列表响应
-   */
-  async getAnnouncements(params = {}) {
-    const url = SYSTEM_ADMIN_ENDPOINTS.ANNOUNCEMENT_LIST + buildQueryString(params)
-    return await request({ url, method: 'GET' })
-  },
-
-  /**
-   * 获取公告详情
-   * @param {number} id - 公告 ID
-   * @returns {Promise<Object>} 公告详情响应
-   */
-  async getAnnouncementDetail(id) {
-    const url = buildURL(SYSTEM_ADMIN_ENDPOINTS.ANNOUNCEMENT_DETAIL, { id })
-    return await request({ url, method: 'GET' })
-  },
-
-  /**
-   * 创建系统公告
-   * @param {Object} data - 公告数据
-   * @returns {Promise<Object>} 创建结果响应
-   */
-  async createAnnouncement(data) {
-    return await request({ url: SYSTEM_ADMIN_ENDPOINTS.ANNOUNCEMENT_CREATE, method: 'POST', data })
-  },
-
-  /**
-   * 更新公告
-   * @param {number} id - 公告 ID
-   * @param {Object} data - 公告更新数据
-   * @returns {Promise<Object>} 更新结果响应
-   */
-  async updateAnnouncement(id, data) {
-    const url = buildURL(SYSTEM_ADMIN_ENDPOINTS.ANNOUNCEMENT_UPDATE, { id })
-    return await request({ url, method: 'PUT', data })
-  },
-
-  /**
-   * 删除公告
-   * @param {number} id - 公告 ID
-   * @returns {Promise<Object>} 删除结果响应
-   */
-  async deleteAnnouncement(id) {
-    const url = buildURL(SYSTEM_ADMIN_ENDPOINTS.ANNOUNCEMENT_DELETE, { id })
-    return await request({ url, method: 'DELETE' })
-  },
-
   // ===== 系统通知 =====
 
   /**
@@ -221,58 +172,6 @@ export const SystemAdminAPI = {
    */
   async sendNotification(data) {
     return await request({ url: SYSTEM_ADMIN_ENDPOINTS.NOTIFICATION_SEND, method: 'POST', data })
-  },
-
-  // ===== 弹窗Banner =====
-
-  /**
-   * 获取弹窗Banner列表
-   * @param {Object} [params={}] - 查询参数
-   * @returns {Promise<Object>} Banner列表响应
-   */
-  async getPopupBanners(params = {}) {
-    const url = SYSTEM_ADMIN_ENDPOINTS.POPUP_BANNER_LIST + buildQueryString(params)
-    return await request({ url, method: 'GET' })
-  },
-
-  /**
-   * 创建弹窗Banner
-   * @param {Object} data - Banner数据
-   * @returns {Promise<Object>} 创建结果响应
-   */
-  async createPopupBanner(data) {
-    return await request({ url: SYSTEM_ADMIN_ENDPOINTS.POPUP_BANNER_CREATE, method: 'POST', data })
-  },
-
-  /**
-   * 更新弹窗Banner
-   * @param {number} id - Banner ID
-   * @param {Object} data - 更新数据
-   * @returns {Promise<Object>} 更新结果响应
-   */
-  async updatePopupBanner(id, data) {
-    const url = buildURL(SYSTEM_ADMIN_ENDPOINTS.POPUP_BANNER_UPDATE, { id })
-    return await request({ url, method: 'PUT', data })
-  },
-
-  /**
-   * 删除弹窗Banner
-   * @param {number} id - Banner ID
-   * @returns {Promise<Object>} 删除结果响应
-   */
-  async deletePopupBanner(id) {
-    const url = buildURL(SYSTEM_ADMIN_ENDPOINTS.POPUP_BANNER_DELETE, { id })
-    return await request({ url, method: 'DELETE' })
-  },
-
-  /**
-   * 切换弹窗Banner状态
-   * @param {number} id - Banner ID
-   * @returns {Promise<Object>} 切换结果响应
-   */
-  async togglePopupBanner(id) {
-    const url = buildURL(SYSTEM_ADMIN_ENDPOINTS.POPUP_BANNER_TOGGLE, { id })
-    return await request({ url, method: 'PATCH' })
   },
 
   // ===== 风控告警 =====

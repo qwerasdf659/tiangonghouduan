@@ -26,7 +26,7 @@ const TransactionManager = require('../../../../utils/TransactionManager')
  * - 商家/管理员核销用户的12位核销码
  * - 验证核销码有效性（格式、状态、过期时间）
  * - 标记订单为已核销（status = fulfilled）
- * - 标记物品为已使用（ItemInstance.status = used）
+ * - 标记物品为已使用（Item.status = used）
  *
  * 规范遵循：
  * - API设计与契约标准规范 v2.0（2025-12-23）
@@ -64,9 +64,9 @@ router.post('/fulfill', authenticateToken, async (req, res) => {
       return res.apiError('核销码不能为空', 'REDEEM_CODE_REQUIRED', null, 400)
     }
 
-    // 权限验证（从 SystemSettings 读取最低角色等级，决策P6）
+    /** 权限验证（从 SystemSettings 读取最低角色等级，通过 ServiceManager 获取服务） */
     const { getUserRoles } = require('../../../../middleware/auth')
-    const AdminSystemService = require('../../../../services/AdminSystemService')
+    const AdminSystemService = req.app.locals.services.getService('admin_system')
     const userRoles = await getUserRoles(redeemerUserId)
     const minRoleLevel = Number(
       await AdminSystemService.getSettingValue('redemption', 'min_role_level_for_fulfill', 20)
@@ -101,20 +101,20 @@ router.post('/fulfill', authenticateToken, async (req, res) => {
 
     // 异步发送通知（不阻塞响应）
     const NotificationService = req.app.locals.services.getService('notification')
-    if (order.item_instance && order.item_instance.owner_user_id) {
-      NotificationService.send(order.item_instance.owner_user_id, {
+    if (order.item && order.item.ownerAccount && order.item.ownerAccount.user_id) {
+      NotificationService.send(order.item.ownerAccount.user_id, {
         type: 'redemption_success',
         title: '核销通知',
         content: '您的商品已核销成功',
         data: {
           order_id: order.redemption_order_id,
-          item_instance_id: order.item_instance_id,
+          item_id: order.item_id,
           fulfilled_at: order.fulfilled_at
         }
       }).catch(error => {
         logger.warn('核销通知发送失败（不影响核销结果）', {
           error: error.message,
-          user_id: order.item_instance.owner_user_id
+          user_id: order.item.ownerAccount?.user_id
         })
       })
     }
@@ -128,19 +128,19 @@ router.post('/fulfill', authenticateToken, async (req, res) => {
       {
         order: {
           redemption_order_id: order.redemption_order_id,
-          item_instance_id: order.item_instance_id,
+          item_id: order.item_id,
           status: order.status,
           fulfilled_at: order.fulfilled_at,
           redeemer_user_id: order.redeemer_user_id,
           fulfilled_store_id: order.fulfilled_store_id,
           fulfilled_by_staff_id: order.fulfilled_by_staff_id
         },
-        item_instance: order.item_instance
+        item: order.item
           ? {
-              item_instance_id: order.item_instance.item_instance_id,
-              item_type: order.item_instance.item_type,
-              name: order.item_instance.meta?.name || '未命名物品',
-              status: order.item_instance.status
+              item_id: order.item.item_id,
+              item_type: order.item.item_type,
+              name: order.item.meta?.name || '未命名物品',
+              status: order.item.status
             }
           : null,
         redeemer: {

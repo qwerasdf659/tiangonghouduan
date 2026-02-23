@@ -1400,6 +1400,144 @@ class CustomerServiceSessionService {
    * @param {Object} options.transaction - 外部事务对象（必填）
    * @returns {Object} 评分结果
    */
+  /**
+   * 客服接单 - 显式认领等待中的会话
+   *
+   * 业务场景：客服在会话队列中点击"接单"，将 waiting 状态的会话分配给自己
+   * 状态流转：waiting → assigned（后续发送消息时自动变为 active）
+   *
+   * @param {number} session_id - 会话ID（customer_service_session_id）
+   * @param {number} admin_id - 客服用户ID
+   * @param {Object} options - 选项（必须包含 transaction）
+   * @returns {{ customer_service_session_id, status, admin_id }} 更新后的会话信息
+   */
+  static async acceptSession(session_id, admin_id, options = {}) {
+    const transaction = assertAndGetTransaction(
+      options,
+      'CustomerServiceSessionService.acceptSession'
+    )
+
+    const session = await CustomerServiceSession.findOne({
+      where: { customer_service_session_id: session_id },
+      transaction
+    })
+
+    if (!session) {
+      throw new Error('会话不存在')
+    }
+
+    if (session.status !== 'waiting') {
+      throw new Error(`仅等待中的会话可接单，当前状态：${session.status}`)
+    }
+
+    await session.update({ admin_id, status: 'assigned' }, { transaction })
+
+    logger.info(`📋 客服 ${admin_id} 接单会话 ${session_id}`)
+
+    return {
+      customer_service_session_id: session_id,
+      status: 'assigned',
+      admin_id
+    }
+  }
+
+  /**
+   * 更新会话标签 - 用于分类标记会话问题类型
+   *
+   * 业务场景：客服对会话打标签（如"交易纠纷"、"已补偿"），便于分类统计和后续查找
+   *
+   * @param {number} session_id - 会话ID
+   * @param {string[]} tags - 标签数组（如 ["交易纠纷", "已补偿"]）
+   * @param {number} admin_id - 操作人ID（用于权限校验）
+   * @param {Object} options - 选项（必须包含 transaction）
+   * @returns {{ customer_service_session_id, tags }} 更新后的标签
+   */
+  static async updateSessionTags(session_id, tags, admin_id, options = {}) {
+    const transaction = assertAndGetTransaction(
+      options,
+      'CustomerServiceSessionService.updateSessionTags'
+    )
+
+    const session = await CustomerServiceSession.findOne({
+      where: { customer_service_session_id: session_id },
+      transaction
+    })
+
+    if (!session) {
+      throw new Error('会话不存在')
+    }
+
+    await session.update({ tags }, { transaction })
+
+    logger.info(`🏷️ 客服 ${admin_id} 更新会话 ${session_id} 标签: ${JSON.stringify(tags)}`)
+
+    return {
+      customer_service_session_id: session_id,
+      tags
+    }
+  }
+
+  /**
+   * 请求满意度评价 - 通过 WebSocket 向用户推送评价邀请
+   *
+   * 业务场景：客服处理完问题后，主动邀请用户评价（不需要关闭会话也可以请求）
+   * 触发方式：客服点击"请求评价"按钮 → 用户端显示内嵌评分卡片
+   *
+   * @param {number} session_id - 会话ID
+   * @param {number} admin_id - 客服用户ID
+   * @returns {{ session_id, user_id, pushed }} 推送结果
+   */
+  static async requestSatisfactionRating(session_id, admin_id) {
+    const session = await CustomerServiceSession.findOne({
+      where: { customer_service_session_id: session_id }
+    })
+
+    if (!session) {
+      throw new Error('会话不存在')
+    }
+
+    if (session.admin_id !== admin_id) {
+      throw new Error('仅负责该会话的客服可以请求评价')
+    }
+
+    if (session.satisfaction_score !== null) {
+      throw new Error('该会话已有评分，无需再次请求')
+    }
+
+    /* ChatWebSocketService 导出的是单例实例（非类），直接调用实例方法 */
+    const chatWsInstance = require('./ChatWebSocketService')
+
+    let pushed = false
+    if (chatWsInstance && chatWsInstance.pushMessageToUser) {
+      chatWsInstance.pushMessageToUser(session.user_id, {
+        type: 'satisfaction_request',
+        session_id
+      })
+      pushed = true
+      logger.info(
+        `⭐ 客服 ${admin_id} 向用户 ${session.user_id} 推送满意度评价邀请（会话 ${session_id}）`
+      )
+    } else {
+      logger.warn(`⚠️ WebSocket 服务未启动，无法推送满意度评价邀请（会话 ${session_id}）`)
+    }
+
+    return {
+      session_id,
+      user_id: session.user_id,
+      pushed
+    }
+  }
+
+  /**
+   * 用户对已关闭的客服会话提交满意度评分（1-5星）
+   *
+   * @param {number} session_id - 会话ID（customer_service_session_id）
+   * @param {Object} data - 评分数据
+   * @param {number} data.user_id - 用户ID
+   * @param {number} data.satisfaction_score - 评分（1-5）
+   * @param {Object} options - 选项（必须包含 transaction）
+   * @returns {Promise<{customer_service_session_id: number, satisfaction_score: number, rated_at: string}>} 评分结果
+   */
   static async rateSession(session_id, data, options = {}) {
     const transaction = assertAndGetTransaction(
       options,

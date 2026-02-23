@@ -146,11 +146,10 @@ const REGISTERED_SERVICE_KEYS = [
   'premium', // 付费会员服务
 
   /* ==================== 系统功能服务 ==================== */
-  'announcement', // 公告服务
   'notification', // 通知服务
   'feedback', // 反馈服务
-  'popup_banner', // 弹窗/Banner 服务
   'image', // 图片服务
+  'ad_interaction_log', // 统一内容交互日志服务（D2 定论）
 
   /* ==================== 报表服务（ReportingService 拆分） ==================== */
   'reporting_analytics', // 决策分析/趋势分析（静态类）

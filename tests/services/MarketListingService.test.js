@@ -15,7 +15,7 @@
  */
 
 const models = require('../../models')
-const { sequelize, User, MarketListing, ItemInstance } = models
+const { sequelize, User, MarketListing, Item } = models
 
 /**
  * V4.7.0 大文件拆分：MarketListingService 已拆分为子服务
@@ -74,8 +74,8 @@ describe('MarketListingService - 市场挂牌服务', () => {
 
     it('getMarketListings 返回的物品挂牌应使用 name 字段而非 item_name', async () => {
       // 创建测试物品
-      const test_item = await ItemInstance.create({
-        owner_user_id: test_user.user_id,
+      const test_item = await Item.create({
+        owner_account_id: test_user.user_id,
         item_type: 'voucher',
         status: 'locked', // 挂牌后物品会被锁定
         meta: {
@@ -91,8 +91,8 @@ describe('MarketListingService - 市场挂牌服务', () => {
       // 创建测试挂牌（包含必填的 idempotency_key）
       const test_listing = await MarketListing.create({
         seller_user_id: test_user.user_id,
-        listing_kind: 'item_instance',
-        offer_item_instance_id: test_item.item_instance_id,
+        listing_kind: 'item',
+        offer_item_id: test_item.item_id,
         offer_item_display_name: '市场测试商品', // 快照字段
         price_asset_code: 'DIAMOND',
         price_amount: 100,
@@ -126,7 +126,7 @@ describe('MarketListingService - 市场挂牌服务', () => {
            * - 可叠加资产类型：asset_info.display_name
            */
           expect(found_listing).toHaveProperty('market_listing_id')
-          expect(found_listing).toHaveProperty('listing_kind', 'item_instance')
+          expect(found_listing).toHaveProperty('listing_kind', 'item')
           expect(found_listing).toHaveProperty('price_amount')
           expect(found_listing).toHaveProperty('price_asset_code')
           expect(found_listing).toHaveProperty('status')
@@ -134,7 +134,7 @@ describe('MarketListingService - 市场挂牌服务', () => {
           // 物品实例应有 item_info 对象
           expect(found_listing).toHaveProperty('item_info')
           expect(found_listing.item_info).toHaveProperty('display_name', '市场测试商品')
-          expect(found_listing.item_info).toHaveProperty('item_instance_id')
+          expect(found_listing.item_info).toHaveProperty('item_id')
         } else {
           // 如果找不到（可能被分页过滤），验证结构即可
           console.log('测试挂牌可能被分页过滤，验证返回结构')
@@ -272,7 +272,7 @@ describe('MarketListingService - 市场挂牌服务', () => {
       const result = await MarketListingService.getMarketListings({
         page: 1,
         page_size: 20,
-        listing_kind: 'item_instance'
+        listing_kind: 'item'
       })
 
       if (result.products.length > 0) {
@@ -280,7 +280,7 @@ describe('MarketListingService - 市场挂牌服务', () => {
 
         // 验证基础字段
         expect(listing).toHaveProperty('market_listing_id')
-        expect(listing).toHaveProperty('listing_kind', 'item_instance')
+        expect(listing).toHaveProperty('listing_kind', 'item')
         expect(listing).toHaveProperty('status')
         expect(listing).toHaveProperty('price_amount')
         expect(listing).toHaveProperty('price_asset_code')
@@ -288,12 +288,12 @@ describe('MarketListingService - 市场挂牌服务', () => {
 
         /**
          * V4.7.0 更新：物品实例字段在 item_info 对象中
-         * - item_info.item_instance_id: 物品实例ID
+         * - item_info.item_id: 物品实例ID
          * - item_info.display_name: 显示名称
          * - item_info.category_code: 分类代码
          */
         expect(listing).toHaveProperty('item_info')
-        expect(listing.item_info).toHaveProperty('item_instance_id')
+        expect(listing.item_info).toHaveProperty('item_id')
         expect(listing.item_info).toHaveProperty('display_name')
 
         // 验证字段类型（price_amount 是 DECIMAL，返回为字符串）

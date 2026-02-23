@@ -21,8 +21,8 @@
  * const { testCleaner, registerCleanup, cleanupAfterEach, cleanupAfterAll } = require('../helpers/TestDataCleaner')
  *
  * // 方式1：手动注册清理
- * const item = await ItemInstance.create({ ... })
- * registerCleanup('ItemInstance', 'item_instance_id', item.item_instance_id)
+ * const item = await Item.create({ ... })
+ * registerCleanup('Item', 'item_id', item.item_id)
  *
  * // 方式2：使用便捷方法创建并自动注册
  * const order = await testCleaner.createAndRegister('TradeOrder', orderData)
@@ -42,7 +42,7 @@
 const MODEL_PRIMARY_KEYS = {
   // 核心业务模型
   User: 'user_id',
-  ItemInstance: 'item_instance_id',
+  Item: 'item_id',
   ItemTemplate: 'item_template_id',
   MarketListing: 'market_listing_id',
   TradeOrder: 'order_id',
@@ -130,14 +130,14 @@ class TestDataCleaner {
   /**
    * 注册待清理的数据
    *
-   * @param {string} modelName - 模型名称（如 'ItemInstance', 'TradeOrder'）
-   * @param {string} idField - 主键字段名（如 'item_instance_id'）
+   * @param {string} modelName - 模型名称（如 'Item', 'TradeOrder'）
+   * @param {string} idField - 主键字段名（如 'item_id'）
    * @param {number|string} idValue - 主键值
    *
    * @example
    * // 创建数据后注册清理
-   * const item = await ItemInstance.create({ ... })
-   * testCleaner.register('ItemInstance', 'item_instance_id', item.item_instance_id)
+   * const item = await Item.create({ ... })
+   * testCleaner.register('Item', 'item_id', item.item_id)
    */
   register(modelName, idField, idValue) {
     if (!idValue) {
@@ -162,7 +162,7 @@ class TestDataCleaner {
    * @param {number|string} idValue - 主键值
    *
    * @example
-   * testCleaner.registerById('ItemInstance', item.item_instance_id)
+   * testCleaner.registerById('Item', item.item_id)
    */
   registerById(modelName, idValue) {
     const idField = this.getPrimaryKey(modelName)
@@ -262,7 +262,7 @@ class TestDataCleaner {
       'CustomerSession',
       'TradeOrder',
       'MarketListing',
-      'ItemInstance',
+      'Item',
       'AssetTransaction',
       'AccountAssetBalance',
       'LotteryRecord',
@@ -275,7 +275,7 @@ class TestDataCleaner {
             'CustomerSession',
             'TradeOrder',
             'MarketListing',
-            'ItemInstance',
+            'Item',
             'AssetTransaction',
             'AccountAssetBalance',
             'LotteryRecord',

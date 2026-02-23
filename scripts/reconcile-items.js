@@ -23,7 +23,14 @@
 
 require('dotenv').config()
 
-async function main() {
+/**
+ * 执行统一对账（可被定时任务调用，也可独立运行）
+ *
+ * @param {Object} [options] - 选项
+ * @param {boolean} [options.standalone=false] - 是否独立运行模式（standalone 模式会关闭连接并 exit）
+ * @returns {Promise<Object>} 对账结果
+ */
+async function executeReconciliation(options = {}) {
   const { sequelize } = require('../config/database')
   const logger = require('../utils/logger')
 
@@ -135,11 +142,20 @@ async function main() {
     logger.info('对账全部通过', { results })
   }
 
-  await sequelize.close()
-  process.exit(allPass ? 0 : 1)
+  if (options.standalone) {
+    await sequelize.close()
+    process.exit(allPass ? 0 : 1)
+  }
+
+  return { allPass, results }
 }
 
-main().catch(err => {
-  console.error('对账脚本执行失败:', err)
-  process.exit(1)
-})
+module.exports = { executeReconciliation }
+
+// 独立运行模式
+if (require.main === module) {
+  executeReconciliation({ standalone: true }).catch(err => {
+    console.error('对账脚本执行失败:', err)
+    process.exit(1)
+  })
+}

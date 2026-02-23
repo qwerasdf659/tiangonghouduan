@@ -189,7 +189,7 @@ module.exports = sequelize => {
      * 当前关联路径：
      * - C2C交易：User → TradeOrder (buyer_user_id / seller_user_id)
      * - 资产变动：User → Account → AssetTransaction
-     * - 物品事件：User → ItemInstance → ItemInstanceEvent
+     * - 物品事件：User → Item → ItemLedger
      */
 
     // 🔥 用户的抽奖记录（LotteryRecord已合并到LotteryDraw）

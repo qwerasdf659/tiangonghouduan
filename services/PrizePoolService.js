@@ -583,7 +583,9 @@ class PrizePoolService {
       /** 选奖权重（tier_first 模式下实际生效的概率控制字段） */
       win_weight: 'win_weight',
       /** 所属档位（high/mid/low，决定奖品归属哪个档位池） */
-      reward_tier: 'reward_tier'
+      reward_tier: 'reward_tier',
+      /** 是否为兜底奖品（当其他奖品都无法选中时的保底选项） */
+      is_fallback: 'is_fallback'
     }
 
     const filteredUpdateData = {}
@@ -794,10 +796,29 @@ class PrizePoolService {
       })
     }
 
+    // 10. 零库存风险警告（覆盖 tier_first 的 win_weight 和 normalize 的 win_probability）
+    const warnings = []
+    if ((updatedPrize.stock_quantity || 0) === 0 && (updatedPrize.win_weight || 0) > 0) {
+      warnings.push({
+        type: 'zero_stock_positive_weight',
+        message: `${updatedPrize.prize_name}：库存为 0 但权重 ${updatedPrize.win_weight} > 0，算法选中后将触发降级`
+      })
+    }
+    if (
+      (updatedPrize.stock_quantity || 0) === 0 &&
+      (parseFloat(updatedPrize.win_probability) || 0) > 0
+    ) {
+      warnings.push({
+        type: 'zero_stock_positive_probability',
+        message: `${updatedPrize.prize_name}：库存为 0 但概率 ${updatedPrize.win_probability} > 0（normalize 模式下选中将触发降级）`
+      })
+    }
+
     return {
       lottery_prize_id: updatedPrize.lottery_prize_id,
       updated_fields: Object.keys(filteredUpdateData),
-      prize: convertedPrizeData
+      prize: convertedPrizeData,
+      warnings
     }
   }
 
@@ -1098,14 +1119,35 @@ class PrizePoolService {
 
       const prizes = await LotteryPrize.findAll({
         where: { lottery_campaign_id: campaign.lottery_campaign_id },
-        order: [['reward_tier', 'ASC'], ['sort_order', 'ASC']],
+        order: [
+          ['reward_tier', 'ASC'],
+          ['sort_order', 'ASC']
+        ],
         attributes: [
-          'lottery_prize_id', 'lottery_campaign_id', 'prize_name', 'prize_type',
-          'prize_value', 'prize_value_points', 'stock_quantity', 'win_probability',
-          'win_weight', 'reward_tier', 'is_fallback', 'prize_description',
-          'image_resource_id', 'angle', 'color', 'cost_points', 'status',
-          'sort_order', 'rarity_code', 'total_win_count', 'daily_win_count',
-          'max_daily_wins', 'created_at', 'updated_at'
+          'lottery_prize_id',
+          'lottery_campaign_id',
+          'prize_name',
+          'prize_type',
+          'prize_value',
+          'prize_value_points',
+          'stock_quantity',
+          'win_probability',
+          'win_weight',
+          'reward_tier',
+          'is_fallback',
+          'prize_description',
+          'image_resource_id',
+          'angle',
+          'color',
+          'cost_points',
+          'status',
+          'sort_order',
+          'rarity_code',
+          'total_win_count',
+          'daily_win_count',
+          'max_daily_wins',
+          'created_at',
+          'updated_at'
         ]
       })
 
@@ -1130,9 +1172,10 @@ class PrizePoolService {
           const totalWeight = tierPrizes.reduce((sum, p) => sum + (p.win_weight || 0), 0)
 
           const formattedPrizes = tierPrizes.map(p => {
-            const tierPercentage = totalWeight > 0
-              ? parseFloat(((p.win_weight || 0) / totalWeight * 100).toFixed(2))
-              : 0
+            const tierPercentage =
+              totalWeight > 0
+                ? parseFloat((((p.win_weight || 0) / totalWeight) * 100).toFixed(2))
+                : 0
 
             if (p.stock_quantity === 0 && (p.win_weight || 0) > 0) {
               warnings.push({
@@ -1298,7 +1341,8 @@ class PrizePoolService {
 
     try {
       await BusinessCacheHelper.invalidateLotteryCampaign(
-        prize.lottery_campaign_id, 'prize_stock_set'
+        prize.lottery_campaign_id,
+        'prize_stock_set'
       )
     } catch (cacheError) {
       logger.warn('[缓存] 活动配置缓存失效失败（非致命）', { error: cacheError.message })
@@ -1431,7 +1475,8 @@ class PrizePoolService {
 
     try {
       await BusinessCacheHelper.invalidateLotteryCampaign(
-        campaign.lottery_campaign_id, 'prize_sort_updated'
+        campaign.lottery_campaign_id,
+        'prize_sort_updated'
       )
     } catch (cacheError) {
       logger.warn('[缓存] 活动配置缓存失效失败（非致命）', { error: cacheError.message })

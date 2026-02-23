@@ -37,8 +37,8 @@ router.post('/scan', authenticateToken, async (req, res) => {
       return res.apiError('QR码内容不能为空', 'QR_CONTENT_REQUIRED', null, 400)
     }
 
-    // 权限验证（从 SystemSettings 读取最低角色等级，决策P6）
-    const AdminSystemService = require('../../../../services/AdminSystemService')
+    /** 权限验证（从 SystemSettings 读取最低角色等级，通过 ServiceManager 获取服务） */
+    const AdminSystemService = req.app.locals.services.getService('admin_system')
     const userRoles = await getUserRoles(redeemerUserId)
     const minRoleLevel = Number(
       await AdminSystemService.getSettingValue('redemption', 'min_role_level_for_fulfill', 20)
@@ -99,20 +99,20 @@ router.post('/scan', authenticateToken, async (req, res) => {
 
     // 异步通知物品所有者
     const NotificationService = req.app.locals.services.getService('notification')
-    if (order.item_instance && order.item_instance.owner_user_id) {
-      NotificationService.send(order.item_instance.owner_user_id, {
+    if (order.item && order.item.ownerAccount && order.item.ownerAccount.user_id) {
+      NotificationService.send(order.item.ownerAccount.user_id, {
         type: 'redemption_success',
         title: '核销通知',
         content: '您的商品已核销成功',
         data: {
           redemption_order_id: order.redemption_order_id,
-          item_instance_id: order.item_instance_id,
+          item_id: order.item_id,
           fulfilled_at: order.fulfilled_at
         }
       }).catch(error => {
         logger.warn('核销通知发送失败（不影响核销结果）', {
           error: error.message,
-          user_id: order.item_instance.owner_user_id
+          user_id: order.item.ownerAccount?.user_id
         })
       })
     }
@@ -121,18 +121,18 @@ router.post('/scan', authenticateToken, async (req, res) => {
       {
         order: {
           redemption_order_id: order.redemption_order_id,
-          item_instance_id: order.item_instance_id,
+          item_id: order.item_id,
           status: order.status,
           fulfilled_at: order.fulfilled_at,
           fulfilled_store_id: order.fulfilled_store_id,
           fulfilled_by_staff_id: order.fulfilled_by_staff_id
         },
-        item_instance: order.item_instance
+        item: order.item
           ? {
-              item_instance_id: order.item_instance.item_instance_id,
-              item_type: order.item_instance.item_type,
-              name: order.item_instance.meta?.name || '未命名物品',
-              status: order.item_instance.status
+              item_id: order.item.item_id,
+              item_type: order.item.item_type,
+              name: order.item.meta?.name || '未命名物品',
+              status: order.item.status
             }
           : null,
         scan_method: 'qr_code'

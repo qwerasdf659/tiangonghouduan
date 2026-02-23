@@ -65,7 +65,7 @@ function asyncHandler(fn) {
  *   ],
  *   items: [       // 不可叠加物品
  *     {
- *       item_instance_id: 123,
+ *       item_id: 123,
  *       item_type: '优惠券',
  *       status: 'available',
  *       has_redemption_code: true,
@@ -111,16 +111,16 @@ router.get(
 )
 
 /**
- * GET /api/v4/backpack/items/:item_instance_id
+ * GET /api/v4/backpack/items/:item_id
  *
  * @description 获取背包物品详情
  * @access Private（用户只能查看自己的物品，管理员可查看任意物品）
  *
- * @param {number} item_instance_id - 物品实例ID（路由参数）
+ * @param {number} item_id - 物品ID（路由参数）
  *
  * @returns {Object} 物品详情
  * {
- *   item_instance_id: 123,
+ *   item_id: 123,
  *   item_type: 'voucher',
  *   name: '10元代金券',
  *   status: 'available',
@@ -133,16 +133,16 @@ router.get(
  * }
  */
 router.get(
-  '/items/:item_instance_id',
+  '/items/:item_id',
   authenticateToken,
   asyncHandler(async (req, res) => {
-    const { item_instance_id } = req.params
+    const { item_id } = req.params
     const viewer_user_id = req.user.user_id
 
-    // 参数验证：物品实例ID必须为正整数
-    const instanceId = parseInt(item_instance_id, 10)
-    if (isNaN(instanceId) || instanceId <= 0) {
-      return res.apiError('无效的物品实例ID', 'BAD_REQUEST', null, 400)
+    // 参数验证：物品ID必须为正整数
+    const itemId = parseInt(item_id, 10)
+    if (isNaN(itemId) || itemId <= 0) {
+      return res.apiError('无效的物品ID', 'BAD_REQUEST', null, 400)
     }
 
     // 获取用户角色（判断是否为管理员 role_level >= 100）
@@ -152,7 +152,7 @@ router.get(
     // 通过 ServiceManager 获取 BackpackService
     const BackpackService = req.app.locals.services.getService('backpack')
 
-    const itemDetail = await BackpackService.getItemDetail(instanceId, {
+    const itemDetail = await BackpackService.getItemDetail(itemId, {
       viewer_user_id,
       has_admin_access
     })
@@ -172,7 +172,7 @@ router.get(
 )
 
 /**
- * POST /api/v4/backpack/items/:item_instance_id/redeem
+ * POST /api/v4/backpack/items/:item_id/redeem
  *
  * @description 用户为自己的物品生成核销码
  * @access Private（仅物品所有者或管理员可操作）
@@ -184,26 +184,26 @@ router.get(
  * 4. 返回明文核销码给用户（仅此一次）
  * 5. 用户到店出示核销码 → 商家调用 POST /shop/redemption/fulfill 完成核销
  *
- * @param {number} item_instance_id - 物品实例ID（路由参数）
+ * @param {number} item_id - 物品ID（路由参数）
  *
  * @returns {Object} { order, code }
  * - order: 核销订单信息（order_id, status, expires_at）
  * - code: 12位Base32明文核销码（仅此一次返回）
  */
 router.post(
-  '/items/:item_instance_id/redeem',
+  '/items/:item_id/redeem',
   authenticateToken,
   asyncHandler(async (req, res) => {
-    const { item_instance_id } = req.params
+    const { item_id } = req.params
     const user_id = req.user.user_id
 
     // 参数验证
-    const instanceId = parseInt(item_instance_id, 10)
-    if (isNaN(instanceId) || instanceId <= 0) {
-      return res.apiError('无效的物品实例ID', 'BAD_REQUEST', null, 400)
+    const itemId = parseInt(item_id, 10)
+    if (isNaN(itemId) || itemId <= 0) {
+      return res.apiError('无效的物品ID', 'BAD_REQUEST', null, 400)
     }
 
-    logger.info('用户生成核销码请求', { user_id, item_instance_id: instanceId })
+    logger.info('用户生成核销码请求', { user_id, item_id: itemId })
 
     try {
       // 通过 ServiceManager 获取 RedemptionService
@@ -214,7 +214,7 @@ router.post(
        * RedemptionService.createOrder 强制要求 options.transaction
        */
       const result = await TransactionManager.execute(async transaction => {
-        return await RedemptionService.createOrder(instanceId, {
+        return await RedemptionService.createOrder(itemId, {
           transaction,
           creator_user_id: user_id
         })
@@ -222,7 +222,7 @@ router.post(
 
       logger.info('用户生成核销码成功', {
         user_id,
-        item_instance_id: instanceId,
+        item_id: itemId,
         redemption_order_id: result.order.redemption_order_id
       })
 
@@ -258,7 +258,7 @@ router.post(
       logger.error('用户生成核销码失败', {
         error: error.message,
         user_id,
-        item_instance_id: instanceId
+        item_id: itemId
       })
       return handleServiceError(error, res, '生成核销码失败')
     }
@@ -266,24 +266,24 @@ router.post(
 )
 
 /**
- * POST /api/v4/backpack/items/:item_instance_id/redeem/refresh-qr
+ * POST /api/v4/backpack/items/:item_id/redeem/refresh-qr
  *
  * @description 刷新核销码的动态QR码（5分钟有效，过期后调用此接口刷新）
  * @access Private（仅物品所有者可操作）
  *
- * @param {number} item_instance_id - 物品实例ID（路由参数）
+ * @param {number} item_id - 物品ID（路由参数）
  *
  * @returns {Object} { qr: { qr_content, expires_at } }
  */
 router.post(
-  '/items/:item_instance_id/redeem/refresh-qr',
+  '/items/:item_id/redeem/refresh-qr',
   authenticateToken,
   asyncHandler(async (req, res) => {
-    const { item_instance_id } = req.params
+    const { item_id } = req.params
     const user_id = req.user.user_id
+    const itemId = parseInt(item_id, 10)
 
-    const instanceId = parseInt(item_instance_id, 10)
-    if (isNaN(instanceId) || instanceId <= 0) {
+    if (isNaN(itemId) || itemId <= 0) {
       return res.apiError('无效的物品实例ID', 'BAD_REQUEST', null, 400)
     }
 
@@ -291,7 +291,7 @@ router.post(
       const RedemptionService = req.app.locals.services.getService('redemption_order')
 
       // 查找该物品的 pending 核销订单
-      const order = await RedemptionService.getOrderByItem(instanceId)
+      const order = await RedemptionService.getOrderByItem(itemId)
 
       if (!order) {
         return res.apiError('该物品没有待核销订单', 'NOT_FOUND', null, 404)
@@ -326,7 +326,7 @@ router.post(
       logger.error('QR码刷新失败', {
         error: error.message,
         user_id,
-        item_instance_id: instanceId
+        item_id: itemId
       })
       return handleServiceError(error, res, 'QR码刷新失败')
     }
@@ -334,7 +334,7 @@ router.post(
 )
 
 /**
- * POST /api/v4/backpack/items/:item_instance_id/use
+ * POST /api/v4/backpack/items/:item_id/use
  *
  * @description 用户直接使用物品（纯线上数字物品/可直接使用的物品）
  * @access Private（仅物品所有者可操作）
@@ -348,24 +348,24 @@ router.post(
  * - redeem：生成核销码 → 到店核销（O2O线下场景，voucher/product 类型）
  * - use：直接使用 → 立即生效（纯线上场景）
  *
- * @param {number} item_instance_id - 物品实例ID（路由参数）
+ * @param {number} item_id - 物品ID（路由参数）
  *
- * @returns {Object} { item_instance, is_duplicate }
+ * @returns {Object} { item, is_duplicate }
  */
 router.post(
-  '/items/:item_instance_id/use',
+  '/items/:item_id/use',
   authenticateToken,
   asyncHandler(async (req, res) => {
-    const { item_instance_id } = req.params
+    const { item_id } = req.params
     const user_id = req.user.user_id
 
     // 参数验证
-    const instanceId = parseInt(item_instance_id, 10)
-    if (isNaN(instanceId) || instanceId <= 0) {
-      return res.apiError('无效的物品实例ID', 'BAD_REQUEST', null, 400)
+    const itemId = parseInt(item_id, 10)
+    if (isNaN(itemId) || itemId <= 0) {
+      return res.apiError('无效的物品ID', 'BAD_REQUEST', null, 400)
     }
 
-    logger.info('用户直接使用物品请求', { user_id, item_instance_id: instanceId })
+    logger.info('用户直接使用物品请求', { user_id, item_id: itemId })
 
     try {
       /*
@@ -382,7 +382,7 @@ router.post(
          * 1. 验证物品存在且属于当前用户
          * 使用 getItemDetail 进行所有权检查（非管理员模式）
          */
-        const itemDetail = await BackpackService.getItemDetail(instanceId, {
+        const itemDetail = await BackpackService.getItemDetail(itemId, {
           viewer_user_id: user_id,
           has_admin_access: false,
           transaction
@@ -404,10 +404,10 @@ router.post(
         // 3. 调用 ItemService.consumeItem 执行物品消耗
         const consumeResult = await ItemService.consumeItem(
           {
-            item_instance_id: instanceId,
+            item_id: itemId,
             operator_user_id: user_id,
             business_type: 'backpack_use',
-            idempotency_key: `backpack_use_${instanceId}_${user_id}_${Date.now()}`,
+            idempotency_key: `backpack_use_${itemId}_${user_id}_${Date.now()}`,
             meta: {
               source: 'backpack',
               action: 'direct_use'
@@ -421,7 +421,7 @@ router.post(
 
       logger.info('用户直接使用物品成功', {
         user_id,
-        item_instance_id: instanceId,
+        item_id: itemId,
         is_duplicate: result.is_duplicate
       })
 
@@ -429,7 +429,7 @@ router.post(
 
       return res.apiSuccess(
         {
-          item_instance_id: instanceId,
+          item_id: itemId,
           status: 'used',
           is_duplicate: result.is_duplicate,
           instructions
@@ -440,7 +440,7 @@ router.post(
       logger.error('用户直接使用物品失败', {
         error: error.message,
         user_id,
-        item_instance_id: instanceId
+        item_id: itemId
       })
       return handleServiceError(error, res, '使用物品失败')
     }
@@ -477,38 +477,52 @@ router.use('/bid', bidRoutes)
  * 仅返回与当前用户相关的记录
  *
  * @route GET /api/v4/backpack/items/:item_id/timeline
+ * @param {number} item_id - 物品ID（路由参数）
+ * @access Private（仅物品所有者可查看）
+ * @returns {Object} 物品流转时间线数据
  */
-router.get('/items/:item_id/timeline', async (req, res) => {
-  try {
-    const ItemLifecycleService = require('../../../services/asset/ItemLifecycleService')
-    const { Item } = require('../../../models')
-    const BalanceService = require('../../../services/asset/BalanceService')
+router.get(
+  '/items/:item_id/timeline',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const userId = req.user.user_id
 
-    const userId = req.user?.user_id
-    if (!userId) return res.apiError('UNAUTHORIZED', '未登录', 401)
-
-    const account = await BalanceService.getOrCreateAccount({ user_id: userId })
-    const item = await Item.findByPk(req.params.item_id)
-
-    if (!item || item.owner_account_id !== account.account_id) {
-      return res.apiError('ITEM_NOT_FOUND', '物品不存在或无权访问', 404)
+    const itemId = parseInt(req.params.item_id, 10)
+    if (isNaN(itemId) || itemId <= 0) {
+      return res.apiError('无效的物品ID', 'BAD_REQUEST', null, 400)
     }
 
-    const lifecycle = await ItemLifecycleService.getLifecycle(item.item_id)
-    if (!lifecycle) return res.apiError('ITEM_NOT_FOUND', '物品不存在', 404)
+    /** 通过 ServiceManager 获取服务（不直接 require） */
+    const ItemLifecycleService = req.app.locals.services.getService('item_lifecycle')
 
-    return res.apiSuccess({
-      tracking_code: lifecycle.tracking_code,
-      item_name: lifecycle.item_name,
-      item_type: lifecycle.item_type,
-      status: lifecycle.status,
-      timeline: lifecycle.timeline
-    }, '获取物品时间线成功')
-  } catch (error) {
-    const logger = require('../../../utils/logger')
-    logger.error('获取物品时间线失败', { error: error.message })
-    return res.apiError('TIMELINE_QUERY_FAILED', error.message, 500)
-  }
-})
+    /** 通过 ItemLifecycleService 获取物品并验证所有权（避免直连 models） */
+    const lifecycle = await ItemLifecycleService.getLifecycle(itemId)
+    if (!lifecycle) {
+      return res.apiError('物品不存在', 'ITEM_NOT_FOUND', null, 404)
+    }
+
+    /** 验证物品所有权：通过 BackpackService 获取物品详情进行所有权校验 */
+    const BackpackService = req.app.locals.services.getService('backpack')
+    const itemDetail = await BackpackService.getItemDetail(itemId, {
+      viewer_user_id: userId,
+      has_admin_access: false
+    })
+
+    if (!itemDetail) {
+      return res.apiError('物品不存在或无权访问', 'ITEM_NOT_FOUND', null, 404)
+    }
+
+    return res.apiSuccess(
+      {
+        tracking_code: lifecycle.tracking_code,
+        item_name: lifecycle.item_name,
+        item_type: lifecycle.item_type,
+        status: lifecycle.status,
+        timeline: lifecycle.timeline
+      },
+      '获取物品时间线成功'
+    )
+  })
+)
 
 module.exports = router

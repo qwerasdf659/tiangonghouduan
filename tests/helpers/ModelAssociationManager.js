@@ -55,7 +55,7 @@ class ModelAssociationManager {
         hasMany: [
           { model: 'LotteryDraw', foreignKey: 'user_id', as: 'lotteryDraws' },
           { model: 'PrizeDistribution', foreignKey: 'user_id', as: 'prizeDistributions' },
-          { model: 'ItemInstance', foreignKey: 'owner_user_id', as: 'itemInstances' }
+          { model: 'Item', foreignKey: 'owner_account_id', as: 'itemInstances' }
         ],
         hasOne: [],
         belongsTo: []

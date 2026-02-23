@@ -328,9 +328,9 @@ describe('IdempotencyService - 单元测试（核心逻辑验证）', () => {
         'MARKET_CREATE_LISTING'
       )
 
-      // 兑换
-      expect(IdempotencyService.getCanonicalOperation('/api/v4/shop/exchange')).toBe(
-        'SHOP_EXCHANGE_CREATE_ORDER'
+      // 兑换（路径已迁移至 backpack 域）
+      expect(IdempotencyService.getCanonicalOperation('/api/v4/backpack/exchange')).toBe(
+        'BACKPACK_EXCHANGE_CREATE_ORDER'
       )
 
       // 测试路径
@@ -418,10 +418,10 @@ describe('IdempotencyService - 单元测试（核心逻辑验证）', () => {
         'ADMIN_STORE_CREATE'
       )
 
-      // 弹窗 Banner
-      expect(IdempotencyService.getCanonicalOperation('/api/v4/console/popup-banners/')).toBe(
-        'ADMIN_POPUP_BANNER_CREATE'
-      )
+      // 运营内容计划（内容投放合并后通过 ad-campaigns/operational 创建）
+      expect(
+        IdempotencyService.getCanonicalOperation('/api/v4/console/ad-campaigns/operational')
+      ).toBe('ADMIN_AD_CAMPAIGN_OPERATIONAL_CREATE')
     })
   })
 
@@ -851,8 +851,8 @@ describe('IdempotencyService - 单元测试（核心逻辑验证）', () => {
         '/api/v4/market/list',
         '/api/v4/market/listings/:id/purchase',
         '/api/v4/market/listings/:id/withdraw',
-        // 兑换
-        '/api/v4/shop/exchange',
+        // 兑换（路径已迁移至 backpack 域）
+        '/api/v4/backpack/exchange',
         // 消费记录
         '/api/v4/shop/consumption/submit',
         // 核销

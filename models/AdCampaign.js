@@ -255,11 +255,13 @@ module.exports = sequelize => {
         allowNull: true,
         defaultValue: 'once_per_day',
         validate: {
+          /**
+           * @param {string|null} value - 频次规则值，校验是否在允许的枚举范围内
+           * @returns {void}
+           */
           isValidRule(value) {
             if (value !== null && !VALID_FREQUENCY_RULES.includes(value)) {
-              throw new Error(
-                '频次规则必须是：' + VALID_FREQUENCY_RULES.join(', ') + ' 之一'
-              )
+              throw new Error('频次规则必须是：' + VALID_FREQUENCY_RULES.join(', ') + ' 之一')
             }
           }
         },

@@ -117,6 +117,12 @@ router.post(
        */
       const result = await TransactionManager.execute(
         async transaction => {
+          // 双录对手方：管理员调账资金来源/去向为系统储备账户
+          const reserveAccount = await BalanceService.getOrCreateAccount(
+            { system_code: 'SYSTEM_RESERVE' },
+            { transaction }
+          )
+
           // 1. 执行资产调整
           const changeResult = await BalanceService.changeBalance(
             {
@@ -126,6 +132,7 @@ router.post(
               business_type: 'admin_adjustment',
               idempotency_key,
               lottery_campaign_id: lottery_campaign_id || null,
+              counterpart_account_id: reserveAccount.account_id,
               meta: {
                 admin_id,
                 reason,
@@ -277,6 +284,11 @@ router.post(
         // eslint-disable-next-line no-await-in-loop -- 批量调整需要逐笔事务处理，确保单笔失败不影响其他
         const result = await TransactionManager.execute(
           async transaction => {
+            const reserveAccount = await BalanceService.getOrCreateAccount(
+              { system_code: 'SYSTEM_RESERVE' },
+              { transaction }
+            )
+
             const changeResult = await BalanceService.changeBalance(
               {
                 user_id,
@@ -285,6 +297,7 @@ router.post(
                 business_type: 'admin_adjustment',
                 idempotency_key: idempotencyKey,
                 lottery_campaign_id: lottery_campaign_id || null,
+                counterpart_account_id: reserveAccount.account_id,
                 meta: {
                   admin_id,
                   reason: batch_reason,

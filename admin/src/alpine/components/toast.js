@@ -314,6 +314,18 @@ export function createToastStore() {
     },
 
     /**
+     * 统一通知入口 - show(message, type)
+     * 全局标准调用方式：Alpine.store('notification').show(msg, type)
+     *
+     * @param {string} message - 通知消息
+     * @param {string} [type='info'] - 通知类型（success/error/warning/info）
+     * @param {number} [duration=3000] - 显示时长（毫秒）
+     */
+    show(message, type = 'info', duration = 3000) {
+      return this.showToast(message, type, duration)
+    },
+
+    /**
      * 兼容方法 - 支持两种参数格式
      * 格式1: showToast(message, type) - 如 consumption.js 等使用
      * 格式2: showToast(type, message) - 如 lottery-quota.js 使用

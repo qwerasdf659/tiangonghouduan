@@ -183,6 +183,10 @@ class PremiumService {
     const unlockTime = BeijingTimeHelper.createBeijingTime()
     const idempotency_key = `premium_unlock_${user_id}_${BeijingTimeHelper.generateIdTimestamp()}`
 
+    const burnAccount = await BalanceService.getOrCreateAccount(
+      { system_code: 'SYSTEM_BURN' },
+      { transaction }
+    )
     // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
     const consumeResult = await BalanceService.changeBalance(
       {
@@ -191,6 +195,7 @@ class PremiumService {
         delta_amount: -UNLOCK_COST,
         business_type: 'premium_unlock',
         idempotency_key,
+        counterpart_account_id: burnAccount.account_id,
         meta: {
           source_type: 'user',
           title: '解锁高级空间',

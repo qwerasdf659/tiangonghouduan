@@ -15,7 +15,7 @@
 
 const {
   MarketListing,
-  ItemInstance,
+  Item,
   ItemTemplate,
   User,
   UserRiskProfile,
@@ -192,13 +192,13 @@ class MarketListingCoreService {
   /**
    * 校验同一物品是否已有其他币种的活跃挂牌
    *
-   * @param {number} itemInstanceId - 物品实例ID
+   * @param {number} itemId - 物品ID
    * @param {string} priceAssetCode - 本次挂牌的定价币种
    * @param {Object} options - 事务选项
    * @returns {Promise<Object>} 校验结果
    */
-  static async validateSameItemSingleCurrency(itemInstanceId, priceAssetCode, options = {}) {
-    if (!itemInstanceId) {
+  static async validateSameItemSingleCurrency(itemId, priceAssetCode, options = {}) {
+    if (!itemId) {
       return { valid: true }
     }
 
@@ -206,7 +206,7 @@ class MarketListingCoreService {
 
     const existingListing = await MarketListing.findOne({
       where: {
-        offer_item_instance_id: itemInstanceId,
+        offer_item_id: itemId,
         status: 'on_sale'
       },
       lock: transaction ? transaction.LOCK.UPDATE : undefined,
@@ -221,7 +221,7 @@ class MarketListingCoreService {
           price_asset_code: existingListing.price_asset_code,
           price_amount: existingListing.price_amount
         },
-        message: `物品 ${itemInstanceId} 已存在活跃挂牌`
+        message: `物品 ${itemId} 已存在活跃挂牌`
       }
     }
 
@@ -323,7 +323,7 @@ class MarketListingCoreService {
    * @param {Object} params - 挂牌参数
    * @param {string} params.idempotency_key - 幂等键
    * @param {number} params.seller_user_id - 卖家用户ID
-   * @param {number} params.item_instance_id - 物品实例ID
+   * @param {number} params.item_id - 物品ID
    * @param {number} params.price_amount - 价格金额
    * @param {string} [params.price_asset_code='DIAMOND'] - 价格资产类型
    * @param {Object} [options] - 事务选项
@@ -333,7 +333,7 @@ class MarketListingCoreService {
     const {
       idempotency_key,
       seller_user_id,
-      item_instance_id,
+      item_id,
       price_amount,
       price_asset_code = 'DIAMOND'
     } = params
@@ -341,7 +341,7 @@ class MarketListingCoreService {
     // 1. 参数验证
     if (!idempotency_key) throw new Error('idempotency_key 是必需参数')
     if (!seller_user_id) throw new Error('seller_user_id 是必需参数')
-    if (!item_instance_id) throw new Error('item_instance_id 是必需参数')
+    if (!item_id) throw new Error('item_id 是必需参数')
     if (!price_amount || price_amount <= 0) throw new Error('price_amount 必须大于0')
 
     // 2. 幂等性检查
@@ -357,10 +357,8 @@ class MarketListingCoreService {
           `seller_user_id: ${existingListing.seller_user_id} ≠ ${seller_user_id}`
         )
       }
-      if (Number(existingListing.offer_item_instance_id) !== Number(item_instance_id)) {
-        parameterMismatch.push(
-          `item_instance_id: ${existingListing.offer_item_instance_id} ≠ ${item_instance_id}`
-        )
+      if (Number(existingListing.offer_item_id) !== Number(item_id)) {
+        parameterMismatch.push(`item_id: ${existingListing.offer_item_id} ≠ ${item_id}`)
       }
 
       if (parameterMismatch.length > 0) {
@@ -399,7 +397,7 @@ class MarketListingCoreService {
 
     // 3.3 同物单币校验
     const sameItemValidation = await this.validateSameItemSingleCurrency(
-      item_instance_id,
+      item_id,
       price_asset_code,
       { transaction }
     )
@@ -423,14 +421,14 @@ class MarketListingCoreService {
     }
 
     // 4. 查询并校验物品
-    const item = await ItemInstance.findOne({
-      where: { item_instance_id },
+    const item = await Item.findOne({
+      where: { item_id },
       lock: transaction.LOCK.UPDATE,
       transaction
     })
 
     if (!item) {
-      const error = new Error(`物品不存在: ${item_instance_id}`)
+      const error = new Error(`物品不存在: ${item_id}`)
       error.code = 'ITEM_NOT_FOUND'
       error.statusCode = 404
       throw error
@@ -471,7 +469,7 @@ class MarketListingCoreService {
     }
 
     /**
-     * 无模板时降级：从 item_instances.meta.name 获取显示名称
+     * 无模板时降级：从 items.meta.name 获取显示名称
      * 业务场景：早期物品实例未关联模板，但 meta JSON 中存储了名称
      */
     if (!snapshotFields.offer_item_display_name && item.meta?.name) {
@@ -481,9 +479,9 @@ class MarketListingCoreService {
     // 7. 创建挂牌记录
     const listing = await MarketListing.create(
       {
-        listing_kind: 'item_instance',
+        listing_kind: 'item',
         seller_user_id,
-        offer_item_instance_id: item_instance_id,
+        offer_item_id: item_id,
         price_amount,
         price_asset_code,
         seller_offer_frozen: false,
@@ -560,9 +558,9 @@ class MarketListingCoreService {
 
     // 解锁物品
     let item = null
-    if (listing.listing_kind === 'item_instance' && listing.offer_item_instance_id) {
-      item = await ItemInstance.findOne({
-        where: { item_instance_id: listing.offer_item_instance_id },
+    if (listing.listing_kind === 'item' && listing.offer_item_id) {
+      item = await Item.findOne({
+        where: { item_id: listing.offer_item_id },
         transaction
       })
 
@@ -1155,9 +1153,9 @@ class MarketListingCoreService {
 
     // 解锁物品/解冻资产
     let item = null
-    if (listing.listing_kind === 'item_instance' && listing.offer_item_instance_id) {
-      item = await ItemInstance.findOne({
-        where: { item_instance_id: listing.offer_item_instance_id },
+    if (listing.listing_kind === 'item' && listing.offer_item_id) {
+      item = await Item.findOne({
+        where: { item_id: listing.offer_item_id },
         transaction
       })
       if (item) {

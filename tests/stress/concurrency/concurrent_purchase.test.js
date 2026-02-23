@@ -27,7 +27,7 @@ const {
   sequelize,
   User,
   MarketListing,
-  ItemInstance,
+  Item,
   TradeOrder,
   ItemTemplate
 } = require('../../../models')
@@ -68,7 +68,7 @@ describe('🛒 并发购买竞态测试', () => {
    */
   async function createTestItem(ownerUserId, options = {}) {
     const itemData = {
-      owner_user_id: ownerUserId,
+      owner_account_id: ownerUserId,
       item_template_id: testItemTemplate?.item_template_id || null,
       item_type: 'tradable_item',
       status: options.status || 'available',
@@ -78,8 +78,8 @@ describe('🛒 并发购买竞态测试', () => {
       }
     }
 
-    const item = await ItemInstance.create(itemData)
-    createdItems.push(item.item_instance_id)
+    const item = await Item.create(itemData)
+    createdItems.push(item.item_id)
     return item
   }
 
@@ -93,7 +93,7 @@ describe('🛒 并发购买竞态测试', () => {
         {
           idempotency_key: generateIdempotencyKey('concurrent_listing'),
           seller_user_id: sellerId,
-          item_instance_id: itemInstanceId,
+          item_id: itemInstanceId,
           price_amount: priceAmount,
           price_asset_code: 'DIAMOND'
         },
@@ -210,7 +210,7 @@ describe('🛒 并发购买竞态测试', () => {
     // 清理测试物品
     for (const itemInstanceId of createdItems) {
       try {
-        await ItemInstance.destroy({ where: { item_instance_id: itemInstanceId }, force: true })
+        await Item.destroy({ where: { item_id: itemInstanceId }, force: true })
       } catch (error) {
         console.log(`清理物品 ${itemInstanceId} 失败:`, error.message)
       }
@@ -240,7 +240,7 @@ describe('🛒 并发购买竞态测试', () => {
 
       // 1. 创建测试物品和挂牌
       const testItem = await createTestItem(testSeller.user_id)
-      const testListing = await createTestListing(testSeller.user_id, testItem.item_instance_id, 30)
+      const testListing = await createTestListing(testSeller.user_id, testItem.item_id, 30)
       console.log(`✅ 挂牌创建成功: ${testListing.market_listing_id}`)
 
       // 2. 为所有买家准备资产
@@ -353,7 +353,7 @@ describe('🛒 并发购买竞态测试', () => {
 
       // 1. 创建测试物品和挂牌
       const testItem = await createTestItem(testSeller.user_id)
-      const testListing = await createTestListing(testSeller.user_id, testItem.item_instance_id, 25)
+      const testListing = await createTestListing(testSeller.user_id, testItem.item_id, 25)
 
       // 2. 准备买家资产
       await grantTestAsset(testBuyer.user_id, 100)
@@ -431,11 +431,7 @@ describe('🛒 并发购买竞态测试', () => {
       const listings = []
       for (let i = 0; i < 3; i++) {
         const item = await createTestItem(testSeller.user_id)
-        const listing = await createTestListing(
-          testSeller.user_id,
-          item.item_instance_id,
-          20 + i * 10
-        )
+        const listing = await createTestListing(testSeller.user_id, item.item_id, 20 + i * 10)
         listings.push(listing)
       }
 
@@ -545,7 +541,7 @@ describe('🛒 并发购买竞态测试', () => {
 
       // 1. 创建挂牌
       const testItem = await createTestItem(testSeller.user_id)
-      const testListing = await createTestListing(testSeller.user_id, testItem.item_instance_id, 35)
+      const testListing = await createTestListing(testSeller.user_id, testItem.item_id, 35)
 
       // 2. 准备买家资产
       await grantTestAsset(buyer1.user_id, 100)
@@ -607,7 +603,7 @@ describe('🛒 并发购买竞态测试', () => {
 
       // 1. 创建并完成一个交易
       const testItem = await createTestItem(testSeller.user_id)
-      const testListing = await createTestListing(testSeller.user_id, testItem.item_instance_id, 40)
+      const testListing = await createTestListing(testSeller.user_id, testItem.item_id, 40)
 
       // 准备资产
       await grantTestAsset(buyer1.user_id, 200)

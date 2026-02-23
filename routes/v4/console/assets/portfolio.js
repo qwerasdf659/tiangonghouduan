@@ -8,7 +8,7 @@
  * 功能说明：
  * - 整合两类资产域，提供统一的资产查询入口
  * - 可叠加资产（POINTS、DIAMOND、材料） - 来自 account_asset_balances 表
- * - 不可叠加物品（优惠券、实物商品） - 来自 item_instances 表
+ * - 不可叠加物品（优惠券、实物商品） - 来自 items 表（三表架构）
  *
  * 业务场景：
  * - 后台/运营"用户资产总览"查询
@@ -120,7 +120,7 @@ router.get('/portfolio/items', authenticateToken, requireRoleLevel(30), async (r
     // V4.7.0 AssetService 拆分：通过 ServiceManager 获取 ItemService（2026-01-31）
     const ItemService = req.app.locals.services.getService('asset_item')
 
-    const result = await ItemService.getUserItemInstances(
+    const result = await ItemService.getUserItems(
       { user_id },
       { item_type, status, page, page_size }
     )
@@ -137,30 +137,27 @@ router.get('/portfolio/items', authenticateToken, requireRoleLevel(30), async (r
 })
 
 /**
- * GET /portfolio/items/:item_instance_id - 获取物品详情
+ * GET /portfolio/items/:item_id - 获取物品详情
  *
  * 权限要求：admin（可写）或 ops（只读）角色
  */
 router.get(
-  '/portfolio/items/:item_instance_id',
+  '/portfolio/items/:item_id',
   authenticateToken,
   requireRoleLevel(30),
   async (req, res) => {
     try {
       const user_id = req.user.user_id
-      const item_instance_id = parseInt(req.params.item_instance_id)
+      const item_id = parseInt(req.params.item_id)
 
-      if (!item_instance_id || isNaN(item_instance_id)) {
+      if (!item_id || isNaN(item_id)) {
         return res.apiError('无效的物品ID', 400)
       }
 
       // V4.7.0 AssetService 拆分：通过 ServiceManager 获取 ItemService（2026-01-31）
       const ItemService = req.app.locals.services.getService('asset_item')
 
-      const result = await ItemService.getItemInstanceDetail(
-        { user_id, item_instance_id },
-        { event_limit: 10 }
-      )
+      const result = await ItemService.getItemDetail({ user_id, item_id }, { event_limit: 10 })
 
       if (!result) {
         return res.apiError('物品不存在或无权访问', 404)
@@ -170,7 +167,7 @@ router.get(
     } catch (error) {
       logger.error('❌ 获取物品详情失败', {
         user_id: req.user?.user_id,
-        item_instance_id: req.params.item_instance_id,
+        item_id: req.params.item_id,
         error: error.message
       })
 
@@ -185,10 +182,10 @@ router.get(
  * 权限要求：admin（可写）或 ops（只读）角色
  *
  * 查询参数：
- * - item_instance_id: number（可选）- 指定物品的事件
+ * - item_id: number（可选）- 指定物品的账本事件
  * - event_types: string（可选）- 事件类型过滤，逗号分隔（mint,lock,unlock,transfer,use）
  * - page: number（可选）- 页码（默认1）
- * - limit: number（可选）- 每页数量（默认20）
+ * - page_size: number（可选）- 每页数量（默认20，最大100）
  *
  * 响应示例：
  * {
@@ -205,24 +202,21 @@ router.get(
 router.get('/item-events', authenticateToken, requireRoleLevel(30), async (req, res) => {
   try {
     const user_id = req.user.user_id
-    const item_instance_id = req.query.item_instance_id
-      ? parseInt(req.query.item_instance_id)
-      : null
+    const item_id = req.query.item_id ? parseInt(req.query.item_id) : null
     const event_types = req.query.event_types ? req.query.event_types.split(',') : null
     const page = Math.max(1, parseInt(req.query.page) || 1)
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20))
+    const page_size = Math.min(100, Math.max(1, parseInt(req.query.page_size) || 20))
 
-    logger.info('📜 获取物品事件历史', { user_id, item_instance_id, event_types, page, limit })
+    logger.info('📜 获取物品账本事件', { user_id, item_id, event_types, page, page_size })
 
-    // V4.7.0 AssetService 拆分：通过 ServiceManager 获取 ItemService（2026-01-31）
     const ItemService = req.app.locals.services.getService('asset_item')
 
-    const result = await ItemService.getItemEvents({
-      user_id,
-      item_instance_id,
+    const result = await ItemService.getLedgerEntries({
+      item_id,
+      account_id: null,
       event_types,
       page,
-      limit
+      page_size
     })
 
     return res.apiSuccess(result, '获取物品事件历史成功')

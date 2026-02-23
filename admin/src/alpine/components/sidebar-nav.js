@@ -166,6 +166,8 @@ export function sidebarNav() {
         items: [
           { id: 'asset-mgmt', name: '资产管理', url: '/admin/asset-management.html' },
           { id: 'asset-adj', name: '资产调整', url: '/admin/asset-adjustment.html' },
+          { id: 'item-lifecycle', name: '物品追踪', url: '/admin/item-lifecycle.html' },
+          { id: 'reconciliation', name: '对账报告', url: '/admin/reconciliation.html' },
           { id: 'exchange', name: '兑换市场', url: '/admin/exchange-market.html' },
           { id: 'trade', name: 'C2C交易', url: '/admin/trade-management.html' },
           { id: 'bid-mgmt', name: '竞价管理', url: '/admin/bid-management.html' },

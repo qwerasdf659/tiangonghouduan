@@ -26,7 +26,7 @@ const request = require('supertest')
 const app = require('../../app')
 const {
   sequelize,
-  ItemInstance,
+  Item,
   LotteryDraw,
   LotteryCampaign,
   MarketListing,
@@ -405,13 +405,13 @@ describe('阶段九：压力测试与高并发（P1）', () => {
             { transaction }
           )
 
-          const item_instance_id = mint_result.item_instance.item_instance_id
+          const item_id = mint_result.item_instance.item_id
 
           // 上架商品
           const listing_result = await MarketListingService.createListing(
             {
               seller_user_id: test_user_id,
-              item_instance_id,
+              item_id,
               price_asset_code: 'DIAMOND',
               price_amount: 10,
               idempotency_key: generateIdempotencyKey('stress_listing')
@@ -839,8 +839,8 @@ describe('阶段九：压力测试与高并发（P1）', () => {
           async () => await LotteryDraw.count({ where: { user_id: test_user_id } }),
           // 联表查询
           async () =>
-            await ItemInstance.findAll({
-              where: { owner_user_id: test_user_id },
+            await Item.findAll({
+              where: { owner_account_id: test_user_id },
               limit: 10
             }),
           // 聚合查询

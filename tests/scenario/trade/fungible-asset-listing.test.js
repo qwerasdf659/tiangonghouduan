@@ -175,7 +175,7 @@ describe('C2C 材料交易功能集成测试', () => {
    *
    * 清理策略：
    * 1. on_sale + fungible_asset：使用 withdrawFungibleAssetListing 撤回并解冻
-   * 2. on_sale + item_instance：使用 withdrawItemInstanceListing 撤回
+   * 2. on_sale + item_instance：使用 withdrawItemListing 撤回
    * 3. 其他状态（sold/withdrawn/locked）：已完成的业务流程，无需清理
    * 4. 撤回失败：记录警告日志，交由每日孤儿冻结检测任务处理
    */
@@ -217,7 +217,7 @@ describe('C2C 材料交易功能集成测试', () => {
             { description: `test_cleanup_${listingId}` }
           )
           console.log(`✅ 撤回挂牌并解冻: ${listingId}`)
-        } else if (listing.listing_kind === 'item_instance') {
+        } else if (listing.listing_kind === 'item') {
           // item_instance 类型的撤回
           await TransactionManager.execute(
             async transaction => {

@@ -397,6 +397,10 @@ class AdBillingService {
             results.completed++
           }
 
+          const platformFeeAccount = await BalanceService.getOrCreateAccount(
+            { system_code: 'SYSTEM_PLATFORM_FEE' },
+            { transaction: campaignTransaction }
+          )
           await BalanceService.changeBalance(
             {
               user_id: freshCampaign.advertiser_user_id,
@@ -404,6 +408,7 @@ class AdBillingService {
               delta_amount: -freshCampaign.daily_bid_diamond,
               business_type: 'ad_campaign_daily_deduct',
               idempotency_key: `ad_daily_${business_id}`,
+              counterpart_account_id: platformFeeAccount.account_id,
               meta: { ad_campaign_id: freshCampaign.ad_campaign_id, billing_date: today }
             },
             { transaction: campaignTransaction }

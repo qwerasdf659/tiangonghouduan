@@ -9,7 +9,7 @@
  * 委托关系：
  * - getSummary → UserDataQueryService.getUserOverview + 补充统计
  * - getAssets → UserDataQueryService.getAssetTransactions + BalanceService.getAllBalances
- * - getBackpack → ItemService.getUserItemInstances
+ * - getBackpack → ItemService.getUserItems
  * - getLottery → UserDataQueryService.getLotteryDraws
  * - getTrades → UserDataQueryService.getTradeRecords + getMarketListings
  * - getTimeline → UserDataQueryService多方法合并 + consumption_records + feedbacks
@@ -23,8 +23,12 @@
  * @date 2026-02-22
  */
 
-const logger = require('../utils/logger').logger
-
+/**
+ * 客服用户上下文聚合查询服务
+ *
+ * 为客服工作台C区（用户上下文面板）提供用户全维度数据聚合查询
+ * 全部为只读操作，不涉及数据变更
+ */
 class CustomerServiceUserContextService {
   /**
    * 获取用户画像聚合摘要
@@ -33,16 +37,23 @@ class CustomerServiceUserContextService {
    * @param {number} userId - 用户ID
    * @returns {Object} 用户基本信息 + 各模块统计计数
    */
-  static async getSummary (models, userId) {
+  static async getSummary(models, userId) {
     const UserDataQueryService = require('./UserDataQueryService')
 
     /* 委托 UserDataQueryService 获取用户基本信息和资产汇总 */
     const overview = await UserDataQueryService.getUserOverview(models, userId)
 
+    /* 先查用户的 account_id（物品通过 owner_account_id 关联） */
+    const account = await models.Account.findOne({
+      where: { user_id: userId },
+      attributes: ['account_id']
+    })
+    const accountId = account ? account.account_id : null
+
     /* 补充各模块统计计数（并行查询提升性能） */
     const [itemCount, lotteryCount, tradeOrderCount, feedbackCount, sessionCount] =
       await Promise.all([
-        models.ItemInstance.count({ where: { owner_user_id: userId } }),
+        accountId ? models.Item.count({ where: { owner_account_id: accountId } }) : 0,
         models.LotteryDraw.count({ where: { user_id: userId } }),
         models.TradeOrder.count({
           where: {
@@ -73,7 +84,7 @@ class CustomerServiceUserContextService {
    * @param {Object} params - 查询参数（分页、筛选）
    * @returns {Object} { balances: [...], transactions: { rows: [...], count, page, page_size } }
    */
-  static async getAssets (models, userId, params = {}) {
+  static async getAssets(models, userId, params = {}) {
     const UserDataQueryService = require('./UserDataQueryService')
 
     /* 查询用户账户，获取 account_id 用于余额查询 */
@@ -87,7 +98,7 @@ class CustomerServiceUserContextService {
       /* 查询所有资产余额（默认只查 GLOBAL 全局余额，折叠展示活动专属余额） */
       const balanceRows = await models.AccountAssetBalance.findAll({
         where: { account_id: account.account_id },
-        
+
         order: [['lottery_campaign_key', 'ASC']]
       })
       balances = balanceRows.map(b => b.get({ plain: true }))
@@ -110,24 +121,38 @@ class CustomerServiceUserContextService {
    * @param {Object} params - 查询参数（分页、状态筛选）
    * @returns {Object} { rows: [...], count, page, page_size }
    */
-  static async getBackpack (models, userId, params = {}) {
+  static async getBackpack(models, userId, params = {}) {
     const page = parseInt(params.page) || 1
     const pageSize = Math.min(parseInt(params.page_size) || 20, 100)
     const offset = (page - 1) * pageSize
 
-    const where = { owner_user_id: userId }
+    /* 物品通过 owner_account_id 关联账户，需先查用户的 account_id */
+    const account = await models.Account.findOne({
+      where: { user_id: userId },
+      attributes: ['account_id']
+    })
+
+    if (!account) {
+      return { rows: [], count: 0, page, page_size: pageSize }
+    }
+
+    const where = { owner_account_id: account.account_id }
     if (params.status) {
       where.status = params.status
     }
 
-    const { count, rows } = await models.ItemInstance.findAndCountAll({
+    const { count, rows } = await models.Item.findAndCountAll({
       where,
-      include: [
-        {
-          model: models.ItemTemplate,
-          as: 'itemTemplate',
-          attributes: ['item_template_id', 'template_code', 'display_name', 'item_type', 'rarity_code']
-        }
+      attributes: [
+        'item_id',
+        'tracking_code',
+        'status',
+        'item_type',
+        'item_name',
+        'item_description',
+        'rarity_code',
+        'source',
+        'created_at'
       ],
       order: [['created_at', 'DESC']],
       limit: pageSize,
@@ -150,7 +175,7 @@ class CustomerServiceUserContextService {
    * @param {Object} params - 查询参数（分页、活动筛选）
    * @returns {Object} { summary: {...}, records: { rows, count, page, page_size } }
    */
-  static async getLottery (models, userId, params = {}) {
+  static async getLottery(models, userId, params = {}) {
     const UserDataQueryService = require('./UserDataQueryService')
 
     /* 计算抽奖统计摘要（按档位分布） */
@@ -200,7 +225,7 @@ class CustomerServiceUserContextService {
    * @param {Object} params - 查询参数
    * @returns {Object} { orders: {...}, listings: {...}, stats: {...} }
    */
-  static async getTrades (models, userId, params = {}) {
+  static async getTrades(models, userId, params = {}) {
     const UserDataQueryService = require('./UserDataQueryService')
 
     /* 委托 UserDataQueryService 获取交易订单和市场挂单 */
@@ -256,7 +281,7 @@ class CustomerServiceUserContextService {
    * @param {Object} params - 查询参数（分页）
    * @returns {Object} { rows: [...], count, page, page_size }
    */
-  static async getTimeline (models, userId, params = {}) {
+  static async getTimeline(models, userId, params = {}) {
     const page = parseInt(params.page) || 1
     const pageSize = parseInt(params.page_size) || 20
 
@@ -264,11 +289,11 @@ class CustomerServiceUserContextService {
     const [consumptions, feedbacks, lotteryDraws] = await Promise.all([
       models.ConsumptionRecord
         ? models.ConsumptionRecord.findAll({
-          where: { user_id: userId },
-          order: [['created_at', 'DESC']],
-          limit: pageSize,
-          raw: true
-        })
+            where: { user_id: userId },
+            order: [['created_at', 'DESC']],
+            limit: pageSize,
+            raw: true
+          })
         : [],
       models.Feedback.findAll({
         where: { user_id: userId },
@@ -323,18 +348,18 @@ class CustomerServiceUserContextService {
    * @param {number} userId - 用户ID
    * @returns {Object} { risk_profile: {...}, alerts: [...] }
    */
-  static async getRisk (models, userId) {
+  static async getRisk(models, userId) {
     const [riskProfile, alerts] = await Promise.all([
       models.UserRiskProfile
         ? models.UserRiskProfile.findOne({ where: { user_id: userId }, raw: true })
         : null,
       models.RiskAlert
         ? models.RiskAlert.findAll({
-          where: { target_user_id: userId },
-          order: [['created_at', 'DESC']],
-          limit: 20,
-          raw: true
-        })
+            where: { target_user_id: userId },
+            order: [['created_at', 'DESC']],
+            limit: 20,
+            raw: true
+          })
         : []
     ])
 
@@ -352,7 +377,7 @@ class CustomerServiceUserContextService {
    * @param {Object} params - 查询参数（分页）
    * @returns {Object} { rows: [...], count, page, page_size }
    */
-  static async getHistory (models, userId, params = {}) {
+  static async getHistory(models, userId, params = {}) {
     const page = parseInt(params.page) || 1
     const pageSize = parseInt(params.page_size) || 10
     const offset = (page - 1) * pageSize
@@ -383,9 +408,7 @@ class CustomerServiceUserContextService {
         const plain = session.get({ plain: true })
         plain.last_message_preview = lastMessage
           ? {
-              content: lastMessage.content
-                ? lastMessage.content.substring(0, 50)
-                : '',
+              content: lastMessage.content ? lastMessage.content.substring(0, 50) : '',
               sender_type: lastMessage.sender_type,
               created_at: lastMessage.created_at
             }

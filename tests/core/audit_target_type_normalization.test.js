@@ -45,7 +45,7 @@ describe('审计日志 target_type 命名统一测试', () => {
       expect(AUDIT_TARGET_TYPES.ASSET_TRANSACTION).toBe('asset_transaction')
 
       // 物品与库存
-      expect(AUDIT_TARGET_TYPES.ITEM_INSTANCE).toBe('item_instance')
+      expect(AUDIT_TARGET_TYPES.ITEM_INSTANCE).toBe('item')
 
       // 市场交易
       expect(AUDIT_TARGET_TYPES.MARKET_LISTING).toBe('market_listing')
@@ -70,8 +70,8 @@ describe('审计日志 target_type 命名统一测试', () => {
         expect(normalizeTargetType('User')).toBe('user')
       })
 
-      test('ItemInstance → item_instance', () => {
-        expect(normalizeTargetType('ItemInstance')).toBe('item_instance')
+      test('Item → item_instance', () => {
+        expect(normalizeTargetType('Item')).toBe('item')
       })
 
       test('AssetTransaction → asset_transaction', () => {
@@ -97,7 +97,7 @@ describe('审计日志 target_type 命名统一测试', () => {
       })
 
       test('item_instance → item_instance（已规范化）', () => {
-        expect(normalizeTargetType('item_instance')).toBe('item_instance')
+        expect(normalizeTargetType('item')).toBe('item')
       })
 
       test('asset_transaction → asset_transaction（已规范化）', () => {
@@ -131,7 +131,7 @@ describe('审计日志 target_type 命名统一测试', () => {
   describe('isValidTargetType 校验逻辑验证', () => {
     test('标准资源码返回 true', () => {
       expect(isValidTargetType('user')).toBe(true)
-      expect(isValidTargetType('item_instance')).toBe(true)
+      expect(isValidTargetType('item')).toBe(true)
       expect(isValidTargetType('asset_transaction')).toBe(true)
       expect(isValidTargetType('account_asset_balance')).toBe(true)
       expect(isValidTargetType('market_listing')).toBe(true)
@@ -139,7 +139,7 @@ describe('审计日志 target_type 命名统一测试', () => {
 
     test('PascalCase 返回 false（需要先规范化）', () => {
       expect(isValidTargetType('User')).toBe(false)
-      expect(isValidTargetType('ItemInstance')).toBe(false)
+      expect(isValidTargetType('Item')).toBe(false)
       expect(isValidTargetType('AssetTransaction')).toBe(false)
     })
 
@@ -154,7 +154,7 @@ describe('审计日志 target_type 命名统一测试', () => {
       expect(getTargetTypeDisplayName('user')).toBe('用户')
       expect(getTargetTypeDisplayName('account_asset_balance')).toBe('资产余额')
       expect(getTargetTypeDisplayName('asset_transaction')).toBe('资产流水')
-      expect(getTargetTypeDisplayName('item_instance')).toBe('道具实例')
+      expect(getTargetTypeDisplayName('item')).toBe('道具实例')
       expect(getTargetTypeDisplayName('market_listing')).toBe('市场挂牌')
       expect(getTargetTypeDisplayName('trade_order')).toBe('交易订单')
     })
@@ -166,22 +166,22 @@ describe('审计日志 target_type 命名统一测试', () => {
 
   describe('normalizeTargetTypes 批量规范化验证', () => {
     test('批量转换多个 target_type', () => {
-      const input = ['User', 'ItemInstance', 'user']
+      const input = ['User', 'Item', 'user']
       const result = normalizeTargetTypes(input)
 
-      expect(result.normalized).toEqual(['user', 'item_instance', 'user'])
+      expect(result.normalized).toEqual(['user', 'item', 'user'])
 
       expect(result.mapping).toEqual({
         User: 'user',
-        ItemInstance: 'item_instance'
+        Item: 'item'
       })
     })
 
     test('已规范化的值不记录在 mapping 中', () => {
-      const input = ['user', 'item_instance']
+      const input = ['user', 'item']
       const result = normalizeTargetTypes(input)
 
-      expect(result.normalized).toEqual(['user', 'item_instance'])
+      expect(result.normalized).toEqual(['user', 'item'])
       expect(result.mapping).toEqual({})
     })
   })
@@ -201,7 +201,7 @@ describe('审计日志 target_type 命名统一测试', () => {
         'asset_transaction',
         'feature_flag',
         'exchange_record',
-        'item_instance'
+        'item'
       ]
 
       dbTargetTypes.forEach(targetType => {

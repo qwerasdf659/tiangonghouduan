@@ -152,12 +152,12 @@ router.post(
        * - item_instance 交易：创建订单 + 生成担保码（买方需确认后才完成）
        * - fungible_asset 交易：创建订单 + 立即完成（自动转移，无需担保码）
        */
-      const isItemInstanceTrade = listing.listing_kind === 'item_instance'
+      const isItemTrade = listing.listing_kind === 'item'
       const EscrowCodeService = req.app.locals.services.getService('escrow_code')
 
       let responseData
 
-      if (isItemInstanceTrade) {
+      if (isItemTrade) {
         // 实物交易：创建订单（冻结资产）→ 生成担保码 → 等待买方确认
         const orderResult = await TransactionManager.execute(async transaction => {
           return await TradeOrderService.createOrder(
@@ -165,7 +165,7 @@ router.post(
               buyer_id,
               seller_id: listing.seller_user_id,
               market_listing_id,
-              item_instance_id: listing.offer_item_instance_id,
+              item_id: listing.offer_item_id,
               price_amount: listing.price_amount,
               price_asset_code: listing.price_asset_code,
               idempotency_key
@@ -212,7 +212,7 @@ router.post(
                 buyer_id,
                 seller_id: listing.seller_user_id,
                 market_listing_id,
-                item_instance_id: listing.offer_item_instance_id,
+                item_id: listing.offer_item_id,
                 price_amount: listing.price_amount,
                 price_asset_code: listing.price_asset_code,
                 idempotency_key
@@ -264,7 +264,7 @@ router.post(
         seller_id: listing.seller_user_id,
         price_amount: listing.price_amount,
         trade_order_id: responseData.trade_order_id,
-        requires_escrow: isItemInstanceTrade,
+        requires_escrow: isItemTrade,
         idempotency_key
       })
 

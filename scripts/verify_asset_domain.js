@@ -338,7 +338,7 @@ async function verifyServiceLayer() {
     console.log('\n【检查2】ItemService 核心方法（物品操作）')
 
     // ItemService 方法
-    const itemMethods = ['createItemInstance', 'updateItemOwner', 'getItemInstance', 'getItemInstancesByOwner', 'redeemItem', 'consumeItem', 'getItemStats']
+    const itemMethods = ['mintItem', 'transferItem', 'getItem', 'getUserItems', 'useItem', 'getItemStats']
     itemMethods.forEach(method => {
       if (typeof ItemService[method] === 'function') {
         pass(`ItemService.${method}() 方法存在`)
@@ -521,11 +521,11 @@ async function verifyBusinessLayer() {
         const stageName = path.basename(stagePath)
 
         // V4.7.0：检查是否使用 BalanceService 或 ItemService
-        if (content.includes('BalanceService.changeBalance') || content.includes('ItemService.createItemInstance')) {
+        if (content.includes('BalanceService.changeBalance') || content.includes('ItemService.mintItem')) {
           pass(`${stageName} 已使用资产子服务（V4.7.0）`)
           pipelineCheckPassed = true
-        } else if (content.includes('ItemInstance.create')) {
-          fail(`${stageName} 仍直接使用 ItemInstance.create()`)
+        } else if (content.includes('ItemInstance.create') || content.includes('Item.create')) {
+          fail(`${stageName} 仍直接使用 ItemInstance.create() 或 Item.create()`)
         } else {
           warn(`${stageName} 未发现资产子服务调用`)
         }
@@ -548,14 +548,14 @@ async function verifyBusinessLayer() {
       const content = fs.readFileSync(tradeServicePath, 'utf-8')
 
       if (
-        content.includes('ItemService.updateItemOwner') ||
-        content.includes('itemService.updateItemOwner')
+        content.includes('ItemService.transferItem') ||
+        content.includes('itemService.transferItem')
       ) {
-        pass('交易服务已使用 ItemService.updateItemOwner()（V4.7.0）')
+        pass('交易服务已使用 ItemService.transferItem()（V4.7.0）')
       } else if (content.includes('.update(') && content.includes('owner_user_id')) {
-        fail('交易服务仍直接操作 ItemInstance')
+        fail('交易服务仍直接操作 Item')
       } else {
-        warn('交易服务未发现 updateItemOwner 调用')
+        warn('交易服务未发现 transferItem 调用')
       }
     } else {
       warn('TradeOrderService.js 文件不存在')
@@ -573,14 +573,14 @@ async function verifyBusinessLayer() {
       const content = fs.readFileSync(redemptionServicePath, 'utf-8')
 
       if (
-        content.includes('ItemService.consumeItem') ||
-        content.includes('itemService.consumeItem')
+        content.includes('ItemService.useItem') ||
+        content.includes('itemService.useItem')
       ) {
-        pass('核销服务已使用 ItemService.consumeItem()（V4.7.0）')
+        pass('核销服务已使用 ItemService.useItem()（V4.7.0）')
       } else if (content.includes('markAsUsed')) {
         fail('核销服务仍直接调用 markAsUsed()')
       } else {
-        warn('核销服务未发现 consumeItem 或 markAsUsed 调用')
+        warn('核销服务未发现 useItem 或 markAsUsed 调用')
       }
     } else {
       warn('RedemptionService.js 文件不存在')

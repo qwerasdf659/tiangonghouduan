@@ -32,6 +32,10 @@ const LEVEL = {
 const FREEZE_WARNING_MS = 30 * 60 * 1000
 const FREEZE_ERROR_MS = 2 * 60 * 60 * 1000
 
+/**
+ * 客服一键诊断服务
+ * 并行检查用户5个模块状态（资产/交易/物品/抽奖/账号），2-3秒内返回结果
+ */
 class CustomerServiceDiagnoseService {
   /**
    * 对指定用户执行一键诊断，并行检查所有模块
@@ -40,7 +44,7 @@ class CustomerServiceDiagnoseService {
    * @param {number} userId - 用户ID
    * @returns {Object} { overall_level, checks: { asset, trade, item, lottery, account }, issues: [...] }
    */
-  static async diagnose (models, userId) {
+  static async diagnose(models, userId) {
     const now = Date.now()
 
     const [assetCheck, tradeCheck, itemCheck, lotteryCheck, accountCheck] = await Promise.all([
@@ -90,10 +94,10 @@ class CustomerServiceDiagnoseService {
    * 检查资产状态：是否有异常冻结（frozen_amount > 0 且关联订单已超时）
    * @param {Object} models - Sequelize models 对象
    * @param {number} userId - 用户ID
-   * @param {number} now - 当前时间戳
+   * @param {number} _now - 当前时间戳（资产检查暂未使用，预留）
    * @returns {Promise<Object>} 检查结果
    */
-  static async _checkAssets (models, userId, now) {
+  static async _checkAssets(models, userId, _now) {
     try {
       const account = await models.Account.findOne({
         where: { user_id: userId },
@@ -143,7 +147,7 @@ class CustomerServiceDiagnoseService {
    * @param {number} now - 当前时间戳
    * @returns {Promise<Object>} 检查结果
    */
-  static async _checkTrades (models, userId, now) {
+  static async _checkTrades(models, userId, now) {
     try {
       const pendingOrders = await models.TradeOrder.findAll({
         where: {
@@ -188,7 +192,11 @@ class CustomerServiceDiagnoseService {
       })
 
       if (issues.length === 0) {
-        return { level: LEVEL.OK, message: `${pendingOrders.length} 个进行中订单均在正常时限内`, issues: [] }
+        return {
+          level: LEVEL.OK,
+          message: `${pendingOrders.length} 个进行中订单均在正常时限内`,
+          issues: []
+        }
       }
 
       return {
@@ -209,20 +217,34 @@ class CustomerServiceDiagnoseService {
    * @param {number} now - 当前时间戳
    * @returns {Promise<Object>} 检查结果
    */
-  static async _checkItems (models, userId, now) {
+  static async _checkItems(models, userId, now) {
     try {
-      const lockedItems = await models.ItemInstance.findAll({
+      /* 物品通过 owner_account_id 关联账户 */
+      const account = await models.Account.findOne({
+        where: { user_id: userId },
+        attributes: ['account_id']
+      })
+
+      if (!account) {
+        return { level: LEVEL.OK, message: '无账户记录', issues: [] }
+      }
+
+      const lockedItems = await models.Item.findAll({
         where: {
-          owner_user_id: userId,
-          status: 'locked'
+          owner_account_id: account.account_id,
+          status: 'held'
         },
-        include: [
-          {
-            model: models.ItemTemplate,
-            as: 'template',
-            attributes: ['name', 'display_name']
-          }
-        ]
+        include: models.ItemHold
+          ? [
+              {
+                model: models.ItemHold,
+                as: 'holds',
+                where: { released_at: null },
+                required: false,
+                attributes: ['hold_type', 'created_at']
+              }
+            ]
+          : []
       })
 
       if (lockedItems.length === 0) {
@@ -234,16 +256,11 @@ class CustomerServiceDiagnoseService {
 
       lockedItems.forEach(item => {
         const plain = item.get({ plain: true })
-        const locks = plain.locks || {}
-        let lockTime = null
+        const itemHolds = plain.holds || []
 
-        /* 从 locks JSON 中提取最早的锁定时间 */
-        Object.values(locks).forEach(lock => {
-          if (lock && lock.locked_at) {
-            const t = new Date(lock.locked_at).getTime()
-            if (!lockTime || t < lockTime) lockTime = t
-          }
-        })
+        /* 优先使用 item_holds.created_at 作为锁定时间，回退到物品 updated_at */
+        const holdCreatedAt = itemHolds.length > 0 ? itemHolds[0].created_at : null
+        const lockTime = new Date(holdCreatedAt || plain.updated_at || plain.created_at).getTime()
 
         if (lockTime) {
           const elapsed = now - lockTime
@@ -257,13 +274,14 @@ class CustomerServiceDiagnoseService {
 
           if (severity !== LEVEL.OK) {
             const elapsedMinutes = Math.round(elapsed / 60000)
-            const templateName = plain.template ? (plain.template.display_name || plain.template.name) : '未知物品'
+            const templateName = plain.item_name || '未知物品'
+            const holdTypes = itemHolds.map(h => h.hold_type)
             issues.push({
               type: 'item_lock_timeout',
               severity,
               item_instance_id: plain.item_instance_id,
               item_name: templateName,
-              lock_types: Object.keys(locks),
+              lock_types: holdTypes,
               elapsed_minutes: elapsedMinutes,
               message: `物品 "${templateName}" (ID:${plain.item_instance_id}) 锁定已 ${elapsedMinutes} 分钟`
             })
@@ -276,7 +294,11 @@ class CustomerServiceDiagnoseService {
       })
 
       if (issues.length === 0) {
-        return { level: LEVEL.OK, message: `${lockedItems.length} 个锁定物品均在正常时限内`, issues: [] }
+        return {
+          level: LEVEL.OK,
+          message: `${lockedItems.length} 个锁定物品均在正常时限内`,
+          issues: []
+        }
       }
 
       return {
@@ -296,7 +318,7 @@ class CustomerServiceDiagnoseService {
    * @param {number} userId - 用户ID
    * @returns {Promise<Object>} 检查结果
    */
-  static async _checkLottery (models, userId) {
+  static async _checkLottery(models, userId) {
     try {
       const debtDraws = await models.LotteryDraw.findAll({
         where: { user_id: userId, has_debt: true },
@@ -334,7 +356,7 @@ class CustomerServiceDiagnoseService {
    * @param {number} userId - 用户ID
    * @returns {Promise<Object>} 检查结果
    */
-  static async _checkAccount (models, userId) {
+  static async _checkAccount(models, userId) {
     try {
       const user = await models.User.findByPk(userId, {
         attributes: ['user_id', 'status', 'nickname', 'mobile']
@@ -344,7 +366,9 @@ class CustomerServiceDiagnoseService {
         return {
           level: LEVEL.ERROR,
           message: '用户不存在',
-          issues: [{ type: 'account_not_found', severity: LEVEL.ERROR, message: `用户ID ${userId} 不存在` }]
+          issues: [
+            { type: 'account_not_found', severity: LEVEL.ERROR, message: `用户ID ${userId} 不存在` }
+          ]
         }
       }
 
@@ -352,12 +376,14 @@ class CustomerServiceDiagnoseService {
         return {
           level: LEVEL.WARNING,
           message: `账号状态异常: ${user.status}`,
-          issues: [{
-            type: 'account_status_abnormal',
-            severity: LEVEL.WARNING,
-            status: user.status,
-            message: `用户账号状态为 ${user.status}（非active）`
-          }]
+          issues: [
+            {
+              type: 'account_status_abnormal',
+              severity: LEVEL.WARNING,
+              status: user.status,
+              message: `用户账号状态为 ${user.status}（非active）`
+            }
+          ]
         }
       }
 

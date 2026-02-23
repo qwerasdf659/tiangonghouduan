@@ -190,15 +190,20 @@ class SettleStage extends BaseStage {
          */
         const consume_idempotency_key = `${idempotency_key}:consume`
 
+        const burnAccount = await BalanceService.getOrCreateAccount(
+          { system_code: 'SYSTEM_BURN' },
+          { transaction }
+        )
         // eslint-disable-next-line no-restricted-syntax -- transaction 已正确传递
         const asset_result = await BalanceService.changeBalance(
           {
             user_id,
             asset_code: 'POINTS',
             delta_amount: -draw_cost,
-            idempotency_key: consume_idempotency_key, // 派生幂等键
+            idempotency_key: consume_idempotency_key,
             lottery_session_id,
-            business_type: 'lottery_consume', // 业务类型：抽奖消耗
+            business_type: 'lottery_consume',
+            counterpart_account_id: burnAccount.account_id,
             meta: {
               source_type: 'system',
               title: '抽奖消耗',
@@ -580,6 +585,11 @@ class SettleStage extends BaseStage {
     const { idempotency_key, lottery_session_id, lottery_draw_id, transaction } = options
 
     try {
+      const mintAccount = await BalanceService.getOrCreateAccount(
+        { system_code: 'SYSTEM_MINT' },
+        { transaction }
+      )
+
       switch (prize.prize_type) {
         case 'points':
           // eslint-disable-next-line no-restricted-syntax -- transaction 已正确传递
@@ -591,6 +601,7 @@ class SettleStage extends BaseStage {
               idempotency_key: `${idempotency_key}:points`,
               lottery_session_id,
               business_type: 'lottery_reward',
+              counterpart_account_id: mintAccount.account_id,
               meta: {
                 source_type: 'system',
                 title: `抽奖奖励：${prize.prize_name}`,
@@ -638,6 +649,7 @@ class SettleStage extends BaseStage {
                 delta_amount: prize.material_amount,
                 idempotency_key: `${idempotency_key}:material`,
                 business_type: 'lottery_reward_material',
+                counterpart_account_id: mintAccount.account_id,
                 meta: {
                   lottery_prize_id: prize.lottery_prize_id,
                   prize_name: prize.prize_name

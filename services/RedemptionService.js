@@ -4,7 +4,7 @@
  * 职责：
  * - 核销码域（Redemption Code Domain）核心服务
  * - 统一管理核销订单的创建、核销、取消、过期
- * - 协调物品实例状态变更（调用 ItemInstance）
+ * - 协调物品状态变更（调用 Item 三表模型）
  * - 提供强幂等性保证（code_hash 唯一）
  *
  * 业务流程：
@@ -19,7 +19,7 @@
  *    - 计算哈希查找订单
  *    - 检查订单状态和过期时间
  *    - 更新订单状态（status = fulfilled）
- *    - 标记物品已使用（ItemInstance.status = used）
+ *    - 标记物品已使用（Item → SYSTEM_BURN 双录）
  * 3. 取消订单（cancelOrder）：
  *    - 更新订单状态（status = cancelled）
  * 4. 过期清理（expireOrders）：
@@ -34,9 +34,10 @@
  * 最后更新：2026年01月05日（事务边界治理改造）
  */
 
-const { sequelize, RedemptionOrder, ItemInstance, User, StoreStaff } = require('../models')
+const { sequelize, RedemptionOrder, Item, Account, User, StoreStaff } = require('../models')
 const RedemptionCodeGenerator = require('../utils/RedemptionCodeGenerator')
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
+const ItemService = require('./asset/ItemService')
 
 const logger = require('../utils/logger').logger
 
@@ -55,19 +56,19 @@ class RedemptionService {
    * - 未提供事务时直接报错，由入口层统一管理事务
    *
    * 业务流程：
-   * 1. 验证物品实例存在且可用
+   * 1. 验证物品存在且可用
    * 2. 🔐 验证所有权或管理员权限（服务层兜底）
    * 3. 生成唯一的12位Base32核销码
    * 4. 计算SHA-256哈希
    * 5. 创建订单记录（30天有效期）
    * 6. 返回明文码（仅此一次，不再存储）
    *
-   * @param {number} item_instance_id - 物品实例ID
+   * @param {number} item_id - 物品ID
    * @param {Object} options - 事务选项
    * @param {Object} options.transaction - Sequelize事务对象（必填）
    * @param {number} [options.creator_user_id] - 创建者用户ID（用于权限兜底校验）
    * @returns {Promise<Object>} {order, code} - 订单对象和明文码
-   * @throws {Error} 物品实例不存在、物品不可用、权限不足、核销码生成失败等
+   * @throws {Error} 物品不存在、物品不可用、权限不足、核销码生成失败等
    *
    * @example
    * const result = await RedemptionService.createOrder(123, { transaction, creator_user_id: 456 })
@@ -75,21 +76,21 @@ class RedemptionService {
    * logger.info('订单ID:', result.order.redemption_order_id)
    * logger.info('过期时间:', result.order.expires_at)
    */
-  static async createOrder(item_instance_id, options = {}) {
+  static async createOrder(item_id, options = {}) {
     // 强制要求事务边界 - 2026-01-05 治理决策
     const transaction = assertAndGetTransaction(options, 'RedemptionService.createOrder')
     const { creator_user_id } = options
 
-    logger.info('开始创建兑换订单', { item_instance_id, creator_user_id })
+    logger.info('开始创建兑换订单', { item_id, creator_user_id })
 
-    // 1. 验证物品实例存在且可用（使用行锁防止并发冲突）
-    const item = await ItemInstance.findByPk(item_instance_id, {
+    // 1. 验证物品存在且可用（使用行锁防止并发冲突）
+    const item = await Item.findByPk(item_id, {
       lock: transaction.LOCK.UPDATE, // 添加行锁（SELECT ... FOR UPDATE）
       transaction
     })
 
     if (!item) {
-      throw new Error(`物品实例不存在: ${item_instance_id}`)
+      throw new Error(`物品不存在: ${item_id}`)
     }
 
     if (item.status !== 'available') {
@@ -99,7 +100,7 @@ class RedemptionService {
     // 1.5 幂等性检查：防止同一物品并发创建多个pending订单
     const existingOrder = await RedemptionOrder.findOne({
       where: {
-        item_instance_id,
+        item_id,
         status: 'pending'
       },
       transaction
@@ -107,7 +108,7 @@ class RedemptionService {
 
     if (existingOrder) {
       logger.warn('物品已有pending核销订单，拒绝重复创建', {
-        item_instance_id,
+        item_id,
         existing_order_id: existingOrder.redemption_order_id,
         creator_user_id
       })
@@ -116,18 +117,23 @@ class RedemptionService {
 
     // 🔐 2. 服务层兜底：所有权或管理员权限校验（防越权）
     if (creator_user_id) {
-      // 检查创建者是否为物品所有者
-      if (item.owner_user_id !== creator_user_id) {
-        // 检查创建者是否为管理员（统一使用getUserRoles，基于role_level判定）
+      /* 通过 accounts 表将 creator_user_id 转为 account_id 做所有权比对 */
+      const creatorAccount = await Account.findOne({
+        where: { user_id: creator_user_id, account_type: 'user' },
+        attributes: ['account_id'],
+        transaction
+      })
+      const isOwner = creatorAccount && item.owner_account_id === creatorAccount.account_id
+
+      if (!isOwner) {
         const { getUserRoles } = require('../middleware/auth')
         const userRoles = await getUserRoles(creator_user_id)
 
-        // 管理员判定：role_level >= 100
         if (userRoles.role_level < 100) {
           logger.error('服务层兜底：非所有者且非管理员尝试生成核销码', {
             creator_user_id,
-            item_instance_id,
-            actual_owner: item.owner_user_id,
+            item_id,
+            owner_account_id: item.owner_account_id,
             role_level: userRoles.role_level
           })
           throw new Error('权限不足：仅物品所有者或管理员可生成核销码')
@@ -135,15 +141,14 @@ class RedemptionService {
 
         logger.info('服务层验证：管理员生成核销码', {
           admin_user_id: creator_user_id,
-          item_instance_id,
-          actual_owner: item.owner_user_id,
+          item_id,
+          owner_account_id: item.owner_account_id,
           role_level: userRoles.role_level
         })
       }
     } else {
-      // 如果未传入creator_user_id，记录警告（建议路由层传入）
       logger.warn('创建核销订单时未传入creator_user_id，无法执行权限兜底校验', {
-        item_instance_id
+        item_id
       })
     }
 
@@ -180,34 +185,30 @@ class RedemptionService {
     const order = await RedemptionOrder.create(
       {
         code_hash: codeHash,
-        item_instance_id,
+        item_id,
         expires_at: expiresAt,
         status: 'pending'
       },
       { transaction }
     )
 
-    /*
-     * 5. 立即锁定物品实例（防止码已发出但物品被转让/重复生成码）
-     * 方案B升级：使用多级锁定机制，redemption 锁有效期与核销码一致
-     */
-    await item.lock(order.redemption_order_id, 'redemption', expiresAt, {
-      transaction,
-      reason: '兑换订单锁定'
-    })
+    /* 5. 通过 ItemService.holdItem 锁定物品（写入 item_holds 表） */
+    await ItemService.holdItem(
+      {
+        item_id,
+        hold_type: 'redemption',
+        holder_ref: String(order.redemption_order_id),
+        expires_at: expiresAt,
+        reason: '兑换订单锁定'
+      },
+      { transaction }
+    )
 
-    logger.info('物品已锁定', {
-      item_instance_id,
+    logger.info('兑换订单创建成功（物品已通过 item_holds 锁定）', {
+      item_id,
       order_id: order.redemption_order_id,
-      lock_type: 'redemption',
+      hold_type: 'redemption',
       expires_at: expiresAt
-    })
-
-    logger.info('兑换订单创建成功', {
-      order_id: order.redemption_order_id,
-      item_instance_id,
-      expires_at: expiresAt,
-      item_locked: true
     })
 
     // ⚠️ 明文码只返回一次，不再存储
@@ -260,8 +261,8 @@ class RedemptionService {
       where: { code_hash: codeHash },
       include: [
         {
-          model: ItemInstance,
-          as: 'item_instance'
+          model: Item,
+          as: 'item'
         }
       ],
       lock: transaction.LOCK.UPDATE,
@@ -333,7 +334,6 @@ class RedemptionService {
 
     // 7. 消耗物品（双录记账：用户→SYSTEM_BURN）
     if (order.item_id) {
-      const ItemService = require('./asset/ItemService')
       await ItemService.consumeItem(
         {
           item_id: order.item_id,
@@ -385,8 +385,8 @@ class RedemptionService {
       transaction,
       include: [
         {
-          model: ItemInstance,
-          as: 'item_instance'
+          model: Item,
+          as: 'item'
         }
       ]
     })
@@ -412,16 +412,21 @@ class RedemptionService {
      * 释放物品锁定（如果物品被该订单锁定）
      * 方案B升级：使用多级锁定机制，通过 lock_id 精确匹配
      */
-    if (order.item_instance) {
-      const existingLock = order.item_instance.getLockById(order_id)
-      if (existingLock && existingLock.lock_type === 'redemption') {
-        await order.item_instance.unlock(order_id, 'redemption', { transaction })
-        logger.info('物品锁定已释放', {
-          item_instance_id: order.item_instance_id,
-          order_id,
-          lock_type: 'redemption'
-        })
-      }
+    if (order.item) {
+      // 通过 ItemService 释放锁定
+      await ItemService.releaseHold(
+        {
+          item_id: order.item_id,
+          hold_type: 'redemption',
+          holder_ref: String(order.redemption_order_id)
+        },
+        { transaction }
+      )
+      logger.info('物品锁定已释放', {
+        item_id: order.item_id,
+        order_id,
+        hold_type: 'redemption'
+      })
     }
 
     logger.info('订单取消成功', { order_id, item_unlocked: true })
@@ -460,8 +465,8 @@ class RedemptionService {
       },
       include: [
         {
-          model: ItemInstance,
-          as: 'item_instance',
+          model: Item,
+          as: 'item',
           required: false // LEFT JOIN，避免物品不存在时订单无法过期
         }
       ],
@@ -491,13 +496,17 @@ class RedemptionService {
      */
     let unlockedCount = 0
     for (const order of expiredOrders) {
-      if (order.item_instance) {
-        const existingLock = order.item_instance.getLockById(order.redemption_order_id)
-        if (existingLock && existingLock.lock_type === 'redemption') {
-          // eslint-disable-next-line no-await-in-loop -- 批量解锁需要在事务内串行执行
-          await order.item_instance.unlock(order.redemption_order_id, 'redemption', { transaction })
-          unlockedCount++
-        }
+      if (order.item) {
+        // eslint-disable-next-line no-await-in-loop -- 批量解锁需要在事务内串行执行
+        await ItemService.releaseHold(
+          {
+            item_id: order.item_id,
+            hold_type: 'redemption',
+            holder_ref: String(order.redemption_order_id)
+          },
+          { transaction }
+        )
+        unlockedCount++
       }
     }
 
@@ -531,8 +540,8 @@ class RedemptionService {
 
     if (include_item) {
       include.push({
-        model: ItemInstance,
-        as: 'item_instance'
+        model: Item,
+        as: 'item'
       })
     }
 
@@ -559,18 +568,18 @@ class RedemptionService {
   }
 
   /**
-   * 查询物品实例的兑换订单
+   * 查询物品的兑换订单
    *
-   * @param {number} item_instance_id - 物品实例ID
+   * @param {number} item_id - 物品ID
    * @param {Object} [options] - 选项
    * @param {Object} [options.transaction] - Sequelize事务对象
    * @returns {Promise<RedemptionOrder|null>} 订单对象或null
    */
-  static async getOrderByItem(item_instance_id, options = {}) {
+  static async getOrderByItem(item_id, options = {}) {
     const { transaction = null } = options
 
     const order = await RedemptionOrder.findOne({
-      where: { item_instance_id },
+      where: { item_id },
       order: [['created_at', 'DESC']], // 获取最新的订单
       transaction
     })
@@ -625,8 +634,8 @@ class RedemptionService {
     const order = await RedemptionOrder.findByPk(order_id, {
       include: [
         {
-          model: ItemInstance,
-          as: 'item_instance'
+          model: Item,
+          as: 'item'
         }
       ],
       lock: transaction.LOCK.UPDATE,
@@ -689,7 +698,6 @@ class RedemptionService {
 
     // 6. 消耗物品（双录记账：用户→SYSTEM_BURN）
     if (order.item_id) {
-      const ItemService = require('./asset/ItemService')
       await ItemService.consumeItem(
         {
           item_id: order.item_id,
@@ -760,8 +768,8 @@ class RedemptionService {
     const order = await RedemptionOrder.findByPk(order_id, {
       include: [
         {
-          model: ItemInstance,
-          as: 'item_instance'
+          model: Item,
+          as: 'item'
         }
       ],
       lock: transaction.LOCK.UPDATE,
@@ -787,17 +795,21 @@ class RedemptionService {
     await order.update({ status: 'cancelled' }, { transaction })
 
     // 4. 释放物品锁定（如果物品被该订单锁定）
-    if (order.item_instance) {
-      const existingLock = order.item_instance.getLockById(order_id)
-      if (existingLock && existingLock.lock_type === 'redemption') {
-        await order.item_instance.unlock(order_id, 'redemption', { transaction })
-        logger.info('物品锁定已释放', {
-          item_instance_id: order.item_instance_id,
-          order_id,
-          lock_type: 'redemption',
-          admin_user_id
-        })
-      }
+    if (order.item) {
+      await ItemService.releaseHold(
+        {
+          item_id: order.item_id,
+          hold_type: 'redemption',
+          holder_ref: String(order.redemption_order_id)
+        },
+        { transaction }
+      )
+      logger.info('物品锁定已释放', {
+        item_id: order.item_id,
+        order_id,
+        hold_type: 'redemption',
+        admin_user_id
+      })
     }
 
     logger.info('管理员取消订单成功', {
@@ -947,8 +959,8 @@ class RedemptionService {
       },
       include: [
         {
-          model: ItemInstance,
-          as: 'item_instance',
+          model: Item,
+          as: 'item',
           required: false
         }
       ],
@@ -973,13 +985,17 @@ class RedemptionService {
     // 3. 释放被这些订单锁定的物品
     let unlockedCount = 0
     for (const order of orders) {
-      if (order.item_instance) {
-        const existingLock = order.item_instance.getLockById(order.redemption_order_id)
-        if (existingLock && existingLock.lock_type === 'redemption') {
-          // eslint-disable-next-line no-await-in-loop -- 批量解锁需要在事务内串行执行
-          await order.item_instance.unlock(order.redemption_order_id, 'redemption', { transaction })
-          unlockedCount++
-        }
+      if (order.item) {
+        // eslint-disable-next-line no-await-in-loop -- 批量解锁需要在事务内串行执行
+        await ItemService.releaseHold(
+          {
+            item_id: order.item_id,
+            hold_type: 'redemption',
+            holder_ref: String(order.redemption_order_id)
+          },
+          { transaction }
+        )
+        unlockedCount++
       }
     }
 

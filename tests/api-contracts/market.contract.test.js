@@ -39,6 +39,15 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
     app = require('../../app')
     await sequelize.authenticate()
 
+    // 等待 ServiceManager 异步初始化完成
+    const { initializeTestServiceManager } = require('../helpers/UnifiedTestManager')
+    const sm = await initializeTestServiceManager()
+    app.locals.services = app.locals.services || {
+      getService: key => sm.getService(key),
+      getAllServices: () => sm._services,
+      models: require('../../models')
+    }
+
     // 使用测试账号登录获取Token
     const login_response = await request(app).post('/api/v4/auth/login').send({
       mobile: '13612227930',
@@ -153,7 +162,7 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
         const response = await request(app)
           .get('/api/v4/market/listings')
           .set('Authorization', `Bearer ${access_token}`)
-          .query({ listing_kind: 'item_instance' })
+          .query({ listing_kind: 'item' })
 
         expect(response.status).toBe(200)
         validateApiContract(response.body)
@@ -161,7 +170,7 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
         // 如果有数据，验证类型匹配
         if (response.body.data.products.length > 0) {
           response.body.data.products.forEach(product => {
-            expect(product.listing_kind).toBe('item_instance')
+            expect(product.listing_kind).toBe('item')
           })
         }
       })
@@ -264,7 +273,7 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
       /**
        * Case 1: 缺少必要参数应返回400
        */
-      test('缺少item_instance_id应返回400', async () => {
+      test('缺少item_id应返回400', async () => {
         const response = await request(app)
           .post('/api/v4/market/list')
           .set('Authorization', `Bearer ${access_token}`)
@@ -287,7 +296,7 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
           .set('Authorization', `Bearer ${access_token}`)
           .set('Idempotency-Key', `test_list_${Date.now()}_2`)
           .send({
-            item_instance_id: 1,
+            item_id: 1,
             price_asset_code: 'DIAMOND'
           })
 
@@ -303,7 +312,7 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
           .post('/api/v4/market/list')
           .set('Authorization', `Bearer ${access_token}`)
           .send({
-            item_instance_id: 1,
+            item_id: 1,
             price_amount: 100,
             price_asset_code: 'DIAMOND'
           })
@@ -321,7 +330,7 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
           .post('/api/v4/market/list')
           .set('Idempotency-Key', `test_list_${Date.now()}_3`)
           .send({
-            item_instance_id: 1,
+            item_id: 1,
             price_amount: 100,
             price_asset_code: 'DIAMOND'
           })
@@ -339,7 +348,7 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
           .set('Authorization', `Bearer ${access_token}`)
           .set('Idempotency-Key', `test_list_${Date.now()}_4`)
           .send({
-            item_instance_id: 1,
+            item_id: 1,
             price_amount: -100,
             price_asset_code: 'DIAMOND'
           })
@@ -351,13 +360,13 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
       /**
        * Case 6: 不存在的物品应返回404或400
        */
-      test('不存在的item_instance_id应返回404或400', async () => {
+      test('不存在的item_id应返回404或400', async () => {
         const response = await request(app)
           .post('/api/v4/market/list')
           .set('Authorization', `Bearer ${access_token}`)
           .set('Idempotency-Key', `test_list_${Date.now()}_5`)
           .send({
-            item_instance_id: 999999999,
+            item_id: 999999999,
             price_amount: 100,
             price_asset_code: 'DIAMOND'
           })

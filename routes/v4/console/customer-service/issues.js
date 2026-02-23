@@ -43,10 +43,10 @@ router.get('/', async (req, res) => {
     const IssueService = req.app.locals.services.getService('cs_issue')
     const result = await IssueService.list(models, req.query)
 
-    res.apiSuccess(result, '获取工单列表成功')
+    return res.apiSuccess(result, '获取工单列表成功')
   } catch (error) {
     logger.error('获取工单列表失败:', error)
-    res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
   }
 })
 
@@ -93,10 +93,10 @@ router.post('/', async (req, res) => {
       { description: 'createIssue' }
     )
 
-    res.apiSuccess(result, '工单创建成功')
+    return res.apiSuccess(result, '工单创建成功')
   } catch (error) {
     logger.error('创建工单失败:', error)
-    res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
   }
 })
 
@@ -117,10 +117,10 @@ router.get('/:id', async (req, res) => {
     const IssueService = req.app.locals.services.getService('cs_issue')
     const result = await IssueService.getDetail(models, issueId)
 
-    res.apiSuccess(result, '获取工单详情成功')
+    return res.apiSuccess(result, '获取工单详情成功')
   } catch (error) {
     logger.error('获取工单详情失败:', error)
-    res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
   }
 })
 
@@ -151,10 +151,10 @@ router.put('/:id', async (req, res) => {
       { description: 'updateIssue' }
     )
 
-    res.apiSuccess(result, '工单更新成功')
+    return res.apiSuccess(result, '工单更新成功')
   } catch (error) {
     logger.error('更新工单失败:', error)
-    res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
   }
 })
 
@@ -181,10 +181,10 @@ router.get('/:id/notes', async (req, res) => {
       page_size: req.query.page_size
     })
 
-    res.apiSuccess(result, '获取工单备注成功')
+    return res.apiSuccess(result, '获取工单备注成功')
   } catch (error) {
     logger.error('获取工单备注失败:', error)
-    res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
   }
 })
 
@@ -207,25 +207,27 @@ router.post('/:id/notes', async (req, res) => {
       return res.apiError('备注内容不能为空', 'BAD_REQUEST', null, 400)
     }
 
-    /* 先查工单获取 user_id */
+    /** 通过 ServiceManager 获取工单服务（不直连 models.CustomerServiceIssue） */
+    const IssueService = req.app.locals.services.getService('cs_issue')
     const models = req.app.locals.models
-    const issue = await models.CustomerServiceIssue.findByPk(issueId, { attributes: ['user_id'] })
-    if (!issue) {
+
+    /* 先通过 Service 获取工单详情验证存在性 */
+    const issueDetail = await IssueService.getDetail(models, issueId)
+    if (!issueDetail) {
       return res.apiError('工单不存在', 'NOT_FOUND', null, 404)
     }
 
-    const IssueService = req.app.locals.services.getService('cs_issue')
     const result = await IssueService.addNote(models, {
       issue_id: issueId,
-      user_id: issue.user_id,
+      user_id: issueDetail.user_id,
       author_id: req.user.user_id,
       content: content.trim()
     })
 
-    res.apiSuccess(result, '备注添加成功')
+    return res.apiSuccess(result, '备注添加成功')
   } catch (error) {
     logger.error('添加工单备注失败:', error)
-    res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
   }
 })
 

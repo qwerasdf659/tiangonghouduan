@@ -2,8 +2,11 @@
  * 客服管理 - 会话操作模块
  *
  * 业务范围：
- * - 转接会话
- * - 关闭会话
+ * - 客服接单（accept）- waiting → assigned
+ * - 转接会话（transfer）
+ * - 关闭会话（close）
+ * - 会话打标签（tag）
+ * - 请求满意度评价（satisfaction）- WebSocket 推送
  * - 管理员在线状态管理（online / busy / offline）
  *
  * 架构规范：
@@ -144,6 +147,150 @@ router.post('/:id/close', async (req, res) => {
       statusCode = 404
       errorCode = 'NOT_FOUND'
     } else if (error.message === '无权限关闭此会话') {
+      statusCode = 403
+      errorCode = 'FORBIDDEN'
+    }
+
+    return res.apiError(error.message, errorCode, null, statusCode)
+  }
+})
+
+/**
+ * POST /:id/accept - 客服接单
+ *
+ * @description 客服显式认领等待中的会话（状态 waiting → assigned）
+ * @route POST /api/v4/console/customer-service/sessions/:id/accept
+ * @param {number} id - 会话ID（事务实体，customer_service_session_id）
+ * @access Admin（role_level >= 1）
+ */
+router.post('/:id/accept', async (req, res) => {
+  try {
+    const sessionId = parseInt(req.params.id)
+
+    if (isNaN(sessionId) || sessionId <= 0) {
+      return res.apiError('会话ID无效', 'BAD_REQUEST', null, 400)
+    }
+
+    const adminId = req.user.user_id
+    const CustomerServiceSessionService = req.app.locals.services.getService(
+      'customer_service_session'
+    )
+
+    const result = await TransactionManager.execute(
+      async transaction => {
+        return await CustomerServiceSessionService.acceptSession(sessionId, adminId, {
+          transaction
+        })
+      },
+      { description: 'acceptSession' }
+    )
+
+    return res.apiSuccess(result, '接单成功')
+  } catch (error) {
+    logger.error('客服接单失败:', error)
+    let statusCode = 500
+    let errorCode = 'INTERNAL_ERROR'
+
+    if (error.message === '会话不存在') {
+      statusCode = 404
+      errorCode = 'NOT_FOUND'
+    } else if (error.message.includes('仅等待中')) {
+      statusCode = 409
+      errorCode = 'CONFLICT'
+    }
+
+    return res.apiError(error.message, errorCode, null, statusCode)
+  }
+})
+
+/**
+ * POST /:id/tag - 会话打标签
+ *
+ * @description 客服对会话打标签，用于分类问题类型和跟踪处理状态
+ * @route POST /api/v4/console/customer-service/sessions/:id/tag
+ * @param {number} id - 会话ID（事务实体，customer_service_session_id）
+ * @body {string[]} tags - 标签数组（如 ["交易纠纷", "已补偿"]）
+ * @access Admin（role_level >= 1）
+ */
+router.post('/:id/tag', async (req, res) => {
+  try {
+    const sessionId = parseInt(req.params.id)
+
+    if (isNaN(sessionId) || sessionId <= 0) {
+      return res.apiError('会话ID无效', 'BAD_REQUEST', null, 400)
+    }
+
+    const { tags } = req.body
+
+    if (!Array.isArray(tags)) {
+      return res.apiError('tags 必须是数组', 'BAD_REQUEST', null, 400)
+    }
+
+    const adminId = req.user.user_id
+    const CustomerServiceSessionService = req.app.locals.services.getService(
+      'customer_service_session'
+    )
+
+    const result = await TransactionManager.execute(
+      async transaction => {
+        return await CustomerServiceSessionService.updateSessionTags(sessionId, tags, adminId, {
+          transaction
+        })
+      },
+      { description: 'updateSessionTags' }
+    )
+
+    return res.apiSuccess(result, '标签更新成功')
+  } catch (error) {
+    logger.error('会话打标签失败:', error)
+    let statusCode = 500
+    let errorCode = 'INTERNAL_ERROR'
+
+    if (error.message === '会话不存在') {
+      statusCode = 404
+      errorCode = 'NOT_FOUND'
+    }
+
+    return res.apiError(error.message, errorCode, null, statusCode)
+  }
+})
+
+/**
+ * POST /:id/satisfaction - 请求满意度评价
+ *
+ * @description 客服通过 WebSocket 向用户推送满意度评价邀请
+ * @route POST /api/v4/console/customer-service/sessions/:id/satisfaction
+ * @param {number} id - 会话ID（事务实体，customer_service_session_id）
+ * @access Admin（role_level >= 1）
+ */
+router.post('/:id/satisfaction', async (req, res) => {
+  try {
+    const sessionId = parseInt(req.params.id)
+
+    if (isNaN(sessionId) || sessionId <= 0) {
+      return res.apiError('会话ID无效', 'BAD_REQUEST', null, 400)
+    }
+
+    const adminId = req.user.user_id
+    const CustomerServiceSessionService = req.app.locals.services.getService(
+      'customer_service_session'
+    )
+
+    const result = await CustomerServiceSessionService.requestSatisfactionRating(sessionId, adminId)
+
+    return res.apiSuccess(result, '满意度评价邀请已推送')
+  } catch (error) {
+    logger.error('请求满意度评价失败:', error)
+    let statusCode = 500
+    let errorCode = 'INTERNAL_ERROR'
+
+    if (error.message === '会话不存在') {
+      statusCode = 404
+      errorCode = 'NOT_FOUND'
+    } else if (error.message.includes('无需再次')) {
+      statusCode = 409
+      errorCode = 'CONFLICT'
+    } else if (error.message.includes('仅负责')) {
       statusCode = 403
       errorCode = 'FORBIDDEN'
     }

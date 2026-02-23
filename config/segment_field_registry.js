@@ -123,8 +123,17 @@ function getFieldRegistry() {
   return { fields, operators: Object.keys(SEGMENT_OPERATORS) }
 }
 
+/**
+ * 组合注册表对象（供 SegmentRuleService / segment_rules 等引用 SEGMENT_FIELD_REGISTRY.fields / .operators）
+ */
+const SEGMENT_FIELD_REGISTRY = {
+  fields: SEGMENT_FIELDS,
+  operators: SEGMENT_OPERATORS
+}
+
 module.exports = {
   SEGMENT_FIELDS,
   SEGMENT_OPERATORS,
+  SEGMENT_FIELD_REGISTRY,
   getFieldRegistry
 }

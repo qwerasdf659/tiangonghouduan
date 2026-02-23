@@ -151,7 +151,7 @@ class BusinessRecordQueryService {
    * @returns {Promise<Object>} 订单列表和分页信息
    */
   static async getRedemptionOrders(options = {}) {
-    const { RedemptionOrder, User, ItemInstance } = require('../../models')
+    const { RedemptionOrder, User, Item } = require('../../models')
 
     const { status, redeemer_user_id, mobile, start_date, end_date } = options
     const pagination = buildPaginationOptions(options)
@@ -185,9 +185,9 @@ class BusinessRecordQueryService {
           required: userRequired
         },
         {
-          model: ItemInstance,
-          as: 'item_instance',
-          attributes: ['item_instance_id', 'item_type', 'meta'],
+          model: Item,
+          as: 'item',
+          attributes: ['item_id', 'item_type', 'item_name', 'item_value', 'rarity_code'],
           required: false
         }
       ],
@@ -214,7 +214,7 @@ class BusinessRecordQueryService {
    * @returns {Promise<Object|null>} 订单详情
    */
   static async getRedemptionOrderById(order_id) {
-    const { RedemptionOrder, User, ItemInstance } = require('../../models')
+    const { RedemptionOrder, User, Item } = require('../../models')
 
     const order = await RedemptionOrder.findByPk(order_id, {
       include: [
@@ -225,8 +225,8 @@ class BusinessRecordQueryService {
           required: false
         },
         {
-          model: ItemInstance,
-          as: 'item_instance',
+          model: Item,
+          as: 'item',
           required: false
         }
       ]
@@ -279,7 +279,7 @@ class BusinessRecordQueryService {
    * @returns {Promise<Array>} 订单数组
    */
   static async exportRedemptionOrders(options = {}) {
-    const { RedemptionOrder, User, ItemInstance } = require('../../models')
+    const { RedemptionOrder, User, Item } = require('../../models')
 
     const { status, start_date, end_date, limit = 10000 } = options
 
@@ -303,9 +303,9 @@ class BusinessRecordQueryService {
           required: false
         },
         {
-          model: ItemInstance,
-          as: 'item_instance',
-          attributes: ['item_instance_id', 'item_type', 'meta'],
+          model: Item,
+          as: 'item',
+          attributes: ['item_id', 'item_type', 'item_name', 'item_value', 'rarity_code'],
           required: false
         }
       ],

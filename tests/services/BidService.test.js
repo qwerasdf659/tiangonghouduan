@@ -237,8 +237,8 @@ describe('竞价系统服务测试（臻选空间/幸运空间/竞价功能）',
       expect(attributes.source.defaultValue).toBe('exchange')
     })
 
-    test('ItemInstance 模型有 source 字段', () => {
-      const attributes = models.ItemInstance.getAttributes()
+    test('Item 模型有 source 字段', () => {
+      const attributes = models.Item.getAttributes()
       expect(attributes.source).toBeDefined()
       expect(attributes.source.defaultValue).toBeNull()
     })

@@ -21,7 +21,7 @@
 
 const request = require('supertest')
 const app = require('../../../app')
-const { sequelize, RedemptionOrder, ItemInstance, User } = require('../../../models')
+const { sequelize, RedemptionOrder, Item, User } = require('../../../models')
 const jwt = require('jsonwebtoken')
 
 describe('核销系统修复验证测试', () => {
@@ -80,11 +80,11 @@ describe('核销系统修复验证测试', () => {
 
       // 创建一个测试物品实例
       try {
-        testItem = await ItemInstance.create({
+        testItem = await Item.create({
           item_type: 'coupon',
           item_name: '测试优惠券',
           item_value: 10,
-          owner_user_id: testUser.user_id,
+          owner_account_id: testUser.user_id,
           status: 'available',
           source_type: 'lottery'
         })
@@ -97,7 +97,7 @@ describe('核销系统修复验证测试', () => {
       const response = await request(app)
         .post('/api/v4/redemption/orders')
         .set('Authorization', `Bearer ${authToken}`)
-        .send({ item_instance_id: testItem.item_instance_id })
+        .send({ item_id: testItem.item_id })
 
       /*
        * 不应该因为找不到roleHelpers模块而500
@@ -108,7 +108,7 @@ describe('核销系统修复验证测试', () => {
       if (response.body.success) {
         // 清理生成的订单
         await RedemptionOrder.destroy({
-          where: { item_instance_id: testItem.item_instance_id }
+          where: { item_id: testItem.item_id }
         })
       }
     })
@@ -117,7 +117,7 @@ describe('核销系统修复验证测试', () => {
   describe('P0-2: models注入验证', () => {
     test('app.locals.models应该已注入', () => {
       expect(app.locals.models).toBeDefined()
-      expect(app.locals.models.ItemInstance).toBeDefined()
+      expect(app.locals.models.Item).toBeDefined()
       expect(app.locals.models.User).toBeDefined()
       expect(app.locals.models.RedemptionOrder).toBeDefined()
     })
@@ -131,11 +131,11 @@ describe('核销系统修复验证测试', () => {
 
       try {
         // 创建测试物品
-        concurrentTestItem = await ItemInstance.create({
+        concurrentTestItem = await Item.create({
           item_type: 'coupon',
           item_name: '并发测试优惠券',
           item_value: 20,
-          owner_user_id: testUser.user_id,
+          owner_account_id: testUser.user_id,
           status: 'available',
           source_type: 'lottery'
         })
@@ -149,7 +149,7 @@ describe('核销系统修复验证测试', () => {
       if (concurrentTestItem) {
         try {
           await RedemptionOrder.destroy({
-            where: { item_instance_id: concurrentTestItem.item_instance_id }
+            where: { item_id: concurrentTestItem.item_id }
           })
           await concurrentTestItem.destroy({ force: true })
         } catch (error) {
@@ -171,7 +171,7 @@ describe('核销系统修复验证测试', () => {
           request(app)
             .post('/api/v4/redemption/orders')
             .set('Authorization', `Bearer ${authToken}`)
-            .send({ item_instance_id: concurrentTestItem.item_instance_id })
+            .send({ item_id: concurrentTestItem.item_id })
         )
 
       const responses = await Promise.all(promises)
@@ -203,7 +203,7 @@ describe('核销系统修复验证测试', () => {
       const response = await request(app)
         .post('/api/v4/redemption/orders')
         .set('Authorization', `Bearer ${authToken}`)
-        .send({ item_instance_id: concurrentTestItem.item_instance_id })
+        .send({ item_id: concurrentTestItem.item_id })
 
       // 404表示路由不存在，跳过验证
       if (response.status === 404) {
@@ -279,11 +279,11 @@ describe('核销系统修复验证测试', () => {
 
       try {
         // 创建测试物品和订单
-        orderTestItem = await ItemInstance.create({
+        orderTestItem = await Item.create({
           item_type: 'coupon',
           item_name: '订单测试优惠券',
           item_value: 30,
-          owner_user_id: testUser.user_id,
+          owner_account_id: testUser.user_id,
           status: 'available',
           source_type: 'lottery'
         })
@@ -291,7 +291,7 @@ describe('核销系统修复验证测试', () => {
         const response = await request(app)
           .post('/api/v4/redemption/orders')
           .set('Authorization', `Bearer ${authToken}`)
-          .send({ item_instance_id: orderTestItem.item_instance_id })
+          .send({ item_id: orderTestItem.item_id })
 
         // 如果API返回404或失败，设置标志
         if (response.status !== 200 || !response.body.success) {

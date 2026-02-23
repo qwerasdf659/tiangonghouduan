@@ -24,6 +24,15 @@ describe('API契约测试 - 订单模块 (/api/v4/shop/redemption, /api/v4/backp
     app = require('../../app')
     await sequelize.authenticate()
 
+    // 等待 ServiceManager 异步初始化完成
+    const { initializeTestServiceManager } = require('../helpers/UnifiedTestManager')
+    const sm = await initializeTestServiceManager()
+    app.locals.services = app.locals.services || {
+      getService: key => sm.getService(key),
+      getAllServices: () => sm._services,
+      models: require('../../models')
+    }
+
     // 登录获取 Token
     const loginResponse = await request(app)
       .post('/api/v4/auth/login')
@@ -64,9 +73,9 @@ describe('API契约测试 - 订单模块 (/api/v4/shop/redemption, /api/v4/backp
    */
   describe('POST /shop/redemption/orders - 生成核销订单', () => {
     /**
-     * Case 1: 缺少 item_instance_id 应该返回 400 或 403 (无商家权限)
+     * Case 1: 缺少 item_id 应该返回 400 或 403 (无商家权限)
      */
-    test('缺少 item_instance_id 应该返回 400 或 403', async () => {
+    test('缺少 item_id 应该返回 400 或 403', async () => {
       const response = await request(app)
         .post('/api/v4/shop/redemption/orders')
         .set('Authorization', `Bearer ${accessToken}`)
@@ -78,13 +87,13 @@ describe('API契约测试 - 订单模块 (/api/v4/shop/redemption, /api/v4/backp
     })
 
     /**
-     * Case 2: 无效的 item_instance_id 应该返回 400 或 403 (无商家权限)
+     * Case 2: 无效的 item_id 应该返回 400 或 403 (无商家权限)
      */
-    test('item_instance_id 非正整数应该返回 400 或 403', async () => {
+    test('item_id 非正整数应该返回 400 或 403', async () => {
       const response = await request(app)
         .post('/api/v4/shop/redemption/orders')
         .set('Authorization', `Bearer ${accessToken}`)
-        .send({ item_instance_id: -1 })
+        .send({ item_id: -1 })
 
       // 可能返回 400（参数校验失败）或 403（无商家域访问权限）
       expect([400, 403]).toContain(response.status)
@@ -98,7 +107,7 @@ describe('API契约测试 - 订单模块 (/api/v4/shop/redemption, /api/v4/backp
       const response = await request(app)
         .post('/api/v4/shop/redemption/orders')
         .set('Authorization', `Bearer ${accessToken}`)
-        .send({ item_instance_id: 999999999 })
+        .send({ item_id: 999999999 })
 
       expect([403, 404]).toContain(response.status)
       validateApiContract(response.body, false)
@@ -110,7 +119,7 @@ describe('API契约测试 - 订单模块 (/api/v4/shop/redemption, /api/v4/backp
     test('无 Authorization 应该返回 401', async () => {
       const response = await request(app)
         .post('/api/v4/shop/redemption/orders')
-        .send({ item_instance_id: 1 })
+        .send({ item_id: 1 })
 
       expect(response.status).toBe(401)
       validateApiContract(response.body, false)

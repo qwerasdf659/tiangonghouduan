@@ -173,7 +173,7 @@ class DataSanitizer {
   /**
    * 库存物品数据脱敏（γ 模式：接收 BackpackService 输出，只做安全过滤）
    *
-   * 🗄️ 数据库表：item_instances（主键：item_instance_id）
+   * 🗄️ 数据库表：items（主键：item_id）
    *
    * ⚠️ D2 决策（2026-02-21）：此方法当前不被任何路由调用。
    * BackpackService 已是完整的领域转换层，背包列表和详情都直接使用 BackpackService 输出。
@@ -186,7 +186,7 @@ class DataSanitizer {
    * @param {Array<Object>} inventory - 库存数据数组（来自 BackpackService._getItems() 输出）
    * @param {string} dataLevel - 数据级别：'full'（管理员完整数据）或'public'（普通用户脱敏数据）
    * @returns {Array<Object>} 脱敏后的库存数组
-   * @returns {number} return[].item_instance_id - 物品实例ID（数据库主键原样输出）
+   * @returns {number} return[].item_id - 物品ID（数据库主键原样输出）
    * @returns {string} return[].item_type - 物品类型（voucher/product/service）
    * @returns {string} return[].name - 物品名称（来自 meta JSON）
    * @returns {string} return[].description - 物品描述（来自 meta JSON）
@@ -214,7 +214,7 @@ class DataSanitizer {
      * 背包列表和详情都直接使用 BackpackService 输出（BackpackService 已是完整的领域转换层）。
      * 保留此方法供未来需要时使用。
      *
-     * BackpackService 输出字段：item_instance_id, item_type, name, description,
+     * BackpackService 输出字段：item_id, item_type, name, description,
      * rarity, status, has_redemption_code, acquired_at, expires_at, allowed_actions,
      * status_display_name, item_type_display_name, rarity_display_name
      */
@@ -558,7 +558,7 @@ class DataSanitizer {
    * @param {string} dataLevel - 数据级别：'full'（管理员）或 'public'（普通用户）
    * @returns {Array<Object>} 脱敏后的挂单数组
    * @returns {number} return[].listing_id - 挂单ID（剥离 market_ 前缀）
-   * @returns {string} return[].listing_kind - 挂单类型（item_instance/fungible_asset）
+   * @returns {string} return[].listing_kind - 挂单类型（item/fungible_asset）
    * @returns {number} return[].seller_user_id - 卖家用户ID
    * @returns {string} return[].seller_nickname - 卖家昵称（经 maskUserName 脱敏）
    * @returns {number} return[].price_amount - 价格

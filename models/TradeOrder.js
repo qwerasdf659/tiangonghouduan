@@ -48,7 +48,7 @@
  * 集成服务：
  * - BalanceService：资产冻结/解冻/结算
  * - MarketListing：挂牌状态更新
- * - ItemInstance：物品所有权转移
+ * - Item：物品所有权转移
  *
  * 创建时间：2025年12月15日
  * 最后更新：2025年12月15日

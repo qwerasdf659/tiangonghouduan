@@ -10,7 +10,7 @@
  * - POST /trade-orders/:trade_order_id/cancel - 取消交易（买方/超时取消）
  *
  * 业务场景（决策5/Phase 4）：
- * - 仅用于 listing_kind = 'item_instance' 的实物交易
+ * - 仅用于 listing_kind = 'item' 的实物交易
  * - 买方付款后资产冻结，系统生成担保码发给卖方
  * - 卖方当面交付物品后将码告知买方
  * - 买方输入码确认 → 冻结资产转给卖方 → 交易完成

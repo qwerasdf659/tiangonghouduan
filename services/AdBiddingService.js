@@ -98,11 +98,7 @@ class AdBiddingService {
 
       for (const campaign of activeCampaigns) {
         // 定向匹配检查（仅 commercial 需要定向，operational/system 跳过）
-        if (
-          campaign.campaign_category === 'commercial' &&
-          campaign.targeting_rules &&
-          userTags
-        ) {
+        if (campaign.campaign_category === 'commercial' && campaign.targeting_rules && userTags) {
           const rules =
             typeof campaign.targeting_rules === 'string'
               ? JSON.parse(campaign.targeting_rules)

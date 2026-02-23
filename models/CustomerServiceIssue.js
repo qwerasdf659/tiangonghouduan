@@ -152,7 +152,8 @@ module.exports = sequelize => {
       compensation_log: {
         type: DataTypes.JSON,
         allowNull: true,
-        comment: '补偿记录（由 CompensateService 自动填充，格式：[{type, asset_code, amount, item_type, ...}]）'
+        comment:
+          '补偿记录（由 CompensateService 自动填充，格式：[{type, asset_code, amount, item_type, ...}]）'
       },
 
       resolved_at: {

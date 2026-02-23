@@ -28,7 +28,7 @@ const TransactionManager = require('../../../../utils/TransactionManager')
  * - 系统存储SHA-256哈希用于验证
  *
  * 请求参数：
- * @body {number} item_instance_id - 物品实例ID
+ * @body {number} item_id - 物品ID
  *
  * 返回数据：
  * @returns {Object} order - 订单对象
@@ -37,22 +37,22 @@ const TransactionManager = require('../../../../utils/TransactionManager')
  * @returns {string} order_id - 订单ID（UUID）
  *
  * 错误场景：
- * - 物品实例不存在 → 404 NOT_FOUND
+ * - 物品不存在 → 404 NOT_FOUND
  * - 物品不可用（已使用/已锁定等） → 409 CONFLICT
  * - 核销码生成失败（碰撞重试失败） → 500 INTERNAL_ERROR
  */
 router.post('/orders', authenticateToken, async (req, res) => {
   try {
-    const { item_instance_id } = req.body
+    const { item_id } = req.body
     const userId = req.user.user_id
 
     // 参数验证
-    if (!item_instance_id || !Number.isInteger(item_instance_id) || item_instance_id <= 0) {
-      return res.apiError('item_instance_id必须是正整数', 'BAD_REQUEST', null, 400)
+    if (!item_id || !Number.isInteger(item_id) || item_id <= 0) {
+      return res.apiError('item_id必须是正整数', 'BAD_REQUEST', null, 400)
     }
 
     logger.info('开始生成核销订单', {
-      item_instance_id,
+      item_id,
       user_id: userId
     })
 
@@ -64,7 +64,7 @@ router.post('/orders', authenticateToken, async (req, res) => {
      */
     const RedemptionService = req.app.locals.services.getService('redemption_order')
     const result = await TransactionManager.execute(async transaction => {
-      return await RedemptionService.createOrder(item_instance_id, {
+      return await RedemptionService.createOrder(item_id, {
         creator_user_id: userId, // 传入创建者ID，供服务层权限校验
         transaction
       })
@@ -72,7 +72,7 @@ router.post('/orders', authenticateToken, async (req, res) => {
 
     logger.info('核销订单生成成功', {
       order_id: result.order.redemption_order_id,
-      item_instance_id,
+      item_id,
       expires_at: result.order.expires_at
     })
 
@@ -80,7 +80,7 @@ router.post('/orders', authenticateToken, async (req, res) => {
       {
         order: {
           order_id: result.order.redemption_order_id,
-          item_instance_id: result.order.item_instance_id,
+          item_id: result.order.item_id,
           status: result.order.status,
           expires_at: result.order.expires_at,
           created_at: result.order.created_at
@@ -92,12 +92,12 @@ router.post('/orders', authenticateToken, async (req, res) => {
   } catch (error) {
     logger.error('核销订单生成失败', {
       error: error.message,
-      item_instance_id: req.body.item_instance_id,
+      item_id: req.body.item_id,
       user_id: req.user?.user_id
     })
 
     // 业务错误处理（服务层返回的业务错误）
-    if (error.message.includes('物品实例不存在')) {
+    if (error.message.includes('物品不存在')) {
       return res.apiError(error.message, 'NOT_FOUND', null, 404)
     }
 

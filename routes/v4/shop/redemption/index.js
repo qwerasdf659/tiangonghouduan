@@ -17,7 +17,7 @@
  * 2. POST /api/v4/redemption/fulfill - 核销订单
  * 3. GET /api/v4/redemption/orders/:order_id - 查询订单详情
  * 4. POST /api/v4/redemption/orders/:order_id/cancel - 取消订单
- * 5. GET /api/v4/redemption/items/:item_instance_id/order - 查询物品的核销订单
+ * 5. GET /api/v4/redemption/items/:item_id/order - 查询物品的核销订单
  *
  * 创建时间：2025年12月22日
  * 使用 Claude Sonnet 4.5 模型
@@ -36,6 +36,6 @@ const queryRoutes = require('./query')
 router.use('/', ordersRoutes) // POST /orders, POST /orders/:order_id/cancel
 router.use('/', fulfillRoutes) // POST /fulfill（文本码核销，备用）
 router.use('/', scanRoutes) // POST /scan（QR码扫码核销，主流程）
-router.use('/', queryRoutes) // GET /orders/:order_id, GET /items/:item_instance_id/order
+router.use('/', queryRoutes) // GET /orders/:order_id, GET /items/:item_id/order
 
 module.exports = router

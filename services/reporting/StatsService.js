@@ -268,8 +268,8 @@ class StatsService {
           return Math.abs(spent || 0)
         })(),
 
-        // 库存统计（使用新表 ItemInstance）
-        models.ItemInstance.count({
+        // 库存统计（使用新表 Item）
+        models.Item.count({
           where: {
             created_at: {
               [Op.gte]: todayStart,
@@ -277,8 +277,8 @@ class StatsService {
             }
           }
         }),
-        // ItemInstance表没有used_at字段，改用updated_at + status='used'来统计今日使用的物品
-        models.ItemInstance.count({
+        // Item表没有used_at字段，改用updated_at + status='used'来统计今日使用的物品
+        models.Item.count({
           where: {
             updated_at: {
               [Op.gte]: todayStart,
@@ -512,8 +512,8 @@ class StatsService {
             raw: true
           }),
 
-          // 库存统计（使用新表 ItemInstance）
-          models.ItemInstance.findAll({
+          // 库存统计（使用新表 Item）
+          models.Item.findAll({
             where: { owner_user_id: user_id },
             attributes: [
               [fn('COUNT', col('*')), 'total_items'],
@@ -856,29 +856,23 @@ class StatsService {
    */
   static async getInventoryAdminStatistics() {
     try {
-      const { ItemInstance, sequelize } = models
+      const { Item, sequelize } = models
 
       // 并行执行统计查询提升性能
       const [totalItems, statusStats, typeStats] = await Promise.all([
         // 总物品数
-        ItemInstance.count(),
+        Item.count(),
 
         // 按状态统计
-        ItemInstance.findAll({
-          attributes: [
-            'status',
-            [sequelize.fn('COUNT', sequelize.col('item_instance_id')), 'count']
-          ],
+        Item.findAll({
+          attributes: ['status', [sequelize.fn('COUNT', sequelize.col('item_id')), 'count']],
           group: ['status'],
           raw: true
         }),
 
         // 按类型统计
-        ItemInstance.findAll({
-          attributes: [
-            'item_type',
-            [sequelize.fn('COUNT', sequelize.col('item_instance_id')), 'count']
-          ],
+        Item.findAll({
+          attributes: ['item_type', [sequelize.fn('COUNT', sequelize.col('item_id')), 'count']],
           group: ['item_type'],
           raw: true
         })

@@ -38,7 +38,7 @@ const {
   sequelize,
   User,
   MarketListing,
-  ItemInstance,
+  Item,
   TradeOrder,
   ItemTemplate
 } = require('../../../models')
@@ -73,13 +73,13 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
 
   /**
    * 创建测试物品实例
-   * @param {number} owner_user_id - 所有者用户ID
+   * @param {number} owner_account_id - 所有者用户ID
    * @param {Object} options - 选项
    * @returns {Promise<Object>} 物品实例
    */
-  async function createTestItem(owner_user_id, options = {}) {
+  async function createTestItem(owner_account_id, options = {}) {
     const item_data = {
-      owner_user_id,
+      owner_account_id,
       item_template_id: testItemTemplate?.item_template_id || null,
       item_type: 'tradable_item',
       status: options.status || 'available',
@@ -89,8 +89,8 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
       }
     }
 
-    const item = await ItemInstance.create(item_data)
-    createdItems.push(item.item_instance_id)
+    const item = await Item.create(item_data)
+    createdItems.push(item.item_id)
     return item
   }
 
@@ -114,7 +114,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
         {
           idempotency_key: generateIdempotencyKey('listing'),
           seller_user_id: seller_id,
-          item_instance_id: test_item.item_instance_id,
+          item_id: test_item.item_id,
           price_amount,
           price_asset_code: 'DIAMOND'
         },
@@ -236,11 +236,11 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
     createdListings = []
 
     // 清理测试物品
-    for (const item_instance_id of createdItems) {
+    for (const item_id of createdItems) {
       try {
-        await ItemInstance.destroy({ where: { item_instance_id }, force: true })
+        await Item.destroy({ where: { item_id }, force: true })
       } catch (error) {
-        console.log(`清理物品 ${item_instance_id} 失败:`, error.message)
+        console.log(`清理物品 ${item_id} 失败:`, error.message)
       }
     }
     createdItems = []
@@ -395,8 +395,8 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
         expect(sold_listing.status).toBe('sold')
 
         // 7. 验证物品所有权转移
-        const transferred_item = await ItemInstance.findByPk(item.item_instance_id)
-        expect(transferred_item.owner_user_id).toBe(testBuyer.user_id)
+        const transferred_item = await Item.findByPk(item.item_id)
+        expect(transferred_item.owner_account_id).toBe(testBuyer.user_id)
         expect(transferred_item.status).toBe('transferred')
 
         // 8. 验证卖家收到款项
@@ -1056,17 +1056,17 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
       // Step 6: 最终状态验证
       const final_order = await TradeOrder.findByPk(order_id)
       const final_listing = await MarketListing.findByPk(listing.market_listing_id)
-      const final_item = await ItemInstance.findByPk(item.item_instance_id)
+      const final_item = await Item.findByPk(item.item_id)
 
       expect(final_order.status).toBe('completed')
       expect(final_listing.status).toBe('sold')
-      expect(final_item.owner_user_id).toBe(testBuyer.user_id)
+      expect(final_item.owner_account_id).toBe(testBuyer.user_id)
 
       console.log('Step 5-6: 订单完成，最终状态验证通过')
       console.log({
         order_status: final_order.status,
         listing_status: final_listing.status,
-        item_new_owner: final_item.owner_user_id
+        item_new_owner: final_item.owner_account_id
       })
 
       console.log('📋 ===== 完整订单生命周期结束 =====\n')

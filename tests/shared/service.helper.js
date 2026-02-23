@@ -388,15 +388,15 @@ class ServiceTestSuite {
 
     // 2. 测试 ItemService（9个方法）
     const itemMethods = [
-      'createItemInstance',
+      'createItem',
       'updateItemOwner',
-      'getItemInstance',
-      'getItemInstancesByOwner',
+      'getItem',
+      'getItemsByOwner',
       'redeemItem',
       'consumeItem',
       'getItemStats',
       'migrateInventoryToAssetDomain',
-      'syncItemInstancesFromExistingData'
+      'syncItemsFromExistingData'
     ]
     await ServiceTestSuite.testServiceHealth(ItemService, itemMethods)
     results.item = { success: true, methods: itemMethods }

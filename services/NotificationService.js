@@ -640,9 +640,8 @@ class NotificationService {
     const { title, content, announcement_type } = announcementData
 
     if (user_id) {
-      // 发送给特定用户
       return await this.send(user_id, {
-        type: 'system_announcement',
+        type: 'system_campaign_notification',
         title: `📢 ${title}`,
         content,
         data: {
@@ -651,9 +650,8 @@ class NotificationService {
         }
       })
     } else {
-      // 广播给所有管理员
       return await this.sendToAdmins({
-        type: 'system_announcement',
+        type: 'system_campaign_notification',
         title: `📢 ${title}`,
         content,
         data: {

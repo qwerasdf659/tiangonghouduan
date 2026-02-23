@@ -81,7 +81,8 @@ module.exports = sequelize => {
       extra_data: {
         type: DataTypes.JSON,
         allowNull: true,
-        comment: '扩展数据JSON（弹窗: show_duration_ms/close_method/queue_position; 轮播: exposure_duration_ms/is_manual_swipe/is_clicked）'
+        comment:
+          '扩展数据JSON（弹窗: show_duration_ms/close_method/queue_position; 轮播: exposure_duration_ms/is_manual_swipe/is_clicked）'
       },
 
       created_at: {

@@ -12,11 +12,7 @@
     "lint:mappings": "node scripts/check-frontend-mappings.js",
     "lint:all": "npm run lint && npm run lint:mappings",
     "format": "prettier --write \"src/**/*.{js,html,css}\"",
-    "format:check": "prettier --check \"src/**/*.{js,html,css}\"",
-    "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui",
-    "test:e2e:debug": "playwright test --debug",
-    "test:e2e:report": "playwright show-report"
+    "format:check": "prettier --check \"src/**/*.{js,html,css}\""
   },
   "dependencies": {
     "alpinejs": "^3.15.4",
@@ -27,7 +23,6 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
-    "@playwright/test": "^1.58.1",
     "autoprefixer": "^10.4.23",
     "eslint": "^9.39.2",
     "eslint-plugin-import": "^2.32.0",

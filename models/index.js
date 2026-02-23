@@ -194,22 +194,8 @@ models.ItemTemplate = require('./ItemTemplate')(sequelize, DataTypes)
 /*
  * ✅ ItemTemplate：物品模板定义（物品分类元数据）
  *    - 用途：定义不可叠加物品的模板（名称、类目、稀有度、图片等）
- *    - 特点：为 ItemInstance 提供模板定义，市场挂牌分类筛选
+ *    - 特点：为 Item 提供模板定义，市场挂牌分类筛选
  *    - 表名：item_templates，主键：item_template_id，唯一键：template_code
- */
-
-models.ItemInstance = require('./ItemInstance')(sequelize, DataTypes)
-/*
- * ✅ ItemInstance：物品实例所有权管理（旧表 — 迁移完成后退役）
- *    - 表名：item_instances，主键：item_instance_id，外键：owner_user_id
- *    - ⚠️ 新代码应使用 Item + ItemLedger + ItemHold 三表模型
- */
-
-models.ItemInstanceEvent = require('./ItemInstanceEvent')(sequelize, DataTypes)
-/*
- * ✅ ItemInstanceEvent：物品实例事件（旧表 — 迁移完成后退役）
- *    - 表名：item_instance_events，主键：event_id，外键：item_instance_id
- *    - ⚠️ 新代码应使用 ItemLedger 双录记账
  */
 
 // 🔴 从零三表模型（资产全链路追踪 — 2026-02-22）
@@ -298,58 +284,11 @@ models.CustomerServiceUserAssignment = require('./CustomerServiceUserAssignment'
  *    - 业务场景：管理员分配用户到客服→用户下次咨询自动路由→客服间转移用户
  */
 
-/*
- * V4.0新增：系统公告和反馈系统
- * [已合并+DROP] models.SystemAnnouncement — 表已迁移到 ad_campaigns + ad_creatives
- */
+// V4.0新增：反馈系统
 models.Feedback = require('./Feedback')(sequelize, DataTypes)
 models.SystemSettings = require('./SystemSettings')(sequelize, DataTypes)
-/*
- * ✅ SystemSettings：系统设置（系统配置管理）
- *    - 用途：存储系统各模块的配置设置（基础设置、抽奖设置、积分设置、通知设置、安全设置）
- *    - 特点：支持多种数据类型（string/number/boolean/json）、分类管理、可见性控制、只读保护
- *    - 表名：system_settings，主键：setting_id，外键：updated_by（最后更新管理员）
- *    - 业务场景：系统配置管理、参数调整、策略控制
- */
 
-// [已合并+DROP] models.PopupBanner — 表已迁移到 ad_campaigns + ad_creatives
-/*
- * ✅ PopupBanner：弹窗Banner配置（首页弹窗管理）
- *    - 用途：管理微信小程序首页弹窗图片和跳转链接
- *    - 特点：支持多弹窗位、时间范围控制、点击跳转、显示顺序、频率控制、类型分级
- *    - 表名：popup_banners，主键：popup_banner_id，外键：created_by
- *    - Phase 1 新增：banner_type / frequency_rule / frequency_value / force_show / priority
- */
-
-// [已合并+DROP] models.CarouselItem — 表已迁移到 ad_campaigns + ad_creatives
-/*
- * ✅ CarouselItem：轮播图配置（页面内嵌 swiper 组件）
- *    - 用途：管理微信小程序首页轮播图展示
- *    - 特点：与弹窗（PopupBanner）独立管理，不需要频率控制
- *    - 表名：carousel_items，主键：carousel_item_id，外键：created_by
- *    - 拍板决策1：轮播图独立为 carousel_items 表
- *    - 表名：popup_banners，主键：banner_id，外键：created_by
- *    - 业务场景：首页活动弹窗、公告展示、运营推广
- */
-
-/*
- * 🔴 Phase 2：服务端展示日志
- * [已合并+DROP] models.PopupShowLog — 表已迁移到 ad_interaction_logs
- */
-/*
- * ✅ PopupShowLog：弹窗展示日志
- *    - 用途：记录每个弹窗的展示时长、关闭方式、队列位置
- *    - 表名：popup_show_logs，主键：popup_show_log_id（BIGINT）
- */
-
-// [已合并+DROP] models.CarouselShowLog — 表已迁移到 ad_interaction_logs
-/*
- * ✅ CarouselShowLog：轮播图曝光日志
- *    - 用途：记录每张轮播图的曝光时长、手动滑入、点击情况
- *    - 表名：carousel_show_logs，主键：carousel_show_log_id（BIGINT）
- */
-
-// 🔴 Phase 3：广告基础版
+// 广告系统（内容投放统一架构）
 models.AdSlot = require('./AdSlot')(sequelize, DataTypes)
 /*
  * ✅ AdSlot：广告位配置

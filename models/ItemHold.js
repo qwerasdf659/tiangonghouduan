@@ -45,6 +45,7 @@ class ItemHold extends Model {
    * 模型关联定义
    *
    * @param {Object} models - 所有模型的映射对象
+   * @returns {void}
    */
   static associate(models) {
     // 锁定记录关联物品
@@ -98,8 +99,8 @@ class ItemHold extends Model {
 /**
  * 模型初始化
  *
- * @param {import('sequelize').Sequelize} sequelize - Sequelize 实例
- * @returns {ItemHold} 初始化后的模型
+ * @param {Object} sequelize - Sequelize 实例
+ * @returns {Model} 初始化后的模型
  */
 module.exports = sequelize => {
   ItemHold.init(
@@ -120,7 +121,8 @@ module.exports = sequelize => {
       hold_type: {
         type: DataTypes.ENUM('trade', 'redemption', 'security'),
         allowNull: false,
-        comment: '锁定类型：trade=交易锁(3分钟) / redemption=兑换码锁(30天) / security=风控锁(无限期)'
+        comment:
+          '锁定类型：trade=交易锁(3分钟) / redemption=兑换码锁(30天) / security=风控锁(无限期)'
       },
 
       holder_ref: {
@@ -140,7 +142,8 @@ module.exports = sequelize => {
         type: DataTypes.ENUM('active', 'released', 'expired', 'overridden'),
         allowNull: false,
         defaultValue: 'active',
-        comment: '锁定状态：active=活跃 / released=已释放 / expired=已过期 / overridden=被高优先级覆盖'
+        comment:
+          '锁定状态：active=活跃 / released=已释放 / expired=已过期 / overridden=被高优先级覆盖'
       },
 
       reason: {

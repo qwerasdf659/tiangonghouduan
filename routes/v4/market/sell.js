@@ -48,7 +48,7 @@ const marketRiskMiddleware = getMarketRiskControlMiddleware()
  * @access Private (需要登录)
  *
  * @header {string} Idempotency-Key - 幂等键（必填，不接受body参数）
- * @body {number} item_instance_id - 物品实例ID（必填）
+ * @body {number} item_id - 物品ID（必填）
  * @body {number} price_amount - 售价（必填，大于0的整数）
  * @body {string} price_asset_code - 定价结算币种（必填，支持：DIAMOND/red_shard）
  * @body {string} condition - 物品状态（可选，默认good）
@@ -56,7 +56,7 @@ const marketRiskMiddleware = getMarketRiskControlMiddleware()
  * @returns {Object} 上架结果
  * @returns {Object} data.listing - 挂牌信息
  * @returns {number} data.listing.market_listing_id - 挂牌ID
- * @returns {number} data.listing.item_instance_id - 物品实例ID
+ * @returns {number} data.listing.item_id - 物品ID
  * @returns {number} data.listing.price_amount - 售价
  * @returns {boolean} data.listing.is_duplicate - 是否为幂等回放请求
  * @returns {Object} data.listing_status - 上架状态
@@ -102,28 +102,27 @@ router.post(
 
     try {
       const userId = req.user.user_id
-      const { item_instance_id, price_amount } = req.body
+      const { item_id, price_amount } = req.body
 
       // 【不做兼容】参数命名严格对齐最终方案（snake_case）
-      if (req.body.inventory_id !== undefined || req.body.selling_amount !== undefined) {
+      if (
+        req.body.inventory_id !== undefined ||
+        req.body.selling_amount !== undefined ||
+        req.body.item_instance_id !== undefined
+      ) {
         return res.apiError(
-          '参数已升级：请使用 item_instance_id 与 price_amount（不再支持 inventory_id/selling_amount）',
+          '参数已升级：请使用 item_id 与 price_amount（不再支持 inventory_id/selling_amount/item_instance_id）',
           'BAD_REQUEST',
           null,
           400
         )
       }
 
-      if (!item_instance_id || price_amount === undefined) {
-        return res.apiError(
-          '缺少必要参数：item_instance_id 和 price_amount',
-          'BAD_REQUEST',
-          null,
-          400
-        )
+      if (!item_id || price_amount === undefined) {
+        return res.apiError('缺少必要参数：item_id 和 price_amount', 'BAD_REQUEST', null, 400)
       }
 
-      const itemId = parseInt(item_instance_id, 10)
+      const itemId = parseInt(item_id, 10)
       const priceAmountValue = parseInt(price_amount, 10)
 
       if (isNaN(itemId) || itemId <= 0) {
@@ -158,7 +157,7 @@ router.post(
         api_path: '/api/v4/market/list',
         http_method: 'POST',
         request_params: {
-          item_instance_id: itemId,
+          item_id: itemId,
           price_amount: priceAmountValue,
           price_asset_code: priceAssetCode
         },
@@ -170,7 +169,7 @@ router.post(
         logger.info('🔄 入口幂等拦截：重复请求，返回首次结果', {
           idempotency_key,
           user_id: userId,
-          item_instance_id: itemId
+          item_id: itemId
         })
         const duplicateResponse = {
           ...idempotencyResult.response,
@@ -202,7 +201,7 @@ router.post(
             {
               idempotency_key,
               seller_user_id: userId,
-              item_instance_id: itemId,
+              item_id: itemId,
               price_amount: priceAmountValue,
               price_asset_code: priceAssetCode // 多币种扩展（2026-01-14）：使用请求参数
             },
@@ -214,7 +213,7 @@ router.post(
           return {
             listing: {
               market_listing_id: listing.market_listing_id,
-              item_instance_id: itemId,
+              item_id: itemId,
               price_amount: priceAmountValue,
               is_duplicate
             },
@@ -246,7 +245,7 @@ router.post(
 
       logger.info('商品上架成功', {
         user_id: userId,
-        item_instance_id: itemId,
+        item_id: itemId,
         market_listing_id: responseData._market_listing_id,
         idempotency_key,
         price_amount: priceAmountValue,

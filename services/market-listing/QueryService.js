@@ -14,7 +14,7 @@
 
 const {
   MarketListing,
-  ItemInstance,
+  Item,
   ItemTemplate,
   MaterialAssetType,
   User,
@@ -46,17 +46,9 @@ class MarketListingQueryService {
       where: { market_listing_id },
       include: [
         {
-          model: ItemInstance,
+          model: Item,
           as: 'offerItem',
-          required: false,
-          include: [
-            {
-              model: ItemTemplate,
-              as: 'itemTemplate',
-              attributes: ['item_template_id', 'display_name', 'image_url', 'thumbnail_url'],
-              required: false
-            }
-          ]
+          required: false
         },
         {
           model: ItemTemplate,
@@ -93,7 +85,7 @@ class MarketListingQueryService {
       where,
       include: [
         {
-          model: ItemInstance,
+          model: Item,
           as: 'offerItem',
           required: false
         }
@@ -250,17 +242,9 @@ class MarketListingQueryService {
         required: false
       },
       {
-        model: ItemInstance,
+        model: Item,
         as: 'offerItem',
-        required: false,
-        include: [
-          {
-            model: ItemTemplate,
-            as: 'itemTemplate',
-            attributes: ['item_template_id', 'display_name', 'image_url', 'thumbnail_url'],
-            required: false
-          }
-        ]
+        required: false
       },
       {
         /** 直接关联物品模板（通过 offer_item_template_id 快照字段） */
@@ -311,7 +295,7 @@ class MarketListingQueryService {
       }
 
       // 物品实例类型
-      if (plain.listing_kind === 'item_instance') {
+      if (plain.listing_kind === 'item') {
         /**
          * 图片 object key 优先级：
          * 1. 直接关联的 offerItemTemplate（通过快照字段 offer_item_template_id）
@@ -322,7 +306,7 @@ class MarketListingQueryService {
           plain.offerItemTemplate?.image_url || plain.offerItem?.itemTemplate?.image_url || null
 
         product.item_info = {
-          item_instance_id: plain.offer_item_instance_id,
+          item_id: plain.offer_item_id,
           display_name: plain.offer_item_display_name || plain.offerItem?.meta?.name,
           image_url: templateImageKey ? getImageUrl(templateImageKey) : null,
           category_code: plain.offer_item_category_code,
@@ -427,7 +411,7 @@ class MarketListingQueryService {
     // 4. 挂牌类型列表（静态定义）
     const listingKinds = [
       {
-        listing_kind: 'item_instance',
+        listing_kind: 'item',
         display_name: '物品',
         description: '不可叠加物品（NFT类），如奖品实例'
       },

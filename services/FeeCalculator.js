@@ -5,7 +5,7 @@ const _logger = require('../utils/logger').logger
  * 文件路径：services/FeeCalculator.js
  *
  * 业务场景：
- * - 计算物品转让的手续费（基于 ItemInstance.meta.value 字段）
+ * - 计算物品转让的手续费（基于 Item.meta.value 字段）
  * - 支持按商品价值分档计费（DIAMOND）
  * - 支持单一费率模式（red_shard 等非 DIAMOND 币种）
  * - 集成到TradeOrder交易订单系统（C2C市场）
@@ -16,7 +16,7 @@ const _logger = require('../utils/logger').logger
  * - 其他币种：根据 system_settings 配置的费率和最低费计算
  *
  * 数据库关联：
- * - ItemInstance.meta.value（商品价值）- 用于 DIAMOND 计费分档
+ * - Item.meta.value（商品价值）- 用于 DIAMOND 计费分档
  * - MarketListing.price_amount（用户定价）- 买家支付金额
  * - MarketListing.price_asset_code（结算币种）- 决定计费模式
  * - TradeOrder.fee_amount（手续费）- 平台收取
@@ -46,11 +46,11 @@ class FeeCalculator {
    * 根据商品价值计算单个商品的手续费（核心方法）
    *
    * 业务规则：
-   * - 按 ItemInstance.meta.value 字段分档计费（不是 price_amount）
+   * - 按 Item.meta.value 字段分档计费（不是 price_amount）
    * - 手续费从 price_amount 中扣除，卖家实收 = price_amount - fee
    * - 向上取整，最小收1积分
    *
-   * @param {number} itemValue - 商品价值（ItemInstance.meta.value 字段）
+   * @param {number} itemValue - 商品价值（Item.meta.value 字段）
    * @param {number} sellingPrice - 用户定价（MarketListing.price_amount 字段）
    * @returns {Object} 手续费计算结果
    *   - fee: 手续费积分（向上取整）
@@ -115,11 +115,11 @@ class FeeCalculator {
    * 计算整个订单的手续费（支持混合商品 - 当前系统为单商品交易）
    *
    * 业务场景：
-   * - 当前系统：每次交易只涉及一个物品（ItemInstance 单条记录）
+   * - 当前系统：每次交易只涉及一个物品（Item 单条记录）
    * - 未来扩展：支持批量购买多个物品
    *
    * @param {Array} orderItems - 订单商品列表
-   *   [{ item_instance_id, item_value, selling_price }, ...]
+   *   [{ item_id, item_value, selling_price }, ...]
    * @returns {Object} 订单手续费汇总
    *   - total_fee: 总手续费
    *   - total_selling_price: 总售价
@@ -177,7 +177,7 @@ class FeeCalculator {
    * - 商品详情页展示预估手续费
    * - 上架前提示用户手续费档位
    *
-   * @param {number} itemValue - 商品价值（ItemInstance.meta.value）
+   * @param {number} itemValue - 商品价值（Item.meta.value）
    * @returns {number} 费率（如0.03表示3%）
    *
    * @example
@@ -197,7 +197,7 @@ class FeeCalculator {
    * - 客服解释手续费规则
    * - 用户帮助文档
    *
-   * @param {number} itemValue - 商品价值（ItemInstance.meta.value）
+   * @param {number} itemValue - 商品价值（Item.meta.value）
    * @returns {string} 费率说明（如"3%（低价值档）- 普通优惠券、小额商品"）
    *
    * @example

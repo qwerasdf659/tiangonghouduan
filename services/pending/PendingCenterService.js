@@ -739,7 +739,7 @@ class PendingCenterService {
    */
   static async _getRedemptionItems(options = {}) {
     try {
-      const { RedemptionOrder, User, ItemInstance } = require('../../models')
+      const { RedemptionOrder, User, Item } = require('../../models')
       const { urgent_only = false } = options
 
       const pendingOrders = await RedemptionOrder.findAll({
@@ -752,9 +752,9 @@ class PendingCenterService {
             required: false
           },
           {
-            model: ItemInstance,
-            as: 'item_instance',
-            attributes: ['item_instance_id', 'item_type', 'meta'],
+            model: Item,
+            as: 'item',
+            attributes: ['item_id', 'item_type', 'meta'],
             required: false
           }
         ],

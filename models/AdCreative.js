@@ -100,6 +100,10 @@ module.exports = sequelize => {
         type: DataTypes.STRING(500),
         allowNull: true,
         validate: {
+          /**
+           * @param {string|null} value - 图片URL，content_type='image' 时必填
+           * @returns {void}
+           */
           conditionalNotEmpty(value) {
             if (this.content_type === 'image' && (!value || value.trim() === '')) {
               throw new Error('图片类型创意必须提供图片URL')
@@ -148,7 +152,8 @@ module.exports = sequelize => {
             msg: '链接类型必须是：none, page, miniprogram, webview 之一'
           }
         },
-        comment: '链接类型（D3 定论微信系命名）：none=无跳转 / page=小程序页面 / miniprogram=其他小程序 / webview=H5页面'
+        comment:
+          '链接类型（D3 定论微信系命名）：none=无跳转 / page=小程序页面 / miniprogram=其他小程序 / webview=H5页面'
       },
 
       text_content: {
@@ -161,15 +166,18 @@ module.exports = sequelize => {
         type: DataTypes.STRING(30),
         allowNull: true,
         validate: {
+          /**
+           * @param {string|null} value - 显示模式值，校验是否在允许的枚举范围内
+           * @returns {void}
+           */
           isValidMode(value) {
             if (value !== null && !VALID_DISPLAY_MODES.includes(value)) {
-              throw new Error(
-                '显示模式必须是：' + VALID_DISPLAY_MODES.join(', ') + ' 之一'
-              )
+              throw new Error('显示模式必须是：' + VALID_DISPLAY_MODES.join(', ') + ' 之一')
             }
           }
         },
-        comment: '显示模式（原 PopupBanner 属性）：wide / horizontal / square / tall / slim / full_image'
+        comment:
+          '显示模式（原 PopupBanner 属性）：wide / horizontal / square / tall / slim / full_image'
       },
 
       review_status: {

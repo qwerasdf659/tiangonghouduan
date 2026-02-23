@@ -28,6 +28,7 @@ const { LotteryCampaign, LotteryPrize } = require('../../models')
 const logger = require('../../utils/logger').logger
 const { assertAndGetTransaction } = require('../../utils/transactionHelpers')
 const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
+const CampaignCodeGenerator = require('../../utils/CampaignCodeGenerator')
 
 /**
  * 抽奖活动 CRUD 服务类
@@ -45,7 +46,6 @@ class LotteryCampaignCRUDService {
    *
    * @param {Object} campaignData - 活动数据
    * @param {string} campaignData.campaign_name - 活动名称（必填）
-   * @param {string} campaignData.campaign_code - 活动代码（必填，唯一标识）
    * @param {string} campaignData.campaign_type - 活动类型（必填）
    * @param {string} [campaignData.description] - 活动描述
    * @param {Date} [campaignData.start_time] - 开始时间
@@ -68,9 +68,10 @@ class LotteryCampaignCRUDService {
    * // 路由层使用 TransactionManager.execute() 管理事务
    * const campaign = await TransactionManager.execute(async (transaction) => {
    *   return await LotteryCampaignCRUDService.createCampaign(
-   *     { campaign_name: '新年活动', campaign_code: 'NY2026', campaign_type: 'normal' },
+   *     { campaign_name: '新年活动', campaign_type: 'normal' },
    *     { transaction, operator_user_id: 123 }
    *   )
+   *   // campaign.campaign_code => 'CAMP202602230001'（后端自动生成）
    * })
    */
   static async createCampaign(campaignData, options = {}) {
@@ -85,16 +86,10 @@ class LotteryCampaignCRUDService {
       throw new Error('operator_user_id 是必填参数')
     }
 
-    // 验证必填字段
-    const { campaign_name, campaign_code, campaign_type } = campaignData
+    // 验证必填字段（campaign_code 由后端自动生成，前端不传）
+    const { campaign_name, campaign_type } = campaignData
     if (!campaign_name) {
       const error = new Error('活动名称不能为空')
-      error.code = 'VALIDATION_ERROR'
-      error.statusCode = 400
-      throw error
-    }
-    if (!campaign_code) {
-      const error = new Error('活动代码不能为空')
       error.code = 'VALIDATION_ERROR'
       error.statusCode = 400
       throw error
@@ -106,25 +101,15 @@ class LotteryCampaignCRUDService {
       throw error
     }
 
+    // 后端自动生成活动编码（忽略前端传入的值，格式：CAMP202602230001）
+    const campaign_code = await CampaignCodeGenerator.generateWithRetry({ transaction })
+
     logger.info('开始创建抽奖活动', {
       campaign_name,
       campaign_code,
       campaign_type,
       operator_user_id
     })
-
-    // 检查活动代码是否已存在
-    const existingCampaign = await LotteryCampaign.findOne({
-      where: { campaign_code },
-      transaction
-    })
-
-    if (existingCampaign) {
-      const error = new Error(`活动代码 ${campaign_code} 已存在`)
-      error.code = 'DUPLICATE_CAMPAIGN_CODE'
-      error.statusCode = 409
-      throw error
-    }
 
     // 创建活动（含前端展示配置字段 - 2026-02-15 多活动抽奖系统）
     const campaign = await LotteryCampaign.create(
@@ -407,6 +392,75 @@ class LotteryCampaignCRUDService {
     }
 
     const oldStatus = campaign.status
+
+    /**
+     * 激活校验：status 切换为 active 时执行全量奖品分布校验
+     * - normalize 模式：win_probability 总和必须 = 1.0（±0.001）
+     * - tier_first 模式：每档位至少 1 个奖品，且至少 1 个兜底奖品（is_fallback=1）
+     * 校验不通过则阻断激活
+     */
+    if (status === 'active' && oldStatus !== 'active') {
+      const prizes = await LotteryPrize.findAll({
+        where: {
+          lottery_campaign_id: parseInt(lottery_campaign_id),
+          status: 'active'
+        },
+        transaction
+      })
+
+      if (prizes.length === 0) {
+        const error = new Error('活动没有任何有效奖品，无法激活')
+        error.code = 'ACTIVATION_VALIDATION_FAILED'
+        error.statusCode = 400
+        throw error
+      }
+
+      const pickMethod = campaign.pick_method || 'tier_first'
+
+      if (pickMethod === 'normalize') {
+        const totalProbability = prizes.reduce(
+          (sum, p) => sum + (parseFloat(p.win_probability) || 0),
+          0
+        )
+        if (Math.abs(totalProbability - 1.0) > 0.001) {
+          const error = new Error(
+            `normalize 模式要求 win_probability 总和 = 1.0（当前 ${totalProbability.toFixed(4)}），无法激活`
+          )
+          error.code = 'ACTIVATION_VALIDATION_FAILED'
+          error.statusCode = 400
+          throw error
+        }
+      } else if (pickMethod === 'tier_first') {
+        const tierGroups = {}
+        for (const p of prizes) {
+          const tier = p.reward_tier || 'low'
+          if (!tierGroups[tier]) tierGroups[tier] = []
+          tierGroups[tier].push(p)
+        }
+        for (const [tier, tierPrizes] of Object.entries(tierGroups)) {
+          if (tierPrizes.length === 0) {
+            const error = new Error(`tier_first 模式下档位 ${tier} 没有任何奖品，无法激活`)
+            error.code = 'ACTIVATION_VALIDATION_FAILED'
+            error.statusCode = 400
+            throw error
+          }
+        }
+
+        const hasFallback = prizes.some(p => p.is_fallback === true || p.is_fallback === 1)
+        if (!hasFallback) {
+          const error = new Error('tier_first 模式要求至少 1 个兜底奖品（is_fallback=1），无法激活')
+          error.code = 'ACTIVATION_VALIDATION_FAILED'
+          error.statusCode = 400
+          throw error
+        }
+      }
+
+      logger.info('活动激活校验通过', {
+        lottery_campaign_id,
+        pick_method: pickMethod,
+        prize_count: prizes.length
+      })
+    }
 
     // 执行更新
     await campaign.update({ status }, { transaction })

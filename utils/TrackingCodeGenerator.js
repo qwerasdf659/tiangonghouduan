@@ -108,7 +108,7 @@ class TrackingCodeGenerator {
    * 用于 API 路由中 :identifier 的解析
    *
    * @param {string} identifier - 标识符
-   * @returns {{ type: 'tracking_code' | 'item_id', value: string | number }} 解析结果
+   * @returns {Object} 解析结果，包含 type ('tracking_code' 或 'item_id') 和 value
    */
   static resolveIdentifier(identifier) {
     if (this.validate(identifier)) {

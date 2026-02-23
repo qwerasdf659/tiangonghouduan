@@ -33,6 +33,7 @@ class Item extends Model {
    * 模型关联定义
    *
    * @param {Object} models - 所有模型的映射对象
+   * @returns {void}
    */
   static associate(models) {
     // 物品属于某个账户（当前持有者，统一用户账户和系统账户）
@@ -53,6 +54,18 @@ class Item extends Model {
     Item.hasMany(models.ItemHold, {
       foreignKey: 'item_id',
       as: 'holds'
+    })
+
+    // 物品对应的交易市场挂牌
+    Item.hasMany(models.MarketListing, {
+      foreignKey: 'offer_item_id',
+      as: 'marketListings'
+    })
+
+    // 物品对应的兑换订单
+    Item.hasMany(models.RedemptionOrder, {
+      foreignKey: 'item_id',
+      as: 'redemptionOrders'
     })
   }
 
@@ -87,8 +100,8 @@ class Item extends Model {
 /**
  * 模型初始化
  *
- * @param {import('sequelize').Sequelize} sequelize - Sequelize 实例
- * @returns {Item} 初始化后的模型
+ * @param {Object} sequelize - Sequelize 实例
+ * @returns {Model} 初始化后的模型
  */
 module.exports = sequelize => {
   Item.init(
@@ -117,7 +130,8 @@ module.exports = sequelize => {
         type: DataTypes.ENUM('available', 'held', 'used', 'expired', 'destroyed'),
         allowNull: false,
         defaultValue: 'available',
-        comment: '物品状态：available=可用 / held=锁定中 / used=已使用 / expired=已过期 / destroyed=已销毁'
+        comment:
+          '物品状态：available=可用 / held=锁定中 / used=已使用 / expired=已过期 / destroyed=已销毁'
       },
 
       item_type: {
@@ -161,7 +175,8 @@ module.exports = sequelize => {
       source: {
         type: DataTypes.STRING(20),
         allowNull: false,
-        comment: '物品来源：lottery=抽奖 / bid_settlement=竞价结算 / exchange=兑换 / admin=管理员 / test=测试 / legacy=历史数据'
+        comment:
+          '物品来源：lottery=抽奖 / bid_settlement=竞价结算 / exchange=兑换 / admin=管理员 / test=测试 / legacy=历史数据'
       },
 
       source_ref_id: {

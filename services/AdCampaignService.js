@@ -882,7 +882,9 @@ class AdCampaignService {
       }
 
       if (!['operational', 'system'].includes(campaign.campaign_category)) {
-        throw new Error('只有运营/系统类型计划可以直接发布，当前类型: ' + campaign.campaign_category)
+        throw new Error(
+          '只有运营/系统类型计划可以直接发布，当前类型: ' + campaign.campaign_category
+        )
       }
 
       await campaign.update({ status: 'active' }, { transaction: options.transaction })
@@ -973,119 +975,6 @@ class AdCampaignService {
       logger.error('获取广告计划统计信息失败', { error: error.message })
       throw error
     }
-  }
-
-  /**
-   * 创建运营内容计划（简化流程：billing_mode='free'，status='draft'，手动发布切 active）
-   * D1 定论 + D6 定论：priority 强制 100-899 范围
-   *
-   * @param {Object} data - 创建数据
-   * @param {number} data.ad_slot_id - 广告位ID
-   * @param {string} data.campaign_name - 计划名称
-   * @param {number} data.advertiser_user_id - 运营人员 user_id
-   * @param {number} [data.priority=500] - 优先级（100-899）
-   * @param {string} [data.frequency_rule='once_per_day'] - 频次规则
-   * @param {number} [data.frequency_value=1] - 频次参数
-   * @param {boolean} [data.force_show=false] - 是否强制弹出
-   * @param {number} [data.slide_interval_ms] - 轮播间隔毫秒
-   * @param {string} [data.start_date] - 开始日期
-   * @param {string} [data.end_date] - 结束日期
-   * @param {string} [data.internal_notes] - 内部备注
-   * @param {Object} options - 选项
-   * @param {Object} options.transaction - 数据库事务（路由层传入）
-   * @returns {Promise<Object>} 创建的 campaign 实例
-   */
-  static async createOperationalCampaign(data, options = {}) {
-    const priority = data.priority || 500
-    if (priority < 100 || priority > 899) {
-      throw new Error('运营内容优先级必须在 100-899 范围内')
-    }
-
-    const campaignData = {
-      business_id: data.business_id || `operational_${uuidv4()}`,
-      advertiser_user_id: data.advertiser_user_id,
-      ad_slot_id: data.ad_slot_id,
-      campaign_name: data.campaign_name,
-      billing_mode: 'free',
-      status: 'draft',
-      campaign_category: 'operational',
-      priority,
-      start_date: data.start_date || null,
-      end_date: data.end_date || null,
-      targeting_rules: data.targeting_rules || null,
-      frequency_rule: data.frequency_rule || 'once_per_day',
-      frequency_value: data.frequency_value || 1,
-      force_show: data.force_show || false,
-      slide_interval_ms: data.slide_interval_ms || null,
-      internal_notes: data.internal_notes || null,
-      budget_spent_diamond: 0
-    }
-
-    const campaign = await AdCampaign.create(campaignData, {
-      transaction: options.transaction
-    })
-
-    logger.info('[AdCampaignService] 创建运营内容计划', {
-      ad_campaign_id: campaign.ad_campaign_id,
-      campaign_name: campaign.campaign_name,
-      priority
-    })
-
-    return campaign
-  }
-
-  /**
-   * 创建系统通知计划（简化流程：billing_mode='free'，force_show=true，priority≥900）
-   * D1 定论 + D6 定论：priority 强制 900-999 范围
-   *
-   * @param {Object} data - 创建数据
-   * @param {number} data.ad_slot_id - 广告位ID
-   * @param {string} data.campaign_name - 计划名称
-   * @param {number} data.advertiser_user_id - 管理员 user_id
-   * @param {number} [data.priority=950] - 优先级（900-999）
-   * @param {string} [data.end_date] - 结束日期
-   * @param {string} [data.internal_notes] - 内部备注
-   * @param {Object} [data.targeting_rules] - 目标用户组
-   * @param {Object} options - 选项
-   * @param {Object} options.transaction - 数据库事务（路由层传入）
-   * @returns {Promise<Object>} 创建的 campaign 实例
-   */
-  static async createSystemCampaign(data, options = {}) {
-    const priority = data.priority || 950
-    if (priority < 900 || priority > 999) {
-      throw new Error('系统通知优先级必须在 900-999 范围内')
-    }
-
-    const campaignData = {
-      business_id: data.business_id || `system_${uuidv4()}`,
-      advertiser_user_id: data.advertiser_user_id,
-      ad_slot_id: data.ad_slot_id,
-      campaign_name: data.campaign_name,
-      billing_mode: 'free',
-      status: 'draft',
-      campaign_category: 'system',
-      priority,
-      start_date: data.start_date || null,
-      end_date: data.end_date || null,
-      targeting_rules: data.targeting_rules || null,
-      frequency_rule: data.frequency_rule || 'always',
-      frequency_value: 1,
-      force_show: true,
-      internal_notes: data.internal_notes || null,
-      budget_spent_diamond: 0
-    }
-
-    const campaign = await AdCampaign.create(campaignData, {
-      transaction: options.transaction
-    })
-
-    logger.info('[AdCampaignService] 创建系统通知计划', {
-      ad_campaign_id: campaign.ad_campaign_id,
-      campaign_name: campaign.campaign_name,
-      priority
-    })
-
-    return campaign
   }
 
   /**
@@ -1260,22 +1149,28 @@ class AdCampaignService {
       throw new Error('系统公告广告位未配置')
     }
 
-    const campaign = await this.createSystemCampaign({
-      ad_slot_id: announcementSlot.ad_slot_id,
-      campaign_name: title,
-      advertiser_user_id: sender_user_id,
-      targeting_rules: target !== 'all' ? { target_groups: target } : null,
-      internal_notes: `通过通知中心发送，管理员ID: ${sender_user_id}`
-    }, options)
+    const campaign = await this.createSystemCampaign(
+      {
+        ad_slot_id: announcementSlot.ad_slot_id,
+        campaign_name: title,
+        advertiser_user_id: sender_user_id,
+        targeting_rules: target !== 'all' ? { target_groups: target } : null,
+        internal_notes: `通过通知中心发送，管理员ID: ${sender_user_id}`
+      },
+      options
+    )
 
-    await AdCreative.create({
-      ad_campaign_id: campaign.ad_campaign_id,
-      title,
-      content_type: 'text',
-      text_content: content,
-      link_type: 'none',
-      review_status: 'approved'
-    }, { transaction: options.transaction })
+    await AdCreative.create(
+      {
+        ad_campaign_id: campaign.ad_campaign_id,
+        title,
+        content_type: 'text',
+        text_content: content,
+        link_type: 'none',
+        review_status: 'approved'
+      },
+      { transaction: options.transaction }
+    )
 
     logger.info('[AdCampaignService] 发送系统通知成功', {
       ad_campaign_id: campaign.ad_campaign_id,

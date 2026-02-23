@@ -70,7 +70,7 @@ describe('GET /api/v4/console/ - 管理员模块信息API', () => {
     expect(modules).toHaveProperty('marketplace')
     expect(modules).toHaveProperty('material')
     // diamond 模块已移除（功能并入 material 模块）
-    expect(modules).toHaveProperty('popup_banners')
+    expect(modules).toHaveProperty('ad_campaigns')
     expect(modules).toHaveProperty('lottery_quota')
 
     // 验证新增的模块（2026-01-08）

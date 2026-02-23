@@ -189,6 +189,7 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/system/chat/sessions': 'CHAT_SESSION_CREATE', // 创建聊天会话
   '/api/v4/system/chat/sessions/:id/messages': 'CHAT_MESSAGE_SEND', // 发送聊天消息
   '/api/v4/system/chat/sessions/:id/upload': 'CHAT_IMAGE_UPLOAD', // 聊天图片上传
+  '/api/v4/system/chat/sessions/:id/rate': 'CHAT_SESSION_RATE', // 用户提交满意度评分
   '/api/v4/backpack/exchange/orders/:id/rate': 'EXCHANGE_ORDER_RATE', // 兑换订单评分（需求6）
   '/api/v4/system/notifications/:id/read': 'NOTIFICATION_MARK_READ', // 标记通知已读（修复：system/:id/read → system/notifications/:id/read）
   '/api/v4/system/notifications/read-all': 'NOTIFICATION_READ_ALL', // 全部已读（修复：system/read-all → system/notifications/read-all）
@@ -245,6 +246,9 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/console/customer-service/sessions/:id/mark-read': 'ADMIN_CS_MESSAGE_READ', // 标记已读（canonical 路径）
   '/api/v4/console/customer-service/sessions/:id/transfer': 'ADMIN_CS_TRANSFER', // 转接会话（canonical 路径）
   '/api/v4/console/customer-service/sessions/:id/close': 'ADMIN_CS_CLOSE', // 关闭会话（canonical 路径）
+  '/api/v4/console/customer-service/sessions/:id/accept': 'ADMIN_CS_ACCEPT', // 客服接单（waiting → assigned）
+  '/api/v4/console/customer-service/sessions/:id/tag': 'ADMIN_CS_TAG', // 会话打标签
+  '/api/v4/console/customer-service/sessions/:id/satisfaction': 'ADMIN_CS_SATISFACTION_REQUEST', // 请求满意度评价（WebSocket推送）
 
   // ===== 客服座席管理 =====
   '/api/v4/console/customer-service/agents': 'ADMIN_CS_AGENT_CREATE', // 注册客服座席
@@ -412,6 +416,9 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/console/ad-campaigns/': 'ADMIN_AD_CAMPAIGN_CREATE', // 管理员创建广告计划
   '/api/v4/console/ad-campaigns/:id': 'ADMIN_AD_CAMPAIGN_UPDATE_STATUS', // 管理员更新活动状态（发布/暂停）
   '/api/v4/console/ad-campaigns/:id/review': 'ADMIN_AD_CAMPAIGN_REVIEW', // 审核广告计划
+  '/api/v4/console/ad-campaigns/operational': 'ADMIN_AD_CAMPAIGN_OPERATIONAL_CREATE', // 创建运营内容（弹窗/轮播，billing_mode=free）
+  '/api/v4/console/ad-campaigns/system': 'ADMIN_AD_CAMPAIGN_SYSTEM_CREATE', // 创建系统通知（公告，billing_mode=free）
+  '/api/v4/console/ad-campaigns/:id/publish': 'ADMIN_AD_CAMPAIGN_PUBLISH', // 发布运营/系统类型计划（draft→active）
 
   // Phase 3: 广告位管理（管理端）
   '/api/v4/console/ad-slots/': 'ADMIN_AD_SLOT_CREATE', // 创建广告位

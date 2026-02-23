@@ -10,14 +10,9 @@
 
 const express = require('express')
 const router = express.Router()
-const SegmentRuleService = require('../../../services/SegmentRuleService')
-const { SEGMENT_FIELD_REGISTRY } = require('../../../config/segment_field_registry')
+const { SEGMENT_FIELDS, SEGMENT_OPERATORS } = require('../../../config/segment_field_registry')
 const TransactionManager = require('../../../utils/TransactionManager')
-const {
-  adminAuthMiddleware,
-  asyncHandler,
-  sharedComponents
-} = require('./shared/middleware')
+const { adminAuthMiddleware, asyncHandler, sharedComponents } = require('./shared/middleware')
 
 /**
  * GET / - 列出所有分群策略版本
@@ -25,8 +20,9 @@ const {
 router.get(
   '/',
   adminAuthMiddleware,
-  asyncHandler(async (_req, res) => {
+  asyncHandler(async (req, res) => {
     try {
+      const SegmentRuleService = req.app.locals.services.getService('segment_rule')
       const configs = await SegmentRuleService.getAllVersions()
 
       return res.apiSuccess(
@@ -56,13 +52,13 @@ router.get(
   asyncHandler(async (_req, res) => {
     /* 序列化时去掉 evaluate 函数（前端不需要） */
     const fields = {}
-    for (const [key, field] of Object.entries(SEGMENT_FIELD_REGISTRY.fields)) {
+    for (const [key, field] of Object.entries(SEGMENT_FIELDS)) {
       fields[key] = { label: field.label, type: field.type, operators: field.operators }
       if (field.options) fields[key].options = field.options
     }
 
     const operators = {}
-    for (const [key, op] of Object.entries(SEGMENT_FIELD_REGISTRY.operators)) {
+    for (const [key, op] of Object.entries(SEGMENT_OPERATORS)) {
       operators[key] = {
         label: op.label,
         value_type: op.value_type,
@@ -82,6 +78,7 @@ router.get(
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
     try {
+      const SegmentRuleService = req.app.locals.services.getService('segment_rule')
       const config = await SegmentRuleService.getVersionDetail(req.params.version_key)
 
       return res.apiSuccess(
@@ -113,8 +110,9 @@ router.post(
         return res.apiError('version_key、version_name、rules 为必填字段', 'VALIDATION_ERROR')
       }
 
+      const SegmentRuleService = req.app.locals.services.getService('segment_rule')
       const config = await TransactionManager.execute(
-        async (transaction) => {
+        async transaction => {
           return SegmentRuleService.createVersion(
             { version_key, version_name, description, rules },
             { transaction, created_by: req.user?.user_id || null }
@@ -141,8 +139,9 @@ router.put(
     try {
       const { version_name, description, rules } = req.body
 
+      const SegmentRuleService = req.app.locals.services.getService('segment_rule')
       const result = await TransactionManager.execute(
-        async (transaction) => {
+        async transaction => {
           return SegmentRuleService.updateVersion(
             req.params.version_key,
             { version_name, description, rules },
@@ -168,12 +167,13 @@ router.delete(
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
     try {
+      const SegmentRuleService = req.app.locals.services.getService('segment_rule')
       const result = await TransactionManager.execute(
-        async (transaction) => {
-          return SegmentRuleService.archiveVersion(
-            req.params.version_key,
-            { transaction, deleted_by: req.user?.user_id || null }
-          )
+        async transaction => {
+          return SegmentRuleService.archiveVersion(req.params.version_key, {
+            transaction,
+            deleted_by: req.user?.user_id || null
+          })
         },
         { description: '归档分群策略版本' }
       )

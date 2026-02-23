@@ -641,7 +641,7 @@ document.addEventListener('alpine:init', () => {
   Alpine.data('itemInstancesDataTable', () => {
     const table = dataTable({
       columns: [
-        { key: 'item_instance_id', label: '实例ID', sortable: true },
+        { key: 'item_id', label: '物品ID', sortable: true },
         { key: 'item_name', label: '物品名称', render: (val, row) => val || row.template_name || '-' },
         { key: 'owner_user_id', label: '持有者' },
         { key: 'status', label: '状态', type: 'status' },
@@ -652,7 +652,7 @@ document.addEventListener('alpine:init', () => {
         const res = await request({ url: ASSET_ENDPOINTS.ITEM_INSTANCE_LIST, method: 'GET', params })
         return { items: res.data?.list || res.data?.instances || res.data || [], total: res.data?.pagination?.total || res.data?.count || 0 }
       },
-      primaryKey: 'item_instance_id', sortable: true, page_size: 20
+      primaryKey: 'item_id', sortable: true, page_size: 20
     })
     const origInit = table.init
     table.init = async function () { window.addEventListener('refresh-item-instances', () => this.loadData()); if (origInit) await origInit.call(this) }

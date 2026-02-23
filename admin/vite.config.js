@@ -122,6 +122,7 @@ export default defineConfig({
     outDir: resolve(__dirname, 'dist'),
     emptyOutDir: true,
     rollupOptions: {
+      external: ['canvg', 'html2canvas', 'dompurify'],
       input: getHtmlEntries(),
       output: {
         // JS 文件命名

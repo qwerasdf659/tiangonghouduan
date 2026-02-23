@@ -35,7 +35,7 @@ describe('E2E - 新用户完整旅程测试', () => {
   let testUserId
   let testCampaignCode
   let _drawResult // 用于后续资产验证扩展
-  let itemInstanceId
+  let itemId
 
   beforeAll(async () => {
     // 加载应用
@@ -275,10 +275,10 @@ describe('E2E - 新用户完整旅程测试', () => {
 
       // 如果有物品，保存第一个用于后续测试
       if (response.body.data.items && response.body.data.items.length > 0) {
-        itemInstanceId = response.body.data.items[0].item_instance_id
+        itemId = response.body.data.items[0].item_id
         console.log('[Step 5] 背包物品:', {
           item_count: response.body.data.items.length,
-          first_item_id: itemInstanceId
+          first_item_id: itemId
         })
       }
 
@@ -326,7 +326,7 @@ describe('E2E - 新用户完整旅程测试', () => {
      */
     test('应该能为背包物品生成核销码', async () => {
       // 跳过测试如果没有物品
-      if (!itemInstanceId) {
+      if (!itemId) {
         console.log('[Step 7] 跳过：背包中没有可核销的物品')
         return
       }
@@ -334,7 +334,7 @@ describe('E2E - 新用户完整旅程测试', () => {
       const response = await request(app)
         .post('/api/v4/redemption/orders')
         .set('Authorization', `Bearer ${accessToken}`)
-        .send({ item_instance_id: itemInstanceId })
+        .send({ item_id: itemId })
         .expect('Content-Type', /json/)
 
       console.log('[Step 7] 核销码生成响应:', {

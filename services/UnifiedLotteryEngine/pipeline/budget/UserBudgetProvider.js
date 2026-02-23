@@ -166,7 +166,10 @@ class UserBudgetProvider extends BudgetProvider {
        */
       const deduct_lottery_campaign_id = this.allowed_campaign_ids[0]
 
-      // 执行扣减（使用 changeBalance，负数表示扣减）
+      const burnAccount = await BalanceService.getOrCreateAccount(
+        { system_code: 'SYSTEM_BURN' },
+        { transaction }
+      )
       // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction（见下方 options 参数）
       const deduct_result = await BalanceService.changeBalance(
         {
@@ -175,12 +178,13 @@ class UserBudgetProvider extends BudgetProvider {
           delta_amount: -amount,
           business_type: 'lottery_budget_deduct',
           idempotency_key: reference_id,
-          lottery_campaign_id: deduct_lottery_campaign_id, // ✅ 使用 allowed_campaign_ids 中的桶
+          lottery_campaign_id: deduct_lottery_campaign_id,
+          counterpart_account_id: burnAccount.account_id,
           meta: {
             reason: reason || '抽奖预算扣减',
             reference_type: 'lottery_draw',
-            target_lottery_campaign_id: lottery_campaign_id, // 记录目标活动ID（用于对账）
-            deduct_from_lottery_campaign_id: deduct_lottery_campaign_id // 记录实际扣减的桶
+            target_lottery_campaign_id: lottery_campaign_id,
+            deduct_from_lottery_campaign_id: deduct_lottery_campaign_id
           }
         },
         { transaction }
@@ -241,7 +245,10 @@ class UserBudgetProvider extends BudgetProvider {
 
       const rollback_lottery_campaign_id = this.allowed_campaign_ids[0]
 
-      // 执行回滚（使用 changeBalance，正数表示增加）
+      const mintAccount = await BalanceService.getOrCreateAccount(
+        { system_code: 'SYSTEM_MINT' },
+        { transaction }
+      )
       // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction（见下方 options 参数）
       const refund_result = await BalanceService.changeBalance(
         {
@@ -250,7 +257,8 @@ class UserBudgetProvider extends BudgetProvider {
           delta_amount: amount,
           business_type: 'lottery_budget_rollback',
           idempotency_key: `${original_reference_id}_rollback`,
-          lottery_campaign_id: rollback_lottery_campaign_id, // ✅ 使用 allowed_campaign_ids 中的桶
+          lottery_campaign_id: rollback_lottery_campaign_id,
+          counterpart_account_id: mintAccount.account_id,
           meta: {
             reason: '抽奖预算回滚',
             reference_type: 'lottery_draw_rollback',

@@ -26,7 +26,7 @@
  * 技术验证点：
  * 1. MarketListingService 挂牌全生命周期管理
  * 2. BalanceService 资产冻结/解冻（可叠加资产挂牌）
- * 3. ItemInstance 物品状态联动
+ * 3. Item 物品状态联动
  * 4. 幂等性保证（idempotency_key）
  *
  * 测试数据：
@@ -40,7 +40,7 @@ const {
   sequelize,
   User,
   MarketListing,
-  ItemInstance,
+  Item,
   TradeOrder,
   ItemTemplate
 } = require('../../../models')
@@ -76,13 +76,13 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
 
   /**
    * 创建测试物品实例
-   * @param {number} owner_user_id - 所有者用户ID
+   * @param {number} owner_account_id - 所有者用户ID
    * @param {Object} options - 选项
    * @returns {Promise<Object>} 物品实例
    */
-  async function createTestItem(owner_user_id, options = {}) {
+  async function createTestItem(owner_account_id, options = {}) {
     const item_data = {
-      owner_user_id,
+      owner_account_id,
       item_template_id: testItemTemplate?.item_template_id || null,
       item_type: 'tradable_item',
       status: options.status || 'available',
@@ -92,8 +92,8 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
       }
     }
 
-    const item = await ItemInstance.create(item_data)
-    createdItems.push(item.item_instance_id)
+    const item = await Item.create(item_data)
+    createdItems.push(item.item_id)
     return item
   }
 
@@ -217,11 +217,11 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
     createdListings = []
 
     // 清理测试物品
-    for (const item_instance_id of createdItems) {
+    for (const item_id of createdItems) {
       try {
-        await ItemInstance.destroy({ where: { item_instance_id }, force: true })
+        await Item.destroy({ where: { item_id }, force: true })
       } catch (error) {
-        console.log(`清理物品 ${item_instance_id} 失败:`, error.message)
+        console.log(`清理物品 ${item_id} 失败:`, error.message)
       }
     }
     createdItems = []
@@ -244,7 +244,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
       test('创建物品实例挂牌应成功进入 on_sale 状态', async () => {
         // 1. 创建测试物品
         const test_item = await createTestItem(testSeller.user_id)
-        console.log(`✅ 测试物品创建成功: item_instance_id=${test_item.item_instance_id}`)
+        console.log(`✅ 测试物品创建成功: item_id=${test_item.item_id}`)
 
         // 2. 创建挂牌
         const listing_tx = await sequelize.transaction()
@@ -254,7 +254,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
             {
               idempotency_key: generateIdempotencyKey('item_listing'),
               seller_user_id: testSeller.user_id,
-              item_instance_id: test_item.item_instance_id,
+              item_id: test_item.item_id,
               price_amount: 100,
               price_asset_code: 'DIAMOND'
             },
@@ -268,13 +268,13 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
         }
 
         // 3. 验证挂牌状态
-        expect(listing_result.listing.listing_kind).toBe('item_instance')
+        expect(listing_result.listing.listing_kind).toBe('item')
         expect(listing_result.listing.status).toBe('on_sale')
         expect(listing_result.listing.seller_user_id).toBe(testSeller.user_id)
         expect(Number(listing_result.listing.price_amount)).toBe(100)
 
         // 4. 验证物品状态已锁定
-        const locked_item = await ItemInstance.findByPk(test_item.item_instance_id)
+        const locked_item = await Item.findByPk(test_item.item_id)
         expect(locked_item.status).toBe('locked')
 
         console.log('✅ 物品实例挂牌创建 → on_sale 验证通过')
@@ -283,7 +283,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
       test('挂牌创建应具有幂等性', async () => {
         // 1. 创建测试物品
         const test_item = await createTestItem(testSeller.user_id)
-        console.log(`✅ 幂等性测试物品创建: item_instance_id=${test_item.item_instance_id}`)
+        console.log(`✅ 幂等性测试物品创建: item_id=${test_item.item_id}`)
 
         // 使用完全唯一的幂等键（UUID + 时间戳确保唯一性）
         const unique_suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
@@ -291,7 +291,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
 
         // 清理可能存在的同物品挂牌（确保测试隔离）
         await MarketListing.destroy({
-          where: { offer_item_instance_id: test_item.item_instance_id },
+          where: { offer_item_id: test_item.item_id },
           force: true
         })
 
@@ -303,7 +303,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
             {
               idempotency_key,
               seller_user_id: testSeller.user_id,
-              item_instance_id: test_item.item_instance_id,
+              item_id: test_item.item_id,
               price_amount: 80,
               price_asset_code: 'DIAMOND'
             },
@@ -329,7 +329,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
             {
               idempotency_key,
               seller_user_id: testSeller.user_id,
-              item_instance_id: test_item.item_instance_id,
+              item_id: test_item.item_id,
               price_amount: 80,
               price_asset_code: 'DIAMOND'
             },
@@ -370,7 +370,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
             {
               idempotency_key: generateIdempotencyKey('to_lock'),
               seller_user_id: testSeller.user_id,
-              item_instance_id: test_item.item_instance_id,
+              item_id: test_item.item_id,
               price_amount: 60,
               price_asset_code: 'DIAMOND'
             },
@@ -438,7 +438,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
             {
               idempotency_key: generateIdempotencyKey('to_sold'),
               seller_user_id: testSeller.user_id,
-              item_instance_id: test_item.item_instance_id,
+              item_id: test_item.item_id,
               price_amount: 50,
               price_asset_code: 'DIAMOND'
             },
@@ -496,8 +496,8 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
         expect(sold_listing.status).toBe('sold')
 
         // 验证物品所有权转移
-        const transferred_item = await ItemInstance.findByPk(test_item.item_instance_id)
-        expect(transferred_item.owner_user_id).toBe(testBuyer.user_id)
+        const transferred_item = await Item.findByPk(test_item.item_id)
+        expect(transferred_item.owner_account_id).toBe(testBuyer.user_id)
 
         console.log('✅ locked → sold 状态转换验证通过')
       })
@@ -522,7 +522,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
             {
               idempotency_key: generateIdempotencyKey('to_rollback'),
               seller_user_id: testSeller.user_id,
-              item_instance_id: test_item.item_instance_id,
+              item_id: test_item.item_id,
               price_amount: 55,
               price_asset_code: 'DIAMOND'
             },
@@ -582,8 +582,8 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
         expect(restored_listing.locked_at).toBeNull()
 
         // 验证物品仍属于卖家
-        const item_after_cancel = await ItemInstance.findByPk(test_item.item_instance_id)
-        expect(item_after_cancel.owner_user_id).toBe(testSeller.user_id)
+        const item_after_cancel = await Item.findByPk(test_item.item_id)
+        expect(item_after_cancel.owner_account_id).toBe(testSeller.user_id)
 
         console.log('✅ locked → on_sale（订单取消回滚）状态转换验证通过')
       })
@@ -603,7 +603,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
             {
               idempotency_key: generateIdempotencyKey('to_withdraw'),
               seller_user_id: testSeller.user_id,
-              item_instance_id: test_item.item_instance_id,
+              item_id: test_item.item_id,
               price_amount: 70,
               price_asset_code: 'DIAMOND'
             },
@@ -641,7 +641,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
         expect(withdrawn_listing.status).toBe('withdrawn')
 
         // 验证物品状态恢复
-        const restored_item = await ItemInstance.findByPk(test_item.item_instance_id)
+        const restored_item = await Item.findByPk(test_item.item_id)
         expect(restored_item.status).toBe('available')
 
         console.log('✅ on_sale → withdrawn 状态转换验证通过')
@@ -662,7 +662,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
             {
               idempotency_key: generateIdempotencyKey('admin_withdraw_on_sale'),
               seller_user_id: testSeller.user_id,
-              item_instance_id: test_item.item_instance_id,
+              item_id: test_item.item_id,
               price_amount: 90,
               price_asset_code: 'DIAMOND'
             },
@@ -720,7 +720,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
             {
               idempotency_key: generateIdempotencyKey('admin_withdraw_locked'),
               seller_user_id: testSeller.user_id,
-              item_instance_id: test_item.item_instance_id,
+              item_id: test_item.item_id,
               price_amount: 65,
               price_asset_code: 'DIAMOND'
             },
@@ -826,7 +826,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
             {
               idempotency_key: generateIdempotencyKey('wrong_owner'),
               seller_user_id: testSeller.user_id,
-              item_instance_id: buyer_item.item_instance_id,
+              item_id: buyer_item.item_id,
               price_amount: 100,
               price_asset_code: 'DIAMOND'
             },
@@ -860,7 +860,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
             {
               idempotency_key: generateIdempotencyKey('locked_item'),
               seller_user_id: testSeller.user_id,
-              item_instance_id: locked_item.item_instance_id,
+              item_id: locked_item.item_id,
               price_amount: 80,
               price_asset_code: 'DIAMOND'
             },
@@ -898,7 +898,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
             {
               idempotency_key: generateIdempotencyKey('cannot_withdraw'),
               seller_user_id: testSeller.user_id,
-              item_instance_id: test_item.item_instance_id,
+              item_id: test_item.item_id,
               price_amount: 45,
               price_asset_code: 'DIAMOND'
             },
@@ -973,7 +973,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
             {
               idempotency_key: generateIdempotencyKey('sold_listing'),
               seller_user_id: testSeller.user_id,
-              item_instance_id: test_item.item_instance_id,
+              item_id: test_item.item_id,
               price_amount: 40,
               price_asset_code: 'DIAMOND'
             },
@@ -1062,7 +1062,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
             {
               idempotency_key: generateIdempotencyKey('others_listing'),
               seller_user_id: testSeller.user_id,
-              item_instance_id: test_item.item_instance_id,
+              item_id: test_item.item_id,
               price_amount: 75,
               price_asset_code: 'DIAMOND'
             },
@@ -1146,7 +1146,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
 
       // Step 1: 创建物品
       const test_item = await createTestItem(testSeller.user_id)
-      console.log(`Step 1: 物品创建 item_instance_id=${test_item.item_instance_id}`)
+      console.log(`Step 1: 物品创建 item_id=${test_item.item_id}`)
 
       // Step 2: 创建挂牌
       const listing_tx = await sequelize.transaction()
@@ -1156,7 +1156,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
           {
             idempotency_key: generateIdempotencyKey('e2e_listing'),
             seller_user_id: testSeller.user_id,
-            item_instance_id: test_item.item_instance_id,
+            item_id: test_item.item_id,
             price_amount: 85,
             price_asset_code: 'DIAMOND'
           },
@@ -1214,17 +1214,17 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
 
       // Step 5: 最终状态验证
       const final_listing = await MarketListing.findByPk(listing.market_listing_id)
-      const final_item = await ItemInstance.findByPk(test_item.item_instance_id)
+      const final_item = await Item.findByPk(test_item.item_id)
       const final_order = await TradeOrder.findByPk(order_id)
 
       expect(final_listing.status).toBe('sold')
-      expect(final_item.owner_user_id).toBe(testBuyer.user_id)
+      expect(final_item.owner_account_id).toBe(testBuyer.user_id)
       expect(final_order.status).toBe('completed')
 
       console.log('Step 4-5: 订单完成，最终状态验证通过')
       console.log({
         listing_status: final_listing.status,
-        item_new_owner: final_item.owner_user_id,
+        item_new_owner: final_item.owner_account_id,
         order_status: final_order.status
       })
 
@@ -1236,7 +1236,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
 
       // Step 1: 创建物品
       const test_item = await createTestItem(testSeller.user_id)
-      console.log(`Step 1: 物品创建 item_instance_id=${test_item.item_instance_id}`)
+      console.log(`Step 1: 物品创建 item_id=${test_item.item_id}`)
 
       // Step 2: 创建挂牌
       const listing_tx = await sequelize.transaction()
@@ -1246,7 +1246,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
           {
             idempotency_key: generateIdempotencyKey('withdraw_listing'),
             seller_user_id: testSeller.user_id,
-            item_instance_id: test_item.item_instance_id,
+            item_id: test_item.item_id,
             price_amount: 95,
             price_asset_code: 'DIAMOND'
           },
@@ -1281,17 +1281,17 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
 
       // Step 4: 最终状态验证
       const final_listing = await MarketListing.findByPk(listing.market_listing_id)
-      const final_item = await ItemInstance.findByPk(test_item.item_instance_id)
+      const final_item = await Item.findByPk(test_item.item_id)
 
       expect(final_listing.status).toBe('withdrawn')
       expect(final_item.status).toBe('available')
-      expect(final_item.owner_user_id).toBe(testSeller.user_id)
+      expect(final_item.owner_account_id).toBe(testSeller.user_id)
 
       console.log('Step 3-4: 撤回完成，最终状态验证通过')
       console.log({
         listing_status: final_listing.status,
         item_status: final_item.status,
-        item_owner: final_item.owner_user_id
+        item_owner: final_item.owner_account_id
       })
 
       console.log('📋 ===== 完整撤回流程结束 =====\n')

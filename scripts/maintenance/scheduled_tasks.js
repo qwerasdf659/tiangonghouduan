@@ -293,7 +293,12 @@ class ScheduledTasks {
     // 任务34: 每天凌晨5点图片存储一致性检测（HEAD请求验证Sealos文件真实存在）
     this.scheduleDailyImageStorageConsistencyCheck()
 
-    logger.info('所有定时任务已初始化完成（包含2026-02-21核销码系统升级方案 + 图片管理体系方案新增任务）')
+    // ========== 2026-02-23 统一对账定时任务 ==========
+
+    // 任务35: 每天凌晨4:30执行物品+资产统一对账（物品守恒+持有者一致+铸造数量+资产守恒+余额一致）
+    this.scheduleDailyUnifiedReconciliation()
+
+    logger.info('所有定时任务已初始化完成（包含2026-02-23统一对账任务）')
   }
 
   /**
@@ -3487,6 +3492,44 @@ class ScheduledTasks {
     })
 
     logger.info('✅ 定时任务已设置: 图片存储一致性检测（每天凌晨5点执行，HEAD请求验证Sealos文件存在性）')
+  }
+
+  /**
+   * 定时任务35: 每天凌晨4:30执行物品+资产统一对账
+   * Cron表达式: 30 4 * * * (每天凌晨4:30)
+   *
+   * 覆盖范围：
+   * - 物品守恒：SUM(delta) GROUP BY item_id 全部为 0
+   * - 持有者一致：ledger 推导持有者 == items.owner_account_id
+   * - 铸造数量一致：items 总数 == mint(delta=+1) 条数
+   * - 资产全局守恒：SUM(delta_amount) GROUP BY asset_code
+   * - 账户余额一致：流水聚合 == 余额记录
+   *
+   * @since 2026-02-23
+   * @returns {void}
+   */
+  static scheduleDailyUnifiedReconciliation() {
+    cron.schedule('30 4 * * *', async () => {
+      try {
+        logger.info('[定时任务] 开始执行物品+资产统一对账...')
+
+        const { executeReconciliation } = require('../../scripts/reconcile-items')
+        const report = await executeReconciliation()
+
+        if (report.allPass) {
+          logger.info('[定时任务] 统一对账完成：全部通过')
+        } else {
+          logger.warn('[定时任务] 统一对账完成：存在异常', { results: report.results })
+        }
+      } catch (error) {
+        logger.error('[定时任务] 统一对账执行失败', {
+          error: error.message,
+          stack: error.stack
+        })
+      }
+    })
+
+    logger.info('✅ 定时任务已设置: 物品+资产统一对账（每天凌晨4:30执行）')
   }
 }
 

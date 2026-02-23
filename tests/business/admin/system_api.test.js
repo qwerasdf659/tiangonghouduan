@@ -124,12 +124,12 @@ describe('管理员和系统管理API测试', () => {
     })
   })
 
-  // ========== 公告管理API ==========
-  describe('公告管理API', () => {
-    test('✅ 获取公告列表 - GET /api/v4/console/system/announcements', async () => {
+  // ========== 系统通知管理API（合并后通过 ad-campaigns?campaign_category=system 访问） ==========
+  describe('系统通知管理API（合并后）', () => {
+    test('✅ 获取系统通知列表 - GET /api/v4/console/ad-campaigns?campaign_category=system', async () => {
       const response = await tester.make_authenticated_request(
         'GET',
-        '/api/v4/console/system/announcements',
+        '/api/v4/console/ad-campaigns?campaign_category=system',
         null,
         'admin'
       )
@@ -137,13 +137,8 @@ describe('管理员和系统管理API测试', () => {
       expect([200, 401, 403]).toContain(response.status)
       if (response.status === 200) {
         expect(response.data).toHaveProperty('success', true)
-        // 实际API返回格式：data.announcements（数组）或 data.list（数组）
-        const dataContent = response.data.data
-        const hasValidData =
-          dataContent.announcements !== undefined ||
-          dataContent.list !== undefined ||
-          Array.isArray(dataContent)
-        expect(hasValidData).toBe(true)
+        expect(response.data.data).toHaveProperty('campaigns')
+        expect(Array.isArray(response.data.data.campaigns)).toBe(true)
       }
     })
   })

@@ -14,7 +14,7 @@
  * - 服务 key 使用 snake_case（E2-Strict）
  */
 
-const { sequelize, ItemInstance, User, RedemptionOrder } = require('../../../models')
+const { sequelize, Item, User, RedemptionOrder } = require('../../../models')
 const TransactionManager = require('../../../utils/TransactionManager')
 
 // 🔴 P1-9 J2-RepoWide：通过 global.getTestService 获取服务（snake_case key）
@@ -61,8 +61,8 @@ describe('背包与兑换集成测试', () => {
       }
 
       // 创建测试物品实例
-      test_item_instance = await ItemInstance.create({
-        owner_user_id: test_user.user_id,
+      test_item_instance = await Item.create({
+        owner_account_id: test_user.user_id,
         item_type: 'voucher',
         status: 'available',
         meta: {
@@ -84,14 +84,14 @@ describe('背包与兑换集成测试', () => {
       try {
         await RedemptionOrder.destroy({
           where: {
-            item_instance_id: test_item_instance.item_instance_id
+            item_id: test_item_instance.item_id
           }
         })
 
         // 清理测试物品实例
-        await ItemInstance.destroy({
+        await Item.destroy({
           where: {
-            item_instance_id: test_item_instance.item_instance_id
+            item_id: test_item_instance.item_id
           }
         })
       } catch (error) {
@@ -126,7 +126,7 @@ describe('背包与兑换集成测试', () => {
 
       // === 第2步：创建兑换订单（生成核销码） ===
       const create_result = await TransactionManager.execute(async transaction => {
-        return await RedemptionService.createOrder(test_item_instance.item_instance_id, {
+        return await RedemptionService.createOrder(test_item_instance.item_id, {
           transaction
         })
       })
@@ -139,7 +139,7 @@ describe('背包与兑换集成测试', () => {
 
       // 验证订单状态
       expect(order.status).toBe('pending')
-      expect(order.item_instance_id).toBe(test_item_instance.item_instance_id)
+      expect(order.item_id).toBe(test_item_instance.item_id)
 
       // 验证核销码格式
       expect(code).toMatch(
@@ -171,7 +171,7 @@ describe('背包与兑换集成测试', () => {
 
       // 验证背包中不包含已使用的物品
       const found_item = backpack_after.items.find(
-        item => item.item_instance_id === test_item_instance.item_instance_id
+        item => item.item_id === test_item_instance.item_id
       )
       expect(found_item).toBeUndefined()
 
@@ -186,15 +186,15 @@ describe('背包与兑换集成测试', () => {
       }
 
       // 创建多个物品实例
-      const item_1 = await ItemInstance.create({
-        owner_user_id: test_user.user_id,
+      const item_1 = await Item.create({
+        owner_account_id: test_user.user_id,
         item_type: 'voucher',
         status: 'available',
         meta: { name: '优惠券1', value: 50 }
       })
 
-      const item_2 = await ItemInstance.create({
-        owner_user_id: test_user.user_id,
+      const item_2 = await Item.create({
+        owner_account_id: test_user.user_id,
         item_type: 'voucher',
         status: 'available',
         meta: { name: '优惠券2', value: 100 }
@@ -203,10 +203,10 @@ describe('背包与兑换集成测试', () => {
       try {
         // 为两个物品创建兑换订单
         const order_1 = await TransactionManager.execute(async transaction => {
-          return await RedemptionService.createOrder(item_1.item_instance_id, { transaction })
+          return await RedemptionService.createOrder(item_1.item_id, { transaction })
         })
         const order_2 = await TransactionManager.execute(async transaction => {
-          return await RedemptionService.createOrder(item_2.item_instance_id, { transaction })
+          return await RedemptionService.createOrder(item_2.item_id, { transaction })
         })
 
         // 验证生成了不同的核销码
@@ -230,12 +230,8 @@ describe('背包与兑换集成测试', () => {
         // item_2创建了订单order_2，所以状态应为locked（有待核销订单）
         expect(['available', 'locked']).toContain(item_2.status)
 
-        const found_item_1 = backpack.items.find(
-          item => item.item_instance_id === item_1.item_instance_id
-        )
-        const found_item_2 = backpack.items.find(
-          item => item.item_instance_id === item_2.item_instance_id
-        )
+        const found_item_1 = backpack.items.find(item => item.item_id === item_1.item_id)
+        const found_item_2 = backpack.items.find(item => item.item_id === item_2.item_id)
 
         expect(found_item_1).toBeUndefined()
         // locked状态的物品可能在背包中显示也可能不显示
@@ -251,7 +247,7 @@ describe('背包与兑换集成测试', () => {
         try {
           await RedemptionOrder.destroy({
             where: {
-              item_instance_id: [item_1.item_instance_id, item_2.item_instance_id]
+              item_id: [item_1.item_id, item_2.item_id]
             }
           })
         } catch (error) {
@@ -283,7 +279,7 @@ describe('背包与兑换集成测试', () => {
 
       // 创建订单
       const result = await TransactionManager.execute(async transaction => {
-        return await RedemptionService.createOrder(test_item_instance.item_instance_id, {
+        return await RedemptionService.createOrder(test_item_instance.item_id, {
           transaction
         })
       })
@@ -320,7 +316,7 @@ describe('背包与兑换集成测试', () => {
 
       // 创建订单
       const result = await TransactionManager.execute(async transaction => {
-        return await RedemptionService.createOrder(test_item_instance.item_instance_id, {
+        return await RedemptionService.createOrder(test_item_instance.item_id, {
           transaction
         })
       })
@@ -363,9 +359,7 @@ describe('背包与兑换集成测试', () => {
        * 背包中应该包含该物品（如果状态是available）
        * 注意：locked状态的物品可能不在背包中显示
        */
-      const found_item = backpack.items.find(
-        item => item.item_instance_id === test_item_instance.item_instance_id
-      )
+      const found_item = backpack.items.find(item => item.item_id === test_item_instance.item_id)
       if (test_item_instance.status === 'available') {
         expect(found_item).toBeDefined()
       } else {
@@ -387,7 +381,7 @@ describe('背包与兑换集成测试', () => {
 
       // 创建订单
       const result = await TransactionManager.execute(async transaction => {
-        return await RedemptionService.createOrder(test_item_instance.item_instance_id, {
+        return await RedemptionService.createOrder(test_item_instance.item_id, {
           transaction
         })
       })
@@ -430,8 +424,8 @@ describe('背包与兑换集成测试', () => {
       // 创建多个物品实例
       const items = []
       for (let i = 0; i < 5; i++) {
-        const item = await ItemInstance.create({
-          owner_user_id: test_user.user_id,
+        const item = await Item.create({
+          owner_account_id: test_user.user_id,
           item_type: 'voucher',
           status: 'available',
           meta: { name: `优惠券${i + 1}`, value: 50 }
@@ -443,7 +437,7 @@ describe('背包与兑换集成测试', () => {
         // 并发创建订单
         const promises = items.map(item =>
           TransactionManager.execute(async transaction => {
-            return RedemptionService.createOrder(item.item_instance_id, { transaction })
+            return RedemptionService.createOrder(item.item_id, { transaction })
           })
         )
 
@@ -462,7 +456,7 @@ describe('背包与兑换集成测试', () => {
         // 清理测试数据
         await RedemptionOrder.destroy({
           where: {
-            item_instance_id: items.map(item => item.item_instance_id)
+            item_id: items.map(item => item.item_id)
           }
         })
         for (const item of items) {
@@ -480,7 +474,7 @@ describe('背包与兑换集成测试', () => {
 
       // 创建订单
       const result = await TransactionManager.execute(async transaction => {
-        return await RedemptionService.createOrder(test_item_instance.item_instance_id, {
+        return await RedemptionService.createOrder(test_item_instance.item_id, {
           transaction
         })
       })
@@ -524,7 +518,7 @@ describe('背包与兑换集成测试', () => {
 
       // 创建订单
       const result = await TransactionManager.execute(async transaction => {
-        return await RedemptionService.createOrder(test_item_instance.item_instance_id, {
+        return await RedemptionService.createOrder(test_item_instance.item_id, {
           transaction
         })
       })
@@ -558,9 +552,9 @@ describe('背包与兑换集成测试', () => {
       const backpack = await BackpackService.getUserBackpack(test_user.user_id, test_user.user_id)
 
       // 查询数据库中的物品实例
-      const db_items = await ItemInstance.findAll({
+      const db_items = await Item.findAll({
         where: {
-          owner_user_id: test_user.user_id,
+          owner_account_id: test_user.user_id,
           status: ['available', 'locked']
         }
       })

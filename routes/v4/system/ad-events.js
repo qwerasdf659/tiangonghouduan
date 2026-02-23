@@ -60,13 +60,10 @@ router.post(
 
       const validTypes = ['impression', 'click', 'close', 'swipe']
       if (!validTypes.includes(interaction_type)) {
-        return res.apiBadRequest(
-          'interaction_type 必须是以下之一：' + validTypes.join(', ')
-        )
+        return res.apiBadRequest('interaction_type 必须是以下之一：' + validTypes.join(', '))
       }
 
-      const AdInteractionLogService =
-        req.app.locals.services.getService('ad_interaction_log')
+      const AdInteractionLogService = req.app.locals.services.getService('ad_interaction_log')
       const log = await AdInteractionLogService.createLog({
         ad_campaign_id: parsedCampaignId,
         user_id: req.user.user_id,
@@ -87,11 +84,7 @@ router.post(
         ad_campaign_id: req.body.ad_campaign_id,
         user_id: req.user?.user_id
       })
-      return res.apiInternalError(
-        '上报交互日志失败',
-        error.message,
-        'INTERACTION_LOG_ERROR'
-      )
+      return res.apiInternalError('上报交互日志失败', error.message, 'INTERACTION_LOG_ERROR')
     }
   })
 )

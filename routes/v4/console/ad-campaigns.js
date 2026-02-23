@@ -60,6 +60,12 @@ router.get(
       const pageNum = parseInt(page) || 1
       const pageSize = parseInt(limit) || 20
 
+      if (campaign_category && !VALID_CAMPAIGN_CATEGORIES.includes(campaign_category)) {
+        return res.apiBadRequest(
+          'campaign_category 必须是以下之一：' + VALID_CAMPAIGN_CATEGORIES.join(', ')
+        )
+      }
+
       const AdCampaignService = req.app.locals.services.getService('ad_campaign')
       const result = await AdCampaignService.getAdminCampaignList({
         status,
@@ -227,9 +233,7 @@ router.post(
         frequency_rule: req.body.frequency_rule || 'once_per_day',
         frequency_value: req.body.frequency_value ? parseInt(req.body.frequency_value) : 1,
         force_show: req.body.force_show === true || req.body.force_show === 'true',
-        slide_interval_ms: req.body.slide_interval_ms
-          ? parseInt(req.body.slide_interval_ms)
-          : 3000,
+        slide_interval_ms: req.body.slide_interval_ms ? parseInt(req.body.slide_interval_ms) : 3000,
         start_date: req.body.start_date || null,
         end_date: req.body.end_date || null,
         internal_notes: req.body.internal_notes || null,
@@ -422,8 +426,7 @@ router.get(
       const { id } = req.params
       const { start_date, end_date } = req.query
 
-      const AdInteractionLogService =
-        req.app.locals.services.getService('ad_interaction_log')
+      const AdInteractionLogService = req.app.locals.services.getService('ad_interaction_log')
       const stats = await AdInteractionLogService.getShowStats(parseInt(id), {
         start_date,
         end_date

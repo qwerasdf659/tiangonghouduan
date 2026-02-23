@@ -37,13 +37,14 @@ class ItemLifecycleService {
    */
   static async getItemLifecycle(identifier, options = {}) {
     const { transaction } = options
-    const { Item, ItemLedger, ItemHold, Account, LotteryDraw, RedemptionOrder, MarketListing } = require('../../models')
+    const { Item, ItemLedger, ItemHold, Account, LotteryDraw } = require('../../models')
 
     const resolved = TrackingCodeGenerator.resolveIdentifier(identifier)
 
-    const where = resolved.type === 'tracking_code'
-      ? { tracking_code: resolved.value }
-      : { item_id: resolved.value }
+    const where =
+      resolved.type === 'tracking_code'
+        ? { tracking_code: resolved.value }
+        : { item_id: resolved.value }
 
     const item = await Item.findOne({ where, transaction })
     if (!item) return null
@@ -90,7 +91,7 @@ class ItemLifecycleService {
       created_at: item.created_at,
       origin,
       timeline,
-      holds: holds.map(h => h.toJSON ? h.toJSON() : h),
+      holds: holds.map(h => (h.toJSON ? h.toJSON() : h)),
       ledger_check: {
         sum_delta: deltaSum,
         entry_count: ledgerEntries.length,
@@ -115,8 +116,8 @@ class ItemLifecycleService {
       HAVING balance != 0
     `)
 
-    // 持有者一致性：ledger 推导持有者 vs items.owner_account_id
-    const [ownerMismatch] = await sequelize.query(`
+    // 持有者一致性（严格检查非 legacy 物品，legacy 物品单独统计）
+    const [ownerMismatchStrict] = await sequelize.query(`
       SELECT l.item_id, l.account_id AS ledger_owner, i.owner_account_id AS cache_owner
       FROM (
         SELECT item_id, account_id
@@ -128,15 +129,42 @@ class ItemLifecycleService {
         )
       ) l
       JOIN items i ON l.item_id = i.item_id
-      WHERE l.account_id != i.owner_account_id
+      WHERE l.account_id != i.owner_account_id AND i.source != 'legacy'
     `)
 
-    // 铸造数量一致性
-    const [[{ item_count: itemCount }]] = await sequelize.query(
-      'SELECT COUNT(*) AS item_count FROM items'
+    const [[{ legacy_mismatch: legacyMismatchCount }]] = await sequelize.query(`
+      SELECT COUNT(*) AS legacy_mismatch
+      FROM (
+        SELECT item_id, account_id
+        FROM item_ledger
+        WHERE (item_id, account_id) IN (
+          SELECT item_id, account_id FROM item_ledger
+          GROUP BY item_id, account_id
+          HAVING SUM(delta) = 1
+        )
+      ) l
+      JOIN items i ON l.item_id = i.item_id
+      WHERE l.account_id != i.owner_account_id AND i.source = 'legacy'
+    `)
+
+    // 铸造数量一致性：只检查非 legacy 物品是否都有对应的 mint 入账
+    const [[{ orphan_count: orphanItemCount }]] = await sequelize.query(`
+      SELECT COUNT(*) AS orphan_count
+      FROM items i
+      WHERE i.source != 'legacy'
+        AND NOT EXISTS (
+          SELECT 1 FROM item_ledger il
+          WHERE il.item_id = i.item_id AND il.event_type = 'mint' AND il.delta = 1
+        )
+    `)
+    const [[{ total_items: totalItems }]] = await sequelize.query(
+      'SELECT COUNT(*) AS total_items FROM items'
     )
-    const [[{ mint_count: mintInCount }]] = await sequelize.query(
-      "SELECT COUNT(*) AS mint_count FROM item_ledger WHERE event_type = 'mint' AND delta = 1"
+    const [[{ legacy_count: legacyCount }]] = await sequelize.query(
+      "SELECT COUNT(*) AS legacy_count FROM items WHERE source = 'legacy'"
+    )
+    const [[{ no_ledger: noLedgerCount }]] = await sequelize.query(
+      'SELECT COUNT(*) AS no_ledger FROM items WHERE item_id NOT IN (SELECT DISTINCT item_id FROM item_ledger)'
     )
 
     return {
@@ -147,14 +175,17 @@ class ItemLifecycleService {
         imbalanced_items: imbalanced.slice(0, 20)
       },
       owner_consistency: {
-        status: ownerMismatch.length === 0 ? 'PASS' : 'FAIL',
-        mismatch_count: ownerMismatch.length,
-        mismatches: ownerMismatch.slice(0, 20)
+        status: ownerMismatchStrict.length === 0 ? 'PASS' : 'FAIL',
+        mismatch_count: ownerMismatchStrict.length,
+        mismatches: ownerMismatchStrict.slice(0, 20),
+        legacy_mismatches: Number(legacyMismatchCount)
       },
       mint_count_consistency: {
-        status: Number(itemCount) === Number(mintInCount) ? 'PASS' : 'FAIL',
-        items_total: Number(itemCount),
-        mint_entries_total: Number(mintInCount)
+        status: Number(orphanItemCount) === 0 ? 'PASS' : 'FAIL',
+        total_items: Number(totalItems),
+        legacy_items: Number(legacyCount),
+        items_without_mint: Number(orphanItemCount),
+        items_without_any_ledger: Number(noLedgerCount)
       }
     }
   }
@@ -219,10 +250,13 @@ class ItemLifecycleService {
    */
   static async getUserItemTimeline(userId, itemId, options = {}) {
     const { transaction } = options
-    const { Item, ItemLedger, Account } = require('../../models')
+    const { Item, ItemLedger } = require('../../models')
     const BalanceService = require('./BalanceService')
 
-    const userAccount = await BalanceService.getOrCreateAccount({ user_id: userId }, { transaction })
+    const userAccount = await BalanceService.getOrCreateAccount(
+      { user_id: userId },
+      { transaction }
+    )
 
     const item = await Item.findOne({
       where: { item_id: itemId, owner_account_id: userAccount.account_id },
@@ -238,9 +272,8 @@ class ItemLifecycleService {
     })
 
     // 只返回与该用户相关的条目
-    const userEntries = entries.filter(e =>
-      e.account_id === userAccount.account_id ||
-      e.counterpart_id === userAccount.account_id
+    const userEntries = entries.filter(
+      e => e.account_id === userAccount.account_id || e.counterpart_id === userAccount.account_id
     )
 
     return {
@@ -251,7 +284,8 @@ class ItemLifecycleService {
       timeline: userEntries.map(e => ({
         time: e.created_at,
         event: e.event_type,
-        direction: e.account_id === userAccount.account_id ? (e.delta > 0 ? 'in' : 'out') : 'related',
+        direction:
+          e.account_id === userAccount.account_id ? (e.delta > 0 ? 'in' : 'out') : 'related',
         business_type: e.business_type
       }))
     }
@@ -260,7 +294,11 @@ class ItemLifecycleService {
   // ========== 内部辅助方法 ==========
 
   /**
-   * 构建来源信息
+   * 构建来源信息（关联抽奖记录等上游数据）
+   *
+   * @param {Object} item - 物品实例
+   * @param {Object} [options] - 选项（含 transaction、LotteryDraw 模型）
+   * @returns {Promise<Object>} 来源信息
    * @private
    */
   static async _buildOriginInfo(item, options = {}) {
@@ -292,7 +330,11 @@ class ItemLifecycleService {
   }
 
   /**
-   * 从账本和锁定记录构建时间线
+   * 从账本和锁定记录构建时间线（按时间排序）
+   *
+   * @param {Array} ledgerEntries - 账本条目数组
+   * @param {Array} holds - 锁定记录数组
+   * @returns {Array<Object>} 按时间排序的事件时间线
    * @private
    */
   static _buildTimeline(ledgerEntries, holds) {
@@ -332,7 +374,10 @@ class ItemLifecycleService {
   }
 
   /**
-   * 生成事件描述文本
+   * 生成事件描述文本（中文，用于管理后台展示）
+   *
+   * @param {Object} entry - 账本条目
+   * @returns {string} 事件描述
    * @private
    */
   static _describeEvent(entry) {

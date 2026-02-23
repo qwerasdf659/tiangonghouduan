@@ -40,9 +40,9 @@ const logger = require('../../../utils/logger').logger
  *
  * @query {number} page - 页码（默认1）
  * @query {number} limit - 每页数量（默认20）
- * @query {string} listing_kind - 挂牌类型筛选（item_instance / fungible_asset，可选）
+ * @query {string} listing_kind - 挂牌类型筛选（item / fungible_asset，可选）
  * @query {string} asset_code - 资产代码筛选（如 red_shard，仅对 fungible_asset 有效）
- * @query {string} item_category_code - 物品类目代码筛选（仅对 item_instance 有效）
+ * @query {string} item_category_code - 物品类目代码筛选（仅对 item 类型有效）
  * @query {string} asset_group_code - 资产分组代码筛选（仅对 fungible_asset 有效）
  * @query {string} rarity_code - 稀有度代码筛选（仅对 item_instance 有效）
  * @query {number} min_price - 最低价格筛选（可选）
@@ -191,7 +191,7 @@ router.get('/listings/facets', authenticateToken, async (req, res) => {
  *
  * @returns {Object} 挂牌详情
  * @returns {number} data.market_listing_id - 挂牌ID
- * @returns {number} data.item_instance_id - 物品实例ID
+ * @returns {number} data.item_id - 物品ID
  * @returns {string} data.name - 物品名称（2026-01-20 统一字段名）
  * @returns {string} data.item_type - 物品类型
  * @returns {number} data.price_amount - 价格数量
@@ -235,7 +235,7 @@ router.get(
       const plainListing = listing.toJSON ? listing.toJSON() : { ...listing }
 
       // 补充详情专有字段（列表接口不包含）
-      plainListing.item_instance_id = plainListing.offer_item_instance_id
+      plainListing.item_id = plainListing.offer_item_id
       plainListing.item_template_id = plainListing.offer_item_template_id || null
       plainListing.name =
         plainListing.offer_item_display_name ||
