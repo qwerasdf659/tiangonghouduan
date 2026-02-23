@@ -50,6 +50,7 @@ const AUDIT_TARGET_TYPES = Object.freeze({
   ASSET_TRANSACTION: 'asset_transaction',
 
   // ========== 物品与库存 ==========
+  ITEM: 'item', // items 表（物品实例，Item 模型）
   ITEM_INSTANCE: 'item_instance',
   ITEM_INSTANCE_EVENT: 'item_instance_event',
   REDEMPTION_ORDER: 'redemption_order',

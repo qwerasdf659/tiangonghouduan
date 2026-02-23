@@ -125,6 +125,7 @@ function registerLotteryManagementComponents() {
       ],
       strategy: [
         { id: 'lottery-strategy', title: '策略配置', icon: '⚙️' },
+        { id: 'activity-strategy-switch', title: '活动策略开关', icon: '🔧' },
         { id: 'segment-rules', title: '分群策略', icon: '👥' },
         { id: 'lottery-quota', title: '配额管理', icon: '📊' },
         { id: 'lottery-pricing', title: '定价配置', icon: '💵' },
@@ -147,6 +148,7 @@ function registerLotteryManagementComponents() {
       'campaign-budget': 'activity',
       'campaign-placement': 'activity',
       'lottery-strategy': 'strategy',
+      'activity-strategy-switch': 'strategy',
       'segment-rules': 'strategy',
       'lottery-quota': 'strategy',
       'lottery-pricing': 'strategy',
@@ -267,6 +269,8 @@ function registerLotteryManagementComponents() {
       segmentFieldRegistry: { fields: {}, operators: {} },
       /** @type {Object|null} 分群测试结果 */
       segmentTestResult: null,
+      /** @type {Object} 分群测试输入数据 */
+      segmentTestInput: { registration_days: 30, points: 0, user_level: 'normal', fail_count: 0 },
 
       // ==================== 通用状态 ====================
       page: 1,
@@ -421,6 +425,13 @@ function registerLotteryManagementComponents() {
                 logger.debug('💳 [LotteryPage] 进入系统垫付看板页面')
                 await this.loadAdvanceDashboard()
                 // 加载活动列表供筛选
+                if (!this.campaigns || this.campaigns.length === 0) {
+                  await this.loadCampaigns()
+                }
+                break
+              // 10策略活动级开关配置
+              case 'activity-strategy-switch':
+                logger.debug('🔧 [LotteryPage] 进入活动策略开关页面')
                 if (!this.campaigns || this.campaigns.length === 0) {
                   await this.loadCampaigns()
                 }

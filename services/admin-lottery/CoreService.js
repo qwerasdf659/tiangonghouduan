@@ -69,6 +69,7 @@ class AdminLotteryCoreService {
    * @param {Date|null} [expiresAt=null] - 过期时间
    * @param {Object} options - 选项
    * @param {Object} options.transaction - Sequelize事务对象（必填）
+   * @param {number|null} [options.lottery_campaign_id] - 关联活动ID（NULL=全局干预）
    * @returns {Promise<Object>} 操作结果
    */
   static async forceWinForUser(
@@ -85,6 +86,7 @@ class AdminLotteryCoreService {
       admin_id: adminId,
       user_id: userId,
       lottery_prize_id: prizeId,
+      lottery_campaign_id: options.lottery_campaign_id || null,
       reason
     })
 
@@ -107,9 +109,10 @@ class AdminLotteryCoreService {
     const { sharedComponents } = require('../../routes/v4/console/shared/middleware')
     const managementStrategy = sharedComponents.managementStrategy
 
-    // 调用管理策略设置强制中奖（传入事务，确保数据库操作在同一事务中）
+    // 调用管理策略设置强制中奖（传入事务 + 活动ID，确保数据库操作在同一事务中）
     const result = await managementStrategy.forceWin(adminId, userId, prizeId, reason, expiresAt, {
-      transaction
+      transaction,
+      lottery_campaign_id: options.lottery_campaign_id || null
     })
 
     if (!result.success) {
@@ -202,9 +205,10 @@ class AdminLotteryCoreService {
     const { sharedComponents } = require('../../routes/v4/console/shared/middleware')
     const managementStrategy = sharedComponents.managementStrategy
 
-    // 调用管理策略设置强制不中奖（传入事务，确保数据库操作在同一事务中）
+    // 调用管理策略设置强制不中奖（传入事务 + 活动ID，确保数据库操作在同一事务中）
     const result = await managementStrategy.forceLose(adminId, userId, count, reason, expiresAt, {
-      transaction
+      transaction,
+      lottery_campaign_id: options.lottery_campaign_id || null
     })
 
     if (!result.success) {

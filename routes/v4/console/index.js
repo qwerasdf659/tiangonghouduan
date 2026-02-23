@@ -67,14 +67,15 @@ const navRoutes = require('./nav') // 🆕 导航徽标（2026-01-31 P0 侧边�
 const lotteryHealthRoutes = require('./lottery-health') // 🆕 抽奖健康度（2026-01-31 P1 B-14~B-18）
 const consumptionAnomalyRoutes = require('./consumption-anomaly') // 🆕 消费异常检测（2026-01-31 P1 B-25~B-30）
 const userSegmentsRoutes = require('./user-segments') // 🆕 用户分层（2026-01-31 P1 B-19~B-24）
-const itemsRoutes = require('./items') // 🆕 物品监控（2026-02-03 运营后台优化 §5.4）
-const itemInstancesRoutes = require('./item-instances') // 🆕 物品实例管理（2026-02-15 修复404缺失路由）
+const itemsRoutes = require('./items') // 物品管理 + 监控（三表模型 CRUD + 锁定率）
 const lotteryRoutes = require('./lottery') // 🆕 抽奖分析Dashboard（2026-02-04 运营仪表盘E2E测试）
 const bidManagementRoutes = require('./bid-management') // 🆕 竞价管理（2026-02-16 臻选空间/幸运空间/竞价功能 Phase 3.7）
 const userDataQueryRoutes = require('./user-data-query') // 🆕 用户数据查询（2026-02-18 用户全维度数据检索看板）
 const segmentRulesRoutes = require('./segment-rules') // 🆕 分群策略管理（2026-02-22 运营可视化搭建分群条件）
 const itemLifecycleRoutes = require('./item-lifecycle') // 🆕 物品全链路追踪（2026-02-22 资产全链路追踪方案）
 const reconciliationRoutes = require('./reconciliation') // 🆕 对账报告（2026-02-22 资产全链路追踪方案）
+const exchangeRatesRoutes = require('./exchange-rates') // 🆕 汇率兑换管理（2026-02-23 市场增强）
+const merchantsRoutes = require('./merchants') // 🆕 商家管理（2026-02-23 多商家接入架构）
 
 // 🔴 广告系统路由（Phase 2-6）
 const adCampaignsRoutes = require('./ad-campaigns') // Phase 3: 广告计划管理
@@ -146,14 +147,15 @@ router.use('/nav', navRoutes) // 🆕 导航徽标路由（2026-01-31 P0 侧边�
 router.use('/lottery-health', lotteryHealthRoutes) // 🆕 抽奖健康度路由（2026-01-31 P1 B-14~B-18 活动健康度评估）
 router.use('/consumption-anomaly', consumptionAnomalyRoutes) // 🆕 消费异常检测路由（2026-01-31 P1 B-25~B-30 风险评估）
 router.use('/users', userSegmentsRoutes) // 🆕 用户分层路由（2026-01-31 P1 B-19~B-24 用户画像）
-router.use('/items', itemsRoutes) // 🆕 物品监控路由（2026-02-03 运营后台优化 §5.4 锁定率监控）
-router.use('/item-instances', itemInstancesRoutes) // 🆕 物品实例管理路由（2026-02-15 管理员物品CRUD）
+router.use('/items', itemsRoutes) // 物品管理路由（CRUD + 监控，统一 /items 路径）
 router.use('/lottery', lotteryRoutes) // 🆕 抽奖分析Dashboard路由（2026-02-04 运营仪表盘E2E测试）
 router.use('/bid-management', bidManagementRoutes) // 🆕 竞价管理路由（2026-02-16 臻选空间/幸运空间/竞价功能 Phase 3.7）
 router.use('/user-data-query', userDataQueryRoutes) // 🆕 用户数据查询路由（2026-02-18 用户全维度数据检索看板）
 router.use('/segment-rules', segmentRulesRoutes) // 🆕 分群策略管理路由（2026-02-22 运营可视化搭建分群条件）
 router.use('/item-lifecycle', itemLifecycleRoutes) // 🆕 物品全链路追踪路由（2026-02-22 资产全链路追踪）
 router.use('/reconciliation', reconciliationRoutes) // 🆕 对账报告路由（2026-02-22 资产全链路追踪）
+router.use('/exchange-rates', exchangeRatesRoutes) // 🆕 汇率兑换管理路由（2026-02-23 市场增强）
+router.use('/merchants', merchantsRoutes) // 🆕 商家管理路由（2026-02-23 多商家接入架构）
 
 // 🔴 广告系统路由（Phase 2-6）
 router.use('/ad-campaigns', adCampaignsRoutes) // Phase 3: 广告计划管理路由
@@ -558,17 +560,18 @@ router.get('/', (req, res) => {
         ],
         note: '抽奖预设（lottery_presets）CRUD管理，为用户创建预设队列和统计；仅限 admin 访问'
       },
-      item_instances: {
-        description: '物品实例管理（2026-02-15 管理员物品CRUD）',
+      items: {
+        description: '物品管理（三表模型 CRUD + 锁定率监控）',
         endpoints: [
-          '/item-instances',
-          '/item-instances/user/:user_id',
-          '/item-instances/:id',
-          '/item-instances/:id/freeze',
-          '/item-instances/:id/unfreeze',
-          '/item-instances/:id/transfer'
+          '/items',
+          '/items/lock-rate',
+          '/items/user/:user_id',
+          '/items/:id',
+          '/items/:id/freeze',
+          '/items/:id/unfreeze',
+          '/items/:id/transfer'
         ],
-        note: '管理员查看全平台物品实例列表、详情、冻结/解冻/转移操作；仅限 admin（role_level >= 100）访问'
+        note: '管理员查看全平台物品列表/详情/冻结/解冻/转移 + 锁定率监控；仅限 admin（role_level >= 100）访问'
       },
       lottery_monitoring: {
         description: '抽奖监控数据查询（2026-01-21 P2 API覆盖率补齐）',

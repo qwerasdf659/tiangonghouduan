@@ -71,10 +71,52 @@ export function useCsWorkStatusMethods() {
       }
 
       /* SLA 超时：等待超过15分钟 */
+      const prevBreachCount = this.slaBreachCount
       this.slaBreachCount = waiting.filter(s => {
         const created = new Date(s.created_at).getTime()
         return (now - created) > 15 * 60000
       }).length
+
+      if (this.slaBreachCount > prevBreachCount) {
+        this._fireSlaNotification(this.slaBreachCount)
+      }
+    },
+
+    /**
+     * 触发 SLA 超时浏览器通知
+     * @param {number} count - 超时会话数
+     */
+    _fireSlaNotification(count) {
+      if (!('Notification' in window)) return
+
+      if (Notification.permission === 'default') {
+        Notification.requestPermission()
+        return
+      }
+
+      if (Notification.permission === 'granted') {
+        try {
+          const n = new Notification('⚠️ SLA 超时告警', {
+            body: `${count} 个会话等待超过 15 分钟，请尽快处理`,
+            icon: '/favicon.ico',
+            tag: 'sla-breach',
+            requireInteraction: true
+          })
+          n.onclick = () => { window.focus(); n.close() }
+        } catch {
+          /* Service Worker 环境下 Notification 构造函数可能不可用 */
+        }
+      }
+    },
+
+    /**
+     * 请求浏览器通知权限
+     */
+    async requestNotificationPermission() {
+      if ('Notification' in window && Notification.permission === 'default') {
+        const result = await Notification.requestPermission()
+        logger.info('[SLA] 通知权限:', result)
+      }
     },
 
     /**

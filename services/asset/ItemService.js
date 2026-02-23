@@ -52,6 +52,7 @@ class ItemService {
    * @param {number} [params.item_value=0] - 物品价值（积分计）
    * @param {number} [params.prize_definition_id] - 奖品定义ID
    * @param {string} [params.rarity_code='common'] - 稀有度代码
+   * @param {number} [params.merchant_id] - 来源商家ID（NULL=平台自营）
    * @param {string} params.business_type - 业务类型（lottery_mint/bid_settlement_mint 等）
    * @param {string} params.idempotency_key - 幂等键（调用方提供，如 lottery_session:item）
    * @param {Object} [params.meta] - 扩展元数据
@@ -70,6 +71,7 @@ class ItemService {
       item_value = 0,
       prize_definition_id,
       rarity_code = 'common',
+      merchant_id,
       business_type = 'lottery_mint',
       idempotency_key,
       meta = {}
@@ -124,6 +126,7 @@ class ItemService {
           item_value: Math.round(item_value) || 0,
           prize_definition_id: prize_definition_id || null,
           rarity_code,
+          merchant_id: merchant_id || null,
           source,
           source_ref_id: source_ref_id || null
         },

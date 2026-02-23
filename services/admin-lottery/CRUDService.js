@@ -24,7 +24,7 @@
  * 拆分自：routes/v4/console/system-data.js（路由层直接操作模型）
  */
 
-const { LotteryCampaign, LotteryPrize } = require('../../models')
+const { LotteryCampaign, LotteryPrize, LotteryStrategyConfig } = require('../../models')
 const logger = require('../../utils/logger').logger
 const { assertAndGetTransaction } = require('../../utils/transactionHelpers')
 const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
@@ -153,6 +153,168 @@ class LotteryCampaignCRUDService {
       campaign_code,
       operator_user_id
     })
+
+    // ✅ 自动生成默认策略配置（10策略活动级开关：创建即完整，每活动24条配置）
+    try {
+      const { LotteryStrategyConfig } = require('../../models')
+      const STRATEGY_DEFAULTS = [
+        { group: 'anti_empty', key: 'enabled', value: true, type: 'boolean', desc: '防连空开关' },
+        {
+          group: 'anti_empty',
+          key: 'empty_streak_threshold',
+          value: 3,
+          type: 'number',
+          desc: '连续空奖触发阈值'
+        },
+        { group: 'anti_high', key: 'enabled', value: true, type: 'boolean', desc: '防连高开关' },
+        {
+          group: 'anti_high',
+          key: 'high_streak_threshold',
+          value: 2,
+          type: 'number',
+          desc: '连续高价值触发阈值'
+        },
+        {
+          group: 'anti_high',
+          key: 'recent_draw_window',
+          value: 5,
+          type: 'number',
+          desc: '近期抽奖统计窗口'
+        },
+        {
+          group: 'budget_tier',
+          key: 'threshold_high',
+          value: 1000,
+          type: 'number',
+          desc: 'B3阈值'
+        },
+        { group: 'budget_tier', key: 'threshold_mid', value: 500, type: 'number', desc: 'B2阈值' },
+        { group: 'budget_tier', key: 'threshold_low', value: 100, type: 'number', desc: 'B1阈值' },
+        { group: 'luck_debt', key: 'enabled', value: true, type: 'boolean', desc: '运气债务开关' },
+        {
+          group: 'luck_debt',
+          key: 'expected_empty_rate',
+          value: 0.3,
+          type: 'number',
+          desc: '期望空奖率'
+        },
+        {
+          group: 'luck_debt',
+          key: 'min_draw_count',
+          value: 10,
+          type: 'number',
+          desc: '最小样本量'
+        },
+        { group: 'matrix', key: 'enabled', value: true, type: 'boolean', desc: 'BxPx矩阵开关' },
+        { group: 'pity', key: 'enabled', value: true, type: 'boolean', desc: 'Pity保底开关' },
+        {
+          group: 'pity',
+          key: 'hard_guarantee_threshold',
+          value: 10,
+          type: 'number',
+          desc: '硬保底阈值'
+        },
+        {
+          group: 'pity',
+          key: 'min_non_empty_cost',
+          value: 10,
+          type: 'number',
+          desc: '最低非空奖价值'
+        },
+        {
+          group: 'pity',
+          key: 'multiplier_table',
+          value: { 0: 1, 1: 1, 2: 1, 3: 1.5, 4: 2, 5: 3, 6: 4, 7: 6, 8: 8, 9: 10 },
+          type: 'object',
+          desc: 'Pity倍数表'
+        },
+        {
+          group: 'pressure_tier',
+          key: 'enabled',
+          value: true,
+          type: 'boolean',
+          desc: '活动压力开关'
+        },
+        {
+          group: 'pressure_tier',
+          key: 'threshold_high',
+          value: 0.8,
+          type: 'number',
+          desc: 'P2阈值'
+        },
+        {
+          group: 'pressure_tier',
+          key: 'threshold_low',
+          value: 0.5,
+          type: 'number',
+          desc: 'P1阈值'
+        },
+        {
+          group: 'management',
+          key: 'enabled',
+          value: true,
+          type: 'boolean',
+          desc: '管理干预总开关'
+        },
+        {
+          group: 'grayscale',
+          key: 'pity_percentage',
+          value: 100,
+          type: 'number',
+          desc: 'Pity灰度百分比'
+        },
+        {
+          group: 'grayscale',
+          key: 'luck_debt_percentage',
+          value: 100,
+          type: 'number',
+          desc: '运气债务灰度百分比'
+        },
+        {
+          group: 'grayscale',
+          key: 'anti_empty_percentage',
+          value: 100,
+          type: 'number',
+          desc: '防连空灰度百分比'
+        },
+        {
+          group: 'grayscale',
+          key: 'anti_high_percentage',
+          value: 100,
+          type: 'number',
+          desc: '防连高灰度百分比'
+        }
+      ]
+
+      const strategyRecords = STRATEGY_DEFAULTS.map(cfg => ({
+        lottery_campaign_id: campaign.lottery_campaign_id,
+        config_group: cfg.group,
+        config_key: cfg.key,
+        config_value: JSON.stringify(cfg.value),
+        value_type: cfg.type,
+        description: cfg.desc,
+        is_active: true,
+        priority: 0,
+        created_by: operator_user_id,
+        updated_by: operator_user_id
+      }))
+
+      await LotteryStrategyConfig.bulkCreate(strategyRecords, {
+        transaction,
+        ignoreDuplicates: true
+      })
+
+      logger.info('自动创建默认策略配置', {
+        lottery_campaign_id: campaign.lottery_campaign_id,
+        config_count: strategyRecords.length,
+        operator_user_id
+      })
+    } catch (strategyError) {
+      logger.error('自动创建默认策略配置失败', {
+        lottery_campaign_id: campaign.lottery_campaign_id,
+        error: strategyError.message
+      })
+    }
 
     // ✅ 自动生成默认定价配置（决策 3：创建即可用，运营可后续修改）
     try {
@@ -395,8 +557,11 @@ class LotteryCampaignCRUDService {
 
     /**
      * 激活校验：status 切换为 active 时执行全量奖品分布校验
-     * - normalize 模式：win_probability 总和必须 = 1.0（±0.001）
-     * - tier_first 模式：每档位至少 1 个奖品，且至少 1 个兜底奖品（is_fallback=1）
+     * tier_first 模式全量校验：
+     * - 必须有至少 1 个有效奖品
+     * - 每个档位至少 1 个奖品，且有库存
+     * - 至少 1 个兜底奖品（is_fallback=1）
+     * - 每个奖品的 win_weight 必须 > 0
      * 校验不通过则阻断激活
      */
     if (status === 'active' && oldStatus !== 'active') {
@@ -415,50 +580,53 @@ class LotteryCampaignCRUDService {
         throw error
       }
 
-      const pickMethod = campaign.pick_method || 'tier_first'
+      const validationErrors = []
 
-      if (pickMethod === 'normalize') {
-        const totalProbability = prizes.reduce(
-          (sum, p) => sum + (parseFloat(p.win_probability) || 0),
-          0
+      const tierGroups = {}
+      for (const p of prizes) {
+        const tier = p.reward_tier || 'low'
+        if (!tierGroups[tier]) tierGroups[tier] = []
+        tierGroups[tier].push(p)
+      }
+
+      for (const [tier, tierPrizes] of Object.entries(tierGroups)) {
+        if (tierPrizes.length === 0) {
+          validationErrors.push(`档位 ${tier} 没有任何奖品`)
+        }
+      }
+
+      const hasFallback = prizes.some(p => p.is_fallback === true || p.is_fallback === 1)
+      if (!hasFallback) {
+        validationErrors.push('缺少兜底奖品（至少 1 个奖品需设置 is_fallback=1）')
+      }
+
+      const zeroWeightPrizes = prizes.filter(p => (p.win_weight || 0) <= 0)
+      if (zeroWeightPrizes.length > 0) {
+        validationErrors.push(
+          `${zeroWeightPrizes.length} 个奖品 win_weight ≤ 0：${zeroWeightPrizes.map(p => p.prize_name).join('、')}`
         )
-        if (Math.abs(totalProbability - 1.0) > 0.001) {
-          const error = new Error(
-            `normalize 模式要求 win_probability 总和 = 1.0（当前 ${totalProbability.toFixed(4)}），无法激活`
-          )
-          error.code = 'ACTIVATION_VALIDATION_FAILED'
-          error.statusCode = 400
-          throw error
-        }
-      } else if (pickMethod === 'tier_first') {
-        const tierGroups = {}
-        for (const p of prizes) {
-          const tier = p.reward_tier || 'low'
-          if (!tierGroups[tier]) tierGroups[tier] = []
-          tierGroups[tier].push(p)
-        }
-        for (const [tier, tierPrizes] of Object.entries(tierGroups)) {
-          if (tierPrizes.length === 0) {
-            const error = new Error(`tier_first 模式下档位 ${tier} 没有任何奖品，无法激活`)
-            error.code = 'ACTIVATION_VALIDATION_FAILED'
-            error.statusCode = 400
-            throw error
-          }
-        }
+      }
 
-        const hasFallback = prizes.some(p => p.is_fallback === true || p.is_fallback === 1)
-        if (!hasFallback) {
-          const error = new Error('tier_first 模式要求至少 1 个兜底奖品（is_fallback=1），无法激活')
-          error.code = 'ACTIVATION_VALIDATION_FAILED'
-          error.statusCode = 400
-          throw error
-        }
+      const zeroStockPrizes = prizes.filter(p => {
+        const remaining = (p.stock_quantity || 0) - (p.total_win_count || 0)
+        return remaining <= 0
+      })
+      if (zeroStockPrizes.length === prizes.length) {
+        validationErrors.push('所有奖品库存均已耗尽，无法激活')
+      }
+
+      if (validationErrors.length > 0) {
+        const error = new Error(`活动激活校验失败：${validationErrors.join('；')}`)
+        error.code = 'ACTIVATION_VALIDATION_FAILED'
+        error.statusCode = 400
+        throw error
       }
 
       logger.info('活动激活校验通过', {
         lottery_campaign_id,
-        pick_method: pickMethod,
-        prize_count: prizes.length
+        prize_count: prizes.length,
+        tier_count: Object.keys(tierGroups).length,
+        has_fallback: hasFallback
       })
     }
 
@@ -575,6 +743,74 @@ class LotteryCampaignCRUDService {
       lottery_campaign_id: parseInt(lottery_campaign_id),
       campaign_name: campaignName,
       deleted: true
+    }
+  }
+
+  /**
+   * 批量更新某活动的策略配置
+   *
+   * @description 10策略活动级开关的配置更新（写操作收口到Service层）
+   * @param {number} lottery_campaign_id - 活动ID
+   * @param {Object} config - 配置对象 { config_group: { config_key: config_value } }
+   * @param {Object} options - 必须包含 transaction 和 operator_user_id
+   * @param {Transaction} options.transaction - Sequelize事务（模式A：外部传入）
+   * @param {number} options.operator_user_id - 操作员用户ID
+   * @returns {Promise<Object>} 更新结果
+   */
+  static async updateStrategyConfig(lottery_campaign_id, config, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'updateStrategyConfig')
+    const { operator_user_id } = options
+
+    if (!lottery_campaign_id || isNaN(parseInt(lottery_campaign_id))) {
+      const error = new Error('无效的活动ID')
+      error.code = 'INVALID_CAMPAIGN_ID'
+      error.statusCode = 400
+      throw error
+    }
+
+    if (!config || typeof config !== 'object') {
+      const error = new Error('请求体必须包含 config 对象')
+      error.code = 'INVALID_REQUEST_BODY'
+      error.statusCode = 400
+      throw error
+    }
+
+    const campaign_id = parseInt(lottery_campaign_id)
+
+    const upsert_tasks = []
+    for (const [config_group, group_config] of Object.entries(config)) {
+      for (const [config_key, config_value] of Object.entries(group_config)) {
+        upsert_tasks.push({ config_group, config_key, config_value })
+      }
+    }
+
+    const updated = []
+    for (const task of upsert_tasks) {
+      // eslint-disable-next-line no-await-in-loop -- upsertConfig 需在同一事务内串行执行，保证幂等键唯一约束的正确性
+      const record = await LotteryStrategyConfig.upsertConfig(
+        task.config_group,
+        task.config_key,
+        task.config_value,
+        { lottery_campaign_id: campaign_id, updated_by: operator_user_id, transaction }
+      )
+      updated.push({
+        config_group: task.config_group,
+        config_key: task.config_key,
+        config_value: task.config_value,
+        lottery_strategy_config_id: record.lottery_strategy_config_id
+      })
+    }
+
+    logger.info('批量更新策略配置成功', {
+      lottery_campaign_id: campaign_id,
+      updated_count: updated.length,
+      operator_user_id
+    })
+
+    return {
+      lottery_campaign_id: campaign_id,
+      updated_count: updated.length,
+      updated_configs: updated
     }
   }
 }

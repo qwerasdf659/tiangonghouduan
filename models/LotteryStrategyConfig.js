@@ -181,13 +181,17 @@ module.exports = (sequelize, DataTypes) => {
      * @returns {Promise<LotteryStrategyConfig>} 配置实例
      */
     static async upsertConfig(config_group, config_key, config_value, options = {}) {
-      const { description, priority = 0, updated_by, transaction } = options
+      const { description, priority = 0, updated_by, transaction, lottery_campaign_id } = options
 
-      // 确定值类型
+      if (!lottery_campaign_id) {
+        throw new Error('upsertConfig 必须传入 lottery_campaign_id，防止跨活动覆盖')
+      }
+
       const value_type = LotteryStrategyConfig.detectValueType(config_value)
 
       const [config, created] = await this.findOrCreate({
         where: {
+          lottery_campaign_id,
           config_group,
           config_key,
           priority

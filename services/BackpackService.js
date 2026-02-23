@@ -217,6 +217,7 @@ class BackpackService {
         item_description: item.item_description || '',
         item_value: item.item_value || 0,
         source: item.source,
+        merchant_id: item.merchant_id || null,
         has_redemption_code: false,
         acquired_at: item.created_at,
         prize_definition_id: item.prize_definition_id

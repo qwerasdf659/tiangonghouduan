@@ -205,15 +205,19 @@ class TierPickStage extends BaseStage {
       const campaign = campaign_data.campaign
       const tier_rules = campaign_data.tier_rules || []
 
-      /* normalize 模式：跳过档位选择，由 PrizePickStage 直接按 win_probability 选奖 */
+      /*
+       * normalize 选奖模式：跳过档位选择，直接由 PrizePickStage 按 win_probability 归一化抽取
+       * 此模式下不区分 reward_tier，所有奖品在同一个池中按概率竞争
+       */
       if (campaign.pick_method === 'normalize') {
-        this.log('info', 'normalize 模式：跳过档位抽取，由 PrizePickStage 直接选奖', {
+        this.log('info', 'normalize 模式：跳过档位选择，交由 PrizePickStage 按概率抽取', {
           user_id,
+          lottery_campaign_id,
           pick_method: 'normalize'
         })
         return this.success({
-          selected_tier: null,
-          original_tier: null,
+          selected_tier: 'normalize',
+          original_tier: 'normalize',
           tier_downgrade_path: [],
           random_value: 0,
           tier_weights: {},
@@ -245,7 +249,12 @@ class TierPickStage extends BaseStage {
        * 活动级 pressure.enabled 开关（lottery_strategy_config 表）
        * 关闭后固定返回 P0，乘数恒为 1.0，不影响权重
        */
-      const pressure_enabled = await DynamicConfigLoader.getValue('pressure_tier', 'enabled', true)
+      const pressure_enabled = await DynamicConfigLoader.getValue(
+        'pressure_tier',
+        'enabled',
+        true,
+        { lottery_campaign_id }
+      )
       const pressure_tier = pressure_enabled ? prize_pool_data.pressure_tier || 'P1' : 'P0'
 
       if (!pressure_enabled) {
@@ -265,7 +274,9 @@ class TierPickStage extends BaseStage {
        * 活动级 matrix.enabled 开关（lottery_strategy_config 表）
        * 关闭后 computeWeightAdjustment() 直接返回原始权重，所有乘数恒为 1.0
        */
-      const matrix_enabled = await DynamicConfigLoader.getValue('matrix', 'enabled', true)
+      const matrix_enabled = await DynamicConfigLoader.getValue('matrix', 'enabled', true, {
+        lottery_campaign_id
+      })
 
       let adjusted_weights
       let weight_adjustment = { adjusted_weights: null, empty_weight_multiplier: 1.0 }

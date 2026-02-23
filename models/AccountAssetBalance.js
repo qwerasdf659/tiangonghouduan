@@ -100,6 +100,14 @@ module.exports = sequelize => {
         defaultValue: 0,
         comment:
           '冻结余额（Frozen Amount）：下单冻结、挂牌冻结的余额；业务规则：交易市场购买时冻结买家DIAMOND，挂牌时冻结卖家标的资产；成交后从冻结转为扣减或入账；取消/超时时解冻回到 available_amount；不可为负数'
+      },
+
+      balance_id: {
+        type: DataTypes.VIRTUAL,
+        /** @returns {number} account_asset_balance_id alias */
+        get() {
+          return this.getDataValue('account_asset_balance_id')
+        }
       }
     },
     {

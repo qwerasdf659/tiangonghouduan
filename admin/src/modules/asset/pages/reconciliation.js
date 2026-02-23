@@ -10,6 +10,7 @@
 import { Alpine, createPageMixin } from '../../../alpine/index.js'
 import { ASSET_ENDPOINTS } from '../../../api/asset.js'
 import { request } from '../../../api/base.js'
+import { loadECharts } from '../../../utils/echarts-lazy.js'
 
 document.addEventListener('alpine:init', () => {
   Alpine.data('reconciliationPage', () => ({
@@ -75,44 +76,43 @@ document.addEventListener('alpine:init', () => {
     },
 
     /**
-     * 渲染资产守恒 ECharts 柱状图
+     * 渲染资产守恒 ECharts 柱状图（懒加载方式）
      */
-    renderAssetChart() {
+    async renderAssetChart() {
       const container = document.getElementById('asset-conservation-chart')
       if (!container || !this.asset_result?.global_conservation?.by_asset_code) return
 
-      const echarts = window.echarts
-      if (!echarts) {
-        console.warn('[reconciliation] ECharts 未加载，跳过图表渲染')
-        return
+      try {
+        const echarts = await loadECharts()
+        const chart = echarts.init(container)
+        const data = this.asset_result.global_conservation.by_asset_code
+
+        const option = {
+          title: { text: '资产全局守恒概览', left: 'center', textStyle: { fontSize: 14 } },
+          tooltip: { trigger: 'axis', formatter: '{b}: {c}' },
+          xAxis: {
+            type: 'category',
+            data: data.map(r => r.asset_code),
+            axisLabel: { rotate: 30 }
+          },
+          yAxis: { type: 'value', name: 'SUM(delta_amount)' },
+          series: [{
+            name: 'delta_amount',
+            type: 'bar',
+            data: data.map(r => ({
+              value: Number(r.total_delta) || 0,
+              itemStyle: { color: Number(r.total_delta) === 0 ? '#10b981' : '#ef4444' }
+            })),
+            label: { show: true, position: 'top', formatter: '{c}' }
+          }],
+          grid: { left: '10%', right: '5%', bottom: '15%', top: '15%' }
+        }
+
+        chart.setOption(option)
+        window.addEventListener('resize', () => chart.resize())
+      } catch (error) {
+        console.error('[reconciliation] ECharts 加载失败:', error)
       }
-
-      const chart = echarts.init(container)
-      const data = this.asset_result.global_conservation.by_asset_code
-
-      const option = {
-        title: { text: '资产全局守恒概览', left: 'center', textStyle: { fontSize: 14 } },
-        tooltip: { trigger: 'axis', formatter: '{b}: {c}' },
-        xAxis: {
-          type: 'category',
-          data: data.map(r => r.asset_code),
-          axisLabel: { rotate: 30 }
-        },
-        yAxis: { type: 'value', name: 'SUM(delta_amount)' },
-        series: [{
-          name: 'delta_amount',
-          type: 'bar',
-          data: data.map(r => ({
-            value: Number(r.total_delta) || 0,
-            itemStyle: { color: Number(r.total_delta) === 0 ? '#10b981' : '#ef4444' }
-          })),
-          label: { show: true, position: 'top', formatter: '{c}' }
-        }],
-        grid: { left: '10%', right: '5%', bottom: '15%', top: '15%' }
-      }
-
-      chart.setOption(option)
-      window.addEventListener('resize', () => chart.resize())
     }
   }))
 })

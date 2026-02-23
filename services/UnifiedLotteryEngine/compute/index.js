@@ -276,11 +276,11 @@ module.exports = {
   GRAYSCALE_CONFIG: StrategyConfig.GRAYSCALE_CONFIG,
 
   /**
-   * 判断功能是否对特定上下文启用（带灰度控制）
+   * 判断功能是否对特定上下文启用（带灰度控制，async — 改造后从 DB 按活动读取灰度百分比）
    *
    * @param {string} feature - 特性名称
    * @param {Object} context - 上下文信息
-   * @returns {Object} 启用状态详情
+   * @returns {Promise<Object>} 启用状态详情
    */
   isFeatureEnabledForContext: StrategyConfig.isFeatureEnabledForContext,
 

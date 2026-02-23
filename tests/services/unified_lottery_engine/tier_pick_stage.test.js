@@ -359,6 +359,23 @@ describe('TierPickStage 层级选择器测试（任务2.3）', () => {
   // ========== 决策来源处理验证 ==========
 
   describe('决策来源处理验证', () => {
+    /**
+     * 决策来源测试聚焦于路由逻辑（preset/override/guarantee 跳过正常抽取），
+     * 而非每日高档上限风控。绕过 _enforceDailyHighCap 避免累计抽奖记录
+     * 导致 high → mid 降级，使测试不依赖当日 LotteryDraw 数据状态。
+     */
+    let daily_cap_spy
+
+    beforeEach(() => {
+      daily_cap_spy = jest
+        .spyOn(TierPickStage.prototype, '_enforceDailyHighCap')
+        .mockImplementation(async (_uid, _cid, tier, _ctx) => tier)
+    })
+
+    afterEach(() => {
+      daily_cap_spy.mockRestore()
+    })
+
     test('preset模式应该跳过正常抽取', async () => {
       const context = create_test_context()
 
@@ -370,7 +387,6 @@ describe('TierPickStage 层级选择器测试（任务2.3）', () => {
 
       await prepare_prerequisite_stages(context)
 
-      // 模拟 LoadDecisionSourceStage 返回 preset 模式
       context.stage_results.LoadDecisionSourceStage = {
         success: true,
         data: {
@@ -404,7 +420,6 @@ describe('TierPickStage 层级选择器测试（任务2.3）', () => {
 
       await prepare_prerequisite_stages(context)
 
-      // 模拟 override force_win 模式
       context.stage_results.LoadDecisionSourceStage = {
         success: true,
         data: {
@@ -437,7 +452,6 @@ describe('TierPickStage 层级选择器测试（任务2.3）', () => {
 
       await prepare_prerequisite_stages(context)
 
-      // 模拟 override force_lose 模式
       context.stage_results.LoadDecisionSourceStage = {
         success: true,
         data: {
@@ -470,7 +484,6 @@ describe('TierPickStage 层级选择器测试（任务2.3）', () => {
 
       await prepare_prerequisite_stages(context)
 
-      // 模拟 guarantee 模式
       context.stage_results.LoadDecisionSourceStage = {
         success: true,
         data: {

@@ -44,6 +44,15 @@ class LotteryManagementSetting extends Model {
       as: 'admin',
       comment: '哪个管理员创建的设置'
     })
+
+    // 关联到抽奖活动（活动级干预隔离）
+    if (models.LotteryCampaign) {
+      LotteryManagementSetting.belongsTo(models.LotteryCampaign, {
+        foreignKey: 'lottery_campaign_id',
+        as: 'campaign',
+        comment: '干预关联的抽奖活动（NULL=全局）'
+      })
+    }
   }
 
   /**
@@ -136,6 +145,22 @@ module.exports = sequelize => {
         comment: '目标用户ID（设置对哪个用户生效）'
       },
 
+      /*
+       * 关联的抽奖活动ID（活动级管理干预隔离）
+       * NULL 表示全局干预（对所有活动生效，兼容历史终态记录）
+       */
+      lottery_campaign_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: {
+          model: 'lottery_campaigns',
+          key: 'lottery_campaign_id'
+        },
+        onUpdate: 'CASCADE',
+        onDelete: 'SET NULL',
+        comment: '关联的抽奖活动ID（NULL=全局干预，非NULL=仅对指定活动生效）'
+      },
+
       // 设置类型：区分不同的管理设置
       setting_type: {
         type: DataTypes.ENUM('force_win', 'force_lose', 'probability_adjust', 'user_queue'),
@@ -224,6 +249,10 @@ module.exports = sequelize => {
         {
           name: 'idx_user_type_status',
           fields: ['user_id', 'setting_type', 'status']
+        },
+        {
+          name: 'idx_campaign_user_status',
+          fields: ['lottery_campaign_id', 'user_id', 'status']
         }
       ]
     }

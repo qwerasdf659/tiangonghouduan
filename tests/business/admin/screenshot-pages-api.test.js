@@ -251,12 +251,12 @@ describe('截图页面API联动测试', () => {
     })
   })
 
-  // ========== 物品实例管理 ==========
+  // ========== 物品管理 ==========
 
-  describe('物品实例管理', () => {
-    test('GET /console/item-instances 应返回实例列表', async () => {
+  describe('物品管理', () => {
+    test('GET /console/items 应返回物品列表', async () => {
       const res = await request(app)
-        .get(`${API_BASE}/console/item-instances`)
+        .get(`${API_BASE}/console/items`)
         .query({ page: 1, page_size: 10 })
         .set('Authorization', `Bearer ${token}`)
 

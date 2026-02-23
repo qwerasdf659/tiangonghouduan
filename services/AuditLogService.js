@@ -354,7 +354,7 @@ class AuditLogService {
     return this.logOperation({
       operator_id,
       operation_type: 'points_adjust',
-      target_type: 'AssetTransaction', // 决策10：指向资产交易记录
+      target_type: 'asset_transaction', // 决策10：指向资产交易记录
       target_id: transaction_id, // 决策10：使用业务记录主键
       action: 'add',
       before_data: {
@@ -402,7 +402,7 @@ class AuditLogService {
     return this.logOperation({
       operator_id,
       operation_type: 'points_adjust',
-      target_type: 'AssetTransaction', // 决策10：指向资产交易记录
+      target_type: 'asset_transaction', // 决策10：指向资产交易记录
       target_id: transaction_id, // 决策10：使用业务记录主键
       action: 'consume',
       before_data: {
@@ -446,7 +446,7 @@ class AuditLogService {
     return this.logOperation({
       operator_id,
       operation_type: 'points_adjust',
-      target_type: 'AssetTransaction', // 更新到统一资产架构
+      target_type: 'asset_transaction', // 统一资产架构
       target_id: transaction_id,
       action: 'activate',
       before_data: {
@@ -481,7 +481,7 @@ class AuditLogService {
     return this.logOperation({
       operator_id,
       operation_type: 'inventory_operation',
-      target_type: 'Item', // 物品表
+      target_type: 'item', // items 表（标准 snake_case 码）
       target_id: item_id,
       action: 'use',
       before_data: {
@@ -528,7 +528,7 @@ class AuditLogService {
     return this.logOperation({
       operator_id,
       operation_type: 'inventory_transfer', // ✅ 使用独立的物品转让审计类型（P0-4整改）
-      target_type: 'Item', // 物品表
+      target_type: 'item', // items 表（标准 snake_case 码）
       target_id: item_id,
       action: 'transfer',
       before_data: {
@@ -572,7 +572,7 @@ class AuditLogService {
     return this.logOperation({
       operator_id,
       operation_type: 'inventory_operation',
-      target_type: 'Item', // 物品表
+      target_type: 'item', // items 表（标准 snake_case 码）
       target_id: item_id,
       action: 'verify',
       before_data: {
@@ -618,7 +618,7 @@ class AuditLogService {
     return this.logOperation({
       operator_id,
       operation_type: 'exchange_audit',
-      target_type: 'ExchangeRecord',
+      target_type: 'exchange_record',
       target_id: exchange_id,
       action,
       before_data: {
@@ -664,7 +664,7 @@ class AuditLogService {
     return this.logOperation({
       operator_id,
       operation_type: 'consumption_audit',
-      target_type: 'ConsumptionRecord',
+      target_type: 'consumption_record',
       target_id: consumption_id,
       action,
       before_data: {
@@ -730,7 +730,7 @@ class AuditLogService {
     return this.logOperation({
       operator_id,
       operation_type: OPERATION_TYPES.ASSET_ADJUSTMENT, // 使用统一枚举常量
-      target_type: 'AccountAssetBalance',
+      target_type: 'account_asset_balance',
       target_id: user_id,
       action: delta_amount > 0 ? 'add' : 'deduct',
       before_data: {

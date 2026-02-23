@@ -379,6 +379,61 @@ router.post(
 )
 
 /**
+ * POST /:id/interaction - 上报用户交互日志（展示/点击/关闭/滑动）
+ *
+ * 小程序端通过此端点上报弹窗/轮播/公告的交互事件，
+ * 也可直接使用 POST /api/v4/system/ad-events/interaction-log（功能等价）。
+ *
+ * @route POST /api/v4/user/ad-campaigns/:id/interaction
+ * @access Private
+ * @param {number} id - 广告计划ID
+ * @body {string} interaction_type - 交互类型：impression / click / close / swipe
+ * @body {number} [ad_slot_id] - 广告位ID
+ * @body {Object} [extra_data] - 扩展数据（展示时长、页面来源等）
+ */
+router.post(
+  '/:id/interaction',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    try {
+      const campaignId = parseInt(req.params.id)
+      if (isNaN(campaignId)) {
+        return res.apiBadRequest('广告计划 ID 必须是有效数字')
+      }
+
+      const { interaction_type, ad_slot_id, extra_data } = req.body
+
+      if (!interaction_type) {
+        return res.apiBadRequest('缺少必需参数：interaction_type')
+      }
+
+      const validTypes = ['impression', 'click', 'close', 'swipe']
+      if (!validTypes.includes(interaction_type)) {
+        return res.apiBadRequest('interaction_type 必须是以下之一：' + validTypes.join(', '))
+      }
+
+      const AdCampaignService = req.app.locals.services.getService('ad_campaign')
+      const log = await AdCampaignService.createInteractionLog({
+        ad_campaign_id: campaignId,
+        user_id: req.user.user_id,
+        interaction_type,
+        ad_slot_id: ad_slot_id ? parseInt(ad_slot_id) : null,
+        extra_data: extra_data || null
+      })
+
+      return res.apiSuccess(log, '上报交互日志成功')
+    } catch (error) {
+      logger.error('上报交互日志失败', {
+        error: error.message,
+        campaign_id: req.params.id,
+        user_id: req.user.user_id
+      })
+      return res.apiInternalError('上报交互日志失败', error.message, 'INTERACTION_LOG_ERROR')
+    }
+  })
+)
+
+/**
  * GET /:id/report - 获取广告活动报表（Phase 6）
  * @route GET /api/v4/user/ad-campaigns/:id/report
  * @access Private

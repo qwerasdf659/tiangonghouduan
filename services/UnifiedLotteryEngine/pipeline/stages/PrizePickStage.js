@@ -196,27 +196,42 @@ class PrizePickStage extends BaseStage {
         )
       }
 
-      /**
-       * normalize 模式：按 win_probability 百分比直接抽奖，不区分档位
-       * 从全量可用奖品中按概率归一化随机选取
+      const selected_tier = tier_pick_data.selected_tier
+
+      /*
+       * normalize 选奖模式：将所有档位的奖品合并到同一个池，按 win_probability 归一化随机抽取
+       * 不区分 reward_tier，每个奖品的中奖概率由 win_probability 字段决定
        */
-      if (tier_pick_data.pick_method === 'normalize') {
-        const all_prizes = Object.values(prizes_by_tier).flat()
-          .filter(p => p.status === 'active' && (p.stock_quantity || 0) > (p.total_win_count || 0))
+      if (selected_tier === 'normalize') {
+        const all_prizes = Object.values(prizes_by_tier)
+          .flat()
+          .filter(p => p.status === 'active')
 
         if (all_prizes.length === 0) {
-          throw this.createError('normalize模式下没有可用奖品', 'NO_AVAILABLE_PRIZES', true)
+          throw this.createError('normalize 模式下没有可用奖品', 'NO_PRIZES_FOR_NORMALIZE', true)
         }
 
         const { selected_prize, random_value, total_weight, hit_range } =
           this._pickPrizeByProbability(all_prizes)
 
-        this.log('info', 'normalize模式：按概率抽取奖品成功', {
+        if (!selected_prize) {
+          throw this.createError(
+            'normalize 模式奖品抽取失败：无法选中奖品',
+            'NORMALIZE_PICK_FAILED',
+            true
+          )
+        }
+
+        this.log('info', 'normalize 模式奖品抽取完成', {
           user_id,
-          selected_prize_id: selected_prize.lottery_prize_id,
+          lottery_campaign_id,
+          pick_method: 'normalize',
+          pool_size: all_prizes.length,
+          lottery_prize_id: selected_prize.lottery_prize_id,
           prize_name: selected_prize.prize_name,
           win_probability: selected_prize.win_probability,
-          total_probability: total_weight
+          random_value_percent:
+            total_weight > 0 ? ((random_value / total_weight) * 100).toFixed(4) + '%' : '0%'
         })
 
         return this.success({
@@ -225,22 +240,19 @@ class PrizePickStage extends BaseStage {
           tier_total_weight: total_weight,
           prize_hit_range: hit_range,
           tier_prize_count: all_prizes.length,
-          selected_tier: selected_prize.reward_tier || null,
-          decision_source,
+          selected_tier: selected_prize.reward_tier || 'normalize',
           pick_method: 'normalize'
         })
       }
 
-      const selected_tier = tier_pick_data.selected_tier
-
-      // 获取选中档位的奖品列表
+      // tier_first 模式：获取选中档位的奖品列表
       const tier_prizes = prizes_by_tier[selected_tier] || []
 
       if (tier_prizes.length === 0) {
         throw this.createError(`选中档位 ${selected_tier} 没有可用奖品`, 'NO_PRIZES_IN_TIER', true)
       }
 
-      // 执行奖品抽取
+      // 执行奖品抽取（按 win_weight 加权随机）
       const { selected_prize, random_value, total_weight, hit_range } = this._pickPrize(tier_prizes)
 
       if (!selected_prize) {
@@ -281,7 +293,67 @@ class PrizePickStage extends BaseStage {
   }
 
   /**
-   * 在档位内抽取奖品
+   * normalize 模式：按 win_probability 归一化随机抽取奖品
+   *
+   * 算法：
+   * 1. 收集所有奖品的 win_probability，计算总和
+   * 2. 归一化为 [0, total_probability) 范围
+   * 3. 生成随机数，累加概率直到覆盖
+   *
+   * @param {Array} prizes - 全部可用奖品（不区分档位）
+   * @returns {Object} { selected_prize, random_value, total_weight, hit_range }
+   * @private
+   */
+  _pickPrizeByProbability(prizes) {
+    const total_probability = prizes.reduce((sum, prize) => {
+      return sum + (parseFloat(prize.win_probability) || 0)
+    }, 0)
+
+    if (total_probability === 0) {
+      this.log('warn', 'normalize 模式所有奖品 win_probability 为 0，等概率随机选择')
+      const random_index = Math.floor(Math.random() * prizes.length)
+      return {
+        selected_prize: prizes[random_index],
+        random_value: 0,
+        total_weight: 0,
+        hit_range: [0, 0]
+      }
+    }
+
+    const random_value = Math.random() * total_probability
+    let cumulative = 0
+    let selected_prize = null
+    let hit_range = [0, 0]
+
+    for (const prize of prizes) {
+      const prob = parseFloat(prize.win_probability) || 0
+      const range_start = cumulative
+      cumulative += prob
+      const range_end = cumulative
+
+      if (random_value < cumulative) {
+        selected_prize = prize
+        hit_range = [range_start, range_end]
+        break
+      }
+    }
+
+    if (!selected_prize && prizes.length > 0) {
+      selected_prize = prizes[prizes.length - 1]
+      const last_prob = parseFloat(selected_prize.win_probability) || 0
+      hit_range = [total_probability - last_prob, total_probability]
+    }
+
+    return {
+      selected_prize,
+      random_value,
+      total_weight: total_probability,
+      hit_range
+    }
+  }
+
+  /**
+   * 在档位内抽取奖品（tier_first 模式）
    *
    * 算法：加权随机选择
    * 1. 计算档位内所有奖品的总权重
@@ -341,66 +413,6 @@ class PrizePickStage extends BaseStage {
         random_value,
         total_weight
       })
-    }
-
-    return {
-      selected_prize,
-      random_value,
-      total_weight,
-      hit_range
-    }
-  }
-
-  /**
-   * normalize 模式：按 win_probability 百分比抽取奖品
-   *
-   * 算法：概率归一化随机选择
-   * 1. 累加所有可用奖品的 win_probability
-   * 2. 归一化后生成 [0, total_probability) 范围的随机数
-   * 3. 累加概率直到覆盖随机数
-   *
-   * @param {Array} prizes - 所有可用奖品列表
-   * @returns {Object} { selected_prize, random_value, total_weight, hit_range }
-   * @private
-   */
-  _pickPrizeByProbability(prizes) {
-    const total_weight = prizes.reduce((sum, prize) => {
-      return sum + (parseFloat(prize.win_probability) || 0)
-    }, 0)
-
-    if (total_weight === 0) {
-      this.log('warn', 'normalize模式：所有奖品概率为0，随机选择')
-      const random_index = Math.floor(Math.random() * prizes.length)
-      return {
-        selected_prize: prizes[random_index],
-        random_value: 0,
-        total_weight: 0,
-        hit_range: [0, 0]
-      }
-    }
-
-    const random_value = Math.random() * total_weight
-    let cumulative = 0
-    let selected_prize = null
-    let hit_range = [0, 0]
-
-    for (const prize of prizes) {
-      const prize_probability = parseFloat(prize.win_probability) || 0
-      const range_start = cumulative
-      cumulative += prize_probability
-      const range_end = cumulative
-
-      if (random_value < cumulative) {
-        selected_prize = prize
-        hit_range = [range_start, range_end]
-        break
-      }
-    }
-
-    if (!selected_prize && prizes.length > 0) {
-      selected_prize = prizes[prizes.length - 1]
-      const last_probability = parseFloat(selected_prize.win_probability) || 0
-      hit_range = [total_weight - last_probability, total_weight]
     }
 
     return {

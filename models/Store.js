@@ -212,18 +212,19 @@ module.exports = sequelize => {
       },
 
       /**
-       * 商户ID（关联商家用户，外键关联 users.user_id）
+       * 归属商家ID（关联 merchants 表）
+       * NULL 表示未分配商家
        */
       merchant_id: {
         type: DataTypes.INTEGER,
         allowNull: true,
         references: {
-          model: 'users',
-          key: 'user_id'
+          model: 'merchants',
+          key: 'merchant_id'
         },
         onDelete: 'SET NULL',
         onUpdate: 'CASCADE',
-        comment: '商户ID（关联商家用户，外键关联users.user_id）'
+        comment: '归属商家ID（关联 merchants 表，NULL=未分配）'
       },
 
       /**
@@ -305,12 +306,14 @@ module.exports = sequelize => {
       comment: '分配的业务员'
     })
 
-    // 多对一：多个门店属于一个商户
-    Store.belongsTo(models.User, {
-      foreignKey: 'merchant_id',
-      as: 'merchant',
-      comment: '商户信息'
-    })
+    // 多对一：多个门店属于一个商家
+    if (models.Merchant) {
+      Store.belongsTo(models.Merchant, {
+        foreignKey: 'merchant_id',
+        as: 'merchant',
+        comment: '归属商家'
+      })
+    }
 
     // 关联行政区划字典（用于验证和查询）
     if (models.AdministrativeRegion) {

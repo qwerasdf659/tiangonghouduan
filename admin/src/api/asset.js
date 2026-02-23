@@ -8,7 +8,7 @@
  * - 资产统计: /api/v4/console/assets/*
  * - 资产调整: /api/v4/console/asset-adjustment/*（POINTS/DIAMOND/BUDGET_POINTS/材料统一入口）
  * - 材料管理: /api/v4/console/material/*
- * - 物品管理: /api/v4/console/item-templates/*, /api/v4/console/item-instances/*
+ * - 物品管理: /api/v4/console/item-templates/*, /api/v4/console/items/*
  *
  * @version 2.0.0
  * @since 2026-01-23
@@ -56,12 +56,12 @@ export const ASSET_ENDPOINTS = {
   ITEM_TEMPLATE_STATS: `${API_PREFIX}/console/item-templates/stats`,
 
   // 物品管理（三表模型：items + item_ledger + item_holds）
-  ITEM_INSTANCE_LIST: `${API_PREFIX}/console/item-instances`,
-  ITEM_INSTANCE_DETAIL: `${API_PREFIX}/console/item-instances/:id`,
-  ITEM_INSTANCE_USER: `${API_PREFIX}/console/item-instances/user/:user_id`,
-  ITEM_INSTANCE_TRANSFER: `${API_PREFIX}/console/item-instances/:id/transfer`,
-  ITEM_INSTANCE_FREEZE: `${API_PREFIX}/console/item-instances/:id/freeze`,
-  ITEM_INSTANCE_UNFREEZE: `${API_PREFIX}/console/item-instances/:id/unfreeze`,
+  ITEM_LIST: `${API_PREFIX}/console/items`,
+  ITEM_DETAIL: `${API_PREFIX}/console/items/:id`,
+  ITEM_USER: `${API_PREFIX}/console/items/user/:user_id`,
+  ITEM_TRANSFER: `${API_PREFIX}/console/items/:id/transfer`,
+  ITEM_FREEZE: `${API_PREFIX}/console/items/:id/freeze`,
+  ITEM_UNFREEZE: `${API_PREFIX}/console/items/:id/unfreeze`,
 
   // 物品全链路追踪（三表模型 2026-02-22）
   ITEM_LIFECYCLE: `${API_PREFIX}/console/item-lifecycle/:identifier/lifecycle`,
@@ -198,7 +198,7 @@ export const AssetAPI = {
    * @description 整合三类资产域，提供统一的资产查询入口：
    * 1. 积分（POINTS）- 来自 account_asset_balances
    * 2. 可叠加资产（DIAMOND、材料）- 来自 account_asset_balances
-   * 3. 不可叠加物品（优惠券、实物商品）- 来自 item_instances
+   * 3. 不可叠加物品（优惠券、实物商品）- 来自 items
    *
    * @async
    * @function getPortfolio
@@ -611,16 +611,16 @@ export const AssetAPI = {
     return await request({ url, method: 'DELETE' })
   },
 
-  // ===== 物品实例 =====
+  // ===== 物品管理（三表模型：items + item_ledger + item_holds） =====
 
   /**
-   * 获取物品实例列表
+   * 获取物品列表
    * @param {Object} params - 查询参数
    * @async
    * @returns {Promise<Object>}
    */
-  async getItemInstances(params = {}) {
-    const url = ASSET_ENDPOINTS.ITEM_INSTANCE_LIST + buildQueryString(params)
+  async getItems(params = {}) {
+    const url = ASSET_ENDPOINTS.ITEM_LIST + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 
@@ -633,7 +633,7 @@ export const AssetAPI = {
    */
   async getUserItems(userId, params = {}) {
     const url =
-      buildURL(ASSET_ENDPOINTS.ITEM_INSTANCE_USER, { user_id: userId }) + buildQueryString(params)
+      buildURL(ASSET_ENDPOINTS.ITEM_USER, { user_id: userId }) + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 
@@ -645,7 +645,7 @@ export const AssetAPI = {
    * @returns {Promise<Object>} 转移结果
    */
   async transferItem(itemId, data) {
-    const url = buildURL(ASSET_ENDPOINTS.ITEM_INSTANCE_TRANSFER, { id: itemId })
+    const url = buildURL(ASSET_ENDPOINTS.ITEM_TRANSFER, { id: itemId })
     return await request({ url, method: 'POST', data })
   },
 
@@ -657,7 +657,7 @@ export const AssetAPI = {
    * @returns {Promise<Object>} 冻结结果
    */
   async freezeItem(itemId, data) {
-    const url = buildURL(ASSET_ENDPOINTS.ITEM_INSTANCE_FREEZE, { id: itemId })
+    const url = buildURL(ASSET_ENDPOINTS.ITEM_FREEZE, { id: itemId })
     return await request({ url, method: 'POST', data })
   },
 
@@ -668,7 +668,7 @@ export const AssetAPI = {
    * @returns {Promise<Object>} 解冻结果
    */
   async unfreezeItem(itemId) {
-    const url = buildURL(ASSET_ENDPOINTS.ITEM_INSTANCE_UNFREEZE, { id: itemId })
+    const url = buildURL(ASSET_ENDPOINTS.ITEM_UNFREEZE, { id: itemId })
     return await request({ url, method: 'POST' })
   }
 }

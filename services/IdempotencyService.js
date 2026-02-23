@@ -114,6 +114,9 @@ const CANONICAL_OPERATION_MAP = {
   // ===== 材料转换 =====
   '/api/v4/shop/assets/convert': 'SHOP_ASSET_CONVERT', // 资产转换（canonical 路径）
 
+  // ===== 汇率兑换（2026-02-23 市场增强） =====
+  '/api/v4/market/exchange-rates/convert': 'EXCHANGE_RATE_CONVERT', // 执行汇率兑换
+
   // ===== C2C 市场交易 - 物品 =====
   '/api/v4/market/list': 'MARKET_CREATE_LISTING', // 物品上架
   '/api/v4/market/listings/:id/purchase': 'MARKET_PURCHASE_LISTING', // 购买物品
@@ -279,10 +282,10 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/console/assets/portfolio/items/': 'ADMIN_ASSET_ITEM_CREATE', // 创建资产组合项（尾斜杠）
   '/api/v4/console/assets/portfolio/items/:id': 'ADMIN_ASSET_ITEM_UPDATE', // 更新或删除资产组合项（PUT/DELETE）
 
-  // ===== 物品实例管理（2026-02-15 新增） =====
-  '/api/v4/console/item-instances/:id/freeze': 'ADMIN_ITEM_INSTANCE_FREEZE', // 管理员冻结物品
-  '/api/v4/console/item-instances/:id/unfreeze': 'ADMIN_ITEM_INSTANCE_UNFREEZE', // 管理员解冻物品
-  '/api/v4/console/item-instances/:id/transfer': 'ADMIN_ITEM_INSTANCE_TRANSFER', // 管理员转移物品
+  // ===== 物品管理（三表模型写操作） =====
+  '/api/v4/console/items/:id/freeze': 'ADMIN_ITEM_FREEZE', // 管理员冻结物品
+  '/api/v4/console/items/:id/unfreeze': 'ADMIN_ITEM_UNFREEZE', // 管理员解冻物品
+  '/api/v4/console/items/:id/transfer': 'ADMIN_ITEM_TRANSFER', // 管理员转移物品
 
   // ===== 抽奖干预 =====
   '/api/v4/console/lottery-management/probability-adjust': 'ADMIN_LOTTERY_PROB_ADJUST', // 概率调整（canonical 路径）
@@ -293,6 +296,9 @@ const CANONICAL_OPERATION_MAP = {
     'ADMIN_LOTTERY_INTERVENTION_CANCEL', // 取消干预（canonical 路径）
   '/api/v4/console/lottery-management/clear-user-settings/:id': 'ADMIN_LOTTERY_CLEAR_USER', // 清除用户设置（DELETE）
   '/api/v4/console/lottery-management/user-settings/:id': 'ADMIN_LOTTERY_USER_SETTINGS_DELETE', // 删除用户抽奖设置（DELETE 方法）
+
+  // ===== 策略配置（10策略活动级开关） =====
+  '/api/v4/console/lottery-campaigns/:id/strategy-config': 'ADMIN_LOTTERY_STRATEGY_CONFIG_UPDATE', // 批量更新活动策略配置（PUT）
 
   // ===== 孤儿冻结清理 =====
   '/api/v4/console/orphan-frozen/cleanup': 'ADMIN_ORPHAN_CLEANUP', // 孤儿清理（修复：console/order → console/orphan-frozen/cleanup）
@@ -337,6 +343,10 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/console/material/conversion-rules/': 'ADMIN_MATERIAL_RULE_CREATE', // 创建转换规则
   '/api/v4/console/material/conversion-rules/:id': 'ADMIN_MATERIAL_RULE_UPDATE', // 更新或删除转换规则
   '/api/v4/console/material/conversion-rules/:id/disable': 'ADMIN_MATERIAL_RULE_DISABLE', // 禁用转换规则
+  // 汇率兑换管理（2026-02-23 市场增强）
+  '/api/v4/console/exchange-rates': 'ADMIN_EXCHANGE_RATE_CREATE', // 创建汇率规则
+  '/api/v4/console/exchange-rates/:id': 'ADMIN_EXCHANGE_RATE_UPDATE', // 更新汇率规则
+  '/api/v4/console/exchange-rates/:id/status': 'ADMIN_EXCHANGE_RATE_STATUS', // 更新汇率规则状态
   // 资产类型：配置实体，使用 :code
   '/api/v4/console/material/asset-types/': 'ADMIN_MATERIAL_TYPE_CREATE', // 创建资产类型
   '/api/v4/console/material/asset-types/:code': 'ADMIN_MATERIAL_TYPE_UPDATE', // 更新资产类型（配置实体用业务码）
@@ -383,6 +393,10 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/console/stores/:id/activate': 'ADMIN_STORE_ACTIVATE', // 激活门店
   '/api/v4/console/stores/:id/deactivate': 'ADMIN_STORE_DEACTIVATE', // 停用门店
 
+  // ===== 商家管理（多商家接入架构） =====
+  '/api/v4/console/merchants/': 'ADMIN_MERCHANT_CREATE', // 创建商家
+  '/api/v4/console/merchants/:id': 'ADMIN_MERCHANT_UPDATE', // 更新/删除商家（PUT/DELETE）
+
   // ===== 商户积分审核 =====
   '/api/v4/console/merchant-points/:id/approve': 'ADMIN_MERCHANT_APPROVE', // 审批商户积分（修复：console/:id/approve → console/merchant-points/:id/approve）
   '/api/v4/console/merchant-points/:id/reject': 'ADMIN_MERCHANT_REJECT', // 拒绝商户积分（修复：console/:id/reject → console/merchant-points/:id/reject）
@@ -411,6 +425,7 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/user/ad-campaigns/:id': 'USER_AD_CAMPAIGN_UPDATE', // 更新广告计划
   '/api/v4/user/ad-campaigns/:id/submit': 'USER_AD_CAMPAIGN_SUBMIT', // 提交审核（含钻石冻结）
   '/api/v4/user/ad-campaigns/:id/cancel': 'USER_AD_CAMPAIGN_CANCEL', // 取消计划（含钻石退回）
+  '/api/v4/user/ad-campaigns/:id/interaction': 'USER_AD_CAMPAIGN_INTERACTION', // 用户端交互日志上报
 
   // Phase 3: 广告计划管理（管理端）
   '/api/v4/console/ad-campaigns/': 'ADMIN_AD_CAMPAIGN_CREATE', // 管理员创建广告计划

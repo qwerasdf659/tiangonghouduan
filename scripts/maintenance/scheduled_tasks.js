@@ -53,8 +53,8 @@ const { Op } = sequelize.Sequelize
 const BeijingTimeHelper = require('../../utils/timeHelper')
 // 2025-11-09新增：数据库性能监控
 const { monitor: databaseMonitor } = require('./database_performance_monitor')
-// 2025-12-17新增：每日资产对账任务（Phase 1）
-const DailyAssetReconciliation = require('../../jobs/daily-asset-reconciliation')
+// @deprecated 旧版每日资产对账已被统一对账脚本(scripts/reconcile-items.js)替代
+// DailyAssetReconciliation 不再直接引用，任务12已委托给统一对账
 // 🔴 移除 RedemptionService 直接引用（2025-12-17 P1-2）
 // 原因：统一通过 jobs/daily-redemption-order-expiration.js 作为唯一入口
 // 避免多处直接调用服务层方法，确保业务逻辑和报告格式统一
@@ -295,10 +295,13 @@ class ScheduledTasks {
 
     // ========== 2026-02-23 统一对账定时任务 ==========
 
-    // 任务35: 每天凌晨4:30执行物品+资产统一对账（物品守恒+持有者一致+铸造数量+资产守恒+余额一致）
-    this.scheduleDailyUnifiedReconciliation()
+    // 任务35: 每小时第50分钟执行物品+资产统一对账（物品守恒+持有者一致+铸造数量+资产守恒+余额一致）
+    this.scheduleHourlyUnifiedReconciliation()
 
-    logger.info('所有定时任务已初始化完成（包含2026-02-23统一对账任务）')
+    // 任务36: 每10分钟检查 item_holds 过期记录并自动释放
+    this.scheduleItemHoldsExpiration()
+
+    logger.info('所有定时任务已初始化完成（包含统一对账+物品锁定过期释放）')
   }
 
   /**
@@ -1229,59 +1232,31 @@ class ScheduledTasks {
   }
 
   /**
-   * 任务12: 每天凌晨2点执行每日资产对账（2025-12-17新增）
+   * 任务12: 每天凌晨2点执行每日资产对账
+   *
+   * @deprecated 已被任务35（scheduleHourlyUnifiedReconciliation）替代
+   * 旧版仅做余额对比，新版覆盖物品守恒+资产双录守恒+余额一致性。
+   * 保留此方法以避免调用链断裂，实际委托给统一对账脚本。
+   *
    * Cron表达式: 0 2 * * * (每天凌晨2点)
    * @returns {void}
    */
   static scheduleDailyAssetReconciliation() {
     cron.schedule('0 2 * * *', async () => {
-      const lockKey = 'lock:daily_asset_reconciliation'
-      const lockValue = `${process.pid}_${Date.now()}` // 进程ID + 时间戳作为锁值
-      let redisClient = null
-
       try {
-        // 获取Redis客户端
-        const { getRawClient } = require('../../utils/UnifiedRedisClient')
-        redisClient = getRawClient()
+        logger.info('[定时任务] 每日资产对账（已委托给统一对账脚本）...')
+        const { executeReconciliation } = require('../../scripts/reconcile-items')
+        const report = await executeReconciliation({ autoFix: true })
 
-        // 尝试获取分布式锁（20分钟过期，资产对账可能耗时较长）
-        const acquired = await redisClient.set(lockKey, lockValue, 'EX', 1200, 'NX')
-
-        if (!acquired) {
-          logger.info('[定时任务] 其他实例正在执行每日资产对账，跳过')
-          return
-        }
-
-        logger.info('[定时任务] 获取分布式锁成功，开始执行每日资产对账...', {
-          lock_key: lockKey,
-          lock_value: lockValue
-        })
-
-        // 调用 DailyAssetReconciliation 的对账方法
-        const report = await DailyAssetReconciliation.execute()
-
-        if (report.status === 'OK') {
-          logger.info('[定时任务] 每日资产对账完成：无差异')
+        if (report.allPass) {
+          logger.info('[定时任务] 每日资产对账（统一版）完成：全部通过')
         } else {
-          logger.warn(
-            `[定时任务] 每日资产对账完成：发现${report.discrepancy_count}笔差异（状态: ${report.status}）`
-          )
+          logger.warn('[定时任务] 每日资产对账（统一版）完成：存在异常', {
+            results: report.results
+          })
         }
-
-        // 释放锁
-        await redisClient.del(lockKey)
-        logger.info('[定时任务] 分布式锁已释放', { lock_key: lockKey })
       } catch (error) {
         logger.error('[定时任务] 每日资产对账失败', { error: error.message })
-
-        // 确保释放锁
-        if (redisClient) {
-          try {
-            await redisClient.del(lockKey)
-          } catch (unlockError) {
-            logger.error('[定时任务] 释放分布式锁失败', { error: unlockError.message })
-          }
-        }
       }
     })
 
@@ -1303,18 +1278,18 @@ class ScheduledTasks {
    */
   static async manualDailyAssetReconciliation() {
     try {
-      logger.info('[手动触发] 开始执行每日资产对账...')
-      const report = await DailyAssetReconciliation.execute()
+      logger.info('[手动触发] 开始执行统一资产对账（物品守恒 + 资产双录守恒）...')
+      const { executeReconciliation } = require('../../scripts/reconcile-items')
+      const report = await executeReconciliation({ autoFix: true })
 
-      logger.info('[手动触发] 每日资产对账完成', {
-        status: report.status,
-        total_checked: report.total_checked,
-        discrepancy_count: report.discrepancy_count
+      logger.info('[手动触发] 统一资产对账完成', {
+        allPass: report.allPass,
+        results: report.results
       })
 
       return report
     } catch (error) {
-      logger.error('[手动触发] 每日资产对账失败', { error: error.message })
+      logger.error('[手动触发] 统一资产对账失败', { error: error.message })
       throw error
     }
   }
@@ -1373,7 +1348,7 @@ class ScheduledTasks {
    * 业务规则：
    * - 物品锁定超时时间：3分钟
    * - 订单超时后：自动取消并解冻资产（与商家审核不同，可以自动解冻）
-   * - 记录超时解锁事件到 item_instance_events
+   * - 记录超时解锁事件到 item_ledger（物品账本）
    *
    * 创建时间：2025-12-29（资产域标准架构）
    * @returns {void}
@@ -3508,8 +3483,8 @@ class ScheduledTasks {
    * @since 2026-02-23
    * @returns {void}
    */
-  static scheduleDailyUnifiedReconciliation() {
-    cron.schedule('30 4 * * *', async () => {
+  static scheduleHourlyUnifiedReconciliation() {
+    cron.schedule('50 * * * *', async () => {
       try {
         logger.info('[定时任务] 开始执行物品+资产统一对账...')
 
@@ -3529,7 +3504,71 @@ class ScheduledTasks {
       }
     })
 
-    logger.info('✅ 定时任务已设置: 物品+资产统一对账（每天凌晨4:30执行）')
+    logger.info('✅ 定时任务已设置: 物品+资产统一对账（每小时第50分钟执行）')
+  }
+
+  /**
+   * 任务36: item_holds 过期自动释放
+   * Cron表达式: */10 * * * * (每10分钟)
+   *
+   * 检查 item_holds 表中已过期的锁定记录，自动释放。
+   * 业务场景：交易市场挂牌超时、抽奖锁定超时等。
+   *
+   * @since 2026-02-23
+   * @returns {void}
+   */
+  static scheduleItemHoldsExpiration() {
+    cron.schedule('*/10 * * * *', async () => {
+      const lockKey = 'lock:item_holds_expiration'
+
+      try {
+        const { getRawClient } = require('../../utils/UnifiedRedisClient')
+        const redisClient = getRawClient()
+        const acquired = await redisClient.set(lockKey, `${process.pid}_${Date.now()}`, 'EX', 300, 'NX')
+        if (!acquired) return
+
+        const { sequelize } = require('../../config/database')
+
+        const [expiredHolds] = await sequelize.query(`
+          SELECT hold_id, item_id, hold_type, holder_id, expires_at
+          FROM item_holds
+          WHERE expires_at IS NOT NULL AND expires_at < NOW()
+          LIMIT 100
+        `)
+
+        if (expiredHolds.length === 0) {
+          await redisClient.del(lockKey)
+          return
+        }
+
+        logger.info(`[定时任务] 发现 ${expiredHolds.length} 个过期的 item_holds，开始释放...`)
+
+        const holdIds = expiredHolds.map(h => h.hold_id)
+        await sequelize.query(`
+          DELETE FROM item_holds WHERE hold_id IN (:holdIds)
+        `, { replacements: { holdIds } })
+
+        // 更新 items 表的 status（如果该物品没有其他 hold 了，恢复为 available）
+        const itemIds = [...new Set(expiredHolds.map(h => h.item_id))]
+        await sequelize.query(`
+          UPDATE items i
+          SET i.status = 'available', i.updated_at = NOW()
+          WHERE i.item_id IN (:itemIds)
+            AND NOT EXISTS (SELECT 1 FROM item_holds h WHERE h.item_id = i.item_id)
+            AND i.status = 'held'
+        `, { replacements: { itemIds } })
+
+        logger.info(`[定时任务] 已释放 ${expiredHolds.length} 个过期 item_holds`)
+        await redisClient.del(lockKey)
+      } catch (error) {
+        logger.error('[定时任务] item_holds 过期释放失败', {
+          error: error.message,
+          stack: error.stack
+        })
+      }
+    })
+
+    logger.info('✅ 定时任务已设置: item_holds 过期自动释放（每10分钟检查）')
   }
 }
 

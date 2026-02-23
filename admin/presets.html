@@ -418,6 +418,15 @@
         </div>
         
         <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1.5">关联活动 <span class="text-slate-400 text-xs font-normal">（不选则全局生效）</span></label>
+          <select x-model="interventionForm.lottery_campaign_id" class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400">
+            <option value="">全局（所有活动生效）</option>
+            <template x-for="c in campaignsForIntervention" :key="c.lottery_campaign_id">
+              <option :value="c.lottery_campaign_id" x-text="`${c.campaign_name}（${c.status}）`"></option>
+            </template>
+          </select>
+        </div>
+        <div>
           <label class="block text-sm font-medium text-slate-700 mb-1.5">指定奖品 <span class="text-red-500">*</span></label>
           <select x-model="interventionForm.prize_id" class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400">
             <option value="">请选择要指定的奖品</option>

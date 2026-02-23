@@ -4,7 +4,7 @@
  * 业务定位：
  * - 物品当前状态的缓存/快照，方便查询
  * - 可从 item_ledger（真相层）随时重建
- * - 与旧 ItemInstance 的核心区别：
+ * 架构特点：
  *   1. 关键属性都是正式列（非 JSON meta）
  *   2. 锁定状态由 item_holds 独立表管理（非 JSON locks）
  *   3. 持有者使用 account_id（统一用户和系统账户）
@@ -67,6 +67,14 @@ class Item extends Model {
       foreignKey: 'item_id',
       as: 'redemptionOrders'
     })
+
+    // 物品来源商家（NULL=平台自营）
+    if (models.Merchant) {
+      Item.belongsTo(models.Merchant, {
+        foreignKey: 'merchant_id',
+        as: 'merchant'
+      })
+    }
   }
 
   /**
@@ -183,6 +191,19 @@ module.exports = sequelize => {
         type: DataTypes.STRING(100),
         allowNull: true,
         comment: '来源关联ID（lottery_draw_id / bid_product_id 等，用于追溯物品起源）'
+      },
+
+      /** 来源商家ID（NULL=平台自营） */
+      merchant_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: {
+          model: 'merchants',
+          key: 'merchant_id'
+        },
+        onDelete: 'SET NULL',
+        onUpdate: 'CASCADE',
+        comment: '来源商家ID（NULL=平台自营，关联 merchants 表）'
       },
 
       created_at: {

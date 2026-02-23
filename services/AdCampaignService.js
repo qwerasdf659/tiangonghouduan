@@ -232,6 +232,12 @@ class AdCampaignService {
    */
   static async createCampaign(data, options = {}) {
     try {
+      // D6 定论：commercial 类型 priority 范围 1-99，Service 层强制校验
+      const priority = data.priority || 50
+      if (priority < 1 || priority > 99) {
+        throw new Error('商业广告优先级必须在 1-99 范围内，当前值: ' + priority)
+      }
+
       // 验证广告位是否存在
       const adSlot = await AdSlot.findByPk(data.ad_slot_id, {
         transaction: options.transaction
@@ -269,10 +275,11 @@ class AdCampaignService {
       // 生成business_id
       const business_id = uuidv4()
 
-      // 创建计划（草稿状态）
+      // 创建计划（草稿状态，campaign_category 强制设为 commercial）
       const campaign = await AdCampaign.create(
         {
           business_id,
+          campaign_category: 'commercial',
           advertiser_user_id: data.advertiser_user_id,
           ad_slot_id: data.ad_slot_id,
           campaign_name: data.campaign_name,
@@ -286,7 +293,7 @@ class AdCampaignService {
           targeting_rules: data.targeting_rules || null,
           start_date: data.start_date || null,
           end_date: data.end_date || null,
-          priority: data.priority || 50
+          priority
         },
         { transaction: options.transaction }
       )

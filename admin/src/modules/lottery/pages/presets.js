@@ -102,6 +102,9 @@ function presetsPage() {
 
     // ==================== 页面特有状态 ====================
 
+    /** @type {Array} 活动列表（用于干预规则关联活动选择） */
+    campaignsForIntervention: [],
+
     /**
      * 全局加载状态
      * @type {boolean}
@@ -273,6 +276,7 @@ function presetsPage() {
      */
     interventionForm: {
       prize_id: '',
+      lottery_campaign_id: '',
       expire_time: '',
       reason: '',
       note: ''
@@ -311,13 +315,14 @@ function presetsPage() {
       }
       logger.debug('[PRESETS] 认证检查通过')
 
-      // 加载 Tab 1 数据（强制中奖 + 奖品列表）
+      // 加载 Tab 1 数据（强制中奖 + 奖品列表 + 活动列表）
       try {
-        logger.debug('[PRESETS] 开始加载奖品和干预列表...')
-        await Promise.all([this.loadPrizes(), this.loadData()])
+        logger.debug('[PRESETS] 开始加载奖品、干预列表和活动列表...')
+        await Promise.all([this.loadPrizes(), this.loadData(), this.loadCampaignsForIntervention()])
         logger.info('[PRESETS] Tab 1 初始化完成', {
           interventionsCount: this.interventions.length,
-          prizesCount: this.allPrizes.length
+          prizesCount: this.allPrizes.length,
+          campaignsCount: this.campaignsForIntervention.length
         })
       } catch (error) {
         logger.error('[PRESETS] Tab 1 初始化失败:', error)
@@ -391,6 +396,23 @@ function presetsPage() {
     /** @type {boolean} 预设队列 Tab 数据是否已加载（懒加载标记） */
     _presetTabLoaded: false,
 
+    /**
+     * 加载活动列表（用于干预规则创建时选择关联活动）
+     * @async
+     * @returns {Promise<void>}
+     */
+    async loadCampaignsForIntervention() {
+      try {
+        const response = await apiRequest(LOTTERY_ENDPOINTS.CAMPAIGN_LIST)
+        const data = response?.data || response
+        this.campaignsForIntervention = Array.isArray(data?.campaigns) ? data.campaigns : (Array.isArray(data) ? data : [])
+        logger.debug('[PRESETS] 活动列表加载完成', { count: this.campaignsForIntervention.length })
+      } catch (error) {
+        logger.warn('[PRESETS] 加载活动列表失败（干预创建将使用全局模式）:', error.message)
+        this.campaignsForIntervention = []
+      }
+    },
+
     // ==================== 创建干预规则 ====================
 
     /**
@@ -413,6 +435,7 @@ function presetsPage() {
     resetForm() {
       this.interventionForm = {
         prize_id: '',
+        lottery_campaign_id: '',
         expire_time: '',
         reason: '',
         note: ''
@@ -533,14 +556,19 @@ function presetsPage() {
           ? `${this.interventionForm.reason || '管理员强制中奖'} - ${this.interventionForm.note}`
           : this.interventionForm.reason || '管理员强制中奖'
 
+        const data = {
+          user_id: parseInt(this.selectedUser.user_id),
+          prize_id: parseInt(this.interventionForm.prize_id),
+          duration_minutes: durationMinutes,
+          reason: reason
+        }
+        if (this.interventionForm.lottery_campaign_id) {
+          data.lottery_campaign_id = parseInt(this.interventionForm.lottery_campaign_id)
+        }
+
         const response = await apiRequest(LOTTERY_ENDPOINTS.INTERVENTION_FORCE_WIN, {
           method: 'POST',
-          data: {
-            user_id: parseInt(this.selectedUser.user_id),
-            prize_id: parseInt(this.interventionForm.prize_id),
-            duration_minutes: durationMinutes,
-            reason: reason
-          }
+          data
         })
 
         if (response && response.success) {

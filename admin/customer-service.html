@@ -79,6 +79,14 @@
               <p class="text-sm font-semibold" :class="pendingIssueCount > 0 ? 'text-orange-600' : 'themed-text'" x-text="pendingIssueCount"></p>
             </div>
           </div>
+          <!-- 满意度均分 -->
+          <div class="flex items-center gap-2">
+            <span class="text-base">⭐</span>
+            <div class="leading-tight">
+              <p class="text-[10px] themed-text-muted">满意度</p>
+              <p class="text-sm font-semibold" :class="avgSatisfaction >= 4 ? 'text-green-600' : avgSatisfaction >= 3 ? 'text-yellow-600' : avgSatisfaction ? 'text-red-600' : 'themed-text'" x-text="avgSatisfaction ? avgSatisfaction.toFixed(1) : '--'"></p>
+            </div>
+          </div>
           <!-- SLA超时告警 -->
           <div x-show="slaBreachCount > 0" class="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-2.5 py-1 animate-pulse">
             <span class="text-base">⚠️</span>
@@ -119,7 +127,7 @@
             </div>
             <!-- 状态筛选 Tabs -->
             <div class="flex rounded-lg themed-bg-subtle p-0.5 text-xs">
-              <template x-for="tab in [{val:'all',label:'全部'},{val:'waiting',label:'待接入'},{val:'active',label:'进行中'},{val:'closed',label:'已关闭'}]" :key="tab.val">
+              <template x-for="tab in [{val:'all',label:'全部'},{val:'mine',label:'我的'},{val:'waiting',label:'待接入'},{val:'active',label:'进行中'},{val:'closed',label:'已关闭'}]" :key="tab.val">
                 <button @click="statusFilter = tab.val; loadSessions()"
                         :class="statusFilter === tab.val ? 'themed-card shadow-sm font-medium themed-text' : 'themed-text-muted'"
                         class="flex-1 py-1.5 rounded-md text-center transition-all" x-text="tab.label">

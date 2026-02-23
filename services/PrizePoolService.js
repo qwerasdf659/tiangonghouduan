@@ -106,18 +106,27 @@ class PrizePoolService {
       throw new Error('活动不存在')
     }
 
-    /**
-     * 2. 按选奖方式分支校验
-     * - normalize 模式：校验 win_probability 总和 = 1.0
-     * - tier_first 模式：不校验概率总和（使用 win_weight 权重）
-     */
+    // 2. normalize 模式概率校验：win_probability 总和应为 1.0（柔性提醒）
     if (campaign.pick_method === 'normalize') {
-      const totalProbability = prizes.reduce((sum, p) => {
-        const prob = parseFloat(p.win_probability) || 0
-        return sum + prob
-      }, 0)
-      if (Math.abs(totalProbability - 1.0) > 0.001) {
-        throw new Error(`normalize模式下奖品概率总和必须为1，当前为${totalProbability.toFixed(4)}`)
+      const existing_prizes = await LotteryPrize.findAll({
+        where: { lottery_campaign_id: parseInt(lottery_campaign_id), status: 'active' },
+        attributes: ['win_probability'],
+        transaction
+      })
+      const existing_sum = existing_prizes.reduce(
+        (sum, p) => sum + (parseFloat(p.win_probability) || 0),
+        0
+      )
+      const new_sum = prizes.reduce((sum, p) => sum + (parseFloat(p.win_probability) || 0), 0)
+      const total_probability = existing_sum + new_sum
+      if (Math.abs(total_probability - 1.0) > 0.01) {
+        logger.warn('[normalize 概率校验] win_probability 总和不等于 1.0（柔性提醒）', {
+          lottery_campaign_id,
+          existing_sum: existing_sum.toFixed(4),
+          new_sum: new_sum.toFixed(4),
+          total: total_probability.toFixed(4),
+          deviation: Math.abs(total_probability - 1.0).toFixed(4)
+        })
       }
     }
 
@@ -601,12 +610,32 @@ class PrizePoolService {
     }
 
     // 3. 特殊处理库存数量更新（验证库存合法性）
+    const warnings = []
+
     if (filteredUpdateData.stock_quantity !== undefined) {
       const newQuantity = parseInt(filteredUpdateData.stock_quantity)
       const currentUsed = prize.total_win_count || 0
 
       if (newQuantity < currentUsed) {
         throw new Error(`新库存(${newQuantity})不能小于已使用数量(${currentUsed})`)
+      }
+
+      if (newQuantity === 0) {
+        warnings.push({
+          code: 'ZERO_STOCK',
+          message: '库存已设为0，该奖品将无法被抽中',
+          field: 'stock_quantity'
+        })
+      }
+
+      const remainingStock = newQuantity - currentUsed
+      if (remainingStock > 0 && remainingStock <= 10) {
+        warnings.push({
+          code: 'LOW_STOCK',
+          message: `剩余可用库存仅 ${remainingStock} 件，建议及时补货`,
+          field: 'stock_quantity',
+          remaining: remainingStock
+        })
       }
     }
 
@@ -796,21 +825,45 @@ class PrizePoolService {
       })
     }
 
-    // 10. 零库存风险警告（覆盖 tier_first 的 win_weight 和 normalize 的 win_probability）
-    const warnings = []
+    // 10. normalize 模式概率校验：更新后检查 win_probability 总和（柔性提醒）
+    if (filteredUpdateData.win_probability !== undefined) {
+      try {
+        const ownerCampaign = await LotteryCampaign.findByPk(updatedPrize.lottery_campaign_id, {
+          attributes: ['pick_method'],
+          transaction
+        })
+        if (ownerCampaign && ownerCampaign.pick_method === 'normalize') {
+          const all_prizes = await LotteryPrize.findAll({
+            where: {
+              lottery_campaign_id: updatedPrize.lottery_campaign_id,
+              status: 'active'
+            },
+            attributes: ['win_probability'],
+            transaction
+          })
+          const total_prob = all_prizes.reduce(
+            (sum, p) => sum + (parseFloat(p.win_probability) || 0),
+            0
+          )
+          if (Math.abs(total_prob - 1.0) > 0.01) {
+            warnings.push({
+              code: 'NORMALIZE_PROBABILITY_SUM_OFF',
+              message: `normalize 模式下 win_probability 总和为 ${total_prob.toFixed(4)}，应为 1.0`,
+              field: 'win_probability'
+            })
+          }
+        }
+      } catch (probCheckError) {
+        logger.warn('[normalize 概率校验] 检查失败（非致命）', { error: probCheckError.message })
+      }
+    }
+
+    // 11. 零库存风险警告（tier_first 模式下检查 win_weight）
     if ((updatedPrize.stock_quantity || 0) === 0 && (updatedPrize.win_weight || 0) > 0) {
       warnings.push({
-        type: 'zero_stock_positive_weight',
-        message: `${updatedPrize.prize_name}：库存为 0 但权重 ${updatedPrize.win_weight} > 0，算法选中后将触发降级`
-      })
-    }
-    if (
-      (updatedPrize.stock_quantity || 0) === 0 &&
-      (parseFloat(updatedPrize.win_probability) || 0) > 0
-    ) {
-      warnings.push({
-        type: 'zero_stock_positive_probability',
-        message: `${updatedPrize.prize_name}：库存为 0 但概率 ${updatedPrize.win_probability} > 0（normalize 模式下选中将触发降级）`
+        code: 'ZERO_STOCK_POSITIVE_WEIGHT',
+        message: `${updatedPrize.prize_name}：库存为 0 但权重 ${updatedPrize.win_weight} > 0，算法选中后将触发降级`,
+        field: 'stock_quantity'
       })
     }
 

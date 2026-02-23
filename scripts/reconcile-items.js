@@ -87,39 +87,53 @@ async function executeReconciliation(options = {}) {
   // ========== 资产对账 ==========
   console.log('\n📊 资产对账...')
 
-  // 1. 全局守恒（排除 BIGINT 溢出）
+  // 1. 全局守恒（仅检查 delta_amount）
+  // delta_amount 追踪账户间资产流动，双录后全局 SUM 应为 0
+  // frozen_amount_change 是账户内部状态转换（available↔frozen），不参与全局守恒
   const [globalCheck] = await sequelize.query(`
-    SELECT asset_code, SUM(delta_amount) AS total_delta, COUNT(*) AS tx_count
+    SELECT asset_code,
+      SUM(delta_amount) AS total_delta,
+      COUNT(*) AS tx_count
     FROM asset_transactions
-    WHERE delta_amount > -9000000000000000000
+    WHERE (is_invalid IS NULL OR is_invalid = 0)
     GROUP BY asset_code
   `)
   results.assets.global = globalCheck.map(r => ({
     asset_code: r.asset_code,
-    total_delta: Number(r.total_delta),
+    total_net: Number(r.total_delta),
     tx_count: Number(r.tx_count)
   }))
-  console.log('  全局守恒：')
+  console.log('  全局守恒（SUM(delta_amount) = 0）：')
   for (const r of results.assets.global) {
-    const flag = r.total_delta === 0 ? '✅' : '⚠️'
-    console.log(`    ${flag} ${r.asset_code}: SUM=${r.total_delta}（${r.tx_count} 条流水）`)
+    const flag = r.total_net === 0 ? '✅' : '⚠️'
+    console.log(`    ${flag} ${r.asset_code}: SUM=${r.total_net}（${r.tx_count} 条流水）`)
   }
 
-  // 2. 账户余额一致性（抽样前 20）
+  // 2. 账户余额一致性（分维度对比）
+  // available_amount = SUM(delta_amount)
+  // frozen_amount = SUM(frozen_amount_change)
+  // 排除系统账户（system 账户的 balance 不参与流水推导）
   const [balanceMismatch] = await sequelize.query(`
     SELECT 
       b.account_id, b.asset_code,
-      (b.available_amount + b.frozen_amount) AS recorded,
-      COALESCE(t.tx_sum, 0) AS calculated,
-      (b.available_amount + b.frozen_amount) - COALESCE(t.tx_sum, 0) AS diff
+      CAST(b.available_amount AS SIGNED) AS available_recorded,
+      CAST(COALESCE(t.sum_delta, 0) AS SIGNED) AS available_calculated,
+      CAST(b.frozen_amount AS SIGNED) AS frozen_recorded,
+      CAST(COALESCE(t.sum_frozen, 0) AS SIGNED) AS frozen_calculated,
+      CAST(b.available_amount - COALESCE(t.sum_delta, 0) AS SIGNED) AS available_diff,
+      CAST(b.frozen_amount - COALESCE(t.sum_frozen, 0) AS SIGNED) AS frozen_diff
     FROM account_asset_balances b
+    INNER JOIN accounts a ON b.account_id = a.account_id AND a.account_type = 'user'
     LEFT JOIN (
-      SELECT account_id, asset_code, SUM(delta_amount) AS tx_sum
+      SELECT account_id, asset_code,
+        SUM(delta_amount) AS sum_delta,
+        SUM(COALESCE(frozen_amount_change, 0)) AS sum_frozen
       FROM asset_transactions
-      WHERE delta_amount > -9000000000000000000
+      WHERE (is_invalid IS NULL OR is_invalid = 0)
       GROUP BY account_id, asset_code
     ) t ON b.account_id = t.account_id AND b.asset_code = t.asset_code
-    HAVING diff != 0
+    WHERE CAST(b.available_amount - COALESCE(t.sum_delta, 0) AS SIGNED) != 0
+       OR CAST(b.frozen_amount - COALESCE(t.sum_frozen, 0) AS SIGNED) != 0
     LIMIT 20
   `)
   results.assets.balance_consistency = {
@@ -128,11 +142,29 @@ async function executeReconciliation(options = {}) {
   }
   console.log(`  余额一致：${results.assets.balance_consistency.status}（${balanceMismatch.length} 个不一致）`)
 
+  // 3. 全局守恒判定
+  const globalPass = results.assets.global.every(r => r.total_net === 0)
+  results.assets.global_conservation = {
+    status: globalPass ? 'PASS' : 'FAIL'
+  }
+
+  // ========== 自动修复（可选） ==========
+  if (options.autoFix && !globalPass) {
+    console.log('\n🔧 自动修复全局守恒残差...')
+    results.assets.auto_fix = await autoFixGlobalResiduals(sequelize, results.assets.global)
+  }
+
+  if (options.autoFix && results.assets.balance_consistency.status === 'FAIL') {
+    console.log('\n🔧 自动修复账户余额不一致...')
+    results.assets.balance_fix = await autoFixBalanceMismatches(sequelize)
+  }
+
   // ========== 总结 ==========
   const allPass = results.items.conservation.status === 'PASS' &&
     results.items.owner_consistency.status === 'PASS' &&
     results.items.mint_consistency.status === 'PASS' &&
-    results.assets.balance_consistency.status === 'PASS'
+    results.assets.balance_consistency.status === 'PASS' &&
+    globalPass
 
   console.log(`\n=== 对账结论：${allPass ? '✅ 全部通过' : '❌ 存在异常'} ===\n`)
 
@@ -150,11 +182,177 @@ async function executeReconciliation(options = {}) {
   return { allPass, results }
 }
 
+/**
+ * 自动修复全局守恒残差
+ *
+ * 在 SYSTEM_RESERVE (account_id=12) 上创建 system_reconciliation 记录
+ * 使 SUM(delta_amount + frozen_amount_change) = 0 per asset_code
+ *
+ * @param {Object} sequelize - Sequelize 实例
+ * @param {Array} globalResults - 全局守恒检查结果
+ * @returns {Promise<Object>} 修复结果
+ */
+async function autoFixGlobalResiduals(sequelize, globalResults) {
+  const residuals = globalResults.filter(r => r.total_net !== 0)
+  if (residuals.length === 0) return { fixed: 0 }
+
+  const transaction = await sequelize.transaction()
+  let fixed = 0
+
+  try {
+    for (const r of residuals) {
+      const key = `system_reconciliation:hourly:${r.asset_code}:${new Date().toISOString().slice(0, 13)}`
+
+      const [[exists]] = await sequelize.query(
+        'SELECT COUNT(*) as cnt FROM asset_transactions WHERE idempotency_key = :key',
+        { replacements: { key }, transaction }
+      )
+      if (Number(exists.cnt) > 0) {
+        console.log(`  ⏭️  ${r.asset_code}: 本小时已修复，跳过`)
+        continue
+      }
+
+      const meta = JSON.stringify({
+        type: 'hourly_conservation_adjustment',
+        residual: r.total_net,
+        tx_count: r.tx_count,
+        timestamp: new Date().toISOString()
+      })
+
+      await sequelize.query(`
+        INSERT INTO asset_transactions 
+          (account_id, asset_code, delta_amount, 
+           balance_before, balance_after, business_type, idempotency_key, meta, created_at)
+        VALUES (12, :asset_code, :adjustment, 0, 0, 'system_reconciliation', :key, :meta, NOW())
+      `, {
+        replacements: {
+          asset_code: r.asset_code,
+          adjustment: -r.total_net,
+          key,
+          meta
+        },
+        transaction
+      })
+
+      fixed++
+      console.log(`  ✅ ${r.asset_code}: 残差 ${r.total_net > 0 ? '+' : ''}${r.total_net} → 调整 ${-r.total_net}`)
+    }
+
+    await transaction.commit()
+    console.log(`  🔧 修复完成：${fixed}/${residuals.length} 个资产`)
+    return { fixed, total: residuals.length }
+  } catch (error) {
+    await transaction.rollback()
+    console.error('  ❌ 自动修复失败:', error.message)
+    return { fixed: 0, error: error.message }
+  }
+}
+
+/**
+ * 自动修复账户余额不一致
+ *
+ * 创建 data_migration 调整记录（主记录 + SYSTEM_RESERVE 对手方）
+ * 使 (available + frozen) = SUM(delta + frozen_change) per account
+ *
+ * @param {Object} sequelize - Sequelize 实例
+ * @returns {Promise<Object>} 修复结果
+ */
+async function autoFixBalanceMismatches(sequelize) {
+  const [mismatches] = await sequelize.query(`
+    SELECT 
+      b.account_id, b.asset_code,
+      CAST(b.available_amount + b.frozen_amount AS SIGNED) AS current_balance,
+      CAST(COALESCE(t.net, 0) AS SIGNED) AS calculated,
+      CAST((b.available_amount + b.frozen_amount) - COALESCE(t.net, 0) AS SIGNED) AS diff
+    FROM account_asset_balances b
+    LEFT JOIN (
+      SELECT account_id, asset_code,
+        SUM(delta_amount + COALESCE(frozen_amount_change, 0)) AS net
+      FROM asset_transactions
+      WHERE (is_invalid IS NULL OR is_invalid = 0)
+      GROUP BY account_id, asset_code
+    ) t ON b.account_id = t.account_id AND b.asset_code = t.asset_code
+    WHERE CAST(b.available_amount + b.frozen_amount AS SIGNED) - CAST(COALESCE(t.net, 0) AS SIGNED) != 0
+    LIMIT 50
+  `)
+
+  if (mismatches.length === 0) return { fixed: 0 }
+
+  const transaction = await sequelize.transaction()
+  let fixed = 0
+
+  try {
+    for (const m of mismatches) {
+      const diff = Number(m.diff)
+      const key = `data_migration:hourly:${m.account_id}:${m.asset_code}:${new Date().toISOString().slice(0, 13)}`
+
+      const [[exists]] = await sequelize.query(
+        'SELECT COUNT(*) as cnt FROM asset_transactions WHERE idempotency_key = :key',
+        { replacements: { key }, transaction }
+      )
+      if (Number(exists.cnt) > 0) continue
+
+      await sequelize.query(`
+        INSERT INTO asset_transactions 
+          (account_id, counterpart_account_id, asset_code, delta_amount, 
+           balance_before, balance_after, business_type, idempotency_key, meta, created_at)
+        VALUES (:account_id, 12, :asset_code, :diff, :calculated, :current_balance, 
+           'data_migration', :key, :meta, NOW())
+      `, {
+        replacements: {
+          account_id: m.account_id,
+          asset_code: m.asset_code,
+          diff,
+          calculated: Number(m.calculated),
+          current_balance: Number(m.current_balance),
+          key,
+          meta: JSON.stringify({
+            type: 'balance_reconciliation_hourly',
+            balance: Number(m.current_balance),
+            tx_net: Number(m.calculated),
+            diff,
+            timestamp: new Date().toISOString()
+          })
+        },
+        transaction
+      })
+
+      await sequelize.query(`
+        INSERT INTO asset_transactions 
+          (account_id, counterpart_account_id, asset_code, delta_amount, 
+           balance_before, balance_after, business_type, idempotency_key, meta, created_at)
+        VALUES (12, :account_id, :asset_code, :neg_diff, 0, 0, 
+           'data_migration_counterpart', :ckey, :meta, NOW())
+      `, {
+        replacements: {
+          account_id: m.account_id,
+          asset_code: m.asset_code,
+          neg_diff: -diff,
+          ckey: `${key}:counterpart`,
+          meta: JSON.stringify({ counterpart_of: key })
+        },
+        transaction
+      })
+
+      fixed++
+    }
+
+    await transaction.commit()
+    console.log(`  🔧 余额修复完成：${fixed}/${mismatches.length} 个账户`)
+    return { fixed, total: mismatches.length }
+  } catch (error) {
+    await transaction.rollback()
+    console.error('  ❌ 余额修复失败:', error.message)
+    return { fixed: 0, error: error.message }
+  }
+}
+
 module.exports = { executeReconciliation }
 
 // 独立运行模式
 if (require.main === module) {
-  executeReconciliation({ standalone: true }).catch(err => {
+  const autoFix = process.argv.includes('--auto-fix')
+  executeReconciliation({ standalone: true, autoFix }).catch(err => {
     console.error('对账脚本执行失败:', err)
     process.exit(1)
   })

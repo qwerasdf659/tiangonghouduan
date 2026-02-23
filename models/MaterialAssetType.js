@@ -33,10 +33,16 @@ class MaterialAssetType extends Model {
   /**
    * 静态关联定义
    *
-   * @param {Object} _models - Sequelize所有模型的集合对象（当前未使用）
+   * @param {Object} models - Sequelize所有模型的集合对象
    * @returns {void} 无返回值，仅定义关联关系
    */
-  static associate(_models) {
+  static associate(models) {
+    if (models.Merchant) {
+      MaterialAssetType.belongsTo(models.Merchant, {
+        foreignKey: 'merchant_id',
+        as: 'merchant'
+      })
+    }
     /*
      * 材料资产类型与材料转换规则的关联说明：
      * - 本表只存“材料展示与分组配置”
@@ -149,6 +155,19 @@ module.exports = sequelize => {
         defaultValue: true,
         comment:
           '是否可交易（Is Tradable - C2C市场交易开关）：true-可在市场挂牌交易，false-禁止市场交易'
+      },
+
+      /** 归属商家ID（NULL=平台资产，游戏商家场景下标识资产归属） */
+      merchant_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: {
+          model: 'merchants',
+          key: 'merchant_id'
+        },
+        onDelete: 'SET NULL',
+        onUpdate: 'CASCADE',
+        comment: '归属商家ID（NULL=平台资产，关联 merchants 表）'
       }
     },
     {

@@ -202,7 +202,7 @@ models.ItemTemplate = require('./ItemTemplate')(sequelize, DataTypes)
 models.Item = require('./Item')(sequelize, DataTypes)
 /*
  * ✅ Item：物品（当前状态缓存，可从 item_ledger 重建）
- *    - 用途：不可叠加物品的一等实体（替代 item_instances）
+ *    - 用途：不可叠加物品的一等实体
  *    - 特点：正式列（item_name/item_value/item_type）、tracking_code 唯一追踪码
  *    - 表名：items，主键：item_id，外键：owner_account_id
  *    - 状态流转：available → held → used/expired/destroyed
@@ -502,6 +502,15 @@ models.AdminOperationLog = require('./AdminOperationLog')(sequelize, DataTypes)
  *    - ⚠️ 与ContentReviewRecord的区别：AdminOperationLog是操作追溯，ContentReviewRecord是业务审核
  */
 
+models.Merchant = require('./Merchant')(sequelize, DataTypes)
+/*
+ * ✅ Merchant：商家信息（2026-02-23 多商家架构）
+ *    - 用途：记录接入平台的商家（餐厅/商铺/小游戏/服务商）
+ *    - 特点：merchant_type 通过字典表校验，支持运营自助扩展
+ *    - 表名：merchants，主键：merchant_id
+ *    - 关联：stores(门店)、items(物品)、lottery_prizes(奖品)、material_asset_types(资产类型)
+ */
+
 models.MerchantOperationLog = require('./MerchantOperationLog')(sequelize, DataTypes)
 /*
  * ✅ MerchantOperationLog：商家操作审计日志（2026-01-12 商家员工域权限体系升级）
@@ -620,6 +629,15 @@ models.WebSocketStartupLog = require('./WebSocketStartupLog')(sequelize, DataTyp
  */
 models.MaterialAssetType = require('./MaterialAssetType')(sequelize, DataTypes)
 models.MaterialConversionRule = require('./MaterialConversionRule')(sequelize, DataTypes)
+
+// 🔴 固定汇率兑换规则模型（2026-02-23 市场增强）
+models.ExchangeRate = require('./ExchangeRate')(sequelize, DataTypes)
+/*
+ * ✅ ExchangeRate：固定汇率兑换规则
+ *    - 用途：管理资产间的固定汇率兑换配置（如 10 red_shard = 1 DIAMOND）
+ *    - 与 MaterialConversionRule 语义分离：材料转换是"合成"，汇率兑换是"货币兑换"
+ *    - 表名：exchange_rates，主键：exchange_rate_id
+ */
 
 // 🔴 V4.2 交易市场升级模型（Phase 2）
 models.MarketListing = require('./MarketListing')(sequelize, DataTypes)

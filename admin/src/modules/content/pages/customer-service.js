@@ -117,6 +117,13 @@ function customerServicePage () {
       logger.info('[CustomerService] 资源已清理')
     },
 
+    // ==================== 模板库 getter ====================
+
+    /** 按关键词过滤后的模板列表（供 HTML x-for 使用） */
+    get filteredTemplates () {
+      return this.getFilteredTemplates()
+    },
+
     // ==================== A区增强：智能会话队列辅助方法 ====================
 
     /**

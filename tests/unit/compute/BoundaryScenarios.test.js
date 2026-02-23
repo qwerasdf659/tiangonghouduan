@@ -1580,24 +1580,28 @@ describe('策略引擎边界场景测试', () => {
         const engine = new LotteryComputeEngine({
           enable_pity: false,
           enable_luck_debt: false,
-          enable_anti_streak: false
+          enable_anti_empty: false,
+          enable_anti_high: false
         })
 
         expect(engine.options.enable_pity).toBe(false)
         expect(engine.options.enable_luck_debt).toBe(false)
-        expect(engine.options.enable_anti_streak).toBe(false)
+        expect(engine.options.enable_anti_empty).toBe(false)
+        expect(engine.options.enable_anti_high).toBe(false)
       })
 
       test('所有功能启用时应正常运行', () => {
         const engine = new LotteryComputeEngine({
           enable_pity: true,
           enable_luck_debt: true,
-          enable_anti_streak: true
+          enable_anti_empty: true,
+          enable_anti_high: true
         })
 
         expect(engine.options.enable_pity).toBe(true)
         expect(engine.options.enable_luck_debt).toBe(true)
-        expect(engine.options.enable_anti_streak).toBe(true)
+        expect(engine.options.enable_anti_empty).toBe(true)
+        expect(engine.options.enable_anti_high).toBe(true)
       })
     })
 

@@ -27,6 +27,14 @@ class LotteryPrize extends Model {
       as: 'draws'
     })
 
+    // 奖品赞助商家（NULL=平台自营）
+    if (models.Merchant) {
+      LotteryPrize.belongsTo(models.Merchant, {
+        foreignKey: 'merchant_id',
+        as: 'merchant'
+      })
+    }
+
     /*
      * 🔥 关联到抽奖记录（已合并到LotteryDraw）
      * LotteryRecord已合并到LotteryDraw，使用draws关联即可
@@ -795,6 +803,19 @@ module.exports = sequelize => {
         type: DataTypes.DATE,
         allowNull: false,
         defaultValue: () => BeijingTimeHelper.createDatabaseTime()
+      },
+
+      /** 赞助商家ID（NULL=平台自营） */
+      merchant_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: {
+          model: 'merchants',
+          key: 'merchant_id'
+        },
+        onDelete: 'SET NULL',
+        onUpdate: 'CASCADE',
+        comment: '赞助商家ID（NULL=平台自营，关联 merchants 表）'
       }
     },
     {

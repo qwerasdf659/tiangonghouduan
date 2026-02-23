@@ -24,7 +24,7 @@
  * - GET/POST/PUT/DELETE /api/v4/console/material/asset-types (资产类型)
  * - GET /api/v4/console/material/accounts (材料账户)
  * - GET /api/v4/console/material/transactions (材料交易)
- * - GET /api/v4/console/item-instances (物品实例)
+ * - GET /api/v4/console/items (物品管理)
  * - GET /api/v4/console/virtual-accounts (虚拟账户)
  */
 
@@ -90,7 +90,7 @@ document.addEventListener('alpine:init', () => {
       { id: 'material-types', name: '材料资产类型', icon: '📦' },
       { id: 'material-accounts', name: '材料账户', icon: '💰' },
       { id: 'material-transactions', name: '材料交易', icon: '🔄' },
-      { id: 'item-instances', name: '物品实例', icon: '🎁' },
+      { id: 'items', name: '物品管理', icon: '🎁' },
       { id: 'virtual-accounts', name: '虚拟账户', icon: '💎' },
       { id: 'virtual-transactions', name: '虚拟交易', icon: '📊' },
       { id: 'asset-stats', name: '资产统计', icon: '📈' }
@@ -133,10 +133,10 @@ document.addEventListener('alpine:init', () => {
     materialTxFilters: { mobile: '', asset_code: '', type: '' },
     materialTxPagination: { total: 0, total_pages: 1, current_page: 1 },
 
-    // 物品实例
-    itemInstances: [],
-    itemInstanceFilters: { mobile: '', template_code: '', status: '' },
-    itemInstancePagination: { total: 0, total_pages: 1, current_page: 1 },
+    // 物品（三表模型：items + item_ledger + item_holds）
+    items: [],
+    itemFilters: { mobile: '', template_code: '', status: '' },
+    itemPagination: { total: 0, total_pages: 1, current_page: 1 },
     instanceDetail: null,
 
     // 虚拟账户
@@ -191,8 +191,8 @@ document.addEventListener('alpine:init', () => {
           case 'material-transactions':
             await this.loadMaterialTransactions()
             break
-          case 'item-instances':
-            await this.loadItemInstances()
+          case 'items':
+            await this.loadItems()
             break
           case 'virtual-accounts':
             await this.loadVirtualAccounts()
@@ -298,28 +298,28 @@ document.addEventListener('alpine:init', () => {
       }
     },
 
-    async loadItemInstances() {
+    async loadItems() {
       try {
         // 使用物品模板接口获取列表
         const response = await this.apiGet(ASSET_ENDPOINTS.ITEM_TEMPLATE_LIST, {
-          item_type: this.itemInstanceFilters.template_code || undefined,
+          item_type: this.itemFilters.template_code || undefined,
           is_enabled:
-            this.itemInstanceFilters.status === 'enabled'
+            this.itemFilters.status === 'enabled'
               ? true
-              : this.itemInstanceFilters.status === 'disabled'
+              : this.itemFilters.status === 'disabled'
                 ? false
                 : undefined
         })
-        logger.debug('[AssetManagement] loadItemInstances response:', response)
+        logger.debug('[AssetManagement] loadItems response:', response)
         if (response.success && response.data) {
           // 后端返回 data.list 数组
           const itemInsData = response.data?.list || response.data?.items || response.data
-          this.itemInstances = Array.isArray(itemInsData) ? itemInsData : []
-          logger.info(`[AssetManagement] 加载物品模板成功: ${this.itemInstances.length} 条`)
+          this.items = Array.isArray(itemInsData) ? itemInsData : []
+          logger.info(`[AssetManagement] 加载物品模板成功: ${this.items.length} 条`)
         }
       } catch (error) {
         logger.warn('物品模板查询失败:', error.message)
-        this.itemInstances = []
+        this.items = []
       }
     },
 
@@ -406,7 +406,7 @@ document.addEventListener('alpine:init', () => {
           this.assetStats = {
             totalMaterialValue,
             totalVirtualValue,
-            totalItemCount: this.itemInstances?.length || 0,
+            totalItemCount: this.items?.length || 0,
             totalAssetTypes: summary.total_asset_types || assetStats.length,
             totalHolders: summary.total_holders || 0,
             totalCirculation: summary.total_circulation || 0,
@@ -637,8 +637,8 @@ document.addEventListener('alpine:init', () => {
     return table
   })
 
-  /** 物品实例列表 */
-  Alpine.data('itemInstancesDataTable', () => {
+  /** 物品列表（三表模型） */
+  Alpine.data('itemsDataTable', () => {
     const table = dataTable({
       columns: [
         { key: 'item_id', label: '物品ID', sortable: true },
@@ -649,13 +649,13 @@ document.addEventListener('alpine:init', () => {
         { key: 'created_at', label: '获取时间', type: 'datetime', sortable: true }
       ],
       dataSource: async (params) => {
-        const res = await request({ url: ASSET_ENDPOINTS.ITEM_INSTANCE_LIST, method: 'GET', params })
+        const res = await request({ url: ASSET_ENDPOINTS.ITEM_LIST, method: 'GET', params })
         return { items: res.data?.list || res.data?.instances || res.data || [], total: res.data?.pagination?.total || res.data?.count || 0 }
       },
       primaryKey: 'item_id', sortable: true, page_size: 20
     })
     const origInit = table.init
-    table.init = async function () { window.addEventListener('refresh-item-instances', () => this.loadData()); if (origInit) await origInit.call(this) }
+    table.init = async function () { window.addEventListener('refresh-items', () => this.loadData()); if (origInit) await origInit.call(this) }
     return table
   })
 

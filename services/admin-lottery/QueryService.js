@@ -201,6 +201,31 @@ class AdminLotteryQueryService {
   }
 
   /**
+   * 获取某活动的全部策略配置（按 config_group 分组）
+   *
+   * @description 用于10策略活动级开关管理页面
+   * @param {number} lottery_campaign_id - 活动ID
+   * @returns {Promise<Object>} 按 config_group 分组的策略配置
+   * @throws {Error} 活动ID无效
+   */
+  static async getStrategyConfig(lottery_campaign_id) {
+    if (!lottery_campaign_id || isNaN(parseInt(lottery_campaign_id))) {
+      const error = new Error('无效的活动ID')
+      error.code = 'INVALID_CAMPAIGN_ID'
+      error.statusCode = 400
+      throw error
+    }
+
+    const { LotteryStrategyConfig } = models
+    const config = await LotteryStrategyConfig.getAllConfig(parseInt(lottery_campaign_id))
+
+    return {
+      lottery_campaign_id: parseInt(lottery_campaign_id),
+      config
+    }
+  }
+
+  /**
    * 格式化干预规则列表项
    *
    * @private

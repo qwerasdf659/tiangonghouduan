@@ -32,11 +32,18 @@ router.post(
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
     try {
-      const { user_id, prize_id, reason = '管理员强制中奖', duration_minutes = null } = req.body
+      const {
+        user_id,
+        prize_id,
+        reason = '管理员强制中奖',
+        duration_minutes = null,
+        lottery_campaign_id = null
+      } = req.body
 
       // 参数验证
       const validatedUserId = validators.validateUserId(user_id)
       const validatedPrizeId = validators.validatePrizeId(prize_id)
+      const validatedCampaignId = lottery_campaign_id ? parseInt(lottery_campaign_id, 10) : null
 
       // 计算过期时间（如果提供了持续时间）
       let expiresAt = null
@@ -56,7 +63,7 @@ router.post(
             validatedPrizeId,
             reason,
             expiresAt,
-            { transaction }
+            { transaction, lottery_campaign_id: validatedCampaignId }
           )
         },
         { description: 'forceWinForUser' }
@@ -90,10 +97,17 @@ router.post(
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
     try {
-      const { user_id, count = 1, reason = '管理员强制不中奖', duration_minutes = null } = req.body
+      const {
+        user_id,
+        count = 1,
+        reason = '管理员强制不中奖',
+        duration_minutes = null,
+        lottery_campaign_id = null
+      } = req.body
 
       // 参数验证
       const validatedUserId = validators.validateUserId(user_id)
+      const validatedCampaignId = lottery_campaign_id ? parseInt(lottery_campaign_id, 10) : null
 
       if (!count || isNaN(parseInt(count)) || parseInt(count) < 1 || parseInt(count) > 100) {
         return res.apiError('不中奖次数必须在1-100之间', 'INVALID_COUNT')
@@ -117,7 +131,7 @@ router.post(
             parseInt(count),
             reason,
             expiresAt,
-            { transaction }
+            { transaction, lottery_campaign_id: validatedCampaignId }
           )
         },
         { description: 'forceLoseForUser' }

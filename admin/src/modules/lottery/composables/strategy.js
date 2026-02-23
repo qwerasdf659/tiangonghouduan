@@ -73,7 +73,17 @@ export function useStrategyState() {
       end_date: ''
     },
     /** @type {boolean} 显示策略效果分析弹窗/页面 */
-    showStrategyEffectivenessPanel: false
+    showStrategyEffectivenessPanel: false,
+
+    // === 活动级策略开关配置（10策略活动级开关） ===
+    /** @type {Object|null} 当前选中活动的策略开关配置 */
+    activityStrategyConfig: null,
+    /** @type {number|null} 当前选中的活动ID */
+    selectedCampaignIdForStrategy: null,
+    /** @type {boolean} 活动策略配置加载状态 */
+    loadingActivityStrategy: false,
+    /** @type {boolean} 活动策略配置保存状态 */
+    savingActivityStrategy: false
   }
 }
 
@@ -971,6 +981,82 @@ export function useStrategyMethods() {
       } catch (error) {
         logger.error('[P2-12] 渲染策略触发热力图失败:', error.message)
       }
+    },
+
+    // ========== 活动级策略开关配置（10策略活动级开关） ==========
+
+    /**
+     * 加载指定活动的策略配置
+     * @param {number} lottery_campaign_id - 活动ID
+     */
+    async loadActivityStrategyConfig(lottery_campaign_id) {
+      if (!lottery_campaign_id) return
+      this.selectedCampaignIdForStrategy = lottery_campaign_id
+      this.loadingActivityStrategy = true
+      try {
+        const response = await this.apiGet(
+          `${API_PREFIX}/console/lottery-campaigns/${lottery_campaign_id}/strategy-config`,
+          {},
+          { showLoading: false }
+        )
+        this.activityStrategyConfig = response?.config || response?.data?.config || null
+        logger.info('[Strategy] 活动策略配置加载成功', {
+          lottery_campaign_id,
+          groups: this.activityStrategyConfig ? Object.keys(this.activityStrategyConfig) : []
+        })
+      } catch (error) {
+        logger.error('[Strategy] 加载活动策略配置失败:', error)
+        this.activityStrategyConfig = null
+      } finally {
+        this.loadingActivityStrategy = false
+      }
+    },
+
+    /**
+     * 更新活动策略开关（单个config_group内的配置）
+     * @param {string} config_group - 配置分组（如 pity, anti_empty）
+     * @param {string} config_key - 配置键名（如 enabled）
+     * @param {*} config_value - 新值
+     */
+    async updateActivityStrategySetting(config_group, config_key, config_value) {
+      const lottery_campaign_id = this.selectedCampaignIdForStrategy
+      if (!lottery_campaign_id) return
+
+      this.savingActivityStrategy = true
+      try {
+        await this.apiCall(
+          `${API_PREFIX}/console/lottery-campaigns/${lottery_campaign_id}/strategy-config`,
+          {
+            method: 'PUT',
+            data: { config: { [config_group]: { [config_key]: config_value } } }
+          }
+        )
+
+        /* 更新本地状态 */
+        if (this.activityStrategyConfig && this.activityStrategyConfig[config_group]) {
+          this.activityStrategyConfig[config_group][config_key] = config_value
+        }
+
+        this.showSuccess(`策略配置已更新: ${config_group}.${config_key}`)
+        logger.info('[Strategy] 活动策略配置更新成功', {
+          lottery_campaign_id, config_group, config_key, config_value
+        })
+      } catch (error) {
+        this.showError('更新策略配置失败: ' + (error.message || '未知错误'))
+        logger.error('[Strategy] 更新活动策略配置失败:', error)
+      } finally {
+        this.savingActivityStrategy = false
+      }
+    },
+
+    /**
+     * 切换策略开关（enabled 布尔值取反）
+     * @param {string} config_group - 配置分组
+     */
+    async toggleActivityStrategySwitch(config_group) {
+      const current = this.activityStrategyConfig?.[config_group]?.enabled
+      if (current === undefined) return
+      await this.updateActivityStrategySetting(config_group, 'enabled', !current)
     }
   }
 }

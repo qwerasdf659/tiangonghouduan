@@ -734,15 +734,14 @@ module.exports = sequelize => {
        * @type {string}
        * @业务含义 控制如何从奖品池中选择奖品
        * @枚举值
-       * - normalize：归一化百分比方法（按 win_probability 直接抽奖，不分档位）
-       * - tier_first：先选档位法（推荐，先按 reward_tier 选档位，再按 win_weight 选奖品）
-       * @注意 fallback 已废弃并移除（2026-02-22），功能被 is_fallback + tier_fallback 替代
+       *   - tier_first: 先选档位再选奖品（先按 reward_tier 选档位，再按 win_weight 选奖品）
+       *   - normalize: 归一化百分比选奖（跳过档位，按 win_probability 归一化随机抽取）
        */
       pick_method: {
         type: DataTypes.ENUM('normalize', 'tier_first'),
         allowNull: false,
         defaultValue: 'tier_first',
-        comment: '选奖方法：normalize=归一化百分比, tier_first=先选档位再选奖品（推荐）'
+        comment: '选奖方法：normalize=归一化百分比选奖, tier_first=先选档位再选奖品'
       },
 
       /**

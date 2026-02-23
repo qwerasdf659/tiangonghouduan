@@ -37,7 +37,7 @@ async function analyzeDatabase() {
     const coreTables = [
       'users', 'roles', 'user_roles',
       'lottery_campaigns', 'lottery_prizes', 'lottery_draws',
-      'item_templates', 'item_instances',
+      'item_templates', 'items',
       'accounts', 'account_asset_balances', 'asset_transactions',
       'market_listings', 'trade_orders',
       'stores', 'store_staff', 'user_hierarchy',
@@ -134,7 +134,7 @@ async function analyzeDatabase() {
       SELECT 
         COUNT(*) as total,
         SUM(CASE WHEN status = 'available' THEN 1 ELSE 0 END) as available_count
-      FROM item_instances
+      FROM items
     `)
     stats.itemInstances = instanceStats[0]
     

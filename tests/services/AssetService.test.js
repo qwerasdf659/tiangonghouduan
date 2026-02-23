@@ -102,7 +102,10 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
     // 清理流水记录
     for (const transaction_id of created_transactions) {
       try {
-        await AssetTransaction.destroy({ where: { transaction_id }, force: true })
+        await AssetTransaction.destroy({
+          where: { asset_transaction_id: transaction_id },
+          force: true
+        })
       } catch (error) {
         // 忽略清理错误
       }
@@ -528,14 +531,14 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         })
 
         // 记录创建的流水（用于清理）
-        if (result && result.transaction_record && result.transaction_record.transaction_id) {
-          created_transactions.push(result.transaction_record.transaction_id)
+        if (result && result.transaction_record && result.transaction_record.asset_transaction_id) {
+          created_transactions.push(result.transaction_record.asset_transaction_id)
         }
 
         // 验证：返回结构包含 { account, balance, transaction_record, is_duplicate }
         expect(result).toBeDefined()
         expect(result.transaction_record).toBeDefined()
-        expect(result.transaction_record.transaction_id).toBeDefined()
+        expect(result.transaction_record.asset_transaction_id).toBeDefined()
         expect(Number(result.transaction_record.delta_amount)).toBe(delta_amount)
         expect(result.transaction_record.asset_code).toBe('POINTS')
         expect(result.transaction_record.business_type).toBe('test_increase')
@@ -577,8 +580,8 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         })
 
         // 记录创建的流水
-        if (result && result.transaction_record && result.transaction_record.transaction_id) {
-          created_transactions.push(result.transaction_record.transaction_id)
+        if (result && result.transaction_record && result.transaction_record.asset_transaction_id) {
+          created_transactions.push(result.transaction_record.asset_transaction_id)
         }
 
         // 验证
@@ -625,8 +628,8 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         })
 
         // 记录创建的流水
-        if (result && result.transaction_record && result.transaction_record.transaction_id) {
-          created_transactions.push(result.transaction_record.transaction_id)
+        if (result && result.transaction_record && result.transaction_record.asset_transaction_id) {
+          created_transactions.push(result.transaction_record.asset_transaction_id)
         }
 
         // 验证
@@ -670,8 +673,8 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         })
 
         // 记录创建的流水
-        if (result && result.transaction_record && result.transaction_record.transaction_id) {
-          created_transactions.push(result.transaction_record.transaction_id)
+        if (result && result.transaction_record && result.transaction_record.asset_transaction_id) {
+          created_transactions.push(result.transaction_record.asset_transaction_id)
         }
 
         // 验证
@@ -720,9 +723,9 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         if (
           first_result &&
           first_result.transaction_record &&
-          first_result.transaction_record.transaction_id
+          first_result.transaction_record.asset_transaction_id
         ) {
-          created_transactions.push(first_result.transaction_record.transaction_id)
+          created_transactions.push(first_result.transaction_record.asset_transaction_id)
         }
 
         // 验证：第一次执行成功
@@ -753,12 +756,12 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
           )
         })
 
-        // 验证：第二次调用应返回 is_duplicate: true，且 transaction_id 相同
+        // 验证：第二次调用应返回 is_duplicate: true，且 asset_transaction_id 相同
         expect(second_result).toBeDefined()
         expect(second_result.is_duplicate).toBe(true)
-        // 使用 == 比较，因为 transaction_id 可能是数字或字符串
-        expect(String(second_result.transaction_record.transaction_id)).toBe(
-          String(first_result.transaction_record.transaction_id)
+        // 使用 == 比较，因为 asset_transaction_id 可能是数字或字符串
+        expect(String(second_result.transaction_record.asset_transaction_id)).toBe(
+          String(first_result.transaction_record.asset_transaction_id)
         )
 
         // 验证：余额应该与第一次执行后相同（没有重复增加）
@@ -811,16 +814,24 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         })
 
         // 记录创建的流水
-        if (result_1 && result_1.transaction_record && result_1.transaction_record.transaction_id) {
-          created_transactions.push(result_1.transaction_record.transaction_id)
+        if (
+          result_1 &&
+          result_1.transaction_record &&
+          result_1.transaction_record.asset_transaction_id
+        ) {
+          created_transactions.push(result_1.transaction_record.asset_transaction_id)
         }
-        if (result_2 && result_2.transaction_record && result_2.transaction_record.transaction_id) {
-          created_transactions.push(result_2.transaction_record.transaction_id)
+        if (
+          result_2 &&
+          result_2.transaction_record &&
+          result_2.transaction_record.asset_transaction_id
+        ) {
+          created_transactions.push(result_2.transaction_record.asset_transaction_id)
         }
 
-        // 验证：两次执行的 transaction_id 不同
-        expect(result_1.transaction_record.transaction_id).not.toBe(
-          result_2.transaction_record.transaction_id
+        // 验证：两次执行的 asset_transaction_id 不同
+        expect(result_1.transaction_record.asset_transaction_id).not.toBe(
+          result_2.transaction_record.asset_transaction_id
         )
         expect(result_1.is_duplicate).toBe(false)
         expect(result_2.is_duplicate).toBe(false)
@@ -871,14 +882,14 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         })
 
         // 记录创建的流水
-        if (result && result.transaction_record && result.transaction_record.transaction_id) {
-          created_transactions.push(result.transaction_record.transaction_id)
+        if (result && result.transaction_record && result.transaction_record.asset_transaction_id) {
+          created_transactions.push(result.transaction_record.asset_transaction_id)
         }
 
         // 验证流水记录字段
         const tx = result.transaction_record
         expect(tx).toBeDefined()
-        expect(tx.transaction_id).toBeDefined()
+        expect(tx.asset_transaction_id).toBeDefined()
         expect(tx.account_id).toBeDefined()
         expect(tx.asset_code).toBe('POINTS')
         expect(Number(tx.delta_amount)).toBe(delta_amount)
@@ -938,8 +949,8 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         })
 
         // 记录创建的流水
-        if (result && result.transaction_record && result.transaction_record.transaction_id) {
-          created_transactions.push(result.transaction_record.transaction_id)
+        if (result && result.transaction_record && result.transaction_record.asset_transaction_id) {
+          created_transactions.push(result.transaction_record.asset_transaction_id)
         }
 
         // 验证
@@ -1041,8 +1052,8 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         })
 
         // 记录创建的流水
-        if (result && result.transaction_record && result.transaction_record.transaction_id) {
-          created_transactions.push(result.transaction_record.transaction_id)
+        if (result && result.transaction_record && result.transaction_record.asset_transaction_id) {
+          created_transactions.push(result.transaction_record.asset_transaction_id)
         }
 
         // 验证
@@ -1143,8 +1154,8 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         })
 
         // 记录创建的流水
-        if (result && result.transaction_record && result.transaction_record.transaction_id) {
-          created_transactions.push(result.transaction_record.transaction_id)
+        if (result && result.transaction_record && result.transaction_record.asset_transaction_id) {
+          created_transactions.push(result.transaction_record.asset_transaction_id)
         }
 
         // 验证
@@ -1253,8 +1264,8 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         })
 
         // 记录创建的流水
-        if (result && result.transaction_record && result.transaction_record.transaction_id) {
-          created_transactions.push(result.transaction_record.transaction_id)
+        if (result && result.transaction_record && result.transaction_record.asset_transaction_id) {
+          created_transactions.push(result.transaction_record.asset_transaction_id)
         }
 
         // 验证
@@ -1367,8 +1378,8 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         })
 
         // 记录创建的流水
-        if (result && result.transaction_record && result.transaction_record.transaction_id) {
-          created_transactions.push(result.transaction_record.transaction_id)
+        if (result && result.transaction_record && result.transaction_record.asset_transaction_id) {
+          created_transactions.push(result.transaction_record.asset_transaction_id)
         }
 
         // 验证
@@ -1450,8 +1461,12 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
           )
         })
 
-        if (result_1 && result_1.transaction_record && result_1.transaction_record.transaction_id) {
-          created_transactions.push(result_1.transaction_record.transaction_id)
+        if (
+          result_1 &&
+          result_1.transaction_record &&
+          result_1.transaction_record.asset_transaction_id
+        ) {
+          created_transactions.push(result_1.transaction_record.asset_transaction_id)
         }
 
         expect(result_1.is_duplicate).toBe(false)
@@ -1472,8 +1487,8 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         })
 
         expect(result_2.is_duplicate).toBe(true)
-        expect(String(result_2.transaction_record.transaction_id)).toBe(
-          String(result_1.transaction_record.transaction_id)
+        expect(String(result_2.transaction_record.asset_transaction_id)).toBe(
+          String(result_1.transaction_record.asset_transaction_id)
         )
 
         // 第三次调用（相同幂等键）
@@ -1528,8 +1543,12 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
             )
           })
 
-          if (result && result.transaction_record && result.transaction_record.transaction_id) {
-            created_transactions.push(result.transaction_record.transaction_id)
+          if (
+            result &&
+            result.transaction_record &&
+            result.transaction_record.asset_transaction_id
+          ) {
+            created_transactions.push(result.transaction_record.asset_transaction_id)
           }
 
           results.push(result)
@@ -1540,8 +1559,8 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
           expect(result.is_duplicate).toBe(false)
         })
 
-        // 每次调用的 transaction_id 都不同
-        const tx_ids = results.map(r => String(r.transaction_record.transaction_id))
+        // 每次调用的 asset_transaction_id 都不同
+        const tx_ids = results.map(r => String(r.transaction_record.asset_transaction_id))
         const unique_tx_ids = [...new Set(tx_ids)]
         expect(unique_tx_ids.length).toBe(3)
 
@@ -1590,8 +1609,12 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
           )
         })
 
-        if (result_1 && result_1.transaction_record && result_1.transaction_record.transaction_id) {
-          created_transactions.push(result_1.transaction_record.transaction_id)
+        if (
+          result_1 &&
+          result_1.transaction_record &&
+          result_1.transaction_record.asset_transaction_id
+        ) {
+          created_transactions.push(result_1.transaction_record.asset_transaction_id)
         }
 
         expect(result_1.is_duplicate).toBe(false)
@@ -1669,9 +1692,9 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
             result &&
             !result.error &&
             result.transaction_record &&
-            result.transaction_record.transaction_id
+            result.transaction_record.asset_transaction_id
           ) {
-            created_transactions.push(result.transaction_record.transaction_id)
+            created_transactions.push(result.transaction_record.asset_transaction_id)
           }
         })
 
@@ -1888,11 +1911,11 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         })
 
         // 记录创建的流水
-        if (results.add_result?.transaction_record?.transaction_id) {
-          created_transactions.push(results.add_result.transaction_record.transaction_id)
+        if (results.add_result?.transaction_record?.asset_transaction_id) {
+          created_transactions.push(results.add_result.transaction_record.asset_transaction_id)
         }
-        if (results.freeze_result?.transaction_record?.transaction_id) {
-          created_transactions.push(results.freeze_result.transaction_record.transaction_id)
+        if (results.freeze_result?.transaction_record?.asset_transaction_id) {
+          created_transactions.push(results.freeze_result.transaction_record.asset_transaction_id)
         }
 
         // 验证事务已提交
@@ -1953,14 +1976,14 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
       if (
         change_result &&
         change_result.transaction_record &&
-        change_result.transaction_record.transaction_id
+        change_result.transaction_record.asset_transaction_id
       ) {
-        created_transactions.push(change_result.transaction_record.transaction_id)
+        created_transactions.push(change_result.transaction_record.asset_transaction_id)
       }
 
       expect(change_result).toBeDefined()
       expect(change_result.transaction_record).toBeDefined()
-      expect(change_result.transaction_record.transaction_id).toBeDefined()
+      expect(change_result.transaction_record.asset_transaction_id).toBeDefined()
 
       // 4. 查询余额验证
       const final_balance = await BalanceService.getBalance({

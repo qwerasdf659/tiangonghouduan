@@ -7,8 +7,7 @@
  */
 
 import { logger } from '../../../utils/logger.js'
-import { request } from '../../../api/base.js'
-import { CONTENT_ENDPOINTS } from '../../../api/content.js'
+import { ContentAPI } from '../../../api/content.js'
 
 /**
  * 消息模板状态
@@ -37,7 +36,7 @@ export function useCsTemplatesMethods () {
     async loadTemplates () {
       this.templatesLoading = true
       try {
-        const response = await request({ url: CONTENT_ENDPOINTS.CS_GM_TEMPLATES, method: 'GET' })
+        const response = await ContentAPI.getMessageTemplates()
         if (response?.success) {
           this.templateCategories = response.data?.categories || response.data || []
         }

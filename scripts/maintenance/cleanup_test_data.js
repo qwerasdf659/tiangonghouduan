@@ -322,6 +322,92 @@ async function stepDelete(sequelize, dryRun) {
 }
 
 /**
+ * 第 7 步：清理 items 表中 source='test' 的测试物品
+ * 同时清理对应的 item_ledger 和 item_holds 记录
+ *
+ * @param {Object} sequelize - Sequelize 数据库实例
+ * @param {boolean} dryRun - 是否为预览模式
+ * @returns {Promise<Object>} 清理结果
+ */
+async function stepCleanupTestItems(sequelize, dryRun) {
+  printSection('第 7 步：清理 source=test 的测试物品')
+
+  const [testItems] = await sequelize.query(`
+    SELECT item_id, item_name, status, tracking_code, source, source_ref_id, created_at
+    FROM items WHERE source = 'test'
+    ORDER BY created_at DESC
+  `)
+
+  console.log(`  source='test' 物品总数: ${testItems.length}`)
+
+  if (testItems.length === 0) {
+    console.log('  ✅ 无测试物品需要清理')
+    return { items_cleaned: 0 }
+  }
+
+  const statusDist = {}
+  testItems.forEach(i => {
+    statusDist[i.status] = (statusDist[i.status] || 0) + 1
+  })
+  console.log('  状态分布:')
+  Object.entries(statusDist).forEach(([s, c]) => console.log(`    ${s}: ${c}`))
+
+  console.log('  最近 5 个测试物品:')
+  testItems.slice(0, 5).forEach(i => {
+    console.log(`    [${i.item_id}] ${i.item_name} (${i.status}) - ${i.source_ref_id}`)
+  })
+
+  if (dryRun) {
+    console.log(`  📋 预览模式：将清理 ${testItems.length} 个测试物品及关联记录（未执行）`)
+    return { items_cleaned: 0, would_clean: testItems.length }
+  }
+
+  const itemIds = testItems.map(i => i.item_id)
+
+  const transaction = await sequelize.transaction()
+  try {
+    // 先清理 redemption_orders（外键 RESTRICT 约束必须先清理子记录）
+    const [redemptionResult] = await sequelize.query(
+      'DELETE FROM redemption_orders WHERE item_id IN (:itemIds)',
+      { replacements: { itemIds }, transaction }
+    )
+    const redemptionDeleted = redemptionResult.affectedRows || 0
+
+    const [holdsResult] = await sequelize.query(
+      'DELETE FROM item_holds WHERE item_id IN (:itemIds)',
+      { replacements: { itemIds }, transaction }
+    )
+    const holdsDeleted = holdsResult.affectedRows || 0
+
+    const [ledgerResult] = await sequelize.query(
+      'DELETE FROM item_ledger WHERE item_id IN (:itemIds)',
+      { replacements: { itemIds }, transaction }
+    )
+    const ledgerDeleted = ledgerResult.affectedRows || 0
+
+    const [itemsResult] = await sequelize.query(
+      'DELETE FROM items WHERE item_id IN (:itemIds)',
+      { replacements: { itemIds }, transaction }
+    )
+    const itemsDeleted = itemsResult.affectedRows || 0
+
+    await transaction.commit()
+
+    console.log(`  ✅ 清理完成:`)
+    console.log(`    redemption_orders: ${redemptionDeleted} 条`)
+    console.log(`    item_holds: ${holdsDeleted} 条`)
+    console.log(`    item_ledger: ${ledgerDeleted} 条`)
+    console.log(`    items: ${itemsDeleted} 条`)
+
+    return { items_cleaned: itemsDeleted, ledger_cleaned: ledgerDeleted, holds_cleaned: holdsDeleted, redemption_cleaned: redemptionDeleted }
+  } catch (error) {
+    await transaction.rollback()
+    console.error('  ❌ 测试物品清理失败:', error.message)
+    return { items_cleaned: 0, error: error.message }
+  }
+}
+
+/**
  * 主函数：解析命令行参数，按步骤执行测试数据清理
  *
  * @returns {Promise<void>} 无返回值
@@ -333,15 +419,17 @@ async function main() {
   const doFixBalance = args.includes('--fix-balance') || args.includes('--all')
   const doVerify = args.includes('--verify') || args.includes('--all')
   const doDelete = args.includes('--delete') || args.includes('--all')
+  const doCleanItems = args.includes('--clean-items') || args.includes('--all')
 
-  if (!doMark && !doFixBalance && !doVerify && !doDelete && !dryRun) {
+  if (!doMark && !doFixBalance && !doVerify && !doDelete && !doCleanItems && !dryRun) {
     console.log('用法:')
     console.log('  node scripts/maintenance/cleanup_test_data.js --dry-run       预览影响范围')
     console.log('  node scripts/maintenance/cleanup_test_data.js --mark           仅标记 test_* 记录')
     console.log('  node scripts/maintenance/cleanup_test_data.js --fix-balance    标记 + 修正余额')
     console.log('  node scripts/maintenance/cleanup_test_data.js --verify         验证余额一致性')
     console.log('  node scripts/maintenance/cleanup_test_data.js --delete         删除 + 最终验证')
-    console.log('  node scripts/maintenance/cleanup_test_data.js --all            完整执行 1-6 步')
+    console.log('  node scripts/maintenance/cleanup_test_data.js --clean-items    清理 source=test 物品')
+    console.log('  node scripts/maintenance/cleanup_test_data.js --all            完整执行全部步骤')
     console.log('')
     console.log('  任何步骤可追加 --dry-run 进入预览模式')
     process.exit(0)
@@ -400,6 +488,10 @@ async function main() {
         await stepMark(sequelize, false)
       }
       await stepDelete(sequelize, dryRun)
+    }
+
+    if (doCleanItems) {
+      await stepCleanupTestItems(sequelize, dryRun)
     }
 
     // 清理后统计

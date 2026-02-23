@@ -208,35 +208,50 @@ class LoadDecisionSourceStage extends BaseStage {
    * 4. 未过期：expires_at 为 NULL（永不过期）或 expires_at > 当前时间
    *
    * @param {number} user_id - 用户ID
-   * @param {number} _lottery_campaign_id - 活动ID（管理干预不区分活动）
+   * @param {number} lottery_campaign_id - 活动ID（按活动过滤 + 总开关前置检查）
    * @returns {Promise<Object|null>} 干预设置或 null
    * @private
    */
-  async _checkOverride(user_id, _lottery_campaign_id) {
+  async _checkOverride(user_id, lottery_campaign_id) {
     try {
-      /*
-       * 2026-02-15 修复：增加过期时间实时检查
-       *
-       * 修复根因：
-       * - 原代码仅检查 status='active'，不检查 expires_at
-       * - 依赖定时任务将过期的 active 改为 expired，存在时间窗口
-       * - 在定时任务执行间隔内，已过期的干预仍会被命中
-       *
-       * 修复方案：查询时同时检查 expires_at，实时过滤已过期的干预
+      // 活动级总开关：management.enabled=false 时跳过全部干预检查
+      const { DynamicConfigLoader } = require('../../compute/config/StrategyConfig')
+      const management_enabled = await DynamicConfigLoader.getValue('management', 'enabled', true, {
+        lottery_campaign_id
+      })
+
+      if (!management_enabled) {
+        this.log('info', '管理干预总开关已关闭', { user_id, lottery_campaign_id })
+        return null
+      }
+
+      /**
+       * 2026-02-23 改造：按活动ID过滤管理干预
+       * - lottery_campaign_id 匹配当前活动 OR NULL（全局干预）
+       * - 同时检查 expires_at 实时过滤已过期的干预
        */
       const override = await LotteryManagementSetting.findOne({
         where: {
           user_id,
           setting_type: { [Op.in]: ['force_win', 'force_lose'] },
           status: 'active',
-          [Op.or]: [{ expires_at: null }, { expires_at: { [Op.gt]: new Date() } }]
-        }
+          [Op.and]: [
+            {
+              [Op.or]: [{ lottery_campaign_id }, { lottery_campaign_id: null }]
+            },
+            {
+              [Op.or]: [{ expires_at: null }, { expires_at: { [Op.gt]: new Date() } }]
+            }
+          ]
+        },
+        order: [['lottery_campaign_id', 'DESC NULLS LAST']]
       })
 
       return override
     } catch (error) {
       this.log('warn', '检查管理干预失败', {
         user_id,
+        lottery_campaign_id,
         error: error.message
       })
       return null

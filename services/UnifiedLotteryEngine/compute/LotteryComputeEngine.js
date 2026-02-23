@@ -59,7 +59,6 @@ const {
   ANTI_EMPTY_CONFIG: _ANTI_EMPTY_CONFIG, // 预留供防连续空奖处理使用
   ANTI_HIGH_CONFIG: _ANTI_HIGH_CONFIG, // 预留供防连续高价值处理使用
   isFeatureEnabled,
-  isFeatureEnabledForContext, // Phase P2：带上下文的灰度判断
   getGrayscaleSummary // Phase P2：获取灰度配置摘要
 } = require('./config/StrategyConfig')
 
@@ -140,16 +139,17 @@ class LotteryComputeEngine {
    * 创建策略引擎实例
    *
    * @param {Object} options - 配置选项
-   * @param {boolean} options.enable_pity - 是否启用 Pity 系统（默认从 StrategyConfig 读取）
-   * @param {boolean} options.enable_luck_debt - 是否启用运气债务（默认从 StrategyConfig 读取）
-   * @param {boolean} options.enable_anti_streak - 是否启用防连续机制（默认从 StrategyConfig 读取）
+   * @param {boolean} options.enable_pity - 是否启用 Pity 系统（env 级默认值，运行时会被 DB 活动级覆盖）
+   * @param {boolean} options.enable_luck_debt - 是否启用运气债务（env 级默认值）
+   * @param {boolean} options.enable_anti_empty - 是否启用防连空（env 级默认值）
+   * @param {boolean} options.enable_anti_high - 是否启用防连高（env 级默认值）
    */
   constructor(options = {}) {
-    // 从 StrategyConfig 读取功能开关默认值
     this.options = {
       enable_pity: isFeatureEnabled('pity'),
       enable_luck_debt: isFeatureEnabled('luck_debt'),
-      enable_anti_streak: isFeatureEnabled('anti_empty') || isFeatureEnabled('anti_high'),
+      enable_anti_empty: isFeatureEnabled('anti_empty'),
+      enable_anti_high: isFeatureEnabled('anti_high'),
       ...options
     }
 
@@ -393,12 +393,44 @@ class LotteryComputeEngine {
       selected_tier
     })
 
+    const { DynamicConfigLoader } = require('./config/StrategyConfig')
+    const campaign_opts = { lottery_campaign_id }
+
+    /**
+     * 活动级开关读取（优先级：DB活动级 > env环境变量 > 代码默认true）
+     * 拆分 enable_anti_streak 为 anti_empty / anti_high 两个独立开关
+     */
+    const pity_enabled = await DynamicConfigLoader.getValue(
+      'pity',
+      'enabled',
+      this.options.enable_pity,
+      campaign_opts
+    )
+    const anti_empty_enabled = await DynamicConfigLoader.getValue(
+      'anti_empty',
+      'enabled',
+      isFeatureEnabled('anti_empty'),
+      campaign_opts
+    )
+    const anti_high_enabled = await DynamicConfigLoader.getValue(
+      'anti_high',
+      'enabled',
+      isFeatureEnabled('anti_high'),
+      campaign_opts
+    )
+    const luck_debt_enabled = await DynamicConfigLoader.getValue(
+      'luck_debt',
+      'enabled',
+      this.options.enable_luck_debt,
+      campaign_opts
+    )
+
     let final_tier = selected_tier
     let final_weights = { ...tier_weights }
     const applied_mechanisms = []
 
     // 1. Pity 系统：根据连续空奖次数提升非空奖概率
-    if (this.options.enable_pity && experience_state) {
+    if (pity_enabled && experience_state) {
       const pity_result = this._applyPitySystem({
         empty_streak: experience_state.empty_streak || 0,
         tier_weights: final_weights
@@ -414,8 +446,8 @@ class LotteryComputeEngine {
       }
     }
 
-    // 2. AntiEmpty：连续空奖保护
-    if (this.options.enable_anti_streak && experience_state) {
+    // 2. AntiEmpty：连续空奖保护（独立开关）
+    if (anti_empty_enabled && experience_state) {
       const anti_empty_result = this._applyAntiEmptyStreak({
         empty_streak: experience_state.empty_streak || 0,
         selected_tier: final_tier,
@@ -437,16 +469,8 @@ class LotteryComputeEngine {
       }
     }
 
-    // 3. AntiHigh：连续高价值保护
-    if (this.options.enable_anti_streak && experience_state) {
-      /**
-       * 🔴 2026-02-15 修复：传递 anti_high_cooldown 参数
-       *
-       * 修复根因：
-       * - 原代码未传递 experience_state.anti_high_cooldown 给 AntiHighStreakHandler
-       * - 导致冷却机制形同虚设（handler 内默认值 0 = 不在冷却期）
-       * - 用户触发降级后无法进入冷却期，每次抽奖都重新检测
-       */
+    // 3. AntiHigh：连续高价值保护（独立开关）
+    if (anti_high_enabled && experience_state) {
       const anti_high_result = this._applyAntiHighStreak({
         recent_high_count: experience_state.recent_high_count || 0,
         anti_high_cooldown: experience_state.anti_high_cooldown || 0,
@@ -457,21 +481,6 @@ class LotteryComputeEngine {
         lottery_campaign_id
       })
 
-      /**
-       * 🔴 2026-02-15 严重BUG修复：字段名不匹配
-       *
-       * 问题根因：
-       * - AntiHighStreakHandler.handle() 返回 { tier_capped: true, final_tier: 'mid' }
-       * - 但此处原代码读取 anti_high_result.capped_tier（不存在该字段！）
-       * - 导致 final_tier = undefined → 下游 PrizePickStage 异常
-       * - 异常被 TierPickStage 的 try-catch 静默捕获 → AntiHigh 完全失效
-       *
-       * 影响范围：
-       * - 用户 13612227930 高价值中奖率从设计的 5% 飙升到 64.7%
-       * - 总计获得 2,083,900 积分的奖品价值
-       *
-       * 修复方案：使用正确的字段名 final_tier（与 AntiHighStreakHandler 返回一致）
-       */
       if (anti_high_result.tier_capped) {
         final_tier = anti_high_result.final_tier
         applied_mechanisms.push({
@@ -488,7 +497,8 @@ class LotteryComputeEngine {
       original_tier: selected_tier,
       original_weights: tier_weights,
       applied_mechanisms,
-      smoothing_applied: applied_mechanisms.length > 0
+      smoothing_applied: applied_mechanisms.length > 0,
+      switch_states: { pity_enabled, anti_empty_enabled, anti_high_enabled, luck_debt_enabled }
     }
 
     this._log('info', '体验平滑应用完成', {
@@ -972,319 +982,13 @@ class LotteryComputeEngine {
     }
   }
 
-  /**
-   * 检查功能是否对特定上下文启用（Phase P2 增强）
-   *
-   * 支持带上下文的灰度控制：
-   * - 用户白名单检查
-   * - 活动白名单检查
-   * - 百分比灰度判断
-   *
-   * @param {string} feature - 特性名称（pity/luck_debt/anti_empty/anti_high）
-   * @param {Object} context - 上下文信息
-   * @param {number} context.user_id - 用户ID
-   * @param {number} context.lottery_campaign_id - 活动ID
-   * @returns {Object} 启用状态详情
-   *
-   * @example
-   * const result = engine.checkFeatureWithGrayscale('pity', { user_id: 123, lottery_campaign_id: 1 })
-   * if (result.enabled) {
-   *   // 执行 Pity 逻辑
-   * }
+  /*
+   * 2026-02-23 10策略活动级开关改造：删除约350行死代码
+   * checkFeatureWithGrayscale / applyExperienceSmoothingWithGrayscale
+   * checkFeatureWithFeatureFlag / applyExperienceSmoothingWithFeatureFlag
+   * getLuckDebtMultiplierWithFeatureFlag
+   * 灰度逻辑已由 DynamicConfigLoader 活动级配置完全覆盖，如需恢复查阅 git 历史
    */
-  checkFeatureWithGrayscale(feature, context) {
-    return isFeatureEnabledForContext(feature, context)
-  }
-
-  /**
-   * 检查并应用体验平滑（带灰度控制）
-   *
-   * 与 applyExperienceSmoothing 类似，但使用灰度判断而非全局开关
-   *
-   * @param {Object} params - 参数对象
-   * @param {number} params.user_id - 用户ID
-   * @param {number} params.lottery_campaign_id - 活动ID
-   * @param {string} params.selected_tier - 当前选择的档位
-   * @param {Object} params.tier_weights - 档位权重
-   * @param {Object} params.experience_state - 体验状态
-   * @returns {Promise<Object>} 平滑处理结果
-   */
-  async applyExperienceSmoothingWithGrayscale(params) {
-    const { user_id, lottery_campaign_id, selected_tier, tier_weights, experience_state } = params
-    const context = { user_id, lottery_campaign_id }
-
-    this._log('debug', '开始应用体验平滑（带灰度）', {
-      user_id,
-      lottery_campaign_id,
-      selected_tier
-    })
-
-    let final_tier = selected_tier
-    let final_weights = { ...tier_weights }
-    const applied_mechanisms = []
-    const grayscale_decisions = {}
-
-    // 1. Pity 系统（带灰度判断）
-    const pity_grayscale = this.checkFeatureWithGrayscale('pity', context)
-    grayscale_decisions.pity = pity_grayscale
-
-    if (pity_grayscale.enabled && experience_state) {
-      const pity_result = this._applyPitySystem({
-        empty_streak: experience_state.empty_streak || 0,
-        tier_weights: final_weights
-      })
-
-      if (pity_result.pity_triggered) {
-        final_weights = pity_result.adjusted_weights
-        applied_mechanisms.push({
-          type: 'pity',
-          empty_streak: experience_state.empty_streak,
-          boost_multiplier: pity_result.boost_multiplier,
-          grayscale_reason: pity_grayscale.reason
-        })
-      }
-    }
-
-    // 2. AntiEmpty（带灰度判断）
-    const anti_empty_grayscale = this.checkFeatureWithGrayscale('anti_empty', context)
-    grayscale_decisions.anti_empty = anti_empty_grayscale
-
-    if (anti_empty_grayscale.enabled && experience_state) {
-      const anti_empty_result = this._applyAntiEmptyStreak({
-        empty_streak: experience_state.empty_streak || 0,
-        selected_tier: final_tier,
-        tier_weights: final_weights
-      })
-
-      if (anti_empty_result.forced) {
-        final_tier = anti_empty_result.final_tier
-        applied_mechanisms.push({
-          type: 'anti_empty',
-          empty_streak: experience_state.empty_streak,
-          forced_tier: final_tier,
-          grayscale_reason: anti_empty_grayscale.reason
-        })
-      }
-    }
-
-    // 3. AntiHigh（带灰度判断）
-    const anti_high_grayscale = this.checkFeatureWithGrayscale('anti_high', context)
-    grayscale_decisions.anti_high = anti_high_grayscale
-
-    if (anti_high_grayscale.enabled && experience_state) {
-      const anti_high_result = this._applyAntiHighStreak({
-        recent_high_count: experience_state.recent_high_count || 0,
-        anti_high_cooldown: experience_state.anti_high_cooldown || 0,
-        selected_tier: final_tier,
-        tier_weights: final_weights
-      })
-
-      if (anti_high_result.tier_capped) {
-        final_tier = anti_high_result.final_tier
-        applied_mechanisms.push({
-          type: 'anti_high',
-          recent_high_count: experience_state.recent_high_count,
-          capped_tier: anti_high_result.final_tier,
-          grayscale_reason: anti_high_grayscale.reason
-        })
-      }
-    }
-
-    return {
-      smoothing_applied: applied_mechanisms.length > 0,
-      final_tier,
-      final_weights,
-      applied_mechanisms,
-      grayscale_decisions // 返回灰度判断详情，便于调试
-    }
-  }
-
-  // ==================== Feature Flag 服务集成（V4.6.0 灰度发布） ====================
-
-  /**
-   * 检查功能是否对特定用户启用（使用 FeatureFlagService 数据库配置）
-   *
-   * 与 checkFeatureWithGrayscale 的区别：
-   * - checkFeatureWithGrayscale：使用 StrategyConfig 的环境变量配置
-   * - checkFeatureWithFeatureFlag：使用 FeatureFlagService 的数据库配置
-   *
-   * 推荐使用场景：
-   * - 需要动态调整灰度配置而无需重启服务
-   * - 需要精细化的用户分群控制
-   * - 需要审计日志记录配置变更
-   *
-   * @param {string} feature - 特性名称（对应 flag_key）
-   * @param {number} user_id - 用户ID
-   * @param {Object} options - 额外选项
-   * @returns {Promise<Object>} 判定结果，包含 enabled、reason、strategy 字段
-   *
-   * @example
-   * // 检查 Pity 系统是否对用户启用
-   * const result = await engine.checkFeatureWithFeatureFlag('lottery_pity_system', userId)
-   * if (result.enabled) {
-   *   // 执行 Pity 逻辑
-   * }
-   */
-  async checkFeatureWithFeatureFlag(feature, user_id, options = {}) {
-    try {
-      // 延迟加载 FeatureFlagService（避免循环依赖）
-      const FeatureFlagService = require('../../FeatureFlagService')
-      return await FeatureFlagService.isEnabled(feature, user_id, options)
-    } catch (error) {
-      this._log('warn', 'Feature Flag 服务调用失败，降级到环境变量配置', {
-        feature,
-        user_id,
-        error: error.message
-      })
-      // 降级到环境变量配置
-      return this.checkFeatureWithGrayscale(feature, { user_id })
-    }
-  }
-
-  /**
-   * 使用 Feature Flag 服务应用体验平滑机制（V4.6.0 灰度发布集成）
-   *
-   * 与 applyExperienceSmoothingWithGrayscale 的区别：
-   * - applyExperienceSmoothingWithGrayscale：使用环境变量配置
-   * - applyExperienceSmoothingWithFeatureFlag：使用数据库配置（FeatureFlagService）
-   *
-   * @param {Object} params - 参数对象
-   * @param {number} params.user_id - 用户ID
-   * @param {number} params.lottery_campaign_id - 活动ID
-   * @param {string} params.selected_tier - 当前选择的档位
-   * @param {Object} params.tier_weights - 档位权重
-   * @param {Object} params.experience_state - 体验状态
-   * @returns {Promise<Object>} 平滑处理结果
-   */
-  async applyExperienceSmoothingWithFeatureFlag(params) {
-    const { user_id, lottery_campaign_id, selected_tier, tier_weights, experience_state } = params
-
-    this._log('debug', '开始应用体验平滑（Feature Flag）', {
-      user_id,
-      lottery_campaign_id,
-      selected_tier
-    })
-
-    let final_tier = selected_tier
-    let final_weights = { ...tier_weights }
-    const applied_mechanisms = []
-    const feature_flag_decisions = {}
-
-    // 1. Pity 系统（通过 FeatureFlagService 判断）
-    const pity_decision = await this.checkFeatureWithFeatureFlag('lottery_pity_system', user_id)
-    feature_flag_decisions.pity = pity_decision
-
-    if (pity_decision.enabled && experience_state) {
-      const pity_result = this._applyPitySystem({
-        empty_streak: experience_state.empty_streak || 0,
-        tier_weights: final_weights
-      })
-
-      if (pity_result.pity_triggered) {
-        final_weights = pity_result.adjusted_weights
-        applied_mechanisms.push({
-          type: 'pity',
-          empty_streak: experience_state.empty_streak,
-          boost_multiplier: pity_result.boost_multiplier,
-          feature_flag_reason: pity_decision.reason,
-          feature_flag_strategy: pity_decision.strategy
-        })
-      }
-    }
-
-    // 2. AntiEmpty（通过 FeatureFlagService 判断）
-    const anti_empty_decision = await this.checkFeatureWithFeatureFlag(
-      'lottery_anti_empty_streak',
-      user_id
-    )
-    feature_flag_decisions.anti_empty = anti_empty_decision
-
-    if (anti_empty_decision.enabled && experience_state) {
-      const anti_empty_result = this._applyAntiEmptyStreak({
-        empty_streak: experience_state.empty_streak || 0,
-        selected_tier: final_tier,
-        tier_weights: final_weights
-      })
-
-      if (anti_empty_result.forced) {
-        final_tier = anti_empty_result.final_tier
-        applied_mechanisms.push({
-          type: 'anti_empty',
-          empty_streak: experience_state.empty_streak,
-          forced_tier: final_tier,
-          feature_flag_reason: anti_empty_decision.reason
-        })
-      }
-    }
-
-    // 3. AntiHigh（通过 FeatureFlagService 判断）
-    const anti_high_decision = await this.checkFeatureWithFeatureFlag(
-      'lottery_anti_high_streak',
-      user_id
-    )
-    feature_flag_decisions.anti_high = anti_high_decision
-
-    if (anti_high_decision.enabled && experience_state) {
-      const anti_high_result = this._applyAntiHighStreak({
-        recent_high_count: experience_state.recent_high_count || 0,
-        anti_high_cooldown: experience_state.anti_high_cooldown || 0,
-        selected_tier: final_tier,
-        tier_weights: final_weights
-      })
-
-      if (anti_high_result.tier_capped) {
-        final_tier = anti_high_result.final_tier
-        applied_mechanisms.push({
-          type: 'anti_high',
-          recent_high_count: experience_state.recent_high_count,
-          capped_tier: anti_high_result.final_tier,
-          feature_flag_reason: anti_high_decision.reason
-        })
-      }
-    }
-
-    return {
-      smoothing_applied: applied_mechanisms.length > 0,
-      final_tier,
-      final_weights,
-      applied_mechanisms,
-      feature_flag_decisions // 返回 Feature Flag 判断详情
-    }
-  }
-
-  /**
-   * 获取运气债务乘数（使用 Feature Flag 服务）
-   *
-   * @param {Object} params - 参数对象
-   * @param {number} params.user_id - 用户ID
-   * @param {Object} params.user_stats - 用户统计数据
-   * @returns {Promise<Object>} 包含 multiplier、enabled、reason 等字段的结果对象
-   */
-  async getLuckDebtMultiplierWithFeatureFlag(params) {
-    const { user_id, user_stats } = params
-
-    // 检查运气债务功能是否启用
-    const decision = await this.checkFeatureWithFeatureFlag('lottery_luck_debt', user_id)
-
-    if (!decision.enabled) {
-      return {
-        multiplier: 1.0,
-        enabled: false,
-        reason: decision.reason,
-        feature_flag_strategy: decision.strategy
-      }
-    }
-
-    // 调用实际的运气债务计算
-    const luckDebtResult = this._applyLuckDebt(user_stats)
-
-    return {
-      ...luckDebtResult,
-      enabled: true,
-      feature_flag_reason: decision.reason,
-      feature_flag_strategy: decision.strategy
-    }
-  }
 }
 
 /* 导出类和常量 */
@@ -1292,5 +996,3 @@ module.exports = LotteryComputeEngine
 module.exports.BUDGET_TIERS = BUDGET_TIERS
 module.exports.PRESSURE_TIERS = PRESSURE_TIERS
 module.exports.TIER_MATRIX_CONFIG = TIER_MATRIX_CONFIG
-module.exports.isFeatureEnabledForContext = isFeatureEnabledForContext // Phase P2：灰度判断函数
-module.exports.getGrayscaleSummary = getGrayscaleSummary // Phase P2：灰度摘要函数

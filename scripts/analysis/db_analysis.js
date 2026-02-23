@@ -103,9 +103,9 @@ async function analyzeDatabase() {
         SUM(CASE WHEN status = 'available' THEN 1 ELSE 0 END) as available,
         SUM(CASE WHEN status = 'locked' THEN 1 ELSE 0 END) as locked,
         SUM(CASE WHEN status = 'used' THEN 1 ELSE 0 END) as used
-      FROM item_instances
+      FROM items
     `)
-    console.log('🎒 物品实例 (item_instances):', itemStats[0])
+    console.log('🎒 物品实例 (items):', itemStats[0])
 
     // 市场挂牌
     const [listingStats] = await sequelize.query(`

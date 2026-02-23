@@ -448,4 +448,87 @@ router.get('/:lottery_campaign_id', authenticateToken, requireRoleLevel(100), as
   }
 })
 
+/* ========== 策略配置子路由（10策略活动级开关） ========== */
+
+const TransactionManager = require('../../../utils/TransactionManager')
+
+/**
+ * GET /:lottery_campaign_id/strategy-config
+ * 获取某活动的全部策略配置（按 config_group 分组）
+ * 通过 ServiceManager → QueryService 读取（架构规范：读操作收口到 QueryService）
+ */
+router.get(
+  '/:lottery_campaign_id/strategy-config',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const queryService = req.app.locals.services.getService('admin_lottery_query')
+      const result = await queryService.getStrategyConfig(req.params.lottery_campaign_id)
+      return res.apiSuccess(result, '获取策略配置成功')
+    } catch (error) {
+      logger.error('获取策略配置失败:', error)
+      const statusCode = error.statusCode || 500
+      return res.apiError(
+        `获取策略配置失败：${error.message}`,
+        error.code || 'GET_STRATEGY_CONFIG_FAILED',
+        null,
+        statusCode
+      )
+    }
+  }
+)
+
+/**
+ * PUT /:lottery_campaign_id/strategy-config
+ * 批量更新某活动的策略配置
+ * 通过 ServiceManager → CRUDService 写入（架构规范：写操作收口到 Service + 事务）
+ *
+ * 请求体示例：
+ * {
+ *   "config": {
+ *     "pity": { "enabled": false },
+ *     "anti_empty": { "enabled": true, "empty_streak_threshold": 5 },
+ *     "grayscale": { "pity_percentage": 50 }
+ *   }
+ * }
+ */
+router.put(
+  '/:lottery_campaign_id/strategy-config',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const lottery_campaign_id = req.params.lottery_campaign_id
+      const { config } = req.body
+
+      const crudService = req.app.locals.services.getService('lottery_campaign_crud')
+
+      const result = await TransactionManager.execute(async transaction => {
+        return await crudService.updateStrategyConfig(lottery_campaign_id, config, {
+          transaction,
+          operator_user_id: req.user.user_id
+        })
+      })
+
+      /* 更新后清除该活动的配置缓存 */
+      const {
+        DynamicConfigLoader
+      } = require('../../../services/UnifiedLotteryEngine/compute/config/StrategyConfig')
+      DynamicConfigLoader.clearCache(parseInt(lottery_campaign_id))
+
+      return res.apiSuccess(result, '策略配置更新成功')
+    } catch (error) {
+      logger.error('更新策略配置失败:', error)
+      const statusCode = error.statusCode || 500
+      return res.apiError(
+        `更新策略配置失败：${error.message}`,
+        error.code || 'UPDATE_STRATEGY_CONFIG_FAILED',
+        null,
+        statusCode
+      )
+    }
+  }
+)
+
 module.exports = router

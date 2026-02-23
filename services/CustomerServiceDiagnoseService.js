@@ -279,11 +279,11 @@ class CustomerServiceDiagnoseService {
             issues.push({
               type: 'item_lock_timeout',
               severity,
-              item_instance_id: plain.item_instance_id,
+              item_id: plain.item_id,
               item_name: templateName,
               lock_types: holdTypes,
               elapsed_minutes: elapsedMinutes,
-              message: `物品 "${templateName}" (ID:${plain.item_instance_id}) 锁定已 ${elapsedMinutes} 分钟`
+              message: `物品 "${templateName}" (ID:${plain.item_id}) 锁定已 ${elapsedMinutes} 分钟`
             })
           }
 

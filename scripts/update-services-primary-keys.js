@@ -44,7 +44,7 @@ const primaryKeyMappings = {
   
   // 物品相关
   item_template_id: 'item_template_id', // 保持不变
-  item_instance_id: 'item_instance_id', // 保持不变
+  item_id: 'item_id', // items 表主键（原 item_instance_id 已迁移）
   
   // 用户相关
   user_id: 'user_id', // 语义外键，保持不变

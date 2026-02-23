@@ -8,8 +8,13 @@
  */
 
 import { logger } from '../../../utils/logger.js'
-import { buildURL, request, buildQueryString } from '../../../api/base.js'
+import { buildURL, request } from '../../../api/base.js'
 import { CONTENT_ENDPOINTS } from '../../../api/content.js'
+import {
+  loadAssets, loadBackpack, loadLottery, loadTrades,
+  loadTimeline, loadRisk, loadHistory, loadNotes,
+  runDiagnose as runDiagnosePanel
+} from '../components/index.js'
 
 /**
  * 用户上下文面板状态
@@ -141,56 +146,44 @@ export function useUserContextMethods () {
     },
 
     async _loadAssets (userId) {
-      const url = buildURL(CONTENT_ENDPOINTS.CS_USER_CONTEXT_ASSETS, { userId }) + buildQueryString({ page_size: 10 })
-      const res = await request({ url, method: 'GET' })
-      if (res.success) this.context_assets = res.data
+      const data = await loadAssets(userId)
+      if (data) this.context_assets = data
     },
 
     async _loadBackpack (userId) {
-      const url = buildURL(CONTENT_ENDPOINTS.CS_USER_CONTEXT_BACKPACK, { userId }) + buildQueryString({ page_size: 20 })
-      const res = await request({ url, method: 'GET' })
-      if (res.success) this.context_backpack = res.data
+      const data = await loadBackpack(userId)
+      if (data) this.context_backpack = data
     },
 
     async _loadLottery (userId) {
-      const url = buildURL(CONTENT_ENDPOINTS.CS_USER_CONTEXT_LOTTERY, { userId }) + buildQueryString({ page_size: 10 })
-      const res = await request({ url, method: 'GET' })
-      if (res.success) this.context_lottery = res.data
+      const data = await loadLottery(userId)
+      if (data) this.context_lottery = data
     },
 
     async _loadTrades (userId) {
-      const url = buildURL(CONTENT_ENDPOINTS.CS_USER_CONTEXT_TRADES, { userId }) + buildQueryString({ page_size: 10 })
-      const res = await request({ url, method: 'GET' })
-      if (res.success) this.context_trades = res.data
+      const data = await loadTrades(userId)
+      if (data) this.context_trades = data
     },
 
     async _loadTimeline (userId) {
-      const url = buildURL(CONTENT_ENDPOINTS.CS_USER_CONTEXT_TIMELINE, { userId }) + buildQueryString({ page_size: 20 })
-      const res = await request({ url, method: 'GET' })
-      if (res.success) this.context_timeline = res.data
+      const data = await loadTimeline(userId)
+      if (data) this.context_timeline = data
     },
 
     async _loadRisk (userId) {
-      const url = buildURL(CONTENT_ENDPOINTS.CS_USER_CONTEXT_RISK, { userId })
-      const res = await request({ url, method: 'GET' })
-      if (res.success) this.context_risk = res.data
+      const data = await loadRisk(userId)
+      if (data) this.context_risk = data
     },
 
     async _loadHistory (userId) {
-      const url = buildURL(CONTENT_ENDPOINTS.CS_USER_CONTEXT_HISTORY, { userId }) + buildQueryString({ page_size: 10 })
-      const res = await request({ url, method: 'GET' })
-      if (res.success) this.context_history = res.data
+      const data = await loadHistory(userId)
+      if (data) this.context_history = data
     },
 
     async _loadNotes (userId) {
-      const notesUrl = buildURL(CONTENT_ENDPOINTS.CS_USER_CONTEXT_NOTES, { userId }) + buildQueryString({ page_size: 50 })
-      const issuesUrl = CONTENT_ENDPOINTS.CS_ISSUE_LIST + buildQueryString({ user_id: userId, page_size: 50 })
-      const [notesRes, issuesRes] = await Promise.all([
-        request({ url: notesUrl, method: 'GET' }),
-        request({ url: issuesUrl, method: 'GET' })
-      ])
-      if (notesRes.success) this.context_notes = notesRes.data?.rows || []
-      if (issuesRes.success) this.context_issues = issuesRes.data?.rows || []
+      const result = await loadNotes(userId)
+      this.context_notes = result.notes
+      this.context_issues = result.issues
     },
 
     /**
@@ -202,12 +195,11 @@ export function useUserContextMethods () {
 
       this.context_loading = true
       try {
-        const url = buildURL(CONTENT_ENDPOINTS.CS_USER_CONTEXT_DIAGNOSE, { userId })
-        const res = await request({ url, method: 'GET' })
-        if (res.success) {
-          this.context_diagnose = res.data
+        const data = await runDiagnosePanel(userId)
+        if (data) {
+          this.context_diagnose = data
           Alpine.store('notification').show('诊断完成', 'success')
-          logger.info('[UserContext] 诊断完成', { overall_level: res.data?.overall_level })
+          logger.info('[UserContext] 诊断完成', { overall_level: data?.overall_level })
         }
       } catch (error) {
         logger.error('[UserContext] 诊断失败:', error)

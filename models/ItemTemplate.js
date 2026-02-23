@@ -9,7 +9,7 @@
  * 硬约束：
  * - item_template_id 为自增主键
  * - template_code 为唯一业务标识（如 prize_iphone_15_pro）
- * - item_type 对应 item_instances.item_type
+ * - item_type 对应 items.item_type
  * - 关联 category_defs 和 rarity_defs 字典表
  *
  * 命名规范（snake_case）：

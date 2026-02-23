@@ -490,10 +490,10 @@ function isFeatureEnabled(feature) {
  *   user_hash_value: 42               // 用户 hash 值（0-99）
  * }
  */
-function isFeatureEnabledForContext(feature, context = {}) {
+async function isFeatureEnabledForContext(feature, context = {}) {
   const { user_id, lottery_campaign_id } = context
 
-  // 1. 全局开关检查
+  // 1. 全局开关检查（env 级）
   if (!isFeatureEnabled(feature)) {
     return {
       enabled: false,
@@ -503,24 +503,30 @@ function isFeatureEnabledForContext(feature, context = {}) {
     }
   }
 
-  // 2. 获取灰度配置
-  const grayscale = GRAYSCALE_CONFIG[feature]
-  if (!grayscale) {
-    // 无灰度配置，默认全量开放
-    return {
-      enabled: true,
-      reason: 'no_grayscale_config',
-      grayscale_percentage: 100,
-      user_hash_value: null
+  // 2. 获取灰度百分比（优先级：DB活动级 > env > 默认100%）
+  const grayscale = GRAYSCALE_CONFIG[feature] || {
+    percentage: 100,
+    user_whitelist: [],
+    campaign_whitelist: []
+  }
+  const percentage_key = `${feature}_percentage`
+  let effective_percentage = grayscale.percentage
+
+  if (lottery_campaign_id) {
+    const db_percentage = await DynamicConfigLoader.getValue('grayscale', percentage_key, null, {
+      lottery_campaign_id
+    })
+    if (db_percentage !== null && db_percentage !== undefined) {
+      effective_percentage = db_percentage
     }
   }
 
-  // 3. 用户白名单检查
+  // 3. 用户白名单检查（保持 env 配置）
   if (user_id && grayscale.user_whitelist.includes(user_id)) {
     return {
       enabled: true,
       reason: 'user_whitelist',
-      grayscale_percentage: grayscale.percentage,
+      grayscale_percentage: effective_percentage,
       user_hash_value: null
     }
   }
@@ -530,14 +536,13 @@ function isFeatureEnabledForContext(feature, context = {}) {
     return {
       enabled: true,
       reason: 'campaign_whitelist',
-      grayscale_percentage: grayscale.percentage,
+      grayscale_percentage: effective_percentage,
       user_hash_value: null
     }
   }
 
   // 5. 百分比灰度检查
-  if (grayscale.percentage >= 100) {
-    // 100% 全量开放
+  if (effective_percentage >= 100) {
     return {
       enabled: true,
       reason: 'full_rollout',
@@ -546,8 +551,7 @@ function isFeatureEnabledForContext(feature, context = {}) {
     }
   }
 
-  if (grayscale.percentage <= 0) {
-    // 0% 完全关闭
+  if (effective_percentage <= 0) {
     return {
       enabled: false,
       reason: 'zero_percentage',
@@ -558,12 +562,12 @@ function isFeatureEnabledForContext(feature, context = {}) {
 
   // 6. 按用户ID hash 计算灰度命中
   const hash_value = user_id ? calculateUserHash(user_id) : Math.floor(Math.random() * 100)
-  const is_hit = hash_value < grayscale.percentage
+  const is_hit = hash_value < effective_percentage
 
   return {
     enabled: is_hit,
     reason: is_hit ? 'percentage_hit' : 'percentage_miss',
-    grayscale_percentage: grayscale.percentage,
+    grayscale_percentage: effective_percentage,
     user_hash_value: hash_value
   }
 }
@@ -632,15 +636,34 @@ function getGrayscaleSummary() {
  * @type {Object}
  * @private
  */
-const _dynamicConfigCache = {
-  /** 缓存的配置数据 */
-  data: null,
-  /** 矩阵配置缓存 */
-  matrix: null,
-  /** 缓存加载时间戳 */
-  loaded_at: null,
-  /** 是否正在加载 */
-  loading: false
+/**
+ * 动态配置缓存（按活动ID隔离）
+ *
+ * Map 结构：lottery_campaign_id | 'global' → { data, matrix, loaded_at, loading }
+ * 每个活动的配置独立缓存，互不干扰
+ *
+ * @type {Map<string|number, Object>}
+ */
+const _dynamicConfigCache = new Map()
+
+/**
+ * 获取指定活动的缓存槽位（不存在时创建空槽位）
+ *
+ * @param {number|null} lottery_campaign_id - 活动ID（null 表示全局）
+ * @returns {Object} 缓存槽位 { data, matrix, loaded_at, loading }
+ * @private
+ */
+function _getCacheSlot(lottery_campaign_id) {
+  const key = lottery_campaign_id || 'global'
+  if (!_dynamicConfigCache.has(key)) {
+    _dynamicConfigCache.set(key, {
+      data: null,
+      matrix: null,
+      loaded_at: null,
+      loading: false
+    })
+  }
+  return _dynamicConfigCache.get(key)
 }
 
 /**
@@ -664,11 +687,13 @@ class DynamicConfigLoader {
   /**
    * 检查缓存是否有效
    *
+   * @param {number|null} [lottery_campaign_id] - 活动ID（按活动检查缓存有效性）
    * @returns {boolean} 缓存是否有效
    */
-  static isCacheValid() {
-    if (!_dynamicConfigCache.loaded_at) return false
-    const age = Date.now() - _dynamicConfigCache.loaded_at
+  static isCacheValid(lottery_campaign_id) {
+    const slot = _getCacheSlot(lottery_campaign_id)
+    if (!slot.loaded_at) return false
+    const age = Date.now() - slot.loaded_at
     return age < CONFIG_CACHE_TTL
   }
 
@@ -688,23 +713,22 @@ class DynamicConfigLoader {
    * // }
    */
   static async loadConfig(options = {}) {
-    const { force_refresh = false } = options
+    const { force_refresh = false, lottery_campaign_id } = options
+    const cache = _getCacheSlot(lottery_campaign_id)
 
-    // 1. 检查缓存
-    if (!force_refresh && this.isCacheValid() && _dynamicConfigCache.data) {
-      return _dynamicConfigCache.data
+    // 1. 检查缓存（按活动隔离）
+    if (!force_refresh && this.isCacheValid(lottery_campaign_id) && cache.data) {
+      return cache.data
     }
 
     // 2. 避免并发加载 - 等待当前加载完成
-    if (_dynamicConfigCache.loading) {
+    if (cache.loading) {
       await new Promise(resolve => {
         setTimeout(resolve, 100)
       })
-      return _dynamicConfigCache.data
+      return cache.data
     }
 
-    // 标记加载开始（原子操作）
-    const cache = _dynamicConfigCache
     cache.loading = true
 
     try {
@@ -716,17 +740,19 @@ class DynamicConfigLoader {
         return null
       }
 
-      // 4. 从数据库加载配置（支持按活动ID过滤，多活动隔离）
-      const db_config = await LotteryStrategyConfig.getAllConfig(options.lottery_campaign_id)
+      // 4. 从数据库加载配置（按活动ID隔离）
+      const db_config = await LotteryStrategyConfig.getAllConfig(lottery_campaign_id)
 
       // 5. 合并配置（数据库覆盖默认值）
       const merged_config = this.mergeConfig(db_config)
 
-      // 6. 更新缓存（使用局部变量避免竞态）
+      // 6. 更新缓存
       cache.data = merged_config
       cache.loaded_at = Date.now()
 
-      logger.info('[StrategyConfig] 动态配置加载成功，已缓存')
+      logger.info('[StrategyConfig] 动态配置加载成功', {
+        lottery_campaign_id: lottery_campaign_id || 'global'
+      })
       return merged_config
     } catch (error) {
       logger.error('[StrategyConfig] 动态配置加载失败:', error.message)
@@ -744,11 +770,11 @@ class DynamicConfigLoader {
    * @returns {Promise<Object|null>} 矩阵配置或 null
    */
   static async loadMatrixConfig(options = {}) {
-    const { force_refresh = false } = options
-    const cache = _dynamicConfigCache
+    const { force_refresh = false, lottery_campaign_id } = options
+    const cache = _getCacheSlot(lottery_campaign_id)
 
-    // 1. 检查缓存
-    if (!force_refresh && this.isCacheValid() && cache.matrix) {
+    // 1. 检查缓存（按活动隔离）
+    if (!force_refresh && this.isCacheValid(lottery_campaign_id) && cache.matrix) {
       return cache.matrix
     }
 
@@ -761,17 +787,19 @@ class DynamicConfigLoader {
         return null
       }
 
-      // 3. 从数据库加载矩阵（支持按活动ID过滤，多活动隔离）
-      const db_matrix = await LotteryTierMatrixConfig.getFullMatrix(options.lottery_campaign_id)
+      // 3. 从数据库加载矩阵（按活动ID隔离）
+      const db_matrix = await LotteryTierMatrixConfig.getFullMatrix(lottery_campaign_id)
 
       if (Object.keys(db_matrix).length === 0) {
         return null
       }
 
-      // 4. 更新缓存（使用局部变量避免竞态）
+      // 4. 更新缓存
       cache.matrix = db_matrix
 
-      logger.info('[StrategyConfig] 矩阵配置加载成功')
+      logger.info('[StrategyConfig] 矩阵配置加载成功', {
+        lottery_campaign_id: lottery_campaign_id || 'global'
+      })
       return db_matrix
     } catch (error) {
       logger.error('[StrategyConfig] 矩阵配置加载失败:', error.message)
@@ -833,20 +861,20 @@ class DynamicConfigLoader {
   }
 
   /**
-   * 获取动态配置值
+   * 获取动态配置值（支持活动级隔离）
    *
-   * 带有默认值回退的配置获取方法
-   *
-   * @param {string} group - 配置分组
-   * @param {string} key - 配置键名
-   * @param {*} default_value - 默认值
+   * @param {string} group - 配置分组（如 pity、anti_empty、pressure_tier）
+   * @param {string} key - 配置键名（如 enabled、threshold）
+   * @param {*} default_value - 默认值（DB 无记录时返回）
+   * @param {Object} [options={}] - 选项（透传给 loadConfig）
+   * @param {number} [options.lottery_campaign_id] - 活动ID（按活动读取配置）
    * @returns {Promise<*>} 配置值
    *
    * @example
-   * const threshold = await DynamicConfigLoader.getValue('budget_tier', 'threshold_high', 1000)
+   * const threshold = await DynamicConfigLoader.getValue('budget_tier', 'threshold_high', 1000, { lottery_campaign_id: 1 })
    */
-  static async getValue(group, key, default_value) {
-    const config = await this.loadConfig()
+  static async getValue(group, key, default_value, options = {}) {
+    const config = await this.loadConfig(options)
 
     if (config && config[group] && config[group][key] !== undefined) {
       return config[group][key]
@@ -875,36 +903,41 @@ class DynamicConfigLoader {
   }
 
   /**
-   * 清除配置缓存
+   * 清除配置缓存（用于配置更新后强制刷新）
    *
-   * 用于配置更新后强制刷新
-   *
+   * @param {number|null} [lottery_campaign_id] - 活动ID（传入则只清该活动，不传清全部）
    * @returns {void}
    */
-  static clearCache() {
-    _dynamicConfigCache.data = null
-    _dynamicConfigCache.matrix = null
-    _dynamicConfigCache.loaded_at = null
-    logger.info('[StrategyConfig] 配置缓存已清除')
+  static clearCache(lottery_campaign_id) {
+    if (lottery_campaign_id) {
+      const key = lottery_campaign_id
+      if (_dynamicConfigCache.has(key)) {
+        _dynamicConfigCache.delete(key)
+      }
+      logger.info('[StrategyConfig] 活动配置缓存已清除', { lottery_campaign_id })
+    } else {
+      _dynamicConfigCache.clear()
+      logger.info('[StrategyConfig] 全部配置缓存已清除')
+    }
   }
 
   /**
    * 获取缓存状态
    *
+   * @param {number|null} [lottery_campaign_id] - 活动ID（查看指定活动的缓存状态）
    * @returns {Object} 缓存状态信息
    */
-  static getCacheStatus() {
+  static getCacheStatus(lottery_campaign_id) {
+    const slot = _getCacheSlot(lottery_campaign_id)
     return {
-      has_config_cache: !!_dynamicConfigCache.data,
-      has_matrix_cache: !!_dynamicConfigCache.matrix,
-      loaded_at: _dynamicConfigCache.loaded_at
-        ? new Date(_dynamicConfigCache.loaded_at).toISOString()
-        : null,
-      cache_age_ms: _dynamicConfigCache.loaded_at
-        ? Date.now() - _dynamicConfigCache.loaded_at
-        : null,
+      lottery_campaign_id: lottery_campaign_id || 'global',
+      has_config_cache: !!slot.data,
+      has_matrix_cache: !!slot.matrix,
+      loaded_at: slot.loaded_at ? new Date(slot.loaded_at).toISOString() : null,
+      cache_age_ms: slot.loaded_at ? Date.now() - slot.loaded_at : null,
       cache_ttl_ms: CONFIG_CACHE_TTL,
-      is_valid: DynamicConfigLoader.isCacheValid()
+      is_valid: DynamicConfigLoader.isCacheValid(lottery_campaign_id),
+      total_cached_campaigns: _dynamicConfigCache.size
     }
   }
 }

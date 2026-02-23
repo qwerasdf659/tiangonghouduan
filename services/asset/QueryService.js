@@ -267,7 +267,7 @@ class QueryService {
    * 整合三个资产域：
    * 1. 积分（POINTS） - 来自 account_asset_balances（asset_code='POINTS'）
    * 2. 可叠加资产（DIAMOND、材料） - 来自 account_asset_balances
-   * 3. 不可叠加物品 - 来自 item_instances
+   * 3. 不可叠加物品 - 来自 items（三表模型：items + item_ledger + item_holds）
    *
    * 业务场景：
    * - 用户背包页面展示

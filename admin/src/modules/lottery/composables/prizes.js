@@ -7,6 +7,7 @@
  * @date 2026-01-24
  */
 
+import Sortable from 'sortablejs'
 import { logger } from '../../../utils/logger.js'
 import { LOTTERY_ENDPOINTS } from '../../../api/lottery/index.js'
 import { buildURL } from '../../../api/base.js'
@@ -22,7 +23,7 @@ import { buildURL } from '../../../api/base.js'
  * - stock_quantity: 库存数量 (正整数，999999表示无限)
  * - status: 状态 (active/inactive)
  * - prize_description: 奖品描述
- * - image_id: 图片ID
+ * - image_resource_id: 图片资源ID（FK→image_resources.image_resource_id）
  *
  * 注意：后端要求 quantity 必须为正整数，不接受 -1 或 0
  */
@@ -40,7 +41,7 @@ export function usePrizesState() {
       win_probability: 0, // 前端百分比显示 0-100
       stock_quantity: 100, // 默认库存100，后端要求正整数
       status: 'active',
-      image_id: null,
+      image_resource_id: null,
       prize_description: '',
       /**
        * 稀有度代码（面向前端的视觉稀有度等级）
@@ -52,8 +53,6 @@ export function usePrizesState() {
       win_weight: 100000,
       /** 所属档位（high/mid/low，决定奖品归属哪个档位池） */
       reward_tier: 'low'
-      // sort_order 不在表单中设置，由后端自动分配唯一递增值
-      // 编辑模式下通过 editPrize() 从后端数据中获取
     },
     /** @type {Array} 稀有度选项（来自 rarity_defs 表，5级） */
     rarityOptions: [
@@ -65,6 +64,8 @@ export function usePrizesState() {
     ],
     /** @type {number|string|null} 当前编辑的奖品ID - 使用后端字段名 */
     editingLotteryPrizeId: null,
+    /** @type {Array} 同档位其他奖品列表（编辑时从已加载的奖品数据中过滤） */
+    sameTierPrizes: [],
     /** @type {Object} 库存补充表单 - 使用后端字段名 */
     stockForm: { lottery_prize_id: null, prize_name: '', quantity: 1 },
 
@@ -172,15 +173,14 @@ export function usePrizesMethods() {
         win_probability: 0, // 前端百分比 0-100
         stock_quantity: 100, // 默认库存100，后端要求正整数
         status: 'active',
-        image_id: null,
-        prize_description: '',
-        rarity_code: 'common',
-        win_weight: 100000,
-        reward_tier: 'low'
-        // sort_order 不设置，由后端自动分配唯一递增值
-      }
-      this.showModal('prizeModal')
-    },
+      image_resource_id: null,
+      prize_description: '',
+      rarity_code: 'common',
+      win_weight: 100000,
+      reward_tier: 'low'
+    }
+    this.showModal('prizeModal')
+  },
 
     /**
      * 编辑奖品
@@ -189,24 +189,49 @@ export function usePrizesMethods() {
     editPrize(prize) {
       this.editingLotteryPrizeId = prize.lottery_prize_id
       this.isEditMode = true
-      // 后端概率是小数(0-1)，前端显示百分比(0-100)
       const winProbability = parseFloat(prize.win_probability || 0) * 100
-      // 使用后端字段名
       this.prizeForm = {
+        lottery_prize_id: prize.lottery_prize_id,
         lottery_campaign_id: prize.lottery_campaign_id || null,
         prize_name: prize.prize_name || '',
         prize_type: prize.prize_type || 'virtual',
         win_probability: winProbability,
         stock_quantity: prize.stock_quantity || 100,
         status: prize.status || 'active',
-        image_id: prize.image_id || null,
+        image_resource_id: prize.image_resource_id || null,
         prize_description: prize.prize_description || '',
         rarity_code: prize.rarity_code || 'common',
         sort_order: prize.sort_order || 1,
         win_weight: prize.win_weight || 100000,
         reward_tier: prize.reward_tier || 'low'
       }
+      this._loadSameTierPrizes(prize)
       this.showModal('prizeModal')
+    },
+
+    /**
+     * 加载同档位其他奖品用于对比参照
+     * 从已加载的 prizes 列表中过滤同 reward_tier 的奖品
+     * @param {Object} currentPrize - 当前编辑的奖品
+     * @private
+     */
+    _loadSameTierPrizes(currentPrize) {
+      const tier = currentPrize.reward_tier || 'low'
+      const campaignId = currentPrize.lottery_campaign_id
+      const sameTier = (this.prizes || []).filter(
+        p => p.reward_tier === tier && p.lottery_campaign_id === campaignId
+      )
+      const totalWeight = sameTier.reduce((sum, p) => sum + (p.win_weight || 0), 0)
+      this.sameTierPrizes = sameTier.map(p => ({
+        lottery_prize_id: p.lottery_prize_id,
+        prize_name: p.prize_name,
+        win_weight: p.win_weight || 0,
+        tier_percentage: totalWeight > 0
+          ? parseFloat((((p.win_weight || 0) / totalWeight) * 100).toFixed(2))
+          : 0,
+        stock_quantity: p.stock_quantity || 0,
+        remaining_quantity: Math.max(0, (p.stock_quantity || 0) - (p.total_win_count || 0))
+      }))
     },
 
     /**
@@ -285,7 +310,7 @@ export function usePrizesMethods() {
               win_probability: winProbability,
               stock_quantity: this.prizeForm.stock_quantity,
               status: this.prizeForm.status,
-              image_id: this.prizeForm.image_id,
+              image_resource_id: this.prizeForm.image_resource_id,
               prize_description: this.prizeForm.prize_description,
               rarity_code: this.prizeForm.rarity_code || 'common',
               win_weight: parseInt(this.prizeForm.win_weight) || 100000,
@@ -584,7 +609,7 @@ export function usePrizesMethods() {
         win_probability: 0,
         stock_quantity: 100,
         status: 'active',
-        image_id: null,
+        image_resource_id: null,
         prize_description: '',
         rarity_code: 'common',
         win_weight: 100000,
@@ -661,7 +686,7 @@ export function usePrizesMethods() {
         win_probability: parseFloat(prize.win_probability || 0) * 100,
         stock_quantity: prize.stock_quantity || 100,
         status: prize.status || 'active',
-        image_id: prize.image_id || null,
+        image_resource_id: prize.image_resource_id || null,
         prize_description: prize.prize_description || '',
         rarity_code: prize.rarity_code || 'common',
         win_weight: prize.win_weight || 100000,
@@ -775,6 +800,37 @@ export function usePrizesMethods() {
       await this.savePrizeSortOrder(updates)
     },
 
+    /**
+     * 初始化奖品列表拖拽排序（SortableJS）
+     * 拖拽结束后自动调用后端批量更新排序接口
+     * @param {HTMLElement} el - tbody 元素
+     */
+    initPrizeSortable(el) {
+      if (!el || this._prizeSortableInstance) return
+      this._prizeSortableInstance = Sortable.create(el, {
+        animation: 150,
+        handle: 'tr',
+        ghostClass: 'bg-blue-50',
+        chosenClass: 'opacity-70',
+        onEnd: async (evt) => {
+          if (evt.oldIndex === evt.newIndex) return
+          const rows = el.querySelectorAll('tr[data-prize-id]')
+          const updates = Array.from(rows).map((row, idx) => ({
+            lottery_prize_id: parseInt(row.dataset.prizeId),
+            sort_order: idx + 1
+          }))
+          try {
+            await this.savePrizeSortOrder(updates)
+            logger.info('[SortableJS] 拖拽排序已保存', { count: updates.length })
+          } catch (error) {
+            logger.error('[SortableJS] 排序保存失败:', error)
+            this.showError('排序保存失败: ' + error.message)
+            await this.loadPrizes()
+          }
+        }
+      })
+    },
+
     /** 打开批量调库存弹窗 */
     openBatchStockModal() {
       this.batchStockItems = []
@@ -795,9 +851,9 @@ export function usePrizesMethods() {
 
     /** 提交批量库存更新 */
     async submitBatchStock() {
-      const selectedItems = this.batchStockItems.filter(item => item.selected && item.new_stock !== item.current_stock)
+      const selectedItems = this.batchStockItems.filter(item => item.new_stock !== item.current_stock)
       if (selectedItems.length === 0) {
-        this.showError('请勾选并修改至少一个奖品的库存')
+        this.showError('没有检测到库存变更，请修改至少一个奖品的库存')
         return
       }
       try {

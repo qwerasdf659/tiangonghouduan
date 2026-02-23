@@ -194,6 +194,9 @@
                     <button class="px-3 py-1 text-sm border border-green-500 text-green-500 rounded hover:bg-green-50" @click="openCampaignReport(campaign.lottery_campaign_id)">
                       📋 复盘
                     </button>
+                    <button class="px-3 py-1 text-sm border border-orange-500 text-orange-500 rounded hover:bg-orange-50" @click="openPrizeManager(campaign)">
+                      🏆 奖品
+                    </button>
                     <button class="px-3 py-1 text-sm border border-yellow-500 text-yellow-500 rounded hover:bg-yellow-50" @click="toggleCampaign(campaign)" x-text="campaign.status === 'active' ? '⏸️ 停止' : '▶️ 启动'"></button>
                   </div>
                 </div>
@@ -311,12 +314,12 @@
                   <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
                 </tr>
               </thead>
-              <tbody class="divide-y">
+              <tbody class="divide-y" x-ref="prizeTableBody" x-init="$nextTick(() => initPrizeSortable($refs.prizeTableBody))">
                 <tr x-show="prizes.length === 0">
                   <td colspan="7" class="px-4 py-8 text-center themed-text-muted">暂无奖品数据</td>
                 </tr>
                 <template x-for="prize in prizes" :key="prize.lottery_prize_id">
-                  <tr class="themed-hover-bg" :class="{ 'bg-yellow-50': prize.stock_quantity === 0 && (prize.win_weight || 0) > 0 }">
+                  <tr class="themed-hover-bg cursor-grab" :class="{ 'bg-yellow-50': prize.stock_quantity === 0 && (prize.win_weight || 0) > 0 }" :data-prize-id="prize.lottery_prize_id">
                     <td class="px-4 py-3">
                       <div class="flex items-center">
                         <div class="w-10 h-10 rounded overflow-hidden mr-3 img-blur-load">
@@ -1158,6 +1161,380 @@
                 </div>
               </template>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== 活动策略开关页（10策略活动级开关） ==================== -->
+      <div x-show="current_page === 'activity-strategy-switch'" x-cloak>
+
+        <!-- 页面引导说明 -->
+        <div class="rounded-lg p-4 mb-6 bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-lg">
+          <div class="flex items-start gap-3">
+            <span class="text-2xl">🔧</span>
+            <div>
+              <h3 class="font-bold text-lg mb-1">活动策略开关</h3>
+              <p class="text-sm text-white/90">按活动独立配置10个策略的开关和参数。不同活动可选择不同的策略组合，互不影响。</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 活动选择器 -->
+        <div class="themed-card rounded-lg shadow p-4 mb-6">
+          <label class="block text-sm font-medium mb-2">选择活动</label>
+          <select class="w-full border border-gray-300 rounded-lg px-3 py-2"
+                  x-model="selectedCampaignIdForStrategy"
+                  @change="loadActivityStrategyConfig(selectedCampaignIdForStrategy)">
+            <option value="">-- 请选择活动 --</option>
+            <template x-for="c in campaigns" :key="c.lottery_campaign_id">
+              <option :value="c.lottery_campaign_id" x-text="`[${c.lottery_campaign_id}] ${c.campaign_name} (${c.status})`"></option>
+            </template>
+          </select>
+        </div>
+
+        <!-- 加载状态 -->
+        <div x-show="loadingActivityStrategy" class="text-center py-8">
+          <div class="animate-spin inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
+          <p class="mt-2 text-gray-500">加载策略配置中...</p>
+        </div>
+
+        <!-- 策略开关列表 -->
+        <div x-show="activityStrategyConfig && !loadingActivityStrategy">
+
+          <!-- 策略开关分组展示 -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+            <!-- Pity 保底 -->
+            <div class="themed-card rounded-lg shadow p-4">
+              <div class="flex items-center justify-between mb-3">
+                <h4 class="font-semibold">🎯 Pity 保底</h4>
+                <button class="relative inline-flex h-6 w-11 rounded-full transition-colors"
+                        :class="activityStrategyConfig?.pity?.enabled ? 'bg-green-500' : 'bg-gray-300'"
+                        @click="toggleActivityStrategySwitch('pity')">
+                  <span class="inline-block w-4 h-4 bg-white rounded-full shadow transform transition-transform mt-1 ml-1"
+                        :class="activityStrategyConfig?.pity?.enabled ? 'translate-x-5' : ''"></span>
+                </button>
+              </div>
+              <p class="text-xs text-gray-500 mb-2">连续空奖后提升非空奖概率，保护用户体验</p>
+              <div class="text-sm" x-show="activityStrategyConfig?.pity">
+                <span class="text-gray-600">硬保底阈值：</span>
+                <span x-text="activityStrategyConfig?.pity?.hard_guarantee_threshold || '-'"></span> 次
+              </div>
+            </div>
+
+            <!-- 防连空 -->
+            <div class="themed-card rounded-lg shadow p-4">
+              <div class="flex items-center justify-between mb-3">
+                <h4 class="font-semibold">🛡️ 防连空</h4>
+                <button class="relative inline-flex h-6 w-11 rounded-full transition-colors"
+                        :class="activityStrategyConfig?.anti_empty?.enabled ? 'bg-green-500' : 'bg-gray-300'"
+                        @click="toggleActivityStrategySwitch('anti_empty')">
+                  <span class="inline-block w-4 h-4 bg-white rounded-full shadow transform transition-transform mt-1 ml-1"
+                        :class="activityStrategyConfig?.anti_empty?.enabled ? 'translate-x-5' : ''"></span>
+                </button>
+              </div>
+              <p class="text-xs text-gray-500 mb-2">连续空奖达到阈值后强制给奖，防止用户"太倒霉"</p>
+              <div class="text-sm" x-show="activityStrategyConfig?.anti_empty">
+                <span class="text-gray-600">触发阈值：</span>
+                <span x-text="activityStrategyConfig?.anti_empty?.empty_streak_threshold || '-'"></span> 次连续空奖
+              </div>
+            </div>
+
+            <!-- 防连高 -->
+            <div class="themed-card rounded-lg shadow p-4">
+              <div class="flex items-center justify-between mb-3">
+                <h4 class="font-semibold">⚖️ 防连高</h4>
+                <button class="relative inline-flex h-6 w-11 rounded-full transition-colors"
+                        :class="activityStrategyConfig?.anti_high?.enabled ? 'bg-green-500' : 'bg-gray-300'"
+                        @click="toggleActivityStrategySwitch('anti_high')">
+                  <span class="inline-block w-4 h-4 bg-white rounded-full shadow transform transition-transform mt-1 ml-1"
+                        :class="activityStrategyConfig?.anti_high?.enabled ? 'translate-x-5' : ''"></span>
+                </button>
+              </div>
+              <p class="text-xs text-gray-500 mb-2">防止用户连续获得高价值奖品，保护商业模型</p>
+              <div class="text-sm" x-show="activityStrategyConfig?.anti_high">
+                <span class="text-gray-600">统计窗口：</span>
+                <span x-text="activityStrategyConfig?.anti_high?.recent_draw_window || '-'"></span> 次
+              </div>
+            </div>
+
+            <!-- 运气债务 -->
+            <div class="themed-card rounded-lg shadow p-4">
+              <div class="flex items-center justify-between mb-3">
+                <h4 class="font-semibold">🍀 运气债务</h4>
+                <button class="relative inline-flex h-6 w-11 rounded-full transition-colors"
+                        :class="activityStrategyConfig?.luck_debt?.enabled ? 'bg-green-500' : 'bg-gray-300'"
+                        @click="toggleActivityStrategySwitch('luck_debt')">
+                  <span class="inline-block w-4 h-4 bg-white rounded-full shadow transform transition-transform mt-1 ml-1"
+                        :class="activityStrategyConfig?.luck_debt?.enabled ? 'translate-x-5' : ''"></span>
+                </button>
+              </div>
+              <p class="text-xs text-gray-500 mb-2">基于用户历史空奖率计算补偿乘数</p>
+            </div>
+
+            <!-- 活动压力 -->
+            <div class="themed-card rounded-lg shadow p-4">
+              <div class="flex items-center justify-between mb-3">
+                <h4 class="font-semibold">📊 活动压力</h4>
+                <button class="relative inline-flex h-6 w-11 rounded-full transition-colors"
+                        :class="activityStrategyConfig?.pressure_tier?.enabled ? 'bg-green-500' : 'bg-gray-300'"
+                        @click="toggleActivityStrategySwitch('pressure_tier')">
+                  <span class="inline-block w-4 h-4 bg-white rounded-full shadow transform transition-transform mt-1 ml-1"
+                        :class="activityStrategyConfig?.pressure_tier?.enabled ? 'translate-x-5' : ''"></span>
+                </button>
+              </div>
+              <p class="text-xs text-gray-500 mb-2">根据活动消耗进度动态调整奖品概率</p>
+            </div>
+
+            <!-- BxPx 矩阵 -->
+            <div class="themed-card rounded-lg shadow p-4">
+              <div class="flex items-center justify-between mb-3">
+                <h4 class="font-semibold">🔢 BxPx 矩阵</h4>
+                <button class="relative inline-flex h-6 w-11 rounded-full transition-colors"
+                        :class="activityStrategyConfig?.matrix?.enabled ? 'bg-green-500' : 'bg-gray-300'"
+                        @click="toggleActivityStrategySwitch('matrix')">
+                  <span class="inline-block w-4 h-4 bg-white rounded-full shadow transform transition-transform mt-1 ml-1"
+                        :class="activityStrategyConfig?.matrix?.enabled ? 'translate-x-5' : ''"></span>
+                </button>
+              </div>
+              <p class="text-xs text-gray-500 mb-2">预算档位 × 压力档位的权重调整矩阵</p>
+            </div>
+
+            <!-- 管理干预总开关 -->
+            <div class="themed-card rounded-lg shadow p-4">
+              <div class="flex items-center justify-between mb-3">
+                <h4 class="font-semibold">🎮 管理干预</h4>
+                <button class="relative inline-flex h-6 w-11 rounded-full transition-colors"
+                        :class="activityStrategyConfig?.management?.enabled ? 'bg-green-500' : 'bg-gray-300'"
+                        @click="toggleActivityStrategySwitch('management')">
+                  <span class="inline-block w-4 h-4 bg-white rounded-full shadow transform transition-transform mt-1 ml-1"
+                        :class="activityStrategyConfig?.management?.enabled ? 'translate-x-5' : ''"></span>
+                </button>
+              </div>
+              <p class="text-xs text-gray-500 mb-2">关闭后该活动的所有 force_win/force_lose 干预不生效</p>
+            </div>
+
+          </div>
+
+          <!-- 灰度配置区域 -->
+          <div class="themed-card rounded-lg shadow p-4 mt-4">
+            <h4 class="font-semibold mb-3">🌗 灰度放量配置（%）</h4>
+            <p class="text-xs text-gray-500 mb-4">控制各策略对多少百分比的用户生效（0=完全关闭，100=全量开放）</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" x-show="activityStrategyConfig?.grayscale">
+              <template x-for="key in ['pity_percentage', 'luck_debt_percentage', 'anti_empty_percentage', 'anti_high_percentage']" :key="key">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1" x-text="key.replace('_percentage', '').replace(/_/g, ' ')"></label>
+                  <div class="flex items-center gap-2">
+                    <input type="range" min="0" max="100" class="flex-1"
+                           :value="activityStrategyConfig?.grayscale?.[key] || 100"
+                           @change="updateActivityStrategySetting('grayscale', key, parseInt($event.target.value))">
+                    <span class="text-sm font-mono w-10 text-right" x-text="(activityStrategyConfig?.grayscale?.[key] || 100) + '%'"></span>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+
+        <!-- 未选择活动提示 -->
+        <div x-show="!selectedCampaignIdForStrategy && !loadingActivityStrategy" class="text-center py-12 text-gray-400">
+          <span class="text-4xl block mb-2">📋</span>
+          <p>请先选择一个活动查看/编辑策略配置</p>
+        </div>
+      </div>
+
+      <!-- ==================== 分群策略管理页（任务3） ==================== -->
+      <div x-show="current_page === 'segment-rules'" x-cloak>
+        <!-- 页面引导说明 -->
+        <div class="rounded-lg p-4 mb-6 bg-gradient-to-r from-violet-500 to-fuchsia-600 text-white shadow-lg">
+          <div class="flex items-start gap-3">
+            <span class="text-2xl">👥</span>
+            <div>
+              <h5 class="font-bold text-lg">分群策略管理</h5>
+              <p class="text-white/80 text-sm mt-1">配置用户分群规则，决定不同用户群体的档位概率分配。系统内置版本不可修改，可创建自定义版本。</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 策略版本列表 -->
+        <div class="themed-card rounded-lg shadow mb-6">
+          <div class="flex items-center justify-between p-4 border-b">
+            <h5 class="font-semibold">📋 策略版本列表</h5>
+            <button @click="createSegmentRule()" class="px-3 py-1.5 text-sm bg-violet-600 text-white rounded hover:bg-violet-700">
+              ➕ 新建策略版本
+            </button>
+          </div>
+          <div class="divide-y">
+            <template x-if="segmentRuleVersions.length === 0">
+              <div class="p-6 text-center text-gray-400">暂无分群策略版本，请点击上方按钮创建</div>
+            </template>
+            <template x-for="version in segmentRuleVersions" :key="version.version_key || version.config_id">
+              <div class="p-4 hover:bg-gray-50 transition-colors">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-3">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
+                      :class="version.is_system ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'">
+                      <span x-text="version.is_system ? '系统内置' : '自定义'"></span>
+                    </span>
+                    <span class="font-medium" x-text="version.version_key || version.config_key"></span>
+                    <span class="text-sm text-gray-500" x-text="version.description || ''"></span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <button @click="openSegmentRuleEditor(version.version_key || version.config_key)" class="px-2 py-1 text-xs border rounded hover:bg-gray-100">
+                      👁️ 查看
+                    </button>
+                    <template x-if="!version.is_system">
+                      <button @click="openSegmentRuleEditor(version.version_key || version.config_key)" class="px-2 py-1 text-xs border rounded hover:bg-blue-50 text-blue-600">
+                        ✏️ 编辑
+                      </button>
+                    </template>
+                    <template x-if="!version.is_system">
+                      <button @click="archiveSegmentRule(version.version_key || version.config_key)" class="px-2 py-1 text-xs border rounded hover:bg-red-50 text-red-600">
+                        🗑️ 删除
+                      </button>
+                    </template>
+                  </div>
+                </div>
+                <!-- 规则条目预览 -->
+                <div class="mt-2 flex flex-wrap gap-1" x-show="version.rules && version.rules.length > 0">
+                  <template x-for="rule in (version.rules || []).slice(0, 5)" :key="rule.segment_key">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-600">
+                      <span x-text="rule.label || rule.segment_key"></span>
+                    </span>
+                  </template>
+                  <span x-show="(version.rules || []).length > 5" class="text-xs text-gray-400">... 共<span x-text="version.rules.length"></span>条</span>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- 测试面板 -->
+        <div class="themed-card rounded-lg shadow">
+          <div class="p-4 border-b">
+            <h5 class="font-semibold">🧪 分群规则测试面板</h5>
+            <p class="text-sm text-gray-500 mt-1">输入模拟用户数据，实时测试分群匹配结果</p>
+          </div>
+          <div class="p-4">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">注册天数</label>
+                <input type="number" class="w-full px-2 py-1.5 border rounded text-sm" x-model.number="segmentTestInput.registration_days" placeholder="30">
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">历史积分</label>
+                <input type="number" class="w-full px-2 py-1.5 border rounded text-sm" x-model.number="segmentTestInput.points" placeholder="1000">
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">用户等级</label>
+                <select class="w-full px-2 py-1.5 border rounded text-sm" x-model="segmentTestInput.user_level">
+                  <option value="normal">普通用户</option>
+                  <option value="vip">VIP</option>
+                  <option value="svip">SVIP</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">连续未中次数</label>
+                <input type="number" class="w-full px-2 py-1.5 border rounded text-sm" x-model.number="segmentTestInput.fail_count" placeholder="0">
+              </div>
+            </div>
+            <div class="flex items-center gap-3">
+              <button @click="testSegmentRule()" class="px-4 py-2 bg-violet-600 text-white rounded text-sm hover:bg-violet-700" :disabled="!editingSegmentRule">
+                ▶️ 运行测试
+              </button>
+              <template x-if="segmentTestResult">
+                <div class="flex items-center gap-2 px-3 py-1.5 rounded text-sm"
+                  :class="segmentTestResult.matched ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-yellow-50 text-yellow-700 border border-yellow-200'">
+                  <span x-text="segmentTestResult.matched ? '✅ 匹配分群：' + segmentTestResult.segment_key : '⚠️ 未匹配到任何分群，使用默认(default)'"></span>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== 分群策略编辑 Modal ==================== -->
+      <div x-show="modals.segmentRuleModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="hideModal('segmentRuleModal')">
+        <div class="themed-card rounded-lg shadow-xl w-full max-w-3xl max-h-[85vh] overflow-y-auto">
+          <div class="sticky top-0 themed-bg-card p-4 border-b flex items-center justify-between z-10">
+            <h5 class="font-semibold text-lg" x-text="editingSegmentRule?.version_key ? '编辑策略版本：' + editingSegmentRule.version_key : '新建策略版本'"></h5>
+            <button @click="hideModal('segmentRuleModal')" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+          </div>
+          <div class="p-4 space-y-4" x-show="editingSegmentRule">
+            <!-- 版本基础信息 -->
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium mb-1">版本标识 <span class="text-red-500">*</span></label>
+                <input type="text" class="w-full px-3 py-2 border rounded" x-model="editingSegmentRule.version_key" :disabled="editingSegmentRule.is_system" placeholder="如: v3_spring_2026">
+              </div>
+              <div>
+                <label class="block text-sm font-medium mb-1">描述</label>
+                <input type="text" class="w-full px-3 py-2 border rounded" x-model="editingSegmentRule.description" placeholder="策略版本描述">
+              </div>
+            </div>
+
+            <!-- 规则条目列表 -->
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <h6 class="font-semibold text-sm">📝 分群规则条目</h6>
+                <button @click="addSegmentRuleEntry()" class="px-2 py-1 text-xs border rounded hover:bg-gray-100" :disabled="editingSegmentRule.is_system">
+                  ➕ 添加规则
+                </button>
+              </div>
+              <div class="space-y-3">
+                <template x-for="(rule, ruleIdx) in editingSegmentRule.rules || []" :key="ruleIdx">
+                  <div class="border rounded p-3 bg-gray-50">
+                    <div class="grid grid-cols-3 gap-2 mb-2">
+                      <div>
+                        <label class="text-xs text-gray-500">分群标识</label>
+                        <input type="text" class="w-full px-2 py-1 border rounded text-sm" x-model="rule.segment_key" :disabled="editingSegmentRule.is_system" placeholder="如: new_user">
+                      </div>
+                      <div>
+                        <label class="text-xs text-gray-500">分群名称</label>
+                        <input type="text" class="w-full px-2 py-1 border rounded text-sm" x-model="rule.label" :disabled="editingSegmentRule.is_system" placeholder="如: 新用户">
+                      </div>
+                      <div>
+                        <label class="text-xs text-gray-500">优先级</label>
+                        <input type="number" class="w-full px-2 py-1 border rounded text-sm" x-model.number="rule.priority" :disabled="editingSegmentRule.is_system" min="0">
+                      </div>
+                    </div>
+                    <!-- 条件构建器 -->
+                    <div class="space-y-2">
+                      <template x-for="(cond, condIdx) in rule.conditions || []" :key="condIdx">
+                        <div class="flex items-center gap-2">
+                          <select class="px-2 py-1 border rounded text-xs" x-model="cond.field" :disabled="editingSegmentRule.is_system">
+                            <template x-for="[key, fieldDef] in Object.entries(segmentFieldRegistry.fields || {})" :key="key">
+                              <option :value="key" x-text="fieldDef.label || key"></option>
+                            </template>
+                          </select>
+                          <select class="px-2 py-1 border rounded text-xs" x-model="cond.operator" :disabled="editingSegmentRule.is_system">
+                            <template x-for="op in getOperatorsForField(cond.field)" :key="op.key">
+                              <option :value="op.key" x-text="op.label"></option>
+                            </template>
+                          </select>
+                          <input type="text" class="flex-1 px-2 py-1 border rounded text-xs" x-model="cond.value" :disabled="editingSegmentRule.is_system" placeholder="条件值">
+                          <button @click="rule.conditions.splice(condIdx, 1)" class="text-red-400 hover:text-red-600 text-xs" :disabled="editingSegmentRule.is_system">&times;</button>
+                        </div>
+                      </template>
+                      <button @click="addCondition(ruleIdx)" class="text-xs text-blue-500 hover:text-blue-700" :disabled="editingSegmentRule.is_system">+ 添加条件</button>
+                    </div>
+                    <!-- 条件自然语言描述 -->
+                    <div class="mt-1 text-xs text-gray-400" x-show="rule.conditions && rule.conditions.length > 0">
+                      <template x-for="cond in rule.conditions" :key="cond.field + cond.operator">
+                        <span class="mr-2" x-text="describeCondition(cond)"></span>
+                      </template>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+          <!-- 操作按钮 -->
+          <div class="sticky bottom-0 themed-bg-card p-4 border-t flex justify-end gap-2">
+            <button @click="hideModal('segmentRuleModal')" class="px-4 py-2 border rounded text-sm hover:bg-gray-100">取消</button>
+            <template x-if="!editingSegmentRule?.is_system">
+              <button @click="saveSegmentRule()" class="px-4 py-2 bg-violet-600 text-white rounded text-sm hover:bg-violet-700">保存策略</button>
+            </template>
           </div>
         </div>
       </div>
@@ -5250,6 +5627,28 @@
                 <p class="text-xs themed-text-muted mt-1">0或空表示不限制</p>
               </div>
             </div>
+            <!-- 选奖方式（pick_method）+ 分群策略版本 -->
+            <div class="grid grid-cols-2 gap-4 mt-3">
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">选奖方式 <span class="text-red-500">*</span></label>
+                <select class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" x-model="campaignForm.pick_method">
+                  <option value="tier_first">🎯 先选档位再选奖品（tier_first）</option>
+                  <option value="normalize">📊 归一化百分比选奖（normalize）</option>
+                </select>
+                <p class="text-xs themed-text-muted mt-1" x-show="campaignForm.pick_method === 'tier_first'">按 reward_tier 档位 + win_weight 权重两级选择</p>
+                <p class="text-xs themed-text-muted mt-1" x-show="campaignForm.pick_method === 'normalize'">跳过档位，按 win_probability 归一化百分比抽取，概率总和应为 1.0</p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">分群策略版本</label>
+                <select class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" x-model="campaignForm.segment_resolver_version"
+                  x-init="$nextTick(() => loadAvailableSegmentVersions())">
+                  <template x-for="sv in availableSegmentVersions" :key="sv.version_key">
+                    <option :value="sv.version_key" x-text="sv.description + '（' + sv.version_key + '）'"></option>
+                  </template>
+                </select>
+                <p class="text-xs themed-text-muted mt-1">控制用户分群规则版本，影响档位概率分配</p>
+              </div>
+            </div>
           </div>
 
           <!-- 展示配置（多活动抽奖系统 2026-02-15） -->
@@ -5620,6 +6019,39 @@
           <div class="flex items-center">
             <input type="checkbox" :checked="prizeForm.status === 'active'" @change="prizeForm.status = $event.target.checked ? 'active' : 'inactive'" id="prizeActiveSwitch" class="mr-2">
             <label for="prizeActiveSwitch">启用奖品</label>
+          </div>
+
+          <!-- 同档位其他奖品对比区（任务6） -->
+          <div x-show="isEditMode && prizeForm.reward_tier && sameTierPrizes.length > 0" class="border rounded p-3 bg-blue-50/50">
+            <h6 class="text-sm font-semibold text-blue-700 mb-2">📊 同档位（<span x-text="prizeForm.reward_tier"></span>）其他奖品</h6>
+            <div class="overflow-x-auto">
+              <table class="w-full text-xs">
+                <thead>
+                  <tr class="text-gray-500 border-b">
+                    <th class="text-left py-1 px-2">奖品名称</th>
+                    <th class="text-right py-1 px-2">权重</th>
+                    <th class="text-right py-1 px-2">档内占比</th>
+                    <th class="text-right py-1 px-2">库存</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template x-for="sp in sameTierPrizes" :key="sp.lottery_prize_id">
+                    <tr class="border-b border-gray-100" :class="sp.lottery_prize_id === prizeForm.lottery_prize_id ? 'bg-blue-100 font-semibold' : ''">
+                      <td class="py-1 px-2">
+                        <span x-text="sp.prize_name"></span>
+                        <span x-show="sp.lottery_prize_id === prizeForm.lottery_prize_id" class="text-blue-500 text-[10px] ml-1">← 当前编辑</span>
+                      </td>
+                      <td class="text-right py-1 px-2" x-text="sp.win_weight"></td>
+                      <td class="text-right py-1 px-2" x-text="sp.tier_percentage + '%'"></td>
+                      <td class="text-right py-1 px-2">
+                        <span x-text="sp.remaining_quantity"></span>
+                        <span x-show="sp.stock_quantity === 0 && sp.win_weight > 0" class="text-yellow-600 ml-1">⚠️</span>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
         <div class="p-4 border-t flex justify-end space-x-2">
@@ -6712,6 +7144,265 @@
         <div class="p-4 border-t bg-gray-50 flex justify-end">
           <button type="button" class="px-6 py-2 themed-bg-primary text-white rounded-lg themed-hover-primary" @click="closeCampaignRoiModal()">
             关闭
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== 活动级奖品管理面板（任务11-14） ==================== -->
+    <div x-show="prizeManagerVisible" x-cloak class="fixed inset-0 z-40 bg-gray-100 overflow-y-auto">
+      <!-- 面板头部 -->
+      <div class="sticky top-0 z-10 themed-bg-card shadow border-b">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <button @click="closePrizeManager()" class="p-1.5 rounded hover:bg-gray-200 text-gray-500">
+              ← 返回
+            </button>
+            <div>
+              <h4 class="font-semibold text-lg">🏆 奖品管理</h4>
+              <p class="text-sm text-gray-500" x-text="managingCampaign?.campaign_name + '（' + managingCampaign?.campaign_code + '）'"></p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="px-2 py-1 text-xs rounded"
+              :class="managingCampaign?.pick_method === 'normalize' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'"
+              x-text="managingCampaign?.pick_method === 'normalize' ? '📊 归一化模式' : '🎯 档位优先模式'"></span>
+            <button @click="openBatchStockModal()" class="px-3 py-1.5 text-sm border rounded hover:bg-gray-100">
+              📦 批量调库存
+            </button>
+            <button @click="addPrizeToCampaign()" class="px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">
+              ➕ 新增奖品
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 警告提示区 -->
+      <div class="max-w-7xl mx-auto px-4 mt-4" x-show="campaignPrizeWarnings.length > 0">
+        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+          <h6 class="font-semibold text-yellow-700 text-sm mb-2">⚠️ 风险提醒</h6>
+          <template x-for="warn in campaignPrizeWarnings" :key="warn.lottery_prize_id">
+            <p class="text-xs text-yellow-600" x-text="warn.message"></p>
+          </template>
+        </div>
+      </div>
+
+      <!-- 按档位分组面板 -->
+      <div class="max-w-7xl mx-auto px-4 py-4 space-y-4">
+        <!-- 无奖品提示 -->
+        <div x-show="campaignPrizeGroups.length === 0" class="themed-card rounded-lg p-8 text-center">
+          <div class="text-4xl mb-3">📭</div>
+          <p class="text-gray-500 mb-3">该活动暂无奖品，请添加奖品</p>
+          <button @click="addPrizeToCampaign()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+            ➕ 添加第一个奖品
+          </button>
+        </div>
+
+        <!-- 按 reward_tier 分组展示 -->
+        <template x-for="group in campaignPrizeGroups" :key="group.tier">
+          <div class="themed-card rounded-lg shadow overflow-hidden">
+            <!-- 档位组头部 -->
+            <div class="px-4 py-3 border-b flex items-center justify-between"
+              :class="{
+                'bg-red-50': group.tier === 'high',
+                'bg-blue-50': group.tier === 'mid',
+                'bg-gray-50': group.tier === 'low'
+              }">
+              <div class="flex items-center gap-3">
+                <span class="px-2 py-1 text-xs font-semibold rounded"
+                  :class="{
+                    'bg-red-200 text-red-800': group.tier === 'high',
+                    'bg-blue-200 text-blue-800': group.tier === 'mid',
+                    'bg-gray-200 text-gray-800': group.tier === 'low'
+                  }"
+                  x-text="group.tier_label"></span>
+                <span class="text-sm text-gray-600" x-text="group.prize_count + ' 个奖品'"></span>
+                <span class="text-xs text-gray-400" x-text="'总权重: ' + (group.total_weight || 0).toLocaleString()"></span>
+              </div>
+            </div>
+
+            <!-- 奖品表格 -->
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50/50">
+                  <tr>
+                    <th class="text-left py-2 px-4 font-medium text-gray-500">奖品名称</th>
+                    <th class="text-center py-2 px-4 font-medium text-gray-500">类型</th>
+                    <th class="text-right py-2 px-4 font-medium text-gray-500">权重</th>
+                    <th class="text-right py-2 px-4 font-medium text-gray-500">档内占比</th>
+                    <th class="text-right py-2 px-4 font-medium text-gray-500">库存</th>
+                    <th class="text-right py-2 px-4 font-medium text-gray-500">已发放</th>
+                    <th class="text-center py-2 px-4 font-medium text-gray-500">状态</th>
+                    <th class="text-center py-2 px-4 font-medium text-gray-500">操作</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y">
+                  <template x-for="(prize, prizeIdx) in group.prizes" :key="prize.lottery_prize_id">
+                    <tr class="hover:bg-gray-50 transition-colors"
+                      :class="{ 'bg-yellow-50': prize.stock_quantity === 0 && (prize.win_weight || 0) > 0 }">
+                      <td class="py-2 px-4">
+                        <div class="flex items-center gap-2">
+                          <span class="text-gray-400 cursor-grab text-xs" title="拖拽排序">⠿</span>
+                          <div>
+                            <span class="font-medium" x-text="prize.prize_name"></span>
+                            <template x-if="prize.is_fallback">
+                              <span class="ml-1 text-xs text-orange-500">兜底</span>
+                            </template>
+                            <div class="text-xs text-gray-400" x-text="'#' + prize.lottery_prize_id"></div>
+                          </div>
+                        </div>
+                      </td>
+                      <td class="text-center py-2 px-4">
+                        <span class="px-1.5 py-0.5 text-xs rounded bg-cyan-100 text-cyan-700" x-text="prize.prize_type"></span>
+                        <span class="ml-1 inline-block w-2.5 h-2.5 rounded-full"
+                          :style="'background:' + (rarityOptions?.find(o => o.value === prize.rarity_code)?.color || '#9E9E9E')"></span>
+                      </td>
+                      <td class="text-right py-2 px-4 font-mono" x-text="(prize.win_weight || 0).toLocaleString()"></td>
+                      <td class="text-right py-2 px-4">
+                        <span class="font-medium" x-text="prize.tier_percentage + '%'"></span>
+                      </td>
+                      <td class="text-right py-2 px-4">
+                        <span :class="{ 'text-red-600 font-bold': prize.remaining_quantity === 0 }"
+                          x-text="prize.stock_quantity >= 999999 ? '无限' : prize.remaining_quantity + '/' + prize.stock_quantity"></span>
+                        <template x-if="prize.stock_quantity === 0 && (prize.win_weight || 0) > 0">
+                          <span class="ml-1 text-yellow-500" title="零库存但有权重">⚠️</span>
+                        </template>
+                      </td>
+                      <td class="text-right py-2 px-4 text-gray-500" x-text="prize.total_win_count || 0"></td>
+                      <td class="text-center py-2 px-4">
+                        <span class="px-1.5 py-0.5 text-xs rounded"
+                          :class="prize.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'"
+                          x-text="prize.status === 'active' ? '启用' : '禁用'"></span>
+                      </td>
+                      <td class="text-center py-2 px-4">
+                        <div class="flex items-center justify-center gap-1">
+                          <button @click="editCampaignPrize(prize)" class="px-1.5 py-0.5 text-xs text-blue-600 hover:bg-blue-50 rounded" title="编辑">✏️</button>
+                          <button @click="openStockModal(prize)" class="px-1.5 py-0.5 text-xs text-green-600 hover:bg-green-50 rounded" title="补货">📦</button>
+                          <button @click="deleteCampaignPrize(prize)" class="px-1.5 py-0.5 text-xs text-red-600 hover:bg-red-50 rounded" title="删除"
+                            :disabled="prize.is_fallback">🗑️</button>
+                        </div>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- 活动级奖品新增/编辑 Modal -->
+    <div x-show="isModalOpen('campaignPrizeModal')" x-cloak class="fixed inset-0 z-50 flex items-center justify-center">
+      <div class="fixed inset-0 bg-black/50" @click="hideModal('campaignPrizeModal')"></div>
+      <div class="relative themed-card rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div class="p-4 border-b flex justify-between items-center">
+          <h5 class="font-semibold">🏆 <span x-text="isEditMode ? '编辑奖品' : '添加奖品'"></span></h5>
+          <button @click="hideModal('campaignPrizeModal')" class="text-gray-400 hover:text-gray-600">&times;</button>
+        </div>
+        <form @submit.prevent="submitCampaignPrize()">
+          <div class="p-4 space-y-4">
+            <div>
+              <label class="block text-sm font-medium mb-1">奖品名称 <span class="text-red-500">*</span></label>
+              <input type="text" class="w-full px-3 py-2 border rounded" x-model="prizeForm.prize_name" required>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium mb-1">奖品类型</label>
+                <select class="w-full px-3 py-2 border rounded" x-model="prizeForm.prize_type">
+                  <option value="points">积分</option>
+                  <option value="coupon">优惠券</option>
+                  <option value="physical">实物</option>
+                  <option value="virtual">虚拟</option>
+                  <option value="empty">空奖</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium mb-1">稀有度</label>
+                <select class="w-full px-3 py-2 border rounded" x-model="prizeForm.rarity_code">
+                  <template x-for="opt in rarityOptions" :key="opt.value">
+                    <option :value="opt.value" x-text="opt.label"></option>
+                  </template>
+                </select>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium mb-1">选奖权重</label>
+                <input type="number" class="w-full px-3 py-2 border rounded" x-model.number="prizeForm.win_weight" min="0" step="1000">
+                <p class="text-xs text-gray-400 mt-1">同档位内的相对概率</p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium mb-1">所属档位</label>
+                <select class="w-full px-3 py-2 border rounded" x-model="prizeForm.reward_tier">
+                  <option value="high">高档（high）</option>
+                  <option value="mid">中档（mid）</option>
+                  <option value="low">低档（low）</option>
+                </select>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium mb-1">中奖概率 (%)</label>
+                <input type="number" class="w-full px-3 py-2 border rounded" x-model.number="prizeForm.win_probability" min="0" max="100" step="0.01">
+                <p class="text-xs text-gray-400 mt-1" x-text="managingCampaign?.pick_method === 'normalize' ? '✅ normalize 模式下此字段生效' : '⚠️ tier_first 模式下此字段不生效'"></p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium mb-1">库存数量</label>
+                <input type="number" class="w-full px-3 py-2 border rounded" x-model.number="prizeForm.stock_quantity" min="1" placeholder="输入正整数">
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1">奖品描述</label>
+              <textarea class="w-full px-3 py-2 border rounded" x-model="prizeForm.prize_description" rows="2"></textarea>
+            </div>
+            <div class="flex items-center">
+              <input type="checkbox" :checked="prizeForm.status === 'active'" @change="prizeForm.status = $event.target.checked ? 'active' : 'inactive'" class="mr-2">
+              <label>启用奖品</label>
+            </div>
+          </div>
+          <div class="p-4 border-t flex justify-end gap-2">
+            <button type="button" class="px-4 py-2 border rounded hover:bg-gray-100" @click="hideModal('campaignPrizeModal')">取消</button>
+            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700" :disabled="saving">
+              <span x-show="saving">保存中...</span>
+              <span x-show="!saving" x-text="isEditMode ? '保存修改' : '添加奖品'"></span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 批量调库存 Modal -->
+    <div x-show="isModalOpen('batchStockModal')" x-cloak class="fixed inset-0 z-50 flex items-center justify-center">
+      <div class="fixed inset-0 bg-black/50" @click="hideModal('batchStockModal')"></div>
+      <div class="relative themed-card rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[85vh] overflow-y-auto">
+        <div class="sticky top-0 themed-bg-card p-4 border-b flex justify-between items-center z-10">
+          <h5 class="font-semibold">📦 批量调整库存</h5>
+          <button @click="hideModal('batchStockModal')" class="text-gray-400 hover:text-gray-600">&times;</button>
+        </div>
+        <div class="p-4">
+          <div class="space-y-2 max-h-[50vh] overflow-y-auto">
+            <template x-for="item in batchStockItems" :key="item.lottery_prize_id">
+              <div class="flex items-center gap-3 py-2 border-b border-gray-100">
+                <span class="px-1.5 py-0.5 text-xs rounded"
+                  :class="{
+                    'bg-red-100 text-red-700': item.reward_tier === 'high',
+                    'bg-blue-100 text-blue-700': item.reward_tier === 'mid',
+                    'bg-gray-100 text-gray-700': item.reward_tier === 'low'
+                  }"
+                  x-text="{ 'high': '高', 'mid': '中', 'low': '低' }[item.reward_tier] || '低'"></span>
+                <span class="flex-1 text-sm truncate" x-text="item.prize_name"></span>
+                <span class="text-xs text-gray-400" x-text="'当前: ' + item.current_stock"></span>
+                <input type="number" class="w-24 px-2 py-1 border rounded text-sm text-right" x-model.number="item.new_stock" min="0">
+              </div>
+            </template>
+          </div>
+        </div>
+        <div class="sticky bottom-0 themed-bg-card p-4 border-t flex justify-end gap-2">
+          <button @click="hideModal('batchStockModal')" class="px-4 py-2 border rounded text-sm hover:bg-gray-100">取消</button>
+          <button @click="submitBatchStock()" class="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700" :disabled="saving">
+            <span x-show="saving">提交中...</span>
+            <span x-show="!saving">确认提交</span>
           </button>
         </div>
       </div>

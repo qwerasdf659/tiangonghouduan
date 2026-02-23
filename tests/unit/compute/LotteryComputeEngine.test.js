@@ -29,6 +29,8 @@ const {
   GRAYSCALE_CONFIG
 } = require('../../../services/UnifiedLotteryEngine/compute/index')
 
+/* isFeatureEnabledForContext 在 10策略活动级开关改造后变为 async */
+
 describe('LotteryComputeEngine', () => {
   let engine
 
@@ -216,37 +218,37 @@ describe('LotteryComputeEngine', () => {
     })
   })
 
-  /* ========== Phase P2 增强：灰度发布测试 ========== */
+  /* ========== Phase P2 增强：灰度发布测试（10策略活动级开关改造后适配） ========== */
   describe('灰度发布功能', () => {
-    describe('isFeatureEnabledForContext - 带上下文的灰度判断', () => {
-      test('全局禁用时返回 false', () => {
-        /*
-         * 由于当前环境 Pity 是启用的，测试全局禁用需要模拟
-         * 这里测试函数存在且返回正确结构
-         */
-        const result = isFeatureEnabledForContext('pity', { user_id: 1, lottery_campaign_id: 1 })
+    describe('isFeatureEnabledForContext - 带上下文的灰度判断（async）', () => {
+      test('函数存在且返回正确结构', async () => {
+        const result = await isFeatureEnabledForContext('pity', {
+          user_id: 1,
+          lottery_campaign_id: 1
+        })
         expect(result).toBeDefined()
         expect(result).toHaveProperty('enabled')
         expect(result).toHaveProperty('reason')
         expect(result).toHaveProperty('grayscale_percentage')
       })
 
-      test('默认配置下返回 enabled=true（全量开放）', () => {
-        // 默认灰度百分比是 100%，应该返回 enabled: true
-        const result = isFeatureEnabledForContext('pity', { user_id: 123, lottery_campaign_id: 1 })
+      test('默认配置下返回 enabled=true（全量开放）', async () => {
+        const result = await isFeatureEnabledForContext('pity', {
+          user_id: 123,
+          lottery_campaign_id: 1
+        })
         expect(result.enabled).toBe(true)
         expect(result.grayscale_percentage).toBe(100)
       })
 
-      test('不同用户 ID 返回一致的 hash 结果', () => {
-        // 同一用户多次调用应该返回相同结果
-        const result1 = isFeatureEnabledForContext('pity', { user_id: 12345 })
-        const result2 = isFeatureEnabledForContext('pity', { user_id: 12345 })
+      test('不同用户 ID 返回一致的 hash 结果', async () => {
+        const result1 = await isFeatureEnabledForContext('pity', { user_id: 12345 })
+        const result2 = await isFeatureEnabledForContext('pity', { user_id: 12345 })
         expect(result1.user_hash_value).toEqual(result2.user_hash_value)
       })
 
-      test('无效特性返回 false', () => {
-        const result = isFeatureEnabledForContext('invalid_feature', { user_id: 1 })
+      test('无效特性返回 false', async () => {
+        const result = await isFeatureEnabledForContext('invalid_feature', { user_id: 1 })
         expect(result.enabled).toBe(false)
         expect(result.reason).toBe('global_disabled')
       })
@@ -284,20 +286,10 @@ describe('LotteryComputeEngine', () => {
       })
     })
 
-    describe('engine.checkFeatureWithGrayscale - 实例方法', () => {
-      test('方法存在且可调用', () => {
-        expect(engine.checkFeatureWithGrayscale).toBeDefined()
-        expect(typeof engine.checkFeatureWithGrayscale).toBe('function')
-      })
-
-      test('返回与 isFeatureEnabledForContext 一致的结果', () => {
-        const context = { user_id: 999, lottery_campaign_id: 1 }
-        const result1 = engine.checkFeatureWithGrayscale('pity', context)
-        const result2 = isFeatureEnabledForContext('pity', context)
-        expect(result1.enabled).toBe(result2.enabled)
-        expect(result1.reason).toBe(result2.reason)
-      })
-    })
+    /*
+     * engine.checkFeatureWithGrayscale 已在10策略活动级开关改造中删除
+     * 灰度逻辑已由 DynamicConfigLoader 活动级配置完全覆盖
+     */
 
     describe('engine.getStatus - 状态包含灰度摘要', () => {
       test('状态包含 grayscale_summary', () => {

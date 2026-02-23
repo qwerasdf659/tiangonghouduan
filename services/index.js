@@ -77,6 +77,7 @@ const AuditLogService = require('./AuditLogService') // 审计日志服务
 
 // V4.5.0 材料系统服务（2025-12-15）
 const AssetConversionService = require('./AssetConversionService') // 资产转换服务（材料转钻石）
+const ExchangeRateService = require('./exchange/ExchangeRateService') // 固定汇率兑换服务（2026-02-23 市场增强）
 
 // Asset 域子服务
 const BalanceService = require('./asset/BalanceService') // 资产余额服务（8个方法）
@@ -158,6 +159,7 @@ const MerchantPointsService = require('./MerchantPointsService') // 商家积分
 const StaffManagementService = require('./StaffManagementService') // 员工管理服务
 const StoreService = require('./StoreService') // 门店管理服务（P1 门店数据维护入口）
 const RegionService = require('./RegionService') // 行政区划服务（省市区级联选择）
+const MerchantService = require('./MerchantService') // 商家管理服务（多商家接入架构）
 const MerchantOperationLogService = require('./MerchantOperationLogService') // 商家操作审计日志服务
 const MerchantRiskControlService = require('./MerchantRiskControlService') // 商家风控服务
 const DebtManagementService = require('./DebtManagementService') // 欠账管理服务（2026-01-18 路由层合规性治理）
@@ -239,7 +241,9 @@ const {
   BusinessRecordQueryService,
   DashboardQueryService
 } = require('./console')
-const { QueryService: MarketQueryService } = require('./market')
+const { MarketQueryService } = require('./market')
+const PriceDiscoveryService = require('./market/PriceDiscoveryService') // 价格发现服务（2026-02-23 市场增强）
+const MarketAnalyticsService = require('./market/MarketAnalyticsService') // 市场数据分析服务（2026-02-23 市场增强）
 const { PortfolioQueryService: AssetPortfolioQueryService } = require('./asset')
 
 // 数据库模型
@@ -375,6 +379,7 @@ class ServiceManager {
       this._services.set('exchange_admin', new ExchangeAdminService(this.models)) // 管理后台操作（需实例化）
       this._services.set('exchange_bid_core', new ExchangeBidService(this.models)) // 竞价核心服务（出价/结算/取消）
       this._services.set('exchange_bid_query', new ExchangeBidQueryService(this.models)) // 竞价查询服务（列表/详情/历史）
+      this._services.set('exchange_rate', ExchangeRateService) // 固定汇率兑换服务（静态类，2026-02-23 市场增强）
       this._services.set('content_audit', ContentAuditEngine)
       // [已合并] this._services.set('announcement', AnnouncementService)
       this._services.set('notification', NotificationService)
@@ -486,6 +491,7 @@ class ServiceManager {
       this._services.set('staff_management', StaffManagementService) // 员工管理服务
       this._services.set('store', StoreService) // 门店管理服务（P1 门店数据维护入口）
       this._services.set('region', new RegionService(this.models)) // 行政区划服务（省市区级联选择，需实例化）
+      this._services.set('merchant', MerchantService) // 商家管理服务（多商家接入架构）
       this._services.set('merchant_operation_log', MerchantOperationLogService) // 商家操作审计日志服务
       this._services.set('merchant_risk_control', MerchantRiskControlService) // 商家风控服务
       this._services.set('debt_management', DebtManagementService) // 欠账管理服务（2026-01-18 路由层合规性治理）
@@ -538,6 +544,8 @@ class ServiceManager {
       this._services.set('console_business_record_query', BusinessRecordQueryService) // 管理后台业务记录查询服务（静态类）
       this._services.set('console_dashboard_query', DashboardQueryService) // 管理后台仪表盘查询服务（静态类）
       this._services.set('market_query', MarketQueryService) // 市场热点读查询服务（静态类）
+      this._services.set('price_discovery', PriceDiscoveryService) // 价格发现服务（静态类，2026-02-23 市场增强）
+      this._services.set('market_analytics', MarketAnalyticsService) // 市场数据分析服务（静态类，2026-02-23 市场增强）
       this._services.set('asset_portfolio_query', AssetPortfolioQueryService) // 资产组合分析查询服务（静态类）
 
       // ========== 阶段C 批量操作基础设施服务（2026-01-30） ==========

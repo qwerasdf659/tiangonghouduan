@@ -20,11 +20,7 @@ export const SYSTEM_ADMIN_ENDPOINTS = {
   NOTIFICATION_READ_ALL: `${API_PREFIX}/system/notifications/read-all`,
   NOTIFICATION_CLEAR: `${API_PREFIX}/system/notifications/clear`,
   NOTIFICATION_SEND: `${API_PREFIX}/system/notifications/send`,
-  NOTIFICATION_ANNOUNCEMENTS: `${API_PREFIX}/console/notifications/announcements`,
   CONSOLE_NOTIFICATIONS: `${API_PREFIX}/console/system/notifications`,
-
-  // [已合并] 弹窗Banner + 轮播图 → ad-campaigns?category=operational
-  // [已合并] 公告 → ad-campaigns?category=system
 
   // 广告活动管理（统一内容投放管理，支持 commercial/operational/system 三种类型）
   AD_CAMPAIGN_LIST: `${API_PREFIX}/console/ad-campaigns`,

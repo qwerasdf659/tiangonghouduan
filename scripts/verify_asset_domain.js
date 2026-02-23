@@ -207,7 +207,7 @@ async function verifyDatabaseLayer() {
   console.log('\n【检查6】物品锁超时修复状态')
   try {
     const lockedItems = await sequelize.query(
-      `SELECT COUNT(*) as count FROM item_instances WHERE status = 'locked'`,
+      `SELECT COUNT(*) as count FROM items WHERE status = 'locked'`,
       { type: QueryTypes.SELECT }
     )
     const lockedCount = lockedItems[0]?.count || 0
@@ -223,7 +223,7 @@ async function verifyDatabaseLayer() {
        * - 如果 expires_at 为空，检查 locked_at + 3分钟是否超时
        */
       const timeoutLocked = await sequelize.query(
-        `SELECT COUNT(*) as count FROM item_instances
+        `SELECT COUNT(*) as count FROM items
          WHERE status = 'locked'
            AND locks IS NOT NULL
            AND JSON_LENGTH(locks) > 0
@@ -251,7 +251,7 @@ async function verifyDatabaseLayer() {
 
     // 显示物品状态分布
     const statusDist = await sequelize.query(
-      `SELECT status, COUNT(*) as count FROM item_instances GROUP BY status`,
+      `SELECT status, COUNT(*) as count FROM items GROUP BY status`,
       { type: QueryTypes.SELECT }
     )
     console.log('   物品状态分布:')
@@ -524,8 +524,8 @@ async function verifyBusinessLayer() {
         if (content.includes('BalanceService.changeBalance') || content.includes('ItemService.mintItem')) {
           pass(`${stageName} 已使用资产子服务（V4.7.0）`)
           pipelineCheckPassed = true
-        } else if (content.includes('ItemInstance.create') || content.includes('Item.create')) {
-          fail(`${stageName} 仍直接使用 ItemInstance.create() 或 Item.create()`)
+        } else if (content.includes('Item.create')) {
+          fail(`${stageName} 仍直接使用 Item.create()，应通过 ItemService.mintItem()`)
         } else {
           warn(`${stageName} 未发现资产子服务调用`)
         }

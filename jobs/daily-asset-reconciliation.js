@@ -1,25 +1,18 @@
 /**
- * 餐厅积分抽奖系统 V4.2 - 每日资产对账任务
+ * @deprecated 已废弃 — 请使用 scripts/reconcile-items.js（统一对账脚本）
  *
- * 职责：
- * - 每日对比 account_asset_balances 和 asset_transactions 的一致性
- * - 检测余额异常并生成报告
- * - 发送告警通知
- * - 【P1-3 事务边界治理】业务记录与资产流水关联对账
+ * 此文件为旧版余额对账任务，仅覆盖 account_asset_balances ↔ asset_transactions 的余额对比。
+ * 新版统一对账脚本（scripts/reconcile-items.js）已覆盖：
+ * - 物品守恒验证（items ↔ item_ledger ↔ item_holds 三表互锁）
+ * - 资产双录守恒验证（SUM(delta_amount) GROUP BY asset_code = 0）
+ * - 余额一致性验证（available_amount = SUM(delta_amount)）
+ * - 冻结追踪验证（frozen_amount_change 全局平衡）
  *
- * 执行策略：
- * - 定时执行：每天凌晨2点
- * - 对账范围：所有非零余额账户 + 业务记录关联
- * - 差异阈值：0.01（精度容忍范围）
- * - 告警渠道：日志 + 可扩展企业微信/钉钉
- *
- * 事务边界治理扩展（2026-01-05）：
- * - 检查 lottery_draws.asset_transaction_id 关联
- * - 检查 consumption_records.reward_transaction_id 关联
- * - 检查 exchange_records.debit_transaction_id 关联
+ * 定时任务 scheduled_tasks.js 的任务12已切换至新版脚本。
+ * 此文件的 executeBusinessRecordReconciliation() 仍被任务15引用（业务记录关联对账）。
  *
  * 创建时间：2025-12-17
- * 最后更新：2026-01-05（事务边界治理 P1-3）
+ * 废弃时间：2026-02-23（由 scripts/reconcile-items.js 替代核心对账逻辑）
  */
 
 const {
@@ -89,6 +82,9 @@ class DailyAssetReconciliation {
         }
       }
 
+      // 双录全局守恒检查（V1.1.0 新增：SUM(delta_amount) by asset_code 应为 0）
+      const globalConservation = await this._checkGlobalConservation()
+
       // 生成报告
       const duration_ms = Date.now() - start_time
       const report = {
@@ -97,7 +93,12 @@ class DailyAssetReconciliation {
         total_checked: balances.length,
         discrepancy_count: discrepancies.length,
         discrepancies,
-        status: this._determineStatus(discrepancies.length, balances.length)
+        global_conservation: globalConservation,
+        status: this._determineOverallStatus(
+          discrepancies.length,
+          balances.length,
+          globalConservation
+        )
       }
 
       // 输出报告
@@ -228,17 +229,83 @@ class DailyAssetReconciliation {
 
     const discrepancy_rate = discrepancy_count / total_count
 
-    // 差异率 > 5% 为严重错误
     if (discrepancy_rate > 0.05) {
       return 'ERROR'
     }
 
-    // 差异率 > 1% 为警告
     if (discrepancy_rate > 0.01) {
       return 'WARNING'
     }
 
     return 'WARNING'
+  }
+
+  /**
+   * 双录全局守恒检查：SUM(delta_amount) GROUP BY asset_code 应全部为 0
+   *
+   * 双录记账的核心承诺：排除 is_invalid 记录后，每个 asset_code 的 delta_amount 合计为 0
+   *
+   * @returns {Promise<Object>} 守恒检查结果
+   * @private
+   */
+  static async _checkGlobalConservation() {
+    try {
+      const { sequelize } = require('../config/database')
+      // 全局守恒：仅检查 delta_amount（资产流动），不包含 frozen_amount_change（账户内部状态）
+      const [results] = await sequelize.query(`
+        SELECT asset_code, 
+               CAST(SUM(delta_amount) AS SIGNED) as sum_delta,
+               COUNT(*) as tx_count
+        FROM asset_transactions
+        WHERE COALESCE(is_invalid, 0) = 0
+        GROUP BY asset_code
+        HAVING SUM(delta_amount) != 0
+        ORDER BY ABS(SUM(delta_amount)) DESC
+      `)
+
+      const allPass = results.length === 0
+      const report = {
+        status: allPass ? 'PASS' : 'FAIL',
+        imbalanced_assets: results.map(r => ({
+          asset_code: r.asset_code,
+          sum_delta: Number(r.sum_delta),
+          tx_count: r.tx_count
+        }))
+      }
+
+      if (!allPass) {
+        logger.warn('双录全局守恒检查失败', {
+          imbalanced_count: results.length,
+          details: report.imbalanced_assets
+        })
+      } else {
+        logger.info('双录全局守恒检查通过')
+      }
+
+      return report
+    } catch (error) {
+      logger.error('双录全局守恒检查出错', { error: error.message })
+      return { status: 'ERROR', error: error.message }
+    }
+  }
+
+  /**
+   * 综合判断对账状态（余额一致性 + 全局守恒）
+   *
+   * @param {number} discrepancy_count - 余额差异数
+   * @param {number} total_count - 总检查数
+   * @param {Object} globalConservation - 全局守恒检查结果
+   * @returns {string} 状态: OK/WARNING/ERROR
+   * @private
+   */
+  static _determineOverallStatus(discrepancy_count, total_count, globalConservation) {
+    const balanceStatus = this._determineStatus(discrepancy_count, total_count)
+
+    if (globalConservation.status === 'FAIL') {
+      return 'ERROR'
+    }
+
+    return balanceStatus
   }
 
   /**

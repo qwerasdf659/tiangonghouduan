@@ -346,18 +346,17 @@
  */
 
 /**
- * 公告信息
+ * 系统通知信息（通过 AdCampaign(system) 统一管理）
  *
- * @typedef {Object} AnnouncementInfo
- * @property {number} announcement_id - 公告ID
- * @property {string} title - 公告标题
- * @property {string} content - 公告内容
- * @property {string} type - 公告类型（notice/maintenance/promotion）
- * @property {boolean} is_pinned - 是否置顶
- * @property {boolean} is_published - 是否发布
+ * @typedef {Object} SystemNotificationInfo
+ * @property {number} notification_id - 通知ID（即 ad_campaign_id）
+ * @property {string} title - 通知标题
+ * @property {string} content - 通知内容
+ * @property {string} type - 类型（固定为 'system'）
+ * @property {number} priority - 优先级（900-999）
+ * @property {boolean} is_active - 是否生效
  * @property {string} created_at - 创建时间
- * @property {string} [publish_at] - 发布时间
- * @property {string} [expires_at] - 过期时间
+ * @property {string} [end_date] - 过期日期
  */
 
 // ========== 认证相关类型 ==========

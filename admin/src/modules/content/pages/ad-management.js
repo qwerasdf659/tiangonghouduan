@@ -467,7 +467,8 @@ document.addEventListener('alpine:init', () => {
         force_show: isSystem,
         internal_notes: '',
         text_content: '',
-        content_type: isSystem ? 'text' : 'image'
+        content_type: isSystem ? 'text' : 'image',
+        display_mode: null
       }
       this.showModal('campaignCreateModal')
     },
@@ -553,8 +554,29 @@ document.addEventListener('alpine:init', () => {
           data.internal_notes = this.campaignForm.internal_notes
         }
 
+        // W1+W2: 传递 text_content 和 content_type（AdCreative 模型字段）
+        if (this.campaignForm.content_type) {
+          data.content_type = this.campaignForm.content_type
+        }
+        if (this.campaignForm.text_content?.trim()) {
+          data.text_content = this.campaignForm.text_content.trim()
+        }
+
+        // W5: 传递 display_mode（弹窗显示模式）
+        if (this.campaignForm.display_mode) {
+          data.display_mode = this.campaignForm.display_mode
+        }
+
+        // W4: 根据 category 使用对应的专用创建端点（跳过审核简化流程）
+        let createUrl = SYSTEM_ENDPOINTS.AD_CAMPAIGN_CREATE
+        if (category === 'operational') {
+          createUrl = SYSTEM_ENDPOINTS.AD_CAMPAIGN_OPERATIONAL_CREATE
+        } else if (category === 'system') {
+          createUrl = SYSTEM_ENDPOINTS.AD_CAMPAIGN_SYSTEM_CREATE
+        }
+
         const response = await request({
-          url: SYSTEM_ENDPOINTS.AD_CAMPAIGN_CREATE,
+          url: createUrl,
           method: 'POST',
           data
         })

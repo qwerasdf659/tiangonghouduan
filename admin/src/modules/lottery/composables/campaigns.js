@@ -9,6 +9,7 @@
 
 import { logger } from '../../../utils/logger.js'
 import { LOTTERY_ENDPOINTS } from '../../../api/lottery/index.js'
+import { API_PREFIX } from '../../../api/base.js'
 
 /**
  * 活动管理状态
@@ -20,6 +21,8 @@ export function useCampaignsState() {
     campaigns: [],
     /** @type {Object} 活动统计 */
     campaignStats: { total: 0, active: 0, today_participants: 0, today_winners: 0 },
+    /** @type {Array} 可用的分群策略版本列表（动态从后端加载） */
+    availableSegmentVersions: [{ version_key: 'default', description: '默认版本' }],
     /** @type {Object} 活动筛选条件 */
     campaignFilters: { status: '', keyword: '' },
     /** @type {Object} 活动编辑表单 - 包含后端所有必填字段 */
@@ -176,6 +179,31 @@ export function useCampaignsMethods(_context) {
     },
 
     /**
+     * 加载可用的分群策略版本列表（供活动编辑下拉选择）
+     */
+    async loadAvailableSegmentVersions() {
+      try {
+        const response = await this.apiGet(
+          `${API_PREFIX}/console/segment-rules`,
+          {},
+          { showLoading: false }
+        )
+        const data = response?.success ? response.data : response
+        const configs = data?.configs || data || []
+        this.availableSegmentVersions = configs.map(c => ({
+          version_key: c.version_key || c.config_key,
+          description: c.description || c.version_key || '未命名'
+        }))
+        if (this.availableSegmentVersions.length === 0) {
+          this.availableSegmentVersions = [{ version_key: 'default', description: '默认版本' }]
+        }
+      } catch (error) {
+        logger.warn('[Campaigns] 加载分群策略版本失败（使用默认列表）:', error.message)
+        this.availableSegmentVersions = [{ version_key: 'default', description: '默认版本' }]
+      }
+    },
+
+    /**
      * 加载活动统计数据
      */
     async loadCampaignStats() {
@@ -271,6 +299,9 @@ export function useCampaignsMethods(_context) {
         rarity_effects_enabled: fullCampaign.rarity_effects_enabled !== false,
         win_animation: fullCampaign.win_animation || 'simple',
         background_image_url: fullCampaign.background_image_url || null,
+        // 选奖配置（任务10+3）
+        pick_method: fullCampaign.pick_method || 'tier_first',
+        segment_resolver_version: fullCampaign.segment_resolver_version || 'default',
         // 固定间隔保底配置（从活动详情回填）
         guarantee_enabled:
           fullCampaign.guarantee_enabled === true || fullCampaign.guarantee_enabled === 1,

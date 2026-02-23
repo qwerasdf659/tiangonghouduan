@@ -34,7 +34,7 @@ async function getMarketListingsStats() {
       SUM(CASE WHEN status = 'on_sale' THEN 1 ELSE 0 END) AS on_sale,
       SUM(CASE WHEN status = 'withdrawn' THEN 1 ELSE 0 END) AS withdrawn,
       SUM(CASE WHEN status = 'sold' THEN 1 ELSE 0 END) AS sold,
-      SUM(CASE WHEN listing_kind = 'item_instance' THEN 1 ELSE 0 END) AS item_instance,
+      SUM(CASE WHEN listing_kind = 'item' THEN 1 ELSE 0 END) AS item_count,
       SUM(CASE WHEN listing_kind = 'fungible_asset' THEN 1 ELSE 0 END) AS fungible_asset
     FROM market_listings
   `)
@@ -60,7 +60,7 @@ async function truncateMarketListings() {
     console.log(`   - on_sale: ${beforeStats.on_sale || 0}`)
     console.log(`   - withdrawn: ${beforeStats.withdrawn || 0}`)
     console.log(`   - sold: ${beforeStats.sold || 0}`)
-    console.log(`   - item_instance: ${beforeStats.item_instance || 0}`)
+    console.log(`   - item: ${beforeStats.item_count || 0}`)
     console.log(`   - fungible_asset: ${beforeStats.fungible_asset || 0}`)
 
     // 3. 执行清空（使用 DELETE 避免外键约束问题）

@@ -74,6 +74,11 @@ export function sidebarNav() {
             badgeKey: 'redemptionPendingCount'
           },
           {
+            id: 'redemption-scan',
+            name: '扫码核销',
+            url: '/admin/redemption-scan.html'
+          },
+          {
             id: 'customer-service',
             name: '客服工作台',
             url: '/admin/customer-service.html',
@@ -169,6 +174,7 @@ export function sidebarNav() {
           { id: 'item-lifecycle', name: '物品追踪', url: '/admin/item-lifecycle.html' },
           { id: 'reconciliation', name: '对账报告', url: '/admin/reconciliation.html' },
           { id: 'exchange', name: '兑换市场', url: '/admin/exchange-market.html' },
+          { id: 'exchange-rate', name: '汇率兑换', url: '/admin/exchange-rate-management.html' },
           { id: 'trade', name: 'C2C交易', url: '/admin/trade-management.html' },
           { id: 'bid-mgmt', name: '竞价管理', url: '/admin/bid-management.html' },
           { id: 'orphan-frozen', name: '孤儿冻结清理', url: '/admin/orphan-frozen.html' }
@@ -183,7 +189,8 @@ export function sidebarNav() {
         items: [
           { id: 'user-mgmt', name: '用户管理', url: '/admin/user-management.html' },
           { id: 'user-hierarchy', name: '用户层级', url: '/admin/user-hierarchy.html' },
-          { id: 'stores', name: '门店管理', url: '/admin/store-management.html' }
+          { id: 'stores', name: '门店管理', url: '/admin/store-management.html' },
+          { id: 'merchant-mgmt', name: '商家管理', url: '/admin/merchant-management.html' }
         ]
       },
 

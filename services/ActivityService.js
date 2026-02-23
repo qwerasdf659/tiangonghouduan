@@ -813,7 +813,7 @@ class ActivityService {
       validationDetails.tier_weights = {
         valid: true,
         skipped: true,
-        reason: `活动使用 ${campaign.pick_method || 'normalize'} 选奖法，不需要档位权重校验`
+        reason: `活动使用 ${campaign.pick_method || 'tier_first'} 选奖法，不需要档位权重校验`
       }
     }
 

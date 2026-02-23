@@ -10,8 +10,8 @@
  * - 防止出现"孤儿冻结"问题
  *
  * 涉及表（按外键依赖顺序删除）：
- * 1. item_instance_events
- * 2. item_instances
+ * 1. item_ledger（原 item_instance_events）
+ * 2. items
  * 3. exchange_records
  * 4. content_review_records
  * 5. consumption_records
@@ -41,11 +41,12 @@ const DRY_RUN = process.env.DRY_RUN === 'true'
  * 需要清理的表（按外键依赖顺序）
  */
 const TABLES_TO_CLEANUP = [
-  { table: 'item_instance_events', time_column: 'created_at' },
-  { table: 'redemption_orders', time_column: 'created_at' }, // 依赖 item_instances
-  { table: 'market_listings', time_column: 'created_at' }, // 依赖 item_instances
-  { table: 'trade_orders', time_column: 'created_at' }, // 依赖 item_instances
-  { table: 'item_instances', time_column: 'created_at' },
+  { table: 'item_ledger', time_column: 'created_at' },
+  { table: 'item_holds', time_column: 'created_at' },
+  { table: 'redemption_orders', time_column: 'created_at' },
+  { table: 'market_listings', time_column: 'created_at' },
+  { table: 'trade_orders', time_column: 'created_at' },
+  { table: 'items', time_column: 'created_at' },
   { table: 'exchange_records', time_column: 'created_at' },
   { table: 'content_review_records', time_column: 'created_at' },
   { table: 'consumption_records', time_column: 'created_at' },

@@ -99,7 +99,7 @@ async function verifyAll() {
       'users',
       'lottery_draws',
       'lottery_prizes',
-      'item_instances',
+      'items',
       'redemption_orders',
       'asset_transactions',
       'account_asset_balances',
@@ -114,7 +114,7 @@ async function verifyAll() {
       users: 22,
       lottery_draws: 2840,
       lottery_prizes: 9,
-      item_instances: 1150,
+      items: 1150,
       redemption_orders: 373,
       asset_transactions: 175,
       account_asset_balances: 11,
@@ -226,13 +226,13 @@ async function verifyAll() {
 
     report.sections.assetTxIndexes = { count: assetTxIndexes.length, indexes: assetTxIndexes }
 
-    // 4.4 item_instances 表索引
-    console.log('\n【4.4】item_instances 表索引:')
+    // 4.4 items 表索引
+    console.log('\n【4.4】items 表索引:')
     const itemInstancesIndexes = await sequelize.query(
       `
       SELECT INDEX_NAME, NON_UNIQUE, GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) as columns
       FROM information_schema.STATISTICS
-      WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'item_instances'
+      WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'items'
       GROUP BY INDEX_NAME, NON_UNIQUE
       ORDER BY INDEX_NAME
     `,
@@ -338,7 +338,7 @@ async function verifyAll() {
     try {
       const explainBackpack = await sequelize.query(
         `
-        EXPLAIN SELECT * FROM item_instances
+        EXPLAIN SELECT * FROM items
         WHERE owner_user_id = 31 AND status = 'available'
         ORDER BY created_at DESC
       `,

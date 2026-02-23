@@ -38,7 +38,7 @@ async function checkDatabaseStatus() {
       { name: 'customer_service_sessions', desc: '客服会话' },
       { name: 'admin_operation_logs', desc: '操作审计' },
       { name: 'lottery_management_settings', desc: '抽奖预设' },
-      { name: 'item_instances', desc: '物品实例' },
+      { name: 'items', desc: '物品实例' },
       { name: 'market_listings', desc: '市场挂牌' },
       { name: 'trade_orders', desc: '交易订单' },
       { name: 'asset_transactions', desc: '资产流水' },

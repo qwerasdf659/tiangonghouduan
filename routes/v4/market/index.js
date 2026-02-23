@@ -38,6 +38,9 @@ const sellRoutes = require('./sell')
 const buyRoutes = require('./buy')
 const manageRoutes = require('./manage')
 const escrowRoutes = require('./escrow')
+const exchangeRateRoutes = require('./exchange-rate') // 固定汇率兑换（2026-02-23 市场增强）
+const priceRoutes = require('./price') // 价格发现（2026-02-23 市场增强）
+const analyticsRoutes = require('./analytics') // 市场数据分析（2026-02-23 市场增强）
 
 // 挂载子路由
 router.use('/', listingsRoutes) // 市场列表查询
@@ -45,5 +48,8 @@ router.use('/', sellRoutes) // 上架商品
 router.use('/', buyRoutes) // 购买商品
 router.use('/', manageRoutes) // 撤回/管理
 router.use('/', escrowRoutes) // C2C担保码确认（Phase 4）
+router.use('/', exchangeRateRoutes) // 固定汇率兑换
+router.use('/', priceRoutes) // 价格发现
+router.use('/', analyticsRoutes) // 市场数据分析
 
 module.exports = router

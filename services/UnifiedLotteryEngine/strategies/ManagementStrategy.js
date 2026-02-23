@@ -149,9 +149,10 @@ class ManagementStrategy {
         {
           user_id: targetUserId,
           setting_type: 'force_win',
+          lottery_campaign_id: options.lottery_campaign_id || null,
           setting_data: {
             lottery_prize_id: prizeId,
-            prize_name: prizeName, // 保存奖品名称用于显示
+            prize_name: prizeName,
             reason
           },
           expires_at: expiresAt,
@@ -260,6 +261,7 @@ class ManagementStrategy {
         {
           user_id: targetUserId,
           setting_type: 'force_lose',
+          lottery_campaign_id: options.lottery_campaign_id || null,
           setting_data: {
             count,
             remaining: count,

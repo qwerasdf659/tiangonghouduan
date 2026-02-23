@@ -256,8 +256,8 @@
       </div>
     </div>
 
-    <!-- 物品实例 -->
-    <div x-show="current_page === 'item-instances'" x-cloak>
+    <!-- 物品管理（三表模型） -->
+    <div x-show="current_page === 'items'" x-cloak>
       <div class="content-section">
         <div class="content-section-header">
           <div class="section-title">
@@ -266,7 +266,7 @@
           </div>
         </div>
         <!-- data-table: 物品模板列表 -->
-        <div x-data="itemInstancesDataTable()" x-init="init()">
+        <div x-data="itemsDataTable()" x-init="init()">
           <div class="filter-toolbar">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
               <select x-model="activeFilters.template_code" class="form-select">
@@ -306,7 +306,7 @@
                 </tr>
               </thead>
               <tbody class="divide-y">
-                <template x-for="(row, idx) in data" :key="row.item_instance_id || idx">
+                <template x-for="(row, idx) in data" :key="row.item_id || idx">
                   <tr class="themed-hover-bg">
                     <template x-for="col in columns" :key="col.key">
                       <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>

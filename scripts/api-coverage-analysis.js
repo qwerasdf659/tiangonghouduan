@@ -176,7 +176,7 @@ async function main() {
     // 判断是否有对外API（v2.1 改进的检测逻辑）
     // 策略1：路由文件直接引用表名/模型名
     // 策略2：服务文件在 console 路由中被调用（通过 ServiceManager）
-    // 策略3：表名映射到特定的路由文件（如 popup_banners -> popup-banners.js）
+    // 策略3：表名映射到特定的路由文件（合并后统一通过 ad-campaigns.js 管理）
     let hasExternalAPI = false
     let apiEndpoints = []
     let matchedRouteFiles = []

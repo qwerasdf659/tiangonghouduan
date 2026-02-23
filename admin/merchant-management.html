@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <%- include('partials/head', { 
+    title: '商家管理', 
+    pageStyle: '[x-cloak] { display: none !important; }' 
+  }) %>
+</head>
+<body class="themed-bg-subtle min-h-screen">
+  
+  <!-- 导航栏 -->
+  <nav class="themed-bg-primary text-white shadow-lg">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/workspace.html" class="hover:text-blue-200 transition-colors">← 返回工作台</a>
+        <span class="text-lg font-semibold">🏪 商家管理</span>
+      </div>
+      <div class="flex items-center space-x-4">
+        <span x-data x-text="$store.auth?.user?.nickname ? `欢迎，${$store.auth.user.nickname}` : '欢迎，管理员'">欢迎，管理员</span>
+        <button onclick="logout()" class="px-3 py-1 border border-white rounded hover:bg-white hover:themed-text-secondary text-sm">退出登录</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 主内容 -->
+  <div class="container mx-auto px-4 py-6" x-data="merchantManagement()" x-cloak>
+
+    <!-- 筛选栏 -->
+    <div class="themed-bg-base rounded-lg shadow p-4 mb-6">
+      <div class="flex flex-wrap gap-4 items-end">
+        <div class="flex-1 min-w-[200px]">
+          <label class="block text-sm font-medium themed-text-secondary mb-1">名称搜索</label>
+          <input type="text" x-model="filters.keyword" @keyup.enter="handleSearch()"
+            placeholder="输入商家名称" class="w-full px-3 py-2 border rounded themed-border focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div class="w-40">
+          <label class="block text-sm font-medium themed-text-secondary mb-1">商家类型</label>
+          <select x-model="filters.merchant_type" @change="handleSearch()" class="w-full px-3 py-2 border rounded themed-border">
+            <option value="">全部类型</option>
+            <template x-for="t in type_options" :key="t.code">
+              <option :value="t.code" x-text="t.name"></option>
+            </template>
+          </select>
+        </div>
+        <div class="w-32">
+          <label class="block text-sm font-medium themed-text-secondary mb-1">状态</label>
+          <select x-model="filters.status" @change="handleSearch()" class="w-full px-3 py-2 border rounded themed-border">
+            <option value="">全部状态</option>
+            <template x-for="s in status_options" :key="s.code">
+              <option :value="s.code" x-text="s.name"></option>
+            </template>
+          </select>
+        </div>
+        <div class="flex gap-2">
+          <button @click="handleSearch()" class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary">搜索</button>
+          <button @click="resetFilters()" class="px-4 py-2 border rounded themed-border hover:bg-gray-50">重置</button>
+          <button @click="openCreateForm()" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">+ 新增商家</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 统计概览 -->
+    <div class="flex gap-4 mb-6">
+      <div class="themed-bg-base rounded-lg shadow px-4 py-3 flex-1 text-center">
+        <div class="text-2xl font-bold themed-text-primary" x-text="total">0</div>
+        <div class="text-sm themed-text-secondary">商家总数</div>
+      </div>
+    </div>
+
+    <!-- 列表 -->
+    <div class="themed-bg-base rounded-lg shadow overflow-hidden">
+      <div x-show="loading" class="p-8 text-center themed-text-secondary">
+        <span class="animate-spin inline-block mr-2">⏳</span>加载中...
+      </div>
+
+      <div x-show="!loading && merchants.length === 0" class="p-8 text-center themed-text-secondary">
+        暂无商家数据
+      </div>
+
+      <table x-show="!loading && merchants.length > 0" class="w-full text-sm">
+        <thead class="bg-gray-50 themed-border-b">
+          <tr>
+            <th class="px-4 py-3 text-left font-medium themed-text-secondary">ID</th>
+            <th class="px-4 py-3 text-left font-medium themed-text-secondary">商家名称</th>
+            <th class="px-4 py-3 text-left font-medium themed-text-secondary">类型</th>
+            <th class="px-4 py-3 text-left font-medium themed-text-secondary">联系人</th>
+            <th class="px-4 py-3 text-left font-medium themed-text-secondary">联系电话</th>
+            <th class="px-4 py-3 text-left font-medium themed-text-secondary">门店数</th>
+            <th class="px-4 py-3 text-left font-medium themed-text-secondary">抽佣</th>
+            <th class="px-4 py-3 text-left font-medium themed-text-secondary">状态</th>
+            <th class="px-4 py-3 text-left font-medium themed-text-secondary">创建时间</th>
+            <th class="px-4 py-3 text-center font-medium themed-text-secondary">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="m in merchants" :key="m.merchant_id">
+            <tr class="themed-border-b hover:bg-gray-50">
+              <td class="px-4 py-3" x-text="m.merchant_id"></td>
+              <td class="px-4 py-3 font-medium" x-text="m.merchant_name"></td>
+              <td class="px-4 py-3">
+                <span class="px-2 py-1 rounded text-xs text-white" 
+                  :style="`background-color: ${getTypeColor(m.merchant_type)}`"
+                  x-text="getTypeName(m.merchant_type)"></span>
+              </td>
+              <td class="px-4 py-3" x-text="m.contact_name || '-'"></td>
+              <td class="px-4 py-3" x-text="m.contact_mobile || '-'"></td>
+              <td class="px-4 py-3" x-text="m.store_count || 0"></td>
+              <td class="px-4 py-3" x-text="m.commission_rate + '%'"></td>
+              <td class="px-4 py-3">
+                <span class="px-2 py-1 rounded text-xs text-white"
+                  :style="`background-color: ${getStatusColor(m.status)}`"
+                  x-text="getStatusName(m.status)"></span>
+              </td>
+              <td class="px-4 py-3 text-xs themed-text-secondary" x-text="formatDate(m.created_at)"></td>
+              <td class="px-4 py-3 text-center">
+                <div class="flex justify-center gap-1">
+                  <button @click="viewDetail(m.merchant_id)" class="px-2 py-1 text-blue-600 hover:bg-blue-50 rounded text-xs">详情</button>
+                  <button @click="openEditForm(m.merchant_id)" class="px-2 py-1 text-green-600 hover:bg-green-50 rounded text-xs">编辑</button>
+                  <button @click="handleDelete(m.merchant_id, m.merchant_name)" class="px-2 py-1 text-red-600 hover:bg-red-50 rounded text-xs">删除</button>
+                </div>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+
+      <!-- 分页 -->
+      <div x-show="total > 0" class="px-4 py-3 flex justify-between items-center bg-gray-50 themed-border-t">
+        <span class="text-sm themed-text-secondary">
+          共 <span x-text="total"></span> 条，第 <span x-text="pagination.page"></span>/<span x-text="totalPages"></span> 页
+        </span>
+        <div class="flex gap-1">
+          <button @click="goToPage(pagination.page - 1)" :disabled="!hasPrevPage"
+            class="px-3 py-1 border rounded text-sm themed-border" :class="hasPrevPage ? 'hover:bg-gray-100' : 'opacity-50 cursor-not-allowed'">上一页</button>
+          <button @click="goToPage(pagination.page + 1)" :disabled="!hasNextPage"
+            class="px-3 py-1 border rounded text-sm themed-border" :class="hasNextPage ? 'hover:bg-gray-100' : 'opacity-50 cursor-not-allowed'">下一页</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 创建/编辑弹窗 -->
+    <div x-show="show_form" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" x-cloak>
+      <div class="themed-bg-base rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+        <div class="px-6 py-4 themed-border-b flex justify-between items-center">
+          <h3 class="text-lg font-semibold" x-text="is_edit ? '编辑商家' : '新增商家'"></h3>
+          <button @click="closeForm()" class="themed-text-secondary hover:themed-text-primary text-xl">&times;</button>
+        </div>
+        <form @submit.prevent="submitForm()" class="px-6 py-4 space-y-4">
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">商家名称 <span class="text-red-500">*</span></label>
+            <input type="text" x-model="form.merchant_name" required
+              class="w-full px-3 py-2 border rounded themed-border focus:ring-2 focus:ring-blue-500" placeholder="输入商家名称">
+          </div>
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">商家类型 <span class="text-red-500">*</span></label>
+            <select x-model="form.merchant_type" required class="w-full px-3 py-2 border rounded themed-border">
+              <option value="">请选择类型</option>
+              <template x-for="t in type_options" :key="t.code">
+                <option :value="t.code" x-text="t.name"></option>
+              </template>
+            </select>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">联系人</label>
+              <input type="text" x-model="form.contact_name" class="w-full px-3 py-2 border rounded themed-border" placeholder="联系人姓名">
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">联系电话</label>
+              <input type="text" x-model="form.contact_mobile" class="w-full px-3 py-2 border rounded themed-border" placeholder="联系电话">
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">状态</label>
+              <select x-model="form.status" class="w-full px-3 py-2 border rounded themed-border">
+                <template x-for="s in status_options" :key="s.code">
+                  <option :value="s.code" x-text="s.name"></option>
+                </template>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">抽佣比例 (%)</label>
+              <input type="number" x-model.number="form.commission_rate" min="0" max="99.99" step="0.01"
+                class="w-full px-3 py-2 border rounded themed-border" placeholder="0.00">
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">LOGO地址</label>
+            <input type="text" x-model="form.logo_url" class="w-full px-3 py-2 border rounded themed-border" placeholder="图片URL">
+          </div>
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">备注</label>
+            <textarea x-model="form.notes" rows="3" class="w-full px-3 py-2 border rounded themed-border" placeholder="备注信息"></textarea>
+          </div>
+          <div class="flex justify-end gap-2 pt-2">
+            <button type="button" @click="closeForm()" class="px-4 py-2 border rounded themed-border hover:bg-gray-50">取消</button>
+            <button type="submit" :disabled="saving" class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary">
+              <span x-show="saving" class="inline-block animate-spin mr-1">⏳</span>
+              <span x-text="is_edit ? '保存修改' : '创建商家'"></span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 详情弹窗 -->
+    <div x-show="show_detail" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" x-cloak>
+      <div class="themed-bg-base rounded-lg shadow-xl w-full max-w-lg mx-4">
+        <div class="px-6 py-4 themed-border-b flex justify-between items-center">
+          <h3 class="text-lg font-semibold">商家详情</h3>
+          <button @click="show_detail = false" class="themed-text-secondary hover:themed-text-primary text-xl">&times;</button>
+        </div>
+        <div x-show="detail" class="px-6 py-4 space-y-3">
+          <div class="flex justify-between">
+            <span class="themed-text-secondary">商家ID</span>
+            <span class="font-medium" x-text="detail?.merchant_id"></span>
+          </div>
+          <div class="flex justify-between">
+            <span class="themed-text-secondary">商家名称</span>
+            <span class="font-medium" x-text="detail?.merchant_name"></span>
+          </div>
+          <div class="flex justify-between">
+            <span class="themed-text-secondary">商家类型</span>
+            <span class="px-2 py-1 rounded text-xs text-white"
+              :style="`background-color: ${getTypeColor(detail?.merchant_type)}`"
+              x-text="getTypeName(detail?.merchant_type)"></span>
+          </div>
+          <div class="flex justify-between">
+            <span class="themed-text-secondary">联系人</span>
+            <span x-text="detail?.contact_name || '-'"></span>
+          </div>
+          <div class="flex justify-between">
+            <span class="themed-text-secondary">联系电话</span>
+            <span x-text="detail?.contact_mobile || '-'"></span>
+          </div>
+          <div class="flex justify-between">
+            <span class="themed-text-secondary">门店数量</span>
+            <span x-text="detail?.store_count || 0"></span>
+          </div>
+          <div class="flex justify-between">
+            <span class="themed-text-secondary">抽佣比例</span>
+            <span x-text="(detail?.commission_rate || 0) + '%'"></span>
+          </div>
+          <div class="flex justify-between">
+            <span class="themed-text-secondary">状态</span>
+            <span class="px-2 py-1 rounded text-xs text-white"
+              :style="`background-color: ${getStatusColor(detail?.status)}`"
+              x-text="getStatusName(detail?.status)"></span>
+          </div>
+          <div class="flex justify-between">
+            <span class="themed-text-secondary">创建时间</span>
+            <span x-text="formatDate(detail?.created_at)"></span>
+          </div>
+          <template x-if="detail?.notes">
+            <div>
+              <span class="themed-text-secondary">备注</span>
+              <p class="mt-1 text-sm" x-text="detail.notes"></p>
+            </div>
+          </template>
+          <template x-if="detail?.stores?.length > 0">
+            <div>
+              <span class="themed-text-secondary block mb-2">关联门店</span>
+              <div class="space-y-1">
+                <template x-for="s in detail.stores" :key="s.store_id">
+                  <div class="flex justify-between items-center bg-gray-50 px-3 py-2 rounded text-sm">
+                    <span x-text="s.store_name"></span>
+                    <span class="px-2 py-0.5 rounded text-xs"
+                      :class="s.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'"
+                      x-text="s.status === 'active' ? '营业中' : '已关闭'"></span>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </template>
+        </div>
+        <div class="px-6 py-3 themed-border-t flex justify-end">
+          <button @click="show_detail = false" class="px-4 py-2 border rounded themed-border hover:bg-gray-50">关闭</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <%- include('partials/footer') %>
+  <script type="module" src="./src/modules/merchant/pages/merchant-management.js"></script>
+</body>
+</html>

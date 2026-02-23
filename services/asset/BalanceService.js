@@ -3,13 +3,13 @@
  *
  * @description 处理所有账户和余额相关操作（从 AssetService 提取）
  * @module services/asset/BalanceService
- * @version 1.0.0
- * @date 2026-01-31
+ * @version 1.1.0
+ * @date 2026-02-23
  *
  * 职责范围：
  * - 账户创建/查询：getOrCreateAccount
  * - 余额管理：getOrCreateBalance, changeBalance
- * - 冻结管理：freeze, unfreeze, settleFromFrozen
+ * - 冻结管理：freeze, unfreeze, settleFromFrozen（V1.1.0 接入双录记账）
  * - 余额查询：getBalance, getAllBalances
  *
  * 服务类型：静态类（无需实例化）
@@ -28,6 +28,11 @@
  * - 余额不足时直接抛出异常，不允许负余额
  * - 记录变动前后余额用于完整对账（before + delta = after）
  * - 冻结模型：交易市场购买和资产挂牌必须走冻结→结算链路
+ *
+ * V1.1.0 双录变更（2026-02-23）：
+ * - freeze/unfreeze 自动在 SYSTEM_ESCROW 账户写反向流水，保证全局 SUM(delta_amount)=0
+ * - settleFromFrozen 的 delta_amount=0，仅记录 counterpart_account_id 用于审计追踪
+ * - 所有冻结/解冻操作记录 counterpart_account_id，支持完整的对手方追溯
  */
 
 'use strict'
@@ -389,33 +394,48 @@ class BalanceService {
         { transaction }
       )
 
-      // === 双录记账：写入对手方流水（V4.2.0 资产全链路追踪） ===
+      /*
+       * 双录记账：写入对手方反向流水（V4.2.0 资产全链路追踪）
+       *
+       * 规则：仅对系统账户创建 counterpart 反向记录
+       * - 用户↔系统操作（抽奖、充值、兑换等）：创建 counterpart 使全局 SUM=0
+       * - 用户↔用户操作（交易结算）：不创建 counterpart（freeze→settle→credit 链路已平衡）
+       *   counterpart_account_id 仍保留在主记录上用于审计追踪
+       */
       if (params.counterpart_account_id) {
-        const counterpartIdempotencyKey = `${idempotency_key}:counterpart`
-        const existingCounterpart = await AssetTransaction.findOne({
-          where: { idempotency_key: counterpartIdempotencyKey },
+        const counterpartAccount = await Account.findByPk(params.counterpart_account_id, {
+          attributes: ['account_id', 'account_type'],
           transaction
         })
 
-        if (!existingCounterpart) {
-          await AssetTransaction.create(
-            {
-              account_id: params.counterpart_account_id,
-              asset_code,
-              delta_amount: -delta_amount,
-              balance_before: 0,
-              balance_after: 0,
-              business_type: `${business_type}_counterpart`,
-              lottery_session_id: lottery_session_id || null,
-              idempotency_key: counterpartIdempotencyKey,
-              meta: {
-                counterpart_of: idempotency_key,
-                original_account_id: account.account_id,
-                lottery_campaign_id: lottery_campaign_id || null
-              }
-            },
-            { transaction }
-          )
+        if (counterpartAccount && counterpartAccount.account_type === 'system') {
+          const counterpartIdempotencyKey = `${idempotency_key}:counterpart`
+          const existingCounterpart = await AssetTransaction.findOne({
+            where: { idempotency_key: counterpartIdempotencyKey },
+            transaction
+          })
+
+          if (!existingCounterpart) {
+            await AssetTransaction.create(
+              {
+                account_id: params.counterpart_account_id,
+                counterpart_account_id: account.account_id,
+                asset_code,
+                delta_amount: -delta_amount,
+                balance_before: 0,
+                balance_after: 0,
+                business_type: `${business_type}_counterpart`,
+                lottery_session_id: lottery_session_id || null,
+                idempotency_key: counterpartIdempotencyKey,
+                meta: {
+                  counterpart_of: idempotency_key,
+                  original_account_id: account.account_id,
+                  lottery_campaign_id: lottery_campaign_id || null
+                }
+              },
+              { transaction }
+            )
+          }
         }
       }
 
@@ -469,6 +489,12 @@ class BalanceService {
    * - 从available_amount扣减，增加到frozen_amount
    * - 支持幂等性控制（idempotency_key唯一约束）
    * - 记录冻结流水
+   * - 【V1.1.0】自动在 SYSTEM_ESCROW 写反向 counterpart 流水（保证全局 SUM(delta_amount)=0）
+   *
+   * 双录设计（冻结 = 账户内 available→frozen 状态变更）：
+   * - 主记录：用户账户 delta_amount = -amount（可用余额减少）
+   * - 对手方：SYSTEM_ESCROW delta_amount = +amount（托管概念上"接收"冻结资金）
+   * - 解冻或结算时写反向记录抵消，保证 SYSTEM_ESCROW 最终余额为 0
    *
    * @param {Object} params - 参数对象
    * @param {number} params.user_id - 用户ID（用户账户）
@@ -587,10 +613,17 @@ class BalanceService {
         { transaction }
       )
 
-      // 创建冻结流水记录
+      // 获取 SYSTEM_ESCROW 账户（双录对手方）
+      const escrowAccount = await this.getOrCreateAccount(
+        { system_code: 'SYSTEM_ESCROW' },
+        { transaction }
+      )
+
+      // 创建冻结流水记录（主记录，含对手方标记）
       const transaction_record = await AssetTransaction.create(
         {
           account_id: account.account_id,
+          counterpart_account_id: escrowAccount.account_id,
           asset_code,
           delta_amount: -numericAmount,
           balance_before: available_before,
@@ -609,10 +642,40 @@ class BalanceService {
         { transaction }
       )
 
-      logger.info('✅ 资产冻结成功', {
+      // 双录记账：在 SYSTEM_ESCROW 写反向流水（delta = +amount，对冲主记录的 -amount）
+      const counterpartIdempotencyKey = `${idempotency_key}:escrow_counterpart`
+      const existingCounterpart = await AssetTransaction.findOne({
+        where: { idempotency_key: counterpartIdempotencyKey },
+        transaction
+      })
+      if (!existingCounterpart) {
+        await AssetTransaction.create(
+          {
+            account_id: escrowAccount.account_id,
+            counterpart_account_id: account.account_id,
+            asset_code,
+            delta_amount: numericAmount,
+            balance_before: 0,
+            balance_after: 0,
+            frozen_amount_change: 0,
+            business_type: `${business_type}_counterpart`,
+            lottery_session_id: null,
+            idempotency_key: counterpartIdempotencyKey,
+            meta: {
+              counterpart_of: idempotency_key,
+              original_account_id: account.account_id,
+              operation: 'freeze'
+            }
+          },
+          { transaction }
+        )
+      }
+
+      logger.info('✅ 资产冻结成功（双录）', {
         service: 'BalanceService',
         method: 'freeze',
         account_id: account.account_id,
+        counterpart_account_id: escrowAccount.account_id,
         system_code,
         asset_code,
         amount,
@@ -622,7 +685,8 @@ class BalanceService {
         frozen_after,
         business_type,
         idempotency_key,
-        asset_transaction_id: transaction_record.asset_transaction_id
+        asset_transaction_id: transaction_record.asset_transaction_id,
+        double_entry: true
       })
 
       await balance.reload({ transaction })
@@ -656,6 +720,11 @@ class BalanceService {
    * - 从frozen_amount扣减，增加到available_amount
    * - 支持幂等性控制（idempotency_key唯一约束）
    * - 记录解冻流水
+   * - 【V1.1.0】自动在 SYSTEM_ESCROW 写反向 counterpart 流水（抵消冻结时的 counterpart）
+   *
+   * 双录设计（解冻 = 冻结的反向操作）：
+   * - 主记录：用户账户 delta_amount = +amount（可用余额恢复）
+   * - 对手方：SYSTEM_ESCROW delta_amount = -amount（托管"释放"冻结资金）
    *
    * @param {Object} params - 参数对象
    * @param {number} params.user_id - 用户ID（用户账户）
@@ -776,10 +845,17 @@ class BalanceService {
         { transaction }
       )
 
-      // 创建解冻流水记录
+      // 获取 SYSTEM_ESCROW 账户（双录对手方）
+      const escrowAccount = await this.getOrCreateAccount(
+        { system_code: 'SYSTEM_ESCROW' },
+        { transaction }
+      )
+
+      // 创建解冻流水记录（主记录，含对手方标记）
       const transaction_record = await AssetTransaction.create(
         {
           account_id: account.account_id,
+          counterpart_account_id: escrowAccount.account_id,
           asset_code,
           delta_amount: numericAmount,
           balance_before: available_before,
@@ -798,10 +874,40 @@ class BalanceService {
         { transaction }
       )
 
-      logger.info('✅ 资产解冻成功', {
+      // 双录记账：在 SYSTEM_ESCROW 写反向流水（delta = -amount，抵消冻结时的 +amount）
+      const counterpartIdempotencyKey = `${idempotency_key}:escrow_counterpart`
+      const existingCounterpart = await AssetTransaction.findOne({
+        where: { idempotency_key: counterpartIdempotencyKey },
+        transaction
+      })
+      if (!existingCounterpart) {
+        await AssetTransaction.create(
+          {
+            account_id: escrowAccount.account_id,
+            counterpart_account_id: account.account_id,
+            asset_code,
+            delta_amount: -numericAmount,
+            balance_before: 0,
+            balance_after: 0,
+            frozen_amount_change: 0,
+            business_type: `${business_type}_counterpart`,
+            lottery_session_id: null,
+            idempotency_key: counterpartIdempotencyKey,
+            meta: {
+              counterpart_of: idempotency_key,
+              original_account_id: account.account_id,
+              operation: 'unfreeze'
+            }
+          },
+          { transaction }
+        )
+      }
+
+      logger.info('✅ 资产解冻成功（双录）', {
         service: 'BalanceService',
         method: 'unfreeze',
         account_id: account.account_id,
+        counterpart_account_id: escrowAccount.account_id,
         system_code,
         asset_code,
         amount,
@@ -811,7 +917,8 @@ class BalanceService {
         frozen_after,
         business_type,
         idempotency_key,
-        asset_transaction_id: transaction_record.asset_transaction_id
+        asset_transaction_id: transaction_record.asset_transaction_id,
+        double_entry: true
       })
 
       await balance.reload({ transaction })
@@ -845,6 +952,12 @@ class BalanceService {
    * - 从frozen_amount扣减（无需增加到available）
    * - 支持幂等性控制（idempotency_key唯一约束）
    * - 记录结算流水
+   * - 【V1.1.0】记录 SYSTEM_ESCROW 为 counterpart_account_id（审计追踪）
+   *
+   * 双录设计（结算 = 冻结资金消耗）：
+   * - 主记录：delta_amount = 0（可用余额不变），frozen_amount_change = -amount
+   * - 对手方标记：SYSTEM_ESCROW（仅作审计追踪，不写反向流水，因为 delta=0 不影响全局 SUM）
+   * - 结算的"真实"对手方由同一事务中的 changeBalance（如卖家收款）处理
    *
    * @param {Object} params - 参数对象
    * @param {number} params.user_id - 用户ID（用户账户）
@@ -965,12 +1078,19 @@ class BalanceService {
         { transaction }
       )
 
-      // 创建结算流水记录
+      // 获取 SYSTEM_ESCROW 账户（审计追踪对手方）
+      const escrowAccount = await this.getOrCreateAccount(
+        { system_code: 'SYSTEM_ESCROW' },
+        { transaction }
+      )
+
+      // 创建结算流水记录（delta_amount=0，不影响全局 SUM，仅记录 counterpart 用于审计）
       const transaction_record = await AssetTransaction.create(
         {
           account_id: account.account_id,
+          counterpart_account_id: escrowAccount.account_id,
           asset_code,
-          delta_amount: 0, // 可用余额不变
+          delta_amount: 0,
           balance_before: available_before,
           balance_after: available_after,
           frozen_amount_change: -numericAmount,
@@ -987,10 +1107,11 @@ class BalanceService {
         { transaction }
       )
 
-      logger.info('✅ 资产结算成功（从冻结余额）', {
+      logger.info('✅ 资产结算成功（从冻结余额，双录）', {
         service: 'BalanceService',
         method: 'settleFromFrozen',
         account_id: account.account_id,
+        counterpart_account_id: escrowAccount.account_id,
         system_code,
         asset_code,
         amount,
@@ -1000,7 +1121,8 @@ class BalanceService {
         frozen_after,
         business_type,
         idempotency_key,
-        asset_transaction_id: transaction_record.asset_transaction_id
+        asset_transaction_id: transaction_record.asset_transaction_id,
+        double_entry: true
       })
 
       await balance.reload({ transaction })

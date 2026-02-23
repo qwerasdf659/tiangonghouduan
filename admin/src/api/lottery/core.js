@@ -66,7 +66,10 @@ export const LOTTERY_CORE_ENDPOINTS = {
 
   // 活动条件配置
   CAMPAIGN_CONDITIONS: `${API_PREFIX}/activities/:code/conditions`,
-  CAMPAIGN_CONFIGURE_CONDITIONS: `${API_PREFIX}/activities/:code/configure-conditions`
+  CAMPAIGN_CONFIGURE_CONDITIONS: `${API_PREFIX}/activities/:code/configure-conditions`,
+
+  // 活动策略配置（10策略活动级开关）
+  CAMPAIGN_STRATEGY_CONFIG: `${API_PREFIX}/console/lottery-campaigns/:lottery_campaign_id/strategy-config`
 }
 
 // ========== API 调用方法 ==========
@@ -334,6 +337,33 @@ export const LotteryCoreAPI = {
   async configureActivityConditions(code, data) {
     const url = buildURL(LOTTERY_CORE_ENDPOINTS.CAMPAIGN_CONFIGURE_CONDITIONS, { code })
     return await request({ url, method: 'POST', data })
+  },
+
+  // ===== 活动策略配置（10策略活动级开关） =====
+
+  /**
+   * 获取某活动的全部策略配置
+   * @param {number} lotteryCampaignId - 活动ID
+   * @returns {Promise<Object>} { lottery_campaign_id, config: { pity: {...}, ... } }
+   */
+  async getStrategyConfig(lotteryCampaignId) {
+    const url = buildURL(LOTTERY_CORE_ENDPOINTS.CAMPAIGN_STRATEGY_CONFIG, {
+      lottery_campaign_id: lotteryCampaignId
+    })
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 批量更新某活动的策略配置
+   * @param {number} lotteryCampaignId - 活动ID
+   * @param {Object} config - 配置对象 { pity: { enabled: false }, ... }
+   * @returns {Promise<Object>} 更新结果
+   */
+  async updateStrategyConfig(lotteryCampaignId, config) {
+    const url = buildURL(LOTTERY_CORE_ENDPOINTS.CAMPAIGN_STRATEGY_CONFIG, {
+      lottery_campaign_id: lotteryCampaignId
+    })
+    return await request({ url, method: 'PUT', data: { config } })
   }
 }
 

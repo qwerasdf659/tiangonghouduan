@@ -78,24 +78,33 @@ class AdCreativeService {
         throw new Error(`广告计划不存在: ${data.ad_campaign_id}`)
       }
 
-      // 创建创意（默认待审核状态）
+      // D6/2.6 定论：operational/system 类型的 creative 自动审核通过，跳过人工审核
+      const autoApproveCategories = ['operational', 'system']
+      const reviewStatus = autoApproveCategories.includes(campaign.campaign_category)
+        ? 'approved'
+        : 'pending'
+
       const creative = await AdCreative.create(
         {
           ad_campaign_id: data.ad_campaign_id,
           title: data.title,
-          image_url: data.image_url,
+          content_type: data.content_type || 'image',
+          image_url: data.image_url || null,
           image_width: data.image_width || null,
           image_height: data.image_height || null,
+          text_content: data.text_content || null,
           link_url: data.link_url || null,
           link_type: data.link_type || 'none',
-          review_status: 'pending'
+          review_status: reviewStatus
         },
         { transaction: options.transaction }
       )
 
       logger.info('创建广告创意成功', {
         creative_id: creative.ad_creative_id,
-        campaign_id: data.ad_campaign_id
+        campaign_id: data.ad_campaign_id,
+        campaign_category: campaign.campaign_category,
+        review_status: reviewStatus
       })
 
       return creative

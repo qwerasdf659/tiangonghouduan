@@ -754,7 +754,7 @@ class PendingCenterService {
           {
             model: Item,
             as: 'item',
-            attributes: ['item_id', 'item_type', 'meta'],
+            attributes: ['item_id', 'item_name', 'item_type', 'meta'],
             required: false
           }
         ],
@@ -773,10 +773,7 @@ class PendingCenterService {
           const waitMinutes = Math.floor((now - new Date(order.created_at)) / 60000)
           const isUrgent = waitMinutes >= threshold
           const prizeName =
-            orderData.item_instance?.meta?.prize_name ||
-            orderData.item_instance?.meta?.name ||
-            orderData.item_instance?.item_type ||
-            '未知奖品'
+            orderData.item?.item_name || orderData.item?.meta?.prize_name || '未知奖品'
 
           return {
             id: orderData.redemption_order_id,

@@ -22,7 +22,11 @@ export const REDEMPTION_ENDPOINTS = {
   /** 批量取消 */
   BATCH_CANCEL: `${API_PREFIX}/console/business-records/redemption-orders/batch-cancel`,
   /** 批量过期处理 */
-  BATCH_EXPIRE: `${API_PREFIX}/console/business-records/redemption-orders/batch-expire`
+  BATCH_EXPIRE: `${API_PREFIX}/console/business-records/redemption-orders/batch-expire`,
+  /** QR码扫码核销（商家店员使用） */
+  SCAN: `${API_PREFIX}/shop/redemption/scan`,
+  /** 文本码核销（商家店员使用） */
+  FULFILL: `${API_PREFIX}/shop/redemption/fulfill`
 }
 
 /**
@@ -133,6 +137,38 @@ export const RedemptionAPI = {
       url: REDEMPTION_ENDPOINTS.BATCH_EXPIRE,
       method: 'POST',
       data: { order_ids: orderIds }
+    })
+  },
+
+  /**
+   * 扫码核销（QR码 → 后端 RQRV1 签名验证 → 核销）
+   * 用于店员扫码核销页面
+   *
+   * @param {Object} data - 扫码数据
+   * @param {string} data.qr_content - QR码内容（扫码获取的原始字符串）
+   * @returns {Promise<Object>} 核销结果
+   */
+  async scanRedeem(data) {
+    return request({
+      url: REDEMPTION_ENDPOINTS.SCAN,
+      method: 'POST',
+      data
+    })
+  },
+
+  /**
+   * 文本码核销（输入 XXXX-YYYY-ZZZZ 格式兑换码 → 核销）
+   * 用于店员手动输入兑换码核销
+   *
+   * @param {Object} data - 核销数据
+   * @param {string} data.redeem_code - 兑换码（XXXX-YYYY-ZZZZ 格式）
+   * @returns {Promise<Object>} 核销结果
+   */
+  async fulfillByCode(data) {
+    return request({
+      url: REDEMPTION_ENDPOINTS.FULFILL,
+      method: 'POST',
+      data
     })
   },
 

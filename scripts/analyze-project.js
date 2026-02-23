@@ -81,7 +81,7 @@ async function analyze() {
     console.log(JSON.stringify(prizeData, null, 2));
 
     // 9. 物品实例
-    const [[itemCount]] = await sequelize.query('SELECT COUNT(*) as total FROM item_instances');
+    const [[itemCount]] = await sequelize.query('SELECT COUNT(*) as total FROM items');
     console.log('\n=== 物品实例数 ===');
     console.log(itemCount.total);
 

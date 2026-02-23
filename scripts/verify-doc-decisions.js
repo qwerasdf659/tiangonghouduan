@@ -134,7 +134,7 @@ async function verifyDecisions() {
     
     const coreTables = [
       'users', 'roles', 'user_roles', 'accounts', 'account_asset_balances',
-      'asset_transactions', 'item_templates', 'item_instances', 'item_instance_events',
+      'asset_transactions', 'item_templates', 'items', 'item_ledger', 'item_holds',
       'lottery_campaigns', 'lottery_prizes', 'lottery_draws', 'lottery_management_settings',
       'market_listings', 'exchange_items', 'exchange_records', 'redemption_orders',
       'admin_operation_logs', 'stores', 'store_staff', 'feedbacks'
