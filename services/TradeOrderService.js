@@ -32,7 +32,7 @@
  */
 
 const { Op, fn, col } = require('sequelize')
-const { sequelize, TradeOrder, MarketListing, Item, User } = require('../models')
+const { sequelize, TradeOrder, MarketListing, Item, User, Account } = require('../models')
 const { attachDisplayNames, DICT_TYPES } = require('../utils/displayNameHelper')
 // V4.7.0 AssetService 拆分：使用子服务替代原 AssetService（2026-01-31）
 const BalanceService = require('./asset/BalanceService')
@@ -302,10 +302,12 @@ class TradeOrderService {
       if (!itemInstance) {
         throw new Error(`物品不存在: ${listing.offer_item_id}`)
       }
-      if (Number(itemInstance.owner_user_id) !== Number(listing.seller_user_id)) {
+      // owner_account_id → Account → user_id 校验（Item 模型使用 account_id 而非 user_id）
+      const sellerAccount = await Account.findByPk(itemInstance.owner_account_id, { transaction })
+      if (!sellerAccount || Number(sellerAccount.user_id) !== Number(listing.seller_user_id)) {
         throw new Error('物品所有权异常：物品不属于当前卖家，禁止购买')
       }
-      const allowedStatuses = ['locked', 'available']
+      const allowedStatuses = ['held', 'available']
       if (!allowedStatuses.includes(itemInstance.status)) {
         throw new Error(`物品实例状态不可购买：${itemInstance.status}`)
       }
@@ -525,13 +527,17 @@ class TradeOrderService {
 
     // 2. 从冻结资产结算（三笔：买家扣减、卖家入账、平台手续费）
 
-    // 获取双录所需的账户ID（买家、卖家）
-    const buyerAccount = await BalanceService.getOrCreateAccount(
+    // 获取双录所需的账户ID（买家、卖家、ESCROW 托管）
+    const _buyerAccount = await BalanceService.getOrCreateAccount(
       { user_id: order.buyer_user_id },
       { transaction }
     )
-    const sellerAccount = await BalanceService.getOrCreateAccount(
+    const _sellerAccount = await BalanceService.getOrCreateAccount(
       { user_id: order.seller_user_id },
+      { transaction }
+    )
+    const escrowAccount = await BalanceService.getOrCreateAccount(
+      { system_code: 'SYSTEM_ESCROW' },
       { transaction }
     )
 
@@ -555,7 +561,13 @@ class TradeOrderService {
       { transaction }
     )
 
-    // 2.2 卖家入账（实收金额）
+    /*
+     * 2.2 卖家入账（实收金额）
+     * 增强版方案 B：counterpart 指向 SYSTEM_ESCROW（系统账户），
+     * BalanceService 双录机制自动创建 ESCROW -net_amount 释放记录，
+     * 实现 ESCROW 逐笔释放可追溯（卖家收了多少、平台收了多少一目了然）。
+     * 买家信息保留在 meta 中用于审计。
+     */
     if (order.net_amount > 0) {
       // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
       await BalanceService.changeBalance(
@@ -565,7 +577,7 @@ class TradeOrderService {
           user_id: order.seller_user_id,
           asset_code: order.asset_code,
           delta_amount: order.net_amount,
-          counterpart_account_id: buyerAccount.account_id,
+          counterpart_account_id: escrowAccount.account_id,
           meta: {
             trade_order_id: order.trade_order_id,
             market_listing_id: order.market_listing_id,
@@ -579,7 +591,10 @@ class TradeOrderService {
       )
     }
 
-    // 2.3 平台手续费入账（如果手续费>0）
+    /*
+     * 2.3 平台手续费入账（如果手续费>0）
+     * 增强版方案 B：counterpart 同样指向 SYSTEM_ESCROW
+     */
     if (order.fee_amount > 0) {
       // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
       await BalanceService.changeBalance(
@@ -589,7 +604,7 @@ class TradeOrderService {
           system_code: 'SYSTEM_PLATFORM_FEE',
           asset_code: order.asset_code,
           delta_amount: order.fee_amount,
-          counterpart_account_id: buyerAccount.account_id,
+          counterpart_account_id: escrowAccount.account_id,
           meta: {
             trade_order_id: order.trade_order_id,
             market_listing_id: order.market_listing_id,
@@ -616,8 +631,11 @@ class TradeOrderService {
         throw new Error(`物品不存在: ${listing.offer_item_id}`)
       }
 
-      // 所有权一致性校验（防止异常数据导致越权转移）
-      if (Number(itemInstance.owner_user_id) !== Number(order.seller_user_id)) {
+      // 所有权一致性校验：owner_account_id → Account → user_id
+      const itemOwnerAccount = await Account.findByPk(itemInstance.owner_account_id, {
+        transaction
+      })
+      if (!itemOwnerAccount || Number(itemOwnerAccount.user_id) !== Number(order.seller_user_id)) {
         throw new Error('物品所有权异常：物品不属于卖家，禁止成交转移')
       }
 
@@ -626,7 +644,7 @@ class TradeOrderService {
       await ItemService.transferItem(
         {
           item_id: itemInstance.item_id,
-          new_owner_id: order.buyer_user_id,
+          new_owner_user_id: order.buyer_user_id,
           business_type: 'market_transfer',
           idempotency_key: `${idempotency_key}:transfer_item`, // 派生子幂等键
           meta: {
@@ -683,7 +701,11 @@ class TradeOrderService {
         amount: listing.offer_amount
       })
 
-      // 3.2.2 买家：收到标的资产入账
+      /*
+       * 3.2.2 买家：收到标的资产入账
+       * 增强版方案 B：counterpart 指向 SYSTEM_ESCROW，
+       * 双录机制自动创建 ESCROW 释放记录，卖家信息保留在 meta 中。
+       */
       // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
       await BalanceService.changeBalance(
         {
@@ -692,7 +714,7 @@ class TradeOrderService {
           user_id: order.buyer_user_id,
           asset_code: listing.offer_asset_code,
           delta_amount: listing.offer_amount,
-          counterpart_account_id: sellerAccount.account_id,
+          counterpart_account_id: escrowAccount.account_id,
           meta: {
             trade_order_id: order.trade_order_id,
             market_listing_id: order.market_listing_id,

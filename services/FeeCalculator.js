@@ -8,7 +8,7 @@ const _logger = require('../utils/logger').logger
  * - 计算物品转让的手续费（基于 Item.meta.value 字段）
  * - 支持按商品价值分档计费（DIAMOND）
  * - 支持单一费率模式（red_shard 等非 DIAMOND 币种）
- * - 集成到TradeOrder交易订单系统（C2C市场）
+ * - 集成到TradeOrder交易订单系统（交易市场）
  *
  * 多币种扩展（2026-01-14）：
  * - DIAMOND：保持分档逻辑（基于 itemValue 分档 + ceil + 最低费 1）

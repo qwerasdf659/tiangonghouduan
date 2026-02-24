@@ -69,7 +69,10 @@ export const LOTTERY_CORE_ENDPOINTS = {
   CAMPAIGN_CONFIGURE_CONDITIONS: `${API_PREFIX}/activities/:code/configure-conditions`,
 
   // 活动策略配置（10策略活动级开关）
-  CAMPAIGN_STRATEGY_CONFIG: `${API_PREFIX}/console/lottery-campaigns/:lottery_campaign_id/strategy-config`
+  CAMPAIGN_STRATEGY_CONFIG: `${API_PREFIX}/console/lottery-campaigns/:lottery_campaign_id/strategy-config`,
+
+  /** 获取抽奖系统全局默认配置（积分定价配置页的全局值） */
+  CAMPAIGN_GLOBAL_DEFAULTS: `${API_PREFIX}/console/lottery-campaigns/global-defaults`
 }
 
 // ========== API 调用方法 ==========
@@ -364,6 +367,14 @@ export const LotteryCoreAPI = {
       lottery_campaign_id: lotteryCampaignId
     })
     return await request({ url, method: 'PUT', data: { config } })
+  },
+
+  /**
+   * 获取抽奖系统全局默认配置
+   * @returns {Promise<Object>} { global_defaults, priority_rules }
+   */
+  async getGlobalDefaults() {
+    return await request({ url: LOTTERY_CORE_ENDPOINTS.CAMPAIGN_GLOBAL_DEFAULTS, method: 'GET' })
   }
 }
 

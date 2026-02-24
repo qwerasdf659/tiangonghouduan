@@ -18,6 +18,7 @@ const {
   Item,
   ItemTemplate,
   User,
+  Account,
   UserRiskProfile,
   TradeOrder,
   MaterialAssetType,
@@ -434,7 +435,9 @@ class MarketListingCoreService {
       throw error
     }
 
-    if (Number(item.owner_user_id) !== Number(seller_user_id)) {
+    // 所有权校验：item.owner_account_id 是 accounts 表主键，需通过 Account 反查 user_id
+    const ownerAccount = await Account.findByPk(item.owner_account_id, { transaction })
+    if (!ownerAccount || Number(ownerAccount.user_id) !== Number(seller_user_id)) {
       const error = new Error('无权上架：物品不属于当前用户')
       error.code = 'NOT_OWNER'
       error.statusCode = 403
@@ -448,8 +451,8 @@ class MarketListingCoreService {
       throw error
     }
 
-    // 5. 锁定物品
-    await item.update({ status: 'locked' }, { transaction })
+    // 5. 锁定物品（Item 模型 ENUM 使用 'held' 表示锁定中）
+    await item.update({ status: 'held' }, { transaction })
 
     // 6. 获取物品模板信息（快照字段填充）
     let snapshotFields = {}
@@ -821,13 +824,13 @@ class MarketListingCoreService {
       throw error
     }
 
-    // C2C黑名单检查
+    // 交易市场黑名单检查
     const {
-      isBlacklistedForC2C,
-      createC2CBlacklistError
+      isBlacklistedForMarket,
+      createMarketBlacklistError
     } = require('../../constants/TradableAssetTypes')
-    if (isBlacklistedForC2C(offer_asset_code)) {
-      throw createC2CBlacklistError(offer_asset_code, offer_asset_code)
+    if (isBlacklistedForMarket(offer_asset_code)) {
+      throw createMarketBlacklistError(offer_asset_code, offer_asset_code)
     }
 
     // 校验资产类型

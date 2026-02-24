@@ -27,6 +27,7 @@
 const {
   Item,
   Account,
+  Merchant,
   MaterialAssetType,
   SystemConfig,
   RedemptionOrder,
@@ -196,17 +197,25 @@ class BackpackService {
         return []
       }
 
-      /* 查询 items 表，只返回 available 状态 */
+      /* 查询 items 表，只返回 available 状态，LEFT JOIN merchants 获取 merchant_name */
       const items = await Item.findAll({
         where: {
           owner_account_id: account.account_id,
           status: 'available'
         },
+        include: [
+          {
+            model: Merchant,
+            as: 'merchant',
+            attributes: ['merchant_id', 'merchant_name'],
+            required: false
+          }
+        ],
         order: [['created_at', 'DESC']],
         transaction
       })
 
-      /* 格式化物品数据（正式列，无需解析 JSON） */
+      /* 格式化物品数据（正式列，无需解析 JSON），包含商家名称 */
       const formattedItems = items.map(item => ({
         item_id: item.item_id,
         tracking_code: item.tracking_code,
@@ -218,6 +227,7 @@ class BackpackService {
         item_value: item.item_value || 0,
         source: item.source,
         merchant_id: item.merchant_id || null,
+        merchant_name: item.merchant?.merchant_name || null,
         has_redemption_code: false,
         acquired_at: item.created_at,
         prize_definition_id: item.prize_definition_id

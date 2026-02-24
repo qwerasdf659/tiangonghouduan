@@ -86,6 +86,40 @@ const SYSTEM_SETTINGS_WHITELIST = {
     businessImpact: 'LOW'
   },
 
+  'basic/maintenance_mode': {
+    type: 'boolean',
+    default: false,
+    readonly: false,
+    description: '维护模式开关（开启后用户端 API 返回 503，管理后台不受影响）',
+    changeRequiresRestart: false,
+    businessImpact: 'CRITICAL',
+    auditRequired: true
+  },
+
+  'basic/maintenance_message': {
+    type: 'string',
+    minLength: 0,
+    maxLength: 500,
+    default: '系统正在升级维护中，预计30分钟后恢复，给您带来不便敬请谅解。',
+    readonly: false,
+    description: '维护模式公告内容（展示给用户的提示信息）',
+    changeRequiresRestart: false,
+    businessImpact: 'MEDIUM',
+    auditRequired: true
+  },
+
+  'basic/maintenance_end_time': {
+    type: 'string',
+    minLength: 0,
+    maxLength: 30,
+    default: '',
+    readonly: false,
+    description: '维护预计结束时间（留空表示未确定，格式示例：2026-02-25 12:00）',
+    changeRequiresRestart: false,
+    businessImpact: 'MEDIUM',
+    auditRequired: true
+  },
+
   // ===== 积分设置（运营策略）=====
   'points/points_expire_days': {
     type: 'number',
@@ -105,18 +139,6 @@ const SYSTEM_SETTINGS_WHITELIST = {
     default: 200,
     readonly: false,
     description: '新用户初始积分',
-    changeRequiresRestart: false,
-    businessImpact: 'MEDIUM',
-    auditRequired: true
-  },
-
-  'points/sign_in_points': {
-    type: 'number',
-    min: 0,
-    max: 1000,
-    default: 20,
-    readonly: false,
-    description: '每日签到积分',
     changeRequiresRestart: false,
     businessImpact: 'MEDIUM',
     auditRequired: true

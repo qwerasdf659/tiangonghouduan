@@ -148,13 +148,13 @@ module.exports = sequelize => {
           '是否启用（Is Enabled - 启用状态）：true-启用（可展示可转换），false-禁用（不可展示不可转换）'
       },
 
-      // 是否可交易（Is Tradable - C2C市场交易开关）
+      // 是否可交易（Is Tradable - 交易市场交易开关）
       is_tradable: {
         type: DataTypes.BOOLEAN,
         allowNull: false,
         defaultValue: true,
         comment:
-          '是否可交易（Is Tradable - C2C市场交易开关）：true-可在市场挂牌交易，false-禁止市场交易'
+          '是否可交易（Is Tradable - 交易市场交易开关）：true-可在市场挂牌交易，false-禁止市场交易'
       },
 
       /** 归属商家ID（NULL=平台资产，游戏商家场景下标识资产归属） */

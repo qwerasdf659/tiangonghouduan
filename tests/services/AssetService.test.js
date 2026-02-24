@@ -524,6 +524,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
               delta_amount,
               idempotency_key,
               business_type: 'test_increase',
+              counterpart_account_id: 2,
               meta: { description: '单元测试-增加积分' }
             },
             { transaction }
@@ -573,6 +574,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
               delta_amount,
               idempotency_key,
               business_type: 'test_increase',
+              counterpart_account_id: 2,
               meta: { description: '单元测试-增加钻石' }
             },
             { transaction }
@@ -621,6 +623,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
               delta_amount,
               idempotency_key,
               business_type: 'test_large_increase',
+              counterpart_account_id: 2,
               meta: { description: '单元测试-大额增加' }
             },
             { transaction }
@@ -666,6 +669,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
               delta_amount,
               idempotency_key,
               business_type: 'test_min_increase',
+              counterpart_account_id: 2,
               meta: { description: '单元测试-最小增加' }
             },
             { transaction }
@@ -713,6 +717,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
               delta_amount,
               idempotency_key,
               business_type: 'test_idempotent',
+              counterpart_account_id: 2,
               meta: { description: '幂等性测试-第一次' }
             },
             { transaction }
@@ -750,6 +755,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
               delta_amount,
               idempotency_key, // 相同的幂等键
               business_type: 'test_idempotent',
+              counterpart_account_id: 2,
               meta: { description: '幂等性测试-第二次' }
             },
             { transaction }
@@ -793,6 +799,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
               delta_amount,
               idempotency_key: generateIdempotencyKey('test_diff_key_1'),
               business_type: 'test_diff_key',
+              counterpart_account_id: 2,
               meta: { description: '不同幂等键-1' }
             },
             { transaction }
@@ -807,6 +814,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
               delta_amount,
               idempotency_key: generateIdempotencyKey('test_diff_key_2'),
               business_type: 'test_diff_key',
+              counterpart_account_id: 2,
               meta: { description: '不同幂等键-2' }
             },
             { transaction }
@@ -917,6 +925,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
               delta_amount: 500,
               idempotency_key: setup_key,
               business_type: 'test_setup',
+              counterpart_account_id: 2,
               meta: { description: '准备扣减测试' }
             },
             { transaction }
@@ -942,6 +951,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
               delta_amount,
               idempotency_key,
               business_type: 'test_deduct',
+              counterpart_account_id: 2,
               meta: { description: '单元测试-扣减积分' }
             },
             { transaction }
@@ -990,6 +1000,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
                 delta_amount: excessive_amount,
                 idempotency_key,
                 business_type: 'test_insufficient',
+                counterpart_account_id: 2,
                 meta: { description: '余额不足测试' }
               },
               { transaction }
@@ -1022,6 +1033,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
               delta_amount: setup_amount,
               idempotency_key: setup_key,
               business_type: 'test_setup',
+              counterpart_account_id: 2,
               meta: { description: '边界测试准备' }
             },
             { transaction }
@@ -1045,6 +1057,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
               delta_amount: -available_to_deduct,
               idempotency_key,
               business_type: 'test_boundary',
+              counterpart_account_id: 2,
               meta: { description: '边界值-扣减全部余额' }
             },
             { transaction }
@@ -1093,6 +1106,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
                   delta_amount: -1,
                   idempotency_key,
                   business_type: 'test_zero_deduct',
+                  counterpart_account_id: 2,
                   meta: { description: '零余额扣减测试' }
                 },
                 { transaction }
@@ -1121,6 +1135,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
               delta_amount: 300,
               idempotency_key: setup_key,
               business_type: 'test_setup',
+              counterpart_account_id: 2,
               meta: { description: '冻结测试准备' }
             },
             { transaction }
@@ -1219,6 +1234,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
               delta_amount: 200,
               idempotency_key: setup_add_key,
               business_type: 'test_setup',
+              counterpart_account_id: 2,
               meta: { description: '解冻测试准备-增加' }
             },
             { transaction }
@@ -1333,6 +1349,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
               delta_amount: 400,
               idempotency_key: setup_add_key,
               business_type: 'test_setup',
+              counterpart_account_id: 2,
               meta: { description: '结算测试准备-增加' }
             },
             { transaction }
@@ -1455,6 +1472,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
               delta_amount,
               idempotency_key,
               business_type: 'test_idempotent',
+              counterpart_account_id: 2,
               meta: { attempt: 1 }
             },
             { transaction }
@@ -1480,6 +1498,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
               delta_amount,
               idempotency_key,
               business_type: 'test_idempotent',
+              counterpart_account_id: 2,
               meta: { attempt: 2 }
             },
             { transaction }
@@ -1500,6 +1519,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
               delta_amount,
               idempotency_key,
               business_type: 'test_idempotent',
+              counterpart_account_id: 2,
               meta: { attempt: 3 }
             },
             { transaction }
@@ -1537,6 +1557,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
                 delta_amount,
                 idempotency_key: generateIdempotencyKey(`test_diff_key_${i}`),
                 business_type: 'test_diff_key',
+                counterpart_account_id: 2,
                 meta: { attempt: i }
               },
               { transaction }
@@ -1585,6 +1606,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
               delta_amount: 200,
               idempotency_key: setup_key,
               business_type: 'test_setup',
+              counterpart_account_id: 2,
               meta: { description: '幂等冻结测试准备' }
             },
             { transaction }
@@ -1650,6 +1672,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
               delta_amount: 500,
               idempotency_key: setup_key,
               business_type: 'test_setup',
+              counterpart_account_id: 2,
               meta: { description: '并发幂等测试准备' }
             },
             { transaction }
@@ -1677,6 +1700,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
                 delta_amount,
                 idempotency_key,
                 business_type: 'test_concurrent',
+                counterpart_account_id: 2,
                 meta: { concurrent_index: i }
               },
               { transaction }
@@ -1729,7 +1753,8 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
             asset_code: 'POINTS',
             delta_amount: 10,
             idempotency_key: generateIdempotencyKey('test_no_tx_change'),
-            business_type: 'test_no_tx'
+            business_type: 'test_no_tx',
+            counterpart_account_id: 2
           })
         ).rejects.toThrow(/事务边界|TRANSACTION_REQUIRED|必须在事务中/i)
       })
@@ -1791,6 +1816,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
                 delta_amount: 1000,
                 idempotency_key: generateIdempotencyKey('test_rollback_add'),
                 business_type: 'test_rollback',
+                counterpart_account_id: 2,
                 meta: { step: 1 }
               },
               { transaction }
@@ -1833,6 +1859,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
                 delta_amount: 500,
                 idempotency_key: generateIdempotencyKey('test_multi_rollback_1'),
                 business_type: 'test_rollback',
+                counterpart_account_id: 2,
                 meta: { step: 1 }
               },
               { transaction }
@@ -1890,6 +1917,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
               delta_amount: add_amount,
               idempotency_key: generateIdempotencyKey('test_commit_add'),
               business_type: 'test_commit',
+              counterpart_account_id: 2,
               meta: { step: 1 }
             },
             { transaction }
@@ -1966,6 +1994,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
             delta_amount: 500,
             idempotency_key,
             business_type: 'test_full_flow',
+            counterpart_account_id: 2,
             meta: { description: '完整流程测试' }
           },
           { transaction }

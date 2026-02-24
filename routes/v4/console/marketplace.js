@@ -847,13 +847,13 @@ router.delete(
 )
 
 /**
- * 管理员获取C2C交易订单列表（Admin Only）
+ * 管理员获取交易市场订单列表（Admin Only）
  * GET /api/v4/console/marketplace/trade_orders
  *
- * @description 管理员查看所有C2C交易订单，支持状态筛选、分页
+ * @description 管理员查看所有交易市场订单，支持状态筛选、分页
  *
  * 业务场景：
- * - 管理后台C2C交易订单管理页面
+ * - 管理后台交易市场订单管理页面
  * - 订单状态筛选和查看
  * - 交易纠纷处理
  *
@@ -887,7 +887,7 @@ router.get('/trade_orders', authenticateToken, requireRoleLevel(100), async (req
     } = req.query
     const admin_id = req.user.user_id
 
-    logger.info('管理员查询C2C交易订单列表', {
+    logger.info('管理员查询交易市场订单列表', {
       admin_id,
       status,
       buyer_user_id,
@@ -910,15 +910,15 @@ router.get('/trade_orders', authenticateToken, requireRoleLevel(100), async (req
       page_size: parseInt(page_size)
     })
 
-    logger.info('管理员查询C2C交易订单成功', {
+    logger.info('管理员查询交易市场订单成功', {
       admin_id,
       total: result.pagination.total_count,
       page: result.pagination.page
     })
 
-    return res.apiSuccess(result, 'C2C交易订单列表查询成功')
+    return res.apiSuccess(result, '交易市场订单列表查询成功')
   } catch (error) {
-    logger.error('管理员查询C2C交易订单失败', {
+    logger.error('管理员查询交易市场订单失败', {
       error: error.message,
       stack: error.stack,
       admin_id: req.user?.user_id
@@ -929,10 +929,10 @@ router.get('/trade_orders', authenticateToken, requireRoleLevel(100), async (req
 })
 
 /**
- * 管理员获取C2C交易订单详情（Admin Only）
+ * 管理员获取交易市场订单详情（Admin Only）
  * GET /api/v4/console/marketplace/trade_orders/:order_id
  *
- * @description 管理员查看C2C交易订单详情，返回完整信息
+ * @description 管理员查看交易市场订单详情，返回完整信息
  *
  * @param {number} order_id - 订单ID
  *
@@ -951,7 +951,7 @@ router.get(
       const { order_id } = req.params
       const admin_id = req.user.user_id
 
-      logger.info('管理员查询C2C交易订单详情', {
+      logger.info('管理员查询交易市场订单详情', {
         admin_id,
         order_id
       })
@@ -968,7 +968,7 @@ router.get(
       // 调用服务层方法获取订单详情
       const order = await TradeOrderService.getOrderDetail(orderId)
 
-      logger.info('管理员获取C2C交易订单详情成功', {
+      logger.info('管理员获取交易市场订单详情成功', {
         admin_id,
         order_id: orderId,
         status: order?.status
@@ -979,10 +979,10 @@ router.get(
           success: true,
           order
         },
-        'C2C交易订单详情查询成功'
+        '交易市场订单详情查询成功'
       )
     } catch (error) {
-      logger.error('管理员查询C2C交易订单详情失败', {
+      logger.error('管理员查询交易市场订单详情失败', {
         error: error.message,
         stack: error.stack,
         admin_id: req.user?.user_id,
@@ -1018,7 +1018,7 @@ router.get(
  *
  * @security JWT + Admin权限
  *
- * @created 2026-01-08（C2C材料交易 Phase 2）
+ * @created 2026-01-08（交易市场材料交易 Phase 2）
  */
 router.post(
   '/listings/:market_listing_id/force-withdraw',
@@ -1409,15 +1409,15 @@ router.post(
 )
 
 /**
- * 查看C2C可交易资产配置
+ * 查看交易市场可交易资产配置
  * GET /api/v4/console/marketplace/tradable-assets
  *
- * P0-4: 管理端查看"C2C可交易资产配置"的接口
+ * P0-4: 管理端查看"交易市场可交易资产配置"的接口
  *
  * 业务场景：
  * - 管理员查看所有材料类资产及其可交易状态
  * - 显示硬编码黑名单、数据库配置、最终有效状态
- * - 帮助运营人员了解哪些资产允许在C2C市场交易
+ * - 帮助运营人员了解哪些资产允许在交易市场交易
  *
  * 响应字段说明：
  * - asset_code: 资产代码
@@ -1440,15 +1440,15 @@ router.get('/tradable-assets', authenticateToken, requireRoleLevel(100), async (
   try {
     const admin_id = req.user.user_id
 
-    logger.info('管理员查看C2C可交易资产配置', { admin_id })
+    logger.info('管理员查看交易市场可交易资产配置', { admin_id })
 
     // P1-9：通过 ServiceManager 获取服务（snake_case key）
     const MaterialManagementService = req.app.locals.services.getService('material_management')
 
     // 导入黑名单相关常量和函数
     const {
-      C2C_BLACKLISTED_ASSET_CODES,
-      isBlacklistedForC2C,
+      MARKET_BLACKLISTED_ASSET_CODES,
+      isBlacklistedForMarket,
       getBlacklistReason
     } = require('../../../constants/TradableAssetTypes')
 
@@ -1457,7 +1457,7 @@ router.get('/tradable-assets', authenticateToken, requireRoleLevel(100), async (
 
     // 构建响应数据，添加黑名单检查结果
     const assetConfigs = assets.map(asset => {
-      const inBlacklist = isBlacklistedForC2C(asset.asset_code)
+      const inBlacklist = isBlacklistedForMarket(asset.asset_code)
       const blacklistReason = getBlacklistReason(asset.asset_code)
 
       /*
@@ -1488,10 +1488,10 @@ router.get('/tradable-assets', authenticateToken, requireRoleLevel(100), async (
       enabled_count: assetConfigs.filter(a => a.is_enabled).length,
       tradable_count: assetConfigs.filter(a => a.effective_tradable).length,
       blacklisted_count: assetConfigs.filter(a => a.in_blacklist).length,
-      blacklisted_codes: [...C2C_BLACKLISTED_ASSET_CODES]
+      blacklisted_codes: [...MARKET_BLACKLISTED_ASSET_CODES]
     }
 
-    logger.info('C2C可交易资产配置查询成功', {
+    logger.info('交易市场可交易资产配置查询成功', {
       admin_id,
       total: summary.total_assets,
       tradable: summary.tradable_count,
@@ -1503,10 +1503,10 @@ router.get('/tradable-assets', authenticateToken, requireRoleLevel(100), async (
         assets: assetConfigs,
         summary
       },
-      'C2C可交易资产配置'
+      '交易市场可交易资产配置'
     )
   } catch (error) {
-    logger.error('查看C2C可交易资产配置失败', {
+    logger.error('查看交易市场可交易资产配置失败', {
       error: error.message,
       stack: error.stack,
       admin_id: req.user?.user_id

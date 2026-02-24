@@ -8,7 +8,7 @@
  *   - 资产流水（积分来源 / 消耗 / 收入支出）
  *   - 抽奖记录（每次抽奖详情）
  *   - 兑换记录（兑换 + 核销状态 + 管理员审核操作）
- *   - 交易记录（C2C 买卖）
+ *   - 交易记录（交易市场 买卖）
  *   - 市场挂牌（上架 / 下架）
  *   - 材料转换（分解 / 合成）
  *
@@ -193,7 +193,7 @@ router.get(
 )
 
 /**
- * GET /:user_id/trade-records - 交易记录查询（C2C 买卖）
+ * GET /:user_id/trade-records - 交易记录查询（交易市场 买卖）
  *
  * @param {number} user_id - 用户 ID
  * @query {string} [role] - 角色筛选：buyer / seller / all

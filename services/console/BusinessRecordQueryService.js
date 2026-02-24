@@ -153,7 +153,7 @@ class BusinessRecordQueryService {
   static async getRedemptionOrders(options = {}) {
     const { RedemptionOrder, User, Item } = require('../../models')
 
-    const { status, redeemer_user_id, mobile, start_date, end_date } = options
+    const { status, redeemer_user_id, mobile, merchant_id, start_date, end_date } = options
     const pagination = buildPaginationOptions(options)
 
     // 构建查询条件
@@ -174,6 +174,14 @@ class BusinessRecordQueryService {
       userRequired = true
     }
 
+    // 商家筛选：通过关联 Item 表的 merchant_id 过滤
+    const itemWhere = {}
+    let itemRequired = false
+    if (merchant_id) {
+      itemWhere.merchant_id = parseInt(merchant_id)
+      itemRequired = true
+    }
+
     const { count, rows } = await RedemptionOrder.findAndCountAll({
       where,
       include: [
@@ -187,8 +195,16 @@ class BusinessRecordQueryService {
         {
           model: Item,
           as: 'item',
-          attributes: ['item_id', 'item_type', 'item_name', 'item_value', 'rarity_code'],
-          required: false
+          attributes: [
+            'item_id',
+            'item_type',
+            'item_name',
+            'item_value',
+            'rarity_code',
+            'merchant_id'
+          ],
+          where: Object.keys(itemWhere).length > 0 ? itemWhere : undefined,
+          required: itemRequired
         }
       ],
       ...pagination

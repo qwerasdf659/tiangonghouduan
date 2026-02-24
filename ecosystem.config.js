@@ -60,26 +60,12 @@ module.exports = {
 
       // 时间戳
       time: true
-    },
-
-    {
-      name: 'daily-asset-reconciliation',
-      script: 'jobs/daily-asset-reconciliation.js',
-      cwd: '/home/devbox/project',
-      env_file: '.env',
-      exec_mode: 'fork',
-      instances: 1,
-      cron_restart: '0 2 * * *',
-      autorestart: false,
-      watch: false,
-      log_file: './logs/reconciliation.log',
-      out_file: './logs/reconciliation-out.log',
-      error_file: './logs/reconciliation-error.log',
-      log_date_format: 'YYYY-MM-DD HH:mm:ss [+08:00]',
-      max_memory_restart: '256M',
-      node_args: '--max-old-space-size=256',
-      merge_logs: true,
-      time: true
     }
+    /*
+     * daily-asset-reconciliation 已移除（2026-02-24）
+     * 原因：资产对账任务已由 scheduled_tasks.js 内部 cron 统一调度（任务12），
+     * 无需在 PM2 独立注册。PM2 独立条目 autorestart:false + cron_restart 的组合
+     * 在任务退出后 cron_restart 不会重新触发，导致"始终 stopped"的误导状态。
+     */
   ]
 }

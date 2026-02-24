@@ -658,6 +658,16 @@ models.TradeOrder = require('./TradeOrder')(sequelize, DataTypes)
  *    - 业务场景：创建订单→冻结资产→成交结算→取消订单
  */
 
+const MarketPriceSnapshot = require('./MarketPriceSnapshot')
+MarketPriceSnapshot.initModel(sequelize)
+models.MarketPriceSnapshot = MarketPriceSnapshot
+/*
+ * ✅ MarketPriceSnapshot：市场价格快照预聚合
+ *    - 用途：每日汇总市场挂牌的价格统计（最低/最高/平均、成交量）
+ *    - 表名：market_price_snapshots，主键：snapshot_id
+ *    - 唯一约束：(snapshot_date, asset_code, listing_kind, price_asset_code)
+ */
+
 // 🔴 V4.2 背包双轨架构模型（Phase 1 - 核销码系统）
 models.RedemptionOrder = require('./RedemptionOrder')(sequelize, DataTypes)
 /*

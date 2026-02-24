@@ -1,8 +1,8 @@
 /**
- * 餐厅积分抽奖系统 V4.2 - C2C 交易担保码服务
+ * 餐厅积分抽奖系统 V4.2 - 交易市场担保码服务
  *
  * 业务场景（决策5/Phase 4）：
- * - 仅用于 listing_kind = 'item' 的实物交易
+ * - 仅用于 listing_kind = 'item' 的实物交易（交易市场实物交易）
  * - 买方付款（资产冻结）后，系统生成 6 位纯数字担保码
  * - 担保码发给卖方，卖方交付物品后将码告知买方
  * - 买方输入码确认收货 → 冻结资产转给卖方 → 交易完成
@@ -22,10 +22,10 @@ const crypto = require('crypto')
 const logger = require('../utils/logger').logger
 
 /**
- * C2C 交易担保码服务
+ * 交易市场担保码服务
  *
  * @class EscrowCodeService
- * @description 生成、验证、管理 C2C 实物交易的担保码
+ * @description 生成、验证、管理 交易市场实物交易的担保码
  */
 class EscrowCodeService {
   /**

@@ -1,15 +1,15 @@
 /**
- * 可交易资产类型常量
+ * 交易市场可交易资产类型常量
  *
  * 文件路径：constants/TradableAssetTypes.js
  *
  * 职责：
- * - 定义C2C市场可交易/不可交易的资产类型黑白名单
+ * - 定义交易市场可交易/不可交易的资产类型黑白名单
  * - 提供资产交易权限验证函数
  * - 作为硬编码保护层，防止积分类资产被误交易
  *
  * 🔴 P0-4已拍板决策：
- * - POINTS 和 BUDGET_POINTS 永久禁止在C2C市场交易
+ * - POINTS 和 BUDGET_POINTS 永久禁止在交易市场交易
  * - 即使数据库 is_tradable=true 也不允许
  * - 黑名单优先级高于数据库配置
  *
@@ -20,10 +20,10 @@
 'use strict'
 
 /**
- * C2C市场禁止交易的资产类型（硬编码黑名单）
+ * 交易市场禁止交易的资产类型（硬编码黑名单）
  *
  * 🔴 重要：
- * - 这些资产类型永远不允许在C2C市场交易
+ * - 这些资产类型永远不允许在交易市场交易
  * - 即使数据库 material_asset_types.is_tradable = true 也会被拒绝
  * - 黑名单检查优先于数据库字段检查
  *
@@ -37,24 +37,24 @@
  *
  * @type {string[]}
  */
-const C2C_BLACKLISTED_ASSET_CODES = Object.freeze([
-  'POINTS', // 系统积分 - 永久禁止C2C交易
-  'BUDGET_POINTS' // 预算积分 - 永久禁止C2C交易
+const MARKET_BLACKLISTED_ASSET_CODES = Object.freeze([
+  'POINTS', // 系统积分 - 永久禁止在交易市场交易
+  'BUDGET_POINTS' // 预算积分 - 永久禁止在交易市场交易
 ])
 
 /**
- * 检查资产类型是否被C2C交易黑名单禁止
+ * 检查资产类型是否被交易市场黑名单禁止
  *
  * @param {string} asset_code - 资产代码
  * @returns {boolean} true=禁止交易，false=允许（但仍需检查数据库is_tradable字段）
  *
  * @example
- * isBlacklistedForC2C('POINTS') // true - 禁止交易
- * isBlacklistedForC2C('BUDGET_POINTS') // true - 禁止交易
- * isBlacklistedForC2C('GOLD_COIN') // false - 允许（需继续检查数据库）
+ * isBlacklistedForMarket('POINTS') // true - 禁止交易
+ * isBlacklistedForMarket('BUDGET_POINTS') // true - 禁止交易
+ * isBlacklistedForMarket('GOLD_COIN') // false - 允许（需继续检查数据库）
  */
-function isBlacklistedForC2C(asset_code) {
-  return C2C_BLACKLISTED_ASSET_CODES.includes(asset_code)
+function isBlacklistedForMarket(asset_code) {
+  return MARKET_BLACKLISTED_ASSET_CODES.includes(asset_code)
 }
 
 /**
@@ -64,24 +64,24 @@ function isBlacklistedForC2C(asset_code) {
  * @returns {string|null} 禁止原因，如果允许交易则返回null
  *
  * @example
- * getBlacklistReason('POINTS') // '积分类资产禁止在C2C市场交易'
+ * getBlacklistReason('POINTS') // '系统积分禁止在交易市场交易'
  * getBlacklistReason('GOLD_COIN') // null
  */
 function getBlacklistReason(asset_code) {
-  if (!isBlacklistedForC2C(asset_code)) {
+  if (!isBlacklistedForMarket(asset_code)) {
     return null
   }
 
   const reasons = {
-    POINTS: '系统积分禁止在C2C市场交易（只能通过官方渠道获取/消耗）',
-    BUDGET_POINTS: '预算积分禁止在C2C市场交易（专用于特定活动预算）'
+    POINTS: '系统积分禁止在交易市场交易（只能通过官方渠道获取/消耗）',
+    BUDGET_POINTS: '预算积分禁止在交易市场交易（专用于特定活动预算）'
   }
 
-  return reasons[asset_code] || '该资产类型禁止在C2C市场交易'
+  return reasons[asset_code] || '该资产类型禁止在交易市场交易'
 }
 
 /**
- * 验证资产类型是否可在C2C市场交易（综合检查）
+ * 验证资产类型是否可在交易市场交易（综合检查）
  *
  * 检查顺序（优先级从高到低）：
  * 1. 黑名单检查（硬编码保护，最高优先级）
@@ -93,14 +93,13 @@ function getBlacklistReason(asset_code) {
  * @returns {string|null} returns.reason - 不允许的原因
  *
  * @example
- * validateC2CTradability('POINTS')
- * // { allowed: false, reason: '系统积分禁止在C2C市场交易...' }
+ * validateMarketTradability('POINTS')
+ * // { allowed: false, reason: '系统积分禁止在交易市场交易...' }
  *
- * validateC2CTradability('GOLD_COIN')
+ * validateMarketTradability('GOLD_COIN')
  * // { allowed: true, reason: null } // 但仍需检查数据库is_tradable
  */
-function validateC2CTradability(asset_code) {
-  // 1. 黑名单检查（最高优先级）
+function validateMarketTradability(asset_code) {
   const blacklistReason = getBlacklistReason(asset_code)
   if (blacklistReason) {
     return {
@@ -110,7 +109,6 @@ function validateC2CTradability(asset_code) {
     }
   }
 
-  // 2. 允许交易（但调用方需继续检查数据库is_tradable字段）
   return {
     allowed: true,
     reason: null,
@@ -119,17 +117,17 @@ function validateC2CTradability(asset_code) {
 }
 
 /**
- * 创建C2C交易资产禁止错误对象
+ * 创建交易市场资产禁止错误对象
  *
  * @param {string} asset_code - 资产代码
  * @param {string} display_name - 资产显示名称
  * @returns {Error} 带有标准化字段的错误对象
  */
-function createC2CBlacklistError(asset_code, display_name = asset_code) {
-  const reason = getBlacklistReason(asset_code) || `资产${asset_code}禁止在C2C市场交易`
+function createMarketBlacklistError(asset_code, display_name = asset_code) {
+  const reason = getBlacklistReason(asset_code) || `资产${asset_code}禁止在交易市场交易`
 
-  const error = new Error(`该资产类型禁止在C2C市场交易: ${display_name}`)
-  error.code = 'ASSET_C2C_BLACKLISTED' // 区别于 ASSET_NOT_TRADABLE
+  const error = new Error(`该资产类型禁止在交易市场交易: ${display_name}`)
+  error.code = 'ASSET_MARKET_BLACKLISTED'
   error.statusCode = 400
   error.details = {
     asset_code,
@@ -143,12 +141,9 @@ function createC2CBlacklistError(asset_code, display_name = asset_code) {
 }
 
 module.exports = {
-  // 黑名单常量
-  C2C_BLACKLISTED_ASSET_CODES,
-
-  // 验证函数
-  isBlacklistedForC2C,
+  MARKET_BLACKLISTED_ASSET_CODES,
+  isBlacklistedForMarket,
   getBlacklistReason,
-  validateC2CTradability,
-  createC2CBlacklistError
+  validateMarketTradability,
+  createMarketBlacklistError
 }

@@ -2,7 +2,7 @@
  * 8.6 完整交易流程测试（Full Trade Flow Integration Tests）
  *
  * 测试目标：
- * 1. 验证完整的 C2C 交易流程：挂单 → 购买 → 交割
+ * 1. 验证完整的交易市场交易流程：挂单 → 购买 → 交割
  * 2. 验证资产冻结/解冻/结算的正确性
  * 3. 验证物品所有权转移
  * 4. 验证手续费计算和收取
@@ -248,12 +248,12 @@ describe('【8.6】完整交易流程测试 - 挂单→购买→交割', () => {
 
         await transaction.commit()
 
-        orderId = result.order_id
+        orderId = result.trade_order_id
         createdOrderIds.push(orderId)
 
-        console.log(`✅ 创建订单成功: order_id=${orderId}`)
+        console.log(`✅ 创建订单成功: trade_order_id=${orderId}`)
 
-        expect(result.order_id).toBeDefined()
+        expect(result.trade_order_id).toBeDefined()
         expect(result.is_duplicate).toBeFalsy()
       } catch (error) {
         if (!transaction.finished) {
@@ -315,8 +315,7 @@ describe('【8.6】完整交易流程测试 - 挂单→购买→交割', () => {
 
         // completeOrder 返回 { order, fee_amount, net_amount }
         expect(result.order).toBeDefined()
-        // order_id 可能是字符串或数字，使用宽松相等
-        expect(Number(result.order.order_id)).toBe(Number(orderId))
+        expect(Number(result.order.trade_order_id)).toBe(Number(orderId))
       } catch (error) {
         if (!transaction.finished) {
           await transaction.rollback()
@@ -474,7 +473,7 @@ describe('【8.6】完整交易流程测试 - 挂单→购买→交割', () => {
           { transaction: transaction1 }
         )
         await transaction1.commit()
-        createdOrderIds.push(firstResult.order_id)
+        createdOrderIds.push(firstResult.trade_order_id)
       } catch (error) {
         await transaction1.rollback()
         throw error
@@ -500,11 +499,11 @@ describe('【8.6】完整交易流程测试 - 挂单→购买→交割', () => {
         throw error
       }
 
-      // 验证幂等返回
-      expect(duplicateResult.order_id).toBe(firstResult.order_id)
+      // 验证幂等返回（TradeOrderService.createOrder 返回 trade_order_id）
+      expect(duplicateResult.trade_order_id).toBe(firstResult.trade_order_id)
       expect(duplicateResult.is_duplicate).toBe(true)
 
-      console.log(`✅ 订单幂等性验证通过: order_id=${firstResult.order_id}`)
+      console.log(`✅ 订单幂等性验证通过: trade_order_id=${firstResult.trade_order_id}`)
     }, 30000)
   })
 
@@ -677,6 +676,7 @@ async function ensureBalance(userId, assetCode, minBalance) {
           asset_code: assetCode,
           delta_amount: amountToAdd,
           business_type: 'test_topup',
+          counterpart_account_id: 2,
           idempotency_key: `test_topup_${userId}_${assetCode}_${Date.now()}_${uuidv4().slice(0, 8)}`
         },
         { transaction }

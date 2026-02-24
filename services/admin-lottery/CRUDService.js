@@ -24,7 +24,12 @@
  * 拆分自：routes/v4/console/system-data.js（路由层直接操作模型）
  */
 
-const { LotteryCampaign, LotteryPrize, LotteryStrategyConfig } = require('../../models')
+const {
+  LotteryCampaign,
+  LotteryPrize,
+  LotteryStrategyConfig,
+  LotteryDrawQuotaRule
+} = require('../../models')
 const logger = require('../../utils/logger').logger
 const { assertAndGetTransaction } = require('../../utils/transactionHelpers')
 const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
@@ -369,6 +374,13 @@ class LotteryCampaignCRUDService {
       })
     }
 
+    // ✅ 自动同步每日抽奖次数到配额规则表（确保 max_draws_per_user_daily 真正被强制执行）
+    await LotteryCampaignCRUDService._syncDailyQuotaRule(
+      campaign.lottery_campaign_id,
+      campaign.max_draws_per_user_daily,
+      { transaction, operator_user_id }
+    )
+
     return campaign
   }
 
@@ -470,6 +482,15 @@ class LotteryCampaignCRUDService {
 
     // 执行更新
     await campaign.update(filteredData, { transaction })
+
+    // 如果更新了 max_draws_per_user_daily，同步到配额规则表
+    if (filteredData.max_draws_per_user_daily !== undefined) {
+      await LotteryCampaignCRUDService._syncDailyQuotaRule(
+        parseInt(lottery_campaign_id),
+        filteredData.max_draws_per_user_daily,
+        { transaction, operator_user_id }
+      )
+    }
 
     // 失效缓存
     try {
@@ -811,6 +832,103 @@ class LotteryCampaignCRUDService {
       lottery_campaign_id: campaign_id,
       updated_count: updated.length,
       updated_configs: updated
+    }
+  }
+
+  /**
+   * 同步活动的 max_draws_per_user_daily 到配额规则表
+   *
+   * 业务场景：
+   * - 运营在活动编辑弹窗设置"每日最大次数"时，自动创建/更新 campaign 级配额规则
+   * - 确保 LotteryQuotaService 的四维度配额体系中，campaign 级规则与活动表字段一致
+   * - 消除 lottery_campaigns.max_draws_per_user_daily 与 lottery_draw_quota_rules 之间的配置分裂
+   *
+   * 技术实现：
+   * - 使用 upsert 模式（存在则更新，不存在则创建），保证幂等
+   * - scope_type='campaign'，scope_id=活动ID，window_type='daily'
+   * - reason 字段标注数据来源便于运营排查
+   *
+   * @param {number} lottery_campaign_id - 活动ID
+   * @param {number} max_draws_daily - 每日最大抽奖次数
+   * @param {Object} options - 操作选项
+   * @param {Object} options.transaction - 事务对象（必填）
+   * @param {number} options.operator_user_id - 操作者ID
+   * @returns {Promise<void>} 无返回值，同步失败仅打印日志不阻断主流程
+   * @private
+   */
+  static async _syncDailyQuotaRule(lottery_campaign_id, max_draws_daily, options = {}) {
+    const transaction = assertAndGetTransaction(
+      options,
+      'LotteryCampaignCRUDService._syncDailyQuotaRule'
+    )
+    const { operator_user_id } = options
+
+    try {
+      const limit_value = parseInt(max_draws_daily, 10)
+      if (isNaN(limit_value) || limit_value < 0) {
+        logger.warn('max_draws_per_user_daily 值无效，跳过配额规则同步', {
+          lottery_campaign_id,
+          max_draws_daily
+        })
+        return
+      }
+
+      // 查找该活动的 active 状态的 campaign 级每日配额规则
+      const existing = await LotteryDrawQuotaRule.findOne({
+        where: {
+          scope_type: 'campaign',
+          scope_id: String(lottery_campaign_id),
+          window_type: 'daily',
+          status: 'active'
+        },
+        transaction
+      })
+
+      if (existing) {
+        // 更新已有规则的 limit_value
+        if (existing.limit_value !== limit_value) {
+          await existing.update(
+            {
+              limit_value,
+              reason: `活动编辑同步（运营设置每日${limit_value}次）`,
+              updated_by: operator_user_id
+            },
+            { transaction }
+          )
+          logger.info('同步配额规则：更新 campaign 级每日限额', {
+            lottery_campaign_id,
+            old_limit: existing.limit_value,
+            new_limit: limit_value,
+            lottery_draw_quota_rule_id: existing.lottery_draw_quota_rule_id
+          })
+        }
+      } else {
+        // 创建新的 campaign 级配额规则
+        await LotteryDrawQuotaRule.create(
+          {
+            scope_type: 'campaign',
+            scope_id: String(lottery_campaign_id),
+            window_type: 'daily',
+            limit_value,
+            priority: 0,
+            status: 'active',
+            reason: `活动创建自动同步（每日${limit_value}次）`,
+            created_by: operator_user_id
+          },
+          { transaction }
+        )
+        logger.info('同步配额规则：创建 campaign 级每日限额', {
+          lottery_campaign_id,
+          limit_value
+        })
+      }
+    } catch (error) {
+      // 配额规则同步失败不阻断活动操作（降级为仅靠全局兜底）
+      logger.error('同步 campaign 级配额规则失败（非致命）', {
+        lottery_campaign_id,
+        max_draws_daily,
+        error: error.message
+      })
     }
   }
 }

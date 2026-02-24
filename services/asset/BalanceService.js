@@ -338,9 +338,9 @@ class BalanceService {
       // 验证可用余额充足（扣减时）
       if (delta_amount < 0) {
         const required_amount = Math.abs(delta_amount)
-        if (finalBalance.available_amount < required_amount) {
+        if (Number(finalBalance.available_amount) < Number(required_amount)) {
           throw new Error(
-            `可用余额不足：当前可用余额${finalBalance.available_amount}个${asset_code}，需要${required_amount}个，差额${required_amount - finalBalance.available_amount}个`
+            `可用余额不足：当前可用余额${finalBalance.available_amount}个${asset_code}，需要${required_amount}个，差额${required_amount - Number(finalBalance.available_amount)}个`
           )
         }
       }
@@ -395,47 +395,43 @@ class BalanceService {
       )
 
       /*
-       * 双录记账：写入对手方反向流水（V4.2.0 资产全链路追踪）
+       * 双录记账：写入对手方反向流水（V4.2.0 → V4.8.0 全覆盖升级）
        *
-       * 规则：仅对系统账户创建 counterpart 反向记录
+       * 规则：对所有提供 counterpart_account_id 的操作创建 counterpart 反向记录
        * - 用户↔系统操作（抽奖、充值、兑换等）：创建 counterpart 使全局 SUM=0
-       * - 用户↔用户操作（交易结算）：不创建 counterpart（freeze→settle→credit 链路已平衡）
-       *   counterpart_account_id 仍保留在主记录上用于审计追踪
+       * - 用户↔用户操作（交易结算）：同样创建 counterpart，保证全局 SUM(delta_amount)=0
+       *
+       * V4.8.0 修复：移除 account_type === 'system' 限制
+       * 原因：trade settlement 中的 seller_credit/platform_fee_credit/buyer_offer_credit
+       *       因 counterpart 是 user 账户而跳过了反向流水，导致全局 SUM ≠ 0
        */
       if (params.counterpart_account_id) {
-        const counterpartAccount = await Account.findByPk(params.counterpart_account_id, {
-          attributes: ['account_id', 'account_type'],
+        const counterpartIdempotencyKey = `${idempotency_key}:counterpart`
+        const existingCounterpart = await AssetTransaction.findOne({
+          where: { idempotency_key: counterpartIdempotencyKey },
           transaction
         })
 
-        if (counterpartAccount && counterpartAccount.account_type === 'system') {
-          const counterpartIdempotencyKey = `${idempotency_key}:counterpart`
-          const existingCounterpart = await AssetTransaction.findOne({
-            where: { idempotency_key: counterpartIdempotencyKey },
-            transaction
-          })
-
-          if (!existingCounterpart) {
-            await AssetTransaction.create(
-              {
-                account_id: params.counterpart_account_id,
-                counterpart_account_id: account.account_id,
-                asset_code,
-                delta_amount: -delta_amount,
-                balance_before: 0,
-                balance_after: 0,
-                business_type: `${business_type}_counterpart`,
-                lottery_session_id: lottery_session_id || null,
-                idempotency_key: counterpartIdempotencyKey,
-                meta: {
-                  counterpart_of: idempotency_key,
-                  original_account_id: account.account_id,
-                  lottery_campaign_id: lottery_campaign_id || null
-                }
-              },
-              { transaction }
-            )
-          }
+        if (!existingCounterpart) {
+          await AssetTransaction.create(
+            {
+              account_id: params.counterpart_account_id,
+              counterpart_account_id: account.account_id,
+              asset_code,
+              delta_amount: -delta_amount,
+              balance_before: 0,
+              balance_after: 0,
+              business_type: `${business_type}_counterpart`,
+              lottery_session_id: lottery_session_id || null,
+              idempotency_key: counterpartIdempotencyKey,
+              meta: {
+                counterpart_of: idempotency_key,
+                original_account_id: account.account_id,
+                lottery_campaign_id: lottery_campaign_id || null
+              }
+            },
+            { transaction }
+          )
         }
       }
 
@@ -588,10 +584,10 @@ class BalanceService {
         )
       }
 
-      // 验证可用余额充足
-      if (balance.available_amount < amount) {
+      // 验证可用余额充足（BIGINT 返回字符串，必须 Number() 转换防止字典序比较）
+      if (Number(balance.available_amount) < Number(amount)) {
         throw new Error(
-          `可用余额不足：当前可用余额${balance.available_amount}个${asset_code}，需要冻结${amount}个，差额${amount - balance.available_amount}个`
+          `可用余额不足：当前可用余额${balance.available_amount}个${asset_code}，需要冻结${amount}个，差额${Number(amount) - Number(balance.available_amount)}个`
         )
       }
 
@@ -954,9 +950,9 @@ class BalanceService {
    * - 记录结算流水
    * - 【V1.1.0】记录 SYSTEM_ESCROW 为 counterpart_account_id（审计追踪）
    *
-   * 双录设计（结算 = 冻结资金消耗）：
+   * 双录设计（结算 = 冻结资金消耗，V4.8.0 完善）：
    * - 主记录：delta_amount = 0（可用余额不变），frozen_amount_change = -amount
-   * - 对手方标记：SYSTEM_ESCROW（仅作审计追踪，不写反向流水，因为 delta=0 不影响全局 SUM）
+   * - ESCROW counterpart：delta = -amount（对冲 freeze 时的 +amount，使 ESCROW 归零）
    * - 结算的"真实"对手方由同一事务中的 changeBalance（如卖家收款）处理
    *
    * @param {Object} params - 参数对象
@@ -1051,10 +1047,10 @@ class BalanceService {
         )
       }
 
-      // 验证冻结余额充足
-      if (balance.frozen_amount < amount) {
+      // 验证冻结余额充足（BIGINT 返回字符串，必须 Number() 转换防止字典序比较）
+      if (Number(balance.frozen_amount) < Number(amount)) {
         throw new Error(
-          `冻结余额不足：当前冻结余额${balance.frozen_amount}个${asset_code}，需要结算${amount}个，差额${amount - balance.frozen_amount}个`
+          `冻结余额不足：当前冻结余额${balance.frozen_amount}个${asset_code}，需要结算${amount}个，差额${Number(amount) - Number(balance.frozen_amount)}个`
         )
       }
 
@@ -1084,7 +1080,7 @@ class BalanceService {
         { transaction }
       )
 
-      // 创建结算流水记录（delta_amount=0，不影响全局 SUM，仅记录 counterpart 用于审计）
+      // 创建结算流水记录（delta_amount=0，仅记录 frozen_amount_change 和 counterpart 用于审计）
       const transaction_record = await AssetTransaction.create(
         {
           account_id: account.account_id,
@@ -1107,7 +1103,21 @@ class BalanceService {
         { transaction }
       )
 
-      logger.info('✅ 资产结算成功（从冻结余额，双录）', {
+      /*
+       * V4.9.0 增强版方案 B：settleFromFrozen 不再写毯式 ESCROW 释放记录。
+       *
+       * 改由结算调用方（如 TradeOrderService.settleOrder）在每笔 credit 时
+       * 将 counterpart_account_id 指向 SYSTEM_ESCROW，使 changeBalance 的
+       * 双录机制自动创建逐笔 ESCROW 释放记录。
+       *
+       * 优势：ESCROW 的每一笔释放都能追溯到具体收款方（卖家/平台），
+       * 而非一个笼统的 -500 释放。
+       *
+       * 历史记录：V4.8.0 曾在此处写 ESCROW 毯式释放（`${business_type}_counterpart`），
+       * 已有的历史记录保留在数据库中不受影响，由 system_reconciliation_final 兜底平衡。
+       */
+
+      logger.info('✅ 资产结算成功（从冻结余额）', {
         service: 'BalanceService',
         method: 'settleFromFrozen',
         account_id: account.account_id,

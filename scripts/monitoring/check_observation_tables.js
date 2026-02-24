@@ -11,7 +11,7 @@
  * 观察期表及阈值：
  * - content_review_records: ≥ 10 条审批记录
  * - exchange_records: ≥ 5 笔兑换订单
- * - trade_orders: ≥ 10 笔 C2C 交易订单
+ * - trade_orders: ≥ 10 笔 交易市场 交易订单
  * - consumption_records: ≥ 5 条消费记录
  *
  * 使用方式：
@@ -47,7 +47,7 @@ const OBSERVATION_TABLES = [
     name: 'trade_orders',
     minCount: 10,
     deadline: '2026-04-09',
-    description: 'C2C 市场交易订单表'
+    description: '交易市场交易订单表'
   },
   {
     name: 'consumption_records',

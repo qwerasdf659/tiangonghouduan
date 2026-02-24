@@ -7,7 +7,7 @@
  * 核心功能：
  * 1. 系统基础信息配置（系统名称、版本号、客服电话、客服邮箱等）
  * 2. 抽奖系统参数配置（基础中奖率、最大连续不中奖次数、调整因子等）
- * 3. 积分系统规则配置（签到积分、抽奖消耗、积分有效期等）
+ * 3. 积分系统规则配置（抽奖消耗、积分有效期、预算分配比例等）
  * 4. 通知系统设置（短信、邮件、站内信开关及模板）
  * 5. 安全策略配置（登录限制、密码规则、API限流等）
  *
@@ -135,7 +135,7 @@ module.exports = sequelize => {
         type: DataTypes.STRING(100),
         allowNull: false,
         unique: true,
-        comment: '配置键名（唯一，如system_name、base_win_rate、sign_in_points等）'
+        comment: '配置键名（唯一，如system_name、base_win_rate、lottery_cost_points等）'
       },
 
       // 配置值：存储配置数据（支持多种类型）

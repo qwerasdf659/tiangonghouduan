@@ -19,7 +19,15 @@
 
 'use strict'
 
-const { sequelize, User, MarketListing, Item, TradeOrder, ItemTemplate } = require('../../models')
+const {
+  sequelize,
+  User,
+  Account,
+  MarketListing,
+  Item,
+  TradeOrder,
+  ItemTemplate
+} = require('../../models')
 const { Op } = sequelize.Sequelize
 
 // 测试超时设置（市场交易涉及多服务调用，增加超时）
@@ -141,13 +149,24 @@ describe('市场交易流程测试（阶段四：P2）', () => {
    * @param {Object} options - 可选参数
    * @returns {Promise<Item>} 创建的物品实例
    */
-  async function createTestItem(owner_account_id, options = {}) {
+  async function createTestItem(user_id, options = {}) {
+    const ts = Date.now()
+    const itemName = options.item_name || `测试物品_${ts}`
+
+    const account = await Account.findOne({
+      where: { user_id, account_type: 'user' }
+    })
+    if (!account) throw new Error(`用户 ${user_id} 没有对应的资产账户`)
+
     const item_data = {
-      owner_account_id,
+      tracking_code: `TS${ts.toString().slice(-10)}${Math.random().toString(36).slice(2, 4)}`,
+      owner_account_id: account.account_id,
       item_template_id: test_item_template?.item_template_id || null,
       item_type: 'tradable_item',
+      item_name: itemName,
+      source: 'test',
       status: options.status || 'available',
-      meta: options.meta || { name: `测试物品_${Date.now()}`, description: '市场交易测试用物品' }
+      meta: options.meta || { name: itemName, description: '市场交易测试用物品' }
     }
 
     const item = await Item.create(item_data)
@@ -206,11 +225,11 @@ describe('市场交易流程测试（阶段四：P2）', () => {
 
           // 5. 验证物品状态已变为 locked
           const updated_item = await Item.findByPk(test_item.item_id)
-          expect(updated_item.status).toBe('locked')
+          expect(updated_item.status).toBe('held')
 
           console.log('✅ 物品实例挂牌创建成功:', result.listing.market_listing_id)
         } catch (error) {
-          await transaction.rollback()
+          if (!transaction.finished) await transaction.rollback()
           throw error
         }
       })
@@ -367,6 +386,7 @@ describe('市场交易流程测试（阶段四：P2）', () => {
             asset_code: 'red_shard',
             delta_amount: 100,
             business_type: 'test_grant',
+            counterpart_account_id: 2,
             idempotency_key: generateIdempotencyKey('grant_shard')
           })
           console.log('✅ 已为卖家添加测试 red_shard 资产')
@@ -409,7 +429,7 @@ describe('市场交易流程测试（阶段四：P2）', () => {
 
           console.log('✅ 可叠加资产挂牌创建成功:', result.listing.market_listing_id)
         } catch (error) {
-          await transaction.rollback()
+          if (!transaction.finished) await transaction.rollback()
           throw error
         }
       })
@@ -672,6 +692,7 @@ describe('市场交易流程测试（阶段四：P2）', () => {
               asset_code: 'red_shard',
               delta_amount: 50,
               business_type: 'test_grant',
+              counterpart_account_id: 2,
               idempotency_key: generateIdempotencyKey('grant_for_withdraw')
             },
             { transaction: grant_tx }

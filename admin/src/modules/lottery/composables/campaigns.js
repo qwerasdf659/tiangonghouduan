@@ -21,6 +21,8 @@ export function useCampaignsState() {
     campaigns: [],
     /** @type {Object} 活动统计 */
     campaignStats: { total: 0, active: 0, today_participants: 0, today_winners: 0 },
+    /** @type {Object|null} 全局默认配置（从 system_settings 读取，用于优先级可视化提示） */
+    globalDefaults: null,
     /** @type {Array} 可用的分群策略版本列表（动态从后端加载） */
     availableSegmentVersions: [{ version_key: 'default', description: '默认版本' }],
     /** @type {Object} 活动筛选条件 */
@@ -129,6 +131,25 @@ export function useCampaignsState() {
  */
 export function useCampaignsMethods(_context) {
   return {
+    /**
+     * 加载全局默认配置（从 system_settings 读取）
+     *
+     * 业务场景：在活动编辑弹窗中显示"当前全局默认值 → 10次/日"等参考信息，
+     * 帮助运营理解配置优先级：活动级配置 > 全局配置
+     */
+    async loadGlobalDefaults() {
+      try {
+        const response = await this.apiGet(LOTTERY_ENDPOINTS.CAMPAIGN_GLOBAL_DEFAULTS)
+        const data = response?.success ? response.data : response
+        if (data?.global_defaults) {
+          this.globalDefaults = data.global_defaults
+          logger.debug('[Campaigns] 全局默认配置已加载:', this.globalDefaults)
+        }
+      } catch (error) {
+        logger.warn('[Campaigns] 加载全局默认配置失败（非致命）:', error.message)
+      }
+    },
+
     /**
      * 加载活动列表
      * @description apiGet 返回的是 response.data（已解包），不是完整响应对象

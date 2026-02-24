@@ -120,6 +120,7 @@ describe('🛒 并发购买竞态测试', () => {
           asset_code: 'DIAMOND',
           delta_amount: amount,
           business_type: 'test_grant',
+          counterpart_account_id: 2,
           idempotency_key: generateIdempotencyKey(`grant_${userId}`)
         },
         { transaction }

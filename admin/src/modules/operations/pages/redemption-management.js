@@ -13,6 +13,16 @@ import { logger } from '../../../utils/logger.js'
 import { createPageMixin } from '../../../alpine/mixins/index.js'
 import { RedemptionAPI } from '../../../api/redemption.js'
 import { STORE_ENDPOINTS } from '../../../api/store.js'
+import { MERCHANT_ENDPOINTS } from '../../../api/merchant.js'
+
+/**
+ * @typedef {Object} ScanState 扫码核销Tab的状态
+ * @property {string} redeem_code - 文本码输入值
+ * @property {string} qr_content - QR码内容输入值
+ * @property {boolean} processing - 是否正在处理核销
+ * @property {Object|null} result - 核销结果（{ type: 'success'|'error', message, data }）
+ * @property {Array} history - 本次会话的核销记录
+ */
 
 /**
  * 创建兑换核销管理页面组件
@@ -31,6 +41,18 @@ function redemptionManagementPage() {
 
     // ==================== 页面状态 ====================
 
+    /** @type {string} 当前激活的Tab（orders=订单管理, scan=扫码核销） */
+    activeTab: 'orders',
+
+    /** @type {ScanState} 扫码核销Tab状态 */
+    scan: {
+      redeem_code: '',
+      qr_content: '',
+      processing: false,
+      result: null,
+      history: []
+    },
+
     /** @type {Array} 核销订单列表 */
     orders: [],
 
@@ -47,9 +69,13 @@ function redemptionManagementPage() {
     filter: {
       status: '',
       mobile: '',
+      merchant_id: '',
       start_date: '',
       end_date: ''
     },
+
+    /** @type {Array} 商家下拉选项列表 */
+    merchantOptions: [],
 
     /** @type {Object|null} 当前查看的订单详情 */
     orderDetail: null,
@@ -81,7 +107,7 @@ function redemptionManagementPage() {
       if (!this.checkAuth()) return
 
       // 并行加载数据
-      await Promise.all([this.loadStats(), this.loadOrders(), this.loadStores()])
+      await Promise.all([this.loadStats(), this.loadOrders(), this.loadStores(), this.loadMerchantOptions()])
 
       logger.info('[RedemptionMgmt] 初始化完成')
     },
@@ -122,6 +148,7 @@ function redemptionManagementPage() {
 
         if (this.filter.status) params.status = this.filter.status
         if (this.filter.mobile) params.mobile = this.filter.mobile
+        if (this.filter.merchant_id) params.merchant_id = this.filter.merchant_id
         if (this.filter.start_date) params.start_date = this.filter.start_date
         if (this.filter.end_date) params.end_date = this.filter.end_date
 
@@ -161,6 +188,21 @@ function redemptionManagementPage() {
         }
       } catch (error) {
         logger.warn('[RedemptionMgmt] 加载门店列表失败:', error.message)
+      }
+    },
+
+    /**
+     * 加载商家下拉选项
+     */
+    async loadMerchantOptions() {
+      try {
+        const result = await this.apiGet(MERCHANT_ENDPOINTS.OPTIONS, {}, { showLoading: false, showError: false })
+        const data = result?.success ? result.data : result
+        this.merchantOptions = Array.isArray(data) ? data : []
+        logger.debug('[RedemptionMgmt] 商家选项加载完成', { count: this.merchantOptions.length })
+      } catch (error) {
+        logger.warn('[RedemptionMgmt] 加载商家选项失败:', error.message)
+        this.merchantOptions = []
       }
     },
 
@@ -597,6 +639,83 @@ function redemptionManagementPage() {
       if (order.fulfilled_staff?.nickname) return order.fulfilled_staff.nickname
       if (order.fulfilled_by_user_id) return `员工#${order.fulfilled_by_user_id}`
       return '-'
+    },
+
+    // ==================== 扫码核销（Tab: scan） ====================
+
+    /**
+     * 文本码核销（店员输入 XXXX-YYYY-ZZZZ 格式兑换码）
+     * POST /api/v4/shop/redemption/fulfill
+     */
+    async fulfillByTextCode() {
+      const code = this.scan.redeem_code.trim()
+      if (!code) {
+        Alpine.store('notification').show('请输入兑换码', 'warning')
+        return
+      }
+
+      this.scan.processing = true
+      this.scan.result = null
+
+      try {
+        const res = await RedemptionAPI.fulfillByCode({ redeem_code: code })
+        const time = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
+
+        if (res.success) {
+          this.scan.result = { type: 'success', message: '核销成功', data: res.data }
+          this.scan.history.unshift({ code, status: 'success', time, data: res.data })
+          this.scan.redeem_code = ''
+          Alpine.store('notification').show('核销成功', 'success')
+          this.loadStats()
+        } else {
+          this.scan.result = { type: 'error', message: res.message }
+          this.scan.history.unshift({ code, status: 'failed', time, error: res.message })
+          Alpine.store('notification').show(res.message || '核销失败', 'error')
+        }
+      } catch (error) {
+        this.scan.result = { type: 'error', message: error.message }
+        Alpine.store('notification').show('核销失败：' + error.message, 'error')
+      } finally {
+        this.scan.processing = false
+      }
+    },
+
+    /**
+     * QR码扫码核销（扫描 RQRV1_... 格式QR码内容）
+     * POST /api/v4/shop/redemption/scan
+     */
+    async fulfillByScan() {
+      const qrContent = this.scan.qr_content.trim()
+      if (!qrContent) {
+        Alpine.store('notification').show('请输入QR码内容', 'warning')
+        return
+      }
+
+      this.scan.processing = true
+      this.scan.result = null
+
+      try {
+        const res = await RedemptionAPI.scanRedeem({ qr_content: qrContent })
+        const time = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
+        const displayCode = qrContent.substring(0, 20) + '...'
+
+        if (res.success) {
+          this.scan.result = { type: 'success', message: '扫码核销成功', data: res.data }
+          this.scan.history.unshift({ code: displayCode, status: 'success', time, data: res.data })
+          this.scan.qr_content = ''
+          Alpine.store('notification').show('扫码核销成功', 'success')
+          this.loadStats()
+        } else {
+          this.scan.result = { type: 'error', message: res.message }
+          this.scan.history.unshift({ code: displayCode, status: 'failed', time, error: res.message })
+          Alpine.store('notification').show(res.message || '扫码核销失败', 'error')
+        }
+      } catch (error) {
+        this.scan.result = { type: 'error', message: error.message }
+        Alpine.store('notification').show('扫码核销失败：' + error.message, 'error')
+      } finally {
+        this.scan.processing = false
+      }
     }
   }
 }

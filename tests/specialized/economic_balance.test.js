@@ -85,7 +85,6 @@ const POINTS_BUSINESS_TYPES = {
   /** 产出类型 */
   PRODUCTION: [
     'lottery_win', // 抽奖获得
-    'sign_in', // 签到奖励
     'consumption_review_approved', // 消费审核奖励
     'admin_adjust_add', // 管理员调增
     'bonus', // 活动奖励

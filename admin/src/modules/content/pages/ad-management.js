@@ -136,7 +136,7 @@ document.addEventListener('alpine:init', () => {
       diamond_balance: '钻石余额',
       diamond_rich: '钻石富豪',
       has_red_shard: '持有红水晶碎片',
-      market_trader: 'C2C交易者',
+      market_trader: '交易市场用户',
       new_user: '新用户',
       register_days: '注册天数',
       active_7d: '7天活跃'

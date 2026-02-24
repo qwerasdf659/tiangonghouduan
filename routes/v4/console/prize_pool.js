@@ -116,11 +116,12 @@ router.get(
   adminOpsAuthMiddleware, // P1只读API：允许admin和ops角色访问
   asyncHandler(async (req, res) => {
     try {
-      const { lottery_campaign_id, status } = req.query
+      const { lottery_campaign_id, status, merchant_id } = req.query
 
       const filters = {}
       if (lottery_campaign_id) filters.lottery_campaign_id = parseInt(lottery_campaign_id)
       if (status) filters.status = status
+      if (merchant_id) filters.merchant_id = parseInt(merchant_id)
 
       // 通过 ServiceManager 获取 PrizePoolService
       const PrizePoolService = req.app.locals.services.getService('prize_pool')

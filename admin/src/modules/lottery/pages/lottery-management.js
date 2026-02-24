@@ -323,6 +323,8 @@ function registerLotteryManagementComponents() {
               case 'campaigns':
                 await this.loadCampaigns()
                 await this.loadCampaignStats()
+                // 加载全局默认配置（用于活动编辑弹窗中的优先级可视化提示）
+                await this.loadGlobalDefaults()
                 break
               case 'prizes':
                 await this.loadPrizes()

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * 临时测试脚本 - 使用 Playwright 验证资产调账和C2C交易页面
+ * 临时测试脚本 - 使用 Playwright 验证资产调账和交易市场页面
  * 测试完成后删除
  */
 
@@ -102,7 +102,7 @@ async function testAssetAdjustmentPage(page) {
 }
 
 async function testTradeManagementPage(page) {
-  console.log('\n--- 测试C2C交易管理页面 ---')
+  console.log('\n--- 测试交易市场管理页面 ---')
   await page.goto(`${BASE_URL}/admin/trade-management.html`, { waitUntil: 'networkidle', timeout: 30000 })
   await page.waitForTimeout(3000)
   
@@ -116,7 +116,7 @@ async function testTradeManagementPage(page) {
   console.log(`  页面标题: ${pageTitle > 0 ? '✅ 存在' : '❌ 缺失'}`)
   
   // 检查Tab导航
-  const tabs = await page.locator('button:has-text("C2C交易订单"), button:has-text("上架统计")').count()
+  const tabs = await page.locator('button:has-text("交易市场订单"), button:has-text("上架统计")').count()
   console.log(`  Tab数量: ${tabs}`)
   
   // 检查统计卡片的值

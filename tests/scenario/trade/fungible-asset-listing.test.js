@@ -1,5 +1,5 @@
 /**
- * C2C 材料交易功能集成测试
+ * 交易市场材料交易功能集成测试
  *
  * 测试场景：
  * - 可叠加资产挂牌创建（createFungibleAssetListing）
@@ -25,7 +25,7 @@ let BalanceService
 // 测试数据库配置
 jest.setTimeout(30000)
 
-describe('C2C 材料交易功能集成测试', () => {
+describe('交易市场材料交易功能集成测试', () => {
   let testUser
   const testAssetCode = 'red_shard' // 测试资产代码
   let skipTests = false

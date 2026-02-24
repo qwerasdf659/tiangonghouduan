@@ -23,7 +23,7 @@
 
 'use strict'
 
-const { sequelize, Item, User } = require('../../../models')
+const { sequelize, Item, User, Account } = require('../../../models')
 const {
   createIsolatedTestContext,
   withTransactionRollback,
@@ -39,6 +39,8 @@ jest.setTimeout(60000)
 describe('🔬 事务隔离测试（Transaction Isolation）', () => {
   // 测试数据
   let testUser
+  /** items.owner_account_id 需要真实的 accounts.account_id（非 user_id） */
+  let testAccountId
 
   beforeAll(async () => {
     console.log('🔬 ===== 事务隔离测试启动 =====')
@@ -63,12 +65,33 @@ describe('🔬 事务隔离测试（Transaction Isolation）', () => {
       throw new Error('未找到测试用户 13612227930')
     }
 
-    console.log(`✅ 测试用户获取成功: user_id=${testUser.user_id}`)
+    // 获取用户的资产账户ID（items.owner_account_id 是 FK → accounts.account_id）
+    const account = await Account.findOne({
+      where: { user_id: testUser.user_id, account_type: 'user' }
+    })
+    if (!account) {
+      throw new Error('未找到测试用户的资产账户')
+    }
+    testAccountId = account.account_id
+
+    console.log(`✅ 测试用户获取成功: user_id=${testUser.user_id}, account_id=${testAccountId}`)
   })
 
   afterAll(async () => {
     console.log('🔬 ===== 事务隔离测试结束 =====')
   })
+
+  /** 生成测试物品必填字段（tracking_code + item_name + source） */
+  let _txTestSeq = 0
+  function txItemFields(nameSuffix) {
+    _txTestSeq++
+    const ts = Date.now()
+    return {
+      tracking_code: `TS${ts.toString().slice(-8)}${String(_txTestSeq).padStart(4, '0')}`,
+      item_name: nameSuffix || `事务测试物品_${ts}`,
+      source: 'test'
+    }
+  }
 
   // ========== 方式1：使用 createTestTransactionManager ==========
   describe('📦 方式1：createTestTransactionManager', () => {
@@ -86,7 +109,8 @@ describe('🔬 事务隔离测试（Transaction Isolation）', () => {
       // 在事务内创建测试物品
       const testItem = await Item.create(
         {
-          owner_account_id: testUser.user_id,
+          ...txItemFields('事务隔离测试物品'),
+          owner_account_id: testAccountId,
           item_template_id: null,
           item_type: 'tradable_item',
           status: 'available',
@@ -135,7 +159,8 @@ describe('🔬 事务隔离测试（Transaction Isolation）', () => {
           // 在事务内创建测试物品
           const testItem = await Item.create(
             {
-              owner_account_id: testUser.user_id,
+              ...txItemFields('withTransactionRollback测试'),
+              owner_account_id: testAccountId,
               item_template_id: null,
               item_type: 'tradable_item',
               status: 'available',
@@ -169,7 +194,8 @@ describe('🔬 事务隔离测试（Transaction Isolation）', () => {
         await withTransactionRollback(async transaction => {
           const testItem = await Item.create(
             {
-              owner_account_id: testUser.user_id,
+              ...txItemFields('断言失败测试'),
+              owner_account_id: testAccountId,
               item_template_id: null,
               item_type: 'tradable_item',
               status: 'available',
@@ -211,7 +237,8 @@ describe('🔬 事务隔离测试（Transaction Isolation）', () => {
         // 在事务内创建数据
         const testItem = await Item.create(
           {
-            owner_account_id: testUser.user_id,
+            ...txItemFields('手动管理测试'),
+            owner_account_id: testAccountId,
             item_template_id: null,
             item_type: 'tradable_item',
             status: 'available',
@@ -248,7 +275,8 @@ describe('🔬 事务隔离测试（Transaction Isolation）', () => {
             tx =>
               Item.create(
                 {
-                  owner_account_id: testUser.user_id,
+                  ...txItemFields('批量创建测试1'),
+                  owner_account_id: testAccountId,
                   item_template_id: null,
                   item_type: 'tradable_item',
                   status: 'available',
@@ -259,7 +287,8 @@ describe('🔬 事务隔离测试（Transaction Isolation）', () => {
             tx =>
               Item.create(
                 {
-                  owner_account_id: testUser.user_id,
+                  ...txItemFields('批量创建测试2'),
+                  owner_account_id: testAccountId,
                   item_template_id: null,
                   item_type: 'tradable_item',
                   status: 'available',
@@ -285,7 +314,8 @@ describe('🔬 事务隔离测试（Transaction Isolation）', () => {
           // 创建测试数据
           const testItem = await Item.create(
             {
-              owner_account_id: testUser.user_id,
+              ...txItemFields('验证测试物品'),
+              owner_account_id: testAccountId,
               item_template_id: null,
               item_type: 'tradable_item',
               status: 'available',
@@ -331,7 +361,8 @@ describe('🔬 事务隔离测试（Transaction Isolation）', () => {
         // 在事务1中创建数据
         const item1 = await Item.create(
           {
-            owner_account_id: testUser.user_id,
+            ...txItemFields('隔离测试-事务1'),
+            owner_account_id: testAccountId,
             item_template_id: null,
             item_type: 'tradable_item',
             status: 'available',

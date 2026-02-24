@@ -99,6 +99,7 @@ describe('P1-1 余额边界测试', () => {
             asset_code: TEST_ASSET_CODE,
             delta_amount: exact_amount,
             business_type: 'test_charge',
+            counterpart_account_id: 2,
             idempotency_key: charge_key
           },
           { transaction }
@@ -120,6 +121,7 @@ describe('P1-1 余额边界测试', () => {
             asset_code: TEST_ASSET_CODE,
             delta_amount: -exact_amount,
             business_type: 'test_deduct',
+            counterpart_account_id: 2,
             idempotency_key: deduct_key
           },
           { transaction }
@@ -177,6 +179,7 @@ describe('P1-1 余额边界测试', () => {
               asset_code: TEST_ASSET_CODE,
               delta_amount: -initial_balance.available_amount,
               business_type: 'test_clear',
+              counterpart_account_id: 2,
               idempotency_key: clear_key
             },
             { transaction }
@@ -201,6 +204,7 @@ describe('P1-1 余额边界测试', () => {
               asset_code: TEST_ASSET_CODE,
               delta_amount: -100,
               business_type: 'test_deduct',
+              counterpart_account_id: 2,
               idempotency_key: deduct_key
             },
             { transaction }
@@ -247,6 +251,7 @@ describe('P1-1 余额边界测试', () => {
             asset_code: TEST_ASSET_CODE,
             delta_amount: add_amount,
             business_type: 'test_add',
+            counterpart_account_id: 2,
             idempotency_key: add_key
           },
           { transaction }
@@ -304,13 +309,14 @@ describe('P1-1 余额边界测试', () => {
             asset_code: TEST_ASSET_CODE,
             delta_amount: large_amount,
             business_type: 'test_large_add',
+            counterpart_account_id: 2,
             idempotency_key: add_key
           },
           { transaction }
         )
 
-        // 4. 验证数值精确
-        const expected_balance = initial_balance.available_amount + large_amount
+        // 4. 验证数值精确（BIGINT 返回字符串，必须显式转为数字）
+        const expected_balance = Number(initial_balance.available_amount) + large_amount
         expect(Number(add_result.balance.available_amount)).toBe(expected_balance)
 
         console.log('✅ 1亿级增加测试通过', {
@@ -352,6 +358,7 @@ describe('P1-1 余额边界测试', () => {
             asset_code: TEST_ASSET_CODE,
             delta_amount: large_amount,
             business_type: 'test_large_charge',
+            counterpart_account_id: 2,
             idempotency_key: charge_key
           },
           { transaction }
@@ -371,6 +378,7 @@ describe('P1-1 余额边界测试', () => {
             asset_code: TEST_ASSET_CODE,
             delta_amount: -large_amount,
             business_type: 'test_large_deduct',
+            counterpart_account_id: 2,
             idempotency_key: deduct_key
           },
           { transaction }
@@ -410,8 +418,12 @@ describe('P1-1 余额边界测试', () => {
       const transaction = await sequelize.transaction()
 
       try {
-        // 1. 测试较大但安全的数值（10亿）
-        const safe_large = 1000000000 // 10亿
+        /*
+         * 1. 测试接近安全上限但不超出的数值
+         *    BalanceService.BALANCE_SAFETY_LIMIT = 10亿，单笔和变动后余额都不能超过
+         *    所以使用一个低于上限的值，考虑到用户已有余额
+         */
+        const safe_large = 500000000 // 5亿（留出余量，确保变动后余额不超过10亿上限）
         const add_key = generateIdempotencyKey('add_bigint')
 
         const add_result = await BalanceService.changeBalance(
@@ -420,6 +432,7 @@ describe('P1-1 余额边界测试', () => {
             asset_code: TEST_ASSET_CODE,
             delta_amount: safe_large,
             business_type: 'test_bigint_add',
+            counterpart_account_id: 2,
             idempotency_key: add_key
           },
           { transaction }
@@ -436,6 +449,7 @@ describe('P1-1 余额边界测试', () => {
             asset_code: TEST_ASSET_CODE,
             delta_amount: -safe_large,
             business_type: 'test_bigint_deduct',
+            counterpart_account_id: 2,
             idempotency_key: deduct_key
           },
           { transaction }
@@ -476,9 +490,9 @@ describe('P1-1 余额边界测试', () => {
           { transaction }
         )
 
-        // 2. 连续执行10次大额操作
-        const operation_amount = 10000000 // 1千万
-        let expected_balance = initial_balance.available_amount
+        // 2. 连续执行10次大额操作（每次5千万，总计5亿，低于10亿安全上限）
+        const operation_amount = 50000000 // 5千万
+        let expected_balance = Number(initial_balance.available_amount)
 
         for (let i = 0; i < 10; i++) {
           const key = generateIdempotencyKey(`consecutive_${i}`)
@@ -488,6 +502,7 @@ describe('P1-1 余额边界测试', () => {
               asset_code: TEST_ASSET_CODE,
               delta_amount: operation_amount,
               business_type: 'test_consecutive',
+              counterpart_account_id: 2,
               idempotency_key: key
             },
             { transaction }
@@ -501,7 +516,7 @@ describe('P1-1 余额边界测试', () => {
           { transaction }
         )
 
-        expect(final_balance.available_amount).toBe(expected_balance)
+        expect(Number(final_balance.available_amount)).toBe(expected_balance)
 
         console.log('✅ 连续大额操作精度测试通过', {
           operations: 10,
@@ -547,6 +562,7 @@ describe('P1-1 余额边界测试', () => {
             asset_code: TEST_ASSET_CODE,
             delta_amount: charge_amount,
             business_type: 'test_charge',
+            counterpart_account_id: 2,
             idempotency_key: charge_key
           },
           { transaction }
@@ -569,6 +585,7 @@ describe('P1-1 余额边界测试', () => {
               asset_code: TEST_ASSET_CODE,
               delta_amount: -overdraft_amount,
               business_type: 'test_overdraft',
+              counterpart_account_id: 2,
               idempotency_key: deduct_key
             },
             { transaction }
@@ -618,6 +635,7 @@ describe('P1-1 余额边界测试', () => {
             asset_code: TEST_ASSET_CODE,
             delta_amount: charge_amount,
             business_type: 'test_charge',
+            counterpart_account_id: 2,
             idempotency_key: charge_key
           },
           { transaction }
@@ -639,13 +657,14 @@ describe('P1-1 余额边界测试', () => {
             asset_code: TEST_ASSET_CODE,
             delta_amount: negative_delta,
             business_type: 'test_negative_delta',
+            counterpart_account_id: 2,
             idempotency_key: negative_key
           },
           { transaction }
         )
 
-        // 4. 验证余额减少
-        const expected = balance_after_charge.available_amount + negative_delta
+        // 4. 验证余额减少（BIGINT 返回字符串，必须显式转为数字）
+        const expected = Number(balance_after_charge.available_amount) + negative_delta
         expect(Number(result.balance.available_amount)).toBe(expected)
 
         console.log('✅ 负数delta测试通过', {
@@ -718,7 +737,7 @@ describe('P1-1 余额边界测试', () => {
           { transaction }
         )
 
-        expect(final_balance.available_amount).toBeGreaterThanOrEqual(0)
+        expect(Number(final_balance.available_amount)).toBeGreaterThanOrEqual(0)
 
         console.log('✅ 余额非负测试通过', {
           final_balance: final_balance.available_amount
@@ -756,6 +775,7 @@ describe('P1-1 余额边界测试', () => {
               asset_code: TEST_ASSET_CODE,
               delta_amount: 0,
               business_type: 'test_zero',
+              counterpart_account_id: 2,
               idempotency_key: zero_key
             },
             { transaction }
@@ -806,7 +826,7 @@ describe('P1-1 余额边界测试', () => {
           { user_id: test_user_id, asset_code: TEST_ASSET_CODE },
           { transaction }
         )
-        running_total = initial_balance.available_amount
+        running_total = Number(initial_balance.available_amount)
 
         for (const amount of test_amounts) {
           const key = generateIdempotencyKey(`integer_${amount}`)
@@ -816,6 +836,7 @@ describe('P1-1 余额边界测试', () => {
               asset_code: TEST_ASSET_CODE,
               delta_amount: amount,
               business_type: 'test_integer',
+              counterpart_account_id: 2,
               idempotency_key: key
             },
             { transaction }
@@ -832,8 +853,8 @@ describe('P1-1 余额边界测试', () => {
         )
 
         const expected_total =
-          initial_balance.available_amount + test_amounts.reduce((a, b) => a + b, 0)
-        expect(final_balance.available_amount).toBe(expected_total)
+          Number(initial_balance.available_amount) + test_amounts.reduce((a, b) => a + b, 0)
+        expect(Number(final_balance.available_amount)).toBe(expected_total)
 
         console.log('✅ 整数精度测试通过', {
           operations: test_amounts.length,
@@ -881,6 +902,7 @@ describe('P1-1 余额边界测试', () => {
             asset_code: TEST_ASSET_CODE,
             delta_amount: decimal_amount,
             business_type: 'test_decimal',
+            counterpart_account_id: 2,
             idempotency_key: key
           },
           { transaction }
@@ -940,7 +962,7 @@ describe('P1-1 余额边界测试', () => {
           { delta: -666666, expected_change: -666666 }
         ]
 
-        let running_balance = initial_balance.available_amount
+        let running_balance = Number(initial_balance.available_amount)
 
         for (const op of operations) {
           const key = generateIdempotencyKey(`precision_${Math.abs(op.delta)}`)
@@ -952,6 +974,7 @@ describe('P1-1 余额边界测试', () => {
                 asset_code: TEST_ASSET_CODE,
                 delta_amount: op.delta,
                 business_type: 'test_precision',
+                counterpart_account_id: 2,
                 idempotency_key: key
               },
               { transaction }
@@ -1007,6 +1030,7 @@ describe('P1-1 余额边界测试', () => {
             asset_code: TEST_ASSET_CODE,
             delta_amount: delta,
             business_type: 'test_flow',
+            counterpart_account_id: 2,
             idempotency_key: key
           },
           { transaction }
@@ -1072,6 +1096,7 @@ describe('P1-1 余额边界测试', () => {
             asset_code: TEST_ASSET_CODE,
             delta_amount: amount,
             business_type: 'test_idempotency',
+            counterpart_account_id: 2,
             idempotency_key: fixed_key
           },
           { transaction }
@@ -1087,6 +1112,7 @@ describe('P1-1 余额边界测试', () => {
             asset_code: TEST_ASSET_CODE,
             delta_amount: amount,
             business_type: 'test_idempotency',
+            counterpart_account_id: 2,
             idempotency_key: fixed_key
           },
           { transaction }

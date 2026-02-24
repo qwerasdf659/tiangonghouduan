@@ -141,6 +141,7 @@ class MarketListingQueryService {
    * @param {string} [params.item_category_code] - 物品类目代码筛选
    * @param {string} [params.asset_group_code] - 资产分组代码筛选
    * @param {string} [params.rarity_code] - 稀有度代码筛选
+   * @param {number} [params.merchant_id] - 商家ID筛选（通过关联物品的 merchant_id 过滤）
    * @param {number} [params.min_price] - 最低价格筛选
    * @param {number} [params.max_price] - 最高价格筛选
    * @param {string} [params.sort='newest'] - 排序方式
@@ -155,6 +156,7 @@ class MarketListingQueryService {
       item_category_code,
       asset_group_code,
       rarity_code,
+      merchant_id,
       min_price,
       max_price,
       sort = 'newest'
@@ -169,6 +171,7 @@ class MarketListingQueryService {
       item_category_code: item_category_code || 'all',
       asset_group_code: asset_group_code || 'all',
       rarity_code: rarity_code || 'all',
+      merchant_id: merchant_id || 'all',
       min_price: min_price || 0,
       max_price: max_price || 0,
       sort
@@ -234,6 +237,15 @@ class MarketListingQueryService {
     }
 
     // 构建关联查询
+    const offerItemInclude = {
+      model: Item,
+      as: 'offerItem',
+      required: !!merchant_id
+    }
+    if (merchant_id) {
+      offerItemInclude.where = { merchant_id: Number(merchant_id) }
+    }
+
     const include = [
       {
         model: User,
@@ -241,11 +253,7 @@ class MarketListingQueryService {
         attributes: ['user_id', 'nickname', 'avatar_url'],
         required: false
       },
-      {
-        model: Item,
-        as: 'offerItem',
-        required: false
-      },
+      offerItemInclude,
       {
         /** 直接关联物品模板（通过 offer_item_template_id 快照字段） */
         model: ItemTemplate,

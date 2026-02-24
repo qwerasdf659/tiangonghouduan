@@ -117,16 +117,16 @@ const CANONICAL_OPERATION_MAP = {
   // ===== 汇率兑换（2026-02-23 市场增强） =====
   '/api/v4/market/exchange-rates/convert': 'EXCHANGE_RATE_CONVERT', // 执行汇率兑换
 
-  // ===== C2C 市场交易 - 物品 =====
+  // ===== 交易市场 - 物品 =====
   '/api/v4/market/list': 'MARKET_CREATE_LISTING', // 物品上架
   '/api/v4/market/listings/:id/purchase': 'MARKET_PURCHASE_LISTING', // 购买物品
   '/api/v4/market/listings/:id/withdraw': 'MARKET_CANCEL_LISTING', // 撤回物品
 
-  // ===== C2C 市场交易 - 担保码确认（Phase 4） =====
+  // ===== 交易市场 - 担保码确认（Phase 4） =====
   '/api/v4/market/trade-orders/:id/confirm-delivery': 'MARKET_ESCROW_CONFIRM', // 担保码确认收货
   '/api/v4/market/trade-orders/:id/cancel': 'MARKET_ESCROW_CANCEL', // 担保码交易取消
 
-  // ===== C2C 市场交易 - 可叠加资产（材料） =====
+  // ===== 交易市场 - 可叠加资产（材料） =====
   '/api/v4/market/fungible-assets/list': 'MARKET_CREATE_FUNGIBLE_LISTING', // 材料上架
   '/api/v4/market/fungible-assets/:id/purchase': 'MARKET_PURCHASE_FUNGIBLE', // 购买材料
   '/api/v4/market/fungible-assets/:id/withdraw': 'MARKET_CANCEL_FUNGIBLE_LISTING', // 材料撤回

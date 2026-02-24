@@ -187,6 +187,7 @@ describe('交易市场跨用户交互场景测试（P0-2 系列）', () => {
         asset_code,
         delta_amount: amount,
         business_type: 'test_grant',
+        counterpart_account_id: 2,
         idempotency_key: generateIdempotencyKey(`grant_${user_id}_${asset_code}`)
       },
       options

@@ -441,7 +441,6 @@ class AdminSystemService {
     maintenance_end_time: '维护结束时间',
 
     // ===== 积分设置 (points) =====
-    sign_in_points: '签到积分',
     lottery_cost_points: '抽奖消耗积分',
     points_expire_days: '积分过期天数',
     initial_points: '新用户初始积分',

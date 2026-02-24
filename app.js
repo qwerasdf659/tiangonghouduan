@@ -240,6 +240,10 @@ app.use((req, res, next) => {
   next()
 })
 
+// 🔧 维护模式拦截中间件 — 管理员开启维护模式后，用户端 API 返回 503
+const { createMaintenanceMiddleware } = require('./middleware/maintenanceMode')
+app.use(createMaintenanceMiddleware())
+
 /*
  * 🔧 全局API超时保护中间件（30秒）
  * 功能：防止长时间无响应的请求占用连接资源

@@ -26,7 +26,7 @@
     <!-- 页面横幅 -->
     <div class="page-banner mb-6">
       <h1>💱 交易管理</h1>
-      <p>C2C交易订单监控、市场上架管理、核销记录追溯</p>
+      <p>交易市场订单监控、市场上架管理、核销记录追溯</p>
     </div>
 
     <!-- Tab导航（增强样式） -->
@@ -41,7 +41,7 @@
       </template>
     </div>
 
-    <!-- ==================== C2C交易订单 Tab ==================== -->
+    <!-- ==================== 交易市场订单 Tab ==================== -->
     <div x-show="current_page === 'trade-orders'">
 
     <!-- 统计卡片（渐变样式） -->
@@ -126,7 +126,7 @@
       </div>
     </div>
 
-    </div><!-- End of C2C交易订单 Tab -->
+    </div><!-- End of 交易市场订单 Tab -->
 
     <!-- ==================== 上架统计 Tab ==================== -->
     <div x-show="current_page === 'marketplace-stats'">
@@ -253,9 +253,124 @@
 
     </div><!-- End of 上架统计 Tab -->
 
+    <!-- ==================== 市场概览 Tab ==================== -->
+    <div x-show="current_page === 'market-overview'">
+
+      <!-- 加载状态 -->
+      <div x-show="marketOverviewLoading" class="text-center py-12">
+        <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+        <p class="mt-2 themed-text-muted">加载市场概览数据...</p>
+      </div>
+
+      <div x-show="!marketOverviewLoading">
+        <!-- 核心指标卡片 -->
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+          <div class="gradient-stat-card gradient-stat-blue">
+            <div class="stat-icon">📊</div>
+            <div class="stat-value" x-text="marketOverview.total_orders">0</div>
+            <div class="stat-label">总订单数</div>
+          </div>
+          <div class="gradient-stat-card gradient-stat-green">
+            <div class="stat-icon">✅</div>
+            <div class="stat-value" x-text="marketOverview.completed_orders">0</div>
+            <div class="stat-label">已完成订单</div>
+          </div>
+          <div class="gradient-stat-card gradient-stat-orange">
+            <div class="stat-icon">💰</div>
+            <div class="stat-value" x-text="formatNumber(marketOverview.total_volume)">0</div>
+            <div class="stat-label">总成交额</div>
+          </div>
+          <div class="gradient-stat-card gradient-stat-rose">
+            <div class="stat-icon">💎</div>
+            <div class="stat-value" x-text="formatNumber(marketOverview.total_fees)">0</div>
+            <div class="stat-label">总手续费</div>
+          </div>
+          <div class="gradient-stat-card gradient-stat-purple" style="background: linear-gradient(135deg, #7C3AED 0%, #A855F7 100%);">
+            <div class="stat-icon">👥</div>
+            <div class="stat-value" x-text="marketOverview.active_listings">0</div>
+            <div class="stat-label">活跃卖家数</div>
+          </div>
+        </div>
+
+        <!-- 订单状态分布 -->
+        <div class="themed-card rounded-lg shadow mb-6">
+          <div class="p-4 border-b">
+            <h5 class="font-semibold">📈 订单状态分布</h5>
+          </div>
+          <div class="p-6">
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-4"
+                 x-show="Object.keys(marketOverview.by_status).length > 0">
+              <template x-for="[status, info] in Object.entries(marketOverview.by_status)" :key="status">
+                <div class="text-center p-4 themed-bg-base rounded-lg">
+                  <div class="text-2xl font-bold themed-text-primary" x-text="info.count || 0"></div>
+                  <div class="text-sm themed-text-muted mt-1" x-text="info.display_name || status"></div>
+                </div>
+              </template>
+            </div>
+            <div x-show="Object.keys(marketOverview.by_status).length === 0"
+                 class="text-center py-8 themed-text-muted">
+              暂无订单状态数据
+            </div>
+          </div>
+        </div>
+
+        <!-- 市场健康指标 -->
+        <div class="themed-card rounded-lg shadow">
+          <div class="p-4 border-b">
+            <h5 class="font-semibold">🏥 市场健康指标</h5>
+          </div>
+          <div class="p-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div class="p-4 themed-bg-base rounded-lg">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="text-sm font-medium themed-text-secondary">成交转化率</span>
+                  <span class="text-lg font-bold themed-text-primary"
+                        x-text="marketOverview.total_orders > 0
+                          ? (marketOverview.completed_orders / marketOverview.total_orders * 100).toFixed(1) + '%'
+                          : '0%'">0%</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2">
+                  <div class="bg-green-500 h-2 rounded-full transition-all"
+                       :style="'width:' + (marketOverview.total_orders > 0 ? (marketOverview.completed_orders / marketOverview.total_orders * 100) : 0) + '%'"></div>
+                </div>
+              </div>
+              <div class="p-4 themed-bg-base rounded-lg">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="text-sm font-medium themed-text-secondary">平均订单金额</span>
+                  <span class="text-lg font-bold themed-text-primary"
+                        x-text="marketOverview.completed_orders > 0
+                          ? formatNumber(Math.round(marketOverview.total_volume / marketOverview.completed_orders))
+                          : '0'">0</span>
+                </div>
+                <p class="text-xs themed-text-muted">基于已完成订单计算</p>
+              </div>
+              <div class="p-4 themed-bg-base rounded-lg">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="text-sm font-medium themed-text-secondary">平均手续费率</span>
+                  <span class="text-lg font-bold themed-text-primary"
+                        x-text="marketOverview.total_volume > 0
+                          ? (marketOverview.total_fees / marketOverview.total_volume * 100).toFixed(2) + '%'
+                          : '0%'">0%</span>
+                </div>
+                <p class="text-xs themed-text-muted">手续费 / 总成交额</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 操作区 -->
+        <div class="mt-4 text-right">
+          <button @click="loadMarketOverview()" class="px-4 py-2 themed-btn-primary rounded-lg text-sm">
+            🔄 刷新数据
+          </button>
+        </div>
+      </div>
+
+    </div><!-- End of 市场概览 Tab -->
+
   </div>
 
-  <!-- C2C交易订单详情 Modal (新架构) -->
+  <!-- 交易市场订单详情 Modal (新架构) -->
   <div x-ref="tradeDetailModal" 
        x-show="isModalOpen('tradeDetailModal')" 
        x-cloak
@@ -264,7 +379,7 @@
     <div class="fixed inset-0 bg-black/50" @click="hideModal('tradeDetailModal')"></div>
     <div class="relative themed-card rounded-lg shadow-xl w-full max-w-lg mx-4 z-10">
       <div class="p-4 border-b flex justify-between items-center">
-        <h5 class="font-semibold">📋 C2C交易订单详情</h5>
+        <h5 class="font-semibold">📋 交易市场订单详情</h5>
         <button @click="hideModal('tradeDetailModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
       </div>
       <div class="p-6 space-y-3" x-show="selectedTradeOrder">

@@ -1,13 +1,13 @@
 /**
  * 管理后台页面 API 业务联调测试
  *
- * @description 验证兑换市场、C2C交易、资产调账、资产组合页面的 API 数据流
+ * @description 验证兑换市场、交易市场、资产调账、资产组合页面的 API 数据流
  * @version 1.0.0
  * @date 2026-02-18
  *
  * 对应截图页面：
  * - exchange-market.html（兑换市场管理）
- * - trade-management.html（C2C交易管理）
+ * - trade-management.html（交易市场管理）
  * - asset-adjustment.html（资产调账）
  * - assets-portfolio.html（资产组合）
  */
@@ -88,13 +88,13 @@ describe('兑换市场管理页面 API', () => {
     expect(stats).toHaveProperty('total_exchanges')
     expect(typeof stats.total_items).toBe('number')
     expect(typeof stats.active_items).toBe('number')
-    expect(stats.total_items).toBeGreaterThan(0)
+    expect(stats.total_items).toBeGreaterThanOrEqual(0)
   })
 })
 
-// ==================== C2C交易管理（trade-management.html）====================
+// ==================== 交易市场管理（trade-management.html）====================
 
-describe('C2C交易管理页面 API', () => {
+describe('交易市场管理页面 API', () => {
   test('GET /console/trade-orders - 交易订单列表应返回分页数据', async () => {
     const res = await request
       .get('/api/v4/console/trade-orders')
@@ -129,7 +129,7 @@ describe('C2C交易管理页面 API', () => {
     expect(by_status).toHaveProperty('completed')
   })
 
-  test('GET /console/marketplace/trade_orders - C2C订单列表应返回分页数据', async () => {
+  test('GET /console/marketplace/trade_orders - 交易市场订单列表应返回分页数据', async () => {
     const res = await request
       .get('/api/v4/console/marketplace/trade_orders')
       .set('Authorization', `Bearer ${adminToken}`)

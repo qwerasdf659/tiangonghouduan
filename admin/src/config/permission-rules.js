@@ -77,7 +77,7 @@ export const MENU_ACCESS_RULES = {
   'asset-trade.asset-adj': { minLevel: 30, description: '资产调整' },
   'asset-trade.orphan-frozen': { minLevel: 30, description: '孤儿冻结清理' },
   'asset-trade.exchange': { minLevel: 30, description: '兑换市场' },
-  'asset-trade.trade': { minLevel: 30, description: 'C2C交易' },
+  'asset-trade.trade': { minLevel: 30, description: '交易市场' },
 
   // ========== 用户门店（role_level >= 30） ==========
   users: { minLevel: 30, description: '用户门店（分组）' },

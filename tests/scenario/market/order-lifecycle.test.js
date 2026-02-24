@@ -37,6 +37,7 @@
 const {
   sequelize,
   User,
+  Account,
   MarketListing,
   Item,
   TradeOrder,
@@ -58,6 +59,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
   let testSeller
   let testBuyer
   let testItemTemplate
+  let buyerAccountId
   let createdListings = []
   let createdItems = []
   let createdOrders = []
@@ -77,14 +79,25 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
    * @param {Object} options - 选项
    * @returns {Promise<Object>} 物品实例
    */
-  async function createTestItem(owner_account_id, options = {}) {
+  async function createTestItem(user_id, options = {}) {
+    const ts = Date.now()
+    const itemName = `生命周期测试物品_${ts}`
+
+    const account = await Account.findOne({
+      where: { user_id, account_type: 'user' }
+    })
+    if (!account) throw new Error(`用户 ${user_id} 没有对应的资产账户`)
+
     const item_data = {
-      owner_account_id,
+      tracking_code: `TS${ts.toString().slice(-10)}${Math.random().toString(36).slice(2, 4)}`,
+      owner_account_id: account.account_id,
       item_template_id: testItemTemplate?.item_template_id || null,
       item_type: 'tradable_item',
+      item_name: itemName,
+      source: 'test',
       status: options.status || 'available',
       meta: options.meta || {
-        name: `生命周期测试物品_${Date.now()}`,
+        name: itemName,
         description: '订单生命周期测试用物品'
       }
     }
@@ -124,7 +137,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
       listing = listing_result.listing
       createdListings.push(listing.market_listing_id)
     } catch (error) {
-      await listing_tx.rollback()
+      if (!listing_tx.finished) await listing_tx.rollback()
       throw error
     }
 
@@ -145,6 +158,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
           asset_code: 'DIAMOND',
           delta_amount: amount,
           business_type: 'test_grant',
+          counterpart_account_id: 2,
           idempotency_key: generateIdempotencyKey('grant')
         },
         { transaction: grant_tx }
@@ -208,9 +222,18 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
       })
     }
 
+    // 解析买家账户ID（items.owner_account_id 是 accounts.account_id）
+    if (testBuyer) {
+      const buyerAcc = await Account.findOne({
+        where: { user_id: testBuyer.user_id, account_type: 'user' }
+      })
+      buyerAccountId = buyerAcc ? Number(buyerAcc.account_id) : null
+    }
+
     console.log('✅ 测试用户准备完成', {
       seller_id: testSeller.user_id,
-      buyer_id: testBuyer?.user_id || '未找到'
+      buyer_id: testBuyer?.user_id || '未找到',
+      buyer_account_id: buyerAccountId
     })
   })
 
@@ -296,7 +319,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
           await order_tx.commit()
           createdOrders.push(order_result.trade_order_id)
         } catch (error) {
-          await order_tx.rollback()
+          if (!order_tx.finished) await order_tx.rollback()
           throw error
         }
 
@@ -353,7 +376,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
           order_id = order_result.trade_order_id
           createdOrders.push(order_id)
         } catch (error) {
-          await order_tx.rollback()
+          if (!order_tx.finished) await order_tx.rollback()
           throw error
         }
 
@@ -381,7 +404,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
           )
           await complete_tx.commit()
         } catch (error) {
-          await complete_tx.rollback()
+          if (!complete_tx.finished) await complete_tx.rollback()
           throw error
         }
 
@@ -396,8 +419,8 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
 
         // 7. 验证物品所有权转移
         const transferred_item = await Item.findByPk(item.item_id)
-        expect(transferred_item.owner_account_id).toBe(testBuyer.user_id)
-        expect(transferred_item.status).toBe('transferred')
+        expect(Number(transferred_item.owner_account_id)).toBe(buyerAccountId)
+        expect(transferred_item.status).toBe('available')
 
         // 8. 验证卖家收到款项
         const seller_balance_after = await BalanceService.getBalance({
@@ -445,7 +468,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
           order_id = order_result.trade_order_id
           createdOrders.push(order_id)
         } catch (error) {
-          await order_tx.rollback()
+          if (!order_tx.finished) await order_tx.rollback()
           throw error
         }
 
@@ -472,7 +495,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
           )
           await cancel_tx.commit()
         } catch (error) {
-          await cancel_tx.rollback()
+          if (!cancel_tx.finished) await cancel_tx.rollback()
           throw error
         }
 
@@ -607,14 +630,14 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
             },
             { transaction: order_tx }
           )
-          await order_tx.rollback()
+          if (!order_tx.finished) await order_tx.rollback()
           tx_committed = true
           throw new Error('测试失败：应因余额不足而拒绝')
         } catch (error) {
           // 事务可能已被服务层回滚，安全地尝试回滚
           if (!tx_committed && !order_tx.finished) {
             try {
-              await order_tx.rollback()
+              if (!order_tx.finished) await order_tx.rollback()
             } catch (_rollbackError) {
               // 忽略回滚错误
             }
@@ -751,7 +774,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
           order_id = result.trade_order_id
           createdOrders.push(order_id)
         } catch (error) {
-          await order_tx.rollback()
+          if (!order_tx.finished) await order_tx.rollback()
           throw error
         }
 
@@ -764,7 +787,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
           await complete_tx.commit()
           console.log('✅ 第一个订单完成')
         } catch (error) {
-          await complete_tx.rollback()
+          if (!complete_tx.finished) await complete_tx.rollback()
           throw error
         }
 
@@ -816,10 +839,10 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
             },
             { transaction: order_tx }
           )
-          await order_tx.rollback()
+          if (!order_tx.finished) await order_tx.rollback()
           throw new Error('测试失败：应拒绝自购行为')
         } catch (error) {
-          await order_tx.rollback()
+          if (!order_tx.finished) await order_tx.rollback()
           if (error.message.includes('测试失败')) {
             throw error
           }
@@ -858,7 +881,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
           order_id = result.trade_order_id
           createdOrders.push(order_id)
         } catch (error) {
-          await order_tx.rollback()
+          if (!order_tx.finished) await order_tx.rollback()
           throw error
         }
 
@@ -871,7 +894,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
           )
           await cancel_tx.commit()
         } catch (error) {
-          await cancel_tx.rollback()
+          if (!cancel_tx.finished) await cancel_tx.rollback()
           throw error
         }
 
@@ -882,10 +905,10 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
             { trade_order_id: order_id, buyer_id: testBuyer.user_id },
             { transaction: complete_tx }
           )
-          await complete_tx.rollback()
+          if (!complete_tx.finished) await complete_tx.rollback()
           throw new Error('测试失败：应拒绝完成已取消订单')
         } catch (error) {
-          await complete_tx.rollback()
+          if (!complete_tx.finished) await complete_tx.rollback()
           if (error.message.includes('测试失败')) {
             throw error
           }
@@ -924,7 +947,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
           order_id = result.trade_order_id
           createdOrders.push(order_id)
         } catch (error) {
-          await order_tx.rollback()
+          if (!order_tx.finished) await order_tx.rollback()
           throw error
         }
 
@@ -937,7 +960,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
           )
           await complete_tx.commit()
         } catch (error) {
-          await complete_tx.rollback()
+          if (!complete_tx.finished) await complete_tx.rollback()
           throw error
         }
 
@@ -948,10 +971,10 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
             { trade_order_id: order_id, cancel_reason: '测试取消' },
             { transaction: cancel_tx }
           )
-          await cancel_tx.rollback()
+          if (!cancel_tx.finished) await cancel_tx.rollback()
           throw new Error('测试失败：应拒绝取消已完成订单')
         } catch (error) {
-          await cancel_tx.rollback()
+          if (!cancel_tx.finished) await cancel_tx.rollback()
           if (error.message.includes('测试失败')) {
             throw error
           }
@@ -975,10 +998,10 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
             { trade_order_id: fake_order_id, buyer_id: testSeller.user_id },
             { transaction: complete_tx }
           )
-          await complete_tx.rollback()
+          if (!complete_tx.finished) await complete_tx.rollback()
           throw new Error('测试失败：应拒绝操作不存在的订单')
         } catch (error) {
-          await complete_tx.rollback()
+          if (!complete_tx.finished) await complete_tx.rollback()
           if (error.message.includes('测试失败')) {
             throw error
           }
@@ -1027,7 +1050,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
         order_id = result.trade_order_id
         createdOrders.push(order_id)
       } catch (error) {
-        await order_tx.rollback()
+        if (!order_tx.finished) await order_tx.rollback()
         throw error
       }
 
@@ -1049,7 +1072,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
         )
         await complete_tx.commit()
       } catch (error) {
-        await complete_tx.rollback()
+        if (!complete_tx.finished) await complete_tx.rollback()
         throw error
       }
 
@@ -1060,7 +1083,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
 
       expect(final_order.status).toBe('completed')
       expect(final_listing.status).toBe('sold')
-      expect(final_item.owner_account_id).toBe(testBuyer.user_id)
+      expect(Number(final_item.owner_account_id)).toBe(buyerAccountId)
 
       console.log('Step 5-6: 订单完成，最终状态验证通过')
       console.log({

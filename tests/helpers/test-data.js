@@ -146,7 +146,7 @@ const TEST_DATA = {
     // 标准积分量
     standard: {
       lottery: 100, // 抽奖获得的标准积分
-      daily: 10, // 每日签到积分
+      consumption_reward: 50, // 消费审核奖励积分
       share: 5, // 分享奖励积分
       purchase: 50 // 购买奖励积分
       /*

@@ -5,7 +5,7 @@
  *
  * 业务场景：测试兑换市场的幂等性保护机制，确保不会产生重复订单
  *
- * P1-1待办任务：兑换市场 `/api/v4/shop/exchange` 的 business_id 策略
+ * P1-1待办任务：兑换市场 `/api/v4/backpack/exchange` 的 business_id 策略
  *
  * 核心功能测试：
  * 1. 强制幂等键验证 - 缺少business_id和Idempotency-Key时返回400
@@ -187,6 +187,7 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
               asset_code: 'red_shard',
               delta_amount: 1000 - currentBalance,
               business_type: 'test_recharge',
+              counterpart_account_id: 2,
               idempotency_key: generateStandaloneIdempotencyKey('test_recharge', testUser.user_id),
               meta: { description: '测试充值' }
             },
@@ -226,7 +227,7 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
   describe('P1-1-1: 强制幂等键验证', () => {
     test('缺少 Idempotency-Key Header 时应返回400', async () => {
       const response = await request(app)
-        .post('/api/v4/shop/exchange')
+        .post('/api/v4/backpack/exchange')
         .set('Authorization', `Bearer ${testToken}`)
         .send({
           exchange_item_id: testItem.exchange_item_id,
@@ -250,7 +251,7 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
       const idempotencyKey = `test_idempotency_header_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
 
       const response = await request(app)
-        .post('/api/v4/shop/exchange')
+        .post('/api/v4/backpack/exchange')
         .set('Authorization', `Bearer ${testToken}`)
         .set('Idempotency-Key', idempotencyKey) // ✅ 通过Header提供Idempotency-Key
         .send({
@@ -286,7 +287,7 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
 
       // 第一次请求
       const response1 = await request(app)
-        .post('/api/v4/shop/exchange')
+        .post('/api/v4/backpack/exchange')
         .set('Authorization', `Bearer ${testToken}`)
         .set('Idempotency-Key', idempotencyKey)
         .send({
@@ -305,7 +306,7 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
 
       // 第二次请求（相同 Idempotency-Key）
       const response2 = await request(app)
-        .post('/api/v4/shop/exchange')
+        .post('/api/v4/backpack/exchange')
         .set('Authorization', `Bearer ${testToken}`)
         .set('Idempotency-Key', idempotencyKey) // 🔄 相同的 Idempotency-Key
         .send({
@@ -348,7 +349,7 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
 
       // 第一次兑换
       const response1 = await request(app)
-        .post('/api/v4/shop/exchange')
+        .post('/api/v4/backpack/exchange')
         .set('Authorization', `Bearer ${testToken}`)
         .set('Idempotency-Key', idempotencyKey)
         .send({
@@ -370,7 +371,7 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
 
       // 第二次兑换（相同 Idempotency-Key）
       const response2 = await request(app)
-        .post('/api/v4/shop/exchange')
+        .post('/api/v4/backpack/exchange')
         .set('Authorization', `Bearer ${testToken}`)
         .set('Idempotency-Key', idempotencyKey) // 🔄 相同的 Idempotency-Key
         .send({
@@ -407,7 +408,7 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
 
       // 第一次请求
       const response1 = await request(app)
-        .post('/api/v4/shop/exchange')
+        .post('/api/v4/backpack/exchange')
         .set('Authorization', `Bearer ${testToken}`)
         .set('Idempotency-Key', idempotencyKey)
         .send({
@@ -436,7 +437,7 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
 
       // 第二次请求（相同 Idempotency-Key，但不同 exchange_item_id）
       const response2 = await request(app)
-        .post('/api/v4/shop/exchange')
+        .post('/api/v4/backpack/exchange')
         .set('Authorization', `Bearer ${testToken}`)
         .set('Idempotency-Key', idempotencyKey) // 🔄 相同的 Idempotency-Key
         .send({
@@ -461,7 +462,7 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
 
       // 第一次请求
       const response1 = await request(app)
-        .post('/api/v4/shop/exchange')
+        .post('/api/v4/backpack/exchange')
         .set('Authorization', `Bearer ${testToken}`)
         .set('Idempotency-Key', idempotencyKey)
         .send({
@@ -476,7 +477,7 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
 
       // 第二次请求（相同 Idempotency-Key，但不同 quantity）
       const response2 = await request(app)
-        .post('/api/v4/shop/exchange')
+        .post('/api/v4/backpack/exchange')
         .set('Authorization', `Bearer ${testToken}`)
         .set('Idempotency-Key', idempotencyKey) // 🔄 相同的 Idempotency-Key
         .send({
@@ -605,7 +606,7 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
       // 并发发送5个相同的请求
       const promises = Array.from({ length: 5 }, () =>
         request(app)
-          .post('/api/v4/shop/exchange')
+          .post('/api/v4/backpack/exchange')
           .set('Authorization', `Bearer ${testToken}`)
           .set('Idempotency-Key', idempotencyKey) // 🔄 相同的 Idempotency-Key
           .send({

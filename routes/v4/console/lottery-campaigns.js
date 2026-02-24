@@ -373,6 +373,65 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
 })
 
 /**
+ * GET /global-defaults
+ *
+ * 获取抽奖系统全局默认配置（积分定价配置页的全局值）
+ *
+ * 业务场景：
+ * - 前端活动编辑弹窗需要显示"当前全局默认值"作为参考
+ * - 让运营看到"全局设了10次/日，当前活动设了3次/日，生效的是活动级的3次"
+ * - 消除全局配置和活动级配置之间的信息不对称
+ *
+ * 返回字段：
+ * - lottery_cost_points: 全局单抽消耗积分（system_settings）
+ * - daily_lottery_limit: 全局每日抽奖次数限制（system_settings）
+ * - sign_in_points: 签到积分
+ * - initial_points: 新用户初始积分
+ *
+ * 配置优先级说明（附在响应中）：
+ * - 活动级配置 > 全局配置（活动有配置则覆盖全局，无配置则使用全局兜底）
+ */
+router.get('/global-defaults', authenticateToken, requireRoleLevel(100), async (req, res) => {
+  try {
+    const AdminSystemService = req.app.locals.services.getService('admin_system')
+
+    const [lottery_cost_points, daily_lottery_limit, sign_in_points, initial_points] =
+      await Promise.all([
+        AdminSystemService.getSettingValue('points', 'lottery_cost_points', 100),
+        AdminSystemService.getSettingValue('points', 'daily_lottery_limit', 10),
+        AdminSystemService.getSettingValue('points', 'sign_in_points', 0),
+        AdminSystemService.getSettingValue('points', 'initial_points', 200)
+      ])
+
+    return res.apiSuccess(
+      {
+        global_defaults: {
+          lottery_cost_points: parseInt(lottery_cost_points, 10),
+          daily_lottery_limit: parseInt(daily_lottery_limit, 10),
+          sign_in_points: parseInt(sign_in_points, 10),
+          initial_points: parseInt(initial_points, 10)
+        },
+        priority_rules: {
+          lottery_cost_points: '活动定价配置(base_cost) > 全局lottery_cost_points',
+          daily_lottery_limit:
+            '配额规则(user > role > campaign > global) > 全局daily_lottery_limit',
+          description: '活动级配置优先，未配置时使用全局默认值兜底'
+        }
+      },
+      '获取全局默认配置成功'
+    )
+  } catch (error) {
+    logger.error('获取全局默认配置失败:', error)
+    return res.apiError(
+      '获取全局默认配置失败',
+      error.code || 'GET_GLOBAL_DEFAULTS_FAILED',
+      null,
+      500
+    )
+  }
+})
+
+/**
  * GET /:lottery_campaign_id - 获取单个活动详情（含 ROI、复购率、库存预警）
  *
  * 完整路径：GET /api/v4/console/lottery-campaigns/:lottery_campaign_id

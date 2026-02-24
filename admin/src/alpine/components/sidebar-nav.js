@@ -74,11 +74,6 @@ export function sidebarNav() {
             badgeKey: 'redemptionPendingCount'
           },
           {
-            id: 'redemption-scan',
-            name: '扫码核销',
-            url: '/admin/redemption-scan.html'
-          },
-          {
             id: 'customer-service',
             name: '客服工作台',
             url: '/admin/customer-service.html',
@@ -159,6 +154,11 @@ export function sidebarNav() {
             id: 'exchange-page-config',
             name: '🛍️ 兑换页面配置',
             url: '/admin/exchange-page-config.html'
+          },
+          {
+            id: 'pricing-config',
+            name: '💰 积分定价配置',
+            url: '/admin/pricing-config.html'
           }
         ]
       },
@@ -175,7 +175,7 @@ export function sidebarNav() {
           { id: 'reconciliation', name: '对账报告', url: '/admin/reconciliation.html' },
           { id: 'exchange', name: '兑换市场', url: '/admin/exchange-market.html' },
           { id: 'exchange-rate', name: '汇率兑换', url: '/admin/exchange-rate-management.html' },
-          { id: 'trade', name: 'C2C交易', url: '/admin/trade-management.html' },
+          { id: 'trade', name: '交易市场', url: '/admin/trade-management.html' },
           { id: 'bid-mgmt', name: '竞价管理', url: '/admin/bid-management.html' },
           { id: 'orphan-frozen', name: '孤儿冻结清理', url: '/admin/orphan-frozen.html' }
         ]

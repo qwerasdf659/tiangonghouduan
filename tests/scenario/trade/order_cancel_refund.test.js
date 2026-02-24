@@ -124,6 +124,7 @@ async function ensureBalance(userId, assetCode, minBalance) {
           asset_code: assetCode,
           delta_amount: amountToAdd,
           business_type: 'test_topup',
+          counterpart_account_id: 2,
           idempotency_key: `test_topup_${userId}_${assetCode}_${Date.now()}_${uuidv4().slice(0, 8)}`
         },
         { transaction }

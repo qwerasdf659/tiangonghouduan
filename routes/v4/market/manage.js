@@ -6,7 +6,7 @@
  *
  * API列表：
  * - POST /listings/:market_listing_id/withdraw - 撤回物品实例挂牌
- * - POST /fungible-assets/:market_listing_id/withdraw - 撤回可叠加资产挂牌（C2C材料交易）
+ * - POST /fungible-assets/:market_listing_id/withdraw - 撤回可叠加资产挂牌（交易市场材料交易）
  *
  * 业务场景：
  * - 卖家撤回已上架的商品/可叠加资产
@@ -14,7 +14,7 @@
  *
  * 创建时间：2025年12月22日
  * 从inventory-market.js拆分而来
- * 更新时间：2026年01月08日 - 实现可叠加资产撤回功能（C2C材料交易）
+ * 更新时间：2026年01月08日 - 实现可叠加资产撤回功能（交易市场材料交易）
  */
 
 const express = require('express')
@@ -123,7 +123,7 @@ router.post(
 
 /**
  * @route POST /api/v4/market/fungible-assets/:market_listing_id/withdraw
- * @desc 撤回可叠加资产挂牌（C2C材料交易）
+ * @desc 撤回可叠加资产挂牌（交易市场材料交易）
  * @access Private (需要登录，只能撤回自己的挂牌)
  *
  * @param {number} market_listing_id - 挂牌ID

@@ -34,7 +34,7 @@
  * 最后更新：2026年01月05日（事务边界治理改造）
  */
 
-const { sequelize, RedemptionOrder, Item, Account, User, StoreStaff } = require('../models')
+const { sequelize, RedemptionOrder, Item, Account, User, Store, StoreStaff } = require('../models')
 const RedemptionCodeGenerator = require('../utils/RedemptionCodeGenerator')
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 const ItemService = require('./asset/ItemService')
@@ -317,6 +317,26 @@ class RedemptionService {
         logger.info('核销人无活跃 store_staff 记录，门店字段为空', {
           redeemer_user_id
         })
+      }
+    }
+
+    // 5.5 商家一致性校验：物品 merchant_id 与核销门店 merchant_id 必须一致
+    if (fulfilledStoreId && order.item?.merchant_id) {
+      const store = await Store.findByPk(fulfilledStoreId, {
+        attributes: ['store_id', 'merchant_id'],
+        transaction
+      })
+
+      if (store && store.merchant_id !== order.item.merchant_id) {
+        logger.error('商家一致性校验失败：物品商家与核销门店商家不匹配', {
+          item_merchant_id: order.item.merchant_id,
+          store_merchant_id: store.merchant_id,
+          store_id: fulfilledStoreId,
+          item_id: order.item_id
+        })
+        throw new Error(
+          `核销失败：物品归属商家(${order.item.merchant_id})与核销门店归属商家(${store.merchant_id})不匹配`
+        )
       }
     }
 
@@ -681,6 +701,27 @@ class RedemptionService {
       if (staffRecord) {
         fulfilledStoreId = fulfilledStoreId || staffRecord.store_id
         fulfilledByStaffId = fulfilledByStaffId || staffRecord.store_staff_id
+      }
+    }
+
+    // 4.5 商家一致性校验：物品 merchant_id 与核销门店 merchant_id 必须一致
+    if (fulfilledStoreId && order.item?.merchant_id) {
+      const checkStore = await Store.findByPk(fulfilledStoreId, {
+        attributes: ['store_id', 'merchant_id'],
+        transaction
+      })
+
+      if (checkStore && checkStore.merchant_id !== order.item.merchant_id) {
+        logger.error('管理员核销 - 商家一致性校验失败', {
+          item_merchant_id: order.item.merchant_id,
+          store_merchant_id: checkStore.merchant_id,
+          store_id: fulfilledStoreId,
+          item_id: order.item_id,
+          admin_user_id
+        })
+        throw new Error(
+          `核销失败：物品归属商家(${order.item.merchant_id})与核销门店归属商家(${checkStore.merchant_id})不匹配`
+        )
       }
     }
 

@@ -10,6 +10,7 @@
 import Sortable from 'sortablejs'
 import { logger } from '../../../utils/logger.js'
 import { LOTTERY_ENDPOINTS } from '../../../api/lottery/index.js'
+import { MERCHANT_ENDPOINTS } from '../../../api/merchant.js'
 import { buildURL } from '../../../api/base.js'
 
 /**
@@ -32,7 +33,9 @@ export function usePrizesState() {
     /** @type {Array} 奖品列表 */
     prizes: [],
     /** @type {Object} 奖品筛选条件 */
-    prizeFilters: { prize_type: '', status: '', keyword: '' },
+    prizeFilters: { prize_type: '', status: '', keyword: '', merchant_id: '' },
+    /** @type {Array} 商家下拉选项列表（来自 /api/v4/console/merchants/options） */
+    merchantOptions: [],
     /** @type {Object} 奖品编辑表单 - 使用后端字段名 */
     prizeForm: {
       lottery_campaign_id: null, // 添加奖品时需要选择活动
@@ -111,6 +114,22 @@ export function usePrizesState() {
 export function usePrizesMethods() {
   return {
     /**
+     * 加载商家下拉选项（供筛选器使用）
+     * 后端返回：[{ merchant_id, merchant_name, merchant_type }]
+     */
+    async loadMerchantOptions() {
+      try {
+        const response = await this.apiGet(MERCHANT_ENDPOINTS.OPTIONS, {}, { showLoading: false })
+        const data = response?.success ? response.data : response
+        this.merchantOptions = Array.isArray(data) ? data : []
+        logger.debug('[Prizes] 商家选项加载完成', { count: this.merchantOptions.length })
+      } catch (error) {
+        logger.warn('[Prizes] 加载商家选项失败', error)
+        this.merchantOptions = []
+      }
+    },
+
+    /**
      * 加载奖品列表
      * 后端返回字段: lottery_prize_id, prize_name, prize_type, win_probability,
      *               stock_quantity, status, prize_description, image_resource_id
@@ -129,6 +148,9 @@ export function usePrizesMethods() {
         }
         if (this.prizeFilters.keyword) {
           params.append('keyword', this.prizeFilters.keyword)
+        }
+        if (this.prizeFilters.merchant_id) {
+          params.append('merchant_id', this.prizeFilters.merchant_id)
         }
 
         // apiGet 通过 withLoading 包装，返回 { success: true, data: {...} }

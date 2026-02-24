@@ -6,7 +6,7 @@
  *
  * API列表：
  * - POST /list - 上架物品实例到交易市场
- * - POST /fungible-assets/list - 挂牌可叠加资产到市场（C2C材料交易）
+ * - POST /fungible-assets/list - 挂牌可叠加资产到市场（交易市场材料交易）
  *
  * 业务场景：
  * - 用户将库存物品/可叠加资产上架到交易市场出售
@@ -19,7 +19,7 @@
  *
  * 创建时间：2025年12月22日
  * 更新时间：2026年01月02日 - 业界标准形态破坏性重构
- * 更新时间：2026年01月08日 - 实现可叠加资产挂牌功能（C2C材料交易）
+ * 更新时间：2026年01月08日 - 实现可叠加资产挂牌功能（交易市场材料交易）
  */
 
 const express = require('express')
@@ -299,7 +299,7 @@ router.post(
 
 /**
  * @route POST /api/v4/market/fungible-assets/list
- * @desc 挂牌可叠加资产到市场（C2C材料交易）
+ * @desc 挂牌可叠加资产到市场（交易市场材料交易）
  * @access Private (需要登录)
  *
  * @header {string} Idempotency-Key - 幂等键（必填，不接受body参数）
@@ -319,7 +319,7 @@ router.post(
  * @returns {Object} data.listing_status - 上架状态
  * @returns {Object} data.balance_after - 冻结后余额信息
  *
- * 业务场景：用户将可叠加资产（如材料）挂牌到C2C市场出售
+ * 业务场景：用户将可叠加资产（如材料）挂牌到交易市场出售
  *
  * 多币种扩展（2026-01-14）：
  * - price_asset_code 参数支持选择结算币种

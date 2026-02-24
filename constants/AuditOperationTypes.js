@@ -240,7 +240,7 @@ const OPERATION_TYPES = Object.freeze({
    */
   INVENTORY_TRANSFER: 'inventory_transfer',
 
-  // ==================== 市场交易类（C2C Phase 2 新增）====================
+  // ==================== 市场交易类（交易市场 Phase 2 新增）====================
   /**
    * 市场挂牌管理员强制撤回
    * @description 客服强制撤回用户的市场挂牌
@@ -391,7 +391,7 @@ const OPERATION_TYPE_DESCRIPTIONS = Object.freeze({
   [OPERATION_TYPES.INVENTORY_OPERATION]: '库存操作',
   [OPERATION_TYPES.INVENTORY_TRANSFER]: '物品转让',
 
-  // 市场交易类（C2C Phase 2 新增）
+  // 市场交易类（交易市场 Phase 2 新增）
   [OPERATION_TYPES.MARKET_LISTING_ADMIN_WITHDRAW]: '市场挂牌强制撤回',
 
   // 系统配置类
@@ -463,7 +463,7 @@ const CRITICAL_OPERATIONS = Object.freeze(
     OPERATION_TYPES.SIMULATION_APPLY, // 模拟配置应用 - 直接修改生产策略配置
     OPERATION_TYPES.CONFIG_ROLLBACK, // 配置版本回滚 - 回退生产策略配置
 
-    // ========== 市场交易关键操作（C2C Phase 2 新增）==========
+    // ========== 市场交易关键操作（交易市场 Phase 2 新增）==========
     OPERATION_TYPES.MARKET_LISTING_ADMIN_WITHDRAW, // 市场挂牌强制撤回 - 影响卖家资产和交易
 
     // ========== 功能开关关键操作（Feature Flag V4.6.0 新增）==========

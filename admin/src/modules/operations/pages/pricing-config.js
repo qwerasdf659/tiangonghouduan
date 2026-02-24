@@ -45,7 +45,6 @@ function registerPricingConfigComponents() {
     pointsDefaults: {
       lottery_cost_points: 0,
       daily_lottery_limit: 0,
-      sign_in_points: 0,
       initial_points: 0
     },
 

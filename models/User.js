@@ -187,7 +187,7 @@ module.exports = sequelize => {
 
     /**
      * 当前关联路径：
-     * - C2C交易：User → TradeOrder (buyer_user_id / seller_user_id)
+     * - 交易市场交易：User → TradeOrder (buyer_user_id / seller_user_id)
      * - 资产变动：User → Account → AssetTransaction
      * - 物品事件：User → Item → ItemLedger
      */

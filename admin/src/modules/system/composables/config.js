@@ -17,7 +17,7 @@ import { buildURL } from '../../../api/base.js'
  */
 const CATEGORY_DISPLAY = {
   basic: { name: '基础设置', icon: '⚙️', description: '系统名称、客服信息、维护模式' },
-  points: { name: '积分设置', icon: '🪙', description: '抽奖消耗、签到积分、预算比例' },
+  points: { name: '积分设置', icon: '🪙', description: '抽奖消耗、每日抽奖限制、预算比例' },
   notification: { name: '通知设置', icon: '🔔', description: '短信、邮件、APP推送开关' },
   security: { name: '安全设置', icon: '🔐', description: '登录限制、密码策略、API限流' },
   marketplace: { name: '市场设置', icon: '🏪', description: '上架数量、过期天数、价格阈值' },

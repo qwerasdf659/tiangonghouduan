@@ -6,7 +6,7 @@
  *
  * 📌 重构记录（2025-12-22）：
  * - 从 /api/v4/market 迁移到 /api/v4/shop/exchange
- * - 明确业务语义：shop域负责B2C兑换，market域负责C2C交易
+ * - 明确业务语义：shop域负责B2C兑换，market域负责交易市场交易
  *
  * 子模块划分（按业务职责）：
  * - items.js    - 商品列表/详情（GET /items, GET /items/:item_id）

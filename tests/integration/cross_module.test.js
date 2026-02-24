@@ -140,9 +140,9 @@ describe('阶段八：跨模块集成测试', () => {
           initial_points
         })
 
-        // 2. 获取用户初始物品数量
+        // 2. 获取用户初始物品数量（owner_account_id 是 accounts 表的 account_id，不是 user_id）
         const initial_items = await Item.count({
-          where: { owner_account_id: test_user_id },
+          where: { owner_account_id: initial_account.account_id },
           transaction
         })
 
@@ -163,6 +163,7 @@ describe('阶段八：跨模块集成测试', () => {
               asset_code: 'POINTS',
               delta_amount: recharge_amount,
               business_type: 'test_recharge',
+              counterpart_account_id: 2,
               idempotency_key: generateIdempotencyKey('test_recharge'),
               meta: { source: 'cross_module_test' }
             },
@@ -256,9 +257,9 @@ describe('阶段八：跨模块集成测试', () => {
          * prize 已在步骤8中定义
          */
         if (prize.prize && ['coupon', 'physical'].includes(prize.prize.type)) {
-          // 验证物品实例已创建
+          // 验证物品实例已创建（owner_account_id 是 accounts 表的 account_id）
           const final_items = await Item.count({
-            where: { owner_account_id: test_user_id },
+            where: { owner_account_id: initial_account.account_id },
             transaction
           })
           expect(final_items).toBeGreaterThan(initial_items)
@@ -429,21 +430,20 @@ describe('阶段八：跨模块集成测试', () => {
           {
             user_id: seller_user_id,
             item_type: 'voucher',
-            source_type: 'test',
-            source_id: mint_idempotency_key,
-            meta: {
-              name: '测试商品券',
-              description: '跨模块测试用商品券',
-              value: 100
-            }
+            item_name: '测试商品券',
+            item_description: '跨模块测试用商品券',
+            item_value: 100,
+            source: 'test',
+            source_ref_id: mint_idempotency_key,
+            business_type: 'test_mint',
+            idempotency_key: mint_idempotency_key
           },
           { transaction }
         )
 
         expect(mint_result).not.toBeNull()
-        expect(mint_result.item_instance).toBeDefined()
-        // mintItem 返回 { item_instance, is_duplicate }，需要从 item_instance 中获取 ID
-        test_item_id = mint_result.item_instance.item_id
+        expect(mint_result.item).toBeDefined()
+        test_item_id = mint_result.item.item_id
         // 🔴 P0修复：使用统一清理器注册
         testCleaner.registerById('Item', test_item_id)
 
@@ -510,6 +510,7 @@ describe('阶段八：跨模块集成测试', () => {
               asset_code: 'DIAMOND',
               delta_amount: 100,
               business_type: 'test_recharge',
+              counterpart_account_id: 2,
               idempotency_key: generateIdempotencyKey('buyer_recharge'),
               meta: { source: 'cross_module_test' }
             },
@@ -569,13 +570,18 @@ describe('阶段八：跨模块集成测试', () => {
           final_balance: seller_final_balance?.available_amount
         })
 
-        // 6.2 验证物品所有权已转移
+        // 6.2 验证物品所有权已转移（owner_account_id 是 accounts 表的 account_id，不是 user_id）
+        const buyer_acct = await BalanceService.getOrCreateAccount(
+          { user_id: buyer_user_id },
+          { transaction }
+        )
         const transferred_item = await Item.findByPk(test_item_id, { transaction })
-        expect(transferred_item.owner_account_id).toBe(buyer_user_id)
+        expect(Number(transferred_item.owner_account_id)).toBe(Number(buyer_acct.account_id))
 
         console.log('🔄 物品所有权转移验证', {
           item_id: test_item_id,
-          new_owner: transferred_item.owner_account_id
+          new_owner_account_id: transferred_item.owner_account_id,
+          buyer_account_id: buyer_account.account_id
         })
 
         // 7. 验证订单状态

@@ -214,6 +214,7 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
             asset_code: assetCode,
             delta_amount: topUpAmount,
             business_type: 'test_topup',
+            counterpart_account_id: 2,
             idempotency_key: generateIdempotencyKey('topup'),
             meta: { reason: '测试数据准备 - 充值资产' }
           },
@@ -431,6 +432,7 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
             asset_code: 'red_shard',
             delta_amount: -consumeAmount,
             business_type: 'test_consume',
+            counterpart_account_id: 2,
             idempotency_key: generateIdempotencyKey('shard_consume'),
             meta: { reason: '测试碎片消耗' }
           },
@@ -1207,6 +1209,7 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
               asset_code: 'POINTS',
               delta_amount: -excessiveAmount, // 负数表示扣减
               business_type: 'test_boundary',
+              counterpart_account_id: 2,
               idempotency_key: generateIdempotencyKey('boundary_test'),
               meta: { reason: '测试 - 边界条件测试（应失败）' }
             },

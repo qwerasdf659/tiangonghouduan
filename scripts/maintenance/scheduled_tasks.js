@@ -17,8 +17,8 @@
  * 11. 交易市场超时解锁（每小时）- 2025-12-29新增（资产域标准架构）
  * 12. 业务记录关联对账（每小时第5分钟）- 2026-01-05新增（事务边界治理）
  * 13. 未绑定图片清理（每小时第30分钟）- 2026-01-08新增（图片存储架构）
- * 14. 可叠加资产挂牌过期（每小时第15分钟）- 2026-01-08新增（C2C材料交易）
- * 15. 市场挂牌异常监控（每小时第45分钟）- 2026-01-08新增（C2C材料交易 Phase 2）
+ * 14. 可叠加资产挂牌过期（每小时第15分钟）- 2026-01-08新增（交易市场材料交易）
+ * 15. 市场挂牌异常监控（每小时第45分钟）- 2026-01-08新增（交易市场材料交易 Phase 2）
  * 16. 孤儿冻结检测与清理（每天凌晨2点）- 2026-01-09新增（P0-2修复）
  * 17. 商家审计日志180天清理（每天凌晨3点）- 2026-01-12新增（AC4.4 商家员工域权限体系升级）
  * 18. 图片资源数据质量检查（每天凌晨4点）- 2026-01-14新增（图片缩略图架构兼容残留核查报告 Phase 1）
@@ -63,9 +63,9 @@ const { monitor: databaseMonitor } = require('./database_performance_monitor')
 const HourlyUnlockTimeoutTradeOrders = require('../../jobs/hourly-unlock-timeout-trade-orders')
 // 2026-01-08新增：图片存储架构 - 未绑定图片清理
 const HourlyCleanupUnboundImages = require('../../jobs/hourly-cleanup-unbound-images')
-// 2026-01-08新增：C2C材料交易 - 可叠加资产挂牌自动过期
+// 2026-01-08新增：交易市场材料交易 - 可叠加资产挂牌自动过期
 const HourlyExpireFungibleAssetListings = require('../../jobs/hourly-expire-fungible-asset-listings')
-// 2026-01-08新增：C2C材料交易 - 市场挂牌异常监控
+// 2026-01-08新增：交易市场材料交易 - 市场挂牌异常监控
 const HourlyMarketListingMonitor = require('../../jobs/hourly-market-listing-monitor')
 // 2026-01-09新增：P0-2 孤儿冻结检测与清理（每天凌晨2点）
 const DailyOrphanFrozenCheck = require('../../jobs/daily-orphan-frozen-check')
@@ -231,10 +231,10 @@ class ScheduledTasks {
     // 任务16: 每小时清理未绑定图片（2026-01-08新增 - 图片存储架构）
     this.scheduleHourlyCleanupUnboundImages()
 
-    // 任务17: 每小时过期超时的可叠加资产挂牌（2026-01-08新增 - C2C材料交易）
+    // 任务17: 每小时过期超时的可叠加资产挂牌（2026-01-08新增 - 交易市场材料交易）
     this.scheduleHourlyExpireFungibleAssetListings()
 
-    // 任务18: 每小时市场挂牌异常监控（2026-01-08新增 - C2C材料交易 Phase 2）
+    // 任务18: 每小时市场挂牌异常监控（2026-01-08新增 - 交易市场材料交易 Phase 2）
     this.scheduleHourlyMarketListingMonitor()
 
     // 任务19: 每天凌晨2点孤儿冻结检测与清理（2026-01-09新增 - P0-2修复）
@@ -301,7 +301,12 @@ class ScheduledTasks {
     // 任务36: 每10分钟检查 item_holds 过期记录并自动释放
     this.scheduleItemHoldsExpiration()
 
-    logger.info('所有定时任务已初始化完成（包含统一对账+物品锁定过期释放）')
+    // ========== 2026-02-23 市场价格快照聚合 ==========
+
+    // 任务37: 每天凌晨1:15执行市场价格快照聚合（market_price_snapshots 预聚合）
+    this.scheduleDailyMarketPriceSnapshot()
+
+    logger.info('所有定时任务已初始化完成（包含统一对账+物品锁定过期释放+市场价格快照）')
   }
 
   /**
@@ -1570,7 +1575,7 @@ class ScheduledTasks {
    * 定时任务17: 每小时过期超时的可叠加资产挂牌
    * Cron表达式: 15 * * * * (每小时第15分钟)
    *
-   * 业务场景（C2C材料交易 2026-01-08）：
+   * 业务场景（交易市场材料交易 2026-01-08）：
    * - status='on_sale' 且 created_at > 3天的可叠加资产挂牌
    * - 自动撤回挂牌并解冻卖家资产
    * - 发送过期通知给卖家
@@ -1665,7 +1670,7 @@ class ScheduledTasks {
    * 定时任务18: 每小时市场挂牌异常监控
    * Cron表达式: 45 * * * * (每小时第45分钟)
    *
-   * 业务场景（C2C材料交易 Phase 2 2026-01-08）：
+   * 业务场景（交易市场材料交易 Phase 2 2026-01-08）：
    * - 监控价格异常挂牌（单价过高或过低）
    * - 监控超长时间挂牌（超过7天仍未成交）
    * - 监控冻结余额异常（冻结总额与挂牌不匹配）
@@ -3569,6 +3574,49 @@ class ScheduledTasks {
     })
 
     logger.info('✅ 定时任务已设置: item_holds 过期自动释放（每10分钟检查）')
+  }
+
+  /**
+   * 定时任务37: 每天凌晨1:15执行市场价格快照聚合
+   * Cron表达式: 15 1 * * * (每天凌晨1:15)
+   *
+   * 业务场景（市场增强 2026-02-23）：
+   * - 从 market_listings 聚合在售挂牌价格统计（最低/最高/平均、挂牌数）
+   * - 从 trade_orders 聚合已完成交易成交统计（成交笔数、成交总额）
+   * - 按 asset_code + listing_kind + price_asset_code 维度 UPSERT 到 market_price_snapshots
+   * - 支持幂等执行（同一日期重复执行不会产生重复记录）
+   *
+   * @returns {void}
+   */
+  static scheduleDailyMarketPriceSnapshot() {
+    const DailyMarketPriceSnapshot = require('../../jobs/daily-market-price-snapshot')
+
+    cron.schedule('15 1 * * *', async () => {
+      const lockKey = 'lock:daily_market_price_snapshot'
+
+      try {
+        const locked = await distributedLock.tryLock(lockKey, 300)
+        if (!locked) {
+          logger.warn('[定时任务37] 市场价格快照聚合获取分布式锁失败，跳过本次执行')
+          return
+        }
+
+        logger.info('[定时任务37] 开始市场价格快照聚合')
+        const report = await DailyMarketPriceSnapshot.execute()
+        logger.info('[定时任务37] 市场价格快照聚合完成', report)
+      } catch (error) {
+        logger.error('[定时任务37] 市场价格快照聚合异常', {
+          error: error.message,
+          stack: error.stack
+        })
+      } finally {
+        try {
+          await distributedLock.unlock(lockKey)
+        } catch (_e) { /* 锁已自动过期 */ }
+      }
+    })
+
+    logger.info('✅ 定时任务已设置: 市场价格快照聚合（每天凌晨1:15）')
   }
 }
 

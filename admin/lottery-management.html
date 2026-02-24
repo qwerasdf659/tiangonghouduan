@@ -282,7 +282,7 @@
           </div>
           <!-- 筛选器 -->
           <div class="p-4 border-b themed-bg-base">
-            <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
               <select class="px-3 py-2 border rounded" x-model="prizeFilters.prize_type" @change="loadPrizes()">
                 <option value="">全部类型</option>
                 <option value="physical">实物奖品</option>
@@ -293,6 +293,12 @@
                 <option value="">全部状态</option>
                 <option value="active">启用</option>
                 <option value="inactive">禁用</option>
+              </select>
+              <select class="px-3 py-2 border rounded" x-model="prizeFilters.merchant_id" @change="loadPrizes()" x-init="loadMerchantOptions()">
+                <option value="">全部商家</option>
+                <template x-for="m in merchantOptions" :key="m.merchant_id">
+                  <option :value="m.merchant_id" x-text="m.merchant_name"></option>
+                </template>
               </select>
               <input type="text" class="px-3 py-2 border rounded" placeholder="搜索奖品名称..." x-model="prizeFilters.keyword">
               <button class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary" @click="loadPrizes()">
@@ -5616,10 +5622,26 @@
           <!-- 抽奖配置 -->
           <div class="themed-bg-base p-3 rounded">
             <h6 class="text-sm font-semibold themed-text-muted mb-3">🎰 抽奖配置</h6>
+            <!-- 配置优先级提示（当全局默认配置已加载时显示） -->
+            <template x-if="globalDefaults">
+              <div class="mb-3 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700">
+                <span class="font-semibold">⚡ 配置优先级：</span>活动级配置 &gt; 全局默认值。此处设置会覆盖全局配置。
+                <span class="ml-2">全局默认：</span>
+                <span class="font-mono" x-text="globalDefaults.daily_lottery_limit + '次/日'"></span>
+                <span class="mx-1">|</span>
+                <span x-text="globalDefaults.lottery_cost_points + '积分/次'"></span>
+              </div>
+            </template>
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label class="block text-sm font-medium themed-text-secondary mb-1">每日最大次数</label>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">每日最大次数 <span class="text-red-500">*</span></label>
                 <input type="number" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" x-model.number="campaignForm.max_draws_per_user_daily" min="1">
+                <template x-if="globalDefaults && campaignForm.max_draws_per_user_daily !== globalDefaults.daily_lottery_limit">
+                  <p class="text-xs text-orange-600 mt-1">⚠️ 已覆盖全局默认值（全局：<span x-text="globalDefaults.daily_lottery_limit"></span>次/日）</p>
+                </template>
+                <template x-if="globalDefaults && campaignForm.max_draws_per_user_daily === globalDefaults.daily_lottery_limit">
+                  <p class="text-xs text-green-600 mt-1">✅ 与全局默认值一致</p>
+                </template>
               </div>
               <div>
                 <label class="block text-sm font-medium themed-text-secondary mb-1">总最大次数</label>

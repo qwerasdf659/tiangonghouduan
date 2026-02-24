@@ -1,14 +1,14 @@
 /**
- * C2C交易管理页面 - Alpine.js 组件 (Mixin v3.0)
+ * 交易市场管理页面 - Alpine.js 组件 (Mixin v3.0)
  *
  * @file admin/src/modules/market/pages/trade-management.js
- * @description C2C用户间交易管理页面，包含交易订单和上架统计
+ * @description 交易市场管理页面，包含交易订单和上架统计
  * @version 3.0.0
  * @date 2026-01-23
  *
  * @requires Alpine.js
  * @requires createPageMixin - 页面基础功能混入
- * @requires MARKET_ENDPOINTS - 市场模块API端点（C2C市场、业务记录等）
+ * @requires MARKET_ENDPOINTS - 市场模块API端点（交易市场、业务记录等）
  *
  * @example
  * <!-- 使用导航组件 -->
@@ -20,7 +20,7 @@
  *
  * <!-- 使用主组件 -->
  * <div x-data="tradeManagementPage()">
- *   <div x-show="current_page === 'trade-orders'">C2C交易订单</div>
+ *   <div x-show="current_page === 'trade-orders'">交易市场订单</div>
  *   <div x-show="current_page === 'marketplace-stats'">上架统计</div>
  *   <div x-show="current_page === 'redemption-orders'">兑换订单</div>
  * </div>
@@ -60,8 +60,9 @@ document.addEventListener('alpine:init', () => {
      * @type {Array<{id: string, title: string, icon: string}>}
      */
     subPages: [
-      { id: 'trade-orders', title: 'C2C交易订单', icon: 'bi-arrow-left-right' },
-      { id: 'marketplace-stats', title: '上架统计', icon: 'bi-bar-chart' }
+      { id: 'trade-orders', title: '交易市场订单', icon: 'bi-arrow-left-right' },
+      { id: 'marketplace-stats', title: '上架统计', icon: 'bi-bar-chart' },
+      { id: 'market-overview', title: '市场概览', icon: 'bi-graph-up' }
     ],
 
     /**
@@ -107,10 +108,10 @@ document.addEventListener('alpine:init', () => {
   /**
    * 交易管理内容组件
    *
-   * @description 管理C2C交易订单、上架统计和兑换订单的数据展示
+   * @description 管理交易市场订单、上架统计和兑换订单的数据展示
    * @returns {Object} Alpine组件对象
    *
-   * @property {Array} tradeOrders - C2C交易订单列表
+   * @property {Array} tradeOrders - 交易市场订单列表
    * @property {Array} marketplaceStats - 上架统计数据
    * @property {Array} redemptionOrders - 兑换订单列表
    */
@@ -242,8 +243,8 @@ document.addEventListener('alpine:init', () => {
       if (action === 'detail') this.viewTradeOrderDetail(row)
     },
 
-    // ========== C2C交易订单数据 ==========
-    /** @type {Array<Object>} C2C交易订单列表 */
+    // ========== 交易市场订单数据 ==========
+    /** @type {Array<Object>} 交易市场订单列表 */
     tradeOrders: [],
     /** @type {Object|null} 当前选中的交易订单 */
     selectedTradeOrder: null,
@@ -379,10 +380,10 @@ document.addEventListener('alpine:init', () => {
       }
     },
 
-    // ==================== C2C交易订单方法 ====================
+    // ==================== 交易市场订单方法 ====================
 
     /**
-     * 加载C2C交易订单列表
+     * 加载交易市场订单列表
      * @async
      * @description 根据筛选条件和分页参数获取交易订单数据
      * @returns {Promise<void>}
@@ -510,14 +511,15 @@ document.addEventListener('alpine:init', () => {
     async loadMarketplaceSummary() {
       try {
         const res = await request({
-          url: MARKET_ENDPOINTS.C2C_MARKET_LISTING_SUMMARY,
+          url: MARKET_ENDPOINTS.LISTING_STATS,
           method: 'GET'
         })
         if (res.success && res.data) {
+          const summary = res.data.summary || res.data
           this.marketplaceSummary = {
-            total_users_with_listings: res.data.total_users_with_listings || 0,
-            users_near_limit: res.data.users_near_limit || 0,
-            users_at_limit: res.data.users_at_limit || 0
+            total_users_with_listings: summary.total_users_with_listings || 0,
+            users_near_limit: summary.users_near_limit || 0,
+            users_at_limit: summary.users_at_limit || 0
           }
         }
       } catch (e) {
@@ -536,28 +538,32 @@ document.addEventListener('alpine:init', () => {
         this.loading = true
         const params = {
           page: this.marketplaceCurrentPage,
-          page_size: this.marketplacePageSize,
-          status: this.marketplaceFilters.status
+          limit: this.marketplacePageSize
         }
 
-        if (params.status === 'all') delete params.status
+        if (this.marketplaceFilters.status && this.marketplaceFilters.status !== 'all') {
+          params.filter = this.marketplaceFilters.status
+        }
 
         const res = await request({
-          url: MARKET_ENDPOINTS.C2C_MARKET_LISTING_USER_STATS,
+          url: MARKET_ENDPOINTS.LISTING_STATS,
           method: 'GET',
           params
         })
 
-        if (res.success) {
-          this.marketplaceStats = res.data?.list || res.data || []
+        if (res.success && res.data) {
+          this.marketplaceStats = res.data.stats || []
           this.marketplacePagination = {
-            total_pages: res.data?.pagination?.total_pages || 1,
-            total: res.data?.pagination?.total || this.marketplaceStats.length
+            total_pages: res.data.pagination?.total_pages || 1,
+            total: res.data.pagination?.total || this.marketplaceStats.length
           }
 
-          // 获取最大上架数
-          if (res.data?.max_listings) {
-            this.maxListings = res.data.max_listings
+          if (res.data.summary) {
+            this.marketplaceSummary = {
+              total_users_with_listings: res.data.summary.total_users_with_listings || 0,
+              users_near_limit: res.data.summary.users_near_limit || 0,
+              users_at_limit: res.data.summary.users_at_limit || 0
+            }
           }
         }
       } catch (e) {
@@ -712,11 +718,11 @@ document.addEventListener('alpine:init', () => {
   /**
    * 交易管理主组件
    *
-   * @description 整合C2C交易订单、上架统计、兑换订单的完整页面组件
+   * @description 整合交易市场订单、上架统计、兑换订单的完整页面组件
    * @returns {Object} Alpine组件对象
    *
    * @property {string} current_page - 当前子页面 ('trade-orders' | 'marketplace-stats' | 'redemption-orders')
-   * @property {Array} tradeOrders - C2C交易订单列表
+   * @property {Array} tradeOrders - 交易市场订单列表
    * @property {Array} marketplaceStats - 上架统计数据
    * @property {Array} redemptionOrders - 兑换订单列表
    *
@@ -728,7 +734,7 @@ document.addEventListener('alpine:init', () => {
    *     </template>
    *   </nav>
    *   <div x-show="current_page === 'trade-orders'">
-   *     <!-- C2C交易订单列表 -->
+   *     <!-- 交易市场订单列表 -->
    *   </div>
    * </div>
    */
@@ -743,8 +749,9 @@ document.addEventListener('alpine:init', () => {
      * @type {Array<{id: string, name: string, icon: string}>}
      */
     subPages: [
-      { id: 'trade-orders', name: 'C2C交易订单', icon: '🔄' },
-      { id: 'marketplace-stats', name: '上架统计', icon: '📊' }
+      { id: 'trade-orders', name: '交易市场订单', icon: '🔄' },
+      { id: 'marketplace-stats', name: '上架统计', icon: '📊' },
+      { id: 'market-overview', name: '市场概览', icon: '📈' }
     ],
 
     // ========== data-table 列配置 ==========
@@ -842,8 +849,8 @@ document.addEventListener('alpine:init', () => {
       }
     ],
 
-    // C2C交易订单
-    /** @type {Array<Object>} C2C交易订单列表 */
+    // 交易市场订单
+    /** @type {Array<Object>} 交易市场订单列表 */
     tradeOrders: [],
     /** @type {Object|null} 当前选中的交易订单 */
     selectedTradeOrder: null,
@@ -889,6 +896,19 @@ document.addEventListener('alpine:init', () => {
     userListingsCurrentPage: 1,
     /** @type {{total: number, total_pages: number}} 用户上架商品分页 */
     userListingsPagination: { total: 0, total_pages: 0 },
+
+    // ========== 市场概览数据 ==========
+    /** @type {Object} 市场概览统计 */
+    marketOverview: {
+      total_orders: 0,
+      completed_orders: 0,
+      total_volume: 0,
+      total_fees: 0,
+      active_listings: 0,
+      by_status: {}
+    },
+    /** @type {boolean} 市场概览加载中 */
+    marketOverviewLoading: false,
 
     // 调整上架限制表单
     /** @type {Object} 调整限制表单数据 */
@@ -953,6 +973,9 @@ document.addEventListener('alpine:init', () => {
         case 'marketplace-stats':
           await this.loadMarketplaceStats()
           break
+        case 'market-overview':
+          await this.loadMarketOverview()
+          break
         case 'redemption-orders':
           await this.loadRedemptionOrders()
           break
@@ -960,7 +983,7 @@ document.addEventListener('alpine:init', () => {
     },
 
     /**
-     * 加载C2C交易订单列表
+     * 加载交易市场订单列表
      * @async
      * @returns {Promise<void>}
      */
@@ -1077,6 +1100,65 @@ document.addEventListener('alpine:init', () => {
         this.$toast?.error('加载上架统计失败')
       } finally {
         this.loading = false
+      }
+    },
+
+    // ==================== 市场概览方法 ====================
+
+    /**
+     * 加载市场概览数据（交易统计 + 在售挂牌数）
+     * @async
+     * @returns {Promise<void>}
+     */
+    async loadMarketOverview() {
+      try {
+        this.marketOverviewLoading = true
+
+        const res = await request({
+          url: MARKET_ENDPOINTS.TRADE_ORDER_STATS,
+          method: 'GET'
+        })
+
+        if (res?.success && res.data) {
+          const data = res.data
+          this.marketOverview = {
+            total_orders: 0,
+            completed_orders: data.completed_summary?.total_orders || 0,
+            total_volume: data.completed_summary?.total_gross_amount || 0,
+            total_fees: data.completed_summary?.total_fee_amount || 0,
+            active_listings: 0,
+            by_status: data.by_status || {}
+          }
+
+          // 汇总各状态的订单数
+          let totalOrders = 0
+          Object.values(data.by_status || {}).forEach(item => {
+            totalOrders += item.count || 0
+          })
+          this.marketOverview.total_orders = totalOrders
+        }
+
+        // 并行获取在售挂牌数
+        try {
+          const listingRes = await request({
+            url: MARKET_ENDPOINTS.LISTING_STATS,
+            method: 'GET',
+            params: { page: 1, limit: 1 }
+          })
+          if (listingRes?.success && listingRes.data?.summary) {
+            this.marketOverview.active_listings =
+              listingRes.data.summary.total_users_with_listings || 0
+          }
+        } catch (err) {
+          logger.warn('[TradeManagement] 加载挂牌统计失败（非致命）:', err.message)
+        }
+
+        logger.info('[TradeManagement] 市场概览加载完成', this.marketOverview)
+      } catch (error) {
+        logger.error('[TradeManagement] 加载市场概览失败:', error)
+        this.$toast?.error('加载市场概览数据失败')
+      } finally {
+        this.marketOverviewLoading = false
       }
     },
 
@@ -1398,7 +1480,7 @@ document.addEventListener('alpine:init', () => {
       }
 
       const result = await request({
-        url: MARKET_ENDPOINTS.C2C_MARKET_STATS,
+        url: MARKET_ENDPOINTS.LISTING_STATS,
         method: 'GET',
         params: queryParams
       })

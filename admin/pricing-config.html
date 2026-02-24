@@ -16,7 +16,7 @@
           <a href="/admin/workspace.html" class="text-blue-200 hover:text-white text-sm transition">← 返回工作台</a>
         </div>
         <h1>💰 积分定价配置</h1>
-        <p>管理抽奖消耗、签到奖励、新用户初始积分等核心运营参数，修改后即时生效</p>
+        <p>管理抽奖消耗、每日抽奖限制、新用户初始积分等核心运营参数，修改后即时生效</p>
       </div>
       <div class="text-6xl opacity-20">💎</div>
     </div>
@@ -26,7 +26,7 @@
   <div class="container mx-auto px-4 py-6" x-data="pricingConfig()">
     
     <!-- 快速概览统计卡片 -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+    <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
       <div class="gradient-stat-card gradient-stat-blue">
         <div class="stat-icon">🎰</div>
         <div class="stat-value" x-text="pointsDefaults.lottery_cost_points || 0"></div>
@@ -37,15 +37,27 @@
         <div class="stat-value" x-text="pointsDefaults.daily_lottery_limit || 0"></div>
         <div class="stat-label">每日抽奖上限/次</div>
       </div>
-      <div class="gradient-stat-card gradient-stat-green">
-        <div class="stat-icon">✅</div>
-        <div class="stat-value" x-text="pointsDefaults.sign_in_points || 0"></div>
-        <div class="stat-label">签到奖励积分/次</div>
-      </div>
       <div class="gradient-stat-card gradient-stat-purple">
         <div class="stat-icon">🎁</div>
         <div class="stat-value" x-text="pointsDefaults.initial_points || 0"></div>
         <div class="stat-label">新用户初始积分</div>
+      </div>
+    </div>
+
+    <!-- 全局默认配置优先级说明 -->
+    <div class="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+      <div class="flex items-start gap-2">
+        <span class="text-lg">💡</span>
+        <div>
+          <p class="text-sm font-semibold text-amber-800">此处为全局默认值</p>
+          <p class="text-xs text-amber-700 mt-1">
+            这些配置作为系统级默认值。如果在「抽奖运营 → 活动运营」中为某个活动单独配置了参数，
+            则该活动将使用<span class="font-semibold">活动级配置</span>覆盖此处的全局值。
+          </p>
+          <p class="text-xs text-amber-600 mt-1">
+            <span class="font-semibold">优先级：</span>用户级 &gt; 角色级 &gt; 活动级 &gt; 全局默认值（此处）
+          </p>
+        </div>
       </div>
     </div>
 
@@ -56,7 +68,7 @@
           <span class="title-icon">⚙️</span>
           <div>
             <span>积分参数配置</span>
-            <div class="text-xs font-normal mt-0.5" style="color: var(--color-text-muted)">修改后点击「保存配置」立即生效，影响所有用户</div>
+            <div class="text-xs font-normal mt-0.5" style="color: var(--color-text-muted)">修改后点击「保存配置」立即生效，作为全局默认值影响未单独配置的活动</div>
           </div>
         </div>
         <button @click="savePointsConfigs()" 
@@ -99,22 +111,6 @@
               <span class="px-3 py-2 bg-orange-100 text-orange-700 text-sm rounded-lg font-medium whitespace-nowrap">次/日</span>
             </div>
             <p class="text-xs text-orange-600/70">设为 0 表示不限制每日抽奖次数</p>
-          </div>
-
-          <!-- 签到积分 -->
-          <div class="p-4 rounded-lg border border-green-100 bg-green-50/30 space-y-2">
-            <label class="block text-sm font-semibold text-green-800" x-tooltip="'用户每日签到可获得的积分奖励'">
-              ✅ 签到积分 <span class="text-green-400 text-xs ml-1">ℹ️</span>
-            </label>
-            <div class="flex items-center gap-2">
-              <input type="number" 
-                     class="flex-1 px-3 py-2.5 border border-green-200 rounded-lg bg-white focus:ring-2 focus:ring-green-500 focus:border-green-500 text-lg font-semibold"
-                     x-model.number="pointsDefaults.sign_in_points"
-                     min="0"
-                     placeholder="0">
-              <span class="px-3 py-2 bg-green-100 text-green-700 text-sm rounded-lg font-medium whitespace-nowrap">积分/次</span>
-            </div>
-            <p class="text-xs text-green-600/70">用户每日签到可获得的积分奖励</p>
           </div>
 
           <!-- 新用户初始积分 -->

@@ -22,7 +22,7 @@ export const USER_DATA_QUERY_ENDPOINTS = {
   EXCHANGE_RECORDS: `${API_PREFIX}/console/user-data-query/:user_id/exchange-records`,
   /** 兑换订单审核（管理员审核操作：完成 / 发货 / 取消） */
   EXCHANGE_RECORD_REVIEW: `${API_PREFIX}/console/user-data-query/:user_id/exchange-records/:order_no/review`,
-  /** 交易记录（C2C 市场买卖） */
+  /** 交易记录（交易市场买卖） */
   TRADE_RECORDS: `${API_PREFIX}/console/user-data-query/:user_id/trade-records`,
   /** 市场挂牌（上架/下架） */
   MARKET_LISTINGS: `${API_PREFIX}/console/user-data-query/:user_id/market-listings`,

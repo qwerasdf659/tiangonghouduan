@@ -37,13 +37,13 @@ const {
   getRetryStrategy
 } = require('./ErrorCodes')
 
-// C2C可交易资产类型常量（P0-4 实施）
+// 交易市场可交易资产类型常量（P0-4 实施）
 const {
-  C2C_BLACKLISTED_ASSET_CODES,
-  isBlacklistedForC2C,
+  MARKET_BLACKLISTED_ASSET_CODES,
+  isBlacklistedForMarket,
   getBlacklistReason,
-  validateC2CTradability,
-  createC2CBlacklistError
+  validateMarketTradability,
+  createMarketBlacklistError
 } = require('./TradableAssetTypes')
 
 // 审计日志 target_type 常量
@@ -77,12 +77,12 @@ module.exports = {
   isRetryableErrorByMessage,
   getRetryStrategy,
 
-  // C2C可交易资产类型（P0-4 实施）
-  C2C_BLACKLISTED_ASSET_CODES,
-  isBlacklistedForC2C,
+  // 交易市场可交易资产类型（P0-4 实施）
+  MARKET_BLACKLISTED_ASSET_CODES,
+  isBlacklistedForMarket,
   getBlacklistReason,
-  validateC2CTradability,
-  createC2CBlacklistError,
+  validateMarketTradability,
+  createMarketBlacklistError,
 
   // 审计日志 target_type
   AUDIT_TARGET_TYPES,

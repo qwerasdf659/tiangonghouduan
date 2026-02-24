@@ -108,6 +108,7 @@ describe('MarketListingService - 撤回挂牌时买家订单处理', () => {
             asset_code: test_asset_code,
             delta_amount: listing_amount,
             business_type: 'test_grant',
+            counterpart_account_id: 2,
             idempotency_key: `test_seller_grant_${Date.now()}`
           },
           { transaction: prep_tx }
@@ -120,6 +121,7 @@ describe('MarketListingService - 撤回挂牌时买家订单处理', () => {
             asset_code: test_asset_code,
             delta_amount: price_amount,
             business_type: 'test_grant',
+            counterpart_account_id: 2,
             idempotency_key: `test_buyer_grant_${Date.now()}`
           },
           { transaction: prep_tx }
@@ -168,7 +170,7 @@ describe('MarketListingService - 撤回挂牌时买家订单处理', () => {
           },
           { transaction: order_tx }
         )
-        order_id = result.order_id
+        order_id = result.trade_order_id
         await order_tx.commit()
       } catch (e) {
         await order_tx.rollback()
@@ -250,6 +252,7 @@ describe('MarketListingService - 撤回挂牌时买家订单处理', () => {
             asset_code: test_asset_code,
             delta_amount: 10,
             business_type: 'test_grant',
+            counterpart_account_id: 2,
             idempotency_key: `no_order_grant_${Date.now()}`
           },
           { transaction: prep_tx }

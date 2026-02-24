@@ -109,7 +109,7 @@ async function ensureTestUserHasPoints(requiredPoints = 1500000, options = {}) {
     const today = new Date().toISOString().slice(0, 10).replace(/-/g, '')
     const idempotency_key = `test_topup_${user_id}_${testName}_${today}_${uuidv4().slice(0, 8)}`
 
-    // 4. 执行充值
+    // 4. 执行充值（counterpart 指向 SYSTEM_MINT，确保双录 SUM=0）
     await BalanceService.changeBalance(
       {
         user_id,
@@ -117,6 +117,7 @@ async function ensureTestUserHasPoints(requiredPoints = 1500000, options = {}) {
         delta_amount: shortage,
         business_type: 'test_topup',
         idempotency_key,
+        counterpart_account_id: 2,
         meta: {
           reason: '测试积分充值',
           test_name: testName,

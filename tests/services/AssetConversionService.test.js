@@ -204,6 +204,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
             delta_amount: 100, // 增加 100 个 red_shard
             idempotency_key: prepare_key,
             business_type: 'test_mint',
+            counterpart_account_id: 2,
             meta: { test: true, purpose: '测试前置准备' }
           },
           { transaction }
@@ -265,6 +266,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
             delta_amount: 50,
             idempotency_key: prepare_key,
             business_type: 'test_mint',
+            counterpart_account_id: 2,
             meta: { test: true }
           },
           { transaction }
@@ -339,6 +341,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
             delta_amount: 100,
             idempotency_key: prepare_key,
             business_type: 'test_mint',
+            counterpart_account_id: 2,
             meta: { test: true }
           },
           { transaction }
@@ -407,6 +410,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
             delta_amount: 100,
             idempotency_key: prepare_key,
             business_type: 'test_mint',
+            counterpart_account_id: 2,
             meta: { test: true }
           },
           { transaction }
@@ -688,6 +692,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
             delta_amount: 50,
             idempotency_key: prepare_key,
             business_type: 'test_mint',
+            counterpart_account_id: 2,
             meta: { test: true }
           },
           { transaction }
@@ -755,6 +760,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
             delta_amount: 50,
             idempotency_key: prepare_key,
             business_type: 'test_mint',
+            counterpart_account_id: 2,
             meta: { test: true }
           },
           { transaction }
@@ -802,6 +808,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
             delta_amount: 100,
             idempotency_key: prepare_key,
             business_type: 'test_mint',
+            counterpart_account_id: 2,
             meta: { test: true }
           },
           { transaction }
@@ -878,6 +885,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
             delta_amount: max_amount + 100,
             idempotency_key: prepare_key,
             business_type: 'test_mint',
+            counterpart_account_id: 2,
             meta: { test: true }
           },
           { transaction }
@@ -922,6 +930,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
             delta_amount: 50,
             idempotency_key: prepare_key,
             business_type: 'test_mint',
+            counterpart_account_id: 2,
             meta: { test: true }
           },
           { transaction }
@@ -1074,6 +1083,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
             delta_amount: exact_amount,
             idempotency_key: prepare_key,
             business_type: 'test_mint',
+            counterpart_account_id: 2,
             meta: { test: true, purpose: '边界测试准备' }
           },
           { transaction }
@@ -1195,6 +1205,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
                 delta_amount: 50,
                 idempotency_key: generateIdempotencyKey('rollback_test_mint'),
                 business_type: 'test_mint',
+                counterpart_account_id: 2,
                 meta: { test: true }
               },
               { transaction }
@@ -1268,6 +1279,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
               delta_amount: prepare_amount,
               idempotency_key: generateIdempotencyKey('commit_test_mint'),
               business_type: 'test_mint',
+              counterpart_account_id: 2,
               meta: { test: true }
             },
             { transaction }

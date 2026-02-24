@@ -63,7 +63,7 @@ const NON_RETRYABLE_ERROR_CODES = Object.freeze([
   'INVALID_LISTING_STATUS', // 挂牌状态不合法
   'INVALID_LISTING_KIND', // 挂牌类型不合法
   'ASSET_NOT_TRADABLE', // 资产不可交易（数据库配置）
-  'ASSET_C2C_BLACKLISTED', // 资产C2C黑名单禁止（P0-4硬编码保护）
+  'ASSET_MARKET_BLACKLISTED', // 资产交易市场黑名单禁止（P0-4硬编码保护）
   'ASSET_TYPE_DISABLED', // 资产类型已禁用
   'INVALID_ASSET_TYPE', // 无效资产类型
   'LISTING_LIMIT_EXCEEDED', // 挂牌数量超限

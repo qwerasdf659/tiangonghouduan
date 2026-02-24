@@ -1,10 +1,10 @@
 /**
- * C2C 交易市场 API 模块
+ * 交易市场 API 模块
  *
  * @module api/market/trade
- * @description C2C 交易订单、市场挂牌、孤儿冻结检测、业务记录相关的 API 调用
- * @version 2.0.0
- * @date 2026-01-30
+ * @description 交易市场订单、市场挂牌、孤儿冻结检测、业务记录相关的 API 调用
+ * @version 2.1.0
+ * @date 2026-02-24
  */
 
 import { API_PREFIX, request, buildURL, buildQueryString } from '../base.js'
@@ -31,12 +31,6 @@ export const TRADE_ENDPOINTS = {
   ORPHAN_DETECT: `${API_PREFIX}/console/orphan-frozen/detect`,
   ORPHAN_STATS: `${API_PREFIX}/console/orphan-frozen/stats`,
   ORPHAN_CLEANUP: `${API_PREFIX}/console/orphan-frozen/cleanup`,
-
-  // C2C市场扩展
-  C2C_MARKET_ORDERS: `${API_PREFIX}/console/c2c-market/orders`,
-  C2C_MARKET_ORDER_STATS: `${API_PREFIX}/console/c2c-market/orders/stats`,
-  C2C_MARKET_LISTING_SUMMARY: `${API_PREFIX}/console/c2c-market/listings/summary`,
-  C2C_MARKET_LISTING_USER_STATS: `${API_PREFIX}/console/c2c-market/listings/user-stats`,
 
   // 市场统计扩展
   MARKETPLACE_STATS_ITEM_STATS: `${API_PREFIX}/console/marketplace/stats/items`,
@@ -69,10 +63,6 @@ export const TRADE_ENDPOINTS = {
   TRADE_ORDER_USER_STATS: `${API_PREFIX}/console/trade-orders/user/:user_id/stats`,
   TRADE_ORDER_BY_BUSINESS_ID: `${API_PREFIX}/console/trade-orders/by-business-id/:business_id`,
 
-  // C2C市场扩展（补充）
-  C2C_MARKET_LIST: `${API_PREFIX}/console/marketplace/listings`,
-  C2C_MARKET_DETAIL: `${API_PREFIX}/console/marketplace/listings/:listing_id`,
-  C2C_MARKET_STATS: `${API_PREFIX}/console/marketplace/listing-stats`
 }
 
 // ========== API 调用方法 ==========
@@ -491,35 +481,6 @@ export const TradeAPI = {
     return await request({ url, method: 'GET' })
   },
 
-  /**
-   * 获取C2C市场列表
-   * @param {Object} [params={}] - 查询参数
-   * @returns {Promise<Object>} 市场列表
-   */
-  async getC2CMarketList(params = {}) {
-    const url = TRADE_ENDPOINTS.C2C_MARKET_LIST + buildQueryString(params)
-    return await request({ url, method: 'GET' })
-  },
-
-  /**
-   * 获取C2C市场详情
-   * @param {number} listingId - 挂牌ID
-   * @returns {Promise<Object>} 挂牌详情
-   */
-  async getC2CMarketDetail(listingId) {
-    const url = buildURL(TRADE_ENDPOINTS.C2C_MARKET_DETAIL, { listing_id: listingId })
-    return await request({ url, method: 'GET' })
-  },
-
-  /**
-   * 获取C2C市场统计
-   * @param {Object} [params={}] - 查询参数
-   * @returns {Promise<Object>} 统计数据
-   */
-  async getC2CMarketStats(params = {}) {
-    const url = TRADE_ENDPOINTS.C2C_MARKET_STATS + buildQueryString(params)
-    return await request({ url, method: 'GET' })
-  }
 }
 
 export default TradeAPI

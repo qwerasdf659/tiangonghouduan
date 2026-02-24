@@ -403,7 +403,7 @@ class PrizePoolService {
    */
   static async getAllPrizes(filters = {}) {
     try {
-      const { lottery_campaign_id, status } = filters
+      const { lottery_campaign_id, status, merchant_id } = filters
 
       logger.info('获取奖品列表', { filters })
 
@@ -411,6 +411,7 @@ class PrizePoolService {
       const where = {}
       if (lottery_campaign_id) where.lottery_campaign_id = parseInt(lottery_campaign_id)
       if (status) where.status = status
+      if (merchant_id) where.merchant_id = parseInt(merchant_id)
 
       // 2. 查询奖品列表
       const prizes = await LotteryPrize.findAll({
