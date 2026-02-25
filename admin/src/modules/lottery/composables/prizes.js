@@ -12,6 +12,7 @@ import { logger } from '../../../utils/logger.js'
 import { LOTTERY_ENDPOINTS } from '../../../api/lottery/index.js'
 import { MERCHANT_ENDPOINTS } from '../../../api/merchant.js'
 import { buildURL } from '../../../api/base.js'
+import { imageUploadMixin } from '../../../alpine/mixins/image-upload.js'
 
 /**
  * 奖品管理状态
@@ -30,6 +31,9 @@ import { buildURL } from '../../../api/base.js'
  */
 export function usePrizesState() {
   return {
+    ...imageUploadMixin(),
+    /** @type {string|null} 奖品图片预览URL（编辑/上传时的本地预览） */
+    prize_image_preview_url: null,
     /** @type {Array} 奖品列表 */
     prizes: [],
     /** @type {Object} 奖品筛选条件 */
@@ -130,6 +134,48 @@ export function usePrizesMethods() {
     },
 
     /**
+     * 上传奖品图片
+     *
+     * 复用 imageUploadMixin.uploadImage() 上传到 Sealos 对象存储，
+     * 上传成功后设置 prizeForm.image_resource_id 和本地预览URL。
+     *
+     * @param {Event} event - input[type=file] 的 change 事件
+     */
+    async handlePrizeImageUpload(event) {
+      const fileInfo = this.getFileFromEvent(event)
+      if (!fileInfo) return
+
+      this.prize_image_preview_url = fileInfo.preview_url
+
+      const result = await this.uploadImage(fileInfo.file, {
+        business_type: 'lottery',
+        category: 'prizes'
+      })
+
+      if (result) {
+        this.prizeForm.image_resource_id = result.image_resource_id
+        if (result.public_url) {
+          this.prize_image_preview_url = result.public_url
+        }
+        logger.info('[Prizes] 奖品图片上传成功', {
+          image_resource_id: result.image_resource_id
+        })
+      } else {
+        this.prize_image_preview_url = null
+      }
+
+      event.target.value = ''
+    },
+
+    /**
+     * 清除奖品图片
+     */
+    clearPrizeImage() {
+      this.prizeForm.image_resource_id = null
+      this.prize_image_preview_url = null
+    },
+
+    /**
      * 加载奖品列表
      * 后端返回字段: lottery_prize_id, prize_name, prize_type, win_probability,
      *               stock_quantity, status, prize_description, image_resource_id
@@ -186,23 +232,22 @@ export function usePrizesMethods() {
     openCreatePrizeModal() {
       this.editingLotteryPrizeId = null
       this.isEditMode = false
-      // 使用后端字段名，添加lottery_campaign_id
-      // 注意：后端要求 quantity 必须为正整数，默认100
+      this.prize_image_preview_url = null
       this.prizeForm = {
-        lottery_campaign_id: this.campaigns?.[0]?.lottery_campaign_id || null, // 默认选择第一个活动
+        lottery_campaign_id: this.campaigns?.[0]?.lottery_campaign_id || null,
         prize_name: '',
         prize_type: 'virtual',
-        win_probability: 0, // 前端百分比 0-100
-        stock_quantity: 100, // 默认库存100，后端要求正整数
+        win_probability: 0,
+        stock_quantity: 100,
         status: 'active',
-      image_resource_id: null,
-      prize_description: '',
-      rarity_code: 'common',
-      win_weight: 100000,
-      reward_tier: 'low'
-    }
-    this.showModal('prizeModal')
-  },
+        image_resource_id: null,
+        prize_description: '',
+        rarity_code: 'common',
+        win_weight: 100000,
+        reward_tier: 'low'
+      }
+      this.showModal('prizeModal')
+    },
 
     /**
      * 编辑奖品
@@ -211,6 +256,7 @@ export function usePrizesMethods() {
     editPrize(prize) {
       this.editingLotteryPrizeId = prize.lottery_prize_id
       this.isEditMode = true
+      this.prize_image_preview_url = prize.image_url || null
       const winProbability = parseFloat(prize.win_probability || 0) * 100
       this.prizeForm = {
         lottery_prize_id: prize.lottery_prize_id,

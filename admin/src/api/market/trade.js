@@ -37,6 +37,10 @@ export const TRADE_ENDPOINTS = {
   MARKETPLACE_STATS_ORDER_STATS: `${API_PREFIX}/console/marketplace/stats/orders`,
   MARKETPLACE_STATS: `${API_PREFIX}/console/marketplace/stats`,
 
+  // 市场分析（MarketAnalyticsService）
+  MARKET_OVERVIEW: `${API_PREFIX}/console/marketplace/stats/overview`,
+  MARKET_PRICE_HISTORY: `${API_PREFIX}/console/marketplace/stats/price-history`,
+
   // 业务记录查询
   BUSINESS_RECORD_LOTTERY_CLEAR: `${API_PREFIX}/console/business-records/lottery-clear-settings`,
   BUSINESS_RECORD_LOTTERY_CLEAR_DETAIL: `${API_PREFIX}/console/business-records/lottery-clear-settings/:record_id`,

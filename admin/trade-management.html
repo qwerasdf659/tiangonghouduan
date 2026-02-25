@@ -71,7 +71,7 @@
     <!-- 筛选栏 -->
     <div class="themed-card rounded-lg shadow mb-6">
       <div class="p-4">
-        <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+        <div class="grid grid-cols-2 md:grid-cols-6 gap-4 items-end">
           <div>
             <label class="block text-sm font-medium themed-text-secondary mb-1">交易状态</label>
             <select x-model="tradeFilters.status" class="w-full px-3 py-2 border rounded-lg">
@@ -81,6 +81,15 @@
               <option value="completed">已完成</option>
               <option value="cancelled">已取消</option>
               <option value="disputed">争议中</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">商家筛选</label>
+            <select x-model="tradeOrderMerchantFilter" class="w-full px-3 py-2 border rounded-lg">
+              <option value="">全部商家</option>
+              <template x-for="m in merchantOptions" :key="m.merchant_id">
+                <option :value="m.merchant_id" x-text="m.merchant_name"></option>
+              </template>
             </select>
           </div>
           <div>
@@ -99,7 +108,7 @@
             </button>
           </div>
           <div>
-            <button @click="tradeFilters = { status: '', buyer_mobile: '', seller_mobile: '', listing_id: '' }; resolvedBuyer = null; resolvedSeller = null; loadTradeOrders()" class="w-full px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">
+            <button @click="tradeFilters = { status: '', buyer_mobile: '', seller_mobile: '', listing_id: '' }; tradeOrderMerchantFilter = ''; resolvedBuyer = null; resolvedSeller = null; loadTradeOrders()" class="w-full px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">
               🔄 重置
             </button>
           </div>
@@ -158,7 +167,7 @@
       <!-- 筛选栏 -->
       <div class="themed-card rounded-lg shadow mb-6">
         <div class="p-4">
-          <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+          <div class="grid grid-cols-2 md:grid-cols-6 gap-4 items-end">
             <div>
               <label class="block text-sm font-medium themed-text-secondary mb-1">手机号搜索</label>
               <input type="text" x-model="marketplaceFilters.mobile" placeholder="输入手机号搜索"
@@ -174,12 +183,21 @@
               </select>
             </div>
             <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">商家筛选</label>
+              <select x-model="marketplaceFilters.merchant_id" class="w-full px-3 py-2 border rounded-lg">
+                <option value="">全部商家</option>
+                <template x-for="m in merchantOptions" :key="m.merchant_id">
+                  <option :value="m.merchant_id" x-text="m.merchant_name"></option>
+                </template>
+              </select>
+            </div>
+            <div>
               <button @click="loadMarketplaceStats()" class="w-full px-4 py-2 themed-btn-primary rounded-lg">
                 🔍 查询
               </button>
             </div>
             <div>
-              <button @click="marketplaceFilters = { status: 'all', mobile: '' }; loadMarketplaceStats()" class="w-full px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">
+              <button @click="marketplaceFilters = { status: 'all', mobile: '', merchant_id: '' }; loadMarketplaceStats()" class="w-full px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">
                 🔄 重置
               </button>
             </div>
@@ -264,11 +282,11 @@
 
       <div x-show="!marketOverviewLoading">
         <!-- 核心指标卡片 -->
-        <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
           <div class="gradient-stat-card gradient-stat-blue">
             <div class="stat-icon">📊</div>
             <div class="stat-value" x-text="marketOverview.total_orders">0</div>
-            <div class="stat-label">总订单数</div>
+            <div class="stat-label">近7天成交笔数</div>
           </div>
           <div class="gradient-stat-card gradient-stat-green">
             <div class="stat-icon">✅</div>
@@ -278,17 +296,22 @@
           <div class="gradient-stat-card gradient-stat-orange">
             <div class="stat-icon">💰</div>
             <div class="stat-value" x-text="formatNumber(marketOverview.total_volume)">0</div>
-            <div class="stat-label">总成交额</div>
+            <div class="stat-label">总成交额(钻石)</div>
           </div>
           <div class="gradient-stat-card gradient-stat-rose">
             <div class="stat-icon">💎</div>
             <div class="stat-value" x-text="formatNumber(marketOverview.total_fees)">0</div>
             <div class="stat-label">总手续费</div>
           </div>
-          <div class="gradient-stat-card gradient-stat-purple" style="background: linear-gradient(135deg, #7C3AED 0%, #A855F7 100%);">
+          <div class="gradient-stat-card" style="background: linear-gradient(135deg, #06b6d4 0%, #22d3ee 100%); color: white;">
+            <div class="stat-icon">🛒</div>
+            <div class="stat-value" x-text="marketOverview.unique_buyers || 0">0</div>
+            <div class="stat-label">活跃买家(近7天)</div>
+          </div>
+          <div class="gradient-stat-card" style="background: linear-gradient(135deg, #7C3AED 0%, #A855F7 100%); color: white;">
             <div class="stat-icon">👥</div>
-            <div class="stat-value" x-text="marketOverview.active_listings">0</div>
-            <div class="stat-label">活跃卖家数</div>
+            <div class="stat-value" x-text="marketOverview.unique_sellers || 0">0</div>
+            <div class="stat-label">活跃卖家(近7天)</div>
           </div>
         </div>
 
@@ -314,13 +337,84 @@
           </div>
         </div>
 
+        <!-- ECharts 图表区域（MarketAnalyticsService 数据可视化） -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <!-- 资产成交量排行图表 -->
+          <div class="themed-card rounded-lg shadow">
+            <div class="p-4 border-b">
+              <h5 class="font-semibold">📊 近7天各资产成交量排行</h5>
+            </div>
+            <div class="p-4">
+              <div id="asset-ranking-chart" style="width: 100%; height: 320px;"></div>
+              <div x-show="marketOverview.asset_ranking.length === 0"
+                   class="text-center py-12 themed-text-muted">
+                暂无资产成交数据
+              </div>
+            </div>
+          </div>
+
+          <!-- 当前在售资产分布饼图 -->
+          <div class="themed-card rounded-lg shadow">
+            <div class="p-4 border-b">
+              <h5 class="font-semibold">🥧 当前在售资产分布</h5>
+            </div>
+            <div class="p-4">
+              <div id="on-sale-chart" style="width: 100%; height: 320px;"></div>
+              <div x-show="marketOverview.on_sale_summary.length === 0"
+                   class="text-center py-12 themed-text-muted">
+                暂无在售资产数据
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 资产成交量明细表格 -->
+        <div class="themed-card rounded-lg shadow mb-6"
+             x-show="marketOverview.asset_ranking.length > 0">
+          <div class="p-4 border-b">
+            <h5 class="font-semibold">📋 资产成交量明细</h5>
+          </div>
+          <div class="p-4 overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b themed-text-muted">
+                  <th class="py-2 text-left">资产代码</th>
+                  <th class="py-2 text-left">挂牌类型</th>
+                  <th class="py-2 text-right">成交笔数</th>
+                  <th class="py-2 text-right">成交总量(钻石)</th>
+                  <th class="py-2 text-right">均价</th>
+                  <th class="py-2 text-right">最低价</th>
+                  <th class="py-2 text-right">最高价</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="item in marketOverview.asset_ranking" :key="item.asset_code + item.listing_kind">
+                  <tr class="border-b hover:bg-gray-50">
+                    <td class="py-2 font-medium" x-text="item.asset_code"></td>
+                    <td class="py-2">
+                      <span class="px-2 py-0.5 rounded text-xs"
+                            :class="item.listing_kind === 'item' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'"
+                            x-text="item.listing_kind === 'item' ? '物品' : '可叠加资产'"></span>
+                    </td>
+                    <td class="py-2 text-right font-bold" x-text="Number(item.trade_count || 0).toLocaleString()"></td>
+                    <td class="py-2 text-right" x-text="Number(item.total_diamond_volume || 0).toLocaleString()"></td>
+                    <td class="py-2 text-right" x-text="Number(item.avg_price || 0).toLocaleString()"></td>
+                    <td class="py-2 text-right" x-text="Number(item.min_price || 0).toLocaleString()"></td>
+                    <td class="py-2 text-right" x-text="Number(item.max_price || 0).toLocaleString()"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
         <!-- 市场健康指标 -->
-        <div class="themed-card rounded-lg shadow">
+        <div class="themed-card rounded-lg shadow mb-6">
           <div class="p-4 border-b">
             <h5 class="font-semibold">🏥 市场健康指标</h5>
           </div>
           <div class="p-6">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
               <div class="p-4 themed-bg-base rounded-lg">
                 <div class="flex items-center justify-between mb-2">
                   <span class="text-sm font-medium themed-text-secondary">成交转化率</span>
@@ -353,6 +447,14 @@
                           : '0%'">0%</span>
                 </div>
                 <p class="text-xs themed-text-muted">手续费 / 总成交额</p>
+              </div>
+              <div class="p-4 themed-bg-base rounded-lg">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="text-sm font-medium themed-text-secondary">活跃参与者</span>
+                  <span class="text-lg font-bold themed-text-primary"
+                        x-text="(marketOverview.unique_buyers || 0) + ' / ' + (marketOverview.unique_sellers || 0)"></span>
+                </div>
+                <p class="text-xs themed-text-muted">买家 / 卖家（近7天）</p>
               </div>
             </div>
           </div>

@@ -470,8 +470,7 @@ class ActivityService {
         'pool_budget_total',
         'pool_budget_remaining',
         'allowed_campaign_ids',
-        // ======================== 预设欠账控制字段（统一架构 V1.6） ========================
-        'preset_debt_enabled',
+        // preset_debt_enabled 已迁移到 lottery_strategy_config 表（config_group=preset）
         'preset_budget_policy',
         'status'
       ]
@@ -495,12 +494,7 @@ class ActivityService {
         used:
           (Number(campaign.pool_budget_total) || 0) - (Number(campaign.pool_budget_remaining) || 0)
       },
-      /*
-       * 预设欠账控制字段（统一架构真源字段）
-       * - preset_debt_enabled：是否允许欠账（预设发放资源不足时是否允许欠账）
-       * - preset_budget_policy：预设预算扣减策略（follow_campaign/pool_first/user_first）
-       */
-      preset_debt_enabled: !!campaign.preset_debt_enabled,
+      // preset_debt_enabled 已迁移到 lottery_strategy_config.preset.debt_enabled
       preset_budget_policy: campaign.preset_budget_policy,
       allowed_campaign_ids: campaign.allowed_campaign_ids || [],
       status: campaign.status

@@ -3,8 +3,8 @@
  *
  * @file admin/src/modules/market/composables/index.js
  * @description 导出所有市场相关的 composable 模块
- * @version 1.0.0
- * @date 2026-01-24
+ * @version 1.1.0
+ * @date 2026-02-24
  */
 
 // 兑换商品管理模块
@@ -16,6 +16,9 @@ import { useExchangeOrdersState, useExchangeOrdersMethods } from './exchange-ord
 // 兑换统计分析模块
 import { useExchangeStatsState, useExchangeStatsMethods } from './exchange-stats.js'
 
+// 汇率管理模块
+import { useExchangeRateState, useExchangeRateActions } from './exchange-rates.js'
+
 // 命名导出
 export {
   useExchangeItemsState,
@@ -23,5 +26,7 @@ export {
   useExchangeOrdersState,
   useExchangeOrdersMethods,
   useExchangeStatsState,
-  useExchangeStatsMethods
+  useExchangeStatsMethods,
+  useExchangeRateState,
+  useExchangeRateActions
 }

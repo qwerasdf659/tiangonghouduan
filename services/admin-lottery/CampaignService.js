@@ -286,15 +286,10 @@ class AdminLotteryCampaignService {
       }
     }
 
-    // 验证 preset_debt_enabled
-    if (updateData.preset_debt_enabled !== undefined) {
-      if (typeof updateData.preset_debt_enabled !== 'boolean') {
-        const error = new Error('preset_debt_enabled 必须是 boolean（true/false）')
-        error.code = 'INVALID_PRESET_DEBT_ENABLED'
-        error.statusCode = 400
-        throw error
-      }
-    }
+    /*
+     * preset_debt_enabled 已迁移到 lottery_strategy_config.preset.debt_enabled
+     * 通过 PUT /api/v4/console/lottery-campaigns/:id/strategy-config 管理
+     */
 
     // 获取活动
     const campaign = await LotteryCampaign.findByPk(parseInt(lottery_campaign_id), { transaction })
@@ -307,13 +302,8 @@ class AdminLotteryCampaignService {
 
     // 构建更新数据
     const fieldsToUpdate = {}
-    const {
-      budget_mode,
-      pool_budget_total,
-      allowed_campaign_ids,
-      preset_debt_enabled,
-      preset_budget_policy
-    } = updateData
+    const { budget_mode, pool_budget_total, allowed_campaign_ids, preset_budget_policy } =
+      updateData
 
     if (budget_mode) {
       fieldsToUpdate.budget_mode = budget_mode
@@ -350,9 +340,6 @@ class AdminLotteryCampaignService {
       fieldsToUpdate.allowed_campaign_ids = allowed_campaign_ids
     }
 
-    if (preset_debt_enabled !== undefined) {
-      fieldsToUpdate.preset_debt_enabled = preset_debt_enabled
-    }
     if (preset_budget_policy !== undefined) {
       fieldsToUpdate.preset_budget_policy = preset_budget_policy
     }

@@ -402,6 +402,12 @@ class TierPickStage extends BaseStage {
       }
 
       /* 7. 构建返回数据 */
+      const resolver_version_value = await DynamicConfigLoader.getValue(
+        'segment',
+        'resolver_version',
+        'default',
+        { lottery_campaign_id }
+      )
       const result = {
         selected_tier: final_tier,
         original_tier,
@@ -410,6 +416,7 @@ class TierPickStage extends BaseStage {
         tier_weights: base_tier_weights,
         adjusted_weights: capped_weights,
         user_segment,
+        resolver_version: resolver_version_value,
         weight_scale: WEIGHT_SCALE,
         /* 策略引擎分层信息 */
         budget_tier,
@@ -458,7 +465,7 @@ class TierPickStage extends BaseStage {
    *
    * 根据架构设计方案 DR-15 和 DR-17：
    * - segment_key 是代码级策略，存储在 config/segment_rules.js
-   * - 通过 campaign.segment_resolver_version 指定使用哪个版本
+   * - 通过 lottery_strategy_config.segment.resolver_version 指定使用哪个版本
    * - 需要查询用户信息（created_at, history_total_points 等）来匹配规则
    *
    * @param {number} user_id - 用户ID
@@ -468,8 +475,14 @@ class TierPickStage extends BaseStage {
    */
   async _resolveUserSegment(user_id, campaign) {
     try {
-      // 获取分层规则版本（默认使用 'default' 版本）
-      const resolver_version = campaign.segment_resolver_version || 'default'
+      // 从 lottery_strategy_config 读取分群版本（三层优先级：DB活动级 > env > 代码默认值）
+      const { DynamicConfigLoader } = require('../../compute/config/StrategyConfig')
+      const resolver_version = await DynamicConfigLoader.getValue(
+        'segment',
+        'resolver_version',
+        'default',
+        { lottery_campaign_id: campaign.lottery_campaign_id }
+      )
 
       // 验证版本是否有效
       if (!SegmentResolver.isValidVersion(resolver_version)) {

@@ -345,6 +345,45 @@ describe('ChatWebSocketService - 聊天WebSocket服务', () => {
 
       expect(successCount).toBe(2)
     })
+
+    it('pushNotificationToUser 应成功推送通知给在线用户', () => {
+      /**
+       * 测试场景：向在线用户推送通知（方案B：user_notifications 实时推送通道）
+       * 预期结果：返回 true，emit 事件为 new_notification
+       */
+      chatWebSocketService.connectedUsers.set(1, 'socket_1')
+
+      const notification = {
+        notification_id: 100,
+        type: 'exchange_approved',
+        title: '兑换审核通过',
+        content: '您的兑换申请已审核通过',
+        metadata: { exchange_id: 'test_001' },
+        created_at: new Date().toISOString()
+      }
+
+      const result = chatWebSocketService.pushNotificationToUser(1, notification)
+
+      expect(result).toBe(true)
+      expect(chatWebSocketService.io.to).toHaveBeenCalledWith('socket_1')
+      expect(mockEmit).toHaveBeenCalledWith('new_notification', notification)
+    })
+
+    it('pushNotificationToUser 对离线用户应返回 false', () => {
+      /**
+       * 测试场景：向离线用户推送通知
+       * 预期结果：返回 false（用户不在线，通知仍保存在 user_notifications 表中）
+       */
+      const notification = {
+        notification_id: 101,
+        type: 'exchange_rejected',
+        title: '兑换审核未通过'
+      }
+
+      const result = chatWebSocketService.pushNotificationToUser(999, notification)
+
+      expect(result).toBe(false)
+    })
   })
 
   // ==================== 5. 服务状态测试 ====================

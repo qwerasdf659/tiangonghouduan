@@ -55,6 +55,7 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
         cost_points: 500,
         max_daily_wins: 1,
         daily_win_count: 0,
+        is_fallback: false,
         status: 'active',
         sort_order: 1
       },
@@ -66,6 +67,7 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
         stock_quantity: 100,
         prize_value: 200,
         cost_points: 50,
+        is_fallback: true,
         status: 'active',
         sort_order: 2
       }
@@ -93,6 +95,13 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
       result.forEach(prize => {
         expect(prize).not.toHaveProperty('cost_points')
       })
+    })
+
+    test('B-5-1-3b 普通用户（public）可见 is_fallback（2026-02-25 决策6 放开）', () => {
+      const result = DataSanitizer.sanitizePrizes(mockPrizes, 'public')
+
+      expect(result[0].is_fallback).toBe(false)
+      expect(result[1].is_fallback).toBe(true)
     })
 
     test('B-5-1-4 普通用户（public）保留 rarity_code 字段', () => {

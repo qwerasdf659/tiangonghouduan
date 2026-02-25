@@ -530,6 +530,42 @@ class ChatWebSocketService {
   }
 
   /**
+   * 推送通知给指定用户（方案B：用户通知独立通道）
+   *
+   * 事件名 new_notification 与聊天的 new_message 和管理员的 notification 区分：
+   *   - new_message → 客服聊天消息
+   *   - new_notification → 用户系统通知（挂牌、交易、中奖等）
+   *   - notification → 管理员系统通知
+   *
+   * @param {number} user_id - 接收用户ID
+   * @param {Object} notification - 通知对象（含 notification_id, type, title, content, metadata, created_at）
+   * @returns {boolean} 是否推送成功（用户不在线返回 false）
+   */
+  pushNotificationToUser(user_id, notification) {
+    const socketId = this.connectedUsers.get(user_id)
+    if (socketId) {
+      try {
+        this.io.to(socketId).emit('new_notification', notification)
+        wsLogger.info(`🔔 用户通知已推送给用户 ${user_id}`, {
+          notification_id: notification.notification_id,
+          type: notification.type
+        })
+        return true
+      } catch (error) {
+        wsLogger.error('推送通知给用户失败', {
+          user_id,
+          notification_id: notification.notification_id || 'unknown',
+          error: error.message,
+          timestamp: BeijingTimeHelper.now()
+        })
+        return false
+      }
+    }
+    wsLogger.info(`⚠️ 用户 ${user_id} 不在线，无法推送通知`)
+    return false
+  }
+
+  /**
    * 推送通知给指定管理员（专用于系统通知）
    * @param {Number} admin_id - 接收管理员ID
    * @param {Object} notification - 通知对象

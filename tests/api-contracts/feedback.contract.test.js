@@ -109,8 +109,10 @@ describe('API契约测试 - 反馈模块 (/api/v4/system)', () => {
     })
   })
 
-  // ==================== GET /api/v4/system/ad-delivery?slot_type=announcement ====================
-  // [已合并] /system/announcements → /system/ad-delivery?slot_type=announcement
+  /*
+   * ==================== GET /api/v4/system/ad-delivery?slot_type=announcement ====================
+   * [已合并] /system/announcements → /system/ad-delivery?slot_type=announcement
+   */
   describe('GET /system/ad-delivery?slot_type=announcement - 系统公告（统一内容投放）', () => {
     /**
      * Case 1: 获取公告列表（已合并到统一内容投放接口）
@@ -132,9 +134,7 @@ describe('API契约测试 - 反馈模块 (/api/v4/system)', () => {
      * Case 2: 统一内容投放接口需要登录
      */
     test('无 Authorization 应该返回 401', async () => {
-      const response = await request(app).get(
-        '/api/v4/system/ad-delivery?slot_type=announcement'
-      )
+      const response = await request(app).get('/api/v4/system/ad-delivery?slot_type=announcement')
 
       expect(response.status).toBe(401)
     })

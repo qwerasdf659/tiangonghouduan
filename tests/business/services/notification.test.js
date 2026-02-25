@@ -1,8 +1,8 @@
 /**
  * NotificationService 测试套件
- * 测试统一通知服务（客服聊天系统集成）
+ * 测试统一通知服务（方案B：通知通道独立化）
  * 创建时间：2025-10-11 北京时间
- * 更新时间：2026-01-09（P1-9 ServiceManager 集成）
+ * 更新时间：2026-02-24（方案B：send() 写入 user_notifications 而非 chat_messages）
  *
  * P1-9 重构说明：
  * - NotificationService 通过 global.getTestService() 获取（J2-RepoWide）
@@ -10,20 +10,18 @@
  * - 模型直接引用用于测试数据准备/验证
  */
 
-const { CustomerServiceSession, ChatMessage, User } = require('../../../models')
+const { Op } = require('sequelize')
+const { CustomerServiceSession, ChatMessage, UserNotification, User } = require('../../../models')
 const { TEST_DATA } = require('../../helpers/test-data')
-
-// 🔴 P1-9：通过 ServiceManager 获取服务（替代直接 require）
-let NotificationService
+const NotificationService = require('../../../services/NotificationService')
 
 describe('NotificationService - 统一通知服务', () => {
   let testUser
+  const createdNotificationIds = []
+  const createdSessionIds = []
+  const createdChatMessageIds = []
 
   beforeAll(async () => {
-    // 🔴 P1-9：通过 ServiceManager 获取服务实例（snake_case key）
-    NotificationService = global.getTestService('notification')
-
-    // 创建测试用户 - 使用统一测试数据
     testUser = await User.findOne({
       where: { mobile: TEST_DATA.users.testUser.mobile }
     })
@@ -33,8 +31,81 @@ describe('NotificationService - 统一通知服务', () => {
     }
   })
 
+  afterAll(async () => {
+    try {
+      // 清理测试产生的 user_notifications 数据
+      if (createdNotificationIds.length > 0) {
+        await UserNotification.destroy({
+          where: { notification_id: { [Op.in]: createdNotificationIds } }
+        })
+      }
+
+      // 清理测试类型的通知（兜底清理）
+      const testTypes = [
+        'test_notification',
+        'isolation_test',
+        'admin_test',
+        'exchange_pending',
+        'exchange_approved',
+        'exchange_rejected',
+        'new_exchange_audit',
+        'pending_orders_alert',
+        'image_approved',
+        'image_rejected',
+        'format_test',
+        'no_title_test'
+      ]
+      await UserNotification.destroy({
+        where: {
+          user_id: testUser.user_id,
+          type: { [Op.in]: testTypes }
+        }
+      })
+
+      // 清理并发测试产生的通知
+      await UserNotification.destroy({
+        where: {
+          user_id: testUser.user_id,
+          type: { [Op.like]: 'concurrent_test_%' }
+        }
+      })
+
+      // 清理 sendToChat 测试产生的 chat_messages
+      if (createdChatMessageIds.length > 0) {
+        await ChatMessage.destroy({
+          where: { message_id: { [Op.in]: createdChatMessageIds } }
+        })
+      }
+
+      // 清理测试创建的 system_notification 空壳会话
+      if (createdSessionIds.length > 0) {
+        await CustomerServiceSession.destroy({
+          where: { session_id: { [Op.in]: createdSessionIds } }
+        })
+      }
+
+      // 清理测试源会话（仅清理无消息的空壳会话）
+      const testSessions = await CustomerServiceSession.findAll({
+        where: {
+          user_id: testUser.user_id,
+          source: { [Op.in]: ['test', 'system_notification'] }
+        }
+      })
+      for (const session of testSessions) {
+        const messageCount = await ChatMessage.count({
+          where: { session_id: session.session_id }
+        })
+        if (messageCount === 0) {
+          await session.destroy()
+        }
+      }
+    } catch (error) {
+      console.warn('⚠️ 测试数据清理部分失败（非致命）:', error.message)
+    }
+  })
+
   describe('核心通知功能', () => {
-    test('应该能够发送用户通知到聊天系统', async () => {
+    test('应该能够发送用户通知到 user_notifications 表（方案B）', async () => {
       const result = await NotificationService.send(testUser.user_id, {
         type: 'test_notification',
         title: '测试通知',
@@ -47,49 +118,40 @@ describe('NotificationService - 统一通知服务', () => {
 
       expect(result.success).toBe(true)
       expect(result.notification_id).toBeDefined()
+      createdNotificationIds.push(result.notification_id)
       expect(result.user_id).toBe(testUser.user_id)
       expect(result.type).toBe('test_notification')
       expect(result.title).toBe('测试通知')
       expect(result.saved_to_database).toBe(true)
 
-      // 验证消息已保存到数据库
-      const message = await ChatMessage.findByPk(result.notification_id)
-      expect(message).toBeDefined()
-      expect(message.message_source).toBe('system')
-      expect(message.message_type).toBe('system')
-      expect(message.sender_id).toBeNull() // ✅ 系统消息sender_id为NULL
-      expect(message.content).toContain('测试通知')
+      const notification = await UserNotification.findByPk(result.notification_id)
+      expect(notification).toBeDefined()
+      expect(notification.user_id).toBe(testUser.user_id)
+      expect(notification.type).toBe('test_notification')
+      expect(notification.title).toBe('测试通知')
+      expect(notification.content).toBe('这是一条测试通知消息')
+      expect(notification.is_read).toBe(0)
     })
 
-    test('应该能够自动创建用户聊天会话', async () => {
-      const beforeSessionCount = await CustomerServiceSession.count({
-        where: { user_id: testUser.user_id }
+    test('方案B：通知不应写入 chat_messages 表', async () => {
+      const beforeChatCount = await ChatMessage.count({
+        where: { message_source: 'system' }
       })
 
-      await NotificationService.send(testUser.user_id, {
-        type: 'auto_session_test',
-        title: '自动会话测试',
-        content: '测试自动创建会话功能'
+      const isolationResult = await NotificationService.send(testUser.user_id, {
+        type: 'isolation_test',
+        title: '隔离验证',
+        content: '验证通知不再写入聊天表'
+      })
+      if (isolationResult.notification_id) {
+        createdNotificationIds.push(isolationResult.notification_id)
+      }
+
+      const afterChatCount = await ChatMessage.count({
+        where: { message_source: 'system' }
       })
 
-      const afterSessionCount = await CustomerServiceSession.count({
-        where: { user_id: testUser.user_id }
-      })
-
-      // 如果之前没有会话，应该自动创建一个
-      expect(afterSessionCount).toBeGreaterThanOrEqual(beforeSessionCount)
-
-      // 验证会话存在且状态正确
-      const session = await CustomerServiceSession.findOne({
-        where: {
-          user_id: testUser.user_id,
-          status: ['waiting', 'assigned', 'active']
-        },
-        order: [['created_at', 'DESC']]
-      })
-
-      expect(session).toBeDefined()
-      expect(session.user_id).toBe(testUser.user_id)
+      expect(afterChatCount).toBe(beforeChatCount)
     })
 
     test('应该能够发送管理员通知', async () => {
@@ -105,9 +167,10 @@ describe('NotificationService - 统一通知服务', () => {
 
       expect(result.success).toBe(true)
       expect(result.notification_id).toBeDefined()
+      if (result.notification_id) createdNotificationIds.push(result.notification_id)
       expect(result.target).toBe('admins')
       expect(result.type).toBe('admin_test')
-      expect(result.broadcasted_count).toBeGreaterThanOrEqual(0) // 可能没有在线管理员
+      expect(result.broadcasted_count).toBeGreaterThanOrEqual(0)
     })
   })
 
@@ -121,6 +184,7 @@ describe('NotificationService - 统一通知服务', () => {
       }
 
       const result = await NotificationService.notifyExchangePending(testUser.user_id, exchangeData)
+      if (result.notification_id) createdNotificationIds.push(result.notification_id)
 
       expect(result.success).toBe(true)
       expect(result.type).toBe('exchange_pending')
@@ -139,6 +203,7 @@ describe('NotificationService - 统一通知服务', () => {
         testUser.user_id,
         exchangeData
       )
+      if (result.notification_id) createdNotificationIds.push(result.notification_id)
 
       expect(result.success).toBe(true)
       expect(result.type).toBe('exchange_approved')
@@ -157,6 +222,7 @@ describe('NotificationService - 统一通知服务', () => {
         testUser.user_id,
         exchangeData
       )
+      if (result.notification_id) createdNotificationIds.push(result.notification_id)
 
       expect(result.success).toBe(true)
       expect(result.type).toBe('exchange_rejected')
@@ -175,6 +241,7 @@ describe('NotificationService - 统一通知服务', () => {
       }
 
       const result = await NotificationService.notifyNewExchangeAudit(exchangeData)
+      if (result.notification_id) createdNotificationIds.push(result.notification_id)
 
       expect(result.success).toBe(true)
       expect(result.type).toBe('new_exchange_audit')
@@ -193,6 +260,7 @@ describe('NotificationService - 统一通知服务', () => {
       }
 
       const result = await NotificationService.notifyTimeoutAlert(alertData)
+      if (result.notification_id) createdNotificationIds.push(result.notification_id)
 
       expect(result.success).toBe(true)
       expect(result.type).toBe('pending_orders_alert')
@@ -214,6 +282,7 @@ describe('NotificationService - 统一通知服务', () => {
         testUser.user_id,
         auditData
       )
+      if (result.notification_id) createdNotificationIds.push(result.notification_id)
 
       expect(result.success).toBe(true)
       expect(result.type).toBe('exchange_approved')
@@ -231,6 +300,7 @@ describe('NotificationService - 统一通知服务', () => {
         testUser.user_id,
         auditData
       )
+      if (result.notification_id) createdNotificationIds.push(result.notification_id)
 
       expect(result.success).toBe(true)
       expect(result.type).toBe('image_approved')
@@ -249,6 +319,7 @@ describe('NotificationService - 统一通知服务', () => {
         testUser.user_id,
         auditData
       )
+      if (result.notification_id) createdNotificationIds.push(result.notification_id)
 
       expect(result.success).toBe(true)
       expect(result.type).toBe('image_rejected')
@@ -259,50 +330,49 @@ describe('NotificationService - 统一通知服务', () => {
 
   describe('错误处理', () => {
     test('当发送通知失败时应该返回错误但不抛出异常', async () => {
-      // 使用不存在的用户ID
       const result = await NotificationService.send(99999, {
         type: 'error_test',
         title: '错误测试',
         content: '测试错误处理'
       })
+      if (result && result.notification_id) createdNotificationIds.push(result.notification_id)
 
-      // 通知发送失败不应该影响业务流程
       expect(result).toBeDefined()
-      // 可能成功（如果系统创建了会话）或失败，都应该有结果
     })
   })
 
-  describe('系统消息格式验证', () => {
-    test('系统消息应该包含正确的标题和内容格式', async () => {
+  describe('通知格式验证（方案B）', () => {
+    test('通知应该包含正确的字段结构', async () => {
       const result = await NotificationService.send(testUser.user_id, {
         type: 'format_test',
         title: '格式测试标题',
         content: '这是消息内容',
         data: { test: 'data' }
       })
+      if (result.notification_id) createdNotificationIds.push(result.notification_id)
 
-      const message = await ChatMessage.findByPk(result.notification_id)
+      const notification = await UserNotification.findByPk(result.notification_id)
 
-      // 验证消息格式
-      expect(message.content).toBe('【格式测试标题】\n这是消息内容')
-      expect(message.message_source).toBe('system')
-      expect(message.sender_type).toBe('admin')
-      expect(message.sender_id).toBeNull() // ✅ 系统消息sender_id为NULL
+      expect(notification.type).toBe('format_test')
+      expect(notification.title).toBe('格式测试标题')
+      expect(notification.content).toBe('这是消息内容')
+      expect(notification.is_read).toBe(0)
+      expect(notification.read_at).toBeNull()
 
-      // 验证元数据
-      expect(message.metadata).toBeDefined()
-      expect(message.metadata.notification_type).toBe('format_test')
-      expect(message.metadata.title).toBe('格式测试标题')
-      expect(message.metadata.is_system_notification).toBe(true)
+      // 验证 metadata
+      expect(notification.metadata).toBeDefined()
+      expect(notification.metadata.test).toBe('data')
     })
 
-    test('没有标题的通知应该只显示内容', async () => {
+    test('sendToChat 方法仍可直接调用（保留但不作为默认通道）', async () => {
       const result = await NotificationService.sendToChat(testUser.user_id, {
         content: '这是纯内容消息',
         notification_type: 'no_title_test'
       })
 
-      const message = await ChatMessage.findByPk(result.message_id)
+      expect(result.chat_message_id).toBeDefined()
+      if (result.chat_message_id) createdChatMessageIds.push(result.chat_message_id)
+      const message = await ChatMessage.findByPk(result.chat_message_id)
       expect(message.content).toBe('这是纯内容消息')
     })
   })
@@ -310,23 +380,20 @@ describe('NotificationService - 统一通知服务', () => {
   describe('会话管理', () => {
     test('应该能够获取现有活跃会话', async () => {
       try {
-        // 先创建一个活跃会话
         const session1 = await CustomerServiceSession.create({
           user_id: testUser.user_id,
           status: 'active',
           source: 'test'
         })
+        createdSessionIds.push(session1.session_id)
 
-        // 获取会话应该返回现有会话
         const session2 = await NotificationService.getOrCreateCustomerServiceSession(
           testUser.user_id
         )
 
-        // ✅ 转换为字符串比较，因为BIGINT类型可能返回字符串
         expect(String(session2.session_id)).toBe(String(session1.session_id))
         expect(session2.status).toBe('active')
       } catch (error) {
-        // 数据库约束问题时跳过测试
         console.warn('⚠️ 跳过测试：创建会话失败', error.message)
         expect(true).toBe(true)
       }
@@ -339,8 +406,8 @@ describe('NotificationService - 统一通知服务', () => {
         { where: { user_id: testUser.user_id } }
       )
 
-      // 获取会话应该创建新会话
       const session = await NotificationService.getOrCreateCustomerServiceSession(testUser.user_id)
+      if (session && session.session_id) createdSessionIds.push(session.session_id)
 
       expect(session).toBeDefined()
       expect(session.status).toBe('waiting')
@@ -376,13 +443,13 @@ describe('NotificationService - 性能和并发测试', () => {
       expect(result.notification_id).toBeDefined()
     })
 
-    // 所有消息都应该保存到数据库
-    const messages = await ChatMessage.findAll({
+    // 方案B：所有通知应保存到 user_notifications 表
+    const notifications = await UserNotification.findAll({
       where: {
-        message_id: results.map(r => r.notification_id)
+        notification_id: results.map(r => r.notification_id)
       }
     })
 
-    expect(messages.length).toBe(10)
+    expect(notifications.length).toBe(10)
   })
 })

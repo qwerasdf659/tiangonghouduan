@@ -381,8 +381,7 @@ class ServiceManager {
       this._services.set('exchange_bid_query', new ExchangeBidQueryService(this.models)) // 竞价查询服务（列表/详情/历史）
       this._services.set('exchange_rate', ExchangeRateService) // 固定汇率兑换服务（静态类，2026-02-23 市场增强）
       this._services.set('content_audit', ContentAuditEngine)
-      // [已合并] this._services.set('announcement', AnnouncementService)
-      this._services.set('notification', NotificationService)
+      this._services.set('notification', NotificationService) // 静态类，方案B保持静态调用；路由通过 ServiceManager 统一获取
 
       // Consumption 域子服务
       this._services.set('consumption_core', ConsumptionCoreService) // 核心操作（静态类）

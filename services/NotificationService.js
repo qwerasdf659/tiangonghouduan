@@ -1,68 +1,71 @@
 const logger = require('../utils/logger').logger
 
 /**
- * 通知服务 - 统一客服聊天系统通知
+ * 通知服务 - 用户通知独立系统（方案B）
  *
  * 功能：
- * 1. 发送用户通知（兑换审核结果、抽奖结果等）
- * 2. 发送管理员通知（新订单待审核、超时告警）
- * 3. 通过客服聊天系统发送系统消息
- * 4. 支持WebSocket实时推送（在线用户）+ 消息持久化（离线用户）
+ * 1. 发送用户通知（挂牌、交易、中奖、兑换审核等）→ 写入 user_notifications 表
+ * 2. 发送管理员通知（新订单待审核、超时告警）→ WebSocket 广播
+ * 3. 支持 WebSocket 实时推送（在线用户）+ 消息持久化（离线用户）
  *
- * 实现方式：
- * - 所有通知通过客服聊天系统的系统消息发送
- * - 在线用户：WebSocket实时推送
- * - 离线用户：消息持久化在ChatMessage表，用户上线后可查看
+ * 方案B改造（2026-02-24）：
+ * - send() 写入目标从 chat_messages 切换到 user_notifications
+ * - 客服聊天回归纯粹人工对话，不再被系统通知淹没
+ * - sendToChat() 代码保留但不再作为默认通道
  *
  * 创建时间：2025-10-10
- * 最后更新：2025-10-11 - 集成客服聊天系统
+ * 最后更新：2026-02-24 - 方案B通知通道独立化
+ *
+ * @see docs/通知系统独立化-方案B实施文档.md
  */
 
 const BeijingTimeHelper = require('../utils/timeHelper')
 
 /**
- * 通知服务类
- * 业务职责：统一管理用户通知和管理员通知，集成客服聊天系统
- * 实现方式：在线用户WebSocket实时推送 + 离线用户消息持久化
- * 设计模式：通知服务层，支持多种通知类型（兑换、抽奖、积分、审核等）
+ * 通知服务类（静态类，无内部状态）
+ * 业务职责：统一管理用户通知和管理员通知
+ * 用户通知：写入 user_notifications 表 + WebSocket 推送 new_notification 事件
+ * 管理员通知：WebSocket 广播 notification 事件
  */
 class NotificationService {
   /**
-   * 发送通知给指定用户（通过客服聊天系统）
+   * 发送通知给指定用户（写入 user_notifications 表）
+   *
+   * 方案B改造：写入目标从 chat_messages 切换到 user_notifications，
+   * 客服聊天回归纯粹人工对话场景。
    *
    * @param {number} user_id - 用户ID
    * @param {Object} options - 通知选项
-   * @param {string} options.type - 通知类型
-   * @param {string} options.title - 通知标题
+   * @param {string} options.type - 通知类型（如 listing_created, purchase_completed）
+   * @param {string} options.title - 通知标题（如 "📦 挂牌成功"）
    * @param {string} options.content - 通知内容
-   * @param {Object} options.data - 附加数据
+   * @param {Object} options.data - 附加业务数据（存入 metadata 字段）
    * @returns {Promise<Object>} 通知结果
    */
   static async send(user_id, options) {
     const { type, title, content, data = {} } = options
 
     try {
-      // ✅ 通过客服聊天系统发送系统通知
-      const result = await this.sendToChat(user_id, {
+      // ✅ 方案B：写入 user_notifications 表（不再写入 chat_messages）
+      const result = await this.sendToNotification(user_id, {
+        type,
         title,
         content,
-        notification_type: type,
         metadata: data
       })
 
-      // 记录通知日志
-      logger.info('[通知] 系统通知已发送', {
+      logger.info('[通知] 用户通知已发送', {
         user_id,
         type,
         title,
-        chat_message_id: result.chat_message_id,
+        notification_id: result.notification_id,
         pushed: result.pushed_to_websocket,
-        content: content.substring(0, 100) // 限制日志长度
+        content: content.substring(0, 100)
       })
 
       return {
         success: true,
-        notification_id: result.chat_message_id,
+        notification_id: result.notification_id,
         user_id,
         type,
         title,
@@ -88,6 +91,66 @@ class NotificationService {
         title,
         content
       }
+    }
+  }
+
+  /**
+   * 写入 user_notifications 表并通过 WebSocket 推送（方案B核心方法）
+   *
+   * @param {number} user_id - 用户ID
+   * @param {Object} options - 通知选项
+   * @param {string} options.type - 通知类型
+   * @param {string} options.title - 通知标题
+   * @param {string} options.content - 通知内容
+   * @param {Object} options.metadata - 附加业务数据
+   * @returns {Promise<Object>} { notification_id, pushed_to_websocket, created_at }
+   */
+  static async sendToNotification(user_id, options) {
+    const { type, title, content, metadata = {} } = options
+
+    const { UserNotification } = require('../models')
+    const ChatWebSocketService = require('./ChatWebSocketService')
+
+    // 1. 写入 user_notifications 表（持久化）
+    const notification = await UserNotification.create({
+      user_id,
+      type,
+      title,
+      content,
+      metadata,
+      is_read: 0,
+      created_at: BeijingTimeHelper.createBeijingTime(),
+      updated_at: BeijingTimeHelper.createBeijingTime()
+    })
+
+    // 2. 通过 WebSocket 推送 new_notification 事件（在线用户实时收到）
+    let pushed = false
+    try {
+      const notificationData = {
+        notification_id: notification.notification_id,
+        type,
+        title,
+        content,
+        metadata,
+        is_read: 0,
+        created_at: notification.created_at
+      }
+
+      pushed = ChatWebSocketService.pushNotificationToUser(user_id, notificationData)
+
+      if (pushed) {
+        logger.info(`✅ 用户通知已实时推送给用户 ${user_id}`)
+      } else {
+        logger.info(`📝 用户 ${user_id} 不在线，通知已保存到数据库`)
+      }
+    } catch (wsError) {
+      logger.error('[通知] WebSocket推送失败（不影响通知持久化）:', wsError.message)
+    }
+
+    return {
+      notification_id: notification.notification_id,
+      created_at: notification.created_at,
+      pushed_to_websocket: pushed
     }
   }
 
@@ -1114,6 +1177,131 @@ class NotificationService {
     }
 
     return chatResult
+  }
+
+  /*
+   * ========================================
+   * 用户通知查询方法（供路由层通过 ServiceManager 调用）
+   * ========================================
+   */
+
+  /**
+   * 获取用户通知列表（分页）
+   *
+   * @param {number} userId - 用户ID
+   * @param {Object} [options={}] - 查询选项
+   * @param {number} [options.page=1] - 页码
+   * @param {number} [options.pageSize=20] - 每页数量（最大50）
+   * @param {string} [options.type] - 按通知类型筛选
+   * @param {string} [options.isRead] - 按已读状态筛选（'0'未读 / '1'已读）
+   * @returns {Promise<{notifications: Array, pagination: Object}>} 通知列表和分页信息
+   */
+  static async getNotifications(userId, options = {}) {
+    const { UserNotification } = require('../models')
+
+    const page = Math.max(1, parseInt(options.page) || 1)
+    const pageSize = Math.min(50, Math.max(1, parseInt(options.pageSize) || 20))
+
+    const where = { user_id: userId }
+
+    if (options.type) {
+      where.type = options.type
+    }
+
+    if (options.isRead !== undefined && options.isRead !== '') {
+      where.is_read = parseInt(options.isRead) === 1 ? 1 : 0
+    }
+
+    const { count: totalCount, rows: notifications } = await UserNotification.findAndCountAll({
+      where,
+      order: [['created_at', 'DESC']],
+      limit: pageSize,
+      offset: (page - 1) * pageSize,
+      attributes: [
+        'notification_id',
+        'type',
+        'title',
+        'content',
+        'metadata',
+        'is_read',
+        'read_at',
+        'created_at'
+      ]
+    })
+
+    const totalPages = Math.ceil(totalCount / pageSize)
+
+    return {
+      notifications,
+      pagination: {
+        current_page: page,
+        page_size: pageSize,
+        total_count: totalCount,
+        total_pages: totalPages,
+        has_next: page < totalPages,
+        has_prev: page > 1
+      }
+    }
+  }
+
+  /**
+   * 获取用户未读通知数量（铃铛角标数据源）
+   *
+   * @param {number} userId - 用户ID
+   * @returns {Promise<number>} 未读数量
+   */
+  static async getUnreadCount(userId) {
+    const { UserNotification } = require('../models')
+    return UserNotification.getUnreadCount(userId)
+  }
+
+  /**
+   * 批量标记通知为已读
+   *
+   * @param {number} userId - 用户ID
+   * @param {number[]} [notificationIds] - 通知ID列表（空/不传则全部标记已读）
+   * @returns {Promise<number>} 实际标记数量
+   */
+  static async markBatchAsRead(userId, notificationIds) {
+    const { UserNotification } = require('../models')
+    return UserNotification.markBatchAsRead(userId, notificationIds)
+  }
+
+  /**
+   * 单条标记通知为已读
+   *
+   * @param {number} userId - 用户ID
+   * @param {number} notificationId - 通知ID
+   * @returns {Promise<{notification_id: number, is_read: number, read_at: Date}|null>} 更新后的通知数据，不存在返回 null
+   */
+  static async markSingleAsRead(userId, notificationId) {
+    const { UserNotification } = require('../models')
+
+    const notification = await UserNotification.findOne({
+      where: { notification_id: notificationId, user_id: userId }
+    })
+
+    if (!notification) {
+      return null
+    }
+
+    if (notification.is_read === 1) {
+      return {
+        notification_id: notification.notification_id,
+        is_read: 1,
+        read_at: notification.read_at,
+        already_read: true
+      }
+    }
+
+    await notification.markAsRead()
+
+    return {
+      notification_id: notification.notification_id,
+      is_read: 1,
+      read_at: notification.read_at,
+      already_read: false
+    }
   }
 }
 

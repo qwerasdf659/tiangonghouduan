@@ -69,7 +69,7 @@ class LoadCampaignStage extends BaseStage {
       const tier_rules = await this._loadTierRules(lottery_campaign_id)
 
       // 5. 获取兜底奖品
-      const fallback_prize = this._getFallbackPrize(prizes, campaign)
+      const fallback_prize = await this._getFallbackPrize(prizes, campaign)
 
       // 6. 返回结果
       const result = {
@@ -191,12 +191,19 @@ class LoadCampaignStage extends BaseStage {
    * @returns {Object|null} 兜底奖品
    * @private
    */
-  _getFallbackPrize(prizes, campaign) {
-    // 1. 检查活动是否配置了指定的兜底奖品（P3迁移：tier_fallback_prize_id → tier_fallback_lottery_prize_id）
-    if (campaign.tier_fallback_lottery_prize_id) {
-      const specified_fallback = prizes.find(
-        p => p.lottery_prize_id === campaign.tier_fallback_lottery_prize_id
-      )
+  async _getFallbackPrize(prizes, campaign) {
+    // 从 lottery_strategy_config 读取档位降级兜底奖品ID
+    const { DynamicConfigLoader } = require('../../compute/config/StrategyConfig')
+    const tier_fallback_prize_id = await DynamicConfigLoader.getValue(
+      'tier_fallback',
+      'prize_id',
+      null,
+      { lottery_campaign_id: campaign.lottery_campaign_id }
+    )
+
+    // 1. 检查是否配置了指定的兜底奖品
+    if (tier_fallback_prize_id) {
+      const specified_fallback = prizes.find(p => p.lottery_prize_id === tier_fallback_prize_id)
       if (specified_fallback) {
         return specified_fallback
       }

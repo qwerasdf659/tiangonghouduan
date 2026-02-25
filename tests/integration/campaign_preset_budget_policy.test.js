@@ -3,7 +3,7 @@
  *
  * 业务目标：
  * - 管理员可以通过 Console 管理端 API 更新 lottery_campaigns.preset_budget_policy
- * - 读取活动预算配置接口会返回最新的 preset_budget_policy 与 preset_debt_enabled
+ * - 读取活动预算配置接口会返回最新的 preset_budget_policy
  *
  * 测试约束（与项目规范一致）：
  * - 使用真实数据库 restaurant_points_dev（由 jest.setup.js 从 .env 读取 DB_NAME）
@@ -105,8 +105,9 @@ describe('🛠️ Console 活动预设预算策略配置管理（preset_budget_p
     TestAssertions.validateApiResponse(get_after.body, true)
     expect(get_after.body.data?.campaign?.preset_budget_policy).toBe(target_policy)
 
-    // ✅ 同时验证“预设欠账开关”字段也对管理端可见（字段真源：lottery_campaigns.preset_debt_enabled）
-    expect(get_after.body.data?.campaign).toHaveProperty('preset_debt_enabled')
-    expect(typeof get_after.body.data.campaign.preset_debt_enabled).toBe('boolean')
+    /*
+     * preset_debt_enabled 已迁移到 lottery_strategy_config.preset.debt_enabled
+     * 通过 GET /api/v4/console/lottery-campaigns/:id/strategy-config 查看
+     */
   })
 })

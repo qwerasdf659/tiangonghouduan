@@ -23,11 +23,6 @@ const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
 const TransactionManager = require('../../../utils/TransactionManager')
-/*
- * P1-9：服务通过 ServiceManager 获取（B1-Injected + E2-Strict snake_case）
- * const MaterialManagementService = require('../../../services/MaterialManagementService')
- */
-
 const logger = require('../../../utils/logger').logger
 
 /**
@@ -53,7 +48,7 @@ const logger = require('../../../utils/logger').logger
  */
 router.get('/listing-stats', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const { page = 1, limit = 20, filter = 'all', mobile } = req.query
+    const { page = 1, limit = 20, filter = 'all', mobile, merchant_id } = req.query
 
     const AdminSystemService = req.app.locals.services.getService('admin_system')
     const maxListings = await AdminSystemService.getSettingValue(
@@ -67,7 +62,8 @@ router.get('/listing-stats', authenticateToken, requireRoleLevel(100), async (re
       page,
       limit,
       filter,
-      mobile: mobile || null
+      mobile: mobile || null,
+      merchant_id: merchant_id || null
     })
 
     const ExchangeService = req.app.locals.services.getService('exchange_admin')
@@ -77,7 +73,8 @@ router.get('/listing-stats', authenticateToken, requireRoleLevel(100), async (re
       limit,
       filter,
       max_listings: maxListings,
-      mobile
+      mobile,
+      merchant_id: merchant_id ? parseInt(merchant_id) : undefined
     })
 
     logger.info('查询用户上架状态成功', {
@@ -249,6 +246,7 @@ router.get('/exchange_market/items', authenticateToken, requireRoleLevel(100), a
     const {
       status = 'all',
       keyword,
+      merchant_id,
       page = 1,
       page_size = 20,
       sort_by = 'sort_order',
@@ -260,6 +258,7 @@ router.get('/exchange_market/items', authenticateToken, requireRoleLevel(100), a
       admin_id,
       status,
       keyword,
+      merchant_id: merchant_id || null,
       page,
       page_size
     })
@@ -708,9 +707,8 @@ router.put(
         image_changes: result.image_changes
       })
 
-      // 🔌 WebSocket推送：通知所有在线用户商品已更新（2026-02-15 新增）
       try {
-        const ChatWebSocketService = require('../../../services/ChatWebSocketService')
+        const ChatWebSocketService = req.app.locals.services.getService('chat_web_socket')
         ChatWebSocketService.broadcastProductUpdated({
           action: 'updated',
           exchange_item_id: itemId,
@@ -882,6 +880,7 @@ router.get('/trade_orders', authenticateToken, requireRoleLevel(100), async (req
       buyer_user_id,
       seller_user_id,
       market_listing_id,
+      merchant_id,
       page = 1,
       page_size = 20
     } = req.query
@@ -893,19 +892,19 @@ router.get('/trade_orders', authenticateToken, requireRoleLevel(100), async (req
       buyer_user_id,
       seller_user_id,
       market_listing_id,
+      merchant_id: merchant_id || null,
       page,
       page_size
     })
 
-    // P1-9：通过 ServiceManager 获取 TradeOrderService（snake_case key）
     const TradeOrderService = req.app.locals.services.getService('trade_order')
 
-    // 调用服务层方法获取订单列表（2026-01-22 合并：使用 getOrders() 替代 getAdminOrders()）
     const result = await TradeOrderService.getOrders({
       status,
       buyer_user_id: buyer_user_id ? parseInt(buyer_user_id) : undefined,
       seller_user_id: seller_user_id ? parseInt(seller_user_id) : undefined,
       market_listing_id: market_listing_id ? parseInt(market_listing_id) : undefined,
+      merchant_id: merchant_id ? parseInt(merchant_id) : undefined,
       page: parseInt(page),
       page_size: parseInt(page_size)
     })
@@ -1407,6 +1406,97 @@ router.post(
     }
   }
 )
+
+/**
+ * 市场概览数据（复用 MarketAnalyticsService）
+ * GET /api/v4/console/marketplace/stats/overview
+ *
+ * @description 管理后台查看交易市场总览数据，包括：
+ *   - 近7天各资产成交量排行
+ *   - 当前在售统计
+ *   - 汇总数据（总成交笔数、总成交量、买家/卖家活跃数）
+ *
+ * @query {number} [merchant_id] - 按商家筛选（可选，预留多商家场景）
+ *
+ * @returns {Object} 市场概览数据
+ * @returns {Object} data.totals - 汇总统计
+ * @returns {Array}  data.asset_ranking - 各资产成交量排行
+ * @returns {Array}  data.on_sale_summary - 当前在售统计
+ * @returns {string} data.period - 统计周期
+ *
+ * @security JWT + Admin权限
+ *
+ * @created 2026-02-24（文档 6.5 节要求 - 管理后台市场概览端点）
+ */
+router.get('/stats/overview', authenticateToken, requireRoleLevel(100), async (req, res) => {
+  try {
+    const admin_id = req.user.user_id
+
+    logger.info('管理员查询市场概览数据', { admin_id })
+
+    const MarketAnalyticsService = req.app.locals.services.getService('market_analytics')
+    const overview = await MarketAnalyticsService.getMarketOverview()
+
+    logger.info('市场概览数据查询成功', {
+      admin_id,
+      total_trades: overview.totals.total_trades,
+      asset_count: overview.asset_ranking.length
+    })
+
+    return res.apiSuccess(overview, '市场概览数据查询成功')
+  } catch (error) {
+    logger.error('查询市场概览数据失败', {
+      error: error.message,
+      stack: error.stack,
+      admin_id: req.user?.user_id
+    })
+
+    return res.apiError(error.message || '查询失败', 'INTERNAL_ERROR', null, 500)
+  }
+})
+
+/**
+ * 资产价格历史（复用 MarketAnalyticsService）
+ * GET /api/v4/console/marketplace/stats/price-history
+ *
+ * @description 管理后台查看指定资产的价格走势
+ *
+ * @query {string} asset_code - 资产代码（必填）
+ * @query {number} [days=30] - 查询天数
+ *
+ * @returns {Object} 价格历史数据
+ *
+ * @security JWT + Admin权限
+ *
+ * @created 2026-02-24（文档 6.5 节要求 - 管理后台市场分析）
+ */
+router.get('/stats/price-history', authenticateToken, requireRoleLevel(100), async (req, res) => {
+  try {
+    const { asset_code, days = 30 } = req.query
+    const admin_id = req.user.user_id
+
+    if (!asset_code) {
+      return res.apiError('需要 asset_code 参数', 'MISSING_PARAMS', null, 400)
+    }
+
+    logger.info('管理员查询资产价格历史', { admin_id, asset_code, days })
+
+    const MarketAnalyticsService = req.app.locals.services.getService('market_analytics')
+    const result = await MarketAnalyticsService.getAssetPriceHistory({
+      asset_code,
+      days: parseInt(days)
+    })
+
+    return res.apiSuccess(result, '价格历史查询成功')
+  } catch (error) {
+    logger.error('查询价格历史失败', {
+      error: error.message,
+      admin_id: req.user?.user_id
+    })
+
+    return res.apiError(error.message || '查询失败', 'INTERNAL_ERROR', null, 500)
+  }
+})
 
 /**
  * 查看交易市场可交易资产配置

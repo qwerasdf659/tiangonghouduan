@@ -5,7 +5,7 @@
  * 业务职责：
  * - 定义用户分层规则（segment_key 的计算逻辑）
  * - 支持多版本配置，便于灰度发布和回滚
- * - 通过活动的 segment_resolver_version 字段指定使用哪个版本
+ * - 通过 lottery_strategy_config 表的 segment.resolver_version 指定使用哪个版本
  *
  * 核心规则（DR-15）：
  * - segment_key 不是数据库表字段，是代码级策略
@@ -14,7 +14,7 @@
  * - 新增规则必须使用新版本号
  *
  * 使用方式：
- * 1. 活动配置 segment_resolver_version = 'v1'
+ * 1. lottery_strategy_config 配置 segment.resolver_version = 'v1'
  * 2. 抽奖时调用 resolveSegment('v1', user) 获取 segment_key
  * 3. 根据 segment_key 查询 lottery_tier_rules 表获取档位权重
  */

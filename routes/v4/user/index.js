@@ -35,6 +35,9 @@ const consumptionQrcodeRoutes = require('./consumption-qrcode')
 const adCampaignsRoutes = require('./ad-campaigns')
 const adSlotsRoutes = require('./ad-slots')
 
+// 用户通知路由（方案B：通知系统独立化，2026-02-24）
+const notificationsRoutes = require('./notifications')
+
 /**
  * GET /api/v4/user/me
  * @desc 获取当前用户基本信息（通过token识别）
@@ -71,5 +74,8 @@ router.use('/ad-slots', adSlotsRoutes)
 
 // 挂载广告计划管理路由（Phase 3 广告主自助投放）
 router.use('/ad-campaigns', adCampaignsRoutes)
+
+// 挂载用户通知路由（方案B：通知系统独立化，/api/v4/user/notifications）
+router.use('/notifications', authenticateToken, notificationsRoutes)
 
 module.exports = router

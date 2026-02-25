@@ -841,6 +841,15 @@ models.AdminNotification = require('./AdminNotification')(sequelize, DataTypes)
  *    - 业务场景：智能提醒触发→生成通知→管理员查看→标记已读→历史归档
  */
 
+models.UserNotification = require('./UserNotification')(sequelize, DataTypes)
+/*
+ * ✅ UserNotification：用户通知表（方案B — 通知通道独立化）
+ *    - 用途：存储面向普通用户的系统通知（挂牌、交易、中奖、兑换审核等）
+ *    - 特点：与客服聊天系统完全分离、已读/未读管理、预留微信推送字段
+ *    - 表名：user_notifications，主键：notification_id，关联：user_id
+ *    - 业务场景：业务事件触发→写入通知表→WebSocket实时推送→用户查看→标记已读
+ */
+
 // 🔴 策略效果模拟分析（2026-02-20）
 models.LotterySimulationRecord = require('./LotterySimulationRecord')(sequelize, DataTypes)
 /*

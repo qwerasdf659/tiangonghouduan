@@ -79,6 +79,7 @@ class LotteryQueryService {
           'image_resource_id',
           'win_probability',
           'stock_quantity',
+          'is_fallback',
           'max_daily_wins',
           'daily_win_count',
           'status',

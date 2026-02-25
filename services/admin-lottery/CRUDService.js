@@ -143,10 +143,6 @@ class LotteryCampaignCRUDService {
             : true,
         win_animation: campaignData.win_animation || 'simple',
         background_image_url: campaignData.background_image_url || null,
-        // 固定间隔保底配置（运营可按活动开关"每N次必出指定奖品"）
-        guarantee_enabled: campaignData.guarantee_enabled === true,
-        guarantee_threshold: campaignData.guarantee_threshold || 10,
-        guarantee_prize_id: campaignData.guarantee_prize_id || null,
         created_by: operator_user_id
       },
       { transaction }
@@ -159,7 +155,7 @@ class LotteryCampaignCRUDService {
       operator_user_id
     })
 
-    // ✅ 自动生成默认策略配置（10策略活动级开关：创建即完整，每活动24条配置）
+    // ✅ 自动生成默认策略配置（13策略活动级开关：创建即完整，每活动30条配置）
     try {
       const { LotteryStrategyConfig } = require('../../models')
       const STRATEGY_DEFAULTS = [
@@ -288,6 +284,49 @@ class LotteryCampaignCRUDService {
           value: 100,
           type: 'number',
           desc: '防连高灰度百分比'
+        },
+        // ======== 从 lottery_campaigns 表迁移的策略参数（2026-02-24） ========
+        {
+          group: 'segment',
+          key: 'resolver_version',
+          value: 'default',
+          type: 'string',
+          desc: '用户分群版本'
+        },
+        {
+          group: 'guarantee',
+          key: 'enabled',
+          value: false,
+          type: 'boolean',
+          desc: '固定间隔保底开关'
+        },
+        {
+          group: 'guarantee',
+          key: 'threshold',
+          value: 10,
+          type: 'number',
+          desc: '保底触发间隔（每N次）'
+        },
+        {
+          group: 'guarantee',
+          key: 'prize_id',
+          value: null,
+          type: 'number',
+          desc: '保底指定奖品ID（null=自动选最高档）'
+        },
+        {
+          group: 'tier_fallback',
+          key: 'prize_id',
+          value: null,
+          type: 'number',
+          desc: '档位降级兜底奖品ID'
+        },
+        {
+          group: 'preset',
+          key: 'debt_enabled',
+          value: false,
+          type: 'boolean',
+          desc: '预设队列透支开关'
         }
       ]
 
@@ -456,11 +495,7 @@ class LotteryCampaignCRUDService {
       'effect_theme',
       'rarity_effects_enabled',
       'win_animation',
-      'background_image_url',
-      // 固定间隔保底配置
-      'guarantee_enabled',
-      'guarantee_threshold',
-      'guarantee_prize_id'
+      'background_image_url'
     ]
 
     const filteredData = {}

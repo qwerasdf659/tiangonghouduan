@@ -182,7 +182,9 @@ describe('保底触发完整流程测试（任务8.4）', () => {
         last_high_tier_draw: 5 // 上次高价值在第5次
       }
 
-      const result = checkGuaranteeTrigger(context)
+      // 测试触发逻辑需要 enabled=true（guarantee.enabled 已迁移到 strategy_config，数据库实际值为 false）
+      const enabledConfig = { ...(GUARANTEE_CONFIG || DEFAULT_GUARANTEE_CONFIG), enabled: true }
+      const result = checkGuaranteeTrigger(context, enabledConfig)
 
       console.log('📊 保底触发检查:')
       console.log(`   user_draw_count: ${context.user_draw_count}`)
@@ -204,7 +206,9 @@ describe('保底触发完整流程测试（任务8.4）', () => {
         last_high_tier_draw: 0
       }
 
-      const result = checkGuaranteeTrigger(context)
+      // 测试"未达阈值"逻辑需要 enabled=true（guarantee.enabled 已迁移到 strategy_config，数据库实际值为 false）
+      const enabledConfig = { ...(GUARANTEE_CONFIG || DEFAULT_GUARANTEE_CONFIG), enabled: true }
+      const result = checkGuaranteeTrigger(context, enabledConfig)
 
       console.log('📊 保底不触发检查:')
       console.log(`   draws_since_high_tier: ${result.draws_since_high_tier}`)
@@ -223,7 +227,9 @@ describe('保底触发完整流程测试（任务8.4）', () => {
         last_high_tier_draw: 0
       }
 
-      const result = checkGuaranteeTrigger(context)
+      // 测试阈值边界需要 enabled=true（guarantee.enabled 已迁移到 strategy_config，数据库实际值为 false）
+      const enabledConfig = { ...(GUARANTEE_CONFIG || DEFAULT_GUARANTEE_CONFIG), enabled: true }
+      const result = checkGuaranteeTrigger(context, enabledConfig)
 
       console.log('📊 刚好达到阈值:')
       console.log(`   draws_since_high_tier: ${result.draws_since_high_tier}`)

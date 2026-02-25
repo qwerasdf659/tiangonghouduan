@@ -260,18 +260,75 @@ router.get('/:code/config', authenticateToken, dataAccessControl, async (req, re
       background_image_url: campaign.background_image_url || null
     }
 
+    /**
+     * 保底进度信息（pity_info）
+     *
+     * 2026-02-25 B3 实施：
+     * - 从 lottery_strategy_config 表 config_group='pity' 读取保底配置
+     * - 登录用户额外返回 current_pity / remaining（从 lottery_user_experience_state 读取）
+     * - 决策10（B方案）：字段名使用 pity_info（精确语义，代码自解释）
+     * - 决策12（A方案）：config 接口内判断登录态，一次请求完成
+     */
+    let pityInfo = { exists: false, description: '连续抽奖有惊喜哦~' }
+
+    try {
+      const models = require('../../../models')
+      const campaignId = campaign.lottery_campaign_id
+
+      const pityConfig = await models.LotteryStrategyConfig.findAll({
+        where: {
+          lottery_campaign_id: campaignId,
+          config_group: 'pity',
+          is_active: true
+        }
+      })
+      const pityMap = {}
+      for (const c of pityConfig) {
+        pityMap[c.config_key] = c.getParsedValue()
+      }
+      const pityEnabled = pityMap.enabled ?? false
+      const hardGuaranteeThreshold = pityMap.hard_guarantee_threshold ?? 10
+
+      if (pityEnabled) {
+        pityInfo = {
+          exists: true,
+          pity_enabled: true,
+          guarantee_threshold: hardGuaranteeThreshold,
+          description: '连续抽奖有惊喜哦~'
+        }
+
+        if (req.user && req.user.user_id) {
+          const experienceState = await models.LotteryUserExperienceState.findOrCreateState(
+            req.user.user_id,
+            campaign.lottery_campaign_id
+          )
+          const currentPity = experienceState.empty_streak || 0
+          const remaining = Math.max(0, hardGuaranteeThreshold - currentPity)
+
+          pityInfo.current_pity = currentPity
+          pityInfo.remaining = remaining
+          pityInfo.description =
+            remaining > 0 ? `距离保底还有 ${remaining} 次` : '下次抽奖即触发保底！'
+        }
+      }
+    } catch (pityError) {
+      logger.warn('读取保底配置失败（降级返回默认值）:', {
+        campaign_code,
+        error: pityError.message
+      })
+    }
+
     if (req.dataLevel === 'full') {
-      // 管理员获取完整配置（返回 campaign_code 而不是 lottery_campaign_id）
       const adminConfig = {
         ...fullConfig,
         campaign_code: campaign.campaign_code,
-        base_cost: drawButtons[0]?.original_cost ?? 0, // 折扣前基础定价（与用户端一致）
-        per_draw_cost: drawButtons.find(b => b.draw_count === 1)?.per_draw ?? 0, // 折扣后单抽实际价
-        draw_buttons: drawButtons, // 2026-01-26: 统一使用数组格式
-        display: displayConfig // 2026-02-15: 前端展示配置（多活动抽奖系统）
+        base_cost: drawButtons[0]?.original_cost ?? 0,
+        per_draw_cost: drawButtons.find(b => b.draw_count === 1)?.per_draw ?? 0,
+        pity_info: pityInfo,
+        draw_buttons: drawButtons,
+        display: displayConfig
       }
 
-      // 如果配置缺失，在响应中添加警告信息（仅管理员可见）
       const warningMessage = isConfigMissing
         ? '当前活动未配置自定义定价，正在使用系统默认定价'
         : null
@@ -283,7 +340,6 @@ router.get('/:code/config', authenticateToken, dataAccessControl, async (req, re
         warningMessage ? { warning: warningMessage } : undefined
       )
     } else {
-      // 普通用户获取脱敏配置（已应用降级保护）
       const sanitizedConfig = {
         campaign_code: campaign.campaign_code,
         campaign_name: fullConfig.campaign_name,
@@ -291,12 +347,9 @@ router.get('/:code/config', authenticateToken, dataAccessControl, async (req, re
         base_cost: drawButtons[0]?.original_cost ?? 0,
         per_draw_cost: drawButtons.find(b => b.draw_count === 1)?.per_draw ?? 0,
         max_draws_per_user_daily: fullConfig.max_draws_per_user_daily,
-        guarantee_info: {
-          exists: !!fullConfig.guarantee_rule,
-          description: '连续抽奖有惊喜哦~'
-        },
-        draw_buttons: drawButtons, // 2026-01-26: 统一使用数组格式
-        display: displayConfig // 2026-02-15: 前端展示配置（多活动抽奖系统）
+        pity_info: pityInfo,
+        draw_buttons: drawButtons,
+        display: displayConfig
       }
 
       return res.apiSuccess(sanitizedConfig, '抽奖配置获取成功')

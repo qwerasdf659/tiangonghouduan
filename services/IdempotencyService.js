@@ -427,6 +427,10 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/user/ad-campaigns/:id/cancel': 'USER_AD_CAMPAIGN_CANCEL', // 取消计划（含钻石退回）
   '/api/v4/user/ad-campaigns/:id/interaction': 'USER_AD_CAMPAIGN_INTERACTION', // 用户端交互日志上报
 
+  // 方案B: 用户通知操作（标记已读本身具备幂等性）
+  '/api/v4/user/notifications/mark-read': 'USER_NOTIFICATION_BATCH_READ', // 批量标记已读（含全部已读）
+  '/api/v4/user/notifications/:id/read': 'USER_NOTIFICATION_SINGLE_READ', // 单条标记已读
+
   // Phase 3: 广告计划管理（管理端）
   '/api/v4/console/ad-campaigns/': 'ADMIN_AD_CAMPAIGN_CREATE', // 管理员创建广告计划
   '/api/v4/console/ad-campaigns/:id': 'ADMIN_AD_CAMPAIGN_UPDATE_STATUS', // 管理员更新活动状态（发布/暂停）

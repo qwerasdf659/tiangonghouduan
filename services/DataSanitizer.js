@@ -160,7 +160,7 @@ class DataSanitizer {
       delete sanitized.max_daily_wins
       delete sanitized.daily_win_count
       delete sanitized.total_win_count
-      delete sanitized.is_fallback
+      // is_fallback 已放开（2026-02-25 决策6）：前端"保底"badge 依赖此字段
       delete sanitized.reserved_for_vip
       delete sanitized.angle
       delete sanitized.color

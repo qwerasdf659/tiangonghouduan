@@ -89,21 +89,10 @@ class LotteryCampaign extends Model {
      * 获取活动的欠账上限配置请使用: PresetDebtLimit.getOrCreateForCampaign(lottery_campaign_id)
      */
 
-    // 多对一：档位降级保底奖品（P3迁移更新外键名）
-    LotteryCampaign.belongsTo(models.LotteryPrize, {
-      foreignKey: 'tier_fallback_lottery_prize_id',
-      as: 'tierFallbackPrize',
-      onDelete: 'SET NULL',
-      comment: '档位降级保底奖品（必须是prize_value_points=0的空奖）'
-    })
-
-    // 多对一：固定间隔保底指定奖品（运营配置"每N次必出"的目标奖品）
-    LotteryCampaign.belongsTo(models.LotteryPrize, {
-      foreignKey: 'guarantee_prize_id',
-      as: 'guaranteePrize',
-      onDelete: 'SET NULL',
-      comment: '固定间隔保底奖品（NULL=自动选最高档有库存奖品）'
-    })
+    /*
+     * 档位降级兜底奖品和固定间隔保底奖品已迁移到 lottery_strategy_config 表
+     * config_group: tier_fallback / guarantee，通过 DynamicConfigLoader 读取
+     */
 
     /*
      * 🔥 LotteryRecord已合并到LotteryDraw，使用draws关联即可
@@ -745,20 +734,6 @@ module.exports = sequelize => {
       },
 
       /**
-       * 档位保底奖品ID（P3迁移重命名：tier_fallback_prize_id → tier_fallback_lottery_prize_id）
-       * @type {number}
-       * @业务含义 当所有档位都无可用奖品时，发放此保底奖品
-       * @外键关联 lottery_prizes.lottery_prize_id
-       * @注意 此奖品应配置为prize_value_points=0的空奖
-       */
-      tier_fallback_lottery_prize_id: {
-        type: DataTypes.INTEGER,
-        allowNull: true,
-        defaultValue: null,
-        comment: '档位保底奖品ID（所有档位无货时发放，外键关联 lottery_prizes.lottery_prize_id）'
-      },
-
-      /**
        * 档位权重比例因子
        * @type {number}
        * @业务含义 整数权重制的比例因子，所有档位权重之和必须等于此值
@@ -772,33 +747,10 @@ module.exports = sequelize => {
         comment: '档位权重比例因子（默认1000000，所有档位权重之和必须等于此值）'
       },
 
-      /**
-       * 分层解析器版本
-       * @type {string}
-       * @业务含义 指定使用哪个版本的用户分层配置
-       * @关联 config/segment_rules.js 中的配置版本
-       * @用途 根据用户特征（VIP等级、新用户等）匹配不同的档位概率规则
+      /*
+       * segment_resolver_version / preset_debt_enabled 已迁移到 lottery_strategy_config 表
+       * config_group: segment / preset，通过 DynamicConfigLoader 读取
        */
-      segment_resolver_version: {
-        type: DataTypes.STRING(32),
-        allowNull: false,
-        defaultValue: 'v1',
-        comment: '分层解析器配置版本号（如v1/v2），匹配config/segment_rules.js中的配置'
-      },
-
-      // ======================== 预设欠账控制字段（统一架构V1.6） ========================
-
-      /**
-       * 预设是否允许欠账
-       * @type {boolean}
-       * @业务含义 核心开关：TRUE-允许欠账发放，FALSE-资源不足直接失败
-       */
-      preset_debt_enabled: {
-        type: DataTypes.BOOLEAN,
-        allowNull: false,
-        defaultValue: false,
-        comment: '预设是否允许欠账（核心开关）：TRUE-允许欠账发放，FALSE-资源不足直接失败'
-      },
 
       /**
        * 预设预算扣减策略
@@ -1092,51 +1044,8 @@ module.exports = sequelize => {
         allowNull: true,
         defaultValue: null,
         comment: '活动背景图URL（运营上传，可选，与 banner_image_url 横幅图用途不同）'
-      },
-
-      // ======================== 固定间隔保底配置 ========================
-
-      /**
-       * 是否启用固定间隔保底
-       * @type {boolean}
-       * @业务含义 核心开关：true=启用固定间隔保底, false=关闭
-       * @场景 运营在活动编辑页配置"每N次必出大奖"营销活动
-       * @与Pity区别 Pity是"体验兜底"（连续运气差时补偿），本字段是"营销承诺"（固定间隔必出）
-       */
-      guarantee_enabled: {
-        type: DataTypes.BOOLEAN,
-        allowNull: false,
-        defaultValue: false,
-        comment: '是否启用固定间隔保底：false=关闭(默认), true=开启'
-      },
-
-      /**
-       * 保底触发间隔
-       * @type {number}
-       * @业务含义 用户每累计抽奖此次数，自动触发保底机制
-       * @范围 5~100（前端限制，后端不强制）
-       * @示例 设为20表示每20次抽奖必出一次保底奖品
-       */
-      guarantee_threshold: {
-        type: DataTypes.INTEGER,
-        allowNull: false,
-        defaultValue: 10,
-        comment: '保底触发间隔（每N次抽奖触发一次保底）'
-      },
-
-      /**
-       * 保底奖品ID
-       * @type {number|null}
-       * @业务含义 触发保底时发放的奖品，NULL表示自动选最高档有库存奖品
-       * @外键关联 lottery_prizes.lottery_prize_id
-       * @降级策略 指定奖品无库存→自动选最高档有库存→中档→返回无保底
-       */
-      guarantee_prize_id: {
-        type: DataTypes.INTEGER,
-        allowNull: true,
-        defaultValue: null,
-        comment: '保底奖品ID（NULL=自动选最高档有库存奖品），FK→lottery_prizes.lottery_prize_id'
       }
+      /* guarantee_enabled/threshold/prize_id 已迁移到 lottery_strategy_config（guarantee.*） */
     },
     {
       sequelize,

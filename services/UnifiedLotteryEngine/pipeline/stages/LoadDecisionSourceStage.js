@@ -268,15 +268,21 @@ class LoadDecisionSourceStage extends BaseStage {
    *
    * @param {number} user_id - 用户ID
    * @param {number} lottery_campaign_id - 活动ID
-   * @param {Object} campaign - 活动配置
+   * @param {Object} _campaign - 活动配置（保底配置已迁移到 strategy_config，此参数保留兼容调用签名）
    * @returns {Promise<Object>} 保底检查结果
    * @private
    */
-  async _checkGuarantee(user_id, lottery_campaign_id, campaign) {
+  async _checkGuarantee(user_id, lottery_campaign_id, _campaign) {
     try {
-      // 读取活动顶层保底配置（与 GuaranteeStage 保持一致）
-      const guarantee_enabled = campaign.guarantee_enabled === true
-      const threshold = campaign.guarantee_threshold || 10
+      // 从 lottery_strategy_config 读取保底配置（三层优先级：DB活动级 > env > 代码默认值）
+      const { DynamicConfigLoader } = require('../../compute/config/StrategyConfig')
+      const guarantee_enabled =
+        (await DynamicConfigLoader.getValue('guarantee', 'enabled', false, {
+          lottery_campaign_id
+        })) === true
+      const threshold = await DynamicConfigLoader.getValue('guarantee', 'threshold', 10, {
+        lottery_campaign_id
+      })
 
       if (!guarantee_enabled) {
         return { triggered: false, reason: 'guarantee_disabled' }

@@ -2,716 +2,30 @@
  * 交易市场管理页面 - Alpine.js 组件 (Mixin v3.0)
  *
  * @file admin/src/modules/market/pages/trade-management.js
- * @description 交易市场管理页面，包含交易订单和上架统计
- * @version 3.0.0
- * @date 2026-01-23
+ * @description 交易市场管理页面，包含交易订单、上架统计、市场概览
+ * @version 3.1.0
+ * @date 2026-02-25
  *
  * @requires Alpine.js
  * @requires createPageMixin - 页面基础功能混入
  * @requires MARKET_ENDPOINTS - 市场模块API端点（交易市场、业务记录等）
  *
  * @example
- * <!-- 使用导航组件 -->
- * <nav x-data="tradeNavigation()">
- *   <template x-for="page in subPages">
- *     <button @click="switchPage(page.id)" x-text="page.title"></button>
- *   </template>
- * </nav>
- *
- * <!-- 使用主组件 -->
  * <div x-data="tradeManagementPage()">
  *   <div x-show="current_page === 'trade-orders'">交易市场订单</div>
  *   <div x-show="current_page === 'marketplace-stats'">上架统计</div>
- *   <div x-show="current_page === 'redemption-orders'">兑换订单</div>
+ *   <div x-show="current_page === 'market-overview'">市场概览</div>
  * </div>
  */
 
 import { logger } from '../../../utils/logger.js'
 import { MARKET_ENDPOINTS } from '../../../api/market/index.js'
+import { MERCHANT_ENDPOINTS } from '../../../api/merchant.js'
 import { buildURL, request } from '../../../api/base.js'
 import { Alpine, createPageMixin } from '../../../alpine/index.js'
-import { UserAPI } from '../../../api/user.js'
 
 document.addEventListener('alpine:init', () => {
   logger.info('[TradeManagement] 注册 Alpine 组件 (Mixin v3.0)...')
-
-  // 存储当前子页面
-  Alpine.store('tradePage', 'trade-orders')
-
-  // ==================== 导航组件 ====================
-
-  /**
-   * 交易管理导航组件
-   *
-   * @description 管理交易管理子页面导航，支持URL参数持久化
-   * @returns {Object} Alpine组件对象
-   *
-   * @property {string} current_page - 当前激活的页面ID
-   * @property {Array<{id: string, title: string, icon: string}>} subPages - 子页面配置列表
-   */
-  Alpine.data('tradeNavigation', () => ({
-    ...createPageMixin(),
-
-    /** @type {string} 当前页面ID，默认为'trade-orders' */
-    current_page: 'trade-orders',
-
-    /**
-     * 子页面配置列表
-     * @type {Array<{id: string, title: string, icon: string}>}
-     */
-    subPages: [
-      { id: 'trade-orders', title: '交易市场订单', icon: 'bi-arrow-left-right' },
-      { id: 'marketplace-stats', title: '上架统计', icon: 'bi-bar-chart' },
-      { id: 'market-overview', title: '市场概览', icon: 'bi-graph-up' }
-    ],
-
-    /**
-     * 初始化导航组件
-     * @description 从URL参数读取当前页面，并同步到Alpine store
-     * @returns {void}
-     */
-    init() {
-      // 从 URL 参数读取页面
-      const urlParams = new URLSearchParams(window.location.search)
-      const page = urlParams.get('page')
-      if (page && this.subPages.some(p => p.id === page)) {
-        this.current_page = page
-      }
-      Alpine.store('tradePage', this.current_page)
-      logger.info('[TradeNavigation] 当前页面:', this.current_page)
-    },
-
-    /**
-     * 切换到指定页面
-     * @description 更新当前页面状态、URL参数，并触发页面切换事件
-     * @param {string} pageId - 目标页面ID ('trade-orders' | 'marketplace-stats' | 'redemption-orders')
-     * @fires trade-page-changed - 页面切换自定义事件
-     * @returns {void}
-     */
-    switchPage(pageId) {
-      this.current_page = pageId
-      Alpine.store('tradePage', pageId)
-
-      // 更新 URL
-      const url = new URL(window.location)
-      url.searchParams.set('page', pageId)
-      window.history.pushState({}, '', url)
-
-      // 触发数据加载事件
-      window.dispatchEvent(new CustomEvent('trade-page-changed', { detail: pageId }))
-      logger.info('[TradeNavigation] 切换到:', pageId)
-    }
-  }))
-
-  // ==================== 内容组件 ====================
-
-  /**
-   * 交易管理内容组件
-   *
-   * @description 管理交易市场订单、上架统计和兑换订单的数据展示
-   * @returns {Object} Alpine组件对象
-   *
-   * @property {Array} tradeOrders - 交易市场订单列表
-   * @property {Array} marketplaceStats - 上架统计数据
-   * @property {Array} redemptionOrders - 兑换订单列表
-   */
-  Alpine.data('tradePageContent', () => ({
-    ...createPageMixin({ userResolver: true }),
-
-    // ========== data-table 列配置 ==========
-    tradeOrderTableColumns: [
-      { key: 'trade_order_id', label: '交易ID', sortable: true, type: 'code' },
-      {
-        key: 'buyer_user_id',
-        label: '买家',
-        render: (val, row) => row.buyer?.nickname || val || '-'
-      },
-      {
-        key: 'seller_user_id',
-        label: '卖家',
-        render: (val, row) => row.seller?.nickname || val || '-'
-      },
-      {
-        key: 'asset_code',
-        label: '商品',
-        render: (val, row) => row.listing?.offer_asset_code || val || '-'
-      },
-      {
-        key: 'gross_amount',
-        label: '成交价',
-        sortable: true,
-        render: (val, row) => {
-          const amount = val || row.price_amount || 0
-          return `<span class="font-mono text-green-600">${Number(amount).toLocaleString('zh-CN')}</span>`
-        }
-      },
-      {
-        key: 'status',
-        label: '状态',
-        type: 'status',
-        statusMap: {
-          pending: { class: 'yellow', label: '待处理' },
-          processing: { class: 'blue', label: '处理中' },
-          completed: { class: 'green', label: '已完成' },
-          cancelled: { class: 'gray', label: '已取消' },
-          disputed: { class: 'red', label: '争议中' }
-        }
-      },
-      { key: 'created_at', label: '时间', type: 'datetime', sortable: true },
-      {
-        key: '_actions',
-        label: '操作',
-        type: 'actions',
-        width: '80px',
-        actions: [
-          { name: 'detail', label: '详情', class: 'text-blue-600 hover:text-blue-800' }
-        ]
-      }
-    ],
-
-    marketplaceStatsTableColumns: [
-      { key: 'user_id', label: '用户ID', sortable: true },
-      { key: 'nickname', label: '用户昵称' },
-      { key: 'active_listing_count', label: '当前上架数', type: 'number', sortable: true },
-      { key: 'max_listings', label: '上架上限', type: 'number' },
-      {
-        key: 'usage_ratio',
-        label: '使用率',
-        render: (val) => {
-          const pct = Math.round((val || 0) * 100)
-          const cls = pct >= 90 ? 'text-red-600' : pct >= 70 ? 'text-yellow-600' : 'text-green-600'
-          return `<span class="${cls} font-medium">${pct}%</span>`
-        }
-      },
-      {
-        key: 'status_label',
-        label: '状态',
-        type: 'status',
-        statusMap: {
-          normal: { class: 'green', label: '正常' },
-          near_limit: { class: 'yellow', label: '接近上限' },
-          at_limit: { class: 'red', label: '已达上限' }
-        }
-      }
-    ],
-
-    /**
-     * data-table 数据源：交易订单
-     */
-    async fetchTradeOrderTableData(params) {
-      const queryParams = {
-        page: params.page || 1,
-        page_size: params.page_size || 20
-      }
-      if (params.status) queryParams.status = params.status
-
-      Object.keys(queryParams).forEach(k => !queryParams[k] && delete queryParams[k])
-
-      const result = await this.apiGet(MARKET_ENDPOINTS.TRADE_ORDER_LIST, queryParams)
-
-      if (result?.success && result.data) {
-        const items = result.data.orders || result.data.list || result.data.items || []
-        const total = result.data.pagination?.total || result.data.total || items.length
-        this.tradeOrders = items
-        return { items, total }
-      }
-      throw new Error(result?.message || '加载交易订单失败')
-    },
-
-    /**
-     * data-table 数据源：上架统计
-     */
-    async fetchMarketplaceStatsTableData(params) {
-      const queryParams = { page: params.page || 1, page_size: params.page_size || 20 }
-      if (params.status && params.status !== 'all') queryParams.status = params.status
-
-      const result = await this.apiGet(MARKET_ENDPOINTS.MARKETPLACE_STATS, queryParams)
-
-      if (result?.success && result.data) {
-        const items = result.data.users || result.data.stats || result.data.list || []
-        const total = result.data.pagination?.total || items.length
-        return { items, total }
-      }
-      throw new Error(result?.message || '加载上架统计失败')
-    },
-
-    /**
-     * 处理交易订单表格操作
-     */
-    handleTradeOrderTableAction(detail) {
-      const { action, row } = detail
-      if (action === 'detail') this.viewTradeOrderDetail(row)
-    },
-
-    // ========== 交易市场订单数据 ==========
-    /** @type {Array<Object>} 交易市场订单列表 */
-    tradeOrders: [],
-    /** @type {Object|null} 当前选中的交易订单 */
-    selectedTradeOrder: null,
-    /**
-     * 交易统计信息
-     * @type {{total: number, created: number, frozen: number, completed: number}}
-     */
-    tradeStats: {
-      total: 0,
-      created: 0,
-      frozen: 0,
-      completed: 0
-    },
-    /**
-     * 交易订单筛选条件（手机号主导搜索）
-     * @type {{status: string, buyer_mobile: string, seller_mobile: string, listing_id: string}}
-     */
-    tradeFilters: {
-      status: '',
-      buyer_mobile: '',
-      seller_mobile: '',
-      listing_id: ''
-    },
-    /** @type {Object|null} 买家解析结果（独立于 resolvedUser，支持同时显示买卖双方） */
-    resolvedBuyer: null,
-    /** @type {Object|null} 卖家解析结果 */
-    resolvedSeller: null,
-    /** @type {number} 交易订单当前页码 */
-    tradeCurrentPage: 1,
-    /** @type {number} 交易订单每页数量 */
-    tradePageSize: 20,
-    /** @type {{total_pages: number, total: number}} 交易订单分页信息 */
-    tradePagination: { total_pages: 1, total: 0 },
-
-    // ========== 上架统计数据 ==========
-    /** @type {Array<Object>} 用户上架统计列表 */
-    marketplaceStats: [],
-    /**
-     * 上架统计摘要
-     * @type {{total_users_with_listings: number, users_near_limit: number, users_at_limit: number}}
-     */
-    marketplaceSummary: {
-      total_users_with_listings: 0,
-      users_near_limit: 0,
-      users_at_limit: 0
-    },
-    /**
-     * 上架统计筛选条件
-     * @type {{status: string}}
-     */
-    marketplaceFilters: {
-      status: 'all'
-    },
-    /** @type {number} 上架统计当前页码 */
-    marketplaceCurrentPage: 1,
-    /** @type {number} 上架统计每页数量 */
-    marketplacePageSize: 20,
-    /** @type {{total_pages: number, total: number}} 上架统计分页信息 */
-    marketplacePagination: { total_pages: 1, total: 0 },
-    /** @type {number} 最大上架数限制 */
-    maxListings: 10,
-
-    // ========== 兑换订单数据 ==========
-    /** @type {Array<Object>} 兑换订单列表 */
-    redemptionOrders: [],
-    /**
-     * 兑换订单筛选条件
-     * @type {{status: string}}
-     */
-    redemptionFilters: {
-      status: ''
-    },
-    /** @type {number} 兑换订单当前页码 */
-    redemptionCurrentPage: 1,
-    /** @type {number} 兑换订单每页数量 */
-    redemptionPageSize: 20,
-    /** @type {{total_pages: number, total: number}} 兑换订单分页信息 */
-    redemptionPagination: { total_pages: 1, total: 0 },
-
-    // ========== 通用状态 ==========
-    /** @type {boolean} 保存操作进行中标志 */
-    saving: false,
-
-    /**
-     * 获取当前页面ID（从Alpine store读取）
-     * @returns {string} 当前页面ID
-     */
-    get current_page() {
-      return Alpine.store('tradePage')
-    },
-
-    // ========== 初始化 ==========
-    /**
-     * 初始化内容组件
-     * @description 加载页面数据并监听页面切换事件
-     * @returns {void}
-     */
-    init() {
-      logger.info('[TradePageContent] 初始化...')
-
-      // 根据当前页面加载数据
-      this.loadPageData()
-
-      // 监听页面切换（命名引用以便清理）
-      this._tradePageChangedHandler = _e => {
-        this.loadPageData()
-      }
-      window.addEventListener('trade-page-changed', this._tradePageChangedHandler)
-    },
-
-    /**
-     * 根据当前页面加载对应数据
-     * @async
-     * @description 根据current_page调用不同的数据加载方法
-     * @returns {Promise<void>}
-     */
-    async loadPageData() {
-      const page = this.current_page
-      logger.info('[TradePageContent] 加载数据:', page)
-
-      switch (page) {
-        case 'trade-orders':
-          await this.loadTradeOrders()
-          await this.loadTradeStats()
-          break
-        case 'marketplace-stats':
-          await this.loadMarketplaceSummary()
-          await this.loadMarketplaceStats()
-          break
-        case 'redemption-orders':
-          await this.loadRedemptionOrders()
-          break
-      }
-    },
-
-    // ==================== 交易市场订单方法 ====================
-
-    /**
-     * 加载交易市场订单列表
-     * @async
-     * @description 根据筛选条件和分页参数获取交易订单数据
-     * @returns {Promise<void>}
-     */
-    async loadTradeOrders() {
-      try {
-        this.loading = true
-        const params = {
-          page: this.tradeCurrentPage,
-          page_size: this.tradePageSize,
-          status: this.tradeFilters.status,
-          listing_id: this.tradeFilters.listing_id
-        }
-
-        // 买家手机号 → resolve 获取 buyer_user_id
-        if (this.tradeFilters.buyer_mobile) {
-          const buyer = await this.resolveUserByMobile(this.tradeFilters.buyer_mobile)
-          if (buyer) { params.buyer_user_id = buyer.user_id; this.resolvedBuyer = buyer }
-          else { this.resolvedBuyer = null; this.tradeOrders = []; this.loading = false; return }
-        } else { this.resolvedBuyer = null }
-        // 卖家手机号 → resolve 获取 seller_user_id
-        if (this.tradeFilters.seller_mobile) {
-          const seller = await this.resolveUserByMobile(this.tradeFilters.seller_mobile)
-          if (seller) { params.seller_user_id = seller.user_id; this.resolvedSeller = seller }
-          else { this.resolvedSeller = null; this.tradeOrders = []; this.loading = false; return }
-        } else { this.resolvedSeller = null }
-
-        // 移除空值
-        Object.keys(params).forEach(k => !params[k] && delete params[k])
-
-        const res = await request({
-          url: MARKET_ENDPOINTS.TRADE_ORDER_LIST,
-          method: 'GET',
-          params
-        })
-
-        if (res.success) {
-          // 后端返回 orders 数组
-          this.tradeOrders = res.data?.orders || res.data?.list || []
-          // 后端使用 snake_case: total_count, total_pages
-          const pagination = res.data?.pagination || {}
-          this.tradePagination = {
-            total_pages: pagination.total_pages || pagination.total_pages || 1,
-            total: pagination.total_count || pagination.total || this.tradeOrders.length
-          }
-        } else {
-          // 确保失败时 tradeOrders 是空数组
-          this.tradeOrders = []
-        }
-      } catch (e) {
-        logger.error('[TradeManagement] 加载交易订单失败:', e)
-        this.$toast?.error('加载交易订单失败')
-        // 确保出错时 tradeOrders 是空数组
-        this.tradeOrders = []
-      } finally {
-        this.loading = false
-      }
-    },
-
-    /**
-     * 加载交易统计信息
-     * @async
-     * @description 获取交易订单的统计数据
-     * @returns {Promise<void>}
-     */
-    async loadTradeStats() {
-      try {
-        const res = await request({ url: MARKET_ENDPOINTS.TRADE_ORDER_STATS, method: 'GET' })
-        if (res.success && res.data) {
-          // 后端返回格式: { by_status: {...}, completed_summary: {...} }
-          const byStatus = res.data.by_status || {}
-          const summary = res.data.completed_summary || {}
-          this.tradeStats = {
-            total:
-              summary.total_orders || Object.values(byStatus).reduce((a, b) => a + (b || 0), 0),
-            created: byStatus.created || 0,
-            frozen: byStatus.frozen || 0,
-            completed: byStatus.completed || 0
-          }
-        }
-      } catch (e) {
-        logger.error('[TradeManagement] 加载交易统计失败:', e)
-      }
-    },
-
-    /**
-     * 切换交易订单列表页码
-     * @param {number} page - 目标页码
-     * @returns {void}
-     */
-    changeTradePage(page) {
-      if (page < 1 || page > this.tradePagination.total_pages) return
-      this.tradeCurrentPage = page
-      this.loadTradeOrders()
-    },
-
-    /**
-     * 获取交易状态显示文本
-     * @param {string} status - 交易状态码
-     * @returns {string} 状态显示文本
-     */
-    // ✅ 已删除 getTradeStatusText 映射函数 - 改用后端 _display 字段（P2 中文化）
-
-    // ✅ 已删除 getStatusText 映射函数，使用后端返回的 status_display 字段
-
-    /**
-     * 查看交易订单详情
-     * @description 设置选中订单并显示详情弹窗
-     * @param {Object} order - 订单对象
-     * @returns {void}
-     */
-    viewTradeOrderDetail(order) {
-      this.selectedTradeOrder = order
-      this.showModal('tradeDetailModal')
-    },
-
-    // ==================== 上架统计方法 ====================
-
-    /**
-     * 加载上架统计摘要
-     * @async
-     * @description 获取用户上架数量的汇总统计
-     * @returns {Promise<void>}
-     */
-    async loadMarketplaceSummary() {
-      try {
-        const res = await request({
-          url: MARKET_ENDPOINTS.LISTING_STATS,
-          method: 'GET'
-        })
-        if (res.success && res.data) {
-          const summary = res.data.summary || res.data
-          this.marketplaceSummary = {
-            total_users_with_listings: summary.total_users_with_listings || 0,
-            users_near_limit: summary.users_near_limit || 0,
-            users_at_limit: summary.users_at_limit || 0
-          }
-        }
-      } catch (e) {
-        logger.error('[TradeManagement] 加载上架摘要失败:', e)
-      }
-    },
-
-    /**
-     * 加载用户上架统计详情
-     * @async
-     * @description 获取每个用户的上架数量详细信息
-     * @returns {Promise<void>}
-     */
-    async loadMarketplaceStats() {
-      try {
-        this.loading = true
-        const params = {
-          page: this.marketplaceCurrentPage,
-          limit: this.marketplacePageSize
-        }
-
-        if (this.marketplaceFilters.status && this.marketplaceFilters.status !== 'all') {
-          params.filter = this.marketplaceFilters.status
-        }
-
-        const res = await request({
-          url: MARKET_ENDPOINTS.LISTING_STATS,
-          method: 'GET',
-          params
-        })
-
-        if (res.success && res.data) {
-          this.marketplaceStats = res.data.stats || []
-          this.marketplacePagination = {
-            total_pages: res.data.pagination?.total_pages || 1,
-            total: res.data.pagination?.total || this.marketplaceStats.length
-          }
-
-          if (res.data.summary) {
-            this.marketplaceSummary = {
-              total_users_with_listings: res.data.summary.total_users_with_listings || 0,
-              users_near_limit: res.data.summary.users_near_limit || 0,
-              users_at_limit: res.data.summary.users_at_limit || 0
-            }
-          }
-        }
-      } catch (e) {
-        logger.error('[TradeManagement] 加载上架统计失败:', e)
-        this.$toast?.error('加载上架统计失败')
-      } finally {
-        this.loading = false
-      }
-    },
-
-    /**
-     * 切换上架统计列表页码
-     * @param {number} page - 目标页码
-     * @returns {void}
-     */
-    changeMarketplacePage(page) {
-      if (page < 1 || page > this.marketplacePagination.total_pages) return
-      this.marketplaceCurrentPage = page
-      this.loadMarketplaceStats()
-    },
-
-    // ==================== 兑换订单方法 ====================
-
-    /**
-     * 加载兑换订单列表
-     * @async
-     * @description 根据筛选条件和分页参数获取兑换订单数据
-     * @returns {Promise<void>}
-     */
-    async loadRedemptionOrders() {
-      try {
-        this.loading = true
-        const params = {
-          page: this.redemptionCurrentPage,
-          page_size: this.redemptionPageSize,
-          ...this.redemptionFilters
-        }
-
-        Object.keys(params).forEach(k => !params[k] && delete params[k])
-
-        // 使用正确的后端API路径
-        const res = await request({
-          url: MARKET_ENDPOINTS.BUSINESS_RECORD_REDEMPTION,
-          method: 'GET',
-          params
-        })
-
-        if (res.success) {
-          this.redemptionOrders = res.data?.list || res.data || []
-          this.redemptionPagination = {
-            total_pages: res.data?.pagination?.total_pages || 1,
-            total: res.data?.pagination?.total || this.redemptionOrders.length
-          }
-        }
-      } catch (e) {
-        logger.error('[TradeManagement] 加载兑换订单失败:', e)
-        this.$toast?.error('加载兑换订单失败')
-      } finally {
-        this.loading = false
-      }
-    },
-
-    /**
-     * 切换兑换订单列表页码
-     * @param {number} page - 目标页码
-     * @returns {void}
-     */
-    changeRedemptionPage(page) {
-      if (page < 1 || page > this.redemptionPagination.total_pages) return
-      this.redemptionCurrentPage = page
-      this.loadRedemptionOrders()
-    },
-
-    /**
-     * 获取兑换订单状态显示文本
-     * @param {string} status - 兑换状态码
-     * @returns {string} 状态显示文本
-     */
-    // ✅ 已删除 getRedemptionStatusText 映射函数 - 改用后端 _display 字段（P2 中文化）
-
-    // 注意：后端 /api/v4/console/business-records/redemption-orders 是只读查询接口
-    // 不支持审批/拒绝操作，管理员需通过核销操作处理订单
-    // 核销操作请使用 MARKET_ENDPOINTS.BUSINESS_RECORD_REDEMPTION_REDEEM
-
-    /**
-     * 核销兑换订单
-     * @async
-     * @description 确认后核销指定的兑换订单
-     * @param {Object} order - 订单对象
-     * @param {string} order.order_id - 订单ID
-     * @returns {Promise<void>}
-     */
-    async redeemRedemptionOrder(order) {
-      const confirmed = await this.$confirm?.('确定要核销此订单吗？')
-      if (!confirmed) return
-
-      try {
-        const res = await request({
-          url: buildURL(MARKET_ENDPOINTS.BUSINESS_RECORD_REDEMPTION_REDEEM, {
-            order_id: order.order_id
-          }),
-          method: 'POST'
-        })
-
-        if (res.success) {
-          this.$toast?.success('核销成功')
-          this.loadRedemptionOrders()
-        } else {
-          this.$toast?.error(res.message || '核销失败')
-        }
-      } catch (e) {
-        logger.error('[TradeManagement] 核销订单失败:', e)
-        this.$toast?.error('核销失败')
-      }
-    },
-
-    /**
-     * 取消兑换订单
-     * @async
-     * @description 确认后取消指定的兑换订单
-     * @param {Object} order - 订单对象
-     * @param {string} order.order_id - 订单ID
-     * @returns {Promise<void>}
-     */
-    async cancelRedemptionOrder(order) {
-      const confirmed = await this.$confirm?.('确定要取消此订单吗？', { type: 'danger' })
-      if (!confirmed) return
-
-      try {
-        const res = await request({
-          url: buildURL(MARKET_ENDPOINTS.BUSINESS_RECORD_REDEMPTION_CANCEL, {
-            order_id: order.order_id
-          }),
-          method: 'POST'
-        })
-
-        if (res.success) {
-          this.$toast?.success('已取消')
-          this.loadRedemptionOrders()
-        } else {
-          this.$toast?.error(res.message || '操作失败')
-        }
-      } catch (e) {
-        logger.error('[TradeManagement] 取消订单失败:', e)
-        this.$toast?.error('操作失败')
-      }
-    }
-  }))
 
   // ==================== 主组件 ====================
 
@@ -876,8 +190,13 @@ document.addEventListener('alpine:init', () => {
     marketplaceStats: [],
     /** @type {{total_users_with_listings: number, users_near_limit: number, users_at_limit: number}} 上架摘要 */
     marketplaceSummary: { total_users_with_listings: 0, users_near_limit: 0, users_at_limit: 0 },
-    /** @type {{status: string, mobile: string}} 上架统计筛选条件 */
-    marketplaceFilters: { status: 'all', mobile: '' },
+    /** @type {{status: string, mobile: string, merchant_id: string}} 上架统计筛选条件 */
+    marketplaceFilters: { status: 'all', mobile: '', merchant_id: '' },
+
+    /** @type {Array<{merchant_id: number, merchant_name: string}>} 商家下拉选项 */
+    merchantOptions: [],
+    /** @type {string} 交易订单商家筛选 */
+    tradeOrderMerchantFilter: '',
     /** @type {number} 上架统计当前页码 */
     marketplaceCurrentPage: 1,
     /** @type {number} 上架统计每页数量 */
@@ -897,7 +216,7 @@ document.addEventListener('alpine:init', () => {
     /** @type {{total: number, total_pages: number}} 用户上架商品分页 */
     userListingsPagination: { total: 0, total_pages: 0 },
 
-    // ========== 市场概览数据 ==========
+    // ========== 市场概览数据（MarketAnalyticsService 数据源） ==========
     /** @type {Object} 市场概览统计 */
     marketOverview: {
       total_orders: 0,
@@ -905,10 +224,18 @@ document.addEventListener('alpine:init', () => {
       total_volume: 0,
       total_fees: 0,
       active_listings: 0,
-      by_status: {}
+      unique_buyers: 0,
+      unique_sellers: 0,
+      by_status: {},
+      asset_ranking: [],
+      on_sale_summary: []
     },
     /** @type {boolean} 市场概览加载中 */
     marketOverviewLoading: false,
+    /** @type {Object|null} 资产成交量排行图表实例 */
+    assetRankingChart: null,
+    /** @type {Object|null} 在售分布图表实例 */
+    onSaleChart: null,
 
     // 调整上架限制表单
     /** @type {Object} 调整限制表单数据 */
@@ -936,7 +263,7 @@ document.addEventListener('alpine:init', () => {
 
     /**
      * 初始化交易管理主组件
-     * @description 验证权限、从URL读取页面并加载数据
+     * @description 验证权限、从URL读取页面并加载数据、加载商家选项
      * @returns {void}
      */
     init() {
@@ -944,7 +271,25 @@ document.addEventListener('alpine:init', () => {
       if (!this.checkAuth()) return
       const urlParams = new URLSearchParams(window.location.search)
       this.current_page = urlParams.get('page') || 'trade-orders'
+      this._loadMerchantOptions()
       this.loadPageData()
+    },
+
+    /**
+     * 加载商家下拉选项（供筛选器使用）
+     * @private
+     * @async
+     */
+    async _loadMerchantOptions() {
+      try {
+        const res = await request({ url: MERCHANT_ENDPOINTS.OPTIONS, method: 'GET' })
+        const data = res?.success ? res.data : res
+        this.merchantOptions = Array.isArray(data) ? data : []
+        logger.debug('[TradeManagement] 商家选项加载完成', { count: this.merchantOptions.length })
+      } catch (error) {
+        logger.warn('[TradeManagement] 加载商家选项失败', error)
+        this.merchantOptions = []
+      }
     },
 
     /**
@@ -1106,7 +451,12 @@ document.addEventListener('alpine:init', () => {
     // ==================== 市场概览方法 ====================
 
     /**
-     * 加载市场概览数据（交易统计 + 在售挂牌数）
+     * 加载市场概览数据（MarketAnalyticsService + 交易统计）
+     *
+     * 数据来源：
+     * 1. MarketAnalyticsService.getMarketOverview() - 各资产成交量排行、在售统计
+     * 2. TradeOrderService 统计 - 订单状态分布
+     *
      * @async
      * @returns {Promise<void>}
      */
@@ -1114,31 +464,38 @@ document.addEventListener('alpine:init', () => {
       try {
         this.marketOverviewLoading = true
 
-        const res = await request({
-          url: MARKET_ENDPOINTS.TRADE_ORDER_STATS,
-          method: 'GET'
-        })
+        // 并行请求：市场分析数据 + 交易订单统计
+        const [analyticsRes, statsRes] = await Promise.allSettled([
+          request({ url: MARKET_ENDPOINTS.MARKET_OVERVIEW, method: 'GET' }),
+          request({ url: MARKET_ENDPOINTS.TRADE_ORDER_STATS, method: 'GET' })
+        ])
 
-        if (res?.success && res.data) {
-          const data = res.data
-          this.marketOverview = {
-            total_orders: 0,
-            completed_orders: data.completed_summary?.total_orders || 0,
-            total_volume: data.completed_summary?.total_gross_amount || 0,
-            total_fees: data.completed_summary?.total_fee_amount || 0,
-            active_listings: 0,
-            by_status: data.by_status || {}
-          }
-
-          // 汇总各状态的订单数
-          let totalOrders = 0
-          Object.values(data.by_status || {}).forEach(item => {
-            totalOrders += item.count || 0
-          })
-          this.marketOverview.total_orders = totalOrders
+        // 处理市场分析数据（MarketAnalyticsService）
+        if (analyticsRes.status === 'fulfilled' && analyticsRes.value?.success) {
+          const analytics = analyticsRes.value.data
+          this.marketOverview.total_orders = analytics.totals?.total_trades || 0
+          this.marketOverview.total_volume = analytics.totals?.total_volume || 0
+          this.marketOverview.unique_buyers = analytics.totals?.unique_buyers || 0
+          this.marketOverview.unique_sellers = analytics.totals?.unique_sellers || 0
+          this.marketOverview.asset_ranking = analytics.asset_ranking || []
+          this.marketOverview.on_sale_summary = analytics.on_sale_summary || []
         }
 
-        // 并行获取在售挂牌数
+        // 处理交易订单统计（补充订单状态分布和费用信息）
+        if (statsRes.status === 'fulfilled' && statsRes.value?.success) {
+          const stats = statsRes.value.data
+          this.marketOverview.completed_orders = stats.completed_summary?.total_orders || 0
+          this.marketOverview.total_fees = stats.completed_summary?.total_fee_amount || 0
+          this.marketOverview.by_status = stats.by_status || {}
+
+          if (!this.marketOverview.total_orders) {
+            let total = 0
+            Object.values(stats.by_status || {}).forEach(item => { total += item.count || 0 })
+            this.marketOverview.total_orders = total
+          }
+        }
+
+        // 获取在售挂牌数
         try {
           const listingRes = await request({
             url: MARKET_ENDPOINTS.LISTING_STATS,
@@ -1153,12 +510,98 @@ document.addEventListener('alpine:init', () => {
           logger.warn('[TradeManagement] 加载挂牌统计失败（非致命）:', err.message)
         }
 
-        logger.info('[TradeManagement] 市场概览加载完成', this.marketOverview)
+        // 渲染 ECharts 图表
+        await this._renderMarketOverviewCharts()
+
+        logger.info('[TradeManagement] 市场概览加载完成', {
+          total_trades: this.marketOverview.total_orders,
+          asset_ranking_count: this.marketOverview.asset_ranking.length
+        })
       } catch (error) {
         logger.error('[TradeManagement] 加载市场概览失败:', error)
-        this.$toast?.error('加载市场概览数据失败')
+        Alpine.store('notification').show('加载市场概览数据失败', 'error')
       } finally {
         this.marketOverviewLoading = false
+      }
+    },
+
+    /**
+     * 渲染市场概览 ECharts 图表
+     * @private
+     * @async
+     */
+    async _renderMarketOverviewCharts() {
+      try {
+        const { loadECharts } = await import('../../../utils/index.js')
+        const echarts = await loadECharts()
+        if (!echarts) {
+          logger.warn('[TradeManagement] ECharts 加载失败，跳过图表渲染')
+          return
+        }
+
+        // 资产成交量排行柱状图
+        await this.$nextTick
+        const rankingEl = document.getElementById('asset-ranking-chart')
+        if (rankingEl && this.marketOverview.asset_ranking.length > 0) {
+          if (this.assetRankingChart) this.assetRankingChart.dispose()
+          this.assetRankingChart = echarts.init(rankingEl)
+
+          const ranking = this.marketOverview.asset_ranking
+          this.assetRankingChart.setOption({
+            title: { text: '近7天各资产成交量排行', left: 'center', textStyle: { fontSize: 14 } },
+            tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+            grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+            xAxis: {
+              type: 'category',
+              data: ranking.map(r => r.asset_code || '未知'),
+              axisLabel: { rotate: 30 }
+            },
+            yAxis: [
+              { type: 'value', name: '成交笔数' },
+              { type: 'value', name: '成交量(钻石)', position: 'right' }
+            ],
+            series: [
+              {
+                name: '成交笔数',
+                type: 'bar',
+                data: ranking.map(r => Number(r.trade_count) || 0),
+                itemStyle: { color: '#3b82f6' }
+              },
+              {
+                name: '成交量(钻石)',
+                type: 'bar',
+                yAxisIndex: 1,
+                data: ranking.map(r => Number(r.total_diamond_volume) || 0),
+                itemStyle: { color: '#10b981' }
+              }
+            ]
+          })
+        }
+
+        // 在售分布饼图
+        const onSaleEl = document.getElementById('on-sale-chart')
+        if (onSaleEl && this.marketOverview.on_sale_summary.length > 0) {
+          if (this.onSaleChart) this.onSaleChart.dispose()
+          this.onSaleChart = echarts.init(onSaleEl)
+
+          const onSale = this.marketOverview.on_sale_summary
+          this.onSaleChart.setOption({
+            title: { text: '当前在售资产分布', left: 'center', textStyle: { fontSize: 14 } },
+            tooltip: { trigger: 'item', formatter: '{b}: {c}件 ({d}%)' },
+            series: [{
+              type: 'pie',
+              radius: ['35%', '65%'],
+              avoidLabelOverlap: true,
+              label: { show: true, formatter: '{b}\n{c}件' },
+              data: onSale.map(s => ({
+                name: s.asset_code || '未知',
+                value: Number(s.on_sale_count) || 0
+              }))
+            }]
+          })
+        }
+      } catch (err) {
+        logger.warn('[TradeManagement] 图表渲染失败（非致命）:', err.message)
       }
     },
 

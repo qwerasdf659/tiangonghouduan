@@ -46,11 +46,6 @@ async function analyzeLotteryCampaigns() {
       campaign_name,
       status,
       budget_mode,
-      total_budget,
-      remaining_budget,
-      guarantee_enabled,
-      guarantee_threshold,
-      guarantee_prize_id,
       start_time,
       end_time,
       created_at
@@ -66,8 +61,6 @@ async function analyzeLotteryCampaigns() {
     console.log(`      代码: ${campaign.campaign_code}`)
     console.log(`      状态: ${campaign.status}`)
     console.log(`      预算模式: ${campaign.budget_mode}`)
-    console.log(`      总预算: ${campaign.total_budget || 'N/A'} | 剩余: ${campaign.remaining_budget || 'N/A'}`)
-    console.log(`      保底: ${campaign.guarantee_enabled ? '启用' : '禁用'} | 阈值: ${campaign.guarantee_threshold || 'N/A'}次`)
   }
 
   // 统计各状态活动数量

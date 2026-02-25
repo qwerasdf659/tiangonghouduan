@@ -440,6 +440,286 @@ class LotteryAnalyticsQueryService {
       }))
     }
   }
+  // ==================== Dashboard 级别跨活动聚合查询 ====================
+
+  /**
+   * 获取抽奖 Dashboard 统计（跨活动聚合）
+   *
+   * @param {Object} options - 查询选项
+   * @param {string} [options.range='7d'] - 时间范围
+   * @param {number} [options.merchant_id] - 按商家筛选（通过 LotteryPrize 关联）
+   * @returns {Promise<Object>} { total_draws, total_wins, win_rate, total_prize_value, updated_at }
+   */
+  static async getDashboardStats(options = {}) {
+    const { range = '7d', merchant_id } = options
+    const { start_time, end_time } = this._getTimeRange(range)
+    const { LotteryDraw, LotteryPrize } = require('../../models')
+
+    const queryOptions = {
+      attributes: [
+        [fn('COUNT', col('LotteryDraw.lottery_draw_id')), 'total_draws'],
+        [
+          fn(
+            'SUM',
+            literal("CASE WHEN LotteryDraw.reward_tier IN ('high', 'mid', 'low') THEN 1 ELSE 0 END")
+          ),
+          'total_wins'
+        ],
+        [fn('SUM', col('LotteryDraw.prize_value_points')), 'total_prize_value']
+      ],
+      where: { created_at: { [Op.between]: [start_time, end_time] } },
+      raw: true
+    }
+
+    if (merchant_id) {
+      queryOptions.include = [
+        {
+          model: LotteryPrize,
+          as: 'prize',
+          attributes: [],
+          where: { merchant_id: parseInt(merchant_id) },
+          required: true
+        }
+      ]
+    }
+
+    const stats = await LotteryDraw.findAll(queryOptions)
+    const result = stats[0] || {}
+    const totalDraws = parseInt(result.total_draws || 0)
+    const totalWins = parseInt(result.total_wins || 0)
+
+    return {
+      total_draws: totalDraws,
+      total_wins: totalWins,
+      win_rate: totalDraws > 0 ? parseFloat(((totalWins / totalDraws) * 100).toFixed(1)) : 0,
+      total_prize_value: parseInt(result.total_prize_value || 0),
+      updated_at: new Date().toISOString()
+    }
+  }
+
+  /**
+   * 获取抽奖趋势（跨活动聚合，按天/小时分组）
+   *
+   * @param {Object} options - 查询选项
+   * @param {string} [options.range='7d'] - 时间范围
+   * @param {string} [options.granularity='day'] - 粒度（hour/day）
+   * @param {number} [options.merchant_id] - 按商家筛选
+   * @returns {Promise<Object>} { trend, range, granularity, updated_at }
+   */
+  static async getDashboardTrend(options = {}) {
+    const { range = '7d', granularity = 'day', merchant_id } = options
+    const { start_time, end_time } = this._getTimeRange(range)
+    const { LotteryDraw, LotteryPrize } = require('../../models')
+
+    const dateFormat =
+      granularity === 'hour'
+        ? "DATE_FORMAT(CONVERT_TZ(`LotteryDraw`.`created_at`, '+00:00', '+08:00'), '%Y-%m-%d %H:00')"
+        : "DATE_FORMAT(CONVERT_TZ(`LotteryDraw`.`created_at`, '+00:00', '+08:00'), '%Y-%m-%d')"
+
+    const queryOptions = {
+      attributes: [
+        [literal(dateFormat), 'date'],
+        [fn('COUNT', col('LotteryDraw.lottery_draw_id')), 'draws'],
+        [
+          fn(
+            'SUM',
+            literal(
+              "CASE WHEN `LotteryDraw`.`reward_tier` IN ('high', 'mid', 'low') THEN 1 ELSE 0 END"
+            )
+          ),
+          'wins'
+        ]
+      ],
+      where: { created_at: { [Op.between]: [start_time, end_time] } },
+      group: [literal(dateFormat)],
+      order: [[literal('date'), 'ASC']],
+      raw: true
+    }
+
+    if (merchant_id) {
+      queryOptions.include = [
+        {
+          model: LotteryPrize,
+          as: 'prize',
+          attributes: [],
+          where: { merchant_id: parseInt(merchant_id) },
+          required: true
+        }
+      ]
+    }
+
+    const trendData = await LotteryDraw.findAll(queryOptions)
+
+    return {
+      trend: trendData.map(item => ({
+        date: item.date,
+        draws: parseInt(item.draws || 0),
+        wins: parseInt(item.wins || 0),
+        win_rate:
+          parseInt(item.draws) > 0
+            ? parseFloat(((parseInt(item.wins) / parseInt(item.draws)) * 100).toFixed(1))
+            : 0
+      })),
+      range,
+      granularity,
+      updated_at: new Date().toISOString()
+    }
+  }
+
+  /**
+   * 获取奖品档位分布（跨活动聚合）
+   *
+   * @param {Object} options - 查询选项
+   * @param {string} [options.range='7d'] - 时间范围
+   * @param {number} [options.merchant_id] - 按商家筛选
+   * @returns {Promise<Object>} { distribution, total_count, range, updated_at }
+   */
+  static async getDashboardPrizeDistribution(options = {}) {
+    const { range = '7d', merchant_id } = options
+    const { start_time, end_time } = this._getTimeRange(range)
+    const { LotteryDraw, LotteryPrize } = require('../../models')
+
+    const TIER_NAMES = {
+      high: '高级奖品',
+      mid: '中级奖品',
+      low: '低级奖品',
+      fallback: '保底奖品',
+      unknown: '未知'
+    }
+
+    const queryOptions = {
+      attributes: [
+        'reward_tier',
+        [fn('COUNT', col('LotteryDraw.lottery_draw_id')), 'count'],
+        [fn('SUM', col('LotteryDraw.prize_value_points')), 'value']
+      ],
+      where: { created_at: { [Op.between]: [start_time, end_time] } },
+      group: ['reward_tier'],
+      raw: true
+    }
+
+    if (merchant_id) {
+      queryOptions.include = [
+        {
+          model: LotteryPrize,
+          as: 'prize',
+          attributes: [],
+          where: { merchant_id: parseInt(merchant_id) },
+          required: true
+        }
+      ]
+    }
+
+    const distributionData = await LotteryDraw.findAll(queryOptions)
+    const totalCount = distributionData.reduce((sum, item) => sum + parseInt(item.count || 0), 0)
+
+    const distribution = distributionData
+      .map(item => ({
+        tier: item.reward_tier || 'unknown',
+        tier_name: TIER_NAMES[item.reward_tier] || '未知',
+        count: parseInt(item.count || 0),
+        percentage:
+          totalCount > 0
+            ? parseFloat(((parseInt(item.count || 0) / totalCount) * 100).toFixed(1))
+            : 0,
+        value: parseInt(item.value || 0)
+      }))
+      .sort((a, b) => b.count - a.count)
+
+    return { distribution, total_count: totalCount, range, updated_at: new Date().toISOString() }
+  }
+
+  /**
+   * 获取活动排行（跨活动聚合）
+   *
+   * @param {Object} options - 查询选项
+   * @param {string} [options.range='7d'] - 时间范围
+   * @param {string} [options.sort_by='draws'] - 排序字段
+   * @param {number} [options.limit=10] - 返回数量
+   * @param {number} [options.merchant_id] - 按商家筛选
+   * @returns {Promise<Object>} { ranking, range, sort_by, updated_at }
+   */
+  static async getDashboardCampaignRanking(options = {}) {
+    const { range = '7d', sort_by = 'draws', limit = 10, merchant_id } = options
+    const { start_time, end_time } = this._getTimeRange(range)
+    const { LotteryDraw, LotteryCampaign, LotteryPrize } = require('../../models')
+
+    const includeList = [
+      {
+        model: LotteryCampaign,
+        as: 'campaign',
+        attributes: ['campaign_name', 'status'],
+        required: false
+      }
+    ]
+
+    if (merchant_id) {
+      includeList.push({
+        model: LotteryPrize,
+        as: 'prize',
+        attributes: [],
+        where: { merchant_id: parseInt(merchant_id) },
+        required: true
+      })
+    }
+
+    const rankingData = await LotteryDraw.findAll({
+      attributes: [
+        'lottery_campaign_id',
+        [fn('COUNT', col('LotteryDraw.lottery_draw_id')), 'draws'],
+        [
+          fn(
+            'SUM',
+            literal(
+              "CASE WHEN `LotteryDraw`.`reward_tier` IN ('high', 'mid', 'low') THEN 1 ELSE 0 END"
+            )
+          ),
+          'wins'
+        ],
+        [fn('COUNT', fn('DISTINCT', col('LotteryDraw.user_id'))), 'users']
+      ],
+      where: { created_at: { [Op.between]: [start_time, end_time] } },
+      include: includeList,
+      group: ['lottery_campaign_id'],
+      order: [[literal(sort_by === 'wins' ? 'wins' : 'draws'), 'DESC']],
+      limit: parseInt(limit),
+      raw: false
+    })
+
+    return {
+      ranking: rankingData.map((item, index) => {
+        const draws = parseInt(item.dataValues.draws || 0)
+        const wins = parseInt(item.dataValues.wins || 0)
+        return {
+          rank: index + 1,
+          lottery_campaign_id: item.lottery_campaign_id,
+          campaign_name: item.campaign?.campaign_name || '未知活动',
+          status: item.campaign?.status || 'unknown',
+          draws,
+          wins,
+          win_rate: draws > 0 ? parseFloat(((wins / draws) * 100).toFixed(1)) : 0,
+          users: parseInt(item.dataValues.users || 0)
+        }
+      }),
+      range,
+      sort_by,
+      updated_at: new Date().toISOString()
+    }
+  }
+
+  // ==================== 内部工具方法 ====================
+
+  /**
+   * 根据范围字符串计算起止时间
+   * @param {string} range - 时间范围（如 '7d', '30d', '90d'）
+   * @returns {Object} { start_time, end_time }
+   * @private
+   */
+  static _getTimeRange(range = '7d') {
+    const now = new Date()
+    const days = parseInt(range) || 7
+    return { start_time: new Date(now.getTime() - days * 24 * 60 * 60 * 1000), end_time: now }
+  }
 }
 
 module.exports = LotteryAnalyticsQueryService

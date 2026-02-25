@@ -58,17 +58,9 @@ export function useCampaignsState() {
       /** 中奖动画类型 */
       win_animation: 'simple',
       /** 活动背景图URL */
-      background_image_url: null,
-      // ======== 固定间隔保底配置 ========
-      /** 是否启用固定间隔保底（运营可按活动开关） */
-      guarantee_enabled: false,
-      /** 保底触发间隔（每N次抽奖触发保底，范围5~100） */
-      guarantee_threshold: 20,
-      /** 保底奖品ID（NULL=自动选最高档有库存奖品） */
-      guarantee_prize_id: null
+      background_image_url: null
+      // guarantee_enabled/threshold/prize_id 已迁移到策略开关页面管理
     },
-    /** @type {Array} 当前编辑活动关联的奖品列表（供保底奖品下拉选择） */
-    currentCampaignPrizes: [],
     /** @type {Array} 活动类型选项 */
     campaignTypeOptions: [
       { value: 'daily', label: '每日抽奖' },
@@ -262,20 +254,16 @@ export function useCampaignsMethods(_context) {
         rules_text: '',
         // 选奖配置默认值（任务10+3前端）
         pick_method: 'tier_first',
-        segment_resolver_version: 'default',
+        // segment_resolver_version 已迁移到策略开关页面
         // 展示配置默认值
         display_mode: 'grid_3x3',
         grid_cols: 3,
         effect_theme: 'default',
         rarity_effects_enabled: true,
         win_animation: 'simple',
-        background_image_url: null,
-        // 固定间隔保底配置默认值
-        guarantee_enabled: false,
-        guarantee_threshold: 20,
-        guarantee_prize_id: null
+        background_image_url: null
+        // guarantee 配置已迁移到策略开关页面
       }
-      this.currentCampaignPrizes = []
       this.showModal('campaignModal')
     },
 
@@ -320,17 +308,10 @@ export function useCampaignsMethods(_context) {
         rarity_effects_enabled: fullCampaign.rarity_effects_enabled !== false,
         win_animation: fullCampaign.win_animation || 'simple',
         background_image_url: fullCampaign.background_image_url || null,
-        // 选奖配置（任务10+3）
-        pick_method: fullCampaign.pick_method || 'tier_first',
-        segment_resolver_version: fullCampaign.segment_resolver_version || 'default',
-        // 固定间隔保底配置（从活动详情回填）
-        guarantee_enabled:
-          fullCampaign.guarantee_enabled === true || fullCampaign.guarantee_enabled === 1,
-        guarantee_threshold: fullCampaign.guarantee_threshold || 20,
-        guarantee_prize_id: fullCampaign.guarantee_prize_id || null
+        // 选奖配置
+        pick_method: fullCampaign.pick_method || 'tier_first'
+        // segment_resolver_version / guarantee_* 已迁移到策略开关页面管理
       }
-      // 活动关联的奖品列表（供保底奖品下拉选择）
-      this.currentCampaignPrizes = fullCampaign.prizes || []
       this.showModal('campaignModal')
     },
 
@@ -397,18 +378,14 @@ export function useCampaignsMethods(_context) {
           },
           // ======== 选奖配置（任务10+3前端） ========
           pick_method: this.campaignForm.pick_method || 'tier_first',
-          segment_resolver_version: this.campaignForm.segment_resolver_version || 'default',
           // ======== 前端展示配置（多活动抽奖系统 2026-02-15） ========
           display_mode: this.campaignForm.display_mode || 'grid_3x3',
           grid_cols: parseInt(this.campaignForm.grid_cols) || 3,
           effect_theme: this.campaignForm.effect_theme || 'default',
           rarity_effects_enabled: this.campaignForm.rarity_effects_enabled !== false,
           win_animation: this.campaignForm.win_animation || 'simple',
-          background_image_url: this.campaignForm.background_image_url || null,
-          // ======== 固定间隔保底配置 ========
-          guarantee_enabled: this.campaignForm.guarantee_enabled === true,
-          guarantee_threshold: parseInt(this.campaignForm.guarantee_threshold) || 20,
-          guarantee_prize_id: this.campaignForm.guarantee_prize_id || null
+          background_image_url: this.campaignForm.background_image_url || null
+          // guarantee 配置已迁移到策略开关页面
         }
 
         logger.debug('提交活动数据:', requestData)

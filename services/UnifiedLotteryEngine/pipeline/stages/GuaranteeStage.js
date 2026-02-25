@@ -76,21 +76,16 @@ class GuaranteeStage extends BaseStage {
         })
       }
 
-      const campaign = campaign_data.campaign
+      const _campaign = campaign_data.campaign // eslint-disable-line no-unused-vars
       const prizes = campaign_data.prizes || []
 
-      /**
-       * 🔴 2026-02-19 修复：保底机制默认关闭
-       *
-       * 修复根因：
-       * - lottery_campaigns 表无 guarantee_enabled 字段
-       * - 原代码 `campaign.guarantee_enabled !== false` → undefined !== false = true
-       * - 导致保底机制"幽灵启用"，每10次抽奖强制高档位
-       * - 项目已有 Pity 系统（连续空奖保底），无需额外的固定间隔保底
-       *
-       * 修复方案：保底需要显式设为 true 才启用（安全默认值）
-       */
-      const guarantee_enabled = campaign.guarantee_enabled === true
+      // 从 lottery_strategy_config 读取保底配置（三层优先级：DB活动级 > env > 代码默认值）
+      const { DynamicConfigLoader } = require('../../compute/config/StrategyConfig')
+      const guarantee_enabled =
+        (await DynamicConfigLoader.getValue('guarantee', 'enabled', false, {
+          lottery_campaign_id
+        })) === true
+
       if (!guarantee_enabled) {
         this.log('info', '活动未启用保底机制（需显式开启）', { lottery_campaign_id })
         return this.success({
@@ -99,9 +94,16 @@ class GuaranteeStage extends BaseStage {
         })
       }
 
-      // 获取保底配置
-      const guarantee_threshold = campaign.guarantee_threshold || DEFAULT_GUARANTEE_THRESHOLD
-      const guarantee_prize_id = campaign.guarantee_prize_id || null
+      // 从 lottery_strategy_config 读取保底阈值和奖品ID
+      const guarantee_threshold = await DynamicConfigLoader.getValue(
+        'guarantee',
+        'threshold',
+        DEFAULT_GUARANTEE_THRESHOLD,
+        { lottery_campaign_id }
+      )
+      const guarantee_prize_id = await DynamicConfigLoader.getValue('guarantee', 'prize_id', null, {
+        lottery_campaign_id
+      })
 
       // 1. 获取用户累计抽奖次数（不含当前这次，传入事务保证连抽数据一致）
       const user_draw_count = await this._getUserDrawCount(

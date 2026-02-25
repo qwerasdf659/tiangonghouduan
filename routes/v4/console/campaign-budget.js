@@ -186,7 +186,6 @@ router.get(
  * @body {string} budget_mode - 预算模式（user/pool/none）
  * @body {number} pool_budget_total - 活动池总预算（budget_mode=pool时使用）
  * @body {Array<string|number>} allowed_campaign_ids - 允许使用的预算来源活动ID列表
- * @body {boolean} preset_debt_enabled - 预设是否允许欠账（true/false）
  * @body {string} preset_budget_policy - 预设预算扣减策略（follow_campaign/pool_first/user_first）
  *
  * 缓存策略（决策3/7）：
@@ -197,13 +196,7 @@ router.put(
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
     const { lottery_campaign_id } = req.params
-    const {
-      budget_mode,
-      pool_budget_total,
-      allowed_campaign_ids,
-      preset_debt_enabled,
-      preset_budget_policy
-    } = req.body
+    const { budget_mode, pool_budget_total, allowed_campaign_ids, preset_budget_policy } = req.body
 
     /*
      * P1-9：通过 ServiceManager 获取服务
@@ -230,7 +223,6 @@ router.put(
               budget_mode,
               pool_budget_total,
               allowed_campaign_ids,
-              preset_debt_enabled,
               preset_budget_policy
             },
             { operated_by: req.user?.user_id, transaction }
@@ -259,7 +251,6 @@ router.put(
             pool_budget_total: campaign.pool_budget_total,
             pool_budget_remaining: campaign.pool_budget_remaining,
             allowed_campaign_ids: campaign.allowed_campaign_ids,
-            preset_debt_enabled: campaign.preset_debt_enabled,
             preset_budget_policy: campaign.preset_budget_policy
           }
         },

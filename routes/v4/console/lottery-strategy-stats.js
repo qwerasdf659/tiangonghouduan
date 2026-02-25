@@ -553,6 +553,7 @@ router.get('/config-summary', authenticateToken, requireRoleLevel(100), async (r
   try {
     const { LotteryStrategyConfig, LotteryTierMatrixConfig, LotteryCampaign, sequelize } =
       req.app.locals.models
+    const { Op } = require('sequelize')
 
     // ── 1. 策略配置总览 ──
     const allStrategies = await LotteryStrategyConfig.findAll({
@@ -577,16 +578,37 @@ router.get('/config-summary', authenticateToken, requireRoleLevel(100), async (r
     // ── 2. 活跃活动列表 ──
     const activeCampaigns = await LotteryCampaign.findAll({
       where: { status: 'active' },
-      attributes: [
-        'lottery_campaign_id',
-        'campaign_name',
-        'pick_method',
-        'budget_mode',
-        'guarantee_enabled',
-        'guarantee_threshold'
-      ],
+      attributes: ['lottery_campaign_id', 'campaign_name', 'pick_method', 'budget_mode'],
       order: [['lottery_campaign_id', 'ASC']]
     })
+
+    // 批量查询 guarantee 配置（从 lottery_strategy_config 聚合，避免 N+1）
+    const campaignIds = activeCampaigns.map(c => c.lottery_campaign_id)
+    const guaranteeMap = new Map()
+    if (campaignIds.length > 0) {
+      const guaranteeConfigs = await LotteryStrategyConfig.findAll({
+        where: {
+          lottery_campaign_id: { [Op.in]: campaignIds },
+          config_group: 'guarantee',
+          config_key: { [Op.in]: ['enabled', 'threshold'] },
+          is_active: 1
+        },
+        attributes: ['lottery_campaign_id', 'config_key', 'config_value']
+      })
+      guaranteeConfigs.forEach(gc => {
+        if (!guaranteeMap.has(gc.lottery_campaign_id)) {
+          guaranteeMap.set(gc.lottery_campaign_id, {})
+        }
+        const parsed_value = (() => {
+          try {
+            return JSON.parse(gc.config_value)
+          } catch {
+            return gc.config_value
+          }
+        })()
+        guaranteeMap.get(gc.lottery_campaign_id)[gc.config_key] = parsed_value
+      })
+    }
 
     // ── 3. 最近24小时策略执行概况（直接查 lottery_draws） ──
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
@@ -643,7 +665,14 @@ router.get('/config-summary', authenticateToken, requireRoleLevel(100), async (r
         matrix_configs: matrixConfigs.length,
         active_matrix_configs: activeMatrixConfigs.length
       },
-      active_campaigns: activeCampaigns.map(c => c.toJSON()),
+      active_campaigns: activeCampaigns.map(c => {
+        const gConfig = guaranteeMap.get(c.lottery_campaign_id) || {}
+        return {
+          ...c.toJSON(),
+          guarantee_enabled: gConfig.enabled || false,
+          guarantee_threshold: gConfig.threshold || 10
+        }
+      }),
       recent_24h: {
         total_draws: totalDraws,
         tier_distribution: {

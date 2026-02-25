@@ -117,7 +117,7 @@ class DecisionSnapshotStage extends BaseStage {
           pick_method: campaign_data.pick_method,
           budget_mode: campaign_data.budget_mode,
           tier_weight_scale: campaign_data.campaign?.tier_weight_scale,
-          segment_resolver_version: campaign_data.campaign?.segment_resolver_version
+          segment_resolver_version: tier_pick_data?.resolver_version || 'default'
         },
 
         // 资格检查结果

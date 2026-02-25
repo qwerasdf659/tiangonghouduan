@@ -570,21 +570,22 @@ describe('【P1】保底机制专项测试 - GuaranteeStage', () => {
 
       /*
        * 业务规则：
-       * - 活动可通过 guarantee_enabled = false 禁用保底
+       * - 活动可通过 guarantee.enabled = false 禁用保底（从 lottery_strategy_config 读取）
        * - 禁用后即使达到阈值也不会触发保底
        */
 
-      const mockCampaign = {
-        lottery_campaign_id: 1,
-        guarantee_enabled: false,
-        guarantee_threshold: 10
+      // 保底配置已迁移到 lottery_strategy_config，通过 DynamicConfigLoader 读取
+      const mockGuaranteeConfig = {
+        enabled: false,
+        threshold: 10,
+        prize_id: null
       }
 
-      if (!mockCampaign.guarantee_enabled) {
+      if (!mockGuaranteeConfig.enabled) {
         console.log('   活动未启用保底机制，跳过保底检查')
       }
 
-      expect(mockCampaign.guarantee_enabled).toBe(false)
+      expect(mockGuaranteeConfig.enabled).toBe(false)
       console.log('   ✅ 活动禁用保底时不触发')
     })
   })

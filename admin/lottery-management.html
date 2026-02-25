@@ -5660,16 +5660,7 @@
                 <p class="text-xs themed-text-muted mt-1" x-show="campaignForm.pick_method === 'tier_first'">按 reward_tier 档位 + win_weight 权重两级选择</p>
                 <p class="text-xs themed-text-muted mt-1" x-show="campaignForm.pick_method === 'normalize'">跳过档位，按 win_probability 归一化百分比抽取，概率总和应为 1.0</p>
               </div>
-              <div>
-                <label class="block text-sm font-medium themed-text-secondary mb-1">分群策略版本</label>
-                <select class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" x-model="campaignForm.segment_resolver_version"
-                  x-init="$nextTick(() => loadAvailableSegmentVersions())">
-                  <template x-for="sv in availableSegmentVersions" :key="sv.version_key">
-                    <option :value="sv.version_key" x-text="sv.description + '（' + sv.version_key + '）'"></option>
-                  </template>
-                </select>
-                <p class="text-xs themed-text-muted mt-1">控制用户分群规则版本，影响档位概率分配</p>
-              </div>
+              <!-- 分群策略版本已迁移到「策略开关」Tab 管理 -->
             </div>
           </div>
 
@@ -5772,66 +5763,7 @@
             </div>
           </div>
 
-          <!-- 固定间隔保底配置 -->
-          <div class="themed-bg-base p-3 rounded">
-            <h6 class="text-sm font-semibold themed-text-muted mb-3">🛡️ 固定间隔保底配置</h6>
-            <div class="space-y-3">
-              <!-- 启用开关 -->
-              <div class="flex items-center justify-between">
-                <div>
-                  <label class="text-sm font-medium themed-text-secondary">启用固定间隔保底</label>
-                  <p class="text-xs themed-text-muted">开启后，用户每累计抽奖N次必定获得一次指定奖品</p>
-                </div>
-                <label class="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" x-model="campaignForm.guarantee_enabled" class="sr-only peer">
-                  <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                </label>
-              </div>
-
-              <!-- 子配置（仅启用时显示） -->
-              <div x-show="campaignForm.guarantee_enabled" x-transition class="space-y-3 pl-4 border-l-2 border-blue-200">
-                <!-- 保底间隔次数 -->
-                <div>
-                  <label class="block text-sm font-medium themed-text-secondary mb-1">保底间隔次数</label>
-                  <input type="number" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
-                         x-model.number="campaignForm.guarantee_threshold"
-                         min="5" max="100" step="1" placeholder="20">
-                  <p class="text-xs themed-text-muted mt-1">范围 5~100，用户每累计此次数触发一次保底</p>
-                </div>
-
-                <!-- 保底奖品选择 -->
-                <div>
-                  <label class="block text-sm font-medium themed-text-secondary mb-1">保底奖品</label>
-                  <select class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
-                          x-model.number="campaignForm.guarantee_prize_id">
-                    <option :value="null">自动选择（最高档有库存奖品）</option>
-                    <template x-for="tier in ['high', 'mid', 'low']" :key="tier">
-                      <optgroup :label="tier === 'high' ? '🔴 高档奖品' : tier === 'mid' ? '🟡 中档奖品' : '🟢 低档奖品'">
-                        <template x-for="prize in (currentCampaignPrizes || []).filter(p => p.reward_tier === tier && p.status === 'active')" :key="prize.lottery_prize_id">
-                          <option :value="prize.lottery_prize_id"
-                                  x-text="`${prize.prize_name} (${prize.prize_value_points}积分, 库存:${prize.stock_quantity})`">
-                          </option>
-                        </template>
-                      </optgroup>
-                    </template>
-                  </select>
-                  <p class="text-xs themed-text-muted mt-1">留空时后端自动选当前活动最高档有库存奖品</p>
-                  <template x-if="isEditMode && (!currentCampaignPrizes || currentCampaignPrizes.length === 0)">
-                    <p class="text-xs text-amber-600 mt-1">⚠️ 该活动暂无关联奖品，请先在奖品管理中添加奖品</p>
-                  </template>
-                </div>
-
-                <!-- 预估影响 -->
-                <div class="bg-blue-50 rounded-lg p-3 text-sm" x-show="campaignForm.guarantee_threshold > 0">
-                  <p class="font-medium text-blue-800">📊 预估影响</p>
-                  <p class="text-blue-700">
-                    间隔 <span class="font-semibold" x-text="campaignForm.guarantee_threshold"></span> 次
-                    → 约 <span class="font-semibold" x-text="(100 / campaignForm.guarantee_threshold).toFixed(1)"></span>% 的抽奖会触发保底
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
+          <!-- 固定间隔保底配置已迁移到「策略开关」Tab 管理（segment/guarantee/tier_fallback/preset） -->
 
           <!-- 奖池配置 -->
           <div class="themed-bg-base p-3 rounded">
@@ -6031,8 +5963,19 @@
             </div>
           </div>
           <div>
-            <label class="block text-sm font-medium themed-text-secondary mb-1">奖品图片URL</label>
-            <input type="text" class="w-full px-3 py-2 border rounded" x-model="prizeForm.image_url">
+            <label class="block text-sm font-medium themed-text-secondary mb-1">奖品图片</label>
+            <div class="flex gap-2 items-center">
+              <label class="px-3 py-2 bg-gray-100 border rounded cursor-pointer hover:bg-gray-200 text-sm whitespace-nowrap">
+                📤 上传图片
+                <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" class="hidden" @change="handlePrizeImageUpload($event)">
+              </label>
+              <span x-show="image_uploading" class="text-sm text-blue-500">上传中...</span>
+              <span x-show="prizeForm.image_resource_id" class="text-xs text-green-600">✅ 已上传 (ID: <span x-text="prizeForm.image_resource_id"></span>)</span>
+            </div>
+            <div x-show="prize_image_preview_url" class="mt-2 flex items-center gap-2">
+              <img :src="prize_image_preview_url" class="max-h-24 rounded border" alt="奖品图片预览">
+              <button type="button" @click="clearPrizeImage()" class="text-xs text-red-500 hover:text-red-700">清除</button>
+            </div>
           </div>
           <div>
             <label class="block text-sm font-medium themed-text-secondary mb-1">奖品描述</label>
