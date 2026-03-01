@@ -116,7 +116,6 @@ class LotteryCampaignCRUDService {
       operator_user_id
     })
 
-    // 创建活动（含前端展示配置字段 - 2026-02-15 多活动抽奖系统）
     const campaign = await LotteryCampaign.create(
       {
         campaign_name,
@@ -133,6 +132,12 @@ class LotteryCampaignCRUDService {
         total_prize_pool: campaignData.total_prize_pool || 0,
         remaining_prize_pool: campaignData.remaining_prize_pool || 0,
         prize_distribution_config: campaignData.prize_distribution_config || { tiers: [] },
+        // 抽奖引擎核心配置（pipeline 路径分叉参数）
+        pick_method: campaignData.pick_method || 'tier_first',
+        preset_budget_policy: campaignData.preset_budget_policy || 'follow_campaign',
+        default_quota: campaignData.default_quota ?? 0,
+        quota_init_mode: campaignData.quota_init_mode || 'on_demand',
+        tier_weight_scale: campaignData.tier_weight_scale ?? 1000000,
         // 前端展示配置字段（多活动抽奖系统）
         display_mode: campaignData.display_mode || 'grid_3x3',
         grid_cols: campaignData.grid_cols || 3,
@@ -489,6 +494,12 @@ class LotteryCampaignCRUDService {
       'total_prize_pool',
       'remaining_prize_pool',
       'prize_distribution_config',
+      // 抽奖引擎核心配置（pipeline 路径分叉参数）
+      'pick_method',
+      'preset_budget_policy',
+      'default_quota',
+      'quota_init_mode',
+      'tier_weight_scale',
       // 前端展示配置字段（2026-02-15 多活动抽奖系统）
       'display_mode',
       'grid_cols',
@@ -805,7 +816,7 @@ class LotteryCampaignCRUDService {
   /**
    * 批量更新某活动的策略配置
    *
-   * @description 10策略活动级开关的配置更新（写操作收口到Service层）
+   * @description 9策略活动级开关的配置更新（写操作收口到Service层）
    * @param {number} lottery_campaign_id - 活动ID
    * @param {Object} config - 配置对象 { config_group: { config_key: config_value } }
    * @param {Object} options - 必须包含 transaction 和 operator_user_id

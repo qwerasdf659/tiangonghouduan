@@ -1,7 +1,7 @@
 'use strict'
 
 /**
- * 10策略活动级开关 - 数据迁移
+ * 9策略活动级开关 - 数据迁移
  *
  * 改动内容：
  * 1. lottery_management_settings 表新增 lottery_campaign_id 列（活动级干预隔离）
@@ -9,7 +9,7 @@
  * 3. 修复活动 26 的 config_group='pressure' → 'pressure_tier'
  * 4. 为所有活动补充缺失的策略配置默认记录（management + grayscale）
  *
- * @see docs/10策略活动级开关-需求方案.md
+ * @see docs/9策略活动级开关-需求方案.md
  */
 
 /** @type {import('sequelize-cli').Migration} */

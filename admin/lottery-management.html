@@ -91,6 +91,12 @@
                 <option value="inactive">已结束</option>
                 <option value="pending">待开始</option>
               </select>
+              <select class="px-3 py-2 border rounded" x-model="campaignFilters.merchant_id" @change="loadCampaigns()" x-init="loadCampaignMerchantOptions()">
+                <option value="">全部商家</option>
+                <template x-for="m in campaignMerchantOptions" :key="m.merchant_id">
+                  <option :value="m.merchant_id" x-text="m.merchant_name"></option>
+                </template>
+              </select>
               <input type="text" class="px-3 py-2 border rounded" placeholder="搜索活动名称..." x-model="campaignFilters.keyword">
               <button class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary" @click="loadCampaigns()">
                 🔍 搜索
@@ -1171,7 +1177,7 @@
         </div>
       </div>
 
-      <!-- ==================== 活动策略开关页（10策略活动级开关） ==================== -->
+      <!-- ==================== 活动策略开关页（9策略活动级开关） ==================== -->
       <div x-show="current_page === 'activity-strategy-switch'" x-cloak>
 
         <!-- 页面引导说明 -->
@@ -1180,7 +1186,7 @@
             <span class="text-2xl">🔧</span>
             <div>
               <h3 class="font-bold text-lg mb-1">活动策略开关</h3>
-              <p class="text-sm text-white/90">按活动独立配置10个策略的开关和参数。不同活动可选择不同的策略组合，互不影响。</p>
+              <p class="text-sm text-white/90">按活动独立配置9个策略的开关和参数。不同活动可选择不同的策略组合，互不影响。</p>
             </div>
           </div>
         </div>
@@ -1318,6 +1324,56 @@
                 </button>
               </div>
               <p class="text-xs text-gray-500 mb-2">关闭后该活动的所有 force_win/force_lose 干预不生效</p>
+            </div>
+
+            <!-- 固定保底系统 -->
+            <div class="themed-card rounded-lg shadow p-4">
+              <div class="flex items-center justify-between mb-3">
+                <h4 class="font-semibold">🎁 固定保底</h4>
+                <button class="relative inline-flex h-6 w-11 rounded-full transition-colors"
+                        :class="activityStrategyConfig?.guarantee?.enabled ? 'bg-green-500' : 'bg-gray-300'"
+                        @click="toggleActivityStrategySwitch('guarantee')">
+                  <span class="inline-block w-4 h-4 bg-white rounded-full shadow transform transition-transform mt-1 ml-1"
+                        :class="activityStrategyConfig?.guarantee?.enabled ? 'translate-x-5' : ''"></span>
+                </button>
+              </div>
+              <p class="text-xs text-gray-500 mb-2">固定间隔保底，达到指定抽奖次数后强制发放指定奖品</p>
+              <div class="text-sm" x-show="activityStrategyConfig?.guarantee">
+                <span class="text-gray-600">保底阈值：</span>
+                <span x-text="activityStrategyConfig?.guarantee?.threshold || '-'"></span> 次
+              </div>
+            </div>
+
+            <!-- 档位兜底奖品 -->
+            <div class="themed-card rounded-lg shadow p-4">
+              <div class="flex items-center justify-between mb-3">
+                <h4 class="font-semibold">🔄 档位兜底</h4>
+                <button class="relative inline-flex h-6 w-11 rounded-full transition-colors"
+                        :class="activityStrategyConfig?.tier_fallback?.enabled ? 'bg-green-500' : 'bg-gray-300'"
+                        @click="toggleActivityStrategySwitch('tier_fallback')">
+                  <span class="inline-block w-4 h-4 bg-white rounded-full shadow transform transition-transform mt-1 ml-1"
+                        :class="activityStrategyConfig?.tier_fallback?.enabled ? 'translate-x-5' : ''"></span>
+                </button>
+              </div>
+              <p class="text-xs text-gray-500 mb-2">当某档位奖品库存耗尽时的兜底替代奖品</p>
+              <div class="text-sm" x-show="activityStrategyConfig?.tier_fallback">
+                <span class="text-gray-600">兜底奖品ID：</span>
+                <span x-text="activityStrategyConfig?.tier_fallback?.prize_id || '未设置（自动选择）'"></span>
+              </div>
+            </div>
+
+            <!-- 预设队列控制 -->
+            <div class="themed-card rounded-lg shadow p-4">
+              <div class="flex items-center justify-between mb-3">
+                <h4 class="font-semibold">📋 预设队列</h4>
+                <button class="relative inline-flex h-6 w-11 rounded-full transition-colors"
+                        :class="activityStrategyConfig?.preset?.debt_enabled ? 'bg-green-500' : 'bg-gray-300'"
+                        @click="toggleActivityStrategySwitch('preset', 'debt_enabled')">
+                  <span class="inline-block w-4 h-4 bg-white rounded-full shadow transform transition-transform mt-1 ml-1"
+                        :class="activityStrategyConfig?.preset?.debt_enabled ? 'translate-x-5' : ''"></span>
+                </button>
+              </div>
+              <p class="text-xs text-gray-500 mb-2">启用债务预抽机制，基于用户运气债务预计算抽奖结果队列</p>
             </div>
 
           </div>
@@ -5649,7 +5705,7 @@
                 <p class="text-xs themed-text-muted mt-1">0或空表示不限制</p>
               </div>
             </div>
-            <!-- 选奖方式（pick_method）+ 分群策略版本 -->
+            <!-- 选奖方式（pick_method）-->
             <div class="grid grid-cols-2 gap-4 mt-3">
               <div>
                 <label class="block text-sm font-medium themed-text-secondary mb-1">选奖方式 <span class="text-red-500">*</span></label>
@@ -5660,7 +5716,50 @@
                 <p class="text-xs themed-text-muted mt-1" x-show="campaignForm.pick_method === 'tier_first'">按 reward_tier 档位 + win_weight 权重两级选择</p>
                 <p class="text-xs themed-text-muted mt-1" x-show="campaignForm.pick_method === 'normalize'">跳过档位，按 win_probability 归一化百分比抽取，概率总和应为 1.0</p>
               </div>
-              <!-- 分群策略版本已迁移到「策略开关」Tab 管理 -->
+              <!-- 预算模式（budget_mode）-->
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">预算模式 <span class="text-red-500">*</span></label>
+                <select class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" x-model="campaignForm.budget_mode">
+                  <template x-for="opt in budgetModeOptions" :key="opt.value">
+                    <option :value="opt.value" x-text="opt.label"></option>
+                  </template>
+                </select>
+                <p class="text-xs themed-text-muted mt-1" x-text="budgetModeOptions.find(o => o.value === campaignForm.budget_mode)?.desc || ''"></p>
+              </div>
+            </div>
+            <!-- 预设预算策略 + 配额初始化模式 -->
+            <div class="grid grid-cols-2 gap-4 mt-3">
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">预设预算策略</label>
+                <select class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" x-model="campaignForm.preset_budget_policy">
+                  <template x-for="opt in presetBudgetPolicyOptions" :key="opt.value">
+                    <option :value="opt.value" x-text="opt.label"></option>
+                  </template>
+                </select>
+                <p class="text-xs themed-text-muted mt-1" x-text="presetBudgetPolicyOptions.find(o => o.value === campaignForm.preset_budget_policy)?.desc || ''"></p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">配额初始化模式</label>
+                <select class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" x-model="campaignForm.quota_init_mode">
+                  <template x-for="opt in quotaInitModeOptions" :key="opt.value">
+                    <option :value="opt.value" x-text="opt.label"></option>
+                  </template>
+                </select>
+                <p class="text-xs themed-text-muted mt-1" x-text="quotaInitModeOptions.find(o => o.value === campaignForm.quota_init_mode)?.desc || ''"></p>
+              </div>
+            </div>
+            <!-- 默认配额 + 档位权重比例因子 -->
+            <div class="grid grid-cols-2 gap-4 mt-3">
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">默认用户配额</label>
+                <input type="number" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" x-model.number="campaignForm.default_quota" min="0" step="0.01">
+                <p class="text-xs themed-text-muted mt-1">pool+quota 模式按需初始化时分配给新用户的默认配额</p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">档位权重比例因子</label>
+                <input type="number" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 bg-gray-50" x-model.number="campaignForm.tier_weight_scale" min="1">
+                <p class="text-xs themed-text-muted mt-1">系统常量（默认1000000），所有档位权重之和必须等于此值</p>
+              </div>
             </div>
           </div>
 

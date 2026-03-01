@@ -203,7 +203,7 @@ class AdminLotteryQueryService {
   /**
    * 获取某活动的全部策略配置（按 config_group 分组）
    *
-   * @description 用于10策略活动级开关管理页面
+   * @description 用于9策略活动级开关管理页面
    * @param {number} lottery_campaign_id - 活动ID
    * @returns {Promise<Object>} 按 config_group 分组的策略配置
    * @throws {Error} 活动ID无效

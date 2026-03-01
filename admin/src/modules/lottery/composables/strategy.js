@@ -75,7 +75,7 @@ export function useStrategyState() {
     /** @type {boolean} 显示策略效果分析弹窗/页面 */
     showStrategyEffectivenessPanel: false,
 
-    // === 活动级策略开关配置（10策略活动级开关） ===
+    // === 活动级策略开关配置（9策略活动级开关） ===
     /** @type {Object|null} 当前选中活动的策略开关配置 */
     activityStrategyConfig: null,
     /** @type {number|null} 当前选中的活动ID */
@@ -458,7 +458,11 @@ export function useStrategyMethods() {
         { value: 'pity', label: '保底机制' },
         { value: 'luck_debt', label: '运气债务' },
         { value: 'budget_tier', label: '预算层级' },
-        { value: 'pressure_tier', label: '压力层级' }
+        { value: 'pressure_tier', label: '压力层级' },
+        { value: 'segment', label: '用户分群策略' },
+        { value: 'guarantee', label: '固定间隔保底' },
+        { value: 'tier_fallback', label: '档位兜底奖品' },
+        { value: 'preset', label: '预设队列控制' }
       ]
     },
 
@@ -475,6 +479,10 @@ export function useStrategyMethods() {
         luck_debt: '🎰',
         budget_tier: '📊',
         pressure_tier: '🔥',
+        segment: '👥',
+        guarantee: '🎯',
+        tier_fallback: '🔄',
+        preset: '📋',
         probability: '🎲',
         frequency: '⏱️',
         budget: '💰',
@@ -500,6 +508,10 @@ export function useStrategyMethods() {
         luck_debt: '运气债务',
         budget_tier: '预算层级',
         pressure_tier: '压力层级',
+        segment: '用户分群策略',
+        guarantee: '固定间隔保底',
+        tier_fallback: '档位兜底奖品',
+        preset: '预设队列控制',
         probability: '概率策略',
         frequency: '频率控制',
         budget: '预算管理',
@@ -524,6 +536,10 @@ export function useStrategyMethods() {
         luck_debt: '追踪用户的运气偏差度，自动回归均值',
         budget_tier: '根据预算消耗情况动态调整策略',
         pressure_tier: '根据系统压力自动调控出奖力度',
+        segment: '根据用户分群（新用户/老用户/VIP等）应用不同策略版本',
+        guarantee: '每隔固定次数必定给予指定奖品，与 pity 保底是不同机制',
+        tier_fallback: '当某档位奖品库存耗尽时的兜底替代奖品',
+        preset: '运气债务预设队列开关，控制是否启用预设结果',
         probability: '控制各档位奖品的基础概率分配',
         frequency: '限制抽奖频率，防止异常高频操作',
         budget: '控制奖品发放预算上限和速率',
@@ -571,6 +587,26 @@ export function useStrategyMethods() {
           border: 'border-l-4 border-l-red-500',
           bg: 'bg-red-50',
           badge: 'bg-red-100 text-red-700'
+        },
+        segment: {
+          border: 'border-l-4 border-l-cyan-500',
+          bg: 'bg-cyan-50',
+          badge: 'bg-cyan-100 text-cyan-700'
+        },
+        guarantee: {
+          border: 'border-l-4 border-l-emerald-500',
+          bg: 'bg-emerald-50',
+          badge: 'bg-emerald-100 text-emerald-700'
+        },
+        tier_fallback: {
+          border: 'border-l-4 border-l-amber-500',
+          bg: 'bg-amber-50',
+          badge: 'bg-amber-100 text-amber-700'
+        },
+        preset: {
+          border: 'border-l-4 border-l-pink-500',
+          bg: 'bg-pink-50',
+          badge: 'bg-pink-100 text-pink-700'
         },
         probability: {
           border: 'border-l-4 border-l-violet-500',
@@ -637,7 +673,7 @@ export function useStrategyMethods() {
         high_streak_threshold: '连高触发阈值',
         multiplier_table: 'Pity倍率表',
         min_non_empty_cost: '最低非空奖成本',
-        recent_draw_window: '近期抽奖窗口'
+        debt_enabled: '债务预抽开关'
       }
       return labels[configKey] || configKey
     },
@@ -983,7 +1019,7 @@ export function useStrategyMethods() {
       }
     },
 
-    // ========== 活动级策略开关配置（10策略活动级开关） ==========
+    // ========== 活动级策略开关配置（9策略活动级开关） ==========
 
     /**
      * 加载指定活动的策略配置
@@ -1050,13 +1086,14 @@ export function useStrategyMethods() {
     },
 
     /**
-     * 切换策略开关（enabled 布尔值取反）
+     * 切换策略开关（布尔值取反）
      * @param {string} config_group - 配置分组
+     * @param {string} [config_key='enabled'] - 开关键名（preset 使用 debt_enabled）
      */
-    async toggleActivityStrategySwitch(config_group) {
-      const current = this.activityStrategyConfig?.[config_group]?.enabled
+    async toggleActivityStrategySwitch(config_group, config_key = 'enabled') {
+      const current = this.activityStrategyConfig?.[config_group]?.[config_key]
       if (current === undefined) return
-      await this.updateActivityStrategySetting(config_group, 'enabled', !current)
+      await this.updateActivityStrategySetting(config_group, config_key, !current)
     }
   }
 }

@@ -9,6 +9,7 @@
 
 import { logger } from '../../../utils/logger.js'
 import { LOTTERY_ENDPOINTS } from '../../../api/lottery/index.js'
+import { MERCHANT_ENDPOINTS } from '../../../api/merchant.js'
 import { API_PREFIX } from '../../../api/base.js'
 
 /**
@@ -26,7 +27,9 @@ export function useCampaignsState() {
     /** @type {Array} 可用的分群策略版本列表（动态从后端加载） */
     availableSegmentVersions: [{ version_key: 'default', description: '默认版本' }],
     /** @type {Object} 活动筛选条件 */
-    campaignFilters: { status: '', keyword: '' },
+    campaignFilters: { status: '', keyword: '', merchant_id: '' },
+    /** @type {Array} 商家下拉选项列表（来自 /api/v4/console/merchants/options） */
+    campaignMerchantOptions: [],
     /** @type {Object} 活动编辑表单 - 包含后端所有必填字段 */
     campaignForm: {
       // 基本信息（后端必填）
@@ -40,6 +43,19 @@ export function useCampaignsState() {
       // 抽奖配置（后端必填，定价通过 pricing_config 管理，创建活动时自动生成默认定价）
       max_draws_per_user_daily: 3,
       max_draws_per_user_total: null,
+      // ======== 抽奖引擎核心配置（pipeline 路径分叉参数） ========
+      /** 选奖方法：tier_first=先选档位再选奖品 / normalize=归一化百分比选奖 */
+      pick_method: 'tier_first',
+      /** 预算模式：user=用户预算扣减 / pool=活动池预算扣减 / none=不限制（测试用） */
+      budget_mode: 'user',
+      /** 预设预算策略：follow_campaign=遵循budget_mode / pool_first=先pool后user / user_first=先user后pool */
+      preset_budget_policy: 'follow_campaign',
+      /** 默认用户配额（pool+quota模式按需初始化时使用） */
+      default_quota: 0,
+      /** 配额初始化模式：on_demand=按需初始化 / pre_allocated=预分配 */
+      quota_init_mode: 'on_demand',
+      /** 档位权重比例因子（系统常量，所有档位权重之和必须等于此值） */
+      tier_weight_scale: 1000000,
       // 奖池配置
       total_prize_pool: 10000,
       remaining_prize_pool: 10000,
@@ -101,6 +117,23 @@ export function useCampaignsState() {
       { value: 'card_flip', label: '卡牌翻转' },
       { value: 'fireworks', label: '烟花特效' }
     ],
+    /** @type {Array} 预算模式选项（对应 budget_mode 字段） */
+    budgetModeOptions: [
+      { value: 'user', label: '用户预算', desc: '从用户预算账户扣减' },
+      { value: 'pool', label: '活动池预算', desc: '从活动池预算扣减' },
+      { value: 'none', label: '不限制（测试用）', desc: '无预算限制，仅用于测试' }
+    ],
+    /** @type {Array} 预设预算策略选项（对应 preset_budget_policy 字段） */
+    presetBudgetPolicyOptions: [
+      { value: 'follow_campaign', label: '遵循活动预算模式', desc: '跟随 budget_mode 设置' },
+      { value: 'pool_first', label: '先扣活动池后扣用户', desc: '优先使用活动池预算' },
+      { value: 'user_first', label: '先扣用户后扣活动池', desc: '优先使用用户预算' }
+    ],
+    /** @type {Array} 配额初始化模式选项（对应 quota_init_mode 字段） */
+    quotaInitModeOptions: [
+      { value: 'on_demand', label: '按需初始化', desc: '用户首次参与时创建配额' },
+      { value: 'pre_allocated', label: '预分配', desc: '管理员批量导入配额' }
+    ],
     /** @type {number|string|null} 当前编辑的活动ID */
     editingCampaignId: null,
     /** @type {Object|null} 选中的活动 */
@@ -143,6 +176,22 @@ export function useCampaignsMethods(_context) {
     },
 
     /**
+     * 加载商家下拉选项（供活动列表按商家筛选使用）
+     * 后端返回：[{ merchant_id, merchant_name, merchant_type }]
+     */
+    async loadCampaignMerchantOptions() {
+      try {
+        const response = await this.apiGet(MERCHANT_ENDPOINTS.OPTIONS, {}, { showLoading: false })
+        const data = response?.success ? response.data : response
+        this.campaignMerchantOptions = Array.isArray(data) ? data : []
+        logger.debug('[Campaigns] 商家选项加载完成', { count: this.campaignMerchantOptions.length })
+      } catch (error) {
+        logger.warn('[Campaigns] 加载商家选项失败', error)
+        this.campaignMerchantOptions = []
+      }
+    },
+
+    /**
      * 加载活动列表
      * @description apiGet 返回的是 response.data（已解包），不是完整响应对象
      */
@@ -157,6 +206,9 @@ export function useCampaignsMethods(_context) {
         }
         if (this.campaignFilters.keyword) {
           params.append('keyword', this.campaignFilters.keyword)
+        }
+        if (this.campaignFilters.merchant_id) {
+          params.append('merchant_id', this.campaignFilters.merchant_id)
         }
 
         // apiGet 通过 withLoading 包装，返回 { success: true, data: {...} }
@@ -252,9 +304,13 @@ export function useCampaignsMethods(_context) {
         remaining_prize_pool: 10000,
         status: 'draft',
         rules_text: '',
-        // 选奖配置默认值（任务10+3前端）
+        // 抽奖引擎核心配置
         pick_method: 'tier_first',
-        // segment_resolver_version 已迁移到策略开关页面
+        budget_mode: 'user',
+        preset_budget_policy: 'follow_campaign',
+        default_quota: 0,
+        quota_init_mode: 'on_demand',
+        tier_weight_scale: 1000000,
         // 展示配置默认值
         display_mode: 'grid_3x3',
         grid_cols: 3,
@@ -262,7 +318,6 @@ export function useCampaignsMethods(_context) {
         rarity_effects_enabled: true,
         win_animation: 'simple',
         background_image_url: null
-        // guarantee 配置已迁移到策略开关页面
       }
       this.showModal('campaignModal')
     },
@@ -302,15 +357,20 @@ export function useCampaignsMethods(_context) {
         remaining_prize_pool: fullCampaign.remaining_prize_pool || 10000,
         status: fullCampaign.status || 'draft',
         rules_text: fullCampaign.rules_text || '',
+        // 抽奖引擎核心配置
+        pick_method: fullCampaign.pick_method || 'tier_first',
+        budget_mode: fullCampaign.budget_mode || 'user',
+        preset_budget_policy: fullCampaign.preset_budget_policy || 'follow_campaign',
+        default_quota: fullCampaign.default_quota ?? 0,
+        quota_init_mode: fullCampaign.quota_init_mode || 'on_demand',
+        tier_weight_scale: fullCampaign.tier_weight_scale ?? 1000000,
+        // 展示配置
         display_mode: fullCampaign.display_mode || 'grid_3x3',
         grid_cols: fullCampaign.grid_cols || 3,
         effect_theme: fullCampaign.effect_theme || 'default',
         rarity_effects_enabled: fullCampaign.rarity_effects_enabled !== false,
         win_animation: fullCampaign.win_animation || 'simple',
-        background_image_url: fullCampaign.background_image_url || null,
-        // 选奖配置
-        pick_method: fullCampaign.pick_method || 'tier_first'
-        // segment_resolver_version / guarantee_* 已迁移到策略开关页面管理
+        background_image_url: fullCampaign.background_image_url || null
       }
       this.showModal('campaignModal')
     },
@@ -366,7 +426,6 @@ export function useCampaignsMethods(_context) {
           remaining_prize_pool: parseFloat(this.campaignForm.remaining_prize_pool) || 10000,
           status: this.campaignForm.status || 'draft',
           rules_text: this.campaignForm.rules_text || '',
-          // 后端必填的prize_distribution_config - 提供默认配置
           prize_distribution_config: {
             tiers: [
               { tier_id: 1, tier_name: '特等奖', weight: 1000 },
@@ -376,16 +435,20 @@ export function useCampaignsMethods(_context) {
               { tier_id: 5, tier_name: '谢谢参与', weight: 500000 }
             ]
           },
-          // ======== 选奖配置（任务10+3前端） ========
+          // ======== 抽奖引擎核心配置 ========
           pick_method: this.campaignForm.pick_method || 'tier_first',
-          // ======== 前端展示配置（多活动抽奖系统 2026-02-15） ========
+          budget_mode: this.campaignForm.budget_mode || 'user',
+          preset_budget_policy: this.campaignForm.preset_budget_policy || 'follow_campaign',
+          default_quota: parseFloat(this.campaignForm.default_quota) || 0,
+          quota_init_mode: this.campaignForm.quota_init_mode || 'on_demand',
+          tier_weight_scale: parseInt(this.campaignForm.tier_weight_scale) || 1000000,
+          // ======== 前端展示配置 ========
           display_mode: this.campaignForm.display_mode || 'grid_3x3',
           grid_cols: parseInt(this.campaignForm.grid_cols) || 3,
           effect_theme: this.campaignForm.effect_theme || 'default',
           rarity_effects_enabled: this.campaignForm.rarity_effects_enabled !== false,
           win_animation: this.campaignForm.win_animation || 'simple',
           background_image_url: this.campaignForm.background_image_url || null
-          // guarantee 配置已迁移到策略开关页面
         }
 
         logger.debug('提交活动数据:', requestData)

@@ -29,7 +29,7 @@ const {
   GRAYSCALE_CONFIG
 } = require('../../../services/UnifiedLotteryEngine/compute/index')
 
-/* isFeatureEnabledForContext 在 10策略活动级开关改造后变为 async */
+/* isFeatureEnabledForContext 在 9策略活动级开关改造后变为 async */
 
 describe('LotteryComputeEngine', () => {
   let engine
@@ -218,7 +218,7 @@ describe('LotteryComputeEngine', () => {
     })
   })
 
-  /* ========== Phase P2 增强：灰度发布测试（10策略活动级开关改造后适配） ========== */
+  /* ========== Phase P2 增强：灰度发布测试（9策略活动级开关改造后适配） ========== */
   describe('灰度发布功能', () => {
     describe('isFeatureEnabledForContext - 带上下文的灰度判断（async）', () => {
       test('函数存在且返回正确结构', async () => {
@@ -287,7 +287,7 @@ describe('LotteryComputeEngine', () => {
     })
 
     /*
-     * engine.checkFeatureWithGrayscale 已在10策略活动级开关改造中删除
+     * engine.checkFeatureWithGrayscale 已在9策略活动级开关改造中删除
      * 灰度逻辑已由 DynamicConfigLoader 活动级配置完全覆盖
      */
 

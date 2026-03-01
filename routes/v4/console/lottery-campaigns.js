@@ -223,6 +223,7 @@ async function calculateStockWarning(analyticsService, campaignId) {
  *
  * Query 参数：
  * - status: 活动状态筛选（active/inactive/upcoming/ended）
+ * - merchant_id: 按商家筛选（可选，通过 LotteryPrize 关联查找包含该商家奖品的活动）
  * - page: 页码（默认 1）
  * - page_size: 每页数量（默认 20，最大 100）
  *
@@ -241,7 +242,7 @@ async function calculateStockWarning(analyticsService, campaignId) {
  */
 router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const { status, page = 1, page_size = 20 } = req.query
+    const { status, merchant_id, page = 1, page_size = 20 } = req.query
     const limit = Math.min(parseInt(page_size) || 20, 100)
     const offset = (Math.max(parseInt(page) || 1, 1) - 1) * limit
 
@@ -253,6 +254,10 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
 
     // 构建查询条件
     const where = {}
+
+    // 商家筛选：通过 LotteryPrize 关联查找包含指定商家奖品的活动
+    const parsedMerchantId = merchant_id ? parseInt(merchant_id) : undefined
+
     if (status) {
       const now = new Date()
       switch (status) {
@@ -277,8 +282,8 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
       }
     }
 
-    // 查询活动列表
-    const { count, rows: campaigns } = await LotteryCampaign.findAndCountAll({
+    // 构建查询选项
+    const queryOptions = {
       where,
       attributes: [
         'lottery_campaign_id',
@@ -299,8 +304,26 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
       ],
       order: [['created_at', 'DESC']],
       limit,
-      offset
-    })
+      offset,
+      distinct: true
+    }
+
+    // 商家筛选：通过 include + required 关联 LotteryPrize 表（避免 SQL 注入）
+    if (parsedMerchantId && !isNaN(parsedMerchantId)) {
+      const LotteryPrize = analyticsService.models.LotteryPrize
+      queryOptions.include = [
+        {
+          model: LotteryPrize,
+          as: 'prizes',
+          where: { merchant_id: parsedMerchantId },
+          required: true,
+          attributes: []
+        }
+      ]
+    }
+
+    // 查询活动列表
+    const { count, rows: campaigns } = await LotteryCampaign.findAndCountAll(queryOptions)
 
     // 获取 Redis 客户端
     const redis = await getRedis()
@@ -360,6 +383,7 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
     logger.info('获取活动列表成功', {
       admin_id: req.user.user_id,
       status,
+      merchant_id: parsedMerchantId || null,
       page,
       total_count: count,
       returned_count: enrichedCampaigns.length
@@ -507,7 +531,7 @@ router.get('/:lottery_campaign_id', authenticateToken, requireRoleLevel(100), as
   }
 })
 
-/* ========== 策略配置子路由（10策略活动级开关） ========== */
+/* ========== 策略配置子路由（9策略活动级开关） ========== */
 
 const TransactionManager = require('../../../utils/TransactionManager')
 

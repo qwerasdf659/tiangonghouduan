@@ -68,7 +68,7 @@ export const LOTTERY_CORE_ENDPOINTS = {
   CAMPAIGN_CONDITIONS: `${API_PREFIX}/activities/:code/conditions`,
   CAMPAIGN_CONFIGURE_CONDITIONS: `${API_PREFIX}/activities/:code/configure-conditions`,
 
-  // 活动策略配置（10策略活动级开关）
+  // 活动策略配置（9策略活动级开关）
   CAMPAIGN_STRATEGY_CONFIG: `${API_PREFIX}/console/lottery-campaigns/:lottery_campaign_id/strategy-config`,
 
   /** 获取抽奖系统全局默认配置（积分定价配置页的全局值） */
@@ -342,7 +342,7 @@ export const LotteryCoreAPI = {
     return await request({ url, method: 'POST', data })
   },
 
-  // ===== 活动策略配置（10策略活动级开关） =====
+  // ===== 活动策略配置（9策略活动级开关） =====
 
   /**
    * 获取某活动的全部策略配置

@@ -410,6 +410,12 @@ router.put(
         total_prize_pool,
         remaining_prize_pool,
         prize_distribution_config,
+        // 抽奖引擎核心配置（pipeline 路径分叉参数）
+        pick_method,
+        preset_budget_policy,
+        default_quota,
+        quota_init_mode,
+        tier_weight_scale,
         // 前端展示配置字段（多活动抽奖系统）
         display_mode,
         grid_cols,
@@ -440,6 +446,12 @@ router.put(
       if (prize_distribution_config !== undefined) {
         updateData.prize_distribution_config = prize_distribution_config
       }
+      // 抽奖引擎核心配置
+      if (pick_method !== undefined) updateData.pick_method = pick_method
+      if (preset_budget_policy !== undefined) updateData.preset_budget_policy = preset_budget_policy
+      if (default_quota !== undefined) updateData.default_quota = default_quota
+      if (quota_init_mode !== undefined) updateData.quota_init_mode = quota_init_mode
+      if (tier_weight_scale !== undefined) updateData.tier_weight_scale = tier_weight_scale
       // 前端展示配置字段（多活动抽奖系统）
       if (display_mode !== undefined) updateData.display_mode = display_mode
       if (grid_cols !== undefined) updateData.grid_cols = grid_cols

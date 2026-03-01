@@ -431,7 +431,7 @@ function registerLotteryManagementComponents() {
                   await this.loadCampaigns()
                 }
                 break
-              // 10策略活动级开关配置
+              // 9策略活动级开关配置
               case 'activity-strategy-switch':
                 logger.debug('🔧 [LotteryPage] 进入活动策略开关页面')
                 if (!this.campaigns || this.campaigns.length === 0) {

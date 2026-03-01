@@ -297,7 +297,7 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/console/lottery-management/clear-user-settings/:id': 'ADMIN_LOTTERY_CLEAR_USER', // 清除用户设置（DELETE）
   '/api/v4/console/lottery-management/user-settings/:id': 'ADMIN_LOTTERY_USER_SETTINGS_DELETE', // 删除用户抽奖设置（DELETE 方法）
 
-  // ===== 策略配置（10策略活动级开关） =====
+  // ===== 策略配置（9策略活动级开关） =====
   '/api/v4/console/lottery-campaigns/:id/strategy-config': 'ADMIN_LOTTERY_STRATEGY_CONFIG_UPDATE', // 批量更新活动策略配置（PUT）
 
   // ===== 孤儿冻结清理 =====

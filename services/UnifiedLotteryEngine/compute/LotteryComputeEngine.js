@@ -983,7 +983,7 @@ class LotteryComputeEngine {
   }
 
   /*
-   * 2026-02-23 10策略活动级开关改造：删除约350行死代码
+   * 2026-02-23 9策略活动级开关改造：删除约350行死代码
    * checkFeatureWithGrayscale / applyExperienceSmoothingWithGrayscale
    * checkFeatureWithFeatureFlag / applyExperienceSmoothingWithFeatureFlag
    * getLuckDebtMultiplierWithFeatureFlag
