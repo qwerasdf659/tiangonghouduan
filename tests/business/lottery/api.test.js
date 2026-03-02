@@ -118,7 +118,7 @@ describe('抽奖系统API测试（V4架构）', () => {
         'POST',
         '/api/v4/lottery/draw',
         {
-          campaign_code: 'BASIC_LOTTERY', // 使用实际存在的活动代码
+          campaign_code: 'CAMP20250901001', // 使用实际存在的活动代码
           draw_count: 1
         },
         'regular'
@@ -489,7 +489,7 @@ describe('抽奖系统API测试（V4架构）', () => {
 
       for (let i = 0; i < concurrent_requests; i++) {
         const lottery_data = {
-          campaign_code: 'BASIC_LOTTERY', // 使用正确的活动代码
+          campaign_code: 'CAMP20250901001', // 使用正确的活动代码
           draw_count: 1
         }
 

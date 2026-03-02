@@ -28,7 +28,7 @@ const BeijingTimeHelper = require('../utils/timeHelper')
  * 计费模式有效值（含 free — 运营/系统类型不计费）
  * @constant {string[]}
  */
-const VALID_BILLING_MODES = ['fixed_daily', 'bidding', 'free']
+const VALID_BILLING_MODES = ['fixed_daily', 'bidding', 'free', 'cpm']
 
 /**
  * 计划分类有效值
@@ -137,7 +137,7 @@ module.exports = sequelize => {
           notEmpty: { msg: '计费模式不能为空' },
           isIn: {
             args: [VALID_BILLING_MODES],
-            msg: '计费模式必须是：fixed_daily, bidding, free 之一'
+            msg: '计费模式必须是：fixed_daily, bidding, free, cpm 之一'
           }
         },
         comment: '计费模式：fixed_daily=固定包天 / bidding=竞价 / free=免费（运营/系统类型）'

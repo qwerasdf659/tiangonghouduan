@@ -10,11 +10,13 @@
  * - 路由层只负责：认证/鉴权、参数校验、调用Service、统一响应
  * - 登录操作通过 UserService 处理
  *
- * 会话管理（2026-01-21 新增，2026-02-18 优化 TTL）：
+ * 会话管理（2026-01-21 新增，2026-02-18 优化 TTL，2026-03-01 跨平台共存）：
  * - 登录成功后创建 AuthenticationSession 记录
  * - 会话有效期：7天（与 refresh_token 生命周期对齐）
  * - session_token 存入 JWT Payload，用于敏感操作验证
- * - 单设备登录策略：新登录使旧会话失效
+ * - 多平台共存策略：user_type 按登录上下文确定（用户端=user，管理后台=admin）
+ * - 同一 user_type + 同一 platform 互斥（新登录使旧会话失效）
+ * - 不同 user_type 或不同 platform 可共存（小程序 + Web管理后台同时在线）
  *
  * 创建时间：2025-12-22
  * 更新时间：2026-01-21（新增会话存储功能）
@@ -177,11 +179,18 @@ router.post('/login', async (req, res) => {
    * @see docs/会话管理功能补齐方案.md
    */
   const sessionToken = uuidv4()
-  const userType = userRoles.role_level >= 100 ? 'admin' : 'user'
+  /**
+   * 会话 user_type 按登录上下文确定，不按角色等级确定：
+   *   - 用户端（小程序/App/H5）登录 → 固定 'user'
+   *   - 管理后台登录 → 固定 'admin'（见 console/auth.js）
+   *
+   * 这样管理员账号可以同时保持小程序(user) + 管理后台(admin) 两个会话，
+   * 互斥仅发生在 同一 user_type + 同一 platform 内。
+   */
+  const userType = 'user'
   const loginIp = req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || null
   const platform = detectLoginPlatform(req)
 
-  // 通过 app.locals.models 获取 AuthenticationSession（app.js 中注入）
   const { AuthenticationSession } = req.app.locals.models
 
   try {
@@ -192,9 +201,10 @@ router.post('/login', async (req, res) => {
      * 使用 SELECT FOR UPDATE 行级锁序列化同一用户的并发登录，
      * 避免 REPEATABLE READ 隔离级别下多个事务互相看不到未提交数据导致旧会话未被去活。
      *
-     * 平台隔离规则：
-     *   Web 登录 → 只踢 Web 旧会话，微信/抖音小程序不受影响
-     *   微信小程序登录 → 只踢微信旧会话，Web/抖音不受影响
+     * 平台隔离规则（user_type + platform 双维度隔离）：
+     *   小程序登录(user+wechat_mp) → 只踢 user+wechat_mp 旧会话
+     *   Web端登录(user+web)        → 只踢 user+web 旧会话
+     *   管理后台登录(admin+web)     → 只踢 admin+web 旧会话（见 console/auth.js）
      */
     const isTestEnv = process.env.NODE_ENV === 'test'
     const disableMultiDeviceCheck = process.env.DISABLE_MULTI_DEVICE_CHECK === 'true'
@@ -465,7 +475,11 @@ router.post('/quick-login', async (req, res) => {
    * @see docs/multi-platform-session-design.md
    */
   const sessionToken = uuidv4()
-  const userType = userRoles.role_level >= 100 ? 'admin' : 'user'
+  /**
+   * 用户端登录会话固定 user_type='user'，与管理后台(admin)天然隔离。
+   * @see routes/v4/auth/login.js POST /login 中的同策略注释
+   */
+  const userType = 'user'
   const loginIp = req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || null
   const platform = 'wechat_mp' // quick-login 端点固定为微信小程序
 

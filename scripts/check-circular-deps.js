@@ -10,10 +10,6 @@ const { execSync } = require('child_process')
 // 已知的运行时解耦循环依赖（使用 setImmediate/动态 require 解决）
 // 这些在静态分析中会被检测到，但运行时不会造成问题
 const KNOWN_RUNTIME_DECOUPLED = [
-  // config/database.js ↔ database_performance_monitor.js
-  // 解决方案：setImmediate 延迟加载
-  ['config/database.js', 'scripts/maintenance/database_performance_monitor.js'],
-  
   // models/LotteryDrawQuotaRule.js → services/AdminSystemService.js
   // 解决方案：函数内动态 require
   ['models/LotteryDrawQuotaRule.js', 'services/AdminSystemService.js'],

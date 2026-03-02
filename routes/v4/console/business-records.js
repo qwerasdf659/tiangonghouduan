@@ -138,9 +138,11 @@ router.get(
  * @desc 查询核销订单列表
  * @access Admin only (role_level >= 30)
  *
+ * @query {string} [keyword] - 订单号或核销码（模糊搜索）
  * @query {string} [status] - 订单状态（pending/fulfilled/cancelled/expired）
  * @query {number} [redeemer_user_id] - 核销用户ID
  * @query {string} [mobile] - 用户手机号（模糊搜索）
+ * @query {number} [merchant_id] - 商家ID
  * @query {string} [start_date] - 开始日期
  * @query {string} [end_date] - 结束日期
  * @query {number} [page=1] - 页码

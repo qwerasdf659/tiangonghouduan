@@ -101,10 +101,10 @@ class MerchantPointsService {
       operator_id: userId,
       operation_type: 'merchant_points_submit',
       target_type: 'ContentReviewRecord',
-      target_id: auditRecord.audit_id,
+      target_id: auditRecord.content_review_record_id,
       action: 'create',
       after_data: {
-        audit_id: auditRecord.audit_id,
+        content_review_record_id: auditRecord.content_review_record_id,
         points_amount: pointsAmount,
         description: description.trim(),
         status: 'pending'
@@ -112,7 +112,7 @@ class MerchantPointsService {
     })
 
     logger.info(
-      `[商家积分] 提交申请成功: audit_id=${auditRecord.audit_id}, user_id=${userId}, points=${pointsAmount}`
+      `[商家积分] 提交申请成功: content_review_record_id=${auditRecord.content_review_record_id}, user_id=${userId}, points=${pointsAmount}`
     )
 
     return auditRecord

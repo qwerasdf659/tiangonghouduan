@@ -93,7 +93,9 @@ class ContentAuditEngine {
     })
 
     if (existingAudit) {
-      logger.info(`[审核服务] 已存在待审核记录: audit_id=${existingAudit.audit_id}`)
+      logger.info(
+        `[审核服务] 已存在待审核记录: content_review_record_id=${existingAudit.content_review_record_id}`
+      )
       return existingAudit
     }
 
@@ -110,7 +112,9 @@ class ContentAuditEngine {
       { transaction }
     )
 
-    logger.info(`[审核服务] 审核记录已创建: audit_id=${auditRecord.audit_id}`)
+    logger.info(
+      `[审核服务] 审核记录已创建: content_review_record_id=${auditRecord.content_review_record_id}`
+    )
 
     return auditRecord
   }

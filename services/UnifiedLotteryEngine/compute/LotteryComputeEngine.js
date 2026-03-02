@@ -60,7 +60,7 @@ const {
   ANTI_HIGH_CONFIG: _ANTI_HIGH_CONFIG, // 预留供防连续高价值处理使用
   isFeatureEnabled,
   getGrayscaleSummary // Phase P2：获取灰度配置摘要
-} = require('./config/StrategyConfig')
+} = require('./config/ComputeConfig')
 
 /**
  * 预算档位定义（B0-B3）
@@ -393,7 +393,7 @@ class LotteryComputeEngine {
       selected_tier
     })
 
-    const { DynamicConfigLoader } = require('./config/StrategyConfig')
+    const { DynamicConfigLoader } = require('./config/ComputeConfig')
     const campaign_opts = { lottery_campaign_id }
 
     /**

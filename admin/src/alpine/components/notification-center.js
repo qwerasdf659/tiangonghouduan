@@ -1,14 +1,113 @@
 /**
  * 实时提醒中心组件
  * @description 右上角实时提醒图标+下拉列表+声音提醒+Socket.IO集成
- * @version 1.1.0
- * @date 2026-02-01
- * @updated 2026-02-01 - 改用 socket.io-client 适配后端
+ * @version 2.0.0
+ * @date 2026-03-01
+ * @updated 2026-03-01 - 数据源切换到 admin_notifications 表，字段对齐后端
  */
 
 import { logger } from '../../utils/logger.js'
-import { API_PREFIX, request } from '../../api/base.js'
+import { request, buildURL } from '../../api/base.js'
+import { SYSTEM_ADMIN_ENDPOINTS } from '../../api/system/admin.js'
 import { io } from 'socket.io-client'
+
+/**
+ * source_type → 图标映射（对应后端 sendToAdmins 的 type 参数）
+ */
+const SOURCE_TYPE_ICONS = {
+  exchange_audit: '📋',
+  timeout_alert: '⏰',
+  system_announcement: '📢',
+  activity_status_change: '🎰',
+  asset_reconciliation_alert: '📊',
+  business_record_reconciliation_alert: '📊',
+  market_monitor_alert: '📈',
+  orphan_frozen_alert: '🧊',
+  orphan_frozen_error: '❌',
+  reminder_alert: '🔔',
+  customer_service: '💬'
+}
+
+/**
+ * source_type → 跳转页面映射
+ */
+const SOURCE_TYPE_URLS = {
+  exchange_audit: '/admin/redemption-management.html',
+  timeout_alert: '/admin/redemption-management.html',
+  activity_status_change: '/admin/lottery-management.html',
+  asset_reconciliation_alert: '/admin/finance-management.html',
+  business_record_reconciliation_alert: '/admin/finance-management.html',
+  market_monitor_alert: '/admin/market-management.html',
+  orphan_frozen_alert: '/admin/finance-management.html',
+  orphan_frozen_error: '/admin/finance-management.html',
+  reminder_alert: '/admin/pending-center.html',
+  customer_service: '/admin/customer-service.html',
+  system_announcement: '/admin/message-center.html'
+}
+
+/**
+ * source_type → Tab 标题映射
+ */
+const SOURCE_TYPE_TITLES = {
+  exchange_audit: '兑换审核',
+  timeout_alert: '超时告警',
+  activity_status_change: '活动状态',
+  asset_reconciliation_alert: '资产对账',
+  business_record_reconciliation_alert: '业务对账',
+  market_monitor_alert: '市场监控',
+  orphan_frozen_alert: '孤儿冻结',
+  orphan_frozen_error: '检测异常',
+  reminder_alert: '提醒通知',
+  customer_service: '客服会话',
+  system_announcement: '系统公告'
+}
+
+/**
+ * source_type → 颜色样式映射
+ */
+const SOURCE_TYPE_COLORS = {
+  exchange_audit: 'text-orange-500 bg-orange-50',
+  timeout_alert: 'text-red-500 bg-red-50',
+  activity_status_change: 'text-yellow-500 bg-yellow-50',
+  asset_reconciliation_alert: 'text-red-500 bg-red-50',
+  business_record_reconciliation_alert: 'text-red-500 bg-red-50',
+  market_monitor_alert: 'text-blue-500 bg-blue-50',
+  orphan_frozen_alert: 'text-purple-500 bg-purple-50',
+  orphan_frozen_error: 'text-red-500 bg-red-50',
+  reminder_alert: 'text-blue-500 bg-blue-50',
+  customer_service: 'text-blue-500 bg-blue-50',
+  system_announcement: 'text-green-500 bg-green-50'
+}
+
+/**
+ * priority → 图标映射（后端枚举：low/normal/high/urgent）
+ */
+const PRIORITY_ICONS = {
+  low: '🟢',
+  normal: '🔵',
+  high: '🟠',
+  urgent: '🔴'
+}
+
+/**
+ * priority → 中文标签映射
+ */
+const PRIORITY_LABELS = {
+  low: '低',
+  normal: '普通',
+  high: '高',
+  urgent: '紧急'
+}
+
+/**
+ * priority → 颜色样式映射（用于通知项右侧优先级标签）
+ */
+const PRIORITY_COLORS = {
+  low: 'text-green-600 bg-green-50',
+  normal: 'text-blue-600 bg-blue-50',
+  high: 'text-orange-600 bg-orange-50',
+  urgent: 'text-red-600 bg-red-50'
+}
 
 /**
  * 创建通知中心组件
@@ -16,56 +115,27 @@ import { io } from 'socket.io-client'
  */
 export function notificationCenter() {
   return {
-    // 下拉菜单状态
     isOpen: false,
-
-    // 加载状态
     loading: false,
-
-    // 通知列表
     notifications: [],
-
-    // 未读数量
     unreadCount: 0,
-
-    // 声音设置
     soundEnabled: true,
-
-    // 音频对象
     audioContext: null,
     notificationSound: null,
-
-    // WebSocket 连接
     socket: null,
     wsConnected: false,
     wsReconnectAttempts: 0,
     maxReconnectAttempts: 5,
-
-    // 轮询定时器
     pollTimer: null,
 
-    /**
-     * 初始化
-     */
     async init() {
       logger.debug('[NotificationCenter] 初始化实时提醒中心')
-
-      // 加载声音设置
       this.soundEnabled = localStorage.getItem('notification_sound') !== 'false'
-
-      // 初始化音频
       this.initAudio()
-
-      // 加载通知列表
       await this.loadNotifications()
-
-      // 尝试建立 WebSocket 连接
       this.connectWebSocket()
-
-      // 降级方案：轮询
       this.startPolling()
 
-      // 监听点击外部关闭
       document.addEventListener('click', e => {
         if (!e.target.closest('.notification-center')) {
           this.isOpen = false
@@ -73,12 +143,8 @@ export function notificationCenter() {
       })
     },
 
-    /**
-     * 初始化音频
-     */
     initAudio() {
       try {
-        // 使用 Web Audio API 创建简单的提示音
         this.audioContext = new (window.AudioContext || window.webkitAudioContext)()
         logger.debug('[NotificationCenter] 音频上下文已初始化')
       } catch (e) {
@@ -86,29 +152,23 @@ export function notificationCenter() {
       }
     },
 
-    /**
-     * 播放通知声音
-     */
     playNotificationSound() {
       if (!this.soundEnabled || !this.audioContext) return
 
       try {
-        // 恢复音频上下文（如果被暂停）
         if (this.audioContext.state === 'suspended') {
           this.audioContext.resume()
         }
 
-        // 创建一个简单的提示音
         const oscillator = this.audioContext.createOscillator()
         const gainNode = this.audioContext.createGain()
 
         oscillator.connect(gainNode)
         gainNode.connect(this.audioContext.destination)
 
-        oscillator.frequency.value = 800 // 800Hz 提示音
+        oscillator.frequency.value = 800
         oscillator.type = 'sine'
 
-        // 淡入淡出效果
         gainNode.gain.setValueAtTime(0, this.audioContext.currentTime)
         gainNode.gain.linearRampToValueAtTime(0.3, this.audioContext.currentTime + 0.05)
         gainNode.gain.linearRampToValueAtTime(0, this.audioContext.currentTime + 0.3)
@@ -122,57 +182,42 @@ export function notificationCenter() {
       }
     },
 
-    /**
-     * 切换声音设置
-     */
     toggleSound() {
       this.soundEnabled = !this.soundEnabled
       localStorage.setItem('notification_sound', this.soundEnabled)
-
-      // 如果启用，播放一次测试音
       if (this.soundEnabled) {
         this.playNotificationSound()
       }
     },
 
-    /**
-     * 切换下拉菜单
-     */
     toggleDropdown() {
       this.isOpen = !this.isOpen
-
-      // 打开时刷新列表
       if (this.isOpen) {
         this.loadNotifications()
       }
     },
 
-    /**
-     * 关闭下拉菜单
-     */
     closeDropdown() {
       this.isOpen = false
     },
 
     /**
      * 加载通知列表
+     * 响应格式：{ items: [...], total, unread_count }
      */
     async loadNotifications() {
       this.loading = true
       try {
         const result = await request({
-          url: `${API_PREFIX}/system/notifications`,
+          url: SYSTEM_ADMIN_ENDPOINTS.NOTIFICATION_LIST,
           params: { limit: 20 }
         })
         if (result.data) {
           const oldUnreadCount = this.unreadCount
-          // 安全处理：确保 notifications 始终是数组
-          const items = result.data.items || result.data
-          this.notifications = Array.isArray(items) ? items : []
+          this.notifications = Array.isArray(result.data.items) ? result.data.items : []
           this.unreadCount =
             result.data.unread_count ?? this.notifications.filter(n => !n.is_read).length
 
-          // 如果有新通知，播放提示音
           if (this.unreadCount > oldUnreadCount && oldUnreadCount > 0) {
             this.playNotificationSound()
           }
@@ -187,90 +232,66 @@ export function notificationCenter() {
     },
 
     /**
-     * 标记为已读
+     * 标记为已读（使用 admin_notification_id）
      */
     async markAsRead(notification) {
       if (notification.is_read) return
 
+      const notifId = notification.admin_notification_id
       try {
-        await request({
-          url: `${API_PREFIX}/system/notifications/${notification.id}/read`,
-          method: 'POST'
-        })
-
-        notification.is_read = true
-        this.unreadCount = Math.max(0, this.unreadCount - 1)
+        if (notifId) {
+          await request({
+            url: buildURL(SYSTEM_ADMIN_ENDPOINTS.NOTIFICATION_READ, { id: notifId }),
+            method: 'POST'
+          })
+        }
       } catch (e) {
         logger.warn('[NotificationCenter] 标记已读失败:', e.message)
-        // 即使API失败也更新UI
-        notification.is_read = true
-        this.unreadCount = Math.max(0, this.unreadCount - 1)
       }
+
+      notification.is_read = true
+      this.unreadCount = Math.max(0, this.unreadCount - 1)
     },
 
-    /**
-     * 全部标记为已读
-     */
     async markAllAsRead() {
       try {
         await request({
-          url: `${API_PREFIX}/system/notifications/read-all`,
+          url: SYSTEM_ADMIN_ENDPOINTS.NOTIFICATION_READ_ALL,
           method: 'POST'
         })
-
-        this.notifications.forEach(n => (n.is_read = true))
-        this.unreadCount = 0
       } catch (e) {
         logger.warn('[NotificationCenter] 全部标记已读失败:', e.message)
-        // 即使API失败也更新UI
-        this.notifications.forEach(n => (n.is_read = true))
-        this.unreadCount = 0
       }
+
+      this.notifications.forEach(n => (n.is_read = true))
+      this.unreadCount = 0
     },
 
     /**
-     * 处理通知点击
+     * 处理通知点击 — 基于 source_type 跳转
      */
     handleNotificationClick(notification) {
-      // 标记为已读
       this.markAsRead(notification)
 
-      // 根据通知类型跳转
-      const urlMap = {
-        consumption: '/admin/finance-management.html',
-        customer_service: '/admin/customer-service.html',
-        lottery_alert: '/admin/lottery-alerts.html',
-        risk_alert: '/admin/risk-alerts.html',
-        alert: '/admin/pending-center.html',
-        warning: '/admin/lottery-alerts.html',
-        info: '/admin/system-settings.html'
-      }
+      const sourceType = notification.source_type || ''
+      const url = SOURCE_TYPE_URLS[sourceType] || '/admin/message-center.html'
 
-      const url = urlMap[notification.type] || '/admin/pending-center.html'
-
-      // 关闭下拉菜单
       this.isOpen = false
 
-      // 通知父窗口打开Tab
       window.dispatchEvent(
         new CustomEvent('open-tab', {
           detail: {
-            id: notification.type || 'notification',
-            title: this.getNotificationTitle(notification.type),
-            icon: this.getNotificationIcon(notification.type),
+            id: sourceType || 'notification',
+            title: SOURCE_TYPE_TITLES[sourceType] || '消息通知',
+            icon: SOURCE_TYPE_ICONS[sourceType] || '📬',
             url: url
           }
         })
       )
     },
 
-    /**
-     * 查看全部通知
-     */
     viewAllNotifications() {
       this.isOpen = false
-
-      // 打开消息中心Tab
       window.dispatchEvent(
         new CustomEvent('open-tab', {
           detail: {
@@ -283,22 +304,16 @@ export function notificationCenter() {
       )
     },
 
-    /**
-     * 连接 Socket.IO（适配后端 ChatWebSocketService）
-     */
     connectWebSocket() {
-      // 检查是否已有连接
       if (this.socket && this.wsConnected) return
 
       try {
-        // 获取 token
         const token = localStorage.getItem('admin_token')
         if (!token) {
           logger.warn('[NotificationCenter] 未登录，跳过 Socket.IO 连接')
           return
         }
 
-        // 使用 socket.io-client 连接后端
         const socketUrl = window.location.origin
         logger.debug('[NotificationCenter] 连接 Socket.IO:', socketUrl)
 
@@ -316,29 +331,24 @@ export function notificationCenter() {
           logger.info('[NotificationCenter] Socket.IO 连接成功')
           this.wsConnected = true
           this.wsReconnectAttempts = 0
-
-          // 注册为管理员客户端
           this.socket.emit('register_admin', { token })
         })
 
-        // 监听通知消息
         this.socket.on('notification', data => {
           this.handleWebSocketMessage({ type: 'notification', payload: data })
         })
 
-        // 监听徽章更新
         this.socket.on('badge_update', data => {
           this.handleWebSocketMessage({ type: 'badge_update', payload: data })
         })
 
-        // 监听新消息（复用聊天消息作为通知）
         this.socket.on('new_message', data => {
           this.handleWebSocketMessage({
             type: 'notification',
             payload: {
-              type: 'customer_service',
+              source_type: 'customer_service',
               title: '新客服消息',
-              message: data.content || '收到新消息',
+              content: data.content || '收到新消息',
               ...data
             }
           })
@@ -361,25 +371,28 @@ export function notificationCenter() {
     },
 
     /**
-     * 处理 WebSocket 消息
+     * 处理 WebSocket 消息 — 使用 admin_notification_id 去重
      */
     handleWebSocketMessage(data) {
       logger.debug('[NotificationCenter] 收到 WebSocket 消息:', data)
 
       if (data.type === 'notification') {
         const payload = data.payload
-        // 去重：如果通知 id 已存在则跳过，防止 Alpine x-for :key 重复
-        if (payload.id && this.notifications.some(n => n.id === payload.id)) {
-          logger.debug('[NotificationCenter] 忽略重复通知:', payload.id)
+
+        // 使用 admin_notification_id 去重
+        const notifId = payload.admin_notification_id
+        if (notifId && this.notifications.some(n => n.admin_notification_id === notifId)) {
+          logger.debug('[NotificationCenter] 忽略重复通知:', notifId)
           return
         }
-        // 无 id 时生成临时唯一标识
-        if (!payload.id) {
-          payload.id = `ws_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+
+        // 确保有唯一标识用于 Alpine x-for :key
+        if (!payload.admin_notification_id) {
+          payload.admin_notification_id = `ws_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
         }
+
         this.notifications.unshift(payload)
         this.unreadCount++
-
         this.playNotificationSound()
         this.showBrowserNotification(payload)
       } else if (data.type === 'badge_update') {
@@ -387,17 +400,14 @@ export function notificationCenter() {
       }
     },
 
-    /**
-     * 显示浏览器通知
-     */
     showBrowserNotification(notification) {
       if (!('Notification' in window)) return
 
       if (Notification.permission === 'granted') {
         new Notification(notification.title, {
-          body: notification.message,
+          body: notification.content || notification.message,
           icon: '/admin/favicon.svg',
-          tag: 'admin-notification-' + notification.id
+          tag: 'admin-notification-' + (notification.admin_notification_id || Date.now())
         })
       } else if (Notification.permission !== 'denied') {
         Notification.requestPermission().then(permission => {
@@ -408,95 +418,79 @@ export function notificationCenter() {
       }
     },
 
-    /**
-     * 安排重连（socket.io-client 自动处理，此方法仅作日志记录）
-     */
     scheduleReconnect() {
       if (this.wsReconnectAttempts >= this.maxReconnectAttempts) {
         logger.warn('[NotificationCenter] Socket.IO 重连次数已达上限，将使用轮询降级')
         return
       }
-
-      // socket.io-client 自动处理重连，这里只记录日志
       logger.debug(
         `[NotificationCenter] Socket.IO 将自动重连 (已尝试${this.wsReconnectAttempts}次)`
       )
     },
 
-    /**
-     * 开始轮询（降级方案）
-     */
     startPolling() {
-      // 清除旧的定时器
       if (this.pollTimer) {
         clearInterval(this.pollTimer)
       }
-
-      // 每30秒轮询一次
       this.pollTimer = setInterval(() => {
-        // 如果 WebSocket 已连接，跳过轮询
         if (this.wsConnected) return
-
         this.loadNotifications()
       }, 30000)
     },
 
     /**
-     * 获取通知图标
+     * 获取通知图标 — 基于 source_type
      */
-    getNotificationIcon(type) {
-      const icons = {
-        consumption: '📋',
-        customer_service: '💬',
-        lottery_alert: '🎰',
-        risk_alert: '⚠️',
-        alert: '🔔',
-        warning: '⚠️',
-        info: 'ℹ️',
-        success: '✅'
-      }
-      return icons[type] || '📬'
+    getNotificationIcon(sourceType) {
+      return SOURCE_TYPE_ICONS[sourceType] || '📬'
     },
 
     /**
-     * 获取通知标题
+     * 获取通知标题 — 基于 source_type
      */
-    getNotificationTitle(type) {
-      const titles = {
-        consumption: '消耗审核',
-        customer_service: '客服会话',
-        lottery_alert: '抽奖告警',
-        risk_alert: '风控告警',
-        alert: '待处理事项',
-        warning: '告警信息',
-        info: '系统通知'
-      }
-      return titles[type] || '消息通知'
+    getNotificationTitle(sourceType) {
+      return SOURCE_TYPE_TITLES[sourceType] || '消息通知'
     },
 
     /**
-     * 获取通知类型颜色类名
+     * 获取通知类型颜色类名 — 基于 source_type
      */
-    getNotificationColorClass(type) {
-      const colors = {
-        alert: 'text-red-500 bg-red-50',
-        warning: 'text-yellow-500 bg-yellow-50',
-        info: 'text-blue-500 bg-blue-50',
-        success: 'text-green-500 bg-green-50',
-        consumption: 'text-orange-500 bg-orange-50',
-        customer_service: 'text-blue-500 bg-blue-50',
-        lottery_alert: 'text-yellow-500 bg-yellow-50',
-        risk_alert: 'text-red-500 bg-red-50'
-      }
-      return colors[type] || 'text-gray-500 bg-gray-50'
+    getNotificationColorClass(sourceType) {
+      return SOURCE_TYPE_COLORS[sourceType] || 'text-gray-500 bg-gray-50'
     },
 
     /**
-     * 格式化时间
+     * 获取 priority 图标（后端枚举：low/normal/high/urgent）
      */
+    getPriorityIcon(priority) {
+      return PRIORITY_ICONS[priority] || '🔵'
+    },
+
+    /**
+     * 获取 priority 中文标签
+     */
+    getPriorityLabel(priority) {
+      return PRIORITY_LABELS[priority] || priority || '普通'
+    },
+
+    /**
+     * 获取 priority 颜色类名
+     */
+    getPriorityColorClass(priority) {
+      return PRIORITY_COLORS[priority] || 'text-blue-600 bg-blue-50'
+    },
+
+    /**
+     * 判断是否为高优先级通知（high/urgent）
+     */
+    isHighPriority(priority) {
+      return priority === 'high' || priority === 'urgent'
+    },
+
     formatTime(dateStr) {
       if (!dateStr) return '--'
       const date = new Date(dateStr)
+      if (isNaN(date.getTime())) return String(dateStr)
       const now = new Date()
       const diff = now - date
 
@@ -505,6 +499,7 @@ export function notificationCenter() {
       if (diff < 86400000) return Math.floor(diff / 3600000) + '小时前'
 
       return date.toLocaleString('zh-CN', {
+        timeZone: 'Asia/Shanghai',
         month: '2-digit',
         day: '2-digit',
         hour: '2-digit',
@@ -512,22 +507,14 @@ export function notificationCenter() {
       })
     },
 
-    /**
-     * 销毁组件
-     */
     destroy() {
-      // 清除轮询
       if (this.pollTimer) {
         clearInterval(this.pollTimer)
       }
-
-      // 关闭 Socket.IO 连接
       if (this.socket) {
         this.socket.disconnect()
         this.socket = null
       }
-
-      // 关闭音频上下文
       if (this.audioContext) {
         this.audioContext.close()
       }

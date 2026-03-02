@@ -597,7 +597,7 @@ router.put(
       /* 更新后清除该活动的配置缓存 */
       const {
         DynamicConfigLoader
-      } = require('../../../services/UnifiedLotteryEngine/compute/config/StrategyConfig')
+      } = require('../../../services/UnifiedLotteryEngine/compute/config/ComputeConfig')
       DynamicConfigLoader.clearCache(parseInt(lottery_campaign_id))
 
       return res.apiSuccess(result, '策略配置更新成功')

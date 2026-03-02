@@ -745,19 +745,18 @@ class PrizePoolService {
      * - 决策6：幂等键由 prize_id + 更新后的数据版本号派生
      * - 决策7：同一事务内
      */
-    const updateVersion = prize.updated_at ? new Date(prize.updated_at).getTime() : Date.now()
     await AuditLogService.logOperation({
-      operator_id: updated_by || 1, // 操作员ID（如果没有传入，使用系统用户1）
-      operation_type: 'prize_config', // 操作类型：奖品配置
-      target_type: 'LotteryPrize', // 目标对象类型
-      target_id: prize_id, // 目标对象ID（奖品ID）
-      action: 'update', // 操作动作：更新
+      operator_id: updated_by || 1,
+      operation_type: 'prize_config',
+      target_type: 'LotteryPrize',
+      target_id: prize_id,
+      action: 'update',
       before_data: beforeData,
       after_data: afterData,
       reason: operationDetail,
-      idempotency_key: `prize_config_${prize_id}_v${updateVersion}`, // 决策6：业务主键派生
-      is_critical_operation: true, // 决策5：关键操作
-      transaction // 事务对象
+      idempotency_key: `prize_config_${prize_id}_${Date.now()}_${changedFields.sort().join('_')}`,
+      is_critical_operation: true,
+      transaction
     })
 
     logger.info('奖品更新成功', {

@@ -355,18 +355,24 @@ class QueryService {
       }
     }
 
-    // 3. 获取不可叠加物品统计
+    // 3. 获取不可叠加物品统计（通过 account_id 关联查询）
     const sequelize = require('sequelize')
+    const itemWhere = {
+      status: { [Op.in]: ['available', 'locked'] }
+    }
+    if (account) {
+      itemWhere.owner_account_id = account.account_id
+    } else {
+      itemWhere.owner_account_id = -1
+    }
+
     const itemCounts = await Item.findAll({
       attributes: [
         'item_type',
         'status',
         [sequelize.fn('COUNT', sequelize.col('item_id')), 'count']
       ],
-      where: {
-        owner_user_id: user_id,
-        status: { [Op.in]: ['available', 'locked'] } // 只统计用户持有的物品
-      },
+      where: itemWhere,
       group: ['item_type', 'status'],
       raw: true,
       transaction
@@ -396,16 +402,16 @@ class QueryService {
       non_fungible_items.by_type[item.item_type][item.status] = count
     }
 
-    // 4. 可选：获取物品详细列表
+    // 4. 可选：获取物品详细列表（通过 account_id 关联查询）
     let items_list = null
-    if (include_items) {
+    if (include_items && account) {
       items_list = await Item.findAll({
         where: {
-          owner_user_id: user_id,
+          owner_account_id: account.account_id,
           status: { [Op.in]: ['available', 'locked'] }
         },
         order: [['created_at', 'DESC']],
-        limit: 100, // 限制返回数量
+        limit: 100,
         transaction
       })
     }

@@ -157,7 +157,7 @@ describe('📊 任务11.3：保底触发完整链路测试', () => {
         const firstActivity = activitiesResponse.body.data.activities[0]
         campaignCode = firstActivity.campaign_code
       } else {
-        campaignCode = 'BASIC_LOTTERY'
+        campaignCode = 'CAMP20250901001'
       }
     }
 

@@ -67,6 +67,7 @@ function redemptionManagementPage() {
 
     /** @type {Object} 筛选条件 */
     filter: {
+      keyword: '',
       status: '',
       mobile: '',
       merchant_id: '',
@@ -146,6 +147,7 @@ function redemptionManagementPage() {
           page_size: this.page_size
         }
 
+        if (this.filter.keyword) params.keyword = this.filter.keyword
         if (this.filter.status) params.status = this.filter.status
         if (this.filter.mobile) params.mobile = this.filter.mobile
         if (this.filter.merchant_id) params.merchant_id = this.filter.merchant_id
@@ -230,7 +232,7 @@ function redemptionManagementPage() {
      * 重置筛选条件
      */
     resetFilter() {
-      this.filter = { status: '', mobile: '', start_date: '', end_date: '' }
+      this.filter = { keyword: '', status: '', mobile: '', merchant_id: '', start_date: '', end_date: '' }
       this.current_page = 1
       this.loadOrders()
     },

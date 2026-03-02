@@ -30,13 +30,13 @@ const RULE_TYPES = {
 }
 
 /**
- * 通知优先级枚举
+ * 通知优先级枚举（与 AdminNotification.PRIORITIES 保持一致）
  * @readonly
  * @enum {string}
  */
 const NOTIFICATION_PRIORITIES = {
   LOW: 'low',
-  MEDIUM: 'medium',
+  NORMAL: 'normal',
   HIGH: 'high',
   URGENT: 'urgent'
 }
@@ -153,7 +153,7 @@ module.exports = sequelize => {
       notification_priority: {
         type: DataTypes.ENUM(...Object.values(NOTIFICATION_PRIORITIES)),
         allowNull: false,
-        defaultValue: NOTIFICATION_PRIORITIES.MEDIUM,
+        defaultValue: NOTIFICATION_PRIORITIES.NORMAL,
         comment: '通知优先级'
       },
 

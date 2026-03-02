@@ -51,10 +51,8 @@ const logger = require('../../utils/logger')
 const { UserPremiumStatus, sequelize } = require('../../models')
 const { Op } = sequelize.Sequelize
 const BeijingTimeHelper = require('../../utils/timeHelper')
-// 2025-11-09新增：数据库性能监控
-const { monitor: databaseMonitor } = require('./database_performance_monitor')
-// @deprecated 旧版每日资产对账已被统一对账脚本(scripts/reconcile-items.js)替代
-// DailyAssetReconciliation 不再直接引用，任务12已委托给统一对账
+// 任务12(核心对账)+任务15(业务记录关联对账)统一由 scripts/reconcile-items.js 提供
+const { executeBusinessRecordReconciliation } = require('../reconcile-items')
 // 🔴 移除 RedemptionService 直接引用（2025-12-17 P1-2）
 // 原因：统一通过 jobs/daily-redemption-order-expiration.js 作为唯一入口
 // 避免多处直接调用服务层方法，确保业务逻辑和报告格式统一
@@ -204,10 +202,8 @@ class ScheduledTasks {
     // 任务6: 每天凌晨清理过期的高级空间状态（2025-11-09新增）
     this.schedulePremiumStatusCleanup()
 
-    // 任务7: 每5分钟执行数据库性能监控（2025-11-09新增）
-    this.scheduleDatabasePerformanceMonitor()
+    // 任务8: 每天凌晨0点重置抽奖奖品每日中奖次数
 
-    // 任务8: 每天凌晨0点重置抽奖奖品每日中奖次数（2025-12-11新增）
     this.scheduleLotteryPrizesDailyReset()
 
     // 任务9: 每小时同步抽奖活动状态（2025-12-11新增）
@@ -325,6 +321,11 @@ class ScheduledTasks {
 
         if (result.hasTimeout) {
           logger.warn(`[定时任务] 发现${result.count}个超时订单（24小时）`)
+          ScheduledTasks.NotificationService.notifyTimeoutAlert({
+            count: result.count,
+            timeout_hours: 24,
+            statistics: result.orders?.map(o => o.order_no) || []
+          }).catch(e => logger.error('[定时任务] 24小时超时通知发送失败', { error: e.message }))
         } else {
           logger.info('[定时任务] 24小时超时订单检查完成，无超时订单')
         }
@@ -352,7 +353,11 @@ class ScheduledTasks {
 
         if (result.hasTimeout) {
           logger.error(`[定时任务] 🚨 发现${result.count}个紧急超时订单（72小时）`)
-          // 扩展点：如需发送紧急通知（钉钉/企业微信），可在此处集成 ScheduledTasks.NotificationService
+          ScheduledTasks.NotificationService.notifyTimeoutAlert({
+            count: result.count,
+            timeout_hours: 72,
+            statistics: result.orders?.map(o => o.order_no) || []
+          }).catch(e => logger.error('[定时任务] 72小时超时通知发送失败', { error: e.message }))
         } else {
           logger.info('[定时任务] 72小时超时订单检查完成，无超时订单')
         }
@@ -392,12 +397,17 @@ class ScheduledTasks {
           has_72h_timeout: timeoutResult72h?.hasTimeout || false
         })
 
-        // 如果有大量超时订单，发送告警
+        // 如果有大量超时订单，发送告警通知管理员
         if (timeoutResult24h?.count > 10) {
           logger.warn('[定时任务] ⚠️ 待审核订单积压', {
             over24h: timeoutResult24h.count,
             message: '超过24小时的待审核订单数量较多，请及时处理'
           })
+          ScheduledTasks.NotificationService.notifyTimeoutAlert({
+            count: timeoutResult24h.count,
+            timeout_hours: 24,
+            statistics: timeoutResult24h.orders?.map(o => o.order_no) || []
+          }).catch(e => logger.error('[定时任务] 每日24h超时通知发送失败', { error: e.message }))
         }
 
         if (timeoutResult72h?.count > 5) {
@@ -405,6 +415,11 @@ class ScheduledTasks {
             over72h: timeoutResult72h.count,
             message: '超过72小时的待审核订单数量较多，需要紧急处理'
           })
+          ScheduledTasks.NotificationService.notifyTimeoutAlert({
+            count: timeoutResult72h.count,
+            timeout_hours: 72,
+            statistics: timeoutResult72h.orders?.map(o => o.order_no) || []
+          }).catch(e => logger.error('[定时任务] 每日72h超时通知发送失败', { error: e.message }))
         }
 
         logger.info('[定时任务] 每日运营数据统计完成')
@@ -692,93 +707,6 @@ class ScheduledTasks {
     })
 
     logger.info('✅ 定时任务已设置: 高级空间状态清理（每天凌晨3点执行）')
-  }
-
-  /**
-   * 定时任务7: 每10分钟执行数据库性能监控
-   * Cron表达式: 0,10,20,30,40,50 * * * * (每10分钟)
-   *
-   * 业务场景：
-   * - 实施《数据库性能问题排查和优化方案.md》中的方案0（持续监控方案）
-   * - 监控数据库连接数、慢查询频率等关键性能指标
-   * - 在发现实际性能问题时提供数据支撑，判断是否需要优化
-   *
-   * 监控内容：
-   * 1. 数据库连接数监控（告警阈值：>32为warning，>35为critical）
-   * 2. 慢查询频率统计（告警阈值：>5次/小时为warning，>10次/小时为critical）
-   *
-   * 优化触发条件（基于文档3.4节）：
-   * - 连接数>35持续1小时 → 执行方案1（调整连接池配置）
-   * - 慢查询>10次/小时持续1天 → 执行方案1或2
-   * - 登录响应>3秒持续1周 → 执行方案2（代码优化）
-   *
-   * ⚠️ 重要说明：
-   * - 这是预防性监控，不是紧急优化
-   * - 当前系统运行稳定，无需立即优化
-   * - 只在监控数据达到触发条件时才执行优化
-   *
-   * 参考文档：docs/数据库性能问题排查和优化方案.md
-   *
-   * 创建时间：2025-11-09
-   * @returns {void}
-   */
-  static scheduleDatabasePerformanceMonitor() {
-    cron.schedule('0,10,20,30,40,50 * * * *', async () => {
-      try {
-        logger.info('[定时任务] 开始执行数据库性能监控...')
-
-        // 执行性能监控检查
-        const results = await databaseMonitor.performFullCheck()
-
-        // 只在发现异常时输出详细信息
-        if (results.overall_status !== 'normal') {
-          logger.warn('[定时任务] ⚠️ 发现数据库性能异常', {
-            overall_status: results.overall_status,
-            connection_status: results.checks.connection_count.status,
-            current_connections: results.checks.connection_count.current_connections,
-            slow_query_count: results.checks.slow_query_stats.count,
-            slow_query_hourly_rate: results.checks.slow_query_stats.hourly_rate
-          })
-        } else {
-          logger.info('[定时任务] 数据库性能监控完成：状态正常')
-        }
-      } catch (error) {
-        logger.error('[定时任务] 数据库性能监控失败', { error: error.message })
-      }
-    })
-
-    logger.info('✅ 定时任务已设置: 数据库性能监控（每10分钟执行）')
-  }
-
-  /**
-   * 手动触发数据库性能监控（用于测试和调试）
-   *
-   * 业务场景：
-   * - 手动检查数据库性能
-   * - 生成性能监控报告
-   * - 开发调试和验证监控功能
-   *
-   * @returns {Promise<string>} 格式化的性能监控报告
-   *
-   * @example
-   * const ScheduledTasks = require('./scripts/maintenance/scheduled-tasks')
-   * const report = await ScheduledTasks.manualDatabasePerformanceCheck()
-   * console.log(report)
-   *
-   * 创建时间：2025-11-09
-   */
-  static async manualDatabasePerformanceCheck() {
-    logger.info('[手动触发] 执行数据库性能监控...')
-    try {
-      const results = await databaseMonitor.performFullCheck()
-      const report = databaseMonitor.generateReport(results)
-      console.log(report)
-      logger.info('[手动触发] 数据库性能监控完成')
-      return report
-    } catch (error) {
-      logger.error('[手动触发] 数据库性能监控失败', { error: error.message })
-      throw error
-    }
   }
 
   /**
@@ -1419,8 +1347,8 @@ class ScheduledTasks {
       try {
         logger.info('[定时任务] 开始执行业务记录关联对账（事务边界治理）...')
 
-        // 调用 DailyAssetReconciliation 的业务记录对账方法
-        const report = await DailyAssetReconciliation.executeBusinessRecordReconciliation()
+        // 调用统一对账脚本的业务记录对账方法
+        const report = await executeBusinessRecordReconciliation()
 
         if (report.total_issues > 0) {
           logger.warn(`[定时任务] 业务记录关联对账完成：发现${report.total_issues}个问题`, {
@@ -1454,7 +1382,7 @@ class ScheduledTasks {
   static async manualBusinessRecordReconciliation() {
     try {
       logger.info('[手动触发] 开始执行业务记录关联对账...')
-      const report = await DailyAssetReconciliation.executeBusinessRecordReconciliation()
+      const report = await executeBusinessRecordReconciliation()
 
       logger.info('[手动触发] 业务记录关联对账完成', {
         status: report.status,
@@ -3514,7 +3442,7 @@ class ScheduledTasks {
 
   /**
    * 任务36: item_holds 过期自动释放
-   * Cron表达式: */10 * * * * (每10分钟)
+   * Cron表达式: 每10分钟 (星/10 * * * *)
    *
    * 检查 item_holds 表中已过期的锁定记录，自动释放。
    * 业务场景：交易市场挂牌超时、抽奖锁定超时等。
@@ -3535,7 +3463,7 @@ class ScheduledTasks {
         const { sequelize } = require('../../config/database')
 
         const [expiredHolds] = await sequelize.query(`
-          SELECT hold_id, item_id, hold_type, holder_id, expires_at
+          SELECT hold_id, item_id, hold_type, holder_ref, expires_at
           FROM item_holds
           WHERE expires_at IS NOT NULL AND expires_at < NOW()
           LIMIT 100

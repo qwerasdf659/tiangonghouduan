@@ -354,6 +354,13 @@ models.AdAntifraudLog = require('./AdAntifraudLog')(sequelize, DataTypes)
  *    - 表名：ad_antifraud_logs，主键：ad_antifraud_log_id（BIGINT）
  */
 
+models.AdDauDailyStat = require('./AdDauDailyStat')(sequelize)
+/*
+ * ✅ AdDauDailyStat：DAU 每日统计
+ *    - 用途：每日活跃用户数和 DAU 系数（广告定价数据源）
+ *    - 表名：ad_dau_daily_stats，主键：ad_dau_daily_stat_id
+ */
+
 // 🔴 Phase 6：归因追踪 + 多维报表
 models.AdAttributionLog = require('./AdAttributionLog')(sequelize, DataTypes)
 /*
@@ -367,6 +374,43 @@ models.AdReportDailySnapshot = require('./AdReportDailySnapshot')(sequelize, Dat
  * ✅ AdReportDailySnapshot：每日报表快照
  *    - 用途：凌晨4点聚合前一天的曝光/点击/转化/消耗数据
  *    - 表名：ad_report_daily_snapshots，主键：snapshot_id（BIGINT）
+ */
+
+// 🔴 P1c 地域定向管理（商圈/区域 + 联合广告组）
+models.AdTargetZone = require('./AdTargetZone')(sequelize, DataTypes)
+/*
+ * ✅ AdTargetZone：广告地域定向（商圈/区域管理）
+ *    - 用途：定义地域定向区域（商圈/区域），支持层级结构和优先级匹配
+ *    - 特点：zone_type 区分商圈(district)和区域(region)，parent_zone_id 自引用层级
+ *    - 表名：ad_target_zones，主键：zone_id
+ *    - 业务场景：运营创建商圈/区域 → 关联广告位 → 竞价时地域匹配
+ */
+
+models.AdZoneGroup = require('./AdZoneGroup')(sequelize, DataTypes)
+/*
+ * ✅ AdZoneGroup：联合广告组（地域定向联合投放）
+ *    - 用途：将多个地域区域组合为联合投放组，支持三种定价模式
+ *    - 特点：pricing_mode 支持 sum(累加)/discount(折扣)/fixed(固定价)
+ *    - 表名：ad_zone_groups，主键：group_id
+ *    - 业务场景：运营创建联合组 → 添加地域成员 → 联合投放定价
+ */
+
+models.AdZoneGroupMember = require('./AdZoneGroupMember')(sequelize, DataTypes)
+/*
+ * ✅ AdZoneGroupMember：联合组成员（地域与组的多对多关联）
+ *    - 用途：ad_zone_groups 与 ad_target_zones 的中间表
+ *    - 特点：(group_id, zone_id) 唯一约束，CASCADE 删除
+ *    - 表名：ad_zone_group_members，主键：ad_zone_group_member_id
+ */
+
+// 🔴 P1c 调价审批管理
+models.AdPriceAdjustmentLog = require('./AdPriceAdjustmentLog')(sequelize, DataTypes)
+/*
+ * ✅ AdPriceAdjustmentLog：调价日志（DAU系数调整审批与执行记录）
+ *    - 用途：记录自动/手动触发的调价建议，支持运营审批流程
+ *    - 特点：状态流转 pending → confirmed/rejected → applied
+ *    - 表名：ad_price_adjustment_logs，主键：ad_price_adjustment_log_id
+ *    - 业务场景：DAU变化触发调价建议 → 运营查看 → 确认/拒绝 → 执行调价
  */
 
 // 🔴 内容投放合并：通用交互日志表（D2 定论：替代分散的 popup_show_logs / carousel_show_logs）

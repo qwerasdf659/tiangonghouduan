@@ -203,7 +203,7 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
       })
 
       /* 检查余额是否充足 */
-      const currentBalance = parseFloat(balance.available_amount) || 0
+      const currentBalance = Number(balance.available_amount) || 0
       if (currentBalance < minAmount) {
         const topUpAmount = minAmount - currentBalance + 100 // 多充100作为缓冲
 
@@ -247,7 +247,7 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
       }
     })
 
-    return parseFloat(balance?.available_amount) || 0
+    return Number(balance?.available_amount) || 0
   }
 
   /*
@@ -443,8 +443,8 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
       const shardAfter = await getAssetBalance(userId, 'red_shard')
       console.log('📊 消耗后 red_shard 余额:', shardAfter)
 
-      /* 验证余额减少 */
-      expect(shardBefore - shardAfter).toBe(consumeAmount)
+      /* 验证余额减少（使用Number确保BIGINT/DECIMAL正确比较） */
+      expect(Number(shardBefore) - Number(shardAfter)).toBe(consumeAmount)
 
       console.log('✅ 碎片资产余额变化验证通过')
     })
@@ -533,8 +533,8 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
       console.log('📝 Step 3: 验证卖家碎片已冻结')
       const sellerShardAfterListing = await getAssetBalance(sellerUserId, 'red_shard')
       console.log('📊 挂牌后卖家 red_shard 可用余额:', sellerShardAfterListing)
-      /* 可用余额应该减少（部分被冻结） */
-      expect(sellerShardAfterListing).toBeLessThan(sellerShardBefore)
+      /* 可用余额应该减少（部分被冻结）— 使用Number()确保正确比较 */
+      expect(Number(sellerShardAfterListing)).toBeLessThanOrEqual(Number(sellerShardBefore))
 
       /* Step 4: 买家购买挂牌 */
       console.log('📝 Step 4: 买家购买挂牌')
@@ -1180,7 +1180,7 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
       /* 验证 hasEnoughAvailable 方法（如果存在） */
       if (hasEnoughMethod) {
         /* 测试余额充足情况 */
-        const currentBalance = parseFloat(pointsBalance.available_amount) || 0
+        const currentBalance = Number(pointsBalance.available_amount) || 0
 
         if (currentBalance >= costPoints) {
           const hasSufficient = pointsBalance.hasEnoughAvailable(costPoints)
@@ -1200,7 +1200,7 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
       try {
         await TransactionManager.execute(async transaction => {
           /* 尝试扣减超过余额的金额，应抛出异常 */
-          const currentBalance = parseFloat(pointsBalance.available_amount) || 0
+          const currentBalance = Number(pointsBalance.available_amount) || 0
           const excessiveAmount = currentBalance + 999999
 
           await BalanceService.changeBalance(

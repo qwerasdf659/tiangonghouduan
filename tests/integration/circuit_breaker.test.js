@@ -205,7 +205,7 @@ describe('【P2】熔断降级测试', () => {
           .set('Authorization', `Bearer ${authToken}`)
           .set('Idempotency-Key', idempotencyKey)
           .send({
-            campaign_code: 'BASIC_LOTTERY'
+            campaign_code: 'CAMP20250901001'
           })
 
         // 3. 验证：不应返回500错误
@@ -244,7 +244,7 @@ describe('【P2】熔断降级测试', () => {
 
         // 2. 执行一些操作（触发降级）
         await request(app)
-          .get('/api/v4/lottery/campaigns/BASIC_LOTTERY')
+          .get('/api/v4/lottery/campaigns/CAMP20250901001')
           .set('Authorization', `Bearer ${authToken}`)
 
         // 3. 恢复Redis
@@ -252,7 +252,7 @@ describe('【P2】熔断降级测试', () => {
 
         // 4. 验证Redis恢复后的操作
         const response = await request(app)
-          .get('/api/v4/lottery/campaigns/BASIC_LOTTERY')
+          .get('/api/v4/lottery/campaigns/CAMP20250901001')
           .set('Authorization', `Bearer ${authToken}`)
 
         // 5. 验证：恢复后应该正常工作
@@ -288,7 +288,7 @@ describe('【P2】熔断降级测试', () => {
         const results = []
         for (let i = 0; i < 5; i++) {
           const response = await request(app)
-            .get('/api/v4/lottery/campaigns/BASIC_LOTTERY')
+            .get('/api/v4/lottery/campaigns/CAMP20250901001')
             .set('Authorization', `Bearer ${authToken}`)
 
           results.push({
@@ -368,7 +368,7 @@ describe('【P2】熔断降级测试', () => {
 
         // 执行一个正常请求作为基准
         const response = await request(app)
-          .get('/api/v4/lottery/campaigns/BASIC_LOTTERY')
+          .get('/api/v4/lottery/campaigns/CAMP20250901001')
           .set('Authorization', `Bearer ${authToken}`)
 
         // 验证：无论什么情况，都不应该返回裸的500错误
@@ -402,7 +402,7 @@ describe('【P2】熔断降级测试', () => {
 
         // 2. 执行请求
         const response = await request(app)
-          .get('/api/v4/lottery/campaigns/BASIC_LOTTERY')
+          .get('/api/v4/lottery/campaigns/CAMP20250901001')
           .set('Authorization', `Bearer ${authToken}`)
 
         // 3. 验证：如果是降级响应，应该使用503
@@ -433,7 +433,7 @@ describe('【P2】熔断降级测试', () => {
         circuitController.simulateRedisDown()
 
         const response = await request(app)
-          .get('/api/v4/lottery/campaigns/BASIC_LOTTERY')
+          .get('/api/v4/lottery/campaigns/CAMP20250901001')
           .set('Authorization', `Bearer ${authToken}`)
 
         // 如果是降级响应，验证retry_after字段
@@ -462,7 +462,7 @@ describe('【P2】熔断降级测试', () => {
         circuitController.simulateRedisDown()
 
         const response = await request(app)
-          .get('/api/v4/lottery/campaigns/BASIC_LOTTERY')
+          .get('/api/v4/lottery/campaigns/CAMP20250901001')
           .set('Authorization', `Bearer ${authToken}`)
 
         // 如果是降级响应，验证degraded_reason字段
@@ -489,7 +489,7 @@ describe('【P2】熔断降级测试', () => {
         circuitController.simulateRedisDown()
 
         const response = await request(app)
-          .get('/api/v4/lottery/campaigns/BASIC_LOTTERY')
+          .get('/api/v4/lottery/campaigns/CAMP20250901001')
           .set('Authorization', `Bearer ${authToken}`)
 
         // 无论是正常响应还是降级响应，都应该符合API标准格式

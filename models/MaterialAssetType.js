@@ -102,9 +102,9 @@ module.exports = sequelize => {
 
       // 形态（Form - 碎片/水晶）
       form: {
-        type: DataTypes.ENUM('shard', 'crystal'),
+        type: DataTypes.ENUM('shard', 'crystal', 'currency', 'quota'),
         allowNull: false,
-        comment: '形态（Form - 碎片/水晶）：shard-碎片（低级形态），crystal-水晶（高级形态）'
+        comment: '形态：shard-碎片, crystal-水晶, currency-货币, quota-配额'
       },
 
       // 层级（Tier - 材料层级）

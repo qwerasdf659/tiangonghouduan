@@ -239,8 +239,8 @@ function handleServiceError(error, res, defaultMessage = '操作失败') {
 
   // 🔴 P1-1: 优先检查自定义的 statusCode 和 errorCode（用于幂等键冲突等场景）
   if (error.statusCode) {
-    const errorCode = error.errorCode || 'SERVICE_ERROR'
-    return res.apiError(errorMessage, errorCode, null, error.statusCode)
+    const errorCode = error.errorCode || error.code || 'SERVICE_ERROR'
+    return res.apiError(errorMessage, errorCode, error.data || null, error.statusCode)
   }
 
   // 根据错误消息内容判断错误类型

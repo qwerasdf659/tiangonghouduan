@@ -55,11 +55,16 @@ class AdBiddingService {
         return []
       }
 
-      // 2. 查找有效的广告计划
+      // 1.5 地域匹配：确定用户匹配的广告位 ID 集合
+      const matchedSlotIds = await AdBiddingService._resolveZoneSlots(adSlot, userId, slotKey, {
+        transaction
+      })
+
+      // 2. 查找有效的广告计划（匹配地域的所有广告位）
       const now = BeijingTimeHelper.createDatabaseTime()
       const activeCampaigns = await AdCampaign.findAll({
         where: {
-          ad_slot_id: adSlot.ad_slot_id,
+          ad_slot_id: { [Op.in]: matchedSlotIds },
           status: 'active',
           start_date: { [Op.lte]: now },
           end_date: { [Op.gte]: now },
@@ -311,6 +316,87 @@ class AdBiddingService {
         error: error.message
       })
       return new Map() // 失败时返回空Map，不影响竞价流程
+    }
+  }
+
+  /**
+   * 地域匹配：根据用户关联门店推断用户所在地域，返回匹配的广告位 ID 列表
+   *
+   * 匹配优先级：商圈（zone_type=district）→ 区域（zone_type=region）→ 全站（zone_id=NULL）
+   * 如果广告位没有绑定 zone_id（全站级别），直接返回该广告位 ID
+   *
+   * @param {Object} adSlot - 当前请求的广告位
+   * @param {number} userId - 用户ID
+   * @param {string} slotKey - 广告位键（用于查找同类型的地域广告位）
+   * @param {Object} options - 选项
+   * @returns {Promise<Array<number>>} 匹配的广告位 ID 列表
+   * @private
+   */
+  static async _resolveZoneSlots(adSlot, userId, slotKey, options = {}) {
+    const { transaction } = options
+
+    // 如果广告位无地域绑定，直接返回该广告位（全站级别）
+    if (!adSlot.zone_id) {
+      return [adSlot.ad_slot_id]
+    }
+
+    try {
+      // 查询用户关联门店的行政区划
+      const [userRegions] = await sequelize.query(
+        `SELECT DISTINCT s.administrative_region_id
+         FROM consumption_records cr
+         JOIN stores s ON cr.store_id = s.store_id
+         WHERE cr.user_id = ? AND cr.status = 'approved'
+         ORDER BY cr.created_at DESC LIMIT 5`,
+        { replacements: [userId], transaction }
+      )
+
+      if (userRegions.length === 0) {
+        // 无消费记录，只返回全站广告位
+        const globalSlots = await AdSlot.findAll({
+          where: { slot_key: slotKey, is_active: true, zone_id: null },
+          attributes: ['ad_slot_id'],
+          transaction
+        })
+        return globalSlots.length > 0 ? globalSlots.map(s => s.ad_slot_id) : [adSlot.ad_slot_id]
+      }
+
+      const regionIds = userRegions.map(r => r.administrative_region_id).filter(Boolean)
+
+      // 查找用户所在地域匹配的广告位（按优先级排序）
+      const [matchedSlots] = await sequelize.query(
+        `SELECT DISTINCT ads.ad_slot_id, atz.priority
+         FROM ad_slots ads
+         JOIN ad_target_zones atz ON ads.zone_id = atz.zone_id
+         WHERE ads.slot_key = ? AND ads.is_active = 1
+           AND atz.status = 'active'
+           AND JSON_CONTAINS(atz.geo_scope, CAST(? AS JSON), '$.region_ids')
+         ORDER BY atz.priority ASC`,
+        { replacements: [slotKey, JSON.stringify(regionIds)], transaction }
+      )
+
+      const slotIds = matchedSlots.map(s => s.ad_slot_id)
+
+      // 始终包含全站广告位作为兜底
+      const globalSlots = await AdSlot.findAll({
+        where: { slot_key: slotKey, is_active: true, zone_id: null },
+        attributes: ['ad_slot_id'],
+        transaction
+      })
+      for (const gs of globalSlots) {
+        if (!slotIds.includes(gs.ad_slot_id)) {
+          slotIds.push(gs.ad_slot_id)
+        }
+      }
+
+      return slotIds.length > 0 ? slotIds : [adSlot.ad_slot_id]
+    } catch (error) {
+      logger.warn('[AdBiddingService] 地域匹配失败，降级到当前广告位', {
+        slotKey,
+        userId,
+        error: error.message
+      })
+      return [adSlot.ad_slot_id]
     }
   }
 }

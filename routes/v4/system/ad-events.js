@@ -145,6 +145,29 @@ router.post(
         user_id: req.user.user_id
       })
 
+      // CPM 计费管线：对 CPM 类型广告计划进行 Redis 曝光计数
+      try {
+        const { AdCampaign } = require('../../../models')
+        const campaign = await AdCampaign.findByPk(parsedCampaignId, {
+          attributes: ['ad_campaign_id', 'billing_mode']
+        })
+        if (campaign && campaign.billing_mode === 'cpm') {
+          const AdBillingService = req.app.locals.services.getService('ad_billing')
+          const BeijingTimeHelper = require('../../../utils/timeHelper')
+          const billingDate = BeijingTimeHelper.formatDate(new Date(), 'YYYY-MM-DD')
+          await AdBillingService.recordCPMImpression(parsedCampaignId, billingDate)
+          logger.debug('CPM 曝光计数已记录', {
+            ad_campaign_id: parsedCampaignId,
+            billing_date: billingDate
+          })
+        }
+      } catch (cpmError) {
+        logger.warn('CPM 曝光计数失败（非致命，不影响曝光日志）', {
+          ad_campaign_id: parsedCampaignId,
+          error: cpmError.message
+        })
+      }
+
       logger.info('广告曝光事件上报成功', {
         ad_campaign_id,
         ad_slot_id,

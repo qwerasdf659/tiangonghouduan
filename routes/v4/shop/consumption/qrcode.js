@@ -113,8 +113,8 @@ router.get(
         return res.apiError('二维码不能为空', 'BAD_REQUEST', null, 400)
       }
 
-      // 先验证v2二维码格式
-      if (QRCodeValidator.isV1QRCode(qr_code)) {
+      // 验证二维码格式（仅支持 V2 动态码，V1 永久码已废弃）
+      if (QRCodeValidator.detectVersion(qr_code) !== 'v2') {
         return res.apiError(
           '二维码格式不支持，请刷新获取最新二维码',
           'INVALID_QRCODE_FORMAT',

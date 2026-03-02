@@ -176,9 +176,7 @@ router.get('/:id', authenticateToken, requireRoleLevel(100), async (req, res) =>
  * - category_code: 类目代码
  * - rarity_code: 稀有度代码
  * - description: 描述
- * - image_resource_id: 关联图片资源ID（推荐，关联 image_resources 表）
- * - image_url: 图片对象key（遗留字段，优先使用 image_resource_id）
- * - thumbnail_url: 缩略图URL（遗留字段）
+ * - image_resource_id: 关联图片资源ID（关联 image_resources 表）
  * - reference_price_points: 参考价格
  * - is_tradable: 是否可交易
  * - meta: 扩展元数据
@@ -213,9 +211,7 @@ router.post('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
  * - category_code: 类目代码
  * - rarity_code: 稀有度代码
  * - description: 描述
- * - image_resource_id: 关联图片资源ID（推荐，关联 image_resources 表）
- * - image_url: 图片对象key（遗留字段，优先使用 image_resource_id）
- * - thumbnail_url: 缩略图URL（遗留字段）
+ * - image_resource_id: 关联图片资源ID（关联 image_resources 表）
  * - reference_price_points: 参考价格
  * - is_tradable: 是否可交易
  * - is_enabled: 是否启用

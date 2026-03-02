@@ -8,7 +8,7 @@
 
 'use strict'
 
-// 🔴 设置应用程序时区为北京时间 (中国区域)
+//  设置应用程序时区为北京时间 (中国区域)
 process.env.TZ = 'Asia/Shanghai'
 
 const crypto = require('crypto')
@@ -18,35 +18,32 @@ const cors = require('cors')
 const helmet = require('helmet')
 const compression = require('compression')
 const rateLimit = require('express-rate-limit')
-const cookieParser = require('cookie-parser') // 🔐 Cookie解析中间件（Token安全升级）
+const cookieParser = require('cookie-parser') //  Cookie解析中间件（Token安全升级）
 /**
- * ✅ dotenv配置：所有环境统一禁止 override（单一真相源方案）
+ * dotenv配置：所有环境统一禁止 override（单一真相源方案）
  * 优先级模型：PM2 env_file 注入 > .env 补齐（跨环境一致、可预测）
- * 参考：docs/Devbox单环境统一配置方案.md
  */
 require('dotenv').config()
-console.log(`✅ [${process.env.NODE_ENV || 'unknown'}] 环境变量已加载，配置源：.env 文件`)
+console.log(` [${process.env.NODE_ENV || 'unknown'}] 环境变量已加载，配置源：.env 文件`)
 
-// 🔧 配置校验（统一 fail-fast 模式）
+//  配置校验（统一 fail-fast 模式）
 const { validateConfig } = require('./config/environment')
 /**
  * 配置校验架构升级（2025-12-30 配置管理三层分离方案）
  * - 所有环境统一 fail-fast（移除 development 的 try/catch 忽略）
  * - 校验逻辑统一到 ConfigValidator（基于 CONFIG_SCHEMA 权威定义）
  * - 避免"开发能跑、生产炸"的环境差异问题
- *
- * 参考文档：docs/配置管理三层分离与校验统一方案.md
  */
 validateConfig(true) // failFast=true，所有环境遇错即退出
 
-// 🕐 北京时间工具导入
+//  北京时间工具导入
 const BeijingTimeHelper = require('./utils/timeHelper')
 
-// 📝 统一日志系统导入
+//  统一日志系统导入
 const logger = require('./utils/logger')
 const appLogger = logger
 
-// 🔧 导入API响应统一中间件 - 解决API格式不一致问题
+//  导入API响应统一中间件 - 解决API格式不一致问题
 const ApiResponse = require('./utils/ApiResponse')
 
 /**
@@ -75,10 +72,10 @@ appLogger.info('应用启动', {
 // 初始化Express应用
 const app = express()
 
-// 🔧 信任代理配置 - Sealos部署环境必需
+//  信任代理配置 - Sealos部署环境必需
 app.set('trust proxy', true)
 
-// 🔧 安全中间件
+//  安全中间件
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -134,7 +131,7 @@ const corsOriginValidator = function (origin, callback) {
   }
 }
 
-// 🔧 CORS配置 - 支持微信小程序跨域访问
+//  CORS配置 - 支持微信小程序跨域访问
 app.use(
   cors({
     origin: corsOriginValidator,
@@ -145,28 +142,28 @@ app.use(
   })
 )
 
-// 🔧 请求体解析
+//  请求体解析
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 
-// 🔐 Cookie解析中间件（Token安全升级 - 用于读取HttpOnly refresh_token）
+//  Cookie解析中间件（Token安全升级 - 用于读取HttpOnly refresh_token）
 app.use(cookieParser())
 
-// 🔧 压缩响应
+//  压缩响应
 app.use(compression())
 
 /*
- * 🔧 API请求频率限制 V4 - Redis滑动窗口限流
+ *  API请求频率限制 V4 - Redis滑动窗口限流
  * 创建时间：2025年10月12日
  * 功能：防止恶意刷接口，保护服务器资源
  */
 const { getRateLimiter } = require('./middleware/RateLimiterMiddleware')
 const rateLimiter = getRateLimiter()
 
-// 🔧 API响应格式统一中间件 - 统一所有API响应格式（必须在 /api 限流器之前，确保限流响应也包含 request_id）
+//  API响应格式统一中间件 - 统一所有API响应格式（必须在 /api 限流器之前，确保限流响应也包含 request_id）
 app.use('/api/', ApiResponse.middleware())
 
-// 🔧 全局API限流 - 100次/分钟/IP（基于Redis）
+//  全局API限流 - 100次/分钟/IP（基于Redis）
 const globalRateLimiter = rateLimiter.createLimiter({
   windowMs: 60 * 1000, // 1分钟窗口
   max: 100, // 最多100个请求
@@ -184,13 +181,13 @@ const globalRateLimiter = rateLimiter.createLimiter({
 })
 app.use('/api/', globalRateLimiter)
 
-// 🔧 后备限流器（当Redis不可用时） - 1000次/15分钟
+//  后备限流器（当Redis不可用时） - 1000次/15分钟
 const fallbackLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15分钟
   max: 1000, // 限制每个IP 15分钟内最多1000个请求
   // 使用 handler 输出统一 ApiResponse 格式（禁止直接返回非标准 message 对象）
   handler: (req, res, _next, options) => {
-    // 🔴 可观测性：记录后备限流触发（Redis退化）
+    //  可观测性：记录后备限流触发（Redis退化）
     appLogger.warn('[RateLimiter] 后备限流触发（Redis不可用）', {
       limiter_type: 'fallback',
       redis_status: 'disconnected',
@@ -210,7 +207,7 @@ const fallbackLimiter = rateLimit({
   legacyHeaders: false,
   skip: req => {
     const redisConnected = rateLimiter.redisClient.isConnected
-    // 🔴 可观测性：记录限流链路切换
+    //  可观测性：记录限流链路切换
     if (!redisConnected) {
       appLogger.warn('[RateLimiter] Redis不可用，启用后备限流', {
         limiter_type: 'fallback',
@@ -229,7 +226,7 @@ const fallbackLimiter = rateLimit({
 })
 app.use('/api/', fallbackLimiter)
 
-// 🔧 请求日志中间件
+//  请求日志中间件
 app.use((req, res, next) => {
   appLogger.debug('API请求', {
     method: req.method,
@@ -240,12 +237,12 @@ app.use((req, res, next) => {
   next()
 })
 
-// 🔧 维护模式拦截中间件 — 管理员开启维护模式后，用户端 API 返回 503
+//  维护模式拦截中间件 — 管理员开启维护模式后，用户端 API 返回 503
 const { createMaintenanceMiddleware } = require('./middleware/maintenanceMode')
 app.use(createMaintenanceMiddleware())
 
 /*
- * 🔧 全局API超时保护中间件（30秒）
+ *  全局API超时保护中间件（30秒）
  * 功能：防止长时间无响应的请求占用连接资源
  * 创建时间：2025年01月21日
  */
@@ -280,7 +277,7 @@ app.use('/api/', (req, res, next) => {
   next()
 })
 
-// 📊 健康检查端点
+//  健康检查端点
 app.get('/health', async (req, res) => {
   try {
     // 检查数据库连接
@@ -313,12 +310,12 @@ app.get('/health', async (req, res) => {
     const healthCode = overallStatus === 'healthy' ? 'SYSTEM_HEALTHY' : 'SYSTEM_DEGRADED'
 
     const healthData = {
-      success: true, // ✅ 业务标准格式
-      code: healthCode, // ✅ 业务代码（根据整体状态）
+      success: true, //  业务标准格式
+      code: healthCode, //  业务代码（根据整体状态）
       message:
         overallStatus === 'healthy'
           ? 'V4 Unified Lottery Engine 系统运行正常'
-          : 'V4 Unified Lottery Engine 系统降级运行', // ✅ 用户友好消息
+          : 'V4 Unified Lottery Engine 系统降级运行', //  用户友好消息
       data: {
         status: overallStatus,
         version: '4.0.0',
@@ -334,30 +331,30 @@ app.get('/health', async (req, res) => {
         },
         uptime: Math.floor(process.uptime()) + 's'
       },
-      timestamp: BeijingTimeHelper.apiTimestamp(), // ✅ 顶层 timestamp（监控标准）
-      version: 'v4.0', // ✅ API版本信息
-      request_id: getRequestId(req) // ✅ 请求追踪ID
+      timestamp: BeijingTimeHelper.apiTimestamp(), //  顶层 timestamp（监控标准）
+      version: 'v4.0', //  API版本信息
+      request_id: getRequestId(req) //  请求追踪ID
     }
 
     res.json(healthData)
   } catch (error) {
     appLogger.error('健康检查失败', { error: error.message, stack: error.stack })
     res.status(500).json({
-      success: false, // ✅ 业务标准格式
-      code: 'SYSTEM_UNHEALTHY', // ✅ 业务错误代码
-      message: '系统健康检查失败', // ✅ 用户友好错误消息
+      success: false, //  业务标准格式
+      code: 'SYSTEM_UNHEALTHY', //  业务错误代码
+      message: '系统健康检查失败', //  用户友好错误消息
       data: {
         status: 'unhealthy',
         error: error.message
       },
-      timestamp: BeijingTimeHelper.apiTimestamp(), // ✅ 顶层 timestamp
-      version: 'v4.0', // ✅ API版本信息
-      request_id: getRequestId(req) // ✅ 请求追踪ID
+      timestamp: BeijingTimeHelper.apiTimestamp(), //  顶层 timestamp
+      version: 'v4.0', //  API版本信息
+      request_id: getRequestId(req) //  请求追踪ID
     })
   }
 })
 
-// 📊 V4统一引擎信息端点
+//  V4统一引擎信息端点
 app.get('/api/v4', (req, res) => {
   return res.apiSuccess(
     {
@@ -398,7 +395,7 @@ app.get('/api/v4', (req, res) => {
   )
 })
 
-// 📚 V4统一引擎API文档端点
+//  V4统一引擎API文档端点
 app.get('/api/v4/docs', (req, res) => {
   return res.apiSuccess(
     {
@@ -467,7 +464,7 @@ app.get('/api/v4/docs', (req, res) => {
 })
 
 /*
- * 🛣️ 基础路由配置
+ *  基础路由配置
  * 根路径
  */
 app.get('/', (req, res) => {
@@ -514,7 +511,7 @@ app.get('/api', (req, res) => {
 
 /*
  * ========================================
- * 🌐 Web管理后台静态文件托管
+ *  Web管理后台静态文件托管
  * ========================================
  */
 
@@ -526,8 +523,8 @@ app.get('/api', (req, res) => {
  * - /admin/assets/main.js → admin/dist/assets/main.js
  * - /admin/assets/main.css → admin/dist/assets/main.css
  *
- * ⚠️ 必须在API路由注册之前配置，避免路由冲突
- * 📝 已从 public/admin 迁移到 admin/dist（Vite 构建输出）
+ *  必须在API路由注册之前配置，避免路由冲突
+ *  已从 public/admin 迁移到 admin/dist（Vite 构建输出）
  */
 app.use(
   '/admin',
@@ -554,7 +551,7 @@ app.get('/admin', (req, res) => {
   res.redirect(301, '/admin/login.html')
 })
 
-appLogger.info('✅ Web管理后台静态文件托管已配置', {
+appLogger.info(' Web管理后台静态文件托管已配置', {
   mount: '/admin',
   directory: 'admin/dist',
   cache: '1h'
@@ -563,10 +560,10 @@ appLogger.info('✅ Web管理后台静态文件托管已配置', {
 
 /*
  * ========================================
- * 🔗 V4 API路由注册（标准化域结构）
+ *  V4 API路由注册（标准化域结构）
  * ========================================
  *
- * 📌 API顶层域规范（共8个标准域）：
+ *  API顶层域规范（共8个标准域）：
  * - /market    交易市场
  * - /shop      积分商城（积分、兑换、消费、会员）
  * - /lottery   抽奖系统
@@ -576,7 +573,7 @@ appLogger.info('✅ Web管理后台静态文件托管已配置', {
  * - /auth      认证授权
  * - /system    系统功能
  *
- * 📌 目录结构规范：
+ *  目录结构规范：
  * - routes/v4/{domain}/ 目录名与顶层域一致
  * - 每个域有独立的index.js聚合子路由
  */
@@ -587,20 +584,19 @@ try {
    * ========================================
    */
   app.use('/api/v4/auth', require('./routes/v4/auth'))
-  appLogger.info('✅ auth域加载成功', { route: '/api/v4/auth' })
+  appLogger.info(' auth域加载成功', { route: '/api/v4/auth' })
 
   /*
    * ========================================
    * 1.1 /permissions - 权限管理域（2026-01-08 从 auth 域拆分）
    * ========================================
-   * 📌 拆分原因：解决 POST /api/v4/auth/refresh 路由冲突
+   *  拆分原因：解决 POST /api/v4/auth/refresh 路由冲突
    * - token.js 的 Token 刷新 和 permissions.js 的权限缓存失效 都注册了 /refresh
    * - Express 路由匹配规则：先注册先匹配，导致权限缓存失效接口不可达
-   * 📌 新路径：POST /api/v4/permissions/cache/invalidate
-   * 📌 详见文档：docs/路由冲突修复方案-POST-auth-refresh-2026-01-08.md
+   * 新路径：POST /api/v4/permissions/cache/invalidate
    */
   app.use('/api/v4/permissions', require('./routes/v4/auth/permissions'))
-  appLogger.info('✅ permissions域加载成功', { route: '/api/v4/permissions' })
+  appLogger.info(' permissions域加载成功', { route: '/api/v4/permissions' })
 
   /*
    * ========================================
@@ -608,7 +604,7 @@ try {
    * ========================================
    */
   app.use('/api/v4/console', require('./routes/v4/console'))
-  appLogger.info('✅ console域加载成功', { route: '/api/v4/console' })
+  appLogger.info(' console域加载成功', { route: '/api/v4/console' })
 
   /*
    * ========================================
@@ -616,7 +612,7 @@ try {
    * ========================================
    */
   app.use('/api/v4/lottery', require('./routes/v4/lottery'))
-  appLogger.info('✅ lottery域加载成功', { route: '/api/v4/lottery' })
+  appLogger.info(' lottery域加载成功', { route: '/api/v4/lottery' })
 
   /*
    * ========================================
@@ -624,7 +620,7 @@ try {
    * ========================================
    */
   app.use('/api/v4/market', require('./routes/v4/market'))
-  appLogger.info('✅ market域加载成功', { route: '/api/v4/market' })
+  appLogger.info(' market域加载成功', { route: '/api/v4/market' })
 
   /*
    * ========================================
@@ -632,7 +628,7 @@ try {
    * ========================================
    */
   app.use('/api/v4/shop', require('./routes/v4/shop'))
-  appLogger.info('✅ shop域加载成功', { route: '/api/v4/shop' })
+  appLogger.info(' shop域加载成功', { route: '/api/v4/shop' })
 
   /*
    * ========================================
@@ -640,7 +636,7 @@ try {
    * ========================================
    */
   app.use('/api/v4/system', require('./routes/v4/system'))
-  appLogger.info('✅ system域加载成功', { route: '/api/v4/system' })
+  appLogger.info(' system域加载成功', { route: '/api/v4/system' })
 
   /*
    * ========================================
@@ -648,7 +644,7 @@ try {
    * ========================================
    */
   app.use('/api/v4/user', require('./routes/v4/user'))
-  appLogger.info('✅ user域加载成功', { route: '/api/v4/user' })
+  appLogger.info(' user域加载成功', { route: '/api/v4/user' })
 
   /*
    * ========================================
@@ -660,7 +656,7 @@ try {
    * ========================================
    */
   app.use('/api/v4/assets', require('./routes/v4/assets'))
-  appLogger.info('✅ assets域加载成功', { route: '/api/v4/assets' })
+  appLogger.info(' assets域加载成功', { route: '/api/v4/assets' })
 
   /*
    * ========================================
@@ -668,7 +664,7 @@ try {
    * ========================================
    */
   app.use('/api/v4/backpack', require('./routes/v4/backpack'))
-  appLogger.info('✅ backpack域加载成功', { route: '/api/v4/backpack' })
+  appLogger.info(' backpack域加载成功', { route: '/api/v4/backpack' })
 
   /*
    * ========================================
@@ -676,32 +672,31 @@ try {
    * ========================================
    */
   app.use('/api/v4/merchant-points', require('./routes/v4/merchant-points'))
-  appLogger.info('✅ merchant-points域加载成功', { route: '/api/v4/merchant-points' })
+  appLogger.info(' merchant-points域加载成功', { route: '/api/v4/merchant-points' })
 
   /*
    * ========================================
    * 12. /activities - 活动条件域（2026-01-08 活动条件API）
    * ========================================
    * 功能：活动列表查询、参与条件验证、条件配置（管理员）
-   * 详见：docs/web管理平台前端功能完善方案-2026-01-08.md
    */
   app.use('/api/v4/activities', require('./routes/v4/activities'))
-  appLogger.info('✅ activities域加载成功', { route: '/api/v4/activities' })
+  appLogger.info(' activities域加载成功', { route: '/api/v4/activities' })
 
   /*
    * ========================================
-   * 🔧 调试控制接口（仅管理员）
+   *  调试控制接口（仅管理员）
    * ========================================
    */
   app.use('/api/v4/debug-control', require('./routes/v4/debug-control'))
-  appLogger.info('✅ debug-control加载成功', { route: '/api/v4/debug-control' })
+  appLogger.info(' debug-control加载成功', { route: '/api/v4/debug-control' })
 
   /*
    * ========================================
-   * 📊 API架构信息汇总
+   *  API架构信息汇总
    * ========================================
    */
-  appLogger.info('🎉 V4 API标准化域结构加载完成', {
+  appLogger.info(' V4 API标准化域结构加载完成', {
     standard_domains: [
       '/auth',
       '/admin',
@@ -718,11 +713,11 @@ try {
     refactored_at: '2025-12-21'
   })
 } catch (error) {
-  appLogger.error('❌ V4 API路由加载失败', { error: error.message, stack: error.stack })
+  appLogger.error(' V4 API路由加载失败', { error: error.message, stack: error.stack })
   process.exit(1)
 }
 
-// 🔧 404处理
+//  404处理
 app.use('*', (req, res) => {
   res.status(404).json({
     success: false,
@@ -742,7 +737,7 @@ app.use('*', (req, res) => {
         // 权限域（2026-01-08 从 auth 域拆分）
         'GET /api/v4/permissions/me', // 获取当前用户权限
         'POST /api/v4/permissions/check', // 检查权限
-        'POST /api/v4/permissions/cache/invalidate', // 权限缓存失效（✅ 新路径）
+        'POST /api/v4/permissions/cache/invalidate', // 权限缓存失效（ 新路径）
         'GET /api/v4/permissions/admins', // 管理员列表
         'GET /api/v4/permissions/statistics', // 权限统计
         'POST /api/v4/permissions/batch-check', // 批量权限检查
@@ -758,14 +753,14 @@ app.use('*', (req, res) => {
         'GET /api/v4/console/system/dashboard'
       ]
     },
-    timestamp: BeijingTimeHelper.apiTimestamp(), // 🕐 北京时间API时间戳
+    timestamp: BeijingTimeHelper.apiTimestamp(), //  北京时间API时间戳
     version: 'v4.0',
     request_id: getRequestId(req)
   })
 })
 
 /**
- * 🔧 全局错误处理
+ *  全局错误处理
  *
  * 架构决策4（2026-01-13）：
  * - BusinessError：使用业务错误码，details 仅日志记录，不返回给客户端
@@ -775,7 +770,7 @@ app.use('*', (req, res) => {
 app.use((error, req, res, _next) => {
   const requestId = getRequestId(req)
 
-  // 🔐 记录完整错误信息到日志（包含 request_id 用于追踪）
+  //  记录完整错误信息到日志（包含 request_id 用于追踪）
   appLogger.error('全局错误处理', {
     error: error.message,
     code: error.code,
@@ -788,7 +783,7 @@ app.use((error, req, res, _next) => {
     details: error.details || null
   })
 
-  // 🎯 BusinessError 处理（架构决策4）
+  //  BusinessError 处理（架构决策4）
   if (error.name === 'BusinessError') {
     const resp = ApiResponse.error(
       error.message,
@@ -833,7 +828,7 @@ app.use((error, req, res, _next) => {
 })
 
 /**
- * 🔴 应用初始化流程（同步阻塞模式）
+ *  应用初始化流程（同步阻塞模式）
  *
  * 初始化顺序：
  * 1. Service层初始化
@@ -845,7 +840,6 @@ app.use((error, req, res, _next) => {
  * - 使用 await 确保预检在服务器启动前完成
  *
  * @returns {Promise<void>} 无返回值，初始化失败时直接退出进程
- * @see docs/配置管理三层分离与校验统一方案.md
  */
 async function initializeApp() {
   // 步骤1：初始化 Service 层
@@ -883,8 +877,8 @@ async function initializeApp() {
   // 步骤2：关键 SystemSettings 启动预检（同步阻塞）
   try {
     const { validateCriticalSettings } = require('./config/system-settings-validator')
-    await validateCriticalSettings() // 🔴 使用 await 确保同步阻塞
-    appLogger.info('✅ SystemSettings 启动预检通过')
+    await validateCriticalSettings() //  使用 await 确保同步阻塞
+    appLogger.info(' SystemSettings 启动预检通过')
   } catch (error) {
     // 预检器内部已经 process.exit(1)，这里仅作日志记录
     appLogger.error('SystemSettings 启动预检失败', { error: error.message })
@@ -899,7 +893,7 @@ async function initializeApp() {
     const enumResult = await validateDbEnumConsistency(sequelize)
 
     if (!enumResult.valid) {
-      appLogger.error('❌ 审计操作类型 ENUM 一致性校验失败', {
+      appLogger.error(' 审计操作类型 ENUM 一致性校验失败', {
         missing: enumResult.missing,
         extra: enumResult.extra,
         solution: '请执行数据库迁移: npx sequelize-cli db:migrate'
@@ -909,9 +903,9 @@ async function initializeApp() {
     }
 
     if (enumResult.skipped) {
-      appLogger.warn('⚠️ 审计操作类型 ENUM 校验跳过（表或列不存在）')
+      appLogger.warn(' 审计操作类型 ENUM 校验跳过（表或列不存在）')
     } else {
-      appLogger.info('✅ 审计操作类型 ENUM 一致性校验通过')
+      appLogger.info(' 审计操作类型 ENUM 一致性校验通过')
     }
   } catch (error) {
     appLogger.warn('审计 ENUM 校验出错（非致命）', { error: error.message })
@@ -925,7 +919,7 @@ async function initializeApp() {
     const targetTypeResult = await validateTargetTypeConsistency(sequelize)
 
     if (!targetTypeResult.valid) {
-      appLogger.error('❌ 审计日志 target_type 一致性校验失败', {
+      appLogger.error(' 审计日志 target_type 一致性校验失败', {
         unknown: targetTypeResult.unknown,
         stats: targetTypeResult.stats,
         solution: '请检查 constants/AuditTargetTypes.js 中的 AUDIT_TARGET_TYPES 定义'
@@ -935,13 +929,13 @@ async function initializeApp() {
        * 仅记录错误，运维人员根据情况处理
        */
     } else if (targetTypeResult.warning) {
-      appLogger.warn('⚠️ target_type 存在可规范化的值，建议执行数据迁移', {
+      appLogger.warn(' target_type 存在可规范化的值，建议执行数据迁移', {
         unknown: targetTypeResult.unknown
       })
     } else if (targetTypeResult.skipped) {
-      appLogger.info('ℹ️ target_type 校验跳过（表为空）')
+      appLogger.info('ℹ target_type 校验跳过（表为空）')
     } else {
-      appLogger.info('✅ 审计日志 target_type 一致性校验通过', {
+      appLogger.info(' 审计日志 target_type 一致性校验通过', {
         total_types: targetTypeResult.stats?.total_types,
         total_records: targetTypeResult.stats?.total_records
       })
@@ -954,7 +948,7 @@ async function initializeApp() {
   try {
     const DisplayNameService = require('./services/DisplayNameService')
     await DisplayNameService.initialize()
-    appLogger.info('✅ DisplayNameService 中文显示名称服务初始化完成')
+    appLogger.info(' DisplayNameService 中文显示名称服务初始化完成')
   } catch (error) {
     appLogger.error('DisplayNameService 初始化失败（非致命）', { error: error.message })
     // 显示名称服务初始化失败不阻断启动，降级为使用内存缓存或直接数据库查询
@@ -962,7 +956,7 @@ async function initializeApp() {
 }
 
 /*
- * 🧪 测试环境自动初始化 ServiceManager
+ *  测试环境自动初始化 ServiceManager
  * 问题：测试通过 require('app') 加载时，initializeApp() 不会被调用
  * 解决：检测测试环境并自动初始化 Service 层
  */
@@ -973,30 +967,30 @@ if (process.env.NODE_ENV === 'test' && !app.locals.services) {
     const services = initializeServices(models)
     app.locals.services = services
     app.locals.models = models
-    appLogger.info('🧪 测试环境 Service 层自动初始化完成', {
+    appLogger.info(' 测试环境 Service 层自动初始化完成', {
       services: Array.from(services.getAllServices().keys())
     })
   } catch (error) {
-    appLogger.error('🧪 测试环境 Service 层初始化失败', { error: error.message })
+    appLogger.error(' 测试环境 Service 层初始化失败', { error: error.message })
   }
 }
 
-// 🚀 启动服务器
+//  启动服务器
 const PORT = process.env.PORT || 3000
 const HOST = process.env.HOST || '0.0.0.0'
 
 if (require.main === module) {
-  // 🔌 使用http.createServer创建服务器实例（支持WebSocket）
+  //  使用http.createServer创建服务器实例（支持WebSocket）
   const http = require('http')
   const server = http.createServer(app)
 
-  // 🔴 先执行初始化（包含预检），再启动服务器监听
+  //  先执行初始化（包含预检），再启动服务器监听
   initializeApp()
     .then(() => {
       server.listen(PORT, HOST, async () => {
-        console.log('🔄 [DEBUG] 服务器启动监听完成')
+        console.log(' [DEBUG] 服务器启动监听完成')
 
-        // 🔌 初始化聊天WebSocket服务
+        //  初始化聊天WebSocket服务
         try {
           const ChatWebSocketService = require('./services/ChatWebSocketService')
           ChatWebSocketService.initialize(server)
@@ -1029,7 +1023,7 @@ if (require.main === module) {
 
         // 初始化内容过期清理定时任务（ENABLE_CONTENT_CRON_JOBS=true 时启用）
         try {
-          require('./jobs/content-cron-jobs')
+          require('./jobs/ad-campaign-expiry-jobs')
           appLogger.info('内容过期清理定时任务模块已加载', {
             enabled: process.env.ENABLE_CONTENT_CRON_JOBS === 'true'
           })
@@ -1037,8 +1031,18 @@ if (require.main === module) {
           appLogger.error('内容过期清理定时任务加载失败', { error: error.message })
         }
 
+        // 初始化管理员通知清理定时任务（ENABLE_NOTIFICATION_CLEANUP=true 时启用）
+        try {
+          require('./jobs/daily-notification-cleanup')
+          appLogger.info('管理员通知清理定时任务模块已加载', {
+            enabled: process.env.ENABLE_NOTIFICATION_CLEANUP === 'true'
+          })
+        } catch (error) {
+          appLogger.error('管理员通知清理定时任务加载失败', { error: error.message })
+        }
+
         /*
-         * 🔴 连接池持续监控（2025-12-30 方案A已拍板）
+         *  连接池持续监控（2025-12-30 方案A已拍板）
          * 功能：每60s打点到应用日志，建立连接池可观测性
          * 环境：生产环境已确认允许（噪音可接受）
          * 告警条件：waiting > 5（严重）、usage_rate > 80%（警告）
@@ -1085,7 +1089,7 @@ if (require.main === module) {
             }
           }, 60000) // 每分钟
 
-          appLogger.info('✅ 连接池监控已启动', {
+          appLogger.info(' 连接池监控已启动', {
             interval: '60s',
             alert_thresholds: { waiting: 5, usage_rate: '80%' },
             log_level: 'info',
@@ -1108,14 +1112,14 @@ if (require.main === module) {
           }
         })
 
-        // ✅ V4架构已完全启用，无需传统定时任务服务
+        //  V4架构已完全启用，无需传统定时任务服务
         appLogger.info('V4统一决策引擎架构完全就绪', {
           architecture: '现代化微服务架构',
           websocket: '实时通信已启用'
         })
 
         /*
-         * 🔌 优雅关闭处理（2025年11月08日新增）
+         *  优雅关闭处理（2025年11月08日新增）
          * 功能：服务关闭时记录WebSocket停止事件到数据库
          * 用途：服务维护、部署更新、异常追踪、SLA统计
          */

@@ -34,7 +34,7 @@ const ExperienceStateManager = require('./state/ExperienceStateManager')
 const GlobalStateManager = require('./state/GlobalStateManager')
 
 // ========== 配置模块 ==========
-const StrategyConfig = require('./config/StrategyConfig')
+const ComputeConfig = require('./config/ComputeConfig')
 
 // ========== 从 LotteryComputeEngine 提取常量 ==========
 const { BUDGET_TIERS, PRESSURE_TIERS, TIER_MATRIX_CONFIG } = LotteryComputeEngine
@@ -219,9 +219,9 @@ module.exports = {
    *
    * 包含静态配置常量和动态配置加载器
    *
-   * @see StrategyConfig
+   * @see ComputeConfig
    */
-  StrategyConfig,
+  ComputeConfig,
 
   /**
    * 动态配置加载器
@@ -230,7 +230,7 @@ module.exports = {
    *
    * @see DynamicConfigLoader
    */
-  DynamicConfigLoader: StrategyConfig.DynamicConfigLoader,
+  DynamicConfigLoader: ComputeConfig.DynamicConfigLoader,
 
   /* ======================================== */
   /* 配置常量快捷访问                         */
@@ -239,32 +239,32 @@ module.exports = {
   /**
    * Budget Tier 阈值配置
    */
-  BUDGET_TIER_CONFIG: StrategyConfig.BUDGET_TIER_CONFIG,
+  BUDGET_TIER_CONFIG: ComputeConfig.BUDGET_TIER_CONFIG,
 
   /**
    * Pressure Tier 阈值配置
    */
-  PRESSURE_TIER_CONFIG: StrategyConfig.PRESSURE_TIER_CONFIG,
+  PRESSURE_TIER_CONFIG: ComputeConfig.PRESSURE_TIER_CONFIG,
 
   /**
    * Pity 系统配置
    */
-  PITY_CONFIG: StrategyConfig.PITY_CONFIG,
+  PITY_CONFIG: ComputeConfig.PITY_CONFIG,
 
   /**
    * Luck Debt 运气债务配置
    */
-  LUCK_DEBT_CONFIG: StrategyConfig.LUCK_DEBT_CONFIG,
+  LUCK_DEBT_CONFIG: ComputeConfig.LUCK_DEBT_CONFIG,
 
   /**
    * Anti-Empty 防连续空奖配置
    */
-  ANTI_EMPTY_CONFIG: StrategyConfig.ANTI_EMPTY_CONFIG,
+  ANTI_EMPTY_CONFIG: ComputeConfig.ANTI_EMPTY_CONFIG,
 
   /**
    * Anti-High 防连续高价值配置
    */
-  ANTI_HIGH_CONFIG: StrategyConfig.ANTI_HIGH_CONFIG,
+  ANTI_HIGH_CONFIG: ComputeConfig.ANTI_HIGH_CONFIG,
 
   /* ======================================== */
   /* Phase P2：灰度发布相关                   */
@@ -273,7 +273,7 @@ module.exports = {
   /**
    * 灰度发布配置
    */
-  GRAYSCALE_CONFIG: StrategyConfig.GRAYSCALE_CONFIG,
+  GRAYSCALE_CONFIG: ComputeConfig.GRAYSCALE_CONFIG,
 
   /**
    * 判断功能是否对特定上下文启用（带灰度控制，async — 改造后从 DB 按活动读取灰度百分比）
@@ -282,14 +282,14 @@ module.exports = {
    * @param {Object} context - 上下文信息
    * @returns {Promise<Object>} 启用状态详情
    */
-  isFeatureEnabledForContext: StrategyConfig.isFeatureEnabledForContext,
+  isFeatureEnabledForContext: ComputeConfig.isFeatureEnabledForContext,
 
   /**
    * 获取灰度配置摘要
    *
    * @returns {Object} 灰度配置摘要
    */
-  getGrayscaleSummary: StrategyConfig.getGrayscaleSummary,
+  getGrayscaleSummary: ComputeConfig.getGrayscaleSummary,
 
   /**
    * 判断功能是否全局启用（无灰度）
@@ -297,5 +297,5 @@ module.exports = {
    * @param {string} feature - 特性名称
    * @returns {boolean} 是否启用
    */
-  isFeatureEnabled: StrategyConfig.isFeatureEnabled
+  isFeatureEnabled: ComputeConfig.isFeatureEnabled
 }

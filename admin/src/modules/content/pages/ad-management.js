@@ -12,12 +12,14 @@ import { buildURL, request } from '../../../api/base.js'
 import { SYSTEM_ENDPOINTS } from '../../../api/system/index.js'
 import { Alpine, createPageMixin } from '../../../alpine/index.js'
 import { loadECharts } from '../../../utils/echarts-lazy.js'
+import { useAdPricingState } from '../composables/ad-pricing.js'
 
 document.addEventListener('alpine:init', () => {
   logger.info('[AdManagement] 注册 Alpine 组件...')
 
   Alpine.data('adManagement', () => ({
     ...createPageMixin(),
+    ...useAdPricingState(),
 
     // ==================== 子页面导航 ====================
     current_page: 'dashboard',
@@ -31,7 +33,9 @@ document.addEventListener('alpine:init', () => {
       { id: 'bid-logs', name: '竞价日志', icon: '🏷️' },
       { id: 'user-tags', name: '用户标签', icon: '🏷️' },
       { id: 'antifraud', name: '反作弊', icon: '🛡️' },
-      { id: 'attribution', name: '归因追踪', icon: '🔗' }
+      { id: 'attribution', name: '归因追踪', icon: '🔗' },
+      { id: 'pricing', name: '定价配置', icon: '💰' },
+      { id: 'adjustments', name: '调价历史', icon: '📝' }
     ],
 
     /** 当前选中的 category 筛选（system/operational/commercial）*/
@@ -64,13 +68,20 @@ document.addEventListener('alpine:init', () => {
     BILLING_MAP: {
       fixed_daily: '固定包天',
       bidding: '竞价排名',
-      free: '免费（运营/系统）'
+      free: '免费（运营/系统）',
+      cpm: 'CPM曝光计费'
     },
     /** 广告位类型 → 中文 */
     SLOT_TYPE_MAP: {
       popup: '弹窗',
       carousel: '轮播图',
-      announcement: '系统公告'
+      announcement: '系统公告',
+      feed: '信息流'
+    },
+    /** 广告位大类 → 中文 */
+    SLOT_CATEGORY_MAP: {
+      display: '展示广告',
+      feed: '信息流广告'
     },
     /** 计划分类 → 中文 */
     CATEGORY_MAP: {
@@ -243,11 +254,15 @@ document.addEventListener('alpine:init', () => {
       slot_key: '',
       slot_name: '',
       slot_type: 'popup',
+      slot_category: 'display',
       position: 'home',
       max_display_count: 3,
       daily_price_diamond: 100,
       min_bid_diamond: 50,
       min_budget_diamond: 500,
+      min_daily_price_diamond: 0,
+      cpm_price_diamond: 0,
+      zone_id: null,
       description: ''
     },
 
@@ -277,6 +292,31 @@ document.addEventListener('alpine:init', () => {
     attributionFilters: { ad_campaign_id: '', conversion_type: '' },
     attributionPagination: { total: 0, total_pages: 0 },
     attributionPage: 1,
+
+    /** 调价历史列表 */
+    price_adjustments: [],
+    price_adjustments_loading: false,
+    price_adjustments_pagination: { total: 0, total_pages: 0 },
+    price_adjustments_page: 1,
+    price_adjustments_filter: { status: '', trigger_type: '' },
+
+    /** 调价状态映射 */
+    ADJUSTMENT_STATUS_MAP: {
+      pending: '待确认',
+      confirmed: '已确认',
+      rejected: '已拒绝',
+      applied: '已执行'
+    },
+    ADJUSTMENT_STATUS_COLOR: {
+      pending: 'bg-yellow-500',
+      confirmed: 'bg-blue-500',
+      rejected: 'bg-red-500',
+      applied: 'bg-green-500'
+    },
+    TRIGGER_TYPE_MAP: {
+      dau_shift: 'DAU变化自动触发',
+      manual: '运营手动触发'
+    },
 
     /** 单活动/广告位详细报表 */
     campaignReport: null,
@@ -358,6 +398,13 @@ document.addEventListener('alpine:init', () => {
           break
         case 'attribution':
           await this.loadAttributionLogs()
+          break
+        case 'pricing':
+          await this.loadPricingConfig()
+          await this.loadDauStats(this.dau_chart_days || 30)
+          break
+        case 'adjustments':
+          await this.loadPriceAdjustments()
           break
       }
     },
@@ -714,11 +761,15 @@ document.addEventListener('alpine:init', () => {
         slot_key: '',
         slot_name: '',
         slot_type: 'popup',
+        slot_category: 'display',
         position: 'home',
         max_display_count: 3,
         daily_price_diamond: 100,
         min_bid_diamond: 50,
         min_budget_diamond: 500,
+        min_daily_price_diamond: 0,
+        cpm_price_diamond: 0,
+        zone_id: null,
         description: ''
       }
       this.showModal('slotModal')
@@ -731,11 +782,15 @@ document.addEventListener('alpine:init', () => {
         slot_key: slot.slot_key,
         slot_name: slot.slot_name,
         slot_type: slot.slot_type,
+        slot_category: slot.slot_category || 'display',
         position: slot.position,
         max_display_count: slot.max_display_count,
         daily_price_diamond: slot.daily_price_diamond,
         min_bid_diamond: slot.min_bid_diamond,
         min_budget_diamond: slot.min_budget_diamond || 500,
+        min_daily_price_diamond: slot.min_daily_price_diamond || 0,
+        cpm_price_diamond: slot.cpm_price_diamond || 0,
+        zone_id: slot.zone_id || null,
         description: slot.description || ''
       }
       this.showModal('slotModal')
@@ -969,6 +1024,85 @@ document.addEventListener('alpine:init', () => {
         this.attributionLogs = []
       } finally {
         this.attributionLogsLoading = false
+      }
+    },
+
+    // ==================== 调价历史管理 ====================
+    async loadPriceAdjustments() {
+      this.price_adjustments_loading = true
+      try {
+        const params = {
+          page: this.price_adjustments_page,
+          page_size: 20
+        }
+        if (this.price_adjustments_filter.status) {
+          params.status = this.price_adjustments_filter.status
+        }
+        if (this.price_adjustments_filter.trigger_type) {
+          params.trigger_type = this.price_adjustments_filter.trigger_type
+        }
+
+        const response = await request({
+          url: SYSTEM_ENDPOINTS.AD_PRICE_ADJUSTMENT_LIST + '?' + new URLSearchParams(params).toString(),
+          method: 'GET'
+        })
+        if (response?.success) {
+          this.price_adjustments = response.data?.rows || []
+          this.price_adjustments_pagination = {
+            total: response.data?.count || 0,
+            total_pages: Math.ceil((response.data?.count || 0) / 20)
+          }
+        }
+      } catch (error) {
+        logger.error('加载调价历史失败:', error)
+        this.price_adjustments = []
+      } finally {
+        this.price_adjustments_loading = false
+      }
+    },
+
+    async confirmAdjustment(adjustmentId) {
+      if (!confirm('确认执行此调价建议？')) return
+      try {
+        const url = SYSTEM_ENDPOINTS.AD_PRICE_ADJUSTMENT_CONFIRM.replace(':id', adjustmentId)
+        const response = await request({ url, method: 'POST' })
+        if (response?.success) {
+          Alpine.store('notification').show('调价建议已确认', 'success')
+          await this.loadPriceAdjustments()
+        }
+      } catch (error) {
+        logger.error('确认调价失败:', error)
+        Alpine.store('notification').show('确认调价失败: ' + error.message, 'error')
+      }
+    },
+
+    async rejectAdjustment(adjustmentId) {
+      if (!confirm('确认拒绝此调价建议？')) return
+      try {
+        const url = SYSTEM_ENDPOINTS.AD_PRICE_ADJUSTMENT_REJECT.replace(':id', adjustmentId)
+        const response = await request({ url, method: 'POST' })
+        if (response?.success) {
+          Alpine.store('notification').show('调价建议已拒绝', 'success')
+          await this.loadPriceAdjustments()
+        }
+      } catch (error) {
+        logger.error('拒绝调价失败:', error)
+        Alpine.store('notification').show('拒绝调价失败: ' + error.message, 'error')
+      }
+    },
+
+    async applyAdjustment(adjustmentId) {
+      if (!confirm('确认执行此调价？执行后将更新系统定价配置。')) return
+      try {
+        const url = SYSTEM_ENDPOINTS.AD_PRICE_ADJUSTMENT_APPLY.replace(':id', adjustmentId)
+        const response = await request({ url, method: 'POST' })
+        if (response?.success) {
+          Alpine.store('notification').show('调价已执行', 'success')
+          await this.loadPriceAdjustments()
+        }
+      } catch (error) {
+        logger.error('执行调价失败:', error)
+        Alpine.store('notification').show('执行调价失败: ' + error.message, 'error')
       }
     },
 

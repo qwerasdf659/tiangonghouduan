@@ -312,14 +312,14 @@ function reminderRulesPage() {
           : REMINDER_ENDPOINTS.CREATE
         const method = this.editMode ? 'PUT' : 'POST'
 
-        const priorityMap = { 80: 'high', 50: 'medium', 20: 'low' }
+        const priorityMap = { 80: 'urgent', 60: 'high', 40: 'normal', 20: 'low' }
         const payload = {
           name: this.form.rule_name,
           rule_type: this.form.rule_type,
           description: this.form.description,
           trigger_conditions: this.form.conditions || {},
           action_config: this.form.actions || {},
-          notification_priority: priorityMap[this.form.priority] || 'medium',
+          notification_priority: priorityMap[this.form.priority] || 'normal',
           check_interval: this.form.check_interval,
           is_enabled: this.form.is_enabled
         }

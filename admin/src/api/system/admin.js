@@ -14,12 +14,15 @@ import { API_PREFIX, request, buildURL, buildQueryString } from '../base.js'
 export const SYSTEM_ADMIN_ENDPOINTS = {
   // [已合并] 公告管理 → ad-campaigns?category=system
 
-  // 系统通知
+  // 系统通知（数据源：admin_notifications 表）
   NOTIFICATION_LIST: `${API_PREFIX}/system/notifications`,
+  NOTIFICATION_DETAIL: `${API_PREFIX}/system/notifications/:id`,
   NOTIFICATION_READ: `${API_PREFIX}/system/notifications/:id/read`,
   NOTIFICATION_READ_ALL: `${API_PREFIX}/system/notifications/read-all`,
   NOTIFICATION_CLEAR: `${API_PREFIX}/system/notifications/clear`,
   NOTIFICATION_SEND: `${API_PREFIX}/system/notifications/send`,
+  NOTIFICATION_DELETE: `${API_PREFIX}/system/notifications/:id`,
+  NOTIFICATION_UNREAD_COUNT: `${API_PREFIX}/system/notifications/unread-count`,
   CONSOLE_NOTIFICATIONS: `${API_PREFIX}/console/system/notifications`,
 
   // 广告活动管理（统一内容投放管理，支持 commercial/operational/system 三种类型）
@@ -45,6 +48,40 @@ export const SYSTEM_ADMIN_ENDPOINTS = {
   AD_SLOT_UPDATE: `${API_PREFIX}/console/ad-slots/:id`,
   AD_SLOT_TOGGLE: `${API_PREFIX}/console/ad-slots/:id/toggle`,
   AD_SLOT_STATS: `${API_PREFIX}/console/ad-slots/statistics`,
+
+  // 广告定价配置（DAU系数/折扣/底价）
+  AD_PRICING_CONFIG: `${API_PREFIX}/console/ad-pricing/config`,
+  AD_PRICING_CONFIG_UPDATE: `${API_PREFIX}/console/ad-pricing/config/:config_key`,
+  AD_PRICING_DAU_STATS: `${API_PREFIX}/console/ad-pricing/dau-stats`,
+  AD_PRICING_PREVIEW: `${API_PREFIX}/console/ad-pricing/preview`,
+  AD_PRICING_COEFFICIENT: `${API_PREFIX}/console/ad-pricing/current-coefficient`,
+
+  // 地域定向管理（商圈/区域/联合广告组 CRUD）
+  AD_ZONE_LIST: `${API_PREFIX}/console/zone-management/zones`,
+  AD_ZONE_CREATE: `${API_PREFIX}/console/zone-management/zones`,
+  AD_ZONE_DETAIL: `${API_PREFIX}/console/zone-management/zones/:id`,
+  AD_ZONE_UPDATE: `${API_PREFIX}/console/zone-management/zones/:id`,
+  AD_ZONE_DELETE: `${API_PREFIX}/console/zone-management/zones/:id`,
+
+  // 联合广告组管理
+  AD_ZONE_GROUP_LIST: `${API_PREFIX}/console/zone-management/groups`,
+  AD_ZONE_GROUP_CREATE: `${API_PREFIX}/console/zone-management/groups`,
+  AD_ZONE_GROUP_DETAIL: `${API_PREFIX}/console/zone-management/groups/:id`,
+  AD_ZONE_GROUP_UPDATE: `${API_PREFIX}/console/zone-management/groups/:id`,
+  AD_ZONE_GROUP_DELETE: `${API_PREFIX}/console/zone-management/groups/:id`,
+  AD_ZONE_GROUP_ADD_MEMBERS: `${API_PREFIX}/console/zone-management/groups/:id/members`,
+  AD_ZONE_GROUP_REMOVE_MEMBERS: `${API_PREFIX}/console/zone-management/groups/:id/members`,
+
+  // 调价历史管理（调价建议列表 + 确认/拒绝/执行）
+  AD_PRICE_ADJUSTMENT_LIST: `${API_PREFIX}/console/ad-pricing/adjustments`,
+  AD_PRICE_ADJUSTMENT_CONFIRM: `${API_PREFIX}/console/ad-pricing/adjustments/:id/confirm`,
+  AD_PRICE_ADJUSTMENT_REJECT: `${API_PREFIX}/console/ad-pricing/adjustments/:id/reject`,
+  AD_PRICE_ADJUSTMENT_APPLY: `${API_PREFIX}/console/ad-pricing/adjustments/:id/apply`,
+
+  // 平台钻石管理
+  PLATFORM_DIAMOND_BALANCE: `${API_PREFIX}/console/platform-diamond/balance`,
+  PLATFORM_DIAMOND_BURN: `${API_PREFIX}/console/platform-diamond/burn`,
+  PLATFORM_DIAMOND_BURN_HISTORY: `${API_PREFIX}/console/platform-diamond/burn-history`,
 
   // 统一内容投放获取（系统端只读接口，替代原 popup-banners/carousel-items/announcements）
   AD_DELIVERY: `${API_PREFIX}/system/ad-delivery`,
@@ -144,6 +181,16 @@ export const SystemAdminAPI = {
   },
 
   /**
+   * 获取通知详情
+   * @param {number} id - 通知 admin_notification_id
+   * @returns {Promise<Object>} 通知详情响应
+   */
+  async getNotificationDetail(id) {
+    const url = buildURL(SYSTEM_ADMIN_ENDPOINTS.NOTIFICATION_DETAIL, { id })
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
    * 标记单条通知已读
    * @param {number} id - 通知 ID
    * @returns {Promise<Object>} 操作结果响应
@@ -168,6 +215,200 @@ export const SystemAdminAPI = {
    */
   async sendNotification(data) {
     return await request({ url: SYSTEM_ADMIN_ENDPOINTS.NOTIFICATION_SEND, method: 'POST', data })
+  },
+
+  /**
+   * 获取未读通知数量
+   * @returns {Promise<Object>} { unread_count, urgent_unread_count }
+   */
+  async getNotificationUnreadCount() {
+    return await request({ url: SYSTEM_ADMIN_ENDPOINTS.NOTIFICATION_UNREAD_COUNT, method: 'GET' })
+  },
+
+  /**
+   * 删除单条通知（物理删除）
+   * @param {number} id - 通知 admin_notification_id
+   * @returns {Promise<Object>} 删除结果响应
+   */
+  async deleteNotification(id) {
+    const url = buildURL(SYSTEM_ADMIN_ENDPOINTS.NOTIFICATION_DELETE, { id })
+    return await request({ url, method: 'DELETE' })
+  },
+
+  /**
+   * 清空已读通知
+   * @returns {Promise<Object>} 清空结果响应
+   */
+  async clearNotifications() {
+    return await request({ url: SYSTEM_ADMIN_ENDPOINTS.NOTIFICATION_CLEAR, method: 'POST' })
+  },
+
+  // ===== 地域定向管理 =====
+
+  /**
+   * 获取地域列表
+   * @param {Object} [params={}] - 查询参数（zone_type, status, keyword, page, page_size）
+   * @returns {Promise<Object>} 地域列表响应
+   */
+  async getZoneList(params = {}) {
+    const url = SYSTEM_ADMIN_ENDPOINTS.AD_ZONE_LIST + buildQueryString(params)
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 获取地域详情
+   * @param {number} id - 地域ID
+   * @returns {Promise<Object>} 地域详情响应
+   */
+  async getZoneDetail(id) {
+    const url = buildURL(SYSTEM_ADMIN_ENDPOINTS.AD_ZONE_DETAIL, { id })
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 创建地域
+   * @param {Object} data - 地域数据（zone_type, zone_name, priority, parent_zone_id, geo_scope）
+   * @returns {Promise<Object>} 创建结果
+   */
+  async createZone(data) {
+    return await request({ url: SYSTEM_ADMIN_ENDPOINTS.AD_ZONE_CREATE, method: 'POST', data })
+  },
+
+  /**
+   * 更新地域
+   * @param {number} id - 地域ID
+   * @param {Object} data - 更新数据
+   * @returns {Promise<Object>} 更新结果
+   */
+  async updateZone(id, data) {
+    const url = buildURL(SYSTEM_ADMIN_ENDPOINTS.AD_ZONE_UPDATE, { id })
+    return await request({ url, method: 'PUT', data })
+  },
+
+  /**
+   * 删除地域
+   * @param {number} id - 地域ID
+   * @returns {Promise<Object>} 删除结果
+   */
+  async deleteZone(id) {
+    const url = buildURL(SYSTEM_ADMIN_ENDPOINTS.AD_ZONE_DELETE, { id })
+    return await request({ url, method: 'DELETE' })
+  },
+
+  // ===== 联合广告组管理 =====
+
+  /**
+   * 获取联合组列表
+   * @param {Object} [params={}] - 查询参数
+   * @returns {Promise<Object>} 联合组列表
+   */
+  async getZoneGroupList(params = {}) {
+    const url = SYSTEM_ADMIN_ENDPOINTS.AD_ZONE_GROUP_LIST + buildQueryString(params)
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 获取联合组详情
+   * @param {number} id - 联合组ID
+   * @returns {Promise<Object>} 联合组详情
+   */
+  async getZoneGroupDetail(id) {
+    const url = buildURL(SYSTEM_ADMIN_ENDPOINTS.AD_ZONE_GROUP_DETAIL, { id })
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 创建联合组
+   * @param {Object} data - 联合组数据
+   * @returns {Promise<Object>} 创建结果
+   */
+  async createZoneGroup(data) {
+    return await request({ url: SYSTEM_ADMIN_ENDPOINTS.AD_ZONE_GROUP_CREATE, method: 'POST', data })
+  },
+
+  /**
+   * 更新联合组
+   * @param {number} id - 联合组ID
+   * @param {Object} data - 更新数据
+   * @returns {Promise<Object>} 更新结果
+   */
+  async updateZoneGroup(id, data) {
+    const url = buildURL(SYSTEM_ADMIN_ENDPOINTS.AD_ZONE_GROUP_UPDATE, { id })
+    return await request({ url, method: 'PUT', data })
+  },
+
+  /**
+   * 删除联合组
+   * @param {number} id - 联合组ID
+   * @returns {Promise<Object>} 删除结果
+   */
+  async deleteZoneGroup(id) {
+    const url = buildURL(SYSTEM_ADMIN_ENDPOINTS.AD_ZONE_GROUP_DELETE, { id })
+    return await request({ url, method: 'DELETE' })
+  },
+
+  /**
+   * 添加联合组成员
+   * @param {number} id - 联合组ID
+   * @param {number[]} zoneIds - 地域ID列表
+   * @returns {Promise<Object>} 添加结果
+   */
+  async addZoneGroupMembers(id, zoneIds) {
+    const url = buildURL(SYSTEM_ADMIN_ENDPOINTS.AD_ZONE_GROUP_ADD_MEMBERS, { id })
+    return await request({ url, method: 'POST', data: { zone_ids: zoneIds } })
+  },
+
+  /**
+   * 移除联合组成员
+   * @param {number} id - 联合组ID
+   * @param {number[]} zoneIds - 地域ID列表
+   * @returns {Promise<Object>} 移除结果
+   */
+  async removeZoneGroupMembers(id, zoneIds) {
+    const url = buildURL(SYSTEM_ADMIN_ENDPOINTS.AD_ZONE_GROUP_REMOVE_MEMBERS, { id })
+    return await request({ url, method: 'DELETE', data: { zone_ids: zoneIds } })
+  },
+
+  // ===== 调价历史管理 =====
+
+  /**
+   * 获取调价历史列表
+   * @param {Object} [params={}] - 查询参数（status, trigger_type, page, page_size）
+   * @returns {Promise<Object>} 调价历史列表
+   */
+  async getPriceAdjustmentList(params = {}) {
+    const url = SYSTEM_ADMIN_ENDPOINTS.AD_PRICE_ADJUSTMENT_LIST + buildQueryString(params)
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 确认调价建议
+   * @param {number} id - 调价记录ID
+   * @returns {Promise<Object>} 确认结果
+   */
+  async confirmPriceAdjustment(id) {
+    const url = buildURL(SYSTEM_ADMIN_ENDPOINTS.AD_PRICE_ADJUSTMENT_CONFIRM, { id })
+    return await request({ url, method: 'POST' })
+  },
+
+  /**
+   * 拒绝调价建议
+   * @param {number} id - 调价记录ID
+   * @returns {Promise<Object>} 拒绝结果
+   */
+  async rejectPriceAdjustment(id) {
+    const url = buildURL(SYSTEM_ADMIN_ENDPOINTS.AD_PRICE_ADJUSTMENT_REJECT, { id })
+    return await request({ url, method: 'POST' })
+  },
+
+  /**
+   * 执行已确认的调价
+   * @param {number} id - 调价记录ID
+   * @returns {Promise<Object>} 执行结果
+   */
+  async applyPriceAdjustment(id) {
+    const url = buildURL(SYSTEM_ADMIN_ENDPOINTS.AD_PRICE_ADJUSTMENT_APPLY, { id })
+    return await request({ url, method: 'POST' })
   },
 
   // ===== 风控告警 =====

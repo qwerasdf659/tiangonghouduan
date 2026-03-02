@@ -215,24 +215,23 @@ router.post(
       // 对抽奖结果进行脱敏处理（V4.0语义更新）
       const sanitizedResult = {
         success: drawResult.success,
-        campaign_code: campaign.campaign_code, // 返回campaign_code
-        lottery_session_id: drawResult.execution_id, // 返回抽奖会话ID（用于关联查询）
+        campaign_code: campaign.campaign_code,
+        lottery_session_id: drawResult.execution_id,
         prizes: drawResult.prizes.map(prize => {
-          // V4.0：所有抽奖都有奖品，使用 reward_tier 表示档位
           const rewardTier =
-            prize.reward_tier ||
-            LotteryDrawFormatter.inferRewardTier(prize.prize?.prize_value_points || 0)
-          /** prize_value：DECIMAL→number 转换 */
-          const prizeValue =
-            typeof prize.prize?.prize_value === 'number'
-              ? prize.prize.prize_value
-              : parseFloat(prize.prize?.prize_value) || 0
+            prize.reward_tier || LotteryDrawFormatter.inferRewardTier(prize.prize?.value || 0)
+          /**
+           * execute_draw 返回的 prize 对象使用短字段名：id, name, type, value
+           * 路由层转换为 API 契约字段名：lottery_prize_id, prize_name, prize_type, prize_value
+           */
+          const rawValue = prize.prize?.value
+          const prizeValue = typeof rawValue === 'number' ? rawValue : parseFloat(rawValue) || 0
           return {
             reward_tier: rewardTier,
             reward_tier_text: LotteryDrawFormatter.getRewardTierText(rewardTier),
-            lottery_prize_id: prize.prize?.lottery_prize_id,
-            prize_name: prize.prize?.prize_name || '奖励',
-            prize_type: prize.prize?.prize_type,
+            lottery_prize_id: prize.prize?.id || null,
+            prize_name: prize.prize?.name || '未知奖品',
+            prize_type: prize.prize?.type || null,
             prize_value: prizeValue,
             sort_order: prize.prize?.sort_order,
             /** 稀有度代码（FK→rarity_defs，前端直接使用此字段名显示对应颜色光效） */
@@ -346,6 +345,16 @@ router.post(
           message: error.message
         })
         return res.apiError(error.message, error.errorCode || 'IDEMPOTENCY_ERROR', {}, 409)
+      }
+
+      // 已知业务错误：活动不存在、活动状态异常（直接返回明确的业务错误码）
+      if (error.code === 'CAMPAIGN_NOT_FOUND' || error.code === 'CAMPAIGN_NOT_ACTIVE') {
+        return res.apiError(error.message, error.code, error.data || null, error.statusCode || 404)
+      }
+
+      // 已知业务错误：配额不足（403）
+      if (error.errorCode === 'DAILY_DRAW_LIMIT_EXCEEDED') {
+        return res.apiError(error.message, error.errorCode, error.data || null, 403)
       }
 
       logger.error('抽奖失败:', error)

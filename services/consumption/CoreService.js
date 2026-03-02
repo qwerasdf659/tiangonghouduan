@@ -14,7 +14,12 @@
  */
 const logger = require('../../utils/logger').logger
 const BusinessError = require('../../utils/BusinessError')
-const { ConsumptionRecord, ContentReviewRecord, User } = require('../../models')
+const {
+  ConsumptionRecord,
+  ContentReviewRecord,
+  User,
+  LotteryStrategyConfig
+} = require('../../models')
 const BalanceService = require('../asset/BalanceService')
 const BeijingTimeHelper = require('../../utils/timeHelper')
 const AuditLogService = require('../AuditLogService')
@@ -372,7 +377,44 @@ class CoreService {
       )
     }
 
-    // 7. 记录审计日志
+    // 7. 钻石配额发放（双池隔离第二轨道）
+    let diamondQuotaAllocated = 0
+    try {
+      const quotaConfig = await CoreService._getDiamondQuotaConfig(transaction)
+      if (quotaConfig.enabled) {
+        const quotaAmount = Math.floor(parseFloat(record.consumption_amount) * quotaConfig.ratio)
+        if (quotaAmount > 0) {
+          // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
+          const quotaResult = await BalanceService.changeBalance(
+            {
+              user_id: record.user_id,
+              asset_code: 'DIAMOND_QUOTA',
+              delta_amount: quotaAmount,
+              business_type: 'consumption_quota_allocation',
+              idempotency_key: `consumption_quota:approve:${recordId}`,
+              counterpart_account_id: mintAccount.account_id,
+              meta: {
+                reference_type: 'consumption',
+                reference_id: recordId,
+                consumption_amount: record.consumption_amount,
+                quota_ratio: quotaConfig.ratio,
+                description: `消费${record.consumption_amount}元，发放钻石配额${quotaAmount}`
+              }
+            },
+            { transaction }
+          )
+
+          diamondQuotaAllocated = quotaAmount
+          logger.info(
+            `💎 钻石配额发放成功: user_id=${record.user_id}, 配额=${quotaAmount}, 幂等=${quotaResult.is_duplicate ? '重复' : '新增'}`
+          )
+        }
+      }
+    } catch (quotaError) {
+      logger.error(`[ConsumptionService] 钻石配额发放失败（非致命）: ${quotaError.message}`)
+    }
+
+    // 8. 记录审计日志
     try {
       await AuditLogService.logOperation({
         operator_id: reviewData.reviewer_id,
@@ -387,7 +429,8 @@ class CoreService {
         details: {
           consumption_record_id: recordId,
           amount: record.consumption_amount,
-          points_to_award: record.points_to_award
+          points_to_award: record.points_to_award,
+          diamond_quota_allocated: diamondQuotaAllocated
         },
         reason: reviewData.admin_notes || '审核通过',
         idempotency_key: `consumption_audit:approve:${reviewRecord.review_id}`,
@@ -398,7 +441,7 @@ class CoreService {
     }
 
     logger.info(
-      `✅ 消费记录审核通过: record_id=${recordId}, 奖励积分=${record.points_to_award}, 预算积分=${budgetPointsToAllocate}`
+      `✅ 消费记录审核通过: record_id=${recordId}, 奖励积分=${record.points_to_award}, 预算积分=${budgetPointsToAllocate}, 钻石配额=${diamondQuotaAllocated}`
     )
 
     return {
@@ -406,6 +449,7 @@ class CoreService {
       points_transaction: pointsResult.transaction,
       points_awarded: record.points_to_award,
       budget_points_allocated: budgetPointsToAllocate,
+      diamond_quota_allocated: diamondQuotaAllocated,
       new_balance: pointsResult.new_balance
     }
   }
@@ -655,6 +699,58 @@ class CoreService {
 
     logger.info('[配置] 预算系数读取成功', { ratio })
     return ratio
+  }
+
+  /**
+   * 读取钻石配额配置（从 lottery_strategy_config）
+   *
+   * 配额配置存储在第一个活跃活动的 lottery_strategy_config 中，
+   * 与 threshold_high/pity_percentage 等配置同一管理方式。
+   *
+   * @param {Object} transaction - 数据库事务
+   * @returns {Promise<{enabled: boolean, ratio: number, action: string}>} 配额配置
+   * @private
+   */
+  static async _getDiamondQuotaConfig(transaction) {
+    try {
+      const config = await LotteryStrategyConfig.findOne({
+        where: { config_key: 'diamond_quota_enabled', is_active: true },
+        transaction
+      })
+
+      if (!config) {
+        return { enabled: false, ratio: 1.0, action: 'filter' }
+      }
+
+      const enabled = config.config_value === 'true' || config.config_value === true
+
+      const ratioConfig = await LotteryStrategyConfig.findOne({
+        where: {
+          lottery_campaign_id: config.lottery_campaign_id,
+          config_key: 'diamond_quota_ratio',
+          is_active: true
+        },
+        transaction
+      })
+
+      const actionConfig = await LotteryStrategyConfig.findOne({
+        where: {
+          lottery_campaign_id: config.lottery_campaign_id,
+          config_key: 'quota_exhausted_action',
+          is_active: true
+        },
+        transaction
+      })
+
+      return {
+        enabled,
+        ratio: parseFloat(ratioConfig?.config_value || '1.0'),
+        action: (actionConfig?.config_value || 'filter').replace(/"/g, '')
+      }
+    } catch (error) {
+      logger.warn(`[ConsumptionService] 读取钻石配额配置失败: ${error.message}`)
+      return { enabled: false, ratio: 1.0, action: 'filter' }
+    }
   }
 }
 

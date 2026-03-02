@@ -24,7 +24,7 @@ const BeijingTimeHelper = require('../utils/timeHelper')
  * 广告位类型有效值（含 announcement — 系统公告展示位）
  * @constant {string[]}
  */
-const VALID_SLOT_TYPES = ['popup', 'carousel', 'announcement']
+const VALID_SLOT_TYPES = ['popup', 'carousel', 'announcement', 'feed']
 
 /**
  * 定义 AdSlot 模型
@@ -70,7 +70,7 @@ module.exports = sequelize => {
           notEmpty: { msg: '广告位类型不能为空' },
           isIn: {
             args: [VALID_SLOT_TYPES],
-            msg: '广告位类型必须是：popup, carousel, announcement 之一'
+            msg: '广告位类型必须是：popup, carousel, announcement, feed 之一'
           }
         },
         comment: '广告位类型：popup=弹窗 / carousel=轮播图 / announcement=系统公告'
@@ -120,6 +120,47 @@ module.exports = sequelize => {
           min: { args: [1], msg: '最低预算不能小于1' }
         },
         comment: '最低预算（钻石），用于竞价模式'
+      },
+
+      /** DAU 系数计算结果不得低于此值，0 表示不限制 */
+      min_daily_price_diamond: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
+        comment: '最低日价下限（DAU 系数计算结果不得低于此值），0 表示不限制'
+      },
+
+      /** 运营手动覆盖的竞价底价（优先于动态计算值） */
+      floor_price_override: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        defaultValue: null,
+        comment: '运营手动覆盖的竞价底价，NULL 表示使用自动计算'
+      },
+
+      /** 绑定地域ID（NULL=全站级别广告位） */
+      zone_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: { model: 'ad_target_zones', key: 'zone_id' },
+        onDelete: 'SET NULL',
+        comment: '绑定地域ID（NULL=全站级别广告位）'
+      },
+
+      /** 广告位大类：display=展示广告（按天/竞价）, feed=信息流广告（CPM） */
+      slot_category: {
+        type: DataTypes.STRING(20),
+        allowNull: false,
+        defaultValue: 'display',
+        comment: '广告位大类：display=展示广告, feed=信息流广告'
+      },
+
+      /** 每千次曝光价格（钻石），仅 slot_category=feed 时使用 */
+      cpm_price_diamond: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
+        comment: '每千次曝光价格（钻石），仅信息流广告使用'
       },
 
       is_active: {

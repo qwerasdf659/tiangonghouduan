@@ -278,68 +278,204 @@ class NotificationService {
   }
 
   /**
-   * 发送通知给所有管理员（通过WebSocket广播）
+   * source_type → notification_type 映射（大分类）
+   * @private
+   * @param {string} sourceType - 来源类型
+   * @returns {string} notification_type 枚举值（system/alert/reminder/task）
+   */
+  static _getNotificationType(sourceType) {
+    const alertTypes = [
+      'exchange_audit',
+      'timeout_alert',
+      'asset_reconciliation_alert',
+      'business_record_reconciliation_alert',
+      'market_monitor_alert',
+      'orphan_frozen_alert',
+      'orphan_frozen_error'
+    ]
+    const reminderTypes = ['reminder_alert']
+    const taskTypes = ['activity_status_change']
+
+    if (alertTypes.includes(sourceType)) return 'alert'
+    if (reminderTypes.includes(sourceType)) return 'reminder'
+    if (taskTypes.includes(sourceType)) return 'task'
+    return 'system'
+  }
+
+  /**
+   * source_type → priority 自动映射
+   * @private
+   * @param {string} sourceType - 来源类型
+   * @returns {string} priority 枚举值（low/normal/high/urgent）
+   */
+  static _getPriority(sourceType) {
+    const urgentTypes = ['orphan_frozen_alert']
+    const highTypes = [
+      'asset_reconciliation_alert',
+      'business_record_reconciliation_alert',
+      'timeout_alert',
+      'orphan_frozen_error'
+    ]
+
+    if (urgentTypes.includes(sourceType)) return 'urgent'
+    if (highTypes.includes(sourceType)) return 'high'
+    return 'normal'
+  }
+
+  /**
+   * 查询所有活跃管理员（role_level >= 100）
+   * 通过 User.belongsToMany(Role, { through: UserRole, as: 'roles' }) 关联查询
+   * @private
+   * @returns {Promise<number[]>} 管理员 user_id 数组
+   */
+  static async _getAdminUserIds() {
+    const { User, Role, Op } = require('../models')
+
+    const admins = await User.findAll({
+      where: { status: 'active' },
+      include: [
+        {
+          model: Role,
+          as: 'roles',
+          required: true,
+          where: {
+            role_level: { [Op.gte]: 100 },
+            is_active: true
+          },
+          through: { where: { is_active: true } }
+        }
+      ],
+      attributes: ['user_id']
+    })
+
+    return admins.map(a => a.user_id)
+  }
+
+  /**
+   * 发送通知给所有管理员（持久化到 admin_notifications 表 + WebSocket 广播）
+   *
+   * 流程：
+   * 1. 查询所有活跃管理员（三表 JOIN）
+   * 2. 批量写入 AdminNotification（每个管理员一条）— 失败不阻断广播
+   * 3. WebSocket 广播（payload 携带 admin_notification_id 用于去重和已读）
+   * 4. 返回持久化数量 + 广播数量
    *
    * @param {Object} options - 通知选项
-   * @param {string} options.type - 通知类型
+   * @param {string} options.type - 来源类型（source_type），如 exchange_audit、timeout_alert
    * @param {string} options.title - 通知标题
    * @param {string} options.content - 通知内容
-   * @param {Object} options.data - 附加数据
-   * @returns {Promise<Object>} 通知结果
+   * @param {Object} [options.data={}] - 附加业务数据（存入 extra_data JSON 字段）
+   * @param {number} [options.source_id] - 来源实体 ID
+   * @returns {Promise<Object>} 通知结果 { success, persisted_count, broadcasted_count, ... }
    */
   static async sendToAdmins(options) {
-    const { type, title, content, data = {} } = options
+    const { type, title, content, data = {}, source_id } = options
 
+    let persistedCount = 0
+    const adminNotificationMap = new Map()
+
+    // === Step 1 + 2: 持久化到 admin_notifications 表（失败不阻断广播） ===
+    try {
+      const { AdminNotification } = require('../models')
+      const adminIds = await NotificationService._getAdminUserIds()
+
+      if (adminIds.length > 0) {
+        const notificationType = NotificationService._getNotificationType(type)
+        const priority = NotificationService._getPriority(type)
+
+        const records = await AdminNotification.bulkCreate(
+          adminIds.map(adminId => ({
+            admin_id: adminId,
+            title,
+            content,
+            notification_type: notificationType,
+            priority,
+            source_type: type,
+            source_id: source_id || null,
+            extra_data: Object.keys(data).length > 0 ? data : null
+          }))
+        )
+
+        persistedCount = records.length
+        records.forEach(r => adminNotificationMap.set(r.admin_id, r.admin_notification_id))
+
+        logger.info('[通知] 管理员通知已持久化', {
+          type,
+          title,
+          persisted_count: persistedCount,
+          admin_ids: adminIds
+        })
+      }
+    } catch (persistError) {
+      logger.error('[通知] 管理员通知持久化失败（不阻断广播）', {
+        type,
+        title,
+        error: persistError.message
+      })
+    }
+
+    // === Step 3: WebSocket 广播（无论持久化成败都执行） ===
+    let broadcastedCount = 0
     try {
       const ChatWebSocketService = require('./ChatWebSocketService')
 
-      // 构建管理员通知消息（特殊格式，不保存到数据库）
-      const adminNotification = {
-        notification_type: 'admin_alert',
-        type,
+      const basePayload = {
+        notification_type: NotificationService._getNotificationType(type),
+        source_type: type,
         title,
         content,
         data,
+        priority: NotificationService._getPriority(type),
         sender_name: '系统通知',
         timestamp: BeijingTimeHelper.timestamp(),
         created_at: BeijingTimeHelper.createBeijingTime()
       }
 
-      // ✅ 广播通知给所有在线管理员（使用notification事件）
-      const count = ChatWebSocketService.broadcastNotificationToAllAdmins(adminNotification)
-
-      // 记录管理员通知日志
-      logger.info('[通知] 管理员通知已广播', {
-        type,
-        title,
-        online_admins: count,
-        content: content.substring(0, 100)
-      })
-
-      return {
-        success: true,
-        notification_id: `admin_notif_${BeijingTimeHelper.generateIdTimestamp()}`,
-        target: 'admins',
-        type,
-        title,
-        content,
-        data,
-        broadcasted_count: count,
-        timestamp: adminNotification.created_at
+      if (adminNotificationMap.size > 0) {
+        // 按管理员注入对应的 admin_notification_id，便于前端去重和已读
+        for (const [adminId, socketId] of ChatWebSocketService.connectedAdmins.entries()) {
+          try {
+            const payload = {
+              ...basePayload,
+              admin_notification_id: adminNotificationMap.get(adminId) || null
+            }
+            ChatWebSocketService.io.to(socketId).emit('notification', payload)
+            broadcastedCount++
+          } catch (emitError) {
+            logger.error('[通知] 广播通知给管理员失败', {
+              admin_id: adminId,
+              error: emitError.message
+            })
+          }
+        }
+      } else {
+        broadcastedCount = ChatWebSocketService.broadcastNotificationToAllAdmins(basePayload)
       }
-    } catch (error) {
-      logger.error('[通知] 管理员通知发送失败', {
+    } catch (broadcastError) {
+      logger.error('[通知] 管理员通知广播失败', {
         type,
-        error: error.message
+        error: broadcastError.message
       })
+    }
 
-      return {
-        success: false,
-        error: error.message,
-        type,
-        title,
-        content
-      }
+    logger.info('[通知] 管理员通知发送完成', {
+      type,
+      title,
+      persisted_count: persistedCount,
+      broadcasted_count: broadcastedCount,
+      content: content.substring(0, 100)
+    })
+
+    return {
+      success: true,
+      target: 'admins',
+      type,
+      title,
+      content,
+      data,
+      persisted_count: persistedCount,
+      broadcasted_count: broadcastedCount,
+      timestamp: BeijingTimeHelper.createBeijingTime()
     }
   }
 
@@ -372,7 +508,7 @@ class NotificationService {
    */
   static async notifyNewExchangeAudit(exchangeData) {
     return await this.sendToAdmins({
-      type: 'new_exchange_audit',
+      type: 'exchange_audit',
       title: '新的兑换订单待审核',
       content: `用户${exchangeData.user_id}申请兑换${exchangeData.product_name} × ${exchangeData.quantity}，总计${exchangeData.total_points}分`,
       data: {
@@ -434,7 +570,7 @@ class NotificationService {
    */
   static async notifyTimeoutAlert(alertData) {
     return await this.sendToAdmins({
-      type: 'pending_orders_alert',
+      type: 'timeout_alert',
       title: '待审核订单超时告警',
       content: `当前有${alertData.count}个订单待审核超过${alertData.timeout_hours}小时，请及时处理`,
       data: {
@@ -704,7 +840,7 @@ class NotificationService {
 
     if (user_id) {
       return await this.send(user_id, {
-        type: 'system_campaign_notification',
+        type: 'system_announcement',
         title: `📢 ${title}`,
         content,
         data: {
@@ -714,7 +850,7 @@ class NotificationService {
       })
     } else {
       return await this.sendToAdmins({
-        type: 'system_campaign_notification',
+        type: 'system_announcement',
         title: `📢 ${title}`,
         content,
         data: {

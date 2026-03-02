@@ -33,9 +33,9 @@ describe('用户个性化中奖率设置功能测试', () => {
     // 使用TEST_DATA中定义的测试用户ID
     testUserId = TEST_DATA.users.testUser.user_id
 
-    // 获取测试奖品ID（查询BASIC_LOTTERY活动的第一个奖品）
+    // 获取测试奖品ID（查询CAMP20250901001活动的第一个奖品）
     const campaign = await LotteryCampaign.findOne({
-      where: { campaign_code: 'BASIC_LOTTERY' }
+      where: { campaign_code: 'CAMP20250901001' }
     })
 
     if (campaign) {
@@ -77,7 +77,7 @@ describe('用户个性化中奖率设置功能测试', () => {
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           user_id: testUserId,
-          lottery_prize_id: testPrizeId,
+          prize_id: testPrizeId,
           custom_probability: 0.5, // 50%中奖率
           duration_minutes: 60,
           reason: '测试：用户B一等奖50%中奖率'
@@ -113,7 +113,7 @@ describe('用户个性化中奖率设置功能测试', () => {
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           user_id: testUserId,
-          lottery_prize_id: testPrizeId,
+          prize_id: testPrizeId,
           custom_probability: 1.5, // 无效：超过100%
           duration_minutes: 60
         })
@@ -129,7 +129,7 @@ describe('用户个性化中奖率设置功能测试', () => {
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           user_id: testUserId,
-          lottery_prize_id: 99999, // 不存在的奖品ID
+          prize_id: 99999, // 不存在的奖品ID
           custom_probability: 0.5,
           duration_minutes: 60
         })
@@ -196,7 +196,7 @@ describe('用户个性化中奖率设置功能测试', () => {
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           user_id: testUserId,
-          lottery_prize_id: testPrizeId,
+          prize_id: testPrizeId,
           custom_probability: 0.5,
           duration_minutes: 60,
           reason: '测试查询状态'
@@ -283,7 +283,7 @@ describe('用户个性化中奖率设置功能测试', () => {
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           user_id: testUserId,
-          lottery_prize_id: testPrizeId,
+          prize_id: testPrizeId,
           custom_probability: 1.0, // 设置为100%必中
           duration_minutes: 60,
           reason: '测试抽奖算法应用'
@@ -297,7 +297,7 @@ describe('用户个性化中奖率设置功能测试', () => {
         .post('/api/v4/lottery/draw')
         .set('Authorization', `Bearer ${userToken}`)
         .send({
-          campaign_code: 'BASIC_LOTTERY',
+          campaign_code: 'CAMP20250901001',
           draw_count: 1
         })
 
@@ -364,7 +364,7 @@ describe('用户个性化中奖率设置功能测试', () => {
       // 模拟前端发送的请求数据（来自users.html的saveProbabilityAdjustment函数）
       const frontendData = {
         user_id: testUserId,
-        lottery_prize_id: testPrizeId,
+        prize_id: testPrizeId,
         custom_probability: 0.5, // 前端发送0.5（50%）
         duration_minutes: 60,
         reason: 'VIP用户特权'

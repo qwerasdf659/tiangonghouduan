@@ -347,7 +347,92 @@ async function autoFixBalanceMismatches(sequelize) {
   }
 }
 
-module.exports = { executeReconciliation }
+/**
+ * 业务记录关联对账（原 DailyAssetReconciliation.executeBusinessRecordReconciliation）
+ *
+ * 检查业务记录与 asset_transactions 的关联完整性：
+ * 1. lottery_draws.asset_transaction_id 是否有效
+ * 2. consumption_records.reward_transaction_id 是否有效（已审核通过的）
+ * 3. exchange_records.debit_transaction_id 是否有效
+ *
+ * @param {Date} [cutoffDate] - 分界线时间（只检查该时间之后的记录）
+ * @returns {Promise<Object>} 业务关联对账报告
+ */
+async function executeBusinessRecordReconciliation(cutoffDate = null) {
+  const { LotteryDraw, ConsumptionRecord, ExchangeRecord, AssetTransaction, Op } = require('../models')
+  const logger = require('../utils/logger').logger
+  const NotificationService = require('../services/NotificationService')
+
+  const start_time = Date.now()
+  const effectiveCutoff = cutoffDate || new Date('2026-01-02T20:24:20.000Z')
+
+  logger.info('开始业务记录关联对账', { cutoff_date: effectiveCutoff.toISOString() })
+
+  try {
+    const reconcileTable = async (Model, idField, txIdField, extraWhere = {}) => {
+      const records = await (Model.unscoped ? Model.unscoped() : Model).findAll({
+        where: { created_at: { [Op.gte]: effectiveCutoff }, ...extraWhere },
+        attributes: [idField, 'user_id', txIdField, 'created_at']
+      })
+
+      const missing_transaction_ids = []
+      const orphan_transaction_ids = []
+
+      for (const record of records) {
+        if (!record[txIdField]) {
+          missing_transaction_ids.push({ [idField]: record[idField], user_id: record.user_id, created_at: record.created_at })
+        } else {
+          // eslint-disable-next-line no-await-in-loop
+          const tx = await AssetTransaction.findByPk(record[txIdField])
+          if (!tx) {
+            orphan_transaction_ids.push({ [idField]: record[idField], [txIdField]: record[txIdField], user_id: record.user_id, created_at: record.created_at })
+          }
+        }
+      }
+
+      return { total_checked: records.length, missing_transaction_ids, orphan_transaction_ids }
+    }
+
+    const results = {
+      timestamp: new Date().toISOString(),
+      cutoff_date: effectiveCutoff.toISOString(),
+      lottery_draws: await reconcileTable(LotteryDraw, 'lottery_draw_id', 'asset_transaction_id'),
+      consumption_records: await reconcileTable(ConsumptionRecord, 'consumption_record_id', 'reward_transaction_id', { status: 'approved', is_deleted: 0 }),
+      exchange_records: await reconcileTable(ExchangeRecord, 'exchange_record_id', 'debit_transaction_id')
+    }
+
+    results.duration_ms = Date.now() - start_time
+    results.total_issues =
+      results.lottery_draws.missing_transaction_ids.length +
+      results.lottery_draws.orphan_transaction_ids.length +
+      results.consumption_records.missing_transaction_ids.length +
+      results.consumption_records.orphan_transaction_ids.length +
+      results.exchange_records.missing_transaction_ids.length +
+      results.exchange_records.orphan_transaction_ids.length
+    results.status = results.total_issues === 0 ? 'OK' : 'WARNING'
+
+    if (results.total_issues > 0) {
+      try {
+        await NotificationService.sendToAdmins({
+          type: 'business_record_reconciliation_alert',
+          title: '业务记录关联对账告警',
+          content: `发现${results.total_issues}个业务记录关联问题，请及时检查处理`,
+          data: { total_issues: results.total_issues, cutoff_date: results.cutoff_date, timestamp: results.timestamp }
+        })
+      } catch (notifyError) {
+        logger.error('发送业务记录关联对账告警失败', { error: notifyError.message })
+      }
+    }
+
+    logger.info('业务记录关联对账完成', { total_issues: results.total_issues, duration_ms: results.duration_ms })
+    return results
+  } catch (error) {
+    logger.error('业务记录关联对账失败', { error_message: error.message })
+    throw error
+  }
+}
+
+module.exports = { executeReconciliation, executeBusinessRecordReconciliation }
 
 // 独立运行模式
 if (require.main === module) {

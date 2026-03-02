@@ -197,9 +197,7 @@ class ItemTemplateService {
    * @param {string} [data.category_code] - 类目代码
    * @param {string} [data.rarity_code] - 稀有度代码
    * @param {string} [data.description] - 描述
-   * @param {number} [data.image_resource_id] - 关联图片资源ID（优先使用，关联 image_resources 表）
-   * @param {string} [data.image_url] - 图片URL（遗留字段，优先使用 image_resource_id）
-   * @param {string} [data.thumbnail_url] - 缩略图URL（遗留字段）
+   * @param {number} [data.image_resource_id] - 关联图片资源ID（关联 image_resources 表）
    * @param {number} [data.reference_price_points] - 参考价格
    * @param {boolean} [data.is_tradable=true] - 是否可交易
    * @param {Object} [data.meta] - 扩展元数据
@@ -220,8 +218,6 @@ class ItemTemplateService {
         rarity_code,
         description,
         image_resource_id,
-        image_url,
-        thumbnail_url,
         reference_price_points = 0,
         is_tradable = true,
         meta
@@ -271,8 +267,6 @@ class ItemTemplateService {
           rarity_code,
           description,
           image_resource_id: image_resource_id || null,
-          image_url,
-          thumbnail_url,
           reference_price_points,
           is_tradable,
           is_enabled: true,
@@ -327,8 +321,6 @@ class ItemTemplateService {
         'rarity_code',
         'description',
         'image_resource_id',
-        'image_url',
-        'thumbnail_url',
         'reference_price_points',
         'is_tradable',
         'is_enabled',

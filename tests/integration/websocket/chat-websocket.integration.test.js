@@ -51,16 +51,16 @@ const TEST_CONFIG = {
  */
 function createTestToken(payload) {
   const secret = process.env.JWT_SECRET || 'test-jwt-secret-key-for-development-only'
-  return jwt.sign(
-    {
-      user_id: payload.user_id,
-      role: payload.role || 'user',
-      role_level: payload.role_level || 0,
-      iat: Math.floor(Date.now() / 1000)
-    },
-    secret,
-    { expiresIn: '1h' }
-  )
+  const jwtPayload = {
+    user_id: payload.user_id,
+    role: payload.role || 'user',
+    role_level: payload.role_level || 0,
+    iat: Math.floor(Date.now() / 1000)
+  }
+  if (payload.session_token) {
+    jwtPayload.session_token = payload.session_token
+  }
+  return jwt.sign(jwtPayload, secret, { expiresIn: '1h' })
 }
 
 /**
@@ -146,18 +146,38 @@ describe('WebSocket聊天功能集成测试（P1-4.2）', () => {
       testUserId = loginResponse.body.data.user.user_id
       console.log(`✅ 用户登录成功: user_id=${testUserId}`)
 
-      // 创建管理员 Token
-      const userInfo = loginResponse.body.data.user
-      if (userInfo.role_level >= 100) {
-        _adminAuthToken = userAuthToken
-        console.log('✅ 当前用户具有管理员权限')
+      /*
+       * 创建管理员 Token（必须包含 session_token，WebSocket 服务强制校验）
+       * 使用管理后台登录获取带 session_token 的 Token，与 ChatWebSocketService 鉴权逻辑一致
+       */
+      const adminLoginResponse = await request(app).post('/api/v4/console/auth/login').send({
+        mobile: TEST_CONFIG.testUserMobile,
+        verification_code: TEST_CONFIG.testVerificationCode
+      })
+
+      if (adminLoginResponse.status === 200 && adminLoginResponse.body.success) {
+        _adminAuthToken = adminLoginResponse.body.data.access_token
+        console.log('✅ 管理后台登录成功，获取带 session_token 的管理员 Token')
       } else {
+        // 降级：创建会话并生成带 session_token 的 Token（测试用户可能无 admin 角色）
+        const { v4: uuidv4 } = require('uuid')
+        const { AuthenticationSession } = require('../../../models')
+        const sessionToken = uuidv4()
+        await AuthenticationSession.createSession({
+          session_token: sessionToken,
+          user_type: 'admin',
+          user_id: testUserId,
+          login_ip: '127.0.0.1',
+          login_platform: 'test',
+          expires_in_minutes: 10080
+        })
         _adminAuthToken = createTestToken({
           user_id: testUserId,
           role: 'admin',
-          role_level: 100
+          role_level: 100,
+          session_token: sessionToken
         })
-        console.log('✅ 已创建测试用管理员 Token')
+        console.log('✅ 已创建测试用管理员 Token（含 session_token）')
       }
     } catch (error) {
       console.error('❌ 测试初始化失败:', error.message)
@@ -244,13 +264,7 @@ describe('WebSocket聊天功能集成测试（P1-4.2）', () => {
         return
       }
 
-      const adminToken = createTestToken({
-        user_id: testUserId,
-        role: 'admin',
-        role_level: 100
-      })
-
-      const socket = createWebSocketClient(adminToken)
+      const socket = createWebSocketClient(_adminAuthToken)
       socketClients.push(socket)
 
       // 建立连接
@@ -436,13 +450,8 @@ describe('WebSocket聊天功能集成测试（P1-4.2）', () => {
         return
       }
 
-      const adminToken = createTestToken({
-        user_id: testUserId + 1, // 使用不同的用户ID模拟另一个管理员
-        role: 'admin',
-        role_level: 100
-      })
-
-      const socket = createWebSocketClient(adminToken)
+      // 使用 beforeAll 中获取的带 session_token 的管理员 Token
+      const socket = createWebSocketClient(_adminAuthToken)
       socketClients.push(socket)
 
       // 建立连接

@@ -71,35 +71,35 @@
     <!-- 筛选和搜索栏 -->
     <div class="themed-card rounded-xl shadow-sm p-4 mb-6">
       <div class="flex flex-wrap items-center gap-4">
-        <!-- 类型筛选 -->
+        <!-- 类型筛选（对齐后端 notification_type 枚举：system/alert/reminder/task） -->
         <div class="flex items-center gap-2">
           <span class="text-sm themed-text-muted">类型:</span>
           <div class="flex themed-bg-base rounded-lg p-1">
             <button 
-              @click="filter.type = ''"
-              :class="filter.type === '' ? 'themed-card shadow-sm' : ''"
+              @click="filter.notification_type = ''; loadMessages()"
+              :class="filter.notification_type === '' ? 'themed-card shadow-sm' : ''"
               class="px-3 py-1.5 text-sm rounded-md transition"
             >全部</button>
             <button 
-              @click="filter.type = 'system'"
-              :class="filter.type === 'system' ? 'themed-card shadow-sm text-red-600' : ''"
+              @click="filter.notification_type = 'system'; loadMessages()"
+              :class="filter.notification_type === 'system' ? 'themed-card shadow-sm text-blue-600' : ''"
               class="px-3 py-1.5 text-sm rounded-md transition"
-            >🔔 系统公告</button>
+            >📢 系统通知</button>
             <button 
-              @click="filter.type = 'maintenance'"
-              :class="filter.type === 'maintenance' ? 'themed-card shadow-sm text-yellow-600' : ''"
+              @click="filter.notification_type = 'alert'; loadMessages()"
+              :class="filter.notification_type === 'alert' ? 'themed-card shadow-sm text-red-600' : ''"
               class="px-3 py-1.5 text-sm rounded-md transition"
-            >⚠️ 维护通知</button>
+            >🚨 告警通知</button>
             <button 
-              @click="filter.type = 'notice'"
-              :class="filter.type === 'notice' ? 'themed-card shadow-sm themed-text-primary' : ''"
+              @click="filter.notification_type = 'reminder'; loadMessages()"
+              :class="filter.notification_type === 'reminder' ? 'themed-card shadow-sm text-yellow-600' : ''"
               class="px-3 py-1.5 text-sm rounded-md transition"
-            >ℹ️ 通知公告</button>
+            >🔔 提醒通知</button>
             <button 
-              @click="filter.type = 'activity'"
-              :class="filter.type === 'activity' ? 'themed-card shadow-sm text-green-600' : ''"
+              @click="filter.notification_type = 'task'; loadMessages()"
+              :class="filter.notification_type === 'task' ? 'themed-card shadow-sm text-green-600' : ''"
               class="px-3 py-1.5 text-sm rounded-md transition"
-            >🎉 活动公告</button>
+            >📋 任务通知</button>
           </div>
         </div>
         
@@ -201,7 +201,7 @@
           </div>
 
         <!-- 消息项 -->
-        <template x-for="message in messages" :key="message.id">
+        <template x-for="message in messages" :key="message.admin_notification_id">
           <div 
             class="message-item flex items-start gap-4 p-4 cursor-pointer"
             :class="{ 'unread': !message.is_read }"
@@ -211,7 +211,7 @@
             <div class="pt-1">
               <input 
                 type="checkbox"
-                :value="message.id"
+                :value="message.admin_notification_id"
                 x-model="selectedIds"
                 @click.stop
                 class="w-4 h-4 rounded border-gray-300 themed-text-primary focus:ring-blue-500"
@@ -221,9 +221,9 @@
             <!-- 类型图标 -->
             <div 
               class="w-10 h-10 rounded-full flex items-center justify-center text-lg flex-shrink-0"
-              :class="getTypeColorClass(message.type)"
+              :class="getTypeColorClass(message.notification_type)"
             >
-              <span x-text="getTypeIcon(message.type)"></span>
+              <span x-text="getTypeIcon(message.notification_type)"></span>
             </div>
             
             <!-- 消息内容 -->
@@ -236,8 +236,8 @@
                 ></span>
                 <span 
                   class="type-badge"
-                  :class="getTypeBadgeClass(message.type)"
-                  x-text="getTypeLabel(message.type)"
+                  :class="getTypeBadgeClass(message.notification_type)"
+                  x-text="getTypeLabel(message.notification_type)"
                 ></span>
                 <span 
                   x-show="!message.is_read"
@@ -247,7 +247,7 @@
               <div class="text-sm themed-text-secondary line-clamp-2" x-text="message.content"></div>
               <div class="flex items-center gap-4 mt-2 text-xs themed-text-muted">
                 <span x-text="formatTime(message.created_at)"></span>
-                <span x-show="message.priority" x-text="'优先级: ' + getTypeLabel(message.priority)"></span>
+                <span x-show="message.priority"><span x-text="getPriorityIcon(message.priority)"></span> <span x-text="getPriorityLabel(message.priority)"></span></span>
               </div>
             </div>
             
@@ -339,16 +339,16 @@
           <div class="flex items-center gap-3">
             <div 
               class="w-10 h-10 rounded-full flex items-center justify-center text-lg"
-              :class="getTypeColorClass(currentMessage?.type)"
+              :class="getTypeColorClass(currentMessage?.notification_type)"
             >
-              <span x-text="getTypeIcon(currentMessage?.type)"></span>
+              <span x-text="getTypeIcon(currentMessage?.notification_type)"></span>
             </div>
             <div>
               <h3 class="font-semibold themed-text-primary" x-text="currentMessage?.title"></h3>
               <span 
                 class="type-badge"
-                :class="getTypeBadgeClass(currentMessage?.type)"
-                x-text="getTypeLabel(currentMessage?.type)"
+                :class="getTypeBadgeClass(currentMessage?.notification_type)"
+                x-text="getTypeLabel(currentMessage?.notification_type)"
               ></span>
             </div>
           </div>
@@ -377,7 +377,7 @@
         <div class="px-6 py-4 border-t themed-divide flex items-center justify-between themed-bg-base">
           <div class="text-sm themed-text-muted">
             <span x-text="formatFullTime(currentMessage?.created_at)"></span>
-            <span x-show="currentMessage?.priority" class="ml-2" x-text="'· 优先级: ' + currentMessage?.priority"></span>
+            <span x-show="currentMessage?.priority" class="ml-2">· 优先级: <span x-text="getPriorityIcon(currentMessage?.priority)"></span> <span x-text="getPriorityLabel(currentMessage?.priority)"></span></span>
           </div>
           <div class="flex items-center gap-2">
             <button 

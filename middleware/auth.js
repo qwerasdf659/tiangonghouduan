@@ -497,12 +497,14 @@ async function authenticateToken(req, res, next) {
           /**
            * 查找替换当前会话的新会话，获取新登录的平台信息，
            * 让用户知道是哪个平台的登录踢掉了当前会话。
+           * 限定 user_type 一致：因为只有同 user_type 内才会互斥。
            */
           let replacedByPlatform = null
           try {
             const newerSession = await AuthenticationSession.findOne({
               where: {
                 user_id: decoded.user_id,
+                user_type: rawSession.user_type,
                 is_active: true,
                 authentication_session_id: {
                   [require('sequelize').Op.gt]: rawSession.authentication_session_id
@@ -565,6 +567,41 @@ async function authenticateToken(req, res, next) {
       session.updateActivity().catch(err => {
         logger.warn(`⚠️ [Auth] 更新会话活动时间失败（非致命）: ${err.message}`)
       })
+
+      // 更新用户最后活跃时间（异步，用于 DAU 统计）
+      const { User: UserModel, UserBehaviorTrack } = require('../models')
+      UserModel.update(
+        { last_active_at: new Date() },
+        { where: { user_id: decoded.user_id }, silent: true }
+      ).catch(err => {
+        logger.warn(`⚠️ [Auth] 更新用户活跃时间失败（非致命）: ${err.message}`)
+      })
+
+      // 记录用户行为追踪（异步，不阻塞请求，每分钟最多记录一次避免写入风暴）
+      if (UserBehaviorTrack) {
+        ;(async () => {
+          try {
+            const trackKey = `track:${decoded.user_id}:${Math.floor(Date.now() / 60000)}`
+            const { getRedisClient } = require('../utils/UnifiedRedisClient')
+            const redisClient = getRedisClient()
+            const wasSet = await redisClient.set(trackKey, '1', 'EX', 60, 'NX')
+            if (wasSet) {
+              await UserBehaviorTrack.create({
+                user_id: decoded.user_id,
+                behavior_type: 'api_access',
+                behavior_action: req.method.toLowerCase(),
+                behavior_target: 'api',
+                behavior_data: { path: req.path },
+                behavior_result: 'success',
+                behavior_time: new Date(),
+                ip_address: req.ip
+              })
+            }
+          } catch (_) {
+            /* 非致命，静默忽略 */
+          }
+        })()
+      }
     }
 
     // 从数据库获取最新用户信息（包含user_uuid字段）

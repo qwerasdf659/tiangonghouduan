@@ -177,7 +177,7 @@ describe('【P0】保底机制测试 - Pity/Anti-Empty/Anti-High', () => {
 
     // 获取活动信息（直接从 TestConfig.realData 获取，已在 initRealTestData 中查询数据库）
     campaignId = TestConfig.realData.testCampaign?.lottery_campaign_id || 1
-    campaignCode = TestConfig.realData.testCampaign?.campaign_code || 'BASIC_LOTTERY'
+    campaignCode = TestConfig.realData.testCampaign?.campaign_code || 'CAMP20250901001'
     console.log(`📋 活动ID: ${campaignId}, 活动代码: ${campaignCode}`)
 
     // 充值测试积分

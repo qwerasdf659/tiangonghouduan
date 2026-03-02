@@ -72,8 +72,8 @@ MarketPriceSnapshot.initModel = function (sequelize) {
       min_price: {
         type: DataTypes.DECIMAL(20, 4),
         allowNull: true,
+        /** @returns {number|null} 最低挂牌价格的数值 */
         get() {
-          // eslint-disable-line require-jsdoc
           const val = this.getDataValue('min_price')
           return val !== null ? Number(val) : null
         },
@@ -82,8 +82,8 @@ MarketPriceSnapshot.initModel = function (sequelize) {
       max_price: {
         type: DataTypes.DECIMAL(20, 4),
         allowNull: true,
+        /** @returns {number|null} 最高挂牌价格的数值 */
         get() {
-          // eslint-disable-line require-jsdoc
           const val = this.getDataValue('max_price')
           return val !== null ? Number(val) : null
         },
@@ -92,8 +92,8 @@ MarketPriceSnapshot.initModel = function (sequelize) {
       avg_price: {
         type: DataTypes.DECIMAL(20, 4),
         allowNull: true,
+        /** @returns {number|null} 平均挂牌价格的数值 */
         get() {
-          // eslint-disable-line require-jsdoc
           const val = this.getDataValue('avg_price')
           return val !== null ? Number(val) : null
         },
@@ -103,8 +103,8 @@ MarketPriceSnapshot.initModel = function (sequelize) {
         type: DataTypes.DECIMAL(20, 4),
         allowNull: false,
         defaultValue: 0,
+        /** @returns {number} 当日成交总额的数值 */
         get() {
-          // eslint-disable-line require-jsdoc
           return Number(this.getDataValue('total_volume') || 0)
         },
         comment: '当日成交总额'

@@ -23,7 +23,7 @@ const crypto = require('crypto')
 const { BatchOperationLog } = require('../models')
 const SystemConfigService = require('./SystemConfigService')
 const logger = require('../utils/logger').logger
-const { getUnifiedRedisClient } = require('../utils/UnifiedRedisClient')
+const { getRedisClient: getRedisClientInstance } = require('../utils/UnifiedRedisClient')
 // BeijingTimeHelper 未在当前版本中使用，保留导入用于未来时间处理需求
 
 /**
@@ -53,7 +53,7 @@ class BatchOperationService {
    */
   static getRedisClient() {
     try {
-      return getUnifiedRedisClient()
+      return getRedisClientInstance()
     } catch (error) {
       logger.warn('Redis 客户端初始化失败', { error: error.message })
       return null

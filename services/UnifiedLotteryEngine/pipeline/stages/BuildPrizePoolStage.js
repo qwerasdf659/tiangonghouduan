@@ -35,17 +35,8 @@
  */
 
 const BaseStage = require('./BaseStage')
-
-/*
- * 注：以下导入预留用于未来扩展功能（当前版本暂未使用）
- * - LotteryPrize: 用于直接查询奖品（当前通过 context.campaign.prizes 获取）
- * - Op: Sequelize 操作符（当前条件过滤在 JavaScript 层面完成）
- * - BeijingTimeHelper: 时间处理工具（当前阶段不涉及时间计算）
- *
- * const { LotteryPrize } = require('../../../../models')
- * const { Op } = require('sequelize')
- * const BeijingTimeHelper = require('../../../../utils/timeHelper')
- */
+const { sequelize } = require('../../../../models')
+const BalanceService = require('../../../asset/BalanceService')
 
 /**
  * 档位定义（降级顺序）
@@ -118,6 +109,9 @@ class BuildPrizePoolStage extends BaseStage {
         allowed_tiers
       })
 
+      /* 获取抽奖策略配置（用于钻石配额控制） */
+      const strategy_config = campaign_data.strategy_config || {}
+
       /* 1. 根据库存和每日上限过滤奖品 */
       let filtered_prizes = await this._filterByAvailability(prizes)
 
@@ -126,24 +120,39 @@ class BuildPrizePoolStage extends BaseStage {
         filtered_prizes = this._filterByBudget(filtered_prizes, budget_before)
       }
 
-      /* 3. 按档位分组 */
+      /* 3. 根据钻石配额过滤钻石类奖品（双池隔离第二轨道） */
+      const diamond_quota_enabled =
+        strategy_config.diamond_quota_enabled === true ||
+        strategy_config.diamond_quota_enabled === 'true'
+      if (diamond_quota_enabled) {
+        filtered_prizes = await this._filterByDiamondQuota(
+          filtered_prizes,
+          user_id,
+          strategy_config
+        )
+      }
+
+      /* 4. 根据用户总中奖次数上限过滤奖品 */
+      filtered_prizes = await this._filterByUserWins(filtered_prizes, user_id)
+
+      /* 5. 按档位分组 */
       const prizes_by_tier = this._groupByTier(filtered_prizes)
 
-      /* 4. 确保有兜底奖品 */
+      /* 6. 确保有兜底奖品 */
       if (prizes_by_tier.fallback.length === 0 && fallback_prize) {
         prizes_by_tier.fallback.push(fallback_prize)
       }
 
-      /* 5. 根据 budget_tier 限制可参与的档位（新增） */
+      /* 7. 根据 budget_tier 限制可参与的档位 */
       const filtered_prizes_by_tier = this._filterByAllowedTiers(prizes_by_tier, allowed_tiers)
 
-      /* 6. 计算可用档位（在 allowed_tiers 限制后） */
+      /* 8. 计算可用档位（在 allowed_tiers 限制后） */
       const available_tiers = this._getAvailableTiers(filtered_prizes_by_tier)
 
-      /* 7. 判断是否有有价值的奖品 */
+      /* 9. 判断是否有有价值的奖品 */
       const has_valuable_prizes = this._hasValuablePrizes(filtered_prizes_by_tier)
 
-      /* 8. 构建返回数据 */
+      /* 10. 构建返回数据 */
       const result = {
         available_prizes: filtered_prizes,
         prizes_by_tier: filtered_prizes_by_tier,
@@ -331,6 +340,139 @@ class BuildPrizePoolStage extends BaseStage {
     }
 
     return false
+  }
+
+  /**
+   * 根据钻石配额过滤钻石类奖品（双池隔离第二轨道）
+   *
+   * 业务规则：
+   * - 消费审核通过时按比例发放 DIAMOND_QUOTA
+   * - 抽中钻石奖品时检查用户 DIAMOND_QUOTA 余额
+   * - 配额不足时根据 quota_exhausted_action 决定行为：
+   *   - filter：直接过滤掉该钻石奖品
+   *   - downgrade：保留最小额钻石奖品
+   *
+   * @param {Array} prizes - 奖品列表
+   * @param {number} user_id - 用户ID
+   * @param {Object} strategy_config - 策略配置
+   * @returns {Promise<Array>} 过滤后的奖品列表
+   * @private
+   */
+  async _filterByDiamondQuota(prizes, user_id, strategy_config) {
+    const action = (strategy_config.quota_exhausted_action || 'filter').replace(/"/g, '')
+
+    let user_quota = 0
+    try {
+      const userAccount = await BalanceService.getOrCreateAccount(
+        { user_id },
+        { transaction: null }
+      )
+      const balance = await BalanceService.getBalance(userAccount.account_id, 'DIAMOND_QUOTA', {
+        transaction: null
+      })
+      user_quota = balance?.available_amount || 0
+    } catch (error) {
+      this.log('warn', '查询钻石配额失败，跳过配额过滤', {
+        user_id,
+        error: error.message
+      })
+      return prizes
+    }
+
+    const diamond_prizes = prizes.filter(
+      p => p.material_asset_code === 'DIAMOND' && p.material_amount > 0
+    )
+    const non_diamond_prizes = prizes.filter(
+      p => !(p.material_asset_code === 'DIAMOND' && p.material_amount > 0)
+    )
+
+    if (diamond_prizes.length === 0) return prizes
+
+    if (user_quota <= 0) {
+      this.log('info', '用户钻石配额为零，执行配额耗尽策略', {
+        user_id,
+        action,
+        diamond_prizes_count: diamond_prizes.length
+      })
+
+      if (action === 'downgrade') {
+        const smallest = diamond_prizes.reduce(
+          (min, p) => (p.material_amount < min.material_amount ? p : min),
+          diamond_prizes[0]
+        )
+        return [...non_diamond_prizes, smallest]
+      }
+      return non_diamond_prizes
+    }
+
+    /* 配额足够的保留，不够的按策略处理 */
+    const affordable = diamond_prizes.filter(p => p.material_amount <= user_quota)
+    const unaffordable = diamond_prizes.filter(p => p.material_amount > user_quota)
+
+    if (unaffordable.length > 0) {
+      this.log('debug', '部分钻石奖品超出配额限制', {
+        user_id,
+        user_quota,
+        affordable_count: affordable.length,
+        filtered_count: unaffordable.length
+      })
+    }
+
+    return [...non_diamond_prizes, ...affordable]
+  }
+
+  /**
+   * 根据用户总中奖次数过滤奖品（跨日累计）
+   *
+   * 与 max_daily_wins 互补：
+   * - max_daily_wins：每日上限，由 _filterByAvailability 检查
+   * - max_user_wins：跨日总上限，由本方法检查
+   *
+   * @param {Array} prizes - 奖品列表
+   * @param {number} user_id - 用户ID
+   * @returns {Promise<Array>} 过滤后的奖品列表
+   * @private
+   */
+  async _filterByUserWins(prizes, user_id) {
+    const prizes_with_limit = prizes.filter(
+      p => p.max_user_wins !== null && p.max_user_wins !== undefined
+    )
+    if (prizes_with_limit.length === 0) return prizes
+
+    const prize_ids = prizes_with_limit.map(p => p.lottery_prize_id)
+
+    let user_win_counts
+    try {
+      const [results] = await sequelize.query(
+        `SELECT lottery_prize_id, COUNT(*) as win_count
+         FROM lottery_draws
+         WHERE user_id = ? AND lottery_prize_id IN (?)
+         GROUP BY lottery_prize_id`,
+        { replacements: [user_id, prize_ids] }
+      )
+      user_win_counts = new Map(results.map(r => [r.lottery_prize_id, parseInt(r.win_count)]))
+    } catch (error) {
+      this.log('warn', '查询用户历史中奖次数失败，跳过过滤', {
+        user_id,
+        error: error.message
+      })
+      return prizes
+    }
+
+    return prizes.filter(prize => {
+      if (prize.max_user_wins === null || prize.max_user_wins === undefined) return true
+      const user_wins = user_win_counts.get(prize.lottery_prize_id) || 0
+      if (user_wins >= prize.max_user_wins) {
+        this.log('debug', '奖品用户总中奖次数已达上限，已排除', {
+          lottery_prize_id: prize.lottery_prize_id,
+          prize_name: prize.prize_name,
+          user_wins,
+          max_user_wins: prize.max_user_wins
+        })
+        return false
+      }
+      return true
+    })
   }
 
   /**

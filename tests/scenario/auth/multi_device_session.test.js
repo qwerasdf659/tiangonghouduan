@@ -186,10 +186,10 @@ describe('P0-6: 多设备登录冲突测试', () => {
 
     /**
      * 验证数据库状态
-     * 注意：测试用户 role_level=100 是管理员，使用 'admin' 类型
+     * 用户端登录（/api/v4/auth/login）固定 user_type='user'，不再按 role_level 判定
      */
     console.log('\n🗄️ 数据库验证...')
-    const activeSessions = await AuthenticationSession.findUserActiveSessions('admin', testUserId)
+    const activeSessions = await AuthenticationSession.findUserActiveSessions('user', testUserId)
     console.log(`   活跃会话数量: ${activeSessions.length}`)
 
     // 应该只有1个活跃会话（设备B的）
@@ -343,11 +343,11 @@ describe('P0-6: 多设备登录冲突测试', () => {
     expect(validTokenCount).toBeGreaterThanOrEqual(1)
     console.log(`📊 ${validTokenCount} 个Token有效（并发场景下可能>1）`)
 
-    /*
+    /**
      * 验证数据库状态：活跃会话数量应该等于有效Token数量
-     * 注意：测试用户 role_level=100 是管理员，使用 'admin' 类型
+     * 用户端登录固定 user_type='user'
      */
-    const activeSessions = await AuthenticationSession.findUserActiveSessions('admin', testUserId)
+    const activeSessions = await AuthenticationSession.findUserActiveSessions('user', testUserId)
     expect(activeSessions.length).toBe(validTokenCount)
     console.log(`✅ 数据库活跃会话数: ${activeSessions.length}，与有效Token数一致`)
   }, 60000)
@@ -387,11 +387,11 @@ describe('P0-6: 多设备登录冲突测试', () => {
 
     /**
      * Step 3: 手动使所有会话失效（模拟强制登出）
-     * 注意：测试用户 role_level=100 是管理员，会话创建时使用 'admin' 类型
+     * 用户端登录固定 user_type='user'
      */
     console.log('🔒 手动使所有会话失效（模拟强制登出）...')
     const deactivatedCount = await AuthenticationSession.deactivateUserSessions(
-      'admin', // ✅ 使用 'admin' 类型（测试用户 role_level=100）
+      'user',
       testUserId,
       null
     )

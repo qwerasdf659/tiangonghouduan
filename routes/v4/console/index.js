@@ -80,6 +80,9 @@ const merchantsRoutes = require('./merchants') // 🆕 商家管理（2026-02-23
 // 🔴 广告系统路由（Phase 2-6）
 const adCampaignsRoutes = require('./ad-campaigns') // Phase 3: 广告计划管理
 const adSlotsRoutes = require('./ad-slots') // Phase 3: 广告位管理
+const adPricingRoutes = require('./ad-pricing') // 广告定价配置（DAU系数/折扣/底价）
+const zoneManagementRoutes = require('./zone-management') // P1c: 地域定向管理（商圈/区域/联合组 CRUD）
+const platformDiamondRoutes = require('./platform-diamond') // 平台钻石管理（余额/销毁）
 const adReportsRoutes = require('./ad-reports') // Phase 6: 广告报表
 
 // P2新增路由（2026-01-31 第2阶段任务）
@@ -160,6 +163,9 @@ router.use('/merchants', merchantsRoutes) // 🆕 商家管理路由（2026-02-2
 // 🔴 广告系统路由（Phase 2-6）
 router.use('/ad-campaigns', adCampaignsRoutes) // Phase 3: 广告计划管理路由
 router.use('/ad-slots', adSlotsRoutes) // Phase 3: 广告位管理路由
+router.use('/ad-pricing', adPricingRoutes) // 广告定价配置路由
+router.use('/zone-management', zoneManagementRoutes) // P1c: 地域定向管理路由
+router.use('/platform-diamond', platformDiamondRoutes) // 平台钻石管理路由
 router.use('/ad-reports', adReportsRoutes) // Phase 6: 广告报表路由
 
 // P2新增路由（2026-01-31 第2阶段任务）

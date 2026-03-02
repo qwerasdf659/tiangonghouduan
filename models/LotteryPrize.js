@@ -659,6 +659,13 @@ module.exports = sequelize => {
         type: DataTypes.INTEGER,
         comment: '每日最大中奖次数'
       },
+      /** 每人总中奖上限（跨日累计），NULL 表示不限制 */
+      max_user_wins: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        defaultValue: null,
+        comment: '每人总中奖上限（跨日累计），NULL表示不限制'
+      },
       total_win_count: {
         type: DataTypes.INTEGER,
         allowNull: false,

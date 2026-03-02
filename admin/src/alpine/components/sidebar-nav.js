@@ -201,6 +201,8 @@ export function sidebarNav() {
         icon: '📢',
         items: [
           { id: 'ad-management', name: '内容投放管理', url: '/admin/ad-management.html', badgeKey: 'adPendingReviewCount' },
+          { id: 'platform-diamond', name: '平台钻石管理', url: '/admin/platform-diamond.html' },
+          { id: 'zone-management', name: '地域管理', url: '/admin/zone-management.html' },
           { id: 'dict-mgmt', name: '字典管理', url: '/admin/dict-management.html' },
           { id: 'message-center', name: '消息中心', url: '/admin/message-center.html' }
         ]

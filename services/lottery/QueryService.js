@@ -649,7 +649,7 @@ class LotteryQueryService {
    *   - 状态检查在缓存命中后实时执行（确保状态变化后能正确报错）
    *   - 缓存 key: lottery:campaigns:code:{campaign_code}
    *
-   * @param {string} campaign_code - 活动代码（如'BASIC_LOTTERY'）
+   * @param {string} campaign_code - 活动代码（如'CAMP20250901001'）
    * @param {Object} options - 选项参数
    * @param {boolean} options.checkStatus - 是否检查活动状态（默认true）
    * @param {boolean} options.refresh - 强制刷新缓存（默认false）
@@ -686,8 +686,12 @@ class LotteryQueryService {
         if (!campaign) {
           const error = new Error('活动不存在，请检查活动代码是否正确')
           error.code = 'CAMPAIGN_NOT_FOUND'
+          error.errorCode = 'CAMPAIGN_NOT_FOUND'
           error.statusCode = 404
-          error.data = { campaign_code, hint: '常见活动代码: BASIC_LOTTERY' }
+          error.data = {
+            campaign_code,
+            hint: '请通过 GET /api/v4/lottery/campaigns/active 获取可用活动列表'
+          }
           throw error
         }
 
@@ -711,6 +715,7 @@ class LotteryQueryService {
         }
         const error = new Error(statusMessages[campaignStatus] || '活动暂不可用')
         error.code = 'CAMPAIGN_NOT_ACTIVE'
+        error.errorCode = 'CAMPAIGN_NOT_ACTIVE'
         error.statusCode = 403
         error.data = {
           campaign_code,

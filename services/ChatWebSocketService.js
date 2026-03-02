@@ -161,6 +161,14 @@ class ChatWebSocketService {
             })
             return next(new Error(`Authentication failed: ${reason}`))
           }
+
+          /**
+           * 将会话的 user_type 挂到 socket 上，用于连接路由（connectedUsers / connectedAdmins）。
+           * user_type 按登录上下文确定（用户端=user，管理后台=admin），
+           * 确保 disconnectUser 与 session 的 user_type 一致。
+           */
+          // eslint-disable-next-line require-atomic-updates
+          socket.session_user_type = session.user_type
         } else {
           wsLogger.warn('WebSocket握手失败：Token缺少session_token', {
             user_id: decoded.user_id,
@@ -204,16 +212,29 @@ class ChatWebSocketService {
    */
   setupEventHandlers() {
     this.io.on('connection', socket => {
-      // 从 JWT 自动注册用户身份，使用 role_level >= 100 判断管理员
       const userId = socket.user.user_id
-      const isAdmin = socket.user.role_level >= 100
+      /**
+       * 连接路由基于会话的 user_type（登录上下文）而非 role_level：
+       *   user_type='admin' → connectedAdmins（管理后台 WebSocket）
+       *   user_type='user'  → connectedUsers（用户端/小程序 WebSocket）
+       * 这样同一管理员可在小程序(connectedUsers) + 管理后台(connectedAdmins) 同时在线。
+       */
+      const isAdminSession = socket.session_user_type === 'admin'
 
-      if (isAdmin) {
+      if (isAdminSession) {
         this.connectedAdmins.set(userId, socket.id)
-        wsLogger.info('管理员已连接', { user_id: userId, socket_id: socket.id })
+        wsLogger.info('管理员已连接', {
+          user_id: userId,
+          socket_id: socket.id,
+          session_user_type: socket.session_user_type
+        })
       } else {
         this.connectedUsers.set(userId, socket.id)
-        wsLogger.info('用户已连接', { user_id: userId, socket_id: socket.id })
+        wsLogger.info('用户已连接', {
+          user_id: userId,
+          socket_id: socket.id,
+          session_user_type: socket.session_user_type
+        })
       }
 
       // ⚡ 连接数检查（2025年01月21日新增）
@@ -266,10 +287,9 @@ class ChatWebSocketService {
         })
       })
 
-      // 🔌 连接建立确认（2026-02-15 新增 - 微信小程序前端适配）
       socket.emit('connection_established', {
         user_id: userId,
-        is_admin: isAdmin,
+        is_admin: isAdminSession,
         socket_id: socket.id,
         server_time: BeijingTimeHelper.now(),
         timestamp: Date.now()
@@ -882,21 +902,34 @@ class ChatWebSocketService {
   }
 
   /**
-   * 强制断开指定用户的连接
+   * 强制断开指定用户的连接（会话被替换时调用）
+   *
    * @param {Number} user_id - 用户ID
-   * @param {String} user_type - 用户类型 'user' 或 'admin'
+   * @param {String} user_type - 会话类型 'user'（用户端）或 'admin'（管理后台）
+   * @param {Object} [options] - 可选参数
+   * @param {String} [options.reason='session_replaced'] - 断连原因
+   * @param {String} [options.replaced_by_platform] - 替换登录的平台
    * @returns {void} 无返回值，强制断开用户WebSocket连接
    */
-  disconnectUser(user_id, user_type = 'user') {
+  disconnectUser(user_id, user_type = 'user', options = {}) {
+    const { reason = 'session_replaced', replaced_by_platform = null } = options
     const map = user_type === 'user' ? this.connectedUsers : this.connectedAdmins
     const socketId = map.get(user_id)
 
     if (socketId) {
       const socket = this.io.sockets.sockets.get(socketId)
       if (socket) {
+        socket.emit('session_replaced', {
+          reason,
+          replaced_by_platform,
+          message: '您的账号已在其他设备登录'
+        })
         socket.disconnect(true)
         map.delete(user_id)
-        wsLogger.info(`🔌 已强制断开 ${user_type} ${user_id} 的连接`)
+        wsLogger.info(`🔌 已强制断开 ${user_type} ${user_id} 的连接`, {
+          reason,
+          replaced_by_platform
+        })
       }
     }
   }
@@ -1491,7 +1524,7 @@ class ChatWebSocketService {
   async handleReconnection(socket, options = {}) {
     const { last_sync_time } = options
     const userId = socket.user?.user_id
-    const isAdmin = socket.user?.role_level >= 100
+    const isAdminSession = socket.session_user_type === 'admin'
 
     if (!userId) {
       wsLogger.warn('会话恢复失败：用户未认证', { socket_id: socket.id })
@@ -1505,12 +1538,11 @@ class ChatWebSocketService {
     try {
       wsLogger.info('开始会话恢复', {
         user_id: userId,
-        is_admin: isAdmin,
+        is_admin: isAdminSession,
         last_sync_time: last_sync_time || 'not_provided'
       })
 
-      // 1. 恢复连接映射（如果之前有断开的连接，更新为新的socket）
-      if (isAdmin) {
+      if (isAdminSession) {
         this.connectedAdmins.set(userId, socket.id)
         wsLogger.info('管理员连接映射已恢复', { user_id: userId, socket_id: socket.id })
       } else {
@@ -1518,9 +1550,8 @@ class ChatWebSocketService {
         wsLogger.info('用户连接映射已恢复', { user_id: userId, socket_id: socket.id })
       }
 
-      // 2. 获取离线消息
       let offlineMessages = { messages: [], count: 0 }
-      if (!isAdmin) {
+      if (!isAdminSession) {
         // 只为普通用户获取离线消息
         const since = last_sync_time ? new Date(last_sync_time) : undefined
         offlineMessages = await this.getOfflineMessages(userId, { since })
@@ -1540,11 +1571,10 @@ class ChatWebSocketService {
         }
       }
 
-      // 4. 发送会话恢复成功通知
       const result = {
         success: true,
         user_id: userId,
-        is_admin: isAdmin,
+        is_admin: isAdminSession,
         offline_messages_count: offlineMessages.count,
         sync_timestamp: BeijingTimeHelper.now(),
         message: `会话恢复成功${offlineMessages.count > 0 ? `，已推送${offlineMessages.count}条离线消息` : ''}`

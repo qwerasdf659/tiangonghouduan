@@ -218,7 +218,7 @@ describe('【P0】概率分布验证测试 - 10,000次抽奖统计', () => {
     // 获取活动信息（直接从 TestConfig.realData 获取，已在 initRealTestData 中查询数据库）
     console.log('📋 获取活动配置...')
     campaignId = TestConfig.realData.testCampaign?.lottery_campaign_id || 1
-    campaignCode = TestConfig.realData.testCampaign?.campaign_code || 'BASIC_LOTTERY'
+    campaignCode = TestConfig.realData.testCampaign?.campaign_code || 'CAMP20250901001'
     console.log(`✅ 活动ID: ${campaignId}, 活动代码: ${campaignCode}`)
 
     // 检查并充值测试积分

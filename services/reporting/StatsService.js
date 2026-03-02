@@ -512,20 +512,29 @@ class StatsService {
             raw: true
           }),
 
-          // 库存统计（使用新表 Item）
-          models.Item.findAll({
-            where: { owner_user_id: user_id },
-            attributes: [
-              [fn('COUNT', col('*')), 'total_items'],
-              [fn('COUNT', literal('CASE WHEN status = "available" THEN 1 END')), 'available_items']
-            ],
-            raw: true
-          }),
+          // 库存统计（使用新表 Item，通过 Account 关联查询）
+          (async () => {
+            const itemAccount = await models.Account.findOne({
+              where: { user_id, account_type: 'user' },
+              attributes: ['account_id']
+            })
+            if (!itemAccount) return [{ total_items: 0, available_items: 0 }]
+            return models.Item.findAll({
+              where: { owner_account_id: itemAccount.account_id },
+              attributes: [
+                [fn('COUNT', col('*')), 'total_items'],
+                [
+                  fn('COUNT', literal('CASE WHEN status = "available" THEN 1 END')),
+                  'available_items'
+                ]
+              ],
+              raw: true
+            })
+          })(),
 
           // 积分统计（使用 AssetTransaction，通过 Account 关联查询用户积分流水）
           (async () => {
             try {
-              // 先获取用户的 account_id
               const account = await models.Account.findOne({
                 where: { user_id, account_type: 'user' },
                 attributes: ['account_id']

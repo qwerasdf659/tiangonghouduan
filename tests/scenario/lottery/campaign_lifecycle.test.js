@@ -95,7 +95,7 @@ describe('📊 任务11.2：活动全生命周期测试', () => {
 
     // 3. 获取测试活动信息
     testCampaignId = global.testData?.testCampaign?.lottery_campaign_id
-    testCampaignCode = TestConfig.realData?.testCampaign?.campaign_code || 'BASIC_LOTTERY'
+    testCampaignCode = TestConfig.realData?.testCampaign?.campaign_code || 'CAMP20250901001'
     testCampaignName = global.testData?.testCampaign?.campaign_name || '测试活动'
 
     console.log(
@@ -191,7 +191,7 @@ describe('📊 任务11.2：活动全生命周期测试', () => {
 
       // 使用活动代码查询奖品池
       const response = await request(app)
-        .get(`/api/v4/console/prize-pool/${testCampaignCode || 'BASIC_LOTTERY'}`)
+        .get(`/api/v4/console/prize-pool/${testCampaignCode || 'CAMP20250901001'}`)
         .set('Authorization', `Bearer ${adminToken}`)
 
       console.log(`   响应状态: ${response.status}`)
@@ -227,7 +227,7 @@ describe('📊 任务11.2：活动全生命周期测试', () => {
       console.log('🎁 验证奖品档位分布...')
 
       const response = await request(app)
-        .get(`/api/v4/console/prize-pool/${testCampaignCode || 'BASIC_LOTTERY'}`)
+        .get(`/api/v4/console/prize-pool/${testCampaignCode || 'CAMP20250901001'}`)
         .set('Authorization', `Bearer ${adminToken}`)
 
       if (response.status === 200 && response.body.data) {

@@ -37,34 +37,6 @@ function sanitizeSql(sql) {
   return sql.replace(/(\d{3})\d{4}(\d{4})/g, '$1****$2')
 }
 
-/*
- * 🔴 集成数据库性能监控模块（2025-11-09新增）
- * 用于统计慢查询频率，支持性能监控和告警
- *
- * 🔧 循环依赖修复（2026-01-31）：
- * 使用延迟加载模式，避免 database.js <-> database_performance_monitor.js 循环依赖
- */
-let performanceMonitor = null
-let monitorLoadAttempted = false
-
-/**
- * 延迟加载性能监控模块（解决循环依赖）
- * @returns {Object|null} 监控模块实例或null
- */
-function getPerformanceMonitor() {
-  if (!monitorLoadAttempted) {
-    monitorLoadAttempted = true
-    try {
-      const { monitor } = require('../scripts/maintenance/database_performance_monitor')
-      performanceMonitor = monitor
-    } catch (error) {
-      // 如果监控模块加载失败，不影响数据库正常运行
-      console.warn('⚠️ 数据库性能监控模块加载失败，慢查询统计功能不可用:', error.message)
-    }
-  }
-  return performanceMonitor
-}
-
 const slowQueryLogger = (sql, timing) => {
   if (timing >= SLOW_QUERY_THRESHOLD) {
     console.warn('🐌 慢查询检测:', {
@@ -73,21 +45,6 @@ const slowQueryLogger = (sql, timing) => {
       threshold: `${SLOW_QUERY_THRESHOLD}ms`,
       timestamp: new Date().toISOString()
     })
-
-    /*
-     * 🔴 记录慢查询到性能监控系统（2025-11-09新增）
-     * 用于统计慢查询频率，判断是否需要优化
-     * 🔧 循环依赖修复：使用延迟加载函数获取监控模块
-     */
-    const monitor = getPerformanceMonitor()
-    if (monitor) {
-      try {
-        monitor.recordSlowQuery(sql, timing)
-      } catch (error) {
-        // 监控记录失败不影响业务逻辑
-        console.warn('⚠️ 慢查询统计记录失败:', error.message)
-      }
-    }
   }
 }
 

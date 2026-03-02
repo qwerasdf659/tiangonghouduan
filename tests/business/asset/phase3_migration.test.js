@@ -16,7 +16,12 @@
  * - 模型直接引用用于测试数据准备/清理
  */
 
-const { User, AssetTransaction, sequelize: _sequelize } = require('../../../models')
+const {
+  User,
+  AssetTransaction,
+  MaterialConversionRule,
+  sequelize: _sequelize
+} = require('../../../models')
 const { Op } = require('sequelize')
 const TransactionManager = require('../../../utils/TransactionManager')
 
@@ -26,6 +31,7 @@ let AssetConversionService
 
 describe('Phase 3迁移测试：统一账本域', () => {
   let testUser
+  let createdConversionRule = false
 
   beforeAll(async () => {
     // 🔴 P1-9：通过 ServiceManager 获取服务实例（snake_case key）
@@ -49,12 +55,37 @@ describe('Phase 3迁移测试：统一账本域', () => {
     } else {
       console.log('✅ 使用已存在测试用户:', testUser.user_id)
     }
+
+    // 确保 red_shard → DIAMOND 转换规则存在（固定比例 1:20）
+    const existingRule = await MaterialConversionRule.findOne({
+      where: {
+        from_asset_code: 'red_shard',
+        to_asset_code: 'DIAMOND',
+        is_enabled: true
+      }
+    })
+
+    if (!existingRule) {
+      await MaterialConversionRule.create({
+        from_asset_code: 'red_shard',
+        to_asset_code: 'DIAMOND',
+        from_amount: 1,
+        to_amount: 20,
+        fee_rate: 0,
+        is_enabled: true,
+        effective_at: new Date('2025-01-01'),
+        created_by: testUser.user_id
+      })
+      createdConversionRule = true
+      console.log('✅ 创建转换规则: red_shard → DIAMOND (1:20)')
+    } else {
+      console.log('✅ 转换规则已存在: red_shard → DIAMOND')
+    }
   })
 
   afterAll(async () => {
     // 清理测试数据（保留测试用户，只清理测试业务数据）
     if (testUser) {
-      // 只清理测试相关的业务数据
       await AssetTransaction.destroy({
         where: {
           idempotency_key: { [Op.like]: 'test_phase3_%' }
@@ -62,6 +93,17 @@ describe('Phase 3迁移测试：统一账本域', () => {
       })
 
       console.log('✅ 清理测试数据完成（保留测试用户）')
+    }
+
+    if (createdConversionRule) {
+      await MaterialConversionRule.destroy({
+        where: {
+          from_asset_code: 'red_shard',
+          to_asset_code: 'DIAMOND',
+          created_by: testUser?.user_id
+        }
+      })
+      console.log('✅ 清理测试创建的转换规则')
     }
   })
 

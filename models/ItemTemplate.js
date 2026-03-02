@@ -211,20 +211,6 @@ module.exports = sequelize => {
         onDelete: 'SET NULL'
       },
 
-      // 遗留字段（已废弃，保留数据库兼容性，新功能使用 image_resource_id）
-      image_url: {
-        type: DataTypes.STRING(500),
-        allowNull: true,
-        comment: '【已废弃】物品图片URL（请使用 image_resource_id）'
-      },
-
-      // 遗留字段（已废弃）
-      thumbnail_url: {
-        type: DataTypes.STRING(500),
-        allowNull: true,
-        comment: '【已废弃】缩略图URL（请使用 image_resource_id 关联的缩略图）'
-      },
-
       // 参考价格（积分）
       reference_price_points: {
         type: DataTypes.DECIMAL(10, 2),

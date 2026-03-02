@@ -193,7 +193,7 @@ class LoadCampaignStage extends BaseStage {
    */
   async _getFallbackPrize(prizes, campaign) {
     // 从 lottery_strategy_config 读取档位降级兜底奖品ID
-    const { DynamicConfigLoader } = require('../../compute/config/StrategyConfig')
+    const { DynamicConfigLoader } = require('../../compute/config/ComputeConfig')
     const tier_fallback_prize_id = await DynamicConfigLoader.getValue(
       'tier_fallback',
       'prize_id',

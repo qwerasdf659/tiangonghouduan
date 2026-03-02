@@ -171,7 +171,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
        */
       expect(result).toBeDefined()
       expect(result.transaction_record).toBeDefined()
-      expect(result.transaction_record.transaction_id).toBeDefined()
+      expect(result.transaction_record.asset_transaction_id).toBeDefined()
       expect(Number(result.transaction_record.delta_amount)).toBe(-deductAmount)
       expect(result.is_duplicate).toBe(false)
 
@@ -180,7 +180,9 @@ describe('Phase 2 资产账户测试（P1）', () => {
         { user_id: testUserContext.user_id, asset_code: 'POINTS' },
         {}
       )
-      expect(afterBalance.available_amount).toBe(beforeBalance.available_amount - deductAmount)
+      expect(Number(afterBalance.available_amount)).toBe(
+        Number(beforeBalance.available_amount) - deductAmount
+      )
 
       console.log('✅ 3.1.1 POINTS 扣费测试通过')
       console.log(`   - 扣费前余额: ${beforeBalance.available_amount}`)
@@ -219,7 +221,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
        */
       expect(result).toBeDefined()
       expect(result.transaction_record).toBeDefined()
-      expect(result.transaction_record.transaction_id).toBeDefined()
+      expect(result.transaction_record.asset_transaction_id).toBeDefined()
       expect(Number(result.transaction_record.delta_amount)).toBe(-deductAmount)
 
       // 验证余额变化
@@ -227,7 +229,9 @@ describe('Phase 2 资产账户测试（P1）', () => {
         { user_id: testUserContext.user_id, asset_code: 'red_shard' },
         {}
       )
-      expect(afterBalance.available_amount).toBe(beforeBalance.available_amount - deductAmount)
+      expect(Number(afterBalance.available_amount)).toBe(
+        Number(beforeBalance.available_amount) - deductAmount
+      )
 
       console.log('✅ 3.1.2 red_shard 扣费测试通过')
       console.log(`   - 扣费前余额: ${beforeBalance.available_amount}`)
@@ -279,8 +283,8 @@ describe('Phase 2 资产账户测试（P1）', () => {
 
       // 验证幂等返回
       expect(result2.is_duplicate).toBe(true)
-      expect(Number(result2.transaction_record.transaction_id)).toBe(
-        Number(result1.transaction_record.transaction_id)
+      expect(Number(result2.transaction_record.asset_transaction_id)).toBe(
+        Number(result1.transaction_record.asset_transaction_id)
       )
 
       // 验证余额只扣减一次
@@ -288,7 +292,9 @@ describe('Phase 2 资产账户测试（P1）', () => {
         { user_id: testUserContext.user_id, asset_code: 'POINTS' },
         {}
       )
-      expect(finalBalance.available_amount).toBe(initialBalance.available_amount - deductAmount)
+      expect(Number(finalBalance.available_amount)).toBe(
+        Number(initialBalance.available_amount) - deductAmount
+      )
 
       console.log('✅ 3.1.3 扣费幂等性测试通过')
     })
@@ -345,7 +351,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
        */
       expect(result).toBeDefined()
       expect(result.transaction_record).toBeDefined()
-      expect(result.transaction_record.transaction_id).toBeDefined()
+      expect(result.transaction_record.asset_transaction_id).toBeDefined()
       expect(Number(result.transaction_record.delta_amount)).toBe(rewardAmount)
       expect(result.is_duplicate).toBe(false)
 
@@ -354,7 +360,9 @@ describe('Phase 2 资产账户测试（P1）', () => {
         { user_id: testUserContext.user_id, asset_code: 'POINTS' },
         {}
       )
-      expect(afterBalance.available_amount).toBe(beforeBalance.available_amount + rewardAmount)
+      expect(Number(afterBalance.available_amount)).toBe(
+        Number(beforeBalance.available_amount) + rewardAmount
+      )
 
       console.log('✅ 3.2.1 POINTS 奖励发放测试通过')
       console.log(`   - 发放前余额: ${beforeBalance.available_amount}`)
@@ -403,7 +411,9 @@ describe('Phase 2 资产账户测试（P1）', () => {
         { user_id: testUserContext.user_id, asset_code: 'DIAMOND' },
         {}
       )
-      expect(afterBalance.available_amount).toBe(beforeBalance.available_amount + rewardAmount)
+      expect(Number(afterBalance.available_amount)).toBe(
+        Number(beforeBalance.available_amount) + rewardAmount
+      )
 
       console.log('✅ 3.2.2 DIAMOND 奖励发放测试通过')
     })
@@ -438,7 +448,9 @@ describe('Phase 2 资产账户测试（P1）', () => {
         { user_id: testUserContext.user_id, asset_code: 'red_shard' },
         {}
       )
-      expect(afterBalance.available_amount).toBe(beforeBalance.available_amount + rewardAmount)
+      expect(Number(afterBalance.available_amount)).toBe(
+        Number(beforeBalance.available_amount) + rewardAmount
+      )
 
       console.log('✅ 3.2.3 red_shard 奖励发放测试通过')
     })
@@ -461,7 +473,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
       )
 
       // 尝试扣除超过可用余额的金额
-      const excessiveAmount = currentBalance.available_amount + 10000
+      const excessiveAmount = Number(currentBalance.available_amount) + 10000
 
       // 验证扣费被拒绝并抛出错误
       await expect(
@@ -485,7 +497,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
         { user_id: testUserContext.user_id, asset_code: 'POINTS' },
         {}
       )
-      expect(afterBalance.available_amount).toBe(currentBalance.available_amount)
+      expect(Number(afterBalance.available_amount)).toBe(Number(currentBalance.available_amount))
 
       console.log('✅ 3.3.1 余额不足拦截测试通过')
       console.log(`   - 当前余额: ${currentBalance.available_amount}`)
@@ -519,7 +531,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
       )
 
       // 扣除恰好等于可用余额的金额
-      const exactAmount = currentBalance.available_amount
+      const exactAmount = Number(currentBalance.available_amount)
 
       const result = await TransactionManager.execute(async transaction => {
         return await BalanceService.changeBalance(
@@ -544,7 +556,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
         { user_id: testUserContext.user_id, asset_code: 'POINTS' },
         {}
       )
-      expect(afterBalance.available_amount).toBe(0)
+      expect(Number(afterBalance.available_amount)).toBe(0)
 
       console.log('✅ 3.3.2 边界值扣费测试通过')
     })
@@ -561,13 +573,13 @@ describe('Phase 2 资产账户测试（P1）', () => {
       )
 
       // 如果余额不为0，先扣除到0
-      if (currentBalance.available_amount > 0) {
+      if (currentBalance && Number(currentBalance.available_amount) > 0) {
         await TransactionManager.execute(async transaction => {
           await BalanceService.changeBalance(
             {
               user_id: testUserContext.user_id,
               asset_code: testAssetCode,
-              delta_amount: -currentBalance.available_amount,
+              delta_amount: -Number(currentBalance.available_amount),
               idempotency_key: `${TEST_PREFIX}_zero_init_${Date.now()}`,
               business_type: 'admin_adjustment',
               meta: { reason: '3.3.3 测试初始化' }
@@ -658,7 +670,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
         { user_id: testUserContext.user_id, asset_code: 'POINTS' },
         {}
       )
-      expect(afterBalance.available_amount).toBe(beforeBalance.available_amount)
+      expect(Number(afterBalance.available_amount)).toBe(Number(beforeBalance.available_amount))
 
       // 验证扣费交易记录也被回滚（不存在）
       const deductTx = await AssetTransaction.findOne({
@@ -737,14 +749,18 @@ describe('Phase 2 资产账户测试（P1）', () => {
         { user_id: testUserContext.user_id, asset_code: 'POINTS' },
         {}
       )
-      expect(afterPointsBalance.available_amount).toBe(beforePointsBalance.available_amount - 200)
+      expect(Number(afterPointsBalance.available_amount)).toBe(
+        Number(beforePointsBalance.available_amount) - 200
+      )
 
       // 验证奖励生效
       const afterDiamondBalance = await BalanceService.getBalance(
         { user_id: testUserContext.user_id, asset_code: 'DIAMOND' },
         {}
       )
-      expect(afterDiamondBalance.available_amount).toBe(beforeDiamondBalance.available_amount + 50)
+      expect(Number(afterDiamondBalance.available_amount)).toBe(
+        Number(beforeDiamondBalance.available_amount) + 50
+      )
 
       // 验证两条交易记录都存在
       const deductTx = await AssetTransaction.findOne({
@@ -851,8 +867,10 @@ describe('Phase 2 资产账户测试（P1）', () => {
       expect(txRecord.lottery_session_id).toBe('test_session_3.5.1')
 
       // 验证余额快照字段
-      expect(Number(txRecord.balance_before)).toBe(beforeBalance.available_amount)
-      expect(Number(txRecord.balance_after)).toBe(beforeBalance.available_amount - deductAmount)
+      expect(Number(txRecord.balance_before)).toBe(Number(beforeBalance.available_amount))
+      expect(Number(txRecord.balance_after)).toBe(
+        Number(beforeBalance.available_amount) - deductAmount
+      )
 
       // 验证元数据
       const meta = typeof txRecord.meta === 'string' ? JSON.parse(txRecord.meta) : txRecord.meta
@@ -909,8 +927,10 @@ describe('Phase 2 资产账户测试（P1）', () => {
       expect(txRecord.lottery_session_id).toBe('test_session_3.5.2')
 
       // 验证余额快照
-      expect(Number(txRecord.balance_before)).toBe(beforeBalance.available_amount)
-      expect(Number(txRecord.balance_after)).toBe(beforeBalance.available_amount + rewardAmount)
+      expect(Number(txRecord.balance_before)).toBe(Number(beforeBalance.available_amount))
+      expect(Number(txRecord.balance_after)).toBe(
+        Number(beforeBalance.available_amount) + rewardAmount
+      )
 
       console.log('✅ 3.5.2 奖励交易记录完整性测试通过')
     })

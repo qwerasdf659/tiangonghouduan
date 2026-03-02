@@ -91,10 +91,10 @@ class AssetPortfolioQueryService {
         },
         order: [['balance', 'DESC']]
       }),
-      // 获取物品实例
+      // 获取物品实例（通过 account_id 查询，items 表使用 owner_account_id）
       Item.findAll({
         where: {
-          owner_user_id: parseInt(user_id),
+          owner_account_id: account.account_id,
           status: 'available'
         },
         order: [['created_at', 'DESC']],
@@ -265,28 +265,38 @@ class AssetPortfolioQueryService {
    * @returns {Promise<Object>} 物品持有分析
    */
   static async getItemHoldingAnalysis(user_id) {
-    const { Item } = require('../../models')
+    const { Item, Account } = require('../../models')
 
-    // 按物品类型分组统计
+    const account = await Account.findOne({
+      where: { user_id: parseInt(user_id), account_type: 'user' },
+      attributes: ['account_id']
+    })
+
+    if (!account) {
+      return {
+        user_id: parseInt(user_id),
+        total_items: 0,
+        by_type: {},
+        by_status: {}
+      }
+    }
+
+    const ownerWhere = { owner_account_id: account.account_id }
+
     const [typeStats, statusStats, totalItems] = await Promise.all([
-      // 按类型统计
       Item.findAll({
         attributes: ['item_type', [fn('COUNT', col('item_id')), 'count']],
-        where: { owner_user_id: parseInt(user_id) },
+        where: ownerWhere,
         group: ['item_type'],
         raw: true
       }),
-      // 按状态统计
       Item.findAll({
         attributes: ['status', [fn('COUNT', col('item_id')), 'count']],
-        where: { owner_user_id: parseInt(user_id) },
+        where: ownerWhere,
         group: ['status'],
         raw: true
       }),
-      // 总物品数
-      Item.count({
-        where: { owner_user_id: parseInt(user_id) }
-      })
+      Item.count({ where: ownerWhere })
     ])
 
     return {

@@ -11,7 +11,13 @@
  */
 
 const { Op } = require('sequelize')
-const { CustomerServiceSession, ChatMessage, UserNotification, User } = require('../../../models')
+const {
+  CustomerServiceSession,
+  ChatMessage,
+  UserNotification,
+  AdminNotification,
+  User
+} = require('../../../models')
 const { TEST_DATA } = require('../../helpers/test-data')
 const NotificationService = require('../../../services/NotificationService')
 
@@ -48,8 +54,8 @@ describe('NotificationService - 统一通知服务', () => {
         'exchange_pending',
         'exchange_approved',
         'exchange_rejected',
-        'new_exchange_audit',
-        'pending_orders_alert',
+        'exchange_audit',
+        'timeout_alert',
         'image_approved',
         'image_rejected',
         'format_test',
@@ -76,6 +82,17 @@ describe('NotificationService - 统一通知服务', () => {
           where: { message_id: { [Op.in]: createdChatMessageIds } }
         })
       }
+
+      // 清理测试产生的 admin_notifications 数据（sendToAdmins 持久化）
+      const adminTestTypes = [
+        'admin_test',
+        'exchange_audit',
+        'timeout_alert',
+        'system_announcement'
+      ]
+      await AdminNotification.destroy({
+        where: { source_type: { [Op.in]: adminTestTypes } }
+      })
 
       // 清理测试创建的 system_notification 空壳会话
       if (createdSessionIds.length > 0) {
@@ -166,8 +183,7 @@ describe('NotificationService - 统一通知服务', () => {
       })
 
       expect(result.success).toBe(true)
-      expect(result.notification_id).toBeDefined()
-      if (result.notification_id) createdNotificationIds.push(result.notification_id)
+      expect(result.persisted_count).toBeGreaterThanOrEqual(0)
       expect(result.target).toBe('admins')
       expect(result.type).toBe('admin_test')
       expect(result.broadcasted_count).toBeGreaterThanOrEqual(0)
@@ -244,7 +260,7 @@ describe('NotificationService - 统一通知服务', () => {
       if (result.notification_id) createdNotificationIds.push(result.notification_id)
 
       expect(result.success).toBe(true)
-      expect(result.type).toBe('new_exchange_audit')
+      expect(result.type).toBe('exchange_audit')
       expect(result.target).toBe('admins')
       expect(result.title).toBe('新的兑换订单待审核')
     })
@@ -263,7 +279,7 @@ describe('NotificationService - 统一通知服务', () => {
       if (result.notification_id) createdNotificationIds.push(result.notification_id)
 
       expect(result.success).toBe(true)
-      expect(result.type).toBe('pending_orders_alert')
+      expect(result.type).toBe('timeout_alert')
       expect(result.target).toBe('admins')
       expect(result.content).toContain('24小时')
     })

@@ -8,9 +8,9 @@
  * 2. 用户体系（管理员、普通用户、商户）
  * 3. 材料资产类型（含图标 icon_url）
  * 4. 图片资源（ImageResources，供兑换商品引用）
- * 5. 物品模板（含 image_url）
+ * 5. 物品模板
  * 6. 兑换商品图片绑定（更新 primary_image_id）
- * 7. 弹窗/轮播图（含 image_url）
+ * 7. 弹窗/轮播图
  * 8. 系统公告
  * 9. 抽奖活动 + 奖品
  * 10. 材料转换规则
@@ -806,7 +806,7 @@ module.exports = {
 
     /*
      * ================================================================
-     * 5. 物品模板（含 image_url）
+     * 5. 物品模板
      * ================================================================
      */
     console.log('📦 5/13 物品模板...')
@@ -819,8 +819,6 @@ module.exports = {
         rarity_code: 'legendary',
         display_name: 'iPhone 16 Pro',
         description: '苹果 iPhone 16 Pro 256GB，年度旗舰智能手机',
-        image_url: 'test-seeds/items/iphone-16-pro.jpg',
-        thumbnail_url: 'test-seeds/items/thumbnails/small/iphone-16-pro.jpg',
         reference_price_points: 89900,
         is_tradable: true,
         is_enabled: true,
@@ -835,8 +833,6 @@ module.exports = {
         rarity_code: 'epic',
         display_name: 'AirPods Pro 2',
         description: 'Apple AirPods Pro 第二代，主动降噪无线耳机',
-        image_url: 'test-seeds/items/airpods-pro-2.jpg',
-        thumbnail_url: 'test-seeds/items/thumbnails/small/airpods-pro-2.jpg',
         reference_price_points: 17900,
         is_tradable: true,
         is_enabled: true,
@@ -851,8 +847,6 @@ module.exports = {
         rarity_code: 'rare',
         display_name: '小米手环8',
         description: '小米手环8，全天候健康监测',
-        image_url: 'test-seeds/items/xiaomi-band-8.jpg',
-        thumbnail_url: 'test-seeds/items/thumbnails/small/xiaomi-band-8.jpg',
         reference_price_points: 2490,
         is_tradable: true,
         is_enabled: true,
@@ -867,8 +861,6 @@ module.exports = {
         rarity_code: 'uncommon',
         display_name: '星巴克50元代金券',
         description: '星巴克饮品 50 元代金券，全国门店通用',
-        image_url: 'test-seeds/items/starbucks-50.jpg',
-        thumbnail_url: 'test-seeds/items/thumbnails/small/starbucks-50.jpg',
         reference_price_points: 500,
         is_tradable: false,
         is_enabled: true,
@@ -883,8 +875,6 @@ module.exports = {
         rarity_code: 'common',
         display_name: '美团20元红包',
         description: '美团外卖 20 元红包，满 40 使用',
-        image_url: 'test-seeds/items/meituan-20.jpg',
-        thumbnail_url: 'test-seeds/items/thumbnails/small/meituan-20.jpg',
         reference_price_points: 200,
         is_tradable: false,
         is_enabled: true,
@@ -899,8 +889,6 @@ module.exports = {
         rarity_code: 'rare',
         display_name: '机械键盘 87键',
         description: 'Cherry 轴体 87键机械键盘，RGB背光',
-        image_url: 'test-seeds/items/mech-keyboard.jpg',
-        thumbnail_url: 'test-seeds/items/thumbnails/small/mech-keyboard.jpg',
         reference_price_points: 3990,
         is_tradable: true,
         is_enabled: true,
@@ -915,8 +903,6 @@ module.exports = {
         rarity_code: 'common',
         display_name: '品牌帆布袋',
         description: '环保帆布袋，大容量实用',
-        image_url: 'test-seeds/items/canvas-bag.jpg',
-        thumbnail_url: 'test-seeds/items/thumbnails/small/canvas-bag.jpg',
         reference_price_points: 290,
         is_tradable: false,
         is_enabled: true,
@@ -931,8 +917,6 @@ module.exports = {
         rarity_code: 'epic',
         display_name: '限定纪念徽章',
         description: '2026新春限定纪念徽章，编号收藏',
-        image_url: 'test-seeds/items/limited-badge.jpg',
-        thumbnail_url: 'test-seeds/items/thumbnails/small/limited-badge.jpg',
         reference_price_points: 9990,
         is_tradable: true,
         is_enabled: true,
@@ -947,8 +931,6 @@ module.exports = {
         rarity_code: 'uncommon',
         display_name: 'LED护眼台灯',
         description: '三色调光 LED 护眼台灯，USB充电',
-        image_url: 'test-seeds/items/desk-lamp.jpg',
-        thumbnail_url: 'test-seeds/items/thumbnails/small/desk-lamp.jpg',
         reference_price_points: 1290,
         is_tradable: true,
         is_enabled: true,
@@ -963,8 +945,6 @@ module.exports = {
         rarity_code: 'common',
         display_name: '已下架-旧款商品',
         description: '此物品模板已下架停用',
-        image_url: 'test-seeds/items/disabled-item.jpg',
-        thumbnail_url: null,
         reference_price_points: 100,
         is_tradable: false,
         is_enabled: false,
@@ -1179,8 +1159,10 @@ module.exports = {
     /* [已删除] popupBanners 数据 — 原 popup_banners 表已 DROP，数据通过 ad_campaigns (category=operational) 管理 */
     /* [已删除] carouselItems 数据 — 原 carousel_items 表已 DROP，数据通过 ad_campaigns (category=operational) 管理 */
 
-    // 以下注释保留数据结构参考，实际插入已移除
-    // 如需创建广告系统测试数据，请使用 ad_campaigns + ad_creatives 表
+    /*
+     * 以下注释保留数据结构参考，实际插入已移除
+     * 如需创建广告系统测试数据，请使用 ad_campaigns + ad_creatives 表
+     */
     console.log('📢 8/13 系统公告已合并到广告系统，跳过...')
 
     /* [已删除] announcements 数据 — 原 system_announcements 表已 DROP，数据通过 ad_campaigns (category=system) 管理 */
@@ -1995,9 +1977,9 @@ module.exports = {
     console.log('   - 稀有度字典：5条 | 类目字典：5条 | 资产分组：7条')
     console.log('   - 测试用户：复用已有用户（admin/普通/商户）')
     console.log('   - 材料资产类型：15种（含图标icon_url）')
-    console.log('   - 图片资源：8条 | 物品模板：10个（含image_url）')
+    console.log('   - 图片资源：8条 | 物品模板：10个')
     console.log('   - 兑换商品：7个（含primary_image_id绑定）')
-    console.log('   - 弹窗：5个 | 轮播图：5个（含image_url）')
+    console.log('   - 弹窗：5个 | 轮播图：5个')
     console.log('   - 系统公告：4条 | 抽奖活动：3个 | 奖品：6个')
     console.log('   - 材料转换规则：5条 | 广告位：4个')
     console.log('   - 广告活动：3个 | 广告素材：2个')

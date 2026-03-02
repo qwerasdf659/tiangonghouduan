@@ -484,19 +484,19 @@
                   </div>
 
                 <!-- 通知项 -->
-                <template x-for="notification in notifications" :key="notification.id">
+                <template x-for="notification in notifications" :key="notification.admin_notification_id">
                   <div 
                     class="px-4 py-3 border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition"
                     :class="{ 'bg-blue-50/50': !notification.is_read }"
                     @click="handleNotificationClick(notification)"
                   >
                     <div class="flex items-start gap-3">
-                      <!-- 类型图标 -->
+                      <!-- 类型图标（基于 source_type 映射） -->
                       <div 
                         class="w-8 h-8 rounded-full flex items-center justify-center text-sm flex-shrink-0"
-                        :class="getNotificationColorClass(notification.type)"
+                        :class="getNotificationColorClass(notification.source_type)"
                       >
-                        <span x-text="getNotificationIcon(notification.type)"></span>
+                        <span x-text="getNotificationIcon(notification.source_type)"></span>
                       </div>
                       
                       <!-- 内容 -->
@@ -507,13 +507,20 @@
                             :class="{ 'font-semibold': !notification.is_read }"
                             x-text="notification.title"
                           ></span>
+                          <!-- 优先级标签（仅 high/urgent 显示，帮助管理员快速识别紧急告警） -->
+                          <span 
+                            x-show="isHighPriority(notification.priority)"
+                            class="px-1.5 py-0.5 text-xs font-medium rounded flex-shrink-0"
+                            :class="getPriorityColorClass(notification.priority)"
+                            x-text="getPriorityLabel(notification.priority)"
+                          ></span>
                           <!-- 未读指示器 -->
                           <span 
                             x-show="!notification.is_read"
                             class="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"
                           ></span>
                         </div>
-                        <div class="text-xs text-gray-500 mt-0.5 line-clamp-2" x-text="notification.message"></div>
+                        <div class="text-xs text-gray-500 mt-0.5 line-clamp-2" x-text="notification.content || notification.message"></div>
                         <div class="text-xs text-gray-400 mt-1" x-text="formatTime(notification.created_at)"></div>
                       </div>
                     </div>

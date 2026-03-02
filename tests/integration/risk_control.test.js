@@ -114,7 +114,7 @@ describe('【P1】风控规则测试 - 限流规则、黑名单、异常检测',
     }
 
     // 获取活动信息
-    campaignCode = TestConfig.realData.testCampaign?.campaign_code || 'BASIC_LOTTERY'
+    campaignCode = TestConfig.realData.testCampaign?.campaign_code || 'CAMP20250901001'
     console.log(`📋 活动代码: ${campaignCode}`)
 
     console.log('='.repeat(80))

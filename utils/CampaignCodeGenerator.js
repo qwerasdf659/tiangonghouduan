@@ -13,7 +13,6 @@
  * - 日期部分使用北京时间（复用 BeijingTimeHelper）
  * - 序号部分：当天已有同前缀活动数 + 1，补零到 4 位
  * - 唯一约束：数据库 UNIQUE 索引保底，冲突时序号 +1 重试
- * - 旧编码（如 BASIC_LOTTERY、CAMP_xxx_xxx）保留不动，新旧共存
  *
  * 参考：utils/TrackingCodeGenerator.js 的静态类 generate/parse/validate 三件套模式
  *
@@ -28,7 +27,7 @@ const BeijingTimeHelper = require('./timeHelper')
 const { Op } = require('sequelize')
 
 /**
- * 活动编码前缀（与现有 4 条旧编码 CAMP_xxx 自然过渡，无割裂感）
+ * 活动编码前缀
  * @type {string}
  */
 const PREFIX = 'CAMP'
@@ -145,9 +144,6 @@ class CampaignCodeGenerator {
    * @example
    * CampaignCodeGenerator.parse('CAMP202602230001')
    * // { date_part: '20260223', seq: 1 }
-   *
-   * CampaignCodeGenerator.parse('BASIC_LOTTERY')
-   * // null（旧格式，不符合新规则）
    */
   static parse(code) {
     if (!code || typeof code !== 'string') return null
@@ -167,9 +163,6 @@ class CampaignCodeGenerator {
 
   /**
    * 验证活动编码是否符合新格式
-   *
-   * 注意：旧格式（BASIC_LOTTERY、CAMP_xxx_xxx）不符合此校验，这是预期行为。
-   * 此方法仅用于验证新生成的编码格式。
    *
    * @param {string} code - 待验证编码
    * @returns {boolean} 是否符合 CAMP{YYYYMMDD}{4+位数字} 格式

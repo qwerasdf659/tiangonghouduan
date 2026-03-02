@@ -18,7 +18,7 @@
  */
 
 const logger = require('../utils/logger').logger
-const { AdBillingRecord, AdCampaign } = require('../models')
+const { AdBillingRecord, AdCampaign, AdSlot } = require('../models')
 const { Op } = require('sequelize')
 const BeijingTimeHelper = require('../utils/timeHelper')
 const { v4: uuidv4 } = require('uuid')
@@ -292,17 +292,23 @@ class AdBillingService {
   /**
    * 处理每日竞价扣款（定时任务）
    *
-   * @param {Object} _options - 预留选项（每个计划使用独立事务）
+   * 竞争排名机制（2026-03-01 重构）：
+   * - 按 ad_slot_id 分组查询当日 active bidding 计划
+   * - 每组按 daily_bid_diamond DESC 排序
+   * - 取前 N 名（N = ad_slots.max_display_count）为中标
+   * - 仅对中标者创建 daily_deduct 记录并扣费
+   * - 落选者不扣费（保持 active 状态，次日继续参与竞价）
+   *
+   * @param {Object} _options - 预留选项
    * @returns {Promise<Object>} 处理结果统计
    */
   static async processDailyBidding(_options = {}) {
-    const { sequelize } = require('../models')
+    const { sequelize, AdSlot } = require('../models')
 
     try {
       const todayDate = BeijingTimeHelper.createBeijingTime()
       const today = todayDate.toISOString().split('T')[0]
 
-      // 查询不需要事务，只读操作
       const activeBiddingCampaigns = await AdCampaign.findAll({
         where: {
           status: 'active',
@@ -311,131 +317,140 @@ class AdBillingService {
         }
       })
 
+      /* 按广告位分组 */
+      const campaignsBySlot = new Map()
+      for (const campaign of activeBiddingCampaigns) {
+        const slotId = campaign.ad_slot_id
+        if (!campaignsBySlot.has(slotId)) {
+          campaignsBySlot.set(slotId, [])
+        }
+        campaignsBySlot.get(slotId).push(campaign)
+      }
+
       const results = {
         processed: 0,
         completed: 0,
         failed: 0,
         skipped: 0,
+        eliminated: 0,
         total_deducted: 0
       }
 
-      // 每个计划使用独立事务，一个失败不影响其他计划
-      for (const campaign of activeBiddingCampaigns) {
-        const campaignTransaction = await sequelize.transaction()
+      for (const [slotId, campaigns] of campaignsBySlot) {
+        const slot = await AdSlot.findByPk(slotId)
+        const maxWinners = slot?.max_display_count || 1
 
-        try {
-          // 检查今日是否已扣款（幂等性保护）
-          const existingDeduct = await AdBillingRecord.findOne({
-            where: {
-              ad_campaign_id: campaign.ad_campaign_id,
-              billing_date: today,
-              billing_type: 'daily_deduct'
-            },
-            transaction: campaignTransaction
-          })
+        /* 按出价降序排列，取前 N 名为中标者 */
+        const sorted = [...campaigns].sort((a, b) => b.daily_bid_diamond - a.daily_bid_diamond)
+        const winners = sorted.slice(0, maxWinners)
+        const losers = sorted.slice(maxWinners)
 
-          if (existingDeduct) {
-            await campaignTransaction.commit()
-            results.skipped++
-            continue
-          }
+        results.eliminated += losers.length
 
-          // 重新读取最新状态（悲观锁，防止并发）
-          const freshCampaign = await AdCampaign.findByPk(campaign.ad_campaign_id, {
-            lock: campaignTransaction.LOCK.UPDATE,
-            transaction: campaignTransaction
-          })
+        for (const campaign of winners) {
+          const campaignTransaction = await sequelize.transaction()
 
-          if (!freshCampaign || freshCampaign.status !== 'active') {
-            await campaignTransaction.commit()
-            results.skipped++
-            continue
-          }
-
-          const newSpent = freshCampaign.budget_spent_diamond + freshCampaign.daily_bid_diamond
-
-          if (newSpent > freshCampaign.budget_total_diamond) {
-            await freshCampaign.update(
-              { status: 'completed' },
-              { transaction: campaignTransaction }
-            )
-            await campaignTransaction.commit()
-            results.completed++
-            logger.info('竞价计划预算耗尽，标记为已完成', {
-              campaign_id: freshCampaign.ad_campaign_id,
-              budget_spent: freshCampaign.budget_spent_diamond,
-              budget_total: freshCampaign.budget_total_diamond
+          try {
+            const existingDeduct = await AdBillingRecord.findOne({
+              where: {
+                ad_campaign_id: campaign.ad_campaign_id,
+                billing_date: today,
+                billing_type: 'daily_deduct'
+              },
+              transaction: campaignTransaction
             })
-            continue
-          }
 
-          const business_id = `daily_deduct_${freshCampaign.ad_campaign_id}_${today}_${uuidv4().substring(0, 8)}`
+            if (existingDeduct) {
+              await campaignTransaction.commit()
+              results.skipped++
+              continue
+            }
 
-          await AdBillingRecord.create(
-            {
-              business_id,
-              ad_campaign_id: freshCampaign.ad_campaign_id,
-              advertiser_user_id: freshCampaign.advertiser_user_id,
-              billing_date: today,
-              amount_diamond: freshCampaign.daily_bid_diamond,
-              billing_type: 'daily_deduct',
-              remark: `竞价计划每日扣款: ${freshCampaign.daily_bid_diamond}钻石`
-            },
-            { transaction: campaignTransaction }
-          )
+            const freshCampaign = await AdCampaign.findByPk(campaign.ad_campaign_id, {
+              lock: campaignTransaction.LOCK.UPDATE,
+              transaction: campaignTransaction
+            })
 
-          await freshCampaign.update(
-            { budget_spent_diamond: newSpent },
-            { transaction: campaignTransaction }
-          )
+            if (!freshCampaign || freshCampaign.status !== 'active') {
+              await campaignTransaction.commit()
+              results.skipped++
+              continue
+            }
 
-          if (newSpent >= freshCampaign.budget_total_diamond) {
-            await freshCampaign.update(
-              { status: 'completed' },
+            const newSpent = freshCampaign.budget_spent_diamond + freshCampaign.daily_bid_diamond
+
+            if (newSpent > freshCampaign.budget_total_diamond) {
+              await freshCampaign.update(
+                { status: 'completed' },
+                { transaction: campaignTransaction }
+              )
+              await campaignTransaction.commit()
+              results.completed++
+              continue
+            }
+
+            const business_id = `daily_deduct_${freshCampaign.ad_campaign_id}_${today}_${uuidv4().substring(0, 8)}`
+
+            await AdBillingRecord.create(
+              {
+                business_id,
+                ad_campaign_id: freshCampaign.ad_campaign_id,
+                advertiser_user_id: freshCampaign.advertiser_user_id,
+                billing_date: today,
+                amount_diamond: freshCampaign.daily_bid_diamond,
+                billing_type: 'daily_deduct',
+                remark: `竞价中标扣款: ${freshCampaign.daily_bid_diamond}钻石（排名${winners.indexOf(campaign) + 1}/${sorted.length}）`
+              },
               { transaction: campaignTransaction }
             )
-            results.completed++
+
+            await freshCampaign.update(
+              { budget_spent_diamond: newSpent },
+              { transaction: campaignTransaction }
+            )
+
+            if (newSpent >= freshCampaign.budget_total_diamond) {
+              await freshCampaign.update(
+                { status: 'completed' },
+                { transaction: campaignTransaction }
+              )
+              results.completed++
+            }
+
+            const platformFeeAccount = await BalanceService.getOrCreateAccount(
+              { system_code: 'SYSTEM_PLATFORM_FEE' },
+              { transaction: campaignTransaction }
+            )
+            await BalanceService.changeBalance(
+              {
+                user_id: freshCampaign.advertiser_user_id,
+                asset_code: 'DIAMOND',
+                delta_amount: -freshCampaign.daily_bid_diamond,
+                business_type: 'ad_campaign_daily_deduct',
+                idempotency_key: `ad_daily_${business_id}`,
+                counterpart_account_id: platformFeeAccount.account_id,
+                meta: { ad_campaign_id: freshCampaign.ad_campaign_id, billing_date: today }
+              },
+              { transaction: campaignTransaction }
+            )
+
+            await campaignTransaction.commit()
+            results.processed++
+            results.total_deducted += freshCampaign.daily_bid_diamond
+          } catch (error) {
+            if (!campaignTransaction.finished) {
+              await campaignTransaction.rollback()
+            }
+            results.failed++
+            logger.error('处理竞价中标扣款失败', {
+              campaign_id: campaign.ad_campaign_id,
+              error: error.message
+            })
           }
-
-          const platformFeeAccount = await BalanceService.getOrCreateAccount(
-            { system_code: 'SYSTEM_PLATFORM_FEE' },
-            { transaction: campaignTransaction }
-          )
-          await BalanceService.changeBalance(
-            {
-              user_id: freshCampaign.advertiser_user_id,
-              asset_code: 'DIAMOND',
-              delta_amount: -freshCampaign.daily_bid_diamond,
-              business_type: 'ad_campaign_daily_deduct',
-              idempotency_key: `ad_daily_${business_id}`,
-              counterpart_account_id: platformFeeAccount.account_id,
-              meta: { ad_campaign_id: freshCampaign.ad_campaign_id, billing_date: today }
-            },
-            { transaction: campaignTransaction }
-          )
-
-          await campaignTransaction.commit()
-          results.processed++
-          results.total_deducted += freshCampaign.daily_bid_diamond
-
-          logger.info('竞价计划每日扣款成功', {
-            campaign_id: freshCampaign.ad_campaign_id,
-            amount: freshCampaign.daily_bid_diamond,
-            new_spent: newSpent
-          })
-        } catch (error) {
-          if (!campaignTransaction.finished) {
-            await campaignTransaction.rollback()
-          }
-          results.failed++
-          logger.error('处理竞价计划扣款失败（独立事务已回滚）', {
-            campaign_id: campaign.ad_campaign_id,
-            error: error.message
-          })
         }
       }
 
-      logger.info('每日竞价扣款处理完成', results)
+      logger.info('每日竞价结算完成', results)
       return results
     } catch (error) {
       logger.error('处理每日竞价扣款失败', { error: error.message })
@@ -537,6 +552,169 @@ class AdBillingService {
       }
     } catch (error) {
       logger.error('获取计费统计信息失败', { error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * 记录 CPM 广告曝光（Redis 原子计数）
+   *
+   * 每次广告展示时调用，Redis INCR 原子递增当日曝光计数。
+   * 数据在每日凌晨由 processDailyCPM 归档并结算。
+   *
+   * @param {number} campaignId - 广告计划ID
+   * @param {string} billingDate - 计费日期（YYYY-MM-DD）
+   * @returns {Promise<number>} 当日累计曝光数
+   */
+  static async recordCPMImpression(campaignId, billingDate) {
+    try {
+      const { getRedisClient } = require('../utils/UnifiedRedisClient')
+      const rawRedis = getRedisClient().getClient()
+      const key = `ad_cpm_count:${campaignId}:${billingDate}`
+      const count = await rawRedis.incr(key)
+      await rawRedis.expire(key, 172800) // 48小时过期
+      return count
+    } catch (error) {
+      logger.warn('[AdBillingService] CPM 曝光计数失败（非致命）', {
+        campaignId,
+        billingDate,
+        error: error.message
+      })
+      return 0
+    }
+  }
+
+  /**
+   * CPM 每日结算（定时任务，凌晨 01:15 执行）
+   *
+   * 读取前日各 CPM 计划的 Redis 曝光计数，按 cpm_price_diamond 计费扣款。
+   * 公式：扣费 = Math.ceil(曝光次数 / 1000 * cpm_price_diamond)
+   *
+   * @returns {Promise<Object>} 结算结果统计
+   */
+  static async processDailyCPM() {
+    const { sequelize } = require('../models')
+
+    try {
+      const { getRedisClient } = require('../utils/UnifiedRedisClient')
+      const rawRedis = getRedisClient().getClient()
+      const BeijingTimeHelper = require('../utils/timeHelper')
+
+      const yesterday = BeijingTimeHelper.daysAgo(1)
+      const billingDate =
+        typeof yesterday === 'string'
+          ? yesterday.substring(0, 10)
+          : new Date(yesterday).toISOString().substring(0, 10)
+
+      const cpmCampaigns = await AdCampaign.findAll({
+        where: {
+          status: 'active',
+          billing_mode: 'cpm'
+        },
+        include: [
+          {
+            model: AdSlot,
+            as: 'ad_slot',
+            attributes: ['cpm_price_diamond']
+          }
+        ]
+      })
+
+      const results = { processed: 0, skipped: 0, failed: 0, total_deducted: 0 }
+
+      for (const campaign of cpmCampaigns) {
+        const key = `ad_cpm_count:${campaign.ad_campaign_id}:${billingDate}`
+        const impressionCount = parseInt((await rawRedis.get(key)) || '0')
+
+        if (impressionCount === 0) {
+          results.skipped++
+          continue
+        }
+
+        const cpmPrice = campaign.ad_slot?.cpm_price_diamond || 0
+        if (cpmPrice <= 0) {
+          results.skipped++
+          continue
+        }
+
+        const amount = Math.ceil((impressionCount * cpmPrice) / 1000)
+        const campaignTx = await sequelize.transaction()
+
+        try {
+          const existingDeduct = await AdBillingRecord.findOne({
+            where: {
+              ad_campaign_id: campaign.ad_campaign_id,
+              billing_date: billingDate,
+              billing_type: 'cpm_deduct'
+            },
+            transaction: campaignTx
+          })
+
+          if (existingDeduct) {
+            await campaignTx.commit()
+            results.skipped++
+            continue
+          }
+
+          const businessId = `cpm_deduct_${campaign.ad_campaign_id}_${billingDate}`
+
+          await AdBillingRecord.create(
+            {
+              business_id: businessId,
+              ad_campaign_id: campaign.ad_campaign_id,
+              advertiser_user_id: campaign.advertiser_user_id,
+              billing_date: billingDate,
+              amount_diamond: amount,
+              billing_type: 'cpm_deduct',
+              remark: `CPM结算: ${impressionCount}次曝光 × ${cpmPrice}钻/千次 = ${amount}钻石`
+            },
+            { transaction: campaignTx }
+          )
+
+          const platformFeeAccount = await BalanceService.getOrCreateAccount(
+            { system_code: 'SYSTEM_PLATFORM_FEE' },
+            { transaction: campaignTx }
+          )
+          await BalanceService.changeBalance(
+            {
+              user_id: campaign.advertiser_user_id,
+              asset_code: 'DIAMOND',
+              delta_amount: -amount,
+              business_type: 'ad_campaign_cpm_deduct',
+              idempotency_key: `ad_cpm_${businessId}`,
+              counterpart_account_id: platformFeeAccount.account_id,
+              meta: {
+                ad_campaign_id: campaign.ad_campaign_id,
+                billing_date: billingDate,
+                impression_count: impressionCount,
+                cpm_price: cpmPrice
+              }
+            },
+            { transaction: campaignTx }
+          )
+
+          await campaign.update(
+            { budget_spent_diamond: campaign.budget_spent_diamond + amount },
+            { transaction: campaignTx }
+          )
+
+          await campaignTx.commit()
+          results.processed++
+          results.total_deducted += amount
+        } catch (error) {
+          if (!campaignTx.finished) await campaignTx.rollback()
+          results.failed++
+          logger.error('[AdBillingService] CPM结算失败', {
+            campaign_id: campaign.ad_campaign_id,
+            error: error.message
+          })
+        }
+      }
+
+      logger.info('[AdBillingService] CPM每日结算完成', results)
+      return results
+    } catch (error) {
+      logger.error('[AdBillingService] CPM结算失败', { error: error.message })
       throw error
     }
   }

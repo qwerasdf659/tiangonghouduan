@@ -318,9 +318,9 @@
               <thead class="themed-bg-base">
                 <tr>
                   <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">奖品</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">类型</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">档位</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">权重</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted" title="奖品发放方式：points=积分 coupon=优惠券 physical=实物 virtual=虚拟道具">类型 <span class="text-xs opacity-50 cursor-help">ⓘ</span></th>
+                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted" title="奖品价值档位：高档=稀有高价值 中档=中等价值 低档=普通/安慰奖">档位 <span class="text-xs opacity-50 cursor-help">ⓘ</span></th>
+                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted" title="选奖权重：数值越大，在同一档位内被选中的概率越高。同一档位所有奖品权重之和即该档位总权重">权重 <span class="text-xs opacity-50 cursor-help">ⓘ</span></th>
                   <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">库存</th>
                   <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">状态</th>
                   <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
@@ -1516,81 +1516,83 @@
       </div>
 
       <!-- ==================== 分群策略编辑 Modal ==================== -->
-      <div x-show="modals.segmentRuleModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="hideModal('segmentRuleModal')">
+      <div x-ref="segmentRuleModal" x-show="isModalOpen('segmentRuleModal')" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="hideModal('segmentRuleModal')">
         <div class="themed-card rounded-lg shadow-xl w-full max-w-3xl max-h-[85vh] overflow-y-auto">
           <div class="sticky top-0 themed-bg-card p-4 border-b flex items-center justify-between z-10">
             <h5 class="font-semibold text-lg" x-text="editingSegmentRule?.version_key ? '编辑策略版本：' + editingSegmentRule.version_key : '新建策略版本'"></h5>
             <button @click="hideModal('segmentRuleModal')" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
           </div>
-          <div class="p-4 space-y-4" x-show="editingSegmentRule">
-            <!-- 版本基础信息 -->
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-sm font-medium mb-1">版本标识 <span class="text-red-500">*</span></label>
-                <input type="text" class="w-full px-3 py-2 border rounded" x-model="editingSegmentRule.version_key" :disabled="editingSegmentRule.is_system" placeholder="如: v3_spring_2026">
+          <template x-if="editingSegmentRule">
+            <div class="p-4 space-y-4">
+              <!-- 版本基础信息 -->
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium mb-1">版本标识 <span class="text-red-500">*</span></label>
+                  <input type="text" class="w-full px-3 py-2 border rounded" x-model="editingSegmentRule.version_key" :disabled="editingSegmentRule.is_system" placeholder="如: v3_spring_2026">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium mb-1">描述</label>
+                  <input type="text" class="w-full px-3 py-2 border rounded" x-model="editingSegmentRule.description" placeholder="策略版本描述">
+                </div>
               </div>
-              <div>
-                <label class="block text-sm font-medium mb-1">描述</label>
-                <input type="text" class="w-full px-3 py-2 border rounded" x-model="editingSegmentRule.description" placeholder="策略版本描述">
-              </div>
-            </div>
 
-            <!-- 规则条目列表 -->
-            <div>
-              <div class="flex items-center justify-between mb-2">
-                <h6 class="font-semibold text-sm">📝 分群规则条目</h6>
-                <button @click="addSegmentRuleEntry()" class="px-2 py-1 text-xs border rounded hover:bg-gray-100" :disabled="editingSegmentRule.is_system">
-                  ➕ 添加规则
-                </button>
-              </div>
-              <div class="space-y-3">
-                <template x-for="(rule, ruleIdx) in editingSegmentRule.rules || []" :key="ruleIdx">
-                  <div class="border rounded p-3 bg-gray-50">
-                    <div class="grid grid-cols-3 gap-2 mb-2">
-                      <div>
-                        <label class="text-xs text-gray-500">分群标识</label>
-                        <input type="text" class="w-full px-2 py-1 border rounded text-sm" x-model="rule.segment_key" :disabled="editingSegmentRule.is_system" placeholder="如: new_user">
-                      </div>
-                      <div>
-                        <label class="text-xs text-gray-500">分群名称</label>
-                        <input type="text" class="w-full px-2 py-1 border rounded text-sm" x-model="rule.label" :disabled="editingSegmentRule.is_system" placeholder="如: 新用户">
-                      </div>
-                      <div>
-                        <label class="text-xs text-gray-500">优先级</label>
-                        <input type="number" class="w-full px-2 py-1 border rounded text-sm" x-model.number="rule.priority" :disabled="editingSegmentRule.is_system" min="0">
-                      </div>
-                    </div>
-                    <!-- 条件构建器 -->
-                    <div class="space-y-2">
-                      <template x-for="(cond, condIdx) in rule.conditions || []" :key="condIdx">
-                        <div class="flex items-center gap-2">
-                          <select class="px-2 py-1 border rounded text-xs" x-model="cond.field" :disabled="editingSegmentRule.is_system">
-                            <template x-for="[key, fieldDef] in Object.entries(segmentFieldRegistry.fields || {})" :key="key">
-                              <option :value="key" x-text="fieldDef.label || key"></option>
-                            </template>
-                          </select>
-                          <select class="px-2 py-1 border rounded text-xs" x-model="cond.operator" :disabled="editingSegmentRule.is_system">
-                            <template x-for="op in getOperatorsForField(cond.field)" :key="op.key">
-                              <option :value="op.key" x-text="op.label"></option>
-                            </template>
-                          </select>
-                          <input type="text" class="flex-1 px-2 py-1 border rounded text-xs" x-model="cond.value" :disabled="editingSegmentRule.is_system" placeholder="条件值">
-                          <button @click="rule.conditions.splice(condIdx, 1)" class="text-red-400 hover:text-red-600 text-xs" :disabled="editingSegmentRule.is_system">&times;</button>
+              <!-- 规则条目列表 -->
+              <div>
+                <div class="flex items-center justify-between mb-2">
+                  <h6 class="font-semibold text-sm">📝 分群规则条目</h6>
+                  <button @click="addSegmentRule()" class="px-2 py-1 text-xs border rounded hover:bg-gray-100" :disabled="editingSegmentRule.is_system">
+                    ➕ 添加规则
+                  </button>
+                </div>
+                <div class="space-y-3">
+                  <template x-for="(rule, ruleIdx) in editingSegmentRule.rules || []" :key="ruleIdx">
+                    <div class="border rounded p-3 bg-gray-50">
+                      <div class="grid grid-cols-3 gap-2 mb-2">
+                        <div>
+                          <label class="text-xs text-gray-500">分群标识</label>
+                          <input type="text" class="w-full px-2 py-1 border rounded text-sm" x-model="rule.segment_key" :disabled="editingSegmentRule.is_system" placeholder="如: new_user">
                         </div>
-                      </template>
-                      <button @click="addCondition(ruleIdx)" class="text-xs text-blue-500 hover:text-blue-700" :disabled="editingSegmentRule.is_system">+ 添加条件</button>
+                        <div>
+                          <label class="text-xs text-gray-500">分群名称</label>
+                          <input type="text" class="w-full px-2 py-1 border rounded text-sm" x-model="rule.label" :disabled="editingSegmentRule.is_system" placeholder="如: 新用户">
+                        </div>
+                        <div>
+                          <label class="text-xs text-gray-500">优先级</label>
+                          <input type="number" class="w-full px-2 py-1 border rounded text-sm" x-model.number="rule.priority" :disabled="editingSegmentRule.is_system" min="0">
+                        </div>
+                      </div>
+                      <!-- 条件构建器 -->
+                      <div class="space-y-2">
+                        <template x-for="(cond, condIdx) in rule.conditions || []" :key="condIdx">
+                          <div class="flex items-center gap-2">
+                            <select class="px-2 py-1 border rounded text-xs" x-model="cond.field" :disabled="editingSegmentRule.is_system">
+                              <template x-for="[key, fieldDef] in Object.entries(segmentFieldRegistry.fields || {})" :key="key">
+                                <option :value="key" x-text="fieldDef.label || key"></option>
+                              </template>
+                            </select>
+                            <select class="px-2 py-1 border rounded text-xs" x-model="cond.operator" :disabled="editingSegmentRule.is_system">
+                              <template x-for="op in getOperatorsForField(cond.field)" :key="op.key">
+                                <option :value="op.key" x-text="op.label"></option>
+                              </template>
+                            </select>
+                            <input type="text" class="flex-1 px-2 py-1 border rounded text-xs" x-model="cond.value" :disabled="editingSegmentRule.is_system" placeholder="条件值">
+                            <button @click="rule.conditions.splice(condIdx, 1)" class="text-red-400 hover:text-red-600 text-xs" :disabled="editingSegmentRule.is_system">&times;</button>
+                          </div>
+                        </template>
+                        <button @click="addCondition(ruleIdx)" class="text-xs text-blue-500 hover:text-blue-700" :disabled="editingSegmentRule.is_system">+ 添加条件</button>
+                      </div>
+                      <!-- 条件自然语言描述 -->
+                      <div class="mt-1 text-xs text-gray-400" x-show="rule.conditions && rule.conditions.length > 0">
+                        <template x-for="cond in rule.conditions" :key="cond.field + cond.operator">
+                          <span class="mr-2" x-text="describeCondition(cond)"></span>
+                        </template>
+                      </div>
                     </div>
-                    <!-- 条件自然语言描述 -->
-                    <div class="mt-1 text-xs text-gray-400" x-show="rule.conditions && rule.conditions.length > 0">
-                      <template x-for="cond in rule.conditions" :key="cond.field + cond.operator">
-                        <span class="mr-2" x-text="describeCondition(cond)"></span>
-                      </template>
-                    </div>
-                  </div>
-                </template>
+                  </template>
+                </div>
               </div>
             </div>
-          </div>
+          </template>
           <!-- 操作按钮 -->
           <div class="sticky bottom-0 themed-bg-card p-4 border-t flex justify-end gap-2">
             <button @click="hideModal('segmentRuleModal')" class="px-4 py-2 border rounded text-sm hover:bg-gray-100">取消</button>
@@ -6080,6 +6082,19 @@
             <label class="block text-sm font-medium themed-text-secondary mb-1">奖品描述</label>
             <textarea class="w-full px-3 py-2 border rounded" x-model="prizeForm.prize_description" rows="2"></textarea>
           </div>
+          <!-- 中奖次数限制 -->
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">每人总中奖上限</label>
+              <input type="number" class="w-full px-3 py-2 border rounded" x-model.number="prizeForm.max_user_wins" min="1" placeholder="不限制">
+              <p class="text-xs themed-text-muted mt-1">单个用户累计可中此奖品的最大次数，留空表示不限制</p>
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">每人每日中奖上限</label>
+              <input type="number" class="w-full px-3 py-2 border rounded" x-model.number="prizeForm.max_daily_wins" min="1" placeholder="不限制">
+              <p class="text-xs themed-text-muted mt-1">单个用户每天可中此奖品的最大次数，留空表示不限制</p>
+            </div>
+          </div>
           <div class="flex items-center">
             <input type="checkbox" :checked="prizeForm.status === 'active'" @change="prizeForm.status = $event.target.checked ? 'active' : 'inactive'" id="prizeActiveSwitch" class="mr-2">
             <label for="prizeActiveSwitch">启用奖品</label>
@@ -7291,9 +7306,9 @@
                 <thead class="bg-gray-50/50">
                   <tr>
                     <th class="text-left py-2 px-4 font-medium text-gray-500">奖品名称</th>
-                    <th class="text-center py-2 px-4 font-medium text-gray-500">类型</th>
-                    <th class="text-right py-2 px-4 font-medium text-gray-500">权重</th>
-                    <th class="text-right py-2 px-4 font-medium text-gray-500">档内占比</th>
+                    <th class="text-center py-2 px-4 font-medium text-gray-500" title="奖品发放方式：points=积分 coupon=优惠券 physical=实物 virtual=虚拟道具">类型 <span class="text-xs opacity-40 cursor-help">ⓘ</span></th>
+                    <th class="text-right py-2 px-4 font-medium text-gray-500" title="选奖权重：数值越大，在同一档位内被选中的概率越高">权重 <span class="text-xs opacity-40 cursor-help">ⓘ</span></th>
+                    <th class="text-right py-2 px-4 font-medium text-gray-500" title="该奖品权重占所在档位总权重的百分比，表示用户抽到这个档位后选中该奖品的概率">档内占比 <span class="text-xs opacity-40 cursor-help">ⓘ</span></th>
                     <th class="text-right py-2 px-4 font-medium text-gray-500">库存</th>
                     <th class="text-right py-2 px-4 font-medium text-gray-500">已发放</th>
                     <th class="text-center py-2 px-4 font-medium text-gray-500">状态</th>
@@ -7317,7 +7332,7 @@
                         </div>
                       </td>
                       <td class="text-center py-2 px-4">
-                        <span class="px-1.5 py-0.5 text-xs rounded bg-cyan-100 text-cyan-700" x-text="prize.prize_type"></span>
+                        <span class="px-1.5 py-0.5 text-xs rounded bg-cyan-100 text-cyan-700" x-text="({ points: '积分', coupon: '优惠券', physical: '实物', virtual: '虚拟道具', service: '服务', product: '商品', special: '特殊' })[prize.prize_type] || prize.prize_type"></span>
                         <span class="ml-1 inline-block w-2.5 h-2.5 rounded-full"
                           :style="'background:' + (rarityOptions?.find(o => o.value === prize.rarity_code)?.color || '#9E9E9E')"></span>
                       </td>
@@ -7419,6 +7434,19 @@
             <div>
               <label class="block text-sm font-medium mb-1">奖品描述</label>
               <textarea class="w-full px-3 py-2 border rounded" x-model="prizeForm.prize_description" rows="2"></textarea>
+            </div>
+            <!-- 中奖次数限制 -->
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium mb-1">每人总中奖上限</label>
+                <input type="number" class="w-full px-3 py-2 border rounded" x-model.number="prizeForm.max_user_wins" min="1" placeholder="不限制">
+                <p class="text-xs text-gray-400 mt-1">留空表示不限制</p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium mb-1">每人每日中奖上限</label>
+                <input type="number" class="w-full px-3 py-2 border rounded" x-model.number="prizeForm.max_daily_wins" min="1" placeholder="不限制">
+                <p class="text-xs text-gray-400 mt-1">留空表示不限制</p>
+              </div>
             </div>
             <div class="flex items-center">
               <input type="checkbox" :checked="prizeForm.status === 'active'" @change="prizeForm.status = $event.target.checked ? 'active' : 'inactive'" class="mr-2">

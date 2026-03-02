@@ -670,10 +670,13 @@ export function usePrizesMethods() {
       if (!this.managingCampaign?.campaign_code) return
       this.editingLotteryPrizeId = null
       this.isEditMode = false
+      this.prize_image_preview_url = null
       this.prizeForm = {
         lottery_campaign_id: this.managingCampaign.lottery_campaign_id,
         prize_name: '',
         prize_type: 'virtual',
+        prize_value: 0,
+        prize_value_points: 0,
         win_probability: 0,
         stock_quantity: 100,
         status: 'active',
@@ -681,13 +684,18 @@ export function usePrizesMethods() {
         prize_description: '',
         rarity_code: 'common',
         win_weight: 100000,
-        reward_tier: 'low'
+        reward_tier: 'low',
+        max_daily_wins: null,
+        max_user_wins: null,
+        is_fallback: false
       }
       this.showModal('campaignPrizeModal')
     },
 
     /**
-     * 提交活动级新增奖品（使用 add-prize 端点）
+     * 提交活动级新增/编辑奖品
+     * 新增使用 add-prize 端点，编辑使用 prize/:id 端点
+     * 支持全部可调整参数：价值、预算成本、库存、权重、每日限制、兜底标记等
      */
     async submitCampaignPrize() {
       if (!this.prizeForm.prize_name) {
@@ -699,35 +707,59 @@ export function usePrizesMethods() {
         if (this.isEditMode) {
           const winProbability = (this.prizeForm.win_probability || 0) / 100
           const url = buildURL(LOTTERY_ENDPOINTS.PRIZE_UPDATE, { prize_id: this.editingLotteryPrizeId })
-          await this.apiCall(url, {
-            method: 'PUT',
-            data: {
-              prize_name: this.prizeForm.prize_name,
-              prize_type: this.prizeForm.prize_type,
-              win_probability: winProbability,
-              stock_quantity: this.prizeForm.stock_quantity,
-              status: this.prizeForm.status,
-              prize_description: this.prizeForm.prize_description,
-              rarity_code: this.prizeForm.rarity_code || 'common',
-              win_weight: parseInt(this.prizeForm.win_weight) || 100000,
-              reward_tier: this.prizeForm.reward_tier || 'low'
-            }
-          })
+          const updateData = {
+            prize_name: this.prizeForm.prize_name,
+            prize_type: this.prizeForm.prize_type,
+            prize_value: parseFloat(this.prizeForm.prize_value) || 0,
+            prize_value_points: parseInt(this.prizeForm.prize_value_points) || 0,
+            win_probability: winProbability,
+            stock_quantity: this.prizeForm.stock_quantity,
+            status: this.prizeForm.status,
+            prize_description: this.prizeForm.prize_description,
+            rarity_code: this.prizeForm.rarity_code || 'common',
+            win_weight: parseInt(this.prizeForm.win_weight) || 100000,
+            reward_tier: this.prizeForm.reward_tier || 'low',
+            is_fallback: this.prizeForm.is_fallback ? 1 : 0
+          }
+          if (this.prizeForm.max_daily_wins !== null && this.prizeForm.max_daily_wins !== '') {
+            updateData.max_daily_wins = parseInt(this.prizeForm.max_daily_wins)
+          } else {
+            updateData.max_daily_wins = null
+          }
+          if (this.prizeForm.max_user_wins !== null && this.prizeForm.max_user_wins !== '') {
+            updateData.max_user_wins = parseInt(this.prizeForm.max_user_wins)
+          } else {
+            updateData.max_user_wins = null
+          }
+          if (this.prizeForm.image_resource_id) {
+            updateData.image_resource_id = this.prizeForm.image_resource_id
+          }
+          await this.apiCall(url, { method: 'PUT', data: updateData })
         } else {
+          const addData = {
+            prize_name: this.prizeForm.prize_name,
+            prize_type: this.prizeForm.prize_type,
+            prize_value: parseFloat(this.prizeForm.prize_value) || 0,
+            prize_value_points: parseInt(this.prizeForm.prize_value_points) || 0,
+            stock_quantity: this.prizeForm.stock_quantity === -1 ? 999999 : this.prizeForm.stock_quantity,
+            prize_description: this.prizeForm.prize_description,
+            rarity_code: this.prizeForm.rarity_code || 'common',
+            win_weight: parseInt(this.prizeForm.win_weight) || 100000,
+            reward_tier: this.prizeForm.reward_tier || 'low',
+            is_fallback: this.prizeForm.is_fallback ? 1 : 0
+          }
+          if (this.prizeForm.max_daily_wins !== null && this.prizeForm.max_daily_wins !== '') {
+            addData.max_daily_wins = parseInt(this.prizeForm.max_daily_wins)
+          }
+          if (this.prizeForm.max_user_wins !== null && this.prizeForm.max_user_wins !== '') {
+            addData.max_user_wins = parseInt(this.prizeForm.max_user_wins)
+          }
+          if (this.prizeForm.image_resource_id) {
+            addData.image_resource_id = this.prizeForm.image_resource_id
+          }
           await this.apiCall(
             buildURL(LOTTERY_ENDPOINTS.PRIZE_ADD_TO_CAMPAIGN, { code: this.managingCampaign.campaign_code }),
-            {
-              method: 'POST',
-              data: {
-                prize_name: this.prizeForm.prize_name,
-                prize_type: this.prizeForm.prize_type,
-                stock_quantity: this.prizeForm.stock_quantity === -1 ? 999999 : this.prizeForm.stock_quantity,
-                prize_description: this.prizeForm.prize_description,
-                rarity_code: this.prizeForm.rarity_code || 'common',
-                win_weight: parseInt(this.prizeForm.win_weight) || 100000,
-                reward_tier: this.prizeForm.reward_tier || 'low'
-              }
-            }
+            { method: 'POST', data: addData }
           )
         }
         this.showSuccess(this.isEditMode ? '奖品更新成功' : '奖品添加成功')
@@ -742,15 +774,19 @@ export function usePrizesMethods() {
 
     /**
      * 在活动奖品管理面板内编辑奖品
-     * @param {Object} prize - 奖品对象
+     * 加载全部可调整参数到表单
+     * @param {Object} prize - 奖品对象（后端字段名）
      */
     editCampaignPrize(prize) {
       this.editingLotteryPrizeId = prize.lottery_prize_id
       this.isEditMode = true
+      this.prize_image_preview_url = prize.image_url || null
       this.prizeForm = {
         lottery_campaign_id: this.managingCampaign?.lottery_campaign_id,
         prize_name: prize.prize_name || '',
         prize_type: prize.prize_type || 'virtual',
+        prize_value: parseFloat(prize.prize_value) || 0,
+        prize_value_points: parseInt(prize.prize_value_points) || 0,
         win_probability: parseFloat(prize.win_probability || 0) * 100,
         stock_quantity: prize.stock_quantity || 100,
         status: prize.status || 'active',
@@ -758,7 +794,10 @@ export function usePrizesMethods() {
         prize_description: prize.prize_description || '',
         rarity_code: prize.rarity_code || 'common',
         win_weight: prize.win_weight || 100000,
-        reward_tier: prize.reward_tier || 'low'
+        reward_tier: prize.reward_tier || 'low',
+        max_daily_wins: prize.max_daily_wins ?? null,
+        max_user_wins: prize.max_user_wins ?? null,
+        is_fallback: prize.is_fallback || false
       }
       this.showModal('campaignPrizeModal')
     },

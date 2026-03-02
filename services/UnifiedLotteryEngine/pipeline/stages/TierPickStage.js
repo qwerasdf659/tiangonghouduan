@@ -45,7 +45,7 @@ const BeijingTimeHelper = require('../../../../utils/timeHelper')
 const LotteryComputeEngine = require('../../compute/LotteryComputeEngine')
 
 /* 动态配置加载器（读取活动级 pressure/matrix 开关） */
-const { DynamicConfigLoader } = require('../../compute/config/StrategyConfig')
+const { DynamicConfigLoader } = require('../../compute/config/ComputeConfig')
 
 /**
  * 权重缩放比例（整数权重系统）
@@ -476,7 +476,7 @@ class TierPickStage extends BaseStage {
   async _resolveUserSegment(user_id, campaign) {
     try {
       // 从 lottery_strategy_config 读取分群版本（三层优先级：DB活动级 > env > 代码默认值）
-      const { DynamicConfigLoader } = require('../../compute/config/StrategyConfig')
+      const { DynamicConfigLoader } = require('../../compute/config/ComputeConfig')
       const resolver_version = await DynamicConfigLoader.getValue(
         'segment',
         'resolver_version',

@@ -1427,6 +1427,241 @@
       </div>
     </div>
 
+    <!-- ===== 定价配置 ===== -->
+    <div x-show="current_page === 'pricing'" x-cloak x-init="current_page === 'pricing' && loadPricingConfig()">
+      <div class="space-y-6">
+
+        <!-- 当前 DAU 状态卡片 -->
+        <div class="bg-white rounded-lg shadow p-4">
+          <h3 class="font-semibold text-lg mb-3">📊 当前 DAU 状态</h3>
+          <div class="grid grid-cols-3 gap-4" x-init="loadCurrentCoefficient()">
+            <div class="bg-blue-50 rounded p-3 text-center">
+              <div class="text-sm text-gray-500">当前系数</div>
+              <div class="text-2xl font-bold text-blue-600" x-text="current_coefficient?.coefficient ?? '—'"></div>
+            </div>
+            <div class="bg-green-50 rounded p-3 text-center">
+              <div class="text-sm text-gray-500">DAU 状态</div>
+              <div class="text-sm font-medium" x-text="current_coefficient?.tier_label ?? '—'"></div>
+            </div>
+            <div class="bg-purple-50 rounded p-3 text-center">
+              <div class="text-sm text-gray-500">功能状态</div>
+              <div class="text-sm font-medium" :class="current_coefficient?.enabled ? 'text-green-600' : 'text-gray-400'" x-text="current_coefficient?.enabled ? '已启用' : '未启用'"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- DAU 趋势折线图 -->
+        <div class="bg-white rounded-lg shadow p-4">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="font-semibold text-lg">📈 DAU 趋势</h3>
+            <div class="flex items-center gap-2">
+              <select x-model.number="dau_chart_days" @change="loadDauStats(dau_chart_days)" class="border rounded px-2 py-1 text-sm">
+                <option value="7">近7天</option>
+                <option value="14">近14天</option>
+                <option value="30" selected>近30天</option>
+              </select>
+              <button @click="loadDauStats(dau_chart_days || 30)" class="text-blue-500 text-sm hover:text-blue-700">🔄 刷新</button>
+            </div>
+          </div>
+          <div id="dauTrendChart" class="w-full h-64"></div>
+          <div x-show="!dau_stats || dau_stats.length === 0" class="text-center text-gray-400 text-sm py-8">
+            暂无 DAU 数据。<button @click="loadDauStats(30)" class="text-blue-500 hover:underline ml-1">点击加载</button>
+          </div>
+        </div>
+
+        <!-- DAU 系数配置 -->
+        <div class="bg-white rounded-lg shadow p-4">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="font-semibold">DAU 系数档位</h3>
+            <label class="flex items-center gap-2 text-sm">
+              <input type="checkbox" x-model="dau_pricing_enabled" @change="toggleDauPricing()" class="rounded">
+              <span x-text="dau_pricing_enabled ? '已启用' : '已禁用'"></span>
+            </label>
+          </div>
+          <table class="w-full text-sm">
+            <thead><tr class="text-left border-b"><th class="py-2">DAU 上限</th><th>系数</th><th>标签</th><th class="w-16">操作</th></tr></thead>
+            <tbody>
+              <template x-for="(tier, i) in dau_coefficient_tiers" :key="i">
+                <tr class="border-b">
+                  <td class="py-2" x-text="tier.max_dau ?? '无上限'"></td>
+                  <td x-text="tier.coefficient"></td>
+                  <td x-text="tier.label"></td>
+                  <td><button @click="removeDauTier(i)" class="text-red-500 text-xs hover:underline">删除</button></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+          <div class="flex gap-2 mt-3">
+            <input type="number" x-model="new_dau_tier.max_dau" placeholder="DAU 上限（空=无上限）" class="border rounded px-2 py-1 text-sm flex-1">
+            <input type="number" x-model="new_dau_tier.coefficient" placeholder="系数" step="0.001" class="border rounded px-2 py-1 text-sm w-24">
+            <input type="text" x-model="new_dau_tier.label" placeholder="标签" class="border rounded px-2 py-1 text-sm w-32">
+            <button @click="addDauTier()" class="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600">添加</button>
+          </div>
+        </div>
+
+        <!-- 阶梯折扣配置 -->
+        <div class="bg-white rounded-lg shadow p-4">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="font-semibold">阶梯折扣规则</h3>
+            <label class="flex items-center gap-2 text-sm">
+              <input type="checkbox" x-model="discount_enabled" @change="toggleDiscount()" class="rounded">
+              <span x-text="discount_enabled ? '已启用' : '已禁用'"></span>
+            </label>
+          </div>
+          <table class="w-full text-sm">
+            <thead><tr class="text-left border-b"><th class="py-2">最低天数</th><th>折扣率</th><th>标签</th><th class="w-16">操作</th></tr></thead>
+            <tbody>
+              <template x-for="(tier, i) in discount_tiers" :key="i">
+                <tr class="border-b">
+                  <td class="py-2" x-text="tier.min_days + '天'"></td>
+                  <td x-text="(tier.discount * 100).toFixed(0) + '%'"></td>
+                  <td x-text="tier.label"></td>
+                  <td><button @click="removeDiscountTier(i)" class="text-red-500 text-xs hover:underline">删除</button></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+          <div class="flex gap-2 mt-3">
+            <input type="number" x-model="new_discount_tier.min_days" placeholder="最低天数" class="border rounded px-2 py-1 text-sm w-24">
+            <input type="number" x-model="new_discount_tier.discount" placeholder="折扣率（如0.95）" step="0.01" class="border rounded px-2 py-1 text-sm w-32">
+            <input type="text" x-model="new_discount_tier.label" placeholder="标签" class="border rounded px-2 py-1 text-sm flex-1">
+            <button @click="addDiscountTier()" class="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600">添加</button>
+          </div>
+        </div>
+
+        <!-- 动态底价配置 -->
+        <div class="bg-white rounded-lg shadow p-4">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="font-semibold">动态竞价底价</h3>
+            <label class="flex items-center gap-2 text-sm">
+              <input type="checkbox" x-model="floor_price_config.enabled" @change="saveFloorPriceConfig()" class="rounded">
+              <span x-text="floor_price_config.enabled ? '已启用' : '已禁用'"></span>
+            </label>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="text-sm text-gray-600">回看天数</label>
+              <input type="number" x-model.number="floor_price_config.lookback_days" class="border rounded px-2 py-1 text-sm w-full mt-1">
+            </div>
+            <div>
+              <label class="text-sm text-gray-600">底价比例</label>
+              <input type="number" x-model.number="floor_price_config.floor_ratio" step="0.1" class="border rounded px-2 py-1 text-sm w-full mt-1">
+            </div>
+          </div>
+          <button @click="saveFloorPriceConfig()" class="bg-green-500 text-white px-4 py-1 rounded text-sm hover:bg-green-600 mt-3">保存底价配置</button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ===== 调价历史 ===== -->
+    <div x-show="current_page === 'adjustments'" x-cloak>
+      <div class="space-y-4">
+
+        <!-- 操作说明 -->
+        <div class="p-3 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/60 text-sm text-amber-800">
+          <span class="font-semibold">💡 功能说明：</span>系统根据 DAU 变化自动生成调价建议，运营可以在此查看、确认或拒绝。确认后点击"执行"将更新系统定价配置。
+        </div>
+
+        <!-- 筛选栏 -->
+        <div class="flex items-center gap-4 bg-white rounded-lg shadow p-3">
+          <select x-model="price_adjustments_filter.status" @change="price_adjustments_page = 1; loadPriceAdjustments()"
+            class="border rounded px-3 py-1.5 text-sm">
+            <option value="">全部状态</option>
+            <option value="pending">待确认</option>
+            <option value="confirmed">已确认</option>
+            <option value="rejected">已拒绝</option>
+            <option value="applied">已执行</option>
+          </select>
+          <select x-model="price_adjustments_filter.trigger_type" @change="price_adjustments_page = 1; loadPriceAdjustments()"
+            class="border rounded px-3 py-1.5 text-sm">
+            <option value="">全部触发类型</option>
+            <option value="dau_shift">DAU变化</option>
+            <option value="manual">手动触发</option>
+          </select>
+          <button @click="loadPriceAdjustments()" class="bg-blue-500 text-white px-3 py-1.5 rounded text-sm hover:bg-blue-600">
+            🔄 刷新
+          </button>
+        </div>
+
+        <!-- 列表 -->
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+          <template x-if="price_adjustments_loading">
+            <div class="p-8 text-center text-gray-500">加载中...</div>
+          </template>
+          <template x-if="!price_adjustments_loading && price_adjustments.length === 0">
+            <div class="p-8 text-center text-gray-400">暂无调价记录</div>
+          </template>
+          <template x-if="!price_adjustments_loading && price_adjustments.length > 0">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-4 py-3 text-left">ID</th>
+                  <th class="px-4 py-3 text-left">触发类型</th>
+                  <th class="px-4 py-3 text-left">旧系数</th>
+                  <th class="px-4 py-3 text-left">新系数</th>
+                  <th class="px-4 py-3 text-left">状态</th>
+                  <th class="px-4 py-3 text-left">确认人</th>
+                  <th class="px-4 py-3 text-left">创建时间</th>
+                  <th class="px-4 py-3 text-left">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="adj in price_adjustments" :key="adj.ad_price_adjustment_log_id">
+                  <tr class="border-t hover:bg-gray-50">
+                    <td class="px-4 py-3" x-text="adj.ad_price_adjustment_log_id"></td>
+                    <td class="px-4 py-3" x-text="TRIGGER_TYPE_MAP[adj.trigger_type] || adj.trigger_type"></td>
+                    <td class="px-4 py-3" x-text="adj.old_coefficient ?? '-'"></td>
+                    <td class="px-4 py-3 font-semibold" x-text="adj.new_coefficient ?? '-'"></td>
+                    <td class="px-4 py-3">
+                      <span class="px-2 py-0.5 rounded text-white text-xs"
+                        :class="ADJUSTMENT_STATUS_COLOR[adj.status] || 'bg-gray-500'"
+                        x-text="ADJUSTMENT_STATUS_MAP[adj.status] || adj.status">
+                      </span>
+                    </td>
+                    <td class="px-4 py-3" x-text="adj.confirmer?.nickname || '-'"></td>
+                    <td class="px-4 py-3" x-text="adj.created_at"></td>
+                    <td class="px-4 py-3">
+                      <template x-if="adj.status === 'pending'">
+                        <div class="flex gap-2">
+                          <button @click="confirmAdjustment(adj.ad_price_adjustment_log_id)"
+                            class="text-green-600 hover:text-green-800 text-xs font-semibold">✅ 确认</button>
+                          <button @click="rejectAdjustment(adj.ad_price_adjustment_log_id)"
+                            class="text-red-600 hover:text-red-800 text-xs font-semibold">❌ 拒绝</button>
+                        </div>
+                      </template>
+                      <template x-if="adj.status === 'confirmed'">
+                        <button @click="applyAdjustment(adj.ad_price_adjustment_log_id)"
+                          class="text-blue-600 hover:text-blue-800 text-xs font-semibold">🚀 执行</button>
+                      </template>
+                      <template x-if="adj.status === 'rejected' || adj.status === 'applied'">
+                        <span class="text-gray-400 text-xs">-</span>
+                      </template>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </template>
+        </div>
+
+        <!-- 分页 -->
+        <div class="flex justify-between items-center" x-show="price_adjustments_pagination.total > 0">
+          <span class="text-sm text-gray-500" x-text="'共 ' + price_adjustments_pagination.total + ' 条记录'"></span>
+          <div class="flex gap-2">
+            <button @click="price_adjustments_page--; loadPriceAdjustments()"
+              :disabled="price_adjustments_page <= 1"
+              class="px-3 py-1 border rounded text-sm disabled:opacity-50">上一页</button>
+            <span class="px-3 py-1 text-sm" x-text="price_adjustments_page + ' / ' + price_adjustments_pagination.total_pages"></span>
+            <button @click="price_adjustments_page++; loadPriceAdjustments()"
+              :disabled="price_adjustments_page >= price_adjustments_pagination.total_pages"
+              class="px-3 py-1 border rounded text-sm disabled:opacity-50">下一页</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
   </div>
 
   <%- include('partials/footer') %>

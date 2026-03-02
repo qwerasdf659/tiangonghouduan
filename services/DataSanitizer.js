@@ -181,7 +181,7 @@ class DataSanitizer {
    *
    * γ 模式职责：
    * - 接收 BackpackService._getItems() 已转换的数据（从 meta JSON 提取的结构化字段）
-   * - 白名单输出面向用户的字段，排除内部字段（owner_user_id、locks、item_template_id、source、meta）
+   * - 白名单输出面向用户的字段，排除内部字段（owner_account_id、locks、item_template_id、source、meta）
    *
    * @param {Array<Object>} inventory - 库存数据数组（来自 BackpackService._getItems() 输出）
    * @param {string} dataLevel - 数据级别：'full'（管理员完整数据）或'public'（普通用户脱敏数据）
@@ -225,7 +225,7 @@ class DataSanitizer {
       const sanitized = { ...(item.toJSON ? item.toJSON() : item) }
 
       // 黑名单：删除内部字段（隐私 + 内部状态 + 核销码明文 + 原始 JSON）
-      delete sanitized.owner_user_id
+      delete sanitized.owner_account_id
       delete sanitized.locks
       delete sanitized.item_template_id
       delete sanitized.source
@@ -597,7 +597,7 @@ class DataSanitizer {
       delete sanitized.transaction_fees
       delete sanitized.profit_analysis
       delete sanitized.internal_remark
-      // Sequelize include 关联对象（含 owner_user_id、locks、meta 等敏感信息）
+      // Sequelize include 关联对象（含 owner_account_id、locks、meta 等敏感信息）
       delete sanitized.offerItem
       delete sanitized.offerItemTemplate
 

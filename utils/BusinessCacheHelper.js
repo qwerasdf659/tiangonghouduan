@@ -152,12 +152,6 @@ const cacheStats = {
 }
 
 /**
- * 监控定时器 ID
- * @type {NodeJS.Timeout|null}
- */
-let monitorIntervalId = null
-
-/**
  * 计算命中率
  * @param {Object} stat - 统计对象
  * @returns {string} 命中率百分比
@@ -1029,41 +1023,6 @@ class BusinessCacheHelper {
       cacheStats[prefix].invalidations = 0
     })
     logger.info('[业务缓存] 统计数据已重置')
-  }
-
-  /**
-   * [已废弃] 启动缓存监控定时输出
-   *
-   * ⚠️ 2026-01-30 定时任务统一管理改进：
-   * - 此方法中的 setInterval 已被移除
-   * - 缓存监控现在由 ScheduledTasks.scheduleBusinessCacheMonitor() 统一管理
-   * - 详见 scripts/maintenance/scheduled_tasks.js (Task 28)
-   *
-   * @deprecated 请使用 ScheduledTasks 中的 Task 28 替代
-   * @param {number} _intervalMs - 输出间隔（毫秒），此参数已无效
-   * @returns {void}
-   */
-  static startMonitor(_intervalMs = 10 * 60 * 1000) {
-    logger.warn(
-      '[业务缓存] startMonitor() 已废弃，' +
-        '请使用 ScheduledTasks.scheduleBusinessCacheMonitor() (Task 28) 替代'
-    )
-    /*
-     * 兼容性处理：不再启动定时器，避免重复执行
-     * 如需获取统计数据，请直接调用 getStatsSnapshot()
-     */
-  }
-
-  /**
-   * 停止缓存监控
-   * @returns {void}
-   */
-  static stopMonitor() {
-    if (monitorIntervalId) {
-      clearInterval(monitorIntervalId)
-      monitorIntervalId = null
-      logger.info('[业务缓存] 监控已停止')
-    }
   }
 }
 

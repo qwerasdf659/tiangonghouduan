@@ -1,13 +1,14 @@
 /**
  * 管理员认证路由 - V4.0 UUID角色系统版本
  *
- * 会话管理（2026-02-19 补齐）：
- * - 管理后台登录时创建 AuthenticationSession，login_platform='web'
- * - 与用户端登录统一的会话管理体系，支持多平台会话隔离
+ * 会话管理（2026-02-19 补齐，2026-03-01 跨平台共存）：
+ * - 管理后台登录固定 user_type='admin'，与用户端(user)天然隔离
+ * - 同一管理员可同时保持：小程序(user+wechat_mp) + 管理后台(admin+web)
+ * - 同一 user_type + platform 内互斥（同浏览器重复登录踢旧会话）
  * - 管理后台登出时失效会话
  *
  * 创建时间：2025年01月21日
- * 更新时间：2026-02-19（补齐会话管理，接入多平台隔离体系）
+ * 更新时间：2026-03-01（跨平台共存：user_type 按上下文确定，非按角色等级）
  */
 
 const express = require('express')
@@ -51,7 +52,11 @@ router.post(
      * 避免 REPEATABLE READ 隔离级别下多个事务互相看不到未提交数据导致旧会话未被去活。
      */
     const sessionToken = uuidv4()
-    const userType = roles.role_level >= 100 ? 'admin' : 'user'
+    /**
+     * 管理后台登录会话固定 user_type='admin'，与用户端(user)天然隔离。
+     * 同一管理员可同时保持小程序(user) + 管理后台(admin) 两个会话。
+     */
+    const userType = 'admin'
     const loginIp = req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || null
     const platform = detectLoginPlatform(req)
     const { AuthenticationSession } = req.app.locals.models
@@ -91,6 +96,16 @@ router.post(
             logger.info(
               `🔒 [Session] 管理后台同平台会话替换: 已使 ${deactivatedCount} 个旧会话失效 (user_id=${user.user_id}, platform=${platform})`
             )
+
+            try {
+              const ChatWebSocketService = req.app.locals.services.getService('chat_web_socket')
+              ChatWebSocketService.disconnectUser(user.user_id, userType)
+              logger.info(
+                `🔌 [Session] 管理后台已断开旧设备WebSocket: user_id=${user.user_id}, type=${userType}`
+              )
+            } catch (wsError) {
+              logger.debug(`🔌 [Session] WebSocket断开跳过: ${wsError.message}`)
+            }
           }
           logger.info(
             `🔐 [Session] 管理后台会话创建成功: user_id=${user.user_id}, platform=${platform}, session=${sessionToken.substring(0, 8)}...`

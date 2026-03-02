@@ -143,15 +143,21 @@
           <div class="h-8 w-px bg-gray-200 mx-1 hidden md:block"></div>
 
           <div>
+            <label class="block text-xs themed-text-muted mb-1.5 font-medium">订单号/核销码</label>
+            <input type="text" x-model="filter.keyword" placeholder="订单号或核销码"
+                   @keyup.enter="search()"
+                   class="w-44 px-3 py-1.5 text-sm border themed-bg-base themed-border rounded-lg themed-text" />
+          </div>
+          <div>
             <label class="block text-xs themed-text-muted mb-1.5 font-medium">手机号</label>
             <input type="text" x-model="filter.mobile" placeholder="搜索用户手机号"
                    @keyup.enter="search()"
-                   class="w-40 px-3 py-1.5 text-sm themed-bg-base themed-border rounded-lg themed-text" />
+                   class="w-40 px-3 py-1.5 text-sm border themed-bg-base themed-border rounded-lg themed-text" />
           </div>
           <div>
             <label class="block text-xs themed-text-muted mb-1.5 font-medium">所属商家</label>
             <select x-model="filter.merchant_id" @change="search()"
-                    class="w-40 px-3 py-1.5 text-sm themed-bg-base themed-border rounded-lg themed-text">
+                    class="w-40 px-3 py-1.5 text-sm border themed-bg-base themed-border rounded-lg themed-text">
               <option value="">全部商家</option>
               <template x-for="m in merchantOptions" :key="m.merchant_id">
                 <option :value="m.merchant_id" x-text="m.merchant_name"></option>
@@ -161,17 +167,17 @@
           <div>
             <label class="block text-xs themed-text-muted mb-1.5 font-medium">开始日期</label>
             <input type="date" x-model="filter.start_date"
-                   class="px-3 py-1.5 text-sm themed-bg-base themed-border rounded-lg themed-text" />
+                   class="px-3 py-1.5 text-sm border themed-bg-base themed-border rounded-lg themed-text" />
           </div>
           <div>
             <label class="block text-xs themed-text-muted mb-1.5 font-medium">结束日期</label>
             <input type="date" x-model="filter.end_date"
-                   class="px-3 py-1.5 text-sm themed-bg-base themed-border rounded-lg themed-text" />
+                   class="px-3 py-1.5 text-sm border themed-bg-base themed-border rounded-lg themed-text" />
           </div>
           <button @click="search()" class="px-4 py-1.5 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition font-medium">
             🔍 搜索
           </button>
-          <button @click="resetFilter()" class="px-3 py-1.5 text-sm themed-bg-base themed-text-muted rounded-lg hover:themed-bg-subtle transition themed-border">
+          <button @click="resetFilter()" class="px-3 py-1.5 text-sm border themed-bg-base themed-text-muted rounded-lg hover:themed-bg-subtle transition themed-border">
             重置
           </button>
         </div>

@@ -75,7 +75,7 @@ describe('🎯 Pipeline架构完整业务流程测试', () => {
     }
 
     // 获取活动代码（直接从 TestConfig.realData 获取，已在 initRealTestData 中查询数据库）
-    campaignCode = TestConfig.realData.testCampaign?.campaign_code || 'BASIC_LOTTERY'
+    campaignCode = TestConfig.realData.testCampaign?.campaign_code || 'CAMP20250901001'
     console.log(`📋 活动代码: ${campaignCode}`)
   })
 

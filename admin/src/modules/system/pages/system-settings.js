@@ -83,7 +83,7 @@ function registerSystemSettingsComponents() {
       rule_description: '',
       trigger_condition: {},
       notification_channels: ['admin_broadcast'],
-      notification_priority: 'medium',
+      notification_priority: 'normal',
       check_interval_minutes: 60,
       is_enabled: true
     },
@@ -202,7 +202,7 @@ function registerSystemSettingsComponents() {
           rule_description: rule.rule_description || '',
           trigger_condition: rule.trigger_condition || {},
           notification_channels: rule.notification_channels || ['admin_broadcast'],
-          notification_priority: rule.notification_priority || 'medium',
+          notification_priority: rule.notification_priority || 'normal',
           check_interval_minutes: rule.check_interval_minutes || 60,
           is_enabled: rule.is_enabled !== false
         }
@@ -214,7 +214,7 @@ function registerSystemSettingsComponents() {
           rule_description: '',
           trigger_condition: {},
           notification_channels: ['admin_broadcast'],
-          notification_priority: 'medium',
+          notification_priority: 'normal',
           check_interval_minutes: 60,
           is_enabled: true
         }
@@ -327,7 +327,7 @@ function registerSystemSettingsComponents() {
         { key: 'reminder_rule_id', label: '规则ID', sortable: true },
         { key: 'rule_name', label: '规则名称', sortable: true },
         { key: 'rule_type', label: '规则类型', render: (val, row) => row.rule_type_display || val || '-' },
-        { key: 'notification_priority', label: '优先级', type: 'status', statusMap: { high: { class: 'red', label: '高' }, medium: { class: 'yellow', label: '中' }, low: { class: 'green', label: '低' } } },
+        { key: 'notification_priority', label: '优先级', type: 'status', statusMap: { urgent: { class: 'red', label: '紧急' }, high: { class: 'orange', label: '高' }, normal: { class: 'yellow', label: '普通' }, low: { class: 'green', label: '低' } } },
         { key: 'check_interval_minutes', label: '检查间隔', render: (val) => val ? `${val}分钟` : '-' },
         { key: 'is_enabled', label: '状态', type: 'status', statusMap: { true: { class: 'green', label: '启用' }, false: { class: 'gray', label: '禁用' } } }
       ],

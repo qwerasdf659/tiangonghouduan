@@ -104,7 +104,7 @@ describe('📊 任务11.1：积分发放→抽奖消费完整链路测试', () =
     campaignCode = TestConfig.realData?.testCampaign?.campaign_code
     if (!campaignCode) {
       // 从 global.testData 获取
-      campaignCode = global.testData?.testCampaign?.campaign_code || 'BASIC_LOTTERY'
+      campaignCode = global.testData?.testCampaign?.campaign_code || 'CAMP20250901001'
     }
     console.log(`📋 活动代码: ${campaignCode}`)
 

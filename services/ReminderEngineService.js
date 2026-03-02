@@ -400,6 +400,11 @@ class ReminderEngineService {
   /**
    * 发送提醒通知
    *
+   * 渠道去重策略：
+   * - admin_broadcast：持久化到 admin_notifications 表 + WebSocket 广播（完整通知）
+   * - websocket：被 admin_broadcast 包含，不单独调用（避免双重通知）
+   * - wechat：预留渠道，独立调用微信推送（未来实现）
+   *
    * @param {Object} rule - 提醒规则
    * @param {Object} checkResult - 检测结果
    * @returns {Promise<Object>} 发送结果
@@ -409,36 +414,50 @@ class ReminderEngineService {
     const results = []
 
     try {
-      // 解析通知模板
       const message = ReminderEngineService.parseTemplate(rule, checkResult)
 
-      // 遍历通知渠道
-      for (const channel of channels) {
+      /*
+       * 渠道去重：admin_broadcast 已包含 WebSocket 广播，
+       * 若同时配置 websocket 渠道则跳过，防止产生 2 倍通知记录
+       */
+      const hasAdminBroadcast = channels.includes('admin_broadcast')
+      const deduplicatedChannels = hasAdminBroadcast
+        ? channels.filter(ch => ch !== 'websocket')
+        : channels
+
+      if (deduplicatedChannels.length < channels.length) {
+        logger.info(`[提醒引擎] 渠道去重: websocket 已被 admin_broadcast 覆盖，跳过独立调用`, {
+          original_channels: channels,
+          effective_channels: deduplicatedChannels
+        })
+      }
+
+      for (const channel of deduplicatedChannels) {
         try {
           if (channel === 'admin_broadcast') {
-            // 管理员广播通知
+            // 管理员广播通知（持久化到 admin_notifications + WebSocket 广播）
             await NotificationService.sendToAdmins({
-              notification_type: 'reminder_alert',
+              type: 'reminder_alert',
               title: `提醒: ${rule.rule_name}`,
               content: message,
-              priority: rule.notification_priority || 'medium',
               data: {
                 reminder_rule_id: rule.reminder_rule_id,
                 rule_code: rule.rule_code,
+                notification_priority: rule.notification_priority,
                 check_result: checkResult
               }
             })
             results.push({ channel, success: true })
           } else if (channel === 'websocket') {
-            // WebSocket 实时推送
+            // 仅在 admin_broadcast 未配置时独立执行 WebSocket 广播
             await NotificationService.sendToAdmins({
-              notification_type: 'reminder_alert',
+              type: 'reminder_alert',
               title: `提醒: ${rule.rule_name}`,
               content: message,
-              priority: rule.notification_priority || 'medium',
               data: {
                 reminder_rule_id: rule.reminder_rule_id,
                 rule_code: rule.rule_code,
+                notification_priority: rule.notification_priority,
                 check_result: checkResult
               }
             })
@@ -620,7 +639,7 @@ class ReminderEngineService {
       rule_type,
       condition_config,
       action_config,
-      priority = 'medium',
+      priority = 'normal',
       created_by
     } = data
 

@@ -86,9 +86,6 @@ class QRCodeValidator {
     // Redis 客户端（延迟初始化）
     this._redis_client = null
 
-    // V1 永久码前缀（用于检测和拒绝旧格式）
-    this.v1_prefix = 'QR_'
-
     // V2 动态码前缀
     this.v2_prefix = 'QRV2_'
   }
@@ -240,17 +237,7 @@ class QRCodeValidator {
         }
       }
 
-      // 2. 检测并拒绝V1永久码
-      if (qr_code.startsWith(this.v1_prefix) && !qr_code.startsWith(this.v2_prefix)) {
-        logger.warn(`🚫 [QRCodeValidator] 检测到V1永久码，直接拒绝: ${qr_code.substring(0, 30)}...`)
-        return {
-          valid: false,
-          error: '二维码格式不支持，请刷新获取最新二维码',
-          error_code: 'INVALID_QRCODE_FORMAT'
-        }
-      }
-
-      // 3. 检查V2前缀
+      // 2. 检查V2前缀
       if (!qr_code.startsWith(this.v2_prefix)) {
         return {
           valid: false,
@@ -259,7 +246,7 @@ class QRCodeValidator {
         }
       }
 
-      // 4. 解析二维码：QRV2_{base64_payload}_{signature}
+      // 3. 解析二维码：QRV2_{base64_payload}_{signature}
       const without_prefix = qr_code.substring(this.v2_prefix.length)
       const last_underscore = without_prefix.lastIndexOf('_')
 
@@ -274,7 +261,7 @@ class QRCodeValidator {
       const base64_payload = without_prefix.substring(0, last_underscore)
       const provided_signature = without_prefix.substring(last_underscore + 1)
 
-      // 5. 验证签名长度
+      // 4. 验证签名长度
       if (!provided_signature || provided_signature.length !== 64) {
         return {
           valid: false,
@@ -283,7 +270,7 @@ class QRCodeValidator {
         }
       }
 
-      // 6. 验证签名
+      // 5. 验证签名
       const expected_signature = this._generateSignature(base64_payload)
       if (provided_signature !== expected_signature) {
         return {
@@ -293,7 +280,7 @@ class QRCodeValidator {
         }
       }
 
-      // 7. 解析 payload
+      // 6. 解析 payload
       let payload
       try {
         const payload_json = Buffer.from(base64_payload, 'base64url').toString('utf8')
@@ -306,7 +293,7 @@ class QRCodeValidator {
         }
       }
 
-      // 8. 验证 payload 必需字段
+      // 7. 验证 payload 必需字段
       if (!payload.user_uuid || !payload.exp || !payload.nonce) {
         return {
           valid: false,
@@ -315,7 +302,7 @@ class QRCodeValidator {
         }
       }
 
-      // 9. 验证 UUID 格式
+      // 8. 验证 UUID 格式
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
       if (!uuidRegex.test(payload.user_uuid)) {
         return {
@@ -325,7 +312,7 @@ class QRCodeValidator {
         }
       }
 
-      // 10. 验证过期时间
+      // 9. 验证过期时间
       const now = Date.now()
       if (now > payload.exp) {
         const expired_ago = Math.floor((now - payload.exp) / 1000)
@@ -382,18 +369,7 @@ class QRCodeValidator {
    * }
    */
   validateQRCodeV2WithoutNonceConsumption(qr_code) {
-    // 1. 检测并拒绝V1永久码
-    if (this.isV1QRCode(qr_code)) {
-      logger.warn(`🚫 [QRCodeValidator] 拒绝V1永久码（预览模式）: ${qr_code.substring(0, 30)}...`)
-      return {
-        valid: false,
-        error: '二维码格式不支持，请刷新获取最新二维码',
-        error_code: 'INVALID_QRCODE_FORMAT',
-        http_status: 400
-      }
-    }
-
-    // 2. 基础格式、签名、过期验证（不消耗nonce）
+    // 1. 基础格式、签名、过期验证（不消耗nonce）
     const format_result = this._validateV2Format(qr_code)
     if (!format_result.valid) {
       return {
@@ -588,7 +564,7 @@ class QRCodeValidator {
    * 检测二维码版本
    *
    * @param {string} qr_code - 二维码字符串
-   * @returns {string} 版本：'v1'（旧永久码）、'v2'（动态码）、'unknown'
+   * @returns {string} 版本：'v2'（动态码）、'unknown'
    */
   detectVersion(qr_code) {
     if (!qr_code || typeof qr_code !== 'string') {
@@ -599,33 +575,7 @@ class QRCodeValidator {
       return 'v2'
     }
 
-    if (qr_code.startsWith(this.v1_prefix)) {
-      return 'v1'
-    }
-
     return 'unknown'
-  }
-
-  /**
-   * 检测是否为V1永久码（旧格式，需拒绝）
-   *
-   * V1永久码格式：QR_{user_id}_{signature}（已废弃，存在重放攻击风险）
-   * V2动态码格式：QRV2_{base64_payload}_{signature}
-   *
-   * @param {string} qr_code - 二维码字符串
-   * @returns {boolean} 是否为V1永久码
-   *
-   * @example
-   * isV1QRCode('QR_123_abc...') // true（V1永久码，应拒绝）
-   * isV1QRCode('QRV2_eyJ...') // false（V2动态码，可验证）
-   */
-  isV1QRCode(qr_code) {
-    if (!qr_code || typeof qr_code !== 'string') {
-      return false
-    }
-
-    // V1格式：以 QR_ 开头但不是 QRV2_
-    return qr_code.startsWith(this.v1_prefix) && !qr_code.startsWith(this.v2_prefix)
   }
 
   /**
@@ -637,8 +587,7 @@ class QRCodeValidator {
    *
    * 验证步骤：
    * 1. 检测二维码版本
-   * 2. V1码直接拒绝（安全考虑）
-   * 3. V2码验证格式+签名+过期（不消耗nonce）
+   * 2. V2码验证格式+签名+过期（不消耗nonce）
    *
    * @param {string} qr_code - 二维码字符串
    * @returns {Object} 验证结果（同步方法，不需要await）
@@ -661,18 +610,7 @@ class QRCodeValidator {
     // 1. 检测版本
     const version = this.detectVersion(qr_code)
 
-    // 2. V1永久码直接拒绝（安全考虑：防重放攻击）
-    if (version === 'v1') {
-      logger.warn(`🚫 [QRCodeValidator] 拒绝V1永久码（预览模式）: ${qr_code.substring(0, 30)}...`)
-      return {
-        valid: false,
-        error: '二维码格式不支持，请刷新获取最新二维码',
-        code: 'INVALID_QRCODE_FORMAT',
-        statusCode: 400
-      }
-    }
-
-    // 3. 未知格式拒绝
+    // 2. 未知格式拒绝
     if (version === 'unknown') {
       return {
         valid: false,
@@ -682,10 +620,10 @@ class QRCodeValidator {
       }
     }
 
-    // 4. V2码预览验证（格式+签名+过期，不消耗nonce）
+    // 3. V2码预览验证（格式+签名+过期，不消耗nonce）
     const result = this.validateQRCodeV2WithoutNonceConsumption(qr_code)
 
-    // 5. 统一返回格式（将 error_code 映射为 code，http_status 映射为 statusCode）
+    // 4. 统一返回格式（将 error_code 映射为 code，http_status 映射为 statusCode）
     return {
       valid: result.valid,
       user_uuid: result.user_uuid,
@@ -707,8 +645,7 @@ class QRCodeValidator {
    *
    * 验证步骤：
    * 1. 检测二维码版本
-   * 2. V1码直接拒绝（安全考虑）
-   * 3. V2码进行完整验证（格式+签名+过期+nonce防重放）
+   * 2. V2码进行完整验证（格式+签名+过期+nonce防重放）
    *
    * @param {string} qr_code - 二维码字符串
    * @returns {Promise<Object>} 验证结果
@@ -730,18 +667,7 @@ class QRCodeValidator {
     // 1. 检测版本
     const version = this.detectVersion(qr_code)
 
-    // 2. V1永久码直接拒绝（安全考虑：防重放攻击）
-    if (version === 'v1') {
-      logger.warn(`🚫 [QRCodeValidator] 拒绝V1永久码: ${qr_code.substring(0, 30)}...`)
-      return {
-        valid: false,
-        error: '二维码格式不支持，请刷新获取最新二维码',
-        code: 'INVALID_QRCODE_FORMAT',
-        statusCode: 400
-      }
-    }
-
-    // 3. 未知格式拒绝
+    // 2. 未知格式拒绝
     if (version === 'unknown') {
       return {
         valid: false,
@@ -751,10 +677,10 @@ class QRCodeValidator {
       }
     }
 
-    // 4. V2码完整验证（格式+签名+过期+nonce防重放）
+    // 3. V2码完整验证（格式+签名+过期+nonce防重放）
     const result = await this.validateQRCodeV2WithNonce(qr_code)
 
-    // 5. 统一返回格式（将 error_code 映射为 code，http_status 映射为 statusCode）
+    // 4. 统一返回格式（将 error_code 映射为 code，http_status 映射为 statusCode）
     return {
       valid: result.valid,
       user_uuid: result.user_uuid,

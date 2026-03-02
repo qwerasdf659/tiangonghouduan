@@ -351,6 +351,19 @@ router.post(
         pay_amount: result.order.pay_amount
       })
 
+      // 异步通知管理员有新的兑换订单待审核（不阻塞用户响应）
+      const NotificationService = req.app.locals.services.getService('notification')
+      NotificationService.notifyNewExchangeAudit({
+        exchange_id: result.order.record_id,
+        user_id,
+        product_name: result.order.item_name,
+        quantity: exchangeQuantity,
+        total_points: result.order.pay_amount,
+        product_category: 'exchange'
+      }).catch(notifyError => {
+        logger.error('[兑换] 通知管理员失败（不影响兑换结果）', { error: notifyError.message })
+      })
+
       return res.apiSuccess(responseData, result.message)
     } catch (error) {
       // 标记幂等请求失败（允许重试）

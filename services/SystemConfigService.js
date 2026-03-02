@@ -26,7 +26,7 @@
 
 const { SystemConfig } = require('../models')
 const logger = require('../utils/logger').logger
-const { getUnifiedRedisClient } = require('../utils/UnifiedRedisClient')
+const { getRedisClient: getRedisClientInstance } = require('../utils/UnifiedRedisClient')
 
 /**
  * 缓存配置常量
@@ -53,7 +53,7 @@ class SystemConfigService {
    */
   static getRedisClient() {
     try {
-      return getUnifiedRedisClient()
+      return getRedisClientInstance()
     } catch (error) {
       logger.warn('Redis 客户端初始化失败，将使用数据库回落', { error: error.message })
       return null

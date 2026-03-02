@@ -198,6 +198,7 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/system/notifications/read-all': 'NOTIFICATION_READ_ALL', // 全部已读（修复：system/read-all → system/notifications/read-all）
   '/api/v4/system/notifications/clear': 'NOTIFICATION_CLEAR', // 清空通知（修复：system/clear → system/notifications/clear）
   '/api/v4/system/notifications/send': 'NOTIFICATION_SEND', // 发送通知（修复：system/send → system/notifications/send）
+  '/api/v4/system/notifications/:id': 'NOTIFICATION_DELETE', // 删除通知（DELETE 方法，物理删除）
 
   // ===== 活动参与 =====
   '/api/v4/activities/:id/participate': 'ACTIVITY_PARTICIPATE', // 参与活动
@@ -443,6 +444,18 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/console/ad-slots/': 'ADMIN_AD_SLOT_CREATE', // 创建广告位
   '/api/v4/console/ad-slots/:id': 'ADMIN_AD_SLOT_UPDATE', // 更新广告位
   '/api/v4/console/ad-slots/:id/toggle': 'ADMIN_AD_SLOT_TOGGLE', // 切换广告位状态
+
+  // P1c: 地域定向管理 CRUD
+  '/api/v4/console/zone-management/zones/': 'ADMIN_ZONE_CREATE', // 创建地域区域
+  '/api/v4/console/zone-management/zones/:id': 'ADMIN_ZONE_UPDATE', // 更新/删除地域区域
+  '/api/v4/console/zone-management/groups/': 'ADMIN_ZONE_GROUP_CREATE', // 创建联合广告组
+  '/api/v4/console/zone-management/groups/:id': 'ADMIN_ZONE_GROUP_UPDATE', // 更新/删除联合广告组
+  '/api/v4/console/zone-management/groups/:id/members': 'ADMIN_ZONE_GROUP_MEMBERS_MANAGE', // 管理联合组成员
+
+  // P1c: 调价审批管理
+  '/api/v4/console/ad-pricing/adjustments/:id/confirm': 'ADMIN_PRICE_ADJUSTMENT_CONFIRM', // 确认调价建议
+  '/api/v4/console/ad-pricing/adjustments/:id/reject': 'ADMIN_PRICE_ADJUSTMENT_REJECT', // 拒绝调价建议
+  '/api/v4/console/ad-pricing/adjustments/:id/apply': 'ADMIN_PRICE_ADJUSTMENT_APPLY', // 执行已确认的调价
 
   // Phase 5: 广告事件上报
   '/api/v4/system/ad-events/impression': 'AD_IMPRESSION_REPORT', // 广告曝光上报

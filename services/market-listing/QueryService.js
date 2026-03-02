@@ -53,7 +53,7 @@ class MarketListingQueryService {
         {
           model: ItemTemplate,
           as: 'offerItemTemplate',
-          attributes: ['item_template_id', 'display_name', 'image_url', 'thumbnail_url'],
+          attributes: ['item_template_id', 'display_name'],
           required: false
         }
       ],
@@ -258,7 +258,7 @@ class MarketListingQueryService {
         /** 直接关联物品模板（通过 offer_item_template_id 快照字段） */
         model: ItemTemplate,
         as: 'offerItemTemplate',
-        attributes: ['item_template_id', 'display_name', 'image_url', 'thumbnail_url'],
+        attributes: ['item_template_id', 'display_name'],
         required: false
       }
     ]

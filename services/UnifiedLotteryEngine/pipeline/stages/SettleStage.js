@@ -657,6 +657,15 @@ class SettleStage extends BaseStage {
               },
               { transaction }
             )
+
+            /* 钻石奖品扣减 DIAMOND_QUOTA（双池隔离第二轨道） */
+            if (prize.material_asset_code === 'DIAMOND') {
+              await this._deductDiamondQuota(user_id, prize.material_amount, {
+                idempotency_key: `${idempotency_key}:quota_deduct`,
+                lottery_prize_id: prize.lottery_prize_id,
+                transaction
+              })
+            }
           }
           break
 
@@ -679,6 +688,63 @@ class SettleStage extends BaseStage {
         error: error.message
       })
       throw error
+    }
+  }
+
+  /**
+   * 扣减钻石配额（抽中钻石奖品时）
+   *
+   * 双池隔离第二轨道：预算积分管实物/券/水晶，钻石配额管钻石。
+   * 扣减失败不阻断结算（配额可能未启用或余额不足），仅记录日志。
+   *
+   * @param {number} user_id - 用户ID
+   * @param {number} diamond_amount - 发放的钻石数量
+   * @param {Object} options - 扣减选项
+   * @param {string} options.idempotency_key - 幂等键
+   * @param {number} options.lottery_prize_id - 奖品ID
+   * @param {Object} options.transaction - 事务对象
+   * @returns {Promise<void>} 无返回值
+   * @private
+   */
+  async _deductDiamondQuota(user_id, diamond_amount, options) {
+    const { idempotency_key, lottery_prize_id, transaction } = options
+
+    try {
+      const burnAccount = await BalanceService.getOrCreateAccount(
+        { system_code: 'SYSTEM_BURN' },
+        { transaction }
+      )
+
+      // eslint-disable-next-line no-restricted-syntax -- transaction 已正确传递
+      await BalanceService.changeBalance(
+        {
+          user_id,
+          asset_code: 'DIAMOND_QUOTA',
+          delta_amount: -diamond_amount,
+          idempotency_key,
+          business_type: 'lottery_quota_deduct',
+          counterpart_account_id: burnAccount.account_id,
+          meta: {
+            lottery_prize_id,
+            diamond_amount,
+            description: `抽奖扣减钻石配额 ${diamond_amount}`
+          }
+        },
+        { transaction }
+      )
+
+      this.log('info', '钻石配额扣减成功', {
+        user_id,
+        diamond_amount,
+        lottery_prize_id
+      })
+    } catch (error) {
+      this.log('warn', '钻石配额扣减失败（非致命，配额可能未初始化）', {
+        user_id,
+        diamond_amount,
+        lottery_prize_id,
+        error: error.message
+      })
     }
   }
 

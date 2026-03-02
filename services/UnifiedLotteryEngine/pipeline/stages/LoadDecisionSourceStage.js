@@ -27,7 +27,7 @@
 
 const BaseStage = require('./BaseStage')
 const { LotteryPreset, LotteryManagementSetting, LotteryDraw, User } = require('../../../../models')
-const { Op } = require('sequelize')
+const { Op, literal } = require('sequelize')
 
 /**
  * 决策来源类型常量
@@ -215,7 +215,7 @@ class LoadDecisionSourceStage extends BaseStage {
   async _checkOverride(user_id, lottery_campaign_id) {
     try {
       // 活动级总开关：management.enabled=false 时跳过全部干预检查
-      const { DynamicConfigLoader } = require('../../compute/config/StrategyConfig')
+      const { DynamicConfigLoader } = require('../../compute/config/ComputeConfig')
       const management_enabled = await DynamicConfigLoader.getValue('management', 'enabled', true, {
         lottery_campaign_id
       })
@@ -244,7 +244,10 @@ class LoadDecisionSourceStage extends BaseStage {
             }
           ]
         },
-        order: [['lottery_campaign_id', 'DESC NULLS LAST']]
+        order: [
+          [literal('lottery_campaign_id IS NULL'), 'ASC'],
+          ['lottery_campaign_id', 'DESC']
+        ]
       })
 
       return override
@@ -275,7 +278,7 @@ class LoadDecisionSourceStage extends BaseStage {
   async _checkGuarantee(user_id, lottery_campaign_id, _campaign) {
     try {
       // 从 lottery_strategy_config 读取保底配置（三层优先级：DB活动级 > env > 代码默认值）
-      const { DynamicConfigLoader } = require('../../compute/config/StrategyConfig')
+      const { DynamicConfigLoader } = require('../../compute/config/ComputeConfig')
       const guarantee_enabled =
         (await DynamicConfigLoader.getValue('guarantee', 'enabled', false, {
           lottery_campaign_id

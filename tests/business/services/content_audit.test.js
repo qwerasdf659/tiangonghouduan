@@ -61,7 +61,9 @@ describe('ContentAuditEngine - 内容审核引擎测试', () => {
       const result = await ContentAuditEngine.submitForAudit('exchange', 1)
 
       // 应该返回已存在的审核记录（BIGINT类型转换为字符串）
-      expect(result.audit_id.toString()).toBe(testContentReviewRecord.audit_id.toString())
+      expect(result.content_review_record_id.toString()).toBe(
+        testContentReviewRecord.content_review_record_id.toString()
+      )
     })
 
     it('应该拒绝不支持的审核类型', async () => {
@@ -88,7 +90,7 @@ describe('ContentAuditEngine - 内容审核引擎测试', () => {
     it('应该成功审核通过', async () => {
       const result = await TransactionManager.execute(async transaction => {
         return await ContentAuditEngine.approve(
-          approveContentReviewRecord.audit_id,
+          approveContentReviewRecord.content_review_record_id,
           testUser.user_id,
           '测试审核通过',
           { transaction }
@@ -113,7 +115,7 @@ describe('ContentAuditEngine - 内容审核引擎测试', () => {
       await expect(
         TransactionManager.execute(async transaction => {
           return await ContentAuditEngine.approve(
-            approveContentReviewRecord.audit_id,
+            approveContentReviewRecord.content_review_record_id,
             testUser.user_id,
             '重复审核',
             { transaction }
@@ -140,7 +142,7 @@ describe('ContentAuditEngine - 内容审核引擎测试', () => {
     it('应该成功审核拒绝', async () => {
       const result = await TransactionManager.execute(async transaction => {
         return await ContentAuditEngine.reject(
-          rejectContentReviewRecord.audit_id,
+          rejectContentReviewRecord.content_review_record_id,
           testUser.user_id,
           '测试审核拒绝原因',
           { transaction }
@@ -163,9 +165,14 @@ describe('ContentAuditEngine - 内容审核引擎测试', () => {
 
       await expect(
         TransactionManager.execute(async transaction => {
-          return await ContentAuditEngine.reject(newRecord.audit_id, testUser.user_id, '', {
-            transaction
-          })
+          return await ContentAuditEngine.reject(
+            newRecord.content_review_record_id,
+            testUser.user_id,
+            '',
+            {
+              transaction
+            }
+          )
         })
       ).rejects.toThrow('拒绝原因必须提供')
     })

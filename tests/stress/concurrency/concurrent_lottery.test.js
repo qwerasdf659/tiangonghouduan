@@ -104,7 +104,7 @@ describe('【P0】并发抽奖测试 - 多用户/多设备并发场景', () => {
     console.log(`✅ 登录成功，用户ID: ${testUserId}`)
 
     // 获取活动信息（直接从 TestConfig.realData 获取，已在 initRealTestData 中查询数据库）
-    campaignCode = TestConfig.realData.testCampaign?.campaign_code || 'BASIC_LOTTERY'
+    campaignCode = TestConfig.realData.testCampaign?.campaign_code || 'CAMP20250901001'
     console.log(`📋 活动代码: ${campaignCode}`)
 
     // 充值测试积分

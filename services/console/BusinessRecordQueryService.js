@@ -153,7 +153,7 @@ class BusinessRecordQueryService {
   static async getRedemptionOrders(options = {}) {
     const { RedemptionOrder, User, Item } = require('../../models')
 
-    const { status, redeemer_user_id, mobile, merchant_id, start_date, end_date } = options
+    const { keyword, status, redeemer_user_id, mobile, merchant_id, start_date, end_date } = options
     const pagination = buildPaginationOptions(options)
 
     // 构建查询条件
@@ -164,6 +164,14 @@ class BusinessRecordQueryService {
       where.created_at = {}
       if (start_date) where.created_at[Op.gte] = new Date(start_date)
       if (end_date) where.created_at[Op.lte] = new Date(end_date + ' 23:59:59')
+    }
+
+    // 订单号/核销码关键词搜索
+    if (keyword) {
+      where[Op.or] = [
+        { redemption_order_id: { [Op.like]: `%${keyword}%` } },
+        { code_hash: { [Op.like]: `%${keyword}%` } }
+      ]
     }
 
     // 手机号搜索：通过关联 User 表的 mobile 字段过滤

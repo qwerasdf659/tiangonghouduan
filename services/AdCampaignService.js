@@ -18,6 +18,7 @@
  */
 
 const logger = require('../utils/logger').logger
+const { Op } = require('sequelize')
 const {
   AdCampaign,
   AdSlot,
@@ -255,6 +256,25 @@ class AdCampaignService {
       if (data.billing_mode === 'fixed_daily') {
         if (!data.fixed_days || data.fixed_days < 1) {
           throw new Error('固定包天模式必须提供包天天数（fixed_days >= 1）')
+        }
+
+        // 包天坑位排他检查：同一广告位、日期范围重叠、已有 active/approved/pending_review 的包天计划则拒绝
+        if (data.start_date && data.end_date) {
+          const conflicting = await AdCampaign.findOne({
+            where: {
+              ad_slot_id: data.ad_slot_id,
+              billing_mode: 'fixed_daily',
+              status: { [Op.in]: ['active', 'approved', 'pending_review'] },
+              start_date: { [Op.lte]: data.end_date },
+              end_date: { [Op.gte]: data.start_date }
+            },
+            transaction: options.transaction
+          })
+          if (conflicting) {
+            throw new Error(
+              `包天坑位冲突：广告位 ${adSlot.slot_name} 在 ${data.start_date} ~ ${data.end_date} 期间已有包天计划（ID: ${conflicting.ad_campaign_id}）`
+            )
+          }
         }
 
         // 计算固定包天总价
@@ -612,6 +632,26 @@ class AdCampaignService {
       }
 
       if (action === 'approve') {
+        // 包天坑位排他检查：审核通过前确认同广告位无日期冲突
+        if (campaign.billing_mode === 'fixed_daily' && campaign.start_date && campaign.end_date) {
+          const conflicting = await AdCampaign.findOne({
+            where: {
+              ad_slot_id: campaign.ad_slot_id,
+              billing_mode: 'fixed_daily',
+              ad_campaign_id: { [Op.ne]: campaignId },
+              status: { [Op.in]: ['active', 'approved'] },
+              start_date: { [Op.lte]: campaign.end_date },
+              end_date: { [Op.gte]: campaign.start_date }
+            },
+            transaction: options.transaction
+          })
+          if (conflicting) {
+            throw new Error(
+              `包天坑位冲突：该广告位在 ${campaign.start_date} ~ ${campaign.end_date} 期间已有包天计划（ID: ${conflicting.ad_campaign_id}），无法审核通过`
+            )
+          }
+        }
+
         // 审核通过：状态变为已审核，然后自动激活
         await campaign.update(
           {

@@ -283,7 +283,7 @@ describe('用户权限系统测试 - P0优先级', () => {
 
       if (hierarchy_records.length > 0) {
         const first_record = hierarchy_records[0]
-        expect(first_record.hierarchy_id).toBeDefined()
+        expect(first_record.user_hierarchy_id).toBeDefined()
         expect(first_record.user_id).toBeDefined()
         expect(first_record.role_id).toBeDefined()
       }

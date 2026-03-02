@@ -5,8 +5,7 @@
     "public/admin",
     "backups",
     "logs",
-    "tests",
-    "scripts/maintenance/database_performance_monitor.js"
+    "tests"
   ],
   "detectiveOptions": {
     "es6": {
