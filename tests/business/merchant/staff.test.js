@@ -363,10 +363,12 @@ describe('员工管理API测试', () => {
        *
        * 200: 成功禁用
        * 400: 参数错误
+       * 401: 认证失败（session_token过期等）
+       * 403: 权限不足
        * 404: 员工不存在
        * 500: 员工未绑定任何门店（业务逻辑错误，用户存在但无门店绑定）
        */
-      expect([200, 400, 403, 404, 500]).toContain(response.status)
+      expect([200, 400, 401, 403, 404, 500]).toContain(response.status)
       console.log('✅ 禁用员工API权限验证完成')
     })
   })

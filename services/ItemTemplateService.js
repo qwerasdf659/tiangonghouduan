@@ -391,8 +391,12 @@ class ItemTemplateService {
         throw error
       }
 
-      // 检查是否有关联的物品实例
-      if (this.models.Item) {
+      // 检查是否有关联的物品实例（仅当模型存在且具有 item_template_id 列时）
+      if (
+        this.models.Item &&
+        this.models.Item.rawAttributes &&
+        this.models.Item.rawAttributes.item_template_id
+      ) {
         const instanceCount = await this.models.Item.count({
           where: { item_template_id },
           transaction

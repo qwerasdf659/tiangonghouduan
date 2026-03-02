@@ -145,16 +145,28 @@ describe('竞价系统功能测试 (Bid System — 臻选空间/幸运空间/竞
 
       expect(res.body.success).toBe(true)
       expect(res.body.data).toHaveProperty('unlocked')
-      expect(res.body.data).toHaveProperty('can_unlock')
       expect(typeof res.body.data.unlocked).toBe('boolean')
-      expect(typeof res.body.data.can_unlock).toBe('boolean')
 
-      /* 决策3：验证后端参数值（以后端为准，前端适配） */
-      if (res.body.data.unlock_cost !== undefined) {
-        expect(res.body.data.unlock_cost).toBe(100) // 100 POINTS
-      }
-      if (res.body.data.validity_hours !== undefined) {
-        expect(res.body.data.validity_hours).toBe(24) // 24小时
+      /*
+       * 响应字段依赖于 unlocked 状态：
+       * - unlocked=false: 返回 can_unlock, unlock_cost, validity_hours 等
+       * - unlocked=true: 返回 is_valid, remaining_hours, total_unlock_count 等
+       */
+      if (res.body.data.unlocked === false) {
+        expect(res.body.data).toHaveProperty('can_unlock')
+        expect(typeof res.body.data.can_unlock).toBe('boolean')
+
+        /* 决策3：验证后端参数值（以后端为准，前端适配） */
+        if (res.body.data.unlock_cost !== undefined) {
+          expect(res.body.data.unlock_cost).toBe(100) // 100 POINTS
+        }
+        if (res.body.data.validity_hours !== undefined) {
+          expect(res.body.data.validity_hours).toBe(24) // 24小时
+        }
+      } else {
+        /* unlocked=true: 验证有效期等字段存在 */
+        expect(res.body.data).toHaveProperty('is_valid')
+        expect(res.body.data).toHaveProperty('remaining_hours')
       }
     })
 
