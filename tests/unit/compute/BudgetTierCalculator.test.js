@@ -15,6 +15,19 @@
 
 const BudgetTierCalculator = require('../../../services/UnifiedLotteryEngine/compute/calculators/BudgetTierCalculator')
 
+/**
+ * 默认阈值基于 ratio=0.22 动态计算：
+ *   high = round(100 * 0.22 * 5) = 110
+ *   mid  = round(100 * 0.22 * 2) = 44
+ *   low  = round(100 * 0.22 * 1) = 22
+ */
+const DEFAULT_RATIO = 0.22
+const EXPECTED_DEFAULTS = {
+  high: Math.round(100 * DEFAULT_RATIO * 5),
+  mid: Math.round(100 * DEFAULT_RATIO * 2),
+  low: Math.round(100 * DEFAULT_RATIO * 1)
+}
+
 describe('BudgetTierCalculator', () => {
   let calculator
 
@@ -27,10 +40,10 @@ describe('BudgetTierCalculator', () => {
       expect(calculator).toBeInstanceOf(BudgetTierCalculator)
     })
 
-    test('默认阈值配置正确', () => {
-      expect(calculator.thresholds.high).toBe(1000)
-      expect(calculator.thresholds.mid).toBe(500)
-      expect(calculator.thresholds.low).toBe(100)
+    test('默认阈值基于 ratio=0.22 动态计算', () => {
+      expect(calculator.thresholds.high).toBe(EXPECTED_DEFAULTS.high)
+      expect(calculator.thresholds.mid).toBe(EXPECTED_DEFAULTS.mid)
+      expect(calculator.thresholds.low).toBe(EXPECTED_DEFAULTS.low)
     })
 
     test('支持自定义阈值', () => {
@@ -45,45 +58,49 @@ describe('BudgetTierCalculator', () => {
       expect(customCalculator.thresholds.mid).toBe(1000)
       expect(customCalculator.thresholds.low).toBe(200)
     })
+
+    test('支持自定义 ratio 计算默认阈值', () => {
+      const customRatio = 0.5
+      const calc = new BudgetTierCalculator({ budget_allocation_ratio: customRatio })
+      expect(calc.thresholds.high).toBe(Math.round(100 * customRatio * 5))
+      expect(calc.thresholds.mid).toBe(Math.round(100 * customRatio * 2))
+      expect(calc.thresholds.low).toBe(Math.round(100 * customRatio * 1))
+    })
   })
 
   describe('_determineBudgetTier - 内部分层逻辑', () => {
-    /**
-     * 测试私有方法（通过反射访问）
-     * 注意：测试私有方法仅用于验证核心逻辑，不推荐在生产测试中过度使用
-     */
     test('effective_budget = 0 => B0', () => {
       const result = calculator._determineBudgetTier(0, calculator.thresholds)
       expect(result).toBe('B0')
     })
 
-    test('effective_budget = 50 => B0（低于 low 阈值）', () => {
-      const result = calculator._determineBudgetTier(50, calculator.thresholds)
+    test('effective_budget = 10 => B0（低于 low=22 阈值）', () => {
+      const result = calculator._determineBudgetTier(10, calculator.thresholds)
       expect(result).toBe('B0')
     })
 
-    test('effective_budget = 100 => B1（等于 low 阈值）', () => {
-      const result = calculator._determineBudgetTier(100, calculator.thresholds)
+    test('effective_budget = 22 => B1（等于 low 阈值）', () => {
+      const result = calculator._determineBudgetTier(EXPECTED_DEFAULTS.low, calculator.thresholds)
       expect(result).toBe('B1')
     })
 
-    test('effective_budget = 300 => B1（介于 low 和 mid 之间）', () => {
-      const result = calculator._determineBudgetTier(300, calculator.thresholds)
+    test('effective_budget = 30 => B1（介于 low=22 和 mid=44 之间）', () => {
+      const result = calculator._determineBudgetTier(30, calculator.thresholds)
       expect(result).toBe('B1')
     })
 
-    test('effective_budget = 500 => B2（等于 mid 阈值）', () => {
-      const result = calculator._determineBudgetTier(500, calculator.thresholds)
+    test('effective_budget = 44 => B2（等于 mid 阈值）', () => {
+      const result = calculator._determineBudgetTier(EXPECTED_DEFAULTS.mid, calculator.thresholds)
       expect(result).toBe('B2')
     })
 
-    test('effective_budget = 800 => B2（介于 mid 和 high 之间）', () => {
-      const result = calculator._determineBudgetTier(800, calculator.thresholds)
+    test('effective_budget = 80 => B2（介于 mid=44 和 high=110 之间）', () => {
+      const result = calculator._determineBudgetTier(80, calculator.thresholds)
       expect(result).toBe('B2')
     })
 
-    test('effective_budget = 1000 => B3（等于 high 阈值）', () => {
-      const result = calculator._determineBudgetTier(1000, calculator.thresholds)
+    test('effective_budget = 110 => B3（等于 high 阈值）', () => {
+      const result = calculator._determineBudgetTier(EXPECTED_DEFAULTS.high, calculator.thresholds)
       expect(result).toBe('B3')
     })
 
@@ -136,19 +153,50 @@ describe('BudgetTierCalculator', () => {
   })
 
   describe('_calculateDynamicThresholds - 动态阈值', () => {
-    test('基于奖品价值计算阈值', () => {
+    test('基于奖品 reward_tier 和 prize_value_points 计算阈值', () => {
       const prizes = [
-        { prize_value_points: 0 },
-        { prize_value_points: 50 },
-        { prize_value_points: 100 },
-        { prize_value_points: 200 },
-        { prize_value_points: 400 }
+        { reward_tier: 'high', prize_value_points: 40 },
+        { reward_tier: 'high', prize_value_points: 20 },
+        { reward_tier: 'mid', prize_value_points: 10 },
+        { reward_tier: 'mid', prize_value_points: 5 },
+        { reward_tier: 'low', prize_value_points: 1 },
+        { reward_tier: 'low', prize_value_points: 0, is_fallback: true }
       ]
       const thresholds = calculator._calculateDynamicThresholds(prizes)
 
-      // 阈值应该有意义的层级
-      expect(thresholds.low).toBeLessThan(thresholds.mid)
-      expect(thresholds.mid).toBeLessThan(thresholds.high)
+      expect(thresholds.high).toBe(20)
+      expect(thresholds.mid).toBe(5)
+      expect(thresholds.low).toBe(1)
+      expect(thresholds.low).toBeLessThanOrEqual(thresholds.mid)
+      expect(thresholds.mid).toBeLessThanOrEqual(thresholds.high)
+    })
+
+    test('A 层修复：某档全部 prize_value_points=0 时阈值回退到 0 而非默认值', () => {
+      const prizes = [
+        { reward_tier: 'high', prize_value_points: 20 },
+        { reward_tier: 'mid', prize_value_points: 5 },
+        { reward_tier: 'low', prize_value_points: 0 },
+        { reward_tier: 'low', prize_value_points: 0 }
+      ]
+      const thresholds = calculator._calculateDynamicThresholds(prizes)
+
+      expect(thresholds.low).toBe(0)
+      expect(thresholds.mid).toBe(5)
+      expect(thresholds.high).toBe(20)
+    })
+
+    test('B 层修复：保序向下收敛（low 不拉高 mid）', () => {
+      const prizes = [
+        { reward_tier: 'high', prize_value_points: 10 },
+        { reward_tier: 'mid', prize_value_points: 5 },
+        { reward_tier: 'low', prize_value_points: 50 }
+      ]
+      const thresholds = calculator._calculateDynamicThresholds(prizes)
+
+      expect(thresholds.low).toBeLessThanOrEqual(thresholds.mid)
+      expect(thresholds.mid).toBeLessThanOrEqual(thresholds.high)
+      expect(thresholds.low).toBe(5)
+      expect(thresholds.mid).toBe(5)
     })
 
     test('空奖品列表返回默认阈值', () => {

@@ -24,8 +24,8 @@ const {
   sequelize,
   Item,
   ItemTemplate,
-  ItemLedger,
-  ItemHold,
+  _ItemLedger,
+  _ItemHold,
   User,
   Account
 } = require('../../../models')

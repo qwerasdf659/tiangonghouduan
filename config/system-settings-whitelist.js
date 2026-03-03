@@ -172,6 +172,58 @@ const SYSTEM_SETTINGS_WHITELIST = {
     approvalRequired: false // ✅ 业务决策：无需审批，运营主管可直接修改
   },
 
+  // ===== 消费比例配置（2026-03-02 钻石配额优化方案）=====
+  'points/points_award_ratio': {
+    type: 'number',
+    min: 0.1, // 防止接近零导致消费无积分
+    max: 5.0, // 覆盖行业天花板（美团/阿里同类参数上限），防运营误操作
+    step: 0.01, // 与 budget_allocation_ratio 一致，1% 精度调参
+    default: 1.0, // 与当前硬编码行为一致（消费 100 元 = 100 积分）
+    readonly: false,
+    description: '消费积分比例（消费金额×该系数=奖励积分数量）',
+    changeRequiresRestart: false,
+    businessImpact: 'CRITICAL',
+    auditRequired: true,
+    approvalRequired: false
+  },
+
+  'points/diamond_quota_ratio': {
+    type: 'number',
+    min: 0.1,
+    max: 5.0,
+    step: 0.01,
+    default: 1.0,
+    readonly: false,
+    description: '钻石配额比例（消费金额×该系数=钻石配额数量）',
+    changeRequiresRestart: false,
+    businessImpact: 'CRITICAL',
+    auditRequired: true,
+    approvalRequired: false
+  },
+
+  'points/diamond_quota_enabled': {
+    type: 'boolean',
+    default: true, // 保护类机制默认开启（运营忘配也安全）
+    readonly: false,
+    description: '抽奖钻石配额控制（开启后配额不足的用户不会抽到钻石奖品）',
+    changeRequiresRestart: false,
+    businessImpact: 'HIGH',
+    auditRequired: true,
+    approvalRequired: false
+  },
+
+  'points/diamond_quota_exhausted_action': {
+    type: 'string',
+    pattern: /^(filter|downgrade)$/,
+    default: 'filter', // filter=更严格，安全默认值
+    readonly: false,
+    description: '配额不足策略（filter=移除全部钻石奖品，downgrade=保留最小额钻石）',
+    changeRequiresRestart: false,
+    businessImpact: 'HIGH',
+    auditRequired: true,
+    approvalRequired: false
+  },
+
   'points/daily_lottery_limit': {
     type: 'number',
     min: 10, // ✅ 业务决策：最低 10 次（防止过低）

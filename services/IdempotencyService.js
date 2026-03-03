@@ -240,6 +240,10 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/console/config/config': 'ADMIN_CONFIG_UPDATE', // 更新系统配置（修复：console/config → console/config/config）
   '/api/v4/console/config/test/simulate': 'ADMIN_CONFIG_TEST', // 测试配置（修复：console/test/simulate → console/config/test/simulate）
 
+  // ===== 用户比例覆盖管理（2026-03-02 钻石配额优化方案）=====
+  '/api/v4/console/user-ratio-overrides': 'ADMIN_USER_RATIO_OVERRIDE_CREATE',
+  '/api/v4/console/user-ratio-overrides/:id': 'ADMIN_USER_RATIO_OVERRIDE_UPDATE',
+
   // ===== 消费审批 =====
   '/api/v4/console/consumption/approve/:id': 'ADMIN_CONSUMPTION_APPROVE', // 审批消费（修复：console/approve/:id → console/consumption/approve/:id）
   '/api/v4/console/consumption/reject/:id': 'ADMIN_CONSUMPTION_REJECT', // 拒绝消费（修复：console/reject/:id → console/consumption/reject/:id）

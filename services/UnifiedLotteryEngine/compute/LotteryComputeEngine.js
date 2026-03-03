@@ -157,10 +157,15 @@ class LotteryComputeEngine {
     this.logger = logger
 
     /* 初始化各计算器实例（Phase 3-6 已实现） */
-    // 使用 StrategyConfig 作为默认配置
-    this.budgetTierCalculator = new BudgetTierCalculator(
-      options.budget_tier_config || BUDGET_TIER_CONFIG
-    )
+    const budget_config = options.budget_tier_config || BUDGET_TIER_CONFIG
+    this.budgetTierCalculator = new BudgetTierCalculator({
+      budget_allocation_ratio: budget_config.budget_allocation_ratio,
+      thresholds: {
+        high: budget_config.threshold_high,
+        mid: budget_config.threshold_mid,
+        low: budget_config.threshold_low
+      }
+    })
     this.pressureTierCalculator = new PressureTierCalculator(
       options.pressure_tier_config || PRESSURE_TIER_CONFIG
     )
@@ -629,9 +634,13 @@ class LotteryComputeEngine {
    * @returns {Object} 运气债务信息
    */
   getLuckDebtMultiplier(params) {
-    const { global_state, tier_weights } = params
+    const { global_state, tier_weights, luck_debt_enabled } = params
 
-    if (!this.options.enable_luck_debt || !global_state) {
+    /* 优先使用调用方传入的动态开关值，兜底读构造函数的静态值 */
+    const is_enabled =
+      luck_debt_enabled !== undefined ? luck_debt_enabled : this.options.enable_luck_debt
+
+    if (!is_enabled || !global_state) {
       return {
         multiplier: 1.0,
         debt_level: 'none',

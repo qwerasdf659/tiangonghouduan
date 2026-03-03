@@ -759,7 +759,7 @@ describe('预算耗尽降级测试（任务8.3）', () => {
       console.log('✅ 阈值边界条件验证通过')
     })
 
-    test('所有奖品价值为0时应正确处理', () => {
+    test('所有奖品价值为0时阈值应为0（免费奖品不需要预算门槛）', () => {
       const zero_value_prizes = [
         { lottery_prize_id: 1, reward_tier: 'fallback', prize_value_points: 0 },
         { lottery_prize_id: 2, reward_tier: 'fallback', prize_value_points: 0 }
@@ -770,10 +770,13 @@ describe('预算耗尽降级测试（任务8.3）', () => {
 
       console.log(`📊 全0价值奖品阈值: ${JSON.stringify(dynamic_thresholds)}`)
 
-      // 应该使用默认阈值
-      expect(dynamic_thresholds.high).toBeGreaterThan(0)
-      expect(dynamic_thresholds.mid).toBeGreaterThan(0)
-      expect(dynamic_thresholds.low).toBeGreaterThan(0)
+      /*
+       * 所有奖品 prize_value_points=0 → getMinPositiveCost 返回 null → 阈值为 0
+       * 这是正确行为：免费奖品无需任何预算门槛
+       */
+      expect(dynamic_thresholds.high).toBe(0)
+      expect(dynamic_thresholds.mid).toBe(0)
+      expect(dynamic_thresholds.low).toBe(0)
 
       console.log('✅ 全0价值奖品处理验证通过')
     })

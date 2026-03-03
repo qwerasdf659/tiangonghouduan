@@ -18,6 +18,7 @@
     "admin:preview": "cd admin && npm run preview",
     "test": "jest",
     "test:coverage": "jest --coverage",
+    "test:stress": "jest --testPathPattern=tests/stress/ --forceExit --no-coverage",
     "lint": "eslint . --ext .js",
     "lint:fix": "eslint . --ext .js --fix",
     "check:circular": "node scripts/check-circular-deps.js",

@@ -109,9 +109,6 @@ class BuildPrizePoolStage extends BaseStage {
         allowed_tiers
       })
 
-      /* 获取抽奖策略配置（用于钻石配额控制） */
-      const strategy_config = campaign_data.strategy_config || {}
-
       /* 1. 根据库存和每日上限过滤奖品 */
       let filtered_prizes = await this._filterByAvailability(prizes)
 
@@ -120,15 +117,27 @@ class BuildPrizePoolStage extends BaseStage {
         filtered_prizes = this._filterByBudget(filtered_prizes, budget_before)
       }
 
-      /* 3. 根据钻石配额过滤钻石类奖品（双池隔离第二轨道） */
-      const diamond_quota_enabled =
-        strategy_config.diamond_quota_enabled === true ||
-        strategy_config.diamond_quota_enabled === 'true'
+      /*
+       * 3. 根据钻石配额过滤钻石类奖品（双池隔离第二轨道）
+       *    配额配置已统一迁移到 system_settings (points 分类)，
+       *    通过 AdminSystemService 读取，享有 Redis L2 缓存。
+       */
+      const AdminSystemService = require('../../../AdminSystemService')
+      const diamond_quota_enabled = await AdminSystemService.getSettingValue(
+        'points',
+        'diamond_quota_enabled',
+        true
+      )
       if (diamond_quota_enabled) {
+        const exhausted_action = await AdminSystemService.getSettingValue(
+          'points',
+          'diamond_quota_exhausted_action',
+          'filter'
+        )
         filtered_prizes = await this._filterByDiamondQuota(
           filtered_prizes,
           user_id,
-          strategy_config
+          exhausted_action
         )
       }
 
@@ -354,12 +363,12 @@ class BuildPrizePoolStage extends BaseStage {
    *
    * @param {Array} prizes - 奖品列表
    * @param {number} user_id - 用户ID
-   * @param {Object} strategy_config - 策略配置
+   * @param {string} exhausted_action - 配额耗尽策略（'filter'=移除全部钻石奖品 / 'downgrade'=保留最小额钻石）
    * @returns {Promise<Array>} 过滤后的奖品列表
    * @private
    */
-  async _filterByDiamondQuota(prizes, user_id, strategy_config) {
-    const action = (strategy_config.quota_exhausted_action || 'filter').replace(/"/g, '')
+  async _filterByDiamondQuota(prizes, user_id, exhausted_action) {
+    const action = (exhausted_action || 'filter').replace(/"/g, '')
 
     let user_quota = 0
     try {

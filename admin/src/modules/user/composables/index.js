@@ -16,6 +16,9 @@ export { useRolesPermissionsState, useRolesPermissionsMethods } from './roles-pe
 // 高级状态管理模块
 export { useAdvancedStatusState, useAdvancedStatusMethods } from './advanced-status.js'
 
+// 用户比例覆盖管理模块（2026-03-02 钻石配额优化方案）
+export { useRatioOverridesState, useRatioOverridesMethods } from './ratio-overrides.js'
+
 /**
  * 组合所有用户管理状态
  * @returns {Object} 合并后的状态对象

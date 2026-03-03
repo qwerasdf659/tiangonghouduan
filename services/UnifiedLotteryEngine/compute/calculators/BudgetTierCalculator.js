@@ -66,18 +66,22 @@ class BudgetTierCalculator {
    */
   constructor(options = {}) {
     /**
-     * 预算阈值配置
-     * 默认值基于文档设计，可通过配置覆盖
+     * 预算阈值配置（C 层修复：默认值跟随 budget_allocation_ratio 动态计算）
      *
      * threshold_high：预算 >= 此值 → B3
      * threshold_mid：预算 >= 此值 → B2
      * threshold_low：预算 >= 此值 → B1
      * 预算 < threshold_low → B0
+     *
+     * 默认值基于 budget_allocation_ratio 动态计算：
+     *   ratio=0.22 时: high=110(消费500元), mid=44(消费200元), low=22(消费100元)
+     * 运行时 _calculateDynamicThresholds 会用奖品实际数据覆盖这些默认值
      */
+    const ratio = options.budget_allocation_ratio || 0.22
     this.thresholds = {
-      high: 1000, // B3 阈值：可抽高档奖品
-      mid: 500, // B2 阈值：可抽中档奖品
-      low: 100, // B1 阈值：可抽低档奖品
+      high: Math.round(100 * ratio * 5),
+      mid: Math.round(100 * ratio * 2),
+      low: Math.round(100 * ratio * 1),
       ...options.thresholds
     }
 
@@ -378,18 +382,27 @@ class BudgetTierCalculator {
       return positive_costs.length > 0 ? Math.min(...positive_costs) : null
     }
 
+    /**
+     * A 层修复：null 回退到 0（而非 this.thresholds.high/mid/low）
+     * 当某档位所有奖品 prize_value_points=0 时，getMinPositiveCost 返回 null，
+     * 说明该档位不需要预算门槛，阈值应为 0（任何人都能进），而非硬编码默认值
+     */
     const dynamic_thresholds = {
-      high: getMinPositiveCost(prize_by_tier.high) ?? this.thresholds.high,
-      mid: getMinPositiveCost(prize_by_tier.mid) ?? this.thresholds.mid,
-      low: getMinPositiveCost(prize_by_tier.low) ?? this.thresholds.low
+      high: getMinPositiveCost(prize_by_tier.high) ?? 0,
+      mid: getMinPositiveCost(prize_by_tier.mid) ?? 0,
+      low: getMinPositiveCost(prize_by_tier.low) ?? 0
     }
 
-    // 确保阈值递减：high >= mid >= low
-    if (dynamic_thresholds.mid > dynamic_thresholds.high) {
-      dynamic_thresholds.high = dynamic_thresholds.mid
-    }
+    /**
+     * B 层修复：保序方向从「向上污染」改为「向下收敛」
+     * 确保阈值递减 high >= mid >= low：
+     *   偏高的往下拉（low 异常高不会拉高 mid），不会向上扩散影响其他档位
+     */
     if (dynamic_thresholds.low > dynamic_thresholds.mid) {
-      dynamic_thresholds.mid = dynamic_thresholds.low
+      dynamic_thresholds.low = dynamic_thresholds.mid
+    }
+    if (dynamic_thresholds.mid > dynamic_thresholds.high) {
+      dynamic_thresholds.mid = dynamic_thresholds.high
     }
 
     return dynamic_thresholds

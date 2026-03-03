@@ -95,80 +95,79 @@ describe('策略引擎边界场景测试', () => {
         expect(result).toBe('B0')
       })
 
-      test('effective_budget = "100" 字符串数字应正确解析', () => {
-        // 业务层应该在调用前处理类型转换，但计算器应该容错
-        const result = calculator._determineBudgetTier(100, calculator.thresholds)
+      test('effective_budget = "22" 字符串数字应正确解析', () => {
+        const result = calculator._determineBudgetTier(22, calculator.thresholds)
         expect(result).toBe('B1')
       })
     })
 
     describe('精确边界值测试（阈值临界点）', () => {
-      // 默认阈值: low=100, mid=500, high=1000
+      // 默认阈值基于 ratio=0.22: low=22, mid=44, high=110
 
-      test('effective_budget = 99 应返回 B0（刚好低于 low 阈值）', () => {
-        const result = calculator._determineBudgetTier(99, calculator.thresholds)
+      test('effective_budget = 21 应返回 B0（刚好低于 low=22 阈值）', () => {
+        const result = calculator._determineBudgetTier(21, calculator.thresholds)
         expect(result).toBe('B0')
       })
 
-      test('effective_budget = 100 应返回 B1（等于 low 阈值）', () => {
-        const result = calculator._determineBudgetTier(100, calculator.thresholds)
+      test('effective_budget = 22 应返回 B1（等于 low 阈值）', () => {
+        const result = calculator._determineBudgetTier(22, calculator.thresholds)
         expect(result).toBe('B1')
       })
 
-      test('effective_budget = 101 应返回 B1（刚好高于 low 阈值）', () => {
-        const result = calculator._determineBudgetTier(101, calculator.thresholds)
+      test('effective_budget = 23 应返回 B1（刚好高于 low 阈值）', () => {
+        const result = calculator._determineBudgetTier(23, calculator.thresholds)
         expect(result).toBe('B1')
       })
 
-      test('effective_budget = 499 应返回 B1（刚好低于 mid 阈值）', () => {
-        const result = calculator._determineBudgetTier(499, calculator.thresholds)
+      test('effective_budget = 43 应返回 B1（刚好低于 mid=44 阈值）', () => {
+        const result = calculator._determineBudgetTier(43, calculator.thresholds)
         expect(result).toBe('B1')
       })
 
-      test('effective_budget = 500 应返回 B2（等于 mid 阈值）', () => {
-        const result = calculator._determineBudgetTier(500, calculator.thresholds)
+      test('effective_budget = 44 应返回 B2（等于 mid 阈值）', () => {
+        const result = calculator._determineBudgetTier(44, calculator.thresholds)
         expect(result).toBe('B2')
       })
 
-      test('effective_budget = 501 应返回 B2（刚好高于 mid 阈值）', () => {
-        const result = calculator._determineBudgetTier(501, calculator.thresholds)
+      test('effective_budget = 45 应返回 B2（刚好高于 mid 阈值）', () => {
+        const result = calculator._determineBudgetTier(45, calculator.thresholds)
         expect(result).toBe('B2')
       })
 
-      test('effective_budget = 999 应返回 B2（刚好低于 high 阈值）', () => {
-        const result = calculator._determineBudgetTier(999, calculator.thresholds)
+      test('effective_budget = 109 应返回 B2（刚好低于 high=110 阈值）', () => {
+        const result = calculator._determineBudgetTier(109, calculator.thresholds)
         expect(result).toBe('B2')
       })
 
-      test('effective_budget = 1000 应返回 B3（等于 high 阈值）', () => {
-        const result = calculator._determineBudgetTier(1000, calculator.thresholds)
+      test('effective_budget = 110 应返回 B3（等于 high 阈值）', () => {
+        const result = calculator._determineBudgetTier(110, calculator.thresholds)
         expect(result).toBe('B3')
       })
 
-      test('effective_budget = 1001 应返回 B3（刚好高于 high 阈值）', () => {
-        const result = calculator._determineBudgetTier(1001, calculator.thresholds)
+      test('effective_budget = 111 应返回 B3（刚好高于 high 阈值）', () => {
+        const result = calculator._determineBudgetTier(111, calculator.thresholds)
         expect(result).toBe('B3')
       })
     })
 
     describe('浮点数精度边界', () => {
-      test('effective_budget = 99.9 应返回 B0', () => {
-        const result = calculator._determineBudgetTier(99.9, calculator.thresholds)
+      test('effective_budget = 21.9 应返回 B0', () => {
+        const result = calculator._determineBudgetTier(21.9, calculator.thresholds)
         expect(result).toBe('B0')
       })
 
-      test('effective_budget = 99.999999 应返回 B0', () => {
-        const result = calculator._determineBudgetTier(99.999999, calculator.thresholds)
+      test('effective_budget = 21.999999 应返回 B0', () => {
+        const result = calculator._determineBudgetTier(21.999999, calculator.thresholds)
         expect(result).toBe('B0')
       })
 
-      test('effective_budget = 100.0 应返回 B1', () => {
-        const result = calculator._determineBudgetTier(100.0, calculator.thresholds)
+      test('effective_budget = 22.0 应返回 B1', () => {
+        const result = calculator._determineBudgetTier(22.0, calculator.thresholds)
         expect(result).toBe('B1')
       })
 
-      test('effective_budget = 100.00001 应返回 B1', () => {
-        const result = calculator._determineBudgetTier(100.00001, calculator.thresholds)
+      test('effective_budget = 22.00001 应返回 B1', () => {
+        const result = calculator._determineBudgetTier(22.00001, calculator.thresholds)
         expect(result).toBe('B1')
       })
     })
@@ -1275,8 +1274,8 @@ describe('策略引擎边界场景测试', () => {
       const pityCalc = new PityCalculator()
       const luckDebtCalc = new LuckDebtCalculator()
 
-      // 1. 计算 Budget Tier
-      const budget_tier = budgetCalc._determineBudgetTier(50, budgetCalc.thresholds)
+      // 1. 计算 Budget Tier（默认阈值 low=22, mid=44, high=110，budget=10 < 22 → B0）
+      const budget_tier = budgetCalc._determineBudgetTier(10, budgetCalc.thresholds)
       expect(budget_tier).toBe('B0')
 
       // 2. 计算 Pressure Tier
@@ -1454,11 +1453,11 @@ describe('策略引擎边界场景测试', () => {
 
       /*
        * B2 中等预算、P1 中等压力、无连续空奖、无连续高价值、正常运气
-       * 根据阈值配置：B0 < 100, B1 = 100-499, B2 = 500-999, B3 >= 1000
+       * 阈值基于 ratio=0.22: B0 < 22, B1 = 22-43, B2 = 44-109, B3 >= 110
        */
 
-      // 1. Budget Tier = B2（需要 500 <= 预算 < 1000）
-      const budget_tier = budgetCalc._determineBudgetTier(600, budgetCalc.thresholds)
+      // 1. Budget Tier = B2（需要 44 <= 预算 < 110）
+      const budget_tier = budgetCalc._determineBudgetTier(60, budgetCalc.thresholds)
       expect(budget_tier).toBe('B2')
 
       // 2. Pressure Tier = P1
@@ -1705,21 +1704,22 @@ describe('策略引擎边界场景测试', () => {
       const budgetCalc = new BudgetTierCalculator()
 
       /*
-       * 注意：Number.EPSILON ≈ 2.22e-16，太小以至于 100 - Number.EPSILON
-       * 在 64 位浮点表示中几乎等于 100。
+       * 注意：Number.EPSILON ≈ 2.22e-16，太小以至于 22 - Number.EPSILON
+       * 在 64 位浮点表示中几乎等于 22。
        * 使用更大的差值（如 0.0001）来测试实际的边界行为
+       * 默认阈值基于 ratio=0.22: low=22, mid=44, high=110
        */
 
-      // 99.9999（比阈值稍小）应该是 B0
-      const result1 = budgetCalc._determineBudgetTier(99.9999, budgetCalc.thresholds)
+      // 21.9999（比 low=22 稍小）应该是 B0
+      const result1 = budgetCalc._determineBudgetTier(21.9999, budgetCalc.thresholds)
       expect(result1).toBe('B0')
 
-      // 100.0001（比阈值稍大）应该是 B1
-      const result2 = budgetCalc._determineBudgetTier(100.0001, budgetCalc.thresholds)
+      // 22.0001（比 low=22 稍大）应该是 B1
+      const result2 = budgetCalc._determineBudgetTier(22.0001, budgetCalc.thresholds)
       expect(result2).toBe('B1')
 
-      // 精确的 100 应该是 B1（>= 阈值）
-      const result3 = budgetCalc._determineBudgetTier(100, budgetCalc.thresholds)
+      // 精确的 22 应该是 B1（>= low 阈值）
+      const result3 = budgetCalc._determineBudgetTier(22, budgetCalc.thresholds)
       expect(result3).toBe('B1')
     })
 

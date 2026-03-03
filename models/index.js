@@ -904,6 +904,16 @@ models.LotterySimulationRecord = require('./LotterySimulationRecord')(sequelize,
  *    - 业务场景：策略调参预览→模拟运行→对比分析→风险评估→一键应用→偏差追踪
  */
 
+// 🔴 用户消费比例覆盖（2026-03-02 钻石配额优化方案）
+models.UserRatioOverride = require('./UserRatioOverride')(sequelize, DataTypes)
+/*
+ * ✅ UserRatioOverride：用户消费比例覆盖表
+ *    - 用途：管理员为特定用户设置个性化消费比例（积分/预算/配额三个比例）
+ *    - 优先级：个人覆盖 > 全局默认（system_settings）
+ *    - 表名：user_ratio_overrides，主键：user_ratio_override_id，外键：user_id
+ *    - 业务场景：活动奖励、投诉补偿、VIP关怀、内部测试
+ */
+
 // 🔴 设置模型关联关系
 Object.keys(models).forEach(modelName => {
   if (models[modelName].associate) {

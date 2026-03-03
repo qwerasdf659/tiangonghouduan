@@ -108,6 +108,12 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
       test_user_id = test_user.user_id
       console.log(`✅ 从数据库获取测试用户: user_id=${test_user_id}`)
     }
+
+    // 确保 red_shard → DIAMOND 转换规则已启用（测试依赖）
+    await sequelize.query(
+      "UPDATE material_conversion_rules SET is_enabled = 1 WHERE from_asset_code = 'red_shard' AND to_asset_code = 'DIAMOND'"
+    )
+    console.log('✅ 测试前已启用 red_shard → DIAMOND 转换规则')
   })
 
   afterEach(async () => {
@@ -139,6 +145,16 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
       console.log('✅ 测试流水记录已清理')
     } catch (error) {
       console.warn('⚠️ 测试流水清理失败:', error.message)
+    }
+
+    // 恢复转换规则到测试前状态（禁用）
+    try {
+      await sequelize.query(
+        "UPDATE material_conversion_rules SET is_enabled = 0 WHERE from_asset_code = 'red_shard' AND to_asset_code = 'DIAMOND'"
+      )
+      console.log('✅ 测试后已恢复转换规则状态')
+    } catch (_e) {
+      // 忽略恢复错误
     }
 
     // 关闭数据库连接
@@ -479,13 +495,13 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
     beforeAll(async () => {
       // 查询是否有带手续费的规则
       const [existingFeeRules] = await sequelize.query(`
-        SELECT rule_id, from_asset_code, to_asset_code, fee_rate, fee_min_amount 
+        SELECT material_conversion_rule_id, from_asset_code, to_asset_code, fee_rate, fee_min_amount 
         FROM material_conversion_rules 
         WHERE fee_rate > 0 AND is_enabled = 1
       `)
 
       if (existingFeeRules.length > 0) {
-        fee_rule_id = existingFeeRules[0].rule_id
+        fee_rule_id = existingFeeRules[0].material_conversion_rule_id
         console.log(
           `✅ 使用现有带手续费的规则: rule_id=${fee_rule_id}, fee_rate=${existingFeeRules[0].fee_rate}`
         )

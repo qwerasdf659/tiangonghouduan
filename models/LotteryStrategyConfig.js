@@ -187,7 +187,12 @@ module.exports = (sequelize, DataTypes) => {
         throw new Error('upsertConfig 必须传入 lottery_campaign_id，防止跨活动覆盖')
       }
 
+      /*
+       * 写入前类型强制转换：确保 JSON 存储类型与 value_type 声明一致
+       * 堵住增量数据质量问题（如 Admin UI 传入 "true" 字符串）
+       */
       const value_type = LotteryStrategyConfig.detectValueType(config_value)
+      const coerced_value = LotteryStrategyConfig._coerceValue(config_value, value_type)
 
       const [config, created] = await this.findOrCreate({
         where: {
@@ -197,7 +202,7 @@ module.exports = (sequelize, DataTypes) => {
           priority
         },
         defaults: {
-          config_value: JSON.stringify(config_value),
+          config_value: JSON.stringify(coerced_value),
           value_type,
           description,
           is_active: true,
@@ -210,7 +215,7 @@ module.exports = (sequelize, DataTypes) => {
       if (!created) {
         await config.update(
           {
-            config_value: JSON.stringify(config_value),
+            config_value: JSON.stringify(coerced_value),
             value_type,
             description: description || config.description,
             updated_by
@@ -220,6 +225,45 @@ module.exports = (sequelize, DataTypes) => {
       }
 
       return config
+    }
+
+    /**
+     * 写入前类型强制转换
+     *
+     * 确保存入 JSON 列的值与 value_type 声明的类型严格一致：
+     * - boolean: "true"/"false" 字符串 → true/false 布尔值
+     * - number: "52" 字符串 → 52 数字
+     * - array/object: JSON 字符串 → 解析后的结构
+     *
+     * @param {*} value - 原始值
+     * @param {string} value_type - 声明的类型
+     * @returns {*} 强制转换后的值
+     * @private
+     */
+    static _coerceValue(value, value_type) {
+      if (value === null || value === undefined) return value
+
+      switch (value_type) {
+        case 'boolean':
+          if (typeof value === 'boolean') return value
+          return value === 'true' || value === true
+        case 'number': {
+          if (typeof value === 'number') return value
+          const num = Number(value)
+          if (isNaN(num)) throw new Error(`config_value "${value}" 无法转换为 number`)
+          return num
+        }
+        case 'string':
+          return String(value)
+        case 'array':
+          if (Array.isArray(value)) return value
+          return typeof value === 'string' ? JSON.parse(value) : value
+        case 'object':
+          if (typeof value === 'object') return value
+          return typeof value === 'string' ? JSON.parse(value) : value
+        default:
+          return value
+      }
     }
 
     /**

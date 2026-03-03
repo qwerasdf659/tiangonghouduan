@@ -39,24 +39,23 @@ const { logger } = require('../../../../utils/logger')
  *
  * @type {Object}
  */
+/**
+ * Budget Tier 阈值配置（D7+D9 全自动方案）
+ *
+ * 阈值 100% 由奖品数据在 BudgetTierCalculator._calculateDynamicThresholds() 中动态推导，
+ * 此处仅作为 BudgetTierCalculator 构造函数无奖品数据时的回退基线。
+ *
+ * 默认值跟随 budget_allocation_ratio=0.22 计算：
+ *   high = round(100 * 0.22 * 5) = 110  → 对应消费 500 元
+ *   mid  = round(100 * 0.22 * 2) = 44   → 对应消费 200 元
+ *   low  = round(100 * 0.22 * 1) = 22   → 对应消费 100 元
+ */
+const BUDGET_ALLOCATION_RATIO = parseFloat(process.env.BUDGET_ALLOCATION_RATIO) || 0.22
 const BUDGET_TIER_CONFIG = {
-  /**
-   * B3 阈值：预算 >= 此值可抽所有档位（包括 high）
-   * 默认 1000 积分
-   */
-  threshold_high: parseInt(process.env.BUDGET_TIER_THRESHOLD_HIGH) || 1000,
-
-  /**
-   * B2 阈值：预算 >= 此值可抽 mid + low + fallback
-   * 默认 500 积分
-   */
-  threshold_mid: parseInt(process.env.BUDGET_TIER_THRESHOLD_MID) || 500,
-
-  /**
-   * B1 阈值：预算 >= 此值可抽 low + fallback
-   * 默认 100 积分
-   */
-  threshold_low: parseInt(process.env.BUDGET_TIER_THRESHOLD_LOW) || 100
+  threshold_high: Math.round(100 * BUDGET_ALLOCATION_RATIO * 5),
+  threshold_mid: Math.round(100 * BUDGET_ALLOCATION_RATIO * 2),
+  threshold_low: Math.round(100 * BUDGET_ALLOCATION_RATIO * 1),
+  budget_allocation_ratio: BUDGET_ALLOCATION_RATIO
 }
 
 /**
@@ -919,6 +918,25 @@ class DynamicConfigLoader {
       _dynamicConfigCache.clear()
       logger.info('[ComputeConfig] 全部配置缓存已清除')
     }
+  }
+
+  /**
+   * 判断指定策略是否启用（统一开关查询入口）
+   *
+   * 读取 lottery_strategy_config 中 config_group 对应的 enabled 记录，
+   * 统一布尔转换逻辑，所有 Stage 应通过此方法判断策略开关状态。
+   *
+   * 默认值来源链：DB活动级配置 → isFeatureEnabled(全局开关) → default_value
+   *
+   * @param {string} config_group - 策略分组（如 pity / anti_empty / diamond_quota / tier_fallback）
+   * @param {boolean} [default_value=true] - DB 无记录时的默认值
+   * @param {Object} [options={}] - 透传给 getValue 的选项
+   * @param {number} [options.lottery_campaign_id] - 活动ID
+   * @returns {Promise<boolean>} 策略是否启用
+   */
+  static async isStrategyEnabled(config_group, default_value = true, options = {}) {
+    const raw = await this.getValue(config_group, 'enabled', default_value, options)
+    return raw === true || raw === 'true'
   }
 
   /**

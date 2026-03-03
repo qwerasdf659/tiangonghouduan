@@ -633,17 +633,25 @@ export function usePrizesMethods() {
     },
 
     /**
-     * 档位权重校验（前端侧）
+     * 活动奖品综合校验（前端侧）
      *
-     * 业务规则：每个档位内所有激活奖品的 win_weight 之和必须等于 1,000,000（百万分制）
+     * 业务规则：
+     * 1. 每个档位内所有激活奖品的 win_weight 之和 = 1,000,000（百万分制）
+     * 2. D11: fallback 奖品必须恰好 1 个
+     * 3. low 档非 fallback 奖品至少一个 prize_value_points > 0（避免阈值回退）
+     * 4. D13: 奖品总数匹配 display_mode 格位数
+     *
      * 不合规时在 campaignPrizeWarnings 中追加警告，不阻塞操作
      */
     validateTierWeights() {
       const WEIGHT_SCALE = 1000000
       const tierLabels = { high: '高档位 (high)', mid: '中档位 (mid)', low: '低档位 (low)' }
 
+      const allActivePrizes = []
+
       this.campaignPrizeGroups.forEach(group => {
         const activePrizes = (group.prizes || []).filter(p => p.status === 'active')
+        allActivePrizes.push(...activePrizes)
         if (activePrizes.length === 0) return
 
         const totalWeight = activePrizes.reduce((sum, p) => sum + (parseInt(p.win_weight) || 0), 0)
@@ -660,6 +668,64 @@ export function usePrizesMethods() {
           logger.warn('[Prizes] 权重校验不通过:', warning)
         }
       })
+
+      // D11: fallback 数量校验（严格 1 个）
+      const fallbackPrizes = allActivePrizes.filter(p => p.is_fallback)
+      if (fallbackPrizes.length !== 1) {
+        const warning = `🚨 Fallback（保底）奖品必须恰好 1 个，当前 ${fallbackPrizes.length} 个。` +
+          (fallbackPrizes.length === 0 ? '缺少保底奖品会导致极端情况下抽奖失败' : '多个保底奖品增加运营复杂度且无额外安全性')
+        if (!this.campaignPrizeWarnings.includes(warning)) {
+          this.campaignPrizeWarnings.push(warning)
+        }
+      }
+
+      // low 档 prize_value_points 校验
+      const lowGroup = this.campaignPrizeGroups.find(g => g.tier === 'low')
+      if (lowGroup) {
+        const lowNonFallback = (lowGroup.prizes || []).filter(
+          p => p.status === 'active' && !p.is_fallback
+        )
+        const allZeroPvp = lowNonFallback.length > 0 &&
+          lowNonFallback.every(p => !p.prize_value_points || parseInt(p.prize_value_points) === 0)
+        if (allZeroPvp) {
+          const warning = '🚨 低档位（low）非保底奖品的预算价值全部为 0，会导致动态阈值异常回退。' +
+            '至少一个非保底奖品的预算价值应 > 0'
+          if (!this.campaignPrizeWarnings.includes(warning)) {
+            this.campaignPrizeWarnings.push(warning)
+          }
+        }
+      }
+
+      // D13: 格位数量校验
+      if (this.managingCampaign?.display_mode) {
+        const display_mode = this.managingCampaign.display_mode
+        const FIXED_SLOTS = { grid_3x3: 8, grid_4x4: 12 }
+        const FLEXIBLE_RANGE = {
+          wheel: { min: 4, max: 12 },
+          card_flip: { min: 4, max: 20 },
+          scratch_card: { min: 4, max: 16 }
+        }
+        const DEFAULT_RANGE = { min: 4, max: 20 }
+        const prizeCount = allActivePrizes.length
+
+        if (FIXED_SLOTS[display_mode]) {
+          const expected = FIXED_SLOTS[display_mode]
+          if (prizeCount !== expected) {
+            const warning = `⚠️ ${display_mode} 玩法需要恰好 ${expected} 个奖品，当前 ${prizeCount} 个`
+            if (!this.campaignPrizeWarnings.includes(warning)) {
+              this.campaignPrizeWarnings.push(warning)
+            }
+          }
+        } else {
+          const range = FLEXIBLE_RANGE[display_mode] || DEFAULT_RANGE
+          if (prizeCount < range.min || prizeCount > range.max) {
+            const warning = `⚠️ ${display_mode} 玩法建议 ${range.min}-${range.max} 个奖品，当前 ${prizeCount} 个`
+            if (!this.campaignPrizeWarnings.includes(warning)) {
+              this.campaignPrizeWarnings.push(warning)
+            }
+          }
+        }
+      }
     },
 
     /**

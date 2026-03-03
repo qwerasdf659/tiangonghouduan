@@ -251,7 +251,7 @@ class StoreService {
         },
         {
           model: User,
-          as: 'merchant',
+          as: 'assigned_staff',
           attributes: ['user_id', 'nickname', 'mobile']
         }
       ],
@@ -295,7 +295,7 @@ class StoreService {
         },
         {
           model: User,
-          as: 'merchant',
+          as: 'assigned_staff',
           attributes: ['user_id', 'nickname', 'mobile']
         }
       ],

@@ -14,12 +14,7 @@
  */
 const logger = require('../../utils/logger').logger
 const BusinessError = require('../../utils/BusinessError')
-const {
-  ConsumptionRecord,
-  ContentReviewRecord,
-  User,
-  LotteryStrategyConfig
-} = require('../../models')
+const { ConsumptionRecord, ContentReviewRecord, User } = require('../../models')
 const BalanceService = require('../asset/BalanceService')
 const BeijingTimeHelper = require('../../utils/timeHelper')
 const AuditLogService = require('../AuditLogService')
@@ -154,8 +149,14 @@ class CoreService {
       }
     }
 
-    // 步骤6：计算奖励积分（1元=1分，四舍五入）
-    const pointsToAward = Math.round(parseFloat(data.consumption_amount))
+    // 步骤6：计算奖励积分（可配置比例，提交时锁定，保证用户承诺一致）
+    const AdminSystemService = require('../AdminSystemService')
+    const pointsRatio = await CoreService.getEffectiveRatio(
+      data.user_id,
+      'points_award_ratio',
+      await AdminSystemService.getSettingValue('points', 'points_award_ratio', 1.0)
+    )
+    const pointsToAward = Math.round(parseFloat(data.consumption_amount) * pointsRatio)
 
     // 生成业务唯一键
     const randomSuffix = Math.random().toString(36).substr(2, 6)
@@ -342,8 +343,13 @@ class CoreService {
       { transaction }
     )
 
-    // 6. 双账户模型：预算分配逻辑
-    const budgetRatio = await CoreService.getBudgetRatio()
+    // 6. 双账户模型：预算分配逻辑（支持用户级覆盖）
+    const globalBudgetRatio = await CoreService.getBudgetRatio()
+    const budgetRatio = await CoreService.getEffectiveRatio(
+      record.user_id,
+      'budget_allocation_ratio',
+      globalBudgetRatio
+    )
     const budgetPointsToAllocate = Math.round(record.consumption_amount * budgetRatio)
 
     logger.info(
@@ -377,12 +383,17 @@ class CoreService {
       )
     }
 
-    // 7. 钻石配额发放（双池隔离第二轨道）
+    // 7. 钻石配额发放（双池隔离第二轨道，配置已迁移到 system_settings）
     let diamondQuotaAllocated = 0
     try {
-      const quotaConfig = await CoreService._getDiamondQuotaConfig(transaction)
+      const quotaConfig = await CoreService._getDiamondQuotaConfig()
       if (quotaConfig.enabled) {
-        const quotaAmount = Math.floor(parseFloat(record.consumption_amount) * quotaConfig.ratio)
+        const effectiveRatio = await CoreService.getEffectiveRatio(
+          record.user_id,
+          'diamond_quota_ratio',
+          quotaConfig.ratio
+        )
+        const quotaAmount = Math.floor(parseFloat(record.consumption_amount) * effectiveRatio)
         if (quotaAmount > 0) {
           // eslint-disable-next-line no-restricted-syntax -- 已传递 transaction
           const quotaResult = await BalanceService.changeBalance(
@@ -397,7 +408,7 @@ class CoreService {
                 reference_type: 'consumption',
                 reference_id: recordId,
                 consumption_amount: record.consumption_amount,
-                quota_ratio: quotaConfig.ratio,
+                quota_ratio: effectiveRatio,
                 description: `消费${record.consumption_amount}元，发放钻石配额${quotaAmount}`
               }
             },
@@ -702,54 +713,91 @@ class CoreService {
   }
 
   /**
-   * 读取钻石配额配置（从 lottery_strategy_config）
+   * 读取钻石配额配置（通过 AdminSystemService 统一读取）
    *
-   * 配额配置存储在第一个活跃活动的 lottery_strategy_config 中，
-   * 与 threshold_high/pity_percentage 等配置同一管理方式。
+   * 配额配置已统一迁移到 system_settings 表 points 分类，
+   * 通过 AdminSystemService.getSettingValue() 读取，享有 Redis L2 缓存。
    *
-   * @param {Object} transaction - 数据库事务
+   * 不再依赖 lottery_campaign_id（配额是全局配置，与具体活动无关）。
+   *
    * @returns {Promise<{enabled: boolean, ratio: number, action: string}>} 配额配置
    * @private
    */
-  static async _getDiamondQuotaConfig(transaction) {
+  static async _getDiamondQuotaConfig() {
     try {
-      const config = await LotteryStrategyConfig.findOne({
-        where: { config_key: 'diamond_quota_enabled', is_active: true },
-        transaction
-      })
-
-      if (!config) {
-        return { enabled: false, ratio: 1.0, action: 'filter' }
-      }
-
-      const enabled = config.config_value === 'true' || config.config_value === true
-
-      const ratioConfig = await LotteryStrategyConfig.findOne({
-        where: {
-          lottery_campaign_id: config.lottery_campaign_id,
-          config_key: 'diamond_quota_ratio',
-          is_active: true
-        },
-        transaction
-      })
-
-      const actionConfig = await LotteryStrategyConfig.findOne({
-        where: {
-          lottery_campaign_id: config.lottery_campaign_id,
-          config_key: 'quota_exhausted_action',
-          is_active: true
-        },
-        transaction
-      })
+      const AdminSystemService = require('../AdminSystemService')
+      const [enabled, ratio, action] = await Promise.all([
+        AdminSystemService.getSettingValue('points', 'diamond_quota_enabled', true),
+        AdminSystemService.getSettingValue('points', 'diamond_quota_ratio', 1.0),
+        AdminSystemService.getSettingValue('points', 'diamond_quota_exhausted_action', 'filter')
+      ])
 
       return {
-        enabled,
-        ratio: parseFloat(ratioConfig?.config_value || '1.0'),
-        action: (actionConfig?.config_value || 'filter').replace(/"/g, '')
+        enabled: enabled === true || enabled === 'true',
+        ratio: typeof ratio === 'number' ? ratio : parseFloat(ratio) || 1.0,
+        action: String(action || 'filter').replace(/"/g, '')
       }
     } catch (error) {
       logger.warn(`[ConsumptionService] 读取钻石配额配置失败: ${error.message}`)
       return { enabled: false, ratio: 1.0, action: 'filter' }
+    }
+  }
+
+  /**
+   * 获取用户有效比例（优先个人覆盖，其次全局默认）
+   *
+   * 读取逻辑：先查 user_ratio_overrides 表是否有生效中的个人覆盖，
+   * 有效覆盖存在则返回覆盖值，否则返回 globalDefault。
+   *
+   * 有效覆盖条件：
+   * - effective_start IS NULL 或 effective_start <= NOW()
+   * - effective_end IS NULL 或 effective_end > NOW()
+   *
+   * @param {number} user_id - 用户ID
+   * @param {string} ratio_key - 比例类型（points_award_ratio / budget_allocation_ratio / diamond_quota_ratio）
+   * @param {number} globalDefault - 全局默认值（来自 system_settings）
+   * @returns {Promise<number>} 有效比例值
+   */
+  static async getEffectiveRatio(user_id, ratio_key, globalDefault) {
+    try {
+      const {
+        UserRatioOverride,
+        Sequelize: { Op }
+      } = require('../../models')
+      const now = new Date()
+
+      const override = await UserRatioOverride.findOne({
+        where: {
+          user_id,
+          ratio_key,
+          [Op.and]: [
+            {
+              [Op.or]: [{ effective_start: null }, { effective_start: { [Op.lte]: now } }]
+            },
+            {
+              [Op.or]: [{ effective_end: null }, { effective_end: { [Op.gt]: now } }]
+            }
+          ]
+        }
+      })
+
+      if (override) {
+        logger.info('[配置] 使用用户个人比例覆盖', {
+          user_id,
+          ratio_key,
+          override_value: override.ratio_value,
+          global_default: globalDefault
+        })
+        return override.ratio_value
+      }
+
+      return globalDefault
+    } catch (error) {
+      logger.warn(`[配置] 查询用户比例覆盖失败，降级到全局默认: ${error.message}`, {
+        user_id,
+        ratio_key
+      })
+      return globalDefault
     }
   }
 }

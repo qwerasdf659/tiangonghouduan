@@ -21,7 +21,8 @@ module.exports = {
     '/tests/shared/',
     '/tests/backup-20251112/', // 忽略备份目录,避免测试重复执行
     '/tests/temp/', // 忽略临时目录
-    '/tests/manual/' // 忽略手动测试目录
+    '/tests/manual/', // 忽略手动测试目录
+    '/tests/stress/' // 压力测试单独运行（npm run test:stress），避免默认测试超时
   ],
 
   // 设置文件

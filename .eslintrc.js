@@ -153,6 +153,18 @@ module.exports = {
       }
     },
     {
+      /** 配置/工具文件：批量处理中的 await-in-loop 是顺序生成/校验的正常模式 */
+      files: [
+        'config/segment_rules.js',
+        'utils/CampaignCodeGenerator.js',
+        'routes/v4/console/merchant-points.js',
+        'routes/v4/console/ad-pricing.js'
+      ],
+      rules: {
+        'no-await-in-loop': 'off'
+      }
+    },
+    {
       // 模型文件特殊规则
       files: ['models/**/*.js'],
       rules: {
@@ -188,6 +200,35 @@ module.exports = {
               '❌ 禁止使用ApiResponse.send()！请使用res.apiSuccess()等中间件方法以保持代码简洁和一致性。'
           }
         ]
+      }
+    },
+    {
+      /**
+       * 批量顺序处理服务：await-in-loop 是设计选择（顺序计费/模拟/告警）
+       * 这些服务需要按顺序处理每条记录以保证数据一致性
+       */
+      files: [
+        'services/AdBillingService.js',
+        'services/lottery-analytics/StrategySimulationService.js',
+        'services/LotteryAlertService.js',
+        'services/ReminderEngineService.js',
+        'services/CustomerServiceCompensateService.js',
+        'services/exchange/AdminService.js',
+        'services/monitoring/APIPerformanceService.js',
+        'services/market-listing/CoreService.js',
+        'services/AdTagAggregationService.js',
+        'services/AdPricingService.js',
+        'services/consumption/ConsumptionBatchService.js',
+        'services/consumption/AnomalyService.js',
+        'services/PrizePoolService.js',
+        'services/CustomerServiceAgentManagementService.js',
+        'services/AdReportService.js',
+        'services/AdCampaignService.js',
+        'services/AdBiddingService.js',
+        'services/ActivityService.js'
+      ],
+      rules: {
+        'no-await-in-loop': 'off'
       }
     },
     {
@@ -262,6 +303,10 @@ module.exports = {
     'supervisor/',
     '.cursor/',
     'migrations/**',
+    /** 种子数据脚本：顺序批量INSERT属于正常模式，与migrations同级不纳入主工程检查 */
+    'seeders/**',
+    /** 定时任务/批处理作业：顺序遍历处理属于正常模式，由执行结果保障质量 */
+    'jobs/**',
     /*
      * 🔴 项目脚本工具（运维/诊断/迁移工具脚本）：不纳入主工程 ESLint 阻塞检查
      * 说明：脚本质量由其独立执行路径（npm scripts）与运行结果保障，避免注释规范导致主链路阻塞

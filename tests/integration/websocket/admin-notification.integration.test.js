@@ -112,7 +112,7 @@ describe('WebSocket管理员通知集成测试（P1-4.3）', () => {
   /** 测试用户ID */
   let testUserId = null
   /** 用户认证 Token */
-  let userAuthToken = null
+  let _userAuthToken = null
   /** 管理员认证 Token */
   let adminAuthToken = null
   /** WebSocket 客户端列表（测试后清理） */
@@ -143,7 +143,7 @@ describe('WebSocket管理员通知集成测试（P1-4.3）', () => {
         return
       }
 
-      userAuthToken = loginResponse.body.data.access_token
+      _userAuthToken = loginResponse.body.data.access_token
       testUserId = loginResponse.body.data.user.user_id
       console.log(`✅ 用户登录成功: user_id=${testUserId}`)
 

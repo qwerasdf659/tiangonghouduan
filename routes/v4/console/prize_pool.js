@@ -432,7 +432,23 @@ router.post(
       if (error.message.includes('活动不存在')) {
         return res.apiError(error.message, 'CAMPAIGN_NOT_FOUND')
       }
-      sharedComponents.logger.error('添加奖品失败', { error: error.message })
+      if (error.message.includes('排序') && error.message.includes('已存在')) {
+        return res.apiError(error.message, 'SORT_ORDER_CONFLICT')
+      }
+      if (error.name === 'SequelizeDatabaseError' || error.name === 'SequelizeValidationError') {
+        sharedComponents.logger.error('添加奖品数据校验失败', {
+          error: error.message,
+          campaign_code,
+          prize_name: prizeData.prize_name
+        })
+        return res.apiError(`奖品数据校验失败: ${error.message}`, 'PRIZE_VALIDATION_ERROR')
+      }
+      sharedComponents.logger.error('添加奖品失败', {
+        error: error.message,
+        stack: error.stack,
+        campaign_code,
+        prize_name: prizeData.prize_name
+      })
       return res.apiInternalError('添加奖品失败', error.message, 'PRIZE_ADD_ERROR')
     }
   })

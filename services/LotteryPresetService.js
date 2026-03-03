@@ -639,7 +639,7 @@ class LotteryPresetService {
       })
     ])
 
-    // 获取奖品类型分布
+    // 获取奖品类型分布（raw: true 确保 GROUP BY + JOIN 返回纯对象）
     const prizeTypeStats = await models.LotteryPreset.findAll({
       attributes: [
         [models.sequelize.col('prize.prize_type'), 'prize_type'],
@@ -655,7 +655,8 @@ class LotteryPresetService {
           attributes: []
         }
       ],
-      group: ['prize.prize_type']
+      group: ['prize.prize_type'],
+      raw: true
     })
 
     return {
@@ -664,10 +665,12 @@ class LotteryPresetService {
       used_presets: usedPresets,
       total_users_with_presets: totalUsers,
       usage_rate: totalPresets > 0 ? ((usedPresets / totalPresets) * 100).toFixed(2) : '0.00',
-      prize_type_distribution: prizeTypeStats.map(stat => ({
-        prize_type: stat.getDataValue('prize_type'),
-        count: parseInt(stat.getDataValue('count'))
-      }))
+      prize_type_distribution: prizeTypeStats
+        .filter(stat => stat.prize_type !== null)
+        .map(stat => ({
+          prize_type: String(stat.prize_type),
+          count: parseInt(stat.count) || 0
+        }))
     }
   }
 }

@@ -436,11 +436,12 @@ describe('ChatWebSocketService - 聊天WebSocket服务', () => {
        */
       chatWebSocketService.connectedUsers.set(1, 'socket_1')
 
-      // Mock socket 实例
+      // Mock socket 实例（需同时提供 emit 和 disconnect，disconnectUser 先 emit 再 disconnect）
       const mockDisconnect = jest.fn()
+      const mockEmit = jest.fn()
       chatWebSocketService.io = {
         sockets: {
-          sockets: new Map([['socket_1', { disconnect: mockDisconnect }]])
+          sockets: new Map([['socket_1', { emit: mockEmit, disconnect: mockDisconnect }]])
         }
       }
 
@@ -458,9 +459,10 @@ describe('ChatWebSocketService - 聊天WebSocket服务', () => {
       chatWebSocketService.connectedAdmins.set(101, 'socket_101')
 
       const mockDisconnect = jest.fn()
+      const mockEmit = jest.fn()
       chatWebSocketService.io = {
         sockets: {
-          sockets: new Map([['socket_101', { disconnect: mockDisconnect }]])
+          sockets: new Map([['socket_101', { emit: mockEmit, disconnect: mockDisconnect }]])
         }
       }
 

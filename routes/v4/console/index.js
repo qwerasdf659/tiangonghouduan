@@ -156,6 +156,7 @@ router.use('/bid-management', bidManagementRoutes) // 🆕 竞价管理路由（
 router.use('/user-data-query', userDataQueryRoutes) // 🆕 用户数据查询路由（2026-02-18 用户全维度数据检索看板）
 router.use('/segment-rules', segmentRulesRoutes) // 🆕 分群策略管理路由（2026-02-22 运营可视化搭建分群条件）
 router.use('/item-lifecycle', itemLifecycleRoutes) // 🆕 物品全链路追踪路由（2026-02-22 资产全链路追踪）
+router.use('/user-ratio-overrides', require('./user-ratio-overrides')) // 🆕 用户比例覆盖管理路由（2026-03-02 钻石配额优化方案）
 router.use('/reconciliation', reconciliationRoutes) // 🆕 对账报告路由（2026-02-22 资产全链路追踪）
 router.use('/exchange-rates', exchangeRatesRoutes) // 🆕 汇率兑换管理路由（2026-02-23 市场增强）
 router.use('/merchants', merchantsRoutes) // 🆕 商家管理路由（2026-02-23 多商家接入架构）

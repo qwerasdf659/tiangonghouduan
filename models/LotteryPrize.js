@@ -495,11 +495,256 @@ class LotteryPrize extends Model {
   }
 
   /**
+   * D11: 校验 fallback 奖品数量必须恰好 1 个
+   *
+   * 业务规则：fallback 是系统安全网，多个只增加混乱不增加安全性
+   *
+   * @param {number} campaignId - 活动ID
+   * @param {Object} options - 查询选项
+   * @returns {Promise<Object>} 校验结果
+   */
+  static async validateFallbackCount(campaignId, options = {}) {
+    const { transaction } = options
+
+    const fallbackPrizes = await this.findAll({
+      where: {
+        lottery_campaign_id: campaignId,
+        status: 'active',
+        is_fallback: true
+      },
+      attributes: ['lottery_prize_id', 'prize_name', 'prize_type', 'prize_value_points'],
+      transaction
+    })
+
+    if (fallbackPrizes.length !== 1) {
+      return {
+        valid: false,
+        error: `fallback 奖品必须恰好 1 个，当前 ${fallbackPrizes.length} 个`,
+        fallback_count: fallbackPrizes.length,
+        fallback_prizes: fallbackPrizes.map(p => p.toJSON())
+      }
+    }
+
+    const fb = fallbackPrizes[0]
+    if (fb.prize_value_points !== 0 && fb.prize_value_points !== null) {
+      return {
+        valid: false,
+        error: `fallback 奖品的 prize_value_points 必须为 0，当前值 ${fb.prize_value_points}`,
+        fallback_count: 1
+      }
+    }
+
+    return { valid: true, fallback_count: 1 }
+  }
+
+  /**
+   * D13 补充: 校验 low 档非 fallback 奖品的 prize_value_points 至少有一个 > 0
+   *
+   * 业务规则：避免动态阈值回退到默认值，导致所有用户卡在 B0
+   *
+   * @param {number} campaignId - 活动ID
+   * @param {Object} options - 查询选项
+   * @returns {Promise<Object>} 校验结果
+   */
+  static async validateLowTierBudgetValues(campaignId, options = {}) {
+    const { transaction } = options
+
+    const lowNonFallback = await this.findAll({
+      where: {
+        lottery_campaign_id: campaignId,
+        status: 'active',
+        reward_tier: 'low',
+        is_fallback: false
+      },
+      attributes: ['lottery_prize_id', 'prize_name', 'prize_value_points'],
+      transaction
+    })
+
+    if (lowNonFallback.length === 0) {
+      return { valid: true, message: 'low 档无非 fallback 奖品，跳过检查' }
+    }
+
+    const allZero = lowNonFallback.every(p => !p.prize_value_points || p.prize_value_points === 0)
+    if (allZero) {
+      return {
+        valid: false,
+        error:
+          'low 档非 fallback 奖品的 prize_value_points 全部为 0，会导致动态阈值回退异常。至少一个应 > 0',
+        prizes: lowNonFallback.map(p => p.toJSON())
+      }
+    }
+
+    return { valid: true }
+  }
+
+  /**
+   * D13: 校验奖品数量与 display_mode 格位数匹配
+   *
+   * 业务规则：
+   * - grid_3x3: 必须恰好 8 个（9格-1按钮）
+   * - grid_4x4: 必须恰好 12 个（16格-4按钮）
+   * - wheel: 4-12 个（弹性）
+   * - card_flip: 4-20 个（弹性）
+   * - 其他: 4-20 个（通用范围）
+   *
+   * @param {number} campaignId - 活动ID
+   * @param {Object} options - 查询选项
+   * @returns {Promise<Object>} 校验结果
+   */
+  static async validateDisplayModeSlotCount(campaignId, options = {}) {
+    const { transaction } = options
+    const { LotteryCampaign } = require('./index').default || require('.')
+
+    const campaign = await LotteryCampaign.findByPk(campaignId, {
+      attributes: ['display_mode'],
+      transaction
+    })
+
+    if (!campaign || !campaign.display_mode) {
+      return { valid: true, message: '活动无 display_mode 配置，跳过格位校验' }
+    }
+
+    const activePrizeCount = await this.count({
+      where: {
+        lottery_campaign_id: campaignId,
+        status: 'active',
+        deleted_at: null
+      },
+      transaction
+    })
+
+    const FIXED_SLOTS = { grid_3x3: 8, grid_4x4: 12 }
+    const FLEXIBLE_RANGE = {
+      wheel: { min: 4, max: 12 },
+      card_flip: { min: 4, max: 20 },
+      scratch_card: { min: 4, max: 16 }
+    }
+    const DEFAULT_RANGE = { min: 4, max: 20 }
+
+    const display_mode = campaign.display_mode
+
+    if (FIXED_SLOTS[display_mode]) {
+      const expected = FIXED_SLOTS[display_mode]
+      if (activePrizeCount !== expected) {
+        return {
+          valid: false,
+          error: `${display_mode} 玩法需要恰好 ${expected} 个奖品，当前 ${activePrizeCount} 个`,
+          display_mode,
+          expected_count: expected,
+          actual_count: activePrizeCount
+        }
+      }
+    } else {
+      const range = FLEXIBLE_RANGE[display_mode] || DEFAULT_RANGE
+      if (activePrizeCount < range.min || activePrizeCount > range.max) {
+        return {
+          valid: false,
+          error: `${display_mode} 玩法需要 ${range.min}-${range.max} 个奖品，当前 ${activePrizeCount} 个`,
+          display_mode,
+          expected_range: range,
+          actual_count: activePrizeCount
+        }
+      }
+    }
+
+    return { valid: true, display_mode, actual_count: activePrizeCount }
+  }
+
+  /**
+   * 奖品命名负面词检测（P3 优先级）
+   *
+   * 业务规则（文档第五章）：
+   * - 禁止使用「谢谢参与」「下次好运」「未中奖」等负面词
+   * - 负面词不阻止上线，仅返回警告
+   *
+   * @param {number} campaignId - 活动ID
+   * @param {Object} options - 查询选项
+   * @returns {Promise<Object>} 检测结果（warnings 数组）
+   */
+  static async validatePrizeNaming(campaignId, options = {}) {
+    const { transaction } = options
+
+    const NEGATIVE_WORDS = [
+      '谢谢参与',
+      '下次好运',
+      '未中奖',
+      '很遗憾',
+      '再接再厉',
+      '没有中',
+      '空手',
+      '再来一次',
+      '不好意思',
+      '对不起'
+    ]
+
+    const MISLEADING_PATTERNS = [
+      {
+        pattern: /神秘.{0,2}(?:彩蛋|大奖|惊喜)/,
+        rule: '「神秘XX」容易制造期待落差，实际为空奖时用户体验差'
+      }
+    ]
+
+    const activePrizes = await this.findAll({
+      where: {
+        lottery_campaign_id: campaignId,
+        status: 'active'
+      },
+      attributes: [
+        'lottery_prize_id',
+        'prize_name',
+        'prize_value',
+        'prize_value_points',
+        'is_fallback'
+      ],
+      transaction
+    })
+
+    const warnings = []
+
+    for (const prize of activePrizes) {
+      const name = prize.prize_name || ''
+
+      for (const word of NEGATIVE_WORDS) {
+        if (name.includes(word)) {
+          warnings.push({
+            lottery_prize_id: prize.lottery_prize_id,
+            prize_name: name,
+            type: 'negative_word',
+            message: `奖品「${name}」包含负面词「${word}」，建议改用正面表述（如「幸运X积分」「好运加持」）`
+          })
+        }
+      }
+
+      for (const { pattern, rule } of MISLEADING_PATTERNS) {
+        const isLowValue =
+          (!prize.prize_value || parseFloat(prize.prize_value) === 0) &&
+          (!prize.prize_value_points || prize.prize_value_points === 0)
+        if (pattern.test(name) && isLowValue) {
+          warnings.push({
+            lottery_prize_id: prize.lottery_prize_id,
+            prize_name: name,
+            type: 'misleading_name',
+            message: `奖品「${name}」可能造成误导：${rule}`
+          })
+        }
+      }
+    }
+
+    return {
+      valid: warnings.length === 0,
+      warning_count: warnings.length,
+      warnings
+    }
+  }
+
+  /**
    * 活动上线前完整校验（纯严格模式）
    *
    * 业务规则（用户拍板决定）：
    * - 配置不正确就禁止上线活动
-   * - 包括：档位权重校验 + 奖品权重校验 + 空奖配置校验
+   * - 包括：档位权重校验 + 空奖配置校验 + 预算配置校验
+   *         + fallback 数量校验(D11) + low 档预算值校验 + 格位数量校验(D13)
+   *         + 奖品命名负面词检测（P3，仅警告不阻止）
    *
    * @param {number} campaignId - 活动ID
    * @param {Object} options - 查询选项
@@ -517,7 +762,18 @@ class LotteryPrize extends Model {
     // 3. 校验预算配置
     const budgetConfigResult = await this.validateCampaignBudgetConfig(campaignId, { transaction })
 
-    // 汇总所有错误
+    // 4. D11: 校验 fallback 数量严格 1 个
+    const fallbackResult = await this.validateFallbackCount(campaignId, { transaction })
+
+    // 5. 校验 low 档非 fallback 至少一个 prize_value_points > 0
+    const lowTierResult = await this.validateLowTierBudgetValues(campaignId, { transaction })
+
+    // 6. D13: 校验奖品数量与 display_mode 格位匹配
+    const slotCountResult = await this.validateDisplayModeSlotCount(campaignId, { transaction })
+
+    // 7. P3: 奖品命名负面词检测（仅警告，不阻止上线）
+    const namingResult = await this.validatePrizeNaming(campaignId, { transaction })
+
     const errors = []
     if (!prizeWeightResult.valid && prizeWeightResult.error) {
       errors.push(`奖品权重：${prizeWeightResult.error}`)
@@ -528,8 +784,23 @@ class LotteryPrize extends Model {
     if (!budgetConfigResult.valid && budgetConfigResult.error) {
       errors.push(`预算配置：${budgetConfigResult.error}`)
     }
+    if (!fallbackResult.valid && fallbackResult.error) {
+      errors.push(`Fallback 校验：${fallbackResult.error}`)
+    }
+    if (!lowTierResult.valid && lowTierResult.error) {
+      errors.push(`Low 档预算值：${lowTierResult.error}`)
+    }
+    if (!slotCountResult.valid && slotCountResult.error) {
+      errors.push(`格位数量：${slotCountResult.error}`)
+    }
 
-    const allValid = prizeWeightResult.valid && emptyPrizeResult.valid && budgetConfigResult.valid
+    const allValid =
+      prizeWeightResult.valid &&
+      emptyPrizeResult.valid &&
+      budgetConfigResult.valid &&
+      fallbackResult.valid &&
+      lowTierResult.valid &&
+      slotCountResult.valid
 
     return {
       valid: allValid,
@@ -539,10 +810,16 @@ class LotteryPrize extends Model {
       validation_details: {
         prize_weights: prizeWeightResult,
         empty_prize: emptyPrizeResult,
-        budget_config: budgetConfigResult
+        budget_config: budgetConfigResult,
+        fallback: fallbackResult,
+        low_tier_budget: lowTierResult,
+        slot_count: slotCountResult,
+        naming: namingResult
       },
+      naming_warnings: namingResult.warnings,
       message: allValid
-        ? `活动 ${campaignId} 配置校验通过，可以上线`
+        ? `活动 ${campaignId} 配置校验通过，可以上线` +
+          (namingResult.warning_count > 0 ? `（${namingResult.warning_count} 个命名建议）` : '')
         : `活动 ${campaignId} 配置校验失败，禁止上线：${errors.join('；')}`
     }
   }

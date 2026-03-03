@@ -21,7 +21,7 @@
 
 const TransactionManager = require('../../utils/TransactionManager')
 const models = require('../../models')
-const { sequelize } = models
+const { sequelize: _sequelize } = models
 
 let ExchangeRateService
 

@@ -30,7 +30,9 @@ const CRITICAL_SETTINGS_REQUIRED_AT_STARTUP = [
   'marketplace/max_active_listings', // 上架上限（影响市场秩序）
   'security/max_login_attempts', // 登录限制（影响安全）
   'security/password_min_length', // 密码长度（影响安全）
-  'security/api_rate_limit' // API限流（影响风控）
+  'security/api_rate_limit', // API限流（影响风控）
+  'points/points_award_ratio', // 消费积分比例（影响积分发放，缺失掩盖 migration 失败）
+  'points/diamond_quota_ratio' // 钻石配额比例（影响配额发放，缺失掩盖 migration 失败）
 ]
 
 /**

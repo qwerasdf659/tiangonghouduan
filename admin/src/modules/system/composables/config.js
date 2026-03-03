@@ -28,9 +28,7 @@ const CATEGORY_DISPLAY = {
 /**
  * 需要活动下拉选择器的配置项 key 集合
  */
-const CAMPAIGN_SELECT_KEYS = new Set([
-  'merchant_review_campaign_id'
-])
+const CAMPAIGN_SELECT_KEYS = new Set(['merchant_review_campaign_id'])
 
 /**
  * 布尔类型配置项 key 集合
@@ -39,7 +37,8 @@ const BOOLEAN_KEYS = new Set([
   'maintenance_mode',
   'sms_enabled',
   'email_enabled',
-  'app_notification_enabled'
+  'app_notification_enabled',
+  'diamond_quota_enabled'
 ])
 
 /**

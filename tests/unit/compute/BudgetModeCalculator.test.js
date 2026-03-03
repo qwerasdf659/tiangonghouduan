@@ -9,7 +9,7 @@
  * 业务规则（来自 BudgetTierCalculator.js）：
  * - budget_mode 决定预算来源（user/pool/hybrid/none）
  * - Budget Tier (B0-B3) 根据有效预算和阈值确定
- * - 默认阈值: { high: 1000, mid: 500, low: 100 }
+ * - 默认阈值基于 ratio=0.22: { high: 110, mid: 44, low: 22 }
  * - B3: 预算 >= high, B2: 预算 >= mid, B1: 预算 >= low, B0: 预算 < low
  *
  * 核心组件：
@@ -25,10 +25,11 @@ const BudgetTierCalculator = require('../../../services/UnifiedLotteryEngine/com
 /**
  * 默认预算阈值
  */
+const DEFAULT_RATIO = 0.22
 const DEFAULT_THRESHOLDS = {
-  high: 1000, // B3 阈值：可抽高档奖品
-  mid: 500, // B2 阈值：可抽中档奖品
-  low: 100 // B1 阈值：可抽低档奖品
+  high: Math.round(100 * DEFAULT_RATIO * 5), // 110 — B3 阈值：可抽高档奖品
+  mid: Math.round(100 * DEFAULT_RATIO * 2), // 44  — B2 阈值：可抽中档奖品
+  low: Math.round(100 * DEFAULT_RATIO * 1) // 22  — B1 阈值：可抽低档奖品
 }
 
 /**
@@ -86,14 +87,13 @@ describe('【P1】预算计算器专项测试 - BudgetCalculator', () => {
       )
     })
 
-    test('默认阈值配置正确', () => {
+    test('默认阈值基于 ratio=0.22 动态计算', () => {
       console.log('📊 2.6.1.2 验证默认阈值...')
 
-      expect(calculator.thresholds.high).toBe(1000)
-      expect(calculator.thresholds.mid).toBe(500)
-      expect(calculator.thresholds.low).toBe(100)
+      expect(calculator.thresholds.high).toBe(DEFAULT_THRESHOLDS.high)
+      expect(calculator.thresholds.mid).toBe(DEFAULT_THRESHOLDS.mid)
+      expect(calculator.thresholds.low).toBe(DEFAULT_THRESHOLDS.low)
 
-      // 阈值应递减
       expect(calculator.thresholds.high).toBeGreaterThanOrEqual(calculator.thresholds.mid)
       expect(calculator.thresholds.mid).toBeGreaterThanOrEqual(calculator.thresholds.low)
 
@@ -162,12 +162,11 @@ describe('【P1】预算计算器专项测试 - BudgetCalculator', () => {
     test('预算 >= high 应返回 B3', () => {
       console.log('📊 2.6.2.1 验证 B3 (高预算) 判定...')
 
-      // 默认 high = 1000
-      const budgetTier = calculator._determineBudgetTier(1500, DEFAULT_THRESHOLDS)
+      const budgetTier = calculator._determineBudgetTier(150, DEFAULT_THRESHOLDS)
 
       expect(budgetTier).toBe('B3')
 
-      console.log(`   有效预算: 1500, 阈值 high=${DEFAULT_THRESHOLDS.high}`)
+      console.log(`   有效预算: 150, 阈值 high=${DEFAULT_THRESHOLDS.high}`)
       console.log(`   Budget Tier: ${budgetTier}`)
       console.log('   ✅ B3 判定正确')
     })
@@ -175,12 +174,14 @@ describe('【P1】预算计算器专项测试 - BudgetCalculator', () => {
     test('预算 >= mid 且 < high 应返回 B2', () => {
       console.log('📊 2.6.2.2 验证 B2 (中预算) 判定...')
 
-      // 500 <= budget < 1000
-      const budgetTier = calculator._determineBudgetTier(700, DEFAULT_THRESHOLDS)
+      // mid=44 <= budget < high=110
+      const budgetTier = calculator._determineBudgetTier(70, DEFAULT_THRESHOLDS)
 
       expect(budgetTier).toBe('B2')
 
-      console.log(`   有效预算: 700 (mid=500 <= 700 < high=1000)`)
+      console.log(
+        `   有效预算: 70 (mid=${DEFAULT_THRESHOLDS.mid} <= 70 < high=${DEFAULT_THRESHOLDS.high})`
+      )
       console.log(`   Budget Tier: ${budgetTier}`)
       console.log('   ✅ B2 判定正确')
     })
@@ -188,12 +189,14 @@ describe('【P1】预算计算器专项测试 - BudgetCalculator', () => {
     test('预算 >= low 且 < mid 应返回 B1', () => {
       console.log('📊 2.6.2.3 验证 B1 (低预算) 判定...')
 
-      // 100 <= budget < 500
-      const budgetTier = calculator._determineBudgetTier(200, DEFAULT_THRESHOLDS)
+      // low=22 <= budget < mid=44
+      const budgetTier = calculator._determineBudgetTier(30, DEFAULT_THRESHOLDS)
 
       expect(budgetTier).toBe('B1')
 
-      console.log(`   有效预算: 200 (low=100 <= 200 < mid=500)`)
+      console.log(
+        `   有效预算: 30 (low=${DEFAULT_THRESHOLDS.low} <= 30 < mid=${DEFAULT_THRESHOLDS.mid})`
+      )
       console.log(`   Budget Tier: ${budgetTier}`)
       console.log('   ✅ B1 判定正确')
     })
@@ -201,12 +204,12 @@ describe('【P1】预算计算器专项测试 - BudgetCalculator', () => {
     test('预算 < low 应返回 B0', () => {
       console.log('📊 2.6.2.4 验证 B0 (不足) 判定...')
 
-      // budget < 100
-      const budgetTier = calculator._determineBudgetTier(50, DEFAULT_THRESHOLDS)
+      // budget < low=22
+      const budgetTier = calculator._determineBudgetTier(10, DEFAULT_THRESHOLDS)
 
       expect(budgetTier).toBe('B0')
 
-      console.log(`   有效预算: 50 (< low=100)`)
+      console.log(`   有效预算: 10 (< low=${DEFAULT_THRESHOLDS.low})`)
       console.log(`   Budget Tier: ${budgetTier}`)
       console.log('   ✅ B0 判定正确')
     })
@@ -214,21 +217,18 @@ describe('【P1】预算计算器专项测试 - BudgetCalculator', () => {
     test('边界值测试 - 恰好等于阈值', () => {
       console.log('📊 2.6.2.5 验证边界值处理...')
 
-      // 恰好等于 high 阈值
-      const tier1 = calculator._determineBudgetTier(1000, DEFAULT_THRESHOLDS)
+      const tier1 = calculator._determineBudgetTier(DEFAULT_THRESHOLDS.high, DEFAULT_THRESHOLDS)
       expect(tier1).toBe('B3')
 
-      // 恰好等于 mid 阈值
-      const tier2 = calculator._determineBudgetTier(500, DEFAULT_THRESHOLDS)
+      const tier2 = calculator._determineBudgetTier(DEFAULT_THRESHOLDS.mid, DEFAULT_THRESHOLDS)
       expect(tier2).toBe('B2')
 
-      // 恰好等于 low 阈值
-      const tier3 = calculator._determineBudgetTier(100, DEFAULT_THRESHOLDS)
+      const tier3 = calculator._determineBudgetTier(DEFAULT_THRESHOLDS.low, DEFAULT_THRESHOLDS)
       expect(tier3).toBe('B1')
 
-      console.log(`   预算=1000 → ${tier1}`)
-      console.log(`   预算=500 → ${tier2}`)
-      console.log(`   预算=100 → ${tier3}`)
+      console.log(`   预算=${DEFAULT_THRESHOLDS.high} → ${tier1}`)
+      console.log(`   预算=${DEFAULT_THRESHOLDS.mid} → ${tier2}`)
+      console.log(`   预算=${DEFAULT_THRESHOLDS.low} → ${tier3}`)
       console.log('   ✅ 边界值处理正确（等于阈值归入对应档）')
     })
 
@@ -447,7 +447,9 @@ describe('【P1】预算计算器专项测试 - BudgetCalculator', () => {
       console.log('')
       console.log('📋 核心业务规则验证：')
       console.log('   - Budget Tier: B0(不足) → B3(高)')
-      console.log('   - 默认阈值: high=1000, mid=500, low=100')
+      console.log(
+        `   - 默认阈值(ratio=0.22): high=${DEFAULT_THRESHOLDS.high}, mid=${DEFAULT_THRESHOLDS.mid}, low=${DEFAULT_THRESHOLDS.low}`
+      )
       console.log('   - 动态阈值: 基于奖品价值自动计算')
       console.log('   - 档位可用性: B0=fallback, B3=all')
       console.log('='.repeat(80))

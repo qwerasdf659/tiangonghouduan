@@ -127,14 +127,15 @@ describe('抽奖预设系统API测试（V4架构）', () => {
       )
 
       const { prize_type_distribution } = response.data.data
+      expect(Array.isArray(prize_type_distribution)).toBe(true)
 
-      // 验证每个奖品类型项的结构
+      // 有效的分布项中，prize_type 为非空字符串（null 关联已被服务层过滤）
       prize_type_distribution.forEach(item => {
         expect(item).toHaveProperty('prize_type')
         expect(item).toHaveProperty('count')
         expect(typeof item.prize_type).toBe('string')
-        // count可能是字符串（Sequelize返回）或数字
-        expect(['string', 'number']).toContain(typeof item.count)
+        expect(item.prize_type.length).toBeGreaterThan(0)
+        expect(typeof item.count).toBe('number')
       })
 
       console.log('🎁 奖品类型分布:', prize_type_distribution)
