@@ -4,34 +4,36 @@
  * BuildPrizePoolStage - 构建奖品池 Stage
  *
  * 职责：
- * 1. 根据用户预算过滤奖品（排除超出预算的奖品）
- * 2. 根据库存过滤奖品（排除缺货奖品）
- * 3. 根据每日中奖上限过滤奖品
+ * 1. 根据库存和权重过滤奖品（排除缺货/零权重奖品）
+ * 2. 按资源类型统一过滤奖品（DIAMOND→配额检查，其余→预算检查）
+ * 3. 根据用户总中奖次数过滤奖品
  * 4. 按档位分组奖品（high/mid/low/fallback）
- * 5. 根据 Budget Tier 限制可参与的档位
- * 6. 确保至少有一个空奖可用
+ * 5. 确保有兜底奖品
+ * 6. 计算可用档位并构建返回数据
  *
  * 输出到上下文：
  * - available_prizes: 可用奖品列表
  * - prizes_by_tier: 按档位分组的奖品 { high: [], mid: [], low: [], fallback: [] }
- * - available_tiers: 可用的档位列表（受 Budget Tier 限制）
- * - allowed_tiers: 预算分层允许的档位（来自 BudgetContextStage）
+ * - available_tiers: 可用的档位列表
+ * - allowed_tiers: 预算分层允许的档位（来自 BudgetContextStage，保留用于分析）
  * - has_valuable_prizes: 是否有有价值的奖品可用
  *
- * 策略引擎集成（2026-01-20）：
- * - 从 BudgetContextStage 获取 budget_tier 和 allowed_tiers
- * - 根据 budget_tier 过滤可参与的档位
- * - 为后续的 TierPickStage 准备分层权重信息
+ * 架构重构（2026-03-04）：
+ * - 合并 _filterByBudget + _filterByDiamondQuota → _filterByResourceEligibility（资源级过滤）
+ * - 删除 _filterByAllowedTiers 调用（档位系统只管概率分配，不做准入门控）
+ * - 资格检查下沉到单个奖品，按资源类型独立判断（行业最佳实践）
  *
  * 设计原则：
  * - 读操作Stage，不执行任何写操作
- * - 预算不足时自动降级到空奖（B0 只能抽 fallback）
+ * - 档位系统只管概率分配，不做准入门控
+ * - 资格检查由 _filterByResourceEligibility 唯一负责
  * - 保证每次抽奖都能选出一个奖品（100%中奖）
  *
  * @module services/UnifiedLotteryEngine/pipeline/stages/BuildPrizePoolStage
  * @author 统一抽奖架构重构
  * @since 2026-01-18
  * @updated 2026-01-20 集成预算分层限制
+ * @updated 2026-03-04 去预算门控改资源级过滤（合并 _filterByBudget + _filterByDiamondQuota → _filterByResourceEligibility）
  */
 
 const BaseStage = require('./BaseStage')
@@ -112,53 +114,38 @@ class BuildPrizePoolStage extends BaseStage {
       /* 1. 根据库存和每日上限过滤奖品 */
       let filtered_prizes = await this._filterByAvailability(prizes)
 
-      /* 2. 根据预算过滤奖品（如果启用了预算限制） */
+      /* 2. 按资源类型统一过滤（合并原 _filterByBudget + _filterByDiamondQuota） */
       if (budget_mode !== 'none') {
-        filtered_prizes = this._filterByBudget(filtered_prizes, budget_before)
-      }
-
-      /*
-       * 3. 根据钻石配额过滤钻石类奖品（双池隔离第二轨道）
-       *    配额配置已统一迁移到 system_settings (points 分类)，
-       *    通过 AdminSystemService 读取，享有 Redis L2 缓存。
-       */
-      const AdminSystemService = require('../../../AdminSystemService')
-      const diamond_quota_enabled = await AdminSystemService.getSettingValue(
-        'points',
-        'diamond_quota_enabled',
-        true
-      )
-      if (diamond_quota_enabled) {
-        const exhausted_action = await AdminSystemService.getSettingValue(
-          'points',
-          'diamond_quota_exhausted_action',
-          'filter'
-        )
-        filtered_prizes = await this._filterByDiamondQuota(
+        filtered_prizes = await this._filterByResourceEligibility(
           filtered_prizes,
           user_id,
-          exhausted_action
+          budget_before
         )
       }
 
-      /* 4. 根据用户总中奖次数上限过滤奖品 */
+      /* 3. 根据用户总中奖次数上限过滤奖品 */
       filtered_prizes = await this._filterByUserWins(filtered_prizes, user_id)
 
-      /* 5. 按档位分组 */
+      /* 4. 按档位分组 */
       const prizes_by_tier = this._groupByTier(filtered_prizes)
 
-      /* 6. 确保有兜底奖品 */
+      /* 5. 确保有兜底奖品 */
       if (prizes_by_tier.fallback.length === 0 && fallback_prize) {
         prizes_by_tier.fallback.push(fallback_prize)
       }
 
-      /* 7. 根据 budget_tier 限制可参与的档位 */
-      const filtered_prizes_by_tier = this._filterByAllowedTiers(prizes_by_tier, allowed_tiers)
+      /*
+       * 6. 档位门控已移除（2026-03-04 架构重构）
+       *    资格检查由 _filterByResourceEligibility 唯一负责，档位系统只管概率分配。
+       *    原 _filterByAllowedTiers 按 BudgetTier 整档删除的逻辑导致 DIAMOND 等
+       *    免费奖品被预算门控连带封杀，违背资源隔离原则。
+       */
+      const filtered_prizes_by_tier = prizes_by_tier
 
-      /* 8. 计算可用档位（在 allowed_tiers 限制后） */
+      /* 7. 计算可用档位 */
       const available_tiers = this._getAvailableTiers(filtered_prizes_by_tier)
 
-      /* 9. 判断是否有有价值的奖品 */
+      /* 8. 判断是否有有价值的奖品 */
       const has_valuable_prizes = this._hasValuablePrizes(filtered_prizes_by_tier)
 
       /* 10. 构建返回数据 */
@@ -256,8 +243,107 @@ class BuildPrizePoolStage extends BaseStage {
   }
 
   /**
+   * 按资源类型统一过滤奖品（合并原 _filterByBudget + _filterByDiamondQuota）
+   *
+   * 每个奖品按自身消耗的资源类型独立判断资格：
+   * - DIAMOND 奖品（material_asset_code='DIAMOND'）：仅受 DIAMOND_QUOTA 控制
+   * - 保底/空奖（prize_value_points=0 且非 DIAMOND）：永远通过
+   * - 其余奖品（物理/券/积分/虚拟）：检查 BUDGET_POINTS 余额
+   *
+   * 设计原则：资格检查唯一关卡，按资源类型判断，不做档位级门控
+   *
+   * @param {Array} prizes - 奖品列表
+   * @param {number} user_id - 用户ID
+   * @param {number} budget_before - 用户当前 BUDGET_POINTS 余额
+   * @returns {Promise<Array>} 过滤后的奖品列表
+   * @private
+   */
+  async _filterByResourceEligibility(prizes, user_id, budget_before) {
+    let user_diamond_quota = 0
+
+    const AdminSystemService = require('../../../AdminSystemService')
+    const diamond_quota_enabled = await AdminSystemService.getSettingValue(
+      'points',
+      'diamond_quota_enabled',
+      true
+    )
+
+    if (diamond_quota_enabled) {
+      try {
+        await BalanceService.getOrCreateAccount({ user_id }, { transaction: null })
+        const balance = await BalanceService.getBalance(
+          { user_id, asset_code: 'DIAMOND_QUOTA' },
+          { transaction: null }
+        )
+        user_diamond_quota = balance?.available_amount || 0
+      } catch (error) {
+        this.log('warn', '查询钻石配额失败，钻石奖品将跳过配额过滤', {
+          user_id,
+          error: error.message
+        })
+        user_diamond_quota = Infinity
+      }
+    } else {
+      user_diamond_quota = Infinity
+    }
+
+    this.log('info', '资源级过滤参数', {
+      user_id,
+      budget_before,
+      user_diamond_quota: user_diamond_quota === Infinity ? 'unlimited' : user_diamond_quota,
+      diamond_quota_enabled,
+      total_prizes: prizes.length
+    })
+
+    const result = prizes.filter(prize => {
+      const pvp = prize.prize_value_points || 0
+
+      /* DIAMOND 奖品：仅受 DIAMOND_QUOTA 控制，不受 BUDGET_POINTS 影响 */
+      if (prize.material_asset_code === 'DIAMOND' && prize.material_amount > 0) {
+        const eligible = user_diamond_quota >= prize.material_amount
+        if (!eligible) {
+          this.log('debug', 'DIAMOND 奖品因配额不足被过滤', {
+            lottery_prize_id: prize.lottery_prize_id,
+            prize_name: prize.prize_name,
+            material_amount: prize.material_amount,
+            user_diamond_quota
+          })
+        }
+        return eligible
+      }
+
+      /* 保底/空奖（pvp=0 且非 DIAMOND）：永远通过 */
+      if (pvp === 0) return true
+
+      /* 其余奖品（物理/券/积分/虚拟）：检查 BUDGET_POINTS */
+      const eligible = pvp <= budget_before
+      if (!eligible) {
+        this.log('debug', '奖品因预算不足被过滤', {
+          lottery_prize_id: prize.lottery_prize_id,
+          prize_name: prize.prize_name,
+          prize_value_points: pvp,
+          budget_before
+        })
+      }
+      return eligible
+    })
+
+    this.log('info', '资源级过滤完成', {
+      user_id,
+      before_count: prizes.length,
+      after_count: result.length,
+      filtered_count: prizes.length - result.length
+    })
+
+    return result
+  }
+
+  /**
    * 根据预算过滤奖品
    *
+   * @deprecated 2026-03-04 由 _filterByResourceEligibility 替代。
+   *             保留函数体用于回滚，回滚时恢复 execute() 中的调用即可。
+   * @removal-date 2026-04-04
    * @param {Array} prizes - 奖品列表
    * @param {number} budget - 用户预算
    * @returns {Array} 过滤后的奖品列表
@@ -353,6 +439,10 @@ class BuildPrizePoolStage extends BaseStage {
 
   /**
    * 根据钻石配额过滤钻石类奖品（双池隔离第二轨道）
+   *
+   * @deprecated 2026-03-04 由 _filterByResourceEligibility 替代。
+   *             保留函数体用于回滚，回滚时恢复 execute() 中的调用即可。
+   * @removal-date 2026-04-04
    *
    * 业务规则：
    * - 消费审核通过时按比例发放 DIAMOND_QUOTA
@@ -486,6 +576,11 @@ class BuildPrizePoolStage extends BaseStage {
 
   /**
    * 根据预算分层允许的档位过滤奖品
+   *
+   * @deprecated 2026-03-04 档位门控已移除，资格检查由 _filterByResourceEligibility 唯一负责。
+   *             档位系统只管概率分配，不做准入门控（行业最佳实践）。
+   *             保留函数体用于回滚，回滚时恢复 execute() 中的调用即可。
+   * @removal-date 2026-04-04
    *
    * 业务规则（Budget Tier 限制）：
    * - B0（无预算）：只允许 fallback

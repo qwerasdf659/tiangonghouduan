@@ -32,7 +32,7 @@ const { logger } = require('../../../../utils/logger')
  * Budget Tier 预算分层阈值配置
  *
  * 根据用户 EffectiveBudget 划分预算层级：
- * - B0: effective_budget < threshold_low（仅 fallback）
+ * - B0: effective_budget < threshold_low（low + fallback，资格由资源级过滤保证）
  * - B1: threshold_low <= effective_budget < threshold_mid（low + fallback）
  * - B2: threshold_mid <= effective_budget < threshold_high（mid + low + fallback）
  * - B3: effective_budget >= threshold_high（all tiers）
@@ -66,7 +66,13 @@ const BUDGET_TIER_CONFIG = {
  * @type {Object<string, string[]>}
  */
 const BUDGET_TIER_AVAILABILITY = {
-  B0: ['fallback'],
+  /**
+   * 2026-03-04 架构重构：B0 允许 low 档
+   * 资格检查已由 BuildPrizePoolStage._filterByResourceEligibility 唯一负责，
+   * 资源级过滤后 B0 的 low 档只剩 pvp=0 的免费奖品（DIAMOND + 保底），经济上安全。
+   * 概率层不做资格门控是行业最佳实践（米哈游/腾讯/阿里/美团均如此）。
+   */
+  B0: ['low', 'fallback'],
   B1: ['low', 'fallback'],
   B2: ['mid', 'low', 'fallback'],
   B3: ['high', 'mid', 'low', 'fallback']
@@ -97,42 +103,19 @@ const PRESSURE_TIER_CONFIG = {
 }
 
 /**
- * BxPx 矩阵配置
+ * Pressure-Only 矩阵配置（静态兜底）
  *
- * 定义 Budget Tier（Bx）和 Pressure Tier（Px）组合下的：
- * - cap_multiplier：预算上限乘数（相对于 EffectiveBudget）
- * - empty_weight_multiplier：空奖权重乘数（调整 fallback 概率）
+ * 2026-03-04 架构重构：Budget Tier 降级为纯监控指标，
+ * 概率层只保留 Pressure Tier 维度。
+ * 运行时由 TierMatrixCalculator 统一管理全部 6 字段（从 DB 加载），
+ * 此处仅作为 TierMatrixCalculator/DynamicConfigLoader 无法连接 DB 时的静态兜底。
  *
- * 矩阵解读：
- * - multiplier < 1.0：抑制空奖（提高非空奖概率）
- * - multiplier = 1.0：保持原权重
- * - multiplier > 1.0：增强空奖（降低非空奖概率）
- *
- * B0 档强制全空奖，乘数设为极大值
- *
- * @type {Object<string, Object<string, Object>>}
+ * @type {Object<string, {cap_multiplier: number, empty_weight_multiplier: number}>}
  */
-const TIER_MATRIX_CONFIG = {
-  B0: {
-    P0: { cap_multiplier: 0, empty_weight_multiplier: 10.0 },
-    P1: { cap_multiplier: 0, empty_weight_multiplier: 10.0 },
-    P2: { cap_multiplier: 0, empty_weight_multiplier: 10.0 }
-  },
-  B1: {
-    P0: { cap_multiplier: 1.0, empty_weight_multiplier: 1.2 },
-    P1: { cap_multiplier: 1.0, empty_weight_multiplier: 1.0 },
-    P2: { cap_multiplier: 0.8, empty_weight_multiplier: 0.8 }
-  },
-  B2: {
-    P0: { cap_multiplier: 1.0, empty_weight_multiplier: 1.0 },
-    P1: { cap_multiplier: 1.0, empty_weight_multiplier: 0.9 },
-    P2: { cap_multiplier: 0.9, empty_weight_multiplier: 0.7 }
-  },
-  B3: {
-    P0: { cap_multiplier: 1.0, empty_weight_multiplier: 0.8 },
-    P1: { cap_multiplier: 1.0, empty_weight_multiplier: 0.7 },
-    P2: { cap_multiplier: 1.0, empty_weight_multiplier: 0.6 }
-  }
+const PRESSURE_MATRIX_FALLBACK = {
+  P0: { cap_multiplier: 1.0, empty_weight_multiplier: 1.0 },
+  P1: { cap_multiplier: 1.0, empty_weight_multiplier: 1.0 },
+  P2: { cap_multiplier: 1.0, empty_weight_multiplier: 1.0 }
 }
 
 /**
@@ -249,7 +232,7 @@ const ANTI_EMPTY_CONFIG = {
    * 强制干预阈值（连续空奖次数）
    * 达到此值后强制发放非空奖
    */
-  force_threshold: parseInt(process.env.ANTI_EMPTY_THRESHOLD) || 8,
+  force_threshold: parseInt(process.env.ANTI_EMPTY_THRESHOLD) || 5,
 
   /**
    * 强制发放的最低档位
@@ -406,7 +389,7 @@ function getFullConfig() {
     budget_tier: BUDGET_TIER_CONFIG,
     budget_tier_availability: BUDGET_TIER_AVAILABILITY,
     pressure_tier: PRESSURE_TIER_CONFIG,
-    tier_matrix: TIER_MATRIX_CONFIG,
+    pressure_matrix: PRESSURE_MATRIX_FALLBACK,
     pity: PITY_CONFIG,
     luck_debt: LUCK_DEBT_CONFIG,
     anti_empty: ANTI_EMPTY_CONFIG,
@@ -416,19 +399,13 @@ function getFullConfig() {
 }
 
 /**
- * 获取 BxPx 矩阵值
+ * 获取 Pressure-Only 矩阵值（静态兜底）
  *
- * @param {string} budget_tier - 预算分层（B0/B1/B2/B3）
  * @param {string} pressure_tier - 压力分层（P0/P1/P2）
  * @returns {Object} { cap_multiplier, empty_weight_multiplier }
  */
-function getMatrixValue(budget_tier, pressure_tier) {
-  const budget_config = TIER_MATRIX_CONFIG[budget_tier]
-  if (!budget_config) {
-    return { cap_multiplier: 1.0, empty_weight_multiplier: 1.0 }
-  }
-
-  const matrix_value = budget_config[pressure_tier]
+function getMatrixValue(pressure_tier) {
+  const matrix_value = PRESSURE_MATRIX_FALLBACK[pressure_tier]
   if (!matrix_value) {
     return { cap_multiplier: 1.0, empty_weight_multiplier: 1.0 }
   }
@@ -883,22 +860,19 @@ class DynamicConfigLoader {
   }
 
   /**
-   * 获取矩阵配置值
+   * 获取 Pressure-Only 矩阵配置值
    *
-   * @param {string} budget_tier - Budget Tier
-   * @param {string} pressure_tier - Pressure Tier
-   * @returns {Promise<Object>} 矩阵配置值
+   * @param {string} pressure_tier - Pressure Tier（P0/P1/P2）
+   * @returns {Promise<Object>} 矩阵配置值（全部 6 字段）
    */
-  static async getMatrixValue(budget_tier, pressure_tier) {
+  static async getMatrixValue(pressure_tier) {
     const matrix = await this.loadMatrixConfig()
 
-    // 优先使用数据库配置
-    if (matrix && matrix[budget_tier] && matrix[budget_tier][pressure_tier]) {
-      return matrix[budget_tier][pressure_tier]
+    if (matrix && matrix[pressure_tier]) {
+      return matrix[pressure_tier]
     }
 
-    // 回退到静态配置
-    return getMatrixValue(budget_tier, pressure_tier)
+    return getMatrixValue(pressure_tier)
   }
 
   /**
@@ -976,16 +950,15 @@ async function getFullConfigAsync() {
 }
 
 /**
- * 获取动态配置的矩阵值
+ * 获取动态配置的 Pressure-Only 矩阵值
  *
  * 异步版本，优先从数据库加载
  *
- * @param {string} budget_tier - Budget Tier
- * @param {string} pressure_tier - Pressure Tier
+ * @param {string} pressure_tier - Pressure Tier（P0/P1/P2）
  * @returns {Promise<Object>} 矩阵配置值
  */
-async function getMatrixValueAsync(budget_tier, pressure_tier) {
-  return DynamicConfigLoader.getMatrixValue(budget_tier, pressure_tier)
+async function getMatrixValueAsync(pressure_tier) {
+  return DynamicConfigLoader.getMatrixValue(pressure_tier)
 }
 
 module.exports = {
@@ -993,7 +966,7 @@ module.exports = {
   BUDGET_TIER_CONFIG,
   BUDGET_TIER_AVAILABILITY,
   PRESSURE_TIER_CONFIG,
-  TIER_MATRIX_CONFIG,
+  PRESSURE_MATRIX_FALLBACK,
   PITY_CONFIG,
   LUCK_DEBT_CONFIG,
   ANTI_EMPTY_CONFIG,

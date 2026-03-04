@@ -24,13 +24,11 @@ export function useStrategyState() {
     strategyGroups: {},
     /** @type {Array} 层级矩阵 */
     tierMatrix: [],
-    /** @type {Array} 预算层级 - 使用后端的 B0/B1/B2/B3 格式 */
-    budgetTiers: ['B0', 'B1', 'B2', 'B3'],
-    /** @type {Array} 压力层级 - 使用后端的 P0/P1/P2 格式 */
+    /** @type {Array} 压力层级 - 使用后端的 P0/P1/P2 格式（Pressure-Only 矩阵） */
     pressureTiers: ['P0', 'P1', 'P2'],
     /** @type {Object} 当前编辑的矩阵单元格（初始化为默认对象避免null访问错误） */
     editingMatrixCell: {
-      budget_tier: '',
+      budget_tier: 'ALL',
       pressure_tier: '',
       cap_multiplier: 1.0,
       empty_weight_multiplier: 1.0,
@@ -176,15 +174,14 @@ export function useStrategyMethods() {
     },
 
     /**
-     * 获取BxPx命中分布中某组合的命中数
-     * @param {string} budgetTier - B0/B1/B2/B3
+     * 获取 Pressure 命中分布中某 Pressure Tier 的命中数
      * @param {string} pressureTier - P0/P1/P2
      * @returns {number} 命中次数
      */
-    getConfigSummaryBxPxCount(budgetTier, pressureTier) {
+    getConfigSummaryPressureCount(pressureTier) {
       const hits = this.strategyConfigSummary?.bxpx_hit_distribution || []
-      const hit = hits.find(h => h.budget_tier === budgetTier && h.pressure_tier === pressureTier)
-      return hit ? parseInt(hit.count) || 0 : 0
+      const matching = hits.filter(h => h.pressure_tier === pressureTier)
+      return matching.reduce((sum, h) => sum + (parseInt(h.count) || 0), 0)
     },
 
     /**
@@ -219,33 +216,29 @@ export function useStrategyMethods() {
     },
 
     /**
-     * 获取矩阵单元格配置
-     * @param {string} budgetTier - 预算层级
-     * @param {string} pressureTier - 压力层级
+     * 获取矩阵单元格配置（Pressure-Only，budget_tier 固定 'ALL'）
+     * @param {string} pressureTier - 压力层级（P0/P1/P2）
      * @returns {Object|undefined} 矩阵配置对象
      */
-    getMatrixConfig(budgetTier, pressureTier) {
+    getMatrixConfig(pressureTier) {
       return this.tierMatrix.find(
-        item => item.budget_tier === budgetTier && item.pressure_tier === pressureTier
+        item => item.budget_tier === 'ALL' && item.pressure_tier === pressureTier
       )
     },
 
     /**
-     * 编辑矩阵单元格
-     * 使用后端字段：cap_multiplier, empty_weight_multiplier
-     * @param {string} budgetTier - 预算层级 (B0/B1/B2/B3)
+     * 编辑矩阵单元格（Pressure-Only）
      * @param {string} pressureTier - 压力层级 (P0/P1/P2)
      */
-    editMatrixCell(budgetTier, pressureTier) {
-      const currentConfig = this.getMatrixConfig(budgetTier, pressureTier) || {
-        budget_tier: budgetTier,
+    editMatrixCell(pressureTier) {
+      const currentConfig = this.getMatrixConfig(pressureTier) || {
+        budget_tier: 'ALL',
         pressure_tier: pressureTier,
         cap_multiplier: 1.0,
         empty_weight_multiplier: 1.0,
-        // 档位权重乘数默认值
-        high_multiplier: 0.0,
-        mid_multiplier: 0.0,
-        low_multiplier: 0.0,
+        high_multiplier: 1.0,
+        mid_multiplier: 1.0,
+        low_multiplier: 1.0,
         fallback_multiplier: 1.0,
         description: ''
       }

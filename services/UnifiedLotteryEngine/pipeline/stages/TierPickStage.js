@@ -281,26 +281,23 @@ class TierPickStage extends BaseStage {
       let adjusted_weights
       let weight_adjustment = { adjusted_weights: null, empty_weight_multiplier: 1.0 }
       if (matrix_enabled) {
-        /* 3. 应用 BxPx 矩阵权重调整（策略引擎集成） */
+        /* 3. 应用 Pressure-Only 矩阵权重调整（不再传 budget_tier） */
         weight_adjustment = this.computeEngine.computeWeightAdjustment({
-          budget_tier,
           pressure_tier,
           base_tier_weights
         })
         adjusted_weights = weight_adjustment.adjusted_weights
 
-        this.log('info', 'BxPx 矩阵权重调整', {
+        this.log('info', 'Pressure 矩阵权重调整', {
           user_id,
           budget_tier,
           pressure_tier,
           base_weights: base_tier_weights,
-          adjusted_weights,
-          empty_weight_multiplier: weight_adjustment.empty_weight_multiplier
+          adjusted_weights
         })
       } else {
-        /* 矩阵关闭：直接使用基础档位权重，不做任何调整 */
         adjusted_weights = { ...base_tier_weights }
-        this.log('info', 'BxPx 矩阵已关闭（matrix.enabled=false），使用原始权重', {
+        this.log('info', 'Pressure 矩阵已关闭（matrix.enabled=false），使用原始权重', {
           user_id,
           base_weights: base_tier_weights
         })
@@ -322,7 +319,11 @@ class TierPickStage extends BaseStage {
       const capped_weights = this._enforceHighTierCap(adjusted_weights, MAX_HIGH_TIER_PROBABILITY)
 
       /* 4b. 执行档位抽取（使用限制后的权重） */
-      const random_value = Math.random() * WEIGHT_SCALE
+      const total_capped_weight = Object.values(capped_weights).reduce(
+        (sum, w) => sum + (w || 0),
+        0
+      )
+      const random_value = Math.random() * (total_capped_weight || WEIGHT_SCALE)
       const original_tier = this._pickTier(capped_weights, random_value)
 
       /* 5. 检查选中档位是否有可用奖品，必要时降级 */

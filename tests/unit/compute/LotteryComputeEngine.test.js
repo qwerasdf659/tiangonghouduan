@@ -7,6 +7,11 @@
  * - 类名从 StrategyEngine 更名为 LotteryComputeEngine
  * - 目录从 strategy/ 更名为 compute/
  *
+ * 2026-03-04 Pressure-Only 重构：
+ * - computeWeightAdjustment 不再接收 budget_tier，仅 { pressure_tier, base_tier_weights }
+ * - matrix_result 不再包含 available_tiers
+ * - TIER_MATRIX_CONFIG 替换为 PRESSURE_MATRIX（P0/P1/P2 结构）
+ *
  * 测试内容：
  * 1. 计算引擎初始化
  * 2. 常量导出
@@ -23,7 +28,7 @@ const {
   resetComputeEngine,
   BUDGET_TIERS,
   PRESSURE_TIERS,
-  TIER_MATRIX_CONFIG,
+  PRESSURE_MATRIX,
   isFeatureEnabledForContext,
   getGrayscaleSummary,
   GRAYSCALE_CONFIG
@@ -89,23 +94,23 @@ describe('LotteryComputeEngine', () => {
       expect(PRESSURE_TIERS.P2).toBeDefined()
     })
 
-    test('TIER_MATRIX_CONFIG 定义正确', () => {
-      expect(TIER_MATRIX_CONFIG).toBeDefined()
-      /*
-       * TIER_MATRIX_CONFIG 导出完整的矩阵配置
-       * 包含 cap_multiplier 和 empty_weight_multiplier
-       * B0 x P1 应该有强空奖倾向（empty_weight_multiplier >= 10）
-       */
-      expect(TIER_MATRIX_CONFIG.B0?.P1).toBeDefined()
-      expect(typeof TIER_MATRIX_CONFIG.B0?.P1.empty_weight_multiplier).toBe('number')
-      expect(TIER_MATRIX_CONFIG.B0?.P1.empty_weight_multiplier).toBeGreaterThanOrEqual(10.0)
+    test('PRESSURE_MATRIX 定义正确', () => {
+      expect(PRESSURE_MATRIX).toBeDefined()
+      expect(PRESSURE_MATRIX.P0).toBeDefined()
+      expect(PRESSURE_MATRIX.P1).toBeDefined()
+      expect(PRESSURE_MATRIX.P2).toBeDefined()
+      expect(typeof PRESSURE_MATRIX.P0.high).toBe('number')
+      expect(typeof PRESSURE_MATRIX.P0.mid).toBe('number')
+      expect(typeof PRESSURE_MATRIX.P0.low).toBe('number')
+      expect(typeof PRESSURE_MATRIX.P0.fallback).toBe('number')
+      expect(typeof PRESSURE_MATRIX.P0.cap).toBe('number')
+      expect(typeof PRESSURE_MATRIX.P0.empty).toBe('number')
     })
   })
 
   describe('computeWeightAdjustment - 权重调整计算', () => {
-    test('B0xP1 返回空奖倾向', () => {
+    test('P1 返回标准乘数矩阵', () => {
       const result = engine.computeWeightAdjustment({
-        budget_tier: 'B0',
         pressure_tier: 'P1',
         base_tier_weights: {
           high: 50000,
@@ -116,13 +121,15 @@ describe('LotteryComputeEngine', () => {
       })
 
       expect(result.matrix_result).toBeDefined()
-      expect(result.matrix_result.available_tiers).toEqual(['fallback'])
+      expect(result.matrix_result.multipliers).toBeDefined()
+      expect(result.matrix_result.matrix_key).toBe('P1')
+      expect(result.adjusted_weights).toBeDefined()
+      expect(result.pressure_tier).toBe('P1')
     })
 
-    test('B3xP1 返回所有档位可用', () => {
+    test('P2 返回高压乘数矩阵', () => {
       const result = engine.computeWeightAdjustment({
-        budget_tier: 'B3',
-        pressure_tier: 'P1',
+        pressure_tier: 'P2',
         base_tier_weights: {
           high: 50000,
           mid: 150000,
@@ -131,9 +138,11 @@ describe('LotteryComputeEngine', () => {
         }
       })
 
-      expect(result.matrix_result.available_tiers).toContain('high')
-      expect(result.matrix_result.available_tiers).toContain('mid')
-      expect(result.matrix_result.available_tiers).toContain('low')
+      expect(result.matrix_result).toBeDefined()
+      expect(result.matrix_result.multipliers).toBeDefined()
+      expect(result.matrix_result.matrix_key).toBe('P2')
+      expect(result.adjusted_weights).toBeDefined()
+      expect(result.pressure_tier).toBe('P2')
     })
   })
 
@@ -303,10 +312,9 @@ describe('LotteryComputeEngine', () => {
   // ========== 边界场景测试 ==========
   describe('边界场景测试', () => {
     describe('computeWeightAdjustment - 边界值', () => {
-      test('无效 budget_tier 使用默认处理', () => {
+      test('无效 pressure_tier 使用默认处理', () => {
         const result = engine.computeWeightAdjustment({
-          budget_tier: 'INVALID',
-          pressure_tier: 'P1',
+          pressure_tier: 'INVALID',
           base_tier_weights: {
             high: 50000,
             mid: 150000,
@@ -314,14 +322,13 @@ describe('LotteryComputeEngine', () => {
             fallback: 500000
           }
         })
-        // 应该有安全的降级处理
+        // 应该有安全的降级处理（使用 P1）
         expect(result).toBeDefined()
         expect(result.matrix_result).toBeDefined()
       })
 
       test('空权重对象处理', () => {
         const result = engine.computeWeightAdjustment({
-          budget_tier: 'B1',
           pressure_tier: 'P1',
           base_tier_weights: {}
         })
@@ -331,7 +338,6 @@ describe('LotteryComputeEngine', () => {
 
       test('负数权重处理', () => {
         const result = engine.computeWeightAdjustment({
-          budget_tier: 'B2',
           pressure_tier: 'P1',
           base_tier_weights: {
             high: -50000,

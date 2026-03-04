@@ -51,9 +51,9 @@ const DEFAULT_ANTI_EMPTY_CONFIG = {
   /**
    * 强制触发阈值
    * 连续空奖次数达到此值时强制发放非空奖
-   * 应与 Pity 系统的硬保底阈值一致（10）
+   * 文档 D12 确认值为 5
    */
-  force_threshold: 10,
+  force_threshold: 5,
 
   /**
    * 强制时选择的档位优先级

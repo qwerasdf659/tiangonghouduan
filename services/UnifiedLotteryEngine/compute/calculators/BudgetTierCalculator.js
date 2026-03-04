@@ -11,7 +11,7 @@
  * 业务背景（来自方案文档）：
  * - 预算不足时应降低高价值奖品概率，而非直接失败
  * - Budget Tier 决定用户可参与哪些档位的抽奖
- * - B0: 仅 fallback/low
+ * - B0: low + fallback（资格由资源级过滤保证）
  * - B1: 仅 low + fallback
  * - B2: mid + low + fallback
  * - B3: high + mid + low + fallback
@@ -33,7 +33,7 @@ const { logger } = require('../../../../utils/logger')
  * @enum {string}
  */
 const BUDGET_TIER = {
-  /** B0：预算不足，仅可抽 fallback/空奖 */
+  /** B0：预算不足，可抽 low + fallback（资格由资源级过滤保证） */
   B0: 'B0',
   /** B1：低预算，可抽 low + fallback */
   B1: 'B1',
@@ -48,7 +48,7 @@ const BUDGET_TIER = {
  * 定义每个 Budget Tier 允许参与的档位
  */
 const TIER_AVAILABILITY = {
-  [BUDGET_TIER.B0]: ['fallback'], // 仅空奖/最低档
+  [BUDGET_TIER.B0]: ['low', 'fallback'], // low + fallback（资格由资源级过滤保证）
   [BUDGET_TIER.B1]: ['low', 'fallback'], // 低档 + 空奖
   [BUDGET_TIER.B2]: ['mid', 'low', 'fallback'], // 中档 + 低档 + 空奖
   [BUDGET_TIER.B3]: ['high', 'mid', 'low', 'fallback'] // 所有档位

@@ -3,21 +3,23 @@
 /**
  * 预算耗尽降级测试（任务8.3）
  *
- * 测试内容：
- * - 验证预算从 B3 逐渐降级到 B0 的过程
+ * 测试内容（2026-03-04 Pressure-Only 重构后）：
+ * - 验证 BudgetTierCalculator 阈值判定（监控用途）
  * - 验证 TierPickStage 的固定降级路径（high → mid → low → fallback）
- * - 验证预算不足时的档位限制
- * - 验证降级后权重重新归一化
+ * - 验证资源过滤后的档位限制（模拟 _filterByResourceEligibility 结果）
+ * - 验证 Pressure-Only 矩阵权重归一化
  *
  * 业务语义验证：
- * - 预算耗尽时系统应自动降级，而非直接失败
+ * - 预算耗尽时资格由 BuildPrizePoolStage._filterByResourceEligibility 控制
  * - 降级路径是确定性的：high → mid → low → fallback
  * - 当某档位无可用奖品时，应自动尝试下一档位
  * - 最终必定有奖品产出（fallback 兜底）
+ * - TierMatrixCalculator 仅根据 Pressure Tier 调整概率，不参与资格门控
  *
  * @module tests/services/unified_lottery_engine/budget_exhaustion
  * @author 测试审计标准文档 任务8.3
  * @since 2026-01-28
+ * @updated 2026-03-04 Pressure-Only 矩阵重构
  */
 
 const {
@@ -28,7 +30,6 @@ const {
 
 const models = require('../../../models')
 const { LotteryCampaign, LotteryPrize } = models
-// User 模型用于后续扩展测试场景
 
 /**
  * 权重缩放比例常量
@@ -36,7 +37,7 @@ const { LotteryCampaign, LotteryPrize } = models
 const WEIGHT_SCALE = TierMatrixCalculator.WEIGHT_SCALE || 1000000
 
 /**
- * Budget Tier 常量
+ * Budget Tier 常量（监控用途）
  */
 const BUDGET_TIER = BudgetTierCalculator.BUDGET_TIER || {
   B0: 'B0',
@@ -46,13 +47,13 @@ const BUDGET_TIER = BudgetTierCalculator.BUDGET_TIER || {
 }
 
 /**
- * Tier 可用性映射
+ * 资源过滤后的可用档位（模拟 _filterByResourceEligibility 结果）
+ * 用于固定降级路径测试，不再从 Budget Tier 推导
  */
-const TIER_AVAILABILITY = BudgetTierCalculator.TIER_AVAILABILITY || {
-  [BUDGET_TIER.B0]: ['fallback'],
-  [BUDGET_TIER.B1]: ['low', 'fallback'],
-  [BUDGET_TIER.B2]: ['mid', 'low', 'fallback'],
-  [BUDGET_TIER.B3]: ['high', 'mid', 'low', 'fallback']
+const RESOURCE_ELIGIBLE_TIERS = {
+  all: ['high', 'mid', 'low', 'fallback'],
+  mid_low_fallback: ['mid', 'low', 'fallback'],
+  low_fallback: ['low', 'fallback']
 }
 
 /**
@@ -254,94 +255,45 @@ describe('预算耗尽降级测试（任务8.3）', () => {
     })
   })
 
-  // ========== 预算耗尽降级过程测试 ==========
-
-  describe('预算耗尽降级过程', () => {
-    test('预算从 B3 降级到 B2 应限制 high 档位', () => {
-      const high_budget_result = tier_matrix_calculator.calculate({
-        budget_tier: BUDGET_TIER.B3,
-        pressure_tier: 'P1',
+  /*
+   * ========== Pressure-Only 矩阵权重测试 ==========
+   * 注：预算档位不再影响概率，资格由 BuildPrizePoolStage._filterByResourceEligibility 控制
+   */
+  describe('Pressure-Only 矩阵权重', () => {
+    test('P0 高档权重应高于 P2', () => {
+      const p0_result = tier_matrix_calculator.calculate({
+        pressure_tier: 'P0',
         base_weights: { high: 100000, mid: 200000, low: 300000, fallback: 400000 }
       })
 
-      const mid_budget_result = tier_matrix_calculator.calculate({
-        budget_tier: BUDGET_TIER.B2,
-        pressure_tier: 'P1',
+      const p2_result = tier_matrix_calculator.calculate({
+        pressure_tier: 'P2',
         base_weights: { high: 100000, mid: 200000, low: 300000, fallback: 400000 }
       })
 
-      console.log('📊 B3 → B2 降级对比:')
-      console.log(`   B3 final_weights: ${JSON.stringify(high_budget_result.final_weights)}`)
-      console.log(`   B2 final_weights: ${JSON.stringify(mid_budget_result.final_weights)}`)
+      console.log('📊 P0 vs P2 对比:')
+      console.log(`   P0 final_weights: ${JSON.stringify(p0_result.final_weights)}`)
+      console.log(`   P2 final_weights: ${JSON.stringify(p2_result.final_weights)}`)
 
-      // B3 有 high 权重
-      expect(high_budget_result.final_weights.high).toBeGreaterThan(0)
+      expect(p0_result.final_weights.high).toBeGreaterThan(p2_result.final_weights.high)
+      expect(p2_result.final_weights.fallback).toBeGreaterThan(p0_result.final_weights.fallback)
 
-      // B2 没有 high 权重
-      expect(mid_budget_result.final_weights.high).toBe(0)
-
-      // B2 有 mid 权重
-      expect(mid_budget_result.final_weights.mid).toBeGreaterThan(0)
-
-      console.log('✅ B3 → B2 降级验证通过')
+      console.log('✅ P0 高档权重高于 P2 验证通过')
     })
 
-    test('预算从 B2 降级到 B1 应限制 mid 档位', () => {
-      const b2_result = tier_matrix_calculator.calculate({
-        budget_tier: BUDGET_TIER.B2,
+    test('P1 应保持原始权重比例', () => {
+      const base_weights = { high: 100000, mid: 200000, low: 300000, fallback: 400000 }
+      const result = tier_matrix_calculator.calculate({
         pressure_tier: 'P1',
-        base_weights: { high: 100000, mid: 200000, low: 300000, fallback: 400000 }
+        base_weights
       })
 
-      const b1_result = tier_matrix_calculator.calculate({
-        budget_tier: BUDGET_TIER.B1,
-        pressure_tier: 'P1',
-        base_weights: { high: 100000, mid: 200000, low: 300000, fallback: 400000 }
-      })
+      const total = Object.values(result.final_weights).reduce((a, b) => a + b, 0)
+      expect(total).toBe(WEIGHT_SCALE)
+      expect(result.final_weights.high).toBeGreaterThan(0)
+      expect(result.final_weights.fallback).toBeGreaterThan(0)
 
-      console.log('📊 B2 → B1 降级对比:')
-      console.log(`   B2 final_weights: ${JSON.stringify(b2_result.final_weights)}`)
-      console.log(`   B1 final_weights: ${JSON.stringify(b1_result.final_weights)}`)
-
-      // B2 有 mid 权重
-      expect(b2_result.final_weights.mid).toBeGreaterThan(0)
-
-      // B1 没有 mid 权重
-      expect(b1_result.final_weights.mid).toBe(0)
-
-      // B1 有 low 权重
-      expect(b1_result.final_weights.low).toBeGreaterThan(0)
-
-      console.log('✅ B2 → B1 降级验证通过')
-    })
-
-    test('预算从 B1 降级到 B0 应仅保留 fallback', () => {
-      const b1_result = tier_matrix_calculator.calculate({
-        budget_tier: BUDGET_TIER.B1,
-        pressure_tier: 'P1',
-        base_weights: { high: 100000, mid: 200000, low: 300000, fallback: 400000 }
-      })
-
-      const b0_result = tier_matrix_calculator.calculate({
-        budget_tier: BUDGET_TIER.B0,
-        pressure_tier: 'P1',
-        base_weights: { high: 100000, mid: 200000, low: 300000, fallback: 400000 }
-      })
-
-      console.log('📊 B1 → B0 降级对比:')
-      console.log(`   B1 final_weights: ${JSON.stringify(b1_result.final_weights)}`)
-      console.log(`   B0 final_weights: ${JSON.stringify(b0_result.final_weights)}`)
-
-      // B1 有 low 权重
-      expect(b1_result.final_weights.low).toBeGreaterThan(0)
-
-      // B0 只有 fallback 权重
-      expect(b0_result.final_weights.high).toBe(0)
-      expect(b0_result.final_weights.mid).toBe(0)
-      expect(b0_result.final_weights.low).toBe(0)
-      expect(b0_result.final_weights.fallback).toBe(WEIGHT_SCALE)
-
-      console.log('✅ B1 → B0 降级验证通过')
+      console.log('✅ P1 权重归一化验证通过')
     })
   })
 
@@ -384,11 +336,7 @@ describe('预算耗尽降级测试（任务8.3）', () => {
         fallback: [{ lottery_prize_id: 3 }]
       }
 
-      const result = simulateTierDowngrade(
-        'high',
-        prizes_by_tier,
-        TIER_AVAILABILITY[BUDGET_TIER.B3]
-      )
+      const result = simulateTierDowngrade('high', prizes_by_tier, RESOURCE_ELIGIBLE_TIERS.all)
 
       console.log(`📊 high 无奖品降级结果: ${result}`)
       expect(result).toBe('mid')
@@ -404,11 +352,7 @@ describe('预算耗尽降级测试（任务8.3）', () => {
         fallback: [{ lottery_prize_id: 2 }]
       }
 
-      const result = simulateTierDowngrade(
-        'high',
-        prizes_by_tier,
-        TIER_AVAILABILITY[BUDGET_TIER.B3]
-      )
+      const result = simulateTierDowngrade('high', prizes_by_tier, RESOURCE_ELIGIBLE_TIERS.all)
 
       console.log(`📊 high/mid 无奖品降级结果: ${result}`)
       expect(result).toBe('low')
@@ -424,11 +368,7 @@ describe('预算耗尽降级测试（任务8.3）', () => {
         fallback: [{ lottery_prize_id: 1 }]
       }
 
-      const result = simulateTierDowngrade(
-        'high',
-        prizes_by_tier,
-        TIER_AVAILABILITY[BUDGET_TIER.B3]
-      )
+      const result = simulateTierDowngrade('high', prizes_by_tier, RESOURCE_ELIGIBLE_TIERS.all)
 
       console.log(`📊 high/mid/low 无奖品降级结果: ${result}`)
       expect(result).toBe('fallback')
@@ -456,28 +396,27 @@ describe('预算耗尽降级测试（任务8.3）', () => {
       console.log('✅ 降级路径顺序验证通过')
     })
 
-    test('B2 预算下 high 不可用时应直接从 mid 开始', () => {
+    test('资源过滤排除 high 时应直接从 mid 开始', () => {
       const prizes_by_tier = {
-        high: [{ lottery_prize_id: 1 }], // 有高档奖品但预算不够
+        high: [{ lottery_prize_id: 1 }], // 有高档奖品但资源过滤排除
         mid: [{ lottery_prize_id: 2 }],
         low: [{ lottery_prize_id: 3 }],
         fallback: [{ lottery_prize_id: 4 }]
       }
 
-      // B2 不允许 high 档位
       const result = simulateTierDowngrade(
         'high',
         prizes_by_tier,
-        TIER_AVAILABILITY[BUDGET_TIER.B2]
+        RESOURCE_ELIGIBLE_TIERS.mid_low_fallback
       )
 
-      console.log(`📊 B2 预算下从 high 降级结果: ${result}`)
-      expect(result).toBe('mid') // 跳过 high，从 mid 开始
+      console.log(`📊 资源过滤排除 high 时降级结果: ${result}`)
+      expect(result).toBe('mid')
 
-      console.log('✅ B2 预算限制降级验证通过')
+      console.log('✅ 资源过滤排除 high 降级验证通过')
     })
 
-    test('B1 预算下应只能选择 low 或 fallback', () => {
+    test('资源过滤仅允许 low/fallback 时应只能选择 low 或 fallback', () => {
       const prizes_by_tier = {
         high: [{ lottery_prize_id: 1 }],
         mid: [{ lottery_prize_id: 2 }],
@@ -485,17 +424,16 @@ describe('预算耗尽降级测试（任务8.3）', () => {
         fallback: [{ lottery_prize_id: 4 }]
       }
 
-      // B1 只允许 low 和 fallback
       const result = simulateTierDowngrade(
         'high',
         prizes_by_tier,
-        TIER_AVAILABILITY[BUDGET_TIER.B1]
+        RESOURCE_ELIGIBLE_TIERS.low_fallback
       )
 
-      console.log(`📊 B1 预算下从 high 降级结果: ${result}`)
+      console.log(`📊 资源过滤仅 low/fallback 时降级结果: ${result}`)
       expect(['low', 'fallback']).toContain(result)
 
-      console.log('✅ B1 预算限制降级验证通过')
+      console.log('✅ 资源过滤 low/fallback 降级验证通过')
     })
   })
 
@@ -614,16 +552,15 @@ describe('预算耗尽降级测试（任务8.3）', () => {
     })
   })
 
-  // ========== 权重重新归一化测试 ==========
+  // ========== 权重归一化测试（Pressure-Only） ==========
 
-  describe('降级后权重重新归一化', () => {
-    test('降级后权重总和应保持 WEIGHT_SCALE', () => {
-      const tiers = [BUDGET_TIER.B0, BUDGET_TIER.B1, BUDGET_TIER.B2, BUDGET_TIER.B3]
+  describe('Pressure-Only 权重归一化', () => {
+    test('所有 Pressure Tier 权重总和应保持 WEIGHT_SCALE', () => {
+      const pressureTiers = ['P0', 'P1', 'P2']
 
-      for (const budget_tier of tiers) {
+      for (const pressure_tier of pressureTiers) {
         const result = tier_matrix_calculator.calculate({
-          budget_tier,
-          pressure_tier: 'P1',
+          pressure_tier,
           base_weights: { high: 50000, mid: 150000, low: 300000, fallback: 500000 }
         })
 
@@ -633,36 +570,36 @@ describe('预算耗尽降级测试（任务8.3）', () => {
           result.final_weights.low +
           result.final_weights.fallback
 
-        console.log(`📊 ${budget_tier} 权重总和: ${total}`)
+        console.log(`📊 ${pressure_tier} 权重总和: ${total}`)
         expect(total).toBe(WEIGHT_SCALE)
       }
 
-      console.log('✅ 所有 Budget Tier 权重归一化验证通过')
+      console.log('✅ 所有 Pressure Tier 权重归一化验证通过')
     })
 
-    test('禁用档位的权重应重新分配到可用档位', () => {
+    test('P2 高压时高档权重降低、兜底权重提升', () => {
       const base_weights = { high: 250000, mid: 250000, low: 250000, fallback: 250000 }
 
-      // B2 禁用 high，其权重应分配到其他档位
-      const b2_result = tier_matrix_calculator.calculate({
-        budget_tier: BUDGET_TIER.B2,
+      const p1_result = tier_matrix_calculator.calculate({
         pressure_tier: 'P1',
         base_weights
       })
+      const p2_result = tier_matrix_calculator.calculate({
+        pressure_tier: 'P2',
+        base_weights
+      })
 
-      console.log('📊 B2 权重重分配:')
-      console.log(`   原始: ${JSON.stringify(base_weights)}`)
-      console.log(`   调整后: ${JSON.stringify(b2_result.final_weights)}`)
+      console.log('📊 P1 vs P2 权重重分配:')
+      console.log(`   P1: ${JSON.stringify(p1_result.final_weights)}`)
+      console.log(`   P2: ${JSON.stringify(p2_result.final_weights)}`)
 
-      // high 权重为0
-      expect(b2_result.final_weights.high).toBe(0)
+      expect(p2_result.final_weights.high).toBeLessThan(p1_result.final_weights.high)
+      expect(p2_result.final_weights.fallback).toBeGreaterThan(p1_result.final_weights.fallback)
 
-      // 其他档位权重增加（总和仍为 WEIGHT_SCALE）
-      const non_high_total =
-        b2_result.final_weights.mid + b2_result.final_weights.low + b2_result.final_weights.fallback
-      expect(non_high_total).toBe(WEIGHT_SCALE)
+      const total = Object.values(p2_result.final_weights).reduce((a, b) => a + b, 0)
+      expect(total).toBe(WEIGHT_SCALE)
 
-      console.log('✅ 权重重分配验证通过')
+      console.log('✅ P2 高档降低、兜底提升验证通过')
     })
   })
 

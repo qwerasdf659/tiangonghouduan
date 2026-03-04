@@ -6,7 +6,7 @@
  * 测试内容：
  * 1. 极端预算边界（负数、无穷大、NaN、null/undefined）
  * 2. 极端压力指数边界（边界值、零除法、极端时间进度）
- * 3. BxPx 矩阵所有组合（12种组合完整覆盖）
+ * 3. P0/P1/P2 矩阵组合（Pressure-Only）
  * 4. Pity 系统边界（空奖连击 0/极大、乘数边界）
  * 5. 运气债务边界（历史空奖率 0%/100%、样本量阈值）
  *
@@ -290,10 +290,10 @@ describe('策略引擎边界场景测试', () => {
 
   /*
    * ========================================
-   * 3. BxPx 矩阵完整组合测试（12 种组合）
+   * 3. TierMatrixCalculator - P0/P1/P2 矩阵测试（Pressure-Only）
    * ========================================
    */
-  describe('TierMatrixCalculator - BxPx 矩阵完整覆盖', () => {
+  describe('TierMatrixCalculator - P0/P1/P2 矩阵完整覆盖', () => {
     let calculator
 
     const baseWeights = {
@@ -307,92 +307,45 @@ describe('策略引擎边界场景测试', () => {
       calculator = new TierMatrixCalculator()
     })
 
-    // 4 种 Budget Tier × 3 种 Pressure Tier = 12 种组合
-    const budgetTiers = ['B0', 'B1', 'B2', 'B3']
     const pressureTiers = ['P0', 'P1', 'P2']
 
-    describe.each(budgetTiers)('Budget Tier %s 组合测试', budget_tier => {
-      pressureTiers.forEach(pressure_tier => {
-        test(`${budget_tier} x ${pressure_tier} 应返回有效结果`, () => {
-          const result = calculator.calculate({
-            budget_tier,
-            pressure_tier,
-            base_weights: baseWeights
-          })
-
-          // 1. 返回结构正确
-          expect(result).toHaveProperty('budget_tier', budget_tier)
-          expect(result).toHaveProperty('pressure_tier', pressure_tier)
-          expect(result).toHaveProperty('available_tiers')
-          expect(result).toHaveProperty('final_weights')
-          expect(result).toHaveProperty('multipliers')
-
-          // 2. 可用档位是数组
-          expect(Array.isArray(result.available_tiers)).toBe(true)
-          expect(result.available_tiers.length).toBeGreaterThan(0)
-
-          // 3. 至少有一个档位有权重
-          const hasWeight = Object.values(result.final_weights).some(w => w > 0)
-          expect(hasWeight).toBe(true)
-
-          // 4. B0 只能抽 fallback
-          if (budget_tier === 'B0') {
-            expect(result.available_tiers).toEqual(['fallback'])
-            expect(result.final_weights.high).toBe(0)
-            expect(result.final_weights.mid).toBe(0)
-            expect(result.final_weights.low).toBe(0)
-          }
-
-          // 5. B1 不能抽 high
-          if (budget_tier === 'B1') {
-            expect(result.available_tiers).not.toContain('high')
-            expect(result.final_weights.high).toBe(0)
-          }
-
-          // 6. B2 不能抽 high
-          if (budget_tier === 'B2') {
-            expect(result.available_tiers).not.toContain('high')
-            expect(result.final_weights.high).toBe(0)
-          }
-
-          // 7. B3 可以抽所有档位
-          if (budget_tier === 'B3') {
-            expect(result.available_tiers).toContain('fallback')
-            // B3 应该有非零 fallback 权重
-            expect(result.final_weights.fallback).toBeGreaterThan(0)
-          }
-        })
-      })
-    })
-
-    describe('无效 Budget/Pressure Tier 处理', () => {
-      test('无效 budget_tier = "B4" 应安全降级', () => {
+    describe.each(pressureTiers)('Pressure Tier %s 组合测试', pressure_tier => {
+      test(`${pressure_tier} 应返回有效结果`, () => {
         const result = calculator.calculate({
-          budget_tier: 'B4',
-          pressure_tier: 'P1',
+          pressure_tier,
           base_weights: baseWeights
         })
 
-        // 应该有结果，不崩溃
-        expect(result).toBeDefined()
-        expect(result.budget_tier).toBe('B4')
-      })
+        // 1. 返回结构正确
+        expect(result).toHaveProperty('pressure_tier', pressure_tier)
+        expect(result).toHaveProperty('final_weights')
+        expect(result).toHaveProperty('multipliers')
 
-      test('无效 pressure_tier = "P3" 应安全降级', () => {
+        // 2. 至少有一个档位有权重
+        const hasWeight = Object.values(result.final_weights).some(w => w > 0)
+        expect(hasWeight).toBe(true)
+
+        // 3. 所有权重总和应为 WEIGHT_SCALE
+        const total = Object.values(result.final_weights).reduce((a, b) => a + b, 0)
+        expect(total).toBe(1000000)
+      })
+    })
+
+    describe('无效 Pressure Tier 处理', () => {
+      test('无效 pressure_tier = "P3" 应安全降级到 P1', () => {
         const result = calculator.calculate({
-          budget_tier: 'B2',
           pressure_tier: 'P3',
           base_weights: baseWeights
         })
 
         expect(result).toBeDefined()
         expect(result.pressure_tier).toBe('P3')
+        expect(result.final_weights).toBeDefined()
       })
 
-      test('null budget_tier 应安全处理', () => {
+      test('null pressure_tier 应安全处理', () => {
         const result = calculator.calculate({
-          budget_tier: null,
-          pressure_tier: 'P1',
+          pressure_tier: null,
           base_weights: baseWeights
         })
 
@@ -401,7 +354,6 @@ describe('策略引擎边界场景测试', () => {
 
       test('空 base_weights 应安全处理', () => {
         const result = calculator.calculate({
-          budget_tier: 'B2',
           pressure_tier: 'P1',
           base_weights: {}
         })
@@ -1274,7 +1226,7 @@ describe('策略引擎边界场景测试', () => {
       const pityCalc = new PityCalculator()
       const luckDebtCalc = new LuckDebtCalculator()
 
-      // 1. 计算 Budget Tier（默认阈值 low=22, mid=44, high=110，budget=10 < 22 → B0）
+      // 1. 计算 Budget Tier（监控用途，默认阈值 low=22, mid=44, high=110，budget=10 < 22 → B0）
       const budget_tier = budgetCalc._determineBudgetTier(10, budgetCalc.thresholds)
       expect(budget_tier).toBe('B0')
 
@@ -1282,13 +1234,13 @@ describe('策略引擎边界场景测试', () => {
       const pressure_tier = pressureCalc._determinePressureTier(1.5)
       expect(pressure_tier).toBe('P2')
 
-      // 3. 计算矩阵权重
+      // 3. 计算矩阵权重（Pressure-Only，不传 budget_tier）
       const matrixResult = matrixCalc.calculate({
-        budget_tier,
         pressure_tier,
         base_weights: { high: 50000, mid: 150000, low: 300000, fallback: 500000 }
       })
-      expect(matrixResult.available_tiers).toEqual(['fallback'])
+      expect(matrixResult.final_weights).toBeDefined()
+      expect(Object.values(matrixResult.final_weights).reduce((a, b) => a + b, 0)).toBe(1000000)
 
       // 4. Pity 计算（Pity 独立于 Budget Tier 运作）
       const pityResult = pityCalc.calculate({
@@ -1312,7 +1264,7 @@ describe('策略引擎边界场景测试', () => {
       const pityCalc = new PityCalculator()
       const luckDebtCalc = new LuckDebtCalculator()
 
-      // 1. B3 高预算
+      // 1. B3 高预算（监控用途）
       const budget_tier = budgetCalc._determineBudgetTier(2000, budgetCalc.thresholds)
       expect(budget_tier).toBe('B3')
 
@@ -1320,15 +1272,14 @@ describe('策略引擎边界场景测试', () => {
       const pressure_tier = pressureCalc._determinePressureTier(0.3)
       expect(pressure_tier).toBe('P0')
 
-      // 3. 矩阵应该允许所有档位
+      // 3. 矩阵计算（Pressure-Only，P0 高档权重最高）
       const matrixResult = matrixCalc.calculate({
-        budget_tier,
         pressure_tier,
         base_weights: { high: 50000, mid: 150000, low: 300000, fallback: 500000 }
       })
-      expect(matrixResult.available_tiers).toContain('high')
-      expect(matrixResult.available_tiers).toContain('mid')
-      expect(matrixResult.available_tiers).toContain('low')
+      expect(matrixResult.final_weights.high).toBeGreaterThan(0)
+      expect(matrixResult.final_weights.mid).toBeGreaterThan(0)
+      expect(matrixResult.final_weights.low).toBeGreaterThan(0)
 
       // 4. 无空奖连击，Pity 不触发
       const pityResult = pityCalc.calculate({
@@ -1464,15 +1415,14 @@ describe('策略引擎边界场景测试', () => {
       const pressure_tier = pressureCalc._determinePressureTier(1.0)
       expect(pressure_tier).toBe('P1')
 
-      // 3. 矩阵计算正常
+      // 3. 矩阵计算正常（Pressure-Only）
       const matrixResult = matrixCalc.calculate({
-        budget_tier,
         pressure_tier,
         base_weights: { high: 50000, mid: 150000, low: 300000, fallback: 500000 }
       })
-      expect(matrixResult.available_tiers).toContain('mid')
-      expect(matrixResult.available_tiers).toContain('low')
-      expect(matrixResult.available_tiers).toContain('fallback')
+      expect(matrixResult.final_weights.mid).toBeGreaterThan(0)
+      expect(matrixResult.final_weights.low).toBeGreaterThan(0)
+      expect(matrixResult.final_weights.fallback).toBeGreaterThan(0)
 
       // 4. Pity 不触发
       const pityResult = pityCalc.calculate({ empty_streak: 0 })
@@ -1611,32 +1561,28 @@ describe('策略引擎边界场景测试', () => {
         engine = new LotteryComputeEngine()
       })
 
-      test('有效的 BxPx 组合应返回正确结果', () => {
+      test('有效的 Px 组合应返回正确结果', () => {
         const result = engine.computeWeightAdjustment({
-          budget_tier: 'B2',
           pressure_tier: 'P1',
           base_tier_weights: { high: 50000, mid: 150000, low: 300000, fallback: 500000 }
         })
 
         expect(result.adjusted_weights).toBeDefined()
-        expect(result.budget_tier).toBe('B2')
         expect(result.pressure_tier).toBe('P1')
       })
 
-      test('无效的 budget_tier 应安全处理', () => {
+      test('无效的 pressure_tier 应安全处理', () => {
         const result = engine.computeWeightAdjustment({
-          budget_tier: 'B99',
-          pressure_tier: 'P1',
+          pressure_tier: 'P99',
           base_tier_weights: { high: 50000, mid: 150000, low: 300000, fallback: 500000 }
         })
 
         expect(result).toBeDefined()
-        expect(result.budget_tier).toBe('B99')
+        expect(result.adjusted_weights).toBeDefined()
       })
 
       test('空的 base_tier_weights 应安全处理', () => {
         const result = engine.computeWeightAdjustment({
-          budget_tier: 'B2',
           pressure_tier: 'P1',
           base_tier_weights: {}
         })
@@ -1647,7 +1593,6 @@ describe('策略引擎边界场景测试', () => {
 
       test('undefined base_tier_weights 应安全处理', () => {
         const result = engine.computeWeightAdjustment({
-          budget_tier: 'B2',
           pressure_tier: 'P1',
           base_tier_weights: undefined
         })

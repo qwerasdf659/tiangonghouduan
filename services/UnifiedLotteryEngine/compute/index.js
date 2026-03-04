@@ -37,7 +37,7 @@ const GlobalStateManager = require('./state/GlobalStateManager')
 const ComputeConfig = require('./config/ComputeConfig')
 
 // ========== 从 LotteryComputeEngine 提取常量 ==========
-const { BUDGET_TIERS, PRESSURE_TIERS, TIER_MATRIX_CONFIG } = LotteryComputeEngine
+const { BUDGET_TIERS, PRESSURE_TIERS, PRESSURE_MATRIX } = LotteryComputeEngine
 
 // ========== 默认实例（单例模式） ==========
 let _defaultInstance = null
@@ -119,7 +119,7 @@ module.exports = {
   /* ======================================== */
   BUDGET_TIERS,
   PRESSURE_TIERS,
-  TIER_MATRIX_CONFIG,
+  PRESSURE_MATRIX,
 
   /* ======================================== */
   /* 独立计算器（Phase 3+ 直接导出）          */

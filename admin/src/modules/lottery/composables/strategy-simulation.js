@@ -82,36 +82,36 @@ const PRESET_SCENARIOS = {
   }
 }
 
-/** 灵敏度可扫射参数定义 */
+/** 灵敏度可扫射参数定义（Pressure-Only 矩阵） */
 const SENSITIVITY_PARAMS = [
   {
     group: 'matrix_config',
-    key: 'B3_P1.high_multiplier',
-    label: 'B3×P1 高档乘数',
+    key: 'P1.high_multiplier',
+    label: 'P1 高档乘数',
     min: 0,
     max: 2,
     step_default: 10
   },
   {
     group: 'matrix_config',
-    key: 'B3_P1.empty_weight_multiplier',
-    label: 'B3×P1 空奖权重乘数',
+    key: 'P1.empty_weight_multiplier',
+    label: 'P1 空奖权重乘数',
     min: 0,
     max: 2,
     step_default: 10
   },
   {
     group: 'matrix_config',
-    key: 'B3_P2.high_multiplier',
-    label: 'B3×P2 高档乘数',
+    key: 'P2.high_multiplier',
+    label: 'P2 高档乘数',
     min: 0,
     max: 2,
     step_default: 10
   },
   {
     group: 'matrix_config',
-    key: 'B3_P1.mid_multiplier',
-    label: 'B3×P1 中档乘数',
+    key: 'P1.mid_multiplier',
+    label: 'P1 中档乘数',
     min: 0,
     max: 2,
     step_default: 10
@@ -205,9 +205,9 @@ export function useStrategySimulationState() {
     },
     /** @type {Array<string>} 目标反推可调参数 */
     recommend_adjustable_params: [
-      'matrix_config.B3_P1.high_multiplier',
-      'matrix_config.B3_P1.empty_weight_multiplier',
-      'matrix_config.B3_P2.high_multiplier'
+      'matrix_config.P1.high_multiplier',
+      'matrix_config.P1.empty_weight_multiplier',
+      'matrix_config.P2.high_multiplier'
     ],
 
     /** @type {Array} 模拟历史记录列表 */
@@ -488,8 +488,7 @@ export function useStrategySimulationMethods() {
       for (const [path, value] of Object.entries(recommendation.proposed_changes)) {
         const parts = path.split('.')
         if (parts[0] === 'matrix_config' && parts.length === 3) {
-          const [bt, pt] = parts[1].split('_')
-          this.updateProposedMatrixValue(bt, pt, parts[2], value)
+          this.updateProposedMatrixValue(parts[1], parts[2], value)
         }
       }
       Alpine.store('notification')?.show?.('推荐方案已加载到参数沙盒', 'success')
@@ -755,32 +754,32 @@ export function useStrategySimulationMethods() {
 
     // ===== 矩阵操作辅助方法 =====
 
-    getProposedMatrixValue(budget_tier, pressure_tier, field) {
+    getProposedMatrixValue(pressure_tier, field) {
       const cell = this.proposed_config.matrix_config?.find(
-        m => m.budget_tier === budget_tier && m.pressure_tier === pressure_tier
+        m => m.pressure_tier === pressure_tier
       )
       return cell ? (cell[field] ?? 0) : 0
     },
 
-    updateProposedMatrixValue(budget_tier, pressure_tier, field, value) {
+    updateProposedMatrixValue(pressure_tier, field, value) {
       const idx = this.proposed_config.matrix_config?.findIndex(
-        m => m.budget_tier === budget_tier && m.pressure_tier === pressure_tier
+        m => m.pressure_tier === pressure_tier
       )
       if (idx >= 0) {
         this.proposed_config.matrix_config[idx][field] = parseFloat(value)
       }
     },
 
-    getBaselineMatrixValue(budget_tier, pressure_tier, field) {
+    getBaselineMatrixValue(pressure_tier, field) {
       const cell = this.simulation_baseline?.matrix_config?.find(
-        m => m.budget_tier === budget_tier && m.pressure_tier === pressure_tier
+        m => m.pressure_tier === pressure_tier
       )
       return cell ? (cell[field] ?? 0) : 0
     },
 
-    isMatrixValueChanged(budget_tier, pressure_tier, field) {
-      const baseline = this.getBaselineMatrixValue(budget_tier, pressure_tier, field)
-      const proposed = this.getProposedMatrixValue(budget_tier, pressure_tier, field)
+    isMatrixValueChanged(pressure_tier, field) {
+      const baseline = this.getBaselineMatrixValue(pressure_tier, field)
+      const proposed = this.getProposedMatrixValue(pressure_tier, field)
       return Math.abs(baseline - proposed) > 0.001
     },
 

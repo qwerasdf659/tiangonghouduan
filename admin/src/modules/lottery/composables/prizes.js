@@ -91,8 +91,10 @@ export function usePrizesState() {
     managingCampaign: null,
     /** @type {Array} 按档位分组的奖品列表 */
     campaignPrizeGroups: [],
-    /** @type {Array} 风险警告列表 */
+    /** @type {Array} 风险警告列表（不阻止操作） */
     campaignPrizeWarnings: [],
+    /** @type {Array} 阻断性错误列表（阻止发布） */
+    campaignPrizeErrors: [],
     /** @type {boolean} 排序模式开关 */
     prizeManagerSortMode: false,
     /** @type {Array} 批量库存调整项目 */
@@ -294,9 +296,8 @@ export function usePrizesMethods() {
         lottery_prize_id: p.lottery_prize_id,
         prize_name: p.prize_name,
         win_weight: p.win_weight || 0,
-        tier_percentage: totalWeight > 0
-          ? parseFloat((((p.win_weight || 0) / totalWeight) * 100).toFixed(2))
-          : 0,
+        tier_percentage:
+          totalWeight > 0 ? parseFloat((((p.win_weight || 0) / totalWeight) * 100).toFixed(2)) : 0,
         stock_quantity: p.stock_quantity || 0,
         remaining_quantity: Math.max(0, (p.stock_quantity || 0) - (p.total_win_count || 0))
       }))
@@ -371,19 +372,21 @@ export function usePrizesMethods() {
           // 编辑模式：使用PUT更新单个奖品
           // 中奖概率：前端表单是百分比(0-100)，后端需要小数(0-1)
           const winProbability = (this.prizeForm.win_probability || 0) / 100
-          const url = buildURL(LOTTERY_ENDPOINTS.PRIZE_UPDATE, { prize_id: this.editingLotteryPrizeId })
+          const url = buildURL(LOTTERY_ENDPOINTS.PRIZE_UPDATE, {
+            prize_id: this.editingLotteryPrizeId
+          })
           const updateData = {
-              prize_name: this.prizeForm.prize_name,
-              prize_type: this.prizeForm.prize_type,
-              win_probability: winProbability,
-              stock_quantity: this.prizeForm.stock_quantity,
-              status: this.prizeForm.status,
-              image_resource_id: this.prizeForm.image_resource_id,
-              prize_description: this.prizeForm.prize_description,
-              rarity_code: this.prizeForm.rarity_code || 'common',
-              win_weight: parseInt(this.prizeForm.win_weight) || 100000,
-              reward_tier: this.prizeForm.reward_tier || 'low'
-            }
+            prize_name: this.prizeForm.prize_name,
+            prize_type: this.prizeForm.prize_type,
+            win_probability: winProbability,
+            stock_quantity: this.prizeForm.stock_quantity,
+            status: this.prizeForm.status,
+            image_resource_id: this.prizeForm.image_resource_id,
+            prize_description: this.prizeForm.prize_description,
+            rarity_code: this.prizeForm.rarity_code || 'common',
+            win_weight: parseInt(this.prizeForm.win_weight) || 100000,
+            reward_tier: this.prizeForm.reward_tier || 'low'
+          }
           // 编辑模式下保留原有 sort_order（来自后端数据）
           if (this.prizeForm.sort_order !== undefined) {
             updateData.sort_order = parseInt(this.prizeForm.sort_order)
@@ -606,6 +609,7 @@ export function usePrizesMethods() {
       this.managingCampaign = null
       this.campaignPrizeGroups = []
       this.campaignPrizeWarnings = []
+      this.campaignPrizeErrors = []
     },
 
     /**
@@ -641,11 +645,13 @@ export function usePrizesMethods() {
      * 3. low 档非 fallback 奖品至少一个 prize_value_points > 0（避免阈值回退）
      * 4. D13: 奖品总数匹配 display_mode 格位数
      *
-     * 不合规时在 campaignPrizeWarnings 中追加警告，不阻塞操作
+     * D11 fallback 数量、D13 格位精确匹配 → campaignPrizeErrors（阻止发布）
+     * 权重偏差、灵活格位范围、low 档预算 → campaignPrizeWarnings（仅提示）
      */
     validateTierWeights() {
       const WEIGHT_SCALE = 1000000
       const tierLabels = { high: '高档位 (high)', mid: '中档位 (mid)', low: '低档位 (low)' }
+      this.campaignPrizeErrors = []
 
       const allActivePrizes = []
 
@@ -659,7 +665,8 @@ export function usePrizesMethods() {
 
         if (totalWeight !== WEIGHT_SCALE) {
           const diff = totalWeight - WEIGHT_SCALE
-          const diffText = diff > 0 ? `超出 ${diff.toLocaleString()}` : `不足 ${Math.abs(diff).toLocaleString()}`
+          const diffText =
+            diff > 0 ? `超出 ${diff.toLocaleString()}` : `不足 ${Math.abs(diff).toLocaleString()}`
           const warning = `⚠️ ${tierName} 权重总和 ${totalWeight.toLocaleString()} ≠ ${WEIGHT_SCALE.toLocaleString()}（${diffText}），请调整后再上线活动`
 
           if (!this.campaignPrizeWarnings.includes(warning)) {
@@ -669,14 +676,15 @@ export function usePrizesMethods() {
         }
       })
 
-      // D11: fallback 数量校验（严格 1 个）
+      // D11: fallback 数量校验 → 升级为 error（阻止发布）
       const fallbackPrizes = allActivePrizes.filter(p => p.is_fallback)
       if (fallbackPrizes.length !== 1) {
-        const warning = `🚨 Fallback（保底）奖品必须恰好 1 个，当前 ${fallbackPrizes.length} 个。` +
-          (fallbackPrizes.length === 0 ? '缺少保底奖品会导致极端情况下抽奖失败' : '多个保底奖品增加运营复杂度且无额外安全性')
-        if (!this.campaignPrizeWarnings.includes(warning)) {
-          this.campaignPrizeWarnings.push(warning)
-        }
+        const errMsg =
+          `❌ Fallback（保底）奖品必须恰好 1 个，当前 ${fallbackPrizes.length} 个。` +
+          (fallbackPrizes.length === 0
+            ? '缺少保底奖品会导致极端情况下抽奖失败'
+            : '多个保底奖品增加运营复杂度且无额外安全性')
+        this.campaignPrizeErrors.push(errMsg)
       }
 
       // low 档 prize_value_points 校验
@@ -685,10 +693,12 @@ export function usePrizesMethods() {
         const lowNonFallback = (lowGroup.prizes || []).filter(
           p => p.status === 'active' && !p.is_fallback
         )
-        const allZeroPvp = lowNonFallback.length > 0 &&
+        const allZeroPvp =
+          lowNonFallback.length > 0 &&
           lowNonFallback.every(p => !p.prize_value_points || parseInt(p.prize_value_points) === 0)
         if (allZeroPvp) {
-          const warning = '🚨 低档位（low）非保底奖品的预算价值全部为 0，会导致动态阈值异常回退。' +
+          const warning =
+            '🚨 低档位（low）非保底奖品的预算价值全部为 0，会导致动态阈值异常回退。' +
             '至少一个非保底奖品的预算价值应 > 0'
           if (!this.campaignPrizeWarnings.includes(warning)) {
             this.campaignPrizeWarnings.push(warning)
@@ -711,10 +721,9 @@ export function usePrizesMethods() {
         if (FIXED_SLOTS[display_mode]) {
           const expected = FIXED_SLOTS[display_mode]
           if (prizeCount !== expected) {
-            const warning = `⚠️ ${display_mode} 玩法需要恰好 ${expected} 个奖品，当前 ${prizeCount} 个`
-            if (!this.campaignPrizeWarnings.includes(warning)) {
-              this.campaignPrizeWarnings.push(warning)
-            }
+            // 固定格位 → error 阻止发布
+            const errMsg = `❌ ${display_mode} 玩法需要恰好 ${expected} 个奖品，当前 ${prizeCount} 个`
+            this.campaignPrizeErrors.push(errMsg)
           }
         } else {
           const range = FLEXIBLE_RANGE[display_mode] || DEFAULT_RANGE
@@ -725,6 +734,62 @@ export function usePrizesMethods() {
             }
           }
         }
+      }
+
+      // W4: 奖品命名负面词校验
+      const NEGATIVE_WORDS = ['谢谢参与', '下次好运', '未中奖', '很遗憾', '再试一次', '安慰']
+      allActivePrizes.forEach(p => {
+        const name = p.prize_name || ''
+        const matched = NEGATIVE_WORDS.filter(w => name.includes(w))
+        if (matched.length > 0) {
+          const warning = `⚠️ 奖品「${name}」包含负面词（${matched.join('、')}），建议使用正向命名`
+          if (!this.campaignPrizeWarnings.includes(warning)) {
+            this.campaignPrizeWarnings.push(warning)
+          }
+        }
+      })
+    },
+
+    /**
+     * 调用后端 validateForLaunch 接口，执行完整的上线前校验
+     * 将后端返回的 errors/warnings 合并到前端展示
+     */
+    async validateForLaunch() {
+      if (!this.managingCampaign?.lottery_campaign_id) {
+        this.showError('请先选择一个活动')
+        return
+      }
+      try {
+        this.saving = true
+        const url = buildURL(LOTTERY_ENDPOINTS.CAMPAIGN_BUDGET_VALIDATE_LAUNCH, {
+          lottery_campaign_id: this.managingCampaign.lottery_campaign_id
+        })
+        const result = await this.apiCall(url, { method: 'POST' })
+
+        this.campaignPrizeErrors = []
+        this.campaignPrizeWarnings = []
+
+        if (result.can_launch) {
+          this.showSuccess('✅ 上线校验全部通过，活动可以安全上线')
+        } else {
+          if (result.errors && result.errors.length > 0) {
+            this.campaignPrizeErrors = result.errors.map(e =>
+              typeof e === 'string' ? `❌ ${e}` : `❌ [${e.code || ''}] ${e.message || e}`
+            )
+          }
+          if (result.warnings && result.warnings.length > 0) {
+            this.campaignPrizeWarnings = result.warnings.map(w =>
+              typeof w === 'string' ? `⚠️ ${w}` : `⚠️ [${w.code || ''}] ${w.message || w}`
+            )
+          }
+          this.showError(
+            `上线校验未通过：${this.campaignPrizeErrors.length} 项错误，${this.campaignPrizeWarnings.length} 项警告`
+          )
+        }
+      } catch (error) {
+        this.showError('上线校验请求失败: ' + (error.message || '未知错误'))
+      } finally {
+        this.saving = false
       }
     },
 
@@ -772,7 +837,9 @@ export function usePrizesMethods() {
         this.saving = true
         if (this.isEditMode) {
           const winProbability = (this.prizeForm.win_probability || 0) / 100
-          const url = buildURL(LOTTERY_ENDPOINTS.PRIZE_UPDATE, { prize_id: this.editingLotteryPrizeId })
+          const url = buildURL(LOTTERY_ENDPOINTS.PRIZE_UPDATE, {
+            prize_id: this.editingLotteryPrizeId
+          })
           const updateData = {
             prize_name: this.prizeForm.prize_name,
             prize_type: this.prizeForm.prize_type,
@@ -807,7 +874,8 @@ export function usePrizesMethods() {
             prize_type: this.prizeForm.prize_type,
             prize_value: parseFloat(this.prizeForm.prize_value) || 0,
             prize_value_points: parseInt(this.prizeForm.prize_value_points) || 0,
-            stock_quantity: this.prizeForm.stock_quantity === -1 ? 999999 : this.prizeForm.stock_quantity,
+            stock_quantity:
+              this.prizeForm.stock_quantity === -1 ? 999999 : this.prizeForm.stock_quantity,
             prize_description: this.prizeForm.prize_description,
             rarity_code: this.prizeForm.rarity_code || 'common',
             win_weight: parseInt(this.prizeForm.win_weight) || 100000,
@@ -824,7 +892,9 @@ export function usePrizesMethods() {
             addData.image_resource_id = this.prizeForm.image_resource_id
           }
           await this.apiCall(
-            buildURL(LOTTERY_ENDPOINTS.PRIZE_ADD_TO_CAMPAIGN, { code: this.managingCampaign.campaign_code }),
+            buildURL(LOTTERY_ENDPOINTS.PRIZE_ADD_TO_CAMPAIGN, {
+              code: this.managingCampaign.campaign_code
+            }),
             { method: 'POST', data: addData }
           )
         }
@@ -941,7 +1011,9 @@ export function usePrizesMethods() {
       if (!this.managingCampaign?.campaign_code || !prizeOrders?.length) return
       try {
         await this.apiCall(
-          buildURL(LOTTERY_ENDPOINTS.PRIZE_SORT_ORDER, { code: this.managingCampaign.campaign_code }),
+          buildURL(LOTTERY_ENDPOINTS.PRIZE_SORT_ORDER, {
+            code: this.managingCampaign.campaign_code
+          }),
           { method: 'PUT', data: { updates: prizeOrders } }
         )
         this.showSuccess('排序已保存')
@@ -956,8 +1028,14 @@ export function usePrizesMethods() {
       if (prizeIndex <= 0) return
       const prizes = group.prizes
       const updates = [
-        { lottery_prize_id: prizes[prizeIndex].lottery_prize_id, sort_order: prizes[prizeIndex - 1].sort_order },
-        { lottery_prize_id: prizes[prizeIndex - 1].lottery_prize_id, sort_order: prizes[prizeIndex].sort_order }
+        {
+          lottery_prize_id: prizes[prizeIndex].lottery_prize_id,
+          sort_order: prizes[prizeIndex - 1].sort_order
+        },
+        {
+          lottery_prize_id: prizes[prizeIndex - 1].lottery_prize_id,
+          sort_order: prizes[prizeIndex].sort_order
+        }
       ]
       await this.savePrizeSortOrder(updates)
     },
@@ -967,8 +1045,14 @@ export function usePrizesMethods() {
       if (prizeIndex >= group.prizes.length - 1) return
       const prizes = group.prizes
       const updates = [
-        { lottery_prize_id: prizes[prizeIndex].lottery_prize_id, sort_order: prizes[prizeIndex + 1].sort_order },
-        { lottery_prize_id: prizes[prizeIndex + 1].lottery_prize_id, sort_order: prizes[prizeIndex].sort_order }
+        {
+          lottery_prize_id: prizes[prizeIndex].lottery_prize_id,
+          sort_order: prizes[prizeIndex + 1].sort_order
+        },
+        {
+          lottery_prize_id: prizes[prizeIndex + 1].lottery_prize_id,
+          sort_order: prizes[prizeIndex].sort_order
+        }
       ]
       await this.savePrizeSortOrder(updates)
     },
@@ -985,7 +1069,7 @@ export function usePrizesMethods() {
         handle: 'tr',
         ghostClass: 'bg-blue-50',
         chosenClass: 'opacity-70',
-        onEnd: async (evt) => {
+        onEnd: async evt => {
           if (evt.oldIndex === evt.newIndex) return
           const rows = el.querySelectorAll('tr[data-prize-id]')
           const updates = Array.from(rows).map((row, idx) => ({
@@ -1024,7 +1108,9 @@ export function usePrizesMethods() {
 
     /** 提交批量库存更新 */
     async submitBatchStock() {
-      const selectedItems = this.batchStockItems.filter(item => item.new_stock !== item.current_stock)
+      const selectedItems = this.batchStockItems.filter(
+        item => item.new_stock !== item.current_stock
+      )
       if (selectedItems.length === 0) {
         this.showError('没有检测到库存变更，请修改至少一个奖品的库存')
         return
@@ -1032,7 +1118,9 @@ export function usePrizesMethods() {
       try {
         this.saving = true
         await this.apiCall(
-          buildURL(LOTTERY_ENDPOINTS.PRIZE_BATCH_STOCK, { code: this.managingCampaign.campaign_code }),
+          buildURL(LOTTERY_ENDPOINTS.PRIZE_BATCH_STOCK, {
+            code: this.managingCampaign.campaign_code
+          }),
           {
             method: 'PUT',
             data: {
@@ -1105,14 +1193,14 @@ export function usePrizesMethods() {
      */
     addBatchPrizeSlot() {
       this.batchPrizes.push({
-          prize_name: '',
-          prize_type: 'virtual',
-          win_probability: 0,
-          stock_quantity: 100,
-          prize_description: '',
-          rarity_code: 'common'
-          // sort_order 不设置，由后端自动分配
-        })
+        prize_name: '',
+        prize_type: 'virtual',
+        win_probability: 0,
+        stock_quantity: 100,
+        prize_description: '',
+        rarity_code: 'common'
+        // sort_order 不设置，由后端自动分配
+      })
     },
 
     /**
@@ -1193,7 +1281,7 @@ export function usePrizesMethods() {
 
         // 直接使用后端字段名，无需映射
         // sort_order 不传，由后端自动分配唯一递增值（避免 SORT_ORDER_DUPLICATE 错误）
-        const prizesData = this.batchPrizes.map((prize) => ({
+        const prizesData = this.batchPrizes.map(prize => ({
           prize_name: prize.prize_name.trim(),
           prize_type: prize.prize_type,
           win_probability: parseFloat(prize.win_probability) || 0,

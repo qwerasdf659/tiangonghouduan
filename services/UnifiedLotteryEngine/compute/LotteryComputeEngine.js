@@ -53,7 +53,7 @@ const {
   BUDGET_TIER_CONFIG,
   BUDGET_TIER_AVAILABILITY,
   PRESSURE_TIER_CONFIG,
-  TIER_MATRIX_CONFIG,
+  PRESSURE_MATRIX_FALLBACK: _PRESSURE_MATRIX_FALLBACK, // Pressure-Only 静态兜底
   PITY_CONFIG: _PITY_CONFIG, // 预留供未来计算器使用
   LUCK_DEBT_CONFIG: _LUCK_DEBT_CONFIG, // 预留供运气债务计算使用
   ANTI_EMPTY_CONFIG: _ANTI_EMPTY_CONFIG, // 预留供防连续空奖处理使用
@@ -63,13 +63,14 @@ const {
 } = require('./config/ComputeConfig')
 
 /**
- * 预算档位定义（B0-B3）
+ * 预算档位定义（B0-B3）— 仅用于监控/诊断/报表，不参与概率决策
  *
- * 基于 StrategyConfig.BUDGET_TIER_CONFIG 动态生成
- * - B0: effective_budget < threshold_low（仅 fallback）
- * - B1: threshold_low <= effective_budget < threshold_mid
- * - B2: threshold_mid <= effective_budget < threshold_high
- * - B3: effective_budget >= threshold_high
+ * 2026-03-04 架构重构：Budget Tier 降级为纯监控指标。
+ * 资格控制由 BuildPrizePoolStage._filterByResourceEligibility 唯一负责，
+ * 概率调整只保留 Pressure Tier 维度。
+ *
+ * allowed_tiers 字段仅作为监控参考元数据，描述该预算层级理论上可触达的档位。
+ * 实际用户能抽到哪些奖品，完全由资源级过滤（DIAMOND_QUOTA / BUDGET_POINTS）决定。
  *
  * @type {Object<string, {min: number, max: number, description: string, allowed_tiers: string[]}>}
  */
@@ -77,25 +78,25 @@ const BUDGET_TIERS = {
   B0: {
     min: 0,
     max: BUDGET_TIER_CONFIG.threshold_low - 1,
-    description: '无预算（只能抽空奖）',
+    description: '无预算（仅监控标识，资格由资源级过滤决定）',
     allowed_tiers: BUDGET_TIER_AVAILABILITY.B0
   },
   B1: {
     min: BUDGET_TIER_CONFIG.threshold_low,
     max: BUDGET_TIER_CONFIG.threshold_mid - 1,
-    description: `低预算（${BUDGET_TIER_CONFIG.threshold_low}-${BUDGET_TIER_CONFIG.threshold_mid - 1}分）`,
+    description: `低预算（${BUDGET_TIER_CONFIG.threshold_low}-${BUDGET_TIER_CONFIG.threshold_mid - 1}分，仅监控标识）`,
     allowed_tiers: BUDGET_TIER_AVAILABILITY.B1
   },
   B2: {
     min: BUDGET_TIER_CONFIG.threshold_mid,
     max: BUDGET_TIER_CONFIG.threshold_high - 1,
-    description: `中预算（${BUDGET_TIER_CONFIG.threshold_mid}-${BUDGET_TIER_CONFIG.threshold_high - 1}分）`,
+    description: `中预算（${BUDGET_TIER_CONFIG.threshold_mid}-${BUDGET_TIER_CONFIG.threshold_high - 1}分，仅监控标识）`,
     allowed_tiers: BUDGET_TIER_AVAILABILITY.B2
   },
   B3: {
     min: BUDGET_TIER_CONFIG.threshold_high,
     max: Infinity,
-    description: `高预算（>=${BUDGET_TIER_CONFIG.threshold_high}分）`,
+    description: `高预算（>=${BUDGET_TIER_CONFIG.threshold_high}分，仅监控标识）`,
     allowed_tiers: BUDGET_TIER_AVAILABILITY.B3
   }
 }
@@ -169,23 +170,21 @@ class LotteryComputeEngine {
     this.pressureTierCalculator = new PressureTierCalculator(
       options.pressure_tier_config || PRESSURE_TIER_CONFIG
     )
-    this.tierMatrixCalculator = new TierMatrixCalculator(
-      options.tier_matrix_config || TIER_MATRIX_CONFIG
-    )
+    this.tierMatrixCalculator = new TierMatrixCalculator(options.tier_matrix_config || {})
 
-    /* Phase 9-12 新增计算器实例 */
-    this.pityCalculator = new PityCalculator(
-      options.pity_config ? { pity_config: options.pity_config } : {}
-    )
-    this.luckDebtCalculator = new LuckDebtCalculator(
-      options.luck_debt_config ? { luck_debt_config: options.luck_debt_config } : {}
-    )
-    this.antiEmptyHandler = new AntiEmptyStreakHandler(
-      options.anti_empty_config ? { anti_empty_config: options.anti_empty_config } : {}
-    )
-    this.antiHighHandler = new AntiHighStreakHandler(
-      options.anti_high_config ? { anti_high_config: options.anti_high_config } : {}
-    )
+    /* Phase 9-12 新增计算器实例（始终传入 ComputeConfig 静态配置作为默认值） */
+    this.pityCalculator = new PityCalculator({
+      pity_config: options.pity_config || _PITY_CONFIG
+    })
+    this.luckDebtCalculator = new LuckDebtCalculator({
+      luck_debt_config: options.luck_debt_config || _LUCK_DEBT_CONFIG
+    })
+    this.antiEmptyHandler = new AntiEmptyStreakHandler({
+      anti_empty_config: options.anti_empty_config || _ANTI_EMPTY_CONFIG
+    })
+    this.antiHighHandler = new AntiHighStreakHandler({
+      anti_high_config: options.anti_high_config || _ANTI_HIGH_CONFIG
+    })
 
     /* Phase 15 状态管理器实例 */
     this.experienceStateManager = new ExperienceStateManager()
@@ -310,53 +309,43 @@ class LotteryComputeEngine {
   // ========== 核心接口：权重调整计算 ==========
 
   /**
-   * 计算档位权重调整
+   * 计算档位权重调整（Pressure-Only）
    *
-   * 集成点：BuildPrizePoolStage / TierPickStage
+   * 集成点：TierPickStage
    *
-   * 基于 BxPx 矩阵计算档位权重调整乘数
-   * 使用 TierMatrixCalculator 进行完整的矩阵计算
+   * 基于 Pressure Tier 矩阵计算档位权重调整乘数。
+   * 2026-03-04 架构重构：去掉 budget_tier 参数，只保留 pressure_tier。
    *
    * @param {Object} params - 参数对象
-   * @param {string} params.budget_tier - 预算档位（B0-B3）
    * @param {string} params.pressure_tier - 压力档位（P0-P2）
    * @param {Object} params.base_tier_weights - 基础档位权重（来自 segment 配置）
    * @returns {Object} 调整后的权重配置
    */
   computeWeightAdjustment(params) {
-    const { budget_tier, pressure_tier, base_tier_weights } = params
+    const { pressure_tier, base_tier_weights } = params
 
     this._log('debug', '开始计算权重调整', {
-      budget_tier,
       pressure_tier
     })
 
-    // 使用 TierMatrixCalculator 进行完整的矩阵计算
     const matrix_result = this.tierMatrixCalculator.calculate({
-      budget_tier,
       pressure_tier,
       base_weights: base_tier_weights
     })
 
-    /* 权重调整结果 */
     const result = {
       adjusted_weights: matrix_result.final_weights,
       original_weights: base_tier_weights,
-      budget_tier,
       pressure_tier,
-      // 完整的矩阵计算结果
       matrix_result: {
         multipliers: matrix_result.multipliers,
-        available_tiers: matrix_result.available_tiers,
         matrix_key: matrix_result.matrix_key
       }
     }
 
     this._log('info', '权重调整计算完成', {
-      budget_tier,
       pressure_tier,
-      matrix_key: matrix_result.matrix_key,
-      available_tiers: matrix_result.available_tiers
+      matrix_key: matrix_result.matrix_key
     })
 
     return result
@@ -888,28 +877,15 @@ class LotteryComputeEngine {
   // ========== 内部方法：矩阵乘数 ==========
 
   /**
-   * 获取 BxPx 矩阵乘数
+   * 获取 Pressure-Only 矩阵空奖乘数
    *
-   * @param {string} budget_tier - 预算档位
-   * @param {string} pressure_tier - 压力档位
+   * @param {string} pressure_tier - 压力档位（P0/P1/P2）
    * @returns {number} 空奖权重乘数
    * @private
    */
-  _getMatrixMultiplier(budget_tier, pressure_tier) {
-    // 使用 TIER_MATRIX_CONFIG 获取 empty_weight_multiplier
-    const tier_config = TIER_MATRIX_CONFIG[budget_tier]
-    if (!tier_config) {
-      this._log('warn', '未知的 budget_tier，使用默认乘数', { budget_tier })
-      return 1.0
-    }
-
-    const pressure_config = tier_config[pressure_tier]
-    if (!pressure_config || pressure_config.empty_weight_multiplier === undefined) {
-      this._log('warn', '未知的 pressure_tier，使用默认乘数', { pressure_tier })
-      return 1.0
-    }
-
-    return pressure_config.empty_weight_multiplier
+  _getMatrixMultiplier(pressure_tier) {
+    const multipliers = this.tierMatrixCalculator._getMatrixMultipliers(pressure_tier)
+    return multipliers.empty || 1.0
   }
 
   // ========== 内部方法：Pity 系统 ==========
@@ -986,7 +962,7 @@ class LotteryComputeEngine {
       options: this.options,
       budget_tiers: BUDGET_TIERS,
       pressure_tiers: PRESSURE_TIERS,
-      matrix: TIER_MATRIX_CONFIG,
+      matrix: TierMatrixCalculator.DEFAULT_MATRIX,
       grayscale_summary: getGrayscaleSummary() // Phase P2：灰度配置摘要
     }
   }
@@ -1004,4 +980,4 @@ class LotteryComputeEngine {
 module.exports = LotteryComputeEngine
 module.exports.BUDGET_TIERS = BUDGET_TIERS
 module.exports.PRESSURE_TIERS = PRESSURE_TIERS
-module.exports.TIER_MATRIX_CONFIG = TIER_MATRIX_CONFIG
+module.exports.PRESSURE_MATRIX = TierMatrixCalculator.DEFAULT_MATRIX

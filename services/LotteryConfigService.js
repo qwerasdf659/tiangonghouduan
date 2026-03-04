@@ -430,9 +430,9 @@ class LotteryConfigService {
   }
 
   /**
-   * 获取完整的BxPx矩阵
+   * 获取完整的 Pressure-Only 矩阵
    *
-   * @returns {Promise<Object>} 矩阵配置对象
+   * @returns {Promise<Object>} 矩阵配置对象 { P0: {...}, P1: {...}, P2: {...} }
    */
   async getFullMatrix() {
     try {
@@ -473,18 +473,17 @@ class LotteryConfigService {
   }
 
   /**
-   * 获取特定BxPx组合的配置
+   * 获取特定 Pressure Tier 的矩阵配置（Pressure-Only 模式）
    *
-   * @param {string} budget_tier - Budget Tier（B0/B1/B2/B3）
    * @param {string} pressure_tier - Pressure Tier（P0/P1/P2）
-   * @returns {Promise<Object>} 配置对象
+   * @returns {Promise<Object>} 配置对象（全部 6 个乘数字段）
    */
-  async getMatrixValue(budget_tier, pressure_tier) {
+  async getMatrixValue(pressure_tier) {
     try {
-      const config = await this.LotteryTierMatrixConfig.getMatrixValue(budget_tier, pressure_tier)
+      const config = await this.LotteryTierMatrixConfig.getMatrixValue(pressure_tier)
 
       if (!config) {
-        const error = new Error(`矩阵配置 ${budget_tier}x${pressure_tier} 不存在`)
+        const error = new Error(`矩阵配置 ${pressure_tier} 不存在`)
         error.status = 404
         error.code = 'MATRIX_CONFIG_NOT_FOUND'
         throw error
@@ -492,7 +491,7 @@ class LotteryConfigService {
 
       return config
     } catch (error) {
-      logger.error(`获取矩阵配置[${budget_tier}x${pressure_tier}]失败:`, error)
+      logger.error(`获取矩阵配置[${pressure_tier}]失败:`, error)
       throw error
     }
   }
@@ -515,10 +514,23 @@ class LotteryConfigService {
     const { transaction } = options
 
     try {
-      const { budget_tier, pressure_tier, cap_multiplier, empty_weight_multiplier, description } =
-        data
+      const {
+        pressure_tier,
+        cap_multiplier,
+        empty_weight_multiplier,
+        high_multiplier,
+        mid_multiplier,
+        low_multiplier,
+        fallback_multiplier,
+        description
+      } = data
 
-      // 检查唯一性约束
+      /*
+       * Pressure-Only 模式：budget_tier 固定 'ALL'
+       * 2026-03-04 架构重构后不再接受外部指定 budget_tier
+       */
+      const budget_tier = 'ALL'
+
       const existing = await this.LotteryTierMatrixConfig.findOne({
         where: { budget_tier, pressure_tier },
         transaction
@@ -535,8 +547,12 @@ class LotteryConfigService {
         {
           budget_tier,
           pressure_tier,
-          cap_multiplier,
-          empty_weight_multiplier,
+          cap_multiplier: cap_multiplier ?? 1.0,
+          empty_weight_multiplier: empty_weight_multiplier ?? 1.0,
+          high_multiplier: high_multiplier ?? 1.0,
+          mid_multiplier: mid_multiplier ?? 1.0,
+          low_multiplier: low_multiplier ?? 1.0,
+          fallback_multiplier: fallback_multiplier ?? 1.0,
           description,
           is_active: true,
           created_by: admin_id,
@@ -546,7 +562,7 @@ class LotteryConfigService {
       )
 
       logger.info(`管理员 ${admin_id} 创建矩阵配置成功`, {
-        matrix_config_id: newConfig.matrix_config_id,
+        matrix_config_id: newConfig.lottery_tier_matrix_config_id,
         budget_tier,
         pressure_tier
       })

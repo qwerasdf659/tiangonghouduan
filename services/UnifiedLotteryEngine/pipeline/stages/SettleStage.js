@@ -856,6 +856,16 @@ class SettleStage extends BaseStage {
         downgrade_count: Math.max(0, (tier_pick_data.tier_downgrade_path?.length || 1) - 1),
         fallback_triggered:
           final_tier === 'fallback' && tier_pick_data.original_tier !== 'fallback',
+        /**
+         * 2026-03-04 架构重构：写入 budget_tier 和 pressure_tier 到 result_metadata
+         * budget_tier 降级为纯监控指标，通过 result_metadata 支持运营报表和日志追踪
+         */
+        result_metadata: {
+          budget_tier: budget_data?.budget_tier || null,
+          pressure_tier: budget_data?.pressure_tier || tier_pick_data?.pressure_tier || null,
+          effective_budget: budget_data?.effective_budget || 0,
+          weight_adjustment: tier_pick_data?.weight_adjustment || null
+        },
         created_at: BeijingTimeHelper.createBeijingTime()
       },
       { transaction }

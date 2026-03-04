@@ -1,26 +1,27 @@
 'use strict'
 
 /**
- * LotteryTierMatrixConfig 模型 - BxPx矩阵配置表
+ * LotteryTierMatrixConfig 模型 - Pressure-Only 矩阵配置表
  *
- * 存储 Budget Tier × Pressure Tier 组合的乘数配置：
+ * 存储 Pressure Tier 维度的乘数配置（budget_tier 固定为 'ALL'）：
  * - cap_multiplier: 预算上限乘数（控制单次抽奖最大消耗）
  * - empty_weight_multiplier: 空奖权重乘数（<1抑制空奖，>1增强空奖）
+ * - high_multiplier: high 档位权重乘数
+ * - mid_multiplier: mid 档位权重乘数
+ * - low_multiplier: low 档位权重乘数
+ * - fallback_multiplier: fallback 档位权重乘数
  *
- * 矩阵说明（12种组合）：
- * +------+------+------+------+
- * |      | P0   | P1   | P2   |
- * +------+------+------+------+
- * | B0   | 全空 | 全空 | 全空 |  <- 预算不足，强制空奖
- * | B1   | 略增 | 正常 | 抑制 |  <- 低预算档位
- * | B2   | 正常 | 略抑 | 抑制 |  <- 中预算档位
- * | B3   | 抑制 | 显抑 | 强抑 |  <- 高预算档位
- * +------+------+------+------+
+ * 矩阵说明（Pressure-Only，3 种组合）：
+ * +------+--------+--------+--------+
+ * |      | P0     | P1     | P2     |
+ * +------+--------+--------+--------+
+ * | ALL  | 略提高 | 正常   | 压低高 |  <- 不区分 Budget Tier
+ * +------+--------+--------+--------+
  *
- * 使用场景：
- * - 根据用户预算和活动压力动态调整奖品分布
- * - 运营人员可通过后台调整矩阵参数
- * - 支持 A/B 测试不同的策略配置
+ * 架构重构说明（2026-03-04）：
+ * Budget Tier 降级为纯监控指标，不再参与概率决策。
+ * 概率调整只保留 Pressure Tier 维度（活动消耗压力）。
+ * 资格控制由 BuildPrizePoolStage._filterByResourceEligibility 唯一负责。
  *
  * @module models/LotteryTierMatrixConfig
  * @author 抽奖模块策略引擎
@@ -31,7 +32,7 @@ const { Model } = require('sequelize')
 
 module.exports = (sequelize, DataTypes) => {
   /**
-   * BxPx矩阵配置模型类
+   * Pressure-Only 矩阵配置模型类
    *
    * @class LotteryTierMatrixConfig
    * @extends Model
@@ -70,47 +71,39 @@ module.exports = (sequelize, DataTypes) => {
     /* ========== 静态查询方法 ========== */
 
     /**
-     * 获取完整的矩阵配置
+     * 获取完整的 Pressure-Only 矩阵配置
+     *
+     * 返回以 pressure_tier 为键的扁平结构（不再有 budget_tier 嵌套）。
      *
      * @param {number} [lottery_campaign_id] - 活动ID（可选）
      * @returns {Promise<Object>} 矩阵配置对象
      *
      * @example
-     * const matrix = await LotteryTierMatrixConfig.getFullMatrix()
+     * const matrix = await LotteryTierMatrixConfig.getFullMatrix(1)
      * // 返回: {
-     * //   B0: { P0: { cap: 0, empty: 10.0 }, P1: {...}, P2: {...} },
-     * //   B1: { P0: {...}, P1: {...}, P2: {...} },
-     * //   B2: { P0: {...}, P1: {...}, P2: {...} },
-     * //   B3: { P0: {...}, P1: {...}, P2: {...} }
+     * //   P0: { cap_multiplier: 1.0, empty_weight_multiplier: 1.0, high_multiplier: 1.3, ... },
+     * //   P1: { ... },
+     * //   P2: { ... }
      * // }
      */
     static async getFullMatrix(lottery_campaign_id) {
-      const where = { is_active: true }
+      const where = { is_active: true, budget_tier: 'ALL' }
       if (lottery_campaign_id) {
         where.lottery_campaign_id = lottery_campaign_id
       }
       const configs = await this.findAll({
         where,
-        order: [
-          ['budget_tier', 'ASC'],
-          ['pressure_tier', 'ASC']
-        ]
+        order: [['pressure_tier', 'ASC']]
       })
 
       const matrix = {}
 
       for (const config of configs) {
-        const bt = config.budget_tier
         const pt = config.pressure_tier
 
-        if (!matrix[bt]) {
-          matrix[bt] = {}
-        }
-
-        matrix[bt][pt] = {
+        matrix[pt] = {
           cap_multiplier: parseFloat(config.cap_multiplier),
           empty_weight_multiplier: parseFloat(config.empty_weight_multiplier),
-          // 新增档位权重字段（P0修复 - 2026-01-30）
           high_multiplier: parseFloat(config.high_multiplier),
           mid_multiplier: parseFloat(config.mid_multiplier),
           low_multiplier: parseFloat(config.low_multiplier),
@@ -122,20 +115,19 @@ module.exports = (sequelize, DataTypes) => {
     }
 
     /**
-     * 获取特定组合的配置
+     * 获取特定 Pressure Tier 的配置（budget_tier 固定 'ALL'）
      *
-     * @param {string} budget_tier - Budget Tier（B0/B1/B2/B3）
      * @param {string} pressure_tier - Pressure Tier（P0/P1/P2）
      * @returns {Promise<Object|null>} 配置对象或null
      *
      * @example
-     * const config = await LotteryTierMatrixConfig.getMatrixValue('B2', 'P1')
-     * // 返回: { cap_multiplier: 1.0, empty_weight_multiplier: 0.9 }
+     * const config = await LotteryTierMatrixConfig.getMatrixValue('P1')
+     * // 返回: { cap_multiplier: 1.0, empty_weight_multiplier: 1.0, high_multiplier: 1.0, ... }
      */
-    static async getMatrixValue(budget_tier, pressure_tier) {
+    static async getMatrixValue(pressure_tier) {
       const config = await this.findOne({
         where: {
-          budget_tier,
+          budget_tier: 'ALL',
           pressure_tier,
           is_active: true
         }
@@ -148,7 +140,6 @@ module.exports = (sequelize, DataTypes) => {
       return {
         cap_multiplier: parseFloat(config.cap_multiplier),
         empty_weight_multiplier: parseFloat(config.empty_weight_multiplier),
-        // 新增档位权重字段（P0修复 - 2026-01-30）
         high_multiplier: parseFloat(config.high_multiplier),
         mid_multiplier: parseFloat(config.mid_multiplier),
         low_multiplier: parseFloat(config.low_multiplier),
@@ -157,86 +148,57 @@ module.exports = (sequelize, DataTypes) => {
     }
 
     /**
-     * 批量更新矩阵配置
+     * 批量更新矩阵配置（全部 6 个乘数字段）
      *
-     * @param {Object} matrix_data - 矩阵数据对象
+     * 入参格式为 Pressure-Only 结构：{ P0: {...}, P1: {...}, P2: {...} }
+     * 每个 P 对象包含全部 6 字段：cap/empty/high/mid/low/fallback_multiplier
+     *
+     * @param {Object} matrix_data - 矩阵数据对象（以 pressure_tier 为键）
      * @param {number} updated_by - 更新人ID
      * @param {Object} options - 额外选项
      * @returns {Promise<number>} 更新的记录数
      *
      * @example
      * await LotteryTierMatrixConfig.updateMatrix({
-     *   B2: {
-     *     P1: { cap_multiplier: 1.0, empty_weight_multiplier: 0.85 }
+     *   P1: {
+     *     cap_multiplier: 1.0, empty_weight_multiplier: 1.0,
+     *     high_multiplier: 1.0, mid_multiplier: 1.0,
+     *     low_multiplier: 1.0, fallback_multiplier: 1.0
      *   }
      * }, admin_id)
      */
     static async updateMatrix(matrix_data, updated_by, options = {}) {
       const { transaction } = options
 
-      // 构建所有更新操作的 Promise 数组（避免 await-in-loop 警告）
       const update_promises = []
 
-      for (const [budget_tier, pressure_configs] of Object.entries(matrix_data)) {
-        for (const [pressure_tier, values] of Object.entries(pressure_configs)) {
-          // 将每个更新操作添加到 Promise 数组
-          update_promises.push(
-            this.update(
-              {
-                cap_multiplier: values.cap_multiplier,
-                empty_weight_multiplier: values.empty_weight_multiplier,
-                updated_by
+      for (const [pressure_tier, values] of Object.entries(matrix_data)) {
+        update_promises.push(
+          this.update(
+            {
+              cap_multiplier: values.cap_multiplier,
+              empty_weight_multiplier: values.empty_weight_multiplier,
+              high_multiplier: values.high_multiplier,
+              mid_multiplier: values.mid_multiplier,
+              low_multiplier: values.low_multiplier,
+              fallback_multiplier: values.fallback_multiplier,
+              updated_by
+            },
+            {
+              where: {
+                budget_tier: 'ALL',
+                pressure_tier
               },
-              {
-                where: {
-                  budget_tier,
-                  pressure_tier
-                },
-                transaction
-              }
-            )
+              transaction
+            }
           )
-        }
+        )
       }
 
-      // 并行执行所有更新操作
       const results = await Promise.all(update_promises)
-
-      // 计算总更新数量（每个 result 是 [rows_affected] 数组）
       const updated_count = results.reduce((sum, [rows_affected]) => sum + rows_affected, 0)
 
       return updated_count
-    }
-
-    /**
-     * 获取指定 Budget Tier 的所有配置
-     *
-     * @param {string} budget_tier - Budget Tier（B0/B1/B2/B3）
-     * @returns {Promise<Object>} 该 Budget Tier 的所有 Pressure Tier 配置
-     */
-    static async getConfigsByBudgetTier(budget_tier) {
-      const configs = await this.findAll({
-        where: {
-          budget_tier,
-          is_active: true
-        },
-        order: [['pressure_tier', 'ASC']]
-      })
-
-      const result = {}
-      for (const config of configs) {
-        result[config.pressure_tier] = {
-          cap_multiplier: parseFloat(config.cap_multiplier),
-          empty_weight_multiplier: parseFloat(config.empty_weight_multiplier),
-          // 新增档位权重字段（P0修复 - 2026-01-30）
-          high_multiplier: parseFloat(config.high_multiplier),
-          mid_multiplier: parseFloat(config.mid_multiplier),
-          low_multiplier: parseFloat(config.low_multiplier),
-          fallback_multiplier: parseFloat(config.fallback_multiplier)
-        }
-      }
-
-      return result
     }
 
     /* ========== 实例方法 ========== */
@@ -285,9 +247,7 @@ module.exports = (sequelize, DataTypes) => {
 
   LotteryTierMatrixConfig.init(
     {
-      /**
-       * 矩阵配置ID（自增主键）
-       */
+      /** 矩阵配置ID（自增主键） */
       lottery_tier_matrix_config_id: {
         type: DataTypes.INTEGER,
         primaryKey: true,
@@ -295,10 +255,7 @@ module.exports = (sequelize, DataTypes) => {
         comment: '矩阵配置ID'
       },
 
-      /**
-       * 关联的抽奖活动ID（支持多活动策略隔离）
-       * 2026-02-20 新增 — 策略模拟分析功能需要按活动隔离矩阵配置
-       */
+      /** 关联的抽奖活动ID（支持多活动策略隔离） */
       lottery_campaign_id: {
         type: DataTypes.INTEGER,
         allowNull: false,
@@ -312,16 +269,16 @@ module.exports = (sequelize, DataTypes) => {
       },
 
       /**
-       * Budget Tier 预算层级
-       * - B0: 预算极低（仅 fallback）
-       * - B1: 预算低（low + fallback）
-       * - B2: 预算中（mid + low + fallback）
-       * - B3: 预算高（all tiers）
+       * Budget Tier 预算层级（Pressure-Only 模式下固定为 'ALL'）
+       *
+       * 2026-03-04 架构重构：budget_tier 降级为纯监控指标，
+       * 新数据固定 'ALL'，保留旧 ENUM 值用于迁移回滚兼容。
        */
       budget_tier: {
-        type: DataTypes.ENUM('B0', 'B1', 'B2', 'B3'),
+        type: DataTypes.ENUM('B0', 'B1', 'B2', 'B3', 'ALL'),
         allowNull: false,
-        comment: 'Budget Tier 预算层级'
+        defaultValue: 'ALL',
+        comment: 'Budget Tier 预算层级（Pressure-Only 模式固定 ALL）'
       },
 
       /**
@@ -338,7 +295,7 @@ module.exports = (sequelize, DataTypes) => {
 
       /**
        * 预算上限乘数
-       * - 0: 强制空奖（用于 B0 场景）
+       * - 0: 强制空奖
        * - 1.0: 正常（可用全部 EffectiveBudget）
        * - < 1.0: 收紧（限制最大消耗）
        */
@@ -347,10 +304,7 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         defaultValue: 1.0,
         comment: '预算上限乘数（0=强制空奖）',
-        /**
-         * 获取预算上限乘数，将DECIMAL转换为浮点数
-         * @returns {number} 预算上限乘数
-         */
+        /** @returns {number} 预算上限乘数 */
         get() {
           const value = this.getDataValue('cap_multiplier')
           return value ? parseFloat(value) : 1.0
@@ -368,10 +322,7 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         defaultValue: 1.0,
         comment: '空奖权重乘数',
-        /**
-         * 获取空奖权重乘数，将DECIMAL转换为浮点数
-         * @returns {number} 空奖权重乘数
-         */
+        /** @returns {number} 空奖权重乘数 */
         get() {
           const value = this.getDataValue('empty_weight_multiplier')
           return value ? parseFloat(value) : 1.0
@@ -379,8 +330,7 @@ module.exports = (sequelize, DataTypes) => {
       },
 
       /**
-       * high档位权重乘数（P0修复新增 - 2026-01-30）
-       * 用于 TierMatrixCalculator 计算档位概率调整
+       * high 档位权重乘数
        * - 0: 不允许该档位
        * - 1.0: 保持原权重
        * - > 1.0: 提高该档位概率
@@ -390,82 +340,60 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         defaultValue: 0.0,
         comment: 'high档位权重乘数',
-        /**
-         * 获取high档位权重乘数，将DECIMAL转换为浮点数
-         * @returns {number} high档位权重乘数
-         */
+        /** @returns {number} high 档位权重乘数 */
         get() {
           const value = this.getDataValue('high_multiplier')
           return value ? parseFloat(value) : 0.0
         }
       },
 
-      /**
-       * mid档位权重乘数（P0修复新增 - 2026-01-30）
-       */
+      /** mid 档位权重乘数 */
       mid_multiplier: {
         type: DataTypes.DECIMAL(5, 2),
         allowNull: false,
         defaultValue: 0.0,
         comment: 'mid档位权重乘数',
-        /**
-         * 获取mid档位权重乘数，将DECIMAL转换为浮点数
-         * @returns {number} mid档位权重乘数
-         */
+        /** @returns {number} mid 档位权重乘数 */
         get() {
           const value = this.getDataValue('mid_multiplier')
           return value ? parseFloat(value) : 0.0
         }
       },
 
-      /**
-       * low档位权重乘数（P0修复新增 - 2026-01-30）
-       */
+      /** low 档位权重乘数 */
       low_multiplier: {
         type: DataTypes.DECIMAL(5, 2),
         allowNull: false,
         defaultValue: 0.0,
         comment: 'low档位权重乘数',
-        /**
-         * 获取low档位权重乘数，将DECIMAL转换为浮点数
-         * @returns {number} low档位权重乘数
-         */
+        /** @returns {number} low 档位权重乘数 */
         get() {
           const value = this.getDataValue('low_multiplier')
           return value ? parseFloat(value) : 0.0
         }
       },
 
-      /**
-       * fallback档位权重乘数（P0修复新增 - 2026-01-30）
-       */
+      /** fallback 档位权重乘数 */
       fallback_multiplier: {
         type: DataTypes.DECIMAL(5, 2),
         allowNull: false,
         defaultValue: 1.0,
         comment: 'fallback档位权重乘数',
-        /**
-         * 获取fallback档位权重乘数，将DECIMAL转换为浮点数
-         * @returns {number} fallback档位权重乘数
-         */
+        /** @returns {number} fallback 档位权重乘数 */
         get() {
           const value = this.getDataValue('fallback_multiplier')
           return value ? parseFloat(value) : 1.0
         }
       },
 
-      /**
-       * 配置描述
-       */
+      /** 配置描述 */
       description: {
         type: DataTypes.STRING(200),
         allowNull: true,
         comment: '配置描述'
       },
 
-      /**
-       * 是否启用
-       */
+      /** 是否启用 */
       is_active: {
         type: DataTypes.BOOLEAN,
         allowNull: false,
@@ -473,18 +401,14 @@ module.exports = (sequelize, DataTypes) => {
         comment: '是否启用'
       },
 
-      /**
-       * 创建人ID
-       */
+      /** 创建人ID */
       created_by: {
         type: DataTypes.INTEGER,
         allowNull: true,
         comment: '创建人ID'
       },
 
-      /**
-       * 更新人ID
-       */
+      /** 更新人ID */
       updated_by: {
         type: DataTypes.INTEGER,
         allowNull: true,
@@ -498,7 +422,7 @@ module.exports = (sequelize, DataTypes) => {
       timestamps: true,
       createdAt: 'created_at',
       updatedAt: 'updated_at',
-      comment: 'BxPx矩阵配置表',
+      comment: 'Pressure-Only 矩阵配置表',
       indexes: [
         {
           unique: true,

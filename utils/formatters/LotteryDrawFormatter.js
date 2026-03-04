@@ -15,7 +15,8 @@
 const REWARD_TIER_CONFIG = {
   low: { code: 'low', name: '低档奖励', minPoints: 0, maxPoints: 299, color: '#999999' },
   mid: { code: 'mid', name: '中档奖励', minPoints: 300, maxPoints: 699, color: '#4A90E2' },
-  high: { code: 'high', name: '高档奖励', minPoints: 700, maxPoints: null, color: '#FFD700' }
+  high: { code: 'high', name: '高档奖励', minPoints: 700, maxPoints: null, color: '#FFD700' },
+  fallback: { code: 'fallback', name: '保底奖励', minPoints: 0, maxPoints: 0, color: '#CCCCCC' }
 }
 
 /**
