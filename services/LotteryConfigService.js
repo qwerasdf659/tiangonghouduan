@@ -500,10 +500,13 @@ class LotteryConfigService {
    * 创建矩阵配置
    *
    * @param {Object} data - 配置数据
-   * @param {string} data.budget_tier - Budget Tier
-   * @param {string} data.pressure_tier - Pressure Tier
-   * @param {number} data.cap_multiplier - 预算上限乘数
-   * @param {number} data.empty_weight_multiplier - 空奖权重乘数
+   * @param {string} data.pressure_tier - Pressure Tier（P0/P1/P2）
+   * @param {number} [data.cap_multiplier=1.0] - 预算上限乘数
+   * @param {number} [data.empty_weight_multiplier=1.0] - 空奖权重乘数
+   * @param {number} [data.high_multiplier=1.0] - high 档位权重乘数
+   * @param {number} [data.mid_multiplier=1.0] - mid 档位权重乘数
+   * @param {number} [data.low_multiplier=1.0] - low 档位权重乘数
+   * @param {number} [data.fallback_multiplier=1.0] - fallback 档位权重乘数
    * @param {string} [data.description] - 配置描述
    * @param {number} admin_id - 操作管理员ID
    * @param {Object} [options={}] - 额外选项
@@ -601,10 +604,15 @@ class LotteryConfigService {
         updated_by: admin_id
       }
 
-      // 仅更新提供的字段
       if (data.cap_multiplier !== undefined) updateData.cap_multiplier = data.cap_multiplier
       if (data.empty_weight_multiplier !== undefined) {
         updateData.empty_weight_multiplier = data.empty_weight_multiplier
+      }
+      if (data.high_multiplier !== undefined) updateData.high_multiplier = data.high_multiplier
+      if (data.mid_multiplier !== undefined) updateData.mid_multiplier = data.mid_multiplier
+      if (data.low_multiplier !== undefined) updateData.low_multiplier = data.low_multiplier
+      if (data.fallback_multiplier !== undefined) {
+        updateData.fallback_multiplier = data.fallback_multiplier
       }
       if (data.description !== undefined) updateData.description = data.description
       if (data.is_active !== undefined) updateData.is_active = data.is_active

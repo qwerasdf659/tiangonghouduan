@@ -3487,8 +3487,9 @@
             <!-- P1-7: 预算健康度可视化 -->
             <div class="themed-card rounded-lg shadow">
               <div class="p-4 border-b">
+                <!-- Budget Tier 作为纯监控指标保留（2026-03-04 架构重构后不参与概率决策） -->
                 <h6 class="font-semibold flex items-center gap-2">
-                  📊 预算健康度
+                  📊 预算健康度（监控指标）
                   <span class="text-xs px-2 py-0.5 rounded border" :class="getBudgetHealthClass(budgetHealthData.health_level)" x-text="getBudgetHealthLabel(budgetHealthData.health_level)"></span>
                 </h6>
               </div>

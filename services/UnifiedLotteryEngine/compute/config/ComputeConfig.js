@@ -59,19 +59,16 @@ const BUDGET_TIER_CONFIG = {
 }
 
 /**
- * Budget Tier 允许的档位映射
+ * Budget Tier 允许的档位映射 — 仅用于监控/诊断元数据
  *
- * 定义每个 Budget Tier 可以参与的奖品档位
+ * 2026-03-04 架构重构：Budget Tier 降级为纯监控指标，不再参与概率决策。
+ * 资格控制由 BuildPrizePoolStage._filterByResourceEligibility 唯一负责。
+ * 此映射仅作为 LotteryComputeEngine.BUDGET_TIERS 的监控参考元数据导出，
+ * 不被任何概率计算或奖品过滤逻辑引用。
  *
  * @type {Object<string, string[]>}
  */
 const BUDGET_TIER_AVAILABILITY = {
-  /**
-   * 2026-03-04 架构重构：B0 允许 low 档
-   * 资格检查已由 BuildPrizePoolStage._filterByResourceEligibility 唯一负责，
-   * 资源级过滤后 B0 的 low 档只剩 pvp=0 的免费奖品（DIAMOND + 保底），经济上安全。
-   * 概率层不做资格门控是行业最佳实践（米哈游/腾讯/阿里/美团均如此）。
-   */
   B0: ['low', 'fallback'],
   B1: ['low', 'fallback'],
   B2: ['mid', 'low', 'fallback'],

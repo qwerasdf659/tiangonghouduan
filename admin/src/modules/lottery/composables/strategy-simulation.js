@@ -50,7 +50,13 @@ const SIMULATION_ENDPOINTS = {
   CIRCUIT_BREAKER_STATUS: `${API_PREFIX}/circuit-breaker-status`
 }
 
-/** 预设场景库 */
+/**
+ * 预设场景库
+ *
+ * budget_distribution 描述模拟用户群体中各 Budget Tier 的占比（仅用于模拟分析）。
+ * Budget Tier 已降级为纯监控指标（2026-03-04），不参与概率决策，
+ * 但模拟仍可假设不同预算分布的用户群体来分析体验差异。
+ */
 const PRESET_SCENARIOS = {
   current_real: {
     name: '当前真实分布',

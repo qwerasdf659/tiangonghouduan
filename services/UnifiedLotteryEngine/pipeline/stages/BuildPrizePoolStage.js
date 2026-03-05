@@ -588,6 +588,9 @@ class BuildPrizePoolStage extends BaseStage {
    * - B2（中预算）：允许 mid + low + fallback
    * - B3（高预算）：允许 high + mid + low + fallback
    *
+   * @deprecated 2026-03-04 架构重构后不再被 execute() 调用。
+   *   资格控制由 _filterByResourceEligibility 唯一负责，此方法保留仅供回滚使用。
+   *   计划移除日期：2026-04-04（确认无需回滚后删除）。
    * @param {Object} prizes_by_tier - 原始按档位分组的奖品
    * @param {Array<string>} allowed_tiers - 预算分层允许的档位列表
    * @returns {Object} 过滤后的按档位分组奖品
