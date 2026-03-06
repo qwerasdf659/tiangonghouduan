@@ -102,7 +102,6 @@ class TierPickStage extends BaseStage {
         const preset = decision_data.preset
         let preset_tier = preset.reward_tier || 'high'
 
-        // 预设模式也受每日高档上限约束，防止运营配置大量高档预设绕过风控
         if (preset_tier === 'high') {
           preset_tier = await this._enforceDailyHighCap(
             user_id,
@@ -110,6 +109,30 @@ class TierPickStage extends BaseStage {
             preset_tier,
             context
           )
+        }
+
+        /*
+         * 预设模式也需要检查奖品池可用性并降级
+         * 预设奖品可能因库存耗尽/状态变更/资格过滤而不在当前奖品池中
+         */
+        const preset_pool_data = this.getContextData(context, 'BuildPrizePoolStage.data')
+        let preset_downgrade_path = []
+        if (preset_pool_data) {
+          const { selected_tier: downgraded, downgrade_path } = this._applyDowngrade(
+            preset_tier,
+            preset_pool_data.prizes_by_tier,
+            preset_pool_data.available_tiers
+          )
+          if (downgraded !== preset_tier) {
+            this.log('warn', '预设模式档位降级：目标档位无可用奖品', {
+              user_id,
+              original_preset_tier: preset_tier,
+              downgraded_to: downgraded,
+              downgrade_path
+            })
+          }
+          preset_downgrade_path = downgrade_path
+          preset_tier = downgraded
         }
 
         this.log('info', '预设模式：跳过档位抽取，使用预设档位', {
@@ -120,7 +143,7 @@ class TierPickStage extends BaseStage {
         return this.success({
           selected_tier: preset_tier,
           original_tier: preset.reward_tier || 'high',
-          tier_downgrade_path: [],
+          tier_downgrade_path: preset_downgrade_path,
           random_value: 0,
           tier_weights: {},
           weight_scale: WEIGHT_SCALE,
@@ -145,6 +168,31 @@ class TierPickStage extends BaseStage {
           )
         }
 
+        /*
+         * 干预模式也需要检查奖品池可用性并降级
+         * force_win 设定 high 但奖品池可能因预算/库存/资格过滤后无 high 档位奖品
+         * 此时必须降级到有奖品的档位，否则 PrizePickStage 会因空池报错
+         */
+        const override_pool_data = this.getContextData(context, 'BuildPrizePoolStage.data')
+        let override_downgrade_path = []
+        if (override_pool_data) {
+          const { selected_tier: downgraded, downgrade_path } = this._applyDowngrade(
+            override_tier,
+            override_pool_data.prizes_by_tier,
+            override_pool_data.available_tiers
+          )
+          if (downgraded !== override_tier) {
+            this.log('warn', '干预模式档位降级：目标档位无可用奖品', {
+              user_id,
+              original_override_tier: override_tier,
+              downgraded_to: downgraded,
+              downgrade_path
+            })
+          }
+          override_downgrade_path = downgrade_path
+          override_tier = downgraded
+        }
+
         this.log('info', '干预模式：跳过档位抽取，使用干预档位', {
           user_id,
           decision_source,
@@ -154,7 +202,7 @@ class TierPickStage extends BaseStage {
         return this.success({
           selected_tier: override_tier,
           original_tier: override_type === 'force_win' ? 'high' : 'fallback',
-          tier_downgrade_path: [],
+          tier_downgrade_path: override_downgrade_path,
           random_value: 0,
           tier_weights: {},
           weight_scale: WEIGHT_SCALE,
@@ -174,6 +222,30 @@ class TierPickStage extends BaseStage {
           context
         )
 
+        /*
+         * 保底模式也需要检查奖品池可用性并降级
+         * high 档位可能因预算/库存过滤后无奖品
+         */
+        const guarantee_pool_data = this.getContextData(context, 'BuildPrizePoolStage.data')
+        let guarantee_downgrade_path = []
+        if (guarantee_pool_data) {
+          const { selected_tier: downgraded, downgrade_path } = this._applyDowngrade(
+            guarantee_tier,
+            guarantee_pool_data.prizes_by_tier,
+            guarantee_pool_data.available_tiers
+          )
+          if (downgraded !== guarantee_tier) {
+            this.log('warn', '保底模式档位降级：目标档位无可用奖品', {
+              user_id,
+              original_guarantee_tier: guarantee_tier,
+              downgraded_to: downgraded,
+              downgrade_path
+            })
+          }
+          guarantee_downgrade_path = downgrade_path
+          guarantee_tier = downgraded
+        }
+
         this.log('info', '保底模式：强制使用高档位', {
           user_id,
           decision_source,
@@ -182,7 +254,7 @@ class TierPickStage extends BaseStage {
         return this.success({
           selected_tier: guarantee_tier,
           original_tier: 'high',
-          tier_downgrade_path: [],
+          tier_downgrade_path: guarantee_downgrade_path,
           random_value: 0,
           tier_weights: {},
           weight_scale: WEIGHT_SCALE,

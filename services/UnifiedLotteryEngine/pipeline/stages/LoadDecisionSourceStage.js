@@ -26,7 +26,14 @@
  */
 
 const BaseStage = require('./BaseStage')
-const { LotteryPreset, LotteryManagementSetting, LotteryDraw, User } = require('../../../../models')
+const {
+  LotteryPreset,
+  LotteryManagementSetting,
+  LotteryDraw,
+  LotteryPrize,
+  LotteryUserExperienceState,
+  User
+} = require('../../../../models')
 const { Op, literal } = require('sequelize')
 
 /**
@@ -75,6 +82,24 @@ class LoadDecisionSourceStage extends BaseStage {
        * 决策优先级判断（按优先级顺序检查）
        * 优先级：preset > override > guarantee > normal
        */
+
+      // 0. 首抽必中检查（在 Preset 之前，通过 Preset 机制注入）
+      const firstWinPreset = await this._checkFirstWin(user_id, lottery_campaign_id)
+      if (firstWinPreset) {
+        this.log('info', '命中首抽必中', {
+          user_id,
+          prize_name: firstWinPreset.prize_name,
+          material_asset_code: firstWinPreset.material_asset_code,
+          material_amount: firstWinPreset.material_amount
+        })
+        return this.success({
+          decision_source: DECISION_SOURCES.PRESET,
+          preset: firstWinPreset,
+          override: null,
+          guarantee_triggered: null,
+          first_win: true
+        })
+      }
 
       // 1. 检查预设（最高优先级）
       const preset = await this._checkPreset(user_id, lottery_campaign_id)
@@ -139,6 +164,128 @@ class LoadDecisionSourceStage extends BaseStage {
         error: error.message
       })
       throw error
+    }
+  }
+
+  /**
+   * 检查是否触发首抽必中（新用户首次抽奖保证中奖）
+   *
+   * 触发条件：
+   * 1. first_win.enabled = true（策略配置开关）
+   * 2. 用户是新用户（SegmentResolver 判断，或 total_draw_count === 0）
+   * 3. 用户在该活动的 total_draw_count === 0（首次抽奖）
+   *
+   * 实现方式：
+   * - 根据消费段匹配五档动态奖品池（first_win.pools）
+   * - 从候选奖品中加权随机选择一个
+   * - 构造虚拟 Preset 对象注入决策链
+   * - 后续 Settle 阶段走正常流程（扣配额、发资产）
+   *
+   * @param {number} user_id - 用户ID
+   * @param {number} lottery_campaign_id - 活动ID
+   * @returns {Promise<Object|null>} 虚拟 Preset 或 null
+   * @private
+   */
+  async _checkFirstWin(user_id, lottery_campaign_id) {
+    try {
+      const { DynamicConfigLoader } = require('../../compute/config/ComputeConfig')
+
+      const enabled = await DynamicConfigLoader.getValue('first_win', 'enabled', false, {
+        lottery_campaign_id
+      })
+      if (enabled !== true && enabled !== 'true') return null
+
+      const expState = await LotteryUserExperienceState.findOne({
+        where: { user_id, lottery_campaign_id }
+      })
+
+      if (expState && expState.total_draw_count > 0) return null
+
+      const poolsConfig = await DynamicConfigLoader.getValue('first_win', 'pools', null, {
+        lottery_campaign_id
+      })
+      if (!poolsConfig) return null
+
+      const pools = typeof poolsConfig === 'string' ? JSON.parse(poolsConfig) : poolsConfig
+
+      const user = await User.findByPk(user_id, { attributes: ['user_id'] })
+      if (!user) return null
+
+      /* 从用户配额账户推算消费段（积分 1:1 消费额） */
+      const BalanceService = require('../../../asset/BalanceService')
+      let spendEstimate = 0
+      try {
+        const pointsBalance = await BalanceService.getBalance(user_id, 'POINTS')
+        const quotaBalance = await BalanceService.getBalance(user_id, 'DIAMOND_QUOTA')
+        spendEstimate = Math.max(pointsBalance || 0, quotaBalance || 0)
+      } catch {
+        spendEstimate = 0
+      }
+
+      let selectedTier = null
+      const tierKeys = Object.keys(pools).sort()
+      for (const key of tierKeys) {
+        const tier = pools[key]
+        if (tier.max_spend && spendEstimate <= tier.max_spend) {
+          selectedTier = tier
+          break
+        }
+        if (tier.min_spend && spendEstimate >= tier.min_spend) {
+          selectedTier = tier
+          break
+        }
+      }
+      if (!selectedTier) selectedTier = pools[tierKeys[0]]
+
+      if (!selectedTier?.candidates?.length) return null
+
+      /* 加权随机从候选池中选一个奖品 */
+      const totalWeight = selectedTier.candidates.reduce((s, c) => s + (c.weight || 1), 0)
+      let roll = Math.random() * totalWeight
+      let chosen = selectedTier.candidates[0]
+      for (const candidate of selectedTier.candidates) {
+        roll -= candidate.weight || 1
+        if (roll <= 0) {
+          chosen = candidate
+          break
+        }
+      }
+
+      /* 从真实奖品表中匹配对应奖品 */
+      const matchedPrize = await LotteryPrize.findOne({
+        where: {
+          lottery_campaign_id,
+          material_asset_code: chosen.asset,
+          material_amount: chosen.amount,
+          status: 'active'
+        }
+      })
+
+      if (!matchedPrize) {
+        this.log('warn', '首抽必中奖品未在奖品表中找到匹配', {
+          user_id,
+          asset: chosen.asset,
+          amount: chosen.amount
+        })
+        return null
+      }
+
+      /* 返回完整奖品对象 + Preset 元数据，PrizePickStage 直接使用 */
+      const prizeJSON = matchedPrize.toJSON ? matchedPrize.toJSON() : matchedPrize
+      return {
+        ...prizeJSON,
+        lottery_preset_id: null,
+        status: 'pending',
+        approval_status: 'approved',
+        source: 'first_win'
+      }
+    } catch (error) {
+      this.log('warn', '首抽必中检查失败（不影响正常抽奖）', {
+        user_id,
+        lottery_campaign_id,
+        error: error.message
+      })
+      return null
     }
   }
 

@@ -93,28 +93,51 @@ class PrizePickStage extends BaseStage {
       if (decision_source === 'override' && decision_data?.override) {
         const override = decision_data.override
         const override_type = override.setting_type || override.override_type
-        const override_stage_data = this.getContextData(context, 'LoadOverrideStage.data')
 
-        if (override_type === 'force_win' && override_stage_data?.override_prize) {
-          const override_prize = override_stage_data.override_prize
-          this.log('info', '干预模式（强制中奖）：使用指定奖品', {
-            user_id,
-            decision_source,
-            lottery_prize_id: override_prize.lottery_prize_id,
-            prize_name: override_prize.prize_name
-          })
+        if (override_type === 'force_win') {
+          /*
+           * force_win 模式：尝试使用干预指定的奖品
+           * 数据来源：LoadDecisionSourceStage.data.override.setting_data.lottery_prize_id
+           * 如果指定奖品在当前奖品池中可用，直接使用；否则走正常抽取流程
+           */
+          const override_prize_id = override.setting_data?.lottery_prize_id
+          const prize_pool_data = this.getContextData(context, 'BuildPrizePoolStage.data')
 
-          return this.success({
-            selected_prize: override_prize,
-            prize_random_value: 0,
-            tier_total_weight: 0,
-            prize_hit_range: [0, 0],
-            tier_prize_count: 1,
-            selected_tier: override_prize.reward_tier || 'high',
-            decision_source,
-            skipped: true,
-            skip_reason: 'override_force_win'
-          })
+          if (override_prize_id && prize_pool_data) {
+            const all_pool_prizes = prize_pool_data.available_prizes || []
+            const matched_prize = all_pool_prizes.find(
+              p => p.lottery_prize_id === override_prize_id
+            )
+
+            if (matched_prize) {
+              this.log('info', '干预模式（强制中奖）：使用指定奖品', {
+                user_id,
+                decision_source,
+                lottery_prize_id: matched_prize.lottery_prize_id,
+                prize_name: matched_prize.prize_name
+              })
+
+              return this.success({
+                selected_prize: matched_prize,
+                prize_random_value: 0,
+                tier_total_weight: 0,
+                prize_hit_range: [0, 0],
+                tier_prize_count: 1,
+                selected_tier: matched_prize.reward_tier || 'high',
+                decision_source,
+                skipped: true,
+                skip_reason: 'override_force_win'
+              })
+            }
+
+            this.log('warn', '干预指定奖品不在当前奖品池中，降级为档位内随机抽取', {
+              user_id,
+              override_prize_id,
+              pool_size: all_pool_prizes.length,
+              reason: '奖品可能已停用/缺货/不满足资格条件'
+            })
+          }
+          /* 指定奖品不可用时，继续走正常的档位内抽取流程 */
         }
 
         // force_lose 模式：使用 fallback 奖品
