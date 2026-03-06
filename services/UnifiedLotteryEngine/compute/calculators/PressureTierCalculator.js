@@ -249,16 +249,33 @@ class PressureTierCalculator {
         return 0.5
       }
 
-      // 计算已发放奖品价值总和（使用 reward_tier 判断中奖状态）
-      const prize_value_sum = await LotteryDraw.sum('prize_value_points', {
+      /*
+       * 计算已消耗的预算总量（使用 budget_points_before - budget_points_after）
+       * 与 BuildPrizePoolStage/SettleStage 的 budget_cost 口径一致
+       * pvp（prize_value_points）仅管分层阈值，不参与消耗统计
+       */
+      const { sequelize } = require('../../../../models')
+      const consumed_result = await LotteryDraw.findOne({
+        attributes: [
+          [
+            sequelize.fn(
+              'SUM',
+              sequelize.literal(
+                'COALESCE(budget_points_before, 0) - COALESCE(budget_points_after, 0)'
+              )
+            ),
+            'total_budget_consumed'
+          ]
+        ],
         where: {
           lottery_campaign_id,
-          reward_tier: { [Op.in]: ['high', 'mid', 'low'] } // 有效中奖的档位
+          reward_tier: { [Op.in]: ['high', 'mid', 'low'] }
         },
+        raw: true,
         transaction
       })
 
-      const total_consumed = Number(prize_value_sum) || 0
+      const total_consumed = Number(consumed_result?.total_budget_consumed) || 0
 
       // 根据 budget_mode 计算总预算
       let total_budget = 0
@@ -270,8 +287,8 @@ class PressureTierCalculator {
 
       // 如果没有配置预算总额，尝试从奖品估算
       if (total_budget === 0) {
-        // 估算：奖品价值总和 * 预期发放次数
-        const prize_total = await LotteryPrize.sum('prize_value_points', {
+        // 估算：奖品预算成本总和 × 预期发放次数（与过滤/扣减口径一致）
+        const prize_total = await LotteryPrize.sum('budget_cost', {
           where: { lottery_campaign_id, status: 'active' },
           transaction
         })

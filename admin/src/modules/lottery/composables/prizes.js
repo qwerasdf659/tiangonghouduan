@@ -59,7 +59,13 @@ export function usePrizesState() {
       /** 选奖权重（tier_first 模式下实际生效的概率控制字段） */
       win_weight: 100000,
       /** 所属档位（high/mid/low，决定奖品归属哪个档位池） */
-      reward_tier: 'low'
+      reward_tier: 'low',
+      /** 奖品总预算成本（过滤+扣减用） */
+      budget_cost: 0,
+      /** 材质资产编码（碎片/水晶等虚拟物品的资产类型标识，传统奖品留空） */
+      material_asset_code: '',
+      /** 材质数量（虚拟物品发放数量） */
+      material_amount: null
     },
     /** @type {Array} 稀有度选项（来自 rarity_defs 表，5级） */
     rarityOptions: [
@@ -246,7 +252,10 @@ export function usePrizesMethods() {
         prize_description: '',
         rarity_code: 'common',
         win_weight: 100000,
-        reward_tier: 'low'
+        reward_tier: 'low',
+        budget_cost: 0,
+        material_asset_code: '',
+        material_amount: null
       }
       this.showModal('prizeModal')
     },
@@ -273,7 +282,10 @@ export function usePrizesMethods() {
         rarity_code: prize.rarity_code || 'common',
         sort_order: prize.sort_order || 1,
         win_weight: prize.win_weight || 100000,
-        reward_tier: prize.reward_tier || 'low'
+        reward_tier: prize.reward_tier || 'low',
+        budget_cost: parseInt(prize.budget_cost) || 0,
+        material_asset_code: prize.material_asset_code || '',
+        material_amount: prize.material_amount || null
       }
       this._loadSameTierPrizes(prize)
       this.showModal('prizeModal')
@@ -808,6 +820,9 @@ export function usePrizesMethods() {
         prize_type: 'virtual',
         prize_value: 0,
         prize_value_points: 0,
+        budget_cost: 0,
+        material_asset_code: '',
+        material_amount: null,
         win_probability: 0,
         stock_quantity: 100,
         status: 'active',
@@ -845,6 +860,10 @@ export function usePrizesMethods() {
             prize_type: this.prizeForm.prize_type,
             prize_value: parseFloat(this.prizeForm.prize_value) || 0,
             prize_value_points: parseInt(this.prizeForm.prize_value_points) || 0,
+            budget_cost: parseInt(this.prizeForm.budget_cost) || 0,
+            material_asset_code: this.prizeForm.material_asset_code || null,
+            material_amount: this.prizeForm.material_amount
+              ? parseInt(this.prizeForm.material_amount) : null,
             win_probability: winProbability,
             stock_quantity: this.prizeForm.stock_quantity,
             status: this.prizeForm.status,
@@ -874,6 +893,10 @@ export function usePrizesMethods() {
             prize_type: this.prizeForm.prize_type,
             prize_value: parseFloat(this.prizeForm.prize_value) || 0,
             prize_value_points: parseInt(this.prizeForm.prize_value_points) || 0,
+            budget_cost: parseInt(this.prizeForm.budget_cost) || 0,
+            material_asset_code: this.prizeForm.material_asset_code || null,
+            material_amount: this.prizeForm.material_amount
+              ? parseInt(this.prizeForm.material_amount) : null,
             stock_quantity:
               this.prizeForm.stock_quantity === -1 ? 999999 : this.prizeForm.stock_quantity,
             prize_description: this.prizeForm.prize_description,
@@ -923,6 +946,9 @@ export function usePrizesMethods() {
         prize_type: prize.prize_type || 'virtual',
         prize_value: parseFloat(prize.prize_value) || 0,
         prize_value_points: parseInt(prize.prize_value_points) || 0,
+        budget_cost: parseInt(prize.budget_cost) || 0,
+        material_asset_code: prize.material_asset_code || '',
+        material_amount: prize.material_amount || null,
         win_probability: parseFloat(prize.win_probability || 0) * 100,
         stock_quantity: prize.stock_quantity || 100,
         status: prize.status || 'active',

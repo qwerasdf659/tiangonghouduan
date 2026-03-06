@@ -69,14 +69,53 @@ describe('AntiEmptyStreakHandler', () => {
         available_tiers: { fallback: true, low: true },
         effective_budget: 100,
         prizes_by_tier: {
-          low: [{ lottery_prize_id: 1, prize_value_points: 50 }]
+          low: [{ lottery_prize_id: 1, prize_value_points: 50, budget_cost: 50 }]
         },
         user_id: 1
       })
 
       expect(result.result_type).not.toBe('not_triggered')
-      // 要么强制成功，要么预算不足
       expect(['forced', 'budget_insufficient']).toContain(result.result_type)
+    })
+  })
+
+  describe('_selectForcedTier — budget_cost 口径一致性', () => {
+    /**
+     * 碎片奖品的 pvp 和 budget_cost 差异巨大
+     * pvp=1（分层标记），budget_cost=30（实际成本）
+     * 防连空必须用 budget_cost 判断"买得起"，否则会触发"幽灵保底"
+     */
+    test('budget_cost=30 在 budget=5 时应判定为预算不足', () => {
+      const forceThreshold = handler.config.force_threshold
+      const result = handler.handle({
+        empty_streak: forceThreshold + 2,
+        selected_tier: 'fallback',
+        available_tiers: { fallback: true, low: true },
+        effective_budget: 5,
+        prizes_by_tier: {
+          low: [{ lottery_prize_id: 202, prize_value_points: 1, budget_cost: 30 }]
+        },
+        user_id: 1
+      })
+
+      expect(result.result_type).toBe('budget_insufficient')
+    })
+
+    test('budget_cost=30 在 budget=30 时应成功强制发放', () => {
+      const forceThreshold = handler.config.force_threshold
+      const result = handler.handle({
+        empty_streak: forceThreshold + 2,
+        selected_tier: 'fallback',
+        available_tiers: { fallback: true, low: true },
+        effective_budget: 30,
+        prizes_by_tier: {
+          low: [{ lottery_prize_id: 202, prize_value_points: 1, budget_cost: 30 }]
+        },
+        user_id: 1
+      })
+
+      expect(result.result_type).toBe('forced')
+      expect(result.final_tier).toBe('low')
     })
   })
 })

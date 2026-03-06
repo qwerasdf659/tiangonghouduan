@@ -117,10 +117,10 @@ describe('BudgetTierCalculator', () => {
 
   describe('_calculateBudgetSufficiency - 预算充足性', () => {
     const testPrizes = [
-      { lottery_prize_id: 1, prize_value_points: 0 }, // 空奖
-      { lottery_prize_id: 2, prize_value_points: 50 }, // 低价值
-      { lottery_prize_id: 3, prize_value_points: 100 }, // 中价值
-      { lottery_prize_id: 4, prize_value_points: 500 } // 高价值
+      { lottery_prize_id: 1, prize_value_points: 0, budget_cost: 0 },
+      { lottery_prize_id: 2, prize_value_points: 50, budget_cost: 50 },
+      { lottery_prize_id: 3, prize_value_points: 100, budget_cost: 100 },
+      { lottery_prize_id: 4, prize_value_points: 500, budget_cost: 500 }
     ]
 
     test('预算足够时返回 is_sufficient=true', () => {

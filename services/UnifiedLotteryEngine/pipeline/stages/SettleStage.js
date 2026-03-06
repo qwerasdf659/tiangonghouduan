@@ -237,20 +237,17 @@ class SettleStage extends BaseStage {
       // 2. 扣减奖品库存
       await this._deductPrizeStock(final_prize, transaction)
 
-      // 3. 扣减用户预算（如果有 BudgetProvider）
+      // 3. 扣减用户预算（如果有 BudgetProvider，使用 budget_cost 而非 pvp）
       let budget_deducted = 0
-      if (budget_provider && final_prize.prize_value_points > 0) {
-        budget_deducted = await this._deductBudget(
-          budget_provider,
-          final_prize.prize_value_points,
-          {
-            user_id,
-            lottery_campaign_id,
-            lottery_prize_id: final_prize.lottery_prize_id,
-            idempotency_key,
-            transaction
-          }
-        )
+      const budget_cost = final_prize.budget_cost || 0
+      if (budget_provider && budget_cost > 0) {
+        budget_deducted = await this._deductBudget(budget_provider, budget_cost, {
+          user_id,
+          lottery_campaign_id,
+          lottery_prize_id: final_prize.lottery_prize_id,
+          idempotency_key,
+          transaction
+        })
       }
 
       /*
@@ -351,7 +348,7 @@ class SettleStage extends BaseStage {
       await this._recordHourlyMetrics({
         lottery_campaign_id,
         draw_tier: final_tier,
-        prize_value: final_prize.prize_value_points || 0,
+        prize_value: final_prize.budget_cost || 0,
         budget_tier: budget_data?.budget_tier || null,
         mechanisms: decision_snapshot.experience_smoothing || {},
         transaction
@@ -388,7 +385,7 @@ class SettleStage extends BaseStage {
         lottery_campaign_id,
         user_id,
         draw_tier: final_tier,
-        prize_value: final_prize.prize_value_points || 0,
+        prize_value: final_prize.budget_cost || 0,
         budget_tier: budget_data?.budget_tier || null,
         mechanisms: decision_snapshot.experience_smoothing || {}
       }).catch(redis_error => {
@@ -425,7 +422,16 @@ class SettleStage extends BaseStage {
            * rarity_code: 稀有度代码（来自 rarity_defs 外键），前端直接使用此字段名显示光效
            */
           sort_order: final_prize.sort_order,
-          rarity_code: final_prize.rarity_code || 'common'
+          rarity_code: final_prize.rarity_code || 'common',
+          /**
+           * 虚拟物品展示字段（碎片配额修复方案新增）
+           * material_asset_code: 资产类型标识（如 red_shard / DIAMOND），用于图标/动效
+           * material_amount: 虚拟物品数量（展示"获得碎片×3"）
+           * budget_cost: 本次中奖实际消耗的 BUDGET_POINTS（小程序端可展示"消耗 xx 预算积分"）
+           */
+          material_asset_code: final_prize.material_asset_code || null,
+          material_amount: final_prize.material_amount || null,
+          budget_cost: final_prize.budget_cost || 0
         }
       }
 

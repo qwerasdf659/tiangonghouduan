@@ -296,8 +296,6 @@ class BuildPrizePoolStage extends BaseStage {
     })
 
     const result = prizes.filter(prize => {
-      const pvp = prize.prize_value_points || 0
-
       /* DIAMOND 奖品：仅受 DIAMOND_QUOTA 控制，不受 BUDGET_POINTS 影响 */
       if (prize.material_asset_code === 'DIAMOND' && prize.material_amount > 0) {
         const eligible = user_diamond_quota >= prize.material_amount
@@ -312,16 +310,16 @@ class BuildPrizePoolStage extends BaseStage {
         return eligible
       }
 
-      /* 保底/空奖（pvp=0 且非 DIAMOND）：永远通过 */
-      if (pvp === 0) return true
+      /* 所有非 DIAMOND 奖品：统一用 budget_cost 判断（pvp 仅管分层阈值） */
+      const budget_cost = prize.budget_cost || 0
+      if (budget_cost === 0) return true
 
-      /* 其余奖品（物理/券/积分/虚拟）：检查 BUDGET_POINTS */
-      const eligible = pvp <= budget_before
+      const eligible = budget_before >= budget_cost
       if (!eligible) {
         this.log('debug', '奖品因预算不足被过滤', {
           lottery_prize_id: prize.lottery_prize_id,
           prize_name: prize.prize_name,
-          prize_value_points: pvp,
+          budget_cost,
           budget_before
         })
       }
@@ -338,24 +336,7 @@ class BuildPrizePoolStage extends BaseStage {
     return result
   }
 
-  /**
-   * 根据预算过滤奖品
-   *
-   * @deprecated 2026-03-04 由 _filterByResourceEligibility 替代。
-   *             保留函数体用于回滚，回滚时恢复 execute() 中的调用即可。
-   * @removal-date 2026-04-04
-   * @param {Array} prizes - 奖品列表
-   * @param {number} budget - 用户预算
-   * @returns {Array} 过滤后的奖品列表
-   * @private
-   */
-  _filterByBudget(prizes, budget) {
-    return prizes.filter(prize => {
-      const prize_cost = prize.prize_value_points || 0
-      // 保留成本 <= 预算的奖品，或者成本为0的空奖
-      return prize_cost <= budget || prize_cost === 0
-    })
-  }
+  /* _filterByBudget 已于 2026-03-05 删除，由 _filterByResourceEligibility 完全取代 */
 
   /**
    * 按档位分组奖品
@@ -427,8 +408,8 @@ class BuildPrizePoolStage extends BaseStage {
 
     for (const tier of valuable_tiers) {
       const tier_prizes = prizes_by_tier[tier] || []
-      /* 检查是否有 prize_value_points > 0 的奖品 */
-      const has_valuable = tier_prizes.some(p => (p.prize_value_points || 0) > 0)
+      /* 检查是否有 budget_cost > 0 的奖品（与过滤/扣减口径一致） */
+      const has_valuable = tier_prizes.some(p => (p.budget_cost || 0) > 0)
       if (has_valuable) {
         return true
       }

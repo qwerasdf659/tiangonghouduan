@@ -56,7 +56,7 @@
  * 最后更新：2026年01月05日（事务边界治理改造）
  */
 
-const { LotteryPrize, LotteryCampaign } = require('../models')
+const { LotteryPrize, LotteryCampaign, MaterialAssetType } = require('../models')
 const DecimalConverter = require('../utils/formatters/DecimalConverter')
 const AuditLogService = require('./AuditLogService') // 审计日志服务
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
@@ -143,19 +143,39 @@ class PrizePoolService {
       // sort_order唯一性保证：如果前端没提供，自动分配递增的唯一值
       const sortOrder = prizeData.sort_order !== undefined ? prizeData.sort_order : nextSortOrder++
 
+      /*
+       * 按奖品类型分治计算 budget_cost（决定 1 方案 D）
+       * - 虚拟物品（非 DIAMOND）：强制 material_amount × budget_value_points
+       * - DIAMOND / 保底：固定 0
+       * - 传统奖品：接受运营填写，回退到 pvp
+       */
+      // eslint-disable-next-line no-await-in-loop -- 碎片奖品需要查询 MaterialAssetType 计算 budget_cost
+      let computed_budget_cost
+      if (prizeData.material_asset_code && prizeData.material_asset_code !== 'DIAMOND') {
+        const assetType = await MaterialAssetType.findOne({
+          where: { asset_code: prizeData.material_asset_code },
+          transaction
+        })
+        computed_budget_cost =
+          (parseInt(prizeData.material_amount) || 0) * (assetType?.budget_value_points || 0)
+      } else if (prizeData.material_asset_code === 'DIAMOND' || prizeData.is_fallback) {
+        computed_budget_cost = 0
+      } else {
+        computed_budget_cost =
+          parseInt(prizeData.budget_cost ?? prizeData.prize_value_points ?? 0) || 0
+      }
+
       // eslint-disable-next-line no-await-in-loop -- 需要在事务中顺序创建奖品，确保原子性和sort_order验证
-      // 2026-01-29 技术债务清理：去掉字段映射，直接使用后端字段名
       const prize = await LotteryPrize.create(
         {
           lottery_campaign_id: parseInt(lottery_campaign_id),
           prize_name: prizeData.prize_name,
           prize_type: prizeData.prize_type,
           prize_value: prizeData.prize_value || 0,
-          /**
-           * 双账户模型：内部预算成本（系统内部）
-           * 语义：用于 remaining_budget_points 的筛奖与扣减
-           */
+          /** 分层阈值标记（仅用于 BudgetTierCalculator 档位准入，非扣减金额） */
           prize_value_points: parseInt(prizeData.prize_value_points ?? 0) || 0,
+          /** 奖品总预算成本（过滤+扣减用） */
+          budget_cost: computed_budget_cost,
           stock_quantity: parseInt(prizeData.stock_quantity),
           win_probability: prizeData.win_probability || 0,
           prize_description: prizeData.prize_description || '',
@@ -178,7 +198,11 @@ class PrizePoolService {
           /** 所属档位（high/mid/low） */
           reward_tier: prizeData.reward_tier || 'low',
           /** 是否为兜底奖品（所有档位无可用奖品时发放） */
-          is_fallback: prizeData.is_fallback ? 1 : 0
+          is_fallback: prizeData.is_fallback ? 1 : 0,
+          /** 材质资产编码（碎片/水晶等虚拟物品的资产类型标识） */
+          material_asset_code: prizeData.material_asset_code || null,
+          /** 材质数量（虚拟物品发放数量） */
+          material_amount: prizeData.material_amount ? parseInt(prizeData.material_amount) : null
         },
         { transaction }
       )
@@ -301,7 +325,9 @@ class PrizePoolService {
           'prize_type',
           'prize_value',
           'prize_value_points',
-          // 注意：virtual_amount 和 category 字段数据库不存在，已移除
+          'budget_cost',
+          'material_asset_code',
+          'material_amount',
           'stock_quantity',
           'win_probability',
           'prize_description',
@@ -340,6 +366,9 @@ class PrizePoolService {
         prize_type: prize.prize_type,
         prize_value: prize.prize_value,
         prize_value_points: prize.prize_value_points,
+        budget_cost: prize.budget_cost || 0,
+        material_asset_code: prize.material_asset_code || null,
+        material_amount: prize.material_amount || null,
         stock_quantity: prize.stock_quantity,
         remaining_quantity: Math.max(0, (prize.stock_quantity || 0) - (prize.total_win_count || 0)),
         win_probability: prize.win_probability,
@@ -431,7 +460,9 @@ class PrizePoolService {
           'prize_type',
           'prize_value',
           'prize_value_points',
-          // 注意：virtual_amount 和 category 字段数据库不存在，已移除
+          'budget_cost',
+          'material_asset_code',
+          'material_amount',
           'stock_quantity',
           'total_win_count',
           'daily_win_count',
@@ -469,7 +500,7 @@ class PrizePoolService {
         }, 0)
       }
 
-      // 4. 格式化奖品数据（virtual_amount 和 category 已移除）
+      // 4. 格式化奖品数据
       const formattedPrizes = prizes.map(prize => ({
         lottery_prize_id: prize.lottery_prize_id,
         lottery_campaign_id: prize.lottery_campaign_id,
@@ -479,6 +510,9 @@ class PrizePoolService {
         prize_type: prize.prize_type,
         prize_value: prize.prize_value,
         prize_value_points: prize.prize_value_points,
+        budget_cost: prize.budget_cost || 0,
+        material_asset_code: prize.material_asset_code || null,
+        material_amount: prize.material_amount || null,
         stock_quantity: prize.stock_quantity,
         remaining_quantity: Math.max(0, (prize.stock_quantity || 0) - (prize.total_win_count || 0)),
         total_win_count: prize.total_win_count || 0,
@@ -552,11 +586,13 @@ class PrizePoolService {
       prize_type: prize.prize_type,
       prize_value: prize.prize_value,
       prize_value_points: prize.prize_value_points,
-      // 注意：virtual_amount 和 category 字段数据库不存在，已移除
+      budget_cost: prize.budget_cost || 0,
+      material_asset_code: prize.material_asset_code || null,
+      material_amount: prize.material_amount || null,
       stock_quantity: prize.stock_quantity,
       win_probability: prize.win_probability,
       status: prize.status,
-      image_resource_id: prize.image_resource_id // 记录旧的图片ID
+      image_resource_id: prize.image_resource_id
     }
 
     /*
@@ -570,7 +606,8 @@ class PrizePoolService {
       prize_type: 'prize_type',
       value: 'prize_value',
       prize_value: 'prize_value',
-      prize_value_points: 'prize_value_points', // 双账户模型：内部预算成本
+      /** 分层阈值标记（仅用于 BudgetTierCalculator 档位准入，非扣减金额） */
+      prize_value_points: 'prize_value_points',
       quantity: 'stock_quantity',
       stock_quantity: 'stock_quantity',
       win_probability: 'win_probability', // 中奖概率
@@ -595,7 +632,13 @@ class PrizePoolService {
       /** 所属档位（high/mid/low，决定奖品归属哪个档位池） */
       reward_tier: 'reward_tier',
       /** 是否为兜底奖品（当其他奖品都无法选中时的保底选项） */
-      is_fallback: 'is_fallback'
+      is_fallback: 'is_fallback',
+      /** 奖品总预算成本（过滤+扣减用，pvp 仅管分层阈值） */
+      budget_cost: 'budget_cost',
+      /** 材质资产编码（碎片/水晶等虚拟物品的资产类型标识） */
+      material_asset_code: 'material_asset_code',
+      /** 材质数量（虚拟物品发放数量） */
+      material_amount: 'material_amount'
     }
 
     const filteredUpdateData = {}
@@ -660,7 +703,24 @@ class PrizePoolService {
     const isImageChanging =
       filteredUpdateData.image_resource_id !== undefined && newImageId !== oldImageId
 
-    // 4. 更新奖品
+    /*
+     * 4a. budget_cost 分治重算：当 material_amount 或 material_asset_code 变更时
+     * 按奖品类型分治：虚拟物品强制 material_amount × budget_value_points，DIAMOND/保底=0
+     */
+    const mac = filteredUpdateData.material_asset_code ?? prize.material_asset_code
+    const ma = filteredUpdateData.material_amount ?? prize.material_amount
+    const isFallback = filteredUpdateData.is_fallback ?? prize.is_fallback
+    if (mac && mac !== 'DIAMOND') {
+      const assetType = await MaterialAssetType.findOne({
+        where: { asset_code: mac },
+        transaction
+      })
+      filteredUpdateData.budget_cost = (parseInt(ma) || 0) * (assetType?.budget_value_points || 0)
+    } else if (mac === 'DIAMOND' || isFallback) {
+      filteredUpdateData.budget_cost = 0
+    }
+
+    // 4b. 更新奖品
     await prize.update(filteredUpdateData, { transaction })
 
     // 5. 处理图片绑定和旧图片删除（2026-01-08 P0修复）
@@ -725,6 +785,9 @@ class PrizePoolService {
       prize_type: prize.prize_type,
       prize_value: prize.prize_value,
       prize_value_points: prize.prize_value_points,
+      budget_cost: prize.budget_cost || 0,
+      material_asset_code: prize.material_asset_code || null,
+      material_amount: prize.material_amount || null,
       stock_quantity: prize.stock_quantity,
       win_probability: prize.win_probability,
       status: prize.status
@@ -778,7 +841,9 @@ class PrizePoolService {
       prize_type: updatedPrize.prize_type,
       prize_value: updatedPrize.prize_value,
       prize_value_points: updatedPrize.prize_value_points,
-      // 注意：virtual_amount 和 category 字段数据库不存在，已移除
+      budget_cost: updatedPrize.budget_cost || 0,
+      material_asset_code: updatedPrize.material_asset_code || null,
+      material_amount: updatedPrize.material_amount || null,
       stock_quantity: updatedPrize.stock_quantity,
       remaining_quantity: Math.max(
         0,

@@ -354,6 +354,7 @@ class BudgetTierCalculator {
 
     for (const prize of prizes) {
       const tier = prize.reward_tier || 'fallback'
+      /* _calculateDynamicThresholds 用 pvp 做分层阈值标记（pvp 的唯一正确职责） */
       const cost = prize.prize_value_points || 0
 
       if (prize_by_tier[tier]) {
@@ -459,16 +460,16 @@ class BudgetTierCalculator {
       }
     }
 
-    // 计算用户能负担的奖品数量
+    // 计算用户能负担的奖品数量（用 budget_cost 判断可承受性，与过滤/扣减口径一致）
     const affordable_prizes = prizes.filter(p => {
-      const cost = p.prize_value_points || 0
+      const cost = p.budget_cost || 0
       return cost <= effective_budget || cost === 0
     })
 
-    // 找出最低奖品成本（排除空奖）
-    const non_empty_prizes = prizes.filter(p => (p.prize_value_points || 0) > 0)
+    // 找出最低奖品成本（排除空奖，用 budget_cost 与过滤口径一致）
+    const non_empty_prizes = prizes.filter(p => (p.budget_cost || 0) > 0)
     const min_prize_cost =
-      non_empty_prizes.length > 0 ? Math.min(...non_empty_prizes.map(p => p.prize_value_points)) : 0
+      non_empty_prizes.length > 0 ? Math.min(...non_empty_prizes.map(p => p.budget_cost)) : 0
 
     return {
       is_sufficient: budget_tier !== BUDGET_TIER.B0,

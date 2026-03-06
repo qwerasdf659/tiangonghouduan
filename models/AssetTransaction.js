@@ -23,7 +23,7 @@
  *
  * 命名规范（snake_case）：
  * - 表名：asset_transactions
- * - 主键：transaction_id
+ * - 主键：asset_transaction_id
  * - 外键：account_id（关联 accounts 表）
  *
  * 创建时间：2025-12-15

@@ -3,16 +3,15 @@
 /**
  * BuildPrizePoolStage 资源级过滤测试
  *
- * 验证"去预算门控改资源级过滤"重构后的核心行为：
+ * 验证核心行为：
  * 1. DIAMOND 奖品仅受 DIAMOND_QUOTA 控制，不受 BUDGET_POINTS 影响
- * 2. 保底/空奖（pvp=0 且非 DIAMOND）永远通过
- * 3. 其余奖品检查 BUDGET_POINTS 余额
- * 4. 档位门控（_filterByAllowedTiers）不再执行
- *
- * 对应文档：档位门控重构：去预算门控改资源级过滤.md 第五章验证用例
+ * 2. 保底/空奖（budget_cost=0）永远通过
+ * 3. 其余奖品统一用 budget_cost 判断（pvp 仅管分层阈值）
+ * 4. 碎片奖品的 budget_cost 正确过滤（BUG-1 修复验证）
  *
  * @module tests/unit/stages/BuildPrizePoolStage
  * @since 2026-03-04
+ * @updated 2026-03-05 budget_cost 修复（BUG-1/BUG-2/BUG-3）
  */
 
 const BuildPrizePoolStage = require('../../../services/UnifiedLotteryEngine/pipeline/stages/BuildPrizePoolStage')
@@ -30,11 +29,10 @@ const REAL_PRIZE_POOL = [
     material_asset_code: null,
     material_amount: null,
     prize_value_points: 20,
+    budget_cost: 20,
     is_fallback: 0,
     win_weight: 200000,
-    stock_quantity: 50,
-    max_daily_wins: null,
-    max_user_wins: null
+    stock_quantity: 50
   },
   {
     lottery_prize_id: 164,
@@ -44,11 +42,10 @@ const REAL_PRIZE_POOL = [
     material_asset_code: null,
     material_amount: null,
     prize_value_points: 15,
+    budget_cost: 15,
     is_fallback: 0,
     win_weight: 800000,
-    stock_quantity: 3000,
-    max_daily_wins: null,
-    max_user_wins: null
+    stock_quantity: 3000
   },
   {
     lottery_prize_id: 165,
@@ -58,11 +55,10 @@ const REAL_PRIZE_POOL = [
     material_asset_code: null,
     material_amount: null,
     prize_value_points: 10,
+    budget_cost: 10,
     is_fallback: 0,
     win_weight: 400000,
-    stock_quantity: 500,
-    max_daily_wins: null,
-    max_user_wins: null
+    stock_quantity: 500
   },
   {
     lottery_prize_id: 166,
@@ -72,11 +68,10 @@ const REAL_PRIZE_POOL = [
     material_asset_code: null,
     material_amount: null,
     prize_value_points: 8,
+    budget_cost: 8,
     is_fallback: 0,
     win_weight: 350000,
-    stock_quantity: 1000,
-    max_daily_wins: null,
-    max_user_wins: null
+    stock_quantity: 1000
   },
   {
     lottery_prize_id: 167,
@@ -86,11 +81,10 @@ const REAL_PRIZE_POOL = [
     material_asset_code: null,
     material_amount: null,
     prize_value_points: 5,
+    budget_cost: 5,
     is_fallback: 0,
     win_weight: 250000,
-    stock_quantity: 8000,
-    max_daily_wins: null,
-    max_user_wins: null
+    stock_quantity: 8000
   },
   {
     lottery_prize_id: 168,
@@ -100,11 +94,10 @@ const REAL_PRIZE_POOL = [
     material_asset_code: 'DIAMOND',
     material_amount: 1,
     prize_value_points: 0,
+    budget_cost: 0,
     is_fallback: 0,
     win_weight: 300000,
-    stock_quantity: 99999,
-    max_daily_wins: null,
-    max_user_wins: null
+    stock_quantity: 99999
   },
   {
     lottery_prize_id: 169,
@@ -114,11 +107,10 @@ const REAL_PRIZE_POOL = [
     material_asset_code: null,
     material_amount: null,
     prize_value_points: 1,
+    budget_cost: 1,
     is_fallback: 0,
     win_weight: 350000,
-    stock_quantity: 99999,
-    max_daily_wins: null,
-    max_user_wins: null
+    stock_quantity: 99999
   },
   {
     lottery_prize_id: 170,
@@ -128,11 +120,45 @@ const REAL_PRIZE_POOL = [
     material_asset_code: null,
     material_amount: null,
     prize_value_points: 0,
+    budget_cost: 0,
     is_fallback: 1,
     win_weight: 350000,
-    stock_quantity: 99999,
-    max_daily_wins: null,
-    max_user_wins: null
+    stock_quantity: 99999
+  }
+]
+
+/**
+ * 扩展奖品池：包含碎片奖品（用于 BUG-1 修复验证）
+ * 碎片×50: pvp=8（分层标记），budget_cost=500（50 × 10）
+ * 碎片×3:  pvp=1（分层标记），budget_cost=30（3 × 10）
+ */
+const PRIZE_POOL_WITH_SHARDS = [
+  ...REAL_PRIZE_POOL,
+  {
+    lottery_prize_id: 201,
+    prize_name: '碎片×50',
+    prize_type: 'virtual',
+    reward_tier: 'high',
+    material_asset_code: 'red_shard',
+    material_amount: 50,
+    prize_value_points: 8,
+    budget_cost: 500,
+    is_fallback: 0,
+    win_weight: 100000,
+    stock_quantity: 100
+  },
+  {
+    lottery_prize_id: 202,
+    prize_name: '碎片×3',
+    prize_type: 'virtual',
+    reward_tier: 'low',
+    material_asset_code: 'red_shard',
+    material_amount: 3,
+    prize_value_points: 1,
+    budget_cost: 30,
+    is_fallback: 0,
+    win_weight: 200000,
+    stock_quantity: 1000
   }
 ]
 
@@ -184,26 +210,26 @@ describe('BuildPrizePoolStage — 资源级过滤', () => {
 
     /**
      * 场景2（核心场景）：预算耗尽（BUDGET=0），钻石配额充足（QUOTA=200）
-     * 期望：钻石×1 通过（走 DIAMOND_QUOTA 分支），幸运5积分(pvp=0) 通过，其余被预算过滤
+     * 期望：钻石×1 通过（走 DIAMOND_QUOTA 分支），budget_cost=0 的奖品通过，其余被过滤
      */
     test('场景2：预算耗尽 + 钻石配额充足 → 钻石通过、付费奖品被过滤', async () => {
       const result = await stage._filterByResourceEligibility(REAL_PRIZE_POOL, 31, 0)
 
       const surviving_ids = result.map(p => p.lottery_prize_id)
 
-      /* 钻石×1 (id=168, DIAMOND, amount=1) 必须存活 — 这是本次重构的核心验证 */
+      /* 钻石×1 (id=168, DIAMOND, amount=1) 必须存活 */
       expect(surviving_ids).toContain(168)
 
-      /* 幸运5积分 (id=170, pvp=0, is_fallback=1) 必须存活 */
+      /* 幸运5积分 (id=170, budget_cost=0, is_fallback=1) 必须存活 */
       expect(surviving_ids).toContain(170)
 
-      /* 付费奖品（pvp>0 且非 DIAMOND）全部被过滤 */
-      expect(surviving_ids).not.toContain(163) // 四人鸳鸯锅套餐 pvp=20
-      expect(surviving_ids).not.toContain(164) // 八折优惠券 pvp=15
-      expect(surviving_ids).not.toContain(165) // 招牌虾滑 pvp=10
-      expect(surviving_ids).not.toContain(166) // 精酿啤酒 pvp=8
-      expect(surviving_ids).not.toContain(167) // 九五折券 pvp=5
-      expect(surviving_ids).not.toContain(169) // 幸运5积分 pvp=1
+      /* 付费奖品（budget_cost>0 且非 DIAMOND）全部被过滤 */
+      expect(surviving_ids).not.toContain(163) // 四人鸳鸯锅套餐 budget_cost=20
+      expect(surviving_ids).not.toContain(164) // 八折优惠券 budget_cost=15
+      expect(surviving_ids).not.toContain(165) // 招牌虾滑 budget_cost=10
+      expect(surviving_ids).not.toContain(166) // 精酿啤酒 budget_cost=8
+      expect(surviving_ids).not.toContain(167) // 九五折券 budget_cost=5
+      expect(surviving_ids).not.toContain(169) // 幸运5积分 budget_cost=1
 
       expect(result).toHaveLength(2)
     })
@@ -287,21 +313,73 @@ describe('BuildPrizePoolStage — 资源级过滤', () => {
     })
   })
 
-  describe('档位门控移除验证', () => {
+  describe('碎片奖品 budget_cost 过滤验证（BUG-1 修复）', () => {
     /**
-     * 验证 _filterByAllowedTiers 函数仍然存在（用于回滚），
-     * 但 execute() 不再调用它
+     * BUG-1 核心验证：碎片×50 的 pvp=8 但 budget_cost=500
+     * 用户 BUDGET=60 时，pvp 判断会错误通过（8≤60），budget_cost 正确过滤（60<500）
      */
-    test('_filterByAllowedTiers 方法仍然存在（保留用于回滚）', () => {
-      expect(typeof stage._filterByAllowedTiers).toBe('function')
+    test('BUG-1：碎片×50（budget_cost=500）在 BUDGET=60 时被正确过滤', async () => {
+      const result = await stage._filterByResourceEligibility(PRIZE_POOL_WITH_SHARDS, 31, 60)
+      const surviving_ids = result.map(p => p.lottery_prize_id)
+
+      expect(surviving_ids).not.toContain(201) // 碎片×50 budget_cost=500 > 60
+      expect(surviving_ids).toContain(202) // 碎片×3 budget_cost=30 ≤ 60
     })
 
+    /**
+     * 碎片×3（budget_cost=30）在 BUDGET=29 时被过滤，BUDGET=30 时通过
+     */
+    test('碎片×3 的过滤边界：budget_cost=30 vs BUDGET=29/30', async () => {
+      const result29 = await stage._filterByResourceEligibility(PRIZE_POOL_WITH_SHARDS, 31, 29)
+      expect(result29.map(p => p.lottery_prize_id)).not.toContain(202)
+
+      const result30 = await stage._filterByResourceEligibility(PRIZE_POOL_WITH_SHARDS, 31, 30)
+      expect(result30.map(p => p.lottery_prize_id)).toContain(202)
+    })
+
+    /**
+     * BUDGET=500 恰好等于碎片×50 的 budget_cost=500 → 通过（边界值）
+     */
+    test('BUDGET=500 等于碎片×50 budget_cost=500 → 恰好通过（边界值）', async () => {
+      const result = await stage._filterByResourceEligibility(PRIZE_POOL_WITH_SHARDS, 31, 500)
+      const surviving_ids = result.map(p => p.lottery_prize_id)
+
+      expect(surviving_ids).toContain(201) // 碎片×50 budget_cost=500 ≤ 500
+      expect(surviving_ids).toContain(202) // 碎片×3 budget_cost=30 ≤ 500
+    })
+
+    /**
+     * BUDGET=499 不够碎片×50 的 budget_cost=500 → 过滤
+     */
+    test('BUDGET=499 小于碎片×50 budget_cost=500 → 过滤', async () => {
+      const result = await stage._filterByResourceEligibility(PRIZE_POOL_WITH_SHARDS, 31, 499)
+      const surviving_ids = result.map(p => p.lottery_prize_id)
+
+      expect(surviving_ids).not.toContain(201) // 碎片×50 budget_cost=500 > 499
+      expect(surviving_ids).toContain(202) // 碎片×3 budget_cost=30 ≤ 499
+    })
+
+    /**
+     * 碎片配额耗尽后只剩保底和钻石
+     */
+    test('碎片配额耗尽 → 碎片全过滤，钻石和保底保留', async () => {
+      const result = await stage._filterByResourceEligibility(PRIZE_POOL_WITH_SHARDS, 31, 0)
+      const surviving_ids = result.map(p => p.lottery_prize_id)
+
+      expect(surviving_ids).not.toContain(201)
+      expect(surviving_ids).not.toContain(202)
+      expect(surviving_ids).toContain(168) // 钻石
+      expect(surviving_ids).toContain(170) // 保底
+    })
+  })
+
+  describe('方法存在性验证', () => {
     test('_filterByResourceEligibility 方法已添加', () => {
       expect(typeof stage._filterByResourceEligibility).toBe('function')
     })
 
-    test('_filterByBudget 方法仍然存在（保留用于回滚）', () => {
-      expect(typeof stage._filterByBudget).toBe('function')
+    test('_filterByBudget 已删除（被 _filterByResourceEligibility 取代）', () => {
+      expect(typeof stage._filterByBudget).toBe('undefined')
     })
   })
 })

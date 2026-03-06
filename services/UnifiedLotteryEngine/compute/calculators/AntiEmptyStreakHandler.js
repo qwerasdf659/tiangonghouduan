@@ -278,8 +278,8 @@ class AntiEmptyStreakHandler {
         continue
       }
 
-      // 找出最低成本
-      const min_cost = Math.min(...tier_prizes.map(p => p.prize_value_points || 0))
+      // 找出最低成本（用 budget_cost 与过滤/扣减口径一致，避免"幽灵保底"）
+      const min_cost = Math.min(...tier_prizes.map(p => p.budget_cost || 0))
 
       // 检查预算是否足够
       if (effective_budget >= min_cost || effective_budget === Infinity) {

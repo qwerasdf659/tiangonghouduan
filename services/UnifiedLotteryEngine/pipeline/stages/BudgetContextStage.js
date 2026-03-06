@@ -179,14 +179,14 @@ class BudgetContextStage extends BaseStage {
   }
 
   /**
-   * 计算最低奖品成本
+   * 计算最低奖品预算成本
    *
    * 业务规则：
-   * - 排除空奖（prize_value_points = 0）
-   * - 找出最小的 prize_value_points
+   * - 排除空奖（budget_cost = 0）
+   * - 找出最小的 budget_cost（与过滤/扣减口径一致）
    *
    * @param {Array} prizes - 奖品列表
-   * @returns {number} 最低奖品成本
+   * @returns {number} 最低奖品预算成本
    * @private
    */
   _calculateMinPrizeCost(prizes) {
@@ -194,9 +194,8 @@ class BudgetContextStage extends BaseStage {
       return 0
     }
 
-    // 过滤出有价值的奖品（prize_value_points > 0）
     const valuable_prizes = prizes.filter(p => {
-      const cost = p.prize_value_points || 0
+      const cost = p.budget_cost || 0
       return cost > 0
     })
 
@@ -204,8 +203,7 @@ class BudgetContextStage extends BaseStage {
       return 0
     }
 
-    // 找出最小成本
-    const min_cost = Math.min(...valuable_prizes.map(p => p.prize_value_points || 0))
+    const min_cost = Math.min(...valuable_prizes.map(p => p.budget_cost || 0))
 
     return min_cost
   }

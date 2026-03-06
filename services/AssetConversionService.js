@@ -321,9 +321,9 @@ class AssetConversionService {
         fee_amount,
         fee_asset_code,
         to_amount: net_to_amount,
-        from_tx_id: existing_record.transaction_id,
-        to_tx_id: existing_credit?.transaction_id || null,
-        fee_tx_id: existing_fee?.transaction_id || null,
+        from_tx_id: existing_record.asset_transaction_id,
+        to_tx_id: existing_credit?.asset_transaction_id || null,
+        fee_tx_id: existing_fee?.asset_transaction_id || null,
         from_balance: from_balance_obj.available_amount,
         to_balance: to_balance_obj.available_amount,
         is_duplicate: true,
@@ -419,7 +419,7 @@ class AssetConversionService {
         user_id,
         fee_amount,
         fee_asset_code,
-        fee_tx_id: fee_result.transaction_record.transaction_id
+        fee_tx_id: fee_result.transaction_record.asset_transaction_id
       })
     }
 
@@ -431,9 +431,9 @@ class AssetConversionService {
       gross_to_amount,
       fee_amount,
       net_to_amount,
-      from_tx_id: from_result.transaction_record.transaction_id,
-      to_tx_id: to_result.transaction_record.transaction_id,
-      fee_tx_id: fee_result?.transaction_record.transaction_id || null,
+      from_tx_id: from_result.transaction_record.asset_transaction_id,
+      to_tx_id: to_result.transaction_record.asset_transaction_id,
+      fee_tx_id: fee_result?.transaction_record.asset_transaction_id || null,
       idempotency_key
     })
 
@@ -446,9 +446,9 @@ class AssetConversionService {
       fee_amount,
       fee_asset_code,
       to_amount: net_to_amount,
-      from_tx_id: from_result.transaction_record.transaction_id,
-      to_tx_id: to_result.transaction_record.transaction_id,
-      fee_tx_id: fee_result?.transaction_record.transaction_id || null,
+      from_tx_id: from_result.transaction_record.asset_transaction_id,
+      to_tx_id: to_result.transaction_record.asset_transaction_id,
+      fee_tx_id: fee_result?.transaction_record.asset_transaction_id || null,
       from_balance: from_result.balance.available_amount,
       to_balance: to_result.balance.available_amount,
       is_duplicate: false,

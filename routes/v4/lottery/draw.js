@@ -236,6 +236,14 @@ router.post(
             sort_order: prize.prize?.sort_order,
             /** 稀有度代码（FK→rarity_defs，前端直接使用此字段名显示对应颜色光效） */
             rarity_code: prize.prize?.rarity_code || 'common'
+            /*
+             * 🔒 以下字段仅保留在引擎内部（settle_result / draw_result），不对小程序普通用户暴露：
+             *   - budget_cost：商业敏感，暴露内部预算成本结构
+             *   - material_asset_code：暴露内部资产编码体系
+             *   - material_amount：暴露虚拟物品发放明细（可通过 prize_name 推断）
+             *   - prize_value_points：后端分层阈值标记，无前端展示意义
+             * 小程序端通过 prize_name（如"碎片×3"）+ prize_type + rarity_code 完成展示
+             */
           }
         }),
         total_points_cost: drawResult.total_points_cost, // 实际消耗积分（折后价）

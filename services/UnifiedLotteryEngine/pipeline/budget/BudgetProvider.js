@@ -141,9 +141,9 @@ class BudgetProvider {
     const budget_info = await this.getAvailableBudget(params, options)
     const available = budget_info.available
 
-    // 过滤奖品：只保留预算足够的奖品
+    // 过滤奖品：只保留预算足够的奖品（用 budget_cost 与过滤/扣减口径一致）
     const filtered = prizes.filter(prize => {
-      const prize_cost = prize.prize_value_points || 0
+      const prize_cost = prize.budget_cost || 0
       return prize_cost <= available
     })
 

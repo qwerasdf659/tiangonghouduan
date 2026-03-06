@@ -345,7 +345,11 @@ class UnifiedLotteryEngine {
            * rarity_code: 稀有度代码（来自 settle_result，原始来源 rarity_defs 外键）
            */
           sort_order: settleResult.sort_order,
-          rarity_code: settleResult.rarity_code || 'common'
+          rarity_code: settleResult.rarity_code || 'common',
+          /** 虚拟物品展示字段（碎片配额修复方案新增） */
+          material_asset_code: settleResult.material_asset_code || null,
+          material_amount: settleResult.material_amount || null,
+          budget_cost: settleResult.budget_cost || 0
         }
       },
       // 元数据
@@ -1122,7 +1126,11 @@ class UnifiedLotteryEngine {
                   value: drawResult.data.draw_result.prize_value,
                   sort_order: drawResult.data.draw_result.sort_order,
                   /** 稀有度代码（前端直接使用此字段名显示对应颜色光效） */
-                  rarity_code: drawResult.data.draw_result.rarity_code || 'common'
+                  rarity_code: drawResult.data.draw_result.rarity_code || 'common',
+                  /** 虚拟物品展示字段（碎片配额修复方案新增） */
+                  material_asset_code: drawResult.data.draw_result.material_asset_code || null,
+                  material_amount: drawResult.data.draw_result.material_amount || null,
+                  budget_cost: drawResult.data.draw_result.budget_cost || 0
                 }
               : null,
             points_cost: drawResult.data?.draw_result?.points_cost || 0

@@ -683,7 +683,7 @@ describe('策略引擎边界场景测试', () => {
           available_tiers: { fallback: true, low: true },
           effective_budget: 500,
           prizes_by_tier: {
-            low: [{ lottery_prize_id: 1, prize_value_points: 50 }]
+            low: [{ lottery_prize_id: 1, prize_value_points: 50, budget_cost: 50 }]
           },
           user_id: 1
         })
@@ -700,7 +700,7 @@ describe('策略引擎边界场景测试', () => {
           available_tiers: { fallback: true, low: true },
           effective_budget: 500,
           prizes_by_tier: {
-            low: [{ lottery_prize_id: 1, prize_value_points: 50 }]
+            low: [{ lottery_prize_id: 1, prize_value_points: 50, budget_cost: 50 }]
           },
           user_id: 1
         })
@@ -718,7 +718,7 @@ describe('策略引擎边界场景测试', () => {
           available_tiers: { fallback: true, low: true },
           effective_budget: 500,
           prizes_by_tier: {
-            low: [{ lottery_prize_id: 1, prize_value_points: 50 }]
+            low: [{ lottery_prize_id: 1, prize_value_points: 50, budget_cost: 50 }]
           },
           user_id: 1
         })
@@ -737,7 +737,7 @@ describe('策略引擎边界场景测试', () => {
           available_tiers: { fallback: true, low: true },
           effective_budget: 0,
           prizes_by_tier: {
-            low: [{ lottery_prize_id: 1, prize_value_points: 50 }]
+            low: [{ lottery_prize_id: 1, prize_value_points: 50, budget_cost: 50 }]
           },
           user_id: 1
         })
@@ -755,7 +755,7 @@ describe('策略引擎边界场景测试', () => {
           available_tiers: { fallback: true, low: true },
           effective_budget: 50, // 刚好等于 low 档位最低成本
           prizes_by_tier: {
-            low: [{ lottery_prize_id: 1, prize_value_points: 50 }]
+            low: [{ lottery_prize_id: 1, prize_value_points: 50, budget_cost: 50 }]
           },
           user_id: 1
         })
@@ -773,7 +773,7 @@ describe('策略引擎边界场景测试', () => {
           available_tiers: { fallback: true, low: true },
           effective_budget: 49, // 比 low 档位最低成本少 1
           prizes_by_tier: {
-            low: [{ lottery_prize_id: 1, prize_value_points: 50 }]
+            low: [{ lottery_prize_id: 1, prize_value_points: 50, budget_cost: 50 }]
           },
           user_id: 1
         })
@@ -790,7 +790,7 @@ describe('策略引擎边界场景测试', () => {
           available_tiers: { fallback: true, low: true },
           effective_budget: Infinity,
           prizes_by_tier: {
-            low: [{ lottery_prize_id: 1, prize_value_points: 50 }]
+            low: [{ lottery_prize_id: 1, prize_value_points: 50, budget_cost: 50 }]
           },
           user_id: 1
         })
@@ -858,7 +858,7 @@ describe('策略引擎边界场景测试', () => {
           available_tiers: { low: false, mid: false, high: false },
           effective_budget: 500,
           prizes_by_tier: {
-            low: [{ lottery_prize_id: 1, prize_value_points: 50 }]
+            low: [{ lottery_prize_id: 1, prize_value_points: 50, budget_cost: 50 }]
           },
           user_id: 1
         })
@@ -874,7 +874,7 @@ describe('策略引擎边界场景测试', () => {
           available_tiers: {},
           effective_budget: 500,
           prizes_by_tier: {
-            low: [{ lottery_prize_id: 1, prize_value_points: 50 }]
+            low: [{ lottery_prize_id: 1, prize_value_points: 50, budget_cost: 50 }]
           },
           user_id: 1
         })
@@ -935,7 +935,7 @@ describe('策略引擎边界场景测试', () => {
           available_tiers: { fallback: true, low: true },
           effective_budget: 500,
           prizes_by_tier: {
-            low: [{ lottery_prize_id: 1, prize_value_points: 50 }]
+            low: [{ lottery_prize_id: 1, prize_value_points: 50, budget_cost: 50 }]
           },
           user_id: 1
         })
@@ -952,7 +952,7 @@ describe('策略引擎边界场景测试', () => {
           available_tiers: { fallback: true, low: true },
           effective_budget: 500,
           prizes_by_tier: {
-            low: [{ lottery_prize_id: 1, prize_value_points: 50 }]
+            low: [{ lottery_prize_id: 1, prize_value_points: 50, budget_cost: 50 }]
           },
           user_id: 1
         })
@@ -1353,7 +1353,7 @@ describe('策略引擎边界场景测试', () => {
         available_tiers: { fallback: true, low: true },
         effective_budget: 100,
         prizes_by_tier: {
-          low: [{ lottery_prize_id: 1, prize_value_points: 50 }]
+          low: [{ lottery_prize_id: 1, prize_value_points: 50, budget_cost: 50 }]
         },
         user_id: 1
       })

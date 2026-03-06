@@ -975,7 +975,20 @@ module.exports = sequelize => {
         type: DataTypes.INTEGER,
         allowNull: false,
         defaultValue: 0,
-        comment: '奖品价值积分（统一价值单位）'
+        comment: '分层阈值标记（仅用于 BudgetTierCalculator 档位准入计算，非扣减金额）'
+      },
+
+      /**
+       * 奖品总预算成本（过滤 + 扣减用）
+       * - BuildPrizePoolStage 用此字段做资格过滤：budget_before >= budget_cost
+       * - SettleStage 用此字段做配额扣减金额
+       * - pvp（prize_value_points）仅管分层阈值，不参与过滤和扣减
+       */
+      budget_cost: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
+        comment: '奖品总预算成本（过滤+扣减用），pvp 仅管分层阈值'
       },
 
       // ======================== 统一抽奖架构新字段 ========================

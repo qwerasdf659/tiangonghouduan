@@ -119,11 +119,11 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
   afterEach(async () => {
     /*
      * 每个测试后清理创建的测试数据
-     * 按幂等键模式清理测试创建的流水记录
+     * 按 asset_transaction_id（主键）清理测试创建的流水记录
      */
-    for (const transaction_id of created_transactions) {
+    for (const tx_id of created_transactions) {
       try {
-        await AssetTransaction.destroy({ where: { transaction_id }, force: true })
+        await AssetTransaction.destroy({ where: { asset_transaction_id: tx_id }, force: true })
       } catch (error) {
         // 忽略清理错误
       }
@@ -1045,9 +1045,10 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
     it('材料余额不足时应抛出 INSUFFICIENT_BALANCE 错误', async () => {
       /*
        * 业务场景：用户尝试转换数量超过其持有量的材料
-       * 期望行为：
-       * 1. 拒绝转换
-       * 2. 抛出余额不足错误
+       * 期望行为：拒绝转换，抛出余额不足错误
+       *
+       * 策略：先把余额降到很低（3），再尝试转换 5。
+       * 5 ≤ 任何 max_from_amount 限制（不触发超限），5 > 3（触发余额不足）
        */
 
       // 获取当前余额
@@ -1057,11 +1058,29 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
           { transaction }
         )
       })
-
       const current_balance = Number(balanceResult?.available_amount || 0)
 
-      // 尝试转换比余额多的数量
-      const excessive_amount = current_balance + 10000
+      // 先把余额降到 3，确保后续转换 5 时触发"余额不足"
+      const target_balance = 3
+      if (current_balance > target_balance) {
+        const reduction = current_balance - target_balance
+        await TransactionManager.execute(async transaction => {
+          await BalanceService.changeBalance(
+            {
+              user_id: test_user_id,
+              asset_code: 'red_shard',
+              delta_amount: -reduction,
+              idempotency_key: generateIdempotencyKey('reduce_for_insufficient_test'),
+              business_type: 'test_burn',
+              counterpart_account_id: 2,
+              meta: { test: true, purpose: '余额不足测试准备' }
+            },
+            { transaction }
+          )
+        })
+      }
+
+      // 转换 5 > 余额 3 → 应触发余额不足（5 远小于 max_from_amount，不会触发超限）
       const idempotency_key = generateIdempotencyKey('convert_insufficient')
 
       await expect(
@@ -1070,14 +1089,14 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
             test_user_id,
             'red_shard',
             'DIAMOND',
-            excessive_amount, // 超过余额
+            5,
             {
               transaction,
               idempotency_key
             }
           )
         })
-      ).rejects.toThrow(/余额不足|INSUFFICIENT_BALANCE/)
+      ).rejects.toThrow(/余额不足|INSUFFICIENT_BALANCE|可用余额不足/)
     })
 
     it('余额刚好等于转换数量时应成功执行', async () => {
