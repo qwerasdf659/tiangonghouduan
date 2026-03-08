@@ -568,9 +568,23 @@ class SettleStage extends BaseStage {
         },
         { transaction }
       )
-      return result.deducted || amount
+
+      if (!result.success) {
+        this.log('warn', '预算扣减失败：余额不足，跳过预算消耗', {
+          user_id,
+          lottery_campaign_id,
+          lottery_prize_id,
+          required: amount,
+          available: result.remaining,
+          shortage: result.shortage
+        })
+        return 0
+      }
+
+      return result.deducted
     } catch (error) {
-      this.log('error', '预算扣减失败', {
+      this.log('error', '预算扣减异常', {
+        user_id: options.user_id,
         amount,
         error: error.message
       })
@@ -1203,12 +1217,14 @@ class SettleStage extends BaseStage {
       const experience_manager = new ExperienceStateManager()
 
       /**
-       * 🔴 2026-02-15 严重BUG修复：is_empty 判定逻辑
+       * 🔴 2026-03-06 业务语义修正：is_empty 判定逻辑
        *
-       * 修复方案：只有 'fallback' 和 'empty' 档位才算真正的空奖
-       * low 档位的零值奖品是"参与奖"，不计入空奖统计
+       * 业务规则：每次抽奖100%获得奖品（只是价值不同）
+       * - fallback 是保底奖品（真实奖品），不算空奖
+       * - 只有 'empty' 才算真正的空奖（理论上不应出现）
+       * - low 档位的零值奖品是"参与奖"，不计入空奖统计
        */
-      const is_empty = final_tier === 'empty' || final_tier === 'fallback'
+      const is_empty = final_tier === 'empty'
 
       await experience_manager.updateState(
         {

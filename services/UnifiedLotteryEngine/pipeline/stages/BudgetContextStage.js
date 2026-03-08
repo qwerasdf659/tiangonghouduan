@@ -96,11 +96,10 @@ class BudgetContextStage extends BaseStage {
         budget_mode
       })
 
-      /* 1. 创建 BudgetProvider 实例 */
-      const budget_provider = budgetProviderFactory.createByMode(budget_mode, {
+      /* 1. 创建 BudgetProvider 实例（使用 create 方法，确保 allowed_campaign_ids 正确传递） */
+      const budget_provider = budgetProviderFactory.create(campaign, {
         user_id,
         lottery_campaign_id,
-        campaign,
         transaction: context.transaction || null
       })
 

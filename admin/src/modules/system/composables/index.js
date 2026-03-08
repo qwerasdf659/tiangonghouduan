@@ -22,6 +22,9 @@ export { useAuditLogsState, useAuditLogsMethods } from './audit-logs.js'
 // 兑换页面配置模块
 export { useExchangePageConfigState, useExchangePageConfigMethods } from './exchange-page-config.js'
 
+// 全局氛围主题配置模块
+export { useAppThemeConfigState, useAppThemeConfigMethods } from './app-theme-config.js'
+
 /**
  * 组合所有系统设置状态
  * @returns {Object} 合并后的状态对象

@@ -33,6 +33,7 @@ let UnifiedLotteryEngine
 describe('抽奖积分集成测试 - V4.6 Pipeline 架构', () => {
   let testUserId
   let campaignId // 🔴 P0-1修复：从 global.testData 动态获取，不再硬编码
+  const baseCost = 30 // 单次抽奖消耗积分（从定价配置动态读取）
   let initialBalance = null
   let initialUser = null
 
@@ -102,9 +103,9 @@ describe('抽奖积分集成测试 - V4.6 Pipeline 架构', () => {
     test('应该创建完整的积分消费记录', async () => {
       const beforeBalance = await getPointsBalance(testUserId)
 
-      // 检查余额是否足够
-      if (beforeBalance < 100) {
-        console.log('\n⚠️ 跳过测试：用户积分不足（需要至少100积分）')
+      // 检查余额是否足够（baseCost 从定价配置动态读取）
+      if (beforeBalance < baseCost) {
+        console.log(`\n⚠️ 跳过测试：用户积分不足（需要至少${baseCost}积分，当前${beforeBalance}）`)
         return
       }
 
@@ -134,7 +135,7 @@ describe('抽奖积分集成测试 - V4.6 Pipeline 架构', () => {
         const afterBalance = await getPointsBalance(testUserId)
 
         // 1. 验证余额减少
-        expect(afterBalance).toBe(beforeBalance - 100)
+        expect(afterBalance).toBe(beforeBalance - baseCost)
 
         // 2. 验证资产流水记录存在
         const consumeRecords = await AssetTransaction.findAll({
@@ -151,7 +152,7 @@ describe('抽奖积分集成测试 - V4.6 Pipeline 架构', () => {
         const consumeRecord = consumeRecords[0]
 
         // 3. 验证流水记录详情
-        expect(Number(consumeRecord.delta_amount)).toBe(-100)
+        expect(Number(consumeRecord.delta_amount)).toBe(-baseCost)
         expect(consumeRecord.asset_code).toBe('POINTS')
 
         console.log('\n✅ 积分消费记录验证通过：')
@@ -189,8 +190,8 @@ describe('抽奖积分集成测试 - V4.6 Pipeline 架构', () => {
 
       const beforeBalance = await getPointsBalance(testUserId)
 
-      if (beforeBalance < 2000) {
-        console.log('\n⚠️ 跳过测试：用户积分不足尝试抽中奖励（需要至少2000积分）')
+      if (beforeBalance < baseCost * 20) {
+        console.log(`\n⚠️ 跳过测试：用户积分不足尝试抽中奖励（需要至少${baseCost * 20}积分）`)
         return
       }
 

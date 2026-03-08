@@ -8,21 +8,23 @@
 </head>
 <body class="themed-bg-subtle min-h-screen">
 
-  <!-- 导航栏 -->
-  <nav class="bg-emerald-600 text-white shadow-lg">
-    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
-      <div class="flex items-center space-x-4">
-        <a href="/admin/workspace.html" class="hover:text-emerald-200">← 返回工作台</a>
-        <span class="text-lg font-semibold">💱 汇率兑换管理</span>
-      </div>
-      <button @click="openCreateForm()" class="bg-white text-emerald-600 px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-emerald-50">
-        + 新增汇率规则
-      </button>
-    </div>
-  </nav>
+  <!-- 页面主体（x-data 包裹导航栏和内容，确保按钮在组件作用域内） -->
+  <div x-data="exchangeRateManagementPage()" x-init="init()">
 
-  <!-- 页面主体 -->
-  <div class="container mx-auto px-4 py-6" x-data="exchangeRateManagementPage()" x-init="init()">
+    <!-- 导航栏 -->
+    <nav class="bg-emerald-600 text-white shadow-lg">
+      <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+        <div class="flex items-center space-x-4">
+          <a href="/admin/workspace.html" class="hover:text-emerald-200">← 返回工作台</a>
+          <span class="text-lg font-semibold">💱 汇率兑换管理</span>
+        </div>
+        <button @click="openCreateForm()" class="bg-white text-emerald-600 px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-emerald-50">
+          + 新增汇率规则
+        </button>
+      </div>
+    </nav>
+
+    <div class="container mx-auto px-4 py-6">
 
     <!-- ==================== 页面横幅 ==================== -->
     <div class="themed-card rounded-lg shadow p-4 mb-6 border-l-4 border-emerald-500">
@@ -234,7 +236,8 @@
       </div>
     </template>
 
-  </div>
+    </div><!-- /.container -->
+  </div><!-- /x-data -->
 
   <!-- JS 模块 -->
   <script type="module" src="/src/alpine/index.js"></script>

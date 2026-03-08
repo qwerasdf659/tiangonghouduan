@@ -721,7 +721,7 @@ export function usePrizesMethods() {
       // D13: 格位数量校验
       if (this.managingCampaign?.display_mode) {
         const display_mode = this.managingCampaign.display_mode
-        const FIXED_SLOTS = { grid_3x3: 8, grid_4x4: 12 }
+        const FIXED_SLOTS = { grid_3x3: 8, grid_4x3: 12, grid_4x4: 16 }
         const FLEXIBLE_RANGE = {
           wheel: { min: 4, max: 12 },
           card_flip: { min: 4, max: 20 },
@@ -1179,7 +1179,7 @@ export function usePrizesMethods() {
       this.batchPrizes = [
         {
           prize_name: '一等奖',
-          prize_type: 'physical',
+          prize_type: 'virtual',
           win_probability: 0.05,
           stock_quantity: 10,
           prize_description: '',
@@ -1195,7 +1195,7 @@ export function usePrizesMethods() {
         },
         {
           prize_name: '三等奖',
-          prize_type: 'points',
+          prize_type: 'virtual',
           win_probability: 0.3,
           stock_quantity: 200,
           prize_description: '',

@@ -114,13 +114,15 @@
       <div x-data="dataTable({
         columns: tableColumns,
         dataSource: fetchTableData,
-        primaryKey: 'account_id',
+        primaryKey: '_row_id',
         sortable: true,
         selectable: true,
         exportable: false,
         page_size: 20,
         emptyText: '暂无孤儿/冻结资产数据'
-      })" x-init="init()" @dt-refresh.window="refresh()">
+      })" x-init="init(); $watch('selectedRows', () => {
+        window.dispatchEvent(new CustomEvent('orphan-selection-changed', {detail: {rows: getSelectedRows()}}))
+      })" @dt-refresh.window="refresh()">
         <%- include('components/data-table') %>
       </div>
     </div>

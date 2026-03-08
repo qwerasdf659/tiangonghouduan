@@ -57,6 +57,16 @@ class LotteryPrize extends Model {
       })
     }
 
+    // 关联到材料资产类型（通过 material_asset_code 查询材料图标）
+    if (models.MaterialAssetType) {
+      LotteryPrize.belongsTo(models.MaterialAssetType, {
+        foreignKey: 'material_asset_code',
+        targetKey: 'asset_code',
+        as: 'materialAssetType',
+        constraints: false
+      })
+    }
+
     // 关联到稀有度字典（多活动抽奖系统 - 前端视觉稀有度等级）
     if (models.RarityDef) {
       LotteryPrize.belongsTo(models.RarityDef, {

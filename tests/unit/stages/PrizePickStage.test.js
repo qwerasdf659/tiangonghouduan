@@ -308,27 +308,32 @@ describe('【P1】奖品选择器专项测试 - PrizePickStage', () => {
       console.log('   ✅ override/force_win 模式正确使用指定奖品')
     })
 
-    test('override 模式（force_lose）应该使用兜底奖品', () => {
+    test('override 模式（force_lose）应该使用低档奖品', () => {
       console.log('📊 2.4.3.3 验证 override/force_lose 模式...')
 
+      /**
+       * 2026-03-06 业务语义修正：
+       * 100%出奖设计下，force_lose 意为"强制低档奖品"
+       * selected_tier 应为 'low'，skip_reason 为 'override_force_lose_low_tier'
+       */
       const overrideResult = {
         selected_prize: {
           lottery_prize_id: 777,
-          prize_name: '谢谢参与',
-          reward_tier: 'fallback'
+          prize_name: '幸运积分',
+          reward_tier: 'low'
         },
         decision_source: 'override',
-        selected_tier: 'fallback',
+        selected_tier: 'low',
         skipped: true,
-        skip_reason: 'override_force_lose'
+        skip_reason: 'override_force_lose_low_tier'
       }
 
       expect(overrideResult.decision_source).toBe('override')
-      expect(overrideResult.selected_tier).toBe('fallback')
-      expect(overrideResult.skip_reason).toBe('override_force_lose')
+      expect(overrideResult.selected_tier).toBe('low')
+      expect(overrideResult.skip_reason).toBe('override_force_lose_low_tier')
 
-      console.log(`   兜底奖品: ${overrideResult.selected_prize.prize_name}`)
-      console.log('   ✅ override/force_lose 模式正确使用兜底奖品')
+      console.log(`   低档奖品: ${overrideResult.selected_prize.prize_name}`)
+      console.log('   ✅ override/force_lose 模式正确使用低档奖品（100%出奖）')
     })
 
     test('guarantee 模式应该使用保底奖品', () => {

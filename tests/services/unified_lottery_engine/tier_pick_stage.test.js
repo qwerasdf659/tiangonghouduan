@@ -441,7 +441,7 @@ describe('TierPickStage 层级选择器测试（任务2.3）', () => {
       console.log('✅ override(force_win)模式正确使用high档位')
     })
 
-    test('override模式（force_lose）应该使用fallback档位', async () => {
+    test('override模式（force_lose）应该使用low档位（100%出奖）', async () => {
       const context = create_test_context()
 
       if (!context) {
@@ -468,9 +468,10 @@ describe('TierPickStage 层级选择器测试（任务2.3）', () => {
       expect(result.success).toBe(true)
       expect(result.data.skipped).toBe(true)
       expect(result.data.skip_reason).toBe('override_mode')
-      expect(result.data.selected_tier).toBe('fallback')
+      /* 2026-03-06 修正：force_lose 现在选择 low 档位而非 fallback */
+      expect(result.data.selected_tier).toBe('low')
 
-      console.log('✅ override(force_lose)模式正确使用fallback档位')
+      console.log('✅ override(force_lose)模式正确使用low档位（100%出奖）')
     })
 
     test('guarantee模式应该强制使用high档位', async () => {

@@ -542,11 +542,12 @@ class LotteryComputeEngine {
 
     try {
       /**
-       * 🔴 2026-02-15 修复：is_empty 判定逻辑
-       * 只有 'fallback' 和 'empty' 档位才是真正的空奖
+       * 🔴 2026-03-06 业务语义修正：is_empty 判定逻辑
+       * 100%出奖设计：fallback 是保底奖品（真实奖品），不算空奖
+       * 只有 'empty' 才算真正的空奖（理论上不应出现）
        * prize_value_points=0 的 low 档位奖品是"参与奖"，不计入空奖
        */
-      const is_empty = is_empty_prize || reward_tier === 'empty' || reward_tier === 'fallback'
+      const is_empty = is_empty_prize || reward_tier === 'empty'
 
       const experience_state = await this.experienceStateManager.updateState(
         {

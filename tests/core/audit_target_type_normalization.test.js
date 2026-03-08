@@ -45,7 +45,8 @@ describe('审计日志 target_type 命名统一测试', () => {
       expect(AUDIT_TARGET_TYPES.ASSET_TRANSACTION).toBe('asset_transaction')
 
       // 物品与库存
-      expect(AUDIT_TARGET_TYPES.ITEM_INSTANCE).toBe('item')
+      expect(AUDIT_TARGET_TYPES.ITEM).toBe('item')
+      expect(AUDIT_TARGET_TYPES.ITEM_INSTANCE).toBe('item_instance')
 
       // 市场交易
       expect(AUDIT_TARGET_TYPES.MARKET_LISTING).toBe('market_listing')
@@ -154,7 +155,8 @@ describe('审计日志 target_type 命名统一测试', () => {
       expect(getTargetTypeDisplayName('user')).toBe('用户')
       expect(getTargetTypeDisplayName('account_asset_balance')).toBe('资产余额')
       expect(getTargetTypeDisplayName('asset_transaction')).toBe('资产流水')
-      expect(getTargetTypeDisplayName('item')).toBe('道具实例')
+      expect(getTargetTypeDisplayName('item')).toBe('物品')
+      expect(getTargetTypeDisplayName('item_instance')).toBe('道具实例')
       expect(getTargetTypeDisplayName('market_listing')).toBe('市场挂牌')
       expect(getTargetTypeDisplayName('trade_order')).toBe('交易订单')
     })

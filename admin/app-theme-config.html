@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <%- include('partials/head', { 
+    title: '全局氛围主题配置', 
+    pageStyle: '[x-cloak] { display: none !important; } .theme-card { cursor: pointer; transition: all 0.25s ease; border: 2px solid transparent; } .theme-card:hover { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(0,0,0,0.12); } .theme-card.selected { border-color: var(--color-primary, #3b82f6); box-shadow: 0 0 0 3px rgba(59,130,246,0.2), 0 8px 24px rgba(59,130,246,0.15); } .theme-preview { width: 100%; height: 80px; border-radius: 8px; position: relative; overflow: hidden; } .theme-preview-dot { width: 24px; height: 24px; border-radius: 50%; position: absolute; } .section-help { background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border: 1px solid #bae6fd; border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; } .section-help p { color: #0369a1; font-size: 13px; line-height: 1.6; }' 
+  }) %>
+</head>
+<body class="themed-bg-subtle min-h-screen" x-data="appThemeConfigPage()" x-init="init()" x-cloak>
+
+  <!-- 导航栏 -->
+  <nav class="page-navbar">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/workspace.html" class="text-blue-200 hover:text-white transition-colors">&larr; 返回工作台</a>
+        <span class="text-lg font-semibold">🎨 全局氛围主题配置</span>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mx-auto px-4 py-6">
+
+    <!-- 页面横幅 -->
+    <div class="page-banner mb-6">
+      <div class="flex justify-between items-center">
+        <div>
+          <h1>🎨 全局氛围主题配置</h1>
+          <p>一键切换小程序所有页面的视觉风格，抽奖/商城/发现/我的 四个 Tab 统一应用</p>
+        </div>
+        <div class="text-6xl opacity-20 hidden md:block">🎨</div>
+      </div>
+    </div>
+
+    <!-- 操作栏 -->
+    <div class="flex justify-between items-center mb-6">
+      <div class="flex items-center gap-3">
+        <template x-if="configUpdatedAt">
+          <span class="badge-gray text-xs">
+            最后更新: <span x-text="formatDateTime(configUpdatedAt)"></span>
+          </span>
+        </template>
+        <template x-if="configModified">
+          <span class="badge-warning text-xs">&#9889; 有未保存的修改</span>
+        </template>
+      </div>
+      <div class="flex items-center gap-3">
+        <button @click="resetAppThemeConfig()" class="btn btn-outline btn-sm" :disabled="!configModified">
+          &#128260; 重置
+        </button>
+        <button @click="saveAppThemeConfig()" class="action-btn action-btn-primary btn-sm" :disabled="saving || !configModified">
+          <span x-show="saving" class="animate-spin mr-1">&#9696;</span>
+          <span x-text="saving ? '保存中...' : '&#128190; 保存配置'"></span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 加载状态 -->
+    <template x-if="loading">
+      <div class="flex justify-center py-20">
+        <div class="text-gray-400 text-center">
+          <div class="animate-spin text-4xl mb-3">&#9696;</div>
+          <p>加载配置中...</p>
+        </div>
+      </div>
+    </template>
+
+    <!-- 主题选择区 -->
+    <template x-if="!loading">
+      <div>
+        <!-- 说明 -->
+        <div class="section-help">
+          <p>&#128161; 全局氛围主题控制小程序所有 Tab 页面的视觉风格。切换主题后，用户下次打开小程序即可看到新风格。如果某个抽奖活动单独设置了主题，活动页面会使用活动自身主题，其他页面仍使用全局主题。</p>
+        </div>
+
+        <!-- 当前主题状态 -->
+        <div class="content-section mb-6">
+          <div class="content-section-header">
+            <div class="section-title">
+              <span class="title-icon">&#127919;</span>
+              当前主题
+            </div>
+          </div>
+          <div class="content-section-body">
+            <div class="flex items-center gap-4 p-4 rounded-xl" :style="'background: ' + (getThemeCards().find(t => t.value === currentTheme)?.background_color || '#fff')">
+              <div class="text-4xl" x-text="getThemeCards().find(t => t.value === currentTheme)?.icon || '&#127912;'"></div>
+              <div>
+                <div class="text-lg font-bold" :style="'color: ' + (getThemeCards().find(t => t.value === currentTheme)?.primary_color || '#333')" x-text="getThemeCards().find(t => t.value === currentTheme)?.label || currentTheme"></div>
+                <div class="text-sm text-gray-500" x-text="getThemeCards().find(t => t.value === currentTheme)?.description || ''"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 主题卡片网格 -->
+        <div class="content-section">
+          <div class="content-section-header">
+            <div class="section-title">
+              <span class="title-icon">&#127912;</span>
+              选择主题风格（6 套）
+            </div>
+          </div>
+          <div class="content-section-body">
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-6">
+              <template x-for="theme in getThemeCards()" :key="theme.value">
+                <div class="theme-card rounded-2xl overflow-hidden"
+                     :class="currentTheme === theme.value ? 'selected' : ''"
+                     @click="selectTheme(theme.value)">
+                  <!-- 主题预览色块 -->
+                  <div class="theme-preview" :style="'background: ' + theme.background_color">
+                    <div class="theme-preview-dot" :style="'background: ' + theme.primary_color + '; top: 16px; left: 16px;'"></div>
+                    <div class="theme-preview-dot" :style="'background: ' + theme.primary_color + '; opacity: 0.5; top: 16px; right: 16px; width: 16px; height: 16px;'"></div>
+                    <div class="absolute bottom-3 left-4 text-3xl" x-text="theme.icon"></div>
+                    <!-- 选中标记 -->
+                    <template x-if="currentTheme === theme.value">
+                      <div class="absolute top-3 right-3 w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold">&#10003;</div>
+                    </template>
+                  </div>
+                  <!-- 主题信息 -->
+                  <div class="p-4 bg-white">
+                    <div class="flex items-center gap-2 mb-1">
+                      <div class="w-3 h-3 rounded-full" :style="'background: ' + theme.primary_color"></div>
+                      <span class="text-sm font-semibold text-gray-800" x-text="theme.label"></span>
+                    </div>
+                    <p class="text-xs text-gray-400" x-text="theme.description"></p>
+                    <div class="mt-2 text-xs font-mono text-gray-300" x-text="theme.value"></div>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+
+        <!-- 主题关系说明 -->
+        <div class="mt-6 p-4 rounded-xl border border-gray-200 bg-gray-50">
+          <h4 class="text-sm font-semibold text-gray-700 mb-2">&#128218; 主题覆盖关系</h4>
+          <div class="text-xs text-gray-500 space-y-1">
+            <p>&#8226; <strong>全局氛围主题</strong>（本页面配置）：控制商城页、发现页、我的页、抽奖列表页的视觉风格</p>
+            <p>&#8226; <strong>活动级别主题</strong>（抽奖活动管理中配置）：仅控制单个抽奖活动页面内部的视觉风格</p>
+            <p>&#8226; <strong>覆盖规则</strong>：活动配置了独立主题 &rarr; 活动页面使用活动主题 | 活动未配置 &rarr; 继承全局氛围主题</p>
+            <p>&#8226; <strong>运营建议</strong>：日常使用 default（日常活动），大促/节日期间切换对应节日主题即可实现「全站换肤」效果</p>
+          </div>
+        </div>
+      </div>
+    </template>
+  </div>
+
+  <!-- 页面脚本 -->
+  <script type="module" src="./src/modules/system/pages/app-theme-config.js"></script>
+</body>
+</html>

@@ -63,10 +63,10 @@ export function useCampaignsState() {
       status: 'draft',
       rules_text: '',
       // ======== 前端展示配置（多活动抽奖系统 2026-02-15） ========
-      /** 前端展示方式（14种玩法） */
-      display_mode: 'grid_3x3',
+      /** 前端展示方式（15种玩法） */
+      display_mode: 'grid_4x3',
       /** 网格列数（仅 grid 模式有效） */
-      grid_cols: 3,
+      grid_cols: 4,
       /** 特效主题（6套） */
       effect_theme: 'default',
       /** 是否启用稀有度光效 */
@@ -86,8 +86,9 @@ export function useCampaignsState() {
     ],
     /** @type {Array} 玩法类型选项（14种，对应 display_mode 字段） */
     displayModeOptions: [
-      { value: 'grid_3x3', label: '九宫格 3×3', icon: '🎰' },
-      { value: 'grid_4x4', label: '九宫格 4×4', icon: '🎰' },
+      { value: 'grid_3x3', label: '九宫格 3×3（8奖品）', icon: '🎰' },
+      { value: 'grid_4x3', label: '网格 4×3（12奖品）', icon: '🎰' },
+      { value: 'grid_4x4', label: '网格 4×4（16奖品）', icon: '🎰' },
       { value: 'wheel', label: '转盘', icon: '🎡' },
       { value: 'card_flip', label: '卡牌翻转', icon: '🃏' },
       { value: 'golden_egg', label: '砸金蛋', icon: '🥚' },
@@ -312,8 +313,8 @@ export function useCampaignsMethods(_context) {
         quota_init_mode: 'on_demand',
         tier_weight_scale: 1000000,
         // 展示配置默认值
-        display_mode: 'grid_3x3',
-        grid_cols: 3,
+        display_mode: 'grid_4x3',
+        grid_cols: 4,
         effect_theme: 'default',
         rarity_effects_enabled: true,
         win_animation: 'simple',

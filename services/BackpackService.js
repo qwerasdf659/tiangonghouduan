@@ -136,7 +136,10 @@ class BackpackService {
       const formattedAssets = validAssets
         .filter(account => {
           const assetType = assetTypeMap.get(account.asset_code)
-          return !assetType || assetType.is_enabled !== false
+          if (!assetType) return false
+          if (assetType.is_enabled === false) return false
+          if (assetType.form === 'quota') return false
+          return true
         })
         .map(account => {
           const assetType = assetTypeMap.get(account.asset_code)

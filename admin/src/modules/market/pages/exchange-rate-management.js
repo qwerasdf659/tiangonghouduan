@@ -31,6 +31,25 @@ const STATUS_OPTIONS = [
   { value: 'disabled', label: '已禁用' }
 ]
 
+/** 生成空白汇率表单（提取为独立函数，避免对象字面量中 this 未就绪） */
+function getEmptyForm() {
+  return {
+    from_asset_code: '',
+    to_asset_code: 'DIAMOND',
+    rate_numerator: 1,
+    rate_denominator: 1,
+    min_from_amount: 1,
+    max_from_amount: '',
+    daily_user_limit: '',
+    daily_global_limit: '',
+    fee_rate: 0,
+    priority: 0,
+    effective_from: '',
+    effective_until: '',
+    description: ''
+  }
+}
+
 document.addEventListener('alpine:init', () => {
   logger.info('[ExchangeRateManagement] 注册 Alpine 组件...')
 
@@ -76,7 +95,7 @@ document.addEventListener('alpine:init', () => {
       // ========== 表单弹窗 ==========
       show_form: false,
       is_editing: false,
-      form: this._getEmptyForm(),
+      form: getEmptyForm(),
 
       // ========== 初始化 ==========
       async init() {
@@ -126,21 +145,7 @@ document.addEventListener('alpine:init', () => {
 
       // ========== 表单操作 ==========
       _getEmptyForm() {
-        return {
-          from_asset_code: '',
-          to_asset_code: 'DIAMOND',
-          rate_numerator: 1,
-          rate_denominator: 1,
-          min_from_amount: 1,
-          max_from_amount: '',
-          daily_user_limit: '',
-          daily_global_limit: '',
-          fee_rate: 0,
-          priority: 0,
-          effective_from: '',
-          effective_until: '',
-          description: ''
-        }
+        return getEmptyForm()
       },
 
       openCreateForm() {

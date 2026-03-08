@@ -135,8 +135,8 @@ describe('GET /api/v4/system/config/exchange-page - 获取兑换页面配置', (
   }, 15000)
 
   /**
-   * 测试5：data 包含 card_display 对象（卡片主题配置）
-   * 验证：card_display.theme 为 A~E 之一
+   * 测试5：data 包含 card_display 对象（卡片特效配置）
+   * 验证：card_display.effects 为对象（theme 已迁移到全局氛围主题 app_theme）
    */
   test('data 包含有效的 card_display 配置', async () => {
     const response = await request(app).get('/api/v4/system/config/exchange-page')
@@ -148,7 +148,7 @@ describe('GET /api/v4/system/config/exchange-page - 获取兑换页面配置', (
     expect(typeof data.card_display).toBe('object')
 
     const cd = data.card_display
-    expect(['A', 'B', 'C', 'D', 'E']).toContain(cd.theme)
+    // card_display.theme 已迁移到全局氛围主题（app_theme），此处不再校验
     expect(cd).toHaveProperty('effects')
     expect(typeof cd.effects).toBe('object')
   }, 15000)

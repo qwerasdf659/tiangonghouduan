@@ -107,9 +107,21 @@ class DataSanitizer {
        * 管理员看完整数据，但需要转换DECIMAL字段为数字类型（修复前端TypeError）
        * Sequelize 模型实例需先转为普通对象，供 DecimalConverter 的 spread 操作正常工作
        */
-      const plainPrizes = (Array.isArray(prizes) ? prizes : [prizes]).map(p =>
-        p.toJSON ? p.toJSON() : p
-      )
+      const plainPrizes = (Array.isArray(prizes) ? prizes : [prizes]).map(p => {
+        const plain = p.toJSON ? p.toJSON() : p
+
+        // 管理员视图也需要材料图标URL（用于Web管理后台奖品列表展示）
+        if (!plain.image && plain.materialAssetType?.icon_url) {
+          const materialIconUrl = getImageUrl(plain.materialAssetType.icon_url)
+          plain.image = {
+            url: materialIconUrl,
+            thumbnail_url: materialIconUrl,
+            source: 'material_icon'
+          }
+        }
+
+        return plain
+      })
       return DecimalConverter.convertPrizeData(plainPrizes)
     }
 
@@ -119,6 +131,8 @@ class DataSanitizer {
      */
     return prizes.map(prize => {
       const rawImage = prize.image || (prize.toJSON ? prize.toJSON().image : null)
+      const rawMaterial =
+        prize.materialAssetType || (prize.toJSON ? prize.toJSON().materialAssetType : null)
       const sanitized = { ...(prize.toJSON ? prize.toJSON() : prize) }
 
       // 主键统一（决策 A：剥离 lottery_ 模块前缀）
@@ -143,9 +157,29 @@ class DataSanitizer {
             ? getImageUrl(rawImage.thumbnail_paths.small)
             : getImageUrl(rawImage.file_path)
         }
+      } else if (rawMaterial?.icon_url) {
+        /*
+         * 材料图标降级：当奖品没有独立图片时，使用关联材料类型的 icon_url
+         * 解决场景：钻石、水晶碎片等材料奖品无 image_resource_id，
+         *           但 material_asset_types 表有对应图标
+         */
+        const materialIconUrl = getImageUrl(rawMaterial.icon_url)
+        sanitized.image = {
+          url: materialIconUrl,
+          thumbnail_url: materialIconUrl,
+          source: 'material_icon'
+        }
       } else {
         sanitized.image = null
       }
+
+      // 材料资产展示信息（前端需要材料的display_name用于展示）
+      if (rawMaterial) {
+        sanitized.material_display_name = rawMaterial.display_name
+      }
+
+      // 清理关联对象原始数据（防止泄露材料资产内部结构）
+      delete sanitized.materialAssetType
 
       // DECIMAL 类型转换（Sequelize DECIMAL 返回字符串，前端需要数字）
       sanitized.prize_value = DecimalConverter.toNumber(sanitized.prize_value, 0)
@@ -1331,12 +1365,15 @@ class DataSanitizer {
           mime: safeImage.mime_type,
           thumbnail_url: safeImage.thumbnails?.small || safeImage.imageUrl
         }
-      } else if (rawPrimaryImage) {
+      } else if (rawPrimaryImage?.file_path) {
+        // plain object（来自 item.toJSON()），用 file_path 生成完整 URL
         sanitized.primary_image = {
           image_resource_id: rawPrimaryImage.image_resource_id,
-          url: null,
+          url: getImageUrl(rawPrimaryImage.file_path),
           mime: rawPrimaryImage.mime_type,
-          thumbnail_url: null
+          thumbnail_url: rawPrimaryImage.thumbnail_paths?.small
+            ? getImageUrl(rawPrimaryImage.thumbnail_paths.small)
+            : getImageUrl(rawPrimaryImage.file_path)
         }
       } else {
         sanitized.primary_image = null

@@ -181,7 +181,7 @@
             <table class="table w-full">
               <thead>
                 <tr>
-                  <template x-for="col in columns" :key="col.key">
+                  <template x-for="col in (columns || [])" :key="col.key || $id('col')">
                     <th :class="{ 'cursor-pointer hover:text-blue-600': col.sortable }" @click="sort(col)">
                       <span x-text="col.label"></span>
                       <span x-show="col.sortable" class="ml-1 text-xs" x-text="getSortIcon(col)"></span>
@@ -193,7 +193,7 @@
               <tbody>
                 <template x-for="(row, idx) in data" :key="row.reminder_rule_id || idx">
                   <tr>
-                    <template x-for="col in columns" :key="col.key">
+                    <template x-for="col in (columns || [])" :key="col.key || $id('col')">
                       <td x-html="renderCell(row, col)"></td>
                     </template>
                     <td>
@@ -272,7 +272,7 @@
             <table class="table w-full">
               <thead>
                 <tr>
-                  <template x-for="col in columns" :key="col.key">
+                  <template x-for="col in (columns || [])" :key="col.key || $id('col')">
                     <th :class="{ 'cursor-pointer hover:text-blue-600': col.sortable }" @click="sort(col)">
                       <span x-text="col.label"></span>
                       <span x-show="col.sortable" class="ml-1 text-xs" x-text="getSortIcon(col)"></span>
@@ -284,7 +284,7 @@
               <tbody>
                 <template x-for="(row, idx) in data" :key="row.id || idx">
                   <tr>
-                    <template x-for="col in columns" :key="col.key">
+                    <template x-for="col in (columns || [])" :key="col.key || $id('col')">
                       <td x-html="renderCell(row, col)"></td>
                     </template>
                     <td>

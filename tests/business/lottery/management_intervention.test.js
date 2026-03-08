@@ -6,7 +6,7 @@
  * 功能覆盖：
  * 1. 管理设置 - LotteryManagementSetting CRUD操作
  * 2. 强制中奖 - force_win 设置生效验证
- * 3. 强制不中奖 - force_lose 设置生效验证
+ * 3. 强制低档 - force_lose 设置生效验证（100%出奖下强制选择低档奖品）
  * 4. 概率调整 - probability_adjust 设置验证
  * 5. 预算欠账 - PresetBudgetDebt 管理和清偿
  * 6. 库存欠账 - PresetInventoryDebt 管理和清偿
@@ -28,7 +28,7 @@
  *
  * 设置类型：
  * - force_win: 强制中奖（指定用户下次抽奖必中指定奖品）
- * - force_lose: 强制不中奖（指定用户N次抽奖不中奖）
+ * - force_lose: 强制低档（100%出奖设计下，指定用户N次强制获得低档奖品）
  * - probability_adjust: 概率调整（临时调整用户中奖概率倍数）
  * - user_queue: 用户专属队列（预设抽奖结果队列）
  *

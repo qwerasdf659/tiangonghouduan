@@ -683,7 +683,7 @@
                            class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                            title="全选/取消全选">
                   </th>
-                  <template x-for="col in columns" :key="col.key">
+                  <template x-for="col in (columns || [])" :key="col.key || $id('col')">
                     <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider"
                         :class="{ 'cursor-pointer hover:text-gray-700': col.sortable }"
                         @click="sort(col)">
@@ -710,7 +710,7 @@
                              class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                              :title="row.status !== 'pending' ? '仅待审核记录可选' : '选择此记录'">
                     </td>
-                    <template x-for="col in columns" :key="col.key">
+                    <template x-for="col in (columns || [])" :key="col.key || $id('col')">
                       <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
                     </template>
                     <td class="px-4 py-3">
@@ -860,7 +860,7 @@
             <table class="w-full">
               <thead>
                 <tr class="bg-gradient-to-r from-gray-50 to-slate-50 border-b-2 border-gray-200">
-                  <template x-for="col in columns" :key="col.key">
+                  <template x-for="col in (columns || [])" :key="col.key || $id('col')">
                     <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider"
                         :class="{ 'cursor-pointer hover:text-gray-700': col.sortable }"
                         @click="sort(col)">
@@ -874,7 +874,7 @@
               <tbody class="divide-y divide-gray-100">
                 <template x-for="(row, idx) in data" :key="row.debt_id || idx">
                   <tr class="hover:bg-gray-50 transition-colors">
-                    <template x-for="col in columns" :key="col.key">
+                    <template x-for="col in (columns || [])" :key="col.key || $id('col')">
                       <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
                     </template>
                     <td class="px-4 py-3">
@@ -1005,7 +1005,7 @@
             <table class="w-full">
               <thead>
                 <tr class="bg-gradient-to-r from-gray-50 to-slate-50 border-b-2 border-gray-200">
-                  <template x-for="col in columns" :key="col.key">
+                  <template x-for="col in (columns || [])" :key="col.key || $id('col')">
                     <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider"
                         :class="{ 'cursor-pointer hover:text-gray-700': col.sortable }"
                         @click="sort(col)">
@@ -1019,7 +1019,7 @@
               <tbody class="divide-y divide-gray-100">
                 <template x-for="(row, idx) in data" :key="row.budget_id || idx">
                   <tr class="hover:bg-gray-50 transition-colors">
-                    <template x-for="col in columns" :key="col.key">
+                    <template x-for="col in (columns || [])" :key="col.key || $id('col')">
                       <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
                     </template>
                     <td class="px-4 py-3">
@@ -1122,7 +1122,7 @@
             <table class="w-full">
               <thead>
                 <tr class="bg-gradient-to-r from-gray-50 to-slate-50 border-b-2 border-gray-200">
-                  <template x-for="col in columns" :key="col.key">
+                  <template x-for="col in (columns || [])" :key="col.key || $id('col')">
                     <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider"
                         :class="{ 'cursor-pointer hover:text-gray-700': col.sortable }"
                         @click="sort(col)">
@@ -1135,7 +1135,7 @@
               <tbody class="divide-y divide-gray-100">
                 <template x-for="(row, idx) in data" :key="row.id || idx">
                   <tr class="hover:bg-gray-50 transition-colors">
-                    <template x-for="col in columns" :key="col.key">
+                    <template x-for="col in (columns || [])" :key="col.key || $id('col')">
                       <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
                     </template>
                   </tr>

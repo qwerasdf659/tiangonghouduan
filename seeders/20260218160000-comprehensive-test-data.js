@@ -1195,7 +1195,7 @@ module.exports = {
         budget_mode: 'user',
         pick_method: 'normalize',
         display_mode: 'turntable',
-        effect_theme: 'crystal',
+        effect_theme: null, // 继承全局 app_theme
         created_at: now,
         updated_at: now
       },
@@ -1243,7 +1243,7 @@ module.exports = {
         budget_mode: 'none',
         pick_method: 'normalize',
         display_mode: 'turntable',
-        effect_theme: 'default',
+        effect_theme: null, // 继承全局 app_theme
         created_at: new Date(now.getTime() - 30 * 24 * 3600 * 1000),
         updated_at: now
       }

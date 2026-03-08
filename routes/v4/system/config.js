@@ -312,7 +312,6 @@ router.get('/exchange-page', async (req, res) => {
           sort_options: [{ value: 'default', label: '默认' }]
         },
         card_display: {
-          theme: 'E',
           effects: {
             grain: true,
             holo: true,
@@ -364,6 +363,59 @@ router.get('/exchange-page', async (req, res) => {
     )
   } catch (error) {
     logger.error('获取兑换页面配置失败', { error: error.message, stack: error.stack })
+    return res.apiError('获取配置失败', 'INTERNAL_ERROR', null, 500)
+  }
+})
+
+/**
+ * @route GET /api/v4/system/config/app-theme
+ * @desc 获取全局氛围主题配置 - 公开接口（无需登录）
+ * @access Public
+ *
+ * 业务场景：
+ * - 小程序启动时拉取全局氛围主题，控制所有 Tab 页的视觉风格
+ * - 配置由运营通过管理后台维护（system_configs 表 config_key = 'app_theme'）
+ * - 前端使用 4 层降级策略，本接口不可用时自动使用内置默认主题 'default'
+ *
+ * 可选主题：default / gold_luxury / purple_mystery / spring_festival / christmas / summer
+ *
+ * @returns {Object} 全局氛围主题配置
+ * @returns {string} data.theme - 当前全局主题标识
+ *
+ * @see docs/项目特效主题体系分析报告.md
+ * @date 2026-03-06
+ */
+router.get('/app-theme', async (req, res) => {
+  try {
+    const { SystemConfig } = req.app.locals.models
+
+    const config = await SystemConfig.getByKey('app_theme')
+
+    if (!config || !config.isEnabled()) {
+      return res.apiSuccess(
+        { theme: 'default' },
+        '获取默认全局主题配置',
+        'APP_THEME_CONFIG_DEFAULT'
+      )
+    }
+
+    const configData = config.getValue()
+
+    const version = config.updated_at
+      ? new Date(config.updated_at).getTime().toString()
+      : Date.now().toString()
+
+    return res.apiSuccess(
+      {
+        theme: configData.theme || 'default',
+        version,
+        updated_at: config.updated_at
+      },
+      '获取全局主题配置成功',
+      'APP_THEME_CONFIG_SUCCESS'
+    )
+  } catch (error) {
+    logger.error('获取全局主题配置失败', { error: error.message, stack: error.stack })
     return res.apiError('获取配置失败', 'INTERNAL_ERROR', null, 500)
   }
 })

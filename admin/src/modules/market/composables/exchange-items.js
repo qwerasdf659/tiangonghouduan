@@ -44,6 +44,7 @@ export function useExchangeItemsState() {
       sort_order: 100,
       status: 'active',
       primary_image_id: null,
+      rarity_code: 'common',
       is_new: false,
       is_hot: false,
       is_lucky: false,
@@ -51,6 +52,14 @@ export function useExchangeItemsState() {
       has_warranty: false,
       free_shipping: false
     },
+    /** @type {Array<Object>} 稀有度选项（从 rarity_defs 字典表加载） */
+    rarityOptions: [
+      { value: 'common', label: '普通', color: '#9E9E9E' },
+      { value: 'uncommon', label: '优质', color: '#4CAF50' },
+      { value: 'rare', label: '稀有', color: '#2196F3' },
+      { value: 'epic', label: '史诗', color: '#9C27B0' },
+      { value: 'legendary', label: '传说', color: '#FF9800' }
+    ],
     /** @type {number|null} 正在编辑的商品ID */
     editingItemId: null,
     /** @type {string|null} 商品图片预览 URL（上传后由后端返回） */
@@ -176,6 +185,7 @@ export function useExchangeItemsMethods() {
         sort_order: 100,
         status: 'active',
         primary_image_id: null,
+        rarity_code: 'common',
         is_new: false,
         is_hot: false,
         is_lucky: false,
@@ -204,6 +214,7 @@ export function useExchangeItemsMethods() {
         sort_order: item.sort_order || 100,
         status: item.status || 'active',
         primary_image_id: item.primary_image_id || null,
+        rarity_code: item.rarity_code || 'common',
         is_new: !!item.is_new,
         is_hot: !!item.is_hot,
         is_lucky: !!item.is_lucky,

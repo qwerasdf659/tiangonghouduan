@@ -14,15 +14,6 @@ import { logger } from '../../../utils/logger.js'
 /** 管理后台兑换页面配置 API 端点 */
 export const EXCHANGE_PAGE_CONFIG_ENDPOINT = `${API_PREFIX}/console/system/exchange-page-config`
 
-/** 卡片主题选项 */
-const THEME_OPTIONS = [
-  { value: 'A', label: 'A 毛玻璃', description: '毛玻璃风格，清新透明' },
-  { value: 'B', label: 'B 电商', description: '电商风格，信息密度高' },
-  { value: 'C', label: 'C 暗色', description: '暗色风格，沉浸体验' },
-  { value: 'D', label: 'D 极简', description: '极简风格，突出内容' },
-  { value: 'E', label: 'E 推荐', description: '推荐主题，综合最优' }
-]
-
 /** 空间布局选项 */
 const LAYOUT_OPTIONS = [
   { value: 'waterfall', label: '瀑布流' },
@@ -75,7 +66,6 @@ export function useExchangePageConfigState() {
     configUpdatedAt: '',
 
     /** 选项常量 */
-    themeOptions: THEME_OPTIONS,
     layoutOptions: LAYOUT_OPTIONS,
     stockDisplayOptions: STOCK_DISPLAY_OPTIONS,
     viewModeOptions: VIEW_MODE_OPTIONS,

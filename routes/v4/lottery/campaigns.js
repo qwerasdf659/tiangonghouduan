@@ -99,7 +99,7 @@ router.get('/active', authenticateToken, async (req, res) => {
       status: campaign.status,
       display: {
         mode: campaign.display_mode || 'grid_3x3',
-        effect_theme: campaign.effect_theme || 'default'
+        effect_theme: campaign.effect_theme || null // null = 继承全局 app_theme
       },
       banner_image_url: campaign.banner_image_url || null,
       start_time: campaign.start_time,
@@ -254,7 +254,7 @@ router.get('/:code/config', authenticateToken, dataAccessControl, async (req, re
     const displayConfig = {
       mode: campaign.display_mode || 'grid_3x3',
       grid_cols: campaign.grid_cols || 3,
-      effect_theme: campaign.effect_theme || 'default',
+      effect_theme: campaign.effect_theme || null, // null = 继承全局 app_theme
       rarity_effects_enabled: campaign.rarity_effects_enabled !== false,
       win_animation: campaign.win_animation || 'simple',
       background_image_url: campaign.background_image_url || null

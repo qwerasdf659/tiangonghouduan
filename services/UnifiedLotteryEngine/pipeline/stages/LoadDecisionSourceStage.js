@@ -84,7 +84,7 @@ class LoadDecisionSourceStage extends BaseStage {
        */
 
       // 0. 首抽必中检查（在 Preset 之前，通过 Preset 机制注入）
-      const firstWinPreset = await this._checkFirstWin(user_id, lottery_campaign_id)
+      const firstWinPreset = await this._checkFirstWin(user_id, lottery_campaign_id, context)
       if (firstWinPreset) {
         this.log('info', '命中首抽必中', {
           user_id,
@@ -97,7 +97,8 @@ class LoadDecisionSourceStage extends BaseStage {
           preset: firstWinPreset,
           override: null,
           guarantee_triggered: null,
-          first_win: true
+          first_win: true,
+          first_win_debt_coefficient: firstWinPreset.first_win_debt_coefficient || 0.15
         })
       }
 
@@ -172,21 +173,23 @@ class LoadDecisionSourceStage extends BaseStage {
    *
    * 触发条件：
    * 1. first_win.enabled = true（策略配置开关）
-   * 2. 用户是新用户（SegmentResolver 判断，或 total_draw_count === 0）
-   * 3. 用户在该活动的 total_draw_count === 0（首次抽奖）
+   * 2. 用户在该活动的历史抽奖次数为 0（本批次之前无抽奖记录）
+   * 3. 当前 draw_number 匹配 inject_position（D20：多抽→第2抽，单抽→第1抽）
    *
    * 实现方式：
    * - 根据消费段匹配五档动态奖品池（first_win.pools）
    * - 从候选奖品中加权随机选择一个
    * - 构造虚拟 Preset 对象注入决策链
+   * - 附带 first_win_debt_coefficient（D22：0.15）供 SettleStage 应用运气债务
    * - 后续 Settle 阶段走正常流程（扣配额、发资产）
    *
    * @param {number} user_id - 用户ID
    * @param {number} lottery_campaign_id - 活动ID
+   * @param {Object} context - 执行上下文（含 draw_number, total_draws）
    * @returns {Promise<Object|null>} 虚拟 Preset 或 null
    * @private
    */
-  async _checkFirstWin(user_id, lottery_campaign_id) {
+  async _checkFirstWin(user_id, lottery_campaign_id, context) {
     try {
       const { DynamicConfigLoader } = require('../../compute/config/ComputeConfig')
 
@@ -195,11 +198,31 @@ class LoadDecisionSourceStage extends BaseStage {
       })
       if (enabled !== true && enabled !== 'true') return null
 
+      const draw_number = context?.draw_number || 1
+      const total_draws = context?.total_draws || 1
+
+      /* D20 注入时机：多抽→第 inject_position 抽，单抽→第 1 抽 */
+      const inject_position = await DynamicConfigLoader.getValue(
+        'first_win',
+        'inject_position',
+        2,
+        { lottery_campaign_id }
+      )
+      const target_position = total_draws > 1 ? Number(inject_position) : 1
+      if (draw_number !== target_position) return null
+
       const expState = await LotteryUserExperienceState.findOne({
         where: { user_id, lottery_campaign_id }
       })
 
-      if (expState && expState.total_draw_count > 0) return null
+      /*
+       * 多抽场景下 total_draw_count 会随批次内每次抽奖递增，
+       * 实际判断条件：本批次开始前用户的历史抽奖次数为 0
+       * draw_number - 1 = 本批次中在当前抽之前已完成的次数
+       */
+      const draws_before_this = draw_number - 1
+      const historical_draw_count = expState ? expState.total_draw_count - draws_before_this : 0
+      if (historical_draw_count > 0) return null
 
       const poolsConfig = await DynamicConfigLoader.getValue('first_win', 'pools', null, {
         lottery_campaign_id
@@ -270,6 +293,14 @@ class LoadDecisionSourceStage extends BaseStage {
         return null
       }
 
+      /* D22 运气债务系数：首抽必中产生轻微债务（0.15），弱于普通 HIGH（0.5） */
+      const debt_coefficient = await DynamicConfigLoader.getValue(
+        'first_win',
+        'debt_coefficient',
+        0.15,
+        { lottery_campaign_id }
+      )
+
       /* 返回完整奖品对象 + Preset 元数据，PrizePickStage 直接使用 */
       const prizeJSON = matchedPrize.toJSON ? matchedPrize.toJSON() : matchedPrize
       return {
@@ -277,7 +308,8 @@ class LoadDecisionSourceStage extends BaseStage {
         lottery_preset_id: null,
         status: 'pending',
         approval_status: 'approved',
-        source: 'first_win'
+        source: 'first_win',
+        first_win_debt_coefficient: Number(debt_coefficient)
       }
     } catch (error) {
       this.log('warn', '首抽必中检查失败（不影响正常抽奖）', {

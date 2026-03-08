@@ -580,6 +580,16 @@ appLogger.info(' Web管理后台静态文件托管已配置', {
 try {
   /*
    * ========================================
+   * 0. /images - 图片代理域（公开接口，无需认证）
+   *   解决 Sealos 对象存储 Content-Disposition: attachment
+   *   导致微信小程序 <image> 组件无法渲染图片的问题
+   * ========================================
+   */
+  app.use('/api/v4/images', require('./routes/v4/images'))
+  appLogger.info(' images域加载成功', { route: '/api/v4/images' })
+
+  /*
+   * ========================================
    * 1. /auth - 认证授权域
    * ========================================
    */

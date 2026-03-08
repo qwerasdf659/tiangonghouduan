@@ -43,12 +43,12 @@ document.addEventListener('alpine:init', () => {
         const response = await request({ url: ASSET_ENDPOINTS.RECONCILIATION_ITEMS })
         if (response.success && response.data) {
           this.item_result = response.data
-          Alpine.store('notification').show('物品对账完成', 'success')
+          Alpine.store('notification').success('物品对账完成')
         } else {
-          Alpine.store('notification').show(response.message || '对账失败', 'error')
+          Alpine.store('notification').error(response.message || '对账失败')
         }
       } catch (error) {
-        Alpine.store('notification').show(`物品对账失败：${error.message}`, 'error')
+        Alpine.store('notification').error(`物品对账失败：${error.message}`)
       } finally {
         this.loading_items = false
       }

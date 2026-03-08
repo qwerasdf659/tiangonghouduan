@@ -68,14 +68,26 @@ function getImageUrl(objectKey) {
   }
 
   /*
-   * 🎯 架构决策（2026-01-08 拍板）：不使用 CDN，直连 Sealos 公网端点
-   * 环境变量：SEALOS_ENDPOINT（公网端点）、SEALOS_BUCKET（存储桶名）
+   * 🎯 架构决策（2026-03-06 升级）：
+   *   通过后端图片代理返回图片，解决两个问题：
+   *   1. Sealos 对象存储强制 Content-Disposition: attachment 导致小程序无法渲染
+   *   2. 无需在微信白名单中额外配置对象存储域名
+   *
+   *   代理路由：/api/v4/images/{objectKey}
+   *   后端内网获取图片 → 以 inline 方式返回 → 小程序正常显示
    */
+  const publicBaseUrl = process.env.PUBLIC_BASE_URL
+
+  if (publicBaseUrl) {
+    return `${publicBaseUrl}/api/v4/images/${objectKey}`
+  }
+
+  // 本地开发环境降级：直连 Sealos 公网端点
   const publicEndpoint = process.env.SEALOS_ENDPOINT
   const bucket = process.env.SEALOS_BUCKET
 
   if (!publicEndpoint || !bucket) {
-    console.warn('❌ ImageUrlHelper: 缺少 SEALOS_ENDPOINT 或 SEALOS_BUCKET 环境变量')
+    console.warn('❌ ImageUrlHelper: 缺少 PUBLIC_BASE_URL 和 SEALOS_ENDPOINT 环境变量')
     return null
   }
 

@@ -410,6 +410,7 @@ class LotteryHealthService {
       high: 0,
       mid: 0,
       low: 0,
+      fallback: 0,
       empty: 0,
       total: 0
     }
@@ -420,14 +421,14 @@ class LotteryHealthService {
       if (Object.prototype.hasOwnProperty.call(result, tier)) {
         result[tier] = count
       } else {
+        /* 未知档位归入 empty（理论上不应出现） */
         result.empty += count
       }
       result.total += count
     })
 
-    // 计算百分比
     const percentages = {}
-    for (const tier of ['high', 'mid', 'low', 'empty']) {
+    for (const tier of ['high', 'mid', 'low', 'fallback', 'empty']) {
       percentages[tier] =
         result.total > 0 ? Math.round((result[tier] / result.total) * 10000) / 100 : 0
     }

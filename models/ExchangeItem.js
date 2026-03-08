@@ -200,6 +200,24 @@ module.exports = sequelize => {
         type: DataTypes.STRING(200),
         allowNull: true,
         comment: '营销卖点文案'
+      },
+
+      /**
+       * 稀有度代码 — 关联 rarity_defs 字典表
+       * 用于小程序卡片增强特效（holo 全息光效仅 legendary 触发）
+       * @see docs/项目特效主题体系分析报告.md 八.13 决策4
+       */
+      rarity_code: {
+        type: DataTypes.STRING(50),
+        allowNull: false,
+        defaultValue: 'common',
+        comment: '稀有度代码（common/uncommon/rare/epic/legendary），FK→rarity_defs',
+        references: {
+          model: 'rarity_defs',
+          key: 'rarity_code'
+        },
+        onUpdate: 'CASCADE',
+        onDelete: 'RESTRICT'
       }
 
       // ❌ 已砍掉（决策12）：discount（前端算）、rating（无评价系统）、sales（复用sold_count）、seller_info（自营非多商家）
@@ -215,7 +233,8 @@ module.exports = sequelize => {
         { fields: ['category'] },
         { fields: ['cost_asset_code'] },
         { fields: ['space'], name: 'idx_space' },
-        { fields: ['space', 'status'], name: 'idx_space_status' }
+        { fields: ['space', 'status'], name: 'idx_space_status' },
+        { fields: ['rarity_code'], name: 'idx_exchange_items_rarity_code' }
       ],
       comment: '兑换市场商品表（V4.5.0材料资产支付 + 臻选空间/幸运空间扩展）'
     }
@@ -238,6 +257,13 @@ module.exports = sequelize => {
     ExchangeItem.belongsTo(models.ImageResources, {
       foreignKey: 'primary_image_id',
       as: 'primaryImage'
+    })
+
+    // 多对一：商品关联稀有度定义（2026-03-06 全局主题体系统一）
+    ExchangeItem.belongsTo(models.RarityDef, {
+      foreignKey: 'rarity_code',
+      targetKey: 'rarity_code',
+      as: 'rarityDef'
     })
 
     // 一对多：商品有多个竞价记录（臻选空间/幸运空间竞价功能）

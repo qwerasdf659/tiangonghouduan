@@ -21,7 +21,7 @@
  *
  * @requires createBatchOperationMixin - 批量操作混入
  * @requires ASSET_ENDPOINTS - 资产相关API端点
- * @requires apiRequest - API请求函数
+ * @requires request - 统一API请求函数（来自 api/base.js）
  *
  * @example
  * // HTML中使用
@@ -39,6 +39,7 @@ import { Alpine, createBatchOperationMixin, createPageMixin } from '../../../alp
 /**
  * 孤儿冻结项目对象类型
  * @typedef {Object} OrphanItem
+ * @property {string} _row_id - 前端唯一行标识（account_id + '_' + asset_code）
  * @property {number} account_id - 账户ID
  * @property {number} user_id - 用户ID
  * @property {string} asset_code - 资产代码
@@ -68,7 +69,7 @@ function orphanFrozenPage() {
     ...createPageMixin(),
     ...createBatchOperationMixin({
       page_size: 20,
-      primaryKey: 'account_id'
+      primaryKey: '_row_id'
     }),
 
     // ==================== 页面特有状态 ====================
@@ -114,7 +115,8 @@ function orphanFrozenPage() {
         key: 'orphan_amount',
         label: '孤儿金额',
         sortable: true,
-        render: (val) => `<span class="font-mono text-orange-600">${Number(val || 0).toLocaleString('zh-CN')}</span>`
+        render: val =>
+          `<span class="font-mono text-orange-600">${Number(val || 0).toLocaleString('zh-CN')}</span>`
       },
       {
         key: 'status',
@@ -138,13 +140,13 @@ function orphanFrozenPage() {
             name: 'clean',
             label: '处理',
             class: 'text-green-500 hover:text-green-700',
-            condition: (row) => row.status === 'pending'
+            condition: row => row.status === 'pending'
           },
           {
             name: 'unfreeze',
             label: '解冻',
             class: 'text-orange-500 hover:text-orange-700',
-            condition: (row) => row.type === 'frozen' && row.status !== 'processed'
+            condition: row => row.type === 'frozen' && row.status !== 'processed'
           }
         ]
       }
@@ -224,8 +226,17 @@ function orphanFrozenPage() {
         return
       }
 
+      /*
+       * 同步 data-table 内部的选择状态到本页面的 selectedItems。
+       * data-table 组件的 $watch('selectedRows') 会触发 window 级别的
+       * 'orphan-selection-changed' 事件，携带完整行数据。
+       * 使用 window 事件而非 Alpine $dispatch，避免嵌套 x-data 组件间的事件传递问题。
+       */
+      window.addEventListener('orphan-selection-changed', e => {
+        this.selectedItems = e.detail?.rows || []
+      })
+
       logger.debug('✅ [orphanFrozenPage] checkAuth() 通过，数据由 data-table 自动加载')
-      // 数据由 data-table 组件自动加载
     },
 
     // ==================== data-table 数据源 ====================
@@ -237,7 +248,8 @@ function orphanFrozenPage() {
       const detectParams = new URLSearchParams()
       if (params.asset_code) detectParams.append('asset_code', params.asset_code)
 
-      const detectUrl = ASSET_ENDPOINTS.ORPHAN_FROZEN_DETECT +
+      const detectUrl =
+        ASSET_ENDPOINTS.ORPHAN_FROZEN_DETECT +
         (detectParams.toString() ? '?' + detectParams.toString() : '')
       const statsUrl = ASSET_ENDPOINTS.ORPHAN_FROZEN_STATS
 
@@ -262,6 +274,7 @@ function orphanFrozenPage() {
         const generatedAt = detectResponse.data.generated_at || new Date().toISOString()
         const items = (detectResponse.data.orphan_items || []).map(item => ({
           ...item,
+          _row_id: `${item.account_id}_${item.asset_code}`,
           type: 'orphan',
           status: 'pending',
           discovered_at: generatedAt
@@ -343,14 +356,12 @@ function orphanFrozenPage() {
         if (detectResponse && detectResponse.success) {
           const generatedAt = detectResponse.data.generated_at || new Date().toISOString()
 
-          // 以后端为准，仅补充后端没有返回的字段
           this.orphanList = (detectResponse.data.orphan_items || []).map(item => ({
-            // 直接使用后端返回的字段
             ...item,
-            // 补充后端未返回但前端显示需要的字段
-            type: 'orphan', // 后端无此字段，默认为孤儿类型
-            status: 'pending', // 后端无此字段，默认待处理
-            discovered_at: generatedAt // 使用顶层的检测时间
+            _row_id: `${item.account_id}_${item.asset_code}`,
+            type: 'orphan',
+            status: 'pending',
+            discovered_at: generatedAt
           }))
           // 使用 paginationMixin 的 total_records 字段
           this.total_records = this.orphanList.length
@@ -472,10 +483,7 @@ function orphanFrozenPage() {
      * @returns {boolean} 项目是否在已选列表中
      */
     isItemSelected(item) {
-      return this.selectedItems.some(
-        selected =>
-          selected.account_id === item.account_id && selected.asset_code === item.asset_code
-      )
+      return this.selectedItems.some(selected => selected._row_id === item._row_id)
     },
 
     /**
@@ -486,10 +494,7 @@ function orphanFrozenPage() {
      * @returns {void}
      */
     toggleRowSelection(item) {
-      const index = this.selectedItems.findIndex(
-        selected =>
-          selected.account_id === item.account_id && selected.asset_code === item.asset_code
-      )
+      const index = this.selectedItems.findIndex(selected => selected._row_id === item._row_id)
 
       if (index > -1) {
         this.selectedItems.splice(index, 1)
@@ -601,7 +606,8 @@ function orphanFrozenPage() {
       this.cleaning = true
 
       try {
-        const response = await apiRequest(ASSET_ENDPOINTS.ORPHAN_FROZEN_CLEANUP, {
+        const response = await request({
+          url: ASSET_ENDPOINTS.ORPHAN_FROZEN_CLEANUP,
           method: 'POST',
           data: {
             dry_run: false,
@@ -615,7 +621,8 @@ function orphanFrozenPage() {
         if (response && response.success) {
           const cleanedCount = response.data.cleaned_count || 0
           this.showSuccess(`清理成功：已解冻 ${cleanedCount} 条孤儿冻结`)
-          this.loadData()
+          this.selectedItems = []
+          window.dispatchEvent(new CustomEvent('dt-refresh'))
         } else {
           this.showError(response?.message || '清理失败')
         }

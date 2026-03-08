@@ -69,7 +69,7 @@
           <table class="w-full">
             <thead class="themed-bg-base">
               <tr>
-                <template x-for="col in columns" :key="col.key">
+                <template x-for="col in (columns || [])" :key="col.key || $id('col')">
                   <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted"
                       :class="{ 'cursor-pointer hover:text-blue-600': col.sortable }"
                       @click="sort(col)">
@@ -83,7 +83,7 @@
             <tbody class="divide-y">
               <template x-for="(row, idx) in data" :key="row.dict_id || idx">
                 <tr class="themed-hover-bg">
-                  <template x-for="col in columns" :key="col.key">
+                  <template x-for="col in (columns || [])" :key="col.key || $id('col')">
                     <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
                   </template>
                   <td class="px-4 py-3">
@@ -131,7 +131,7 @@
           <table class="w-full">
             <thead class="themed-bg-base">
               <tr>
-                <template x-for="col in columns" :key="col.key">
+                <template x-for="col in (columns || [])" :key="col.key || $id('col')">
                   <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted"
                       :class="{ 'cursor-pointer hover:text-blue-600': col.sortable }"
                       @click="sort(col)">
@@ -144,7 +144,7 @@
             <tbody class="divide-y">
               <template x-for="(row, idx) in data" :key="row.id || row.admin_operation_log_id || idx">
                 <tr class="themed-hover-bg">
-                  <template x-for="col in columns" :key="col.key">
+                  <template x-for="col in (columns || [])" :key="col.key || $id('col')">
                     <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
                   </template>
                 </tr>

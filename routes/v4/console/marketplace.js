@@ -450,147 +450,153 @@ router.post(
   authenticateToken,
   requireRoleLevel(100),
   async (req, res) => {
-    const {
-      name,
-      description = '',
-      cost_asset_code,
-      cost_amount,
-      cost_price,
-      stock,
-      sort_order = 100,
-      status = 'active',
-      // 🎯 2026-01-08 图片存储架构：主图片ID（关联 image_resources.image_resource_id）
-      primary_image_id,
-      // 臻选空间/幸运空间扩展字段（决策12：9个新字段）
-      space,
-      original_price,
-      tags,
-      is_new,
-      is_hot,
-      is_lucky,
-      has_warranty,
-      free_shipping,
-      is_limited,
-      sell_point,
-      category
-    } = req.body
+    try {
+      const {
+        item_name: name,
+        description = '',
+        cost_asset_code,
+        cost_amount,
+        cost_price = 0,
+        stock,
+        sort_order = 100,
+        status = 'active',
+        primary_image_id,
+        space,
+        original_price,
+        tags,
+        is_new,
+        is_hot,
+        is_lucky,
+        has_warranty,
+        free_shipping,
+        is_limited,
+        sell_point,
+        category
+      } = req.body
 
-    const admin_id = req.user.user_id
+      const admin_id = req.user.user_id
 
-    logger.info('管理员创建兑换商品（材料资产支付）', {
-      admin_id,
-      name,
-      cost_asset_code,
-      cost_amount,
-      stock,
-      primary_image_id
-    })
-
-    // 🎯 P2-C架构重构：通过 ServiceManager 获取 ExchangeService
-    const ExchangeService = req.app.locals.services.getService('exchange_admin')
-
-    // 商品上架前置校验（在事务外执行，避免 TransactionManager 误重试业务校验错误）
-    const targetStatus = status || 'active'
-    if (targetStatus === 'active' && !primary_image_id) {
-      return res.apiError(
-        '商品上架必须上传主图片（primary_image_id 不能为空）',
-        'IMAGE_REQUIRED',
-        null,
-        400
-      )
-    }
-
-    // 🎯 2026-01-08 图片存储架构修复：使用 TransactionManager 包装事务
-    const transactionResult = await TransactionManager.execute(async transaction => {
-      // 调用服务层方法创建商品（V4.5.0 材料资产支付 + 臻选空间/幸运空间扩展字段）
-      const result = await ExchangeService.createExchangeItem(
-        {
-          name,
-          description,
-          cost_asset_code,
-          cost_amount,
-          cost_price,
-          stock,
-          sort_order,
-          status,
-          primary_image_id,
-          // 臻选空间/幸运空间扩展字段
-          space,
-          original_price,
-          tags,
-          is_new,
-          is_hot,
-          is_lucky,
-          has_warranty,
-          free_shipping,
-          is_limited,
-          sell_point,
-          category
-        },
+      logger.info('管理员创建兑换商品（材料资产支付）', {
         admin_id,
-        { transaction }
-      )
-
-      return result
-    })
-
-    /*
-     * 🔧 2026-01-09 修复：ExchangeService.createExchangeItem 直接返回
-     * { success, item, bound_image, timestamp }，不需要检查 .data
-     */
-    if (!transactionResult.success) {
-      const errorMessage = transactionResult.error?.message || '创建商品失败'
-      logger.error('创建兑换商品失败', {
-        error: errorMessage,
-        admin_id
+        name,
+        cost_asset_code,
+        cost_amount,
+        stock,
+        primary_image_id
       })
 
-      // 业务错误直接返回错误消息
-      if (
-        errorMessage.includes('不能为空') ||
-        errorMessage.includes('最长') ||
-        errorMessage.includes('无效') ||
-        errorMessage.includes('必须')
-      ) {
-        return res.apiError(errorMessage, 'BAD_REQUEST', null, 400)
+      const ExchangeService = req.app.locals.services.getService('exchange_admin')
+
+      // 商品上架前置校验（在事务外执行，避免 TransactionManager 误重试业务校验错误）
+      const targetStatus = status || 'active'
+      if (targetStatus === 'active' && !primary_image_id) {
+        return res.apiError(
+          '商品上架必须上传主图片（primary_image_id 不能为空）',
+          'IMAGE_REQUIRED',
+          null,
+          400
+        )
       }
 
-      return res.apiError(errorMessage, 'INTERNAL_ERROR', null, 500)
-    }
+      const transactionResult = await TransactionManager.execute(async transaction => {
+        const result = await ExchangeService.createExchangeItem(
+          {
+            name,
+            description,
+            cost_asset_code,
+            cost_amount,
+            cost_price,
+            stock,
+            sort_order,
+            status,
+            primary_image_id,
+            space,
+            original_price,
+            tags,
+            is_new,
+            is_hot,
+            is_lucky,
+            has_warranty,
+            free_shipping,
+            is_limited,
+            sell_point,
+            category
+          },
+          admin_id,
+          { transaction }
+        )
 
-    // 直接使用 transactionResult（已包含 item, bound_image, timestamp）
-    logger.info('兑换商品创建成功（材料资产支付）', {
-      admin_id,
-      exchange_item_id: transactionResult.item?.exchange_item_id,
-      name: transactionResult.item?.name,
-      cost_asset_code: transactionResult.item?.cost_asset_code,
-      cost_amount: transactionResult.item?.cost_amount,
-      bound_image: transactionResult.bound_image
-    })
-
-    // 🔌 WebSocket推送：通知所有在线用户商品已创建（2026-02-15 新增）
-    try {
-      /** 通过 ServiceManager 获取 ChatWebSocketService（不直接 require） */
-      const ChatWebSocketService = req.app.locals.services.getService('chat_web_socket')
-      ChatWebSocketService.broadcastProductUpdated({
-        action: 'created',
-        exchange_item_id: transactionResult.item?.exchange_item_id,
-        name: transactionResult.item?.name,
-        stock: transactionResult.item?.stock,
-        status: transactionResult.item?.status,
-        operator_id: admin_id
+        return result
       })
-    } catch (wsError) {
-      logger.warn('WebSocket推送商品创建通知失败（非致命）', { error: wsError.message })
-    }
 
-    return res.apiSuccess(
-      {
-        item: transactionResult.item,
+      if (!transactionResult.success) {
+        const errorMessage = transactionResult.error?.message || '创建商品失败'
+        logger.error('创建兑换商品失败', { error: errorMessage, admin_id })
+
+        if (
+          errorMessage.includes('不能为空') ||
+          errorMessage.includes('最长') ||
+          errorMessage.includes('无效') ||
+          errorMessage.includes('必须')
+        ) {
+          return res.apiError(errorMessage, 'BAD_REQUEST', null, 400)
+        }
+
+        return res.apiError(errorMessage, 'INTERNAL_ERROR', null, 500)
+      }
+
+      logger.info('兑换商品创建成功（材料资产支付）', {
+        admin_id,
+        exchange_item_id: transactionResult.item?.exchange_item_id,
+        item_name: transactionResult.item?.item_name,
+        cost_asset_code: transactionResult.item?.cost_asset_code,
+        cost_amount: transactionResult.item?.cost_amount,
         bound_image: transactionResult.bound_image
-      },
-      '商品创建成功'
-    )
+      })
+
+      try {
+        const ChatWebSocketService = req.app.locals.services.getService('chat_web_socket')
+        ChatWebSocketService.broadcastProductUpdated({
+          action: 'created',
+          exchange_item_id: transactionResult.item?.exchange_item_id,
+          item_name: transactionResult.item?.item_name,
+          stock: transactionResult.item?.stock,
+          status: transactionResult.item?.status,
+          operator_id: admin_id
+        })
+      } catch (wsError) {
+        logger.warn('WebSocket推送商品创建通知失败（非致命）', { error: wsError.message })
+      }
+
+      return res.apiSuccess(
+        {
+          item: transactionResult.item,
+          bound_image: transactionResult.bound_image
+        },
+        '商品创建成功'
+      )
+    } catch (error) {
+      logger.error('创建兑换商品失败', {
+        error: error.message,
+        stack: error.stack,
+        admin_id: req.user?.user_id
+      })
+
+      if (error.message === '商品不存在') {
+        return res.apiError(error.message, 'NOT_FOUND', null, 404)
+      }
+
+      if (
+        error.message.includes('不能为空') ||
+        error.message.includes('最长') ||
+        error.message.includes('无效') ||
+        error.message.includes('必须')
+      ) {
+        return res.apiError(error.message, 'BAD_REQUEST', null, 400)
+      }
+
+      return res.apiError(error.message || '创建商品失败', 'INTERNAL_ERROR', null, 500)
+    }
   }
 )
 
@@ -617,7 +623,7 @@ router.put(
     try {
       const { exchange_item_id } = req.params
       const {
-        name,
+        item_name: name,
         description,
         cost_asset_code,
         cost_amount,
@@ -625,9 +631,7 @@ router.put(
         stock,
         sort_order,
         status,
-        // 🎯 2026-01-08 图片存储架构：主图片ID（关联 image_resources.image_resource_id）
         primary_image_id,
-        // 臻选空间/幸运空间扩展字段（决策12：9个新字段）
         space,
         original_price,
         tags,
@@ -1054,8 +1058,8 @@ router.post(
         )
       }
 
-      // 🎯 P1-9：通过 ServiceManager 获取 MarketListingService（snake_case key）
-      const MarketListingService = req.app.locals.services.getService('market_listing_query')
+      // 通过 ServiceManager 获取 MarketListingCoreService（写操作需要 core 服务）
+      const MarketListingService = req.app.locals.services.getService('market_listing_core')
 
       const result = await TransactionManager.execute(
         async transaction => {

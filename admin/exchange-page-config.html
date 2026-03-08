@@ -389,34 +389,17 @@
           </div>
         </div>
 
-        <!-- ========== 卡片主题配置区 ========== -->
+        <!-- ========== 卡片特效配置区（主题已迁移到全局氛围主题） ========== -->
         <div x-show="activeSection === 'card_display'" class="content-section animate-fade-in">
           <div class="content-section-header">
             <div class="section-title">
-              <span class="title-icon">🎨</span>
-              卡片主题配置（两个 Tab 共用）
+              <span class="title-icon">✨</span>
+              卡片特效配置（两个 Tab 共用）
             </div>
           </div>
           <div class="content-section-body">
             <div class="section-help">
-              <p>💡 卡片主题决定商品在小程序中的展示风格。选择主题后，「商品兑换」和「交易市场」两个页面会同步应用。可开关各种视觉增强效果。</p>
-            </div>
-
-            <!-- 主题选择 -->
-            <div class="mb-8">
-              <h4 class="text-sm font-semibold text-gray-800 mb-4">选择主题风格</h4>
-              <div class="grid grid-cols-5 gap-4">
-                <template x-for="theme in themeOptions" :key="theme.value">
-                  <label class="theme-card" @click="config.card_display.theme = theme.value; markConfigModified()">
-                    <input type="radio" :value="theme.value" x-model="config.card_display.theme" class="sr-only">
-                    <div :class="config.card_display.theme === theme.value ? 'selected border-2' : 'border'" class="theme-card rounded-xl p-4 text-center" :style="config.card_display.theme === theme.value ? 'border-color: var(--color-primary); background: linear-gradient(135deg, #eff6ff, #dbeafe);' : 'border-color: var(--color-border); background: var(--card-bg);'">
-                      <div class="text-2xl font-bold mb-1" :style="config.card_display.theme === theme.value ? 'color: var(--color-primary)' : 'color: #64748b'" x-text="theme.value"></div>
-                      <div class="text-xs font-medium" :style="config.card_display.theme === theme.value ? 'color: var(--color-primary)' : 'color: #94a3b8'" x-text="theme.label.split(' ').slice(1).join(' ')"></div>
-                      <div class="text-xs mt-1 text-gray-400" x-text="theme.description"></div>
-                    </div>
-                  </label>
-                </template>
-              </div>
+              <p>💡 卡片特效控制商品在小程序中的视觉增强效果（噪点纹理、全息光效、旋转边框等）。全局视觉主题请前往 <a href="/admin/app-theme-config.html" class="text-blue-600 underline hover:text-blue-800">全局主题配置</a> 页面管理。</p>
             </div>
 
             <!-- 增强效果开关 -->

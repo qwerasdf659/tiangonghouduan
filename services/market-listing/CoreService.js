@@ -611,57 +611,54 @@ class MarketListingCoreService {
     const cancelledOrders = []
 
     for (const order of pendingOrders) {
-      try {
-        if (order.status === 'frozen') {
-          // eslint-disable-next-line no-restricted-syntax
-          await BalanceService.unfreeze(
-            {
-              idempotency_key: `${order.idempotency_key}:withdraw_unfreeze`,
-              business_type: 'listing_withdrawn_unfreeze',
-              user_id: order.buyer_user_id,
-              asset_code: order.asset_code,
-              amount: order.gross_amount,
-              meta: {
-                order_action: 'withdraw_unfreeze',
-                trade_order_id: order.trade_order_id,
-                market_listing_id,
-                unfreeze_reason: `挂牌 ${market_listing_id} 被卖家撤回`
-              }
-            },
-            { transaction }
-          )
-        }
-
-        await order.update(
+      /*
+       * frozen 和 created 订单都需要尝试解冻：
+       * - frozen: 已冻结买家资产，必须解冻
+       * - created: 在同一事务中 freeze 已执行但 status 未推进到 frozen 时
+       *   （虽然正常事务不会出现此状态，但防御性处理避免孤儿冻结）
+       * unfreeze 本身是幂等的，对无冻结的 created 订单不会产生副作用
+       */
+      if (order.status === 'frozen' || order.status === 'created') {
+        // eslint-disable-next-line no-restricted-syntax
+        await BalanceService.unfreeze(
           {
-            status: 'cancelled',
-            cancelled_at: new Date(),
+            idempotency_key: `${order.idempotency_key}:withdraw_unfreeze`,
+            business_type: 'listing_withdrawn_unfreeze',
+            user_id: order.buyer_user_id,
+            asset_code: order.asset_code,
+            amount: order.gross_amount,
             meta: {
-              ...order.meta,
-              cancel_reason: '挂牌被卖家撤回',
-              cancelled_by: 'listing_withdrawal'
+              order_action: 'withdraw_unfreeze',
+              trade_order_id: order.trade_order_id,
+              market_listing_id,
+              original_order_status: order.status,
+              unfreeze_reason: `挂牌 ${market_listing_id} 被卖家撤回`
             }
           },
           { transaction }
         )
-
-        cancelledOrders.push({
-          trade_order_id: order.trade_order_id,
-          buyer_user_id: order.buyer_user_id,
-          asset_code: order.asset_code,
-          amount: order.gross_amount,
-          original_status: order.status
-        })
-      } catch (orderError) {
-        logger.error(`[MarketListingCoreService] 取消订单 ${order.trade_order_id} 失败`, {
-          error: orderError.message
-        })
-        cancelledOrders.push({
-          trade_order_id: order.trade_order_id,
-          status: 'failed',
-          error: orderError.message
-        })
       }
+
+      await order.update(
+        {
+          status: 'cancelled',
+          cancelled_at: new Date(),
+          meta: {
+            ...order.meta,
+            cancel_reason: '挂牌被卖家撤回',
+            cancelled_by: 'listing_withdrawal'
+          }
+        },
+        { transaction }
+      )
+
+      cancelledOrders.push({
+        trade_order_id: order.trade_order_id,
+        buyer_user_id: order.buyer_user_id,
+        asset_code: order.asset_code,
+        amount: order.gross_amount,
+        original_status: order.status
+      })
     }
 
     return cancelledOrders

@@ -19,6 +19,7 @@
 
 const logger = require('../../utils/logger')
 const TrackingCodeGenerator = require('../../utils/TrackingCodeGenerator')
+const BeijingTimeHelper = require('../../utils/timeHelper')
 
 /**
  * 物品全链路追踪服务
@@ -168,7 +169,7 @@ class ItemLifecycleService {
     )
 
     return {
-      checked_at: new Date().toISOString(),
+      checked_at: BeijingTimeHelper.apiTimestamp(),
       item_conservation: {
         status: imbalanced.length === 0 ? 'PASS' : 'FAIL',
         imbalanced_count: imbalanced.length,
@@ -224,7 +225,7 @@ class ItemLifecycleService {
     `)
 
     return {
-      checked_at: new Date().toISOString(),
+      checked_at: BeijingTimeHelper.apiTimestamp(),
       global_conservation: {
         status: globalCheck.every(r => Number(r.total_delta) === 0) ? 'PASS' : 'WARNING',
         by_asset_code: globalCheck.map(r => ({

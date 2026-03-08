@@ -149,6 +149,7 @@ function getTargetTypeDisplayName(targetType) {
     account: '账户',
     account_asset_balance: '资产余额',
     asset_transaction: '资产流水',
+    item: '物品',
     item_instance: '道具实例',
     item_instance_event: '道具事件',
     redemption_order: '兑换订单',

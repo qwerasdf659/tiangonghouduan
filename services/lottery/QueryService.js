@@ -97,6 +97,12 @@ class LotteryQueryService {
             as: 'image',
             required: false,
             attributes: ['image_resource_id', 'file_path', 'mime_type', 'thumbnail_paths']
+          },
+          {
+            model: models.MaterialAssetType,
+            as: 'materialAssetType',
+            required: false,
+            attributes: ['asset_code', 'display_name', 'icon_url']
           }
         ],
         order: [
@@ -430,6 +436,10 @@ class LotteryQueryService {
             end_time: campaign.end_time,
             total_prize_pool: campaign.total_prize_pool,
             remaining_prize_pool: campaign.remaining_prize_pool,
+            // 前端展示配置字段（多活动抽奖系统）
+            display_mode: campaign.display_mode,
+            effect_theme: campaign.effect_theme, // null = 继承全局 app_theme
+            banner_image_url: campaign.banner_image_url,
             user_today_draws: user_id
               ? userDrawCounts[campaign.lottery_campaign_id] || 0
               : undefined,

@@ -1362,7 +1362,7 @@ module.exports = {
   \`daily_budget_limit\` decimal(15,2) DEFAULT NULL COMMENT '每日预算上限（积分），NULL表示不限制每日预算',
   \`display_mode\` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'grid_3x3' COMMENT '前端展示方式（14种玩法）: grid_3x3/grid_4x4/wheel/card_flip/golden_egg/scratch_card/blind_box/gashapon/lucky_bag/red_packet/slot_machine/whack_mole/pinball/card_collect/flash_sale',
   \`grid_cols\` int NOT NULL DEFAULT '3' COMMENT '网格列数（仅 grid 模式有效）: 3/4/5',
-  \`effect_theme\` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'default' COMMENT '特效主题（6套）: default/gold_luxury/purple_mystery/spring_festival/christmas/summer',
+  \`effect_theme\` varchar(30) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '活动级特效主题: null=继承全局app_theme | default/gold_luxury/purple_mystery/spring_festival/christmas/summer',
   \`rarity_effects_enabled\` tinyint(1) NOT NULL DEFAULT '1' COMMENT '是否启用稀有度光效（前端根据 rarity_code 显示不同颜色光效）',
   \`win_animation\` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'simple' COMMENT '中奖动画类型: simple（简单弹窗）/card_flip（卡牌翻转）/fireworks（烟花特效）',
   \`background_image_url\` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '活动背景图URL（运营上传，可选）',

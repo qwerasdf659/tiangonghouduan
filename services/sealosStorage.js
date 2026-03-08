@@ -210,6 +210,7 @@ class SealosStorageService {
       Key: objectKey,
       Body: fileBuffer,
       ContentType: contentType,
+      ContentDisposition: 'inline', // 浏览器/小程序直接显示图片，而非触发下载
       ACL: 'public-read', // 设置为公共可读（全部展示型素材）
       CacheControl: 'max-age=31536000' // 缓存1年
     }
@@ -475,6 +476,33 @@ class SealosStorageService {
   }
 
   /**
+   * 获取图片文件内容（用于图片代理）
+   *
+   * @description
+   *   解决 Sealos 对象存储强制 Content-Disposition: attachment 导致
+   *   微信小程序 <image> 组件无法渲染图片的问题。
+   *   后端通过内网获取图片二进制内容，再以 inline 方式返回给客户端。
+   *
+   * @param {string} objectKey - 对象存储 key（如 prizes/xxx.jpg）
+   * @returns {Promise<{body: Buffer, contentType: string, contentLength: number, etag: string}>} 图片文件内容和元数据
+   */
+  async getImageBuffer(objectKey) {
+    const result = await this.s3
+      .getObject({
+        Bucket: this.config.bucket,
+        Key: objectKey
+      })
+      .promise()
+
+    return {
+      body: result.Body,
+      contentType: result.ContentType,
+      contentLength: result.ContentLength,
+      etag: result.ETag
+    }
+  }
+
+  /**
    * 🔴 获取文件元数据
    * @param {string} fileKey - 文件Key
    * @returns {Promise<Object>} 文件元数据
@@ -588,6 +616,7 @@ class SealosStorageService {
           Key: originalKey,
           Body: processedBuffer,
           ContentType: outputFormat === 'jpeg' ? 'image/jpeg' : 'image/png',
+          ContentDisposition: 'inline',
           ACL: 'public-read',
           CacheControl: 'max-age=31536000'
         },
@@ -631,6 +660,7 @@ class SealosStorageService {
               Key: thumbnailKey,
               Body: thumbnailBuffer,
               ContentType: outputFormat === 'jpeg' ? 'image/jpeg' : 'image/png',
+              ContentDisposition: 'inline',
               ACL: 'public-read',
               CacheControl: 'max-age=31536000'
             },

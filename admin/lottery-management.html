@@ -1390,6 +1390,33 @@
               </template>
             </div>
           </div>
+
+          <!-- 灰度白名单配置区域（运营可直接管理白名单用户，无需重启服务） -->
+          <div class="themed-card rounded-lg shadow p-4 mt-4">
+            <h4 class="font-semibold mb-3">👤 灰度白名单用户（强制启用策略）</h4>
+            <p class="text-xs text-gray-500 mb-4">白名单中的用户不受百分比限制，始终启用对应策略。输入用户ID，多个用逗号分隔（如 31,42,108）</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4" x-show="activityStrategyConfig?.grayscale">
+              <template x-for="key in ['pity_user_whitelist', 'luck_debt_user_whitelist', 'anti_empty_user_whitelist', 'anti_high_user_whitelist']" :key="key">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">
+                    <span x-text="key.replace('_user_whitelist', '').replace(/_/g, ' ')"></span>
+                    <span class="text-xs text-gray-400 ml-1">白名单</span>
+                    <span class="text-xs text-blue-500 ml-1"
+                          x-text="'(' + (Array.isArray(activityStrategyConfig?.grayscale?.[key]) ? activityStrategyConfig.grayscale[key].length : 0) + '人)'"></span>
+                  </label>
+                  <div class="flex items-center gap-2">
+                    <input type="text" class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm"
+                           placeholder="如：31,42,108"
+                           :value="Array.isArray(activityStrategyConfig?.grayscale?.[key]) ? activityStrategyConfig.grayscale[key].join(',') : ''"
+                           @change="updateActivityStrategySetting('grayscale', key,
+                             $event.target.value.trim() === '' ? [] :
+                             $event.target.value.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id) && id > 0)
+                           )">
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
         </div>
 
         <!-- 未选择活动提示 -->

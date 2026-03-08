@@ -14,6 +14,7 @@
 /** asset_code → 本地图标路径映射 */
 export const MATERIAL_ICONS = {
   DIAMOND: '/assets/icons/materials/diamond.png',
+  DIAMOND_QUOTA: '/assets/icons/materials/diamond-quota.png',
   POINTS: '/assets/icons/materials/points.png',
   BUDGET_POINTS: '/assets/icons/materials/budget-points.png',
   red_shard: '/assets/icons/materials/red-shard.png',

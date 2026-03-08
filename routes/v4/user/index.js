@@ -38,6 +38,9 @@ const adSlotsRoutes = require('./ad-slots')
 // 用户通知路由（方案B：通知系统独立化，2026-02-24）
 const notificationsRoutes = require('./notifications')
 
+// 广告定价预览路由（Need 2: 用户端复用 AdPricingService 查询广告位定价）
+const adPricingRoutes = require('./ad-pricing')
+
 /**
  * GET /api/v4/user/me
  * @desc 获取当前用户基本信息（通过token识别）
@@ -77,5 +80,8 @@ router.use('/ad-campaigns', adCampaignsRoutes)
 
 // 挂载用户通知路由（方案B：通知系统独立化，/api/v4/user/notifications）
 router.use('/notifications', authenticateToken, notificationsRoutes)
+
+// 挂载广告定价预览路由（/api/v4/user/ad-pricing/preview）
+router.use('/ad-pricing', adPricingRoutes)
 
 module.exports = router

@@ -215,7 +215,7 @@
  * @property {number} prize_id - 奖品ID
  * @property {string} name - 奖品名称
  * @property {string} description - 奖品描述
- * @property {string} prize_type - 奖品类型（points/item/coupon/physical）
+ * @property {string} prize_type - 奖品类型（virtual/points/physical/coupon/service/product/special）
  * @property {number} value - 奖品价值
  * @property {number} probability - 中奖概率（0-1）
  * @property {number} stock - 库存数量（-1 表示无限）

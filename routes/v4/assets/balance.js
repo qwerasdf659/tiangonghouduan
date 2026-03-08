@@ -51,8 +51,25 @@ router.get(
       return res.apiError('asset_code 是必填参数', 'BAD_REQUEST', null, 400)
     }
 
-    // BUDGET_POINTS 是系统内部资产，禁止前端直接查询
-    if (asset_code === 'BUDGET_POINTS') {
+    // 系统内部资产禁止前端直接查询（BUDGET_POINTS 预算积分、DIAMOND_QUOTA 钻石配额等）
+    const BLOCKED_ASSET_CODES = new Set(['BUDGET_POINTS'])
+    if (BLOCKED_ASSET_CODES.has(asset_code)) {
+      return res.apiError('无效的资产类型', 'BAD_REQUEST', null, 400)
+    }
+
+    // 动态检查：form='quota' 的内部配额类资产也禁止查询
+    const MaterialAssetType = req.app.locals.models.MaterialAssetType
+    const assetTypeDef = await MaterialAssetType.findOne({
+      where: { asset_code },
+      attributes: ['asset_code', 'form', 'is_enabled']
+    })
+    if (!assetTypeDef) {
+      return res.apiError('无效的资产类型', 'BAD_REQUEST', null, 400)
+    }
+    if (assetTypeDef.form === 'quota') {
+      return res.apiError('无效的资产类型', 'BAD_REQUEST', null, 400)
+    }
+    if (assetTypeDef.is_enabled === false) {
       return res.apiError('无效的资产类型', 'BAD_REQUEST', null, 400)
     }
 
@@ -99,10 +116,25 @@ router.get(
     const balances = await BalanceService.getAllBalances({ user_id })
 
     /*
-     * 过滤系统内部资产类型，BUDGET_POINTS 不暴露给前端
-     * BUDGET_POINTS 是活动预算积分，仅在抽奖引擎内部使用
+     * 过滤策略（与 BackpackService._getAssets 一致）：
+     * ① 必须有 material_asset_types 类型定义（排除孤儿数据如 MATERIAL_001）
+     * ② is_enabled 非 false
+     * ③ form 非 'quota'（排除 DIAMOND_QUOTA 等内部配额类资产）
+     * ④ 非 BUDGET_POINTS（活动预算积分，仅抽奖引擎内部使用）
      */
-    const filteredBalances = balances.filter(b => b.asset_code !== 'BUDGET_POINTS')
+    const { Op } = require('sequelize')
+    const MaterialAssetType = req.app.locals.models.MaterialAssetType
+    const balanceAssetCodes = balances.map(b => b.asset_code)
+    const assetTypes = await MaterialAssetType.findAll({
+      where: { asset_code: { [Op.in]: balanceAssetCodes } },
+      attributes: ['asset_code', 'form', 'is_enabled']
+    })
+    const validAssetCodes = new Set(
+      assetTypes.filter(t => t.is_enabled !== false && t.form !== 'quota').map(t => t.asset_code)
+    )
+    const filteredBalances = balances.filter(
+      b => b.asset_code !== 'BUDGET_POINTS' && validAssetCodes.has(b.asset_code)
+    )
 
     // 返回字段命名与 BalanceService.getBalance() 保持一致（全链路统一）
     return res.apiSuccess({

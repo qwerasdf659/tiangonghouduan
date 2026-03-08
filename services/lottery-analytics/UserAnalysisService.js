@@ -774,7 +774,12 @@ class UserAnalysisService {
           campaign_name: draw.campaign?.campaign_name || '未知活动',
           created_at: draw.created_at,
           cost_points: draw.cost_points || 0,
-          is_winner: draw.reward_tier && draw.reward_tier !== 'fallback',
+          /**
+           * 🔴 2026-03-06 业务语义修正：
+           * 100%出奖设计下，只有 'empty' 才算未中奖
+           * fallback 是保底奖品（真实奖品），仍算中奖
+           */
+          is_winner: !!draw.reward_tier && draw.reward_tier !== 'empty',
           reward_tier: draw.reward_tier,
           prize_name: draw.prize?.prize_name || '未知奖品',
           prize_cost: draw.prize?.cost_points || 0

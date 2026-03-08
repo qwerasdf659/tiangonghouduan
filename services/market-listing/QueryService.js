@@ -17,6 +17,7 @@ const {
   Item,
   ItemTemplate,
   MaterialAssetType,
+  CategoryDef,
   User,
   sequelize
 } = require('../../models')
@@ -258,7 +259,14 @@ class MarketListingQueryService {
         /** 直接关联物品模板（通过 offer_item_template_id 快照字段） */
         model: ItemTemplate,
         as: 'offerItemTemplate',
-        attributes: ['item_template_id', 'display_name'],
+        attributes: ['item_template_id', 'display_name', 'image_resource_id'],
+        required: false
+      },
+      {
+        /** 关联分类定义（通过 offer_item_category_code），用于分类图标降级 */
+        model: CategoryDef,
+        as: 'offerCategory',
+        attributes: ['category_code', 'display_name', 'icon_url'],
         required: false
       }
     ]
@@ -305,18 +313,18 @@ class MarketListingQueryService {
       // 物品实例类型
       if (plain.listing_kind === 'item') {
         /**
-         * 图片 object key 优先级：
-         * 1. 直接关联的 offerItemTemplate（通过快照字段 offer_item_template_id）
-         * 2. 通过 offerItem.itemTemplate 间接获取
-         * 数据库存 object key，通过 ImageUrlHelper 拼接完整公网 URL
+         * 图片 object key 降级链：
+         * 1. 物品模板图片（offerItemTemplate.image_resource_id → image_resources.file_path）
+         * 2. 分类图标（offerCategory.icon_url）
+         * 3. 默认占位图（defaults/product-placeholder.png）
          */
-        const templateImageKey =
-          plain.offerItemTemplate?.image_url || plain.offerItem?.itemTemplate?.image_url || null
+        const categoryIconKey = plain.offerCategory?.icon_url || null
+        const imageKey = categoryIconKey || 'defaults/product-placeholder.png'
 
         product.item_info = {
           item_id: plain.offer_item_id,
           display_name: plain.offer_item_display_name || plain.offerItem?.meta?.name,
-          image_url: templateImageKey ? getImageUrl(templateImageKey) : null,
+          image_url: getImageUrl(imageKey),
           category_code: plain.offer_item_category_code,
           rarity_code: plain.offer_item_rarity,
           template_id: plain.offer_item_template_id

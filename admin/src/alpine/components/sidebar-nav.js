@@ -151,6 +151,11 @@ export function sidebarNav() {
             url: '/admin/material-conversion.html'
           },
           {
+            id: 'app-theme-config',
+            name: '🎨 全局主题配置',
+            url: '/admin/app-theme-config.html'
+          },
+          {
             id: 'exchange-page-config',
             name: '🛍️ 兑换页面配置',
             url: '/admin/exchange-page-config.html'
@@ -386,7 +391,6 @@ export function sidebarNav() {
 
         const data = await request({ url: `${API_PREFIX}/console/nav/badges` })
         if (data.success && data.data) {
-          // 直接使用后端字段名
           this.totalPendingCount = data.data.total || 0
           this.consumptionPendingCount = data.data.badges?.consumption || 0
           this.customerPendingCount = data.data.badges?.customer_service || 0
@@ -404,8 +408,12 @@ export function sidebarNav() {
           })
         }
       } catch (error) {
-        logger.warn('获取徽标数量失败:', error.message)
-        // 降级：使用原有单独的API获取
+        const isNetworkError = error.message === 'Failed to fetch' || error.name === 'TypeError'
+        if (isNetworkError) {
+          logger.warn('[SidebarNav] 网络不可达，跳过降级请求:', error.message)
+          return
+        }
+        logger.warn('[SidebarNav] 统一徽标API失败，尝试降级获取:', error.message)
         this.fetchPendingAlertCount()
         this.fetchLotteryAlertCount()
         this.fetchAdPendingReviewCount()
@@ -440,7 +448,7 @@ export function sidebarNav() {
 
         const data = await request({
           url: `${API_PREFIX}/console/lottery-realtime/alerts`,
-          params: { status: 'active', page_size: 1 }
+          params: { status: 'active', limit: 1 }
         })
         if (data.success && data.data) {
           // 从 summary 获取 danger + warning 数量

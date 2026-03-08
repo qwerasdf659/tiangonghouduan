@@ -56,12 +56,13 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
     'free_shipping',
     'is_limited',
     'sell_point',
+    'rarity_code',
     'created_at'
   ],
 
   /**
    * 商品详情视图
-   * 包含臻选空间/幸运空间扩展字段
+   * 包含臻选空间/幸运空间扩展字段 + 稀有度
    */
   marketItemDetailView: [
     'exchange_item_id',
@@ -85,6 +86,7 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
     'free_shipping',
     'is_limited',
     'sell_point',
+    'rarity_code',
     'created_at',
     'updated_at'
   ],

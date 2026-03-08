@@ -292,8 +292,12 @@ const EXPERIENCE_STATE_CONFIG = {
   /**
    * 空奖档位定义
    * 抽中这些档位会增加 empty_streak
+   *
+   * 🔴 2026-03-06 业务语义修正：
+   * fallback 是保底奖品（真实奖品，只是价值最低），不算空奖
+   * 只有 'empty' 才算真正的空奖（理论上不应出现，因为100%出奖）
    */
-  empty_tiers: ['fallback', 'empty'],
+  empty_tiers: ['empty'],
 
   /**
    * 近期高价值统计窗口（次数）
@@ -494,13 +498,62 @@ async function isFeatureEnabledForContext(feature, context = {}) {
     }
   }
 
-  // 3. 用户白名单检查（保持 env 配置）
-  if (user_id && grayscale.user_whitelist.includes(user_id)) {
-    return {
-      enabled: true,
-      reason: 'user_whitelist',
-      grayscale_percentage: effective_percentage,
-      user_hash_value: null
+  // 3. 用户白名单检查（三源合并：env + DB策略配置 + Feature Flags）
+  if (user_id) {
+    // 来源A：.env 环境变量白名单（启动时加载，适合开发/测试账号）
+    const env_hit = grayscale.user_whitelist.includes(user_id)
+
+    // 来源B：lottery_strategy_config 表白名单（运营在策略配置页管理）
+    let db_whitelist_hit = false
+    if (lottery_campaign_id) {
+      const whitelist_key = `${feature}_user_whitelist`
+      const db_whitelist = await DynamicConfigLoader.getValue('grayscale', whitelist_key, null, {
+        lottery_campaign_id
+      })
+      if (db_whitelist) {
+        const user_ids = Array.isArray(db_whitelist)
+          ? db_whitelist
+          : typeof db_whitelist === 'string'
+            ? JSON.parse(db_whitelist)
+            : []
+        db_whitelist_hit = user_ids.includes(user_id) || user_ids.includes(String(user_id))
+      }
+    }
+
+    // 来源C：Feature Flags 表白名单（运营在 Feature Flags 管理页管理）
+    let feature_flag_hit = false
+    try {
+      const FEATURE_TO_FLAG_KEY = {
+        pity: 'lottery_pity_system',
+        luck_debt: 'lottery_luck_debt',
+        anti_empty: 'lottery_anti_empty_streak',
+        anti_high: 'lottery_anti_high_streak'
+      }
+      const flag_key = FEATURE_TO_FLAG_KEY[feature]
+      if (flag_key) {
+        const { FeatureFlag } = require('../../../../models')
+        const flag = await FeatureFlag.findByKey(flag_key)
+        if (flag) {
+          feature_flag_hit =
+            flag.isUserInWhitelist(user_id) || flag.isUserInWhitelist(Number(user_id))
+        }
+      }
+    } catch (_err) {
+      /* Feature Flags 查询失败不阻断灰度判定 */
+    }
+
+    if (env_hit || db_whitelist_hit || feature_flag_hit) {
+      const source = env_hit
+        ? 'env_whitelist'
+        : db_whitelist_hit
+          ? 'db_config_whitelist'
+          : 'feature_flag_whitelist'
+      return {
+        enabled: true,
+        reason: source,
+        grayscale_percentage: effective_percentage,
+        user_hash_value: null
+      }
     }
   }
 

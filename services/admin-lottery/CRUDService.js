@@ -141,7 +141,7 @@ class LotteryCampaignCRUDService {
         // 前端展示配置字段（多活动抽奖系统）
         display_mode: campaignData.display_mode || 'grid_3x3',
         grid_cols: campaignData.grid_cols || 3,
-        effect_theme: campaignData.effect_theme || 'default',
+        effect_theme: campaignData.effect_theme || null, // null = 继承全局 app_theme
         rarity_effects_enabled:
           campaignData.rarity_effects_enabled !== undefined
             ? campaignData.rarity_effects_enabled

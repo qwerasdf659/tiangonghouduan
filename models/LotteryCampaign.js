@@ -993,18 +993,18 @@ module.exports = sequelize => {
       },
 
       /**
-       * 特效主题（6套主题色）
-       * @type {string}
-       * @业务含义 控制前端整体颜色风格，通过CSS变量系统切换
-       * @枚举值 default/gold_luxury/purple_mystery/spring_festival/christmas/summer
-       * @前端效果 全局CSS变量切换颜色风格（如春节红金色/圣诞绿色等）
+       * 活动级特效主题（6套主题色，可选）
+       * @type {string|null}
+       * @业务含义 控制该活动页面的颜色风格，NULL 表示继承全局氛围主题（app_theme）
+       * @枚举值 null/default/gold_luxury/purple_mystery/spring_festival/christmas/summer
+       * @前端效果 非空时通过CSS变量切换颜色风格；为空时继承全局 app_theme 配置
        */
       effect_theme: {
         type: DataTypes.STRING(30),
-        allowNull: false,
-        defaultValue: 'default',
+        allowNull: true,
+        defaultValue: null,
         comment:
-          '特效主题（6套）: default/gold_luxury/purple_mystery/spring_festival/christmas/summer'
+          '活动级特效主题: null=继承全局app_theme | default/gold_luxury/purple_mystery/spring_festival/christmas/summer'
       },
 
       /**

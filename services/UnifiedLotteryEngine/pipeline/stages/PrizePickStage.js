@@ -140,31 +140,47 @@ class PrizePickStage extends BaseStage {
           /* 指定奖品不可用时，继续走正常的档位内抽取流程 */
         }
 
-        // force_lose 模式：使用 fallback 奖品
+        /**
+         * 🔴 2026-03-06 业务语义修正：force_lose → 强制低档奖品
+         * 100%出奖设计下，force_lose 意为"强制选择低档奖品"
+         * 从 low 档位奖品池中随机选取，而非使用 fallback 空奖
+         */
         if (override_type === 'force_lose') {
-          const campaign_data = this.getContextData(context, 'LoadCampaignStage.data')
-          const fallback_prize = campaign_data?.fallback_prize
+          const prize_pool_data = this.getContextData(context, 'BuildPrizePoolStage.data')
+          const prizes_by_tier = prize_pool_data?.prizes_by_tier || {}
+          const low_prizes = (prizes_by_tier.low || []).filter(p => p.status === 'active')
 
-          if (fallback_prize) {
-            this.log('info', '干预模式（强制不中）：使用兜底奖品', {
-              user_id,
-              decision_source,
-              lottery_prize_id: fallback_prize.lottery_prize_id,
-              prize_name: fallback_prize.prize_name
-            })
+          if (low_prizes.length > 0) {
+            const { selected_prize, random_value, total_weight, hit_range } =
+              this._pickPrize(low_prizes)
 
-            return this.success({
-              selected_prize: fallback_prize,
-              prize_random_value: 0,
-              tier_total_weight: 0,
-              prize_hit_range: [0, 0],
-              tier_prize_count: 1,
-              selected_tier: 'fallback',
-              decision_source,
-              skipped: true,
-              skip_reason: 'override_force_lose'
-            })
+            if (selected_prize) {
+              this.log('info', '干预模式（强制低档）：从低档奖品池选取', {
+                user_id,
+                decision_source,
+                lottery_prize_id: selected_prize.lottery_prize_id,
+                prize_name: selected_prize.prize_name,
+                low_pool_size: low_prizes.length
+              })
+
+              return this.success({
+                selected_prize,
+                prize_random_value: random_value,
+                tier_total_weight: total_weight,
+                prize_hit_range: hit_range,
+                tier_prize_count: low_prizes.length,
+                selected_tier: 'low',
+                decision_source,
+                skipped: true,
+                skip_reason: 'override_force_lose_low_tier'
+              })
+            }
           }
+
+          this.log('warn', '干预模式（强制低档）：低档奖品池为空，降级到正常抽取流程', {
+            user_id,
+            decision_source
+          })
         }
       }
 

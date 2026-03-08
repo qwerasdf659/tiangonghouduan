@@ -157,7 +157,11 @@ class TierPickStage extends BaseStage {
       if (decision_source === 'override' && decision_data?.override) {
         const override = decision_data.override
         const override_type = override.setting_type || override.override_type
-        let override_tier = override_type === 'force_win' ? 'high' : 'fallback'
+        /**
+         * 🔴 2026-03-06 业务语义修正：force_lose → low 档位
+         * 100%出奖设计下没有"不中奖"概念，force_lose 意为"强制低档奖品"
+         */
+        let override_tier = override_type === 'force_win' ? 'high' : 'low'
 
         if (override_tier === 'high') {
           override_tier = await this._enforceDailyHighCap(
@@ -201,7 +205,7 @@ class TierPickStage extends BaseStage {
         })
         return this.success({
           selected_tier: override_tier,
-          original_tier: override_type === 'force_win' ? 'high' : 'fallback',
+          original_tier: override_type === 'force_win' ? 'high' : 'low',
           tier_downgrade_path: override_downgrade_path,
           random_value: 0,
           tier_weights: {},

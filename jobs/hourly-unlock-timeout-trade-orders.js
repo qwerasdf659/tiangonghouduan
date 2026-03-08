@@ -153,12 +153,16 @@ class HourlyUnlockTimeoutTradeOrders {
     const transaction = await sequelize.transaction()
 
     try {
-      // 查找超时的订单（created_at 超过3分钟且状态仍为 frozen）
+      /*
+       * 查找超时的订单（created_at 超过3分钟且状态仍为 frozen 或 created）
+       * - frozen: 已冻结买家资产的正常状态
+       * - created: 防御性处理，避免因事务中间态导致的孤儿冻结
+       */
       const timeout_threshold = new Date(Date.now() - this.LOCK_TIMEOUT_MINUTES * 60 * 1000)
 
       const frozen_orders = await TradeOrder.findAll({
         where: {
-          status: 'frozen',
+          status: { [Op.in]: ['frozen', 'created'] },
           created_at: { [Op.lt]: timeout_threshold }
         },
         lock: transaction.LOCK.UPDATE,

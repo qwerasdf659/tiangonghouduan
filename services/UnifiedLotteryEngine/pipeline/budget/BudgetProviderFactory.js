@@ -63,14 +63,20 @@ class BudgetProviderFactory {
     let provider
 
     switch (budget_mode) {
-      case BudgetProvider.MODES.USER:
+      case BudgetProvider.MODES.USER: {
+        /* Sequelize JSON 类型已自动解析为数组，无需 JSON.parse */
+        const raw_ids = campaign.allowed_campaign_ids
+        const parsed_ids = Array.isArray(raw_ids)
+          ? raw_ids
+          : typeof raw_ids === 'string'
+            ? JSON.parse(raw_ids)
+            : null
         provider = new UserBudgetProvider({
-          allowed_campaign_ids: campaign.allowed_campaign_ids
-            ? JSON.parse(campaign.allowed_campaign_ids)
-            : null,
+          allowed_campaign_ids: parsed_ids,
           ...options
         })
         break
+      }
 
       case BudgetProvider.MODES.POOL:
         provider = new PoolBudgetProvider({
@@ -119,8 +125,19 @@ class BudgetProviderFactory {
    */
   createByMode(budget_mode, options = {}) {
     switch (budget_mode) {
-      case BudgetProvider.MODES.USER:
-        return new UserBudgetProvider(options)
+      case BudgetProvider.MODES.USER: {
+        const campaign = options.campaign
+        const raw_ids = options.allowed_campaign_ids || campaign?.allowed_campaign_ids
+        const parsed_ids = Array.isArray(raw_ids)
+          ? raw_ids
+          : typeof raw_ids === 'string'
+            ? JSON.parse(raw_ids)
+            : null
+        return new UserBudgetProvider({
+          ...options,
+          allowed_campaign_ids: parsed_ids
+        })
+      }
 
       case BudgetProvider.MODES.POOL:
         return new PoolBudgetProvider(options)
