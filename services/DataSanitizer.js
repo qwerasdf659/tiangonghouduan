@@ -1,6 +1,6 @@
 const BeijingTimeHelper = require('../utils/timeHelper')
 const DecimalConverter = require('../utils/formatters/DecimalConverter') // 🔧 DECIMAL字段类型转换工具
-const { getImageUrl } = require('../utils/ImageUrlHelper') // 🔧 Sealos 对象存储 URL 生成
+const { getImageUrl, getPlaceholderImageUrl } = require('../utils/ImageUrlHelper') // 🔧 Sealos 对象存储 URL 生成
 
 /**
  * 🔒 全局敏感资产类型黑名单（决策1：绝对禁止暴露给前端）
@@ -170,7 +170,16 @@ class DataSanitizer {
           source: 'material_icon'
         }
       } else {
-        sanitized.image = null
+        /**
+         * 最终兜底：所有图片来源都不可用时，返回占位图 URL
+         * 确保前端 <image> 组件始终有可渲染的图片地址
+         */
+        const placeholderUrl = getPlaceholderImageUrl('prize')
+        sanitized.image = {
+          url: placeholderUrl,
+          thumbnail_url: placeholderUrl,
+          source: 'placeholder'
+        }
       }
 
       // 材料资产展示信息（前端需要材料的display_name用于展示）

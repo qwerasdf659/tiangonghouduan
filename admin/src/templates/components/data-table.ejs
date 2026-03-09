@@ -45,7 +45,7 @@
           </th>
         </template>
         <!-- 数据列（#10 排序） -->
-        <template x-for="col in columns" :key="col.key">
+        <template x-for="(col, colIdx) in columns" :key="'th_' + colIdx">
           <th class="px-4 py-3 text-left text-sm font-medium themed-text-secondary"
             :class="{ 'cursor-pointer hover:text-blue-600 select-none': sortable && col.sortable }"
             :style="col.width ? 'width:' + col.width : ''"
@@ -106,7 +106,7 @@
             </td>
           </template>
           <!-- 数据列 -->
-          <template x-for="col in columns" :key="col.key">
+          <template x-for="(col, colIdx) in columns" :key="'td_' + rowIndex + '_' + colIdx">
             <td class="px-4 py-3 text-sm" :class="col.type === 'actions' ? '' : 'themed-text-primary'">
               <!-- 普通列：使用 renderCell -->
               <span x-show="col.type !== 'actions'" x-html="renderCell(row, col)"></span>

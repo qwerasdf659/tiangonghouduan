@@ -5,19 +5,19 @@
  * - 管理员批量审核多条消费记录
  * - 支持部分成功模式（单条失败不影响其他）
  * - 自动幂等性检查，防止重复处理
- * - 审批通过自动发放积分
+ * - 审批通过自动发放全部资产（积分 + 预算积分 + 钻石配额）
  *
  * 技术特性：
- * - 使用 BatchOperationService 进行幂等性检查
+ * - 复用 CoreService.approveConsumption / rejectConsumption 完整业务逻辑
  * - 使用 TransactionManager 进行事务管理（每条记录独立事务）
  * - 使用 AuditLogService 记录审核操作
  * - 部分成功模式：返回成功/失败/跳过的详细统计
  *
  * API 端点：
- * - POST /api/v4/admin/consumption/batch-review
+ * - POST /api/v4/console/consumption/batch-review
  *
  * 创建时间：2026年01月31日
- * 关联文档：后端数据库开发任务清单-2026年1月.md（P0-B10）
+ * 修复时间：2026年03月08日 - 复用 CoreService 完整审核逻辑
  *
  * @module services/consumption/ConsumptionBatchService
  */
@@ -25,8 +25,8 @@
 'use strict'
 
 const { Op } = require('sequelize')
-const { sequelize } = require('../../config/database')
 const BeijingTimeHelper = require('../../utils/timeHelper')
+const TransactionManager = require('../../utils/TransactionManager')
 const logger = require('../../utils/logger').logger
 
 /**
@@ -196,7 +196,13 @@ class ConsumptionBatchService {
   }
 
   /**
-   * 处理单条记录的审核
+   * 处理单条记录的审核（复用 CoreService 完整业务逻辑）
+   *
+   * 通过 TransactionManager.execute 管理事务边界，
+   * 内部调用 CoreService.approveConsumption / rejectConsumption，
+   * 确保批量审核与单条审核走完全相同的流程：
+   * - approve: 积分 + 预算积分 + 钻石配额 + ContentReviewRecord + reward_transaction_id
+   * - reject: 状态更新 + ContentReviewRecord + 审计日志
    *
    * @private
    * @param {Object} record - 消费记录实例
@@ -205,113 +211,50 @@ class ConsumptionBatchService {
    */
   static async _processSingleRecord(record, options) {
     const { action, reason, operator_id } = options
-    const transaction = await sequelize.transaction()
+    const CoreService = require('./CoreService')
+    const recordId = record.consumption_record_id
 
-    try {
-      const updateData = {
-        reviewed_by: operator_id,
-        reviewed_at: BeijingTimeHelper.createDatabaseTime()
-      }
-
-      let pointsAwarded = 0
-
-      if (action === BATCH_REVIEW_ACTIONS.APPROVE) {
-        // 审核通过
-        updateData.status = 'approved'
-        updateData.final_status = 'approved'
-        updateData.admin_notes = reason || '批量审核通过'
-
-        // 发放积分
-        pointsAwarded = await this._awardPoints(record, operator_id, transaction)
-      } else if (action === BATCH_REVIEW_ACTIONS.REJECT) {
-        // 审核拒绝
-        updateData.status = 'rejected'
-        updateData.final_status = 'rejected'
-        updateData.admin_notes = reason || '批量审核拒绝'
-      }
-
-      // 更新记录
-      await record.update(updateData, { transaction })
-
-      await transaction.commit()
+    if (action === BATCH_REVIEW_ACTIONS.APPROVE) {
+      /* 审核通过：复用 CoreService.approveConsumption 完整逻辑 */
+      const approveResult = await TransactionManager.execute(async transaction => {
+        return await CoreService.approveConsumption(recordId, {
+          reviewer_id: operator_id,
+          admin_notes: reason || '批量审核通过',
+          transaction
+        })
+      })
 
       return {
-        consumption_record_id: record.consumption_record_id,
+        consumption_record_id: recordId,
         action,
         previous_status: 'pending',
-        new_status: updateData.status,
-        points_awarded: pointsAwarded,
+        new_status: 'approved',
+        points_awarded: approveResult.points_awarded || 0,
+        budget_points_allocated: approveResult.budget_points_allocated || 0,
+        diamond_quota_allocated: approveResult.diamond_quota_allocated || 0,
         processed_at: BeijingTimeHelper.apiTimestamp()
       }
-    } catch (error) {
-      await transaction.rollback()
-      throw error
-    }
-  }
-
-  /**
-   * 发放消费积分
-   *
-   * @private
-   * @param {Object} record - 消费记录
-   * @param {number} operator_id - 操作员 ID
-   * @param {Object} transaction - 事务实例
-   * @returns {Promise<number>} 发放的积分数量
-   */
-  static async _awardPoints(record, operator_id, transaction) {
-    try {
-      // 计算积分（如果记录中没有预设积分值）
-      const pointsToAward = record.points_to_award || Math.floor(record.consumption_amount * 10) // 默认1元=10积分
-
-      if (pointsToAward <= 0) {
-        return 0
-      }
-
-      /*
-       * 通过 BalanceService.changeBalance 发放积分
-       * 资产模块已拆分（V4.7.0）：
-       * - BalanceService：余额操作
-       * - ItemService：物品操作
-       * - QueryService：查询统计
-       */
-      const BalanceService = require('../asset/BalanceService')
-
-      // 生成幂等键：业务类型_记录ID_操作员ID
-      const idempotencyKey = `consumption_reward_${record.consumption_record_id}_${operator_id}`
-
-      const mintAccount = await BalanceService.getOrCreateAccount(
-        { system_code: 'SYSTEM_MINT' },
-        { transaction }
-      )
-      await BalanceService.changeBalance(
-        {
-          user_id: record.user_id,
-          asset_code: 'POINTS',
-          delta_amount: pointsToAward,
-          business_type: 'consumption_reward',
-          idempotency_key: idempotencyKey,
-          counterpart_account_id: mintAccount.account_id,
-          meta: {
-            reference_id: record.consumption_record_id,
-            reference_type: 'consumption_record',
-            description: `消费奖励: ¥${record.consumption_amount}`,
-            operator_id
-          }
-        },
-        { transaction }
-      )
-
-      // 更新记录的积分交易关联
-      record.reward_transaction_id = record.consumption_record_id
-
-      return pointsToAward
-    } catch (error) {
-      logger.error('[批量审核] 积分发放失败', {
-        record_id: record.consumption_record_id,
-        error: error.message
+    } else if (action === BATCH_REVIEW_ACTIONS.REJECT) {
+      /* 审核拒绝：复用 CoreService.rejectConsumption 完整逻辑 */
+      await TransactionManager.execute(async transaction => {
+        return await CoreService.rejectConsumption(recordId, {
+          reviewer_id: operator_id,
+          admin_notes: reason,
+          transaction
+        })
       })
-      throw new Error(`积分发放失败: ${error.message}`)
+
+      return {
+        consumption_record_id: recordId,
+        action,
+        previous_status: 'pending',
+        new_status: 'rejected',
+        points_awarded: 0,
+        processed_at: BeijingTimeHelper.apiTimestamp()
+      }
     }
+
+    throw new Error(`未知的审核动作: ${action}`)
   }
 
   /**

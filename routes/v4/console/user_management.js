@@ -159,15 +159,15 @@ router.get('/users/resolve', async (req, res) => {
  */
 router.get('/users', async (req, res) => {
   try {
-    const { page = 1, limit = 20, search, role_filter } = req.query
+    const { page = 1, limit, page_size, search, role_filter } = req.query
 
     // 通过 ServiceManager 获取 UserRoleService
     const UserRoleService = req.app.locals.services.getService('user_role')
 
-    // 调用 Service 层方法
+    // 调用 Service 层方法（兼容 limit 和 page_size 两种分页参数）
     const result = await UserRoleService.getUserList({
       page,
-      limit,
+      limit: limit || page_size || 20,
       search,
       role_filter
     })

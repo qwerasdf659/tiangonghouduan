@@ -142,12 +142,16 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
       })
     })
 
-    test('B-5-1-8 普通用户（public）image 字段为 null 当奖品无图片', () => {
+    test('B-5-1-8 普通用户（public）奖品无图片时返回占位图 URL（非 null）', () => {
       const result = DataSanitizer.sanitizePrizes(mockPrizes, 'public')
 
       result.forEach(prize => {
         expect(prize).toHaveProperty('image')
-        expect(prize.image).toBeNull()
+        expect(prize.image).not.toBeNull()
+        expect(prize.image).toHaveProperty('url')
+        expect(prize.image).toHaveProperty('thumbnail_url')
+        expect(prize.image.source).toBe('placeholder')
+        expect(prize.image.url).toMatch(/placeholder/)
       })
     })
   })

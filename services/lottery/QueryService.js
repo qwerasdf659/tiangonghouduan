@@ -827,9 +827,16 @@ class LotteryQueryService {
         prizes_count: prizes.length
       })
 
+      /**
+       * 缓存序列化：Sequelize 模型实例必须转为 plain 对象
+       * 否则 LEFT JOIN 为 null 的关联（如 image）在 JSON.stringify 后丢失，
+       * 导致缓存命中时 DataSanitizer 无法从 materialAssetType.icon_url 生成图片 URL
+       */
+      const plainPrizes = prizes.map(p => (p.toJSON ? p.toJSON() : p))
+
       const result = {
         campaign: campaign.toJSON ? campaign.toJSON() : campaign,
-        prizes
+        prizes: plainPrizes
       }
 
       // ========== 写入缓存 ==========

@@ -455,10 +455,10 @@ class UserRoleService {
    */
   static async getUserList(filters = {}) {
     const { Op } = require('sequelize')
-    const { page = 1, limit = 20, search, role_filter } = filters
+    const { page = 1, limit, page_size, search, role_filter } = filters
 
-    // 分页安全保护
-    const finalLimit = Math.min(parseInt(limit), 100)
+    // 分页安全保护（兼容 limit 和 page_size 两种参数名）
+    const finalLimit = Math.min(parseInt(limit || page_size || 20), 100)
 
     // 构建查询条件
     const whereClause = {}
@@ -495,8 +495,8 @@ class UserRoleService {
       ]
     }
 
-    // 角色过滤
-    if (role_filter) {
+    // 角色过滤（'all' 或空值表示不过滤，返回所有用户）
+    if (role_filter && role_filter !== 'all') {
       userQuery.include[0].where = { role_name: role_filter }
       userQuery.include[0].required = true
     }
@@ -504,16 +504,35 @@ class UserRoleService {
     // 查询用户数据
     const { count, rows: users } = await User.findAndCountAll(userQuery)
 
+    // 角色中文显示名映射
+    const ROLE_DISPLAY_MAP = {
+      admin: '管理员',
+      user: '普通用户',
+      system_job: '系统任务',
+      merchant: '商户',
+      vip: 'VIP用户'
+    }
+
     // 处理用户数据
     const processedUsers = users.map(user => {
       const max_role_level =
         user.roles.length > 0 ? Math.max(...user.roles.map(role => role.role_level)) : 0
+      const primaryRole =
+        user.roles.length > 0
+          ? user.roles.reduce(
+              (best, r) => (r.role_level > (best?.role_level || 0) ? r : best),
+              null
+            )
+          : null
+      const roleName = primaryRole?.role_name || 'user'
       return {
         user_id: user.user_id,
         mobile: user.mobile,
         nickname: user.nickname,
         history_total_points: user.history_total_points,
         status: user.status,
+        role_name: roleName,
+        role_display: ROLE_DISPLAY_MAP[roleName] || roleName,
         role_level: max_role_level,
         roles: user.roles.map(role => role.role_name),
         last_login: user.last_login,

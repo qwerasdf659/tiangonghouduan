@@ -791,7 +791,7 @@ document.addEventListener('alpine:init', () => {
         { key: 'code', label: '权限标识', sortable: true },
         { key: 'name', label: '权限名称' },
         { key: 'actions', label: '可用操作', render: (val) => Array.isArray(val) ? val.map(a => a.name || a.code).join('、') : '-' },
-        { key: 'actions', label: '操作数量', render: (val) => Array.isArray(val) ? `${val.length} 项` : '-' }
+        { key: 'actions_count', label: '操作数量', render: (val, row) => { const a = row.actions; return Array.isArray(a) ? `${a.length} 项` : '-' } }
       ],
       dataSource: async (params) => {
         const res = await request({ url: `${API_PREFIX}/console/user-management/permission-resources`, method: 'GET', params })
@@ -816,7 +816,7 @@ document.addEventListener('alpine:init', () => {
         { key: 'role_level', label: '角色级别', type: 'number' }
       ],
       dataSource: async (params) => {
-        const res = await request({ url: `${API_PREFIX}/console/user-management/users`, method: 'GET', params: { ...params, role_filter: 'all' } })
+        const res = await request({ url: `${API_PREFIX}/console/user-management/users`, method: 'GET', params })
         return { items: res.data?.users || res.data?.rows || res.data?.list || [], total: res.data?.pagination?.total || res.data?.count || 0 }
       },
       primaryKey: 'user_id', sortable: true, page_size: 20

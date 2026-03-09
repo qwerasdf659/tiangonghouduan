@@ -420,11 +420,14 @@ export function useConsumptionMethods() {
 
             if (response?.success) {
               this.batchResult = response.data
-              const { success_count, fail_count } = response.data
-              if (fail_count > 0) {
-                this.showWarning(`成功 ${success_count} 项，失败 ${fail_count} 项`)
+              /* 后端返回 stats 嵌套对象：{ stats: { success_count, failed_count, ... } } */
+              const stats = response.data?.stats || {}
+              const successCount = stats.success_count || 0
+              const failedCount = stats.failed_count || 0
+              if (failedCount > 0) {
+                this.showWarning(`成功 ${successCount} 项，失败 ${failedCount} 项`)
               } else {
-                this.showSuccess(`成功通过 ${success_count} 条记录`)
+                this.showSuccess(`成功通过 ${successCount} 条记录`)
               }
               // 清空选择并刷新
               this.selectedIds = []
@@ -473,12 +476,15 @@ export function useConsumptionMethods() {
 
         if (response?.success) {
           this.batchResult = response.data
-          const { success_count, fail_count } = response.data
+          /* 后端返回 stats 嵌套对象：{ stats: { success_count, failed_count, ... } } */
+          const stats = response.data?.stats || {}
+          const successCount = stats.success_count || 0
+          const failedCount = stats.failed_count || 0
           this.hideModal('batchRejectModal')
-          if (fail_count > 0) {
-            this.showWarning(`成功 ${success_count} 项，失败 ${fail_count} 项`)
+          if (failedCount > 0) {
+            this.showWarning(`成功 ${successCount} 项，失败 ${failedCount} 项`)
           } else {
-            this.showSuccess(`成功拒绝 ${success_count} 条记录`)
+            this.showSuccess(`成功拒绝 ${successCount} 条记录`)
           }
           this.selectedIds = []
           this.isAllSelected = false
@@ -860,11 +866,14 @@ export function useConsumptionMethods() {
             })
 
             if (response?.success) {
-              const { success_count, fail_count } = response.data
-              if (fail_count > 0) {
-                this.showWarning(`成功 ${success_count} 项，失败 ${fail_count} 项`)
+              /* 后端返回 stats 嵌套对象：{ stats: { success_count, failed_count, ... } } */
+              const stats = response.data?.stats || {}
+              const successCount = stats.success_count || 0
+              const failedCount = stats.failed_count || 0
+              if (failedCount > 0) {
+                this.showWarning(`成功 ${successCount} 项，失败 ${failedCount} 项`)
               } else {
-                this.showSuccess(`成功通过 ${success_count} 条推荐记录`)
+                this.showSuccess(`成功通过 ${successCount} 条推荐记录`)
               }
               await this.loadConsumptions()
             }

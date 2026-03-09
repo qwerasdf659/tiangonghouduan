@@ -293,6 +293,23 @@
           </div>
           <!-- data-table: 用户角色列表 -->
           <div x-data="userRolesDataTable()" x-init="init()">
+            <!-- 手机号搜索栏 -->
+            <div class="p-4 border-b flex items-center gap-3">
+              <div class="relative flex-1 max-w-sm">
+                <input type="tel" x-ref="roleSearchInput" placeholder="输入手机号搜索用户"
+                       maxlength="11" class="w-full pl-9 pr-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-purple-300 focus:border-purple-400 outline-none transition-all"
+                       @keydown.enter="if ($refs.roleSearchInput.value.trim()) handleFilterSearch({ search: $refs.roleSearchInput.value.trim() })">
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">📱</span>
+              </div>
+              <button @click="if ($refs.roleSearchInput.value.trim()) handleFilterSearch({ search: $refs.roleSearchInput.value.trim() })"
+                      class="px-4 py-2 text-sm themed-bg-primary text-white rounded-lg themed-hover-primary transition-all">
+                🔍 搜索
+              </button>
+              <button @click="$refs.roleSearchInput.value = ''; handleFilterReset()"
+                      class="px-4 py-2 text-sm border rounded-lg themed-hover-bg transition-all text-gray-600">
+                🔄 重置
+              </button>
+            </div>
             <div x-show="loading" class="p-8 text-center themed-text-muted">加载中...</div>
             <div x-show="hasError" class="p-8 text-center">
               <p class="text-red-500 mb-2" x-text="error"></p>

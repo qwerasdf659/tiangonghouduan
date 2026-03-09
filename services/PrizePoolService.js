@@ -165,6 +165,28 @@ class PrizePoolService {
           parseInt(prizeData.budget_cost ?? prizeData.prize_value_points ?? 0) || 0
       }
 
+      /*
+       * 图片完整性保障：points 类型奖品自动关联 POINTS 材料图标
+       * 防止 material_asset_code 为空导致前端无图片（降级到占位图）
+       */
+      let resolvedMaterialAssetCode = prizeData.material_asset_code || null
+      if (!resolvedMaterialAssetCode && !prizeData.image_resource_id) {
+        if (prizeData.prize_type === 'points') {
+          resolvedMaterialAssetCode = 'POINTS'
+          logger.info('[奖品池] 积分类奖品自动关联 POINTS 材料图标', {
+            prize_name: prizeData.prize_name
+          })
+        } else if (!prizeData.image_resource_id) {
+          logger.warn(
+            '[奖品池] 奖品缺少图片来源（无 image_resource_id 且无 material_asset_code）',
+            {
+              prize_name: prizeData.prize_name,
+              prize_type: prizeData.prize_type
+            }
+          )
+        }
+      }
+
       // eslint-disable-next-line no-await-in-loop -- 需要在事务中顺序创建奖品，确保原子性和sort_order验证
       const prize = await LotteryPrize.create(
         {
@@ -200,7 +222,7 @@ class PrizePoolService {
           /** 是否为兜底奖品（所有档位无可用奖品时发放） */
           is_fallback: prizeData.is_fallback ? 1 : 0,
           /** 材质资产编码（碎片/水晶等虚拟物品的资产类型标识） */
-          material_asset_code: prizeData.material_asset_code || null,
+          material_asset_code: resolvedMaterialAssetCode,
           /** 材质数量（虚拟物品发放数量） */
           material_amount: prizeData.material_amount ? parseInt(prizeData.material_amount) : null
         },
