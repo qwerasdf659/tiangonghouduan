@@ -79,7 +79,10 @@ const AUDIT_TARGET_TYPES = Object.freeze({
   // ========== 系统配置 ==========
   SYSTEM_SETTING: 'system_setting',
   AD_CAMPAIGN: 'ad_campaign',
-  FEATURE_FLAG: 'feature_flag'
+  FEATURE_FLAG: 'feature_flag',
+
+  // ========== 数据管理（2026-03-10 新增）==========
+  DATA_MANAGEMENT: 'data_management'
 })
 
 /**
@@ -168,7 +171,8 @@ function getTargetTypeDisplayName(targetType) {
     trade_order: '交易订单',
     system_setting: '系统设置',
     ad_campaign: '广告计划',
-    feature_flag: '功能开关'
+    feature_flag: '功能开关',
+    data_management: '数据管理'
   }
 
   return displayNames[targetType] || targetType

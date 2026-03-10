@@ -229,23 +229,23 @@ export function useAdPricingState() {
             trigger: 'axis',
             axisPointer: { type: 'cross' }
           },
-          legend: { data: ['DAU 人数', 'DAU 系数'] },
+          legend: { data: ['日活人数', '日活系数'] },
           grid: { left: 60, right: 60, top: 40, bottom: 30 },
           xAxis: { type: 'category', data: dates },
           yAxis: [
-            { type: 'value', name: 'DAU 人数', min: 0 },
-            { type: 'value', name: 'DAU 系数', min: 0, max: 2, splitLine: { show: false } }
+            { type: 'value', name: '日活人数', min: 0 },
+            { type: 'value', name: '日活系数', min: 0, max: 2, splitLine: { show: false } }
           ],
           series: [
             {
-              name: 'DAU 人数',
+              name: '日活人数',
               type: 'bar',
               yAxisIndex: 0,
               data: dauCounts,
               itemStyle: { color: '#6366f1' }
             },
             {
-              name: 'DAU 系数',
+              name: '日活系数',
               type: 'line',
               yAxisIndex: 1,
               data: coefficients,

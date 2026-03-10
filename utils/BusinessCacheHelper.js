@@ -567,12 +567,19 @@ class BusinessCacheHelper {
     const {
       status = 'active',
       asset_code = 'all',
+      space = 'all',
+      keyword = '',
+      category = 'all',
+      min_cost = 0,
+      max_cost = 0,
+      stock_status = 'all',
+      with_counts = '0',
       page = 1,
       page_size = 20,
       sort_by = 'sort_order',
       sort_order = 'ASC'
     } = params
-    return `${KEY_PREFIX}${CACHE_PREFIX.EXCHANGE}:items:list:${status}:${asset_code}:${page}:${page_size}:${sort_by}:${sort_order}`
+    return `${KEY_PREFIX}${CACHE_PREFIX.EXCHANGE}:items:list:${status}:${asset_code}:${space}:${category}:${min_cost}:${max_cost}:${stock_status}:${with_counts}:${keyword}:${page}:${page_size}:${sort_by}:${sort_order}`
   }
 
   /**
@@ -639,11 +646,12 @@ class BusinessCacheHelper {
       min_price = 0,
       max_price = 0,
       sort = 'newest',
+      with_counts = '0',
       page = 1,
       page_size = 20
     } = params
 
-    // 缓存 key 格式：按筛选维度组合（移除废弃的 category 参数）
+    // 缓存 key 格式：按筛选维度组合（含 with_counts 区分聚合计数缓存）
     const keyParts = [
       KEY_PREFIX,
       CACHE_PREFIX.MARKET,
@@ -656,6 +664,7 @@ class BusinessCacheHelper {
       min_price,
       max_price,
       sort,
+      with_counts,
       page,
       page_size
     ]

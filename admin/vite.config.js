@@ -72,6 +72,11 @@ const pageConfigs = {
   'dashboard': { title: '仪表盘', pageIcon: '📊', pageTitle: '管理后台', backUrl: '/admin/dashboard.html' },
   'report-center': { title: '报表中心', pageIcon: '📈', pageTitle: '报表中心' },
   
+  // 数据管理模块（2026-03-10 数据一键删除功能）
+  'data-management': { title: '数据管理', pageIcon: '🗄️', pageTitle: '数据管理' },
+
+  // 审核链配置管理
+  'approval-chain': { title: '审核链配置管理', pageIcon: '🔗', pageTitle: '审核链配置管理' },
   // 默认配置
   'default': { title: '管理后台', pageIcon: '🏠', pageTitle: '管理后台' }
 }

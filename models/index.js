@@ -445,6 +445,14 @@ models.ExchangeRecord = require('./ExchangeRecord')(sequelize, DataTypes)
  *    - source字段：exchange(普通兑换) / bid(竞价中标)
  */
 
+models.ExchangeOrderEvent = require('./ExchangeOrderEvent')(sequelize, DataTypes)
+/*
+ * ✅ ExchangeOrderEvent：兑换订单状态变更事件表
+ *    - 用途：记录订单完整状态变更链（审计追踪）
+ *    - 表名：exchange_order_events，主键：event_id
+ *    - 业务场景：创建/审核/发货/收货/评分/取消/拒绝 全链路事件
+ */
+
 // 🔴 竞价系统模型（臻选空间/幸运空间/竞价功能 — 2026-02-16）
 models.BidProduct = require('./BidProduct')(sequelize, DataTypes)
 /*
@@ -906,6 +914,39 @@ models.LotterySimulationRecord = require('./LotterySimulationRecord')(sequelize,
 
 // 🔴 用户消费比例覆盖（2026-03-02 钻石配额优化方案）
 models.UserRatioOverride = require('./UserRatioOverride')(sequelize, DataTypes)
+
+// 🔴 审核链系统（2026-03-10 多级审核链）
+models.ApprovalChainTemplate = require('./ApprovalChainTemplate')(sequelize, DataTypes)
+/*
+ * ✅ ApprovalChainTemplate：审核链模板（配置实体）
+ *    - 用途：定义审核流程模板，按 auditable_type + match_conditions + priority 匹配
+ *    - 表名：approval_chain_templates，主键：template_id，唯一键：template_code
+ *    - 业务场景：运营在管理后台配置审核链（如"消费审核-大额链"、"消费审核-默认链"）
+ */
+
+models.ApprovalChainNode = require('./ApprovalChainNode')(sequelize, DataTypes)
+/*
+ * ✅ ApprovalChainNode：审核链节点定义（模板内的每个审核步骤）
+ *    - 用途：定义模板中每个步骤的审核人分配方式（按角色/指定人/提交人上级）
+ *    - 表名：approval_chain_nodes，主键：node_id，外键：template_id
+ *    - 业务场景：配置"初审-业务经理(role_id=102)"、"终审-管理员(role_id=2)"
+ */
+
+models.ApprovalChainInstance = require('./ApprovalChainInstance')(sequelize, DataTypes)
+/*
+ * ✅ ApprovalChainInstance：审核链实例（每次业务提交创建）
+ *    - 用途：跟踪一次审核的完整流程进度（当前步骤、整体状态、最终结果）
+ *    - 表名：approval_chain_instances，主键：instance_id，幂等键：idempotency_key
+ *    - 业务场景：消费提交 → 匹配模板 → 创建实例 → 逐步审核 → 完成/拒绝
+ */
+
+models.ApprovalChainStep = require('./ApprovalChainStep')(sequelize, DataTypes)
+/*
+ * ✅ ApprovalChainStep：审核链步骤执行记录
+ *    - 用途：记录实例中每个步骤的执行状态、审核人、审核意见
+ *    - 表名：approval_chain_steps，主键：step_id，外键：instance_id
+ *    - 状态流转：waiting → pending → approved/rejected/skipped/timeout
+ */
 /*
  * ✅ UserRatioOverride：用户消费比例覆盖表
  *    - 用途：管理员为特定用户设置个性化消费比例（积分/预算/配额三个比例）

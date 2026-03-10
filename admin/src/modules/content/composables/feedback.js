@@ -97,6 +97,16 @@ export function useFeedbackState() {
     /** @type {boolean} 批量操作提交中 */
     submittingBatch: false,
 
+    // ========== 批量回复状态 ==========
+    /** @type {boolean} 显示批量回复弹窗 */
+    showBatchReplyModal: false,
+    /** @type {string} 批量回复内容 */
+    batchReplyContent: '',
+    /** @type {string} 批量回复的内部备注 */
+    batchReplyNotes: '',
+    /** @type {boolean} 批量回复提交中 */
+    submittingBatchReply: false,
+
     /** @type {Object} 状态字典 */
     FEEDBACK_STATUS_MAP,
     /** @type {Object} 分类字典 */
@@ -503,6 +513,62 @@ export function useFeedbackMethods() {
         this.showError?.('批量更新失败: ' + (error.message || '网络错误'))
       } finally {
         this.submittingBatch = false
+      }
+    },
+
+    // ========== 批量回复方法 ==========
+
+    /**
+     * 打开批量回复弹窗
+     */
+    openBatchReplyModal() {
+      if (this.selectedFeedbackIds.size === 0) {
+        this.showError?.('请先勾选要批量回复的反馈')
+        return
+      }
+      this.batchReplyContent = ''
+      this.batchReplyNotes = ''
+      this.showBatchReplyModal = true
+    },
+
+    /**
+     * 提交批量回复
+     */
+    async submitBatchReply() {
+      if (!this.batchReplyContent.trim()) {
+        this.showError?.('回复内容不能为空')
+        return
+      }
+
+      if (this.selectedFeedbackIds.size === 0) {
+        this.showError?.('没有选中的反馈')
+        return
+      }
+
+      this.submittingBatchReply = true
+      try {
+        const response = await ContentAPI.batchReplyFeedback({
+          feedback_ids: Array.from(this.selectedFeedbackIds),
+          reply_content: this.batchReplyContent.trim(),
+          internal_notes: this.batchReplyNotes.trim() || null
+        })
+
+        if (response?.success) {
+          const count = response.data?.updated_count || 0
+          this.showBatchReplyModal = false
+          this.clearFeedbackSelection()
+          if (typeof Alpine !== 'undefined' && Alpine.store('notification')) {
+            Alpine.store('notification').success(`批量回复成功，共回复 ${count} 条反馈`)
+          }
+          await Promise.all([this.loadFeedbacks(), this.loadFeedbackStats()])
+        } else {
+          this.showError?.('批量回复失败: ' + (response?.message || '未知错误'))
+        }
+      } catch (error) {
+        logger.error('[Feedback] 批量回复失败:', error)
+        this.showError?.('批量回复失败: ' + (error.message || '网络错误'))
+      } finally {
+        this.submittingBatchReply = false
       }
     },
 

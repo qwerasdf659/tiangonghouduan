@@ -914,118 +914,167 @@
       </div>
     </div>
 
-    <!-- 活动预算管理 -->
+    <!-- 活动预算管理（分区域：用户预算 / 活动池预算） -->
     <div x-show="current_page === 'campaign-budget'" x-cloak>
-      <!-- 预算统计卡片 - 使用统一 stats-card 组件 -->
-      <div class="stats-grid stats-grid-4 mb-6">
-        <div class="stats-card stats-primary stats-card-animate">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="stats-card-label">总预算</p>
-              <p class="stats-card-value themed-text-primary" x-text="budgetStats?.total_budget || 0"></p>
+
+      <!-- 筛选栏 -->
+      <div class="themed-card rounded-xl shadow-sm border overflow-hidden mb-6">
+        <div class="p-4 bg-gray-50/50">
+          <div class="flex flex-wrap items-center gap-3">
+            <div class="flex-1 min-w-[140px] max-w-[180px]">
+              <input type="text" x-model="budgetFilters.lottery_campaign_id" placeholder="输入活动ID" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400">
             </div>
-            <div class="stats-card-icon bg-gradient-to-br from-blue-100 to-blue-200 text-blue-600">🏦</div>
+            <div class="flex-1 min-w-[160px] max-w-[220px]">
+              <input type="text" x-model="budgetFilters.keyword" placeholder="活动名称关键词" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400">
+            </div>
+            <div class="flex-1 min-w-[140px] max-w-[160px]">
+              <select x-model="budgetFilters.status" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400 bg-white">
+                <option value="">全部状态</option>
+                <option value="active">运行中</option>
+                <option value="draft">草稿</option>
+                <option value="paused">暂停</option>
+                <option value="ended">已结束</option>
+              </select>
+            </div>
+            <button @click="searchBudgets()" class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-sm">🔍 搜索</button>
+            <button @click="budgetFilters = { lottery_campaign_id: '', status: '', keyword: '' }; loadBudgets()" class="px-4 py-2 text-sm bg-white text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition">↺ 重置</button>
           </div>
-          <p class="text-xs themed-text-muted mt-2">所有活动的预算总额</p>
-        </div>
-        <div class="stats-card stats-warning stats-card-animate">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="stats-card-label">已使用</p>
-              <p class="stats-card-value text-orange-600" x-text="budgetStats?.used_budget || 0"></p>
-            </div>
-            <div class="stats-card-icon bg-gradient-to-br from-orange-100 to-orange-200 text-orange-600">📊</div>
-          </div>
-          <p class="text-xs themed-text-muted mt-2">已消耗的预算额度</p>
-        </div>
-        <div class="stats-card stats-success stats-card-animate">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="stats-card-label">剩余预算</p>
-              <p class="stats-card-value text-green-600" x-text="budgetStats?.remaining_budget || 0"></p>
-            </div>
-            <div class="stats-card-icon bg-gradient-to-br from-green-100 to-green-200 text-green-600">💰</div>
-          </div>
-          <p class="text-xs themed-text-muted mt-2">当前可用预算余额</p>
-        </div>
-        <div class="stats-card stats-card-animate" :class="(budgetStats?.utilization_rate || 0) > 80 ? 'stats-danger' : 'stats-success'">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="stats-card-label">使用率</p>
-              <p class="stats-card-value" :class="(budgetStats?.utilization_rate || 0) > 80 ? 'text-red-600' : 'text-green-600'" x-text="(budgetStats?.utilization_rate || 0) + '%'"></p>
-            </div>
-            <div class="stats-card-icon" :class="(budgetStats?.utilization_rate || 0) > 80 ? 'bg-gradient-to-br from-red-100 to-red-200 text-red-600' : 'bg-gradient-to-br from-green-100 to-green-200 text-green-600'">
-              <span x-text="(budgetStats?.utilization_rate || 0) > 80 ? '⚠️' : '📈'"></span>
-            </div>
-          </div>
-          <p class="text-xs themed-text-muted mt-2">
-            <span x-show="(budgetStats?.utilization_rate || 0) > 80" class="text-red-500">预算即将耗尽，请关注</span>
-            <span x-show="(budgetStats?.utilization_rate || 0) <= 80">预算使用比例正常</span>
-          </p>
         </div>
       </div>
 
-      <div class="themed-card rounded-xl shadow-sm border overflow-hidden">
-        <div class="px-5 py-4 bg-gradient-to-r from-slate-50 to-white border-b flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <span class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center text-base">📊</span>
+      <!-- 预算模式切换 Tab -->
+      <div class="flex border-b border-gray-200 mb-6">
+        <button @click="switchBudgetTab('user')"
+                :class="budgetActiveTab === 'user' ? 'border-blue-500 text-blue-600 font-semibold' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                class="px-6 py-3 text-sm border-b-2 transition-colors flex items-center gap-2">
+          <span class="text-lg">👤</span>
+          <span>用户账户预算</span>
+          <span class="ml-1 px-2 py-0.5 text-xs rounded-full"
+                :class="budgetActiveTab === 'user' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'"
+                x-text="groupedBudgets.user.campaigns.length + '个活动'"></span>
+        </button>
+        <button @click="switchBudgetTab('pool')"
+                :class="budgetActiveTab === 'pool' ? 'border-green-500 text-green-600 font-semibold' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                class="px-6 py-3 text-sm border-b-2 transition-colors flex items-center gap-2">
+          <span class="text-lg">🏦</span>
+          <span>活动池预算</span>
+          <span class="ml-1 px-2 py-0.5 text-xs rounded-full"
+                :class="budgetActiveTab === 'pool' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'"
+                x-text="groupedBudgets.pool.campaigns.length + '个活动'"></span>
+        </button>
+        <template x-if="groupedBudgets.none.campaigns.length > 0">
+          <button @click="switchBudgetTab('none')"
+                  :class="budgetActiveTab === 'none' ? 'border-gray-500 text-gray-600 font-semibold' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                  class="px-6 py-3 text-sm border-b-2 transition-colors flex items-center gap-2">
+            <span class="text-lg">⚪</span>
+            <span>无预算</span>
+            <span class="ml-1 px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-500"
+                  x-text="groupedBudgets.none.campaigns.length + '个活动'"></span>
+          </button>
+        </template>
+      </div>
+
+      <!-- ==================== 区域1: 用户账户预算 ==================== -->
+      <div x-show="budgetActiveTab === 'user'">
+        <!-- 用户预算模式说明 -->
+        <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+          <div class="flex items-start gap-3">
+            <span class="text-2xl mt-0.5">👤</span>
             <div>
-              <h5 class="font-semibold text-gray-800">活动预算列表</h5>
-              <p class="text-xs text-gray-400 mt-0.5">查看各活动预算使用情况，调整预算配置</p>
+              <h4 class="font-semibold text-blue-800 text-sm">用户账户级别预算</h4>
+              <p class="text-xs text-blue-600 mt-1">
+                预算来源是<strong>用户个人的 BUDGET_POINTS 余额</strong>，用户通过消费审批获得预算积分。
+                每次抽奖从用户个人余额中扣除。预算按「活动桶」隔离，活动可配置允许使用哪些来源的预算积分。
+              </p>
             </div>
           </div>
         </div>
-        <!-- data-table: 活动预算列表 -->
-        <div x-data="budgetDataTable()" x-init="init()">
-          <div class="p-4 border-b bg-gray-50/50">
-            <div class="flex flex-wrap items-center gap-3">
-              <div class="flex-1 min-w-[140px] max-w-[180px]">
-                <input type="text" x-model="activeFilters.lottery_campaign_id" placeholder="输入活动ID" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400">
+
+        <!-- 用户预算统计卡片 -->
+        <div class="stats-grid stats-grid-4 mb-6">
+          <div class="stats-card stats-primary stats-card-animate">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="stats-card-label">活动数量</p>
+                <p class="stats-card-value themed-text-primary" x-text="groupedBudgets.user.summary.total_campaigns || 0"></p>
               </div>
-              <div class="flex-1 min-w-[160px] max-w-[220px]">
-                <input type="text" x-model="activeFilters.keyword" placeholder="活动名称关键词" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400">
+              <div class="stats-card-icon bg-gradient-to-br from-blue-100 to-blue-200 text-blue-600">📋</div>
+            </div>
+            <p class="text-xs themed-text-muted mt-2">使用用户预算模式的活动</p>
+          </div>
+          <div class="stats-card stats-success stats-card-animate">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="stats-card-label">用户预算池总量</p>
+                <p class="stats-card-value text-green-600" x-text="groupedBudgets.user.summary.total_user_budget_balance || 0"></p>
               </div>
-              <div class="flex-1 min-w-[140px] max-w-[160px]">
-                <select x-model="activeFilters.status" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400 bg-white">
-                  <option value="">全部状态</option>
-                  <option value="active">🟢 运行中</option>
-                  <option value="exhausted">🔴 已耗尽</option>
-                </select>
+              <div class="stats-card-icon bg-gradient-to-br from-green-100 to-green-200 text-green-600">💰</div>
+            </div>
+            <p class="text-xs themed-text-muted mt-2">所有用户 BUDGET_POINTS 可用余额之和</p>
+          </div>
+          <div class="stats-card stats-warning stats-card-animate">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="stats-card-label">已消耗</p>
+                <p class="stats-card-value text-orange-600" x-text="groupedBudgets.user.summary.total_consumed || 0"></p>
               </div>
-              <button @click="search()" class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-sm">🔍 搜索</button>
-              <button @click="handleFilterReset()" class="px-4 py-2 text-sm bg-white text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition">↺ 重置</button>
+              <div class="stats-card-icon bg-gradient-to-br from-orange-100 to-orange-200 text-orange-600">📊</div>
+            </div>
+            <p class="text-xs themed-text-muted mt-2">抽奖已消耗的预算积分总量</p>
+          </div>
+          <div class="stats-card stats-card-animate">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="stats-card-label">持有用户数</p>
+                <p class="stats-card-value text-purple-600" x-text="groupedBudgets.user.summary.total_user_count || 0"></p>
+              </div>
+              <div class="stats-card-icon bg-gradient-to-br from-purple-100 to-purple-200 text-purple-600">👥</div>
+            </div>
+            <p class="text-xs themed-text-muted mt-2">持有预算积分的用户数量</p>
+          </div>
+        </div>
+
+        <!-- 用户预算活动列表 -->
+        <div class="themed-card rounded-xl shadow-sm border overflow-hidden">
+          <div class="px-5 py-4 bg-gradient-to-r from-blue-50 to-white border-b flex items-center gap-2">
+            <span class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center text-base">👤</span>
+            <div>
+              <h5 class="font-semibold text-gray-800">用户预算活动列表</h5>
+              <p class="text-xs text-gray-400 mt-0.5">以下活动的预算来自用户个人的预算积分账户</p>
             </div>
           </div>
-          <div x-show="loading" class="p-8 text-center themed-text-muted">加载中...</div>
-          <div x-show="hasError" class="p-8 text-center">
-            <p class="text-red-500 mb-2" x-text="error"></p>
-            <button @click="loadData()" class="text-sm themed-text-primary hover:underline">🔄 重试</button>
-          </div>
-          <div x-show="hasData" class="overflow-x-auto">
+          <div x-show="groupedBudgets.user.campaigns.length > 0" class="overflow-x-auto">
             <table class="w-full">
               <thead>
                 <tr class="bg-gradient-to-r from-gray-50 to-slate-50 border-b-2 border-gray-200">
-                  <template x-for="col in (columns || [])" :key="col.key || $id('col')">
-                    <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider"
-                        :class="{ 'cursor-pointer hover:text-gray-700': col.sortable }"
-                        @click="sort(col)">
-                      <span x-text="col.label"></span>
-                      <span x-show="col.sortable" class="ml-1 text-xs" x-text="getSortIcon(col)"></span>
-                    </th>
-                  </template>
+                  <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">活动ID</th>
+                  <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">活动名称</th>
+                  <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">预算来源（桶）</th>
+                  <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">用户余额总量</th>
+                  <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">持有用户数</th>
+                  <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">已消耗</th>
+                  <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">活动状态</th>
                   <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">操作</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-100">
-                <template x-for="(row, idx) in data" :key="row.budget_id || idx">
+                <template x-for="(campaign, idx) in groupedBudgets.user.campaigns" :key="campaign.lottery_campaign_id">
                   <tr class="hover:bg-gray-50 transition-colors">
-                    <template x-for="col in (columns || [])" :key="col.key || $id('col')">
-                      <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
-                    </template>
+                    <td class="px-4 py-3 text-sm font-mono text-gray-600" x-text="campaign.lottery_campaign_id"></td>
+                    <td class="px-4 py-3 text-sm font-medium text-gray-900" x-text="campaign.campaign_name || '-'"></td>
+                    <td class="px-4 py-3 text-sm">
+                      <span class="px-2 py-1 text-xs rounded-md bg-blue-50 text-blue-700" x-text="campaign.user_budget?.budget_source_display || '-'"></span>
+                    </td>
+                    <td class="px-4 py-3 text-sm font-semibold text-green-600" x-text="campaign.user_budget?.total_balance || 0"></td>
+                    <td class="px-4 py-3 text-sm text-gray-600" x-text="campaign.user_budget?.user_count || 0"></td>
+                    <td class="px-4 py-3 text-sm text-orange-600" x-text="campaign.statistics?.total_consumed || 0"></td>
+                    <td class="px-4 py-3 text-sm">
+                      <span class="px-2 py-1 text-xs rounded-full" :class="getStatusDisplay(campaign.status).class" x-text="getStatusDisplay(campaign.status).label"></span>
+                    </td>
                     <td class="px-4 py-3">
                       <div class="flex items-center gap-1">
-                        <button @click="$dispatch('view-budget-detail', row)" class="px-2.5 py-1 text-xs text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition font-medium">📋 详情</button>
-                        <button @click="$dispatch('open-edit-budget', row)" class="px-2.5 py-1 text-xs text-green-700 bg-green-50 rounded-md hover:bg-green-100 transition font-medium">✏️ 编辑</button>
+                        <button @click="viewBudgetDetail(campaign)" class="px-2.5 py-1 text-xs text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition font-medium">📋 详情</button>
+                        <button @click="openEditBudgetModal(campaign)" class="px-2.5 py-1 text-xs text-green-700 bg-green-50 rounded-md hover:bg-green-100 transition font-medium">✏️ 编辑</button>
                       </div>
                     </td>
                   </tr>
@@ -1033,30 +1082,182 @@
               </tbody>
             </table>
           </div>
-          <div x-show="isEmpty" class="p-12 text-center">
+          <div x-show="groupedBudgets.user.campaigns.length === 0" class="p-12 text-center">
             <div class="inline-flex flex-col items-center">
-              <span class="text-5xl mb-3">📊</span>
-              <p class="text-gray-500 font-medium">暂无活动预算数据</p>
-              <p class="text-xs text-gray-400 mt-1">创建抽奖活动后，预算信息将在此处展示</p>
+              <span class="text-5xl mb-3">👤</span>
+              <p class="text-gray-500 font-medium">暂无使用用户预算模式的活动</p>
+              <p class="text-xs text-gray-400 mt-1">在活动管理中将活动的预算模式设为「用户预算」后，将在此处展示</p>
             </div>
-          </div>
-          <template x-if="total_pages > 1">
-            <div class="p-4 border-t flex justify-between items-center">
-              <span class="text-sm themed-text-muted" x-text="paginationInfo"></span>
-              <div class="flex space-x-1">
-                <button @click="prevPage()" :disabled="!hasPrevPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">‹</button>
-                <template x-for="p in visiblePages" :key="'bg'+p">
-                  <button @click="goToPage(p)" :class="p === current_page ? 'themed-bg-primary text-white' : 'themed-hover-bg'" class="px-3 py-1 text-sm border rounded" :disabled="p === '...'" x-text="p"></button>
-                </template>
-                <button @click="nextPage()" :disabled="!hasNextPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">›</button>
-              </div>
-            </div>
-          </template>
-          <div x-show="lastUpdateTime" class="px-4 py-2 text-xs themed-text-muted text-right border-t">
-            最后更新: <span x-text="lastUpdateTime"></span>
           </div>
         </div>
       </div>
+
+      <!-- ==================== 区域2: 活动池预算 ==================== -->
+      <div x-show="budgetActiveTab === 'pool'">
+        <!-- 活动池预算模式说明 -->
+        <div class="bg-green-50 border border-green-200 rounded-xl p-4 mb-6">
+          <div class="flex items-start gap-3">
+            <span class="text-2xl mt-0.5">🏦</span>
+            <div>
+              <h4 class="font-semibold text-green-800 text-sm">活动账户级别预算</h4>
+              <p class="text-xs text-green-600 mt-1">
+                预算来源是<strong>活动自身的固定预算池</strong>（pool_budget_total），由管理员设定总额。
+                每次抽奖从活动的剩余预算池中扣除。预算耗尽后无法继续抽奖。可通过「补充预算」追加额度。
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 活动池预算统计卡片 -->
+        <div class="stats-grid stats-grid-4 mb-6">
+          <div class="stats-card stats-primary stats-card-animate">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="stats-card-label">活动数量</p>
+                <p class="stats-card-value themed-text-primary" x-text="groupedBudgets.pool.summary.total_campaigns || 0"></p>
+              </div>
+              <div class="stats-card-icon bg-gradient-to-br from-green-100 to-green-200 text-green-600">📋</div>
+            </div>
+            <p class="text-xs themed-text-muted mt-2">使用活动池预算模式的活动</p>
+          </div>
+          <div class="stats-card stats-success stats-card-animate">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="stats-card-label">池总预算</p>
+                <p class="stats-card-value text-green-600" x-text="groupedBudgets.pool.summary.total_budget || 0"></p>
+              </div>
+              <div class="stats-card-icon bg-gradient-to-br from-green-100 to-green-200 text-green-600">🏦</div>
+            </div>
+            <p class="text-xs themed-text-muted mt-2">所有活动池的预算总额</p>
+          </div>
+          <div class="stats-card stats-warning stats-card-animate">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="stats-card-label">已使用</p>
+                <p class="stats-card-value text-orange-600" x-text="groupedBudgets.pool.summary.total_used || 0"></p>
+              </div>
+              <div class="stats-card-icon bg-gradient-to-br from-orange-100 to-orange-200 text-orange-600">📊</div>
+            </div>
+            <p class="text-xs themed-text-muted mt-2">活动池已消耗的预算</p>
+          </div>
+          <div class="stats-card stats-card-animate">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="stats-card-label">剩余预算</p>
+                <p class="stats-card-value text-blue-600" x-text="groupedBudgets.pool.summary.total_remaining || 0"></p>
+              </div>
+              <div class="stats-card-icon bg-gradient-to-br from-blue-100 to-blue-200 text-blue-600">💰</div>
+            </div>
+            <p class="text-xs themed-text-muted mt-2">活动池当前可用余额</p>
+          </div>
+        </div>
+
+        <!-- 活动池预算活动列表 -->
+        <div class="themed-card rounded-xl shadow-sm border overflow-hidden">
+          <div class="px-5 py-4 bg-gradient-to-r from-green-50 to-white border-b flex items-center gap-2">
+            <span class="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center text-base">🏦</span>
+            <div>
+              <h5 class="font-semibold text-gray-800">活动池预算列表</h5>
+              <p class="text-xs text-gray-400 mt-0.5">以下活动拥有独立的预算池，抽奖从池中扣除</p>
+            </div>
+          </div>
+          <div x-show="groupedBudgets.pool.campaigns.length > 0" class="overflow-x-auto">
+            <table class="w-full">
+              <thead>
+                <tr class="bg-gradient-to-r from-gray-50 to-slate-50 border-b-2 border-gray-200">
+                  <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">活动ID</th>
+                  <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">活动名称</th>
+                  <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">池总预算</th>
+                  <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">已使用</th>
+                  <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">剩余</th>
+                  <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">使用率</th>
+                  <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">活动状态</th>
+                  <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">操作</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                <template x-for="(campaign, idx) in groupedBudgets.pool.campaigns" :key="campaign.lottery_campaign_id">
+                  <tr class="hover:bg-gray-50 transition-colors">
+                    <td class="px-4 py-3 text-sm font-mono text-gray-600" x-text="campaign.lottery_campaign_id"></td>
+                    <td class="px-4 py-3 text-sm font-medium text-gray-900" x-text="campaign.campaign_name || '-'"></td>
+                    <td class="px-4 py-3 text-sm font-semibold text-green-600" x-text="campaign.pool_budget?.total || 0"></td>
+                    <td class="px-4 py-3 text-sm text-orange-600" x-text="campaign.pool_budget?.used || 0"></td>
+                    <td class="px-4 py-3 text-sm text-blue-600" x-text="campaign.pool_budget?.remaining || 0"></td>
+                    <td class="px-4 py-3 text-sm">
+                      <span :class="getBudgetRateColor(parseFloat(campaign.pool_budget?.usage_rate) || 0)" x-text="campaign.pool_budget?.usage_rate || '暂无'"></span>
+                    </td>
+                    <td class="px-4 py-3 text-sm">
+                      <span class="px-2 py-1 text-xs rounded-full" :class="getStatusDisplay(campaign.status).class" x-text="getStatusDisplay(campaign.status).label"></span>
+                    </td>
+                    <td class="px-4 py-3">
+                      <div class="flex items-center gap-1">
+                        <button @click="viewBudgetDetail(campaign)" class="px-2.5 py-1 text-xs text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition font-medium">📋 详情</button>
+                        <button @click="openEditBudgetModal(campaign)" class="px-2.5 py-1 text-xs text-green-700 bg-green-50 rounded-md hover:bg-green-100 transition font-medium">✏️ 编辑</button>
+                        <button @click="addBudgetPool(campaign, prompt('请输入补充金额：'))" class="px-2.5 py-1 text-xs text-purple-700 bg-purple-50 rounded-md hover:bg-purple-100 transition font-medium">➕ 补充</button>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+          <div x-show="groupedBudgets.pool.campaigns.length === 0" class="p-12 text-center">
+            <div class="inline-flex flex-col items-center">
+              <span class="text-5xl mb-3">🏦</span>
+              <p class="text-gray-500 font-medium">暂无使用活动池预算模式的活动</p>
+              <p class="text-xs text-gray-400 mt-1">在活动管理中将活动的预算模式设为「活动池」后，将在此处展示</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== 区域3: 无预算模式（仅在有数据时显示） ==================== -->
+      <div x-show="budgetActiveTab === 'none'">
+        <div class="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-6">
+          <div class="flex items-start gap-3">
+            <span class="text-2xl mt-0.5">⚪</span>
+            <div>
+              <h4 class="font-semibold text-gray-800 text-sm">无预算模式</h4>
+              <p class="text-xs text-gray-500 mt-1">以下活动不受预算控制，抽奖不消耗任何预算积分。</p>
+            </div>
+          </div>
+        </div>
+        <div class="themed-card rounded-xl shadow-sm border overflow-hidden">
+          <div x-show="groupedBudgets.none.campaigns.length > 0" class="overflow-x-auto">
+            <table class="w-full">
+              <thead>
+                <tr class="bg-gradient-to-r from-gray-50 to-slate-50 border-b-2 border-gray-200">
+                  <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">活动ID</th>
+                  <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">活动名称</th>
+                  <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">已消耗(统计)</th>
+                  <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">活动状态</th>
+                  <th class="px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">操作</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                <template x-for="(campaign, idx) in groupedBudgets.none.campaigns" :key="campaign.lottery_campaign_id">
+                  <tr class="hover:bg-gray-50 transition-colors">
+                    <td class="px-4 py-3 text-sm font-mono text-gray-600" x-text="campaign.lottery_campaign_id"></td>
+                    <td class="px-4 py-3 text-sm font-medium text-gray-900" x-text="campaign.campaign_name || '-'"></td>
+                    <td class="px-4 py-3 text-sm text-gray-600" x-text="campaign.statistics?.total_consumed || 0"></td>
+                    <td class="px-4 py-3 text-sm">
+                      <span class="px-2 py-1 text-xs rounded-full" :class="getStatusDisplay(campaign.status).class" x-text="getStatusDisplay(campaign.status).label"></span>
+                    </td>
+                    <td class="px-4 py-3">
+                      <button @click="viewBudgetDetail(campaign)" class="px-2.5 py-1 text-xs text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition font-medium">📋 详情</button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+          <div x-show="groupedBudgets.none.campaigns.length === 0" class="p-12 text-center">
+            <span class="text-5xl mb-3">⚪</span>
+            <p class="text-gray-500 font-medium mt-3">暂无无预算模式的活动</p>
+          </div>
+        </div>
+      </div>
+
     </div>
 
     <!-- 商户日志 -->

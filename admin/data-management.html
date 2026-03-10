@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <%- include('partials/head', {
+    title: '数据管理',
+    pageStyle: '[x-cloak] { display: none !important; }'
+  }) %>
+</head>
+<body class="themed-bg-subtle min-h-screen" x-data="dataManagementPage()" x-init="init()" x-cloak>
+
+  <!-- 导航栏 -->
+  <nav class="bg-gray-700 text-white shadow-lg">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/workspace.html" class="hover:text-gray-300">← 返回工作台</a>
+        <span class="text-lg font-semibold">🗄️ 数据管理</span>
+      </div>
+      <div class="flex items-center space-x-4">
+        <span x-text="'欢迎，' + (current_user?.nickname || '管理员')"></span>
+        <button @click="logout()" class="px-3 py-1 border border-white/50 rounded hover:bg-white/10">退出登录</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mx-auto px-4 py-6">
+    <!-- 页面标题 -->
+    <div class="mb-6">
+      <h1 class="text-2xl font-bold text-gray-800">🗄️ 数据管理</h1>
+      <p class="text-gray-500 mt-1">数据量统计、自动清理策略、手动清理、对账校验、清理历史</p>
+    </div>
+
+    <!-- Tab 导航 -->
+    <div class="border-b border-gray-200 mb-6">
+      <nav class="flex space-x-4" aria-label="Tabs">
+        <button @click="switchTab('overview')"
+          :class="activeTab === 'overview' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+          class="py-2 px-3 border-b-2 font-medium text-sm transition-colors">
+          📊 数据总览
+        </button>
+        <button @click="switchTab('policies')"
+          :class="activeTab === 'policies' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+          class="py-2 px-3 border-b-2 font-medium text-sm transition-colors">
+          ⏰ 自动清理策略
+        </button>
+        <button @click="switchTab('manual')"
+          :class="activeTab === 'manual' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+          class="py-2 px-3 border-b-2 font-medium text-sm transition-colors">
+          🧹 手动清理
+        </button>
+        <button @click="switchTab('reconciliation')"
+          :class="activeTab === 'reconciliation' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+          class="py-2 px-3 border-b-2 font-medium text-sm transition-colors">
+          ✅ 对账校验
+        </button>
+        <button @click="switchTab('history')"
+          :class="activeTab === 'history' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+          class="py-2 px-3 border-b-2 font-medium text-sm transition-colors">
+          📋 清理历史
+        </button>
+      </nav>
+    </div>
+
+    <!-- ==================== Tab 1: 数据总览 ==================== -->
+    <div x-show="activeTab === 'overview'" x-cloak>
+      <template x-if="statsLoading">
+        <div class="text-center py-12 text-gray-500">加载中...</div>
+      </template>
+
+      <template x-if="!statsLoading && stats">
+        <div>
+          <!-- 概览卡片 -->
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div class="bg-white rounded-lg shadow p-4">
+              <p class="text-sm text-gray-500">数据库大小</p>
+              <p class="text-2xl font-bold text-indigo-600" x-text="stats.database_size_mb + ' MB'"></p>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4">
+              <p class="text-sm text-gray-500">总表数</p>
+              <p class="text-2xl font-bold text-gray-800" x-text="stats.table_count"></p>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4">
+              <p class="text-sm text-gray-500">L0 不可删</p>
+              <p class="text-2xl font-bold text-red-600" x-text="stats.by_level.L0.count + ' 张'"></p>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4">
+              <p class="text-sm text-gray-500">L3 可自动清理</p>
+              <p class="text-2xl font-bold text-green-600" x-text="stats.by_level.L3.count + ' 张'"></p>
+            </div>
+          </div>
+
+          <!-- 安全等级分组 -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <template x-for="level in ['L0', 'L1', 'L2', 'L3']" :key="level">
+              <div class="bg-white rounded-lg shadow p-4">
+                <div class="flex items-center mb-3">
+                  <span :class="getLevelBadgeClass(level)" class="px-2 py-1 rounded text-xs font-semibold" x-text="level"></span>
+                  <span class="ml-2 text-sm font-medium text-gray-700" x-text="
+                    level === 'L0' ? '不可删（系统基石）' :
+                    level === 'L1' ? '金融级数据' :
+                    level === 'L2' ? '业务运营数据' : '可自动清理'
+                  "></span>
+                  <span class="ml-auto text-sm text-gray-500" x-text="stats.by_level[level].count + ' 张表'"></span>
+                </div>
+                <div class="max-h-48 overflow-y-auto">
+                  <template x-for="table in stats.by_level[level].tables" :key="table.table_name">
+                    <div class="flex justify-between py-1 text-xs border-b border-gray-50">
+                      <span class="text-gray-600 font-mono" x-text="table.table_name"></span>
+                      <span class="text-gray-400" x-text="'~' + table.estimated_rows + ' 行 / ' + table.data_size_mb + ' MB'"></span>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </template>
+          </div>
+
+          <!-- Top 20 表 -->
+          <div class="bg-white rounded-lg shadow p-4">
+            <h3 class="text-lg font-semibold mb-3">📈 数据量 Top 20</h3>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th class="px-3 py-2 text-left">表名</th>
+                    <th class="px-3 py-2 text-right">预估行数</th>
+                    <th class="px-3 py-2 text-right">数据大小</th>
+                    <th class="px-3 py-2 text-right">索引大小</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template x-for="(table, idx) in stats.top_tables" :key="table.table_name">
+                    <tr class="border-b border-gray-100 hover:bg-gray-50">
+                      <td class="px-3 py-2 font-mono text-xs" x-text="table.table_name"></td>
+                      <td class="px-3 py-2 text-right" x-text="Number(table.estimated_rows).toLocaleString()"></td>
+                      <td class="px-3 py-2 text-right" x-text="table.data_size_mb + ' MB'"></td>
+                      <td class="px-3 py-2 text-right" x-text="table.index_size_mb + ' MB'"></td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <!-- ==================== Tab 2: 自动清理策略 ==================== -->
+    <div x-show="activeTab === 'policies'" x-cloak>
+      <div class="bg-white rounded-lg shadow">
+        <div class="p-4 border-b flex justify-between items-center">
+          <h3 class="text-lg font-semibold">⏰ 自动清理策略</h3>
+          <button @click="loadPolicies()" class="text-sm text-indigo-600 hover:text-indigo-800">刷新</button>
+        </div>
+        <template x-if="policiesLoading">
+          <div class="text-center py-8 text-gray-500">加载中...</div>
+        </template>
+        <template x-if="!policiesLoading">
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-4 py-3 text-left">表名</th>
+                  <th class="px-4 py-3 text-center">保留天数</th>
+                  <th class="px-4 py-3 text-center">每批大小</th>
+                  <th class="px-4 py-3 text-center">状态</th>
+                  <th class="px-4 py-3 text-center">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="policy in policies" :key="policy.table">
+                  <tr class="border-b border-gray-100 hover:bg-gray-50">
+                    <td class="px-4 py-3 font-mono text-xs" x-text="policy.table"></td>
+                    <td class="px-4 py-3 text-center">
+                      <template x-if="editingPolicy && editingPolicy.table === policy.table">
+                        <input type="number" min="1" max="365"
+                          x-model.number="editingPolicy.retention_days"
+                          class="w-20 border rounded px-2 py-1 text-center text-sm">
+                      </template>
+                      <template x-if="!editingPolicy || editingPolicy.table !== policy.table">
+                        <span x-text="policy.retention_days + ' 天'"></span>
+                      </template>
+                    </td>
+                    <td class="px-4 py-3 text-center" x-text="policy.batch_size"></td>
+                    <td class="px-4 py-3 text-center">
+                      <button @click="togglePolicy(policy)"
+                        :class="policy.enabled ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-500'"
+                        class="px-2 py-1 rounded text-xs font-medium cursor-pointer">
+                        <span x-text="policy.enabled ? '已启用' : '已禁用'"></span>
+                      </button>
+                    </td>
+                    <td class="px-4 py-3 text-center">
+                      <template x-if="editingPolicy && editingPolicy.table === policy.table">
+                        <div class="flex space-x-2 justify-center">
+                          <button @click="savePolicy()" class="text-green-600 hover:text-green-800 text-xs">保存</button>
+                          <button @click="cancelEditPolicy()" class="text-gray-500 hover:text-gray-700 text-xs">取消</button>
+                        </div>
+                      </template>
+                      <template x-if="!editingPolicy || editingPolicy.table !== policy.table">
+                        <button @click="startEditPolicy(policy)" class="text-indigo-600 hover:text-indigo-800 text-xs">编辑</button>
+                      </template>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- ==================== Tab 3: 手动清理 ==================== -->
+    <div x-show="activeTab === 'manual'" x-cloak>
+      <!-- 步骤指示器 -->
+      <div class="flex items-center mb-6">
+        <template x-for="(step, idx) in ['选择类目', '设置范围', '预览影响', '确认执行', '执行结果']" :key="idx">
+          <div class="flex items-center">
+            <div :class="cleanupStep > idx + 1 ? 'bg-green-500' : cleanupStep === idx + 1 ? 'bg-indigo-500' : 'bg-gray-300'"
+              class="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium" x-text="idx + 1">
+            </div>
+            <span class="ml-2 text-sm" :class="cleanupStep === idx + 1 ? 'text-indigo-600 font-medium' : 'text-gray-500'" x-text="step"></span>
+            <template x-if="idx < 4">
+              <div class="w-12 h-0.5 mx-2" :class="cleanupStep > idx + 1 ? 'bg-green-500' : 'bg-gray-300'"></div>
+            </template>
+          </div>
+        </template>
+      </div>
+
+      <!-- 步骤 1: 选择类目 -->
+      <div x-show="cleanupStep === 1" class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold mb-4">选择清理类目</h3>
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <template x-for="cat in availableCategories" :key="cat.key">
+            <label @click="toggleCategory(cat.key)"
+              :class="isCategorySelected(cat.key) ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'"
+              class="border-2 rounded-lg p-3 cursor-pointer transition-colors">
+              <div class="flex items-center">
+                <input type="checkbox" :checked="isCategorySelected(cat.key)" class="mr-2" @click.stop>
+                <span class="text-sm font-medium" x-text="cat.label"></span>
+              </div>
+            </label>
+          </template>
+        </div>
+        <div class="mt-4 flex justify-end">
+          <button @click="nextStep()" class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 text-sm">
+            下一步
+          </button>
+        </div>
+      </div>
+
+      <!-- 步骤 2: 设置范围 -->
+      <div x-show="cleanupStep === 2" class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold mb-4">设置时间范围（可选）</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div>
+            <label class="block text-sm text-gray-600 mb-1">开始时间</label>
+            <input type="datetime-local" x-model="timeRange.start" class="w-full border rounded px-3 py-2 text-sm">
+          </div>
+          <div>
+            <label class="block text-sm text-gray-600 mb-1">结束时间</label>
+            <input type="datetime-local" x-model="timeRange.end" class="w-full border rounded px-3 py-2 text-sm">
+          </div>
+        </div>
+        <div class="mb-4">
+          <label class="block text-sm text-gray-600 mb-1">用户ID（可选，精准清理）</label>
+          <input type="text" x-model="cleanupFilters.user_id" placeholder="留空则清理所有用户" class="w-64 border rounded px-3 py-2 text-sm">
+        </div>
+        <div class="flex justify-between">
+          <button @click="prevStep()" class="text-gray-600 hover:text-gray-800 text-sm">上一步</button>
+          <button @click="nextStep()" :disabled="previewLoading"
+            class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 text-sm disabled:opacity-50">
+            <span x-show="!previewLoading">预览影响</span>
+            <span x-show="previewLoading">预览中...</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 步骤 3: 预览影响 -->
+      <div x-show="cleanupStep === 3 && previewResult" class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold mb-4">预览清理影响</h3>
+        <!-- 汇总 -->
+        <div class="grid grid-cols-3 gap-4 mb-4">
+          <div class="bg-red-50 rounded p-3 text-center">
+            <p class="text-2xl font-bold text-red-600" x-text="previewResult.summary.total_rows_to_delete.toLocaleString()"></p>
+            <p class="text-xs text-gray-500">将删除行数</p>
+          </div>
+          <div class="bg-yellow-50 rounded p-3 text-center">
+            <p class="text-2xl font-bold text-yellow-600" x-text="previewResult.summary.tables_affected"></p>
+            <p class="text-xs text-gray-500">影响表数</p>
+          </div>
+          <div class="bg-blue-50 rounded p-3 text-center">
+            <p class="text-2xl font-bold text-blue-600" x-text="'~' + previewResult.summary.estimated_duration_seconds + 's'"></p>
+            <p class="text-xs text-gray-500">预计耗时</p>
+          </div>
+        </div>
+        <!-- 详情表格 -->
+        <div class="overflow-x-auto mb-4">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-3 py-2 text-left">表名</th>
+                <th class="px-3 py-2 text-right">将删除行数</th>
+                <th class="px-3 py-2 text-center">安全等级</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="item in previewResult.details" :key="item.table_name">
+                <tr class="border-b border-gray-100">
+                  <td class="px-3 py-2 font-mono text-xs" x-text="item.table_name"></td>
+                  <td class="px-3 py-2 text-right text-red-600 font-medium" x-text="item.rows_to_delete.toLocaleString()"></td>
+                  <td class="px-3 py-2 text-center">
+                    <span :class="getLevelBadgeClass(item.safety_level)" class="px-2 py-0.5 rounded text-xs" x-text="item.safety_level"></span>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+        <!-- 警告 -->
+        <template x-if="previewResult.warnings && previewResult.warnings.length">
+          <div class="bg-yellow-50 border border-yellow-200 rounded p-3 mb-4">
+            <p class="text-sm font-medium text-yellow-800 mb-1">⚠️ 注意事项</p>
+            <template x-for="w in previewResult.warnings" :key="w">
+              <p class="text-xs text-yellow-700" x-text="w"></p>
+            </template>
+          </div>
+        </template>
+        <div class="flex justify-between">
+          <button @click="prevStep()" class="text-gray-600 hover:text-gray-800 text-sm">上一步</button>
+          <button @click="cleanupStep = 4" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 text-sm">
+            确认并执行
+          </button>
+        </div>
+      </div>
+
+      <!-- 步骤 4: 二次确认 -->
+      <div x-show="cleanupStep === 4" class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold mb-4 text-red-600">⚠️ 二次确认</h3>
+        <div class="bg-red-50 border border-red-200 rounded p-4 mb-4">
+          <p class="text-sm text-red-800">此操作将永久删除数据，不可恢复。请仔细确认。</p>
+          <p class="text-sm text-red-800 mt-1">
+            将删除 <strong x-text="previewResult?.summary?.total_rows_to_delete?.toLocaleString() || 0"></strong> 行数据，
+            影响 <strong x-text="previewResult?.summary?.tables_affected || 0"></strong> 张表。
+          </p>
+        </div>
+        <div class="space-y-4 mb-4">
+          <div>
+            <label class="block text-sm text-gray-600 mb-1">操作原因 <span class="text-red-500">*</span></label>
+            <input type="text" x-model="cleanupReason" placeholder="例如：上线前清理测试数据"
+              class="w-full border rounded px-3 py-2 text-sm">
+          </div>
+          <div>
+            <label class="block text-sm text-gray-600 mb-1">请输入 <strong class="text-red-600">确认删除</strong> 以确认操作</label>
+            <input type="text" x-model="confirmationText" placeholder="确认删除"
+              class="w-full border rounded px-3 py-2 text-sm">
+          </div>
+        </div>
+        <div class="flex justify-between">
+          <button @click="cleanupStep = 3" class="text-gray-600 hover:text-gray-800 text-sm">上一步</button>
+          <button @click="executeCleanup()" :disabled="cleanupExecuting || confirmationText !== '确认删除'"
+            class="bg-red-600 text-white px-6 py-2 rounded hover:bg-red-700 text-sm disabled:opacity-50">
+            <span x-show="!cleanupExecuting">🗑️ 执行删除</span>
+            <span x-show="cleanupExecuting">执行中...</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 步骤 5: 执行结果 -->
+      <div x-show="cleanupStep === 5 && cleanupResult" class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold mb-4 text-green-600">✅ 清理完成</h3>
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div class="bg-green-50 rounded p-3 text-center">
+            <p class="text-2xl font-bold text-green-600" x-text="cleanupResult.total_deleted.toLocaleString()"></p>
+            <p class="text-xs text-gray-500">已删除行数</p>
+          </div>
+          <div class="bg-blue-50 rounded p-3 text-center">
+            <p class="text-2xl font-bold text-blue-600" x-text="cleanupResult.duration_seconds + 's'"></p>
+            <p class="text-xs text-gray-500">执行耗时</p>
+          </div>
+        </div>
+        <div class="overflow-x-auto mb-4">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-3 py-2 text-left">表名</th>
+                <th class="px-3 py-2 text-right">删除行数</th>
+                <th class="px-3 py-2 text-center">状态</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="item in cleanupResult.details" :key="item.table_name">
+                <tr class="border-b border-gray-100">
+                  <td class="px-3 py-2 font-mono text-xs" x-text="item.table_name"></td>
+                  <td class="px-3 py-2 text-right" x-text="item.deleted_count.toLocaleString()"></td>
+                  <td class="px-3 py-2 text-center">
+                    <span :class="item.status === 'success' ? 'text-green-600' : 'text-red-600'" x-text="item.status === 'success' ? '成功' : '失败'"></span>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+        <div class="flex justify-end">
+          <button @click="resetManualCleanup()" class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 text-sm">
+            重新开始
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== Tab 4: 对账校验 ==================== -->
+    <div x-show="activeTab === 'reconciliation'" x-cloak>
+      <div class="bg-white rounded-lg shadow p-6">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-lg font-semibold">✅ 对账校验</h3>
+          <button @click="runReconciliation()" :disabled="reconcileLoading"
+            class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 text-sm disabled:opacity-50">
+            <span x-show="!reconcileLoading">运行对账</span>
+            <span x-show="reconcileLoading">对账中...</span>
+          </button>
+        </div>
+
+        <template x-if="!assetReconciliation && !itemReconciliation && !reconcileLoading">
+          <div class="text-center py-12 text-gray-400">
+            <p>点击"运行对账"按钮开始资产域和物品域对账校验</p>
+            <p class="text-xs mt-2">复用已有 /api/v4/console/reconciliation/assets 和 /items 端点</p>
+          </div>
+        </template>
+
+        <!-- 资产域对账结果 -->
+        <template x-if="assetReconciliation">
+          <div class="mb-6">
+            <h4 class="text-md font-medium mb-2">💰 资产域对账</h4>
+            <pre class="bg-gray-50 rounded p-4 text-xs overflow-auto max-h-64" x-text="JSON.stringify(assetReconciliation, null, 2)"></pre>
+          </div>
+        </template>
+
+        <!-- 物品域对账结果 -->
+        <template x-if="itemReconciliation">
+          <div>
+            <h4 class="text-md font-medium mb-2">📦 物品域对账</h4>
+            <pre class="bg-gray-50 rounded p-4 text-xs overflow-auto max-h-64" x-text="JSON.stringify(itemReconciliation, null, 2)"></pre>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- ==================== Tab 5: 清理历史 ==================== -->
+    <div x-show="activeTab === 'history'" x-cloak>
+      <div class="bg-white rounded-lg shadow">
+        <div class="p-4 border-b flex justify-between items-center">
+          <h3 class="text-lg font-semibold">📋 清理历史</h3>
+          <button @click="loadHistory()" class="text-sm text-indigo-600 hover:text-indigo-800">刷新</button>
+        </div>
+        <template x-if="historyLoading">
+          <div class="text-center py-8 text-gray-500">加载中...</div>
+        </template>
+        <template x-if="!historyLoading && historyList.length === 0">
+          <div class="text-center py-8 text-gray-400">暂无清理历史记录</div>
+        </template>
+        <template x-if="!historyLoading && historyList.length > 0">
+          <div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th class="px-4 py-3 text-left">操作人</th>
+                    <th class="px-4 py-3 text-left">操作描述</th>
+                    <th class="px-4 py-3 text-left">原因</th>
+                    <th class="px-4 py-3 text-right">删除行数</th>
+                    <th class="px-4 py-3 text-left">时间</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template x-for="item in historyList" :key="item.log_id">
+                    <tr class="border-b border-gray-100 hover:bg-gray-50">
+                      <td class="px-4 py-3 text-xs" x-text="item.operator_mobile || ('ID:' + item.operator_id)"></td>
+                      <td class="px-4 py-3 text-xs" x-text="item.action"></td>
+                      <td class="px-4 py-3 text-xs" x-text="item.reason || '-'"></td>
+                      <td class="px-4 py-3 text-right text-xs font-medium" x-text="item.after_data?.total_deleted?.toLocaleString() || '-'"></td>
+                      <td class="px-4 py-3 text-xs text-gray-500" x-text="formatDate(item.created_at)"></td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+            <!-- 分页 -->
+            <div class="p-4 border-t flex justify-between items-center text-sm text-gray-500">
+              <span x-text="'共 ' + historyPagination.total + ' 条'"></span>
+              <div class="flex space-x-2">
+                <button @click="goToHistoryPage(historyPagination.page - 1)" :disabled="historyPagination.page <= 1"
+                  class="px-3 py-1 border rounded text-xs disabled:opacity-50">上一页</button>
+                <span x-text="historyPagination.page + ' / ' + historyPagination.total_pages"></span>
+                <button @click="goToHistoryPage(historyPagination.page + 1)" :disabled="historyPagination.page >= historyPagination.total_pages"
+                  class="px-3 py-1 border rounded text-xs disabled:opacity-50">下一页</button>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+  </div>
+
+  <%- include('partials/footer') %>
+
+  <script type="module" src="./src/modules/system/pages/data-management.js"></script>
+</body>
+</html>

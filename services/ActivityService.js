@@ -346,30 +346,38 @@ class ActivityService {
   }
 
   /**
-   * 批量获取活动预算状态
+   * 批量获取活动预算状态（按预算模式分组）
    *
-   * @description 批量查询多个活动的预算状态，避免前端逐个请求
+   * @description 批量查询活动预算状态，按 budget_mode 分组返回，
+   *              区分「用户预算模式」和「活动池预算模式」，
+   *              让运营人员清晰理解两种预算体系的区别
+   *
+   * 预算模式说明：
+   * - user：用户账户级别预算 — 预算来源是用户的 BUDGET_POINTS 余额（按活动桶隔离）
+   * - pool：活动账户级别预算 — 预算来源是活动自身的固定预算池（pool_budget_total）
+   * - pool_quota：活动池+用户配额混合模式
+   * - none：无预算控制
    *
    * @param {Object} options - 查询选项
    * @param {Array<number>} options.lottery_campaign_ids - 活动ID列表（可选）
    * @param {string} options.status - 活动状态筛选（可选，如：active/draft/completed/paused）
-   * @param {number} options.limit - 限制返回数量（默认20，最大50）
-   * @returns {Promise<Object>} 活动预算状态列表和汇总
+   * @param {number} options.limit - 限制返回数量（默认50，最大100）
+   * @returns {Promise<Object>} 按预算模式分组的活动预算状态
    */
   static async getBatchBudgetStatus(options = {}) {
-    const { lottery_campaign_ids = [], status = '', limit = 20 } = options
-    const maxLimit = Math.min(parseInt(limit) || 20, 50)
+    const { lottery_campaign_ids = [], status = '', limit = 50 } = options
+    const maxLimit = Math.min(parseInt(limit) || 50, 100)
 
-    // 构建查询条件（支持 status 参数筛选）
     let whereCondition = {}
     if (lottery_campaign_ids.length > 0) {
       whereCondition = { lottery_campaign_id: { [Op.in]: lottery_campaign_ids } }
-    } else if (status && ['active', 'draft', 'completed', 'paused'].includes(status)) {
+    } else if (
+      status &&
+      ['active', 'draft', 'completed', 'paused', 'ended', 'cancelled'].includes(status)
+    ) {
       whereCondition = { status }
     }
-    // 如果没有指定条件，则返回所有活动（不再默认只返回 active）
 
-    // 批量获取活动预算信息
     const campaigns = await models.LotteryCampaign.findAll({
       where: whereCondition,
       attributes: [
@@ -379,6 +387,7 @@ class ActivityService {
         'budget_mode',
         'pool_budget_total',
         'pool_budget_remaining',
+        'allowed_campaign_ids',
         'status'
       ],
       limit: maxLimit,
@@ -386,10 +395,19 @@ class ActivityService {
     })
 
     if (campaigns.length === 0) {
-      return { campaigns: [], total_count: 0, summary: {} }
+      return {
+        campaigns: [],
+        grouped: {
+          user: { campaigns: [], summary: {} },
+          pool: { campaigns: [], summary: {} },
+          none: { campaigns: [], summary: {} }
+        },
+        total_count: 0,
+        summary: {}
+      }
     }
 
-    // 批量获取使用统计（所有活动一次查询）
+    // 批量获取抽奖消耗统计
     const campaignIdList = campaigns.map(c => c.lottery_campaign_id)
     const budgetStats = await models.LotteryDraw.findAll({
       where: {
@@ -405,7 +423,6 @@ class ActivityService {
       raw: true
     })
 
-    // 将统计数据映射为快速查找表
     const statsMap = {}
     budgetStats.forEach(stat => {
       statsMap[stat.lottery_campaign_id] = {
@@ -414,41 +431,194 @@ class ActivityService {
       }
     })
 
-    // 组装结果
-    const results = campaigns.map(campaign => {
+    // 为 user 模式活动批量查询关联的 BUDGET_POINTS 余额汇总
+    const userModeCampaigns = campaigns.filter(c => c.budget_mode === 'user')
+    const userBudgetTotals = await this._getUserBudgetPointsSummary(userModeCampaigns)
+
+    // 按 budget_mode 分组组装数据
+    const grouped = { user: [], pool: [], pool_quota: [], none: [] }
+
+    const allResults = campaigns.map(campaign => {
       const stats = statsMap[campaign.lottery_campaign_id] || {
         winning_draws: 0,
         total_consumed: 0
       }
-      const total = Number(campaign.pool_budget_total) || 0
-      const remaining = Number(campaign.pool_budget_remaining) || 0
-      const used = total - remaining
+      const budgetMode = campaign.budget_mode || 'none'
 
-      return {
+      const baseResult = {
         lottery_campaign_id: campaign.lottery_campaign_id,
         campaign_name: campaign.campaign_name,
         campaign_code: campaign.campaign_code,
-        budget_mode: campaign.budget_mode,
+        budget_mode: budgetMode,
         status: campaign.status,
-        pool_budget: {
-          total,
-          remaining,
-          used,
-          usage_rate: total > 0 ? ((used / total) * 100).toFixed(2) + '%' : 'N/A'
-        },
         statistics: stats
+      }
+
+      if (budgetMode === 'user') {
+        // 用户预算模式：预算来源是用户的 BUDGET_POINTS 余额
+        const allowedIds = campaign.allowed_campaign_ids || []
+        const userBudgetInfo = userBudgetTotals[campaign.lottery_campaign_id] || {
+          total_balance: 0,
+          user_count: 0
+        }
+        const result = {
+          ...baseResult,
+          allowed_campaign_ids: allowedIds,
+          user_budget: {
+            total_balance: userBudgetInfo.total_balance,
+            user_count: userBudgetInfo.user_count,
+            budget_source_display:
+              allowedIds.length > 0
+                ? allowedIds.map(id => (typeof id === 'string' ? id : `活动${id}`)).join('、')
+                : '所有来源（无限制）'
+          },
+          pool_budget: { total: 0, remaining: 0, used: 0, usage_rate: 'N/A' }
+        }
+        grouped.user.push(result)
+        return result
+      } else if (budgetMode === 'pool' || budgetMode === 'pool_quota') {
+        // 活动池预算模式：预算来源是活动自身的固定池
+        const total = Number(campaign.pool_budget_total) || 0
+        const remaining = Number(campaign.pool_budget_remaining) || 0
+        const used = total - remaining
+        const result = {
+          ...baseResult,
+          pool_budget: {
+            total,
+            remaining,
+            used,
+            usage_rate: total > 0 ? ((used / total) * 100).toFixed(2) + '%' : 'N/A'
+          }
+        }
+        const groupKey = budgetMode === 'pool_quota' ? 'pool' : budgetMode
+        grouped[groupKey].push(result)
+        return result
+      } else {
+        // 无预算模式
+        const result = {
+          ...baseResult,
+          pool_budget: { total: 0, remaining: 0, used: 0, usage_rate: 'N/A' }
+        }
+        grouped.none.push(result)
+        return result
       }
     })
 
-    // 汇总统计
-    const summary = {
-      total_campaigns: results.length,
-      total_budget: results.reduce((sum, r) => sum + r.pool_budget.total, 0),
-      total_remaining: results.reduce((sum, r) => sum + r.pool_budget.remaining, 0),
-      total_used: results.reduce((sum, r) => sum + r.pool_budget.used, 0)
+    // 按模式分别计算汇总
+    const userSummary = {
+      total_campaigns: grouped.user.length,
+      total_user_budget_balance: grouped.user.reduce(
+        (sum, c) => sum + (c.user_budget?.total_balance || 0),
+        0
+      ),
+      total_user_count: grouped.user.reduce((sum, c) => sum + (c.user_budget?.user_count || 0), 0),
+      total_consumed: grouped.user.reduce((sum, c) => sum + c.statistics.total_consumed, 0)
     }
 
-    return { campaigns: results, total_count: results.length, summary }
+    const poolSummary = {
+      total_campaigns: grouped.pool.length,
+      total_budget: grouped.pool.reduce((sum, c) => sum + c.pool_budget.total, 0),
+      total_remaining: grouped.pool.reduce((sum, c) => sum + c.pool_budget.remaining, 0),
+      total_used: grouped.pool.reduce((sum, c) => sum + c.pool_budget.used, 0)
+    }
+
+    const noneSummary = {
+      total_campaigns: grouped.none.length
+    }
+
+    // 总体汇总（兼容旧前端）
+    const summary = {
+      total_campaigns: allResults.length,
+      total_budget: poolSummary.total_budget + userSummary.total_user_budget_balance,
+      total_remaining: poolSummary.total_remaining + userSummary.total_user_budget_balance,
+      total_used: poolSummary.total_used + userSummary.total_consumed,
+      by_mode: {
+        user: userSummary,
+        pool: poolSummary,
+        none: noneSummary
+      }
+    }
+
+    return {
+      campaigns: allResults,
+      grouped: {
+        user: { campaigns: grouped.user, summary: userSummary },
+        pool: { campaigns: grouped.pool, summary: poolSummary },
+        none: { campaigns: grouped.none, summary: noneSummary }
+      },
+      total_count: allResults.length,
+      summary
+    }
+  }
+
+  /**
+   * 查询用户预算模式活动关联的 BUDGET_POINTS 余额汇总
+   *
+   * @description 根据 user 模式活动的 allowed_campaign_ids，
+   *              汇总对应桶的 BUDGET_POINTS 总余额和持有用户数
+   *
+   * @param {Array<Object>} userModeCampaigns - budget_mode=user 的活动列表
+   * @returns {Promise<Object>} { [lottery_campaign_id]: { total_balance, user_count } }
+   * @private
+   */
+  static async _getUserBudgetPointsSummary(userModeCampaigns) {
+    if (!userModeCampaigns || userModeCampaigns.length === 0) return {}
+
+    // 收集所有 allowed_campaign_ids 桶标识
+    const allBucketIds = new Set()
+    const campaignBucketMap = {}
+
+    userModeCampaigns.forEach(campaign => {
+      const allowedIds = campaign.allowed_campaign_ids || []
+      campaignBucketMap[campaign.lottery_campaign_id] = allowedIds
+      allowedIds.forEach(id => allBucketIds.add(String(id)))
+    })
+
+    if (allBucketIds.size === 0) return {}
+
+    // 批量查询这些桶的 BUDGET_POINTS 余额汇总
+    const bucketBalances = await models.AccountAssetBalance.findAll({
+      where: {
+        asset_code: 'BUDGET_POINTS',
+        lottery_campaign_id: { [Op.in]: Array.from(allBucketIds) }
+      },
+      attributes: [
+        'lottery_campaign_id',
+        [models.sequelize.fn('SUM', models.sequelize.col('available_amount')), 'total_available'],
+        [
+          models.sequelize.fn('COUNT', models.sequelize.literal('DISTINCT account_id')),
+          'user_count'
+        ]
+      ],
+      group: ['lottery_campaign_id'],
+      raw: true
+    })
+
+    // 构建桶余额查找表
+    const bucketMap = {}
+    bucketBalances.forEach(b => {
+      bucketMap[b.lottery_campaign_id] = {
+        total_available: parseInt(b.total_available) || 0,
+        user_count: parseInt(b.user_count) || 0
+      }
+    })
+
+    // 按活动聚合（一个活动可以关联多个桶）
+    const result = {}
+    Object.entries(campaignBucketMap).forEach(([campaignId, bucketIds]) => {
+      let totalBalance = 0
+      let totalUsers = 0
+      bucketIds.forEach(bucketId => {
+        const bucket = bucketMap[String(bucketId)]
+        if (bucket) {
+          totalBalance += bucket.total_available
+          totalUsers += bucket.user_count
+        }
+      })
+      result[campaignId] = { total_balance: totalBalance, user_count: totalUsers }
+    })
+
+    return result
   }
 
   /**

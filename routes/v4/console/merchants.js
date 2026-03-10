@@ -83,7 +83,8 @@ router.use(authenticateToken, requireRoleLevel(100))
  * @query {number} [page_size=20] - 每页数量
  * @query {string} [merchant_type] - 商家类型筛选
  * @query {string} [status] - 状态筛选（active/inactive/suspended）
- * @query {string} [keyword] - 名称关键字搜索
+ * @query {string} [keyword] - 名称/联系电话模糊搜索
+ * @query {string} [contact_mobile] - 联系电话独立筛选
  */
 router.get('/', async (req, res) => {
   try {

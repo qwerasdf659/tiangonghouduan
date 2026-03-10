@@ -242,6 +242,14 @@ module.exports = sequelize => {
         comment: '是否自动确认收货：true-7天自动确认 | false-用户手动确认'
       },
 
+      // 审核通过时间
+      approved_at: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        defaultValue: null,
+        comment: '审核通过时间（管理员审核通过的时间）'
+      },
+
       // 拒绝时间
       rejected_at: {
         type: DataTypes.DATE,

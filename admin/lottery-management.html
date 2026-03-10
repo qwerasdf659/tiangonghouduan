@@ -901,7 +901,7 @@
               </div>
             </div>
 
-            <!-- 第二行：档位分布 + Pressure命中热力 -->
+            <!-- 第二行：档位分布 + 压力矩阵命中热力 -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <!-- 档位分布 -->
               <div class="rounded-xl shadow-sm border border-gray-100 p-4 bg-white">
@@ -958,10 +958,10 @@
                 </div>
               </div>
 
-              <!-- Pressure 命中分布 -->
+              <!-- 压力矩阵命中分布 -->
               <div class="rounded-xl shadow-sm border border-gray-100 p-4 bg-white">
                 <h6 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                  🔥 Pressure矩阵最近24小时命中分布
+                  🔥 压力矩阵最近24小时命中分布
                 </h6>
                 <div x-show="strategyConfigSummary.recent_24h.total_draws === 0" class="text-center py-4 text-xs text-gray-400">暂无决策数据</div>
                 <div x-show="strategyConfigSummary.recent_24h.total_draws > 0" class="overflow-x-auto">
@@ -1093,7 +1093,7 @@
               <div class="flex items-center gap-2">
                 <span class="text-lg">📊</span>
                 <div>
-                  <h6 class="font-semibold text-sm">Pressure 矩阵配置</h6>
+                  <h6 class="font-semibold text-sm">压力矩阵配置</h6>
                   <p class="text-xs opacity-60 mt-0.5">压力层级(P0-P2) 的档位权重乘数矩阵，点击单元格可编辑</p>
                 </div>
               </div>
@@ -1210,10 +1210,10 @@
           <!-- 策略开关分组展示 -->
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-            <!-- Pity 保底 -->
+            <!-- 保底机制 -->
             <div class="themed-card rounded-lg shadow p-4">
               <div class="flex items-center justify-between mb-3">
-                <h4 class="font-semibold">🎯 Pity 保底</h4>
+                <h4 class="font-semibold">🎯 保底机制</h4>
                 <button class="relative inline-flex h-6 w-11 rounded-full transition-colors"
                         :class="activityStrategyConfig?.pity?.enabled ? 'bg-green-500' : 'bg-gray-300'"
                         @click="toggleActivityStrategySwitch('pity')">
@@ -1292,10 +1292,10 @@
               <p class="text-xs text-gray-500 mb-2">根据活动消耗进度动态调整奖品概率</p>
             </div>
 
-            <!-- Pressure 矩阵 -->
+            <!-- 压力矩阵 -->
             <div class="themed-card rounded-lg shadow p-4">
               <div class="flex items-center justify-between mb-3">
-                <h4 class="font-semibold">🔢 Pressure 矩阵</h4>
+                <h4 class="font-semibold">🔢 压力矩阵</h4>
                 <button class="relative inline-flex h-6 w-11 rounded-full transition-colors"
                         :class="activityStrategyConfig?.matrix?.enabled ? 'bg-green-500' : 'bg-gray-300'"
                         @click="toggleActivityStrategySwitch('matrix')">
@@ -1303,7 +1303,7 @@
                         :class="activityStrategyConfig?.matrix?.enabled ? 'translate-x-5' : ''"></span>
                 </button>
               </div>
-              <p class="text-xs text-gray-500 mb-2">压力档位(P0-P2)的权重调整矩阵</p>
+              <p class="text-xs text-gray-500 mb-2">压力档位(P0-P2)权重调整矩阵</p>
             </div>
 
             <!-- 管理干预总开关 -->
@@ -1317,7 +1317,7 @@
                         :class="activityStrategyConfig?.management?.enabled ? 'translate-x-5' : ''"></span>
                 </button>
               </div>
-              <p class="text-xs text-gray-500 mb-2">关闭后该活动的所有 force_win/force_lose 干预不生效</p>
+              <p class="text-xs text-gray-500 mb-2">关闭后该活动的所有「强制中奖/强制未中奖」干预不生效</p>
             </div>
 
             <!-- 固定保底系统 -->
@@ -1379,7 +1379,7 @@
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" x-show="activityStrategyConfig?.grayscale">
               <template x-for="key in ['pity_percentage', 'luck_debt_percentage', 'anti_empty_percentage', 'anti_high_percentage']" :key="key">
                 <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1" x-text="key.replace('_percentage', '').replace(/_/g, ' ')"></label>
+                  <label class="block text-sm font-medium text-gray-700 mb-1" x-text="({pity_percentage:'保底机制',luck_debt_percentage:'运气债务',anti_empty_percentage:'防连空',anti_high_percentage:'防连高'})[key] || key"></label>
                   <div class="flex items-center gap-2">
                     <input type="range" min="0" max="100" class="flex-1"
                            :value="activityStrategyConfig?.grayscale?.[key] || 100"
@@ -1399,7 +1399,7 @@
               <template x-for="key in ['pity_user_whitelist', 'luck_debt_user_whitelist', 'anti_empty_user_whitelist', 'anti_high_user_whitelist']" :key="key">
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-1">
-                    <span x-text="key.replace('_user_whitelist', '').replace(/_/g, ' ')"></span>
+                    <span x-text="({pity_user_whitelist:'保底机制',luck_debt_user_whitelist:'运气债务',anti_empty_user_whitelist:'防连空',anti_high_user_whitelist:'防连高'})[key] || key"></span>
                     <span class="text-xs text-gray-400 ml-1">白名单</span>
                     <span class="text-xs text-blue-500 ml-1"
                           x-text="'(' + (Array.isArray(activityStrategyConfig?.grayscale?.[key]) ? activityStrategyConfig.grayscale[key].length : 0) + '人)'"></span>
@@ -2403,7 +2403,7 @@
                       <p x-text="drawDetails.user_state_before?.empty_streak || 0"></p>
                     </div>
                     <div>
-                      <span class="themed-text-muted">Pity进度:</span>
+                      <span class="themed-text-muted">保底进度:</span>
                       <p x-text="drawDetails.user_state_before?.pity_progress || 0"></p>
                     </div>
                     <div>
@@ -2436,7 +2436,7 @@
                       <p x-text="drawDetails.decision_snapshot?.downgrade_count || 0"></p>
                     </div>
                     <div>
-                      <span class="themed-text-muted">触发Pity:</span>
+                      <span class="themed-text-muted">触发保底:</span>
                       <p>
                         <span class="px-2 py-0.5 text-xs rounded"
                               :class="drawDetails.decision_snapshot?.pity_triggered ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'"
@@ -2861,7 +2861,7 @@
                       <span class="text-xl">📊</span>
                     </span>
                   </div>
-                  <p class="text-xs text-violet-600/70 font-medium mb-1">Pressure矩阵评分</p>
+                  <p class="text-xs text-violet-600/70 font-medium mb-1">压力矩阵评分</p>
                   <p class="text-2xl font-bold text-violet-700" x-text="(strategyEffectiveness.bxpx_matrix_analysis?.effectiveness_score || 0)"></p>
                   <p class="text-xs text-violet-500/60 mt-1" x-show="strategyEffectiveness.bxpx_matrix_analysis?.active_cells != null"
                      x-text="'活跃格子: ' + (strategyEffectiveness.bxpx_matrix_analysis?.active_cells || 0) + '/' + (strategyEffectiveness.bxpx_matrix_analysis?.total_cells || 3)"></p>
@@ -2899,7 +2899,7 @@
                         <dd class="text-xs text-slate-500 mt-0.5">综合评估策略运行健康度。80分以上=优秀，60-80=正常，60以下=需关注。评分依据：矩阵分散度、体验机制触发率、降级率。</dd>
                       </div>
                       <div>
-                        <dt class="font-medium text-violet-700">Pressure矩阵评分（0-100分）</dt>
+                        <dt class="font-medium text-violet-700">压力矩阵评分（0-100分）</dt>
                         <dd class="text-xs text-slate-500 mt-0.5">衡量压力层级的分散度。分数越高=不同压力层级的抽奖分布越均匀。如果分数很低，说明抽奖过于集中在某个压力层级。</dd>
                       </div>
                       <div>
@@ -2945,12 +2945,12 @@
               </div>
             </div>
 
-            <!-- Pressure矩阵热力图 -->
+            <!-- 压力矩阵热力图 -->
             <div class="rounded-xl shadow-sm overflow-hidden border border-gray-100">
               <div class="px-5 py-4 bg-gradient-to-r from-slate-700 to-slate-800 flex items-center justify-between">
                 <div>
                   <h6 class="font-semibold text-white flex items-center gap-2">
-                    🔥 Pressure 矩阵热力图
+                    🔥 压力矩阵热力图
                   </h6>
                   <p class="text-xs text-slate-300 mt-1">压力层级(P0-P2) 的命中率分布，颜色越深代表命中频率越高</p>
                 </div>
@@ -2998,7 +2998,7 @@
                     <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gray-100 mb-3">
                       <span class="text-xl">📊</span>
                     </div>
-                    <p class="themed-text-muted text-sm">暂无Pressure矩阵数据</p>
+                    <p class="themed-text-muted text-sm">暂无压力矩阵数据</p>
                     <p class="text-xs themed-text-muted mt-1">数据将在有抽奖记录后自动生成</p>
                   </div>
                 </template>
@@ -3068,7 +3068,7 @@
               <div class="p-5 bg-white">
                 <template x-if="strategyEffectiveness.experience_mechanism_analysis">
                   <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <!-- Pity（保底）机制 -->
+                    <!-- 保底机制 -->
                     <div class="rounded-xl border-l-4 border-l-purple-500 bg-gradient-to-br from-purple-50 to-white p-5 hover:shadow-md transition-shadow">
                       <div class="flex items-center gap-2 mb-4">
                         <span class="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-purple-100">
@@ -3093,7 +3093,7 @@
                             <span class="text-purple-600/70">效果评估</span>
                             <span class="px-2 py-0.5 rounded text-xs font-medium" 
                                   :class="(strategyEffectiveness.experience_mechanism_analysis.pity_mechanism?.effectiveness || '') === 'good' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'"
-                                  x-text="strategyEffectiveness.experience_mechanism_analysis.pity_mechanism?.effectiveness || '-'"></span>
+                                  x-text="({'good':'良好','poor':'较差','warning':'警告','excellent':'优秀'})[strategyEffectiveness.experience_mechanism_analysis.pity_mechanism?.effectiveness] || strategyEffectiveness.experience_mechanism_analysis.pity_mechanism?.effectiveness || '-'"></span>
                           </div>
                         </div>
                       </div>
@@ -3124,7 +3124,7 @@
                             <span class="text-blue-600/70">效果评估</span>
                             <span class="px-2 py-0.5 rounded text-xs font-medium"
                                   :class="(strategyEffectiveness.experience_mechanism_analysis.anti_empty_mechanism?.effectiveness || '') === 'good' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'"
-                                  x-text="strategyEffectiveness.experience_mechanism_analysis.anti_empty_mechanism?.effectiveness || '-'"></span>
+                                  x-text="({'good':'良好','poor':'较差','warning':'警告','excellent':'优秀'})[strategyEffectiveness.experience_mechanism_analysis.anti_empty_mechanism?.effectiveness] || strategyEffectiveness.experience_mechanism_analysis.anti_empty_mechanism?.effectiveness || '-'"></span>
                           </div>
                         </div>
                       </div>
@@ -3151,7 +3151,7 @@
                             <span class="text-emerald-600/70">效果评估</span>
                             <span class="px-2 py-0.5 rounded text-xs font-medium"
                                   :class="(strategyEffectiveness.experience_mechanism_analysis.luck_debt_mechanism?.effectiveness || '') === 'good' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'"
-                                  x-text="strategyEffectiveness.experience_mechanism_analysis.luck_debt_mechanism?.effectiveness || '-'"></span>
+                                  x-text="({'good':'良好','poor':'较差','warning':'警告','excellent':'优秀'})[strategyEffectiveness.experience_mechanism_analysis.luck_debt_mechanism?.effectiveness] || strategyEffectiveness.experience_mechanism_analysis.luck_debt_mechanism?.effectiveness || '-'"></span>
                           </div>
                         </div>
                       </div>
@@ -3975,11 +3975,11 @@
                 </div>
               </div>
 
-              <!-- Pressure 矩阵编辑 -->
+              <!-- 压力矩阵编辑 -->
               <div class="themed-card rounded-xl shadow-sm p-5 mb-5">
                 <div class="flex items-center justify-between mb-3">
                   <div class="flex items-center gap-2">
-                    <h6 class="text-sm font-semibold text-gray-800">Pressure 矩阵配置</h6>
+                    <h6 class="text-sm font-semibold text-gray-800">压力矩阵配置</h6>
                     <span class="text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700">修改的值高亮显示</span>
                     <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700"
                           x-text="'共 ' + (proposed_config.matrix_config?.length || 0) + ' 个格子'"></span>
@@ -4078,7 +4078,7 @@
               <div class="themed-card rounded-xl shadow-sm p-5 mb-5">
                 <div class="flex items-center gap-2 mb-3">
                   <h6 class="text-sm font-semibold text-gray-800">体验策略参数</h6>
-                  <span class="text-xs text-gray-400">Pity保底、防连空、防连高等体验保障机制</span>
+                  <span class="text-xs text-gray-400">保底机制、防连空、防连高等体验保障机制</span>
                   <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700"
                         x-text="'共 ' + Object.keys(proposed_config.strategy_config || {}).length + ' 组'"></span>
                 </div>
@@ -4103,12 +4103,12 @@
                                 :class="group === 'pity' ? 'bg-purple-200' : group === 'anti_empty' ? 'bg-orange-200' : group === 'anti_high' ? 'bg-red-200' : 'bg-gray-200'"
                                 x-text="group === 'pity' ? '🛡️' : group === 'anti_empty' ? '🔄' : group === 'anti_high' ? '⚖️' : '⚙️'"></span>
                           <div class="font-semibold text-sm text-gray-800"
-                               x-text="group === 'pity' ? '保底机制(Pity)' : group === 'anti_empty' ? '防连空保护' : group === 'anti_high' ? '防连高限制' : group === 'budget_tier' ? '预算分层' : group === 'pressure_tier' ? '压力分层' : group.replace(/_/g, ' ')"></div>
+                               x-text="group === 'pity' ? '保底机制' : group === 'anti_empty' ? '防连空保护' : group === 'anti_high' ? '防连高限制' : group === 'budget_tier' ? '预算分层' : group === 'pressure_tier' ? '压力分层' : group === 'luck_debt' ? '运气债务' : group === 'guarantee' ? '固定保底' : group === 'matrix' ? '压力矩阵' : group === 'management' ? '管理干预' : group === 'segment' ? '用户分群' : group === 'preset' ? '预设队列' : group === 'tier_fallback' ? '档位兜底' : group"></div>
                         </div>
                         <template x-for="(val, key) in values" :key="key">
                           <div class="flex items-center justify-between text-xs mb-2.5 py-1">
                             <span class="text-gray-600 font-medium"
-                                  x-text="key === 'enabled' ? '是否启用' : key === 'hard_guarantee_threshold' ? '硬保底阈值' : key === 'empty_streak_threshold' ? '连空触发阈值' : key === 'high_streak_threshold' ? '连高触发阈值' : key === 'multiplier_table' ? '加权倍率表' : key === 'threshold_high' ? '高预算线' : key === 'threshold_mid' ? '中预算线' : key === 'threshold_low' ? '低预算线' : key"></span>
+                                  x-text="({'enabled':'是否启用','hard_guarantee_threshold':'硬保底阈值','empty_streak_threshold':'连空触发阈值','high_streak_threshold':'连高触发阈值','multiplier_table':'加权倍率表','threshold_high':'高预算线','threshold_mid':'中预算线','threshold_low':'低预算线','expected_empty_rate':'预期空奖率','min_draw_count':'最少抽奖次数','recent_draw_window':'近期抽奖窗口','min_non_empty_cost':'最低非空奖成本','debt_enabled':'债务预抽开关','threshold':'保底阈值','prize_id':'保底奖品ID','high_multiplier':'高档乘数','mid_multiplier':'中档乘数','low_multiplier':'低档乘数','empty_weight_multiplier':'空奖权重乘数','fallback_multiplier':'兜底乘数'})[key] || key"></span>
                             <template x-if="typeof val === 'boolean'">
                               <label class="relative inline-flex items-center cursor-pointer">
                                 <input type="checkbox" :checked="val" @change="proposed_config.strategy_config[group][key] = $event.target.checked" class="sr-only peer">
@@ -4212,7 +4212,7 @@
                     <div class="themed-card rounded-xl shadow-sm p-4 text-center border-l-4 border-purple-400">
                       <div class="text-xs text-gray-500 mb-1">保底触发率</div>
                       <div class="text-2xl font-bold text-purple-600" x-text="(simulation_result?.simulation_result?.experience_metrics?.pity_trigger_rate || 0).toFixed(2) + '%'"></div>
-                      <div class="text-xs text-gray-400 mt-1">Pity机制保护触发</div>
+                      <div class="text-xs text-gray-400 mt-1">保底机制保护触发</div>
                     </div>
                     <div class="themed-card rounded-xl shadow-sm p-4 text-center border-l-4 border-orange-400">
                       <div class="text-xs text-gray-500 mb-1">防连空触发</div>
@@ -6349,7 +6349,7 @@
     <div class="fixed inset-0 bg-black bg-opacity-50" @click="hideModal('matrixEditModal')"></div>
     <div class="relative themed-card rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
       <div class="p-4 border-b flex justify-between items-center sticky top-0 themed-card z-10">
-        <h5 class="font-semibold">📊 编辑 Pressure 矩阵配置</h5>
+        <h5 class="font-semibold">📊 编辑压力矩阵配置</h5>
         <button @click="hideModal('matrixEditModal')" class="text-gray-400 hover:themed-text-muted">&times;</button>
       </div>
       <form @submit.prevent="submitMatrixConfig()">

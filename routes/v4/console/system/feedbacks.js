@@ -153,6 +153,72 @@ router.put(
 )
 
 /**
+ * PUT /feedbacks/batch-reply - 批量回复反馈
+ *
+ * @description 运营批量对多条反馈统一回复相同内容（如批量回复"感谢反馈，已记录"）
+ * @route PUT /api/v4/console/system/feedbacks/batch-reply
+ * @access Private (需要管理员权限)
+ *
+ * @body {Array<number>} feedback_ids - 反馈ID数组（必填，最多100条）
+ * @body {string} reply_content - 统一回复内容（必填）
+ * @body {string} [internal_notes] - 内部备注（可选）
+ *
+ * @since 2026-03-09 新增批量回复功能，满足运营批量回复相同信息的需求
+ */
+router.put(
+  '/batch-reply',
+  adminAuthMiddleware,
+  asyncHandler(async (req, res) => {
+    const { feedback_ids, reply_content, internal_notes = null } = req.body
+
+    if (!Array.isArray(feedback_ids) || feedback_ids.length === 0) {
+      return res.apiError('feedback_ids 必须是非空数组', 'INVALID_PARAMETERS', null, 400)
+    }
+
+    if (!reply_content || reply_content.trim().length === 0) {
+      return res.apiError('reply_content 不能为空', 'INVALID_PARAMETERS', null, 400)
+    }
+
+    if (reply_content.trim().length > 3000) {
+      return res.apiError('回复内容不能超过3000字符', 'INVALID_PARAMETERS', null, 400)
+    }
+
+    try {
+      const result = await TransactionManager.execute(async transaction => {
+        const FeedbackService = req.app.locals.services.getService('feedback')
+        return await FeedbackService.batchReplyFeedback(
+          feedback_ids,
+          reply_content,
+          req.user.user_id,
+          internal_notes,
+          { transaction }
+        )
+      })
+
+      sharedComponents.logger.info('管理员批量回复反馈', {
+        admin_id: req.user.user_id,
+        feedback_ids,
+        updated_count: result.updated_count
+      })
+
+      return res.apiSuccess(result, `批量回复成功，共回复 ${result.updated_count} 条反馈`)
+    } catch (error) {
+      sharedComponents.logger.error('批量回复反馈失败', { error: error.message })
+
+      if (
+        error.message.includes('不能为空') ||
+        error.message.includes('不能超过') ||
+        error.message.includes('ID列表')
+      ) {
+        return res.apiError(error.message, 'INVALID_PARAMETERS', null, 400)
+      }
+
+      return res.apiInternalError('批量回复反馈失败', error.message, 'FEEDBACK_BATCH_REPLY_ERROR')
+    }
+  })
+)
+
+/**
  * GET /feedbacks/:id - 获取单个反馈详情
  *
  * @description 获取指定反馈的详细信息

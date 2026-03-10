@@ -25,6 +25,9 @@ export { useExchangePageConfigState, useExchangePageConfigMethods } from './exch
 // 全局氛围主题配置模块
 export { useAppThemeConfigState, useAppThemeConfigMethods } from './app-theme-config.js'
 
+// 数据管理模块（2026-03-10 数据一键删除功能）
+export { useDataManagementState, useDataManagementMethods } from './data-management.js'
+
 /**
  * 组合所有系统设置状态
  * @returns {Object} 合并后的状态对象

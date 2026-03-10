@@ -28,6 +28,7 @@
  * 关键方法列表：
  * - getFeedbackList(filters) - 获取反馈列表
  * - replyFeedback(feedbackId, replyContent, adminId, internalNotes) - 回复反馈
+ * - batchReplyFeedback(feedbackIds, replyContent, adminId, internalNotes, options) - 批量回复反馈
  * - updateFeedbackStatus(feedbackId, status, internalNotes) - 更新反馈状态
  *
  * 数据模型关联：
@@ -297,6 +298,91 @@ class FeedbackService {
       logger.error('回复反馈失败', {
         error: error.message,
         feedback_id: feedbackId
+      })
+      throw error
+    }
+  }
+
+  /**
+   * 批量回复用户反馈
+   *
+   * @description 对多条反馈统一回复相同内容，状态自动变为 replied，满足运营批量处理需求
+   * @param {Array<number>} feedbackIds - 反馈ID数组（最多100条）
+   * @param {string} replyContent - 统一回复内容
+   * @param {number} adminId - 管理员用户ID
+   * @param {string|null} internalNotes - 内部备注（可选）
+   * @param {Object} options - 选项
+   * @param {Object} options.transaction - Sequelize 事务（由路由层传入）
+   * @returns {Promise<Object>} 批量回复结果 { updated_count, requested_count }
+   * @throws {Error} 参数校验失败或数据库操作失败
+   *
+   * @since 2026-03-09 新增批量回复功能，满足运营批量回复相同信息的需求
+   */
+  static async batchReplyFeedback(
+    feedbackIds,
+    replyContent,
+    adminId,
+    internalNotes = null,
+    options = {}
+  ) {
+    const { transaction } = options
+
+    try {
+      logger.info('开始批量回复反馈', {
+        count: feedbackIds.length,
+        admin_id: adminId
+      })
+
+      if (!replyContent || replyContent.trim().length === 0) {
+        throw new Error('回复内容不能为空')
+      }
+
+      if (replyContent.trim().length > 3000) {
+        throw new Error('回复内容不能超过3000字符')
+      }
+
+      if (!Array.isArray(feedbackIds) || feedbackIds.length === 0) {
+        throw new Error('反馈ID列表不能为空')
+      }
+
+      if (feedbackIds.length > 100) {
+        throw new Error('单次批量操作不能超过100条')
+      }
+
+      const now = BeijingTimeHelper.createBeijingTime()
+
+      const [updatedCount] = await models.Feedback.update(
+        {
+          reply_content: replyContent.trim(),
+          admin_id: adminId,
+          replied_at: now,
+          status: 'replied',
+          internal_notes: internalNotes || null,
+          updated_at: now
+        },
+        {
+          where: {
+            feedback_id: feedbackIds
+          },
+          transaction
+        }
+      )
+
+      logger.info('批量回复反馈完成', {
+        requested: feedbackIds.length,
+        updated_count: updatedCount,
+        admin_id: adminId
+      })
+
+      return {
+        updated_count: updatedCount,
+        requested_count: feedbackIds.length
+      }
+    } catch (error) {
+      logger.error('批量回复反馈失败', {
+        error: error.message,
+        feedback_ids: feedbackIds,
+        admin_id: adminId
       })
       throw error
     }

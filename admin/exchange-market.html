@@ -24,7 +24,7 @@
        @delete-item="deleteItem($event.detail)"
        @toggle-item-status="toggleItemStatus($event.detail)"
        @ship-order="shipOrder($event.detail)"
-       @complete-order-action="completeOrder($event.detail)">
+       @reject-order="rejectOrder($event.detail)">
     
     <!-- 页面横幅 -->
     <div class="page-banner mb-6">
@@ -173,8 +173,8 @@
                         <template x-if="row.status === 'pending'">
                           <button @click="$dispatch('ship-order', row)" class="themed-text-primary hover:text-blue-700 text-sm">发货</button>
                         </template>
-                        <template x-if="row.status === 'shipped'">
-                          <button @click="$dispatch('complete-order-action', row)" class="text-green-500 hover:text-green-700 text-sm">完成</button>
+                        <template x-if="row.status === 'pending'">
+                          <button @click="$dispatch('reject-order', row)" class="text-red-500 hover:text-red-700 text-sm">拒绝</button>
                         </template>
                       </div>
                     </td>
@@ -594,8 +594,8 @@
         <template x-if="selectedOrder && selectedOrder.status === 'pending'">
           <button type="button" @click="shipOrder(selectedOrder); hideModal('orderDetailModal')" class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary">📦 发货</button>
         </template>
-        <template x-if="selectedOrder && selectedOrder.status === 'shipped'">
-          <button type="button" @click="completeOrder(selectedOrder); hideModal('orderDetailModal')" class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600">✓ 完成</button>
+        <template x-if="selectedOrder && selectedOrder.status === 'pending'">
+          <button type="button" @click="rejectOrder(selectedOrder); hideModal('orderDetailModal')" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">✕ 拒绝</button>
         </template>
       </div>
     </div>

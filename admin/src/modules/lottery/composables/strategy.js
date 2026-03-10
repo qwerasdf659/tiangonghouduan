@@ -664,7 +664,7 @@ export function useStrategyMethods() {
         recent_draw_window: '近期抽奖窗口',
         empty_streak_threshold: '连空触发阈值',
         high_streak_threshold: '连高触发阈值',
-        multiplier_table: 'Pity倍率表',
+        multiplier_table: '保底倍率表',
         min_non_empty_cost: '最低非空奖成本',
         debt_enabled: '债务预抽开关'
       }
@@ -694,8 +694,8 @@ export function useStrategyMethods() {
         recent_draw_window: '参与策略计算的近期抽奖记录数量',
         empty_streak_threshold: '连续空奖达到此次数后触发保护机制',
         high_streak_threshold: '连续获得高奖品达到此次数后触发限制',
-        multiplier_table: 'Pity系统的连续未中奖次数对应的概率提升倍率映射表',
-        min_non_empty_cost: '最低非空奖品的成本阈值，用于Pity系统判断'
+        multiplier_table: '保底系统的连续未中奖次数对应的概率提升倍率映射表',
+        min_non_empty_cost: '最低非空奖品的成本阈值，用于保底系统判断'
       }
       return descriptions[configKey] || ''
     },
@@ -948,7 +948,7 @@ export function useStrategyMethods() {
             axisPointer: { type: 'shadow' }
           },
           legend: {
-            data: ['Pity(保底)', 'AntiEmpty(反连空)', 'AntiHigh(反连高)', 'LuckDebt(运气债务)'],
+            data: ['保底机制', '防连空', '防连高', '运气债务'],
             bottom: 0,
             textStyle: { fontSize: 11 }
           },
@@ -971,28 +971,28 @@ export function useStrategyMethods() {
           },
           series: [
             {
-              name: 'Pity(保底)',
+              name: '保底机制',
               type: 'bar',
               stack: 'triggers',
               data: pityData.length > 0 ? pityData : [0],
               itemStyle: { color: '#8B5CF6' }
             },
             {
-              name: 'AntiEmpty(反连空)',
+              name: '防连空',
               type: 'bar',
               stack: 'triggers',
               data: antiEmptyData.length > 0 ? antiEmptyData : [0],
               itemStyle: { color: '#3B82F6' }
             },
             {
-              name: 'AntiHigh(反连高)',
+              name: '防连高',
               type: 'bar',
               stack: 'triggers',
               data: antiHighData.length > 0 ? antiHighData : [0],
               itemStyle: { color: '#F97316' }
             },
             {
-              name: 'LuckDebt(运气债务)',
+              name: '运气债务',
               type: 'bar',
               stack: 'triggers',
               data: luckDebtData.length > 0 ? luckDebtData : [0],

@@ -38,7 +38,8 @@ export const MERCHANT_ENDPOINTS = {
  * @param {number} [params.page_size=20] - 每页数量
  * @param {string} [params.merchant_type] - 商家类型筛选
  * @param {string} [params.status] - 状态筛选
- * @param {string} [params.keyword] - 名称关键字搜索
+ * @param {string} [params.keyword] - 名称/联系电话模糊搜索
+ * @param {string} [params.contact_mobile] - 联系电话独立筛选
  * @returns {Promise<Object>} { list, total, page, page_size }
  */
 export async function getMerchantList(params = {}) {
@@ -48,6 +49,7 @@ export async function getMerchantList(params = {}) {
   if (params.merchant_type) query.set('merchant_type', params.merchant_type)
   if (params.status) query.set('status', params.status)
   if (params.keyword) query.set('keyword', params.keyword)
+  if (params.contact_mobile) query.set('contact_mobile', params.contact_mobile)
 
   const url = query.toString()
     ? `${MERCHANT_ENDPOINTS.LIST}?${query.toString()}`

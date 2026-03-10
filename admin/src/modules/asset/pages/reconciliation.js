@@ -95,9 +95,9 @@ document.addEventListener('alpine:init', () => {
             data: data.map(r => r.asset_code),
             axisLabel: { rotate: 30 }
           },
-          yAxis: { type: 'value', name: 'SUM(delta_amount)' },
+          yAxis: { type: 'value', name: '变动金额合计' },
           series: [{
-            name: 'delta_amount',
+            name: '变动金额',
             type: 'bar',
             data: data.map(r => ({
               value: Number(r.total_delta) || 0,

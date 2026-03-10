@@ -219,36 +219,39 @@ document.addEventListener('alpine:init', () => {
       },
 
       /**
-       * 完成订单（HTML 模板使用）
+       * 拒绝订单（HTML 模板使用，管理员操作：审核拒绝，退还材料资产）
        * @param {Object} order - 订单对象
        */
-      async completeOrder(order) {
-        if (!(await $confirm(`确定要完成订单 ${order.order_no} 吗？`))) return
+      async rejectOrder(order) {
+        if (
+          !(await $confirm(
+            `确定要拒绝订单 ${order.order_no} 吗？已支付的资产将退回用户账户。`,
+            { type: 'danger' }
+          ))
+        )
+          return
 
         try {
           this.saving = true
           const res = await request({
-            url: buildURL(
-              MARKET_ENDPOINTS.EXCHANGE_ORDER_COMPLETE || MARKET_ENDPOINTS.EXCHANGE_ORDER_SHIP,
-              {
-                order_no: order.order_no
-              }
-            ),
+            url: buildURL(MARKET_ENDPOINTS.EXCHANGE_ORDER_REJECT, {
+              order_no: order.order_no
+            }),
             method: 'POST',
-            data: { status: 'completed' }
+            data: { remark: '管理员拒绝审批' }
           })
 
           if (res.success) {
-            this.showSuccess?.('订单已完成')
+            this.showSuccess?.('订单已拒绝，资产已退还用户')
             this._refreshOrdersTable()
             this.loadOrderStats()
             this._updateMarketStats()
           } else {
-            this.showError?.(res.message || '操作失败')
+            this.showError?.(res.message || '拒绝失败')
           }
         } catch (e) {
-          logger.error('[ExchangeMarket] 完成订单失败:', e)
-          this.showError?.('操作失败')
+          logger.error('[ExchangeMarket] 拒绝订单失败:', e)
+          this.showError?.('拒绝失败')
         } finally {
           this.saving = false
         }

@@ -109,8 +109,6 @@ const CANONICAL_OPERATION_MAP = {
   // ===== 背包域写操作 =====
   '/api/v4/backpack/items/:id/redeem': 'BACKPACK_ITEM_REDEEM', // 用户生成核销码（创建核销订单+锁定物品）
   '/api/v4/backpack/exchange': 'BACKPACK_EXCHANGE_CREATE_ORDER', // 用户端兑换商品（新路径）
-  '/api/v4/shop/exchange/orders/:id/status': 'SHOP_EXCHANGE_UPDATE_STATUS', // 更新订单状态（管理操作保留在 shop）
-
   // ===== 材料转换 =====
   '/api/v4/shop/assets/convert': 'SHOP_ASSET_CONVERT', // 资产转换（canonical 路径）
 
@@ -194,6 +192,8 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/system/chat/sessions/:id/upload': 'CHAT_IMAGE_UPLOAD', // 聊天图片上传
   '/api/v4/system/chat/sessions/:id/rate': 'CHAT_SESSION_RATE', // 用户提交满意度评分
   '/api/v4/backpack/exchange/orders/:id/rate': 'EXCHANGE_ORDER_RATE', // 兑换订单评分（需求6）
+  '/api/v4/backpack/exchange/orders/:id/confirm-receipt': 'EXCHANGE_ORDER_CONFIRM_RECEIPT', // 用户确认收货
+  '/api/v4/backpack/exchange/orders/:id/cancel': 'EXCHANGE_ORDER_USER_CANCEL', // 用户取消订单
   '/api/v4/system/notifications/:id/read': 'NOTIFICATION_MARK_READ', // 标记通知已读（修复：system/:id/read → system/notifications/:id/read）
   '/api/v4/system/notifications/read-all': 'NOTIFICATION_READ_ALL', // 全部已读（修复：system/read-all → system/notifications/read-all）
   '/api/v4/system/notifications/clear': 'NOTIFICATION_CLEAR', // 清空通知（修复：system/clear → system/notifications/clear）
@@ -308,6 +308,11 @@ const CANONICAL_OPERATION_MAP = {
   // ===== 孤儿冻结清理 =====
   '/api/v4/console/orphan-frozen/cleanup': 'ADMIN_ORPHAN_CLEANUP', // 孤儿清理（修复：console/order → console/orphan-frozen/cleanup）
 
+  // ===== 数据管理（2026-03-10 数据一键删除功能） =====
+  '/api/v4/console/data-management/preview': 'ADMIN_DATA_CLEANUP_PREVIEW', // 数据清理预览
+  '/api/v4/console/data-management/cleanup': 'ADMIN_DATA_CLEANUP_EXECUTE', // 数据清理执行
+  '/api/v4/console/data-management/policies/:id': 'ADMIN_DATA_CLEANUP_POLICY_UPDATE', // 清理策略更新
+
   /*
    * ===== 奖池管理（2026-01-20 V2.2 路由重构）=====
    * 奖品池（按活动查询）：配置实体，使用 :code
@@ -368,6 +373,8 @@ const CANONICAL_OPERATION_MAP = {
   // ===== 市场管理 =====
   '/api/v4/console/marketplace/exchange_market/items': 'ADMIN_EXCHANGE_ITEM_CREATE', // 创建兑换商品（修复：添加 marketplace 前缀）
   '/api/v4/console/marketplace/exchange_market/items/:id': 'ADMIN_EXCHANGE_ITEM_UPDATE', // 更新兑换商品（修复：添加 marketplace 前缀）或删除（DELETE）
+  '/api/v4/console/marketplace/exchange_market/orders/:id/ship': 'ADMIN_EXCHANGE_ORDER_SHIP', // 管理员发货
+  '/api/v4/console/marketplace/exchange_market/orders/:id/reject': 'ADMIN_EXCHANGE_ORDER_REJECT', // 管理员拒绝订单
   '/api/v4/console/marketplace/exchange_market/batch-bind-images':
     'ADMIN_EXCHANGE_BATCH_BIND_IMAGES', // 批量绑定商品图片
   '/api/v4/console/marketplace/listings/:id/force-withdraw': 'ADMIN_FORCE_WITHDRAW', // 强制下架
@@ -407,6 +414,13 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/console/merchant-points/:id/reject': 'ADMIN_MERCHANT_REJECT', // 拒绝商户积分（修复：console/:id/reject → console/merchant-points/:id/reject）
   '/api/v4/console/merchant-points/batch': 'ADMIN_MERCHANT_POINTS_BATCH', // 批量审核商户积分（通过/拒绝）
 
+  // ===== 审核链管理（2026-03-10 多级审核链） =====
+  '/api/v4/console/approval-chain/templates': 'ADMIN_APPROVAL_CHAIN_CREATE_TEMPLATE', // 创建审核链模板
+  '/api/v4/console/approval-chain/templates/:id': 'ADMIN_APPROVAL_CHAIN_UPDATE_TEMPLATE', // 更新审核链模板
+  '/api/v4/console/approval-chain/templates/:id/toggle': 'ADMIN_APPROVAL_CHAIN_TOGGLE_TEMPLATE', // 启用/禁用审核链模板
+  '/api/v4/console/approval-chain/steps/:id/approve': 'APPROVAL_CHAIN_STEP_APPROVE', // 审核链步骤审核通过
+  '/api/v4/console/approval-chain/steps/:id/reject': 'APPROVAL_CHAIN_STEP_REJECT', // 审核链步骤审核拒绝
+
   // ===== 风险告警 =====
   '/api/v4/console/risk-alerts/:id/review': 'ADMIN_RISK_ALERT_REVIEW', // 审核风险告警（修复：risk/alerts → risk-alerts）
 
@@ -414,6 +428,7 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/console/system/feedbacks/:id/reply': 'ADMIN_FEEDBACK_REPLY', // 回复反馈
   '/api/v4/console/system/feedbacks/:id/status': 'ADMIN_FEEDBACK_STATUS', // 更新反馈状态
   '/api/v4/console/system/feedbacks/batch-status': 'ADMIN_FEEDBACK_BATCH_STATUS', // 批量更新反馈状态
+  '/api/v4/console/system/feedbacks/batch-reply': 'ADMIN_FEEDBACK_BATCH_REPLY', // 批量回复反馈
 
   // ===== 区域管理 =====
   '/api/v4/console/regions/validate': 'ADMIN_REGION_VALIDATE', // 验证区域（修复：console/validate → console/regions/validate）

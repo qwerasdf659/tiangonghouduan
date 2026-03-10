@@ -89,7 +89,6 @@ class DataSanitizer {
    * @returns {number} return[].prize_value - 展示价值（DECIMAL→number 转换）
    * @returns {string} return[].rarity_code - 稀有度代码（FK→rarity_defs）
    * @returns {number} return[].sort_order - 排序顺序（前端转盘位置索引）
-   * @returns {string} return[].reward_tier - 档位（high/mid/low）
    * @returns {string} return[].status - 奖品状态（active/inactive）
    *
    * @example
@@ -203,7 +202,8 @@ class DataSanitizer {
       delete sanitized.max_daily_wins
       delete sanitized.daily_win_count
       delete sanitized.total_win_count
-      // is_fallback 已放开（2026-02-25 决策6）：前端"保底"badge 依赖此字段
+      delete sanitized.is_fallback
+      delete sanitized.reward_tier
       delete sanitized.reserved_for_vip
       delete sanitized.angle
       delete sanitized.color
@@ -1050,6 +1050,7 @@ class DataSanitizer {
       .replace(/"?cost_points"?:\s*\d+/g, 'cost_points: [HIDDEN]')
       .replace(/"?market_value"?:\s*[\d.]+/g, 'market_value: [HIDDEN]')
       .replace(/"?acquisition_cost"?:\s*\d+/g, 'acquisition_cost: [HIDDEN]')
+      .replace(/"?is_fallback"?:\s*(true|false)/g, 'is_fallback: [HIDDEN]')
   }
 
   // ========== 辅助方法 ==========
@@ -1452,8 +1453,9 @@ class DataSanitizer {
       // 安全处理 item_snapshot（只保留用户可见信息）
       if (sanitized.item_snapshot) {
         sanitized.item_snapshot = {
-          name: sanitized.item_snapshot.name,
-          description: sanitized.item_snapshot.description
+          item_name: sanitized.item_snapshot.item_name,
+          description: sanitized.item_snapshot.description,
+          image_url: sanitized.item_snapshot.image_url
         }
       }
 

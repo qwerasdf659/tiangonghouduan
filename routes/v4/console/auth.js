@@ -135,6 +135,7 @@ router.post(
           mobile: user.mobile,
           nickname: user.nickname,
           status: user.status,
+          user_level: user.user_level,
           role_level: roles.role_level,
           roles: roles.roles
         },
@@ -164,6 +165,7 @@ router.get(
         'mobile',
         'nickname',
         'status',
+        'user_level',
         'last_login',
         'login_count',
         'created_at'
@@ -186,6 +188,7 @@ router.get(
           mobile: user.mobile,
           nickname: user.nickname,
           status: user.status,
+          user_level: user.user_level,
           role_level: userRoles.role_level,
           roles: userRoles.roles,
           last_login: user.last_login,

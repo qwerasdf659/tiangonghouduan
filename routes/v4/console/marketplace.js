@@ -1610,4 +1610,118 @@ router.get('/tradable-assets', authenticateToken, requireRoleLevel(100), async (
   }
 })
 
+// ==================== 兑换订单管理员操作路由 ====================
+
+/**
+ * 管理员发货（Admin Only）
+ * POST /api/v4/console/marketplace/exchange_market/orders/:order_no/ship
+ *
+ * @description 管理员将订单状态变更为 shipped，记录发货时间
+ *
+ * @param {string} order_no - 订单号
+ * @body {string} [remark] - 操作备注
+ *
+ * @security JWT + Admin权限（role_level >= 100）
+ */
+router.post(
+  '/exchange_market/orders/:order_no/ship',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const ExchangeCoreService = req.app.locals.services.getService('exchange_core')
+      const TransactionManager = require('../../../utils/TransactionManager')
+
+      const { order_no } = req.params
+      const { remark = '' } = req.body
+      const operator_id = req.user.user_id
+
+      if (!order_no || order_no.trim().length === 0) {
+        return res.apiError('订单号不能为空', 'BAD_REQUEST', null, 400)
+      }
+
+      const result = await TransactionManager.execute(async transaction => {
+        return await ExchangeCoreService.updateOrderStatus(
+          order_no,
+          'shipped',
+          operator_id,
+          remark,
+          { transaction }
+        )
+      })
+
+      logger.info('管理员发货成功', { operator_id, order_no })
+
+      return res.apiSuccess(result.order, result.message)
+    } catch (error) {
+      logger.error('管理员发货失败', {
+        error: error.message,
+        operator_id: req.user?.user_id,
+        order_no: req.params.order_no
+      })
+
+      if (error.statusCode === 404) {
+        return res.apiError(error.message, 'NOT_FOUND', null, 404)
+      }
+      if (error.statusCode === 400) {
+        return res.apiError(error.message, 'BAD_REQUEST', error.data, 400)
+      }
+      return res.apiError(error.message || '发货失败', 'INTERNAL_ERROR', null, 500)
+    }
+  }
+)
+
+/**
+ * 管理员拒绝订单（Admin Only）
+ * POST /api/v4/console/marketplace/exchange_market/orders/:order_no/reject
+ *
+ * @description 管理员拒绝审批订单（仅 pending 状态），退还材料资产
+ *
+ * @param {string} order_no - 订单号
+ * @body {string} [remark] - 拒绝原因
+ *
+ * @security JWT + Admin权限（role_level >= 100）
+ */
+router.post(
+  '/exchange_market/orders/:order_no/reject',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const ExchangeCoreService = req.app.locals.services.getService('exchange_core')
+      const TransactionManager = require('../../../utils/TransactionManager')
+
+      const { order_no } = req.params
+      const { remark = '' } = req.body
+      const operator_id = req.user.user_id
+
+      if (!order_no || order_no.trim().length === 0) {
+        return res.apiError('订单号不能为空', 'BAD_REQUEST', null, 400)
+      }
+
+      const result = await TransactionManager.execute(async transaction => {
+        return await ExchangeCoreService.rejectOrder(order_no, operator_id, remark, { transaction })
+      })
+
+      logger.info('管理员拒绝订单成功', { operator_id, order_no, remark })
+
+      return res.apiSuccess(result.order, result.message)
+    } catch (error) {
+      logger.error('管理员拒绝订单失败', {
+        error: error.message,
+        operator_id: req.user?.user_id,
+        order_no: req.params.order_no
+      })
+
+      if (error.statusCode === 404) {
+        return res.apiError(error.message, 'NOT_FOUND', null, 404)
+      }
+      if (error.statusCode === 400) {
+        return res.apiError(error.message, 'BAD_REQUEST', error.data, 400)
+      }
+      return res.apiError(error.message || '拒绝失败', 'INTERNAL_ERROR', null, 500)
+    }
+  }
+)
+
 module.exports = router

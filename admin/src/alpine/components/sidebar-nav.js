@@ -68,6 +68,11 @@ export function sidebarNav() {
             badgeKey: 'consumptionPendingCount'
           },
           {
+            id: 'approval-chain',
+            name: '审核链管理',
+            url: '/admin/approval-chain.html'
+          },
+          {
             id: 'redemption-mgmt',
             name: '兑换核销管理',
             url: '/admin/redemption-management.html',
@@ -236,7 +241,8 @@ export function sidebarNav() {
           { id: 'feature-flags', name: '功能开关', icon: '🔀', url: '/admin/feature-flags.html' },
           { id: 'item-templates', name: '物品模板', icon: '📦', url: '/admin/item-templates.html' },
           { id: 'dict-mgmt', name: '数据字典', icon: '📖', url: '/admin/dict-management.html' },
-          { id: 'sys-maintain', name: '系统维护', icon: '🔧', url: '/admin/sys-maintain.html' }
+          { id: 'sys-maintain', name: '系统维护', icon: '🔧', url: '/admin/sys-maintain.html' },
+          { id: 'data-mgmt', name: '数据管理', icon: '🗄️', url: '/admin/data-management.html' }
         ]
       }
     ],

@@ -83,6 +83,7 @@ router.get(
       min_cost,
       max_cost,
       stock_status,
+      with_counts,
       page = 1,
       page_size = 20,
       sort_by = 'sort_order',
@@ -140,7 +141,7 @@ router.get(
       )
     }
 
-    // 调用服务层（新增参数：space/keyword/category/min_cost/max_cost/stock_status）
+    // 调用服务层（筛选 + C+++ 聚合计数）
     const result = await ExchangeQueryService.getMarketItems({
       status,
       asset_code,
@@ -150,6 +151,7 @@ router.get(
       min_cost: min_cost ? parseInt(min_cost, 10) : null,
       max_cost: max_cost ? parseInt(max_cost, 10) : null,
       stock_status: stock_status || null,
+      with_counts: with_counts === 'true',
       page: finalPage,
       page_size: finalPageSize,
       sort_by,
@@ -172,15 +174,19 @@ router.get(
       page: finalPage
     })
 
-    return res.apiSuccess(
-      {
-        items: sanitizedItems,
-        pagination: result.pagination,
-        /** 统计摘要（需求6 趋势销量 + 需求8 折扣率） */
-        summary: result.summary || null
-      },
-      '获取商品列表成功'
-    )
+    const responseData = {
+      items: sanitizedItems,
+      pagination: result.pagination,
+      /** 统计摘要（需求6 趋势销量 + 需求8 折扣率） */
+      summary: result.summary || null
+    }
+
+    // C+++ 聚合计数：仅在 with_counts=true 时返回
+    if (result.filters_count) {
+      responseData.filters_count = result.filters_count
+    }
+
+    return res.apiSuccess(responseData, '获取商品列表成功')
   })
 )
 
@@ -616,6 +622,175 @@ router.post(
 
       return handleServiceError(error, res, '解锁失败')
     }
+  })
+)
+
+// ==================== 兑换订单路由（从 shop/exchange/orders.js 迁移） ====================
+
+/**
+ * GET /api/v4/backpack/exchange/orders
+ *
+ * @description 获取用户兑换订单列表（支持状态筛选 + 分页）
+ * @access Private（登录用户查看自己的订单）
+ *
+ * @query {string} [status] - 订单状态筛选（9 种状态之一，可选）
+ * @query {number} [page=1] - 页码
+ * @query {number} [page_size=20] - 每页数量（最大 50）
+ *
+ * @returns {Object} { orders, pagination }
+ */
+router.get(
+  '/orders',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const ExchangeQueryService = req.app.locals.services.getService('exchange_query')
+    const DataSanitizer = req.app.locals.services.getService('data_sanitizer')
+    const { getUserRoles } = require('../../../middleware/auth')
+
+    const { status, page = 1, page_size = 20 } = req.query
+    const user_id = req.user.user_id
+
+    const finalPage = Math.max(parseInt(page) || 1, 1)
+    const finalPageSize = Math.min(Math.max(parseInt(page_size) || 20, 1), 50)
+
+    // 状态白名单验证
+    if (status) {
+      const validStatuses = [
+        'pending',
+        'approved',
+        'shipped',
+        'received',
+        'rated',
+        'rejected',
+        'refunded',
+        'cancelled',
+        'completed'
+      ]
+      if (!validStatuses.includes(status)) {
+        return res.apiError(
+          `无效的status参数，允许值：${validStatuses.join(', ')}`,
+          'BAD_REQUEST',
+          null,
+          400
+        )
+      }
+    }
+
+    const result = await ExchangeQueryService.getUserOrders(user_id, {
+      status,
+      page: finalPage,
+      page_size: finalPageSize
+    })
+
+    const userRoles = await getUserRoles(user_id)
+    const dataLevel = userRoles.role_level >= 100 ? 'full' : 'public'
+    const sanitizedOrders = DataSanitizer.sanitizeExchangeMarketOrders(result.orders, dataLevel)
+
+    logger.info('查询用户兑换订单列表成功', {
+      user_id,
+      total: result.pagination.total,
+      page: finalPage
+    })
+
+    return res.apiSuccess(
+      { orders: sanitizedOrders, pagination: result.pagination },
+      '获取订单列表成功'
+    )
+  })
+)
+
+/**
+ * GET /api/v4/backpack/exchange/orders/:order_no
+ *
+ * @description 获取用户兑换订单详情（含 user_id 权限校验）
+ * @access Private（登录用户查看自己的订单）
+ *
+ * @param {string} order_no - 订单号
+ *
+ * @returns {Object} { order }
+ */
+router.get(
+  '/orders/:order_no',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const ExchangeQueryService = req.app.locals.services.getService('exchange_query')
+    const DataSanitizer = req.app.locals.services.getService('data_sanitizer')
+    const { getUserRoles } = require('../../../middleware/auth')
+
+    const { order_no } = req.params
+    const user_id = req.user.user_id
+
+    if (!order_no || order_no.trim().length === 0) {
+      return res.apiError('订单号不能为空', 'BAD_REQUEST', null, 400)
+    }
+
+    const result = await ExchangeQueryService.getOrderDetail(user_id, order_no)
+
+    const userRoles = await getUserRoles(user_id)
+    const dataLevel = userRoles.role_level >= 100 ? 'full' : 'public'
+    const sanitizedOrder = DataSanitizer.sanitizeExchangeMarketOrder(result.order, dataLevel)
+
+    return res.apiSuccess({ order: sanitizedOrder }, '获取订单详情成功')
+  })
+)
+
+/**
+ * POST /api/v4/backpack/exchange/orders/:order_no/confirm-receipt
+ *
+ * @description 用户确认收货（shipped → received）
+ * @access Private（登录用户确认自己的订单）
+ *
+ * @param {string} order_no - 订单号
+ *
+ * @returns {Object} 确认收货结果
+ */
+router.post(
+  '/orders/:order_no/confirm-receipt',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const ExchangeCoreService = req.app.locals.services.getService('exchange_core')
+    const { order_no } = req.params
+    const user_id = req.user.user_id
+
+    if (!order_no || order_no.trim().length === 0) {
+      return res.apiError('订单号不能为空', 'BAD_REQUEST', null, 400)
+    }
+
+    const result = await TransactionManager.execute(async transaction => {
+      return await ExchangeCoreService.confirmReceipt(user_id, order_no, { transaction })
+    })
+
+    return res.apiSuccess(result, result.message)
+  })
+)
+
+/**
+ * POST /api/v4/backpack/exchange/orders/:order_no/cancel
+ *
+ * @description 用户取消订单（仅 pending 状态，退还材料资产）
+ * @access Private（登录用户取消自己的订单）
+ *
+ * @param {string} order_no - 订单号
+ *
+ * @returns {Object} 取消结果（含退款信息）
+ */
+router.post(
+  '/orders/:order_no/cancel',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const ExchangeCoreService = req.app.locals.services.getService('exchange_core')
+    const { order_no } = req.params
+    const user_id = req.user.user_id
+
+    if (!order_no || order_no.trim().length === 0) {
+      return res.apiError('订单号不能为空', 'BAD_REQUEST', null, 400)
+    }
+
+    const result = await TransactionManager.execute(async transaction => {
+      return await ExchangeCoreService.cancelOrder(user_id, order_no, { transaction })
+    })
+
+    return res.apiSuccess(result, result.message)
   })
 )
 

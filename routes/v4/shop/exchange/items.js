@@ -63,6 +63,7 @@ router.get('/items', authenticateToken, async (req, res) => {
       min_cost,
       max_cost,
       stock_status,
+      with_counts,
       page = 1,
       page_size = 20,
       sort_by = 'sort_order',
@@ -118,7 +119,7 @@ router.get('/items', authenticateToken, async (req, res) => {
       )
     }
 
-    // 调用服务层（传递所有筛选参数）
+    // 调用服务层（筛选 + C+++ 聚合计数）
     const result = await ExchangeService.getMarketItems({
       status,
       asset_code,
@@ -128,6 +129,7 @@ router.get('/items', authenticateToken, async (req, res) => {
       min_cost: min_cost || null,
       max_cost: max_cost || null,
       stock_status: stock_status || null,
+      with_counts: with_counts === 'true',
       page: finalPage,
       page_size: finalPageSize,
       sort_by,
@@ -152,13 +154,17 @@ router.get('/items', authenticateToken, async (req, res) => {
       page: finalPage
     })
 
-    return res.apiSuccess(
-      {
-        items: sanitizedItems,
-        pagination: result.pagination
-      },
-      '获取商品列表成功'
-    )
+    const responseData = {
+      items: sanitizedItems,
+      pagination: result.pagination
+    }
+
+    // C+++ 聚合计数：仅在 with_counts=true 时返回
+    if (result.filters_count) {
+      responseData.filters_count = result.filters_count
+    }
+
+    return res.apiSuccess(responseData, '获取商品列表成功')
   } catch (error) {
     logger.error('获取商品列表失败', {
       error: error.message,

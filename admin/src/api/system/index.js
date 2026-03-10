@@ -32,6 +32,7 @@ export const SystemAPI = {
 // ========== 分离导出（按需引入） ==========
 export { SYSTEM_CORE_ENDPOINTS, SystemCoreAPI } from './core.js'
 export { SYSTEM_ADMIN_ENDPOINTS, SystemAdminAPI } from './admin.js'
+export { DATA_MANAGEMENT_ENDPOINTS, DataManagementAPI } from './data-management.js'
 
 // ========== 默认导出 ==========
 export default SystemAPI

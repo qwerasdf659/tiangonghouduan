@@ -87,24 +87,42 @@ router.get(
        * 通过 Service 层获取批量预算状态（符合路由层规范）
        * 支持按活动状态筛选（status: active/draft/paused/ended/cancelled）
        */
-      const { campaigns: results, summary } = await ActivityService.getBatchBudgetStatus({
+      const {
+        campaigns: results,
+        grouped,
+        summary
+      } = await ActivityService.getBatchBudgetStatus({
         lottery_campaign_ids: targetIds,
         status: status || '',
-        limit: parseInt(limit) || 20
+        limit: parseInt(limit) || 50
       })
 
       if (results.length === 0) {
-        return res.apiSuccess({ campaigns: [], total_count: 0 }, '未找到匹配的活动')
+        return res.apiSuccess(
+          {
+            campaigns: [],
+            grouped: {
+              user: { campaigns: [], summary: {} },
+              pool: { campaigns: [], summary: {} },
+              none: { campaigns: [], summary: {} }
+            },
+            total_count: 0
+          },
+          '未找到匹配的活动'
+        )
       }
 
       sharedComponents.logger.info('批量获取活动预算状态成功', {
         campaign_count: results.length,
+        user_mode_count: grouped?.user?.campaigns?.length || 0,
+        pool_mode_count: grouped?.pool?.campaigns?.length || 0,
         operated_by: req.user?.id
       })
 
       return res.apiSuccess(
         {
           campaigns: results,
+          grouped,
           summary,
           total_count: results.length
         },

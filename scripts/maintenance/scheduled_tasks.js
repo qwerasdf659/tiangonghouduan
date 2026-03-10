@@ -302,7 +302,10 @@ class ScheduledTasks {
     // 任务37: 每天凌晨1:15执行市场价格快照聚合（market_price_snapshots 预聚合）
     this.scheduleDailyMarketPriceSnapshot()
 
-    logger.info('所有定时任务已初始化完成（包含统一对账+物品锁定过期释放+市场价格快照）')
+    // 任务38: 每天凌晨3:10执行数据自动清理（2026-03-10 数据一键删除功能）
+    this.scheduleDataCleanup()
+
+    logger.info('所有定时任务已初始化完成（包含统一对账+物品锁定过期释放+市场价格快照+数据自动清理）')
   }
 
   /**
@@ -3545,6 +3548,24 @@ class ScheduledTasks {
     })
 
     logger.info('✅ 定时任务已设置: 市场价格快照聚合（每天凌晨1:15）')
+  }
+
+  /**
+   * 定时任务38: 数据自动清理
+   * Cron表达式: 10 3 * * * (每天凌晨3:10，错开3:00的通知清理)
+   *
+   * 读取 system_configs.data_cleanup_policies 策略，按保留天数清理 L3 级别表
+   * 环境变量 ENABLE_DATA_CLEANUP=true 时启用
+   *
+   * @returns {void}
+   */
+  static scheduleDataCleanup() {
+    const DataCleanupJob = require('../../jobs/daily-data-cleanup')
+    if (!DataCleanupJob || !DataCleanupJob.run) {
+      logger.info('[定时任务38] 数据自动清理已禁用（ENABLE_DATA_CLEANUP != true）')
+      return
+    }
+    logger.info('✅ 定时任务已设置: 数据自动清理（每天凌晨3:10，由 daily-data-cleanup.js 管理 cron）')
   }
 }
 

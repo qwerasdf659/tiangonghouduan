@@ -39,10 +39,11 @@ router.get('/profile', authenticateToken, async (req, res) => {
   const responseData = {
     user: {
       user_id: user.user_id,
-      // 🔐 P0-1修复：手机号脱敏处理，返回 136****7930 格式（审计标准B-1-2）
+      // 🔐 手机号脱敏处理，返回 136****7930 格式
       mobile: sanitize.mobile(user.mobile),
       nickname: user.nickname,
-      role_level: userRoles.role_level, // 角色级别（>= 100 为管理员）
+      user_level: user.user_level,
+      role_level: userRoles.role_level,
       roles: userRoles.roles,
       status: user.status,
       consecutive_fail_count: user.consecutive_fail_count,

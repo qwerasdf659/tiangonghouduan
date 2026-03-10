@@ -2,9 +2,9 @@
  * 商家管理页面 - Alpine.js 组件
  *
  * @file admin/src/modules/merchant/pages/merchant-management.js
- * @description 商家 CRUD 管理页面（列表、创建、编辑、删除）
- * @version 1.0.0
- * @date 2026-02-23
+ * @description 商家 CRUD 管理页面（列表、创建、编辑、删除、统计概览）
+ * @version 1.1.0
+ * @date 2026-03-09
  */
 
 import { logger } from '../../../utils/logger.js'
@@ -29,22 +29,28 @@ function registerMerchantComponents() {
   Alpine.data('merchantManagement', () => ({
     ...createPageMixin(),
 
-    // 列表状态
     merchants: [],
     total: 0,
     pagination: { page: 1, page_size: 20 },
-    filters: { merchant_type: '', status: '', keyword: '' },
+    filters: { merchant_type: '', status: '', keyword: '', contact_mobile: '' },
     loading: false,
 
-    // 类型选项（字典表驱动）
+    /** 统计概览数据 */
+    stats: {
+      active_count: 0,
+      inactive_count: 0,
+      type_count: 0
+    },
+
+    /** 商家类型选项（字典表驱动） */
     type_options: [],
+    /** 状态选项 */
     status_options: [
       { code: 'active', name: '正常', color: '#10b981' },
       { code: 'inactive', name: '停用', color: '#6b7280' },
       { code: 'suspended', name: '暂停', color: '#ef4444' }
     ],
 
-    // 表单状态
     show_form: false,
     is_edit: false,
     saving: false,
@@ -60,7 +66,6 @@ function registerMerchantComponents() {
     },
     editing_id: null,
 
-    // 详情弹窗
     show_detail: false,
     detail: null,
 
@@ -88,6 +93,7 @@ function registerMerchantComponents() {
         const res = await getMerchantTypeOptions()
         if (res.success) {
           this.type_options = res.data
+          this.stats.type_count = res.data.length
         }
       } catch (error) {
         logger.error('[MerchantManagement] 加载类型选项失败', error)
@@ -110,6 +116,7 @@ function registerMerchantComponents() {
         if (res.success) {
           this.merchants = res.data.list
           this.total = res.data.total
+          this.computeStats(res.data.list)
         } else {
           Alpine.store('notification').show(res.message || '加载失败', 'error')
         }
@@ -121,13 +128,22 @@ function registerMerchantComponents() {
       }
     },
 
+    /**
+     * 根据当前列表数据计算统计概览
+     * @param {Array} list - 商家列表
+     */
+    computeStats(list) {
+      this.stats.active_count = list.filter(m => m.status === 'active').length
+      this.stats.inactive_count = list.filter(m => m.status !== 'active').length
+    },
+
     async handleSearch() {
       this.pagination.page = 1
       await this.loadData()
     },
 
     async resetFilters() {
-      this.filters = { merchant_type: '', status: '', keyword: '' }
+      this.filters = { merchant_type: '', status: '', keyword: '', contact_mobile: '' }
       this.pagination.page = 1
       await this.loadData()
     },

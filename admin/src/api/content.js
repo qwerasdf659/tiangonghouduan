@@ -108,6 +108,7 @@ export const CONTENT_ENDPOINTS = {
   FEEDBACK_REPLY: `${API_PREFIX}/console/system/feedbacks/:id/reply`,
   FEEDBACK_STATUS: `${API_PREFIX}/console/system/feedbacks/:id/status`,
   FEEDBACK_BATCH_STATUS: `${API_PREFIX}/console/system/feedbacks/batch-status`,
+  FEEDBACK_BATCH_REPLY: `${API_PREFIX}/console/system/feedbacks/batch-reply`,
 
   // 活动管理
   ACTIVITY_LIST: `${API_PREFIX}/activities`,
@@ -662,6 +663,32 @@ export const ContentAPI = {
   async batchUpdateFeedbackStatus(data) {
     return await request({
       url: CONTENT_ENDPOINTS.FEEDBACK_BATCH_STATUS,
+      method: 'PUT',
+      data
+    })
+  },
+
+  /**
+   * 批量回复反馈（对多条反馈统一回复相同内容）
+   * @async
+   * @param {Object} data - 批量回复数据
+   * @param {Array<number>} data.feedback_ids - 反馈ID数组（必填，最多100条）
+   * @param {string} data.reply_content - 统一回复内容（必填）
+   * @param {string} [data.internal_notes] - 内部备注（仅管理员可见，可选）
+   * @returns {Promise<Object>} 批量回复结果 { updated_count, requested_count }
+   * @throws {Error} 参数校验失败
+   * @throws {Error} 网络请求失败
+   *
+   * @example
+   * const result = await ContentAPI.batchReplyFeedback({
+   *   feedback_ids: [1, 2, 3],
+   *   reply_content: '感谢您的反馈，我们已记录并会尽快处理。',
+   *   internal_notes: '批量回复'
+   * })
+   */
+  async batchReplyFeedback(data) {
+    return await request({
+      url: CONTENT_ENDPOINTS.FEEDBACK_BATCH_REPLY,
       method: 'PUT',
       data
     })

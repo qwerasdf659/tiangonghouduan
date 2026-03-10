@@ -74,10 +74,11 @@ router.get('/listings', authenticateToken, async (req, res) => {
       rarity_code,
       min_price,
       max_price,
-      sort = 'newest'
+      sort = 'newest',
+      with_counts
     } = req.query
 
-    // 决策7：通过 Service 层获取市场列表（带缓存）
+    // 决策7：通过 Service 层获取市场列表（带缓存 + C+++ 聚合计数）
     const result = await MarketListingService.getMarketListings({
       page: parseInt(page, 10),
       page_size: parseInt(limit, 10),
@@ -88,7 +89,8 @@ router.get('/listings', authenticateToken, async (req, res) => {
       rarity_code,
       min_price: min_price ? parseInt(min_price, 10) : undefined,
       max_price: max_price ? parseInt(max_price, 10) : undefined,
-      sort
+      sort,
+      with_counts: with_counts === 'true'
     })
 
     /*
@@ -114,18 +116,22 @@ router.get('/listings', authenticateToken, async (req, res) => {
       returned: sanitizedProducts.length
     })
 
-    return res.apiSuccess(
-      {
-        products: sanitizedProducts,
-        pagination: {
-          total: result.pagination.total,
-          page: result.pagination.page,
-          limit: result.pagination.page_size,
-          total_pages: result.pagination.total_pages
-        }
-      },
-      '获取市场挂牌列表成功'
-    )
+    const responseData = {
+      products: sanitizedProducts,
+      pagination: {
+        total: result.pagination.total,
+        page: result.pagination.page,
+        limit: result.pagination.page_size,
+        total_pages: result.pagination.total_pages
+      }
+    }
+
+    // C+++ 聚合计数：仅在 with_counts=true 时返回
+    if (result.filters_count) {
+      responseData.filters_count = result.filters_count
+    }
+
+    return res.apiSuccess(responseData, '获取市场挂牌列表成功')
   } catch (error) {
     logger.error('获取交易市场挂牌列表失败', {
       error: error.message,

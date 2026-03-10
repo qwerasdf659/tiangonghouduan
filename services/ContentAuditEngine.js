@@ -116,6 +116,35 @@ class ContentAuditEngine {
       `[审核服务] 审核记录已创建: content_review_record_id=${auditRecord.content_review_record_id}`
     )
 
+    // 2026-03-10: 审核链集成 — 创建审核记录后尝试匹配审核链模板
+    try {
+      const ApprovalChainService = require('./ApprovalChainService')
+      const businessData = {
+        ...auditData,
+        auditable_type: auditableType,
+        auditable_id: auditableId
+      }
+      const template = await ApprovalChainService.matchTemplate(auditableType, businessData)
+
+      if (template) {
+        await ApprovalChainService.createChainInstance(
+          template,
+          auditableType,
+          auditableId,
+          auditData.submitted_by || auditData.operator_id || null,
+          {
+            transaction,
+            content_review_record_id: auditRecord.content_review_record_id,
+            business_snapshot: auditData
+          }
+        )
+        logger.info(`[审核服务] 审核链实例已创建: type=${auditableType}, id=${auditableId}`)
+      }
+    } catch (chainError) {
+      // 审核链创建失败不影响审核记录（降级为单级审核）
+      logger.warn(`[审核服务] 审核链创建失败（降级为单级审核）: ${chainError.message}`)
+    }
+
     return auditRecord
   }
 

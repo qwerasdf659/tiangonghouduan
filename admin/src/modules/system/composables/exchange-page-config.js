@@ -72,7 +72,7 @@ export function useExchangePageConfigState() {
 
     /** 区块导航 */
     sections: [
-      { key: 'tabs', label: 'Tab 配置', icon: '📑' },
+      { key: 'tabs', label: '标签页配置', icon: '📑' },
       { key: 'spaces', label: '空间配置', icon: '🌌' },
       { key: 'shop_filters', label: '商品筛选配置', icon: '🔍' },
       { key: 'market_filters', label: '交易市场筛选', icon: '💹' },

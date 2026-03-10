@@ -1,19 +1,24 @@
 /**
- * 活动预算模块
+ * 活动预算模块（分区域展示：用户预算 / 活动池预算）
  *
  * @file admin/src/modules/analytics/composables/campaign-budget.js
- * @description 活动预算配置和监控（基于后端实际提供的端点）
- * @version 2.0.0
- * @date 2026-01-24
+ * @description 活动预算配置和监控，按 budget_mode 分组展示，
+ *              让运营清晰区分「用户账户级别预算」和「活动账户级别预算」
+ * @version 3.0.0
+ * @date 2026-03-09
+ *
+ * 预算模式说明：
+ * - user：用户账户级别预算 — 预算来源是用户的 BUDGET_POINTS 余额（按活动桶隔离）
+ * - pool：活动账户级别预算 — 预算来源是活动自身的固定预算池（pool_budget_total/remaining）
+ * - none：无预算控制
  *
  * 后端可用端点（以后端为准）：
- * - GET /batch-status - 批量获取活动预算状态
- * - GET /campaigns/:campaign_id - 获取单个活动预算详情
- * - PUT /campaigns/:campaign_id - 更新活动预算配置
- * - GET /campaigns/:campaign_id/budget-status - 获取活动预算状态
- * - POST /campaigns/:campaign_id/pool/add - 补充活动池预算
- *
- * 注意：后端没有提供 LIST、CREATE、DELETE、TOGGLE 端点
+ * - GET /batch-status - 批量获取活动预算状态（按 budget_mode 分组返回）
+ * - GET /campaigns/:lottery_campaign_id - 获取单个活动预算详情
+ * - PUT /campaigns/:lottery_campaign_id - 更新活动预算配置
+ * - GET /campaigns/:lottery_campaign_id/budget-status - 获取活动预算状态
+ * - POST /campaigns/:lottery_campaign_id/pool/add - 补充活动池预算
+ * - GET /users/:user_id - 获取用户 BUDGET_POINTS 余额
  */
 
 import { logger } from '../../../utils/logger.js'
@@ -21,51 +26,71 @@ import { LOTTERY_ENDPOINTS } from '../../../api/lottery/index.js'
 import { buildURL } from '../../../api/base.js'
 
 /**
- * 活动预算状态
+ * 活动预算状态（分区域）
  * @returns {Object} 状态对象
  */
 export function useCampaignBudgetState() {
   return {
-    /** @type {Array} 活动预算列表（来自 batch-status） */
+    /** @type {Array} 所有活动预算列表（兼容旧逻辑） */
     budgets: [],
+
+    /** @type {string} 当前激活的预算区域 tab（user / pool） */
+    budgetActiveTab: 'user',
+
+    /** @type {Object} 按 budget_mode 分组的活动数据 */
+    groupedBudgets: {
+      user: { campaigns: [], summary: {} },
+      pool: { campaigns: [], summary: {} },
+      none: { campaigns: [], summary: {} }
+    },
+
     /** @type {Object} 预算筛选条件 */
     budgetFilters: { lottery_campaign_id: '', status: '', keyword: '' },
-    /** @type {Object} 预算统计（从 batch-status 数据计算） */
-    budgetStats: { total_budget: 0, used_budget: 0, remaining_budget: 0, utilization_rate: 0 },
+
+    /** @type {Object} 总体预算统计 */
+    budgetStats: {
+      total_budget: 0,
+      used_budget: 0,
+      remaining_budget: 0,
+      utilization_rate: 0,
+      by_mode: null
+    },
+
     /** @type {Object|null} 选中的预算 */
     selectedBudget: null,
+
     /** @type {Object} 预算表单 */
     budgetForm: {
       lottery_campaign_id: '',
-      budget_mode: 'UNLIMITED',
-      pool_budget_remaining: 0,
+      budget_mode: 'user',
+      pool_budget_total: 0,
       allowed_campaign_ids: [],
-      // HTML模板需要的字段
-      type: 'daily',
-      amount: 0,
       alert_threshold: 80
     },
+
     /** @type {boolean} 预算编辑模式 */
     budgetEditMode: false
   }
 }
 
 /**
- * 活动预算方法
+ * 活动预算方法（分区域展示）
  * @returns {Object} 方法对象
  */
 export function useCampaignBudgetMethods() {
   return {
     /**
-     * 加载活动预算列表（使用 batch-status 端点）
-     * @description 后端没有专门的 LIST 端点，使用 batch-status 获取所有活动预算状态
+     * 加载活动预算列表（后端按 budget_mode 分组返回）
      */
     async loadBudgets() {
       try {
         const params = new URLSearchParams()
-        params.append('limit', this.financePagination?.page_size || 50)
+        params.append('limit', 50)
         if (this.budgetFilters.lottery_campaign_id) {
-          params.append('campaign_ids', this.budgetFilters.lottery_campaign_id)
+          params.append('lottery_campaign_ids', this.budgetFilters.lottery_campaign_id)
+        }
+        if (this.budgetFilters.status) {
+          params.append('status', this.budgetFilters.status)
         }
 
         const response = await this.apiGet(
@@ -75,125 +100,73 @@ export function useCampaignBudgetMethods() {
         )
 
         if (response?.success && response.data) {
-          // batch-status 返回的数据结构：campaigns 数组
-          let rawBudgets = response.data.campaigns || response.data.budgets || response.data || []
+          const data = response.data
 
-          // 如果是对象格式（按 campaign_id 索引），转换为数组
-          if (!Array.isArray(rawBudgets) && typeof rawBudgets === 'object') {
-            rawBudgets = Object.values(rawBudgets)
+          // 存储分组数据（后端 V3 返回 grouped 字段）
+          if (data.grouped) {
+            this.groupedBudgets = {
+              user: data.grouped.user || { campaigns: [], summary: {} },
+              pool: data.grouped.pool || { campaigns: [], summary: {} },
+              none: data.grouped.none || { campaigns: [], summary: {} }
+            }
           }
 
-          // 转换后端返回的嵌套结构为扁平结构（供前端使用）
-          rawBudgets = rawBudgets.map(budget => ({
-            ...budget,
-            // 扁平化 pool_budget 字段
-            pool_budget_remaining:
-              budget.pool_budget?.remaining ?? budget.pool_budget_remaining ?? 0,
-            pool_budget_total: budget.pool_budget?.total ?? budget.pool_budget_total ?? 0,
-            pool_budget_used: budget.pool_budget?.used ?? 0,
-            usage_rate: budget.pool_budget?.usage_rate ?? '0%'
-          }))
+          // 兼容：保留扁平列表
+          this.budgets = data.campaigns || []
 
-          // 应用筛选
-          this.budgets = rawBudgets.filter(budget => {
-            // 状态筛选
-            if (this.budgetFilters.status) {
-              const budgetStatus = this.getBudgetStatusFromData(budget)
-              if (budgetStatus !== this.budgetFilters.status) return false
+          // 应用前端关键词筛选
+          if (this.budgetFilters.keyword) {
+            const keyword = this.budgetFilters.keyword.toLowerCase()
+            const filterFn = c => {
+              const name = (c.campaign_name || '').toLowerCase()
+              return name.includes(keyword)
             }
-            // 关键词筛选
-            if (this.budgetFilters.keyword) {
-              const keyword = this.budgetFilters.keyword.toLowerCase()
-              const name = (budget.campaign_name || budget.name || '').toLowerCase()
-              if (!name.includes(keyword)) return false
-            }
-            return true
-          })
+            this.groupedBudgets.user.campaigns = this.groupedBudgets.user.campaigns.filter(filterFn)
+            this.groupedBudgets.pool.campaigns = this.groupedBudgets.pool.campaigns.filter(filterFn)
+            this.groupedBudgets.none.campaigns = this.groupedBudgets.none.campaigns.filter(filterFn)
+          }
 
-          // 只更新 total，total_pages 由 getter 计算
-          this.financePagination.total = this.budgets.length
-
-          // 使用后端返回的 summary 或从数据计算统计
-          if (response.data.summary) {
+          // 使用后端返回的汇总
+          if (data.summary) {
             this.budgetStats = {
-              total_budget: response.data.summary.total_budget || 0,
-              used_budget: response.data.summary.total_used || 0,
-              remaining_budget: response.data.summary.total_remaining || 0,
+              total_budget: data.summary.total_budget || 0,
+              used_budget: data.summary.total_used || 0,
+              remaining_budget: data.summary.total_remaining || 0,
               utilization_rate:
-                response.data.summary.total_budget > 0
-                  ? Math.round(
-                      (response.data.summary.total_used / response.data.summary.total_budget) * 100
-                    )
-                  : 0
+                data.summary.total_budget > 0
+                  ? Math.round((data.summary.total_used / data.summary.total_budget) * 100)
+                  : 0,
+              by_mode: data.summary.by_mode || null
             }
-          } else {
-            // 从数据计算统计
-            this.calculateBudgetStats(rawBudgets)
           }
+
+          this.financePagination.total = this.budgets.length
         }
       } catch (error) {
         logger.error('加载活动预算失败:', error)
         this.budgets = []
+        this.groupedBudgets = {
+          user: { campaigns: [], summary: {} },
+          pool: { campaigns: [], summary: {} },
+          none: { campaigns: [], summary: {} }
+        }
       }
     },
 
     /**
-     * 从 batch-status 数据计算预算统计
-     * @param {Array} budgets - 预算数据数组
-     */
-    calculateBudgetStats(budgets) {
-      if (!Array.isArray(budgets) || budgets.length === 0) {
-        this.budgetStats = { total_budget: 0, used_budget: 0, remaining_budget: 0, utilization_rate: 0 }
-        return
-      }
-
-      let totalBudget = 0
-      let remainingBudget = 0
-
-      budgets.forEach(budget => {
-        // 根据后端返回的字段名提取数据
-        const poolRemaining = budget.pool_budget_remaining ?? budget.remaining ?? 0
-        const poolTotal = budget.pool_budget_total ?? budget.total_budget ?? poolRemaining
-
-        totalBudget += poolTotal
-        remainingBudget += poolRemaining
-      })
-
-      const usedBudget = totalBudget - remainingBudget
-      const utilizationRate = totalBudget > 0 ? Math.round((usedBudget / totalBudget) * 100) : 0
-
-      this.budgetStats = {
-        total_budget: totalBudget,
-        used_budget: usedBudget,
-        remaining_budget: remainingBudget,
-        utilization_rate: utilizationRate
-      }
-    },
-
-    /**
-     * 从预算数据推断状态
-     * @param {Object} budget - 预算对象
-     * @returns {string} 状态字符串
-     */
-    getBudgetStatusFromData(budget) {
-      if (budget.status) return budget.status
-      if (budget.budget_mode === 'UNLIMITED') return 'active'
-      if ((budget.pool_budget_remaining ?? 0) <= 0) return 'exhausted'
-      return 'active'
-    },
-
-    /**
-     * 加载预算统计（调用 loadBudgets 时会自动计算）
-     * @description 后端没有专门的 STATS 端点，统计从 batch-status 数据计算
+     * 加载预算统计（loadBudgets 时已自动计算）
      */
     async loadBudgetStats() {
-      // 如果已有预算数据，直接从缓存计算
-      if (this.budgets.length > 0) {
-        this.calculateBudgetStats(this.budgets)
-        return
-      }
-      // 否则先加载预算列表（会自动计算统计）
+      if (this.budgets.length > 0) return
       await this.loadBudgets()
+    },
+
+    /**
+     * 切换预算区域 tab
+     * @param {string} tab - user / pool
+     */
+    switchBudgetTab(tab) {
+      this.budgetActiveTab = tab
     },
 
     /**
@@ -205,16 +178,30 @@ export function useCampaignBudgetMethods() {
     },
 
     /**
+     * 获取活动状态中文显示
+     * @param {string} status - 活动状态
+     * @returns {string} 中文状态和样式类
+     */
+    getStatusDisplay(status) {
+      const map = {
+        active: { label: '运行中', class: 'bg-green-100 text-green-800' },
+        draft: { label: '草稿', class: 'bg-gray-100 text-gray-800' },
+        paused: { label: '暂停', class: 'bg-yellow-100 text-yellow-800' },
+        ended: { label: '已结束', class: 'bg-blue-100 text-blue-800' },
+        cancelled: { label: '已取消', class: 'bg-red-100 text-red-800' }
+      }
+      return map[status] || { label: status || '-', class: 'bg-gray-100 text-gray-600' }
+    },
+
+    /**
      * 打开编辑预算模态框
      * @param {Object} budget - 预算对象
-     * @description 后端只支持更新现有活动的预算配置，不支持创建新预算
      */
     openEditBudgetModal(budget) {
       this.budgetForm = {
-        // 使用后端返回的 lottery_campaign_id 字段
         lottery_campaign_id: budget.lottery_campaign_id,
-        budget_mode: budget.budget_mode || 'UNLIMITED',
-        pool_budget_remaining: budget.pool_budget_remaining || 0,
+        budget_mode: budget.budget_mode || 'user',
+        pool_budget_total: budget.pool_budget?.total || 0,
         allowed_campaign_ids: budget.allowed_campaign_ids || []
       }
       this.selectedBudget = budget
@@ -224,7 +211,6 @@ export function useCampaignBudgetMethods() {
 
     /**
      * 保存预算配置
-     * @description 只支持更新现有活动预算，后端没有 CREATE 端点
      */
     async saveBudget() {
       if (!this.budgetForm.lottery_campaign_id) {
@@ -234,8 +220,6 @@ export function useCampaignBudgetMethods() {
 
       try {
         this.saving = true
-
-        // 只支持更新模式（使用后端的 lottery_campaign_id 参数）
         const response = await this.apiCall(
           buildURL(LOTTERY_ENDPOINTS.CAMPAIGN_BUDGET_UPDATE, {
             lottery_campaign_id: this.budgetForm.lottery_campaign_id
@@ -244,7 +228,7 @@ export function useCampaignBudgetMethods() {
             method: 'PUT',
             data: {
               budget_mode: this.budgetForm.budget_mode,
-              pool_budget_remaining: this.budgetForm.pool_budget_remaining,
+              pool_budget_total: parseFloat(this.budgetForm.pool_budget_total) || 0,
               allowed_campaign_ids: this.budgetForm.allowed_campaign_ids
             }
           }
@@ -263,7 +247,7 @@ export function useCampaignBudgetMethods() {
     },
 
     /**
-     * 补充预算池
+     * 补充活动池预算
      * @param {Object} budget - 预算对象
      * @param {number} amount - 补充金额
      */
@@ -274,7 +258,7 @@ export function useCampaignBudgetMethods() {
       }
 
       await this.confirmAndExecute(
-        `确定为该活动补充 ${amount} 预算积分？`,
+        `确定为活动「${budget.campaign_name}」补充 ${amount} 预算积分？`,
         async () => {
           const response = await this.apiCall(
             buildURL(LOTTERY_ENDPOINTS.CAMPAIGN_BUDGET_POOL_ADD, {
@@ -282,7 +266,7 @@ export function useCampaignBudgetMethods() {
             }),
             {
               method: 'POST',
-              data: { amount }
+              data: { amount, reason: '管理员手动补充' }
             }
           )
           if (response?.success) {
@@ -300,7 +284,9 @@ export function useCampaignBudgetMethods() {
     async viewBudgetDetail(budget) {
       try {
         const response = await this.apiGet(
-          buildURL(LOTTERY_ENDPOINTS.CAMPAIGN_BUDGET_DETAIL, { lottery_campaign_id: budget.lottery_campaign_id }),
+          buildURL(LOTTERY_ENDPOINTS.CAMPAIGN_BUDGET_DETAIL, {
+            lottery_campaign_id: budget.lottery_campaign_id
+          }),
           {},
           { showLoading: true }
         )
@@ -320,9 +306,9 @@ export function useCampaignBudgetMethods() {
      * @returns {string} 颜色类名
      */
     getBudgetRateColor(rate) {
-      if (rate >= 90) return 'text-danger'
-      if (rate >= 70) return 'text-warning'
-      return 'text-success'
+      if (rate >= 90) return 'text-red-600'
+      if (rate >= 70) return 'text-yellow-600'
+      return 'text-green-600'
     },
 
     /**
@@ -332,18 +318,14 @@ export function useCampaignBudgetMethods() {
      */
     getBudgetStatusClass(status) {
       const map = {
-        active: 'bg-success',
-        paused: 'bg-warning',
-        exhausted: 'bg-danger',
-        expired: 'bg-secondary',
-        UNLIMITED: 'bg-info',
-        BUDGET_POINTS: 'bg-primary'
+        active: 'bg-green-100 text-green-800',
+        paused: 'bg-yellow-100 text-yellow-800',
+        ended: 'bg-blue-100 text-blue-800',
+        cancelled: 'bg-red-100 text-red-800',
+        exhausted: 'bg-red-100 text-red-800'
       }
-      return map[status] || 'bg-secondary'
-    },
-
-    // ✅ 已删除 getBudgetStatusText / getBudgetModeText 映射函数
-    // 中文显示名称由后端 attachDisplayNames 统一返回 status_display / budget_mode_display 字段
+      return map[status] || 'bg-gray-100 text-gray-600'
+    }
   }
 }
 

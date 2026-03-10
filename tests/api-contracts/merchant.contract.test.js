@@ -138,6 +138,78 @@ describe('API契约测试 - 商户模块 (/api/v4/shop, /api/v4/console)', () =>
     })
   })
 
+  // ==================== GET /api/v4/console/merchants ====================
+  describe('GET /console/merchants - 商家列表', () => {
+    /**
+     * Case 1: 获取商家列表（无筛选）
+     */
+    test('应该返回商家列表契约格式', async () => {
+      const response = await request(app)
+        .get('/api/v4/console/merchants')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .query({ page: 1, page_size: 10 })
+
+      expect(response.status).toBe(200)
+      validateApiContract(response.body)
+      expect(response.body.data).toHaveProperty('list')
+      expect(response.body.data).toHaveProperty('total')
+      expect(response.body.data).toHaveProperty('page')
+      expect(response.body.data).toHaveProperty('page_size')
+      expect(Array.isArray(response.body.data.list)).toBe(true)
+    })
+
+    /**
+     * Case 2: keyword 同时支持名称和手机号搜索
+     */
+    test('keyword 应该同时搜索商家名称和联系电话', async () => {
+      const response = await request(app)
+        .get('/api/v4/console/merchants')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .query({ keyword: '136' })
+
+      expect(response.status).toBe(200)
+      validateApiContract(response.body)
+
+      if (response.body.data.total > 0) {
+        const matched = response.body.data.list.some(
+          m =>
+            m.merchant_name.includes('136') ||
+            (m.contact_mobile && m.contact_mobile.includes('136'))
+        )
+        expect(matched).toBe(true)
+      }
+    })
+
+    /**
+     * Case 3: contact_mobile 独立筛选
+     */
+    test('contact_mobile 应该支持联系电话独立搜索', async () => {
+      const response = await request(app)
+        .get('/api/v4/console/merchants')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .query({ contact_mobile: '13612227930' })
+
+      expect(response.status).toBe(200)
+      validateApiContract(response.body)
+
+      if (response.body.data.total > 0) {
+        response.body.data.list.forEach(m => {
+          expect(m.contact_mobile).toContain('13612227930')
+        })
+      }
+    })
+
+    /**
+     * Case 4: 无 Token 应该返回 401
+     */
+    test('无 Authorization 应该返回 401', async () => {
+      const response = await request(app).get('/api/v4/console/merchants')
+
+      expect(response.status).toBe(401)
+      validateApiContract(response.body, false)
+    })
+  })
+
   // ==================== GET /api/v4/console/stores ====================
   describe('GET /console/stores - 门店列表', () => {
     /**

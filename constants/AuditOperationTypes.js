@@ -315,7 +315,16 @@ const OPERATION_TYPES = Object.freeze({
    * @example 管理端路由 /api/v4/console/lottery-user-analysis/statistics/:user_id
    * @since 2026-02-12（路由分离方案 - 抽奖接口安全改造）
    */
-  ADMIN_VIEW_USER_DATA: 'admin_view_user_data'
+  ADMIN_VIEW_USER_DATA: 'admin_view_user_data',
+
+  // ==================== 数据管理类（数据一键删除功能 2026-03-10 新增）====================
+  /**
+   * 数据清理操作
+   * @description 管理员执行数据清理（手动清理/自动清理/上线前清档）
+   * @example DataManagementService.executeCleanup()
+   * @since 2026-03-10（数据一键删除功能）
+   */
+  DATA_CLEANUP: 'data_cleanup'
 })
 
 /**
@@ -411,7 +420,10 @@ const OPERATION_TYPE_DESCRIPTIONS = Object.freeze({
   [OPERATION_TYPES.STAFF_PERMANENT_DELETE]: '员工记录删除',
 
   // 管理员查看用户数据类（路由分离方案 V4.8.0 新增）
-  [OPERATION_TYPES.ADMIN_VIEW_USER_DATA]: '管理员查看用户数据'
+  [OPERATION_TYPES.ADMIN_VIEW_USER_DATA]: '管理员查看用户数据',
+
+  // 数据管理类（数据一键删除功能 2026-03-10 新增）
+  [OPERATION_TYPES.DATA_CLEANUP]: '数据清理'
 })
 
 /**
@@ -471,7 +483,10 @@ const CRITICAL_OPERATIONS = Object.freeze(
     OPERATION_TYPES.FEATURE_FLAG_TOGGLE, // 功能开关切换 - 影响系统功能可用性
 
     // ========== 员工管理关键操作（V4.6.1 新增）==========
-    OPERATION_TYPES.STAFF_PERMANENT_DELETE // 员工删除 - 影响员工权限和系统安全
+    OPERATION_TYPES.STAFF_PERMANENT_DELETE, // 员工删除 - 影响员工权限和系统安全
+
+    // ========== 数据管理关键操作（2026-03-10 新增）==========
+    OPERATION_TYPES.DATA_CLEANUP // 数据清理 - 不可恢复的批量删除操作
   ])
 )
 

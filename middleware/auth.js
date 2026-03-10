@@ -430,7 +430,8 @@ async function verifyRefreshToken(refresh_token) {
         mobile: user.mobile,
         nickname: user.nickname,
         status: user.status,
-        role_level: userRoles.role_level, // 🔄 统一命名：使用role_level
+        user_level: user.user_level,
+        role_level: userRoles.role_level,
         roles: userRoles.roles
       }
     }
@@ -607,7 +608,7 @@ async function authenticateToken(req, res, next) {
     // 从数据库获取最新用户信息（包含user_uuid字段）
     const user = await User.findOne({
       where: { user_id: decoded.user_id, status: 'active' },
-      attributes: ['user_id', 'user_uuid', 'mobile', 'nickname', 'status'] // 明确包含user_uuid
+      attributes: ['user_id', 'user_uuid', 'mobile', 'nickname', 'status', 'user_level']
     })
 
     if (!user) {
@@ -624,14 +625,15 @@ async function authenticateToken(req, res, next) {
     // 构建用户信息对象（包含user_uuid）
     const userInfo = {
       user_id: user.user_id,
-      user_uuid: user.user_uuid, // ⭐ 新增：用户UUID（用于QR码生成）
+      user_uuid: user.user_uuid,
       mobile: user.mobile,
       nickname: user.nickname,
       status: user.status,
-      role_level: userRoles.role_level, // 🔄 统一命名：使用role_level
+      user_level: user.user_level,
+      role_level: userRoles.role_level,
       roles: userRoles.roles,
       permissions: userRoles.permissions,
-      session_token: decoded.session_token // 🆕 传递 session_token 供后续使用
+      session_token: decoded.session_token
     }
 
     // 一次性设置用户信息，避免竞态条件

@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>用户信息组件预览</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 40px;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: #fff;
+      min-height: 100vh;
+    }
+
+    .preview-container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .title {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 40px;
+      text-align: center;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* 模拟 workspace 顶部栏 */
+    .workspace-header-demo {
+      background: #16213e;
+      padding: 12px 24px;
+      border-radius: 12px;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 40px;
+      border: 1px solid #0f3460;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      color: #94a3b8;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* 用户下拉菜单组件 */
+    .user-dropdown {
+      position: relative;
+      cursor: pointer;
+    }
+
+    .user-trigger {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 16px;
+      background: rgba(59, 130, 246, 0.1);
+      border-radius: 8px;
+      transition: all 0.2s;
+      border: 1px solid rgba(59, 130, 246, 0.2);
+    }
+
+    .user-trigger:hover {
+      background: rgba(59, 130, 246, 0.15);
+      border-color: rgba(59, 130, 246, 0.4);
+      transform: translateY(-1px);
+    }
+
+    .user-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      font-weight: 700;
+      color: white;
+      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+    }
+
+    .user-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: #fff;
+      letter-spacing: 0.3px;
+    }
+
+    .user-role {
+      padding: 4px 10px;
+      background: rgba(59, 130, 246, 0.2);
+      color: #93c5fd;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+
+    .dropdown-arrow {
+      font-size: 10px;
+      color: #64748b;
+      transition: transform 0.2s;
+    }
+
+    /* 说明区域 */
+    .explanation {
+      background: #0f3460;
+      padding: 30px;
+      border-radius: 12px;
+      margin-top: 40px;
+      border: 1px solid rgba(59, 130, 246, 0.2);
+    }
+
+    .explanation h3 {
+      color: #3b82f6;
+      margin-top: 0;
+      margin-bottom: 20px;
+      font-size: 20px;
+    }
+
+    .data-item {
+      padding: 15px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 8px;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .data-label {
+      color: #94a3b8;
+      font-weight: 500;
+    }
+
+    .data-value {
+      color: #3b82f6;
+      font-weight: 600;
+      font-family: 'Courier New', monospace;
+    }
+
+    .code-block {
+      background: #000;
+      color: #0f0;
+      padding: 20px;
+      border-radius: 8px;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      margin: 20px 0;
+      overflow-x: auto;
+      border: 1px solid #333;
+    }
+
+    .highlight {
+      color: #fbbf24;
+      font-weight: 600;
+    }
+
+    .check-mark {
+      color: #10b981;
+      font-size: 24px;
+      margin-right: 8px;
+    }
+
+    .comparison {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-top: 30px;
+    }
+
+    .comparison-box {
+      background: rgba(0, 0, 0, 0.3);
+      padding: 20px;
+      border-radius: 8px;
+      border: 2px solid;
+    }
+
+    .comparison-box.wrong {
+      border-color: #ef4444;
+    }
+
+    .comparison-box.correct {
+      border-color: #10b981;
+    }
+
+    .comparison-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 15px;
+      display: flex;
+      align-items: center;
+    }
+
+    .wrong-icon {
+      color: #ef4444;
+      margin-right: 8px;
+      font-size: 24px;
+    }
+
+    .correct-icon {
+      color: #10b981;
+      margin-right: 8px;
+      font-size: 24px;
+    }
+  </style>
+</head>
+<body>
+  <div class="preview-container">
+    <h1 class="title">🎰 管理后台用户信息组件实际效果</h1>
+
+    <!-- 模拟 workspace 顶部栏 -->
+    <div class="workspace-header-demo">
+      <div class="header-left">
+        <span>☰</span>
+        <span>管理后台 / 工作台</span>
+      </div>
+      
+      <div class="header-right">
+        <!-- 搜索框 -->
+        <div style="background: rgba(0,0,0,0.2); padding: 6px 12px; border-radius: 6px; color: #64748b; font-size: 13px;">
+          🔍 搜索功能...
+        </div>
+        
+        <!-- 刷新按钮 -->
+        <button style="background: transparent; border: none; color: #64748b; font-size: 18px; cursor: pointer; padding: 6px 10px;">
+          🔄
+        </button>
+
+        <!-- 外观设置 -->
+        <button style="background: transparent; border: none; color: #64748b; font-size: 18px; cursor: pointer; padding: 6px 10px;">
+          💙
+        </button>
+
+        <!-- 通知中心 -->
+        <button style="background: transparent; border: none; color: #64748b; font-size: 18px; cursor: pointer; padding: 6px 10px; position: relative;">
+          🔔
+          <span style="position: absolute; top: 2px; right: 2px; width: 8px; height: 8px; background: #ef4444; border-radius: 50%; border: 2px solid #16213e;"></span>
+        </button>
+        
+        <!-- 用户信息组件 (核心部分) -->
+        <div class="user-dropdown">
+          <div class="user-trigger">
+            <span class="user-avatar">管</span>
+            <span class="user-name">管理员用户</span>
+            <span class="user-role">超级管理员</span>
+            <span class="dropdown-arrow">▼</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 数据说明 -->
+    <div class="explanation">
+      <h3>📊 数据来源分析</h3>
+      
+      <div class="data-item">
+        <span class="data-label">API接口</span>
+        <span class="data-value">POST /api/v4/auth/login</span>
+      </div>
+
+      <div class="data-item">
+        <span class="data-label">用户昵称 (nickname)</span>
+        <span class="data-value">"管理员用户"</span>
+      </div>
+
+      <div class="data-item">
+        <span class="data-label">权限等级 (role_level)</span>
+        <span class="data-value">100</span>
+      </div>
+
+      <div class="data-item">
+        <span class="data-label">手机号 (mobile)</span>
+        <span class="data-value">"13612227930"</span>
+      </div>
+
+      <h3 style="margin-top: 30px;">🔧 显示逻辑代码</h3>
+      
+      <div class="code-block">
+<span class="highlight">// Alpine.js Auth Store (index.js)</span>
+
+get displayName() {
+  return this.user?.nickname || this.user?.mobile || '未登录'
+}
+// 结果: <span class="highlight">"管理员用户"</span> (使用 nickname)
+
+get roleLevelDescription() {
+  const level = this.roleLevel  // 100
+  if (level >= 100) return '超级管理员'  // ✓ 匹配
+  if (level >= 80) return '高级运营'
+  if (level >= 30) return '运营'
+  if (level >= 1) return '客服'
+  return '普通用户'
+}
+// 结果: <span class="highlight">"超级管理员"</span>
+
+get avatarInitial() {
+  if (this.user?.nickname) return this.user.nickname.charAt(0)
+  if (this.user?.mobile) return this.user.mobile.charAt(0)
+  return '?'
+}
+// 结果: <span class="highlight">"管"</span> (nickname首字)
+      </div>
+    </div>
+
+    <!-- 对比说明 -->
+    <div class="explanation">
+      <h3>✅ 是否使用硬编码？</h3>
+      
+      <div class="comparison">
+        <div class="comparison-box wrong">
+          <div class="comparison-title">
+            <span class="wrong-icon">❌</span>
+            硬编码方式 (错误)
+          </div>
+          <div class="code-block">
+// 如果是硬编码，代码会是这样：
+&lt;span class="user-name"&gt;管理员&lt;/span&gt;
+&lt;span class="user-role"&gt;超级管理员&lt;/span&gt;
+
+// 固定不变的字符串
+          </div>
+        </div>
+
+        <div class="comparison-box correct">
+          <div class="comparison-title">
+            <span class="correct-icon">✅</span>
+            实际实现 (正确)
+          </div>
+          <div class="code-block">
+// 实际使用动态数据绑定：
+&lt;span x-text="$store.auth.displayName"&gt;&lt;/span&gt;
+&lt;span x-text="$store.auth.roleLevelDescription"&gt;&lt;/span&gt;
+
+// 完全基于API返回的数据计算
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 测试结论 -->
+    <div class="explanation">
+      <h3>🎯 测试结论</h3>
+      
+      <div style="background: rgba(16, 185, 129, 0.2); padding: 20px; border-radius: 8px; border: 2px solid #10b981;">
+        <div style="font-size: 20px; font-weight: 600; margin-bottom: 15px;">
+          <span class="check-mark">✓</span>
+          右上角用户信息完全基于真实API数据
+        </div>
+        <ul style="line-height: 2; margin: 0; padding-left: 30px;">
+          <li><strong>用户名显示</strong>: "管理员用户" (来自 API 的 nickname 字段)</li>
+          <li><strong>权限等级</strong>: "超级管理员" (根据 role_level=100 动态计算)</li>
+          <li><strong>头像首字</strong>: "管" (nickname 的第一个字符)</li>
+          <li><strong>非硬编码</strong>: 代码中无固定字符串，完全数据驱动</li>
+        </ul>
+      </div>
+
+      <div style="margin-top: 20px; padding: 20px; background: rgba(59, 130, 246, 0.1); border-radius: 8px; border: 1px solid rgba(59, 130, 246, 0.3);">
+        <div style="font-size: 16px; font-weight: 600; margin-bottom: 10px; color: #3b82f6;">
+          📝 显示优先级逻辑
+        </div>
+        <div style="font-family: 'Courier New', monospace; font-size: 14px; line-height: 1.8;">
+          1. 优先使用 <span class="highlight">nickname</span> ("管理员用户") ✓<br>
+          2. 如果没有 nickname，使用 <span class="highlight">mobile</span> ("13612227930")<br>
+          3. 如果都没有，显示 "未登录"
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // 模拟点击下拉效果
+    document.querySelector('.user-dropdown').addEventListener('click', function() {
+      const arrow = this.querySelector('.dropdown-arrow');
+      if (arrow.style.transform === 'rotate(180deg)') {
+        arrow.style.transform = 'rotate(0deg)';
+      } else {
+        arrow.style.transform = 'rotate(180deg)';
+      }
+    });
+  </script>
+</body>
+</html>

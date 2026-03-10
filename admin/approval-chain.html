@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>审核链配置管理</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <style>[x-cloak] { display: none !important; }</style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+  <!-- 顶部导航 -->
+  <nav class="bg-gray-800 text-white shadow-lg">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/workspace.html" class="hover:text-gray-300 transition-colors">← 返回工作台</a>
+        <span class="text-lg font-semibold">🔗 审核链配置管理</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 页面主体 -->
+  <div class="container mx-auto px-4 py-6" x-data="approvalChainPage()" x-init="init()" x-cloak>
+
+    <!-- Tab 导航 -->
+    <div class="bg-white rounded-xl shadow-sm mb-6 overflow-hidden">
+      <div class="flex border-b">
+        <button @click="switchTab('templates')"
+          :class="current_tab === 'templates' ? 'border-b-2 border-blue-500 text-blue-600 bg-blue-50' : 'text-gray-500 hover:text-gray-700'"
+          class="px-6 py-3.5 font-medium transition-all">
+          <i class="bi bi-diagram-3 mr-1.5"></i> 模板管理
+        </button>
+        <button @click="switchTab('instances')"
+          :class="current_tab === 'instances' ? 'border-b-2 border-blue-500 text-blue-600 bg-blue-50' : 'text-gray-500 hover:text-gray-700'"
+          class="px-6 py-3.5 font-medium transition-all">
+          <i class="bi bi-list-check mr-1.5"></i> 审核实例
+        </button>
+        <button @click="switchTab('my-pending')"
+          :class="current_tab === 'my-pending' ? 'border-b-2 border-blue-500 text-blue-600 bg-blue-50' : 'text-gray-500 hover:text-gray-700'"
+          class="px-6 py-3.5 font-medium transition-all">
+          <i class="bi bi-clock-history mr-1.5"></i> 我的待审核
+        </button>
+      </div>
+    </div>
+
+    <!-- ==================== Tab: 模板管理 ==================== -->
+    <div x-show="current_tab === 'templates'">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-bold text-gray-800">审核链模板</h2>
+        <button @click="openCreateTemplate()"
+          class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+          <i class="bi bi-plus-lg mr-1"></i> 新建模板
+        </button>
+      </div>
+
+      <!-- 模板列表 -->
+      <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+        <template x-if="templates_loading">
+          <div class="p-8 text-center text-gray-400"><i class="bi bi-arrow-repeat animate-spin mr-2"></i>加载中...</div>
+        </template>
+        <template x-if="!templates_loading && templates.length === 0">
+          <div class="p-8 text-center text-gray-400">暂无审核链模板</div>
+        </template>
+        <template x-if="!templates_loading && templates.length > 0">
+          <table class="w-full">
+            <thead class="bg-gray-50 border-b">
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">模板编码</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">模板名称</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">业务类型</th>
+                <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">节点数</th>
+                <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">优先级</th>
+                <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">状态</th>
+                <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">操作</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+              <template x-for="t in templates" :key="t.template_id">
+                <tr class="hover:bg-gray-50 transition-colors">
+                  <td class="px-4 py-3 text-sm font-mono text-gray-700" x-text="t.template_code"></td>
+                  <td class="px-4 py-3 text-sm text-gray-900" x-text="t.template_name"></td>
+                  <td class="px-4 py-3 text-sm" x-text="getAuditableTypeLabel(t.auditable_type)"></td>
+                  <td class="px-4 py-3 text-sm text-center" x-text="t.total_nodes"></td>
+                  <td class="px-4 py-3 text-sm text-center" x-text="t.priority"></td>
+                  <td class="px-4 py-3 text-center">
+                    <span x-text="t.is_active ? '启用' : '禁用'"
+                      :class="t.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'"
+                      class="px-2 py-0.5 rounded-full text-xs font-medium"></span>
+                  </td>
+                  <td class="px-4 py-3 text-center space-x-2">
+                    <button @click="openEditTemplate(t.template_id)" class="text-blue-600 hover:text-blue-800 text-sm">编辑</button>
+                    <button @click="toggleTemplate(t.template_id)" class="text-sm"
+                      :class="t.is_active ? 'text-yellow-600 hover:text-yellow-800' : 'text-green-600 hover:text-green-800'"
+                      x-text="t.is_active ? '禁用' : '启用'"></button>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </template>
+      </div>
+    </div>
+
+    <!-- ==================== Tab: 审核实例 ==================== -->
+    <div x-show="current_tab === 'instances'">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-bold text-gray-800">审核链实例</h2>
+        <div class="flex items-center space-x-3">
+          <select x-model="instance_filter.auditable_type" @change="loadInstances()"
+            class="border rounded-lg px-3 py-2 text-sm">
+            <option value="">全部类型</option>
+            <option value="consumption">消费审核</option>
+            <option value="merchant_points">商家积分审核</option>
+          </select>
+          <select x-model="instance_filter.status" @change="loadInstances()"
+            class="border rounded-lg px-3 py-2 text-sm">
+            <option value="">全部状态</option>
+            <option value="in_progress">审核中</option>
+            <option value="completed">已完成</option>
+            <option value="rejected">已拒绝</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+        <template x-if="instances_loading">
+          <div class="p-8 text-center text-gray-400"><i class="bi bi-arrow-repeat animate-spin mr-2"></i>加载中...</div>
+        </template>
+        <template x-if="!instances_loading && instances.length === 0">
+          <div class="p-8 text-center text-gray-400">暂无审核实例</div>
+        </template>
+        <template x-if="!instances_loading && instances.length > 0">
+          <table class="w-full">
+            <thead class="bg-gray-50 border-b">
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">业务类型</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">模板</th>
+                <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">进度</th>
+                <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">状态</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">提交人</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">提交时间</th>
+                <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">操作</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+              <template x-for="inst in instances" :key="inst.instance_id">
+                <tr class="hover:bg-gray-50">
+                  <td class="px-4 py-3 text-sm text-gray-700" x-text="inst.instance_id"></td>
+                  <td class="px-4 py-3 text-sm" x-text="getAuditableTypeLabel(inst.auditable_type)"></td>
+                  <td class="px-4 py-3 text-sm text-gray-600" x-text="inst.template?.template_name || '-'"></td>
+                  <td class="px-4 py-3 text-sm text-center">
+                    <span class="font-mono" x-text="`${inst.current_step}/${inst.total_steps}`"></span>
+                  </td>
+                  <td class="px-4 py-3 text-center">
+                    <span :class="getInstanceStatusInfo(inst.status).color"
+                      class="px-2 py-0.5 rounded-full text-xs font-medium"
+                      x-text="getInstanceStatusInfo(inst.status).label"></span>
+                  </td>
+                  <td class="px-4 py-3 text-sm text-gray-600" x-text="inst.submitter?.nickname || inst.submitted_by"></td>
+                  <td class="px-4 py-3 text-sm text-gray-500" x-text="formatDateTime(inst.submitted_at)"></td>
+                  <td class="px-4 py-3 text-center">
+                    <button @click="viewInstanceDetail(inst.instance_id)" class="text-blue-600 hover:text-blue-800 text-sm">详情</button>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </template>
+      </div>
+    </div>
+
+    <!-- ==================== Tab: 我的待审核 ==================== -->
+    <div x-show="current_tab === 'my-pending'">
+      <h2 class="text-xl font-bold text-gray-800 mb-4">我的待审核</h2>
+
+      <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+        <template x-if="my_pending_loading">
+          <div class="p-8 text-center text-gray-400"><i class="bi bi-arrow-repeat animate-spin mr-2"></i>加载中...</div>
+        </template>
+        <template x-if="!my_pending_loading && my_pending.length === 0">
+          <div class="p-8 text-center text-gray-400">
+            <i class="bi bi-check-circle text-4xl text-green-300 mb-3 block"></i>
+            没有待审核的任务
+          </div>
+        </template>
+        <template x-if="!my_pending_loading && my_pending.length > 0">
+          <div class="divide-y divide-gray-200">
+            <template x-for="step in my_pending" :key="step.step_id">
+              <div class="p-4 hover:bg-gray-50 flex items-center justify-between">
+                <div class="flex-1">
+                  <div class="flex items-center space-x-3 mb-1">
+                    <span class="font-medium text-gray-900" x-text="step.node?.node_name || '审核步骤'"></span>
+                    <span class="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full"
+                      x-text="getAuditableTypeLabel(step.instance?.auditable_type)"></span>
+                    <span class="text-xs text-gray-400" x-text="'#' + step.instance?.auditable_id"></span>
+                  </div>
+                  <div class="text-sm text-gray-500">
+                    <span>模板: </span><span x-text="step.instance?.template?.template_name || '-'"></span>
+                    <span class="ml-3">进度: </span><span x-text="`第${step.step_number}步 / 共${step.instance?.total_steps}步`"></span>
+                    <span class="ml-3" x-show="step.timeout_at">超时: <span x-text="formatDateTime(step.timeout_at)" class="text-orange-600"></span></span>
+                  </div>
+                </div>
+                <div class="flex items-center space-x-2 ml-4">
+                  <button @click="openReviewModal(step.step_id, 'approve')"
+                    class="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 transition-colors">
+                    <i class="bi bi-check-lg mr-1"></i>通过
+                  </button>
+                  <button @click="openReviewModal(step.step_id, 'reject')"
+                    class="px-3 py-1.5 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 transition-colors">
+                    <i class="bi bi-x-lg mr-1"></i>拒绝
+                  </button>
+                </div>
+              </div>
+            </template>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- ==================== 审核操作弹窗 ==================== -->
+    <div x-show="review_modal_visible" x-cloak
+      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      @click.self="review_modal_visible = false">
+      <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
+        <h3 class="text-lg font-bold mb-4" x-text="review_action === 'approve' ? '✅ 审核通过' : '❌ 审核拒绝'"></h3>
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1"
+            x-text="review_action === 'reject' ? '拒绝原因（必填，至少5个字符）' : '审批意见（选填）'"></label>
+          <textarea x-model="review_reason" rows="3"
+            class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 focus:outline-none"
+            :placeholder="review_action === 'reject' ? '请输入拒绝原因...' : '可选填审批意见...'"></textarea>
+        </div>
+        <div class="flex justify-end space-x-3">
+          <button @click="review_modal_visible = false"
+            class="px-4 py-2 border rounded-lg text-gray-600 hover:bg-gray-50">取消</button>
+          <button @click="submitReview()"
+            :class="review_action === 'approve' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'"
+            class="px-4 py-2 text-white rounded-lg transition-colors"
+            x-text="review_action === 'approve' ? '确认通过' : '确认拒绝'"></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== 模板编辑弹窗 ==================== -->
+    <div x-show="template_form_visible" x-cloak
+      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto"
+      @click.self="template_form_visible = false">
+      <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl p-6 my-8">
+        <h3 class="text-lg font-bold mb-4" x-text="editing_template_id ? '编辑审核链模板' : '新建审核链模板'"></h3>
+
+        <div class="space-y-4">
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">模板编码</label>
+              <input x-model="template_form.template_code" type="text" :disabled="!!editing_template_id"
+                class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="如 consumption_default">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">模板名称</label>
+              <input x-model="template_form.template_name" type="text"
+                class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="如 消费审核-标准链">
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">业务类型</label>
+              <select x-model="template_form.auditable_type" class="w-full border rounded-lg px-3 py-2 text-sm">
+                <option value="consumption">消费审核</option>
+                <option value="merchant_points">商家积分审核</option>
+                <option value="exchange">兑换审核</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">优先级（数值越大越优先）</label>
+              <input x-model.number="template_form.priority" type="number" class="w-full border rounded-lg px-3 py-2 text-sm">
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">匹配条件（JSON）</label>
+            <input x-model="template_form.match_conditions" type="text"
+              class="w-full border rounded-lg px-3 py-2 text-sm font-mono" placeholder='{"min_amount": 200}'>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">描述</label>
+            <textarea x-model="template_form.description" rows="2" class="w-full border rounded-lg px-3 py-2 text-sm"></textarea>
+          </div>
+
+          <!-- 节点配置 -->
+          <div>
+            <div class="flex justify-between items-center mb-2">
+              <label class="text-sm font-medium text-gray-700">审核节点</label>
+              <button @click="addNode()" class="text-sm text-blue-600 hover:text-blue-800"><i class="bi bi-plus-lg mr-1"></i>添加节点</button>
+            </div>
+            <template x-for="(node, idx) in template_form.nodes" :key="idx">
+              <div class="border rounded-lg p-3 mb-2 bg-gray-50">
+                <div class="grid grid-cols-4 gap-3 text-sm">
+                  <div>
+                    <label class="text-xs text-gray-500">步骤号</label>
+                    <input x-model.number="node.step_number" type="number" min="2" max="9" class="w-full border rounded px-2 py-1 text-sm">
+                  </div>
+                  <div>
+                    <label class="text-xs text-gray-500">节点名称</label>
+                    <input x-model="node.node_name" type="text" class="w-full border rounded px-2 py-1 text-sm" placeholder="如 管理员终审">
+                  </div>
+                  <div>
+                    <label class="text-xs text-gray-500">角色ID</label>
+                    <input x-model.number="node.assignee_role_id" type="number" class="w-full border rounded px-2 py-1 text-sm" placeholder="如 2=admin">
+                  </div>
+                  <div class="flex items-end space-x-2">
+                    <label class="flex items-center text-xs">
+                      <input type="checkbox" x-model="node.is_final" :true-value="1" :false-value="0" class="mr-1"> 终审
+                    </label>
+                    <button @click="removeNode(idx)" class="text-red-500 hover:text-red-700"><i class="bi bi-trash"></i></button>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <div class="flex justify-end space-x-3 mt-6">
+          <button @click="template_form_visible = false" class="px-4 py-2 border rounded-lg text-gray-600 hover:bg-gray-50">取消</button>
+          <button @click="saveTemplate()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">保存</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== 实例详情弹窗 ==================== -->
+    <div x-show="instance_detail_visible" x-cloak
+      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto"
+      @click.self="instance_detail_visible = false">
+      <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl p-6 my-8" x-show="instance_detail">
+        <h3 class="text-lg font-bold mb-4">审核链详情 #<span x-text="instance_detail?.instance_id"></span></h3>
+
+        <!-- 基本信息 -->
+        <div class="grid grid-cols-2 gap-4 mb-6 text-sm">
+          <div><span class="text-gray-500">业务类型:</span> <span x-text="getAuditableTypeLabel(instance_detail?.auditable_type)"></span></div>
+          <div><span class="text-gray-500">业务ID:</span> <span x-text="instance_detail?.auditable_id"></span></div>
+          <div><span class="text-gray-500">模板:</span> <span x-text="instance_detail?.template?.template_name"></span></div>
+          <div><span class="text-gray-500">状态:</span>
+            <span :class="getInstanceStatusInfo(instance_detail?.status).color"
+              class="px-2 py-0.5 rounded-full text-xs font-medium"
+              x-text="getInstanceStatusInfo(instance_detail?.status).label"></span>
+          </div>
+          <div><span class="text-gray-500">提交人:</span> <span x-text="instance_detail?.submitter?.nickname || instance_detail?.submitted_by"></span></div>
+          <div><span class="text-gray-500">提交时间:</span> <span x-text="formatDateTime(instance_detail?.submitted_at)"></span></div>
+        </div>
+
+        <!-- 审核时间线 -->
+        <h4 class="font-medium text-gray-800 mb-3">审核进度</h4>
+        <div class="space-y-3">
+          <template x-for="step in (instance_detail?.steps || [])" :key="step.step_id">
+            <div class="flex items-start space-x-3 border-l-2 pl-4 pb-3"
+              :class="step.status === 'approved' ? 'border-green-400' : step.status === 'rejected' ? 'border-red-400' : step.status === 'pending' ? 'border-yellow-400' : 'border-gray-200'">
+              <div class="flex-1">
+                <div class="flex items-center space-x-2">
+                  <span class="font-medium text-gray-900" x-text="step.node?.node_name || `步骤${step.step_number}`"></span>
+                  <span :class="getStepStatusInfo(step.status).color"
+                    class="px-2 py-0.5 rounded-full text-xs font-medium"
+                    x-text="getStepStatusInfo(step.status).label"></span>
+                  <span x-show="step.is_final" class="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">终审</span>
+                </div>
+                <div class="text-xs text-gray-500 mt-1">
+                  <span x-show="step.actor" x-text="'审核人: ' + (step.actor?.nickname || step.actioned_by)"></span>
+                  <span x-show="step.actioned_at" x-text="' | ' + formatDateTime(step.actioned_at)"></span>
+                </div>
+                <div x-show="step.action_reason" class="text-sm text-gray-600 mt-1 bg-gray-50 rounded px-2 py-1" x-text="step.action_reason"></div>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <div class="flex justify-end mt-6">
+          <button @click="instance_detail_visible = false" class="px-4 py-2 border rounded-lg text-gray-600 hover:bg-gray-50">关闭</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- JS 模块入口 -->
+  <script type="module" src="./src/alpine/index.js"></script>
+  <script type="module" src="./src/modules/operations/pages/approval-chain.js"></script>
+</body>
+</html>

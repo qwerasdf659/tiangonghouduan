@@ -181,7 +181,8 @@ class MerchantService {
    * @param {number} [query.page_size=20] - 每页数量
    * @param {string} [query.merchant_type] - 商家类型筛选
    * @param {string} [query.status] - 状态筛选
-   * @param {string} [query.keyword] - 名称关键字搜索
+   * @param {string} [query.keyword] - 名称/联系电话模糊搜索
+   * @param {string} [query.contact_mobile] - 联系电话精确筛选
    * @param {Object} [options] - 选项
    * @returns {Promise<Object>} { list, total, page, page_size }
    */
@@ -201,8 +202,17 @@ class MerchantService {
       where.status = query.status
     }
 
+    // keyword 同时搜索商家名称和联系电话
     if (query.keyword) {
-      where.merchant_name = { [Op.like]: `%${query.keyword}%` }
+      where[Op.or] = [
+        { merchant_name: { [Op.like]: `%${query.keyword}%` } },
+        { contact_mobile: { [Op.like]: `%${query.keyword}%` } }
+      ]
+    }
+
+    // 联系电话独立精确筛选
+    if (query.contact_mobile) {
+      where.contact_mobile = { [Op.like]: `%${query.contact_mobile}%` }
     }
 
     const { count, rows } = await Merchant.findAndCountAll({

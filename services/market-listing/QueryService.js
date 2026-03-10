@@ -146,7 +146,8 @@ class MarketListingQueryService {
    * @param {number} [params.min_price] - 最低价格筛选
    * @param {number} [params.max_price] - 最高价格筛选
    * @param {string} [params.sort='newest'] - 排序方式
-   * @returns {Promise<Object>} 市场列表 {products, pagination}
+   * @param {boolean} [params.with_counts=false] - 是否返回各筛选维度的聚合计数（C+++ 条件联动）
+   * @returns {Promise<Object>} 市场列表 {products, pagination}（with_counts=true 时额外包含 filters_count）
    */
   static async getMarketListings(params = {}) {
     const {
@@ -160,7 +161,8 @@ class MarketListingQueryService {
       merchant_id,
       min_price,
       max_price,
-      sort = 'newest'
+      sort = 'newest',
+      with_counts = false
     } = params
 
     // 构建缓存参数对象（BusinessCacheHelper 使用对象来构建缓存键）
@@ -175,7 +177,8 @@ class MarketListingQueryService {
       merchant_id: merchant_id || 'all',
       min_price: min_price || 0,
       max_price: max_price || 0,
-      sort
+      sort,
+      with_counts: with_counts ? '1' : '0'
     }
 
     // 尝试从缓存读取
@@ -358,6 +361,18 @@ class MarketListingQueryService {
       }
     }
 
+    // C+++ 聚合计数：每个维度排除自身条件，保留其他维度条件（条件联动）
+    if (with_counts) {
+      result.filters_count = await MarketListingQueryService._buildMarketFiltersCount({
+        listing_kind,
+        item_category_code,
+        asset_group_code,
+        rarity_code,
+        min_price,
+        max_price
+      })
+    }
+
     // 写入缓存
     try {
       await BusinessCacheHelper.setMarketListings(cacheParams, result)
@@ -366,6 +381,150 @@ class MarketListingQueryService {
     }
 
     return result
+  }
+
+  /**
+   * C+++ 交易市场聚合计数：各筛选维度交叉排除计数（条件联动）
+   *
+   * @param {Object} filterValues - 当前所有筛选值
+   * @returns {Promise<Object>} 各维度聚合计数
+   * @private
+   */
+  static async _buildMarketFiltersCount(filterValues) {
+    const { item_category_code, rarity_code, min_price, max_price } = filterValues
+
+    try {
+      /**
+       * 基础 WHERE：始终限定 status='on_sale'
+       * @returns {{parts: string[], replacements: Object}} SQL 片段和参数
+       */
+      const buildBaseWhere = () => {
+        const parts = ["ml.status = 'on_sale'"]
+        const replacements = {}
+        return { parts, replacements }
+      }
+
+      // 1. 挂单类型计数：排除 listing_kind 条件，保留其他条件
+      const kindBase = buildBaseWhere()
+      if (item_category_code) {
+        kindBase.parts.push('ml.offer_item_category_code = :item_cat')
+        kindBase.replacements.item_cat = item_category_code
+      }
+      if (rarity_code) {
+        kindBase.parts.push('ml.offer_item_rarity = :rarity')
+        kindBase.replacements.rarity = rarity_code
+      }
+      if (min_price) {
+        kindBase.parts.push('ml.price_amount >= :min_p')
+        kindBase.replacements.min_p = min_price
+      }
+      if (max_price) {
+        kindBase.parts.push('ml.price_amount <= :max_p')
+        kindBase.replacements.max_p = max_price
+      }
+
+      // 2. 物品类目计数：排除 item_category_code 条件，限定 listing_kind='item'
+      const catBase = buildBaseWhere()
+      catBase.parts.push("ml.listing_kind = 'item'")
+      if (rarity_code) {
+        catBase.parts.push('ml.offer_item_rarity = :rarity_c')
+        catBase.replacements.rarity_c = rarity_code
+      }
+      if (min_price) {
+        catBase.parts.push('ml.price_amount >= :min_p_c')
+        catBase.replacements.min_p_c = min_price
+      }
+      if (max_price) {
+        catBase.parts.push('ml.price_amount <= :max_p_c')
+        catBase.replacements.max_p_c = max_price
+      }
+
+      // 3. 稀有度计数：排除 rarity_code 条件，限定 listing_kind='item'
+      const rarityBase = buildBaseWhere()
+      rarityBase.parts.push("ml.listing_kind = 'item'")
+      if (item_category_code) {
+        rarityBase.parts.push('ml.offer_item_category_code = :item_cat_r')
+        rarityBase.replacements.item_cat_r = item_category_code
+      }
+      if (min_price) {
+        rarityBase.parts.push('ml.price_amount >= :min_p_r')
+        rarityBase.replacements.min_p_r = min_price
+      }
+      if (max_price) {
+        rarityBase.parts.push('ml.price_amount <= :max_p_r')
+        rarityBase.replacements.max_p_r = max_price
+      }
+
+      // 4. 资产分组计数：排除 asset_group_code 条件，限定 listing_kind='fungible_asset'
+      const groupBase = buildBaseWhere()
+      groupBase.parts.push("ml.listing_kind = 'fungible_asset'")
+      if (min_price) {
+        groupBase.parts.push('ml.price_amount >= :min_p_g')
+        groupBase.replacements.min_p_g = min_price
+      }
+      if (max_price) {
+        groupBase.parts.push('ml.price_amount <= :max_p_g')
+        groupBase.replacements.max_p_g = max_price
+      }
+
+      // 并行执行 4 个聚合查询
+      const [kindRows, catRows, rarityRows, groupRows] = await Promise.all([
+        sequelize.query(
+          `SELECT ml.listing_kind, COUNT(*) AS cnt
+           FROM market_listings ml
+           WHERE ${kindBase.parts.join(' AND ')}
+           GROUP BY ml.listing_kind`,
+          { replacements: kindBase.replacements, type: sequelize.constructor.QueryTypes.SELECT }
+        ),
+        sequelize.query(
+          `SELECT COALESCE(ml.offer_item_category_code, '__null__') AS category_code, COUNT(*) AS cnt
+           FROM market_listings ml
+           WHERE ${catBase.parts.join(' AND ')}
+           GROUP BY ml.offer_item_category_code`,
+          { replacements: catBase.replacements, type: sequelize.constructor.QueryTypes.SELECT }
+        ),
+        sequelize.query(
+          `SELECT COALESCE(ml.offer_item_rarity, '__null__') AS rarity_code, COUNT(*) AS cnt
+           FROM market_listings ml
+           WHERE ${rarityBase.parts.join(' AND ')}
+           GROUP BY ml.offer_item_rarity`,
+          { replacements: rarityBase.replacements, type: sequelize.constructor.QueryTypes.SELECT }
+        ),
+        sequelize.query(
+          `SELECT COALESCE(ml.offer_asset_group_code, '__null__') AS group_code, COUNT(*) AS cnt
+           FROM market_listings ml
+           WHERE ${groupBase.parts.join(' AND ')}
+           GROUP BY ml.offer_asset_group_code`,
+          { replacements: groupBase.replacements, type: sequelize.constructor.QueryTypes.SELECT }
+        )
+      ])
+
+      // 组装结果
+      const listing_kinds = {}
+      for (const row of kindRows) {
+        listing_kinds[row.listing_kind] = parseInt(row.cnt, 10)
+      }
+
+      const item_categories = {}
+      for (const row of catRows) {
+        item_categories[row.category_code] = parseInt(row.cnt, 10)
+      }
+
+      const rarities = {}
+      for (const row of rarityRows) {
+        rarities[row.rarity_code] = parseInt(row.cnt, 10)
+      }
+
+      const asset_groups = {}
+      for (const row of groupRows) {
+        asset_groups[row.group_code] = parseInt(row.cnt, 10)
+      }
+
+      return { listing_kinds, item_categories, rarities, asset_groups }
+    } catch (error) {
+      logger.warn('[MarketListingQueryService] 聚合计数计算失败（非致命）:', error.message)
+      return { listing_kinds: {}, item_categories: {}, rarities: {}, asset_groups: {} }
+    }
   }
 
   /**

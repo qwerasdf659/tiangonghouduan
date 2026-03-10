@@ -1159,7 +1159,7 @@ export function useMetricsMethods() {
         random_generate: '随机数生成',
         tier_select: '档位选择',
         prize_pick: '奖品抽取',
-        pity_check: 'Pity保底检查',
+        pity_check: '保底机制检查',
         state_update: '状态更新',
         result_save: '结果保存'
       }

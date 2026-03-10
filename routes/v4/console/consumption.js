@@ -4,10 +4,12 @@
  * @route /api/v4/console/consumption
  * @description 平台管理员审核消费记录（通过/拒绝）
  *
- * 📌 域边界说明（2026-01-12 商家员工域权限体系升级 AC1.4）：
- * - 此模块属于 console 域，仅限 admin（role_level >= 100）访问
+ * 📌 域边界说明（2026-03-10 多级审核链改造）：
+ * - 此模块属于 console 域
+ * - 查询路由：admin(role_level >= 100)
+ * - 审核路由：content_auditor(role_level >= 55) 及以上可进入路由
+ *   具体审核权限由 ApprovalChainService.processStep() 精确校验
  * - 商家员工（merchant_staff/merchant_manager）使用 /api/v4/shop/* 提交和查询消费
- * - 审核权限只开放给 admin，不开放 ops/区域经理（已确认）
  *
  * API列表：
  * - GET /pending - 管理员查询待审核的消费记录
@@ -162,21 +164,42 @@ router.get('/records', authenticateToken, requireRoleLevel(100), async (req, res
  *   "admin_notes": "核实无误，审核通过"
  * }
  */
-router.post('/approve/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
+router.post('/approve/:id', authenticateToken, requireRoleLevel(60), async (req, res) => {
   try {
-    // 🔄 通过 ServiceManager 获取 CoreService（V4.7.0 服务拆分：审核操作在 CoreService 中）
     const CoreService = req.app.locals.services.getService('consumption_core')
+    const ApprovalChainService = req.app.locals.services.getService('approval_chain')
 
     const record_id = parseInt(req.params.id, 10)
     const { admin_notes } = req.body
     const reviewerId = req.user.user_id
 
-    logger.info('管理员审核通过消费记录', {
-      record_id,
-      reviewer_id: reviewerId
-    })
+    logger.info('审核消费记录', { record_id, reviewer_id: reviewerId })
 
-    // 使用 TransactionManager 统一事务边界（符合治理决策）
+    // 检查是否有审核链实例
+    const chainInstance = await ApprovalChainService.getInstanceByAuditable(
+      'consumption',
+      record_id
+    )
+
+    if (chainInstance && chainInstance.status === 'in_progress') {
+      // 有审核链：通过审核链步骤处理（重定向到 /approval-chain/steps/:id/approve）
+      const pendingStep = chainInstance.steps?.find(s => s.status === 'pending')
+      if (!pendingStep) {
+        return res.apiBadRequest('当前审核链没有待处理的步骤')
+      }
+      return res.apiSuccess(
+        {
+          redirect: true,
+          message: '该记录使用审核链流程，请通过审核链步骤审核',
+          chain_instance_id: chainInstance.instance_id,
+          pending_step_id: pendingStep.step_id,
+          approval_chain_url: `/api/v4/console/approval-chain/steps/${pendingStep.step_id}/approve`
+        },
+        '该记录使用审核链流程'
+      )
+    }
+
+    // 无审核链：走原有 CoreService.approveConsumption()（兼容存量数据）
     const result = await TransactionManager.execute(async transaction => {
       return await CoreService.approveConsumption(parseInt(record_id), {
         reviewer_id: reviewerId,
@@ -185,7 +208,7 @@ router.post('/approve/:id', authenticateToken, requireRoleLevel(100), async (req
       })
     })
 
-    logger.info('✅ 消费记录审核通过', {
+    logger.info('✅ 消费记录审核通过（直接路径）', {
       record_id,
       user_id: result.consumption_record.user_id,
       points_awarded: result.points_awarded
@@ -310,7 +333,7 @@ router.post('/batch-review', authenticateToken, requireRoleLevel(100), async (re
  *   "admin_notes": "消费金额与实际不符"
  * }
  */
-router.post('/reject/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
+router.post('/reject/:id', authenticateToken, requireRoleLevel(60), async (req, res) => {
   try {
     // 🔄 通过 ServiceManager 获取 CoreService（V4.7.0 服务拆分：审核操作在 CoreService 中）
     const CoreService = req.app.locals.services.getService('consumption_core')

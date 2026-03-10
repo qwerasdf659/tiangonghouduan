@@ -384,6 +384,7 @@ class UserService {
         'mobile',
         'nickname',
         'status',
+        'user_level',
         'history_total_points',
         'created_at',
         'last_login',

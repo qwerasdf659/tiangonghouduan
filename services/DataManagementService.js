@@ -1,0 +1,943 @@
+'use strict'
+
+/**
+ * 数据管理服务 - 数据一键删除功能核心业务逻辑
+ *
+ * 职责：
+ * - 数据量统计（按安全等级分组）
+ * - 清理影响预览（计算各表将删除行数 + FK 级联分析）
+ * - 清理执行（分批删除 + FK 拓扑排序 + 审计日志）
+ * - 自动清理策略管理（读写 system_configs）
+ *
+ * 数据安全等级：
+ * - L0 不可删（系统基石）：sequelizemeta, administrative_regions, accounts(system), roles 等
+ * - L1 仅归档可删（金融级）：asset_transactions, item_ledger, account_asset_balances 等
+ * - L2 审批后可删（业务运营）：lottery_draws, customer_service_sessions 等
+ * - L3 可自动清理（日志/临时）：api_idempotency_requests, websocket_startup_logs 等
+ *
+ * @see docs/数据一键删除功能设计方案.md
+ * @module services/DataManagementService
+ */
+
+const { sequelize } = require('../config/database')
+const { logger } = require('../utils/logger')
+const AuditLogService = require('./AuditLogService')
+const { OPERATION_TYPES } = require('../constants/AuditOperationTypes')
+const { AUDIT_TARGET_TYPES } = require('../constants/AuditTargetTypes')
+const BeijingTimeHelper = require('../utils/timeHelper')
+const crypto = require('crypto')
+
+/**
+ * L0 不可删表白名单（硬编码，任何清理操作均跳过）
+ * @constant {Set<string>}
+ */
+const L0_PROTECTED_TABLES = Object.freeze(
+  new Set([
+    'sequelizemeta',
+    'administrative_regions',
+    'roles',
+    'material_asset_types',
+    'asset_group_defs',
+    'rarity_defs',
+    'category_defs'
+  ])
+)
+
+/**
+ * L1 金融级数据表（清理前需对账校验通过）
+ * @constant {Set<string>}
+ */
+const L1_FINANCIAL_TABLES = Object.freeze(
+  new Set([
+    'asset_transactions',
+    'item_ledger',
+    'account_asset_balances',
+    'items',
+    'trade_orders',
+    'item_holds'
+  ])
+)
+
+/**
+ * L3 可自动清理表及其时间字段映射
+ * @constant {Object}
+ */
+const L3_AUTO_CLEANUP_TABLES = Object.freeze({
+  api_idempotency_requests: 'created_at',
+  websocket_startup_logs: 'created_at',
+  authentication_sessions: 'created_at',
+  admin_operation_logs: 'created_at',
+  ad_impression_logs: 'created_at',
+  ad_click_logs: 'created_at',
+  ad_interaction_logs: 'created_at',
+  ad_bid_logs: 'created_at',
+  ad_antifraud_logs: 'created_at',
+  ad_attribution_logs: 'created_at',
+  reminder_history: 'created_at',
+  merchant_operation_logs: 'created_at',
+  batch_operation_logs: 'created_at',
+  user_role_change_records: 'created_at',
+  user_status_change_records: 'created_at',
+  risk_alerts: 'created_at',
+  alert_silence_rules: 'created_at',
+  ad_report_daily_snapshots: 'report_date',
+  ad_dau_daily_stats: 'stat_date'
+})
+
+/**
+ * L2 业务数据 - 按清理类目分组
+ * @constant {Object}
+ */
+const L2_CLEANUP_CATEGORIES = Object.freeze({
+  lottery_records: {
+    label: '抽奖记录',
+    tables: [
+      'lottery_draw_decisions',
+      'lottery_draws',
+      'lottery_management_settings',
+      'lottery_clear_setting_records',
+      'lottery_presets',
+      'lottery_user_daily_draw_quota',
+      'lottery_campaign_user_quota',
+      'lottery_campaign_quota_grants',
+      'lottery_user_experience_state',
+      'lottery_user_global_state'
+    ],
+    time_field: 'created_at'
+  },
+  lottery_monitoring: {
+    label: '抽奖监控',
+    tables: [
+      'lottery_hourly_metrics',
+      'lottery_daily_metrics',
+      'lottery_alerts',
+      'lottery_simulation_records'
+    ],
+    time_field: 'created_at'
+  },
+  consumption_records: {
+    label: '消费与核销',
+    tables: ['consumption_records', 'redemption_orders', 'content_review_records'],
+    time_field: 'created_at'
+  },
+  customer_service: {
+    label: '客服会话',
+    tables: [
+      'chat_messages',
+      'customer_service_notes',
+      'customer_service_issues',
+      'customer_service_user_assignments',
+      'customer_service_sessions',
+      'customer_service_agents'
+    ],
+    time_field: 'created_at'
+  },
+  market_listings: {
+    label: '市场挂牌',
+    tables: ['market_listings'],
+    time_field: 'created_at',
+    status_filter: { field: 'status', exclude: ['active'] }
+  },
+  notifications: {
+    label: '用户通知',
+    tables: ['user_notifications', 'admin_notifications'],
+    time_field: 'created_at'
+  },
+  feedbacks: {
+    label: '用户反馈',
+    tables: ['feedbacks'],
+    time_field: 'created_at'
+  },
+  market_snapshots: {
+    label: '市场快照',
+    tables: ['market_price_snapshots', 'exchange_rates'],
+    time_field: 'created_at'
+  },
+  exchange_records: {
+    label: '兑换记录',
+    tables: ['exchange_records'],
+    time_field: 'created_at'
+  },
+  bid_records: {
+    label: '竞拍记录',
+    tables: ['bid_records', 'bid_products'],
+    time_field: 'created_at'
+  },
+  system_debts: {
+    label: '系统垫付',
+    tables: ['preset_inventory_debt', 'preset_budget_debt'],
+    time_field: 'created_at'
+  }
+})
+
+/**
+ * FK 拓扑排序 - 删除顺序（先子表后父表）
+ * 基于 174 条外键约束分析
+ * @constant {string[][]}
+ */
+const DELETE_TOPOLOGY = Object.freeze([
+  // 第一层（叶子表）
+  [
+    'ad_interaction_logs',
+    'ad_impression_logs',
+    'ad_click_logs',
+    'ad_attribution_logs',
+    'ad_antifraud_logs',
+    'ad_billing_records',
+    'ad_bid_logs',
+    'ad_report_daily_snapshots',
+    'ad_dau_daily_stats',
+    'ad_creatives',
+    'ad_price_adjustment_logs',
+    'websocket_startup_logs',
+    'authentication_sessions',
+    'api_idempotency_requests',
+    'admin_notifications',
+    'user_notifications',
+    'user_behavior_tracks',
+    'user_ad_tags',
+    'batch_operation_logs',
+    'user_role_change_records',
+    'user_status_change_records',
+    'reminder_history',
+    'alert_silence_rules',
+    'lottery_simulation_records',
+    'lottery_clear_setting_records',
+    'lottery_user_daily_draw_quota',
+    'lottery_campaign_user_quota',
+    'lottery_campaign_quota_grants',
+    'lottery_user_experience_state',
+    'lottery_user_global_state',
+    'lottery_hourly_metrics',
+    'lottery_daily_metrics',
+    'lottery_alerts',
+    'lottery_draw_decisions',
+    'lottery_management_settings',
+    'lottery_campaign_pricing_config',
+    'lottery_tier_rules',
+    'lottery_strategy_config',
+    'lottery_tier_matrix_config',
+    'lottery_draw_quota_rules',
+    'preset_inventory_debt',
+    'preset_budget_debt',
+    'content_review_records',
+    'merchant_operation_logs',
+    'feedbacks',
+    'image_resources',
+    'item_holds',
+    'item_ledger',
+    'exchange_records',
+    'bid_records',
+    'market_price_snapshots',
+    'chat_messages',
+    'customer_service_notes',
+    'system_dictionary_history',
+    'user_premium_status',
+    'user_risk_profiles',
+    'store_staff',
+    'user_hierarchy',
+    'user_ratio_overrides',
+    'risk_alerts'
+  ],
+  // 第二层
+  [
+    'trade_orders',
+    'redemption_orders',
+    'lottery_draws',
+    'consumption_records',
+    'customer_service_user_assignments',
+    'customer_service_issues',
+    'ad_zone_group_members',
+    'bid_products',
+    'lottery_presets',
+    'preset_debt_limits',
+    'report_templates',
+    'reminder_rules',
+    'segment_rule_configs',
+    'customer_service_agents'
+  ],
+  // 第三层
+  ['market_listings', 'customer_service_sessions', 'ad_campaigns'],
+  // 第四层
+  ['items', 'lottery_prizes', 'exchange_items'],
+  // 第五层（核心配置表 - 通常不删，仅清档模式时按需处理）
+  [
+    'lottery_campaigns',
+    'item_templates',
+    'ad_slots',
+    'ad_target_zones',
+    'asset_transactions',
+    'account_asset_balances'
+  ]
+])
+
+/** 预览令牌缓存（5 分钟有效） */
+const previewCache = new Map()
+
+/**
+ * 数据管理服务
+ *
+ * @class DataManagementService
+ */
+class DataManagementService {
+  /**
+   * @param {Object} models - Sequelize 模型集合
+   */
+  constructor(models) {
+    this.models = models
+  }
+
+  /**
+   * 获取数据量统计（按安全等级分组）
+   *
+   * @returns {Promise<Object>} 统计结果：各表行数、安全等级分组、数据库大小
+   */
+  async getStats() {
+    const [tableRows] = await sequelize.query(`
+      SELECT table_name, table_rows AS estimated_rows,
+             ROUND(data_length / 1024 / 1024, 2) AS data_size_mb,
+             ROUND(index_length / 1024 / 1024, 2) AS index_size_mb
+      FROM information_schema.tables
+      WHERE table_schema = DATABASE()
+        AND table_type = 'BASE TABLE'
+      ORDER BY data_length DESC
+    `)
+
+    const [dbSize] = await sequelize.query(`
+      SELECT ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS total_size_mb
+      FROM information_schema.tables
+      WHERE table_schema = DATABASE()
+    `)
+
+    const byLevel = { L0: [], L1: [], L2: [], L3: [], other: [] }
+
+    for (const row of tableRows) {
+      const tableName = row.table_name
+      if (L0_PROTECTED_TABLES.has(tableName) || tableName === 'accounts') {
+        byLevel.L0.push(row)
+      } else if (L1_FINANCIAL_TABLES.has(tableName)) {
+        byLevel.L1.push(row)
+      } else if (L3_AUTO_CLEANUP_TABLES[tableName]) {
+        byLevel.L3.push(row)
+      } else {
+        const isL2 = Object.values(L2_CLEANUP_CATEGORIES).some(cat =>
+          cat.tables.includes(tableName)
+        )
+        if (isL2) {
+          byLevel.L2.push(row)
+        } else {
+          byLevel.other.push(row)
+        }
+      }
+    }
+
+    return {
+      database_size_mb: dbSize[0]?.total_size_mb || 0,
+      table_count: tableRows.length,
+      by_level: {
+        L0: { count: byLevel.L0.length, tables: byLevel.L0 },
+        L1: { count: byLevel.L1.length, tables: byLevel.L1 },
+        L2: { count: byLevel.L2.length, tables: byLevel.L2 },
+        L3: { count: byLevel.L3.length, tables: byLevel.L3 },
+        other: { count: byLevel.other.length, tables: byLevel.other }
+      },
+      top_tables: tableRows.slice(0, 20),
+      categories: Object.entries(L2_CLEANUP_CATEGORIES).map(([key, cat]) => ({
+        key,
+        label: cat.label,
+        table_count: cat.tables.length
+      }))
+    }
+  }
+
+  /**
+   * 获取自动清理策略列表
+   *
+   * @returns {Promise<Object>} 策略配置
+   */
+  async getPolicies() {
+    const SystemConfig = this.models.SystemConfig
+    const config = await SystemConfig.getValue('data_cleanup_policies')
+
+    if (!config) {
+      return { policies: [], schedule_cron: '0 3 * * *', max_execution_time_seconds: 300 }
+    }
+
+    return config
+  }
+
+  /**
+   * 更新清理策略（保留天数/启用禁用）
+   *
+   * @param {string} tableName - 策略对应的表名
+   * @param {Object} updates - { retention_days?: number, enabled?: boolean }
+   * @param {number} operatorId - 操作人用户ID
+   * @returns {Promise<Object>} 更新后的策略
+   */
+  async updatePolicy(tableName, updates, operatorId) {
+    const SystemConfig = this.models.SystemConfig
+    const config = await SystemConfig.getValue('data_cleanup_policies')
+
+    if (!config || !config.policies) {
+      throw new Error('清理策略配置不存在')
+    }
+
+    const policy = config.policies.find(p => p.table === tableName)
+    if (!policy) {
+      throw new Error(`未找到表 ${tableName} 的清理策略`)
+    }
+
+    const beforeData = { ...policy }
+
+    if (updates.retention_days !== undefined) {
+      if (updates.retention_days < 1 || updates.retention_days > 365) {
+        throw new Error('保留天数必须在 1-365 之间')
+      }
+      policy.retention_days = updates.retention_days
+    }
+    if (updates.enabled !== undefined) {
+      policy.enabled = Boolean(updates.enabled)
+    }
+
+    await SystemConfig.upsert('data_cleanup_policies', config, 'data_management')
+
+    await AuditLogService.logOperation({
+      operator_id: operatorId,
+      operation_type: OPERATION_TYPES.SYSTEM_CONFIG,
+      target_type: AUDIT_TARGET_TYPES.DATA_MANAGEMENT,
+      target_id: tableName,
+      action: '更新数据清理策略',
+      before_data: beforeData,
+      after_data: policy
+    })
+
+    return policy
+  }
+
+  /**
+   * 预览清理影响（计算各表将删除行数）
+   *
+   * @param {Object} options - 预览参数
+   * @param {string} options.mode - 清理模式：'manual'（手动）/ 'auto'（自动）/ 'pre_launch'（清档）
+   * @param {string[]} [options.categories] - 清理类目（manual 模式）
+   * @param {Object} [options.time_range] - 时间范围 { start, end }
+   * @param {Object} [options.filters] - 额外筛选条件
+   * @returns {Promise<Object>} 预览结果，含 preview_token
+   */
+  async previewCleanup(options) {
+    const { mode, categories = [], time_range, filters = {} } = options
+    const details = []
+    const warnings = []
+    const blocked = []
+
+    if (mode === 'pre_launch') {
+      await this._previewPreLaunchWipe(details, warnings, blocked)
+    } else if (mode === 'manual') {
+      await this._previewManualCleanup(categories, time_range, filters, details, warnings, blocked)
+    } else if (mode === 'auto') {
+      await this._previewAutoCleanup(details, warnings)
+    }
+
+    const totalRows = details.reduce((sum, d) => sum + d.rows_to_delete, 0)
+    const tablesAffected = details.filter(d => d.rows_to_delete > 0).length
+
+    const previewToken = `pv_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000)
+
+    previewCache.set(previewToken, {
+      options,
+      details,
+      expires_at: expiresAt,
+      created_at: new Date()
+    })
+
+    setTimeout(() => previewCache.delete(previewToken), 5 * 60 * 1000)
+
+    return {
+      preview_token: previewToken,
+      expires_at: BeijingTimeHelper.apiTimestamp(expiresAt),
+      summary: {
+        total_rows_to_delete: totalRows,
+        tables_affected: tablesAffected,
+        estimated_duration_seconds: Math.ceil(totalRows / 5000) + 2
+      },
+      details: details.filter(d => d.rows_to_delete > 0),
+      warnings,
+      blocked
+    }
+  }
+
+  /**
+   * 执行清理操作
+   *
+   * @param {Object} options - 执行参数
+   * @param {string} options.preview_token - 预览令牌（5 分钟有效）
+   * @param {boolean} [options.dry_run=false] - 干跑模式（只输出不删除）
+   * @param {string} options.reason - 操作原因
+   * @param {string} options.confirmation_text - 确认文字（必须为"确认删除"）
+   * @param {number} operatorId - 操作人用户ID
+   * @returns {Promise<Object>} 执行结果
+   */
+  async executeCleanup(options, operatorId) {
+    const { preview_token, dry_run = false, reason, confirmation_text } = options
+
+    if (confirmation_text !== '确认删除') {
+      throw new Error('确认文字不正确，请输入"确认删除"')
+    }
+
+    const cached = previewCache.get(preview_token)
+    if (!cached) {
+      throw new Error('预览令牌无效或已过期，请重新预览')
+    }
+
+    if (new Date() > cached.expires_at) {
+      previewCache.delete(preview_token)
+      throw new Error('预览令牌已过期，请重新预览')
+    }
+
+    const { details } = cached
+    const mode = cached.options.mode
+    const startTime = Date.now()
+    const results = []
+
+    const flatDeleteOrder = DELETE_TOPOLOGY.flat()
+
+    const sortedDetails = [...details].sort((a, b) => {
+      const idxA = flatDeleteOrder.indexOf(a.table_name)
+      const idxB = flatDeleteOrder.indexOf(b.table_name)
+      return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB)
+    })
+
+    for (const item of sortedDetails) {
+      if (item.rows_to_delete === 0) continue
+      if (L0_PROTECTED_TABLES.has(item.table_name)) continue
+
+      try {
+        let deletedCount = 0
+
+        if (dry_run) {
+          deletedCount = item.rows_to_delete
+          logger.info(`[数据清理][干跑] ${item.table_name}: 将删除 ${deletedCount} 行`)
+        } else {
+          deletedCount = await this._batchDelete(
+            item.table_name,
+            item.where_clause || '1=1',
+            item.batch_size || 1000
+          )
+          logger.info(`[数据清理] ${item.table_name}: 已删除 ${deletedCount} 行`)
+        }
+
+        results.push({
+          table_name: item.table_name,
+          deleted_count: deletedCount,
+          status: 'success'
+        })
+      } catch (error) {
+        logger.error(`[数据清理] ${item.table_name} 删除失败:`, { error: error.message })
+        results.push({
+          table_name: item.table_name,
+          deleted_count: 0,
+          status: 'error',
+          error: error.message
+        })
+      }
+    }
+
+    const totalDeleted = results.reduce((sum, r) => sum + r.deleted_count, 0)
+    const durationSeconds = (Date.now() - startTime) / 1000
+
+    if (!dry_run) {
+      try {
+        await AuditLogService.logOperation({
+          operator_id: operatorId,
+          operation_type: OPERATION_TYPES.DATA_CLEANUP,
+          target_type: AUDIT_TARGET_TYPES.DATA_MANAGEMENT,
+          target_id: `cleanup_${mode}`,
+          action: `数据清理（${mode === 'pre_launch' ? '上线前清档' : mode === 'auto' ? '自动清理' : '手动清理'}）`,
+          before_data: { mode, tables_affected: details.length },
+          after_data: { total_deleted: totalDeleted, duration_seconds: durationSeconds, results },
+          reason,
+          idempotency_key: `data_cleanup_${Date.now()}`
+        })
+      } catch (auditError) {
+        logger.error('[数据清理] 审计日志写入失败:', { error: auditError.message })
+      }
+    }
+
+    previewCache.delete(preview_token)
+
+    return {
+      mode,
+      dry_run,
+      total_deleted: totalDeleted,
+      duration_seconds: Math.round(durationSeconds * 10) / 10,
+      details: results
+    }
+  }
+
+  /**
+   * 获取清理历史（从 admin_operation_logs 查询）
+   *
+   * @param {Object} pagination - { page, page_size }
+   * @returns {Promise<Object>} 分页清理历史
+   */
+  async getHistory(pagination = {}) {
+    const { page = 1, page_size = 20 } = pagination
+    const offset = (page - 1) * page_size
+
+    const [rows] = await sequelize.query(
+      `
+      SELECT aol.admin_operation_log_id, aol.operator_id, u.mobile AS operator_mobile,
+             aol.action, aol.before_data, aol.after_data, aol.reason,
+             aol.created_at
+      FROM admin_operation_logs aol
+      LEFT JOIN users u ON u.user_id = aol.operator_id
+      WHERE aol.operation_type = 'data_cleanup'
+      ORDER BY aol.created_at DESC
+      LIMIT :limit OFFSET :offset
+    `,
+      { replacements: { limit: page_size, offset } }
+    )
+
+    const [countResult] = await sequelize.query(`
+      SELECT COUNT(*) AS total
+      FROM admin_operation_logs
+      WHERE operation_type = 'data_cleanup'
+    `)
+
+    const total = countResult[0]?.total || 0
+
+    return {
+      items: rows.map(r => ({
+        log_id: r.admin_operation_log_id,
+        operator_id: r.operator_id,
+        operator_mobile: r.operator_mobile,
+        action: r.action,
+        before_data: typeof r.before_data === 'string' ? JSON.parse(r.before_data) : r.before_data,
+        after_data: typeof r.after_data === 'string' ? JSON.parse(r.after_data) : r.after_data,
+        reason: r.reason,
+        created_at: r.created_at
+      })),
+      pagination: {
+        page,
+        page_size,
+        total: Number(total),
+        total_pages: Math.ceil(Number(total) / page_size)
+      }
+    }
+  }
+
+  /**
+   * 执行自动清理（定时任务调用）
+   *
+   * @param {number} maxExecutionSeconds - 最大执行时间（秒）
+   * @returns {Promise<Object>} 各表清理结果
+   */
+  async runAutoCleanup(maxExecutionSeconds = 300) {
+    const startTime = Date.now()
+    const config = await this.getPolicies()
+
+    if (!config.policies || config.policies.length === 0) {
+      logger.info('[自动清理] 无清理策略配置，跳过')
+      return { skipped: true, reason: 'no_policies' }
+    }
+
+    const results = []
+
+    for (const policy of config.policies) {
+      if (!policy.enabled) continue
+
+      const elapsed = (Date.now() - startTime) / 1000
+      if (elapsed >= maxExecutionSeconds) {
+        logger.warn(
+          `[自动清理] 超时中止（已执行 ${elapsed.toFixed(1)}s / 上限 ${maxExecutionSeconds}s）`
+        )
+        break
+      }
+
+      const timeField = L3_AUTO_CLEANUP_TABLES[policy.table]
+      if (!timeField) {
+        logger.warn(`[自动清理] 表 ${policy.table} 不在自动清理白名单中，跳过`)
+        continue
+      }
+
+      const cutoffDate = new Date(Date.now() - policy.retention_days * 24 * 60 * 60 * 1000)
+      const whereClause = `\`${timeField}\` < '${cutoffDate.toISOString().slice(0, 19)}'`
+
+      try {
+        const deletedCount = await this._batchDelete(
+          policy.table,
+          whereClause,
+          policy.batch_size || 1000
+        )
+
+        results.push({
+          table: policy.table,
+          deleted_count: deletedCount,
+          retention_days: policy.retention_days,
+          status: 'success'
+        })
+
+        if (deletedCount > 0) {
+          logger.info(
+            `[自动清理] ${policy.table}: 删除 ${deletedCount} 行（保留 ${policy.retention_days} 天）`
+          )
+        }
+      } catch (error) {
+        logger.error(`[自动清理] ${policy.table} 失败:`, { error: error.message })
+        results.push({
+          table: policy.table,
+          deleted_count: 0,
+          status: 'error',
+          error: error.message
+        })
+      }
+    }
+
+    const totalDeleted = results.reduce((sum, r) => sum + r.deleted_count, 0)
+
+    if (totalDeleted > 0) {
+      try {
+        await AuditLogService.logOperation({
+          operator_id: 0,
+          operation_type: OPERATION_TYPES.DATA_CLEANUP,
+          target_type: AUDIT_TARGET_TYPES.DATA_MANAGEMENT,
+          target_id: 'auto_cleanup',
+          action: '定时自动清理',
+          after_data: { total_deleted: totalDeleted, results },
+          reason: '定时自动清理任务',
+          idempotency_key: `auto_cleanup_${Date.now()}`
+        })
+      } catch (auditError) {
+        logger.error('[自动清理] 审计日志写入失败:', { error: auditError.message })
+      }
+    }
+
+    return {
+      total_deleted: totalDeleted,
+      duration_seconds: Math.round((Date.now() - startTime) / 100) / 10,
+      results
+    }
+  }
+
+  // ==================== 私有方法 ====================
+
+  /**
+   * 预览上线前清档影响
+   * @param {Array} details - 影响详情列表（输出参数）
+   * @param {Array} warnings - 警告列表（输出参数）
+   * @param {Array} blocked - 阻断列表（输出参数）
+   * @returns {Promise<void>} 无返回值，结果通过输出参数写入
+   * @private
+   */
+  async _previewPreLaunchWipe(details, warnings, blocked) {
+    if (process.env.NODE_ENV === 'production') {
+      blocked.push('生产环境禁止执行清档操作')
+      return
+    }
+
+    const allTables = DELETE_TOPOLOGY.flat()
+
+    for (const tableName of allTables) {
+      if (L0_PROTECTED_TABLES.has(tableName)) continue
+
+      try {
+        const [result] = await sequelize.query(`SELECT COUNT(*) AS cnt FROM \`${tableName}\``, {
+          raw: true
+        })
+        const count = result[0]?.cnt || 0
+
+        if (count > 0) {
+          let safetyLevel = 'L2'
+          if (L1_FINANCIAL_TABLES.has(tableName)) safetyLevel = 'L1'
+          if (L3_AUTO_CLEANUP_TABLES[tableName]) safetyLevel = 'L3'
+
+          details.push({
+            table_name: tableName,
+            rows_to_delete: Number(count),
+            safety_level: safetyLevel,
+            where_clause: '1=1',
+            batch_size: 2000,
+            cascade_effects: []
+          })
+        }
+      } catch (_) {
+        // 表可能已不存在（如 legacy 表已 DROP）
+      }
+    }
+
+    // accounts 表特殊处理：只删 user 类型，保留 system 类型
+    try {
+      const [accountResult] = await sequelize.query(
+        "SELECT COUNT(*) AS cnt FROM accounts WHERE account_type = 'user'"
+      )
+      const userAccountCount = accountResult[0]?.cnt || 0
+      if (userAccountCount > 0) {
+        details.push({
+          table_name: 'accounts',
+          rows_to_delete: Number(userAccountCount),
+          safety_level: 'L1',
+          where_clause: "account_type = 'user'",
+          batch_size: 500,
+          cascade_effects: ['系统账户（account_type=system）将被保留']
+        })
+      }
+    } catch (_) {}
+
+    // users 表：清档时全部清除
+    try {
+      const [userResult] = await sequelize.query('SELECT COUNT(*) AS cnt FROM users')
+      const userCount = userResult[0]?.cnt || 0
+      if (userCount > 0) {
+        details.push({
+          table_name: 'users',
+          rows_to_delete: Number(userCount),
+          safety_level: 'L2',
+          where_clause: '1=1',
+          batch_size: 500,
+          cascade_effects: ['清档后将通过 SUPER_ADMIN_MOBILE 重建超管账号']
+        })
+      }
+    } catch (_) {}
+
+    warnings.push('清档操作将清空全部测试数据，保留 L0 系统基石数据')
+    warnings.push('7 个系统账户（account_type=system）将被保留')
+    warnings.push('清档完成后将自动重建超管账号')
+  }
+
+  /**
+   * 预览手动清理影响
+   * @param {string[]} categories - 清理类目
+   * @param {Object} timeRange - 时间范围
+   * @param {Object} filters - 筛选条件
+   * @param {Array} details - 影响详情列表（输出参数）
+   * @param {Array} warnings - 警告列表（输出参数）
+   * @param {Array} _blocked - 阻断列表（输出参数）
+   * @returns {Promise<void>} 无返回值，结果通过输出参数写入
+   * @private
+   */
+  async _previewManualCleanup(categories, timeRange, filters, details, warnings, _blocked) {
+    for (const catKey of categories) {
+      const category = L2_CLEANUP_CATEGORIES[catKey]
+      if (!category) {
+        warnings.push(`未知清理类目: ${catKey}`)
+        continue
+      }
+
+      for (const tableName of category.tables) {
+        const conditions = []
+
+        if (timeRange?.start) {
+          conditions.push(`\`${category.time_field}\` >= '${timeRange.start}'`)
+        }
+        if (timeRange?.end) {
+          conditions.push(`\`${category.time_field}\` <= '${timeRange.end}'`)
+        }
+
+        if (category.status_filter) {
+          const excludeList = category.status_filter.exclude.map(s => `'${s}'`).join(',')
+          conditions.push(`\`${category.status_filter.field}\` NOT IN (${excludeList})`)
+        }
+
+        if (filters.user_id) {
+          conditions.push(`user_id = ${Number(filters.user_id)}`)
+        }
+
+        const whereClause = conditions.length > 0 ? conditions.join(' AND ') : '1=1'
+
+        try {
+          const [result] = await sequelize.query(
+            `SELECT COUNT(*) AS cnt FROM \`${tableName}\` WHERE ${whereClause}`
+          )
+          const count = result[0]?.cnt || 0
+
+          details.push({
+            table_name: tableName,
+            rows_to_delete: Number(count),
+            safety_level: 'L2',
+            category: catKey,
+            category_label: category.label,
+            where_clause: whereClause,
+            batch_size: 1000,
+            cascade_effects: []
+          })
+        } catch (error) {
+          warnings.push(`表 ${tableName} 查询失败: ${error.message}`)
+        }
+      }
+    }
+  }
+
+  /**
+   * 预览自动清理影响
+   * @param {Array} details - 影响详情列表（输出参数）
+   * @param {Array} warnings - 警告列表（输出参数）
+   * @returns {Promise<void>} 无返回值，结果通过输出参数写入
+   * @private
+   */
+  async _previewAutoCleanup(details, warnings) {
+    const config = await this.getPolicies()
+    if (!config.policies) return
+
+    for (const policy of config.policies) {
+      if (!policy.enabled) continue
+
+      const timeField = L3_AUTO_CLEANUP_TABLES[policy.table]
+      if (!timeField) continue
+
+      const cutoffDate = new Date(Date.now() - policy.retention_days * 24 * 60 * 60 * 1000)
+      const whereClause = `\`${timeField}\` < '${cutoffDate.toISOString().slice(0, 19)}'`
+
+      try {
+        const [result] = await sequelize.query(
+          `SELECT COUNT(*) AS cnt FROM \`${policy.table}\` WHERE ${whereClause}`
+        )
+        const count = result[0]?.cnt || 0
+
+        details.push({
+          table_name: policy.table,
+          rows_to_delete: Number(count),
+          safety_level: 'L3',
+          where_clause: whereClause,
+          batch_size: policy.batch_size || 1000,
+          retention_days: policy.retention_days,
+          cascade_effects: []
+        })
+      } catch (error) {
+        warnings.push(`表 ${policy.table} 查询失败: ${error.message}`)
+      }
+    }
+  }
+
+  /**
+   * 分批删除（避免长事务锁表）
+   *
+   * @param {string} tableName - 表名
+   * @param {string} whereClause - WHERE 条件
+   * @param {number} batchSize - 每批删除行数
+   * @returns {Promise<number>} 总删除行数
+   * @private
+   */
+  async _batchDelete(tableName, whereClause, batchSize = 1000) {
+    let totalDeleted = 0
+    let batchDeleted = 0
+
+    do {
+      const [, meta] = await sequelize.query(
+        `DELETE FROM \`${tableName}\` WHERE ${whereClause} LIMIT ${batchSize}`
+      )
+      batchDeleted = meta?.affectedRows || 0
+      totalDeleted += batchDeleted
+
+      if (batchDeleted > 0) {
+        await new Promise(resolve => {
+          setTimeout(resolve, 100)
+        })
+      }
+    } while (batchDeleted >= batchSize)
+
+    return totalDeleted
+  }
+}
+
+module.exports = DataManagementService

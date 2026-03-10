@@ -149,7 +149,7 @@ class CoreService {
         order: {
           order_no: existingOrder.order_no,
           record_id: existingOrder.exchange_record_id,
-          name: existingOrder.item_snapshot?.name || '未知商品',
+          name: existingOrder.item_snapshot?.item_name || '未知商品',
           quantity: existingOrder.quantity,
           pay_asset_code: existingOrder.pay_asset_code,
           pay_amount: existingOrder.pay_amount,
@@ -167,9 +167,17 @@ class CoreService {
       `[兑换市场] 用户${user_id}兑换商品${exchange_item_id}，数量${quantity}，idempotency_key=${idempotency_key}`
     )
 
-    // 1. 获取商品信息（加锁防止超卖）
+    // 1. 获取商品信息（加锁防止超卖，含主图片用于快照）
     const item = await this.ExchangeItem.findOne({
       where: { exchange_item_id },
+      include: [
+        {
+          model: this.models.ImageResources,
+          as: 'primaryImage',
+          attributes: ['file_path'],
+          required: false
+        }
+      ],
       lock: transaction.LOCK.UPDATE,
       transaction
     })
@@ -301,7 +309,8 @@ class CoreService {
             item_name: item.item_name,
             description: item.description,
             cost_asset_code: item.cost_asset_code,
-            cost_amount: item.cost_amount
+            cost_amount: item.cost_amount,
+            image_url: item.primaryImage?.file_path || null
           },
           quantity,
           pay_asset_code: item.cost_asset_code,
@@ -345,6 +354,20 @@ class CoreService {
 
     // 缓存失效
     await BusinessCacheHelper.invalidateExchangeItems('exchange_success')
+
+    // 写入创建事件
+    await this._recordEvent(
+      {
+        order_no,
+        old_status: null,
+        new_status: 'pending',
+        operator_id: user_id,
+        operator_type: 'user',
+        reason: '用户兑换商品',
+        metadata: { exchange_item_id, quantity, pay_amount: totalPayAmount }
+      },
+      { transaction }
+    )
 
     logger.info(`[兑换市场] 兑换成功，订单号：${order_no}`)
 
@@ -394,6 +417,8 @@ class CoreService {
       throw new Error('订单不存在')
     }
 
+    const old_status = order.status
+
     // 更新订单状态
     await order.update(
       {
@@ -406,6 +431,7 @@ class CoreService {
 
     // 根据状态类型记录对应时间戳
     const timestampMap = {
+      approved: { approved_at: BeijingTimeHelper.createDatabaseTime() },
       shipped: { shipped_at: BeijingTimeHelper.createDatabaseTime() },
       received: { received_at: BeijingTimeHelper.createDatabaseTime() },
       rejected: { rejected_at: BeijingTimeHelper.createDatabaseTime() },
@@ -415,6 +441,20 @@ class CoreService {
     if (timestampMap[new_status]) {
       await order.update(timestampMap[new_status], { transaction })
     }
+
+    // 写入状态变更事件
+    await this._recordEvent(
+      {
+        order_no,
+        old_status,
+        new_status,
+        operator_id,
+        operator_type: 'admin',
+        reason: remark || `管理员变更状态为 ${new_status}`,
+        metadata: null
+      },
+      { transaction }
+    )
 
     logger.info(`[兑换市场] 订单状态更新成功：${order_no} -> ${new_status}`)
 
@@ -487,11 +527,27 @@ class CoreService {
       throw error
     }
 
+    const previousStatus = order.status
+
     await order.update(
       {
         status: 'rated',
         rating,
         rated_at: BeijingTimeHelper.createDatabaseTime()
+      },
+      { transaction }
+    )
+
+    // 写入事件记录
+    await this._recordEvent(
+      {
+        order_no,
+        old_status: previousStatus,
+        new_status: 'rated',
+        operator_id: user_id,
+        operator_type: 'user',
+        reason: `用户评分 ${rating} 分`,
+        metadata: { rating }
       },
       { transaction }
     )
@@ -572,6 +628,20 @@ class CoreService {
       { transaction }
     )
 
+    // 写入事件记录
+    await this._recordEvent(
+      {
+        order_no,
+        old_status: 'shipped',
+        new_status: 'received',
+        operator_id: auto_confirmed ? 11021 : user_id,
+        operator_type: auto_confirmed ? 'system' : 'user',
+        reason: auto_confirmed ? '发货7天后系统自动确认收货' : '用户手动确认收货',
+        metadata: { auto_confirmed }
+      },
+      { transaction }
+    )
+
     await BusinessCacheHelper.invalidateExchangeItems().catch(err => {
       logger.warn('[兑换市场] 确认收货后清除缓存失败（非致命）:', err.message)
     })
@@ -601,9 +671,26 @@ class CoreService {
    */
   async autoConfirmShippedOrders(options = {}) {
     const transaction = assertAndGetTransaction(options, 'CoreService.autoConfirmShippedOrders')
+    const { Op } = require('sequelize')
 
     const sevenDaysAgo = new Date()
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+
+    const whereClause = {
+      status: 'shipped',
+      shipped_at: { [Op.lt]: sevenDaysAgo }
+    }
+
+    // 先查出即将被自动确认的订单号（用于事件记录）
+    const pendingOrders = await this.ExchangeRecord.findAll({
+      where: whereClause,
+      attributes: ['order_no'],
+      transaction
+    })
+
+    if (pendingOrders.length === 0) {
+      return 0
+    }
 
     const [affectedCount] = await this.ExchangeRecord.update(
       {
@@ -611,16 +698,26 @@ class CoreService {
         received_at: BeijingTimeHelper.createDatabaseTime(),
         auto_confirmed: true
       },
-      {
-        where: {
-          status: 'shipped',
-          shipped_at: { [require('sequelize').Op.lt]: sevenDaysAgo }
-        },
-        transaction
-      }
+      { where: whereClause, transaction }
     )
 
     if (affectedCount > 0) {
+      // 批量写入事件记录（SYSTEM_DAILY_JOB_USER_ID = 11021）
+      for (const row of pendingOrders) {
+        await this._recordEvent(
+          {
+            order_no: row.order_no,
+            old_status: 'shipped',
+            new_status: 'received',
+            operator_id: 11021,
+            operator_type: 'system',
+            reason: '发货7天后系统自动确认收货',
+            metadata: { auto_confirmed: true }
+          },
+          { transaction }
+        )
+      }
+
       logger.info(`[兑换市场] 自动确认收货完成，共 ${affectedCount} 笔订单`)
       await BusinessCacheHelper.invalidateExchangeItems().catch(err => {
         logger.warn('[兑换市场] 批量确认收货后清除缓存失败（非致命）:', err.message)
@@ -628,6 +725,270 @@ class CoreService {
     }
 
     return affectedCount
+  }
+
+  /**
+   * 用户取消订单（仅 pending 状态可取消，退还材料资产）
+   *
+   * 业务规则：
+   * - 只能取消自己的订单
+   * - 订单状态必须为 pending（待审核阶段才可取消）
+   * - 退还 pay_amount 到用户账户（通过 BalanceService，幂等键防重）
+   * - 记录状态变更事件
+   *
+   * @param {number} user_id - 用户ID
+   * @param {string} order_no - 订单号
+   * @param {Object} options - 选项
+   * @param {Transaction} options.transaction - 外部事务对象（必填）
+   * @returns {Promise<Object>} 取消结果
+   */
+  async cancelOrder(user_id, order_no, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'CoreService.cancelOrder')
+
+    const order = await this.ExchangeRecord.findOne({
+      where: { order_no, user_id },
+      lock: transaction.LOCK.UPDATE,
+      transaction
+    })
+
+    if (!order) {
+      const error = new Error('订单不存在或无权操作')
+      error.statusCode = 404
+      error.code = 'ORDER_NOT_FOUND'
+      throw error
+    }
+
+    if (order.status !== 'pending') {
+      const error = new Error('只有待审核的订单才能取消')
+      error.statusCode = 400
+      error.code = 'ORDER_STATUS_INVALID'
+      error.data = { current_status: order.status }
+      throw error
+    }
+
+    // 退还材料资产（与 exchangeItem 扣减完全对称）
+    const BalanceService = require('../asset/BalanceService')
+    const burnAccount = await BalanceService.getOrCreateAccount(
+      { system_code: 'SYSTEM_BURN' },
+      { transaction }
+    )
+    // eslint-disable-next-line no-restricted-syntax
+    await BalanceService.changeBalance(
+      {
+        user_id: order.user_id,
+        asset_code: order.pay_asset_code,
+        delta_amount: +order.pay_amount,
+        idempotency_key: `exchange_refund_${order.order_no}`,
+        business_type: 'exchange_cancel_refund',
+        counterpart_account_id: burnAccount.account_id,
+        meta: {
+          order_no: order.order_no,
+          reason: 'user_cancel',
+          original_pay_amount: order.pay_amount
+        }
+      },
+      { transaction }
+    )
+
+    await order.update(
+      {
+        status: 'cancelled',
+        updated_at: BeijingTimeHelper.createDatabaseTime()
+      },
+      { transaction }
+    )
+
+    // 写入事件记录
+    await this._recordEvent(
+      {
+        order_no,
+        old_status: 'pending',
+        new_status: 'cancelled',
+        operator_id: user_id,
+        operator_type: 'user',
+        reason: '用户主动取消订单',
+        metadata: { refund_amount: order.pay_amount, refund_asset_code: order.pay_asset_code }
+      },
+      { transaction }
+    )
+
+    await BusinessCacheHelper.invalidateExchangeItems().catch(err => {
+      logger.warn('[兑换市场] 取消订单后清除缓存失败（非致命）:', err.message)
+    })
+
+    logger.info('[兑换市场] 用户取消订单成功', {
+      user_id,
+      order_no,
+      refund_amount: order.pay_amount,
+      refund_asset_code: order.pay_asset_code
+    })
+
+    return {
+      success: true,
+      message: '订单取消成功，材料资产已退还',
+      order_no,
+      status: 'cancelled',
+      refund: {
+        asset_code: order.pay_asset_code,
+        amount: order.pay_amount
+      }
+    }
+  }
+
+  /**
+   * 管理员拒绝订单（仅 pending 状态可拒绝，退还材料资产）
+   *
+   * 业务规则：
+   * - 管理员操作，不校验 user_id
+   * - 订单状态必须为 pending（待审核阶段才可拒绝）
+   * - 退还 pay_amount 到用户账户
+   * - 记录 admin_remark 和 rejected_at
+   * - 记录状态变更事件
+   *
+   * @param {string} order_no - 订单号
+   * @param {number} operator_id - 管理员ID
+   * @param {string} remark - 拒绝原因
+   * @param {Object} options - 选项
+   * @param {Transaction} options.transaction - 外部事务对象（必填）
+   * @returns {Promise<Object>} 拒绝结果
+   */
+  async rejectOrder(order_no, operator_id, remark, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'CoreService.rejectOrder')
+
+    const order = await this.ExchangeRecord.findOne({
+      where: { order_no },
+      lock: transaction.LOCK.UPDATE,
+      transaction
+    })
+
+    if (!order) {
+      const error = new Error('订单不存在')
+      error.statusCode = 404
+      error.code = 'ORDER_NOT_FOUND'
+      throw error
+    }
+
+    if (order.status !== 'pending') {
+      const error = new Error('只有待审核的订单才能拒绝')
+      error.statusCode = 400
+      error.code = 'ORDER_STATUS_INVALID'
+      error.data = { current_status: order.status }
+      throw error
+    }
+
+    // 退还材料资产
+    const BalanceService = require('../asset/BalanceService')
+    const burnAccount = await BalanceService.getOrCreateAccount(
+      { system_code: 'SYSTEM_BURN' },
+      { transaction }
+    )
+    // eslint-disable-next-line no-restricted-syntax
+    await BalanceService.changeBalance(
+      {
+        user_id: order.user_id,
+        asset_code: order.pay_asset_code,
+        delta_amount: +order.pay_amount,
+        idempotency_key: `exchange_refund_${order.order_no}`,
+        business_type: 'exchange_reject_refund',
+        counterpart_account_id: burnAccount.account_id,
+        meta: {
+          order_no: order.order_no,
+          reason: 'admin_reject',
+          operator_id,
+          remark,
+          original_pay_amount: order.pay_amount
+        }
+      },
+      { transaction }
+    )
+
+    await order.update(
+      {
+        status: 'rejected',
+        admin_remark: remark,
+        rejected_at: BeijingTimeHelper.createDatabaseTime(),
+        updated_at: BeijingTimeHelper.createDatabaseTime()
+      },
+      { transaction }
+    )
+
+    // 写入事件记录
+    await this._recordEvent(
+      {
+        order_no,
+        old_status: 'pending',
+        new_status: 'rejected',
+        operator_id,
+        operator_type: 'admin',
+        reason: remark || '管理员拒绝审批',
+        metadata: { refund_amount: order.pay_amount, refund_asset_code: order.pay_asset_code }
+      },
+      { transaction }
+    )
+
+    await BusinessCacheHelper.invalidateExchangeItems().catch(err => {
+      logger.warn('[兑换市场] 拒绝订单后清除缓存失败（非致命）:', err.message)
+    })
+
+    logger.info('[兑换市场] 管理员拒绝订单成功', {
+      operator_id,
+      order_no,
+      remark,
+      refund_amount: order.pay_amount
+    })
+
+    return {
+      success: true,
+      message: '订单已拒绝，材料资产已退还用户',
+      order: {
+        order_no,
+        status: 'rejected'
+      }
+    }
+  }
+
+  /**
+   * 写入订单状态变更事件（私有方法，事务内同步写入）
+   *
+   * @param {Object} eventData - 事件数据
+   * @param {string} eventData.order_no - 订单号
+   * @param {string|null} eventData.old_status - 变更前状态
+   * @param {string} eventData.new_status - 变更后状态
+   * @param {number} eventData.operator_id - 操作人ID
+   * @param {string} eventData.operator_type - 操作人类型（user/admin/system）
+   * @param {string} [eventData.reason] - 变更原因
+   * @param {Object} [eventData.metadata] - 额外元数据
+   * @param {Object} options - 选项
+   * @param {Transaction} options.transaction - 事务对象
+   * @returns {Promise<void>} 无返回值
+   * @private
+   */
+  async _recordEvent(eventData, options = {}) {
+    try {
+      const ExchangeOrderEvent = this.models.ExchangeOrderEvent
+      if (!ExchangeOrderEvent) {
+        logger.warn('[兑换市场] ExchangeOrderEvent 模型未注册，跳过事件记录')
+        return
+      }
+
+      const idempotency_key = ExchangeOrderEvent.generateIdempotencyKey(
+        eventData.order_no,
+        eventData.new_status,
+        eventData.operator_id
+      )
+
+      await ExchangeOrderEvent.create(
+        { ...eventData, idempotency_key },
+        { transaction: options.transaction }
+      )
+    } catch (err) {
+      // 幂等冲突不抛出（防止重复写入）
+      if (err.name === 'SequelizeUniqueConstraintError') {
+        logger.info('[兑换市场] 事件记录幂等命中，跳过', { order_no: eventData.order_no })
+        return
+      }
+      logger.error('[兑换市场] 写入事件记录失败（非致命）:', err.message)
+    }
   }
 
   /**

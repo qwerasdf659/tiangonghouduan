@@ -545,8 +545,17 @@
           <!-- 用户下拉菜单 -->
           <div class="user-dropdown relative" x-data="{ open: false }" @click.away="open = false">
             <div @click="open = !open" class="flex items-center gap-2 cursor-pointer">
-              <span class="user-avatar">A</span>
-              <span class="user-name">管理员</span>
+              <span class="user-avatar" x-text="$store.auth.avatarInitial"></span>
+              <div class="flex flex-col items-start leading-tight">
+                <span class="user-name text-sm" x-text="$store.auth.displayName"></span>
+                <span class="text-xs text-gray-400" x-show="$store.auth.mobileDisplay" x-text="$store.auth.mobileDisplay"></span>
+              </div>
+              <span class="text-xs px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 font-medium" x-text="$store.auth.roleLevelDescription"></span>
+              <span
+                x-show="$store.auth.userLevelDisplay"
+                class="text-xs px-1.5 py-0.5 rounded bg-green-500/20 text-green-300 font-medium"
+                x-text="$store.auth.userLevelDisplay"
+              ></span>
               <span class="text-xs text-gray-400">▼</span>
             </div>
             
@@ -554,9 +563,18 @@
             <div 
               x-show="open"
               x-transition
-              class="absolute right-0 top-full mt-2 w-48 themed-card rounded-lg shadow-lg border themed-border py-2 z-50"
+              class="absolute right-0 top-full mt-2 w-56 themed-card rounded-lg shadow-lg border themed-border py-2 z-50"
               style="display: none;"
             >
+              <!-- 用户信息摘要 -->
+              <div class="px-4 py-2 border-b themed-border">
+                <div class="text-sm font-medium themed-text" x-text="$store.auth.displayName"></div>
+                <div class="text-xs text-gray-400 mt-0.5" x-show="$store.auth.mobileDisplay" x-text="$store.auth.mobileDisplay"></div>
+                <div class="flex gap-1 mt-1">
+                  <span class="text-xs px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300" x-text="$store.auth.roleLevelDescription"></span>
+                  <span x-show="$store.auth.userLevelDisplay" class="text-xs px-1.5 py-0.5 rounded bg-green-500/20 text-green-300" x-text="$store.auth.userLevelDisplay"></span>
+                </div>
+              </div>
               <a href="/admin/system-settings.html" class="block px-4 py-2 text-sm themed-text-secondary themed-hover-bg">
                 👤 个人设置
               </a>

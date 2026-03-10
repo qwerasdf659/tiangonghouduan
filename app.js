@@ -866,6 +866,15 @@ async function initializeApp() {
       services: Array.from(services.getAllServices().keys())
     })
 
+    // 审核链超时自动升级定时任务（每30分钟扫描）
+    try {
+      const ApprovalChainTimeoutService = require('./services/ApprovalChainTimeoutService')
+      ApprovalChainTimeoutService.start()
+      appLogger.info('审核链超时扫描定时任务已启动')
+    } catch (timeoutError) {
+      appLogger.warn(`审核链超时服务启动失败（非致命）: ${timeoutError.message}`)
+    }
+
     // 运行时自检：打印连接池配置
     const pool = models.sequelize.connectionManager.pool
     if (pool && pool._factory) {

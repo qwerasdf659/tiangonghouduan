@@ -125,7 +125,7 @@ const SENSITIVITY_PARAMS = [
   {
     group: 'strategy_config',
     key: 'pity.hard_guarantee_threshold',
-    label: 'Pity 硬保底阈值',
+    label: '保底硬保底阈值',
     min: 3,
     max: 20,
     step_default: 8
@@ -881,19 +881,19 @@ export function useStrategySimulationMethods() {
           yAxis: { type: 'value', axisLabel: { formatter: '{value}%' } },
           series: [
             {
-              name: 'high%',
+              name: '高档%',
               type: 'line',
               data: points.map(p => p.tier_distribution?.high || 0),
               smooth: true
             },
             {
-              name: 'mid%',
+              name: '中档%',
               type: 'line',
               data: points.map(p => p.tier_distribution?.mid || 0),
               smooth: true
             },
             {
-              name: 'low%',
+              name: '低档%',
               type: 'line',
               data: points.map(p => p.tier_distribution?.low || 0),
               smooth: true

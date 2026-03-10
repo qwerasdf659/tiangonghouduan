@@ -20,14 +20,13 @@ export const EXCHANGE_ENDPOINTS = {
   // 兑换订单
   EXCHANGE_ORDERS: `${API_PREFIX}/console/marketplace/exchange_market/orders`,
   EXCHANGE_ORDER_DETAIL: `${API_PREFIX}/console/marketplace/exchange_market/orders/:order_no`,
-  EXCHANGE_ORDER_STATUS: `${API_PREFIX}/shop/exchange/orders/:order_no/status`,
   EXCHANGE_ORDER_SIMPLE: `${API_PREFIX}/console/marketplace/exchange_market/orders`,
   EXCHANGE_STATS: `${API_PREFIX}/console/marketplace/exchange_market/statistics`,
   EXCHANGE_FULL_STATS: `${API_PREFIX}/console/marketplace/exchange_market/statistics`,
   EXCHANGE_TREND: `${API_PREFIX}/console/marketplace/exchange_market/statistics/trend`,
   EXCHANGE_ORDER_STATS: `${API_PREFIX}/console/marketplace/exchange_market/orders/stats`,
   EXCHANGE_ORDER_SHIP: `${API_PREFIX}/console/marketplace/exchange_market/orders/:order_no/ship`,
-  EXCHANGE_ORDER_CANCEL: `${API_PREFIX}/console/marketplace/exchange_market/orders/:order_no/cancel`
+  EXCHANGE_ORDER_REJECT: `${API_PREFIX}/console/marketplace/exchange_market/orders/:order_no/reject`
 }
 
 // ========== API 调用方法 ==========
@@ -88,16 +87,15 @@ export const ExchangeAPI = {
   },
 
   /**
-   * 更新兑换订单状态
+   * 管理员拒绝兑换订单（退还材料资产）
    * @param {string} orderNo - 订单号
-   * @param {Object} data - 状态更新数据
-   * @param {string} data.status - 新状态（pending/completed/shipped/cancelled）
-   * @param {string} [data.remark] - 操作备注
+   * @param {Object} [data={}] - 拒绝数据
+   * @param {string} [data.remark] - 拒绝原因
    * @returns {Promise<Object>} API 响应
    */
-  async updateExchangeOrderStatus(orderNo, data) {
-    const url = buildURL(EXCHANGE_ENDPOINTS.EXCHANGE_ORDER_STATUS, { order_no: orderNo })
-    return await request({ url, method: 'PUT', data })
+  async rejectExchangeOrder(orderNo, data = {}) {
+    const url = buildURL(EXCHANGE_ENDPOINTS.EXCHANGE_ORDER_REJECT, { order_no: orderNo })
+    return await request({ url, method: 'POST', data })
   },
 
   /**

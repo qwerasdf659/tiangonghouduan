@@ -178,12 +178,12 @@ export function useExchangeOrdersMethods() {
     },
 
     /**
-     * 取消订单
+     * 拒绝订单（管理员操作：审核拒绝，退还材料资产）
      * @param {Object} order - 订单对象
      */
-    async cancelOrder(order) {
+    async rejectOrder(order) {
       const confirmed = await this.$confirm?.(
-        `确定要取消订单 ${order.order_no} 吗？已支付的资产将退回用户账户。`,
+        `确定要拒绝订单 ${order.order_no} 吗？已支付的资产将退回用户账户。`,
         { type: 'danger' }
       )
       if (!confirmed) return
@@ -191,23 +191,23 @@ export function useExchangeOrdersMethods() {
       try {
         this.saving = true
         const res = await request({
-          url: buildURL(MARKET_ENDPOINTS.EXCHANGE_ORDER_CANCEL, {
+          url: buildURL(MARKET_ENDPOINTS.EXCHANGE_ORDER_REJECT, {
             order_no: order.order_no
           }),
           method: 'POST',
-          data: { status: 'cancelled' }
+          data: { remark: '管理员拒绝审批' }
         })
 
         if (res.success) {
-          this.showSuccess?.('订单已取消')
+          this.showSuccess?.('订单已拒绝，资产已退还用户')
           window.dispatchEvent(new CustomEvent('refresh-exchange-orders'))
           this.loadOrderStats()
         } else {
-          this.showError?.(res.message || '取消失败')
+          this.showError?.(res.message || '拒绝失败')
         }
       } catch (e) {
-        logger.error('[ExchangeOrders] 取消订单失败:', e)
-        this.showError?.('取消失败')
+        logger.error('[ExchangeOrders] 拒绝订单失败:', e)
+        this.showError?.('拒绝失败')
       } finally {
         this.saving = false
       }

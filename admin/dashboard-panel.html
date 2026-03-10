@@ -248,7 +248,7 @@
               <template x-for="(value, key) in healthScore.components" :key="key">
                 <div class="text-center">
                   <div class="text-lg font-semibold themed-text" x-text="typeof value === 'object' ? value.score : value"></div>
-                  <div class="text-xs themed-text-muted" x-text="key.replace(/_/g, ' ')"></div>
+                  <div class="text-xs themed-text-muted" x-text="({'prize_pool':'奖品池','user_experience':'用户体验','budget_health':'预算健康','system_performance':'系统性能','draw_quality':'抽奖质量','strategy_effectiveness':'策略效果','data_integrity':'数据完整性'})[key] || key.replace(/_/g, ' ')"></div>
                 </div>
               </template>
             </div>

@@ -106,6 +106,14 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
     'status',
     'exchange_time',
     'shipped_at',
+    'received_at',
+    'rated_at',
+    'rejected_at',
+    'refunded_at',
+    'approved_at',
+    'auto_confirmed',
+    'rating',
+    'source',
     'created_at',
     'updated_at'
   ],
@@ -127,6 +135,14 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
     'admin_remark',
     'exchange_time',
     'shipped_at',
+    'received_at',
+    'rated_at',
+    'rejected_at',
+    'refunded_at',
+    'approved_at',
+    'auto_confirmed',
+    'rating',
+    'source',
     'created_at',
     'updated_at'
   ]
@@ -161,8 +177,9 @@ class QueryService {
    * @param {number} [options.page_size=20] - 每页数量
    * @param {string} [options.sort_by='sort_order'] - 排序字段
    * @param {string} [options.sort_order='ASC'] - 排序方向
+   * @param {boolean} [options.with_counts=false] - 是否返回各筛选维度的聚合计数（C+++ 条件联动）
    * @param {boolean} [options.refresh=false] - 强制刷新缓存
-   * @returns {Promise<Object>} 商品列表和分页信息
+   * @returns {Promise<Object>} 商品列表和分页信息（with_counts=true 时额外包含 filters_count）
    */
   async getMarketItems(options = {}) {
     const {
@@ -174,6 +191,7 @@ class QueryService {
       min_cost = null,
       max_cost = null,
       stock_status = null,
+      with_counts = false,
       page = 1,
       page_size = 20,
       sort_by = 'sort_order',
@@ -182,12 +200,17 @@ class QueryService {
     } = options
 
     try {
-      // Redis 缓存读取
+      // Redis 缓存读取（所有筛选参数都必须参与缓存 key，避免不同条件命中相同缓存）
       const cacheParams = {
         status,
         asset_code: asset_code || 'all',
         space: space || 'all',
         keyword: keyword || '',
+        category: category || 'all',
+        min_cost: min_cost || 0,
+        max_cost: max_cost || 0,
+        stock_status: stock_status || 'all',
+        with_counts: with_counts ? '1' : '0',
         page,
         page_size,
         sort_by,
@@ -294,6 +317,20 @@ class QueryService {
         },
         summary,
         timestamp: BeijingTimeHelper.now()
+      }
+
+      // C+++ 聚合计数：每个维度排除自身条件，保留其他维度条件（条件联动）
+      if (with_counts) {
+        result.filters_count = await this._buildFiltersCount({
+          status,
+          asset_code,
+          space,
+          keyword,
+          category,
+          min_cost,
+          max_cost,
+          stock_status
+        })
       }
 
       // 写入 Redis 缓存
@@ -692,6 +729,158 @@ class QueryService {
     } catch (error) {
       logger.error(`[兑换市场] 查询空间统计失败(space:${space}):`, error.message)
       throw error
+    }
+  }
+
+  /**
+   * C+++ 聚合计数：各筛选维度交叉排除计数（条件联动）
+   *
+   * 每个维度的 COUNT 排除自身条件但保留其他维度条件，
+   * 使前端能够展示"如果选了这个分类，有几个商品"的动态计数。
+   *
+   * @param {Object} filterValues - 当前所有筛选值
+   * @returns {Promise<Object>} 各维度的聚合计数 { categories, cost_ranges, stock_statuses }
+   * @private
+   */
+  async _buildFiltersCount(filterValues) {
+    const { status, asset_code, space, keyword, category, min_cost, max_cost, stock_status } =
+      filterValues
+
+    try {
+      const { sequelize } = this.ExchangeItem
+
+      /**
+       * 构建基础 WHERE（status + asset_code + space + keyword 不参与维度排除，始终保留）
+       * 这些是"全局筛选"，不属于 facet 维度
+       *
+       * @returns {Object} SQL 片段和参数 { parts, replacements }
+       */
+      const buildBaseWhere = () => {
+        const parts = ['ei.status = :status']
+        const replacements = { status }
+
+        if (asset_code) {
+          parts.push('ei.cost_asset_code = :asset_code')
+          replacements.asset_code = asset_code
+        }
+        if (space) {
+          parts.push('ei.space IN (:space_values)')
+          replacements.space_values = [space, 'both']
+        }
+        if (keyword) {
+          parts.push('ei.item_name LIKE :keyword')
+          replacements.keyword = `%${keyword}%`
+        }
+        return { parts, replacements }
+      }
+
+      // 1. 分类计数：排除 category 条件，保留 price + stock 条件
+      const catBase = buildBaseWhere()
+      if (min_cost !== null) {
+        catBase.parts.push('ei.cost_amount >= :min_cost')
+        catBase.replacements.min_cost = parseInt(min_cost, 10)
+      }
+      if (max_cost !== null) {
+        catBase.parts.push('ei.cost_amount <= :max_cost')
+        catBase.replacements.max_cost = parseInt(max_cost, 10)
+      }
+      if (stock_status === 'in_stock') {
+        catBase.parts.push('ei.stock > 5')
+      } else if (stock_status === 'low_stock') {
+        catBase.parts.push('ei.stock BETWEEN 1 AND 5')
+      }
+
+      // 2. 价格区间计数：排除 price 条件，保留 category + stock 条件
+      const priceBase = buildBaseWhere()
+      if (category) {
+        priceBase.parts.push('ei.category = :category')
+        priceBase.replacements.category = category
+      }
+      if (stock_status === 'in_stock') {
+        priceBase.parts.push('ei.stock > 5')
+      } else if (stock_status === 'low_stock') {
+        priceBase.parts.push('ei.stock BETWEEN 1 AND 5')
+      }
+
+      // 3. 库存状态计数：排除 stock 条件，保留 category + price 条件
+      const stockBase = buildBaseWhere()
+      if (category) {
+        stockBase.parts.push('ei.category = :category_s')
+        stockBase.replacements.category_s = category
+      }
+      if (min_cost !== null) {
+        stockBase.parts.push('ei.cost_amount >= :min_cost_s')
+        stockBase.replacements.min_cost_s = parseInt(min_cost, 10)
+      }
+      if (max_cost !== null) {
+        stockBase.parts.push('ei.cost_amount <= :max_cost_s')
+        stockBase.replacements.max_cost_s = parseInt(max_cost, 10)
+      }
+
+      // 并行执行 3 个聚合查询
+      const [categoryRows, priceRows, stockRows] = await Promise.all([
+        // 分类维度计数
+        sequelize.query(
+          `SELECT COALESCE(ei.category, '__null__') AS category_code, COUNT(*) AS cnt
+           FROM exchange_items ei
+           WHERE ${catBase.parts.join(' AND ')}
+           GROUP BY ei.category`,
+          { replacements: catBase.replacements, type: sequelize.constructor.QueryTypes.SELECT }
+        ),
+        // 价格区间维度计数（区间定义：0-100, 100-500, 500-1000, 1000+）
+        sequelize.query(
+          `SELECT
+             SUM(CASE WHEN ei.cost_amount <= 100 THEN 1 ELSE 0 END) AS range_0_100,
+             SUM(CASE WHEN ei.cost_amount > 100 AND ei.cost_amount <= 500 THEN 1 ELSE 0 END) AS range_100_500,
+             SUM(CASE WHEN ei.cost_amount > 500 AND ei.cost_amount <= 1000 THEN 1 ELSE 0 END) AS range_500_1000,
+             SUM(CASE WHEN ei.cost_amount > 1000 THEN 1 ELSE 0 END) AS range_1000_plus,
+             COUNT(*) AS total
+           FROM exchange_items ei
+           WHERE ${priceBase.parts.join(' AND ')}`,
+          { replacements: priceBase.replacements, type: sequelize.constructor.QueryTypes.SELECT }
+        ),
+        // 库存状态维度计数
+        sequelize.query(
+          `SELECT
+             SUM(CASE WHEN ei.stock > 5 THEN 1 ELSE 0 END) AS in_stock,
+             SUM(CASE WHEN ei.stock BETWEEN 1 AND 5 THEN 1 ELSE 0 END) AS low_stock,
+             SUM(CASE WHEN ei.stock = 0 THEN 1 ELSE 0 END) AS out_of_stock,
+             COUNT(*) AS total
+           FROM exchange_items ei
+           WHERE ${stockBase.parts.join(' AND ')}`,
+          { replacements: stockBase.replacements, type: sequelize.constructor.QueryTypes.SELECT }
+        )
+      ])
+
+      // 组装分类计数结果
+      const categories = {}
+      for (const row of categoryRows) {
+        categories[row.category_code] = parseInt(row.cnt, 10)
+      }
+
+      // 组装价格区间计数结果
+      const priceResult = priceRows[0] || {}
+      const cost_ranges = {
+        '0-100': parseInt(priceResult.range_0_100 || 0, 10),
+        '100-500': parseInt(priceResult.range_100_500 || 0, 10),
+        '500-1000': parseInt(priceResult.range_500_1000 || 0, 10),
+        '1000+': parseInt(priceResult.range_1000_plus || 0, 10),
+        total: parseInt(priceResult.total || 0, 10)
+      }
+
+      // 组装库存状态计数结果
+      const stockResult = stockRows[0] || {}
+      const stock_statuses = {
+        in_stock: parseInt(stockResult.in_stock || 0, 10),
+        low_stock: parseInt(stockResult.low_stock || 0, 10),
+        out_of_stock: parseInt(stockResult.out_of_stock || 0, 10),
+        total: parseInt(stockResult.total || 0, 10)
+      }
+
+      return { categories, cost_ranges, stock_statuses }
+    } catch (error) {
+      logger.warn('[兑换市场] 聚合计数计算失败（非致命）:', error.message)
+      return { categories: {}, cost_ranges: {}, stock_statuses: {} }
     }
   }
 

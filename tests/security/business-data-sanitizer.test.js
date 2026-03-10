@@ -97,11 +97,21 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
       })
     })
 
-    test('B-5-1-3b 普通用户（public）可见 is_fallback（2026-02-25 决策6 放开）', () => {
+    test('B-5-1-3b 普通用户（public）不可见 is_fallback（商业机密：暴露保底机制）', () => {
       const result = DataSanitizer.sanitizePrizes(mockPrizes, 'public')
 
-      expect(result[0].is_fallback).toBe(false)
-      expect(result[1].is_fallback).toBe(true)
+      result.forEach(prize => {
+        expect(prize).not.toHaveProperty('is_fallback')
+      })
+    })
+
+    test('B-5-1-3c 普通用户（public）不可见 reward_tier（商业机密：暴露奖品档次）', () => {
+      const prizesWithTier = mockPrizes.map(p => ({ ...p, reward_tier: 'high' }))
+      const result = DataSanitizer.sanitizePrizes(prizesWithTier, 'public')
+
+      result.forEach(prize => {
+        expect(prize).not.toHaveProperty('reward_tier')
+      })
     })
 
     test('B-5-1-4 普通用户（public）保留 rarity_code 字段', () => {
@@ -604,6 +614,14 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
 
       expect(result).toContain('acquisition_cost: [HIDDEN]')
       expect(result).not.toContain('1000')
+    })
+
+    test('B-5-10-7 is_fallback 在日志中脱敏（防止保底机制泄露）', () => {
+      const logData = 'prize info: is_fallback: true, prize_name: 积分'
+      const result = DataSanitizer.sanitizeLogs(logData)
+
+      expect(result).toContain('is_fallback: [HIDDEN]')
+      expect(result).not.toMatch(/is_fallback:\s*true/)
     })
 
     test('B-5-10-6 对象输入自动转换为JSON字符串', () => {

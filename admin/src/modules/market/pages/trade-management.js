@@ -340,6 +340,7 @@ document.addEventListener('alpine:init', () => {
         const queryParams = {
           status: this.tradeFilters.status,
           listing_id: this.tradeFilters.listing_id,
+          merchant_id: this.tradeOrderMerchantFilter || undefined,
           page: this.tradeCurrentPage,
           page_size: this.tradePageSize
         }
@@ -416,6 +417,9 @@ document.addEventListener('alpine:init', () => {
         }
         if (this.marketplaceFilters.mobile?.trim()) {
           params.mobile = this.marketplaceFilters.mobile.trim()
+        }
+        if (this.marketplaceFilters.merchant_id) {
+          params.merchant_id = this.marketplaceFilters.merchant_id
         }
 
         const result = await request({
@@ -879,6 +883,7 @@ document.addEventListener('alpine:init', () => {
       }
       // 合并筛选条件
       if (this.tradeFilters?.status) queryParams.status = this.tradeFilters.status
+      if (this.tradeOrderMerchantFilter) queryParams.merchant_id = this.tradeOrderMerchantFilter
       if (this.tradeFilters?.buyer_mobile) {
         const buyer = await this.resolveUserByMobile(this.tradeFilters.buyer_mobile)
         if (buyer) { queryParams.buyer_user_id = buyer.user_id; this.resolvedBuyer = buyer }
@@ -920,6 +925,12 @@ document.addEventListener('alpine:init', () => {
       }
       if (this.marketplaceFilters?.status && this.marketplaceFilters.status !== 'all') {
         queryParams.filter = this.marketplaceFilters.status
+      }
+      if (this.marketplaceFilters?.mobile?.trim()) {
+        queryParams.mobile = this.marketplaceFilters.mobile.trim()
+      }
+      if (this.marketplaceFilters?.merchant_id) {
+        queryParams.merchant_id = this.marketplaceFilters.merchant_id
       }
 
       const result = await request({

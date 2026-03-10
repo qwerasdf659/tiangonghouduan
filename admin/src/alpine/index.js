@@ -229,28 +229,80 @@ export function initAlpine() {
   // 注册通知状态 store（使用 createToastStore 包含完整 API：show/success/error/warning/info）
   Alpine.store('notification', createToastStore())
 
-  // 注册认证状态 store
+  // 注册认证状态 store（与 login.js 的 setUser/setToken 对齐，读取 admin_user/admin_token）
   Alpine.store('auth', {
-    user_info: null,
+    token: localStorage.getItem('admin_token'),
+    user: JSON.parse(localStorage.getItem('admin_user') || 'null'),
 
-    init() {
-      try {
-        const stored_info = localStorage.getItem('admin_user_info')
-        if (stored_info) {
-          this.user_info = JSON.parse(stored_info)
-        }
-      } catch (_e) {
-        logger.warn('无法恢复管理员信息')
-      }
+    get isLoggedIn() {
+      return !!this.token
     },
 
-    setUserInfo(info) {
-      this.user_info = info
-      if (info) {
-        localStorage.setItem('admin_user_info', JSON.stringify(info))
-      } else {
-        localStorage.removeItem('admin_user_info')
+    get isAdmin() {
+      if (!this.user) return false
+      if (this.user.role_level >= 100) return true
+      if (Array.isArray(this.user.roles)) {
+        return this.user.roles.some(r => r.role_name === 'admin' || r.role_level >= 100)
       }
+      return false
+    },
+
+    /** 用户显示名称：优先 nickname，其次 mobile */
+    get displayName() {
+      return this.user?.nickname || this.user?.mobile || '未登录'
+    },
+
+    /** 用户权限等级数值 */
+    get roleLevel() {
+      return this.user?.role_level || 0
+    },
+
+    /** 用户权限等级中文描述（与 permission-rules.js getUserRoleLevelDescription 对齐） */
+    get roleLevelDescription() {
+      const level = this.roleLevel
+      if (level >= 100) return '超级管理员'
+      if (level >= 80) return '高级运营'
+      if (level >= 30) return '运营'
+      if (level >= 1) return '客服'
+      return '普通用户'
+    },
+
+    /** 用户手机号（管理后台不做脱敏处理） */
+    get mobileDisplay() {
+      return this.user?.mobile || ''
+    },
+
+    /** 用户等级（normal/vip/merchant → 中文显示） */
+    get userLevelDisplay() {
+      const levelMap = { normal: '普通用户', vip: 'VIP用户', merchant: '商户' }
+      return levelMap[this.user?.user_level] || this.user?.user_level || ''
+    },
+
+    /** 用户头像首字（取 nickname 或 mobile 首字符） */
+    get avatarInitial() {
+      if (this.user?.nickname) return this.user.nickname.charAt(0).toUpperCase()
+      if (this.user?.mobile) return this.user.mobile.charAt(0)
+      return '?'
+    },
+
+    login(token, user) {
+      this.token = token
+      this.user = user
+      localStorage.setItem('admin_token', token)
+      localStorage.setItem('admin_user', JSON.stringify(user))
+    },
+
+    logout() {
+      this.token = null
+      this.user = null
+      localStorage.removeItem('admin_token')
+      localStorage.removeItem('admin_user')
+      window.location.href = '/admin/login.html'
+    },
+
+    updateUser(userData) {
+      this.user = { ...this.user, ...userData }
+      localStorage.setItem('admin_user', JSON.stringify(this.user))
     }
   })
 

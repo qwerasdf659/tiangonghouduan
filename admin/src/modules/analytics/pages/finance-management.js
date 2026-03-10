@@ -506,68 +506,16 @@ document.addEventListener('alpine:init', () => {
     return table
   })
 
-  /** 活动预算 - 使用后端 /batch-status 端点（后端无根路径 GET） */
-  Alpine.data('budgetDataTable', () => {
-    const table = dataTable({
-      columns: [
-        { key: 'lottery_campaign_id', label: '活动ID', sortable: true },
-        { key: 'campaign_name', label: '活动名称', render: (val, row) => val || row.name || '-' },
-        {
-          key: 'budget_mode',
-          label: '预算模式',
-          render: val =>
-            val === 'pool'
-              ? '活动池'
-              : val === 'user'
-                ? '用户预算'
-                : val === 'none'
-                  ? '无预算'
-                  : val || '-'
-        },
-        {
-          key: 'pool_budget_total',
-          label: '总预算',
-          render: (val, row) => row.pool_budget?.total ?? val ?? 0
-        },
-        {
-          key: 'pool_budget_remaining',
-          label: '剩余',
-          render: (val, row) => row.pool_budget?.remaining ?? val ?? 0
-        },
-        {
-          key: 'status',
-          label: '活动状态',
-          type: 'status',
-          statusMap: {
-            active: { class: 'green', label: '运行中' },
-            draft: { class: 'gray', label: '草稿' },
-            paused: { class: 'yellow', label: '暂停' },
-            ended: { class: 'blue', label: '已结束' },
-            cancelled: { class: 'red', label: '已取消' }
-          }
-        }
-      ],
-      dataSource: async params => {
-        const res = await request({
-          url: `${API_PREFIX}/console/campaign-budget/batch-status`,
-          method: 'GET',
-          params
-        })
-        const items = res.data?.campaigns || res.data?.list || res.data?.budgets || []
-        const total = res.data?.total_count || res.data?.pagination?.total || items.length
-        return { items, total }
-      },
-      primaryKey: 'lottery_campaign_id',
-      sortable: true,
-      page_size: 20
-    })
-    const origInit = table.init
-    table.init = async function () {
-      window.addEventListener('refresh-budgets', () => this.loadData())
-      if (origInit) await origInit.call(this)
+  /**
+   * 活动预算 - 数据由 financePageContent composable 的 loadBudgets() 加载
+   * V3.0: 分区域展示（用户预算 / 活动池预算），不再使用单一 dataTable
+   * 保留 budgetDataTable 注册以防旧 HTML 引用不报错
+   */
+  Alpine.data('budgetDataTable', () => ({
+    init() {
+      logger.debug('[BudgetDataTable] 预算列表已由 financePageContent 分组渲染')
     }
-    return table
-  })
+  }))
 
   /** 商户操作日志 - 适配后端 /console/audit-logs API */
   Alpine.data('merchantLogsDataTable', () => {

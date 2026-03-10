@@ -314,7 +314,7 @@ document.addEventListener('alpine:init', () => {
       applied: 'bg-green-500'
     },
     TRIGGER_TYPE_MAP: {
-      dau_shift: 'DAU变化自动触发',
+      dau_shift: '日活变化自动触发',
       manual: '运营手动触发'
     },
 
