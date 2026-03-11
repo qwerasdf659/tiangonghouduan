@@ -829,6 +829,22 @@ class AdCampaignService {
         slot_id: data.ad_slot_id
       })
 
+      // 自动创建 AdCreative 记录（图片或文字素材）
+      if (data.image_url || data.text_content) {
+        await AdCreative.create(
+          {
+            ad_campaign_id: campaign.ad_campaign_id,
+            title: data.campaign_name,
+            content_type: data.content_type || 'image',
+            image_url: data.image_url || null,
+            text_content: data.text_content || null,
+            display_mode: data.display_mode || null,
+            review_status: 'approved'
+          },
+          { transaction: options.transaction }
+        )
+      }
+
       return campaign
     } catch (error) {
       logger.error('创建运营内容计划失败', { error: error.message, data })

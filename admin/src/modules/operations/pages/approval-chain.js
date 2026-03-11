@@ -11,7 +11,7 @@
  */
 
 import { logger } from '../../../utils/logger.js'
-import { createPageMixin } from '../../../alpine/mixins/index.js'
+import { Alpine, createPageMixin } from '../../../alpine/index.js'
 import { ApprovalChainAPI } from '../../../api/approval-chain.js'
 
 /** 业务类型映射（后端 auditable_type → 中文） */
@@ -286,9 +286,6 @@ function approvalChainPage() {
   }
 }
 
-document.addEventListener('alpine:init', () => {
-  if (window.Alpine) {
-    window.Alpine.data('approvalChainPage', approvalChainPage)
-    logger.info('[ApprovalChain] Alpine 组件注册完成')
-  }
-})
+Alpine.data('approvalChainPage', approvalChainPage)
+
+export default approvalChainPage

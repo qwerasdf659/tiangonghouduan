@@ -4,7 +4,7 @@
  *
  * 职责范围：核心兑换操作
  * - exchangeItem(): 商品兑换核心逻辑（材料资产扣减、订单创建、库存扣减）
- * - updateOrderStatus(): 更新订单状态（管理员操作）
+ * - updateOrderStatus(): 更新订单状态（管理员操作，含状态机校验）
  * - _generateOrderNo(): 生成订单号（私有方法）
  *
  * 设计原则：
@@ -20,6 +20,36 @@ const logger = require('../../utils/logger').logger
 const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
 const BeijingTimeHelper = require('../../utils/timeHelper')
 const { assertAndGetTransaction } = require('../../utils/transactionHelpers')
+
+/**
+ * 兑换订单状态机白名单
+ *
+ * 业务流程：
+ *   pending → approved（管理员审批通过）
+ *   pending → rejected（管理员拒绝，退还材料）
+ *   pending → cancelled（用户自行取消，退还材料）
+ *   approved → shipped（管理员标记发货）
+ *   shipped → received（用户确认收货 / 7天自动确认）
+ *   received → rated（用户评分）
+ *   received → completed（管理员标记完成）
+ *   shipped → completed（管理员直接标记完成）
+ *   rated → completed（管理员标记完成）
+ *   approved → refunded（管理员退款）
+ *   shipped → refunded（管理员退款-已发货阶段）
+ *
+ * @type {Object<string, string[]>}
+ */
+const ORDER_STATUS_TRANSITIONS = {
+  pending: ['approved', 'rejected', 'cancelled'],
+  approved: ['shipped', 'refunded'],
+  shipped: ['received', 'completed', 'refunded'],
+  received: ['rated', 'completed'],
+  rated: ['completed'],
+  rejected: [],
+  refunded: [],
+  cancelled: [],
+  completed: []
+}
 
 /**
  * 兑换市场核心服务类
@@ -418,6 +448,30 @@ class CoreService {
     }
 
     const old_status = order.status
+
+    // 状态机校验：只允许白名单中定义的合法状态转换
+    const allowedTransitions = ORDER_STATUS_TRANSITIONS[old_status]
+    if (!allowedTransitions) {
+      const error = new Error(`当前订单状态 "${old_status}" 无法执行任何状态变更`)
+      error.statusCode = 400
+      error.code = 'INVALID_STATUS_TRANSITION'
+      error.data = { current_status: old_status, requested_status: new_status }
+      throw error
+    }
+    if (!allowedTransitions.includes(new_status)) {
+      const error = new Error(
+        `不允许的状态转换：${old_status} → ${new_status}，` +
+          `当前状态仅可转换为：${allowedTransitions.length > 0 ? allowedTransitions.join(', ') : '（终态，不可变更）'}`
+      )
+      error.statusCode = 400
+      error.code = 'INVALID_STATUS_TRANSITION'
+      error.data = {
+        current_status: old_status,
+        requested_status: new_status,
+        allowed_transitions: allowedTransitions
+      }
+      throw error
+    }
 
     // 更新订单状态
     await order.update(
@@ -1005,3 +1059,4 @@ class CoreService {
 }
 
 module.exports = CoreService
+module.exports.ORDER_STATUS_TRANSITIONS = ORDER_STATUS_TRANSITIONS

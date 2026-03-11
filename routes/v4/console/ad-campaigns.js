@@ -237,7 +237,11 @@ router.post(
         start_date: req.body.start_date || null,
         end_date: req.body.end_date || null,
         internal_notes: req.body.internal_notes || null,
-        targeting_rules: req.body.targeting_rules || null
+        targeting_rules: req.body.targeting_rules || null,
+        image_url: req.body.image_url || null,
+        content_type: req.body.content_type || 'image',
+        text_content: req.body.text_content || null,
+        display_mode: req.body.display_mode || null
       })
 
       logger.info('创建运营内容计划成功', {
@@ -292,7 +296,11 @@ router.post(
         start_date: req.body.start_date || null,
         end_date: req.body.end_date || null,
         internal_notes: req.body.internal_notes || null,
-        targeting_rules: req.body.targeting_rules || null
+        targeting_rules: req.body.targeting_rules || null,
+        content_type: req.body.content_type || 'text',
+        text_content: req.body.text_content || null,
+        image_url: req.body.image_url || null,
+        display_mode: req.body.display_mode || null
       })
 
       logger.info('创建系统通知计划成功', {

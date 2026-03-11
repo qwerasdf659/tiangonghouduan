@@ -1202,7 +1202,10 @@ router.get(
         page: result.pagination.page
       })
 
-      return res.apiSuccess(result, '订单列表查询成功')
+      return res.apiSuccess(
+        { orders: result.orders, pagination: result.pagination, filters: result.filters },
+        '订单列表查询成功'
+      )
     } catch (error) {
       logger.error('管理员查询兑换订单失败', {
         error: error.message,
@@ -1255,7 +1258,7 @@ router.get(
         status: result.order?.status
       })
 
-      return res.apiSuccess(result, '订单详情查询成功')
+      return res.apiSuccess({ order: result.order }, '订单详情查询成功')
     } catch (error) {
       logger.error('管理员查询兑换订单详情失败', {
         error: error.message,
@@ -1264,7 +1267,6 @@ router.get(
         order_no: req.params.order_no
       })
 
-      // 业务错误处理
       if (error.errorCode === 'ORDER_NOT_FOUND' || error.statusCode === 404) {
         return res.apiError(error.message, 'NOT_FOUND', null, 404)
       }

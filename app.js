@@ -826,6 +826,18 @@ app.use((error, req, res, _next) => {
     return ApiResponse.send(res, resp)
   }
 
+  // 携带 statusCode 的业务错误（Service 层抛出的带 HTTP 状态码的 Error）
+  if (error.statusCode && error.statusCode !== 500) {
+    const resp = ApiResponse.error(
+      error.message,
+      error.errorCode || error.code || 'BUSINESS_ERROR',
+      error.data || null,
+      error.statusCode
+    )
+    resp.request_id = requestId
+    return ApiResponse.send(res, resp)
+  }
+
   // 默认错误处理
   const resp = ApiResponse.error(
     process.env.NODE_ENV === 'development' ? error.message : '服务器内部错误',

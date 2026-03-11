@@ -4,7 +4,7 @@
  * 审核链系统 — 初始化默认模板和节点配置
  *
  * 决策 #2：同时 Seed 单级+多级配置
- * 决策 #6：初审使用 business_manager(role_id=102) 兼任
+ * 决策 #6：初审使用 business_manager(role_id=7, level=60) 兼任
  *
  * 配置清单：
  *   1. consumption_default — 消费审核默认链（1级，admin终审），priority=0 兜底

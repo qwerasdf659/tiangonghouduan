@@ -13,6 +13,7 @@ import { SYSTEM_ENDPOINTS } from '../../../api/system/index.js'
 import { Alpine, createPageMixin } from '../../../alpine/index.js'
 import { loadECharts } from '../../../utils/echarts-lazy.js'
 import { useAdPricingState } from '../composables/ad-pricing.js'
+import { imageUploadMixin } from '../../../alpine/mixins/image-upload.js'
 
 document.addEventListener('alpine:init', () => {
   logger.info('[AdManagement] 注册 Alpine 组件...')
@@ -20,6 +21,7 @@ document.addEventListener('alpine:init', () => {
   Alpine.data('adManagement', () => ({
     ...createPageMixin(),
     ...useAdPricingState(),
+    ...imageUploadMixin(),
 
     // ==================== 子页面导航 ====================
     current_page: 'dashboard',
@@ -204,6 +206,35 @@ document.addEventListener('alpine:init', () => {
     /** 获取频次规则中文 */
     frequencyText (rule) {
       return this.FREQUENCY_MAP[rule] || rule || '-'
+    },
+
+    // ==================== 图片上传 ====================
+    /** 广告创意图片预览 URL（本地 blob 或已上传的远程 URL） */
+    campaignImagePreview: '',
+    /** 已上传的图片远程 URL（用于提交） */
+    campaignImageUrl: '',
+
+    /** 处理广告图片选择 */
+    async handleCampaignImageUpload(event) {
+      const fileInfo = this.getFileFromEvent(event)
+      if (!fileInfo) return
+      this.campaignImagePreview = fileInfo.preview_url
+      const result = await this.uploadImage(fileInfo.file, {
+        business_type: 'uploads',
+        category: 'ad_creative'
+      })
+      if (result) {
+        this.campaignImageUrl = result.public_url
+      } else {
+        this.campaignImagePreview = ''
+        this.campaignImageUrl = ''
+      }
+    },
+
+    /** 清除已选图片 */
+    clearCampaignImage() {
+      this.campaignImagePreview = ''
+      this.campaignImageUrl = ''
     },
 
     // ==================== 通用状态 ====================
@@ -517,6 +548,8 @@ document.addEventListener('alpine:init', () => {
         content_type: isSystem ? 'text' : 'image',
         display_mode: null
       }
+      this.campaignImagePreview = ''
+      this.campaignImageUrl = ''
       this.showModal('campaignCreateModal')
     },
 
@@ -612,6 +645,11 @@ document.addEventListener('alpine:init', () => {
         // W5: 传递 display_mode（弹窗显示模式）
         if (this.campaignForm.display_mode) {
           data.display_mode = this.campaignForm.display_mode
+        }
+
+        // 传递广告图片 URL（通过独立上传接口获得）
+        if (this.campaignImageUrl) {
+          data.image_url = this.campaignImageUrl
         }
 
         // W4: 根据 category 使用对应的专用创建端点（跳过审核简化流程）

@@ -456,7 +456,10 @@ class QueryService {
       })
 
       if (!order) {
-        throw new Error('订单不存在或无权访问')
+        const notFoundError = new Error('订单不存在或无权访问')
+        notFoundError.statusCode = 404
+        notFoundError.errorCode = 'ORDER_NOT_FOUND'
+        throw notFoundError
       }
 
       // 添加中文显示名称

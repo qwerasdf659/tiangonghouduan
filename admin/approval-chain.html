@@ -1,26 +1,29 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>审核链配置管理</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-  <style>[x-cloak] { display: none !important; }</style>
+  <%- include('partials/head', {
+    title: '审核链配置管理',
+    pageStyle: '[x-cloak] { display: none !important; }'
+  }) %>
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="themed-bg-subtle min-h-screen" x-data="approvalChainPage()" x-init="init()" x-cloak>
 
-  <!-- 顶部导航 -->
-  <nav class="bg-gray-800 text-white shadow-lg">
+  <!-- 导航栏 -->
+  <nav class="bg-gray-700 text-white shadow-lg">
     <div class="container mx-auto px-4 py-3 flex justify-between items-center">
       <div class="flex items-center space-x-4">
-        <a href="/admin/workspace.html" class="hover:text-gray-300 transition-colors">← 返回工作台</a>
+        <a href="/admin/workspace.html" class="hover:text-gray-300">← 返回工作台</a>
         <span class="text-lg font-semibold">🔗 审核链配置管理</span>
+      </div>
+      <div class="flex items-center space-x-4">
+        <span x-text="'欢迎，' + (current_user?.nickname || '管理员')"></span>
+        <button @click="logout()" class="px-3 py-1 border border-white/50 rounded hover:bg-white/10">退出登录</button>
       </div>
     </div>
   </nav>
 
   <!-- 页面主体 -->
-  <div class="container mx-auto px-4 py-6" x-data="approvalChainPage()" x-init="init()" x-cloak>
+  <div class="container mx-auto px-4 py-6">
 
     <!-- Tab 导航 -->
     <div class="bg-white rounded-xl shadow-sm mb-6 overflow-hidden">
@@ -28,17 +31,17 @@
         <button @click="switchTab('templates')"
           :class="current_tab === 'templates' ? 'border-b-2 border-blue-500 text-blue-600 bg-blue-50' : 'text-gray-500 hover:text-gray-700'"
           class="px-6 py-3.5 font-medium transition-all">
-          <i class="bi bi-diagram-3 mr-1.5"></i> 模板管理
+          📋 模板管理
         </button>
         <button @click="switchTab('instances')"
           :class="current_tab === 'instances' ? 'border-b-2 border-blue-500 text-blue-600 bg-blue-50' : 'text-gray-500 hover:text-gray-700'"
           class="px-6 py-3.5 font-medium transition-all">
-          <i class="bi bi-list-check mr-1.5"></i> 审核实例
+          📝 审核实例
         </button>
         <button @click="switchTab('my-pending')"
           :class="current_tab === 'my-pending' ? 'border-b-2 border-blue-500 text-blue-600 bg-blue-50' : 'text-gray-500 hover:text-gray-700'"
           class="px-6 py-3.5 font-medium transition-all">
-          <i class="bi bi-clock-history mr-1.5"></i> 我的待审核
+          ⏳ 我的待审核
         </button>
       </div>
     </div>
@@ -49,14 +52,13 @@
         <h2 class="text-xl font-bold text-gray-800">审核链模板</h2>
         <button @click="openCreateTemplate()"
           class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-          <i class="bi bi-plus-lg mr-1"></i> 新建模板
+          ＋ 新建模板
         </button>
       </div>
 
-      <!-- 模板列表 -->
       <div class="bg-white rounded-xl shadow-sm overflow-hidden">
         <template x-if="templates_loading">
-          <div class="p-8 text-center text-gray-400"><i class="bi bi-arrow-repeat animate-spin mr-2"></i>加载中...</div>
+          <div class="p-8 text-center text-gray-400">⏳ 加载中...</div>
         </template>
         <template x-if="!templates_loading && templates.length === 0">
           <div class="p-8 text-center text-gray-400">暂无审核链模板</div>
@@ -124,7 +126,7 @@
 
       <div class="bg-white rounded-xl shadow-sm overflow-hidden">
         <template x-if="instances_loading">
-          <div class="p-8 text-center text-gray-400"><i class="bi bi-arrow-repeat animate-spin mr-2"></i>加载中...</div>
+          <div class="p-8 text-center text-gray-400">⏳ 加载中...</div>
         </template>
         <template x-if="!instances_loading && instances.length === 0">
           <div class="p-8 text-center text-gray-400">暂无审核实例</div>
@@ -176,11 +178,11 @@
 
       <div class="bg-white rounded-xl shadow-sm overflow-hidden">
         <template x-if="my_pending_loading">
-          <div class="p-8 text-center text-gray-400"><i class="bi bi-arrow-repeat animate-spin mr-2"></i>加载中...</div>
+          <div class="p-8 text-center text-gray-400">⏳ 加载中...</div>
         </template>
         <template x-if="!my_pending_loading && my_pending.length === 0">
           <div class="p-8 text-center text-gray-400">
-            <i class="bi bi-check-circle text-4xl text-green-300 mb-3 block"></i>
+            <div class="text-4xl text-green-300 mb-3">✅</div>
             没有待审核的任务
           </div>
         </template>
@@ -204,11 +206,11 @@
                 <div class="flex items-center space-x-2 ml-4">
                   <button @click="openReviewModal(step.step_id, 'approve')"
                     class="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 transition-colors">
-                    <i class="bi bi-check-lg mr-1"></i>通过
+                    ✓ 通过
                   </button>
                   <button @click="openReviewModal(step.step_id, 'reject')"
                     class="px-3 py-1.5 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 transition-colors">
-                    <i class="bi bi-x-lg mr-1"></i>拒绝
+                    ✕ 拒绝
                   </button>
                 </div>
               </div>
@@ -290,7 +292,7 @@
           <div>
             <div class="flex justify-between items-center mb-2">
               <label class="text-sm font-medium text-gray-700">审核节点</label>
-              <button @click="addNode()" class="text-sm text-blue-600 hover:text-blue-800"><i class="bi bi-plus-lg mr-1"></i>添加节点</button>
+              <button @click="addNode()" class="text-sm text-blue-600 hover:text-blue-800">＋ 添加节点</button>
             </div>
             <template x-for="(node, idx) in template_form.nodes" :key="idx">
               <div class="border rounded-lg p-3 mb-2 bg-gray-50">
@@ -311,7 +313,7 @@
                     <label class="flex items-center text-xs">
                       <input type="checkbox" x-model="node.is_final" :true-value="1" :false-value="0" class="mr-1"> 终审
                     </label>
-                    <button @click="removeNode(idx)" class="text-red-500 hover:text-red-700"><i class="bi bi-trash"></i></button>
+                    <button @click="removeNode(idx)" class="text-red-500 hover:text-red-700 text-sm">删除</button>
                   </div>
                 </div>
               </div>
@@ -379,8 +381,8 @@
 
   </div>
 
-  <!-- JS 模块入口 -->
-  <script type="module" src="./src/alpine/index.js"></script>
+  <%- include('partials/footer') %>
+
   <script type="module" src="./src/modules/operations/pages/approval-chain.js"></script>
 </body>
 </html>

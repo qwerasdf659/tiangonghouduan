@@ -1147,6 +1147,26 @@
               </div>
             </div>
 
+            <!-- 广告创意图片上传（非系统通知时显示） -->
+            <div x-show="campaignForm.campaign_category !== 'system'">
+              <label class="block text-sm font-medium themed-text-secondary mb-1">广告图片</label>
+              <div x-show="!campaignImagePreview" class="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:border-indigo-400 transition-colors themed-border"
+                   @click="$refs.campaignImageInput.click()">
+                <div class="text-3xl mb-2 themed-text-muted">🖼️</div>
+                <p class="text-sm themed-text-muted">点击上传广告图片</p>
+                <p class="text-xs themed-text-muted mt-1">支持 JPG/PNG/GIF/WebP，最大 5MB</p>
+              </div>
+              <div x-show="campaignImagePreview" class="relative">
+                <img :src="campaignImagePreview" class="w-full max-h-48 object-contain rounded-lg border" alt="广告图片预览">
+                <button type="button" @click="clearCampaignImage(); $refs.campaignImageInput.value = ''"
+                        class="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600">✕</button>
+                <div x-show="image_uploading" class="absolute inset-0 bg-black/30 rounded-lg flex items-center justify-center">
+                  <span class="inline-block w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                </div>
+              </div>
+              <input type="file" x-ref="campaignImageInput" accept="image/jpeg,image/png,image/gif,image/webp" class="hidden" @change="handleCampaignImageUpload($event)">
+            </div>
+
             <!-- 弹窗显示模式选择（运营推广和弹窗类广告） -->
             <div x-show="campaignForm.campaign_category !== 'system'">
               <label class="block text-sm font-medium themed-text-secondary mb-1">弹窗显示模式</label>

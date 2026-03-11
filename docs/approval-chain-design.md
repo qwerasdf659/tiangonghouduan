@@ -1,9 +1,9 @@
 # 老良记多级审核链设计方案
 
 > 生成日期: 2026-03-09
-> 最后更新: 2026-03-10（第三次校准 — **后端实现完成**，角色体系数据再次纠正）
+> 最后更新: 2026-03-10（第五次校准 — **后端+Web前端实施完成**，消费拒绝路由补齐审核链检查，前端页面修复Alpine初始化）
 > 数据来源: 连接 restaurant_points_dev 数据库实时查询 + 后端源码（models/services/routes/callbacks）逐文件阅读
-> **⚠️ 2026-03-10 实施校准**: 第二版文档的角色 role_id 仍有误（如 ops=101、business_manager=102、content_auditor=104 均不存在）。已根据实际数据库纠正，content_auditor 角色不存在，审核准入线调整为 business_manager(role_level=60)。
+> **⚠️ 2026-03-10 终版校准**: 角色体系已与真实数据库完全对齐：ops=9/level30, business_manager=7/level60, admin=2/level100。content_auditor 角色不存在，审核准入线设在 business_manager(role_level=60)。兑换订单新增状态机校验（ORDER_STATUS_TRANSITIONS），禁止非法状态转换。
 >
 > **🟢 后端实施状态**: 已完成（4张表 + 4个模型 + ApprovalChainService + 路由 + Seed数据 + 超时服务 + Web前端页面）
 
@@ -17,27 +17,26 @@
 | **后端技术栈** | Node.js 20+ / Express 4.18 / Sequelize 6.35 / MySQL (mysql2) / Redis (ioredis) / Socket.IO 4.8 / JWT |
 | **Web管理平台** | Alpine.js 3.15 / Tailwind CSS 3.4 / Vite 6.4 / ECharts 6（多页iframe架构） |
 | **微信小程序** | TypeScript / Sass / MobX / weapp.socket.io / Skyline（独立仓库，不在本项目内） |
-| **数据库** | restaurant_points_dev（Sealos托管MySQL），108张表 |
+| **数据库** | restaurant_points_dev（Sealos托管MySQL），111张表 |
 | **唯一商户** | 老良记 (merchant_id=6, merchant_type=restaurant) |
 | **门店** | 5家（store_id: 7~11），全部 active |
 
-### 1.1 角色体系（真实数据，来自 roles + user_roles 表实时查询）
+### 1.1 角色体系（真实数据，2026-03-10 从 roles + user_roles 表实时查询）
 
 | role_name | role_level | 实际用户数 | role_id | 说明 |
 |-----------|-----------|-----------|---------|------|
 | admin | 100 | 5 | 2 | 超级管理员，全部权限 |
-| ops | 90 | 1 | 101 | 运营管理员 |
-| merchant_manager | 80 | 1 | 3 | 商户管理（staff/store/consumption） |
-| business_manager | 70 | 2 | 102 | 业务经理（business+consumption管理） |
-| finance_viewer | 60 | 0 | 103 | 财务只读角色 |
-| **content_auditor** | **55** | **0** | **104** | **内容审核专岗（与审核链高度相关）** |
-| merchant_staff | 30 | 0 | 105 | 商户员工（扫码/消费创建） |
-| store_staff | 20 | 0 | 106 | 门店员工 |
+| regional_manager | 80 | 0 | 6 | 区域负责人（可管理业务经理和业务员，查看所有业务数据） |
+| business_manager | 60 | 2 | 7 | 业务经理（可管理业务员，录入和管理消费记录，查看业务报表） |
+| sales_staff | 40 | 0 | 8 | 业务员（可录入消费记录，查看分配门店信息） |
+| merchant_manager | 40 | 1 | 11 | 商家店长（可执行消费录入，可管理本店员工） |
+| ops | 30 | 1 | 9 | 运营只读角色（可查询所有后台数据，不可修改） |
+| merchant_staff | 20 | 0 | 10 | 商家员工（可执行消费录入，不可管理员工） |
 | campaign_2 | 10 | 2 | 5 | 抽奖活动角色 |
-| user | 0 | 57 | 1 | 普通用户（积分/抽奖/个人中心） |
-| system_job | -1 | 1 | 100 | 系统定时任务角色 |
+| user | 0 | 59 | 1 | 普通用户（积分/抽奖/个人中心） |
+| system_job | -1 | 1 | 100 | 系统定时任务专用角色 |
 
-> **⚠️ 前版文档重大勘误**: 数据库中**不存在** `regional_manager` 和 `sales_staff` 角色（前版文档错误引用）。实际层级为 admin(100) → ops(90) → merchant_manager(80) → business_manager(70) → finance_viewer(60) → content_auditor(55) → merchant_staff(30) → store_staff(20)。`content_auditor`(role_id=104, level=55) 是专门为内容审核设计的角色，对审核链设计高度相关但当前无用户分配。另有 `test_role_api`(role_id=107, level=15, is_active=0) 为测试角色，已忽略。
+> **⚠️ 2026-03-10 终版勘误**: 数据库中**不存在** `content_auditor`(104)、`finance_viewer`(103) 角色。实际层级为 admin(2/100) → regional_manager(6/80) → business_manager(7/60) → sales_staff(8/40) = merchant_manager(11/40) → ops(9/30) → merchant_staff(10/20)。审核链准入线设置在 business_manager(role_level=60)。如将来需要审核专岗，需创建 content_auditor 角色并调整准入线。另有 `test_role_api`(role_id=107, level=15, is_active=0) 为测试角色，已忽略。共111张表。
 
 ### 1.2 当前审核流程（基于实际代码分析）
 
@@ -1102,7 +1101,7 @@ business_manager 收到初审任务
 | `services/index.js` | 导入ApprovalChainService + 注册到ServiceManager（key: approval_chain） |
 | `services/ContentAuditEngine.js` | submitForAudit() 末尾新增审核链匹配和创建调用 |
 | `callbacks/ConsumptionAuditCallback.js` | 从空实现改为真实实现（积分发放+预算分配+状态更新） |
-| `routes/v4/console/consumption.js` | approve/reject 路由 requireRoleLevel 从100降到60 + approve增加审核链判断 |
+| `routes/v4/console/consumption.js` | approve/reject 路由 requireRoleLevel 从100降到60 + approve和reject均增加审核链实例检查 |
 | `routes/v4/console/index.js` | 导入并挂载 approval-chain 路由 |
 | `services/IdempotencyService.js` | CANONICAL_OPERATION_MAP 新增5个审核链路径映射 |
 | `app.js` | 启动时注册超时扫描定时任务 |

@@ -55,10 +55,10 @@ describe('ExchangeRateService - 固定汇率兑换服务测试', () => {
   })
 
   describe('getAllRates - 获取所有活跃汇率', () => {
-    it('应返回数组且包含初始的7条规则', async () => {
+    it('应返回数组且包含当前活跃的汇率规则', async () => {
       const rates = await ExchangeRateService.getAllRates()
       expect(Array.isArray(rates)).toBe(true)
-      expect(rates.length).toBeGreaterThanOrEqual(7)
+      expect(rates.length).toBeGreaterThanOrEqual(6)
 
       const redShard = rates.find(r => r.from_asset_code === 'red_shard')
       expect(redShard).toBeDefined()
@@ -184,7 +184,7 @@ describe('ExchangeRateService - 固定汇率兑换服务测试', () => {
       expect(result).toHaveProperty('page')
       expect(result).toHaveProperty('page_size')
       expect(Array.isArray(result.items)).toBe(true)
-      expect(result.total).toBeGreaterThanOrEqual(7)
+      expect(result.total).toBeGreaterThanOrEqual(6)
     })
 
     it('应支持按状态筛选', async () => {

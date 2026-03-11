@@ -7,7 +7,7 @@
  * 📌 域边界说明（2026-03-10 多级审核链改造）：
  * - 此模块属于 console 域
  * - 查询路由：admin(role_level >= 100)
- * - 审核路由：content_auditor(role_level >= 55) 及以上可进入路由
+ * - 审核路由(approve/reject)：business_manager(role_level >= 60) 及以上可进入路由
  *   具体审核权限由 ApprovalChainService.processStep() 精确校验
  * - 商家员工（merchant_staff/merchant_manager）使用 /api/v4/shop/* 提交和查询消费
  *
@@ -143,7 +143,7 @@ router.get('/records', authenticateToken, requireRoleLevel(100), async (req, res
 /**
  * @route POST /api/v4/console/consumption/approve/:id
  * @desc 管理员审核通过消费记录
- * @access Private (管理员，role_level >= 100)
+ * @access Private (role_level >= 60，审核链场景由 ApprovalChainService 精确鉴权)
  *
  * API路径参数设计规范 V2.2（2026-01-20）：
  * - 消费记录是事务实体，使用数字ID（:id）作为标识符
@@ -313,7 +313,7 @@ router.post('/batch-review', authenticateToken, requireRoleLevel(100), async (re
 /**
  * @route POST /api/v4/console/consumption/reject/:id
  * @desc 管理员审核拒绝消费记录
- * @access Private (管理员，role_level >= 100)
+ * @access Private (role_level >= 60，审核链场景由 ApprovalChainService 精确鉴权)
  *
  * API路径参数设计规范 V2.2（2026-01-20）：
  * - 消费记录是事务实体，使用数字ID（:id）作为标识符
@@ -335,8 +335,8 @@ router.post('/batch-review', authenticateToken, requireRoleLevel(100), async (re
  */
 router.post('/reject/:id', authenticateToken, requireRoleLevel(60), async (req, res) => {
   try {
-    // 🔄 通过 ServiceManager 获取 CoreService（V4.7.0 服务拆分：审核操作在 CoreService 中）
     const CoreService = req.app.locals.services.getService('consumption_core')
+    const ApprovalChainService = req.app.locals.services.getService('approval_chain')
 
     const record_id = parseInt(req.params.id, 10)
     const { admin_notes } = req.body
@@ -347,7 +347,6 @@ router.post('/reject/:id', authenticateToken, requireRoleLevel(60), async (req, 
       return res.apiError('拒绝原因不能为空，且至少5个字符', 'BAD_REQUEST', null, 400)
     }
 
-    // 增加最大长度限制（防止超长文本影响性能和前端显示）
     if (admin_notes.length > 500) {
       return res.apiError('拒绝原因最多500个字符，请精简描述', 'BAD_REQUEST', null, 400)
     }
@@ -357,7 +356,30 @@ router.post('/reject/:id', authenticateToken, requireRoleLevel(60), async (req, 
       reviewer_id: reviewerId
     })
 
-    // 使用 TransactionManager 统一事务边界（符合治理决策）
+    // 检查是否有审核链实例（与 approve 路由行为一致）
+    const chainInstance = await ApprovalChainService.getInstanceByAuditable(
+      'consumption',
+      record_id
+    )
+
+    if (chainInstance && chainInstance.status === 'in_progress') {
+      const pendingStep = chainInstance.steps?.find(s => s.status === 'pending')
+      if (!pendingStep) {
+        return res.apiBadRequest('当前审核链没有待处理的步骤')
+      }
+      return res.apiSuccess(
+        {
+          redirect: true,
+          message: '该记录使用审核链流程，请通过审核链步骤拒绝',
+          chain_instance_id: chainInstance.instance_id,
+          pending_step_id: pendingStep.step_id,
+          approval_chain_url: `/api/v4/console/approval-chain/steps/${pendingStep.step_id}/reject`
+        },
+        '该记录使用审核链流程'
+      )
+    }
+
+    // 无审核链：走原有 CoreService.rejectConsumption()（兼容存量数据）
     const result = await TransactionManager.execute(async transaction => {
       return await CoreService.rejectConsumption(parseInt(record_id), {
         reviewer_id: reviewerId,
@@ -366,7 +388,7 @@ router.post('/reject/:id', authenticateToken, requireRoleLevel(60), async (req, 
       })
     })
 
-    logger.info('✅ 消费记录审核拒绝', {
+    logger.info('✅ 消费记录审核拒绝（直接路径）', {
       record_id,
       reason: admin_notes.substring(0, 50)
     })
