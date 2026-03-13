@@ -191,10 +191,8 @@ class AdminService {
     }
 
     return {
-      success: true,
       item: item.toJSON(),
-      bound_image,
-      timestamp: BeijingTimeHelper.now()
+      bound_image
     }
   }
 
@@ -404,15 +402,13 @@ class AdminService {
     }
 
     return {
-      success: true,
       item: item.toJSON(),
       image_changes: {
         deleted_old_image,
         bound_new_image,
         old_image_id,
         new_image_id
-      },
-      timestamp: BeijingTimeHelper.now()
+      }
     }
   }
 
@@ -461,11 +457,9 @@ class AdminService {
       }
 
       return {
-        success: true,
         action: 'deactivated',
         message: `该商品有${orderCount}个关联订单，已自动下架而非删除`,
-        item: item.toJSON(),
-        timestamp: BeijingTimeHelper.now()
+        item: item.toJSON()
       }
     }
 
@@ -504,12 +498,9 @@ class AdminService {
     }
 
     return {
-      success: true,
       action: 'deleted',
       message: '商品删除成功',
-      // 2026-02-01 主键命名规范化：使用完整前缀 image_resource_id
-      deleted_image_resource_id: associated_image_id,
-      timestamp: BeijingTimeHelper.now()
+      deleted_image_resource_id: associated_image_id
     }
   }
 
@@ -525,7 +516,14 @@ class AdminService {
    */
   async getUserListingStats(options) {
     try {
-      const { page = 1, limit = 20, filter = 'all', max_listings = 3, mobile } = options
+      const {
+        page = 1,
+        limit = 20,
+        filter = 'all',
+        max_listings = 3,
+        mobile,
+        merchant_id
+      } = options
 
       logger.info('[兑换市场] 管理员获取用户上架统计', {
         page,
@@ -565,15 +563,36 @@ class AdminService {
         listingWhere.seller_user_id = mobileFilterUserIds
       }
 
-      const listingCounts = await this.MarketListing.findAll({
+      const listingQueryOptions = {
         where: listingWhere,
         attributes: [
           'seller_user_id',
-          [this.sequelize.fn('COUNT', this.sequelize.col('market_listing_id')), 'count']
+          [
+            this.sequelize.fn(
+              'COUNT',
+              this.sequelize.col(`${this.MarketListing.name}.market_listing_id`)
+            ),
+            'count'
+          ]
         ],
         group: ['seller_user_id'],
         raw: true
-      })
+      }
+
+      // 商家ID筛选：通过 MarketListing → Item 关联查找指定商家的挂牌
+      if (merchant_id) {
+        listingQueryOptions.include = [
+          {
+            model: this.models.Item,
+            as: 'offerItem',
+            attributes: [],
+            where: { merchant_id },
+            required: true
+          }
+        ]
+      }
+
+      const listingCounts = await this.MarketListing.findAll(listingQueryOptions)
 
       // 查询所有相关用户（含 max_active_listings 个性化配置）
       const allUserIds = listingCounts.map(item => item.seller_user_id)
@@ -933,15 +952,13 @@ class AdminService {
       )
 
       return {
-        success: true,
         items: itemsWithDisplayNames,
         pagination: {
           total: count,
           page,
           page_size,
           total_pages: Math.ceil(count / page_size)
-        },
-        timestamp: BeijingTimeHelper.now()
+        }
       }
     } catch (error) {
       logger.error('[兑换市场-管理] 查询商品列表失败:', error.message)

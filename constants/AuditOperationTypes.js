@@ -270,6 +270,39 @@ const OPERATION_TYPES = Object.freeze({
    */
   SESSION_ASSIGN: 'session_assign',
 
+  // ==================== 兑换订单操作类（2026-03-13 细分类型补充）====================
+  /**
+   * 兑换订单取消
+   * @description 管理员或用户取消兑换订单
+   * @example exchange/CoreService.cancelOrder()
+   * @since 2026-03-13
+   */
+  EXCHANGE_CANCEL: 'exchange_cancel',
+
+  /**
+   * 兑换订单拒绝
+   * @description 管理员拒绝兑换订单
+   * @example exchange/AdminService.rejectOrder()
+   * @since 2026-03-13
+   */
+  EXCHANGE_REJECT: 'exchange_reject',
+
+  /**
+   * 兑换订单发货
+   * @description 管理员对兑换订单执行发货操作
+   * @example exchange/AdminService.shipOrder()
+   * @since 2026-03-13
+   */
+  EXCHANGE_SHIP: 'exchange_ship',
+
+  /**
+   * 兑换订单确认收货
+   * @description 用户确认收到兑换商品
+   * @example exchange/CoreService.confirmReceipt()
+   * @since 2026-03-13
+   */
+  EXCHANGE_CONFIRM_RECEIPT: 'exchange_confirm_receipt',
+
   // ==================== 消费审核类 ====================
   /**
    * 消费审核（审核通过/拒绝）
@@ -406,6 +439,12 @@ const OPERATION_TYPE_DESCRIPTIONS = Object.freeze({
   // 系统配置类
   [OPERATION_TYPES.SYSTEM_CONFIG]: '系统配置',
   [OPERATION_TYPES.SESSION_ASSIGN]: '客服会话分配',
+
+  // 兑换订单操作类（2026-03-13 细分类型补充）
+  [OPERATION_TYPES.EXCHANGE_CANCEL]: '兑换订单取消',
+  [OPERATION_TYPES.EXCHANGE_REJECT]: '兑换订单拒绝',
+  [OPERATION_TYPES.EXCHANGE_SHIP]: '兑换订单发货',
+  [OPERATION_TYPES.EXCHANGE_CONFIRM_RECEIPT]: '兑换订单确认收货',
 
   // 消费审核类
   [OPERATION_TYPES.CONSUMPTION_AUDIT]: '消费审核',

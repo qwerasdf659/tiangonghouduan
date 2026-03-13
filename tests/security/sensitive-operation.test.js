@@ -216,9 +216,12 @@ describe('P1-7.3: 敏感操作二次认证测试', () => {
        * 2. 返回 401 SESSION_INVALID - 会话无效
        */
       if (sensitiveResponse.status === 401) {
-        expect(['SESSION_INVALIDATED', 'SESSION_INVALID', 'UNAUTHORIZED']).toContain(
-          sensitiveResponse.body.code
-        )
+        expect([
+          'SESSION_INVALIDATED',
+          'SESSION_REPLACED',
+          'SESSION_INVALID',
+          'UNAUTHORIZED'
+        ]).toContain(sensitiveResponse.body.code)
         console.log('[P1-7.3] 会话失效后敏感操作被拒绝测试通过')
       } else {
         console.log(
@@ -394,7 +397,10 @@ describe('P1-7.3: 敏感操作二次认证测试', () => {
        * 1. 允许多设备同时登录（两个Token都有效）
        * 2. 新登录使旧会话失效（第一个Token的会话失效）
        */
-      if (sensitiveOp.status === 401 && sensitiveOp.body.code === 'SESSION_INVALIDATED') {
+      if (
+        sensitiveOp.status === 401 &&
+        ['SESSION_INVALIDATED', 'SESSION_REPLACED'].includes(sensitiveOp.body.code)
+      ) {
         console.log('[P1-7.3] 多设备登录冲突处理：旧设备会话已失效 ✓')
       } else if (sensitiveOp.status === 200) {
         console.log('[P1-7.3] 多设备登录冲突处理：允许多设备同时在线')

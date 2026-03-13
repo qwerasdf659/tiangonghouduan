@@ -242,8 +242,8 @@
               <div class="flex flex-wrap gap-2">
                 <template x-for="(item, index) in config.shop_filters?.categories || []" :key="index">
                   <div class="filter-tag">
-                    <input type="text" x-model="item.label" @input="markConfigModified()" class="bg-transparent border-0 text-sm w-16 focus:outline-none font-medium">
-                    <span class="text-xs px-1.5 py-0.5 rounded bg-white/60 text-gray-500" x-text="item.value"></span>
+                    <input type="text" x-model="item.label" @input="markConfigModified()" class="bg-transparent border-0 text-sm w-16 focus:outline-none font-medium" placeholder="显示名">
+                    <input type="text" x-model="item.value" @input="markConfigModified()" class="bg-white/60 border-0 text-xs px-1.5 py-0.5 rounded text-gray-500 w-20 focus:outline-none" placeholder="category_code">
                     <span class="remove-btn" @click="removeFilterOption('shop_filters.categories', index)">✕</span>
                   </div>
                 </template>

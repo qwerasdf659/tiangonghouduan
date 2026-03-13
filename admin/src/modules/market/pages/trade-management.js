@@ -339,7 +339,7 @@ document.addEventListener('alpine:init', () => {
         // 构建查询参数（手机号 → resolve 获取 user_id）
         const queryParams = {
           status: this.tradeFilters.status,
-          listing_id: this.tradeFilters.listing_id,
+          market_listing_id: this.tradeFilters.listing_id,
           merchant_id: this.tradeOrderMerchantFilter || undefined,
           page: this.tradeCurrentPage,
           page_size: this.tradePageSize
@@ -370,7 +370,7 @@ document.addEventListener('alpine:init', () => {
           // 后端使用 snake_case: total_count, total_pages
           const pagination = data.pagination || {}
           this.tradePagination = {
-            total_pages: pagination.total_pages || pagination.total_pages || 1,
+            total_pages: pagination.total_pages || 1,
             total: pagination.total_count || pagination.total || this.tradeOrders.length
           }
           this.tradeStats = { total: this.tradeOrders.length, created: 0, frozen: 0, completed: 0 }
@@ -508,7 +508,7 @@ document.addEventListener('alpine:init', () => {
           })
           if (listingRes?.success && listingRes.data?.summary) {
             this.marketOverview.active_listings =
-              listingRes.data.summary.total_users_with_listings || 0
+              listingRes.data.summary.total_listings || 0
           }
         } catch (err) {
           logger.warn('[TradeManagement] 加载挂牌统计失败（非致命）:', err.message)
@@ -544,7 +544,7 @@ document.addEventListener('alpine:init', () => {
         }
 
         // 资产成交量排行柱状图
-        await this.$nextTick
+        await this.$nextTick()
         const rankingEl = document.getElementById('asset-ranking-chart')
         if (rankingEl && this.marketOverview.asset_ranking.length > 0) {
           if (this.assetRankingChart) this.assetRankingChart.dispose()
@@ -791,23 +791,29 @@ document.addEventListener('alpine:init', () => {
     async loadRedemptionOrders() {
       try {
         // apiGet 返回 { success, data } 结构
-        const result = await this.apiGet(MARKET_ENDPOINTS.BUSINESS_RECORD_REDEMPTION, {
+        const queryParams = {
           ...this.redemptionFilters,
           page: this.redemptionCurrentPage,
-          page_size: this.redemptionPageSize // 后端使用 snake_case
-        })
+          page_size: this.redemptionPageSize
+        }
+        if (this.tradeOrderMerchantFilter) {
+          queryParams.merchant_id = this.tradeOrderMerchantFilter
+        }
+        const result = await this.apiGet(MARKET_ENDPOINTS.BUSINESS_RECORD_REDEMPTION, queryParams)
         if (result && result.success && result.data) {
           const data = result.data
           const redemptionData = data?.orders || data?.list || data
           this.redemptionOrders = Array.isArray(redemptionData) ? redemptionData : []
           const pagination = data.pagination || {}
           this.redemptionPagination = {
-            total_pages: pagination.total_pages || pagination.total_pages || 1,
+            total_pages: pagination.total_pages || 1,
             total: pagination.total_count || pagination.total || this.redemptionOrders.length
           }
         }
       } catch (error) {
         logger.error('加载兑换订单失败:', error)
+        this.redemptionOrders = []
+        this.$toast?.error('加载兑换订单失败: ' + error.message)
       }
     },
 
@@ -883,6 +889,7 @@ document.addEventListener('alpine:init', () => {
       }
       // 合并筛选条件
       if (this.tradeFilters?.status) queryParams.status = this.tradeFilters.status
+      if (this.tradeFilters?.listing_id) queryParams.market_listing_id = this.tradeFilters.listing_id
       if (this.tradeOrderMerchantFilter) queryParams.merchant_id = this.tradeOrderMerchantFilter
       if (this.tradeFilters?.buyer_mobile) {
         const buyer = await this.resolveUserByMobile(this.tradeFilters.buyer_mobile)

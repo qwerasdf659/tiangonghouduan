@@ -163,14 +163,12 @@ describe('ExchangeService - 兑换市场服务测试', () => {
 
       // 验证：返回结构正确
       expect(result).toBeDefined()
-      expect(result.success).toBe(true)
       expect(result.items).toBeDefined()
       expect(Array.isArray(result.items)).toBe(true)
       expect(result.pagination).toBeDefined()
       expect(result.pagination.page).toBe(1)
       expect(result.pagination.page_size).toBe(10)
       expect(result.pagination.total).toBeGreaterThanOrEqual(0)
-      expect(result.timestamp).toBeDefined()
     })
 
     it('应该支持分页查询', async () => {
@@ -197,7 +195,7 @@ describe('ExchangeService - 兑换市场服务测试', () => {
       })
 
       // 验证：返回的商品都是指定资产代码
-      expect(result.success).toBe(true)
+      expect(result).toBeDefined()
       if (result.items.length > 0) {
         result.items.forEach(item => {
           expect(item.cost_asset_code).toBe('red_shard')
@@ -215,7 +213,7 @@ describe('ExchangeService - 兑换市场服务测试', () => {
       })
 
       // 验证：刷新后仍正常返回
-      expect(result.success).toBe(true)
+      expect(result).toBeDefined()
       expect(result.items).toBeDefined()
     })
   })
@@ -242,7 +240,7 @@ describe('ExchangeService - 兑换市场服务测试', () => {
       const result = await ExchangeService.getItemDetail(exchange_item_id)
 
       // 验证：详情包含必要字段
-      expect(result.success).toBe(true)
+      expect(result).toBeDefined()
       expect(result.item).toBeDefined()
       expect(result.item.exchange_item_id).toBe(exchange_item_id)
       expect(result.item.cost_asset_code).toBeDefined()
@@ -268,7 +266,7 @@ describe('ExchangeService - 兑换市场服务测试', () => {
       })
 
       // 验证：返回结构正确
-      expect(result.success).toBe(true)
+      expect(result).toBeDefined()
       expect(result.orders).toBeDefined()
       expect(Array.isArray(result.orders)).toBe(true)
       expect(result.pagination).toBeDefined()
@@ -284,7 +282,7 @@ describe('ExchangeService - 兑换市场服务测试', () => {
       })
 
       // 验证：所有订单状态为 pending
-      expect(result.success).toBe(true)
+      expect(result).toBeDefined()
       if (result.orders.length > 0) {
         result.orders.forEach(order => {
           expect(order.status).toBe('pending')
@@ -318,7 +316,7 @@ describe('ExchangeService - 兑换市场服务测试', () => {
         })
 
         // 验证：商品创建成功
-        expect(result.success).toBe(true)
+        expect(result).toBeDefined()
         expect(result.item).toBeDefined()
         expect(result.item.exchange_item_id).toBeDefined()
         expect(result.item.item_name).toContain('测试商品') // 🔧 2026-01-29 修复：与数据库模型字段名一致
@@ -404,7 +402,7 @@ describe('ExchangeService - 兑换市场服务测试', () => {
         })
 
         // 验证：更新成功
-        expect(result.success).toBe(true)
+        expect(result).toBeDefined()
         expect(result.item.stock).toBe(200)
       })
 
@@ -447,7 +445,7 @@ describe('ExchangeService - 兑换市场服务测试', () => {
         })
 
         // 验证：删除成功
-        expect(result.success).toBe(true)
+        expect(result).toBeDefined()
         expect(result.action).toBe('deleted')
       })
 
@@ -473,7 +471,7 @@ describe('ExchangeService - 兑换市场服务测试', () => {
         })
 
         // 验证：返回结构正确
-        expect(result.success).toBe(true)
+        expect(result).toBeDefined()
         expect(result.orders).toBeDefined()
         expect(Array.isArray(result.orders)).toBe(true)
         expect(result.pagination).toBeDefined()
@@ -489,7 +487,7 @@ describe('ExchangeService - 兑换市场服务测试', () => {
         })
 
         // 验证：筛选条件返回正确
-        expect(result.success).toBe(true)
+        expect(result).toBeDefined()
         expect(result.filters.status).toBe('pending')
       })
     })
@@ -500,7 +498,7 @@ describe('ExchangeService - 兑换市场服务测试', () => {
         const result = await ExchangeService.getMarketStatistics()
 
         // 验证：返回统计结构
-        expect(result.success).toBe(true)
+        expect(result).toBeDefined()
         expect(result.statistics).toBeDefined()
         expect(result.statistics.orders).toBeDefined()
         expect(typeof result.statistics.orders.total).toBe('number')
@@ -517,7 +515,7 @@ describe('ExchangeService - 兑换市场服务测试', () => {
         })
 
         // 验证：返回结构正确
-        expect(result.success).toBe(true)
+        expect(result).toBeDefined()
         expect(result.items).toBeDefined()
         expect(result.pagination).toBeDefined()
       })
@@ -531,7 +529,7 @@ describe('ExchangeService - 兑换市场服务测试', () => {
         })
 
         // 验证：返回成功
-        expect(result.success).toBe(true)
+        expect(result).toBeDefined()
       })
     })
 

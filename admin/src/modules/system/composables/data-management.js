@@ -33,6 +33,8 @@ export function useDataManagementState() {
     editingPolicy: null,
 
     // ========== Tab 3: 手动清理 ==========
+    /** @type {string} 清理模式：manual/pre_launch/auto */
+    cleanupMode: 'manual',
     /** @type {number} 手动清理步骤（1-5） */
     cleanupStep: 1,
     /** @type {string[]} 选中的清理类目 */
@@ -255,8 +257,8 @@ export function useDataManagementMethods() {
       this.previewLoading = true
       try {
         const params = {
-          mode: 'manual',
-          categories: this.selectedCategories
+          mode: this.cleanupMode,
+          categories: this.cleanupMode === 'manual' ? this.selectedCategories : undefined
         }
         if (this.timeRange.start || this.timeRange.end) {
           params.time_range = {}

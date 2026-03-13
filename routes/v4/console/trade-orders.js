@@ -42,6 +42,7 @@ function getTradeOrderService(req) {
  * - buyer_user_id: 买家用户ID（可选）
  * - seller_user_id: 卖家用户ID（可选）
  * - market_listing_id: 挂牌ID（可选，数据库主键字段名）
+ * - merchant_id: 商家ID（可选，通过 listing → item 关联筛选）
  * - status: 订单状态（created/frozen/completed/cancelled/failed，可选）
  * - asset_code: 结算资产代码（可选）
  * - start_time: 开始时间（ISO8601格式，可选）
@@ -58,6 +59,7 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
       buyer_user_id,
       seller_user_id,
       market_listing_id,
+      merchant_id,
       status,
       asset_code,
       start_time,
@@ -70,6 +72,7 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
       buyer_user_id: buyer_user_id ? parseInt(buyer_user_id) : undefined,
       seller_user_id: seller_user_id ? parseInt(seller_user_id) : undefined,
       market_listing_id: market_listing_id ? parseInt(market_listing_id) : undefined,
+      merchant_id: merchant_id ? parseInt(merchant_id) : undefined,
       status,
       asset_code,
       start_time,
@@ -80,7 +83,7 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
 
     logger.info('查询交易订单列表', {
       admin_id: req.user.user_id,
-      filters: { buyer_user_id, seller_user_id, status },
+      filters: { buyer_user_id, seller_user_id, merchant_id, status },
       total: result.pagination.total_count
     })
 

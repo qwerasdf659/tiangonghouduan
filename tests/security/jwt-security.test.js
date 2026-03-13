@@ -355,9 +355,12 @@ describe('P1-7.2: JWT安全测试', () => {
        * 本项目使用session_token关联会话，登出应使会话失效
        */
       if (afterLogout.status === 401) {
-        expect(['SESSION_INVALIDATED', 'INVALID_TOKEN', 'UNAUTHORIZED']).toContain(
-          afterLogout.body.code
-        )
+        expect([
+          'SESSION_INVALIDATED',
+          'SESSION_REPLACED',
+          'INVALID_TOKEN',
+          'UNAUTHORIZED'
+        ]).toContain(afterLogout.body.code)
         console.log('[P1-7.2] 登出后Token失效测试通过（会话已失效）')
       } else {
         console.log('[P1-7.2] 登出后Token仍有效（JWT未关联会话）')
@@ -401,7 +404,7 @@ describe('P1-7.2: JWT安全测试', () => {
 
       // 记录实际行为（取决于项目配置）
       if (firstCheckAgain.status === 401) {
-        expect(firstCheckAgain.body.code).toBe('SESSION_INVALIDATED')
+        expect(['SESSION_INVALIDATED', 'SESSION_REPLACED']).toContain(firstCheckAgain.body.code)
         console.log('[P1-7.2] 多设备登录冲突处理测试通过（旧会话已失效）')
       } else {
         console.log('[P1-7.2] 多设备登录冲突测试通过（允许多设备同时登录）')

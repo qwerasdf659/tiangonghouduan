@@ -702,7 +702,10 @@ class IdempotencyService {
       '/:uuid'
     )
 
-    // Step 2: 纯数字 → :id
+    // Step 2a: 业务订单号前缀（EM/RD/TR等）+ 数字 → :id
+    result = result.replace(/\/(?:EM|RD|TR|MK|BD)[A-Za-z0-9_-]+/g, '/:id')
+
+    // Step 2b: 纯数字 → :id
     result = result.replace(/\/\d+/g, '/:id')
 
     /*

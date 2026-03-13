@@ -138,6 +138,12 @@ module.exports = sequelize => {
       foreignKey: 'assignee_user_id',
       as: 'assignee_user'
     })
+    /** 超时升级目标节点（自引用关联） */
+    ApprovalChainNode.belongsTo(models.ApprovalChainNode, {
+      foreignKey: 'escalate_to_node',
+      as: 'escalateTarget',
+      constraints: false
+    })
   }
 
   return ApprovalChainNode

@@ -23,7 +23,6 @@
 const logger = require('../../utils/logger').logger
 const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
 const displayNameHelper = require('../../utils/displayNameHelper')
-const BeijingTimeHelper = require('../../utils/timeHelper')
 const { Op } = require('sequelize')
 
 /**
@@ -163,6 +162,7 @@ class QueryService {
     this.models = models
     this.ExchangeItem = models.ExchangeItem
     this.ExchangeRecord = models.ExchangeRecord
+    this.ExchangeOrderEvent = models.ExchangeOrderEvent
     this.ImageResources = models.ImageResources
     this.sequelize = models.sequelize
   }
@@ -307,7 +307,6 @@ class QueryService {
       const summary = await this._calculateListSummary(where)
 
       const result = {
-        success: true,
         items: itemsWithDisplayNames,
         pagination: {
           total: count,
@@ -315,8 +314,7 @@ class QueryService {
           page_size,
           total_pages: Math.ceil(count / page_size)
         },
-        summary,
-        timestamp: BeijingTimeHelper.now()
+        summary
       }
 
       // C+++ 聚合计数：每个维度排除自身条件，保留其他维度条件（条件联动）
@@ -374,9 +372,7 @@ class QueryService {
       ])
 
       return {
-        success: true,
-        item: itemWithDisplayNames,
-        timestamp: BeijingTimeHelper.now()
+        item: itemWithDisplayNames
       }
     } catch (error) {
       logger.error(`[兑换市场] 查询商品详情失败(item_id:${item_id}):`, error.message)
@@ -425,15 +421,13 @@ class QueryService {
       )
 
       return {
-        success: true,
         orders: ordersWithDisplayNames,
         pagination: {
           total: count,
           page,
           page_size,
           total_pages: Math.ceil(count / page_size)
-        },
-        timestamp: BeijingTimeHelper.now()
+        }
       }
     } catch (error) {
       logger.error(`[兑换市场] 查询用户订单列表失败(user_id:${user_id}):`, error.message)
@@ -468,9 +462,7 @@ class QueryService {
       ])
 
       return {
-        success: true,
-        order: orderWithDisplayNames,
-        timestamp: BeijingTimeHelper.now()
+        order: orderWithDisplayNames
       }
     } catch (error) {
       logger.error(`[兑换市场] 查询订单详情失败(order_no:${order_no}):`, error.message)
@@ -544,7 +536,6 @@ class QueryService {
       )
 
       return {
-        success: true,
         orders: ordersWithDisplayNames,
         pagination: {
           total: count,
@@ -557,8 +548,7 @@ class QueryService {
           user_id,
           exchange_item_id,
           order_no
-        },
-        timestamp: BeijingTimeHelper.now()
+        }
       }
     } catch (error) {
       logger.error('[兑换市场] 管理员查询订单列表失败:', error.message)
@@ -576,9 +566,30 @@ class QueryService {
     try {
       logger.info('[兑换市场] 管理员查询订单详情', { order_no })
 
+      const includeConfig = []
+      if (this.ExchangeOrderEvent) {
+        includeConfig.push({
+          model: this.ExchangeOrderEvent,
+          as: 'events',
+          attributes: [
+            'event_id',
+            'event_type',
+            'from_status',
+            'to_status',
+            'operator_id',
+            'operator_role',
+            'remark',
+            'created_at'
+          ],
+          order: [['created_at', 'ASC']],
+          required: false
+        })
+      }
+
       const order = await this.ExchangeRecord.findOne({
         where: { order_no },
-        attributes: EXCHANGE_MARKET_ATTRIBUTES.adminMarketOrderView
+        attributes: EXCHANGE_MARKET_ATTRIBUTES.adminMarketOrderView,
+        include: includeConfig
       })
 
       if (!order) {
@@ -593,15 +604,15 @@ class QueryService {
         status: order.status
       })
 
+      const orderData = order.toJSON()
+
       // 添加中文显示名称
-      const orderWithDisplayNames = await displayNameHelper.attachDisplayNames(order.toJSON(), [
+      const orderWithDisplayNames = await displayNameHelper.attachDisplayNames(orderData, [
         { field: 'status', dictType: 'exchange_status' }
       ])
 
       return {
-        success: true,
-        order: orderWithDisplayNames,
-        timestamp: BeijingTimeHelper.now()
+        order: orderWithDisplayNames
       }
     } catch (error) {
       logger.error(`[兑换市场] 管理员查询订单详情失败(order_no:${order_no}):`, error.message)
@@ -644,7 +655,6 @@ class QueryService {
       })
 
       return {
-        success: true,
         statistics: {
           orders: {
             total: totalOrders,
@@ -657,8 +667,7 @@ class QueryService {
             total_amount: totalMaterialCost || 0
           },
           items: itemStats
-        },
-        timestamp: BeijingTimeHelper.now()
+        }
       }
     } catch (error) {
       logger.error('[兑换市场] 查询统计数据失败:', error.message)

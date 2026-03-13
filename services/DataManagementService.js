@@ -25,6 +25,7 @@ const AuditLogService = require('./AuditLogService')
 const { OPERATION_TYPES } = require('../constants/AuditOperationTypes')
 const { AUDIT_TARGET_TYPES } = require('../constants/AuditTargetTypes')
 const BeijingTimeHelper = require('../utils/timeHelper')
+const TransactionManager = require('../utils/TransactionManager')
 const crypto = require('crypto')
 
 /**
@@ -567,12 +568,72 @@ class DataManagementService {
 
     previewCache.delete(preview_token)
 
+    /*
+     * pre_launch 清档完成后自动重建超管账号
+     * 读取 .env SUPER_ADMIN_MOBILE 配置，创建用户并关联 admin 角色（role_id=2）
+     */
+    let super_admin_rebuilt = false
+    if (mode === 'pre_launch' && !dry_run && totalDeleted > 0) {
+      try {
+        const superAdminMobile = process.env.SUPER_ADMIN_MOBILE
+        if (!superAdminMobile) {
+          logger.warn('[数据清理] 未配置 SUPER_ADMIN_MOBILE 环境变量，跳过超管重建')
+        } else {
+          const UserService = require('./UserService')
+          const { UserRole, Role } = require('../models')
+
+          await TransactionManager.execute(async transaction => {
+            let user
+            try {
+              user = await UserService.registerUser(superAdminMobile, {
+                nickname: '超级管理员',
+                status: 'active',
+                transaction
+              })
+            } catch (regErr) {
+              if (regErr.code === 'MOBILE_EXISTS') {
+                user = { user_id: regErr.data.user_id }
+                logger.info('[数据清理] 超管账号已存在，跳过创建', { user_id: user.user_id })
+              } else {
+                throw regErr
+              }
+            }
+
+            const adminRole = await Role.findOne({
+              where: { role_id: 2 },
+              transaction
+            })
+            if (adminRole) {
+              await UserRole.findOrCreate({
+                where: { user_id: user.user_id, role_id: 2 },
+                defaults: { user_id: user.user_id, role_id: 2 },
+                transaction
+              })
+              logger.info('[数据清理] 超管角色关联成功', {
+                user_id: user.user_id,
+                role_id: 2,
+                role_name: adminRole.role_name
+              })
+            } else {
+              logger.warn('[数据清理] role_id=2 不存在，请手动创建 admin 角色')
+            }
+          })
+
+          super_admin_rebuilt = true
+          logger.info('[数据清理] pre_launch 清档后超管重建完成', { mobile: superAdminMobile })
+        }
+      } catch (rebuildError) {
+        logger.error('[数据清理] 超管重建失败（非致命）:', { error: rebuildError.message })
+      }
+    }
+
     return {
       mode,
       dry_run,
       total_deleted: totalDeleted,
       duration_seconds: Math.round(durationSeconds * 10) / 10,
-      details: results
+      details: results,
+      super_admin_rebuilt
     }
   }
 

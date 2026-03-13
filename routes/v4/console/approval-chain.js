@@ -30,8 +30,6 @@ const { authenticateToken, requireRoleLevel } = require('../../../middleware/aut
 const { handleServiceError } = require('../../../middleware/validation')
 const logger = require('../../../utils/logger').logger
 const TransactionManager = require('../../../utils/TransactionManager')
-const ContentAuditEngine = require('../../../services/ContentAuditEngine')
-
 /**
  * 获取审核链服务
  * @param {Object} req - Express 请求对象
@@ -39,6 +37,15 @@ const ContentAuditEngine = require('../../../services/ContentAuditEngine')
  */
 function getApprovalChainService(req) {
   return req.app.locals.services.getService('approval_chain')
+}
+
+/**
+ * 获取内容审核引擎（通过 ServiceManager 统一入口）
+ * @param {Object} req - Express 请求对象
+ * @returns {Object} ContentAuditEngine
+ */
+function getContentAuditEngine(req) {
+  return req.app.locals.services.getService('content_audit')
 }
 
 // ==================== 模板管理路由（admin only） ====================
@@ -254,6 +261,7 @@ router.post('/steps/:id/approve', authenticateToken, requireRoleLevel(60), async
         if (processResult.is_chain_completed && processResult.final_result === 'approved') {
           const instance = processResult.instance
           if (instance.content_review_record_id) {
+            const ContentAuditEngine = getContentAuditEngine(req)
             await ContentAuditEngine.approve(
               instance.content_review_record_id,
               req.user.user_id,
@@ -326,6 +334,7 @@ router.post('/steps/:id/reject', authenticateToken, requireRoleLevel(60), async 
         if (processResult.is_chain_completed && processResult.final_result === 'rejected') {
           const instance = processResult.instance
           if (instance.content_review_record_id) {
+            const ContentAuditEngine = getContentAuditEngine(req)
             await ContentAuditEngine.reject(
               instance.content_review_record_id,
               req.user.user_id,

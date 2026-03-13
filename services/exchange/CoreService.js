@@ -174,7 +174,6 @@ class CoreService {
       }
 
       return {
-        success: true,
         message: '兑换订单已存在',
         order: {
           order_no: existingOrder.order_no,
@@ -295,7 +294,6 @@ class CoreService {
         )
 
         return {
-          success: true,
           message: '兑换订单已存在（材料扣减幂等）',
           order: existingRecord.toJSON(),
           remaining: {
@@ -402,7 +400,6 @@ class CoreService {
     logger.info(`[兑换市场] 兑换成功，订单号：${order_no}`)
 
     return {
-      success: true,
       message: '兑换成功',
       order: {
         order_no,
@@ -513,7 +510,6 @@ class CoreService {
     logger.info(`[兑换市场] 订单状态更新成功：${order_no} -> ${new_status}`)
 
     return {
-      success: true,
       message: '订单状态更新成功',
       order: {
         order_no,
@@ -619,7 +615,6 @@ class CoreService {
     })
 
     return {
-      success: true,
       message: '评分成功',
       order_no,
       rating,
@@ -707,7 +702,6 @@ class CoreService {
     })
 
     return {
-      success: true,
       message: auto_confirmed ? '系统自动确认收货成功' : '确认收货成功',
       order_no,
       status: 'received',
@@ -878,7 +872,6 @@ class CoreService {
     })
 
     return {
-      success: true,
       message: '订单取消成功，材料资产已退还',
       order_no,
       status: 'cancelled',
@@ -992,7 +985,6 @@ class CoreService {
     })
 
     return {
-      success: true,
       message: '订单已拒绝，材料资产已退还用户',
       order: {
         order_no,

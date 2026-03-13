@@ -1010,6 +1010,7 @@ class TradeOrderService {
    * @param {number} [options.buyer_user_id] - 买家用户ID
    * @param {number} [options.seller_user_id] - 卖家用户ID
    * @param {number} [options.market_listing_id] - 挂牌ID
+   * @param {number} [options.merchant_id] - 商家ID（通过 listing → item 关联筛选）
    * @param {string} [options.status] - 订单状态（created/frozen/completed/cancelled/failed）
    * @param {string} [options.asset_code] - 结算资产代码
    * @param {string} [options.start_time] - 开始时间（ISO8601格式，北京时间）
@@ -1023,6 +1024,7 @@ class TradeOrderService {
       buyer_user_id,
       seller_user_id,
       market_listing_id,
+      merchant_id,
       status,
       asset_code,
       start_time,
@@ -1048,6 +1050,38 @@ class TradeOrderService {
 
     const offset = (page - 1) * page_size
 
+    /*
+     * listing include 配置：
+     * 当传入 merchant_id 时，通过嵌套 include（listing → offerItem）
+     * 实现 trade_orders → market_listings → items.merchant_id 的关联筛选
+     */
+    const listingInclude = {
+      model: MarketListing,
+      as: 'listing',
+      attributes: [
+        'market_listing_id',
+        'listing_kind',
+        'offer_item_id',
+        'offer_asset_code',
+        'offer_amount',
+        'price_amount',
+        'status'
+      ]
+    }
+
+    if (merchant_id) {
+      listingInclude.required = true
+      listingInclude.include = [
+        {
+          model: Item,
+          as: 'offerItem',
+          attributes: ['item_id', 'merchant_id'],
+          where: { merchant_id },
+          required: true
+        }
+      ]
+    }
+
     const { count, rows } = await TradeOrder.findAndCountAll({
       where,
       include: [
@@ -1061,23 +1095,12 @@ class TradeOrderService {
           as: 'seller',
           attributes: ['user_id', 'nickname', 'mobile']
         },
-        {
-          model: MarketListing,
-          as: 'listing',
-          attributes: [
-            'market_listing_id',
-            'listing_kind',
-            'offer_item_id',
-            'offer_asset_code',
-            'offer_amount',
-            'price_amount',
-            'status'
-          ]
-        }
+        listingInclude
       ],
       order: [['created_at', 'DESC']],
       limit: page_size,
-      offset
+      offset,
+      distinct: true
     })
 
     // 添加中文显示名称（2026-01-22 迁移到数据库字典表）
