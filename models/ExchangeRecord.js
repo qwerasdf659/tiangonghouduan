@@ -301,6 +301,15 @@ module.exports = sequelize => {
       foreignKey: 'exchange_item_id',
       as: 'item'
     })
+
+    // 订单状态变更事件链（审计追踪）
+    if (models.ExchangeOrderEvent) {
+      ExchangeRecord.hasMany(models.ExchangeOrderEvent, {
+        foreignKey: 'order_no',
+        sourceKey: 'order_no',
+        as: 'events'
+      })
+    }
   }
 
   /**

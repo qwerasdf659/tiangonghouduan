@@ -151,11 +151,16 @@ class ConsumptionBatchService {
           operator_id
         })
 
-        result.processed.success.push(processResult)
-        result.stats.success_count++
+        if (processResult.skipped) {
+          result.processed.skipped.push(processResult)
+          result.stats.skipped_count++
+        } else {
+          result.processed.success.push(processResult)
+          result.stats.success_count++
 
-        if (processResult.points_awarded) {
-          result.stats.total_points_awarded += processResult.points_awarded
+          if (processResult.points_awarded) {
+            result.stats.total_points_awarded += processResult.points_awarded
+          }
         }
       } catch (error) {
         logger.error('[批量审核] 单条记录处理失败', {
@@ -212,7 +217,21 @@ class ConsumptionBatchService {
   static async _processSingleRecord(record, options) {
     const { action, reason, operator_id } = options
     const CoreService = require('./CoreService')
+    const ApprovalChainService = require('../ApprovalChainService')
     const recordId = record.consumption_record_id
+
+    // 检查是否有进行中的审核链实例（与单条审核路由行为一致）
+    const chainInstance = await ApprovalChainService.getInstanceByAuditable('consumption', recordId)
+    if (chainInstance && chainInstance.status === 'in_progress') {
+      return {
+        consumption_record_id: recordId,
+        action,
+        skipped: true,
+        skip_reason: '该记录使用审核链流程，请通过审核链步骤审核',
+        chain_instance_id: chainInstance.instance_id,
+        processed_at: BeijingTimeHelper.apiTimestamp()
+      }
+    }
 
     if (action === BATCH_REVIEW_ACTIONS.APPROVE) {
       /* 审核通过：复用 CoreService.approveConsumption 完整逻辑 */

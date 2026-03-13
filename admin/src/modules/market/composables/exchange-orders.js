@@ -135,7 +135,7 @@ export function useExchangeOrdersMethods() {
           method: 'GET'
         })
         if (res.success) {
-          this.selectedOrder = res.data
+          this.selectedOrder = res.data?.order || res.data
           this.showModal('orderDetailModal')
         }
       } catch (e) {

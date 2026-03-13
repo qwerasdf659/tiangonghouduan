@@ -522,7 +522,8 @@ class DataManagementService {
           deletedCount = await this._batchDelete(
             item.table_name,
             item.where_clause || '1=1',
-            item.batch_size || 1000
+            item.batch_size || 1000,
+            item.where_replacements
           )
           logger.info(`[数据清理] ${item.table_name}: 已删除 ${deletedCount} 行`)
         }
@@ -613,8 +614,8 @@ class DataManagementService {
         operator_id: r.operator_id,
         operator_mobile: r.operator_mobile,
         action: r.action,
-        before_data: typeof r.before_data === 'string' ? JSON.parse(r.before_data) : r.before_data,
-        after_data: typeof r.after_data === 'string' ? JSON.parse(r.after_data) : r.after_data,
+        before_data: this._safeJsonParse(r.before_data),
+        after_data: this._safeJsonParse(r.after_data),
         reason: r.reason,
         created_at: r.created_at
       })),
@@ -636,6 +637,10 @@ class DataManagementService {
   async runAutoCleanup(maxExecutionSeconds = 300) {
     const startTime = Date.now()
     const config = await this.getPolicies()
+
+    if (config.max_execution_time_seconds) {
+      maxExecutionSeconds = config.max_execution_time_seconds
+    }
 
     if (!config.policies || config.policies.length === 0) {
       logger.info('[自动清理] 无清理策略配置，跳过')
@@ -662,13 +667,15 @@ class DataManagementService {
       }
 
       const cutoffDate = new Date(Date.now() - policy.retention_days * 24 * 60 * 60 * 1000)
-      const whereClause = `\`${timeField}\` < '${cutoffDate.toISOString().slice(0, 19)}'`
+      const whereClause = `\`${timeField}\` < :cutoff_date`
+      const replacements = { cutoff_date: cutoffDate.toISOString().slice(0, 19) }
 
       try {
         const deletedCount = await this._batchDelete(
           policy.table,
           whereClause,
-          policy.batch_size || 1000
+          policy.batch_size || 1000,
+          replacements
         )
 
         results.push({
@@ -720,6 +727,22 @@ class DataManagementService {
     }
   }
 
+  /**
+   * 安全 JSON 解析（不抛出异常）
+   * @param {*} value - 待解析值
+   * @returns {*} 解析结果，失败时返回原值
+   * @private
+   */
+  _safeJsonParse(value) {
+    if (value === null || value === undefined) return null
+    if (typeof value !== 'string') return value
+    try {
+      return JSON.parse(value)
+    } catch {
+      return value
+    }
+  }
+
   // ==================== 私有方法 ====================
 
   /**
@@ -734,6 +757,15 @@ class DataManagementService {
     if (process.env.NODE_ENV === 'production') {
       blocked.push('生产环境禁止执行清档操作')
       return
+    }
+
+    const FeatureFlag = this.models.FeatureFlag
+    if (FeatureFlag) {
+      const flag = await FeatureFlag.findOne({ where: { flag_key: 'data_pre_launch_wipe' } })
+      if (!flag || !flag.is_enabled) {
+        blocked.push('清档功能未启用（feature_flag: data_pre_launch_wipe 需要设置为 enabled）')
+        return
+      }
     }
 
     const allTables = DELETE_TOPOLOGY.flat()
@@ -826,12 +858,15 @@ class DataManagementService {
 
       for (const tableName of category.tables) {
         const conditions = []
+        const replacements = {}
 
         if (timeRange?.start) {
-          conditions.push(`\`${category.time_field}\` >= '${timeRange.start}'`)
+          conditions.push(`\`${category.time_field}\` >= :time_start`)
+          replacements.time_start = timeRange.start
         }
         if (timeRange?.end) {
-          conditions.push(`\`${category.time_field}\` <= '${timeRange.end}'`)
+          conditions.push(`\`${category.time_field}\` <= :time_end`)
+          replacements.time_end = timeRange.end
         }
 
         if (category.status_filter) {
@@ -840,14 +875,19 @@ class DataManagementService {
         }
 
         if (filters.user_id) {
-          conditions.push(`user_id = ${Number(filters.user_id)}`)
+          const userId = parseInt(filters.user_id, 10)
+          if (!isNaN(userId) && userId > 0) {
+            conditions.push('user_id = :filter_user_id')
+            replacements.filter_user_id = userId
+          }
         }
 
         const whereClause = conditions.length > 0 ? conditions.join(' AND ') : '1=1'
 
         try {
           const [result] = await sequelize.query(
-            `SELECT COUNT(*) AS cnt FROM \`${tableName}\` WHERE ${whereClause}`
+            `SELECT COUNT(*) AS cnt FROM \`${tableName}\` WHERE ${whereClause}`,
+            { replacements }
           )
           const count = result[0]?.cnt || 0
 
@@ -858,6 +898,7 @@ class DataManagementService {
             category: catKey,
             category_label: category.label,
             where_clause: whereClause,
+            where_replacements: replacements,
             batch_size: 1000,
             cascade_effects: []
           })
@@ -886,11 +927,13 @@ class DataManagementService {
       if (!timeField) continue
 
       const cutoffDate = new Date(Date.now() - policy.retention_days * 24 * 60 * 60 * 1000)
-      const whereClause = `\`${timeField}\` < '${cutoffDate.toISOString().slice(0, 19)}'`
+      const cutoffStr = cutoffDate.toISOString().slice(0, 19)
+      const whereClause = `\`${timeField}\` < :cutoff_date`
 
       try {
         const [result] = await sequelize.query(
-          `SELECT COUNT(*) AS cnt FROM \`${policy.table}\` WHERE ${whereClause}`
+          `SELECT COUNT(*) AS cnt FROM \`${policy.table}\` WHERE ${whereClause}`,
+          { replacements: { cutoff_date: cutoffStr } }
         )
         const count = result[0]?.cnt || 0
 
@@ -913,18 +956,20 @@ class DataManagementService {
    * 分批删除（避免长事务锁表）
    *
    * @param {string} tableName - 表名
-   * @param {string} whereClause - WHERE 条件
+   * @param {string} whereClause - WHERE 条件（支持 :named 占位符）
    * @param {number} batchSize - 每批删除行数
+   * @param {Object} [replacements] - 参数化查询的替换值
    * @returns {Promise<number>} 总删除行数
    * @private
    */
-  async _batchDelete(tableName, whereClause, batchSize = 1000) {
+  async _batchDelete(tableName, whereClause, batchSize = 1000, replacements = {}) {
     let totalDeleted = 0
     let batchDeleted = 0
 
     do {
       const [, meta] = await sequelize.query(
-        `DELETE FROM \`${tableName}\` WHERE ${whereClause} LIMIT ${batchSize}`
+        `DELETE FROM \`${tableName}\` WHERE ${whereClause} LIMIT :batch_limit`,
+        { replacements: { ...replacements, batch_limit: batchSize } }
       )
       batchDeleted = meta?.affectedRows || 0
       totalDeleted += batchDeleted

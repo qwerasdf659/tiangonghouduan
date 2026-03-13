@@ -11,8 +11,8 @@
  * 子模块划分（按业务职责）：
  * - items.js    - 商品列表/详情（GET /items, GET /items/:item_id）
  * - exchange.js - 兑换操作（POST /exchange）
- * - orders.js   - 订单查询/管理（GET /orders, GET /orders/:order_no, POST /orders/:order_no/status）
  * - statistics.js - 统计数据（GET /statistics）
+ * - （orders.js 已迁移到 /api/v4/backpack/exchange 域，2026-03-10）
  *
  * 业务规则（V4.5.0强制）：
  * - ✅ 兑换只能使用材料资产支付（cost_asset_code + cost_amount）
@@ -32,16 +32,14 @@
 const express = require('express')
 const router = express.Router()
 
-// 导入子模块
+// 导入子模块（订单路由已迁移到 /api/v4/backpack/exchange 域，2026-03-10）
 const itemsRoutes = require('./items')
 const exchangeRoutes = require('./exchange')
-const ordersRoutes = require('./orders')
 const statisticsRoutes = require('./statistics')
 
 // 挂载子路由
 router.use('/', itemsRoutes) // 商品列表/详情
 router.use('/', exchangeRoutes) // 兑换操作
-router.use('/', ordersRoutes) // 订单查询/管理
 router.use('/', statisticsRoutes) // 统计数据
 
 module.exports = router

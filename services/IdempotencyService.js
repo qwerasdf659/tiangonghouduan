@@ -311,7 +311,7 @@ const CANONICAL_OPERATION_MAP = {
   // ===== 数据管理（2026-03-10 数据一键删除功能） =====
   '/api/v4/console/data-management/preview': 'ADMIN_DATA_CLEANUP_PREVIEW', // 数据清理预览
   '/api/v4/console/data-management/cleanup': 'ADMIN_DATA_CLEANUP_EXECUTE', // 数据清理执行
-  '/api/v4/console/data-management/policies/:id': 'ADMIN_DATA_CLEANUP_POLICY_UPDATE', // 清理策略更新
+  '/api/v4/console/data-management/policies/:code': 'ADMIN_DATA_CLEANUP_POLICY_UPDATE', // 清理策略更新（config_key 是表名，配置实体码）
 
   /*
    * ===== 奖池管理（2026-01-20 V2.2 路由重构）=====
@@ -718,7 +718,8 @@ class IdempotencyService {
       /\/(campaigns)\/([A-Za-z][A-Za-z0-9_]*)(?=\/|$)/g, // 抽奖活动
       /\/(prize-pool)\/(?!prize(?:\/|$)|batch-add(?:\/|$)|list(?:\/|$))([A-Za-z][A-Za-z0-9_]*)(?=\/|$)/g, // 奖品池（按活动，排除固定路径段）
       /\/(settings)\/([A-Za-z][A-Za-z0-9_]*)(?=\/|$)/g, // 系统设置
-      /\/(feature-flags)\/([A-Za-z][A-Za-z0-9_]*)(?=\/|$)/g // 功能开关（flag_key 是业务码）
+      /\/(feature-flags)\/([A-Za-z][A-Za-z0-9_]*)(?=\/|$)/g, // 功能开关（flag_key 是业务码）
+      /\/(policies)\/([A-Za-z][A-Za-z0-9_]*)(?=\/|$)/g // 数据清理策略（表名作为配置实体码）
     ]
 
     configEntityPatterns.forEach(pattern => {
