@@ -291,13 +291,13 @@ describe('P3-6f: DailyImageResourceQualityCheck - 每日图片资源质量检查
         return
       }
 
-      // 验证必要字段
-      expect(image.resource_id).toBeDefined()
+      // 验证必要字段（主键: image_resource_id，遵循 {table_name}_id 命名规范）
+      expect(image.image_resource_id).toBeDefined()
       expect(image.context_id).toBeDefined()
       expect(image.file_path).toBeDefined()
 
       console.log('[P3-6f] 图片资源记录:', {
-        resource_id: image.resource_id,
+        image_resource_id: image.image_resource_id,
         context_id: image.context_id,
         file_path: image.file_path,
         has_thumbnails: !!image.thumbnail_paths

@@ -2,11 +2,12 @@
  * 审核链管理模块 — 管理员配置和审核操作（Console 域）
  *
  * @route /api/v4/console/approval-chain
- * @description 审核链模板配置（仅admin）+ 审核操作（content_auditor及以上）
+ * @description 审核链模板配置（仅admin）+ 审核操作（business_manager及以上）
  *
  * 📌 域边界说明（2026-03-10 多级审核链）：
- * - 模板配置路由（templates/*）：仅 admin(role_level>=100) 可操作
- * - 审核操作路由（my-pending/steps/*）：business_manager(role_level>=60) 及以上可进入路由
+ * - 模板配置路由（templates/*）：仅 admin(role_level >= 100) 可操作
+ * - 实例查询路由（instances/*）：business_manager(role_level >= 60) 及以上可查看
+ * - 审核操作路由（my-pending/steps/*）：business_manager(role_level >= 60) 及以上可进入路由
  *   具体审核权限由 ApprovalChainService.processStep() 精确校验（两层鉴权机制）
  *
  * API列表：
@@ -15,11 +16,12 @@
  * - POST   /templates          - 创建审核链模板（admin）
  * - PUT    /templates/:id      - 更新模板（admin）
  * - PUT    /templates/:id/toggle - 启用/禁用模板（admin）
- * - GET    /instances          - 查询审核链实例列表（content_auditor+）
- * - GET    /instances/:id      - 查询实例详情（content_auditor+）
- * - GET    /my-pending         - 查询当前登录人的待审核步骤（content_auditor+）
- * - POST   /steps/:id/approve  - 审核通过（content_auditor+，Service层精确鉴权）
- * - POST   /steps/:id/reject   - 审核拒绝（content_auditor+，Service层精确鉴权）
+ * - GET    /instances          - 查询审核链实例列表（business_manager+）
+ * - GET    /instances/:id      - 查询实例详情（business_manager+）
+ * - GET    /instances/by-auditable - 按业务记录查询审核链实例（business_manager+）
+ * - GET    /my-pending         - 查询当前登录人的待审核步骤（business_manager+）
+ * - POST   /steps/:id/approve  - 审核通过（business_manager+，Service层精确鉴权）
+ * - POST   /steps/:id/reject   - 审核拒绝（business_manager+，Service层精确鉴权）
  *
  * @module routes/v4/console/approval-chain
  */
@@ -30,6 +32,9 @@ const { authenticateToken, requireRoleLevel } = require('../../../middleware/aut
 const { handleServiceError } = require('../../../middleware/validation')
 const logger = require('../../../utils/logger').logger
 const TransactionManager = require('../../../utils/TransactionManager')
+const AuditLogService = require('../../../services/AuditLogService')
+const { OPERATION_TYPES } = require('../../../constants/AuditOperationTypes')
+
 /**
  * 获取审核链服务
  * @param {Object} req - Express 请求对象
@@ -46,6 +51,28 @@ function getApprovalChainService(req) {
  */
 function getContentAuditEngine(req) {
   return req.app.locals.services.getService('content_audit')
+}
+
+/**
+ * 通过 Socket.IO 推送审核链事件通知（非致命，失败仅记录日志）
+ * @param {Object} req - Express 请求对象
+ * @param {string} event - 事件类型
+ * @param {Object} data - 事件数据
+ * @returns {void}
+ */
+function pushApprovalChainSocketEvent(req, event, data) {
+  try {
+    const wsService = req.app.locals.services.getService('chat_web_socket')
+    if (wsService && typeof wsService.broadcastNotificationToAllAdmins === 'function') {
+      wsService.broadcastNotificationToAllAdmins({
+        type: event,
+        ...data,
+        timestamp: new Date().toISOString()
+      })
+    }
+  } catch (err) {
+    logger.warn(`[审核链] Socket.IO推送失败（非致命）: ${err.message}`)
+  }
 }
 
 // ==================== 模板管理路由（admin only） ====================
@@ -118,6 +145,15 @@ router.post('/templates', authenticateToken, requireRoleLevel(100), async (req, 
       { description: '创建审核链模板' }
     )
 
+    AuditLogService.logOperation({
+      operator_id: req.user.user_id,
+      operation_type: OPERATION_TYPES.APPROVAL_CHAIN_CONFIG,
+      target_type: 'approval_chain_template',
+      target_id: result.template_id,
+      action: 'create',
+      after_data: { template_code: result.template_code, auditable_type: result.auditable_type }
+    }).catch(err => logger.warn('[审核链] 模板创建审计日志失败（非致命）:', err.message))
+
     return res.apiCreated(result, '审核链模板创建成功')
   } catch (error) {
     return handleServiceError(error, res, '创建审核链模板失败')
@@ -132,12 +168,22 @@ router.post('/templates', authenticateToken, requireRoleLevel(100), async (req, 
 router.put('/templates/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const service = getApprovalChainService(req)
+    const templateId = parseInt(req.params.id, 10)
     const result = await TransactionManager.execute(
       async transaction => {
-        return await service.updateTemplate(parseInt(req.params.id, 10), req.body, { transaction })
+        return await service.updateTemplate(templateId, req.body, { transaction })
       },
       { description: '更新审核链模板' }
     )
+
+    AuditLogService.logOperation({
+      operator_id: req.user.user_id,
+      operation_type: OPERATION_TYPES.APPROVAL_CHAIN_CONFIG,
+      target_type: 'approval_chain_template',
+      target_id: templateId,
+      action: 'update',
+      after_data: req.body
+    }).catch(err => logger.warn('[审核链] 模板更新审计日志失败（非致命）:', err.message))
 
     return res.apiSuccess(result, '审核链模板更新成功')
   } catch (error) {
@@ -153,12 +199,21 @@ router.put('/templates/:id', authenticateToken, requireRoleLevel(100), async (re
 router.put('/templates/:id/toggle', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const service = getApprovalChainService(req)
+    const templateId = parseInt(req.params.id, 10)
     const result = await TransactionManager.execute(
       async transaction => {
-        return await service.toggleTemplate(parseInt(req.params.id, 10), { transaction })
+        return await service.toggleTemplate(templateId, { transaction })
       },
       { description: '启用/禁用审核链模板' }
     )
+
+    AuditLogService.logOperation({
+      operator_id: req.user.user_id,
+      operation_type: OPERATION_TYPES.APPROVAL_CHAIN_CONFIG,
+      target_type: 'approval_chain_template',
+      target_id: templateId,
+      action: result.is_active ? 'enable' : 'disable'
+    }).catch(err => logger.warn('[审核链] 模板启停审计日志失败（非致命）:', err.message))
 
     return res.apiSuccess(result, `模板已${result.is_active ? '启用' : '禁用'}`)
   } catch (error) {
@@ -166,12 +221,12 @@ router.put('/templates/:id/toggle', authenticateToken, requireRoleLevel(100), as
   }
 })
 
-// ==================== 实例查询路由（content_auditor+） ====================
+// ==================== 实例查询路由（business_manager+） ====================
 
 /**
  * @route GET /api/v4/console/approval-chain/instances
  * @desc 查询审核链实例列表
- * @access content_auditor(role_level >= 55)
+ * @access business_manager(role_level >= 60)
  */
 router.get('/instances', authenticateToken, requireRoleLevel(60), async (req, res) => {
   try {
@@ -193,9 +248,37 @@ router.get('/instances', authenticateToken, requireRoleLevel(60), async (req, re
 })
 
 /**
+ * @route GET /api/v4/console/approval-chain/instances/by-auditable
+ * @desc 按业务记录查询审核链实例（finance-management 等页面集成审核链进度）
+ * @access business_manager(role_level >= 60)
+ *
+ * @query {string} auditable_type - 业务类型（consumption/merchant_points/exchange）
+ * @query {number} auditable_id - 业务记录ID
+ */
+router.get('/instances/by-auditable', authenticateToken, requireRoleLevel(60), async (req, res) => {
+  try {
+    const service = getApprovalChainService(req)
+    const { auditable_type, auditable_id } = req.query
+
+    if (!auditable_type || !auditable_id) {
+      return res.apiBadRequest('auditable_type 和 auditable_id 必填')
+    }
+
+    const instance = await service.getInstanceByAuditable(
+      auditable_type,
+      parseInt(auditable_id, 10)
+    )
+
+    return res.apiSuccess(instance, instance ? '查询审核链实例成功' : '该业务记录无审核链实例')
+  } catch (error) {
+    return handleServiceError(error, res, '查询审核链实例失败')
+  }
+})
+
+/**
  * @route GET /api/v4/console/approval-chain/instances/:id
  * @desc 查询实例详情（含所有步骤和审核历史）
- * @access content_auditor(role_level >= 55)
+ * @access business_manager(role_level >= 60)
  */
 router.get('/instances/:id', authenticateToken, requireRoleLevel(60), async (req, res) => {
   try {
@@ -207,12 +290,52 @@ router.get('/instances/:id', authenticateToken, requireRoleLevel(60), async (req
   }
 })
 
-// ==================== 审核操作路由（content_auditor+） ====================
+/**
+ * @route GET /api/v4/console/approval-chain/role-pending
+ * @desc 按角色查询待审核步骤（角色池审核队列）
+ * @access admin(role_level >= 100)
+ *
+ * @query {number} role_id - 角色ID（必填）
+ * @query {string} [auditable_type] - 按业务类型筛选
+ * @query {number} [page=1] - 页码
+ * @query {number} [page_size=20] - 每页数量
+ */
+router.get('/role-pending', authenticateToken, requireRoleLevel(100), async (req, res) => {
+  try {
+    const service = getApprovalChainService(req)
+    const { role_id, auditable_type, page, page_size } = req.query
+
+    if (!role_id) {
+      return res.apiBadRequest('role_id 必填')
+    }
+
+    const result = await service.getPendingStepsForRole(parseInt(role_id, 10), {
+      auditable_type,
+      page: parseInt(page, 10) || 1,
+      page_size: parseInt(page_size, 10) || 20
+    })
+
+    return res.apiPaginated(
+      result.rows,
+      {
+        page: result.page,
+        page_size: result.page_size,
+        total: result.count,
+        total_pages: result.total_pages
+      },
+      '查询角色待审核步骤成功'
+    )
+  } catch (error) {
+    return handleServiceError(error, res, '查询角色待审核步骤失败')
+  }
+})
+
+// ==================== 审核操作路由（business_manager+） ====================
 
 /**
  * @route GET /api/v4/console/approval-chain/my-pending
  * @desc 查询当前登录人的待审核步骤
- * @access content_auditor(role_level >= 55)
+ * @access business_manager(role_level >= 60)
  */
 router.get('/my-pending', authenticateToken, requireRoleLevel(60), async (req, res) => {
   try {
@@ -236,7 +359,7 @@ router.get('/my-pending', authenticateToken, requireRoleLevel(60), async (req, r
 /**
  * @route POST /api/v4/console/approval-chain/steps/:id/approve
  * @desc 审核通过
- * @access content_auditor(role_level >= 55)，Service层精确鉴权
+ * @access business_manager(role_level >= 60)，Service层精确鉴权
  *
  * @param {number} id - 步骤ID（step_id）
  * @body {string} [reason] - 审批意见
@@ -283,6 +406,28 @@ router.post('/steps/:id/approve', authenticateToken, requireRoleLevel(60), async
       final_result: result.final_result
     })
 
+    // 审计日志
+    AuditLogService.logOperation({
+      operator_id: req.user.user_id,
+      operation_type: OPERATION_TYPES.APPROVAL_CHAIN_AUDIT,
+      target_type: 'approval_chain_step',
+      target_id: stepId,
+      action: 'approve',
+      after_data: {
+        is_chain_completed: result.is_chain_completed,
+        final_result: result.final_result
+      },
+      reason: reason || '审核通过'
+    }).catch(err => logger.warn('[审核链] 审计日志写入失败（非致命）:', err.message))
+
+    // Socket.IO 实时推送审核链事件
+    pushApprovalChainSocketEvent(req, 'approval_chain_step_approved', {
+      step_id: stepId,
+      is_chain_completed: result.is_chain_completed,
+      final_result: result.final_result,
+      operator_id: req.user.user_id
+    })
+
     return res.apiSuccess(
       {
         step_id: stepId,
@@ -305,7 +450,7 @@ router.post('/steps/:id/approve', authenticateToken, requireRoleLevel(60), async
 /**
  * @route POST /api/v4/console/approval-chain/steps/:id/reject
  * @desc 审核拒绝
- * @access content_auditor(role_level >= 55)，Service层精确鉴权
+ * @access business_manager(role_level >= 60)，Service层精确鉴权
  *
  * @param {number} id - 步骤ID（step_id）
  * @body {string} reason - 拒绝原因（必填，>=5字符）
@@ -351,6 +496,25 @@ router.post('/steps/:id/reject', authenticateToken, requireRoleLevel(60), async 
 
     logger.info('[审核链] 步骤审核拒绝', {
       step_id: stepId,
+      operator_id: req.user.user_id
+    })
+
+    // 审计日志
+    AuditLogService.logOperation({
+      operator_id: req.user.user_id,
+      operation_type: OPERATION_TYPES.APPROVAL_CHAIN_AUDIT,
+      target_type: 'approval_chain_step',
+      target_id: stepId,
+      action: 'reject',
+      after_data: { is_chain_completed: true, final_result: 'rejected' },
+      reason
+    }).catch(err => logger.warn('[审核链] 审计日志写入失败（非致命）:', err.message))
+
+    // Socket.IO 实时推送审核链事件
+    pushApprovalChainSocketEvent(req, 'approval_chain_step_rejected', {
+      step_id: stepId,
+      is_chain_completed: true,
+      final_result: 'rejected',
       operator_id: req.user.user_id
     })
 

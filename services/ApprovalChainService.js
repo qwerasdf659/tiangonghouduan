@@ -19,6 +19,7 @@ const {
   ApprovalChainNode,
   ApprovalChainInstance,
   ApprovalChainStep,
+  AdminNotification,
   UserRole,
   Role,
   User
@@ -151,6 +152,37 @@ class ApprovalChainService {
       )
     }
 
+    // 通知第一个审核人
+    try {
+      const firstNode = auditNodes[0]
+      const notifyUserIds = await ApprovalChainService._resolveAssigneeUserIds(
+        firstNode,
+        transaction
+      )
+      for (const adminId of notifyUserIds) {
+        await AdminNotification.create(
+          {
+            admin_id: adminId,
+            title: '新审核任务',
+            content: `${auditableType}审核 #${auditableId} 已提交，请审核`,
+            notification_type: 'task',
+            priority: 'normal',
+            source_type: 'approval_chain',
+            source_id: instance.instance_id,
+            extra_data: {
+              event: 'approval_chain_created',
+              instance_id: instance.instance_id,
+              auditable_type: auditableType,
+              auditable_id: auditableId
+            }
+          },
+          { transaction }
+        )
+      }
+    } catch (notifyError) {
+      logger.warn(`[审核链] 创建实例后通知审核人失败（非致命）: ${notifyError.message}`)
+    }
+
     logger.info(
       `[审核链] 实例创建成功: instance_id=${instance.instance_id}, template=${template.template_code}, steps=${auditNodes.length}`
     )
@@ -227,6 +259,31 @@ class ApprovalChainService {
 
         logger.info(`[审核链] 终审通过: instance_id=${step.instance_id}, step_id=${stepId}`)
 
+        // 通知提交人：审核链已完成（通过）
+        try {
+          if (step.instance.submitted_by) {
+            await AdminNotification.create(
+              {
+                admin_id: step.instance.submitted_by,
+                title: '审核已通过',
+                content: `${step.instance.auditable_type}审核 #${step.instance.auditable_id} 已通过终审`,
+                notification_type: 'system',
+                priority: 'normal',
+                source_type: 'approval_chain',
+                source_id: step.instance_id,
+                extra_data: {
+                  event: 'approval_chain_approved',
+                  instance_id: step.instance_id,
+                  final_result: 'approved'
+                }
+              },
+              { transaction }
+            )
+          }
+        } catch (notifyError) {
+          logger.warn(`[审核链] 终审通过通知提交人失败（非致命）: ${notifyError.message}`)
+        }
+
         return {
           action: 'approved',
           is_chain_completed: true,
@@ -284,6 +341,32 @@ class ApprovalChainService {
 
       logger.info(`[审核链] 审核拒绝: instance_id=${step.instance_id}, step_id=${stepId}`)
 
+      // 通知提交人：审核链已拒绝
+      try {
+        if (step.instance.submitted_by) {
+          await AdminNotification.create(
+            {
+              admin_id: step.instance.submitted_by,
+              title: '审核已拒绝',
+              content: `${step.instance.auditable_type}审核 #${step.instance.auditable_id} 已被拒绝，原因：${reason}`,
+              notification_type: 'alert',
+              priority: 'high',
+              source_type: 'approval_chain',
+              source_id: step.instance_id,
+              extra_data: {
+                event: 'approval_chain_rejected',
+                instance_id: step.instance_id,
+                final_result: 'rejected',
+                reason
+              }
+            },
+            { transaction }
+          )
+        }
+      } catch (notifyError) {
+        logger.warn(`[审核链] 审核拒绝通知提交人失败（非致命）: ${notifyError.message}`)
+      }
+
       return {
         action: 'rejected',
         is_chain_completed: true,
@@ -338,6 +421,36 @@ class ApprovalChainService {
       },
       { transaction }
     )
+
+    // 通知下一步审核人
+    try {
+      const node =
+        nextStep.node || (await ApprovalChainNode.findByPk(nextStep.node_id, { transaction }))
+      if (node) {
+        const notifyUserIds = await ApprovalChainService._resolveAssigneeUserIds(node, transaction)
+        for (const adminId of notifyUserIds) {
+          await AdminNotification.create(
+            {
+              admin_id: adminId,
+              title: '审核任务推进',
+              content: `${instance.auditable_type}审核 #${instance.auditable_id} 已推进到您，请审核`,
+              notification_type: 'task',
+              priority: 'normal',
+              source_type: 'approval_chain',
+              source_id: instance.instance_id,
+              extra_data: {
+                event: 'approval_chain_advanced',
+                instance_id: instance.instance_id,
+                step_number: nextStep.step_number
+              }
+            },
+            { transaction }
+          )
+        }
+      }
+    } catch (notifyError) {
+      logger.warn(`[审核链] 推进步骤后通知审核人失败（非致命）: ${notifyError.message}`)
+    }
 
     return { next_step_number: nextStep.step_number, next_step: nextStep }
   }
@@ -405,6 +518,49 @@ class ApprovalChainService {
         {
           model: ApprovalChainInstance,
           as: 'instance',
+          include: [{ model: ApprovalChainTemplate, as: 'template' }]
+        },
+        { model: ApprovalChainNode, as: 'node' }
+      ],
+      order: [['created_at', 'ASC']],
+      limit: page_size,
+      offset: (page - 1) * page_size
+    })
+
+    return { rows, count, page, page_size, total_pages: Math.ceil(count / page_size) }
+  }
+
+  /**
+   * 按角色查询待审核步骤
+   *
+   * 查询指定角色 ID 被分配为审核人的所有 pending 步骤，
+   * 用于角色维度的待办统计和审核队列展示。
+   *
+   * @param {number} roleId - 角色ID（如 business_manager 的 role_id）
+   * @param {Object} [queryOptions] - 查询选项
+   * @param {number} [queryOptions.page=1] - 页码
+   * @param {number} [queryOptions.page_size=20] - 每页数量
+   * @param {string} [queryOptions.auditable_type] - 按业务类型筛选
+   * @returns {Promise<Object>} { rows, count, page, page_size, total_pages }
+   */
+  static async getPendingStepsForRole(roleId, queryOptions = {}) {
+    const { page = 1, page_size = 20, auditable_type } = queryOptions
+
+    const whereCondition = {
+      status: 'pending',
+      assignee_role_id: roleId
+    }
+
+    const instanceWhere = {}
+    if (auditable_type) instanceWhere.auditable_type = auditable_type
+
+    const { count, rows } = await ApprovalChainStep.findAndCountAll({
+      where: whereCondition,
+      include: [
+        {
+          model: ApprovalChainInstance,
+          as: 'instance',
+          where: Object.keys(instanceWhere).length > 0 ? instanceWhere : undefined,
           include: [{ model: ApprovalChainTemplate, as: 'template' }]
         },
         { model: ApprovalChainNode, as: 'node' }
@@ -696,6 +852,34 @@ class ApprovalChainService {
     }
 
     throw new Error('当前步骤无法确定审核人分配方式')
+  }
+
+  /**
+   * 根据审核节点解析实际需要通知的用户ID列表
+   *
+   * - 指定人模式（assignee_type='user'）：直接返回 [assignee_user_id]
+   * - 角色池模式（assignee_type='role'）：查找拥有该角色的所有用户
+   *
+   * @param {Object} node - 审核节点
+   * @param {Object} transaction - 事务
+   * @returns {Promise<number[]>} 需要通知的 user_id 列表
+   * @private
+   */
+  static async _resolveAssigneeUserIds(node, transaction) {
+    if (node.assignee_type === 'user' && node.assignee_user_id) {
+      return [node.assignee_user_id]
+    }
+
+    if (node.assignee_type === 'role' && node.assignee_role_id) {
+      const userRoles = await UserRole.findAll({
+        where: { role_id: node.assignee_role_id, is_active: 1 },
+        attributes: ['user_id'],
+        transaction
+      })
+      return userRoles.map(ur => ur.user_id)
+    }
+
+    return []
   }
 }
 

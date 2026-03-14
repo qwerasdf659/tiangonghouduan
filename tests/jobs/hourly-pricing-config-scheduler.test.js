@@ -215,8 +215,8 @@ describe('P3-5: HourlyPricingConfigScheduler - 每小时定价配置调度任务
         return
       }
 
-      // 验证必要字段（模型字段：config_id, lottery_campaign_id, status, effective_at）
-      expect(config.config_id).toBeDefined()
+      // 验证必要字段（主键: lottery_campaign_pricing_config_id，遵循 {table_name}_id 命名规范）
+      expect(config.lottery_campaign_pricing_config_id).toBeDefined()
       expect(config.lottery_campaign_id).toBeDefined()
       expect(config.status).toBeDefined()
 
@@ -225,7 +225,7 @@ describe('P3-5: HourlyPricingConfigScheduler - 每小时定价配置调度任务
       expect(validStatuses).toContain(config.status)
 
       console.log('[P3-5] 定价配置状态:', {
-        config_id: config.config_id,
+        lottery_campaign_pricing_config_id: config.lottery_campaign_pricing_config_id,
         status: config.status,
         effective_at: config.effective_at
       })

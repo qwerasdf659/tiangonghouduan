@@ -452,6 +452,18 @@ async function verifyMigrations() {
 
     log(`\n📂 找到 ${files.length} 个迁移文件\n`)
 
+    // 查询已执行的迁移（SequelizeMeta），对已执行的迁移命名问题降级为 warning
+    let executedMigrations = new Set()
+    try {
+      require('dotenv').config()
+      const { sequelize } = require('../../models')
+      const [rows] = await sequelize.query('SELECT name FROM SequelizeMeta')
+      executedMigrations = new Set(rows.map(r => r.name))
+      await sequelize.close()
+    } catch {
+      log('  ⚠️ 无法查询 SequelizeMeta，所有文件按严格模式验证', 'yellow')
+    }
+
     let errorCount = 0
     let warningCount = 0
 
@@ -459,10 +471,15 @@ async function verifyMigrations() {
     for (const file of files) {
       const errors = []
       const warnings = []
+      const isExecuted = executedMigrations.has(file)
 
       // 3.1 验证文件名格式
       if (!VALIDATION_RULES.fileName.pattern.test(file)) {
-        errors.push('文件名格式不符合规范')
+        if (isExecuted) {
+          warnings.push('文件名格式不符合规范（历史已执行，降级为警告）')
+        } else {
+          errors.push('文件名格式不符合规范')
+        }
       }
 
       // 3.2 验证action类型
@@ -471,7 +488,11 @@ async function verifyMigrations() {
         const action = parts[1]
 
         if (VALIDATION_RULES.forbiddenActions.includes(action)) {
-          errors.push(`禁止使用的action类型: ${action}`)
+          if (isExecuted) {
+            warnings.push(`禁止使用的action类型: ${action}（历史已执行，降级为警告）`)
+          } else {
+            errors.push(`禁止使用的action类型: ${action}`)
+          }
         }
 
         if (!VALIDATION_RULES.allowedActions.includes(action)) {

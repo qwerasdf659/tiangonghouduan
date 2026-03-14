@@ -612,29 +612,30 @@ class QueryService {
       logger.info('[兑换市场] 管理员查询订单详情', { order_no })
 
       const includeConfig = []
+      const orderConfig = []
       if (this.ExchangeOrderEvent) {
         includeConfig.push({
           model: this.ExchangeOrderEvent,
           as: 'events',
           attributes: [
             'event_id',
-            'event_type',
-            'from_status',
-            'to_status',
+            'old_status',
+            'new_status',
             'operator_id',
-            'operator_role',
-            'remark',
+            'operator_type',
+            'reason',
             'created_at'
           ],
-          order: [['created_at', 'ASC']],
           required: false
         })
+        orderConfig.push([{ model: this.ExchangeOrderEvent, as: 'events' }, 'created_at', 'ASC'])
       }
 
       const order = await this.ExchangeRecord.findOne({
         where: { order_no },
         attributes: EXCHANGE_MARKET_ATTRIBUTES.adminMarketOrderView,
-        include: includeConfig
+        include: includeConfig,
+        order: orderConfig
       })
 
       if (!order) {

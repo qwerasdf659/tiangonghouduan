@@ -10,6 +10,7 @@
 import { logger } from '../../../utils/logger.js'
 import { STORE_ENDPOINTS } from '../../../api/store.js'
 import { API_PREFIX, buildURL } from '../../../api/base.js'
+import { ApprovalChainAPI } from '../../../api/approval-chain.js'
 
 /**
  * 消费记录状态
@@ -63,7 +64,12 @@ export function useConsumptionState() {
     loadingDecisionInfo: false,
     // ========== P1-18: 智能推荐状态 ==========
     /** @type {number} 推荐通过的异常分数阈值 */
-    recommendThreshold: 30
+    recommendThreshold: 30,
+    // ========== 审核链进度集成 ==========
+    /** @type {Map<number, Object>} 消费记录ID → 审核链实例缓存 */
+    approvalChainCache: {},
+    /** @type {Object|null} 当前查看的审核链实例详情（时间线弹窗用） */
+    selectedChainInstance: null
   }
 }
 
@@ -134,6 +140,8 @@ export function useConsumptionMethods() {
               todayCount: response.data.statistics.today ?? 0
             }
           }
+          // 预加载 pending 记录的审核链进度（异步，不阻塞列表渲染）
+          this.preloadChainStatus(this.consumptions)
         }
       } catch (error) {
         logger.error('加载消费记录失败:', error)
@@ -242,6 +250,8 @@ export function useConsumptionMethods() {
         )
         if (response?.success) {
           this.selectedConsumption = response.data
+          // 同时加载审核链进度信息
+          await this.loadChainForRecord(record.record_id)
           this.showModal('consumptionDetailModal')
         }
       } catch (error) {
@@ -265,6 +275,14 @@ export function useConsumptionMethods() {
             { method: 'POST', data: {} }
           )
           if (response?.success) {
+            if (response.data?.redirect) {
+              this.showWarning(response.data.message || '该记录需要通过审核链流程审核')
+              await this.loadChainForRecord(recordId)
+              if (this.selectedChainInstance) {
+                this.showModal('chainTimelineModal')
+              }
+              return
+            }
             await this.loadConsumptions()
           }
         },
@@ -314,6 +332,15 @@ export function useConsumptionMethods() {
         )
 
         if (response?.success) {
+          if (response.data?.redirect) {
+            this.showWarning(response.data.message || '该记录需要通过审核链流程拒绝')
+            this.hideModal('rejectModal')
+            await this.loadChainForRecord(recordId)
+            if (this.selectedChainInstance) {
+              this.showModal('chainTimelineModal')
+            }
+            return
+          }
           this.showSuccess('消费记录已拒绝')
           this.hideModal('rejectModal')
           await this.loadConsumptions()
@@ -917,6 +944,122 @@ export function useConsumptionMethods() {
       if (rate >= 80) return 'text-green-600 font-medium'
       if (rate >= 50) return 'text-yellow-600'
       return 'text-red-600 font-medium'
+    },
+
+    // ========== 审核链进度集成方法 ==========
+
+    /**
+     * 加载指定消费记录的审核链实例
+     * @param {number} recordId - 消费记录ID (consumption_record_id)
+     */
+    async loadChainForRecord(recordId) {
+      try {
+        const response = await ApprovalChainAPI.getInstanceByAuditable('consumption', recordId)
+        if (response?.success && response.data) {
+          this.approvalChainCache[recordId] = response.data
+          this.selectedChainInstance = response.data
+        } else {
+          this.selectedChainInstance = null
+        }
+      } catch (error) {
+        logger.warn('[消费记录] 加载审核链信息失败:', error.message)
+        this.selectedChainInstance = null
+      }
+    },
+
+    /**
+     * 获取消费记录的审核链进度标签文本
+     * @param {Object} record - 消费记录
+     * @returns {string} 如 "第1步/共2步" 或空字符串
+     */
+    getChainProgressLabel(record) {
+      const chain = this.approvalChainCache[record.record_id]
+      if (!chain) return ''
+      return `第${chain.current_step}步/共${chain.total_steps}步`
+    },
+
+    /**
+     * 获取审核链进度状态的样式类
+     * @param {Object} record - 消费记录
+     * @returns {string} Tailwind CSS 类名
+     */
+    getChainStatusClass(record) {
+      const chain = this.approvalChainCache[record.record_id]
+      if (!chain) return ''
+      const statusMap = {
+        in_progress: 'bg-blue-100 text-blue-800',
+        completed: 'bg-green-100 text-green-800',
+        rejected: 'bg-red-100 text-red-800',
+        cancelled: 'bg-gray-100 text-gray-800'
+      }
+      return statusMap[chain.status] || 'bg-gray-100 text-gray-800'
+    },
+
+    /**
+     * 查看审核链时间线（打开审核链详情弹窗）
+     * @param {Object} record - 消费记录
+     */
+    async viewChainTimeline(record) {
+      await this.loadChainForRecord(record.record_id)
+      if (this.selectedChainInstance) {
+        this.showModal('chainTimelineModal')
+      } else {
+        this.showInfo('该记录暂无审核链信息')
+      }
+    },
+
+    /**
+     * 批量预加载列表中消费记录的审核链状态
+     * @param {Array} records - 消费记录数组
+     */
+    async preloadChainStatus(records) {
+      const pendingRecords = records.filter(r => r.status === 'pending')
+      for (const record of pendingRecords) {
+        if (!this.approvalChainCache[record.record_id]) {
+          try {
+            const resp = await ApprovalChainAPI.getInstanceByAuditable('consumption', record.record_id)
+            if (resp?.success && resp.data) {
+              this.approvalChainCache[record.record_id] = resp.data
+            }
+          } catch {
+            // 单条查询失败不影响其他
+          }
+        }
+      }
+    },
+
+    /**
+     * 获取审核链步骤状态的中文标签
+     * @param {string} status - 步骤状态
+     * @returns {string} 中文标签
+     */
+    getStepStatusLabel(status) {
+      const labels = {
+        pending: '待审核',
+        approved: '已通过',
+        rejected: '已拒绝',
+        waiting: '等待中',
+        skipped: '已跳过',
+        timeout: '已超时'
+      }
+      return labels[status] || status
+    },
+
+    /**
+     * 获取审核链步骤状态的样式
+     * @param {string} status - 步骤状态
+     * @returns {string} Tailwind CSS 类名
+     */
+    getStepStatusClass(status) {
+      const classes = {
+        pending: 'text-yellow-600 bg-yellow-50 border-yellow-200',
+        approved: 'text-green-600 bg-green-50 border-green-200',
+        rejected: 'text-red-600 bg-red-50 border-red-200',
+        waiting: 'text-gray-400 bg-gray-50 border-gray-200',
+        skipped: 'text-gray-400 bg-gray-50 border-gray-200',
+        timeout: 'text-orange-600 bg-orange-50 border-orange-200'
+      }
+      return classes[status] || 'text-gray-400 bg-gray-50 border-gray-200'
     }
   }
 }

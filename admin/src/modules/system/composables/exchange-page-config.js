@@ -287,7 +287,7 @@ export function useExchangePageConfigMethods() {
       }
       if (!Array.isArray(target)) return
 
-      target.push({ value: `new_${Date.now()}`, label: '新选项' })
+      target.push({ value: '', label: '新选项' })
       this.markConfigModified()
     },
 

@@ -153,10 +153,14 @@ class ApprovalChainTimeoutService {
                   admin_id: targetAdminId,
                   title: '审核任务超时升级',
                   content: `${step.instance.auditable_type}审核 #${step.instance.auditable_id} 已超时升级到您，原审核人12小时未处理`,
-                  type: 'approval_timeout_escalation',
+                  notification_type: 'task',
                   priority: 'high',
-                  source: 'approval_chain_timeout',
-                  source_id: step.instance_id
+                  source_type: 'approval_chain_timeout',
+                  source_id: step.instance_id,
+                  extra_data: {
+                    event: 'approval_timeout_escalation',
+                    instance_id: step.instance_id
+                  }
                 },
                 { transaction }
               )
@@ -184,9 +188,9 @@ class ApprovalChainTimeoutService {
     // 检查是否已经在12小时内发过通知，避免重复
     const recentNotification = await AdminNotification.findOne({
       where: {
-        source: 'approval_chain_timeout',
+        source_type: 'approval_chain_timeout',
         source_id: step.instance_id,
-        type: 'approval_final_timeout_reminder',
+        notification_type: 'alert',
         created_at: { [Op.gt]: new Date(Date.now() - 12 * 3600 * 1000) }
       }
     })
@@ -203,10 +207,11 @@ class ApprovalChainTimeoutService {
           admin_id: targetAdminId,
           title: '终审超时提醒',
           content: `${step.instance.auditable_type}审核 #${step.instance.auditable_id} 已超时12小时，请尽快处理`,
-          type: 'approval_final_timeout_reminder',
+          notification_type: 'alert',
           priority: 'high',
-          source: 'approval_chain_timeout',
-          source_id: step.instance_id
+          source_type: 'approval_chain_timeout',
+          source_id: step.instance_id,
+          extra_data: { event: 'approval_final_timeout_reminder', instance_id: step.instance_id }
         })
       }
     } catch (error) {
@@ -230,10 +235,11 @@ class ApprovalChainTimeoutService {
           admin_id: targetAdminId,
           title: '审核超时提醒',
           content: `您负责的${step.instance.auditable_type}审核 #${step.instance.auditable_id} 已超时，请尽快处理`,
-          type: 'approval_timeout_reminder',
+          notification_type: 'reminder',
           priority: 'medium',
-          source: 'approval_chain_timeout',
-          source_id: step.instance_id
+          source_type: 'approval_chain_timeout',
+          source_id: step.instance_id,
+          extra_data: { event: 'approval_timeout_reminder', instance_id: step.instance_id }
         })
       }
     } catch (error) {

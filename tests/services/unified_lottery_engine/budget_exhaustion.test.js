@@ -77,6 +77,7 @@ describe('预算耗尽降级测试（任务8.3）', () => {
       name: 'high_prize_1',
       reward_tier: 'high',
       prize_value_points: 1000,
+      budget_cost: 1000,
       status: 'active'
     },
     {
@@ -84,6 +85,7 @@ describe('预算耗尽降级测试（任务8.3）', () => {
       name: 'high_prize_2',
       reward_tier: 'high',
       prize_value_points: 800,
+      budget_cost: 800,
       status: 'active'
     },
     {
@@ -91,6 +93,7 @@ describe('预算耗尽降级测试（任务8.3）', () => {
       name: 'mid_prize_1',
       reward_tier: 'mid',
       prize_value_points: 500,
+      budget_cost: 500,
       status: 'active'
     },
     {
@@ -98,6 +101,7 @@ describe('预算耗尽降级测试（任务8.3）', () => {
       name: 'mid_prize_2',
       reward_tier: 'mid',
       prize_value_points: 400,
+      budget_cost: 400,
       status: 'active'
     },
     {
@@ -105,6 +109,7 @@ describe('预算耗尽降级测试（任务8.3）', () => {
       name: 'low_prize_1',
       reward_tier: 'low',
       prize_value_points: 100,
+      budget_cost: 100,
       status: 'active'
     },
     {
@@ -112,6 +117,7 @@ describe('预算耗尽降级测试（任务8.3）', () => {
       name: 'low_prize_2',
       reward_tier: 'low',
       prize_value_points: 50,
+      budget_cost: 50,
       status: 'active'
     },
     {
@@ -119,6 +125,7 @@ describe('预算耗尽降级测试（任务8.3）', () => {
       name: 'fallback_prize',
       reward_tier: 'fallback',
       prize_value_points: 0,
+      budget_cost: 0,
       status: 'active'
     }
   ]
@@ -541,9 +548,9 @@ describe('预算耗尽降级测试（任务8.3）', () => {
       console.log(`   total_prizes_count: ${sufficiency.total_prizes_count}`)
       console.log(`   min_prize_cost: ${sufficiency.min_prize_cost}`)
 
-      // 可负担的奖品：cost <= budget 或 cost == 0
+      // 可负担的奖品：budget_cost <= budget 或 budget_cost === 0（与业务代码口径一致）
       const expected_affordable = MOCK_PRIZES.filter(
-        p => p.prize_value_points <= budget || p.prize_value_points === 0
+        p => (p.budget_cost || 0) <= budget || (p.budget_cost || 0) === 0
       ).length
 
       expect(sufficiency.affordable_prizes_count).toBe(expected_affordable)

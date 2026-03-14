@@ -125,6 +125,14 @@ function globalErrorHandler(err, req, res, next) {
     return ApiResponse.send(res, resp)
   }
 
+  // 带自定义 statusCode 的非 BusinessError 错误（如 Service 层抛出的 404 ORDER_NOT_FOUND 等）
+  if (err.statusCode && err.statusCode !== 500) {
+    const errorCode = err.errorCode || err.code || 'SERVICE_ERROR'
+    const resp = ApiResponse.error(err.message, errorCode, null, err.statusCode)
+    resp.request_id = requestId
+    return ApiResponse.send(res, resp)
+  }
+
   // 未知错误：通用错误码
   const errorMessage = process.env.NODE_ENV === 'development' ? err.message : '服务器内部错误'
 

@@ -60,7 +60,9 @@ const PENDING_CATEGORIES = {
   /** 兑换核销待处理（redemption_orders 表 status=pending） */
   REDEMPTION: 'redemption',
   /** 用户反馈待处理（feedbacks 表 status=pending） */
-  FEEDBACK: 'feedback'
+  FEEDBACK: 'feedback',
+  /** 审核链待审核（approval_chain_steps 表 status=pending） */
+  APPROVAL_CHAIN: 'approval_chain'
 }
 
 /**
@@ -102,16 +104,24 @@ class PendingCenterService {
         return cached
       }
 
-      // 2. 并行查询各分类统计（6个数据源）
-      const [consumption, customerService, riskAlerts, lotteryAlerts, redemption, feedback] =
-        await Promise.all([
-          this._getCategoryStats(PENDING_CATEGORIES.CONSUMPTION),
-          this._getCategoryStats(PENDING_CATEGORIES.CUSTOMER_SERVICE),
-          this._getCategoryStats(PENDING_CATEGORIES.RISK_ALERT),
-          this._getCategoryStats(PENDING_CATEGORIES.LOTTERY_ALERT),
-          this._getCategoryStats(PENDING_CATEGORIES.REDEMPTION),
-          this._getCategoryStats(PENDING_CATEGORIES.FEEDBACK)
-        ])
+      // 2. 并行查询各分类统计（7个数据源）
+      const [
+        consumption,
+        customerService,
+        riskAlerts,
+        lotteryAlerts,
+        redemption,
+        feedback,
+        approvalChain
+      ] = await Promise.all([
+        this._getCategoryStats(PENDING_CATEGORIES.CONSUMPTION),
+        this._getCategoryStats(PENDING_CATEGORIES.CUSTOMER_SERVICE),
+        this._getCategoryStats(PENDING_CATEGORIES.RISK_ALERT),
+        this._getCategoryStats(PENDING_CATEGORIES.LOTTERY_ALERT),
+        this._getCategoryStats(PENDING_CATEGORIES.REDEMPTION),
+        this._getCategoryStats(PENDING_CATEGORIES.FEEDBACK),
+        this._getCategoryStats(PENDING_CATEGORIES.APPROVAL_CHAIN)
+      ])
 
       // 3. 组装返回结构
       const segments = [
@@ -150,6 +160,12 @@ class PendingCenterService {
           category_name: '用户反馈',
           icon: 'feedback',
           ...feedback
+        },
+        {
+          category: PENDING_CATEGORIES.APPROVAL_CHAIN,
+          category_name: '审核链待审',
+          icon: 'check-circle',
+          ...approvalChain
         }
       ]
 
@@ -286,6 +302,8 @@ class PendingCenterService {
           return await this._getRedemptionStats()
         case PENDING_CATEGORIES.FEEDBACK:
           return await this._getFeedbackStats()
+        case PENDING_CATEGORIES.APPROVAL_CHAIN:
+          return await this._getApprovalChainStats()
         default:
           return { count: 0, urgent_count: 0, oldest_minutes: 0 }
       }
@@ -318,6 +336,8 @@ class PendingCenterService {
           return await this._getRedemptionItems(options)
         case PENDING_CATEGORIES.FEEDBACK:
           return await this._getFeedbackItems(options)
+        case PENDING_CATEGORIES.APPROVAL_CHAIN:
+          return await this._getApprovalChainItems(options)
         default:
           return []
       }
@@ -941,6 +961,99 @@ class PendingCenterService {
   static async invalidateCache(reason = 'manual_invalidation') {
     const cacheKey = `${KEY_PREFIX}${CACHE_KEYS.SEGMENT_STATS}`
     return await BusinessCacheHelper.del(cacheKey, reason)
+  }
+
+  // ==================== 审核链待审核 ====================
+
+  /**
+   * 获取审核链待审核统计
+   * @private
+   * @returns {Promise<Object>} { count, urgent_count, oldest_minutes }
+   */
+  static async _getApprovalChainStats() {
+    const { ApprovalChainStep, ApprovalChainInstance } = require('../../models')
+
+    const pendingSteps = await ApprovalChainStep.findAll({
+      where: { status: 'pending' },
+      include: [{ model: ApprovalChainInstance, as: 'instance', attributes: ['auditable_type'] }],
+      attributes: ['step_id', 'timeout_at', 'created_at']
+    })
+
+    const now = Date.now()
+    const urgentCount = pendingSteps.filter(s => {
+      if (!s.timeout_at) return false
+      const remaining = new Date(s.timeout_at).getTime() - now
+      return remaining < 2 * 3600 * 1000
+    }).length
+
+    let oldestMinutes = 0
+    if (pendingSteps.length > 0) {
+      const oldest = pendingSteps.reduce((min, s) =>
+        new Date(s.created_at) < new Date(min.created_at) ? s : min
+      )
+      oldestMinutes = Math.floor((now - new Date(oldest.created_at).getTime()) / 60000)
+    }
+
+    return { count: pendingSteps.length, urgent_count: urgentCount, oldest_minutes: oldestMinutes }
+  }
+
+  /**
+   * 获取审核链待审核列表项
+   * @private
+   * @param {Object} options - 查询选项
+   * @returns {Promise<Array>} 列表项
+   */
+  static async _getApprovalChainItems(options = {}) {
+    const {
+      ApprovalChainStep,
+      ApprovalChainInstance,
+      ApprovalChainTemplate,
+      ApprovalChainNode
+    } = require('../../models')
+
+    const steps = await ApprovalChainStep.findAll({
+      where: { status: 'pending' },
+      include: [
+        {
+          model: ApprovalChainInstance,
+          as: 'instance',
+          include: [
+            {
+              model: ApprovalChainTemplate,
+              as: 'template',
+              attributes: ['template_name', 'auditable_type']
+            }
+          ]
+        },
+        { model: ApprovalChainNode, as: 'node', attributes: ['node_name'] }
+      ],
+      order: [['created_at', 'ASC']],
+      limit: options.page_size || 20,
+      offset: ((options.page || 1) - 1) * (options.page_size || 20)
+    })
+
+    const now = Date.now()
+    return steps.map(step => {
+      const timeoutAt = step.timeout_at ? new Date(step.timeout_at).getTime() : null
+      const isUrgent = timeoutAt ? timeoutAt - now < 2 * 3600 * 1000 : false
+
+      return {
+        id: step.step_id,
+        category: PENDING_CATEGORIES.APPROVAL_CHAIN,
+        title: `${step.instance?.template?.template_name || '审核链'} - ${step.node?.node_name || '步骤'}`,
+        description: `${step.instance?.template?.auditable_type || ''} #${step.instance?.auditable_id || ''}`,
+        priority: isUrgent ? 'urgent' : 'normal',
+        is_urgent: isUrgent,
+        created_at: step.created_at,
+        timeout_at: step.timeout_at,
+        action_url: `/approval-chain.html?tab=my-pending&step_id=${step.step_id}`,
+        meta: {
+          instance_id: step.instance_id,
+          auditable_type: step.instance?.auditable_type,
+          auditable_id: step.instance?.auditable_id
+        }
+      }
+    })
   }
 }
 

@@ -8,6 +8,7 @@
  */
 
 import { DataManagementAPI } from '../../../api/system/data-management.js'
+import { loadECharts } from '../../../utils/echarts-lazy.js'
 
 /**
  * 数据管理状态
@@ -42,7 +43,9 @@ export function useDataManagementState() {
     /** @type {Object} 时间范围 */
     timeRange: { start: '', end: '' },
     /** @type {Object} 筛选条件 */
-    cleanupFilters: { user_id: '' },
+    cleanupFilters: { user_id: '', lottery_campaign_id: '', business_type_prefix: '' },
+    /** @type {string} 管理员验证码（二次确认） */
+    verificationCode: '',
     /** @type {Object|null} 预览结果 */
     previewResult: null,
     /** @type {boolean} 预览加载中 */
@@ -51,6 +54,8 @@ export function useDataManagementState() {
     confirmationText: '',
     /** @type {string} 操作原因 */
     cleanupReason: '',
+    /** @type {boolean} 干跑模式：仅预览影响，不实际删除数据 */
+    dry_run: false,
     /** @type {boolean} 清理执行中 */
     cleanupExecuting: false,
     /** @type {Object|null} 清理结果 */
@@ -75,7 +80,8 @@ export function useDataManagementState() {
     /** @type {string[]} 可用的清理类目 */
     availableCategories: [
       { key: 'lottery_records', label: '抽奖记录' },
-      { key: 'lottery_monitoring', label: '抽奖监控' },
+      { key: 'lottery_monitoring', label: '抽奖监控（告警与模拟）' },
+      { key: 'monitoring_metrics', label: '监控指标' },
       { key: 'consumption_records', label: '消费与核销' },
       { key: 'customer_service', label: '客服会话' },
       { key: 'market_listings', label: '市场挂牌' },
@@ -115,6 +121,7 @@ export function useDataManagementMethods() {
         const res = await DataManagementAPI.getStats()
         if (res.success) {
           this.stats = res.data
+          this.renderOverviewCharts()
         } else {
           this.showError(res.message || '获取统计失败')
         }
@@ -122,6 +129,88 @@ export function useDataManagementMethods() {
         this.showError('获取统计失败: ' + error.message)
       } finally {
         this.statsLoading = false
+      }
+    },
+
+    /**
+     * 渲染数据总览 ECharts 图表（安全等级饼图 + Top20 柱状图）
+     * 在 loadStats() 成功后自动调用
+     */
+    async renderOverviewCharts() {
+      if (!this.stats) return
+
+      try {
+        const echarts = await loadECharts()
+
+        /* 安全等级数据量饼图 */
+        this.$nextTick(() => {
+          const pieEl = document.getElementById('level-pie-chart')
+          if (pieEl) {
+            const pieChart = echarts.init(pieEl)
+            const levelColors = {
+              L0: '#ef4444', L1: '#f97316', L2: '#eab308', L3: '#22c55e', other: '#6b7280'
+            }
+            const pieData = Object.entries(this.stats.by_level).map(([level, info]) => ({
+              name: level === 'other' ? '其他' : level,
+              value: info.tables.reduce((sum, t) => sum + Number(t.estimated_rows || 0), 0),
+              itemStyle: { color: levelColors[level] }
+            }))
+
+            pieChart.setOption({
+              title: { text: '各安全等级数据量分布', left: 'center', textStyle: { fontSize: 14 } },
+              tooltip: {
+                trigger: 'item',
+                formatter: (p) => `${p.name}: ${Number(p.value).toLocaleString()} 行 (${p.percent}%)`
+              },
+              legend: { bottom: 0, textStyle: { fontSize: 11 } },
+              series: [{
+                type: 'pie', radius: ['35%', '65%'], center: ['50%', '45%'],
+                label: { formatter: '{b}\n{d}%', fontSize: 11 },
+                data: pieData
+              }]
+            })
+            window.addEventListener('resize', () => pieChart.resize())
+          }
+
+          /* Top 20 表数据量柱状图 */
+          const barEl = document.getElementById('top20-bar-chart')
+          if (barEl && this.stats.top_tables?.length > 0) {
+            const barChart = echarts.init(barEl)
+            const top20 = this.stats.top_tables.slice(0, 20)
+
+            barChart.setOption({
+              title: { text: '数据量 Top 20 表', left: 'center', textStyle: { fontSize: 14 } },
+              tooltip: {
+                trigger: 'axis', axisPointer: { type: 'shadow' },
+                formatter: (params) => {
+                  const p = params[0]
+                  return `${p.name}<br/>预估行数: ${Number(p.value).toLocaleString()}`
+                }
+              },
+              grid: { left: 10, right: 30, bottom: 5, top: 40, containLabel: true },
+              xAxis: { type: 'value', axisLabel: { fontSize: 10 } },
+              yAxis: {
+                type: 'category', inverse: true,
+                data: top20.map(t => t.table_name),
+                axisLabel: { fontSize: 10, width: 160, overflow: 'truncate' }
+              },
+              series: [{
+                type: 'bar',
+                data: top20.map(t => Number(t.estimated_rows || 0)),
+                itemStyle: {
+                  color: (params) => {
+                    const colors = ['#6366f1', '#8b5cf6', '#a78bfa', '#c4b5fd']
+                    return colors[params.dataIndex % colors.length]
+                  }
+                },
+                label: { show: true, position: 'right', fontSize: 10, formatter: (p) => p.value.toLocaleString() }
+              }]
+            })
+            window.addEventListener('resize', () => barChart.resize())
+          }
+        })
+      } catch (error) {
+        console.warn('[DataManagement] ECharts 图表渲染失败:', error.message)
       }
     },
 
@@ -245,9 +334,10 @@ export function useDataManagementMethods() {
       this.cleanupStep = 1
       this.selectedCategories = []
       this.timeRange = { start: '', end: '' }
-      this.cleanupFilters = { user_id: '' }
+      this.cleanupFilters = { user_id: '', lottery_campaign_id: '', business_type_prefix: '' }
       this.previewResult = null
       this.confirmationText = ''
+      this.verificationCode = ''
       this.cleanupReason = ''
       this.cleanupResult = null
     },
@@ -265,8 +355,18 @@ export function useDataManagementMethods() {
           if (this.timeRange.start) params.time_range.start = this.timeRange.start
           if (this.timeRange.end) params.time_range.end = this.timeRange.end
         }
+        const filters = {}
         if (this.cleanupFilters.user_id) {
-          params.filters = { user_id: Number(this.cleanupFilters.user_id) }
+          filters.user_id = Number(this.cleanupFilters.user_id)
+        }
+        if (this.cleanupFilters.lottery_campaign_id) {
+          filters.lottery_campaign_id = Number(this.cleanupFilters.lottery_campaign_id)
+        }
+        if (this.cleanupFilters.business_type_prefix) {
+          filters.business_type_prefix = this.cleanupFilters.business_type_prefix.trim()
+        }
+        if (Object.keys(filters).length > 0) {
+          params.filters = filters
         }
 
         const res = await DataManagementAPI.preview(params)
@@ -293,19 +393,25 @@ export function useDataManagementMethods() {
         this.showError('请填写操作原因')
         return
       }
+      if (!this.verificationCode.trim()) {
+        this.showError('请输入管理员验证码')
+        return
+      }
 
       this.cleanupExecuting = true
       try {
         const res = await DataManagementAPI.cleanup({
           preview_token: this.previewResult.preview_token,
-          dry_run: false,
+          dry_run: this.dry_run,
           reason: this.cleanupReason,
-          confirmation_text: this.confirmationText
+          confirmation_text: this.confirmationText,
+          verification_code: this.verificationCode
         })
         if (res.success) {
           this.cleanupResult = res.data
           this.cleanupStep = 5
-          this.showSuccess(`清理完成，共删除 ${res.data.total_deleted} 条数据`)
+          const modeLabel = this.dry_run ? '干跑模式完成（未实际删除）' : '清理完成'
+          this.showSuccess(`${modeLabel}，共${this.dry_run ? '影响' : '删除'} ${res.data.total_deleted} 条数据`)
         } else {
           this.showError(res.message || '清理失败')
         }

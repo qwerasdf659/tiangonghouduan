@@ -88,6 +88,16 @@
             </div>
           </div>
 
+          <!-- ECharts 图表区域 -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div class="bg-white rounded-lg shadow p-4">
+              <div id="level-pie-chart" style="width: 100%; height: 320px;"></div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4">
+              <div id="top20-bar-chart" style="width: 100%; height: 320px;"></div>
+            </div>
+          </div>
+
           <!-- 安全等级分组 -->
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <template x-for="level in ['L0', 'L1', 'L2', 'L3']" :key="level">
@@ -281,9 +291,20 @@
             <input type="datetime-local" x-model="timeRange.end" class="w-full border rounded px-3 py-2 text-sm">
           </div>
         </div>
-        <div class="mb-4">
-          <label class="block text-sm text-gray-600 mb-1">用户ID（可选，精准清理）</label>
-          <input type="text" x-model="cleanupFilters.user_id" placeholder="留空则清理所有用户" class="w-64 border rounded px-3 py-2 text-sm">
+        <h3 class="text-lg font-semibold mb-4 mt-6">筛选条件（可选，精准清理）</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <div>
+            <label class="block text-sm text-gray-600 mb-1">用户ID</label>
+            <input type="text" x-model="cleanupFilters.user_id" placeholder="留空则不限定用户" class="w-full border rounded px-3 py-2 text-sm">
+          </div>
+          <div>
+            <label class="block text-sm text-gray-600 mb-1">活动ID（lottery_campaign_id）</label>
+            <input type="text" x-model="cleanupFilters.lottery_campaign_id" placeholder="留空则不限定活动" class="w-full border rounded px-3 py-2 text-sm">
+          </div>
+          <div>
+            <label class="block text-sm text-gray-600 mb-1">业务类型前缀</label>
+            <input type="text" x-model="cleanupFilters.business_type_prefix" placeholder="如 test_ 仅清理测试数据" class="w-full border rounded px-3 py-2 text-sm">
+          </div>
         </div>
         <div class="flex justify-between">
           <button @click="prevStep()" class="text-gray-600 hover:text-gray-800 text-sm">上一步</button>
@@ -370,16 +391,30 @@
               class="w-full border rounded px-3 py-2 text-sm">
           </div>
           <div>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" x-model="dry_run" class="rounded border-gray-300 text-yellow-500 focus:ring-yellow-500">
+              <span class="text-sm font-medium text-gray-700">🧪 干跑模式（仅预览影响，不实际删除数据）</span>
+            </label>
+            <p class="text-xs text-gray-400 mt-1 ml-6">开启后执行操作不会删除任何数据，仅返回将被影响的数据统计</p>
+          </div>
+          <div>
             <label class="block text-sm text-gray-600 mb-1">请输入 <strong class="text-red-600">确认删除</strong> 以确认操作</label>
             <input type="text" x-model="confirmationText" placeholder="确认删除"
               class="w-full border rounded px-3 py-2 text-sm">
           </div>
+          <div>
+            <label class="block text-sm text-gray-600 mb-1">管理员验证码 <span class="text-red-500">*</span></label>
+            <input type="text" x-model="verificationCode" placeholder="请输入手机验证码（开发环境：123456）"
+              class="w-full border rounded px-3 py-2 text-sm" maxlength="6">
+            <p class="text-xs text-gray-400 mt-1">数据清理操作需要二次身份验证</p>
+          </div>
         </div>
         <div class="flex justify-between">
           <button @click="cleanupStep = 3" class="text-gray-600 hover:text-gray-800 text-sm">上一步</button>
-          <button @click="executeCleanup()" :disabled="cleanupExecuting || confirmationText !== '确认删除'"
-            class="bg-red-600 text-white px-6 py-2 rounded hover:bg-red-700 text-sm disabled:opacity-50">
-            <span x-show="!cleanupExecuting">🗑️ 执行删除</span>
+          <button @click="executeCleanup()" :disabled="cleanupExecuting || confirmationText !== '确认删除' || !verificationCode.trim()"
+            :class="dry_run ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-red-600 hover:bg-red-700'"
+            class="text-white px-6 py-2 rounded text-sm disabled:opacity-50">
+            <span x-show="!cleanupExecuting" x-text="dry_run ? '🧪 干跑预览' : '🗑️ 执行删除'"></span>
             <span x-show="cleanupExecuting">执行中...</span>
           </button>
         </div>
@@ -450,16 +485,164 @@
         <!-- 资产域对账结果 -->
         <template x-if="assetReconciliation">
           <div class="mb-6">
-            <h4 class="text-md font-medium mb-2">💰 资产域对账</h4>
-            <pre class="bg-gray-50 rounded p-4 text-xs overflow-auto max-h-64" x-text="JSON.stringify(assetReconciliation, null, 2)"></pre>
+            <h4 class="text-md font-medium mb-3">💰 资产域对账</h4>
+            <!-- 全局守恒 -->
+            <div class="mb-4">
+              <div class="flex items-center mb-2">
+                <span class="text-sm font-medium text-gray-700">全局守恒检查</span>
+                <span class="ml-2 px-2 py-0.5 rounded text-xs font-semibold"
+                  :class="assetReconciliation.global_conservation?.status === 'PASS' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'"
+                  x-text="assetReconciliation.global_conservation?.status"></span>
+              </div>
+              <template x-if="assetReconciliation.global_conservation?.by_asset_code?.length > 0">
+                <table class="w-full text-xs border">
+                  <thead class="bg-gray-50">
+                    <tr>
+                      <th class="px-3 py-2 text-left border-b">资产编码</th>
+                      <th class="px-3 py-2 text-right border-b">流水合计 (SUM delta)</th>
+                      <th class="px-3 py-2 text-center border-b">状态</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="item in assetReconciliation.global_conservation.by_asset_code" :key="item.asset_code">
+                      <tr class="border-b hover:bg-gray-50">
+                        <td class="px-3 py-2 font-mono" x-text="item.asset_code"></td>
+                        <td class="px-3 py-2 text-right" x-text="Number(item.total_delta).toLocaleString()"></td>
+                        <td class="px-3 py-2 text-center">
+                          <span :class="Number(item.total_delta) === 0 ? 'text-green-600' : 'text-red-600'"
+                            x-text="Number(item.total_delta) === 0 ? '✅ 守恒' : '⚠️ 不守恒'"></span>
+                        </td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </template>
+            </div>
+            <!-- 余额一致性 -->
+            <div>
+              <div class="flex items-center mb-2">
+                <span class="text-sm font-medium text-gray-700">余额一致性检查</span>
+                <span class="ml-2 px-2 py-0.5 rounded text-xs font-semibold"
+                  :class="assetReconciliation.balance_consistency?.status === 'PASS' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'"
+                  x-text="assetReconciliation.balance_consistency?.status"></span>
+                <span class="ml-2 text-xs text-gray-500" x-text="'差异账户: ' + (assetReconciliation.balance_consistency?.mismatch_count || 0) + ' 个'"></span>
+              </div>
+              <template x-if="assetReconciliation.balance_consistency?.mismatches?.length > 0">
+                <table class="w-full text-xs border">
+                  <thead class="bg-gray-50">
+                    <tr>
+                      <th class="px-3 py-2 text-left border-b">账户ID</th>
+                      <th class="px-3 py-2 text-left border-b">资产编码</th>
+                      <th class="px-3 py-2 text-right border-b">记录余额</th>
+                      <th class="px-3 py-2 text-right border-b">流水计算余额</th>
+                      <th class="px-3 py-2 text-right border-b">差异</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="m in assetReconciliation.balance_consistency.mismatches" :key="m.account_id + '_' + m.asset_code">
+                      <tr class="border-b hover:bg-gray-50">
+                        <td class="px-3 py-2 font-mono" x-text="m.account_id"></td>
+                        <td class="px-3 py-2 font-mono" x-text="m.asset_code"></td>
+                        <td class="px-3 py-2 text-right" x-text="Number(m.recorded_balance).toLocaleString()"></td>
+                        <td class="px-3 py-2 text-right" x-text="Number(m.calculated_balance).toLocaleString()"></td>
+                        <td class="px-3 py-2 text-right text-red-600 font-medium" x-text="Number(m.difference).toLocaleString()"></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </template>
+              <template x-if="assetReconciliation.balance_consistency?.status === 'PASS'">
+                <p class="text-sm text-green-600 py-2">✅ 所有账户余额与流水合计一致</p>
+              </template>
+            </div>
           </div>
         </template>
 
         <!-- 物品域对账结果 -->
         <template x-if="itemReconciliation">
           <div>
-            <h4 class="text-md font-medium mb-2">📦 物品域对账</h4>
-            <pre class="bg-gray-50 rounded p-4 text-xs overflow-auto max-h-64" x-text="JSON.stringify(itemReconciliation, null, 2)"></pre>
+            <h4 class="text-md font-medium mb-3">📦 物品域对账</h4>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              <!-- 物品守恒 -->
+              <div class="border rounded-lg p-4">
+                <div class="flex items-center mb-1">
+                  <span class="text-sm font-medium">物品守恒</span>
+                  <span class="ml-auto px-2 py-0.5 rounded text-xs font-semibold"
+                    :class="itemReconciliation.item_conservation?.status === 'PASS' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'"
+                    x-text="itemReconciliation.item_conservation?.status"></span>
+                </div>
+                <p class="text-xs text-gray-500" x-text="'不平衡物品: ' + (itemReconciliation.item_conservation?.imbalanced_count || 0) + ' 个'"></p>
+              </div>
+              <!-- 持有者一致性 -->
+              <div class="border rounded-lg p-4">
+                <div class="flex items-center mb-1">
+                  <span class="text-sm font-medium">持有者一致性</span>
+                  <span class="ml-auto px-2 py-0.5 rounded text-xs font-semibold"
+                    :class="itemReconciliation.owner_consistency?.status === 'PASS' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'"
+                    x-text="itemReconciliation.owner_consistency?.status"></span>
+                </div>
+                <p class="text-xs text-gray-500" x-text="'不一致: ' + (itemReconciliation.owner_consistency?.mismatch_count || 0) + ' 个'"></p>
+                <p class="text-xs text-gray-400" x-text="'Legacy 不一致: ' + (itemReconciliation.owner_consistency?.legacy_mismatches || 0) + ' 个'"></p>
+              </div>
+              <!-- 铸造一致性 -->
+              <div class="border rounded-lg p-4">
+                <div class="flex items-center mb-1">
+                  <span class="text-sm font-medium">铸造一致性</span>
+                  <span class="ml-auto px-2 py-0.5 rounded text-xs font-semibold"
+                    :class="itemReconciliation.mint_count_consistency?.status === 'PASS' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'"
+                    x-text="itemReconciliation.mint_count_consistency?.status"></span>
+                </div>
+                <p class="text-xs text-gray-500" x-text="'总物品: ' + (itemReconciliation.mint_count_consistency?.total_items || 0)"></p>
+                <p class="text-xs text-gray-400" x-text="'无铸造记录: ' + (itemReconciliation.mint_count_consistency?.items_without_mint || 0)"></p>
+              </div>
+            </div>
+
+            <!-- 不一致物品明细（仅在有差异时显示） -->
+            <template x-if="itemReconciliation.item_conservation?.imbalanced_items?.length > 0">
+              <div class="mt-4">
+                <h5 class="text-sm font-medium mb-2 text-red-700">⚠️ 不平衡物品明细（前20条）</h5>
+                <table class="w-full text-xs border">
+                  <thead class="bg-gray-50">
+                    <tr>
+                      <th class="px-3 py-2 text-left border-b">物品ID</th>
+                      <th class="px-3 py-2 text-right border-b">账本余额 (SUM delta)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="item in itemReconciliation.item_conservation.imbalanced_items" :key="item.item_id">
+                      <tr class="border-b hover:bg-gray-50">
+                        <td class="px-3 py-2 font-mono" x-text="item.item_id"></td>
+                        <td class="px-3 py-2 text-right text-red-600" x-text="Number(item.balance)"></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+            </template>
+
+            <template x-if="itemReconciliation.owner_consistency?.mismatches?.length > 0">
+              <div class="mt-4">
+                <h5 class="text-sm font-medium mb-2 text-red-700">⚠️ 持有者不一致明细（前20条）</h5>
+                <table class="w-full text-xs border">
+                  <thead class="bg-gray-50">
+                    <tr>
+                      <th class="px-3 py-2 text-left border-b">物品ID</th>
+                      <th class="px-3 py-2 text-left border-b">账本持有者</th>
+                      <th class="px-3 py-2 text-left border-b">缓存持有者</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="m in itemReconciliation.owner_consistency.mismatches" :key="m.item_id">
+                      <tr class="border-b hover:bg-gray-50">
+                        <td class="px-3 py-2 font-mono" x-text="m.item_id"></td>
+                        <td class="px-3 py-2 font-mono" x-text="m.ledger_owner"></td>
+                        <td class="px-3 py-2 font-mono text-red-600" x-text="m.cache_owner"></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+            </template>
           </div>
         </template>
       </div>

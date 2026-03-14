@@ -64,6 +64,7 @@ document.addEventListener('alpine:init', () => {
      */
     subPages: [
       { id: 'trade-orders', name: '交易市场订单', icon: '🔄' },
+      { id: 'redemption-orders', name: '兑换订单', icon: '📦' },
       { id: 'marketplace-stats', name: '上架统计', icon: '📊' },
       { id: 'market-overview', name: '市场概览', icon: '📈' }
     ],

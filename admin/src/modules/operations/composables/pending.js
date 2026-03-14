@@ -47,6 +47,7 @@ export function usePendingState() {
       refund: 0,
       redemption: 0,
       feedback: 0,
+      approval_chain: 0,
       total: 0,
       total_urgent: 0
     },

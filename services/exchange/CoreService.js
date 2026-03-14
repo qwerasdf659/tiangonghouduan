@@ -174,6 +174,7 @@ class CoreService {
       }
 
       return {
+        success: true,
         message: '兑换订单已存在',
         order: {
           order_no: existingOrder.order_no,
@@ -294,6 +295,7 @@ class CoreService {
         )
 
         return {
+          success: true,
           message: '兑换订单已存在（材料扣减幂等）',
           order: existingRecord.toJSON(),
           remaining: {
@@ -400,6 +402,7 @@ class CoreService {
     logger.info(`[兑换市场] 兑换成功，订单号：${order_no}`)
 
     return {
+      success: true,
       message: '兑换成功',
       order: {
         order_no,

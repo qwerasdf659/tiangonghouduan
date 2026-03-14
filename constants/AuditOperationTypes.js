@@ -282,7 +282,7 @@ const OPERATION_TYPES = Object.freeze({
   /**
    * 兑换订单拒绝
    * @description 管理员拒绝兑换订单
-   * @example exchange/AdminService.rejectOrder()
+   * @example exchange/CoreService.rejectOrder()
    * @since 2026-03-13
    */
   EXCHANGE_REJECT: 'exchange_reject',
@@ -290,7 +290,7 @@ const OPERATION_TYPES = Object.freeze({
   /**
    * 兑换订单发货
    * @description 管理员对兑换订单执行发货操作
-   * @example exchange/AdminService.shipOrder()
+   * @example exchange/CoreService.updateOrderStatus('shipped')
    * @since 2026-03-13
    */
   EXCHANGE_SHIP: 'exchange_ship',
@@ -309,6 +309,19 @@ const OPERATION_TYPES = Object.freeze({
    * @description 管理员审核用户的消费记录
    */
   CONSUMPTION_AUDIT: 'consumption_audit',
+
+  // ==================== 审核链类（Approval Chain）====================
+  /**
+   * 审核链模板配置变更（创建/修改/启停模板）
+   * @description 管理员对审核链模板进行 CRUD 操作
+   */
+  APPROVAL_CHAIN_CONFIG: 'approval_chain_config',
+
+  /**
+   * 审核链步骤审核操作（通过/拒绝）
+   * @description 审核人对审核链步骤执行审核操作
+   */
+  APPROVAL_CHAIN_AUDIT: 'approval_chain_audit',
 
   // ==================== 功能开关类（Feature Flag V4.6.0 新增）====================
   /**
@@ -449,6 +462,10 @@ const OPERATION_TYPE_DESCRIPTIONS = Object.freeze({
   // 消费审核类
   [OPERATION_TYPES.CONSUMPTION_AUDIT]: '消费审核',
 
+  // 审核链类
+  [OPERATION_TYPES.APPROVAL_CHAIN_CONFIG]: '审核链配置变更',
+  [OPERATION_TYPES.APPROVAL_CHAIN_AUDIT]: '审核链步骤审核',
+
   // 功能开关类（Feature Flag V4.6.0 新增）
   [OPERATION_TYPES.FEATURE_FLAG_CREATE]: '功能开关创建',
   [OPERATION_TYPES.FEATURE_FLAG_UPDATE]: '功能开关更新',
@@ -489,6 +506,7 @@ const CRITICAL_OPERATIONS = Object.freeze(
     OPERATION_TYPES.ASSET_ADJUSTMENT, // 资产调整 - 影响用户资产余额
     OPERATION_TYPES.EXCHANGE_AUDIT, // 兑换审核 - 涉及实物发放
     OPERATION_TYPES.CONSUMPTION_AUDIT, // 消费审核 - 影响积分到账
+    OPERATION_TYPES.APPROVAL_CHAIN_AUDIT, // 审核链审核 - 影响业务审核流程
     OPERATION_TYPES.INVENTORY_TRANSFER, // 库存转让 - 物品所有权转移
 
     // ========== 用户管理关键操作 ==========

@@ -210,22 +210,24 @@ class CoreService {
       `✅ 消费记录创建成功 (ID: ${consumptionRecord.consumption_record_id}, idempotency_key: ${idempotency_key})`
     )
 
-    // 步骤9：创建审核记录
-    await ContentReviewRecord.create(
+    // 步骤9：通过 ContentAuditEngine 统一创建审核记录（含审核链匹配）
+    const ContentAuditEngine = require('../ContentAuditEngine')
+    await ContentAuditEngine.submitForAudit(
+      'consumption',
+      consumptionRecord.consumption_record_id,
       {
-        auditable_type: 'consumption',
-        auditable_id: consumptionRecord.consumption_record_id,
-        audit_status: 'pending',
-        auditor_id: null,
-        audit_reason: null,
-        submitted_at: BeijingTimeHelper.createDatabaseTime(),
-        created_at: BeijingTimeHelper.createDatabaseTime(),
-        updated_at: BeijingTimeHelper.createDatabaseTime()
-      },
-      { transaction }
+        auditData: {
+          consumption_amount: data.consumption_amount,
+          merchant_id: data.merchant_id,
+          store_id: storeId || null,
+          submitted_by: data.merchant_id,
+          operator_id: data.merchant_id
+        },
+        transaction
+      }
     )
 
-    logger.info('✅ 审核记录创建成功')
+    logger.info('✅ 审核记录创建成功（含审核链匹配）')
     logger.info('🎉 消费记录处理完成，等待入口层提交事务')
 
     logger.info(

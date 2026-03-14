@@ -59,7 +59,8 @@ class ContentAuditEngine {
    * @returns {Promise<ContentReviewRecord>} 审核记录
    */
   static async submitForAudit(auditableType, auditableId, options = {}) {
-    const { priority = 'medium', auditData = {}, transaction = null } = options
+    const { priority = 'medium', auditData = {} } = options
+    const transaction = assertAndGetTransaction(options, 'ContentAuditEngine.submitForAudit')
 
     logger.info(`[审核服务] 提交审核: ${auditableType} ID=${auditableId}, 优先级=${priority}`)
 

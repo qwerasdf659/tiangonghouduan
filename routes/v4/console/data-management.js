@@ -21,7 +21,20 @@ const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
 const { requireValidSession } = require('../../../middleware/sensitiveOperation')
+const { getRateLimiter } = require('../../../middleware/RateLimiterMiddleware')
 const { asyncHandler } = require('./shared/middleware')
+
+/**
+ * 清理操作速率限制：每小时最多 1 次手动清理
+ * 通过 api_idempotency_requests 机制 + Redis 滑动窗口双重控制
+ */
+const cleanupRateLimiter = getRateLimiter().createLimiter({
+  windowMs: 60 * 60 * 1000,
+  max: 1,
+  keyPrefix: 'rate_limit:data_cleanup:',
+  message: '每小时最多执行 1 次清理操作，请稍后再试',
+  keyGenerator: 'user'
+})
 
 /** 管理员认证中间件组 */
 const adminAuth = [authenticateToken, requireRoleLevel(100)]
@@ -137,18 +150,20 @@ router.post(
 /**
  * POST /cleanup - 执行清理
  *
- * @description 执行数据清理，需要预览令牌和二次确认
+ * @description 执行数据清理，需要预览令牌、二次确认文字和管理员验证码
  * @body {string} preview_token - 预览令牌（5 分钟有效）
  * @body {boolean} [dry_run=false] - 干跑模式
  * @body {string} reason - 操作原因
  * @body {string} confirmation_text - 确认文字（必须为"确认删除"）
+ * @body {string} verification_code - 管理员验证码（二次确认）
  */
 router.post(
   '/cleanup',
   adminAuth,
   requireValidSession,
+  cleanupRateLimiter,
   asyncHandler(async (req, res) => {
-    const { preview_token, dry_run, reason, confirmation_text } = req.body
+    const { preview_token, dry_run, reason, confirmation_text, verification_code } = req.body
 
     if (!preview_token) {
       return res.apiBadRequest('缺少 preview_token，请先执行预览')
@@ -158,6 +173,15 @@ router.post(
     }
     if (!confirmation_text) {
       return res.apiBadRequest('缺少确认文字（confirmation_text）')
+    }
+    if (!verification_code) {
+      return res.apiBadRequest('缺少管理员验证码（verification_code），数据清理操作需要二次验证')
+    }
+
+    const smsService = req.app.locals.services.getService('sms')
+    const isCodeValid = await smsService.verifyCode(req.user.mobile, verification_code)
+    if (!isCodeValid) {
+      return res.apiError('管理员验证码错误或已过期', 'INVALID_VERIFICATION_CODE', null, 401)
     }
 
     const service = req.app.locals.services.getService('data_management')

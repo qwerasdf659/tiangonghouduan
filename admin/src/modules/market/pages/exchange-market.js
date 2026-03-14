@@ -333,7 +333,7 @@ document.addEventListener('alpine:init', () => {
         {
           key: 'item_name',
           label: '商品',
-          render: (val, row) => row.item_snapshot?.name || val || '-'
+          render: (val, row) => row.item_snapshot?.item_name || val || '-'
         },
         {
           key: 'pay_amount',

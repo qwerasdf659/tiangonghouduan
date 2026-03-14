@@ -20,6 +20,7 @@ export const APPROVAL_CHAIN_ENDPOINTS = {
 
   /** 实例查询 */
   INSTANCE_LIST: `${API_PREFIX}/console/approval-chain/instances`,
+  INSTANCE_BY_AUDITABLE: `${API_PREFIX}/console/approval-chain/instances/by-auditable`,
   INSTANCE_DETAIL: `${API_PREFIX}/console/approval-chain/instances/:id`,
 
   /** 审核操作 */
@@ -78,6 +79,12 @@ export const ApprovalChainAPI = {
   /** 查询实例详情 */
   async getInstanceDetail(instanceId) {
     return request({ url: buildURL(APPROVAL_CHAIN_ENDPOINTS.INSTANCE_DETAIL, { id: instanceId }) })
+  },
+
+  /** 按业务记录查询审核链实例（用于消费审核列表等页面显示审核链进度） */
+  async getInstanceByAuditable(auditableType, auditableId) {
+    const query = new URLSearchParams({ auditable_type: auditableType, auditable_id: auditableId })
+    return request({ url: `${APPROVAL_CHAIN_ENDPOINTS.INSTANCE_BY_AUDITABLE}?${query}` })
   },
 
   // ========== 审核操作 ==========

@@ -77,6 +77,7 @@
           <option value="risk_alert">风控告警</option>
           <option value="refund">退款申请</option>
           <option value="feedback">用户反馈</option>
+          <option value="approval_chain">审核链待审</option>
         </select>
         
         <!-- 紧急程度筛选 -->
@@ -232,6 +233,19 @@
           <div class="text-2xl font-bold text-indigo-600" x-text="summary.feedback">0</div>
         </div>
         <div class="text-sm themed-text-muted mt-2">用户反馈</div>
+      </div>
+
+      <!-- 审核链待审 -->
+      <div 
+        class="stat-card themed-card rounded-xl p-4 cursor-pointer border-l-4 border-teal-500"
+        :class="filter.type === 'approval_chain' ? 'ring-2 ring-teal-400' : ''"
+        @click="filter.type = filter.type === 'approval_chain' ? '' : 'approval_chain'; loadPendingItems()"
+      >
+        <div class="flex items-center justify-between">
+          <div class="text-2xl">🔗</div>
+          <div class="text-2xl font-bold text-teal-600" x-text="summary.approval_chain">0</div>
+        </div>
+        <div class="text-sm themed-text-muted mt-2">审核链待审</div>
       </div>
     </div>
     

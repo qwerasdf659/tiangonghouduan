@@ -26,7 +26,9 @@ const { OPERATION_TYPES } = require('../constants/AuditOperationTypes')
 const { AUDIT_TARGET_TYPES } = require('../constants/AuditTargetTypes')
 const BeijingTimeHelper = require('../utils/timeHelper')
 const TransactionManager = require('../utils/TransactionManager')
+const ItemLifecycleService = require('./asset/ItemLifecycleService')
 const crypto = require('crypto')
+const { getRawClient } = require('../utils/UnifiedRedisClient')
 
 /**
  * L0 不可删表白名单（硬编码，任何清理操作均跳过）
@@ -36,6 +38,7 @@ const L0_PROTECTED_TABLES = Object.freeze(
   new Set([
     'sequelizemeta',
     'administrative_regions',
+    'accounts',
     'roles',
     'material_asset_types',
     'asset_group_defs',
@@ -43,6 +46,14 @@ const L0_PROTECTED_TABLES = Object.freeze(
     'category_defs'
   ])
 )
+
+/**
+ * accounts 表条件删除白名单 WHERE 子句
+ * 即使 accounts 在 L0 中，pre_launch 清档仍需删除 user 类型账户
+ * 执行删除时必须验证 WHERE 子句包含 account_type 过滤，防止误删系统账户
+ * @constant {string}
+ */
+const _ACCOUNTS_SAFE_DELETE_CONDITION = "account_type = 'user'" // eslint-disable-line no-unused-vars
 
 /**
  * L1 金融级数据表（清理前需对账校验通过）
@@ -82,7 +93,9 @@ const L3_AUTO_CLEANUP_TABLES = Object.freeze({
   risk_alerts: 'created_at',
   alert_silence_rules: 'created_at',
   ad_report_daily_snapshots: 'report_date',
-  ad_dau_daily_stats: 'stat_date'
+  ad_dau_daily_stats: 'stat_date',
+  system_dictionary_history: 'created_at',
+  ad_billing_records: 'created_at'
 })
 
 /**
@@ -107,13 +120,13 @@ const L2_CLEANUP_CATEGORIES = Object.freeze({
     time_field: 'created_at'
   },
   lottery_monitoring: {
-    label: '抽奖监控',
-    tables: [
-      'lottery_hourly_metrics',
-      'lottery_daily_metrics',
-      'lottery_alerts',
-      'lottery_simulation_records'
-    ],
+    label: '抽奖监控（告警与模拟）',
+    tables: ['lottery_alerts', 'lottery_simulation_records'],
+    time_field: 'created_at'
+  },
+  monitoring_metrics: {
+    label: '监控指标',
+    tables: ['lottery_hourly_metrics', 'lottery_daily_metrics'],
     time_field: 'created_at'
   },
   consumption_records: {
@@ -272,8 +285,13 @@ const DELETE_TOPOLOGY = Object.freeze([
   ]
 ])
 
-/** 预览令牌缓存（5 分钟有效） */
-const previewCache = new Map()
+/**
+ * 预览令牌 Redis 键前缀（5 分钟有效）
+ * 使用 Redis 存储，支持进程重启后令牌保持有效、多实例部署共享
+ * @constant {string}
+ */
+const PREVIEW_TOKEN_PREFIX = 'data_mgmt:preview_token:'
+const PREVIEW_TOKEN_TTL_SECONDS = 300
 
 /**
  * 数据管理服务
@@ -294,8 +312,13 @@ class DataManagementService {
    * @returns {Promise<Object>} 统计结果：各表行数、安全等级分组、数据库大小
    */
   async getStats() {
+    /*
+     * information_schema 列名在 MySQL 中返回大写（如 TABLE_NAME），
+     * 必须用显式别名统一为小写，否则 JS 端 row.table_name === undefined
+     */
     const [tableRows] = await sequelize.query(`
-      SELECT table_name, table_rows AS estimated_rows,
+      SELECT table_name AS table_name,
+             table_rows AS estimated_rows,
              ROUND(data_length / 1024 / 1024, 2) AS data_size_mb,
              ROUND(index_length / 1024 / 1024, 2) AS index_size_mb
       FROM information_schema.tables
@@ -314,7 +337,7 @@ class DataManagementService {
 
     for (const row of tableRows) {
       const tableName = row.table_name
-      if (L0_PROTECTED_TABLES.has(tableName) || tableName === 'accounts') {
+      if (L0_PROTECTED_TABLES.has(tableName)) {
         byLevel.L0.push(row)
       } else if (L1_FINANCIAL_TABLES.has(tableName)) {
         byLevel.L1.push(row)
@@ -443,16 +466,20 @@ class DataManagementService {
     const tablesAffected = details.filter(d => d.rows_to_delete > 0).length
 
     const previewToken = `pv_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000)
+    const expiresAt = new Date(Date.now() + PREVIEW_TOKEN_TTL_SECONDS * 1000)
 
-    previewCache.set(previewToken, {
-      options,
-      details,
-      expires_at: expiresAt,
-      created_at: new Date()
-    })
-
-    setTimeout(() => previewCache.delete(previewToken), 5 * 60 * 1000)
+    try {
+      const redisClient = await getRawClient()
+      await redisClient.set(
+        `${PREVIEW_TOKEN_PREFIX}${previewToken}`,
+        JSON.stringify({ options, details, expires_at: expiresAt, created_at: new Date() }),
+        'EX',
+        PREVIEW_TOKEN_TTL_SECONDS
+      )
+    } catch (redisErr) {
+      logger.error('[数据清理] 预览令牌写入 Redis 失败:', { error: redisErr.message })
+      throw new Error('预览令牌存储失败，请检查 Redis 连接')
+    }
 
     return {
       preview_token: previewToken,
@@ -486,13 +513,25 @@ class DataManagementService {
       throw new Error('确认文字不正确，请输入"确认删除"')
     }
 
-    const cached = previewCache.get(preview_token)
-    if (!cached) {
-      throw new Error('预览令牌无效或已过期，请重新预览')
+    let cached
+    try {
+      const redisClient = await getRawClient()
+      const cachedStr = await redisClient.get(`${PREVIEW_TOKEN_PREFIX}${preview_token}`)
+      if (!cachedStr) {
+        throw new Error('预览令牌无效或已过期，请重新预览')
+      }
+      cached = JSON.parse(cachedStr)
+    } catch (redisErr) {
+      if (redisErr.message.includes('预览令牌')) throw redisErr
+      logger.error('[数据清理] 读取预览令牌失败:', { error: redisErr.message })
+      throw new Error('预览令牌读取失败，请检查 Redis 连接')
     }
 
-    if (new Date() > cached.expires_at) {
-      previewCache.delete(preview_token)
+    if (new Date() > new Date(cached.expires_at)) {
+      try {
+        const redisClient = await getRawClient()
+        await redisClient.del(`${PREVIEW_TOKEN_PREFIX}${preview_token}`)
+      } catch (_) {}
       throw new Error('预览令牌已过期，请重新预览')
     }
 
@@ -500,6 +539,59 @@ class DataManagementService {
     const mode = cached.options.mode
     const startTime = Date.now()
     const results = []
+
+    /*
+     * pre_launch 清档：自动进入维护模式，阻止用户端访问
+     * 清档完成后（finally）自动退出维护模式
+     */
+    let maintenanceModeActivated = false
+    if (mode === 'pre_launch' && !dry_run) {
+      try {
+        await this._setMaintenanceMode(true, operatorId, '数据清档 - 系统自动进入维护模式')
+        maintenanceModeActivated = true
+        logger.info('[数据清理] pre_launch 清档：已进入维护模式')
+      } catch (mmError) {
+        logger.error('[数据清理] 进入维护模式失败，中止清档:', { error: mmError.message })
+        throw new Error('无法进入维护模式，清档操作已中止: ' + mmError.message)
+      }
+    }
+
+    /*
+     * L1 金融级数据对账校验
+     * 清理包含 L1 表时，先调用 ItemLifecycleService 做资产/物品守恒校验
+     * 校验不通过则拒绝清理 L1 表
+     */
+    const hasL1Tables = details.some(d => L1_FINANCIAL_TABLES.has(d.table_name))
+    let reconciliationPassed = true
+    if (hasL1Tables && !dry_run) {
+      try {
+        const [assetResult, itemResult] = await Promise.all([
+          ItemLifecycleService.reconcileAssets(),
+          ItemLifecycleService.reconcileItems()
+        ])
+
+        const assetOk = assetResult.balance_consistency.status === 'PASS'
+        const itemOk =
+          itemResult.item_conservation.status === 'PASS' &&
+          itemResult.owner_consistency.status === 'PASS'
+
+        if (!assetOk || !itemOk) {
+          reconciliationPassed = false
+          logger.warn('[数据清理] L1 对账校验未通过，L1 表将被跳过', {
+            asset_balance: assetResult.balance_consistency.status,
+            item_conservation: itemResult.item_conservation.status,
+            item_owner: itemResult.owner_consistency.status
+          })
+        } else {
+          logger.info('[数据清理] L1 对账校验通过')
+        }
+      } catch (reconcileError) {
+        reconciliationPassed = false
+        logger.error('[数据清理] L1 对账校验执行失败，L1 表将被跳过:', {
+          error: reconcileError.message
+        })
+      }
+    }
 
     const flatDeleteOrder = DELETE_TOPOLOGY.flat()
 
@@ -509,131 +601,177 @@ class DataManagementService {
       return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB)
     })
 
-    for (const item of sortedDetails) {
-      if (item.rows_to_delete === 0) continue
-      if (L0_PROTECTED_TABLES.has(item.table_name)) continue
+    try {
+      for (const item of sortedDetails) {
+        if (item.rows_to_delete === 0) continue
 
-      try {
-        let deletedCount = 0
-
-        if (dry_run) {
-          deletedCount = item.rows_to_delete
-          logger.info(`[数据清理][干跑] ${item.table_name}: 将删除 ${deletedCount} 行`)
-        } else {
-          deletedCount = await this._batchDelete(
-            item.table_name,
-            item.where_clause || '1=1',
-            item.batch_size || 1000,
-            item.where_replacements
-          )
-          logger.info(`[数据清理] ${item.table_name}: 已删除 ${deletedCount} 行`)
+        /*
+         * L0 保护：accounts 表允许条件删除（仅删 user 类型，保留 system 类型）
+         * 其他 L0 表一律跳过
+         */
+        if (L0_PROTECTED_TABLES.has(item.table_name)) {
+          if (item.table_name === 'accounts') {
+            if (!item.where_clause || !item.where_clause.includes('account_type')) {
+              results.push({
+                table_name: 'accounts',
+                deleted_count: 0,
+                status: 'skipped',
+                error: 'accounts 表缺少系统账户保护条件，拒绝执行（必须指定 account_type 筛选）'
+              })
+              continue
+            }
+          } else {
+            continue
+          }
         }
 
-        results.push({
-          table_name: item.table_name,
-          deleted_count: deletedCount,
-          status: 'success'
-        })
-      } catch (error) {
-        logger.error(`[数据清理] ${item.table_name} 删除失败:`, { error: error.message })
-        results.push({
-          table_name: item.table_name,
-          deleted_count: 0,
-          status: 'error',
-          error: error.message
-        })
-      }
-    }
-
-    const totalDeleted = results.reduce((sum, r) => sum + r.deleted_count, 0)
-    const durationSeconds = (Date.now() - startTime) / 1000
-
-    if (!dry_run) {
-      try {
-        await AuditLogService.logOperation({
-          operator_id: operatorId,
-          operation_type: OPERATION_TYPES.DATA_CLEANUP,
-          target_type: AUDIT_TARGET_TYPES.DATA_MANAGEMENT,
-          target_id: `cleanup_${mode}`,
-          action: `数据清理（${mode === 'pre_launch' ? '上线前清档' : mode === 'auto' ? '自动清理' : '手动清理'}）`,
-          before_data: { mode, tables_affected: details.length },
-          after_data: { total_deleted: totalDeleted, duration_seconds: durationSeconds, results },
-          reason,
-          idempotency_key: `data_cleanup_${Date.now()}`
-        })
-      } catch (auditError) {
-        logger.error('[数据清理] 审计日志写入失败:', { error: auditError.message })
-      }
-    }
-
-    previewCache.delete(preview_token)
-
-    /*
-     * pre_launch 清档完成后自动重建超管账号
-     * 读取 .env SUPER_ADMIN_MOBILE 配置，创建用户并关联 admin 角色（role_id=2）
-     */
-    let super_admin_rebuilt = false
-    if (mode === 'pre_launch' && !dry_run && totalDeleted > 0) {
-      try {
-        const superAdminMobile = process.env.SUPER_ADMIN_MOBILE
-        if (!superAdminMobile) {
-          logger.warn('[数据清理] 未配置 SUPER_ADMIN_MOBILE 环境变量，跳过超管重建')
-        } else {
-          const UserService = require('./UserService')
-          const { UserRole, Role } = require('../models')
-
-          await TransactionManager.execute(async transaction => {
-            let user
-            try {
-              user = await UserService.registerUser(superAdminMobile, {
-                nickname: '超级管理员',
-                status: 'active',
-                transaction
-              })
-            } catch (regErr) {
-              if (regErr.code === 'MOBILE_EXISTS') {
-                user = { user_id: regErr.data.user_id }
-                logger.info('[数据清理] 超管账号已存在，跳过创建', { user_id: user.user_id })
-              } else {
-                throw regErr
-              }
-            }
-
-            const adminRole = await Role.findOne({
-              where: { role_id: 2 },
-              transaction
-            })
-            if (adminRole) {
-              await UserRole.findOrCreate({
-                where: { user_id: user.user_id, role_id: 2 },
-                defaults: { user_id: user.user_id, role_id: 2 },
-                transaction
-              })
-              logger.info('[数据清理] 超管角色关联成功', {
-                user_id: user.user_id,
-                role_id: 2,
-                role_name: adminRole.role_name
-              })
-            } else {
-              logger.warn('[数据清理] role_id=2 不存在，请手动创建 admin 角色')
-            }
+        /* L1 对账未通过时跳过金融级表 */
+        if (L1_FINANCIAL_TABLES.has(item.table_name) && !reconciliationPassed) {
+          results.push({
+            table_name: item.table_name,
+            deleted_count: 0,
+            status: 'skipped',
+            error: 'L1 对账校验未通过，跳过金融级表'
           })
-
-          super_admin_rebuilt = true
-          logger.info('[数据清理] pre_launch 清档后超管重建完成', { mobile: superAdminMobile })
+          continue
         }
-      } catch (rebuildError) {
-        logger.error('[数据清理] 超管重建失败（非致命）:', { error: rebuildError.message })
-      }
-    }
 
-    return {
-      mode,
-      dry_run,
-      total_deleted: totalDeleted,
-      duration_seconds: Math.round(durationSeconds * 10) / 10,
-      details: results,
-      super_admin_rebuilt
+        try {
+          let deletedCount = 0
+
+          if (dry_run) {
+            deletedCount = item.rows_to_delete
+            logger.info(`[数据清理][干跑] ${item.table_name}: 将删除 ${deletedCount} 行`)
+          } else {
+            deletedCount = await this._batchDelete(
+              item.table_name,
+              item.where_clause || '1=1',
+              item.batch_size || 1000,
+              item.where_replacements
+            )
+            logger.info(`[数据清理] ${item.table_name}: 已删除 ${deletedCount} 行`)
+          }
+
+          results.push({
+            table_name: item.table_name,
+            deleted_count: deletedCount,
+            status: 'success'
+          })
+        } catch (error) {
+          logger.error(`[数据清理] ${item.table_name} 删除失败:`, { error: error.message })
+          results.push({
+            table_name: item.table_name,
+            deleted_count: 0,
+            status: 'error',
+            error: error.message
+          })
+        }
+      }
+
+      const totalDeleted = results.reduce((sum, r) => sum + r.deleted_count, 0)
+      const durationSeconds = (Date.now() - startTime) / 1000
+
+      if (!dry_run) {
+        try {
+          await AuditLogService.logOperation({
+            operator_id: operatorId,
+            operation_type: OPERATION_TYPES.DATA_CLEANUP,
+            target_type: AUDIT_TARGET_TYPES.DATA_MANAGEMENT,
+            target_id: `cleanup_${mode}`,
+            action: `数据清理（${mode === 'pre_launch' ? '上线前清档' : mode === 'auto' ? '自动清理' : '手动清理'}）`,
+            before_data: { mode, tables_affected: details.length },
+            after_data: { total_deleted: totalDeleted, duration_seconds: durationSeconds, results },
+            reason,
+            idempotency_key: `data_cleanup_${Date.now()}`
+          })
+        } catch (auditError) {
+          logger.error('[数据清理] 审计日志写入失败:', { error: auditError.message })
+        }
+      }
+
+      try {
+        const redisClient = await getRawClient()
+        await redisClient.del(`${PREVIEW_TOKEN_PREFIX}${preview_token}`)
+      } catch (_) {}
+
+      /*
+       * pre_launch 清档完成后自动重建超管账号
+       * 读取 .env SUPER_ADMIN_MOBILE 配置，创建用户并关联 admin 角色（role_id=2）
+       */
+      let super_admin_rebuilt = false
+      if (mode === 'pre_launch' && !dry_run && totalDeleted > 0) {
+        try {
+          const superAdminMobile = process.env.SUPER_ADMIN_MOBILE
+          if (!superAdminMobile) {
+            logger.warn('[数据清理] 未配置 SUPER_ADMIN_MOBILE 环境变量，跳过超管重建')
+          } else {
+            const UserService = require('./UserService')
+            const { UserRole, Role } = require('../models')
+
+            await TransactionManager.execute(async transaction => {
+              let user
+              try {
+                user = await UserService.registerUser(superAdminMobile, {
+                  nickname: '超级管理员',
+                  status: 'active',
+                  transaction
+                })
+              } catch (regErr) {
+                if (regErr.code === 'MOBILE_EXISTS') {
+                  user = { user_id: regErr.data.user_id }
+                  logger.info('[数据清理] 超管账号已存在，跳过创建', { user_id: user.user_id })
+                } else {
+                  throw regErr
+                }
+              }
+
+              const adminRole = await Role.findOne({
+                where: { role_id: 2 },
+                transaction
+              })
+              if (adminRole) {
+                await UserRole.findOrCreate({
+                  where: { user_id: user.user_id, role_id: 2 },
+                  defaults: { user_id: user.user_id, role_id: 2 },
+                  transaction
+                })
+                logger.info('[数据清理] 超管角色关联成功', {
+                  user_id: user.user_id,
+                  role_id: 2,
+                  role_name: adminRole.role_name
+                })
+              } else {
+                logger.warn('[数据清理] role_id=2 不存在，请手动创建 admin 角色')
+              }
+            })
+
+            super_admin_rebuilt = true
+            logger.info('[数据清理] pre_launch 清档后超管重建完成', { mobile: superAdminMobile })
+          }
+        } catch (rebuildError) {
+          logger.error('[数据清理] 超管重建失败（非致命）:', { error: rebuildError.message })
+        }
+      }
+
+      return {
+        mode,
+        dry_run,
+        total_deleted: totalDeleted,
+        duration_seconds: Math.round(durationSeconds * 10) / 10,
+        details: results,
+        reconciliation_passed: reconciliationPassed,
+        super_admin_rebuilt
+      }
+    } finally {
+      /* pre_launch 清档完成后退出维护模式（无论成功或失败） */
+      if (maintenanceModeActivated) {
+        try {
+          await this._setMaintenanceMode(false, operatorId, '数据清档完成 - 系统自动退出维护模式')
+          logger.info('[数据清理] pre_launch 清档：已退出维护模式')
+        } catch (mmError) {
+          logger.error('[数据清理] 退出维护模式失败（需手动关闭）:', { error: mmError.message })
+        }
+      }
     }
   }
 
@@ -943,6 +1081,41 @@ class DataManagementService {
           }
         }
 
+        if (filters.lottery_campaign_id) {
+          const campaignId = parseInt(filters.lottery_campaign_id, 10)
+          if (!isNaN(campaignId) && campaignId > 0) {
+            const campaignTables = new Set([
+              'lottery_draws',
+              'lottery_draw_decisions',
+              'lottery_management_settings',
+              'lottery_clear_setting_records',
+              'lottery_user_daily_draw_quota',
+              'lottery_campaign_user_quota',
+              'lottery_campaign_quota_grants',
+              'lottery_hourly_metrics',
+              'lottery_daily_metrics',
+              'lottery_alerts',
+              'lottery_simulation_records',
+              'lottery_presets'
+            ])
+            if (campaignTables.has(tableName)) {
+              conditions.push('lottery_campaign_id = :filter_campaign_id')
+              replacements.filter_campaign_id = campaignId
+            }
+          }
+        }
+
+        if (filters.business_type_prefix && typeof filters.business_type_prefix === 'string') {
+          const prefix = filters.business_type_prefix.trim()
+          if (prefix.length > 0 && prefix.length <= 50) {
+            const businessTypeTables = new Set(['asset_transactions', 'item_ledger'])
+            if (businessTypeTables.has(tableName)) {
+              conditions.push('business_type LIKE :filter_biz_prefix')
+              replacements.filter_biz_prefix = `${prefix}%`
+            }
+          }
+        }
+
         const whereClause = conditions.length > 0 ? conditions.join(' AND ') : '1=1'
 
         try {
@@ -1011,6 +1184,30 @@ class DataManagementService {
         warnings.push(`表 ${policy.table} 查询失败: ${error.message}`)
       }
     }
+  }
+
+  /**
+   * 设置/取消维护模式
+   *
+   * @param {boolean} enabled - true=进入维护模式，false=退出维护模式
+   * @param {number} operatorId - 操作人用户ID
+   * @param {string} reason - 操作原因
+   * @returns {Promise<void>} 无返回值
+   * @private
+   */
+  async _setMaintenanceMode(enabled, operatorId, reason) {
+    const AdminSystemService = require('./AdminSystemService')
+    await TransactionManager.execute(async transaction => {
+      await AdminSystemService.updateSettings(
+        'basic',
+        {
+          maintenance_mode: enabled,
+          maintenance_message: enabled ? '系统正在执行数据清档操作，请稍后再访问' : ''
+        },
+        operatorId,
+        { transaction, reason }
+      )
+    })
   }
 
   /**

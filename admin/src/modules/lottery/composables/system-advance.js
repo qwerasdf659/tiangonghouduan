@@ -11,6 +11,7 @@
 
 import { logger } from '../../../utils/logger.js'
 import { ASSET_ENDPOINTS } from '../../../api/asset.js'
+import { loadECharts } from '../../../utils/echarts-lazy.js'
 
 /**
  * 系统垫付状态
@@ -88,8 +89,7 @@ export function useSystemAdvanceMethods() {
               data.total_budget_debt ??
               0,
             pending_count:
-              (data.inventory_debt?.pending_count || 0) +
-                (data.budget_debt?.pending_count || 0) ||
+              (data.inventory_debt?.pending_count || 0) + (data.budget_debt?.pending_count || 0) ||
               data.pending_count ||
               0,
             cleared_today: data.cleared_today ?? 0,
@@ -237,101 +237,106 @@ export function useSystemAdvanceMethods() {
     },
 
     /**
-     * 初始化垫付趋势图表
+     * 初始化垫付趋势图表（ES Module 按需加载 ECharts）
      */
-    initAdvanceTrendChart() {
+    async initAdvanceTrendChart() {
       const chartDom = document.getElementById('advanceTrendChart')
-      if (!chartDom || !window.echarts) {
-        logger.warn('[SystemAdvance] 图表容器或 ECharts 不可用')
+      if (!chartDom) {
+        logger.warn('[SystemAdvance] 图表容器不可用')
         return
       }
 
-      const chart = window.echarts.init(chartDom)
-      const trendData = this.advanceTrend.data || []
+      try {
+        const echarts = await loadECharts()
+        const chart = echarts.init(chartDom)
+        const trendData = this.advanceTrend.data || []
 
-      const option = {
-        title: {
-          text: '垫付趋势',
-          left: 'center',
-          textStyle: { fontSize: 14 }
-        },
-        tooltip: {
-          trigger: 'axis',
-          formatter: (params) => {
-            let result = params[0]?.axisValue || ''
-            params.forEach((item) => {
-              result += `<br/>${item.marker}${item.seriesName}: ${item.value}`
-            })
-            return result
-          }
-        },
-        legend: {
-          data: ['库存垫付', '预算垫付'],
-          bottom: 10
-        },
-        grid: {
-          left: '3%',
-          right: '4%',
-          bottom: '15%',
-          containLabel: true
-        },
-        xAxis: {
-          type: 'category',
-          boundaryGap: false,
-          data: trendData.map((item) => item.date || item.period)
-        },
-        yAxis: {
-          type: 'value'
-        },
-        series: [
-          {
-            name: '库存垫付',
-            type: 'line',
-            smooth: true,
-            data: trendData.map((item) => item.inventory_debt || item.inventory || 0),
-            itemStyle: { color: '#f59e0b' },
-            areaStyle: {
-              color: {
-                type: 'linear',
-                x: 0,
-                y: 0,
-                x2: 0,
-                y2: 1,
-                colorStops: [
-                  { offset: 0, color: 'rgba(245, 158, 11, 0.3)' },
-                  { offset: 1, color: 'rgba(245, 158, 11, 0.05)' }
-                ]
-              }
+        const option = {
+          title: {
+            text: '垫付趋势',
+            left: 'center',
+            textStyle: { fontSize: 14 }
+          },
+          tooltip: {
+            trigger: 'axis',
+            formatter: params => {
+              let result = params[0]?.axisValue || ''
+              params.forEach(item => {
+                result += `<br/>${item.marker}${item.seriesName}: ${item.value}`
+              })
+              return result
             }
           },
-          {
-            name: '预算垫付',
-            type: 'line',
-            smooth: true,
-            data: trendData.map((item) => item.budget_debt || item.budget || 0),
-            itemStyle: { color: '#3b82f6' },
-            areaStyle: {
-              color: {
-                type: 'linear',
-                x: 0,
-                y: 0,
-                x2: 0,
-                y2: 1,
-                colorStops: [
-                  { offset: 0, color: 'rgba(59, 130, 246, 0.3)' },
-                  { offset: 1, color: 'rgba(59, 130, 246, 0.05)' }
-                ]
+          legend: {
+            data: ['库存垫付', '预算垫付'],
+            bottom: 10
+          },
+          grid: {
+            left: '3%',
+            right: '4%',
+            bottom: '15%',
+            containLabel: true
+          },
+          xAxis: {
+            type: 'category',
+            boundaryGap: false,
+            data: trendData.map(item => item.date || item.period)
+          },
+          yAxis: {
+            type: 'value'
+          },
+          series: [
+            {
+              name: '库存垫付',
+              type: 'line',
+              smooth: true,
+              data: trendData.map(item => item.inventory_debt || item.inventory || 0),
+              itemStyle: { color: '#f59e0b' },
+              areaStyle: {
+                color: {
+                  type: 'linear',
+                  x: 0,
+                  y: 0,
+                  x2: 0,
+                  y2: 1,
+                  colorStops: [
+                    { offset: 0, color: 'rgba(245, 158, 11, 0.3)' },
+                    { offset: 1, color: 'rgba(245, 158, 11, 0.05)' }
+                  ]
+                }
+              }
+            },
+            {
+              name: '预算垫付',
+              type: 'line',
+              smooth: true,
+              data: trendData.map(item => item.budget_debt || item.budget || 0),
+              itemStyle: { color: '#3b82f6' },
+              areaStyle: {
+                color: {
+                  type: 'linear',
+                  x: 0,
+                  y: 0,
+                  x2: 0,
+                  y2: 1,
+                  colorStops: [
+                    { offset: 0, color: 'rgba(59, 130, 246, 0.3)' },
+                    { offset: 1, color: 'rgba(59, 130, 246, 0.05)' }
+                  ]
+                }
               }
             }
-          }
-        ]
+          ]
+        }
+
+        chart.setOption(option)
+
+        // 响应式调整（命名引用以便清理）
+        this._advanceChartResizeHandler = () => chart.resize()
+        window.addEventListener('resize', this._advanceChartResizeHandler)
+      } catch (error) {
+        logger.error('[SystemAdvance] ECharts 加载或图表初始化失败:', error)
       }
-
-      chart.setOption(option)
-
-      // 响应式调整（命名引用以便清理）
-      this._advanceChartResizeHandler = () => chart.resize()
-      window.addEventListener('resize', this._advanceChartResizeHandler)
     },
 
     /**
@@ -439,4 +444,3 @@ export function useSystemAdvanceMethods() {
 }
 
 export default { useSystemAdvanceState, useSystemAdvanceMethods }
-

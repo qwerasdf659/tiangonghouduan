@@ -44,8 +44,8 @@ if (!ENABLE_DATA_CLEANUP) {
     /**
      * 执行自动清理逻辑
      *
+     * 使用 UnifiedDistributedLock 防止多实例并发执行（多 Pod 场景）
      * 通过 ServiceManager 获取 DataManagementService，调用 runAutoCleanup()
-     * 如果 ServiceManager 未就绪，则延迟加载 DataManagementService
      *
      * @returns {Promise<void>}
      */
@@ -54,23 +54,36 @@ if (!ENABLE_DATA_CLEANUP) {
       logger.info('[DataCleanup] 开始执行数据自动清理')
 
       try {
-        const DataManagementService = require('../services/DataManagementService')
-        const models = require('../models')
-        const service = new DataManagementService(models)
+        const UnifiedDistributedLock = require('../utils/UnifiedDistributedLock')
+        const lock = new UnifiedDistributedLock()
 
-        const result = await service.runAutoCleanup(300)
+        await lock.withLock(
+          'daily_data_cleanup',
+          async () => {
+            const DataManagementService = require('../services/DataManagementService')
+            const models = require('../models')
+            const service = new DataManagementService(models)
 
-        const elapsed = Date.now() - startTime
-        logger.info('[DataCleanup] 数据自动清理完成', {
-          total_deleted: result.total_deleted,
-          duration_ms: elapsed,
-          tables_processed: result.results?.length || 0
-        })
+            const result = await service.runAutoCleanup(300)
+
+            const elapsed = Date.now() - startTime
+            logger.info('[DataCleanup] 数据自动清理完成', {
+              total_deleted: result.total_deleted,
+              duration_ms: elapsed,
+              tables_processed: result.results?.length || 0
+            })
+          },
+          { ttl: 600000, autoExtend: true }
+        )
       } catch (error) {
-        logger.error('[DataCleanup] 数据自动清理失败', {
-          error: error.message,
-          stack: error.stack
-        })
+        if (error.message && error.message.includes('无法获取锁')) {
+          logger.info('[DataCleanup] 其他实例正在执行清理任务，本次跳过')
+        } else {
+          logger.error('[DataCleanup] 数据自动清理失败', {
+            error: error.message,
+            stack: error.stack
+          })
+        }
       }
     }
   }
