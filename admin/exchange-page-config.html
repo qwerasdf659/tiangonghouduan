@@ -389,6 +389,42 @@
           </div>
         </div>
 
+        <!-- ========== 详情页配置区 ========== -->
+        <div x-show="activeSection === 'detail_page'" class="content-section animate-fade-in">
+          <div class="content-section-header">
+            <div class="section-title">
+              <span class="title-icon">📄</span>
+              详情页配置
+            </div>
+            <p class="section-desc">控制兑换商品详情页的属性展示模式和标签样式</p>
+          </div>
+          <div class="space-y-6 p-6">
+            <div class="grid grid-cols-2 gap-6">
+              <div>
+                <label class="block text-sm font-medium mb-1">属性展示模式</label>
+                <select x-model="config.detail_page.attr_display_mode" @change="markConfigModified()" class="w-full px-3 py-2 border rounded-lg">
+                  <template x-for="opt in attrDisplayModeOptions" :key="opt.value">
+                    <option :value="opt.value" x-text="opt.label"></option>
+                  </template>
+                </select>
+                <p class="text-xs text-gray-400 mt-1">grid=网格卡片模式（2列居中），list=文字列表模式（左标签右值）</p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium mb-1">标签样式</label>
+                <select x-model="config.detail_page.tag_style_type" @change="markConfigModified()" class="w-full px-3 py-2 border rounded-lg">
+                  <template x-for="opt in tagStyleTypeOptions" :key="opt.value">
+                    <option :value="opt.value" x-text="opt.label"></option>
+                  </template>
+                </select>
+                <p class="text-xs text-gray-400 mt-1">game=游戏风彩色圆角标签（带emoji），plain=简单灰底文字标签</p>
+              </div>
+            </div>
+            <div class="bg-blue-50 rounded-lg p-4 text-sm text-blue-600">
+              <strong>说明：</strong>详情页配置为全局设置，所有商品统一使用同一展示风格（与原神/王者荣耀同类游戏商城设计一致）。
+            </div>
+          </div>
+        </div>
+
         <!-- ========== 卡片特效配置区（主题已迁移到全局氛围主题） ========== -->
         <div x-show="activeSection === 'card_display'" class="content-section animate-fade-in">
           <div class="content-section-header">

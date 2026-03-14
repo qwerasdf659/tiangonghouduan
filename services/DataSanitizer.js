@@ -1402,6 +1402,28 @@ class DataSanitizer {
       sanitized.has_warranty = !!sanitized.has_warranty
       sanitized.free_shipping = !!sanitized.free_shipping
       sanitized.sell_point = sanitized.sell_point || null
+      sanitized.usage_rules = sanitized.usage_rules || null
+
+      // 多图数据透传（兑换详情页 B+C 混合方案）
+      if (sanitized.images !== undefined) {
+        sanitized.images = sanitized.images || []
+      }
+      if (sanitized.detail_images !== undefined) {
+        sanitized.detail_images = sanitized.detail_images || []
+      }
+      if (sanitized.showcase_images !== undefined) {
+        sanitized.showcase_images = sanitized.showcase_images || []
+      }
+
+      // 关联对象透传（Sequelize camelCase alias → snake_case 输出）
+      if (sanitized.rarityDef !== undefined) {
+        sanitized.rarity_def = sanitized.rarityDef || null
+        delete sanitized.rarityDef
+      }
+      if (sanitized.categoryDef !== undefined) {
+        sanitized.category_def = sanitized.categoryDef || null
+        delete sanitized.categoryDef
+      }
 
       // 黑名单：删除敏感字段（成本价仅管理员可见）
       if (dataLevel !== 'full') {

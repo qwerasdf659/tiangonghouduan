@@ -149,6 +149,7 @@ class AdminService {
         free_shipping: !!itemData.free_shipping,
         is_limited: !!itemData.is_limited,
         sell_point: itemData.sell_point || null,
+        usage_rules: itemData.usage_rules || null,
         created_at: BeijingTimeHelper.createDatabaseTime(),
         updated_at: BeijingTimeHelper.createDatabaseTime()
       },
@@ -342,6 +343,10 @@ class AdminService {
 
     if (updateData.category !== undefined) {
       finalUpdateData.category = updateData.category || null
+    }
+
+    if (updateData.usage_rules !== undefined) {
+      finalUpdateData.usage_rules = updateData.usage_rules || null
     }
 
     // 处理图片更换

@@ -252,6 +252,7 @@ router.get('/feedback', async (req, res) => {
  *
  * @returns {Object} 兑换页面配置
  * @returns {Array} data.tabs - Tab 配置
+ * @returns {Object} data.detail_page - 详情页配置（attr_display_mode: grid/list, tag_style_type: game/plain）
  * @returns {Array} data.spaces - 空间配置
  * @returns {Object} data.shop_filters - 商品兑换筛选项
  * @returns {Object} data.market_filters - 交易市场筛选项
@@ -334,6 +335,10 @@ router.get('/exchange-page', async (req, res) => {
           price_color_mode: 'type_based',
           default_view_mode: 'grid'
         },
+        detail_page: {
+          attr_display_mode: 'grid',
+          tag_style_type: 'game'
+        },
         ui: {
           low_stock_threshold: 10,
           grid_page_size: 4,
@@ -351,6 +356,14 @@ router.get('/exchange-page', async (req, res) => {
     }
 
     const configData = config.getValue()
+
+    // 补充 detail_page 默认值（兼容旧配置中未包含 detail_page 的情况）
+    if (!configData.detail_page) {
+      configData.detail_page = {
+        attr_display_mode: 'grid',
+        tag_style_type: 'game'
+      }
+    }
 
     const version = config.updated_at
       ? new Date(config.updated_at).getTime().toString()

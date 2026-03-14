@@ -44,6 +44,7 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
     'sort_order',
     'status',
     'primary_image_id',
+    'category',
     // 臻选空间/幸运空间扩展字段（9个）
     'space',
     'original_price',
@@ -56,12 +57,13 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
     'is_limited',
     'sell_point',
     'rarity_code',
+    'usage_rules',
     'created_at'
   ],
 
   /**
    * 商品详情视图
-   * 包含臻选空间/幸运空间扩展字段 + 稀有度
+   * 包含臻选空间/幸运空间扩展字段 + 稀有度 + 详情页增强字段
    */
   marketItemDetailView: [
     'exchange_item_id',
@@ -74,6 +76,7 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
     'sort_order',
     'status',
     'primary_image_id',
+    'category',
     // 臻选空间/幸运空间扩展字段（9个）
     'space',
     'original_price',
@@ -85,6 +88,7 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
     'free_shipping',
     'is_limited',
     'sell_point',
+    'usage_rules',
     'rarity_code',
     'created_at',
     'updated_at'
@@ -188,6 +192,7 @@ class QueryService {
       space = null,
       keyword = null,
       category = null,
+      exclude_id = null,
       min_cost = null,
       max_cost = null,
       stock_status = null,
@@ -207,6 +212,7 @@ class QueryService {
         space: space || 'all',
         keyword: keyword || '',
         category: category || 'all',
+        exclude_id: exclude_id || 0,
         min_cost: min_cost || 0,
         max_cost: max_cost || 0,
         stock_status: stock_status || 'all',
@@ -255,6 +261,11 @@ class QueryService {
       // 分类筛选
       if (category) {
         where.category = category
+      }
+
+      // 排除指定商品（用于详情页"相关推荐"，排除当前商品自身）
+      if (exclude_id) {
+        where.exchange_item_id = { [Op.ne]: parseInt(exclude_id, 10) }
       }
 
       // 价格范围筛选
@@ -358,6 +369,18 @@ class QueryService {
             as: 'primaryImage',
             attributes: ['image_resource_id', 'file_path', 'mime_type', 'thumbnail_paths'],
             required: false
+          },
+          {
+            model: this.models.RarityDef,
+            as: 'rarityDef',
+            attributes: ['rarity_code', 'display_name', 'color_hex', 'tier'],
+            required: false
+          },
+          {
+            model: this.models.CategoryDef,
+            as: 'categoryDef',
+            attributes: ['category_code', 'display_name', 'icon_url'],
+            required: false
           }
         ]
       })
@@ -366,10 +389,32 @@ class QueryService {
         throw new Error('商品不存在')
       }
 
+      // 查询该商品的所有关联图片，按 category 分组（多图基础设施）
+      const allImages = await this.ImageResources.findAll({
+        where: {
+          business_type: 'exchange',
+          context_id: item_id,
+          status: 'active'
+        },
+        order: [['sort_order', 'ASC']]
+      })
+
+      const images = allImages.filter(i => i.category === 'products').map(i => i.toSafeJSON())
+      const detail_images = allImages.filter(i => i.category === 'detail').map(i => i.toSafeJSON())
+      const showcase_images = allImages
+        .filter(i => i.category === 'showcase')
+        .map(i => i.toSafeJSON())
+
       // 添加中文显示名称
-      const itemWithDisplayNames = await displayNameHelper.attachDisplayNames(item.toJSON(), [
+      const itemJSON = item.toJSON()
+      const itemWithDisplayNames = await displayNameHelper.attachDisplayNames(itemJSON, [
         { field: 'status', dictType: 'product_status' }
       ])
+
+      // 挂载多图数据到返回结果
+      itemWithDisplayNames.images = images
+      itemWithDisplayNames.detail_images = detail_images
+      itemWithDisplayNames.showcase_images = showcase_images
 
       return {
         item: itemWithDisplayNames

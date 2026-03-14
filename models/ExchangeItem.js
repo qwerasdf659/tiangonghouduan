@@ -103,7 +103,13 @@ module.exports = sequelize => {
       category: {
         type: DataTypes.STRING(50),
         allowNull: true,
-        comment: '商品分类'
+        comment: '商品分类代码，FK→category_defs.category_code',
+        references: {
+          model: 'category_defs',
+          key: 'category_code'
+        },
+        onUpdate: 'CASCADE',
+        onDelete: 'SET NULL'
       },
       status: {
         type: DataTypes.ENUM('active', 'inactive'),
@@ -203,6 +209,18 @@ module.exports = sequelize => {
       },
 
       /**
+       * 使用说明条目数组（兑换详情页展示）
+       * 如 ["兑换后物品自动进入背包", "虚拟物品一经兑换不可退还"]
+       * @see docs/兑换详情页B+C混合方案设计文档.md 任务 B1
+       */
+      usage_rules: {
+        type: DataTypes.JSON,
+        allowNull: true,
+        defaultValue: null,
+        comment: '使用说明条目数组，如 ["兑换后物品自动进入背包","虚拟物品一经兑换不可退还"]'
+      },
+
+      /**
        * 稀有度代码 — 关联 rarity_defs 字典表
        * 用于小程序卡片增强特效（holo 全息光效仅 legendary 触发）
        * @see docs/项目特效主题体系分析报告.md 八.13 决策4
@@ -264,6 +282,13 @@ module.exports = sequelize => {
       foreignKey: 'rarity_code',
       targetKey: 'rarity_code',
       as: 'rarityDef'
+    })
+
+    // 多对一：商品关联分类定义（2026-03-14 兑换详情页B+C混合方案）
+    ExchangeItem.belongsTo(models.CategoryDef, {
+      foreignKey: 'category',
+      targetKey: 'category_code',
+      as: 'categoryDef'
     })
 
     // 一对多：商品有多个竞价记录（臻选空间/幸运空间竞价功能）

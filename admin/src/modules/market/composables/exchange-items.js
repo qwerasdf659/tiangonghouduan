@@ -45,6 +45,12 @@ export function useExchangeItemsState() {
       status: 'active',
       primary_image_id: null,
       rarity_code: 'common',
+      category: null,
+      space: 'lucky',
+      original_price: null,
+      tags: [],
+      sell_point: '',
+      usage_rules: [],
       is_new: false,
       is_hot: false,
       is_lucky: false,
@@ -52,14 +58,16 @@ export function useExchangeItemsState() {
       has_warranty: false,
       free_shipping: false
     },
-    /** @type {Array<Object>} 稀有度选项（从 rarity_defs 字典表加载） */
-    rarityOptions: [
-      { value: 'common', label: '普通', color: '#9E9E9E' },
-      { value: 'uncommon', label: '优质', color: '#4CAF50' },
-      { value: 'rare', label: '稀有', color: '#2196F3' },
-      { value: 'epic', label: '史诗', color: '#9C27B0' },
-      { value: 'legendary', label: '传说', color: '#FF9800' }
-    ],
+    /** @type {Array<Object>} 稀有度选项（动态加载自 rarity_defs 字典表） */
+    rarityOptions: [],
+    /** @type {Array<Object>} 分类选项（动态加载自 category_defs 字典表） */
+    categoryOptions: [],
+    /** @type {boolean} 字典数据是否已加载 */
+    dictionariesLoaded: false,
+    /** @type {string} 标签输入临时值 */
+    tagInput: '',
+    /** @type {string} 使用说明输入临时值 */
+    usageRuleInput: '',
     /** @type {number|null} 正在编辑的商品ID */
     editingItemId: null,
     /** @type {string|null} 商品图片预览 URL（上传后由后端返回） */
@@ -69,7 +77,11 @@ export function useExchangeItemsState() {
     /** @type {Array<Object>} 商品详情图列表（多图支持） */
     detailImages: [],
     /** @type {boolean} 详情图上传中 */
-    detailImageUploading: false
+    detailImageUploading: false,
+    /** @type {Array<Object>} 商品展示图列表（多图支持） */
+    showcaseImages: [],
+    /** @type {boolean} 展示图上传中 */
+    showcaseImageUploading: false
   }
 }
 
@@ -171,6 +183,46 @@ export function useExchangeItemsMethods() {
     },
 
     /**
+     * 加载字典数据（稀有度 + 分类），从后端动态获取替代硬编码
+     */
+    async loadDictionaries() {
+      if (this.dictionariesLoaded) return
+      try {
+        const res = await request({
+          url: SYSTEM_ADMIN_ENDPOINTS.DICT_ALL,
+          method: 'GET'
+        })
+        if (res.success && res.data) {
+          // 稀有度选项
+          if (res.data.rarities) {
+            this.rarityOptions = res.data.rarities.map(r => ({
+              value: r.rarity_code,
+              label: r.display_name,
+              color: r.color_hex
+            }))
+          }
+          // 分类选项（仅启用的）
+          if (res.data.categories) {
+            this.categoryOptions = res.data.categories
+              .filter(c => c.is_enabled)
+              .map(c => ({
+                value: c.category_code,
+                label: c.display_name,
+                icon_url: c.icon_url
+              }))
+          }
+          this.dictionariesLoaded = true
+          logger.info('[ExchangeItems] 字典数据加载完成', {
+            rarities: this.rarityOptions.length,
+            categories: this.categoryOptions.length
+          })
+        }
+      } catch (e) {
+        logger.error('[ExchangeItems] 加载字典数据失败:', e)
+      }
+    },
+
+    /**
      * 打开新增商品弹窗
      */
     openAddItemModal() {
@@ -186,6 +238,12 @@ export function useExchangeItemsMethods() {
         status: 'active',
         primary_image_id: null,
         rarity_code: 'common',
+        category: null,
+        space: 'lucky',
+        original_price: null,
+        tags: [],
+        sell_point: '',
+        usage_rules: [],
         is_new: false,
         is_hot: false,
         is_lucky: false,
@@ -195,6 +253,10 @@ export function useExchangeItemsMethods() {
       }
       this.itemImagePreviewUrl = null
       this.detailImages = []
+      this.showcaseImages = []
+      this.tagInput = ''
+      this.usageRuleInput = ''
+      this.loadDictionaries()
       this.showModal('itemModal')
     },
 
@@ -215,6 +277,12 @@ export function useExchangeItemsMethods() {
         status: item.status || 'active',
         primary_image_id: item.primary_image_id || null,
         rarity_code: item.rarity_code || 'common',
+        category: item.category || null,
+        space: item.space || 'lucky',
+        original_price: item.original_price || null,
+        tags: item.tags || [],
+        sell_point: item.sell_point || '',
+        usage_rules: item.usage_rules || [],
         is_new: !!item.is_new,
         is_hot: !!item.is_hot,
         is_lucky: !!item.is_lucky,
@@ -222,8 +290,13 @@ export function useExchangeItemsMethods() {
         has_warranty: !!item.has_warranty,
         free_shipping: !!item.free_shipping
       }
-      this.itemImagePreviewUrl = item.primary_image?.thumbnail_url || item.primary_image?.url || null
+      this.itemImagePreviewUrl =
+        item.primary_image?.thumbnail_url || item.primary_image?.url || null
+      this.tagInput = ''
+      this.usageRuleInput = ''
+      this.loadDictionaries()
       this.loadDetailImages(item.exchange_item_id)
+      this.loadShowcaseImages(item.exchange_item_id)
       this.showModal('itemModal')
     },
 
@@ -519,6 +592,168 @@ export function useExchangeItemsMethods() {
       }
     },
 
+    // === 标签管理方法 ===
+
+    /**
+     * 添加标签
+     */
+    addTag() {
+      const tag = this.tagInput?.trim()
+      if (!tag) return
+      if (!Array.isArray(this.itemForm.tags)) this.itemForm.tags = []
+      if (this.itemForm.tags.includes(tag)) {
+        this.showError?.('标签已存在')
+        return
+      }
+      this.itemForm.tags.push(tag)
+      this.tagInput = ''
+    },
+
+    /**
+     * 移除标签
+     * @param {number} index - 标签索引
+     */
+    removeTag(index) {
+      if (Array.isArray(this.itemForm.tags)) {
+        this.itemForm.tags.splice(index, 1)
+      }
+    },
+
+    // === 使用说明管理方法 ===
+
+    /**
+     * 添加使用说明条目
+     */
+    addUsageRule() {
+      const rule = this.usageRuleInput?.trim()
+      if (!rule) return
+      if (!Array.isArray(this.itemForm.usage_rules)) this.itemForm.usage_rules = []
+      this.itemForm.usage_rules.push(rule)
+      this.usageRuleInput = ''
+    },
+
+    /**
+     * 移除使用说明条目
+     * @param {number} index - 条目索引
+     */
+    removeUsageRule(index) {
+      if (Array.isArray(this.itemForm.usage_rules)) {
+        this.itemForm.usage_rules.splice(index, 1)
+      }
+    },
+
+    // === 展示图管理方法（category='showcase'） ===
+
+    /**
+     * 上传商品展示图（多图支持，最多9张）
+     * @param {Event} event - 文件选择事件
+     */
+    async uploadShowcaseImage(event) {
+      const file = event.target.files?.[0]
+      if (!file) return
+
+      if (this.showcaseImages.length >= 9) {
+        this.showError?.('展示图最多9张')
+        return
+      }
+
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+      if (!allowedTypes.includes(file.type)) {
+        this.showError?.('仅支持 JPG/PNG/GIF/WebP 格式')
+        return
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        this.showError?.('图片大小不能超过 5MB')
+        return
+      }
+
+      try {
+        this.showcaseImageUploading = true
+        const formData = new FormData()
+        formData.append('image', file)
+        formData.append('business_type', 'exchange')
+        formData.append('category', 'showcase')
+        if (this.editingItemId) {
+          formData.append('context_id', String(this.editingItemId))
+        }
+        formData.append('sort_order', String(this.showcaseImages.length + 1))
+
+        const res = await request({
+          url: SYSTEM_ADMIN_ENDPOINTS.IMAGE_UPLOAD,
+          method: 'POST',
+          data: formData
+        })
+
+        if (res.success && res.data) {
+          this.showcaseImages.push({
+            image_resource_id: res.data.image_resource_id,
+            url: res.data.url || res.data.image_url,
+            sort_order: this.showcaseImages.length + 1
+          })
+          this.showSuccess?.('展示图上传成功')
+        } else {
+          this.showError?.(res.message || '展示图上传失败')
+        }
+      } catch (e) {
+        logger.error('[ExchangeItems] 展示图上传失败:', e)
+        this.showError?.('展示图上传失败')
+      } finally {
+        this.showcaseImageUploading = false
+        if (event.target) event.target.value = ''
+      }
+    },
+
+    /**
+     * 加载商品的展示图列表
+     * @param {number} contextId - 商品 exchange_item_id
+     */
+    async loadShowcaseImages(contextId) {
+      if (!contextId) {
+        this.showcaseImages = []
+        return
+      }
+      try {
+        const res = await request({
+          url: SYSTEM_ADMIN_ENDPOINTS.IMAGE_BY_BUSINESS,
+          params: { business_type: 'exchange', context_id: contextId, category: 'showcase' }
+        })
+        if (res.success && res.data?.images) {
+          this.showcaseImages = res.data.images.map(img => ({
+            image_resource_id: img.image_resource_id,
+            url: img.public_url || img.url,
+            sort_order: img.sort_order || 0
+          }))
+        } else {
+          this.showcaseImages = []
+        }
+      } catch (e) {
+        logger.error('[ExchangeItems] 加载展示图失败:', e)
+        this.showcaseImages = []
+      }
+    },
+
+    /**
+     * 删除一张展示图
+     * @param {number} imageId - 图片资源 ID
+     */
+    async removeShowcaseImage(imageId) {
+      const confirmed = await this.$confirm?.('确定要删除此展示图吗？')
+      if (!confirmed) return
+      try {
+        const url = buildURL(SYSTEM_ADMIN_ENDPOINTS.IMAGE_DELETE, { id: imageId })
+        const res = await request({ url, method: 'DELETE' })
+        if (res.success) {
+          this.showcaseImages = this.showcaseImages.filter(img => img.image_resource_id !== imageId)
+          this.showSuccess?.('展示图已删除')
+        } else {
+          this.showError?.(res.message || '删除失败')
+        }
+      } catch (e) {
+        logger.error('[ExchangeItems] 删除展示图失败:', e)
+        this.showError?.('删除展示图失败')
+      }
+    },
+
     /**
      * 获取商品状态CSS类
      * @param {string} status - 商品状态
@@ -526,7 +761,7 @@ export function useExchangeItemsMethods() {
      */
     getItemStatusClass(status) {
       return status === 'active' ? 'bg-success' : 'bg-secondary'
-    },
+    }
 
     /**
      * 获取商品状态文本

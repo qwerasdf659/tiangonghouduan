@@ -70,10 +70,23 @@ export function useExchangePageConfigState() {
     stockDisplayOptions: STOCK_DISPLAY_OPTIONS,
     viewModeOptions: VIEW_MODE_OPTIONS,
 
+    /** 属性展示模式选项（详情页） */
+    attrDisplayModeOptions: [
+      { value: 'grid', label: '网格卡片' },
+      { value: 'list', label: '文字列表' }
+    ],
+
+    /** 标签样式选项（详情页） */
+    tagStyleTypeOptions: [
+      { value: 'game', label: '游戏风彩色标签' },
+      { value: 'plain', label: '简单文字标签' }
+    ],
+
     /** 区块导航 */
     sections: [
       { key: 'tabs', label: '标签页配置', icon: '📑' },
       { key: 'spaces', label: '空间配置', icon: '🌌' },
+      { key: 'detail_page', label: '详情页配置', icon: '📄' },
       { key: 'shop_filters', label: '商品筛选配置', icon: '🔍' },
       { key: 'market_filters', label: '交易市场筛选', icon: '💹' },
       { key: 'card_display', label: '卡片主题配置', icon: '🎨' },
@@ -99,6 +112,13 @@ export function useExchangePageConfigMethods() {
           this.config = { ...response.data }
           delete this.config.version
           delete this.config.updated_at
+          // 初始化 detail_page 默认值（详情页配置子节点）
+          if (!this.config.detail_page) {
+            this.config.detail_page = {
+              attr_display_mode: 'grid',
+              tag_style_type: 'game'
+            }
+          }
           this.originalConfig = JSON.parse(JSON.stringify(this.config))
           this.configVersion = response.data.version || ''
           this.configUpdatedAt = response.data.updated_at || ''
@@ -306,7 +326,6 @@ export function useExchangePageConfigMethods() {
       if (!this.config?.shop_filters?.cost_ranges) return
       this.config.shop_filters.cost_ranges.splice(index, 1)
       this.markConfigModified()
-    },
-
+    }
   }
 }
