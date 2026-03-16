@@ -25,8 +25,11 @@ export const EXCHANGE_ENDPOINTS = {
   EXCHANGE_FULL_STATS: `${API_PREFIX}/console/marketplace/exchange_market/statistics`,
   EXCHANGE_TREND: `${API_PREFIX}/console/marketplace/exchange_market/statistics/trend`,
   EXCHANGE_ORDER_STATS: `${API_PREFIX}/console/marketplace/exchange_market/orders/stats`,
+  EXCHANGE_ORDER_APPROVE: `${API_PREFIX}/console/marketplace/exchange_market/orders/:order_no/approve`,
   EXCHANGE_ORDER_SHIP: `${API_PREFIX}/console/marketplace/exchange_market/orders/:order_no/ship`,
-  EXCHANGE_ORDER_REJECT: `${API_PREFIX}/console/marketplace/exchange_market/orders/:order_no/reject`
+  EXCHANGE_ORDER_REJECT: `${API_PREFIX}/console/marketplace/exchange_market/orders/:order_no/reject`,
+  EXCHANGE_ORDER_REFUND: `${API_PREFIX}/console/marketplace/exchange_market/orders/:order_no/refund`,
+  EXCHANGE_ORDER_COMPLETE: `${API_PREFIX}/console/marketplace/exchange_market/orders/:order_no/complete`
 }
 
 // ========== API 调用方法 ==========
@@ -87,6 +90,18 @@ export const ExchangeAPI = {
   },
 
   /**
+   * 管理员审核通过兑换订单（pending → approved）
+   * @param {string} orderNo - 订单号
+   * @param {Object} [data={}] - 审核数据
+   * @param {string} [data.remark] - 审核备注
+   * @returns {Promise<Object>} API 响应
+   */
+  async approveExchangeOrder(orderNo, data = {}) {
+    const url = buildURL(EXCHANGE_ENDPOINTS.EXCHANGE_ORDER_APPROVE, { order_no: orderNo })
+    return await request({ url, method: 'POST', data })
+  },
+
+  /**
    * 管理员拒绝兑换订单（退还材料资产）
    * @param {string} orderNo - 订单号
    * @param {Object} [data={}] - 拒绝数据
@@ -95,6 +110,42 @@ export const ExchangeAPI = {
    */
   async rejectExchangeOrder(orderNo, data = {}) {
     const url = buildURL(EXCHANGE_ENDPOINTS.EXCHANGE_ORDER_REJECT, { order_no: orderNo })
+    return await request({ url, method: 'POST', data })
+  },
+
+  /**
+   * 管理员发货（approved → shipped）
+   * @param {string} orderNo - 订单号
+   * @param {Object} [data={}] - 发货数据
+   * @param {string} [data.remark] - 发货备注
+   * @returns {Promise<Object>} API 响应
+   */
+  async shipExchangeOrder(orderNo, data = {}) {
+    const url = buildURL(EXCHANGE_ENDPOINTS.EXCHANGE_ORDER_SHIP, { order_no: orderNo })
+    return await request({ url, method: 'POST', data })
+  },
+
+  /**
+   * 管理员退款（approved/shipped → refunded，退还材料资产）
+   * @param {string} orderNo - 订单号
+   * @param {Object} [data={}] - 退款数据
+   * @param {string} [data.remark] - 退款原因
+   * @returns {Promise<Object>} API 响应
+   */
+  async refundExchangeOrder(orderNo, data = {}) {
+    const url = buildURL(EXCHANGE_ENDPOINTS.EXCHANGE_ORDER_REFUND, { order_no: orderNo })
+    return await request({ url, method: 'POST', data })
+  },
+
+  /**
+   * 管理员标记订单完成（shipped/received/rated → completed）
+   * @param {string} orderNo - 订单号
+   * @param {Object} [data={}] - 完成数据
+   * @param {string} [data.remark] - 完成备注
+   * @returns {Promise<Object>} API 响应
+   */
+  async completeExchangeOrder(orderNo, data = {}) {
+    const url = buildURL(EXCHANGE_ENDPOINTS.EXCHANGE_ORDER_COMPLETE, { order_no: orderNo })
     return await request({ url, method: 'POST', data })
   },
 

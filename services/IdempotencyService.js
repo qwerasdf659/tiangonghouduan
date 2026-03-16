@@ -373,8 +373,12 @@ const CANONICAL_OPERATION_MAP = {
   // ===== 市场管理 =====
   '/api/v4/console/marketplace/exchange_market/items': 'ADMIN_EXCHANGE_ITEM_CREATE', // 创建兑换商品（修复：添加 marketplace 前缀）
   '/api/v4/console/marketplace/exchange_market/items/:id': 'ADMIN_EXCHANGE_ITEM_UPDATE', // 更新兑换商品（修复：添加 marketplace 前缀）或删除（DELETE）
+  '/api/v4/console/marketplace/exchange_market/orders/:id/approve': 'ADMIN_EXCHANGE_ORDER_APPROVE', // 管理员审核通过
   '/api/v4/console/marketplace/exchange_market/orders/:id/ship': 'ADMIN_EXCHANGE_ORDER_SHIP', // 管理员发货
   '/api/v4/console/marketplace/exchange_market/orders/:id/reject': 'ADMIN_EXCHANGE_ORDER_REJECT', // 管理员拒绝订单
+  '/api/v4/console/marketplace/exchange_market/orders/:id/refund': 'ADMIN_EXCHANGE_ORDER_REFUND', // 管理员退款
+  '/api/v4/console/marketplace/exchange_market/orders/:id/complete':
+    'ADMIN_EXCHANGE_ORDER_COMPLETE', // 管理员标记完成
   '/api/v4/console/marketplace/exchange_market/batch-bind-images':
     'ADMIN_EXCHANGE_BATCH_BIND_IMAGES', // 批量绑定商品图片
   '/api/v4/console/marketplace/listings/:id/force-withdraw': 'ADMIN_FORCE_WITHDRAW', // 强制下架

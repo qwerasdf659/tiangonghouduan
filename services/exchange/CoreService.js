@@ -997,6 +997,144 @@ class CoreService {
   }
 
   /**
+   * 管理员退款（审核通过或已发货的订单可退款）
+   *
+   * 业务规则：
+   * - 管理员操作，不校验 user_id
+   * - 订单状态必须为 approved 或 shipped（审核通过/已发货阶段可退款）
+   * - 退还 pay_amount 到用户账户（通过 BalanceService.changeBalance）
+   * - 记录 admin_remark 和 refunded_at
+   * - 记录状态变更事件
+   * - 如果已发货，退款后需要恢复商品库存
+   *
+   * @param {string} order_no - 订单号
+   * @param {number} operator_id - 管理员ID
+   * @param {string} remark - 退款原因
+   * @param {Object} options - 选项
+   * @param {Transaction} options.transaction - 外部事务对象（必填）
+   * @returns {Promise<Object>} 退款结果
+   */
+  async refundOrder(order_no, operator_id, remark, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'CoreService.refundOrder')
+
+    const order = await this.ExchangeRecord.findOne({
+      where: { order_no },
+      lock: transaction.LOCK.UPDATE,
+      transaction
+    })
+
+    if (!order) {
+      const error = new Error('订单不存在')
+      error.statusCode = 404
+      error.code = 'ORDER_NOT_FOUND'
+      throw error
+    }
+
+    const refundableStatuses = ['approved', 'shipped']
+    if (!refundableStatuses.includes(order.status)) {
+      const error = new Error(`只有审核通过或已发货的订单才能退款，当前状态：${order.status}`)
+      error.statusCode = 400
+      error.code = 'ORDER_STATUS_INVALID'
+      error.data = { current_status: order.status, allowed_statuses: refundableStatuses }
+      throw error
+    }
+
+    const old_status = order.status
+
+    // 退还材料资产到用户账户
+    const BalanceService = require('../asset/BalanceService')
+    const burnAccount = await BalanceService.getOrCreateAccount(
+      { system_code: 'SYSTEM_BURN' },
+      { transaction }
+    )
+    // eslint-disable-next-line no-restricted-syntax
+    await BalanceService.changeBalance(
+      {
+        user_id: order.user_id,
+        asset_code: order.pay_asset_code,
+        delta_amount: +order.pay_amount,
+        idempotency_key: `exchange_admin_refund_${order.order_no}`,
+        business_type: 'exchange_admin_refund',
+        counterpart_account_id: burnAccount.account_id,
+        meta: {
+          order_no: order.order_no,
+          reason: 'admin_refund',
+          operator_id,
+          remark,
+          original_pay_amount: order.pay_amount,
+          refund_from_status: old_status
+        }
+      },
+      { transaction }
+    )
+
+    // 恢复商品库存（兑换时已扣减，退款应归还）
+    if (order.exchange_item_id) {
+      const ExchangeItem = this.models.ExchangeItem
+      const item = await ExchangeItem.findByPk(order.exchange_item_id, { transaction })
+      if (item) {
+        const quantity = order.quantity || 1
+        await item.update(
+          {
+            stock: item.stock + quantity,
+            sold_count: Math.max(0, item.sold_count - quantity)
+          },
+          { transaction }
+        )
+      }
+    }
+
+    await order.update(
+      {
+        status: 'refunded',
+        admin_remark: remark,
+        refunded_at: BeijingTimeHelper.createDatabaseTime(),
+        updated_at: BeijingTimeHelper.createDatabaseTime()
+      },
+      { transaction }
+    )
+
+    await this._recordEvent(
+      {
+        order_no,
+        old_status,
+        new_status: 'refunded',
+        operator_id,
+        operator_type: 'admin',
+        reason: remark || '管理员退款',
+        metadata: {
+          refund_amount: order.pay_amount,
+          refund_asset_code: order.pay_asset_code,
+          refund_from_status: old_status
+        }
+      },
+      { transaction }
+    )
+
+    await BusinessCacheHelper.invalidateExchangeItems().catch(err => {
+      logger.warn('[兑换市场] 退款后清除缓存失败（非致命）:', err.message)
+    })
+
+    logger.info('[兑换市场] 管理员退款成功', {
+      operator_id,
+      order_no,
+      remark,
+      refund_amount: order.pay_amount,
+      refund_from_status: old_status
+    })
+
+    return {
+      message: '订单已退款，材料资产已退还用户',
+      order: {
+        order_no,
+        status: 'refunded',
+        refund_amount: order.pay_amount,
+        refund_asset_code: order.pay_asset_code
+      }
+    }
+  }
+
+  /**
    * 写入订单状态变更事件（私有方法，事务内同步写入）
    *
    * @param {Object} eventData - 事件数据

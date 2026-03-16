@@ -24,7 +24,10 @@
        @delete-item="deleteItem($event.detail)"
        @toggle-item-status="toggleItemStatus($event.detail)"
        @ship-order="shipOrder($event.detail)"
-       @reject-order="rejectOrder($event.detail)">
+       @reject-order="rejectOrder($event.detail)"
+       @approve-order="approveOrder($event.detail)"
+       @refund-order="refundOrder($event.detail)"
+       @complete-order="completeOrder($event.detail)">
     
     <!-- 页面横幅 -->
     <div class="page-banner mb-6">
@@ -133,9 +136,13 @@
               <input type="text" x-model="activeFilters.order_no" placeholder="订单号" class="px-3 py-2 border rounded">
               <select x-model="activeFilters.status" class="px-3 py-2 border rounded">
                 <option value="">全部状态</option>
-                <option value="pending">待发货</option>
+                <option value="pending">待审核</option>
+                <option value="approved">已审核</option>
                 <option value="shipped">已发货</option>
+                <option value="received">已收货</option>
                 <option value="completed">已完成</option>
+                <option value="rejected">已拒绝</option>
+                <option value="refunded">已退款</option>
                 <option value="cancelled">已取消</option>
               </select>
               <button @click="search()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">🔍 搜索</button>
@@ -169,12 +176,21 @@
                       <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
                     </template>
                     <td class="px-4 py-3">
-                      <div class="flex space-x-2">
+                      <div class="flex flex-wrap gap-1">
                         <template x-if="row.status === 'pending'">
-                          <button @click="$dispatch('ship-order', row)" class="themed-text-primary hover:text-blue-700 text-sm">发货</button>
+                          <button @click="$dispatch('approve-order', row)" class="text-green-600 hover:text-green-800 text-sm font-medium">✓ 审核通过</button>
                         </template>
                         <template x-if="row.status === 'pending'">
-                          <button @click="$dispatch('reject-order', row)" class="text-red-500 hover:text-red-700 text-sm">拒绝</button>
+                          <button @click="$dispatch('reject-order', row)" class="text-red-500 hover:text-red-700 text-sm">✕ 拒绝</button>
+                        </template>
+                        <template x-if="row.status === 'approved'">
+                          <button @click="$dispatch('ship-order', row)" class="themed-text-primary hover:text-blue-700 text-sm font-medium">📦 发货</button>
+                        </template>
+                        <template x-if="row.status === 'approved' || row.status === 'shipped'">
+                          <button @click="$dispatch('refund-order', row)" class="text-orange-500 hover:text-orange-700 text-sm">💰 退款</button>
+                        </template>
+                        <template x-if="row.status === 'shipped' || row.status === 'received' || row.status === 'rated'">
+                          <button @click="$dispatch('complete-order', row)" class="text-green-600 hover:text-green-800 text-sm">✅ 完成</button>
                         </template>
                       </div>
                     </td>
@@ -647,7 +663,7 @@
                 'themed-text-primary': selectedOrder.status === 'shipped',
                 'text-green-600': selectedOrder.status === 'completed',
                 'text-red-600': selectedOrder.status === 'cancelled'
-              }" x-text="selectedOrder.status === 'pending' ? '待发货' : selectedOrder.status === 'shipped' ? '已发货' : selectedOrder.status === 'completed' ? '已完成' : '已取消'"></span>
+              }" x-text="{'pending':'待审核','approved':'已审核待发货','shipped':'已发货','received':'已收货','rated':'已评分','completed':'已完成','rejected':'已拒绝','refunded':'已退款','cancelled':'已取消'}[selectedOrder.status] || selectedOrder.status"></span>
             </div>
             <div class="flex justify-between border-b pb-2">
               <span class="themed-text-muted">下单时间</span>
@@ -671,10 +687,19 @@
       <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-2">
         <button type="button" @click="hideModal('orderDetailModal')" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">关闭</button>
         <template x-if="selectedOrder && selectedOrder.status === 'pending'">
-          <button type="button" @click="shipOrder(selectedOrder); hideModal('orderDetailModal')" class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary">📦 发货</button>
+          <button type="button" @click="approveOrder(selectedOrder); hideModal('orderDetailModal')" class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600">✓ 审核通过</button>
         </template>
         <template x-if="selectedOrder && selectedOrder.status === 'pending'">
           <button type="button" @click="rejectOrder(selectedOrder); hideModal('orderDetailModal')" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">✕ 拒绝</button>
+        </template>
+        <template x-if="selectedOrder && selectedOrder.status === 'approved'">
+          <button type="button" @click="shipOrder(selectedOrder); hideModal('orderDetailModal')" class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary">📦 发货</button>
+        </template>
+        <template x-if="selectedOrder && (selectedOrder.status === 'approved' || selectedOrder.status === 'shipped')">
+          <button type="button" @click="refundOrder(selectedOrder); hideModal('orderDetailModal')" class="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600">💰 退款</button>
+        </template>
+        <template x-if="selectedOrder && (selectedOrder.status === 'shipped' || selectedOrder.status === 'received' || selectedOrder.status === 'rated')">
+          <button type="button" @click="completeOrder(selectedOrder); hideModal('orderDetailModal')" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">✅ 完成</button>
         </template>
       </div>
     </div>

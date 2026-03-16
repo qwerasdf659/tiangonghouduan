@@ -126,7 +126,7 @@ const corsOriginValidator = function (origin, callback) {
     if (origin.includes('servicewechat.com') || origin.includes('weixin.qq.com')) {
       callback(null, true)
     } else {
-      callback(new Error('Not allowed by CORS'))
+      callback(new Error('CORS策略不允许该来源访问'))
     }
   }
 }

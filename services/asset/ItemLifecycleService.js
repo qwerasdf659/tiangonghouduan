@@ -206,6 +206,14 @@ class ItemLifecycleService {
       GROUP BY asset_code
     `)
 
+    // 查询资产代码的中文显示名称
+    const { MaterialAssetType } = require('../../models')
+    const assetTypes = await MaterialAssetType.findAll({
+      attributes: ['asset_code', 'display_name'],
+      raw: true
+    })
+    const displayNameMap = Object.fromEntries(assetTypes.map(t => [t.asset_code, t.display_name]))
+
     // 账户余额一致性（排除 BIGINT 溢出记录）
     const [balanceMismatch] = await sequelize.query(`
       SELECT 
@@ -230,13 +238,17 @@ class ItemLifecycleService {
         status: globalCheck.every(r => Number(r.total_delta) === 0) ? 'PASS' : 'WARNING',
         by_asset_code: globalCheck.map(r => ({
           asset_code: r.asset_code,
+          display_name: displayNameMap[r.asset_code] || r.asset_code,
           total_delta: Number(r.total_delta)
         }))
       },
       balance_consistency: {
         status: balanceMismatch.length === 0 ? 'PASS' : 'FAIL',
         mismatch_count: balanceMismatch.length,
-        mismatches: balanceMismatch.slice(0, 20)
+        mismatches: balanceMismatch.slice(0, 20).map(m => ({
+          ...m,
+          display_name: displayNameMap[m.asset_code] || m.asset_code
+        }))
       }
     }
   }

@@ -28,7 +28,7 @@ router.get('/items', authenticateToken, requireRoleLevel(100), async (req, res) 
     const result = await ItemLifecycleService.reconcileItems()
     return res.apiSuccess(result, '物品对账完成')
   } catch (error) {
-    return res.apiError(`物品对账失败：${error.message}`, 500)
+    return res.apiError(`物品对账失败：${error.message}`, 'INTERNAL_ERROR', null, 500)
   }
 })
 
@@ -44,7 +44,7 @@ router.get('/assets', authenticateToken, requireRoleLevel(100), async (req, res)
     const result = await ItemLifecycleService.reconcileAssets()
     return res.apiSuccess(result, '资产对账完成')
   } catch (error) {
-    return res.apiError(`资产对账失败：${error.message}`, 500)
+    return res.apiError(`资产对账失败：${error.message}`, 'INTERNAL_ERROR', null, 500)
   }
 })
 

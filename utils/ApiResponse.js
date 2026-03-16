@@ -93,7 +93,7 @@ class ApiResponse {
    * @param {string} code - 业务代码，默认SUCCESS
    * @returns {Object} 格式化的成功响应
    */
-  static success(data = null, message = 'Success', code = 'SUCCESS') {
+  static success(data = null, message = '操作成功', code = 'SUCCESS') {
     return {
       success: true,
       code,
@@ -112,7 +112,12 @@ class ApiResponse {
    * @param {number} httpStatus - HTTP状态码（用于设置响应状态）
    * @returns {Object} 格式化的错误响应
    */
-  static error(message = 'Error', errorCode = 'UNKNOWN_ERROR', details = null, httpStatus = null) {
+  static error(
+    message = '操作失败',
+    errorCode = 'UNKNOWN_ERROR',
+    details = null,
+    httpStatus = null
+  ) {
     const response = {
       success: false,
       code: errorCode,
@@ -137,7 +142,7 @@ class ApiResponse {
    * @param {string} message - 响应消息
    * @returns {Object} 格式化的分页响应
    */
-  static paginated(data = [], pagination = {}, message = 'Success') {
+  static paginated(data = [], pagination = {}, message = '查询成功') {
     return {
       success: true,
       code: 'PAGINATION_SUCCESS',
@@ -163,7 +168,7 @@ class ApiResponse {
    * @param {string} message - 响应消息
    * @returns {Object} 格式化的创建响应
    */
-  static created(data = null, message = 'Created successfully') {
+  static created(data = null, message = '创建成功') {
     return {
       success: true,
       code: 'CREATED',
@@ -179,7 +184,7 @@ class ApiResponse {
    * @param {string} message - 响应消息
    * @returns {Object} 格式化的无内容响应
    */
-  static noContent(message = 'No content') {
+  static noContent(message = '操作成功') {
     return {
       success: true,
       code: 'NO_CONTENT',
@@ -197,7 +202,7 @@ class ApiResponse {
    * @param {any} details - 错误详情
    * @returns {Object} 格式化的客户端错误响应
    */
-  static badRequest(message = 'Bad Request', errorCode = 'BAD_REQUEST', details = null) {
+  static badRequest(message = '请求参数错误', errorCode = 'BAD_REQUEST', details = null) {
     return this.error(message, errorCode, details, 400)
   }
 
@@ -207,7 +212,7 @@ class ApiResponse {
    * @param {string} errorCode - 错误代码
    * @returns {Object} 格式化的未授权响应
    */
-  static unauthorized(message = 'Unauthorized', errorCode = 'UNAUTHORIZED') {
+  static unauthorized(message = '未授权访问', errorCode = 'UNAUTHORIZED') {
     return this.error(message, errorCode, null, 401)
   }
 
@@ -217,7 +222,7 @@ class ApiResponse {
    * @param {string} errorCode - 错误代码
    * @returns {Object} 格式化的禁止访问响应
    */
-  static forbidden(message = 'Forbidden', errorCode = 'FORBIDDEN') {
+  static forbidden(message = '禁止访问', errorCode = 'FORBIDDEN') {
     return this.error(message, errorCode, null, 403)
   }
 
@@ -227,7 +232,7 @@ class ApiResponse {
    * @param {string} errorCode - 错误代码
    * @returns {Object} 格式化的未找到响应
    */
-  static notFound(message = 'Not Found', errorCode = 'NOT_FOUND') {
+  static notFound(message = '资源未找到', errorCode = 'NOT_FOUND') {
     return this.error(message, errorCode, null, 404)
   }
 
@@ -237,7 +242,7 @@ class ApiResponse {
    * @param {Array} allowedMethods - 允许的HTTP方法
    * @returns {Object} 格式化的方法不允许响应
    */
-  static methodNotAllowed(message = 'Method Not Allowed', allowedMethods = []) {
+  static methodNotAllowed(message = '请求方法不允许', allowedMethods = []) {
     const response = this.error(message, 'METHOD_NOT_ALLOWED', null, 405)
     response.allowedMethods = allowedMethods
     return response
@@ -250,7 +255,7 @@ class ApiResponse {
    * @param {any} details - 冲突详情
    * @returns {Object} 格式化的冲突响应
    */
-  static conflict(message = 'Conflict', errorCode = 'CONFLICT', details = null) {
+  static conflict(message = '资源冲突', errorCode = 'CONFLICT', details = null) {
     return this.error(message, errorCode, details, 409)
   }
 
@@ -286,7 +291,7 @@ class ApiResponse {
    * @param {number} retryAfter - 重试间隔（秒）
    * @returns {Object} 格式化的请求频率过高响应
    */
-  static tooManyRequests(message = 'Too Many Requests', retryAfter = 60) {
+  static tooManyRequests(message = '请求过于频繁', retryAfter = 60) {
     const response = this.error(message, 'TOO_MANY_REQUESTS', null, 429)
     response.retryAfter = retryAfter
     return response
@@ -299,11 +304,7 @@ class ApiResponse {
    * @param {any} details - 错误详情
    * @returns {Object} 格式化的服务器错误响应
    */
-  static internalError(
-    message = 'Internal Server Error',
-    errorCode = 'INTERNAL_ERROR',
-    details = null
-  ) {
+  static internalError(message = '服务器内部错误', errorCode = 'INTERNAL_ERROR', details = null) {
     return this.error(message, errorCode, details, 500)
   }
 
@@ -313,7 +314,7 @@ class ApiResponse {
    * @param {number} retryAfter - 重试间隔（秒）
    * @returns {Object} 格式化的服务不可用响应
    */
-  static serviceUnavailable(message = 'Service Unavailable', retryAfter = 300) {
+  static serviceUnavailable(message = '服务暂时不可用', retryAfter = 300) {
     const response = this.error(message, 'SERVICE_UNAVAILABLE', null, 503)
     response.retryAfter = retryAfter
     return response

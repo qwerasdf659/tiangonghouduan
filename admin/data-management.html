@@ -317,7 +317,8 @@
       </div>
 
       <!-- 步骤 3: 预览影响 -->
-      <div x-show="cleanupStep === 3 && previewResult" class="bg-white rounded-lg shadow p-6">
+      <template x-if="cleanupStep === 3 && previewResult">
+      <div class="bg-white rounded-lg shadow p-6">
         <h3 class="text-lg font-semibold mb-4">预览清理影响</h3>
         <!-- 汇总 -->
         <div class="grid grid-cols-3 gap-4 mb-4">
@@ -373,6 +374,7 @@
           </button>
         </div>
       </div>
+      </template>
 
       <!-- 步骤 4: 二次确认 -->
       <div x-show="cleanupStep === 4" class="bg-white rounded-lg shadow p-6">
@@ -421,7 +423,8 @@
       </div>
 
       <!-- 步骤 5: 执行结果 -->
-      <div x-show="cleanupStep === 5 && cleanupResult" class="bg-white rounded-lg shadow p-6">
+      <template x-if="cleanupStep === 5 && cleanupResult">
+      <div class="bg-white rounded-lg shadow p-6">
         <h3 class="text-lg font-semibold mb-4 text-green-600">✅ 清理完成</h3>
         <div class="grid grid-cols-2 gap-4 mb-4">
           <div class="bg-green-50 rounded p-3 text-center">
@@ -461,6 +464,7 @@
           </button>
         </div>
       </div>
+      </template>
     </div>
 
     <!-- ==================== Tab 4: 对账校验 ==================== -->
@@ -492,7 +496,7 @@
                 <span class="text-sm font-medium text-gray-700">全局守恒检查</span>
                 <span class="ml-2 px-2 py-0.5 rounded text-xs font-semibold"
                   :class="assetReconciliation.global_conservation?.status === 'PASS' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'"
-                  x-text="assetReconciliation.global_conservation?.status"></span>
+                  x-text="{'PASS':'通过','FAIL':'失败','WARNING':'警告'}[assetReconciliation.global_conservation?.status] || assetReconciliation.global_conservation?.status"></span>
               </div>
               <template x-if="assetReconciliation.global_conservation?.by_asset_code?.length > 0">
                 <table class="w-full text-xs border">
@@ -506,7 +510,7 @@
                   <tbody>
                     <template x-for="item in assetReconciliation.global_conservation.by_asset_code" :key="item.asset_code">
                       <tr class="border-b hover:bg-gray-50">
-                        <td class="px-3 py-2 font-mono" x-text="item.asset_code"></td>
+                        <td class="px-3 py-2 font-mono" x-text="item.display_name || item.asset_code"></td>
                         <td class="px-3 py-2 text-right" x-text="Number(item.total_delta).toLocaleString()"></td>
                         <td class="px-3 py-2 text-center">
                           <span :class="Number(item.total_delta) === 0 ? 'text-green-600' : 'text-red-600'"
@@ -524,7 +528,7 @@
                 <span class="text-sm font-medium text-gray-700">余额一致性检查</span>
                 <span class="ml-2 px-2 py-0.5 rounded text-xs font-semibold"
                   :class="assetReconciliation.balance_consistency?.status === 'PASS' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'"
-                  x-text="assetReconciliation.balance_consistency?.status"></span>
+                  x-text="{'PASS':'通过','FAIL':'失败','WARNING':'警告'}[assetReconciliation.balance_consistency?.status] || assetReconciliation.balance_consistency?.status"></span>
                 <span class="ml-2 text-xs text-gray-500" x-text="'差异账户: ' + (assetReconciliation.balance_consistency?.mismatch_count || 0) + ' 个'"></span>
               </div>
               <template x-if="assetReconciliation.balance_consistency?.mismatches?.length > 0">
@@ -542,7 +546,7 @@
                     <template x-for="m in assetReconciliation.balance_consistency.mismatches" :key="m.account_id + '_' + m.asset_code">
                       <tr class="border-b hover:bg-gray-50">
                         <td class="px-3 py-2 font-mono" x-text="m.account_id"></td>
-                        <td class="px-3 py-2 font-mono" x-text="m.asset_code"></td>
+                        <td class="px-3 py-2 font-mono" x-text="m.display_name || m.asset_code"></td>
                         <td class="px-3 py-2 text-right" x-text="Number(m.recorded_balance).toLocaleString()"></td>
                         <td class="px-3 py-2 text-right" x-text="Number(m.calculated_balance).toLocaleString()"></td>
                         <td class="px-3 py-2 text-right text-red-600 font-medium" x-text="Number(m.difference).toLocaleString()"></td>
@@ -569,7 +573,7 @@
                   <span class="text-sm font-medium">物品守恒</span>
                   <span class="ml-auto px-2 py-0.5 rounded text-xs font-semibold"
                     :class="itemReconciliation.item_conservation?.status === 'PASS' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'"
-                    x-text="itemReconciliation.item_conservation?.status"></span>
+                    x-text="{'PASS':'通过','FAIL':'失败','WARNING':'警告'}[itemReconciliation.item_conservation?.status] || itemReconciliation.item_conservation?.status"></span>
                 </div>
                 <p class="text-xs text-gray-500" x-text="'不平衡物品: ' + (itemReconciliation.item_conservation?.imbalanced_count || 0) + ' 个'"></p>
               </div>
@@ -579,10 +583,10 @@
                   <span class="text-sm font-medium">持有者一致性</span>
                   <span class="ml-auto px-2 py-0.5 rounded text-xs font-semibold"
                     :class="itemReconciliation.owner_consistency?.status === 'PASS' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'"
-                    x-text="itemReconciliation.owner_consistency?.status"></span>
+                    x-text="{'PASS':'通过','FAIL':'失败','WARNING':'警告'}[itemReconciliation.owner_consistency?.status] || itemReconciliation.owner_consistency?.status"></span>
                 </div>
                 <p class="text-xs text-gray-500" x-text="'不一致: ' + (itemReconciliation.owner_consistency?.mismatch_count || 0) + ' 个'"></p>
-                <p class="text-xs text-gray-400" x-text="'Legacy 不一致: ' + (itemReconciliation.owner_consistency?.legacy_mismatches || 0) + ' 个'"></p>
+                <p class="text-xs text-gray-400" x-text="'历史数据不一致: ' + (itemReconciliation.owner_consistency?.legacy_mismatches || 0) + ' 个'"></p>
               </div>
               <!-- 铸造一致性 -->
               <div class="border rounded-lg p-4">
@@ -590,7 +594,7 @@
                   <span class="text-sm font-medium">铸造一致性</span>
                   <span class="ml-auto px-2 py-0.5 rounded text-xs font-semibold"
                     :class="itemReconciliation.mint_count_consistency?.status === 'PASS' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'"
-                    x-text="itemReconciliation.mint_count_consistency?.status"></span>
+                    x-text="{'PASS':'通过','FAIL':'失败','WARNING':'警告'}[itemReconciliation.mint_count_consistency?.status] || itemReconciliation.mint_count_consistency?.status"></span>
                 </div>
                 <p class="text-xs text-gray-500" x-text="'总物品: ' + (itemReconciliation.mint_count_consistency?.total_items || 0)"></p>
                 <p class="text-xs text-gray-400" x-text="'无铸造记录: ' + (itemReconciliation.mint_count_consistency?.items_without_mint || 0)"></p>

@@ -178,6 +178,108 @@ export function useExchangeOrdersMethods() {
     },
 
     /**
+     * 审核通过订单（管理员操作：pending → approved）
+     * @param {Object} order - 订单对象
+     */
+    async approveOrder(order) {
+      const confirmed = await this.$confirm?.(`确定要审核通过订单 ${order.order_no} 吗？`)
+      if (!confirmed) return
+
+      try {
+        this.saving = true
+        const res = await request({
+          url: buildURL(MARKET_ENDPOINTS.EXCHANGE_ORDER_APPROVE, {
+            order_no: order.order_no
+          }),
+          method: 'POST',
+          data: { remark: '管理员审核通过' }
+        })
+
+        if (res.success) {
+          this.showSuccess?.('订单审核通过')
+          window.dispatchEvent(new CustomEvent('refresh-exchange-orders'))
+          this.loadOrderStats()
+        } else {
+          this.showError?.(res.message || '审核失败')
+        }
+      } catch (e) {
+        logger.error('[ExchangeOrders] 审核通过失败:', e)
+        this.showError?.('审核失败')
+      } finally {
+        this.saving = false
+      }
+    },
+
+    /**
+     * 退款订单（管理员操作：approved/shipped → refunded，退还材料资产）
+     * @param {Object} order - 订单对象
+     */
+    async refundOrder(order) {
+      const confirmed = await this.$confirm?.(
+        `确定要退款订单 ${order.order_no} 吗？已支付的材料资产将退回用户账户。`,
+        { type: 'danger' }
+      )
+      if (!confirmed) return
+
+      try {
+        this.saving = true
+        const res = await request({
+          url: buildURL(MARKET_ENDPOINTS.EXCHANGE_ORDER_REFUND, {
+            order_no: order.order_no
+          }),
+          method: 'POST',
+          data: { remark: '管理员退款' }
+        })
+
+        if (res.success) {
+          this.showSuccess?.('订单已退款，材料资产已退还用户')
+          window.dispatchEvent(new CustomEvent('refresh-exchange-orders'))
+          this.loadOrderStats()
+        } else {
+          this.showError?.(res.message || '退款失败')
+        }
+      } catch (e) {
+        logger.error('[ExchangeOrders] 退款失败:', e)
+        this.showError?.('退款失败')
+      } finally {
+        this.saving = false
+      }
+    },
+
+    /**
+     * 标记订单完成（管理员操作：shipped/received/rated → completed）
+     * @param {Object} order - 订单对象
+     */
+    async completeOrder(order) {
+      const confirmed = await this.$confirm?.(`确定要标记订单 ${order.order_no} 为已完成吗？`)
+      if (!confirmed) return
+
+      try {
+        this.saving = true
+        const res = await request({
+          url: buildURL(MARKET_ENDPOINTS.EXCHANGE_ORDER_COMPLETE, {
+            order_no: order.order_no
+          }),
+          method: 'POST',
+          data: { remark: '管理员标记完成' }
+        })
+
+        if (res.success) {
+          this.showSuccess?.('订单已完成')
+          window.dispatchEvent(new CustomEvent('refresh-exchange-orders'))
+          this.loadOrderStats()
+        } else {
+          this.showError?.(res.message || '完成失败')
+        }
+      } catch (e) {
+        logger.error('[ExchangeOrders] 完成订单失败:', e)
+        this.showError?.('完成订单失败')
+      } finally {
+        this.saving = false
+      }
+    },
+
+    /**
      * 拒绝订单（管理员操作：审核拒绝，退还材料资产）
      * @param {Object} order - 订单对象
      */
@@ -232,7 +334,7 @@ export function useExchangeOrdersMethods() {
         cancelled: 'bg-danger'
       }
       return map[status] || 'bg-secondary'
-    },
+    }
 
     /**
      * 获取订单状态文本
