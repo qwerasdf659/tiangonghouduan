@@ -79,11 +79,11 @@ router.get(
           ad_creative_id: creative.ad_creative_id || null,
           title: creative.title || item.campaign_name,
           content_type: creative.content_type || 'image',
-          image_url: creative.image_url
-            ? `${process.env.PUBLIC_BASE_URL}/api/v4/images/${creative.image_url}`
+          image_url: creative.media_object_key
+            ? `${process.env.PUBLIC_BASE_URL}/api/v4/images/${creative.media_object_key}`
             : null,
-          image_width: creative.image_width || null,
-          image_height: creative.image_height || null,
+          image_width: creative.media_width || null,
+          image_height: creative.media_height || null,
           text_content: creative.text_content || null,
           link_url: creative.link_url || null,
           link_type: creative.link_type || 'none',

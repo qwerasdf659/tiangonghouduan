@@ -33,6 +33,7 @@ export const SYSTEM_ADMIN_ENDPOINTS = {
   AD_CAMPAIGN_DETAIL: `${API_PREFIX}/console/ad-campaigns/:id`,
   AD_CAMPAIGN_REVIEW: `${API_PREFIX}/console/ad-campaigns/:id/review`,
   AD_CAMPAIGN_PUBLISH: `${API_PREFIX}/console/ad-campaigns/:id/publish`,
+  AD_CAMPAIGN_PAUSE: `${API_PREFIX}/console/ad-campaigns/:id/pause`,
   AD_CAMPAIGN_STATS: `${API_PREFIX}/console/ad-campaigns/statistics`,
   AD_CAMPAIGN_DASHBOARD: `${API_PREFIX}/console/ad-campaigns/dashboard`,
   AD_CAMPAIGN_INTERACTION_STATS: `${API_PREFIX}/console/ad-campaigns/interaction-stats/:id`,
@@ -144,6 +145,7 @@ export const SYSTEM_ADMIN_ENDPOINTS = {
   DICT_CATEGORY_CREATE: `${API_PREFIX}/console/dictionaries/categories`,
   DICT_CATEGORY_UPDATE: `${API_PREFIX}/console/dictionaries/categories/:code`,
   DICT_CATEGORY_DELETE: `${API_PREFIX}/console/dictionaries/categories/:code`,
+  DICT_CATEGORY_TREE: `${API_PREFIX}/console/dictionaries/categories/tree`,
 
   // 字典管理 - 稀有度
   DICT_RARITY_LIST: `${API_PREFIX}/console/dictionaries/rarities`,
@@ -569,6 +571,14 @@ export const SystemAdminAPI = {
   async getCategoryList(params = {}) {
     const url = SYSTEM_ADMIN_ENDPOINTS.DICT_CATEGORY_LIST + buildQueryString(params)
     return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 获取两级分类树
+   * @returns {Promise<Object>} 树形分类数据
+   */
+  async getCategoryTree() {
+    return await request({ url: SYSTEM_ADMIN_ENDPOINTS.DICT_CATEGORY_TREE, method: 'GET' })
   },
 
   /**

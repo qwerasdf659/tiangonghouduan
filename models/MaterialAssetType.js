@@ -43,11 +43,16 @@ class MaterialAssetType extends Model {
         as: 'merchant'
       })
     }
-    /*
-     * 材料资产类型与材料转换规则的关联说明：
-     * - 本表只存“材料展示与分组配置”
-     * - 转换规则表以 from_asset_code/to_asset_code（字符串）引用 asset_code，因此不做 ORM 外键关联
-     */
+
+    /** 图标通过 media_attachments 多态关联获取（替代已删除的 icon_url 列） */
+    if (models.MediaAttachment) {
+      MaterialAssetType.hasOne(models.MediaAttachment, {
+        foreignKey: 'attachable_id',
+        constraints: false,
+        scope: { attachable_type: 'material_asset_type', role: 'icon' },
+        as: 'iconAttachment'
+      })
+    }
   }
 }
 

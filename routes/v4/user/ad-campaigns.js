@@ -91,7 +91,6 @@ const ALLOWED_CAMPAIGN_CREATE_FIELDS = [
   'end_date',
   'targeting_rules',
   'primary_media_id',
-  'image_url',
   'content_type',
   'text_content',
   'display_mode'

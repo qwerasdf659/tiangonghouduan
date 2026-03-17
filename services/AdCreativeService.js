@@ -58,11 +58,12 @@ class AdCreativeService {
    * @param {Object} data - 创意数据
    * @param {number} data.ad_campaign_id - 广告计划ID
    * @param {string} data.title - 创意标题
-   * @param {string} data.image_url - 图片URL
-   * @param {number} data.image_width - 图片宽度（像素）
-   * @param {number} data.image_height - 图片高度（像素）
-   * @param {string} data.link_url - 跳转链接URL（可选）
-   * @param {string} data.link_type - 链接类型（none/external/internal/app_page，默认none）
+   * @param {number} [data.primary_media_id] - 主媒体文件ID（FK→media_files.media_id，content_type=image 时使用）
+   * @param {string} [data.content_type] - 内容类型（image/text/rich，默认 image）
+   * @param {string} [data.text_content] - 文本内容（content_type=text 时使用）
+   * @param {string} [data.link_url] - 跳转链接URL（可选）
+   * @param {string} [data.link_type] - 链接类型（none/external/internal/app_page，默认none）
+   * @param {string} [data.display_mode] - 展示模式（可选）
    * @param {Object} options - 操作选项
    * @param {Object} options.transaction - 数据库事务
    * @returns {Promise<Object>} 创建的创意对象
@@ -89,12 +90,11 @@ class AdCreativeService {
           ad_campaign_id: data.ad_campaign_id,
           title: data.title,
           content_type: data.content_type || 'image',
-          image_url: data.image_url || null,
-          image_width: data.image_width || null,
-          image_height: data.image_height || null,
+          primary_media_id: data.primary_media_id || null,
           text_content: data.text_content || null,
           link_url: data.link_url || null,
           link_type: data.link_type || 'none',
+          display_mode: data.display_mode || null,
           review_status: reviewStatus
         },
         { transaction: options.transaction }

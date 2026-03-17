@@ -115,7 +115,6 @@ const ALLOWED_ADMIN_CREATE_FIELDS = [
   'targeting_rules',
   'priority',
   'primary_media_id',
-  'image_url',
   'content_type',
   'text_content',
   'display_mode'
@@ -243,7 +242,7 @@ router.post(
         end_date: req.body.end_date || null,
         internal_notes: req.body.internal_notes || null,
         targeting_rules: req.body.targeting_rules || null,
-        image_url: req.body.image_url || null,
+        primary_media_id: req.body.primary_media_id ? parseInt(req.body.primary_media_id) : null,
         content_type: req.body.content_type || 'image',
         text_content: req.body.text_content || null,
         display_mode: req.body.display_mode || null
@@ -302,9 +301,9 @@ router.post(
         end_date: req.body.end_date || null,
         internal_notes: req.body.internal_notes || null,
         targeting_rules: req.body.targeting_rules || null,
+        primary_media_id: req.body.primary_media_id ? parseInt(req.body.primary_media_id) : null,
         content_type: req.body.content_type || 'text',
         text_content: req.body.text_content || null,
-        image_url: req.body.image_url || null,
         display_mode: req.body.display_mode || null
       })
 
@@ -359,6 +358,40 @@ router.patch(
         operator_user_id: req.user.user_id
       })
       return res.apiInternalError('发布计划失败', error.message, 'CAMPAIGN_PUBLISH_ERROR')
+    }
+  })
+)
+
+/**
+ * PATCH /:id/pause - 暂停投放中的计划（active → paused）
+ * @route PATCH /api/v4/console/ad-campaigns/:id/pause
+ * @access Private (Admin)
+ * @param {number} id - 计划ID
+ */
+router.patch(
+  '/:id/pause',
+  adminAuthMiddleware,
+  asyncHandler(async (req, res) => {
+    try {
+      const { id } = req.params
+
+      const AdCampaignService = req.app.locals.services.getService('ad_campaign')
+      const campaign = await AdCampaignService.pauseCampaign(parseInt(id))
+
+      logger.info('暂停计划成功', {
+        campaign_id: id,
+        operator_user_id: req.user.user_id,
+        category: campaign.campaign_category
+      })
+
+      return res.apiSuccess(campaign, '暂停成功')
+    } catch (error) {
+      logger.error('暂停计划失败', {
+        error: error.message,
+        campaign_id: req.params.id,
+        operator_user_id: req.user.user_id
+      })
+      return res.apiInternalError('暂停计划失败', error.message, 'CAMPAIGN_PAUSE_ERROR')
     }
   })
 )

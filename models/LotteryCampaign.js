@@ -39,6 +39,16 @@ class LotteryCampaign extends Model {
       comment: '抽奖记录'
     })
 
+    /** banner/背景图通过 media_attachments 多态关联获取（旧列已删除） */
+    if (models.MediaAttachment) {
+      LotteryCampaign.hasMany(models.MediaAttachment, {
+        foreignKey: 'attachable_id',
+        constraints: false,
+        scope: { attachable_type: 'lottery_campaign' },
+        as: 'mediaAttachments'
+      })
+    }
+
     // 🔴 统一抽奖架构新增关联（2026-01-18）
 
     // 一对多：一个活动有多个档位规则

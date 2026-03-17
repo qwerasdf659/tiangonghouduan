@@ -1,10 +1,10 @@
 /**
- * 图片资源管理 - Composable
+ * 媒体库管理 - Composable
  *
- * @file admin/src/modules/content/composables/images.js
- * @description 从 content-management.js 提取的图片资源管理状态和方法
- * @version 1.0.0
- * @date 2026-02-06
+ * @file admin/src/modules/content/composables/media-library.js
+ * @description 媒体库浏览/上传/删除（基于 media_files + media_attachments 体系）
+ * @version 2.0.0
+ * @date 2026-03-17
  */
 
 import { logger } from '../../../utils/logger.js'

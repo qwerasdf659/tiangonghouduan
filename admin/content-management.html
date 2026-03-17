@@ -26,14 +26,12 @@
       <div class="stats-card stats-warning stats-card-animate">
         <div class="stats-card-icon">🖼️</div>
         <div class="stats-card-value" x-text="imageStats?.total || 0"></div>
-        <div class="stats-card-label">图片资源</div>
+        <div class="stats-card-label">媒体文件</div>
       </div>
       <div class="stats-card stats-info stats-card-animate">
-        <div class="stats-card-icon">📢</div>
-        <div class="stats-card-label">
-          公告/弹窗/轮播管理已合并到
-          <a href="/admin/ad-management.html" class="underline text-blue-300 hover:text-white">内容投放管理</a>
-        </div>
+        <div class="stats-card-icon">💾</div>
+        <div class="stats-card-value" x-text="formatFileSize(imageStats?.totalSize || 0)"></div>
+        <div class="stats-card-label">存储占用</div>
       </div>
     </div>
 
@@ -97,6 +95,148 @@
               <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center space-x-2 rounded-xl">
                 <button @click="viewImage(image)" class="px-3 py-1.5 bg-white text-gray-700 rounded-lg text-xs font-medium shadow-sm hover:bg-gray-50 transition-colors">查看</button>
                 <button @click="deleteImage(image)" class="px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-medium shadow-sm hover:bg-red-600 transition-colors">删除</button>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- 存储管理 -->
+    <div x-show="current_page === 'storage-management'" x-cloak>
+
+      <!-- 存储概览 -->
+      <div class="themed-card rounded-xl shadow-sm overflow-hidden mb-6">
+        <div class="p-5 border-b bg-gradient-to-r from-blue-50 to-transparent dark:from-blue-900/10">
+          <h5 class="font-semibold text-base">📊 存储概览</h5>
+          <p class="text-xs themed-text-muted mt-0.5">各文件夹存储统计（数据来源: Sealos 对象存储）</p>
+        </div>
+        <div x-show="storageLoading" class="p-8 text-center themed-text-muted">
+          <span class="inline-block w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></span>
+          <p class="mt-2">加载中...</p>
+        </div>
+        <div x-show="!storageLoading && storageOverview" class="p-4">
+          <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <template x-for="folder in (storageOverview?.folders || storageOverview?.by_folder || [])" :key="folder.folder || folder.name">
+              <div class="themed-card rounded-lg p-4 border">
+                <div class="text-sm font-medium" x-text="'📁 ' + (folder.folder || folder.name)"></div>
+                <div class="text-2xl font-bold mt-1" x-text="folder.count || folder.file_count || 0"></div>
+                <div class="text-xs themed-text-muted" x-text="'文件数'"></div>
+              </div>
+            </template>
+          </div>
+          <div x-show="!storageOverview?.folders?.length && !storageOverview?.by_folder?.length" class="text-center themed-text-muted py-4">
+            暂无存储数据
+          </div>
+        </div>
+      </div>
+
+      <!-- 孤儿文件 -->
+      <div class="themed-card rounded-xl shadow-sm overflow-hidden mb-6">
+        <div class="p-5 border-b bg-gradient-to-r from-yellow-50 to-transparent dark:from-yellow-900/10 flex justify-between items-center">
+          <div>
+            <h5 class="font-semibold text-base">🔍 孤儿文件检测</h5>
+            <p class="text-xs themed-text-muted mt-0.5">无任何业务关联（media_attachments）的媒体文件</p>
+          </div>
+          <span class="px-3 py-1 rounded-full text-sm font-medium"
+                :class="orphanFiles.length > 0 ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'"
+                x-text="orphanFiles.length > 0 ? orphanFiles.length + ' 个孤儿' : '无孤儿'"></span>
+        </div>
+        <div x-show="orphanFiles.length === 0" class="p-6 text-center themed-text-muted">
+          ✅ 所有媒体文件均已关联到业务实体，无孤儿文件
+        </div>
+        <div x-show="orphanFiles.length > 0" class="overflow-x-auto">
+          <table class="data-table w-full">
+            <thead>
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-medium themed-text-muted uppercase">media_id</th>
+                <th class="px-4 py-3 text-left text-xs font-medium themed-text-muted uppercase">文件路径</th>
+                <th class="px-4 py-3 text-left text-xs font-medium themed-text-muted uppercase">大小</th>
+                <th class="px-4 py-3 text-left text-xs font-medium themed-text-muted uppercase">创建时间</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="file in orphanFiles" :key="file.media_id">
+                <tr class="border-t">
+                  <td class="px-4 py-3 text-sm" x-text="file.media_id"></td>
+                  <td class="px-4 py-3 text-sm font-mono text-xs" x-text="file.object_key"></td>
+                  <td class="px-4 py-3 text-sm" x-text="formatFileSize(file.file_size)"></td>
+                  <td class="px-4 py-3 text-sm" x-text="formatDate(file.created_at)"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 回收站 -->
+      <div class="themed-card rounded-xl shadow-sm overflow-hidden mb-6">
+        <div class="p-5 border-b bg-gradient-to-r from-red-50 to-transparent dark:from-red-900/10 flex justify-between items-center">
+          <div>
+            <h5 class="font-semibold text-base">🗑️ 回收站</h5>
+            <p class="text-xs themed-text-muted mt-0.5">已移入回收站的文件（超过 7 天自动物理删除）</p>
+          </div>
+          <button @click="cleanupTrash()" class="px-4 py-2 bg-red-500 text-white rounded-lg text-sm hover:bg-red-600 transition-colors"
+                  :disabled="cleaning || trashFiles.length === 0"
+                  x-show="trashFiles.length > 0">
+            <span x-show="cleaning" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
+            清理回收站
+          </button>
+        </div>
+        <div x-show="trashFiles.length === 0" class="p-6 text-center themed-text-muted">
+          🗑️ 回收站为空
+        </div>
+        <div x-show="trashFiles.length > 0" class="overflow-x-auto">
+          <table class="data-table w-full">
+            <thead>
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-medium themed-text-muted uppercase">media_id</th>
+                <th class="px-4 py-3 text-left text-xs font-medium themed-text-muted uppercase">文件路径</th>
+                <th class="px-4 py-3 text-left text-xs font-medium themed-text-muted uppercase">大小</th>
+                <th class="px-4 py-3 text-left text-xs font-medium themed-text-muted uppercase">移入时间</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="file in trashFiles" :key="file.media_id">
+                <tr class="border-t">
+                  <td class="px-4 py-3 text-sm" x-text="file.media_id"></td>
+                  <td class="px-4 py-3 text-sm font-mono text-xs" x-text="file.object_key"></td>
+                  <td class="px-4 py-3 text-sm" x-text="formatFileSize(file.file_size)"></td>
+                  <td class="px-4 py-3 text-sm" x-text="formatDate(file.trashed_at || file.updated_at)"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 重复文件 -->
+      <div class="themed-card rounded-xl shadow-sm overflow-hidden">
+        <div class="p-5 border-b bg-gradient-to-r from-purple-50 to-transparent dark:from-purple-900/10 flex justify-between items-center">
+          <div>
+            <h5 class="font-semibold text-base">🔄 重复文件检测</h5>
+            <p class="text-xs themed-text-muted mt-0.5">通过 SHA-256 内容哈希检测相同文件</p>
+          </div>
+          <span class="px-3 py-1 rounded-full text-sm font-medium"
+                :class="duplicateFiles.length > 0 ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'"
+                x-text="duplicateFiles.length > 0 ? duplicateFiles.length + ' 组重复' : '无重复'"></span>
+        </div>
+        <div x-show="duplicateFiles.length === 0" class="p-6 text-center themed-text-muted">
+          ✅ 未检测到重复文件
+        </div>
+        <div x-show="duplicateFiles.length > 0" class="p-4 space-y-3">
+          <template x-for="(group, index) in duplicateFiles" :key="index">
+            <div class="themed-card rounded-lg border p-3">
+              <div class="text-sm font-medium mb-2">
+                哈希: <span class="font-mono text-xs" x-text="(group.content_hash || '').substring(0, 16) + '...'"></span>
+                <span class="ml-2 text-xs themed-text-muted" x-text="(group.files?.length || group.count || 0) + ' 个文件'"></span>
+              </div>
+              <div class="space-y-1">
+                <template x-for="file in (group.files || [])" :key="file.media_id">
+                  <div class="text-xs themed-text-muted pl-4">
+                    <span x-text="'#' + file.media_id"></span> — <span class="font-mono" x-text="file.object_key"></span>
+                  </div>
+                </template>
               </div>
             </div>
           </template>

@@ -79,6 +79,31 @@ router.get(
 )
 
 /**
+ * GET /categories/tree - 获取两级分类树
+ *
+ * @description 返回树形结构的分类列表，一级分类含 children 子分类数组
+ * @route GET /api/v4/console/dictionaries/categories/tree
+ * @access admin
+ * @returns {Object} 树形分类数据
+ */
+router.get(
+  '/categories/tree',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const { CategoryDef } = require('../../../models')
+    const tree = await CategoryDef.getTree()
+
+    logger.info('[dictionaries] 查询分类树', {
+      admin_id: req.user.user_id,
+      top_level_count: tree.length
+    })
+
+    return res.apiSuccess({ tree }, '获取分类树成功')
+  })
+)
+
+/**
  * GET /categories/:code - 获取单个类目详情
  *
  * @description 根据类目代码获取类目详情
@@ -111,7 +136,6 @@ router.get(
  * @body {string} category_code - 类目代码（主键）
  * @body {string} display_name - 显示名称
  * @body {string} [description] - 描述
- * @body {string} [icon_url] - 图标URL
  * @body {number} [sort_order=0] - 排序顺序
  * @body {boolean} [is_enabled=true] - 是否启用
  * @access admin
@@ -122,9 +146,15 @@ router.post(
   authenticateToken,
   requireRoleLevel(100),
   asyncHandler(async (req, res) => {
-    const { category_code, display_name, description, icon_url, sort_order, is_enabled } = req.body
+    const {
+      category_code,
+      display_name,
+      description,
+      sort_order,
+      is_enabled,
+      parent_category_def_id
+    } = req.body
 
-    // 参数验证
     if (!category_code || !display_name) {
       return res.apiError(
         '缺少必要参数：category_code 和 display_name',
@@ -134,7 +164,6 @@ router.post(
       )
     }
 
-    // 验证 category_code 格式（snake_case）
     if (!/^[a-z][a-z0-9_]*$/.test(category_code)) {
       return res.apiError(
         'category_code 必须是 snake_case 格式（小写字母开头，仅包含小写字母、数字和下划线）',
@@ -144,11 +173,22 @@ router.post(
       )
     }
 
+    // 自动推断 level：有父分类则为二级，否则一级
+    const level = parent_category_def_id ? 2 : 1
+
     const DictionaryService = getDictionaryService(req)
 
     const category = await TransactionManager.execute(async transaction => {
       return DictionaryService.createCategory(
-        { category_code, display_name, description, icon_url, sort_order, is_enabled },
+        {
+          category_code,
+          display_name,
+          description,
+          sort_order,
+          is_enabled,
+          parent_category_def_id,
+          level
+        },
         { transaction }
       )
     })
@@ -170,7 +210,6 @@ router.post(
  * @param {string} code - 类目代码
  * @body {string} [display_name] - 显示名称
  * @body {string} [description] - 描述
- * @body {string} [icon_url] - 图标URL
  * @body {number} [sort_order] - 排序顺序
  * @body {boolean} [is_enabled] - 是否启用
  * @access admin

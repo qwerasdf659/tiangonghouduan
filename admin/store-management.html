@@ -269,6 +269,17 @@
             <input type="text" class="w-full px-3 py-2 border rounded" x-model="storeForm.store_name" required>
           </div>
 
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">所属商户</label>
+            <select x-model="storeForm.merchant_id" class="w-full px-3 py-2 border rounded">
+              <option :value="null">未关联商户</option>
+              <template x-for="m in merchantOptions" :key="m.merchant_id">
+                <option :value="m.merchant_id" x-text="m.merchant_name || m.company_name"></option>
+              </template>
+            </select>
+            <p class="text-xs text-gray-400 mt-1">关联商户后可管理佣金和结算</p>
+          </div>
+
           <!-- 省市区街道联动选择 -->
           <div class="grid grid-cols-2 gap-3">
             <div>

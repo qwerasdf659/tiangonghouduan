@@ -20,6 +20,7 @@
 
 import { logger } from '../../../utils/logger.js'
 import { MARKET_ENDPOINTS } from '../../../api/market/index.js'
+import { TradeAPI } from '../../../api/market/trade.js'
 import { MERCHANT_ENDPOINTS } from '../../../api/merchant.js'
 import { buildURL, request } from '../../../api/base.js'
 import { Alpine, createPageMixin } from '../../../alpine/index.js'
@@ -693,6 +694,44 @@ document.addEventListener('alpine:init', () => {
      * 打开强制下架确认弹窗
      * @param {Object} listing - 挂牌对象
      */
+    /**
+     * 置顶/取消置顶挂牌
+     * @param {Object} listing - 挂牌对象
+     */
+    async toggleListingPin(listing) {
+      try {
+        const res = await TradeAPI.toggleListingPin(listing.market_listing_id, !listing.is_pinned)
+        if (res.success) {
+          this.$toast?.success(res.data?.is_pinned ? '挂牌已置顶' : '已取消置顶')
+          await this.loadUserListings(this.userListingsInfo.user?.user_id)
+        } else {
+          this.$toast?.error(res.message || '操作失败')
+        }
+      } catch (e) {
+        logger.error('[TradeManagement] 置顶挂牌失败:', e)
+        this.$toast?.error('操作失败')
+      }
+    },
+
+    /**
+     * 推荐/取消推荐挂牌
+     * @param {Object} listing - 挂牌对象
+     */
+    async toggleListingRecommend(listing) {
+      try {
+        const res = await TradeAPI.toggleListingRecommend(listing.market_listing_id, !listing.is_recommended)
+        if (res.success) {
+          this.$toast?.success(res.data?.is_recommended ? '挂牌已推荐' : '已取消推荐')
+          await this.loadUserListings(this.userListingsInfo.user?.user_id)
+        } else {
+          this.$toast?.error(res.message || '操作失败')
+        }
+      } catch (e) {
+        logger.error('[TradeManagement] 推荐挂牌失败:', e)
+        this.$toast?.error('操作失败')
+      }
+    },
+
     confirmForceWithdraw(listing) {
       this.forceWithdrawForm = {
         market_listing_id: listing.market_listing_id,

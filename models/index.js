@@ -971,6 +971,20 @@ Object.keys(models).forEach(modelName => {
   }
 })
 
+/**
+ * 媒体关联补充定义 — 为 sequelize.define() 模式的模型添加 media_attachments 多态关联
+ * Merchant / LotteryCampaign 使用函数式定义，无 class associate 方法，在此统一注册
+ */
+if (models.Merchant && models.MediaAttachment) {
+  models.Merchant.hasOne(models.MediaAttachment, {
+    foreignKey: 'attachable_id',
+    constraints: false,
+    scope: { attachable_type: 'merchant', role: 'logo' },
+    as: 'logoAttachment'
+  })
+}
+// LotteryCampaign 的 media_attachments 关联已在 LotteryCampaign.associate() 中定义
+
 // 🔴 导出sequelize实例和所有模型
 models.sequelize = sequelize
 models.Sequelize = Sequelize

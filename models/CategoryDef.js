@@ -46,6 +46,16 @@ class CategoryDef extends Model {
       as: 'children'
     })
 
+    /** 图标通过 media_attachments 多态关联获取（替代已删除的 icon_url 列） */
+    if (models.MediaAttachment) {
+      CategoryDef.hasOne(models.MediaAttachment, {
+        foreignKey: 'attachable_id',
+        constraints: false,
+        scope: { attachable_type: 'category_def', role: 'icon' },
+        as: 'iconAttachment'
+      })
+    }
+
     if (models.ItemTemplate) {
       CategoryDef.hasMany(models.ItemTemplate, {
         foreignKey: 'category_def_id',

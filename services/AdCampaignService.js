@@ -1008,6 +1008,42 @@ class AdCampaignService {
   }
 
   /**
+   * 暂停计划（active → paused）
+   *
+   * @param {number} campaignId - 计划ID
+   * @param {Object} options - 操作选项
+   * @param {Object} options.transaction - 数据库事务
+   * @returns {Promise<Object>} 更新后的广告计划
+   */
+  static async pauseCampaign(campaignId, options = {}) {
+    try {
+      const campaign = await AdCampaign.findByPk(campaignId, {
+        transaction: options.transaction
+      })
+
+      if (!campaign) {
+        throw new Error('计划不存在: ' + campaignId)
+      }
+
+      if (campaign.status !== 'active') {
+        throw new Error('只能暂停投放中的计划，当前状态: ' + campaign.status)
+      }
+
+      await campaign.update({ status: 'paused' }, { transaction: options.transaction })
+
+      logger.info('暂停计划成功', {
+        campaign_id: campaignId,
+        category: campaign.campaign_category
+      })
+
+      return campaign
+    } catch (error) {
+      logger.error('暂停计划失败', { campaignId, error: error.message })
+      throw error
+    }
+  }
+
+  /**
    * 获取广告计划统计信息
    *
    * @returns {Promise<Object>} 统计信息

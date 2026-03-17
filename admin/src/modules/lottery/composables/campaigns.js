@@ -639,6 +639,75 @@ export function useCampaignsMethods(_context) {
       if (value > 0) return 'text-green-500'
       if (value > -10) return 'text-yellow-600'
       return 'text-red-600'
+    },
+
+    // ===== Phase 3：活动展示控制 =====
+
+    /**
+     * 切换活动精选状态
+     * @param {Object} campaign - 活动对象
+     */
+    async toggleCampaignFeatured(campaign) {
+      try {
+        const { LotteryCoreAPI } = await import('../../../api/lottery/core.js')
+        const res = await LotteryCoreAPI.toggleCampaignFeatured(
+          campaign.lottery_campaign_id,
+          !campaign.is_featured
+        )
+        if (res.success) {
+          this.showSuccess?.(res.data?.is_featured ? '活动已设为精选' : '已取消精选')
+          await this.loadCampaigns()
+        } else {
+          this.showError?.(res.message || '操作失败')
+        }
+      } catch (e) {
+        logger.error('[Campaigns] 切换精选状态失败:', e)
+        this.showError?.('操作失败')
+      }
+    },
+
+    /**
+     * 切换活动隐藏状态
+     * @param {Object} campaign - 活动对象
+     */
+    async toggleCampaignHidden(campaign) {
+      try {
+        const { LotteryCoreAPI } = await import('../../../api/lottery/core.js')
+        const res = await LotteryCoreAPI.toggleCampaignHidden(
+          campaign.lottery_campaign_id,
+          !campaign.is_hidden
+        )
+        if (res.success) {
+          this.showSuccess?.(res.data?.is_hidden ? '活动已隐藏' : '已取消隐藏')
+          await this.loadCampaigns()
+        } else {
+          this.showError?.(res.message || '操作失败')
+        }
+      } catch (e) {
+        logger.error('[Campaigns] 切换隐藏状态失败:', e)
+        this.showError?.('操作失败')
+      }
+    },
+
+    /**
+     * 批量更新活动排序
+     * @param {Array<{lottery_campaign_id: number, sort_order: number}>} sortItems - 排序数组
+     */
+    async batchSortCampaigns(sortItems) {
+      if (!Array.isArray(sortItems) || sortItems.length === 0) return
+      try {
+        const { LotteryCoreAPI } = await import('../../../api/lottery/core.js')
+        const res = await LotteryCoreAPI.batchSortCampaigns(sortItems)
+        if (res.success) {
+          this.showSuccess?.(`已更新 ${res.data?.updated_count || sortItems.length} 个活动排序`)
+          await this.loadCampaigns()
+        } else {
+          this.showError?.(res.message || '批量排序失败')
+        }
+      } catch (e) {
+        logger.error('[Campaigns] 批量排序失败:', e)
+        this.showError?.('批量排序失败')
+      }
     }
   }
 }

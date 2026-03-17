@@ -23,7 +23,9 @@
        @edit-item="editItem($event.detail)"
        @delete-item="deleteItem($event.detail)"
        @toggle-item-status="toggleItemStatus($event.detail)"
-       @ship-order="shipOrder($event.detail)"
+       @toggle-pin="togglePin($event.detail)"
+       @toggle-recommend="toggleRecommend($event.detail)"
+       @ship-order="openShipModal($event.detail)"
        @reject-order="rejectOrder($event.detail)"
        @approve-order="approveOrder($event.detail)"
        @refund-order="refundOrder($event.detail)"
@@ -90,6 +92,8 @@
                     <td class="px-4 py-3">
                       <div class="flex space-x-2">
                         <button @click="$dispatch('edit-item', row)" class="text-green-500 hover:text-green-700 text-sm">编辑</button>
+                        <button @click="$dispatch('toggle-pin', row)" class="text-sm" :class="row.is_pinned ? 'text-orange-500 hover:text-orange-700' : 'text-gray-400 hover:text-orange-500'" x-text="row.is_pinned ? '取消置顶' : '置顶'"></button>
+                        <button @click="$dispatch('toggle-recommend', row)" class="text-sm" :class="row.is_recommended ? 'text-blue-500 hover:text-blue-700' : 'text-gray-400 hover:text-blue-500'" x-text="row.is_recommended ? '取消推荐' : '推荐'"></button>
                         <button @click="$dispatch('toggle-item-status', row)" class="text-yellow-500 hover:text-yellow-700 text-sm" x-text="row.status === 'active' ? '下架' : '上架'"></button>
                         <button @click="$dispatch('delete-item', row)" class="text-red-500 hover:text-red-700 text-sm">删除</button>
                       </div>
@@ -511,10 +515,10 @@
               <select x-model="itemForm.category_def_id" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
                 <option :value="null">未分类</option>
                 <template x-for="cat in categoryOptions" :key="cat.value">
-                  <option :value="cat.value" x-text="cat.label"></option>
+                  <option :value="cat.value" :disabled="cat.level === 1 && categoryOptions.some(c => c.parent_category_def_id === cat.value)" x-text="(cat.level === 2 ? '  └ ' : '') + cat.label"></option>
                 </template>
               </select>
-              <p class="text-xs text-gray-400 mt-1">影响相关推荐</p>
+              <p class="text-xs text-gray-400 mt-1">两级分类体系，选择具体子分类</p>
             </div>
           </div>
           <div class="grid grid-cols-2 gap-4">
@@ -615,6 +619,55 @@
             </div>
           </div>
         </div>
+
+        <!-- SKU 规格管理区域（仅编辑已有商品时显示） -->
+        <div x-show="editingItemId" class="px-6 pb-4">
+          <div class="border-t pt-4">
+            <div class="flex justify-between items-center mb-3">
+              <label class="text-sm font-medium themed-text-secondary">📦 SKU 规格管理</label>
+              <button type="button" @click="resetSkuForm(); skuForm.spec_values_str = '{}'; showModal('skuModal')" class="text-xs px-2 py-1 bg-green-500 text-white rounded hover:bg-green-600">+ 添加规格</button>
+            </div>
+            <div x-show="itemSkus && itemSkus.length > 0" class="overflow-x-auto">
+              <table class="w-full text-sm border">
+                <thead class="themed-bg-base">
+                  <tr>
+                    <th class="px-3 py-2 text-left">规格值</th>
+                    <th class="px-3 py-2 text-left">价格</th>
+                    <th class="px-3 py-2 text-left">库存</th>
+                    <th class="px-3 py-2 text-left">已售</th>
+                    <th class="px-3 py-2 text-left">状态</th>
+                    <th class="px-3 py-2 text-left">操作</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y">
+                  <template x-for="sku in itemSkus" :key="sku.sku_id">
+                    <tr class="themed-hover-bg">
+                      <td class="px-3 py-2">
+                        <template x-for="(val, key) in (sku.spec_values || {})" :key="key">
+                          <span class="inline-block px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-xs mr-1" x-text="key + ':' + val"></span>
+                        </template>
+                      </td>
+                      <td class="px-3 py-2 font-mono" x-text="sku.cost_amount + ' ' + (sku.cost_asset_code || '')"></td>
+                      <td class="px-3 py-2" x-text="sku.stock"></td>
+                      <td class="px-3 py-2" x-text="sku.sold_count || 0"></td>
+                      <td class="px-3 py-2">
+                        <span class="px-1.5 py-0.5 rounded text-xs" :class="sku.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'" x-text="sku.status === 'active' ? '启用' : '禁用'"></span>
+                      </td>
+                      <td class="px-3 py-2">
+                        <button type="button" @click="editSkuWithStr(sku); showModal('skuModal')" class="text-blue-500 hover:text-blue-700 text-xs mr-2">编辑</button>
+                        <button type="button" @click="deleteSku(sku.sku_id)" class="text-red-500 hover:text-red-700 text-xs">删除</button>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+            <div x-show="!itemSkus || itemSkus.length === 0" class="text-center py-4 text-sm themed-text-muted">
+              暂无规格数据，点击「添加规格」创建第一个 SKU
+            </div>
+          </div>
+        </div>
+
         <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-3 sticky bottom-0">
           <button type="button" @click="hideModal('itemModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">取消</button>
           <button type="submit" class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50" :disabled="saving">
@@ -681,6 +734,42 @@
               <span class="themed-text-muted block mb-1">收货地址</span>
               <p class="themed-bg-base rounded p-2 text-sm" x-text="selectedOrder.address"></p>
             </div>
+            <!-- 快递信息 -->
+            <div x-show="selectedOrder.shipping_no" class="border-t pt-3 mt-3">
+              <span class="themed-text-muted block mb-2 font-medium">🚚 快递信息</span>
+              <div class="space-y-2 text-sm">
+                <div class="flex justify-between">
+                  <span class="themed-text-muted">快递公司</span>
+                  <span x-text="selectedOrder.shipping_company_name || selectedOrder.shipping_company || '-'"></span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="themed-text-muted">快递单号</span>
+                  <span class="font-mono" x-text="selectedOrder.shipping_no || '-'"></span>
+                </div>
+              </div>
+            </div>
+            <!-- 物流轨迹时间线 -->
+            <div x-show="selectedOrder.shipping_no" class="border-t pt-3 mt-3">
+              <div class="flex justify-between items-center mb-2">
+                <span class="themed-text-muted font-medium">📍 物流轨迹</span>
+                <button type="button" @click="queryOrderTrack(selectedOrder.order_no)" class="text-xs text-blue-500 hover:text-blue-700">🔄 刷新</button>
+              </div>
+              <div x-show="orderTrack && orderTrack.track && orderTrack.track.traces && orderTrack.track.traces.length > 0" class="max-h-48 overflow-y-auto">
+                <div class="relative pl-6 space-y-3">
+                  <template x-for="(trace, tidx) in (orderTrack?.track?.traces || [])" :key="tidx">
+                    <div class="relative">
+                      <div class="absolute -left-6 top-1 w-3 h-3 rounded-full" :class="tidx === 0 ? 'bg-green-500' : 'bg-gray-300'"></div>
+                      <div x-show="tidx < (orderTrack?.track?.traces?.length || 0) - 1" class="absolute -left-[18px] top-4 w-0.5 h-full bg-gray-200"></div>
+                      <p class="text-xs text-gray-400" x-text="trace.time"></p>
+                      <p class="text-sm" x-text="trace.desc"></p>
+                    </div>
+                  </template>
+                </div>
+              </div>
+              <div x-show="!orderTrack || !orderTrack.track || !orderTrack.track.traces || orderTrack.track.traces.length === 0" class="text-center py-3 text-xs themed-text-muted">
+                点击「刷新」查询最新物流信息
+              </div>
+            </div>
           </div>
         </div>
       </template>
@@ -693,7 +782,7 @@
           <button type="button" @click="rejectOrder(selectedOrder); hideModal('orderDetailModal')" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">✕ 拒绝</button>
         </template>
         <template x-if="selectedOrder && selectedOrder.status === 'approved'">
-          <button type="button" @click="shipOrder(selectedOrder); hideModal('orderDetailModal')" class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary">📦 发货</button>
+          <button type="button" @click="hideModal('orderDetailModal'); openShipModal(selectedOrder)" class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary">📦 发货</button>
         </template>
         <template x-if="selectedOrder && (selectedOrder.status === 'approved' || selectedOrder.status === 'shipped')">
           <button type="button" @click="refundOrder(selectedOrder); hideModal('orderDetailModal')" class="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600">💰 退款</button>
@@ -701,6 +790,103 @@
         <template x-if="selectedOrder && (selectedOrder.status === 'shipped' || selectedOrder.status === 'received' || selectedOrder.status === 'rated')">
           <button type="button" @click="completeOrder(selectedOrder); hideModal('orderDetailModal')" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">✅ 完成</button>
         </template>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. 发货弹窗（结构化快递信息表单） -->
+  <div x-show="isModalOpen('shipModal')"
+       x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center"
+       style="display: none;">
+    <div class="fixed inset-0 bg-black/50" @click="hideModal('shipModal')"></div>
+    <div class="relative themed-card rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
+      <div class="p-4 border-b flex justify-between items-center">
+        <h5 class="font-semibold">📦 发货 - 填写快递信息</h5>
+        <button @click="hideModal('shipModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+      </div>
+      <div class="p-6 space-y-4">
+        <div x-show="selectedOrder" class="text-sm themed-text-muted mb-2">
+          订单号：<span class="font-mono" x-text="selectedOrder?.order_no"></span>
+        </div>
+        <div>
+          <label class="block text-sm font-medium themed-text-secondary mb-1">快递公司</label>
+          <select x-model="shipForm.shipping_company" @change="onShippingCompanyChange($event)" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" x-init="loadShippingCompanies()">
+            <option value="">请选择快递公司</option>
+            <template x-for="company in (shippingCompanies || [])" :key="company.code">
+              <option :value="company.code" x-text="company.name"></option>
+            </template>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium themed-text-secondary mb-1">快递单号 <span class="text-red-500">*</span></label>
+          <input type="text" x-model="shipForm.shipping_no" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="请输入快递单号" required>
+        </div>
+        <div>
+          <label class="block text-sm font-medium themed-text-secondary mb-1">发货备注</label>
+          <textarea x-model="shipForm.remark" rows="2" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="选填"></textarea>
+        </div>
+      </div>
+      <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-3">
+        <button type="button" @click="hideModal('shipModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">取消</button>
+        <button type="button" @click="submitShipForm()" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50" :disabled="saving || !shipForm.shipping_no">
+          📦 确认发货
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. SKU 编辑弹窗 -->
+  <div x-show="isModalOpen('skuModal')"
+       x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center"
+       style="display: none;">
+    <div class="fixed inset-0 bg-black/50" @click="hideModal('skuModal')"></div>
+    <div class="relative themed-card rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
+      <div class="p-4 border-b flex justify-between items-center">
+        <h5 class="font-semibold" x-text="skuForm.sku_id ? '编辑规格' : '添加规格'"></h5>
+        <button @click="hideModal('skuModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+      </div>
+      <div class="p-6 space-y-4">
+        <div>
+          <label class="block text-sm font-medium themed-text-secondary mb-1">规格值（JSON格式）</label>
+          <textarea x-model="skuForm.spec_values_str" rows="2" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 font-mono text-sm" placeholder='{"颜色":"白色","尺寸":"M"}'></textarea>
+          <p class="text-xs themed-text-muted mt-1">JSON 格式的规格键值对</p>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">价格 <span class="text-red-500">*</span></label>
+            <input type="number" x-model.number="skuForm.cost_amount" min="1" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500" required>
+          </div>
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">库存 <span class="text-red-500">*</span></label>
+            <input type="number" x-model.number="skuForm.stock" min="0" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500" required>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">资产类型</label>
+            <select x-model="skuForm.cost_asset_code" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
+              <option value="">与主商品一致</option>
+              <template x-for="assetType in assetTypes.filter(t => t.display_name && !t.display_name.includes('预算'))" :key="assetType.asset_code">
+                <option :value="assetType.asset_code" x-text="assetType.display_name"></option>
+              </template>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">状态</label>
+            <select x-model="skuForm.status" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
+              <option value="active">启用</option>
+              <option value="inactive">禁用</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-3">
+        <button type="button" @click="hideModal('skuModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">取消</button>
+        <button type="button" @click="saveSkuFromForm()" class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50" :disabled="saving">
+          保存规格
+        </button>
       </div>
     </div>
   </div>

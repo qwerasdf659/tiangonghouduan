@@ -171,9 +171,35 @@ document.addEventListener('alpine:init', () => {
         }
       },
 
+      /** SKU 规格值的 JSON 字符串（编辑用） */
+      skuSpecStr: '{}',
+
       ...useExchangeItemsMethods(),
       ...useExchangeOrdersMethods(),
       ...useExchangeStatsMethods(),
+
+      /**
+       * 编辑 SKU 并同步 spec_values 到 JSON 字符串
+       * @param {Object} sku - SKU 对象
+       */
+      editSkuWithStr(sku) {
+        this.editSku(sku)
+        this.skuForm.spec_values_str = JSON.stringify(sku.spec_values || {}, null, 2)
+      },
+
+      /**
+       * 保存 SKU 前将 spec_values_str 转回对象
+       */
+      async saveSkuFromForm() {
+        try {
+          this.skuForm.spec_values = JSON.parse(this.skuForm.spec_values_str || '{}')
+        } catch {
+          this.showError?.('规格值 JSON 格式错误')
+          return
+        }
+        await this.saveSku()
+        this.hideModal('skuModal')
+      },
 
       formatAmount(amount) {
         return amount != null ? Number(amount).toLocaleString('zh-CN') : '0'

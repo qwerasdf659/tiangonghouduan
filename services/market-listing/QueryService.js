@@ -18,6 +18,8 @@ const {
   ItemTemplate,
   MaterialAssetType,
   CategoryDef,
+  MediaAttachment,
+  MediaFile,
   User,
   sequelize
 } = require('../../models')
@@ -240,10 +242,11 @@ class MarketListingQueryService {
       includeAssetGroup = true
     }
 
-    // 排序：置顶 → 手动排序 → 用户选择排序
+    // 排序：置顶 → 推荐 → 手动排序 → 用户选择排序
     const order = [
       ['is_pinned', 'DESC'],
       ['pinned_at', 'DESC'],
+      ['is_recommended', 'DESC'],
       ['sort_order', 'ASC']
     ]
     switch (sort) {
@@ -288,6 +291,21 @@ class MarketListingQueryService {
         model: CategoryDef,
         as: 'offerCategory',
         attributes: ['category_def_id', 'category_code', 'display_name'],
+        include: [
+          {
+            model: MediaAttachment,
+            as: 'iconAttachment',
+            attributes: ['media_id'],
+            required: false,
+            include: [
+              {
+                model: MediaFile,
+                as: 'media',
+                attributes: ['object_key']
+              }
+            ]
+          }
+        ],
         required: false
       }
     ]
@@ -298,6 +316,21 @@ class MarketListingQueryService {
         model: MaterialAssetType,
         as: 'offerMaterialAsset',
         attributes: ['asset_code', 'display_name', 'group_code'],
+        include: [
+          {
+            model: MediaAttachment,
+            as: 'iconAttachment',
+            attributes: ['media_id'],
+            required: false,
+            include: [
+              {
+                model: MediaFile,
+                as: 'media',
+                attributes: ['object_key']
+              }
+            ]
+          }
+        ],
         required: false,
         where: includeAssetGroup ? { group_code: asset_group_code } : undefined
       })
@@ -335,9 +368,11 @@ class MarketListingQueryService {
         /**
          * 图片 object key 降级链：
          * 1. 物品模板主图（offerItemTemplate.primary_media_id → media_files.object_key）
-         * 2. 默认占位图（defaults/product-placeholder.png）
+         * 2. 分类图标（offerCategory → media_attachments → media_files.object_key）
+         * 3. 默认占位图（defaults/product-placeholder.png）
          */
-        const imageKey = 'defaults/product-placeholder.png'
+        const categoryIconKey = plain.offerCategory?.iconAttachment?.media?.object_key || null
+        const imageKey = categoryIconKey || 'defaults/product-placeholder.png'
 
         product.item_info = {
           item_id: plain.offer_item_id,
@@ -351,11 +386,12 @@ class MarketListingQueryService {
 
       // 可叠加资产类型
       if (plain.listing_kind === 'fungible_asset') {
+        const assetIconKey = plain.offerMaterialAsset?.iconAttachment?.media?.object_key || null
         product.asset_info = {
           asset_code: plain.offer_asset_code,
           amount: plain.offer_amount,
           display_name: plain.offerMaterialAsset?.display_name || plain.offer_asset_code,
-          icon_url: null,
+          icon_url: assetIconKey ? getImageUrl(assetIconKey) : null,
           group_code: plain.offerMaterialAsset?.group_code
         }
       }
@@ -564,19 +600,38 @@ class MarketListingQueryService {
   static async getFilterFacets(options = {}) {
     const { include_disabled = false } = options
 
-    // 延迟加载字典模型
-    const { CategoryDef, RarityDef, AssetGroupDef } = require('../../models')
+    const {
+      CategoryDef,
+      RarityDef,
+      AssetGroupDef,
+      MediaAttachment,
+      MediaFile
+    } = require('../../models')
 
-    // 1. 查询物品类目列表
+    // 1. 查询物品类目列表（图标通过 media_attachments 多态关联获取）
     const categoryWhere = include_disabled ? {} : { is_enabled: true }
     const categories = await CategoryDef.findAll({
       where: categoryWhere,
       attributes: ['category_def_id', 'category_code', 'display_name', 'description', 'sort_order'],
+      include: [
+        {
+          model: MediaAttachment,
+          as: 'iconAttachment',
+          attributes: ['media_id'],
+          required: false,
+          include: [
+            {
+              model: MediaFile,
+              as: 'media',
+              attributes: ['object_key']
+            }
+          ]
+        }
+      ],
       order: [
         ['sort_order', 'ASC'],
         ['category_code', 'ASC']
-      ],
-      raw: true
+      ]
     })
 
     // 2. 查询稀有度列表
@@ -630,8 +685,22 @@ class MarketListingQueryService {
       asset_groups_count: assetGroups.length
     })
 
+    // 转换 categories 数据：从 media_attachments 提取 icon_url
+    const categoriesPlain = categories.map(cat => {
+      const plain = cat.get ? cat.get({ plain: true }) : cat
+      const iconKey = plain.iconAttachment?.media?.object_key || null
+      return {
+        category_def_id: plain.category_def_id,
+        category_code: plain.category_code,
+        display_name: plain.display_name,
+        description: plain.description,
+        sort_order: plain.sort_order,
+        icon_url: iconKey ? getImageUrl(iconKey) : null
+      }
+    })
+
     return {
-      categories,
+      categories: categoriesPlain,
       rarities,
       asset_groups: assetGroups,
       listing_kinds: listingKinds

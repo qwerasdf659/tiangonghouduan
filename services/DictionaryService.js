@@ -116,7 +116,6 @@ class DictionaryService {
    * @param {string} data.category_code - 类目代码（主键）
    * @param {string} data.display_name - 显示名称
    * @param {string} [data.description] - 描述
-   * @param {string} [data.icon_url] - 图标URL
    * @param {number} [data.sort_order=0] - 排序顺序
    * @param {boolean} [data.is_enabled=true] - 是否启用
    * @param {Object} [options={}] - 操作选项
@@ -141,7 +140,6 @@ class DictionaryService {
         category_code: data.category_code,
         display_name: data.display_name,
         description: data.description || null,
-        icon_url: data.icon_url || null,
         sort_order: data.sort_order !== undefined ? data.sort_order : 0,
         is_enabled: data.is_enabled !== undefined ? data.is_enabled : true
       },
@@ -173,8 +171,7 @@ class DictionaryService {
       throw error
     }
 
-    // 只更新允许的字段
-    const updateFields = ['display_name', 'description', 'icon_url', 'sort_order', 'is_enabled']
+    const updateFields = ['display_name', 'description', 'sort_order', 'is_enabled']
     const updateData = {}
     updateFields.forEach(field => {
       if (data[field] !== undefined) {
@@ -599,7 +596,7 @@ class DictionaryService {
           ['sort_order', 'ASC'],
           ['category_code', 'ASC']
         ],
-        attributes: ['category_code', 'display_name', 'description', 'icon_url', 'sort_order']
+        attributes: ['category_code', 'display_name', 'description', 'sort_order']
       }),
       this.RarityDef.findAll({
         where: { is_enabled: true },

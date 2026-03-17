@@ -221,9 +221,9 @@ export function useExchangeItemsMethods() {
               color: r.color_hex
             }))
           }
-          // 分类选项（仅启用的）
+          // 分类选项（仅启用的，按父→子层级排序）
           if (res.data.categories) {
-            this.categoryOptions = res.data.categories
+            const enabled = res.data.categories
               .filter(c => c.is_enabled)
               .map(c => ({
                 value: c.category_def_id,
@@ -232,6 +232,16 @@ export function useExchangeItemsMethods() {
                 parent_category_def_id: c.parent_category_def_id || null,
                 level: c.level || 1
               }))
+            const parents = enabled.filter(c => c.level === 1).sort((a, b) => a.value - b.value)
+            const sorted = []
+            for (const p of parents) {
+              sorted.push(p)
+              const children = enabled.filter(c => c.parent_category_def_id === p.value)
+              sorted.push(...children)
+            }
+            const orphans = enabled.filter(c => c.level === 2 && !parents.some(p => p.value === c.parent_category_def_id))
+            sorted.push(...orphans)
+            this.categoryOptions = sorted
           }
           this.dictionariesLoaded = true
           logger.info('[ExchangeItems] 字典数据加载完成', {
@@ -908,6 +918,33 @@ export function useExchangeItemsMethods() {
       } catch (e) {
         logger.error('[ExchangeItems] 推荐操作失败:', e)
         this.showError?.('操作失败')
+      }
+    },
+
+    /**
+     * 批量更新商品排序（调用后端 batch-sort 接口）
+     * @param {Array<{exchange_item_id: number, sort_order: number}>} sortItems - 排序数组
+     */
+    async batchSortItems(sortItems) {
+      if (!Array.isArray(sortItems) || sortItems.length === 0) return
+      try {
+        this.saving = true
+        const res = await request({
+          url: MARKET_ENDPOINTS.EXCHANGE_ITEMS_BATCH_SORT,
+          method: 'PUT',
+          data: { items: sortItems }
+        })
+        if (res.success) {
+          this.showSuccess?.(`已更新 ${res.data?.updated_count || sortItems.length} 个商品排序`)
+          await this.loadItems()
+        } else {
+          this.showError?.(res.message || '批量排序失败')
+        }
+      } catch (e) {
+        logger.error('[ExchangeItems] 批量排序失败:', e)
+        this.showError?.('批量排序失败')
+      } finally {
+        this.saving = false
       }
     },
 

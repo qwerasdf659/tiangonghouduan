@@ -202,9 +202,10 @@ class AdBiddingService {
                 title: creative.title,
                 content_type: creative.content_type,
                 primary_media_id: creative.primary_media_id,
-                image_url: creative.primary_media?.object_key || null,
-                image_width: creative.primary_media?.width || null,
-                image_height: creative.primary_media?.height || null,
+                // 媒体对象 key：通过 primary_media_id → media_files 关联查询获取，ad-delivery 路由据此拼接完整代理 URL
+                media_object_key: creative.primary_media?.object_key || null,
+                media_width: creative.primary_media?.width || null,
+                media_height: creative.primary_media?.height || null,
                 text_content: creative.text_content,
                 link_url: creative.link_url,
                 link_type: creative.link_type,

@@ -1204,6 +1204,51 @@ router.put(
 )
 
 /**
+ * 批量调整挂牌排序
+ * PUT /api/v4/console/marketplace/listings/batch-sort
+ *
+ * @body {Array<{market_listing_id: number, sort_order: number}>} items - 排序数组
+ *
+ * @security JWT + Admin权限
+ */
+router.put('/listings/batch-sort', authenticateToken, requireRoleLevel(100), async (req, res) => {
+  try {
+    const { items } = req.body
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.apiError('排序数据不能为空', 'BAD_REQUEST', null, 400)
+    }
+
+    const { MarketListing } = req.app.locals.services.getService('exchange_admin').models
+
+    const result = await TransactionManager.execute(
+      async transaction => {
+        let updatedCount = 0
+        for (const item of items) {
+          const { market_listing_id, sort_order } = item
+          if (!market_listing_id || sort_order === undefined) continue
+
+          const [affected] = await MarketListing.update(
+            { sort_order: parseInt(sort_order, 10) },
+            { where: { market_listing_id: parseInt(market_listing_id, 10) }, transaction }
+          )
+          updatedCount += affected
+        }
+        return { updated_count: updatedCount }
+      },
+      { description: '批量排序挂牌', maxRetries: 1 }
+    )
+
+    const { BusinessCacheHelper } = require('../../../utils/BusinessCacheHelper')
+    await BusinessCacheHelper.invalidateMarketListings('batch_sort')
+
+    return res.apiSuccess(result, `已更新 ${result.updated_count} 个挂牌排序`)
+  } catch (error) {
+    logger.error('批量排序挂牌失败', { error: error.message })
+    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+  }
+})
+
+/**
  * 管理员获取交易市场订单列表（Admin Only）
  * GET /api/v4/console/marketplace/trade_orders
  *

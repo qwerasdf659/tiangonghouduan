@@ -355,7 +355,6 @@ router.post('/asset-types', authenticateToken, requireRoleLevel(100), async (req
     const {
       asset_code,
       display_name,
-      icon_url,
       group_code,
       form,
       tier,
@@ -365,7 +364,6 @@ router.post('/asset-types', authenticateToken, requireRoleLevel(100), async (req
       is_enabled = true
     } = req.body
 
-    // 参数验证
     if (!asset_code || !display_name || !group_code || !form || tier === undefined) {
       return res.apiError(
         '缺少必填参数：asset_code/display_name/group_code/form/tier',
@@ -381,14 +379,12 @@ router.post('/asset-types', authenticateToken, requireRoleLevel(100), async (req
 
     const MaterialManagementService = req.app.locals.services.getService('material_management')
 
-    // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
     const result = await TransactionManager.execute(
       async transaction => {
         return await MaterialManagementService.createAssetType(
           {
             asset_code,
             display_name,
-            icon_url: icon_url || null,
             group_code,
             form,
             tier: parseInt(tier),
@@ -447,7 +443,6 @@ router.put('/asset-types/:code', authenticateToken, requireRoleLevel(100), async
     const asset_code = req.params.code
     const {
       display_name,
-      icon_url,
       group_code,
       form,
       tier,
@@ -472,7 +467,6 @@ router.put('/asset-types/:code', authenticateToken, requireRoleLevel(100), async
           asset_code,
           {
             display_name,
-            icon_url,
             group_code,
             form,
             tier,

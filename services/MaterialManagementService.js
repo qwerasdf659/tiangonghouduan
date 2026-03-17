@@ -374,7 +374,6 @@ class MaterialManagementService {
     const {
       asset_code,
       display_name,
-      icon_url,
       group_code,
       form,
       tier,
@@ -404,7 +403,6 @@ class MaterialManagementService {
       {
         asset_code,
         display_name,
-        icon_url: icon_url || null,
         group_code,
         form,
         tier: parseInt(tier),
@@ -466,7 +464,6 @@ class MaterialManagementService {
     // 构建更新字段（只允许更新指定字段）
     const allowedFields = [
       'display_name',
-      'icon_url',
       'group_code',
       'form',
       'tier',

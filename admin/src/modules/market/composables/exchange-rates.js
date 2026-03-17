@@ -50,6 +50,13 @@ export function useExchangeRateState() {
     /** @type {string} 源资产筛选 */
     filter_from_asset: '',
 
+    /** @type {Object} 分页状态 */
+    pagination: {
+      page: 1,
+      page_size: 20,
+      total: 0
+    },
+
     /** @type {boolean} 表单弹窗显示 */
     show_form: false,
     /** @type {boolean} 是否编辑模式 */
@@ -114,6 +121,29 @@ export function useExchangeRateActions() {
     async onRateFilterChange() {
       this.pagination.page = 1
       await this.loadRates()
+    },
+
+    /**
+     * 切换汇率列表页码
+     * @param {number} page - 目标页码
+     */
+    changeRatePage(page) {
+      const totalPages = this.pagination.page_size > 0
+        ? Math.ceil(this.pagination.total / this.pagination.page_size)
+        : 1
+      if (page < 1 || page > totalPages) return
+      this.pagination.page = page
+      this.loadRates()
+    },
+
+    /**
+     * 计算总页数（getter 风格，供模板使用）
+     * @returns {number} 总页数
+     */
+    get rateTotalPages() {
+      return this.pagination.page_size > 0
+        ? Math.ceil(this.pagination.total / this.pagination.page_size)
+        : 1
     },
 
     /**

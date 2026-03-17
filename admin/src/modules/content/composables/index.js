@@ -9,8 +9,11 @@
  * @date 2026-02-22
  */
 
-// 图片资源管理模块
-import { useImagesState, useImagesMethods } from './images.js'
+// 媒体库管理模块（基于 media_files + media_attachments 体系）
+import { useImagesState, useImagesMethods } from './media-library.js'
+
+// 存储管理模块（存储概览、孤儿检测、回收站、重复文件）
+import { useStorageState, useStorageMethods } from './storage.js'
 
 // 客服工作台核心模块（欢迎语、响应统计、全局状态）
 import { useCustomerServiceState, useCustomerServiceMethods } from './customer-service.js'
@@ -49,6 +52,7 @@ import { useFeedbackState, useFeedbackMethods } from './feedback.js'
 import { useCsAgentManagementState, useCsAgentManagementMethods } from './cs-agent-management.js'
 
 export { useImagesState, useImagesMethods }
+export { useStorageState, useStorageMethods }
 export { useCustomerServiceState, useCustomerServiceMethods }
 export { useCsWsConnectionState, useCsWsConnectionMethods }
 export { useCsSessionQueueState, useCsSessionQueueMethods }

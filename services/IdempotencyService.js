@@ -382,6 +382,9 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/console/marketplace/exchange_market/batch-bind-images':
     'ADMIN_EXCHANGE_BATCH_BIND_IMAGES', // 批量绑定商品图片
   '/api/v4/console/marketplace/listings/:id/force-withdraw': 'ADMIN_FORCE_WITHDRAW', // 强制下架
+  '/api/v4/console/marketplace/listings/:id/pin': 'ADMIN_LISTING_PIN', // 挂牌置顶/取消置顶
+  '/api/v4/console/marketplace/listings/:id/recommend': 'ADMIN_LISTING_RECOMMEND', // 挂牌推荐/取消推荐
+  '/api/v4/console/marketplace/listings/batch-sort': 'ADMIN_LISTING_BATCH_SORT', // 批量调整挂牌排序
   '/api/v4/console/marketplace/user-listing-limit': 'ADMIN_UPDATE_USER_LISTING_LIMIT', // 调整用户上架限制
 
   // ===== 用户层级 =====
@@ -462,6 +465,7 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/console/ad-campaigns/operational': 'ADMIN_AD_CAMPAIGN_OPERATIONAL_CREATE', // 创建运营内容（弹窗/轮播，billing_mode=free）
   '/api/v4/console/ad-campaigns/system': 'ADMIN_AD_CAMPAIGN_SYSTEM_CREATE', // 创建系统通知（公告，billing_mode=free）
   '/api/v4/console/ad-campaigns/:id/publish': 'ADMIN_AD_CAMPAIGN_PUBLISH', // 发布运营/系统类型计划（draft→active）
+  '/api/v4/console/ad-campaigns/:id/pause': 'ADMIN_AD_CAMPAIGN_PAUSE', // 暂停投放中的计划（active→paused）
 
   // Phase 3: 广告位管理（管理端）
   '/api/v4/console/ad-slots/': 'ADMIN_AD_SLOT_CREATE', // 创建广告位

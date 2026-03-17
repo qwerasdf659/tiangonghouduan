@@ -29,6 +29,10 @@ export function useExchangeOrdersState() {
     shipForm: { shipping_company: '', shipping_company_name: '', shipping_no: '', remark: '' },
     /** @type {Object|null} 物流轨迹数据 */
     orderTrack: null,
+    /** @type {Array<Object>} 快递公司列表 */
+    shippingCompanies: [],
+    /** @type {boolean} 快递公司列表是否已加载 */
+    shippingCompaniesLoaded: false,
     /** @type {number} 订单当前页码 */
     orderCurrentPage: 1,
     /** @type {number} 订单每页数量 */
@@ -326,6 +330,76 @@ export function useExchangeOrdersMethods() {
         this.showError?.('拒绝失败')
       } finally {
         this.saving = false
+      }
+    },
+
+    /**
+     * 打开发货弹窗（重置发货表单并显示弹窗）
+     * @param {Object} order - 订单对象
+     */
+    openShipModal(order) {
+      this.selectedOrder = order
+      this.shipForm = { shipping_company: '', shipping_company_name: '', shipping_no: '', remark: '' }
+      this.showModal('shipModal')
+    },
+
+    /**
+     * 提交发货表单（从发货弹窗提交）
+     */
+    async submitShipForm() {
+      if (!this.selectedOrder) return
+      await this.shipOrder(this.selectedOrder, { ...this.shipForm })
+      this.closeModal('shipModal')
+    },
+
+    /**
+     * 快递公司选择变更时同步名称
+     * @param {Event} e - change 事件
+     */
+    onShippingCompanyChange(e) {
+      const code = e.target.value
+      const company = (this.shippingCompanies || []).find(c => c.code === code)
+      this.shipForm.shipping_company = code
+      this.shipForm.shipping_company_name = company?.name || ''
+    },
+
+    /**
+     * 加载快递公司列表
+     */
+    async loadShippingCompanies() {
+      if (this.shippingCompaniesLoaded) return
+      try {
+        const res = await request({
+          url: MARKET_ENDPOINTS.EXCHANGE_SHIPPING_COMPANIES,
+          method: 'GET'
+        })
+        if (res.success) {
+          this.shippingCompanies = res.data?.companies || []
+          this.shippingCompaniesLoaded = true
+        }
+      } catch (e) {
+        logger.error('[ExchangeOrders] 加载快递公司列表失败:', e)
+      }
+    },
+
+    /**
+     * 查询订单物流轨迹
+     * @param {string} orderNo - 订单号
+     */
+    async queryOrderTrack(orderNo) {
+      try {
+        const url = buildURL(MARKET_ENDPOINTS.EXCHANGE_ORDER_TRACK, { order_no: orderNo })
+        const res = await request({ url, method: 'GET' })
+        if (res.success) {
+          this.orderTrack = res.data
+        } else {
+          this.showError?.(res.message || '查询物流失败')
+          this.orderTrack = null
+        }
+      } catch (e) {
+        logger.error('[ExchangeOrders] 查询物流失败:', e)
+        this.showError?.('查询物流轨迹失败')
+        this.orderTrack = null
       }
     },
 

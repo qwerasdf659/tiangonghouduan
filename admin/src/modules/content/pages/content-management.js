@@ -1,19 +1,24 @@
 /**
  * 内容管理中心 - Alpine.js 组件
  *
- * 内容投放合并后，公告/弹窗/轮播管理已统一到 ad-management 页面（内容投放管理）
- * 本页面仅保留图片资源管理子模块
+ * 子模块：
+ *   - 图片资源管理（媒体库浏览/上传/删除）
+ *   - 存储管理（存储概览/孤儿检测/回收站/重复文件）
  *
  * @file admin/src/modules/content/pages/content-management.js
- * @version 5.0.0 (内容投放合并版 — 仅保留图片资源管理)
- * @date 2026-02-22
+ * @version 6.0.0 (媒体体系 D+ 完整版)
+ * @date 2026-03-17
  */
 
 import { logger } from '../../../utils/logger.js'
+import { request } from '../../../api/base.js'
+import { SYSTEM_ADMIN_ENDPOINTS } from '../../../api/system/admin.js'
 import { Alpine, createPageMixin } from '../../../alpine/index.js'
 import {
   useImagesState,
-  useImagesMethods
+  useImagesMethods,
+  useStorageState,
+  useStorageMethods
 } from '../composables/index.js'
 
 document.addEventListener('alpine:init', () => {
@@ -23,10 +28,13 @@ document.addEventListener('alpine:init', () => {
     ...createPageMixin(),
     ...useImagesState(),
     ...useImagesMethods(),
+    ...useStorageState(),
+    ...useStorageMethods(),
 
     current_page: 'image-resources',
     subPages: [
-      { id: 'image-resources', name: '图片资源', icon: '🖼️' }
+      { id: 'image-resources', name: '媒体库', icon: '🖼️' },
+      { id: 'storage-management', name: '存储管理', icon: '💾' }
     ],
 
     saving: false,
@@ -36,7 +44,7 @@ document.addEventListener('alpine:init', () => {
     deleteType: null,
 
     init() {
-      logger.info('内容管理页面初始化（图片资源管理）')
+      logger.info('内容管理页面初始化（媒体库 + 存储管理）')
       if (!this.checkAuth()) return
       this.current_page = 'image-resources'
       this.loadPageData()
@@ -50,6 +58,36 @@ document.addEventListener('alpine:init', () => {
     loadPageData() {
       if (this.current_page === 'image-resources') {
         this.loadImages?.()
+      } else if (this.current_page === 'storage-management') {
+        this.loadStorageData?.()
+      }
+    },
+
+    /**
+     * 确认删除图片（移入回收站）
+     */
+    async confirmDelete() {
+      if (!this.deleteTarget) return
+      this.deleting = true
+      try {
+        const mediaId = this.deleteTarget.media_id
+        const response = await request({
+          url: SYSTEM_ADMIN_ENDPOINTS.MEDIA_DELETE(mediaId),
+          method: 'DELETE'
+        })
+        if (response?.success) {
+          this.hideModal('deleteModal')
+          this.showSuccess('图片已移入回收站')
+          await this.loadImages()
+        } else {
+          this.showError(response?.message || '删除失败')
+        }
+      } catch (error) {
+        logger.error('删除图片失败:', error)
+        this.showError('删除失败: ' + error.message)
+      } finally {
+        this.deleting = false
+        this.deleteTarget = null
       }
     }
   }))

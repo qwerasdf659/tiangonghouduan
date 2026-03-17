@@ -304,6 +304,7 @@ class QueryService {
         order: [
           ['is_pinned', 'DESC'],
           ['pinned_at', 'DESC'],
+          ['is_recommended', 'DESC'],
           ['sort_order', 'ASC'],
           [sort_by, sort_order]
         ]

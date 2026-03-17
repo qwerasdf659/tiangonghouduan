@@ -27,6 +27,7 @@ export function useStoresState() {
     storeForm: {
       store_name: '',
       contact_mobile: '',
+      merchant_id: null,
       province_code: '',
       city_code: '',
       district_code: '',
@@ -41,7 +42,9 @@ export function useStoresState() {
     /** 门店排名 */
     storeRanking: [],
     /** 选中门店 */
-    selectedStore: null
+    selectedStore: null,
+    /** 商户列表（用于关联下拉） */
+    merchantOptions: []
   }
 }
 
@@ -115,6 +118,7 @@ export function useStoresMethods() {
       this.storeForm = {
         store_name: '',
         contact_mobile: '',
+        merchant_id: null,
         province_code: '',
         city_code: '',
         district_code: '',
@@ -127,6 +131,7 @@ export function useStoresMethods() {
       this.cities = []
       this.districts = []
       this.streets = []
+      this.loadMerchantOptions()
       this.showModal('storeModal')
     },
 
@@ -136,6 +141,7 @@ export function useStoresMethods() {
       this.storeForm = {
         store_name: store.store_name || '',
         contact_mobile: store.contact_mobile || '',
+        merchant_id: store.merchant_id || null,
         province_code: store.province_code || '',
         city_code: store.city_code || '',
         district_code: store.district_code || '',
@@ -145,6 +151,7 @@ export function useStoresMethods() {
         status: store.status || 'active',
         notes: store.notes || ''
       }
+      this.loadMerchantOptions()
 
       if (store.province_code) {
         await this.loadCitiesForEdit(store.province_code)
@@ -219,6 +226,22 @@ export function useStoresMethods() {
     getStoreStatusClass(status) {
       const map = { active: 'bg-success', inactive: 'bg-warning', closed: 'bg-secondary' }
       return map[status] || 'bg-secondary'
+    },
+
+    /**
+     * 加载商户下拉选项（用于门店关联商户）
+     */
+    async loadMerchantOptions() {
+      try {
+        const { MERCHANT_ENDPOINTS } = await import('../../../api/merchant.js')
+        const res = await this.apiGet(MERCHANT_ENDPOINTS.OPTIONS)
+        if (res?.success) {
+          this.merchantOptions = res.data || []
+        }
+      } catch (error) {
+        logger.warn('加载商户列表失败（非致命）:', error.message)
+        this.merchantOptions = []
+      }
     }
   }
 }

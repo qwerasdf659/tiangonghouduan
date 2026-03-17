@@ -6,7 +6,7 @@
  * 覆盖范围：
  * 1. 基础字典数据（RarityDef、CategoryDef、AssetGroupDef）
  * 2. 用户体系（管理员、普通用户、商户）
- * 3. 材料资产类型（含图标 icon_url）
+ * 3. 材料资产类型（图标通过 media_attachments 管理）
  * 4. 媒体文件（media_files + media_attachments，供兑换商品/奖品引用）
  * 5. 物品模板
  * 6. 兑换商品媒体绑定（更新 primary_media_id）
@@ -114,13 +114,13 @@ module.exports = {
       if (!exists) await queryInterface.bulkInsert('rarity_defs', [r])
     }
 
-    // 1b. 类目字典（icon_url 走前端静态映射，不在 DB 存储图片路径）
+    // 1b. 类目字典（图标通过 media_attachments 多态关联管理）
     const categoryDefs = [
       {
         category_code: 'electronics',
         display_name: '数码电子',
         description: '手机、平板、耳机等数码产品',
-        icon_url: null,
+
         sort_order: 10,
         is_enabled: true,
         created_at: now,
@@ -130,7 +130,7 @@ module.exports = {
         category_code: 'lifestyle',
         display_name: '生活日用',
         description: '日常生活用品',
-        icon_url: null,
+
         sort_order: 20,
         is_enabled: true,
         created_at: now,
@@ -140,7 +140,7 @@ module.exports = {
         category_code: 'food',
         display_name: '美食饮品',
         description: '食品饮料卡券',
-        icon_url: null,
+
         sort_order: 30,
         is_enabled: true,
         created_at: now,
@@ -150,7 +150,7 @@ module.exports = {
         category_code: 'voucher',
         display_name: '优惠券',
         description: '各类优惠券与代金券',
-        icon_url: null,
+
         sort_order: 40,
         is_enabled: true,
         created_at: now,
@@ -160,7 +160,7 @@ module.exports = {
         category_code: 'collectible',
         display_name: '收藏品',
         description: '限量收藏与纪念品',
-        icon_url: null,
+
         sort_order: 50,
         is_enabled: true,
         created_at: now,
@@ -334,7 +334,7 @@ module.exports = {
 
     /*
      * ================================================================
-     * 3. 材料资产类型（含 icon_url）
+     * 3. 材料资产类型（图标通过 media_attachments 管理）
      * ================================================================
      */
     console.log('💎 3/13 材料资产类型...')
@@ -343,7 +343,7 @@ module.exports = {
       {
         asset_code: 'POINTS',
         display_name: '积分',
-        icon_url: null,
+
         group_code: 'system',
         form: 'crystal',
         tier: 0,
@@ -358,7 +358,7 @@ module.exports = {
       {
         asset_code: 'DIAMOND',
         display_name: '钻石',
-        icon_url: null,
+
         group_code: 'system',
         form: 'crystal',
         tier: 0,
@@ -373,7 +373,7 @@ module.exports = {
       {
         asset_code: 'BUDGET_POINTS',
         display_name: '预算积分',
-        icon_url: null,
+
         group_code: 'system',
         form: 'crystal',
         tier: 0,
@@ -388,7 +388,7 @@ module.exports = {
       {
         asset_code: 'red_shard',
         display_name: '红水晶碎片',
-        icon_url: null,
+
         group_code: 'red',
         form: 'shard',
         tier: 1,
@@ -403,7 +403,7 @@ module.exports = {
       {
         asset_code: 'red_crystal',
         display_name: '红水晶',
-        icon_url: null,
+
         group_code: 'red',
         form: 'crystal',
         tier: 2,
@@ -418,7 +418,7 @@ module.exports = {
       {
         asset_code: 'orange_shard',
         display_name: '橙水晶碎片',
-        icon_url: null,
+
         group_code: 'orange',
         form: 'shard',
         tier: 1,
@@ -433,7 +433,7 @@ module.exports = {
       {
         asset_code: 'orange_crystal',
         display_name: '橙水晶',
-        icon_url: null,
+
         group_code: 'orange',
         form: 'crystal',
         tier: 2,
@@ -448,7 +448,7 @@ module.exports = {
       {
         asset_code: 'yellow_shard',
         display_name: '黄水晶碎片',
-        icon_url: null,
+
         group_code: 'yellow',
         form: 'shard',
         tier: 1,
@@ -463,7 +463,7 @@ module.exports = {
       {
         asset_code: 'yellow_crystal',
         display_name: '黄水晶',
-        icon_url: null,
+
         group_code: 'yellow',
         form: 'crystal',
         tier: 2,
@@ -478,7 +478,7 @@ module.exports = {
       {
         asset_code: 'green_shard',
         display_name: '绿水晶碎片',
-        icon_url: null,
+
         group_code: 'green',
         form: 'shard',
         tier: 1,
@@ -493,7 +493,7 @@ module.exports = {
       {
         asset_code: 'green_crystal',
         display_name: '绿水晶',
-        icon_url: null,
+
         group_code: 'green',
         form: 'crystal',
         tier: 2,
@@ -508,7 +508,7 @@ module.exports = {
       {
         asset_code: 'blue_shard',
         display_name: '蓝水晶碎片',
-        icon_url: null,
+
         group_code: 'blue',
         form: 'shard',
         tier: 1,
@@ -523,7 +523,7 @@ module.exports = {
       {
         asset_code: 'blue_crystal',
         display_name: '蓝水晶',
-        icon_url: null,
+
         group_code: 'blue',
         form: 'crystal',
         tier: 2,
@@ -538,7 +538,7 @@ module.exports = {
       {
         asset_code: 'purple_shard',
         display_name: '紫水晶碎片',
-        icon_url: null,
+
         group_code: 'purple',
         form: 'shard',
         tier: 1,
@@ -553,7 +553,7 @@ module.exports = {
       {
         asset_code: 'purple_crystal',
         display_name: '紫水晶',
-        icon_url: null,
+
         group_code: 'purple',
         form: 'crystal',
         tier: 2,
@@ -573,10 +573,9 @@ module.exports = {
         ['material_asset_type_id']
       )
       if (exists) {
-        // 更新 icon_url（可能之前为 NULL）
         await queryInterface.bulkUpdate(
           'material_asset_types',
-          { icon_url: m.icon_url },
+          { display_name: m.display_name },
           { asset_code: m.asset_code }
         )
       } else {
@@ -1714,11 +1713,11 @@ module.exports = {
             {
               ad_campaign_id: adCampaignId1,
               title: '[测试]新品推广主图',
-              image_url: 'test-seeds/ads/new-product-main.jpg',
-              image_width: 750,
-              image_height: 750,
+              primary_media_id: null,
               link_url: '/pages/exchange/detail?id=1',
               link_type: 'internal',
+              content_type: 'image',
+              display_mode: 'popup',
               review_status: 'approved',
               review_note: '素材审核通过',
               reviewed_by: adminUserId,
@@ -1733,11 +1732,11 @@ module.exports = {
             {
               ad_campaign_id: adCampaignId2,
               title: '[测试]品牌宣传横幅',
-              image_url: 'test-seeds/ads/brand-carousel.jpg',
-              image_width: 750,
-              image_height: 420,
+              primary_media_id: null,
               link_url: 'https://example.com/brand',
               link_type: 'external',
+              content_type: 'image',
+              display_mode: 'carousel',
               review_status: 'pending',
               review_note: null,
               reviewed_by: null,
@@ -1938,7 +1937,7 @@ module.exports = {
     console.log('📊 数据概览：')
     console.log('   - 稀有度字典：5条 | 类目字典：5条 | 资产分组：7条')
     console.log('   - 测试用户：复用已有用户（admin/普通/商户）')
-    console.log('   - 材料资产类型：15种（含图标icon_url）')
+    console.log('   - 材料资产类型：15种（图标通过 media_attachments 管理）')
     console.log('   - 图片资源：8条 | 物品模板：10个')
     console.log('   - 兑换商品：7个（含primary_media_id绑定）')
     console.log('   - 弹窗：5个 | 轮播图：5个')

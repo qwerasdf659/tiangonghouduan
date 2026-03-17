@@ -213,7 +213,7 @@ document.addEventListener('alpine:init', () => {
     campaignImagePreview: '',
     /** 已上传的 media_id（用于提交） */
     campaignPrimaryMediaId: null,
-    /** 已上传的 public_url（用于显示和提交 image_url） */
+    /** 已上传的 object_key（仅用于本地状态追踪，不提交给后端） */
     campaignImageUrl: '',
 
     /** 处理广告图片选择 */
@@ -654,12 +654,9 @@ document.addEventListener('alpine:init', () => {
           data.display_mode = this.campaignForm.display_mode
         }
 
-        // 传递广告创意图片（优先 primary_media_id，兼容 image_url 用于显示）
+        // 传递广告创意图片（ad_creatives 表通过 primary_media_id FK → media_files 关联媒体资源）
         if (this.campaignPrimaryMediaId) {
           data.primary_media_id = this.campaignPrimaryMediaId
-        }
-        if (this.campaignImageUrl) {
-          data.image_url = this.campaignImageUrl
         }
 
         // W4: 根据 category 使用对应的专用创建端点（跳过审核简化流程）
@@ -711,9 +708,8 @@ document.addEventListener('alpine:init', () => {
       this.saving = true
       try {
         const response = await request({
-          url: buildURL(SYSTEM_ENDPOINTS.AD_CAMPAIGN_UPDATE, { id: campaign.ad_campaign_id }),
-          method: 'PATCH',
-          data: { status: 'active' }
+          url: buildURL(SYSTEM_ENDPOINTS.AD_CAMPAIGN_PUBLISH, { id: campaign.ad_campaign_id }),
+          method: 'PATCH'
         })
         if (response?.success) {
           this.showSuccess('已发布，开始投放')
@@ -733,9 +729,8 @@ document.addEventListener('alpine:init', () => {
       this.saving = true
       try {
         const response = await request({
-          url: buildURL(SYSTEM_ENDPOINTS.AD_CAMPAIGN_UPDATE, { id: campaign.ad_campaign_id }),
-          method: 'PATCH',
-          data: { status: 'paused' }
+          url: buildURL(SYSTEM_ENDPOINTS.AD_CAMPAIGN_PAUSE, { id: campaign.ad_campaign_id }),
+          method: 'PATCH'
         })
         if (response?.success) {
           this.showSuccess('已暂停投放')
