@@ -25,7 +25,8 @@ const {
   AdCreative,
   AdBillingRecord,
   AdInteractionLog,
-  User
+  User,
+  MediaFile
 } = require('../models')
 
 const BeijingTimeHelper = require('../utils/timeHelper')
@@ -75,7 +76,7 @@ class AdCampaignService {
           {
             model: AdCreative,
             as: 'creatives',
-            attributes: ['ad_creative_id', 'title', 'image_url', 'review_status'],
+            attributes: ['ad_creative_id', 'title', 'primary_media_id', 'review_status'],
             required: false
           }
         ],
@@ -171,15 +172,25 @@ class AdCampaignService {
             attributes: [
               'ad_creative_id',
               'title',
-              'image_url',
-              'image_width',
-              'image_height',
+              'primary_media_id',
+              'content_type',
+              'text_content',
+              'display_mode',
               'link_url',
               'link_type',
               'review_status',
               'review_note'
             ],
-            required: false
+            required: false,
+            include: MediaFile
+              ? [
+                  {
+                    model: MediaFile,
+                    as: 'primary_media',
+                    attributes: ['media_id', 'object_key', 'width', 'height', 'thumbnail_keys']
+                  }
+                ]
+              : []
           },
           {
             model: User,
@@ -317,6 +328,22 @@ class AdCampaignService {
         },
         { transaction: options.transaction }
       )
+
+      // 自动创建 AdCreative 记录（商业广告需审核，review_status='pending'）
+      if (data.primary_media_id || data.text_content) {
+        await AdCreative.create(
+          {
+            ad_campaign_id: campaign.ad_campaign_id,
+            title: data.campaign_name,
+            content_type: data.content_type || 'image',
+            primary_media_id: data.primary_media_id || null,
+            text_content: data.text_content || null,
+            display_mode: data.display_mode || null,
+            review_status: 'pending'
+          },
+          { transaction: options.transaction }
+        )
+      }
 
       logger.info('创建广告计划成功', {
         campaign_id: campaign.ad_campaign_id,
@@ -829,14 +856,14 @@ class AdCampaignService {
         slot_id: data.ad_slot_id
       })
 
-      // 自动创建 AdCreative 记录（图片或文字素材）
-      if (data.image_url || data.text_content) {
+      // 自动创建 AdCreative 记录（运营计划免审核，review_status='approved'）
+      if (data.primary_media_id || data.text_content) {
         await AdCreative.create(
           {
             ad_campaign_id: campaign.ad_campaign_id,
             title: data.campaign_name,
             content_type: data.content_type || 'image',
-            image_url: data.image_url || null,
+            primary_media_id: data.primary_media_id || null,
             text_content: data.text_content || null,
             display_mode: data.display_mode || null,
             review_status: 'approved'
@@ -908,6 +935,22 @@ class AdCampaignService {
         },
         { transaction: options.transaction }
       )
+
+      // 自动创建 AdCreative 记录（系统类型免审核，review_status='approved'）
+      if (data.primary_media_id || data.text_content) {
+        await AdCreative.create(
+          {
+            ad_campaign_id: campaign.ad_campaign_id,
+            title: data.campaign_name,
+            content_type: data.content_type || 'image',
+            primary_media_id: data.primary_media_id || null,
+            text_content: data.text_content || null,
+            display_mode: data.display_mode || null,
+            review_status: 'approved'
+          },
+          { transaction: options.transaction }
+        )
+      }
 
       logger.info('创建系统通知计划成功', {
         campaign_id: campaign.ad_campaign_id,

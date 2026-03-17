@@ -257,9 +257,9 @@ function _aggregateMetrics(metrics) {
       }
     },
     health_indicators: {
-      empty_rate: totals.fallback_tier_count / total,
+      /** 100% 出奖系统：保底奖品占比（fallback 是真实保底奖品，不是空奖） */
+      fallback_rate: totals.fallback_tier_count / total,
       high_value_rate: totals.high_tier_count / total,
-      // 健康状态判断
       status: _getHealthStatus(totals.fallback_tier_count / total, totals.total_draws)
     }
   }
@@ -298,7 +298,7 @@ function _getEmptyAggregation() {
       luck_debt: { count: 0, rate: 0 },
       guarantee: { count: 0, rate: 0 }
     },
-    health_indicators: { empty_rate: 0, high_value_rate: 0, status: 'no_data' }
+    health_indicators: { fallback_rate: 0, high_value_rate: 0, status: 'no_data' }
   }
 }
 
@@ -329,17 +329,21 @@ function _getEmptyTotals() {
 }
 
 /**
- * 获取健康状态
+ * 获取健康状态（100% 出奖系统）
  *
- * @param {number} empty_rate - 空奖率
+ * 判断依据是保底奖品占比，而非"空奖率"：
+ * - 保底占比 > 60% 说明高价值奖品发放异常，可能库存或预算不足
+ * - 保底占比 > 50% 需要关注活动平衡
+ *
+ * @param {number} fallback_rate - 保底奖品占比
  * @param {number} total_draws - 总抽奖次数
  * @returns {string} 健康状态
  * @private
  */
-function _getHealthStatus(empty_rate, total_draws) {
-  if (total_draws < 100) return 'insufficient_data' // 样本量不足
-  if (empty_rate > 0.6) return 'critical' // 空奖率过高
-  if (empty_rate > 0.5) return 'warning' // 空奖率较高
+function _getHealthStatus(fallback_rate, total_draws) {
+  if (total_draws < 100) return 'insufficient_data'
+  if (fallback_rate > 0.6) return 'critical'
+  if (fallback_rate > 0.5) return 'warning'
   return 'healthy'
 }
 

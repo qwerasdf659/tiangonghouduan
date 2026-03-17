@@ -40,7 +40,7 @@ describe('LuckDebtCalculator', () => {
       const result = calculator.calculate({
         global_state: {
           global_draw_count: 100,
-          global_empty_count: 20 // 20% 空奖率，低于期望 30%
+          global_empty_count: 0 // 0% 空奖率，等于期望 0%（100%出奖系统）
         },
         user_id: 1
       })
@@ -54,7 +54,7 @@ describe('LuckDebtCalculator', () => {
       const result = calculator.calculate({
         global_state: {
           global_draw_count: 100,
-          global_empty_count: 38 // 38% 空奖率，偏离 8%（5%-10%区间）
+          global_empty_count: 8 // 8% 空奖率，偏离 8%（5%-10%区间，期望 0%）
         },
         user_id: 1
       })
@@ -68,7 +68,7 @@ describe('LuckDebtCalculator', () => {
       const result = calculator.calculate({
         global_state: {
           global_draw_count: 100,
-          global_empty_count: 42 // 42% 空奖率，偏离 12%（10%-15%区间）
+          global_empty_count: 12 // 12% 空奖率，偏离 12%（10%-15%区间，期望 0%）
         },
         user_id: 1
       })
@@ -82,7 +82,7 @@ describe('LuckDebtCalculator', () => {
       const result = calculator.calculate({
         global_state: {
           global_draw_count: 100,
-          global_empty_count: 50 // 50% 空奖率，偏离 20%（>15%）
+          global_empty_count: 50 // 50% 空奖率，偏离 50%（>15%，期望 0%）
         },
         user_id: 1
       })

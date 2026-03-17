@@ -511,18 +511,17 @@ describe('策略引擎边界场景测试', () => {
         expect(result.multiplier).toBeLessThanOrEqual(1.0)
       })
 
-      test('historical_empty_rate = 30%（期望值）应返回 multiplier ≈ 1.0', () => {
+      test('100% 出奖系统：30 次空奖（偏离期望值 0%）应触发高补偿', () => {
         const result = calculator.calculate({
           user_id: 1,
           global_state: {
             global_draw_count: 100,
-            global_empty_count: 30 // 30% 空奖率（期望值）
+            global_empty_count: 30 // 30% 空奖率，期望 0%，偏离 30% > 15% → high
           }
         })
 
-        // 接近期望值，债务应该很低
-        expect(result.debt_level).toBe('none')
-        expect(result.multiplier).toBeCloseTo(1.0, 1)
+        expect(result.debt_level).toBe('high')
+        expect(result.multiplier).toBeGreaterThan(1.0)
       })
 
       test('historical_empty_rate = 50%（较高）应返回补偿', () => {
@@ -543,7 +542,7 @@ describe('策略引擎边界场景测试', () => {
           user_id: 1,
           global_state: {
             global_draw_count: 50,
-            global_empty_count: 50 // 100% 空奖率（偏离70%，属于高债务）
+            global_empty_count: 50 // 100% 空奖率（偏离100%，属于高债务）
           }
         })
 
@@ -580,7 +579,7 @@ describe('策略引擎边界场景测试', () => {
       })
 
       test('global_draw_count = 10（等于最小样本量）且高空奖率应开始计算债务', () => {
-        // 期望空奖率 30%，80% - 30% = 50% 偏离，属于高债务（>15%）
+        // 期望空奖率 0%，80% - 0% = 80% 偏离，属于高债务（>15%）
         const result = calculator.calculate({
           user_id: 1,
           global_state: {
@@ -590,21 +589,21 @@ describe('策略引擎边界场景测试', () => {
         })
 
         expect(result.sample_sufficient).toBe(true)
-        expect(result.debt_level).toBe('high') // 偏离 50% > 15%
+        expect(result.debt_level).toBe('high') // 偏离 80% > 15%
         expect(result.multiplier).toBeGreaterThan(1.0)
       })
 
       test('global_draw_count = 1000（大样本）应正常计算', () => {
-        // 42% - 30% = 12% 偏离，属于中债务（10%-15%）
+        /* 100% 出奖系统：expected=0，420/1000=42%，偏离 42% > 15% → high */
         const result = calculator.calculate({
           user_id: 1,
           global_state: {
             global_draw_count: 1000,
-            global_empty_count: 420 // 42% 空奖率
+            global_empty_count: 420
           }
         })
 
-        expect(result.debt_level).toBe('medium') // 偏离 12%
+        expect(result.debt_level).toBe('high')
         expect(result.multiplier).toBeGreaterThan(1.0)
       })
     })
@@ -675,12 +674,16 @@ describe('策略引擎边界场景测试', () => {
     })
 
     describe('force_threshold 精确边界测试', () => {
+      /**
+       * 100% 出奖系统：fallback 是真实保底奖品，不触发防空奖
+       * 仅 selected_tier='empty' 才是需要防空奖干预的场景
+       */
       test('empty_streak = force_threshold - 1 应返回 not_triggered', () => {
         const threshold = handler.config.force_threshold
         const result = handler.handle({
           empty_streak: threshold - 1,
-          selected_tier: 'fallback',
-          available_tiers: { fallback: true, low: true },
+          selected_tier: 'empty',
+          available_tiers: { low: true },
           effective_budget: 500,
           prizes_by_tier: {
             low: [{ lottery_prize_id: 1, prize_value_points: 50, budget_cost: 50 }]
@@ -696,8 +699,8 @@ describe('策略引擎边界场景测试', () => {
         const threshold = handler.config.force_threshold
         const result = handler.handle({
           empty_streak: threshold,
-          selected_tier: 'fallback',
-          available_tiers: { fallback: true, low: true },
+          selected_tier: 'empty',
+          available_tiers: { low: true },
           effective_budget: 500,
           prizes_by_tier: {
             low: [{ lottery_prize_id: 1, prize_value_points: 50, budget_cost: 50 }]
@@ -714,8 +717,8 @@ describe('策略引擎边界场景测试', () => {
         const threshold = handler.config.force_threshold
         const result = handler.handle({
           empty_streak: threshold + 1,
-          selected_tier: 'fallback',
-          available_tiers: { fallback: true, low: true },
+          selected_tier: 'empty',
+          available_tiers: { low: true },
           effective_budget: 500,
           prizes_by_tier: {
             low: [{ lottery_prize_id: 1, prize_value_points: 50, budget_cost: 50 }]
@@ -726,6 +729,23 @@ describe('策略引擎边界场景测试', () => {
         expect(result.result_type).toBe('forced')
         expect(result.forced).toBe(true)
       })
+
+      test('selected_tier = fallback 时应返回 already_non_empty（保底是真实奖品）', () => {
+        const threshold = handler.config.force_threshold
+        const result = handler.handle({
+          empty_streak: threshold,
+          selected_tier: 'fallback',
+          available_tiers: { fallback: true, low: true },
+          effective_budget: 500,
+          prizes_by_tier: {
+            low: [{ lottery_prize_id: 1, prize_value_points: 50, budget_cost: 50 }]
+          },
+          user_id: 1
+        })
+
+        expect(result.result_type).toBe('already_non_empty')
+        expect(result.forced).toBe(false)
+      })
     })
 
     describe('预算不足场景边界', () => {
@@ -733,8 +753,8 @@ describe('策略引擎边界场景测试', () => {
         const threshold = handler.config.force_threshold
         const result = handler.handle({
           empty_streak: threshold,
-          selected_tier: 'fallback',
-          available_tiers: { fallback: true, low: true },
+          selected_tier: 'empty',
+          available_tiers: { low: true },
           effective_budget: 0,
           prizes_by_tier: {
             low: [{ lottery_prize_id: 1, prize_value_points: 50, budget_cost: 50 }]
@@ -751,9 +771,9 @@ describe('策略引擎边界场景测试', () => {
         const threshold = handler.config.force_threshold
         const result = handler.handle({
           empty_streak: threshold,
-          selected_tier: 'fallback',
-          available_tiers: { fallback: true, low: true },
-          effective_budget: 50, // 刚好等于 low 档位最低成本
+          selected_tier: 'empty',
+          available_tiers: { low: true },
+          effective_budget: 50,
           prizes_by_tier: {
             low: [{ lottery_prize_id: 1, prize_value_points: 50, budget_cost: 50 }]
           },
@@ -769,9 +789,9 @@ describe('策略引擎边界场景测试', () => {
         const threshold = handler.config.force_threshold
         const result = handler.handle({
           empty_streak: threshold,
-          selected_tier: 'fallback',
-          available_tiers: { fallback: true, low: true },
-          effective_budget: 49, // 比 low 档位最低成本少 1
+          selected_tier: 'empty',
+          available_tiers: { low: true },
+          effective_budget: 49,
           prizes_by_tier: {
             low: [{ lottery_prize_id: 1, prize_value_points: 50, budget_cost: 50 }]
           },
@@ -786,8 +806,8 @@ describe('策略引擎边界场景测试', () => {
         const threshold = handler.config.force_threshold
         const result = handler.handle({
           empty_streak: threshold,
-          selected_tier: 'fallback',
-          available_tiers: { fallback: true, low: true },
+          selected_tier: 'empty',
+          available_tiers: { low: true },
           effective_budget: Infinity,
           prizes_by_tier: {
             low: [{ lottery_prize_id: 1, prize_value_points: 50, budget_cost: 50 }]
@@ -805,7 +825,7 @@ describe('策略引擎边界场景测试', () => {
         const threshold = handler.config.force_threshold
         const result = handler.handle({
           empty_streak: threshold,
-          selected_tier: 'fallback',
+          selected_tier: 'empty',
           available_tiers: { fallback: true, low: true },
           effective_budget: 500,
           prizes_by_tier: {},
@@ -820,7 +840,7 @@ describe('策略引擎边界场景测试', () => {
         const threshold = handler.config.force_threshold
         const result = handler.handle({
           empty_streak: threshold,
-          selected_tier: 'fallback',
+          selected_tier: 'empty',
           available_tiers: { fallback: true, low: true },
           effective_budget: 500,
           prizes_by_tier: undefined,
@@ -835,7 +855,7 @@ describe('策略引擎边界场景测试', () => {
         const threshold = handler.config.force_threshold
         const result = handler.handle({
           empty_streak: threshold,
-          selected_tier: 'fallback',
+          selected_tier: 'empty',
           available_tiers: { fallback: true, high: true },
           effective_budget: 500,
           prizes_by_tier: {
@@ -854,7 +874,7 @@ describe('策略引擎边界场景测试', () => {
         const threshold = handler.config.force_threshold
         const result = handler.handle({
           empty_streak: threshold,
-          selected_tier: 'fallback',
+          selected_tier: 'empty',
           available_tiers: { low: false, mid: false, high: false },
           effective_budget: 500,
           prizes_by_tier: {
@@ -870,7 +890,7 @@ describe('策略引擎边界场景测试', () => {
         const threshold = handler.config.force_threshold
         const result = handler.handle({
           empty_streak: threshold,
-          selected_tier: 'fallback',
+          selected_tier: 'empty',
           available_tiers: {},
           effective_budget: 500,
           prizes_by_tier: {
@@ -967,10 +987,10 @@ describe('策略引擎边界场景测试', () => {
         const threshold = handler.config.force_threshold
 
         // 未达阈值
-        expect(handler.shouldForce(threshold - 1, 'fallback')).toBe(false)
+        expect(handler.shouldForce(threshold - 1, 'empty')).toBe(false)
 
         // 达到阈值
-        expect(handler.shouldForce(threshold, 'fallback')).toBe(true)
+        expect(handler.shouldForce(threshold, 'empty')).toBe(true)
 
         // 非空奖档位
         expect(handler.shouldForce(threshold, 'low')).toBe(false)
@@ -1129,7 +1149,7 @@ describe('策略引擎边界场景测试', () => {
         const result = handler.handle({
           recent_high_count: threshold,
           anti_high_cooldown: 0,
-          selected_tier: 'fallback',
+          selected_tier: 'empty',
           tier_weights: { high: 100000, fallback: 500000 },
           user_id: 1
         })
@@ -1249,7 +1269,7 @@ describe('策略引擎边界场景测试', () => {
       expect(pityResult.pity_triggered).toBe(true)
       expect(pityResult.multiplier).toBe(1.25) // threshold_2: 5次空奖
 
-      // 5. 运气债务计算（80% - 30% = 50% 偏离，高债务）
+      // 5. 运气债务计算（80% - 0% = 80% 偏离，高债务）
       const luckDebtResult = luckDebtCalc.calculate({
         user_id: 1,
         global_state: { global_draw_count: 100, global_empty_count: 80 }
@@ -1287,10 +1307,10 @@ describe('策略引擎边界场景测试', () => {
       })
       expect(pityResult.pity_triggered).toBe(false)
 
-      // 5. 好运气（10% 空奖率 < 30% 期望值），无债务
+      /* 100% 出奖系统：期望空奖率=0，0 空奖 = 0% 偏离 → 无债务 */
       const luckDebtResult = luckDebtCalc.calculate({
         user_id: 1,
-        global_state: { global_draw_count: 100, global_empty_count: 10 }
+        global_state: { global_draw_count: 100, global_empty_count: 0 }
       })
       expect(luckDebtResult.debt_level).toBe('none')
     })
@@ -1349,7 +1369,7 @@ describe('策略引擎边界场景测试', () => {
       // 2. AntiEmpty 也会触发（因为 empty_streak = 10 = force_threshold）
       const antiEmptyResult = antiEmpty.handle({
         empty_streak: 10,
-        selected_tier: 'fallback', // 假设 Pity 提升后仍选中 fallback
+        selected_tier: 'empty', // 假设 Pity 提升后仍选中 fallback
         available_tiers: { fallback: true, low: true },
         effective_budget: 100,
         prizes_by_tier: {
@@ -1428,10 +1448,10 @@ describe('策略引擎边界场景测试', () => {
       const pityResult = pityCalc.calculate({ empty_streak: 0 })
       expect(pityResult.pity_triggered).toBe(false)
 
-      // 5. LuckDebt 不触发（正常运气）
+      /* 100% 出奖系统：0 空奖 = 正常，无债务 */
       const luckDebtResult = luckDebtCalc.calculate({
         user_id: 1,
-        global_state: { global_draw_count: 100, global_empty_count: 30 }
+        global_state: { global_draw_count: 100, global_empty_count: 0 }
       })
       expect(luckDebtResult.debt_level).toBe('none')
 

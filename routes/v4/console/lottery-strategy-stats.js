@@ -312,7 +312,7 @@ router.get(
  * - high: 高价值奖品
  * - mid: 中价值奖品
  * - low: 低价值奖品
- * - fallback: 空奖/保底奖
+ * - fallback: 保底奖品
  *
  * 路径参数：
  * - lottery_campaign_id: 活动ID

@@ -25,7 +25,7 @@ describe('SettleStage — budget_cost 扣减验证（BUG-2 修复）', () => {
   describe('_deductBudget 接收正确的扣减金额', () => {
     test('碎片×50（pvp=8, budget_cost=500）→ 扣减 500 而非 8', async () => {
       const mock_provider = {
-        deductBudget: jest.fn(async ({ amount }) => ({ deducted: amount }))
+        deductBudget: jest.fn(async ({ amount }) => ({ success: true, deducted: amount }))
       }
 
       const result = await stage._deductBudget(mock_provider, 500, {
@@ -45,7 +45,7 @@ describe('SettleStage — budget_cost 扣减验证（BUG-2 修复）', () => {
 
     test('碎片×3（pvp=1, budget_cost=30）→ 扣减 30 而非 1', async () => {
       const mock_provider = {
-        deductBudget: jest.fn(async ({ amount }) => ({ deducted: amount }))
+        deductBudget: jest.fn(async ({ amount }) => ({ success: true, deducted: amount }))
       }
 
       const result = await stage._deductBudget(mock_provider, 30, {
@@ -65,7 +65,7 @@ describe('SettleStage — budget_cost 扣减验证（BUG-2 修复）', () => {
 
     test('四人鸳鸯锅（pvp=20, budget_cost=20）→ 扣减 20（行为一致）', async () => {
       const mock_provider = {
-        deductBudget: jest.fn(async ({ amount }) => ({ deducted: amount }))
+        deductBudget: jest.fn(async ({ amount }) => ({ success: true, deducted: amount }))
       }
 
       const result = await stage._deductBudget(mock_provider, 20, {
@@ -81,7 +81,7 @@ describe('SettleStage — budget_cost 扣减验证（BUG-2 修复）', () => {
 
     test('九五折券×2（pvp=5, budget_cost=10）→ 扣减 10 而非 5', async () => {
       const mock_provider = {
-        deductBudget: jest.fn(async ({ amount }) => ({ deducted: amount }))
+        deductBudget: jest.fn(async ({ amount }) => ({ success: true, deducted: amount }))
       }
 
       const result = await stage._deductBudget(mock_provider, 10, {

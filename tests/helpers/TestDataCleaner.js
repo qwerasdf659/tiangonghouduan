@@ -64,8 +64,9 @@ const MODEL_PRIMARY_KEYS = {
   // 幂等性
   ApiIdempotencyRequest: 'idempotency_key',
 
-  // 图片资源
-  ImageResources: 'resource_id',
+  // 媒体文件
+  MediaFile: 'media_id',
+  MediaAttachment: 'attachment_id',
 
   // 门店
   Store: 'store_id'

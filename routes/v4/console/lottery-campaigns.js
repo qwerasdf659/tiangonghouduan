@@ -614,4 +614,137 @@ router.put(
   }
 )
 
+/*
+ * ============================================
+ * Phase 3：活动展示控制路由
+ * ============================================
+ */
+
+/**
+ * PUT /api/v4/console/lottery-campaigns/:lottery_campaign_id/featured
+ *
+ * @description 切换活动精选状态
+ * @access Admin（requireRoleLevel 100+）
+ *
+ * @param {number} lottery_campaign_id - 活动ID
+ * @body {boolean} is_featured - 是否精选
+ */
+router.put(
+  '/:lottery_campaign_id/featured',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const { lottery_campaign_id } = req.params
+      const { is_featured } = req.body
+
+      const crudService = req.app.locals.services.getService('lottery_campaign_crud')
+      const result = await TransactionManager.execute(async transaction => {
+        return await crudService.toggleFeatured(parseInt(lottery_campaign_id), !!is_featured, {
+          transaction
+        })
+      })
+
+      return res.apiSuccess(result, is_featured ? '已设为精选' : '已取消精选')
+    } catch (error) {
+      logger.error('切换精选状态失败:', error)
+      return res.apiError(error.message, 'TOGGLE_FEATURED_FAILED', null, error.statusCode || 500)
+    }
+  }
+)
+
+/**
+ * PUT /api/v4/console/lottery-campaigns/:lottery_campaign_id/hidden
+ *
+ * @description 切换活动隐藏状态
+ * @access Admin
+ *
+ * @param {number} lottery_campaign_id - 活动ID
+ * @body {boolean} is_hidden - 是否隐藏
+ */
+router.put(
+  '/:lottery_campaign_id/hidden',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const { lottery_campaign_id } = req.params
+      const { is_hidden } = req.body
+
+      const crudService = req.app.locals.services.getService('lottery_campaign_crud')
+      const result = await TransactionManager.execute(async transaction => {
+        return await crudService.toggleHidden(parseInt(lottery_campaign_id), !!is_hidden, {
+          transaction
+        })
+      })
+
+      return res.apiSuccess(result, is_hidden ? '已隐藏' : '已显示')
+    } catch (error) {
+      logger.error('切换隐藏状态失败:', error)
+      return res.apiError(error.message, 'TOGGLE_HIDDEN_FAILED', null, error.statusCode || 500)
+    }
+  }
+)
+
+/**
+ * PUT /api/v4/console/lottery-campaigns/:lottery_campaign_id/display-config
+ *
+ * @description 更新活动展示配置（sort_order / display_tags / display_start_time / display_end_time）
+ * @access Admin
+ *
+ * @param {number} lottery_campaign_id - 活动ID
+ * @body {Object} config - 展示配置对象
+ */
+router.put(
+  '/:lottery_campaign_id/display-config',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const { lottery_campaign_id } = req.params
+      const displayConfig = req.body
+
+      const crudService = req.app.locals.services.getService('lottery_campaign_crud')
+      const result = await TransactionManager.execute(async transaction => {
+        return await crudService.updateDisplayConfig(parseInt(lottery_campaign_id), displayConfig, {
+          transaction
+        })
+      })
+
+      return res.apiSuccess(result, '展示配置已更新')
+    } catch (error) {
+      logger.error('更新展示配置失败:', error)
+      return res.apiError(
+        error.message,
+        'UPDATE_DISPLAY_CONFIG_FAILED',
+        null,
+        error.statusCode || 500
+      )
+    }
+  }
+)
+
+/**
+ * PUT /api/v4/console/lottery-campaigns/batch-sort
+ *
+ * @description 批量更新活动排序
+ * @access Admin
+ *
+ * @body {Array} items - [{ lottery_campaign_id, sort_order }]
+ */
+router.put('/batch-sort', authenticateToken, requireRoleLevel(100), async (req, res) => {
+  try {
+    const { items } = req.body
+    const crudService = req.app.locals.services.getService('lottery_campaign_crud')
+    const result = await TransactionManager.execute(async transaction => {
+      return await crudService.batchSort(items, { transaction })
+    })
+
+    return res.apiSuccess(result, '批量排序完成')
+  } catch (error) {
+    logger.error('批量排序失败:', error)
+    return res.apiError(error.message, 'BATCH_SORT_FAILED', null, error.statusCode || 500)
+  }
+})
+
 module.exports = router

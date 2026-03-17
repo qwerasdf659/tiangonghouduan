@@ -38,13 +38,37 @@ async function initializeSealosStorage() {
 }
 
 /**
- * 获取数据库中所有有效的图片文件路径
+ * 获取数据库中所有有效的媒体文件 object_key（media_files 表）
  */
 async function getDatabaseFilePaths() {
   const [results] = await sequelize.query(
-    'SELECT file_path FROM image_resources WHERE status = "active"'
+    'SELECT object_key FROM media_files WHERE status = \'active\''
   )
-  return new Set(results.map(row => row.file_path))
+  // 收集 object_key 及其缩略图路径
+  const paths = new Set(results.map(row => row.object_key))
+
+  // 同时查询缩略图 keys
+  const [thumbResults] = await sequelize.query(
+    'SELECT thumbnail_keys FROM media_files WHERE status = \'active\' AND thumbnail_keys IS NOT NULL'
+  )
+  for (const row of thumbResults) {
+    const keys = typeof row.thumbnail_keys === 'string' ? JSON.parse(row.thumbnail_keys) : row.thumbnail_keys
+    if (keys) {
+      Object.values(keys).forEach(k => { if (k) paths.add(k) })
+    }
+  }
+
+  // 也包含占位图路径（从 .env 中读取）
+  const placeholderKeys = [
+    process.env.DEFAULT_PRIZE_PLACEHOLDER_KEY,
+    process.env.DEFAULT_PRODUCT_PLACEHOLDER_KEY,
+    process.env.DEFAULT_BANNER_PLACEHOLDER_KEY,
+    process.env.DEFAULT_AVATAR_PLACEHOLDER_KEY,
+    process.env.DEFAULT_PLACEHOLDER_KEY
+  ].filter(Boolean)
+  placeholderKeys.forEach(k => paths.add(k))
+
+  return paths
 }
 
 /**

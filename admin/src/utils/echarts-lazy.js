@@ -1,13 +1,13 @@
 /**
- * ECharts 懒加载模块（按需导入版本）
+ * ECharts 懒加载模块（静态命名导入 + tree-shaking 版本）
  *
- * @description 仅在需要图表的页面动态加载ECharts，减少非图表页面的加载体积。
- *              使用按需导入，仅包含项目实际使用的图表类型和组件。
+ * @description 使用静态命名导入让 Rollup tree-shaking 生效，
+ *              仅打包项目实际使用的 7 种图表 + 9 个组件 + 1 个渲染器。
+ *              非图表页面不导入此文件，不会拉入 echarts 依赖。
  *
  * @usage
  *   import { loadECharts, isEChartsLoaded } from '@/utils/echarts-lazy.js'
  *
- *   // 在需要图表时调用
  *   async function initChart() {
  *     const echarts = await loadECharts()
  *     const chart = echarts.init(document.getElementById('chart'))
@@ -24,106 +24,58 @@
  * - HeatmapChart (热力图) - 策略模拟 BxPx 矩阵热力图
  *
  * @see https://echarts.apache.org/handbook/zh/basics/import
- * @version 2.2.0
- * @date 2026-02-05
+ * @version 3.0.0
+ * @date 2026-03-16
  */
+
+// ========== 静态命名导入（Rollup tree-shaking 生效） ==========
+import * as echarts from 'echarts/core'
+import {
+  LineChart, BarChart, PieChart, ScatterChart,
+  FunnelChart, SankeyChart, HeatmapChart
+} from 'echarts/charts'
+import {
+  TitleComponent, TooltipComponent, GridComponent,
+  LegendComponent, DatasetComponent, TransformComponent,
+  MarkPointComponent, MarkLineComponent, VisualMapComponent
+} from 'echarts/components'
+import { CanvasRenderer } from 'echarts/renderers'
 
 import { logger } from './logger.js'
 
+// 同步注册：模块加载时立即执行，use() 只跑一次
+echarts.use([
+  LineChart, BarChart, PieChart, ScatterChart,
+  FunnelChart, SankeyChart, HeatmapChart,
+  TitleComponent, TooltipComponent, GridComponent,
+  LegendComponent, DatasetComponent, TransformComponent,
+  MarkPointComponent, MarkLineComponent, VisualMapComponent,
+  CanvasRenderer
+])
+
 /**
- * @type {Object|null} 缓存的ECharts实例
+ * @type {Object|null} 缓存的ECharts实例（首次调用 loadECharts() 时赋值）
  */
 let echartsInstance = null
 
 /**
- * @type {Promise|null} 加载中的Promise，防止重复加载
- */
-let loadingPromise = null
-
-/**
- * 初始化并配置 ECharts（按需导入）
+ * 获取已注册的 ECharts 实例（静态导入版本，同步初始化）
  *
- * @returns {Promise<Object>} 配置好的 ECharts 实例
- */
-async function initEChartsCore() {
-  // 核心模块 — 只 import 一次，保证 use() 和 init() 在同一实例上
-  const echartsCore = await import('echarts/core')
-
-  // 图表类型 + 组件 + 渲染器并行加载
-  const [charts, components, renderers] = await Promise.all([
-    import('echarts/charts'),
-    import('echarts/components'),
-    import('echarts/renderers')
-  ])
-
-  echartsCore.use([
-    charts.LineChart,
-    charts.BarChart,
-    charts.PieChart,
-    charts.ScatterChart,
-    charts.FunnelChart,
-    charts.SankeyChart,
-    charts.HeatmapChart,
-    components.TitleComponent,
-    components.TooltipComponent,
-    components.GridComponent,
-    components.LegendComponent,
-    components.DatasetComponent,
-    components.TransformComponent,
-    components.MarkPointComponent,
-    components.MarkLineComponent,
-    components.VisualMapComponent,
-    renderers.CanvasRenderer
-  ])
-
-  return echartsCore
-}
-
-/**
- * 动态加载 ECharts（按需导入）
- *
+ * @description 保持 async 签名以兼容所有 20+ 个调用方（await loadECharts()），
+ *              实际上模块加载时 echarts 已同步注册完毕，此处直接返回。
  * @returns {Promise<Object>} ECharts 实例
  * @example
  *   const echarts = await loadECharts()
  *   const chart = echarts.init(document.getElementById('myChart'))
  */
 export async function loadECharts() {
-  // 如果已加载，直接返回
   if (echartsInstance) {
     return echartsInstance
   }
 
-  // 如果正在加载，等待加载完成
-  if (loadingPromise) {
-    return loadingPromise
-  }
-
-  // 开始加载
-  loadingPromise = (async () => {
-    try {
-      logger.info('[ECharts] 开始动态加载（按需导入模式）...')
-      const startTime = performance.now()
-
-      // 初始化 ECharts（按需导入）
-      echartsInstance = await initEChartsCore()
-
-      // ========== window.echarts 已移除（方案 A：彻底 ES Module） ==========
-      // 请使用 ES Module 导入：
-      //   import { getECharts } from '@/utils/echarts-lazy.js'
-      //   const echarts = await getECharts()
-
-      const loadTime = performance.now() - startTime
-      logger.info(`[ECharts] 加载完成，耗时 ${loadTime.toFixed(2)}ms`)
-
-      return echartsInstance
-    } catch (error) {
-      logger.error('[ECharts] 加载失败:', error)
-      loadingPromise = null // 重置，允许重试
-      throw error
-    }
-  })()
-
-  return loadingPromise
+  logger.info('[ECharts] 初始化（静态命名导入模式，tree-shaking 生效）')
+  echartsInstance = echarts
+  return echartsInstance
 }
 
 /**
@@ -147,27 +99,14 @@ export function getECharts() {
 }
 
 /**
- * 预加载 ECharts（不阻塞）
+ * 预加载 ECharts（静态导入版本下为空操作，保留 API 兼容）
  *
- * @description 在空闲时预加载，提升后续使用体验
+ * @description 静态导入模式下 echarts 模块随页面 JS 一起加载，无需预加载。
+ *              保留此函数以兼容已有调用方。
  */
 export function preloadECharts() {
-  if (echartsInstance || loadingPromise) {
-    return
-  }
-
-  // 使用 requestIdleCallback 在空闲时加载
-  if (typeof requestIdleCallback !== 'undefined') {
-    requestIdleCallback(() => {
-      loadECharts().catch(() => {
-        // 预加载失败不抛出错误
-      })
-    })
-  } else {
-    // 降级方案：延迟加载
-    setTimeout(() => {
-      loadECharts().catch(err => console.warn('[ECharts] 延迟预加载失败:', err.message))
-    }, 1000)
+  if (!echartsInstance) {
+    echartsInstance = echarts
   }
 }
 

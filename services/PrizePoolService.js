@@ -170,20 +170,17 @@ class PrizePoolService {
        * 防止 material_asset_code 为空导致前端无图片（降级到占位图）
        */
       let resolvedMaterialAssetCode = prizeData.material_asset_code || null
-      if (!resolvedMaterialAssetCode && !prizeData.image_resource_id) {
+      if (!resolvedMaterialAssetCode && !prizeData.primary_media_id) {
         if (prizeData.prize_type === 'points') {
           resolvedMaterialAssetCode = 'POINTS'
           logger.info('[奖品池] 积分类奖品自动关联 POINTS 材料图标', {
             prize_name: prizeData.prize_name
           })
-        } else if (!prizeData.image_resource_id) {
-          logger.warn(
-            '[奖品池] 奖品缺少图片来源（无 image_resource_id 且无 material_asset_code）',
-            {
-              prize_name: prizeData.prize_name,
-              prize_type: prizeData.prize_type
-            }
-          )
+        } else {
+          logger.warn('[奖品池] 奖品缺少图片来源（无 primary_media_id 且无 material_asset_code）', {
+            prize_name: prizeData.prize_name,
+            prize_type: prizeData.prize_type
+          })
         }
       }
 
@@ -201,7 +198,7 @@ class PrizePoolService {
           stock_quantity: parseInt(prizeData.stock_quantity),
           win_probability: prizeData.win_probability || 0,
           prize_description: prizeData.prize_description || '',
-          image_resource_id: prizeData.image_resource_id || null,
+          primary_media_id: prizeData.primary_media_id ?? null,
           angle: prizeData.angle || 0,
           color: prizeData.color || '#FF6B6B',
           cost_points: prizeData.cost_points || 100,
@@ -232,24 +229,29 @@ class PrizePoolService {
       createdPrizes.push(prize)
 
       // 🎯 2026-01-08 图片存储架构修复：绑定图片 context_id（避免被24h定时清理误删）
-      if (prizeData.image_resource_id) {
+      const mediaId = prizeData.primary_media_id
+      if (mediaId) {
         try {
-          const ImageService = require('./ImageService')
-          // eslint-disable-next-line no-await-in-loop -- 需要在事务中顺序绑定图片
-          await ImageService.updateImageContextId(
-            prizeData.image_resource_id,
+          const mediaService = this.serviceManager
+            ? this.serviceManager.getService('media')
+            : new (require('./MediaService'))()
+          await mediaService.attach(
+            mediaId,
+            'lottery_prize',
             prize.lottery_prize_id,
+            'primary',
+            0,
+            null,
             transaction
           )
           logger.info('[奖品池] 奖品图片绑定成功', {
             lottery_prize_id: prize.lottery_prize_id,
-            image_resource_id: prizeData.image_resource_id
+            primary_media_id: mediaId
           })
         } catch (bindError) {
-          // 绑定失败记录警告但不阻塞创建
           logger.warn('[奖品池] 奖品图片绑定失败（非致命）', {
             lottery_prize_id: prize.lottery_prize_id,
-            image_resource_id: prizeData.image_resource_id,
+            primary_media_id: mediaId,
             error: bindError.message
           })
         }
@@ -353,7 +355,7 @@ class PrizePoolService {
           'stock_quantity',
           'win_probability',
           'prize_description',
-          'image_resource_id',
+          'primary_media_id',
           'angle',
           'color',
           'cost_points',
@@ -395,7 +397,7 @@ class PrizePoolService {
         remaining_quantity: Math.max(0, (prize.stock_quantity || 0) - (prize.total_win_count || 0)),
         win_probability: prize.win_probability,
         prize_description: prize.prize_description,
-        image_resource_id: prize.image_resource_id,
+        primary_media_id: prize.primary_media_id,
         angle: prize.angle,
         color: prize.color,
         cost_points: prize.cost_points,
@@ -491,7 +493,7 @@ class PrizePoolService {
           'max_daily_wins',
           'win_probability',
           'prize_description',
-          'image_resource_id',
+          'primary_media_id',
           'angle',
           'color',
           'cost_points',
@@ -542,7 +544,7 @@ class PrizePoolService {
         max_daily_wins: prize.max_daily_wins,
         win_probability: prize.win_probability,
         prize_description: prize.prize_description,
-        image_resource_id: prize.image_resource_id,
+        primary_media_id: prize.primary_media_id,
         angle: prize.angle,
         color: prize.color,
         cost_points: prize.cost_points,
@@ -614,12 +616,11 @@ class PrizePoolService {
       stock_quantity: prize.stock_quantity,
       win_probability: prize.win_probability,
       status: prize.status,
-      image_resource_id: prize.image_resource_id
+      primary_media_id: prize.primary_media_id
     }
 
-    /*
+    /**
      * 2. 字段映射（前端字段 → 数据库字段）
-     * 2026-02-01 主键命名规范化：image_id → image_resource_id
      */
     const allowedFields = {
       name: 'prize_name',
@@ -635,7 +636,7 @@ class PrizePoolService {
       win_probability: 'win_probability', // 中奖概率
       description: 'prize_description',
       prize_description: 'prize_description',
-      image_resource_id: 'image_resource_id', // 符合主键命名规范：{table_name}_id
+      primary_media_id: 'primary_media_id',
       angle: 'angle',
       color: 'color',
       cost_points: 'cost_points',
@@ -709,21 +710,17 @@ class PrizePoolService {
     if (filteredUpdateData.status === 'active' && prize.status !== 'active') {
       const prizeType = filteredUpdateData.prize_type || prize.prize_type
       if (prizeType === 'physical') {
-        const targetImageId = filteredUpdateData.image_resource_id ?? prize.image_resource_id
+        const targetImageId = filteredUpdateData.primary_media_id ?? prize.primary_media_id
         if (!targetImageId) {
-          throw new Error('实物奖品上架必须上传图片（image_resource_id 不能为空）')
+          throw new Error('实物奖品上架必须上传图片（primary_media_id 不能为空）')
         }
       }
     }
 
-    /*
-     * 🎯 2026-01-08 图片存储架构：处理图片更换逻辑
-     * 2026-02-01 主键命名规范化：image_id → image_resource_id
-     */
-    const oldImageId = beforeData.image_resource_id
-    const newImageId = filteredUpdateData.image_resource_id
+    const oldImageId = beforeData.primary_media_id
+    const newImageId = filteredUpdateData.primary_media_id
     const isImageChanging =
-      filteredUpdateData.image_resource_id !== undefined && newImageId !== oldImageId
+      filteredUpdateData.primary_media_id !== undefined && newImageId !== oldImageId
 
     /*
      * 4a. budget_cost 分治重算：当 material_amount 或 material_asset_code 变更时
@@ -745,54 +742,50 @@ class PrizePoolService {
     // 4b. 更新奖品
     await prize.update(filteredUpdateData, { transaction })
 
-    // 5. 处理图片绑定和旧图片删除（2026-01-08 P0修复）
+    // 5. 处理图片绑定和旧图片删除（MediaService 统一管理）
     if (isImageChanging) {
-      const ImageService = require('./ImageService')
+      const mediaService = this.serviceManager
+        ? this.serviceManager.getService('media')
+        : new (require('./MediaService'))()
 
-      // 5a. 绑定新图片的 context_id 到 prize_id（如有新图片）
+      // 5a. 绑定新图片到奖品
       if (newImageId) {
         try {
-          const bindSuccess = await ImageService.updateImageContextId(
+          await mediaService.attach(
             newImageId,
+            'lottery_prize',
             prize_id,
+            'primary',
+            0,
+            null,
             transaction
           )
-          if (bindSuccess) {
-            logger.info('[图片存储] 新图片已绑定到奖品', {
-              prize_id,
-              new_image_resource_id: newImageId
-            })
-          } else {
-            logger.warn('[图片存储] 新图片绑定失败（图片可能不存在）', {
-              prize_id,
-              new_image_resource_id: newImageId
-            })
-          }
+          logger.info('[媒体服务] 新图片已绑定到奖品', {
+            prize_id,
+            primary_media_id: newImageId
+          })
         } catch (bindError) {
-          logger.warn('[图片存储] 新图片绑定异常（非致命）', {
+          logger.warn('[媒体服务] 新图片绑定异常（非致命）', {
             error: bindError.message,
             prize_id,
-            new_image_resource_id: newImageId
+            primary_media_id: newImageId
           })
         }
       }
 
-      // 5b. 删除旧图片（如有）
+      // 5b. 解绑旧图片（引用计数归零时自动移入回收站）
       if (oldImageId) {
         try {
-          const deleted = await ImageService.deleteImage(oldImageId, transaction)
-          if (deleted) {
-            logger.info('[图片存储] 奖品旧图片已物理删除', {
-              prize_id,
-              old_image_resource_id: oldImageId
-            })
-          }
+          await mediaService.detach('lottery_prize', prize_id, 'primary', transaction)
+          logger.info('[媒体服务] 奖品旧图片已解绑', {
+            prize_id,
+            old_media_id: oldImageId
+          })
         } catch (imageError) {
-          // 图片删除失败不阻塞主流程，记录警告日志
-          logger.warn('[图片存储] 删除奖品旧图片异常（非致命）', {
+          logger.warn('[媒体服务] 解绑奖品旧图片异常（非致命）', {
             error: imageError.message,
             prize_id,
-            old_image_resource_id: oldImageId
+            old_media_id: oldImageId
           })
         }
       }
@@ -873,7 +866,7 @@ class PrizePoolService {
       ),
       win_probability: updatedPrize.win_probability,
       prize_description: updatedPrize.prize_description,
-      image_resource_id: updatedPrize.image_resource_id,
+      primary_media_id: updatedPrize.primary_media_id,
       angle: updatedPrize.angle,
       color: updatedPrize.color,
       cost_points: updatedPrize.cost_points,
@@ -1007,7 +1000,7 @@ class PrizePoolService {
      * 实物奖品(physical)需要有图片才能自动激活（图片管理体系决策3）
      */
     if (prize.status === 'inactive' && newQuantity > 0) {
-      const canActivate = prize.prize_type !== 'physical' || prize.image_resource_id != null
+      const canActivate = prize.prize_type !== 'physical' || prize.primary_media_id != null
       if (canActivate) {
         await prize.update({ status: 'active' }, { transaction })
       } else {
@@ -1137,7 +1130,7 @@ class PrizePoolService {
         stock_quantity: prize.stock_quantity,
         win_probability: prize.win_probability,
         status: prize.status,
-        image_resource_id: prize.image_resource_id // 记录关联的图片ID
+        primary_media_id: prize.primary_media_id
       },
       after_data: null, // 删除操作后数据为空
       reason: `删除奖品：${prize.prize_name}（ID: ${prize_id}）`,
@@ -1146,9 +1139,9 @@ class PrizePoolService {
       transaction // 事务对象
     })
 
-    // 4. 保存关联的活动ID和图片ID（删除前，用于缓存失效和图片清理）
+    // 4. 保存关联的活动ID和媒体ID（删除前，用于缓存失效和图片清理）
     const campaignIdForCache = prize.lottery_campaign_id
-    const imageIdToDelete = prize.image_resource_id
+    const primaryMediaId = prize.primary_media_id
 
     // 5. 删除奖品
     await prize.destroy({ transaction })
@@ -1156,32 +1149,23 @@ class PrizePoolService {
     logger.info('奖品删除成功', {
       prize_id,
       prize_name: prize.prize_name,
-      image_resource_id: imageIdToDelete,
+      primary_media_id: primaryMediaId,
       deleted_by
     })
 
-    // 6. 联动删除关联图片（2026-01-08 图片存储架构 P0修复）
-    if (imageIdToDelete) {
+    // 6. 联动解除/删除关联图片（2026-03-16：primary_media 用 detach，image_resource 用 deleteImage）
+    if (primaryMediaId) {
       try {
-        const ImageService = require('./ImageService')
-        const deleted = await ImageService.deleteImage(imageIdToDelete, transaction)
-        if (deleted) {
-          logger.info('[图片存储] 奖品关联图片已物理删除', {
-            prize_id,
-            image_resource_id: imageIdToDelete
-          })
-        } else {
-          logger.warn('[图片存储] 奖品关联图片删除失败或不存在', {
-            prize_id,
-            image_resource_id: imageIdToDelete
-          })
-        }
-      } catch (imageError) {
-        // 图片删除失败不阻塞主流程，记录警告日志
-        logger.warn('[图片存储] 删除奖品图片异常（非致命）', {
-          error: imageError.message,
+        const mediaService = this.serviceManager
+          ? this.serviceManager.getService('media')
+          : new (require('./MediaService'))()
+        await mediaService.detach('lottery_prize', prize_id, null, transaction)
+        logger.info('[媒体] 奖品主图已解除关联', { prize_id, primary_media_id: primaryMediaId })
+      } catch (mediaError) {
+        logger.warn('[媒体] 解除奖品主图关联异常（非致命）', {
+          error: mediaError.message,
           prize_id,
-          image_resource_id: imageIdToDelete
+          primary_media_id: primaryMediaId
         })
       }
     }
@@ -1204,7 +1188,7 @@ class PrizePoolService {
 
     return {
       prize_id,
-      deleted_image_resource_id: imageIdToDelete || null
+      deleted_primary_media_id: primaryMediaId || null
     }
   }
 
@@ -1276,7 +1260,7 @@ class PrizePoolService {
           'reward_tier',
           'is_fallback',
           'prize_description',
-          'image_resource_id',
+          'primary_media_id',
           'angle',
           'color',
           'cost_points',
@@ -1343,7 +1327,7 @@ class PrizePoolService {
               rarity_code: p.rarity_code || 'common',
               win_probability: p.win_probability,
               prize_description: p.prize_description,
-              image_resource_id: p.image_resource_id,
+              primary_media_id: p.primary_media_id,
               angle: p.angle,
               color: p.color,
               cost_points: p.cost_points,

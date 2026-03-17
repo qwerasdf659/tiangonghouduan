@@ -9,7 +9,7 @@
 
 import { logger } from '../../../utils/logger.js'
 import { API_PREFIX, request } from '../../../api/base.js'
-import { loadECharts } from '../../../utils/index.js'
+import { loadECharts } from '../../../utils/echarts-lazy.js'
 import { DashboardAPI } from '../../../api/dashboard.js'
 
 /**

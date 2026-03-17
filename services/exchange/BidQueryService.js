@@ -54,13 +54,13 @@ const BID_ATTRIBUTES = {
     'updated_at'
   ],
 
-  /** 关联的兑换商品视图 */
+  /** 关联的兑换商品视图（2026-03-16 媒体体系迁移） */
   exchangeItemBriefView: [
     'exchange_item_id',
     'item_name',
     'description',
-    'category',
-    'primary_image_id'
+    'category_def_id',
+    'primary_media_id'
   ],
 
   /** 出价记录视图 */
@@ -90,7 +90,6 @@ class BidQueryService {
     this.BidProduct = models.BidProduct
     this.BidRecord = models.BidRecord
     this.ExchangeItem = models.ExchangeItem
-    this.ImageResources = models.ImageResources
     this.sequelize = models.sequelize
   }
 
@@ -127,9 +126,9 @@ class BidQueryService {
             attributes: BID_ATTRIBUTES.exchangeItemBriefView,
             include: [
               {
-                model: this.ImageResources,
-                as: 'primaryImage',
-                attributes: ['image_resource_id', 'file_path', 'mime_type', 'thumbnail_paths'],
+                model: this.models.MediaFile,
+                as: 'primary_media',
+                attributes: ['media_id', 'object_key', 'mime_type', 'thumbnail_keys'],
                 required: false
               }
             ]
@@ -204,9 +203,9 @@ class BidQueryService {
             attributes: BID_ATTRIBUTES.exchangeItemBriefView,
             include: [
               {
-                model: this.ImageResources,
-                as: 'primaryImage',
-                attributes: ['image_resource_id', 'file_path', 'mime_type', 'thumbnail_paths'],
+                model: this.models.MediaFile,
+                as: 'primary_media',
+                attributes: ['media_id', 'object_key', 'mime_type', 'thumbnail_keys'],
                 required: false
               }
             ]
@@ -302,7 +301,7 @@ class BidQueryService {
               {
                 model: this.ExchangeItem,
                 as: 'exchangeItem',
-                attributes: ['exchange_item_id', 'item_name', 'primary_image_id']
+                attributes: ['exchange_item_id', 'item_name', 'primary_media_id']
               }
             ]
           }

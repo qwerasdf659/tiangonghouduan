@@ -247,7 +247,7 @@ class BuildPrizePoolStage extends BaseStage {
    *
    * 每个奖品按自身消耗的资源类型独立判断资格：
    * - DIAMOND 奖品（material_asset_code='DIAMOND'）：仅受 DIAMOND_QUOTA 控制
-   * - 保底/空奖（prize_value_points=0 且非 DIAMOND）：永远通过
+   * - 保底奖品（prize_value_points=0 且非 DIAMOND）：永远通过
    * - 其余奖品（物理/券/积分/虚拟）：检查 BUDGET_POINTS 余额
    *
    * 设计原则：资格检查唯一关卡，按资源类型判断，不做档位级门控

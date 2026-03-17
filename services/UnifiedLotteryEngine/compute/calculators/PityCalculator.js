@@ -212,8 +212,8 @@ class PityCalculator {
   /**
    * 调整档位权重
    *
-   * 对非空奖档位（high/mid/low）应用乘数提升权重
-   * 同时降低空奖档位（fallback）的权重
+   * 100% 出奖系统：提升高价值档位（high/mid）权重
+   * low 和 fallback 保持不变（都是真实奖品）
    *
    * @param {Object} tier_weights - 原始档位权重
    * @param {number} multiplier - 权重乘数
@@ -222,21 +222,19 @@ class PityCalculator {
    */
   _adjustWeights(tier_weights, multiplier) {
     const adjusted = { ...tier_weights }
-    const non_empty_tiers = ['high', 'mid', 'low']
 
-    // 提升非空奖档位权重
-    for (const tier of non_empty_tiers) {
+    /**
+     * 100% 出奖系统 Pity 权重调整（2026-03-16 语义修正）
+     *
+     * 提升高价值档位（high/mid）权重，补偿连续低价值体验。
+     * low 和 fallback 不降权——它们都是真实奖品，
+     * 只是通过提升 high/mid 的相对占比来改善体验。
+     */
+    const boost_tiers = ['high', 'mid']
+
+    for (const tier of boost_tiers) {
       if (adjusted[tier] !== undefined && adjusted[tier] > 0) {
         adjusted[tier] = Math.round(adjusted[tier] * multiplier)
-      }
-    }
-
-    // 降低空奖档位权重（反向乘数）
-    if (adjusted.fallback !== undefined && adjusted.fallback > 0) {
-      adjusted.fallback = Math.round(adjusted.fallback / multiplier)
-      // 确保 fallback 权重不低于 1
-      if (adjusted.fallback < 1) {
-        adjusted.fallback = 1
       }
     }
 

@@ -27,6 +27,10 @@ export const TRADE_ENDPOINTS = {
   LISTING_USER_LIMIT: `${API_PREFIX}/console/marketplace/user-listing-limit`,
   LISTING_FORCE_WITHDRAW: `${API_PREFIX}/console/marketplace/listings/:market_listing_id/force-withdraw`,
 
+  // 挂牌排序管理（Phase 3 — 排序增强）
+  LISTING_PIN: `${API_PREFIX}/console/marketplace/listings/:id/pin`,
+  LISTING_RECOMMEND: `${API_PREFIX}/console/marketplace/listings/:id/recommend`,
+
   // 孤儿冻结检测
   ORPHAN_DETECT: `${API_PREFIX}/console/orphan-frozen/detect`,
   ORPHAN_STATS: `${API_PREFIX}/console/orphan-frozen/stats`,
@@ -484,6 +488,30 @@ export const TradeAPI = {
     const url = TRADE_ENDPOINTS.MARKETPLACE_STATS + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
+
+  // ===== 挂牌排序管理（Phase 3） =====
+
+  /**
+   * 置顶/取消置顶挂牌
+   * @param {number} listingId - 挂牌 ID
+   * @param {boolean} isPinned - 是否置顶
+   * @returns {Promise<Object>} 操作结果
+   */
+  async toggleListingPin(listingId, isPinned) {
+    const url = buildURL(TRADE_ENDPOINTS.LISTING_PIN, { id: listingId })
+    return await request({ url, method: 'PUT', data: { is_pinned: isPinned } })
+  },
+
+  /**
+   * 推荐/取消推荐挂牌
+   * @param {number} listingId - 挂牌 ID
+   * @param {boolean} isRecommended - 是否推荐
+   * @returns {Promise<Object>} 操作结果
+   */
+  async toggleListingRecommend(listingId, isRecommended) {
+    const url = buildURL(TRADE_ENDPOINTS.LISTING_RECOMMEND, { id: listingId })
+    return await request({ url, method: 'PUT', data: { is_recommended: isRecommended } })
+  }
 
 }
 

@@ -41,6 +41,9 @@ const notificationsRoutes = require('./notifications')
 // 广告定价预览路由（Need 2: 用户端复用 AdPricingService 查询广告位定价）
 const adPricingRoutes = require('./ad-pricing')
 
+// 用户端图片上传路由（广告主上传广告素材，与管理端 console/images 权限隔离）
+const userImagesRoutes = require('./images')
+
 /**
  * GET /api/v4/user/me
  * @desc 获取当前用户基本信息（通过token识别）
@@ -83,5 +86,8 @@ router.use('/notifications', authenticateToken, notificationsRoutes)
 
 // 挂载广告定价预览路由（/api/v4/user/ad-pricing/preview）
 router.use('/ad-pricing', adPricingRoutes)
+
+// 挂载用户端图片上传路由（/api/v4/user/images/upload）
+router.use('/images', userImagesRoutes)
 
 module.exports = router

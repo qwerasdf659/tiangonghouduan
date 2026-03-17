@@ -154,9 +154,12 @@ class AntiEmptyStreakHandler {
       attempted_tiers: []
     }
 
-    // 检查是否已经是非空奖
-    if (selected_tier && selected_tier !== 'fallback' && selected_tier !== 'empty') {
-      this._log('debug', '当前已选中非空奖档位，无需干预', {
+    /**
+     * 100% 出奖系统：仅 'empty' 视为需要干预的空奖（2026-03-16 语义修正）
+     * fallback 是真实的保底奖品，不需要防空奖干预
+     */
+    if (selected_tier && selected_tier !== 'empty') {
+      this._log('debug', '当前已选中有效档位（含保底），无需干预', {
         user_id,
         lottery_campaign_id,
         selected_tier
@@ -311,11 +314,10 @@ class AntiEmptyStreakHandler {
    * @returns {boolean} 是否需要强制干预
    */
   shouldForce(empty_streak, selected_tier) {
-    // 已经是非空奖，不需要干预
-    if (selected_tier && selected_tier !== 'fallback' && selected_tier !== 'empty') {
+    /* 100% 出奖：仅 'empty' 需要干预，fallback 是真实保底奖品 */
+    if (selected_tier && selected_tier !== 'empty') {
       return false
     }
-    // 检查是否达到阈值
     return empty_streak >= this.config.force_threshold
   }
 

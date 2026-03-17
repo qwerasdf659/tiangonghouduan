@@ -35,7 +35,7 @@ const DICT_TYPES = {
     idField: 'category_code', // 后端主键字段名
     codeField: 'category_code', // 代码字段（用于显示）
     nameField: 'display_name', // 名称字段（用于显示）
-    fields: ['category_code', 'display_name', 'description', 'icon_url', 'sort_order', 'is_enabled']
+    fields: ['category_code', 'display_name', 'description', 'sort_order', 'is_enabled']
   },
   rarities: {
     name: '稀有度字典',
@@ -99,7 +99,6 @@ export function useDictState() {
       category_code: '', // 类目: category_code / 稀有度: rarity_code / 资产分组: group_code
       display_name: '', // 显示名称
       description: '', // 描述
-      icon_url: '', // 图标URL（类目）
       color_hex: '', // 颜色（稀有度/资产分组）
       tier: 1, // 等级（稀有度）
       sort_order: 0, // 排序

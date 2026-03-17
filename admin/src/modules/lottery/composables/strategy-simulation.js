@@ -964,7 +964,7 @@ export function useStrategySimulationMethods() {
           high: '高档(high)',
           mid: '中档(mid)',
           low: '低档(low)',
-          fallback: '空奖(fallback)'
+          fallback: '保底奖品(fallback)'
         }
         for (const tier of ['high', 'mid', 'low', 'fallback']) {
           const actual = (actDist[tier] || 0).toFixed(2)

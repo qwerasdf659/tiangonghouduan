@@ -76,7 +76,7 @@ class LotteryQueryService {
           'prize_type',
           'prize_value',
           'prize_description',
-          'image_resource_id',
+          'primary_media_id',
           'win_probability',
           'stock_quantity',
           'is_fallback',
@@ -93,16 +93,16 @@ class LotteryQueryService {
         ],
         include: [
           {
-            model: models.ImageResources,
-            as: 'image',
+            model: models.MediaFile,
+            as: 'primary_media',
             required: false,
-            attributes: ['image_resource_id', 'file_path', 'mime_type', 'thumbnail_paths']
+            attributes: ['media_id', 'object_key', 'thumbnail_keys', 'mime_type']
           },
           {
             model: models.MaterialAssetType,
             as: 'materialAssetType',
             required: false,
-            attributes: ['asset_code', 'display_name', 'icon_url']
+            attributes: ['asset_code', 'display_name']
           }
         ],
         order: [
@@ -250,7 +250,7 @@ class LotteryQueryService {
               'prize_name',
               'prize_type',
               'prize_value',
-              'image_resource_id',
+              'primary_media_id',
               'win_probability'
             ],
             required: false
@@ -294,7 +294,7 @@ class LotteryQueryService {
                 name: record.prize.prize_name,
                 type: record.prize.prize_type,
                 value: record.prize.prize_value,
-                image_resource_id: record.prize.image_resource_id
+                primary_media_id: record.prize.primary_media_id
               }
             : null,
           points_cost: record.cost_points,
@@ -357,6 +357,20 @@ class LotteryQueryService {
         whereClause.status = status
       }
 
+      // Phase 3 展示控制：排除隐藏活动 + 展示时间窗口过滤
+      whereClause.is_hidden = 0
+
+      const now = new Date()
+      const { Op } = require('sequelize')
+      whereClause[Op.and] = [
+        {
+          [Op.or]: [{ display_start_time: null }, { display_start_time: { [Op.lte]: now } }]
+        },
+        {
+          [Op.or]: [{ display_end_time: null }, { display_end_time: { [Op.gte]: now } }]
+        }
+      ]
+
       const campaigns = await models.LotteryCampaign.findAll({
         where: whereClause,
         attributes: [
@@ -370,12 +384,19 @@ class LotteryQueryService {
           'end_time',
           'total_prize_pool',
           'remaining_prize_pool',
-          // 2026-02-15: 前端展示配置字段（多活动抽奖系统）
+          // 前端展示配置字段
           'display_mode',
           'effect_theme',
-          'banner_image_url'
+          // Phase 3 展示控制字段
+          'sort_order',
+          'is_featured',
+          'display_tags',
+          'display_start_time',
+          'display_end_time'
         ],
         order: [
+          ['is_featured', 'DESC'], // 精选活动优先
+          ['sort_order', 'ASC'], // 按运营排序
           ['status', 'DESC'], // active优先
           ['start_time', 'DESC']
         ]

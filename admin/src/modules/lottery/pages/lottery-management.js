@@ -507,7 +507,7 @@ function registerLotteryManagementComponents() {
           const data = response?.success ? response.data : response
           this.editingSegmentRule = data
           this.showModal('segmentRuleModal')
-        } catch (error) {
+        } catch (_error) {
           this.showError('加载策略详情失败')
         }
       },

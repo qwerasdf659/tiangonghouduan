@@ -112,12 +112,12 @@ describe('PityCalculator', () => {
       const multiplier = 1.5
       const adjusted = calculator._adjustWeights(baseTierWeights, multiplier)
 
-      // 非空奖权重应该提升
+      // high/mid 权重应该提升
       expect(adjusted.high).toBeGreaterThan(baseTierWeights.high)
       expect(adjusted.mid).toBeGreaterThan(baseTierWeights.mid)
-      expect(adjusted.low).toBeGreaterThan(baseTierWeights.low)
-      // 空奖权重应该降低
-      expect(adjusted.fallback).toBeLessThan(baseTierWeights.fallback)
+      // low 和 fallback 不变（100%出奖系统中它们都是真实奖品）
+      expect(adjusted.low).toBe(baseTierWeights.low)
+      expect(adjusted.fallback).toBe(baseTierWeights.fallback)
     })
 
     test('乘数为 1.0 时权重不变', () => {

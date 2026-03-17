@@ -681,13 +681,13 @@ document.addEventListener('alpine:init', () => {
           formData.append('category', 'icons')
 
           const res = await request({
-            url: SYSTEM_ADMIN_ENDPOINTS.IMAGE_UPLOAD,
+            url: SYSTEM_ADMIN_ENDPOINTS.MEDIA_UPLOAD,
             method: 'POST',
             data: formData
           })
 
           if (res.success && res.data) {
-            this.create_type_form.icon_url = res.data.object_key
+            this.create_type_form.icon_url = res.data.public_url || res.data.object_key || ''
             this.create_icon_preview = res.data.public_url || res.data.url || null
             Alpine.store('notification').success('图标上传成功')
             logger.info('[MaterialConversion] 创建表单图标上传成功:', res.data.object_key)
@@ -728,13 +728,13 @@ document.addEventListener('alpine:init', () => {
           formData.append('category', 'icons')
 
           const res = await request({
-            url: SYSTEM_ADMIN_ENDPOINTS.IMAGE_UPLOAD,
+            url: SYSTEM_ADMIN_ENDPOINTS.MEDIA_UPLOAD,
             method: 'POST',
             data: formData
           })
 
           if (res.success && res.data) {
-            this.edit_type_form.icon_url = res.data.object_key
+            this.edit_type_form.icon_url = res.data.public_url || res.data.object_key || ''
             this.edit_icon_preview = res.data.public_url || res.data.url || null
             Alpine.store('notification').success('图标上传成功')
             logger.info('[MaterialConversion] 编辑表单图标上传成功:', res.data.object_key)

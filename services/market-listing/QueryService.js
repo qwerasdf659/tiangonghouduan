@@ -139,7 +139,7 @@ class MarketListingQueryService {
    * @param {number} [params.page_size=20] - 每页数量
    * @param {string} [params.listing_kind] - 挂牌类型筛选
    * @param {string} [params.asset_code] - 资产代码筛选
-   * @param {string} [params.item_category_code] - 物品类目代码筛选
+   * @param {string|number} [params.item_category_code] - 物品类目代码筛选（字符串时查 category_defs 转 category_def_id）
    * @param {string} [params.asset_group_code] - 资产分组代码筛选
    * @param {string} [params.rarity_code] - 稀有度代码筛选
    * @param {number} [params.merchant_id] - 商家ID筛选（通过关联物品的 merchant_id 过滤）
@@ -165,6 +165,19 @@ class MarketListingQueryService {
       with_counts = false
     } = params
 
+    // 前置解析 category 用于缓存键（与 where 条件一致）
+    let resolvedCategoryDefId = null
+    if (
+      item_category_code !== undefined &&
+      item_category_code !== null &&
+      item_category_code !== ''
+    ) {
+      resolvedCategoryDefId =
+        typeof item_category_code === 'number'
+          ? item_category_code
+          : (await CategoryDef.findByCode(item_category_code))?.category_def_id
+    }
+
     // 构建缓存参数对象（BusinessCacheHelper 使用对象来构建缓存键）
     const cacheParams = {
       page,
@@ -172,6 +185,7 @@ class MarketListingQueryService {
       listing_kind: listing_kind || 'all',
       asset_code: asset_code || 'all',
       item_category_code: item_category_code || 'all',
+      category_def_id: resolvedCategoryDefId,
       asset_group_code: asset_group_code || 'all',
       rarity_code: rarity_code || 'all',
       merchant_id: merchant_id || 'all',
@@ -199,9 +213,9 @@ class MarketListingQueryService {
       where.listing_kind = listing_kind
     }
 
-    // 物品实例类型筛选
-    if (item_category_code) {
-      where.offer_item_category_code = item_category_code
+    // 物品实例类型筛选：使用前置解析的 category_def_id
+    if (resolvedCategoryDefId) {
+      where.offer_category_def_id = resolvedCategoryDefId
     }
 
     if (rarity_code) {
@@ -226,18 +240,22 @@ class MarketListingQueryService {
       includeAssetGroup = true
     }
 
-    // 排序
-    let order
+    // 排序：置顶 → 手动排序 → 用户选择排序
+    const order = [
+      ['is_pinned', 'DESC'],
+      ['pinned_at', 'DESC'],
+      ['sort_order', 'ASC']
+    ]
     switch (sort) {
       case 'price_asc':
-        order = [['price_amount', 'ASC']]
+        order.push(['price_amount', 'ASC'])
         break
       case 'price_desc':
-        order = [['price_amount', 'DESC']]
+        order.push(['price_amount', 'DESC'])
         break
       case 'newest':
       default:
-        order = [['created_at', 'DESC']]
+        order.push(['created_at', 'DESC'])
     }
 
     // 构建关联查询
@@ -262,14 +280,14 @@ class MarketListingQueryService {
         /** 直接关联物品模板（通过 offer_item_template_id 快照字段） */
         model: ItemTemplate,
         as: 'offerItemTemplate',
-        attributes: ['item_template_id', 'display_name', 'image_resource_id'],
+        attributes: ['item_template_id', 'display_name', 'primary_media_id'],
         required: false
       },
       {
-        /** 关联分类定义（通过 offer_item_category_code），用于分类图标降级 */
+        /** 关联分类定义（通过 offer_category_def_id），用于分类图标降级 */
         model: CategoryDef,
         as: 'offerCategory',
-        attributes: ['category_code', 'display_name', 'icon_url'],
+        attributes: ['category_def_id', 'category_code', 'display_name'],
         required: false
       }
     ]
@@ -279,8 +297,7 @@ class MarketListingQueryService {
       include.push({
         model: MaterialAssetType,
         as: 'offerMaterialAsset',
-        // V4.7.0: 恢复 icon_url 字段（已通过迁移添加到数据库）
-        attributes: ['asset_code', 'display_name', 'group_code', 'icon_url'],
+        attributes: ['asset_code', 'display_name', 'group_code'],
         required: false,
         where: includeAssetGroup ? { group_code: asset_group_code } : undefined
       })
@@ -317,18 +334,16 @@ class MarketListingQueryService {
       if (plain.listing_kind === 'item') {
         /**
          * 图片 object key 降级链：
-         * 1. 物品模板图片（offerItemTemplate.image_resource_id → image_resources.file_path）
-         * 2. 分类图标（offerCategory.icon_url）
-         * 3. 默认占位图（defaults/product-placeholder.png）
+         * 1. 物品模板主图（offerItemTemplate.primary_media_id → media_files.object_key）
+         * 2. 默认占位图（defaults/product-placeholder.png）
          */
-        const categoryIconKey = plain.offerCategory?.icon_url || null
-        const imageKey = categoryIconKey || 'defaults/product-placeholder.png'
+        const imageKey = 'defaults/product-placeholder.png'
 
         product.item_info = {
           item_id: plain.offer_item_id,
           display_name: plain.offer_item_display_name || plain.offerItem?.meta?.name,
           image_url: getImageUrl(imageKey),
-          category_code: plain.offer_item_category_code,
+          category_code: plain.offerCategory?.category_code ?? null,
           rarity_code: plain.offer_item_rarity,
           template_id: plain.offer_item_template_id
         }
@@ -336,14 +351,11 @@ class MarketListingQueryService {
 
       // 可叠加资产类型
       if (plain.listing_kind === 'fungible_asset') {
-        /** icon_url 存储 object key，通过 ImageUrlHelper 拼接完整公网 URL */
-        const iconKey = plain.offerMaterialAsset?.icon_url || null
-
         product.asset_info = {
           asset_code: plain.offer_asset_code,
           amount: plain.offer_amount,
           display_name: plain.offerMaterialAsset?.display_name || plain.offer_asset_code,
-          icon_url: iconKey ? getImageUrl(iconKey) : null,
+          icon_url: null,
           group_code: plain.offerMaterialAsset?.group_code
         }
       }
@@ -366,6 +378,7 @@ class MarketListingQueryService {
       result.filters_count = await MarketListingQueryService._buildMarketFiltersCount({
         listing_kind,
         item_category_code,
+        category_def_id: resolvedCategoryDefId,
         asset_group_code,
         rarity_code,
         min_price,
@@ -391,7 +404,21 @@ class MarketListingQueryService {
    * @private
    */
   static async _buildMarketFiltersCount(filterValues) {
-    const { item_category_code, rarity_code, min_price, max_price } = filterValues
+    const { item_category_code, category_def_id, rarity_code, min_price, max_price } = filterValues
+
+    // 使用传入的 category_def_id 或解析 item_category_code
+    let resolvedCategoryDefId = category_def_id ?? null
+    if (
+      resolvedCategoryDefId == null &&
+      item_category_code !== undefined &&
+      item_category_code !== null &&
+      item_category_code !== ''
+    ) {
+      resolvedCategoryDefId =
+        typeof item_category_code === 'number'
+          ? item_category_code
+          : (await CategoryDef.findByCode(item_category_code))?.category_def_id
+    }
 
     try {
       /**
@@ -406,9 +433,9 @@ class MarketListingQueryService {
 
       // 1. 挂单类型计数：排除 listing_kind 条件，保留其他条件
       const kindBase = buildBaseWhere()
-      if (item_category_code) {
-        kindBase.parts.push('ml.offer_item_category_code = :item_cat')
-        kindBase.replacements.item_cat = item_category_code
+      if (resolvedCategoryDefId) {
+        kindBase.parts.push('ml.offer_category_def_id = :item_cat')
+        kindBase.replacements.item_cat = resolvedCategoryDefId
       }
       if (rarity_code) {
         kindBase.parts.push('ml.offer_item_rarity = :rarity')
@@ -442,9 +469,9 @@ class MarketListingQueryService {
       // 3. 稀有度计数：排除 rarity_code 条件，限定 listing_kind='item'
       const rarityBase = buildBaseWhere()
       rarityBase.parts.push("ml.listing_kind = 'item'")
-      if (item_category_code) {
-        rarityBase.parts.push('ml.offer_item_category_code = :item_cat_r')
-        rarityBase.replacements.item_cat_r = item_category_code
+      if (resolvedCategoryDefId) {
+        rarityBase.parts.push('ml.offer_category_def_id = :item_cat_r')
+        rarityBase.replacements.item_cat_r = resolvedCategoryDefId
       }
       if (min_price) {
         rarityBase.parts.push('ml.price_amount >= :min_p_r')
@@ -544,7 +571,7 @@ class MarketListingQueryService {
     const categoryWhere = include_disabled ? {} : { is_enabled: true }
     const categories = await CategoryDef.findAll({
       where: categoryWhere,
-      attributes: ['category_code', 'display_name', 'description', 'icon_url', 'sort_order'],
+      attributes: ['category_def_id', 'category_code', 'display_name', 'description', 'sort_order'],
       order: [
         ['sort_order', 'ASC'],
         ['category_code', 'ASC']

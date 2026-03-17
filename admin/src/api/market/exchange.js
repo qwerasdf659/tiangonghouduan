@@ -29,7 +29,20 @@ export const EXCHANGE_ENDPOINTS = {
   EXCHANGE_ORDER_SHIP: `${API_PREFIX}/console/marketplace/exchange_market/orders/:order_no/ship`,
   EXCHANGE_ORDER_REJECT: `${API_PREFIX}/console/marketplace/exchange_market/orders/:order_no/reject`,
   EXCHANGE_ORDER_REFUND: `${API_PREFIX}/console/marketplace/exchange_market/orders/:order_no/refund`,
-  EXCHANGE_ORDER_COMPLETE: `${API_PREFIX}/console/marketplace/exchange_market/orders/:order_no/complete`
+  EXCHANGE_ORDER_COMPLETE: `${API_PREFIX}/console/marketplace/exchange_market/orders/:order_no/complete`,
+
+  // SKU 子资源（Phase 2 — SPU/SKU 全量模式）
+  EXCHANGE_ITEM_SKUS: `${API_PREFIX}/console/marketplace/exchange_market/items/:exchange_item_id/skus`,
+  EXCHANGE_ITEM_SKU_DETAIL: `${API_PREFIX}/console/marketplace/exchange_market/items/:exchange_item_id/skus/:sku_id`,
+
+  // 排序管理（Phase 3 — 排序增强）
+  EXCHANGE_ITEM_PIN: `${API_PREFIX}/console/marketplace/exchange_market/items/:exchange_item_id/pin`,
+  EXCHANGE_ITEM_RECOMMEND: `${API_PREFIX}/console/marketplace/exchange_market/items/:exchange_item_id/recommend`,
+  EXCHANGE_ITEMS_BATCH_SORT: `${API_PREFIX}/console/marketplace/exchange_market/items/batch-sort`,
+
+  // 快递查询（Phase 4 — 快递双通道对接）
+  EXCHANGE_SHIPPING_COMPANIES: `${API_PREFIX}/console/marketplace/exchange_market/shipping-companies`,
+  EXCHANGE_ORDER_TRACK: `${API_PREFIX}/console/marketplace/exchange_market/orders/:order_no/track`
 }
 
 // ========== API 调用方法 ==========
@@ -155,6 +168,105 @@ export const ExchangeAPI = {
    */
   async getExchangeStats() {
     return await request({ url: EXCHANGE_ENDPOINTS.EXCHANGE_STATS, method: 'GET' })
+  },
+
+  // ===== SKU 管理（Phase 2） =====
+
+  /**
+   * 获取商品的所有 SKU 列表
+   * @param {number} itemId - 商品 ID
+   * @returns {Promise<Object>} SKU 列表
+   */
+  async getItemSkus(itemId) {
+    const url = buildURL(EXCHANGE_ENDPOINTS.EXCHANGE_ITEM_SKUS, { exchange_item_id: itemId })
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 创建 SKU
+   * @param {number} itemId - 商品 ID
+   * @param {Object} skuData - SKU 数据（spec_values, cost_amount, stock 等）
+   * @returns {Promise<Object>} 创建结果
+   */
+  async createItemSku(itemId, skuData) {
+    const url = buildURL(EXCHANGE_ENDPOINTS.EXCHANGE_ITEM_SKUS, { exchange_item_id: itemId })
+    return await request({ url, method: 'POST', data: skuData })
+  },
+
+  /**
+   * 更新 SKU
+   * @param {number} itemId - 商品 ID
+   * @param {number} skuId - SKU ID
+   * @param {Object} updateData - 更新数据
+   * @returns {Promise<Object>} 更新结果
+   */
+  async updateItemSku(itemId, skuId, updateData) {
+    const url = buildURL(EXCHANGE_ENDPOINTS.EXCHANGE_ITEM_SKU_DETAIL, { exchange_item_id: itemId, sku_id: skuId })
+    return await request({ url, method: 'PUT', data: updateData })
+  },
+
+  /**
+   * 删除 SKU（不允许删除最后一个）
+   * @param {number} itemId - 商品 ID
+   * @param {number} skuId - SKU ID
+   * @returns {Promise<Object>} 删除结果
+   */
+  async deleteItemSku(itemId, skuId) {
+    const url = buildURL(EXCHANGE_ENDPOINTS.EXCHANGE_ITEM_SKU_DETAIL, { exchange_item_id: itemId, sku_id: skuId })
+    return await request({ url, method: 'DELETE' })
+  },
+
+  // ===== 排序管理（Phase 3） =====
+
+  /**
+   * 置顶/取消置顶商品
+   * @param {number} itemId - 商品 ID
+   * @param {boolean} isPinned - 是否置顶
+   * @returns {Promise<Object>} 操作结果
+   */
+  async toggleItemPin(itemId, isPinned) {
+    const url = buildURL(EXCHANGE_ENDPOINTS.EXCHANGE_ITEM_PIN, { exchange_item_id: itemId })
+    return await request({ url, method: 'PUT', data: { is_pinned: isPinned } })
+  },
+
+  /**
+   * 推荐/取消推荐商品
+   * @param {number} itemId - 商品 ID
+   * @param {boolean} isRecommended - 是否推荐
+   * @returns {Promise<Object>} 操作结果
+   */
+  async toggleItemRecommend(itemId, isRecommended) {
+    const url = buildURL(EXCHANGE_ENDPOINTS.EXCHANGE_ITEM_RECOMMEND, { exchange_item_id: itemId })
+    return await request({ url, method: 'PUT', data: { is_recommended: isRecommended } })
+  },
+
+  /**
+   * 批量调整商品排序
+   * @param {Array<{exchange_item_id: number, sort_order: number}>} items - 排序数据
+   * @returns {Promise<Object>} 操作结果
+   */
+  async batchSortItems(items) {
+    return await request({ url: EXCHANGE_ENDPOINTS.EXCHANGE_ITEMS_BATCH_SORT, method: 'PUT', data: { items } })
+  },
+
+  // ===== 快递查询（Phase 4） =====
+
+  /**
+   * 获取快递公司列表（供发货弹窗下拉）
+   * @returns {Promise<Object>} 快递公司列表
+   */
+  async getShippingCompanies() {
+    return await request({ url: EXCHANGE_ENDPOINTS.EXCHANGE_SHIPPING_COMPANIES, method: 'GET' })
+  },
+
+  /**
+   * 查询订单物流轨迹
+   * @param {string} orderNo - 订单号
+   * @returns {Promise<Object>} 物流轨迹
+   */
+  async getOrderTrack(orderNo) {
+    const url = buildURL(EXCHANGE_ENDPOINTS.EXCHANGE_ORDER_TRACK, { order_no: orderNo })
+    return await request({ url, method: 'GET' })
   }
 }
 

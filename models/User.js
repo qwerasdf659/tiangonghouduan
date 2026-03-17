@@ -163,11 +163,7 @@ module.exports = sequelize => {
       as: 'roles'
     })
 
-    // 用户上传的图片资源
-    User.hasMany(models.ImageResources, {
-      foreignKey: 'user_id',
-      as: 'uploadedImages'
-    })
+    // 用户上传的媒体资源通过 media_attachments 多态关联（image_resources 表已删除）
 
     /**
      * 用户资产系统关联

@@ -99,11 +99,15 @@ router.get('/active', authenticateToken, async (req, res) => {
       status: campaign.status,
       display: {
         mode: campaign.display_mode || 'grid_3x3',
-        effect_theme: campaign.effect_theme || null // null = 继承全局 app_theme
+        effect_theme: campaign.effect_theme || null
       },
-      banner_image_url: campaign.banner_image_url || null,
       start_time: campaign.start_time,
-      end_time: campaign.end_time
+      end_time: campaign.end_time,
+      // Phase 3 展示控制字段
+      is_featured: !!campaign.is_featured,
+      display_tags: campaign.display_tags || [],
+      display_start_time: campaign.display_start_time || null,
+      display_end_time: campaign.display_end_time || null
     }))
 
     return res.apiSuccess(campaignList, '获取活动列表成功', 'ACTIVE_CAMPAIGNS_SUCCESS')

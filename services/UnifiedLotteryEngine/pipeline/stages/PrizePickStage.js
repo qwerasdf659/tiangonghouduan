@@ -143,7 +143,7 @@ class PrizePickStage extends BaseStage {
         /**
          * 🔴 2026-03-06 业务语义修正：force_lose → 强制低档奖品
          * 100%出奖设计下，force_lose 意为"强制选择低档奖品"
-         * 从 low 档位奖品池中随机选取，而非使用 fallback 空奖
+         * 从 low 档位奖品池中随机选取，而非使用 fallback 保底奖品
          */
         if (override_type === 'force_lose') {
           const prize_pool_data = this.getContextData(context, 'BuildPrizePoolStage.data')

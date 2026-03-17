@@ -111,7 +111,7 @@ export function useMetricsMethods() {
     /**
      * 加载抽奖监控指标
      * 并行调用多个后端 API 获取完整指标数据：
-     * - /console/lottery-realtime/stats → total_draws, unique_users, win_rate, empty_rate
+     * - /console/lottery-realtime/stats → total_draws, unique_users, win_rate, empty_rate（100%出奖系统下通常为0）
      * - /console/lottery/stats → total_draws, total_wins, win_rate, total_prize_value
      * - /console/lottery/trend → 趋势数据
      * - /console/lottery/prize-distribution → 奖品分布数据
@@ -438,12 +438,12 @@ export function useMetricsMethods() {
           value
         }))
       } else {
-        // 使用默认数据结构
+        // 使用默认数据结构（100%出奖系统无"未中奖"档位）
         this.tierDistribution = [
           { name: '高档奖品', value: 0 },
           { name: '中档奖品', value: 0 },
           { name: '低档奖品', value: 0 },
-          { name: '未中奖', value: 0 }
+          { name: '其他', value: 0 }
         ]
       }
       logger.info('档位分布计算完成', { tiers: this.tierDistribution.length })
@@ -460,7 +460,7 @@ export function useMetricsMethods() {
         mid: '中档奖品',
         low: '低档奖品',
         fallback: '保底奖品',
-        empty: '未中奖',
+        empty: '异常空奖', // 100%出奖系统下若出现则为异常
         other: '其他'
       }
       return map[tier] || tier
@@ -485,20 +485,15 @@ export function useMetricsMethods() {
           })
         }
 
-        // 2. 检查是否有大量未中奖
+        // 2. 100%出奖系统异常检测：正常情况下不应出现 'empty' 类型数据
         const emptyCount =
-          this.prizeDistribution.find(
-            p => p.name === 'empty' || p.name === '未中奖' || p.name === '谢谢参与'
-          )?.value || 0
-        const emptyRate =
-          this.lotteryMetrics.total_draws > 0
-            ? (emptyCount / this.lotteryMetrics.total_draws) * 100
-            : 0
-        if (emptyRate > 70) {
+          this.prizeDistribution.find(p => p.name === 'empty')?.value || 0
+        if (emptyCount > 0) {
+          const emptyRate = (emptyCount / this.lotteryMetrics.total_draws) * 100
           alerts.push({
-            level: 'info',
+            level: 'warning',
             time: now.toISOString(),
-            message: `空奖率较高：${emptyRate.toFixed(1)}%，用户体验可能受影响`
+            message: `检测到异常空奖数据：${emptyCount}次（${emptyRate.toFixed(1)}%），100%出奖系统不应出现空奖，请检查奖品配置`
           })
         }
 

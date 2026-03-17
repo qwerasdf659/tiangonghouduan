@@ -171,10 +171,10 @@ const LUCK_DEBT_CONFIG = {
   enabled: process.env.LUCK_DEBT_ENABLED !== 'false',
 
   /**
-   * 期望空奖率（系统设计目标）
-   * 默认 50%（对应方案中的 fallback 占比）
+   * 100% 出奖系统中期望空奖率为 0（不存在"空奖"概念）
+   * 保留字段作为异常保护：如因系统异常产生 empty 记录，会触发补偿
    */
-  expected_empty_rate: parseFloat(process.env.LUCK_DEBT_EXPECTED_RATE) || 0.5,
+  expected_empty_rate: parseFloat(process.env.LUCK_DEBT_EXPECTED_RATE) || 0.0,
 
   /**
    * 最小样本量

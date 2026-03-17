@@ -35,7 +35,7 @@ import { logger } from '../../../utils/logger.js'
 import { SYSTEM_ENDPOINTS } from '../../../api/system/index.js'
 import { EXCHANGE_ENDPOINTS } from '../../../api/market/exchange.js'
 import { buildURL, request } from '../../../api/base.js'
-import { loadECharts } from '../../../utils/index.js'
+import { loadECharts } from '../../../utils/echarts-lazy.js'
 import { createPageMixin } from '../../../alpine/mixins/index.js'
 import { io } from 'socket.io-client'
 

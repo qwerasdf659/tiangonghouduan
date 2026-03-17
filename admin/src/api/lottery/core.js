@@ -72,7 +72,13 @@ export const LOTTERY_CORE_ENDPOINTS = {
   CAMPAIGN_STRATEGY_CONFIG: `${API_PREFIX}/console/lottery-campaigns/:lottery_campaign_id/strategy-config`,
 
   /** 获取抽奖系统全局默认配置（积分定价配置页的全局值） */
-  CAMPAIGN_GLOBAL_DEFAULTS: `${API_PREFIX}/console/lottery-campaigns/global-defaults`
+  CAMPAIGN_GLOBAL_DEFAULTS: `${API_PREFIX}/console/lottery-campaigns/global-defaults`,
+
+  /** Phase 3：活动展示控制 */
+  CAMPAIGN_FEATURED: `${API_PREFIX}/console/lottery-campaigns/:lottery_campaign_id/featured`,
+  CAMPAIGN_HIDDEN: `${API_PREFIX}/console/lottery-campaigns/:lottery_campaign_id/hidden`,
+  CAMPAIGN_DISPLAY_CONFIG: `${API_PREFIX}/console/lottery-campaigns/:lottery_campaign_id/display-config`,
+  CAMPAIGN_BATCH_SORT: `${API_PREFIX}/console/lottery-campaigns/batch-sort`
 }
 
 // ========== API 调用方法 ==========
@@ -375,6 +381,41 @@ export const LotteryCoreAPI = {
    */
   async getGlobalDefaults() {
     return await request({ url: LOTTERY_CORE_ENDPOINTS.CAMPAIGN_GLOBAL_DEFAULTS, method: 'GET' })
+  },
+
+  // ===== Phase 3：活动展示控制 =====
+
+  /** 切换活动精选状态 */
+  async toggleCampaignFeatured(lotteryCampaignId, isFeatured) {
+    const url = buildURL(LOTTERY_CORE_ENDPOINTS.CAMPAIGN_FEATURED, {
+      lottery_campaign_id: lotteryCampaignId
+    })
+    return await request({ url, method: 'PUT', data: { is_featured: isFeatured } })
+  },
+
+  /** 切换活动隐藏状态 */
+  async toggleCampaignHidden(lotteryCampaignId, isHidden) {
+    const url = buildURL(LOTTERY_CORE_ENDPOINTS.CAMPAIGN_HIDDEN, {
+      lottery_campaign_id: lotteryCampaignId
+    })
+    return await request({ url, method: 'PUT', data: { is_hidden: isHidden } })
+  },
+
+  /** 更新活动展示配置 */
+  async updateCampaignDisplayConfig(lotteryCampaignId, displayConfig) {
+    const url = buildURL(LOTTERY_CORE_ENDPOINTS.CAMPAIGN_DISPLAY_CONFIG, {
+      lottery_campaign_id: lotteryCampaignId
+    })
+    return await request({ url, method: 'PUT', data: displayConfig })
+  },
+
+  /** 批量更新活动排序 */
+  async batchSortCampaigns(items) {
+    return await request({
+      url: LOTTERY_CORE_ENDPOINTS.CAMPAIGN_BATCH_SORT,
+      method: 'PUT',
+      data: { items }
+    })
   }
 }
 

@@ -48,14 +48,20 @@ const LUCK_DEBT_LEVEL = {
 
 /**
  * 默认运气债务配置
- * 基于方案文档设计
+ *
+ * 100% 出奖系统语义说明（2026-03-16 修正）：
+ * - 本系统每次抽奖 100% 获得奖品（只是价值不同），不存在传统意义的"空奖"
+ * - "空奖"仅在极端异常情况下出现（如所有奖品售罄且无兜底），理论上不应发生
+ * - expected_empty_rate 设为 0.0，表示系统期望零空奖率
+ * - 运气债务机制保留作为异常保护：如果因系统异常产生了 empty 记录，
+ *   会自动触发补偿机制纠正用户体验
  */
 const DEFAULT_LUCK_DEBT_CONFIG = {
   /**
-   * 系统期望空奖率
-   * 用于计算用户实际空奖率与期望值的偏离
+   * 系统期望空奖率（100% 出奖系统中应为 0）
+   * 非零值仅在异常情况下产生偏离，触发补偿
    */
-  expected_empty_rate: 0.3,
+  expected_empty_rate: 0.0,
 
   /**
    * 最小抽奖次数
@@ -152,7 +158,7 @@ class LuckDebtCalculator {
    *   debt_level: 'medium',          // 债务等级
    *   multiplier: 1.15,              // 补偿乘数
    *   historical_empty_rate: 0.42,   // 用户历史空奖率
-   *   expected_empty_rate: 0.30,     // 系统期望空奖率
+   *   expected_empty_rate: 0.00,     // 100%出奖系统期望空奖率为0
    *   deviation: 0.12,               // 偏离值
    *   global_draw_count: 50,         // 全局抽奖次数
    *   global_empty_count: 21,        // 全局空奖次数
@@ -368,10 +374,14 @@ class LuckDebtCalculator {
     }
 
     const adjusted = { ...tier_weights }
-    const non_empty_tiers = ['high', 'mid', 'low']
 
-    // 提升非空奖档位权重
-    for (const tier of non_empty_tiers) {
+    /**
+     * 100% 出奖系统：仅提升高价值档位权重（2026-03-16 语义修正）
+     * 补偿"欠运"用户时只提升 high/mid 的概率，不改动 low/fallback
+     */
+    const boost_tiers = ['high', 'mid']
+
+    for (const tier of boost_tiers) {
       if (adjusted[tier] !== undefined && adjusted[tier] > 0) {
         adjusted[tier] = Math.round(adjusted[tier] * multiplier)
       }

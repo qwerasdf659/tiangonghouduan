@@ -336,10 +336,10 @@
                     <td class="px-4 py-3">
                       <div class="flex items-center">
                         <div class="w-10 h-10 rounded overflow-hidden mr-3 img-blur-load">
-                          <img :data-src="prize.image_url || '/admin/images/placeholder.svg'" 
+                          <img :data-src="(prize.public_url || prize.image_url) || '/admin/images/placeholder.svg'" 
                                :alt="prize.prize_name" 
                                class="w-full h-full object-cover img-lazy"
-                               x-init="$nextTick(() => { $el.src = prize.image_url || '/admin/images/placeholder.svg'; $el.classList.add('loaded') })"
+                               x-init="$nextTick(() => { $el.src = (prize.public_url || prize.image_url) || '/admin/images/placeholder.svg'; $el.classList.add('loaded') })"
                                @error="$el.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22><rect width=%22100%22 height=%22100%22 fill=%22%23e5e7eb%22/></svg>'">
                         </div>
                         <div>
@@ -5829,7 +5829,7 @@
                 <label for="rarityEffectsEnabled" class="text-sm themed-text-secondary">✨ 启用稀有度光效</label>
                 <p class="text-xs themed-text-muted">开启后奖品按稀有度显示不同颜色光效</p>
               </div>
-              <!-- 活动背景图（复用 POST /api/v4/console/images 上传接口） -->
+              <!-- 活动背景图（使用媒体上传接口 /api/v4/console/media/upload） -->
               <div>
                 <label class="block text-sm font-medium themed-text-secondary mb-1">活动背景图（可选）</label>
                 <div class="flex gap-2">
@@ -5842,13 +5842,13 @@
                       if (file.size > 5 * 1024 * 1024) { showError('图片大小不能超过5MB'); return; }
                       const formData = new FormData();
                       formData.append('image', file);
-                      fetch('/api/v4/console/images/upload', {
+                      fetch('/api/v4/console/media/upload', {
                         method: 'POST',
                         headers: { 'Authorization': 'Bearer ' + (localStorage.getItem('token') || '') },
                         body: formData
                       }).then(r => r.json()).then(res => {
-                        if (res.success && res.data?.url) {
-                          campaignForm.background_image_url = res.data.url;
+                        if (res.success && (res.data?.public_url || res.data?.url)) {
+                          campaignForm.background_image_url = res.data.public_url || res.data.url;
                           $dispatch('notification', { type: 'success', message: '图片上传成功' });
                         } else {
                           showError('上传失败: ' + (res.message || '未知错误'));
@@ -6073,7 +6073,7 @@
                 <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" class="hidden" @change="handlePrizeImageUpload($event)">
               </label>
               <span x-show="image_uploading" class="text-sm text-blue-500">上传中...</span>
-              <span x-show="prizeForm.image_resource_id" class="text-xs text-green-600">✅ 已上传 (ID: <span x-text="prizeForm.image_resource_id"></span>)</span>
+              <span x-show="prizeForm.primary_media_id" class="text-xs text-green-600">✅ 已上传 (ID: <span x-text="prizeForm.primary_media_id"></span>)</span>
             </div>
             <div x-show="prize_image_preview_url" class="mt-2 flex items-center gap-2">
               <img :src="prize_image_preview_url" class="max-h-24 rounded border" alt="奖品图片预览">

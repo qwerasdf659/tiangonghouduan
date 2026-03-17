@@ -46,7 +46,7 @@ class ItemTemplateService {
    *
    * @param {Object} options - 查询选项
    * @param {string} [options.item_type] - 物品类型筛选
-   * @param {string} [options.category_code] - 类目代码筛选
+   * @param {string|number} [options.category_code] - 类目代码或 category_def_id 筛选
    * @param {string} [options.rarity_code] - 稀有度代码筛选
    * @param {boolean} [options.is_enabled] - 是否启用筛选
    * @param {boolean} [options.is_tradable] - 是否可交易筛选
@@ -73,8 +73,13 @@ class ItemTemplateService {
       if (item_type) {
         where.item_type = item_type
       }
-      if (category_code) {
-        where.category_code = category_code
+      if (category_code !== undefined && category_code !== null) {
+        if (typeof category_code === 'number') {
+          where.category_def_id = category_code
+        } else {
+          const cat = await this.CategoryDef.findByCode(category_code)
+          if (cat) where.category_def_id = cat.category_def_id
+        }
       }
       if (rarity_code) {
         where.rarity_code = rarity_code
@@ -194,10 +199,10 @@ class ItemTemplateService {
    * @param {string} data.template_code - 模板代码（唯一）
    * @param {string} data.item_type - 物品类型
    * @param {string} data.display_name - 显示名称
-   * @param {string} [data.category_code] - 类目代码
+   * @param {string|number} [data.category_code] - 类目代码或 category_def_id
    * @param {string} [data.rarity_code] - 稀有度代码
    * @param {string} [data.description] - 描述
-   * @param {number} [data.image_resource_id] - 关联图片资源ID（关联 image_resources 表）
+   * @param {number} [data.primary_media_id] - 主图媒体ID（关联 media_files 表）
    * @param {number} [data.reference_price_points] - 参考价格
    * @param {boolean} [data.is_tradable=true] - 是否可交易
    * @param {Object} [data.meta] - 扩展元数据
@@ -215,13 +220,21 @@ class ItemTemplateService {
         item_type,
         display_name,
         category_code,
+        category_def_id,
         rarity_code,
         description,
-        image_resource_id,
+        primary_media_id,
         reference_price_points = 0,
         is_tradable = true,
         meta
       } = data
+
+      // 解析类目：支持 category_code 或 category_def_id
+      let resolvedCategoryDefId = category_def_id ?? null
+      if (resolvedCategoryDefId == null && category_code) {
+        const cat = await this.CategoryDef.findByCode(category_code)
+        resolvedCategoryDefId = cat?.category_def_id ?? null
+      }
 
       // 检查模板代码唯一性
       const existing = await this.ItemTemplate.findOne({
@@ -236,11 +249,11 @@ class ItemTemplateService {
         throw error
       }
 
-      // 验证类目代码
-      if (category_code) {
-        const category = await this.CategoryDef.findByPk(category_code, { transaction })
+      // 验证类目
+      if (resolvedCategoryDefId) {
+        const category = await this.CategoryDef.findByPk(resolvedCategoryDefId, { transaction })
         if (!category) {
-          const error = new Error(`类目代码 ${category_code} 不存在`)
+          const error = new Error(`类目 ID ${resolvedCategoryDefId} 不存在`)
           error.status = 400
           error.code = 'INVALID_CATEGORY_CODE'
           throw error
@@ -263,10 +276,10 @@ class ItemTemplateService {
           template_code,
           item_type,
           display_name,
-          category_code,
+          category_def_id: resolvedCategoryDefId,
           rarity_code,
           description,
-          image_resource_id: image_resource_id || null,
+          primary_media_id: primary_media_id ?? null,
           reference_price_points,
           is_tradable,
           is_enabled: true,
@@ -317,10 +330,11 @@ class ItemTemplateService {
       const allowedFields = [
         'item_type',
         'display_name',
+        'category_def_id',
         'category_code',
         'rarity_code',
         'description',
-        'image_resource_id',
+        'primary_media_id',
         'reference_price_points',
         'is_tradable',
         'is_enabled',
@@ -333,16 +347,23 @@ class ItemTemplateService {
         }
       }
 
-      // 验证类目代码
-      if (updateData.category_code) {
-        const category = await this.CategoryDef.findByPk(updateData.category_code, { transaction })
+      // 验证类目：支持 category_def_id 或 category_code
+      let resolvedCatId = updateData.category_def_id
+      if (resolvedCatId == null && updateData.category_code) {
+        const cat = await this.CategoryDef.findByCode(updateData.category_code)
+        resolvedCatId = cat?.category_def_id
+      }
+      if (resolvedCatId != null) {
+        const category = await this.CategoryDef.findByPk(resolvedCatId, { transaction })
         if (!category) {
-          const error = new Error(`类目代码 ${updateData.category_code} 不存在`)
+          const error = new Error(`类目 ID ${resolvedCatId} 不存在`)
           error.status = 400
           error.code = 'INVALID_CATEGORY_CODE'
           throw error
         }
+        updateData.category_def_id = resolvedCatId
       }
+      delete updateData.category_code
 
       // 验证稀有度代码
       if (updateData.rarity_code) {

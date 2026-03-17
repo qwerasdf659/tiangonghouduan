@@ -56,7 +56,7 @@ function asyncHandler(fn) {
  * @query {string} asset_code - 材料资产代码筛选（可选）
  * @query {string} space - 空间筛选：lucky/premium（可选，不传返回全部）
  * @query {string} keyword - 模糊搜索（匹配 item_name，可选）
- * @query {string} category - 分类筛选（可选）
+ * @query {number} category_def_id - 分类ID筛选（category_defs.category_def_id，可选）
  * @query {number} min_cost - 最低价格（可选）
  * @query {number} max_cost - 最高价格（可选）
  * @query {string} stock_status - 库存状态：in_stock(>5)/low_stock(1-5)（可选）
@@ -79,7 +79,7 @@ router.get(
       asset_code,
       space,
       keyword,
-      category,
+      category_def_id,
       exclude_id,
       min_cost,
       max_cost,
@@ -148,7 +148,7 @@ router.get(
       asset_code,
       space: space || null,
       keyword: keyword || null,
-      category: category || null,
+      category: category_def_id || null,
       exclude_id: exclude_id || null,
       min_cost: min_cost ? parseInt(min_cost, 10) : null,
       max_cost: max_cost ? parseInt(max_cost, 10) : null,
@@ -249,6 +249,7 @@ router.get(
  * @header {string} Idempotency-Key - 幂等键（必填）
  * @body {number} exchange_item_id - 商品ID（必填）
  * @body {number} quantity - 兑换数量（默认 1，最大 10）
+ * @body {number} [sku_id] - SKU ID（多规格商品必填，单品商品可省略自动选择默认 SKU）
  *
  * @returns {Object} { order, remaining, is_duplicate }
  */
@@ -280,13 +281,14 @@ router.post(
     }
 
     try {
-      const { exchange_item_id, quantity = 1 } = req.body
+      const { exchange_item_id, quantity = 1, sku_id } = req.body
       const user_id = req.user.user_id
 
       logger.info('用户兑换商品请求', {
         user_id,
         exchange_item_id,
         quantity,
+        sku_id: sku_id || '(auto)',
         idempotency_key
       })
 
@@ -331,10 +333,16 @@ router.post(
         return res.apiSuccess(duplicateResponse, '兑换成功（幂等回放）')
       }
 
+      const parsedSkuId = sku_id ? parseInt(sku_id, 10) : null
+      if (sku_id && (isNaN(parsedSkuId) || parsedSkuId <= 0)) {
+        return res.apiError('无效的 SKU ID', 'BAD_REQUEST', null, 400)
+      }
+
       // 调用服务层（TransactionManager 统一事务边界）
       const result = await TransactionManager.execute(async transaction => {
         return await ExchangeCoreService.exchangeItem(user_id, itemId, exchangeQuantity, {
           idempotency_key,
+          sku_id: parsedSkuId,
           transaction
         })
       })
@@ -795,5 +803,46 @@ router.post(
     return res.apiSuccess(result, result.message)
   })
 )
+
+/**
+ * 用户端查询兑换订单物流轨迹
+ * GET /api/v4/backpack/exchange/orders/:order_no/track
+ *
+ * @description 用户查看已发货订单的快递物流轨迹
+ */
+router.get('/orders/:order_no/track', authenticateToken, async (req, res) => {
+  try {
+    const { order_no } = req.params
+    const user_id = req.user.user_id
+    const ExchangeQueryService = req.app.locals.services.getService('exchange_query')
+
+    const orderResult = await ExchangeQueryService.getOrderDetail(user_id, order_no)
+    if (!orderResult || !orderResult.order) {
+      return res.apiError('订单不存在', 'NOT_FOUND', null, 404)
+    }
+
+    const order = orderResult.order
+    if (!order.shipping_no) {
+      return res.apiSuccess({ has_shipping: false, message: '该订单尚未填写快递信息' })
+    }
+
+    const ShippingService = req.app.locals.services.getService('shipping_track')
+    const track = await ShippingService.queryTrack(order.shipping_no, order.shipping_company)
+
+    return res.apiSuccess({
+      has_shipping: true,
+      shipping_company: order.shipping_company,
+      shipping_company_name: order.shipping_company_name,
+      shipping_no: order.shipping_no,
+      shipped_at: order.shipped_at,
+      track
+    })
+  } catch (error) {
+    if (error.statusCode === 404) {
+      return res.apiError(error.message, 'NOT_FOUND', null, 404)
+    }
+    return res.apiError(error.message || '查询物流失败', 'INTERNAL_ERROR', null, 500)
+  }
+})
 
 module.exports = router

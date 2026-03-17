@@ -324,38 +324,40 @@ manualChunks(id) {
 - 导出：xlsx 0.18.5 + jspdf 4.2.0
 - 架构：多页应用（53 个 HTML 入口），每页独立 JS 入口
 
-**构建产物实测（2026-03-14 `admin/dist/assets/`）**：
+**构建产物实测（2026-03-16 `admin/dist/assets/` — 优化后）**：
 
 | chunk | 文件名 | 实际大小 | 状态 |
 |-------|--------|---------|------|
-| echarts | `echarts-ByGRWPt7.js` | 881,484 bytes (861KB) | ❌ 未优化（动态 import 导致 tree-shaking 失效） |
-| vendor | `vendor-B7V6ErqQ.js` | 1,112,806 bytes (1.1MB) | ❌ 未拆分（xlsx/jspdf/socket.io/sortablejs 全部合并） |
-| alpine | `alpine-DHMHVPoE.js` | 45,383 bytes (45KB) | ✅ 正常 |
+| echarts | `echarts-DWwj91iq.js` | 499KB (gzip 167KB) | ✅ 已优化（静态导入 + tree-shaking，-42%） |
+| vendor | `vendor-BVm-g4SK.js` | 269KB (gzip 89KB) | ✅ 已拆分（仅通用依赖） |
+| vendor-export | `vendor-export-DZXbx34d.js` | 776KB (gzip 256KB) | ✅ 已拆分（xlsx+jspdf，仅导出页加载） |
+| vendor-ui | `vendor-ui-CAVlluYg.js` | 37KB (gzip 13KB) | ✅ 已拆分（sortablejs，仅拖拽页加载） |
+| alpine | `alpine-DHMHVPoE.js` | 45KB (gzip 16KB) | ✅ 正常（不变） |
 
-**X4 源码验证**：`admin/src/utils/echarts-lazy.js` 第 48-57 行仍为动态 `import()`：
+**X4 源码验证**：`admin/src/utils/echarts-lazy.js` 已改为文件顶部静态命名导入：
 
 ```
-const echartsCore = await import('echarts/core')
-const [charts, components, renderers] = await Promise.all([
-  import('echarts/charts'),      // 动态导入 → 全部 22+ 图表类型打入
-  import('echarts/components'),   // 动态导入 → 全部 30+ 组件打入
-  import('echarts/renderers')
-])
+import * as echarts from 'echarts/core'
+import { LineChart, BarChart, PieChart, ScatterChart, FunnelChart, SankeyChart, HeatmapChart } from 'echarts/charts'
+import { TitleComponent, TooltipComponent, GridComponent, LegendComponent, DatasetComponent, TransformComponent, MarkPointComponent, MarkLineComponent, VisualMapComponent } from 'echarts/components'
+import { CanvasRenderer } from 'echarts/renderers'
 ```
 
-实际仅使用 7 种图表 + 9 个组件 + 1 渲染器，约 60% 代码未使用。**X4 未实施。**
+Rollup tree-shaking 生效，仅包含 7 种图表 + 9 组件 + 1 渲染器。`index.js` 已移除 echarts 重导出，11 个页面已更新为直接从 `echarts-lazy.js` 导入。**X4 已完成（2026-03-16）。**
 
-**X5 源码验证**：`admin/vite.config.js` 第 139-155 行 `manualChunks` 仅 3 路分包：
+**X5 源码验证**：`admin/vite.config.js` `manualChunks` 已细化为 4 路分包：
 
 ```
 manualChunks: (id) => {
   if (id.includes('alpinejs')) return 'alpine'
   if (id.includes('echarts')) return 'echarts'
-  if (id.includes('node_modules')) return 'vendor'  // 全部打入一个 vendor
+  if (id.includes('xlsx') || id.includes('jspdf')) return 'vendor-export'
+  if (id.includes('sortablejs')) return 'vendor-ui'
+  if (id.includes('node_modules')) return 'vendor'
 }
 ```
 
-xlsx (~600KB) + jspdf (~200KB) 仅在少数导出页面使用，socket.io-client (~80KB) 仅在实时通信页面使用，但目前全部 53 个页面均下载完整 vendor chunk。**X5 未实施。**
+xlsx + jspdf 拆入 `vendor-export`（776KB），仅导出页加载。sortablejs 拆入 `vendor-ui`（37KB）。socket.io 因循环依赖保留在 vendor 中。**X5 已完成（2026-03-16）。**
 
 **X6 源码验证**：`admin/src/modules/lottery/composables/system-advance.js` 第 248-251 行：
 
@@ -380,9 +382,9 @@ const chart = echarts.init(chartDom)
 
 | 优化项 | 后端数据库项目 | Web 管理后台前端 (`admin/`) | 微信小程序前端 | 当前状态 |
 |--------|--------------|---------------------------|--------------|---------|
-| X4 echarts 静态导入 | 零影响、零改动 | **100% 归属** — 改 `echarts-lazy.js` + `index.js` | 零影响 | ❌ 待实施 |
-| X5 vendor chunk 拆分 | 零影响、零改动 | **100% 归属** — 改 `vite.config.js` | 零影响 | ❌ 待实施 |
-| X6 window.echarts 残留 | 零影响、零改动 | **100% 归属** | 零影响 | ✅ 已修复 |
+| X4 echarts 静态导入 | 零影响、零改动 | **100% 归属** — 改 `echarts-lazy.js` + `index.js` + 11 页面导入路径 | 零影响 | ✅ 已完成（2026-03-16） |
+| X5 vendor chunk 拆分 | 零影响、零改动 | **100% 归属** — 改 `vite.config.js`（拆出 vendor-export + vendor-ui） | 零影响 | ✅ 已完成（2026-03-16） |
+| X6 window.echarts 残留 | 零影响、零改动 | **100% 归属** | 零影响 | ✅ 已修复（2026-03-14） |
 
 **结论：后端数据库项目不需要任何改动。微信小程序前端项目不需要任何改动。所有改动封闭在 `admin/` 目录内的 3 个文件中。**
 
@@ -439,18 +441,16 @@ const chart = echarts.init(chartDom)
 
 这些后端能力与前端 Vite 构建优化互不影响，各自独立扩展。
 
-### 15.15 更新后的执行计划（X6 已完成，剩余 X4 + X5）
+### 15.15 执行计划（全部完成 — 2026-03-16）
 
-| 步骤 | 改动 | 涉及文件 | 预估工时 | 状态 |
-|------|------|---------|---------|------|
-| 1 | echarts-lazy.js 改为静态命名导入 | `admin/src/utils/echarts-lazy.js` | 15 分钟 | ❌ 待实施 |
-| 2a | 从 index.js 移除 echarts 重导出 | `admin/src/utils/index.js` | 5 分钟 | ❌ 待实施 |
-| 2b | 11 个页面更新 loadECharts 导入路径 | 11 个页面 JS 文件（见详细清单） | 15 分钟 | ❌ 待实施 |
-| ~~3~~ | ~~修复 system-advance.js window.echarts~~ | ~~`admin/src/modules/lottery/composables/system-advance.js`~~ | — | ✅ 已完成 |
-| 4 | vite.config.js manualChunks 细化拆分 | `admin/vite.config.js` | 10 分钟 | ❌ 待实施 |
-| 5 | 重新构建 + 验证 chunk 大小 | 终端 `cd admin && npm run build` | 5 分钟 | ❌ 待实施 |
-
-**剩余总工时**：~50 分钟（步骤 2 增加 11 个页面导入路径更新 +15 分钟）
+| 步骤 | 改动 | 涉及文件 | 状态 |
+|------|------|---------|------|
+| 1 | echarts-lazy.js 改为静态命名导入 | `admin/src/utils/echarts-lazy.js` | ✅ 已完成 |
+| 2a | 从 index.js 移除 echarts 重导出 | `admin/src/utils/index.js` | ✅ 已完成 |
+| 2b | 11 个页面更新 loadECharts 导入路径 | 11 个页面 JS 文件（见详细清单） | ✅ 已完成 |
+| ~~3~~ | ~~修复 system-advance.js window.echarts~~ | ~~`admin/src/modules/lottery/composables/system-advance.js`~~ | ✅ 已完成（2026-03-14） |
+| 4 | vite.config.js manualChunks 细化拆分 | `admin/vite.config.js` | ✅ 已完成 |
+| 5 | 重新构建 + 验证 chunk 大小 | 终端 `cd admin && npm run build` | ✅ 已完成 |
 
 #### 步骤 1 详细方案：echarts-lazy.js 静态命名导入
 
@@ -534,32 +534,36 @@ if (id.includes('socket.io')) return 'vendor-io'
 if (id.includes('sortablejs')) return 'vendor-ui'
 ```
 
-#### 步骤 5 验证标准
+#### 步骤 5 实际构建结果（2026-03-16 验证）
 
-| chunk | 优化前 | 优化后目标 | 加载场景 |
-|-------|--------|----------|---------|
-| echarts | 861KB | ~300-350KB | 仅 20 个图表页面 |
-| vendor（拆分前） | 1.1MB | — | — |
-| vendor-export（xlsx+jspdf） | — | ~800KB | 仅导出/打印页面 |
-| vendor-io（socket.io） | — | ~80KB | 仅实时通信页面 |
-| vendor-ui（sortablejs） | — | ~50KB | 仅拖拽排序页面 |
-| vendor（其余） | — | ~30KB | 通用依赖 |
-| alpine | 45KB | 45KB（不变） | 所有页面 |
+| chunk | 优化前 | 优化后（实测） | 降幅 | 加载场景 |
+|-------|--------|--------------|------|---------|
+| echarts | 861KB | **499KB** | **-42%** | 仅 20 个图表页面 |
+| vendor（拆分前） | 1.1MB | — | — | — |
+| vendor（其余） | — | **269KB** | — | 所有页面 |
+| vendor-export（xlsx+jspdf） | — | **776KB** | — | 仅导出/打印页面 |
+| vendor-ui（sortablejs） | — | **37KB** | — | 仅拖拽排序页面 |
+| alpine | 45KB | **45KB** | 0% | 所有页面 |
 
-构建完成后执行 `ls -la admin/dist/assets/echarts-*.js admin/dist/assets/vendor-*.js` 验证各 chunk 大小。
+**说明**：
+- echarts 实测 499KB（预估 300-350KB）：tree-shaking 生效，7 种图表 + 9 组件 + 1 渲染器 + core 的实际体积约为 500KB，echarts/core 占较大比重
+- socket.io 未单独拆分：与 vendor 存在循环依赖（`Circular chunk: vendor-io -> vendor -> vendor-io`），合并回 vendor 避免运行时问题
+- vendor-export 776KB 仅在导出/打印页面加载，其余 50+ 个页面不再下载 xlsx/jspdf
+- `chunkSizeWarningLimit` 调整为 800，vendor-export 是预期行为不应告警
 
-### 15.16 需要拍板的事项
+### 15.16 实施完成确认（2026-03-16）
 
-经验证，本文档所有决策（8/9/10）已明确且合理，X6 已自行完成。**无需额外拍板**：
+**全部三项优化已实施完毕（X4 + X5 + X6）**。
 
 | 事项 | 状态 | 说明 |
 |------|------|------|
-| 方案选择（A/B/C） | ✅ 已定（方案 A） | 行业 100% 共识，ECharts 6.0 官方推荐，无争议 |
-| vendor 拆分 | ✅ 已定（一并处理） | 改动成本极低（3 行 if 判断），效果显著 |
-| X6 window.echarts | ✅ 已修复 | 无需任何决策 |
-| 是否影响后端 | ✅ 确认零影响 | 不涉及 API/数据库/Service/路由，后端零改动 |
-| 是否影响微信小程序 | ✅ 确认零影响 | 独立仓库、独立构建，零关联 |
-| 是否需要后端配合 | ✅ 确认不需要 | 所有改动封闭在 `admin/` 目录的 3 个文件 |
-| 前置条件 | — | 确认 `admin/` 目录代码的修改权限和构建部署流程即可 |
+| X4 echarts 静态导入 | ✅ 已完成 | echarts chunk 861KB → 499KB（-42%），tree-shaking 生效 |
+| X5 vendor chunk 拆分 | ✅ 已完成 | vendor 1.1MB → 拆分为 vendor 269KB + vendor-export 776KB + vendor-ui 37KB |
+| X6 window.echarts | ✅ 已修复 | 2026-03-14 已完成 |
+| 后端影响 | ✅ 零影响 | 后端服务健康检查通过，PM2/Redis/数据库均正常 |
+| 微信小程序影响 | ✅ 零影响 | 独立仓库、独立构建，零关联 |
+| ESLint 检查 | ✅ 通过 | admin ESLint 零错误零警告 |
+| Prettier 检查 | ✅ 通过 | 所有修改文件格式正确 |
+| Jest 测试 | ✅ 通过 | 1004 测试中 999 通过（5 个失败为预存 SettleStage 问题，与本次优化无关） |
 
-**唯一的执行依赖**：需要在 `admin/` 目录执行 `npm run build` 验证构建产物。改动封闭在 3 个前端文件内（`echarts-lazy.js` / `index.js` / `vite.config.js`），不影响后端服务运行。
+**微信小程序前端对接说明**：本次优化仅涉及 Web 管理后台的 Vite 构建配置（`admin/` 目录），对后端 API 接口和数据格式零影响。微信小程序前端可以照常对接后端 `/api/v4/` 所有端点，无需任何适配。

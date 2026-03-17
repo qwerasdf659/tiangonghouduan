@@ -1,31 +1,31 @@
 /**
- * 餐厅积分抽奖系统 V4.2 - 每小时清理未绑定图片任务
+ * 餐厅积分抽奖系统 V4.2 - 每小时清理未绑定媒体任务
  *
  * @description
- *   自动清理 context_id=0 且超过 24 小时未绑定的孤立图片资源
+ *   自动清理 media_files 中无 media_attachments 关联且超过 24 小时的孤立媒体
  *   同时删除 Sealos 对象存储文件和数据库记录
  *
- * @architecture 架构决策（2026-01-08 最终拍板）
- *   - context_id=0 表示图片已上传但未绑定到任何业务实体
- *   - 超过 24 小时未绑定视为孤立资源，应自动清理
+ * @architecture 2026-03-16 媒体体系迁移
+ *   - 使用 MediaService.cleanupOrphanedMedia 替代 ImageService.cleanupUnboundImages
+ *   - 针对 media_files 表，无 media_attachments 关联视为孤立
  *   - 定时任务每小时执行一次（凌晨低峰期可能清理较多）
  *
  * 执行策略：
  *   - 定时执行：每小时（Cron: 30 * * * *，每小时第30分钟）
- *   - 清理条件：context_id=0 AND status='active' AND created_at < (now - 24h)
- *   - 删除策略：物理删除（Sealos 对象 + 数据库记录）
+ *   - 清理条件：无 media_attachments 关联 AND status='active' AND created_at < (now - 24h)
+ *   - 删除策略：物理删除（Sealos 对象 + media_files 记录）
  *
- * @version 1.0.0
- * @date 2026-01-08
+ * @version 2.0.0
+ * @date 2026-03-16
  */
 
 const logger = require('../utils/logger').logger
 
 /**
- * 每小时清理未绑定图片任务类
+ * 每小时清理未绑定媒体任务类
  *
  * @class HourlyCleanupUnboundImages
- * @description 自动清理超时未绑定的孤立图片资源
+ * @description 自动清理超时未绑定的孤立媒体资源（media_files）
  */
 class HourlyCleanupUnboundImages {
   /**
@@ -42,14 +42,19 @@ class HourlyCleanupUnboundImages {
    */
   static async execute(hours = 24) {
     const startTime = Date.now()
-    logger.info('开始每小时清理未绑定图片任务', { hours_threshold: hours })
+    logger.info('开始每小时清理未绑定媒体任务', { hours_threshold: hours })
 
     try {
-      // 动态导入 ImageService，避免循环依赖
-      const ImageService = require('../services/ImageService')
+      const MediaService = require('../services/MediaService')
+      const SealosStorageService = require('../services/sealosStorage')
+      const mediaService = new MediaService({
+        getService: name => {
+          if (name === 'sealos_storage') return SealosStorageService
+          return null
+        }
+      })
 
-      // 调用服务层方法执行清理
-      const result = await ImageService.cleanupUnboundImages(hours)
+      const result = await mediaService.cleanupOrphanedMedia(hours)
 
       // 生成报告
       const duration_ms = Date.now() - startTime
@@ -57,7 +62,7 @@ class HourlyCleanupUnboundImages {
         timestamp: new Date().toISOString(),
         cleaned_count: result.cleaned_count,
         failed_count: result.failed_count,
-        total_found: result.total_found || result.cleaned_count + result.failed_count,
+        total_found: result.total_found ?? result.cleaned_count + result.failed_count,
         duration_ms,
         status: 'SUCCESS'
       }
@@ -65,7 +70,7 @@ class HourlyCleanupUnboundImages {
       // 输出报告
       this._outputReport(report)
 
-      logger.info('每小时清理未绑定图片任务完成', {
+      logger.info('每小时清理未绑定媒体任务完成', {
         cleaned_count: result.cleaned_count,
         failed_count: result.failed_count,
         duration_ms
@@ -73,7 +78,7 @@ class HourlyCleanupUnboundImages {
 
       return report
     } catch (error) {
-      logger.error('每小时清理未绑定图片任务失败', {
+      logger.error('每小时清理未绑定媒体任务失败', {
         error_message: error.message,
         error_stack: error.stack
       })
@@ -104,11 +109,11 @@ class HourlyCleanupUnboundImages {
    */
   static _outputReport(report) {
     console.log('\n' + '='.repeat(80))
-    console.log('🖼️ 每小时清理未绑定图片任务报告')
+    console.log('🖼️ 每小时清理未绑定媒体任务报告')
     console.log('='.repeat(80))
     console.log(`时间: ${report.timestamp}`)
     console.log(`耗时: ${report.duration_ms}ms`)
-    console.log(`发现未绑定图片数: ${report.total_found}`)
+    console.log(`发现未绑定媒体数: ${report.total_found}`)
     console.log(`清理成功数: ${report.cleaned_count}`)
     console.log(`清理失败数: ${report.failed_count}`)
     console.log(`状态: ${report.status === 'SUCCESS' ? '✅ SUCCESS' : '❌ ERROR'}`)

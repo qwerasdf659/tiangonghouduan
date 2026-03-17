@@ -210,7 +210,7 @@ export function useDailyReportMethods() {
         const avgDrawsPerUser = Math.round(totalDraws / uniqueUsers)
         warnings.push({
           level: avgDrawsPerUser > 200 ? 'danger' : 'warning',
-          title: `单用户高频抽奖预警`,
+          title: '单用户高频抽奖预警',
           message: `仅 ${uniqueUsers} 个用户产生 ${totalDraws} 次抽奖，人均 ${avgDrawsPerUser} 次/天`,
           suggestion: '建议检查是否存在刷奖行为，或配置每日抽奖配额限制'
         })

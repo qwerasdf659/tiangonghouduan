@@ -209,9 +209,11 @@ document.addEventListener('alpine:init', () => {
     },
 
     // ==================== 图片上传 ====================
-    /** 广告创意图片预览 URL（本地 blob 或已上传的远程 URL） */
+    /** 广告创意图片预览 URL（本地 blob 或已上传的 public_url） */
     campaignImagePreview: '',
-    /** 已上传的图片远程 URL（用于提交） */
+    /** 已上传的 media_id（用于提交） */
+    campaignPrimaryMediaId: null,
+    /** 已上传的 public_url（用于显示和提交 image_url） */
     campaignImageUrl: '',
 
     /** 处理广告图片选择 */
@@ -224,9 +226,12 @@ document.addEventListener('alpine:init', () => {
         category: 'ad_creative'
       })
       if (result) {
-        this.campaignImageUrl = result.public_url
+        this.campaignPrimaryMediaId = result.media_id
+        this.campaignImageUrl = result.object_key || ''
+        if (result.public_url) this.campaignImagePreview = result.public_url
       } else {
         this.campaignImagePreview = ''
+        this.campaignPrimaryMediaId = null
         this.campaignImageUrl = ''
       }
     },
@@ -234,6 +239,7 @@ document.addEventListener('alpine:init', () => {
     /** 清除已选图片 */
     clearCampaignImage() {
       this.campaignImagePreview = ''
+      this.campaignPrimaryMediaId = null
       this.campaignImageUrl = ''
     },
 
@@ -549,6 +555,7 @@ document.addEventListener('alpine:init', () => {
         display_mode: null
       }
       this.campaignImagePreview = ''
+      this.campaignPrimaryMediaId = null
       this.campaignImageUrl = ''
       this.showModal('campaignCreateModal')
     },
@@ -647,7 +654,10 @@ document.addEventListener('alpine:init', () => {
           data.display_mode = this.campaignForm.display_mode
         }
 
-        // 传递广告图片 URL（通过独立上传接口获得）
+        // 传递广告创意图片（优先 primary_media_id，兼容 image_url 用于显示）
+        if (this.campaignPrimaryMediaId) {
+          data.primary_media_id = this.campaignPrimaryMediaId
+        }
         if (this.campaignImageUrl) {
           data.image_url = this.campaignImageUrl
         }

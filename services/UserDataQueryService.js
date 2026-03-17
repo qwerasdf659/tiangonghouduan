@@ -373,7 +373,13 @@ class UserDataQueryService {
       includeOpts.push({
         model: ExchangeItem,
         as: 'item',
-        attributes: ['exchange_item_id', 'item_name', 'cost_asset_code', 'cost_amount', 'category'],
+        attributes: [
+          'exchange_item_id',
+          'item_name',
+          'cost_asset_code',
+          'cost_amount',
+          'category_def_id'
+        ],
         required: false
       })
     }

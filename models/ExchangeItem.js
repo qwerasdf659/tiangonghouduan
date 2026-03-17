@@ -45,14 +45,14 @@ module.exports = sequelize => {
         allowNull: true,
         comment: '商品描述'
       },
-      // 商品主图片通过 image_resources 表统一管理
-      primary_image_id: {
-        type: DataTypes.INTEGER,
+      // 主媒体文件ID（media_files.media_id，2026-03-16 媒体体系替代 image_resources）
+      primary_media_id: {
+        type: DataTypes.BIGINT.UNSIGNED,
         allowNull: true,
-        comment: '主图片ID，关联 image_resources.image_resource_id（2026-01-08 图片存储架构）',
+        comment: '主媒体文件ID，FK→media_files.media_id（2026-03-16 媒体体系）',
         references: {
-          model: 'image_resources',
-          key: 'image_resource_id'
+          model: 'media_files',
+          key: 'media_id'
         },
         onUpdate: 'CASCADE',
         onDelete: 'SET NULL'
@@ -100,13 +100,13 @@ module.exports = sequelize => {
       },
 
       // 分类和状态
-      category: {
-        type: DataTypes.STRING(50),
+      category_def_id: {
+        type: DataTypes.INTEGER,
         allowNull: true,
-        comment: '商品分类代码，FK→category_defs.category_code',
+        comment: '商品分类ID，FK→category_defs.category_def_id（2026-03-16 整数主键迁移）',
         references: {
           model: 'category_defs',
-          key: 'category_code'
+          key: 'category_def_id'
         },
         onUpdate: 'CASCADE',
         onDelete: 'SET NULL'
@@ -236,9 +236,57 @@ module.exports = sequelize => {
         },
         onUpdate: 'CASCADE',
         onDelete: 'RESTRICT'
-      }
+      },
 
-      // ❌ 已砍掉（决策12）：discount（前端算）、rating（无评价系统）、sales（复用sold_count）、seller_info（自营非多商家）
+      // === Phase 0 新增字段：SPU/SKU 全量模式 + 排序增强（2026-03-16） ===
+
+      /** 规格维度名称，如 ["颜色","尺码"]；单品商品为 NULL */
+      spec_names: {
+        type: DataTypes.JSON,
+        allowNull: true,
+        defaultValue: null,
+        comment: '规格维度名称，如 ["颜色","尺码"]；单品商品为 NULL'
+      },
+
+      /** SKU 最低价（自动计算汇总字段，单品时等于 cost_amount） */
+      min_cost_amount: {
+        type: DataTypes.BIGINT,
+        allowNull: true,
+        defaultValue: null,
+        comment: 'SKU 最低价（自动计算，单品时等于 cost_amount）'
+      },
+
+      /** SKU 最高价（自动计算汇总字段，单品时等于 cost_amount） */
+      max_cost_amount: {
+        type: DataTypes.BIGINT,
+        allowNull: true,
+        defaultValue: null,
+        comment: 'SKU 最高价（自动计算，单品时等于 cost_amount）'
+      },
+
+      /** 是否置顶（置顶的始终排在最前） */
+      is_pinned: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+        comment: '是否置顶（置顶的始终排在最前）'
+      },
+
+      /** 置顶时间（多个置顶时按此排序） */
+      pinned_at: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        defaultValue: null,
+        comment: '置顶时间（多个置顶时按此排序）'
+      },
+
+      /** 是否推荐（前端可高亮展示、「推荐」标签） */
+      is_recommended: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+        comment: '是否推荐（前端可高亮展示）'
+      }
     },
     {
       tableName: 'exchange_items',
@@ -248,7 +296,7 @@ module.exports = sequelize => {
       underscored: true,
       indexes: [
         { fields: ['status'] },
-        { fields: ['category'] },
+        { fields: ['category_def_id'] },
         { fields: ['cost_asset_code'] },
         { fields: ['space'], name: 'idx_space' },
         { fields: ['space', 'status'], name: 'idx_space_status' },
@@ -271,11 +319,13 @@ module.exports = sequelize => {
       as: 'exchangeRecords'
     })
 
-    // 多对一：商品关联主图片（2026-01-08 图片存储架构）
-    ExchangeItem.belongsTo(models.ImageResources, {
-      foreignKey: 'primary_image_id',
-      as: 'primaryImage'
-    })
+    // 多对一：商品关联主媒体文件（2026-03-16 媒体体系，替代 image_resources）
+    if (models.MediaFile) {
+      ExchangeItem.belongsTo(models.MediaFile, {
+        foreignKey: 'primary_media_id',
+        as: 'primary_media'
+      })
+    }
 
     // 多对一：商品关联稀有度定义（2026-03-06 全局主题体系统一）
     ExchangeItem.belongsTo(models.RarityDef, {
@@ -284,12 +334,19 @@ module.exports = sequelize => {
       as: 'rarityDef'
     })
 
-    // 多对一：商品关联分类定义（2026-03-14 兑换详情页B+C混合方案）
+    // 多对一：商品关联分类定义（2026-03-16 整数主键迁移）
     ExchangeItem.belongsTo(models.CategoryDef, {
-      foreignKey: 'category',
-      targetKey: 'category_code',
+      foreignKey: 'category_def_id',
       as: 'categoryDef'
     })
+
+    // 一对多：商品有多个 SKU（全量 SKU 模式，每个商品至少一个默认 SKU）
+    if (models.ExchangeItemSku) {
+      ExchangeItem.hasMany(models.ExchangeItemSku, {
+        foreignKey: 'exchange_item_id',
+        as: 'skus'
+      })
+    }
 
     // 一对多：商品有多个竞价记录（臻选空间/幸运空间竞价功能）
     if (models.BidProduct) {

@@ -43,8 +43,8 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
     'sold_count',
     'sort_order',
     'status',
-    'primary_image_id',
-    'category',
+    'primary_media_id',
+    'category_def_id',
     // 臻选空间/幸运空间扩展字段（9个）
     'space',
     'original_price',
@@ -75,8 +75,8 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
     'sold_count',
     'sort_order',
     'status',
-    'primary_image_id',
-    'category',
+    'primary_media_id',
+    'category_def_id',
     // 臻选空间/幸运空间扩展字段（9个）
     'space',
     'original_price',
@@ -167,7 +167,6 @@ class QueryService {
     this.ExchangeItem = models.ExchangeItem
     this.ExchangeRecord = models.ExchangeRecord
     this.ExchangeOrderEvent = models.ExchangeOrderEvent
-    this.ImageResources = models.ImageResources
     this.sequelize = models.sequelize
   }
 
@@ -258,9 +257,12 @@ class QueryService {
         where.item_name = { [Op.like]: `%${keyword}%` }
       }
 
-      // 分类筛选
+      // 分类筛选（API 可能传 category_code 或 category_def_id，需转换为 category_def_id）
       if (category) {
-        where.category = category
+        const categoryDefId = await this._resolveCategoryDefId(category)
+        if (categoryDefId !== null) {
+          where.category_def_id = categoryDefId
+        }
       }
 
       // 排除指定商品（用于详情页"相关推荐"，排除当前商品自身）
@@ -291,15 +293,20 @@ class QueryService {
         attributes: EXCHANGE_MARKET_ATTRIBUTES.marketItemView,
         include: [
           {
-            model: this.ImageResources,
-            as: 'primaryImage',
-            attributes: ['image_resource_id', 'file_path', 'mime_type', 'thumbnail_paths'],
+            model: this.models.MediaFile,
+            as: 'primary_media',
+            attributes: ['media_id', 'object_key', 'mime_type', 'thumbnail_keys'],
             required: false
           }
         ],
         limit,
         offset,
-        order: [[sort_by, sort_order]]
+        order: [
+          ['is_pinned', 'DESC'],
+          ['pinned_at', 'DESC'],
+          ['sort_order', 'ASC'],
+          [sort_by, sort_order]
+        ]
       })
 
       logger.info(`[兑换市场] 找到${count}个商品，返回第${page}页（${rows.length}个）`)
@@ -365,9 +372,9 @@ class QueryService {
         attributes: EXCHANGE_MARKET_ATTRIBUTES.marketItemDetailView,
         include: [
           {
-            model: this.ImageResources,
-            as: 'primaryImage',
-            attributes: ['image_resource_id', 'file_path', 'mime_type', 'thumbnail_paths'],
+            model: this.models.MediaFile,
+            as: 'primary_media',
+            attributes: ['media_id', 'object_key', 'mime_type', 'thumbnail_keys'],
             required: false
           },
           {
@@ -379,9 +386,30 @@ class QueryService {
           {
             model: this.models.CategoryDef,
             as: 'categoryDef',
-            attributes: ['category_code', 'display_name', 'icon_url'],
+            attributes: ['category_code', 'display_name'],
             required: false
-          }
+          },
+          ...(this.models.ExchangeItemSku
+            ? [
+                {
+                  model: this.models.ExchangeItemSku,
+                  as: 'skus',
+                  where: { status: 'active' },
+                  required: false,
+                  order: [['sort_order', 'ASC']],
+                  attributes: [
+                    'sku_id',
+                    'spec_values',
+                    'cost_asset_code',
+                    'cost_amount',
+                    'stock',
+                    'sold_count',
+                    'status',
+                    'sort_order'
+                  ]
+                }
+              ]
+            : [])
         ]
       })
 
@@ -389,21 +417,49 @@ class QueryService {
         throw new Error('商品不存在')
       }
 
-      // 查询该商品的所有关联图片，按 category 分组（多图基础设施）
-      const allImages = await this.ImageResources.findAll({
-        where: {
-          business_type: 'exchange',
-          context_id: item_id,
-          status: 'active'
-        },
-        order: [['sort_order', 'ASC']]
-      })
-
-      const images = allImages.filter(i => i.category === 'products').map(i => i.toSafeJSON())
-      const detail_images = allImages.filter(i => i.category === 'detail').map(i => i.toSafeJSON())
-      const showcase_images = allImages
-        .filter(i => i.category === 'showcase')
-        .map(i => i.toSafeJSON())
+      // 多图数据：通过 media_attachments 获取（image_resources 表已删除）
+      const { MediaAttachment, MediaFile } = this.models
+      const { getImageUrl } = require('../../utils/ImageUrlHelper')
+      const attachments =
+        MediaAttachment && MediaFile
+          ? await MediaAttachment.findAll({
+              where: {
+                attachable_type: 'exchange_item',
+                attachable_id: item_id
+              },
+              include: [
+                {
+                  model: MediaFile,
+                  as: 'media',
+                  attributes: ['media_id', 'object_key', 'mime_type', 'thumbnail_keys']
+                }
+              ],
+              order: [['sort_order', 'ASC']]
+            })
+          : []
+      const toImageJson = a => {
+        const m = a.media || a.Media
+        if (!m) return null
+        const url = m.object_key ? getImageUrl(m.object_key) : null
+        return {
+          media_id: m.media_id,
+          url,
+          mime: m.mime_type,
+          thumbnail_url: m.thumbnail_keys?.small ? getImageUrl(m.thumbnail_keys.small) : url
+        }
+      }
+      const images = attachments
+        .filter(a => a.role === 'gallery' || a.role === 'products')
+        .map(toImageJson)
+        .filter(Boolean)
+      const detail_images = attachments
+        .filter(a => a.role === 'detail')
+        .map(toImageJson)
+        .filter(Boolean)
+      const showcase_images = attachments
+        .filter(a => a.role === 'showcase')
+        .map(toImageJson)
+        .filter(Boolean)
 
       // 添加中文显示名称
       const itemJSON = item.toJSON()
@@ -848,11 +904,14 @@ class QueryService {
         catBase.parts.push('ei.stock BETWEEN 1 AND 5')
       }
 
-      // 2. 价格区间计数：排除 price 条件，保留 category + stock 条件
+      // 2. 价格区间计数：排除 price 条件，保留 category + stock 条件（使用 category_def_id）
       const priceBase = buildBaseWhere()
       if (category) {
-        priceBase.parts.push('ei.category = :category')
-        priceBase.replacements.category = category
+        const catDefId = await this._resolveCategoryDefId(category)
+        if (catDefId !== null) {
+          priceBase.parts.push('ei.category_def_id = :category_def_id')
+          priceBase.replacements.category_def_id = catDefId
+        }
       }
       if (stock_status === 'in_stock') {
         priceBase.parts.push('ei.stock > 5')
@@ -860,11 +919,14 @@ class QueryService {
         priceBase.parts.push('ei.stock BETWEEN 1 AND 5')
       }
 
-      // 3. 库存状态计数：排除 stock 条件，保留 category + price 条件
+      // 3. 库存状态计数：排除 stock 条件，保留 category + price 条件（使用 category_def_id）
       const stockBase = buildBaseWhere()
       if (category) {
-        stockBase.parts.push('ei.category = :category_s')
-        stockBase.replacements.category_s = category
+        const catDefIdS = await this._resolveCategoryDefId(category)
+        if (catDefIdS !== null) {
+          stockBase.parts.push('ei.category_def_id = :category_def_id_s')
+          stockBase.replacements.category_def_id_s = catDefIdS
+        }
       }
       if (min_cost !== null) {
         stockBase.parts.push('ei.cost_amount >= :min_cost_s')
@@ -875,14 +937,15 @@ class QueryService {
         stockBase.replacements.max_cost_s = parseInt(max_cost, 10)
       }
 
-      // 并行执行 3 个聚合查询
+      // 并行执行 3 个聚合查询（category_def_id 迁移：JOIN category_defs 获取 category_code）
       const [categoryRows, priceRows, stockRows] = await Promise.all([
-        // 分类维度计数
+        // 分类维度计数（按 category_def_id 分组，关联 category_defs 取 category_code）
         sequelize.query(
-          `SELECT COALESCE(ei.category, '__null__') AS category_code, COUNT(*) AS cnt
+          `SELECT COALESCE(cd.category_code, '__null__') AS category_code, COUNT(*) AS cnt
            FROM exchange_items ei
+           LEFT JOIN category_defs cd ON ei.category_def_id = cd.category_def_id
            WHERE ${catBase.parts.join(' AND ')}
-           GROUP BY ei.category`,
+           GROUP BY ei.category_def_id, cd.category_code`,
           { replacements: catBase.replacements, type: sequelize.constructor.QueryTypes.SELECT }
         ),
         // 价格区间维度计数（区间定义：0-100, 100-500, 500-1000, 1000+）
@@ -940,6 +1003,28 @@ class QueryService {
       logger.warn('[兑换市场] 聚合计数计算失败（非致命）:', error.message)
       return { categories: {}, cost_ranges: {}, stock_statuses: {} }
     }
+  }
+
+  /**
+   * 将 category_code 或 category_def_id 解析为 category_def_id（API 兼容：前端可能传 code 或 id）
+   *
+   * @param {string|number} category - 分类代码或分类ID
+   * @returns {Promise<number|null>} category_def_id，无法解析时返回 null
+   * @private
+   */
+  async _resolveCategoryDefId(category) {
+    if (category == null) return null
+    const num = parseInt(category, 10)
+    if (!Number.isNaN(num) && String(num) === String(category)) {
+      return num
+    }
+    const CategoryDef = this.models.CategoryDef
+    if (!CategoryDef) return null
+    const def = await CategoryDef.findOne({
+      where: { category_code: String(category) },
+      attributes: ['category_def_id']
+    })
+    return def ? def.category_def_id : null
   }
 
   /**

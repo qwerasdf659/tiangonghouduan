@@ -972,7 +972,7 @@
             <div class="grid grid-cols-2 gap-3">
               <template x-for="cr in (campaignDetail?.creatives || [])" :key="cr.ad_creative_id">
                 <div class="border rounded p-2">
-                  <img :src="cr.image_url" alt="" class="w-full h-32 object-contain rounded mb-1" x-show="cr.image_url">
+                  <img :src="cr.public_url || cr.image_url" alt="" class="w-full h-32 object-contain rounded mb-1" x-show="cr.public_url || cr.image_url">
                   <p class="text-xs font-medium" x-text="cr.title"></p>
                   <span class="text-xs px-1 py-0.5 rounded"
                         :class="cr.review_status === 'approved' ? 'bg-green-100 text-green-700' : cr.review_status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'"

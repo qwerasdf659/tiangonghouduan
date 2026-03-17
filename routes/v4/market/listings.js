@@ -42,7 +42,7 @@ const logger = require('../../../utils/logger').logger
  * @query {number} limit - 每页数量（默认20）
  * @query {string} listing_kind - 挂牌类型筛选（item / fungible_asset，可选）
  * @query {string} asset_code - 资产代码筛选（如 red_shard，仅对 fungible_asset 有效）
- * @query {string} item_category_code - 物品类目代码筛选（仅对 item 类型有效）
+ * @query {string|number} item_category_code - 物品类目筛选（category_code 或 category_def_id，仅对 item 类型有效）
  * @query {string} asset_group_code - 资产分组代码筛选（仅对 fungible_asset 有效）
  * @query {string} rarity_code - 稀有度代码筛选（仅对 item_instance 有效）
  * @query {number} min_price - 最低价格筛选（可选）
@@ -249,7 +249,8 @@ router.get(
         plainListing.offerItem?.item_type ||
         '未知商品'
       plainListing.item_type = plainListing.offerItem?.item_type || 'unknown'
-      plainListing.item_category_code = plainListing.offer_item_category_code || null
+      plainListing.item_category_code = plainListing.offer_item_category_code ?? null
+      plainListing.offer_category_def_id = plainListing.offer_category_def_id ?? null
       plainListing.rarity_code = plainListing.offer_item_rarity || null
       plainListing.rarity =
         plainListing.offer_item_rarity || plainListing.offerItem?.meta?.rarity || 'common'

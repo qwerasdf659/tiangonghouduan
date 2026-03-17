@@ -120,12 +120,18 @@ module.exports = sequelize => {
           '挂牌物品模板ID（快照 → item_templates.item_template_id）：仅 listing_kind=item 时有值，挂牌时从物品实例关联的模板复制'
       },
 
-      // 物品类目代码（快照）
-      offer_item_category_code: {
-        type: DataTypes.STRING(50),
+      // 物品类目定义ID（快照，2026-03-16 整数主键迁移）
+      offer_category_def_id: {
+        type: DataTypes.INTEGER,
         allowNull: true,
         comment:
-          '挂牌物品类目代码（快照 → category_defs.category_code）：用于前端筛选，挂牌时从物品模板复制'
+          '挂牌物品类目定义ID（快照 → category_defs.category_def_id）：用于前端筛选，挂牌时从物品模板复制',
+        references: {
+          model: 'category_defs',
+          key: 'category_def_id'
+        },
+        onUpdate: 'CASCADE',
+        onDelete: 'SET NULL'
       },
 
       // 物品稀有度（快照）
@@ -222,6 +228,40 @@ module.exports = sequelize => {
         defaultValue: 'on_sale',
         comment:
           '挂牌状态（Status）：on_sale-在售中 | locked-已锁定 | sold-已售出 | withdrawn-已撤回 | admin_withdrawn-管理员强制撤回；业务规则：on_sale → locked → sold/withdrawn/admin_withdrawn，locked 超时自动回滚为 on_sale'
+      },
+
+      // === Phase 0 新增字段：运营排序控制（2026-03-16） ===
+
+      /** 运营排序权重（数值越小越靠前，全项目统一 sort_order INT ASC 约定） */
+      sort_order: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
+        comment: '运营排序权重（数值越小越靠前）'
+      },
+
+      /** 是否置顶（置顶的始终排在最前） */
+      is_pinned: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+        comment: '是否置顶'
+      },
+
+      /** 置顶时间（多个置顶时按此排序） */
+      pinned_at: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        defaultValue: null,
+        comment: '置顶时间'
+      },
+
+      /** 是否推荐（前端「推荐」标签展示） */
+      is_recommended: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+        comment: '是否推荐（前端「推荐」标签）'
       }
     },
     {
@@ -299,11 +339,10 @@ module.exports = sequelize => {
       })
     }
 
-    // 物品类目关联（筛选维度）
+    // 物品类目关联（筛选维度，2026-03-16 整数主键迁移）
     if (models.CategoryDef) {
       MarketListing.belongsTo(models.CategoryDef, {
-        foreignKey: 'offer_item_category_code',
-        targetKey: 'category_code',
+        foreignKey: 'offer_category_def_id',
         as: 'offerCategory',
         comment: '物品类目关联（筛选维度）- 关联挂牌物品的类目'
       })

@@ -9,7 +9,7 @@
 
 import { logger } from '../../../utils/logger.js'
 import { request } from '../../../api/base.js'
-import { SYSTEM_ENDPOINTS } from '../../../api/system/index.js'
+import { SYSTEM_ADMIN_ENDPOINTS } from '../../../api/system/admin.js'
 
 /**
  * 图片资源管理状态
@@ -43,9 +43,9 @@ export function useImagesMethods() {
         if (this.imageFilters?.type) params.append('type', this.imageFilters.type)
         if (this.imageFilters?.keyword) params.append('keyword', this.imageFilters.keyword)
 
-        const response = await this.apiGet(`${SYSTEM_ENDPOINTS.IMAGE_LIST}?${params}`)
+        const response = await this.apiGet(`${SYSTEM_ADMIN_ENDPOINTS.MEDIA_LIST}?${params}`)
         if (response?.success) {
-          this.images = response.data?.list || response.data?.images || []
+          this.images = response.data?.list || response.data?.images || response.data?.items || []
           logger.info('[ContentManagement] 图片数量:', this.images.length)
           this.imageStats = {
             total: this.images.length,
@@ -88,7 +88,7 @@ export function useImagesMethods() {
         formData.append('category', 'general')
 
         const result = await request({
-          url: SYSTEM_ENDPOINTS.IMAGE_UPLOAD,
+          url: SYSTEM_ADMIN_ENDPOINTS.MEDIA_UPLOAD,
           method: 'POST',
           data: formData
         })
@@ -114,13 +114,15 @@ export function useImagesMethods() {
     },
 
     openImageInNewTab(image) {
-      if (image.url) window.open(image.url, '_blank')
+      const url = image.public_url || image.url
+      if (url) window.open(url, '_blank')
     },
 
     async copyImageUrl(image) {
-      if (image.url) {
+      const url = image.public_url || image.url
+      if (url) {
         try {
-          await navigator.clipboard.writeText(image.url)
+          await navigator.clipboard.writeText(url)
           this.showSuccess('链接已复制')
         } catch {
           this.showError('复制失败，请手动复制')

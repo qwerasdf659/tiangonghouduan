@@ -7,7 +7,7 @@
  * @date 2026-02-06
  */
 
-import { logger, $confirm, formatDateTime, formatDateTimeShort } from '../../../utils/index.js'
+import { logger, $confirm, formatDateTimeShort } from '../../../utils/index.js'
 import { API_PREFIX, request } from '../../../api/base.js'
 
 const API_BASE_URL = API_PREFIX

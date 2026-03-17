@@ -16,9 +16,8 @@
 
 // ES Module 导入
 import { logger } from '../../../utils/logger.js'
-import { API_PREFIX } from '../../../api/base.js'
+import { API_PREFIX, request } from '../../../api/base.js'
 import { Alpine, createPageMixin, dataTable } from '../../../alpine/index.js'
-import { request } from '../../../api/base.js'
 import { $confirmDanger } from '../../../utils/index.js'
 
 // 导入 composables 模块

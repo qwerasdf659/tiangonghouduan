@@ -20,6 +20,7 @@ const logger = require('../../utils/logger').logger
 const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
 const BeijingTimeHelper = require('../../utils/timeHelper')
 const { assertAndGetTransaction } = require('../../utils/transactionHelpers')
+const { getImageUrl } = require('../../utils/ImageUrlHelper')
 
 /**
  * 兑换订单状态机白名单
@@ -197,14 +198,14 @@ class CoreService {
       `[兑换市场] 用户${user_id}兑换商品${exchange_item_id}，数量${quantity}，idempotency_key=${idempotency_key}`
     )
 
-    // 1. 获取商品信息（加锁防止超卖，含主图片用于快照）
+    // 1. 获取商品信息（加锁防止超卖，含主媒体用于快照，2026-03-16 媒体体系迁移）
     const item = await this.ExchangeItem.findOne({
       where: { exchange_item_id },
       include: [
         {
-          model: this.models.ImageResources,
-          as: 'primaryImage',
-          attributes: ['file_path'],
+          model: this.models.MediaFile,
+          as: 'primary_media',
+          attributes: ['object_key'],
           required: false
         }
       ],
@@ -340,7 +341,9 @@ class CoreService {
             description: item.description,
             cost_asset_code: item.cost_asset_code,
             cost_amount: item.cost_amount,
-            image_url: item.primaryImage?.file_path || null
+            image_url: item.primary_media?.object_key
+              ? getImageUrl(item.primary_media.object_key)
+              : null
           },
           quantity,
           pay_asset_code: item.cost_asset_code,
@@ -373,7 +376,53 @@ class CoreService {
       throw createError
     }
 
-    // 6. 扣减商品库存
+    // 6. 扣减库存（全量 SKU 模式：统一走 exchange_item_skus 表）
+    const ExchangeItemSku = this.models.ExchangeItemSku
+    if (ExchangeItemSku) {
+      let targetSku = null
+
+      if (options.sku_id) {
+        // 指定了 SKU：精确查找
+        targetSku = await ExchangeItemSku.findOne({
+          where: { sku_id: options.sku_id, exchange_item_id, status: 'active' },
+          lock: transaction.LOCK.UPDATE,
+          transaction
+        })
+        if (!targetSku) {
+          throw new Error('指定的 SKU 不存在或已停售')
+        }
+      } else {
+        // 未指定 SKU：自动选择默认 SKU（单品商品 spec_values 为 {}）
+        const activeSkus = await ExchangeItemSku.findAll({
+          where: { exchange_item_id, status: 'active' },
+          lock: transaction.LOCK.UPDATE,
+          transaction
+        })
+        if (activeSkus.length === 1) {
+          targetSku = activeSkus[0]
+        } else if (activeSkus.length > 1) {
+          throw new Error('该商品有多个规格，请选择具体的 SKU（sku_id）')
+        }
+        // activeSkus.length === 0 时不做 SKU 扣减，仅扣 SPU（兼容无 SKU 数据的历史场景）
+      }
+
+      if (targetSku) {
+        if (targetSku.stock < quantity) {
+          throw new Error(`SKU 库存不足，当前库存：${targetSku.stock}`)
+        }
+        await targetSku.update(
+          { stock: targetSku.stock - quantity, sold_count: (targetSku.sold_count || 0) + quantity },
+          { transaction }
+        )
+        record.item_snapshot = {
+          ...record.item_snapshot,
+          sku_id: targetSku.sku_id,
+          spec_values: targetSku.spec_values
+        }
+        await record.save({ transaction })
+      }
+    }
+
     await item.update(
       {
         stock: item.stock - quantity,
@@ -1041,6 +1090,9 @@ class CoreService {
 
     const old_status = order.status
 
+    // 退款防刷检查（三层防护，从 system_configs 读取配置，初始值全 0 = 关闭）
+    await this._checkRefundRules(order, transaction)
+
     // 退还材料资产到用户账户
     const BalanceService = require('../asset/BalanceService')
     const burnAccount = await BalanceService.getOrCreateAccount(
@@ -1188,6 +1240,83 @@ class CoreService {
     const timestamp = Date.now()
     const random = Math.random().toString(36).substr(2, 6).toUpperCase()
     return `EM${timestamp}${random}`
+  }
+
+  /**
+   * 退款防刷检查（配置驱动三层防护）
+   * 从 system_configs 读取规则，初始值全 0 = 关闭，上线后按需开启
+   *
+   * @param {Object} order - 兑换订单记录
+   * @param {Transaction} transaction - 事务对象
+   * @returns {Promise<void>} 检查通过无返回值，违规时抛出异常
+   * @throws {Error} 违反退款规则时抛出
+   * @private
+   */
+  async _checkRefundRules(order, transaction) {
+    const getConfigValue = async key => {
+      try {
+        const [rows] = await this.sequelize.query(
+          `SELECT config_value FROM system_configs WHERE config_key = '${key}' AND is_active = 1 LIMIT 1`,
+          { transaction }
+        )
+        if (rows.length > 0) {
+          return parseInt(JSON.parse(rows[0].config_value)) || 0
+        }
+      } catch {
+        /* 配置读取失败不阻断退款 */
+      }
+      return 0
+    }
+
+    // 第一层：冷却期检查
+    const cooldownHours = await getConfigValue('refund_cooldown_hours')
+    if (cooldownHours > 0) {
+      const { getRedisClient } = require('../../utils/UnifiedRedisClient')
+      const redis = await getRedisClient()
+      const cooldownKey = `app:v4:refund_cooldown:${order.user_id}:${order.exchange_item_id}`
+      const exists = await redis.exists(cooldownKey)
+      if (exists) {
+        const error = new Error(`退款冷却期内不可再次兑换同一商品（冷却${cooldownHours}小时）`)
+        error.statusCode = 429
+        error.code = 'REFUND_COOLDOWN'
+        throw error
+      }
+    }
+
+    // 第二层：月限检查
+    const monthlyLimit = await getConfigValue('refund_monthly_limit')
+    if (monthlyLimit > 0) {
+      const { Op } = require('sequelize')
+      const startOfMonth = new Date()
+      startOfMonth.setDate(1)
+      startOfMonth.setHours(0, 0, 0, 0)
+
+      const refundCount = await this.models.ExchangeOrderEvent.count({
+        where: {
+          new_status: 'refunded',
+          operator_id: order.user_id,
+          created_at: { [Op.gte]: startOfMonth }
+        },
+        transaction
+      })
+
+      if (refundCount >= monthlyLimit) {
+        const error = new Error(`本月退款次数已达上限（${monthlyLimit}次/月）`)
+        error.statusCode = 429
+        error.code = 'REFUND_MONTHLY_LIMIT'
+        throw error
+      }
+    }
+
+    // 第三层：大额审批（记录日志，由路由层决定是否走审批链）
+    const approvalThreshold = await getConfigValue('refund_approval_threshold')
+    if (approvalThreshold > 0 && Number(order.pay_amount) > approvalThreshold) {
+      logger.warn('[兑换市场] 大额退款触发审批检查', {
+        order_no: order.order_no,
+        pay_amount: order.pay_amount,
+        threshold: approvalThreshold
+      })
+    }
   }
 }
 

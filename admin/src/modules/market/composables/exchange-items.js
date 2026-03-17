@@ -43,9 +43,9 @@ export function useExchangeItemsState() {
       stock: 0,
       sort_order: 100,
       status: 'active',
-      primary_image_id: null,
+      primary_media_id: null,
       rarity_code: 'common',
-      category: null,
+      category_def_id: null,
       space: 'lucky',
       original_price: null,
       tags: [],
@@ -81,7 +81,27 @@ export function useExchangeItemsState() {
     /** @type {Array<Object>} 商品展示图列表（多图支持） */
     showcaseImages: [],
     /** @type {boolean} 展示图上传中 */
-    showcaseImageUploading: false
+    showcaseImageUploading: false,
+
+    // === SKU 管理状态（Phase 2） ===
+    /** @type {Array<Object>} 当前商品的 SKU 列表 */
+    itemSkus: [],
+    /** @type {Object} SKU 表单（添加/编辑 SKU 用） */
+    skuForm: { spec_values: {}, cost_amount: 1, stock: 0, cost_asset_code: '', status: 'active' },
+    /** @type {number|null} 正在编辑的 SKU ID（null 表示新增） */
+    editingSkuId: null,
+    /** @type {boolean} SKU 管理弹窗是否显示 */
+    showSkuModal: false,
+    /** @type {string} 新规格维度名输入 */
+    specNameInput: '',
+    /** @type {string} 新规格值输入 */
+    specValueInput: '',
+
+    // === 快递公司列表（Phase 4） ===
+    /** @type {Array<Object>} 快递公司列表（供发货弹窗下拉选择） */
+    shippingCompanies: [],
+    /** @type {boolean} 快递公司列表是否已加载 */
+    shippingCompaniesLoaded: false
   }
 }
 
@@ -206,9 +226,11 @@ export function useExchangeItemsMethods() {
             this.categoryOptions = res.data.categories
               .filter(c => c.is_enabled)
               .map(c => ({
-                value: c.category_code,
+                value: c.category_def_id,
                 label: c.display_name,
-                icon_url: c.icon_url
+                category_code: c.category_code,
+                parent_category_def_id: c.parent_category_def_id || null,
+                level: c.level || 1
               }))
           }
           this.dictionariesLoaded = true
@@ -236,9 +258,9 @@ export function useExchangeItemsMethods() {
         stock: 0,
         sort_order: 100,
         status: 'active',
-        primary_image_id: null,
+        primary_media_id: null,
         rarity_code: 'common',
-        category: null,
+        category_def_id: null,
         space: 'lucky',
         original_price: null,
         tags: [],
@@ -275,9 +297,9 @@ export function useExchangeItemsMethods() {
         stock: item.stock || 0,
         sort_order: item.sort_order || 100,
         status: item.status || 'active',
-        primary_image_id: item.primary_image_id || null,
+        primary_media_id: item.primary_media_id ?? null,
         rarity_code: item.rarity_code || 'common',
-        category: item.category || null,
+        category_def_id: item.category_def_id || null,
         space: item.space || 'lucky',
         original_price: item.original_price || null,
         tags: item.tags || [],
@@ -291,7 +313,7 @@ export function useExchangeItemsMethods() {
         free_shipping: !!item.free_shipping
       }
       this.itemImagePreviewUrl =
-        item.primary_image?.thumbnail_url || item.primary_image?.url || null
+        item.primary_image?.thumbnail_url || item.primary_image?.public_url || item.primary_image?.url || null
       this.tagInput = ''
       this.usageRuleInput = ''
       this.loadDictionaries()
@@ -345,11 +367,11 @@ export function useExchangeItemsMethods() {
     },
 
     /**
-     * 上传商品图片并绑定 primary_image_id
+     * 上传商品图片并绑定 primary_media_id
      *
      * @param {Event} event - 文件选择事件（input[type=file] change 事件）
-     * @description 上传图片到 Sealos 对象存储，返回 image_resource_id，
-     *              设置到 itemForm.primary_image_id 并更新预览 URL
+     * @description 上传图片到 Sealos 对象存储，返回 media_id，
+     *              设置到 itemForm.primary_media_id 并更新预览 URL
      */
     async uploadItemImage(event) {
       const file = event.target.files?.[0]
@@ -375,16 +397,16 @@ export function useExchangeItemsMethods() {
         formData.append('category', 'products')
 
         const res = await request({
-          url: SYSTEM_ADMIN_ENDPOINTS.IMAGE_UPLOAD,
+          url: SYSTEM_ADMIN_ENDPOINTS.MEDIA_UPLOAD,
           method: 'POST',
           data: formData
         })
 
         if (res.success && res.data) {
-          this.itemForm.primary_image_id = res.data.image_resource_id
-          this.itemImagePreviewUrl = res.data.url || res.data.image_url || null
+          this.itemForm.primary_media_id = res.data.media_id
+          this.itemImagePreviewUrl = res.data.public_url || res.data.url || res.data.image_url || null
           this.showSuccess?.('图片上传成功')
-          logger.info('[ExchangeItems] 图片上传成功:', res.data.image_resource_id)
+          logger.info('[ExchangeItems] 图片上传成功:', res.data.media_id)
         } else {
           this.showError?.(res.message || '图片上传失败')
         }
@@ -433,15 +455,15 @@ export function useExchangeItemsMethods() {
         formData.append('sort_order', String(this.detailImages.length + 1))
 
         const res = await request({
-          url: SYSTEM_ADMIN_ENDPOINTS.IMAGE_UPLOAD,
+          url: SYSTEM_ADMIN_ENDPOINTS.MEDIA_UPLOAD,
           method: 'POST',
           data: formData
         })
 
         if (res.success && res.data) {
           this.detailImages.push({
-            image_resource_id: res.data.image_resource_id,
-            url: res.data.url || res.data.image_url,
+            media_id: res.data.media_id,
+            url: res.data.public_url || res.data.url || res.data.image_url,
             sort_order: this.detailImages.length + 1
           })
           this.showSuccess?.('详情图上传成功')
@@ -471,13 +493,14 @@ export function useExchangeItemsMethods() {
 
       try {
         const res = await request({
-          url: SYSTEM_ADMIN_ENDPOINTS.IMAGE_BY_BUSINESS,
-          params: { business_type: 'exchange', context_id: contextId, category: 'detail' }
+          url: SYSTEM_ADMIN_ENDPOINTS.MEDIA_BY_ENTITY('exchange_item', contextId),
+          params: { category: 'detail' }
         })
 
-        if (res.success && res.data?.images) {
-          this.detailImages = res.data.images.map(img => ({
-            image_resource_id: img.image_resource_id,
+        const images = res.data?.images || res.data?.items || res.data?.media || []
+        if (res.success && images.length >= 0) {
+          this.detailImages = images.map(img => ({
+            media_id: img.media_id,
             url: img.public_url || img.url,
             sort_order: img.sort_order || 0
           }))
@@ -495,16 +518,16 @@ export function useExchangeItemsMethods() {
      *
      * @param {number} imageId - 图片资源 ID
      */
-    async removeDetailImage(imageId) {
+    async removeDetailImage(mediaId) {
       const confirmed = await this.$confirm?.('确定要删除此详情图吗？')
       if (!confirmed) return
 
       try {
-        const url = buildURL(SYSTEM_ADMIN_ENDPOINTS.IMAGE_DELETE, { id: imageId })
+        const url = SYSTEM_ADMIN_ENDPOINTS.MEDIA_DELETE(mediaId)
         const res = await request({ url, method: 'DELETE' })
 
         if (res.success) {
-          this.detailImages = this.detailImages.filter(img => img.image_resource_id !== imageId)
+          this.detailImages = this.detailImages.filter(img => img.media_id !== mediaId)
           this.showSuccess?.('详情图已删除')
         } else {
           this.showError?.(res.message || '删除失败')
@@ -532,7 +555,7 @@ export function useExchangeItemsMethods() {
 
       this.detailImages.forEach((img, i) => {
         img.sort_order = i + 1
-        const url = buildURL(SYSTEM_ADMIN_ENDPOINTS.IMAGE_UPDATE, { id: img.image_resource_id })
+        const url = SYSTEM_ADMIN_ENDPOINTS.MEDIA_UPDATE(img.media_id)
         request({ url, method: 'PATCH', data: { sort_order: i + 1 } }).catch(e => {
           logger.warn('[ExchangeItems] 更新排序失败:', e)
         })
@@ -679,15 +702,15 @@ export function useExchangeItemsMethods() {
         formData.append('sort_order', String(this.showcaseImages.length + 1))
 
         const res = await request({
-          url: SYSTEM_ADMIN_ENDPOINTS.IMAGE_UPLOAD,
+          url: SYSTEM_ADMIN_ENDPOINTS.MEDIA_UPLOAD,
           method: 'POST',
           data: formData
         })
 
         if (res.success && res.data) {
           this.showcaseImages.push({
-            image_resource_id: res.data.image_resource_id,
-            url: res.data.url || res.data.image_url,
+            media_id: res.data.media_id,
+            url: res.data.public_url || res.data.url || res.data.image_url,
             sort_order: this.showcaseImages.length + 1
           })
           this.showSuccess?.('展示图上传成功')
@@ -714,12 +737,13 @@ export function useExchangeItemsMethods() {
       }
       try {
         const res = await request({
-          url: SYSTEM_ADMIN_ENDPOINTS.IMAGE_BY_BUSINESS,
-          params: { business_type: 'exchange', context_id: contextId, category: 'showcase' }
+          url: SYSTEM_ADMIN_ENDPOINTS.MEDIA_BY_ENTITY('exchange_item', contextId),
+          params: { category: 'showcase' }
         })
-        if (res.success && res.data?.images) {
-          this.showcaseImages = res.data.images.map(img => ({
-            image_resource_id: img.image_resource_id,
+        const images = res.data?.images || res.data?.items || res.data?.media || []
+        if (res.success && images.length >= 0) {
+          this.showcaseImages = images.map(img => ({
+            media_id: img.media_id,
             url: img.public_url || img.url,
             sort_order: img.sort_order || 0
           }))
@@ -736,14 +760,14 @@ export function useExchangeItemsMethods() {
      * 删除一张展示图
      * @param {number} imageId - 图片资源 ID
      */
-    async removeShowcaseImage(imageId) {
+    async removeShowcaseImage(mediaId) {
       const confirmed = await this.$confirm?.('确定要删除此展示图吗？')
       if (!confirmed) return
       try {
-        const url = buildURL(SYSTEM_ADMIN_ENDPOINTS.IMAGE_DELETE, { id: imageId })
+        const url = SYSTEM_ADMIN_ENDPOINTS.MEDIA_DELETE(mediaId)
         const res = await request({ url, method: 'DELETE' })
         if (res.success) {
-          this.showcaseImages = this.showcaseImages.filter(img => img.image_resource_id !== imageId)
+          this.showcaseImages = this.showcaseImages.filter(img => img.media_id !== mediaId)
           this.showSuccess?.('展示图已删除')
         } else {
           this.showError?.(res.message || '删除失败')
@@ -761,14 +785,166 @@ export function useExchangeItemsMethods() {
      */
     getItemStatusClass(status) {
       return status === 'active' ? 'bg-success' : 'bg-secondary'
-    }
+    },
+
+    // ===== SKU 管理方法（Phase 2 — SPU/SKU 全量模式） =====
 
     /**
-     * 获取商品状态文本
-     * @param {string} status - 商品状态
-     * @returns {string} 状态文本
+     * 加载商品的 SKU 列表
+     * @param {number} itemId - 商品 ID
      */
-    // ✅ 已删除 getItemStatusText 映射函数 - 改用后端 _display 字段（P2 中文化）
+    async loadItemSkus(itemId) {
+      try {
+        const url = buildURL(MARKET_ENDPOINTS.EXCHANGE_ITEM_SKUS, { exchange_item_id: itemId })
+        const res = await request({ url, method: 'GET' })
+        if (res.success) {
+          this.itemSkus = res.data?.skus || []
+        }
+      } catch (e) {
+        logger.error('[ExchangeItems] 加载 SKU 列表失败:', e)
+        this.itemSkus = []
+      }
+    },
+
+    /**
+     * 保存 SKU（新建或更新）
+     * @param {number} itemId - 商品 ID
+     */
+    async saveSku(itemId) {
+      try {
+        const url = this.editingSkuId
+          ? buildURL(MARKET_ENDPOINTS.EXCHANGE_ITEM_SKU_DETAIL, { exchange_item_id: itemId, sku_id: this.editingSkuId })
+          : buildURL(MARKET_ENDPOINTS.EXCHANGE_ITEM_SKUS, { exchange_item_id: itemId })
+        const method = this.editingSkuId ? 'PUT' : 'POST'
+        const res = await request({ url, method, data: this.skuForm })
+        if (res.success) {
+          this.showSuccess?.(this.editingSkuId ? 'SKU 已更新' : 'SKU 已创建')
+          await this.loadItemSkus(itemId)
+          this.resetSkuForm()
+        } else {
+          this.showError?.(res.message || '保存 SKU 失败')
+        }
+      } catch (e) {
+        logger.error('[ExchangeItems] 保存 SKU 失败:', e)
+        this.showError?.('保存 SKU 失败')
+      }
+    },
+
+    /**
+     * 编辑 SKU（填充表单）
+     * @param {Object} sku - SKU 数据
+     */
+    editSku(sku) {
+      this.editingSkuId = sku.sku_id
+      this.skuForm = {
+        spec_values: sku.spec_values || {},
+        cost_amount: sku.cost_amount,
+        stock: sku.stock,
+        cost_asset_code: sku.cost_asset_code || '',
+        status: sku.status
+      }
+    },
+
+    /**
+     * 删除 SKU
+     * @param {number} itemId - 商品 ID
+     * @param {number} skuId - SKU ID
+     */
+    async deleteSku(itemId, skuId) {
+      if (!confirm('确定要删除此 SKU 吗？')) return
+      try {
+        const url = buildURL(MARKET_ENDPOINTS.EXCHANGE_ITEM_SKU_DETAIL, { exchange_item_id: itemId, sku_id: skuId })
+        const res = await request({ url, method: 'DELETE' })
+        if (res.success) {
+          this.showSuccess?.('SKU 已删除')
+          await this.loadItemSkus(itemId)
+        } else {
+          this.showError?.(res.message || '删除失败')
+        }
+      } catch (e) {
+        logger.error('[ExchangeItems] 删除 SKU 失败:', e)
+        this.showError?.('删除 SKU 失败')
+      }
+    },
+
+    /** 重置 SKU 表单 */
+    resetSkuForm() {
+      this.editingSkuId = null
+      this.skuForm = { spec_values: {}, cost_amount: 1, stock: 0, cost_asset_code: '', status: 'active' }
+    },
+
+    // ===== 排序管理方法（Phase 3 — 排序增强） =====
+
+    /**
+     * 置顶/取消置顶商品
+     * @param {Object} item - 商品对象
+     */
+    async togglePin(item) {
+      try {
+        const url = buildURL(MARKET_ENDPOINTS.EXCHANGE_ITEM_PIN, { exchange_item_id: item.exchange_item_id })
+        const res = await request({ url, method: 'PUT', data: { is_pinned: !item.is_pinned } })
+        if (res.success) {
+          this.showSuccess?.(res.data?.is_pinned ? '商品已置顶' : '已取消置顶')
+          await this.loadItems()
+        }
+      } catch (e) {
+        logger.error('[ExchangeItems] 置顶操作失败:', e)
+        this.showError?.('操作失败')
+      }
+    },
+
+    /**
+     * 推荐/取消推荐商品
+     * @param {Object} item - 商品对象
+     */
+    async toggleRecommend(item) {
+      try {
+        const url = buildURL(MARKET_ENDPOINTS.EXCHANGE_ITEM_RECOMMEND, { exchange_item_id: item.exchange_item_id })
+        const res = await request({ url, method: 'PUT', data: { is_recommended: !item.is_recommended } })
+        if (res.success) {
+          this.showSuccess?.(res.data?.is_recommended ? '商品已推荐' : '已取消推荐')
+          await this.loadItems()
+        }
+      } catch (e) {
+        logger.error('[ExchangeItems] 推荐操作失败:', e)
+        this.showError?.('操作失败')
+      }
+    },
+
+    // ===== 快递公司加载（Phase 4） =====
+
+    /** 加载快递公司列表（首次调用时从后端获取并缓存） */
+    async loadShippingCompanies() {
+      if (this.shippingCompaniesLoaded) return
+      try {
+        const res = await request({ url: MARKET_ENDPOINTS.EXCHANGE_SHIPPING_COMPANIES, method: 'GET' })
+        if (res.success) {
+          this.shippingCompanies = res.data?.companies || []
+          this.shippingCompaniesLoaded = true
+        }
+      } catch (e) {
+        logger.error('[ExchangeItems] 加载快递公司列表失败:', e)
+      }
+    },
+
+    /**
+     * 查询订单物流轨迹
+     * @param {string} orderNo - 订单号
+     * @returns {Promise<Object|null>} 物流轨迹数据
+     */
+    async queryOrderTrack(orderNo) {
+      try {
+        const url = buildURL(MARKET_ENDPOINTS.EXCHANGE_ORDER_TRACK, { order_no: orderNo })
+        const res = await request({ url, method: 'GET' })
+        if (res.success) return res.data
+        this.showError?.(res.message || '查询物流失败')
+        return null
+      } catch (e) {
+        logger.error('[ExchangeItems] 查询物流失败:', e)
+        this.showError?.('查询物流轨迹失败')
+        return null
+      }
+    }
   }
 }
 

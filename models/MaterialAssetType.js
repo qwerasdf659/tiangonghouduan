@@ -84,14 +84,6 @@ module.exports = sequelize => {
         comment: '展示名称（Display Name - 用户可见名称）：如"红水晶碎片""红水晶"'
       },
 
-      // 图标URL（Icon URL - 资产图标）V4.7.0 新增
-      icon_url: {
-        type: DataTypes.STRING(500),
-        allowNull: true,
-        defaultValue: null,
-        comment: '图标URL（Icon URL - 资产图标）：用于市场列表、资产展示等场景的图标显示'
-      },
-
       // 分组代码（Group Code - 材料分组）
       group_code: {
         type: DataTypes.STRING(50),

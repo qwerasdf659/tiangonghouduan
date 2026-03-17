@@ -162,17 +162,20 @@ class ExperienceStateManager {
       const state = await Model.findOrCreateState(user_id, lottery_campaign_id, { transaction })
 
       /**
-       * 🔴 2026-02-15 修复：空奖判定逻辑
-       * 只有显式传入 is_empty=true 或档位为 'fallback'/'empty' 才算空奖
-       * low 档位的零值奖品是"参与奖"，不增加 empty_streak
+       * 100% 出奖系统空奖判定逻辑（2026-03-16 语义修正）
+       *
+       * 业务规则：每次抽奖 100% 获得奖品（只是价值不同），不存在"空奖"概念
+       * - fallback 是保底奖品（积分 ×10），是真实奖品，不算空奖
+       * - 只信任上游 SettleStage 传入的 is_empty 标志
+       * - 不再根据 draw_tier 自行判定空奖（与 SettleStage 语义保持一致）
+       *
+       * 历史问题：原代码 `draw_tier === 'fallback'` 导致保底奖品被误判为空奖，
+       * 使得 empty_streak/total_empty_count 错误累积，Pity 和 AntiEmpty 机制
+       * 在不该触发时触发
        */
-      const is_actually_empty = is_empty || draw_tier === 'fallback' || draw_tier === 'empty'
-
-      if (is_actually_empty) {
-        // 空奖：增加空奖连击计数
+      if (is_empty) {
         await state.incrementEmptyStreak({ transaction })
       } else {
-        // 非空奖（包括 low 档位零值参与奖）：重置空奖连击，更新其他状态
         await state.resetEmptyStreak(draw_tier, pity_triggered, { transaction })
       }
 

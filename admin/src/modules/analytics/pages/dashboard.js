@@ -19,7 +19,7 @@
 
 // ES Module 导入
 import { logger } from '../../../utils/logger.js'
-import { loadECharts } from '../../../utils/index.js'
+import { loadECharts } from '../../../utils/echarts-lazy.js'
 import { createPageMixin } from '../../../alpine/mixins/index.js'
 import { SYSTEM_ENDPOINTS } from '../../../api/index.js'
 import { http } from '../../../api/base.js'

@@ -25,7 +25,7 @@ module.exports = {
 
     await queryInterface.bulkInsert('ad_slots', [
       {
-        slot_key: 'market_feed',
+        slot_key: 'market_list_feed',
         slot_name: '交易市场信息流广告位',
         slot_type: 'feed',
         position: 'market_list',
@@ -36,14 +36,14 @@ module.exports = {
         min_daily_price_diamond: 20,
         floor_price_override: null,
         zone_id: 1,
-        slot_category: 'standard',
+        slot_category: 'feed',
         cpm_price_diamond: 5,
         is_active: true,
         created_at: now,
         updated_at: now
       },
       {
-        slot_key: 'exchange_feed',
+        slot_key: 'exchange_list_feed',
         slot_name: '兑换商城信息流广告位',
         slot_type: 'feed',
         position: 'exchange_list',
@@ -54,7 +54,7 @@ module.exports = {
         min_daily_price_diamond: 15,
         floor_price_override: null,
         zone_id: 1,
-        slot_category: 'standard',
+        slot_category: 'feed',
         cpm_price_diamond: 3,
         is_active: true,
         created_at: now,
@@ -62,12 +62,12 @@ module.exports = {
       }
     ])
 
-    console.log('[迁移] 已创建 2 个 feed 类型广告位: market_feed, exchange_feed')
+    console.log('[迁移] 已创建 2 个 feed 类型广告位: market_list_feed, exchange_list_feed')
   },
 
   async down(queryInterface) {
     await queryInterface.bulkDelete('ad_slots', {
-      slot_key: ['market_feed', 'exchange_feed']
+      slot_key: ['market_list_feed', 'exchange_list_feed']
     })
     console.log('[回滚] 已删除 feed 类型广告位种子数据')
   }

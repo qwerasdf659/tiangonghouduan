@@ -264,6 +264,32 @@ module.exports = sequelize => {
         allowNull: true,
         defaultValue: null,
         comment: '退款时间（退款完成的时间）'
+      },
+
+      // === Phase 0 新增字段：快递信息（2026-03-16） ===
+
+      /** 快递公司代码（如 sf/yt/zt/yto），用于调用快递查询 API */
+      shipping_company: {
+        type: DataTypes.STRING(50),
+        allowNull: true,
+        defaultValue: null,
+        comment: '快递公司代码（如 sf/yt/zt/yto）'
+      },
+
+      /** 快递公司名称（如 顺丰速运），用于前端展示 */
+      shipping_company_name: {
+        type: DataTypes.STRING(100),
+        allowNull: true,
+        defaultValue: null,
+        comment: '快递公司名称（如 顺丰速运）'
+      },
+
+      /** 快递单号 */
+      shipping_no: {
+        type: DataTypes.STRING(100),
+        allowNull: true,
+        defaultValue: null,
+        comment: '快递单号'
       }
     },
     {
@@ -278,7 +304,8 @@ module.exports = sequelize => {
         { fields: ['business_id'], unique: true, name: 'uk_exchange_records_business_id' },
         { fields: ['user_id'] },
         { fields: ['status'] },
-        { fields: ['created_at'] }
+        { fields: ['created_at'] },
+        { fields: ['shipping_no'], name: 'idx_exchange_records_shipping_no' }
       ],
       comment: 'B2C兑换记录表'
     }

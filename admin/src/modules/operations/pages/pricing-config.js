@@ -229,7 +229,7 @@ function registerPricingConfigComponents() {
         if (response?.success && response.data?.settings) {
           const settings = response.data.settings
           for (const item of settings) {
-            if (this.pointsDefaults.hasOwnProperty(item.setting_key)) {
+            if (Object.prototype.hasOwnProperty.call(this.pointsDefaults, item.setting_key)) {
               this.pointsDefaults[item.setting_key] =
                 item.parsed_value !== undefined ? item.parsed_value : item.setting_value
             }

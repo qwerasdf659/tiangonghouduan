@@ -1330,7 +1330,8 @@ class StrategySimulationService {
       const metric = ruleConfig.metric
       let actualValue = 0
       if (metric === 'high_rate') actualValue = actualRates.high || 0
-      else if (metric === 'empty_rate') actualValue = actualRates.fallback || 0
+      else if (metric === 'empty_rate') actualValue = actualRates.empty || 0
+      else if (metric === 'fallback_rate') actualValue = actualRates.fallback || 0
 
       const upperBound = ruleConfig.upper_bound || 1
       const lowerBound = ruleConfig.lower_bound || 0
@@ -1443,10 +1444,10 @@ class StrategySimulationService {
     const randomValue = Math.floor(Math.random() * WEIGHT_SCALE)
     let selectedTier = this._pickTier(weights, randomValue)
 
-    // AntiEmpty 检查
+    /* 100% 出奖系统：AntiEmpty 仅对真正的 'empty' 档位生效，fallback 是真实保底奖品 */
     if (strategyConfig.anti_empty?.enabled) {
       const threshold = strategyConfig.anti_empty.empty_streak_threshold || 3
-      if (selectedTier === 'fallback' && counters._user_empty_streak >= threshold) {
+      if (selectedTier === 'empty' && counters._user_empty_streak >= threshold) {
         selectedTier = 'low'
         counters.anti_empty_trigger_count++
       }
@@ -2005,7 +2006,7 @@ class StrategySimulationService {
       tierDist[tier] = Math.round(((counters.tier_counts[tier] || 0) / totalDraws) * 10000) / 100
     }
 
-    const emptyRate = tierDist.fallback || 0
+    const fallbackRate = tierDist.fallback || 0
     const avgDrawsToNonEmpty =
       counters.draws_to_first_non_empty.length > 0
         ? Math.round(
@@ -2027,7 +2028,8 @@ class StrategySimulationService {
 
     return {
       tier_distribution: tierDist,
-      empty_rate: emptyRate,
+      /** 保底奖品占比（100% 出奖系统中 fallback = 保底奖品，非空奖） */
+      empty_rate: fallbackRate,
       cost_metrics: {
         avg_prize_value_by_tier: avgPrizeValueByTier,
         prize_value_per_1000_draws: prizeValuePer1000,

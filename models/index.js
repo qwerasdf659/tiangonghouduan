@@ -421,8 +421,9 @@ models.AdInteractionLog = require('./AdInteractionLog')(sequelize, DataTypes)
  *    - 表名：ad_interaction_logs，主键：ad_interaction_log_id（BIGINT）
  */
 
-// 🔴 图片和存储系统
-models.ImageResources = require('./ImageResources')(sequelize, DataTypes)
+// 🔴 媒体文件与多态关联（2026-03-16 替代 image_resources 架构，image_resources 表已删除）
+models.MediaFile = require('./MediaFile')(sequelize, DataTypes)
+models.MediaAttachment = require('./MediaAttachment')(sequelize, DataTypes)
 
 // 🔴 兑换市场系统
 
@@ -451,6 +452,14 @@ models.ExchangeOrderEvent = require('./ExchangeOrderEvent')(sequelize, DataTypes
  *    - 用途：记录订单完整状态变更链（审计追踪）
  *    - 表名：exchange_order_events，主键：event_id
  *    - 业务场景：创建/审核/发货/收货/评分/取消/拒绝 全链路事件
+ */
+
+models.ExchangeItemSku = require('./ExchangeItemSku')(sequelize, DataTypes)
+/*
+ * ✅ ExchangeItemSku：兑换商品 SKU 表（规格变体）
+ *    - 用途：全量 SKU 模式，所有商品至少有一个默认 SKU
+ *    - 表名：exchange_item_skus，主键：sku_id
+ *    - 业务场景：单品商品 spec_values={} | 多规格商品有独立价格/库存
  */
 
 // 🔴 竞价系统模型（臻选空间/幸运空间/竞价功能 — 2026-02-16）

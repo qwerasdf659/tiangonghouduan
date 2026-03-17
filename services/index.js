@@ -38,7 +38,7 @@ const CustomerServiceDiagnoseService = require('./CustomerServiceDiagnoseService
 const CustomerServiceCompensateService = require('./CustomerServiceCompensateService') // 客服补偿发放服务（GM工作台补偿工具）
 const CustomerServiceIssueService = require('./CustomerServiceIssueService') // 客服工单管理服务（工单CRUD+内部备注）
 const MaterialManagementService = require('./MaterialManagementService') // 材料系统运营管理服务（V4.5.0）
-const ImageService = require('./ImageService') // 通用图片上传服务（图片存储架构）
+const MediaService = require('./MediaService') // 媒体服务（media_files + media_attachments）
 
 // 广告系统服务
 const AdInteractionLogService = require('./AdInteractionLogService') // 统一内容交互日志服务
@@ -302,6 +302,11 @@ class ServiceManager {
       this._services.set('exchange_bid_core', new ExchangeBidService(this.models)) // 竞价核心服务（出价/结算/取消）
       this._services.set('exchange_bid_query', new ExchangeBidQueryService(this.models)) // 竞价查询服务（列表/详情/历史）
       this._services.set('exchange_rate', ExchangeRateService) // 固定汇率兑换服务（静态类，2026-02-23 市场增强）
+
+      // 快递查询服务（双通道降级：快递100主 + 快递鸟备，Phase 4 快递对接）
+      const ShippingTrackService = require('./shipping/ShippingTrackService')
+      this._services.set('shipping_track', new ShippingTrackService())
+
       this._services.set('content_audit', ContentAuditEngine)
       this._services.set('notification', NotificationService) // 静态类，方案B保持静态调用；路由通过 ServiceManager 统一获取
 
@@ -341,7 +346,8 @@ class ServiceManager {
       this._services.set('cs_compensate', CustomerServiceCompensateService) // 客服补偿发放（静态类）
       this._services.set('cs_issue', CustomerServiceIssueService) // 客服工单管理（静态类）
       this._services.set('material_management', MaterialManagementService)
-      this._services.set('image', ImageService)
+      // ImageService 已删除，media 服务在下方注册
+      this._services.set('media', new MediaService(this)) // 媒体服务（需 serviceManager 获取 sealos_storage）
 
       /* ========== 广告系统服务（Phase 2-6 广告平台，popup_show_log/carousel_show_log 已合并） ========== */
       this._services.set('ad_interaction_log', AdInteractionLogService) // 内容交互日志（静态类，弹窗/轮播/公告交互事件记录与统计）

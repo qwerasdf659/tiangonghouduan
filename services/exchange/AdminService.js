@@ -61,7 +61,7 @@ class AdminService {
    * @param {number} itemData.stock - 初始库存
    * @param {number} [itemData.sort_order=100] - 排序号
    * @param {string} [itemData.status='active'] - 商品状态
-   * @param {number} [itemData.primary_image_id] - 主图片ID
+   * @param {number} [itemData.primary_media_id] - 主媒体ID（media_files.media_id）
    * @param {string} [itemData.space='lucky'] - 空间归属（lucky=幸运空间, premium=臻选空间, both=两者都展示）
    * @param {number} [itemData.original_price] - 原价（材料数量，用于展示划线价）
    * @param {Array} [itemData.tags] - 商品标签数组，如 ["限量","新品"]
@@ -72,7 +72,7 @@ class AdminService {
    * @param {boolean} [itemData.free_shipping=false] - 是否包邮
    * @param {boolean} [itemData.is_limited=false] - 是否限量商品（前端触发旋转彩虹边框等视觉强调）
    * @param {string} [itemData.sell_point] - 营销卖点文案
-   * @param {string} [itemData.category] - 商品分类
+   * @param {number} [itemData.category_def_id] - 商品分类ID（FK→category_defs.category_def_id）
    * @param {number} created_by - 创建者ID
    * @param {Object} options - 选项
    * @param {Transaction} options.transaction - 外部事务对象（必填）
@@ -126,18 +126,21 @@ class AdminService {
      * 创建商品（包含臻选空间/幸运空间扩展字段）
      * 商品上架图片校验（决策3）已在路由层前置执行，避免 TransactionManager 误重试业务校验
      */
+    // 分类ID（直接使用 category_def_id，不再兼容旧 category_code 字符串）
+    const categoryDefId = itemData.category_def_id ? parseInt(itemData.category_def_id) : null
+
     const item = await this.ExchangeItem.create(
       {
         item_name: name.trim(),
         description: description.trim(),
-        primary_image_id: itemData.primary_image_id || null,
+        primary_media_id: itemData.primary_media_id ?? null,
         cost_asset_code: itemData.cost_asset_code,
         cost_amount: parseInt(itemData.cost_amount) || 0,
         cost_price: parseFloat(itemData.cost_price),
         stock: parseInt(itemData.stock),
         sort_order: parseInt(itemData.sort_order) || 100,
         status: itemData.status || 'active',
-        category: itemData.category || null,
+        category_def_id: categoryDefId,
         // 臻选空间/幸运空间扩展字段（决策12：9个新字段）
         space: itemData.space || 'lucky',
         original_price: itemData.original_price ? parseInt(itemData.original_price) : null,
@@ -158,27 +161,61 @@ class AdminService {
 
     logger.info(`[兑换市场] 商品创建成功，exchange_item_id: ${item.exchange_item_id}`)
 
-    // 图片绑定
+    // 全量 SKU 模式：自动创建默认 SKU（spec_values={}）
+    const ExchangeItemSku = this.models.ExchangeItemSku
+    if (ExchangeItemSku) {
+      await ExchangeItemSku.create(
+        {
+          exchange_item_id: item.exchange_item_id,
+          spec_values: {},
+          cost_asset_code: item.cost_asset_code,
+          cost_amount: parseInt(itemData.cost_amount) || 0,
+          stock: parseInt(itemData.stock),
+          sold_count: 0,
+          status: item.status,
+          sort_order: 0
+        },
+        { transaction }
+      )
+
+      await item.update(
+        {
+          min_cost_amount: parseInt(itemData.cost_amount) || 0,
+          max_cost_amount: parseInt(itemData.cost_amount) || 0
+        },
+        { transaction }
+      )
+
+      logger.info('[兑换市场] 默认 SKU 创建成功', {
+        exchange_item_id: item.exchange_item_id
+      })
+    }
+
+    // 媒体绑定（使用 MediaService.attach，2026-03-16 媒体体系迁移）
     let bound_image = false
-    if (itemData.primary_image_id) {
+    const primaryMediaId = itemData.primary_media_id
+    if (primaryMediaId) {
       try {
-        const ImageService = require('../ImageService')
-        await ImageService.updateImageContextId(
-          itemData.primary_image_id,
+        const MediaService = require('../MediaService')
+        const mediaService = new MediaService({ getService: () => null })
+        await mediaService.attach(
+          primaryMediaId,
+          'exchange_item',
           item.exchange_item_id,
+          'primary',
+          0,
+          null,
           transaction
         )
         bound_image = true
-        logger.info('[兑换市场] 商品图片绑定成功', {
+        logger.info('[兑换市场] 商品主媒体绑定成功', {
           exchange_item_id: item.exchange_item_id,
-          // 2026-02-01 主键命名规范化：使用完整前缀 image_resource_id
-          image_resource_id: itemData.primary_image_id
+          media_id: primaryMediaId
         })
       } catch (bindError) {
-        logger.warn('[兑换市场] 商品图片绑定失败（非致命）', {
+        logger.warn('[兑换市场] 商品主媒体绑定失败（非致命）', {
           exchange_item_id: item.exchange_item_id,
-          // 2026-02-01 主键命名规范化：使用完整前缀 image_resource_id
-          image_resource_id: itemData.primary_image_id,
+          media_id: primaryMediaId,
           error: bindError.message
         })
       }
@@ -216,7 +253,7 @@ class AdminService {
       throw new Error('商品不存在')
     }
 
-    const old_image_id = item.primary_image_id
+    const old_media_id = item.primary_media_id
     const finalUpdateData = { updated_at: BeijingTimeHelper.createDatabaseTime() }
 
     if (updateData.name !== undefined) {
@@ -274,20 +311,20 @@ class AdminService {
         throw new Error(`无效的status参数，允许值：${validStatuses.join(', ')}`)
       }
 
-      // 商品上架强制图片校验（决策3：商品 status → active 时校验 primary_image_id 非空）
+      // 商品上架强制主媒体校验（决策3：status → active 时校验 primary_media_id 非空）
       if (updateData.status === 'active' && item.status !== 'active') {
-        const targetImageId = updateData.primary_image_id ?? item.primary_image_id
-        if (!targetImageId) {
-          throw new Error('商品上架必须上传主图片（primary_image_id 不能为空）')
+        const targetMediaId = updateData.primary_media_id ?? item.primary_media_id
+        if (!targetMediaId) {
+          throw new Error('商品上架必须上传主图片（primary_media_id 不能为空）')
         }
-        // 验证图片记录真实存在且状态为 active
-        const { ImageResources } = require('../../models')
-        const imageRecord = await ImageResources.findByPk(targetImageId, { transaction })
-        if (!imageRecord) {
-          throw new Error(`商品上架失败：关联图片不存在（image_resource_id=${targetImageId}）`)
+        // 验证媒体记录存在且状态为 active（media_files 表，image_resources 已删除）
+        const { MediaFile } = require('../../models')
+        const record = await MediaFile?.findByPk(targetMediaId, { transaction })
+        if (!record) {
+          throw new Error(`商品上架失败：关联媒体不存在（media_id=${targetMediaId}）`)
         }
-        if (imageRecord.status !== 'active') {
-          throw new Error(`商品上架失败：关联图片状态异常（status=${imageRecord.status}）`)
+        if (record && record.status !== 'active') {
+          throw new Error(`商品上架失败：关联媒体状态异常（status=${record.status}）`)
         }
       }
 
@@ -341,49 +378,60 @@ class AdminService {
       finalUpdateData.sell_point = updateData.sell_point || null
     }
 
-    if (updateData.category !== undefined) {
-      finalUpdateData.category = updateData.category || null
+    if (updateData.category_def_id !== undefined) {
+      finalUpdateData.category_def_id = updateData.category_def_id
+        ? parseInt(updateData.category_def_id)
+        : null
     }
 
     if (updateData.usage_rules !== undefined) {
       finalUpdateData.usage_rules = updateData.usage_rules || null
     }
 
-    // 处理图片更换
+    // 处理主媒体更换（使用 MediaService.detach/attach，2026-03-16 媒体体系迁移）
     let deleted_old_image = false
     let bound_new_image = false
-    const new_image_id = updateData.primary_image_id
+    const new_media_id = updateData.primary_media_id
 
-    if (updateData.primary_image_id !== undefined) {
-      finalUpdateData.primary_image_id = updateData.primary_image_id || null
+    if (updateData.primary_media_id !== undefined) {
+      finalUpdateData.primary_media_id = new_media_id || null
 
-      const ImageService = require('../ImageService')
+      const MediaService = require('../MediaService')
+      const mediaService = new MediaService({ getService: () => null })
 
-      // 删除旧图片
-      if (old_image_id && old_image_id !== new_image_id) {
+      // 删除旧媒体关联
+      if (old_media_id && old_media_id !== new_media_id) {
         try {
-          await ImageService.deleteImage(old_image_id, transaction)
+          await mediaService.detach('exchange_item', item_id, 'primary', transaction)
           deleted_old_image = true
-          logger.info('[兑换市场] 商品旧图片删除成功', { item_id, old_image_id })
+          logger.info('[兑换市场] 商品旧主媒体解绑成功', { item_id, old_media_id })
         } catch (imageError) {
-          logger.warn('[兑换市场] 商品旧图片删除失败（非致命）', {
+          logger.warn('[兑换市场] 商品旧主媒体解绑失败（非致命）', {
             item_id,
-            old_image_id,
+            old_media_id,
             error: imageError.message
           })
         }
       }
 
-      // 绑定新图片
-      if (new_image_id) {
+      // 绑定新主媒体
+      if (new_media_id) {
         try {
-          await ImageService.updateImageContextId(new_image_id, item_id, transaction)
-          bound_new_image = true
-          logger.info('[兑换市场] 商品新图片绑定成功', { item_id, new_image_id })
-        } catch (bindError) {
-          logger.warn('[兑换市场] 商品新图片绑定失败（非致命）', {
+          await mediaService.attach(
+            new_media_id,
+            'exchange_item',
             item_id,
-            new_image_id,
+            'primary',
+            0,
+            null,
+            transaction
+          )
+          bound_new_image = true
+          logger.info('[兑换市场] 商品新主媒体绑定成功', { item_id, new_media_id })
+        } catch (bindError) {
+          logger.warn('[兑换市场] 商品新主媒体绑定失败（非致命）', {
+            item_id,
+            new_media_id,
             error: bindError.message
           })
         }
@@ -395,8 +443,8 @@ class AdminService {
     logger.info(`[兑换市场] 商品更新成功，item_id: ${item_id}`, {
       deleted_old_image,
       bound_new_image,
-      old_image_id,
-      new_image_id
+      old_media_id,
+      new_media_id
     })
 
     // 缓存失效
@@ -411,8 +459,8 @@ class AdminService {
       image_changes: {
         deleted_old_image,
         bound_new_image,
-        old_image_id,
-        new_image_id
+        old_media_id,
+        new_media_id
       }
     }
   }
@@ -435,7 +483,7 @@ class AdminService {
       throw new Error('商品不存在')
     }
 
-    const associated_image_id = item.primary_image_id
+    const associated_media_id = item.primary_media_id
 
     // 检查是否有相关订单（通过 exchange_item_id 关联）
     const orderCount = await this.ExchangeRecord.count({
@@ -468,22 +516,26 @@ class AdminService {
       }
     }
 
-    // 删除关联图片
-    if (associated_image_id) {
+    // 删除关联主媒体（使用 MediaService.detach，2026-03-16 媒体体系迁移）
+    if (associated_media_id) {
       try {
-        const ImageService = require('../ImageService')
-        const deleteResult = await ImageService.deleteImage(associated_image_id, transaction)
-        logger.info('[兑换市场] 商品关联图片删除成功', {
+        const MediaService = require('../MediaService')
+        const mediaService = new MediaService({ getService: () => null })
+        const deletedCount = await mediaService.detach(
+          'exchange_item',
           item_id,
-          // 2026-02-01 主键命名规范化：使用完整前缀 image_resource_id
-          image_resource_id: associated_image_id,
-          delete_result: deleteResult.success
+          'primary',
+          transaction
+        )
+        logger.info('[兑换市场] 商品关联主媒体解绑成功', {
+          item_id,
+          media_id: associated_media_id,
+          deleted_count: deletedCount
         })
       } catch (imageError) {
-        logger.warn('[兑换市场] 商品关联图片删除失败（非致命）', {
+        logger.warn('[兑换市场] 商品关联主媒体解绑失败（非致命）', {
           item_id,
-          // 2026-02-01 主键命名规范化：使用完整前缀 image_resource_id
-          image_resource_id: associated_image_id,
+          media_id: associated_media_id,
           error: imageError.message
         })
       }
@@ -492,8 +544,7 @@ class AdminService {
     await item.destroy({ transaction })
 
     logger.info(`[兑换市场] 商品删除成功，item_id: ${item_id}`, {
-      // 2026-02-01 主键命名规范化：使用完整前缀 image_resource_id
-      deleted_image_resource_id: associated_image_id
+      deleted_media_id: associated_media_id
     })
 
     try {
@@ -505,7 +556,7 @@ class AdminService {
     return {
       action: 'deleted',
       message: '商品删除成功',
-      deleted_image_resource_id: associated_image_id
+      deleted_media_id: associated_media_id
     }
   }
 
@@ -1007,12 +1058,11 @@ class AdminService {
   /**
    * 批量绑定商品图片（运营批量上传图片后绑定）
    *
-   * 业务场景：77条兑换商品的 primary_image_id 全为 NULL，
-   * 运营在管理后台上传图片后，通过此接口批量绑定图片到对应商品
+   * 业务场景：运营在管理后台上传图片后，通过此接口批量绑定图片到对应商品
    *
    * @param {Array<Object>} bindings - 绑定关系数组
    * @param {number} bindings[].exchange_item_id - 商品ID
-   * @param {number} bindings[].image_resource_id - 图片资源ID
+   * @param {number} bindings[].media_id - 媒体文件ID（media_files.media_id）
    * @param {Object} options - 选项
    * @param {Object} options.transaction - 事务对象（必填）
    * @returns {Promise<Object>} 绑定结果
@@ -1024,16 +1074,16 @@ class AdminService {
       throw new Error('绑定关系数组不能为空')
     }
 
-    // 参数格式验证
     for (const binding of bindings) {
-      if (!binding.exchange_item_id || !binding.image_resource_id) {
-        throw new Error('每条绑定记录必须包含 exchange_item_id 和 image_resource_id')
+      if (!binding.exchange_item_id || !binding.media_id) {
+        throw new Error('每条绑定记录必须包含 exchange_item_id 和 media_id')
       }
     }
 
-    logger.info('[兑换市场-管理] 批量绑定商品图片', { count: bindings.length })
+    logger.info('[兑换市场-管理] 批量绑定商品主媒体', { count: bindings.length })
 
-    const ImageService = require('../ImageService')
+    const MediaService = require('../MediaService')
+    const mediaService = new MediaService({ getService: () => null })
     const results = { success: 0, failed: 0, details: [] }
 
     for (const binding of bindings) {
@@ -1050,31 +1100,31 @@ class AdminService {
           continue
         }
 
-        // 更新商品的 primary_image_id
-        await item.update({ primary_image_id: binding.image_resource_id }, { transaction })
-
-        // 绑定图片的 context_id 到商品ID（防止24h清理误删）
-        await ImageService.updateImageContextId(
-          binding.image_resource_id,
+        await mediaService.attach(
+          binding.media_id,
+          'exchange_item',
           binding.exchange_item_id,
+          'primary',
+          0,
+          null,
           transaction
         )
 
         results.success++
         results.details.push({
           exchange_item_id: binding.exchange_item_id,
-          image_resource_id: binding.image_resource_id,
+          media_id: binding.media_id,
           success: true
         })
       } catch (bindError) {
         results.failed++
         results.details.push({
           exchange_item_id: binding.exchange_item_id,
-          image_resource_id: binding.image_resource_id,
+          media_id: binding.media_id,
           success: false,
           error: bindError.message
         })
-        logger.warn('[兑换市场-管理] 单条图片绑定失败', {
+        logger.warn('[兑换市场-管理] 单条主媒体绑定失败', {
           exchange_item_id: binding.exchange_item_id,
           error: bindError.message
         })
@@ -1120,8 +1170,15 @@ class AdminService {
       const limit = page_size
 
       const { count, rows } = await this.ExchangeItem.findAndCountAll({
-        where: { primary_image_id: null },
-        attributes: ['exchange_item_id', 'item_name', 'category', 'status', 'space', 'stock'],
+        where: { primary_media_id: null },
+        attributes: [
+          'exchange_item_id',
+          'item_name',
+          'category_def_id',
+          'status',
+          'space',
+          'stock'
+        ],
         limit,
         offset,
         order: [['exchange_item_id', 'ASC']]
@@ -1225,6 +1282,243 @@ class AdminService {
       logger.error('[兑换市场-管理] 查询空间分布失败:', error.message)
       throw error
     }
+  }
+  /*
+   * ================================================================
+   * SKU 管理方法（Phase 2 — SPU/SKU 全量模式）
+   * ================================================================
+   */
+
+  /**
+   * 获取商品的所有 SKU 列表
+   *
+   * @param {number} exchangeItemId - SPU 商品ID
+   * @returns {Promise<Object>} SKU 列表和商品基础信息
+   */
+  async listSkus(exchangeItemId) {
+    const ExchangeItemSku = this.models.ExchangeItemSku
+    const item = await this.ExchangeItem.findByPk(exchangeItemId, {
+      attributes: [
+        'exchange_item_id',
+        'item_name',
+        'spec_names',
+        'cost_asset_code',
+        'cost_amount',
+        'stock',
+        'sold_count',
+        'min_cost_amount',
+        'max_cost_amount'
+      ]
+    })
+
+    if (!item) {
+      throw new Error('商品不存在')
+    }
+
+    const skus = await ExchangeItemSku.findAll({
+      where: { exchange_item_id: exchangeItemId },
+      order: [
+        ['sort_order', 'ASC'],
+        ['sku_id', 'ASC']
+      ]
+    })
+
+    return {
+      item: item.toJSON(),
+      skus: skus.map(s => s.toJSON()),
+      total: skus.length
+    }
+  }
+
+  /**
+   * 创建 SKU（为商品添加新的规格变体）
+   *
+   * @param {number} exchangeItemId - SPU 商品ID
+   * @param {Object} skuData - SKU 数据
+   * @param {Object} skuData.spec_values - 规格值，如 {"颜色":"白色","尺码":"S"}
+   * @param {number} skuData.cost_amount - 该 SKU 的兑换价格
+   * @param {number} skuData.stock - 初始库存
+   * @param {string} [skuData.cost_asset_code] - 支付资产代码（覆盖 SPU 默认值）
+   * @param {Object} options - 选项
+   * @param {Transaction} options.transaction - 外部事务对象（必填）
+   * @returns {Promise<Object>} 创建的 SKU
+   */
+  async createSku(exchangeItemId, skuData, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'AdminService.createSku')
+    const ExchangeItemSku = this.models.ExchangeItemSku
+
+    const item = await this.ExchangeItem.findByPk(exchangeItemId, {
+      lock: transaction.LOCK.UPDATE,
+      transaction
+    })
+    if (!item) {
+      throw new Error('商品不存在')
+    }
+
+    if (!skuData.cost_amount || skuData.cost_amount <= 0) {
+      throw new Error('SKU 兑换价格必须大于 0')
+    }
+
+    if (skuData.stock === undefined || skuData.stock < 0) {
+      throw new Error('SKU 库存必须大于等于 0')
+    }
+
+    const sku = await ExchangeItemSku.create(
+      {
+        exchange_item_id: exchangeItemId,
+        spec_values: skuData.spec_values || {},
+        cost_asset_code: skuData.cost_asset_code || null,
+        cost_amount: parseInt(skuData.cost_amount),
+        stock: parseInt(skuData.stock),
+        sold_count: 0,
+        status: skuData.status || 'active',
+        sort_order: parseInt(skuData.sort_order) || 0
+      },
+      { transaction }
+    )
+
+    // 更新 SPU 规格维度和汇总字段
+    if (skuData.spec_values && Object.keys(skuData.spec_values).length > 0) {
+      const specNames = Object.keys(skuData.spec_values)
+      const currentSpecNames = item.spec_names || []
+      const mergedSpecNames = [...new Set([...currentSpecNames, ...specNames])]
+      await item.update({ spec_names: mergedSpecNames }, { transaction })
+    }
+
+    await this._updateSpuSummary(exchangeItemId, transaction)
+
+    await BusinessCacheHelper.invalidateExchangeItems('sku_created')
+
+    logger.info('[兑换市场] SKU 创建成功', {
+      sku_id: sku.sku_id,
+      exchange_item_id: exchangeItemId,
+      spec_values: skuData.spec_values
+    })
+
+    return { sku: sku.toJSON() }
+  }
+
+  /**
+   * 更新 SKU
+   *
+   * @param {number} skuId - SKU ID
+   * @param {Object} updateData - 更新数据
+   * @param {Object} options - 选项
+   * @param {Transaction} options.transaction - 外部事务对象（必填）
+   * @returns {Promise<Object>} 更新后的 SKU
+   */
+  async updateSku(skuId, updateData, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'AdminService.updateSku')
+    const ExchangeItemSku = this.models.ExchangeItemSku
+
+    const sku = await ExchangeItemSku.findByPk(skuId, {
+      lock: transaction.LOCK.UPDATE,
+      transaction
+    })
+    if (!sku) {
+      throw new Error('SKU 不存在')
+    }
+
+    const allowedFields = [
+      'spec_values',
+      'cost_asset_code',
+      'cost_amount',
+      'stock',
+      'status',
+      'sort_order'
+    ]
+    const finalUpdate = {}
+    for (const field of allowedFields) {
+      if (updateData[field] !== undefined) {
+        finalUpdate[field] = updateData[field]
+      }
+    }
+
+    if (finalUpdate.cost_amount !== undefined && finalUpdate.cost_amount <= 0) {
+      throw new Error('SKU 兑换价格必须大于 0')
+    }
+
+    await sku.update(finalUpdate, { transaction })
+    await this._updateSpuSummary(sku.exchange_item_id, transaction)
+
+    await BusinessCacheHelper.invalidateExchangeItems('sku_updated')
+
+    return { sku: sku.toJSON() }
+  }
+
+  /**
+   * 删除 SKU（不允许删除最后一个 SKU）
+   *
+   * @param {number} skuId - SKU ID
+   * @param {Object} options - 选项
+   * @param {Transaction} options.transaction - 外部事务对象（必填）
+   * @returns {Promise<Object>} 删除结果
+   */
+  async deleteSku(skuId, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'AdminService.deleteSku')
+    const ExchangeItemSku = this.models.ExchangeItemSku
+
+    const sku = await ExchangeItemSku.findByPk(skuId, { transaction })
+    if (!sku) {
+      throw new Error('SKU 不存在')
+    }
+
+    const skuCount = await ExchangeItemSku.count({
+      where: { exchange_item_id: sku.exchange_item_id },
+      transaction
+    })
+
+    if (skuCount <= 1) {
+      throw new Error('不能删除最后一个 SKU，每个商品至少保留一个 SKU')
+    }
+
+    const exchangeItemId = sku.exchange_item_id
+    await sku.destroy({ transaction })
+    await this._updateSpuSummary(exchangeItemId, transaction)
+
+    await BusinessCacheHelper.invalidateExchangeItems('sku_deleted')
+
+    logger.info('[兑换市场] SKU 删除成功', { sku_id: skuId, exchange_item_id: exchangeItemId })
+
+    return { action: 'deleted', sku_id: skuId }
+  }
+
+  /**
+   * 更新 SPU 汇总字段（stock/sold_count/min_cost_amount/max_cost_amount）
+   * 从所有 active SKU 聚合计算
+   *
+   * @param {number} exchangeItemId - SPU 商品ID
+   * @param {Transaction} transaction - 事务对象
+   * @returns {Promise<void>} 无返回值，直接更新 SPU 记录
+   * @private
+   */
+  async _updateSpuSummary(exchangeItemId, transaction) {
+    const ExchangeItemSku = this.models.ExchangeItemSku
+
+    const [summary] = await ExchangeItemSku.findAll({
+      where: { exchange_item_id: exchangeItemId, status: 'active' },
+      attributes: [
+        [this.sequelize.fn('SUM', this.sequelize.col('stock')), 'total_stock'],
+        [this.sequelize.fn('SUM', this.sequelize.col('sold_count')), 'total_sold'],
+        [this.sequelize.fn('MIN', this.sequelize.col('cost_amount')), 'min_cost'],
+        [this.sequelize.fn('MAX', this.sequelize.col('cost_amount')), 'max_cost']
+      ],
+      raw: true,
+      transaction
+    })
+
+    await this.ExchangeItem.update(
+      {
+        stock: parseInt(summary.total_stock) || 0,
+        sold_count: parseInt(summary.total_sold) || 0,
+        min_cost_amount: summary.min_cost !== null ? parseInt(summary.min_cost) : null,
+        max_cost_amount: summary.max_cost !== null ? parseInt(summary.max_cost) : null
+      },
+      {
+        where: { exchange_item_id: exchangeItemId },
+        transaction
+      }
+    )
   }
 }
 

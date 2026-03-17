@@ -19,7 +19,7 @@
  */
 
 const logger = require('../utils/logger').logger
-const { AdSlot, AdCampaign, AdBidLog, AdCreative, UserAdTag } = require('../models')
+const { AdSlot, AdCampaign, AdBidLog, AdCreative, UserAdTag, MediaFile } = require('../models')
 const { Op } = require('sequelize')
 const { sequelize } = require('../models')
 const BeijingTimeHelper = require('../utils/timeHelper')
@@ -78,7 +78,16 @@ class AdBiddingService {
             model: AdCreative,
             as: 'creatives',
             where: { review_status: 'approved' },
-            required: true
+            required: true,
+            include: MediaFile
+              ? [
+                  {
+                    model: MediaFile,
+                    as: 'primary_media',
+                    attributes: ['media_id', 'object_key', 'width', 'height', 'thumbnail_keys']
+                  }
+                ]
+              : []
           }
         ],
         transaction
@@ -192,9 +201,10 @@ class AdBiddingService {
                 ad_creative_id: creative.ad_creative_id,
                 title: creative.title,
                 content_type: creative.content_type,
-                image_url: creative.image_url,
-                image_width: creative.image_width,
-                image_height: creative.image_height,
+                primary_media_id: creative.primary_media_id,
+                image_url: creative.primary_media?.object_key || null,
+                image_width: creative.primary_media?.width || null,
+                image_height: creative.primary_media?.height || null,
                 text_content: creative.text_content,
                 link_url: creative.link_url,
                 link_type: creative.link_type,

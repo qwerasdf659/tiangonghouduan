@@ -28,7 +28,7 @@
  *
  * 设计原则：
  * - 读操作Stage，不执行任何写操作
- * - 预算不足时仍然继续（降级到空奖 B0），不直接失败
+ * - 预算不足时仍然继续（降级到保底档位 B0），不直接失败
  * - 支持三种预算模式：user、pool、hybrid、none
  *
  * @module services/UnifiedLotteryEngine/pipeline/stages/BudgetContextStage
@@ -117,7 +117,7 @@ class BudgetContextStage extends BaseStage {
       /* 4. 计算最低奖品成本 */
       const min_prize_cost = this._calculateMinPrizeCost(prizes)
 
-      /* 5. 判断预算是否充足（能否抽中非空奖） */
+      /* 5. 判断预算是否充足（能否抽中非保底奖品） */
       const budget_sufficient = budget_mode === 'none' || budget_before >= min_prize_cost
 
       /* 6. 构建返回数据（整合策略引擎结果） */
@@ -181,7 +181,7 @@ class BudgetContextStage extends BaseStage {
    * 计算最低奖品预算成本
    *
    * 业务规则：
-   * - 排除空奖（budget_cost = 0）
+   * - 排除保底奖品（budget_cost = 0）
    * - 找出最小的 budget_cost（与过滤/扣减口径一致）
    *
    * @param {Array} prizes - 奖品列表

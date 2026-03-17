@@ -674,7 +674,7 @@ class ActivityService {
   /**
    * 获取活动奖品配置
    *
-   * @description 获取活动的所有奖品配置，包括积分奖品和空奖
+   * @description 获取活动的所有奖品配置，包括积分奖品和保底奖品
    *
    * @param {number} campaignId - 活动ID
    * @returns {Promise<Object>} 奖品配置信息
@@ -715,7 +715,7 @@ class ActivityService {
     // 分析奖品结构
     const analysis = {
       total_prizes: prizes.length,
-      has_empty_prize: prizes.some(p => p.prize_type === 'empty' || p.prize_value_points === 0),
+      has_fallback_prize: prizes.some(p => p.prize_type === 'empty' || p.prize_value_points === 0),
       points_prizes_count: prizes.filter(p => p.prize_value_points > 0).length,
       total_probability: prizes.reduce((sum, p) => sum + Number(p.win_probability || 0), 0)
     }
@@ -848,7 +848,7 @@ class ActivityService {
   /**
    * 验证活动奖品配置
    *
-   * @description 验证活动的奖品配置是否符合业务规则（空奖约束、概率总和等）
+   * @description 验证活动的奖品配置是否符合业务规则（保底奖品约束、概率总和等）
    *
    * @param {number} campaignId - 活动ID
    * @returns {Promise<Object>} 验证结果
@@ -867,8 +867,8 @@ class ActivityService {
       throw error
     }
 
-    // 使用模型静态方法验证空奖约束
-    const emptyPrizeResult = await models.LotteryPrize.validateEmptyPrizeConstraint(
+    // 使用模型静态方法验证保底奖品约束
+    const emptyPrizeResult = await models.LotteryPrize.validateFallbackPrizeConstraint(
       parseInt(campaignId)
     )
 
@@ -881,10 +881,10 @@ class ActivityService {
       lottery_campaign_id: parseInt(campaignId),
       campaign_name: campaign.campaign_name,
       budget_mode: campaign.budget_mode,
-      empty_prize_constraint: {
+      fallback_prize_constraint: {
         valid: emptyPrizeResult.valid,
         error: emptyPrizeResult.error || null,
-        empty_prizes: emptyPrizeResult.emptyPrizes || []
+        fallback_prizes: emptyPrizeResult.emptyPrizes || []
       },
       prize_config: budgetConfigResult,
       overall_valid: emptyPrizeResult.valid && budgetConfigResult.valid
@@ -900,7 +900,7 @@ class ActivityService {
    * - 校验内容：
    *   1. 档位权重校验：同活动+同segment_key下，high+mid+low 权重之和必须 = 1,000,000
    *   2. 奖品权重校验：同档位（reward_tier）内，所有奖品 win_weight 之和必须 = 1,000,000
-   *   3. 空奖配置校验：必须有 prize_value_points=0 的保底奖品
+   *   3. 保底奖品配置校验：必须有 prize_value_points=0 的保底奖品
    *   4. 基础配置校验：必须有激活状态的奖品
    *
    * @param {number} campaignId - 活动ID
@@ -991,15 +991,15 @@ class ActivityService {
       errors.push(`奖品权重：${prizeWeightResult.error}`)
     }
 
-    // 3. 校验空奖配置
-    const emptyPrizeResult = await models.LotteryPrize.validateEmptyPrizeConstraint(
+    // 3. 校验保底奖品配置
+    const emptyPrizeResult = await models.LotteryPrize.validateFallbackPrizeConstraint(
       parsedCampaignId,
       { transaction }
     )
-    validationDetails.empty_prize = emptyPrizeResult
+    validationDetails.fallback_prize = emptyPrizeResult
 
     if (!emptyPrizeResult.valid && emptyPrizeResult.error) {
-      errors.push(`空奖配置：${emptyPrizeResult.error}`)
+      errors.push(`保底奖品配置：${emptyPrizeResult.error}`)
     }
 
     // 4. 校验预算配置

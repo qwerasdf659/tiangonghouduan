@@ -1,12 +1,13 @@
 /**
- * 统一图片上传 Mixin
+ * 统一图片上传 Mixin（媒体 API 版本）
  *
  * @description 封装图片上传的通用逻辑：文件校验、FormData 构建、API 请求、状态管理
  *              消除各模块（exchange-items/item-templates/images/material-conversion）中
  *              重复的上传代码（6 处 80% 重复逻辑）
+ *              使用新媒体 API：upload 仅上传文件，attach 单独绑定实体
  *
- * @version 1.0.0
- * @date 2026-02-21
+ * @version 2.0.0
+ * @date 2026-03-16
  * @see docs/图片管理体系设计方案.md §十四 步骤11
  *
  * @example
@@ -17,21 +18,25 @@
  *     ...imageUploadMixin(),
  *
  *     async handleUpload(event) {
- *       const result = await this.uploadImage(event.target.files[0], {
- *         business_type: 'exchange',
- *         category: 'products'
- *       })
+ *       const result = await this.uploadImage(event.target.files[0])
  *       if (result) {
- *         this.itemForm.primary_image_id = result.image_resource_id
+ *         this.itemForm.primary_media_id = result.media_id
  *         this.imagePreviewUrl = result.public_url
+ *         // 可选：绑定到业务实体
+ *         await this.attachMedia(result.media_id, 'ExchangeItem', this.itemId, 'primary', 0)
  *       }
  *     }
  *   }
  * }
+ *
+ * @typedef {Object} MediaUploadResult
+ * @property {number} media_id - 媒体 ID
+ * @property {string} public_url - 公开访问 URL
+ * @property {Object} thumbnails - 缩略图 URL 集合（来自 MediaFile.getThumbnailUrls()）
  */
 
 import { SYSTEM_ADMIN_ENDPOINTS } from '../../api/system/admin.js'
-import { buildURL, request } from '../../api/base.js'
+import { request } from '../../api/base.js'
 import { logger } from '../../utils/logger.js'
 
 /**
@@ -65,21 +70,16 @@ export function imageUploadMixin(config = {}) {
     image_uploading: false,
 
     /**
-     * 上传单张图片到后端图片管理服务
+     * 上传单张图片到后端媒体管理服务
      *
      * @param {File} file - 要上传的文件对象
-     * @param {Object} options - 上传选项
-     * @param {string} options.business_type - 业务类型（exchange/lottery/uploads 等）
-     * @param {string} options.category - 图片分类（products/items/icons/general 等）
-     * @param {number} [options.context_id] - 关联的业务实体 ID
-     * @param {number} [options.sort_order] - 排序序号（多图场景使用）
-     * @returns {Promise<Object|null>} 上传成功返回图片数据，失败返回 null
-     * @returns {number} return.image_resource_id - 图片资源 ID
-     * @returns {string} return.object_key - 对象存储 key
+     * @param {Object} [options={}] - 预留上传选项（业务绑定请使用 attachMedia）
+     * @returns {Promise<MediaUploadResult|null>} 上传成功返回媒体数据，失败返回 null
+     * @returns {number} return.media_id - 媒体 ID
      * @returns {string} return.public_url - 公开访问 URL
-     * @returns {Object} return.thumbnail_urls - 缩略图 URL 集合
+     * @returns {Object} return.thumbnails - 缩略图 URL 集合（来自 MediaFile.getThumbnailUrls()）
      */
-    async uploadImage(file, options = {}) {
+    async uploadImage(file, _options = {}) {
       if (!file) {
         this.showError?.('请选择图片文件')
         return null
@@ -105,21 +105,15 @@ export function imageUploadMixin(config = {}) {
         const formData = new FormData()
         formData.append('image', file)
 
-        if (options.business_type) formData.append('business_type', options.business_type)
-        if (options.category) formData.append('category', options.category)
-        if (options.context_id) formData.append('context_id', String(options.context_id))
-        if (options.sort_order != null) formData.append('sort_order', String(options.sort_order))
-
         const result = await request({
-          url: SYSTEM_ADMIN_ENDPOINTS.IMAGE_UPLOAD,
+          url: SYSTEM_ADMIN_ENDPOINTS.MEDIA_UPLOAD,
           method: 'POST',
           data: formData
         })
 
         if (result.success && result.data) {
           logger.info('图片上传成功', {
-            image_resource_id: result.data.image_resource_id,
-            business_type: options.business_type
+            media_id: result.data.media_id
           })
           this.showSuccess?.('图片上传成功')
           return result.data
@@ -139,32 +133,32 @@ export function imageUploadMixin(config = {}) {
     },
 
     /**
-     * 更新图片排序序号
+     * 更新媒体排序序号
      *
-     * @param {number} imageId - 图片资源 ID
+     * @param {number} mediaId - 媒体 ID
      * @param {number} sortOrder - 新的排序序号
      * @returns {Promise<boolean>} 更新是否成功
      */
-    async updateImageSortOrder(imageId, sortOrder) {
+    async updateImageSortOrder(mediaId, sortOrder) {
       try {
-        const url = buildURL(SYSTEM_ADMIN_ENDPOINTS.IMAGE_UPDATE, { id: imageId })
+        const url = SYSTEM_ADMIN_ENDPOINTS.MEDIA_UPDATE(mediaId)
         const result = await request({ url, method: 'PATCH', data: { sort_order: sortOrder } })
         return result.success === true
       } catch (error) {
-        logger.error('更新图片排序失败', { image_id: imageId, error: error.message })
+        logger.error('更新媒体排序失败', { media_id: mediaId, error: error.message })
         return false
       }
     },
 
     /**
-     * 删除图片资源
+     * 删除媒体资源
      *
-     * @param {number} imageId - 图片资源 ID
+     * @param {number} mediaId - 媒体 ID
      * @returns {Promise<boolean>} 删除是否成功
      */
-    async deleteImageResource(imageId) {
+    async deleteImageResource(mediaId) {
       try {
-        const url = buildURL(SYSTEM_ADMIN_ENDPOINTS.IMAGE_DELETE, { id: imageId })
+        const url = SYSTEM_ADMIN_ENDPOINTS.MEDIA_DELETE(mediaId)
         const result = await request({ url, method: 'DELETE' })
 
         if (result.success) {
@@ -175,8 +169,55 @@ export function imageUploadMixin(config = {}) {
         this.showError?.(result.message || '删除失败')
         return false
       } catch (error) {
-        logger.error('删除图片失败', { image_id: imageId, error: error.message })
+        logger.error('删除媒体失败', { media_id: mediaId, error: error.message })
         this.showError?.('删除图片失败')
+        return false
+      }
+    },
+
+    /**
+     * 将媒体绑定到业务实体
+     *
+     * @param {number} mediaId - 媒体 ID
+     * @param {string} attachableType - 可挂载实体类型（如 ExchangeItem、AdCreative）
+     * @param {number|string} attachableId - 可挂载实体 ID
+     * @param {string} [role='attachment'] - 附件角色（如 primary、thumbnail、gallery）
+     * @param {number} [sortOrder=0] - 排序序号
+     * @returns {Promise<boolean>} 绑定是否成功
+     */
+    async attachMedia(mediaId, attachableType, attachableId, role = 'attachment', sortOrder = 0) {
+      try {
+        const url = SYSTEM_ADMIN_ENDPOINTS.MEDIA_ATTACH(mediaId)
+        const result = await request({
+          url,
+          method: 'POST',
+          data: { attachable_type: attachableType, attachable_id: attachableId, role, sort_order: sortOrder }
+        })
+        return result.success === true
+      } catch (error) {
+        logger.error('绑定媒体失败', { media_id: mediaId, attachable_type: attachableType, error: error.message })
+        return false
+      }
+    },
+
+    /**
+     * 将媒体从业务实体解绑
+     *
+     * @param {number} mediaId - 媒体 ID
+     * @param {string} attachableType - 可挂载实体类型
+     * @param {number|string} attachableId - 可挂载实体 ID
+     * @param {string} [role] - 附件角色（可选，不传则解绑该实体的全部该媒体）
+     * @returns {Promise<boolean>} 解绑是否成功
+     */
+    async detachMedia(mediaId, attachableType, attachableId, role) {
+      try {
+        const url = SYSTEM_ADMIN_ENDPOINTS.MEDIA_DETACH(mediaId)
+        const data = { attachable_type: attachableType, attachable_id: attachableId }
+        if (role != null) data.role = role
+        const result = await request({ url, method: 'POST', data })
+        return result.success === true
+      } catch (error) {
+        logger.error('解绑媒体失败', { media_id: mediaId, attachable_type: attachableType, error: error.message })
         return false
       }
     },

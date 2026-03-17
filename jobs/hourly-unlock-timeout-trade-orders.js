@@ -48,9 +48,24 @@ const logger = require('../utils/logger')
  */
 class HourlyUnlockTimeoutTradeOrders {
   /**
-   * 锁定超时阈值：3分钟
+   * 获取锁定超时阈值（从 system_configs 读取，兜底 15 分钟）
+   * @returns {Promise<number>} 超时分钟数
    */
-  static LOCK_TIMEOUT_MINUTES = 3
+  static async getLockTimeoutMinutes() {
+    try {
+      const { sequelize } = require('../config/database')
+      const [rows] = await sequelize.query(
+        "SELECT config_value FROM system_configs WHERE config_key = 'trade_order_timeout_minutes' AND is_active = 1 LIMIT 1"
+      )
+      if (rows.length > 0) {
+        const val = JSON.parse(rows[0].config_value)
+        return parseInt(val) || 15
+      }
+    } catch {
+      /* 读取失败时使用默认值 */
+    }
+    return 15
+  }
 
   /**
    * 执行超时解锁任务

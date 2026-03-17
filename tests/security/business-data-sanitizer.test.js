@@ -537,8 +537,8 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
         created_at: '2026-01-01',
         cost_price: 20,
         sold_count: 100,
-        primary_image_id: null,
-        primaryImage: null
+        primary_media_id: null,
+        primary_media: null
       }
     ]
 
@@ -714,7 +714,7 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
         seller_nickname: '张三丰',
         seller_avatar_url: 'https://example.com/avatar1.jpg',
         offer_item_display_name: '红宝石碎片',
-        offer_item_category_code: 'material',
+        offer_category_def_id: 1,
         price_amount: 500,
         price_asset_code: 'DIAMOND',
         status: 'on_sale',
@@ -734,7 +734,7 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
         seller_nickname: '李四',
         seller_avatar_url: null,
         offer_item_display_name: '积分',
-        offer_item_category_code: 'currency',
+        offer_category_def_id: 2,
         price_amount: 100,
         price_asset_code: 'DIAMOND',
         status: 'on_sale',

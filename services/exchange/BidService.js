@@ -451,8 +451,8 @@ class BidService {
         meta: {
           bid_product_id: bidProductId,
           exchange_item_id: exchangeItem.exchange_item_id,
-          primary_image_id: exchangeItem.primary_image_id,
-          category: exchangeItem.category,
+          primary_media_id: exchangeItem.primary_media_id,
+          category_def_id: exchangeItem.category_def_id,
           original_cost_asset_code: exchangeItem.cost_asset_code,
           original_cost_amount: Number(exchangeItem.cost_amount),
           bid_winning_amount: winningAmount,

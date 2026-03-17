@@ -237,7 +237,6 @@ const DELETE_TOPOLOGY = Object.freeze([
     'content_review_records',
     'merchant_operation_logs',
     'feedbacks',
-    'image_resources',
     'item_holds',
     'item_ledger',
     'exchange_records',

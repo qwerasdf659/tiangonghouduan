@@ -432,7 +432,7 @@ router.get(
  * @body {number} stock - 初始库存（必填，>=0）
  * @body {number} sort_order - 排序号（必填，默认100）
  * @body {string} status - 商品状态（必填：active/inactive）
- * @body {number} primary_image_id - 主图片ID（可选，关联 image_resources.image_resource_id）
+ * @body {number} primary_media_id - 主媒体ID（可选，关联 media_files.media_id）
  * @body {string} space - 空间归属（可选，lucky=幸运空间, premium=臻选空间, both=两者都展示，默认lucky）
  * @body {number} original_price - 原价材料数量（可选，用于展示划线价）
  * @body {Array} tags - 商品标签数组（可选，如 ["限量","新品"]）
@@ -443,7 +443,7 @@ router.get(
  * @body {boolean} free_shipping - 是否包邮（可选，默认false）
  * @body {boolean} is_limited - 是否限量商品（可选，默认false，管理员手动控制）
  * @body {string} sell_point - 营销卖点文案（可选，最长200字符）
- * @body {string} category - 商品分类（可选）
+ * @body {string|number} [category] - 商品分类（category_code 或 category_def_id，可选）
  */
 router.post(
   '/exchange_market/items',
@@ -460,7 +460,7 @@ router.post(
         stock,
         sort_order = 100,
         status = 'active',
-        primary_image_id,
+        primary_media_id,
         space,
         original_price,
         tags,
@@ -471,7 +471,8 @@ router.post(
         free_shipping,
         is_limited,
         sell_point,
-        category
+        category,
+        category_def_id
       } = req.body
 
       const admin_id = req.user.user_id
@@ -482,16 +483,17 @@ router.post(
         cost_asset_code,
         cost_amount,
         stock,
-        primary_image_id
+        primary_media_id
       })
 
       const ExchangeService = req.app.locals.services.getService('exchange_admin')
 
       // 商品上架前置校验（在事务外执行，避免 TransactionManager 误重试业务校验错误）
       const targetStatus = status || 'active'
-      if (targetStatus === 'active' && !primary_image_id) {
+      const primaryMediaId = primary_media_id
+      if (targetStatus === 'active' && !primaryMediaId) {
         return res.apiError(
-          '商品上架必须上传主图片（primary_image_id 不能为空）',
+          '商品上架必须上传主图片（primary_media_id 不能为空）',
           'IMAGE_REQUIRED',
           null,
           400
@@ -509,7 +511,7 @@ router.post(
             stock,
             sort_order,
             status,
-            primary_image_id,
+            primary_media_id: primaryMediaId,
             space,
             original_price,
             tags,
@@ -520,7 +522,7 @@ router.post(
             free_shipping,
             is_limited,
             sell_point,
-            category
+            category: category ?? category_def_id
           },
           admin_id,
           { transaction }
@@ -631,7 +633,7 @@ router.put(
         stock,
         sort_order,
         status,
-        primary_image_id,
+        primary_media_id,
         space,
         original_price,
         tags,
@@ -642,7 +644,8 @@ router.put(
         free_shipping,
         is_limited,
         sell_point,
-        category
+        category,
+        category_def_id
       } = req.body
 
       const admin_id = req.user.user_id
@@ -651,7 +654,7 @@ router.put(
         admin_id,
         exchange_item_id,
         cost_asset_code,
-        primary_image_id,
+        primary_media_id,
         cost_amount,
         space
       })
@@ -679,7 +682,7 @@ router.put(
               stock,
               sort_order,
               status,
-              primary_image_id,
+              primary_media_id,
               // 臻选空间/幸运空间扩展字段
               space,
               original_price,
@@ -691,7 +694,7 @@ router.put(
               free_shipping,
               is_limited,
               sell_point,
-              category
+              category: category ?? category_def_id
             },
             { transaction }
           )
@@ -802,8 +805,7 @@ router.delete(
         exchange_item_id: itemId,
         action: result.action,
         message: result.message,
-        // 2026-02-01 主键命名规范化：使用完整前缀 image_resource_id
-        deleted_image_resource_id: result.deleted_image_resource_id
+        deleted_media_id: result.deleted_media_id
       })
 
       /* WebSocket推送：通知所有在线用户商品已删除/下架（通过 ServiceManager 获取） */
@@ -844,6 +846,359 @@ router.delete(
       }
 
       return res.apiError(error.message || '删除商品失败', 'INTERNAL_ERROR', null, 500)
+    }
+  }
+)
+
+/*
+ * ================================================================
+ * SKU 子资源路由（Phase 2 — SPU/SKU 全量模式）
+ * ================================================================
+ */
+
+/**
+ * 获取商品的所有 SKU 列表
+ * GET /api/v4/console/marketplace/exchange_market/items/:exchange_item_id/skus
+ */
+router.get(
+  '/exchange_market/items/:exchange_item_id/skus',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const ExchangeService = req.app.locals.services.getService('exchange_admin')
+      const result = await ExchangeService.listSkus(parseInt(req.params.exchange_item_id))
+      return res.apiSuccess(result, '获取 SKU 列表成功')
+    } catch (error) {
+      logger.error('获取 SKU 列表失败', { error: error.message })
+      if (error.message === '商品不存在') {
+        return res.apiError(error.message, 'NOT_FOUND', null, 404)
+      }
+      return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    }
+  }
+)
+
+/**
+ * 为商品创建新的 SKU
+ * POST /api/v4/console/marketplace/exchange_market/items/:exchange_item_id/skus
+ *
+ * @body {Object} spec_values - 规格值，如 {"颜色":"白色","尺码":"S"}
+ * @body {number} cost_amount - 该 SKU 的兑换价格
+ * @body {number} stock - 初始库存
+ * @body {string} [cost_asset_code] - 覆盖 SPU 默认支付资产
+ * @body {number} [primary_media_id] - 专属主媒体ID（media_files.media_id）
+ */
+router.post(
+  '/exchange_market/items/:exchange_item_id/skus',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const ExchangeService = req.app.locals.services.getService('exchange_admin')
+      const result = await TransactionManager.execute(
+        async transaction => {
+          return await ExchangeService.createSku(parseInt(req.params.exchange_item_id), req.body, {
+            transaction
+          })
+        },
+        { description: '创建 SKU', maxRetries: 1 }
+      )
+      return res.apiSuccess(result, 'SKU 创建成功')
+    } catch (error) {
+      logger.error('创建 SKU 失败', { error: error.message })
+      return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    }
+  }
+)
+
+/**
+ * 更新 SKU
+ * PUT /api/v4/console/marketplace/exchange_market/items/:exchange_item_id/skus/:sku_id
+ */
+router.put(
+  '/exchange_market/items/:exchange_item_id/skus/:sku_id',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const ExchangeService = req.app.locals.services.getService('exchange_admin')
+      const result = await TransactionManager.execute(
+        async transaction => {
+          return await ExchangeService.updateSku(parseInt(req.params.sku_id), req.body, {
+            transaction
+          })
+        },
+        { description: '更新 SKU', maxRetries: 1 }
+      )
+      return res.apiSuccess(result, 'SKU 更新成功')
+    } catch (error) {
+      logger.error('更新 SKU 失败', { error: error.message })
+      return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    }
+  }
+)
+
+/**
+ * 删除 SKU（不允许删除最后一个 SKU）
+ * DELETE /api/v4/console/marketplace/exchange_market/items/:exchange_item_id/skus/:sku_id
+ */
+router.delete(
+  '/exchange_market/items/:exchange_item_id/skus/:sku_id',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const ExchangeService = req.app.locals.services.getService('exchange_admin')
+      const result = await TransactionManager.execute(
+        async transaction => {
+          return await ExchangeService.deleteSku(parseInt(req.params.sku_id), { transaction })
+        },
+        { description: '删除 SKU', maxRetries: 1 }
+      )
+      return res.apiSuccess(result, 'SKU 删除成功')
+    } catch (error) {
+      logger.error('删除 SKU 失败', { error: error.message })
+      if (error.message.includes('最后一个')) {
+        return res.apiError(error.message, 'BUSINESS_ERROR', null, 400)
+      }
+      return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    }
+  }
+)
+
+/*
+ * ================================================================
+ * 排序管理路由（Phase 3 — 三模块排序增强）
+ * ================================================================
+ */
+
+/**
+ * 置顶/取消置顶商品
+ * PUT /api/v4/console/marketplace/exchange_market/items/:exchange_item_id/pin
+ *
+ * @param {number} exchange_item_id - 商品ID
+ * @body {boolean} [is_pinned] - 指定置顶状态（省略则 toggle）
+ *
+ * @security JWT + Admin权限
+ */
+router.put(
+  '/exchange_market/items/:exchange_item_id/pin',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const ExchangeService = req.app.locals.services.getService('exchange_admin')
+      const itemId = parseInt(req.params.exchange_item_id)
+      const { is_pinned } = req.body
+
+      const result = await TransactionManager.execute(
+        async transaction => {
+          const item = await ExchangeService.ExchangeItem.findByPk(itemId, {
+            lock: transaction.LOCK.UPDATE,
+            transaction
+          })
+          if (!item) throw new Error('商品不存在')
+
+          const pinned = is_pinned !== undefined ? !!is_pinned : !item.is_pinned
+          const BeijingTimeHelper = require('../../../utils/timeHelper')
+          await item.update(
+            {
+              is_pinned: pinned,
+              pinned_at: pinned ? BeijingTimeHelper.createDatabaseTime() : null
+            },
+            { transaction }
+          )
+
+          return { exchange_item_id: itemId, is_pinned: pinned }
+        },
+        { description: `置顶商品 ${itemId}`, maxRetries: 1 }
+      )
+
+      return res.apiSuccess(result, result.is_pinned ? '商品已置顶' : '已取消置顶')
+    } catch (error) {
+      logger.error('置顶商品失败', { error: error.message })
+      return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    }
+  }
+)
+
+/**
+ * 推荐/取消推荐商品
+ * PUT /api/v4/console/marketplace/exchange_market/items/:exchange_item_id/recommend
+ *
+ * @param {number} exchange_item_id - 商品ID
+ * @body {boolean} [is_recommended] - 指定推荐状态（省略则 toggle）
+ *
+ * @security JWT + Admin权限
+ */
+router.put(
+  '/exchange_market/items/:exchange_item_id/recommend',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const ExchangeService = req.app.locals.services.getService('exchange_admin')
+      const itemId = parseInt(req.params.exchange_item_id)
+      const { is_recommended } = req.body
+
+      const result = await TransactionManager.execute(
+        async transaction => {
+          const item = await ExchangeService.ExchangeItem.findByPk(itemId, {
+            lock: transaction.LOCK.UPDATE,
+            transaction
+          })
+          if (!item) throw new Error('商品不存在')
+
+          const recommended = is_recommended !== undefined ? !!is_recommended : !item.is_recommended
+          await item.update({ is_recommended: recommended }, { transaction })
+
+          return { exchange_item_id: itemId, is_recommended: recommended }
+        },
+        { description: `推荐商品 ${itemId}`, maxRetries: 1 }
+      )
+
+      return res.apiSuccess(result, result.is_recommended ? '商品已推荐' : '已取消推荐')
+    } catch (error) {
+      logger.error('推荐商品失败', { error: error.message })
+      return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    }
+  }
+)
+
+/**
+ * 批量调整商品排序
+ * PUT /api/v4/console/marketplace/exchange_market/items/batch-sort
+ *
+ * @body {Array<{exchange_item_id: number, sort_order: number}>} items - 排序数组
+ *
+ * @security JWT + Admin权限
+ */
+router.put(
+  '/exchange_market/items/batch-sort',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const { items } = req.body
+      if (!Array.isArray(items) || items.length === 0) {
+        return res.apiError('items 数组不能为空', 'INVALID_PARAMS', null, 400)
+      }
+
+      const ExchangeService = req.app.locals.services.getService('exchange_admin')
+      const result = await TransactionManager.execute(
+        async transaction => {
+          let updated = 0
+          for (const { exchange_item_id, sort_order } of items) {
+            if (exchange_item_id && sort_order !== undefined) {
+              await ExchangeService.ExchangeItem.update(
+                { sort_order: parseInt(sort_order) },
+                { where: { exchange_item_id }, transaction }
+              )
+              updated++
+            }
+          }
+          return { updated_count: updated }
+        },
+        { description: '批量排序商品', maxRetries: 1 }
+      )
+
+      const { BusinessCacheHelper } = require('../../../utils/BusinessCacheHelper')
+      await BusinessCacheHelper.invalidateExchangeItems('batch_sort')
+
+      return res.apiSuccess(result, `已更新 ${result.updated_count} 个商品排序`)
+    } catch (error) {
+      logger.error('批量排序商品失败', { error: error.message })
+      return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    }
+  }
+)
+
+/**
+ * 置顶/取消置顶挂牌
+ * PUT /api/v4/console/marketplace/listings/:id/pin
+ *
+ * @param {number} id - 挂牌ID
+ * @body {boolean} [is_pinned] - 指定置顶状态（省略则 toggle）
+ *
+ * @security JWT + Admin权限
+ */
+router.put('/listings/:id/pin', authenticateToken, requireRoleLevel(100), async (req, res) => {
+  try {
+    const listingId = parseInt(req.params.id)
+    const { is_pinned } = req.body
+    const { MarketListing } = req.app.locals.services.getService('exchange_admin').models
+
+    const result = await TransactionManager.execute(
+      async transaction => {
+        const listing = await MarketListing.findByPk(listingId, {
+          lock: transaction.LOCK.UPDATE,
+          transaction
+        })
+        if (!listing) throw new Error('挂牌不存在')
+
+        const pinned = is_pinned !== undefined ? !!is_pinned : !listing.is_pinned
+        const BeijingTimeHelper = require('../../../utils/timeHelper')
+        await listing.update(
+          {
+            is_pinned: pinned,
+            pinned_at: pinned ? BeijingTimeHelper.createDatabaseTime() : null
+          },
+          { transaction }
+        )
+
+        return { market_listing_id: listingId, is_pinned: pinned }
+      },
+      { description: `置顶挂牌 ${listingId}`, maxRetries: 1 }
+    )
+
+    return res.apiSuccess(result, result.is_pinned ? '挂牌已置顶' : '已取消置顶')
+  } catch (error) {
+    logger.error('置顶挂牌失败', { error: error.message })
+    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+  }
+})
+
+/**
+ * 推荐/取消推荐挂牌
+ * PUT /api/v4/console/marketplace/listings/:id/recommend
+ *
+ * @param {number} id - 挂牌ID
+ * @body {boolean} [is_recommended] - 指定推荐状态（省略则 toggle）
+ *
+ * @security JWT + Admin权限
+ */
+router.put(
+  '/listings/:id/recommend',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const listingId = parseInt(req.params.id)
+      const { is_recommended } = req.body
+      const { MarketListing } = req.app.locals.services.getService('exchange_admin').models
+
+      const result = await TransactionManager.execute(
+        async transaction => {
+          const listing = await MarketListing.findByPk(listingId, {
+            lock: transaction.LOCK.UPDATE,
+            transaction
+          })
+          if (!listing) throw new Error('挂牌不存在')
+
+          const recommended =
+            is_recommended !== undefined ? !!is_recommended : !listing.is_recommended
+          await listing.update({ is_recommended: recommended }, { transaction })
+
+          return { market_listing_id: listingId, is_recommended: recommended }
+        },
+        { description: `推荐挂牌 ${listingId}`, maxRetries: 1 }
+      )
+
+      return res.apiSuccess(result, result.is_recommended ? '挂牌已推荐' : '已取消推荐')
+    } catch (error) {
+      logger.error('推荐挂牌失败', { error: error.message })
+      return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
     }
   }
 )
@@ -1334,7 +1689,7 @@ router.get(
  *
  * @body {Array<Object>} bindings - 绑定关系数组
  * @body {number} bindings[].exchange_item_id - 商品ID
- * @body {number} bindings[].image_resource_id - 图片资源ID（先通过图片上传API获取）
+ * @body {number} bindings[].media_id - 媒体文件ID（media_files.media_id）
  *
  * @returns {Object} 批量绑定结果
  * @returns {number} data.total - 总处理数
@@ -1358,13 +1713,13 @@ router.post(
       // 参数验证
       if (!Array.isArray(bindings) || bindings.length === 0) {
         return res.apiError(
-          'bindings 必须是非空数组，每项包含 exchange_item_id 和 image_resource_id',
+          'bindings 必须是非空数组，每项包含 exchange_item_id 和 media_id',
           'BAD_REQUEST',
           {
             example: {
               bindings: [
-                { exchange_item_id: 1, image_resource_id: 100 },
-                { exchange_item_id: 2, image_resource_id: 101 }
+                { exchange_item_id: 1, media_id: 100 },
+                { exchange_item_id: 2, media_id: 101 }
               ]
             }
           },
@@ -1806,7 +2161,7 @@ router.post(
       const TransactionManager = require('../../../utils/TransactionManager')
 
       const { order_no } = req.params
-      const { remark = '' } = req.body
+      const { remark = '', shipping_company, shipping_company_name, shipping_no } = req.body
       const operator_id = req.user.user_id
 
       if (!order_no || order_no.trim().length === 0) {
@@ -1814,16 +2169,37 @@ router.post(
       }
 
       const result = await TransactionManager.execute(async transaction => {
-        return await ExchangeCoreService.updateOrderStatus(
+        const updateResult = await ExchangeCoreService.updateOrderStatus(
           order_no,
           'shipped',
           operator_id,
           remark,
           { transaction }
         )
+
+        // 保存结构化快递信息到 exchange_records（Phase 4 新增）
+        if (shipping_company || shipping_no) {
+          const ExchangeRecord =
+            req.app.locals.services.getService('exchange_admin').models.ExchangeRecord
+          await ExchangeRecord.update(
+            {
+              shipping_company: shipping_company || null,
+              shipping_company_name: shipping_company_name || null,
+              shipping_no: shipping_no || null
+            },
+            { where: { order_no }, transaction }
+          )
+        }
+
+        return updateResult
       })
 
-      logger.info('管理员发货成功', { operator_id, order_no })
+      logger.info('管理员发货成功', {
+        operator_id,
+        order_no,
+        shipping_company,
+        shipping_no
+      })
 
       return res.apiSuccess(result.order, result.message)
     } catch (error) {
@@ -1893,6 +2269,77 @@ router.post(
         return res.apiError(error.message, 'BAD_REQUEST', error.data, 400)
       }
       return res.apiError(error.message || '拒绝失败', 'INTERNAL_ERROR', null, 500)
+    }
+  }
+)
+
+/*
+ * ================================================================
+ * 快递查询路由（Phase 4 — 快递双通道对接）
+ * ================================================================
+ */
+
+/**
+ * 获取快递公司列表（供发货弹窗下拉选择）
+ * GET /api/v4/console/marketplace/exchange_market/shipping-companies
+ */
+router.get(
+  '/exchange_market/shipping-companies',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const ShippingService = req.app.locals.services.getService('shipping_track')
+      const companies = ShippingService.getCompanies()
+      return res.apiSuccess({ companies }, '获取快递公司列表成功')
+    } catch (error) {
+      return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    }
+  }
+)
+
+/**
+ * 管理端查询物流轨迹
+ * GET /api/v4/console/marketplace/exchange_market/orders/:order_no/track
+ */
+router.get(
+  '/exchange_market/orders/:order_no/track',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const { order_no } = req.params
+      const ExchangeRecord =
+        req.app.locals.services.getService('exchange_admin').models.ExchangeRecord
+      const order = await ExchangeRecord.findOne({
+        where: { order_no },
+        attributes: ['shipping_company', 'shipping_company_name', 'shipping_no', 'shipped_at']
+      })
+
+      if (!order) {
+        return res.apiError('订单不存在', 'NOT_FOUND', null, 404)
+      }
+      if (!order.shipping_no) {
+        return res.apiSuccess({
+          has_shipping: false,
+          message: '该订单尚未填写快递信息'
+        })
+      }
+
+      const ShippingService = req.app.locals.services.getService('shipping_track')
+      const track = await ShippingService.queryTrack(order.shipping_no, order.shipping_company)
+
+      return res.apiSuccess({
+        has_shipping: true,
+        shipping_company: order.shipping_company,
+        shipping_company_name: order.shipping_company_name,
+        shipping_no: order.shipping_no,
+        shipped_at: order.shipped_at,
+        track
+      })
+    } catch (error) {
+      logger.error('查询物流轨迹失败', { error: error.message, order_no: req.params.order_no })
+      return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
     }
   }
 )

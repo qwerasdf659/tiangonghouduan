@@ -51,7 +51,7 @@ describe('AntiEmptyStreakHandler', () => {
     test('未达到阈值时不干预', () => {
       const result = handler.handle({
         empty_streak: 3,
-        selected_tier: 'fallback',
+        selected_tier: 'empty',
         available_tiers: { fallback: true, low: true },
         effective_budget: 100,
         user_id: 1
@@ -65,7 +65,7 @@ describe('AntiEmptyStreakHandler', () => {
       const forceThreshold = handler.config.force_threshold
       const result = handler.handle({
         empty_streak: forceThreshold + 2,
-        selected_tier: 'fallback',
+        selected_tier: 'empty',
         available_tiers: { fallback: true, low: true },
         effective_budget: 100,
         prizes_by_tier: {
@@ -89,7 +89,7 @@ describe('AntiEmptyStreakHandler', () => {
       const forceThreshold = handler.config.force_threshold
       const result = handler.handle({
         empty_streak: forceThreshold + 2,
-        selected_tier: 'fallback',
+        selected_tier: 'empty',
         available_tiers: { fallback: true, low: true },
         effective_budget: 5,
         prizes_by_tier: {
@@ -105,7 +105,7 @@ describe('AntiEmptyStreakHandler', () => {
       const forceThreshold = handler.config.force_threshold
       const result = handler.handle({
         empty_streak: forceThreshold + 2,
-        selected_tier: 'fallback',
+        selected_tier: 'empty',
         available_tiers: { fallback: true, low: true },
         effective_budget: 30,
         prizes_by_tier: {

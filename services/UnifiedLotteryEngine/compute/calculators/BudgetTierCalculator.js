@@ -49,8 +49,8 @@ const BUDGET_TIER = {
  */
 const TIER_AVAILABILITY = {
   [BUDGET_TIER.B0]: ['low', 'fallback'], // low + fallback（资格由资源级过滤保证）
-  [BUDGET_TIER.B1]: ['low', 'fallback'], // 低档 + 空奖
-  [BUDGET_TIER.B2]: ['mid', 'low', 'fallback'], // 中档 + 低档 + 空奖
+  [BUDGET_TIER.B1]: ['low', 'fallback'], // 低档 + 保底
+  [BUDGET_TIER.B2]: ['mid', 'low', 'fallback'], // 中档 + 低档 + 保底
   [BUDGET_TIER.B3]: ['high', 'mid', 'low', 'fallback'] // 所有档位
 }
 

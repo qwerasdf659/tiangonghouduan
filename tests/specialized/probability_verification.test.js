@@ -513,22 +513,22 @@ describe('【P0】概率分布验证测试 - 10,000次抽奖统计', () => {
       console.log('   ✅ 奖品池配置正确')
     })
 
-    test('活动应该配置了空奖（保底奖品）', async () => {
-      console.log('📊 验证空奖配置...')
+    test('活动应该配置了保底奖品', async () => {
+      console.log('📊 验证保底奖品配置...')
 
       const { LotteryPrize } = require('../../models')
 
-      const result = await LotteryPrize.validateEmptyPrizeConstraint(campaignId)
+      const result = await LotteryPrize.validateFallbackPrizeConstraint(campaignId)
 
-      console.log(`   空奖数量: ${result.emptyPrizes?.length || 0}`)
+      console.log(`   保底奖品数量: ${result.emptyPrizes?.length || 0}`)
 
-      // TDD红灯：验证空奖存在
+      // TDD红灯：验证保底奖品存在
       if (!result.valid) {
-        console.log(`   ❌ 空奖配置错误: ${result.error}`)
+        console.log(`   ❌ 保底奖品配置错误: ${result.error}`)
       }
 
       expect(result.valid).toBe(true)
-      console.log('   ✅ 空奖配置正确')
+      console.log('   ✅ 保底奖品配置正确')
     })
   })
 

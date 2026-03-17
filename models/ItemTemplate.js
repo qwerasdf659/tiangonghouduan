@@ -37,11 +37,10 @@ class ItemTemplate extends Model {
    * @returns {void} 无返回值，仅定义关联关系
    */
   static associate(models) {
-    // 关联类目字典（多对一）
+    // 关联类目字典（多对一，2026-03-16 整数主键迁移）
     if (models.CategoryDef) {
       ItemTemplate.belongsTo(models.CategoryDef, {
-        foreignKey: 'category_code',
-        targetKey: 'category_code',
+        foreignKey: 'category_def_id',
         as: 'category'
       })
     }
@@ -69,11 +68,11 @@ class ItemTemplate extends Model {
       })
     }
 
-    // 关联图片资源（多对一，统一图片管理体系）
-    if (models.ImageResources) {
-      ItemTemplate.belongsTo(models.ImageResources, {
-        foreignKey: 'image_resource_id',
-        as: 'primaryImage'
+    // 关联主媒体文件（多对一，2026-03-16 媒体体系，替代 image_resources）
+    if (models.MediaFile) {
+      ItemTemplate.belongsTo(models.MediaFile, {
+        foreignKey: 'primary_media_id',
+        as: 'primary_media'
       })
     }
   }
@@ -124,13 +123,13 @@ class ItemTemplate extends Model {
   /**
    * 按类目获取模板
    *
-   * @param {string} categoryCode - 类目代码
+   * @param {number} categoryDefId - 类目定义ID
    * @returns {Promise<Array>} 符合条件的模板列表
    */
-  static async getByCategory(categoryCode) {
+  static async getByCategory(categoryDefId) {
     return this.findAll({
       where: {
-        category_code: categoryCode,
+        category_def_id: categoryDefId,
         is_enabled: true
       },
       order: [['display_name', 'ASC']]
@@ -170,11 +169,17 @@ module.exports = sequelize => {
         comment: '物品类型：对应 items.item_type'
       },
 
-      // 类目代码（外键 → category_defs）
-      category_code: {
-        type: DataTypes.STRING(50),
+      // 类目定义ID（外键 → category_defs，2026-03-16 整数主键迁移）
+      category_def_id: {
+        type: DataTypes.INTEGER,
         allowNull: true,
-        comment: '类目代码（外键 → category_defs.category_code）'
+        comment: '类目定义ID，FK→category_defs.category_def_id',
+        references: {
+          model: 'category_defs',
+          key: 'category_def_id'
+        },
+        onUpdate: 'CASCADE',
+        onDelete: 'SET NULL'
       },
 
       // 稀有度代码（外键 → rarity_defs）
@@ -198,14 +203,14 @@ module.exports = sequelize => {
         comment: '物品描述'
       },
 
-      // 主图片ID（外键 → image_resources，统一图片管理体系）
-      image_resource_id: {
-        type: DataTypes.INTEGER,
+      // 主媒体文件ID（外键 → media_files，2026-03-16 媒体体系）
+      primary_media_id: {
+        type: DataTypes.BIGINT.UNSIGNED,
         allowNull: true,
-        comment: '主图片ID（外键 → image_resources.image_resource_id）',
+        comment: '主媒体文件ID，FK→media_files.media_id',
         references: {
-          model: 'image_resources',
-          key: 'image_resource_id'
+          model: 'media_files',
+          key: 'media_id'
         },
         onUpdate: 'CASCADE',
         onDelete: 'SET NULL'
@@ -261,7 +266,7 @@ module.exports = sequelize => {
       comment: '物品模板表（Item Templates - 不可叠加物品模板定义）',
       indexes: [
         { fields: ['item_type'], name: 'idx_item_templates_item_type' },
-        { fields: ['category_code'], name: 'idx_item_templates_category_code' },
+        { fields: ['category_def_id'], name: 'idx_item_templates_category_def_id' },
         { fields: ['rarity_code'], name: 'idx_item_templates_rarity_code' },
         { fields: ['is_tradable', 'is_enabled'], name: 'idx_item_templates_tradable_enabled' }
       ]

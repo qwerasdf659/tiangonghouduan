@@ -108,7 +108,7 @@ document.addEventListener('alpine:init', () => {
       item_type: 'voucher',
       rarity_code: 'common',
       is_enabled: true,
-      image_resource_id: null,
+      primary_media_id: null,
       image_url: '',
       reference_price_points: 0,
       description: '',
@@ -285,7 +285,7 @@ document.addEventListener('alpine:init', () => {
         item_type: 'voucher',
         rarity_code: 'common',
         is_enabled: true,
-        image_resource_id: null,
+        primary_media_id: null,
         image_url: '',
         reference_price_points: 0,
         description: '',
@@ -327,15 +327,15 @@ document.addEventListener('alpine:init', () => {
             item_type: t.item_type || 'voucher',
             rarity_code: t.rarity_code || 'common',
             is_enabled: t.is_enabled,
-            image_resource_id: t.image_resource_id || null,
-            image_url: t.image_url || '',
+            primary_media_id: t.primary_media_id ?? null,
+            image_url: t.image_url || t.public_url || '',
             reference_price_points: t.reference_price_points || 0,
             description: t.description || '',
             meta: Object.keys(metaCopy).length > 0 ? JSON.stringify(metaCopy, null, 2) : '',
             use_instructions: metaObj.use_instructions || '',
             allowed_actions: metaObj.allowed_actions || []
           }
-          this.image_preview_url = t.image_url || null
+          this.image_preview_url = t.public_url || t.image_url || null
           this.showModal('templateModal')
         } else {
           this.showError('加载失败', response?.message || '获取模板详情失败')
@@ -398,7 +398,7 @@ document.addEventListener('alpine:init', () => {
         item_type: this.form.item_type,
         rarity_code: this.form.rarity_code,
         is_enabled: this.form.is_enabled,
-        image_resource_id: this.form.image_resource_id || null,
+        primary_media_id: this.form.primary_media_id || null,
         image_url: this.form.image_url || null,
         reference_price_points: this.form.reference_price_points || 0,
         description: this.form.description || null,
@@ -513,17 +513,17 @@ document.addEventListener('alpine:init', () => {
         formData.append('category', 'items')
 
         const res = await request({
-          url: SYSTEM_ADMIN_ENDPOINTS.IMAGE_UPLOAD,
+          url: SYSTEM_ADMIN_ENDPOINTS.MEDIA_UPLOAD,
           method: 'POST',
           data: formData
         })
 
         if (res.success && res.data) {
-          this.form.image_resource_id = res.data.image_resource_id || res.data.image_id || null
-          this.form.image_url = res.data.object_key
+          this.form.primary_media_id = res.data.media_id ?? null
+          this.form.image_url = res.data.object_key || res.data.public_url || ''
           this.image_preview_url = res.data.public_url || res.data.url || null
           this.showSuccess('图片上传成功')
-          logger.info('[ItemTemplates] 图片上传成功:', res.data.object_key, 'image_resource_id:', this.form.image_resource_id)
+          logger.info('[ItemTemplates] 图片上传成功:', res.data.object_key || res.data.public_url, 'primary_media_id:', this.form.primary_media_id)
         } else {
           this.showError('上传失败', res.message || '图片上传失败')
         }
@@ -540,7 +540,7 @@ document.addEventListener('alpine:init', () => {
      * @returns {void}
      */
     clearTemplateImage() {
-      this.form.image_resource_id = null
+      this.form.primary_media_id = null
       this.form.image_url = ''
       this.image_preview_url = null
     },

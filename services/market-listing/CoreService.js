@@ -464,7 +464,7 @@ class MarketListingCoreService {
       if (template) {
         snapshotFields = {
           offer_item_template_id: template.item_template_id,
-          offer_item_category_code: template.category_code,
+          offer_category_def_id: template.category_def_id,
           offer_item_rarity: template.rarity_code,
           offer_item_display_name: template.display_name
         }

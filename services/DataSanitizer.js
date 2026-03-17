@@ -48,11 +48,9 @@ const FORBIDDEN_FRONTEND_ASSET_CODES = ['BUDGET_POINTS']
  *    - 如果业务逻辑依赖该字段，会在后续处理中报错
  *    - 不做"可能有、可能没有"的容错处理
  *
- * 5. 图片字段策略（2026-01-13 确立）
- *    - 强制使用 primary_image_id 关联 image_resources 表
- *    - 禁止使用废弃的 image/image_url 字段
- *    - DataSanitizer 输出层不再返回 image/image_url
- *    - 前端必须通过 primary_image_id 获取图片资源
+ * 5. 图片字段策略（2026-03-16 媒体体系迁移）
+ *    - 仅使用 primary_media_id 关联 media_files 表（image_resources 表已删除）
+ *    - DataSanitizer 输出 image 对象（含 url、primary_media_id）
  *
  * 🔒 安全设计说明（2026-02-21 γ 模式升级）：
  * 1. 主键使用描述性 {entity}_id（行业标准：阿里/腾讯/美团/Stripe 无一例外）
@@ -109,15 +107,7 @@ class DataSanitizer {
       const plainPrizes = (Array.isArray(prizes) ? prizes : [prizes]).map(p => {
         const plain = p.toJSON ? p.toJSON() : p
 
-        // 管理员视图也需要材料图标URL（用于Web管理后台奖品列表展示）
-        if (!plain.image && plain.materialAssetType?.icon_url) {
-          const materialIconUrl = getImageUrl(plain.materialAssetType.icon_url)
-          plain.image = {
-            url: materialIconUrl,
-            thumbnail_url: materialIconUrl,
-            source: 'material_icon'
-          }
-        }
+        // 管理员视图：材料图标通过 material_asset_types.media_attachments 关联获取（icon_url 已删除）
 
         return plain
       })
@@ -129,44 +119,32 @@ class DataSanitizer {
      * 优势：Service 层新增字段自动透传，不会产生 ghost field
      */
     return prizes.map(prize => {
-      const rawImage = prize.image || (prize.toJSON ? prize.toJSON().image : null)
-      const rawMaterial =
-        prize.materialAssetType || (prize.toJSON ? prize.toJSON().materialAssetType : null)
-      const sanitized = { ...(prize.toJSON ? prize.toJSON() : prize) }
+      const plain = prize.toJSON ? prize.toJSON() : prize
+      const rawPrimaryMedia = prize.primary_media || plain.primary_media
+      const rawMaterial = prize.materialAssetType || plain.materialAssetType
+      const sanitized = { ...plain }
 
       // 主键统一（决策 A：剥离 lottery_ 模块前缀）
       sanitized.prize_id = sanitized.lottery_prize_id
       delete sanitized.lottery_prize_id
 
-      // 图片处理（从 Sequelize include 或缓存还原对象生成安全 URL）
-      if (rawImage && typeof rawImage.toSafeJSON === 'function') {
-        const safeImage = rawImage.toSafeJSON()
+      // 图片处理：仅 primary_media（MediaFile），image_resources 已删除
+      if (rawPrimaryMedia && typeof rawPrimaryMedia.toSafeJSON === 'function') {
+        const safe = rawPrimaryMedia.toSafeJSON()
         sanitized.image = {
-          image_resource_id: safeImage.image_resource_id,
-          url: safeImage.imageUrl,
-          mime: safeImage.mime_type,
-          thumbnail_url: safeImage.thumbnails?.small || safeImage.imageUrl
+          primary_media_id: safe.media_id,
+          url: safe.public_url,
+          mime: safe.mime_type,
+          thumbnail_url: safe.thumbnails?.small || safe.public_url
         }
-      } else if (rawImage?.file_path) {
+      } else if (rawPrimaryMedia?.object_key) {
         sanitized.image = {
-          image_resource_id: rawImage.image_resource_id,
-          url: getImageUrl(rawImage.file_path),
-          mime: rawImage.mime_type,
-          thumbnail_url: rawImage.thumbnail_paths?.small
-            ? getImageUrl(rawImage.thumbnail_paths.small)
-            : getImageUrl(rawImage.file_path)
-        }
-      } else if (rawMaterial?.icon_url) {
-        /*
-         * 材料图标降级：当奖品没有独立图片时，使用关联材料类型的 icon_url
-         * 解决场景：钻石、水晶碎片等材料奖品无 image_resource_id，
-         *           但 material_asset_types 表有对应图标
-         */
-        const materialIconUrl = getImageUrl(rawMaterial.icon_url)
-        sanitized.image = {
-          url: materialIconUrl,
-          thumbnail_url: materialIconUrl,
-          source: 'material_icon'
+          primary_media_id: rawPrimaryMedia.media_id,
+          url: getImageUrl(rawPrimaryMedia.object_key),
+          mime: rawPrimaryMedia.mime_type,
+          thumbnail_url: rawPrimaryMedia.thumbnail_keys?.small
+            ? getImageUrl(rawPrimaryMedia.thumbnail_keys.small)
+            : getImageUrl(rawPrimaryMedia.object_key)
         }
       } else {
         /**
@@ -1344,54 +1322,54 @@ class DataSanitizer {
    * 输入契约：
    * - 输入数据必须来自 exchange_items 表的 Sequelize 查询结果
    * - 必须包含 exchange_item_id 字段（数据库主键）
-   * - 🔧 2026-01-13 图片字段策略：需要 include primaryImage（ImageResources 关联）
+   * - 🔧 2026-03-16 媒体体系：需要 include primary_media（MediaFile 关联）
    *
    * 输出字段（统一规范）：
-   * - primary_image_id: 主图片ID（关联 image_resources 表）
-   * - primary_image: 图片对象 { image_resource_id, url, mime, thumbnail_url }，缺失时为 null
+   * - primary_media_id: 主图媒体ID（关联 media_files 表）
+   * - primary_image: 图片对象 { primary_media_id, url, mime, thumbnail_url }，缺失时为 null
    *
-   * @param {Array<Object>} items - 商品数据数组（来自 exchange_items 表，需 include primaryImage）
+   * @param {Array<Object>} items - 商品数据数组（来自 exchange_items 表，需 include primary_media）
    * @param {string} dataLevel - 数据级别：'full'（管理员）或'public'（普通用户）
    * @returns {Array<Object>} 脱敏后的商品数组（exchange_item_id 主键原样输出）
    */
   static sanitizeExchangeMarketItems(items, dataLevel) {
     /*
      * V4.5.0: 材料资产支付 - 统一数据格式
-     * 🔧 2026-01-13 图片字段策略：添加 primary_image_id 和 primary_image 对象
+     * 🔧 2026-03-16 媒体体系：使用 primary_media_id 和 primary_media 对象（替代旧 image_resources）
      */
     /*
      * γ 模式（2026-02-21）：黑名单删除敏感字段
      */
     return items.map(item => {
-      const rawPrimaryImage = item.primaryImage
-      const sanitized = { ...(item.toJSON ? item.toJSON() : item) }
+      const plain = item.toJSON ? item.toJSON() : item
+      const rawPrimaryMedia = item.primary_media || plain.primary_media
+      const sanitized = { ...plain }
 
-      // 图片处理（从 Sequelize include 生成安全 URL）
-      if (rawPrimaryImage && typeof rawPrimaryImage.toSafeJSON === 'function') {
-        const safeImage = rawPrimaryImage.toSafeJSON()
+      // 图片处理：仅 primary_media（MediaFile），image_resources 已删除
+      if (rawPrimaryMedia && typeof rawPrimaryMedia.toSafeJSON === 'function') {
+        const safe = rawPrimaryMedia.toSafeJSON()
         sanitized.primary_image = {
-          image_resource_id: safeImage.image_resource_id,
-          url: safeImage.imageUrl,
-          mime: safeImage.mime_type,
-          thumbnail_url: safeImage.thumbnails?.small || safeImage.imageUrl
+          primary_media_id: safe.media_id,
+          url: safe.public_url,
+          mime: safe.mime_type,
+          thumbnail_url: safe.thumbnails?.small || safe.public_url
         }
-      } else if (rawPrimaryImage?.file_path) {
-        // plain object（来自 item.toJSON()），用 file_path 生成完整 URL
+      } else if (rawPrimaryMedia?.object_key) {
         sanitized.primary_image = {
-          image_resource_id: rawPrimaryImage.image_resource_id,
-          url: getImageUrl(rawPrimaryImage.file_path),
-          mime: rawPrimaryImage.mime_type,
-          thumbnail_url: rawPrimaryImage.thumbnail_paths?.small
-            ? getImageUrl(rawPrimaryImage.thumbnail_paths.small)
-            : getImageUrl(rawPrimaryImage.file_path)
+          primary_media_id: rawPrimaryMedia.media_id,
+          url: getImageUrl(rawPrimaryMedia.object_key),
+          mime: rawPrimaryMedia.mime_type,
+          thumbnail_url: rawPrimaryMedia.thumbnail_keys?.small
+            ? getImageUrl(rawPrimaryMedia.thumbnail_keys.small)
+            : getImageUrl(rawPrimaryMedia.object_key)
         }
       } else {
         sanitized.primary_image = null
       }
-      delete sanitized.primaryImage
+      delete sanitized.primary_media
 
-      // 补充派生字段
-      sanitized.primary_image_id = sanitized.primary_image_id || null
+      // 补充派生字段（2026-03-16 媒体体系：primary_media_id）
+      sanitized.primary_media_id = sanitized.primary_media_id ?? null
       sanitized.space = sanitized.space || 'lucky'
       sanitized.original_price = sanitized.original_price || null
       sanitized.tags = sanitized.tags || null

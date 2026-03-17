@@ -42,8 +42,8 @@ const asyncHandler = fn => (req, res, next) => {
  *
  * @route GET /api/v4/system/ad-delivery
  * @access Private
- * @query {string} slot_type - 广告位类型（必填）：popup / carousel / announcement
- * @query {string} [position=home] - 位置：home / lottery / profile
+ * @query {string} slot_type - 广告位类型（必填）：popup / carousel / announcement / feed
+ * @query {string} [position=home] - 位置：home / lottery / profile / market_list / exchange_list
  */
 router.get(
   '/',
@@ -53,10 +53,12 @@ router.get(
       const { slot_type, position = 'home' } = req.query
 
       if (!slot_type) {
-        return res.apiBadRequest('缺少必需参数：slot_type（popup / carousel / announcement）')
+        return res.apiBadRequest(
+          '缺少必需参数：slot_type（popup / carousel / announcement / feed）'
+        )
       }
 
-      const validSlotTypes = ['popup', 'carousel', 'announcement']
+      const validSlotTypes = ['popup', 'carousel', 'announcement', 'feed']
       if (!validSlotTypes.includes(slot_type)) {
         return res.apiBadRequest('slot_type 必须是以下之一：' + validSlotTypes.join(', '))
       }
@@ -77,7 +79,9 @@ router.get(
           ad_creative_id: creative.ad_creative_id || null,
           title: creative.title || item.campaign_name,
           content_type: creative.content_type || 'image',
-          image_url: creative.image_url || null,
+          image_url: creative.image_url
+            ? `${process.env.PUBLIC_BASE_URL}/api/v4/images/${creative.image_url}`
+            : null,
           image_width: creative.image_width || null,
           image_height: creative.image_height || null,
           text_content: creative.text_content || null,

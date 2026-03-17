@@ -25,6 +25,10 @@ export function useExchangeOrdersState() {
     orderStats: { total: 0, pending: 0, shipped: 0, cancelled: 0 },
     /** @type {Object} 订单筛选条件 */
     orderFilters: { status: '', order_no: '' },
+    /** @type {Object} 发货表单（含快递信息） */
+    shipForm: { shipping_company: '', shipping_company_name: '', shipping_no: '', remark: '' },
+    /** @type {Object|null} 物流轨迹数据 */
+    orderTrack: null,
     /** @type {number} 订单当前页码 */
     orderCurrentPage: 1,
     /** @type {number} 订单每页数量 */
@@ -145,10 +149,15 @@ export function useExchangeOrdersMethods() {
     },
 
     /**
-     * 发货操作
+     * 发货操作（支持结构化快递信息）
      * @param {Object} order - 订单对象
+     * @param {Object} [shippingInfo={}] - 快递信息
+     * @param {string} [shippingInfo.shipping_company] - 快递公司代码
+     * @param {string} [shippingInfo.shipping_company_name] - 快递公司名称
+     * @param {string} [shippingInfo.shipping_no] - 快递单号
+     * @param {string} [shippingInfo.remark] - 发货备注
      */
-    async shipOrder(order) {
+    async shipOrder(order, shippingInfo = {}) {
       const confirmed = await this.$confirm?.(`确定要发货订单 ${order.order_no} 吗？`)
       if (!confirmed) return
 
@@ -159,7 +168,12 @@ export function useExchangeOrdersMethods() {
             order_no: order.order_no
           }),
           method: 'POST',
-          data: { status: 'shipped' }
+          data: {
+            remark: shippingInfo.remark || '',
+            shipping_company: shippingInfo.shipping_company || null,
+            shipping_company_name: shippingInfo.shipping_company_name || null,
+            shipping_no: shippingInfo.shipping_no || null
+          }
         })
 
         if (res.success) {

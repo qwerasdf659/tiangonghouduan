@@ -11,7 +11,7 @@
 import { logger } from '../../../utils/logger.js'
 import { MARKET_ENDPOINTS } from '../../../api/market/index.js'
 import { request } from '../../../api/base.js'
-import { loadECharts } from '../../../utils/index.js'
+import { loadECharts } from '../../../utils/echarts-lazy.js'
 
 /**
  * 统计分析状态

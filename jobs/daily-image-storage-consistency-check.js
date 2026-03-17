@@ -1,28 +1,28 @@
 /**
- * 餐厅积分抽奖系统 V4.2 - 每日图片存储一致性检测任务
+ * 餐厅积分抽奖系统 V4.2 - 每日媒体存储一致性检测任务
  *
  * @description
- *   通过 HEAD 请求验证 image_resources 表中记录的图片文件在 Sealos 对象存储中真实存在
+ *   通过 HEAD 请求验证 media_files 表中记录的媒体文件在 Sealos 对象存储中真实存在
  *   发现"数据库有记录但存储文件缺失"的不一致情况，记录告警日志
  *
- * @architecture 架构决策（2026-02-21 图片管理体系设计方案 §4.2）
+ * @architecture 2026-03-16 媒体体系迁移
+ *   - 针对 media_files 表（替代 image_resources）
  *   - 定时执行：每天凌晨 5:00（Cron: 0 5 * * *）
  *   - 检测方式：SealosStorageService.fileExists()（S3 HEAD 请求）
  *   - 分批处理：每批 50 条，避免瞬时大量 HEAD 请求
  *   - 告警策略：仅记录 WARN 日志，不自动删除记录（防误删）
- *   - 并发控制：Redis 分布式锁，防止多实例重复执行
  *
- * @version 1.0.0
- * @date 2026-02-21
+ * @version 2.0.0
+ * @date 2026-03-16
  */
 
 const logger = require('../utils/logger').logger
 
 /**
- * 每日图片存储一致性检测任务类
+ * 每日媒体存储一致性检测任务类
  *
  * @class DailyImageStorageConsistencyCheck
- * @description 验证数据库图片记录与 Sealos 存储文件的一致性
+ * @description 验证 media_files 数据库记录与 Sealos 存储文件的一致性
  */
 class DailyImageStorageConsistencyCheck {
   /**
@@ -37,10 +37,10 @@ class DailyImageStorageConsistencyCheck {
     const { batchSize = 50, concurrency = 5 } = options
     const startTime = Date.now()
 
-    logger.info('开始每日图片存储一致性检测', { batch_size: batchSize, concurrency })
+    logger.info('开始每日媒体存储一致性检测', { batch_size: batchSize, concurrency })
 
     try {
-      const { ImageResources } = require('../models')
+      const { MediaFile } = require('../models')
       const SealosStorageService = require('../services/sealosStorage')
       const storageService = new SealosStorageService()
 
@@ -49,26 +49,26 @@ class DailyImageStorageConsistencyCheck {
       const missingFiles = []
       const errorRecords = []
 
-      // 分批查询并检测
+      // 分批查询并检测（media_files 表）
       while (true) {
-        const images = await ImageResources.findAll({
+        const mediaFiles = await MediaFile.findAll({
           where: { status: 'active' },
-          attributes: ['image_resource_id', 'file_path', 'business_type', 'context_id'],
-          order: [['image_resource_id', 'ASC']],
+          attributes: ['media_id', 'object_key', 'folder'],
+          order: [['media_id', 'ASC']],
           limit: batchSize,
           offset
         })
 
-        if (images.length === 0) break
+        if (mediaFiles.length === 0) break
 
         // 批内并发检测（限制并发数避免压垮存储服务）
         const results = await DailyImageStorageConsistencyCheck._checkBatch(
           storageService,
-          images,
+          mediaFiles,
           concurrency
         )
 
-        totalChecked += images.length
+        totalChecked += mediaFiles.length
         missingFiles.push(...results.missing)
         errorRecords.push(...results.errors)
 
@@ -76,7 +76,7 @@ class DailyImageStorageConsistencyCheck {
 
         // 进度日志（每 200 条输出一次）
         if (totalChecked % 200 === 0 && totalChecked > 0) {
-          logger.info(`图片存储一致性检测进度: ${totalChecked} 条已检查`, {
+          logger.info(`媒体存储一致性检测进度: ${totalChecked} 条已检查`, {
             missing_so_far: missingFiles.length
           })
         }
@@ -99,16 +99,16 @@ class DailyImageStorageConsistencyCheck {
 
       // 有缺失文件时输出 WARN 级别日志
       if (missingFiles.length > 0) {
-        logger.warn('图片存储一致性检测发现缺失文件', {
+        logger.warn('媒体存储一致性检测发现缺失文件', {
           total_checked: totalChecked,
           missing_count: missingFiles.length,
-          missing_ids: missingFiles.map(m => m.image_resource_id)
+          missing_ids: missingFiles.map(m => m.media_id)
         })
       }
 
       return report
     } catch (error) {
-      logger.error('图片存储一致性检测失败', {
+      logger.error('媒体存储一致性检测失败', {
         error_message: error.message,
         error_stack: error.stack
       })
@@ -132,39 +132,38 @@ class DailyImageStorageConsistencyCheck {
   }
 
   /**
-   * 批量检测图片文件存在性（控制并发数）
+   * 批量检测媒体文件存在性（控制并发数）
    *
    * @param {Object} storageService - SealosStorageService 实例
-   * @param {Array} images - 图片记录数组
+   * @param {Array} mediaFiles - media_files 记录数组
    * @param {number} concurrency - 并发数
    * @returns {Promise<Object>} { missing: [], errors: [] }
    * @private
    */
-  static async _checkBatch(storageService, images, concurrency) {
+  static async _checkBatch(storageService, mediaFiles, concurrency) {
     const missing = []
     const errors = []
 
     // 分组并发执行
-    for (let i = 0; i < images.length; i += concurrency) {
-      const chunk = images.slice(i, i + concurrency)
+    for (let i = 0; i < mediaFiles.length; i += concurrency) {
+      const chunk = mediaFiles.slice(i, i + concurrency)
       const results = await Promise.allSettled(
-        chunk.map(async img => {
-          if (!img.file_path) {
+        chunk.map(async m => {
+          if (!m.object_key) {
             missing.push({
-              image_resource_id: img.image_resource_id,
-              file_path: null,
-              reason: 'file_path 为空'
+              media_id: m.media_id,
+              object_key: null,
+              reason: 'object_key 为空'
             })
             return
           }
 
-          const exists = await storageService.fileExists(img.file_path)
+          const exists = await storageService.fileExists(m.object_key)
           if (!exists) {
             missing.push({
-              image_resource_id: img.image_resource_id,
-              file_path: img.file_path,
-              business_type: img.business_type,
-              context_id: img.context_id,
+              media_id: m.media_id,
+              object_key: m.object_key,
+              folder: m.folder,
               reason: 'Sealos 文件不存在'
             })
           }
@@ -174,10 +173,10 @@ class DailyImageStorageConsistencyCheck {
       // 收集异常（网络错误等）
       results.forEach((r, idx) => {
         if (r.status === 'rejected') {
-          const img = chunk[idx]
+          const m = chunk[idx]
           errors.push({
-            image_resource_id: img.image_resource_id,
-            file_path: img.file_path,
+            media_id: m.media_id,
+            object_key: m.object_key,
             error: r.reason?.message || String(r.reason)
           })
         }
@@ -196,7 +195,7 @@ class DailyImageStorageConsistencyCheck {
    */
   static _outputReport(report) {
     console.log('\n' + '='.repeat(80))
-    console.log('🔍 每日图片存储一致性检测报告')
+    console.log('🔍 每日媒体存储一致性检测报告')
     console.log('='.repeat(80))
     console.log(`时间: ${report.timestamp}`)
     console.log(`耗时: ${report.duration_ms}ms`)
@@ -209,7 +208,7 @@ class DailyImageStorageConsistencyCheck {
     if (report.missing_count > 0) {
       console.log('\n--- 缺失文件明细（前 10 条）---')
       report.missing_files.slice(0, 10).forEach(m => {
-        console.log(`  ID=${m.image_resource_id} | path=${m.file_path} | ${m.reason}`)
+        console.log(`  media_id=${m.media_id} | object_key=${m.object_key} | ${m.reason}`)
       })
     }
 

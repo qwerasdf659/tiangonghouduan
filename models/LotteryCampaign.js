@@ -678,11 +678,6 @@ module.exports = sequelize => {
         defaultValue: '00:00:00',
         comment: '每日重置时间'
       },
-      banner_image_url: {
-        type: DataTypes.STRING(500),
-        allowNull: true,
-        comment: '活动横幅图片'
-      },
       description: {
         type: DataTypes.TEXT,
         allowNull: true,
@@ -920,7 +915,7 @@ module.exports = sequelize => {
        * 活动池剩余预算
        * @type {number}
        * @业务含义 仅 budget_mode=pool 时使用，实时记录剩余可用预算
-       * @场景 每次抽奖后扣减，当剩余预算不足时只能抽到空奖
+       * @场景 每次抽奖后扣减，当剩余预算不足时只能抽到保底奖品
        */
       pool_budget_remaining: {
         type: DataTypes.BIGINT,
@@ -1033,19 +1028,55 @@ module.exports = sequelize => {
         comment: '中奖动画类型: simple（简单弹窗）/card_flip（卡牌翻转）/fireworks（烟花特效）'
       },
 
-      /**
-       * 活动背景图URL
-       * @type {string|null}
-       * @业务含义 运营上传的活动背景图，可选
-       * @注意 与 banner_image_url（活动横幅图）用途不同
-       */
-      background_image_url: {
-        type: DataTypes.STRING(500),
+      // === Phase 0 新增字段：活动展示控制（2026-03-16） ===
+
+      /** 展示排序（数值越小越靠前，全项目统一 sort_order INT ASC 约定） */
+      sort_order: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
+        comment: '展示排序（数值越小越靠前）'
+      },
+
+      /** 是否精选/主推活动（前端可高亮展示） */
+      is_featured: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+        comment: '是否精选/主推活动（前端可高亮展示）'
+      },
+
+      /** 是否隐藏（active 但不在列表展示，用于内测/定向活动） */
+      is_hidden: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+        comment: '是否隐藏（active 但不在列表展示，用于内测/定向活动）'
+      },
+
+      /** 展示标签，如 ["限时","新活动","热门"] */
+      display_tags: {
+        type: DataTypes.JSON,
         allowNull: true,
         defaultValue: null,
-        comment: '活动背景图URL（运营上传，可选，与 banner_image_url 横幅图用途不同）'
+        comment: '展示标签，如 ["限时","新活动","热门"]'
+      },
+
+      /** 展示开始时间（可早于 start_time 做预热展示） */
+      display_start_time: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        defaultValue: null,
+        comment: '展示开始时间（可早于 start_time 做预热展示）'
+      },
+
+      /** 展示结束时间（可晚于 end_time 做收尾展示） */
+      display_end_time: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        defaultValue: null,
+        comment: '展示结束时间（可晚于 end_time 做收尾展示）'
       }
-      /* guarantee_enabled/threshold/prize_id 已迁移到 lottery_strategy_config（guarantee.*） */
     },
     {
       sequelize,

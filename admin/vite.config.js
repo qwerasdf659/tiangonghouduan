@@ -136,19 +136,24 @@ export default defineConfig({
         chunkFileNames: 'assets/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash].[ext]',
         
-        // 代码分割策略（优化后）
+        // 代码分割策略（按库分组，提升浏览器缓存命中率）
         manualChunks: (id) => {
-          // Alpine.js 单独打包
           if (id.includes('alpinejs')) {
             return 'alpine'
           }
-          
-          // ECharts 单独打包（按需导入后约300KB）
+          // 静态命名导入后 tree-shaking 生效，仅包含实际使用的 7 图表 + 9 组件
           if (id.includes('echarts')) {
             return 'echarts'
           }
-          
-          // 其他 node_modules 打包为 vendor
+          // xlsx + jspdf 仅在导出/打印页面使用（~800KB → 单独 chunk）
+          if (id.includes('xlsx') || id.includes('jspdf')) {
+            return 'vendor-export'
+          }
+          // sortablejs 仅在拖拽排序页面使用（~50KB → 单独 chunk）
+          if (id.includes('sortablejs')) {
+            return 'vendor-ui'
+          }
+          // socket.io 与 vendor 有循环依赖，合并入 vendor 避免 circular chunk 警告
           if (id.includes('node_modules')) {
             return 'vendor'
           }
@@ -159,8 +164,8 @@ export default defineConfig({
     minify: 'esbuild',
     sourcemap: true,
     
-    // 调整警告阈值（ECharts chunk 可能超过 500KB）
-    chunkSizeWarningLimit: 600
+    // vendor-export（xlsx+jspdf ~776KB）是预期行为，阈值设为 800 避免误告警
+    chunkSizeWarningLimit: 800
   },
   
   resolve: {

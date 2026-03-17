@@ -11,7 +11,7 @@ import { logger } from '../../../utils/logger.js'
 import { ASSET_ENDPOINTS } from '../../../api/asset.js'
 import { request, buildURL } from '../../../api/base.js'
 import { createPageMixin } from '../../../alpine/mixins/index.js'
-import { loadECharts } from '../../../utils/index.js'
+import { loadECharts } from '../../../utils/echarts-lazy.js'
 
 // 模块级：当前已解析的用户ID
 let _portfolioUserId = null
@@ -96,7 +96,7 @@ function assetsPortfolioPage() {
     /**
      * data-table 数据源：资产列表
      */
-    async fetchAssetsTableData(params) {
+    async fetchAssetsTableData(_params) {
       if (!_portfolioUserId) {
         return { items: [], total: 0 }
       }
@@ -375,7 +375,7 @@ function assetsPortfolioPage() {
       } catch (error) {
         logger.error('[AssetsPortfolioPage] 加载资产列表失败:', error)
         this.assets = []
-        this.showError(`加载用户资产失败`)
+        this.showError('加载用户资产失败')
       }
     },
 

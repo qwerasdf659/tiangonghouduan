@@ -49,11 +49,11 @@ class LotteryPrize extends Model {
       })
     }
 
-    // 关联到图片资源
-    if (models.ImageResources) {
-      LotteryPrize.belongsTo(models.ImageResources, {
-        foreignKey: 'image_resource_id',
-        as: 'image'
+    // 关联到主媒体文件（2026-03-16 媒体体系，替代 image_resources）
+    if (models.MediaFile) {
+      LotteryPrize.belongsTo(models.MediaFile, {
+        foreignKey: 'primary_media_id',
+        as: 'primary_media'
       })
     }
 
@@ -234,19 +234,19 @@ class LotteryPrize extends Model {
   }
 
   /**
-   * 验证活动奖品池配置（BUDGET_POINTS 架构：空奖约束）
+   * 验证活动奖品池配置（BUDGET_POINTS 架构：保底奖品约束）
    *
    * 业务规则：
-   * - 每个抽奖活动必须至少有一个 prize_value_points = 0 的空奖
-   * - 确保预算耗尽时用户仍可参与抽奖（只能抽到空奖）
-   * - 空奖的 status 必须为 'active'
+   * - 每个抽奖活动必须至少有一个 prize_value_points = 0 的保底奖品
+   * - 确保预算耗尽时用户仍可参与抽奖（只能抽到保底奖品）
+   * - 保底奖品的 status 必须为 'active'
    *
    * @param {number} campaignId - 活动ID
    * @param {Object} options - 选项
    * @param {Object} options.transaction - Sequelize事务对象
    * @returns {Promise<Object>} 验证结果 {valid: boolean, error?: string, emptyPrizes: Array}
    */
-  static async validateEmptyPrizeConstraint(campaignId, options = {}) {
+  static async validateFallbackPrizeConstraint(campaignId, options = {}) {
     const { transaction } = options
 
     if (!campaignId) {
@@ -257,7 +257,7 @@ class LotteryPrize extends Model {
       }
     }
 
-    // 查询活动的所有空奖（prize_value_points = 0 或 NULL）
+    // 查询活动的所有保底奖品（prize_value_points = 0 或 NULL）
     const emptyPrizes = await this.findAll({
       where: {
         lottery_campaign_id: campaignId,
@@ -271,12 +271,12 @@ class LotteryPrize extends Model {
     if (emptyPrizes.length === 0) {
       return {
         valid: false,
-        error: `活动 ${campaignId} 缺少空奖配置（prize_value_points = 0）：BUDGET_POINTS 架构要求至少有一个空奖，确保预算耗尽时用户仍可抽奖`,
+        error: `活动 ${campaignId} 缺少保底奖品配置（prize_value_points = 0）：BUDGET_POINTS 架构要求至少有一个保底奖品，确保预算耗尽时用户仍可抽奖`,
         emptyPrizes: []
       }
     }
 
-    // 检查空奖是否有概率配置
+    // 检查保底奖品是否有概率配置
     const emptyPrizesWithProbability = emptyPrizes.filter(
       p => p.win_probability && parseFloat(p.win_probability) > 0
     )
@@ -284,7 +284,7 @@ class LotteryPrize extends Model {
     if (emptyPrizesWithProbability.length === 0) {
       return {
         valid: false,
-        error: `活动 ${campaignId} 的空奖概率配置无效：至少需要一个空奖有大于0的中奖概率`,
+        error: `活动 ${campaignId} 的保底奖品概率配置无效：至少需要一个保底奖品有大于0的中奖概率`,
         emptyPrizes: emptyPrizes.map(p => p.toJSON())
       }
     }
@@ -292,7 +292,7 @@ class LotteryPrize extends Model {
     return {
       valid: true,
       emptyPrizes: emptyPrizes.map(p => p.toJSON()),
-      message: `活动 ${campaignId} 空奖配置有效：${emptyPrizes.length} 个空奖`
+      message: `活动 ${campaignId} 保底奖品配置有效：${emptyPrizes.length} 个保底奖品`
     }
   }
 
@@ -364,12 +364,12 @@ class LotteryPrize extends Model {
 
     const totalProbability = Object.values(probabilitySum).reduce((a, b) => a + b, 0)
 
-    // 空奖约束检查
+    // 保底奖品约束检查
     const emptyPrizeValid = prizesByValue.empty.length > 0 && probabilitySum.empty > 0
 
     return {
       valid: emptyPrizeValid,
-      error: emptyPrizeValid ? null : '缺少有效的空奖配置（prize_value_points = 0 且概率 > 0）',
+      error: emptyPrizeValid ? null : '缺少有效的保底奖品配置（prize_value_points = 0 且概率 > 0）',
       summary: {
         total_prizes: allPrizes.length,
         empty_prizes: prizesByValue.empty.length,
@@ -690,7 +690,7 @@ class LotteryPrize extends Model {
     const MISLEADING_PATTERNS = [
       {
         pattern: /神秘.{0,2}(?:彩蛋|大奖|惊喜)/,
-        rule: '「神秘XX」容易制造期待落差，实际为空奖时用户体验差'
+        rule: '「神秘XX」容易制造期待落差，实际为低价值奖品时用户体验差'
       }
     ]
 
@@ -752,7 +752,7 @@ class LotteryPrize extends Model {
    *
    * 业务规则（用户拍板决定）：
    * - 配置不正确就禁止上线活动
-   * - 包括：档位权重校验 + 空奖配置校验 + 预算配置校验
+   * - 包括：档位权重校验 + 保底奖品配置校验 + 预算配置校验
    *         + fallback 数量校验(D11) + low 档预算值校验 + 格位数量校验(D13)
    *         + 奖品命名负面词检测（P3，仅警告不阻止）
    *
@@ -766,8 +766,8 @@ class LotteryPrize extends Model {
     // 1. 校验奖品权重配置
     const prizeWeightResult = await this.validatePrizeWeights(campaignId, { transaction })
 
-    // 2. 校验空奖配置
-    const emptyPrizeResult = await this.validateEmptyPrizeConstraint(campaignId, { transaction })
+    // 2. 校验保底奖品配置
+    const emptyPrizeResult = await this.validateFallbackPrizeConstraint(campaignId, { transaction })
 
     // 3. 校验预算配置
     const budgetConfigResult = await this.validateCampaignBudgetConfig(campaignId, { transaction })
@@ -789,7 +789,7 @@ class LotteryPrize extends Model {
       errors.push(`奖品权重：${prizeWeightResult.error}`)
     }
     if (!emptyPrizeResult.valid && emptyPrizeResult.error) {
-      errors.push(`空奖配置：${emptyPrizeResult.error}`)
+      errors.push(`保底奖品配置：${emptyPrizeResult.error}`)
     }
     if (!budgetConfigResult.valid && budgetConfigResult.error) {
       errors.push(`预算配置：${budgetConfigResult.error}`)
@@ -910,14 +910,13 @@ module.exports = sequelize => {
         type: DataTypes.TEXT,
         comment: '奖品描述信息'
       },
-      image_resource_id: {
-        type: DataTypes.INTEGER,
+      primary_media_id: {
+        type: DataTypes.BIGINT.UNSIGNED,
         allowNull: true,
-        comment:
-          '关联的奖品图片ID，外键指向 image_resources.image_resource_id（2026-02-01 主键命名规范化）',
+        comment: '主图媒体ID，FK→media_files.media_id（2026-03-16 媒体体系）',
         references: {
-          model: 'image_resources',
-          key: 'image_resource_id'
+          model: 'media_files',
+          key: 'media_id'
         },
         onUpdate: 'CASCADE',
         onDelete: 'SET NULL'

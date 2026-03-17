@@ -7,9 +7,9 @@
  * 1. 基础字典数据（RarityDef、CategoryDef、AssetGroupDef）
  * 2. 用户体系（管理员、普通用户、商户）
  * 3. 材料资产类型（含图标 icon_url）
- * 4. 图片资源（ImageResources，供兑换商品引用）
+ * 4. 媒体文件（media_files + media_attachments，供兑换商品/奖品引用）
  * 5. 物品模板
- * 6. 兑换商品图片绑定（更新 primary_image_id）
+ * 6. 兑换商品媒体绑定（更新 primary_media_id）
  * 7. 弹窗/轮播图
  * 8. 系统公告
  * 9. 抽奖活动 + 奖品
@@ -625,182 +625,158 @@ module.exports = {
 
     /*
      * ================================================================
-     * 4. 图片资源（供兑换商品等引用）
+     * 4. 媒体文件（media_files + media_attachments，供兑换商品/奖品引用）
      * ================================================================
      */
-    console.log('🖼️  4/13 图片资源...')
+    console.log('🖼️  4/13 媒体文件...')
 
-    const imageResources = [
+    const mediaFiles = [
       {
-        business_type: 'exchange',
-        category: 'products',
-        context_id: 0,
-        user_id: adminUserId,
-        file_path: 'test-seeds/exchange/airpods-pro.jpg',
-        thumbnail_paths: JSON.stringify({
+        object_key: 'test-seeds/exchange/airpods-pro.jpg',
+        thumbnail_keys: JSON.stringify({
           small: 'test-seeds/exchange/thumbnails/small/airpods-pro.jpg',
           medium: 'test-seeds/exchange/thumbnails/medium/airpods-pro.jpg',
           large: 'test-seeds/exchange/thumbnails/large/airpods-pro.jpg'
         }),
-        original_filename: 'airpods-pro.jpg',
+        original_name: 'airpods-pro.jpg',
         file_size: 102400,
         mime_type: 'image/jpeg',
+        folder: 'products',
+        uploaded_by: adminUserId,
         status: 'active',
-        source_module: 'admin',
-        ip_address: '127.0.0.1',
-        created_at: now
+        created_at: now,
+        updated_at: now
       },
       {
-        business_type: 'exchange',
-        category: 'products',
-        context_id: 0,
-        user_id: adminUserId,
-        file_path: 'test-seeds/exchange/xiaomi-band.jpg',
-        thumbnail_paths: JSON.stringify({
+        object_key: 'test-seeds/exchange/xiaomi-band.jpg',
+        thumbnail_keys: JSON.stringify({
           small: 'test-seeds/exchange/thumbnails/small/xiaomi-band.jpg',
           medium: 'test-seeds/exchange/thumbnails/medium/xiaomi-band.jpg',
           large: 'test-seeds/exchange/thumbnails/large/xiaomi-band.jpg'
         }),
-        original_filename: 'xiaomi-band.jpg',
+        original_name: 'xiaomi-band.jpg',
         file_size: 89600,
         mime_type: 'image/jpeg',
+        folder: 'products',
+        uploaded_by: adminUserId,
         status: 'active',
-        source_module: 'admin',
-        ip_address: '127.0.0.1',
-        created_at: now
+        created_at: now,
+        updated_at: now
       },
       {
-        business_type: 'exchange',
-        category: 'products',
-        context_id: 0,
-        user_id: adminUserId,
-        file_path: 'test-seeds/exchange/coffee-coupon.jpg',
-        thumbnail_paths: JSON.stringify({
+        object_key: 'test-seeds/exchange/coffee-coupon.jpg',
+        thumbnail_keys: JSON.stringify({
           small: 'test-seeds/exchange/thumbnails/small/coffee-coupon.jpg',
           medium: 'test-seeds/exchange/thumbnails/medium/coffee-coupon.jpg',
           large: 'test-seeds/exchange/thumbnails/large/coffee-coupon.jpg'
         }),
-        original_filename: 'coffee-coupon.jpg',
+        original_name: 'coffee-coupon.jpg',
         file_size: 65536,
         mime_type: 'image/jpeg',
+        folder: 'products',
+        uploaded_by: adminUserId,
         status: 'active',
-        source_module: 'admin',
-        ip_address: '127.0.0.1',
-        created_at: now
+        created_at: now,
+        updated_at: now
       },
       {
-        business_type: 'exchange',
-        category: 'products',
-        context_id: 0,
-        user_id: adminUserId,
-        file_path: 'test-seeds/exchange/canvas-bag.jpg',
-        thumbnail_paths: JSON.stringify({
+        object_key: 'test-seeds/exchange/canvas-bag.jpg',
+        thumbnail_keys: JSON.stringify({
           small: 'test-seeds/exchange/thumbnails/small/canvas-bag.jpg',
           medium: 'test-seeds/exchange/thumbnails/medium/canvas-bag.jpg',
           large: 'test-seeds/exchange/thumbnails/large/canvas-bag.jpg'
         }),
-        original_filename: 'canvas-bag.jpg',
+        original_name: 'canvas-bag.jpg',
         file_size: 78000,
         mime_type: 'image/jpeg',
+        folder: 'products',
+        uploaded_by: adminUserId,
         status: 'active',
-        source_module: 'admin',
-        ip_address: '127.0.0.1',
-        created_at: now
+        created_at: now,
+        updated_at: now
       },
       {
-        business_type: 'exchange',
-        category: 'products',
-        context_id: 0,
-        user_id: adminUserId,
-        file_path: 'test-seeds/exchange/mechanical-keyboard.jpg',
-        thumbnail_paths: JSON.stringify({
+        object_key: 'test-seeds/exchange/mechanical-keyboard.jpg',
+        thumbnail_keys: JSON.stringify({
           small: 'test-seeds/exchange/thumbnails/small/mechanical-keyboard.jpg',
           medium: 'test-seeds/exchange/thumbnails/medium/mechanical-keyboard.jpg',
           large: 'test-seeds/exchange/thumbnails/large/mechanical-keyboard.jpg'
         }),
-        original_filename: 'mechanical-keyboard.jpg',
+        original_name: 'mechanical-keyboard.jpg',
         file_size: 115200,
         mime_type: 'image/jpeg',
+        folder: 'products',
+        uploaded_by: adminUserId,
         status: 'active',
-        source_module: 'admin',
-        ip_address: '127.0.0.1',
-        created_at: now
+        created_at: now,
+        updated_at: now
       },
       {
-        business_type: 'exchange',
-        category: 'products',
-        context_id: 0,
-        user_id: adminUserId,
-        file_path: 'test-seeds/exchange/desk-lamp.jpg',
-        thumbnail_paths: JSON.stringify({
+        object_key: 'test-seeds/exchange/desk-lamp.jpg',
+        thumbnail_keys: JSON.stringify({
           small: 'test-seeds/exchange/thumbnails/small/desk-lamp.jpg',
           medium: 'test-seeds/exchange/thumbnails/medium/desk-lamp.jpg',
           large: 'test-seeds/exchange/thumbnails/large/desk-lamp.jpg'
         }),
-        original_filename: 'desk-lamp.jpg',
+        original_name: 'desk-lamp.jpg',
         file_size: 92000,
         mime_type: 'image/jpeg',
+        folder: 'products',
+        uploaded_by: adminUserId,
         status: 'active',
-        source_module: 'admin',
-        ip_address: '127.0.0.1',
-        created_at: now
+        created_at: now,
+        updated_at: now
       },
       {
-        business_type: 'lottery',
-        category: 'prizes',
-        context_id: 0,
-        user_id: adminUserId,
-        file_path: 'test-seeds/lottery/prize-iphone.jpg',
-        thumbnail_paths: JSON.stringify({
+        object_key: 'test-seeds/lottery/prize-iphone.jpg',
+        thumbnail_keys: JSON.stringify({
           small: 'test-seeds/lottery/thumbnails/small/prize-iphone.jpg',
           medium: 'test-seeds/lottery/thumbnails/medium/prize-iphone.jpg',
           large: 'test-seeds/lottery/thumbnails/large/prize-iphone.jpg'
         }),
-        original_filename: 'prize-iphone.jpg',
+        original_name: 'prize-iphone.jpg',
         file_size: 125000,
         mime_type: 'image/jpeg',
+        folder: 'prizes',
+        uploaded_by: adminUserId,
         status: 'active',
-        source_module: 'admin',
-        ip_address: '127.0.0.1',
-        created_at: now
+        created_at: now,
+        updated_at: now
       },
       {
-        business_type: 'lottery',
-        category: 'prizes',
-        context_id: 0,
-        user_id: adminUserId,
-        file_path: 'test-seeds/lottery/prize-coupon.jpg',
-        thumbnail_paths: JSON.stringify({
+        object_key: 'test-seeds/lottery/prize-coupon.jpg',
+        thumbnail_keys: JSON.stringify({
           small: 'test-seeds/lottery/thumbnails/small/prize-coupon.jpg',
           medium: 'test-seeds/lottery/thumbnails/medium/prize-coupon.jpg',
           large: 'test-seeds/lottery/thumbnails/large/prize-coupon.jpg'
         }),
-        original_filename: 'prize-coupon.jpg',
+        original_name: 'prize-coupon.jpg',
         file_size: 55000,
         mime_type: 'image/jpeg',
+        folder: 'prizes',
+        uploaded_by: adminUserId,
         status: 'active',
-        source_module: 'admin',
-        ip_address: '127.0.0.1',
-        created_at: now
+        created_at: now,
+        updated_at: now
       }
     ]
-    const imageIds = []
-    for (const img of imageResources) {
+    const mediaIds = []
+    for (const mf of mediaFiles) {
       const exists = await queryInterface.rawSelect(
-        'image_resources',
-        { where: { file_path: img.file_path } },
-        ['image_resource_id']
+        'media_files',
+        { where: { object_key: mf.object_key } },
+        ['media_id']
       )
       if (exists) {
-        imageIds.push(exists)
+        mediaIds.push(exists)
       } else {
-        await queryInterface.bulkInsert('image_resources', [img])
+        await queryInterface.bulkInsert('media_files', [mf])
         const newId = await queryInterface.rawSelect(
-          'image_resources',
-          { where: { file_path: img.file_path } },
-          ['image_resource_id']
+          'media_files',
+          { where: { object_key: mf.object_key } },
+          ['media_id']
         )
-        imageIds.push(newId)
+        mediaIds.push(newId)
       }
     }
 
@@ -964,22 +940,22 @@ module.exports = {
 
     /*
      * ================================================================
-     * 6. 兑换商品图片绑定（更新已存在的商品 primary_image_id）
+     * 6. 兑换商品媒体绑定（primary_media_id + media_attachments）
      * ================================================================
      */
-    console.log('🛒 6/13 兑换商品图片绑定...')
+    console.log('🛒 6/13 兑换商品媒体绑定...')
 
     const newExchangeItems = [
       {
         item_name: '[测试]AirPods Pro 2代',
         description: '苹果 AirPods Pro 第二代，主动降噪，适应性音频',
-        primary_image_id: imageIds[0],
+        primary_media_id: mediaIds[0],
         cost_asset_code: 'orange_crystal',
         cost_amount: 50,
         cost_price: 1499.0,
         stock: 10,
         sold_count: 2,
-        category: '数码电子',
+        category_def_id: 1,
         status: 'active',
         sort_order: 1,
         space: 'premium',
@@ -997,13 +973,13 @@ module.exports = {
       {
         item_name: '[测试]小米手环8 NFC版',
         description: '小米手环8 NFC版，1.62英寸AMOLED屏幕，16天超长续航',
-        primary_image_id: imageIds[1],
+        primary_media_id: mediaIds[1],
         cost_asset_code: 'red_shard',
         cost_amount: 300,
         cost_price: 249.0,
         stock: 50,
         sold_count: 15,
-        category: '数码电子',
+        category_def_id: 1,
         status: 'active',
         sort_order: 2,
         space: 'lucky',
@@ -1021,13 +997,13 @@ module.exports = {
       {
         item_name: '[测试]星巴克100元礼品卡',
         description: '星巴克100元电子礼品卡，全国门店通用',
-        primary_image_id: imageIds[2],
+        primary_media_id: mediaIds[2],
         cost_asset_code: 'red_shard',
         cost_amount: 100,
         cost_price: 95.0,
         stock: 100,
         sold_count: 30,
-        category: '美食饮品',
+        category_def_id: 7,
         status: 'active',
         sort_order: 3,
         space: 'both',
@@ -1045,13 +1021,13 @@ module.exports = {
       {
         item_name: '[测试]品牌帆布环保袋',
         description: '加厚环保帆布袋，时尚百搭，大容量收纳',
-        primary_image_id: imageIds[3],
+        primary_media_id: mediaIds[3],
         cost_asset_code: 'red_shard',
         cost_amount: 30,
         cost_price: 15.0,
         stock: 500,
         sold_count: 120,
-        category: '日用百货',
+        category_def_id: 6,
         status: 'active',
         sort_order: 4,
         space: 'lucky',
@@ -1069,13 +1045,13 @@ module.exports = {
       {
         item_name: '[测试]Cherry MX 机械键盘',
         description: 'Cherry MX 红轴 87键 RGB 机械键盘，金属面板',
-        primary_image_id: imageIds[4],
+        primary_media_id: mediaIds[4],
         cost_asset_code: 'orange_shard',
         cost_amount: 200,
         cost_price: 399.0,
         stock: 20,
         sold_count: 5,
-        category: '数码电子',
+        category_def_id: 1,
         status: 'active',
         sort_order: 5,
         space: 'premium',
@@ -1093,13 +1069,13 @@ module.exports = {
       {
         item_name: '[测试]LED护眼台灯',
         description: 'AA级护眼LED台灯，三色调光，无频闪',
-        primary_image_id: imageIds[5],
+        primary_media_id: mediaIds[5],
         cost_asset_code: 'red_shard',
         cost_amount: 150,
         cost_price: 129.0,
         stock: 80,
         sold_count: 22,
-        category: '日用百货',
+        category_def_id: 6,
         status: 'active',
         sort_order: 6,
         space: 'both',
@@ -1117,13 +1093,13 @@ module.exports = {
       {
         item_name: '[测试]已下架-过期活动商品',
         description: '此商品已停止兑换',
-        primary_image_id: null,
+        primary_media_id: null,
         cost_asset_code: 'red_shard',
         cost_amount: 999,
         cost_price: 10.0,
         stock: 0,
         sold_count: 50,
-        category: '其他',
+        category_def_id: 9,
         status: 'inactive',
         sort_order: 99,
         space: 'lucky',
@@ -1285,7 +1261,7 @@ module.exports = {
             prize_value: 3200,
             prize_value_points: 1600,
             prize_description: '获得紫水晶1个',
-            image_resource_id: imageIds[6] || null,
+            primary_media_id: mediaIds[6] || null,
             win_probability: 0.01,
             win_weight: 1,
             reward_tier: 'high',
@@ -1312,7 +1288,7 @@ module.exports = {
             prize_value: 800,
             prize_value_points: 400,
             prize_description: '获得蓝水晶碎片5个',
-            image_resource_id: imageIds[7] || null,
+            primary_media_id: mediaIds[7] || null,
             win_probability: 0.05,
             win_weight: 5,
             reward_tier: 'high',
@@ -1339,7 +1315,7 @@ module.exports = {
             prize_value: 800,
             prize_value_points: 400,
             prize_description: '获得绿水晶碎片10个',
-            image_resource_id: null,
+            primary_media_id: null,
             win_probability: 0.1,
             win_weight: 10,
             reward_tier: 'mid',
@@ -1366,7 +1342,7 @@ module.exports = {
             prize_value: 400,
             prize_value_points: 200,
             prize_description: '获得橙水晶碎片20个',
-            image_resource_id: null,
+            primary_media_id: null,
             win_probability: 0.25,
             win_weight: 25,
             reward_tier: 'mid',
@@ -1393,7 +1369,7 @@ module.exports = {
             prize_value: 300,
             prize_value_points: 150,
             prize_description: '获得红水晶碎片30个',
-            image_resource_id: null,
+            primary_media_id: null,
             win_probability: 0.3,
             win_weight: 30,
             reward_tier: 'low',
@@ -1420,7 +1396,7 @@ module.exports = {
             prize_value: 100,
             prize_value_points: 50,
             prize_description: '获得红水晶碎片10个（保底奖励）',
-            image_resource_id: null,
+            primary_media_id: null,
             win_probability: 0.29,
             win_weight: 29,
             reward_tier: 'low',
@@ -1609,7 +1585,7 @@ module.exports = {
         updated_at: now
       },
       {
-        slot_key: 'lottery_popup_ad',
+        slot_key: 'lottery_popup',
         slot_name: '抽奖页弹窗',
         slot_type: 'popup',
         position: 'lottery',
@@ -1619,20 +1595,6 @@ module.exports = {
         min_budget_diamond: 300,
         is_active: true,
         description: '抽奖页面弹窗广告位',
-        created_at: now,
-        updated_at: now
-      },
-      {
-        slot_key: 'profile_carousel',
-        slot_name: '个人中心轮播',
-        slot_type: 'carousel',
-        position: 'profile',
-        max_display_count: 3,
-        daily_price_diamond: 100,
-        min_bid_diamond: 20,
-        min_budget_diamond: 200,
-        is_active: false,
-        description: '个人中心轮播广告位（暂未开放）',
         created_at: now,
         updated_at: now
       }
@@ -1978,7 +1940,7 @@ module.exports = {
     console.log('   - 测试用户：复用已有用户（admin/普通/商户）')
     console.log('   - 材料资产类型：15种（含图标icon_url）')
     console.log('   - 图片资源：8条 | 物品模板：10个')
-    console.log('   - 兑换商品：7个（含primary_image_id绑定）')
+    console.log('   - 兑换商品：7个（含primary_media_id绑定）')
     console.log('   - 弹窗：5个 | 轮播图：5个')
     console.log('   - 系统公告：4条 | 抽奖活动：3个 | 奖品：6个')
     console.log('   - 材料转换规则：5条 | 广告位：4个')
@@ -2028,8 +1990,13 @@ module.exports = {
     await queryInterface.bulkDelete('item_templates', {
       template_code: { [_Sequelize.Op.like]: 'tpl_%' }
     })
-    await queryInterface.bulkDelete('image_resources', {
-      file_path: { [_Sequelize.Op.like]: 'test-seeds/%' }
+    await queryInterface
+      .bulkDelete('media_attachments', {
+        attachable_type: { [_Sequelize.Op.like]: '%' }
+      })
+      .catch(() => {})
+    await queryInterface.bulkDelete('media_files', {
+      object_key: { [_Sequelize.Op.like]: 'test-seeds/%' }
     })
 
     console.log('✅ [种子数据] 回滚完成')

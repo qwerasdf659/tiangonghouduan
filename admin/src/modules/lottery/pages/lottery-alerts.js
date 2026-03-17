@@ -27,7 +27,7 @@ import { LOTTERY_CORE_ENDPOINTS } from '../../../api/lottery/core.js'
 import { LotteryHealthAPI } from '../../../api/lottery-health.js'
 import { SYSTEM_CORE_ENDPOINTS } from '../../../api/system/core.js'
 import { buildURL, request, buildQueryString } from '../../../api/base.js'
-import { loadECharts } from '../../../utils/index.js'
+import { loadECharts } from '../../../utils/echarts-lazy.js'
 import { createPageMixin } from '../../../alpine/mixins/index.js'
 
 // API请求封装

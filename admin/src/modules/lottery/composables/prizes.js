@@ -25,7 +25,7 @@ import { imageUploadMixin } from '../../../alpine/mixins/image-upload.js'
  * - stock_quantity: 库存数量 (正整数，999999表示无限)
  * - status: 状态 (active/inactive)
  * - prize_description: 奖品描述
- * - image_resource_id: 图片资源ID（FK→image_resources.image_resource_id）
+ * - primary_media_id: 主图媒体ID（FK→media 表）
  *
  * 注意：后端要求 quantity 必须为正整数，不接受 -1 或 0
  */
@@ -48,7 +48,7 @@ export function usePrizesState() {
       win_probability: 0, // 前端百分比显示 0-100
       stock_quantity: 100, // 默认库存100，后端要求正整数
       status: 'active',
-      image_resource_id: null,
+      primary_media_id: null,
       prize_description: '',
       /**
        * 稀有度代码（面向前端的视觉稀有度等级）
@@ -145,7 +145,7 @@ export function usePrizesMethods() {
      * 上传奖品图片
      *
      * 复用 imageUploadMixin.uploadImage() 上传到 Sealos 对象存储，
-     * 上传成功后设置 prizeForm.image_resource_id 和本地预览URL。
+     * 上传成功后设置 prizeForm.primary_media_id 和本地预览URL。
      *
      * @param {Event} event - input[type=file] 的 change 事件
      */
@@ -161,12 +161,12 @@ export function usePrizesMethods() {
       })
 
       if (result) {
-        this.prizeForm.image_resource_id = result.image_resource_id
+        this.prizeForm.primary_media_id = result.media_id
         if (result.public_url) {
           this.prize_image_preview_url = result.public_url
         }
         logger.info('[Prizes] 奖品图片上传成功', {
-          image_resource_id: result.image_resource_id
+          media_id: result.media_id
         })
       } else {
         this.prize_image_preview_url = null
@@ -179,14 +179,14 @@ export function usePrizesMethods() {
      * 清除奖品图片
      */
     clearPrizeImage() {
-      this.prizeForm.image_resource_id = null
+      this.prizeForm.primary_media_id = null
       this.prize_image_preview_url = null
     },
 
     /**
      * 加载奖品列表
      * 后端返回字段: lottery_prize_id, prize_name, prize_type, win_probability,
-     *               stock_quantity, status, prize_description, image_resource_id
+     *               stock_quantity, status, prize_description, primary_media_id
      */
     async loadPrizes() {
       try {
@@ -248,7 +248,7 @@ export function usePrizesMethods() {
         win_probability: 0,
         stock_quantity: 100,
         status: 'active',
-        image_resource_id: null,
+        primary_media_id: null,
         prize_description: '',
         rarity_code: 'common',
         win_weight: 100000,
@@ -267,7 +267,7 @@ export function usePrizesMethods() {
     editPrize(prize) {
       this.editingLotteryPrizeId = prize.lottery_prize_id
       this.isEditMode = true
-      this.prize_image_preview_url = prize.image_url || null
+      this.prize_image_preview_url = prize.public_url || prize.image_url || null
       const winProbability = parseFloat(prize.win_probability || 0) * 100
       this.prizeForm = {
         lottery_prize_id: prize.lottery_prize_id,
@@ -277,7 +277,7 @@ export function usePrizesMethods() {
         win_probability: winProbability,
         stock_quantity: prize.stock_quantity || 100,
         status: prize.status || 'active',
-        image_resource_id: prize.image_resource_id || null,
+        primary_media_id: prize.primary_media_id ?? null,
         prize_description: prize.prize_description || '',
         rarity_code: prize.rarity_code || 'common',
         sort_order: prize.sort_order || 1,
@@ -393,7 +393,7 @@ export function usePrizesMethods() {
             win_probability: winProbability,
             stock_quantity: this.prizeForm.stock_quantity,
             status: this.prizeForm.status,
-            image_resource_id: this.prizeForm.image_resource_id,
+            primary_media_id: this.prizeForm.primary_media_id,
             prize_description: this.prizeForm.prize_description,
             rarity_code: this.prizeForm.rarity_code || 'common',
             win_weight: parseInt(this.prizeForm.win_weight) || 100000,
@@ -427,22 +427,24 @@ export function usePrizesMethods() {
 
           // 2026-01-29 技术债务清理：直接使用后端字段名，无需映射
           // sort_order 不传，由后端自动分配唯一递增值（避免 SORT_ORDER_DUPLICATE 错误）
+          const prizeData = {
+            prize_name: this.prizeForm.prize_name,
+            prize_type: this.prizeForm.prize_type,
+            win_probability: winProbability,
+            stock_quantity: stockQuantity,
+            prize_description: this.prizeForm.prize_description,
+            rarity_code: this.prizeForm.rarity_code || 'common',
+            win_weight: parseInt(this.prizeForm.win_weight) || 100000,
+            reward_tier: this.prizeForm.reward_tier || 'low'
+          }
+          if (this.prizeForm.primary_media_id) {
+            prizeData.primary_media_id = this.prizeForm.primary_media_id
+          }
           await this.apiCall(LOTTERY_ENDPOINTS.PRIZE_BATCH_ADD, {
             method: 'POST',
             data: {
               lottery_campaign_id: this.prizeForm.lottery_campaign_id,
-              prizes: [
-                {
-                  prize_name: this.prizeForm.prize_name,
-                  prize_type: this.prizeForm.prize_type,
-                  win_probability: winProbability,
-                  stock_quantity: stockQuantity,
-                  prize_description: this.prizeForm.prize_description,
-                  rarity_code: this.prizeForm.rarity_code || 'common',
-                  win_weight: parseInt(this.prizeForm.win_weight) || 100000,
-                  reward_tier: this.prizeForm.reward_tier || 'low'
-                }
-              ]
+              prizes: [prizeData]
             }
           })
 
@@ -826,7 +828,7 @@ export function usePrizesMethods() {
         win_probability: 0,
         stock_quantity: 100,
         status: 'active',
-        image_resource_id: null,
+        primary_media_id: null,
         prize_description: '',
         rarity_code: 'common',
         win_weight: 100000,
@@ -883,8 +885,8 @@ export function usePrizesMethods() {
           } else {
             updateData.max_user_wins = null
           }
-          if (this.prizeForm.image_resource_id) {
-            updateData.image_resource_id = this.prizeForm.image_resource_id
+          if (this.prizeForm.primary_media_id) {
+            updateData.primary_media_id = this.prizeForm.primary_media_id
           }
           await this.apiCall(url, { method: 'PUT', data: updateData })
         } else {
@@ -911,8 +913,8 @@ export function usePrizesMethods() {
           if (this.prizeForm.max_user_wins !== null && this.prizeForm.max_user_wins !== '') {
             addData.max_user_wins = parseInt(this.prizeForm.max_user_wins)
           }
-          if (this.prizeForm.image_resource_id) {
-            addData.image_resource_id = this.prizeForm.image_resource_id
+          if (this.prizeForm.primary_media_id) {
+            addData.primary_media_id = this.prizeForm.primary_media_id
           }
           await this.apiCall(
             buildURL(LOTTERY_ENDPOINTS.PRIZE_ADD_TO_CAMPAIGN, {
@@ -939,7 +941,7 @@ export function usePrizesMethods() {
     editCampaignPrize(prize) {
       this.editingLotteryPrizeId = prize.lottery_prize_id
       this.isEditMode = true
-      this.prize_image_preview_url = prize.image_url || null
+      this.prize_image_preview_url = prize.public_url || prize.image_url || null
       this.prizeForm = {
         lottery_campaign_id: this.managingCampaign?.lottery_campaign_id,
         prize_name: prize.prize_name || '',
@@ -952,7 +954,7 @@ export function usePrizesMethods() {
         win_probability: parseFloat(prize.win_probability || 0) * 100,
         stock_quantity: prize.stock_quantity || 100,
         status: prize.status || 'active',
-        image_resource_id: prize.image_resource_id || null,
+        primary_media_id: prize.primary_media_id ?? null,
         prize_description: prize.prize_description || '',
         rarity_code: prize.rarity_code || 'common',
         win_weight: prize.win_weight || 100000,

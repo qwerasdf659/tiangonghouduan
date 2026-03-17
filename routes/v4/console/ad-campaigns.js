@@ -113,7 +113,12 @@ const ALLOWED_ADMIN_CREATE_FIELDS = [
   'start_date',
   'end_date',
   'targeting_rules',
-  'priority'
+  'priority',
+  'primary_media_id',
+  'image_url',
+  'content_type',
+  'text_content',
+  'display_mode'
 ]
 
 /**
@@ -678,7 +683,20 @@ router.get(
         return res.apiError('广告活动不存在', 'CAMPAIGN_NOT_FOUND', null, 404)
       }
 
-      return res.apiSuccess(campaign, '获取广告活动详情成功')
+      // 展示层转换：将素材的 primary_media 对象 key 拼接为完整代理 URL
+      const baseUrl = process.env.PUBLIC_BASE_URL
+      const result = campaign.toJSON ? campaign.toJSON() : campaign
+      if (result.creatives && baseUrl) {
+        result.creatives = result.creatives.map(c => {
+          const objectKey = c.primary_media?.object_key
+          if (objectKey) {
+            c.public_url = `${baseUrl}/api/v4/images/${objectKey}`
+          }
+          return c
+        })
+      }
+
+      return res.apiSuccess(result, '获取广告活动详情成功')
     } catch (error) {
       logger.error('获取广告活动详情失败', {
         error: error.message,

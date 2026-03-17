@@ -32,8 +32,8 @@ const asyncHandler = fn => (req, res, next) => {
   Promise.resolve(fn(req, res, next)).catch(next)
 }
 
-/** 广告位类型枚举（用于参数校验） */
-const VALID_SLOT_TYPES = ['popup', 'carousel']
+/** 广告位类型枚举（用于参数校验，与 models/AdSlot.js VALID_SLOT_TYPES 保持一致） */
+const VALID_SLOT_TYPES = ['popup', 'carousel', 'announcement', 'feed']
 
 /**
  * GET / - 获取可用广告位列表

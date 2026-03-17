@@ -926,7 +926,7 @@ document.addEventListener('alpine:init', () => {
         { key: 'sort_order', label: '排序', type: 'number' },
         { key: 'status', label: '状态', type: 'status' }
       ],
-      dataSource: async (params) => {
+      dataSource: async (_params) => {
         const res = await request({ url: SYSTEM_ENDPOINTS.DICT_ALL })
         const categories = (res.data?.categories || []).map((d, idx) => ({
           dict_id: `cat_${d.category_code || idx}`,

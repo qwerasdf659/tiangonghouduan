@@ -91,13 +91,24 @@ export const SYSTEM_ADMIN_ENDPOINTS = {
   AD_REPORT_CAMPAIGN: `${API_PREFIX}/console/ad-reports/campaigns/:id`,
   AD_REPORT_SLOT: `${API_PREFIX}/console/ad-reports/slots/:id`,
 
-  // 图片资源
-  IMAGE_LIST: `${API_PREFIX}/console/images`,
-  IMAGE_BY_BUSINESS: `${API_PREFIX}/console/images/by-business`,
-  IMAGE_UPLOAD: `${API_PREFIX}/console/images/upload`,
-  IMAGE_UPDATE: `${API_PREFIX}/console/images/:id`,
-  IMAGE_BIND: `${API_PREFIX}/console/images/:id/bind`,
-  IMAGE_DELETE: `${API_PREFIX}/console/images/:id`,
+  // 媒体文件管理端点（替代旧 IMAGE_* 端点）
+  MEDIA_UPLOAD: `${API_PREFIX}/console/media/upload`,
+  MEDIA_LIST: `${API_PREFIX}/console/media`,
+  MEDIA_DETAIL: (mediaId) => `${API_PREFIX}/console/media/${mediaId}`,
+  MEDIA_UPDATE: (mediaId) => `${API_PREFIX}/console/media/${mediaId}`,
+  MEDIA_DELETE: (mediaId) => `${API_PREFIX}/console/media/${mediaId}`,
+  MEDIA_ATTACH: (mediaId) => `${API_PREFIX}/console/media/${mediaId}/attach`,
+  MEDIA_DETACH: (mediaId) => `${API_PREFIX}/console/media/${mediaId}/detach`,
+  MEDIA_BY_ENTITY: (type, id) => `${API_PREFIX}/console/media/by-entity/${type}/${id}`,
+  MEDIA_BATCH_UPLOAD: `${API_PREFIX}/console/media/batch-upload`,
+  MEDIA_BATCH_ATTACH: `${API_PREFIX}/console/media/batch-attach`,
+  MEDIA_RESTORE: (mediaId) => `${API_PREFIX}/console/media/${mediaId}/restore`,
+  // 存储管理端点
+  STORAGE_OVERVIEW: `${API_PREFIX}/console/storage/overview`,
+  STORAGE_ORPHANS: `${API_PREFIX}/console/storage/orphans`,
+  STORAGE_TRASH: `${API_PREFIX}/console/storage/trash`,
+  STORAGE_CLEANUP: `${API_PREFIX}/console/storage/cleanup`,
+  STORAGE_DUPLICATES: `${API_PREFIX}/console/storage/duplicates`,
 
   // 风控告警
   RISK_ALERT_LIST: `${API_PREFIX}/console/risk-alerts`,

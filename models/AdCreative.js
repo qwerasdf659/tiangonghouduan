@@ -96,40 +96,17 @@ module.exports = sequelize => {
         comment: '创意内容类型：image=图片 / text=纯文字（系统公告）'
       },
 
-      image_url: {
-        type: DataTypes.STRING(500),
+      // 主媒体文件ID（2026-03-16 媒体体系，替代 image_url/image_width/image_height）
+      primary_media_id: {
+        type: DataTypes.BIGINT.UNSIGNED,
         allowNull: true,
-        validate: {
-          /**
-           * @param {string|null} value - 图片URL，content_type='image' 时必填
-           * @returns {void}
-           */
-          conditionalNotEmpty(value) {
-            if (this.content_type === 'image' && (!value || value.trim() === '')) {
-              throw new Error('图片类型创意必须提供图片URL')
-            }
-          },
-          len: { args: [0, 500], msg: '图片URL长度不能超过500字符' }
+        comment: '主媒体文件ID，FK→media_files.media_id（content_type=image 时使用）',
+        references: {
+          model: 'media_files',
+          key: 'media_id'
         },
-        comment: '图片URL（content_type=image 时必填，text 类型为 NULL）'
-      },
-
-      image_width: {
-        type: DataTypes.INTEGER.UNSIGNED,
-        allowNull: true,
-        validate: {
-          min: { args: [1], msg: '图片宽度不能小于1' }
-        },
-        comment: '图片宽度（像素）'
-      },
-
-      image_height: {
-        type: DataTypes.INTEGER.UNSIGNED,
-        allowNull: true,
-        validate: {
-          min: { args: [1], msg: '图片高度不能小于1' }
-        },
-        comment: '图片高度（像素）'
+        onUpdate: 'CASCADE',
+        onDelete: 'SET NULL'
       },
 
       link_url: {
@@ -286,6 +263,16 @@ module.exports = sequelize => {
       onUpdate: 'CASCADE',
       onDelete: 'SET NULL'
     })
+
+    // 主媒体文件（2026-03-16 媒体体系）
+    if (models.MediaFile) {
+      AdCreative.belongsTo(models.MediaFile, {
+        foreignKey: 'primary_media_id',
+        as: 'primary_media',
+        onUpdate: 'CASCADE',
+        onDelete: 'SET NULL'
+      })
+    }
   }
 
   return AdCreative

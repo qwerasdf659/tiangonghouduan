@@ -149,14 +149,14 @@ document.addEventListener('alpine:init', () => {
       {
         key: '_actions',
         label: '操作',
-        render: (_val, row) => `
+        render: (_val, _row) => `
           <div class="flex gap-1">
             <button class="px-2 py-1 text-xs themed-btn-primary rounded"
-                    onclick="document.dispatchEvent(new CustomEvent('listing-view-user', {detail: ${JSON.stringify({user_id: '__USER_ID__', mobile: '__MOBILE__', nickname: '__NICKNAME__'}).replace('__USER_ID__', `'+row.user_id+'`).replace('__MOBILE__', `'+row.mobile+'`).replace('__NICKNAME__', `'+(row.nickname||'-')+'`)}}))">
+                    onclick="document.dispatchEvent(new CustomEvent('listing-view-user', {detail: ${JSON.stringify({user_id: '__USER_ID__', mobile: '__MOBILE__', nickname: '__NICKNAME__'}).replace('__USER_ID__', "'+_row.user_id+'").replace('__MOBILE__', "'+_row.mobile+'").replace('__NICKNAME__', "'+(_row.nickname||'-')+'")}}))">
               查看上架
             </button>
             <button class="px-2 py-1 text-xs bg-purple-500 text-white rounded hover:bg-purple-600"
-                    onclick="document.dispatchEvent(new CustomEvent('listing-adjust-limit', {detail: ${JSON.stringify({user_id: '__UID__'}).replace('__UID__', `'+row.user_id+'`)}}))">
+                    onclick="document.dispatchEvent(new CustomEvent('listing-adjust-limit', {detail: ${JSON.stringify({user_id: '__UID__'}).replace('__UID__', "'+_row.user_id+'")}}))">
               调整限制
             </button>
           </div>
@@ -537,7 +537,7 @@ document.addEventListener('alpine:init', () => {
      */
     async _renderMarketOverviewCharts() {
       try {
-        const { loadECharts } = await import('../../../utils/index.js')
+        const { loadECharts } = await import('../../../utils/echarts-lazy.js')
         const echarts = await loadECharts()
         if (!echarts) {
           logger.warn('[TradeManagement] ECharts 加载失败，跳过图表渲染')
