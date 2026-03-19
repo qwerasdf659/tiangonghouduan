@@ -59,16 +59,18 @@ const { executeBusinessRecordReconciliation } = require('../reconcile-items')
 
 // 2025-12-29新增：资产域标准架构定时任务
 const HourlyUnlockTimeoutTradeOrders = require('../../jobs/hourly-unlock-timeout-trade-orders')
-// 2026-01-08新增：图片存储架构 - 未绑定图片清理
-const HourlyCleanupUnboundImages = require('../../jobs/hourly-cleanup-unbound-images')
+// 2026-01-08新增：媒体存储架构 - 未绑定媒体清理
+const HourlyCleanupUnboundMedia = require('../../jobs/hourly-cleanup-unbound-media')
 // 2026-01-08新增：交易市场材料交易 - 可叠加资产挂牌自动过期
 const HourlyExpireFungibleAssetListings = require('../../jobs/hourly-expire-fungible-asset-listings')
 // 2026-01-08新增：交易市场材料交易 - 市场挂牌异常监控
 const HourlyMarketListingMonitor = require('../../jobs/hourly-market-listing-monitor')
 // 2026-01-09新增：P0-2 孤儿冻结检测与清理（每天凌晨2点）
 const DailyOrphanFrozenCheck = require('../../jobs/daily-orphan-frozen-check')
-// 2026-01-14新增：图片资源数据质量门禁（图片缩略图架构兼容残留核查报告 Phase 1）
-const DailyImageResourceQualityCheck = require('../../jobs/daily-image-resource-quality-check')
+// 2026-01-14新增：媒体文件数据质量门禁（媒体缩略图架构核查）
+const DailyMediaFileQualityCheck = require('../../jobs/daily-media-file-quality-check')
+// 2026-03-18新增：媒体回收站自动清理（trashed 超过 7 天物理删除）
+const DailyMediaTrashCleanup = require('../../jobs/daily-media-trash-cleanup')
 // 2026-01-19新增：定价配置定时生效（Phase 3 统一抽奖架构）
 const HourlyPricingConfigScheduler = require('../../jobs/hourly-pricing-config-scheduler')
 // 2026-01-23新增：抽奖策略引擎监控 - 小时级指标聚合
@@ -225,7 +227,7 @@ class ScheduledTasks {
     this.scheduleHourlyBusinessRecordReconciliation()
 
     // 任务16: 每小时清理未绑定图片（2026-01-08新增 - 图片存储架构）
-    this.scheduleHourlyCleanupUnboundImages()
+    this.scheduleHourlyCleanupUnboundMedia()
 
     // 任务17: 每小时过期超时的可叠加资产挂牌（2026-01-08新增 - 交易市场材料交易）
     this.scheduleHourlyExpireFungibleAssetListings()
@@ -239,8 +241,11 @@ class ScheduledTasks {
     // 任务20: 每天凌晨3点清理超过180天的商家操作日志（2026-01-12新增 - AC4.4 商家员工域权限体系升级）
     this.scheduleDailyMerchantAuditLogCleanup()
 
-    // 任务21: 每天凌晨4点图片资源数据质量检查（2026-01-14新增 - 图片缩略图架构兼容残留核查报告 Phase 1）
-    this.scheduleDailyImageResourceQualityCheck()
+    // 任务21: 每天凌晨4点媒体文件数据质量检查（2026-01-14新增）
+    this.scheduleDailyMediaFileQualityCheck()
+
+    // 任务21.5: 每天凌晨3点媒体回收站自动清理（2026-03-18新增 - trashed 超过 7 天物理删除）
+    this.scheduleDailyMediaTrashCleanup()
 
     // 任务22: 每小时第10分钟检查定价配置定时生效（2026-01-19新增 - Phase 3 统一抽奖架构）
     this.scheduleHourlyPricingConfigActivation()
@@ -287,7 +292,7 @@ class ScheduledTasks {
     // ========== 2026-02-21 图片管理体系设计方案新增 ==========
 
     // 任务34: 每天凌晨5点图片存储一致性检测（HEAD请求验证Sealos文件真实存在）
-    this.scheduleDailyImageStorageConsistencyCheck()
+    this.scheduleDailyMediaStorageConsistencyCheck()
 
     // ========== 2026-02-23 统一对账定时任务 ==========
 
@@ -305,7 +310,15 @@ class ScheduledTasks {
     // 任务38: 每天凌晨3:10执行数据自动清理（2026-03-10 数据一键删除功能）
     this.scheduleDataCleanup()
 
-    logger.info('所有定时任务已初始化完成（包含统一对账+物品锁定过期释放+市场价格快照+数据自动清理）')
+    // ========== 2026-03-17 兑换市场增强任务 ==========
+
+    // 任务39: 每10分钟执行定时上下架检测（publish_at/unpublish_at）
+    this.scheduleExchangeItemAutoPublish()
+
+    // 任务40: 每小时第20分钟执行库存预警检测 + 售罄自动下架
+    this.scheduleExchangeStockAlert()
+
+    logger.info('所有定时任务已初始化完成（包含统一对账+物品锁定过期释放+市场价格快照+数据自动清理+定时上下架+库存预警）')
   }
 
   /**
@@ -1418,9 +1431,9 @@ class ScheduledTasks {
    *
    * @returns {void}
    */
-  static scheduleHourlyCleanupUnboundImages() {
+  static scheduleHourlyCleanupUnboundMedia() {
     cron.schedule('30 * * * *', async () => {
-      const lockKey = 'lock:cleanup_unbound_images'
+      const lockKey = 'lock:cleanup_unbound_media'
       const lockValue = `${process.pid}_${Date.now()}`
       let redisClient = null
 
@@ -1433,22 +1446,22 @@ class ScheduledTasks {
         const acquired = await redisClient.set(lockKey, lockValue, 'EX', 600, 'NX')
 
         if (!acquired) {
-          logger.info('[定时任务] 其他实例正在执行未绑定图片清理，跳过')
+          logger.info('[定时任务] 其他实例正在执行未绑定媒体清理，跳过')
           return
         }
 
-        logger.info('[定时任务] 获取分布式锁成功，开始执行未绑定图片清理...', {
+        logger.info('[定时任务] 获取分布式锁成功，开始执行未绑定媒体清理...', {
           lock_key: lockKey,
           lock_value: lockValue
         })
 
         // 调用 Job 类执行清理
-        const report = await HourlyCleanupUnboundImages.execute(24)
+        const report = await HourlyCleanupUnboundMedia.execute(24)
 
         if (report.cleaned_count > 0) {
-          logger.warn(`[定时任务] 未绑定图片清理完成：清理 ${report.cleaned_count} 个图片`)
+          logger.warn(`[定时任务] 未绑定媒体清理完成：清理 ${report.cleaned_count} 个媒体文件`)
         } else {
-          logger.info('[定时任务] 未绑定图片清理完成：无需清理')
+          logger.info('[定时任务] 未绑定媒体清理完成：无需清理')
         }
 
         // 释放锁
@@ -1481,15 +1494,15 @@ class ScheduledTasks {
    *
    * @example
    * const ScheduledTasks = require('./scripts/maintenance/scheduled-tasks')
-   * const report = await ScheduledTasks.manualCleanupUnboundImages(24)
+   * const report = await ScheduledTasks.manualCleanupUnboundMedia(24)
    * console.log('清理数量:', report.cleaned_count)
    */
-  static async manualCleanupUnboundImages(hours = 24) {
+  static async manualCleanupUnboundMedia(hours = 24) {
     try {
-      logger.info('[手动触发] 开始执行未绑定图片清理...', { hours_threshold: hours })
-      const report = await HourlyCleanupUnboundImages.execute(hours)
+      logger.info('[手动触发] 开始执行未绑定媒体清理...', { hours_threshold: hours })
+      const report = await HourlyCleanupUnboundMedia.execute(hours)
 
-      logger.info('[手动触发] 未绑定图片清理完成', {
+      logger.info('[手动触发] 未绑定媒体清理完成', {
         cleaned_count: report.cleaned_count,
         failed_count: report.failed_count,
         duration_ms: report.duration_ms
@@ -1497,7 +1510,7 @@ class ScheduledTasks {
 
       return report
     } catch (error) {
-      logger.error('[手动触发] 未绑定图片清理失败', { error: error.message })
+      logger.error('[手动触发] 未绑定媒体清理失败', { error: error.message })
       throw error
     }
   }
@@ -2023,9 +2036,9 @@ class ScheduledTasks {
    *
    * @since 2026-01-14
    */
-  static scheduleDailyImageResourceQualityCheck() {
+  static scheduleDailyMediaFileQualityCheck() {
     cron.schedule('0 4 * * *', async () => {
-      const lockKey = 'lock:image_resource_quality_check'
+      const lockKey = 'lock:media_file_quality_check'
       const lockValue = `${process.pid}_${Date.now()}`
       let redisClient = null
 
@@ -2038,20 +2051,20 @@ class ScheduledTasks {
         const acquired = await redisClient.set(lockKey, lockValue, 'EX', 900, 'NX')
 
         if (!acquired) {
-          logger.info('[定时任务] 其他实例正在执行图片资源数据质量检查，跳过')
+          logger.info('[定时任务] 其他实例正在执行媒体文件数据质量检查，跳过')
           return
         }
 
-        logger.info('[定时任务] 获取分布式锁成功，开始执行图片资源数据质量检查...', {
+        logger.info('[定时任务] 获取分布式锁成功，开始执行媒体文件数据质量检查...', {
           lock_key: lockKey,
           lock_value: lockValue
         })
 
         // 调用 Job 类执行检查
-        const report = await DailyImageResourceQualityCheck.execute()
+        const report = await DailyMediaFileQualityCheck.execute()
 
         if (report.total_issues > 0) {
-          logger.warn(`[定时任务] 图片资源数据质量检查完成：发现 ${report.total_issues} 个问题`, {
+          logger.warn(`[定时任务] 媒体文件数据质量检查完成：发现 ${report.total_issues} 个问题`, {
             total_checked: report.total_checked,
             missing_thumbnails: report.missing_thumbnails_count,
             incomplete_thumbnails: report.incomplete_thumbnails_count,
@@ -2059,14 +2072,14 @@ class ScheduledTasks {
             duration_ms: report.duration_ms
           })
         } else {
-          logger.info('[定时任务] 图片资源数据质量检查完成：数据质量良好')
+          logger.info('[定时任务] 媒体文件数据质量检查完成：数据质量良好')
         }
 
         // 释放锁
         await redisClient.del(lockKey)
         logger.info('[定时任务] 分布式锁已释放', { lock_key: lockKey })
       } catch (error) {
-        logger.error('[定时任务] 图片资源数据质量检查失败', { error: error.message })
+        logger.error('[定时任务] 媒体文件数据质量检查失败', { error: error.message })
 
         // 确保释放锁
         if (redisClient) {
@@ -2079,27 +2092,93 @@ class ScheduledTasks {
       }
     })
 
-    logger.info('✅ 定时任务已设置: 图片资源数据质量检查（每天凌晨4点执行，支持分布式锁）')
+    logger.info('✅ 定时任务已设置: 媒体文件数据质量检查（每天凌晨4点执行，支持分布式锁）')
+  }
+
+  /**
+   * 定时任务21.5: 每日媒体回收站自动清理
+   * Cron表达式: 0 3 * * * (每天凌晨3点)
+   *
+   * 业务场景（2026-03-18 媒体回收站自动清理）：
+   * - 物理删除 media_files 中 status='trashed' 且 trashed_at 超过 7 天的记录
+   * - 同时删除 Sealos 对象存储文件（主文件 + 缩略图）
+   * - 防止回收站无限膨胀占用存储空间
+   *
+   * @returns {void}
+   * @since 2026-03-18
+   */
+  static scheduleDailyMediaTrashCleanup() {
+    cron.schedule('0 3 * * *', async () => {
+      const lockKey = 'lock:media_trash_cleanup'
+      const lockValue = `${process.pid}_${Date.now()}`
+      let redisClient = null
+
+      try {
+        const { getRawClient } = require('../../utils/UnifiedRedisClient')
+        redisClient = getRawClient()
+
+        // 尝试获取分布式锁（15分钟过期）
+        const acquired = await redisClient.set(lockKey, lockValue, 'EX', 900, 'NX')
+
+        if (!acquired) {
+          logger.info('[定时任务] 其他实例正在执行媒体回收站清理，跳过')
+          return
+        }
+
+        logger.info('[定时任务] 获取分布式锁成功，开始执行媒体回收站清理...', {
+          lock_key: lockKey,
+          lock_value: lockValue
+        })
+
+        const report = await DailyMediaTrashCleanup.execute(7)
+
+        if (report.cleaned_count > 0) {
+          logger.warn(`[定时任务] 媒体回收站清理完成：清理 ${report.cleaned_count} 个过期媒体文件`, {
+            total_found: report.total_found,
+            cleaned_count: report.cleaned_count,
+            failed_count: report.failed_count,
+            duration_ms: report.duration_ms
+          })
+        } else {
+          logger.info('[定时任务] 媒体回收站清理完成：无过期记录需要清理')
+        }
+
+        await redisClient.del(lockKey)
+        logger.info('[定时任务] 分布式锁已释放', { lock_key: lockKey })
+      } catch (error) {
+        logger.error('[定时任务] 媒体回收站清理失败', { error: error.message })
+
+        if (redisClient) {
+          try {
+            await redisClient.del(lockKey)
+          } catch (unlockError) {
+            logger.error('[定时任务] 释放分布式锁失败', { error: unlockError.message })
+          }
+        }
+      }
+    })
+
+    logger.info('✅ 定时任务已设置: 媒体回收站自动清理（每天凌晨3点执行，支持分布式锁）')
   }
 
   /**
    * 手动触发图片资源数据质量检查（用于测试）
    *
-   * 业务场景：手动执行图片资源数据质量检查，用于开发调试和即时检查
+   * 业务场景：手动执行媒体文件数据质量检查，用于开发调试和即时检查
    *
    * @returns {Promise<Object>} 检查报告对象
    *
    * @example
    * const ScheduledTasks = require('./scripts/maintenance/scheduled-tasks')
-   * const report = await ScheduledTasks.manualImageResourceQualityCheck()
+   * const report = await ScheduledTasks.manualMediaFileQualityCheck()
    * console.log('问题数量:', report.total_issues)
    */
-  static async manualImageResourceQualityCheck() {
+  static async manualMediaFileQualityCheck() {
     try {
-      logger.info('[手动触发] 开始执行图片资源数据质量检查...')
-      const report = await DailyImageResourceQualityCheck.execute()
+      logger.info('[手动触发] 开始执行媒体文件数据质量检查...')
+      const report = await DailyMediaFileQualityCheck.execute()
 
-      logger.info('[手动触发] 图片资源数据质量检查完成', {
+      logger.info('[手动触发] 媒体文件数据质量检查完成', {
         total_checked: report.total_checked,
         total_issues: report.total_issues,
         missing_thumbnails: report.missing_thumbnails_count,
@@ -3350,9 +3429,9 @@ class ScheduledTasks {
    * @returns {void}
    * @since 2026-02-21
    */
-  static scheduleDailyImageStorageConsistencyCheck() {
+  static scheduleDailyMediaStorageConsistencyCheck() {
     cron.schedule('0 5 * * *', async () => {
-      const lockKey = 'lock:image_storage_consistency_check'
+      const lockKey = 'lock:media_storage_consistency_check'
       const lockValue = `${process.pid}_${Date.now()}`
       let redisClient = null
 
@@ -3364,32 +3443,32 @@ class ScheduledTasks {
         const acquired = await redisClient.set(lockKey, lockValue, 'EX', 1800, 'NX')
 
         if (!acquired) {
-          logger.info('[定时任务] 其他实例正在执行图片存储一致性检测，跳过')
+          logger.info('[定时任务] 其他实例正在执行媒体存储一致性检测，跳过')
           return
         }
 
-        logger.info('[定时任务] 获取分布式锁成功，开始执行图片存储一致性检测...', {
+        logger.info('[定时任务] 获取分布式锁成功，开始执行媒体存储一致性检测...', {
           lock_key: lockKey,
           lock_value: lockValue
         })
 
-        const DailyImageStorageConsistencyCheck = require('../../jobs/daily-image-storage-consistency-check')
-        const report = await DailyImageStorageConsistencyCheck.execute()
+        const DailyMediaStorageConsistencyCheck = require('../../jobs/daily-media-storage-consistency-check')
+        const report = await DailyMediaStorageConsistencyCheck.execute()
 
         if (report.missing_count > 0) {
-          logger.warn(`[定时任务] 图片存储一致性检测完成：发现 ${report.missing_count} 个文件缺失`, {
+          logger.warn(`[定时任务] 媒体存储一致性检测完成：发现 ${report.missing_count} 个文件缺失`, {
             total_checked: report.total_checked,
             missing_count: report.missing_count,
             duration_ms: report.duration_ms
           })
         } else {
-          logger.info('[定时任务] 图片存储一致性检测完成：存储一致性良好')
+          logger.info('[定时任务] 媒体存储一致性检测完成：存储一致性良好')
         }
 
         await redisClient.del(lockKey)
         logger.info('[定时任务] 分布式锁已释放', { lock_key: lockKey })
       } catch (error) {
-        logger.error('[定时任务] 图片存储一致性检测失败', { error: error.message })
+        logger.error('[定时任务] 媒体存储一致性检测失败', { error: error.message })
 
         if (redisClient) {
           try {
@@ -3565,6 +3644,103 @@ class ScheduledTasks {
       return
     }
     logger.info('✅ 定时任务已设置: 数据自动清理（每天凌晨3:10，由 daily-data-cleanup.js 管理 cron）')
+  }
+  /**
+   * 定时任务39: 每10分钟执行兑换商品定时上下架
+   *
+   * 业务规则：
+   * - publish_at <= NOW() 且 status='inactive' → 自动上架（status='active'）
+   * - unpublish_at <= NOW() 且 status='active' → 自动下架（status='inactive'）
+   * - 执行后清空对应的时间字段，避免重复触发
+   */
+  static scheduleExchangeItemAutoPublish() {
+    cron.schedule('*/10 * * * *', async () => {
+      try {
+        const { ExchangeItem } = require('../../models')
+        const now = new Date()
+
+        // 定时上架：publish_at 已到且当前是 inactive
+        const [publishedCount] = await ExchangeItem.update(
+          { status: 'active', publish_at: null },
+          { where: { publish_at: { [Op.lte]: now }, status: 'inactive' } }
+        )
+
+        // 定时下架：unpublish_at 已到且当前是 active
+        const [unpublishedCount] = await ExchangeItem.update(
+          { status: 'inactive', unpublish_at: null },
+          { where: { unpublish_at: { [Op.lte]: now }, status: 'active' } }
+        )
+
+        if (publishedCount > 0 || unpublishedCount > 0) {
+          logger.info(`[定时任务39] 定时上下架执行完成: 上架 ${publishedCount} 个, 下架 ${unpublishedCount} 个`)
+          const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
+          await BusinessCacheHelper.invalidateExchangeItems('auto_publish').catch(() => {})
+        }
+      } catch (error) {
+        logger.error('[定时任务39] 定时上下架检测失败:', error.message)
+      }
+    })
+
+    logger.info('✅ 定时任务已设置: 兑换商品定时上下架检测（每10分钟，Task 39）')
+  }
+
+  /**
+   * 定时任务40: 每小时执行库存预警检测 + 售罄自动下架
+   *
+   * 业务规则：
+   * - stock=0 且 status='active' → 自动下架（售罄保护）
+   * - stock <= stock_alert_threshold 且 stock_alert_threshold > 0 → 创建管理员通知
+   */
+  static scheduleExchangeStockAlert() {
+    cron.schedule('20 * * * *', async () => {
+      try {
+        const { ExchangeItem, AdminNotification } = require('../../models')
+
+        // 售罄自动下架
+        const [soldOutCount] = await ExchangeItem.update(
+          { status: 'inactive' },
+          { where: { stock: 0, status: 'active' } }
+        )
+
+        if (soldOutCount > 0) {
+          logger.info(`[定时任务40] 售罄自动下架: ${soldOutCount} 个商品`)
+          const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
+          await BusinessCacheHelper.invalidateExchangeItems('sold_out_auto_unpublish').catch(() => {})
+        }
+
+        // 库存预警检测
+        const lowStockItems = await ExchangeItem.findAll({
+          where: {
+            status: 'active',
+            stock_alert_threshold: { [Op.gt]: 0 },
+            stock: { [Op.gt]: 0 }
+          },
+          attributes: ['exchange_item_id', 'item_name', 'stock', 'stock_alert_threshold'],
+          raw: true
+        })
+
+        const alertItems = lowStockItems.filter(item => item.stock <= item.stock_alert_threshold)
+
+        if (alertItems.length > 0 && AdminNotification) {
+          for (const item of alertItems) {
+            await AdminNotification.create({
+              title: `库存预警：${item.item_name}`,
+              content: `商品「${item.item_name}」(ID:${item.exchange_item_id}) 库存仅剩 ${item.stock}，低于预警阈值 ${item.stock_alert_threshold}`,
+              notification_type: 'stock_alert',
+              priority: item.stock <= 1 ? 'high' : 'medium',
+              target_type: 'exchange_item',
+              target_id: item.exchange_item_id,
+              is_read: false
+            }).catch(e => logger.warn(`库存预警通知创建失败(item ${item.exchange_item_id}):`, e.message))
+          }
+          logger.info(`[定时任务40] 库存预警: ${alertItems.length} 个商品低于阈值`)
+        }
+      } catch (error) {
+        logger.error('[定时任务40] 库存预警检测失败:', error.message)
+      }
+    })
+
+    logger.info('✅ 定时任务已设置: 库存预警检测+售罄自动下架（每小时第20分钟，Task 40）')
   }
 }
 

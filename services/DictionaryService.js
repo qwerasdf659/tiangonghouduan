@@ -48,6 +48,15 @@ class DictionaryService {
    */
 
   /**
+   * 获取类目树形结构
+   *
+   * @returns {Promise<Array>} 树形分类结构
+   */
+  async getCategoryTree() {
+    return this.CategoryDef.getTree()
+  }
+
+  /**
    * 获取类目列表（分页）
    *
    * @param {Object} options - 查询选项
@@ -106,11 +115,11 @@ class DictionaryService {
    * @returns {Promise<Object|null>} 类目详情，不存在返回null
    */
   async getCategoryByCode(code) {
-    return this.CategoryDef.findByPk(code)
+    return this.CategoryDef.findOne({ where: { category_code: code } })
   }
 
   /**
-   * 创建类目
+   * 创建类目（支持两级分类）
    *
    * @param {Object} data - 类目数据
    * @param {string} data.category_code - 类目代码（主键）
@@ -118,6 +127,8 @@ class DictionaryService {
    * @param {string} [data.description] - 描述
    * @param {number} [data.sort_order=0] - 排序顺序
    * @param {boolean} [data.is_enabled=true] - 是否启用
+   * @param {number} [data.parent_category_def_id] - 父分类 ID（传入则创建二级子分类）
+   * @param {number} [data.icon_media_id] - 图标媒体文件ID
    * @param {Object} [options={}] - 操作选项
    * @param {Transaction} [options.transaction] - 事务实例
    * @returns {Promise<Object>} 创建的类目记录
@@ -126,13 +137,30 @@ class DictionaryService {
   async createCategory(data, options = {}) {
     const { transaction } = options
 
-    // 检查是否已存在
-    const existing = await this.CategoryDef.findByPk(data.category_code, { transaction })
+    const existing = await this.CategoryDef.findOne({
+      where: { category_code: data.category_code },
+      transaction
+    })
     if (existing) {
       const error = new Error(`类目代码 "${data.category_code}" 已存在`)
       error.status = 409
       error.code = 'CATEGORY_EXISTS'
       throw error
+    }
+
+    // 确定层级：有父分类则为 level=2，否则为 level=1
+    let level = 1
+    let parentCategoryDefId = null
+    if (data.parent_category_def_id) {
+      const parent = await this.CategoryDef.findByPk(data.parent_category_def_id, { transaction })
+      if (!parent) {
+        throw new Error(`父分类不存在：${data.parent_category_def_id}`)
+      }
+      if (parent.level !== 1) {
+        throw new Error('仅支持两级分类，不能在子分类下再创建子分类')
+      }
+      level = 2
+      parentCategoryDefId = data.parent_category_def_id
     }
 
     const category = await this.CategoryDef.create(
@@ -141,10 +169,27 @@ class DictionaryService {
         display_name: data.display_name,
         description: data.description || null,
         sort_order: data.sort_order !== undefined ? data.sort_order : 0,
-        is_enabled: data.is_enabled !== undefined ? data.is_enabled : true
+        is_enabled: data.is_enabled !== undefined ? data.is_enabled : true,
+        parent_category_def_id: parentCategoryDefId,
+        level
       },
       { transaction }
     )
+
+    // 图标通过 media_attachments 多态关联绑定
+    if (data.icon_media_id) {
+      const MediaService = require('./MediaService')
+      const mediaService = new MediaService()
+      await mediaService.attach(
+        data.icon_media_id,
+        'category_def',
+        category.category_def_id,
+        'icon',
+        0,
+        null,
+        transaction
+      )
+    }
 
     logger.info('[DictionaryService] 创建类目成功', { category_code: data.category_code })
     return category
@@ -163,7 +208,7 @@ class DictionaryService {
   async updateCategory(code, data, options = {}) {
     const { transaction } = options
 
-    const category = await this.CategoryDef.findByPk(code, { transaction })
+    const category = await this.CategoryDef.findOne({ where: { category_code: code }, transaction })
     if (!category) {
       const error = new Error(`类目代码 "${code}" 不存在`)
       error.status = 404
@@ -181,6 +226,30 @@ class DictionaryService {
 
     await category.update(updateData, { transaction })
 
+    // 更新图标（先删除旧关联再绑定新图标）
+    if (data.icon_media_id !== undefined && data.icon_media_id) {
+      const { MediaAttachment } = require('../models')
+      await MediaAttachment.destroy({
+        where: {
+          attachable_type: 'category_def',
+          attachable_id: category.category_def_id,
+          role: 'icon'
+        },
+        transaction
+      })
+      const MediaService = require('./MediaService')
+      const mediaService = new MediaService()
+      await mediaService.attach(
+        data.icon_media_id,
+        'category_def',
+        category.category_def_id,
+        'icon',
+        0,
+        null,
+        transaction
+      )
+    }
+
     logger.info('[DictionaryService] 更新类目成功', { category_code: code })
     return category
   }
@@ -197,7 +266,7 @@ class DictionaryService {
   async deleteCategory(code, options = {}) {
     const { transaction } = options
 
-    const category = await this.CategoryDef.findByPk(code, { transaction })
+    const category = await this.CategoryDef.findOne({ where: { category_code: code }, transaction })
     if (!category) {
       const error = new Error(`类目代码 "${code}" 不存在`)
       error.status = 404

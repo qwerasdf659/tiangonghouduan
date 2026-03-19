@@ -91,8 +91,8 @@ router.get(
   authenticateToken,
   requireRoleLevel(100),
   asyncHandler(async (req, res) => {
-    const { CategoryDef } = require('../../../models')
-    const tree = await CategoryDef.getTree()
+    const DictionaryService = getDictionaryService(req)
+    const tree = await DictionaryService.getCategoryTree()
 
     logger.info('[dictionaries] 查询分类树', {
       admin_id: req.user.user_id,
@@ -152,7 +152,8 @@ router.post(
       description,
       sort_order,
       is_enabled,
-      parent_category_def_id
+      parent_category_def_id,
+      icon_media_id
     } = req.body
 
     if (!category_code || !display_name) {
@@ -187,7 +188,8 @@ router.post(
           sort_order,
           is_enabled,
           parent_category_def_id,
-          level
+          level,
+          icon_media_id
         },
         { transaction }
       )

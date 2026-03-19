@@ -361,7 +361,8 @@ router.post('/asset-types', authenticateToken, requireRoleLevel(100), async (req
       sort_order = 0,
       visible_value_points,
       budget_value_points,
-      is_enabled = true
+      is_enabled = true,
+      icon_media_id
     } = req.body
 
     if (!asset_code || !display_name || !group_code || !form || tier === undefined) {
@@ -391,7 +392,8 @@ router.post('/asset-types', authenticateToken, requireRoleLevel(100), async (req
             sort_order: parseInt(sort_order),
             visible_value_points: visible_value_points ? parseInt(visible_value_points) : null,
             budget_value_points: budget_value_points ? parseInt(budget_value_points) : null,
-            is_enabled: is_enabled === true || is_enabled === 'true'
+            is_enabled: is_enabled === true || is_enabled === 'true',
+            icon_media_id: icon_media_id || null
           },
           { transaction }
         )
@@ -450,17 +452,16 @@ router.put('/asset-types/:code', authenticateToken, requireRoleLevel(100), async
       visible_value_points,
       budget_value_points,
       is_enabled,
-      is_tradable
+      is_tradable,
+      icon_media_id
     } = req.body
 
-    // form 字段验证
     if (form !== undefined && !['shard', 'crystal'].includes(form)) {
       return res.apiError('form 必须为 shard 或 crystal', 'INVALID_FORM', null, 400)
     }
 
     const MaterialManagementService = req.app.locals.services.getService('material_management')
 
-    // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
     const result = await TransactionManager.execute(
       async transaction => {
         return await MaterialManagementService.updateAssetType(
@@ -474,7 +475,8 @@ router.put('/asset-types/:code', authenticateToken, requireRoleLevel(100), async
             visible_value_points,
             budget_value_points,
             is_enabled,
-            is_tradable
+            is_tradable,
+            icon_media_id
           },
           { transaction }
         )

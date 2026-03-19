@@ -50,6 +50,65 @@ class AdminService {
   }
 
   /**
+   * 记录库存变动日志（复用 admin_operation_logs 表）
+   *
+   * @param {Object} params - 日志参数
+   * @param {number} params.exchange_item_id - 商品 ID
+   * @param {string} params.item_name - 商品名称
+   * @param {number} params.before_stock - 变动前库存
+   * @param {number} params.after_stock - 变动后库存
+   * @param {string} params.action - 操作类型（admin_set/purchase/refund/batch_update）
+   * @param {number} [params.operator_id] - 操作人 ID（系统操作为 null）
+   * @param {string} [params.reason] - 变动原因
+   * @param {Object} [params.transaction] - 事务对象
+   * @returns {Promise<void>} 无返回值
+   * @private
+   */
+  async _logStockChange({
+    exchange_item_id,
+    item_name,
+    before_stock,
+    after_stock,
+    action,
+    operator_id = null,
+    reason = null,
+    transaction = null
+  }) {
+    try {
+      const delta = after_stock - before_stock
+      if (delta === 0) return // 无变动不记录
+
+      await this.models.AdminOperationLog.create(
+        {
+          operator_id,
+          operation_type: 'stock_change',
+          target_type: 'exchange_item',
+          target_id: exchange_item_id,
+          action,
+          before_data: { stock: before_stock, item_name },
+          after_data: { stock: after_stock, item_name },
+          changed_fields: { stock: { from: before_stock, to: after_stock, delta } },
+          reason:
+            reason ||
+            `库存变动：${before_stock} → ${after_stock}（${delta > 0 ? '+' : ''}${delta}）`,
+          risk_level: Math.abs(delta) > 100 ? 'high' : 'low',
+          requires_approval: false,
+          approval_status: 'not_required',
+          affected_amount: Math.abs(delta)
+        },
+        { transaction }
+      )
+    } catch (logError) {
+      // 日志记录失败不阻断业务
+      logger.warn('[兑换市场] 库存变动日志记录失败', {
+        exchange_item_id,
+        action,
+        error: logError.message
+      })
+    }
+  }
+
+  /**
    * 创建兑换商品（管理员操作）
    *
    * @param {Object} itemData - 商品数据
@@ -438,7 +497,24 @@ class AdminService {
       }
     }
 
+    // 记录库存变动前的值（用于日志）
+    const oldStock = item.stock
+
     await item.update(finalUpdateData, { transaction })
+
+    // 库存变动日志（管理员手动调整库存）
+    if (finalUpdateData.stock !== undefined && finalUpdateData.stock !== oldStock) {
+      await this._logStockChange({
+        exchange_item_id: item_id,
+        item_name: item.item_name,
+        before_stock: oldStock,
+        after_stock: finalUpdateData.stock,
+        action: 'admin_set',
+        operator_id: options.operator_id || null,
+        reason: '管理员手动调整库存',
+        transaction
+      })
+    }
 
     logger.info(`[兑换市场] 商品更新成功，item_id: ${item_id}`, {
       deleted_old_image,
@@ -1056,6 +1132,81 @@ class AdminService {
   }
 
   /**
+   * 获取单品维度统计数据（Admin Only）
+   *
+   * @param {number} exchangeItemId - 商品ID
+   * @returns {Promise<Object>} 单品统计数据
+   */
+  async getItemDashboard(exchangeItemId) {
+    try {
+      const item = await this.ExchangeItem.findByPk(exchangeItemId, {
+        attributes: [
+          'exchange_item_id',
+          'item_name',
+          'stock',
+          'sold_count',
+          'cost_amount',
+          'created_at'
+        ]
+      })
+      if (!item) throw new Error('商品不存在')
+
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+
+      const [recentOrders7d, recentOrders30d, avgRating, statusDistribution] = await Promise.all([
+        this.ExchangeRecord.count({
+          where: { exchange_item_id: exchangeItemId, created_at: { [Op.gte]: sevenDaysAgo } }
+        }),
+        this.ExchangeRecord.count({
+          where: { exchange_item_id: exchangeItemId, created_at: { [Op.gte]: thirtyDaysAgo } }
+        }),
+        this.ExchangeRecord.findOne({
+          attributes: [[this.sequelize.fn('AVG', this.sequelize.col('rating')), 'avg_rating']],
+          where: { exchange_item_id: exchangeItemId, rating: { [Op.ne]: null } },
+          raw: true
+        }),
+        this.ExchangeRecord.findAll({
+          attributes: ['status', [this.sequelize.fn('COUNT', '*'), 'count']],
+          where: { exchange_item_id: exchangeItemId },
+          group: ['status'],
+          raw: true
+        })
+      ])
+
+      const totalOrders = item.sold_count || 0
+      const conversionRate =
+        totalOrders > 0
+          ? ((totalOrders / Math.max(totalOrders + item.stock, 1)) * 100).toFixed(1)
+          : 0
+      const inventoryTurnover =
+        totalOrders > 0 ? (totalOrders / Math.max(item.stock, 1)).toFixed(2) : 0
+
+      return {
+        item_name: item.item_name,
+        exchange_item_id: item.exchange_item_id,
+        current_stock: item.stock,
+        total_sold: totalOrders,
+        cost_amount: item.cost_amount,
+        orders_7d: recentOrders7d,
+        orders_30d: recentOrders30d,
+        avg_rating: avgRating?.avg_rating
+          ? parseFloat(parseFloat(avgRating.avg_rating).toFixed(2))
+          : null,
+        conversion_rate: parseFloat(conversionRate),
+        inventory_turnover: parseFloat(inventoryTurnover),
+        order_status_distribution: statusDistribution.reduce((acc, row) => {
+          acc[row.status] = parseInt(row.count, 10)
+          return acc
+        }, {})
+      }
+    } catch (error) {
+      logger.error(`[兑换市场-管理] 单品统计查询失败(id:${exchangeItemId}):`, error.message)
+      throw error
+    }
+  }
+
+  /**
    * 批量绑定商品图片（运营批量上传图片后绑定）
    *
    * 业务场景：运营在管理后台上传图片后，通过此接口批量绑定图片到对应商品
@@ -1251,6 +1402,235 @@ class AdminService {
     })
 
     return { affected_rows: affectedRows, space }
+  }
+
+  /**
+   * 批量上下架商品（C1：批量切换 active/inactive）
+   *
+   * @param {number[]} exchangeItemIds - 商品 ID 数组
+   * @param {string} status - 目标状态：active/inactive
+   * @param {Object} options - 选项
+   * @param {Object} options.transaction - 事务对象（必填）
+   * @param {number} [options.operator_id] - 操作人 ID
+   * @returns {Promise<Object>} { affected_rows, status }
+   */
+  async batchUpdateStatus(exchangeItemIds, status, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'AdminService.batchUpdateStatus')
+
+    const validStatuses = ['active', 'inactive']
+    if (!validStatuses.includes(status)) {
+      throw new Error(`无效的状态：${status}，允许值：${validStatuses.join(', ')}`)
+    }
+
+    if (!Array.isArray(exchangeItemIds) || exchangeItemIds.length === 0) {
+      throw new Error('商品ID数组不能为空')
+    }
+
+    logger.info('[兑换市场-管理] 批量更新商品状态', {
+      count: exchangeItemIds.length,
+      target_status: status
+    })
+
+    const [affectedRows] = await this.ExchangeItem.update(
+      { status, updated_at: BeijingTimeHelper.createDatabaseTime() },
+      { where: { exchange_item_id: { [Op.in]: exchangeItemIds } }, transaction }
+    )
+
+    await BusinessCacheHelper.invalidateExchangeItems('batch_status_update').catch(() => {})
+
+    logger.info('[兑换市场-管理] 批量更新状态完成', {
+      requested: exchangeItemIds.length,
+      affected: affectedRows
+    })
+    return { affected_rows: affectedRows, status }
+  }
+
+  /**
+   * 批量调整商品价格（C2：按比例或固定值调整 cost_amount）
+   *
+   * @param {number[]} exchangeItemIds - 商品 ID 数组
+   * @param {Object} adjustment - 调整参数
+   * @param {string} adjustment.mode - 调整模式：ratio（按比例）/ fixed（固定值增减）/ set（直接设置）
+   * @param {number} adjustment.value - 调整值（ratio: 1.1=涨10%, fixed: 正数加/负数减, set: 直接设置的值）
+   * @param {Object} options - 选项
+   * @param {Object} options.transaction - 事务对象（必填）
+   * @param {number} [options.operator_id] - 操作人 ID
+   * @returns {Promise<Object>} { affected_rows, adjustment }
+   */
+  async batchUpdatePrice(exchangeItemIds, adjustment, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'AdminService.batchUpdatePrice')
+
+    if (!Array.isArray(exchangeItemIds) || exchangeItemIds.length === 0) {
+      throw new Error('商品ID数组不能为空')
+    }
+
+    const { mode, value } = adjustment
+    if (!['ratio', 'fixed', 'set'].includes(mode)) {
+      throw new Error('调整模式必须是 ratio/fixed/set')
+    }
+    if (typeof value !== 'number' || isNaN(value)) {
+      throw new Error('调整值必须是有效数字')
+    }
+    if (mode === 'ratio' && value <= 0) {
+      throw new Error('比例调整值必须大于0')
+    }
+    if (mode === 'set' && value <= 0) {
+      throw new Error('直接设置的价格必须大于0')
+    }
+
+    logger.info('[兑换市场-管理] 批量调整商品价格', { count: exchangeItemIds.length, mode, value })
+
+    // 逐个更新以记录变动日志
+    const items = await this.ExchangeItem.findAll({
+      where: { exchange_item_id: { [Op.in]: exchangeItemIds } },
+      transaction
+    })
+
+    let updatedCount = 0
+    for (const item of items) {
+      const oldAmount = Number(item.cost_amount)
+      let newAmount
+
+      if (mode === 'ratio') {
+        newAmount = Math.round(oldAmount * value)
+      } else if (mode === 'fixed') {
+        newAmount = oldAmount + value
+      } else {
+        newAmount = value
+      }
+
+      // 价格不能小于1
+      newAmount = Math.max(1, newAmount)
+
+      if (newAmount !== oldAmount) {
+        await item.update(
+          { cost_amount: newAmount, updated_at: BeijingTimeHelper.createDatabaseTime() },
+          { transaction }
+        )
+        updatedCount++
+
+        // 记录库存变动日志（复用 _logStockChange 的模式记录价格变动）
+        try {
+          await this.models.AdminOperationLog.create(
+            {
+              operator_id: options.operator_id || null,
+              operation_type: 'price_change',
+              target_type: 'exchange_item',
+              target_id: item.exchange_item_id,
+              action: 'batch_update',
+              before_data: { cost_amount: oldAmount, item_name: item.item_name },
+              after_data: { cost_amount: newAmount, item_name: item.item_name },
+              changed_fields: { cost_amount: { from: oldAmount, to: newAmount } },
+              reason: `批量调价（${mode}=${value}）`,
+              risk_level: 'medium',
+              requires_approval: false,
+              approval_status: 'not_required'
+            },
+            { transaction }
+          )
+        } catch (logErr) {
+          logger.warn('[兑换市场] 价格变动日志记录失败', { error: logErr.message })
+        }
+      }
+    }
+
+    await BusinessCacheHelper.invalidateExchangeItems('batch_price_update').catch(() => {})
+
+    logger.info('[兑换市场-管理] 批量调价完成', {
+      requested: exchangeItemIds.length,
+      affected: updatedCount
+    })
+    return { affected_rows: updatedCount, adjustment }
+  }
+
+  /**
+   * 批量修改商品分类（C3：批量修改 category_def_id）
+   *
+   * @param {number[]} exchangeItemIds - 商品 ID 数组
+   * @param {number|null} categoryDefId - 目标分类 ID（null 表示清除分类）
+   * @param {Object} options - 选项
+   * @param {Object} options.transaction - 事务对象（必填）
+   * @returns {Promise<Object>} { affected_rows, category_def_id }
+   */
+  async batchUpdateCategory(exchangeItemIds, categoryDefId, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'AdminService.batchUpdateCategory')
+
+    if (!Array.isArray(exchangeItemIds) || exchangeItemIds.length === 0) {
+      throw new Error('商品ID数组不能为空')
+    }
+
+    // 验证分类存在
+    if (categoryDefId !== null) {
+      const { CategoryDef } = this.models
+      const category = await CategoryDef.findByPk(categoryDefId, { transaction })
+      if (!category) {
+        throw new Error(`分类不存在：${categoryDefId}`)
+      }
+    }
+
+    logger.info('[兑换市场-管理] 批量修改商品分类', {
+      count: exchangeItemIds.length,
+      category_def_id: categoryDefId
+    })
+
+    const [affectedRows] = await this.ExchangeItem.update(
+      { category_def_id: categoryDefId, updated_at: BeijingTimeHelper.createDatabaseTime() },
+      { where: { exchange_item_id: { [Op.in]: exchangeItemIds } }, transaction }
+    )
+
+    await BusinessCacheHelper.invalidateExchangeItems('batch_category_update').catch(() => {})
+
+    logger.info('[兑换市场-管理] 批量修改分类完成', {
+      requested: exchangeItemIds.length,
+      affected: affectedRows
+    })
+    return { affected_rows: affectedRows, category_def_id: categoryDefId }
+  }
+
+  /**
+   * 批量修改商品稀有度（C3 扩展：批量修改 rarity_code）
+   *
+   * @param {number[]} exchangeItemIds - 商品 ID 数组
+   * @param {string} rarityCode - 目标稀有度代码
+   * @param {Object} options - 选项
+   * @param {Object} options.transaction - 事务对象（必填）
+   * @returns {Promise<Object>} { affected_rows, rarity_code }
+   */
+  async batchUpdateRarity(exchangeItemIds, rarityCode, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'AdminService.batchUpdateRarity')
+
+    if (!Array.isArray(exchangeItemIds) || exchangeItemIds.length === 0) {
+      throw new Error('商品ID数组不能为空')
+    }
+
+    if (!rarityCode) {
+      throw new Error('稀有度代码不能为空')
+    }
+
+    // 验证稀有度存在
+    const { RarityDef } = this.models
+    const rarity = await RarityDef.findOne({ where: { rarity_code: rarityCode }, transaction })
+    if (!rarity) {
+      throw new Error(`稀有度不存在：${rarityCode}`)
+    }
+
+    logger.info('[兑换市场-管理] 批量修改商品稀有度', {
+      count: exchangeItemIds.length,
+      rarity_code: rarityCode
+    })
+
+    const [affectedRows] = await this.ExchangeItem.update(
+      { rarity_code: rarityCode, updated_at: BeijingTimeHelper.createDatabaseTime() },
+      { where: { exchange_item_id: { [Op.in]: exchangeItemIds } }, transaction }
+    )
+
+    await BusinessCacheHelper.invalidateExchangeItems('batch_rarity_update').catch(() => {})
+
+    logger.info('[兑换市场-管理] 批量修改稀有度完成', {
+      requested: exchangeItemIds.length,
+      affected: affectedRows
+    })
+    return { affected_rows: affectedRows, rarity_code: rarityCode }
   }
 
   /**

@@ -24,7 +24,7 @@
 
 'use strict'
 
-const { MaterialConversionRule, MaterialAssetType, User } = require('../models')
+const { MaterialConversionRule, MaterialAssetType, MediaAttachment, User } = require('../models')
 const MaterialConversionValidator = require('../utils/materialConversionValidator')
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 
@@ -380,7 +380,8 @@ class MaterialManagementService {
       sort_order = 0,
       visible_value_points,
       budget_value_points,
-      is_enabled = true
+      is_enabled = true,
+      icon_media_id
     } = payload || {}
 
     if (!asset_code || !display_name || !group_code || !form || tier === undefined) {
@@ -413,6 +414,21 @@ class MaterialManagementService {
       },
       { transaction }
     )
+
+    // 图标通过 media_attachments 多态关联绑定
+    if (icon_media_id) {
+      const MediaService = require('./MediaService')
+      const mediaService = new MediaService()
+      await mediaService.attach(
+        icon_media_id,
+        'material_asset_type',
+        assetType.material_asset_type_id,
+        'icon',
+        0,
+        null,
+        transaction
+      )
+    }
 
     return { asset_type: assetType.toJSON() }
   }
@@ -498,13 +514,39 @@ class MaterialManagementService {
       }
     }
 
-    // 检查是否有可更新的字段
-    if (Object.keys(updateData).length === 0) {
+    // icon_media_id 不在 allowedFields 中，单独处理
+    const hasIconChange = payload.icon_media_id !== undefined
+
+    if (Object.keys(updateData).length === 0 && !hasIconChange) {
       this._throw(400, 'no_update_fields', '没有提供任何可更新的字段')
     }
 
-    // 执行更新
-    await assetType.update(updateData, { transaction })
+    if (Object.keys(updateData).length > 0) {
+      await assetType.update(updateData, { transaction })
+    }
+
+    // 更新图标：先删除旧关联再绑定新图标
+    if (hasIconChange && payload.icon_media_id) {
+      await MediaAttachment.destroy({
+        where: {
+          attachable_type: 'material_asset_type',
+          attachable_id: assetType.material_asset_type_id,
+          role: 'icon'
+        },
+        transaction
+      })
+      const MediaService = require('./MediaService')
+      const mediaService = new MediaService()
+      await mediaService.attach(
+        payload.icon_media_id,
+        'material_asset_type',
+        assetType.material_asset_type_id,
+        'icon',
+        0,
+        null,
+        transaction
+      )
+    }
 
     return { asset_type: assetType.toJSON() }
   }

@@ -21,10 +21,10 @@ const logger = require('../utils/logger').logger
 /**
  * 每日媒体存储一致性检测任务类
  *
- * @class DailyImageStorageConsistencyCheck
+ * @class DailyMediaStorageConsistencyCheck
  * @description 验证 media_files 数据库记录与 Sealos 存储文件的一致性
  */
-class DailyImageStorageConsistencyCheck {
+class DailyMediaStorageConsistencyCheck {
   /**
    * 执行一致性检测任务
    *
@@ -62,7 +62,7 @@ class DailyImageStorageConsistencyCheck {
         if (mediaFiles.length === 0) break
 
         // 批内并发检测（限制并发数避免压垮存储服务）
-        const results = await DailyImageStorageConsistencyCheck._checkBatch(
+        const results = await DailyMediaStorageConsistencyCheck._checkBatch(
           storageService,
           mediaFiles,
           concurrency
@@ -225,7 +225,7 @@ if (require.main === module) {
   require('dotenv').config()
   ;(async () => {
     try {
-      const report = await DailyImageStorageConsistencyCheck.execute()
+      const report = await DailyMediaStorageConsistencyCheck.execute()
       process.exit(report.status === 'SUCCESS' ? 0 : 1)
     } catch (error) {
       console.error('一致性检测任务执行失败:', error)
@@ -234,4 +234,4 @@ if (require.main === module) {
   })()
 }
 
-module.exports = DailyImageStorageConsistencyCheck
+module.exports = DailyMediaStorageConsistencyCheck

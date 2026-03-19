@@ -163,11 +163,11 @@ module.exports = sequelize => {
 
       // 订单状态
       status: {
-        type: DataTypes.ENUM('created', 'frozen', 'completed', 'cancelled', 'failed'),
+        type: DataTypes.ENUM('created', 'frozen', 'completed', 'cancelled', 'failed', 'disputed'),
         allowNull: false,
         defaultValue: 'created',
         comment:
-          '订单状态（Status）：created-已创建（订单初始状态）| frozen-已冻结（买家资产已冻结，等待结算）| completed-已完成（成交完成，终态）| cancelled-已取消（订单取消，解冻买家资产，终态）| failed-失败（不可恢复错误，终态）；业务规则：created → frozen → completed/cancelled/failed'
+          '订单状态（Status）：created-已创建 | frozen-已冻结 | completed-已完成（终态）| cancelled-已取消（终态）| failed-失败（终态）| disputed-纠纷中（买家发起申诉）'
       },
 
       // 元数据

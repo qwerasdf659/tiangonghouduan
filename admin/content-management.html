@@ -25,12 +25,12 @@
     <div class="stats-grid stats-grid-2 mb-6">
       <div class="stats-card stats-warning stats-card-animate">
         <div class="stats-card-icon">🖼️</div>
-        <div class="stats-card-value" x-text="imageStats?.total || 0"></div>
+        <div class="stats-card-value" x-text="mediaStats?.total || 0"></div>
         <div class="stats-card-label">媒体文件</div>
       </div>
       <div class="stats-card stats-info stats-card-animate">
         <div class="stats-card-icon">💾</div>
-        <div class="stats-card-value" x-text="formatFileSize(imageStats?.totalSize || 0)"></div>
+        <div class="stats-card-value" x-text="formatFileSize(mediaStats?.totalSize || 0)"></div>
         <div class="stats-card-label">存储占用</div>
       </div>
     </div>
@@ -59,18 +59,18 @@
             <h5 class="font-semibold text-base">🖼️ 图片资源</h5>
             <p class="text-xs themed-text-muted mt-0.5">统一管理系统中的图片素材，支持分类筛选和批量操作</p>
           </div>
-          <button @click="showModal('uploadImageModal')" class="px-4 py-2 themed-btn-primary rounded-lg shadow-sm hover:shadow transition-shadow">
+          <button @click="showModal('uploadMediaModal')" class="px-4 py-2 themed-btn-primary rounded-lg shadow-sm hover:shadow transition-shadow">
             ➕ 上传图片
           </button>
         </div>
 
-        <div x-show="images.length === 0" class="empty-state">
+        <div x-show="mediaFiles.length === 0" class="empty-state">
           <div class="empty-state-icon-circle">
             <div class="empty-state-icon">🖼️</div>
           </div>
           <div class="empty-state-title">暂无图片资源</div>
           <div class="empty-state-description">上传图片素材统一管理，所有轮播图、弹窗使用的图片都会在这里归档和检索</div>
-          <button @click="showModal('uploadImageModal')" class="empty-state-action">➕ 上传第一张图片</button>
+          <button @click="showModal('uploadMediaModal')" class="empty-state-action">➕ 上传第一张图片</button>
           <div class="empty-state-tips">
             <div class="empty-state-tips-title">💡 使用提示</div>
             <div>· 支持 JPG/PNG/GIF/WebP 格式，单张不超过 5MB</div>
@@ -80,21 +80,21 @@
           </div>
         </div>
 
-        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 p-4" x-show="images.length > 0">
-          <template x-for="image in images" :key="image.media_id">
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 p-4" x-show="mediaFiles.length > 0">
+          <template x-for="media in mediaFiles" :key="media.media_id">
             <div class="themed-card rounded-xl overflow-hidden group relative shadow-sm hover:shadow-md transition-all duration-200">
               <div class="aspect-square themed-bg-subtle flex items-center justify-center img-blur-load">
-                <img :data-src="image.url" :alt="image.original_filename" 
+                <img :data-src="media.url" :alt="media.original_filename"
                      class="w-full h-full object-cover img-lazy"
-                     x-init="$nextTick(() => { if(image.url) { $el.src = image.url; $el.classList.add('loaded') } })">
+                     x-init="$nextTick(() => { if(media.url) { $el.src = media.url; $el.classList.add('loaded') } })">
               </div>
               <div class="p-2.5">
-                <p class="text-xs font-medium truncate" x-text="image.original_filename || '未命名'"></p>
-                <p class="text-xs themed-text-muted mt-0.5" x-text="formatFileSize(image.file_size)"></p>
+                <p class="text-xs font-medium truncate" x-text="media.original_filename || '未命名'"></p>
+                <p class="text-xs themed-text-muted mt-0.5" x-text="formatFileSize(media.file_size)"></p>
               </div>
               <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center space-x-2 rounded-xl">
-                <button @click="viewImage(image)" class="px-3 py-1.5 bg-white text-gray-700 rounded-lg text-xs font-medium shadow-sm hover:bg-gray-50 transition-colors">查看</button>
-                <button @click="deleteImage(image)" class="px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-medium shadow-sm hover:bg-red-600 transition-colors">删除</button>
+                <button @click="viewMedia(media)" class="px-3 py-1.5 bg-white text-gray-700 rounded-lg text-xs font-medium shadow-sm hover:bg-gray-50 transition-colors">查看</button>
+                <button @click="deleteMedia(media)" class="px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-medium shadow-sm hover:bg-red-600 transition-colors">删除</button>
               </div>
             </div>
           </template>
@@ -247,26 +247,26 @@
     <!-- ==================== Modal 区域 ==================== -->
 
     <!-- 图片上传 Modal -->
-    <div x-ref="uploadImageModal" 
-         x-show="isModalOpen('uploadImageModal')" 
+    <div x-ref="uploadMediaModal" 
+         x-show="isModalOpen('uploadMediaModal')" 
          x-cloak
          class="fixed inset-0 z-50 flex items-center justify-center"
          style="display: none;">
-      <div class="fixed inset-0 bg-black/50" @click="hideModal('uploadImageModal')"></div>
+      <div class="fixed inset-0 bg-black/50" @click="hideModal('uploadMediaModal')"></div>
       <div class="relative themed-card rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
         <div class="p-4 border-b flex justify-between items-center">
           <h5 class="font-semibold">📤 上传图片</h5>
-          <button @click="hideModal('uploadImageModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+          <button @click="hideModal('uploadMediaModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
         </div>
         <div class="p-6" x-data="{ dragover: false }">
           <div class="drop-zone p-8 text-center transition-colors"
                :class="{ 'drag-over': dragover }"
                @dragover.prevent="dragover = true"
                @dragleave="dragover = false"
-               @drop.prevent="dragover = false; handleImageUpload($event)">
+               @drop.prevent="dragover = false; handleMediaUpload($event)">
             <span class="text-5xl mb-4 block" x-text="dragover ? '📥' : '☁️'"></span>
             <p class="mb-2" x-text="dragover ? '释放以上传图片' : '拖拽图片到此处或点击上传'"></p>
-            <input type="file" class="hidden" id="imageUploadInput" accept="image/*" multiple @change="handleImageUpload($event)">
+            <input type="file" class="hidden" id="imageUploadInput" accept="image/*" multiple @change="handleMediaUpload($event)">
             <button type="button" onclick="document.getElementById('imageUploadInput').click()" class="px-4 py-2 themed-btn-primary rounded btn-scale">
               选择图片
             </button>
@@ -274,7 +274,7 @@
           <p class="text-sm themed-text-muted mt-2 text-center">支持 JPG、PNG、GIF 格式，单张最大 5MB</p>
         </div>
         <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end">
-          <button type="button" @click="hideModal('uploadImageModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">关闭</button>
+          <button type="button" @click="hideModal('uploadMediaModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">关闭</button>
         </div>
       </div>
     </div>

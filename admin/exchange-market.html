@@ -60,9 +60,43 @@
           <button @click="openAddItemModal()" class="action-btn action-btn-primary">
             ➕ 新增商品
           </button>
+          <button x-show="!sortMode" @click="enterSortMode()" class="action-btn action-btn-secondary ml-2">
+            ↕ 批量排序
+          </button>
+          <template x-if="sortMode">
+            <div class="flex items-center gap-2 ml-2">
+              <button @click="saveSortOrder()" :disabled="sortSaving || !sortDirty" class="action-btn action-btn-primary disabled:opacity-50">
+                <span x-show="sortSaving" class="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
+                保存排序
+              </button>
+              <button @click="exitSortMode()" class="action-btn action-btn-secondary">取消</button>
+            </div>
+          </template>
         </div>
-        <!-- data-table: 兑换商品列表 -->
-        <div x-data="exchangeItemsTable()" x-init="init()">
+        <!-- 排序模式视图（进入排序模式时显示，替代 data-table） -->
+        <template x-if="sortMode">
+          <div class="themed-card rounded-lg border p-4">
+            <p class="text-sm text-gray-500 mb-3">拖拽或使用上下箭头调整商品排序，完成后点击"保存排序"</p>
+            <div class="space-y-1">
+              <template x-for="(item, idx) in sortableList" :key="item.exchange_item_id">
+                <div class="flex items-center justify-between py-2 px-3 rounded border bg-white hover:bg-gray-50">
+                  <div class="flex items-center gap-3">
+                    <span class="text-xs text-gray-400 w-6 text-center" x-text="idx + 1"></span>
+                    <span class="text-sm font-medium" x-text="item.item_name"></span>
+                    <span class="text-xs text-gray-400" x-text="'ID:' + item.exchange_item_id"></span>
+                  </div>
+                  <div class="flex items-center gap-1">
+                    <button @click="moveSortItemUp(idx)" :disabled="idx === 0" class="w-7 h-7 rounded text-xs border hover:bg-gray-100 disabled:opacity-30">↑</button>
+                    <button @click="moveSortItemDown(idx)" :disabled="idx === sortableList.length - 1" class="w-7 h-7 rounded text-xs border hover:bg-gray-100 disabled:opacity-30">↓</button>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
+
+        <!-- data-table: 兑换商品列表（排序模式时隐藏） -->
+        <div x-show="!sortMode" x-data="exchangeItemsTable()" x-init="init()">
           <div x-show="loading" class="p-8 text-center themed-text-muted">加载中...</div>
           <div x-show="hasError" class="p-8 text-center">
             <p class="text-red-500 mb-2" x-text="error"></p>
@@ -571,6 +605,31 @@
               </template>
             </div>
           </div>
+          <!-- 定时上下架 -->
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">定时上架</label>
+              <input type="datetime-local" x-model="itemForm.publish_at" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
+              <p class="text-xs themed-text-muted mt-1">留空表示不自动上架</p>
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">定时下架</label>
+              <input type="datetime-local" x-model="itemForm.unpublish_at" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
+              <p class="text-xs themed-text-muted mt-1">留空表示不自动下架</p>
+            </div>
+          </div>
+          <!-- 库存预警阈值 -->
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">库存预警阈值</label>
+            <input type="number" x-model.number="itemForm.stock_alert_threshold" min="0" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500" placeholder="0 表示不告警">
+            <p class="text-xs themed-text-muted mt-1">低于此值时系统自动创建库存预警通知，0=不告警</p>
+          </div>
+          <!-- 商品参数表（结构化属性JSON） -->
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">商品参数表</label>
+            <textarea x-model="attributesStr" rows="3" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 font-mono text-sm" placeholder='{"材质":"纯棉","产地":"中国","规格":"500ml"}'></textarea>
+            <p class="text-xs themed-text-muted mt-1">JSON 格式的商品参数键值对，用于详情页展示</p>
+          </div>
           <!-- 展示图上传（category='showcase'） -->
           <div>
             <label class="block text-sm font-medium themed-text-secondary mb-1">展示图（最多9张）</label>
@@ -655,7 +714,7 @@
                       </td>
                       <td class="px-3 py-2">
                         <button type="button" @click="editSkuWithStr(sku); showModal('skuModal')" class="text-blue-500 hover:text-blue-700 text-xs mr-2">编辑</button>
-                        <button type="button" @click="deleteSku(sku.sku_id)" class="text-red-500 hover:text-red-700 text-xs">删除</button>
+                        <button type="button" @click="deleteSku(editingItemId, sku.sku_id)" class="text-red-500 hover:text-red-700 text-xs">删除</button>
                       </td>
                     </tr>
                   </template>

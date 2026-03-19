@@ -12,6 +12,7 @@ import { buildURL, request } from '../../../api/base.js'
 import { MARKET_ENDPOINTS } from '../../../api/market/index.js'
 import { ASSET_ENDPOINTS } from '../../../api/asset.js'
 import { SYSTEM_ADMIN_ENDPOINTS } from '../../../api/system/admin.js'
+import { useSortable } from '../../../alpine/mixins/sortable.js'
 
 /**
  * 商品管理状态
@@ -56,8 +57,14 @@ export function useExchangeItemsState() {
       is_lucky: false,
       is_limited: false,
       has_warranty: false,
-      free_shipping: false
+      free_shipping: false,
+      publish_at: '',
+      unpublish_at: '',
+      attributes: null,
+      stock_alert_threshold: 0
     },
+    /** @type {string} 商品参数表编辑用 JSON 字符串 */
+    attributesStr: '{}',
     /** @type {Array<Object>} 稀有度选项（动态加载自 rarity_defs 字典表） */
     rarityOptions: [],
     /** @type {Array<Object>} 分类选项（动态加载自 category_defs 字典表） */
@@ -110,7 +117,18 @@ export function useExchangeItemsState() {
  * @returns {Object} 方法对象
  */
 export function useExchangeItemsMethods() {
+  /** 排序 mixin：列表键=items，主键=exchange_item_id，保存回调=batchSortItems */
+  const sortMixin = useSortable({
+    listKey: 'items',
+    idKey: 'exchange_item_id',
+    sortKey: 'sort_order',
+    onSave: async function (sortedItems) {
+      await this.batchSortItems(sortedItems)
+    }
+  })
+
   return {
+    ...sortMixin,
     /**
      * 加载资产类型列表
      */
@@ -320,8 +338,13 @@ export function useExchangeItemsMethods() {
         is_lucky: !!item.is_lucky,
         is_limited: !!item.is_limited,
         has_warranty: !!item.has_warranty,
-        free_shipping: !!item.free_shipping
+        free_shipping: !!item.free_shipping,
+        publish_at: item.publish_at ? item.publish_at.substring(0, 16) : '',
+        unpublish_at: item.unpublish_at ? item.unpublish_at.substring(0, 16) : '',
+        attributes: item.attributes || null,
+        stock_alert_threshold: item.stock_alert_threshold || 0
       }
+      this.attributesStr = item.attributes ? JSON.stringify(item.attributes, null, 2) : '{}'
       this.itemImagePreviewUrl =
         item.primary_image?.thumbnail_url || item.primary_image?.public_url || item.primary_image?.url || null
       this.tagInput = ''
@@ -329,6 +352,7 @@ export function useExchangeItemsMethods() {
       this.loadDictionaries()
       this.loadDetailImages(item.exchange_item_id)
       this.loadShowcaseImages(item.exchange_item_id)
+      this.loadItemSkus(item.exchange_item_id)
       this.showModal('itemModal')
     },
 
@@ -340,6 +364,22 @@ export function useExchangeItemsMethods() {
         this.showError?.('请填写必填项')
         return
       }
+
+      // 将 attributesStr JSON 字符串转回对象
+      if (this.attributesStr && this.attributesStr.trim() !== '{}' && this.attributesStr.trim() !== '') {
+        try {
+          this.itemForm.attributes = JSON.parse(this.attributesStr)
+        } catch {
+          this.showError?.('商品参数表 JSON 格式错误')
+          return
+        }
+      } else {
+        this.itemForm.attributes = null
+      }
+
+      // 处理定时上下架空值
+      if (!this.itemForm.publish_at) this.itemForm.publish_at = null
+      if (!this.itemForm.unpublish_at) this.itemForm.unpublish_at = null
 
       try {
         this.saving = true

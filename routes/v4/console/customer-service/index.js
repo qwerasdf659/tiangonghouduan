@@ -31,6 +31,7 @@ const assignmentsRoutes = require('./assignments')
 const userContextRoutes = require('./user-context') // 用户上下文聚合查询（C区面板数据源）
 const issuesRoutes = require('./issues') // 工单管理（问题跟踪到底）
 const gmToolsRoutes = require('./gm-tools') // GM工具（补偿发放 + 消息模板）
+const disputesRoutes = require('./disputes') // 交易纠纷与售后
 
 // 挂载子模块路由
 router.use('/sessions', sessionsRoutes)
@@ -41,5 +42,6 @@ router.use('/assignments', assignmentsRoutes) // 用户-客服分配管理
 router.use('/user-context', userContextRoutes) // 用户上下文聚合查询
 router.use('/issues', issuesRoutes) // 工单管理
 router.use('/gm-tools', gmToolsRoutes) // GM工具
+router.use('/disputes', disputesRoutes) // 交易纠纷与售后
 
 module.exports = router

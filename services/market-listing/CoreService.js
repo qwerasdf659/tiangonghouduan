@@ -396,6 +396,9 @@ class MarketListingCoreService {
       throw error
     }
 
+    // 3.2.1 挂牌价格管控检查（与 createFungibleAssetListing 保持一致）
+    await MarketListingCoreService.checkPriceControl(price_amount, price_asset_code)
+
     // 3.3 同物单币校验
     const sameItemValidation = await this.validateSameItemSingleCurrency(
       item_id,
@@ -409,7 +412,10 @@ class MarketListingCoreService {
       throw error
     }
 
-    // 3.4 风控限额校验
+    // 3.4 高取消率用户交易限制检查
+    await this._checkHighCancelRate(seller_user_id, transaction)
+
+    // 3.5 风控限额校验
     const riskLimitValidation = await this.validateRiskLimitsForListing(
       { seller_user_id, price_asset_code },
       { transaction }
@@ -523,6 +529,9 @@ class MarketListingCoreService {
     if (!seller_user_id) throw new Error('seller_user_id 是必需参数')
 
     const transaction = assertAndGetTransaction(options, 'MarketListingCoreService.withdrawListing')
+
+    // 撤回频率限制检查（每用户每日最多撤回 N 次）
+    await MarketListingCoreService._checkWithdrawRateLimit(seller_user_id, transaction)
 
     const listing = await MarketListing.findOne({
       where: { market_listing_id },
@@ -719,6 +728,12 @@ class MarketListingCoreService {
     if (!price_amount || price_amount <= 0) {
       throw new Error('price_amount 必须大于0')
     }
+
+    // 挂牌价格管控检查
+    await MarketListingCoreService.checkPriceControl(price_amount, price_asset_code)
+
+    // 高取消率用户交易限制检查
+    await this._checkHighCancelRate(seller_user_id, options.transaction)
 
     // 幂等性检查
     const existingListing = await MarketListing.findOne({
@@ -963,6 +978,9 @@ class MarketListingCoreService {
       options,
       'MarketListingCoreService.withdrawFungibleAssetListing'
     )
+
+    // 撤回频率限制（与物品类型挂牌保持一致）
+    await this._checkWithdrawRateLimit(seller_user_id, transaction)
 
     // 查询挂牌（悲观锁）
     const listing = await MarketListing.findOne({
@@ -1211,6 +1229,152 @@ class MarketListingCoreService {
     })
 
     return { listing, item, cancelled_orders: cancelledOrders }
+  }
+
+  /**
+   * 撤回频率限制检查（每用户每日最多撤回次数，从 system_configs 读取）
+   *
+   * @param {number} sellerUserId - 卖家用户ID
+   * @param {Object} transaction - Sequelize 事务
+   * @returns {Promise<void>} 校验通过则静默返回，超限则抛出 429 错误
+   * @private
+   */
+  static async _checkWithdrawRateLimit(sellerUserId, transaction) {
+    try {
+      const AdminSystemService = require('../AdminSystemService')
+      const dailyLimit = await AdminSystemService.getSettingValue(
+        'marketplace',
+        'daily_withdraw_limit',
+        0
+      )
+      if (!dailyLimit || dailyLimit <= 0) return
+
+      const todayStart = new Date()
+      todayStart.setHours(0, 0, 0, 0)
+
+      const todayWithdrawCount = await MarketListing.count({
+        where: {
+          seller_user_id: sellerUserId,
+          status: 'withdrawn',
+          updated_at: { [Op.gte]: todayStart }
+        },
+        transaction
+      })
+
+      if (todayWithdrawCount >= dailyLimit) {
+        const error = new Error(`今日撤回次数已达上限（${dailyLimit}次/天）`)
+        error.statusCode = 429
+        error.code = 'WITHDRAW_DAILY_LIMIT'
+        throw error
+      }
+    } catch (error) {
+      if (error.code === 'WITHDRAW_DAILY_LIMIT') throw error
+      logger.warn('[MarketListingCoreService] 撤回频率限制检查失败（非致命）:', error.message)
+    }
+  }
+
+  /**
+   * 高取消率用户交易限制检查（NEW-8）
+   *
+   * 业务规则：近30天内撤回/取消次数占总挂牌次数的比例超过阈值时，限制新挂牌
+   * - 阈值从 system_settings 读取（marketplace/high_cancel_rate_threshold）
+   * - 最低挂牌数量门槛：至少有5次挂牌记录才触发检查（避免新用户误判）
+   * - 0=关闭检查
+   *
+   * @param {number} sellerUserId - 卖家用户 ID
+   * @param {Object} transaction - Sequelize 事务
+   * @returns {Promise<void>} 校验通过则静默返回，超限则抛出 403 错误
+   * @private
+   */
+  static async _checkHighCancelRate(sellerUserId, transaction) {
+    try {
+      const AdminSystemService = require('../AdminSystemService')
+      const threshold = await AdminSystemService.getSettingValue(
+        'marketplace',
+        'high_cancel_rate_threshold',
+        0
+      )
+      if (!threshold || threshold <= 0) return
+
+      // 近30天的挂牌统计
+      const thirtyDaysAgo = new Date()
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+
+      const totalListings = await MarketListing.count({
+        where: {
+          seller_user_id: sellerUserId,
+          created_at: { [Op.gte]: thirtyDaysAgo }
+        },
+        transaction
+      })
+
+      // 最低门槛：至少5次挂牌才触发检查
+      if (totalListings < 5) return
+
+      const cancelledCount = await MarketListing.count({
+        where: {
+          seller_user_id: sellerUserId,
+          status: { [Op.in]: ['withdrawn', 'admin_withdrawn', 'cancelled'] },
+          created_at: { [Op.gte]: thirtyDaysAgo }
+        },
+        transaction
+      })
+
+      const cancelRate = cancelledCount / totalListings
+      if (cancelRate >= threshold) {
+        const error = new Error(
+          `您近30天的取消率为 ${(cancelRate * 100).toFixed(1)}%，超过平台限制（${(threshold * 100).toFixed(0)}%），暂时无法创建新挂牌`
+        )
+        error.statusCode = 403
+        error.code = 'HIGH_CANCEL_RATE'
+        throw error
+      }
+    } catch (error) {
+      if (error.code === 'HIGH_CANCEL_RATE') throw error
+      logger.warn('[MarketListingCoreService] 高取消率检查失败（非致命）:', error.message)
+    }
+  }
+
+  /**
+   * 挂牌价格管控检查（价格上下限，从 system_configs 读取）
+   *
+   * @param {number} priceAmount - 挂牌价格
+   * @param {string} priceAssetCode - 结算币种
+   * @returns {Promise<void>} 校验通过则静默返回，不通过则抛出业务错误
+   */
+  static async checkPriceControl(priceAmount, priceAssetCode) {
+    try {
+      const AdminSystemService = require('../AdminSystemService')
+      const minPrice = await AdminSystemService.getSettingValue(
+        'marketplace',
+        `listing_price_min_${priceAssetCode}`,
+        0
+      )
+      const maxPrice = await AdminSystemService.getSettingValue(
+        'marketplace',
+        `listing_price_max_${priceAssetCode}`,
+        0
+      )
+
+      if (minPrice > 0 && priceAmount < minPrice) {
+        const error = new Error(`挂牌价格不能低于最低限价 ${minPrice} ${priceAssetCode}`)
+        error.statusCode = 400
+        error.code = 'PRICE_BELOW_MINIMUM'
+        error.data = { min_price: minPrice, current_price: priceAmount }
+        throw error
+      }
+
+      if (maxPrice > 0 && priceAmount > maxPrice) {
+        const error = new Error(`挂牌价格不能高于最高限价 ${maxPrice} ${priceAssetCode}`)
+        error.statusCode = 400
+        error.code = 'PRICE_ABOVE_MAXIMUM'
+        error.data = { max_price: maxPrice, current_price: priceAmount }
+        throw error
+      }
+    } catch (error) {
+      if (error.code === 'PRICE_BELOW_MINIMUM' || error.code === 'PRICE_ABOVE_MAXIMUM') throw error
+      logger.warn('[MarketListingCoreService] 价格管控检查失败（非致命）:', error.message)
+    }
   }
 }
 

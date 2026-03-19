@@ -278,10 +278,15 @@ const CANONICAL_OPERATION_MAP = {
   // ===== GM工作台 — 消息模板 =====
   '/api/v4/console/customer-service/gm-tools/templates': 'ADMIN_CS_TEMPLATE_UPDATE', // 更新消息模板
 
-  // ===== 图片管理 =====
-  '/api/v4/console/images/upload': 'ADMIN_IMAGE_UPLOAD', // 上传图片
-  '/api/v4/console/images/:id/bind': 'ADMIN_IMAGE_BIND', // 绑定图片
-  '/api/v4/console/images/:id': 'ADMIN_IMAGE_DELETE', // 删除图片（新增 DELETE 方法映射）
+  // ===== 媒体管理（2026-03-16 迁移至 media 体系） =====
+  '/api/v4/console/media/upload': 'ADMIN_MEDIA_UPLOAD', // 上传媒体文件
+  '/api/v4/console/media/batch-upload': 'ADMIN_MEDIA_BATCH_UPLOAD', // 批量上传媒体文件
+  '/api/v4/console/media/batch-attach': 'ADMIN_MEDIA_BATCH_ATTACH', // 批量关联媒体
+  '/api/v4/console/media/batch-detach': 'ADMIN_MEDIA_BATCH_DETACH', // 批量解除关联
+  '/api/v4/console/media/:id': 'ADMIN_MEDIA_UPDATE', // 更新或删除媒体（PATCH/DELETE）
+  '/api/v4/console/media/:id/restore': 'ADMIN_MEDIA_RESTORE', // 从回收站恢复媒体
+  '/api/v4/console/media/:id/attach': 'ADMIN_MEDIA_ATTACH', // 关联媒体到实体
+  '/api/v4/console/media/:id/detach': 'ADMIN_MEDIA_DETACH', // 解除媒体与实体的关联
 
   // ===== 资产组合管理 =====
   '/api/v4/console/assets/portfolio/items/': 'ADMIN_ASSET_ITEM_CREATE', // 创建资产组合项（尾斜杠）
@@ -381,6 +386,10 @@ const CANONICAL_OPERATION_MAP = {
     'ADMIN_EXCHANGE_ORDER_COMPLETE', // 管理员标记完成
   '/api/v4/console/marketplace/exchange_market/batch-bind-images':
     'ADMIN_EXCHANGE_BATCH_BIND_IMAGES', // 批量绑定商品图片
+  '/api/v4/console/marketplace/exchange_market/items/batch-status': 'ADMIN_EXCHANGE_BATCH_STATUS', // 批量上下架
+  '/api/v4/console/marketplace/exchange_market/items/batch-price': 'ADMIN_EXCHANGE_BATCH_PRICE', // 批量改价
+  '/api/v4/console/marketplace/exchange_market/items/batch-category':
+    'ADMIN_EXCHANGE_BATCH_CATEGORY', // 批量修改分类
   '/api/v4/console/marketplace/listings/:id/force-withdraw': 'ADMIN_FORCE_WITHDRAW', // 强制下架
   '/api/v4/console/marketplace/listings/:id/pin': 'ADMIN_LISTING_PIN', // 挂牌置顶/取消置顶
   '/api/v4/console/marketplace/listings/:id/recommend': 'ADMIN_LISTING_RECOMMEND', // 挂牌推荐/取消推荐

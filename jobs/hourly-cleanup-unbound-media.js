@@ -24,17 +24,17 @@ const logger = require('../utils/logger').logger
 /**
  * 每小时清理未绑定媒体任务类
  *
- * @class HourlyCleanupUnboundImages
+ * @class HourlyCleanupUnboundMedia
  * @description 自动清理超时未绑定的孤立媒体资源（media_files）
  */
-class HourlyCleanupUnboundImages {
+class HourlyCleanupUnboundMedia {
   /**
    * 执行清理任务
    *
    * @param {number} [hours=24] - 未绑定超过多少小时才清理
    * @returns {Promise<Object>} 清理报告
    * @returns {Object} report - 清理报告
-   * @returns {number} report.cleaned_count - 清理的图片数量
+   * @returns {number} report.cleaned_count - 清理的媒体数量
    * @returns {number} report.failed_count - 清理失败的数量
    * @returns {string} report.timestamp - 执行时间
    * @returns {number} report.duration_ms - 执行耗时(毫秒)
@@ -136,7 +136,7 @@ if (require.main === module) {
       const hours = parseInt(process.argv[2], 10) || 24
       console.log(`执行参数: hours=${hours}`)
 
-      const report = await HourlyCleanupUnboundImages.execute(hours)
+      const report = await HourlyCleanupUnboundMedia.execute(hours)
       process.exit(report.status === 'SUCCESS' ? 0 : 1)
     } catch (error) {
       console.error('清理任务执行失败:', error)
@@ -145,4 +145,4 @@ if (require.main === module) {
   })()
 }
 
-module.exports = HourlyCleanupUnboundImages
+module.exports = HourlyCleanupUnboundMedia

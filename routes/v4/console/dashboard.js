@@ -184,4 +184,144 @@ router.get('/time-comparison', authenticateToken, requireRoleLevel(100), async (
   }
 })
 
+// ========== 市场健康看板（D1）==========
+
+/**
+ * 获取市场健康综合数据
+ * GET /api/v4/console/dashboard/market-health
+ */
+router.get('/market-health', authenticateToken, requireRoleLevel(100), async (req, res) => {
+  try {
+    const MarketHealthService = req.app.locals.services.getService('market_health')
+    const { days } = req.query
+    const result = await MarketHealthService.getMarketHealthSummary({ days: parseInt(days) || 30 })
+    return res.apiSuccess(result, '获取市场健康数据成功')
+  } catch (error) {
+    logger.error('[市场健康] 获取综合数据失败', { error: error.message })
+    return handleServiceError(error, res, '获取市场健康数据失败')
+  }
+})
+
+/**
+ * 获取订单状态趋势（完成率/取消率）
+ * GET /api/v4/console/dashboard/market-health/order-trend
+ */
+router.get(
+  '/market-health/order-trend',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const MarketHealthService = req.app.locals.services.getService('market_health')
+      const { days } = req.query
+      const result = await MarketHealthService.getOrderStatusTrend({ days: parseInt(days) || 30 })
+      return res.apiSuccess(result, '获取订单状态趋势成功')
+    } catch (error) {
+      logger.error('[市场健康] 获取订单趋势失败', { error: error.message })
+      return handleServiceError(error, res, '获取订单趋势失败')
+    }
+  }
+)
+
+/**
+ * 获取活跃买家/卖家 Top N
+ * GET /api/v4/console/dashboard/market-health/top-users
+ */
+router.get(
+  '/market-health/top-users',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const MarketHealthService = req.app.locals.services.getService('market_health')
+      const { days, limit } = req.query
+      const filters = { days: parseInt(days) || 30, limit: parseInt(limit) || 10 }
+
+      const [topBuyers, topSellers] = await Promise.all([
+        MarketHealthService.getTopBuyers(filters),
+        MarketHealthService.getTopSellers(filters)
+      ])
+
+      return res.apiSuccess(
+        { top_buyers: topBuyers, top_sellers: topSellers },
+        '获取活跃用户排行成功'
+      )
+    } catch (error) {
+      logger.error('[市场健康] 获取活跃用户排行失败', { error: error.message })
+      return handleServiceError(error, res, '获取活跃用户排行失败')
+    }
+  }
+)
+
+module.exports = router
+
+/**
+ * 获取平台收入概览
+ * GET /api/v4/console/dashboard/revenue/overview
+ */
+router.get('/revenue/overview', authenticateToken, requireRoleLevel(100), async (req, res) => {
+  try {
+    const PlatformRevenueService = req.app.locals.services.getService('platform_revenue')
+    const overview = await PlatformRevenueService.getRevenueOverview()
+    return res.apiSuccess(overview, '获取收入概览成功')
+  } catch (error) {
+    logger.error('[平台收入] 获取收入概览失败', { error: error.message })
+    return handleServiceError(error, res, '获取收入概览失败')
+  }
+})
+
+/**
+ * 获取收入来源分类统计
+ * GET /api/v4/console/dashboard/revenue/by-source
+ */
+router.get('/revenue/by-source', authenticateToken, requireRoleLevel(100), async (req, res) => {
+  try {
+    const PlatformRevenueService = req.app.locals.services.getService('platform_revenue')
+    const { asset_code, days } = req.query
+    const result = await PlatformRevenueService.getRevenueBySource({
+      asset_code,
+      days: parseInt(days) || 30
+    })
+    return res.apiSuccess(result, '获取收入来源统计成功')
+  } catch (error) {
+    logger.error('[平台收入] 获取收入来源统计失败', { error: error.message })
+    return handleServiceError(error, res, '获取收入来源统计失败')
+  }
+})
+
+/**
+ * 获取收入趋势数据
+ * GET /api/v4/console/dashboard/revenue/trend
+ */
+router.get('/revenue/trend', authenticateToken, requireRoleLevel(100), async (req, res) => {
+  try {
+    const PlatformRevenueService = req.app.locals.services.getService('platform_revenue')
+    const { granularity, asset_code, days } = req.query
+    const result = await PlatformRevenueService.getRevenueTrend({
+      granularity: granularity || 'daily',
+      asset_code,
+      days: parseInt(days) || 30
+    })
+    return res.apiSuccess(result, '获取收入趋势成功')
+  } catch (error) {
+    logger.error('[平台收入] 获取收入趋势失败', { error: error.message })
+    return handleServiceError(error, res, '获取收入趋势失败')
+  }
+})
+
+/**
+ * 获取手续费率配置和实际收费统计
+ * GET /api/v4/console/dashboard/revenue/fee-stats
+ */
+router.get('/revenue/fee-stats', authenticateToken, requireRoleLevel(100), async (req, res) => {
+  try {
+    const PlatformRevenueService = req.app.locals.services.getService('platform_revenue')
+    const result = await PlatformRevenueService.getFeeRateStats()
+    return res.apiSuccess(result, '获取手续费统计成功')
+  } catch (error) {
+    logger.error('[平台收入] 获取手续费统计失败', { error: error.message })
+    return handleServiceError(error, res, '获取手续费统计失败')
+  }
+})
+
 module.exports = router

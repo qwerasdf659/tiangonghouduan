@@ -346,6 +346,45 @@ router.get(
 )
 
 /**
+ * 获取单品数据看板（Admin Only）
+ * GET /api/v4/console/marketplace/exchange_market/items/:exchange_item_id/dashboard
+ *
+ * @description 单品维度的兑换转化率、库存周转、近7天/30天订单量、评分
+ *
+ * @param {number} exchange_item_id - 商品ID
+ * @returns {Object} 单品统计数据
+ *
+ * @security JWT + Admin权限
+ */
+router.get(
+  '/exchange_market/items/:exchange_item_id/dashboard',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const exchangeItemId = parseInt(req.params.exchange_item_id)
+      if (!exchangeItemId || isNaN(exchangeItemId)) {
+        return res.apiError('无效的商品ID', 'BAD_REQUEST', null, 400)
+      }
+
+      const ExchangeAdminService = req.app.locals.services.getService('exchange_admin')
+      const dashboard = await ExchangeAdminService.getItemDashboard(exchangeItemId)
+
+      return res.apiSuccess(dashboard, '单品看板数据查询成功')
+    } catch (error) {
+      logger.error('单品看板查询失败', {
+        error: error.message,
+        exchange_item_id: req.params.exchange_item_id
+      })
+      if (error.message === '商品不存在') {
+        return res.apiError('商品不存在', 'NOT_FOUND', null, 404)
+      }
+      return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    }
+  }
+)
+
+/**
  * 管理员获取单个兑换商品详情（Admin Only）
  * GET /api/v4/console/marketplace/exchange_market/items/:exchange_item_id
  *
@@ -1067,6 +1106,165 @@ router.put(
 )
 
 /**
+ * 批量上下架（批量修改商品状态）
+ * PUT /api/v4/console/marketplace/exchange_market/items/batch-status
+ *
+ * @body {Array<number>} exchange_item_ids - 商品ID数组
+ * @body {string} status - 目标状态（active/inactive）
+ *
+ * @security JWT + Admin权限
+ */
+router.put(
+  '/exchange_market/items/batch-status',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const { exchange_item_ids, status } = req.body
+      if (!Array.isArray(exchange_item_ids) || exchange_item_ids.length === 0) {
+        return res.apiError('商品ID列表不能为空', 'BAD_REQUEST', null, 400)
+      }
+      if (!['active', 'inactive'].includes(status)) {
+        return res.apiError('无效的状态值，仅支持 active/inactive', 'BAD_REQUEST', null, 400)
+      }
+
+      const ExchangeAdminService = req.app.locals.services.getService('exchange_admin')
+
+      const result = await TransactionManager.execute(
+        async transaction => {
+          return await ExchangeAdminService.batchUpdateStatus(exchange_item_ids, status, {
+            transaction,
+            operator_id: req.user?.user_id
+          })
+        },
+        {
+          description: `批量${status === 'active' ? '上架' : '下架'} ${exchange_item_ids.length} 个商品`
+        }
+      )
+
+      const label = status === 'active' ? '上架' : '下架'
+      return res.apiSuccess(result, `已批量${label} ${result.affected_rows} 个商品`)
+    } catch (error) {
+      logger.error('批量修改商品状态失败', { error: error.message })
+      return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    }
+  }
+)
+
+/**
+ * 批量改价（批量修改商品价格）
+ * PUT /api/v4/console/marketplace/exchange_market/items/batch-price
+ *
+ * @body {Array<{exchange_item_id: number, cost_amount: number}>} items - 商品价格数组
+ *
+ * @security JWT + Admin权限
+ */
+router.put(
+  '/exchange_market/items/batch-price',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const { items, mode, value, exchange_item_ids } = req.body
+
+      const ExchangeAdminService = req.app.locals.services.getService('exchange_admin')
+
+      // 支持两种模式：逐个设价（items数组）或批量调价（mode+value）
+      if (mode && value !== undefined && Array.isArray(exchange_item_ids)) {
+        // 新模式：批量按比例/固定值/直接设置
+        const result = await TransactionManager.execute(
+          async transaction => {
+            return await ExchangeAdminService.batchUpdatePrice(
+              exchange_item_ids,
+              { mode, value },
+              {
+                transaction,
+                operator_id: req.user?.user_id
+              }
+            )
+          },
+          { description: `批量改价 ${exchange_item_ids.length} 个商品（${mode}=${value}）` }
+        )
+
+        return res.apiSuccess(result, `已更新 ${result.affected_rows} 个商品价格`)
+      }
+
+      // 兼容旧模式：逐个指定价格
+      if (!Array.isArray(items) || items.length === 0) {
+        return res.apiError('价格数据不能为空', 'BAD_REQUEST', null, 400)
+      }
+
+      const result = await TransactionManager.execute(
+        async transaction => {
+          let updatedCount = 0
+          for (const item of items) {
+            const { exchange_item_id, cost_amount } = item
+            if (!exchange_item_id || cost_amount === undefined || cost_amount < 0) continue
+
+            const [affected] = await ExchangeAdminService.ExchangeItem.update(
+              { cost_amount: parseInt(cost_amount, 10) },
+              { where: { exchange_item_id: parseInt(exchange_item_id, 10) }, transaction }
+            )
+            updatedCount += affected
+          }
+          return { affected_rows: updatedCount }
+        },
+        { description: `批量改价 ${items.length} 个商品` }
+      )
+
+      return res.apiSuccess(result, `已更新 ${result.affected_rows} 个商品价格`)
+    } catch (error) {
+      logger.error('批量改价失败', { error: error.message })
+      return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    }
+  }
+)
+
+/**
+ * 批量修改分类
+ * PUT /api/v4/console/marketplace/exchange_market/items/batch-category
+ *
+ * @body {Array<number>} exchange_item_ids - 商品ID数组
+ * @body {number} category_def_id - 目标分类ID
+ *
+ * @security JWT + Admin权限
+ */
+router.put(
+  '/exchange_market/items/batch-category',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const { exchange_item_ids, category_def_id } = req.body
+      if (!Array.isArray(exchange_item_ids) || exchange_item_ids.length === 0) {
+        return res.apiError('商品ID列表不能为空', 'BAD_REQUEST', null, 400)
+      }
+      if (category_def_id === undefined) {
+        return res.apiError('目标分类ID不能为空', 'BAD_REQUEST', null, 400)
+      }
+
+      const ExchangeAdminService = req.app.locals.services.getService('exchange_admin')
+
+      const result = await TransactionManager.execute(
+        async transaction => {
+          return await ExchangeAdminService.batchUpdateCategory(
+            exchange_item_ids,
+            category_def_id || null,
+            { transaction }
+          )
+        },
+        { description: `批量修改分类 ${exchange_item_ids.length} 个商品` }
+      )
+
+      return res.apiSuccess(result, `已更新 ${result.affected_rows} 个商品分类`)
+    } catch (error) {
+      logger.error('批量修改分类失败', { error: error.message })
+      return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    }
+  }
+)
+
+/**
  * 批量调整商品排序
  * PUT /api/v4/console/marketplace/exchange_market/items/batch-sort
  *
@@ -1105,6 +1303,20 @@ router.put(
 
       const { BusinessCacheHelper } = require('../../../utils/BusinessCacheHelper')
       await BusinessCacheHelper.invalidateExchangeItems('batch_sort')
+
+      // 排序变更审计日志
+      const AuditLogService = require('../../../services/AuditLogService')
+      await AuditLogService.logOperation({
+        operator_id: req.user.user_id,
+        operation_type: 'sort_change',
+        target_type: 'exchange_item',
+        target_id: null,
+        action: 'batch_sort',
+        after_data: { items: items.slice(0, 10), updated_count: result.updated_count },
+        reason: '管理员批量调整商品排序',
+        ip_address: req.ip,
+        user_agent: req.get('user-agent')
+      }).catch(e => logger.warn('排序审计日志写入失败（非致命）', { error: e.message }))
 
       return res.apiSuccess(result, `已更新 ${result.updated_count} 个商品排序`)
     } catch (error) {
@@ -1240,6 +1452,19 @@ router.put('/listings/batch-sort', authenticateToken, requireRoleLevel(100), asy
 
     const { BusinessCacheHelper } = require('../../../utils/BusinessCacheHelper')
     await BusinessCacheHelper.invalidateMarketListings('batch_sort')
+
+    const AuditLogService = require('../../../services/AuditLogService')
+    await AuditLogService.logOperation({
+      operator_id: req.user.user_id,
+      operation_type: 'sort_change',
+      target_type: 'market_listing',
+      target_id: null,
+      action: 'batch_sort',
+      after_data: { items: items.slice(0, 10), updated_count: result.updated_count },
+      reason: '管理员批量调整挂牌排序',
+      ip_address: req.ip,
+      user_agent: req.get('user-agent')
+    }).catch(e => logger.warn('排序审计日志写入失败（非致命）', { error: e.message }))
 
     return res.apiSuccess(result, `已更新 ${result.updated_count} 个挂牌排序`)
   } catch (error) {

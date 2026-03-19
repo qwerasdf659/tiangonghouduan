@@ -123,7 +123,8 @@ module.exports = sequelize => {
           'notification',
           'security',
           'marketplace',
-          'redemption'
+          'redemption',
+          'exchange'
         ),
         allowNull: false,
         comment:

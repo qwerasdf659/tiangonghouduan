@@ -257,11 +257,13 @@ class QueryService {
         where.item_name = { [Op.like]: `%${keyword}%` }
       }
 
-      // 分类筛选（API 可能传 category_code 或 category_def_id，需转换为 category_def_id）
+      // 分类筛选（支持两级分类：选择一级分类时自动包含其下所有子分类商品）
       if (category) {
         const categoryDefId = await this._resolveCategoryDefId(category)
         if (categoryDefId !== null) {
-          where.category_def_id = categoryDefId
+          const { CategoryDef } = this.models
+          const categoryIds = await CategoryDef.getIdsWithChildren(categoryDefId)
+          where.category_def_id = { [Op.in]: categoryIds }
         }
       }
 
@@ -905,13 +907,14 @@ class QueryService {
         catBase.parts.push('ei.stock BETWEEN 1 AND 5')
       }
 
-      // 2. 价格区间计数：排除 price 条件，保留 category + stock 条件（使用 category_def_id）
+      // 2. 价格区间计数：排除 price 条件，保留 category + stock 条件（支持两级分类）
       const priceBase = buildBaseWhere()
       if (category) {
         const catDefId = await this._resolveCategoryDefId(category)
         if (catDefId !== null) {
-          priceBase.parts.push('ei.category_def_id = :category_def_id')
-          priceBase.replacements.category_def_id = catDefId
+          const { CategoryDef } = this.models
+          const catIds = await CategoryDef.getIdsWithChildren(catDefId)
+          priceBase.parts.push(`ei.category_def_id IN (${catIds.join(',')})`)
         }
       }
       if (stock_status === 'in_stock') {
@@ -920,13 +923,14 @@ class QueryService {
         priceBase.parts.push('ei.stock BETWEEN 1 AND 5')
       }
 
-      // 3. 库存状态计数：排除 stock 条件，保留 category + price 条件（使用 category_def_id）
+      // 3. 库存状态计数：排除 stock 条件，保留 category + price 条件（支持两级分类）
       const stockBase = buildBaseWhere()
       if (category) {
         const catDefIdS = await this._resolveCategoryDefId(category)
         if (catDefIdS !== null) {
-          stockBase.parts.push('ei.category_def_id = :category_def_id_s')
-          stockBase.replacements.category_def_id_s = catDefIdS
+          const { CategoryDef } = this.models
+          const catIdsS = await CategoryDef.getIdsWithChildren(catDefIdS)
+          stockBase.parts.push(`ei.category_def_id IN (${catIdsS.join(',')})`)
         }
       }
       if (min_cost !== null) {

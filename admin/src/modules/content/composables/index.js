@@ -10,7 +10,7 @@
  */
 
 // 媒体库管理模块（基于 media_files + media_attachments 体系）
-import { useImagesState, useImagesMethods } from './media-library.js'
+import { useMediaState, useMediaMethods } from './media-library.js'
 
 // 存储管理模块（存储概览、孤儿检测、回收站、重复文件）
 import { useStorageState, useStorageMethods } from './storage.js'
@@ -51,7 +51,7 @@ import { useFeedbackState, useFeedbackMethods } from './feedback.js'
 // 客服座席管理模块
 import { useCsAgentManagementState, useCsAgentManagementMethods } from './cs-agent-management.js'
 
-export { useImagesState, useImagesMethods }
+export { useMediaState, useMediaMethods }
 export { useStorageState, useStorageMethods }
 export { useCustomerServiceState, useCustomerServiceMethods }
 export { useCsWsConnectionState, useCsWsConnectionMethods }

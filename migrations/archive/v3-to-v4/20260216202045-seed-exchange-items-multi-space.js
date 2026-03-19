@@ -16,7 +16,7 @@
  *
  * 注意事项：
  * - 所有 cost_price 字段需由运营填写真实成本价（此处为占位值，标记 TODO）
- * - 商品图片需运营通过管理后台上传绑定（primary_image_id 暂为 NULL）
+ * - 商品图片需运营通过管理后台上传绑定（primary_media_id 暂为 NULL）
  *
  * 回滚方案：
  * - down() 根据 item_name 前缀删除本次插入的商品（使用 LIKE 'S%' 匹配防误删）
@@ -59,7 +59,7 @@ module.exports = {
         has_warranty: false,
         free_shipping: true,
         sell_point: '办公桌面必备，稳固不滑',
-        primary_image_id: null,
+        primary_media_id: null,
         created_at: now,
         updated_at: now
       },
@@ -83,7 +83,7 @@ module.exports = {
         has_warranty: true,
         free_shipping: true,
         sell_point: '304不锈钢，12小时保温',
-        primary_image_id: null,
+        primary_media_id: null,
         created_at: now,
         updated_at: now
       },
@@ -107,7 +107,7 @@ module.exports = {
         has_warranty: false,
         free_shipping: true,
         sell_point: '食物造型，萌趣可爱',
-        primary_image_id: null,
+        primary_media_id: null,
         created_at: now,
         updated_at: now
       },
@@ -131,7 +131,7 @@ module.exports = {
         has_warranty: true,
         free_shipping: true,
         sell_point: '三合一接口，一线走天下',
-        primary_image_id: null,
+        primary_media_id: null,
         created_at: now,
         updated_at: now
       },
@@ -157,7 +157,7 @@ module.exports = {
         has_warranty: true,
         free_shipping: true,
         sell_point: '主动降噪，40小时超长续航',
-        primary_image_id: null,
+        primary_media_id: null,
         created_at: now,
         updated_at: now
       },
@@ -181,7 +181,7 @@ module.exports = {
         has_warranty: true,
         free_shipping: true,
         sell_point: 'LED温度显示，送礼有面子',
-        primary_image_id: null,
+        primary_media_id: null,
         created_at: now,
         updated_at: now
       },
@@ -205,7 +205,7 @@ module.exports = {
         has_warranty: true,
         free_shipping: true,
         sell_point: '防泼水面料，USB充电接口',
-        primary_image_id: null,
+        primary_media_id: null,
         created_at: now,
         updated_at: now
       },
@@ -229,7 +229,7 @@ module.exports = {
         has_warranty: false,
         free_shipping: true,
         sell_point: '12种进口美味，高端礼盒包装',
-        primary_image_id: null,
+        primary_media_id: null,
         created_at: now,
         updated_at: now
       },
@@ -255,7 +255,7 @@ module.exports = {
         has_warranty: true,
         free_shipping: true,
         sell_point: '15W快充，全机型兼容',
-        primary_image_id: null,
+        primary_media_id: null,
         created_at: now,
         updated_at: now
       },
@@ -279,7 +279,7 @@ module.exports = {
         has_warranty: false,
         free_shipping: true,
         sell_point: '日式简约设计，4件套装',
-        primary_image_id: null,
+        primary_media_id: null,
         created_at: now,
         updated_at: now
       },
@@ -303,7 +303,7 @@ module.exports = {
         has_warranty: false,
         free_shipping: true,
         sell_point: '冷感降温，越擦越凉爽',
-        primary_image_id: null,
+        primary_media_id: null,
         created_at: now,
         updated_at: now
       },
@@ -327,7 +327,7 @@ module.exports = {
         has_warranty: true,
         free_shipping: true,
         sell_point: 'IPX5防水，户外随心听',
-        primary_image_id: null,
+        primary_media_id: null,
         created_at: now,
         updated_at: now
       }
@@ -353,7 +353,7 @@ module.exports = {
     console.log('     - 两者都展示(both): 4个（无线充电器、精美餐具套装、品牌运动毛巾、便携蓝牙音箱）')
     console.log('')
     console.log('  ⚠️ 待运营操作:')
-    console.log('     1. 在管理后台为每个商品上传图片（当前 primary_image_id 为空）')
+    console.log('     1. 在管理后台为每个商品上传图片（当前 primary_media_id 为空）')
     console.log('     2. 更新每个商品的真实 cost_price（当前为占位值 0）')
     console.log('📦 [迁移] 完成：兑换商品种子数据插入完毕')
   },

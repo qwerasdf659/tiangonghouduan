@@ -109,7 +109,6 @@ document.addEventListener('alpine:init', () => {
       rarity_code: 'common',
       is_enabled: true,
       primary_media_id: null,
-      image_url: '',
       reference_price_points: 0,
       description: '',
       meta: '',
@@ -286,7 +285,6 @@ document.addEventListener('alpine:init', () => {
         rarity_code: 'common',
         is_enabled: true,
         primary_media_id: null,
-        image_url: '',
         reference_price_points: 0,
         description: '',
         meta: '',
@@ -328,14 +326,13 @@ document.addEventListener('alpine:init', () => {
             rarity_code: t.rarity_code || 'common',
             is_enabled: t.is_enabled,
             primary_media_id: t.primary_media_id ?? null,
-            image_url: t.image_url || t.public_url || '',
             reference_price_points: t.reference_price_points || 0,
             description: t.description || '',
             meta: Object.keys(metaCopy).length > 0 ? JSON.stringify(metaCopy, null, 2) : '',
             use_instructions: metaObj.use_instructions || '',
             allowed_actions: metaObj.allowed_actions || []
           }
-          this.image_preview_url = t.public_url || t.image_url || null
+          this.image_preview_url = t.public_url || null
           this.showModal('templateModal')
         } else {
           this.showError('加载失败', response?.message || '获取模板详情失败')
@@ -399,7 +396,6 @@ document.addEventListener('alpine:init', () => {
         rarity_code: this.form.rarity_code,
         is_enabled: this.form.is_enabled,
         primary_media_id: this.form.primary_media_id || null,
-        image_url: this.form.image_url || null,
         reference_price_points: this.form.reference_price_points || 0,
         description: this.form.description || null,
         meta: Object.keys(finalMeta).length > 0 ? finalMeta : null
@@ -483,8 +479,8 @@ document.addEventListener('alpine:init', () => {
     /**
      * 上传物品模板图片
      *
-     * 上传成功后将 object_key 写入 form.image_url，
-     * 后端 ImageUrlHelper 在 API 响应时自动拼接为完整公网 URL。
+     * 上传成功后将 media_id 写入 form.primary_media_id，
+     * 并设置 image_preview_url 用于前端预览。
      *
      * @param {Event} event - 文件选择事件
      * @returns {Promise<void>}
@@ -520,7 +516,6 @@ document.addEventListener('alpine:init', () => {
 
         if (res.success && res.data) {
           this.form.primary_media_id = res.data.media_id ?? null
-          this.form.image_url = res.data.object_key || res.data.public_url || ''
           this.image_preview_url = res.data.public_url || res.data.url || null
           this.showSuccess('图片上传成功')
           logger.info('[ItemTemplates] 图片上传成功:', res.data.object_key || res.data.public_url, 'primary_media_id:', this.form.primary_media_id)
@@ -541,7 +536,6 @@ document.addEventListener('alpine:init', () => {
      */
     clearTemplateImage() {
       this.form.primary_media_id = null
-      this.form.image_url = ''
       this.image_preview_url = null
     },
 

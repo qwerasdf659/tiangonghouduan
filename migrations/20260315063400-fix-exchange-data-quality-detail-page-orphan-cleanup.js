@@ -62,36 +62,34 @@ module.exports = {
       console.log('[迁移] 警告: 未找到 exchange_page 配置记录')
     }
 
-    // ========== 第二步：硬删除孤儿图片资源 image_resource_id=78 ==========
-    console.log('[迁移] 步骤2: 清理孤儿图片资源 image_resource_id=78...')
+    // ========== 第二步：硬删除孤儿图片资源（已迁移至 media_files 体系，安全跳过） ==========
+    // 注：image_resources 表已被 20260316231845 迁移删除，此步骤仅在表存在时执行
+    console.log('[迁移] 步骤2: 检查孤儿图片资源清理...')
 
-    const [orphanCheck] = await queryInterface.sequelize.query(
-      `SELECT ir.image_resource_id, ir.context_id, ir.file_path
-       FROM image_resources ir
-       LEFT JOIN exchange_items ei ON ir.context_id = ei.exchange_item_id
-       WHERE ir.image_resource_id = 78
-         AND ir.business_type = 'exchange'
-         AND ei.exchange_item_id IS NULL`
+    const [tableCheck] = await queryInterface.sequelize.query(
+      `SELECT COUNT(*) as cnt FROM information_schema.tables
+       WHERE table_schema = DATABASE() AND table_name = 'image_resources'`
     )
-
-    if (orphanCheck.length > 0) {
-      const orphan = orphanCheck[0]
-      console.log(`[迁移] 确认孤儿: image_resource_id=${orphan.image_resource_id}, context_id=${orphan.context_id}, file_path=${orphan.file_path}`)
-
-      // 确认没有被 exchange_items.primary_image_id 引用
-      const [refs] = await queryInterface.sequelize.query(
-        `SELECT exchange_item_id FROM exchange_items WHERE primary_image_id = 78`
+    if (parseInt(tableCheck[0].cnt) > 0) {
+      const [orphanCheck] = await queryInterface.sequelize.query(
+        `SELECT ir.image_resource_id, ir.context_id, ir.file_path
+         FROM image_resources ir
+         LEFT JOIN exchange_items ei ON ir.context_id = ei.exchange_item_id
+         WHERE ir.image_resource_id = 78
+           AND ir.business_type = 'exchange'
+           AND ei.exchange_item_id IS NULL`
       )
-      if (refs.length > 0) {
-        console.log(`[迁移] 警告: image_resource 78 仍被 ${refs.length} 个商品引用，跳过删除`)
-      } else {
+
+      if (orphanCheck.length > 0) {
         await queryInterface.sequelize.query(
           `DELETE FROM image_resources WHERE image_resource_id = 78`
         )
         console.log('[迁移] 孤儿图片资源 image_resource_id=78 已硬删除')
+      } else {
+        console.log('[迁移] image_resource_id=78 不是孤儿或已不存在，跳过')
       }
     } else {
-      console.log('[迁移] image_resource_id=78 不是孤儿或已不存在，跳过')
+      console.log('[迁移] image_resources 表已不存在（已迁移至 media_files），跳过孤儿清理')
     }
 
     // ========== 第三步：硬删除测试商品关联的 exchange_order_events 和 exchange_records ==========
@@ -208,11 +206,19 @@ module.exports = {
     )
     console.log(`  exchange_page.detail_page 存在: ${verifyConfig[0]?.has_detail_page === 1 ? '是' : '否'}`)
 
-    // 验证孤儿图片已删除
-    const [verifyOrphan] = await queryInterface.sequelize.query(
-      `SELECT COUNT(*) as count FROM image_resources WHERE image_resource_id = 78`
+    // 验证孤儿图片已删除（仅在 image_resources 表存在时验证）
+    const [tableCheck2] = await queryInterface.sequelize.query(
+      `SELECT COUNT(*) as cnt FROM information_schema.tables
+       WHERE table_schema = DATABASE() AND table_name = 'image_resources'`
     )
-    console.log(`  孤儿图片 78 已删除: ${parseInt(verifyOrphan[0].count) === 0 ? '是' : '否'}`)
+    if (parseInt(tableCheck2[0].cnt) > 0) {
+      const [verifyOrphan] = await queryInterface.sequelize.query(
+        `SELECT COUNT(*) as count FROM image_resources WHERE image_resource_id = 78`
+      )
+      console.log(`  孤儿图片 78 已删除: ${parseInt(verifyOrphan[0].count) === 0 ? '是' : '否'}`)
+    } else {
+      console.log('  孤儿图片验证: image_resources 表已不存在（已迁移至 media_files）')
+    }
 
     // 验证测试商品已删除
     const [verifyItems] = await queryInterface.sequelize.query(
@@ -234,10 +240,14 @@ module.exports = {
     )
     console.log(`  exchange_items 最终状态: 总计 ${finalItems[0].total} 条, 活跃 ${finalItems[0].active_count} 条`)
 
-    const [finalImages] = await queryInterface.sequelize.query(
-      `SELECT COUNT(*) as total FROM image_resources WHERE business_type = 'exchange'`
-    )
-    console.log(`  exchange 图片资源: ${finalImages[0].total} 条`)
+    if (parseInt(tableCheck2[0].cnt) > 0) {
+      const [finalImages] = await queryInterface.sequelize.query(
+        `SELECT COUNT(*) as total FROM image_resources WHERE business_type = 'exchange'`
+      )
+      console.log(`  exchange 图片资源: ${finalImages[0].total} 条`)
+    } else {
+      console.log('  exchange 图片资源: 已迁移至 media_files 体系')
+    }
 
     console.log('[迁移] 兑换系统数据质量修复完成')
   },

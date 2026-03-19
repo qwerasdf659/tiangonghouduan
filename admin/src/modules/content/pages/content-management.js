@@ -15,8 +15,8 @@ import { request } from '../../../api/base.js'
 import { SYSTEM_ADMIN_ENDPOINTS } from '../../../api/system/admin.js'
 import { Alpine, createPageMixin } from '../../../alpine/index.js'
 import {
-  useImagesState,
-  useImagesMethods,
+  useMediaState,
+  useMediaMethods,
   useStorageState,
   useStorageMethods
 } from '../composables/index.js'
@@ -26,8 +26,8 @@ document.addEventListener('alpine:init', () => {
 
   Alpine.data('contentManagement', () => ({
     ...createPageMixin(),
-    ...useImagesState(),
-    ...useImagesMethods(),
+    ...useMediaState(),
+    ...useMediaMethods(),
     ...useStorageState(),
     ...useStorageMethods(),
 
@@ -57,7 +57,7 @@ document.addEventListener('alpine:init', () => {
 
     loadPageData() {
       if (this.current_page === 'image-resources') {
-        this.loadImages?.()
+        this.loadMedia?.()
       } else if (this.current_page === 'storage-management') {
         this.loadStorageData?.()
       }
@@ -78,7 +78,7 @@ document.addEventListener('alpine:init', () => {
         if (response?.success) {
           this.hideModal('deleteModal')
           this.showSuccess('图片已移入回收站')
-          await this.loadImages()
+          await this.loadMedia()
         } else {
           this.showError(response?.message || '删除失败')
         }

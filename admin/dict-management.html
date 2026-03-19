@@ -65,6 +65,48 @@
       </button>
     </div>
 
+    <!-- 分类树形视图（仅分类 Tab 显示） -->
+    <template x-if="currentDictType === 'categories'">
+      <div class="themed-card rounded-xl border p-4 mb-4">
+        <div class="flex justify-between items-center mb-3">
+          <h6 class="font-semibold text-sm text-gray-700">分类层级结构</h6>
+          <button @click="loadCategoryTree()" class="text-xs text-indigo-600 hover:text-indigo-800">刷新树形</button>
+        </div>
+        <template x-if="categoryTree.length === 0">
+          <p class="text-xs text-gray-400 py-2">暂无分类树数据，点击"刷新树形"加载</p>
+        </template>
+        <div class="space-y-1">
+          <template x-for="parent in categoryTree" :key="parent.category_def_id">
+            <div>
+              <div class="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-gray-50 group">
+                <div class="flex items-center gap-2">
+                  <span class="text-gray-400 text-xs" x-text="parent.children && parent.children.length > 0 ? '📂' : '📁'"></span>
+                  <span class="font-medium text-sm" x-text="parent.display_name"></span>
+                  <span class="text-xs text-gray-400" x-text="'(' + parent.category_code + ')'"></span>
+                  <span x-show="parent.children && parent.children.length > 0" class="text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded" x-text="parent.children.length + ' 个子分类'"></span>
+                </div>
+                <button @click="openAddSubcategoryModal(parent)" class="text-xs text-indigo-500 hover:text-indigo-700 opacity-0 group-hover:opacity-100 transition-opacity">+ 添加子分类</button>
+              </div>
+              <template x-if="parent.children && parent.children.length > 0">
+                <div class="ml-8 border-l-2 border-gray-100">
+                  <template x-for="child in parent.children" :key="child.category_def_id">
+                    <div class="flex items-center justify-between py-1.5 px-3 hover:bg-gray-50 rounded">
+                      <div class="flex items-center gap-2">
+                        <span class="text-gray-300 text-xs">└</span>
+                        <span class="text-sm" x-text="child.display_name"></span>
+                        <span class="text-xs text-gray-400" x-text="'(' + child.category_code + ')'"></span>
+                      </div>
+                      <span :class="child.is_enabled ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'" class="text-xs px-1.5 py-0.5 rounded" x-text="child.is_enabled ? '启用' : '禁用'"></span>
+                    </div>
+                  </template>
+                </div>
+              </template>
+            </div>
+          </template>
+        </div>
+      </div>
+    </template>
+
     <!-- data-table 标准表格组件 -->
     <div x-data="dataTable({
       columns: tableColumns,

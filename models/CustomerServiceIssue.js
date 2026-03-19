@@ -166,6 +166,48 @@ module.exports = sequelize => {
         type: DataTypes.DATE,
         allowNull: true,
         comment: '关闭时间'
+      },
+
+      // ===== 交易纠纷专用字段（issue_type='trade' 时使用）=====
+      trade_order_id: {
+        type: DataTypes.BIGINT,
+        allowNull: true,
+        defaultValue: null,
+        comment: '关联的交易订单 ID（纠纷类型时必填）'
+      },
+
+      dispute_type: {
+        type: DataTypes.ENUM(
+          'item_not_received',
+          'item_mismatch',
+          'quality_issue',
+          'fraud',
+          'other'
+        ),
+        allowNull: true,
+        defaultValue: null,
+        comment: '纠纷类型：未收到物品/物品不符/质量问题/欺诈/其他'
+      },
+
+      dispute_evidence: {
+        type: DataTypes.JSON,
+        allowNull: true,
+        defaultValue: null,
+        comment: '纠纷证据（截图URL数组、文字描述等）'
+      },
+
+      dispute_deadline: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        defaultValue: null,
+        comment: '纠纷处理截止时间（超时自动升级）'
+      },
+
+      approval_chain_instance_id: {
+        type: DataTypes.BIGINT,
+        allowNull: true,
+        defaultValue: null,
+        comment: '关联的审批链实例 ID（仲裁流程）'
       }
     },
     {

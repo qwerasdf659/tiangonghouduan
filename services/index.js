@@ -37,6 +37,9 @@ const CustomerServiceUserContextService = require('./CustomerServiceUserContextS
 const CustomerServiceDiagnoseService = require('./CustomerServiceDiagnoseService') // 客服一键诊断服务（GM工作台核心功能）
 const CustomerServiceCompensateService = require('./CustomerServiceCompensateService') // 客服补偿发放服务（GM工作台补偿工具）
 const CustomerServiceIssueService = require('./CustomerServiceIssueService') // 客服工单管理服务（工单CRUD+内部备注）
+const TradeDisputeService = require('./TradeDisputeService') // 交易纠纷与售后服务
+const PlatformRevenueService = require('./PlatformRevenueService') // 平台收入与手续费管理
+const MarketHealthService = require('./MarketHealthService') // 市场健康看板
 const MaterialManagementService = require('./MaterialManagementService') // 材料系统运营管理服务（V4.5.0）
 const MediaService = require('./MediaService') // 媒体服务（media_files + media_attachments）
 
@@ -345,6 +348,9 @@ class ServiceManager {
       this._services.set('cs_diagnose', CustomerServiceDiagnoseService) // 客服一键诊断（静态类）
       this._services.set('cs_compensate', CustomerServiceCompensateService) // 客服补偿发放（静态类）
       this._services.set('cs_issue', CustomerServiceIssueService) // 客服工单管理（静态类）
+      this._services.set('trade_dispute', new TradeDisputeService()) // 交易纠纷与售后（实例化，需延迟加载 models）
+      this._services.set('platform_revenue', new PlatformRevenueService()) // 平台收入与手续费管理
+      this._services.set('market_health', new MarketHealthService()) // 市场健康看板
       this._services.set('material_management', MaterialManagementService)
       // ImageService 已删除，media 服务在下方注册
       this._services.set('media', new MediaService(this)) // 媒体服务（需 serviceManager 获取 sealos_storage）

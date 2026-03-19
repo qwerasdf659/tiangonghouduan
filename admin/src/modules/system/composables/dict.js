@@ -115,7 +115,11 @@ export function useDictState() {
       categories: [],
       rarities: [],
       asset_groups: []
-    }
+    },
+    /** @type {Array} 分类树形数据（仅 categories 类型使用） */
+    categoryTree: [],
+    /** @type {number|null} 创建子分类时的父分类ID */
+    parentCategoryDefId: null
   }
 }
 
@@ -143,6 +147,10 @@ export function useDictMethods() {
         this.dictList = []
         this.currentDictType = dictType
         await this.loadDictList()
+        // 切换到分类时自动加载树形数据
+        if (dictType === 'categories') {
+          await this.loadCategoryTree()
+        }
       }
     },
 
@@ -317,6 +325,40 @@ export function useDictMethods() {
         },
         { successMessage: '字典已删除', confirmText: '确认删除' }
       )
+    },
+
+    /**
+     * 加载两级分类树（仅 categories 类型可用）
+     */
+    async loadCategoryTree() {
+      try {
+        const response = await this.apiGet(
+          SYSTEM_ENDPOINTS.DICT_CATEGORY_TREE,
+          {},
+          { showLoading: false }
+        )
+        if (response?.success) {
+          this.categoryTree = response.data?.tree || []
+        }
+      } catch (error) {
+        logger.error('加载分类树失败:', error)
+        this.categoryTree = []
+      }
+    },
+
+    /**
+     * 打开创建子分类弹窗
+     * @param {Object} parentCategory - 父分类对象
+     */
+    openAddSubcategoryModal(parentCategory) {
+      this.isEditDict = false
+      this.editingDictCode = null
+      this.parentCategoryDefId = parentCategory.category_def_id
+      this.dictForm = {
+        ...this.getEmptyDictForm(),
+        parent_category_def_id: parentCategory.category_def_id
+      }
+      this.showModal('dictModal')
     },
 
     /**

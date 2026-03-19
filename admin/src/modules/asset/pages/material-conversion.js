@@ -22,7 +22,7 @@ import { AssetAPI } from '../../../api/asset.js'
 import { SYSTEM_ADMIN_ENDPOINTS } from '../../../api/system/admin.js'
 
 /**
- * 材料资产图标本地映射（零网络请求，优先于后端 icon_url）
+ * 材料资产图标本地映射（零网络请求，优先于后端 media_attachments）
  * 与 public/assets/icons/materials/_mapping.js 保持同步
  */
 const MATERIAL_ICON_MAP = {
@@ -192,7 +192,7 @@ document.addEventListener('alpine:init', () => {
       create_type_form: {
         asset_code: '',
         display_name: '',
-        icon_url: '',
+        icon_media_id: null,
         group_code: '',
         form: 'shard',
         tier: 1,
@@ -210,7 +210,7 @@ document.addEventListener('alpine:init', () => {
       edit_type_form: {
         asset_code: '',
         display_name: '',
-        icon_url: '',
+        icon_media_id: null,
         group_code: '',
         form: 'shard',
         tier: 1,
@@ -512,7 +512,7 @@ document.addEventListener('alpine:init', () => {
         this.create_type_form = {
           asset_code: '',
           display_name: '',
-          icon_url: '',
+          icon_media_id: null,
           group_code: '',
           form: 'shard',
           tier: 1,
@@ -538,7 +538,7 @@ document.addEventListener('alpine:init', () => {
           const data = {
             asset_code: f.asset_code.trim(),
             display_name: f.display_name.trim(),
-            icon_url: f.icon_url || null,
+            icon_media_id: f.icon_media_id || null,
             group_code: f.group_code.trim(),
             form: f.form,
             tier: parseInt(f.tier),
@@ -573,7 +573,7 @@ document.addEventListener('alpine:init', () => {
         this.edit_type_form = {
           asset_code: assetType.asset_code,
           display_name: assetType.display_name,
-          icon_url: assetType.icon_url || '',
+          icon_media_id: null,
           group_code: assetType.group_code,
           form: assetType.form,
           tier: assetType.tier,
@@ -581,7 +581,7 @@ document.addEventListener('alpine:init', () => {
           is_enabled: assetType.is_enabled !== false,
           is_tradable: assetType.is_tradable !== false
         }
-        this.edit_icon_preview = assetType.icon_url || null
+        this.edit_icon_preview = this.getAssetIconUrl(assetType)
       },
 
       /**
@@ -599,13 +599,15 @@ document.addEventListener('alpine:init', () => {
         try {
           const data = {
             display_name: f.display_name.trim(),
-            icon_url: f.icon_url || null,
             group_code: f.group_code.trim(),
             form: f.form,
             tier: parseInt(f.tier),
             sort_order: parseInt(f.sort_order) || 0,
             is_enabled: f.is_enabled,
             is_tradable: f.is_tradable
+          }
+          if (f.icon_media_id) {
+            data.icon_media_id = f.icon_media_id
           }
 
           logger.info('[MaterialConversion] 更新资产类型', { asset_code: f.asset_code, data })
@@ -687,10 +689,10 @@ document.addEventListener('alpine:init', () => {
           })
 
           if (res.success && res.data) {
-            this.create_type_form.icon_url = res.data.public_url || res.data.object_key || ''
+            this.create_type_form.icon_media_id = res.data.media_id
             this.create_icon_preview = res.data.public_url || res.data.url || null
             Alpine.store('notification').success('图标上传成功')
-            logger.info('[MaterialConversion] 创建表单图标上传成功:', res.data.object_key)
+            logger.info('[MaterialConversion] 创建表单图标上传成功:', { media_id: res.data.media_id })
           } else {
             Alpine.store('notification').error(res.message || '图标上传失败')
           }
@@ -734,10 +736,10 @@ document.addEventListener('alpine:init', () => {
           })
 
           if (res.success && res.data) {
-            this.edit_type_form.icon_url = res.data.public_url || res.data.object_key || ''
+            this.edit_type_form.icon_media_id = res.data.media_id
             this.edit_icon_preview = res.data.public_url || res.data.url || null
             Alpine.store('notification').success('图标上传成功')
-            logger.info('[MaterialConversion] 编辑表单图标上传成功:', res.data.object_key)
+            logger.info('[MaterialConversion] 编辑表单图标上传成功:', { media_id: res.data.media_id })
           } else {
             Alpine.store('notification').error(res.message || '图标上传失败')
           }
@@ -753,7 +755,7 @@ document.addEventListener('alpine:init', () => {
        * 清除创建表单图标
        */
       clearCreateIcon() {
-        this.create_type_form.icon_url = ''
+        this.create_type_form.icon_media_id = null
         this.create_icon_preview = null
       },
 
@@ -761,7 +763,7 @@ document.addEventListener('alpine:init', () => {
        * 清除编辑表单图标
        */
       clearEditIcon() {
-        this.edit_type_form.icon_url = ''
+        this.edit_type_form.icon_media_id = null
         this.edit_icon_preview = null
       },
 
@@ -917,13 +919,13 @@ document.addEventListener('alpine:init', () => {
       },
 
       /**
-       * 获取资产类型图标URL（本地映射优先，后端 icon_url 作为 fallback）
+       * 获取资产类型图标URL（本地映射优先，后端 media_attachments 通过 iconAttachment 提供）
        * @param {Object} assetType - 资产类型对象
        * @returns {string|null} 图标URL，无图标返回 null
        */
       getAssetIconUrl(assetType) {
         if (!assetType) return null
-        return MATERIAL_ICON_MAP[assetType.asset_code] || assetType.icon_url || null
+        return MATERIAL_ICON_MAP[assetType.asset_code] || null
       }
     }
   })

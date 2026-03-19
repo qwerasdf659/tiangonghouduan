@@ -39,6 +39,9 @@ export const EXCHANGE_ENDPOINTS = {
   EXCHANGE_ITEM_PIN: `${API_PREFIX}/console/marketplace/exchange_market/items/:exchange_item_id/pin`,
   EXCHANGE_ITEM_RECOMMEND: `${API_PREFIX}/console/marketplace/exchange_market/items/:exchange_item_id/recommend`,
   EXCHANGE_ITEMS_BATCH_SORT: `${API_PREFIX}/console/marketplace/exchange_market/items/batch-sort`,
+  EXCHANGE_ITEMS_BATCH_STATUS: `${API_PREFIX}/console/marketplace/exchange_market/items/batch-status`,
+  EXCHANGE_ITEMS_BATCH_PRICE: `${API_PREFIX}/console/marketplace/exchange_market/items/batch-price`,
+  EXCHANGE_ITEMS_BATCH_CATEGORY: `${API_PREFIX}/console/marketplace/exchange_market/items/batch-category`,
 
   // 快递查询（Phase 4 — 快递双通道对接）
   EXCHANGE_SHIPPING_COMPANIES: `${API_PREFIX}/console/marketplace/exchange_market/shipping-companies`,
@@ -247,6 +250,21 @@ export const ExchangeAPI = {
    */
   async batchSortItems(items) {
     return await request({ url: EXCHANGE_ENDPOINTS.EXCHANGE_ITEMS_BATCH_SORT, method: 'PUT', data: { items } })
+  },
+
+  /** 批量上下架 */
+  async batchUpdateStatus(exchangeItemIds, status) {
+    return await request({ url: EXCHANGE_ENDPOINTS.EXCHANGE_ITEMS_BATCH_STATUS, method: 'PUT', data: { exchange_item_ids: exchangeItemIds, status } })
+  },
+
+  /** 批量改价 */
+  async batchUpdatePrice(items) {
+    return await request({ url: EXCHANGE_ENDPOINTS.EXCHANGE_ITEMS_BATCH_PRICE, method: 'PUT', data: { items } })
+  },
+
+  /** 批量修改分类 */
+  async batchUpdateCategory(exchangeItemIds, categoryDefId) {
+    return await request({ url: EXCHANGE_ENDPOINTS.EXCHANGE_ITEMS_BATCH_CATEGORY, method: 'PUT', data: { exchange_item_ids: exchangeItemIds, category_def_id: categoryDefId } })
   },
 
   // ===== 快递查询（Phase 4） =====

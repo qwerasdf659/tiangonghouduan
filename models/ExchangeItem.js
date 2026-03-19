@@ -286,6 +286,40 @@ module.exports = sequelize => {
         allowNull: false,
         defaultValue: false,
         comment: '是否推荐（前端可高亮展示）'
+      },
+
+      // === 定时上下架 + 商品参数表 + 库存预警（2026-03-17） ===
+
+      /** 定时上架时间（到达后自动将 status 设为 active） */
+      publish_at: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        defaultValue: null,
+        comment: '定时上架时间（到达后自动上架）'
+      },
+
+      /** 定时下架时间（到达后自动将 status 设为 inactive） */
+      unpublish_at: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        defaultValue: null,
+        comment: '定时下架时间（到达后自动下架）'
+      },
+
+      /** 商品参数表（结构化 JSON，如 {"材质":"纯棉","产地":"中国"}） */
+      attributes: {
+        type: DataTypes.JSON,
+        allowNull: true,
+        defaultValue: null,
+        comment: '商品参数表（结构化JSON）'
+      },
+
+      /** 库存预警阈值（低于此值触发告警，0=不告警） */
+      stock_alert_threshold: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
+        comment: '库存预警阈值（低于此值触发告警，0=不告警）'
       }
     },
     {

@@ -452,6 +452,87 @@ const SYSTEM_SETTINGS_WHITELIST = {
     approvalRequired: false
   },
 
+  // ===== 挂牌撤回频率限制（运营可调）=====
+  'marketplace/daily_withdraw_limit': {
+    type: 'number',
+    min: 0,
+    max: 100,
+    default: 0,
+    readonly: false,
+    description: '每用户每日最大挂牌撤回次数（0=不限制）',
+    changeRequiresRestart: false,
+    businessImpact: 'MEDIUM',
+    auditRequired: true,
+    approvalRequired: false
+  },
+
+  // ===== 高取消率用户交易限制（运营可调）=====
+  'marketplace/high_cancel_rate_threshold': {
+    type: 'number',
+    min: 0,
+    max: 1,
+    step: 0.01,
+    default: 0, // 0=关闭（上线初期不限制，积累数据后再开启）
+    readonly: false,
+    description: '高取消率限制阈值（0.5=50%，近30天撤回/取消占比超过此值则限制新挂牌，0=关闭）',
+    changeRequiresRestart: false,
+    businessImpact: 'HIGH',
+    auditRequired: true,
+    approvalRequired: false
+  },
+
+  // ===== 兑换退款防刷规则（运营可调）=====
+  'exchange/refund_cooldown_hours': {
+    type: 'number',
+    min: 0,
+    max: 720, // 最长 30 天
+    default: 0, // 0=关闭（当前退款由管理员操作，无需冷却期）
+    readonly: false,
+    description: '退款冷却期（小时）：同用户同商品退款后 N 小时内不可再次兑换，0=关闭',
+    changeRequiresRestart: false,
+    businessImpact: 'HIGH',
+    auditRequired: true,
+    approvalRequired: false
+  },
+
+  'exchange/refund_monthly_limit': {
+    type: 'number',
+    min: 0,
+    max: 100,
+    default: 0, // 0=不限（当前退款由管理员操作，无需月限）
+    readonly: false,
+    description: '单用户每月退款上限（次），0=不限',
+    changeRequiresRestart: false,
+    businessImpact: 'HIGH',
+    auditRequired: true,
+    approvalRequired: false
+  },
+
+  'exchange/refund_approval_threshold': {
+    type: 'number',
+    min: 0,
+    max: 100000,
+    default: 0, // 0=关闭（管理员操作本身就是审批行为）
+    readonly: false,
+    description: '退款大额审批阈值（材料数量）：退款金额超过此值需二次审批，0=关闭',
+    changeRequiresRestart: false,
+    businessImpact: 'HIGH',
+    auditRequired: true,
+    approvalRequired: false
+  },
+
+  // ===== 兑换商品预定义标签（运营可调）=====
+  'exchange/predefined_tags': {
+    type: 'json',
+    default: ['限量', '新品', '热门', '推荐', '包邮', '秒杀', '折扣', '爆款'],
+    readonly: false,
+    description: '兑换商品预定义标签列表（运营维护，商品编辑时可选）',
+    changeRequiresRestart: false,
+    businessImpact: 'LOW',
+    auditRequired: false,
+    approvalRequired: false
+  },
+
   // ===== 安全设置（运营可调）=====
   'security/max_login_attempts': {
     type: 'number',

@@ -3,8 +3,8 @@
  *
  * @file admin/src/modules/content/composables/media-library.js
  * @description 媒体库浏览/上传/删除（基于 media_files + media_attachments 体系）
- * @version 2.0.0
- * @date 2026-03-17
+ * @version 2.1.0
+ * @date 2026-03-18
  */
 
 import { logger } from '../../../utils/logger.js'
@@ -12,57 +12,57 @@ import { request } from '../../../api/base.js'
 import { SYSTEM_ADMIN_ENDPOINTS } from '../../../api/system/admin.js'
 
 /**
- * 图片资源管理状态
+ * 媒体资源管理状态
  * @returns {Object} 状态对象
  */
-export function useImagesState() {
+export function useMediaState() {
   return {
-    /** 图片列表 */
-    images: [],
-    /** 图片筛选 */
-    imageFilters: { type: '', keyword: '' },
-    /** 图片统计 */
-    imageStats: { total: 0, totalSize: 0, weekly_uploads: 0, orphan_count: 0 },
-    /** 选中的图片 */
-    selectedImage: null,
+    /** 媒体文件列表 */
+    mediaFiles: [],
+    /** 媒体筛选 */
+    mediaFilters: { type: '', keyword: '' },
+    /** 媒体统计 */
+    mediaStats: { total: 0, totalSize: 0, weekly_uploads: 0, orphan_count: 0 },
+    /** 选中的媒体 */
+    selectedMedia: null,
     /** 上传状态 */
     uploading: false
   }
 }
 
 /**
- * 图片资源管理方法
+ * 媒体资源管理方法
  * @returns {Object} 方法对象
  */
-export function useImagesMethods() {
+export function useMediaMethods() {
   return {
-    async loadImages() {
+    async loadMedia() {
       try {
-        logger.info('[ContentManagement] 加载图片列表...')
+        logger.info('[ContentManagement] 加载媒体列表...')
         const params = new URLSearchParams()
-        if (this.imageFilters?.type) params.append('type', this.imageFilters.type)
-        if (this.imageFilters?.keyword) params.append('keyword', this.imageFilters.keyword)
+        if (this.mediaFilters?.type) params.append('type', this.mediaFilters.type)
+        if (this.mediaFilters?.keyword) params.append('keyword', this.mediaFilters.keyword)
 
         const response = await this.apiGet(`${SYSTEM_ADMIN_ENDPOINTS.MEDIA_LIST}?${params}`)
         if (response?.success) {
-          this.images = response.data?.list || response.data?.images || response.data?.items || []
-          logger.info('[ContentManagement] 图片数量:', this.images.length)
-          this.imageStats = {
-            total: this.images.length,
-            totalSize: this.images.reduce((sum, img) => sum + (img.size || img.file_size || 0), 0)
+          this.mediaFiles = response.data?.list || response.data?.images || response.data?.items || []
+          logger.info('[ContentManagement] 媒体数量:', this.mediaFiles.length)
+          this.mediaStats = {
+            total: this.mediaFiles.length,
+            totalSize: this.mediaFiles.reduce((sum, m) => sum + (m.size || m.file_size || 0), 0)
           }
         }
       } catch (error) {
-        logger.error('加载图片失败:', error)
-        this.images = []
+        logger.error('加载媒体失败:', error)
+        this.mediaFiles = []
       }
     },
 
-    openUploadImageModal() {
-      this.showModal('uploadImageModal')
+    openUploadMediaModal() {
+      this.showModal('uploadMediaModal')
     },
 
-    handleImageUpload(event) {
+    handleMediaUpload(event) {
       const file = event.target.files?.[0]
       if (!file) return
 
@@ -76,10 +76,10 @@ export function useImagesMethods() {
         return
       }
 
-      this.uploadImage(file)
+      this.uploadMedia(file)
     },
 
-    async uploadImage(file) {
+    async uploadMedia(file) {
       this.uploading = true
       try {
         const formData = new FormData()
@@ -94,32 +94,32 @@ export function useImagesMethods() {
         })
 
         if (result?.success) {
-          this.hideModal('uploadImageModal')
-          await this.loadImages()
-          this.showSuccess('图片上传成功')
+          this.hideModal('uploadMediaModal')
+          await this.loadMedia()
+          this.showSuccess('媒体上传成功')
         } else {
           this.showError(result?.message || '上传失败')
         }
       } catch (error) {
-        logger.error('上传图片失败:', error)
+        logger.error('上传媒体失败:', error)
         this.showError('上传失败: ' + error.message)
       } finally {
         this.uploading = false
       }
     },
 
-    viewImage(image) {
-      this.selectedImage = image
-      this.showModal('imageDetailModal')
+    viewMedia(media) {
+      this.selectedMedia = media
+      this.showModal('mediaDetailModal')
     },
 
-    openImageInNewTab(image) {
-      const url = image.public_url || image.url
+    openMediaInNewTab(media) {
+      const url = media.public_url || media.url
       if (url) window.open(url, '_blank')
     },
 
-    async copyImageUrl(image) {
-      const url = image.public_url || image.url
+    async copyMediaUrl(media) {
+      const url = media.public_url || media.url
       if (url) {
         try {
           await navigator.clipboard.writeText(url)
@@ -130,19 +130,19 @@ export function useImagesMethods() {
       }
     },
 
-    async deleteImage(image) {
-      this.deleteTarget = image
-      this.deleteType = 'image'
+    async deleteMedia(media) {
+      this.deleteTarget = media
+      this.deleteType = 'media'
       this.showModal('deleteModal')
     },
 
-    searchImages() {
-      this.loadImages()
+    searchMedia() {
+      this.loadMedia()
     },
 
-    resetImageFilters() {
-      this.imageFilters = { business_type: '', status: '' }
-      this.loadImages()
+    resetMediaFilters() {
+      this.mediaFilters = { business_type: '', status: '' }
+      this.loadMedia()
     },
 
     formatFileSize(bytes) {
@@ -153,4 +153,3 @@ export function useImagesMethods() {
     }
   }
 }
-

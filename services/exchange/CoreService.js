@@ -431,6 +431,32 @@ class CoreService {
       { transaction }
     )
 
+    // 库存变动日志（用户兑换扣减）
+    try {
+      await this.models.AdminOperationLog.create(
+        {
+          operator_id: null,
+          operation_type: 'stock_change',
+          target_type: 'exchange_item',
+          target_id: item.exchange_item_id,
+          action: 'purchase',
+          before_data: { stock: item.stock, item_name: item.item_name },
+          after_data: { stock: item.stock - quantity, item_name: item.item_name },
+          changed_fields: {
+            stock: { from: item.stock, to: item.stock - quantity, delta: -quantity }
+          },
+          reason: `用户兑换扣减库存（数量：${quantity}）`,
+          risk_level: 'low',
+          requires_approval: false,
+          approval_status: 'not_required',
+          affected_amount: quantity
+        },
+        { transaction }
+      )
+    } catch (logErr) {
+      logger.warn('[兑换市场] 库存变动日志记录失败', { error: logErr.message })
+    }
+
     // 缓存失效
     await BusinessCacheHelper.invalidateExchangeItems('exchange_success')
 
@@ -1133,6 +1159,32 @@ class CoreService {
           },
           { transaction }
         )
+
+        // 库存变动日志（退款回补）
+        try {
+          await this.models.AdminOperationLog.create(
+            {
+              operator_id: null,
+              operation_type: 'stock_change',
+              target_type: 'exchange_item',
+              target_id: item.exchange_item_id,
+              action: 'refund',
+              before_data: { stock: item.stock, item_name: item.item_name },
+              after_data: { stock: item.stock + quantity, item_name: item.item_name },
+              changed_fields: {
+                stock: { from: item.stock, to: item.stock + quantity, delta: quantity }
+              },
+              reason: `退款回补库存（订单：${order.exchange_record_id}，数量：${quantity}）`,
+              risk_level: 'low',
+              requires_approval: false,
+              approval_status: 'not_required',
+              affected_amount: quantity
+            },
+            { transaction }
+          )
+        } catch (logErr) {
+          logger.warn('[兑换市场] 库存变动日志记录失败', { error: logErr.message })
+        }
       }
     }
 
@@ -1253,14 +1305,19 @@ class CoreService {
    * @private
    */
   async _checkRefundRules(order, transaction) {
-    const getConfigValue = async key => {
+    /**
+     * 从 system_settings 读取退款防刷配置（白名单管控）
+     * @param {string} settingKey - 配置键名
+     * @returns {Promise<number>} 配置值（数字），读取失败返回 0
+     */
+    const getSettingValue = async settingKey => {
       try {
         const [rows] = await this.sequelize.query(
-          `SELECT config_value FROM system_configs WHERE config_key = '${key}' AND is_active = 1 LIMIT 1`,
-          { transaction }
+          'SELECT setting_value FROM system_settings WHERE setting_key = ? LIMIT 1',
+          { replacements: [settingKey], transaction }
         )
         if (rows.length > 0) {
-          return parseInt(JSON.parse(rows[0].config_value)) || 0
+          return parseInt(rows[0].setting_value) || 0
         }
       } catch {
         /* 配置读取失败不阻断退款 */
@@ -1269,7 +1326,7 @@ class CoreService {
     }
 
     // 第一层：冷却期检查
-    const cooldownHours = await getConfigValue('refund_cooldown_hours')
+    const cooldownHours = await getSettingValue('exchange/refund_cooldown_hours')
     if (cooldownHours > 0) {
       const { getRedisClient } = require('../../utils/UnifiedRedisClient')
       const redis = await getRedisClient()
@@ -1284,7 +1341,7 @@ class CoreService {
     }
 
     // 第二层：月限检查
-    const monthlyLimit = await getConfigValue('refund_monthly_limit')
+    const monthlyLimit = await getSettingValue('exchange/refund_monthly_limit')
     if (monthlyLimit > 0) {
       const { Op } = require('sequelize')
       const startOfMonth = new Date()
@@ -1309,7 +1366,7 @@ class CoreService {
     }
 
     // 第三层：大额审批（记录日志，由路由层决定是否走审批链）
-    const approvalThreshold = await getConfigValue('refund_approval_threshold')
+    const approvalThreshold = await getSettingValue('exchange/refund_approval_threshold')
     if (approvalThreshold > 0 && Number(order.pay_amount) > approvalThreshold) {
       logger.warn('[兑换市场] 大额退款触发审批检查', {
         order_no: order.order_no,
