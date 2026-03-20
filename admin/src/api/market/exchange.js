@@ -45,7 +45,17 @@ export const EXCHANGE_ENDPOINTS = {
 
   // 快递查询（Phase 4 — 快递双通道对接）
   EXCHANGE_SHIPPING_COMPANIES: `${API_PREFIX}/console/marketplace/exchange_market/shipping-companies`,
-  EXCHANGE_ORDER_TRACK: `${API_PREFIX}/console/marketplace/exchange_market/orders/:order_no/track`
+  EXCHANGE_ORDER_TRACK: `${API_PREFIX}/console/marketplace/exchange_market/orders/:order_no/track`,
+
+  // 单品数据看板（文档 5.2.5）
+  EXCHANGE_ITEM_DASHBOARD: `${API_PREFIX}/console/marketplace/exchange_market/items/:exchange_item_id/dashboard`,
+
+  // 统计分析增强（文档 5.2.5 — 趋势 + 排行）
+  EXCHANGE_RANKING: `${API_PREFIX}/console/marketplace/exchange_market/statistics/ranking`,
+
+  // 数据导出（文档 5.2.1 — 批量导入导出）
+  EXCHANGE_ITEMS_EXPORT: `${API_PREFIX}/console/marketplace/exchange_market/items/export`,
+  EXCHANGE_ITEMS_IMPORT: `${API_PREFIX}/console/marketplace/exchange_market/items/import`
 }
 
 // ========== API 调用方法 ==========
@@ -204,7 +214,10 @@ export const ExchangeAPI = {
    * @returns {Promise<Object>} 更新结果
    */
   async updateItemSku(itemId, skuId, updateData) {
-    const url = buildURL(EXCHANGE_ENDPOINTS.EXCHANGE_ITEM_SKU_DETAIL, { exchange_item_id: itemId, sku_id: skuId })
+    const url = buildURL(EXCHANGE_ENDPOINTS.EXCHANGE_ITEM_SKU_DETAIL, {
+      exchange_item_id: itemId,
+      sku_id: skuId
+    })
     return await request({ url, method: 'PUT', data: updateData })
   },
 
@@ -215,7 +228,10 @@ export const ExchangeAPI = {
    * @returns {Promise<Object>} 删除结果
    */
   async deleteItemSku(itemId, skuId) {
-    const url = buildURL(EXCHANGE_ENDPOINTS.EXCHANGE_ITEM_SKU_DETAIL, { exchange_item_id: itemId, sku_id: skuId })
+    const url = buildURL(EXCHANGE_ENDPOINTS.EXCHANGE_ITEM_SKU_DETAIL, {
+      exchange_item_id: itemId,
+      sku_id: skuId
+    })
     return await request({ url, method: 'DELETE' })
   },
 
@@ -249,22 +265,38 @@ export const ExchangeAPI = {
    * @returns {Promise<Object>} 操作结果
    */
   async batchSortItems(items) {
-    return await request({ url: EXCHANGE_ENDPOINTS.EXCHANGE_ITEMS_BATCH_SORT, method: 'PUT', data: { items } })
+    return await request({
+      url: EXCHANGE_ENDPOINTS.EXCHANGE_ITEMS_BATCH_SORT,
+      method: 'PUT',
+      data: { items }
+    })
   },
 
   /** 批量上下架 */
   async batchUpdateStatus(exchangeItemIds, status) {
-    return await request({ url: EXCHANGE_ENDPOINTS.EXCHANGE_ITEMS_BATCH_STATUS, method: 'PUT', data: { exchange_item_ids: exchangeItemIds, status } })
+    return await request({
+      url: EXCHANGE_ENDPOINTS.EXCHANGE_ITEMS_BATCH_STATUS,
+      method: 'PUT',
+      data: { exchange_item_ids: exchangeItemIds, status }
+    })
   },
 
   /** 批量改价 */
   async batchUpdatePrice(items) {
-    return await request({ url: EXCHANGE_ENDPOINTS.EXCHANGE_ITEMS_BATCH_PRICE, method: 'PUT', data: { items } })
+    return await request({
+      url: EXCHANGE_ENDPOINTS.EXCHANGE_ITEMS_BATCH_PRICE,
+      method: 'PUT',
+      data: { items }
+    })
   },
 
   /** 批量修改分类 */
   async batchUpdateCategory(exchangeItemIds, categoryDefId) {
-    return await request({ url: EXCHANGE_ENDPOINTS.EXCHANGE_ITEMS_BATCH_CATEGORY, method: 'PUT', data: { exchange_item_ids: exchangeItemIds, category_def_id: categoryDefId } })
+    return await request({
+      url: EXCHANGE_ENDPOINTS.EXCHANGE_ITEMS_BATCH_CATEGORY,
+      method: 'PUT',
+      data: { exchange_item_ids: exchangeItemIds, category_def_id: categoryDefId }
+    })
   },
 
   // ===== 快递查询（Phase 4） =====
@@ -285,6 +317,70 @@ export const ExchangeAPI = {
   async getOrderTrack(orderNo) {
     const url = buildURL(EXCHANGE_ENDPOINTS.EXCHANGE_ORDER_TRACK, { order_no: orderNo })
     return await request({ url, method: 'GET' })
+  },
+
+  // ===== 单品数据看板（文档 5.2.5） =====
+
+  /**
+   * 获取单品数据看板
+   * @param {number} itemId - 商品 ID
+   * @returns {Promise<Object>} 看板数据（orders_7d/orders_30d/avg_rating/conversion_rate/inventory_turnover/order_status_distribution）
+   */
+  async getItemDashboard(itemId) {
+    const url = buildURL(EXCHANGE_ENDPOINTS.EXCHANGE_ITEM_DASHBOARD, { exchange_item_id: itemId })
+    return await request({ url, method: 'GET' })
+  },
+
+  // ===== 统计分析增强（文档 5.2.5） =====
+
+  /**
+   * 获取兑换趋势数据
+   * @param {Object} params - 查询参数
+   * @param {number} [params.days=7] - 统计天数（7/14/30）
+   * @returns {Promise<Object>} 趋势数据（trend 数组，每日 order_count/completed_count/total_amount）
+   */
+  async getExchangeTrend(params = {}) {
+    return await request({ url: EXCHANGE_ENDPOINTS.EXCHANGE_TREND, method: 'GET', params })
+  },
+
+  /**
+   * 获取商品排行榜
+   * @param {Object} params - 查询参数
+   * @param {string} [params.sort_by=sold_count] - 排序字段（sold_count/stock_turnover/avg_rating）
+   * @param {number} [params.limit=10] - 返回数量
+   * @returns {Promise<Object>} 排行数据（ranking 数组）
+   */
+  async getItemRanking(params = {}) {
+    return await request({ url: EXCHANGE_ENDPOINTS.EXCHANGE_RANKING, method: 'GET', params })
+  },
+
+  // ===== 数据导出（文档 5.2.1） =====
+
+  /**
+   * 导出兑换商品列表（CSV 下载）
+   * @param {Object} params - 筛选参数
+   * @param {string} [params.status] - 按状态筛选（active/inactive）
+   */
+  exportItems(params = {}) {
+    const query = new URLSearchParams(params).toString()
+    const url = EXCHANGE_ENDPOINTS.EXCHANGE_ITEMS_EXPORT + (query ? `?${query}` : '')
+    window.open(url, '_blank')
+  },
+
+  /**
+   * 导入兑换商品（Excel/CSV 文件上传）
+   * @param {File} file - Excel(.xlsx) 或 CSV(.csv) 文件
+   * @returns {Promise<Object>} 导入结果（imported_count/error_count/errors）
+   */
+  async importItems(file) {
+    const formData = new FormData()
+    formData.append('file', file)
+    return await request({
+      url: EXCHANGE_ENDPOINTS.EXCHANGE_ITEMS_IMPORT,
+      method: 'POST',
+      data: formData,
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
   }
 }
 

@@ -162,6 +162,14 @@ module.exports = sequelize => {
         allowNull: false,
         defaultValue: 0,
         comment: 'SKU 排序（同一商品内的展示顺序）'
+      },
+
+      /** SKU 专属图片 ID（不同规格对应不同图片，如不同颜色） */
+      image_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        defaultValue: null,
+        comment: 'SKU 专属图片 ID（不同规格对应不同图片，如不同颜色）'
       }
     },
     {

@@ -11,8 +11,14 @@ import { logger } from '../../../utils/logger.js'
 import { buildURL, request } from '../../../api/base.js'
 import { CONTENT_ENDPOINTS } from '../../../api/content.js'
 import {
-  loadAssets, loadBackpack, loadLottery, loadTrades,
-  loadTimeline, loadRisk, loadHistory, loadNotes,
+  loadAssets,
+  loadBackpack,
+  loadLottery,
+  loadTrades,
+  loadTimeline,
+  loadRisk,
+  loadHistory,
+  loadNotes,
   runDiagnose as runDiagnosePanel
 } from '../components/index.js'
 
@@ -20,7 +26,7 @@ import {
  * 用户上下文面板状态
  * @returns {Object} C区面板状态
  */
-export function useUserContextState () {
+export function useUserContextState() {
   return {
     /** @type {string} 当前选中的Tab（8个Tab之一） */
     context_active_tab: 'assets',
@@ -67,20 +73,20 @@ export function useUserContextState () {
  * 用户上下文面板方法
  * @returns {Object} C区面板方法
  */
-export function useUserContextMethods () {
+export function useUserContextMethods() {
   return {
     /**
      * 获取当前会话关联的用户ID
      * @returns {number|null} 用户ID
      */
-    _getContextUserId () {
+    _getContextUserId() {
       return this.selectedSession?.user?.user_id || this.selectedSession?.user_id || null
     },
 
     /**
      * 加载用户上下文摘要（选择会话时调用）
      */
-    async loadUserContext () {
+    async loadUserContext() {
       const userId = this._getContextUserId()
       if (!userId) return
 
@@ -105,7 +111,7 @@ export function useUserContextMethods () {
      * 切换Tab并加载对应数据
      * @param {string} tab - Tab名称
      */
-    async loadContextTab (tab) {
+    async loadContextTab(tab) {
       this.context_active_tab = tab
       const userId = this._getContextUserId()
       if (!userId) return
@@ -137,6 +143,9 @@ export function useUserContextMethods () {
           case 'notes':
             await this._loadNotes(userId)
             break
+          case 'disputes':
+            await this._loadDisputes()
+            break
         }
       } catch (error) {
         logger.error(`[UserContext] ${tab} 加载失败:`, error)
@@ -145,42 +154,42 @@ export function useUserContextMethods () {
       }
     },
 
-    async _loadAssets (userId) {
+    async _loadAssets(userId) {
       const data = await loadAssets(userId)
       if (data) this.context_assets = data
     },
 
-    async _loadBackpack (userId) {
+    async _loadBackpack(userId) {
       const data = await loadBackpack(userId)
       if (data) this.context_backpack = data
     },
 
-    async _loadLottery (userId) {
+    async _loadLottery(userId) {
       const data = await loadLottery(userId)
       if (data) this.context_lottery = data
     },
 
-    async _loadTrades (userId) {
+    async _loadTrades(userId) {
       const data = await loadTrades(userId)
       if (data) this.context_trades = data
     },
 
-    async _loadTimeline (userId) {
+    async _loadTimeline(userId) {
       const data = await loadTimeline(userId)
       if (data) this.context_timeline = data
     },
 
-    async _loadRisk (userId) {
+    async _loadRisk(userId) {
       const data = await loadRisk(userId)
       if (data) this.context_risk = data
     },
 
-    async _loadHistory (userId) {
+    async _loadHistory(userId) {
       const data = await loadHistory(userId)
       if (data) this.context_history = data
     },
 
-    async _loadNotes (userId) {
+    async _loadNotes(userId) {
       const result = await loadNotes(userId)
       this.context_notes = result.notes
       this.context_issues = result.issues
@@ -189,7 +198,7 @@ export function useUserContextMethods () {
     /**
      * 执行一键诊断
      */
-    async runDiagnose () {
+    async runDiagnose() {
       const userId = this._getContextUserId()
       if (!userId) return
 
@@ -212,7 +221,7 @@ export function useUserContextMethods () {
     /**
      * 创建工单
      */
-    async createIssue () {
+    async createIssue() {
       const userId = this._getContextUserId()
       if (!userId || !this.issue_form.title) return
 
@@ -243,7 +252,7 @@ export function useUserContextMethods () {
     /**
      * 添加内部备注
      */
-    async addNote () {
+    async addNote() {
       const userId = this._getContextUserId()
       if (!userId || !this.new_note_content.trim()) return
 
@@ -272,12 +281,16 @@ export function useUserContextMethods () {
      * @param {string} level - ok/warning/error
      * @returns {string} CSS class
      */
-    getDiagnoseClass (level) {
+    getDiagnoseClass(level) {
       switch (level) {
-        case 'ok': return 'text-green-600 bg-green-50'
-        case 'warning': return 'text-yellow-600 bg-yellow-50'
-        case 'error': return 'text-red-600 bg-red-50'
-        default: return 'text-gray-600 bg-gray-50'
+        case 'ok':
+          return 'text-green-600 bg-green-50'
+        case 'warning':
+          return 'text-yellow-600 bg-yellow-50'
+        case 'error':
+          return 'text-red-600 bg-red-50'
+        default:
+          return 'text-gray-600 bg-gray-50'
       }
     },
 
@@ -286,12 +299,94 @@ export function useUserContextMethods () {
      * @param {string} level - ok/warning/error
      * @returns {string} emoji
      */
-    getDiagnoseIcon (level) {
+    getDiagnoseIcon(level) {
       switch (level) {
-        case 'ok': return '✅'
-        case 'warning': return '⚠️'
-        case 'error': return '🔴'
-        default: return '❓'
+        case 'ok':
+          return '✅'
+        case 'warning':
+          return '⚠️'
+        case 'error':
+          return '🔴'
+        default:
+          return '❓'
+      }
+    },
+
+    // ========== 交易纠纷 ==========
+    disputes: [],
+    dispute_stats: { open: 0, processing: 0, resolved: 0 },
+
+    /** 加载纠纷列表和统计 */
+    async _loadDisputes() {
+      try {
+        const { CONTENT_ENDPOINTS } = await import('../../../api/content.js')
+        const { request, buildQueryString } = await import('../../../api/base.js')
+        const [listRes, statsRes] = await Promise.all([
+          request({
+            url: CONTENT_ENDPOINTS.DISPUTE_LIST + buildQueryString({ page: 1, page_size: 50 }),
+            method: 'GET'
+          }),
+          request({ url: CONTENT_ENDPOINTS.DISPUTE_STATS, method: 'GET' })
+        ])
+        this.disputes = listRes.data?.rows || listRes.data?.list || listRes.data || []
+        this.dispute_stats = statsRes.data || { open: 0, processing: 0, resolved: 0 }
+      } catch (error) {
+        logger.error('[UserContext] 纠纷加载失败:', error)
+        this.disputes = []
+      }
+    },
+
+    /** 加载纠纷列表（供 HTML 刷新按钮调用） */
+    async loadDisputes() {
+      this.context_loading = true
+      try {
+        await this._loadDisputes()
+      } finally {
+        this.context_loading = false
+      }
+    },
+
+    /** 查看纠纷详情 */
+    async viewDisputeDetail(dispute) {
+      logger.debug('[Dispute] 查看详情:', dispute.issue_id || dispute.customer_service_issue_id)
+      Alpine.store('notification').show(
+        '纠纷详情: #' +
+          (dispute.issue_id || dispute.customer_service_issue_id) +
+          ' ' +
+          (dispute.title || ''),
+        'info'
+      )
+    },
+
+    /** 解决纠纷 */
+    async resolveDisputeAction(dispute) {
+      const id = dispute.issue_id || dispute.customer_service_issue_id
+      if (!confirm(`确定解决纠纷 #${id}？`)) return
+      try {
+        const { CONTENT_ENDPOINTS } = await import('../../../api/content.js')
+        const { request, buildURL } = await import('../../../api/base.js')
+        const url = buildURL(CONTENT_ENDPOINTS.DISPUTE_RESOLVE, { id })
+        await request({ url, method: 'POST', data: { resolution: '管理员手动解决' } })
+        Alpine.store('notification').show('纠纷已解决', 'success')
+        await this._loadDisputes()
+      } catch (error) {
+        Alpine.store('notification').show('解决失败: ' + error.message, 'error')
+      }
+    },
+
+    /** 升级仲裁 */
+    async escalateDisputeAction(dispute) {
+      const id = dispute.issue_id || dispute.customer_service_issue_id
+      if (!confirm(`确定将纠纷 #${id} 升级为仲裁？`)) return
+      try {
+        const { CONTENT_ENDPOINTS } = await import('../../../api/content.js')
+        const { request, buildURL } = await import('../../../api/base.js')
+        const url = buildURL(CONTENT_ENDPOINTS.DISPUTE_ESCALATE, { id })
+        await request({ url, method: 'POST', data: { reason: '需要高级管理员介入' } })
+        Alpine.store('notification').show('已升级为仲裁', 'success')
+        await this._loadDisputes()
+      } catch (error) {
+        Alpine.store('notification').show('升级失败: ' + error.message, 'error')
       }
     }
   }

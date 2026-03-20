@@ -61,10 +61,13 @@ export function useExchangeItemsState() {
       publish_at: '',
       unpublish_at: '',
       attributes: null,
-      stock_alert_threshold: 0
+      stock_alert_threshold: 0,
+      video_url: ''
     },
     /** @type {string} 商品参数表编辑用 JSON 字符串 */
     attributesStr: '{}',
+    /** @type {Object|null} 富文本编辑器实例 */
+    _richEditorInstance: null,
     /** @type {Array<Object>} 稀有度选项（动态加载自 rarity_defs 字典表） */
     rarityOptions: [],
     /** @type {Array<Object>} 分类选项（动态加载自 category_defs 字典表） */
@@ -257,7 +260,9 @@ export function useExchangeItemsMethods() {
               const children = enabled.filter(c => c.parent_category_def_id === p.value)
               sorted.push(...children)
             }
-            const orphans = enabled.filter(c => c.level === 2 && !parents.some(p => p.value === c.parent_category_def_id))
+            const orphans = enabled.filter(
+              c => c.level === 2 && !parents.some(p => p.value === c.parent_category_def_id)
+            )
             sorted.push(...orphans)
             this.categoryOptions = sorted
           }
@@ -299,7 +304,8 @@ export function useExchangeItemsMethods() {
         is_lucky: false,
         is_limited: false,
         has_warranty: false,
-        free_shipping: false
+        free_shipping: false,
+        video_url: ''
       }
       this.itemImagePreviewUrl = null
       this.detailImages = []
@@ -308,6 +314,7 @@ export function useExchangeItemsMethods() {
       this.usageRuleInput = ''
       this.loadDictionaries()
       this.showModal('itemModal')
+      this.$nextTick(() => this._initRichEditor(''))
     },
 
     /**
@@ -342,11 +349,15 @@ export function useExchangeItemsMethods() {
         publish_at: item.publish_at ? item.publish_at.substring(0, 16) : '',
         unpublish_at: item.unpublish_at ? item.unpublish_at.substring(0, 16) : '',
         attributes: item.attributes || null,
-        stock_alert_threshold: item.stock_alert_threshold || 0
+        stock_alert_threshold: item.stock_alert_threshold || 0,
+        video_url: item.video_url || ''
       }
       this.attributesStr = item.attributes ? JSON.stringify(item.attributes, null, 2) : '{}'
       this.itemImagePreviewUrl =
-        item.primary_image?.thumbnail_url || item.primary_image?.public_url || item.primary_image?.url || null
+        item.primary_image?.thumbnail_url ||
+        item.primary_image?.public_url ||
+        item.primary_image?.url ||
+        null
       this.tagInput = ''
       this.usageRuleInput = ''
       this.loadDictionaries()
@@ -354,6 +365,7 @@ export function useExchangeItemsMethods() {
       this.loadShowcaseImages(item.exchange_item_id)
       this.loadItemSkus(item.exchange_item_id)
       this.showModal('itemModal')
+      this.$nextTick(() => this._initRichEditor(item.description || ''))
     },
 
     /**
@@ -366,7 +378,11 @@ export function useExchangeItemsMethods() {
       }
 
       // 将 attributesStr JSON 字符串转回对象
-      if (this.attributesStr && this.attributesStr.trim() !== '{}' && this.attributesStr.trim() !== '') {
+      if (
+        this.attributesStr &&
+        this.attributesStr.trim() !== '{}' &&
+        this.attributesStr.trim() !== ''
+      ) {
         try {
           this.itemForm.attributes = JSON.parse(this.attributesStr)
         } catch {
@@ -454,7 +470,8 @@ export function useExchangeItemsMethods() {
 
         if (res.success && res.data) {
           this.itemForm.primary_media_id = res.data.media_id
-          this.itemImagePreviewUrl = res.data.public_url || res.data.url || res.data.image_url || null
+          this.itemImagePreviewUrl =
+            res.data.public_url || res.data.url || res.data.image_url || null
           this.showSuccess?.('图片上传成功')
           logger.info('[ExchangeItems] 图片上传成功:', res.data.media_id)
         } else {
@@ -863,7 +880,10 @@ export function useExchangeItemsMethods() {
     async saveSku(itemId) {
       try {
         const url = this.editingSkuId
-          ? buildURL(MARKET_ENDPOINTS.EXCHANGE_ITEM_SKU_DETAIL, { exchange_item_id: itemId, sku_id: this.editingSkuId })
+          ? buildURL(MARKET_ENDPOINTS.EXCHANGE_ITEM_SKU_DETAIL, {
+              exchange_item_id: itemId,
+              sku_id: this.editingSkuId
+            })
           : buildURL(MARKET_ENDPOINTS.EXCHANGE_ITEM_SKUS, { exchange_item_id: itemId })
         const method = this.editingSkuId ? 'PUT' : 'POST'
         const res = await request({ url, method, data: this.skuForm })
@@ -903,7 +923,10 @@ export function useExchangeItemsMethods() {
     async deleteSku(itemId, skuId) {
       if (!confirm('确定要删除此 SKU 吗？')) return
       try {
-        const url = buildURL(MARKET_ENDPOINTS.EXCHANGE_ITEM_SKU_DETAIL, { exchange_item_id: itemId, sku_id: skuId })
+        const url = buildURL(MARKET_ENDPOINTS.EXCHANGE_ITEM_SKU_DETAIL, {
+          exchange_item_id: itemId,
+          sku_id: skuId
+        })
         const res = await request({ url, method: 'DELETE' })
         if (res.success) {
           this.showSuccess?.('SKU 已删除')
@@ -920,7 +943,13 @@ export function useExchangeItemsMethods() {
     /** 重置 SKU 表单 */
     resetSkuForm() {
       this.editingSkuId = null
-      this.skuForm = { spec_values: {}, cost_amount: 1, stock: 0, cost_asset_code: '', status: 'active' }
+      this.skuForm = {
+        spec_values: {},
+        cost_amount: 1,
+        stock: 0,
+        cost_asset_code: '',
+        status: 'active'
+      }
     },
 
     // ===== 排序管理方法（Phase 3 — 排序增强） =====
@@ -931,7 +960,9 @@ export function useExchangeItemsMethods() {
      */
     async togglePin(item) {
       try {
-        const url = buildURL(MARKET_ENDPOINTS.EXCHANGE_ITEM_PIN, { exchange_item_id: item.exchange_item_id })
+        const url = buildURL(MARKET_ENDPOINTS.EXCHANGE_ITEM_PIN, {
+          exchange_item_id: item.exchange_item_id
+        })
         const res = await request({ url, method: 'PUT', data: { is_pinned: !item.is_pinned } })
         if (res.success) {
           this.showSuccess?.(res.data?.is_pinned ? '商品已置顶' : '已取消置顶')
@@ -949,8 +980,14 @@ export function useExchangeItemsMethods() {
      */
     async toggleRecommend(item) {
       try {
-        const url = buildURL(MARKET_ENDPOINTS.EXCHANGE_ITEM_RECOMMEND, { exchange_item_id: item.exchange_item_id })
-        const res = await request({ url, method: 'PUT', data: { is_recommended: !item.is_recommended } })
+        const url = buildURL(MARKET_ENDPOINTS.EXCHANGE_ITEM_RECOMMEND, {
+          exchange_item_id: item.exchange_item_id
+        })
+        const res = await request({
+          url,
+          method: 'PUT',
+          data: { is_recommended: !item.is_recommended }
+        })
         if (res.success) {
           this.showSuccess?.(res.data?.is_recommended ? '商品已推荐' : '已取消推荐')
           await this.loadItems()
@@ -988,13 +1025,52 @@ export function useExchangeItemsMethods() {
       }
     },
 
+    // ===== 富文本编辑器（WangEditor） =====
+
+    /**
+     * 初始化富文本编辑器
+     * @param {string} initialHtml - 初始 HTML 内容
+     */
+    async _initRichEditor(initialHtml) {
+      this._destroyRichEditor()
+      try {
+        const { createRichEditor } = await import('../../../utils/wangeditor-lazy.js')
+        this._richEditorInstance = await createRichEditor('#description-editor', {
+          toolbarSelector: '#description-toolbar',
+          initialHtml: initialHtml || '',
+          placeholder: '请输入商品描述（支持富文本格式）...',
+          onChange: html => {
+            this.itemForm.description = html
+          }
+        })
+      } catch (e) {
+        const { logger } = await import('../../../utils/logger.js')
+        logger.warn('[ExchangeItems] 富文本编辑器初始化失败，降级为纯文本:', e.message)
+      }
+    },
+
+    /** 销毁富文本编辑器 */
+    _destroyRichEditor() {
+      if (this._richEditorInstance?.editor) {
+        try {
+          this._richEditorInstance.editor.destroy()
+        } catch {
+          // 静默处理
+        }
+        this._richEditorInstance = null
+      }
+    },
+
     // ===== 快递公司加载（Phase 4） =====
 
     /** 加载快递公司列表（首次调用时从后端获取并缓存） */
     async loadShippingCompanies() {
       if (this.shippingCompaniesLoaded) return
       try {
-        const res = await request({ url: MARKET_ENDPOINTS.EXCHANGE_SHIPPING_COMPANIES, method: 'GET' })
+        const res = await request({
+          url: MARKET_ENDPOINTS.EXCHANGE_SHIPPING_COMPANIES,
+          method: 'GET'
+        })
         if (res.success) {
           this.shippingCompanies = res.data?.companies || []
           this.shippingCompaniesLoaded = true
@@ -1021,8 +1097,48 @@ export function useExchangeItemsMethods() {
         this.showError?.('查询物流轨迹失败')
         return null
       }
+    },
+
+    /**
+     * 导出兑换商品列表（CSV 下载）
+     *
+     * @param {Object} [params] - 筛选参数
+     * @param {string} [params.status] - 按状态筛选（active/inactive）
+     */
+    exportItems(params = {}) {
+      ExchangeAPI.exportItems(params)
+    },
+
+    /**
+     * 导入兑换商品（Excel/CSV 文件上传）
+     * 通过文件选择器选择文件后调用后端导入接口
+     *
+     * @param {Event} event - input[type=file] 的 change 事件
+     */
+    async importItems(event) {
+      const file = event?.target?.files?.[0]
+      if (!file) return
+
+      try {
+        this.saving = true
+        const res = await ExchangeAPI.importItems(file)
+        if (res.success) {
+          const msg = `成功导入 ${res.data?.imported_count || 0} 个商品`
+          const errMsg = res.data?.error_count ? `，${res.data.error_count} 行失败` : ''
+          this.$toast?.success(msg + errMsg)
+          await this.loadItems?.()
+          await this.loadItemStats?.()
+        } else {
+          this.$toast?.error(res.message || '导入失败')
+        }
+      } catch (e) {
+        logger.error('[ExchangeItems] 导入失败:', e)
+        this.$toast?.error(e.message || '导入失败')
+      } finally {
+        this.saving = false
+        // 重置 file input 以便再次选择同一文件
+        if (event?.target) event.target.value = ''
+      }
     }
   }
 }
-
-export default { useExchangeItemsState, useExchangeItemsMethods }

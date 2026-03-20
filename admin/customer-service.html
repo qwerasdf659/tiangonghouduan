@@ -451,6 +451,7 @@
                   {key:'backpack', icon:'🎒', label:'背包'},
                   {key:'lottery', icon:'🎰', label:'抽奖'},
                   {key:'trades', icon:'🔄', label:'交易'},
+                  {key:'disputes', icon:'⚖️', label:'纠纷'},
                   {key:'timeline', icon:'📋', label:'记录'},
                   {key:'risk', icon:'⚠️', label:'风控'},
                   {key:'history', icon:'📜', label:'历史'},
@@ -635,6 +636,58 @@
                     <p x-show="!context_history?.rows?.length" class="text-xs themed-text-hint text-center py-4">暂无历史会话</p>
                   </div>
                 </template>
+              </div>
+
+              <!-- 纠纷 Tab -->
+              <div x-show="!context_loading && context_active_tab === 'disputes'">
+                <div class="space-y-3">
+                  <!-- 纠纷统计 -->
+                  <div class="grid grid-cols-3 gap-2">
+                    <div class="text-center p-2 bg-red-50 rounded">
+                      <p class="text-lg font-bold text-red-600" x-text="dispute_stats?.open || 0"></p>
+                      <p class="text-[10px] text-gray-500">待处理</p>
+                    </div>
+                    <div class="text-center p-2 bg-yellow-50 rounded">
+                      <p class="text-lg font-bold text-yellow-600" x-text="dispute_stats?.processing || 0"></p>
+                      <p class="text-[10px] text-gray-500">处理中</p>
+                    </div>
+                    <div class="text-center p-2 bg-green-50 rounded">
+                      <p class="text-lg font-bold text-green-600" x-text="dispute_stats?.resolved || 0"></p>
+                      <p class="text-[10px] text-gray-500">已解决</p>
+                    </div>
+                  </div>
+
+                  <!-- 纠纷列表 -->
+                  <div>
+                    <div class="flex items-center justify-between mb-2">
+                      <p class="text-[10px] themed-text-hint">交易纠纷列表</p>
+                      <button @click="loadDisputes()" class="text-[10px] themed-text-primary hover:underline">刷新</button>
+                    </div>
+                    <div x-show="disputes.length === 0" class="text-center py-4 text-xs themed-text-muted">暂无纠纷记录</div>
+                    <div class="space-y-2 max-h-64 overflow-y-auto">
+                      <template x-for="d in disputes" :key="d.issue_id || d.customer_service_issue_id">
+                        <div class="text-xs p-2 rounded border themed-border-light hover:bg-gray-50 cursor-pointer" @click="viewDisputeDetail(d)">
+                          <div class="flex items-center justify-between mb-1">
+                            <span class="font-medium themed-text" x-text="'#' + (d.issue_id || d.customer_service_issue_id) + ' ' + (d.title || '交易纠纷')"></span>
+                            <span class="px-1 py-0.5 rounded text-[10px]"
+                                  :class="{'bg-red-100 text-red-700': d.status==='open', 'bg-yellow-100 text-yellow-700': d.status==='processing', 'bg-green-100 text-green-700': d.status==='resolved', 'bg-gray-100 text-gray-700': d.status==='closed'}"
+                                  x-text="{'open':'待处理','processing':'处理中','resolved':'已解决','closed':'已关闭'}[d.status] || d.status">
+                            </span>
+                          </div>
+                          <div class="flex items-center gap-2 themed-text-hint">
+                            <span x-text="{'item_not_received':'未收到物品','item_mismatch':'物品不符','quality_issue':'质量问题','fraud':'欺诈','other':'其他'}[d.dispute_type] || d.dispute_type || '-'"></span>
+                            <span x-text="formatDate(d.created_at)"></span>
+                          </div>
+                          <!-- 操作按钮 -->
+                          <div class="flex gap-1 mt-1.5" x-show="d.status === 'open' || d.status === 'processing'">
+                            <button @click.stop="resolveDisputeAction(d)" class="px-2 py-0.5 text-[10px] bg-green-500 text-white rounded hover:bg-green-600">解决</button>
+                            <button x-show="d.status === 'open'" @click.stop="escalateDisputeAction(d)" class="px-2 py-0.5 text-[10px] bg-orange-500 text-white rounded hover:bg-orange-600">升级仲裁</button>
+                          </div>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <!-- 备注/工单 Tab -->

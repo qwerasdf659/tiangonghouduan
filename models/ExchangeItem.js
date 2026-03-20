@@ -320,6 +320,14 @@ module.exports = sequelize => {
         allowNull: false,
         defaultValue: 0,
         comment: '库存预警阈值（低于此值触发告警，0=不告警）'
+      },
+
+      /** 商品视频 URL（支持视频展示） */
+      video_url: {
+        type: DataTypes.STRING(500),
+        allowNull: true,
+        defaultValue: null,
+        comment: '商品视频 URL（支持视频展示）'
       }
     },
     {

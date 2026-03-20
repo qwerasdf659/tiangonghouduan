@@ -210,7 +210,13 @@ export function sidebarNav() {
         name: '内容运营',
         icon: '📢',
         items: [
-          { id: 'ad-management', name: '内容投放管理', url: '/admin/ad-management.html', badgeKey: 'adPendingReviewCount' },
+          { id: 'media-library', name: '媒体库管理', url: '/admin/content-management.html' },
+          {
+            id: 'ad-management',
+            name: '内容投放管理',
+            url: '/admin/ad-management.html',
+            badgeKey: 'adPendingReviewCount'
+          },
           { id: 'platform-diamond', name: '平台钻石管理', url: '/admin/platform-diamond.html' },
           { id: 'zone-management', name: '地域管理', url: '/admin/zone-management.html' },
           { id: 'dict-mgmt', name: '字典管理', url: '/admin/dict-management.html' },
@@ -339,12 +345,12 @@ export function sidebarNav() {
         if (data.success && data.data) {
           this.healthScore = data.data.score || 0
           this.healthStatus = data.data.status || 'normal'
-          
+
           // 将 'normal' 映射为 'healthy'
           if (this.healthStatus === 'normal') {
             this.healthStatus = 'healthy'
           }
-          
+
           logger.debug('[SidebarNav] 健康度状态已更新', {
             score: this.healthScore,
             status: this.healthStatus
@@ -362,7 +368,7 @@ export function sidebarNav() {
      */
     calculateLocalHealthStatus() {
       const totalPending = this.totalPendingCount
-      
+
       if (totalPending > 50) {
         this.healthStatus = 'critical'
         this.healthScore = Math.max(0, 100 - totalPending)
@@ -727,18 +733,18 @@ export function sidebarNav() {
             if (!hasMenuAccess(group.id)) {
               return null
             }
-            
+
             filteredGroup.subGroups = group.subGroups
               .map(subGroup => {
                 const filteredSubGroup = { ...subGroup }
-                
+
                 // 过滤子分组中的菜单项
                 if (subGroup.items && subGroup.items.length > 0) {
                   filteredSubGroup.items = subGroup.items.filter(item => {
                     const menuId = `${group.id}.${subGroup.id}.${item.id}`
                     return hasMenuAccess(menuId)
                   })
-                  
+
                   // 如果子分组的所有项都被过滤，则隐藏整个子分组
                   if (filteredSubGroup.items.length === 0) {
                     return null
@@ -773,7 +779,7 @@ export function sidebarNav() {
                   }
                   return filteredItem
                 }
-                
+
                 // 普通菜单项
                 const menuId = `${group.id}.${item.id}`
                 return hasMenuAccess(menuId) ? item : null
@@ -793,15 +799,11 @@ export function sidebarNav() {
       // 更新展开的分组（移除不存在的分组）
       const validGroupIds = this.navGroups.map(g => g.id)
       this.expandedGroups = this.expandedGroups.filter(id => validGroupIds.includes(id))
-      
+
       // P2-3: 更新展开的子分组（移除不存在的子分组）
       const validSubGroupIds = [
-        ...this.navGroups.flatMap(g => 
-          (g.items || []).filter(i => i.subItems).map(i => i.id)
-        ),
-        ...this.navGroups.flatMap(g => 
-          (g.subGroups || []).map(sg => sg.id)
-        )
+        ...this.navGroups.flatMap(g => (g.items || []).filter(i => i.subItems).map(i => i.id)),
+        ...this.navGroups.flatMap(g => (g.subGroups || []).map(sg => sg.id))
       ]
       this.expandedSubGroups = this.expandedSubGroups.filter(id => validSubGroupIds.includes(id))
     },

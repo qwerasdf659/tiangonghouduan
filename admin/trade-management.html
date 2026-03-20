@@ -460,6 +460,65 @@
           </div>
         </div>
 
+        <!-- 市场健康看板（MarketHealthService） -->
+        <div class="themed-card rounded-lg shadow mb-6">
+          <div class="p-4 border-b flex items-center justify-between">
+            <h5 class="font-semibold">🏥 市场健康看板</h5>
+            <button @click="loadMarketHealth()" class="text-xs themed-text-primary hover:underline">刷新</button>
+          </div>
+          <div class="p-4">
+            <!-- 健康指标卡片 -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+              <div class="p-3 bg-green-50 rounded-lg text-center">
+                <p class="text-lg font-bold text-green-700" x-text="marketHealth?.avg_settlement_time || '-'"></p>
+                <p class="text-xs text-gray-500">平均结算时间</p>
+              </div>
+              <div class="p-3 bg-blue-50 rounded-lg text-center">
+                <p class="text-lg font-bold text-blue-700" x-text="(marketHealth?.order_status_trend?.completed || 0)"></p>
+                <p class="text-xs text-gray-500">已完成订单</p>
+              </div>
+              <div class="p-3 bg-red-50 rounded-lg text-center">
+                <p class="text-lg font-bold text-red-700" x-text="(marketHealth?.order_status_trend?.cancelled || 0)"></p>
+                <p class="text-xs text-gray-500">已取消订单</p>
+              </div>
+              <div class="p-3 bg-yellow-50 rounded-lg text-center">
+                <p class="text-lg font-bold text-yellow-700" x-text="marketHealth?.order_status_trend?.completed && marketHealth?.order_status_trend?.cancelled ? ((marketHealth.order_status_trend.completed / (marketHealth.order_status_trend.completed + marketHealth.order_status_trend.cancelled) * 100).toFixed(1) + '%') : '-'"></p>
+                <p class="text-xs text-gray-500">完成率</p>
+              </div>
+            </div>
+
+            <!-- Top 买家/卖家排行 -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <h6 class="text-sm font-medium text-gray-600 mb-2">Top 买家</h6>
+                <div x-show="!marketHealth?.top_buyers?.length" class="text-center py-4 text-xs text-gray-400">暂无数据</div>
+                <template x-for="(buyer, idx) in (marketHealth?.top_buyers || [])" :key="idx">
+                  <div class="flex items-center justify-between py-1.5 border-b text-sm">
+                    <span class="flex items-center gap-2">
+                      <span class="w-5 h-5 rounded-full bg-blue-100 text-blue-600 text-xs flex items-center justify-center" x-text="idx + 1"></span>
+                      <span x-text="buyer.nickname || buyer.user_id || '-'"></span>
+                    </span>
+                    <span class="font-mono text-xs" x-text="(buyer.total_amount || buyer.count || 0) + ' 笔'"></span>
+                  </div>
+                </template>
+              </div>
+              <div>
+                <h6 class="text-sm font-medium text-gray-600 mb-2">Top 卖家</h6>
+                <div x-show="!marketHealth?.top_sellers?.length" class="text-center py-4 text-xs text-gray-400">暂无数据</div>
+                <template x-for="(seller, idx) in (marketHealth?.top_sellers || [])" :key="idx">
+                  <div class="flex items-center justify-between py-1.5 border-b text-sm">
+                    <span class="flex items-center gap-2">
+                      <span class="w-5 h-5 rounded-full bg-purple-100 text-purple-600 text-xs flex items-center justify-center" x-text="idx + 1"></span>
+                      <span x-text="seller.nickname || seller.user_id || '-'"></span>
+                    </span>
+                    <span class="font-mono text-xs" x-text="(seller.total_amount || seller.count || 0) + ' 笔'"></span>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- 操作区 -->
         <div class="mt-4 text-right">
           <button @click="loadMarketOverview()" class="px-4 py-2 themed-btn-primary rounded-lg text-sm">
@@ -638,6 +697,21 @@
 
       <!-- 商品列表 -->
       <div class="p-4">
+        <!-- 批量排序操作栏 -->
+        <div class="mb-3 flex items-center justify-between"
+             x-show="userListingsInfo.listings.length > 0">
+          <button @click="toggleListingSortMode()"
+                  class="px-3 py-1 text-sm rounded"
+                  :class="listingSortMode ? 'bg-yellow-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+                  x-text="listingSortMode ? '退出排序' : '调整排序'"></button>
+          <div x-show="listingSortMode" class="flex gap-2">
+            <button @click="submitListingBatchSort()"
+                    :disabled="saving"
+                    class="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50">
+              保存排序
+            </button>
+          </div>
+        </div>
         <div x-show="userListingsInfo.listings.length === 0" class="text-center py-8 themed-text-muted">
           暂无上架商品
         </div>
@@ -648,6 +722,16 @@
                 <div class="flex-1 space-y-1">
                   <div class="flex items-center gap-2">
                     <span class="font-mono text-xs themed-text-muted">#<span x-text="listing.market_listing_id"></span></span>
+                    <!-- 排序模式下显示排序值输入 -->
+                    <template x-if="listingSortMode && listing.status === 'on_sale'">
+                      <label class="flex items-center gap-1 text-xs">
+                        <span class="themed-text-muted">排序:</span>
+                        <input type="number" min="0" step="1"
+                               class="w-16 px-1 py-0.5 text-xs border rounded text-center"
+                               :value="listingSortChanges.find(c => c.id === listing.market_listing_id)?.sort_order || 0"
+                               @input="updateListingSortOrder(listing.market_listing_id, $event.target.value)">
+                      </label>
+                    </template>
                     <span class="px-2 py-0.5 text-xs rounded-full"
                           :class="{
                             'bg-green-100 text-green-700': listing.status === 'on_sale',

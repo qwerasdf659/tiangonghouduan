@@ -117,9 +117,7 @@ document.addEventListener('alpine:init', () => {
         label: '操作',
         type: 'actions',
         width: '80px',
-        actions: [
-          { name: 'detail', label: '详情', class: 'text-blue-600 hover:text-blue-800' }
-        ]
+        actions: [{ name: 'detail', label: '详情', class: 'text-blue-600 hover:text-blue-800' }]
       }
     ],
 
@@ -142,8 +140,9 @@ document.addEventListener('alpine:init', () => {
       {
         key: 'is_at_limit',
         label: '状态',
-        render: (val) => {
-          if (val) return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">已达上限</span>'
+        render: val => {
+          if (val)
+            return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">已达上限</span>'
           return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">正常</span>'
         }
       },
@@ -153,11 +152,11 @@ document.addEventListener('alpine:init', () => {
         render: (_val, _row) => `
           <div class="flex gap-1">
             <button class="px-2 py-1 text-xs themed-btn-primary rounded"
-                    onclick="document.dispatchEvent(new CustomEvent('listing-view-user', {detail: ${JSON.stringify({user_id: '__USER_ID__', mobile: '__MOBILE__', nickname: '__NICKNAME__'}).replace('__USER_ID__', "'+_row.user_id+'").replace('__MOBILE__', "'+_row.mobile+'").replace('__NICKNAME__', "'+(_row.nickname||'-')+'")}}))">
+                    onclick="document.dispatchEvent(new CustomEvent('listing-view-user', {detail: ${JSON.stringify({ user_id: '__USER_ID__', mobile: '__MOBILE__', nickname: '__NICKNAME__' }).replace('__USER_ID__', "'+_row.user_id+'").replace('__MOBILE__', "'+_row.mobile+'").replace('__NICKNAME__', "'+(_row.nickname||'-')+'")}}))">
               查看上架
             </button>
             <button class="px-2 py-1 text-xs bg-purple-500 text-white rounded hover:bg-purple-600"
-                    onclick="document.dispatchEvent(new CustomEvent('listing-adjust-limit', {detail: ${JSON.stringify({user_id: '__UID__'}).replace('__UID__', "'+_row.user_id+'")}}))">
+                    onclick="document.dispatchEvent(new CustomEvent('listing-adjust-limit', {detail: ${JSON.stringify({ user_id: '__UID__' }).replace('__UID__', "'+_row.user_id+'")}}))">
               调整限制
             </button>
           </div>
@@ -217,6 +216,10 @@ document.addEventListener('alpine:init', () => {
     userListingsCurrentPage: 1,
     /** @type {{total: number, total_pages: number}} 用户上架商品分页 */
     userListingsPagination: { total: 0, total_pages: 0 },
+    /** @type {boolean} 挂牌排序模式开关 */
+    listingSortMode: false,
+    /** @type {Array<{id: number, sort_order: number}>} 排序变更暂存 */
+    listingSortChanges: [],
 
     // ========== 市场概览数据（MarketAnalyticsService 数据源） ==========
     /** @type {Object} 市场概览统计 */
@@ -234,6 +237,8 @@ document.addEventListener('alpine:init', () => {
     },
     /** @type {boolean} 市场概览加载中 */
     marketOverviewLoading: false,
+    /** @type {Object|null} 市场健康看板数据 */
+    marketHealth: null,
     /** @type {Object|null} 资产成交量排行图表实例 */
     assetRankingChart: null,
     /** @type {Object|null} 在售分布图表实例 */
@@ -241,7 +246,16 @@ document.addEventListener('alpine:init', () => {
 
     // 调整上架限制表单
     /** @type {Object} 调整限制表单数据 */
-    adjustLimitForm: { user_id: null, mobile: '', nickname: '', current_limit: 0, is_custom: false, new_limit: null, use_global: false, reason: '' },
+    adjustLimitForm: {
+      user_id: null,
+      mobile: '',
+      nickname: '',
+      current_limit: 0,
+      is_custom: false,
+      new_limit: null,
+      use_global: false,
+      reason: ''
+    },
 
     // 强制下架表单
     /** @type {Object} 强制下架表单数据 */
@@ -322,6 +336,7 @@ document.addEventListener('alpine:init', () => {
           break
         case 'market-overview':
           await this.loadMarketOverview()
+          await this.loadMarketHealth()
           break
         case 'redemption-orders':
           await this.loadRedemptionOrders()
@@ -348,14 +363,30 @@ document.addEventListener('alpine:init', () => {
         }
         if (this.tradeFilters.buyer_mobile) {
           const buyer = await this.resolveUserByMobile(this.tradeFilters.buyer_mobile)
-          if (buyer) { queryParams.buyer_user_id = buyer.user_id; this.resolvedBuyer = buyer }
-          else { this.resolvedBuyer = null; this.tradeOrders = []; return }
-        } else { this.resolvedBuyer = null }
+          if (buyer) {
+            queryParams.buyer_user_id = buyer.user_id
+            this.resolvedBuyer = buyer
+          } else {
+            this.resolvedBuyer = null
+            this.tradeOrders = []
+            return
+          }
+        } else {
+          this.resolvedBuyer = null
+        }
         if (this.tradeFilters.seller_mobile) {
           const seller = await this.resolveUserByMobile(this.tradeFilters.seller_mobile)
-          if (seller) { queryParams.seller_user_id = seller.user_id; this.resolvedSeller = seller }
-          else { this.resolvedSeller = null; this.tradeOrders = []; return }
-        } else { this.resolvedSeller = null }
+          if (seller) {
+            queryParams.seller_user_id = seller.user_id
+            this.resolvedSeller = seller
+          } else {
+            this.resolvedSeller = null
+            this.tradeOrders = []
+            return
+          }
+        } else {
+          this.resolvedSeller = null
+        }
         // 移除空值
         Object.keys(queryParams).forEach(k => !queryParams[k] && delete queryParams[k])
 
@@ -496,7 +527,9 @@ document.addEventListener('alpine:init', () => {
 
           if (!this.marketOverview.total_orders) {
             let total = 0
-            Object.values(stats.by_status || {}).forEach(item => { total += item.count || 0 })
+            Object.values(stats.by_status || {}).forEach(item => {
+              total += item.count || 0
+            })
             this.marketOverview.total_orders = total
           }
         }
@@ -509,8 +542,7 @@ document.addEventListener('alpine:init', () => {
             params: { page: 1, limit: 1 }
           })
           if (listingRes?.success && listingRes.data?.summary) {
-            this.marketOverview.active_listings =
-              listingRes.data.summary.total_listings || 0
+            this.marketOverview.active_listings = listingRes.data.summary.total_listings || 0
           }
         } catch (err) {
           logger.warn('[TradeManagement] 加载挂牌统计失败（非致命）:', err.message)
@@ -528,6 +560,20 @@ document.addEventListener('alpine:init', () => {
         Alpine.store('notification').show('加载市场概览数据失败', 'error')
       } finally {
         this.marketOverviewLoading = false
+      }
+    },
+
+    /**
+     * 加载市场健康看板数据（MarketHealthService）
+     */
+    async loadMarketHealth() {
+      try {
+        const { DashboardAPI } = await import('../../../api/dashboard.js')
+        const res = await DashboardAPI.getMarketHealthSummary()
+        this.marketHealth = res.data || res
+        logger.debug('[TradeManagement] 市场健康数据加载完成')
+      } catch (error) {
+        logger.error('[TradeManagement] 市场健康数据加载失败:', error)
       }
     },
 
@@ -594,16 +640,18 @@ document.addEventListener('alpine:init', () => {
           this.onSaleChart.setOption({
             title: { text: '当前在售资产分布', left: 'center', textStyle: { fontSize: 14 } },
             tooltip: { trigger: 'item', formatter: '{b}: {c}件 ({d}%)' },
-            series: [{
-              type: 'pie',
-              radius: ['35%', '65%'],
-              avoidLabelOverlap: true,
-              label: { show: true, formatter: '{b}\n{c}件' },
-              data: onSale.map(s => ({
-                name: s.asset_code || '未知',
-                value: Number(s.on_sale_count) || 0
-              }))
-            }]
+            series: [
+              {
+                type: 'pie',
+                radius: ['35%', '65%'],
+                avoidLabelOverlap: true,
+                label: { show: true, formatter: '{b}\n{c}件' },
+                data: onSale.map(s => ({
+                  name: s.asset_code || '未知',
+                  value: Number(s.on_sale_count) || 0
+                }))
+              }
+            ]
           })
         }
       } catch (err) {
@@ -719,7 +767,10 @@ document.addEventListener('alpine:init', () => {
      */
     async toggleListingRecommend(listing) {
       try {
-        const res = await TradeAPI.toggleListingRecommend(listing.market_listing_id, !listing.is_recommended)
+        const res = await TradeAPI.toggleListingRecommend(
+          listing.market_listing_id,
+          !listing.is_recommended
+        )
         if (res.success) {
           this.$toast?.success(res.data?.is_recommended ? '挂牌已推荐' : '已取消推荐')
           await this.loadUserListings(this.userListingsInfo.user?.user_id)
@@ -729,6 +780,68 @@ document.addEventListener('alpine:init', () => {
       } catch (e) {
         logger.error('[TradeManagement] 推荐挂牌失败:', e)
         this.$toast?.error('操作失败')
+      }
+    },
+
+    /**
+     * 进入/退出挂牌排序模式
+     * 排序模式下显示排序值输入框，退出时可提交批量排序
+     */
+    toggleListingSortMode() {
+      if (this.listingSortMode) {
+        // 退出排序模式，清空暂存
+        this.listingSortMode = false
+        this.listingSortChanges = []
+      } else {
+        // 进入排序模式，初始化暂存
+        this.listingSortMode = true
+        this.listingSortChanges = this.userListingsInfo.listings
+          .filter(l => l.status === 'on_sale')
+          .map(l => ({
+            id: l.market_listing_id,
+            sort_order: l.sort_order || 0
+          }))
+      }
+    },
+
+    /**
+     * 更新单条挂牌的排序值（排序模式下）
+     *
+     * @param {number} listingId - 挂牌ID
+     * @param {number} newSortOrder - 新排序值
+     */
+    updateListingSortOrder(listingId, newSortOrder) {
+      const item = this.listingSortChanges.find(c => c.id === listingId)
+      if (item) {
+        item.sort_order = parseInt(newSortOrder, 10) || 0
+      }
+    },
+
+    /**
+     * 提交批量排序变更
+     * 调用 TradeAPI.batchSortListings 保存排序
+     */
+    async submitListingBatchSort() {
+      if (!this.listingSortChanges.length) {
+        this.$toast?.error('没有可排序的挂牌')
+        return
+      }
+      try {
+        this.saving = true
+        const res = await TradeAPI.batchSortListings(this.listingSortChanges)
+        if (res.success) {
+          this.$toast?.success(`已更新 ${this.listingSortChanges.length} 条挂牌排序`)
+          this.listingSortMode = false
+          this.listingSortChanges = []
+          await this.loadUserListings(this.userListingsInfo.user?.user_id)
+        } else {
+          this.$toast?.error(res.message || '批量排序失败')
+        }
+      } catch (e) {
+        logger.error('[TradeManagement] 批量排序失败:', e)
+        this.$toast?.error(e.message || '批量排序失败')
+      } finally {
+        this.saving = false
       }
     },
 
@@ -800,7 +913,9 @@ document.addEventListener('alpine:init', () => {
         this.saving = true
         const data = {
           user_id: this.adjustLimitForm.user_id,
-          max_active_listings: this.adjustLimitForm.use_global ? null : parseInt(this.adjustLimitForm.new_limit),
+          max_active_listings: this.adjustLimitForm.use_global
+            ? null
+            : parseInt(this.adjustLimitForm.new_limit),
           reason: this.adjustLimitForm.reason || ''
         }
         const result = await request({
@@ -929,17 +1044,28 @@ document.addEventListener('alpine:init', () => {
       }
       // 合并筛选条件
       if (this.tradeFilters?.status) queryParams.status = this.tradeFilters.status
-      if (this.tradeFilters?.listing_id) queryParams.market_listing_id = this.tradeFilters.listing_id
+      if (this.tradeFilters?.listing_id)
+        queryParams.market_listing_id = this.tradeFilters.listing_id
       if (this.tradeOrderMerchantFilter) queryParams.merchant_id = this.tradeOrderMerchantFilter
       if (this.tradeFilters?.buyer_mobile) {
         const buyer = await this.resolveUserByMobile(this.tradeFilters.buyer_mobile)
-        if (buyer) { queryParams.buyer_user_id = buyer.user_id; this.resolvedBuyer = buyer }
-        else { this.resolvedBuyer = null; return { items: [], total: 0 } }
+        if (buyer) {
+          queryParams.buyer_user_id = buyer.user_id
+          this.resolvedBuyer = buyer
+        } else {
+          this.resolvedBuyer = null
+          return { items: [], total: 0 }
+        }
       }
       if (this.tradeFilters?.seller_mobile) {
         const seller = await this.resolveUserByMobile(this.tradeFilters.seller_mobile)
-        if (seller) { queryParams.seller_user_id = seller.user_id; this.resolvedSeller = seller }
-        else { this.resolvedSeller = null; return { items: [], total: 0 } }
+        if (seller) {
+          queryParams.seller_user_id = seller.user_id
+          this.resolvedSeller = seller
+        } else {
+          this.resolvedSeller = null
+          return { items: [], total: 0 }
+        }
       }
 
       Object.keys(queryParams).forEach(k => !queryParams[k] && delete queryParams[k])
@@ -952,7 +1078,8 @@ document.addEventListener('alpine:init', () => {
 
       if (result?.success && result.data) {
         const items = result.data.orders || result.data.list || result.data.items || []
-        const total = result.data.pagination?.total_count || result.data.pagination?.total || items.length
+        const total =
+          result.data.pagination?.total_count || result.data.pagination?.total || items.length
         this.tradeOrders = items
         this._updateStats()
         return { items, total }
@@ -992,7 +1119,8 @@ document.addEventListener('alpine:init', () => {
         // 更新摘要统计
         if (result.data.summary) {
           this.marketplaceSummary = {
-            total_users_with_listings: result.data.summary.total_users_with_listings || items.length,
+            total_users_with_listings:
+              result.data.summary.total_users_with_listings || items.length,
             users_near_limit: result.data.summary.users_near_limit || 0,
             users_at_limit: result.data.summary.users_at_limit || 0
           }

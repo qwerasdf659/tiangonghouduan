@@ -23,6 +23,7 @@
        @edit-item="editItem($event.detail)"
        @delete-item="deleteItem($event.detail)"
        @toggle-item-status="toggleItemStatus($event.detail)"
+       @view-item-dashboard="viewItemDashboard($event.detail)"
        @toggle-pin="togglePin($event.detail)"
        @toggle-recommend="toggleRecommend($event.detail)"
        @ship-order="openShipModal($event.detail)"
@@ -97,6 +98,20 @@
 
         <!-- data-table: 兑换商品列表（排序模式时隐藏） -->
         <div x-show="!sortMode" x-data="exchangeItemsTable()" x-init="init()">
+
+          <!-- 批量操作栏（选中商品时显示） -->
+          <div x-show="hasSelection" x-cloak class="mb-3 p-3 bg-blue-50 rounded-lg border border-blue-200 flex items-center gap-3 flex-wrap">
+            <span class="text-sm text-blue-700 font-medium">已选 <span x-text="selectedCount"></span> 个商品</span>
+            <button @click="$dispatch('batch-status', { ids: selectedRows, status: 'active' })" class="px-3 py-1.5 bg-green-500 text-white text-sm rounded hover:bg-green-600">批量上架</button>
+            <button @click="$dispatch('batch-status', { ids: selectedRows, status: 'inactive' })" class="px-3 py-1.5 bg-gray-500 text-white text-sm rounded hover:bg-gray-600">批量下架</button>
+            <button @click="$dispatch('batch-price-modal', { ids: selectedRows })" class="px-3 py-1.5 bg-yellow-500 text-white text-sm rounded hover:bg-yellow-600">批量改价</button>
+            <button @click="$dispatch('batch-category-modal', { ids: selectedRows })" class="px-3 py-1.5 bg-purple-500 text-white text-sm rounded hover:bg-purple-600">批量修改分类</button>
+            <button @click="exportItems()" class="px-3 py-1.5 bg-indigo-500 text-white text-sm rounded hover:bg-indigo-600">导出 CSV</button>
+            <label class="px-3 py-1.5 bg-teal-500 text-white text-sm rounded hover:bg-teal-600 cursor-pointer">
+              导入 Excel/CSV
+              <input type="file" accept=".xlsx,.csv" class="hidden" @change="importItems($event)">
+            </label>
+          </div>
           <div x-show="loading" class="p-8 text-center themed-text-muted">加载中...</div>
           <div x-show="hasError" class="p-8 text-center">
             <p class="text-red-500 mb-2" x-text="error"></p>
@@ -126,6 +141,7 @@
                     <td class="px-4 py-3">
                       <div class="flex space-x-2">
                         <button @click="$dispatch('edit-item', row)" class="text-green-500 hover:text-green-700 text-sm">编辑</button>
+                        <button @click="$dispatch('view-item-dashboard', row)" class="text-indigo-500 hover:text-indigo-700 text-sm">看板</button>
                         <button @click="$dispatch('toggle-pin', row)" class="text-sm" :class="row.is_pinned ? 'text-orange-500 hover:text-orange-700' : 'text-gray-400 hover:text-orange-500'" x-text="row.is_pinned ? '取消置顶' : '置顶'"></button>
                         <button @click="$dispatch('toggle-recommend', row)" class="text-sm" :class="row.is_recommended ? 'text-blue-500 hover:text-blue-700' : 'text-gray-400 hover:text-blue-500'" x-text="row.is_recommended ? '取消推荐' : '推荐'"></button>
                         <button @click="$dispatch('toggle-item-status', row)" class="text-yellow-500 hover:text-yellow-700 text-sm" x-text="row.status === 'active' ? '下架' : '上架'"></button>
@@ -413,6 +429,149 @@
 
     <!-- ==================== Modal 组件区域 ==================== -->
 
+  <!-- 批量改价弹窗 -->
+  <div x-ref="batchPriceModal"
+       x-show="isModalOpen('batchPriceModal')"
+       x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center"
+       style="display: none;">
+    <div class="fixed inset-0 bg-black/50" @click="hideModal('batchPriceModal')"></div>
+    <div class="relative themed-card rounded-lg shadow-xl w-full max-w-sm mx-4 z-10">
+      <div class="p-4 border-b flex justify-between items-center bg-yellow-50">
+        <h5 class="font-semibold text-yellow-700">💰 批量改价</h5>
+        <button @click="hideModal('batchPriceModal')" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+      </div>
+      <div class="p-5 space-y-4">
+        <p class="text-sm text-gray-500">已选 <span class="font-bold text-yellow-600" x-text="batchPriceIds.length"></span> 个商品</p>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">调价模式</label>
+          <select x-model="batchPriceMode" class="w-full border rounded px-3 py-2 text-sm">
+            <option value="percent">按比例（%）</option>
+            <option value="fixed">固定值增减</option>
+            <option value="set">直接设置</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            <span x-show="batchPriceMode === 'percent'">比例值（如 80 表示打8折）</span>
+            <span x-show="batchPriceMode === 'fixed'">增减值（正数加价，负数减价）</span>
+            <span x-show="batchPriceMode === 'set'">目标价格</span>
+          </label>
+          <input type="number" x-model.number="batchPriceValue" class="w-full border rounded px-3 py-2 text-sm" />
+        </div>
+      </div>
+      <div class="p-4 border-t flex justify-end gap-2">
+        <button @click="hideModal('batchPriceModal')" class="px-4 py-2 text-sm border rounded hover:bg-gray-50">取消</button>
+        <button @click="submitBatchPrice()" class="px-4 py-2 text-sm bg-yellow-500 text-white rounded hover:bg-yellow-600">确认改价</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 批量修改分类弹窗 -->
+  <div x-ref="batchCategoryModal"
+       x-show="isModalOpen('batchCategoryModal')"
+       x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center"
+       style="display: none;">
+    <div class="fixed inset-0 bg-black/50" @click="hideModal('batchCategoryModal')"></div>
+    <div class="relative themed-card rounded-lg shadow-xl w-full max-w-sm mx-4 z-10">
+      <div class="p-4 border-b flex justify-between items-center bg-purple-50">
+        <h5 class="font-semibold text-purple-700">📂 批量修改分类</h5>
+        <button @click="hideModal('batchCategoryModal')" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+      </div>
+      <div class="p-5 space-y-4">
+        <p class="text-sm text-gray-500">已选 <span class="font-bold text-purple-600" x-text="batchCategoryIds.length"></span> 个商品</p>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">目标分类</label>
+          <select x-model.number="batchCategoryDefId" class="w-full border rounded px-3 py-2 text-sm">
+            <option value="">请选择分类</option>
+            <template x-for="cat in (categoryOptions || [])" :key="cat.category_def_id">
+              <option :value="cat.category_def_id" x-text="cat.display_name"></option>
+            </template>
+          </select>
+        </div>
+      </div>
+      <div class="p-4 border-t flex justify-end gap-2">
+        <button @click="hideModal('batchCategoryModal')" class="px-4 py-2 text-sm border rounded hover:bg-gray-50">取消</button>
+        <button @click="submitBatchCategory()" :disabled="!batchCategoryDefId" class="px-4 py-2 text-sm bg-purple-500 text-white rounded hover:bg-purple-600 disabled:opacity-50">确认修改</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 单品数据看板弹窗 -->
+  <div x-ref="itemDashboardModal"
+       x-show="isModalOpen('itemDashboardModal')"
+       x-cloak
+       class="fixed inset-0 z-50 flex items-center justify-center"
+       style="display: none;">
+    <div class="fixed inset-0 bg-black/50" @click="hideModal('itemDashboardModal')"></div>
+    <div class="relative themed-card rounded-lg shadow-xl w-full max-w-lg mx-4 z-10 max-h-[80vh] overflow-y-auto">
+      <div class="p-4 border-b flex justify-between items-center bg-indigo-50">
+        <h5 class="font-semibold text-indigo-700">📊 单品数据看板</h5>
+        <button @click="hideModal('itemDashboardModal')" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+      </div>
+      <div class="p-5">
+        <div x-show="itemDashboardLoading" class="text-center py-8">
+          <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-500"></div>
+          <p class="mt-2 text-sm text-gray-500">加载中...</p>
+        </div>
+        <template x-if="itemDashboard && !itemDashboardLoading">
+          <div class="space-y-4">
+            <div class="text-center mb-3">
+              <h6 class="font-bold text-lg" x-text="itemDashboard.item_name || '-'"></h6>
+              <span class="text-xs text-gray-400" x-text="'ID: ' + (itemDashboard.exchange_item_id || '-')"></span>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div class="p-3 bg-blue-50 rounded-lg text-center">
+                <p class="text-xl font-bold text-blue-700" x-text="itemDashboard.orders_7d ?? '-'"></p>
+                <p class="text-xs text-gray-500">7天订单</p>
+              </div>
+              <div class="p-3 bg-green-50 rounded-lg text-center">
+                <p class="text-xl font-bold text-green-700" x-text="itemDashboard.orders_30d ?? '-'"></p>
+                <p class="text-xs text-gray-500">30天订单</p>
+              </div>
+              <div class="p-3 bg-yellow-50 rounded-lg text-center">
+                <p class="text-xl font-bold text-yellow-700" x-text="itemDashboard.current_stock ?? '-'"></p>
+                <p class="text-xs text-gray-500">当前库存</p>
+              </div>
+              <div class="p-3 bg-purple-50 rounded-lg text-center">
+                <p class="text-xl font-bold text-purple-700" x-text="itemDashboard.total_sold ?? '-'"></p>
+                <p class="text-xs text-gray-500">累计销量</p>
+              </div>
+            </div>
+            <div class="grid grid-cols-3 gap-3">
+              <div class="p-3 bg-gray-50 rounded-lg text-center">
+                <p class="text-lg font-bold" x-text="itemDashboard.avg_rating ? Number(itemDashboard.avg_rating).toFixed(1) : '-'"></p>
+                <p class="text-xs text-gray-500">平均评分</p>
+              </div>
+              <div class="p-3 bg-gray-50 rounded-lg text-center">
+                <p class="text-lg font-bold" x-text="itemDashboard.conversion_rate ? (Number(itemDashboard.conversion_rate) * 100).toFixed(1) + '%' : '-'"></p>
+                <p class="text-xs text-gray-500">转化率</p>
+              </div>
+              <div class="p-3 bg-gray-50 rounded-lg text-center">
+                <p class="text-lg font-bold" x-text="itemDashboard.inventory_turnover ? Number(itemDashboard.inventory_turnover).toFixed(2) : '-'"></p>
+                <p class="text-xs text-gray-500">库存周转</p>
+              </div>
+            </div>
+            <template x-if="itemDashboard.order_status_distribution">
+              <div>
+                <h6 class="text-sm font-medium text-gray-600 mb-2">订单状态分布</h6>
+                <div class="grid grid-cols-3 gap-2">
+                  <template x-for="[status, count] in Object.entries(itemDashboard.order_status_distribution)" :key="status">
+                    <div class="text-center p-2 bg-gray-50 rounded text-xs">
+                      <span class="font-bold" x-text="count"></span>
+                      <span class="text-gray-500 block" x-text="{'pending':'待处理','approved':'已审核','shipped':'已发货','completed':'已完成','cancelled':'已取消','refunded':'已退款','rejected':'已驳回'}[status] || status"></span>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </template>
+          </div>
+        </template>
+      </div>
+    </div>
+  </div>
+
   <!-- 1. 商品编辑模态框 -->
   <div x-ref="itemModal"
        x-show="isModalOpen('itemModal')"
@@ -433,7 +592,11 @@
           </div>
           <div>
             <label class="block text-sm font-medium themed-text-secondary mb-1">商品描述</label>
-            <textarea x-model="itemForm.description" rows="3" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500"></textarea>
+            <div class="border rounded-lg overflow-hidden">
+              <div id="description-toolbar" style="border-bottom: 1px solid #e5e7eb;"></div>
+              <div id="description-editor" style="min-height: 150px; max-height: 300px; overflow-y: auto;"></div>
+            </div>
+            <input type="hidden" x-model="itemForm.description">
           </div>
           <!-- 商品图片上传 -->
           <div>
@@ -572,6 +735,17 @@
           <div>
             <label class="block text-sm font-medium themed-text-secondary mb-1">营销卖点</label>
             <input type="text" x-model="itemForm.sell_point" maxlength="200" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500" placeholder="一句话卖点，如：开箱必出稀有道具，欧皇必备">
+          </div>
+          <!-- 商品视频 -->
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">商品视频 URL</label>
+            <input type="url" x-model="itemForm.video_url" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500" placeholder="输入视频链接（如 https://...）">
+            <p class="text-xs text-gray-400 mt-1">支持 MP4 格式视频链接，用于商品详情页展示</p>
+            <template x-if="itemForm.video_url">
+              <div class="mt-2">
+                <video :src="itemForm.video_url" controls class="w-full max-h-40 rounded border bg-black" preload="metadata"></video>
+              </div>
+            </template>
           </div>
           <!-- 标签管理 -->
           <div>

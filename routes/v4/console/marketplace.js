@@ -346,6 +346,373 @@ router.get(
 )
 
 /**
+ * 获取兑换趋势数据（Admin Only）
+ * GET /api/v4/console/marketplace/exchange_market/statistics/trend
+ *
+ * @description 按日统计兑换订单量、完成量、材料消耗，用于管理后台趋势图
+ *
+ * @query {number} [days=7] - 统计天数（7/14/30）
+ * @returns {Object} data.trend - 每日统计数组
+ *
+ * @security JWT + Admin权限
+ */
+router.get(
+  '/exchange_market/statistics/trend',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const days = parseInt(req.query.days) || 7
+
+      const ExchangeQueryService = req.app.locals.services.getService('exchange_query')
+      const result = await ExchangeQueryService.getExchangeTrend({ days })
+
+      return res.apiSuccess(result, '兑换趋势查询成功')
+    } catch (error) {
+      logger.error('兑换趋势查询失败', { error: error.message })
+      return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    }
+  }
+)
+
+/**
+ * 获取商品排行榜（Admin Only）
+ * GET /api/v4/console/marketplace/exchange_market/statistics/ranking
+ *
+ * @description 按兑换量/库存周转/评分排序的商品排行 Top N
+ *
+ * @query {string} [sort_by=sold_count] - 排序字段（sold_count/stock_turnover/avg_rating）
+ * @query {number} [limit=10] - 返回数量（1-50）
+ * @returns {Object} data.ranking - 排行列表
+ *
+ * @security JWT + Admin权限
+ */
+router.get(
+  '/exchange_market/statistics/ranking',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const { sort_by, limit } = req.query
+
+      const ExchangeQueryService = req.app.locals.services.getService('exchange_query')
+      const result = await ExchangeQueryService.getItemRanking({
+        sort_by: sort_by || 'sold_count',
+        limit: parseInt(limit) || 10
+      })
+
+      return res.apiSuccess(result, '商品排行查询成功')
+    } catch (error) {
+      logger.error('商品排行查询失败', { error: error.message })
+      return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    }
+  }
+)
+
+/**
+ * 导出兑换商品列表（CSV 格式）（Admin Only）
+ * GET /api/v4/console/marketplace/exchange_market/items/export
+ *
+ * @description 导出全部兑换商品数据为 CSV 文件，供运营下载分析
+ * 注意：此路由必须在 /items/:exchange_item_id 之前注册，避免 "export" 被当作商品ID
+ *
+ * @query {string} [status] - 按状态筛选（active/inactive）
+ * @returns {Stream} CSV 文件流
+ *
+ * @security JWT + Admin权限
+ */
+router.get(
+  '/exchange_market/items/export',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const { status } = req.query
+      const where = {}
+      if (status && ['active', 'inactive'].includes(status)) {
+        where.status = status
+      }
+
+      const ExchangeItem =
+        req.app.locals.models?.ExchangeItem || require('../../../models').ExchangeItem
+      const items = await ExchangeItem.findAll({
+        where,
+        order: [
+          ['sort_order', 'ASC'],
+          ['created_at', 'DESC']
+        ],
+        raw: true
+      })
+
+      // CSV 表头（中文列名）
+      const headers = [
+        '商品ID',
+        '商品名称',
+        '状态',
+        '分类',
+        '稀有度',
+        '空间',
+        '支付资产',
+        '兑换价格',
+        '原价',
+        '库存',
+        '已售',
+        '是否新品',
+        '是否热门',
+        '是否限量',
+        '排序权重',
+        '创建时间'
+      ]
+
+      // CSV 行数据
+      const rows = items.map(item => [
+        item.exchange_item_id,
+        `"${(item.item_name || '').replace(/"/g, '""')}"`,
+        item.status,
+        item.category || '',
+        item.rarity_code || '',
+        item.space || '',
+        item.cost_asset_code || '',
+        item.cost_amount || 0,
+        item.original_price || '',
+        item.stock || 0,
+        item.sold_count || 0,
+        item.is_new ? '是' : '否',
+        item.is_hot ? '是' : '否',
+        item.is_limited ? '是' : '否',
+        item.sort_order || 0,
+        item.created_at || ''
+      ])
+
+      // 生成 CSV 内容（UTF-8 BOM 确保 Excel 正确识别中文）
+      const BOM = '\uFEFF'
+      const csvContent = BOM + headers.join(',') + '\n' + rows.map(r => r.join(',')).join('\n')
+
+      const filename = `exchange_items_${new Date().toISOString().slice(0, 10)}.csv`
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+
+      logger.info('管理员导出兑换商品', {
+        admin_id: req.user.user_id,
+        count: items.length,
+        status_filter: status || 'all'
+      })
+
+      return res.send(csvContent)
+    } catch (error) {
+      logger.error('导出兑换商品失败', { error: error.message })
+      return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    }
+  }
+)
+
+/**
+ * 导入兑换商品（Excel/CSV 格式）（Admin Only）
+ * POST /api/v4/console/marketplace/exchange_market/items/import
+ *
+ * @description 从 Excel(.xlsx) 或 CSV(.csv) 文件批量导入兑换商品
+ * 注意：此路由必须在 /items/:exchange_item_id 之前注册
+ *
+ * 文件格式要求（表头必须包含以下列名）：
+ * - 商品名称（必填）
+ * - 支付资产（必填，如 red_shard）
+ * - 兑换价格（必填，正整数）
+ * - 库存（必填，非负整数）
+ * - 分类、稀有度、空间、描述、卖点 等为可选列
+ *
+ * @returns {Object} data.imported_count - 成功导入数量
+ * @returns {Array} data.errors - 导入失败的行及原因
+ *
+ * @security JWT + Admin权限
+ */
+router.post(
+  '/exchange_market/items/import',
+  authenticateToken,
+  requireRoleLevel(100),
+  require('multer')({
+    storage: require('multer').memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+      const allowed = [
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'text/csv',
+        'application/vnd.ms-excel'
+      ]
+      if (allowed.includes(file.mimetype) || file.originalname.match(/\.(xlsx|csv)$/i)) {
+        cb(null, true)
+      } else {
+        cb(new Error('仅支持 .xlsx 或 .csv 格式文件'))
+      }
+    }
+  }).single('file'),
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.apiError('请上传文件', 'BAD_REQUEST', null, 400)
+      }
+
+      const ExcelJS = require('exceljs')
+      const workbook = new ExcelJS.Workbook()
+
+      // 根据文件类型解析
+      if (req.file.originalname.endsWith('.csv')) {
+        await workbook.csv.read(require('stream').Readable.from(req.file.buffer))
+      } else {
+        await workbook.xlsx.load(req.file.buffer)
+      }
+
+      const worksheet = workbook.worksheets[0]
+      if (!worksheet || worksheet.rowCount < 2) {
+        return res.apiError('文件为空或缺少数据行', 'BAD_REQUEST', null, 400)
+      }
+
+      // 解析表头（第一行）→ 列名映射
+      const headerRow = worksheet.getRow(1)
+      const headerMap = {}
+      const COLUMN_MAP = {
+        商品名称: 'item_name',
+        支付资产: 'cost_asset_code',
+        兑换价格: 'cost_amount',
+        库存: 'stock',
+        分类: 'category',
+        稀有度: 'rarity_code',
+        空间: 'space',
+        描述: 'description',
+        卖点: 'sell_point',
+        原价: 'original_price',
+        排序权重: 'sort_order'
+      }
+      headerRow.eachCell((cell, colNumber) => {
+        const val = String(cell.value || '').trim()
+        if (COLUMN_MAP[val]) {
+          headerMap[colNumber] = COLUMN_MAP[val]
+        }
+      })
+
+      if (!headerMap || !Object.values(headerMap).includes('item_name')) {
+        return res.apiError('表头缺少必填列"商品名称"', 'BAD_REQUEST', null, 400)
+      }
+
+      // 逐行解析数据
+      const itemsToCreate = []
+      const errors = []
+
+      for (let rowNum = 2; rowNum <= worksheet.rowCount; rowNum++) {
+        const row = worksheet.getRow(rowNum)
+        const rowData = {}
+        Object.entries(headerMap).forEach(([colNum, field]) => {
+          const cell = row.getCell(parseInt(colNum))
+          rowData[field] =
+            cell.value !== null && cell.value !== undefined ? String(cell.value).trim() : ''
+        })
+
+        // 校验必填字段
+        if (!rowData.item_name) {
+          errors.push({ row: rowNum, reason: '商品名称为空' })
+          continue
+        }
+        if (!rowData.cost_asset_code) {
+          errors.push({ row: rowNum, reason: '支付资产为空' })
+          continue
+        }
+        const costAmount = parseInt(rowData.cost_amount, 10)
+        if (!costAmount || costAmount <= 0) {
+          errors.push({ row: rowNum, reason: '兑换价格无效' })
+          continue
+        }
+        const stock = parseInt(rowData.stock, 10)
+        if (isNaN(stock) || stock < 0) {
+          errors.push({ row: rowNum, reason: '库存无效' })
+          continue
+        }
+
+        itemsToCreate.push({
+          item_name: rowData.item_name,
+          cost_asset_code: rowData.cost_asset_code,
+          cost_amount: costAmount,
+          stock,
+          category: rowData.category || null,
+          rarity_code: rowData.rarity_code || 'common',
+          space: ['lucky', 'premium', 'both'].includes(rowData.space) ? rowData.space : 'lucky',
+          description: rowData.description || '',
+          sell_point: rowData.sell_point || null,
+          original_price: rowData.original_price ? parseInt(rowData.original_price, 10) : null,
+          sort_order: rowData.sort_order ? parseInt(rowData.sort_order, 10) : 100,
+          status: 'inactive'
+        })
+      }
+
+      if (itemsToCreate.length === 0) {
+        return res.apiError(
+          `没有可导入的有效数据（${errors.length} 行校验失败）`,
+          'BAD_REQUEST',
+          { errors },
+          400
+        )
+      }
+
+      // 批量创建（通过 Service）
+      const ExchangeAdminService = req.app.locals.services.getService('exchange_admin')
+      const adminId = req.user.user_id
+      const importedCount = await TransactionManager.execute(
+        async transaction => {
+          let count = 0
+          for (const data of itemsToCreate) {
+            /*
+             * createExchangeItem 签名：(itemData, created_by, options)
+             * itemData 使用 name 字段（非 item_name），需要 cost_price
+             * 顺序执行：同一事务内逐条创建，避免并发写入冲突
+             */
+            // eslint-disable-next-line no-await-in-loop
+            await ExchangeAdminService.createExchangeItem(
+              {
+                name: data.item_name,
+                description: data.description || '',
+                cost_asset_code: data.cost_asset_code,
+                cost_amount: data.cost_amount,
+                cost_price: 0,
+                stock: data.stock,
+                category_def_id: data.category_def_id || null,
+                rarity_code: data.rarity_code || 'common',
+                space: data.space || 'lucky',
+                sell_point: data.sell_point || null,
+                original_price: data.original_price || null,
+                sort_order: data.sort_order || 100,
+                status: data.status || 'inactive'
+              },
+              adminId,
+              { transaction }
+            )
+            count++
+          }
+          return count
+        },
+        { description: `批量导入 ${itemsToCreate.length} 个兑换商品` }
+      )
+
+      logger.info('管理员导入兑换商品', {
+        admin_id: req.user.user_id,
+        imported_count: importedCount,
+        error_count: errors.length,
+        filename: req.file.originalname
+      })
+
+      return res.apiSuccess(
+        {
+          imported_count: importedCount,
+          error_count: errors.length,
+          errors: errors.length > 0 ? errors : undefined
+        },
+        `成功导入 ${importedCount} 个商品${errors.length > 0 ? `，${errors.length} 行失败` : ''}`
+      )
+    } catch (error) {
+      logger.error('导入兑换商品失败', { error: error.message })
+      return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    }
+  }
+)
+
+/**
  * 获取单品数据看板（Admin Only）
  * GET /api/v4/console/marketplace/exchange_market/items/:exchange_item_id/dashboard
  *
@@ -1196,18 +1563,20 @@ router.put(
 
       const result = await TransactionManager.execute(
         async transaction => {
-          let updatedCount = 0
-          for (const item of items) {
-            const { exchange_item_id, cost_amount } = item
-            if (!exchange_item_id || cost_amount === undefined || cost_amount < 0) continue
-
-            const [affected] = await ExchangeAdminService.ExchangeItem.update(
-              { cost_amount: parseInt(cost_amount, 10) },
-              { where: { exchange_item_id: parseInt(exchange_item_id, 10) }, transaction }
+          const updatePromises = items
+            .filter(
+              item =>
+                item.exchange_item_id && item.cost_amount !== undefined && item.cost_amount >= 0
             )
-            updatedCount += affected
-          }
-          return { affected_rows: updatedCount }
+            .map(item =>
+              ExchangeAdminService.ExchangeItem.update(
+                { cost_amount: parseInt(item.cost_amount, 10) },
+                { where: { exchange_item_id: parseInt(item.exchange_item_id, 10) }, transaction }
+              )
+            )
+          const results = await Promise.all(updatePromises)
+          const affectedRows = results.reduce((sum, [affected]) => sum + affected, 0)
+          return { affected_rows: affectedRows }
         },
         { description: `批量改价 ${items.length} 个商品` }
       )
@@ -1286,17 +1655,18 @@ router.put(
       const ExchangeService = req.app.locals.services.getService('exchange_admin')
       const result = await TransactionManager.execute(
         async transaction => {
-          let updated = 0
-          for (const { exchange_item_id, sort_order } of items) {
-            if (exchange_item_id && sort_order !== undefined) {
-              await ExchangeService.ExchangeItem.update(
+          const updatePromises = items
+            .filter(
+              ({ exchange_item_id, sort_order }) => exchange_item_id && sort_order !== undefined
+            )
+            .map(({ exchange_item_id, sort_order }) =>
+              ExchangeService.ExchangeItem.update(
                 { sort_order: parseInt(sort_order) },
                 { where: { exchange_item_id }, transaction }
               )
-              updated++
-            }
-          }
-          return { updated_count: updated }
+            )
+          const results = await Promise.all(updatePromises)
+          return { updated_count: results.length }
         },
         { description: '批量排序商品', maxRetries: 1 }
       )
@@ -1434,17 +1804,16 @@ router.put('/listings/batch-sort', authenticateToken, requireRoleLevel(100), asy
 
     const result = await TransactionManager.execute(
       async transaction => {
-        let updatedCount = 0
-        for (const item of items) {
-          const { market_listing_id, sort_order } = item
-          if (!market_listing_id || sort_order === undefined) continue
-
-          const [affected] = await MarketListing.update(
-            { sort_order: parseInt(sort_order, 10) },
-            { where: { market_listing_id: parseInt(market_listing_id, 10) }, transaction }
+        const updatePromises = items
+          .filter(item => item.market_listing_id && item.sort_order !== undefined)
+          .map(item =>
+            MarketListing.update(
+              { sort_order: parseInt(item.sort_order, 10) },
+              { where: { market_listing_id: parseInt(item.market_listing_id, 10) }, transaction }
+            )
           )
-          updatedCount += affected
-        }
+        const results = await Promise.all(updatePromises)
+        const updatedCount = results.reduce((sum, [affected]) => sum + affected, 0)
         return { updated_count: updatedCount }
       },
       { description: '批量排序挂牌', maxRetries: 1 }

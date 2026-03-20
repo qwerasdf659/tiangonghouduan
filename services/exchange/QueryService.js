@@ -1113,6 +1113,145 @@ class QueryService {
       }
     }
   }
+
+  /**
+   * 获取兑换趋势数据（按日统计）
+   *
+   * 业务场景：管理后台「统计分析」Tab 的兑换趋势图，展示每日兑换量变化
+   *
+   * @param {Object} options - 查询参数
+   * @param {number} [options.days=7] - 统计天数（7/14/30）
+   * @returns {Promise<Object>} 趋势数据
+   * @returns {Array<Object>} returns.trend - 每日兑换量数组
+   * @returns {string} returns.trend[].date - 日期（YYYY-MM-DD）
+   * @returns {number} returns.trend[].order_count - 当日兑换订单数
+   * @returns {number} returns.trend[].completed_count - 当日完成订单数
+   * @returns {number} returns.trend[].total_amount - 当日材料消耗总量
+   */
+  async getExchangeTrend({ days = 7 } = {}) {
+    try {
+      const validDays = [7, 14, 30].includes(days) ? days : 7
+      logger.info('[兑换市场] 查询兑换趋势', { days: validDays })
+
+      const startDate = new Date()
+      startDate.setDate(startDate.getDate() - validDays)
+      startDate.setHours(0, 0, 0, 0)
+
+      const results = await this.sequelize.query(
+        `SELECT
+          DATE(created_at) AS date,
+          COUNT(*) AS order_count,
+          SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed_count,
+          COALESCE(SUM(pay_amount), 0) AS total_amount
+        FROM exchange_records
+        WHERE created_at >= :start_date
+        GROUP BY DATE(created_at)
+        ORDER BY date ASC`,
+        {
+          replacements: { start_date: startDate },
+          type: this.sequelize.QueryTypes.SELECT
+        }
+      )
+
+      // 补齐无数据的日期（确保前端图表连续）
+      const trend = []
+      const resultMap = new Map()
+      results.forEach(r => {
+        const dateStr =
+          typeof r.date === 'string' ? r.date : new Date(r.date).toISOString().slice(0, 10)
+        resultMap.set(dateStr, r)
+      })
+
+      for (let i = 0; i < validDays; i++) {
+        const d = new Date(startDate)
+        d.setDate(d.getDate() + i)
+        const dateStr = d.toISOString().slice(0, 10)
+        const row = resultMap.get(dateStr)
+        trend.push({
+          date: dateStr,
+          order_count: parseInt(row?.order_count || 0, 10),
+          completed_count: parseInt(row?.completed_count || 0, 10),
+          total_amount: parseInt(row?.total_amount || 0, 10)
+        })
+      }
+
+      return { days: validDays, trend }
+    } catch (error) {
+      logger.error('[兑换市场] 查询兑换趋势失败:', error.message)
+      throw new Error(`查询兑换趋势失败: ${error.message}`)
+    }
+  }
+
+  /**
+   * 获取商品排行榜（按兑换量/库存周转排序）
+   *
+   * 业务场景：管理后台「统计分析」Tab 的商品排行，展示兑换量 Top N 商品
+   *
+   * @param {Object} options - 查询参数
+   * @param {string} [options.sort_by='sold_count'] - 排序字段（sold_count / stock_turnover / avg_rating）
+   * @param {number} [options.limit=10] - 返回数量
+   * @returns {Promise<Object>} 排行数据
+   * @returns {Array<Object>} returns.ranking - 排行列表
+   * @returns {number} returns.ranking[].exchange_item_id - 商品ID
+   * @returns {string} returns.ranking[].item_name - 商品名称
+   * @returns {number} returns.ranking[].sold_count - 总销量
+   * @returns {number} returns.ranking[].stock - 当前库存
+   * @returns {number} returns.ranking[].stock_turnover - 库存周转率（sold_count / (stock + sold_count)）
+   * @returns {number|null} returns.ranking[].avg_rating - 平均评分
+   */
+  async getItemRanking({ sort_by = 'sold_count', limit = 10 } = {}) {
+    try {
+      const validLimit = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 50)
+      const validSortBy = ['sold_count', 'stock_turnover', 'avg_rating'].includes(sort_by)
+        ? sort_by
+        : 'sold_count'
+
+      logger.info('[兑换市场] 查询商品排行', { sort_by: validSortBy, limit: validLimit })
+
+      // 基础查询：商品信息 + 平均评分
+      const rows = await this.sequelize.query(
+        `SELECT
+          ei.exchange_item_id,
+          ei.item_name,
+          ei.sold_count,
+          ei.stock,
+          ei.cost_amount,
+          ei.status,
+          ROUND(ei.sold_count / GREATEST(ei.stock + ei.sold_count, 1), 4) AS stock_turnover,
+          AVG(er.rating) AS avg_rating,
+          COUNT(er.exchange_record_id) AS total_orders
+        FROM exchange_items ei
+        LEFT JOIN exchange_records er
+          ON er.exchange_item_id = ei.exchange_item_id
+          AND er.rating IS NOT NULL
+        GROUP BY ei.exchange_item_id
+        ORDER BY ${validSortBy === 'stock_turnover' ? 'stock_turnover' : validSortBy === 'avg_rating' ? 'avg_rating' : 'ei.sold_count'} DESC
+        LIMIT :limit`,
+        {
+          replacements: { limit: validLimit },
+          type: this.sequelize.QueryTypes.SELECT
+        }
+      )
+
+      const ranking = rows.map((r, index) => ({
+        rank: index + 1,
+        exchange_item_id: r.exchange_item_id,
+        item_name: r.item_name,
+        sold_count: parseInt(r.sold_count || 0, 10),
+        stock: parseInt(r.stock || 0, 10),
+        cost_amount: r.cost_amount,
+        status: r.status,
+        stock_turnover: parseFloat(r.stock_turnover || 0),
+        avg_rating: r.avg_rating ? parseFloat(parseFloat(r.avg_rating).toFixed(2)) : null,
+        total_orders: parseInt(r.total_orders || 0, 10)
+      }))
+
+      return { sort_by: validSortBy, limit: validLimit, ranking }
+    } catch (error) {
+      logger.error('[兑换市场] 查询商品排行失败:', error.message)
+      throw new Error(`查询商品排行失败: ${error.message}`)
+    }
+  }
 }
 
 module.exports = QueryService

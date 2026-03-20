@@ -97,6 +97,15 @@ export const CONTENT_ENDPOINTS = {
   CS_ISSUE_LIST: `${API_PREFIX}/console/customer-service/issues`,
   CS_ISSUE_DETAIL: `${API_PREFIX}/console/customer-service/issues/:id`,
   CS_ISSUE_NOTES: `${API_PREFIX}/console/customer-service/issues/:id/notes`,
+
+  // 交易纠纷管理（TradeDisputeService）
+  DISPUTE_LIST: `${API_PREFIX}/console/customer-service/disputes`,
+  DISPUTE_DETAIL: `${API_PREFIX}/console/customer-service/disputes/:id`,
+  DISPUTE_STATS: `${API_PREFIX}/console/customer-service/disputes/stats`,
+  DISPUTE_CREATE: `${API_PREFIX}/console/customer-service/disputes`,
+  DISPUTE_ESCALATE: `${API_PREFIX}/console/customer-service/disputes/:id/escalate`,
+  DISPUTE_RESOLVE: `${API_PREFIX}/console/customer-service/disputes/:id/resolve`,
+
   // 客服工作台 - GM工具
   CS_GM_COMPENSATE: `${API_PREFIX}/console/customer-service/gm-tools/compensate`,
   CS_GM_TEMPLATES: `${API_PREFIX}/console/customer-service/gm-tools/templates`,
@@ -443,7 +452,8 @@ export const ContentAPI = {
    * @returns {Promise<Object>} 资产余额列表 + 最近交易记录
    */
   async getUserContextAssets(userId, params = {}) {
-    const url = buildURL(CONTENT_ENDPOINTS.CS_USER_CONTEXT_ASSETS, { userId }) + buildQueryString(params)
+    const url =
+      buildURL(CONTENT_ENDPOINTS.CS_USER_CONTEXT_ASSETS, { userId }) + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 
@@ -456,7 +466,8 @@ export const ContentAPI = {
    * @returns {Promise<Object>} 物品列表
    */
   async getUserContextBackpack(userId, params = {}) {
-    const url = buildURL(CONTENT_ENDPOINTS.CS_USER_CONTEXT_BACKPACK, { userId }) + buildQueryString(params)
+    const url =
+      buildURL(CONTENT_ENDPOINTS.CS_USER_CONTEXT_BACKPACK, { userId }) + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 
@@ -468,7 +479,8 @@ export const ContentAPI = {
    * @returns {Promise<Object>} 抽奖记录 + 中奖统计
    */
   async getUserContextLottery(userId, params = {}) {
-    const url = buildURL(CONTENT_ENDPOINTS.CS_USER_CONTEXT_LOTTERY, { userId }) + buildQueryString(params)
+    const url =
+      buildURL(CONTENT_ENDPOINTS.CS_USER_CONTEXT_LOTTERY, { userId }) + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 
@@ -480,7 +492,8 @@ export const ContentAPI = {
    * @returns {Promise<Object>} 交易订单 + 市场挂单
    */
   async getUserContextTrades(userId, params = {}) {
-    const url = buildURL(CONTENT_ENDPOINTS.CS_USER_CONTEXT_TRADES, { userId }) + buildQueryString(params)
+    const url =
+      buildURL(CONTENT_ENDPOINTS.CS_USER_CONTEXT_TRADES, { userId }) + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 
@@ -492,7 +505,8 @@ export const ContentAPI = {
    * @returns {Promise<Object>} 多维度操作时间线
    */
   async getUserContextTimeline(userId, params = {}) {
-    const url = buildURL(CONTENT_ENDPOINTS.CS_USER_CONTEXT_TIMELINE, { userId }) + buildQueryString(params)
+    const url =
+      buildURL(CONTENT_ENDPOINTS.CS_USER_CONTEXT_TIMELINE, { userId }) + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 
@@ -515,7 +529,8 @@ export const ContentAPI = {
    * @returns {Promise<Object>} 历史会话列表
    */
   async getUserContextHistory(userId, params = {}) {
-    const url = buildURL(CONTENT_ENDPOINTS.CS_USER_CONTEXT_HISTORY, { userId }) + buildQueryString(params)
+    const url =
+      buildURL(CONTENT_ENDPOINTS.CS_USER_CONTEXT_HISTORY, { userId }) + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 
@@ -527,7 +542,8 @@ export const ContentAPI = {
    * @returns {Promise<Object>} 备注列表
    */
   async getUserContextNotes(userId, params = {}) {
-    const url = buildURL(CONTENT_ENDPOINTS.CS_USER_CONTEXT_NOTES, { userId }) + buildQueryString(params)
+    const url =
+      buildURL(CONTENT_ENDPOINTS.CS_USER_CONTEXT_NOTES, { userId }) + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 
@@ -819,7 +835,8 @@ export const ContentAPI = {
    * @returns {Promise<Object>} 备注列表
    */
   async getIssueNotes(issueId, params = {}) {
-    const url = buildURL(CONTENT_ENDPOINTS.CS_ISSUE_NOTES, { id: issueId }) + buildQueryString(params)
+    const url =
+      buildURL(CONTENT_ENDPOINTS.CS_ISSUE_NOTES, { id: issueId }) + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 
@@ -876,6 +893,67 @@ export const ContentAPI = {
   async getActivityDetail(id) {
     const url = buildURL(CONTENT_ENDPOINTS.ACTIVITY_DETAIL, { id })
     return await request({ url, method: 'GET' })
+  },
+
+  // ===== 交易纠纷管理（TradeDisputeService） =====
+
+  /**
+   * 获取纠纷列表
+   * @param {Object} [params={}] - 查询参数（status/dispute_type/page/page_size）
+   * @returns {Promise<Object>} 纠纷列表
+   */
+  async getDisputes(params = {}) {
+    const url = CONTENT_ENDPOINTS.DISPUTE_LIST + buildQueryString(params)
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 获取纠纷统计
+   * @returns {Promise<Object>} 纠纷统计数据
+   */
+  async getDisputeStats() {
+    return await request({ url: CONTENT_ENDPOINTS.DISPUTE_STATS, method: 'GET' })
+  },
+
+  /**
+   * 获取纠纷详情
+   * @param {number} disputeId - 纠纷 ID
+   * @returns {Promise<Object>} 纠纷详情
+   */
+  async getDisputeDetail(disputeId) {
+    const url = buildURL(CONTENT_ENDPOINTS.DISPUTE_DETAIL, { id: disputeId })
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 创建纠纷工单
+   * @param {Object} data - 纠纷数据（trade_order_id/dispute_type/description/dispute_evidence）
+   * @returns {Promise<Object>} 创建结果
+   */
+  async createDispute(data) {
+    return await request({ url: CONTENT_ENDPOINTS.DISPUTE_CREATE, method: 'POST', data })
+  },
+
+  /**
+   * 升级为仲裁
+   * @param {number} disputeId - 纠纷 ID
+   * @param {Object} data - 升级数据（reason）
+   * @returns {Promise<Object>} 操作结果
+   */
+  async escalateDispute(disputeId, data) {
+    const url = buildURL(CONTENT_ENDPOINTS.DISPUTE_ESCALATE, { id: disputeId })
+    return await request({ url, method: 'POST', data })
+  },
+
+  /**
+   * 解决纠纷
+   * @param {number} disputeId - 纠纷 ID
+   * @param {Object} data - 解决数据（resolution/refund_amount）
+   * @returns {Promise<Object>} 操作结果
+   */
+  async resolveDispute(disputeId, data) {
+    const url = buildURL(CONTENT_ENDPOINTS.DISPUTE_RESOLVE, { id: disputeId })
+    return await request({ url, method: 'POST', data })
   }
 }
 

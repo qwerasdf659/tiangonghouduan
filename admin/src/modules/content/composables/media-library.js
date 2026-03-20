@@ -19,8 +19,8 @@ export function useMediaState() {
   return {
     /** 媒体文件列表 */
     mediaFiles: [],
-    /** 媒体筛选 */
-    mediaFilters: { type: '', keyword: '' },
+    /** 媒体筛选（与后端 GET /api/v4/console/media 查询参数对齐） */
+    mediaFilters: { folder: '', status: '', tags: '', keyword: '' },
     /** 媒体统计 */
     mediaStats: { total: 0, totalSize: 0, weekly_uploads: 0, orphan_count: 0 },
     /** 选中的媒体 */
@@ -40,16 +40,19 @@ export function useMediaMethods() {
       try {
         logger.info('[ContentManagement] 加载媒体列表...')
         const params = new URLSearchParams()
-        if (this.mediaFilters?.type) params.append('type', this.mediaFilters.type)
+        if (this.mediaFilters?.folder) params.append('folder', this.mediaFilters.folder)
+        if (this.mediaFilters?.status) params.append('status', this.mediaFilters.status)
+        if (this.mediaFilters?.tags) params.append('tags', this.mediaFilters.tags)
         if (this.mediaFilters?.keyword) params.append('keyword', this.mediaFilters.keyword)
 
         const response = await this.apiGet(`${SYSTEM_ADMIN_ENDPOINTS.MEDIA_LIST}?${params}`)
         if (response?.success) {
-          this.mediaFiles = response.data?.list || response.data?.images || response.data?.items || []
+          this.mediaFiles =
+            response.data?.list || response.data?.images || response.data?.items || []
           logger.info('[ContentManagement] 媒体数量:', this.mediaFiles.length)
           this.mediaStats = {
             total: this.mediaFiles.length,
-            totalSize: this.mediaFiles.reduce((sum, m) => sum + (m.size || m.file_size || 0), 0)
+            totalSize: this.mediaFiles.reduce((sum, m) => sum + (m.file_size || 0), 0)
           }
         }
       } catch (error) {
@@ -141,7 +144,7 @@ export function useMediaMethods() {
     },
 
     resetMediaFilters() {
-      this.mediaFilters = { business_type: '', status: '' }
+      this.mediaFilters = { folder: '', status: '', tags: '', keyword: '' }
       this.loadMedia()
     },
 

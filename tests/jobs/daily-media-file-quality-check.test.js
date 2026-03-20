@@ -9,13 +9,13 @@
  * - 检测异常的 object_key 格式
  * - 只记录错误日志，不自动修复
  *
- * @module tests/jobs/daily-image-resource-quality-check
+ * @module tests/jobs/daily-media-file-quality-check
  * @since 2026-03-17
  */
 
 require('dotenv').config()
 
-const DailyMediaFileQualityCheck = require('../../jobs/daily-image-resource-quality-check')
+const DailyMediaFileQualityCheck = require('../../jobs/daily-media-file-quality-check')
 const { MediaFile } = require('../../models')
 const { Op } = require('sequelize')
 

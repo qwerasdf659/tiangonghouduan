@@ -60,10 +60,7 @@ const DEFAULT_MAX_SIZE = 5 * 1024 * 1024
  * @returns {Object} Alpine.js mixin 数据和方法
  */
 export function imageUploadMixin(config = {}) {
-  const {
-    allowed_types = DEFAULT_ALLOWED_TYPES,
-    max_size = DEFAULT_MAX_SIZE
-  } = config
+  const { allowed_types = DEFAULT_ALLOWED_TYPES, max_size = DEFAULT_MAX_SIZE } = config
 
   return {
     /** @type {boolean} 图片是否正在上传中 */
@@ -191,11 +188,20 @@ export function imageUploadMixin(config = {}) {
         const result = await request({
           url,
           method: 'POST',
-          data: { attachable_type: attachableType, attachable_id: attachableId, role, sort_order: sortOrder }
+          data: {
+            attachable_type: attachableType,
+            attachable_id: attachableId,
+            role,
+            sort_order: sortOrder
+          }
         })
         return result.success === true
       } catch (error) {
-        logger.error('绑定媒体失败', { media_id: mediaId, attachable_type: attachableType, error: error.message })
+        logger.error('绑定媒体失败', {
+          media_id: mediaId,
+          attachable_type: attachableType,
+          error: error.message
+        })
         return false
       }
     },
@@ -217,7 +223,11 @@ export function imageUploadMixin(config = {}) {
         const result = await request({ url, method: 'POST', data })
         return result.success === true
       } catch (error) {
-        logger.error('解绑媒体失败', { media_id: mediaId, attachable_type: attachableType, error: error.message })
+        logger.error('解绑媒体失败', {
+          media_id: mediaId,
+          attachable_type: attachableType,
+          error: error.message
+        })
         return false
       }
     },

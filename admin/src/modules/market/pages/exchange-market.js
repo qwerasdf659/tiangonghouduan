@@ -15,6 +15,7 @@ import { logger, $confirmDanger, $confirm } from '../../../utils/index.js'
 import { Alpine, createPageMixin, dataTable } from '../../../alpine/index.js'
 import { request, buildURL } from '../../../api/base.js'
 import { MARKET_ENDPOINTS } from '../../../api/market/index.js'
+import { ExchangeAPI } from '../../../api/market/exchange.js'
 import {
   useExchangeItemsState,
   useExchangeItemsMethods,
@@ -115,6 +116,20 @@ document.addEventListener('alpine:init', () => {
           await pageMixin.init.call(this)
         }
 
+        // 批量操作事件监听
+        this.$el.addEventListener('batch-status', async e => {
+          const { ids, status } = e.detail
+          await this.handleBatchStatus(ids, status)
+        })
+        this.$el.addEventListener('batch-price-modal', e => {
+          this.batchPriceIds = e.detail.ids
+          this.showModal('batchPriceModal')
+        })
+        this.$el.addEventListener('batch-category-modal', e => {
+          this.batchCategoryIds = e.detail.ids
+          this.showModal('batchCategoryModal')
+        })
+
         await this.loadAssetTypes()
         await this.loadPageData()
       },
@@ -152,6 +167,78 @@ document.addEventListener('alpine:init', () => {
       /** 刷新订单表格（供 CRUD 操作后调用） */
       _refreshOrdersTable() {
         window.dispatchEvent(new CustomEvent('refresh-exchange-orders'))
+      },
+
+      // ========== 批量操作 ==========
+      batchPriceIds: [],
+      batchCategoryIds: [],
+      batchPriceMode: 'percent',
+      batchPriceValue: 100,
+      batchCategoryDefId: null,
+
+      // ========== 单品数据看板 ==========
+      itemDashboard: null,
+      itemDashboardLoading: false,
+
+      /** 批量上下架 */
+      async handleBatchStatus(ids, status) {
+        const label = status === 'active' ? '上架' : '下架'
+        const confirmed = await $confirm(`确定批量${label} ${ids.length} 个商品？`)
+        if (!confirmed) return
+        try {
+          await ExchangeAPI.batchUpdateStatus(ids, status)
+          this.showSuccess(`已批量${label} ${ids.length} 个商品`)
+          this._refreshItemsTable()
+        } catch (error) {
+          this.showError(`批量${label}失败: ${error.message}`)
+        }
+      },
+
+      /** 批量改价提交 */
+      async submitBatchPrice() {
+        if (!this.batchPriceIds.length) return
+        try {
+          const items = this.batchPriceIds.map(id => ({
+            exchange_item_id: id,
+            mode: this.batchPriceMode,
+            value: Number(this.batchPriceValue)
+          }))
+          await ExchangeAPI.batchUpdatePrice(items)
+          this.showSuccess(`已批量改价 ${this.batchPriceIds.length} 个商品`)
+          this.hideModal('batchPriceModal')
+          this._refreshItemsTable()
+        } catch (error) {
+          this.showError(`批量改价失败: ${error.message}`)
+        }
+      },
+
+      /** 批量修改分类提交 */
+      async submitBatchCategory() {
+        if (!this.batchCategoryIds.length || !this.batchCategoryDefId) return
+        try {
+          await ExchangeAPI.batchUpdateCategory(this.batchCategoryIds, this.batchCategoryDefId)
+          this.showSuccess(`已批量修改分类 ${this.batchCategoryIds.length} 个商品`)
+          this.hideModal('batchCategoryModal')
+          this._refreshItemsTable()
+        } catch (error) {
+          this.showError(`批量修改分类失败: ${error.message}`)
+        }
+      },
+
+      /** 查看单品数据看板 */
+      async viewItemDashboard(item) {
+        const itemId = item.exchange_item_id || item
+        this.itemDashboard = null
+        this.itemDashboardLoading = true
+        this.showModal('itemDashboardModal')
+        try {
+          const res = await ExchangeAPI.getItemDashboard(itemId)
+          this.itemDashboard = res.data || res
+        } catch (error) {
+          this.showError(`看板数据加载失败: ${error.message}`)
+        } finally {
+          this.itemDashboardLoading = false
+        }
       },
 
       /**
@@ -250,10 +337,9 @@ document.addEventListener('alpine:init', () => {
        */
       async rejectOrder(order) {
         if (
-          !(await $confirm(
-            `确定要拒绝订单 ${order.order_no} 吗？已支付的资产将退回用户账户。`,
-            { type: 'danger' }
-          ))
+          !(await $confirm(`确定要拒绝订单 ${order.order_no} 吗？已支付的资产将退回用户账户。`, {
+            type: 'danger'
+          }))
         )
           return
 
@@ -295,7 +381,7 @@ document.addEventListener('alpine:init', () => {
         {
           key: 'primary_image',
           label: '图片',
-          render: (val) => {
+          render: val => {
             const url = val?.thumbnail_url || val?.url
             if (url) {
               return `<img src="${url}" alt="商品图片" class="w-10 h-10 object-cover rounded" />`
@@ -321,7 +407,7 @@ document.addEventListener('alpine:init', () => {
           }
         }
       ],
-      dataSource: async (params) => {
+      dataSource: async params => {
         const res = await request({
           url: MARKET_ENDPOINTS.EXCHANGE_ITEMS,
           method: 'GET',
@@ -334,6 +420,7 @@ document.addEventListener('alpine:init', () => {
       },
       primaryKey: 'exchange_item_id',
       sortable: true,
+      selectable: true,
       page_size: 20
     })
     const origInit = table.init
@@ -380,7 +467,7 @@ document.addEventListener('alpine:init', () => {
         },
         { key: 'created_at', label: '下单时间', type: 'datetime', sortable: true }
       ],
-      dataSource: async (params) => {
+      dataSource: async params => {
         const res = await request({
           url: MARKET_ENDPOINTS.EXCHANGE_ORDERS,
           method: 'GET',

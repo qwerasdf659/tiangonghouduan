@@ -390,6 +390,7 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/console/marketplace/exchange_market/items/batch-price': 'ADMIN_EXCHANGE_BATCH_PRICE', // 批量改价
   '/api/v4/console/marketplace/exchange_market/items/batch-category':
     'ADMIN_EXCHANGE_BATCH_CATEGORY', // 批量修改分类
+  '/api/v4/console/marketplace/exchange_market/items/import': 'ADMIN_EXCHANGE_BATCH_IMPORT', // 批量导入兑换商品（Excel/CSV）
   '/api/v4/console/marketplace/listings/:id/force-withdraw': 'ADMIN_FORCE_WITHDRAW', // 强制下架
   '/api/v4/console/marketplace/listings/:id/pin': 'ADMIN_LISTING_PIN', // 挂牌置顶/取消置顶
   '/api/v4/console/marketplace/listings/:id/recommend': 'ADMIN_LISTING_RECOMMEND', // 挂牌推荐/取消推荐

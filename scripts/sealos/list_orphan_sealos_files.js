@@ -6,7 +6,6 @@
  */
 
 require('dotenv').config()
-const { Sequelize } = require('sequelize')
 // 🔴 复用主 sequelize 实例（单一配置源）
 const { sequelize } = require('../../config/database')
 
@@ -18,7 +17,8 @@ const { sequelize } = require('../../config/database')
 let sealosStorage = null
 
 /**
- * P1-9：初始化 ServiceManager 并获取 SealosStorageService
+ * 初始化 ServiceManager 并获取 SealosStorageService 实例
+ * 注意：sealos_storage 在 ServiceManager 中注册的是类本身，需要 new 实例化
  * @returns {Promise<Object>} SealosStorageService 实例
  */
 async function initializeSealosStorage() {
@@ -28,8 +28,9 @@ async function initializeSealosStorage() {
     if (!serviceManager._initialized) {
       await serviceManager.initialize()
     }
-    sealosStorage = serviceManager.getService('sealos_storage')
-    console.log('✅ SealosStorageService 加载成功（P1-9 ServiceManager）')
+    const SealosStorageServiceClass = serviceManager.getService('sealos_storage')
+    sealosStorage = new SealosStorageServiceClass()
+    console.log('SealosStorageService 实例化成功')
     return sealosStorage
   } catch (error) {
     console.error('❌ SealosStorageService 加载失败:', error.message)
@@ -41,15 +42,16 @@ async function initializeSealosStorage() {
  * 获取数据库中所有有效的媒体文件 object_key（media_files 表）
  */
 async function getDatabaseFilePaths() {
+  // 查询所有非 deleted 状态的 object_key（包含 trashed，回收站文件不应被当作孤儿）
   const [results] = await sequelize.query(
-    'SELECT object_key FROM media_files WHERE status = \'active\''
+    "SELECT object_key FROM media_files WHERE status IN ('active', 'archived', 'trashed')"
   )
   // 收集 object_key 及其缩略图路径
   const paths = new Set(results.map(row => row.object_key))
 
   // 同时查询缩略图 keys
   const [thumbResults] = await sequelize.query(
-    'SELECT thumbnail_keys FROM media_files WHERE status = \'active\' AND thumbnail_keys IS NOT NULL'
+    "SELECT thumbnail_keys FROM media_files WHERE status IN ('active', 'archived', 'trashed') AND thumbnail_keys IS NOT NULL"
   )
   for (const row of thumbResults) {
     const keys = typeof row.thumbnail_keys === 'string' ? JSON.parse(row.thumbnail_keys) : row.thumbnail_keys
@@ -72,21 +74,15 @@ async function getDatabaseFilePaths() {
 }
 
 /**
- * 列出Sealos中所有文件
+ * 列出 Sealos bucket 中所有文件
+ * 使用 SealosStorageService.listFiles() 方法，不直接访问 s3 客户端
  */
 async function listSealosFiles() {
   try {
-    // 获取S3客户端
-    const s3 = sealosStorage.s3
-    const bucket = process.env.SEALOS_BUCKET_NAME
-
-    const params = {
-      Bucket: bucket,
-      Prefix: 'mh3' // 用户上传文件的前缀
-    }
-
-    const data = await s3.listObjectsV2(params).promise()
-    return data.Contents || []
+    // 调用 SealosStorageService.listFiles(prefix, maxKeys)
+    // prefix 为空字符串表示扫描整个 bucket
+    const files = await sealosStorage.listFiles('', 10000)
+    return files
   } catch (error) {
     console.error('❌ 获取Sealos文件列表失败:', error.message)
     return []
@@ -122,12 +118,12 @@ async function identifyOrphanFiles() {
     const orphanFiles = []
 
     sealosFiles.forEach(file => {
-      const fileName = file.Key
+      const fileName = file.key
       if (!dbFilePaths.has(fileName)) {
         orphanFiles.push({
           key: fileName,
-          size: file.Size,
-          lastModified: file.LastModified
+          size: file.size,
+          lastModified: file.lastModified
         })
       }
     })

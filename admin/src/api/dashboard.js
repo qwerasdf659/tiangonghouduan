@@ -12,16 +12,27 @@ import { API_PREFIX, request } from './base.js'
 export const DASHBOARD_ENDPOINTS = {
   // 运营看板核心接口
   PENDING_SUMMARY: `${API_PREFIX}/console/dashboard/pending-summary`,
-  BUSINESS_HEALTH: `${API_PREFIX}/console/dashboard/business-health`,  // 业务健康度评分
-  TIME_COMPARISON: `${API_PREFIX}/console/dashboard/time-comparison`,  // 时间对比数据
-  
+  BUSINESS_HEALTH: `${API_PREFIX}/console/dashboard/business-health`, // 业务健康度评分
+  TIME_COMPARISON: `${API_PREFIX}/console/dashboard/time-comparison`, // 时间对比数据
+
   // 统计分析接口
   TODAY_STATS: `${API_PREFIX}/console/analytics/stats/today`,
   DECISIONS_ANALYTICS: `${API_PREFIX}/console/analytics/decisions/analytics`,
-  
+
   // 告警和预算接口
   REALTIME_ALERTS: `${API_PREFIX}/console/lottery-realtime/alerts`,
-  BUDGET_STATUS: `${API_PREFIX}/console/campaign-budget/batch-status`
+  BUDGET_STATUS: `${API_PREFIX}/console/campaign-budget/batch-status`,
+
+  // 平台收入管理（PlatformRevenueService）
+  REVENUE_OVERVIEW: `${API_PREFIX}/console/dashboard/revenue/overview`,
+  REVENUE_BY_SOURCE: `${API_PREFIX}/console/dashboard/revenue/by-source`,
+  REVENUE_TREND: `${API_PREFIX}/console/dashboard/revenue/trend`,
+  REVENUE_FEE_STATS: `${API_PREFIX}/console/dashboard/revenue/fee-stats`,
+
+  // 市场健康看板（MarketHealthService）
+  MARKET_HEALTH_SUMMARY: `${API_PREFIX}/console/dashboard/market-health`,
+  MARKET_HEALTH_ORDER_TREND: `${API_PREFIX}/console/dashboard/market-health/order-trend`,
+  MARKET_HEALTH_TOP_USERS: `${API_PREFIX}/console/dashboard/market-health/top-users`
 }
 
 /**
@@ -89,6 +100,73 @@ export const DashboardAPI = {
    */
   async getTimeComparison(params = {}) {
     return request({ url: DASHBOARD_ENDPOINTS.TIME_COMPARISON, params })
+  },
+
+  // ===== 平台收入管理（PlatformRevenueService） =====
+
+  /**
+   * 获取平台收入概览
+   * @returns {Promise<Object>} 收入概览（balances + total_income）
+   */
+  async getRevenueOverview() {
+    return request({ url: DASHBOARD_ENDPOINTS.REVENUE_OVERVIEW })
+  },
+
+  /**
+   * 获取收入来源分类
+   * @returns {Promise<Object>} 来源分类数据
+   */
+  async getRevenueBySource() {
+    return request({ url: DASHBOARD_ENDPOINTS.REVENUE_BY_SOURCE })
+  },
+
+  /**
+   * 获取收入趋势
+   * @param {Object} params - 查询参数
+   * @param {string} [params.period='daily'] - 周期（daily/weekly/monthly）
+   * @param {number} [params.days=7] - 天数
+   * @returns {Promise<Object>} 趋势数据
+   */
+  async getRevenueTrend(params = {}) {
+    return request({ url: DASHBOARD_ENDPOINTS.REVENUE_TREND, params })
+  },
+
+  /**
+   * 获取手续费统计
+   * @returns {Promise<Object>} 手续费率配置 + 30天手续费统计
+   */
+  async getRevenueFeeStats() {
+    return request({ url: DASHBOARD_ENDPOINTS.REVENUE_FEE_STATS })
+  },
+
+  // ===== 市场健康看板（MarketHealthService） =====
+
+  /**
+   * 获取市场健康摘要
+   * @returns {Promise<Object>} 订单状态趋势 + 平均结算时间 + Top买家/卖家
+   */
+  async getMarketHealthSummary() {
+    return request({ url: DASHBOARD_ENDPOINTS.MARKET_HEALTH_SUMMARY })
+  },
+
+  /**
+   * 获取市场订单趋势
+   * @param {Object} params - 查询参数
+   * @param {number} [params.days=7] - 天数
+   * @returns {Promise<Object>} 订单趋势数据
+   */
+  async getMarketHealthOrderTrend(params = {}) {
+    return request({ url: DASHBOARD_ENDPOINTS.MARKET_HEALTH_ORDER_TREND, params })
+  },
+
+  /**
+   * 获取市场活跃用户排行
+   * @param {Object} params - 查询参数
+   * @param {number} [params.limit=5] - 排行数量
+   * @returns {Promise<Object>} Top买家/卖家排行
+   */
+  async getMarketHealthTopUsers(params = {}) {
+    return request({ url: DASHBOARD_ENDPOINTS.MARKET_HEALTH_TOP_USERS, params })
   }
 }
 

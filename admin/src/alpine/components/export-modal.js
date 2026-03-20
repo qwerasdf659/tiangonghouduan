@@ -92,6 +92,25 @@ const EXPORT_TYPE_CONFIG = {
       { key: 'health_score', label: '健康度', default: true }
     ]
   },
+  exchange_item: {
+    name: '兑换商品',
+    filename: '兑换商品',
+    supportedFormats: ['csv'],
+    defaultFormat: 'csv',
+    fields: [
+      { key: 'exchange_item_id', label: '商品ID', default: true },
+      { key: 'item_name', label: '商品名称', default: true },
+      { key: 'status', label: '状态', default: true },
+      { key: 'category', label: '分类', default: true },
+      { key: 'rarity_code', label: '稀有度', default: true },
+      { key: 'cost_asset_code', label: '支付资产', default: true },
+      { key: 'cost_amount', label: '兑换价格', default: true },
+      { key: 'stock', label: '库存', default: true },
+      { key: 'sold_count', label: '已售', default: true },
+      { key: 'sort_order', label: '排序权重', default: false },
+      { key: 'created_at', label: '创建时间', default: true }
+    ]
+  },
   lottery: {
     name: '抽奖记录',
     filename: '抽奖记录',

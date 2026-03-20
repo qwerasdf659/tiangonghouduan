@@ -64,6 +64,39 @@
           </button>
         </div>
 
+        <!-- 筛选栏（对齐后端 GET /api/v4/console/media 查询参数） -->
+        <div class="p-4 border-b themed-bg-subtle flex flex-wrap gap-3 items-end">
+          <div class="flex flex-col">
+            <label class="text-xs themed-text-muted mb-1">文件夹</label>
+            <select x-model="mediaFilters.folder" @change="searchMedia()" class="text-sm border rounded-lg px-3 py-1.5 themed-bg-primary themed-text-primary">
+              <option value="">全部</option>
+              <option value="categories">categories（分类图标）</option>
+              <option value="materials">materials（材料图标）</option>
+              <option value="products">products（商品图片）</option>
+              <option value="photos">photos（通用图片）</option>
+            </select>
+          </div>
+          <div class="flex flex-col">
+            <label class="text-xs themed-text-muted mb-1">状态</label>
+            <select x-model="mediaFilters.status" @change="searchMedia()" class="text-sm border rounded-lg px-3 py-1.5 themed-bg-primary themed-text-primary">
+              <option value="">全部</option>
+              <option value="active">active（正常）</option>
+              <option value="archived">archived（已归档）</option>
+              <option value="trashed">trashed（回收站）</option>
+            </select>
+          </div>
+          <div class="flex flex-col">
+            <label class="text-xs themed-text-muted mb-1">标签</label>
+            <input type="text" x-model="mediaFilters.tags" @keyup.enter="searchMedia()" placeholder="输入标签名" class="text-sm border rounded-lg px-3 py-1.5 themed-bg-primary themed-text-primary w-36">
+          </div>
+          <div class="flex flex-col">
+            <label class="text-xs themed-text-muted mb-1">关键词</label>
+            <input type="text" x-model="mediaFilters.keyword" @keyup.enter="searchMedia()" placeholder="搜索文件名" class="text-sm border rounded-lg px-3 py-1.5 themed-bg-primary themed-text-primary w-36">
+          </div>
+          <button @click="searchMedia()" class="px-3 py-1.5 themed-btn-primary rounded-lg text-sm">搜索</button>
+          <button @click="resetMediaFilters()" class="px-3 py-1.5 themed-bg-muted themed-text-secondary rounded-lg text-sm hover:bg-gray-300">重置</button>
+        </div>
+
         <div x-show="mediaFiles.length === 0" class="empty-state">
           <div class="empty-state-icon-circle">
             <div class="empty-state-icon">🖼️</div>

@@ -30,6 +30,7 @@ export const TRADE_ENDPOINTS = {
   // 挂牌排序管理（Phase 3 — 排序增强）
   LISTING_PIN: `${API_PREFIX}/console/marketplace/listings/:id/pin`,
   LISTING_RECOMMEND: `${API_PREFIX}/console/marketplace/listings/:id/recommend`,
+  LISTING_BATCH_SORT: `${API_PREFIX}/console/marketplace/listings/batch-sort`,
 
   // 孤儿冻结检测
   ORPHAN_DETECT: `${API_PREFIX}/console/orphan-frozen/detect`,
@@ -69,8 +70,7 @@ export const TRADE_ENDPOINTS = {
   TRADE_ORDER_DETAIL: `${API_PREFIX}/console/trade-orders/:id`,
   TRADE_ORDER_STATS: `${API_PREFIX}/console/trade-orders/stats`,
   TRADE_ORDER_USER_STATS: `${API_PREFIX}/console/trade-orders/user/:user_id/stats`,
-  TRADE_ORDER_BY_BUSINESS_ID: `${API_PREFIX}/console/trade-orders/by-business-id/:business_id`,
-
+  TRADE_ORDER_BY_BUSINESS_ID: `${API_PREFIX}/console/trade-orders/by-business-id/:business_id`
 }
 
 // ========== API 调用方法 ==========
@@ -207,7 +207,9 @@ export const TradeAPI = {
    * @returns {Promise<Object>} API 响应
    */
   async forceWithdrawListing(marketListingId, data) {
-    const url = buildURL(TRADE_ENDPOINTS.LISTING_FORCE_WITHDRAW, { market_listing_id: marketListingId })
+    const url = buildURL(TRADE_ENDPOINTS.LISTING_FORCE_WITHDRAW, {
+      market_listing_id: marketListingId
+    })
     return await request({ url, method: 'POST', data })
   },
 
@@ -511,8 +513,21 @@ export const TradeAPI = {
   async toggleListingRecommend(listingId, isRecommended) {
     const url = buildURL(TRADE_ENDPOINTS.LISTING_RECOMMEND, { id: listingId })
     return await request({ url, method: 'PUT', data: { is_recommended: isRecommended } })
-  }
+  },
 
+  /**
+   * 批量排序挂牌
+   *
+   * @param {Array<{id: number, sort_order: number}>} items - 排序数据
+   * @returns {Promise<Object>} 批量排序结果
+   */
+  async batchSortListings(items) {
+    return await request({
+      url: TRADE_ENDPOINTS.LISTING_BATCH_SORT,
+      method: 'PUT',
+      data: { items }
+    })
+  }
 }
 
 export default TradeAPI

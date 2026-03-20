@@ -73,6 +73,73 @@ function registerDictManagementComponents() {
     // 页面状态
     saving: false,
 
+    // ========== 分类树形管理 ==========
+    categoryTree: [],
+    subcategoryForm: {
+      parent_category_def_id: null,
+      parent_name: '',
+      category_code: '',
+      display_name: '',
+      description: ''
+    },
+
+    /** 加载分类树 */
+    async loadCategoryTree() {
+      try {
+        const { SystemAdminAPI } = await import('../../../api/system/admin.js')
+        const res = await SystemAdminAPI.getCategoryTree()
+        const payload = res.data || res || {}
+        this.categoryTree = payload.tree || payload || []
+        logger.debug('[DictManagement] 分类树加载完成:', this.categoryTree.length, '个一级分类')
+      } catch (error) {
+        logger.error('[DictManagement] 分类树加载失败:', error)
+        this.categoryTree = []
+      }
+    },
+
+    /** 打开添加子分类弹窗 */
+    openAddSubcategoryModal(parent) {
+      this.subcategoryForm = {
+        parent_category_def_id: parent.category_def_id,
+        parent_name: parent.display_name,
+        category_code: '',
+        display_name: '',
+        description: ''
+      }
+      this.showModal('subcategoryModal')
+    },
+
+    /** 提交添加子分类 */
+    async submitSubcategory() {
+      if (!this.subcategoryForm.category_code || !this.subcategoryForm.display_name) {
+        Alpine.store('notification').show('请填写分类代码和名称', 'warning')
+        return
+      }
+      try {
+        this.saving = true
+        const { request } = await import('../../../api/base.js')
+        const { SYSTEM_ADMIN_ENDPOINTS } = await import('../../../api/system/admin.js')
+        await request({
+          url: SYSTEM_ADMIN_ENDPOINTS.DICT_CATEGORY_TREE.replace('/tree', ''),
+          method: 'POST',
+          data: {
+            category_code: this.subcategoryForm.category_code,
+            display_name: this.subcategoryForm.display_name,
+            description: this.subcategoryForm.description,
+            parent_category_def_id: this.subcategoryForm.parent_category_def_id,
+            is_enabled: true
+          }
+        })
+        Alpine.store('notification').show('子分类添加成功', 'success')
+        this.hideModal('subcategoryModal')
+        await this.loadCategoryTree()
+      } catch (error) {
+        Alpine.store('notification').show('添加失败: ' + error.message, 'error')
+      } finally {
+        this.saving = false
+      }
+    },
+
     // ========== data-table 列配置 ==========
     tableColumns: [
       {
@@ -80,8 +147,7 @@ function registerDictManagementComponents() {
         label: '字典代码',
         sortable: true,
         render: (_val, row) => {
-          const code =
-            row.category_code || row.rarity_code || row.group_code || '-'
+          const code = row.category_code || row.rarity_code || row.group_code || '-'
           return `<code class="text-xs bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded font-mono">${code}</code>`
         }
       },
@@ -152,7 +218,7 @@ function registerDictManagementComponents() {
         // 为每行添加 _row_id：使用当前字典类型的唯一标识字段
         // 避免 display_name 重复导致 x-for :key 冲突（如两个稀有度都叫"普通"）
         const idField = DICT_TYPE_ID_FIELDS[_currentDictType] || 'display_name'
-        items.forEach((item) => {
+        items.forEach(item => {
           item._row_id = item[idField] || item.display_name || ''
         })
 
@@ -213,6 +279,9 @@ function registerDictManagementComponents() {
 
       // 数据加载由 data-table 的 init() 自动完成
       logger.info('[DictManagement] 页面初始化完成（data-table 模式）')
+
+      // 加载分类树（分类 Tab 使用）
+      await this.loadCategoryTree()
     }
   }))
 

@@ -25,6 +25,7 @@
 import { logger } from '../../../utils/logger.js'
 import { Alpine, createPageMixin, dataTable } from '../../../alpine/index.js'
 import { request, API_PREFIX } from '../../../api/base.js'
+import { DashboardAPI } from '../../../api/dashboard.js'
 import {
   useConsumptionState,
   useConsumptionMethods,
@@ -49,7 +50,8 @@ const SUB_PAGES = [
   { id: 'merchant-points', title: '商户积分', icon: 'bi-coin' },
   { id: 'debt-management', title: '债务管理', icon: 'bi-cash-stack' },
   { id: 'campaign-budget', title: '活动预算', icon: 'bi-piggy-bank' },
-  { id: 'merchant-logs', title: '商户日志', icon: 'bi-journal-text' }
+  { id: 'merchant-logs', title: '商户日志', icon: 'bi-journal-text' },
+  { id: 'platform-revenue', title: '平台收入', icon: 'bi-graph-up-arrow' }
 ]
 
 document.addEventListener('alpine:init', () => {
@@ -169,6 +171,14 @@ document.addEventListener('alpine:init', () => {
       ...useCampaignBudgetState(),
       ...useMerchantLogsState(),
 
+      // ========== 平台收入状态 ==========
+      revenueOverview: null,
+      revenueSources: [],
+      revenueTrend: [],
+      revenueFeeStats: null,
+      revenuePeriod: 'daily',
+      revenueDays: 7,
+
       // ========== 计算属性 ==========
       get current_page() {
         return Alpine.store('financePage')
@@ -229,6 +239,9 @@ document.addEventListener('alpine:init', () => {
             case 'merchant-logs':
               await Promise.all([this.loadMerchantLogs(), this.loadLogStats()])
               break
+            case 'platform-revenue':
+              await this.loadRevenueData()
+              break
           }
         } catch (error) {
           logger.error('[FinanceContent] 加载数据失败:', error)
@@ -252,6 +265,44 @@ document.addEventListener('alpine:init', () => {
       },
 
       // ========== 各模块方法 ==========
+
+      // ===== 平台收入 =====
+
+      /**
+       * 加载平台收入全部数据
+       */
+      async loadRevenueData() {
+        try {
+          const [overviewRes, sourceRes, trendRes, feeRes] = await Promise.all([
+            DashboardAPI.getRevenueOverview(),
+            DashboardAPI.getRevenueBySource(),
+            DashboardAPI.getRevenueTrend({ period: this.revenuePeriod, days: this.revenueDays }),
+            DashboardAPI.getRevenueFeeStats()
+          ])
+          this.revenueOverview = overviewRes.data || overviewRes
+          this.revenueSources = sourceRes.data || sourceRes || []
+          this.revenueTrend = trendRes.data || trendRes || []
+          this.revenueFeeStats = feeRes.data || feeRes
+          logger.debug('[PlatformRevenue] 数据加载完成')
+        } catch (error) {
+          logger.error('[PlatformRevenue] 加载失败:', error)
+          this.showError('平台收入数据加载失败')
+        }
+      },
+
+      /**
+       * 切换收入趋势周期
+       * @param {string} period - daily/weekly/monthly
+       */
+      async switchRevenuePeriod(period) {
+        this.revenuePeriod = period
+        try {
+          const res = await DashboardAPI.getRevenueTrend({ period, days: this.revenueDays })
+          this.revenueTrend = res.data || res || []
+        } catch (error) {
+          logger.error('[PlatformRevenue] 趋势加载失败:', error)
+        }
+      },
       ...useConsumptionMethods(),
       ...useDiamondAccountsMethods(),
       ...useMerchantPointsMethods(),

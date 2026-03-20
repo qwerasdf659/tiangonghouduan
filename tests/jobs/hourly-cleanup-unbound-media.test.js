@@ -4,17 +4,17 @@
  * 每小时孤立媒体文件清理任务测试套件
  *
  * 测试目标：
- * - HourlyCleanupUnboundImages.execute() 的核心功能
+ * - HourlyCleanupUnboundMedia.execute() 的核心功能
  * - 清理无 media_attachments 关联且超过指定时间的孤立媒体文件
  * - 使用 MediaService.cleanupOrphanedMedia 执行清理
  *
- * @module tests/jobs/hourly-cleanup-unbound-images
+ * @module tests/jobs/hourly-cleanup-unbound-media
  * @since 2026-03-17
  */
 
 require('dotenv').config()
 
-const HourlyCleanupUnboundImages = require('../../jobs/hourly-cleanup-unbound-images')
+const HourlyCleanupUnboundMedia = require('../../jobs/hourly-cleanup-unbound-media')
 const { MediaFile, MediaAttachment } = require('../../models')
 const { Op } = require('sequelize')
 
@@ -23,7 +23,7 @@ describe('每小时孤立媒体文件清理任务', () => {
 
   describe('execute() - 核心执行逻辑', () => {
     test('应成功执行清理并返回报告', async () => {
-      const report = await HourlyCleanupUnboundImages.execute()
+      const report = await HourlyCleanupUnboundMedia.execute()
 
       expect(report).toBeDefined()
       expect(report).toHaveProperty('timestamp')
@@ -83,7 +83,7 @@ describe('每小时孤立媒体文件清理任务', () => {
 
       const ids = attachedMediaIds.map(a => a.media_id)
 
-      await HourlyCleanupUnboundImages.execute()
+      await HourlyCleanupUnboundMedia.execute()
 
       const remainingFiles = await MediaFile.findAll({
         where: { media_id: { [Op.in]: ids } }
