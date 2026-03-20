@@ -16,6 +16,7 @@ import { Alpine, createPageMixin, dataTable } from '../../../alpine/index.js'
 import { request, buildURL } from '../../../api/base.js'
 import { MARKET_ENDPOINTS } from '../../../api/market/index.js'
 import { ExchangeAPI } from '../../../api/market/exchange.js'
+import { ProductAPI } from '../../../api/product/index.js'
 import {
   useExchangeItemsState,
   useExchangeItemsMethods,
@@ -96,6 +97,15 @@ document.addEventListener('alpine:init', () => {
       current_page: 'items',
       saving: false,
 
+      /** 兑换商品列表视图：grid | list，持久化 localStorage */
+      view_mode: (() => {
+        try {
+          return localStorage.getItem('exchange_items_view_mode') === 'list' ? 'list' : 'grid'
+        } catch (_e) {
+          return 'grid'
+        }
+      })(),
+
       ...useExchangeItemsState(),
       ...useExchangeOrdersState(),
       ...useExchangeStatsState(),
@@ -137,6 +147,20 @@ document.addEventListener('alpine:init', () => {
       switchPage(pageId) {
         this.current_page = pageId
         this.loadPageData()
+      },
+
+      /** 切换商品列表网格/表格视图 */
+      toggleViewMode(mode) {
+        if (mode === 'grid' || mode === 'list') {
+          this.view_mode = mode
+        } else {
+          this.view_mode = this.view_mode === 'grid' ? 'list' : 'grid'
+        }
+        try {
+          localStorage.setItem('exchange_items_view_mode', this.view_mode)
+        } catch (_e) {
+          /* 忽略存储异常 */
+        }
       },
 
       async loadPageData() {
@@ -227,7 +251,7 @@ document.addEventListener('alpine:init', () => {
 
       /** 查看单品数据看板 */
       async viewItemDashboard(item) {
-        const itemId = item.exchange_item_id || item
+        const itemId = item.product_id || item.exchange_item_id || item
         this.itemDashboard = null
         this.itemDashboardLoading = true
         this.showModal('itemDashboardModal')
@@ -297,6 +321,18 @@ document.addEventListener('alpine:init', () => {
         return type?.asset_name || code || '-'
       },
 
+      /** 商品主图 URL（网格卡片用） */
+      exchangeItemImageUrl(row) {
+        const img = row?.primary_image
+        const url = img?.thumbnail_url || img?.url
+        return url || ''
+      },
+
+      /** 商品状态徽章文案（网格卡片用） */
+      exchangeItemStatusLabel(status) {
+        return status === 'active' ? '上架' : '下架'
+      },
+
       // ========== 商品操作方法 ==========
 
       /**
@@ -304,7 +340,9 @@ document.addEventListener('alpine:init', () => {
        * @param {Object|number} itemOrId - 商品对象或商品ID
        */
       async deleteItem(itemOrId) {
-        const itemId = typeof itemOrId === 'object' ? itemOrId.exchange_item_id : itemOrId
+        const itemId = typeof itemOrId === 'object'
+          ? (itemOrId.product_id || itemOrId.exchange_item_id)
+          : itemOrId
         if (!itemId) {
           logger.error('[ExchangeMarket] deleteItem: 无效的商品ID')
           return
@@ -313,10 +351,7 @@ document.addEventListener('alpine:init', () => {
         if (!(await $confirmDanger('确定要删除此商品吗？'))) return
 
         try {
-          const res = await request({
-            url: buildURL(MARKET_ENDPOINTS.EXCHANGE_ITEM_DETAIL, { exchange_item_id: itemId }),
-            method: 'DELETE'
-          })
+          const res = await ProductAPI.deleteProduct(itemId)
           if (res.success) {
             this.showSuccess?.('删除成功')
             this._refreshItemsTable()
@@ -408,13 +443,14 @@ document.addEventListener('alpine:init', () => {
         }
       ],
       dataSource: async params => {
-        const res = await request({
-          url: MARKET_ENDPOINTS.EXCHANGE_ITEMS,
-          method: 'GET',
-          params
-        })
+        const res = await ProductAPI.listProducts(params)
+        const rawItems = res.data?.items || res.data?.list || res.data?.products || []
         return {
-          items: res.data?.items || res.data?.list || [],
+          items: rawItems.map(p => ({
+            ...p,
+            exchange_item_id: p.product_id ?? p.exchange_item_id,
+            item_name: p.product_name ?? p.item_name
+          })),
           total: res.data?.pagination?.total || 0
         }
       },

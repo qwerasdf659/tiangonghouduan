@@ -114,7 +114,15 @@ router.get('/listing-stats', authenticateToken, requireRoleLevel(100), async (re
  */
 router.get('/user-listings', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const { user_id, status, page = 1, page_size = 20 } = req.query
+    const {
+      user_id,
+      status,
+      page = 1,
+      page_size = 20,
+      quality_grade,
+      sort_by,
+      sort_order
+    } = req.query
     const admin_id = req.user.user_id
 
     if (!user_id) {
@@ -129,7 +137,10 @@ router.get('/user-listings', authenticateToken, requireRoleLevel(100), async (re
       user_id: parseInt(user_id),
       status: status || undefined,
       page: parseInt(page),
-      page_size: parseInt(page_size)
+      page_size: parseInt(page_size),
+      quality_grade: quality_grade || undefined,
+      sort_by: sort_by || undefined,
+      sort_order: sort_order || undefined
     })
 
     logger.info('查询用户上架商品列表成功', {
@@ -218,6 +229,8 @@ router.put('/user-listing-limit', authenticateToken, requireRoleLevel(100), asyn
 })
 
 /**
+ * @deprecated 前端已迁移至 ProductAPI → GET /api/v4/console/products
+ *
  * 管理员获取兑换商品列表（Admin Only）
  * GET /api/v4/console/marketplace/exchange_market/items
  *
@@ -433,8 +446,7 @@ router.get(
         where.status = status
       }
 
-      const ExchangeItem =
-        req.app.locals.models?.ExchangeItem || require('../../../models').ExchangeItem
+      const ExchangeItem = req.app.locals.models.ExchangeItem
       const items = await ExchangeItem.findAll({
         where,
         order: [
@@ -752,6 +764,8 @@ router.get(
 )
 
 /**
+ * @deprecated 前端已迁移至 ProductAPI → GET /api/v4/console/products/:id
+ *
  * 管理员获取单个兑换商品详情（Admin Only）
  * GET /api/v4/console/marketplace/exchange_market/items/:exchange_item_id
  *
@@ -817,6 +831,8 @@ router.get(
 )
 
 /**
+ * @deprecated 前端已迁移至 ProductAPI → POST /api/v4/console/products
+ *
  * 创建兑换商品（管理员操作）
  * POST /api/v4/console/marketplace/exchange_market/items
  *
@@ -1009,6 +1025,8 @@ router.post(
 )
 
 /**
+ * @deprecated 前端已迁移至 ProductAPI → PUT /api/v4/console/products/:id
+ *
  * 更新兑换商品（管理员操作）
  * PUT /api/v4/console/marketplace/exchange_market/items/:exchange_item_id
  *
@@ -1163,6 +1181,8 @@ router.put(
 )
 
 /**
+ * @deprecated 前端已迁移至 ProductAPI → DELETE /api/v4/console/products/:id
+ *
  * 删除兑换商品（管理员操作）
  * DELETE /api/v4/console/marketplace/exchange_market/items/:exchange_item_id
  *
@@ -1258,6 +1278,7 @@ router.delete(
 
 /*
  * ================================================================
+ * @deprecated 前端已迁移至 ProductAPI SKU 端点 → /api/v4/console/products/:id/skus
  * SKU 子资源路由（Phase 2 — SPU/SKU 全量模式）
  * ================================================================
  */

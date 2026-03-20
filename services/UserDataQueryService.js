@@ -357,7 +357,8 @@ class UserDataQueryService {
    * @returns {Promise<Object>} 分页兑换记录列表 + 汇总统计
    */
   static async getExchangeRecords(models, user_id, params = {}) {
-    const { ExchangeRecord, ExchangeItem } = models
+    // 迁移路径：ExchangeItem → Product（统一商品模型）
+    const { ExchangeRecord, ExchangeItem, Product } = models
     const { status, start_date, end_date, page = 1, page_size = 20 } = params
 
     const { offset, limit, pageNum, pageSizeNum } = parsePagination(page, page_size)
@@ -380,6 +381,15 @@ class UserDataQueryService {
           'cost_amount',
           'category_def_id'
         ],
+        required: false
+      })
+    }
+    // 迁移路径：关联 Product 统一商品（exchange_records.product_id）
+    if (Product) {
+      includeOpts.push({
+        model: Product,
+        as: 'product',
+        attributes: ['product_id', 'name', 'status'],
         required: false
       })
     }

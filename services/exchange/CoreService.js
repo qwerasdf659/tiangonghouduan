@@ -67,32 +67,51 @@ class CoreService {
     this.models = models
     this.ExchangeItem = models.ExchangeItem
     this.ExchangeRecord = models.ExchangeRecord
+    this.Product = models.Product
+    this.ProductSku = models.ProductSku
+    this.ExchangeChannelPrice = models.ExchangeChannelPrice
   }
 
   /**
    * 兑换商品（核心业务逻辑）
    * V4.5.0 材料资产支付版本（2025-12-15）
+   * V4.8.0 统一商品中心双路径支持（2026-03-20）
    *
    * 支付方式：使用BalanceService扣减材料资产（cost_asset_code + cost_amount）
    *
+   * 双路径：
+   * - use_product=false（默认）：传统 ExchangeItem 路径（向后兼容，竞价系统使用）
+   * - use_product=true：新 Product + ProductSku + ExchangeChannelPrice 路径
+   *
    * @param {number} user_id - 用户ID
-   * @param {number} exchange_item_id - 兑换商品ID（主键命名规范化）
+   * @param {number} exchange_item_id_or_product_id - 商品ID（传统路径为exchange_item_id，Product路径为product_id）
    * @param {number} quantity - 兑换数量
    * @param {Object} options - 选项
    * @param {string} options.idempotency_key - 幂等键（必填，用于幂等性）
    * @param {Transaction} options.transaction - 外部事务对象（必填）
+   * @param {number} [options.sku_id] - SKU ID（use_product=true 时必填）
+   * @param {boolean} [options.use_product=false] - 是否使用 Product 新路径
+   * @param {Object} [options.sku_spec_values] - SKU 规格值（铸造用）
    * @returns {Promise<Object>} 兑换结果和订单信息
    */
-  async exchangeItem(user_id, exchange_item_id, quantity = 1, options = {}) {
-    const { idempotency_key } = options
+  async exchangeItem(user_id, exchange_item_id_or_product_id, quantity = 1, options = {}) {
+    const { idempotency_key, sku_id, use_product = false } = options
 
     // 🔥 必填参数校验
     if (!idempotency_key) {
       throw new Error('idempotency_key 参数不能为空，用于幂等性控制')
     }
 
+    if (use_product && !sku_id) {
+      throw new Error('use_product 模式必须提供 sku_id 参数')
+    }
+
     // 强制要求事务边界 - 2026-01-05 治理决策
     const transaction = assertAndGetTransaction(options, 'CoreService.exchangeItem')
+
+    // 路径分流：Product 新路径 vs ExchangeItem 传统路径
+    const product_id = use_product ? exchange_item_id_or_product_id : null
+    const exchange_item_id = use_product ? null : exchange_item_id_or_product_id
 
     /*
      * ✅ 幂等性检查：以 idempotency_key 为唯一键（统一幂等架构）
@@ -107,26 +126,42 @@ class CoreService {
       logger.info('[兑换市场] ⚠️ 幂等性检查：idempotency_key已存在，验证参数一致性', {
         idempotency_key,
         order_no: existingOrder.order_no,
-        existing_exchange_item_id: existingOrder.exchange_item_id,
-        existing_quantity: existingOrder.quantity,
-        request_exchange_item_id: exchange_item_id,
-        request_quantity: quantity
+        request_quantity: quantity,
+        use_product
       })
 
       // 🔴 P1-1冲突保护：验证请求参数是否一致（确保类型一致）
-      if (
-        Number(existingOrder.exchange_item_id) !== Number(exchange_item_id) ||
-        Number(existingOrder.quantity) !== Number(quantity)
-      ) {
-        const conflictError = new Error(
-          `幂等键冲突：idempotency_key="${idempotency_key}" 已被使用于不同参数的订单。` +
-            `原订单：商品ID=${existingOrder.exchange_item_id}, 数量=${existingOrder.quantity}；` +
-            `当前请求：商品ID=${exchange_item_id}, 数量=${quantity}。` +
-            '请使用不同的幂等键或确认请求参数正确。'
-        )
-        conflictError.statusCode = 409
-        conflictError.errorCode = 'IDEMPOTENCY_KEY_CONFLICT'
-        throw conflictError
+      if (use_product) {
+        if (
+          Number(existingOrder.product_id) !== Number(product_id) ||
+          Number(existingOrder.sku_id) !== Number(sku_id) ||
+          Number(existingOrder.quantity) !== Number(quantity)
+        ) {
+          const conflictError = new Error(
+            `幂等键冲突：idempotency_key="${idempotency_key}" 已被使用于不同参数的订单。` +
+              `原订单：product_id=${existingOrder.product_id}, sku_id=${existingOrder.sku_id}, 数量=${existingOrder.quantity}；` +
+              `当前请求：product_id=${product_id}, sku_id=${sku_id}, 数量=${quantity}。` +
+              '请使用不同的幂等键或确认请求参数正确。'
+          )
+          conflictError.statusCode = 409
+          conflictError.errorCode = 'IDEMPOTENCY_KEY_CONFLICT'
+          throw conflictError
+        }
+      } else {
+        if (
+          Number(existingOrder.exchange_item_id) !== Number(exchange_item_id) ||
+          Number(existingOrder.quantity) !== Number(quantity)
+        ) {
+          const conflictError = new Error(
+            `幂等键冲突：idempotency_key="${idempotency_key}" 已被使用于不同参数的订单。` +
+              `原订单：商品ID=${existingOrder.exchange_item_id}, 数量=${existingOrder.quantity}；` +
+              `当前请求：商品ID=${exchange_item_id}, 数量=${quantity}。` +
+              '请使用不同的幂等键或确认请求参数正确。'
+          )
+          conflictError.statusCode = 409
+          conflictError.errorCode = 'IDEMPOTENCY_KEY_CONFLICT'
+          throw conflictError
+        }
       }
 
       logger.info('[兑换市场] ✅ 参数一致性验证通过，返回原结果（幂等）', {
@@ -138,18 +173,32 @@ class CoreService {
        * 🔴 幂等回放：补齐指纹字段（pay_asset_code/pay_amount）
        */
       const BalanceService = require('../asset/BalanceService')
-      const currentItem = await this.ExchangeItem.findOne({
-        where: { exchange_item_id },
-        transaction
-      })
-      if (!currentItem) {
-        throw new Error('商品不存在')
+      let expectedPayAssetCode, expectedPayAmount
+
+      if (use_product) {
+        const channelPrice = await this.ExchangeChannelPrice.findOne({
+          where: { sku_id, is_enabled: true },
+          transaction
+        })
+        if (!channelPrice) {
+          throw new Error('该 SKU 未配置兑换渠道定价')
+        }
+        expectedPayAssetCode = channelPrice.cost_asset_code
+        expectedPayAmount = Number(channelPrice.cost_amount) * quantity
+      } else {
+        const currentItem = await this.ExchangeItem.findOne({
+          where: { exchange_item_id },
+          transaction
+        })
+        if (!currentItem) {
+          throw new Error('商品不存在')
+        }
+        if (!currentItem.cost_asset_code || !currentItem.cost_amount) {
+          throw new Error('商品未配置材料资产支付方式（cost_asset_code/cost_amount缺失）')
+        }
+        expectedPayAssetCode = currentItem.cost_asset_code
+        expectedPayAmount = currentItem.cost_amount * quantity
       }
-      if (!currentItem.cost_asset_code || !currentItem.cost_amount) {
-        throw new Error('商品未配置材料资产支付方式（cost_asset_code/cost_amount缺失）')
-      }
-      const expectedPayAssetCode = currentItem.cost_asset_code
-      const expectedPayAmount = currentItem.cost_amount * quantity
 
       if (
         existingOrder.pay_asset_code !== expectedPayAssetCode ||
@@ -195,52 +244,135 @@ class CoreService {
     }
 
     logger.info(
-      `[兑换市场] 用户${user_id}兑换商品${exchange_item_id}，数量${quantity}，idempotency_key=${idempotency_key}`
+      `[兑换市场] 用户${user_id}兑换商品（${use_product ? 'product_id' : 'exchange_item_id'}=${exchange_item_id_or_product_id}），数量${quantity}，idempotency_key=${idempotency_key}`
     )
 
-    // 1. 获取商品信息（加锁防止超卖，含主媒体用于快照，2026-03-16 媒体体系迁移）
-    const item = await this.ExchangeItem.findOne({
-      where: { exchange_item_id },
-      include: [
-        {
-          model: this.models.MediaFile,
-          as: 'primary_media',
-          attributes: ['object_key'],
-          required: false
-        }
-      ],
-      lock: transaction.LOCK.UPDATE,
-      transaction
-    })
+    /*
+     * ═══════════════════════════════════════════════════
+     * 1. 商品信息解析：根据路径获取定价、库存、铸造参数
+     * ═══════════════════════════════════════════════════
+     */
+    let itemName, itemDescription, costAssetCode, costAmount, imageUrl
+    let costPrice = 0
+    let rarityCode = 'common'
+    let mintInstance = false
+    let itemTemplateId = null
+    let legacyItem = null
+    let _productRecord = null
+    let productSkuRecord = null
 
-    if (!item) {
-      throw new Error('商品不存在')
-    }
+    if (use_product) {
+      // ─── Product 新路径 ───
+      const product = await this.Product.findOne({
+        where: { product_id },
+        include: [
+          {
+            model: this.models.MediaFile,
+            as: 'primary_media',
+            attributes: ['object_key'],
+            required: false
+          }
+        ],
+        lock: transaction.LOCK.UPDATE,
+        transaction
+      })
 
-    if (item.status !== 'active') {
-      throw new Error('商品已下架')
-    }
+      if (!product) {
+        throw new Error('商品不存在')
+      }
+      if (product.status !== 'active') {
+        throw new Error('商品已下架')
+      }
 
-    if (item.stock < quantity) {
-      throw new Error(`库存不足，当前库存：${item.stock}`)
-    }
+      const productSku = await this.ProductSku.findOne({
+        where: { sku_id, product_id, status: 'active' },
+        lock: transaction.LOCK.UPDATE,
+        transaction
+      })
+      if (!productSku) {
+        throw new Error('SKU 不存在或已停售')
+      }
+      if (productSku.stock < quantity) {
+        throw new Error(`库存不足，当前库存：${productSku.stock}`)
+      }
 
-    // V4.5.0: 验证商品是否配置了材料资产支付
-    if (!item.cost_asset_code || !item.cost_amount) {
-      throw new Error(
-        '商品未配置材料资产支付方式（cost_asset_code/cost_amount缺失）。' +
-          '请联系管理员更新商品配置。'
-      )
+      const channelPrice = await this.ExchangeChannelPrice.findOne({
+        where: { sku_id, is_enabled: true },
+        transaction
+      })
+      if (!channelPrice) {
+        throw new Error('该 SKU 未配置兑换渠道定价')
+      }
+      if (!channelPrice.isPublished()) {
+        throw new Error('该 SKU 兑换定价当前未在发布窗口内')
+      }
+
+      itemName = product.product_name
+      itemDescription = product.description
+      costAssetCode = channelPrice.cost_asset_code
+      costAmount = Number(channelPrice.cost_amount)
+      imageUrl = product.primary_media?.object_key
+        ? getImageUrl(product.primary_media.object_key)
+        : null
+      costPrice = productSku.cost_price || 0
+      rarityCode = product.rarity_code || 'common'
+      mintInstance = product.mint_instance
+      itemTemplateId = product.item_template_id
+      _productRecord = product
+      productSkuRecord = productSku
+    } else {
+      // ─── ExchangeItem 传统路径 ───
+      const item = await this.ExchangeItem.findOne({
+        where: { exchange_item_id },
+        include: [
+          {
+            model: this.models.MediaFile,
+            as: 'primary_media',
+            attributes: ['object_key'],
+            required: false
+          }
+        ],
+        lock: transaction.LOCK.UPDATE,
+        transaction
+      })
+
+      if (!item) {
+        throw new Error('商品不存在')
+      }
+      if (item.status !== 'active') {
+        throw new Error('商品已下架')
+      }
+      if (item.stock < quantity) {
+        throw new Error(`库存不足，当前库存：${item.stock}`)
+      }
+      if (!item.cost_asset_code || !item.cost_amount) {
+        throw new Error(
+          '商品未配置材料资产支付方式（cost_asset_code/cost_amount缺失）。' +
+            '请联系管理员更新商品配置。'
+        )
+      }
+
+      itemName = item.item_name
+      itemDescription = item.description
+      costAssetCode = item.cost_asset_code
+      costAmount = item.cost_amount
+      imageUrl = item.primary_media?.object_key ? getImageUrl(item.primary_media.object_key) : null
+      costPrice = item.cost_price || 0
+      rarityCode = item.rarity_code || 'common'
+      mintInstance = item.mint_instance
+      itemTemplateId = item.item_template_id
+      legacyItem = item
     }
 
     // 2. 计算总支付金额
-    const totalPayAmount = item.cost_amount * quantity
+    const totalPayAmount = costAmount * quantity
 
     logger.info('[兑换市场] 材料资产支付计算', {
-      cost_asset_code: item.cost_asset_code,
-      cost_amount: item.cost_amount,
+      cost_asset_code: costAssetCode,
+      cost_amount: costAmount,
       quantity,
-      totalPayAmount
+      totalPayAmount,
+      use_product
     })
 
     // 3. 使用BalanceService统一账本扣减材料资产
@@ -248,7 +380,7 @@ class CoreService {
 
     logger.info('[兑换市场] 开始扣减材料资产（统一账本）', {
       user_id,
-      asset_code: item.cost_asset_code,
+      asset_code: costAssetCode,
       amount: totalPayAmount,
       idempotency_key: `exchange_debit_${idempotency_key}`
     })
@@ -261,17 +393,18 @@ class CoreService {
     const materialResult = await BalanceService.changeBalance(
       {
         user_id,
-        asset_code: item.cost_asset_code,
+        asset_code: costAssetCode,
         delta_amount: -totalPayAmount,
         idempotency_key: `exchange_debit_${idempotency_key}`,
         business_type: 'exchange_debit',
         counterpart_account_id: burnAccount.account_id,
         meta: {
           idempotency_key,
-          exchange_item_id,
-          item_name: item.item_name,
+          ...(use_product
+            ? { product_id, sku_id, product_name: itemName }
+            : { exchange_item_id, item_name: itemName }),
           quantity,
-          cost_amount: item.cost_amount,
+          cost_amount: costAmount,
           total_pay_amount: totalPayAmount
         }
       },
@@ -291,7 +424,7 @@ class CoreService {
 
       if (existingRecord) {
         const currentBalance = await BalanceService.getBalance(
-          { user_id, asset_code: item.cost_asset_code },
+          { user_id, asset_code: costAssetCode },
           { transaction }
         )
 
@@ -309,7 +442,7 @@ class CoreService {
     }
 
     logger.info(
-      `[兑换市场] 材料扣减成功：${totalPayAmount}个${item.cost_asset_code}，剩余余额通过统一账本管理`
+      `[兑换市场] 材料扣减成功：${totalPayAmount}个${costAssetCode}，剩余余额通过统一账本管理`
     )
 
     /*
@@ -325,7 +458,9 @@ class CoreService {
      */
     let record
     try {
-      const business_id = `exchange_${user_id}_${exchange_item_id}_${Date.now()}`
+      const business_id = use_product
+        ? `exchange_${user_id}_p${product_id}_s${sku_id}_${Date.now()}`
+        : `exchange_${user_id}_${exchange_item_id}_${Date.now()}`
 
       record = await this.ExchangeRecord.create(
         {
@@ -334,21 +469,22 @@ class CoreService {
           business_id,
           debit_transaction_id,
           user_id,
-          exchange_item_id,
+          exchange_item_id: exchange_item_id || null,
+          product_id: product_id || null,
+          sku_id: use_product ? sku_id : null,
           item_snapshot: {
-            exchange_item_id: item.exchange_item_id,
-            item_name: item.item_name,
-            description: item.description,
-            cost_asset_code: item.cost_asset_code,
-            cost_amount: item.cost_amount,
-            image_url: item.primary_media?.object_key
-              ? getImageUrl(item.primary_media.object_key)
-              : null
+            ...(use_product
+              ? { product_id, sku_id, item_name: itemName }
+              : { exchange_item_id, item_name: itemName }),
+            description: itemDescription,
+            cost_asset_code: costAssetCode,
+            cost_amount: costAmount,
+            image_url: imageUrl
           },
           quantity,
-          pay_asset_code: item.cost_asset_code,
+          pay_asset_code: costAssetCode,
           pay_amount: totalPayAmount,
-          total_cost: (item.cost_price || 0) * quantity,
+          total_cost: costPrice * quantity,
           status: 'pending',
           exchange_time: BeijingTimeHelper.createDatabaseTime()
         },
@@ -376,108 +512,159 @@ class CoreService {
       throw createError
     }
 
-    // 6. 扣减库存（全量 SKU 模式：统一走 exchange_item_skus 表）
-    const ExchangeItemSku = this.models.ExchangeItemSku
-    if (ExchangeItemSku) {
-      let targetSku = null
-
-      if (options.sku_id) {
-        // 指定了 SKU：精确查找
-        targetSku = await ExchangeItemSku.findOne({
-          where: { sku_id: options.sku_id, exchange_item_id, status: 'active' },
-          lock: transaction.LOCK.UPDATE,
-          transaction
-        })
-        if (!targetSku) {
-          throw new Error('指定的 SKU 不存在或已停售')
-        }
-      } else {
-        // 未指定 SKU：自动选择默认 SKU（单品商品 spec_values 为 {}）
-        const activeSkus = await ExchangeItemSku.findAll({
-          where: { exchange_item_id, status: 'active' },
-          lock: transaction.LOCK.UPDATE,
-          transaction
-        })
-        if (activeSkus.length === 1) {
-          targetSku = activeSkus[0]
-        } else if (activeSkus.length > 1) {
-          throw new Error('该商品有多个规格，请选择具体的 SKU（sku_id）')
-        }
-        // activeSkus.length === 0 时不做 SKU 扣减，仅扣 SPU（兼容无 SKU 数据的历史场景）
-      }
-
-      if (targetSku) {
-        if (targetSku.stock < quantity) {
-          throw new Error(`SKU 库存不足，当前库存：${targetSku.stock}`)
-        }
-        await targetSku.update(
-          { stock: targetSku.stock - quantity, sold_count: (targetSku.sold_count || 0) + quantity },
-          { transaction }
-        )
-        record.item_snapshot = {
-          ...record.item_snapshot,
-          sku_id: targetSku.sku_id,
-          spec_values: targetSku.spec_values
-        }
-        await record.save({ transaction })
-      }
-    }
-
-    await item.update(
-      {
-        stock: item.stock - quantity,
-        sold_count: (item.sold_count || 0) + quantity
-      },
-      { transaction }
-    )
-
-    // 库存变动日志（用户兑换扣减）
-    try {
-      await this.models.AdminOperationLog.create(
+    // 6. 扣减库存
+    if (use_product) {
+      // ─── Product 路径：扣减 ProductSku 库存 ───
+      await productSkuRecord.update(
         {
-          operator_id: null,
-          operation_type: 'stock_change',
-          target_type: 'exchange_item',
-          target_id: item.exchange_item_id,
-          action: 'purchase',
-          before_data: { stock: item.stock, item_name: item.item_name },
-          after_data: { stock: item.stock - quantity, item_name: item.item_name },
-          changed_fields: {
-            stock: { from: item.stock, to: item.stock - quantity, delta: -quantity }
-          },
-          reason: `用户兑换扣减库存（数量：${quantity}）`,
-          risk_level: 'low',
-          requires_approval: false,
-          approval_status: 'not_required',
-          affected_amount: quantity
+          stock: productSkuRecord.stock - quantity,
+          sold_count: (productSkuRecord.sold_count || 0) + quantity
         },
         { transaction }
       )
-    } catch (logErr) {
-      logger.warn('[兑换市场] 库存变动日志记录失败', { error: logErr.message })
+
+      record.item_snapshot = {
+        ...record.item_snapshot,
+        sku_id: productSkuRecord.sku_id,
+        sku_code: productSkuRecord.sku_code
+      }
+      await record.save({ transaction })
+
+      try {
+        await this.models.AdminOperationLog.create(
+          {
+            operator_id: null,
+            operation_type: 'stock_change',
+            target_type: 'product_sku',
+            target_id: productSkuRecord.sku_id,
+            action: 'purchase',
+            before_data: { stock: productSkuRecord.stock, product_name: itemName },
+            after_data: { stock: productSkuRecord.stock - quantity, product_name: itemName },
+            changed_fields: {
+              stock: {
+                from: productSkuRecord.stock,
+                to: productSkuRecord.stock - quantity,
+                delta: -quantity
+              }
+            },
+            reason: `用户兑换扣减库存（数量：${quantity}，Product路径）`,
+            risk_level: 'low',
+            requires_approval: false,
+            approval_status: 'not_required',
+            affected_amount: quantity
+          },
+          { transaction }
+        )
+      } catch (logErr) {
+        logger.warn('[兑换市场] 库存变动日志记录失败', { error: logErr.message })
+      }
+    } else {
+      // ─── ExchangeItem 传统路径：扣减 ExchangeItemSku + ExchangeItem 库存 ───
+      const ExchangeItemSku = this.models.ExchangeItemSku
+      if (ExchangeItemSku) {
+        let targetSku = null
+
+        if (options.sku_id) {
+          targetSku = await ExchangeItemSku.findOne({
+            where: { sku_id: options.sku_id, exchange_item_id, status: 'active' },
+            lock: transaction.LOCK.UPDATE,
+            transaction
+          })
+          if (!targetSku) {
+            throw new Error('指定的 SKU 不存在或已停售')
+          }
+        } else {
+          const activeSkus = await ExchangeItemSku.findAll({
+            where: { exchange_item_id, status: 'active' },
+            lock: transaction.LOCK.UPDATE,
+            transaction
+          })
+          if (activeSkus.length === 1) {
+            targetSku = activeSkus[0]
+          } else if (activeSkus.length > 1) {
+            throw new Error('该商品有多个规格，请选择具体的 SKU（sku_id）')
+          }
+        }
+
+        if (targetSku) {
+          if (targetSku.stock < quantity) {
+            throw new Error(`SKU 库存不足，当前库存：${targetSku.stock}`)
+          }
+          await targetSku.update(
+            {
+              stock: targetSku.stock - quantity,
+              sold_count: (targetSku.sold_count || 0) + quantity
+            },
+            { transaction }
+          )
+          record.item_snapshot = {
+            ...record.item_snapshot,
+            sku_id: targetSku.sku_id,
+            spec_values: targetSku.spec_values
+          }
+          await record.save({ transaction })
+        }
+      }
+
+      await legacyItem.update(
+        {
+          stock: legacyItem.stock - quantity,
+          sold_count: (legacyItem.sold_count || 0) + quantity
+        },
+        { transaction }
+      )
+
+      try {
+        await this.models.AdminOperationLog.create(
+          {
+            operator_id: null,
+            operation_type: 'stock_change',
+            target_type: 'exchange_item',
+            target_id: legacyItem.exchange_item_id,
+            action: 'purchase',
+            before_data: { stock: legacyItem.stock, item_name: legacyItem.item_name },
+            after_data: { stock: legacyItem.stock - quantity, item_name: legacyItem.item_name },
+            changed_fields: {
+              stock: { from: legacyItem.stock, to: legacyItem.stock - quantity, delta: -quantity }
+            },
+            reason: `用户兑换扣减库存（数量：${quantity}）`,
+            risk_level: 'low',
+            requires_approval: false,
+            approval_status: 'not_required',
+            affected_amount: quantity
+          },
+          { transaction }
+        )
+      } catch (logErr) {
+        logger.warn('[兑换市场] 库存变动日志记录失败', { error: logErr.message })
+      }
     }
 
-    // ═══════════════════════════════════════════════════
-    // 🔥 EAV改造：铸造物品实例分支（2026-03-20）
-    // 当 ExchangeItem 未来迁移到 Product 后，此处逻辑也可复用
-    // ═══════════════════════════════════════════════════
+    /*
+     * ═══════════════════════════════════════════════════
+     * 🔥 EAV改造：铸造物品实例分支（2026-03-20）
+     * Product 路径使用 Product.item_template_id
+     * ExchangeItem 传统路径使用 ExchangeItem.item_template_id
+     * ═══════════════════════════════════════════════════
+     */
     let mintedItem = null
-    if (item.mint_instance && item.item_template_id) {
+    if (mintInstance && itemTemplateId) {
       try {
         const ItemService = require('../asset/ItemService')
         const AttributeRuleEngine = require('../item/AttributeRuleEngine')
         const { ItemTemplate, ItemHold } = this.models
 
-        const template = await ItemTemplate.findByPk(item.item_template_id, { transaction })
+        const template = await ItemTemplate.findByPk(itemTemplateId, { transaction })
         if (!template) {
           logger.warn('[兑换市场] 铸造跳过：关联的物品模板不存在', {
-            item_template_id: item.item_template_id,
-            exchange_item_id
+            item_template_id: itemTemplateId,
+            use_product,
+            source_id: use_product ? product_id : exchange_item_id
           })
         } else {
           // 计算限量编号（按 item_template_id 计数 + 1）
           let serialNumber = null
-          let editionTotal = template.max_edition || null
+          const editionTotal = template.max_edition || null
           if (template.max_edition) {
             const currentCount = await this.models.Item.count({
               where: {
@@ -505,11 +692,11 @@ class CoreService {
               item_type: template.item_type || 'product',
               source: 'exchange',
               source_ref_id: String(record.exchange_record_id),
-              item_name: template.display_name || item.item_name,
-              item_description: template.description || item.description,
+              item_name: template.display_name || itemName,
+              item_description: template.description || itemDescription,
               item_value: 0,
               prize_definition_id: null,
-              rarity_code: template.rarity_code || item.rarity_code || 'common',
+              rarity_code: template.rarity_code || rarityCode,
               business_type: 'exchange_mint',
               idempotency_key: `exchange_mint_${idempotency_key}`,
               item_template_id: template.item_template_id,
@@ -550,7 +737,8 @@ class CoreService {
             quality_grade: instanceAttributes?.quality_grade,
             pattern_id: instanceAttributes?.pattern_id,
             cooldown_days: cooldownDays,
-            exchange_record_id: record.exchange_record_id
+            exchange_record_id: record.exchange_record_id,
+            use_product
           })
         }
       } catch (mintError) {
@@ -559,7 +747,7 @@ class CoreService {
         }
         logger.error('[兑换市场] ❌ 物品铸造失败（非致命，订单仍创建）', {
           error: mintError.message,
-          exchange_item_id,
+          source_id: use_product ? product_id : exchange_item_id,
           order_no
         })
       }
@@ -578,7 +766,7 @@ class CoreService {
         operator_type: 'user',
         reason: '用户兑换商品',
         metadata: {
-          exchange_item_id,
+          ...(use_product ? { product_id, sku_id } : { exchange_item_id }),
           quantity,
           pay_amount: totalPayAmount,
           minted_item_id: mintedItem?.item_id || null
@@ -595,9 +783,9 @@ class CoreService {
       order: {
         order_no,
         record_id: record.exchange_record_id,
-        item_name: item.item_name,
+        item_name: itemName,
         quantity,
-        pay_asset_code: item.cost_asset_code,
+        pay_asset_code: costAssetCode,
         pay_amount: totalPayAmount,
         status: 'pending'
       },

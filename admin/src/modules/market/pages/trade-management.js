@@ -211,7 +211,7 @@ document.addEventListener('alpine:init', () => {
     /** @type {{user: Object|null, listings: Array}} 用户上架商品信息 */
     userListingsInfo: { user: null, listings: [] },
     /** @type {{status: string}} 用户上架商品筛选 */
-    userListingsFilter: { status: '' },
+    userListingsFilter: { status: '', quality_grade: '', listings_sort: '' },
     /** @type {number} 用户上架商品当前页码 */
     userListingsCurrentPage: 1,
     /** @type {{total: number, total_pages: number}} 用户上架商品分页 */
@@ -666,6 +666,8 @@ document.addEventListener('alpine:init', () => {
     async viewUserListings(userStat) {
       try {
         this.userListingsFilter.status = ''
+        this.userListingsFilter.quality_grade = ''
+        this.userListingsFilter.listings_sort = ''
         this.userListingsCurrentPage = 1
         this.userListingsInfo = { user: null, listings: [] }
         this.showModal('userListingsModal')
@@ -690,6 +692,14 @@ document.addEventListener('alpine:init', () => {
         }
         if (this.userListingsFilter.status) {
           params.status = this.userListingsFilter.status
+        }
+        if (this.userListingsFilter.quality_grade) {
+          params.quality_grade = this.userListingsFilter.quality_grade
+        }
+        const sort = this.userListingsFilter.listings_sort || ''
+        if (sort === 'quality_score_desc' || sort === 'quality_score_asc') {
+          params.sort_by = 'quality_score'
+          params.sort_order = sort === 'quality_score_asc' ? 'asc' : 'desc'
         }
         const result = await request({
           url: MARKET_ENDPOINTS.LISTING_USER_LISTINGS,
@@ -736,6 +746,19 @@ document.addEventListener('alpine:init', () => {
         admin_withdrawn: '管理员下架'
       }
       return map[status] || status || '-'
+    },
+
+    /**
+     * C2C 挂牌编号展示：#0042/0100
+     */
+    formatListingSerial(listing) {
+      const sn = listing?.serial_number
+      const total = listing?.edition_total
+      if (sn == null || sn === '' || total == null || total === '') return '-'
+      const n = Number(sn)
+      const t = Number(total)
+      if (Number.isNaN(n) || Number.isNaN(t)) return '-'
+      return `#${String(n).padStart(4, '0')}/${t}`
     },
 
     /**

@@ -27,7 +27,7 @@ const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
 const displayNameHelper = require('../../utils/displayNameHelper')
 const BeijingTimeHelper = require('../../utils/timeHelper')
 const { assertAndGetTransaction } = require('../../utils/transactionHelpers')
-const { Op } = require('sequelize')
+const { Op, fn, col, where: sqlWhere, literal } = require('sequelize')
 
 /**
  * 兑换市场管理服务类
@@ -46,6 +46,11 @@ class AdminService {
     this.ExchangeRecord = models.ExchangeRecord
     this.User = models.User
     this.MarketListing = models.MarketListing
+    this.Item = models.Item
+    this.Product = models.Product
+    this.ProductSku = models.ProductSku
+    this.ExchangeChannelPrice = models.ExchangeChannelPrice
+    this.Category = models.Category
     this.sequelize = models.sequelize
   }
 
@@ -826,11 +831,27 @@ class AdminService {
    */
   async getUserListings(options) {
     try {
-      const { user_id, status, page = 1, page_size = 20 } = options
+      const {
+        user_id,
+        status,
+        page = 1,
+        page_size = 20,
+        quality_grade,
+        sort_by,
+        sort_order = 'desc'
+      } = options
 
       if (!user_id) throw new Error('user_id 是必填参数')
 
-      logger.info('[兑换市场] 管理员查询用户上架列表', { user_id, status, page, page_size })
+      logger.info('[兑换市场] 管理员查询用户上架列表', {
+        user_id,
+        status,
+        page,
+        page_size,
+        quality_grade,
+        sort_by,
+        sort_order
+      })
 
       // 查询用户信息
       const user = await this.User.findByPk(user_id, {
@@ -842,10 +863,47 @@ class AdminService {
       const where = { seller_user_id: user_id }
       if (status) where.status = status
 
+      const needItemJoin = !!quality_grade || String(sort_by || '') === 'quality_score'
+      const include = []
+      if (this.Item && needItemJoin) {
+        const itemInclude = {
+          model: this.Item,
+          as: 'offerItem',
+          required: !!quality_grade
+        }
+        if (quality_grade) {
+          where.listing_kind = 'item'
+          itemInclude.where = sqlWhere(
+            fn(
+              'JSON_UNQUOTE',
+              fn('JSON_EXTRACT', col('offerItem.instance_attributes'), literal(`'$.quality_grade'`))
+            ),
+            quality_grade
+          )
+        }
+        include.push(itemInclude)
+      }
+
+      let order = [['created_at', 'DESC']]
+      if (sort_by === 'quality_score' && this.Item) {
+        const dir = String(sort_order).toLowerCase() === 'asc' ? 'ASC' : 'DESC'
+        order = [
+          [
+            literal(
+              `CAST(JSON_UNQUOTE(JSON_EXTRACT(\`offerItem\`.\`instance_attributes\`, '$.quality_score')) AS DECIMAL(18,6))`
+            ),
+            dir
+          ],
+          ['created_at', 'DESC']
+        ]
+      }
+
       // 查询挂牌列表
       const { count, rows } = await this.MarketListing.findAndCountAll({
         where,
-        order: [['created_at', 'DESC']],
+        include: include.length ? include : undefined,
+        subQuery: false,
+        order,
         limit: parseInt(page_size),
         offset: (parseInt(page) - 1) * parseInt(page_size)
       })
@@ -874,7 +932,19 @@ class AdminService {
           active_listing_count: activeCount,
           remaining_quota: Math.max(0, userMaxListings - activeCount)
         },
-        listings: rows.map(listing => listing.toJSON()),
+        listings: rows.map(listing => {
+          const j = listing.toJSON ? listing.toJSON() : listing
+          const attrs = j.offerItem?.instance_attributes || {}
+          const qScore = attrs.quality_score
+          const qGrade = attrs.quality_grade
+          return {
+            ...j,
+            quality_score: qScore != null ? qScore : null,
+            quality_grade: qGrade != null ? qGrade : null,
+            serial_number: j.offerItem?.serial_number ?? null,
+            edition_total: j.offerItem?.edition_total ?? null
+          }
+        }),
         pagination: {
           page: parseInt(page),
           page_size: parseInt(page_size),
@@ -1899,6 +1969,120 @@ class AdminService {
         transaction
       }
     )
+  }
+  /*
+   * ================================================================
+   * 统一商品（Product）管理方法 — 委托 ProductService
+   * 迁移路径：ExchangeItem → Product 统一商品模型
+   * ================================================================
+   */
+
+  /**
+   * 创建统一商品（委托给 ProductService）
+   *
+   * @param {Object} productData - 商品数据
+   * @param {number} created_by - 操作人ID
+   * @param {Object} options - {transaction}
+   * @returns {Promise<Object>} 创建的商品
+   */
+  async createProduct(productData, created_by, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'AdminService.createProduct')
+    const ProductService = require('../product/ProductService')
+    const svc = new ProductService(this.models)
+    const product = await svc.createProduct(productData, { transaction })
+
+    try {
+      await this.models.AdminOperationLog.create(
+        {
+          operator_id: created_by,
+          operation_type: 'create',
+          target_type: 'product',
+          target_id: product.product_id,
+          action: 'create_product',
+          after_data: product.toJSON(),
+          reason: '创建统一商品',
+          risk_level: 'low',
+          requires_approval: false,
+          approval_status: 'not_required'
+        },
+        { transaction }
+      )
+    } catch (logErr) {
+      logger.warn('[商品中心] 操作日志记录失败', { error: logErr.message })
+    }
+
+    return product
+  }
+
+  /**
+   * 更新统一商品（委托给 ProductService）
+   *
+   * @param {number} product_id - 商品ID
+   * @param {Object} updateData - 更新数据
+   * @param {number} updated_by - 操作人ID
+   * @param {Object} options - {transaction}
+   * @returns {Promise<Object>} 更新后的商品
+   */
+  async updateProduct(product_id, updateData, updated_by, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'AdminService.updateProduct')
+    const svc = new (require('../product/ProductService'))(this.models)
+    const product = await svc.updateProduct(product_id, updateData, { transaction })
+
+    try {
+      await this.models.AdminOperationLog.create(
+        {
+          operator_id: updated_by,
+          operation_type: 'update',
+          target_type: 'product',
+          target_id: product_id,
+          action: 'update_product',
+          after_data: updateData,
+          changed_fields: updateData,
+          reason: '更新统一商品',
+          risk_level: 'low',
+          requires_approval: false,
+          approval_status: 'not_required'
+        },
+        { transaction }
+      )
+    } catch (logErr) {
+      logger.warn('[商品中心] 操作日志记录失败', { error: logErr.message })
+    }
+
+    return product
+  }
+
+  /**
+   * 删除统一商品（委托给 ProductService）
+   *
+   * @param {number} product_id - 商品ID
+   * @param {number} deleted_by - 操作人ID
+   * @param {Object} options - {transaction}
+   * @returns {Promise<void>} 无返回值
+   */
+  async deleteProduct(product_id, deleted_by, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'AdminService.deleteProduct')
+    const svc = new (require('../product/ProductService'))(this.models)
+    await svc.deleteProduct(product_id, { transaction })
+
+    try {
+      await this.models.AdminOperationLog.create(
+        {
+          operator_id: deleted_by,
+          operation_type: 'delete',
+          target_type: 'product',
+          target_id: product_id,
+          action: 'delete_product',
+          reason: '删除统一商品',
+          risk_level: 'medium',
+          requires_approval: false,
+          approval_status: 'not_required'
+        },
+        { transaction }
+      )
+    } catch (logErr) {
+      logger.warn('[商品中心] 操作日志记录失败', { error: logErr.message })
+    }
   }
 }
 

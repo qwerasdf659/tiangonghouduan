@@ -606,7 +606,8 @@ class BusinessRecordQueryService {
    * @returns {Promise<Object>} 记录列表和分页信息
    */
   static async getExchangeRecords(options = {}) {
-    const { ExchangeRecord, User, ExchangeItem } = require('../../models')
+    // 迁移路径：ExchangeItem → Product（统一商品模型）
+    const { ExchangeRecord, User, ExchangeItem, Product } = require('../../models')
 
     const { user_id, exchange_item_id, status, order_no, start_date, end_date } = options
     const pagination = buildPaginationOptions(options)
@@ -631,7 +632,18 @@ class BusinessRecordQueryService {
           model: ExchangeItem,
           as: 'item',
           attributes: ['exchange_item_id', 'item_name', 'cost_asset_code', 'cost_amount']
-        }
+        },
+        // 迁移路径：Product 统一商品关联（exchange_records.product_id）
+        ...(Product
+          ? [
+              {
+                model: Product,
+                as: 'product',
+                attributes: ['product_id', 'name', 'status'],
+                required: false
+              }
+            ]
+          : [])
       ],
       ...pagination
     })
@@ -656,12 +668,23 @@ class BusinessRecordQueryService {
    * @returns {Promise<Object|null>} 记录详情
    */
   static async getExchangeRecordById(record_id) {
-    const { ExchangeRecord, User, ExchangeItem } = require('../../models')
+    // 迁移路径：ExchangeItem → Product（统一商品模型）
+    const { ExchangeRecord, User, ExchangeItem, Product } = require('../../models')
 
     const record = await ExchangeRecord.findByPk(parseInt(record_id), {
       include: [
         { model: User, as: 'user', attributes: ['user_id', 'nickname', 'mobile'] },
-        { model: ExchangeItem, as: 'item' }
+        { model: ExchangeItem, as: 'item' },
+        // 迁移路径：Product 统一商品关联
+        ...(Product
+          ? [
+              {
+                model: Product,
+                as: 'product',
+                required: false
+              }
+            ]
+          : [])
       ]
     })
 

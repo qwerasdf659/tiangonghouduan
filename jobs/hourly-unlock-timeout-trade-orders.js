@@ -1,36 +1,29 @@
 /**
  * 交易市场超时解锁任务（三表模型版本）
  *
- * ⚠️ 注意：此任务需要重构以适配新的 ItemHold 模型
- * - 旧版本使用 ItemInstance.locks JSON 字段
- * - 新版本使用 ItemHold 表（item_holds）
- * - 当前代码仍引用旧模型，需要更新为 Item + ItemHold
- *
  * 职责：
- * - 每小时扫描超时锁定的物品（trade 锁超过3分钟）
- * - 释放超时的物品锁定（使用 item_holds 表）
+ * - 定时扫描超时锁定的物品（trade 锁超过配置的超时分钟数）
+ * - 释放超时的物品锁定（item_holds 表 status='expired'，items 表 status='available'）
  * - 取消关联的超时订单（status: frozen → cancelled）
  * - 解冻买家冻结的资产
  *
  * 业务规则：
  * - 仅处理 hold_type='trade' 且 status='active' 的锁
- * - 物品锁定超时时间：3分钟
- * - 不处理 redemption 锁和 security 锁
+ * - 超时阈值从 system_configs 读取，兜底 15 分钟
+ * - 不处理 redemption / security / trade_cooldown 锁
  * - 订单超时后：自动取消并解冻资产
  *
  * 执行策略：
  * - 定时执行：每小时整点
  * - 并发安全：使用事务 + 悲观锁
- *
- * 创建时间：2025-12-29
- * 更新时间：2026-02-22（迁移到三表模型，需要重构）
  */
 
 'use strict'
 
 const {
-  Item: _Item,
-  ItemHold: _ItemHold,
+  Item,
+  ItemHold,
+  ItemLedger,
   TradeOrder,
   MarketListing,
   Op,
@@ -74,9 +67,11 @@ class HourlyUnlockTimeoutTradeOrders {
    */
   static async execute() {
     const start_time = Date.now()
-    logger.info('开始执行交易市场超时解锁任务（JSON多级锁定版本）')
+    logger.info('开始执行交易市场超时解锁任务（三表模型版本）')
 
     try {
+      // 从 system_configs 获取超时阈值（修复 LOCK_TIMEOUT_MINUTES 未定义导致 Invalid Date 错误）
+      this.LOCK_TIMEOUT_MINUTES = await this.getLockTimeoutMinutes()
       // 1. 释放超时锁定的物品（仅 trade 锁）
       const items_result = await this._releaseTimeoutLockedItems()
 
@@ -110,46 +105,92 @@ class HourlyUnlockTimeoutTradeOrders {
 
   /**
    * 释放超时锁定的物品（三表模型版本）
-   * ⚠️ TODO: 需要重构以使用 ItemHold 表替代旧 JSON locks
    *
-   * 仅处理 hold_type='trade' 且 status='active' 的锁
+   * 查询 item_holds 中 hold_type='trade' 且 status='active' 且 expires_at 已过期的锁，
+   * 逐条释放：更新 hold 状态为 expired → 恢复 item 状态为 available → 写 ItemLedger 审计
    *
    * @private
-   * @returns {Promise<Object>} 释放结果
+   * @returns {Promise<Object>} 释放结果 { released_count, items }
    */
   static async _releaseTimeoutLockedItems() {
-    /*
-     * ⚠️ TODO: 重构此方法以使用 ItemHold 表
-     * 新逻辑应该是：
-     * 1. 查询 ItemHold 表中 status='active' AND hold_type='trade' AND expires_at < NOW() 的记录
-     * 2. 更新这些记录的 status='expired', released_at=NOW()
-     * 3. 通过 ItemLedger 记录解锁事件（而不是 ItemInstanceEvent）
-     */
-
-    logger.warn('⚠️ _releaseTimeoutLockedItems 需要重构以使用 ItemHold 表')
-
     const transaction = await sequelize.transaction()
 
     try {
-      const _timeout_threshold = new Date(Date.now() - this.LOCK_TIMEOUT_MINUTES * 60 * 1000)
+      const timeout_threshold = new Date(Date.now() - this.LOCK_TIMEOUT_MINUTES * 60 * 1000)
 
-      /*
-       * TODO: 查询超时的 trade holds
-       * const expired_holds = await ItemHold.findAll({
-       *   where: {
-       *     hold_type: 'trade',
-       *     status: 'active',
-       *     expires_at: { [Op.lt]: timeout_threshold }
-       *   },
-       *   lock: transaction.LOCK.UPDATE,
-       *   transaction
-       * })
-       */
+      const expired_holds = await ItemHold.findAll({
+        where: {
+          hold_type: 'trade',
+          status: 'active',
+          expires_at: { [Op.lt]: timeout_threshold }
+        },
+        lock: transaction.LOCK.UPDATE,
+        transaction
+      })
+
+      if (expired_holds.length === 0) {
+        await transaction.commit()
+        return { released_count: 0, items: [] }
+      }
+
+      const released_items = []
+
+      for (const hold of expired_holds) {
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          await hold.update({ status: 'expired', released_at: new Date() }, { transaction })
+
+          // eslint-disable-next-line no-await-in-loop
+          const item = await Item.findByPk(hold.item_id, {
+            lock: transaction.LOCK.UPDATE,
+            transaction
+          })
+
+          if (item && item.status === 'held') {
+            // eslint-disable-next-line no-await-in-loop
+            await item.update({ status: 'available' }, { transaction })
+
+            // eslint-disable-next-line no-await-in-loop
+            await ItemLedger.create(
+              {
+                item_id: hold.item_id,
+                account_id: item.owner_account_id,
+                delta: 0,
+                event_type: 'expire',
+                business_type: 'trade_hold_timeout',
+                idempotency_key: `hold_expire_${hold.hold_id}_${Date.now()}`
+              },
+              { transaction }
+            )
+          }
+
+          released_items.push({
+            hold_id: hold.hold_id,
+            item_id: hold.item_id,
+            holder_ref: hold.holder_ref,
+            expires_at: hold.expires_at
+          })
+        } catch (err) {
+          logger.error('释放单个超时锁失败（继续处理下一个）', {
+            hold_id: hold.hold_id,
+            item_id: hold.item_id,
+            error: err.message
+          })
+        }
+      }
 
       await transaction.commit()
+
+      if (released_items.length > 0) {
+        logger.info('✅ 批量释放超时物品锁', {
+          released_count: released_items.length,
+          items: released_items
+        })
+      }
+
       return {
-        released_count: 0,
-        items: []
+        released_count: released_items.length,
+        items: released_items
       }
     } catch (error) {
       await transaction.rollback()

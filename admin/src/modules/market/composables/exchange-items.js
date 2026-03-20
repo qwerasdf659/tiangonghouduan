@@ -10,6 +10,7 @@
 import { logger } from '../../../utils/logger.js'
 import { buildURL, request } from '../../../api/base.js'
 import { MARKET_ENDPOINTS } from '../../../api/market/index.js'
+import { ProductAPI } from '../../../api/product/index.js'
 import { ASSET_ENDPOINTS } from '../../../api/asset.js'
 import { SYSTEM_ADMIN_ENDPOINTS } from '../../../api/system/admin.js'
 import { useSortable } from '../../../alpine/mixins/sortable.js'
@@ -34,9 +35,9 @@ export function useExchangeItemsState() {
     itemPageSize: 20,
     /** @type {Object} 商品分页信息 */
     itemPagination: { total_pages: 1, total: 0 },
-    /** @type {Object} 商品表单数据 - 直接使用后端字段名 */
+    /** @type {Object} 商品表单数据 - 使用 Product 模型字段名 */
     itemForm: {
-      item_name: '',
+      product_name: '',
       description: '',
       cost_asset_code: '',
       cost_amount: 1,
@@ -62,7 +63,10 @@ export function useExchangeItemsState() {
       unpublish_at: '',
       attributes: null,
       stock_alert_threshold: 0,
-      video_url: ''
+      video_url: '',
+      mint_instance: true,
+      item_template_id: null,
+      attributes_json: null
     },
     /** @type {string} 商品参数表编辑用 JSON 字符串 */
     attributesStr: '{}',
@@ -167,19 +171,17 @@ export function useExchangeItemsMethods() {
         }
         Object.keys(params).forEach(k => !params[k] && delete params[k])
 
-        const res = await request({
-          url: MARKET_ENDPOINTS.EXCHANGE_ITEMS,
-          method: 'GET',
-          params
-        })
+        const res = await ProductAPI.listProducts(params)
 
         if (res.success) {
-          // 后端返回数据结构: { items: [...], pagination: {...} }
-          const newItems = res.data?.items || res.data?.list || []
-          this.items = Array.isArray(newItems) ? [...newItems] : []
+          const rawItems = res.data?.items || res.data?.list || res.data?.products || []
+          this.items = (Array.isArray(rawItems) ? rawItems : []).map(p => ({
+            ...p,
+            exchange_item_id: p.product_id ?? p.exchange_item_id,
+            item_name: p.product_name ?? p.item_name
+          }))
           this.itemPagination = {
-            total_pages:
-              res.data?.pagination?.total_pages || res.data?.pagination?.total_pages || 1,
+            total_pages: res.data?.pagination?.total_pages || 1,
             total: res.data?.pagination?.total || this.items.length
           }
         }
@@ -283,7 +285,7 @@ export function useExchangeItemsMethods() {
     openAddItemModal() {
       this.editingItemId = null
       this.itemForm = {
-        item_name: '',
+        product_name: '',
         description: '',
         cost_asset_code: '',
         cost_amount: 1,
@@ -305,7 +307,10 @@ export function useExchangeItemsMethods() {
         is_limited: false,
         has_warranty: false,
         free_shipping: false,
-        video_url: ''
+        video_url: '',
+        mint_instance: true,
+        item_template_id: null,
+        attributes_json: null
       }
       this.itemImagePreviewUrl = null
       this.detailImages = []
@@ -322,9 +327,9 @@ export function useExchangeItemsMethods() {
      * @param {Object} item - 商品对象（字段名与后端模型一致）
      */
     editItem(item) {
-      this.editingItemId = item.exchange_item_id
+      this.editingItemId = item.product_id || item.exchange_item_id
       this.itemForm = {
-        item_name: item.item_name || '',
+        product_name: item.product_name || item.item_name || '',
         description: item.description || '',
         cost_asset_code: item.cost_asset_code || '',
         cost_amount: item.cost_amount || 1,
@@ -350,7 +355,10 @@ export function useExchangeItemsMethods() {
         unpublish_at: item.unpublish_at ? item.unpublish_at.substring(0, 16) : '',
         attributes: item.attributes || null,
         stock_alert_threshold: item.stock_alert_threshold || 0,
-        video_url: item.video_url || ''
+        video_url: item.video_url || '',
+        mint_instance: item.mint_instance ?? true,
+        item_template_id: item.item_template_id || null,
+        attributes_json: item.attributes_json || null
       }
       this.attributesStr = item.attributes ? JSON.stringify(item.attributes, null, 2) : '{}'
       this.itemImagePreviewUrl =
@@ -361,9 +369,10 @@ export function useExchangeItemsMethods() {
       this.tagInput = ''
       this.usageRuleInput = ''
       this.loadDictionaries()
-      this.loadDetailImages(item.exchange_item_id)
-      this.loadShowcaseImages(item.exchange_item_id)
-      this.loadItemSkus(item.exchange_item_id)
+      const itemId = item.product_id || item.exchange_item_id
+      this.loadDetailImages(itemId)
+      this.loadShowcaseImages(itemId)
+      this.loadItemSkus(itemId)
       this.showModal('itemModal')
       this.$nextTick(() => this._initRichEditor(item.description || ''))
     },
@@ -372,12 +381,11 @@ export function useExchangeItemsMethods() {
      * 保存商品（新增或更新）
      */
     async saveItem() {
-      if (!this.itemForm.item_name || !this.itemForm.cost_asset_code) {
+      if (!this.itemForm.product_name || !this.itemForm.cost_asset_code) {
         this.showError?.('请填写必填项')
         return
       }
 
-      // 将 attributesStr JSON 字符串转回对象
       if (
         this.attributesStr &&
         this.attributesStr.trim() !== '{}' &&
@@ -393,26 +401,22 @@ export function useExchangeItemsMethods() {
         this.itemForm.attributes = null
       }
 
-      // 处理定时上下架空值
       if (!this.itemForm.publish_at) this.itemForm.publish_at = null
       if (!this.itemForm.unpublish_at) this.itemForm.unpublish_at = null
 
       try {
         this.saving = true
-        const url = this.editingItemId
-          ? buildURL(MARKET_ENDPOINTS.EXCHANGE_ITEM_DETAIL, {
-              exchange_item_id: this.editingItemId
-            })
-          : MARKET_ENDPOINTS.EXCHANGE_ITEMS
-        const method = this.editingItemId ? 'PUT' : 'POST'
-
-        const res = await request({ url, method, data: this.itemForm })
+        let res
+        if (this.editingItemId) {
+          res = await ProductAPI.updateProduct(this.editingItemId, this.itemForm)
+        } else {
+          res = await ProductAPI.createProduct(this.itemForm)
+        }
 
         if (res.success) {
           this.showSuccess?.(this.editingItemId ? '更新成功' : '添加成功')
           this.hideModal?.('itemModal')
 
-          // 新增商品后：回到第一页，按创建时间倒序，确保新商品显示在最前面
           if (!this.editingItemId) {
             this.itemCurrentPage = 1
             this.itemFilters.sort_by = 'created_at'
@@ -638,10 +642,7 @@ export function useExchangeItemsMethods() {
       if (!confirmed) return
 
       try {
-        const res = await request({
-          url: buildURL(MARKET_ENDPOINTS.EXCHANGE_ITEM_DETAIL, { exchange_item_id: itemId }),
-          method: 'DELETE'
-        })
+        const res = await ProductAPI.deleteProduct(itemId)
         if (res.success) {
           this.showSuccess?.('删除成功')
           window.dispatchEvent(new CustomEvent('refresh-exchange-items'))
@@ -662,15 +663,10 @@ export function useExchangeItemsMethods() {
     async toggleItemStatus(item) {
       const newStatus = item.status === 'active' ? 'inactive' : 'active'
       const actionText = newStatus === 'active' ? '上架' : '下架'
+      const itemId = item.product_id || item.exchange_item_id
 
       try {
-        const res = await request({
-          url: buildURL(MARKET_ENDPOINTS.EXCHANGE_ITEM_DETAIL, {
-            exchange_item_id: item.exchange_item_id
-          }),
-          method: 'PUT',
-          data: { status: newStatus }
-        })
+        const res = await ProductAPI.updateProduct(itemId, { status: newStatus })
         if (res.success) {
           this.showSuccess?.(`商品已${actionText}`)
           window.dispatchEvent(new CustomEvent('refresh-exchange-items'))
@@ -862,10 +858,9 @@ export function useExchangeItemsMethods() {
      */
     async loadItemSkus(itemId) {
       try {
-        const url = buildURL(MARKET_ENDPOINTS.EXCHANGE_ITEM_SKUS, { exchange_item_id: itemId })
-        const res = await request({ url, method: 'GET' })
+        const res = await ProductAPI.listSkus(itemId)
         if (res.success) {
-          this.itemSkus = res.data?.skus || []
+          this.itemSkus = res.data?.skus || res.data?.items || []
         }
       } catch (e) {
         logger.error('[ExchangeItems] 加载 SKU 列表失败:', e)
@@ -879,14 +874,12 @@ export function useExchangeItemsMethods() {
      */
     async saveSku(itemId) {
       try {
-        const url = this.editingSkuId
-          ? buildURL(MARKET_ENDPOINTS.EXCHANGE_ITEM_SKU_DETAIL, {
-              exchange_item_id: itemId,
-              sku_id: this.editingSkuId
-            })
-          : buildURL(MARKET_ENDPOINTS.EXCHANGE_ITEM_SKUS, { exchange_item_id: itemId })
-        const method = this.editingSkuId ? 'PUT' : 'POST'
-        const res = await request({ url, method, data: this.skuForm })
+        let res
+        if (this.editingSkuId) {
+          res = await ProductAPI.updateSku(this.editingSkuId, this.skuForm)
+        } else {
+          res = await ProductAPI.createSku(itemId, this.skuForm)
+        }
         if (res.success) {
           this.showSuccess?.(this.editingSkuId ? 'SKU 已更新' : 'SKU 已创建')
           await this.loadItemSkus(itemId)
@@ -923,11 +916,7 @@ export function useExchangeItemsMethods() {
     async deleteSku(itemId, skuId) {
       if (!confirm('确定要删除此 SKU 吗？')) return
       try {
-        const url = buildURL(MARKET_ENDPOINTS.EXCHANGE_ITEM_SKU_DETAIL, {
-          exchange_item_id: itemId,
-          sku_id: skuId
-        })
-        const res = await request({ url, method: 'DELETE' })
+        const res = await ProductAPI.deleteSku(skuId)
         if (res.success) {
           this.showSuccess?.('SKU 已删除')
           await this.loadItemSkus(itemId)

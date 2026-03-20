@@ -57,6 +57,8 @@ class BidService {
     this.ExchangeRecord = models.ExchangeRecord
     this.Item = models.Item
     this.MaterialAssetType = models.MaterialAssetType
+    // 迁移路径：ExchangeItem → Product（统一商品模型）
+    this.Product = models.Product
     this.sequelize = models.sequelize
   }
 

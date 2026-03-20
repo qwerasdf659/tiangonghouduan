@@ -271,7 +271,10 @@ const DELETE_TOPOLOGY = Object.freeze([
   ],
   // 第三层
   ['market_listings', 'customer_service_sessions', 'ad_campaigns'],
-  // 第四层
+  /*
+   * 第四层
+   * 迁移路径：exchange_items 表保留；新增 products 表由 Product 模型管理
+   */
   ['items', 'lottery_prizes', 'exchange_items'],
   // 第五层（核心配置表 - 通常不删，仅清档模式时按需处理）
   [

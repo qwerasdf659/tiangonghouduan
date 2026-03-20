@@ -90,6 +90,8 @@ class BidQueryService {
     this.BidProduct = models.BidProduct
     this.BidRecord = models.BidRecord
     this.ExchangeItem = models.ExchangeItem
+    // 迁移路径：ExchangeItem → Product（统一商品模型）
+    this.Product = models.Product
     this.sequelize = models.sequelize
   }
 

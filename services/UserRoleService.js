@@ -580,9 +580,9 @@ class UserRoleService {
       users: usersWithDisplayNames,
       pagination: {
         current_page: parseInt(page),
-        per_page: parseInt(limit),
+        per_page: finalLimit,
         total: count,
-        total_pages: Math.ceil(count / parseInt(limit))
+        total_pages: Math.ceil(count / finalLimit)
       },
       // 全局统计数据（供前端统计卡片使用）
       statistics: {

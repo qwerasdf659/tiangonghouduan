@@ -1,4 +1,8 @@
 /**
+ * @deprecated 此模型将被 Product 模型替代（2026-03-20 EAV改造）
+ * 数据已迁移到 products 表，此模型仅保留供兑换服务过渡期使用
+ * 新功能请使用 Product + ProductSku + ExchangeChannelPrice
+ *
  * 兑换市场商品模型 - ExchangeItem
  * 材料资产支付兑换市场核心表（V4.5.0统一版）
  *

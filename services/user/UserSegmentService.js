@@ -427,7 +427,10 @@ class UserSegmentService {
         raw: true
       })
 
-      // 获取兑换商品详情（关联 ExchangeItem 模型）
+      /*
+       * 获取兑换商品详情（关联 ExchangeItem 模型）
+       * 迁移路径：ExchangeItem → Product（统一商品模型）
+       */
       const exchangeItemIds = exchangeStats.map(s => s.exchange_item_id)
       const itemDetails = {}
 
@@ -441,6 +444,26 @@ class UserSegmentService {
         items.forEach(item => {
           itemDetails[item.exchange_item_id] = item
         })
+      }
+
+      // 迁移路径：补充 Product 统一商品名称（兜底）
+      if (models.Product) {
+        const missingIds = exchangeItemIds.filter(id => !itemDetails[id])
+        if (missingIds.length > 0) {
+          const products = await models.Product.findAll({
+            where: { legacy_exchange_item_id: { [Op.in]: missingIds } },
+            attributes: ['product_id', 'name', 'legacy_exchange_item_id'],
+            raw: true
+          })
+          products.forEach(p => {
+            if (p.legacy_exchange_item_id && !itemDetails[p.legacy_exchange_item_id]) {
+              itemDetails[p.legacy_exchange_item_id] = {
+                exchange_item_id: p.legacy_exchange_item_id,
+                item_name: p.name
+              }
+            }
+          })
+        }
       }
 
       // 构建偏好列表

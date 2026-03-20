@@ -1,4 +1,7 @@
 /**
+ * @deprecated 此模型将被 ProductSku + SkuAttributeValue 替代（2026-03-20 EAV改造）
+ * 数据已迁移到 product_skus 表，此模型仅保留供兑换服务过渡期使用
+ *
  * 兑换商品 SKU 模型 - ExchangeItemSku
  * 全量 SKU 模式：所有商品至少有一个默认 SKU（spec_values={}）
  *

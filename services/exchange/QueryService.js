@@ -26,6 +26,71 @@ const displayNameHelper = require('../../utils/displayNameHelper')
 const { Op } = require('sequelize')
 
 /**
+ * 🎯 统一商品视图常量（Product 模型，统一商品中心）
+ */
+const PRODUCT_VIEW_ATTRIBUTES = {
+  /**
+   * 商品列表视图（用户浏览）
+   */
+  listView: [
+    'product_id',
+    'product_name',
+    'description',
+    'category_id',
+    'primary_media_id',
+    'rarity_code',
+    'status',
+    'sort_order',
+    'space',
+    'is_pinned',
+    'pinned_at',
+    'is_new',
+    'is_hot',
+    'is_limited',
+    'is_recommended',
+    'tags',
+    'sell_point',
+    'usage_rules',
+    'publish_at',
+    'unpublish_at',
+    'created_at'
+  ],
+
+  /**
+   * 商品详情视图
+   */
+  detailView: [
+    'product_id',
+    'product_name',
+    'description',
+    'category_id',
+    'primary_media_id',
+    'item_template_id',
+    'mint_instance',
+    'rarity_code',
+    'status',
+    'sort_order',
+    'space',
+    'is_pinned',
+    'pinned_at',
+    'is_new',
+    'is_hot',
+    'is_limited',
+    'is_recommended',
+    'tags',
+    'sell_point',
+    'usage_rules',
+    'video_url',
+    'stock_alert_threshold',
+    'publish_at',
+    'unpublish_at',
+    'attributes_json',
+    'created_at',
+    'updated_at'
+  ]
+}
+
+/**
  * 🎯 统一数据输出视图常量（Data Output View Constants）
  */
 const EXCHANGE_MARKET_ATTRIBUTES = {
@@ -167,6 +232,10 @@ class QueryService {
     this.ExchangeItem = models.ExchangeItem
     this.ExchangeRecord = models.ExchangeRecord
     this.ExchangeOrderEvent = models.ExchangeOrderEvent
+    this.Product = models.Product
+    this.ProductSku = models.ProductSku
+    this.ExchangeChannelPrice = models.ExchangeChannelPrice
+    this.Category = models.Category
     this.sequelize = models.sequelize
   }
 
@@ -1111,6 +1180,536 @@ class QueryService {
         avg_rating: null,
         rated_order_count: 0
       }
+    }
+  }
+
+  /*
+   * =====================================================================
+   *  统一商品中心查询方法（Product / ProductSku / ExchangeChannelPrice）
+   * =====================================================================
+   */
+
+  /**
+   * 查询统一商品列表（替代 getMarketItems 的 Product 版本）
+   *
+   * 数据来源：products → product_skus → exchange_channel_prices
+   * 前端兼容：返回结果包含 exchange_item_id / item_name 等兼容字段
+   *
+   * @param {Object} [filters={}] - 筛选条件
+   * @param {string}  [filters.status='active']    - 商品状态
+   * @param {string}  [filters.asset_code]          - 材料资产代码（定价层筛选）
+   * @param {string}  [filters.space]               - 展示空间 lucky/premium
+   * @param {string}  [filters.keyword]             - 关键词搜索（匹配 product_name）
+   * @param {string|number} [filters.category]      - 品类代码或品类 ID
+   * @param {number}  [filters.exclude_id]          - 排除指定商品
+   * @param {number}  [filters.min_cost]            - 最低价格
+   * @param {number}  [filters.max_cost]            - 最高价格
+   * @param {Object} [pagination={}] - 分页与排序
+   * @param {number}  [pagination.page=1]           - 页码
+   * @param {number}  [pagination.page_size=20]     - 每页数量
+   * @param {string}  [pagination.sort_by='sort_order'] - 排序字段
+   * @param {string}  [pagination.sort_order='ASC'] - 排序方向
+   * @returns {Promise<Object>} { items, pagination }
+   */
+  async listProducts(filters = {}, pagination = {}) {
+    const {
+      status = 'active',
+      asset_code = null,
+      space = null,
+      keyword = null,
+      category = null,
+      exclude_id = null,
+      min_cost = null,
+      max_cost = null
+    } = filters
+
+    const { page = 1, page_size = 20, sort_by = 'sort_order', sort_order = 'ASC' } = pagination
+
+    try {
+      if (!this.Product) {
+        throw new Error('Product 模型未注册，请检查 models 配置')
+      }
+
+      logger.info('[商品中心] 查询商品列表', {
+        status,
+        asset_code,
+        space,
+        keyword,
+        page,
+        page_size
+      })
+
+      // ---- 商品层 WHERE ----
+      const where = { status }
+
+      if (space) {
+        where.space = { [Op.in]: [space, 'both'] }
+      }
+      if (keyword) {
+        where.product_name = { [Op.like]: `%${keyword}%` }
+      }
+      if (category) {
+        const categoryIds = await this._resolveCategoryIds(category)
+        if (categoryIds && categoryIds.length > 0) {
+          where.category_id = { [Op.in]: categoryIds }
+        }
+      }
+      if (exclude_id) {
+        where.product_id = { [Op.ne]: parseInt(exclude_id, 10) }
+      }
+
+      // ---- 定价层 WHERE（ExchangeChannelPrice）----
+      const priceWhere = { is_enabled: true }
+      const hasPriceFilter = !!(asset_code || min_cost !== null || max_cost !== null)
+
+      if (asset_code) {
+        priceWhere.cost_asset_code = asset_code
+      }
+      if (min_cost !== null) {
+        priceWhere.cost_amount = {
+          ...priceWhere.cost_amount,
+          [Op.gte]: parseInt(min_cost, 10)
+        }
+      }
+      if (max_cost !== null) {
+        priceWhere.cost_amount = {
+          ...priceWhere.cost_amount,
+          [Op.lte]: parseInt(max_cost, 10)
+        }
+      }
+
+      const offset = (page - 1) * page_size
+      const limit = page_size
+
+      const { count, rows } = await this.Product.findAndCountAll({
+        where,
+        attributes: PRODUCT_VIEW_ATTRIBUTES.listView,
+        include: [
+          {
+            model: this.Category,
+            as: 'category',
+            attributes: ['category_id', 'category_name', 'category_code'],
+            required: false
+          },
+          {
+            model: this.models.MediaFile,
+            as: 'primary_media',
+            attributes: ['media_id', 'object_key', 'mime_type', 'thumbnail_keys'],
+            required: false
+          },
+          {
+            model: this.models.RarityDef,
+            as: 'rarityDef',
+            attributes: ['rarity_code', 'display_name', 'color_hex', 'tier'],
+            required: false
+          },
+          {
+            model: this.ProductSku,
+            as: 'skus',
+            where: { status: 'active' },
+            required: hasPriceFilter,
+            attributes: ['sku_id', 'sku_code', 'stock', 'sold_count', 'status', 'sort_order'],
+            include: [
+              {
+                model: this.ExchangeChannelPrice,
+                as: 'channelPrices',
+                where: priceWhere,
+                required: hasPriceFilter,
+                attributes: [
+                  'id',
+                  'cost_asset_code',
+                  'cost_amount',
+                  'original_amount',
+                  'is_enabled'
+                ]
+              }
+            ]
+          }
+        ],
+        limit,
+        offset,
+        order: [
+          ['is_pinned', 'DESC'],
+          ['pinned_at', 'DESC'],
+          ['is_recommended', 'DESC'],
+          ['sort_order', 'ASC'],
+          [sort_by, sort_order]
+        ],
+        distinct: true,
+        subQuery: false
+      })
+
+      logger.info(`[商品中心] 找到${count}个商品，返回第${page}页（${rows.length}个）`)
+
+      const items = rows.map(p => this._formatProductForListing(p))
+
+      return {
+        items,
+        pagination: {
+          total: count,
+          page,
+          page_size,
+          total_pages: Math.ceil(count / page_size)
+        }
+      }
+    } catch (error) {
+      logger.error('[商品中心] 查询商品列表失败:', error.message)
+      throw new Error(`查询商品列表失败: ${error.message}`)
+    }
+  }
+
+  /**
+   * 获取单个商品详情（Product 版本，替代 getItemDetail）
+   *
+   * 包含 SKU 列表、渠道定价、品类、稀有度、主图、画廊图等全量信息
+   *
+   * @param {number} productId - 商品 ID（products.product_id）
+   * @returns {Promise<Object>} { item }
+   */
+  async getProductDetail(productId) {
+    try {
+      if (!this.Product) {
+        throw new Error('Product 模型未注册，请检查 models 配置')
+      }
+
+      logger.info('[商品中心] 查询商品详情', { product_id: productId })
+
+      const product = await this.Product.findOne({
+        where: { product_id: productId },
+        attributes: PRODUCT_VIEW_ATTRIBUTES.detailView,
+        include: [
+          {
+            model: this.Category,
+            as: 'category',
+            attributes: ['category_id', 'category_name', 'category_code'],
+            required: false
+          },
+          {
+            model: this.models.MediaFile,
+            as: 'primary_media',
+            attributes: ['media_id', 'object_key', 'mime_type', 'thumbnail_keys'],
+            required: false
+          },
+          {
+            model: this.models.RarityDef,
+            as: 'rarityDef',
+            attributes: ['rarity_code', 'display_name', 'color_hex', 'tier'],
+            required: false
+          },
+          {
+            model: this.ProductSku,
+            as: 'skus',
+            where: { status: 'active' },
+            required: false,
+            attributes: [
+              'sku_id',
+              'sku_code',
+              'stock',
+              'sold_count',
+              'cost_price',
+              'status',
+              'image_id',
+              'sort_order'
+            ],
+            include: [
+              {
+                model: this.ExchangeChannelPrice,
+                as: 'channelPrices',
+                where: { is_enabled: true },
+                required: false,
+                attributes: [
+                  'id',
+                  'cost_asset_code',
+                  'cost_amount',
+                  'original_amount',
+                  'is_enabled',
+                  'publish_at',
+                  'unpublish_at'
+                ]
+              },
+              ...(this.models.MediaFile
+                ? [
+                    {
+                      model: this.models.MediaFile,
+                      as: 'skuImage',
+                      attributes: ['media_id', 'object_key', 'mime_type', 'thumbnail_keys'],
+                      required: false
+                    }
+                  ]
+                : [])
+            ]
+          }
+        ]
+      })
+
+      if (!product) {
+        const err = new Error('商品不存在')
+        err.statusCode = 404
+        err.errorCode = 'PRODUCT_NOT_FOUND'
+        throw err
+      }
+
+      // 画廊 / 详情图 / 展示图（通过 media_attachments）
+      const { MediaAttachment, MediaFile } = this.models
+      const { getImageUrl } = require('../../utils/ImageUrlHelper')
+
+      const attachments =
+        MediaAttachment && MediaFile
+          ? await MediaAttachment.findAll({
+              where: {
+                attachable_type: 'product',
+                attachable_id: productId
+              },
+              include: [
+                {
+                  model: MediaFile,
+                  as: 'media',
+                  attributes: ['media_id', 'object_key', 'mime_type', 'thumbnail_keys']
+                }
+              ],
+              order: [['sort_order', 'ASC']]
+            })
+          : []
+
+      const toImageJson = a => {
+        const m = a.media || a.Media
+        if (!m) return null
+        const url = m.object_key ? getImageUrl(m.object_key) : null
+        return {
+          media_id: m.media_id,
+          url,
+          mime: m.mime_type,
+          thumbnail_url: m.thumbnail_keys?.small ? getImageUrl(m.thumbnail_keys.small) : url
+        }
+      }
+
+      const images = attachments
+        .filter(a => a.role === 'gallery' || a.role === 'products')
+        .map(toImageJson)
+        .filter(Boolean)
+      const detail_images = attachments
+        .filter(a => a.role === 'detail')
+        .map(toImageJson)
+        .filter(Boolean)
+      const showcase_images = attachments
+        .filter(a => a.role === 'showcase')
+        .map(toImageJson)
+        .filter(Boolean)
+
+      const itemJSON = this._formatProductForDetail(product)
+      itemJSON.images = images
+      itemJSON.detail_images = detail_images
+      itemJSON.showcase_images = showcase_images
+
+      return { item: itemJSON }
+    } catch (error) {
+      logger.error(`[商品中心] 查询商品详情失败(product_id:${productId}):`, error.message)
+      throw error
+    }
+  }
+
+  /**
+   * 获取统一商品统计数据（替代 getMarketStatistics 中的商品统计部分）
+   *
+   * 统计维度：商品状态分布、SKU 库存/销量汇总、空间分布
+   *
+   * @returns {Promise<Object>} { statistics: { products, skus, spaces } }
+   */
+  async getProductStats() {
+    try {
+      if (!this.Product) {
+        throw new Error('Product 模型未注册，请检查 models 配置')
+      }
+
+      logger.info('[商品中心] 查询商品统计数据')
+
+      const [productStatusRows, skuStatusRows, spaceRows] = await Promise.all([
+        // 商品按状态分组计数
+        this.Product.findAll({
+          attributes: [
+            'status',
+            [this.sequelize.fn('COUNT', this.sequelize.col('product_id')), 'count']
+          ],
+          group: ['status'],
+          raw: true
+        }),
+        // SKU 按状态分组计数、库存/销量合计
+        this.ProductSku.findAll({
+          attributes: [
+            'status',
+            [this.sequelize.fn('COUNT', this.sequelize.col('sku_id')), 'sku_count'],
+            [this.sequelize.fn('SUM', this.sequelize.col('stock')), 'total_stock'],
+            [this.sequelize.fn('SUM', this.sequelize.col('sold_count')), 'total_sold']
+          ],
+          group: ['status'],
+          raw: true
+        }),
+        // 在售商品按空间分组计数
+        this.Product.findAll({
+          attributes: [
+            'space',
+            [this.sequelize.fn('COUNT', this.sequelize.col('product_id')), 'count']
+          ],
+          where: { status: 'active' },
+          group: ['space'],
+          raw: true
+        })
+      ])
+
+      const byStatus = {}
+      productStatusRows.forEach(row => {
+        byStatus[row.status] = parseInt(row.count, 10)
+      })
+
+      const skuByStatus = {}
+      let totalStock = 0
+      let totalSold = 0
+      skuStatusRows.forEach(row => {
+        const stock = parseInt(row.total_stock || 0, 10)
+        const sold = parseInt(row.total_sold || 0, 10)
+        skuByStatus[row.status] = {
+          count: parseInt(row.sku_count, 10),
+          stock,
+          sold
+        }
+        totalStock += stock
+        totalSold += sold
+      })
+
+      const spaces = {}
+      spaceRows.forEach(row => {
+        spaces[row.space] = parseInt(row.count, 10)
+      })
+
+      return {
+        statistics: {
+          products: {
+            by_status: byStatus,
+            total: Object.values(byStatus).reduce((s, v) => s + v, 0)
+          },
+          skus: {
+            by_status: skuByStatus,
+            total_stock: totalStock,
+            total_sold: totalSold
+          },
+          spaces
+        }
+      }
+    } catch (error) {
+      logger.error('[商品中心] 查询商品统计失败:', error.message)
+      throw new Error(`查询商品统计失败: ${error.message}`)
+    }
+  }
+
+  /*
+   * =====================================================================
+   *  Product 查询私有工具方法
+   * =====================================================================
+   */
+
+  /**
+   * 将 category_code 或 category_id 解析为该品类及其所有子品类 ID 列表
+   *
+   * @param {string|number} category - 品类代码或品类 ID
+   * @returns {Promise<number[]|null>} 品类 ID 数组，无法解析时返回 null
+   * @private
+   */
+  async _resolveCategoryIds(category) {
+    if (category == null) return null
+    const CategoryModel = this.Category
+    if (!CategoryModel) return null
+
+    let categoryId
+    const num = parseInt(category, 10)
+    if (!Number.isNaN(num) && String(num) === String(category)) {
+      categoryId = num
+    } else {
+      const cat = await CategoryModel.findOne({
+        where: { category_code: String(category) },
+        attributes: ['category_id']
+      })
+      categoryId = cat ? cat.category_id : null
+    }
+
+    if (!categoryId) return null
+
+    const children = await CategoryModel.findAll({
+      where: { parent_category_id: categoryId },
+      attributes: ['category_id']
+    })
+
+    return [categoryId, ...children.map(c => c.category_id)]
+  }
+
+  /**
+   * 将 Product 实例格式化为列表视图 JSON（含前端兼容字段）
+   *
+   * 兼容映射：product_id → exchange_item_id、product_name → item_name 等
+   *
+   * @param {Model} product - Product Sequelize 实例
+   * @returns {Object} 格式化后的商品 JSON
+   * @private
+   */
+  _formatProductForListing(product) {
+    const json = product.toJSON()
+
+    const totalStock = (json.skus || []).reduce((sum, sku) => sum + (sku.stock || 0), 0)
+    const totalSoldCount = (json.skus || []).reduce((sum, sku) => sum + (sku.sold_count || 0), 0)
+
+    let cheapestPrice = null
+    for (const sku of json.skus || []) {
+      for (const price of sku.channelPrices || []) {
+        if (!cheapestPrice || price.cost_amount < cheapestPrice.cost_amount) {
+          cheapestPrice = price
+        }
+      }
+    }
+
+    return {
+      ...json,
+      exchange_item_id: json.product_id,
+      item_name: json.product_name,
+      stock: totalStock,
+      sold_count: totalSoldCount,
+      cost_asset_code: cheapestPrice?.cost_asset_code || null,
+      cost_amount: cheapestPrice?.cost_amount || null,
+      original_price: cheapestPrice?.original_amount || null,
+      category_def_id: json.category_id
+    }
+  }
+
+  /**
+   * 将 Product 实例格式化为详情视图 JSON（含前端兼容字段）
+   *
+   * @param {Model} product - Product Sequelize 实例（含 skus、channelPrices 等嵌套）
+   * @returns {Object} 格式化后的商品详情 JSON
+   * @private
+   */
+  _formatProductForDetail(product) {
+    const json = product.toJSON()
+
+    const totalStock = (json.skus || []).reduce((sum, sku) => sum + (sku.stock || 0), 0)
+    const totalSoldCount = (json.skus || []).reduce((sum, sku) => sum + (sku.sold_count || 0), 0)
+
+    let cheapestPrice = null
+    for (const sku of json.skus || []) {
+      for (const price of sku.channelPrices || []) {
+        if (!cheapestPrice || price.cost_amount < cheapestPrice.cost_amount) {
+          cheapestPrice = price
+        }
+      }
+    }
+
+    return {
+      ...json,
+      exchange_item_id: json.product_id,
+      item_name: json.product_name,
+      stock: totalStock,
+      sold_count: totalSoldCount,
+      cost_asset_code: cheapestPrice?.cost_asset_code || null,
+      cost_amount: cheapestPrice?.cost_amount || null,
+      original_price: cheapestPrice?.original_amount || null,
+      category_def_id: json.category_id
     }
   }
 

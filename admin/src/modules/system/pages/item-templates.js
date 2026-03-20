@@ -60,6 +60,33 @@ function hideLoading() {
     }
   }
 }
+
+/** 属性规则默认五档品质（与 C2C 品质文案对齐） */
+function defaultQualityTiers() {
+  const grades = ['完美无瑕', '精良', '良好', '普通', '微瑕']
+  return grades.map(grade => ({
+    min: 0,
+    max: 100,
+    weight: 1,
+    grade
+  }))
+}
+
+function defaultAttributeRulesState() {
+  return {
+    quality_score: {
+      enabled: false,
+      tiers: defaultQualityTiers()
+    },
+    pattern_id: {
+      enabled: false,
+      min: null,
+      max: null
+    },
+    trade_cooldown_days: 7
+  }
+}
+
 document.addEventListener('alpine:init', () => {
   // 使用 createCrudMixin 获取标准功能
   const baseMixin =
@@ -121,6 +148,10 @@ document.addEventListener('alpine:init', () => {
       { value: 'redeem', label: '生成核销码（到店核销）' },
       { value: 'sell', label: '上架交易市场' }
     ],
+    /** 限量总数上限（写入 meta.max_edition） */
+    max_edition: null,
+    /** 属性规则表单（写入 meta.attribute_rules） */
+    attribute_rules: defaultAttributeRulesState(),
     is_submitting: false,
     /** @type {string|null} 图片上传预览URL */
     image_preview_url: null,
@@ -277,6 +308,8 @@ document.addEventListener('alpine:init', () => {
      */
     openCreateModal() {
       logger.info('[openCreateModal] 初始化表单')
+      this.max_edition = null
+      this.attribute_rules = defaultAttributeRulesState()
       this.form = {
         template_id: '',
         display_name: '',
@@ -317,6 +350,12 @@ document.addEventListener('alpine:init', () => {
           const metaCopy = { ...metaObj }
           delete metaCopy.use_instructions
           delete metaCopy.allowed_actions
+          delete metaCopy.max_edition
+          delete metaCopy.attribute_rules
+
+          this.max_edition =
+            metaObj.max_edition != null && metaObj.max_edition !== '' ? Number(metaObj.max_edition) : null
+          this.attribute_rules = this.normalizeAttributeRules(metaObj.attribute_rules)
 
           this.form = {
             template_id: t.item_template_id,
@@ -388,6 +427,12 @@ document.addEventListener('alpine:init', () => {
       if (this.form.allowed_actions && this.form.allowed_actions.length > 0) {
         finalMeta.allowed_actions = this.form.allowed_actions
       }
+
+      if (this.max_edition != null && this.max_edition !== '' && !Number.isNaN(Number(this.max_edition))) {
+        finalMeta.max_edition = Number(this.max_edition)
+      }
+
+      finalMeta.attribute_rules = this.buildAttributeRulesPayload()
 
       const data = {
         display_name: this.form.display_name,
@@ -537,6 +582,67 @@ document.addEventListener('alpine:init', () => {
     clearTemplateImage() {
       this.form.primary_media_id = null
       this.image_preview_url = null
+    },
+
+    /**
+     * 将接口中的 attribute_rules 规范化为表单状态
+     */
+    normalizeAttributeRules(raw) {
+      const base = defaultAttributeRulesState()
+      if (!raw || typeof raw !== 'object') {
+        return base
+      }
+      base.quality_score.enabled = !!raw.quality_score?.enabled
+      const tiers = raw.quality_score?.tiers
+      if (Array.isArray(tiers) && tiers.length > 0) {
+        base.quality_score.tiers = tiers.map((t, i) => ({
+          min: t.min != null ? Number(t.min) : 0,
+          max: t.max != null ? Number(t.max) : 100,
+          weight: t.weight != null ? Number(t.weight) : 1,
+          grade: t.grade != null ? String(t.grade) : base.quality_score.tiers[i]?.grade || ''
+        }))
+        while (base.quality_score.tiers.length < 5) {
+          base.quality_score.tiers.push({
+            min: 0,
+            max: 100,
+            weight: 1,
+            grade: defaultQualityTiers()[base.quality_score.tiers.length]?.grade || ''
+          })
+        }
+        base.quality_score.tiers = base.quality_score.tiers.slice(0, 5)
+      }
+      base.pattern_id.enabled = !!raw.pattern_id?.enabled
+      base.pattern_id.min = raw.pattern_id?.min != null ? Number(raw.pattern_id.min) : null
+      base.pattern_id.max = raw.pattern_id?.max != null ? Number(raw.pattern_id.max) : null
+      base.trade_cooldown_days =
+        raw.trade_cooldown_days != null ? Number(raw.trade_cooldown_days) || 7 : 7
+      return base
+    },
+
+    /**
+     * 组装写入 meta 的 attribute_rules（完整结构，便于回显）
+     */
+    buildAttributeRulesPayload() {
+      const q = this.attribute_rules?.quality_score
+      const p = this.attribute_rules?.pattern_id
+      const cd = this.attribute_rules?.trade_cooldown_days
+      return {
+        quality_score: {
+          enabled: !!q?.enabled,
+          tiers: (q?.tiers || defaultQualityTiers()).slice(0, 5).map(t => ({
+            min: Number(t.min) || 0,
+            max: Number(t.max) || 0,
+            weight: Number(t.weight) || 0,
+            grade: t.grade != null ? String(t.grade) : ''
+          }))
+        },
+        pattern_id: {
+          enabled: !!p?.enabled,
+          min: p?.min != null && p.min !== '' ? Number(p.min) : null,
+          max: p?.max != null && p.max !== '' ? Number(p.max) : null
+        },
+        trade_cooldown_days: cd != null && cd !== '' ? Number(cd) || 7 : 7
+      }
     },
 
     /**

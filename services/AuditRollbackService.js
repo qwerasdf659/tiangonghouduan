@@ -39,29 +39,34 @@ const ROLLBACK_HANDLERS = {
     const { before_data, after_data, target_id } = log
     const { transaction, operator_id, reason } = options
 
-    // 获取 AssetService
     const ServiceManager = require('./index')
-    const assetService = ServiceManager.getService('asset')
+    const balanceService = ServiceManager.getService('asset_balance')
 
     if (!before_data || !after_data) {
       throw new Error('缺少回滚所需的数据快照')
     }
 
-    // 计算需要回滚的积分差值
     const deltaPoints = (before_data.available_points || 0) - (after_data.available_points || 0)
 
     if (deltaPoints === 0) {
       return { success: true, message: '积分无变化，无需回滚' }
     }
 
-    // 执行积分调整（反向操作）
-    const result = await assetService.adjustPoints({
-      user_id: target_id,
-      delta: deltaPoints,
-      reason: `回滚操作: ${reason || '管理员回滚'}`,
-      operator_id,
-      transaction
-    })
+    const result = await balanceService.changeBalance(
+      {
+        user_id: target_id,
+        asset_code: 'DIAMOND',
+        delta_amount: deltaPoints,
+        business_type: 'audit_rollback',
+        idempotency_key: `rollback_points_${log.admin_operation_log_id}_${Date.now()}`,
+        meta: {
+          rollback_reason: reason || '管理员回滚',
+          original_log_id: log.admin_operation_log_id,
+          operator_id
+        }
+      },
+      { transaction }
+    )
 
     return {
       success: true,

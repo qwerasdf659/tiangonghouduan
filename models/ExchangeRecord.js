@@ -48,8 +48,8 @@ module.exports = sequelize => {
       },
       exchange_item_id: {
         type: DataTypes.BIGINT,
-        allowNull: false,
-        comment: '兑换商品ID',
+        allowNull: true,
+        comment: '兑换商品ID（传统路径必填，Product路径为NULL）',
         references: {
           model: 'exchange_items',
           key: 'exchange_item_id'

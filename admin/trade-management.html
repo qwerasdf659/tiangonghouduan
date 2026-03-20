@@ -6,7 +6,7 @@
     pageStyle: '[x-cloak] { display: none !important; }' 
   }) %>
 </head>
-<body class="themed-bg-subtle min-h-screen" x-data="tradeManagementPage()" x-init="init()" x-cloak>
+<body class="themed-bg-subtle min-h-screen" x-data="tradeManagementPage()" x-init="init()">
   
   <!-- 导航栏（深色渐变风格） -->
   <nav class="page-navbar">
@@ -22,7 +22,7 @@
     </div>
   </nav>
 
-  <div class="container mx-auto px-4 py-6">
+  <div class="container mx-auto px-4 py-6" x-cloak>
     <!-- 页面横幅 -->
     <div class="page-banner mb-6">
       <h1>💱 交易管理</h1>
@@ -683,14 +683,41 @@
         </div>
       </div>
 
-      <!-- 状态筛选 -->
-      <div class="p-4 border-b flex gap-2 items-center flex-wrap">
-        <span class="text-sm themed-text-muted">筛选状态：</span>
-        <template x-for="s in [{value:'',label:'全部'},{value:'on_sale',label:'在售'},{value:'locked',label:'锁定中'},{value:'sold',label:'已售'},{value:'withdrawn',label:'已撤回'},{value:'admin_withdrawn',label:'管理员下架'}]" :key="s.value">
-          <button @click="userListingsFilter.status = s.value; loadUserListings(userListingsInfo.user?.user_id)"
-                  :class="userListingsFilter.status === s.value ? 'themed-btn-primary' : 'themed-bg-muted themed-text-secondary'"
-                  class="px-3 py-1 text-xs rounded-full" x-text="s.label"></button>
-        </template>
+      <!-- 状态筛选 + C2C 品质筛选/排序 -->
+      <div class="p-4 border-b space-y-3">
+        <div class="flex gap-2 items-center flex-wrap">
+          <span class="text-sm themed-text-muted">筛选状态：</span>
+          <template x-for="s in [{value:'',label:'全部'},{value:'on_sale',label:'在售'},{value:'locked',label:'锁定中'},{value:'sold',label:'已售'},{value:'withdrawn',label:'已撤回'},{value:'admin_withdrawn',label:'管理员下架'}]" :key="s.value">
+            <button type="button" @click="userListingsFilter.status = s.value; userListingsCurrentPage = 1; loadUserListings(userListingsInfo.user?.user_id)"
+                    :class="userListingsFilter.status === s.value ? 'themed-btn-primary' : 'themed-bg-muted themed-text-secondary'"
+                    class="px-3 py-1 text-xs rounded-full" x-text="s.label"></button>
+          </template>
+        </div>
+        <div class="flex flex-wrap gap-3 items-end">
+          <div>
+            <label class="block text-xs themed-text-muted mb-1">品质等级</label>
+            <select class="px-3 py-2 border rounded-lg text-sm min-w-[8rem]"
+                    x-model="userListingsFilter.quality_grade"
+                    @change="userListingsCurrentPage = 1; loadUserListings(userListingsInfo.user?.user_id)">
+              <option value="">全部</option>
+              <option value="完美无瑕">完美无瑕</option>
+              <option value="精良">精良</option>
+              <option value="良好">良好</option>
+              <option value="普通">普通</option>
+              <option value="微瑕">微瑕</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs themed-text-muted mb-1">品质分排序</label>
+            <select class="px-3 py-2 border rounded-lg text-sm min-w-[10rem]"
+                    x-model="userListingsFilter.listings_sort"
+                    @change="userListingsCurrentPage = 1; loadUserListings(userListingsInfo.user?.user_id)">
+              <option value="">默认（上架时间）</option>
+              <option value="quality_score_desc">品质分 ↓ 高→低</option>
+              <option value="quality_score_asc">品质分 ↑ 低→高</option>
+            </select>
+          </div>
+        </div>
       </div>
 
       <!-- 商品列表 -->
@@ -713,24 +740,49 @@
         <div x-show="userListingsInfo.listings.length === 0" class="text-center py-8 themed-text-muted">
           暂无上架商品
         </div>
-        <div class="space-y-3" x-show="userListingsInfo.listings.length > 0">
-          <template x-for="listing in userListingsInfo.listings" :key="listing.market_listing_id">
-            <div class="border rounded-lg p-3 hover:shadow-md transition-shadow">
-              <div class="flex justify-between items-start">
-                <div class="flex-1 space-y-1">
-                  <div class="flex items-center gap-2">
-                    <span class="font-mono text-xs themed-text-muted">#<span x-text="listing.market_listing_id"></span></span>
-                    <!-- 排序模式下显示排序值输入 -->
+        <div class="overflow-x-auto" x-show="userListingsInfo.listings.length > 0">
+          <table class="w-full text-sm border-collapse">
+            <thead>
+              <tr class="border-b themed-bg-base themed-text-secondary text-left">
+                <th class="px-2 py-2 font-medium">挂牌ID</th>
+                <th class="px-2 py-2 font-medium">标的</th>
+                <th class="px-2 py-2 font-medium text-center">品质分</th>
+                <th class="px-2 py-2 font-medium text-center">品质等级</th>
+                <th class="px-2 py-2 font-medium text-center">编号/限量</th>
+                <th class="px-2 py-2 font-medium">售价</th>
+                <th class="px-2 py-2 font-medium">状态</th>
+                <th class="px-2 py-2 font-medium text-right">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="listing in userListingsInfo.listings" :key="listing.market_listing_id">
+                <tr class="border-b hover:themed-bg-base align-top">
+                  <td class="px-2 py-2 font-mono text-xs">
+                    <span x-text="listing.market_listing_id"></span>
                     <template x-if="listingSortMode && listing.status === 'on_sale'">
-                      <label class="flex items-center gap-1 text-xs">
-                        <span class="themed-text-muted">排序:</span>
+                      <label class="flex items-center gap-1 text-xs mt-1">
+                        <span class="themed-text-muted">序</span>
                         <input type="number" min="0" step="1"
-                               class="w-16 px-1 py-0.5 text-xs border rounded text-center"
+                               class="w-14 px-1 py-0.5 text-xs border rounded"
                                :value="listingSortChanges.find(c => c.id === listing.market_listing_id)?.sort_order || 0"
                                @input="updateListingSortOrder(listing.market_listing_id, $event.target.value)">
                       </label>
                     </template>
-                    <span class="px-2 py-0.5 text-xs rounded-full"
+                  </td>
+                  <td class="px-2 py-2">
+                    <div x-text="listing.offer_item_display_name || listing.offer_asset_code || '-'"></div>
+                    <div class="text-xs themed-text-muted" x-text="listing.listing_kind === 'fungible_asset' ? '材料资产' : '物品实例'"></div>
+                    <div class="text-xs themed-text-muted" x-show="listing.offer_amount" x-text="'×' + listing.offer_amount"></div>
+                  </td>
+                  <td class="px-2 py-2 text-center font-mono" x-text="listing.quality_score != null ? listing.quality_score : '-'"></td>
+                  <td class="px-2 py-2 text-center" x-text="listing.quality_grade || '-'"></td>
+                  <td class="px-2 py-2 text-center font-mono text-xs" x-text="formatListingSerial(listing)"></td>
+                  <td class="px-2 py-2">
+                    <span class="font-bold text-green-600" x-text="listing.price_amount"></span>
+                    <span class="text-xs" x-text="listing.price_asset_code"></span>
+                  </td>
+                  <td class="px-2 py-2">
+                    <span class="px-2 py-0.5 text-xs rounded-full inline-block"
                           :class="{
                             'bg-green-100 text-green-700': listing.status === 'on_sale',
                             'bg-yellow-100 text-yellow-700': listing.status === 'locked',
@@ -739,41 +791,29 @@
                             'bg-red-100 text-red-700': listing.status === 'admin_withdrawn'
                           }"
                           x-text="getListingStatusText(listing.status)"></span>
-                    <span class="text-xs themed-text-muted" x-text="listing.listing_kind === 'fungible_asset' ? '材料资产' : '物品实例'"></span>
-                  </div>
-                  <div class="text-sm">
-                    <span class="themed-text-muted">出售：</span>
-                    <span x-text="listing.offer_item_display_name || listing.offer_asset_code || '-'"></span>
-                    <span x-show="listing.offer_amount" class="text-xs themed-text-muted">×<span x-text="listing.offer_amount"></span></span>
-                  </div>
-                  <div class="text-sm">
-                    <span class="themed-text-muted">售价：</span>
-                    <span class="font-bold text-green-600" x-text="listing.price_amount"></span>
-                    <span class="text-xs" x-text="listing.price_asset_code"></span>
-                  </div>
-                  <div class="text-xs themed-text-muted" x-text="'上架时间：' + formatDate(listing.created_at)"></div>
-                </div>
-                <div class="flex-shrink-0 ml-3 flex flex-col gap-1">
-                  <div x-show="listing.status === 'on_sale'" class="flex gap-1">
-                    <button @click="toggleListingPin(listing)"
-                            class="px-2 py-0.5 text-xs rounded"
-                            :class="listing.is_pinned ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-500 hover:bg-orange-50'"
-                            x-text="listing.is_pinned ? '取消置顶' : '置顶'"></button>
-                    <button @click="toggleListingRecommend(listing)"
-                            class="px-2 py-0.5 text-xs rounded"
-                            :class="listing.is_recommended ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500 hover:bg-blue-50'"
-                            x-text="listing.is_recommended ? '取消推荐' : '推荐'"></button>
-                  </div>
-                  <div x-show="listing.status === 'on_sale' || listing.status === 'locked'">
-                    <button @click="confirmForceWithdraw(listing)"
-                            class="px-3 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600">
+                    <div class="text-xs themed-text-muted mt-1" x-text="formatDate(listing.created_at)"></div>
+                  </td>
+                  <td class="px-2 py-2 text-right whitespace-nowrap">
+                    <div x-show="listing.status === 'on_sale'" class="flex flex-col gap-1 items-end">
+                      <button type="button" @click="toggleListingPin(listing)"
+                              class="px-2 py-0.5 text-xs rounded"
+                              :class="listing.is_pinned ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-500 hover:bg-orange-50'"
+                              x-text="listing.is_pinned ? '取消置顶' : '置顶'"></button>
+                      <button type="button" @click="toggleListingRecommend(listing)"
+                              class="px-2 py-0.5 text-xs rounded"
+                              :class="listing.is_recommended ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500 hover:bg-blue-50'"
+                              x-text="listing.is_recommended ? '取消推荐' : '推荐'"></button>
+                    </div>
+                    <button type="button" x-show="listing.status === 'on_sale' || listing.status === 'locked'"
+                            @click="confirmForceWithdraw(listing)"
+                            class="mt-1 px-2 py-0.5 text-xs bg-red-500 text-white rounded hover:bg-red-600">
                       强制下架
                     </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </template>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
         </div>
 
         <!-- 分页 -->

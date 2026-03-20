@@ -6,7 +6,7 @@
     pageStyle: '[x-cloak] { display: none !important; } .template-card { transition: all 0.3s ease; } .template-card:hover { transform: translateY(-4px); box-shadow: 0 8px 25px rgba(0,0,0,0.12); }' 
   }) %>
 </head>
-<body class="themed-bg-subtle min-h-screen" x-data="itemTemplatesPage()" x-init="init()" x-cloak>
+<body class="themed-bg-subtle min-h-screen" x-data="itemTemplatesPage()" x-init="init()">
   
   <!-- 页面顶部渐变横幅 -->
   <div class="page-banner" style="background: linear-gradient(135deg, #0e4166 0%, #0891b2 50%, #22d3ee 100%);">
@@ -22,7 +22,7 @@
     </div>
   </div>
 
-  <div class="container mx-auto px-4 py-6">
+  <div class="container mx-auto px-4 py-6" x-cloak>
     <!-- 统计卡片 - 使用渐变卡片 -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
       <div class="gradient-stat-card gradient-stat-cyan">
@@ -162,7 +162,7 @@
        x-cloak
        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
        @click.self="hideModal('templateModal')">
-    <div class="themed-card rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto animate-slide-in-up">
+    <div class="themed-card rounded-xl shadow-2xl w-full max-w-3xl mx-4 max-h-[90vh] overflow-y-auto animate-slide-in-up">
       <div class="p-5 border-b flex justify-between items-center bg-gradient-to-r from-cyan-50 to-white rounded-t-xl">
         <h5 class="font-semibold text-cyan-900 flex items-center gap-2">
           <span class="w-8 h-8 rounded-lg bg-cyan-100 flex items-center justify-center text-sm" x-text="form.template_id ? '✏️' : '➕'"></span>
@@ -264,6 +264,64 @@
                 </template>
               </div>
               <p class="text-xs themed-text-muted mt-1">勾选后覆盖该模板的默认操作规则（留空使用 item_type 级别的默认配置）</p>
+            </div>
+            <div class="md:col-span-2">
+              <label class="block text-sm font-medium themed-text-secondary mb-1">限量总数上限（max_edition）</label>
+              <input type="number" min="0" class="w-full px-3 py-2 border rounded-lg" x-model.number="max_edition" placeholder="留空表示不限制">
+              <p class="text-xs themed-text-muted mt-1">写入模板 meta.max_edition，用于版本/限量编号上限等业务</p>
+            </div>
+            <!-- 属性规则配置 → meta.attribute_rules -->
+            <div class="md:col-span-2 border rounded-lg p-4 bg-cyan-50/40 border-cyan-100">
+              <h6 class="text-sm font-semibold text-cyan-900 mb-3">属性规则配置（meta.attribute_rules）</h6>
+              <div class="space-y-4">
+                <div class="flex items-center gap-2">
+                  <input type="checkbox" id="ar_qs_en" x-model="attribute_rules.quality_score.enabled" class="rounded border-gray-300 text-cyan-600">
+                  <label for="ar_qs_en" class="text-sm font-medium themed-text-secondary">品质分规则</label>
+                </div>
+                <div x-show="attribute_rules.quality_score.enabled" class="overflow-x-auto">
+                  <table class="w-full text-xs border-collapse border border-gray-200 bg-white rounded">
+                    <thead>
+                      <tr class="bg-gray-50">
+                        <th class="border px-2 py-1 text-left">档位</th>
+                        <th class="border px-2 py-1">min</th>
+                        <th class="border px-2 py-1">max</th>
+                        <th class="border px-2 py-1">weight</th>
+                        <th class="border px-2 py-1">grade</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <template x-for="(tier, ti) in attribute_rules.quality_score.tiers" :key="ti">
+                        <tr>
+                          <td class="border px-2 py-1 text-gray-500" x-text="'T' + (ti + 1)"></td>
+                          <td class="border px-1 py-0.5"><input type="number" class="w-full min-w-[4rem] px-1 border rounded" x-model.number="tier.min"></td>
+                          <td class="border px-1 py-0.5"><input type="number" class="w-full min-w-[4rem] px-1 border rounded" x-model.number="tier.max"></td>
+                          <td class="border px-1 py-0.5"><input type="number" class="w-full min-w-[4rem] px-1 border rounded" x-model.number="tier.weight"></td>
+                          <td class="border px-1 py-0.5"><input type="text" class="w-full min-w-[5rem] px-1 border rounded" x-model="tier.grade"></td>
+                        </tr>
+                      </template>
+                    </tbody>
+                  </table>
+                </div>
+                <div class="flex items-center gap-2 pt-2 border-t border-cyan-100">
+                  <input type="checkbox" id="ar_pat_en" x-model="attribute_rules.pattern_id.enabled" class="rounded border-gray-300 text-cyan-600">
+                  <label for="ar_pat_en" class="text-sm font-medium themed-text-secondary">花纹 ID（pattern_id）范围</label>
+                </div>
+                <div x-show="attribute_rules.pattern_id.enabled" class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="text-xs themed-text-muted">最小值</label>
+                    <input type="number" class="w-full px-3 py-2 border rounded-lg" x-model.number="attribute_rules.pattern_id.min" placeholder="min">
+                  </div>
+                  <div>
+                    <label class="text-xs themed-text-muted">最大值</label>
+                    <input type="number" class="w-full px-3 py-2 border rounded-lg" x-model.number="attribute_rules.pattern_id.max" placeholder="max">
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium themed-text-secondary mb-1">交易冷却天数（trade_cooldown_days）</label>
+                  <input type="number" min="0" class="w-full max-w-xs px-3 py-2 border rounded-lg" x-model.number="attribute_rules.trade_cooldown_days">
+                  <p class="text-xs themed-text-muted mt-1">默认 7 天</p>
+                </div>
+              </div>
             </div>
             <div class="md:col-span-2">
               <label class="block text-sm font-medium themed-text-secondary mb-1">扩展属性 (JSON格式)</label>
