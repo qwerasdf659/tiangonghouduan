@@ -1388,26 +1388,49 @@
 
     <!-- 平台收入 -->
     <div x-show="current_page === 'platform-revenue'" x-cloak>
-      <!-- 收入概览卡片 -->
-      <div class="stats-grid stats-grid-3 mb-6">
-        <div class="stats-card stats-success stats-card-animate">
-          <div>
-            <p class="stats-card-label">总收入</p>
-            <p class="stats-card-value" x-text="revenueOverview?.total_income ?? '-'"></p>
-          </div>
-          <span class="text-2xl">💰</span>
-        </div>
-        <template x-if="revenueOverview?.balances">
-          <template x-for="(bal, idx) in (Array.isArray(revenueOverview.balances) ? revenueOverview.balances : [])" :key="idx">
-            <div class="stats-card stats-info stats-card-animate">
-              <div>
-                <p class="stats-card-label" x-text="bal.asset_code || bal.account_type || '账户'"></p>
-                <p class="stats-card-value" x-text="bal.available_amount ?? bal.balance ?? '-'"></p>
+      <!-- 累计收入卡片（按币种） -->
+      <div class="mb-4">
+        <h6 class="text-sm font-medium text-gray-500 mb-3">💰 累计收入（按币种）</h6>
+        <div class="stats-grid stats-grid-3">
+          <template x-if="Array.isArray(revenueOverview?.total_income) && revenueOverview.total_income.length > 0">
+            <template x-for="(inc, idx) in revenueOverview.total_income" :key="'income-' + idx">
+              <div class="stats-card stats-success stats-card-animate">
+                <div>
+                  <p class="stats-card-label" x-text="inc.display_name || inc.asset_code"></p>
+                  <p class="stats-card-value" x-text="formatNumber(inc.total_amount)"></p>
+                  <p class="text-xs text-gray-400 mt-1" x-text="'共 ' + (inc.tx_count || 0) + ' 笔'"></p>
+                </div>
+                <span class="text-2xl">💰</span>
               </div>
-              <span class="text-2xl">🏦</span>
+            </template>
+          </template>
+          <template x-if="!Array.isArray(revenueOverview?.total_income) || revenueOverview?.total_income?.length === 0">
+            <div class="stats-card stats-card-animate">
+              <div>
+                <p class="stats-card-label">累计收入</p>
+                <p class="stats-card-value">-</p>
+              </div>
+              <span class="text-2xl">💰</span>
             </div>
           </template>
-        </template>
+        </div>
+      </div>
+      <!-- 当前余额卡片（按币种） -->
+      <div class="mb-6">
+        <h6 class="text-sm font-medium text-gray-500 mb-3">🏦 当前余额</h6>
+        <div class="stats-grid stats-grid-3">
+          <template x-if="Array.isArray(revenueOverview?.balances) && revenueOverview.balances.length > 0">
+            <template x-for="(bal, idx) in revenueOverview.balances" :key="'bal-' + idx">
+              <div class="stats-card stats-info stats-card-animate">
+                <div>
+                  <p class="stats-card-label" x-text="bal.display_name || bal.asset_code"></p>
+                  <p class="stats-card-value" x-text="formatNumber(bal.available_amount)"></p>
+                </div>
+                <span class="text-2xl">🏦</span>
+              </div>
+            </template>
+          </template>
+        </div>
       </div>
 
       <!-- 收入来源分类 -->
@@ -1432,9 +1455,9 @@
                 <tbody>
                   <template x-for="(src, idx) in revenueSources" :key="idx">
                     <tr class="border-b hover:bg-gray-50">
-                      <td class="py-2 px-3 text-sm" x-text="src.business_type || src.source || '-'"></td>
-                      <td class="py-2 px-3 text-sm text-right font-mono" x-text="src.total_amount ?? src.amount ?? '-'"></td>
-                      <td class="py-2 px-3 text-sm text-right" x-text="src.count ?? '-'"></td>
+                      <td class="py-2 px-3 text-sm" x-text="src.business_type_display || src.business_type || '-'"></td>
+                      <td class="py-2 px-3 text-sm text-right font-mono" x-text="formatNumber(src.total_amount)"></td>
+                      <td class="py-2 px-3 text-sm text-right" x-text="src.tx_count ?? '-'"></td>
                     </tr>
                   </template>
                 </tbody>
@@ -1474,9 +1497,9 @@
                 <tbody>
                   <template x-for="(item, idx) in revenueTrend" :key="idx">
                     <tr class="border-b hover:bg-gray-50">
-                      <td class="py-2 px-3 text-sm" x-text="item.date || item.period || '-'"></td>
-                      <td class="py-2 px-3 text-sm text-right font-mono" x-text="item.total_amount ?? item.amount ?? '-'"></td>
-                      <td class="py-2 px-3 text-sm text-right" x-text="item.count ?? '-'"></td>
+                      <td class="py-2 px-3 text-sm" x-text="item.period || '-'"></td>
+                      <td class="py-2 px-3 text-sm text-right font-mono" x-text="formatNumber(item.total_amount)"></td>
+                      <td class="py-2 px-3 text-sm text-right" x-text="item.tx_count ?? '-'"></td>
                     </tr>
                   </template>
                 </tbody>
@@ -1499,21 +1522,69 @@
         </div>
         <div class="p-5">
           <template x-if="revenueFeeStats">
-            <div class="space-y-4">
-              <template x-if="revenueFeeStats.fee_rate_configs">
+            <div class="space-y-6">
+              <!-- 手续费率配置表格 -->
+              <template x-if="Array.isArray(revenueFeeStats.fee_rate_configs) && revenueFeeStats.fee_rate_configs.length > 0">
                 <div>
                   <h6 class="text-sm font-medium text-gray-600 mb-2">手续费率配置</h6>
-                  <div class="bg-gray-50 rounded p-3 text-sm">
-                    <pre class="whitespace-pre-wrap" x-text="JSON.stringify(revenueFeeStats.fee_rate_configs, null, 2)"></pre>
+                  <div class="overflow-x-auto">
+                    <table class="w-full">
+                      <thead>
+                        <tr class="border-b">
+                          <th class="text-left py-2 px-3 text-sm font-medium text-gray-500">资产类型</th>
+                          <th class="text-right py-2 px-3 text-sm font-medium text-gray-500">费率</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <template x-for="(cfg, idx) in revenueFeeStats.fee_rate_configs" :key="'cfg-' + idx">
+                          <tr class="border-b hover:bg-gray-50">
+                            <td class="py-2 px-3 text-sm" x-text="cfg.display_name || cfg.asset_code"></td>
+                            <td class="py-2 px-3 text-sm text-right font-mono" x-text="(cfg.fee_rate * 100).toFixed(1) + '%'"></td>
+                          </tr>
+                        </template>
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               </template>
-              <template x-if="revenueFeeStats.fee_stats_30d">
+              <template x-if="!Array.isArray(revenueFeeStats.fee_rate_configs) || revenueFeeStats.fee_rate_configs.length === 0">
+                <div>
+                  <h6 class="text-sm font-medium text-gray-600 mb-2">手续费率配置</h6>
+                  <p class="text-gray-400 text-sm">暂无费率配置</p>
+                </div>
+              </template>
+              <!-- 30天手续费收入表格 -->
+              <template x-if="Array.isArray(revenueFeeStats.fee_stats_30d) && revenueFeeStats.fee_stats_30d.length > 0">
                 <div>
                   <h6 class="text-sm font-medium text-gray-600 mb-2">30天手续费收入</h6>
-                  <div class="bg-gray-50 rounded p-3 text-sm">
-                    <pre class="whitespace-pre-wrap" x-text="JSON.stringify(revenueFeeStats.fee_stats_30d, null, 2)"></pre>
+                  <div class="overflow-x-auto">
+                    <table class="w-full">
+                      <thead>
+                        <tr class="border-b">
+                          <th class="text-left py-2 px-3 text-sm font-medium text-gray-500">资产类型</th>
+                          <th class="text-right py-2 px-3 text-sm font-medium text-gray-500">手续费总额</th>
+                          <th class="text-right py-2 px-3 text-sm font-medium text-gray-500">笔数</th>
+                          <th class="text-right py-2 px-3 text-sm font-medium text-gray-500">平均手续费</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <template x-for="(fee, idx) in revenueFeeStats.fee_stats_30d" :key="'fee-' + idx">
+                          <tr class="border-b hover:bg-gray-50">
+                            <td class="py-2 px-3 text-sm" x-text="fee.display_name || fee.asset_code"></td>
+                            <td class="py-2 px-3 text-sm text-right font-mono" x-text="formatNumber(fee.fee_total)"></td>
+                            <td class="py-2 px-3 text-sm text-right" x-text="fee.fee_count"></td>
+                            <td class="py-2 px-3 text-sm text-right font-mono" x-text="fee.avg_fee"></td>
+                          </tr>
+                        </template>
+                      </tbody>
+                    </table>
                   </div>
+                </div>
+              </template>
+              <template x-if="!Array.isArray(revenueFeeStats.fee_stats_30d) || revenueFeeStats.fee_stats_30d.length === 0">
+                <div>
+                  <h6 class="text-sm font-medium text-gray-600 mb-2">30天手续费收入</h6>
+                  <p class="text-gray-400 text-sm">暂无手续费数据</p>
                 </div>
               </template>
             </div>

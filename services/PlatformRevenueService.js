@@ -10,6 +10,30 @@
  * - business_type: material_convert_fee（材料转换手续费）
  */
 
+/** 业务类型中文映射（平台收入相关） */
+const BUSINESS_TYPE_DISPLAY = {
+  order_settle_platform_fee_credit: '交易手续费',
+  material_convert_fee: '材料转换手续费',
+  data_migration: '数据迁移',
+  historical_reconciliation: '历史对账',
+  opening_balance: '期初余额',
+  lottery_consume: '抽奖消耗',
+  lottery_reward: '抽奖奖励',
+  market_purchase_buyer_debit: '市场购买（买家扣款）',
+  market_purchase_seller_credit: '市场购买（卖家入账）',
+  market_purchase_fee: '市场交易手续费',
+  exchange_debit: '兑换扣减',
+  material_convert_debit: '材料转换（扣减）',
+  material_convert_credit: '材料转换（入账）',
+  admin_adjust: '管理员调整',
+  points_grant: '积分发放',
+  budget_grant: '预算发放',
+  market_listing_freeze: '挂牌冻结',
+  market_listing_unfreeze: '挂牌解冻',
+  bid_freeze: '竞价冻结',
+  bid_unfreeze: '竞价解冻'
+}
+
 /**
  * 平台收入与手续费管理服务
  */
@@ -49,22 +73,40 @@ class PlatformRevenueService {
   }
 
   /**
+   * 获取资产代码→中文名称映射（缓存）
+   * @private
+   * @returns {Promise<Map<string, string>>} asset_code → display_name
+   */
+  async _getAssetDisplayNames() {
+    if (this._assetNameMap) return this._assetNameMap
+    this._ensureModels()
+
+    const [rows] = await this.sequelize.query(
+      'SELECT asset_code, display_name FROM material_asset_types'
+    )
+    this._assetNameMap = new Map(rows.map(r => [r.asset_code, r.display_name]))
+    return this._assetNameMap
+  }
+
+  /**
    * 获取收入概览（当前余额 + 累计收入）
    *
    * @returns {Promise<Object>} 收入概览数据
+   * @returns {Array} return.balances - 各币种当前余额
+   * @returns {Array} return.total_income - 各币种累计收入列表
    */
   async getRevenueOverview() {
     this._ensureModels()
     const accountId = await this._getPlatformFeeAccountId()
-    if (!accountId) return { balances: [], total_income: {} }
+    if (!accountId) return { balances: [], total_income: [] }
 
-    // 当前各币种余额
+    const nameMap = await this._getAssetDisplayNames()
+
     const [balances] = await this.sequelize.query(
       'SELECT asset_code, available_amount, frozen_amount FROM account_asset_balances WHERE account_id = ?',
       { replacements: [accountId] }
     )
 
-    // 累计收入（按币种汇总所有入账流水）
     const [income] = await this.sequelize.query(
       `SELECT asset_code, SUM(delta_amount) as total_amount, COUNT(*) as tx_count
        FROM asset_transactions
@@ -76,13 +118,16 @@ class PlatformRevenueService {
     return {
       balances: balances.map(b => ({
         asset_code: b.asset_code,
+        display_name: nameMap.get(b.asset_code) || b.asset_code,
         available_amount: Number(b.available_amount),
         frozen_amount: Number(b.frozen_amount)
       })),
-      total_income: income.reduce((acc, r) => {
-        acc[r.asset_code] = { total_amount: Number(r.total_amount), tx_count: Number(r.tx_count) }
-        return acc
-      }, {})
+      total_income: income.map(r => ({
+        asset_code: r.asset_code,
+        display_name: nameMap.get(r.asset_code) || r.asset_code,
+        total_amount: Number(r.total_amount),
+        tx_count: Number(r.tx_count)
+      }))
     }
   }
 
@@ -99,6 +144,7 @@ class PlatformRevenueService {
     const accountId = await this._getPlatformFeeAccountId()
     if (!accountId) return []
 
+    const nameMap = await this._getAssetDisplayNames()
     const { asset_code, days = 30 } = filters
     const startDate = new Date()
     startDate.setDate(startDate.getDate() - days)
@@ -119,7 +165,9 @@ class PlatformRevenueService {
 
     return rows.map(r => ({
       business_type: r.business_type,
+      business_type_display: BUSINESS_TYPE_DISPLAY[r.business_type] || r.business_type,
       asset_code: r.asset_code,
+      asset_display_name: nameMap.get(r.asset_code) || r.asset_code,
       total_amount: Number(r.total_amount),
       tx_count: Number(r.tx_count)
     }))
@@ -166,11 +214,13 @@ class PlatformRevenueService {
 
     sql += ` GROUP BY period, asset_code ORDER BY period ASC`
 
+    const nameMap = await this._getAssetDisplayNames()
     const [rows] = await this.sequelize.query(sql, { replacements })
 
     return rows.map(r => ({
       period: r.period,
       asset_code: r.asset_code,
+      asset_display_name: nameMap.get(r.asset_code) || r.asset_code,
       total_amount: Number(r.total_amount),
       tx_count: Number(r.tx_count)
     }))
@@ -206,14 +256,19 @@ class PlatformRevenueService {
       feeStats = rows
     }
 
+    const nameMap = await this._getAssetDisplayNames()
+
     return {
-      fee_rate_configs: feeConfigs.reduce((acc, r) => {
-        const code = r.setting_key.replace('marketplace/fee_rate_', '')
-        acc[code] = parseFloat(r.setting_value)
-        return acc
-      }, {}),
+      fee_rate_configs: feeConfigs.map(r => ({
+        asset_code: r.setting_key.replace('marketplace/fee_rate_', ''),
+        display_name:
+          nameMap.get(r.setting_key.replace('marketplace/fee_rate_', '')) ||
+          r.setting_key.replace('marketplace/fee_rate_', ''),
+        fee_rate: parseFloat(r.setting_value)
+      })),
       fee_stats_30d: feeStats.map(r => ({
         asset_code: r.asset_code,
+        display_name: nameMap.get(r.asset_code) || r.asset_code,
         fee_total: Number(r.fee_total),
         fee_count: Number(r.fee_count),
         avg_fee: Number(parseFloat(r.avg_fee).toFixed(2))

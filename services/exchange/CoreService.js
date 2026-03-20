@@ -457,6 +457,114 @@ class CoreService {
       logger.warn('[兑换市场] 库存变动日志记录失败', { error: logErr.message })
     }
 
+    // ═══════════════════════════════════════════════════
+    // 🔥 EAV改造：铸造物品实例分支（2026-03-20）
+    // 当 ExchangeItem 未来迁移到 Product 后，此处逻辑也可复用
+    // ═══════════════════════════════════════════════════
+    let mintedItem = null
+    if (item.mint_instance && item.item_template_id) {
+      try {
+        const ItemService = require('../asset/ItemService')
+        const AttributeRuleEngine = require('../item/AttributeRuleEngine')
+        const { ItemTemplate, ItemHold } = this.models
+
+        const template = await ItemTemplate.findByPk(item.item_template_id, { transaction })
+        if (!template) {
+          logger.warn('[兑换市场] 铸造跳过：关联的物品模板不存在', {
+            item_template_id: item.item_template_id,
+            exchange_item_id
+          })
+        } else {
+          // 计算限量编号（按 item_template_id 计数 + 1）
+          let serialNumber = null
+          let editionTotal = template.max_edition || null
+          if (template.max_edition) {
+            const currentCount = await this.models.Item.count({
+              where: {
+                item_template_id: template.item_template_id,
+                serial_number: { [require('sequelize').Op.ne]: null }
+              },
+              transaction
+            })
+            serialNumber = currentCount + 1
+            if (serialNumber > template.max_edition) {
+              throw new Error(
+                `限量售罄：${template.display_name} 限量${template.max_edition}件，已铸造${currentCount}件`
+              )
+            }
+          }
+
+          // 生成随机实例属性（品质分 + 纹理编号 + SKU规格副本）
+          const skuSpecValues = options.sku_spec_values || {}
+          const instanceAttributes = AttributeRuleEngine.generate(template, skuSpecValues)
+
+          // 铸造物品实例
+          const mintResult = await ItemService.mintItem(
+            {
+              user_id,
+              item_type: template.item_type || 'product',
+              source: 'exchange',
+              source_ref_id: String(record.exchange_record_id),
+              item_name: template.display_name || item.item_name,
+              item_description: template.description || item.description,
+              item_value: 0,
+              prize_definition_id: null,
+              rarity_code: template.rarity_code || item.rarity_code || 'common',
+              business_type: 'exchange_mint',
+              idempotency_key: `exchange_mint_${idempotency_key}`,
+              item_template_id: template.item_template_id,
+              instance_attributes: instanceAttributes,
+              serial_number: serialNumber,
+              edition_total: editionTotal
+            },
+            { transaction }
+          )
+
+          mintedItem = mintResult.item
+
+          // 创建交易冷却期 hold（默认7天，可在模板meta中配置）
+          const cooldownDays = template.meta?.trade_cooldown_days || 7
+          const expiresAt = new Date(Date.now() + cooldownDays * 24 * 60 * 60 * 1000)
+          await ItemHold.create(
+            {
+              item_id: mintedItem.item_id,
+              hold_type: 'trade_cooldown',
+              holder_ref: `exchange_${record.exchange_record_id}`,
+              priority: 0,
+              status: 'active',
+              reason: `新物品交易冷却期（${cooldownDays}天）`,
+              expires_at: expiresAt
+            },
+            { transaction }
+          )
+
+          // 更新兑换订单的 item_id 关联
+          await record.update({ item_id: mintedItem.item_id }, { transaction })
+
+          logger.info('[兑换市场] ✅ 物品实例铸造成功', {
+            item_id: mintedItem.item_id,
+            tracking_code: mintedItem.tracking_code,
+            serial_number: serialNumber,
+            edition_total: editionTotal,
+            quality_score: instanceAttributes?.quality_score,
+            quality_grade: instanceAttributes?.quality_grade,
+            pattern_id: instanceAttributes?.pattern_id,
+            cooldown_days: cooldownDays,
+            exchange_record_id: record.exchange_record_id
+          })
+        }
+      } catch (mintError) {
+        if (mintError.message?.includes('限量售罄')) {
+          throw mintError
+        }
+        logger.error('[兑换市场] ❌ 物品铸造失败（非致命，订单仍创建）', {
+          error: mintError.message,
+          exchange_item_id,
+          order_no
+        })
+      }
+    }
+
     // 缓存失效
     await BusinessCacheHelper.invalidateExchangeItems('exchange_success')
 
@@ -469,14 +577,19 @@ class CoreService {
         operator_id: user_id,
         operator_type: 'user',
         reason: '用户兑换商品',
-        metadata: { exchange_item_id, quantity, pay_amount: totalPayAmount }
+        metadata: {
+          exchange_item_id,
+          quantity,
+          pay_amount: totalPayAmount,
+          minted_item_id: mintedItem?.item_id || null
+        }
       },
       { transaction }
     )
 
     logger.info(`[兑换市场] 兑换成功，订单号：${order_no}`)
 
-    return {
+    const result = {
       success: true,
       message: '兑换成功',
       order: {
@@ -493,6 +606,18 @@ class CoreService {
       },
       timestamp: BeijingTimeHelper.now()
     }
+
+    if (mintedItem) {
+      result.minted_item = {
+        item_id: mintedItem.item_id,
+        tracking_code: mintedItem.tracking_code,
+        serial_number: mintedItem.serial_number,
+        edition_total: mintedItem.edition_total,
+        instance_attributes: mintedItem.instance_attributes
+      }
+    }
+
+    return result
   }
 
   /**

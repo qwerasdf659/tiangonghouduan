@@ -218,10 +218,24 @@ class BusinessRecordQueryService {
       ...pagination
     })
 
+    /** @type {Record<string, string>} 核销订单状态中文映射 */
+    const REDEMPTION_STATUS_DISPLAY = {
+      pending: '待核销',
+      fulfilled: '已核销',
+      cancelled: '已取消',
+      expired: '已过期'
+    }
+
+    const orders = rows.map(row => {
+      const plain = row.toJSON ? row.toJSON() : { ...row }
+      plain.status_display = REDEMPTION_STATUS_DISPLAY[plain.status] || plain.status
+      return plain
+    })
+
     logger.info('查询核销订单列表成功', { total: count, page: pagination.page })
 
     return {
-      orders: rows,
+      orders,
       pagination: {
         total: count,
         page: pagination.page,

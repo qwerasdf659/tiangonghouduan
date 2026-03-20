@@ -425,7 +425,18 @@ models.AdInteractionLog = require('./AdInteractionLog')(sequelize, DataTypes)
 models.MediaFile = require('./MediaFile')(sequelize, DataTypes)
 models.MediaAttachment = require('./MediaAttachment')(sequelize, DataTypes)
 
-// 🔴 兑换市场系统
+// 🔴 统一商品中心 EAV 属性体系（2026-03-20 第十一章 EAV 大改造）
+models.Category = require('./Category')(sequelize, DataTypes)
+models.Attribute = require('./Attribute')(sequelize, DataTypes)
+models.AttributeOption = require('./AttributeOption')(sequelize, DataTypes)
+models.CategoryAttribute = require('./CategoryAttribute')(sequelize, DataTypes)
+models.Product = require('./Product')(sequelize, DataTypes)
+models.ProductAttributeValue = require('./ProductAttributeValue')(sequelize, DataTypes)
+models.ProductSku = require('./ProductSku')(sequelize, DataTypes)
+models.SkuAttributeValue = require('./SkuAttributeValue')(sequelize, DataTypes)
+models.ExchangeChannelPrice = require('./ExchangeChannelPrice')(sequelize, DataTypes)
+
+// 🔴 兑换市场系统（旧表，迁移完成后废弃）
 
 models.ExchangeItem = require('./ExchangeItem')(sequelize, DataTypes)
 /*

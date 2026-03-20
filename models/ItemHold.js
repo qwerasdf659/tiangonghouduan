@@ -26,10 +26,11 @@ const { Model, DataTypes } = require('sequelize')
 
 /**
  * 锁类型与优先级映射
- * trade < redemption < security
+ * trade_cooldown(0) < trade(1) < redemption(2) < security(3)
  */
 const HOLD_PRIORITY = {
-  trade: 1, // 交易订单锁：3分钟TTL，优先级最低
+  trade_cooldown: 0, // 交易冷却期锁：7天TTL，优先级最低（新物品铸造后冷却期）
+  trade: 1, // 交易订单锁：3分钟TTL，低优先级
   redemption: 2, // 兑换码锁：30天TTL，中优先级
   security: 3 // 风控冻结锁：无限期，优先级最高
 }
@@ -119,10 +120,10 @@ module.exports = sequelize => {
       },
 
       hold_type: {
-        type: DataTypes.ENUM('trade', 'redemption', 'security'),
+        type: DataTypes.ENUM('trade', 'redemption', 'security', 'trade_cooldown'),
         allowNull: false,
         comment:
-          '锁定类型：trade=交易锁(3分钟) / redemption=兑换码锁(30天) / security=风控锁(无限期)'
+          '锁定类型：trade_cooldown=交易冷却期(7天) / trade=交易锁(3分钟) / redemption=兑换码锁(30天) / security=风控锁(无限期)'
       },
 
       holder_ref: {

@@ -117,12 +117,12 @@
           <template x-for="media in mediaFiles" :key="media.media_id">
             <div class="themed-card rounded-xl overflow-hidden group relative shadow-sm hover:shadow-md transition-all duration-200">
               <div class="aspect-square themed-bg-subtle flex items-center justify-center img-blur-load">
-                <img :data-src="media.url" :alt="media.original_filename"
+                <img :data-src="media.public_url" :alt="media.original_name"
                      class="w-full h-full object-cover img-lazy"
-                     x-init="$nextTick(() => { if(media.url) { $el.src = media.url; $el.classList.add('loaded') } })">
+                     x-init="$nextTick(() => { if(media.public_url) { $el.src = media.public_url; $el.classList.add('loaded') } })">
               </div>
               <div class="p-2.5">
-                <p class="text-xs font-medium truncate" x-text="media.original_filename || '未命名'"></p>
+                <p class="text-xs font-medium truncate" x-text="media.original_name || '未命名'"></p>
                 <p class="text-xs themed-text-muted mt-0.5" x-text="formatFileSize(media.file_size)"></p>
               </div>
               <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center space-x-2 rounded-xl">

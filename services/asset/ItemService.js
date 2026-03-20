@@ -74,7 +74,11 @@ class ItemService {
       merchant_id,
       business_type = 'lottery_mint',
       idempotency_key,
-      meta = {}
+      meta = {},
+      item_template_id = null,
+      instance_attributes = null,
+      serial_number = null,
+      edition_total = null
     } = params
     const { transaction } = options
 
@@ -114,24 +118,26 @@ class ItemService {
       const userAccount = await this._getUserAccount(user_id, { transaction })
       const mintAccount = await Account.getSystemAccount('SYSTEM_MINT', { transaction })
 
-      // 1. 创建 items 缓存记录
-      const item = await Item.create(
-        {
-          tracking_code: 'TEMP', // 先占位，拿到 item_id 后回填
-          owner_account_id: userAccount.account_id,
-          status: 'available',
-          item_type,
-          item_name,
-          item_description: item_description || '',
-          item_value: Math.round(item_value) || 0,
-          prize_definition_id: prize_definition_id || null,
-          rarity_code,
-          merchant_id: merchant_id || null,
-          source,
-          source_ref_id: source_ref_id || null
-        },
-        { transaction }
-      )
+      // 1. 创建 items 缓存记录（含 EAV 改造新增的实例属性字段）
+      const itemData = {
+        tracking_code: 'TEMP',
+        owner_account_id: userAccount.account_id,
+        status: 'available',
+        item_type,
+        item_name,
+        item_description: item_description || '',
+        item_value: Math.round(item_value) || 0,
+        prize_definition_id: prize_definition_id || null,
+        rarity_code,
+        merchant_id: merchant_id || null,
+        source,
+        source_ref_id: source_ref_id || null,
+        item_template_id: item_template_id || null,
+        instance_attributes: instance_attributes || null,
+        serial_number: serial_number || null,
+        edition_total: edition_total || null
+      }
+      const item = await Item.create(itemData, { transaction })
 
       // 2. 生成 tracking_code 并回填
       const trackingCode = TrackingCodeGenerator.generate({

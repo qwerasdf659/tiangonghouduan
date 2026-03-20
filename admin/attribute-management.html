@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <%- include('partials/head', { 
+    title: '属性管理', 
+    pageStyle: '[x-cloak] { display: none !important; }' 
+  }) %>
+</head>
+<body class="themed-bg-subtle min-h-screen">
+
+  <nav class="page-navbar">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/workspace.html" class="text-blue-200 hover:text-white transition-colors">← 返回工作台</a>
+        <span class="text-lg font-semibold">🏷️ 属性管理</span>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mx-auto px-4 py-6"
+       x-data="attributeManagement()"
+       x-init="init()"
+       @table-action="handleTableAction($event.detail)">
+
+    <div x-cloak class="space-y-6">
+
+      <div class="page-banner mb-2">
+        <h1>🏷️ 统一商品中心 · EAV 属性</h1>
+        <p>定义属性字段、销售/搜索标记，并维护下拉选项（适用于 select 类型）</p>
+      </div>
+
+      <div class="themed-card rounded-xl border p-4 flex flex-wrap gap-4 items-end">
+        <div>
+          <label class="block text-xs font-medium text-gray-500 mb-1">销售属性</label>
+          <select x-model="attrFilters.is_sale_attr" @change="onAttrFilterChange()" class="px-3 py-2 border rounded-lg text-sm min-w-[140px]">
+            <option value="">全部</option>
+            <option value="true">是</option>
+            <option value="false">否</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-500 mb-1">启用状态</label>
+          <select x-model="attrFilters.is_enabled" @change="onAttrFilterChange()" class="px-3 py-2 border rounded-lg text-sm min-w-[140px]">
+            <option value="">全部</option>
+            <option value="true">启用</option>
+            <option value="false">禁用</option>
+          </select>
+        </div>
+        <button type="button" @click="openCreateAttribute()" class="action-btn action-btn-primary ml-auto">
+          ➕ 新增属性
+        </button>
+      </div>
+
+      <div x-data="makeAttrTable()" x-init="init()" @dt-refresh.window="refresh()">
+        <%- include('components/data-table') %>
+      </div>
+
+    </div>
+
+    <!-- 属性定义 + 选项 -->
+    <div x-ref="attributeModal"
+         x-show="isModalOpen('attributeModal')"
+         x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center"
+         style="display: none;">
+      <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" @click="hideModal('attributeModal')"></div>
+      <div class="relative themed-card rounded-xl shadow-2xl w-full max-w-2xl mx-4 z-10 max-h-[92vh] overflow-y-auto">
+        <div class="p-4 border-b flex justify-between items-center bg-gradient-to-r from-violet-50 to-white rounded-t-xl">
+          <h5 class="font-semibold text-violet-900" x-text="editingAttributeId ? '编辑属性' : '新增属性'"></h5>
+          <button type="button" @click="hideModal('attributeModal')" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+        </div>
+
+        <div class="p-5 space-y-6">
+          <form class="space-y-4" @submit.prevent="submitAttributeForm()">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-600 mb-1">属性名称 <span class="text-red-500">*</span></label>
+                <input type="text" x-model="attributeForm.attribute_name" class="w-full px-3 py-2 border rounded-lg text-sm" required>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-600 mb-1">属性编码 <span class="text-red-500">*</span></label>
+                <input type="text" x-model="attributeForm.attribute_code" class="w-full px-3 py-2 border rounded-lg text-sm font-mono" required>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-600 mb-1">输入类型</label>
+                <select x-model="attributeForm.input_type" class="w-full px-3 py-2 border rounded-lg text-sm">
+                  <option value="select">select（选项）</option>
+                  <option value="text">text</option>
+                  <option value="number">number</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-600 mb-1">排序</label>
+                <input type="number" x-model.number="attributeForm.sort_order" class="w-full px-3 py-2 border rounded-lg text-sm">
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-4">
+              <label class="inline-flex items-center gap-2 text-sm">
+                <input type="checkbox" x-model="attributeForm.is_required" class="rounded border-gray-300"> 必填
+              </label>
+              <label class="inline-flex items-center gap-2 text-sm">
+                <input type="checkbox" x-model="attributeForm.is_sale_attr" class="rounded border-gray-300"> 销售属性
+              </label>
+              <label class="inline-flex items-center gap-2 text-sm">
+                <input type="checkbox" x-model="attributeForm.is_searchable" class="rounded border-gray-300"> 可搜索
+              </label>
+              <label class="inline-flex items-center gap-2 text-sm">
+                <input type="checkbox" x-model="attributeForm.is_enabled" class="rounded border-gray-300"> 启用
+              </label>
+            </div>
+            <div class="flex justify-end">
+              <button type="submit" :disabled="saving" class="px-4 py-2 text-sm bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50">
+                保存属性定义
+              </button>
+            </div>
+          </form>
+
+          <div class="border-t pt-4" x-show="editingAttributeId">
+            <h6 class="text-sm font-semibold text-gray-800 mb-3">选项列表（select 类型）</h6>
+            <div class="flex flex-wrap gap-2 mb-3">
+              <input type="text" x-model="newOption.option_value" placeholder="选项值" class="flex-1 min-w-[120px] px-3 py-2 border rounded-lg text-sm">
+              <input type="number" x-model.number="newOption.sort_order" placeholder="排序" class="w-24 px-3 py-2 border rounded-lg text-sm">
+              <button type="button" @click="addOptionRow()" :disabled="saving" class="px-3 py-2 text-sm bg-gray-800 text-white rounded-lg disabled:opacity-50"
+                      x-text="editingOption ? '保存选项' : '添加选项'"></button>
+              <button type="button" x-show="editingOption" @click="cancelEditOption()" class="px-3 py-2 text-sm border rounded-lg">取消编辑</button>
+            </div>
+            <div class="overflow-x-auto border rounded-lg">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50 text-gray-600">
+                  <tr>
+                    <th class="px-3 py-2 text-left">选项值</th>
+                    <th class="px-3 py-2 text-left w-24">排序</th>
+                    <th class="px-3 py-2 text-right w-32">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template x-for="opt in attributeOptions" :key="opt.option_id">
+                    <tr class="border-t hover:bg-gray-50/80">
+                      <td class="px-3 py-2" x-text="opt.option_value"></td>
+                      <td class="px-3 py-2" x-text="opt.sort_order"></td>
+                      <td class="px-3 py-2 text-right space-x-1">
+                        <button type="button" class="text-emerald-600 hover:underline text-xs" @click="startEditOption(opt)">编辑</button>
+                        <button type="button" class="text-red-500 hover:underline text-xs" @click="deleteOptionRow(opt)">删除</button>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <%- include('partials/footer') %>
+  <script type="module" src="./src/modules/product/pages/attribute-management.js"></script>
+</body>
+</html>

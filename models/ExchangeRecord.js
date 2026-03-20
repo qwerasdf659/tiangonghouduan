@@ -290,6 +290,36 @@ module.exports = sequelize => {
         allowNull: true,
         defaultValue: null,
         comment: '快递单号'
+      },
+
+      /** 兑换产出的物品实例ID（2026-03-20 EAV改造，打通兑换→物品系统） */
+      item_id: {
+        type: DataTypes.BIGINT,
+        allowNull: true,
+        references: { model: 'items', key: 'item_id' },
+        onDelete: 'SET NULL',
+        onUpdate: 'CASCADE',
+        comment: '兑换产出的物品实例（NULL=纯实物兑换无实例，有值=可查"这个物品是哪笔兑换来的"）'
+      },
+
+      /** 关联统一商品SPU（新商品中心，2026-03-20 EAV改造） */
+      product_id: {
+        type: DataTypes.BIGINT,
+        allowNull: true,
+        references: { model: 'products', key: 'product_id' },
+        onDelete: 'SET NULL',
+        onUpdate: 'CASCADE',
+        comment: '关联统一商品SPU（新商品中心products表）'
+      },
+
+      /** 关联统一SKU（新商品中心，2026-03-20 EAV改造） */
+      sku_id: {
+        type: DataTypes.BIGINT,
+        allowNull: true,
+        references: { model: 'product_skus', key: 'sku_id' },
+        onDelete: 'SET NULL',
+        onUpdate: 'CASCADE',
+        comment: '关联统一SKU（新商品中心product_skus表）'
       }
     },
     {
@@ -335,6 +365,30 @@ module.exports = sequelize => {
         foreignKey: 'order_no',
         sourceKey: 'order_no',
         as: 'events'
+      })
+    }
+
+    // 兑换产出的物品实例（2026-03-20 EAV改造，打通兑换→物品系统）
+    if (models.Item) {
+      ExchangeRecord.belongsTo(models.Item, {
+        foreignKey: 'item_id',
+        as: 'mintedItem'
+      })
+    }
+
+    // 关联统一商品SPU（新商品中心）
+    if (models.Product) {
+      ExchangeRecord.belongsTo(models.Product, {
+        foreignKey: 'product_id',
+        as: 'product'
+      })
+    }
+
+    // 关联统一SKU（新商品中心）
+    if (models.ProductSku) {
+      ExchangeRecord.belongsTo(models.ProductSku, {
+        foreignKey: 'sku_id',
+        as: 'productSku'
       })
     }
   }

@@ -285,18 +285,19 @@ B2C 兑换商城仍然需要电商模式的能力：
 
 ### 5.2 改造步骤
 
-#### 步骤一：ExchangeItem 关联 ItemTemplate
+#### 步骤一：ExchangeItem 关联 ItemTemplate + 铸造开关
 
 在 `exchange_items` 表新增字段：
 
 | 字段 | 类型 | 约束 | 说明 |
 |------|------|------|------|
-| item_template_id | BIGINT | NULL, FK → item_templates | 关联的物品模板 |
+| item_template_id | BIGINT | NULL, FK → item_templates | 关联的物品模板（指定"用哪个模板铸造"） |
+| mint_instance | BOOLEAN | NOT NULL DEFAULT true | 铸造开关（控制"要不要铸造"） |
 
-- **有值：** 兑换后产出 Item 实例（进用户背包，可交易）
-- **NULL：** 纯实物发货（纸巾、杯子），不产出实例（保持现有逻辑）
+- **mint_instance = true（默认）：** 兑换后自动铸造 Item 实例，进入用户背包，可交易
+- **mint_instance = false：** 纯实物发货（纸巾、杯子），不产出实例（保持现有逻辑）
 
-两种商品共存，零破坏性。
+两个字段各管各的，两种商品共存，零破坏性。
 
 #### 步骤二：Item 模型增加实例属性
 
@@ -306,11 +307,17 @@ B2C 兑换商城仍然需要电商模式的能力：
 |------|------|------|------|
 | instance_attributes | JSON | NULL | 实例独有属性，如 `{"磨损值": 0.073, "强化等级": 7, "花纹种子": 442}` |
 | serial_number | INT | NULL | 限量编号，如 42（表示 #0042） |
-| edition_total | INT | NULL | 限量总数，如 100（表示共 100 件） |
+| edition_total | INT | NULL | 限量总数快照，如 100（铸造时从模板复制） |
 | item_template_id | BIGINT | NULL, FK → item_templates | 关联物品模板（补充现有 prize_definition_id 的不足） |
 
-- `instance_attributes`：每件物品的独有属性，铸造时根据规则随机生成或指定
-- `serial_number` + `edition_total`：限量编号体系（"第 42 件 / 共 100 件"）
+在 `item_templates` 表新增字段：
+
+| 字段 | 类型 | 约束 | 说明 |
+|------|------|------|------|
+| max_edition | INT | NULL | 限量总数上限（运营设置，独立于库存，超过后拒绝铸造） |
+
+- `instance_attributes`：第一期只存 SKU 的 spec_values 副本，未来可扩展随机属性
+- `serial_number` + `edition_total`：限量编号体系（"第 42 件 / 共 100 件"），按 ItemTemplate 独立计数
 - 现有 `tracking_code`（如 `LT260219028738`）继续作为系统级唯一标识
 - `serial_number` 是面向用户的"收藏编号"
 
@@ -337,11 +344,12 @@ B2C 兑换商城仍然需要电商模式的能力：
 
 ```
 扣材料 → 建 ExchangeRecord → 扣 SPU/SKU 库存
-    → 如果 ExchangeItem.item_template_id 存在：
+    → 如果 ExchangeItem.mint_instance = true：
         → ItemService.mintItem() 铸造实例
         → 生成 serial_number（该模板已铸造数 + 1）
-        → 生成 instance_attributes（按模板规则随机）
-        → 实例进入用户背包
+        → AttributeRuleEngine 生成 instance_attributes（品质分+纹理编号+SKU副本）
+        → 创建 ItemHold（trade_cooldown, 7天）
+        → 实例进入用户背包（可见但冷却期内不可交易）
         → ExchangeRecord.item_id = 新铸造的 item_id
 ```
 
@@ -388,15 +396,20 @@ instance_attributes = {
 │       ├── 建 ExchangeRecord           │                                      │
 │       │                              ▼                                      │
 │       └── ItemService.mintItem() ──→ Item (物品实例)                        │
-│                                      │    tracking_code = LT260320xxxxx     │
-│                                      │    serial_number = #0042             │
-│                                      │    instance_attributes = {...}       │
+│            + AttributeRuleEngine     │    tracking_code = LT260320xxxxx     │
+│                                      │    serial_number = #0042/0100        │
+│                                      │    instance_attributes:              │
+│                                      │      颜色=冰蓝, quality=87.42 精良   │
+│                                      │      pattern_id=337                  │
 │                                      │    owner = 用户账户                   │
 │                                      │                                      │
 │                                      ├──→ item_ledger (双录记账)            │
 │                                      │                                      │
+│                                      ├──→ item_holds (trade_cooldown, 7天) │
+│                                      │                                      │
 │                                      └──→ 用户背包 (BackpackService)        │
-│                                                │                            │
+│                                                │  （可见、可用、不可交易）     │
+│                                                │  （7天后冷却期结束）          │
 │                                                ▼                            │
 │                                      用户挂牌交易 (MarketListing)            │
 │                                      listing_kind = 'item'                  │
@@ -417,64 +430,28 @@ instance_attributes = {
 
 改造后，所有渠道产出的物品都进入同一个 Item 系统：
 
-| 产出渠道 | 是否铸造 Item | Item.source | 是否可交易 |
-|---------|-------------|-------------|----------|
-| 抽奖（coupon/physical） | ✅ | `lottery` | ✅ 取决于 ItemTemplate.is_tradable |
-| 竞价中标 | ✅ | `bid_settlement` | ✅ |
-| B2C 兑换（关联模板） | ✅ **新增** | `exchange` | ✅ |
-| B2C 兑换（纯实物） | ❌ | — | ❌ 走物流发货 |
-| 管理员赠送 | ✅ | `admin` | ✅ |
+| 产出渠道 | 是否铸造 Item | Item.source | 是否可交易 | 冷却期 |
+|---------|-------------|-------------|----------|--------|
+| 抽奖（coupon/physical） | ✅ | `lottery` | ✅ 取决于 is_tradable | 7 天 |
+| 竞价中标 | ✅ | `bid_settlement` | ✅ | 7 天 |
+| B2C 兑换（mint_instance=true） | ✅ **新增** | `exchange` | ✅ | 7 天 |
+| B2C 兑换（mint_instance=false） | ❌ | — | ❌ 走物流发货 | — |
+| 管理员赠送 | ✅ | `admin` | ✅ | 可配置 |
 
 ---
 
-## 六、改造量评估
+## 六、改造量评估（初版）
 
-### 6.1 数据库迁移
-
-| 表 | 改动 | 字段 | 复杂度 |
-|----|------|------|-------|
-| exchange_items | ADD COLUMN | `item_template_id BIGINT NULL` | 小 |
-| items | ADD COLUMN | `instance_attributes JSON NULL` | 小 |
-| items | ADD COLUMN | `serial_number INT NULL` | 小 |
-| items | ADD COLUMN | `edition_total INT NULL` | 小 |
-| items | ADD COLUMN | `item_template_id BIGINT NULL` | 小 |
-| exchange_records | ADD COLUMN | `item_id BIGINT NULL` | 小 |
-
-共 1 个迁移文件，6 个 ADD COLUMN，全部 NULL-able，零破坏性。
-
-### 6.2 模型层
-
-| 文件 | 改动 | 复杂度 |
-|------|------|-------|
-| models/ExchangeItem.js | 新增 item_template_id 字段 + belongsTo 关联 | 小 |
-| models/Item.js | 新增 3 个字段 + belongsTo ItemTemplate | 小 |
-| models/ExchangeRecord.js | 新增 item_id 字段 + belongsTo Item | 小 |
-
-### 6.3 服务层
-
-| 文件 | 改动 | 复杂度 |
-|------|------|-------|
-| services/exchange/CoreService.js | exchangeItem() 增加铸造分支 | 中 |
-| services/exchange/AdminService.js | 商品创建/编辑增加 item_template_id | 小 |
-| 新建：services/item/AttributeRuleEngine.js | 铸造属性规则引擎 | 中 |
-
-### 6.4 前端
-
-| 文件 | 改动 | 复杂度 |
-|------|------|-------|
-| admin/exchange-market.html | 商品表单增加"关联物品模板"选择 | 小 |
-| admin/src/modules/market/composables/exchange-items.js | itemForm 增加字段 | 小 |
-| 市场列表页 | 展示实例属性（磨损值、编号等） | 中 |
-
-### 6.5 总评
+> 注：本节为决策前的初步评估。决策拍板后的完整改造清单见第十章。
 
 | 维度 | 评估 |
 |------|------|
 | 总改动文件数 | ~10 个 |
-| 新建文件数 | 1 个（属性规则引擎）+ 1 个迁移 |
-| 是否破坏现有数据 | 否，全部 NULL-able 新增 |
-| 是否破坏现有接口 | 否，item_template_id 为空时走老逻辑 |
-| 预计工时 | 2-3 天 |
+| 新建文件数 | 迁移 + 属性规则引擎 + 10 个新模型 |
+| 数据库变更 | 10 张新表 + 数据迁移（详见第十章/十一章） |
+| 是否破坏现有数据 | 否，数据迁移后旧表废弃 |
+| 是否破坏现有接口 | 否，mint_instance=false 时走老逻辑 |
+| 预计工时 | 14-18 天（含 EAV 商品中心 + 多渠道 + 随机属性，详见第十一章） |
 
 ---
 
@@ -522,10 +499,1473 @@ instance_attributes = {
 
 ---
 
-## 九、结论
+## 九、关键业务决策（行业调研 + 拍板结论）
 
-本项目已经拥有一套游戏级的物品实例系统（Item + ItemLedger + ItemHold），质量超过大多数游戏公司的实现（银行级双录记账 + 优先级锁定 + 完整来源追溯）。
+> 以下四个决策点基于对 Steam、网易藏宝阁、鲸探/iBox、得物、原神/星穹铁道、梦幻西游、NBA Top Shot 等平台的实际做法调研，结合本项目技术栈和业务特征得出。
 
-当前的问题不是缺少 Instance 模型，而是 B2C 兑换商城没有接入这套系统。通过在 ExchangeItem 上增加 `item_template_id` 外键、在 Item 上增加 `instance_attributes` / `serial_number` / `edition_total` 三个字段、修改兑换流程增加铸造分支，即可实现"编号 #0042 的限量龙纹宝石"的完整业务。
+### 9.1 决策 1：哪些商品铸造实例
 
-**推荐方案本质：有赞轻 SKU（管销售） + 游戏 Instance（管所有权） 的混合架构，通过 item_template_id 桥接。**
+#### 行业做法
+
+| 公司/平台 | 做法 | 理由 |
+|-----------|------|------|
+| **Steam** | 所有进入用户背包的物品都是实例 | 统一的 asset_id 体系，没有例外 |
+| **原神/星穹铁道** | 所有获得的物品都是实例 | 武器、圣遗物/遗器每件都独立存在 |
+| **网易藏宝阁** | 所有可交易物品都是实例 | 装备/召唤兽都有唯一标识，否则无法交易 |
+| **鲸探/iBox（数字藏品）** | 100% 铸造，每件都有链上序列号 | 唯一性是核心卖点 |
+| **得物** | 每件商品都有鉴定编号 | 一物一码，但目的是防伪不是交易 |
+| **有赞/积分商城** | 从不铸造实例 | 纯电商，不需要 |
+
+**规律：** 凡是有 C2C 交易需求的平台，全部是所有物品都铸造实例，没有"部分铸造部分不铸造"的做法。原因：如果一个物品未来可能被交易，它必须有唯一标识。无法预测用户拿到哪件东西后想卖。
+
+#### ✅ 拍板结论：运营手动开关，默认开启
+
+在 `exchange_items` 表新增 `mint_instance BOOLEAN NOT NULL DEFAULT true`：
+
+- **默认开启（true）：** 兑换后自动铸造 Item 实例，进入用户背包，可交易
+- **运营手动关闭（false）：** 纯实物商品（纸巾、杯子）不铸造实例，走传统发货流程
+
+`mint_instance` 和 `item_template_id` 各管各的：`mint_instance` 控制"要不要铸造"，`item_template_id` 指定"用哪个模板铸造"。
+
+items 表膨胀不是问题：BIGINT 主键 + 合理索引，百万行对 MySQL 无压力。
+
+### 9.2 决策 2：实例随机属性
+
+#### 行业做法
+
+| 公司/平台 | 做法 | 上线节奏 |
+|-----------|------|---------|
+| **CS:GO/Steam** | 铸造时确定 float 值 + paint seed，永不变 | 2013 年上线时就有，是核心玩法 |
+| **原神** | 圣遗物有主词条（部分固定/部分随机）+ 4 条随机副词条，强化时随机升级 | 1.0 版本就有完整系统 |
+| **星穹铁道** | 遗器系统，头/手主词条固定，其余随机；副词条 3-4 条随机 | 首发就有 |
+| **梦幻西游** | 装备有随机附加属性（体力、灵力等），打造时随机 | 2003 年上线时就有 |
+| **鲸探/NFT** | 无随机属性，唯一编号就是全部卖点 | — |
+| **得物** | 无随机属性 | — |
+
+**规律：** 两个流派泾渭分明：
+- **游戏类（有养成体系）：** 从第一天就有随机属性，驱动"反复刷取"的行为循环
+- **收藏/交易类（无养成体系）：** 不做随机属性，唯一编号 + 限量 = 全部价值来源
+
+#### ✅ 拍板结论：第一期就做，2 个属性维度（CS:GO 简化版）
+
+> 决策变更：原方案为"第一期不做"，经讨论后改为"第一期同步上线"。
+> 原因：随机属性是让同一款商品的不同件之间产生价格差异的核心手段，直接驱动 C2C 交易市场活跃度。唯一编号 + 限量只能制造"有没有"的稀缺，随机属性制造"好不好"的稀缺——后者才是高频交易的引擎。
+
+##### 属性 1：品质分（Quality Score）
+
+**作用：** 决定物品成色，直接影响二手市场定价。类比 CS:GO 的 float 值。
+
+- 数值范围：**0.00 ~ 100.00**（两位小数，10000 个可能值）
+- 铸造时加权随机生成，生成后**永不改变**（未来如做强化系统可另议）
+- 映射到 5 个人类可读等级：
+
+| 品质分范围 | 等级标签 | 出现概率 | 视觉标识建议 |
+|-----------|---------|---------|------------|
+| 95.00 ~ 100.00 | 完美无瑕 | 2% | 金色光效 |
+| 80.00 ~ 94.99 | 精良 | 13% | 紫色光效 |
+| 50.00 ~ 79.99 | 良好 | 35% | 蓝色光效 |
+| 20.00 ~ 49.99 | 普通 | 35% | 白色/无光效 |
+| 0.00 ~ 19.99 | 微瑕 | 15% | 灰色 |
+
+**为什么用数值而不是直接用等级？**
+等级只有 5 档，同一档内没有区分。数值有 10000 档——品质分 99.73 的"完美无瑕"和 95.01 的"完美无瑕"都是完美，但 99.73 在市场上值更多钱。CS:GO 中 float 0.001 和 float 0.069 都是"崭新出厂"，但价格差 10 倍。
+
+**概率分布（加权随机，非均匀分布）：**
+
+```
+微瑕区间    [0, 20)     ████████████████  15%
+普通区间    [20, 50)    ███████████████████████████████████  35%
+良好区间    [50, 80)    ███████████████████████████████████  35%
+精良区间    [80, 95)    █████████████  13%
+完美区间    [95, 100]   ██  2%
+```
+
+先用加权随机选中区间，再在区间内均匀随机取精确值。100 件龙纹宝石里平均只有 2 件"完美无瑕"、13 件"精良"。
+
+##### 属性 2：纹理编号（Pattern ID）
+
+**作用：** 决定宝石的花纹/外观，纯视觉差异。类比 CS:GO 的 paint seed。
+
+- 数值范围：**1 ~ 1000**（整数，均匀分布）
+- 铸造时随机生成，永不改变
+- 本身不分好坏，但社区会自发发现"好看的编号"
+
+**业务价值：**
+CS:GO 里 pattern seed 661 的蓝宝石花纹（Karambit Case Hardened Blue Gem）比普通花纹贵几百倍，因为社区公认"这个编号的花纹最好看"。你的宝石同理——纹理编号 #777 可能被社区视为"幸运编号"，#001 被视为"初始编号"，平台不需要做任何事，用户自己会创造溢价。
+
+##### 铸造时生成的完整 instance_attributes
+
+```json
+{
+  "颜色": "冰蓝",
+  "尺寸": "大",
+  "quality_score": 87.42,
+  "quality_grade": "精良",
+  "pattern_id": 337
+}
+```
+
+前两个来自 SKU 的 `spec_values`（用户选择的规格），后三个是铸造时系统随机生成的。
+
+##### 属性规则配置（ItemTemplate.meta）
+
+不同商品的属性规则可以不同，配置放在 `item_templates.meta.attribute_rules` 中：
+
+```json
+{
+  "trade_cooldown_days": 7,
+  "attribute_rules": {
+    "quality_score": {
+      "enabled": true,
+      "distribution": [
+        { "min": 0, "max": 19.99, "weight": 15, "grade": "微瑕" },
+        { "min": 20, "max": 49.99, "weight": 35, "grade": "普通" },
+        { "min": 50, "max": 79.99, "weight": 35, "grade": "良好" },
+        { "min": 80, "max": 94.99, "weight": 13, "grade": "精良" },
+        { "min": 95, "max": 100, "weight": 2, "grade": "完美无瑕" }
+      ]
+    },
+    "pattern_id": {
+      "enabled": true,
+      "min": 1,
+      "max": 1000
+    }
+  }
+}
+```
+
+**配置化的好处：**
+- 运营可按商品调整概率——某个活动商品想让完美率高一点，改 weight 即可
+- 某些商品可关闭随机属性（`enabled: false`），退回纯编号模式
+- 不需要改代码、不需要发版，改配置即可
+- 未来想加第三个属性维度，往 `attribute_rules` 里加一个 key 即可
+
+##### 对 C2C 交易市场的影响
+
+有了随机属性后，市场的筛选和排序有了实质意义：
+
+- 按品质等级筛选："只看完美无瑕"
+- 按品质分排序："品质分从高到低"
+- 按纹理编号搜索："找 pattern_id = 661"
+
+买家看到的挂牌信息：
+
+```
+🔷 龙纹宝石 #0042/0100
+   品质: 87.42分 · 精良
+   纹理: #337
+   卖家: 张三
+   价格: 50 💎
+   冷却期: 已结束
+```
+
+### 9.3 决策 3：限量编号规则
+
+#### 行业做法
+
+| 公司/平台 | 做法 | 展示方式 |
+|-----------|------|---------|
+| **鲸探（蚂蚁链）** | 按系列编号 | "#0042 / 10000" |
+| **iBox** | 按系列编号 | "#0001 / 3000" |
+| **幻核（腾讯，已关）** | 按系列编号 | 同上 |
+| **NBA Top Shot** | 按系列编号 | "Moment #42/10000" |
+| **CS:GO** | 无用户可见编号 | 靠 float 值区分 |
+| **实体收藏品（限量球鞋/手办）** | 按商品编号 | "XX/500 Limited Edition" |
+| **拍卖行（苏富比/佳士得）** | 按拍品编号 | Lot #42（拍卖场次内编号） |
+
+**规律：** 100% 按系列/按商品编号，没有全局编号的。全局编号对用户没有任何意义——"#0037"说明不了什么；但"龙纹宝石 #0042/100"表达"限量 100 件中的第 42 件"，才有收藏价值。
+
+#### ✅ 拍板结论：按 ItemTemplate 编号
+
+- 每个 ItemTemplate 独立计数，铸造时自动分配
+- 展示格式：`#0042 / 0100`（补零到 edition_total 位数）
+- `serial_number` 存在 `items` 表（实例级别）
+- `edition_total`（限量总数）存在 `item_templates` 表新增的 `max_edition` 字段
+- `max_edition` 由运营手动设置，独立于 `exchange_items.stock`（库存可补货，限量总数不变）
+- 铸造时计算：`SELECT COUNT(*) FROM items WHERE item_template_id = ? AND serial_number IS NOT NULL` + 1
+- 超过 `max_edition` 时拒绝铸造（限量售罄）
+
+### 9.4 决策 4：交易冷却期
+
+#### 行业做法
+
+| 公司/平台 | 冷却期 | 机制 |
+|-----------|-------|------|
+| **Steam** | **7 天**，硬性，无例外 | 所有新获得的物品（购买/交易/开箱）都有 7 天交易锁 |
+| **网易藏宝阁** | **4 天**（96 小时）公示期 | 道具/召唤兽挂牌后 4 天才能被购买 |
+| **梦幻西游** | **180 天**时间锁（跨服装备） | 跨服购买的装备 180 天内不能再交易 |
+| **鲸探** | **180 天**持有期 | 购买后 180 天才能转赠（不允许交易） |
+| **CS2** | **7 天** | 开箱获得的物品 7 天后才能上架 |
+| **5173 等游戏交易平台** | **24-72 小时** | 交易完成后安全审核期 |
+
+**规律：** 所有有二级市场的平台，100% 有冷却期，无一例外。冷却期防三件事：防刷单套利（低价兑换 → 立刻高价挂牌）、防盗号洗货、防机器人批量倒卖。
+
+#### ✅ 拍板结论：7 天冷却期，复用 ItemHold
+
+- 铸造时自动创建 `ItemHold`：
+  - `hold_type = 'trade_cooldown'`（新增枚举值）
+  - `expires_at = NOW() + 7 days`
+  - `priority = 0`（最低优先级，可被 security 覆盖）
+  - `reason = '新物品交易冷却期'`
+- 冷却期内：用户在背包里能看到物品、能使用，但不能挂牌交易
+- 7 天后 hold 自动过期（已有 `idx_holds_active_expiry` 索引支持），变为可交易
+- 不同商品可配置不同冷却天数（放在 `ItemTemplate.meta.trade_cooldown_days` 中，默认 7）
+- 不需要新建任何表或机制，完全复用现有 ItemHold 基础设施
+
+### 9.5 决策 5：管理后台商品列表视图
+
+#### 行业做法
+
+| 公司/平台 | 做法 | 说明 |
+|-----------|------|------|
+| **Shopify** | 双视图切换（网格/列表） | 默认列表，可切卡片网格 |
+| **有赞** | 双视图切换 | 商品管理支持缩略图模式和列表模式 |
+| **淘宝/天猫千牛** | 卡片网格为主 | 商品图片突出展示 |
+| **拼多多商家后台** | 列表为主 | 偏数据管理 |
+| **Steam 创意工坊/库存** | 卡片网格 | 物品以图片卡片展示 |
+
+**规律：** 图片是商品核心卖点的平台（珠宝、服装、皮肤）倾向网格视图；数据密集型操作（批量改价、库存管理）倾向表格视图。成熟平台通常两者都支持。
+
+#### ✅ 拍板结论：双视图切换，默认网格
+
+- 标题栏右侧放两个切换按钮：`田`（网格）和 `≡`（列表）
+- **网格视图（默认）：** 3-4 列卡片，每张展示商品图片、名称、价格、库存、状态角标、品质等级分布（如有），悬浮显示快捷操作（编辑/上下架/SKU 管理）
+- **列表视图：** 保持现有 data-table，用于批量操作（批量改价/改分类/排序）和数据对比
+- 数据源复用同一个 `dataSource`，只是渲染方式不同
+- 用户选择的视图偏好存 `localStorage`，下次打开自动恢复
+- 纯前端改造，不动后端
+
+### 9.6 五项决策汇总
+
+| 决策 | 结论 | 行业依据 | 一句话理由 |
+|------|------|---------|----------|
+| 铸造范围 | 手动开关，默认开启 | Steam/游戏公司全部铸造 | 有 C2C 市场就必须有实例，纸巾类手动关闭 |
+| 随机属性 | **第一期同步上线**，品质分 + 纹理编号 | CS:GO float+seed 模式 | 制造"好不好"的稀缺，驱动交易市场活跃 |
+| 编号规则 | 按 ItemTemplate 编号 | 鲸探/iBox/NBA Top Shot 全部按系列 | "限量 100 件中的第 42 件"才有收藏意义 |
+| 交易冷却 | 7 天，复用 ItemHold | Steam 7 天、网易 4 天、鲸探 180 天 | 有二级市场 100% 有冷却期 |
+| 后台商品列表 | 双视图切换，默认网格 | Shopify/有赞均支持双视图 | 宝石类商品图片是核心，网格直观；批量操作切表格 |
+
+---
+
+## 十、改造清单（已跳过，合并到第十一章）
+
+> **已跳过：** 本章为在现有 `exchange_items` 上加字段的小改造方案。经确认直接执行第十一章（EAV 大改造），本章能力全部包含在第十一章中。以下内容保留作为历史参考。
+
+基于第九章的四项决策结论，更新后的完整改造清单：
+
+### 10.1 数据库迁移
+
+| 表 | 改动 | 字段 | 说明 |
+|----|------|------|------|
+| exchange_items | ADD COLUMN | `item_template_id BIGINT NULL FK` | 关联物品模板 |
+| exchange_items | ADD COLUMN | `mint_instance BOOLEAN NOT NULL DEFAULT true` | 铸造开关（决策 1） |
+| items | ADD COLUMN | `instance_attributes JSON NULL` | 实例属性（决策 2，品质分+纹理编号+SKU 副本） |
+| items | ADD COLUMN | `serial_number INT NULL` | 限量编号（决策 3） |
+| items | ADD COLUMN | `edition_total INT NULL` | 限量总数快照 |
+| items | ADD COLUMN | `item_template_id BIGINT NULL FK` | 关联物品模板 |
+| item_templates | ADD COLUMN | `max_edition INT NULL` | 限量总数上限（决策 3） |
+| exchange_records | ADD COLUMN | `item_id BIGINT NULL FK` | 关联产出的物品实例 |
+| item_holds | ALTER ENUM | `hold_type` 新增 `'trade_cooldown'` | 交易冷却锁类型（决策 4） |
+
+共 1 个迁移文件，9 项 DDL 变更。
+
+### 10.2 模型层
+
+| 文件 | 改动 |
+|------|------|
+| models/ExchangeItem.js | 新增 `item_template_id` + `mint_instance` 字段，belongsTo ItemTemplate |
+| models/Item.js | 新增 `instance_attributes` + `serial_number` + `edition_total` + `item_template_id` 字段 |
+| models/ItemTemplate.js | 新增 `max_edition` 字段 |
+| models/ExchangeRecord.js | 新增 `item_id` 字段，belongsTo Item |
+| models/ItemHold.js | `hold_type` ENUM 新增 `'trade_cooldown'`，HOLD_PRIORITY 新增 `trade_cooldown: 0` |
+
+### 10.3 服务层
+
+| 文件 | 改动 |
+|------|------|
+| services/exchange/CoreService.js | `exchangeItem()` 增加铸造分支：检查 `mint_instance` → 调用 `mintItem()` → 分配编号 → 生成随机属性 → 创建冷却 hold |
+| services/exchange/AdminService.js | 商品创建/编辑增加 `item_template_id` + `mint_instance` 字段 |
+| services/item/ItemService.js | `mintItem()` 增加 `serial_number` 分配逻辑 + `trade_cooldown` hold 创建 |
+| **新建** services/item/AttributeRuleEngine.js | 属性规则引擎：读取 `ItemTemplate.meta.attribute_rules`，按配置的概率分布生成 `quality_score`（加权随机）+ `quality_grade`（等级映射）+ `pattern_id`（均匀随机），合并 SKU `spec_values` 副本，输出完整 `instance_attributes` JSON |
+
+### 10.4 前端
+
+| 文件 | 改动 |
+|------|------|
+| admin/exchange-market.html | 商品表单增加"铸造物品实例"开关 + "关联物品模板"下拉 + "限量总数"输入 |
+| admin/exchange-market.html | 商品列表增加双视图切换（网格/列表），默认网格，`localStorage` 记忆偏好（决策 5） |
+| admin/src/modules/market/composables/exchange-items.js | itemForm 增加 `mint_instance` + `item_template_id` 字段 |
+| admin/src/modules/market/pages/exchange-market.js | 新增 `viewMode` 状态 + 网格视图渲染逻辑，复用现有 dataSource |
+| admin 物品模板管理页 | 属性规则配置表单：品质分概率分布编辑 + 纹理编号范围设置 + 启用/禁用开关 |
+| C2C 市场列表页 | 展示编号（#0042/0100）、品质分 + 等级标签、纹理编号、冷却倒计时 |
+| C2C 市场筛选栏 | 按品质等级筛选 + 按品质分排序 + 按纹理编号搜索 |
+
+---
+
+## 十一、升级方案：统一商品中心 + EAV 属性体系 + 多渠道销售
+
+> 本章基于业务规模预期升级（几千品类、几十万 SKU、兑换 + 人民币购买并存），将原有的有赞轻 SKU（JSON 属性）替换为阿里级 EAV 属性体系，并引入统一商品中心支撑多销售渠道。
+>
+> 决策依据：品类扩展到几千个后，JSON `spec_values` 无法支撑按属性组合筛选（如"颜色=冰蓝 且 尺寸=大"），需要 EAV 独立表 + SQL 索引。
+
+### 11.1 核心问题
+
+同一个商品，两种买法：
+- 用户 A 花 10 个红水晶碎片**兑换**
+- 用户 B 花 99 元人民币**购买**
+- 两人拿到同一款商品，进同一个背包，在同一个 C2C 市场交易
+
+如果兑换和购买各维护一套商品数据，改名称要改两处、改图片要改两处、改库存要两边同步——维护灾难。
+
+### 11.2 四层架构设计
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  Layer 1: 统一商品中心（EAV，8 张表）                                 │
+│                                                                     │
+│  categories → category_attributes → attributes → attribute_options │
+│       ↓                                                             │
+│  products → product_attribute_values                                │
+│       ↓                                                             │
+│  product_skus → sku_attribute_values                                │
+│       ↓                                                             │
+│  库存统一在 product_skus.stock                                       │
+├─────────────────────────────────────────────────────────────────────┤
+│  Layer 2: 销售渠道（2 张表，未来可扩展）                               │
+│                                                                     │
+│  exchange_channel_prices（材料兑换定价）                              │
+│  shop_channel_prices（人民币购物定价）                                │
+│  未来可扩：积分渠道、会员专属渠道、团购渠道……每加一个渠道加一张表      │
+├─────────────────────────────────────────────────────────────────────┤
+│  Layer 3: 订单层（各渠道独立）                                       │
+│                                                                     │
+│  exchange_records（兑换订单，现有，改 FK 指向 product_skus）          │
+│  shop_orders（购物订单，新建）                                       │
+├─────────────────────────────────────────────────────────────────────┤
+│  Layer 4: 物品系统（完全不变）                                       │
+│                                                                     │
+│  item_templates → items → item_ledger → item_holds                 │
+│  品质分 + 纹理编号 + 限量编号 + 7天冷却 + C2C 交易                   │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### 11.3 统一商品中心表结构（Layer 1 — EAV 属性体系）
+
+#### 表 1：品类树（categories）
+
+管"有哪些品类"，支持多级层次结构。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| category_id | INT PK | 品类ID |
+| parent_category_id | INT NULL FK → self | 父品类（NULL=顶级） |
+| category_name | VARCHAR(100) | "宝石" / "数码" / "服装" |
+| category_code | VARCHAR(50) UNIQUE | "gems" / "digital" / "clothing" |
+| level | TINYINT | 1=一级 2=二级 3=三级 |
+| sort_order | INT | 排序 |
+| is_enabled | BOOLEAN | 是否启用 |
+| icon_media_id | BIGINT NULL FK → media_files | 品类图标 |
+
+举例：
+```
+数码(1级) → 手机(2级) → 安卓手机(3级)
+宝石(1级) → 天然宝石(2级)
+服装(1级) → 上装(2级) → T恤(3级)
+```
+
+> 注：此表替代现有 `category_defs` 表，扩展了层级结构。
+
+#### 表 2：属性定义（attributes）
+
+管"系统里有哪些属性可以用"。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| attribute_id | INT PK | 属性ID |
+| attribute_name | VARCHAR(100) | "颜色" / "内存" / "尺码" |
+| attribute_code | VARCHAR(50) UNIQUE | "color" / "memory" / "size" |
+| input_type | ENUM('select','text','number') | 下拉选择 / 文本输入 / 数字输入 |
+| is_required | BOOLEAN | 是否必填 |
+| is_sale_attr | BOOLEAN | **是否销售属性**（决定是否影响 SKU 生成） |
+| is_searchable | BOOLEAN | 是否可搜索筛选 |
+| sort_order | INT | 排序 |
+| is_enabled | BOOLEAN | 是否启用 |
+
+**`is_sale_attr` 是关键字段：**
+- `true`（销售属性）= 颜色、尺码 → 不同组合生成不同 SKU，各自有独立价格和库存
+- `false`（普通属性）= 材质、产地 → 只是展示信息，不影响 SKU 拆分
+
+#### 表 3：属性预设值（attribute_options）
+
+管"每个属性有哪些可选值"。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| option_id | INT PK | 选项ID |
+| attribute_id | INT FK → attributes | 所属属性 |
+| option_value | VARCHAR(200) | "冰蓝" / "火红" / "256GB" / "XL" |
+| sort_order | INT | 排序 |
+| is_enabled | BOOLEAN | 是否启用 |
+
+#### 表 4：品类绑定属性（category_attributes）
+
+管"每个品类有哪些属性"——EAV 的核心，实现不同品类不同属性模板。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INT PK | 主键 |
+| category_id | INT FK → categories | 品类 |
+| attribute_id | INT FK → attributes | 属性 |
+| sort_order | INT | 该品类内的属性排序 |
+
+举例：
+```
+宝石品类 → 绑定：颜色、尺寸、切工、净度
+手机品类 → 绑定：颜色、内存、存储、屏幕尺寸
+服装品类 → 绑定：颜色、尺码、面料、版型
+```
+
+运营新加一个品类"食品"，只需往此表插几行，绑定"口味、重量、保质期"属性即可，不需要改代码。
+
+#### 表 5：统一 SPU（products）
+
+**替代现有 `exchange_items`**，成为所有渠道共享的商品主体。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| product_id | BIGINT PK | 商品ID |
+| product_name | VARCHAR(200) | "龙纹宝石" |
+| category_id | INT FK → categories | 所属品类 |
+| description | TEXT | 商品描述（富文本） |
+| primary_media_id | BIGINT FK → media_files | 主图 |
+| item_template_id | BIGINT NULL FK → item_templates | 关联物品模板（决策 1） |
+| mint_instance | BOOLEAN DEFAULT true | 铸造开关（决策 1） |
+| rarity_code | VARCHAR(50) FK → rarity_defs | 稀有度 |
+| status | ENUM('active','inactive') | 状态 |
+| sort_order | INT | 排序 |
+| space | VARCHAR(20) | lucky/premium/both |
+| is_pinned | BOOLEAN | 是否置顶 |
+| is_new | BOOLEAN | 是否新品 |
+| is_hot | BOOLEAN | 是否热门 |
+| is_limited | BOOLEAN | 是否限量 |
+| tags | JSON | 标签数组 |
+| sell_point | VARCHAR(200) | 营销卖点 |
+| usage_rules | JSON | 使用说明 |
+| video_url | VARCHAR(500) | 视频 URL |
+| stock_alert_threshold | INT DEFAULT 0 | 库存预警阈值 |
+| publish_at | DATETIME NULL | 定时上架 |
+| unpublish_at | DATETIME NULL | 定时下架 |
+| attributes_json | JSON NULL | 商品参数表快照（非 EAV 的补充，如长篇图文参数） |
+| created_at | DATETIME | 创建时间 |
+| updated_at | DATETIME | 更新时间 |
+
+#### 表 6：SPU 属性值（product_attribute_values）
+
+管"这个 SPU 的非销售属性值是什么"（材质=天然水晶，产地=巴西）。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | BIGINT PK | 主键 |
+| product_id | BIGINT FK → products | 商品 |
+| attribute_id | INT FK → attributes | 属性 |
+| attribute_value | VARCHAR(500) | "天然水晶" / "巴西" |
+
+#### 表 7：统一 SKU（product_skus）
+
+**替代现有 `exchange_item_skus`**。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| sku_id | BIGINT PK | SKU ID |
+| product_id | BIGINT FK → products | 所属商品 |
+| sku_code | VARCHAR(100) UNIQUE | 唯一编码（如 "dragon_gem_blue_L"） |
+| stock | INT | **统一库存**（所有渠道共享，卖出即减） |
+| sold_count | INT DEFAULT 0 | 已售数量 |
+| cost_price | DECIMAL(10,2) | 成本价（人民币） |
+| status | ENUM('active','inactive') | 状态 |
+| image_id | BIGINT NULL FK → media_files | SKU 专属图片 |
+| sort_order | INT | 排序 |
+| created_at | DATETIME | 创建时间 |
+| updated_at | DATETIME | 更新时间 |
+
+#### 表 8：SKU 销售属性值（sku_attribute_values）
+
+**替代原来的 JSON `spec_values`**，实现 SQL 级别的属性筛选。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | BIGINT PK | 主键 |
+| sku_id | BIGINT FK → product_skus | 所属 SKU |
+| attribute_id | INT FK → attributes | 属性（如"颜色"） |
+| option_id | INT FK → attribute_options | 属性值（如"冰蓝"） |
+
+举例：SKU "冰蓝·大号" 有两行记录：
+```
+sku_id=100 | attribute_id=1(颜色) | option_id=3(冰蓝)
+sku_id=100 | attribute_id=2(尺寸) | option_id=7(大)
+```
+
+查询"所有颜色=冰蓝的 SKU"：`WHERE attribute_id=1 AND option_id=3`，走索引，百万行也快。
+
+### 11.4 销售渠道表（Layer 2）
+
+#### 表 9：兑换渠道定价（exchange_channel_prices）
+
+管"这个 SKU 在兑换商城里用什么材料换、换多少"。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | BIGINT PK | 主键 |
+| sku_id | BIGINT FK → product_skus | 关联 SKU |
+| cost_asset_code | VARCHAR(50) | 支付的材料资产类型（如 "red_shard"） |
+| cost_amount | BIGINT | 需要的数量（如 10） |
+| original_amount | BIGINT NULL | 原价（划线价） |
+| is_enabled | BOOLEAN | 是否在兑换渠道上架 |
+| publish_at | DATETIME NULL | 定时上架 |
+| unpublish_at | DATETIME NULL | 定时下架 |
+| created_at | DATETIME | 创建时间 |
+| updated_at | DATETIME | 更新时间 |
+
+#### 表 10：购物渠道定价（shop_channel_prices）
+
+管"这个 SKU 用人民币卖多少钱"。
+
+> **本期同步建设：** 表 + 模型 + ShopOrderService（下单、支付回调、退款、对账）+ 微信支付/支付宝 API 接入，全部在本期完成。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | BIGINT PK | 主键 |
+| sku_id | BIGINT FK → product_skus | 关联 SKU |
+| price | DECIMAL(10,2) | 售价（人民币） |
+| original_price | DECIMAL(10,2) NULL | 原价（划线价） |
+| is_enabled | BOOLEAN | 是否在购物渠道上架 |
+| publish_at | DATETIME NULL | 定时上架 |
+| unpublish_at | DATETIME NULL | 定时下架 |
+| created_at | DATETIME | 创建时间 |
+| updated_at | DATETIME | 更新时间 |
+
+**同一个 SKU 可以同时在两个渠道上架**——兑换商城卖 10 个红水晶碎片，购物商城卖 ¥99。库存是共享的（`product_skus.stock`），不管从哪个渠道卖出去都减 1。
+
+### 11.5 与现有系统的关系
+
+| 现有模型 | 处理方式 | 说明 |
+|---------|---------|------|
+| `exchange_items` | **被 `products` 替代** | 数据迁移到 products 表，旧表废弃 |
+| `exchange_item_skus` | **被 `product_skus` + `sku_attribute_values` 替代** | 原 `spec_values` JSON 拆为 EAV 行 |
+| `exchange_records` | **保留** | FK 从 `exchange_item_id` 改指向 `product_id` + `sku_id` |
+| `category_defs` | **被 `categories` 替代** | 扩展了层级结构（parent_category_id） |
+| `item_templates` | **不变** | `products.item_template_id` 指向它 |
+| `items` / `item_ledger` / `item_holds` | **完全不变** | Layer 4 物品系统不受影响 |
+| `market_listings` / `trade_orders` | **完全不变** | C2C 交易系统不受影响 |
+| `account_asset_balances` | **完全不变** | 资产账本系统不受影响 |
+
+### 11.6 EAV 属性 vs 实例随机属性的层次关系
+
+这两种属性管的是完全不同阶段的事，互不干扰：
+
+| 维度 | EAV 属性（品类规格） | 实例随机属性 |
+|------|-------------------|------------|
+| 管什么 | "这个商品有什么可选项" | "这一件具体品质怎么样" |
+| 谁决定 | 运营配置 | 系统铸造时随机生成 |
+| 用户操作 | 下单前选择（颜色、尺码） | 无法选择，开箱惊喜 |
+| 存在哪 | Layer 1 EAV 表（`sku_attribute_values`） | Layer 4 物品实例（`items.instance_attributes` JSON） |
+| 影响价格 | 是——不同 SKU 不同价格 | 不直接影响，但影响二手市场价值 |
+| 影响库存 | 是——每个 SKU 独立库存 | 否 |
+| 同款之间 | 一样——所有"冰蓝·大号"规格相同 | 不一样——每件品质分和纹理都不同 |
+| 类比 | 货架上的标签 | 开箱后的惊喜 |
+
+### 11.7 完整数据流（EAV + Instance 统一版）
+
+```
+运营在后台：
+  1. 创建品类"宝石"，绑定属性：颜色、尺寸、切工     ← Layer 1 EAV
+  2. 创建商品"龙纹宝石"，关联品类"宝石"              ← Layer 1 products
+  3. 创建 SKU：冰蓝·大 / 火红·小 / 翡翠绿·中        ← Layer 1 product_skus + sku_attribute_values
+  4. 配置兑换价：冰蓝·大 = 10红水晶碎片               ← Layer 2 exchange_channel_prices
+  5. 配置购物价：冰蓝·大 = ¥99                       ← Layer 2 shop_channel_prices
+  6. 关联物品模板，开启铸造，配置品质分概率             ← item_template_id + mint_instance + attribute_rules
+
+用户兑换：
+  1. 选择"龙纹宝石 冰蓝·大"                         ← SKU 选择（EAV 属性）
+  2. 扣 10 红水晶碎片                                ← AccountAssetBalance 扣减
+  3. 扣 product_skus.stock（共享库存）                ← 不管哪个渠道卖出都扣这里
+  4. 建 exchange_records                             ← 兑换订单
+  5. 铸造 Item 实例 #0042/0100                       ← ItemService.mintItem()
+     品质分 87.42 精良，纹理 #337                     ← AttributeRuleEngine 随机生成
+  6. 创建 trade_cooldown hold（7天）                  ← ItemHold
+  7. 实例进入用户背包                                  ← 可见、可用、7天内不可交易
+
+用户购买（新渠道）：
+  1. 选择"龙纹宝石 冰蓝·大"                         ← 同一个 SKU
+  2. 创建 shop_orders（待支付）                       ← ShopOrderService.createOrder()
+  3. 调起微信支付/支付宝                              ← 支付网关（微信 JSAPI/Native + 支付宝当面付）
+  4. 支付回调 → 订单状态改为已支付                     ← ShopOrderService.handlePaymentCallback()
+  5. 扣 product_skus.stock（同一个库存）              ← 和兑换共享库存
+  6. 铸造 Item 实例（与兑换完全一致）                  ← 复用同一套 mintItem()
+  7. 退款场景 → 原路退回 + 销毁实例                   ← ShopOrderService.refund() + consumeItem()
+
+C2C 交易（不变）：
+  7天后 → 挂牌 → 买家看到"张三的 #0042 龙纹宝石 品质87.42 精良 纹理#337"
+  → 买家扣钻石 → transferItem() → 物品转移到买家背包
+```
+
+### 11.8 工作量评估
+
+> **执行策略：** 跳过第十章（小改造），直接执行第十一章（EAV 大改造）。第十章的能力（铸造实例、随机属性、限量编号、冷却期）全部包含在第十一章中，不需要分两步。购物渠道支付系统同步建设。
+
+| 项目 | 内容 | 工时 |
+|------|------|------|
+| 数据库迁移 | 8 张商品中心表 + 2 张渠道表 + shop_orders 表，共 11 张新表 | 2 天 |
+| 模型层 | 11 个新 Sequelize 模型 + 关联定义 | 1 天 |
+| 商品中心服务层 | ProductService（CRUD）+ AttributeService（属性管理）+ SKU 笛卡尔积生成 | 3-4 天 |
+| 购物渠道订单 | ShopOrderService（下单、支付回调、发货、退款、对账） | 2-3 天 |
+| 支付网关接入 | 微信支付（JSAPI/Native）+ 支付宝（当面付），回调验签、退款 API | 2-3 天 |
+| 兑换流程对接 | exchange CoreService 改指向 products + product_skus + 铸造实例 + 冷却 hold | 1-2 天 |
+| 数据迁移脚本 | exchange_items → products，exchange_item_skus → product_skus + sku_attribute_values | 1 天 |
+| 管理后台 | 品类管理页 + 属性管理页 + 统一商品编辑页 + 渠道定价配置 + 卡片网格视图 + 购物订单管理 | 4-5 天 |
+| 属性规则引擎 | AttributeRuleEngine（品质分 + 纹理编号随机生成） | 0.5 天 |
+| C2C 市场适配 | 展示品质分、编号、等级标签、筛选排序 | 0.5 天 |
+| **总计** | | **17-22 天** |
+
+### 11.9 未来扩展能力
+
+EAV + 多渠道架构建好后，以下扩展都是**纯配置操作，不需要改代码**：
+
+| 扩展场景 | 操作 |
+|---------|------|
+| 新增品类（如"食品"） | 后台创建品类 → 绑定属性（口味、重量、保质期）→ 完 |
+| 新增属性（如"产地"） | 后台创建属性 → 绑定到相关品类 → 完 |
+| 新增销售渠道（如"积分商城"） | 新建一张 `points_channel_prices` 表 → 完 |
+| 新增销售渠道（如"会员专属"） | 新建一张 `vip_channel_prices` 表 → 完 |
+| 某商品只在兑换渠道卖 | `exchange_channel_prices.is_enabled = true`，购物渠道不配置 |
+| 某商品只用人民币卖 | `shop_channel_prices.is_enabled = true`，兑换渠道不配置 |
+
+---
+
+## 十二、结论
+
+本项目的最终架构为**四层混合体系**，整合了行业五大方案中的四种：
+
+| 层级 | 方案来源 | 职责 | 核心表 |
+|------|---------|------|-------|
+| Layer 1 | 阿里 EAV | 统一商品目录（品类、属性、SPU/SKU） | 8 张表 |
+| Layer 2 | 多渠道定价 | 兑换定价 + 购物定价（未来可扩展） | 2 张表 |
+| Layer 3 | 有赞/电商 | 订单管理（兑换订单 + 购物订单） | 2 张表 |
+| Layer 4 | CS:GO/Steam | 物品实例（铸造、所有权、交易、随机属性） | 4 张表（现有） |
+
+**原有的有赞轻 SKU（JSON `spec_values`）被 EAV 完整替代**，`exchange_items` 和 `exchange_item_skus` 迁移到统一商品中心后废弃。物品系统（Item + ItemLedger + ItemHold）和 C2C 交易系统完全不受影响。
+
+本文档定义的全部改造包括：
+
+- 统一商品中心（EAV 属性体系，支撑几千品类、几十万 SKU）
+- 多渠道销售（材料兑换 + 人民币购买，共享库存，独立定价）
+- 购物渠道支付系统（ShopOrderService + 微信支付/支付宝接入 + 退款对账）
+- 物品实例铸造（唯一编号 #0042/0100 + 品质分 87.42 精良 + 纹理 #337）
+- 配置化属性规则（运营可调概率分布，不需要改代码）
+- 7 天交易冷却期（复用 ItemHold）
+- 管理后台卡片网格视图（双视图切换）
+
+**推荐方案本质：阿里 EAV（管商品目录）+ 多渠道定价（管怎么卖）+ 微信/支付宝支付（管收钱）+ CS:GO Instance（管所有权+随机属性）的四合一架构。**
+
+**预计总工时：17-22 天。**
+
+---
+
+## 十三、真实数据库校验报告（2026-03-20 实机验证）
+
+> **数据来源：** 直接通过 Node.js + Sequelize 连接生产数据库 `restaurant_points_dev`（dbconn.sealosbja.site:42569），非备份文件。
+> **验证时间：** 2026-03-20，以下所有数据为实时查询结果。
+
+### 13.1 数据库全局概况
+
+| 指标 | 实际值 |
+|------|-------|
+| 总表数 | 113 张 |
+| Sequelize 模型数 | 113 个（完全对齐） |
+| API 路由版本 | `/api/v4/*`（V4 RESTful 扁平化设计） |
+| 服务注册方式 | `ServiceManager` snake_case 键（如 `exchange_core`） |
+| 三层架构 | Routes → Services → Models |
+
+### 13.2 文档涉及核心表的真实状态
+
+| 表名 | 行数 | 文档描述 vs 真实状态 |
+|------|------|---------------------|
+| `exchange_items` | **5** | 无 `item_template_id`、无 `mint_instance`——文档提案尚未落地 |
+| `exchange_item_skus` | **5** | 全部 `spec_values = {}`——多规格 SKU 功能从未实际使用 |
+| `exchange_records` | **9** | 无 `item_id`——兑换订单不关联物品实例，确认核心断裂 |
+| `item_templates` | **13** | 无 `max_edition`——限量编号功能尚未落地 |
+| `items` | **7,832** | 无 `item_template_id`、无 `instance_attributes`、无 `serial_number`、无 `edition_total` |
+| `item_ledger` | **18,170** | 双录记账正常运行，SUM(delta)=0 守恒 |
+| `item_holds` | **244** | `hold_type` ENUM 只有 `trade/redemption/security`，无 `trade_cooldown` |
+| `market_listings` | **316** | `listing_kind` 支持 `item` 和 `fungible_asset` 两种 |
+| `trade_orders` | **150** | 交易订单系统正常运行 |
+| `category_defs` | **9** | **已有 `parent_category_def_id` 字段**，已支持层级结构 |
+| `rarity_defs` | **5** | common / uncommon / rare / epic / legendary |
+| `material_asset_types` | **16** | 16 种材料资产类型已定义 |
+| `account_asset_balances` | **88** | 统一账本正常运行，含 `lottery_campaign_id` 分区 |
+| `accounts` | — | `account_type` ENUM: `user/system`，统一账户体系 |
+
+### 13.3 items 表物品分布（真实数据）
+
+| item_type | source | status | 数量 |
+|-----------|--------|--------|------|
+| product | lottery | available | 1,874 |
+| voucher | legacy | available | 1,599 |
+| voucher | legacy | used | 1,526 |
+| voucher | lottery | available | 1,235 |
+| voucher | legacy | held | 433 |
+| tradable_item | legacy | available | 203 |
+| tradable_item | test | available | 194 |
+| product | legacy | available | 82 |
+| tradable_item | legacy | held | 56 |
+
+**关键发现：** `items.source` 没有 `exchange` 值——确认 B2C 兑换流程从未调用 `ItemService.mintItem()`，兑换产出不进入物品系统。
+
+### 13.4 item_templates 真实数据（全部 13 条）
+
+| template_code | item_type | rarity | display_name | category |
+|---------------|-----------|--------|-------------|----------|
+| voucher_50_yuan | voucher | common | 50元优惠券 | 优惠券 |
+| voucher_discount_10 | voucher | uncommon | 9折优惠券 | 优惠券 |
+| voucher_discount_20 | voucher | rare | 8折优惠券 | 优惠券 |
+| food_set_meal_single | voucher | common | 单人套餐券 | 餐饮美食 |
+| food_set_meal_family | voucher | rare | 家庭套餐券 | 餐饮美食 |
+| electronics_wireless_earbuds | product | rare | 无线蓝牙耳机 | 电子产品 |
+| electronics_portable_charger | product | uncommon | 移动电源 | 电子产品 |
+| electronics_smartphone | product | legendary | 智能手机 | 电子产品 |
+| gift_card_100 | voucher | uncommon | 100元礼品卡 | 礼品卡 |
+| gift_card_200 | voucher | rare | 200元礼品卡 | 礼品卡 |
+| gift_card_500 | voucher | epic | 500元礼品卡 | 礼品卡 |
+| home_kitchen_set | product | rare | 厨房用品套装 | 家居生活 |
+| home_towel_set | product | common | 毛巾礼盒 | 家居生活 |
+
+### 13.5 exchange_items 真实数据（全部 5 条）
+
+| item_name | cost_asset_code | cost_amount | stock | sold_count | status |
+|-----------|----------------|-------------|-------|------------|--------|
+| 衣服 | red_shard | 10 | 43 | 7 | active |
+| 宝石1 | red_shard | 100 | 299 | 1 | active |
+| 222 | red_shard | 1 | 0 | 0 | inactive |
+| 222 | red_shard | 1 | 1 | 0 | active |
+| 111 | DIAMOND | 500 | 0 | 0 | inactive |
+
+**关键发现：** 5 条商品中 3 条为测试数据（222/111），实际有效商品仅 2 条。5 个 SKU 全部 `spec_values = {}`，多规格 SKU 功能从未使用。
+
+### 13.6 exchange_records 真实数据（全部 9 条）
+
+| source | status | 数量 |
+|--------|--------|------|
+| exchange | pending | 7 |
+| exchange | completed | 1 |
+| exchange | refunded | 1 |
+
+### 13.7 market_listings 交易市场分布
+
+| listing_kind | status | 数量 |
+|--------------|--------|------|
+| item | on_sale | 21 |
+| item | sold | 6 |
+| item | withdrawn | 7 |
+| fungible_asset | sold | 16 |
+| fungible_asset | withdrawn | 266 |
+
+### 13.8 exchange CoreService.exchangeItem() 实际流程验证
+
+通过代码审查确认当前兑换流程：
+
+```
+扣材料资产(BalanceService.changeBalance) → 扣 SPU/SKU 库存 → 建 ExchangeRecord → 完
+```
+
+**不存在**对 `ItemService.mintItem()` 的任何调用。`ItemService.mintItem()` 目前仅被抽奖系统和竞价结算系统调用。
+
+### 13.9 items 表与 item_templates 表的关联方式
+
+真实代码中 `items` 通过 `prize_definition_id` 关联 `lottery_prizes`，**不是直接关联** `item_templates`。`ItemTemplate` 模型注释明确写道：
+
+> "items 表使用 prize_definition_id 关联 lottery_prizes，不再直接关联 item_templates。物品模板 → 物品的关系通过 lottery_prizes 间接建立"
+
+这意味着文档中提出的 `items.item_template_id` 是一个**新建的直接关联**，不是修复现有关联。
+
+---
+
+## 十四、文档内部矛盾与决策评估
+
+### 14.1 EAV 方案的内部矛盾（第七章 vs 第十一章）— ✅ 已解决
+
+> **矛盾已解决：** 用户于 2026-03-20 拍板选择第十一章 EAV 大改造方案。第七章 "禁止引入 EAV" 条目作废。
+
+**第七章 "禁止事项" 原文：**
+
+> ~~"引入 EAV 属性体系——品类少（<20），JSON 够用，EAV 引入后 JOIN 复杂度翻倍"~~（已作废）
+
+**第十一章（已采纳）：**
+
+> "将原有的有赞轻 SKU（JSON 属性）替换为阿里级 EAV 属性体系"
+
+**真实数据（作为基线参考）：**
+- 当前品类 **9 个**，其中 4 个已禁用（is_enabled=0）
+- 实际启用品类仅 **5 个**（家居生活、生活日用、美食饮品、收藏品、其他）
+- 当前 SKU 全部 `spec_values = {}`，多规格 SKU 从未使用
+- `category_defs` 已支持 `parent_category_def_id` 层级结构
+
+**拍板理由：** 项目未上线，一步到位；EAV 建好后新增品类/属性纯配置操作，长期维护成本低。
+
+### 14.2 品类规模预测问题
+
+第十一章基于 "品类扩展到几千个" 的假设，但：
+
+- 餐厅积分抽奖系统的商品品类天然有限（餐饮券、电子产品、家居、礼品卡、收藏品）
+- 本项目不是通用电商平台，品类不会自然增长到 "几千个"
+- 当前 9 个品类覆盖了可预见的全部业务场景
+
+### 14.3 第十章（小改造）vs 第十一章（EAV 大改造）对比
+
+| 维度 | 第十章（小改造） | 第十一章（EAV 大改造） |
+|------|---------------|---------------------|
+| 新建表数 | 0 张 | 11 张 |
+| DDL 变更 | 9 项 ADD COLUMN | 11 张新表 + 数据迁移 |
+| 工时 | 5-7 天 | 17-22 天 |
+| 品类支撑 | <100 个（JSON） | 几千个（EAV） |
+| 属性筛选 | JSON 函数索引 | SQL 原生索引 |
+| 维护复杂度 | 低 | 高（8 张商品中心表 JOIN） |
+| 是否解决核心问题 | ✅ 完全解决（兑换→铸造打通） | ✅ 解决 + 额外支撑万级 SKU |
+| 实际需要？ | ✅ 匹配当前和可预见规模 | ⚠️ 超出当前需求 3-4 个数量级 |
+
+---
+
+## 十五、⚠️ 需要拍板的决策点
+
+### 决策 6（新增）：选择第十章还是第十一章
+
+> **这是最关键的决策，直接影响工时、复杂度和长期维护成本。**
+
+| 选项 | 方案 | 工时 | 适用场景 |
+|------|------|------|---------|
+| A | 第十章（小改造）— 在现有 `exchange_items` 上加字段打通物品系统 | 5-7 天 | 品类 <100、SKU <万级、当前阶段 |
+| **✅ B** | **第十一章（EAV 大改造）— 新建统一商品中心 + EAV 属性体系** | **17-22 天** | **品类 >500、SKU >十万级、多渠道定价** |
+| C | 分步走 — 先执行第十章上线，验证业务后再评估是否升级到第十一章 | 5-7 天 + 后续按需 | 不确定未来规模时的稳妥选择 |
+
+#### ✅ 已拍板：选 B — 第十一章 EAV 大改造
+
+**拍板理由：** 项目未上线，一步到位成本最低。EAV 一旦建好，新增品类/属性纯配置操作，长期维护成本低。不需要先做小改造再做大改造的二次重构。
+
+> **注：** 第十四章指出的 "第七章禁止 EAV vs 第十一章引入 EAV" 矛盾现已解决——用户明确选择 EAV 大改造方案，第七章的 "禁止 EAV" 条目作废，以第十一章方案为准。
+
+### 决策 7（新增）：人民币购买渠道是否在本期
+
+第十一章包含了 `shop_channel_prices` + `shop_orders` + 微信支付/支付宝接入，这是一个独立的大需求。
+
+| 选项 | 说明 | 额外工时 |
+|------|------|---------|
+| 在本期 | 统一商品中心 + 兑换渠道 + 购物渠道同步建设 | +5-6 天（支付网关+订单系统） |
+| **✅ 不在本期** | **只做兑换渠道 + 物品系统打通，购物渠道未来用充值模型** | **0** |
+
+#### ✅ 已拍板：不做人民币购买，全走材料资产兑换
+
+**结论：** 保持当前状态——用户通过抽奖获得材料资产，材料资产兑换商品。完全不涉及 RMB 支付，不需要接入任何支付系统。
+
+**当前已有的完整闭环：**
+
+```
+用户消费 → 获得积分 → 抽奖 → 获得材料资产（红水晶碎片等）
+                                    ↓
+                              材料资产兑换商品（B2C）
+                                    ↓
+                              物品实例进入背包
+                                    ↓
+                              C2C 市场用 DIAMOND 交易
+```
+
+**不做 RMB 支付的理由：**
+1. 当前业务闭环已完整，材料资产兑换覆盖全部商品获取场景
+2. 不涉及 RMB 支付 = 不需要接入微信支付/支付宝 = 零支付合规风险
+3. C2C 市场已用 DIAMOND 结算（150 笔真实交易），虚拟货币体系已自洽
+4. 减少工时：第十一章原方案的 `shop_channel_prices`、`shop_orders`、ShopOrderService、支付网关接入全部不做
+
+**从第十一章中移除的内容：**
+
+| 原方案内容 | 处理 |
+|-----------|------|
+| `shop_channel_prices` 表 | ❌ 不建 |
+| `shop_orders` 表 | ❌ 不建 |
+| `ShopOrderService`（下单、支付回调、退款、对账） | ❌ 不做 |
+| 微信支付（JSAPI/Native）+ 支付宝接入 | ❌ 不做 |
+| 第十一章 11.7 "用户购买" 数据流 | ❌ 不适用 |
+
+**保留的内容：**
+- `exchange_channel_prices` 表（兑换渠道定价）——这是唯一的销售渠道
+- Layer 2 多渠道架构设计保留扩展能力——未来如需 RMB 入口，加一张渠道定价表即可
+
+### 决策 8（新增）：items 表与 item_templates 的关联方式
+
+当前 `items` 通过 `prize_definition_id → lottery_prizes` 间接关联模板，文档提出新增 `items.item_template_id` 直接关联。
+
+| 选项 | 说明 |
+|------|------|
+| **✅ 新增直接外键** | **`items.item_template_id` → `item_templates`，所有来源统一用此字段** |
+| 保持间接关联 | 抽奖来源继续用 `prize_definition_id`，兑换来源用新字段 `exchange_item_id` |
+
+#### ✅ 已拍板：新增直接外键，无争议
+
+**行业验证：** 100% 的公司（Steam / 原神 / 暴雪 / 淘宝 / 有赞 / Shopify）都用直接关联。没有任何公司用间接关联来管理 "物品实例 → 物品定义" 的关系。
+
+**执行方案：**
+- 新增 `items.item_template_id BIGINT NULL FK → item_templates`
+- 所有来源（抽奖/兑换/竞价/管理员）统一用 `item_template_id` 标识 "这个物品是什么"
+- `prize_definition_id` 保留但降级为来源追溯信息——仅表示 "这个物品是从哪个奖品池抽到的"，不再作为 "这个物品是什么" 的主要关联
+- 历史 7,832 条 `items` 记录可通过 `lottery_prizes → item_templates` 关系回填 `item_template_id`
+
+---
+
+## 十六、问题归属分析（后端 / Web管理后台 / 微信小程序）
+
+### 16.1 后端数据库项目的问题
+
+| # | 问题 | 所属层 | 严重程度 |
+|---|------|--------|---------|
+| B1 | `exchange_items` 缺少 `item_template_id` + `mint_instance` 字段 | 模型层 | 核心阻塞 |
+| B2 | `items` 缺少 `item_template_id` + `instance_attributes` + `serial_number` + `edition_total` 字段 | 模型层 | 核心阻塞 |
+| B3 | `item_templates` 缺少 `max_edition` 字段 | 模型层 | 功能缺失 |
+| B4 | `exchange_records` 缺少 `item_id` 字段 | 模型层 | 追溯缺失 |
+| B5 | `item_holds.hold_type` ENUM 缺少 `trade_cooldown` 值 | 模型层 | 功能缺失 |
+| B6 | `exchange/CoreService.exchangeItem()` 不调用 `ItemService.mintItem()` | 服务层 | 核心断裂 |
+| B7 | 缺少 `AttributeRuleEngine`（品质分+纹理编号随机生成） | 服务层 | 功能缺失 |
+| B8 | `ItemService.mintItem()` 不支持 `serial_number` 分配 | 服务层 | 功能缺失 |
+| B9 | `items` 与 `item_templates` 无直接外键关联 | 模型层 | 设计缺陷 |
+
+### 16.2 Web 管理后台前端项目的问题
+
+> **技术栈：** Vite 6.4 + Alpine.js 3.15 + Tailwind CSS 3.4，53 个 HTML 页面，多页应用架构。
+> **API 层：** `admin/src/api/` 下按领域拆分，统一 `/api/v4/console/*` 路径前缀。
+
+| # | 问题 | 所属模块 | 严重程度 |
+|---|------|---------|---------|
+| W1 | 商品编辑表单缺少 "关联物品模板" 下拉 + "铸造开关" | `modules/market/composables/exchange-items.js` | 核心缺失 |
+| W2 | 商品编辑表单缺少 "限量总数" 输入框 | 同上 | 功能缺失 |
+| W3 | 商品列表只有表格视图，缺少卡片网格视图（决策5） | `modules/market/pages/exchange-market.js` | 体验优化 |
+| W4 | 物品模板管理页缺少 "属性规则配置"（品质分概率分布编辑器） | `admin/item-template-management.html` | 功能缺失 |
+| W5 | C2C 市场列表页缺少品质分/编号/纹理展示 | 相关市场页面 | 功能缺失 |
+| W6 | C2C 市场筛选栏缺少按品质等级筛选 + 按品质分排序 | 同上 | 功能缺失 |
+
+**Web 管理后台需要适配后端的字段名：**
+- 后端新增 `item_template_id` → 前端 `itemForm` 增加同名字段
+- 后端新增 `mint_instance` → 前端表单增加开关控件
+- 后端新增 `max_edition` → 前端物品模板表单增加输入框
+- 所有字段名直接使用后端 snake_case，不做映射
+
+### 16.3 微信小程序前端项目的问题
+
+> **微信小程序项目不在当前服务器上**，属于独立仓库。以下为小程序需要适配的后端变更。
+
+| # | 问题 | 说明 |
+|---|------|------|
+| M1 | 兑换详情页需展示 "是否铸造" 标识 | 读取 `exchange_items.mint_instance` |
+| M2 | 用户背包需展示实例属性 | 读取 `items.instance_attributes` 中的 `quality_score` + `quality_grade` + `pattern_id` |
+| M3 | 用户背包需展示限量编号 | 读取 `items.serial_number` + `items.edition_total`，格式 `#0042/0100` |
+| M4 | 物品详情页需展示品质等级视觉标识 | 根据 `quality_grade` 映射颜色（金/紫/蓝/白/灰） |
+| M5 | C2C 市场需展示品质分和编号 | 后端 API 已包含在物品数据中 |
+| M6 | C2C 市场需支持按品质等级筛选 | 后端提供筛选参数，小程序传参即可 |
+| M7 | 冷却期倒计时展示 | 读取 `item_holds` 的 `expires_at`，前端计算倒计时 |
+| M8 | 小程序字段名需直接使用后端 snake_case | 不做字段映射，直接用 `quality_score`、`serial_number` 等 |
+
+---
+
+## 十七、可复用组件与扩展性分析
+
+### 17.1 后端可直接复用的现有能力
+
+| 组件 | 位置 | 可复用性 | 说明 |
+|------|------|---------|------|
+| `ItemService.mintItem()` | `services/asset/ItemService.js` | ✅ 直接复用 | 铸造逻辑完整，只需扩展参数支持 `item_template_id` + `instance_attributes` + `serial_number` |
+| `ItemService.transferItem()` | 同上 | ✅ 直接复用 | 所有权转移已完整 |
+| `ItemService.holdItem()` | 同上 | ✅ 直接复用 | 锁定机制完整，只需新增 `trade_cooldown` 枚举值 |
+| `ItemService.consumeItem()` | 同上 | ✅ 直接复用 | 核销/销毁已完整 |
+| `ItemLedger` 双录记账 | `models/ItemLedger.js` | ✅ 完全不动 | 三表模型的真相层，无需任何修改 |
+| `ItemHold` 锁定机制 | `models/ItemHold.js` | ✅ 扩展复用 | 只需给 ENUM 加一个值 `trade_cooldown` |
+| `BackpackService` | `services/BackpackService.js` | ✅ 直接复用 | 用户背包查询已完整 |
+| `MarketListing` + `TradeOrder` | `services/market-listing/` | ✅ 完全不动 | C2C 交易系统不受影响 |
+| `BalanceService.changeBalance()` | `services/asset/BalanceService.js` | ✅ 直接复用 | 材料资产扣减逻辑不变 |
+| `ExchangeItemSku` | `models/ExchangeItemSku.js` | ✅ 保留 | SKU 管规格和库存，与实例属性是两码事 |
+| `TrackingCodeGenerator` | `utils/TrackingCodeGenerator.js` | ✅ 直接复用 | 人类可读追踪码生成 |
+| `category_defs` | 已有表 | ✅ 直接复用 | 已支持层级结构，不需要新建 `categories` 表 |
+| `rarity_defs` | 已有表 | ✅ 直接复用 | 5 个稀有度等级已定义 |
+| `MediaFile` + `MediaAttachment` | 已有模型 | ✅ 直接复用 | 媒体文件体系 2026-03-16 已完成 |
+| `Sequelize CLI 迁移体系` | `migrations/` + `scripts/database/migration_toolkit.js` | ✅ 直接复用 | 迁移工具链完整 |
+
+### 17.2 后端需要新建的组件
+
+| 组件 | 说明 | 工时 |
+|------|------|------|
+| `AttributeRuleEngine` | 读取 `item_templates.meta.attribute_rules`，生成品质分+纹理编号 | 0.5 天 |
+| 1 个迁移文件 | 9 项 DDL（ADD COLUMN + ALTER ENUM） | 0.5 天 |
+
+### 17.3 后端需要修改的组件
+
+| 组件 | 修改内容 | 工时 |
+|------|---------|------|
+| `models/ExchangeItem.js` | 新增 `item_template_id` + `mint_instance`，添加 `belongsTo(ItemTemplate)` | 0.5 天 |
+| `models/Item.js` | 新增 `item_template_id` + `instance_attributes` + `serial_number` + `edition_total`，添加 `belongsTo(ItemTemplate)` | 0.5 天 |
+| `models/ItemTemplate.js` | 新增 `max_edition` | 0.2 天 |
+| `models/ExchangeRecord.js` | 新增 `item_id`，添加 `belongsTo(Item)` | 0.2 天 |
+| `models/ItemHold.js` | `hold_type` ENUM 新增 `trade_cooldown`，`HOLD_PRIORITY` 新增 `trade_cooldown: 0` | 0.2 天 |
+| `services/exchange/CoreService.js` | `exchangeItem()` 增加铸造分支（检查 `mint_instance` → 调用 `mintItem()` → 分配编号 → 生成属性 → 创建冷却 hold） | 1-2 天 |
+| `services/exchange/AdminService.js` | 商品创建/编辑增加 `item_template_id` + `mint_instance` 处理 | 0.5 天 |
+| `services/asset/ItemService.js` | `mintItem()` 扩展参数支持 `item_template_id` + `serial_number` + `instance_attributes` | 0.5 天 |
+
+### 17.4 Web 管理后台可复用的现有能力
+
+| 组件 | 说明 |
+|------|------|
+| `admin/src/api/market/exchange.js` — `ExchangeAPI` | 兑换商品 CRUD API 调用层，只需扩展参数 |
+| `admin/src/modules/market/composables/exchange-items.js` | 商品表单状态管理，`itemForm` 增加字段即可 |
+| `admin/src/alpine/components/data-table` | 表格组件可复用于列表视图 |
+| `admin/src/alpine/mixins/crud.js` | CRUD 通用逻辑可复用 |
+| Vite 多页打包 | 新增页面只需加 HTML + 模块文件 |
+| Tailwind CSS 组件类 | 卡片、表单、标签等 UI 组件可复用 |
+
+### 17.5 扩展性评估
+
+基于现有后端技术栈（Node.js + Express + Sequelize + MySQL），以下扩展能力已内建：
+
+| 未来需求 | 扩展方式 | 是否需要改数据模型 |
+|---------|---------|-----------------|
+| 新增物品类型（如 "皮肤"） | `item_templates` 新增行 + `items.item_type` 新增值 | 否 |
+| 新增品类 | `category_defs` 新增行 | 否 |
+| 新增稀有度等级 | `rarity_defs` 新增行 | 否 |
+| 新增材料资产类型 | `material_asset_types` 新增行 | 否 |
+| 物品强化/升级 | 修改 `items.instance_attributes` JSON | 否 |
+| 关闭某商品的随机属性 | `item_templates.meta.attribute_rules.quality_score.enabled = false` | 否 |
+| 调整品质分概率分布 | 修改 `item_templates.meta.attribute_rules.quality_score.distribution` | 否 |
+| 新增第三个随机属性维度 | `attribute_rules` JSON 加一个 key | 否 |
+| 人民币购买（充值模型） | RMB → DIAMOND 充值入口（3-4 天），复用现有 DIAMOND 体系，合规微信虚拟支付 | 是（充值表） |
+
+---
+
+## 十八、确认执行路径（基于第十一章 EAV 方案，去除购物渠道）
+
+> 基于已拍板的三项决策：
+> - **决策 6** → 第十一章 EAV 大改造
+> - **决策 7** → 本期不做人民币购买，未来用充值模型（RMB → DIAMOND）
+> - **决策 8** → `items.item_template_id` 直接外键
+>
+> 第十一章原方案中的 `shop_channel_prices`、`shop_orders`、微信支付/支付宝接入**本期不执行**。
+
+### Phase 1：后端数据库 — 统一商品中心建表（2 天）
+
+**迁移文件 1/3：8 张 EAV 商品中心表（Layer 1）**
+
+第十一章 11.3 节定义的 8 张表，使用项目现有迁移工具链（`npm run migration:create`）：
+
+| # | 表名 | 说明 | 关键字段 |
+|---|------|------|---------|
+| 1 | `categories` | 品类树（替代 `category_defs`，扩展层级） | `category_id`, `parent_category_id`, `category_code`, `level` |
+| 2 | `attributes` | 属性定义 | `attribute_id`, `attribute_code`, `input_type`, `is_sale_attr`, `is_searchable` |
+| 3 | `attribute_options` | 属性预设值 | `option_id`, `attribute_id`, `option_value` |
+| 4 | `category_attributes` | 品类绑定属性 | `category_id`, `attribute_id` |
+| 5 | `products` | 统一 SPU（替代 `exchange_items`） | `product_id`, `category_id`, `item_template_id`, `mint_instance`, `rarity_code` |
+| 6 | `product_attribute_values` | SPU 非销售属性值 | `product_id`, `attribute_id`, `attribute_value` |
+| 7 | `product_skus` | 统一 SKU（替代 `exchange_item_skus`） | `sku_id`, `product_id`, `sku_code`, `stock`, `cost_price` |
+| 8 | `sku_attribute_values` | SKU 销售属性值（替代 JSON `spec_values`） | `sku_id`, `attribute_id`, `option_id` |
+
+**迁移文件 2/3：1 张兑换渠道定价表（Layer 2）**
+
+| # | 表名 | 说明 | 关键字段 |
+|---|------|------|---------|
+| 9 | `exchange_channel_prices` | 兑换渠道定价 | `sku_id`, `cost_asset_code`, `cost_amount`, `is_enabled` |
+
+> `shop_channel_prices` 本期不建，未来用充值模型时再评估。
+
+**迁移文件 3/3：物品系统字段扩展（Layer 4 + 关联）**
+
+| # | 表 | DDL | 说明 |
+|---|------|-----|------|
+| 10 | `items` | ADD COLUMN `item_template_id` BIGINT NULL FK | 直接外键关联物品模板（决策 8） |
+| 11 | `items` | ADD COLUMN `instance_attributes` JSON NULL | 实例随机属性 |
+| 12 | `items` | ADD COLUMN `serial_number` INT NULL | 限量编号 |
+| 13 | `items` | ADD COLUMN `edition_total` INT NULL | 限量总数快照 |
+| 14 | `item_templates` | ADD COLUMN `max_edition` INT NULL | 限量总数上限 |
+| 15 | `exchange_records` | ADD COLUMN `item_id` BIGINT NULL FK | 关联产出的物品实例 |
+| 16 | `exchange_records` | MODIFY FK → `product_id` + `sku_id` | 从 `exchange_item_id` 改指向 `products` |
+| 17 | `item_holds` | MODIFY ENUM `hold_type` 新增 `trade_cooldown` | 交易冷却锁类型 |
+
+### Phase 2：后端模型层 — 11 个新模型 + 5 个修改（1 天）
+
+**新建 Sequelize 模型（11 个）：**
+
+| 模型 | 文件 | 说明 |
+|------|------|------|
+| `Category` | `models/Category.js` | 品类树，`associate()` → self(parent), Attribute, Product |
+| `Attribute` | `models/Attribute.js` | 属性定义，`associate()` → AttributeOption, Category |
+| `AttributeOption` | `models/AttributeOption.js` | 属性预设值，`associate()` → Attribute |
+| `CategoryAttribute` | `models/CategoryAttribute.js` | 品类绑定属性 |
+| `Product` | `models/Product.js` | 统一 SPU，`associate()` → Category, ItemTemplate, ProductSku, RarityDef, MediaFile |
+| `ProductAttributeValue` | `models/ProductAttributeValue.js` | SPU 属性值 |
+| `ProductSku` | `models/ProductSku.js` | 统一 SKU，`associate()` → Product, SkuAttributeValue, ExchangeChannelPrice |
+| `SkuAttributeValue` | `models/SkuAttributeValue.js` | SKU 销售属性值 |
+| `ExchangeChannelPrice` | `models/ExchangeChannelPrice.js` | 兑换渠道定价 |
+
+> `ShopChannelPrice` 和 `ShopOrder` 本期不建。
+
+**修改现有模型（5 个）：**
+
+| 模型 | 修改内容 |
+|------|---------|
+| `models/Item.js` | 新增 `item_template_id` + `instance_attributes` + `serial_number` + `edition_total`，`associate()` 增加 `belongsTo(ItemTemplate)` |
+| `models/ItemTemplate.js` | 新增 `max_edition` |
+| `models/ExchangeRecord.js` | 新增 `item_id`，FK 改指向 `products` + `product_skus`，`associate()` 增加 `belongsTo(Item)` |
+| `models/ItemHold.js` | `hold_type` ENUM 增加 `trade_cooldown`，`HOLD_PRIORITY` 增加 `trade_cooldown: 0` |
+| `models/index.js` | 注册新模型，建立关联 |
+
+### Phase 3：后端服务层 — 商品中心 + 属性管理（3-4 天）
+
+| 服务 | 文件 | 职责 | 工时 |
+|------|------|------|------|
+| `ProductService` | `services/product/ProductService.js` | 商品 CRUD（创建时自动关联品类属性、SKU 笛卡尔积生成） | 1.5 天 |
+| `AttributeService` | `services/product/AttributeService.js` | 属性定义管理、品类绑定、预设值管理 | 1 天 |
+| `ExchangeChannelPriceService` | `services/product/ExchangeChannelPriceService.js` | 兑换渠道定价管理 | 0.5 天 |
+| `AttributeRuleEngine` | `services/item/AttributeRuleEngine.js` | 品质分+纹理编号随机生成（读取 `item_templates.meta.attribute_rules`） | 0.5 天 |
+
+### Phase 4：后端服务层 — 兑换流程对接新商品中心（1-2 天）
+
+修改 `services/exchange/CoreService.js`，`exchangeItem()` 改指向 `products` + `product_skus`：
+
+```
+改造后流程:
+  1. 查询 Product + ProductSku（替代原 ExchangeItem + ExchangeItemSku）
+  2. 查询 ExchangeChannelPrice 获取兑换价格
+  3. 扣材料资产（BalanceService.changeBalance，不变）
+  4. 扣 product_skus.stock（共享库存）
+  5. 建 exchange_records（FK 改指向 product_id + sku_id）
+
+  如果 Product.mint_instance = true:
+    6. 查询 Product.item_template_id 获取物品模板
+    7. AttributeRuleEngine.generate() 生成 instance_attributes
+    8. 计算 serial_number（按 item_template_id 计数 + 1）
+    9. 检查 serial_number <= max_edition
+   10. ItemService.mintItem()（传入 item_template_id + instance_attributes + serial_number + edition_total）
+   11. ItemService.holdItem() 创建 trade_cooldown hold（7天）
+   12. exchange_records.item_id = 新铸造的 item_id
+```
+
+修改 `services/asset/ItemService.js`，扩展 `mintItem()` 参数：
+- 新增可选参数 `item_template_id`、`instance_attributes`、`serial_number`、`edition_total`
+- 铸造时写入这些字段到 `items` 表
+
+### Phase 5：后端 — 数据迁移脚本（1 天）
+
+| 迁移 | 说明 |
+|------|------|
+| `exchange_items` → `products` | 5 条商品数据迁移到 `products` 表 |
+| `exchange_item_skus` → `product_skus` + `sku_attribute_values` | 5 条 SKU 数据迁移，`spec_values` JSON 拆为 EAV 行 |
+| `category_defs` → `categories` | 9 条品类数据迁移到新品类树 |
+| `items.item_template_id` 回填 | 7,832 条历史物品通过 `lottery_prizes → item_templates` 关系回填 `item_template_id` |
+| 旧表标记废弃 | `exchange_items`、`exchange_item_skus`、`category_defs` 迁移后标记废弃（不立即删除） |
+
+### Phase 6：后端 — 管理后台 API 路由（0.5 天）
+
+新增/修改的 console API 路由：
+
+| 路由 | 方法 | 说明 |
+|------|------|------|
+| `/api/v4/console/categories` | CRUD | 品类树管理 |
+| `/api/v4/console/attributes` | CRUD | 属性定义管理 |
+| `/api/v4/console/products` | CRUD | 统一商品管理（替代原 `/console/marketplace/exchange-items`） |
+| `/api/v4/console/products/:id/skus` | CRUD | SKU 管理 |
+| `/api/v4/console/products/:id/channel-prices` | CRUD | 渠道定价管理 |
+
+### Phase 7：Web 管理后台前端适配（4-5 天）
+
+| 文件/页面 | 变更 | 工时 |
+|----------|------|------|
+| **新建** `admin/category-management.html` | 品类树管理页（树形结构编辑） | 0.5 天 |
+| **新建** `admin/attribute-management.html` | 属性定义管理页（属性 CRUD + 预设值 + 品类绑定） | 1 天 |
+| **改造** `admin/exchange-market.html` | 统一商品编辑页（品类选择→属性联动→SKU 笛卡尔积→渠道定价→铸造开关） | 1.5 天 |
+| **改造** `admin/exchange-market.html` | 商品列表增加卡片网格视图（双视图切换） | 0.5 天 |
+| **改造** `admin/item-template-management.html` | 增加 `max_edition` + 属性规则配置（品质分概率分布编辑器） | 0.5 天 |
+| `admin/src/api/` | 新增 `category.js`、`attribute.js`、`product.js` API 模块 | 含在上述工时中 |
+
+**前端字段名规则（不变）：** 直接使用后端 snake_case 字段名，不做映射。
+
+### Phase 8：微信小程序前端适配（由小程序团队执行，2-3 天）
+
+小程序需要适配的后端 API 变更清单：
+
+| API | 变更 | 小程序适配 |
+|-----|------|-----------|
+| `GET /api/v4/shop/exchange-items` | 数据源从 `exchange_items` 切换到 `products` + `exchange_channel_prices` | 字段名可能变更，小程序适配新字段 |
+| `GET /api/v4/backpack` | 物品数据增加 `instance_attributes` + `serial_number` + `edition_total` | 背包页展示品质标签 + 编号 |
+| `GET /api/v4/market` | 挂牌数据增加物品实例属性 | 市场页展示品质分+编号 |
+| `GET /api/v4/market` | 新增筛选参数 `quality_grade` + 排序参数 `quality_score` | 市场页增加筛选和排序 |
+| `GET /api/v4/backpack/:item_id` | 物品详情增加冷却期信息 | 物品详情页展示冷却倒计时 |
+
+**小程序字段名规则（不变）：** 直接使用后端字段名，不做映射。
+
+### 工时汇总（EAV 方案，去除购物渠道）
+
+| Phase | 内容 | 工时 | 负责方 |
+|-------|------|------|-------|
+| Phase 1 | 数据库建表（9 张新表 + 字段扩展） | 2 天 | 后端 |
+| Phase 2 | 模型层（11 个新模型 + 5 个修改） | 1 天 | 后端 |
+| Phase 3 | 商品中心服务层 + AttributeRuleEngine | 3-4 天 | 后端 |
+| Phase 4 | 兑换流程对接新商品中心 | 1-2 天 | 后端 |
+| Phase 5 | 数据迁移脚本 | 1 天 | 后端 |
+| Phase 6 | 管理后台 API 路由 | 0.5 天 | 后端 |
+| Phase 7 | Web 管理后台前端 | 4-5 天 | Web 前端 |
+| Phase 8 | 微信小程序适配 | 2-3 天 | 小程序前端 |
+| **后端总计** | | **8.5-10.5 天** | |
+| **Web 前端总计** | | **4-5 天** | |
+| **小程序总计** | | **2-3 天** | |
+| **全部总计** | | **14.5-18.5 天**（三端可并行） | |
+
+> **对比第十一章原估算（17-22 天）：** 去除购物渠道（ShopOrderService + 微信支付/支付宝接入 = 4-6 天）后，工时降至 14.5-18.5 天。未来加充值入口（RMB → DIAMOND）预计 3-4 天，合规且复用现有 DIAMOND 体系。
+
+---
+
+## 十九、Web 管理后台技术栈适配性分析
+
+### 19.1 Web 管理后台技术栈
+
+| 维度 | 技术 |
+|------|------|
+| 构建工具 | Vite 6.4 |
+| UI 框架 | Alpine.js 3.15（声明式 HTML） |
+| 样式 | Tailwind CSS 3.4 |
+| 图表 | ECharts 6.0 |
+| 实时通信 | socket.io-client 4.8 |
+| 架构模式 | 多页应用（53 个 HTML 页面 + EJS 模板布局） |
+| API 层 | `admin/src/api/` 集中管理，`/api/v4/console/*` 前缀 |
+| 状态管理 | Alpine composables + Alpine.store() |
+
+### 19.2 改造方案与 Web 前端技术栈的兼容性
+
+| 改造项 | 是否兼容 Web 前端技术栈 | 说明 |
+|--------|----------------------|------|
+| 商品表单增加字段 | ✅ 完全兼容 | Alpine.js `x-data` 中增加字段，HTML 增加表单控件 |
+| 铸造开关（Boolean） | ✅ 完全兼容 | Tailwind toggle 组件 + `x-model` 双向绑定 |
+| 物品模板下拉选择 | ✅ 完全兼容 | `<select x-model="itemForm.item_template_id">` + API 加载选项 |
+| 品质分概率分布编辑器 | ✅ 兼容但需开发 | 可用 Alpine.js `x-for` 循环渲染分布表格，支持行内编辑 |
+| 双视图切换（网格/列表） | ✅ 完全兼容 | Alpine `x-show` 条件渲染 + `localStorage` 记忆，纯前端改造 |
+| 卡片网格视图 | ✅ 完全兼容 | Tailwind `grid` 布局 + Alpine `x-for` 渲染 |
+
+**结论：** 改造方案完全适配 Web 管理后台现有技术栈（Vite + Alpine.js + Tailwind），无需引入新依赖，无需修改构建配置。
+
+---
+
+## 二十、总结
+
+### 20.1 三项决策已全部拍板
+
+| 决策 | 结论 | 理由 |
+|------|------|------|
+| **决策 6** | ✅ **第十一章 EAV 大改造** | 项目未上线，一步到位成本最低；EAV 建好后新增品类/属性纯配置操作 |
+| **决策 7** | ✅ **不做人民币购买，全走材料资产兑换** | 当前业务闭环已完整；不涉及 RMB = 零支付合规风险；减少 4-6 天工时 |
+| **决策 8** | ✅ **`items.item_template_id` 直接外键** | 行业 100% 采用直接关联；`prize_definition_id` 降级为来源追溯 |
+
+### 20.2 核心结论
+
+1. **核心问题确认**：兑换流程不调用 `ItemService.mintItem()`，两套系统确实断开——本次改造解决
+2. **执行方案确定**：第十一章 EAV 统一商品中心，去除购物渠道（合规原因）
+3. **复用率高**：物品系统（三表模型 + 双录记账 + 锁定 + 背包 + 市场 + DIAMOND 结算）全部直接复用
+4. **工时可控**：后端 8.5-10.5 天、Web 前端 4-5 天、小程序 2-3 天，三端可并行，全部 14.5-18.5 天
+5. **零支付合规风险**：全走材料资产兑换，不涉及 RMB 支付，不需要接入任何支付系统
+6. **第七章 "禁止 EAV" 条目作废**：以第十一章 EAV 方案为准
+
+### 20.3 全部 8 项决策汇总
+
+| # | 决策 | 结论 | 章节 |
+|---|------|------|------|
+| 1 | 铸造范围 | 手动开关，默认开启 | 第九章 9.1 |
+| 2 | 随机属性 | 第一期同步上线，品质分 + 纹理编号 | 第九章 9.2 |
+| 3 | 编号规则 | 按 ItemTemplate 编号 | 第九章 9.3 |
+| 4 | 交易冷却 | 7 天，复用 ItemHold | 第九章 9.4 |
+| 5 | 后台商品列表 | 双视图切换，默认网格 | 第九章 9.5 |
+| 6 | 第十章 vs 第十一章 | **第十一章 EAV 大改造** | 第十五章 |
+| 7 | 人民币购买渠道 | **不做，全走材料资产兑换** | 第十五章 |
+| 8 | items→item_templates 关联 | **直接外键** | 第十五章 |
+
+---
+
+## 二十一、实施进度报告（2026-03-20 实施完成）
+
+### 21.1 后端数据库项目实施完成清单
+
+| Phase | 内容 | 状态 | 说明 |
+|-------|------|------|------|
+| Phase 1 | 数据库迁移（9张新表 + 4张表字段扩展） | ✅ 完成 | 3个迁移文件已执行 |
+| Phase 2 | 模型层（9个新模型 + 5个修改） | ✅ 完成 | 总计122个模型加载成功 |
+| Phase 3 | 服务层（4个新服务） | ✅ 完成 | ProductService + AttributeService + ExchangeChannelPriceService + AttributeRuleEngine |
+| Phase 4 | 兑换流程对接 | ✅ 完成 | ExchangeCoreService增加铸造分支 + ItemService扩展参数 |
+| Phase 5 | 数据迁移 | ✅ 完成 | 25品类 + 5商品 + 5 SKU + 5渠道定价 |
+| Phase 6 | 管理后台API路由 | ✅ 完成 | /console/categories + /console/attributes + /console/products |
+| Phase 7 | Web管理后台前端 | ✅ 完成 | 品类管理页 + 属性管理页 + API客户端 + 构建通过 |
+
+### 21.2 新增的数据库表（9张）
+
+| 表名 | 记录数 | 说明 |
+|------|--------|------|
+| categories | 25 | 品类树（从category_defs迁移 + 二级子品类） |
+| attributes | 0 | 属性定义（待运营配置） |
+| attribute_options | 0 | 属性预设值（待运营配置） |
+| category_attributes | 0 | 品类绑定属性（待运营配置） |
+| products | 5 | 统一SPU（从exchange_items迁移） |
+| product_attribute_values | 0 | SPU属性值 |
+| product_skus | 5 | 统一SKU（从exchange_item_skus迁移） |
+| sku_attribute_values | 0 | SKU销售属性值 |
+| exchange_channel_prices | 5 | 兑换渠道定价 |
+
+### 21.3 修改的现有表字段
+
+| 表 | 新增字段 | 说明 |
+|----|---------|------|
+| items | item_template_id, instance_attributes, serial_number, edition_total | 物品实例关联模板 + 随机属性 + 限量编号 |
+| item_templates | max_edition | 限量总数上限 |
+| exchange_records | item_id, product_id, sku_id | 兑换订单关联物品实例和新商品中心 |
+| item_holds | hold_type新增trade_cooldown | 交易冷却期锁类型 |
+
+### 21.4 新增的服务
+
+| 服务 | ServiceManager键 | 类型 | 说明 |
+|------|-----------------|------|------|
+| ProductService | unified_product | 实例 | 统一商品CRUD + SKU管理 |
+| AttributeService | product_attribute | 实例 | EAV属性定义管理 |
+| ExchangeChannelPriceService | exchange_channel_price | 实例 | 兑换渠道定价 |
+| AttributeRuleEngine | attribute_rule_engine | 静态 | 品质分+纹理编号随机生成 |
+
+### 21.5 新增的API端点
+
+| 路径 | 方法 | 说明 |
+|------|------|------|
+| /api/v4/console/categories | GET/POST | 品类列表/创建 |
+| /api/v4/console/categories/:id | GET/PUT/DELETE | 品类详情/更新/删除 |
+| /api/v4/console/categories/:id/attributes | GET/PUT | 品类属性绑定 |
+| /api/v4/console/attributes | GET/POST | 属性列表/创建 |
+| /api/v4/console/attributes/:id | GET/PUT/DELETE | 属性详情/更新/删除 |
+| /api/v4/console/attributes/:id/options | POST | 新增属性选项 |
+| /api/v4/console/attributes/options/:option_id | PUT/DELETE | 更新/删除属性选项 |
+| /api/v4/console/products | GET/POST | 商品列表/创建 |
+| /api/v4/console/products/:id | GET/PUT/DELETE | 商品详情/更新/删除 |
+| /api/v4/console/products/:id/skus | GET/POST | SKU列表/创建 |
+| /api/v4/console/products/:id/skus/generate | POST | 笛卡尔积自动生成SKU |
+| /api/v4/console/products/skus/:sku_id | PUT/DELETE | 更新/删除SKU |
+| /api/v4/console/products/skus/:sku_id/stock | PUT | 调整SKU库存 |
+| /api/v4/console/products/skus/:sku_id/channel-prices | GET/PUT | 渠道定价 |
+
+---
+
+## 二十二、微信小程序前端对接指南
+
+> 以下为小程序前端团队需要适配的后端变更清单。所有字段名直接使用后端snake_case，不做映射。
+
+### 22.1 兑换商品列表API变更
+
+**旧API**（仍可用，过渡期保留）：
+`GET /api/v4/shop/exchange-items`
+
+**新API**（推荐迁移）：
+`GET /api/v4/console/products?status=active`
+
+**响应新增字段**：
+```json
+{
+  "product_id": 1,
+  "product_name": "龙纹宝石",
+  "category_id": 8,
+  "mint_instance": true,
+  "item_template_id": 5,
+  "rarity_code": "rare",
+  "skus": [
+    {
+      "sku_id": 1,
+      "sku_code": "dragon_gem_blue_L",
+      "stock": 43,
+      "attributeValues": [
+        { "attribute_id": 1, "option_id": 3, "attribute": {"attribute_name": "颜色"}, "option": {"option_value": "冰蓝"} }
+      ],
+      "channelPrices": [
+        { "cost_asset_code": "red_shard", "cost_amount": 10, "is_enabled": true }
+      ]
+    }
+  ]
+}
+```
+
+### 22.2 兑换成功后新增返回字段
+
+当 `mint_instance=true` 时，兑换API返回新增 `minted_item`：
+```json
+{
+  "success": true,
+  "order": { "order_no": "EXC1710923456001234", ... },
+  "minted_item": {
+    "item_id": 8001,
+    "tracking_code": "LT260320123456",
+    "serial_number": 42,
+    "edition_total": 100,
+    "instance_attributes": {
+      "quality_score": 87.42,
+      "quality_grade": "精良",
+      "pattern_id": 337,
+      "颜色": "冰蓝"
+    }
+  }
+}
+```
+
+### 22.3 用户背包新增字段
+
+`GET /api/v4/backpack` 物品数据新增：
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| item_template_id | BIGINT | 关联物品模板 |
+| instance_attributes | JSON | 实例属性（品质分+纹理编号+SKU规格） |
+| serial_number | INT | 限量编号（#0042） |
+| edition_total | INT | 限量总数（/0100） |
+
+### 22.4 品质等级视觉映射
+
+| quality_grade | 品质分范围 | 建议颜色 |
+|--------------|-----------|---------|
+| 完美无瑕 | 95.00~100.00 | 金色 #FFD700 |
+| 精良 | 80.00~94.99 | 紫色 #9B59B6 |
+| 良好 | 50.00~79.99 | 蓝色 #3498DB |
+| 普通 | 20.00~49.99 | 白色 #FFFFFF |
+| 微瑕 | 0.00~19.99 | 灰色 #95A5A6 |
+
+### 22.5 C2C市场新增筛选参数
+
+`GET /api/v4/market` 新增查询参数：
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| quality_grade | STRING | 按品质等级筛选（完美无瑕/精良/良好/普通/微瑕） |
+| sort_by | STRING | 排序字段，新增 quality_score |
+| sort_order | STRING | asc/desc |
+
+### 22.6 冷却期信息
+
+物品详情API返回的 `holds` 中可能包含 `trade_cooldown` 类型：
+```json
+{
+  "holds": [
+    {
+      "hold_type": "trade_cooldown",
+      "status": "active",
+      "reason": "新物品交易冷却期（7天）",
+      "expires_at": "2026-03-27T18:30:00.000+08:00"
+    }
+  ]
+}
+```
+小程序根据 `expires_at` 计算倒计时展示。
+
+### 22.7 展示格式建议
+
+限量编号格式：`#0042 / 0100`（补零到edition_total位数）
+
+```javascript
+function formatEdition(serial_number, edition_total) {
+  if (!serial_number || !edition_total) return null
+  const digits = String(edition_total).length
+  return `#${String(serial_number).padStart(digits, '0')} / ${String(edition_total).padStart(digits, '0')}`
+}
+```

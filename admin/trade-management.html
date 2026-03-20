@@ -536,16 +536,14 @@
       <div class="bg-white rounded-lg shadow p-4 mb-4">
         <div class="flex flex-wrap gap-3 items-end">
           <div>
-            <label class="block text-xs text-gray-500 mb-1">订单状态</label>
+            <label class="block text-xs text-gray-500 mb-1">核销状态</label>
             <select x-model="redemptionFilters.status" @change="redemptionCurrentPage = 1; loadRedemptionOrders()"
                     class="px-3 py-2 border rounded-lg text-sm">
               <option value="">全部状态</option>
-              <option value="pending">待处理</option>
-              <option value="approved">已审核</option>
-              <option value="shipped">已发货</option>
-              <option value="completed">已完成</option>
+              <option value="pending">待核销</option>
+              <option value="fulfilled">已核销</option>
+              <option value="expired">已过期</option>
               <option value="cancelled">已取消</option>
-              <option value="rejected">已拒绝</option>
             </select>
           </div>
           <button @click="redemptionCurrentPage = 1; loadRedemptionOrders()"
@@ -555,47 +553,47 @@
         </div>
       </div>
 
-      <!-- 订单列表表格 -->
+      <!-- 核销订单列表表格 -->
       <div class="bg-white rounded-lg shadow overflow-hidden">
         <table class="w-full text-sm">
           <thead class="bg-gray-50">
             <tr>
-              <th class="px-4 py-3 text-left font-medium text-gray-600">订单号</th>
-              <th class="px-4 py-3 text-left font-medium text-gray-600">用户ID</th>
-              <th class="px-4 py-3 text-left font-medium text-gray-600">商品名称</th>
-              <th class="px-4 py-3 text-right font-medium text-gray-600">数量</th>
-              <th class="px-4 py-3 text-right font-medium text-gray-600">支付金额</th>
+              <th class="px-4 py-3 text-left font-medium text-gray-600">订单ID</th>
+              <th class="px-4 py-3 text-left font-medium text-gray-600">核销人</th>
+              <th class="px-4 py-3 text-left font-medium text-gray-600">关联物品</th>
               <th class="px-4 py-3 text-center font-medium text-gray-600">状态</th>
-              <th class="px-4 py-3 text-left font-medium text-gray-600">兑换时间</th>
+              <th class="px-4 py-3 text-left font-medium text-gray-600">创建时间</th>
+              <th class="px-4 py-3 text-left font-medium text-gray-600">过期时间</th>
+              <th class="px-4 py-3 text-left font-medium text-gray-600">核销时间</th>
             </tr>
           </thead>
           <tbody>
-            <template x-for="order in redemptionOrders" :key="order.order_no || order.exchange_record_id">
+            <template x-for="order in redemptionOrders" :key="order.redemption_order_id">
               <tr class="border-b hover:bg-gray-50">
-                <td class="px-4 py-3 font-mono text-xs" x-text="order.order_no || '-'"></td>
-                <td class="px-4 py-3" x-text="order.user_id"></td>
-                <td class="px-4 py-3" x-text="order.item_snapshot?.item_name || order.item_name || '-'"></td>
-                <td class="px-4 py-3 text-right" x-text="order.quantity || 1"></td>
-                <td class="px-4 py-3 text-right">
-                  <span x-text="order.pay_amount"></span>
-                  <span class="text-gray-400 text-xs" x-text="order.pay_asset_code || ''"></span>
+                <td class="px-4 py-3 font-mono text-xs" x-text="order.redemption_order_id ? order.redemption_order_id.substring(0, 8) + '...' : '-'"></td>
+                <td class="px-4 py-3">
+                  <span x-text="order.redeemer?.nickname || '-'"></span>
+                  <span class="text-gray-400 text-xs ml-1" x-show="order.redeemer?.mobile" x-text="order.redeemer?.mobile"></span>
+                  <span class="text-gray-400 text-xs" x-show="!order.redeemer" x-text="order.redeemer_user_id ? 'ID:' + order.redeemer_user_id : '未核销'"></span>
                 </td>
+                <td class="px-4 py-3" x-text="order.item?.item_name || '-'"></td>
                 <td class="px-4 py-3 text-center">
                   <span class="px-2 py-0.5 rounded text-xs"
                         :class="{
                           'bg-yellow-100 text-yellow-700': order.status === 'pending',
-                          'bg-blue-100 text-blue-700': order.status === 'approved' || order.status === 'shipped',
-                          'bg-green-100 text-green-700': order.status === 'completed',
-                          'bg-red-100 text-red-700': order.status === 'cancelled' || order.status === 'rejected',
-                          'bg-gray-100 text-gray-700': !['pending','approved','shipped','completed','cancelled','rejected'].includes(order.status)
+                          'bg-green-100 text-green-700': order.status === 'fulfilled',
+                          'bg-gray-100 text-gray-700': order.status === 'expired',
+                          'bg-red-100 text-red-700': order.status === 'cancelled'
                         }"
                         x-text="order.status_display || order.status"></span>
                 </td>
-                <td class="px-4 py-3 text-gray-500 text-xs" x-text="formatDate(order.exchange_time || order.created_at)"></td>
+                <td class="px-4 py-3 text-gray-500 text-xs" x-text="formatDate(order.created_at)"></td>
+                <td class="px-4 py-3 text-gray-500 text-xs" x-text="formatDate(order.expires_at)"></td>
+                <td class="px-4 py-3 text-gray-500 text-xs" x-text="order.fulfilled_at ? formatDate(order.fulfilled_at) : '-'"></td>
               </tr>
             </template>
             <tr x-show="redemptionOrders.length === 0">
-              <td colspan="7" class="px-4 py-8 text-center text-gray-400">暂无兑换订单数据</td>
+              <td colspan="7" class="px-4 py-8 text-center text-gray-400">暂无核销订单数据</td>
             </tr>
           </tbody>
         </table>

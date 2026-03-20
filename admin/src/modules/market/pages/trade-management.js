@@ -945,7 +945,6 @@ document.addEventListener('alpine:init', () => {
      */
     async loadRedemptionOrders() {
       try {
-        // apiGet 返回 { success, data } 结构
         const queryParams = {
           ...this.redemptionFilters,
           page: this.redemptionCurrentPage,
@@ -957,18 +956,17 @@ document.addEventListener('alpine:init', () => {
         const result = await this.apiGet(MARKET_ENDPOINTS.BUSINESS_RECORD_REDEMPTION, queryParams)
         if (result && result.success && result.data) {
           const data = result.data
-          const redemptionData = data?.orders || data?.list || data
-          this.redemptionOrders = Array.isArray(redemptionData) ? redemptionData : []
+          this.redemptionOrders = Array.isArray(data.orders) ? data.orders : []
           const pagination = data.pagination || {}
           this.redemptionPagination = {
             total_pages: pagination.total_pages || 1,
-            total: pagination.total_count || pagination.total || this.redemptionOrders.length
+            total: pagination.total || this.redemptionOrders.length
           }
         }
       } catch (error) {
-        logger.error('加载兑换订单失败:', error)
+        logger.error('加载核销订单失败:', error)
         this.redemptionOrders = []
-        this.$toast?.error('加载兑换订单失败: ' + error.message)
+        this.$toast?.error('加载核销订单失败: ' + error.message)
       }
     },
 

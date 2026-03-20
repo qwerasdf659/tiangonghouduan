@@ -75,6 +75,14 @@ class Item extends Model {
         as: 'merchant'
       })
     }
+
+    // 物品关联物品模板（所有来源统一标识"这个物品是什么"）— 2026-03-20 EAV改造
+    if (models.ItemTemplate) {
+      Item.belongsTo(models.ItemTemplate, {
+        foreignKey: 'item_template_id',
+        as: 'itemTemplate'
+      })
+    }
   }
 
   /**
@@ -204,6 +212,40 @@ module.exports = sequelize => {
         onDelete: 'SET NULL',
         onUpdate: 'CASCADE',
         comment: '来源商家ID（NULL=平台自营，关联 merchants 表）'
+      },
+
+      /** 关联物品模板 — 所有来源统一用此字段标识"这个物品是什么"（2026-03-20 EAV改造） */
+      item_template_id: {
+        type: DataTypes.BIGINT,
+        allowNull: true,
+        references: {
+          model: 'item_templates',
+          key: 'item_template_id'
+        },
+        onDelete: 'SET NULL',
+        onUpdate: 'CASCADE',
+        comment: '关联物品模板（所有来源统一标识物品定义，prize_definition_id降级为来源追溯）'
+      },
+
+      /** 实例独有属性 — 铸造时由AttributeRuleEngine生成（品质分+纹理编号+SKU规格副本） */
+      instance_attributes: {
+        type: DataTypes.JSON,
+        allowNull: true,
+        comment: '实例属性 {"quality_score":87.42,"quality_grade":"精良","pattern_id":337,"颜色":"冰蓝"}'
+      },
+
+      /** 限量编号 — 按ItemTemplate独立计数，铸造时自动分配 */
+      serial_number: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        comment: '限量编号（按ItemTemplate计数，如42表示"限量100件中的第42件"）'
+      },
+
+      /** 限量总数快照 — 铸造时从模板的max_edition复制，不随模板变更 */
+      edition_total: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        comment: '限量总数快照（铸造时从item_templates.max_edition复制）'
       },
 
       created_at: {

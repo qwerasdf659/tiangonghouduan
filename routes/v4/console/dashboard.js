@@ -253,7 +253,7 @@ router.get(
   }
 )
 
-module.exports = router
+// ========== 平台收入管理（PlatformRevenueService）==========
 
 /**
  * 获取平台收入概览

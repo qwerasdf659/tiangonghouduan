@@ -54,10 +54,21 @@ class ItemTemplate extends Model {
       })
     }
 
-    /*
-     * 注意：items 表使用 prize_definition_id 关联 lottery_prizes，不再直接关联 item_templates
-     * 物品模板 → 物品的关系通过 lottery_prizes 间接建立
-     */
+    // 物品模板 → 物品实例（一对多，2026-03-20 EAV改造新增直接外键）
+    if (models.Item) {
+      ItemTemplate.hasMany(models.Item, {
+        foreignKey: 'item_template_id',
+        as: 'items'
+      })
+    }
+
+    // 物品模板 → 统一商品SPU（一对多，商品关联此模板进行铸造）
+    if (models.Product) {
+      ItemTemplate.hasMany(models.Product, {
+        foreignKey: 'item_template_id',
+        as: 'products'
+      })
+    }
 
     // 关联市场挂牌（一对多）
     if (models.MarketListing) {
@@ -248,11 +259,18 @@ module.exports = sequelize => {
         comment: '是否启用'
       },
 
-      // 扩展元数据（JSON格式）
+      // 扩展元数据（JSON格式，含attribute_rules属性规则配置）
       meta: {
         type: DataTypes.JSON,
         allowNull: true,
-        comment: '扩展元数据（JSON格式）'
+        comment: '扩展元数据 {trade_cooldown_days:7, attribute_rules:{quality_score:{...},pattern_id:{...}}}'
+      },
+
+      /** 限量总数上限 — 运营设置，超过后拒绝铸造（2026-03-20 EAV改造） */
+      max_edition: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        comment: '限量总数上限（运营设置，独立于库存；超过后拒绝铸造）'
       }
     },
     {

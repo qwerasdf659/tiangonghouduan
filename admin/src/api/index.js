@@ -38,6 +38,7 @@ import { StoreAPI, STORE_ENDPOINTS } from './store.js'
 import { SystemAPI, SYSTEM_ENDPOINTS } from './system/index.js'
 import { AnalyticsAPI, ANALYTICS_ENDPOINTS } from './analytics.js'
 import { ContentAPI, CONTENT_ENDPOINTS } from './content.js'
+import { ProductAPI, PRODUCT_ENDPOINTS } from './product/index.js'
 
 // ========== 导出基础模块 ==========
 export { request, http, buildURL, buildQueryString, getToken, setToken, clearToken }
@@ -52,6 +53,7 @@ export { StoreAPI, STORE_ENDPOINTS }
 export { SystemAPI, SYSTEM_ENDPOINTS }
 export { AnalyticsAPI, ANALYTICS_ENDPOINTS }
 export { ContentAPI, CONTENT_ENDPOINTS }
+export { ProductAPI, PRODUCT_ENDPOINTS }
 
 // ========== 默认导出 ==========
 export default {
@@ -70,5 +72,6 @@ export default {
   StoreAPI,
   SystemAPI,
   AnalyticsAPI,
-  ContentAPI
+  ContentAPI,
+  ProductAPI
 }

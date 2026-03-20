@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <%- include('partials/head', { 
+    title: '品类管理', 
+    pageStyle: '[x-cloak] { display: none !important; }' 
+  }) %>
+</head>
+<body class="themed-bg-subtle min-h-screen">
+
+  <nav class="page-navbar">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/workspace.html" class="text-blue-200 hover:text-white transition-colors">← 返回工作台</a>
+        <span class="text-lg font-semibold">📂 品类管理</span>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mx-auto px-4 py-6"
+       x-data="categoryManagement()"
+       x-init="init()"
+       @table-action="handleTableAction($event.detail)">
+
+    <div x-cloak class="space-y-6">
+
+      <div class="page-banner mb-2">
+        <h1>📂 统一商品中心 · 品类树</h1>
+        <p>维护品类层级、排序、启用状态，并为品类绑定 EAV 属性</p>
+      </div>
+
+      <div class="flex flex-wrap justify-between items-center gap-3">
+        <p class="text-sm themed-text-muted">树形表格按层级缩进展示，刷新列表将重新拉取品类树</p>
+        <button type="button" @click="openCreateCategory()" class="action-btn action-btn-primary">
+          ➕ 新增品类
+        </button>
+      </div>
+
+      <div x-data="makeCategoryTable()" x-init="init()" @dt-refresh.window="refresh()">
+        <%- include('components/data-table') %>
+      </div>
+
+    </div>
+
+    <!-- 品类表单 -->
+    <div x-ref="categoryModal"
+         x-show="isModalOpen('categoryModal')"
+         x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center"
+         style="display: none;">
+      <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" @click="hideModal('categoryModal')"></div>
+      <div class="relative themed-card rounded-xl shadow-2xl w-full max-w-lg mx-4 z-10 max-h-[90vh] overflow-y-auto">
+        <div class="p-4 border-b flex justify-between items-center bg-gradient-to-r from-emerald-50 to-white rounded-t-xl">
+          <h5 class="font-semibold text-emerald-900" x-text="editingCategoryId ? '编辑品类' : '新增品类'"></h5>
+          <button type="button" @click="hideModal('categoryModal')" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+        </div>
+        <form class="p-5 space-y-4" @submit.prevent="submitCategoryForm()">
+          <div>
+            <label class="block text-sm font-medium text-gray-600 mb-1">品类名称 <span class="text-red-500">*</span></label>
+            <input type="text" x-model="categoryForm.category_name" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="显示名称" required>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-600 mb-1">品类编码 <span class="text-red-500">*</span></label>
+            <input type="text" x-model="categoryForm.category_code" class="w-full px-3 py-2 border rounded-lg text-sm font-mono" placeholder="唯一编码，如 electronics" required>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-600 mb-1">父级品类</label>
+            <select x-model="categoryForm.parent_category_id" class="w-full px-3 py-2 border rounded-lg text-sm">
+              <option value="">（根节点）</option>
+              <template x-for="c in parentSelectOptions" :key="c.category_id">
+                <option :value="String(c.category_id)" x-text="('—'.repeat(Math.max(0, (c.level || 1) - 1)) + ' ' + c.category_name).trim()"></option>
+              </template>
+            </select>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium text-gray-600 mb-1">层级</label>
+              <input type="number" min="1" x-model.number="categoryForm.level" class="w-full px-3 py-2 border rounded-lg text-sm">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-600 mb-1">排序</label>
+              <input type="number" x-model.number="categoryForm.sort_order" class="w-full px-3 py-2 border rounded-lg text-sm">
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <input type="checkbox" id="catEnabled" x-model="categoryForm.is_enabled" class="rounded border-gray-300">
+            <label for="catEnabled" class="text-sm text-gray-700">启用</label>
+          </div>
+          <div class="flex justify-end gap-2 pt-2 border-t">
+            <button type="button" @click="hideModal('categoryModal')" class="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50">取消</button>
+            <button type="submit" :disabled="saving" class="px-4 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50">
+              <span x-show="saving" class="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
+              保存
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 品类属性绑定 -->
+    <div x-ref="categoryAttrModal"
+         x-show="isModalOpen('categoryAttrModal')"
+         x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center"
+         style="display: none;">
+      <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" @click="hideModal('categoryAttrModal')"></div>
+      <div class="relative themed-card rounded-xl shadow-2xl w-full max-w-lg mx-4 z-10 max-h-[85vh] overflow-y-auto">
+        <div class="p-4 border-b flex justify-between items-center bg-gradient-to-r from-indigo-50 to-white rounded-t-xl">
+          <h5 class="font-semibold text-indigo-900">绑定属性</h5>
+          <button type="button" @click="hideModal('categoryAttrModal')" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+        </div>
+        <div class="p-5 space-y-3">
+          <p class="text-xs text-gray-500">勾选属性即绑定到该品类；顺序按下方列表自上而下保存为品类内排序。</p>
+          <div class="max-h-72 overflow-y-auto border rounded-lg divide-y bg-white">
+            <template x-for="a in allAttributesForBind" :key="a.attribute_id">
+              <label class="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                <input type="checkbox" class="rounded border-gray-300"
+                       :value="a.attribute_id"
+                       x-model="selectedAttrIds">
+                <span class="text-sm font-medium text-gray-800" x-text="a.attribute_name"></span>
+                <span class="text-xs text-gray-400 font-mono" x-text="a.attribute_code"></span>
+              </label>
+            </template>
+          </div>
+        </div>
+        <div class="p-4 border-t flex justify-end gap-2">
+          <button type="button" @click="hideModal('categoryAttrModal')" class="px-4 py-2 text-sm border rounded-lg">取消</button>
+          <button type="button" @click="saveCategoryAttributes()" :disabled="saving" class="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg disabled:opacity-50">
+            保存绑定
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <%- include('partials/footer') %>
+  <script type="module" src="./src/modules/product/pages/category-management.js"></script>
+</body>
+</html>

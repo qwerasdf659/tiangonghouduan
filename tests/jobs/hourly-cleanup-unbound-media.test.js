@@ -81,16 +81,16 @@ describe('每小时孤立媒体文件清理任务', () => {
         return
       }
 
-      const ids = attachedMediaIds.map(a => a.media_id)
+      const uniqueIds = [...new Set(attachedMediaIds.map(a => a.media_id))]
 
       await HourlyCleanupUnboundMedia.execute()
 
       const remainingFiles = await MediaFile.findAll({
-        where: { media_id: { [Op.in]: ids } }
+        where: { media_id: { [Op.in]: uniqueIds } }
       })
 
-      expect(remainingFiles.length).toBe(ids.length)
-      console.log(`[孤立清理] 验证确认：${ids.length} 个已关联文件未被误删`)
+      expect(remainingFiles.length).toBe(uniqueIds.length)
+      console.log(`[孤立清理] 验证确认：${uniqueIds.length} 个已关联文件未被误删（来自 ${attachedMediaIds.length} 条关联记录）`)
     })
   })
 })
