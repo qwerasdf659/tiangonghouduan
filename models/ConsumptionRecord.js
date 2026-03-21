@@ -530,7 +530,6 @@ module.exports = sequelize => {
        *
        * 格式：consumption_{merchant_id}_{timestamp}_{random}
        *
-       * @see docs/事务边界治理现状核查报告.md 建议9.1
        */
       business_id: {
         type: DataTypes.STRING(150),

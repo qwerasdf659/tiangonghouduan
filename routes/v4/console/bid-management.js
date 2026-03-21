@@ -125,14 +125,13 @@ router.post(
     })
 
     try {
-      const { ExchangeItem, BidProduct } = req.app.locals.models
+      const { Product, BidProduct } = req.app.locals.models
       const result = await TransactionManager.execute(async transaction => {
-        // 校验兑换商品是否存在
-        const exchangeItem = await ExchangeItem.findByPk(exchange_item_id, { transaction })
+        const exchangeItem = await Product.findByPk(exchange_item_id, { transaction })
         if (!exchangeItem) {
-          const err = new Error('关联的兑换商品不存在')
+          const err = new Error('关联的商品不存在')
           err.statusCode = 404
-          err.code = 'EXCHANGE_ITEM_NOT_FOUND'
+          err.code = 'PRODUCT_NOT_FOUND'
           throw err
         }
 

@@ -141,7 +141,6 @@ class ChatWebSocketService {
          * 会话有效性检查（与 middleware/auth.js authenticateToken 保持一致）
          * 防止已失效会话通过WebSocket绕过认证
          *
-         * @see docs/SESSION_INVALIDATED认证异常解决方案.md - 方案D
          */
         if (decoded.session_token) {
           const session = await AuthenticationSession.findValidByToken(decoded.session_token)
@@ -213,6 +212,7 @@ class ChatWebSocketService {
   setupEventHandlers() {
     this.io.on('connection', socket => {
       const userId = socket.user.user_id
+      const roleLevel = socket.user?.role_level ?? 0
       /**
        * 连接路由基于会话的 user_type（登录上下文）而非 role_level：
        *   user_type='admin' → connectedAdmins（管理后台 WebSocket）
@@ -289,7 +289,7 @@ class ChatWebSocketService {
 
       socket.emit('connection_established', {
         user_id: userId,
-        is_admin: isAdminSession,
+        role_level: roleLevel,
         socket_id: socket.id,
         server_time: BeijingTimeHelper.now(),
         timestamp: Date.now()
@@ -1535,10 +1535,12 @@ class ChatWebSocketService {
       }
     }
 
+    const roleLevel = socket.user?.role_level ?? 0
+
     try {
       wsLogger.info('开始会话恢复', {
         user_id: userId,
-        is_admin: isAdminSession,
+        role_level: roleLevel,
         last_sync_time: last_sync_time || 'not_provided'
       })
 
@@ -1574,7 +1576,7 @@ class ChatWebSocketService {
       const result = {
         success: true,
         user_id: userId,
-        is_admin: isAdminSession,
+        role_level: roleLevel,
         offline_messages_count: offlineMessages.count,
         sync_timestamp: BeijingTimeHelper.now(),
         message: `会话恢复成功${offlineMessages.count > 0 ? `，已推送${offlineMessages.count}条离线消息` : ''}`

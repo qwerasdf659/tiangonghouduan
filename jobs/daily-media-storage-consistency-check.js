@@ -6,7 +6,7 @@
  *   发现"数据库有记录但存储文件缺失"的不一致情况，记录告警日志
  *
  * @architecture 2026-03-16 媒体体系迁移
- *   - 针对 media_files 表（替代 image_resources）
+ *   - 针对 media_files 表
  *   - 定时执行：每天凌晨 5:00（Cron: 0 5 * * *）
  *   - 检测方式：SealosStorageService.fileExists()（S3 HEAD 请求）
  *   - 分批处理：每批 50 条，避免瞬时大量 HEAD 请求

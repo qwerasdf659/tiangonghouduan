@@ -2,7 +2,6 @@
  * 多维度统计路由（B-25/B-27 实现）
  *
  * @description 提供多维度组合统计和下钻明细查询API
- * @see docs/后端数据库开发任务清单-2026年1月.md B-25, B-27
  *
  * API端点：
  * - GET /api/v4/console/statistics/multi-dimension - 多维度统计（B-25）

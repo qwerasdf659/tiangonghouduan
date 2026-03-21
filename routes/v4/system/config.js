@@ -16,7 +16,6 @@
  * - 位置配置不含敏感信息（仅包含 campaign_code、页面、位置、尺寸、优先级）
  * - 无需 authenticateToken 中间件
  *
- * @see docs/后端与Web管理平台-对接需求总览.md Section 3.3 接口4
  * @date 2026-02-15
  */
 
@@ -49,32 +48,17 @@ const ServiceManager = require('../../../services')
  */
 router.get('/placement', async (req, res) => {
   try {
-    // 通过 models 获取 SystemConfig（已有模型，含 getByKey 静态方法 + Redis 缓存）
-    const { SystemConfig } = req.app.locals.models
+    const AdminSystemService = ServiceManager.getService('admin_system')
+    const configData = await AdminSystemService.getConfigValue('campaign_placement')
 
-    const config = await SystemConfig.getByKey('campaign_placement')
-
-    if (!config || !config.isEnabled()) {
+    if (!configData) {
       return res.apiError('配置不存在', 'CONFIG_NOT_FOUND', null, 404)
     }
-
-    const configData = config.getValue()
-
-    /**
-     * version 字段：基于 updated_at 时间戳生成的配置版本标识
-     * 前端配置缓存模块依赖此字段判断配置是否有更新：
-     * - 每次管理后台修改配置 → updated_at 自动变化 → version 随之变化
-     * - 前端对比本地缓存的 version 与远端 version，不同则更新本地缓存
-     */
-    const version = config.updated_at
-      ? new Date(config.updated_at).getTime().toString()
-      : Date.now().toString()
 
     return res.apiSuccess(
       {
         placements: configData.placements || [],
-        version,
-        updated_at: config.updated_at
+        version: Date.now().toString()
       },
       '获取配置成功',
       'PLACEMENT_CONFIG_SUCCESS'
@@ -103,12 +87,10 @@ router.get('/placement', async (req, res) => {
  */
 router.get('/product-filter', async (req, res) => {
   try {
-    const { SystemConfig } = req.app.locals.models
+    const AdminSystemService = ServiceManager.getService('admin_system')
+    const configData = await AdminSystemService.getConfigValue('product_filter')
 
-    const config = await SystemConfig.getByKey('product_filter')
-
-    if (!config || !config.isEnabled()) {
-      // 配置不存在时返回默认筛选配置（兜底方案，确保前端不会白屏）
+    if (!configData) {
       return res.apiSuccess(
         {
           filter_config: {
@@ -139,17 +121,10 @@ router.get('/product-filter', async (req, res) => {
       )
     }
 
-    const configData = config.getValue()
-
-    const version = config.updated_at
-      ? new Date(config.updated_at).getTime().toString()
-      : Date.now().toString()
-
     return res.apiSuccess(
       {
         filter_config: configData,
-        version,
-        updated_at: config.updated_at,
+        version: Date.now().toString(),
         is_default: false
       },
       '获取筛选配置成功'
@@ -174,29 +149,20 @@ router.get('/product-filter', async (req, res) => {
  */
 router.get('/feedback', async (req, res) => {
   try {
-    const { SystemConfig } = req.app.locals.models
+    const AdminSystemService = ServiceManager.getService('admin_system')
+    const configData = await AdminSystemService.getConfigValue('feedback_config')
 
-    // 尝试从 system_configs 获取自定义配置
-    const config = await SystemConfig.getByKey('feedback_config')
-
-    if (config && config.isEnabled()) {
-      const configData = config.getValue()
-      const version = config.updated_at
-        ? new Date(config.updated_at).getTime().toString()
-        : Date.now().toString()
-
+    if (configData) {
       return res.apiSuccess(
         {
           feedback_config: configData,
-          version,
-          updated_at: config.updated_at,
+          version: Date.now().toString(),
           is_default: false
         },
         '获取反馈配置成功'
       )
     }
 
-    // 默认配置：从数据库 feedbacks 表的 enum 定义和业务规则导出
     const defaultConfig = {
       /** 反馈类别（对应 feedbacks.category enum） */
       categories: [
@@ -263,12 +229,10 @@ router.get('/feedback', async (req, res) => {
  */
 router.get('/exchange-page', async (req, res) => {
   try {
-    const { SystemConfig } = req.app.locals.models
+    const AdminSystemService = ServiceManager.getService('admin_system')
+    const configData = await AdminSystemService.getConfigValue('exchange_page')
 
-    const config = await SystemConfig.getByKey('exchange_page')
-
-    if (!config || !config.isEnabled()) {
-      // 配置不存在时返回内置默认值（兜底方案，确保小程序不白屏）
+    if (!configData) {
       const defaultConfig = {
         tabs: [
           { key: 'exchange', label: '商品兑换', icon: 'download', enabled: true, sort_order: 1 },
@@ -355,9 +319,6 @@ router.get('/exchange-page', async (req, res) => {
       )
     }
 
-    const configData = config.getValue()
-
-    // 补充 detail_page 默认值（兼容旧配置中未包含 detail_page 的情况）
     if (!configData.detail_page) {
       configData.detail_page = {
         attr_display_mode: 'grid',
@@ -365,12 +326,8 @@ router.get('/exchange-page', async (req, res) => {
       }
     }
 
-    const version = config.updated_at
-      ? new Date(config.updated_at).getTime().toString()
-      : Date.now().toString()
-
     return res.apiSuccess(
-      { ...configData, version, updated_at: config.updated_at, is_default: false },
+      { ...configData, version: Date.now().toString(), is_default: false },
       '获取兑换页面配置成功',
       'EXCHANGE_PAGE_CONFIG_SUCCESS'
     )
@@ -395,16 +352,14 @@ router.get('/exchange-page', async (req, res) => {
  * @returns {Object} 全局氛围主题配置
  * @returns {string} data.theme - 当前全局主题标识
  *
- * @see docs/项目特效主题体系分析报告.md
  * @date 2026-03-06
  */
 router.get('/app-theme', async (req, res) => {
   try {
-    const { SystemConfig } = req.app.locals.models
+    const AdminSystemService = ServiceManager.getService('admin_system')
+    const configData = await AdminSystemService.getConfigValue('app_theme')
 
-    const config = await SystemConfig.getByKey('app_theme')
-
-    if (!config || !config.isEnabled()) {
+    if (!configData) {
       return res.apiSuccess(
         { theme: 'default' },
         '获取默认全局主题配置',
@@ -412,17 +367,10 @@ router.get('/app-theme', async (req, res) => {
       )
     }
 
-    const configData = config.getValue()
-
-    const version = config.updated_at
-      ? new Date(config.updated_at).getTime().toString()
-      : Date.now().toString()
-
     return res.apiSuccess(
       {
         theme: configData.theme || 'default',
-        version,
-        updated_at: config.updated_at
+        version: Date.now().toString()
       },
       '获取全局主题配置成功',
       'APP_THEME_CONFIG_SUCCESS'

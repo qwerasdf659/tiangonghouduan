@@ -11,7 +11,6 @@
  * - diamond_quota_ratio：消费→钻石配额比例
  *
  * @module models/UserRatioOverride
- * @see docs/钻石配额配置修复与优化方案.md §11
  */
 
 module.exports = (sequelize, DataTypes) => {

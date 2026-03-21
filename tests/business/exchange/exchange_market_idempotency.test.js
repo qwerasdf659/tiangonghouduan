@@ -35,7 +35,9 @@
 const request = require('supertest')
 const {
   sequelize,
-  ExchangeItem,
+  Product,
+  ProductSku,
+  ExchangeChannelPrice,
   ExchangeRecord,
   ExchangeOrderEvent,
   Account,
@@ -94,19 +96,35 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
       { expiresIn: '24h' }
     )
 
-    // 创建测试商品（V4.5.0 材料资产支付）
-    testItem = await ExchangeItem.create({
-      item_name: '【测试】幂等性测试商品',
+    // 创建测试商品（V4.5.0 统一商品中心 Product + ProductSku + ExchangeChannelPrice）
+    const testProduct = await Product.create({
+      product_name: '【测试】幂等性测试商品',
       description: '用于测试兑换市场幂等性的测试商品（材料资产支付）',
-      cost_asset_code: 'red_shard', // 材料资产代码：红水晶碎片
-      cost_amount: 100, // 成本数量：100个红水晶碎片
-      cost_price: 50,
-      stock: 1000,
-      sort_order: 1,
       status: 'active',
-      created_at: BeijingTimeHelper.createDatabaseTime(),
-      updated_at: BeijingTimeHelper.createDatabaseTime()
+      sort_order: 1
     })
+    const testSku = await ProductSku.create({
+      product_id: testProduct.product_id,
+      sku_code: `IDEM_TEST_${Date.now()}`,
+      stock: 1000,
+      cost_price: 50,
+      status: 'active',
+      sort_order: 0
+    })
+    await ExchangeChannelPrice.create({
+      sku_id: testSku.sku_id,
+      channel: 'exchange',
+      cost_asset_code: 'red_shard',
+      cost_amount: 100,
+      is_enabled: true
+    })
+    testItem = {
+      product_id: testProduct.product_id,
+      sku_id: testSku.sku_id,
+      product_name: testProduct.product_name,
+      cost_asset_code: 'red_shard',
+      cost_amount: 100
+    }
 
     /*
      * 初始化测试用户的材料资产账户（red_shard）
@@ -145,7 +163,8 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
 
     console.log('✅ 测试环境初始化完成')
     console.log(`   - 测试用户ID: ${testUser.user_id}`)
-    console.log(`   - 测试商品ID: ${testItem.exchange_item_id}`)
+    console.log(`   - 测试商品ID (product_id): ${testItem.product_id}`)
+    console.log(`   - 测试SKU ID: ${testItem.sku_id}`)
     console.log(`   - 商品成本: ${testItem.cost_amount} ${testItem.cost_asset_code}`)
   }, 30000)
 
@@ -210,9 +229,8 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
    */
   afterAll(async () => {
     if (testItem) {
-      // 先删除事件记录（外键依赖 exchange_records.order_no）
       const records = await ExchangeRecord.findAll({
-        where: { exchange_item_id: testItem.exchange_item_id },
+        where: { product_id: testItem.product_id },
         attributes: ['order_no']
       })
       const orderNos = records.map(r => r.order_no)
@@ -220,9 +238,9 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
         await ExchangeOrderEvent.destroy({ where: { order_no: orderNos } })
       }
       await ExchangeRecord.destroy({
-        where: { exchange_item_id: testItem.exchange_item_id }
+        where: { product_id: testItem.product_id }
       })
-      await testItem.destroy()
+      await Product.destroy({ where: { product_id: testItem.product_id } })
     }
 
     console.log('✅ 测试数据清理完成')
@@ -239,7 +257,7 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
         .post('/api/v4/backpack/exchange')
         .set('Authorization', `Bearer ${testToken}`)
         .send({
-          exchange_item_id: testItem.exchange_item_id,
+          product_id: testItem.product_id,
           quantity: 1
           // 🔴 故意不提供 Idempotency-Key Header
         })
@@ -264,7 +282,7 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
         .set('Authorization', `Bearer ${testToken}`)
         .set('Idempotency-Key', idempotencyKey) // ✅ 通过Header提供Idempotency-Key
         .send({
-          exchange_item_id: testItem.exchange_item_id,
+          product_id: testItem.product_id,
           quantity: 1
         })
         .expect(200)
@@ -300,7 +318,7 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
         .set('Authorization', `Bearer ${testToken}`)
         .set('Idempotency-Key', idempotencyKey)
         .send({
-          exchange_item_id: testItem.exchange_item_id,
+          product_id: testItem.product_id,
           quantity: 1
         })
         .expect(200)
@@ -319,7 +337,7 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
         .set('Authorization', `Bearer ${testToken}`)
         .set('Idempotency-Key', idempotencyKey) // 🔄 相同的 Idempotency-Key
         .send({
-          exchange_item_id: testItem.exchange_item_id,
+          product_id: testItem.product_id,
           quantity: 1
         })
         .expect(200)
@@ -362,7 +380,7 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
         .set('Authorization', `Bearer ${testToken}`)
         .set('Idempotency-Key', idempotencyKey)
         .send({
-          exchange_item_id: testItem.exchange_item_id,
+          product_id: testItem.product_id,
           quantity: 1
         })
         .expect(200)
@@ -384,7 +402,7 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
         .set('Authorization', `Bearer ${testToken}`)
         .set('Idempotency-Key', idempotencyKey) // 🔄 相同的 Idempotency-Key
         .send({
-          exchange_item_id: testItem.exchange_item_id,
+          product_id: testItem.product_id,
           quantity: 1
         })
         .expect(200)
@@ -421,49 +439,58 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
         .set('Authorization', `Bearer ${testToken}`)
         .set('Idempotency-Key', idempotencyKey)
         .send({
-          exchange_item_id: testItem.exchange_item_id,
+          product_id: testItem.product_id,
           quantity: 1
         })
         .expect(200)
 
       console.log('✅ 第一次请求成功')
-      console.log(`   - exchange_item_id: ${testItem.exchange_item_id}`)
+      console.log(`   - product_id: ${testItem.product_id}`)
       console.log(`   - order_no: ${response1.body.data.order.order_no}`)
 
-      // 创建另一个测试商品
-      const anotherItem = await ExchangeItem.create({
-        item_name: '【测试】另一个商品',
+      // 创建另一个测试商品（使用 Product 模型）
+      const anotherProduct = await Product.create({
+        product_name: '【测试】另一个商品',
         description: '用于测试冲突保护',
+        status: 'active',
+        sort_order: 2
+      })
+      const anotherSku = await ProductSku.create({
+        product_id: anotherProduct.product_id,
+        sku_code: `CONFLICT_TEST_${Date.now()}`,
+        stock: 1000,
+        cost_price: 50,
+        status: 'active',
+        sort_order: 0
+      })
+      await ExchangeChannelPrice.create({
+        sku_id: anotherSku.sku_id,
+        channel: 'exchange',
         cost_asset_code: 'red_shard',
         cost_amount: 100,
-        cost_price: 50,
-        stock: 1000,
-        sort_order: 1,
-        status: 'active',
-        created_at: BeijingTimeHelper.createDatabaseTime(),
-        updated_at: BeijingTimeHelper.createDatabaseTime()
+        is_enabled: true
       })
 
-      // 第二次请求（相同 Idempotency-Key，但不同 exchange_item_id）
+      // 第二次请求（相同 Idempotency-Key，但不同 product_id）
       const response2 = await request(app)
         .post('/api/v4/backpack/exchange')
         .set('Authorization', `Bearer ${testToken}`)
-        .set('Idempotency-Key', idempotencyKey) // 🔄 相同的 Idempotency-Key
+        .set('Idempotency-Key', idempotencyKey)
         .send({
-          exchange_item_id: anotherItem.exchange_item_id, // 🔴 不同的exchange_item_id
+          product_id: anotherProduct.product_id,
           quantity: 1
         })
-        .expect(409) // ✅ 应该返回409冲突
+        .expect(409)
 
       expect(response2.body.success).toBe(false)
       expect(response2.body.message).toContain('幂等')
 
-      console.log('✅ 冲突保护验证通过：不同exchange_item_id返回409')
+      console.log('✅ 冲突保护验证通过：不同product_id返回409')
       console.log(`   - 错误码: ${response2.body.code}`)
       console.log(`   - 错误信息: ${response2.body.message}`)
 
       // 清理测试数据
-      await anotherItem.destroy()
+      await anotherProduct.destroy()
     })
 
     test('同一 Idempotency-Key 但不同 quantity 应返回409', async () => {
@@ -475,7 +502,7 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
         .set('Authorization', `Bearer ${testToken}`)
         .set('Idempotency-Key', idempotencyKey)
         .send({
-          exchange_item_id: testItem.exchange_item_id,
+          product_id: testItem.product_id,
           quantity: 1
         })
         .expect(200)
@@ -490,7 +517,7 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
         .set('Authorization', `Bearer ${testToken}`)
         .set('Idempotency-Key', idempotencyKey) // 🔄 相同的 Idempotency-Key
         .send({
-          exchange_item_id: testItem.exchange_item_id,
+          product_id: testItem.product_id,
           quantity: 2 // 🔴 不同的quantity
         })
         .expect(409) // ✅ 应该返回409冲突
@@ -519,11 +546,12 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
         // 调用Service时传入外部事务
         const result = await ExchangeService.exchangeItem(
           testUser.user_id,
-          testItem.exchange_item_id,
+          testItem.product_id,
           1,
           {
             idempotency_key: idempotencyKey,
-            transaction: externalTransaction // ✅ 传入外部事务
+            sku_id: testItem.sku_id,
+            transaction: externalTransaction
           }
         )
 
@@ -563,8 +591,9 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
 
       try {
         // 调用Service
-        await ExchangeService.exchangeItem(testUser.user_id, testItem.exchange_item_id, 1, {
+        await ExchangeService.exchangeItem(testUser.user_id, testItem.product_id, 1, {
           idempotency_key: idempotencyKey,
+          sku_id: testItem.sku_id,
           transaction: externalTransaction
         })
 
@@ -619,7 +648,7 @@ describe('兑换市场幂等性测试 (Exchange Market Idempotency - V4.5.0 材�
           .set('Authorization', `Bearer ${testToken}`)
           .set('Idempotency-Key', idempotencyKey) // 🔄 相同的 Idempotency-Key
           .send({
-            exchange_item_id: testItem.exchange_item_id,
+            product_id: testItem.product_id,
             quantity: 1
           })
       )

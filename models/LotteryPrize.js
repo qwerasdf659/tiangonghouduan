@@ -49,7 +49,7 @@ class LotteryPrize extends Model {
       })
     }
 
-    // 关联到主媒体文件（2026-03-16 媒体体系，替代 image_resources）
+    // 关联到主媒体文件（2026-03-16 媒体体系）
     if (models.MediaFile) {
       LotteryPrize.belongsTo(models.MediaFile, {
         foreignKey: 'primary_media_id',

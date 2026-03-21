@@ -204,7 +204,7 @@
                     'bg-gray-100 text-gray-600': m.status === 'inactive',
                     'bg-red-100 text-red-600': m.status === 'suspended'
                   }"
-                  x-text="getStatusName(m.status)"></span>
+                  x-text="m.status_display || m.status"></span>
               </td>
               <td class="px-4 py-3 text-xs themed-text-muted" x-text="formatDate(m.created_at)"></td>
               <td class="px-4 py-3">
@@ -366,7 +366,7 @@
                     'bg-gray-100 text-gray-600': detail?.status === 'inactive',
                     'bg-red-100 text-red-600': detail?.status === 'suspended'
                   }"
-                  x-text="getStatusName(detail?.status)"></span>
+                  x-text="detail?.status_display || detail?.status"></span>
               </div>
             </div>
           </div>

@@ -374,13 +374,21 @@ class MarketListingQueryService {
         const categoryIconKey = plain.offerCategory?.iconAttachment?.media?.object_key || null
         const imageKey = categoryIconKey || 'defaults/product-placeholder.png'
 
+        const offerItem = plain.offerItem || {}
+        const instanceAttrs = offerItem.instance_attributes || null
         product.item_info = {
           item_id: plain.offer_item_id,
-          display_name: plain.offer_item_display_name || plain.offerItem?.meta?.name,
+          display_name: plain.offer_item_display_name || offerItem.meta?.name,
           image_url: getImageUrl(imageKey),
           category_code: plain.offerCategory?.category_code ?? null,
           rarity_code: plain.offer_item_rarity,
-          template_id: plain.offer_item_template_id
+          template_id: plain.offer_item_template_id,
+          serial_number: offerItem.serial_number || null,
+          edition_total: offerItem.edition_total || null,
+          quality_score: instanceAttrs?.quality_score ?? null,
+          quality_grade: instanceAttrs?.quality_grade ?? null,
+          pattern_id: instanceAttrs?.pattern_id ?? null,
+          instance_attributes: instanceAttrs
         }
       }
 

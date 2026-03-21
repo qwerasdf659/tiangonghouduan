@@ -21,7 +21,6 @@
  * - 使用 res.apiSuccess / res.apiError 统一响应
  * - 审核操作使用 TransactionManager（涉及账单）
  *
- * @see docs/广告系统升级方案.md
  */
 
 const express = require('express')
@@ -500,8 +499,8 @@ router.get(
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
     try {
-      const SystemConfigService = req.app.locals.services.getService('system_config')
-      const configValue = await SystemConfigService.getValue('popup_queue_max_count', 5)
+      const AdminSystemService = req.app.locals.services.getService('admin_system')
+      const configValue = await AdminSystemService.getConfigValue('popup_queue_max_count', 5)
 
       return res.apiSuccess({
         config_key: 'popup_queue_max_count',
@@ -534,11 +533,10 @@ router.put(
         return res.apiError('弹窗队列最大数量必须为 1~20 的整数', 'INVALID_PARAM', null, 400)
       }
 
-      const SystemConfigService = req.app.locals.services.getService('system_config')
-      await SystemConfigService.upsert('popup_queue_max_count', String(value), {
+      const AdminSystemService = req.app.locals.services.getService('admin_system')
+      await AdminSystemService.upsertConfig('popup_queue_max_count', String(value), {
         description: '弹窗队列最大数量（每次用户打开页面最多弹出的弹窗个数）',
-        config_category: 'ad_system',
-        is_active: true
+        category: 'ad_system'
       })
 
       logger.info('更新弹窗队列配置', {

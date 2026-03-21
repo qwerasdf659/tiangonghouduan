@@ -9,7 +9,6 @@
  * 数据库表名：ad_report_daily_snapshots
  * 主键：snapshot_id（BIGINT，自增）
  *
- * @see docs/广告系统升级方案.md
  */
 
 const { DataTypes } = require('sequelize')

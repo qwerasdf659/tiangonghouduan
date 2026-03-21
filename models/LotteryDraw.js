@@ -183,7 +183,6 @@ module.exports = sequelize => {
        *
        * 格式：lottery_draw_{user_id}_{session_id}_{draw_index}
        *
-       * @see docs/事务边界治理现状核查报告.md 建议9.1
        */
       business_id: {
         type: DataTypes.STRING(150),

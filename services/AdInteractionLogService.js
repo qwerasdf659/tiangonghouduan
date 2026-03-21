@@ -10,7 +10,6 @@
  * - /api/v4/system/ad-events/interaction-log（小程序端 - 统一交互日志上报）
  * - /api/v4/console/ad-campaigns（管理端 - 展示统计查询）
  *
- * @see docs/内容投放系统-重复功能合并方案.md 第十七节 17.3
  */
 
 const logger = require('../utils/logger').logger

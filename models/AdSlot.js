@@ -14,7 +14,6 @@
  * 数据库表名：ad_slots
  * 主键：ad_slot_id（INT，自增）
  *
- * @see docs/广告系统升级方案.md
  */
 
 const { DataTypes } = require('sequelize')

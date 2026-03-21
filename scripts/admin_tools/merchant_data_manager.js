@@ -14,7 +14,6 @@
  *   node scripts/admin_tools/merchant_data_manager.js --import merchant_data.json
  *
  * @since 2026-01-12
- * @see docs/商家员工域权限体系升级方案.md
  */
 
 'use strict'
@@ -672,3 +671,4 @@ module.exports = MerchantDataManager
 if (require.main === module) {
   main()
 }
+

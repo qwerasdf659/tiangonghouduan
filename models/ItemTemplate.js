@@ -79,7 +79,7 @@ class ItemTemplate extends Model {
       })
     }
 
-    // 关联主媒体文件（多对一，2026-03-16 媒体体系，替代 image_resources）
+    // 关联主媒体文件（多对一，2026-03-16 媒体体系）
     if (models.MediaFile) {
       ItemTemplate.belongsTo(models.MediaFile, {
         foreignKey: 'primary_media_id',

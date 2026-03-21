@@ -176,7 +176,6 @@ router.post('/login', async (req, res) => {
    * - 敏感操作时自动续期30分钟
    * - 强制登出/其他设备登录时立即失效会话
    *
-   * @see docs/会话管理功能补齐方案.md
    */
   const sessionToken = uuidv4()
   /**
@@ -472,7 +471,6 @@ router.post('/quick-login', async (req, res) => {
    * quick-login 端点固定识别为 wechat_mp：
    *   该端点仅微信小程序调用，无需通过 UA 检测
    *
-   * @see docs/multi-platform-session-design.md
    */
   const sessionToken = uuidv4()
   /**

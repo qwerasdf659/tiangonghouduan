@@ -163,8 +163,6 @@ module.exports = sequelize => {
       as: 'roles'
     })
 
-    // 用户上传的媒体资源通过 media_attachments 多态关联（image_resources 表已删除）
-
     /**
      * 用户资产系统关联
      *
@@ -197,52 +195,11 @@ module.exports = sequelize => {
       })
     }
 
-    // 🔥 用户的奖品分发记录
-    if (models.PrizeDistribution) {
-      User.hasMany(models.PrizeDistribution, {
-        foreignKey: 'user_id',
-        as: 'prizeDistributions',
-        comment: '用户奖品分发记录'
-      })
-    }
-
-    // 用户的行为分析
-    if (models.AnalyticsBehavior) {
-      User.hasMany(models.AnalyticsBehavior, {
-        foreignKey: 'user_id',
-        as: 'behaviors'
-      })
-    }
-
-    // 用户画像
-    if (models.AnalyticsUserProfile) {
-      User.hasOne(models.AnalyticsUserProfile, {
-        foreignKey: 'user_id',
-        as: 'profile'
-      })
-    }
-
     // 用户会话
     if (models.AuthenticationSession) {
       User.hasMany(models.AuthenticationSession, {
         foreignKey: 'user_id',
         as: 'sessions'
-      })
-    }
-
-    // 社交抽奖参与记录
-    if (models.SocialLotteryMember) {
-      User.hasMany(models.SocialLotteryMember, {
-        foreignKey: 'user_id',
-        as: 'socialLotteryMembers'
-      })
-    }
-
-    // VIP等级关联
-    if (models.VipLevel) {
-      User.belongsTo(models.VipLevel, {
-        foreignKey: 'vip_level_id',
-        as: 'vipLevel'
       })
     }
   }

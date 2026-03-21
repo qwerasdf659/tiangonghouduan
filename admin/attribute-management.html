@@ -39,6 +39,14 @@
           </select>
         </div>
         <div>
+          <label class="block text-xs font-medium text-gray-500 mb-1">可搜索</label>
+          <select x-model="attrFilters.is_searchable" @change="onAttrFilterChange()" class="px-3 py-2 border rounded-lg text-sm min-w-[140px]">
+            <option value="">全部</option>
+            <option value="true">是</option>
+            <option value="false">否</option>
+          </select>
+        </div>
+        <div>
           <label class="block text-xs font-medium text-gray-500 mb-1">启用状态</label>
           <select x-model="attrFilters.is_enabled" @change="onAttrFilterChange()" class="px-3 py-2 border rounded-lg text-sm min-w-[140px]">
             <option value="">全部</option>

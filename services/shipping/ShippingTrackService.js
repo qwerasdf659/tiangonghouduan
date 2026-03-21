@@ -6,7 +6,6 @@
  * - 快递100故障/超时自动降级到快递鸟
  * - Redis 缓存物流轨迹（已签收24h，其他10min）
  *
- * @see docs/管理后台功能差距分析与优化方案.md 8.6
  * @module services/shipping/ShippingTrackService
  * @version 1.0.0
  */

@@ -27,7 +27,6 @@
  *
  * @see services/AssetConversionService.js - 被测服务
  * @see models/MaterialConversionRule.js - 转换规则模型
- * @see docs/测试体系完善空间分析报告.md - P0-3系列任务定义
  */
 
 'use strict'

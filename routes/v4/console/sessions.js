@@ -21,7 +21,6 @@
  * - 读操作通过 SessionQueryService 执行（Phase 3 收口）
  * - 写操作通过 SessionManagementService 执行
  *
- * @see docs/会话管理功能补齐方案.md
  * @since 2026-01-21
  * @updated 2026-02-02（Phase 3 读写分层收口）
  */

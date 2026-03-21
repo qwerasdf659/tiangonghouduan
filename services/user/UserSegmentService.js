@@ -434,36 +434,21 @@ class UserSegmentService {
       const exchangeItemIds = exchangeStats.map(s => s.exchange_item_id)
       const itemDetails = {}
 
-      if (exchangeItemIds.length > 0 && models.ExchangeItem) {
-        const items = await models.ExchangeItem.findAll({
-          where: { exchange_item_id: { [Op.in]: exchangeItemIds } },
-          attributes: ['exchange_item_id', 'item_name', 'cost_asset_code', 'cost_amount'],
+      if (exchangeItemIds.length > 0 && models.Product) {
+        const items = await models.Product.findAll({
+          where: { product_id: { [Op.in]: exchangeItemIds } },
+          attributes: ['product_id', 'product_name', 'min_cost_amount'],
           raw: true
         })
 
         items.forEach(item => {
-          itemDetails[item.exchange_item_id] = item
+          itemDetails[item.product_id] = {
+            ...item,
+            exchange_item_id: item.product_id,
+            item_name: item.product_name,
+            cost_amount: item.min_cost_amount
+          }
         })
-      }
-
-      // 迁移路径：补充 Product 统一商品名称（兜底）
-      if (models.Product) {
-        const missingIds = exchangeItemIds.filter(id => !itemDetails[id])
-        if (missingIds.length > 0) {
-          const products = await models.Product.findAll({
-            where: { legacy_exchange_item_id: { [Op.in]: missingIds } },
-            attributes: ['product_id', 'name', 'legacy_exchange_item_id'],
-            raw: true
-          })
-          products.forEach(p => {
-            if (p.legacy_exchange_item_id && !itemDetails[p.legacy_exchange_item_id]) {
-              itemDetails[p.legacy_exchange_item_id] = {
-                exchange_item_id: p.legacy_exchange_item_id,
-                item_name: p.name
-              }
-            }
-          })
-        }
       }
 
       // 构建偏好列表

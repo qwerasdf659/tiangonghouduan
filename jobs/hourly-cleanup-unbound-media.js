@@ -46,7 +46,7 @@ class HourlyCleanupUnboundMedia {
 
     try {
       const MediaService = require('../services/MediaService')
-      const SealosStorageService = require('../services/sealosStorage')
+      const SealosStorageService = require('../services/SealosStorageService')
       const mediaService = new MediaService({
         getService: name => {
           if (name === 'sealos_storage') return SealosStorageService

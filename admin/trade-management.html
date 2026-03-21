@@ -749,6 +749,7 @@
                 <th class="px-2 py-2 font-medium text-center">品质分</th>
                 <th class="px-2 py-2 font-medium text-center">品质等级</th>
                 <th class="px-2 py-2 font-medium text-center">编号/限量</th>
+                <th class="px-2 py-2 font-medium text-center">纹理</th>
                 <th class="px-2 py-2 font-medium">售价</th>
                 <th class="px-2 py-2 font-medium">状态</th>
                 <th class="px-2 py-2 font-medium text-right">操作</th>
@@ -777,6 +778,7 @@
                   <td class="px-2 py-2 text-center font-mono" x-text="listing.quality_score != null ? listing.quality_score : '-'"></td>
                   <td class="px-2 py-2 text-center" x-text="listing.quality_grade || '-'"></td>
                   <td class="px-2 py-2 text-center font-mono text-xs" x-text="formatListingSerial(listing)"></td>
+                  <td class="px-2 py-2 text-center font-mono text-xs" x-text="listing.pattern_id != null ? '#' + listing.pattern_id : '-'"></td>
                   <td class="px-2 py-2">
                     <span class="font-bold text-green-600" x-text="listing.price_amount"></span>
                     <span class="text-xs" x-text="listing.price_asset_code"></span>

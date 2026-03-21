@@ -11,7 +11,6 @@
  * 主键：notification_id（BIGINT，应对长期数据增长，交易通知永久保留）
  * 创建时间：2026年02月24日
  *
- * @see docs/通知系统独立化-方案B实施文档.md
  */
 
 'use strict'

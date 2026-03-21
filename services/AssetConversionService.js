@@ -92,7 +92,6 @@ const BalanceService = require('./asset/BalanceService')
 const QueryService = require('./asset/QueryService')
 // 🔴 从 models/index.js 获取已初始化的 Sequelize Model（避免直接 require 模型定义文件导致未初始化）
 const { MaterialConversionRule } = require('../models')
-// const MaterialAssetType = require('../models/MaterialAssetType') // P1-3: 材料类型配置（预留未来使用）
 const logger = require('../utils/logger')
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 

@@ -107,13 +107,11 @@ router.post('/compensate', requireRoleLevel(100), async (req, res) => {
  */
 router.get('/templates', async (req, res) => {
   try {
-    /** 通过 ServiceManager 获取 SystemConfigService（不直连 models.SystemConfig） */
-    const SystemConfigService = req.app.locals.services.getService('system_config')
+    const AdminSystemService = req.app.locals.services.getService('admin_system')
 
-    /* 从 system_configs 表读取消息模板（config_key = 'cs_reply_templates'） */
     let templates = []
     try {
-      const configValue = await SystemConfigService.getValue('cs_reply_templates')
+      const configValue = await AdminSystemService.getConfigValue('cs_reply_templates')
       if (configValue) {
         templates = typeof configValue === 'string' ? JSON.parse(configValue) : configValue
       }
@@ -190,16 +188,12 @@ router.put('/templates', requireRoleLevel(100), async (req, res) => {
       return res.apiError('模板数据格式错误', 'BAD_REQUEST', null, 400)
     }
 
-    const models = req.app.locals.models
+    const AdminSystemService = req.app.locals.services.getService('admin_system')
 
-    if (models.SystemConfig) {
-      await models.SystemConfig.upsert({
-        config_key: 'cs_reply_templates',
-        config_value: JSON.stringify(templates),
-        config_type: 'json',
-        description: '客服消息回复模板库'
-      })
-    }
+    await AdminSystemService.upsertConfig('cs_reply_templates', templates, {
+      description: '客服消息回复模板库',
+      category: 'general'
+    })
 
     return res.apiSuccess(templates, '消息模板更新成功')
   } catch (error) {

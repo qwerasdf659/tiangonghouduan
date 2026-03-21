@@ -24,7 +24,7 @@
 'use strict'
 
 const { Op, fn, col } = require('sequelize')
-const { LotteryAlert, LotteryCampaign, LotteryDraw, LotteryPrize, User } = require('../models')
+const { LotteryAlert, LotteryCampaign, LotteryDraw, LotteryPrize, User, AlertSilenceRule } = require('../models')
 const logger = require('../utils/logger').logger
 const BeijingTimeHelper = require('../utils/timeHelper')
 const { attachDisplayNames, DICT_TYPES } = require('../utils/displayNameHelper')
@@ -333,6 +333,15 @@ class LotteryAlertService {
           existing_alert_id: existingAlert.lottery_alert_id
         })
         return existingAlert
+      }
+
+      // 静默规则检查
+      const isSilenced = await AlertSilenceRule.isAlertSilenced(alert_type, severity)
+      if (isSilenced) {
+        logger.info('告警被静默规则抑制', {
+          lottery_campaign_id, alert_type, severity, rule_code
+        })
+        return null
       }
 
       // 创建新告警

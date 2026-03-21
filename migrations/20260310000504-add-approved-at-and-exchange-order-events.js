@@ -6,7 +6,6 @@
  * 1. exchange_records 表新增 approved_at 列（审核通过时间）
  * 2. 新建 exchange_order_events 表（订单状态变更事件记录）
  *
- * @see docs/兑换订单接口-后端对接需求.md - 决策1
  */
 module.exports = {
   async up(queryInterface, Sequelize) {
@@ -190,3 +189,4 @@ module.exports = {
     }
   }
 }
+

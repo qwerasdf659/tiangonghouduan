@@ -10,7 +10,6 @@
  *
  * 优先级：个人覆盖 > 全局默认（system_settings）
  *
- * @see docs/钻石配额配置修复与优化方案.md §11
  */
 
 /** @type {import('sequelize-cli').Migration} */
@@ -104,3 +103,4 @@ module.exports = {
     await queryInterface.dropTable('user_ratio_overrides')
   }
 }
+

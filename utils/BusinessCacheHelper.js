@@ -19,7 +19,6 @@
  * - Redis Key 强制命名空间隔离（决策5：多环境/多实例安全）
  * - 手机号 PII 治理（决策6B/24：HMAC-SHA256 hash，禁止明文）
  *
- * @see docs/Redis缓存策略现状核查报告.md
  *
  * 创建时间：2026年01月03日
  * 更新时间：2026年01月05日（决策5/6B/20-25实施）
@@ -506,7 +505,6 @@ class BusinessCacheHelper {
    * @returns {string} 缓存 key
    * @example 返回: 'app:v4:dev:api:lottery:pricing:1'
    *
-   * @see docs/技术债务-getDrawPricing定价逻辑迁移方案.md - 问题3决策
    */
   static buildLotteryPricingKey(lottery_campaign_id) {
     return `${KEY_PREFIX}${CACHE_PREFIX.LOTTERY}:pricing:${lottery_campaign_id}`

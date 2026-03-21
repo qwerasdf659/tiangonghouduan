@@ -15,7 +15,6 @@
  * - 使用 res.apiSuccess / res.apiError 统一响应
  * - 用户只能操作自己的广告活动
  *
- * @see docs/广告系统升级方案.md
  */
 
 const express = require('express')

@@ -14,7 +14,7 @@
 
 const logger = require('../utils/logger').logger
 const { AdDauDailyStat, sequelize } = require('../models')
-const SystemConfigService = require('../services/SystemConfigService')
+const AdminSystemService = require('../services/AdminSystemService')
 
 /**
  * 检查 DAU 是否连续 N 天处于同一个新区间
@@ -22,7 +22,7 @@ const SystemConfigService = require('../services/SystemConfigService')
  * @returns {Promise<Object>} 检查结果
  */
 async function checkPriceAdjustment() {
-  const triggerConfig = await SystemConfigService.getValue('ad_price_adjustment_trigger', {
+  const triggerConfig = await AdminSystemService.getConfigValue('ad_price_adjustment_trigger', {
     enabled: false
   })
 
@@ -46,7 +46,7 @@ async function checkPriceAdjustment() {
     return { triggered: false, reason: 'insufficient_data' }
   }
 
-  const tiers = await SystemConfigService.getValue('ad_dau_coefficient_tiers', [])
+  const tiers = await AdminSystemService.getConfigValue('ad_dau_coefficient_tiers', [])
   if (!tiers.length) {
     return { triggered: false, reason: 'no_tiers_configured' }
   }

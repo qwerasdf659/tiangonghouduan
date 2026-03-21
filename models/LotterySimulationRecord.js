@@ -14,7 +14,6 @@
  * 状态流转：draft → applied / archived
  *
  * @module models/LotterySimulationRecord
- * @see docs/策略效果模拟分析页面-设计方案.md Section 八
  * @since 2026-02-20
  */
 

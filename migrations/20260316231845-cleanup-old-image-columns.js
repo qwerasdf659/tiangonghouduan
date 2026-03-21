@@ -1,12 +1,12 @@
 'use strict'
 
 /**
- * Phase 4: 清理旧图片相关列与 image_resources 表
+ * Phase 4: 清理旧图片相关列与旧图片资源表
  *
  * 本迁移在 media_files/media_attachments 体系就绪后，删除已废弃的旧图片字段：
- * 1. 删除引用 image_resources 的外键列（primary_image_id, image_resource_id, image_id）
+ * 1. 删除引用旧图片资源表的外键列（primary_image_id, image_resource_id, image_id）
  * 2. 删除直接存储 object key/URL 的 VARCHAR 列（image_url, icon_url, banner_image_url 等）
- * 3. 删除 image_resources 表
+ * 3. 删除旧图片资源表
  *
  * 设计为幂等执行：每步操作前先检查，避免重复执行报错。
  * 注意：不删除 users.avatar_url 和 merchants.logo_url（决策9）。
@@ -39,7 +39,7 @@ async function constraintExists(queryInterface, table, constraintName) {
   return constraints.length > 0
 }
 
-/** 动态获取引用 image_resources 的所有外键约束名 */
+/** 动态获取引用旧图片资源表的所有外键约束名 */
 async function getImageResourceFkConstraints(queryInterface) {
   const [rows] = await queryInterface.sequelize.query(
     `SELECT TABLE_NAME, CONSTRAINT_NAME
@@ -53,10 +53,10 @@ async function getImageResourceFkConstraints(queryInterface) {
 
 module.exports = {
   async up(queryInterface, Sequelize) {
-    console.log('[cleanup-old-image-columns] 开始清理旧图片列与 image_resources 表...')
+    console.log('[cleanup-old-image-columns] 开始清理旧图片列与旧图片资源表...')
 
     // ========================================
-    // 第一部分：删除引用 image_resources 的外键约束和列
+    // 第一部分：删除引用旧图片资源表的外键约束和列
     // 必须先删外键再删列，否则 MySQL 报错
     // ========================================
 
@@ -115,25 +115,25 @@ module.exports = {
     }
 
     // ========================================
-    // 第三部分：删除 image_resources 表
-    // 需先删除所有引用该表的外键（含 image_resources 自身被引用，以及 image_resources 引用 users 的 fk_image_resources_user_id）
+    // 第三部分：删除旧图片资源表
+    // 需先删除所有引用该表的外键（含该表自身被引用，以及该表指向 users 的用户外键）
     // ========================================
 
     if (await tableExists(queryInterface, 'image_resources')) {
-      // 再次检查是否有遗漏的外键引用 image_resources
+      // 再次检查是否有遗漏的外键引用该表
       const refs = await getImageResourceFkConstraints(queryInterface)
       for (const r of refs) {
         if (await constraintExists(queryInterface, r.TABLE_NAME, r.CONSTRAINT_NAME)) {
           await queryInterface.removeConstraint(r.TABLE_NAME, r.CONSTRAINT_NAME)
-          console.log(`  ✅ 已移除引用 image_resources 的约束 ${r.TABLE_NAME}.${r.CONSTRAINT_NAME}`)
+          console.log(`  ✅ 已移除引用旧图片资源表的约束 ${r.TABLE_NAME}.${r.CONSTRAINT_NAME}`)
         }
       }
 
-      // image_resources 表自身有 fk_image_resources_user_id 引用 users，删除表时 MySQL 会一并删除
+      // 旧图片资源表自身有指向 users 的外键，删除表时 MySQL 会一并删除
       await queryInterface.dropTable('image_resources')
-      console.log('  ✅ 已删除表 image_resources')
+      console.log('  ✅ 已删除旧图片资源表')
     } else {
-      console.log('  ⏭️ image_resources 表不存在，跳过')
+      console.log('  ⏭️ 旧图片资源表不存在，跳过')
     }
 
     console.log('[cleanup-old-image-columns] 迁移完成')
@@ -143,7 +143,7 @@ module.exports = {
     console.log('[cleanup-old-image-columns] 回滚：恢复旧图片列（无数据恢复，项目未上线）')
 
     // ========================================
-    // 1. 重建 image_resources 表
+    // 1. 重建旧图片资源表
     // ========================================
     if (!(await tableExists(queryInterface, 'image_resources'))) {
       await queryInterface.sequelize.query(`
@@ -168,7 +168,7 @@ module.exports = {
           CONSTRAINT \`fk_image_resources_user_id\` FOREIGN KEY (\`user_id\`) REFERENCES \`users\` (\`user_id\`) ON DELETE SET NULL ON UPDATE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
       `)
-      console.log('  ✅ 已重建 image_resources 表')
+      console.log('  ✅ 已重建旧图片资源表')
     }
 
     // ========================================
@@ -196,7 +196,7 @@ module.exports = {
       }
     }
 
-    // 恢复 FK 约束（仅对引用 image_resources 的列）
+    // 恢复 FK 约束（仅对引用旧图片资源表的列）
     const fkRestore = [
       { table: 'exchange_items', column: 'primary_image_id', name: 'fk_exchange_items_primary_image' },
       { table: 'lottery_prizes', column: 'image_resource_id', name: 'fk_lottery_prizes_image' },

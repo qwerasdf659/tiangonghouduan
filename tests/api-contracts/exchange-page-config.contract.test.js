@@ -7,7 +7,6 @@
  * - PUT /api/v4/console/system/exchange-page-config（管理后台更新）
  *
  * @date 2026-02-19
- * @see docs/exchange-config-implementation.md
  */
 
 const request = require('supertest')

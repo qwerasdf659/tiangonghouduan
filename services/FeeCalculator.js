@@ -129,8 +129,8 @@ class FeeCalculator {
    *
    * @example
    * const orderItems = [
-   *   { inventory_id: 1, item_value: 200, selling_price: 250 },
-   *   { inventory_id: 2, item_value: 500, selling_price: 480 }
+   *   { item_id: 1, item_value: 200, selling_price: 250 },
+   *   { item_id: 2, item_value: 500, selling_price: 480 }
    * ];
    * const result = FeeCalculator.calculateOrderFee(orderItems);
    * // 返回：{ total_fee: 32, total_selling_price: 730, total_net_amount: 698, breakdown: [...] }
@@ -146,7 +146,7 @@ class FeeCalculator {
       const feeInfo = this.calculateItemFee(item.item_value, item.selling_price)
 
       breakdown.push({
-        inventory_id: item.inventory_id, // 库存物品ID
+        item_id: item.item_id, // 物品实例/物品ID
         item_value: item.item_value, // 商品价值（用于分档）
         selling_price: item.selling_price, // 用户定价
         fee: feeInfo.fee, // 手续费
@@ -246,7 +246,6 @@ class FeeCalculator {
    *
    * @throws {Error} 不支持的结算币种（未在白名单且未配置费率）
    *
-   * @see docs/交易市场多币种扩展功能-待办清单-2026-01-14.md
    */
   static async calculateFeeByAsset(asset_code, itemValue, sellingPrice) {
     /*

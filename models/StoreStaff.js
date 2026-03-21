@@ -10,7 +10,6 @@
  * 主键：store_staff_id（BIGINT，自增）
  *
  * @since 2026-01-12
- * @see docs/商家员工域权限体系升级方案.md
  */
 
 'use strict'

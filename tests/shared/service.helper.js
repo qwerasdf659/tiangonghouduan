@@ -425,29 +425,6 @@ class ServiceTestSuite {
   }
 
   /**
-   * 测试单个资产子服务（向后兼容旧调用方式）
-   *
-   * @deprecated 使用 testAssetSubServices 替代
-   * @param {Object} AssetService - 实际传入的是 BalanceService
-   * @returns {Promise<Object>} 测试结果
-   */
-  static async testAssetService(AssetService) {
-    console.log('💰 测试 BalanceService（兼容旧 testAssetService 调用）...')
-
-    // V4.7.0: AssetService 已拆分，这里实际测试的是 BalanceService
-    const requiredMethods = ['getBalance', 'getAllBalances', 'changeBalance', 'freeze', 'unfreeze']
-
-    await ServiceTestSuite.testServiceHealth(AssetService, requiredMethods)
-
-    console.log('✅ BalanceService 验证通过')
-
-    return {
-      success: true,
-      requiredMethods
-    }
-  }
-
-  /**
    * 测试ServiceManager（项目特定）
    *
    * 验证内容：

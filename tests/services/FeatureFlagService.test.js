@@ -12,7 +12,6 @@
  * 使用模型：Claude Sonnet 4.5
  *
  * @module tests/services/FeatureFlagService.test
- * @see docs/Feature-Flag灰度发布功能实施方案.md
  */
 
 'use strict'

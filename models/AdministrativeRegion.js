@@ -20,7 +20,6 @@
  * - 支持拼音搜索（pinyin 字段）
  *
  * @since 2026-01-12
- * @see docs/省市区级联选择功能设计方案.md
  */
 
 'use strict'

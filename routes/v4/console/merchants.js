@@ -24,7 +24,6 @@
  * - DELETE /:id             - 删除商家（硬删除，需无关联数据）
  *
  * @since 2026-02-23
- * @see docs/三项核心需求-实施方案.md 第四节
  */
 
 'use strict'

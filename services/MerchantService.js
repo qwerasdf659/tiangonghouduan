@@ -16,7 +16,6 @@
  * - 北京时间统一处理
  *
  * @since 2026-02-23
- * @see docs/三项核心需求-实施方案.md 第四节
  */
 
 'use strict'
@@ -24,7 +23,7 @@
 const { Op } = require('sequelize')
 const { Merchant, Store, SystemDictionary } = require('../models')
 const logger = require('../utils/logger').logger
-const { attachDisplayNames } = require('../utils/displayNameHelper')
+const { attachDisplayNames, DICT_TYPES } = require('../utils/displayNameHelper')
 
 /**
  * 商家管理服务类
@@ -167,8 +166,10 @@ class MerchantService {
     const result = merchant.toJSON()
     result.store_count = result.stores ? result.stores.length : 0
 
-    // 附加字典显示名
-    await attachDisplayNames([result], { merchant_type: 'merchant_type' })
+    await attachDisplayNames([result], [
+      { field: 'merchant_type', dictType: DICT_TYPES.MERCHANT_TYPE },
+      { field: 'status', dictType: DICT_TYPES.MERCHANT_STATUS }
+    ])
 
     return result
   }
@@ -239,7 +240,10 @@ class MerchantService {
       return item
     })
 
-    await attachDisplayNames(list, { merchant_type: 'merchant_type' })
+    await attachDisplayNames(list, [
+      { field: 'merchant_type', dictType: DICT_TYPES.MERCHANT_TYPE },
+      { field: 'status', dictType: DICT_TYPES.MERCHANT_STATUS }
+    ])
 
     return { list, total: count, page, page_size: pageSize }
   }

@@ -21,7 +21,6 @@
  * 版本：1.0.0
  *
  * @see services/IdempotencyService.js - 被测服务
- * @see docs/测试体系问题分析与改进方案.md - P1-5.1 任务定义
  */
 
 'use strict'

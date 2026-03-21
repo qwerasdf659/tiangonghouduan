@@ -17,7 +17,6 @@
  * - 测试数据：幂等性测试创建，已设为 inactive 但未硬删除
  *
  * @see routes/v4/system/config.js - 第 360-366 行 detail_page 兜底逻辑
- * @see docs/兑换详情页B+C混合方案设计文档.md - 决策4 配置结构
  */
 module.exports = {
   async up(queryInterface) {
@@ -63,7 +62,6 @@ module.exports = {
     }
 
     // ========== 第二步：硬删除孤儿图片资源（已迁移至 media_files 体系，安全跳过） ==========
-    // 注：image_resources 表已被 20260316231845 迁移删除，此步骤仅在表存在时执行
     console.log('[迁移] 步骤2: 检查孤儿图片资源清理...')
 
     const [tableCheck] = await queryInterface.sequelize.query(
@@ -89,7 +87,7 @@ module.exports = {
         console.log('[迁移] image_resource_id=78 不是孤儿或已不存在，跳过')
       }
     } else {
-      console.log('[迁移] image_resources 表已不存在（已迁移至 media_files），跳过孤儿清理')
+      console.log('[迁移] 旧图片资源表已不存在（已迁移至 media_files），跳过孤儿清理')
     }
 
     // ========== 第三步：硬删除测试商品关联的 exchange_order_events 和 exchange_records ==========
@@ -206,7 +204,6 @@ module.exports = {
     )
     console.log(`  exchange_page.detail_page 存在: ${verifyConfig[0]?.has_detail_page === 1 ? '是' : '否'}`)
 
-    // 验证孤儿图片已删除（仅在 image_resources 表存在时验证）
     const [tableCheck2] = await queryInterface.sequelize.query(
       `SELECT COUNT(*) as cnt FROM information_schema.tables
        WHERE table_schema = DATABASE() AND table_name = 'image_resources'`
@@ -217,7 +214,7 @@ module.exports = {
       )
       console.log(`  孤儿图片 78 已删除: ${parseInt(verifyOrphan[0].count) === 0 ? '是' : '否'}`)
     } else {
-      console.log('  孤儿图片验证: image_resources 表已不存在（已迁移至 media_files）')
+      console.log('  孤儿图片验证: 旧图片资源表已不存在（已迁移至 media_files）')
     }
 
     // 验证测试商品已删除
@@ -258,3 +255,4 @@ module.exports = {
     console.log('  - 孤儿图片资源和测试数据为无效数据，不可恢复也无需恢复')
   }
 }
+

@@ -114,20 +114,18 @@
     "ioredis": "^5.7.0",
     "joi": "^17.11.0",
     "jsonwebtoken": "^9.0.2",
-    "kuaidi100-api": "^1.0.1",
-    "lodash": "^4.17.21",
     "multer": "^1.4.5-lts.1",
     "mysql2": "^3.6.5",
     "node-cron": "^3.0.3",
-    "qrcode": "^1.5.4",
     "sequelize": "^6.35.2",
     "sharp": "^0.34.5",
     "socket.io": "^4.8.1",
     "uuid": "^9.0.1",
-    "winston": "^3.11.0",
-    "xlsx": "^0.18.5"
+    "winston": "^3.11.0"
   },
   "devDependencies": {
+    "@commitlint/cli": "^20.5.0",
+    "@commitlint/config-conventional": "^20.5.0",
     "ajv-formats": "^3.0.1",
     "eslint": "^8.55.0",
     "eslint-config-standard": "^17.1.0",

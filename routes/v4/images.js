@@ -21,7 +21,7 @@
 
 const express = require('express')
 const router = express.Router()
-const SealosStorageService = require('../../services/sealosStorage')
+const SealosStorageService = require('../../services/SealosStorageService')
 const logger = require('../../utils/logger').logger
 
 /** 允许代理的图片文件扩展名 */

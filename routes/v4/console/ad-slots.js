@@ -14,7 +14,6 @@
  * - 使用 res.apiSuccess / res.apiError 统一响应
  * - 写操作字段白名单过滤，防止字段注入
  *
- * @see docs/广告系统升级方案.md Phase 3
  */
 
 const express = require('express')

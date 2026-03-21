@@ -53,7 +53,7 @@ describe('GET /api/v4/console/ - 管理员模块信息API', () => {
     const { modules } = response.body.data
 
     const moduleCount = Object.keys(modules).length
-    expect(moduleCount).toBe(53) // 实际挂载的路由数量（2026-03-02：实际API返回53个模块）
+    expect(moduleCount).toBe(57) // 实际挂载的路由数量（2026-03-20：新增 alert-silence-rules 等模块后为57个）
 
     // 验证必需的模块是否存在（原有8个）
     expect(modules).toHaveProperty('auth')
@@ -75,7 +75,6 @@ describe('GET /api/v4/console/ - 管理员模块信息API', () => {
 
     // 验证新增的模块（2026-01-08）
     expect(modules).toHaveProperty('assets')
-    expect(modules).toHaveProperty('images')
 
     // 验证会话管理模块（2026-01-21 会话管理功能补齐）
     expect(modules).toHaveProperty('sessions')

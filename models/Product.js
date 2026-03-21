@@ -252,6 +252,30 @@ module.exports = sequelize => {
         allowNull: true,
         comment: '视频地址'
       },
+      stock: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
+        comment: 'SPU 汇总库存（= SUM(product_skus.stock)）'
+      },
+      sold_count: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
+        comment: 'SPU 汇总已售（= SUM(product_skus.sold_count)）'
+      },
+      min_cost_amount: {
+        type: DataTypes.BIGINT,
+        allowNull: true,
+        defaultValue: null,
+        comment: 'SPU 最低兑换价（= MIN(exchange_channel_prices.cost_amount)）'
+      },
+      max_cost_amount: {
+        type: DataTypes.BIGINT,
+        allowNull: true,
+        defaultValue: null,
+        comment: 'SPU 最高兑换价（= MAX(exchange_channel_prices.cost_amount)）'
+      },
       stock_alert_threshold: {
         type: DataTypes.INTEGER,
         allowNull: false,

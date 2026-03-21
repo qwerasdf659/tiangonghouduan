@@ -15,7 +15,6 @@
  * - 复用 Service 层的 getCampaignROI 方法计算 ROI 和复购率
  * - ROI/复购率使用 Redis 缓存（5分钟 TTL，ADR-003）
  *
- * @see docs/后端API开发需求文档-抽奖运营后台.md P1 活动列表 API
  * @see ADR-001 活动列表接口位置
  * @see ADR-003 ROI/复购率缓存策略
  */
@@ -238,7 +237,6 @@ async function calculateStockWarning(analyticsService, campaignId) {
  * - ROI/复购率使用 Redis 缓存，TTL 5 分钟
  * - Redis 不可用时降级到 Service 层实时计算
  *
- * @see docs/后端API开发需求文档-抽奖运营后台.md P1 现有 API 调整
  */
 router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {

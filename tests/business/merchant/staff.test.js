@@ -12,7 +12,6 @@
  * 数据库：restaurant_points_dev (统一数据库)
  *
  * @since 2026-01-12
- * @see docs/商家员工域权限体系升级方案.md
  */
 
 'use strict'

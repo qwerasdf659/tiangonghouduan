@@ -17,7 +17,6 @@
  *
  * @see services/IdempotencyService.js - 被测服务
  * @see models/ApiIdempotencyRequest.js - 幂等请求模型
- * @see docs/测试体系完善空间分析报告.md - P0-2系列任务定义
  */
 
 'use strict'

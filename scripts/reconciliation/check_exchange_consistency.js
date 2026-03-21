@@ -11,7 +11,6 @@
  * - 定时执行：每小时第5分钟（建议配合 cron 或 node-schedule）
  *
  * @since 2026-01-05
- * @see docs/事务边界治理现状核查报告.md
  */
 
 'use strict'
@@ -327,3 +326,4 @@ if (require.main === module) {
 }
 
 module.exports = { check_exchange_consistency }
+

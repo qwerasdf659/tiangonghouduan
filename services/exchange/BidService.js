@@ -53,12 +53,11 @@ class BidService {
     this.models = models
     this.BidProduct = models.BidProduct
     this.BidRecord = models.BidRecord
-    this.ExchangeItem = models.ExchangeItem
     this.ExchangeRecord = models.ExchangeRecord
     this.Item = models.Item
     this.MaterialAssetType = models.MaterialAssetType
-    // 迁移路径：ExchangeItem → Product（统一商品模型）
     this.Product = models.Product
+    this.ProductSku = models.ProductSku
     this.sequelize = models.sequelize
   }
 
@@ -349,14 +348,15 @@ class BidService {
 
     logger.info('[竞价结算] 开始结算', { bid_product_id: bidProductId })
 
-    // 锁定竞价商品记录
+    // 锁定竞价商品记录（Product 替代已废弃的 ExchangeItem）
     const bidProduct = await this.BidProduct.findByPk(bidProductId, {
       lock: transaction.LOCK.UPDATE,
       transaction,
       include: [
         {
-          model: this.ExchangeItem,
-          as: 'exchangeItem'
+          model: this.Product,
+          as: 'exchangeItem',
+          include: [{ model: this.ProductSku, as: 'skus' }]
         }
       ]
     })
@@ -411,14 +411,16 @@ class BidService {
       { transaction }
     )
 
-    // c. 创建 ExchangeRecord（决策10：source = 'bid'）
+    // c. 创建 ExchangeRecord（决策10：source = 'bid'，使用统一商品中心字段）
+    const defaultSku = exchangeItem.skus?.[0] || null
     const orderNo = `BID${Date.now()}${Math.floor(Math.random() * 10000)
       .toString()
       .padStart(4, '0')}`
     await this.ExchangeRecord.create(
       {
         user_id: winnerId,
-        exchange_item_id: exchangeItem.exchange_item_id,
+        product_id: exchangeItem.product_id,
+        sku_id: defaultSku?.sku_id || null,
         pay_asset_code: assetCode,
         pay_amount: winningAmount,
         order_no: orderNo,
@@ -427,10 +429,10 @@ class BidService {
         source: 'bid',
         status: 'completed',
         item_snapshot: {
-          item_name: exchangeItem.item_name,
+          item_name: exchangeItem.product_name,
           description: exchangeItem.description,
-          cost_asset_code: exchangeItem.cost_asset_code,
-          cost_amount: Number(exchangeItem.cost_amount)
+          bid_asset_code: assetCode,
+          bid_winning_amount: winningAmount
         },
         exchange_time: new Date()
       },
@@ -445,18 +447,17 @@ class BidService {
         item_type: 'product',
         source: 'bid_settlement',
         source_ref_id: String(bidProductId),
-        item_name: exchangeItem.item_name,
+        item_name: exchangeItem.product_name,
         item_description: exchangeItem.description || '',
-        item_value: Number(exchangeItem.cost_amount) || 0,
+        item_value: winningAmount || 0,
+        item_template_id: exchangeItem.item_template_id || null,
         business_type: 'bid_settlement_mint',
         idempotency_key: `bid_settle_item_${bidProductId}`,
         meta: {
           bid_product_id: bidProductId,
-          exchange_item_id: exchangeItem.exchange_item_id,
+          product_id: exchangeItem.product_id,
           primary_media_id: exchangeItem.primary_media_id,
-          category_def_id: exchangeItem.category_def_id,
-          original_cost_asset_code: exchangeItem.cost_asset_code,
-          original_cost_amount: Number(exchangeItem.cost_amount),
+          category_id: exchangeItem.category_id,
           bid_winning_amount: winningAmount,
           bid_asset_code: assetCode
         }
@@ -464,23 +465,24 @@ class BidService {
       { transaction }
     )
 
-    // e. 扣减库存（决策13：乐观锁防超卖）
-    const [affectedRows] = await this.ExchangeItem.update(
-      {
-        stock: literal('stock - 1'),
-        sold_count: literal('sold_count + 1')
-      },
-      {
-        where: {
-          exchange_item_id: exchangeItem.exchange_item_id,
-          stock: { [Op.gt]: 0 }
+    // e. 扣减库存（统一商品中心：库存在 product_skus 表）
+    if (defaultSku) {
+      const [affectedRows] = await this.ProductSku.update(
+        {
+          stock: literal('stock - 1'),
+          sold_count: literal('sold_count + 1')
         },
-        transaction
+        {
+          where: {
+            sku_id: defaultSku.sku_id,
+            stock: { [Op.gt]: 0 }
+          },
+          transaction
+        }
+      )
+      if (affectedRows === 0) {
+        throw new Error(`商品 ${exchangeItem.product_name} SKU ${defaultSku.sku_code} 库存不足`)
       }
-    )
-
-    if (affectedRows === 0) {
-      throw new Error(`商品 ${exchangeItem.exchange_item_id} 库存不足，无法完成竞价结算`)
     }
 
     // f. 落选者冻结资产解冻返还

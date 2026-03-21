@@ -15,7 +15,6 @@
  * - L2 审批后可删（业务运营）：lottery_draws, customer_service_sessions 等
  * - L3 可自动清理（日志/临时）：api_idempotency_requests, websocket_startup_logs 等
  *
- * @see docs/数据一键删除功能设计方案.md
  * @module services/DataManagementService
  */
 
@@ -273,9 +272,9 @@ const DELETE_TOPOLOGY = Object.freeze([
   ['market_listings', 'customer_service_sessions', 'ad_campaigns'],
   /*
    * 第四层
-   * 迁移路径：exchange_items 表保留；新增 products 表由 Product 模型管理
+   * products 表由 Product 模型管理（原 exchange_items 已 DROP）
    */
-  ['items', 'lottery_prizes', 'exchange_items'],
+  ['items', 'lottery_prizes', 'products'],
   // 第五层（核心配置表 - 通常不删，仅清档模式时按需处理）
   [
     'lottery_campaigns',
@@ -382,8 +381,8 @@ class DataManagementService {
    * @returns {Promise<Object>} 策略配置
    */
   async getPolicies() {
-    const SystemConfig = this.models.SystemConfig
-    const config = await SystemConfig.getValue('data_cleanup_policies')
+    const AdminSystemService = require('./AdminSystemService')
+    const config = await AdminSystemService.getConfigValue('data_cleanup_policies')
 
     if (!config) {
       return { policies: [], schedule_cron: '0 3 * * *', max_execution_time_seconds: 300 }
@@ -401,8 +400,8 @@ class DataManagementService {
    * @returns {Promise<Object>} 更新后的策略
    */
   async updatePolicy(tableName, updates, operatorId) {
-    const SystemConfig = this.models.SystemConfig
-    const config = await SystemConfig.getValue('data_cleanup_policies')
+    const AdminSystemService = require('./AdminSystemService')
+    const config = await AdminSystemService.getConfigValue('data_cleanup_policies')
 
     if (!config || !config.policies) {
       throw new Error('清理策略配置不存在')
@@ -425,7 +424,7 @@ class DataManagementService {
       policy.enabled = Boolean(updates.enabled)
     }
 
-    await SystemConfig.upsert('data_cleanup_policies', config, 'data_management')
+    await AdminSystemService.upsertConfig('data_cleanup_policies', config, { category: 'data_management' })
 
     await AuditLogService.logOperation({
       operator_id: operatorId,

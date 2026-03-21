@@ -11,7 +11,6 @@
  * 数据库：restaurant_points_dev (统一数据库)
  *
  * @since 2026-01-26
- * @see docs/员工管理删除逻辑优化方案.md
  */
 
 'use strict'
@@ -329,3 +328,4 @@ describe('员工管理删除逻辑测试', () => {
     })
   })
 })
+

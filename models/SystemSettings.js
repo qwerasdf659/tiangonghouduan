@@ -117,18 +117,10 @@ module.exports = sequelize => {
 
       // 配置分类：区分不同模块的配置（仅运营配置，技术配置在代码中管理）
       category: {
-        type: DataTypes.ENUM(
-          'basic',
-          'points',
-          'notification',
-          'security',
-          'marketplace',
-          'redemption',
-          'exchange'
-        ),
+        type: DataTypes.STRING(50),
         allowNull: false,
         comment:
-          '配置分类：basic-基础设置，points-积分设置，notification-通知设置，security-安全设置，marketplace-市场设置，redemption-核销设置（注：抽奖算法配置在config/business.config.js中管理）'
+          '配置分类：basic/points/notification/security/marketplace/redemption/exchange/batch_operation/rate_limit/feature/general/ad_system/ad_pricing/backpack/data_management'
       },
 
       // 配置键名：具体的配置项标识

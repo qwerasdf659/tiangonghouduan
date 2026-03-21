@@ -20,9 +20,6 @@
  * - 测试重点是业务逻辑，而非 Socket.IO 协议实现
  */
 
-/* BeijingTimeHelper 用于后续时间相关测试场景扩展 */
-// const BeijingTimeHelper = require('../../../utils/timeHelper')
-
 // Mock Socket.IO
 jest.mock('socket.io', () => {
   return jest.fn(() => ({
@@ -576,7 +573,7 @@ describe('ChatWebSocketService - 聊天WebSocket服务', () => {
 
       expect(result.success).toBe(true)
       expect(result.user_id).toBe(1)
-      expect(result.is_admin).toBe(false)
+      expect(result.role_level).toBe(0)
       // 用户连接映射应该已恢复
       expect(chatWebSocketService.connectedUsers.get(1)).toBe('socket_new_1')
     })

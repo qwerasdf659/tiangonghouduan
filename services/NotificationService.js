@@ -16,7 +16,6 @@ const logger = require('../utils/logger').logger
  * 创建时间：2025-10-10
  * 最后更新：2026-02-24 - 方案B通知通道独立化
  *
- * @see docs/通知系统独立化-方案B实施文档.md
  */
 
 const BeijingTimeHelper = require('../utils/timeHelper')

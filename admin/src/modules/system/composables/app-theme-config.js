@@ -5,7 +5,6 @@
  * @description 全局氛围主题配置的状态管理和操作方法
  * @version 1.0.0
  * @date 2026-03-06
- * @see docs/项目特效主题体系分析报告.md
  */
 
 import { API_PREFIX, request } from '../../../api/base.js'
@@ -164,3 +163,4 @@ export function useAppThemeConfigMethods() {
     }
   }
 }
+

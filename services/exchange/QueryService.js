@@ -95,66 +95,57 @@ const PRODUCT_VIEW_ATTRIBUTES = {
  */
 const EXCHANGE_MARKET_ATTRIBUTES = {
   /**
-   * 市场商品列表视图（用户浏览）
-   * 包含臻选空间/幸运空间扩展字段（决策12：9个新字段）
+   * 市场商品列表视图（Product SPU + SKU 定价/库存通过 include 获取）
    */
   marketItemView: [
-    'exchange_item_id',
-    'item_name',
+    'product_id',
+    'product_name',
     'description',
-    'cost_asset_code',
-    'cost_amount',
-    'stock',
-    'sold_count',
     'sort_order',
     'status',
     'primary_media_id',
-    'category_def_id',
-    // 臻选空间/幸运空间扩展字段（9个）
+    'category_id',
     'space',
-    'original_price',
     'tags',
     'is_new',
     'is_hot',
-    'is_lucky',
-    'has_warranty',
-    'free_shipping',
     'is_limited',
+    'is_recommended',
     'sell_point',
     'rarity_code',
     'usage_rules',
+    'publish_at',
+    'unpublish_at',
     'created_at'
   ],
 
   /**
    * 商品详情视图
-   * 包含臻选空间/幸运空间扩展字段 + 稀有度 + 详情页增强字段
    */
   marketItemDetailView: [
-    'exchange_item_id',
-    'item_name',
+    'product_id',
+    'product_name',
     'description',
-    'cost_asset_code',
-    'cost_amount',
-    'stock',
-    'sold_count',
     'sort_order',
     'status',
     'primary_media_id',
-    'category_def_id',
-    // 臻选空间/幸运空间扩展字段（9个）
+    'category_id',
+    'item_template_id',
+    'mint_instance',
     'space',
-    'original_price',
     'tags',
     'is_new',
     'is_hot',
-    'is_lucky',
-    'has_warranty',
-    'free_shipping',
     'is_limited',
+    'is_recommended',
     'sell_point',
     'usage_rules',
     'rarity_code',
+    'video_url',
+    'stock_alert_threshold',
+    'publish_at',
+    'unpublish_at',
+    'attributes_json',
     'created_at',
     'updated_at'
   ],
@@ -229,10 +220,9 @@ class QueryService {
    */
   constructor(models) {
     this.models = models
-    this.ExchangeItem = models.ExchangeItem
+    this.Product = models.Product
     this.ExchangeRecord = models.ExchangeRecord
     this.ExchangeOrderEvent = models.ExchangeOrderEvent
-    this.Product = models.Product
     this.ProductSku = models.ProductSku
     this.ExchangeChannelPrice = models.ExchangeChannelPrice
     this.Category = models.Category
@@ -307,23 +297,17 @@ class QueryService {
         page_size
       })
 
-      // 构建查询条件
+      // 构建 Product 表查询条件（price/stock 筛选在嵌套 include 中）
       const where = { status }
-
-      // 材料资产类型筛选
-      if (asset_code) {
-        where.cost_asset_code = asset_code
-      }
 
       // 空间筛选（lucky/premium）— 臻选空间/幸运空间核心逻辑
       if (space) {
-        // space='lucky' 时查 lucky 和 both；space='premium' 时查 premium 和 both
         where.space = { [Op.in]: [space, 'both'] }
       }
 
-      // 关键词搜索（匹配 item_name）
+      // 关键词搜索（匹配 product_name）
       if (keyword) {
-        where.item_name = { [Op.like]: `%${keyword}%` }
+        where.product_name = { [Op.like]: `%${keyword}%` }
       }
 
       // 分类筛选（支持两级分类：选择一级分类时自动包含其下所有子分类商品）
@@ -332,24 +316,24 @@ class QueryService {
         if (categoryDefId !== null) {
           const { CategoryDef } = this.models
           const categoryIds = await CategoryDef.getIdsWithChildren(categoryDefId)
-          where.category_def_id = { [Op.in]: categoryIds }
+          where.category_id = { [Op.in]: categoryIds }
         }
       }
 
       // 排除指定商品（用于详情页"相关推荐"，排除当前商品自身）
       if (exclude_id) {
-        where.exchange_item_id = { [Op.ne]: parseInt(exclude_id, 10) }
+        where.product_id = { [Op.ne]: parseInt(exclude_id, 10) }
       }
 
-      // 价格范围筛选
+      // 价格范围筛选（基于 SPU 汇总列 min_cost_amount）
       if (min_cost !== null) {
-        where.cost_amount = { ...where.cost_amount, [Op.gte]: parseInt(min_cost, 10) }
+        where.min_cost_amount = { ...where.min_cost_amount, [Op.gte]: parseInt(min_cost, 10) }
       }
       if (max_cost !== null) {
-        where.cost_amount = { ...where.cost_amount, [Op.lte]: parseInt(max_cost, 10) }
+        where.min_cost_amount = { ...where.min_cost_amount, [Op.lte]: parseInt(max_cost, 10) }
       }
 
-      // 库存状态筛选
+      // 库存状态筛选（基于 SPU 汇总列 stock）
       if (stock_status === 'in_stock') {
         where.stock = { [Op.gt]: 5 }
       } else if (stock_status === 'low_stock') {
@@ -359,7 +343,7 @@ class QueryService {
       const offset = (page - 1) * page_size
       const limit = page_size
 
-      const { count, rows } = await this.ExchangeItem.findAndCountAll({
+      const { count, rows } = await this.Product.findAndCountAll({
         where,
         attributes: EXCHANGE_MARKET_ATTRIBUTES.marketItemView,
         include: [
@@ -370,6 +354,7 @@ class QueryService {
             required: false
           }
         ],
+        subQuery: false,
         limit,
         offset,
         order: [
@@ -439,8 +424,8 @@ class QueryService {
    */
   async getItemDetail(item_id) {
     try {
-      const item = await this.ExchangeItem.findOne({
-        where: { exchange_item_id: item_id },
+      const item = await this.Product.findOne({
+        where: { product_id: item_id },
         attributes: EXCHANGE_MARKET_ATTRIBUTES.marketItemDetailView,
         include: [
           {
@@ -456,24 +441,30 @@ class QueryService {
             required: false
           },
           {
-            model: this.models.CategoryDef,
-            as: 'categoryDef',
-            attributes: ['category_code', 'display_name'],
+            model: this.models.Category,
+            as: 'category',
+            attributes: ['category_id', 'category_code', 'category_name'],
             required: false
           },
-          ...(this.models.ExchangeItemSku
+          ...(this.models.ProductSku
             ? [
                 {
-                  model: this.models.ExchangeItemSku,
+                  model: this.models.ProductSku,
                   as: 'skus',
                   where: { status: 'active' },
                   required: false,
                   order: [['sort_order', 'ASC']],
+                  include: [
+                    {
+                      model: this.models.ExchangeChannelPrice,
+                      as: 'channelPrices',
+                      required: false,
+                      attributes: ['cost_asset_code', 'cost_amount', 'original_amount']
+                    }
+                  ],
                   attributes: [
                     'sku_id',
-                    'spec_values',
-                    'cost_asset_code',
-                    'cost_amount',
+                    'sku_code',
                     'stock',
                     'sold_count',
                     'status',
@@ -489,14 +480,13 @@ class QueryService {
         throw new Error('商品不存在')
       }
 
-      // 多图数据：通过 media_attachments 获取（image_resources 表已删除）
       const { MediaAttachment, MediaFile } = this.models
       const { getImageUrl } = require('../../utils/ImageUrlHelper')
       const attachments =
         MediaAttachment && MediaFile
           ? await MediaAttachment.findAll({
               where: {
-                attachable_type: 'exchange_item',
+                attachable_type: 'product',
                 attachable_id: item_id
               },
               include: [
@@ -649,7 +639,7 @@ class QueryService {
    * @param {Object} options - 查询选项
    * @param {string} [options.status] - 订单状态筛选
    * @param {number} [options.user_id] - 用户ID筛选
-   * @param {number} [options.exchange_item_id] - 商品ID筛选
+   * @param {number} [options.product_id] - 商品ID筛选
    * @param {string} [options.order_no] - 订单号模糊搜索
    * @param {number} [options.page=1] - 页码
    * @param {number} [options.page_size=20] - 每页数量
@@ -661,6 +651,7 @@ class QueryService {
     const {
       status = null,
       user_id = null,
+      product_id = null,
       exchange_item_id = null,
       order_no = null,
       page = 1,
@@ -673,7 +664,7 @@ class QueryService {
       logger.info('[兑换市场] 管理员查询全量订单列表', {
         status,
         user_id,
-        exchange_item_id,
+        product_id,
         order_no,
         page,
         page_size
@@ -682,7 +673,8 @@ class QueryService {
       const where = {}
       if (status) where.status = status
       if (user_id) where.user_id = user_id
-      if (exchange_item_id) where.exchange_item_id = exchange_item_id
+      if (product_id) where.product_id = product_id
+      else if (exchange_item_id) where.exchange_item_id = exchange_item_id
       if (order_no) {
         where.order_no = { [Op.like]: `%${order_no}%` }
       }
@@ -818,12 +810,11 @@ class QueryService {
         where: { pay_asset_code: { [Op.ne]: null } }
       })
 
-      // 查询商品库存统计
-      const itemStats = await this.ExchangeItem.findAll({
+      // 查询商品统计（Product SPU 维度）
+      const itemStats = await this.Product.findAll({
         attributes: [
           'status',
-          [this.sequelize.fn('COUNT', this.sequelize.col('exchange_item_id')), 'count'],
-          [this.sequelize.fn('SUM', this.sequelize.col('stock')), 'total_stock']
+          [this.sequelize.fn('COUNT', this.sequelize.col('product_id')), 'count']
         ],
         group: ['status']
       })
@@ -867,36 +858,19 @@ class QueryService {
       // 空间筛选条件：space='lucky' 查 lucky+both；space='premium' 查 premium+both
       const spaceCondition = { [Op.in]: [space, 'both'] }
 
-      const [totalProducts, newCount, hotCount, assetDistribution] = await Promise.all([
-        // 该空间商品总数（仅 active）
-        this.ExchangeItem.count({
+      const [totalProducts, newCount, hotCount] = await Promise.all([
+        this.Product.count({
           where: { space: spaceCondition, status: 'active' }
         }),
-        // 新品数量
-        this.ExchangeItem.count({
+        this.Product.count({
           where: { space: spaceCondition, status: 'active', is_new: true }
         }),
-        // 热门数量
-        this.ExchangeItem.count({
+        this.Product.count({
           where: { space: spaceCondition, status: 'active', is_hot: true }
-        }),
-        // 资产类型分布
-        this.ExchangeItem.findAll({
-          attributes: [
-            'cost_asset_code',
-            [this.sequelize.fn('COUNT', this.sequelize.col('exchange_item_id')), 'count']
-          ],
-          where: { space: spaceCondition, status: 'active' },
-          group: ['cost_asset_code'],
-          raw: true
         })
       ])
 
-      // 转换资产分布为对象格式
       const assetCodeDistribution = {}
-      assetDistribution.forEach(row => {
-        assetCodeDistribution[row.cost_asset_code] = parseInt(row.count, 10)
-      })
 
       logger.info('[兑换市场] 空间统计完成', {
         space,
@@ -929,11 +903,11 @@ class QueryService {
    * @private
    */
   async _buildFiltersCount(filterValues) {
-    const { status, asset_code, space, keyword, category, min_cost, max_cost, stock_status } =
+    const { status, asset_code: _asset_code, space, keyword, category, min_cost: _min_cost, max_cost: _max_cost, stock_status: _stock_status } =
       filterValues
 
     try {
-      const { sequelize } = this.ExchangeItem
+      const { sequelize } = this.Product
 
       /**
        * 构建基础 WHERE（status + asset_code + space + keyword 不参与维度排除，始终保留）
@@ -942,106 +916,72 @@ class QueryService {
        * @returns {Object} SQL 片段和参数 { parts, replacements }
        */
       const buildBaseWhere = () => {
-        const parts = ['ei.status = :status']
+        const parts = ['p.status = :status']
         const replacements = { status }
 
-        if (asset_code) {
-          parts.push('ei.cost_asset_code = :asset_code')
-          replacements.asset_code = asset_code
-        }
         if (space) {
-          parts.push('ei.space IN (:space_values)')
+          parts.push('p.space IN (:space_values)')
           replacements.space_values = [space, 'both']
         }
         if (keyword) {
-          parts.push('ei.item_name LIKE :keyword')
+          parts.push('p.product_name LIKE :keyword')
           replacements.keyword = `%${keyword}%`
         }
         return { parts, replacements }
       }
 
-      // 1. 分类计数：排除 category 条件，保留 price + stock 条件
       const catBase = buildBaseWhere()
-      if (min_cost !== null) {
-        catBase.parts.push('ei.cost_amount >= :min_cost')
-        catBase.replacements.min_cost = parseInt(min_cost, 10)
-      }
-      if (max_cost !== null) {
-        catBase.parts.push('ei.cost_amount <= :max_cost')
-        catBase.replacements.max_cost = parseInt(max_cost, 10)
-      }
-      if (stock_status === 'in_stock') {
-        catBase.parts.push('ei.stock > 5')
-      } else if (stock_status === 'low_stock') {
-        catBase.parts.push('ei.stock BETWEEN 1 AND 5')
-      }
 
-      // 2. 价格区间计数：排除 price 条件，保留 category + stock 条件（支持两级分类）
       const priceBase = buildBaseWhere()
       if (category) {
         const catDefId = await this._resolveCategoryDefId(category)
         if (catDefId !== null) {
           const { CategoryDef } = this.models
           const catIds = await CategoryDef.getIdsWithChildren(catDefId)
-          priceBase.parts.push(`ei.category_def_id IN (${catIds.join(',')})`)
+          priceBase.parts.push(`p.category_id IN (${catIds.join(',')})`)
         }
       }
-      if (stock_status === 'in_stock') {
-        priceBase.parts.push('ei.stock > 5')
-      } else if (stock_status === 'low_stock') {
-        priceBase.parts.push('ei.stock BETWEEN 1 AND 5')
-      }
 
-      // 3. 库存状态计数：排除 stock 条件，保留 category + price 条件（支持两级分类）
       const stockBase = buildBaseWhere()
       if (category) {
         const catDefIdS = await this._resolveCategoryDefId(category)
         if (catDefIdS !== null) {
           const { CategoryDef } = this.models
           const catIdsS = await CategoryDef.getIdsWithChildren(catDefIdS)
-          stockBase.parts.push(`ei.category_def_id IN (${catIdsS.join(',')})`)
+          stockBase.parts.push(`p.category_id IN (${catIdsS.join(',')})`)
         }
       }
-      if (min_cost !== null) {
-        stockBase.parts.push('ei.cost_amount >= :min_cost_s')
-        stockBase.replacements.min_cost_s = parseInt(min_cost, 10)
-      }
-      if (max_cost !== null) {
-        stockBase.parts.push('ei.cost_amount <= :max_cost_s')
-        stockBase.replacements.max_cost_s = parseInt(max_cost, 10)
-      }
 
-      // 并行执行 3 个聚合查询（category_def_id 迁移：JOIN category_defs 获取 category_code）
       const [categoryRows, priceRows, stockRows] = await Promise.all([
-        // 分类维度计数（按 category_def_id 分组，关联 category_defs 取 category_code）
         sequelize.query(
-          `SELECT COALESCE(cd.category_code, '__null__') AS category_code, COUNT(*) AS cnt
-           FROM exchange_items ei
-           LEFT JOIN category_defs cd ON ei.category_def_id = cd.category_def_id
+          `SELECT COALESCE(c.category_code, '__null__') AS category_code, COUNT(*) AS cnt
+           FROM products p
+           LEFT JOIN categories c ON p.category_id = c.category_id
            WHERE ${catBase.parts.join(' AND ')}
-           GROUP BY ei.category_def_id, cd.category_code`,
+           GROUP BY p.category_id, c.category_code`,
           { replacements: catBase.replacements, type: sequelize.constructor.QueryTypes.SELECT }
         ),
-        // 价格区间维度计数（区间定义：0-100, 100-500, 500-1000, 1000+）
         sequelize.query(
           `SELECT
-             SUM(CASE WHEN ei.cost_amount <= 100 THEN 1 ELSE 0 END) AS range_0_100,
-             SUM(CASE WHEN ei.cost_amount > 100 AND ei.cost_amount <= 500 THEN 1 ELSE 0 END) AS range_100_500,
-             SUM(CASE WHEN ei.cost_amount > 500 AND ei.cost_amount <= 1000 THEN 1 ELSE 0 END) AS range_500_1000,
-             SUM(CASE WHEN ei.cost_amount > 1000 THEN 1 ELSE 0 END) AS range_1000_plus,
-             COUNT(*) AS total
-           FROM exchange_items ei
+             SUM(CASE WHEN ecp.cost_amount <= 100 THEN 1 ELSE 0 END) AS range_0_100,
+             SUM(CASE WHEN ecp.cost_amount > 100 AND ecp.cost_amount <= 500 THEN 1 ELSE 0 END) AS range_100_500,
+             SUM(CASE WHEN ecp.cost_amount > 500 AND ecp.cost_amount <= 1000 THEN 1 ELSE 0 END) AS range_500_1000,
+             SUM(CASE WHEN ecp.cost_amount > 1000 THEN 1 ELSE 0 END) AS range_1000_plus,
+             COUNT(DISTINCT p.product_id) AS total
+           FROM products p
+           LEFT JOIN product_skus ps ON ps.product_id = p.product_id AND ps.status = 'active'
+           LEFT JOIN exchange_channel_prices ecp ON ecp.sku_id = ps.sku_id
            WHERE ${priceBase.parts.join(' AND ')}`,
           { replacements: priceBase.replacements, type: sequelize.constructor.QueryTypes.SELECT }
         ),
-        // 库存状态维度计数
         sequelize.query(
           `SELECT
-             SUM(CASE WHEN ei.stock > 5 THEN 1 ELSE 0 END) AS in_stock,
-             SUM(CASE WHEN ei.stock BETWEEN 1 AND 5 THEN 1 ELSE 0 END) AS low_stock,
-             SUM(CASE WHEN ei.stock = 0 THEN 1 ELSE 0 END) AS out_of_stock,
+             SUM(CASE WHEN ps.stock > 5 THEN 1 ELSE 0 END) AS in_stock,
+             SUM(CASE WHEN ps.stock BETWEEN 1 AND 5 THEN 1 ELSE 0 END) AS low_stock,
+             SUM(CASE WHEN ps.stock = 0 THEN 1 ELSE 0 END) AS out_of_stock,
              COUNT(*) AS total
-           FROM exchange_items ei
+           FROM products p
+           LEFT JOIN product_skus ps ON ps.product_id = p.product_id AND ps.status = 'active'
            WHERE ${stockBase.parts.join(' AND ')}`,
           { replacements: stockBase.replacements, type: sequelize.constructor.QueryTypes.SELECT }
         )
@@ -1114,17 +1054,17 @@ class QueryService {
    */
   async _calculateListSummary(where) {
     try {
-      const { sequelize } = this.ExchangeItem
+      const { sequelize } = this.Product
 
       // 1. 计算近7天趋势销量（trending_count）
       const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
       const [trendingResult] = await sequelize.query(
         `SELECT COUNT(*) AS trending_count
          FROM exchange_records er
-         INNER JOIN exchange_items ei ON er.exchange_item_id = ei.exchange_item_id
+         INNER JOIN products p ON er.product_id = p.product_id
          WHERE er.created_at >= :seven_days_ago
            AND er.status IN ('completed', 'shipped', 'pending')
-           AND ei.status = :item_status`,
+           AND p.status = :item_status`,
         {
           replacements: {
             seven_days_ago: sevenDaysAgo,
@@ -1134,17 +1074,15 @@ class QueryService {
         }
       )
 
-      // 2. 计算平均折扣率（avg_discount）+ 平均评分（avg_rating）
+      // 2. 平均评分（avg_rating）
       const [discountAndRatingResult] = await sequelize.query(
         `SELECT
-           AVG(CASE WHEN ei.original_price > 0 THEN ei.cost_amount / ei.original_price END) AS avg_discount,
-           COUNT(CASE WHEN ei.original_price > 0 THEN 1 END) AS has_original_price_count,
            AVG(er.rating) AS avg_rating,
            COUNT(er.rating) AS rated_order_count
-         FROM exchange_items ei
+         FROM products p
          LEFT JOIN exchange_records er
-           ON er.exchange_item_id = ei.exchange_item_id AND er.rating IS NOT NULL
-         WHERE ei.status = :item_status`,
+           ON er.product_id = p.product_id AND er.rating IS NOT NULL
+         WHERE p.status = :item_status`,
         {
           replacements: { item_status: where.status || 'active' },
           type: sequelize.constructor.QueryTypes.SELECT
@@ -1810,21 +1748,23 @@ class QueryService {
       // 基础查询：商品信息 + 平均评分
       const rows = await this.sequelize.query(
         `SELECT
-          ei.exchange_item_id,
-          ei.item_name,
-          ei.sold_count,
-          ei.stock,
-          ei.cost_amount,
-          ei.status,
-          ROUND(ei.sold_count / GREATEST(ei.stock + ei.sold_count, 1), 4) AS stock_turnover,
+          p.product_id,
+          p.product_name,
+          COALESCE(SUM(ps.sold_count), 0) AS sold_count,
+          COALESCE(SUM(ps.stock), 0) AS stock,
+          MIN(ecp.cost_amount) AS cost_amount,
+          p.status,
+          ROUND(COALESCE(SUM(ps.sold_count), 0) / GREATEST(COALESCE(SUM(ps.stock), 0) + COALESCE(SUM(ps.sold_count), 0), 1), 4) AS stock_turnover,
           AVG(er.rating) AS avg_rating,
-          COUNT(er.exchange_record_id) AS total_orders
-        FROM exchange_items ei
+          COUNT(DISTINCT er.exchange_record_id) AS total_orders
+        FROM products p
+        LEFT JOIN product_skus ps ON ps.product_id = p.product_id AND ps.status = 'active'
+        LEFT JOIN exchange_channel_prices ecp ON ecp.sku_id = ps.sku_id
         LEFT JOIN exchange_records er
-          ON er.exchange_item_id = ei.exchange_item_id
+          ON er.product_id = p.product_id
           AND er.rating IS NOT NULL
-        GROUP BY ei.exchange_item_id
-        ORDER BY ${validSortBy === 'stock_turnover' ? 'stock_turnover' : validSortBy === 'avg_rating' ? 'avg_rating' : 'ei.sold_count'} DESC
+        GROUP BY p.product_id
+        ORDER BY ${validSortBy === 'stock_turnover' ? 'stock_turnover' : validSortBy === 'avg_rating' ? 'avg_rating' : 'sold_count'} DESC
         LIMIT :limit`,
         {
           replacements: { limit: validLimit },
@@ -1834,8 +1774,8 @@ class QueryService {
 
       const ranking = rows.map((r, index) => ({
         rank: index + 1,
-        exchange_item_id: r.exchange_item_id,
-        item_name: r.item_name,
+        exchange_item_id: r.product_id,
+        item_name: r.product_name,
         sold_count: parseInt(r.sold_count || 0, 10),
         stock: parseInt(r.stock || 0, 10),
         cost_amount: r.cost_amount,

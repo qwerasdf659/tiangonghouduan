@@ -15,7 +15,6 @@
  * - NotificationService 为静态类，注册键: 'notification'
  *
  * 创建时间：2026年02月24日
- * @see docs/通知系统独立化-方案B实施文档.md
  */
 
 'use strict'

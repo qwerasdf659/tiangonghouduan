@@ -20,7 +20,6 @@
  *
  * @since 2026-01-12
  * @updated 2026-01-12 新增省市区街道字段支持（8个）
- * @see docs/省市区级联选择功能设计方案.md
  */
 
 'use strict'
@@ -780,21 +779,6 @@ class StoreService {
     }
 
     return result
-  }
-
-  /**
-   * 获取状态名称（中文）
-   *
-   * @param {string} status - 状态值
-   * @returns {string} 状态名称
-   */
-  static getStatusName(status) {
-    const statusNames = {
-      active: '正常营业',
-      inactive: '已关闭',
-      pending: '待审核'
-    }
-    return statusNames[status] || '未知'
   }
 
   /**

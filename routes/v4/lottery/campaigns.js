@@ -82,7 +82,6 @@ function validateCampaignCode(code) {
  * ⚠️ 路由顺序注意：此路由必须定义在 /:code/* 之前，
  * 否则 Express 会将 'active' 匹配为 :code 参数
  *
- * @see docs/后端与Web管理平台-对接需求总览.md Section 3.3 接口5
  */
 router.get('/active', authenticateToken, async (req, res) => {
   try {
@@ -201,7 +200,6 @@ router.get('/:code/config', authenticateToken, dataAccessControl, async (req, re
      * - 字段名统一：使用 draw_buttons（非旧的 discount_tiers）
      *
      * @see services/lottery/LotteryPricingService.js - 统一定价服务
-     * @see docs/技术债务-getDrawPricing定价逻辑迁移方案.md 方案C
      */
     const LotteryPricingService = getLotteryPricingService(req)
 
@@ -253,7 +251,6 @@ router.get('/:code/config', authenticateToken, dataAccessControl, async (req, re
     /**
      * 前端展示配置对象 - 从 campaign 模型读取展示配置字段
      * 前端根据此对象动态加载玩法组件、主题色、光效和动画
-     * @see docs/后端与Web管理平台-对接需求总览.md Section 3.2 接口1
      */
     const displayConfig = {
       mode: campaign.display_mode || 'grid_3x3',

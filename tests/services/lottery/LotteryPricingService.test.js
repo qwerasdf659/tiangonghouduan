@@ -2,7 +2,6 @@
  * 餐厅积分抽奖系统 V4 - LotteryPricingService 单元测试
  *
  * @description 验证 getDrawPricing 定价逻辑迁移方案（方案C）的正确性
- * @see docs/技术债务-getDrawPricing定价逻辑迁移方案.md
  *
  * 测试范围：
  * - getDrawPricing(): 定价计算正确性

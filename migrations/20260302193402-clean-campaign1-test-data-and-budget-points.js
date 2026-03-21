@@ -15,7 +15,6 @@
  * 3. 全量删除 BUDGET_POINTS 余额（上线后消费审核自动重新发放）
  * 4. 重置活动 1 奖品的统计计数器
  *
- * @see docs/抽奖活动奖品数量配置方案.md D10/D14/D15 决定项
  */
 module.exports = {
   async up(queryInterface, _Sequelize) {
@@ -78,3 +77,4 @@ module.exports = {
     console.log('[D10+D14+D15 rollback] 测试数据无法恢复（不可逆清理），需手动处理')
   }
 }
+

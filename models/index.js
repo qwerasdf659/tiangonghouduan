@@ -421,7 +421,7 @@ models.AdInteractionLog = require('./AdInteractionLog')(sequelize, DataTypes)
  *    - 表名：ad_interaction_logs，主键：ad_interaction_log_id（BIGINT）
  */
 
-// 🔴 媒体文件与多态关联（2026-03-16 替代 image_resources 架构，image_resources 表已删除）
+// 🔴 媒体文件与多态关联（2026-03-16）
 models.MediaFile = require('./MediaFile')(sequelize, DataTypes)
 models.MediaAttachment = require('./MediaAttachment')(sequelize, DataTypes)
 
@@ -436,16 +436,7 @@ models.ProductSku = require('./ProductSku')(sequelize, DataTypes)
 models.SkuAttributeValue = require('./SkuAttributeValue')(sequelize, DataTypes)
 models.ExchangeChannelPrice = require('./ExchangeChannelPrice')(sequelize, DataTypes)
 
-// 🔴 兑换市场系统（旧表，迁移完成后废弃）
-
-models.ExchangeItem = require('./ExchangeItem')(sequelize, DataTypes)
-/*
- * ✅ ExchangeItem：兑换市场商品配置表
- *    - 用途：配置用户可以使用虚拟奖品价值或积分兑换的商品
- *    - 特点：支持虚拟奖品/积分/混合支付方式
- *    - 表名：exchange_items，主键：exchange_item_id
- *    - 业务场景：用户抽奖获得虚拟奖品（水晶等）→ 使用虚拟奖品价值兑换商品
- */
+// 🔴 兑换市场系统（ExchangeItem/ExchangeItemSku 已迁移至 Product/ProductSku）
 
 models.ExchangeRecord = require('./ExchangeRecord')(sequelize, DataTypes)
 /*
@@ -463,14 +454,6 @@ models.ExchangeOrderEvent = require('./ExchangeOrderEvent')(sequelize, DataTypes
  *    - 用途：记录订单完整状态变更链（审计追踪）
  *    - 表名：exchange_order_events，主键：event_id
  *    - 业务场景：创建/审核/发货/收货/评分/取消/拒绝 全链路事件
- */
-
-models.ExchangeItemSku = require('./ExchangeItemSku')(sequelize, DataTypes)
-/*
- * ✅ ExchangeItemSku：兑换商品 SKU 表（规格变体）
- *    - 用途：全量 SKU 模式，所有商品至少有一个默认 SKU
- *    - 表名：exchange_item_skus，主键：sku_id
- *    - 业务场景：单品商品 spec_values={} | 多规格商品有独立价格/库存
  */
 
 // 🔴 竞价系统模型（臻选空间/幸运空间/竞价功能 — 2026-02-16）
@@ -653,34 +636,10 @@ models.AlertSilenceRule = require('./AlertSilenceRule')(sequelize, DataTypes)
  *    - 业务场景：节假日静默、夜间静默、测试环境静默
  */
 
-// 🔴 审计业务记录表（2026-01-08 决策9实现 - 为无天然业务主键的操作提供审计锚点）
-models.UserStatusChangeRecord = require('./UserStatusChangeRecord')(sequelize, DataTypes)
 /*
- * ✅ UserStatusChangeRecord：用户状态变更记录
- *    - 用途：为 user_status_change 审计日志提供业务主键（user_status_change_record_id → target_id）
- *    - 特点：幂等键派生（决策6）、事务内创建（决策7）、关键操作阻断（决策5）
- *    - 表名：user_status_change_records，主键：user_status_change_record_id
- *    - 业务场景：管理员封禁/解封用户→创建变更记录→记录审计日志→可追溯
- */
-
-models.UserRoleChangeRecord = require('./UserRoleChangeRecord')(sequelize, DataTypes)
-/*
- * ✅ UserRoleChangeRecord：用户角色变更记录
- *    - 用途：为 role_change 审计日志提供业务主键（user_role_change_record_id → target_id）
- *    - 特点：幂等键派生（决策6）、事务内创建（决策7）、关键操作阻断（决策5）
- *    - 表名：user_role_change_records，主键：user_role_change_record_id
- *    - 业务场景：管理员变更用户角色→创建变更记录→记录审计日志→可追溯
- *    - 注意：与 RoleChangeLog 区别 - 本模型专用于审计主键生成，不记录角色权限本身的变更
- */
-
-models.LotteryClearSettingRecord = require('./LotteryClearSettingRecord')(sequelize, DataTypes)
-/*
- * ✅ LotteryClearSettingRecord：抽奖清除设置记录
- *    - 用途：为 lottery_clear_settings 审计日志提供业务主键（lottery_clear_setting_record_id → target_id）
- *    - 特点：幂等键派生（决策6）、事务内创建（决策7）、关键操作阻断（决策5）
- *    - 表名：lottery_clear_setting_records，主键：lottery_clear_setting_record_id
- *    - 业务场景：管理员清除用户抽奖设置→创建清除记录→记录审计日志→可追溯
- *    - 解决问题：原 target_id: null 导致关键操作被阻断
+ * 🗄️ Audit thin-tables archived 2026-03-20 (CSV backups in backups/).
+ * Dropped: UserStatusChangeRecord, UserRoleChangeRecord, LotteryClearSettingRecord
+ * Authoritative audit trail lives in admin_operation_logs.
  */
 
 models.WebSocketStartupLog = require('./WebSocketStartupLog')(sequelize, DataTypes)
@@ -800,15 +759,7 @@ models.BatchOperationLog = require('./BatchOperationLog').initModel(sequelize)
  *    - 设计决策来源：需求文档阶段C技术决策（美团独立幂等表 + Redis/MySQL双重校验）
  */
 
-models.SystemConfig = require('./SystemConfig').initModel(sequelize)
-/*
- * ✅ SystemConfig：系统配置表（动态配置管理）
- *    - 用途：存储可动态调整的系统配置参数，支持批量操作限流配置
- *    - 特点：config_key唯一约束、JSON配置值、分类管理、启用/禁用控制
- *    - 表名：system_configs，主键：config_id
- *    - 业务场景：批量操作限流配置、功能开关、系统参数调整
- *    - 设计决策来源：需求文档阶段C技术决策（动态限流配置，运营可调整）
- */
+/* SystemConfig model removed - merged into SystemSettings (migration 20260320230000) */
 
 models.LotteryDailyMetrics = require('./LotteryDailyMetrics')(sequelize, DataTypes)
 /*

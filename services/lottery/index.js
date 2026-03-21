@@ -35,20 +35,12 @@ const LotteryAnalyticsQueryService = require('./AnalyticsQueryService')
  * 命名约定：
  * - 使用snake_case命名（符合项目统一规范）
  * - 服务实例：user_service、history_service
- * - 访问方法：get_user_service()、get_history_service()
  *
  * 使用方式：
  * ```javascript
  * const { lottery_service_container } = require('./services/lottery')
  *
- * // 获取用户服务
- * const userService = lottery_service_container.get_user_service()
- *
- * // 获取历史服务
- * const historyService = lottery_service_container.get_history_service()
- *
- * // 获取所有服务
- * const allServices = lottery_service_container.get_all_services()
+ * const { user_service, history_service } = lottery_service_container.get_all_services()
  * ```
  *
  * 性能优化：
@@ -79,22 +71,6 @@ class LotteryServiceContainer {
     // LotteryUserService 和 LotteryHistoryService 都是类，需要实例化
     this.user_service = new LotteryUserService()
     this.history_service = new LotteryHistoryService()
-  }
-
-  /**
-   * 获取用户服务实例
-   * @returns {LotteryUserService} 用户抽奖资格验证服务实例
-   */
-  get_user_service() {
-    return this.user_service
-  }
-
-  /**
-   * 获取历史服务实例
-   * @returns {LotteryHistoryService} 抽奖历史查询服务实例
-   */
-  get_history_service() {
-    return this.history_service
   }
 
   /**

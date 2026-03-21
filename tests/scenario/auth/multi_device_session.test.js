@@ -204,7 +204,6 @@ describe('P0-6: 多设备登录冲突测试', () => {
    *   普通登录 → platform='web'，快速登录 → platform='wechat_mp'
    *   跨平台登录不互踢，两个 Token 同时有效
    *
-   * @see docs/multi-platform-session-design.md
    */
   test('场景2：Web登录 + 微信快速登录应共存（跨平台不互踢）', async () => {
     if (skipTests) {

@@ -9,7 +9,6 @@
  * - /api/v4/system/ad-events/impression（小程序端 - 曝光事件上报）
  *
  * 创建时间：2026-02-18
- * @see docs/广告系统升级方案.md Phase 5
  */
 
 const logger = require('../utils/logger').logger

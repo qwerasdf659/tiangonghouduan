@@ -16,7 +16,6 @@
  * 数据库表名：ad_creatives
  * 主键：ad_creative_id（INT，自增）
  *
- * @see docs/内容投放系统-重复功能合并方案.md
  */
 
 const { DataTypes } = require('sequelize')

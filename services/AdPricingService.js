@@ -15,7 +15,7 @@
 'use strict'
 
 const logger = require('../utils/logger').logger
-const SystemConfigService = require('./SystemConfigService')
+const AdminSystemService = require('./AdminSystemService')
 const { AdDauDailyStat, AdSlot, sequelize } = require('../models')
 const BeijingTimeHelper = require('../utils/timeHelper')
 
@@ -34,7 +34,7 @@ class AdPricingService {
    * @returns {Promise<Object>} DAU 系数信息
    */
   static async getCurrentDauCoefficient() {
-    const enabled = await SystemConfigService.getValue('ad_dau_pricing_enabled', false)
+    const enabled = await AdminSystemService.getConfigValue('ad_dau_pricing_enabled', false)
     if (!enabled) {
       return { coefficient: 1.0, dau_count: 0, tier_label: '未启用', enabled: false }
     }
@@ -47,7 +47,7 @@ class AdPricingService {
       return { coefficient: 1.0, dau_count: 0, tier_label: '无数据', enabled: true }
     }
 
-    const tiers = await SystemConfigService.getValue('ad_dau_coefficient_tiers', [])
+    const tiers = await AdminSystemService.getConfigValue('ad_dau_coefficient_tiers', [])
     const matched = AdPricingService._matchDauTier(latestStat.dau_count, tiers)
 
     return {
@@ -66,7 +66,7 @@ class AdPricingService {
    * @returns {Promise<Object>} 底价计算结果
    */
   static async calculateDynamicFloorPrice(slot_key) {
-    const config = await SystemConfigService.getValue('ad_dynamic_floor_price_config', {
+    const config = await AdminSystemService.getConfigValue('ad_dynamic_floor_price_config', {
       enabled: false
     })
 
@@ -109,12 +109,12 @@ class AdPricingService {
    * @returns {Promise<Object>} 折扣计算结果
    */
   static async calculateDiscount(consecutive_days) {
-    const enabled = await SystemConfigService.getValue('ad_discount_enabled', false)
+    const enabled = await AdminSystemService.getConfigValue('ad_discount_enabled', false)
     if (!enabled || consecutive_days <= 0) {
       return { discount: 1.0, tier_label: '无折扣', enabled }
     }
 
-    const tiers = await SystemConfigService.getValue('ad_consecutive_discount_tiers', [])
+    const tiers = await AdminSystemService.getConfigValue('ad_consecutive_discount_tiers', [])
     if (!tiers.length) {
       return { discount: 1.0, tier_label: '无折扣规则', enabled: true }
     }

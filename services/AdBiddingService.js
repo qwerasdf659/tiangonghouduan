@@ -15,7 +15,6 @@
  * 创建时间：2026-02-18
  * 更新时间：2026-02-22（内容投放合并 — 三层优先级出队）
  *
- * @see docs/内容投放系统-重复功能合并方案.md 第二节 2.7
  */
 
 const logger = require('../utils/logger').logger

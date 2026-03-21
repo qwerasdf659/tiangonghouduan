@@ -15,7 +15,6 @@
  *
  * 数据来源：system_configs 表，config_key = 'campaign_placement'
  *
- * @see docs/后端与Web管理平台-对接需求总览.md Section 3.4
  * @date 2026-02-15
  */
 
@@ -26,6 +25,7 @@ const router = express.Router()
 const logger = require('../../../../utils/logger').logger
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const { handleServiceError } = require('../../../../middleware/validation')
+const ServiceManager = require('../../../../services')
 
 // 所有路由强制管理员权限（role_level >= 100）
 router.use(authenticateToken, requireRoleLevel(100))
@@ -133,15 +133,14 @@ function validatePlacements(placements) {
  */
 router.get('/', async (req, res) => {
   try {
-    const { SystemConfig } = req.app.locals.models
+    const AdminSystemService = ServiceManager.getService('admin_system')
+    const configData = await AdminSystemService.getConfigValue('campaign_placement')
 
-    const config = await SystemConfig.getByKey('campaign_placement')
-
-    if (!config) {
+    if (!configData) {
       return res.apiSuccess({ placements: [] }, '配置为空（尚未配置活动位置）')
     }
 
-    return res.apiSuccess(config.getValue(), '获取位置配置成功', 'PLACEMENT_GET_SUCCESS')
+    return res.apiSuccess(configData, '获取位置配置成功', 'PLACEMENT_GET_SUCCESS')
   } catch (error) {
     logger.error('获取位置配置失败', { error: error.message, stack: error.stack })
     return handleServiceError(error, res, '获取位置配置失败')
@@ -176,16 +175,14 @@ router.put('/', async (req, res) => {
       )
     }
 
-    const { SystemConfig } = req.app.locals.models
+    const AdminSystemService = ServiceManager.getService('admin_system')
 
-    // 使用 SystemConfig.upsert 创建或更新配置
-    await SystemConfig.upsert(
+    await AdminSystemService.upsertConfig(
       'campaign_placement',
       { placements },
       {
         description: '活动位置配置 - 控制每个活动在小程序中的展示位置和尺寸',
-        config_category: 'feature',
-        is_active: true
+        category: 'feature'
       }
     )
 

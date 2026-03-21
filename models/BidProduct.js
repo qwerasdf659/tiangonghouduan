@@ -24,7 +24,6 @@
  * 主键命名：bid_product_id
  * 创建时间：2026-02-16
  *
- * @see docs/臻选空间-幸运空间-竞价功能-后端实施方案.md §3.2
  */
 
 const { DataTypes } = require('sequelize')
@@ -47,8 +46,8 @@ module.exports = sequelize => {
         allowNull: false,
         comment: '关联兑换商品ID',
         references: {
-          model: 'exchange_items',
-          key: 'exchange_item_id'
+          model: 'products',
+          key: 'product_id'
         },
         onUpdate: 'CASCADE',
         onDelete: 'RESTRICT'
@@ -195,11 +194,13 @@ module.exports = sequelize => {
    * @returns {void}
    */
   BidProduct.associate = function (models) {
-    // 竞价商品关联兑换商品（多对一）
-    BidProduct.belongsTo(models.ExchangeItem, {
-      foreignKey: 'exchange_item_id',
-      as: 'exchangeItem'
-    })
+    // 竞价商品关联商品（Product 统一商品中心）
+    if (models.Product) {
+      BidProduct.belongsTo(models.Product, {
+        foreignKey: 'exchange_item_id',
+        as: 'exchangeItem'
+      })
+    }
 
     // 竞价商品有多个出价记录（一对多）
     BidProduct.hasMany(models.BidRecord, {

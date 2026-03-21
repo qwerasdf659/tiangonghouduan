@@ -49,7 +49,6 @@ describe('V4统一抽奖引擎主引擎测试 - 重构版', () => {
    * 替代原 Strategy 模式（basic_guarantee, management）
    * 统一使用 Pipeline 架构
    *
-   * @see docs/抽奖模块Strategy到Pipeline迁移方案新.md
    */
   /**
    * V4.6 Phase 5 架构：统一管线（2026-01-19）

@@ -138,7 +138,7 @@ if [ $? -eq 0 ]; then
 
     # 显示使用示例
     echo -e "\n${YELLOW}📖 使用示例:${NC}"
-    echo "const SealosStorageService = require('./services/sealosStorage');"
+    echo "const SealosStorageService = require('./services/SealosStorageService');"
     echo "const storage = new SealosStorageService();"
     echo "const imageUrl = await storage.uploadImage(fileBuffer, 'image.jpg');"
 else

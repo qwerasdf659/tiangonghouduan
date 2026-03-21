@@ -29,7 +29,6 @@
  * @module utils/displayNameHelper
  * @author 中文化显示名称系统
  * @since 2026-01-22
- * @see docs/中文化显示名称实施文档.md
  * @see services/DisplayNameService.js
  */
 
@@ -292,6 +291,8 @@ const DICT_TYPES = {
   STORE_STAFF_STATUS: 'store_staff_status', // 门店员工状态
   STORE_STAFF_ROLE: 'store_staff_role', // 门店员工角色
   REGION_STATUS: 'region_status', // 区域状态
+  MERCHANT_TYPE: 'merchant_type', // 商家类型（餐厅/门店等）
+  MERCHANT_STATUS: 'merchant_status', // 商家账号状态（active/inactive/suspended）
   MERCHANT_OPERATION_TYPE: 'merchant_operation_type', // 商家操作类型
 
   // ==================== 消费相关 ====================

@@ -271,6 +271,16 @@ class ItemTemplateService {
         }
       }
 
+      // 从 data 或 meta 中提取 max_edition 写入独立列（兼容前端两种提交方式）
+      let resolvedMaxEdition = data.max_edition ?? null
+      const cleanedMeta = meta ? { ...meta } : null
+      if (resolvedMaxEdition == null && cleanedMeta?.max_edition != null) {
+        resolvedMaxEdition = Number(cleanedMeta.max_edition) || null
+      }
+      if (cleanedMeta) {
+        delete cleanedMeta.max_edition
+      }
+
       const newTemplate = await this.ItemTemplate.create(
         {
           template_code,
@@ -283,7 +293,8 @@ class ItemTemplateService {
           reference_price_points,
           is_tradable,
           is_enabled: true,
-          meta
+          max_edition: resolvedMaxEdition,
+          meta: cleanedMeta
         },
         { transaction }
       )
@@ -338,6 +349,7 @@ class ItemTemplateService {
         'reference_price_points',
         'is_tradable',
         'is_enabled',
+        'max_edition',
         'meta'
       ]
 
@@ -364,6 +376,16 @@ class ItemTemplateService {
         updateData.category_def_id = resolvedCatId
       }
       delete updateData.category_code
+
+      // 从 meta 中提取 max_edition 到独立列（兼容前端写入 meta.max_edition 的场景）
+      if (updateData.max_edition === undefined && updateData.meta?.max_edition != null) {
+        updateData.max_edition = Number(updateData.meta.max_edition) || null
+      }
+      if (updateData.meta) {
+        const cleanedMeta = { ...updateData.meta }
+        delete cleanedMeta.max_edition
+        updateData.meta = cleanedMeta
+      }
 
       // 验证稀有度代码
       if (updateData.rarity_code) {

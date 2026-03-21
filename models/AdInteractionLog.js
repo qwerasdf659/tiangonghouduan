@@ -15,7 +15,6 @@
  * 数据库表名：ad_interaction_logs
  * 主键：ad_interaction_log_id（BIGINT，自增）
  *
- * @see docs/内容投放系统-重复功能合并方案.md 第十二节 D2
  */
 
 const { DataTypes } = require('sequelize')

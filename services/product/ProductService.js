@@ -29,16 +29,16 @@ class ProductService {
   /**
    * 分页列表：支持品类、状态、空间、稀有度、名称关键字
    *
-   * @param {Object} [filters={}]
-   * @param {number} [filters.category_id]
-   * @param {string} [filters.status]
-   * @param {string} [filters.space]
-   * @param {string} [filters.rarity_code]
+   * @param {Object} [filters={}] - 筛选条件
+   * @param {number} [filters.category_id] - 品类 ID
+   * @param {string} [filters.status] - 商品状态
+   * @param {string} [filters.space] - 空间标识
+   * @param {string} [filters.rarity_code] - 稀有度编码
    * @param {string} [filters.keyword] - 模糊匹配 product_name
-   * @param {Object} [pagination={}]
-   * @param {number} [pagination.page=1]
-   * @param {number} [pagination.page_size=20]
-   * @returns {Promise<{items:Array,total:number,page:number,page_size:number,total_pages:number}>}
+   * @param {Object} [pagination={}] - 分页参数
+   * @param {number} [pagination.page=1] - 页码
+   * @param {number} [pagination.page_size=20] - 每页条数
+   * @returns {Promise<{items:Array,total:number,page:number,page_size:number,total_pages:number}>} 分页结果
    */
   async listProducts(filters = {}, pagination = {}) {
     const { Product, Category, RarityDef, MediaFile, ProductSku, ExchangeChannelPrice } =
@@ -103,8 +103,8 @@ class ProductService {
   /**
    * 商品详情：全量关联（SPU 属性、SKU 销售属性、渠道价）
    *
-   * @param {number|string} productId
-   * @returns {Promise<Object|null>}
+   * @param {number|string} productId - 商品 ID
+   * @returns {Promise<Object|null>} 商品详情对象（含关联数据），不存在返回 null
    */
   async getProductDetail(productId) {
     const {
@@ -168,9 +168,9 @@ class ProductService {
    * 创建 SPU
    *
    * @param {Object} data - 商品字段（与 Product 模型一致）
-   * @param {Object} [options={}]
-   * @param {Object} options.transaction - 事务（必填）
-   * @returns {Promise<Object>}
+   * @param {Object} [options={}] - 可选配置
+   * @param {Object} options.transaction - Sequelize 事务实例
+   * @returns {Promise<Object>} 创建的商品记录
    */
   async createProduct(data, options = {}) {
     const transaction = assertAndGetTransaction(options, 'ProductService.createProduct')
@@ -188,11 +188,11 @@ class ProductService {
   /**
    * 更新 SPU
    *
-   * @param {number|string} productId
-   * @param {Object} data
-   * @param {Object} [options={}]
-   * @param {Object} options.transaction
-   * @returns {Promise<Object>}
+   * @param {number|string} productId - 商品 ID
+   * @param {Object} data - 要更新的字段
+   * @param {Object} [options={}] - 可选配置
+   * @param {Object} options.transaction - Sequelize 事务实例
+   * @returns {Promise<Object>} 更新后的商品记录
    */
   async updateProduct(productId, data, options = {}) {
     const transaction = assertAndGetTransaction(options, 'ProductService.updateProduct')
@@ -220,10 +220,10 @@ class ProductService {
   /**
    * 硬删除 SPU（级联 SKU / 属性值 / 渠道价，库表 ON DELETE CASCADE）
    *
-   * @param {number|string} productId
-   * @param {Object} [options={}]
-   * @param {Object} options.transaction
-   * @returns {Promise<void>}
+   * @param {number|string} productId - 商品 ID
+   * @param {Object} [options={}] - 可选配置
+   * @param {Object} options.transaction - Sequelize 事务实例
+   * @returns {Promise<void>} 无返回值，不存在时抛异常
    */
   async deleteProduct(productId, options = {}) {
     const transaction = assertAndGetTransaction(options, 'ProductService.deleteProduct')
@@ -259,18 +259,18 @@ class ProductService {
   /**
    * 创建 SKU 及销售属性行
    *
-   * @param {number|string} productId
-   * @param {Object} data
-   * @param {string} data.sku_code
-   * @param {number} [data.stock]
-   * @param {number} [data.cost_price]
-   * @param {string} [data.status]
-   * @param {number} [data.image_id]
-   * @param {number} [data.sort_order]
-   * @param {Array<{attribute_id:number,option_id:number}>} [data.attribute_values]
-   * @param {Object} [options={}]
-   * @param {Object} options.transaction
-   * @returns {Promise<Object>}
+   * @param {number|string} productId - 商品 ID
+   * @param {Object} data - SKU 数据
+   * @param {string} data.sku_code - SKU 编码（唯一）
+   * @param {number} [data.stock] - 库存数量
+   * @param {number} [data.cost_price] - 成本价
+   * @param {string} [data.status] - SKU 状态
+   * @param {number} [data.image_id] - 规格图片 ID
+   * @param {number} [data.sort_order] - 排序序号
+   * @param {Array<{attribute_id:number,option_id:number}>} [data.attribute_values] - 销售属性值
+   * @param {Object} [options={}] - 可选配置
+   * @param {Object} options.transaction - Sequelize 事务实例
+   * @returns {Promise<Object>} 创建的 SKU 记录（含属性值关联）
    */
   async createSku(productId, data, options = {}) {
     const transaction = assertAndGetTransaction(options, 'ProductService.createSku')
@@ -335,11 +335,11 @@ class ProductService {
   /**
    * 更新 SKU；若传入 attribute_values 则先删后建销售属性行
    *
-   * @param {number|string} skuId
-   * @param {Object} data
-   * @param {Object} [options={}]
-   * @param {Object} options.transaction
-   * @returns {Promise<Object>}
+   * @param {number|string} skuId - SKU ID
+   * @param {Object} data - 要更新的字段
+   * @param {Object} [options={}] - 可选配置
+   * @param {Object} options.transaction - Sequelize 事务实例
+   * @returns {Promise<Object>} 更新后的 SKU 记录
    */
   async updateSku(skuId, data, options = {}) {
     const transaction = assertAndGetTransaction(options, 'ProductService.updateSku')
@@ -400,10 +400,10 @@ class ProductService {
   /**
    * 硬删除 SKU
    *
-   * @param {number|string} skuId
-   * @param {Object} [options={}]
-   * @param {Object} options.transaction
-   * @returns {Promise<void>}
+   * @param {number|string} skuId - 要删除的 SKU ID
+   * @param {Object} [options={}] - 可选配置
+   * @param {Object} options.transaction - Sequelize 事务实例
+   * @returns {Promise<void>} 无返回值，不存在时抛异常
    */
   async deleteSku(skuId, options = {}) {
     const transaction = assertAndGetTransaction(options, 'ProductService.deleteSku')
@@ -451,10 +451,10 @@ class ProductService {
   /**
    * 销售属性选项笛卡尔积批量生成 SKU
    *
-   * @param {number|string} productId
+   * @param {number|string} productId - 商品 ID
    * @param {Object<number, number[]>} saleAttributeOptions - attribute_id -> option_id[]
-   * @param {Object} [options={}]
-   * @param {Object} options.transaction
+   * @param {Object} [options={}] - 可选配置
+   * @param {Object} options.transaction - Sequelize 事务实例
    * @returns {Promise<Array>} 已创建 SKU 列表
    */
   async generateSkuCartesian(productId, saleAttributeOptions, options = {}) {
@@ -559,10 +559,10 @@ class ProductService {
   /**
    * 按增量调整库存（可正可负），结果库存不得小于 0
    *
-   * @param {number|string} skuId
-   * @param {number} delta
-   * @param {Object} [options={}]
-   * @param {Object} options.transaction
+   * @param {number|string} skuId - SKU ID
+   * @param {number} delta - 库存增减量（正数增加，负数减少）
+   * @param {Object} [options={}] - 可选配置
+   * @param {Object} options.transaction - Sequelize 事务实例
    * @returns {Promise<Object>} 更新后的 SKU
    */
   async adjustStock(skuId, delta, options = {}) {
@@ -609,6 +609,8 @@ class ProductService {
   /**
    * 从请求体提取允许写入 Product 的字段
    * @private
+   * @param {Object} data - 请求体数据
+   * @returns {Object} 过滤后的安全字段对象
    */
   static _pickProductPayload(data) {
     if (!data || typeof data !== 'object') return {}
@@ -645,7 +647,13 @@ class ProductService {
   }
 
   /**
+   * 替换 SKU 的属性值（先删后增）
    * @private
+   * @param {Object} models - Sequelize 模型集合
+   * @param {number} skuId - SKU ID
+   * @param {Array<{attribute_id: number, option_id: number}>} attributeValues - 属性值列表
+   * @param {Object} transaction - Sequelize 事务实例
+   * @returns {Promise<void>} 无返回值
    */
   static async _replaceSkuAttributeValues(models, skuId, attributeValues, transaction) {
     if (!attributeValues || !Array.isArray(attributeValues) || attributeValues.length === 0) {
@@ -672,6 +680,8 @@ class ProductService {
   /**
    * 多维数组笛卡尔积，元素为 {attribute_id, option_id}
    * @private
+   * @param {Array<Array<{attribute_id: number, option_id: number}>>} arrays - 多维属性选项数组
+   * @returns {Array<Array<{attribute_id: number, option_id: number}>>} 笛卡尔积组合
    */
   static _cartesian(arrays) {
     if (!arrays.length) return []
@@ -689,7 +699,11 @@ class ProductService {
   }
 
   /**
+   * 根据属性组合生成 SKU 编码（如 P5_1_2__3_4）
    * @private
+   * @param {number} productId - 商品 ID
+   * @param {Array<{attribute_id: number, option_id: number}>} combo - 属性选项组合
+   * @returns {string} 生成的 SKU 编码
    */
   static _buildCartesianSkuCode(productId, combo) {
     const parts = [...combo]

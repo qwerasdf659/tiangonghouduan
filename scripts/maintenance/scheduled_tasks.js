@@ -217,9 +217,6 @@ class ScheduledTasks {
     // 任务11: 每天凌晨2点清理过期核销码（2025-12-17新增）
     this.scheduleRedemptionOrderExpiration()
 
-    // 任务12: 每天凌晨2点执行资产对账（2025-12-17新增）
-    this.scheduleDailyAssetReconciliation()
-
     // 任务13: 每小时解锁超时交易订单（2025-12-29新增 - 资产域标准架构）
     this.scheduleHourlyUnlockTimeoutTradeOrders()
 
@@ -1181,38 +1178,6 @@ class ScheduledTasks {
   }
 
   /**
-   * 任务12: 每天凌晨2点执行每日资产对账
-   *
-   * @deprecated 已被任务35（scheduleHourlyUnifiedReconciliation）替代
-   * 旧版仅做余额对比，新版覆盖物品守恒+资产双录守恒+余额一致性。
-   * 保留此方法以避免调用链断裂，实际委托给统一对账脚本。
-   *
-   * Cron表达式: 0 2 * * * (每天凌晨2点)
-   * @returns {void}
-   */
-  static scheduleDailyAssetReconciliation() {
-    cron.schedule('0 2 * * *', async () => {
-      try {
-        logger.info('[定时任务] 每日资产对账（已委托给统一对账脚本）...')
-        const { executeReconciliation } = require('../../scripts/reconcile-items')
-        const report = await executeReconciliation({ autoFix: true })
-
-        if (report.allPass) {
-          logger.info('[定时任务] 每日资产对账（统一版）完成：全部通过')
-        } else {
-          logger.warn('[定时任务] 每日资产对账（统一版）完成：存在异常', {
-            results: report.results
-          })
-        }
-      } catch (error) {
-        logger.error('[定时任务] 每日资产对账失败', { error: error.message })
-      }
-    })
-
-    logger.info('✅ 定时任务已设置: 每日资产对账（每天凌晨2点执行，支持分布式锁）')
-  }
-
-  /**
    * 手动触发每日资产对账（用于测试）
    *
    * 业务场景：手动执行资产对账，用于开发调试和即时检查
@@ -1855,7 +1820,6 @@ class ScheduledTasks {
    * @returns {void}
    *
    * @since 2026-01-12
-   * @see docs/商家员工域权限体系升级方案.md - AC4.4 审计日志保留策略
    */
   static scheduleDailyMerchantAuditLogCleanup() {
     cron.schedule('0 3 * * *', async () => {
@@ -2206,7 +2170,6 @@ class ScheduledTasks {
    * @returns {void}
    *
    * @since 2026-01-19
-   * @see docs/抽奖模块Strategy到Pipeline迁移方案新.md - Phase 3.3
    */
   static scheduleHourlyPricingConfigActivation() {
     cron.schedule('10 * * * *', async () => {
@@ -2309,7 +2272,6 @@ class ScheduledTasks {
    * @returns {void}
    *
    * @since 2026-01-23
-   * @see docs/抽奖策略引擎监控方案.md
    */
   static scheduleHourlyLotteryMetricsAggregation() {
     cron.schedule('0 * * * *', async () => {
@@ -2372,7 +2334,6 @@ class ScheduledTasks {
    * @returns {void}
    *
    * @since 2026-01-23
-   * @see docs/抽奖策略引擎监控方案.md
    */
   static scheduleDailyLotteryMetricsAggregation() {
     cron.schedule('0 1 * * *', async () => {
@@ -2486,7 +2447,6 @@ class ScheduledTasks {
    * @returns {void}
    *
    * @since 2026-01-30
-   * @see docs/定时任务统一管理改进方案.md - Task 25
    */
   static scheduleRateLimitRecordCleanup() {
     cron.schedule('*/10 * * * *', async () => {
@@ -2561,7 +2521,6 @@ class ScheduledTasks {
    * @returns {void}
    *
    * @since 2026-01-30
-   * @see docs/定时任务统一管理改进方案.md - Task 26
    */
   static scheduleAuthSessionCleanup() {
     cron.schedule('0,30 * * * *', async () => {
@@ -2659,7 +2618,6 @@ class ScheduledTasks {
    * @returns {void}
    *
    * @since 2026-01-30
-   * @see docs/定时任务统一管理改进方案.md - Task 27
    */
   static scheduleLotteryEngineCacheCleanup() {
     cron.schedule('*/10 * * * *', async () => {
@@ -2786,7 +2744,6 @@ class ScheduledTasks {
    * @returns {void}
    *
    * @since 2026-01-30
-   * @see docs/定时任务统一管理改进方案.md - Task 28
    */
   static scheduleBusinessCacheMonitor() {
     cron.schedule('*/10 * * * *', async () => {
@@ -2877,7 +2834,6 @@ class ScheduledTasks {
    * @returns {void}
    *
    * @since 2026-01-30
-   * @see docs/定时任务统一管理改进方案.md - Task 29
    */
   static scheduleDailyAdminOperationLogCleanup() {
     cron.schedule('0 3 * * *', async () => {
@@ -3057,7 +3013,6 @@ class ScheduledTasks {
    * @returns {void}
    *
    * @since 2026-01-30
-   * @see docs/定时任务统一管理改进方案.md - Task 30
    */
   static scheduleDailyWebSocketStartupLogCleanup() {
     cron.schedule('30 3 * * *', async () => {
@@ -3656,17 +3611,15 @@ class ScheduledTasks {
   static scheduleExchangeItemAutoPublish() {
     cron.schedule('*/10 * * * *', async () => {
       try {
-        const { ExchangeItem } = require('../../models')
+        const { Product } = require('../../models')
         const now = new Date()
 
-        // 定时上架：publish_at 已到且当前是 inactive
-        const [publishedCount] = await ExchangeItem.update(
+        const [publishedCount] = await Product.update(
           { status: 'active', publish_at: null },
           { where: { publish_at: { [Op.lte]: now }, status: 'inactive' } }
         )
 
-        // 定时下架：unpublish_at 已到且当前是 active
-        const [unpublishedCount] = await ExchangeItem.update(
+        const [unpublishedCount] = await Product.update(
           { status: 'inactive', unpublish_at: null },
           { where: { unpublish_at: { [Op.lte]: now }, status: 'active' } }
         )
@@ -3694,13 +3647,25 @@ class ScheduledTasks {
   static scheduleExchangeStockAlert() {
     cron.schedule('20 * * * *', async () => {
       try {
-        const { ExchangeItem, AdminNotification } = require('../../models')
+        const { Product, ProductSku, AdminNotification } = require('../../models')
 
-        // 售罄自动下架
-        const [soldOutCount] = await ExchangeItem.update(
-          { status: 'inactive' },
-          { where: { stock: 0, status: 'active' } }
-        )
+        // 售罄自动下架（库存在 product_skus，检查全部 SKU 归零的商品）
+        const activeProducts = await Product.findAll({
+          where: { status: 'active' },
+          attributes: ['product_id', 'product_name'],
+          include: [{ model: ProductSku, as: 'skus', attributes: ['stock'], where: { status: 'active' }, required: true }],
+          raw: false
+        })
+        const zeroStockIds = activeProducts
+          .filter(p => p.skus.every(s => s.stock <= 0))
+          .map(p => p.product_id)
+        let soldOutCount = 0
+        if (zeroStockIds.length > 0) {
+          ;[soldOutCount] = await Product.update(
+            { status: 'inactive' },
+            { where: { product_id: { [Op.in]: zeroStockIds } } }
+          )
+        }
 
         if (soldOutCount > 0) {
           logger.info(`[定时任务40] 售罄自动下架: ${soldOutCount} 个商品`)
@@ -3708,30 +3673,31 @@ class ScheduledTasks {
           await BusinessCacheHelper.invalidateExchangeItems('sold_out_auto_unpublish').catch(() => {})
         }
 
-        // 库存预警检测
-        const lowStockItems = await ExchangeItem.findAll({
-          where: {
-            status: 'active',
-            stock_alert_threshold: { [Op.gt]: 0 },
-            stock: { [Op.gt]: 0 }
-          },
-          attributes: ['exchange_item_id', 'item_name', 'stock', 'stock_alert_threshold'],
-          raw: true
+        // 库存预警检测（统一商品中心：库存在 product_skus + 预警阈值在 products）
+        const alertProducts = await Product.findAll({
+          where: { status: 'active', stock_alert_threshold: { [Op.gt]: 0 } },
+          attributes: ['product_id', 'product_name', 'stock_alert_threshold'],
+          include: [{ model: ProductSku, as: 'skus', attributes: ['stock'], where: { status: 'active' }, required: false }],
+          raw: false
         })
 
-        const alertItems = lowStockItems.filter(item => item.stock <= item.stock_alert_threshold)
+        const alertItems = alertProducts.filter(p => {
+          const totalStock = (p.skus || []).reduce((sum, s) => sum + s.stock, 0)
+          return totalStock > 0 && totalStock <= p.stock_alert_threshold
+        })
 
         if (alertItems.length > 0 && AdminNotification) {
           for (const item of alertItems) {
+            const totalStock = (item.skus || []).reduce((sum, s) => sum + s.stock, 0)
             await AdminNotification.create({
-              title: `库存预警：${item.item_name}`,
-              content: `商品「${item.item_name}」(ID:${item.exchange_item_id}) 库存仅剩 ${item.stock}，低于预警阈值 ${item.stock_alert_threshold}`,
+              title: `库存预警：${item.product_name}`,
+              content: `商品「${item.product_name}」(ID:${item.product_id}) 库存仅剩 ${totalStock}，低于预警阈值 ${item.stock_alert_threshold}`,
               notification_type: 'stock_alert',
-              priority: item.stock <= 1 ? 'high' : 'medium',
-              target_type: 'exchange_item',
-              target_id: item.exchange_item_id,
+              priority: totalStock <= 1 ? 'high' : 'medium',
+              target_type: 'product',
+              target_id: item.product_id,
               is_read: false
-            }).catch(e => logger.warn(`库存预警通知创建失败(item ${item.exchange_item_id}):`, e.message))
+            }).catch(e => logger.warn(`库存预警通知创建失败(product ${item.product_id}):`, e.message))
           }
           logger.info(`[定时任务40] 库存预警: ${alertItems.length} 个商品低于阈值`)
         }
@@ -3745,3 +3711,4 @@ class ScheduledTasks {
 }
 
 module.exports = ScheduledTasks
+

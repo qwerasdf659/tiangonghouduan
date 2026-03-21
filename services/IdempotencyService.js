@@ -142,7 +142,6 @@ const CANONICAL_OPERATION_MAP = {
 
   // ===== 会员解锁（2026-02-16 从 shop/premium 迁移到 backpack/exchange，决策2） =====
   '/api/v4/backpack/exchange/unlock-premium': 'PREMIUM_UNLOCK', // 解锁高级空间（新路径）
-  '/api/v4/shop/premium/unlock': 'PREMIUM_UNLOCK', // 解锁高级会员（旧路径保留映射，实际路由已删除）
 
   // ===== 竞价系统（臻选空间/幸运空间竞价功能 2026-02-16） =====
   '/api/v4/backpack/bid': 'BID_PLACE_BID', // 提交竞价出价

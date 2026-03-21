@@ -18,7 +18,6 @@
  * 本文件仅包含【代码层固定规则】，不包含运营可调参数。
  * 运营可调参数（如 lottery_cost_points、daily_lottery_limit）通过 AdminSystemService 从 DB system_settings 读取。
  *
- * @see docs/配置管理三层分离与校验统一方案.md
  */
 
 module.exports = {
@@ -283,3 +282,4 @@ module.exports = {
     }
   }
 }
+

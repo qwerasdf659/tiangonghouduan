@@ -584,37 +584,14 @@ class AdminLotteryCoreService {
       throw new Error(result.error || '清除用户设置失败')
     }
 
-    // 创建清除设置记录
-    const { LotteryClearSettingRecord } = models
-    const idempotencyKey = LotteryClearSettingRecord.generateIdempotencyKey(
-      userId,
-      settingType || 'all',
-      adminId
-    )
+    const idempotencyKey = `lottery_clear_${userId}_${settingType || 'all'}_${adminId}_${Math.floor(Date.now() / 1000)}`
 
-    const clearRecord = await LotteryClearSettingRecord.create(
-      {
-        user_id: userId,
-        admin_id: adminId,
-        setting_type: settingType || 'all',
-        cleared_count: result.cleared_count,
-        reason,
-        idempotency_key: idempotencyKey,
-        metadata: {
-          user_mobile: user.mobile,
-          cleared_at: BeijingTimeHelper.now()
-        }
-      },
-      { transaction }
-    )
-
-    // 记录审计日志
     await AuditLogService.logAdminOperation(
       {
         admin_id: adminId,
         operation_type: 'lottery_clear_settings',
-        operation_target: 'lottery_clear_setting_record',
-        target_id: clearRecord.lottery_clear_setting_record_id,
+        operation_target: 'User',
+        target_id: userId,
         operation_details: {
           user_id: userId,
           user_mobile: user.mobile,

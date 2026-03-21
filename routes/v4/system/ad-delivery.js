@@ -15,7 +15,6 @@
  * - 美团: GET /api/promotion/feed（运营位内容下发）
  * - 字节跳动: GET /api/content/delivery
  *
- * @see docs/内容投放系统-重复功能合并方案.md 第十八节 D5
  */
 
 const express = require('express')

@@ -629,7 +629,7 @@ module.exports = {
   CONSTRAINT \`batch_operation_logs_ibfk_1\` FOREIGN KEY (\`operator_id\`) REFERENCES \`users\` (\`user_id\`) ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='批量操作日志表 - 幂等性控制与操作审计（阶段C核心基础设施）';`, { transaction });
 
-      // [29/106] image_resources
+      // [29/106] 旧图片资源表
       await queryInterface.sequelize.query(`CREATE TABLE IF NOT EXISTS \`image_resources\` (
   \`image_resource_id\` int NOT NULL AUTO_INCREMENT,
   \`business_type\` enum('lottery','exchange','trade','uploads') COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '业务类型：抽奖/兑换/交易/上传（user_upload_review 已删除 - 2026-01-08）',

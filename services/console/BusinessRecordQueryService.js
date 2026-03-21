@@ -9,13 +9,13 @@
  * 遵循架构规范：读写分层策略 Phase 3
  *
  * 涵盖查询：
- * - 抽奖清除设置记录 (lottery_clear_setting_records)
  * - 核销订单 (redemption_orders)
  * - 内容审核记录 (content_review_records)
- * - 用户角色变更记录 (user_role_change_records)
- * - 用户状态变更记录 (user_status_change_records)
  * - B2C兑换记录 (exchange_records)
  * - 聊天消息记录 (chat_messages)
+ *
+ * Archived (2026-03-20, CSV backups in backups/):
+ * - lottery_clear_setting_records, user_role_change_records, user_status_change_records
  *
  * @module services/console/BusinessRecordQueryService
  * @version 1.0.0
@@ -61,74 +61,17 @@ class BusinessRecordQueryService {
    */
 
   /**
-   * 查询抽奖清除设置记录列表
-   *
-   * @param {Object} options - 查询选项
-   * @param {number} [options.user_id] - 被清除设置的用户ID
-   * @param {number} [options.admin_id] - 执行清除的管理员ID
-   * @param {string} [options.setting_type] - 清除的设置类型
-   * @param {string} [options.start_date] - 开始日期
-   * @param {string} [options.end_date] - 结束日期
-   * @param {number} [options.page=1] - 页码
-   * @param {number} [options.page_size=20] - 每页数量
-   * @returns {Promise<Object>} 记录列表和分页信息
+   * @deprecated Table lottery_clear_setting_records has been archived (2026-03-20).
+   * Audit trail is in admin_operation_logs.
    */
   static async getLotteryClearSettings(options = {}) {
-    const { LotteryClearSettingRecord, User } = require('../../models')
-
-    const { user_id, admin_id, setting_type, start_date, end_date } = options
     const pagination = buildPaginationOptions(options)
-
-    // 构建查询条件
-    const where = {}
-    if (user_id) where.user_id = parseInt(user_id)
-    if (admin_id) where.admin_id = parseInt(admin_id)
-    if (setting_type) where.setting_type = setting_type
-    if (start_date || end_date) {
-      where.created_at = {}
-      if (start_date) where.created_at[Op.gte] = new Date(start_date)
-      if (end_date) where.created_at[Op.lte] = new Date(end_date + ' 23:59:59')
-    }
-
-    const { count, rows } = await LotteryClearSettingRecord.findAndCountAll({
-      where,
-      include: [
-        { model: User, as: 'user', attributes: ['user_id', 'nickname', 'mobile'] },
-        { model: User, as: 'admin', attributes: ['user_id', 'nickname', 'mobile'] }
-      ],
-      ...pagination
-    })
-
-    logger.info('查询抽奖清除设置记录成功', { total: count, page: pagination.page })
-
-    return {
-      records: rows,
-      pagination: {
-        total: count,
-        page: pagination.page,
-        page_size: pagination.page_size,
-        total_pages: Math.ceil(count / pagination.page_size)
-      }
-    }
+    return { records: [], pagination: { total: 0, page: pagination.page, page_size: pagination.page_size, total_pages: 0 } }
   }
 
-  /**
-   * 获取抽奖清除设置记录详情
-   *
-   * @param {number} record_id - 记录ID
-   * @returns {Promise<Object|null>} 记录详情
-   */
-  static async getLotteryClearSettingById(record_id) {
-    const { LotteryClearSettingRecord, User } = require('../../models')
-
-    const record = await LotteryClearSettingRecord.findByPk(parseInt(record_id), {
-      include: [
-        { model: User, as: 'user', attributes: ['user_id', 'nickname', 'mobile'] },
-        { model: User, as: 'admin', attributes: ['user_id', 'nickname', 'mobile'] }
-      ]
-    })
-
-    return record
+  /** @deprecated Table archived 2026-03-20. */
+  static async getLotteryClearSettingById(_record_id) {
+    return null
   }
 
   /*
@@ -434,76 +377,17 @@ class BusinessRecordQueryService {
    */
 
   /**
-   * 查询用户角色变更记录列表
-   *
-   * @param {Object} options - 查询选项
-   * @param {number} [options.user_id] - 被变更角色的用户ID
-   * @param {number} [options.operator_id] - 执行变更的操作员ID
-   * @param {string} [options.old_role] - 变更前角色
-   * @param {string} [options.new_role] - 变更后角色
-   * @param {string} [options.start_date] - 开始日期
-   * @param {string} [options.end_date] - 结束日期
-   * @param {number} [options.page=1] - 页码
-   * @param {number} [options.page_size=20] - 每页数量
-   * @returns {Promise<Object>} 记录列表和分页信息
+   * @deprecated Table user_role_change_records has been archived (2026-03-20).
+   * Audit trail is in admin_operation_logs.
    */
   static async getUserRoleChanges(options = {}) {
-    const { UserRoleChangeRecord, User } = require('../../models')
-
-    const { user_id, operator_id, old_role, new_role, start_date, end_date } = options
     const pagination = buildPaginationOptions(options)
-
-    // 构建查询条件
-    const where = {}
-    if (user_id) where.user_id = parseInt(user_id)
-    if (operator_id) where.operator_id = parseInt(operator_id)
-    if (old_role) where.old_role = old_role
-    if (new_role) where.new_role = new_role
-    if (start_date || end_date) {
-      where.created_at = {}
-      if (start_date) where.created_at[Op.gte] = new Date(start_date)
-      if (end_date) where.created_at[Op.lte] = new Date(end_date + ' 23:59:59')
-    }
-
-    const { count, rows } = await UserRoleChangeRecord.findAndCountAll({
-      where,
-      include: [
-        { model: User, as: 'user', attributes: ['user_id', 'nickname', 'mobile'] },
-        { model: User, as: 'operator', attributes: ['user_id', 'nickname', 'mobile'] }
-      ],
-      ...pagination
-    })
-
-    logger.info('查询用户角色变更记录成功', { total: count, page: pagination.page })
-
-    return {
-      records: rows,
-      pagination: {
-        total: count,
-        page: pagination.page,
-        page_size: pagination.page_size,
-        total_pages: Math.ceil(count / pagination.page_size)
-      }
-    }
+    return { records: [], pagination: { total: 0, page: pagination.page, page_size: pagination.page_size, total_pages: 0 } }
   }
 
-  /**
-   * 获取用户角色变更记录详情
-   *
-   * @param {number} record_id - 记录ID
-   * @returns {Promise<Object|null>} 记录详情
-   */
-  static async getUserRoleChangeById(record_id) {
-    const { UserRoleChangeRecord, User } = require('../../models')
-
-    const record = await UserRoleChangeRecord.findByPk(parseInt(record_id), {
-      include: [
-        { model: User, as: 'user', attributes: ['user_id', 'nickname', 'mobile'] },
-        { model: User, as: 'operator', attributes: ['user_id', 'nickname', 'mobile'] }
-      ]
-    })
-
-    return record
+  /** @deprecated Table archived 2026-03-20. */
+  static async getUserRoleChangeById(_record_id) {
+    return null
   }
 
   /*
@@ -513,76 +397,17 @@ class BusinessRecordQueryService {
    */
 
   /**
-   * 查询用户状态变更记录列表
-   *
-   * @param {Object} options - 查询选项
-   * @param {number} [options.user_id] - 被变更状态的用户ID
-   * @param {number} [options.operator_id] - 执行变更的操作员ID
-   * @param {string} [options.old_status] - 变更前状态
-   * @param {string} [options.new_status] - 变更后状态
-   * @param {string} [options.start_date] - 开始日期
-   * @param {string} [options.end_date] - 结束日期
-   * @param {number} [options.page=1] - 页码
-   * @param {number} [options.page_size=20] - 每页数量
-   * @returns {Promise<Object>} 记录列表和分页信息
+   * @deprecated Table user_status_change_records has been archived (2026-03-20).
+   * Audit trail is in admin_operation_logs.
    */
   static async getUserStatusChanges(options = {}) {
-    const { UserStatusChangeRecord, User } = require('../../models')
-
-    const { user_id, operator_id, old_status, new_status, start_date, end_date } = options
     const pagination = buildPaginationOptions(options)
-
-    // 构建查询条件
-    const where = {}
-    if (user_id) where.user_id = parseInt(user_id)
-    if (operator_id) where.operator_id = parseInt(operator_id)
-    if (old_status) where.old_status = old_status
-    if (new_status) where.new_status = new_status
-    if (start_date || end_date) {
-      where.created_at = {}
-      if (start_date) where.created_at[Op.gte] = new Date(start_date)
-      if (end_date) where.created_at[Op.lte] = new Date(end_date + ' 23:59:59')
-    }
-
-    const { count, rows } = await UserStatusChangeRecord.findAndCountAll({
-      where,
-      include: [
-        { model: User, as: 'user', attributes: ['user_id', 'nickname', 'mobile'] },
-        { model: User, as: 'operator', attributes: ['user_id', 'nickname', 'mobile'] }
-      ],
-      ...pagination
-    })
-
-    logger.info('查询用户状态变更记录成功', { total: count, page: pagination.page })
-
-    return {
-      records: rows,
-      pagination: {
-        total: count,
-        page: pagination.page,
-        page_size: pagination.page_size,
-        total_pages: Math.ceil(count / pagination.page_size)
-      }
-    }
+    return { records: [], pagination: { total: 0, page: pagination.page, page_size: pagination.page_size, total_pages: 0 } }
   }
 
-  /**
-   * 获取用户状态变更记录详情
-   *
-   * @param {number} record_id - 记录ID
-   * @returns {Promise<Object|null>} 记录详情
-   */
-  static async getUserStatusChangeById(record_id) {
-    const { UserStatusChangeRecord, User } = require('../../models')
-
-    const record = await UserStatusChangeRecord.findByPk(parseInt(record_id), {
-      include: [
-        { model: User, as: 'user', attributes: ['user_id', 'nickname', 'mobile'] },
-        { model: User, as: 'operator', attributes: ['user_id', 'nickname', 'mobile'] }
-      ]
-    })
-
-    return record
+  /** @deprecated Table archived 2026-03-20. */
+  static async getUserStatusChangeById(_record_id) {
+    return null
   }
 
   /*
@@ -606,16 +431,14 @@ class BusinessRecordQueryService {
    * @returns {Promise<Object>} 记录列表和分页信息
    */
   static async getExchangeRecords(options = {}) {
-    // 迁移路径：ExchangeItem → Product（统一商品模型）
-    const { ExchangeRecord, User, ExchangeItem, Product } = require('../../models')
+    const { ExchangeRecord, User, Product } = require('../../models')
 
     const { user_id, exchange_item_id, status, order_no, start_date, end_date } = options
     const pagination = buildPaginationOptions(options)
 
-    // 构建查询条件
     const where = {}
     if (user_id) where.user_id = parseInt(user_id)
-    if (exchange_item_id) where.exchange_item_id = parseInt(exchange_item_id)
+    if (exchange_item_id) where.product_id = parseInt(exchange_item_id)
     if (status) where.status = status
     if (order_no) where.order_no = { [Op.like]: `%${order_no}%` }
     if (start_date || end_date) {
@@ -629,21 +452,11 @@ class BusinessRecordQueryService {
       include: [
         { model: User, as: 'user', attributes: ['user_id', 'nickname', 'mobile'] },
         {
-          model: ExchangeItem,
-          as: 'item',
-          attributes: ['exchange_item_id', 'item_name', 'cost_asset_code', 'cost_amount']
-        },
-        // 迁移路径：Product 统一商品关联（exchange_records.product_id）
-        ...(Product
-          ? [
-              {
-                model: Product,
-                as: 'product',
-                attributes: ['product_id', 'name', 'status'],
-                required: false
-              }
-            ]
-          : [])
+          model: Product,
+          as: 'product',
+          attributes: ['product_id', 'product_name', 'status'],
+          required: false
+        }
       ],
       ...pagination
     })
@@ -668,23 +481,16 @@ class BusinessRecordQueryService {
    * @returns {Promise<Object|null>} 记录详情
    */
   static async getExchangeRecordById(record_id) {
-    // 迁移路径：ExchangeItem → Product（统一商品模型）
-    const { ExchangeRecord, User, ExchangeItem, Product } = require('../../models')
+    const { ExchangeRecord, User, Product } = require('../../models')
 
     const record = await ExchangeRecord.findByPk(parseInt(record_id), {
       include: [
         { model: User, as: 'user', attributes: ['user_id', 'nickname', 'mobile'] },
-        { model: ExchangeItem, as: 'item' },
-        // 迁移路径：Product 统一商品关联
-        ...(Product
-          ? [
-              {
-                model: Product,
-                as: 'product',
-                required: false
-              }
-            ]
-          : [])
+        {
+          model: Product,
+          as: 'product',
+          required: false
+        }
       ]
     })
 

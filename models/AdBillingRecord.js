@@ -15,7 +15,6 @@
  * 数据库表名：ad_billing_records
  * 主键：ad_billing_record_id（BIGINT，自增）
  *
- * @see docs/广告系统升级方案.md
  */
 
 const { DataTypes } = require('sequelize')

@@ -14,7 +14,6 @@
  * @module routes/console/feature-flags
  * @author Feature Flag 灰度发布模块
  * @since 2026-01-21
- * @see docs/Feature-Flag灰度发布功能实施方案.md
  */
 
 'use strict'

@@ -532,8 +532,8 @@
           <label class="block text-sm font-medium text-gray-700 mb-1">目标分类</label>
           <select x-model.number="batchCategoryDefId" class="w-full border rounded px-3 py-2 text-sm">
             <option value="">请选择分类</option>
-            <template x-for="cat in (categoryOptions || [])" :key="cat.category_def_id">
-              <option :value="cat.category_def_id" x-text="cat.display_name"></option>
+            <template x-for="cat in (categoryOptions || [])" :key="cat.value">
+              <option :value="cat.value" x-text="cat.label"></option>
             </template>
           </select>
         </div>
@@ -756,13 +756,13 @@
             </div>
             <div>
               <label class="block text-sm font-medium themed-text-secondary mb-1">商品分类</label>
-              <select x-model="itemForm.category_def_id" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
+              <select x-model="itemForm.category_id" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
                 <option :value="null">未分类</option>
                 <template x-for="cat in categoryOptions" :key="cat.value">
-                  <option :value="cat.value" :disabled="cat.level === 1 && categoryOptions.some(c => c.parent_category_def_id === cat.value)" x-text="(cat.level === 2 ? '  └ ' : '') + cat.label"></option>
+                  <option :value="cat.value" :disabled="cat.level === 1 && categoryOptions.some(c => c.parent_category_id === cat.value)" x-text="(cat.level === 2 ? '  └ ' : '') + cat.label"></option>
                 </template>
               </select>
-              <p class="text-xs text-gray-400 mt-1">两级分类体系，选择具体子分类</p>
+              <p class="text-xs text-gray-400 mt-1">统一商品中心品类树，选择具体子分类</p>
             </div>
           </div>
           <div class="grid grid-cols-2 gap-4">
@@ -866,6 +866,29 @@
                 <span x-show="showcaseImageUploading" class="text-xs text-gray-400">上传中...</span>
                 <input type="file" accept="image/*" @change="uploadShowcaseImage($event)" class="hidden">
               </label>
+            </div>
+          </div>
+          <!-- 物品系统关联（铸造实例 + 关联模板） -->
+          <div class="border rounded-lg p-4 bg-blue-50/30">
+            <label class="block text-sm font-medium themed-text-secondary mb-3">🔗 物品系统关联</label>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" x-model="itemForm.mint_instance" class="w-4 h-4 text-blue-500 rounded focus:ring-blue-500">
+                  <span class="text-sm">⚙️ 兑换后铸造物品实例</span>
+                </label>
+                <p class="text-xs text-gray-400 mt-1 ml-6">开启后兑换将自动铸造 Item 进入用户背包，可在 C2C 市场交易</p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">关联物品模板</label>
+                <select x-model.number="itemForm.item_template_id" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" :disabled="!itemForm.mint_instance">
+                  <option :value="null">不关联</option>
+                  <template x-for="tpl in itemTemplateOptions" :key="tpl.value">
+                    <option :value="tpl.value" x-text="tpl.label"></option>
+                  </template>
+                </select>
+                <p class="text-xs text-gray-400 mt-1">铸造时使用的物品定义模板（品质规则、稀有度等）</p>
+              </div>
             </div>
           </div>
           <!-- 商品标记（布尔开关） -->

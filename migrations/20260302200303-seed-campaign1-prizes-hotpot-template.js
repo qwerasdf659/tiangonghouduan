@@ -14,7 +14,6 @@
  * - fallback 严格 1 个，prize_value_points=0，prize_type=points
  * - low 档非 fallback 的 prize_value_points >= 1
  *
- * @see docs/抽奖活动奖品数量配置方案.md 第三章
  */
 module.exports = {
   async up(queryInterface, _Sequelize) {
@@ -304,3 +303,4 @@ module.exports = {
     console.log('[Seed rollback] 已删除活动 1 火锅店模板奖品')
   }
 }
+

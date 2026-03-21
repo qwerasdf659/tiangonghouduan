@@ -26,7 +26,6 @@
  * - 通过 ServiceManager 获取 consumption_anomaly 服务
  * - 使用 res.apiSuccess / res.apiError 统一响应
  *
- * @see docs/后端数据库开发任务清单-2026年1月.md P1 阶段任务
  */
 
 'use strict'

@@ -24,9 +24,25 @@ const logger = require('../../../utils/logger').logger
  */
 
 const express = require('express')
+const ExcelJS = require('exceljs')
 const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
 const { handleServiceError } = require('../../../middleware/validation')
+
+/**
+ * Append a worksheet from an array of row objects (keys become column headers).
+ * @param {import('exceljs').Workbook} workbook - ExcelJS workbook
+ * @param {string} sheetName
+ * @param {object[]} rows
+ */
+function addJsonSheet(workbook, sheetName, rows) {
+  if (!rows || rows.length === 0) return
+  const ws = workbook.addWorksheet(sheetName)
+  const keys = Object.keys(rows[0])
+  ws.columns = keys.map((key) => ({ header: key, key, width: 18 }))
+  ws.getRow(1).font = { bold: true }
+  ws.addRows(rows)
+}
 
 /**
  * GET /api/v4/statistics/charts - 获取图表统计数据
@@ -127,8 +143,6 @@ router.get('/report', authenticateToken, requireRoleLevel(100), async (req, res)
  */
 router.get('/export', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const XLSX = require('xlsx')
-
     // 1. 通过 ServiceManager 获取 ChartsService（V4.7.0 服务拆分：getChartsData 在 ChartsService 中）
     const ChartsService = req.app.locals.services.getService('reporting_charts')
 
@@ -141,21 +155,22 @@ router.get('/export', authenticateToken, requireRoleLevel(100), async (req, res)
     const { user_growth, user_types, lottery_trend, consumption_trend, points_flow, top_prizes } =
       await ChartsService.getChartsData(days)
 
-    // 4. 创建工作簿
-    const workbook = XLSX.utils.book_new()
+    // 4. 创建工作簿（ExcelJS）
+    const workbook = new ExcelJS.Workbook()
 
     // 5. 用户增长趋势表
-    const user_growth_sheet = XLSX.utils.json_to_sheet(
+    addJsonSheet(
+      workbook,
+      '用户增长趋势',
       user_growth.map(item => ({
         日期: item.date,
         新增用户: item.count,
         累计用户: item.cumulative
       }))
     )
-    XLSX.utils.book_append_sheet(workbook, user_growth_sheet, '用户增长趋势')
 
     // 6. 用户类型分布表
-    const user_types_sheet = XLSX.utils.json_to_sheet([
+    addJsonSheet(workbook, '用户类型分布', [
       {
         用户类型: '普通用户',
         数量: user_types.regular.count,
@@ -169,11 +184,12 @@ router.get('/export', authenticateToken, requireRoleLevel(100), async (req, res)
       },
       { 用户类型: '总计', 数量: user_types.total, 占比: '100.00%' }
     ])
-    XLSX.utils.book_append_sheet(workbook, user_types_sheet, '用户类型分布')
 
     // 7. 抽奖趋势表（如果有数据）- V4.0语义更新
     if (lottery_trend.length > 0) {
-      const lottery_trend_sheet = XLSX.utils.json_to_sheet(
+      addJsonSheet(
+        workbook,
+        '抽奖趋势',
         lottery_trend.map(item => ({
           日期: item.date,
           抽奖次数: item.count,
@@ -182,12 +198,13 @@ router.get('/export', authenticateToken, requireRoleLevel(100), async (req, res)
           高档奖励率: (item.high_tier_rate || 0) + '%'
         }))
       )
-      XLSX.utils.book_append_sheet(workbook, lottery_trend_sheet, '抽奖趋势')
     }
 
     // 8. 消费趋势表（如果有数据）
     if (consumption_trend.length > 0) {
-      const consumption_trend_sheet = XLSX.utils.json_to_sheet(
+      addJsonSheet(
+        workbook,
+        '消费趋势',
         consumption_trend.map(item => ({
           日期: item.date,
           消费笔数: item.count,
@@ -195,12 +212,13 @@ router.get('/export', authenticateToken, requireRoleLevel(100), async (req, res)
           平均消费: parseFloat(item.avg_amount)
         }))
       )
-      XLSX.utils.book_append_sheet(workbook, consumption_trend_sheet, '消费趋势')
     }
 
     // 9. 积分流水表（如果有数据）
     if (points_flow.length > 0) {
-      const points_flow_sheet = XLSX.utils.json_to_sheet(
+      addJsonSheet(
+        workbook,
+        '积分流水',
         points_flow.map(item => ({
           日期: item.date,
           积分收入: item.earned,
@@ -208,12 +226,13 @@ router.get('/export', authenticateToken, requireRoleLevel(100), async (req, res)
           净变化: item.balance_change
         }))
       )
-      XLSX.utils.book_append_sheet(workbook, points_flow_sheet, '积分流水')
     }
 
     // 10. 热门奖品表（如果有数据）
     if (top_prizes.length > 0) {
-      const top_prizes_sheet = XLSX.utils.json_to_sheet(
+      addJsonSheet(
+        workbook,
+        '热门奖品TOP10',
         top_prizes.map((item, index) => ({
           排名: index + 1,
           奖品名称: item.prize_name,
@@ -221,11 +240,10 @@ router.get('/export', authenticateToken, requireRoleLevel(100), async (req, res)
           占比: item.percentage + '%'
         }))
       )
-      XLSX.utils.book_append_sheet(workbook, top_prizes_sheet, '热门奖品TOP10')
     }
 
     // 11. 生成Excel buffer
-    const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' })
+    const excelBuffer = Buffer.from(await workbook.xlsx.writeBuffer())
 
     // 12. 设置响应头
     const now = new Date()

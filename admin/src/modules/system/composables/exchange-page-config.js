@@ -5,7 +5,6 @@
  * @description 兑换页面配置的状态管理和操作方法（Tab/空间/筛选/卡片主题/运营参数）
  * @version 1.0.0
  * @date 2026-02-19
- * @see docs/exchange-config-implementation.md Section 五
  */
 
 import { API_PREFIX } from '../../../api/base.js'
@@ -329,3 +328,4 @@ export function useExchangePageConfigMethods() {
     }
   }
 }
+

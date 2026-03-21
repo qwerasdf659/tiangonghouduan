@@ -10,7 +10,6 @@
  * - 路由层不直连 models，通过 ServiceManager 获取 AdReportService
  * - 使用 res.apiSuccess / res.apiError 统一响应
  *
- * @see docs/广告系统升级方案.md Phase 6
  */
 
 const express = require('express')

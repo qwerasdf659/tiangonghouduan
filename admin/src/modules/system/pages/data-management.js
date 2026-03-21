@@ -14,7 +14,6 @@
  * - 对账校验：复用已有资产/物品域对账 API
  * - 清理历史：审计日志查询
  *
- * @see docs/数据一键删除功能设计方案.md
  */
 
 import { logger } from '../../../utils/logger.js'
@@ -44,3 +43,4 @@ function dataManagementPage() {
 Alpine.data('dataManagementPage', dataManagementPage)
 
 export default dataManagementPage
+

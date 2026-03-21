@@ -15,7 +15,6 @@
  *
  * 数据来源：system_configs 表，config_key = 'exchange_page'
  *
- * @see docs/exchange-config-implementation.md Section 3.4
  * @date 2026-02-19
  */
 
@@ -26,6 +25,7 @@ const router = express.Router()
 const logger = require('../../../../utils/logger').logger
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const { handleServiceError } = require('../../../../middleware/validation')
+const ServiceManager = require('../../../../services')
 
 router.use(authenticateToken, requireRoleLevel(100))
 
@@ -205,24 +205,18 @@ function validateExchangePageConfig(config) {
  */
 router.get('/', async (req, res) => {
   try {
-    const { SystemConfig } = req.app.locals.models
+    const AdminSystemService = ServiceManager.getService('admin_system')
+    const configData = await AdminSystemService.getConfigValue('exchange_page')
 
-    const config = await SystemConfig.getByKey('exchange_page')
-
-    if (!config) {
+    if (!configData) {
       return res.apiSuccess(
         { tabs: [], spaces: [], shop_filters: {}, market_filters: {}, card_display: {}, ui: {} },
         '配置为空（尚未配置兑换页面）'
       )
     }
 
-    const configData = config.getValue()
-    const version = config.updated_at
-      ? new Date(config.updated_at).getTime().toString()
-      : Date.now().toString()
-
     return res.apiSuccess(
-      { ...configData, version, updated_at: config.updated_at },
+      { ...configData, version: Date.now().toString() },
       '获取兑换页面配置成功',
       'EXCHANGE_PAGE_CONFIG_GET_SUCCESS'
     )
@@ -258,12 +252,11 @@ router.put('/', async (req, res) => {
       )
     }
 
-    const { SystemConfig } = req.app.locals.models
+    const AdminSystemService = ServiceManager.getService('admin_system')
 
-    await SystemConfig.upsert('exchange_page', configValue, {
+    await AdminSystemService.upsertConfig('exchange_page', configValue, {
       description: '兑换页面配置 — Tab/空间/筛选/卡片主题/运营参数的统一下发配置',
-      config_category: 'feature',
-      is_active: true
+      category: 'feature'
     })
 
     // 记录审计日志

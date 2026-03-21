@@ -861,35 +861,46 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
       console.log('📊 用户A DIAMOND 变化:', userADiamondDelta)
       expect(Number(userADiamondAfter)).toBeGreaterThanOrEqual(Number(userADiamondBefore))
 
-      /* Step 5: 用户B使用red_shard兑换exchange_items */
+      /* Step 5: 用户B使用red_shard兑换商品 */
       console.log('📝 Step 5: 用户B使用 red_shard 兑换商品')
 
-      /* 查找可用的兑换商品（使用 red_shard 支付） */
-      const { ExchangeItem } = require('../../../models')
-      const exchangeItem = await ExchangeItem.findOne({
-        where: {
-          cost_asset_code: 'red_shard',
-          status: 'active',
-          stock: { [sequelize.Sequelize.Op.gt]: 0 }
-        }
+      /* 查找可用的兑换商品（使用 red_shard 支付）— Product + ProductSku + ExchangeChannelPrice */
+      const { Product: ExchangeProduct, ProductSku, ExchangeChannelPrice } = require('../../../models')
+      const exchangeProduct = await ExchangeProduct.findOne({
+        where: { status: 'active' },
+        include: [{
+          model: ProductSku,
+          as: 'skus',
+          where: { stock: { [sequelize.Sequelize.Op.gt]: 0 }, status: 'active' },
+          required: true,
+          include: [{
+            model: ExchangeChannelPrice,
+            as: 'channelPrices',
+            where: { cost_asset_code: 'red_shard', is_enabled: true },
+            required: true
+          }]
+        }]
       })
 
-      if (!exchangeItem) {
+      if (!exchangeProduct) {
         console.log('⏭️ 未找到使用 red_shard 支付的兑换商品，跳过兑换步骤')
-        console.log('💡 提示：需要在 exchange_items 表中配置 cost_asset_code=red_shard 的商品')
+        console.log('💡 提示：需要在 products + product_skus + exchange_channel_prices 中配置 cost_asset_code=red_shard 的商品')
         console.log('✅ 11.6 多用户交互场景测试完成（挂牌+购买流程已验证，兑换步骤跳过）')
         return
       }
 
+      const matchedSku = exchangeProduct.skus[0]
+      const matchedPrice = matchedSku.channelPrices[0]
+
       console.log('📝 找到可兑换商品:', {
-        exchange_item_id: exchangeItem.exchange_item_id,
-        name: exchangeItem.name,
-        cost_asset_code: exchangeItem.cost_asset_code,
-        cost_amount: exchangeItem.cost_amount
+        product_id: exchangeProduct.product_id,
+        product_name: exchangeProduct.product_name,
+        cost_asset_code: matchedPrice.cost_asset_code,
+        cost_amount: matchedPrice.cost_amount
       })
 
       /* 确保用户B有足够的red_shard进行兑换 */
-      const requiredShard = exchangeItem.cost_amount || 1
+      const requiredShard = matchedPrice.cost_amount || 1
       if (userBShardAfter < requiredShard) {
         console.log('⏭️ 用户B red_shard 不足，跳过兑换步骤')
         console.log('✅ 11.6 多用户交互场景测试完成（挂牌+购买流程已验证，兑换步骤跳过）')
@@ -901,10 +912,11 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
         const exchangeResult = await TransactionManager.execute(async transaction => {
           return await ExchangeService.exchangeItem(
             userBId,
-            exchangeItem.exchange_item_id,
-            1, // 兑换数量
+            exchangeProduct.product_id,
+            1,
             {
               idempotency_key: generateIdempotencyKey('multi_user_exchange'),
+              sku_id: matchedSku.sku_id,
               transaction
             }
           )
@@ -912,7 +924,7 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
 
         console.log('✅ 兑换成功:', {
           order_no: exchangeResult?.order_no,
-          item_name: exchangeItem.name
+          product_name: exchangeProduct.product_name
         })
 
         /* 验证兑换后用户B的red_shard余额减少 — Number() 确保 BIGINT/DECIMAL 正确比较 */

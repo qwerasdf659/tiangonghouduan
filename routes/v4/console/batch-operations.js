@@ -69,12 +69,12 @@ function getBatchOperationService(req) {
 }
 
 /**
- * 获取 SystemConfigService
+ * 获取 AdminSystemService
  * @param {Object} req - Express 请求对象
- * @returns {Object} SystemConfigService
+ * @returns {Object} AdminSystemService
  */
-function getSystemConfigService(req) {
-  return req.app.locals.services.getService('system_config')
+function getAdminSystemService(req) {
+  return req.app.locals.services.getService('admin_system')
 }
 
 /**
@@ -1125,7 +1125,7 @@ router.get('/config', authenticateToken, requireRoleLevel(100), async (req, res)
   try {
     // 通过 ServiceManager 获取 models（Phase 3 收口）
     const { BatchOperationLog } = req.app.locals.models
-    const configs = await getSystemConfigService(req).getAllBatchConfigs()
+    const configs = await getAdminSystemService(req).getAllBatchConfigs()
 
     return res.apiSuccess(
       {

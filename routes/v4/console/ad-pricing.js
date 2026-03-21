@@ -40,11 +40,11 @@ router.get(
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
     const ServiceManager = require('../../../services')
-    const SystemConfigService = ServiceManager.getService('system_config')
+    const AdminSystemService = ServiceManager.getService('admin_system')
 
     const config = {}
     for (const key of PRICING_CONFIG_KEYS) {
-      config[key] = await SystemConfigService.getValue(key, null)
+      config[key] = await AdminSystemService.getConfigValue(key, null)
     }
 
     return res.apiSuccess(config, '获取定价配置成功')
@@ -71,13 +71,10 @@ router.put(
     }
 
     const ServiceManager = require('../../../services')
-    const SystemConfigService = ServiceManager.getService('system_config')
+    const AdminSystemService = ServiceManager.getService('admin_system')
 
-    const serializedValue =
-      typeof config_value === 'string' ? config_value : JSON.stringify(config_value)
-
-    await SystemConfigService.upsert(config_key, serializedValue, {
-      config_category: 'ad_pricing',
+    await AdminSystemService.upsertConfig(config_key, config_value, {
+      category: 'ad_pricing',
       description: `广告定价配置 - ${config_key}`
     })
 
@@ -330,9 +327,9 @@ router.post(
       }
 
       const ServiceManager = require('../../../services')
-      const SystemConfigService = ServiceManager.getService('system_config')
+      const AdminSystemService = ServiceManager.getService('admin_system')
 
-      const currentTiers = await SystemConfigService.getValue('ad_dau_coefficient_tiers', null)
+      const currentTiers = await AdminSystemService.getConfigValue('ad_dau_coefficient_tiers', null)
       if (currentTiers && log.new_coefficient) {
         logger.info('[广告定价] 执行调价：更新 DAU 系数配置', {
           adjustment_id: adjustmentId,

@@ -354,7 +354,7 @@ document.addEventListener('alpine:init', () => {
           delete metaCopy.attribute_rules
 
           this.max_edition =
-            metaObj.max_edition != null && metaObj.max_edition !== '' ? Number(metaObj.max_edition) : null
+            t.max_edition != null ? Number(t.max_edition) : metaObj.max_edition != null ? Number(metaObj.max_edition) : null
           this.attribute_rules = this.normalizeAttributeRules(metaObj.attribute_rules)
 
           this.form = {
@@ -428,10 +428,6 @@ document.addEventListener('alpine:init', () => {
         finalMeta.allowed_actions = this.form.allowed_actions
       }
 
-      if (this.max_edition != null && this.max_edition !== '' && !Number.isNaN(Number(this.max_edition))) {
-        finalMeta.max_edition = Number(this.max_edition)
-      }
-
       finalMeta.attribute_rules = this.buildAttributeRulesPayload()
 
       const data = {
@@ -443,6 +439,10 @@ document.addEventListener('alpine:init', () => {
         primary_media_id: this.form.primary_media_id || null,
         reference_price_points: this.form.reference_price_points || 0,
         description: this.form.description || null,
+        max_edition:
+          this.max_edition != null && this.max_edition !== '' && !Number.isNaN(Number(this.max_edition))
+            ? Number(this.max_edition)
+            : null,
         meta: Object.keys(finalMeta).length > 0 ? finalMeta : null
       }
 

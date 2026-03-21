@@ -13,7 +13,6 @@
  * 迁移后配额读取路径统一为：
  *   AdminSystemService.getSettingValue('points', 'diamond_quota_*')
  *
- * @see docs/钻石配额配置修复与优化方案.md §7.1 / §17.1
  */
 
 /** @type {import('sequelize-cli').Migration} */
@@ -118,3 +117,4 @@ module.exports = {
     }
   }
 }
+

@@ -23,8 +23,7 @@ const _logger = require('../utils/logger').logger
 
 /** 业务表 primary_media_id 映射（attach role='primary' 时自动更新） */
 const PRIMARY_MEDIA_TABLES = {
-  exchange_item: { modelName: 'ExchangeItem', pk: 'exchange_item_id' },
-  // 迁移路径：Product 统一商品模型
+  exchange_item: { modelName: 'Product', pk: 'product_id' },
   product: { modelName: 'Product', pk: 'product_id' },
   lottery_prize: { modelName: 'LotteryPrize', pk: 'lottery_prize_id' },
   item_template: { modelName: 'ItemTemplate', pk: 'item_template_id' },

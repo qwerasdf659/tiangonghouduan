@@ -27,7 +27,7 @@ const lotteryQuotaRoutes = require('./lottery-quota') // 🆕 抽奖配额管理
 const assetAdjustmentRoutes = require('./asset-adjustment') // 🆕 资产调整管理（2025-12-30）
 const campaignBudgetRoutes = require('./campaign-budget') // 🆕 活动预算管理（2026-01-03 BUDGET_POINTS架构）
 const assetsRoutes = require('./assets') // 🆕 后台运营资产中心（2026-01-07 架构重构）
-// images.js 已删除（image_resources 架构废弃），图片管理由 /media 路由接管
+// 旧图片独立路由已移除，图片管理由 /media 路由接管
 const orphanFrozenRoutes = require('./orphan-frozen') // 🆕 孤儿冻结清理（P0-2 2026-01-09）
 const merchantPointsRoutes = require('./merchant-points') // 🆕 商家积分审核管理（P1 2026-01-09）
 const userHierarchyRoutes = require('./user-hierarchy') // 🆕 用户层级管理（业务员/门店管理 2026-01-09）
@@ -37,6 +37,7 @@ const regionsRoutes = require('./regions') // 🆕 行政区划管理（2026-01-
 const staffRoutes = require('./staff') // 🆕 员工管理（2026-01-12 商家员工域权限体系升级 Phase 3）
 const auditLogsRoutes = require('./audit-logs') // 🆕 商家操作审计日志（2026-01-12 商家员工域权限体系升级 AC4.3）
 const riskAlertsRoutes = require('./risk-alerts') // 🆕 风控告警管理（2026-01-12 商家员工域权限体系升级 AC5）
+const alertSilenceRoutes = require('./alert-silence') // 🆕 告警静默规则管理（2026-03-20）
 const debtManagementRoutes = require('./debt-management') // 🆕 欠账管理（2026-01-18 统一抽奖架构）
 const dictionariesRoutes = require('./dictionaries') // 🆕 字典表管理（2026-01-21 API覆盖率补齐）
 const lotteryConfigsRoutes = require('./lottery-configs') // 🆕 抽奖配置管理（2026-01-21 API覆盖率补齐）
@@ -127,6 +128,7 @@ router.use('/regions', regionsRoutes) // 🆕 行政区划管理路由（2026-01
 router.use('/staff', staffRoutes) // 🆕 员工管理路由（2026-01-12 商家员工域权限体系升级 Phase 3）
 router.use('/audit-logs', auditLogsRoutes) // 🆕 商家操作审计日志路由（2026-01-12 商家员工域权限体系升级 AC4.3）
 router.use('/risk-alerts', riskAlertsRoutes) // 🆕 风控告警管理路由（2026-01-12 商家员工域权限体系升级 AC5）
+router.use('/alert-silence-rules', alertSilenceRoutes) // 🆕 告警静默规则管理路由（2026-03-20）
 router.use('/debt-management', debtManagementRoutes) // 🆕 欠账管理路由（2026-01-18 统一抽奖架构）
 router.use('/dictionaries', dictionariesRoutes) // 🆕 字典表管理路由（2026-01-21 API覆盖率补齐）
 router.use('/lottery-configs', lotteryConfigsRoutes) // 🆕 抽奖配置管理路由（2026-01-21 API覆盖率补齐）
@@ -344,7 +346,7 @@ router.get('/', (req, res) => {
         ],
         note: '资产总览、物品列表、物品详情、物品事件历史；权限要求：admin（可写）或 ops（只读）'
       },
-      // images 模块已废弃（image_resources 表已删除），使用 media 模块
+      // images 模块已废弃，使用 media 模块
       orphan_frozen: {
         description: '孤儿冻结清理（P0-2 2026-01-09）',
         endpoints: ['/orphan-frozen/detect', '/orphan-frozen/stats', '/orphan-frozen/cleanup'],
@@ -490,6 +492,14 @@ router.get('/', (req, res) => {
           '/risk-alerts/types'
         ],
         note: '风控告警查询、复核、统计；支持频次阻断、金额告警、关联告警；仅限 admin 访问'
+      },
+      alert_silence_rules: {
+        description: '告警静默规则管理（2026-03-20）',
+        endpoints: [
+          '/alert-silence-rules',
+          '/alert-silence-rules/:id'
+        ],
+        note: '告警静默规则的增删改查，用于抑制特定条件下的重复告警'
       },
       debt_management: {
         description: '欠账管理（2026-01-18 统一抽奖架构）',

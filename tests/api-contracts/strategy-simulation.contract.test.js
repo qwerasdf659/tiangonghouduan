@@ -11,7 +11,6 @@
  * - 管理员权限：authenticateToken + requireRoleLevel(100)
  * - 路由前缀：/api/v4/console/lottery-simulation
  *
- * @see docs/策略效果模拟分析页面-设计方案.md Section 六
  */
 
 const request = require('supertest')

@@ -506,6 +506,23 @@ class MerchantRiskControlService {
     }
 
     try {
+      // 静默规则检查
+      const { AlertSilenceRule } = models
+      if (AlertSilenceRule) {
+        const isSilenced = await AlertSilenceRule.isAlertSilenced(
+          alertData.alert_type,
+          alertData.severity
+        )
+        if (isSilenced) {
+          logger.info('风控告警被静默规则抑制', {
+            alert_type: alertData.alert_type,
+            severity: alertData.severity,
+            rule_name: alertData.rule_name
+          })
+          return null
+        }
+      }
+
       const alert = await RiskAlert.create({
         alert_type: alertData.alert_type,
         severity: alertData.severity,
@@ -518,7 +535,7 @@ class MerchantRiskControlService {
         actual_value: alertData.actual_value,
         alert_message: alertData.alert_message,
         is_blocked: alertData.is_blocked || false,
-        status: 'pending', // 待处理
+        status: 'pending',
         created_at: BeijingTimeHelper.createDatabaseTime()
       })
 

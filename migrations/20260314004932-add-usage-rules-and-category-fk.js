@@ -12,7 +12,6 @@
  * - exchange_items.category 为 VARCHAR(50)，与 category_defs.category_code 类型一致
  *
  * @since 2026-03-14
- * @see docs/兑换详情页B+C混合方案设计文档.md 任务 B1/B2
  */
 module.exports = {
   async up(queryInterface, Sequelize) {
@@ -69,3 +68,4 @@ module.exports = {
     await queryInterface.removeColumn('exchange_items', 'usage_rules')
   }
 }
+

@@ -23,7 +23,6 @@
  *   app        - 原生 App（预留）
  *   unknown    - 仅用于旧数据迁移回填，新请求不会产生此值
  *
- * @see docs/multi-platform-session-design.md
  * @created 2026-02-19
  * @updated 2026-02-20（修复：微信小程序 wx.request UA 不含 MicroMessenger 导致误判为 web）
  */

@@ -15,7 +15,6 @@
  * | system_dictionary_history   | 180      |
  * | ad_billing_records          | 365      |
  *
- * @see docs/数据一键删除功能设计方案.md 第四节
  */
 
 const MISSING_POLICIES = [
@@ -96,3 +95,4 @@ module.exports = {
     console.log('[迁移回滚] 已移除 5 条补充的清理策略')
   }
 }
+

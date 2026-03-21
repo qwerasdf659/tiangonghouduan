@@ -104,20 +104,6 @@ router.post(
       const userId = req.user.user_id
       const { item_id, price_amount } = req.body
 
-      // 【不做兼容】参数命名严格对齐最终方案（snake_case）
-      if (
-        req.body.inventory_id !== undefined ||
-        req.body.selling_amount !== undefined ||
-        req.body.item_instance_id !== undefined
-      ) {
-        return res.apiError(
-          '参数已升级：请使用 item_id 与 price_amount（不再支持 inventory_id/selling_amount/item_instance_id）',
-          'BAD_REQUEST',
-          null,
-          400
-        )
-      }
-
       if (!item_id || price_amount === undefined) {
         return res.apiError('缺少必要参数：item_id 和 price_amount', 'BAD_REQUEST', null, 400)
       }

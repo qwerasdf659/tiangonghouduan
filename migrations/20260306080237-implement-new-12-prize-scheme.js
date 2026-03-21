@@ -23,7 +23,6 @@
  * - fallback 严格 1 个
  * - 项目未上线，安全清理测试数据
  *
- * @see docs/抽奖奖品体系全新设计方案.md
  */
 module.exports = {
   async up(queryInterface, _Sequelize) {
@@ -494,3 +493,4 @@ module.exports = {
     }
   }
 }
+

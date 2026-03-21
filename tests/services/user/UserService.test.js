@@ -21,8 +21,6 @@
  */
 
 const { sequelize, User, Role, UserRole } = require('../../../models')
-/* BusinessError 用于后续错误处理测试场景扩展 */
-// const BusinessError = require('../../../utils/BusinessError')
 
 // 延迟加载 UserService（通过 ServiceManager 获取）
 let UserService

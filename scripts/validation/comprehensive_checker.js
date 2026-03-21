@@ -67,7 +67,6 @@ const SUB_ROUTE_MAP = {
     'customer-service': '/customer-service',
     marketplace: '/marketplace',
     material: '/material',
-    'popup-banners': '/popup-banners',
     'lottery-quota': '/lottery-quota',
     'asset-adjustment': '/asset-adjustment',
     'campaign-budget': '/campaign-budget',
@@ -120,7 +119,6 @@ const SUB_ROUTE_MAP = {
     chat: '', // router.use('/', chatRoutes) - 路径是 /chat/*
     feedback: '', // router.use('/', feedbackRoutes)
     notifications: '/notifications', // router.use('/notifications', notificationsRoutes)
-    'popup-banners': '', // router.use('/', popupBannersRoutes)
     statistics: '/statistics', // router.use('/statistics', statisticsRoutes)
     status: '', // router.use('/', statusRoutes)
     'user-stats': '' // router.use('/', userStatsRoutes)

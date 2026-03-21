@@ -18,7 +18,6 @@
  * 权限：authenticateToken + requireRoleLevel(100)（管理员）
  *
  * @module routes/v4/console/lottery-simulation
- * @see docs/策略效果模拟分析页面-设计方案.md Section 六
  * @since 2026-02-20
  */
 

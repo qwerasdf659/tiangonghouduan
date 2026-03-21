@@ -9,7 +9,6 @@
  * 环境变量控制：
  * - ENABLE_DATA_CLEANUP=true 时启用（默认禁用）
  *
- * @see docs/数据一键删除功能设计方案.md 第八节（定时清理 Job）
  * @module jobs/daily-data-cleanup
  */
 
@@ -91,3 +90,4 @@ if (!ENABLE_DATA_CLEANUP) {
   DataCleanupJob.init()
   module.exports = DataCleanupJob
 }
+

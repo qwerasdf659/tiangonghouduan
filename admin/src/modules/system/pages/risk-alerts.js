@@ -32,7 +32,7 @@
 
 // ES Module 导入
 import { logger } from '../../../utils/logger.js'
-import { SYSTEM_ENDPOINTS } from '../../../api/system/index.js'
+import { SYSTEM_ENDPOINTS, SystemAPI } from '../../../api/system/index.js'
 import { EXCHANGE_ENDPOINTS } from '../../../api/market/exchange.js'
 import { buildURL, request } from '../../../api/base.js'
 import { loadECharts } from '../../../utils/echarts-lazy.js'
@@ -284,6 +284,98 @@ function riskAlertsPage() {
      * @type {Object|null}
      */
     currentMergedAlertGroup: null,
+
+    // ==================== 静默规则 Tab 状态 ====================
+
+    /** @type {string} 当前激活的 Tab ('alerts' | 'silence') */
+    activeTab: 'alerts',
+
+    /** @type {boolean} 静默规则模态框可见 */
+    showSilenceRuleModal: false,
+
+    /** @type {boolean} 静默规则提交中 */
+    silenceRuleSubmitting: false,
+
+    /** @type {Object} 静默规则表单 */
+    silenceRuleForm: {
+      alert_silence_rule_id: null,
+      rule_name: '',
+      alert_type: 'risk',
+      alert_level: 'all',
+      start_time: '',
+      end_time: '',
+      effective_start_date: '',
+      effective_end_date: '',
+      is_active: true
+    },
+
+    /** @type {Object[]} data-table 列配置 - 静默规则 */
+    silenceRulesTableColumns: [
+      { key: 'alert_silence_rule_id', label: 'ID', sortable: true, type: 'code' },
+      { key: 'rule_name', label: '规则名称' },
+      {
+        key: 'alert_type',
+        label: '告警类型',
+        type: 'status',
+        statusMap: {
+          risk: { class: 'red', label: '风控' },
+          lottery: { class: 'yellow', label: '抽奖' },
+          system: { class: 'blue', label: '系统' },
+          budget: { class: 'purple', label: '预算' },
+          user: { class: 'gray', label: '用户' }
+        }
+      },
+      {
+        key: 'alert_level',
+        label: '级别',
+        type: 'status',
+        statusMap: {
+          all: { class: 'gray', label: '全部' },
+          critical: { class: 'red', label: '紧急' },
+          warning: { class: 'yellow', label: '警告' },
+          info: { class: 'blue', label: '信息' }
+        }
+      },
+      {
+        key: 'time_range',
+        label: '静默时段',
+        render: (_, row) => {
+          if (row.start_time && row.end_time) return `${row.start_time} ~ ${row.end_time}`
+          return '全天'
+        }
+      },
+      {
+        key: 'date_range',
+        label: '生效日期',
+        render: (_, row) => {
+          if (row.effective_start_date && row.effective_end_date)
+            return `${row.effective_start_date} ~ ${row.effective_end_date}`
+          if (row.effective_start_date) return `${row.effective_start_date} 起`
+          if (row.effective_end_date) return `至 ${row.effective_end_date}`
+          return '长期'
+        }
+      },
+      {
+        key: 'is_active',
+        label: '状态',
+        type: 'status',
+        statusMap: {
+          true: { class: 'green', label: '启用' },
+          false: { class: 'gray', label: '停用' }
+        }
+      },
+      { key: 'created_at', label: '创建时间', type: 'datetime', sortable: true },
+      {
+        key: '_actions',
+        label: '操作',
+        type: 'actions',
+        width: '150px',
+        actions: [
+          { name: 'edit_silence', label: '编辑', class: 'text-blue-600 hover:text-blue-800' },
+          { name: 'delete_silence', label: '删除', class: 'text-red-500 hover:text-red-700' }
+        ]
+      }
+    ],
 
     // ==================== data-table 数据源 ====================
 
@@ -1754,6 +1846,112 @@ function riskAlertsPage() {
      * @param {Object} alert - 告警对象
      * @returns {string|null} 升级状态文本
      */
+    // ==================== 静默规则 Tab 方法 ====================
+
+    async fetchSilenceRulesTableData(params) {
+      try {
+        const res = await SystemAPI.getAlertSilenceRules({
+          page: params.page || 1,
+          page_size: params.page_size || 20
+        })
+        if (res?.data?.list) {
+          return {
+            list: res.data.list,
+            total: res.data.pagination?.total_count || 0
+          }
+        }
+        return { list: [], total: 0 }
+      } catch (error) {
+        logger.error('[RiskAlerts] 获取静默规则失败', error)
+        this.showError('获取静默规则失败')
+        return { list: [], total: 0 }
+      }
+    },
+
+    openSilenceRuleModal(rule = null) {
+      if (rule) {
+        this.silenceRuleForm = {
+          alert_silence_rule_id: rule.alert_silence_rule_id,
+          rule_name: rule.rule_name || '',
+          alert_type: rule.alert_type || 'risk',
+          alert_level: rule.alert_level || 'all',
+          start_time: rule.start_time || '',
+          end_time: rule.end_time || '',
+          effective_start_date: rule.effective_start_date || '',
+          effective_end_date: rule.effective_end_date || '',
+          is_active: rule.is_active !== false
+        }
+      } else {
+        this.silenceRuleForm = {
+          alert_silence_rule_id: null,
+          rule_name: '',
+          alert_type: 'risk',
+          alert_level: 'all',
+          start_time: '',
+          end_time: '',
+          effective_start_date: '',
+          effective_end_date: '',
+          is_active: true
+        }
+      }
+      this.showSilenceRuleModal = true
+    },
+
+    async saveSilenceRule() {
+      if (!this.silenceRuleForm.rule_name || !this.silenceRuleForm.alert_type) {
+        this.showError('请填写规则名称和告警类型')
+        return
+      }
+      this.silenceRuleSubmitting = true
+      try {
+        const data = { ...this.silenceRuleForm }
+        const id = data.alert_silence_rule_id
+        delete data.alert_silence_rule_id
+
+        if (!data.start_time) delete data.start_time
+        if (!data.end_time) delete data.end_time
+        if (!data.effective_start_date) delete data.effective_start_date
+        if (!data.effective_end_date) delete data.effective_end_date
+
+        if (id) {
+          await SystemAPI.updateAlertSilenceRule(id, data)
+          this.showSuccess('静默规则更新成功')
+        } else {
+          await SystemAPI.createAlertSilenceRule(data)
+          this.showSuccess('静默规则创建成功')
+        }
+
+        this.showSilenceRuleModal = false
+        this.$dispatch('refresh-table', { tableId: 'silenceRulesTable' })
+      } catch (error) {
+        logger.error('[RiskAlerts] 保存静默规则失败', error)
+        this.showError(error?.data?.message || '保存失败')
+      } finally {
+        this.silenceRuleSubmitting = false
+      }
+    },
+
+    async deleteSilenceRule(rule) {
+      if (!confirm(`确认删除规则「${rule.rule_name}」？此操作不可恢复。`)) return
+      try {
+        await SystemAPI.deleteAlertSilenceRule(rule.alert_silence_rule_id)
+        this.showSuccess('静默规则已删除')
+        this.$dispatch('refresh-table', { tableId: 'silenceRulesTable' })
+      } catch (error) {
+        logger.error('[RiskAlerts] 删除静默规则失败', error)
+        this.showError('删除失败')
+      }
+    },
+
+    handleSilenceRulesAction(event) {
+      const { action, row } = event.detail || event
+      if (action === 'edit_silence') {
+        this.openSilenceRuleModal(row)
+      } else if (action === 'delete_silence') {
+        this.deleteSilenceRule(row)
+      }
+    },
+
     getEscalationStatus(alert) {
       if (alert.status !== 'pending') return null
 

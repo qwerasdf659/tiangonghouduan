@@ -21,7 +21,7 @@
 
 const crypto = require('crypto')
 const { BatchOperationLog } = require('../models')
-const SystemConfigService = require('./SystemConfigService')
+const AdminSystemService = require('./AdminSystemService')
 const logger = require('../utils/logger').logger
 const { getRedisClient: getRedisClientInstance } = require('../utils/UnifiedRedisClient')
 // BeijingTimeHelper 未在当前版本中使用，保留导入用于未来时间处理需求
@@ -204,7 +204,7 @@ class BatchOperationService {
   static async checkRateLimit(operator_id, operation_type) {
     try {
       // 获取限流配置
-      const config = await SystemConfigService.getBatchRateLimitConfig(operation_type)
+      const config = await AdminSystemService.getBatchRateLimitConfig(operation_type)
       const { cooldown_seconds } = config
 
       // 查询最近的操作
@@ -253,7 +253,7 @@ class BatchOperationService {
   static async checkConcurrencyLimit(operator_id) {
     try {
       // 获取全局配置
-      const globalConfig = await SystemConfigService.getBatchGlobalConfig()
+      const globalConfig = await AdminSystemService.getBatchGlobalConfig()
       const { max_concurrent_batches } = globalConfig
 
       // 查询处理中的操作
@@ -291,7 +291,7 @@ class BatchOperationService {
   static async checkBatchSizeLimit(operation_type, items_count) {
     try {
       // 获取限流配置
-      const config = await SystemConfigService.getBatchRateLimitConfig(operation_type)
+      const config = await AdminSystemService.getBatchRateLimitConfig(operation_type)
       const { max_items_per_request } = config
 
       if (items_count > max_items_per_request) {

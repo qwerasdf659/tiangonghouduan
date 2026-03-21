@@ -14,7 +14,6 @@
  * 创建时间：2026-02-18
  * 更新时间：2026-02-22（内容投放合并 — 新增运营/系统类型创建方法）
  *
- * @see docs/内容投放系统-重复功能合并方案.md
  */
 
 const logger = require('../utils/logger').logger

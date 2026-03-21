@@ -8,7 +8,6 @@
  *
  * @version 2.0.0
  * @date 2026-03-16
- * @see docs/图片管理体系设计方案.md §十四 步骤11
  *
  * @example
  * import { imageUploadMixin } from '@/alpine/mixins/image-upload.js'
@@ -247,3 +246,4 @@ export function imageUploadMixin(config = {}) {
     }
   }
 }
+

@@ -15,7 +15,6 @@
  * 数据库表名：ad_impression_logs
  * 主键：ad_impression_log_id（BIGINT，自增）
  *
- * @see docs/广告系统升级方案.md
  */
 
 const { DataTypes } = require('sequelize')

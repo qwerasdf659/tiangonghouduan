@@ -2,7 +2,6 @@
  * 报表服务子模块入口（V4.7.0 大文件拆分）
  *
  * @description 原 ReportingService.js (1820行) 已拆分为多个子服务
- * @see docs/大文件拆分方案（保持单体架构）.md
  *
  * 子服务职责划分：
  * - AnalyticsService: 决策分析、趋势分析

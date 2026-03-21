@@ -29,7 +29,6 @@ const {
   Account,
   Merchant,
   MaterialAssetType,
-  SystemConfig,
   RedemptionOrder,
   sequelize
 } = require('../models')
@@ -218,7 +217,7 @@ class BackpackService {
         transaction
       })
 
-      /* 格式化物品数据（正式列，无需解析 JSON），包含商家名称 */
+      /* 格式化物品数据（正式列，无需解析 JSON），包含商家名称和铸造属性 */
       const formattedItems = items.map(item => ({
         item_id: item.item_id,
         tracking_code: item.tracking_code,
@@ -231,6 +230,10 @@ class BackpackService {
         source: item.source,
         merchant_id: item.merchant_id || null,
         merchant_name: item.merchant?.merchant_name || null,
+        instance_attributes: item.instance_attributes || null,
+        serial_number: item.serial_number || null,
+        edition_total: item.edition_total || null,
+        item_template_id: item.item_template_id || null,
         has_redemption_code: false,
         acquired_at: item.created_at,
         prize_definition_id: item.prize_definition_id
@@ -265,7 +268,8 @@ class BackpackService {
         !_actionRulesCacheHolder.value ||
         now - _actionRulesCacheHolder.time > ACTION_RULES_CACHE_TTL
       ) {
-        _actionRulesCacheHolder.value = await SystemConfig.getValue('item_type_action_rules', {}) // eslint-disable-line require-atomic-updates
+        const AdminSystemService = require('./AdminSystemService')
+        _actionRulesCacheHolder.value = await AdminSystemService.getConfigValue('item_type_action_rules', {}) // eslint-disable-line require-atomic-updates
         _actionRulesCacheHolder.time = Date.now() // eslint-disable-line require-atomic-updates
       }
 
@@ -341,7 +345,8 @@ class BackpackService {
         !_actionRulesCacheHolder.value ||
         detailNow - _actionRulesCacheHolder.time > ACTION_RULES_CACHE_TTL
       ) {
-        _actionRulesCacheHolder.value = await SystemConfig.getValue('item_type_action_rules', {}) // eslint-disable-line require-atomic-updates
+        const AdminSystemService = require('./AdminSystemService')
+        _actionRulesCacheHolder.value = await AdminSystemService.getConfigValue('item_type_action_rules', {}) // eslint-disable-line require-atomic-updates
         _actionRulesCacheHolder.time = Date.now() // eslint-disable-line require-atomic-updates
       }
       const detailActionRules = _actionRulesCacheHolder.value
@@ -448,9 +453,10 @@ class BackpackService {
   static async getUseInstructions(item) {
     if (!item) return null
 
-    const { SystemConfig: SysConfig, ItemTemplate } = require('../models')
+    const { ItemTemplate } = require('../models')
+    const AdminSystemService = require('./AdminSystemService')
 
-    const instructionsConfig = await SysConfig.getValue('backpack_use_instructions', {})
+    const instructionsConfig = await AdminSystemService.getConfigValue('backpack_use_instructions', {})
     const itemType = item.item_type
 
     if (item.prize_definition_id) {

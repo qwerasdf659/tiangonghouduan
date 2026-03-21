@@ -471,7 +471,6 @@ async function authenticateToken(req, res, next) {
      * - 新设备登录时会使旧会话失效（is_active = false）
      * - 旧设备的 Token 虽然 JWT 有效，但会话已失效，应拒绝访问
      *
-     * @see docs/测试审计标准.md - P0-6 多设备登录冲突测试
      */
     if (decoded.session_token) {
       const { AuthenticationSession } = require('../models')
@@ -484,7 +483,6 @@ async function authenticateToken(req, res, next) {
          * - SESSION_EXPIRED：会话超时过期 → 前端尝试 Token 刷新
          * - SESSION_NOT_FOUND：记录被清理任务删除 → 前端直接重新登录
          *
-         * @see docs/SESSION_INVALIDATED认证异常解决方案.md - 方案C
          */
         const rawSession = await AuthenticationSession.findOne({
           where: { session_token: decoded.session_token }
@@ -877,7 +875,6 @@ function requirePermission(requiredPermission) {
  * // 返回：[{ store_id: 1, store_name: '测试门店', role_in_store: 'staff' }]
  *
  * @since 2026-01-12
- * @see docs/商家员工域权限体系升级方案.md - AC2 组织边界隔离
  */
 async function getUserStores(user_id) {
   try {
@@ -961,7 +958,6 @@ async function isUserActiveInStore(user_id, store_id) {
  * router.use(authenticateToken, requireMerchantDomainAccess())
  *
  * @since 2026-01-12
- * @see docs/商家员工域权限体系升级方案.md - AC1.4 域边界强制隔离
  */
 function requireMerchantDomainAccess() {
   // 允许访问商家域的角色名称列表
@@ -1093,7 +1089,6 @@ function requireMerchantDomainAccess() {
  * router.post('/submit', authenticateToken, requireMerchantPermission('consumption:create', { scope: 'store' }), handler)
  *
  * @since 2026-01-12
- * @see docs/商家员工域权限体系升级方案.md - AC1 权限分层
  */
 function requireMerchantPermission(capability, options = {}) {
   const { scope = 'global', storeIdParam = 'body' } = options

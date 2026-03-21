@@ -73,7 +73,6 @@ const logger = require('../utils/logger').logger
 
 /**
  * 中文显示名称助手（2026-01-22 中文化显示名称系统）
- * @see docs/中文化显示名称实施文档.md
  */
 const displayNameHelper = require('../utils/displayNameHelper')
 

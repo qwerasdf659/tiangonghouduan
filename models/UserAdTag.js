@@ -9,7 +9,6 @@
  * 数据库表名：user_ad_tags
  * 主键：user_ad_tag_id（BIGINT，自增）
  *
- * @see docs/广告系统升级方案.md
  */
 
 const { DataTypes } = require('sequelize')

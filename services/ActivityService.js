@@ -526,7 +526,7 @@ class ActivityService {
       total_campaigns: grouped.none.length
     }
 
-    // 总体汇总（兼容旧前端）
+    // 总体汇总（跨模式聚合统计）
     const summary = {
       total_campaigns: allResults.length,
       total_budget: poolSummary.total_budget + userSummary.total_user_budget_balance,

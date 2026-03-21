@@ -87,7 +87,6 @@ module.exports = sequelize => {
        *
        * 格式：trade_order_{buyer_id}_{market_listing_id}_{timestamp}
        *
-       * @see docs/事务边界治理现状核查报告.md 建议9.1
        */
       business_id: {
         type: DataTypes.STRING(150),

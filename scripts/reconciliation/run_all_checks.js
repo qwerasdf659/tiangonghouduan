@@ -11,7 +11,6 @@
  * - CI/CD：npm run pre-deploy-check
  *
  * @since 2026-01-05
- * @see docs/事务边界治理现状核查报告.md
  */
 
 'use strict'
@@ -138,3 +137,4 @@ if (require.main === module) {
 }
 
 module.exports = { run_all_checks }
+

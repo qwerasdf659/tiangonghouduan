@@ -11,7 +11,6 @@
  *
  * 影响范围：删除 4 个 campaign × 3 个阈值 = 12 行
  *
- * @see docs/抽奖活动奖品数量配置方案.md D9 决定项
  */
 module.exports = {
   async up(queryInterface, _Sequelize) {
@@ -57,3 +56,4 @@ module.exports = {
     console.log('[D9 rollback] 已恢复 budget_tier 静态阈值配置')
   }
 }
+

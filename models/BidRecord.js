@@ -14,7 +14,6 @@
  * 主键命名：bid_record_id
  * 创建时间：2026-02-16
  *
- * @see docs/臻选空间-幸运空间-竞价功能-后端实施方案.md §3.3
  */
 
 const { DataTypes } = require('sequelize')

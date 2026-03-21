@@ -264,17 +264,6 @@ function getPermissionResources() {
 }
 
 /**
- * 根据资源代码获取资源信息
- *
- * @param {string} code - 资源代码
- * @returns {Object|null} 资源信息对象或 null
- */
-function getResourceByCode(code) {
-  const resource = PERMISSION_RESOURCES.find(r => r.code === code)
-  return resource ? JSON.parse(JSON.stringify(resource)) : null
-}
-
-/**
  * 验证权限格式是否有效
  *
  * @param {Object} permissions - 权限对象 { resource: [action1, action2] }
@@ -327,6 +316,5 @@ module.exports = {
   // 工具函数
   isSystemRole,
   getPermissionResources,
-  getResourceByCode,
   validatePermissions
 }

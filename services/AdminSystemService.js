@@ -125,7 +125,6 @@ const logger = require('../utils/logger').logger
 
 /**
  * 白名单校验模块（2025-12-30 配置管理三层分离方案）
- * @see docs/配置管理三层分离与校验统一方案.md
  */
 const {
   getWhitelist,
@@ -135,7 +134,6 @@ const {
 
 /**
  * 业务缓存助手（2026-01-03 Redis L2 缓存方案）
- * @see docs/Redis缓存策略现状与DB压力风险评估-2026-01-02.md
  */
 const { BusinessCacheHelper } = require('../utils/BusinessCacheHelper')
 
@@ -495,61 +493,13 @@ class AdminSystemService {
    */
   static async getSettingsByCategory(category) {
     try {
-      // 验证分类是否合法
       const validCategories = [
-        'basic',
-        'points',
-        'notification',
-        'security',
-        'marketplace',
-        'redemption',
-        'backpack'
+        'basic', 'points', 'notification', 'security', 'marketplace',
+        'redemption', 'exchange', 'batch_operation', 'rate_limit', 'feature',
+        'general', 'ad_system', 'ad_pricing', 'backpack', 'data_management'
       ]
       if (!validCategories.includes(category)) {
         throw new Error(`无效的设置分类: ${category}。有效分类: ${validCategories.join(', ')}`)
-      }
-
-      /*
-       * backpack 分类桥接到 system_configs 表
-       * system_configs 存储 JSON 格式的业务配置（BackpackService/路由直接读取）
-       * 通过桥接让管理后台也能读写同一数据源，避免双表不同步
-       */
-      if (category === 'backpack') {
-        const { SystemConfig } = models
-        const configs = await SystemConfig.findAll({
-          where: { config_category: 'backpack', is_active: true },
-          order: [['system_config_id', 'ASC']]
-        })
-
-        const parsedSettings = configs.map(cfg => {
-          const raw = cfg.toJSON()
-          let parsedValue = raw.config_value
-          if (typeof parsedValue === 'string') {
-            try {
-              parsedValue = JSON.parse(parsedValue)
-            } catch {
-              /* 保持原值 */
-            }
-          }
-          return {
-            system_setting_id: raw.system_config_id,
-            category: 'backpack',
-            setting_key: raw.config_key,
-            setting_value:
-              typeof raw.config_value === 'object'
-                ? JSON.stringify(raw.config_value)
-                : raw.config_value,
-            value_type: 'json',
-            description: raw.description,
-            is_readonly: false,
-            updated_at: raw.updated_at,
-            parsed_value: parsedValue,
-            display_name: AdminSystemService.SETTING_DISPLAY_NAMES[raw.config_key] || raw.config_key
-          }
-        })
-
-        logger.info('获取背包配置成功（桥接 system_configs）', { count: configs.length })
-        return { category, count: configs.length, settings: parsedSettings }
       }
 
       // 查询该分类下的所有配置项
@@ -669,7 +619,6 @@ class AdminSystemService {
    * - 所有配置修改必须通过白名单校验
    * - 范围约束是硬性防护，超出范围直接拒绝
    * - 高影响配置（businessImpact: HIGH/CRITICAL）强制审计日志
-   * @see docs/配置管理三层分离与校验统一方案.md
    *
    * 事务边界治理（2026-01-05 决策）：
    * - 强制要求外部事务传入（options.transaction）
@@ -688,8 +637,8 @@ class AdminSystemService {
       'notification',
       'security',
       'marketplace',
-      'redemption',
-      'backpack'
+      'redemption', 'exchange', 'batch_operation', 'rate_limit', 'feature',
+      'general', 'ad_system', 'ad_pricing', 'backpack', 'data_management'
     ]
     if (!validCategories.includes(category)) {
       throw new Error(`无效的设置分类: ${category}。有效分类: ${validCategories.join(', ')}`)
@@ -702,42 +651,6 @@ class AdminSystemService {
       Object.keys(settingsToUpdate).length === 0
     ) {
       throw new Error('请提供要更新的设置项')
-    }
-
-    /*
-     * backpack 分类桥接到 system_configs 表
-     * 跳过白名单校验（system_configs 不走 system_settings 的三层分离方案）
-     * 直接更新 config_value JSON 字段
-     */
-    if (category === 'backpack') {
-      const { SystemConfig } = models
-      const updateResults = []
-      const errors = []
-
-      for (const [key, value] of Object.entries(settingsToUpdate)) {
-        // eslint-disable-next-line no-await-in-loop
-        const config = await SystemConfig.findOne({
-          where: { config_key: key, config_category: 'backpack' },
-          transaction
-        })
-        if (!config) {
-          errors.push({ setting_key: key, error: '配置项不存在' })
-          continue
-        }
-        const serialized = typeof value === 'string' ? value : JSON.stringify(value)
-        config.config_value = serialized
-        config.updated_at = BeijingTimeHelper.createBeijingTime()
-        // eslint-disable-next-line no-await-in-loop
-        await config.save({ transaction })
-        updateResults.push({ setting_key: key, success: true })
-      }
-
-      logger.info('更新背包配置成功（桥接 system_configs）', {
-        updated: updateResults.length,
-        errors: errors.length
-      })
-
-      return { category, updated: updateResults, errors }
     }
 
     const settingKeys = Object.keys(settingsToUpdate)
@@ -966,7 +879,6 @@ class AdminSystemService {
    * // 获取最大上架数量（默认10）
    * const max = await AdminSystemService.getSettingValue('marketplace', 'max_active_listings', 10)
    *
-   * @see docs/配置管理三层分离与校验统一方案.md
    */
   static async getSettingValue(category, setting_key, default_value = null, options = {}) {
     const { strict = false } = options
@@ -1143,6 +1055,205 @@ class AdminSystemService {
       })
 
       return result
+    }
+  }
+
+  // ==================== Config Key-Based Access (migrated from SystemConfigService) ====================
+
+  static _getConfigCacheKey(setting_key) {
+    return `system_config:${setting_key}`
+  }
+
+  static async _getConfigFromCache(setting_key) {
+    try {
+      const { getRedisClient } = require('../utils/UnifiedRedisClient')
+      const redis = getRedisClient()
+      if (!redis) return null
+      const cached = await redis.get(this._getConfigCacheKey(setting_key))
+      return cached ? JSON.parse(cached) : null
+    } catch {
+      return null
+    }
+  }
+
+  static async _setConfigToCache(setting_key, value, ttl = 300) {
+    try {
+      const { getRedisClient } = require('../utils/UnifiedRedisClient')
+      const redis = getRedisClient()
+      if (!redis) return
+      await redis.set(this._getConfigCacheKey(setting_key), JSON.stringify(value), 'EX', ttl)
+    } catch { /* non-fatal */ }
+  }
+
+  static async _clearConfigCache(setting_key) {
+    try {
+      const { getRedisClient } = require('../utils/UnifiedRedisClient')
+      const redis = getRedisClient()
+      if (!redis) return
+      await redis.del(this._getConfigCacheKey(setting_key))
+    } catch { /* non-fatal */ }
+  }
+
+  /**
+   * Get a config value by setting_key only (no category needed).
+   * Drop-in replacement for SystemConfigService.getValue().
+   */
+  static async getConfigValue(setting_key, defaultValue = null) {
+    try {
+      const cached = await this._getConfigFromCache(setting_key)
+      if (cached !== null) return cached
+
+      const setting = await SystemSettings.findOne({ where: { setting_key } })
+      if (!setting) return defaultValue
+
+      const parsed = setting.getParsedValue()
+      await this._setConfigToCache(setting_key, parsed)
+      return parsed
+    } catch (error) {
+      logger.error('获取配置值失败', { setting_key, error: error.message })
+      return defaultValue
+    }
+  }
+
+  /**
+   * Get a nested property from a JSON config value.
+   */
+  static async getConfigProperty(setting_key, property, defaultValue = null) {
+    const value = await this.getConfigValue(setting_key)
+    if (value && typeof value === 'object') {
+      return value[property] !== undefined ? value[property] : defaultValue
+    }
+    return defaultValue
+  }
+
+  /**
+   * Batch rate-limit config (migrated from SystemConfigService).
+   */
+  static async getBatchRateLimitConfig(operation_type) {
+    const keyMap = {
+      quota_grant_batch: 'batch_rate_limit_quota_grant',
+      preset_batch: 'batch_rate_limit_preset',
+      redemption_verify_batch: 'batch_rate_limit_redemption',
+      campaign_status_batch: 'batch_rate_limit_campaign_status',
+      budget_adjust_batch: 'batch_rate_limit_budget'
+    }
+    const setting_key = keyMap[operation_type]
+    if (!setting_key) {
+      return { max_items_per_request: 50, cooldown_seconds: 60 }
+    }
+    const config = await this.getConfigValue(setting_key)
+    if (!config) {
+      return { max_items_per_request: 50, cooldown_seconds: 60 }
+    }
+    return {
+      max_items_per_request: config.max_items_per_request || 50,
+      cooldown_seconds: config.cooldown_seconds || 60
+    }
+  }
+
+  /**
+   * Batch global config (migrated from SystemConfigService).
+   */
+  static async getBatchGlobalConfig() {
+    const config = await this.getConfigValue('batch_operation_global')
+    if (!config) {
+      return {
+        max_concurrent_batches: 3,
+        default_retry_count: 3,
+        retry_delay_seconds: 5,
+        idempotency_key_ttl_hours: 24
+      }
+    }
+    return config
+  }
+
+  /**
+   * Create-or-update a config row in system_settings by setting_key.
+   * Drop-in replacement for SystemConfigService.upsert().
+   */
+  static async upsertConfig(setting_key, setting_value, options = {}) {
+    const { description, category = 'general', transaction } = options
+    try {
+      const serialized = typeof setting_value === 'string'
+        ? setting_value
+        : JSON.stringify(setting_value)
+
+      const value_type = typeof setting_value === 'object'
+? 'json'
+        : typeof setting_value === 'number'
+? 'number'
+          : typeof setting_value === 'boolean'
+? 'boolean'
+            : 'json'
+
+      const [setting, created] = await SystemSettings.findOrCreate({
+        where: { setting_key },
+        defaults: {
+          setting_key,
+          setting_value: serialized,
+          value_type,
+          category,
+          description: description || null,
+          is_visible: true,
+          is_readonly: false
+        },
+        transaction
+      })
+
+      if (!created) {
+        setting.setting_value = serialized
+        setting.value_type = value_type
+        if (description) setting.description = description
+        await setting.save({ transaction })
+      }
+
+      await this._clearConfigCache(setting_key)
+      logger.info(created ? '配置已创建' : '配置已更新', { setting_key })
+      return { setting_key, created }
+    } catch (error) {
+      logger.error('创建或更新配置失败', { setting_key, error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * Get all batch-operation configs from system_settings.
+   */
+  static async getAllBatchConfigs() {
+    try {
+      const settings = await SystemSettings.findAll({
+        where: { category: 'batch_operation' },
+        order: [['system_setting_id', 'ASC']]
+      })
+      return settings.map(s => ({
+        setting_key: s.setting_key,
+        setting_value: s.getParsedValue(),
+        description: s.description,
+        category: s.category,
+        updated_at: s.updated_at
+      }))
+    } catch (error) {
+      logger.error('获取批量操作配置失败', { error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * Pre-warm batch-operation config cache at startup.
+   */
+  static async warmupBatchConfigs() {
+    try {
+      logger.info('开始预热批量操作配置缓存...')
+      const settings = await SystemSettings.findAll({
+        where: { category: 'batch_operation' }
+      })
+      for (const setting of settings) {
+        // eslint-disable-next-line no-await-in-loop
+        await this._setConfigToCache(setting.setting_key, setting.getParsedValue(), 60)
+      }
+      logger.info('批量操作配置缓存预热完成', { count: settings.length })
+    } catch (error) {
+      logger.warn('配置缓存预热失败', { error: error.message })
     }
   }
 

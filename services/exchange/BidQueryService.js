@@ -54,12 +54,12 @@ const BID_ATTRIBUTES = {
     'updated_at'
   ],
 
-  /** 关联的兑换商品视图（2026-03-16 媒体体系迁移） */
+  /** 关联的商品视图（Product 统一商品中心） */
   exchangeItemBriefView: [
-    'exchange_item_id',
-    'item_name',
+    'product_id',
+    'product_name',
     'description',
-    'category_def_id',
+    'category_id',
     'primary_media_id'
   ],
 
@@ -89,8 +89,6 @@ class BidQueryService {
     this.models = models
     this.BidProduct = models.BidProduct
     this.BidRecord = models.BidRecord
-    this.ExchangeItem = models.ExchangeItem
-    // 迁移路径：ExchangeItem → Product（统一商品模型）
     this.Product = models.Product
     this.sequelize = models.sequelize
   }
@@ -123,7 +121,7 @@ class BidQueryService {
         attributes: BID_ATTRIBUTES.bidProductListView,
         include: [
           {
-            model: this.ExchangeItem,
+            model: this.Product,
             as: 'exchangeItem',
             attributes: BID_ATTRIBUTES.exchangeItemBriefView,
             include: [
@@ -200,7 +198,7 @@ class BidQueryService {
         attributes: BID_ATTRIBUTES.bidProductDetailView,
         include: [
           {
-            model: this.ExchangeItem,
+            model: this.Product,
             as: 'exchangeItem',
             attributes: BID_ATTRIBUTES.exchangeItemBriefView,
             include: [
@@ -301,9 +299,9 @@ class BidQueryService {
             ],
             include: [
               {
-                model: this.ExchangeItem,
+                model: this.Product,
                 as: 'exchangeItem',
-                attributes: ['exchange_item_id', 'item_name', 'primary_media_id']
+                attributes: ['product_id', 'product_name', 'primary_media_id']
               }
             ]
           }

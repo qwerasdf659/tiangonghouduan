@@ -38,7 +38,7 @@
  * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  */
 
-const { User, Role, UserRole, UserRoleChangeRecord, UserStatusChangeRecord } = require('../models')
+const { User, Role, UserRole } = require('../models')
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 const BeijingTimeHelper = require('../utils/timeHelper')
 const logger = require('../utils/logger')
@@ -46,7 +46,6 @@ const AuditLogService = require('./AuditLogService')
 
 /**
  * 中文显示名称助手（2026-01-22 中文化显示名称系统）
- * @see docs/中文化显示名称实施文档.md
  */
 const displayNameHelper = require('../utils/displayNameHelper')
 
@@ -180,11 +179,9 @@ class UserRoleService {
    * - 未提供事务时直接报错，由入口层统一管理事务
    * - 缓存失效、WebSocket断开等副作用应在事务提交后由调用方处理
    *
-   * 审计统一入口整合（2026-01-08 决策5/6/9/10）：
-   * - 【决策9】创建 UserRoleChangeRecord 记录，主键作为审计日志 target_id
-   * - 【决策6】idempotency_key 从 UserRoleChangeRecord.user_role_change_record_id 派生
+   * 审计统一入口整合：
+   * - 审计日志 target_id 直接使用 user_id（thin-table已归档）
    * - 【决策5】审计日志失败时阻断业务流程（关键操作）
-   * - 【决策10】target_id 指向 UserRoleChangeRecord.user_role_change_record_id
    *
    * @param {number} user_id - 用户ID
    * @param {string} role_name - 新角色名称
@@ -240,28 +237,7 @@ class UserRoleService {
     const oldRoles = targetUserRoles.roles.map(r => r.role_name).join(', ') || '无角色'
     const oldRoleLevel = targetMaxLevel
 
-    /*
-     * 【决策9】创建业务记录（为审计日志提供业务主键）
-     * 幂等键由业务主键派生（决策6），格式参考 UserRoleChangeRecord.generateIdempotencyKey
-     */
-    const idempotencyKey = UserRoleChangeRecord.generateIdempotencyKey(
-      user_id,
-      role_name,
-      operator_id
-    )
-
-    const changeRecord = await UserRoleChangeRecord.create(
-      {
-        user_id,
-        operator_id,
-        old_role: oldRoles,
-        new_role: role_name,
-        reason: reason || `角色变更: ${oldRoles} → ${role_name}`,
-        idempotency_key: idempotencyKey,
-        metadata: { ip_address, user_agent }
-      },
-      { transaction }
-    )
+    const idempotencyKey = `role_change_${user_id}_${role_name}_${operator_id}_${Math.floor(Date.now() / 1000)}`
 
     // 移除用户现有角色
     await UserRole.destroy({ where: { user_id }, transaction })
@@ -278,15 +254,11 @@ class UserRoleService {
       { transaction }
     )
 
-    /*
-     * 【决策5/10】记录审计日志（关键操作，失败时阻断业务流程）
-     * target_id 指向 UserRoleChangeRecord.user_role_change_record_id（决策10）
-     */
     await AuditLogService.logOperation({
       operator_id,
       operation_type: 'role_change',
-      target_type: 'UserRoleChangeRecord',
-      target_id: changeRecord.user_role_change_record_id, // 决策10：指向业务记录主键
+      target_type: 'User',
+      target_id: user_id,
       action: 'update',
       before_data: {
         roles: oldRoles,
@@ -297,21 +269,19 @@ class UserRoleService {
         role_level: targetRole.role_level
       },
       reason: reason || `角色变更: ${oldRoles} → ${role_name}`,
-      idempotency_key: `audit_${idempotencyKey}`, // 从业务记录派生（决策6）
+      idempotency_key: `audit_${idempotencyKey}`,
       ip_address,
       user_agent,
       transaction,
-      is_critical_operation: true // 决策5：关键操作
+      is_critical_operation: true
     })
 
     logger.info('用户角色更新成功', {
       user_id,
       new_role: role_name,
-      operator_id,
-      record_id: changeRecord.user_role_change_record_id
+      operator_id
     })
 
-    // 返回结果（包含 post_commit_actions 供调用方在事务提交后处理副作用）
     return {
       user_id,
       new_role: role_name,
@@ -320,11 +290,9 @@ class UserRoleService {
       old_role_level: oldRoleLevel,
       operator_id,
       reason,
-      record_id: changeRecord.user_role_change_record_id, // 业务记录ID
-      // 事务提交后由调用方处理的副作用
       post_commit_actions: {
         invalidate_cache: true,
-        disconnect_ws: targetRole.role_level < 100 // 权限降级需断开WebSocket
+        disconnect_ws: targetRole.role_level < 100
       }
     }
   }
@@ -337,11 +305,9 @@ class UserRoleService {
    * - 未提供事务时直接报错，由入口层统一管理事务
    * - 缓存失效、WebSocket断开等副作用应在事务提交后由调用方处理
    *
-   * 审计统一入口整合（2026-01-08 决策5/6/9/10）：
-   * - 【决策9】创建 UserStatusChangeRecord 记录，主键作为审计日志 target_id
-   * - 【决策6】idempotency_key 从 UserStatusChangeRecord.user_status_change_record_id 派生
+   * 审计统一入口整合：
+   * - 审计日志 target_id 直接使用 user_id（thin-table已归档）
    * - 【决策5】审计日志失败时阻断业务流程（关键操作）
-   * - 【决策10】target_id 指向 UserStatusChangeRecord.user_status_change_record_id
    *
    * @param {number} user_id - 用户ID
    * @param {string} status - 状态（active/inactive/banned/pending）
@@ -377,72 +343,43 @@ class UserRoleService {
 
     const oldStatus = user.status
 
-    /*
-     * 【决策9】创建业务记录（为审计日志提供业务主键）
-     * 幂等键由业务主键派生（决策6），格式参考 UserStatusChangeRecord.generateIdempotencyKey
-     */
-    const idempotencyKey = UserStatusChangeRecord.generateIdempotencyKey(
-      user_id,
-      status,
-      operator_id
-    )
-
-    const changeRecord = await UserStatusChangeRecord.create(
-      {
-        user_id,
-        operator_id,
-        old_status: oldStatus,
-        new_status: status,
-        reason: reason || `状态变更: ${oldStatus} → ${status}`,
-        idempotency_key: idempotencyKey,
-        metadata: { ip_address, user_agent }
-      },
-      { transaction }
-    )
+    const idempotencyKey = `status_change_${user_id}_${status}_${operator_id}_${Math.floor(Date.now() / 1000)}`
 
     // 更新用户状态
     await user.update({ status }, { transaction })
 
-    /*
-     * 【决策5/10】记录审计日志（关键操作，失败时阻断业务流程）
-     * target_id 指向 UserStatusChangeRecord.user_status_change_record_id（决策10）
-     */
     await AuditLogService.logOperation({
       operator_id,
       operation_type: 'user_status_change',
-      target_type: 'UserStatusChangeRecord',
-      target_id: changeRecord.user_status_change_record_id, // 决策10：指向业务记录主键
+      target_type: 'User',
+      target_id: user_id,
       action: 'update',
       before_data: { status: oldStatus },
       after_data: { status },
       reason: reason || `状态变更: ${oldStatus} → ${status}`,
-      idempotency_key: `audit_${idempotencyKey}`, // 从业务记录派生（决策6）
+      idempotency_key: `audit_${idempotencyKey}`,
       ip_address,
       user_agent,
       transaction,
-      is_critical_operation: true // 决策5：关键操作
+      is_critical_operation: true
     })
 
     logger.info('用户状态更新成功', {
       user_id,
       old_status: oldStatus,
       new_status: status,
-      operator_id,
-      record_id: changeRecord.user_status_change_record_id
+      operator_id
     })
 
-    // 返回结果（包含 post_commit_actions 供调用方在事务提交后处理副作用）
     return {
       user_id,
       old_status: oldStatus,
       new_status: status,
       operator_id,
       reason,
-      record_id: changeRecord.user_status_change_record_id, // 业务记录ID
-      // 事务提交后由调用方处理的副作用
       post_commit_actions: {
         invalidate_cache: true,
-        disconnect_ws: status === 'inactive' || status === 'banned' // 禁用/封禁需断开WebSocket
+        disconnect_ws: status === 'inactive' || status === 'banned'
       }
     }
   }

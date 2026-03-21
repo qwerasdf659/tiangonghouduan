@@ -134,7 +134,7 @@ module.exports = {
           image_id: {
             type: DataTypes.INTEGER,
             allowNull: true,
-            comment: '该 SKU 专属图片ID，关联 image_resources.image_resource_id',
+            comment: '该 SKU 专属图片ID（外键至旧图片资源表主键）',
             references: { model: 'image_resources', key: 'image_resource_id' },
             onUpdate: 'CASCADE',
             onDelete: 'SET NULL'

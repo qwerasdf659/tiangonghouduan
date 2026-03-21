@@ -16,7 +16,6 @@
  * - 自动填充 _name 字段
  *
  * @since 2026-01-12
- * @see docs/省市区级联选择功能设计方案.md
  */
 
 'use strict'

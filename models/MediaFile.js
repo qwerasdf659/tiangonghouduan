@@ -7,7 +7,7 @@
  * - 支持 content_hash 建议去重、tags 标签检索、回收站机制
  *
  * 架构定位：
- * - 独立媒体服务方案 D+ 增强版（替代旧 image_resources 表）
+ * - 独立媒体服务方案 D+ 增强版
  * - 与 SealosStorageService + ImageUrlHelper 无缝对接
  *
  * 命名规范（snake_case）：

@@ -16,7 +16,7 @@
 
 const logger = require('../utils/logger').logger
 const { sequelize, AdDauDailyStat } = require('../models')
-const SystemConfigService = require('../services/SystemConfigService')
+const AdminSystemService = require('../services/AdminSystemService')
 const BeijingTimeHelper = require('../utils/timeHelper')
 
 /**
@@ -44,7 +44,7 @@ async function computeDailyDau(targetDate) {
 
   const dauCount = parseInt(results[0]?.dau_count || 0)
 
-  const tiers = await SystemConfigService.getValue('ad_dau_coefficient_tiers', [])
+  const tiers = await AdminSystemService.getConfigValue('ad_dau_coefficient_tiers', [])
   const coefficient = matchDauTier(dauCount, tiers)
 
   return { dau_count: dauCount, dau_coefficient: coefficient }

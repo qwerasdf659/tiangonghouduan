@@ -47,7 +47,7 @@ export function useExchangeItemsState() {
       status: 'active',
       primary_media_id: null,
       rarity_code: 'common',
-      category_def_id: null,
+      category_id: null,
       space: 'lucky',
       original_price: null,
       tags: [],
@@ -76,6 +76,8 @@ export function useExchangeItemsState() {
     rarityOptions: [],
     /** @type {Array<Object>} 分类选项（动态加载自 category_defs 字典表） */
     categoryOptions: [],
+    /** @type {Array<Object>} 物品模板选项（铸造实例时关联的模板） */
+    itemTemplateOptions: [],
     /** @type {boolean} 字典数据是否已加载 */
     dictionariesLoaded: false,
     /** @type {string} 标签输入临时值 */
@@ -244,38 +246,78 @@ export function useExchangeItemsMethods() {
               color: r.color_hex
             }))
           }
-          // 分类选项（仅启用的，按父→子层级排序）
-          if (res.data.categories) {
-            const enabled = res.data.categories
-              .filter(c => c.is_enabled)
-              .map(c => ({
-                value: c.category_def_id,
-                label: c.display_name,
-                category_code: c.category_code,
-                parent_category_def_id: c.parent_category_def_id || null,
-                level: c.level || 1
-              }))
-            const parents = enabled.filter(c => c.level === 1).sort((a, b) => a.value - b.value)
-            const sorted = []
-            for (const p of parents) {
-              sorted.push(p)
-              const children = enabled.filter(c => c.parent_category_def_id === p.value)
-              sorted.push(...children)
-            }
-            const orphans = enabled.filter(
-              c => c.level === 2 && !parents.some(p => p.value === c.parent_category_def_id)
-            )
-            sorted.push(...orphans)
-            this.categoryOptions = sorted
-          }
+          // 分类选项从统一商品中心品类树加载
+          this.loadProductCategories()
           this.dictionariesLoaded = true
           logger.info('[ExchangeItems] 字典数据加载完成', {
             rarities: this.rarityOptions.length,
             categories: this.categoryOptions.length
           })
         }
+        this.loadItemTemplates()
       } catch (e) {
         logger.error('[ExchangeItems] 加载字典数据失败:', e)
+      }
+    },
+
+    /**
+     * 加载物品模板列表（供铸造关联下拉选择）
+     */
+    async loadItemTemplates() {
+      try {
+        const res = await request({
+          url: ASSET_ENDPOINTS.ITEM_TEMPLATE_LIST,
+          method: 'GET',
+          params: { page_size: 200 }
+        })
+        if (res.success && res.data) {
+          const templates = res.data.item_templates || res.data.rows || res.data || []
+          this.itemTemplateOptions = templates.map(t => ({
+            value: t.item_template_id,
+            label: `${t.display_name || t.template_code} (${t.item_type})`,
+            item_type: t.item_type,
+            rarity_code: t.rarity_code
+          }))
+          logger.info('[ExchangeItems] 物品模板加载完成:', this.itemTemplateOptions.length)
+        }
+      } catch (e) {
+        logger.error('[ExchangeItems] 加载物品模板失败:', e)
+      }
+    },
+
+    /**
+     * 从统一商品中心加载品类树（替代旧 category_defs 字典）
+     */
+    async loadProductCategories() {
+      try {
+        const res = await ProductAPI.listCategories()
+        if (res.success && res.data) {
+          const cats = res.data.categories || res.data || []
+          const enabled = cats
+            .filter(c => c.is_enabled)
+            .map(c => ({
+              value: c.category_id,
+              label: c.category_name,
+              category_code: c.category_code,
+              parent_category_id: c.parent_category_id || null,
+              level: c.level || 1
+            }))
+          const parents = enabled.filter(c => c.level === 1).sort((a, b) => a.value - b.value)
+          const sorted = []
+          for (const p of parents) {
+            sorted.push(p)
+            const children = enabled.filter(c => c.parent_category_id === p.value)
+            sorted.push(...children)
+          }
+          const orphans = enabled.filter(
+            c => c.level === 2 && !parents.some(p => p.value === c.parent_category_id)
+          )
+          sorted.push(...orphans)
+          this.categoryOptions = sorted
+          logger.info('[ExchangeItems] 品类树加载完成:', this.categoryOptions.length)
+        }
+      } catch (e) {
+        logger.error('[ExchangeItems] 加载品类树失败:', e)
       }
     },
 
@@ -295,7 +337,7 @@ export function useExchangeItemsMethods() {
         status: 'active',
         primary_media_id: null,
         rarity_code: 'common',
-        category_def_id: null,
+        category_id: null,
         space: 'lucky',
         original_price: null,
         tags: [],
@@ -339,7 +381,7 @@ export function useExchangeItemsMethods() {
         status: item.status || 'active',
         primary_media_id: item.primary_media_id ?? null,
         rarity_code: item.rarity_code || 'common',
-        category_def_id: item.category_def_id || null,
+        category_id: item.category_id || null,
         space: item.space || 'lucky',
         original_price: item.original_price || null,
         tags: item.tags || [],

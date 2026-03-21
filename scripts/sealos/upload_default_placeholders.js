@@ -44,7 +44,7 @@ let SealosStorageService = null
 async function initializeSealosService() {
   try {
     // 直接实例化 SealosStorageService（避免 ServiceManager 封装问题）
-    const SealosStorageServiceClass = require('../../services/sealosStorage')
+    const SealosStorageServiceClass = require('../../services/SealosStorageService')
     SealosStorageService = new SealosStorageServiceClass()
     console.log('✅ SealosStorageService 直接初始化成功')
     return SealosStorageService

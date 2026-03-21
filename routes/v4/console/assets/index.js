@@ -24,8 +24,22 @@ const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const logger = require('../../../../utils/logger')
-const XLSX = require('xlsx')
+const ExcelJS = require('exceljs')
 const BeijingTimeHelper = require('../../../../utils/timeHelper')
+
+/** RFC 4180-style CSV from row objects (UTF-8; caller adds BOM for Excel). */
+function rowsToCsv(rows) {
+  if (!rows.length) return ''
+  const keys = Object.keys(rows[0])
+  const esc = (v) => {
+    const s = String(v ?? '')
+    if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`
+    return s
+  }
+  const header = keys.map(esc).join(',')
+  const body = rows.map((row) => keys.map((k) => esc(row[k])).join(','))
+  return [header, ...body].join('\n')
+}
 
 // 导入子路由模块
 const portfolioRoutes = require('./portfolio')
@@ -126,9 +140,7 @@ router.get('/export', authenticateToken, requireRoleLevel(100), async (req, res)
     const fileName = `资产导出_${timestamp}`
 
     if (format === 'csv') {
-      // CSV格式导出
-      const worksheet = XLSX.utils.json_to_sheet(exportData)
-      const csvContent = XLSX.utils.sheet_to_csv(worksheet)
+      const csvContent = rowsToCsv(exportData)
 
       res.setHeader('Content-Type', 'text/csv; charset=utf-8')
       res.setHeader(
@@ -146,31 +158,20 @@ router.get('/export', authenticateToken, requireRoleLevel(100), async (req, res)
       return res.send('\uFEFF' + csvContent)
     }
 
-    // Excel格式导出
-    const workbook = XLSX.utils.book_new()
-    const worksheet = XLSX.utils.json_to_sheet(exportData)
+    // Excel格式导出（ExcelJS）
+    const workbook = new ExcelJS.Workbook()
+    const worksheet = workbook.addWorksheet('资产数据')
+    const colKeys = Object.keys(exportData[0])
+    const colWidths = [6, 10, 15, 15, 15, 12, 12, 12, 10, 20]
+    worksheet.columns = colKeys.map((key, i) => ({
+      header: key,
+      key,
+      width: colWidths[i] || 15
+    }))
+    worksheet.getRow(1).font = { bold: true }
+    worksheet.addRows(exportData)
 
-    // 设置列宽
-    worksheet['!cols'] = [
-      { wch: 6 }, // 序号
-      { wch: 10 }, // 用户ID
-      { wch: 15 }, // 用户昵称
-      { wch: 15 }, // 资产代码
-      { wch: 15 }, // 资产名称
-      { wch: 12 }, // 可用余额
-      { wch: 12 }, // 冻结余额
-      { wch: 12 }, // 总余额
-      { wch: 10 }, // 活动ID
-      { wch: 20 } // 更新时间
-    ]
-
-    XLSX.utils.book_append_sheet(workbook, worksheet, '资产数据')
-
-    // 生成Excel buffer
-    const excelBuffer = XLSX.write(workbook, {
-      type: 'buffer',
-      bookType: 'xlsx'
-    })
+    const excelBuffer = Buffer.from(await workbook.xlsx.writeBuffer())
 
     res.setHeader(
       'Content-Type',

@@ -120,6 +120,10 @@ export const SYSTEM_ADMIN_ENDPOINTS = {
   RISK_ALERT_PENDING: `${API_PREFIX}/console/risk-alerts/pending`,
   RISK_ALERT_TYPES: `${API_PREFIX}/console/risk-alerts/types`,
 
+  // 告警静默规则
+  ALERT_SILENCE_LIST: `${API_PREFIX}/console/alert-silence-rules`,
+  ALERT_SILENCE_DETAIL: `${API_PREFIX}/console/alert-silence-rules/:id`,
+
   // 审计日志（后端路由：/api/v4/console/admin-audit-logs）
   AUDIT_LOG_LIST: `${API_PREFIX}/console/admin-audit-logs`,
   AUDIT_LOG_STATISTICS: `${API_PREFIX}/console/admin-audit-logs/statistics`,
@@ -485,6 +489,31 @@ export const SystemAdminAPI = {
    */
   async getRiskAlertStats() {
     return await request({ url: SYSTEM_ADMIN_ENDPOINTS.RISK_ALERT_STATS, method: 'GET' })
+  },
+
+  // ===== 告警静默规则 =====
+
+  async getAlertSilenceRules(params = {}) {
+    const url = SYSTEM_ADMIN_ENDPOINTS.ALERT_SILENCE_LIST + buildQueryString(params)
+    return await request({ url, method: 'GET' })
+  },
+
+  async createAlertSilenceRule(data) {
+    return await request({
+      url: SYSTEM_ADMIN_ENDPOINTS.ALERT_SILENCE_LIST,
+      method: 'POST',
+      data
+    })
+  },
+
+  async updateAlertSilenceRule(id, data) {
+    const url = buildURL(SYSTEM_ADMIN_ENDPOINTS.ALERT_SILENCE_DETAIL, { id })
+    return await request({ url, method: 'PUT', data })
+  },
+
+  async deleteAlertSilenceRule(id) {
+    const url = buildURL(SYSTEM_ADMIN_ENDPOINTS.ALERT_SILENCE_DETAIL, { id })
+    return await request({ url, method: 'DELETE' })
   },
 
   // ===== 审计日志 =====

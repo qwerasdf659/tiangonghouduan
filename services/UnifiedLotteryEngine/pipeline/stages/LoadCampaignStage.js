@@ -22,8 +22,6 @@
 
 const BaseStage = require('./BaseStage')
 const { LotteryCampaign, LotteryPrize, LotteryTierRule } = require('../../../../models')
-/* eslint-disable-next-line spaced-comment -- Op 操作符预留用于复杂查询条件（当前版本使用默认查询） */
-// const { Op } = require('sequelize')
 
 /**
  * 加载活动配置 Stage

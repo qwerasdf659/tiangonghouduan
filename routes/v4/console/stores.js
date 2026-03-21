@@ -27,7 +27,6 @@
  * 关联路由：区域列表查询 → /api/v4/console/regions
  *
  * @since 2026-01-12
- * @see docs/商家员工域权限体系升级方案.md - P1 门店数据维护入口
  */
 
 'use strict'

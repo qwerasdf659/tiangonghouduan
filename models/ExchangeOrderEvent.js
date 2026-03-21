@@ -13,7 +13,6 @@
  *
  * @module models/ExchangeOrderEvent
  * @created 2026-03-10（兑换订单功能增强）
- * @see docs/兑换订单接口-后端对接需求.md - 决策1
  */
 
 const { Model, DataTypes } = require('sequelize')

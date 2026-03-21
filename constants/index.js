@@ -56,6 +56,15 @@ const {
   normalizeTargetTypes
 } = require('./AuditTargetTypes')
 
+// 权限资源定义（角色权限 UI / 校验）
+const {
+  PERMISSION_RESOURCES,
+  SYSTEM_ROLES,
+  isSystemRole,
+  getPermissionResources,
+  validatePermissions
+} = require('./PermissionResources')
+
 module.exports = {
   // 审计操作类型
   OPERATION_TYPES,
@@ -92,9 +101,17 @@ module.exports = {
   getTargetTypeDisplayName,
   normalizeTargetTypes,
 
+  // 权限资源（PermissionResources）
+  PERMISSION_RESOURCES,
+  SYSTEM_ROLES,
+  isSystemRole,
+  getPermissionResources,
+  validatePermissions,
+
   // 命名空间导出（便于按模块引用）
   AuditOperationTypes: require('./AuditOperationTypes'),
   ErrorCodes: require('./ErrorCodes'),
   TradableAssetTypes: require('./TradableAssetTypes'),
-  AuditTargetTypes: require('./AuditTargetTypes')
+  AuditTargetTypes: require('./AuditTargetTypes'),
+  PermissionResources: require('./PermissionResources')
 }

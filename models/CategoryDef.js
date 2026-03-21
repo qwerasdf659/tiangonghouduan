@@ -70,10 +70,10 @@ class CategoryDef extends Model {
       })
     }
 
-    if (models.ExchangeItem) {
-      CategoryDef.hasMany(models.ExchangeItem, {
-        foreignKey: 'category_def_id',
-        as: 'exchange_items'
+    if (models.Product) {
+      CategoryDef.hasMany(models.Product, {
+        foreignKey: 'category_id',
+        as: 'products'
       })
     }
   }

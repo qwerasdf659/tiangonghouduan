@@ -273,11 +273,6 @@ function registerMerchantComponents() {
       return type ? type.color : '#6b7280'
     },
 
-    getStatusName(status) {
-      const s = this.status_options.find(o => o.code === status)
-      return s ? s.name : status
-    },
-
     getStatusColor(status) {
       const s = this.status_options.find(o => o.code === status)
       return s ? s.color : '#6b7280'

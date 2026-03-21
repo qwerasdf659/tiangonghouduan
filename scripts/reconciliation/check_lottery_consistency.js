@@ -11,7 +11,6 @@
  * - 定时执行：每小时第5分钟（建议配合 cron 或 node-schedule）
  *
  * @since 2026-01-05
- * @see docs/事务边界治理现状核查报告.md
  */
 
 'use strict'
@@ -88,9 +87,8 @@ async function freeze_entry_on_inconsistency(entry_type, inconsistent_data) {
 
   // 通过 SystemConfigService 更新系统配置
   try {
-    const SystemConfigService = require('../../services/SystemConfigService')
+    const AdminSystemService = require('../../services/AdminSystemService')
 
-    // 根据入口类型确定配置键名
     const configKeyMap = {
       lottery: 'lottery_entrance_enabled',
       redeem: 'redeem_entrance_enabled',
@@ -98,9 +96,9 @@ async function freeze_entry_on_inconsistency(entry_type, inconsistent_data) {
     }
     const configKey = configKeyMap[entry_type] || `${entry_type}_enabled`
 
-    await SystemConfigService.updateConfig(configKey, 'false', {
-      operator_id: 0, // 系统自动操作
-      reason: `对账脚本检测到 ${entry_type} 数据不一致，自动冻结入口`
+    await AdminSystemService.upsertConfig(configKey, 'false', {
+      category: 'feature',
+      description: `对账脚本检测到 ${entry_type} 数据不一致，自动冻结入口`
     })
 
     console.log(`✅ 入口已冻结: ${configKey} = false`)
@@ -337,3 +335,4 @@ if (require.main === module) {
 }
 
 module.exports = { check_lottery_consistency }
+

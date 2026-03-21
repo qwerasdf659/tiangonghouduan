@@ -15,7 +15,6 @@
  * 2. 删除旧的 12 行 B0-B3 差异化数据
  * 3. 插入 3 行 budget_tier='ALL' 的 Pressure-Only 数据（P0/P1/P2）
  *
- * @see docs/双配额体系下BudgetTier概率门控失效问题与重构方案.md
  */
 module.exports = {
   async up(queryInterface) {
@@ -83,3 +82,4 @@ module.exports = {
     `)
   }
 }
+

@@ -21,7 +21,6 @@
  * - 异常熔断联动状态
  *
  * @module admin/src/modules/lottery/composables/strategy-simulation
- * @see docs/策略效果模拟分析页面-设计方案.md
  * @since 2026-02-20
  */
 
@@ -1196,3 +1195,4 @@ export function useStrategySimulationMethods() {
 }
 
 export default { useStrategySimulationState, useStrategySimulationMethods }
+

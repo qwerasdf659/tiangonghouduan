@@ -13,7 +13,6 @@
  * - POST /preview            预览清理影响
  * - POST /cleanup            执行清理
  *
- * @see docs/数据一键删除功能设计方案.md
  * @module routes/v4/console/data-management
  */
 

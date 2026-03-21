@@ -9,7 +9,6 @@
  * 3. feature_flags 插入清档模式开关
  * 4. DROP 迁移遗留 legacy 表（决策 6）
  *
- * @see docs/数据一键删除功能设计方案.md
  */
 
 const { DB_ENUM_VALUES } = require('../constants/AuditOperationTypes')
@@ -193,3 +192,4 @@ module.exports = {
     }
   }
 }
+

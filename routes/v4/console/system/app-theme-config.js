@@ -22,7 +22,6 @@
  * - christmas: 圣诞节（绿色）
  * - summer: 夏日（蓝色）
  *
- * @see docs/项目特效主题体系分析报告.md
  * @date 2026-03-06
  */
 
@@ -33,6 +32,7 @@ const router = express.Router()
 const logger = require('../../../../utils/logger').logger
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const { handleServiceError } = require('../../../../middleware/validation')
+const ServiceManager = require('../../../../services')
 
 router.use(authenticateToken, requireRoleLevel(100))
 
@@ -79,11 +79,10 @@ const THEME_META = {
  */
 router.get('/', async (req, res) => {
   try {
-    const { SystemConfig } = req.app.locals.models
+    const AdminSystemService = ServiceManager.getService('admin_system')
+    const configData = await AdminSystemService.getConfigValue('app_theme')
 
-    const config = await SystemConfig.getByKey('app_theme')
-
-    if (!config) {
+    if (!configData) {
       return res.apiSuccess(
         {
           theme: 'default',
@@ -95,18 +94,12 @@ router.get('/', async (req, res) => {
       )
     }
 
-    const configData = config.getValue()
-    const version = config.updated_at
-      ? new Date(config.updated_at).getTime().toString()
-      : Date.now().toString()
-
     return res.apiSuccess(
       {
         theme: configData.theme || 'default',
         theme_meta: THEME_META,
         valid_themes: VALID_THEMES,
-        version,
-        updated_at: config.updated_at
+        version: Date.now().toString()
       },
       '获取全局主题配置成功',
       'APP_THEME_CONFIG_GET_SUCCESS'
@@ -137,13 +130,12 @@ router.put('/', async (req, res) => {
       )
     }
 
-    const { SystemConfig } = req.app.locals.models
+    const AdminSystemService = ServiceManager.getService('admin_system')
     const configValue = { theme }
 
-    await SystemConfig.upsert('app_theme', configValue, {
+    await AdminSystemService.upsertConfig('app_theme', configValue, {
       description: '全局氛围主题配置，控制小程序所有页面的视觉主题',
-      config_category: 'feature',
-      is_active: true
+      category: 'feature'
     })
 
     try {

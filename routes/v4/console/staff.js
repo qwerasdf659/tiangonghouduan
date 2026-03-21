@@ -26,7 +26,6 @@
  * - POST   /enable                 - 启用员工（指定门店）
  *
  * @since 2026-01-12
- * @see docs/商家员工域权限体系升级方案.md - Phase 3 员工管理
  */
 
 'use strict'

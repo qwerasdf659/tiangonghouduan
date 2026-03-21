@@ -14,7 +14,6 @@
  * - 查询层统一加 WHERE merchant_id = ? 条件实现数据隔离
  *
  * @since 2026-02-23
- * @see docs/三项核心需求-实施方案.md 第四节
  */
 
 'use strict'

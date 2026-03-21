@@ -61,5 +61,4 @@ module.exports = {
  * 2. 确保所有 BalanceService/ItemService 调用都传递了 { transaction }
  * 3. 如果是在 TransactionManager.execute() 内调用，确保传递事务
  *
- * @see docs/事务边界治理现状核查报告.md
  */

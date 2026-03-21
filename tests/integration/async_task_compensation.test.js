@@ -23,7 +23,6 @@
  *
  * @module tests/integration/async_task_compensation
  * @since 2026-01-29
- * @see docs/测试审计标准.md - P3-11
  */
 
 // 加载环境变量

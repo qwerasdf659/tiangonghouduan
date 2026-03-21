@@ -12,7 +12,6 @@
  * - 曝光和点击事件需经过反作弊检查（AdAntifraudService）
  * - 与 ad-delivery.js 职责分离（ad-events 只写，ad-delivery 只读）
  *
- * @see docs/内容投放系统-重复功能合并方案.md 第十七节 17.3
  */
 
 const express = require('express')

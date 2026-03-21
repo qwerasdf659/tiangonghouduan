@@ -2,7 +2,6 @@
  * 报表服务 - 统计概览子服务（V4.7.0 大文件拆分）
  *
  * @description 从 ReportingService.js 拆分出的统计概览相关功能
- * @see docs/大文件拆分方案（保持单体架构）.md
  *
  * 职责范围：
  * - 系统性能报告

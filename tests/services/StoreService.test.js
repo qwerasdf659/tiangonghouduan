@@ -14,7 +14,6 @@
  * - 门店需要关联省市区街道四级行政区划
  *
  * @since 2026-01-29
- * @see docs/测试体系完善空间分析报告.md - P2-3
  */
 
 'use strict'
@@ -621,13 +620,6 @@ describe('StoreService - 门店管理服务', () => {
       expect(result.store.status).toBe('pending')
       // 中文显示名称由 attachDisplayNames 从字典表统一提供
       expect(result.store.status_display).toBe('待审核')
-    })
-
-    it('getStatusName 应该返回正确的状态名称（@deprecated 保留兼容）', () => {
-      expect(StoreService.getStatusName('active')).toBe('正常营业')
-      expect(StoreService.getStatusName('inactive')).toBe('已关闭')
-      expect(StoreService.getStatusName('pending')).toBe('待审核')
-      expect(StoreService.getStatusName('unknown')).toBe('未知')
     })
   })
 

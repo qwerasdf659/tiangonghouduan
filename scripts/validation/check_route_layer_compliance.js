@@ -17,7 +17,6 @@
  *
  * @since 2026-01-09
  * @updated 2026-02-02 删除 NO_ROUTE_TRANSACTION 规则（与决策6冲突）
- * @see docs/架构设计-读写操作分层策略.md 决策6
  */
 
 'use strict'
@@ -302,3 +301,4 @@ function main() {
 }
 
 main()
+

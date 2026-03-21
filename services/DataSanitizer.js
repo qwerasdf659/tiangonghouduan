@@ -49,7 +49,7 @@ const FORBIDDEN_FRONTEND_ASSET_CODES = ['BUDGET_POINTS']
  *    - 不做"可能有、可能没有"的容错处理
  *
  * 5. 图片字段策略（2026-03-16 媒体体系迁移）
- *    - 仅使用 primary_media_id 关联 media_files 表（image_resources 表已删除）
+ *    - 仅使用 primary_media_id 关联 media_files 表
  *    - DataSanitizer 输出 image 对象（含 url、primary_media_id）
  *
  * 🔒 安全设计说明（2026-02-21 γ 模式升级）：
@@ -128,7 +128,7 @@ class DataSanitizer {
       sanitized.prize_id = sanitized.lottery_prize_id
       delete sanitized.lottery_prize_id
 
-      // 图片处理：仅 primary_media（MediaFile），image_resources 已删除
+      // 图片处理：仅 primary_media（MediaFile）
       if (rawPrimaryMedia && typeof rawPrimaryMedia.toSafeJSON === 'function') {
         const safe = rawPrimaryMedia.toSafeJSON()
         sanitized.image = {
@@ -1335,10 +1335,6 @@ class DataSanitizer {
    */
   static sanitizeExchangeMarketItems(items, dataLevel) {
     /*
-     * V4.5.0: 材料资产支付 - 统一数据格式
-     * 🔧 2026-03-16 媒体体系：使用 primary_media_id 和 primary_media 对象（替代旧 image_resources）
-     */
-    /*
      * γ 模式（2026-02-21）：黑名单删除敏感字段
      */
     return items.map(item => {
@@ -1346,7 +1342,7 @@ class DataSanitizer {
       const rawPrimaryMedia = item.primary_media || plain.primary_media
       const sanitized = { ...plain }
 
-      // 图片处理：仅 primary_media（MediaFile），image_resources 已删除
+      // 图片处理：仅 primary_media（MediaFile）
       if (rawPrimaryMedia && typeof rawPrimaryMedia.toSafeJSON === 'function') {
         const safe = rawPrimaryMedia.toSafeJSON()
         sanitized.primary_image = {

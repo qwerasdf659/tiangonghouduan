@@ -153,7 +153,6 @@ router.post('/refresh', async (req, res) => {
    * 3. 会话被新登录覆盖（is_active=false）→ 拒绝刷新，返回 SESSION_REPLACED
    * 4. 会话不存在/过期/旧Token无session_token → 创建新会话
    *
-   * @see docs/SESSION_INVALIDATED认证异常解决方案.md - 方案A
    */
   const { AuthenticationSession } = req.app.locals.models
   const SESSION_TTL_MINUTES = 10080 // 7天，与 refresh_token 生命周期对齐

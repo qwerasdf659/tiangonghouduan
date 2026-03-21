@@ -225,7 +225,6 @@ function parseIdempotencyKey(idempotencyKey) {
  * - 用户连续点击两次"下单"，idempotency_key 相同，第二次被拦截 ✅
  * - 用户刷新页面后重新下单，idempotency_key 不同，但 business_id 相同，第二次被拦截 ✅
  *
- * @see docs/事务边界治理现状核查报告.md 建议9.1
  */
 
 /**

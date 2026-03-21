@@ -18,7 +18,6 @@
  * 数据库表名：ad_campaigns
  * 主键：ad_campaign_id（INT，自增）
  *
- * @see docs/内容投放系统-重复功能合并方案.md
  */
 
 const { DataTypes } = require('sequelize')

@@ -15,9 +15,9 @@ const ATTR_API = `${API_PREFIX}/console/attributes`
 /**
  * 列表筛选（供 dataSource 闭包读取，筛选变更后 dispatch dt-refresh）
  *
- * @type {{ is_sale_attr: string, is_enabled: string }}
+ * @type {{ is_sale_attr: string, is_searchable: string, is_enabled: string }}
  */
-const ATTR_FILTERS = { is_sale_attr: '', is_enabled: '' }
+const ATTR_FILTERS = { is_sale_attr: '', is_searchable: '', is_enabled: '' }
 
 let _registered = false
 
@@ -134,6 +134,8 @@ function registerAttributeManagement() {
           const q = {}
           if (ATTR_FILTERS.is_sale_attr === 'true') q.is_sale_attr = true
           if (ATTR_FILTERS.is_sale_attr === 'false') q.is_sale_attr = false
+          if (ATTR_FILTERS.is_searchable === 'true') q.is_searchable = true
+          if (ATTR_FILTERS.is_searchable === 'false') q.is_searchable = false
           if (ATTR_FILTERS.is_enabled === 'true') q.is_enabled = true
           if (ATTR_FILTERS.is_enabled === 'false') q.is_enabled = false
           const qs = buildQueryString(q)

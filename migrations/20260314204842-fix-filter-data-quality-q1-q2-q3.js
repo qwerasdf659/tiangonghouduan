@@ -19,7 +19,6 @@
  * - rarity_defs 表中 common/uncommon/rare/epic/legendary 处于启用状态
  *
  * @since 2026-03-14
- * @see docs/筛选系统设计方案分析报告.md
  */
 module.exports = {
   async up(queryInterface) {
@@ -82,3 +81,4 @@ module.exports = {
     `)
   }
 }
+

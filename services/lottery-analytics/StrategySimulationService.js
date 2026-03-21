@@ -18,7 +18,6 @@
  * - TierPickStage: 8% 硬顶 + 随机选档位
  *
  * @module services/lottery-analytics/StrategySimulationService
- * @see docs/策略效果模拟分析页面-设计方案.md
  * @since 2026-02-20
  */
 
@@ -35,7 +34,6 @@ const HIGH_TIER_MAX_RATIO = 0.08
 
 /**
  * 风险评估阈值
- * @see docs/策略效果模拟分析页面-设计方案.md Section 4.4
  */
 const RISK_THRESHOLDS = {
   high_tier: { yellow: 0.05, red: 0.08 },

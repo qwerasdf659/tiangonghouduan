@@ -14,7 +14,6 @@
  * - 服务层禁止自建事务，由入口层统一使用 TransactionManager.execute()
  *
  * @since 2026-01-12
- * @see docs/商家员工域权限体系升级方案.md Phase 3.1
  */
 
 const logger = require('../utils/logger').logger
@@ -886,7 +885,6 @@ class StaffManagementService {
    * @throws {Error} 员工不存在、状态不允许删除等情况
    *
    * @since 2026-01-26
-   * @see docs/员工管理删除逻辑优化方案.md
    */
   static async permanentDeleteStaff(data, options = {}) {
     // 强制要求事务边界 - 2026-01-05 治理决策

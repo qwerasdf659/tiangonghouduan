@@ -1786,19 +1786,46 @@ EAV + 多渠道架构建好后，以下扩展都是**纯配置操作，不需要
 
 ---
 
-## 二十一、实施进度报告（2026-03-20 实施完成）
+## 二十一、实施进度报告（2026-03-20 实机验证）
+
+> **验证时间：** 2026-03-20，通过实际启动服务 + 数据库查询 + API 调用 + 代码审查全面验证。
 
 ### 21.1 后端数据库项目实施完成清单
 
-| Phase | 内容 | 状态 | 说明 |
+| Phase | 内容 | 状态 | 实机验证结果 |
 |-------|------|------|------|
-| Phase 1 | 数据库迁移（9张新表 + 4张表字段扩展） | ✅ 完成 | 3个迁移文件已执行 |
-| Phase 2 | 模型层（9个新模型 + 5个修改） | ✅ 完成 | 总计122个模型加载成功 |
-| Phase 3 | 服务层（4个新服务） | ✅ 完成 | ProductService + AttributeService + ExchangeChannelPriceService + AttributeRuleEngine |
-| Phase 4 | 兑换流程对接 | ✅ 完成 | ExchangeCoreService增加铸造分支 + ItemService扩展参数 |
-| Phase 5 | 数据迁移 | ✅ 完成 | 25品类 + 5商品 + 5 SKU + 5渠道定价 |
-| Phase 6 | 管理后台API路由 | ✅ 完成 | /console/categories + /console/attributes + /console/products |
-| Phase 7 | Web管理后台前端 | ✅ 完成 | 品类管理页 + 属性管理页 + API客户端 + 构建通过 |
+| Phase 1 | 数据库迁移（9张新表 + 4张表字段扩展） | ✅ 已验证 | 9张新表全部存在，4张表字段扩展已确认（含 item_holds.trade_cooldown） |
+| Phase 2 | 模型层（9个新模型 + 5个修改） | ✅ 已验证 | 116个模型加载成功，Item/ItemHold/ItemTemplate/ExchangeRecord 字段已确认 |
+| Phase 3 | 服务层（4个新服务） | ✅ 已验证 | 代码审查确认 AttributeRuleEngine 品质分+纹理编号生成逻辑完整 |
+| Phase 4 | 兑换流程对接 | ✅ 已验证 | ExchangeCoreService.exchangeItem() 确认调用 mintItem() + AttributeRuleEngine + trade_cooldown hold |
+| Phase 5 | 数据迁移 | ✅ 已验证 | categories:25 + products:5 + product_skus:5 + exchange_channel_prices:5 |
+| Phase 6 | 管理后台API路由 | ✅ 已验证 | API 调用成功返回 5 个商品数据 |
+| Phase 7 | Web管理后台前端 | ⚠️ 基本完成 | category-management.html + attribute-management.html 已构建，部分旧端点引用待清理 |
+
+### 21.1a 实机验证发现并修复的问题
+
+> 以下问题在文档声称"全部完成"后的实机验证中发现，已在 2026-03-20 修复。
+
+| # | 问题 | 严重程度 | 影响 | 修复方式 |
+|---|------|---------|------|---------|
+| F1 | `BidService` / `BidQueryService` 引用已删除的 `models.ExchangeItem`（undefined） | 🔴 运行时崩溃 | 竞价系统整体不可用 | 改为引用 `models.Product` |
+| F2 | `BusinessRecordQueryService` 引用已删除的 `ExchangeItem` | 🔴 运行时崩溃 | 兑换记录查询接口 500 | 改为使用 `Product` 模型 |
+| F3 | `routes/v4/console/bid-management.js` 引用 `ExchangeItem` | 🔴 运行时崩溃 | 创建竞价接口 500 | 改为使用 `Product` 模型 |
+| F4 | `scheduled_tasks.js` 定时任务引用 `ExchangeItem` | 🟡 定时任务静默失败 | 定时上下架/库存预警不工作 | 改为使用 `Product` + `ProductSku` |
+| F5 | `BidProduct` 模型 FK 指向已删除的 `exchange_items` 表 | 🟡 模型同步异常 | 新建竞价时 FK 约束报错 | 改为指向 `products` 表 |
+| F6 | `MediaService` 实体配置引用 `ExchangeItem` 模型名 | 🟡 媒体上传关联失败 | 商品图片上传异常 | 改为 `Product` |
+| F7 | `config/schema.js` 缺失导致服务无法启动 | 🔴 服务启动崩溃 | 整个后端不可用 | 创建配置 schema 定义文件 |
+| F8 | `BidService.settleBidProduct()` 使用旧字段名（item_name/cost_asset_code 等） | 🟡 竞价结算失败 | 竞价中标后无法正确结算 | 改为 Product 字段名 + ProductSku 库存扣减 |
+
+### 21.1b 仍需处理的遗留问题
+
+| # | 问题 | 优先级 | 说明 |
+|---|------|--------|------|
+| R1 | 5个测试文件引用 `ExchangeItem` | 中 | 不影响生产运行，但测试会失败 |
+| R2 | `exchange_items` 旧表未删除 | 低 | 数据已迁移到 products，旧表占用空间小，可后续清理 |
+| R3 | `bid_products.exchange_item_id` 数据值可能与 `products.product_id` 不匹配 | 中 | 需创建迁移更新竞价商品的 FK 值 |
+| R4 | `admin/src/api/market/exchange.js` 部分端点仍使用旧 `exchange_market` 路径 | 中 | 商品 CRUD 已迁移到 ProductAPI，但 pin/recommend/sort 等仍用旧路径 |
+| R5 | EAV 属性数据为空（attributes=0, attribute_options=0） | 低 | 等运营人员在后台配置 |
 
 ### 21.2 新增的数据库表（9张）
 

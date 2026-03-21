@@ -49,11 +49,7 @@ module.exports = sequelize => {
       exchange_item_id: {
         type: DataTypes.BIGINT,
         allowNull: true,
-        comment: '兑换商品ID（传统路径必填，Product路径为NULL）',
-        references: {
-          model: 'exchange_items',
-          key: 'exchange_item_id'
-        }
+        comment: '兑换商品ID（历史数据保留，新订单使用 product_id）'
       },
 
       // V4.5.0 材料资产支付字段（唯一支付方式）
@@ -109,7 +105,6 @@ module.exports = sequelize => {
        *
        * 格式：exchange_{user_id}_{exchange_item_id}_{timestamp}
        *
-       * @see docs/事务边界治理现状核查报告.md 建议9.1
        */
       business_id: {
         type: DataTypes.STRING(150),
@@ -353,11 +348,13 @@ module.exports = sequelize => {
       as: 'user'
     })
 
-    // 属于商品
-    ExchangeRecord.belongsTo(models.ExchangeItem, {
-      foreignKey: 'exchange_item_id',
-      as: 'item'
-    })
+    // 属于商品（Product 统一商品中心）
+    if (models.Product) {
+      ExchangeRecord.belongsTo(models.Product, {
+        foreignKey: 'product_id',
+        as: 'product'
+      })
+    }
 
     // 订单状态变更事件链（审计追踪）
     if (models.ExchangeOrderEvent) {
@@ -373,14 +370,6 @@ module.exports = sequelize => {
       ExchangeRecord.belongsTo(models.Item, {
         foreignKey: 'item_id',
         as: 'mintedItem'
-      })
-    }
-
-    // 关联统一商品SPU（新商品中心）
-    if (models.Product) {
-      ExchangeRecord.belongsTo(models.Product, {
-        foreignKey: 'product_id',
-        as: 'product'
       })
     }
 

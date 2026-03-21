@@ -446,8 +446,8 @@ router.get(
         where.status = status
       }
 
-      const ExchangeItem = req.app.locals.models.ExchangeItem
-      const items = await ExchangeItem.findAll({
+      const Product = req.app.locals.models.Product
+      const items = await Product.findAll({
         where,
         order: [
           ['sort_order', 'ASC'],
@@ -456,7 +456,6 @@ router.get(
         raw: true
       })
 
-      // CSV 表头（中文列名）
       const headers = [
         '商品ID',
         '商品名称',
@@ -464,11 +463,6 @@ router.get(
         '分类',
         '稀有度',
         '空间',
-        '支付资产',
-        '兑换价格',
-        '原价',
-        '库存',
-        '已售',
         '是否新品',
         '是否热门',
         '是否限量',
@@ -476,19 +470,13 @@ router.get(
         '创建时间'
       ]
 
-      // CSV 行数据
       const rows = items.map(item => [
-        item.exchange_item_id,
-        `"${(item.item_name || '').replace(/"/g, '""')}"`,
+        item.product_id,
+        `"${(item.product_name || '').replace(/"/g, '""')}"`,
         item.status,
-        item.category || '',
+        item.category_id || '',
         item.rarity_code || '',
         item.space || '',
-        item.cost_asset_code || '',
-        item.cost_amount || 0,
-        item.original_price || '',
-        item.stock || 0,
-        item.sold_count || 0,
         item.is_new ? '是' : '否',
         item.is_hot ? '是' : '否',
         item.is_limited ? '是' : '否',
@@ -500,7 +488,7 @@ router.get(
       const BOM = '\uFEFF'
       const csvContent = BOM + headers.join(',') + '\n' + rows.map(r => r.join(',')).join('\n')
 
-      const filename = `exchange_items_${new Date().toISOString().slice(0, 10)}.csv`
+      const filename = `products_${new Date().toISOString().slice(0, 10)}.csv`
       res.setHeader('Content-Type', 'text/csv; charset=utf-8')
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
 
@@ -971,10 +959,8 @@ router.post(
 
       logger.info('兑换商品创建成功（材料资产支付）', {
         admin_id,
-        exchange_item_id: transactionResult.item?.exchange_item_id,
-        item_name: transactionResult.item?.item_name,
-        cost_asset_code: transactionResult.item?.cost_asset_code,
-        cost_amount: transactionResult.item?.cost_amount,
+        product_id: transactionResult.item?.product_id,
+        product_name: transactionResult.item?.product_name,
         bound_image: transactionResult.bound_image
       })
 
@@ -1131,10 +1117,8 @@ router.put(
 
       logger.info('兑换商品更新成功（材料资产支付）', {
         admin_id,
-        exchange_item_id: itemId,
-        item_name: result.item.item_name,
-        cost_asset_code: result.item.cost_asset_code,
-        cost_amount: result.item.cost_amount,
+        product_id: itemId,
+        product_name: result.item.product_name,
         image_changes: result.image_changes
       })
 
@@ -1421,7 +1405,7 @@ router.put(
 
       const result = await TransactionManager.execute(
         async transaction => {
-          const item = await ExchangeService.ExchangeItem.findByPk(itemId, {
+          const item = await ExchangeService.Product.findByPk(itemId, {
             lock: transaction.LOCK.UPDATE,
             transaction
           })
@@ -1437,7 +1421,7 @@ router.put(
             { transaction }
           )
 
-          return { exchange_item_id: itemId, is_pinned: pinned }
+          return { product_id: itemId, is_pinned: pinned }
         },
         { description: `置顶商品 ${itemId}`, maxRetries: 1 }
       )
@@ -1471,7 +1455,7 @@ router.put(
 
       const result = await TransactionManager.execute(
         async transaction => {
-          const item = await ExchangeService.ExchangeItem.findByPk(itemId, {
+          const item = await ExchangeService.Product.findByPk(itemId, {
             lock: transaction.LOCK.UPDATE,
             transaction
           })
@@ -1480,7 +1464,7 @@ router.put(
           const recommended = is_recommended !== undefined ? !!is_recommended : !item.is_recommended
           await item.update({ is_recommended: recommended }, { transaction })
 
-          return { exchange_item_id: itemId, is_recommended: recommended }
+          return { product_id: itemId, is_recommended: recommended }
         },
         { description: `推荐商品 ${itemId}`, maxRetries: 1 }
       )
@@ -1587,14 +1571,16 @@ router.put(
           const updatePromises = items
             .filter(
               item =>
-                item.exchange_item_id && item.cost_amount !== undefined && item.cost_amount >= 0
+                (item.product_id || item.exchange_item_id) &&
+                item.cost_amount !== undefined &&
+                item.cost_amount >= 0
             )
-            .map(item =>
-              ExchangeAdminService.ExchangeItem.update(
-                { cost_amount: parseInt(item.cost_amount, 10) },
-                { where: { exchange_item_id: parseInt(item.exchange_item_id, 10) }, transaction }
-              )
-            )
+            .map(item => {
+              const pid = parseInt(item.product_id || item.exchange_item_id, 10)
+              return ExchangeAdminService.batchUpdateSkuPrice
+                ? ExchangeAdminService.batchUpdateSkuPrice(pid, item.cost_amount, { transaction })
+                : Promise.resolve([0])
+            })
           const results = await Promise.all(updatePromises)
           const affectedRows = results.reduce((sum, [affected]) => sum + affected, 0)
           return { affected_rows: affectedRows }
@@ -1678,12 +1664,13 @@ router.put(
         async transaction => {
           const updatePromises = items
             .filter(
-              ({ exchange_item_id, sort_order }) => exchange_item_id && sort_order !== undefined
+              ({ exchange_item_id, product_id, sort_order }) =>
+                (product_id || exchange_item_id) && sort_order !== undefined
             )
-            .map(({ exchange_item_id, sort_order }) =>
-              ExchangeService.ExchangeItem.update(
+            .map(({ exchange_item_id, product_id, sort_order }) =>
+              ExchangeService.Product.update(
                 { sort_order: parseInt(sort_order) },
-                { where: { exchange_item_id }, transaction }
+                { where: { product_id: product_id || exchange_item_id }, transaction }
               )
             )
           const results = await Promise.all(updatePromises)

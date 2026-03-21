@@ -19,7 +19,7 @@
 'use strict'
 
 const models = require('../../models')
-const { sequelize, ExchangeItem, BidProduct, BidRecord } = models
+const { sequelize, Product, BidProduct, BidRecord } = models
 
 jest.setTimeout(30000)
 
@@ -51,35 +51,31 @@ describe('竞价系统服务测试（臻选空间/幸运空间/竞价功能）',
 
   // ==================== exchange_items 空间字段测试 ====================
 
-  describe('exchange_items 空间字段（Phase 1）', () => {
+  describe('products 空间字段（Phase 1）', () => {
     test('所有现有商品的 space 字段默认为 lucky', async () => {
-      const items = await ExchangeItem.findAll({
-        attributes: ['exchange_item_id', 'space'],
+      const items = await Product.findAll({
+        attributes: ['product_id', 'space'],
         raw: true
       })
 
-      // 当前环境可能无 exchange_items 数据，验证逻辑在有数据时成立
       if (items.length > 0) {
         const allLucky = items.every(item => item.space === 'lucky')
         expect(allLucky).toBe(true)
       }
 
-      // 无论有无数据，模型的 space 字段默认值应为 lucky
-      const attributes = ExchangeItem.getAttributes()
+      const attributes = Product.getAttributes()
       expect(attributes.space.defaultValue).toBe('lucky')
     })
 
     test('新增字段在模型中正确定义', async () => {
-      const attributes = ExchangeItem.getAttributes()
+      const attributes = Product.getAttributes()
       const newFields = [
         'space',
-        'original_price',
         'tags',
         'is_new',
         'is_hot',
-        'is_lucky',
-        'has_warranty',
-        'free_shipping',
+        'is_limited',
+        'is_recommended',
         'sell_point'
       ]
       newFields.forEach(field => {
