@@ -111,7 +111,7 @@ class LotteryHealthService {
    */
   get lotteryAlertService() {
     if (!this._lotteryAlertService) {
-      this._lotteryAlertService = require('../LotteryAlertService')
+      this._lotteryAlertService = require('./LotteryAlertService')
     }
     return this._lotteryAlertService
   }

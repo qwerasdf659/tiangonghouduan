@@ -36,26 +36,31 @@ beforeAll(async () => {
 // ==================== 兑换市场（exchange-market.html）====================
 
 describe('兑换市场管理页面 API', () => {
-  test('GET /console/marketplace/exchange_market/items - 商品列表应返回分页数据', async () => {
+  test('GET /console/exchange-items - 商品列表应返回分页数据', async () => {
     const res = await request
-      .get('/api/v4/console/marketplace/exchange_market/items')
+      .get('/api/v4/console/exchange-items')
       .set('Authorization', `Bearer ${adminToken}`)
       .query({ page: 1, page_size: 10 })
 
     expect(res.status).toBe(200)
     expect(res.body.success).toBe(true)
     expect(res.body.data).toHaveProperty('items')
-    expect(res.body.data).toHaveProperty('pagination')
     expect(Array.isArray(res.body.data.items)).toBe(true)
-    expect(res.body.data.pagination).toHaveProperty('total')
-    expect(res.body.data.pagination).toHaveProperty('page')
+    expect(res.body.data).toHaveProperty('total')
+    expect(res.body.data).toHaveProperty('page')
+    expect(res.body.data).toHaveProperty('page_size')
 
     if (res.body.data.items.length > 0) {
       const item = res.body.data.items[0]
       expect(item).toHaveProperty('exchange_item_id')
       expect(item.item_name || item.name).toBeTruthy()
-      expect(item).toHaveProperty('cost_asset_code')
-      expect(item).toHaveProperty('cost_amount')
+      // 商品中心：成本在 SKU/渠道价上；SPU 层为 min_cost_amount / max_cost_amount
+      const hasSpuCostRange =
+        item.min_cost_amount !== undefined && item.max_cost_amount !== undefined
+      const firstSku = Array.isArray(item.skus) && item.skus[0]
+      const firstPrice = firstSku?.channelPrices?.[0]
+      const hasSkuCost = !!(firstPrice && firstPrice.cost_asset_code && firstPrice.cost_amount)
+      expect(hasSpuCostRange || hasSkuCost).toBe(true)
       expect(item).toHaveProperty('stock')
       expect(item).toHaveProperty('status')
     }
@@ -89,6 +94,8 @@ describe('兑换市场管理页面 API', () => {
     expect(typeof stats.total_items).toBe('number')
     expect(typeof stats.active_items).toBe('number')
     expect(stats.total_items).toBeGreaterThanOrEqual(0)
+    expect(stats).toHaveProperty('order_trend_by_day')
+    expect(Array.isArray(stats.order_trend_by_day)).toBe(true)
   })
 })
 
@@ -254,7 +261,7 @@ describe('跨页面数据一致性', () => {
   test('兑换市场商品数 vs 统计数据应一致', async () => {
     const [itemsRes, statsRes] = await Promise.all([
       request
-        .get('/api/v4/console/marketplace/exchange_market/items')
+        .get('/api/v4/console/exchange-items')
         .set('Authorization', `Bearer ${adminToken}`)
         .query({ page: 1, page_size: 1 }),
       request
@@ -262,7 +269,8 @@ describe('跨页面数据一致性', () => {
         .set('Authorization', `Bearer ${adminToken}`)
     ])
 
-    const totalItems = itemsRes.body.data.pagination.total
+    expect(itemsRes.status).toBe(200)
+    const totalItems = itemsRes.body.data.total
     const statsTotal = statsRes.body.data.total_items
 
     expect(totalItems).toBe(statsTotal)

@@ -126,7 +126,7 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
         expect(Array.isArray(response.body.data.products)).toBe(true)
         expect(response.body.data.pagination).toHaveProperty('total')
         expect(response.body.data.pagination).toHaveProperty('page')
-        expect(response.body.data.pagination).toHaveProperty('limit')
+        expect(response.body.data.pagination).toHaveProperty('page_size')
       })
 
       /**
@@ -146,12 +146,12 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
         const response = await request(app)
           .get('/api/v4/market/listings')
           .set('Authorization', `Bearer ${access_token}`)
-          .query({ page: 1, limit: 5 })
+          .query({ page: 1, page_size: 5 })
 
         expect(response.status).toBe(200)
         validateApiContract(response.body)
         expect(response.body.data.pagination.page).toBe(1)
-        expect(response.body.data.pagination.limit).toBe(5)
+        expect(response.body.data.pagination.page_size).toBe(5)
       })
 
       /**
@@ -630,23 +630,23 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
 
   describe('边界条件和错误处理', () => {
     /**
-     * Case 1: 超大page_size接受服务端返回的limit值
-     * 业务说明：当前服务端未强制限制limit，此测试验证响应格式正确
+     * Case 1: 超大 page_size 请求仍返回合法分页结构
+     * 业务说明：验证响应含 page_size 数值字段
      * 注意：listings端点需要认证
      */
     test('超大page_size请求应返回正确的响应格式', async () => {
       const response = await request(app)
         .get('/api/v4/market/listings')
         .set('Authorization', `Bearer ${access_token}`)
-        .query({ limit: 10000 })
+        .query({ page_size: 10000 })
 
       expect(response.status).toBe(200)
       validateApiContract(response.body)
       // 验证pagination结构完整性
       expect(response.body.data.pagination).toHaveProperty('total')
       expect(response.body.data.pagination).toHaveProperty('page')
-      expect(response.body.data.pagination).toHaveProperty('limit')
-      expect(typeof response.body.data.pagination.limit).toBe('number')
+      expect(response.body.data.pagination).toHaveProperty('page_size')
+      expect(typeof response.body.data.pagination.page_size).toBe('number')
     })
 
     /**

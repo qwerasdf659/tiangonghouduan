@@ -310,7 +310,7 @@ describe('P3-7: SQL注入安全测试', () => {
       if (response.status === 200 && response.body.data?.pagination) {
         // 如果成功，分页应该使用默认值
         expect(typeof response.body.data.pagination.page).toBe('number')
-        expect(typeof response.body.data.pagination.limit).toBe('number')
+        expect(typeof response.body.data.pagination.page_size).toBe('number')
       }
 
       console.log('[P3-7] 参数类型强制验证测试通过')

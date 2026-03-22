@@ -37,9 +37,19 @@
 
 'use strict'
 
+const crypto = require('crypto')
 const { Account, AccountAssetBalance, AssetTransaction, User } = require('../../models')
 const logger = require('../../utils/logger')
+const OrderNoGenerator = require('../../utils/OrderNoGenerator')
 const { requireTransaction } = require('../../utils/transactionHelpers')
+
+/**
+ * 资产流水创建时占位 transaction_no（迁移后列 NOT NULL，写入后用主键生成正式 TX 号）
+ * @returns {string} 占位字符串
+ */
+function assetTransactionNoPlaceholder() {
+  return `PH${crypto.randomBytes(12).toString('hex').toUpperCase()}`
+}
 
 /**
  * 资产余额安全上限（10亿）
@@ -59,6 +69,29 @@ const BALANCE_SAFETY_LIMIT = 1_000_000_000
  * @description 处理账户余额相关的所有操作，是资产服务的核心基础层
  */
 class BalanceService {
+  /**
+   * 用主键与创建时间生成统一 TX 流水号并写回（编码规则统一方案）
+   *
+   * @param {Object} row - AssetTransaction 实例（Sequelize Model）
+   * @param {Object} transaction - 当前 Sequelize 事务
+   * @returns {Promise<Object>} 刷新后的流水记录
+   */
+  static async finalizeAssetTransactionNo(row, transaction) {
+    await row.reload({ transaction })
+    await row.update(
+      {
+        transaction_no: OrderNoGenerator.generate(
+          'TX',
+          row.asset_transaction_id,
+          row.createdAt || row.created_at
+        )
+      },
+      { transaction }
+    )
+    await row.reload({ transaction })
+    return row
+  }
+
   /**
    * 获取或创建账户（支持用户账户和系统账户）
    *
@@ -385,6 +418,7 @@ class BalanceService {
           business_type,
           lottery_session_id: lottery_session_id || null,
           idempotency_key,
+          transaction_no: assetTransactionNoPlaceholder(),
           meta: {
             ...meta,
             lottery_campaign_id: lottery_campaign_id || null,
@@ -393,6 +427,7 @@ class BalanceService {
         },
         { transaction }
       )
+      await BalanceService.finalizeAssetTransactionNo(transaction_record, transaction)
 
       /*
        * 双录记账：写入对手方反向流水（V4.2.0 → V4.8.0 全覆盖升级）
@@ -413,7 +448,7 @@ class BalanceService {
         })
 
         if (!existingCounterpart) {
-          await AssetTransaction.create(
+          const counterpart_row = await AssetTransaction.create(
             {
               account_id: params.counterpart_account_id,
               counterpart_account_id: account.account_id,
@@ -424,6 +459,7 @@ class BalanceService {
               business_type: `${business_type}_counterpart`,
               lottery_session_id: lottery_session_id || null,
               idempotency_key: counterpartIdempotencyKey,
+              transaction_no: assetTransactionNoPlaceholder(),
               meta: {
                 counterpart_of: idempotency_key,
                 original_account_id: account.account_id,
@@ -432,6 +468,7 @@ class BalanceService {
             },
             { transaction }
           )
+          await BalanceService.finalizeAssetTransactionNo(counterpart_row, transaction)
         }
       }
 
@@ -628,6 +665,7 @@ class BalanceService {
           business_type,
           lottery_session_id: null,
           idempotency_key,
+          transaction_no: assetTransactionNoPlaceholder(),
           meta: {
             ...meta,
             freeze_amount: numericAmount,
@@ -637,6 +675,7 @@ class BalanceService {
         },
         { transaction }
       )
+      await BalanceService.finalizeAssetTransactionNo(transaction_record, transaction)
 
       // 双录记账：在 SYSTEM_ESCROW 写反向流水（delta = +amount，对冲主记录的 -amount）
       const counterpartIdempotencyKey = `${idempotency_key}:escrow_counterpart`
@@ -645,7 +684,7 @@ class BalanceService {
         transaction
       })
       if (!existingCounterpart) {
-        await AssetTransaction.create(
+        const escrow_row = await AssetTransaction.create(
           {
             account_id: escrowAccount.account_id,
             counterpart_account_id: account.account_id,
@@ -657,6 +696,7 @@ class BalanceService {
             business_type: `${business_type}_counterpart`,
             lottery_session_id: null,
             idempotency_key: counterpartIdempotencyKey,
+            transaction_no: assetTransactionNoPlaceholder(),
             meta: {
               counterpart_of: idempotency_key,
               original_account_id: account.account_id,
@@ -665,6 +705,7 @@ class BalanceService {
           },
           { transaction }
         )
+        await BalanceService.finalizeAssetTransactionNo(escrow_row, transaction)
       }
 
       logger.info('✅ 资产冻结成功（双录）', {
@@ -860,6 +901,7 @@ class BalanceService {
           business_type,
           lottery_session_id: null,
           idempotency_key,
+          transaction_no: assetTransactionNoPlaceholder(),
           meta: {
             ...meta,
             unfreeze_amount: numericAmount,
@@ -869,6 +911,7 @@ class BalanceService {
         },
         { transaction }
       )
+      await BalanceService.finalizeAssetTransactionNo(transaction_record, transaction)
 
       // 双录记账：在 SYSTEM_ESCROW 写反向流水（delta = -amount，抵消冻结时的 +amount）
       const counterpartIdempotencyKey = `${idempotency_key}:escrow_counterpart`
@@ -877,7 +920,7 @@ class BalanceService {
         transaction
       })
       if (!existingCounterpart) {
-        await AssetTransaction.create(
+        const escrow_un_row = await AssetTransaction.create(
           {
             account_id: escrowAccount.account_id,
             counterpart_account_id: account.account_id,
@@ -889,6 +932,7 @@ class BalanceService {
             business_type: `${business_type}_counterpart`,
             lottery_session_id: null,
             idempotency_key: counterpartIdempotencyKey,
+            transaction_no: assetTransactionNoPlaceholder(),
             meta: {
               counterpart_of: idempotency_key,
               original_account_id: account.account_id,
@@ -897,6 +941,7 @@ class BalanceService {
           },
           { transaction }
         )
+        await BalanceService.finalizeAssetTransactionNo(escrow_un_row, transaction)
       }
 
       logger.info('✅ 资产解冻成功（双录）', {
@@ -1093,6 +1138,7 @@ class BalanceService {
           business_type,
           lottery_session_id: null,
           idempotency_key,
+          transaction_no: assetTransactionNoPlaceholder(),
           meta: {
             ...meta,
             settle_amount: numericAmount,
@@ -1102,6 +1148,7 @@ class BalanceService {
         },
         { transaction }
       )
+      await BalanceService.finalizeAssetTransactionNo(transaction_record, transaction)
 
       /*
        * V4.9.0 增强版方案 B：settleFromFrozen 不再写毯式 ESCROW 释放记录。

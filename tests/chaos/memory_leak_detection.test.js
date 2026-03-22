@@ -427,6 +427,13 @@ describe('🧪 P3-2-1 内存泄漏检测测试', () => {
   let redisClient
   let isRedisAvailable = false
 
+  /**
+   * 5 分钟持续高压 + 回归斜率断言对环境噪声敏感，默认 `npm test` 跳过。
+   * 专项验证：`RUN_MEMORY_STABILITY_TEST=true npm test -- tests/chaos/memory_leak_detection.test.js`
+   * 或 `npm run test:memory-stability`
+   */
+  const runHeavyStability = process.env.RUN_MEMORY_STABILITY_TEST === 'true'
+
   // 是否使用完整测试模式（环境变量控制）
   const useFullTest = process.env.FULL_MEMORY_TEST === 'true'
   const testDuration = useFullTest
@@ -515,7 +522,8 @@ describe('🧪 P3-2-1 内存泄漏检测测试', () => {
      * 测试场景：持续高负载下的内存稳定性
      * 验证目标：内存使用不应持续增长
      */
-    test(
+    const stabilityCase = runHeavyStability ? test : test.skip
+    stabilityCase(
       '持续高压负载下内存稳定性测试',
       async () => {
         console.log('')

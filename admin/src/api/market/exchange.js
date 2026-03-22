@@ -33,8 +33,10 @@ export const EXCHANGE_ENDPOINTS = {
   EXCHANGE_SHIPPING_COMPANIES: `${API_PREFIX}/console/marketplace/exchange_market/shipping-companies`,
   EXCHANGE_ORDER_TRACK: `${API_PREFIX}/console/marketplace/exchange_market/orders/:order_no/track`,
 
-  // 市场概览统计（后端: routes/v4/console/market/marketplace.js）
-  MARKET_STATS_OVERVIEW: `${API_PREFIX}/console/marketplace/stats/overview`
+  // 市场概览统计（二级市场成交，后端: marketplace.js）
+  MARKET_STATS_OVERVIEW: `${API_PREFIX}/console/marketplace/stats/overview`,
+  // 兑换市场聚合统计（服务端聚合，后端: exchange_market/statistics）
+  EXCHANGE_MARKET_STATISTICS: `${API_PREFIX}/console/marketplace/exchange_market/statistics`
 }
 
 // ========== API 调用方法 ==========
@@ -184,11 +186,11 @@ export const ExchangeAPI = {
   },
 
   /** 批量修改分类 */
-  async batchUpdateCategory(exchangeItemIds, categoryDefId) {
+  async batchUpdateCategory(exchangeItemIds, categoryId) {
     return await request({
       url: EXCHANGE_ENDPOINTS.EXCHANGE_ITEMS_BATCH_CATEGORY,
       method: 'PUT',
-      data: { exchange_item_ids: exchangeItemIds, category_def_id: categoryDefId }
+      data: { exchange_item_ids: exchangeItemIds, category_id: categoryId }
     })
   },
 

@@ -36,14 +36,14 @@
  * 使用模型：Claude Sonnet 4.5
  */
 
-const logger = require('../utils/logger').logger
-const { LotteryCampaignPricingConfig, LotteryCampaign } = require('../models')
-const { BusinessCacheHelper } = require('../utils/BusinessCacheHelper')
+const logger = require('../../utils/logger').logger
+const { LotteryCampaignPricingConfig, LotteryCampaign } = require('../../models')
+const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
 
 /**
  * 定价服务 - 用于缓存失效
  */
-const LotteryPricingService = require('./lottery/LotteryPricingService')
+const LotteryPricingService = require('./LotteryPricingService')
 
 /**
  * 活动定价配置管理服务类

@@ -73,6 +73,7 @@ document.addEventListener('alpine:init', () => {
     // ========== data-table 列配置 ==========
     tradeOrderTableColumns: [
       { key: 'trade_order_id', label: '交易ID', sortable: true, type: 'code' },
+      { key: 'order_no', label: '订单号(TO)', type: 'code' },
       {
         key: 'buyer_user_id',
         label: '买家',
@@ -1116,7 +1117,7 @@ document.addEventListener('alpine:init', () => {
     async fetchMarketplaceStatsTableData(params) {
       const queryParams = {
         page: params.page || 1,
-        limit: params.page_size || 20
+        page_size: params.page_size || 20
       }
       if (this.marketplaceFilters?.status && this.marketplaceFilters.status !== 'all') {
         queryParams.filter = this.marketplaceFilters.status

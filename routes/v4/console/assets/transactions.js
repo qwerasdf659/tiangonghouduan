@@ -102,6 +102,7 @@ router.get(
         return {
           // 主键：BIGINT 转 Number（避免 bigNumberStrings 返回字符串）
           asset_transaction_id: Number(plainTx.asset_transaction_id),
+          transaction_no: plainTx.transaction_no || null,
           asset_code: plainTx.asset_code,
           asset_name: getAssetDisplayName(plainTx.asset_code),
           // 业务类型：使用 tx_type 别名（attachDisplayNames 会附加 tx_type_display）

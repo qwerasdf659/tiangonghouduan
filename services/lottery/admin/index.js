@@ -1,4 +1,4 @@
-// services/admin-lottery/index.js
+// services/lottery/admin/index.js
 /**
  * V4.7.0 AdminLotteryService 拆分子服务入口
  *

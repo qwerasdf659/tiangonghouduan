@@ -4,8 +4,8 @@
  * **业务场景**: 验证所有列表API的分页参数和逻辑
  * **技术规范**:
  *   - page: 页码,从1开始,默认1
- *   - limit: 每页数量,默认10,最大100
- *   - 返回total总数、totalPages总页数
+ *   - page_size / limit（查询参数，服务端逐步统一为 page_size）
+ *   - 标准分页响应：page_size、total_pages、has_next、has_prev（ApiResponse.paginated）
  *
  * 创建时间: 2025-11-14
  * 适用范围: 所有带分页功能的列表API
@@ -86,8 +86,8 @@ class PaginationTestSuite {
         expect(res.status).toBe(200)
         expect(res.body.success).toBe(true)
         expect(res.body.data.pagination.page).toBe(1)
-        expect(res.body.data.pagination.limit).toBe(10)
-        console.log('✅ 默认值正确: page=1, limit=10')
+        expect(res.body.data.pagination.page_size).toBe(10)
+        console.log('✅ 默认值正确: page=1, page_size=10')
       })
 
       /**
@@ -101,8 +101,8 @@ class PaginationTestSuite {
         expect(res.status).toBe(200)
         expect(res.body.success).toBe(true)
         expect(res.body.data.pagination.page).toBe(2)
-        expect(res.body.data.pagination.limit).toBe(20)
-        console.log('✅ 自定义参数正确: page=2, limit=20')
+        expect(res.body.data.pagination.page_size).toBe(20)
+        console.log('✅ 自定义参数正确: page=2, page_size=20')
       })
     })
   }
@@ -127,20 +127,20 @@ class PaginationTestSuite {
     const pagination = res.body.data.pagination
     expect(pagination).toBeDefined()
     expect(pagination).toHaveProperty('page')
-    expect(pagination).toHaveProperty('limit')
+    expect(pagination).toHaveProperty('page_size')
     expect(pagination).toHaveProperty('total')
     expect(pagination).toHaveProperty('total_pages')
 
     // 验证数据类型
     expect(typeof pagination.page).toBe('number')
-    expect(typeof pagination.limit).toBe('number')
+    expect(typeof pagination.page_size).toBe('number')
     expect(typeof pagination.total).toBe('number')
     expect(typeof pagination.total_pages).toBe('number')
 
     // 验证数据合理性
     expect(pagination.page).toBeGreaterThanOrEqual(1)
-    expect(pagination.limit).toBeGreaterThanOrEqual(1)
-    expect(pagination.limit).toBeLessThanOrEqual(100)
+    expect(pagination.page_size).toBeGreaterThanOrEqual(1)
+    expect(pagination.page_size).toBeLessThanOrEqual(100)
     expect(pagination.total).toBeGreaterThanOrEqual(0)
     expect(pagination.total_pages).toBeGreaterThanOrEqual(0)
 
@@ -161,27 +161,29 @@ class PaginationTestSuite {
     if (authToken) req1.set('Authorization', `Bearer ${authToken}`)
     const res1 = await req1
 
-    const { total, total_pages, limit } = res1.body.data.pagination
-    const expectedTotalPages = Math.ceil(total / limit)
+    const { total, total_pages, page_size: pageSize } = res1.body.data.pagination
+    const expectedTotalPages = Math.ceil(total / pageSize)
 
     // 2. 验证总页数计算
     expect(total_pages).toBe(expectedTotalPages)
-    console.log(`✅ 总页数计算正确: total=${total}, limit=${limit}, total_pages=${total_pages}`)
+    console.log(
+      `✅ 总页数计算正确: total=${total}, page_size=${pageSize}, total_pages=${total_pages}`
+    )
 
     // 3. 验证最后一页数据
     if (total_pages > 0) {
-      const req2 = request(app).get(`${apiEndpoint}?page=${total_pages}&limit=${limit}`)
+      const req2 = request(app).get(`${apiEndpoint}?page=${total_pages}&limit=${pageSize}`)
       if (authToken) req2.set('Authorization', `Bearer ${authToken}`)
       const res2 = await req2
 
       const itemsInLastPage = res2.body.data.items?.length || res2.body.data.list?.length || 0
 
-      expect(itemsInLastPage).toBeLessThanOrEqual(limit)
+      expect(itemsInLastPage).toBeLessThanOrEqual(pageSize)
       console.log(`✅ 最后一页数据正确: ${itemsInLastPage}条`)
     }
 
     // 4. 验证超出范围的页码
-    const req3 = request(app).get(`${apiEndpoint}?page=${total_pages + 10}&limit=${limit}`)
+    const req3 = request(app).get(`${apiEndpoint}?page=${total_pages + 10}&limit=${pageSize}`)
     if (authToken) req3.set('Authorization', `Bearer ${authToken}`)
     const res3 = await req3
 

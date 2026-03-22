@@ -314,6 +314,8 @@ class ConsumptionRecord extends Model {
       status_name: this.getStatusName(),
       status_color: this.getStatusColor(),
       final_status: this.final_status, // V4.7 业务最终状态（中文化显示名称系统 - 2026-01-22）
+      order_no: this.order_no || null,
+      business_id: this.business_id || null,
       qr_code: this.qr_code,
       merchant_notes: this.merchant_notes,
       admin_notes: this.admin_notes,
@@ -362,6 +364,7 @@ class ConsumptionRecord extends Model {
   toSimpleAPIResponse() {
     return {
       id: this.consumption_record_id,
+      order_no: this.order_no || null,
       consumption_amount: parseFloat(this.consumption_amount),
       points_to_award: this.points_to_award,
       status: this.status,
@@ -535,7 +538,17 @@ module.exports = sequelize => {
         type: DataTypes.STRING(150),
         allowNull: false, // 业务唯一键必填（历史数据已回填完成 - 2026-01-05）
         unique: true,
-        comment: '业务唯一键（格式：consumption_{merchant_id}_{timestamp}_{random}）- 必填'
+        comment: '业务唯一键（格式：consume_{merchant_id}_{user_id}_{timestamp_ms}）- 必填'
+      },
+
+      /**
+       * 面向用户/客服的消费买单号（CS 前缀，16 位统一格式）
+       */
+      order_no: {
+        type: DataTypes.STRING(32),
+        allowNull: false,
+        unique: true,
+        comment: '消费记录订单号（CS 前缀）'
       },
 
       /**

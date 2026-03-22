@@ -45,7 +45,7 @@ const crypto = require('crypto')
 function generateLotterySessionId() {
   const timestamp = Date.now()
   const random = crypto.randomBytes(3).toString('hex') // 6位16进制
-  const seq = String(Math.floor(Math.random() * 1000)).padStart(3, '0')
+  const seq = String(crypto.randomInt(0, 1000)).padStart(3, '0')
   return `lottery_tx_${timestamp}_${random}_${seq}`
 }
 
@@ -127,7 +127,7 @@ function generateStandaloneIdempotencyKey(businessType, accountId) {
 function generateRequestIdempotencyKey() {
   const timestamp = Date.now()
   const random = crypto.randomBytes(4).toString('hex') // 8位16进制
-  const seq = String(Math.floor(Math.random() * 1000)).padStart(3, '0')
+  const seq = String(crypto.randomInt(0, 1000)).padStart(3, '0')
   return `req_${timestamp}_${random}_${seq}`
 }
 
@@ -228,97 +228,94 @@ function parseIdempotencyKey(idempotencyKey) {
  */
 
 /**
- * 生成抽奖记录业务唯一键
+ * 生成抽奖记录业务唯一键（四段式：领域_用户_对象指纹_时间戳毫秒）
  *
- * 格式：lottery_draw_{user_id}_{session_id}_{draw_index}
+ * 对象指纹：对「会话ID + 抽次序号」做 SHA-256 取前 12 位 hex，避免嵌套完整 session 串导致过长。
  *
  * @param {number|string} userId - 用户ID
  * @param {string} lotterySessionId - 抽奖会话ID
  * @param {number} drawIndex - 本次抽奖在会话中的序号（从0开始）
+ * @param {number} [timestamp] - 毫秒时间戳，默认 Date.now()
  * @returns {string} 业务唯一键
- *
- * @example
- * generateLotteryDrawBusinessId(123, 'lottery_tx_1703511234567_a1b2c3_001', 0)
- * // => 'lottery_draw_123_lottery_tx_1703511234567_a1b2c3_001_0'
  */
-function generateLotteryDrawBusinessId(userId, lotterySessionId, drawIndex) {
+function generateLotteryDrawBusinessId(userId, lotterySessionId, drawIndex, timestamp) {
   if (!userId || !lotterySessionId || drawIndex === undefined) {
     throw new Error('userId, lotterySessionId 和 drawIndex 不能为空')
   }
-  return `lottery_draw_${userId}_${lotterySessionId}_${drawIndex}`
+  const ts = timestamp !== undefined && timestamp !== null ? timestamp : Date.now()
+  const objectFingerprint = crypto
+    .createHash('sha256')
+    .update(`${lotterySessionId}|${drawIndex}`)
+    .digest('hex')
+    .slice(0, 12)
+  return `lottery_${userId}_${objectFingerprint}_${ts}`
 }
 
 /**
- * 生成消费记录业务唯一键
+ * 生成消费记录业务唯一键（四段式：consume_商家_用户_时间戳毫秒）
  *
- * 格式：consumption_{merchant_id}_{timestamp}_{random}
- *
- * 业务语义：同一商家在同一时间点（毫秒级）只能提交一笔消费记录
- *
- * @param {number|string} merchantId - 商家ID
- * @param {number} [timestamp] - 时间戳（可选，默认当前时间）
- * @param {string} [randomSuffix] - 随机后缀（可选，默认生成6位随机数）
+ * @param {number|string} merchantId - 商家用户ID
+ * @param {number|string} userId - 消费用户ID
+ * @param {number} [timestamp] - 毫秒时间戳，默认当前时间
  * @returns {string} 业务唯一键
- *
- * @example
- * generateConsumptionBusinessId(456)
- * // => 'consumption_456_1703511234567_a1b2c3'
  */
-function generateConsumptionBusinessId(merchantId, timestamp, randomSuffix) {
-  if (!merchantId) {
-    throw new Error('merchantId 不能为空')
+function generateConsumptionBusinessId(merchantId, userId, timestamp) {
+  if (!merchantId || userId === undefined || userId === null) {
+    throw new Error('merchantId 与 userId 不能为空')
   }
-  const ts = timestamp || Date.now()
-  const random = randomSuffix || crypto.randomBytes(3).toString('hex')
-  return `consumption_${merchantId}_${ts}_${random}`
+  const ts = timestamp !== undefined && timestamp !== null ? timestamp : Date.now()
+  return `consume_${merchantId}_${userId}_${ts}`
 }
 
 /**
- * 生成兑换记录业务唯一键
- *
- * 格式：exchange_{user_id}_{item_id}_{timestamp}
- *
- * 业务语义：同一用户在同一时间点（毫秒级）只能兑换一次同一商品
+ * 生成兑换记录业务唯一键（四段式：exchange_用户_SKU_时间戳毫秒）
  *
  * @param {number|string} userId - 用户ID
- * @param {number|string} exchangeItemId - 兑换商品ID
- * @param {number} [timestamp] - 时间戳（可选，默认当前时间）
+ * @param {number|string} skuId - 兑换 SKU ID（业务对象标识）
+ * @param {number} [timestamp] - 毫秒时间戳，默认当前时间
  * @returns {string} 业务唯一键
- *
- * @example
- * generateExchangeBusinessId(123, 789)
- * // => 'exchange_123_789_1703511234567'
  */
-function generateExchangeBusinessId(userId, exchangeItemId, timestamp) {
-  if (!userId || !exchangeItemId) {
-    throw new Error('userId 和 exchangeItemId 不能为空')
+function generateExchangeBusinessId(userId, skuId, timestamp) {
+  if (!userId || !skuId) {
+    throw new Error('userId 和 skuId 不能为空')
   }
-  const ts = timestamp || Date.now()
-  return `exchange_${userId}_${exchangeItemId}_${ts}`
+  const ts = timestamp !== undefined && timestamp !== null ? timestamp : Date.now()
+  return `exchange_${userId}_${skuId}_${ts}`
 }
 
 /**
- * 生成交易订单业务唯一键
+ * 生成交易订单业务唯一键（四段式：trade_买家_挂牌_时间戳毫秒）
  *
- * 格式：trade_order_{buyer_id}_{market_listing_id}_{timestamp}
- *
- * 业务语义：同一买家在同一时间点（毫秒级）只能对同一挂牌下单一次
- *
- * @param {number|string} buyerId - 买家ID
+ * @param {number|string} buyerId - 买家用户ID
  * @param {number|string} listingId - 挂牌ID
- * @param {number} [timestamp] - 时间戳（可选，默认当前时间）
+ * @param {number} [timestamp] - 毫秒时间戳，默认当前时间
  * @returns {string} 业务唯一键
- *
- * @example
- * generateTradeOrderBusinessId(123, 456)
- * // => 'trade_order_123_456_1703511234567'
  */
 function generateTradeOrderBusinessId(buyerId, listingId, timestamp) {
   if (!buyerId || !listingId) {
     throw new Error('buyerId 和 listingId 不能为空')
   }
-  const ts = timestamp || Date.now()
-  return `trade_order_${buyerId}_${listingId}_${ts}`
+  const ts = timestamp !== undefined && timestamp !== null ? timestamp : Date.now()
+  return `trade_${buyerId}_${listingId}_${ts}`
+}
+
+/**
+ * 生成交易市场订单幂等键（服务端推荐格式，收口调用方拼接）
+ *
+ * 格式：trade_{buyer_id}_{listing_id}_{timestamp}_{8位hex}
+ * 客户端仍可通过 Header 传入任意唯一字符串；此函数供测试与内部脚本统一风格。
+ *
+ * @param {number|string} buyerId - 买家用户ID
+ * @param {number|string} listingId - 挂牌ID
+ * @returns {string} 幂等键
+ */
+function generateTradeIdempotencyKey(buyerId, listingId) {
+  if (!buyerId || !listingId) {
+    throw new Error('buyerId 和 listingId 不能为空')
+  }
+  const ts = Date.now()
+  const hex = crypto.randomBytes(4).toString('hex')
+  return `trade_${buyerId}_${listingId}_${ts}_${hex}`
 }
 
 /**
@@ -335,20 +332,16 @@ function isValidBusinessId(businessId, type) {
 
   switch (type) {
     case 'lottery_draw':
-      // lottery_draw_{user_id}_{session_id}_{draw_index}
-      return /^lottery_draw_\d+_lottery_tx_\d+_[a-f0-9]{6}_\d{3}_\d+$/.test(businessId)
+      return /^lottery_\d+_[a-f0-9]{12}_\d+$/.test(businessId)
 
     case 'consumption':
-      // consumption_{merchant_id}_{timestamp}_{random}
-      return /^consumption_\d+_\d+_[a-f0-9]{6}$/.test(businessId)
+      return /^consume_\d+_\d+_\d+$/.test(businessId)
 
     case 'exchange':
-      // exchange_{user_id}_{item_id}_{timestamp}
       return /^exchange_\d+_\d+_\d+$/.test(businessId)
 
     case 'trade_order':
-      // trade_order_{buyer_id}_{market_listing_id}_{timestamp}
-      return /^trade_order_\d+_\d+_\d+$/.test(businessId)
+      return /^trade_\d+_\d+_\d+$/.test(businessId)
 
     default:
       return false
@@ -384,6 +377,7 @@ module.exports = {
   generateConsumptionBusinessId,
   generateExchangeBusinessId,
   generateTradeOrderBusinessId,
+  generateTradeIdempotencyKey,
   isValidBusinessId,
 
   // 新增：BusinessIdGenerator 类封装

@@ -85,14 +85,24 @@ module.exports = sequelize => {
        * - idempotency_key：请求级幂等（防止同一请求重复提交）
        * - business_id：业务级幂等（防止同一业务操作从不同请求重复执行）
        *
-       * 格式：trade_order_{buyer_id}_{market_listing_id}_{timestamp}
+       * 格式：trade_{buyer_id}_{market_listing_id}_{timestamp_ms}（与 IdempotencyHelper.generateTradeOrderBusinessId 一致）
        *
        */
       business_id: {
         type: DataTypes.STRING(150),
         allowNull: false, // 业务唯一键必填（历史数据已回填完成 - 2026-01-05）
         unique: true,
-        comment: '业务唯一键（格式：trade_order_{buyer_id}_{market_listing_id}_{timestamp}）- 必填'
+        comment: '业务唯一键（trade_买家_挂牌_时间戳毫秒）- 必填'
+      },
+
+      /**
+       * 面向用户/客服的交易订单号（TO 前缀，16 位统一格式，见 OrderNoGenerator）
+       */
+      order_no: {
+        type: DataTypes.STRING(32),
+        allowNull: false,
+        unique: true,
+        comment: '交易订单号（TO 前缀）'
       },
 
       // 关联挂牌

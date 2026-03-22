@@ -3,7 +3,7 @@
  * @description 管理配置类字典表的CRUD API
  *
  * 管理的字典表：
- * - category_defs：物品类目字典表
+ * - categories：物品品类树表
  * - rarity_defs：稀有度字典表
  * - asset_group_defs：资产分组字典表
  *

@@ -143,19 +143,28 @@ class ApiResponse {
    * @returns {Object} 格式化的分页响应
    */
   static paginated(data = [], pagination = {}, message = '查询成功') {
+    const page = pagination.page ?? 1
+    const page_size = pagination.page_size ?? pagination.limit ?? 20
+    const total = pagination.total ?? 0
+    const total_pages =
+      pagination.total_pages ??
+      pagination.totalPages ??
+      (page_size > 0 ? Math.ceil(total / page_size) : 0)
+    const has_next = pagination.has_next ?? pagination.hasNext ?? page * page_size < total
+    const has_prev = pagination.has_prev ?? pagination.hasPrev ?? page > 1
+
     return {
       success: true,
       code: 'PAGINATION_SUCCESS',
       message,
       data,
       pagination: {
-        total: pagination.total || 0,
-        page: pagination.page || 1,
-        limit: pagination.limit || 20,
-        totalPages: pagination.totalPages || 0,
-        hasNext: pagination.hasNext || false,
-        hasPrev: pagination.hasPrev || false,
-        ...pagination
+        total,
+        page,
+        page_size,
+        total_pages,
+        has_next,
+        has_prev
       },
       timestamp: BeijingTimeHelper.apiTimestamp(),
       version: 'v4.0'

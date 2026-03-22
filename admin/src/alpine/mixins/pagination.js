@@ -203,8 +203,7 @@ export function paginationMixin(options = {}) {
     buildPaginationParams() {
       return {
         page: this.current_page,
-        page_size: this.page_size,
-        limit: this.page_size
+        page_size: this.page_size
       }
     },
 

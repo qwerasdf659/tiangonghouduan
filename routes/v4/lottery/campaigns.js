@@ -191,22 +191,8 @@ router.get('/:code/config', authenticateToken, dataAccessControl, async (req, re
     // 使用 campaign.lottery_campaign_id 获取完整配置（内部仍用 ID）
     const fullConfig = await LotteryQueryService.getCampaignConfig(campaign.lottery_campaign_id)
 
-    /*
-     * 使用 LotteryPricingService 统一定价服务获取定价配置
-     *
-     * 🔴 2026-01-21 技术债务修复（完整实施）：
-     * - 定价配置唯一来源：LotteryPricingService（内部读取 lottery_campaign_pricing_config 表）
-     * - 消除代码重复：路由与 UnifiedLotteryEngine/PricingStage 共用同一服务
-     * - 字段名统一：使用 draw_buttons（非旧的 discount_tiers）
-     *
-     * @see services/lottery/LotteryPricingService.js - 统一定价服务
-     */
     const LotteryPricingService = getLotteryPricingService(req)
 
-    /**
-     * 🔴 2026-01-26 技术债务清理：移除数组→对象格式转换兼容
-     * 前端已更新使用数组格式 draw_buttons（非旧的 single/triple/five/ten 对象键名）
-     */
     let drawButtons = []
     let isConfigMissing = false
 

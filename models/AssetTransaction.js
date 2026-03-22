@@ -217,6 +217,16 @@ module.exports = sequelize => {
           '幂等键（每条流水唯一）：抽奖格式 {request_key}:consume/{request_key}:reward，其他格式 {type}_{account}_{ts}_{random}'
       },
 
+      /**
+       * 面向对账/客服的资产流水号（TX 前缀，16 位统一格式）
+       */
+      transaction_no: {
+        type: DataTypes.STRING(32),
+        allowNull: false,
+        unique: true,
+        comment: '资产流水展示号（TX 前缀），与 asset_transaction_id 自增主键分离'
+      },
+
       // 冻结余额变动（Frozen Amount Change - 冻结/解冻/结算操作记录）
       frozen_amount_change: {
         type: DataTypes.BIGINT,

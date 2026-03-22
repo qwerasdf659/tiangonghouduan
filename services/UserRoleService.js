@@ -392,10 +392,9 @@ class UserRoleService {
    */
   static async getUserList(filters = {}) {
     const { Op } = require('sequelize')
-    const { page = 1, limit, page_size, search, role_filter } = filters
+    const { page = 1, page_size = 20, search, role_filter } = filters
 
-    // 分页安全保护（兼容 limit 和 page_size 两种参数名）
-    const finalLimit = Math.min(parseInt(limit || page_size || 20), 100)
+    const finalLimit = Math.min(parseInt(page_size, 10) || 20, 100)
 
     // 构建查询条件
     const whereClause = {}

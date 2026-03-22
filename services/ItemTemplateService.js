@@ -46,7 +46,7 @@ class ItemTemplateService {
    *
    * @param {Object} options - 查询选项
    * @param {string} [options.item_type] - 物品类型筛选
-   * @param {string|number} [options.category_code] - 类目代码或 category_id 筛选
+   * @param {number} [options.category_id] - 品类主键筛选
    * @param {string} [options.rarity_code] - 稀有度代码筛选
    * @param {boolean} [options.is_enabled] - 是否启用筛选
    * @param {boolean} [options.is_tradable] - 是否可交易筛选
@@ -59,7 +59,7 @@ class ItemTemplateService {
     try {
       const {
         item_type,
-        category_code,
+        category_id: filterCategoryId,
         rarity_code,
         is_enabled,
         is_tradable,
@@ -73,12 +73,10 @@ class ItemTemplateService {
       if (item_type) {
         where.item_type = item_type
       }
-      if (category_code !== undefined && category_code !== null) {
-        if (typeof category_code === 'number') {
-          where.category_id = category_code
-        } else {
-          const cat = await this.Category.findByCode(category_code)
-          if (cat) where.category_id = cat.category_id
+      if (filterCategoryId !== undefined && filterCategoryId !== null && filterCategoryId !== '') {
+        const idNum = parseInt(String(filterCategoryId), 10)
+        if (!Number.isNaN(idNum)) {
+          where.category_id = idNum
         }
       }
       if (rarity_code) {
@@ -199,7 +197,7 @@ class ItemTemplateService {
    * @param {string} data.template_code - 模板代码（唯一）
    * @param {string} data.item_type - 物品类型
    * @param {string} data.display_name - 显示名称
-   * @param {string|number} [data.category_code] - 类目代码或 category_id
+   * @param {number} [data.category_id] - 品类主键（categories.category_id）
    * @param {string} [data.rarity_code] - 稀有度代码
    * @param {string} [data.description] - 描述
    * @param {number} [data.primary_media_id] - 主图媒体ID（关联 media_files 表）
@@ -219,7 +217,6 @@ class ItemTemplateService {
         template_code,
         item_type,
         display_name,
-        category_code,
         category_id,
         rarity_code,
         description,
@@ -229,11 +226,16 @@ class ItemTemplateService {
         meta
       } = data
 
-      // 解析类目：支持 category_code 或 category_id
-      let resolvedCategoryId = category_id ?? null
-      if (resolvedCategoryId == null && category_code) {
-        const cat = await this.Category.findByCode(category_code)
-        resolvedCategoryId = cat?.category_id ?? null
+      let resolvedCategoryIdOrNull = null
+      if (category_id !== undefined && category_id !== null && category_id !== '') {
+        const n = parseInt(String(category_id), 10)
+        if (Number.isNaN(n)) {
+          const err = new Error('category_id 必须为有效数字')
+          err.status = 400
+          err.code = 'INVALID_CATEGORY_ID'
+          throw err
+        }
+        resolvedCategoryIdOrNull = n
       }
 
       // 检查模板代码唯一性
@@ -250,10 +252,10 @@ class ItemTemplateService {
       }
 
       // 验证类目
-      if (resolvedCategoryId) {
-        const category = await this.Category.findByPk(resolvedCategoryId, { transaction })
+      if (resolvedCategoryIdOrNull != null) {
+        const category = await this.Category.findByPk(resolvedCategoryIdOrNull, { transaction })
         if (!category) {
-          const error = new Error(`类目 ID ${resolvedCategoryId} 不存在`)
+          const error = new Error(`类目 ID ${resolvedCategoryIdOrNull} 不存在`)
           error.status = 400
           error.code = 'INVALID_CATEGORY_CODE'
           throw error
@@ -286,7 +288,7 @@ class ItemTemplateService {
           template_code,
           item_type,
           display_name,
-          category_id: resolvedCategoryId,
+          category_id: resolvedCategoryIdOrNull,
           rarity_code,
           description,
           primary_media_id: primary_media_id ?? null,
@@ -342,7 +344,6 @@ class ItemTemplateService {
         'item_type',
         'display_name',
         'category_id',
-        'category_code',
         'rarity_code',
         'description',
         'primary_media_id',
@@ -359,23 +360,28 @@ class ItemTemplateService {
         }
       }
 
-      // 验证类目：支持 category_id 或 category_code
-      let resolvedCatId = updateData.category_id
-      if (resolvedCatId == null && updateData.category_code) {
-        const cat = await this.Category.findByCode(updateData.category_code)
-        resolvedCatId = cat?.category_id
-      }
-      if (resolvedCatId != null) {
-        const category = await this.Category.findByPk(resolvedCatId, { transaction })
-        if (!category) {
-          const error = new Error(`类目 ID ${resolvedCatId} 不存在`)
-          error.status = 400
-          error.code = 'INVALID_CATEGORY_CODE'
-          throw error
+      if (updateData.category_id !== undefined) {
+        const raw = updateData.category_id
+        if (raw === null) {
+          updateData.category_id = null
+        } else {
+          const n = parseInt(String(raw), 10)
+          if (Number.isNaN(n)) {
+            const error = new Error('category_id 必须为有效数字')
+            error.status = 400
+            error.code = 'INVALID_CATEGORY_ID'
+            throw error
+          }
+          const category = await this.Category.findByPk(n, { transaction })
+          if (!category) {
+            const error = new Error(`类目 ID ${n} 不存在`)
+            error.status = 400
+            error.code = 'INVALID_CATEGORY_CODE'
+            throw error
+          }
+          updateData.category_id = n
         }
-        updateData.category_id = resolvedCatId
       }
-      delete updateData.category_code
 
       // 从 meta 中提取 max_edition 到独立列（兼容前端写入 meta.max_edition 的场景）
       if (updateData.max_edition === undefined && updateData.meta?.max_edition != null) {

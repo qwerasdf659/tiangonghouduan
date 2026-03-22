@@ -814,6 +814,7 @@ class DataSanitizer {
    * - 添加 business_type_display 中文映射（子决策 2：机器码 + 中文并存）
    * - 过滤 BUDGET_POINTS 等禁止暴露的资产记录
    * - 删除内部字段：account_id、idempotency_key、frozen_amount_change、lottery_session_id
+   * - **保留 `transaction_no`（TX 流水号）**：面向用户/客服的可读编号，非敏感，不得加入删除黑名单（编码统一 2026-03）
    *
    * @param {Array<Object>} records - 资产流水数组
    * @param {string} dataLevel - 数据级别
@@ -1390,16 +1391,6 @@ class DataSanitizer {
         sanitized.showcase_images = sanitized.showcase_images || []
       }
 
-      // 关联对象透传（Sequelize camelCase alias → snake_case 输出）
-      if (sanitized.rarityDef !== undefined) {
-        sanitized.rarity_def = sanitized.rarityDef || null
-        delete sanitized.rarityDef
-      }
-      if (sanitized.categoryDef !== undefined) {
-        sanitized.category_def = sanitized.categoryDef || null
-        delete sanitized.categoryDef
-      }
-
       // 黑名单：删除敏感字段（成本价仅管理员可见）
       if (dataLevel !== 'full') {
         delete sanitized.cost_price
@@ -1431,6 +1422,7 @@ class DataSanitizer {
    * 脱敏规则：
    * - 管理员（dataLevel='full'）：返回完整订单数据
    * - 普通用户（dataLevel='public'）：移除total_cost（成本金额）等敏感字段
+   * - **保留 `order_no`（EM/BD 等运营单号）**；删除 `business_id`（内部幂等/关联键，非展示字段）
    *
    * 输入契约：
    * - 输入数据必须来自 exchange_records 表的 Sequelize 查询结果

@@ -196,6 +196,7 @@ class UserDataQueryService {
       where,
       attributes: [
         'asset_transaction_id',
+        'transaction_no',
         'asset_code',
         'delta_amount',
         'balance_before',

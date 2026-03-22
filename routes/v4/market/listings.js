@@ -66,7 +66,7 @@ router.get('/listings', authenticateToken, async (req, res) => {
 
     const {
       page = 1,
-      limit = 20,
+      page_size: query_page_size = 20,
       listing_kind,
       asset_code,
       item_category_code,
@@ -81,7 +81,7 @@ router.get('/listings', authenticateToken, async (req, res) => {
     // 决策7：通过 Service 层获取市场列表（带缓存 + C+++ 聚合计数）
     const result = await MarketListingService.getMarketListings({
       page: parseInt(page, 10),
-      page_size: parseInt(limit, 10),
+      page_size: parseInt(query_page_size, 10),
       listing_kind,
       asset_code,
       item_category_code,
@@ -121,7 +121,7 @@ router.get('/listings', authenticateToken, async (req, res) => {
       pagination: {
         total: result.pagination.total,
         page: result.pagination.page,
-        limit: result.pagination.page_size,
+        page_size: result.pagination.page_size,
         total_pages: result.pagination.total_pages
       }
     }
@@ -338,13 +338,13 @@ router.get('/my-listings', authenticateToken, async (req, res) => {
     const MarketListingService = req.app.locals.services.getService('market_listing_query')
 
     const userId = req.user.user_id
-    const { page = 1, limit = 20, status } = req.query
+    const { page = 1, page_size: my_page_size = 20, status } = req.query
 
     const result = await MarketListingService.getUserListings({
       seller_user_id: userId,
       status: status || undefined,
       page: parseInt(page, 10),
-      page_size: parseInt(limit, 10)
+      page_size: parseInt(my_page_size, 10)
     })
 
     logger.info('获取用户挂单列表成功', {
@@ -360,7 +360,7 @@ router.get('/my-listings', authenticateToken, async (req, res) => {
         pagination: {
           total: result.total,
           page: result.page,
-          limit: result.page_size,
+          page_size: result.page_size,
           total_pages: Math.ceil(result.total / result.page_size)
         },
         status_counts: result.status_counts

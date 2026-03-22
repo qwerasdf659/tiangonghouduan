@@ -29,11 +29,11 @@ const {
   LotteryPrize,
   LotteryStrategyConfig,
   LotteryDrawQuotaRule
-} = require('../../models')
-const logger = require('../../utils/logger').logger
-const { assertAndGetTransaction } = require('../../utils/transactionHelpers')
-const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
-const CampaignCodeGenerator = require('../../utils/CampaignCodeGenerator')
+} = require('../../../models')
+const logger = require('../../../utils/logger').logger
+const { assertAndGetTransaction } = require('../../../utils/transactionHelpers')
+const { BusinessCacheHelper } = require('../../../utils/BusinessCacheHelper')
+const CampaignCodeGenerator = require('../../../utils/CampaignCodeGenerator')
 
 /**
  * 抽奖活动 CRUD 服务类
@@ -162,7 +162,7 @@ class LotteryCampaignCRUDService {
 
     // ✅ 自动生成默认策略配置（13策略活动级开关：创建即完整，每活动30条配置）
     try {
-      const { LotteryStrategyConfig } = require('../../models')
+      const { LotteryStrategyConfig } = require('../../../models')
       const STRATEGY_DEFAULTS = [
         { group: 'anti_empty', key: 'enabled', value: true, type: 'boolean', desc: '防连空开关' },
         {
@@ -367,8 +367,8 @@ class LotteryCampaignCRUDService {
 
     // ✅ 自动生成默认定价配置（决策 3：创建即可用，运营可后续修改）
     try {
-      const AdminSystemService = require('../AdminSystemService')
-      const { LotteryCampaignPricingConfig } = require('../../models')
+      const AdminSystemService = require('../../AdminSystemService')
+      const { LotteryCampaignPricingConfig } = require('../../../models')
 
       // 从 system_settings 读取全局单抽成本（运营可动态调整，非硬编码）
       let defaultBaseCost
@@ -993,7 +993,7 @@ class LotteryCampaignCRUDService {
    */
   static async toggleFeatured(lottery_campaign_id, is_featured, options = {}) {
     const { transaction } = options
-    const models = require('../../models')
+    const models = require('../../../models')
 
     const campaign = await models.LotteryCampaign.findByPk(lottery_campaign_id, { transaction })
     if (!campaign) {
@@ -1017,7 +1017,7 @@ class LotteryCampaignCRUDService {
    */
   static async toggleHidden(lottery_campaign_id, is_hidden, options = {}) {
     const { transaction } = options
-    const models = require('../../models')
+    const models = require('../../../models')
 
     const campaign = await models.LotteryCampaign.findByPk(lottery_campaign_id, { transaction })
     if (!campaign) {
@@ -1047,7 +1047,7 @@ class LotteryCampaignCRUDService {
    */
   static async updateDisplayConfig(lottery_campaign_id, displayConfig, options = {}) {
     const { transaction } = options
-    const models = require('../../models')
+    const models = require('../../../models')
 
     const campaign = await models.LotteryCampaign.findByPk(lottery_campaign_id, { transaction })
     if (!campaign) {
@@ -1085,7 +1085,7 @@ class LotteryCampaignCRUDService {
    */
   static async batchSort(items, options = {}) {
     const { transaction } = options
-    const models = require('../../models')
+    const models = require('../../../models')
 
     if (!Array.isArray(items) || items.length === 0) {
       const err = new Error('排序数据不能为空')

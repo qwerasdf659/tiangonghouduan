@@ -153,7 +153,7 @@ router.get(
 
       // 生成CSV内容
       const csvHeader =
-        '订单ID,核销码,用户ID,用户昵称,用户手机,奖品类型,奖品名称,状态,创建时间,过期时间,核销时间\n'
+        'RD单号,内部订单ID,核销码,用户ID,用户昵称,用户手机,奖品类型,奖品名称,状态,创建时间,过期时间,核销时间\n'
 
       const csvRows = orders
         .map(order => {
@@ -169,6 +169,7 @@ router.get(
           }
 
           return [
+            order.order_no || '-',
             order.redemption_order_id,
             order.code_hash ? order.code_hash.substring(0, 8) + '...' : '-',
             redeemer.user_id || '-',

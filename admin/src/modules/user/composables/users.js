@@ -119,8 +119,7 @@ export function useUsersMethods() {
         const params = new URLSearchParams()
         // 使用 pagination 对象作为唯一数据源
         params.append('page', this.pagination.page)
-        // 后端用户管理API使用 limit 而非 page_size
-        params.append('limit', this.pagination.page_size)
+        params.append('page_size', this.pagination.page_size)
         // 后端支持 search 字段进行模糊搜索（支持 mobile 和 nickname）
         if (this.userFilters.phone) params.append('search', this.userFilters.phone)
         if (this.userFilters.nickname) params.append('search', this.userFilters.nickname)

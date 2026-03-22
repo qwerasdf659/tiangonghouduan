@@ -32,8 +32,15 @@
  * - 遵循项目 snake_case 命名规范
  */
 
+const crypto = require('crypto')
+const { generateTradeOrderBusinessId } = require('../../../utils/IdempotencyHelper')
 const { sequelize, User, MarketListing, Item, TradeOrder, Account } = require('../../../models')
 const { initRealTestData, getRealTestUserId } = require('../../helpers/test-setup')
+
+/** 测试直接 TradeOrder.create 时满足 order_no 唯一非空（正式单号由 OrderNoGenerator 生成） */
+function uniquePlaceholderOrderNo() {
+  return `PH${crypto.randomBytes(12).toString('hex').toUpperCase()}`
+}
 
 /**
  * 通过 ServiceManager 获取服务
@@ -157,8 +164,8 @@ describe('TradeOrderService - 交易订单服务', () => {
       idempotency_key: listing_idempotency_key
     })
 
-    // 锁定物品实例（模拟挂牌时的物品锁定）
-    await test_item.update({ status: 'locked' })
+    // 锁定物品实例（模拟挂牌时的物品锁定，真实流程用 'held'，见 market-listing/CoreService L461）
+    await test_item.update({ status: 'held' })
 
     console.log(
       `📦 测试数据准备完成: market_listing_id=${test_listing.market_listing_id}, item_id=${test_item.item_id}`
@@ -504,8 +511,13 @@ describe('TradeOrderService - 交易订单服务', () => {
     it('3.3 应拒绝取消非 frozen 状态的订单', async () => {
       // 创建一个已完成的测试订单
       const completed_order = await TradeOrder.create({
+        order_no: uniquePlaceholderOrderNo(),
         idempotency_key: generateIdempotencyKey('completed_order'),
-        business_id: `trade_order_${test_buyer.user_id}_${test_listing.market_listing_id}_${Date.now()}`,
+        business_id: generateTradeOrderBusinessId(
+          test_buyer.user_id,
+          test_listing.market_listing_id,
+          Date.now()
+        ),
         market_listing_id: test_listing.market_listing_id,
         buyer_user_id: test_buyer.user_id,
         seller_user_id: test_seller.user_id,
@@ -540,8 +552,13 @@ describe('TradeOrderService - 交易订单服务', () => {
     beforeEach(async () => {
       // 创建一个测试订单用于查询
       query_test_order = await TradeOrder.create({
+        order_no: uniquePlaceholderOrderNo(),
         idempotency_key: generateIdempotencyKey('query_test_order'),
-        business_id: `trade_order_${test_buyer.user_id}_${test_listing.market_listing_id}_${Date.now()}`,
+        business_id: generateTradeOrderBusinessId(
+          test_buyer.user_id,
+          test_listing.market_listing_id,
+          Date.now()
+        ),
         market_listing_id: test_listing.market_listing_id,
         buyer_user_id: test_buyer.user_id,
         seller_user_id: test_seller.user_id,
@@ -688,8 +705,13 @@ describe('TradeOrderService - 交易订单服务', () => {
       const net_amount = 95 // gross_amount - fee_amount
 
       const test_order = await TradeOrder.create({
+        order_no: uniquePlaceholderOrderNo(),
         idempotency_key: generateIdempotencyKey('reconcile_test'),
-        business_id: `trade_order_${test_buyer.user_id}_${test_listing.market_listing_id}_${Date.now()}`,
+        business_id: generateTradeOrderBusinessId(
+          test_buyer.user_id,
+          test_listing.market_listing_id,
+          Date.now()
+        ),
         market_listing_id: test_listing.market_listing_id,
         buyer_user_id: test_buyer.user_id,
         seller_user_id: test_seller.user_id,
@@ -714,8 +736,13 @@ describe('TradeOrderService - 交易订单服务', () => {
     it('6.2 对账金额错误的订单应被 validateAmounts 检测出', async () => {
       // 创建金额不符的测试订单
       const test_order = await TradeOrder.create({
+        order_no: uniquePlaceholderOrderNo(),
         idempotency_key: generateIdempotencyKey('bad_reconcile_test'),
-        business_id: `trade_order_${test_buyer.user_id}_${test_listing.market_listing_id}_${Date.now()}`,
+        business_id: generateTradeOrderBusinessId(
+          test_buyer.user_id,
+          test_listing.market_listing_id,
+          Date.now()
+        ),
         market_listing_id: test_listing.market_listing_id,
         buyer_user_id: test_buyer.user_id,
         seller_user_id: test_seller.user_id,
@@ -741,8 +768,13 @@ describe('TradeOrderService - 交易订单服务', () => {
     it('7.1 canCancel 应正确判断订单是否可取消', async () => {
       // created 状态可取消
       const created_order = await TradeOrder.create({
+        order_no: uniquePlaceholderOrderNo(),
         idempotency_key: generateIdempotencyKey('cancel_test_created'),
-        business_id: `trade_order_${test_buyer.user_id}_${test_listing.market_listing_id}_${Date.now()}`,
+        business_id: generateTradeOrderBusinessId(
+          test_buyer.user_id,
+          test_listing.market_listing_id,
+          Date.now()
+        ),
         market_listing_id: test_listing.market_listing_id,
         buyer_user_id: test_buyer.user_id,
         seller_user_id: test_seller.user_id,
@@ -757,8 +789,13 @@ describe('TradeOrderService - 交易订单服务', () => {
 
       // frozen 状态可取消
       const frozen_order = await TradeOrder.create({
+        order_no: uniquePlaceholderOrderNo(),
         idempotency_key: generateIdempotencyKey('cancel_test_frozen'),
-        business_id: `trade_order_${test_buyer.user_id}_${test_listing.market_listing_id}_${Date.now() + 1}`,
+        business_id: generateTradeOrderBusinessId(
+          test_buyer.user_id,
+          test_listing.market_listing_id,
+          Date.now() + 1
+        ),
         market_listing_id: test_listing.market_listing_id,
         buyer_user_id: test_buyer.user_id,
         seller_user_id: test_seller.user_id,
@@ -773,8 +810,13 @@ describe('TradeOrderService - 交易订单服务', () => {
 
       // completed 状态不可取消
       const completed_order = await TradeOrder.create({
+        order_no: uniquePlaceholderOrderNo(),
         idempotency_key: generateIdempotencyKey('cancel_test_completed'),
-        business_id: `trade_order_${test_buyer.user_id}_${test_listing.market_listing_id}_${Date.now() + 2}`,
+        business_id: generateTradeOrderBusinessId(
+          test_buyer.user_id,
+          test_listing.market_listing_id,
+          Date.now() + 2
+        ),
         market_listing_id: test_listing.market_listing_id,
         buyer_user_id: test_buyer.user_id,
         seller_user_id: test_seller.user_id,
@@ -789,8 +831,13 @@ describe('TradeOrderService - 交易订单服务', () => {
 
       // cancelled 状态不可取消
       const cancelled_order = await TradeOrder.create({
+        order_no: uniquePlaceholderOrderNo(),
         idempotency_key: generateIdempotencyKey('cancel_test_cancelled'),
-        business_id: `trade_order_${test_buyer.user_id}_${test_listing.market_listing_id}_${Date.now() + 3}`,
+        business_id: generateTradeOrderBusinessId(
+          test_buyer.user_id,
+          test_listing.market_listing_id,
+          Date.now() + 3
+        ),
         market_listing_id: test_listing.market_listing_id,
         buyer_user_id: test_buyer.user_id,
         seller_user_id: test_seller.user_id,
@@ -813,10 +860,17 @@ describe('TradeOrderService - 交易订单服务', () => {
         { status: 'failed', expected: true }
       ]
 
+      let completeTestTs = Date.now()
       for (const { status, expected } of statuses) {
+        completeTestTs += 1
         const test_order = await TradeOrder.create({
+          order_no: uniquePlaceholderOrderNo(),
           idempotency_key: generateIdempotencyKey(`complete_test_${status}`),
-          business_id: `trade_order_${test_buyer.user_id}_${test_listing.market_listing_id}_${Date.now()}_${status}`,
+          business_id: generateTradeOrderBusinessId(
+            test_buyer.user_id,
+            test_listing.market_listing_id,
+            completeTestTs
+          ),
           market_listing_id: test_listing.market_listing_id,
           buyer_user_id: test_buyer.user_id,
           seller_user_id: test_seller.user_id,
@@ -839,8 +893,13 @@ describe('TradeOrderService - 交易订单服务', () => {
     it('8.1 getOrders 应支持时间范围过滤', async () => {
       // 创建一个带时间的测试订单
       const test_order = await TradeOrder.create({
+        order_no: uniquePlaceholderOrderNo(),
         idempotency_key: generateIdempotencyKey('time_filter_test'),
-        business_id: `trade_order_${test_buyer.user_id}_${test_listing.market_listing_id}_${Date.now()}`,
+        business_id: generateTradeOrderBusinessId(
+          test_buyer.user_id,
+          test_listing.market_listing_id,
+          Date.now()
+        ),
         market_listing_id: test_listing.market_listing_id,
         buyer_user_id: test_buyer.user_id,
         seller_user_id: test_seller.user_id,

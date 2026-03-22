@@ -13,9 +13,9 @@
  * 原文件：services/AdminLotteryService.js (1781行)
  */
 
-const models = require('../../models')
-const { attachDisplayNames, DICT_TYPES } = require('../../utils/displayNameHelper')
-const _logger = require('../../utils/logger').logger
+const models = require('../../../models')
+const { attachDisplayNames, DICT_TYPES } = require('../../../utils/displayNameHelper')
+const _logger = require('../../../utils/logger').logger
 
 /**
  * 管理后台抽奖干预规则查询服务类
@@ -335,6 +335,102 @@ class AdminLotteryQueryService {
         : null,
       created_at: setting.created_at,
       updated_at: setting.updated_at
+    }
+  }
+
+  /**
+   * 管理后台：分页查询抽奖流水（lottery_draws）
+   *
+   * @description
+   * 供运营后台「抽奖记录」列表使用，字段与 lottery_draws 表及关联活动/奖品对齐，
+   * 包含面向用户的 order_no（LT）与内部 lottery_draw_id。
+   *
+   * @param {Object} query
+   * @param {number} [query.page=1]
+   * @param {number} [query.page_size=20]
+   * @param {number} [query.user_id] - 按用户 ID 筛选
+   * @param {number} [query.lottery_campaign_id] - 按活动 ID 筛选
+   * @param {string} [query.keyword] - 模糊匹配 lottery_draw_id / order_no
+   * @returns {Promise<{ draws: Object[], pagination: Object }>}
+   */
+  static async getDrawRecordsList(query = {}) {
+    const { Op } = require('sequelize')
+    const {
+      page = 1,
+      page_size = 20,
+      user_id: filterUserId,
+      lottery_campaign_id: filterCampaignId,
+      keyword
+    } = query
+
+    const pageNum = Math.max(1, parseInt(page, 10) || 1)
+    const pageSizeNum = Math.min(100, Math.max(1, parseInt(page_size, 10) || 20))
+    const offset = (pageNum - 1) * pageSizeNum
+
+    const where = {}
+    if (filterUserId) {
+      where.user_id = parseInt(filterUserId, 10)
+    }
+    if (filterCampaignId) {
+      where.lottery_campaign_id = parseInt(filterCampaignId, 10)
+    }
+    if (keyword && String(keyword).trim()) {
+      const k = String(keyword).trim()
+      where[Op.or] = [
+        { lottery_draw_id: { [Op.like]: `%${k}%` } },
+        { order_no: { [Op.like]: `%${k}%` } }
+      ]
+    }
+
+    const { count, rows } = await models.LotteryDraw.findAndCountAll({
+      where,
+      include: [
+        {
+          model: models.LotteryCampaign,
+          as: 'campaign',
+          attributes: ['lottery_campaign_id', 'campaign_name'],
+          required: false
+        },
+        {
+          model: models.LotteryPrize,
+          as: 'prize',
+          attributes: ['lottery_prize_id', 'prize_name'],
+          required: false
+        }
+      ],
+      order: [['created_at', 'DESC']],
+      limit: pageSizeNum,
+      offset
+    })
+
+    const draws = rows.map(row => {
+      const j = row.toJSON()
+      const prizeName = j.prize?.prize_name || j.prize_name || '未中奖'
+      return {
+        /** 与历史前端列名 draw_id 对齐，值同 lottery_draw_id */
+        draw_id: j.lottery_draw_id,
+        lottery_draw_id: j.lottery_draw_id,
+        order_no: j.order_no || null,
+        user_id: j.user_id,
+        campaign_name: j.campaign?.campaign_name || '—',
+        prize_name: prizeName,
+        result: j.result,
+        cost_amount: j.cost_points != null ? Number(j.cost_points) : null,
+        /** V4：用 reward_tier 表达结果；fallback 视为兜底档 */
+        is_winner: j.reward_tier !== 'fallback',
+        reward_tier: j.reward_tier,
+        created_at: j.created_at
+      }
+    })
+
+    return {
+      draws,
+      pagination: {
+        total: count,
+        page: pageNum,
+        page_size: pageSizeNum,
+        total_pages: Math.ceil(count / pageSizeNum) || 1
+      }
     }
   }
 }

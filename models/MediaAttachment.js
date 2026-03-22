@@ -32,7 +32,7 @@ const { Model, DataTypes } = require('sequelize')
  * exchange_item      — 兑换商品主图/画廊
  * item_template      — 物品模板图标
  * ad_creative        — 广告素材图片
- * category_def       — 类目图标
+ * category            — 品类图标（attachable_id → categories.category_id）
  * material_asset_type — 材料资产类型图标
  * merchant           — 商家 logo
  * lottery_campaign   — 活动 banner/背景
@@ -78,7 +78,7 @@ module.exports = sequelize => {
       attachable_type: {
         type: DataTypes.STRING(50),
         allowNull: false,
-        comment: '业务实体类型(lottery_prize/exchange_item/ad_creative/category_def/...)'
+        comment: '业务实体类型(lottery_prize/exchange_item/ad_creative/category/...)'
       },
       attachable_id: {
         type: DataTypes.BIGINT.UNSIGNED,

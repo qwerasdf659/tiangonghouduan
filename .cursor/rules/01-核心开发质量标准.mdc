@@ -24,36 +24,36 @@ const UNIFIED_API_STANDARDS = {
   // 必需的API端点清单（基于实际缺失统计）
   requiredEndpoints: {
     user_management: [
-      'POST /api/v2/auth/login',
-      'POST /api/v2/auth/logout', 
-      'GET /api/v2/user/profile',
-      'PUT /api/v2/user/profile'
+      'POST /api/v4/auth/login',
+      'POST /api/v4/auth/logout', 
+      'GET /api/v4/user/profile',
+      'PUT /api/v4/user/profile'
     ],
     
     // cursor_5.md中缺失的库存管理API
     inventory_management: [
-      'GET /api/v2/inventory/list',        // getUserInventory前端调用
-      'POST /api/v2/inventory/use',        // useInventoryItem前端调用
-      'POST /api/v2/inventory/transfer',   // transferInventoryItem前端调用
-      'POST /api/v2/inventory/generate-code'
+      'GET /api/v4/inventory/list',        // getUserInventory前端调用
+      'POST /api/v4/inventory/use',        // useInventoryItem前端调用
+      'POST /api/v4/inventory/transfer',   // transferInventoryItem前端调用
+      'POST /api/v4/inventory/generate-code'
     ],
     
     // cursor_3.md和cursor_.md相关聊天系统
     chat_system: [
-      'POST /api/v2/chat/session',
-      'POST /api/v2/chat/message', 
-      'GET /api/v2/chat/history',
-      'GET /api/v2/admin/chat/sessions',
-      'POST /api/v2/admin/chat/sessions/:id/messages'
+      'POST /api/v4/chat/session',
+      'POST /api/v4/chat/message', 
+      'GET /api/v4/chat/history',
+      'GET /api/v4/admin/chat/sessions',
+      'POST /api/v4/admin/chat/sessions/:id/messages'
     ]
   },
 
   // 强制API路径兼容映射（解决路径不匹配问题）
   pathCompatibility: {
-    '/admin/chat/sessions': '/api/v2/admin/chat/sessions',   // cursor_1.md发现
-    '/api/inventory': '/api/v2/inventory/list',              // cursor_5.md发现
-    '/api/upload': '/api/v2/photo/upload',                   // 实际路径映射
-    '/api/auth/verify': '/api/v2/auth/verify'                // 版本兼容
+    '/admin/chat/sessions': '/api/v4/admin/chat/sessions',   // cursor_1.md发现
+    '/api/inventory': '/api/v4/inventory/list',              // cursor_5.md发现
+    '/api/upload': '/api/v4/photo/upload',                   // 实际路径映射
+    '/api/auth/verify': '/api/v4/auth/verify'                // 版本兼容
   },
 
   // 自动生成兼容性路由（预防404错误）

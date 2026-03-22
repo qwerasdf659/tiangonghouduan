@@ -43,7 +43,7 @@ async function send_alert(alert_type, data) {
 
   // 通过 LotteryAlertService 创建告警（内部自动推送到管理后台）
   try {
-    const LotteryAlertService = require('../../services/LotteryAlertService')
+    const LotteryAlertService = require('../../services/lottery/LotteryAlertService')
 
     // 创建告警记录并推送
     const alert = await LotteryAlertService.createAlert({

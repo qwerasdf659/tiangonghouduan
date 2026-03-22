@@ -165,12 +165,6 @@ models.LotteryUserDailyDrawQuota = require('./LotteryUserDailyDrawQuota')(sequel
  *    - 业务场景：抽奖前配额检查、原子扣减、连抽支持（10连抽一次扣减10次）
  */
 
-/*
- * ❌ CategoryDef 已废弃（2026-03-22 迁移 unify-category-defs-to-categories）
- *    - category_defs 表已删除，item_templates 和 market_listings 的 FK 已迁移到 categories
- *    - 所有品类功能统一使用 Category 模型（categories 表）
- */
-
 models.RarityDef = require('./RarityDef')(sequelize, DataTypes)
 /*
  * ✅ RarityDef：物品稀有度字典

@@ -17,17 +17,50 @@
  * - 每个操作同时创建 AdBillingRecord 记录和实际执行资产变动
  */
 
+const crypto = require('crypto')
 const logger = require('../utils/logger').logger
 const { AdBillingRecord, AdCampaign, AdSlot } = require('../models')
 const { Op } = require('sequelize')
 const BeijingTimeHelper = require('../utils/timeHelper')
 const { v4: uuidv4 } = require('uuid')
 const BalanceService = require('./asset/BalanceService')
+const OrderNoGenerator = require('../utils/OrderNoGenerator')
+
+/**
+ * 计费记录创建时占位 billing_no（列 NOT NULL 后先用占位，再用主键生成 AB 号）
+ * @returns {string} 占位字符串
+ */
+function adBillingNoPlaceholder() {
+  return `PH${crypto.randomBytes(12).toString('hex').toUpperCase()}`
+}
 
 /**
  * 广告计费服务类
  */
 class AdBillingService {
+  /**
+   * 用主键与创建时间生成统一 AB 账单号并写回
+   *
+   * @param {Object} record - AdBillingRecord 实例（Sequelize Model）
+   * @param {Object} transaction - Sequelize 事务
+   * @returns {Promise<Object>} 刷新后的计费记录
+   */
+  static async finalizeAdBillingNo(record, transaction) {
+    await record.reload({ transaction })
+    await record.update(
+      {
+        billing_no: OrderNoGenerator.generate(
+          'AB',
+          record.ad_billing_record_id,
+          record.createdAt || record.created_at
+        )
+      },
+      { transaction }
+    )
+    await record.reload({ transaction })
+    return record
+  }
+
   /**
    * 冻结钻石（固定包天模式提交审核时）
    *
@@ -62,6 +95,7 @@ class AdBillingService {
       const billingRecord = await AdBillingRecord.create(
         {
           business_id,
+          billing_no: adBillingNoPlaceholder(),
           ad_campaign_id: campaignId,
           advertiser_user_id: campaign.advertiser_user_id,
           billing_date: billingDate,
@@ -71,6 +105,7 @@ class AdBillingService {
         },
         { transaction: options.transaction }
       )
+      await AdBillingService.finalizeAdBillingNo(billingRecord, options.transaction)
 
       // 调用 BalanceService 执行实际的钻石冻结（available → frozen）
       await BalanceService.freeze(
@@ -150,6 +185,7 @@ class AdBillingService {
       const billingRecord = await AdBillingRecord.create(
         {
           business_id,
+          billing_no: adBillingNoPlaceholder(),
           ad_campaign_id: campaignId,
           advertiser_user_id: campaign.advertiser_user_id,
           billing_date: billingDate,
@@ -159,6 +195,7 @@ class AdBillingService {
         },
         { transaction: options.transaction }
       )
+      await AdBillingService.finalizeAdBillingNo(billingRecord, options.transaction)
 
       // 调用 BalanceService 从冻结金额中结算（frozen → 扣除）
       await BalanceService.settleFromFrozen(
@@ -250,6 +287,7 @@ class AdBillingService {
       const billingRecord = await AdBillingRecord.create(
         {
           business_id,
+          billing_no: adBillingNoPlaceholder(),
           ad_campaign_id: campaignId,
           advertiser_user_id: campaign.advertiser_user_id,
           billing_date: billingDate,
@@ -259,6 +297,7 @@ class AdBillingService {
         },
         { transaction: options.transaction }
       )
+      await AdBillingService.finalizeAdBillingNo(billingRecord, options.transaction)
 
       // 调用 BalanceService 解冻（frozen → available）
       await BalanceService.unfreeze(
@@ -391,9 +430,10 @@ class AdBillingService {
 
             const business_id = `daily_deduct_${freshCampaign.ad_campaign_id}_${today}_${uuidv4().substring(0, 8)}`
 
-            await AdBillingRecord.create(
+            const daily_billing_row = await AdBillingRecord.create(
               {
                 business_id,
+                billing_no: adBillingNoPlaceholder(),
                 ad_campaign_id: freshCampaign.ad_campaign_id,
                 advertiser_user_id: freshCampaign.advertiser_user_id,
                 billing_date: today,
@@ -403,6 +443,7 @@ class AdBillingService {
               },
               { transaction: campaignTransaction }
             )
+            await AdBillingService.finalizeAdBillingNo(daily_billing_row, campaignTransaction)
 
             await freshCampaign.update(
               { budget_spent_diamond: newSpent },
@@ -658,9 +699,10 @@ class AdBillingService {
 
           const businessId = `cpm_deduct_${campaign.ad_campaign_id}_${billingDate}`
 
-          await AdBillingRecord.create(
+          const cpm_billing_row = await AdBillingRecord.create(
             {
               business_id: businessId,
+              billing_no: adBillingNoPlaceholder(),
               ad_campaign_id: campaign.ad_campaign_id,
               advertiser_user_id: campaign.advertiser_user_id,
               billing_date: billingDate,
@@ -670,6 +712,7 @@ class AdBillingService {
             },
             { transaction: campaignTx }
           )
+          await AdBillingService.finalizeAdBillingNo(cpm_billing_row, campaignTx)
 
           const platformFeeAccount = await BalanceService.getOrCreateAccount(
             { system_code: 'SYSTEM_PLATFORM_FEE' },

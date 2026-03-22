@@ -293,6 +293,25 @@ module.exports = sequelize => {
         allowNull: true,
         comment: '抽奖序号'
       },
+      /**
+       * 辅助自增序号（数据库层 AUTO_INCREMENT），与 lottery_draw_id 业务主键分离，供 LT 单号序列段
+       */
+      draw_seq: {
+        type: DataTypes.INTEGER.UNSIGNED,
+        allowNull: true,
+        unique: true,
+        comment:
+          '辅助序号（表级 AUTO_INCREMENT，插入后由 DB 填充）：用于统一抽奖订单号 LT 的序列段；模型 allowNull 避免 Sequelize 校验阻塞插入'
+      },
+      /**
+       * 面向用户/客服的抽奖单号（LT 前缀，16 位统一格式）
+       */
+      order_no: {
+        type: DataTypes.STRING(32),
+        allowNull: true,
+        unique: true,
+        comment: '抽奖订单号（LT 前缀）；插入后由服务层回填为正式单号'
+      },
       draw_count: {
         type: DataTypes.INTEGER,
         allowNull: true,

@@ -81,6 +81,8 @@ backups/backup_2026-02-01_complete/*.json
 # 大型备份文件（超过GitHub 100MB限制）
 backups/**/*.sql
 backups/**/*.json
+# CSV 数据快照迁出对象存储/网盘后勿再入库（技术债务 §2.10）
+backups/**/*.csv
 dump.rdb
 
 # 测试结果输出

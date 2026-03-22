@@ -17,6 +17,7 @@
  * 需求来源：测试体系问题分析与改进方案.md (P0-2 系列)
  */
 
+const crypto = require('crypto')
 const {
   sequelize,
   User,
@@ -25,6 +26,10 @@ const {
   AccountAssetBalance,
   Account
 } = require('../../../models')
+
+function uniquePlaceholderTradeOrderNo() {
+  return `PH${crypto.randomBytes(12).toString('hex').toUpperCase()}`
+}
 
 // 延迟加载服务，通过 global.getTestService 获取
 let MarketListingService
@@ -410,6 +415,7 @@ describe('交易市场跨用户交互场景测试（P0-2 系列）', () => {
        * 使用模拟数据创建一个 completed 状态的订单记录
        */
       const mock_order = await TradeOrder.create({
+        order_no: uniquePlaceholderTradeOrderNo(),
         business_id: generateIdempotencyKey('mock_completed'),
         idempotency_key: generateIdempotencyKey('mock_completed_order'),
         market_listing_id: 1, // 模拟挂牌ID

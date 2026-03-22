@@ -55,9 +55,9 @@
  * @module services/LotteryMetricsCollector
  */
 
-const { getRawClient } = require('../utils/UnifiedRedisClient')
-const { logger: _logger } = require('../utils/logger')
-const BeijingTimeHelper = require('../utils/timeHelper')
+const { getRawClient } = require('../../utils/UnifiedRedisClient')
+const { logger: _logger } = require('../../utils/logger')
+const BeijingTimeHelper = require('../../utils/timeHelper')
 
 /**
  * 默认 TTL（秒）：25 小时

@@ -10,7 +10,7 @@
  * - item_template_id 为自增主键
  * - template_code 为唯一业务标识（如 prize_iphone_15_pro）
  * - item_type 对应 items.item_type
- * - 关联 category_defs 和 rarity_defs 字典表
+ * - 关联 categories 与 rarity_defs 字典表
  *
  * 命名规范（snake_case）：
  * - 表名：item_templates
@@ -263,7 +263,8 @@ module.exports = sequelize => {
       meta: {
         type: DataTypes.JSON,
         allowNull: true,
-        comment: '扩展元数据 {trade_cooldown_days:7, attribute_rules:{quality_score:{...},pattern_id:{...}}}'
+        comment:
+          '扩展元数据 {trade_cooldown_days:7, attribute_rules:{quality_score:{...},pattern_id:{...}}}'
       },
 
       /** 限量总数上限 — 运营设置，超过后拒绝铸造（2026-03-20 EAV改造） */

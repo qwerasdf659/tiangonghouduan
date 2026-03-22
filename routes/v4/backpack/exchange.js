@@ -56,7 +56,7 @@ function asyncHandler(fn) {
  * @query {string} asset_code - 材料资产代码筛选（可选）
  * @query {string} space - 空间筛选：lucky/premium（可选，不传返回全部）
  * @query {string} keyword - 模糊搜索（匹配 item_name，可选）
- * @query {number} category_id - 分类ID筛选（category_defs.category_id，可选）
+ * @query {number} category_id - 分类ID筛选（categories.category_id，可选）
  * @query {number} min_cost - 最低价格（可选）
  * @query {number} max_cost - 最高价格（可选）
  * @query {string} stock_status - 库存状态：in_stock(>5)/low_stock(1-5)（可选）

@@ -31,9 +31,12 @@
  * 更新时间：2026-01-21 - 合并 TradeOrderQueryService
  */
 
+const crypto = require('crypto')
 const { Op, fn, col } = require('sequelize')
 const { sequelize, TradeOrder, MarketListing, Item, User, Account } = require('../models')
 const { attachDisplayNames, DICT_TYPES } = require('../utils/displayNameHelper')
+const OrderNoGenerator = require('../utils/OrderNoGenerator')
+const { generateTradeOrderBusinessId } = require('../utils/IdempotencyHelper')
 // V4.7.0 AssetService 拆分：使用子服务替代原 AssetService（2026-01-31）
 const BalanceService = require('./asset/BalanceService')
 const ItemService = require('./asset/ItemService')
@@ -397,14 +400,16 @@ class TradeOrderService {
 
     /*
      * 3.4 创建订单记录（created）
-     * 生成业务唯一键（格式：trade_order_{buyer_id}_{market_listing_id}_{timestamp}）
+     * 业务唯一键：trade_{buyer_id}_{listing_id}_{timestamp_ms}（与 IdempotencyHelper 一致）
      */
-    const business_id = `trade_order_${buyer_id}_${market_listing_id}_${Date.now()}`
+    const business_id = generateTradeOrderBusinessId(buyer_id, market_listing_id, Date.now())
+    const placeholder_trade_order = `PH${crypto.randomBytes(12).toString('hex').toUpperCase()}`
 
     const order = await TradeOrder.create(
       {
         business_id, // ✅ 业务唯一键（事务边界治理 - 2026-01-05）
         idempotency_key,
+        order_no: placeholder_trade_order,
         market_listing_id,
         buyer_user_id: buyer_id,
         seller_user_id: listing.seller_user_id,
@@ -419,6 +424,17 @@ class TradeOrderService {
       },
       { transaction }
     )
+    await order.update(
+      {
+        order_no: OrderNoGenerator.generate(
+          'TO',
+          order.trade_order_id,
+          order.createdAt || order.created_at
+        )
+      },
+      { transaction }
+    )
+    await order.reload({ transaction })
 
     // 3.5 更新挂牌的锁定订单ID（绑定订单）
     await listing.update(

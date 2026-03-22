@@ -32,6 +32,7 @@ lotteryMgmtRouter.use('/', require('./force-control'))
 lotteryMgmtRouter.use('/', require('./adjustment'))
 lotteryMgmtRouter.use('/', require('./user-status'))
 lotteryMgmtRouter.use('/', require('./interventions'))
+lotteryMgmtRouter.use('/', require('./draw-records'))
 lotteryMgmtRouter.use('/', require('./pricing-config'))
 router.use('/lottery-management', lotteryMgmtRouter)
 

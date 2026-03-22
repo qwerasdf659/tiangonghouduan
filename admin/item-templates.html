@@ -268,7 +268,7 @@
             <div class="md:col-span-2">
               <label class="block text-sm font-medium themed-text-secondary mb-1">限量总数上限（max_edition）</label>
               <input type="number" min="0" class="w-full px-3 py-2 border rounded-lg" x-model.number="max_edition" placeholder="留空表示不限制">
-              <p class="text-xs themed-text-muted mt-1">写入模板 meta.max_edition，用于版本/限量编号上限等业务</p>
+              <p class="text-xs themed-text-muted mt-1">写入列 <code class="text-xs">item_templates.max_edition</code>（与 meta 二选一由后端归一，勿混用）</p>
             </div>
             <!-- 属性规则配置 → meta.attribute_rules -->
             <div class="md:col-span-2 border rounded-lg p-4 bg-cyan-50/40 border-cyan-100">

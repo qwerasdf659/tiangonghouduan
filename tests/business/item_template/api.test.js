@@ -15,7 +15,7 @@
  *
  * 相关模型：
  * - ItemTemplate: 物品模板主表
- * - CategoryDef: 物品分类字典表
+ * - Category: 品类表 categories
  * - RarityDef: 稀有度字典表
  *
  * 权限要求：管理员（role_level >= 100）
@@ -26,7 +26,7 @@
 
 const request = require('supertest')
 const app = require('../../../app')
-const { sequelize, User, ItemTemplate, CategoryDef, RarityDef } = require('../../../models')
+const { sequelize, User, ItemTemplate, Category, RarityDef } = require('../../../models')
 const { TEST_DATA } = require('../../helpers/test-data')
 
 // 测试数据
@@ -187,7 +187,7 @@ describe('物品模板管理API测试 - P2优先级', () => {
   describe('POST /api/v4/console/item-templates - 创建物品模板', () => {
     test('应该成功创建新的物品模板', async () => {
       // 先获取有效的分类和稀有度代码
-      const categories = await CategoryDef.findAll({ where: { is_enabled: true } })
+      const categories = await Category.findAll({ where: { is_enabled: true } })
       const rarities = await RarityDef.findAll({ where: { is_enabled: true } })
 
       // 如果没有有效的分类和稀有度，跳过此测试
@@ -199,7 +199,7 @@ describe('物品模板管理API测试 - P2优先级', () => {
       const newTemplate = {
         template_code: test_template_code,
         item_type: 'collectible',
-        category_code: categories[0].category_code,
+        category_id: categories[0].category_id,
         rarity_code: rarities[0].rarity_code,
         display_name: '测试物品模板',
         description: '这是一个用于测试的物品模板',

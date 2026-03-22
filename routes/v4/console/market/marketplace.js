@@ -38,7 +38,7 @@ const logger = require('../../../../utils/logger').logger
  * 4. 返回用户详情和统计信息
  *
  * @query {number} page - 页码（默认1）
- * @query {number} limit - 每页数量（默认20）
+ * @query {number} page_size - 每页数量（默认20，最大100）
  * @query {string} filter - 筛选条件：all/near_limit/at_limit（默认all）
  *
  * @returns {Object} 统计数据
@@ -48,7 +48,7 @@ const logger = require('../../../../utils/logger').logger
  */
 router.get('/listing-stats', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const { page = 1, limit = 20, filter = 'all', mobile, merchant_id } = req.query
+    const { page = 1, page_size = 20, filter = 'all', mobile, merchant_id } = req.query
 
     const AdminSystemService = req.app.locals.services.getService('admin_system')
     const maxListings = await AdminSystemService.getSettingValue(
@@ -60,7 +60,7 @@ router.get('/listing-stats', authenticateToken, requireRoleLevel(100), async (re
     logger.info('管理员查询用户上架状态', {
       admin_id: req.user.user_id,
       page,
-      limit,
+      page_size,
       filter,
       mobile: mobile || null,
       merchant_id: merchant_id || null
@@ -70,7 +70,7 @@ router.get('/listing-stats', authenticateToken, requireRoleLevel(100), async (re
 
     const result = await ExchangeService.getUserListingStats({
       page,
-      limit,
+      page_size,
       filter,
       max_listings: maxListings,
       mobile,
@@ -411,29 +411,18 @@ router.put(
         return res.apiSuccess(result, `已更新 ${result.affected_rows} 个商品价格`)
       }
 
-      // 兼容旧模式：逐个指定价格
       if (!Array.isArray(items) || items.length === 0) {
         return res.apiError('价格数据不能为空', 'BAD_REQUEST', null, 400)
       }
 
       const result = await TransactionManager.execute(
         async transaction => {
-          const updatePromises = items
-            .filter(
-              item =>
-                item.exchange_item_id && item.cost_amount !== undefined && item.cost_amount >= 0
-            )
-            .map(item => {
-              const pid = parseInt(item.exchange_item_id, 10)
-              return ExchangeAdminService.batchUpdateSkuPrice
-                ? ExchangeAdminService.batchUpdateSkuPrice(pid, item.cost_amount, { transaction })
-                : Promise.resolve([0])
-            })
-          const results = await Promise.all(updatePromises)
-          const affectedRows = results.reduce((sum, [affected]) => sum + affected, 0)
-          return { affected_rows: affectedRows }
+          return await ExchangeAdminService.batchSetIndividualPrices(items, {
+            transaction,
+            operator_id: req.user?.user_id
+          })
         },
-        { description: `批量改价 ${items.length} 个商品` }
+        { description: `批量逐个设价 ${items.length} 个商品` }
       )
 
       return res.apiSuccess(result, `已更新 ${result.affected_rows} 个商品价格`)

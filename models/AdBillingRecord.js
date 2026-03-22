@@ -24,7 +24,7 @@ const BeijingTimeHelper = require('../utils/timeHelper')
  * 计费类型有效值
  * @constant {string[]}
  */
-const VALID_BILLING_TYPES = ['freeze', 'deduct', 'refund', 'daily_deduct']
+const VALID_BILLING_TYPES = ['freeze', 'deduct', 'refund', 'daily_deduct', 'cpm_deduct']
 
 /**
  * 定义 AdBillingRecord 模型
@@ -88,10 +88,21 @@ module.exports = sequelize => {
           notEmpty: { msg: '计费类型不能为空' },
           isIn: {
             args: [VALID_BILLING_TYPES],
-            msg: '计费类型必须是：freeze, deduct, refund, daily_deduct 之一'
+            msg: '计费类型必须是：freeze, deduct, refund, daily_deduct, cpm_deduct 之一'
           }
         },
-        comment: '计费类型：freeze=冻结 / deduct=扣款 / refund=退款 / daily_deduct=日扣'
+        comment:
+          '计费类型：freeze=冻结 / deduct=扣款 / refund=退款 / daily_deduct=日扣 / cpm_deduct=CPM扣费'
+      },
+
+      /**
+       * 面向对账的广告账单号（AB 前缀，16 位统一格式）
+       */
+      billing_no: {
+        type: DataTypes.STRING(32),
+        allowNull: false,
+        unique: true,
+        comment: '广告计费账单号（AB 前缀）'
       },
 
       asset_transaction_id: {

@@ -245,7 +245,7 @@ class PendingSummaryService {
   static async _getRiskAlertsPending() {
     try {
       // 使用 LotteryAlertService 获取风控相关告警
-      const LotteryAlertService = require('../LotteryAlertService')
+      const LotteryAlertService = require('../lottery/LotteryAlertService')
 
       // 获取未处理的用户/系统类型告警（作为风控告警）
       const result = await LotteryAlertService.getAlertList({
@@ -297,7 +297,7 @@ class PendingSummaryService {
    */
   static async _getLotteryAlertsPending() {
     try {
-      const LotteryAlertService = require('../LotteryAlertService')
+      const LotteryAlertService = require('../lottery/LotteryAlertService')
 
       // 获取未处理的抽奖相关告警（预算、库存、中奖率）
       const result = await LotteryAlertService.getAlertList({

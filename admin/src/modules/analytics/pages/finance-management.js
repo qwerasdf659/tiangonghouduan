@@ -357,6 +357,7 @@ document.addEventListener('alpine:init', () => {
     const table = dataTable({
       columns: [
         { key: 'record_id', label: '记录ID', sortable: true },
+        { key: 'order_no', label: '单号(CS)', type: 'code' },
         { key: 'user_id', label: '用户ID' },
         {
           key: 'store_name',
@@ -653,6 +654,7 @@ document.addEventListener('alpine:init', () => {
     const table = dataTable({
       columns: [
         { key: 'asset_transaction_id', label: '交易ID', sortable: true },
+        { key: 'transaction_no', label: '流水号(TX)', type: 'code' },
         { key: 'asset_code', label: '资产类型' },
         { key: 'tx_type', label: '类型', render: (val, row) => row.tx_type_display || val || '-' },
         // delta_amount：与后端数据库字段名一致（正数=增加，负数=扣减）

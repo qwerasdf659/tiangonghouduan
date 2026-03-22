@@ -19,6 +19,7 @@
     "test": "jest",
     "test:coverage": "jest --coverage",
     "test:stress": "jest --testPathPattern=tests/stress/ --forceExit --no-coverage",
+    "test:memory-stability": "RUN_MEMORY_STABILITY_TEST=true jest tests/chaos/memory_leak_detection.test.js --forceExit",
     "lint": "eslint . --ext .js",
     "lint:fix": "eslint . --ext .js --fix",
     "check:circular": "node scripts/check-circular-deps.js",

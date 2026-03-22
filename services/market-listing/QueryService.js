@@ -28,6 +28,7 @@ const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
 const logger = require('../../utils/logger').logger
 const { attachDisplayNames, DICT_TYPES } = require('../../utils/displayNameHelper')
 const { getImageUrl } = require('../../utils/ImageUrlHelper')
+const { categoryIconAttachmentInclude } = require('../../utils/mediaAttachmentGallery')
 
 /**
  * 市场挂牌查询服务类
@@ -141,7 +142,7 @@ class MarketListingQueryService {
    * @param {number} [params.page_size=20] - 每页数量
    * @param {string} [params.listing_kind] - 挂牌类型筛选
    * @param {string} [params.asset_code] - 资产代码筛选
-   * @param {string|number} [params.item_category_code] - 物品类目代码筛选（字符串时查 category_defs 转 category_id）
+   * @param {string|number} [params.item_category_code] - 物品类目代码筛选（字符串时按 category_code 解析为 category_id）
    * @param {string} [params.asset_group_code] - 资产分组代码筛选
    * @param {string} [params.rarity_code] - 稀有度代码筛选
    * @param {number} [params.merchant_id] - 商家ID筛选（通过关联物品的 merchant_id 过滤）
@@ -290,22 +291,8 @@ class MarketListingQueryService {
         /** 关联分类定义（通过 offer_category_id），用于分类图标降级 */
         model: Category,
         as: 'offerCategory',
-        attributes: ['category_id', 'category_code', 'display_name'],
-        include: [
-          {
-            model: MediaAttachment,
-            as: 'iconAttachment',
-            attributes: ['media_id'],
-            required: false,
-            include: [
-              {
-                model: MediaFile,
-                as: 'media',
-                attributes: ['object_key']
-              }
-            ]
-          }
-        ],
+        attributes: ['category_id', 'category_code', 'category_name'],
+        include: [categoryIconAttachmentInclude({ MediaAttachment, MediaFile })].filter(Boolean),
         required: false
       }
     ]
@@ -316,21 +303,7 @@ class MarketListingQueryService {
         model: MaterialAssetType,
         as: 'offerMaterialAsset',
         attributes: ['asset_code', 'display_name', 'group_code'],
-        include: [
-          {
-            model: MediaAttachment,
-            as: 'iconAttachment',
-            attributes: ['media_id'],
-            required: false,
-            include: [
-              {
-                model: MediaFile,
-                as: 'media',
-                attributes: ['object_key']
-              }
-            ]
-          }
-        ],
+        include: [categoryIconAttachmentInclude({ MediaAttachment, MediaFile })].filter(Boolean),
         required: false,
         where: includeAssetGroup ? { group_code: asset_group_code } : undefined
       })
@@ -608,34 +581,15 @@ class MarketListingQueryService {
   static async getFilterFacets(options = {}) {
     const { include_disabled = false } = options
 
-    const {
-      Category,
-      RarityDef,
-      AssetGroupDef,
-      MediaAttachment,
-      MediaFile
-    } = require('../../models')
+    const models = require('../../models')
+    const { Category, RarityDef, AssetGroupDef, MediaAttachment, MediaFile } = models
 
     // 1. 查询物品类目列表（图标通过 media_attachments 多态关联获取）
     const categoryWhere = include_disabled ? {} : { is_enabled: true }
     const categories = await Category.findAll({
       where: categoryWhere,
-      attributes: ['category_id', 'category_code', 'display_name', 'description', 'sort_order'],
-      include: [
-        {
-          model: MediaAttachment,
-          as: 'iconAttachment',
-          attributes: ['media_id'],
-          required: false,
-          include: [
-            {
-              model: MediaFile,
-              as: 'media',
-              attributes: ['object_key']
-            }
-          ]
-        }
-      ],
+      attributes: ['category_id', 'category_code', 'category_name', 'sort_order'],
+      include: [categoryIconAttachmentInclude({ MediaAttachment, MediaFile })].filter(Boolean),
       order: [
         ['sort_order', 'ASC'],
         ['category_code', 'ASC']
@@ -700,8 +654,7 @@ class MarketListingQueryService {
       return {
         category_id: plain.category_id,
         category_code: plain.category_code,
-        display_name: plain.display_name,
-        description: plain.description,
+        display_name: plain.category_name,
         sort_order: plain.sort_order,
         icon_url: iconKey ? getImageUrl(iconKey) : null
       }

@@ -1,4 +1,4 @@
-const logger = require('../utils/logger').logger
+const logger = require('../../utils/logger').logger
 
 /**
  * 餐厅积分抽奖系统 V4.0 - 抽奖预设管理服务（LotteryPresetService）
@@ -32,9 +32,9 @@ const logger = require('../utils/logger').logger
  * 使用模型：Claude Sonnet 4.5
  */
 
-const models = require('../models')
-const BeijingTimeHelper = require('../utils/timeHelper')
-const { attachDisplayNames, DICT_TYPES } = require('../utils/displayNameHelper')
+const models = require('../../models')
+const BeijingTimeHelper = require('../../utils/timeHelper')
+const { attachDisplayNames, DICT_TYPES } = require('../../utils/displayNameHelper')
 
 /**
  * 抽奖预设管理服务类

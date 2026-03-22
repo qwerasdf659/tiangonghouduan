@@ -123,6 +123,33 @@ class Category extends Model {
   static async findByCode(code) {
     return this.findOne({ where: { category_code: code } })
   }
+
+  /**
+   * 将品类主键数字或 category_code 解析为 category_id（查询层统一入口）
+   *
+   * @param {string|number|null|undefined} codeOrId - 数字 ID 或品类编码
+   * @param {Object} [options={}] - 查询选项
+   * @param {Object} [options.transaction] - Sequelize 事务
+   * @returns {Promise<number|null>} 有效品类主键，不存在或无效时 null
+   */
+  static async resolveToId(codeOrId, options = {}) {
+    const { transaction } = options
+    if (codeOrId === null || codeOrId === undefined || codeOrId === '') {
+      return null
+    }
+    const str = String(codeOrId).trim()
+    const asNum = parseInt(str, 10)
+    if (!Number.isNaN(asNum) && str === String(asNum) && asNum > 0) {
+      const row = await this.findByPk(asNum, { attributes: ['category_id'], transaction })
+      return row ? row.category_id : null
+    }
+    const row = await this.findOne({
+      where: { category_code: str },
+      attributes: ['category_id'],
+      transaction
+    })
+    return row ? row.category_id : null
+  }
 }
 
 // eslint-disable-next-line valid-jsdoc
@@ -152,6 +179,11 @@ module.exports = sequelize => {
         allowNull: false,
         unique: true,
         comment: '品类编码（全局唯一，用于接口与配置）'
+      },
+      description: {
+        type: DataTypes.STRING(500),
+        allowNull: true,
+        comment: '品类说明（运营/字典展示）'
       },
       level: {
         type: DataTypes.TINYINT,

@@ -462,14 +462,7 @@ class QueryService {
                       attributes: ['cost_asset_code', 'cost_amount', 'original_amount']
                     }
                   ],
-                  attributes: [
-                    'sku_id',
-                    'sku_code',
-                    'stock',
-                    'sold_count',
-                    'status',
-                    'sort_order'
-                  ]
+                  attributes: ['sku_id', 'sku_code', 'stock', 'sold_count', 'status', 'sort_order']
                 }
               ]
             : [])
@@ -480,48 +473,11 @@ class QueryService {
         throw new Error('商品不存在')
       }
 
-      const { MediaAttachment, MediaFile } = this.models
-      const { getImageUrl } = require('../../utils/ImageUrlHelper')
-      const attachments =
-        MediaAttachment && MediaFile
-          ? await MediaAttachment.findAll({
-              where: {
-                attachable_type: 'product',
-                attachable_id: item_id
-              },
-              include: [
-                {
-                  model: MediaFile,
-                  as: 'media',
-                  attributes: ['media_id', 'object_key', 'mime_type', 'thumbnail_keys']
-                }
-              ],
-              order: [['sort_order', 'ASC']]
-            })
-          : []
-      const toImageJson = a => {
-        const m = a.media || a.Media
-        if (!m) return null
-        const url = m.object_key ? getImageUrl(m.object_key) : null
-        return {
-          media_id: m.media_id,
-          url,
-          mime: m.mime_type,
-          thumbnail_url: m.thumbnail_keys?.small ? getImageUrl(m.thumbnail_keys.small) : url
-        }
-      }
-      const images = attachments
-        .filter(a => a.role === 'gallery' || a.role === 'exchange_items')
-        .map(toImageJson)
-        .filter(Boolean)
-      const detail_images = attachments
-        .filter(a => a.role === 'detail')
-        .map(toImageJson)
-        .filter(Boolean)
-      const showcase_images = attachments
-        .filter(a => a.role === 'showcase')
-        .map(toImageJson)
-        .filter(Boolean)
+      const { fetchProductMediaGallery } = require('../../utils/mediaAttachmentGallery')
+      const { images, detail_images, showcase_images } = await fetchProductMediaGallery(
+        this.models,
+        item_id
+      )
 
       // 添加中文显示名称
       const itemJSON = item.toJSON()
@@ -673,7 +629,6 @@ class QueryService {
       if (status) where.status = status
       if (user_id) where.user_id = user_id
       if (exchange_item_id) where.exchange_item_id = exchange_item_id
-      else if (exchange_item_id) where.exchange_item_id = exchange_item_id
       if (order_no) {
         where.order_no = { [Op.like]: `%${order_no}%` }
       }
@@ -902,8 +857,16 @@ class QueryService {
    * @private
    */
   async _buildFiltersCount(filterValues) {
-    const { status, asset_code: _asset_code, space, keyword, category, min_cost: _min_cost, max_cost: _max_cost, stock_status: _stock_status } =
-      filterValues
+    const {
+      status,
+      asset_code: _asset_code,
+      space,
+      keyword,
+      category,
+      min_cost: _min_cost,
+      max_cost: _max_cost,
+      stock_status: _stock_status
+    } = filterValues
 
     try {
       const { sequelize } = this.ExchangeItem
@@ -1019,25 +982,16 @@ class QueryService {
   }
 
   /**
-   * 将 category_code 或 category_id 解析为 category_id（API 兼容：前端可能传 code 或 id）
+   * 将 category_code 或 category_id 解析为 category_id（统一走 Category.resolveToId）
    *
    * @param {string|number} category - 分类代码或分类ID
    * @returns {Promise<number|null>} category_id，无法解析时返回 null
    * @private
    */
   async _resolveCategoryId(category) {
-    if (category == null) return null
-    const num = parseInt(category, 10)
-    if (!Number.isNaN(num) && String(num) === String(category)) {
-      return num
-    }
     const Category = this.models.Category
     if (!Category) return null
-    const def = await Category.findOne({
-      where: { category_code: String(category) },
-      attributes: ['category_id']
-    })
-    return def ? def.category_id : null
+    return Category.resolveToId(category)
   }
 
   /**
@@ -1386,52 +1340,11 @@ class QueryService {
         throw err
       }
 
-      // 画廊 / 详情图 / 展示图（通过 media_attachments）
-      const { MediaAttachment, MediaFile } = this.models
-      const { getImageUrl } = require('../../utils/ImageUrlHelper')
-
-      const attachments =
-        MediaAttachment && MediaFile
-          ? await MediaAttachment.findAll({
-              where: {
-                attachable_type: 'product',
-                attachable_id: productId
-              },
-              include: [
-                {
-                  model: MediaFile,
-                  as: 'media',
-                  attributes: ['media_id', 'object_key', 'mime_type', 'thumbnail_keys']
-                }
-              ],
-              order: [['sort_order', 'ASC']]
-            })
-          : []
-
-      const toImageJson = a => {
-        const m = a.media || a.Media
-        if (!m) return null
-        const url = m.object_key ? getImageUrl(m.object_key) : null
-        return {
-          media_id: m.media_id,
-          url,
-          mime: m.mime_type,
-          thumbnail_url: m.thumbnail_keys?.small ? getImageUrl(m.thumbnail_keys.small) : url
-        }
-      }
-
-      const images = attachments
-        .filter(a => a.role === 'gallery' || a.role === 'exchange_items')
-        .map(toImageJson)
-        .filter(Boolean)
-      const detail_images = attachments
-        .filter(a => a.role === 'detail')
-        .map(toImageJson)
-        .filter(Boolean)
-      const showcase_images = attachments
-        .filter(a => a.role === 'showcase')
-        .map(toImageJson)
-        .filter(Boolean)
+      const { fetchProductMediaGallery } = require('../../utils/mediaAttachmentGallery')
+      const { images, detail_images, showcase_images } = await fetchProductMediaGallery(
+        this.models,
+        productId
+      )
 
       const itemJSON = this._formatExchangeItemForDetail(product)
       itemJSON.images = images
@@ -1556,18 +1469,7 @@ class QueryService {
     const CategoryModel = this.Category
     if (!CategoryModel) return null
 
-    let categoryId
-    const num = parseInt(category, 10)
-    if (!Number.isNaN(num) && String(num) === String(category)) {
-      categoryId = num
-    } else {
-      const cat = await CategoryModel.findOne({
-        where: { category_code: String(category) },
-        attributes: ['category_id']
-      })
-      categoryId = cat ? cat.category_id : null
-    }
-
+    const categoryId = await CategoryModel.resolveToId(category)
     if (!categoryId) return null
 
     const children = await CategoryModel.findAll({

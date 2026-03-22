@@ -79,7 +79,7 @@ function registerDictManagementComponents() {
       parent_category_id: null,
       parent_name: '',
       category_code: '',
-      display_name: '',
+      category_name: '',
       description: ''
     },
 
@@ -103,7 +103,7 @@ function registerDictManagementComponents() {
         parent_category_id: parent.category_id,
         parent_name: parent.category_name,
         category_code: '',
-        display_name: '',
+        category_name: '',
         description: ''
       }
       this.showModal('subcategoryModal')
@@ -111,7 +111,7 @@ function registerDictManagementComponents() {
 
     /** 提交添加子分类 */
     async submitSubcategory() {
-      if (!this.subcategoryForm.category_code || !this.subcategoryForm.display_name) {
+      if (!this.subcategoryForm.category_code || !this.subcategoryForm.category_name) {
         Alpine.store('notification').show('请填写分类代码和名称', 'warning')
         return
       }
@@ -124,7 +124,7 @@ function registerDictManagementComponents() {
           method: 'POST',
           data: {
             category_code: this.subcategoryForm.category_code,
-            display_name: this.subcategoryForm.display_name,
+            category_name: this.subcategoryForm.category_name,
             description: this.subcategoryForm.description,
             parent_category_id: this.subcategoryForm.parent_category_id,
             is_enabled: true
@@ -152,9 +152,10 @@ function registerDictManagementComponents() {
         }
       },
       {
-        key: 'display_name',
+        key: '_name',
         label: '字典名称',
-        sortable: true
+        sortable: false,
+        render: (_v, row) => row.category_name || row.display_name || '-'
       },
       {
         key: 'description',
@@ -219,7 +220,7 @@ function registerDictManagementComponents() {
         // 避免 display_name 重复导致 x-for :key 冲突（如两个稀有度都叫"普通"）
         const idField = DICT_TYPE_ID_FIELDS[_currentDictType] || 'display_name'
         items.forEach(item => {
-          item._row_id = item[idField] || item.display_name || ''
+          item._row_id = item[idField] || item.category_name || item.display_name || ''
         })
 
         return { items, total: items.length }

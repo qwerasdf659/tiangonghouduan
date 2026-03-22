@@ -129,14 +129,14 @@ router.post('/chat/sessions', authenticateToken, async (req, res) => {
  * Canonical Path：GET /api/v4/system/chat/sessions
  *
  * @query {number} page - 页码（默认1）
- * @query {number} limit - 每页数量（默认10，最大50）
+ * @query {number} page_size - 每页数量（默认10，最大50；与全站分页字段一致）
  *
  * @returns {Object} 会话列表和分页信息
  */
 router.get('/chat/sessions', authenticateToken, async (req, res) => {
   try {
     // 获取分页参数（默认第1页，每页10条）
-    const { page = 1, limit = 10 } = req.query
+    const { page = 1, page_size = 10 } = req.query
 
     // 通过 ServiceManager 获取服务（符合TR-005规范）
     const CustomerServiceSessionService = req.app.locals.services.getService(
@@ -146,23 +146,29 @@ router.get('/chat/sessions', authenticateToken, async (req, res) => {
     // 使用 CustomerServiceSessionService 获取会话列表
     const result = await CustomerServiceSessionService.getSessionList({
       user_id: req.user.user_id, // 用户数据隔离（只能查询自己的会话）
-      page: parseInt(page),
-      page_size: Math.min(parseInt(limit), 50), // 分页安全保护：最大50条记录
+      page: parseInt(page, 10),
+      page_size: Math.min(parseInt(page_size, 10) || 10, 50), // 分页安全保护：最大50条记录
       include_last_message: true, // 包含最后一条消息
       calculate_unread: true, // 计算未读消息数
       sort_by: 'created_at', // 按创建时间排序
       sort_order: 'DESC' // 倒序排列（最新的会话在前）
     })
 
-    // 返回分页信息（支持前端分页组件）
+    const p = result.pagination
+    const pageNum = p.page
+    const pageSizeNum = p.page_size
+    const total = p.total
+    // 与 ApiResponse.paginated 及 listings 等路由的 pagination 形状一致
     return res.apiSuccess(
       {
         sessions: result.sessions,
         pagination: {
-          current_page: result.pagination.page, // 当前页码
-          per_page: result.pagination.page_size, // 每页数量
-          total_count: result.pagination.total, // 总会话数
-          total_pages: result.pagination.total_pages // 总页数
+          total,
+          page: pageNum,
+          page_size: pageSizeNum,
+          total_pages: p.total_pages,
+          has_next: pageNum * pageSizeNum < total,
+          has_prev: pageNum > 1
         }
       },
       '获取会话列表成功'

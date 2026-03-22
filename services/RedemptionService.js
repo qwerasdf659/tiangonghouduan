@@ -34,8 +34,10 @@
  * 最后更新：2026年01月05日（事务边界治理改造）
  */
 
+const crypto = require('crypto')
 const { sequelize, RedemptionOrder, Item, Account, User, Store, StoreStaff } = require('../models')
 const RedemptionCodeGenerator = require('../utils/RedemptionCodeGenerator')
+const OrderNoGenerator = require('../utils/OrderNoGenerator')
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 const ItemService = require('./asset/ItemService')
 
@@ -181,16 +183,30 @@ class RedemptionService {
     const expiresAt = new Date()
     expiresAt.setDate(expiresAt.getDate() + Number(expiryDays))
 
-    // 4. 创建订单记录
+    // 4. 创建订单记录（order_no 先占位，插入后用 redemption_seq 生成 RD 统一单号）
+    const placeholder_rd = `PH${crypto.randomBytes(12).toString('hex').toUpperCase()}`
     const order = await RedemptionOrder.create(
       {
         code_hash: codeHash,
         item_id,
         expires_at: expiresAt,
-        status: 'pending'
+        status: 'pending',
+        order_no: placeholder_rd
       },
       { transaction }
     )
+    await order.reload({ transaction })
+    await order.update(
+      {
+        order_no: OrderNoGenerator.generate(
+          'RD',
+          order.redemption_seq,
+          order.createdAt || order.created_at
+        )
+      },
+      { transaction }
+    )
+    await order.reload({ transaction })
 
     /* 5. 通过 ItemService.holdItem 锁定物品（写入 item_holds 表） */
     await ItemService.holdItem(

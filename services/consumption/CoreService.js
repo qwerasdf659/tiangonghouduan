@@ -12,11 +12,14 @@
  *
  * @module services/consumption/CoreService
  */
+const crypto = require('crypto')
 const logger = require('../../utils/logger').logger
 const BusinessError = require('../../utils/BusinessError')
 const { ConsumptionRecord, ContentReviewRecord, User } = require('../../models')
 const BalanceService = require('../asset/BalanceService')
 const BeijingTimeHelper = require('../../utils/timeHelper')
+const OrderNoGenerator = require('../../utils/OrderNoGenerator')
+const { generateConsumptionBusinessId } = require('../../utils/IdempotencyHelper')
 const AuditLogService = require('../AuditLogService')
 const { assertAndGetTransaction } = require('../../utils/transactionHelpers')
 
@@ -158,9 +161,9 @@ class CoreService {
     )
     const pointsToAward = Math.round(parseFloat(data.consumption_amount) * pointsRatio)
 
-    // 生成业务唯一键
-    const randomSuffix = Math.random().toString(36).substr(2, 6)
-    const business_id = `consumption_${data.merchant_id}_${Date.now()}_${randomSuffix}`
+    // 业务唯一键：consume_{merchant_id}_{user_id}_{timestamp_ms}
+    const business_id = generateConsumptionBusinessId(data.merchant_id, userId, Date.now())
+    const placeholder_cs = `PH${crypto.randomBytes(12).toString('hex').toUpperCase()}`
 
     // 步骤6.5：处理 store_id
     let storeId = data.store_id
@@ -199,12 +202,24 @@ class CoreService {
         status: 'pending',
         qr_code: data.qr_code,
         idempotency_key,
+        order_no: placeholder_cs,
         merchant_notes: data.merchant_notes || null,
         created_at: BeijingTimeHelper.createDatabaseTime(),
         updated_at: BeijingTimeHelper.createDatabaseTime()
       },
       { transaction }
     )
+    await consumptionRecord.update(
+      {
+        order_no: OrderNoGenerator.generate(
+          'CS',
+          consumptionRecord.consumption_record_id,
+          consumptionRecord.createdAt || consumptionRecord.created_at
+        )
+      },
+      { transaction }
+    )
+    await consumptionRecord.reload({ transaction })
 
     logger.info(
       `✅ 消费记录创建成功 (ID: ${consumptionRecord.consumption_record_id}, idempotency_key: ${idempotency_key})`

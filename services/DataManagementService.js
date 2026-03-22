@@ -42,7 +42,7 @@ const L0_PROTECTED_TABLES = Object.freeze(
     'material_asset_types',
     'asset_group_defs',
     'rarity_defs',
-    'category_defs'
+    'categories'
   ])
 )
 
@@ -418,7 +418,9 @@ class DataManagementService {
       policy.enabled = Boolean(updates.enabled)
     }
 
-    await AdminSystemService.upsertConfig('data_cleanup_policies', config, { category: 'data_management' })
+    await AdminSystemService.upsertConfig('data_cleanup_policies', config, {
+      category: 'data_management'
+    })
 
     await AuditLogService.logOperation({
       operator_id: operatorId,

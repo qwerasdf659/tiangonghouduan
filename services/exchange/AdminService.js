@@ -27,7 +27,7 @@ const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
 const displayNameHelper = require('../../utils/displayNameHelper')
 const BeijingTimeHelper = require('../../utils/timeHelper')
 const { assertAndGetTransaction } = require('../../utils/transactionHelpers')
-const { Op, fn, col, where: sqlWhere, literal } = require('sequelize')
+const { Op, fn, col, where: sqlWhere, literal, QueryTypes } = require('sequelize')
 
 /**
  * 兑换市场管理服务类
@@ -135,7 +135,7 @@ class AdminService {
    * @param {boolean} [itemData.free_shipping=false] - 是否包邮
    * @param {boolean} [itemData.is_limited=false] - 是否限量商品（前端触发旋转彩虹边框等视觉强调）
    * @param {string} [itemData.sell_point] - 营销卖点文案
-   * @param {number} [itemData.category_id] - 商品分类ID（FK→category_defs.category_id）
+   * @param {number} [itemData.category_id] - 商品分类ID（FK→categories.category_id）
    * @param {number} created_by - 创建者ID
    * @param {Object} options - 选项
    * @param {Transaction} options.transaction - 外部事务对象（必填）
@@ -216,7 +216,8 @@ class AdminService {
     logger.info(`[兑换市场] 商品创建成功，exchange_item_id: ${item.exchange_item_id}`)
 
     // 自动创建默认 SKU + 兑换渠道定价
-    const { ExchangeItemSku: ExchangeItemSkuModel, ExchangeChannelPrice: ChannelPriceModel } = this.models
+    const { ExchangeItemSku: ExchangeItemSkuModel, ExchangeChannelPrice: ChannelPriceModel } =
+      this.models
     if (ExchangeItemSkuModel) {
       const defaultSkuCode = `default_${item.exchange_item_id}`
       const sku = await ExchangeItemSkuModel.create(
@@ -442,9 +443,7 @@ class AdminService {
     }
 
     if (updateData.category_id !== undefined) {
-      finalUpdateData.category_id = updateData.category_id
-        ? parseInt(updateData.category_id)
-        : null
+      finalUpdateData.category_id = updateData.category_id ? parseInt(updateData.category_id) : null
     }
 
     if (updateData.usage_rules !== undefined) {
@@ -643,12 +642,7 @@ class AdminService {
       try {
         const MediaService = require('../MediaService')
         const mediaService = new MediaService({ getService: () => null })
-        const deletedCount = await mediaService.detach(
-          'product',
-          item_id,
-          'primary',
-          transaction
-        )
+        const deletedCount = await mediaService.detach('product', item_id, 'primary', transaction)
         logger.info('[兑换市场] 商品关联主媒体解绑成功', {
           item_id,
           media_id: associated_media_id,
@@ -687,7 +681,7 @@ class AdminService {
    *
    * @param {Object} options - 查询选项
    * @param {number} [options.page=1] - 页码
-   * @param {number} [options.limit=20] - 每页数量
+   * @param {number} [options.page_size=20] - 每页数量
    * @param {string} [options.filter='all'] - 筛选条件：all/near_limit/at_limit
    * @param {number} options.max_listings - 最大上架数量限制
    * @returns {Promise<Object>} 用户上架统计结果
@@ -696,16 +690,18 @@ class AdminService {
     try {
       const {
         page = 1,
-        limit = 20,
+        page_size: listing_stats_page_size = 20,
         filter = 'all',
         max_listings = 3,
         mobile,
         merchant_id
       } = options
 
+      const pageSize = Math.min(Math.max(parseInt(listing_stats_page_size, 10) || 20, 1), 100)
+
       logger.info('[兑换市场] 管理员获取用户上架统计', {
         page,
-        limit,
+        page_size: pageSize,
         filter,
         max_listings,
         mobile
@@ -724,7 +720,7 @@ class AdminService {
         if (mobileFilterUserIds.length === 0) {
           return {
             stats: [],
-            pagination: { page, limit, total: 0, total_pages: 0 },
+            pagination: { page, page_size: pageSize, total: 0, total_pages: 0 },
             summary: {
               total_users_with_listings: 0,
               users_at_limit: 0,
@@ -806,8 +802,8 @@ class AdminService {
 
       // 分页
       const total = filteredItems.length
-      const offset = (page - 1) * limit
-      const paginatedItems = filteredItems.slice(offset, offset + limit)
+      const offset = (page - 1) * pageSize
+      const paginatedItems = filteredItems.slice(offset, offset + pageSize)
 
       // 构建统计结果（含个性化上限信息）
       const stats = paginatedItems.map(item => {
@@ -839,7 +835,7 @@ class AdminService {
 
       const result = {
         stats,
-        pagination: { page, limit, total, total_pages: Math.ceil(total / limit) },
+        pagination: { page, page_size: pageSize, total, total_pages: Math.ceil(total / pageSize) },
         summary
       }
 
@@ -1222,22 +1218,128 @@ class AdminService {
         this.ExchangeItem.count(),
         this.ExchangeItem.count({ where: { status: 'active' } }),
         this.ExchangeItem.count({
-          include: [{
-            model: this.models.ExchangeItemSku,
-            as: 'skus',
-            where: { stock: { [Op.lt]: 10 }, status: 'active' },
-            required: true
-          }]
+          include: [
+            {
+              model: this.models.ExchangeItemSku,
+              as: 'skus',
+              where: { stock: { [Op.lt]: 10 }, status: 'active' },
+              required: true
+            }
+          ]
         }),
         this.ExchangeRecord.count({ where: { status: { [Op.ne]: 'cancelled' } } })
       ])
+
+      const [orderAgg] = await this.sequelize.query(
+        `SELECT
+          SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending,
+          SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed,
+          SUM(CASE WHEN status = 'shipped' THEN 1 ELSE 0 END) AS shipped,
+          SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled,
+          COUNT(*) AS total_orders,
+          COALESCE(SUM(CASE WHEN status <> 'cancelled' THEN pay_amount ELSE 0 END), 0) AS total_pay_amount
+        FROM exchange_records`,
+        { type: QueryTypes.SELECT }
+      )
+
+      const [itemAgg] = await this.sequelize.query(
+        `SELECT
+          SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) AS active_count,
+          SUM(CASE WHEN status <> 'active' THEN 1 ELSE 0 END) AS inactive_count,
+          COALESCE(SUM(CASE WHEN status = 'active' THEN stock ELSE 0 END), 0) AS active_stock,
+          COALESCE(SUM(CASE WHEN status <> 'active' THEN stock ELSE 0 END), 0) AS inactive_stock,
+          SUM(
+            CASE
+              WHEN status = 'active' AND stock <= COALESCE(stock_alert_threshold, 5) THEN 1
+              ELSE 0
+            END
+          ) AS low_stock_count
+        FROM exchange_items`,
+        { type: QueryTypes.SELECT }
+      )
+
+      const [fulfillRow] = await this.sequelize.query(
+        `SELECT
+          AVG(
+            CASE
+              WHEN status IN ('shipped', 'completed') AND updated_at IS NOT NULL
+              THEN TIMESTAMPDIFF(HOUR, created_at, updated_at)
+            END
+          ) AS avg_fulfillment_hours
+        FROM exchange_records
+        WHERE status IN ('shipped', 'completed')`,
+        { type: QueryTypes.SELECT }
+      )
+
+      const totalOrders = Number(orderAgg?.total_orders) || 0
+      const cancelled = Number(orderAgg?.cancelled) || 0
+      const shipped = Number(orderAgg?.shipped) || 0
+      const completed = Number(orderAgg?.completed) || 0
+      const validOrders = totalOrders - cancelled
+      const fulfilledOrders = shipped + completed
+      const fulfillment_rate =
+        validOrders > 0 ? Math.round((fulfilledOrders / validOrders) * 10000) / 100 : 0
+
+      const trendRows = await this.sequelize.query(
+        `SELECT DATE(created_at) AS day,
+          COUNT(*) AS order_count,
+          COALESCE(SUM(CASE WHEN status <> 'cancelled' THEN pay_amount ELSE 0 END), 0) AS revenue
+        FROM exchange_records
+        WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 90 DAY)
+        GROUP BY DATE(created_at)
+        ORDER BY day ASC`,
+        { type: QueryTypes.SELECT }
+      )
+
+      const order_trend_by_day = trendRows.map(r => {
+        const raw = r.day
+        const dateStr =
+          raw instanceof Date ? raw.toISOString().split('T')[0] : String(raw).slice(0, 10)
+        return {
+          date: dateStr,
+          order_count: Number(r.order_count) || 0,
+          revenue: Number(r.revenue) || 0
+        }
+      })
 
       const statistics = {
         total_items: totalItems,
         active_items: activeItems,
         low_stock_items: lowStockItems,
         total_exchanges: totalExchanges,
-        timestamp: BeijingTimeHelper.now()
+        timestamp: BeijingTimeHelper.now(),
+        /** 近 90 日按日订单量与成交额（兑换趋势图，避免前端拉全量订单再聚合） */
+        order_trend_by_day,
+        /** 订单状态分布与支付量（管理后台兑换统计卡片，服务端聚合） */
+        orders_summary: {
+          total: totalOrders,
+          pending: Number(orderAgg?.pending) || 0,
+          completed,
+          shipped,
+          cancelled,
+          total_pay_amount: Number(orderAgg?.total_pay_amount) || 0
+        },
+        /** 商品库存与上下架汇总（替代前端拉全量商品再算） */
+        items_summary: {
+          active_count: Number(itemAgg?.active_count) || 0,
+          inactive_count: Number(itemAgg?.inactive_count) || 0,
+          active_stock: Number(itemAgg?.active_stock) || 0,
+          inactive_stock: Number(itemAgg?.inactive_stock) || 0,
+          low_stock_count: Number(itemAgg?.low_stock_count) || 0
+        },
+        /** 履约看板（全表聚合，非抽样 200 条） */
+        fulfillment_tracking: {
+          total_orders: totalOrders,
+          pending_count: Number(orderAgg?.pending) || 0,
+          shipped_count: shipped,
+          completed_count: completed,
+          cancelled_count: cancelled,
+          fulfillment_rate,
+          avg_fulfillment_time:
+            fulfillRow?.avg_fulfillment_hours != null
+              ? Math.round(Number(fulfillRow.avg_fulfillment_hours) * 10) / 10
+              : 0
+        }
       }
 
       logger.info('[兑换市场-管理] 统计数据查询成功', statistics)
@@ -1440,14 +1542,7 @@ class AdminService {
 
       const { count, rows } = await this.ExchangeItem.findAndCountAll({
         where: { primary_media_id: null },
-        attributes: [
-          'exchange_item_id',
-          'item_name',
-          'category_id',
-          'status',
-          'space',
-          'stock'
-        ],
+        attributes: ['exchange_item_id', 'item_name', 'category_id', 'status', 'space', 'stock'],
         limit,
         offset,
         order: [['exchange_item_id', 'ASC']]
@@ -1603,12 +1698,14 @@ class AdminService {
     // 查询每个商品的默认 SKU → 渠道定价行
     const skus = await this.ExchangeItemSku.findAll({
       where: { exchange_item_id: { [Op.in]: exchangeItemIds } },
-      include: [{
-        model: ChannelPriceModel,
-        as: 'channelPrices',
-        where: { is_enabled: true },
-        required: true
-      }],
+      include: [
+        {
+          model: ChannelPriceModel,
+          as: 'channelPrices',
+          where: { is_enabled: true },
+          required: true
+        }
+      ],
       transaction
     })
 
@@ -1672,6 +1769,108 @@ class AdminService {
       affected: updatedCount
     })
     return { affected_rows: updatedCount, adjustment }
+  }
+
+  /**
+   * 批量逐个设价（每个兑换商品可指定不同 cost_amount）
+   *
+   * 业务场景：运营在后台对多个 SKU 分别定价，与 batchUpdatePrice（统一按比例/加减）互补。
+   * 实现要点：与 batchUpdatePrice 相同路径——默认 SKU + 已启用渠道价行，写审计日志并刷新 SPU 汇总。
+   *
+   * @param {Array<{ exchange_item_id: number, cost_amount: number }>} priceItems - 商品价格行
+   * @param {Object} options - 选项
+   * @param {Object} options.transaction - Sequelize 事务（必填）
+   * @param {number} [options.operator_id] - 操作人 user_id
+   * @returns {Promise<{ affected_rows: number }>} 实际更新的渠道价行数
+   */
+  async batchSetIndividualPrices(priceItems, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'AdminService.batchSetIndividualPrices')
+
+    if (!Array.isArray(priceItems) || priceItems.length === 0) {
+      throw new Error('价格数据不能为空')
+    }
+
+    const priceMap = new Map()
+    for (const item of priceItems) {
+      if (!item.exchange_item_id || item.cost_amount === undefined || item.cost_amount < 0) {
+        continue
+      }
+      priceMap.set(Number(item.exchange_item_id), Number(item.cost_amount))
+    }
+
+    if (priceMap.size === 0) {
+      return { affected_rows: 0 }
+    }
+
+    logger.info('[兑换市场-管理] 批量逐个设价', { count: priceMap.size })
+
+    const ChannelPriceModel = this.models.ExchangeChannelPrice
+
+    const skus = await this.ExchangeItemSku.findAll({
+      where: { exchange_item_id: { [Op.in]: [...priceMap.keys()] } },
+      include: [
+        {
+          model: ChannelPriceModel,
+          as: 'channelPrices',
+          where: { is_enabled: true },
+          required: true
+        }
+      ],
+      transaction
+    })
+
+    let updatedCount = 0
+    const productIdsToRefresh = new Set()
+
+    for (const sku of skus) {
+      const targetAmount = priceMap.get(sku.exchange_item_id)
+      if (targetAmount === undefined) continue
+
+      const newAmount = Math.max(1, Math.round(targetAmount))
+
+      for (const price of sku.channelPrices) {
+        const oldAmount = Number(price.cost_amount)
+        if (newAmount === oldAmount) continue
+
+        await price.update({ cost_amount: newAmount }, { transaction })
+        updatedCount++
+        productIdsToRefresh.add(sku.exchange_item_id)
+
+        try {
+          await this.models.AdminOperationLog.create(
+            {
+              operator_id: options.operator_id || null,
+              operation_type: 'price_change',
+              target_type: 'product',
+              target_id: sku.exchange_item_id,
+              action: 'batch_set_individual',
+              before_data: { cost_amount: oldAmount, sku_id: sku.sku_id },
+              after_data: { cost_amount: newAmount, sku_id: sku.sku_id },
+              changed_fields: { cost_amount: { from: oldAmount, to: newAmount } },
+              reason: '批量逐个设价',
+              risk_level: 'medium',
+              requires_approval: false,
+              approval_status: 'not_required'
+            },
+            { transaction }
+          )
+        } catch (logErr) {
+          logger.warn('[兑换市场] 价格变动日志记录失败', { error: logErr.message })
+        }
+      }
+    }
+
+    for (const pid of productIdsToRefresh) {
+      await this._updateSpuSummary(pid, transaction)
+    }
+
+    await BusinessCacheHelper.invalidateExchangeItems('batch_individual_price_set').catch(() => {})
+
+    logger.info('[兑换市场-管理] 批量逐个设价完成', {
+      requested: priceMap.size,
+      affected: updatedCount
+    })
+    return { affected_rows: updatedCount }
   }
 
   /**
@@ -1950,9 +2149,12 @@ class AdminService {
 
     // 渠道定价更新（cost_asset_code / cost_amount 在 exchange_channel_prices 表）
     const priceUpdate = {}
-    if (updateData.cost_asset_code !== undefined) priceUpdate.cost_asset_code = updateData.cost_asset_code
-    if (updateData.cost_amount !== undefined) priceUpdate.cost_amount = parseInt(updateData.cost_amount)
-    if (updateData.original_amount !== undefined) priceUpdate.original_amount = updateData.original_amount
+    if (updateData.cost_asset_code !== undefined)
+      priceUpdate.cost_asset_code = updateData.cost_asset_code
+    if (updateData.cost_amount !== undefined)
+      priceUpdate.cost_amount = parseInt(updateData.cost_amount)
+    if (updateData.original_amount !== undefined)
+      priceUpdate.original_amount = updateData.original_amount
 
     if (Object.keys(priceUpdate).length > 0) {
       const ChannelPriceModel = this.models.ExchangeChannelPrice
@@ -2035,7 +2237,11 @@ class AdminService {
        FROM exchange_item_skus ps
        JOIN exchange_channel_prices ecp ON ecp.sku_id = ps.sku_id AND ecp.is_enabled = 1
        WHERE ps.exchange_item_id = :productId AND ps.status = 'active'`,
-      { replacements: { productId: exchangeItemId }, type: this.sequelize.QueryTypes.SELECT, transaction }
+      {
+        replacements: { productId: exchangeItemId },
+        type: this.sequelize.QueryTypes.SELECT,
+        transaction
+      }
     )
 
     await this.ExchangeItem.update(

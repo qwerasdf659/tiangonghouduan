@@ -180,7 +180,7 @@ class NavBadgeService {
    */
   static async _getRiskAlertCount() {
     try {
-      const LotteryAlertService = require('../LotteryAlertService')
+      const LotteryAlertService = require('../lottery/LotteryAlertService')
       const result = await LotteryAlertService.getAlertList({
         type: 'user',
         status: 'active',
@@ -201,7 +201,7 @@ class NavBadgeService {
    */
   static async _getLotteryAlertCount() {
     try {
-      const LotteryAlertService = require('../LotteryAlertService')
+      const LotteryAlertService = require('../lottery/LotteryAlertService')
       const result = await LotteryAlertService.getAlertList({
         status: 'active',
         limit: 100

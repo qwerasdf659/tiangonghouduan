@@ -15,7 +15,7 @@
 
 'use strict'
 
-const logger = require('../utils/logger').logger
+const logger = require('../../utils/logger').logger
 
 /**
  * 抽奖档位规则服务类

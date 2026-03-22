@@ -16,7 +16,7 @@ const KNOWN_RUNTIME_DECOUPLED = [
   
   // ChatWebSocketService.js ↔ LotteryAlertService.js
   // 解决方案：setImmediate 延迟加载
-  ['services/ChatWebSocketService.js', 'services/LotteryAlertService.js']
+  ['services/ChatWebSocketService.js', 'services/lottery/LotteryAlertService.js']
 ]
 
 /**

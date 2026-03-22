@@ -143,8 +143,8 @@
           <div class="h-8 w-px bg-gray-200 mx-1 hidden md:block"></div>
 
           <div>
-            <label class="block text-xs themed-text-muted mb-1.5 font-medium">订单号/核销码</label>
-            <input type="text" x-model="filter.keyword" placeholder="订单号或核销码"
+            <label class="block text-xs themed-text-muted mb-1.5 font-medium">RD单号 / 内部ID / 核销码</label>
+            <input type="text" x-model="filter.keyword" placeholder="RD单号、内部ID或核销码"
                    @keyup.enter="search()"
                    class="w-44 px-3 py-1.5 text-sm border themed-bg-base themed-border rounded-lg themed-text" />
           </div>
@@ -282,7 +282,8 @@
                          @change="toggleSelectAll()"
                          class="rounded border-gray-300" />
                 </th>
-                <th class="px-4 py-3 text-left text-xs font-semibold themed-text-muted uppercase tracking-wider">订单编号</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold themed-text-muted uppercase tracking-wider">RD单号</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold themed-text-muted uppercase tracking-wider">内部ID</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold themed-text-muted uppercase tracking-wider">奖品信息</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold themed-text-muted uppercase tracking-wider">用户</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold themed-text-muted uppercase tracking-wider">状态</th>
@@ -304,10 +305,16 @@
                            @change="toggleSelect(order)"
                            class="rounded border-gray-300" />
                   </td>
-                  <!-- 订单编号 -->
+                  <!-- RD 运营单号 -->
                   <td class="px-4 py-3">
-                    <span class="font-mono text-xs themed-text bg-gray-50 px-1.5 py-0.5 rounded" 
-                          x-text="(order.redemption_order_id || order.order_id || '').substring(0, 10) + '...'"
+                    <span class="font-mono text-xs themed-text font-medium" x-text="order.order_no || '-'"></span>
+                  </td>
+                  <!-- 内部 UUID（数据库主键） -->
+                  <td class="px-4 py-3">
+                    <span class="font-mono text-xs themed-text-muted bg-gray-50 px-1.5 py-0.5 rounded"
+                          x-text="(order.redemption_order_id || order.order_id || '').length > 12
+                            ? (order.redemption_order_id || order.order_id || '').substring(0, 10) + '…'
+                            : (order.redemption_order_id || order.order_id || '-')"
                           :title="order.redemption_order_id || order.order_id"></span>
                   </td>
                   <!-- 奖品信息 -->
@@ -644,8 +651,12 @@
               <h4 class="text-xs font-semibold themed-text-muted mb-3 uppercase tracking-wider">基本信息</h4>
               <div class="grid grid-cols-2 gap-4">
                 <div>
-                  <span class="text-xs themed-text-muted uppercase">订单编号</span>
-                  <p class="text-xs themed-text font-mono mt-0.5 break-all" x-text="orderDetail.redemption_order_id || orderDetail.order_id"></p>
+                  <span class="text-xs themed-text-muted uppercase">RD 单号</span>
+                  <p class="text-xs themed-text font-mono mt-0.5 break-all" x-text="orderDetail.order_no || '-'"></p>
+                </div>
+                <div>
+                  <span class="text-xs themed-text-muted uppercase">内部 ID</span>
+                  <p class="text-xs themed-text-muted font-mono mt-0.5 break-all" x-text="orderDetail.redemption_order_id || orderDetail.order_id"></p>
                 </div>
                 <div>
                   <span class="text-xs themed-text-muted uppercase">奖品名称</span>

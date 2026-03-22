@@ -63,11 +63,10 @@ class PrizePickStage extends BaseStage {
       const decision_data = this.getContextData(context, 'LoadDecisionSourceStage.data')
       const decision_source = decision_data?.decision_source || 'normal'
 
-      // preset 模式：直接使用预设奖品
+      // preset 模式：直接使用预设奖品（LoadPresetStage 已自管线移除并归档，数据仅来自 LoadDecisionSourceStage）
       if (decision_source === 'preset' && decision_data?.preset) {
         const preset = decision_data.preset
-        const preset_stage_data = this.getContextData(context, 'LoadPresetStage.data')
-        const preset_prize = preset_stage_data?.preset_prize || preset
+        const preset_prize = preset
 
         this.log('info', '预设模式：使用预设奖品', {
           user_id,

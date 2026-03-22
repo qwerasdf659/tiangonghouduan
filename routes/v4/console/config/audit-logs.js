@@ -247,26 +247,4 @@ router.post('/cleanup', authenticateToken, requireRoleLevel(100), async (req, re
   }
 })
 
-/**
- * GET /api/v4/console/audit-logs/operation-types
- * @desc 获取所有支持的操作类型列表
- * @access Admin only (role_level >= 100)
- */
-router.get('/operation-types', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    /** 通过 ServiceManager 获取商家操作日志服务，从中获取操作类型常量 */
-    const logService = getMerchantOperationLogService(req)
-    const operationTypes = logService.getOperationTypes()
-
-    return res.apiSuccess(
-      {
-        operation_types: operationTypes
-      },
-      '获取操作类型列表成功'
-    )
-  } catch (error) {
-    return handleServiceError(error, res, '获取操作类型列表')
-  }
-})
-
 module.exports = router

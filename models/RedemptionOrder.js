@@ -46,6 +46,27 @@ module.exports = sequelize => {
         comment: '核销码哈希（Code Hash）：12位Base32核销码的SHA-256哈希值，用于验证核销码'
       },
 
+      /**
+       * 辅助自增序号（AUTO_INCREMENT），与 UUID 主键分离，供 RD 单号序列段
+       */
+      redemption_seq: {
+        type: DataTypes.INTEGER.UNSIGNED,
+        allowNull: true,
+        unique: true,
+        comment:
+          '辅助序号（表级 AUTO_INCREMENT）：用于 RD 单号序列段；模型 allowNull 避免 Sequelize 校验阻塞插入'
+      },
+
+      /**
+       * 面向用户/客服的核销订单号（RD 前缀，16 位统一格式）
+       */
+      order_no: {
+        type: DataTypes.STRING(32),
+        allowNull: true,
+        unique: true,
+        comment: '核销订单号（RD 前缀）；创建后由服务层回填'
+      },
+
       // 关联物品（三表模型 items 表）
       item_id: {
         type: DataTypes.BIGINT,

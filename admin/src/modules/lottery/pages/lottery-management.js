@@ -795,9 +795,10 @@ function registerLotteryManagementComponents() {
     const o = t.init; t.init = async function () { window.addEventListener('refresh-matrix', () => this.loadData()); if (o) await o.call(this) }; return t
   })
 
-  /** 抽奖记录 */
+  /** 抽奖记录（真实 lottery_draws 流水，含 LT 单号 order_no） */
   Alpine.data('drawHistoryDataTable', () => {
     const t = dataTable({ columns: [
+      { key: 'order_no', label: '单号(LT)', type: 'code' },
       { key: 'draw_id', label: '抽奖ID', sortable: true },
       { key: 'user_id', label: '用户ID' },
       { key: 'campaign_name', label: '活动' },
@@ -805,7 +806,17 @@ function registerLotteryManagementComponents() {
       { key: 'cost_amount', label: '消耗', type: 'number' },
       { key: 'is_winner', label: '中奖', type: 'boolean' },
       { key: 'created_at', label: '时间', type: 'datetime', sortable: true }
-    ], dataSource: async (p) => { const r = await request({ url: `${API_PREFIX}/console/lottery-statistics/hourly`, method: 'GET', params: p }); return { items: r.data?.metrics || r.data?.draws || r.data?.list || [], total: r.data?.pagination?.total || 0 } }, primaryKey: 'draw_id', page_size: 20 })
+    ], dataSource: async (p) => {
+      const r = await request({
+        url: `${API_PREFIX}/console/lottery-management/draw-records`,
+        method: 'GET',
+        params: p
+      })
+      return {
+        items: r.data?.draws || r.data?.items || r.data?.list || [],
+        total: r.data?.pagination?.total ?? 0
+      }
+    }, primaryKey: 'draw_id', page_size: 20 })
     const o = t.init; t.init = async function () { window.addEventListener('refresh-draw-history', () => this.loadData()); if (o) await o.call(this) }; return t
   })
 

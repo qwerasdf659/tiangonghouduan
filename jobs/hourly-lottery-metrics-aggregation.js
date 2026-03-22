@@ -28,7 +28,7 @@
  */
 
 const { LotteryHourlyMetrics, LotteryCampaign, sequelize } = require('../models')
-const { getInstance: getMetricsCollector } = require('../services/LotteryMetricsCollector')
+const { getInstance: getMetricsCollector } = require('../services/lottery/LotteryMetricsCollector')
 const logger = require('../utils/logger').logger
 const BeijingTimeHelper = require('../utils/timeHelper')
 

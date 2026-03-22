@@ -5,7 +5,7 @@
  * 职责范围：核心兑换操作
  * - exchangeItem(): 商品兑换核心逻辑（材料资产扣减、订单创建、库存扣减）
  * - updateOrderStatus(): 更新订单状态（管理员操作，含状态机校验）
- * - _generateOrderNo(): 生成订单号（私有方法）
+ * - 订单号：创建后使用 OrderNoGenerator（EM 前缀）回写
  *
  * 设计原则：
  * - 所有写操作必须在事务内执行（assertAndGetTransaction）
@@ -16,11 +16,14 @@
  * @created 2026-01-31（大文件拆分方案 Phase 4）
  */
 
+const crypto = require('crypto')
 const logger = require('../../utils/logger').logger
 const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
 const BeijingTimeHelper = require('../../utils/timeHelper')
 const { assertAndGetTransaction } = require('../../utils/transactionHelpers')
 const { getImageUrl } = require('../../utils/ImageUrlHelper')
+const OrderNoGenerator = require('../../utils/OrderNoGenerator')
+const { generateExchangeBusinessId } = require('../../utils/IdempotencyHelper')
 
 /**
  * 兑换订单状态机白名单
@@ -349,19 +352,18 @@ class CoreService {
      */
     const debit_transaction_id = materialResult.transaction_record?.transaction_id || null
 
-    // 4. 生成订单号
-    const order_no = this._generateOrderNo()
-
     /*
-     * 5. 创建兑换订单（✅ 包含 idempotency_key、材料支付字段、debit_transaction_id）
+     * 4~5. 创建兑换订单：订单号依赖自增主键，先用占位唯一值再回写统一格式（OrderNoGenerator）
      */
+    const placeholder_order_no = `PH${crypto.randomBytes(12).toString('hex').toUpperCase()}`
+    const business_ts = Date.now()
+    const business_id = generateExchangeBusinessId(user_id, sku_id, business_ts)
+
     let record
     try {
-      const business_id = `exchange_${user_id}_p${exchange_item_id}_s${sku_id}_${Date.now()}`
-
       record = await this.ExchangeRecord.create(
         {
-          order_no,
+          order_no: placeholder_order_no,
           idempotency_key,
           business_id,
           debit_transaction_id,
@@ -407,6 +409,19 @@ class CoreService {
       }
       throw createError
     }
+
+    await record.update(
+      {
+        order_no: OrderNoGenerator.generate(
+          'EM',
+          record.exchange_record_id,
+          record.createdAt || record.created_at
+        )
+      },
+      { transaction }
+    )
+    await record.reload({ transaction })
+    const order_no = record.order_no
 
     // 6. 扣减库存（ExchangeItem SKU）
     await productSkuRecord.update(
@@ -1293,9 +1308,16 @@ class CoreService {
               target_id: exchangeItem.exchange_item_id,
               action: 'refund',
               before_data: { stock: exchangeItem.stock, item_name: exchangeItem.item_name },
-              after_data: { stock: exchangeItem.stock + quantity, item_name: exchangeItem.item_name },
+              after_data: {
+                stock: exchangeItem.stock + quantity,
+                item_name: exchangeItem.item_name
+              },
               changed_fields: {
-                stock: { from: exchangeItem.stock, to: exchangeItem.stock + quantity, delta: quantity }
+                stock: {
+                  from: exchangeItem.stock,
+                  to: exchangeItem.stock + quantity,
+                  delta: quantity
+                }
               },
               reason: `退款回补库存（订单：${order.exchange_record_id}，数量：${quantity}）`,
               risk_level: 'low',
@@ -1403,18 +1425,6 @@ class CoreService {
       }
       logger.error('[兑换市场] 写入事件记录失败（非致命）:', err.message)
     }
-  }
-
-  /**
-   * 生成订单号（私有方法）
-   *
-   * @returns {string} 订单号
-   * @private
-   */
-  _generateOrderNo() {
-    const timestamp = Date.now()
-    const random = Math.random().toString(36).substr(2, 6).toUpperCase()
-    return `EM${timestamp}${random}`
   }
 
   /**

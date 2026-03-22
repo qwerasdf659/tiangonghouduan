@@ -93,9 +93,9 @@ module.exports = sequelize => {
       },
 
       order_no: {
-        type: DataTypes.STRING(50),
+        type: DataTypes.STRING(32),
         allowNull: false,
-        comment: '订单号（关联 exchange_records.order_no）'
+        comment: '订单号（关联 exchange_records.order_no，列宽与 exchange_records 一致）'
       },
 
       old_status: {

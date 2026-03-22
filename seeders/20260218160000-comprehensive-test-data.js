@@ -114,13 +114,13 @@ module.exports = {
       if (!exists) await queryInterface.bulkInsert('rarity_defs', [r])
     }
 
-    // 1b. 类目字典（图标通过 media_attachments 多态关联管理）
-    const categoryDefs = [
+    // 1b. 品类树（categories 表，替代已删除的 category_defs）
+    const seedCategories = [
       {
         category_code: 'electronics',
-        display_name: '数码电子',
-        description: '手机、平板、耳机等数码产品',
-
+        category_name: '数码电子',
+        level: 1,
+        parent_category_id: null,
         sort_order: 10,
         is_enabled: true,
         created_at: now,
@@ -128,9 +128,9 @@ module.exports = {
       },
       {
         category_code: 'lifestyle',
-        display_name: '生活日用',
-        description: '日常生活用品',
-
+        category_name: '生活日用',
+        level: 1,
+        parent_category_id: null,
         sort_order: 20,
         is_enabled: true,
         created_at: now,
@@ -138,9 +138,9 @@ module.exports = {
       },
       {
         category_code: 'food',
-        display_name: '美食饮品',
-        description: '食品饮料卡券',
-
+        category_name: '美食饮品',
+        level: 1,
+        parent_category_id: null,
         sort_order: 30,
         is_enabled: true,
         created_at: now,
@@ -148,9 +148,9 @@ module.exports = {
       },
       {
         category_code: 'voucher',
-        display_name: '优惠券',
-        description: '各类优惠券与代金券',
-
+        category_name: '优惠券',
+        level: 1,
+        parent_category_id: null,
         sort_order: 40,
         is_enabled: true,
         created_at: now,
@@ -158,22 +158,22 @@ module.exports = {
       },
       {
         category_code: 'collectible',
-        display_name: '收藏品',
-        description: '限量收藏与纪念品',
-
+        category_name: '收藏品',
+        level: 1,
+        parent_category_id: null,
         sort_order: 50,
         is_enabled: true,
         created_at: now,
         updated_at: now
       }
     ]
-    for (const c of categoryDefs) {
+    for (const c of seedCategories) {
       const exists = await queryInterface.rawSelect(
-        'category_defs',
+        'categories',
         { where: { category_code: c.category_code } },
         ['category_code']
       )
-      if (!exists) await queryInterface.bulkInsert('category_defs', [c])
+      if (!exists) await queryInterface.bulkInsert('categories', [c])
     }
 
     // 1c. 资产分组字典

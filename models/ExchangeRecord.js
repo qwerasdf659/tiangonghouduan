@@ -86,10 +86,11 @@ module.exports = sequelize => {
 
       // 订单信息
       order_no: {
-        type: DataTypes.STRING(50),
+        type: DataTypes.STRING(32),
         allowNull: false,
         unique: true,
-        comment: '订单号'
+        comment:
+          '订单号（16位统一格式 EM/BD + 北京YYMMDD + 6位序列 + 2位hex；列宽32与其它业务单号一致）'
       },
       // 幂等键（业界标准形态 - 2026-01-02）
       idempotency_key: {
@@ -373,18 +374,6 @@ module.exports = sequelize => {
         as: 'exchangeItemSku'
       })
     }
-  }
-
-  /**
-   * 生成订单号
-   * @returns {string} 订单号
-   */
-  ExchangeRecord.generateOrderNo = function () {
-    const timestamp = Date.now()
-    const random = Math.floor(Math.random() * 10000)
-      .toString()
-      .padStart(4, '0')
-    return `EXC${timestamp}${random}`
   }
 
   return ExchangeRecord

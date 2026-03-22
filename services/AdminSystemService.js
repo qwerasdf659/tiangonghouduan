@@ -494,9 +494,21 @@ class AdminSystemService {
   static async getSettingsByCategory(category) {
     try {
       const validCategories = [
-        'basic', 'points', 'notification', 'security', 'marketplace',
-        'redemption', 'exchange', 'batch_operation', 'rate_limit', 'feature',
-        'general', 'ad_system', 'ad_pricing', 'backpack', 'data_management'
+        'basic',
+        'points',
+        'notification',
+        'security',
+        'marketplace',
+        'redemption',
+        'exchange',
+        'batch_operation',
+        'rate_limit',
+        'feature',
+        'general',
+        'ad_system',
+        'ad_pricing',
+        'backpack',
+        'data_management'
       ]
       if (!validCategories.includes(category)) {
         throw new Error(`无效的设置分类: ${category}。有效分类: ${validCategories.join(', ')}`)
@@ -637,8 +649,16 @@ class AdminSystemService {
       'notification',
       'security',
       'marketplace',
-      'redemption', 'exchange', 'batch_operation', 'rate_limit', 'feature',
-      'general', 'ad_system', 'ad_pricing', 'backpack', 'data_management'
+      'redemption',
+      'exchange',
+      'batch_operation',
+      'rate_limit',
+      'feature',
+      'general',
+      'ad_system',
+      'ad_pricing',
+      'backpack',
+      'data_management'
     ]
     if (!validCategories.includes(category)) {
       throw new Error(`无效的设置分类: ${category}。有效分类: ${validCategories.join(', ')}`)
@@ -1058,7 +1078,7 @@ class AdminSystemService {
     }
   }
 
-  // ==================== Config Key-Based Access (migrated from SystemConfigService) ====================
+  // ==================== Config Key-Based Access (system_settings) ====================
 
   static _getConfigCacheKey(setting_key) {
     return `system_config:${setting_key}`
@@ -1082,7 +1102,9 @@ class AdminSystemService {
       const redis = getRedisClient()
       if (!redis) return
       await redis.set(this._getConfigCacheKey(setting_key), JSON.stringify(value), 'EX', ttl)
-    } catch { /* non-fatal */ }
+    } catch {
+      /* non-fatal */
+    }
   }
 
   static async _clearConfigCache(setting_key) {
@@ -1091,12 +1113,13 @@ class AdminSystemService {
       const redis = getRedisClient()
       if (!redis) return
       await redis.del(this._getConfigCacheKey(setting_key))
-    } catch { /* non-fatal */ }
+    } catch {
+      /* non-fatal */
+    }
   }
 
   /**
    * Get a config value by setting_key only (no category needed).
-   * Drop-in replacement for SystemConfigService.getValue().
    */
   static async getConfigValue(setting_key, defaultValue = null) {
     try {
@@ -1127,7 +1150,7 @@ class AdminSystemService {
   }
 
   /**
-   * Batch rate-limit config (migrated from SystemConfigService).
+   * Batch rate-limit config from system_settings.
    */
   static async getBatchRateLimitConfig(operation_type) {
     const keyMap = {
@@ -1152,7 +1175,7 @@ class AdminSystemService {
   }
 
   /**
-   * Batch global config (migrated from SystemConfigService).
+   * Batch global config from system_settings.
    */
   static async getBatchGlobalConfig() {
     const config = await this.getConfigValue('batch_operation_global')
@@ -1169,22 +1192,21 @@ class AdminSystemService {
 
   /**
    * Create-or-update a config row in system_settings by setting_key.
-   * Drop-in replacement for SystemConfigService.upsert().
    */
   static async upsertConfig(setting_key, setting_value, options = {}) {
     const { description, category = 'general', transaction } = options
     try {
-      const serialized = typeof setting_value === 'string'
-        ? setting_value
-        : JSON.stringify(setting_value)
+      const serialized =
+        typeof setting_value === 'string' ? setting_value : JSON.stringify(setting_value)
 
-      const value_type = typeof setting_value === 'object'
-? 'json'
-        : typeof setting_value === 'number'
-? 'number'
-          : typeof setting_value === 'boolean'
-? 'boolean'
-            : 'json'
+      const value_type =
+        typeof setting_value === 'object'
+          ? 'json'
+          : typeof setting_value === 'number'
+            ? 'number'
+            : typeof setting_value === 'boolean'
+              ? 'boolean'
+              : 'json'
 
       const [setting, created] = await SystemSettings.findOrCreate({
         where: { setting_key },

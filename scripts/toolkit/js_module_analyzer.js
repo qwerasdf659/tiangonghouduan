@@ -40,15 +40,6 @@ class JSModuleAnalyzer {
       /mockReturnValue/g,
       /mockResolvedValue/g
     ]
-
-    // 🆕 扩展：V3兼容代码检测配置
-    this.v3CompatPatterns = [
-      /\/\*\*.*?V3.*?\*\//gi,
-      /\/\/.*?V3.*$/gim,
-      /_v3|v3_/gi,
-      /legacy.*?support/gi,
-      /backward.*?compatibility/gi
-    ]
   }
 
   /**
@@ -110,6 +101,7 @@ class JSModuleAnalyzer {
       this.modules.set(relativePath, {
         fullPath,
         relativePath,
+        content,
         size: fs.statSync(fullPath).size,
         lines: content.split('\n').length,
         ...analysis
@@ -534,34 +526,6 @@ class JSModuleAnalyzer {
   }
 
   /**
-   * 🆕 扩展功能：检测V3兼容代码
-   */
-  async detectV3CompatibilityCode() {
-    console.log('🔍 检测项目中的V3兼容代码...')
-
-    const v3Files = []
-    for (const [filePath, moduleInfo] of this.modules) {
-      const hasV3Code = this.v3CompatPatterns.some(pattern => pattern.test(moduleInfo.content))
-
-      if (hasV3Code) {
-        const v3Matches = this.v3CompatPatterns
-          .map(pattern => (moduleInfo.content.match(pattern) || []).length)
-          .reduce((a, b) => a + b, 0)
-
-        v3Files.push({
-          path: filePath,
-          v3Count: v3Matches,
-          type: moduleInfo.type,
-          cleanupPriority: this.getV3CleanupPriority(filePath)
-        })
-      }
-    }
-
-    console.log(`📊 发现${v3Files.length}个包含V3兼容代码的文件`)
-    return v3Files.sort((a, b) => b.cleanupPriority - a.cleanupPriority)
-  }
-
-  /**
    * 🆕 扩展功能：获取Mock数据清理优先级
    */
   getMockCleanupPriority(filePath) {
@@ -570,17 +534,6 @@ class JSModuleAnalyzer {
     if (filePath.includes('/models/')) return 7 // 模型层
     if (filePath.includes('/routes/')) return 6 // API层
     return 5 // 其他文件
-  }
-
-  /**
-   * 🆕 扩展功能：获取V3清理优先级
-   */
-  getV3CleanupPriority(filePath) {
-    if (filePath.includes('strategy') || filePath.includes('Strategy')) return 10
-    if (filePath.includes('/services/')) return 9
-    if (filePath.includes('/models/')) return 8
-    if (filePath.includes('/routes/')) return 7
-    return 6
   }
 
   /**
@@ -596,26 +549,20 @@ class JSModuleAnalyzer {
       // 2. 检测Mock数据
       const mockFiles = await this.detectMockDataUsage()
 
-      // 3. 检测V3兼容代码
-      const v3Files = await this.detectV3CompatibilityCode()
-
-      // 4. 生成综合报告
+      // 3. 生成综合报告
       const report = {
         timestamp: BeijingTimeHelper.now(),
         summary: {
           total_modules: this.modules.size,
           duplicate_groups: this.duplicates.size,
-          mock_data_files: mockFiles.length,
-          v3_compat_files: v3Files.length
+          mock_data_files: mockFiles.length
         },
         recommendations: {
           duplicate_cleanup: Array.from(this.duplicates.values()).length,
-          mock_data_cleanup: mockFiles.filter(f => f.priority >= 8).length,
-          v3_code_cleanup: v3Files.filter(f => f.cleanupPriority >= 8).length
+          mock_data_cleanup: mockFiles.filter(f => f.priority >= 8).length
         },
         details: {
-          mock_files: mockFiles.slice(0, 10), // 显示前10个
-          v3_files: v3Files.slice(0, 10) // 显示前10个
+          mock_files: mockFiles.slice(0, 10) // 显示前10个
         }
       }
 
@@ -624,7 +571,6 @@ class JSModuleAnalyzer {
       console.log(`模块总数: ${report.summary.total_modules}`)
       console.log(`重复模块组: ${report.summary.duplicate_groups}`)
       console.log(`Mock数据文件: ${report.summary.mock_data_files}`)
-      console.log(`V3兼容代码文件: ${report.summary.v3_compat_files}`)
 
       return report
     } catch (error) {

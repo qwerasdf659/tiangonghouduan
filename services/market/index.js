@@ -1,20 +1,12 @@
 'use strict'
 
 /**
- * 市场域服务统一导出
+ * 市场域目录入口
  *
- * @description 市场服务入口
- *
- * 包含服务：
- * - MarketQueryService: 市场查询服务
+ * @description PriceDiscoveryService、MarketAnalyticsService 等从此目录按文件直接 require；
+ * 原 MarketQueryService 已无路由消费，已移除。
  *
  * @module services/market
- * @version 1.0.0
- * @date 2026-02-01
  */
 
-const MarketQueryService = require('./QueryService')
-
-module.exports = {
-  MarketQueryService
-}
+module.exports = {}

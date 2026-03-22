@@ -14,12 +14,12 @@
  * 原文件：services/AdminLotteryService.js (1781行)
  */
 
-const BeijingTimeHelper = require('../../utils/timeHelper')
-const models = require('../../models')
-const { assertAndGetTransaction } = require('../../utils/transactionHelpers')
-const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
-const logger = require('../../utils/logger').logger
-const { attachDisplayNames, DICT_TYPES } = require('../../utils/displayNameHelper')
+const BeijingTimeHelper = require('../../../utils/timeHelper')
+const models = require('../../../models')
+const { assertAndGetTransaction } = require('../../../utils/transactionHelpers')
+const { BusinessCacheHelper } = require('../../../utils/BusinessCacheHelper')
+const logger = require('../../../utils/logger').logger
+const { attachDisplayNames, DICT_TYPES } = require('../../../utils/displayNameHelper')
 
 /**
  * 管理后台抽奖活动管理服务类

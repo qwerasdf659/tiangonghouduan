@@ -13,29 +13,25 @@
 
 ## 工具简介
 
-本目录包含两个核心工具，用于强制执行数据库迁移规范：
+本目录以 **`migration_toolkit.js`** 为统一入口（合并了历史上的 `create-migration.js` / `verify-migrations.js` 能力），与 `package.json` 中脚本一致：
 
-### 1️⃣ `create-migration.js` - 迁移文件创建工具
+### 1️⃣ `migration_toolkit.js` — 创建 + 验证 + 可选同步/状态
 
-**用途**: 强制规范，防止手动创建不规范的迁移文件
+**用途**: 强制迁移命名与结构规范；`npm run migration:create` / `migration:verify` / `migration:up` 均依赖此文件。
 
-**特性**:
-- ✅ 自动生成规范的文件名
-- ✅ 提供15种迁移模板
-- ✅ 交互式引导创建过程
-- ✅ 自动更新 VERSION.js
-- ✅ 防止命名错误
+**创建迁移**（`npm run migration:create` 或 `node scripts/database/migration_toolkit.js create`）:
+- ✅ 规范文件名（时间戳-action-target）
+- ✅ 15 种操作类型模板
+- ✅ 交互式引导
 
-### 2️⃣ `verify-migrations.js` - 迁移文件验证工具
+**验证**（`npm run migration:verify` 或 `… verify`）:
+- ✅ 文件名、action、禁止 fix/temp/test 等弱命名
+- ✅ 与 `migrations/` 目录一致性检查
 
-**用途**: 服务启动前验证所有迁移文件的规范性
-
-**验证内容**:
-- ✅ 文件名格式是否符合规范
-- ✅ Action类型是否合法
-- ✅ VERSION.js一致性
-- ✅ 时间戳合理性
-- ✅ 禁止fix/temp/test等不规范命名
+**其他本目录脚本**（按需直接调用）:
+- `database_toolkit.js` — `npm run db:check` 等
+- `validation_toolkit.js` — `npm run db:validate`
+- `complete_backup.js` — 备份流程（非日常迁移前置）
 
 ---
 
@@ -48,7 +44,7 @@
 npm run migration:create
 
 # 方式2: 直接执行
-node scripts/database/create-migration.js
+node scripts/database/migration_toolkit.js create
 ```
 
 ### 验证所有迁移文件
@@ -57,7 +53,10 @@ node scripts/database/create-migration.js
 # 方式1: 使用npm脚本
 npm run migration:verify
 
-# 方式2: 自动验证（每次 npm start 前）
+# 方式2: 直接调用工具包
+node scripts/database/migration_toolkit.js verify
+
+# 方式3: 自动验证（每次 npm start 前）
 npm start  # 自动执行 prestart hook
 ```
 
@@ -78,7 +77,7 @@ npm run migration:status
 
 ## 工具详解
 
-### create-migration.js 详细说明
+### migration_toolkit.js（create 子命令）详细说明
 
 #### 交互式创建流程
 
@@ -198,7 +197,7 @@ module.exports = {
 
 ---
 
-### verify-migrations.js 详细说明
+### migration_toolkit.js（verify 子命令）详细说明
 
 #### 验证规则
 
@@ -648,22 +647,12 @@ user.vip.level     # 使用点号
 ```json
 {
   "scripts": {
-    // 创建迁移文件（交互式）
-    "migration:create": "node scripts/database/create-migration.js",
-    
-    // 验证所有迁移文件
-    "migration:verify": "node scripts/database/verify-migrations.js",
-    
-    // 执行迁移（会先验证）
+    "migration:toolkit": "node scripts/database/migration_toolkit.js",
+    "migration:create": "node scripts/database/migration_toolkit.js create",
+    "migration:verify": "node scripts/database/migration_toolkit.js verify",
     "migration:up": "npm run migration:verify && npx sequelize-cli db:migrate",
-    
-    // 回滚最后一次迁移
     "migration:down": "npx sequelize-cli db:migrate:undo",
-    
-    // 查看迁移状态
     "migration:status": "npx sequelize-cli db:migrate:status",
-    
-    // 服务启动前自动验证
     "prestart": "npm run migration:verify"
   }
 }

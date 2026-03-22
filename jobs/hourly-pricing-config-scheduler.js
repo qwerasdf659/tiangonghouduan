@@ -24,7 +24,7 @@
  */
 
 const logger = require('../utils/logger').logger
-const LotteryCampaignPricingConfigService = require('../services/LotteryCampaignPricingConfigService')
+const LotteryCampaignPricingConfigService = require('../services/lottery/LotteryCampaignPricingConfigService')
 const BeijingTimeHelper = require('../utils/timeHelper')
 
 /**

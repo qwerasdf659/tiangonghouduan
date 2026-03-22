@@ -93,6 +93,7 @@ class BusinessRecordQueryService {
     if (keyword) {
       where[Op.or] = [
         { redemption_order_id: { [Op.like]: `%${keyword}%` } },
+        { order_no: { [Op.like]: `%${keyword}%` } },
         { code_hash: { [Op.like]: `%${keyword}%` } }
       ]
     }

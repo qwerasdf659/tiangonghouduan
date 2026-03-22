@@ -29,8 +29,10 @@ export function useExchangeStatsState() {
     orderStatusChart: null,
     /** @type {Object|null} 兑换趋势图表实例 */
     exchangeTrendChart: null,
-    /** @type {Array} 趋势数据 */
+    /** @type {Array} 趋势数据（来自 statistics.order_trend_by_day 或服务端聚合） */
     trendData: [],
+    /** @type {Array<{date:string,order_count:number,revenue:number}>|null} 服务端按日趋势原始数据 */
+    orderTrendByDay: null,
     /** @type {string} 趋势时间范围 */
     trendRange: '7d',
     // ========== P1-8: 履约追踪看板 ==========
@@ -65,55 +67,53 @@ export function useExchangeStatsMethods() {
     async loadExchangeStats() {
       try {
         this.loading = true
-        const { ExchangeItemAPI } = await import('../../../api/exchange-item/index.js')
+        const statsRes = await request({
+          url: MARKET_ENDPOINTS.EXCHANGE_MARKET_STATISTICS,
+          method: 'GET'
+        })
 
-        const [itemsRes, ordersRes] = await Promise.all([
-          ExchangeItemAPI.listExchangeItems({ page: 1, page_size: 200 }),
-          request({
-            url: MARKET_ENDPOINTS.EXCHANGE_ORDERS,
-            method: 'GET',
-            params: { page: 1, page_size: 200 }
-          })
-        ])
-
-        const allItems = itemsRes.success ? itemsRes.data?.items || [] : []
-        const activeItems = allItems.filter(i => i.status === 'active')
-        const inactiveItems = allItems.filter(i => i.status !== 'active')
-        const lowStockItems = allItems.filter(
-          i => i.status === 'active' && i.stock <= (i.stock_alert_threshold || 5)
-        )
-
-        const orders = ordersRes.success ? ordersRes.data?.orders || [] : []
-        const orderStats = {
-          total: ordersRes.data?.pagination?.total || orders.length,
-          pending: orders.filter(o => o.status === 'pending').length,
-          completed: orders.filter(o => o.status === 'completed').length,
-          shipped: orders.filter(o => o.status === 'shipped').length,
-          cancelled: orders.filter(o => o.status === 'cancelled').length
+        if (!statsRes.success || !statsRes.data) {
+          throw new Error(statsRes.message || '兑换统计数据为空')
         }
 
-        const totalConsumed = orders.reduce((sum, o) => {
-          const amount = parseInt(o.cost_amount) || parseInt(o.pay_amount) || 0
-          return sum + amount
-        }, 0)
+        const d = statsRes.data
+        const os = d.orders_summary || {}
+        const isu = d.items_summary || {}
+        const ft = d.fulfillment_tracking || {}
 
         this.exchangeStats = {
-          orders: orderStats,
+          orders: {
+            total: os.total ?? 0,
+            pending: os.pending ?? 0,
+            completed: os.completed ?? 0,
+            shipped: os.shipped ?? 0,
+            cancelled: os.cancelled ?? 0
+          },
           revenue: {
-            total_virtual_value: totalConsumed,
-            total_points: orders.length
+            total_virtual_value: os.total_pay_amount ?? 0,
+            total_points: os.total ?? 0
           },
           items: {
-            activeCount: activeItems.length,
-            activeStock: activeItems.reduce((sum, i) => sum + (i.stock || 0), 0),
-            inactiveCount: inactiveItems.length,
-            inactiveStock: inactiveItems.reduce((sum, i) => sum + (i.stock || 0), 0),
-            lowStockCount: lowStockItems.length
+            activeCount: isu.active_count ?? 0,
+            activeStock: isu.active_stock ?? 0,
+            inactiveCount: isu.inactive_count ?? 0,
+            inactiveStock: isu.inactive_stock ?? 0,
+            lowStockCount: isu.low_stock_count ?? 0
           }
         }
 
-        this.orders = orders
-        this.calculateFulfillmentTracking()
+        this.fulfillmentTracking = {
+          total_orders: ft.total_orders ?? 0,
+          pending_count: ft.pending_count ?? 0,
+          shipped_count: ft.shipped_count ?? 0,
+          completed_count: ft.completed_count ?? 0,
+          cancelled_count: ft.cancelled_count ?? 0,
+          fulfillment_rate: ft.fulfillment_rate ?? 0,
+          avg_fulfillment_time: ft.avg_fulfillment_time ?? 0
+        }
+
+        this.orderTrendByDay = Array.isArray(d.order_trend_by_day) ? d.order_trend_by_day : null
+        this.orders = []
       } catch (e) {
         logger.error('[ExchangeStats] 加载统计数据失败:', e)
         this.showError?.('加载统计数据失败')
@@ -128,23 +128,11 @@ export function useExchangeStatsMethods() {
      */
     async loadTrendData() {
       try {
-        // 计算日期范围
         const now = new Date()
         let days = 7
         if (this.trendRange === '30d') days = 30
         else if (this.trendRange === '90d') days = 90
 
-        // 获取订单数据（如果还没有订单数据，先加载）
-        if (!this.orders || this.orders.length === 0) {
-          const ordersRes = await request({
-            url: MARKET_ENDPOINTS.EXCHANGE_ORDERS,
-            method: 'GET',
-            params: { page: 1, page_size: 100 }
-          })
-          this.orders = ordersRes.success ? ordersRes.data?.orders || [] : []
-        }
-
-        // 生成日期数组
         const dateMap = new Map()
         for (let i = days - 1; i >= 0; i--) {
           const date = new Date(now)
@@ -153,18 +141,35 @@ export function useExchangeStatsMethods() {
           dateMap.set(dateStr, { date: dateStr, order_count: 0, revenue: 0 })
         }
 
-        // 按日期聚合订单数据
-        this.orders.forEach(order => {
-          if (!order.created_at) return
-          const orderDate = new Date(order.created_at).toISOString().split('T')[0]
-          if (dateMap.has(orderDate)) {
-            const data = dateMap.get(orderDate)
-            data.order_count++
-            data.revenue += parseInt(order.cost_amount) || parseInt(order.pay_amount) || 0
+        if (this.orderTrendByDay && this.orderTrendByDay.length > 0) {
+          this.orderTrendByDay.forEach(row => {
+            const d = row.date
+            if (dateMap.has(d)) {
+              const cell = dateMap.get(d)
+              cell.order_count = Number(row.order_count) || 0
+              cell.revenue = Number(row.revenue) || 0
+            }
+          })
+        } else {
+          if (!this.orders || this.orders.length === 0) {
+            const ordersRes = await request({
+              url: MARKET_ENDPOINTS.EXCHANGE_ORDERS,
+              method: 'GET',
+              params: { page: 1, page_size: 100 }
+            })
+            this.orders = ordersRes.success ? ordersRes.data?.orders || [] : []
           }
-        })
+          this.orders.forEach(order => {
+            if (!order.created_at) return
+            const orderDate = new Date(order.created_at).toISOString().split('T')[0]
+            if (dateMap.has(orderDate)) {
+              const data = dateMap.get(orderDate)
+              data.order_count++
+              data.revenue += parseInt(order.cost_amount, 10) || parseInt(order.pay_amount, 10) || 0
+            }
+          })
+        }
 
-        // 转换为数组
         this.trendData = Array.from(dateMap.values())
         logger.info('[ExchangeStats] 趋势数据计算完成', {
           days,

@@ -20,7 +20,7 @@ import { buildURL } from '../../../api/base.js'
  * 字典类型配置
  *
  * 字段映射说明（后端字段名 → 前端使用）：
- * - categories: category_code, display_name, description
+ * - categories: category_code, category_name, description（与后端 categories 表一致）
  * - rarities: rarity_code, display_name, description, color_hex, tier
  * - asset-groups: group_code, display_name, description, group_type, color_hex
  */
@@ -32,10 +32,10 @@ const DICT_TYPES = {
     createEndpoint: SYSTEM_ENDPOINTS.DICT_CATEGORY_CREATE,
     updateEndpoint: SYSTEM_ENDPOINTS.DICT_CATEGORY_UPDATE,
     deleteEndpoint: SYSTEM_ENDPOINTS.DICT_CATEGORY_DELETE,
-    idField: 'category_code', // 后端主键字段名
-    codeField: 'category_code', // 代码字段（用于显示）
-    nameField: 'display_name', // 名称字段（用于显示）
-    fields: ['category_code', 'display_name', 'description', 'sort_order', 'is_enabled']
+    idField: 'category_code', // 业务唯一键（更新/删除按 code 路由）
+    codeField: 'category_code',
+    nameField: 'category_name',
+    fields: ['category_code', 'category_name', 'description', 'sort_order', 'is_enabled']
   },
   rarities: {
     name: '稀有度字典',
@@ -97,7 +97,8 @@ export function useDictState() {
     /** @type {Object} 字典表单（使用后端字段名） */
     dictForm: {
       category_code: '', // 类目: category_code / 稀有度: rarity_code / 资产分组: group_code
-      display_name: '', // 显示名称
+      category_name: '', // 类目显示名（categories.category_name）
+      display_name: '', // 稀有度/资产分组显示名
       description: '', // 描述
       color_hex: '', // 颜色（稀有度/资产分组）
       tier: 1, // 等级（稀有度）
@@ -118,8 +119,8 @@ export function useDictState() {
     },
     /** @type {Array} 分类树形数据（仅 categories 类型使用） */
     categoryTree: [],
-    /** @type {number|null} 创建子分类时的父分类ID */
-    parentCategoryDefId: null
+    /** @type {number|null} 创建子分类时的父分类 category_id */
+    parentCategoryId: null
   }
 }
 
@@ -353,10 +354,10 @@ export function useDictMethods() {
     openAddSubcategoryModal(parentCategory) {
       this.isEditDict = false
       this.editingDictCode = null
-      this.parentCategoryDefId = parentCategory.category_def_id
+      this.parentCategoryId = parentCategory.category_id
       this.dictForm = {
         ...this.getEmptyDictForm(),
-        parent_category_def_id: parentCategory.category_def_id
+        parent_category_id: parentCategory.category_id
       }
       this.showModal('dictModal')
     },

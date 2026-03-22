@@ -3,7 +3,7 @@
  *
  * 测试范围：
  * - P3-3-3: 字典配置服务核心功能
- *   - 类目定义 (CategoryDef): getCategoryList, getCategoryByCode, createCategory, updateCategory, deleteCategory
+ *   - 品类（categories 表 / Category 模型）: getCategoryList, getCategoryByCode, createCategory, updateCategory, deleteCategory
  *   - 稀有度定义 (RarityDef): getRarityList, getRarityByCode, createRarity, updateRarity, deleteRarity
  *   - 资产组定义 (AssetGroupDef): getAssetGroupList, getAssetGroupByCode, createAssetGroup, updateAssetGroup, deleteAssetGroup
  *   - 综合查询: getAllDictionaries
@@ -21,7 +21,7 @@
 
 'use strict'
 
-const { sequelize, CategoryDef, RarityDef, AssetGroupDef } = require('../../models')
+const { sequelize, Category, RarityDef, AssetGroupDef } = require('../../models')
 const TransactionManager = require('../../utils/TransactionManager')
 
 /**
@@ -75,7 +75,7 @@ describe('DictionaryService - 字典配置服务测试', () => {
     // 清理类目定义
     for (const code of created_categories) {
       try {
-        await CategoryDef.destroy({ where: { category_code: code }, force: true })
+        await Category.destroy({ where: { category_code: code }, force: true })
       } catch (error) {
         // 忽略清理错误
       }
@@ -111,7 +111,7 @@ describe('DictionaryService - 字典配置服务测试', () => {
 
   // ==================== 类目定义测试 ====================
 
-  describe('类目定义 (CategoryDef) 管理', () => {
+  describe('品类（Category / categories）管理', () => {
     describe('getCategoryList - 类目列表查询', () => {
       it('应该成功获取类目列表', async () => {
         // 执行：获取类目列表
@@ -192,12 +192,12 @@ describe('DictionaryService - 字典配置服务测试', () => {
       it('应该成功创建类目', async () => {
         const test_code = generateTestCode('cat')
 
-        // 执行：创建类目（使用 display_name 而不是 category_name）
+        // 执行：创建类目（展示名存 category_name，与数据库字段一致）
         const result = await TransactionManager.execute(async transaction => {
           return await DictionaryService.createCategory(
             {
               category_code: test_code,
-              display_name: '测试类目',
+              category_name: '测试类目',
               description: '单元测试创建的类目',
               sort_order: 999,
               is_enabled: false // 测试数据设为禁用
@@ -209,7 +209,7 @@ describe('DictionaryService - 字典配置服务测试', () => {
         // 验证：创建成功（直接返回模型实例）
         expect(result).toBeDefined()
         expect(result.category_code).toBe(test_code)
-        expect(result.display_name).toBe('测试类目')
+        expect(result.category_name).toBe('测试类目')
         expect(result.is_enabled).toBe(false)
 
         // 记录用于清理
@@ -224,7 +224,7 @@ describe('DictionaryService - 字典配置服务测试', () => {
           return await DictionaryService.createCategory(
             {
               category_code: test_code,
-              display_name: '原始类目',
+              category_name: '原始类目',
               is_enabled: false
             },
             { transaction }
@@ -238,7 +238,7 @@ describe('DictionaryService - 字典配置服务测试', () => {
             return await DictionaryService.createCategory(
               {
                 category_code: test_code,
-                display_name: '重复类目',
+                category_name: '重复类目',
                 is_enabled: false
               },
               { transaction }
@@ -257,7 +257,7 @@ describe('DictionaryService - 字典配置服务测试', () => {
           return await DictionaryService.createCategory(
             {
               category_code: test_code,
-              display_name: '待更新类目',
+              category_name: '待更新类目',
               is_enabled: false
             },
             { transaction }
@@ -270,7 +270,7 @@ describe('DictionaryService - 字典配置服务测试', () => {
           return await DictionaryService.updateCategory(
             test_code,
             {
-              display_name: '已更新类目名称',
+              category_name: '已更新类目名称',
               description: '更新后的描述'
             },
             { transaction }
@@ -279,7 +279,7 @@ describe('DictionaryService - 字典配置服务测试', () => {
 
         // 验证：更新成功（直接返回模型实例）
         expect(result).toBeDefined()
-        expect(result.display_name).toBe('已更新类目名称')
+        expect(result.category_name).toBe('已更新类目名称')
       })
 
       it('更新不存在的类目应该报错', async () => {
@@ -287,7 +287,7 @@ describe('DictionaryService - 字典配置服务测试', () => {
           TransactionManager.execute(async transaction => {
             return await DictionaryService.updateCategory(
               'non_existent_code',
-              { display_name: '测试' },
+              { category_name: '测试' },
               { transaction }
             )
           })
@@ -304,7 +304,7 @@ describe('DictionaryService - 字典配置服务测试', () => {
           return await DictionaryService.createCategory(
             {
               category_code: test_code,
-              display_name: '待删除类目',
+              category_name: '待删除类目',
               is_enabled: true
             },
             { transaction }
@@ -323,7 +323,7 @@ describe('DictionaryService - 字典配置服务测试', () => {
         expect(result.is_enabled).toBe(false)
 
         // 验证：类目已被禁用
-        const category = await CategoryDef.findOne({
+        const category = await Category.findOne({
           where: { category_code: test_code }
         })
         expect(category.is_enabled).toBe(false)

@@ -355,11 +355,11 @@ REDIS_URL=redis://localhost:6379`;
       // 基于cursor_5.md等发现的缺失API方法
       const apiMethods = {
         getUserInventory: {
-          url: '/api/v2/inventory/list',
+          url: '/api/v4/inventory/list',
           method: 'GET'
         },
         useInventoryItem: {
-          url: '/api/v2/inventory/use', 
+          url: '/api/v4/inventory/use', 
           method: 'POST'
         }
       };

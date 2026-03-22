@@ -61,7 +61,7 @@ const AdPricingService = require('./AdPricingService') // 广告定价服务（D
 const { QueryService: AdCampaignQueryService } = require('./ad-campaign') // 广告活动日志查询服务（路由层合规治理）
 
 // V4 架构重构新增服务（2025-12-10）
-const LotteryPresetService = require('./LotteryPresetService') // 抽奖预设管理服务
+const LotteryPresetService = require('./lottery/LotteryPresetService') // 抽奖预设管理服务
 const ActivityService = require('./ActivityService') // 活动管理服务
 const AuditLogService = require('./AuditLogService') // 审计日志服务
 
@@ -122,7 +122,7 @@ const {
   CampaignService: AdminLotteryCampaignService, // 活动管理操作（~450行）
   QueryService: AdminLotteryQueryService, // 干预规则查询（~300行）
   CRUDService: LotteryCampaignCRUDService // 活动 CRUD 操作（2026-01-31 路由层合规治理）
-} = require('./admin-lottery')
+} = require('./lottery/admin')
 
 // P2 路由层合规治理 - 会话管理服务（2026-01-31）
 const SessionManagementService = require('./SessionManagementService')
@@ -156,18 +156,18 @@ const MerchantService = require('./MerchantService') // 商家管理服务（多
 const MerchantOperationLogService = require('./MerchantOperationLogService') // 商家操作审计日志服务
 const MerchantRiskControlService = require('./MerchantRiskControlService') // 商家风控服务
 const DebtManagementService = require('./DebtManagementService') // 欠账管理服务（2026-01-18 路由层合规性治理）
-const LotteryCampaignPricingConfigService = require('./LotteryCampaignPricingConfigService') // 活动定价配置管理服务（2026-01-19 Phase 3）
+const LotteryCampaignPricingConfigService = require('./lottery/LotteryCampaignPricingConfigService') // 活动定价配置管理服务（2026-01-19 Phase 3）
 const DictionaryService = require('./DictionaryService') // 字典表管理服务（2026-01-21 API覆盖率补齐）
-const LotteryConfigService = require('./LotteryConfigService') // 抽奖配置管理服务（2026-01-21 API覆盖率补齐）
+const LotteryConfigService = require('./lottery/LotteryConfigService') // 抽奖配置管理服务（2026-01-21 API覆盖率补齐）
 const ItemTemplateService = require('./ItemTemplateService') // 物品模板管理服务（2026-01-21 API覆盖率补齐）
 const ExchangeItemService = require('./exchange/ExchangeItemService') // 兑换商品中心 SPU/SKU
 const AttributeService = require('./product/AttributeService') // EAV属性定义管理（品类绑定/预设值）
 const ExchangeChannelPriceService = require('./product/ExchangeChannelPriceService') // 兑换渠道定价管理
 const AttributeRuleEngine = require('./item/AttributeRuleEngine') // 物品实例属性规则引擎（静态类）
 const UserRiskProfileService = require('./UserRiskProfileService') // 用户风控配置管理服务（2026-01-21 API覆盖率补齐）
-const LotteryTierRuleService = require('./LotteryTierRuleService') // 抽奖档位规则管理服务（2026-01-21 API覆盖率补齐）
+const LotteryTierRuleService = require('./lottery/LotteryTierRuleService') // 抽奖档位规则管理服务（2026-01-21 API覆盖率补齐）
 
-const LotteryAlertService = require('./LotteryAlertService') // 抽奖告警服务（B1 实时告警列表API）
+const LotteryAlertService = require('./lottery/LotteryAlertService') // 抽奖告警服务（B1 实时告警列表API）
 const AlertSilenceService = require('./AlertSilenceService') // 告警静默规则管理服务
 const DisplayNameService = require('./DisplayNameService') // 显示名称翻译服务（系统字典）
 const FeatureFlagService = require('./FeatureFlagService') // 功能开关服务
@@ -225,10 +225,8 @@ const {
 const {
   SystemDataQueryService,
   SessionQueryService,
-  BusinessRecordQueryService,
-  DashboardQueryService
+  BusinessRecordQueryService
 } = require('./console')
-const { MarketQueryService } = require('./market')
 const PriceDiscoveryService = require('./market/PriceDiscoveryService') // 价格发现服务（2026-02-23 市场增强）
 const MarketAnalyticsService = require('./market/MarketAnalyticsService') // 市场数据分析服务（2026-02-23 市场增强）
 const { PortfolioQueryService: AssetPortfolioQueryService } = require('./asset')
@@ -356,7 +354,6 @@ class ServiceManager {
       this._services.set('platform_revenue', new PlatformRevenueService()) // 平台收入与手续费管理
       this._services.set('market_health', new MarketHealthService()) // 市场健康看板
       this._services.set('material_management', MaterialManagementService)
-      // ImageService 已删除，media 服务在下方注册
       this._services.set('media', new MediaService(this)) // 媒体服务（需 serviceManager 获取 sealos_storage）
 
       /* ========== 广告系统服务（Phase 2-6 广告平台，popup_show_log/carousel_show_log 已合并） ========== */
@@ -452,7 +449,7 @@ class ServiceManager {
 
       // ========== API覆盖率补齐服务 ==========
 
-      this._services.set('dictionary', new DictionaryService(this.models)) // 字典表管理服务（category_defs, rarity_defs, asset_group_defs）
+      this._services.set('dictionary', new DictionaryService(this.models)) // 字典表管理服务（categories, rarity_defs, asset_group_defs）
       this._services.set('lottery_config', new LotteryConfigService(this.models)) // 抽奖配置管理服务（lottery_strategy_config, lottery_tier_matrix_config）
       this._services.set('item_template', new ItemTemplateService(this.models)) // 物品模板管理服务（item_templates）
       this._services.set('exchange_item_service', new ExchangeItemService(this.models)) // 兑换商品中心（exchange_items / exchange_item_skus）
@@ -488,8 +485,6 @@ class ServiceManager {
       this._services.set('console_system_data_query', SystemDataQueryService) // 管理后台系统数据查询服务（静态类）
       this._services.set('console_session_query', SessionQueryService) // 管理后台会话查询服务（静态类）
       this._services.set('console_business_record_query', BusinessRecordQueryService) // 管理后台业务记录查询服务（静态类）
-      this._services.set('console_dashboard_query', DashboardQueryService) // 管理后台仪表盘查询服务（静态类）
-      this._services.set('market_query', MarketQueryService) // 市场热点读查询服务（静态类）
       this._services.set('price_discovery', PriceDiscoveryService) // 价格发现服务（静态类，2026-02-23 市场增强）
       this._services.set('market_analytics', MarketAnalyticsService) // 市场数据分析服务（静态类，2026-02-23 市场增强）
       this._services.set('asset_portfolio_query', AssetPortfolioQueryService) // 资产组合分析查询服务（静态类）

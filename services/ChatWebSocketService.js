@@ -725,7 +725,7 @@ class ChatWebSocketService {
       const alertResult = await new Promise((resolve, reject) => {
         setImmediate(async () => {
           try {
-            const LotteryAlertService = require('./LotteryAlertService')
+            const LotteryAlertService = require('./lottery/LotteryAlertService')
             const result = await LotteryAlertService.getAlertList({
               status: 'active',
               page: 1,

@@ -35,7 +35,10 @@
 // 加载环境变量
 require('dotenv').config()
 
-const { LotteryMetricsCollector, getInstance } = require('../../services/LotteryMetricsCollector')
+const {
+  LotteryMetricsCollector,
+  getInstance
+} = require('../../services/lottery/LotteryMetricsCollector')
 const { getRedisClient, isRedisHealthy } = require('../../utils/UnifiedRedisClient')
 
 describe('P2-3.3: 指标导出测试', () => {

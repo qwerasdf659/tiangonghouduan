@@ -25,11 +25,11 @@
  * 原文件：services/AdminLotteryService.js (1781行)
  */
 
-const BeijingTimeHelper = require('../../utils/timeHelper')
-const models = require('../../models')
-const AuditLogService = require('../AuditLogService')
-const { assertAndGetTransaction } = require('../../utils/transactionHelpers')
-const logger = require('../../utils/logger').logger
+const BeijingTimeHelper = require('../../../utils/timeHelper')
+const models = require('../../../models')
+const AuditLogService = require('../../AuditLogService')
+const { assertAndGetTransaction } = require('../../../utils/transactionHelpers')
+const logger = require('../../../utils/logger').logger
 
 /**
  * 管理后台抽奖干预核心服务类
@@ -106,7 +106,7 @@ class AdminLotteryCoreService {
     }
 
     // 获取ManagementStrategy
-    const { sharedComponents } = require('../../routes/v4/console/shared/middleware')
+    const { sharedComponents } = require('../../../routes/v4/console/shared/middleware')
     const managementStrategy = sharedComponents.managementStrategy
 
     // 调用管理策略设置强制中奖（传入事务 + 活动ID，确保数据库操作在同一事务中）
@@ -202,7 +202,7 @@ class AdminLotteryCoreService {
     }
 
     // 获取ManagementStrategy
-    const { sharedComponents } = require('../../routes/v4/console/shared/middleware')
+    const { sharedComponents } = require('../../../routes/v4/console/shared/middleware')
     const managementStrategy = sharedComponents.managementStrategy
 
     // 调用管理策略设置强制不中奖（传入事务 + 活动ID，确保数据库操作在同一事务中）
@@ -425,7 +425,7 @@ class AdminLotteryCoreService {
     }
 
     // 获取ManagementStrategy
-    const { sharedComponents } = require('../../routes/v4/console/shared/middleware')
+    const { sharedComponents } = require('../../../routes/v4/console/shared/middleware')
     const managementStrategy = sharedComponents.managementStrategy
 
     // 调用管理策略设置用户队列（传入事务，确保数据库操作在同一事务中）
@@ -505,7 +505,7 @@ class AdminLotteryCoreService {
       }
 
       // 获取ManagementStrategy
-      const { sharedComponents } = require('../../routes/v4/console/shared/middleware')
+      const { sharedComponents } = require('../../../routes/v4/console/shared/middleware')
       const managementStrategy = sharedComponents.managementStrategy
 
       // 获取用户管理状态
@@ -574,7 +574,7 @@ class AdminLotteryCoreService {
     }
 
     // 获取ManagementStrategy
-    const { sharedComponents } = require('../../routes/v4/console/shared/middleware')
+    const { sharedComponents } = require('../../../routes/v4/console/shared/middleware')
     const managementStrategy = sharedComponents.managementStrategy
 
     // 调用管理策略清除用户设置

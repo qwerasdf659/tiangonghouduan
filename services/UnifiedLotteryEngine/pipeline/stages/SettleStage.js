@@ -34,6 +34,7 @@
  * @updated 2026-01-19 - Phase 2 增强（积分扣减、派生幂等键）
  */
 
+const crypto = require('crypto')
 const BaseStage = require('./BaseStage')
 const {
   LotteryDraw,
@@ -46,10 +47,14 @@ const {
   sequelize
 } = require('../../../../models')
 const BeijingTimeHelper = require('../../../../utils/timeHelper')
+const { generateLotteryDrawBusinessId } = require('../../../../utils/IdempotencyHelper')
+const OrderNoGenerator = require('../../../../utils/OrderNoGenerator')
 // V4.7.0 AssetService 拆分：使用子服务替代原 AssetService（2026-01-31）
 const BalanceService = require('../../../asset/BalanceService')
 const ItemService = require('../../../asset/ItemService')
-const { getInstance: getLotteryMetricsCollector } = require('../../../LotteryMetricsCollector') // 🆕 实时Redis指标采集
+const {
+  getInstance: getLotteryMetricsCollector
+} = require('../../../lottery/LotteryMetricsCollector') // 🆕 实时Redis指标采集
 
 // 体验状态管理器 - 用于更新用户抽奖体验计数器（Pity/AntiEmpty/AntiHigh）
 const { ExperienceStateManager, GlobalStateManager } = require('../../compute/state')
@@ -289,6 +294,7 @@ class SettleStage extends BaseStage {
         batch_id, // 🆕 Phase 2：连抽批次ID
         asset_transaction_id, // 🆕 关联资产流水ID（必填字段）
         tier_pick_data, // 🔴 2026-02-15 修复：传递档位选择元数据
+        draw_index: reward_index,
         transaction
       })
 
@@ -502,7 +508,7 @@ class SettleStage extends BaseStage {
    */
   _generateDrawId(user_id) {
     const timestamp = BeijingTimeHelper.generateIdTimestamp()
-    const random = Math.random().toString(36).substr(2, 6)
+    const random = crypto.randomBytes(3).toString('hex')
     return `draw_${timestamp}_${user_id}_${random}`
   }
 
@@ -808,11 +814,16 @@ class SettleStage extends BaseStage {
       batch_id = null, // 🆕 Phase 2：连抽批次ID
       asset_transaction_id = null, // 🆕 关联资产流水ID（用于对账）
       tier_pick_data = {}, // 🔴 2026-02-15 修复：档位选择元数据
+      draw_index = 0, // 同一会话内第几次抽奖（用于四段式 business_id）
       transaction
     } = params
 
-    // 生成业务唯一键
-    const business_id = `lottery_draw_${user_id}_${lottery_session_id || 'no_session'}_${lottery_draw_id}`
+    const business_id = generateLotteryDrawBusinessId(
+      user_id,
+      lottery_session_id || 'no_session',
+      draw_index,
+      Date.now()
+    )
 
     /*
      * 🆕 Phase 2 增强：
@@ -829,7 +840,7 @@ class SettleStage extends BaseStage {
      */
     const final_asset_transaction_id = asset_transaction_id || 0
 
-    return await LotteryDraw.create(
+    const drawRow = await LotteryDraw.create(
       {
         lottery_draw_id,
         business_id,
@@ -890,6 +901,19 @@ class SettleStage extends BaseStage {
       },
       { transaction }
     )
+    await drawRow.reload({ transaction })
+    await drawRow.update(
+      {
+        order_no: OrderNoGenerator.generate(
+          'LT',
+          drawRow.draw_seq,
+          drawRow.createdAt || drawRow.created_at
+        )
+      },
+      { transaction }
+    )
+    await drawRow.reload({ transaction })
+    return drawRow
   }
 
   /**
