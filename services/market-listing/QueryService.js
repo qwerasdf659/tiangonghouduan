@@ -17,7 +17,7 @@ const {
   Item,
   ItemTemplate,
   MaterialAssetType,
-  CategoryDef,
+  Category,
   MediaAttachment,
   MediaFile,
   User,
@@ -141,7 +141,7 @@ class MarketListingQueryService {
    * @param {number} [params.page_size=20] - 每页数量
    * @param {string} [params.listing_kind] - 挂牌类型筛选
    * @param {string} [params.asset_code] - 资产代码筛选
-   * @param {string|number} [params.item_category_code] - 物品类目代码筛选（字符串时查 category_defs 转 category_def_id）
+   * @param {string|number} [params.item_category_code] - 物品类目代码筛选（字符串时查 category_defs 转 category_id）
    * @param {string} [params.asset_group_code] - 资产分组代码筛选
    * @param {string} [params.rarity_code] - 稀有度代码筛选
    * @param {number} [params.merchant_id] - 商家ID筛选（通过关联物品的 merchant_id 过滤）
@@ -168,16 +168,16 @@ class MarketListingQueryService {
     } = params
 
     // 前置解析 category 用于缓存键（与 where 条件一致）
-    let resolvedCategoryDefId = null
+    let resolvedCategoryId = null
     if (
       item_category_code !== undefined &&
       item_category_code !== null &&
       item_category_code !== ''
     ) {
-      resolvedCategoryDefId =
+      resolvedCategoryId =
         typeof item_category_code === 'number'
           ? item_category_code
-          : (await CategoryDef.findByCode(item_category_code))?.category_def_id
+          : (await Category.findByCode(item_category_code))?.category_id
     }
 
     // 构建缓存参数对象（BusinessCacheHelper 使用对象来构建缓存键）
@@ -187,7 +187,7 @@ class MarketListingQueryService {
       listing_kind: listing_kind || 'all',
       asset_code: asset_code || 'all',
       item_category_code: item_category_code || 'all',
-      category_def_id: resolvedCategoryDefId,
+      category_id: resolvedCategoryId,
       asset_group_code: asset_group_code || 'all',
       rarity_code: rarity_code || 'all',
       merchant_id: merchant_id || 'all',
@@ -215,9 +215,9 @@ class MarketListingQueryService {
       where.listing_kind = listing_kind
     }
 
-    // 物品实例类型筛选：使用前置解析的 category_def_id
-    if (resolvedCategoryDefId) {
-      where.offer_category_def_id = resolvedCategoryDefId
+    // 物品实例类型筛选：使用前置解析的 category_id
+    if (resolvedCategoryId) {
+      where.offer_category_id = resolvedCategoryId
     }
 
     if (rarity_code) {
@@ -287,10 +287,10 @@ class MarketListingQueryService {
         required: false
       },
       {
-        /** 关联分类定义（通过 offer_category_def_id），用于分类图标降级 */
-        model: CategoryDef,
+        /** 关联分类定义（通过 offer_category_id），用于分类图标降级 */
+        model: Category,
         as: 'offerCategory',
-        attributes: ['category_def_id', 'category_code', 'display_name'],
+        attributes: ['category_id', 'category_code', 'display_name'],
         include: [
           {
             model: MediaAttachment,
@@ -422,7 +422,7 @@ class MarketListingQueryService {
       result.filters_count = await MarketListingQueryService._buildMarketFiltersCount({
         listing_kind,
         item_category_code,
-        category_def_id: resolvedCategoryDefId,
+        category_id: resolvedCategoryId,
         asset_group_code,
         rarity_code,
         min_price,
@@ -448,20 +448,20 @@ class MarketListingQueryService {
    * @private
    */
   static async _buildMarketFiltersCount(filterValues) {
-    const { item_category_code, category_def_id, rarity_code, min_price, max_price } = filterValues
+    const { item_category_code, category_id, rarity_code, min_price, max_price } = filterValues
 
-    // 使用传入的 category_def_id 或解析 item_category_code
-    let resolvedCategoryDefId = category_def_id ?? null
+    // 使用传入的 category_id 或解析 item_category_code
+    let resolvedCategoryId = category_id ?? null
     if (
-      resolvedCategoryDefId == null &&
+      resolvedCategoryId == null &&
       item_category_code !== undefined &&
       item_category_code !== null &&
       item_category_code !== ''
     ) {
-      resolvedCategoryDefId =
+      resolvedCategoryId =
         typeof item_category_code === 'number'
           ? item_category_code
-          : (await CategoryDef.findByCode(item_category_code))?.category_def_id
+          : (await Category.findByCode(item_category_code))?.category_id
     }
 
     try {
@@ -477,9 +477,9 @@ class MarketListingQueryService {
 
       // 1. 挂单类型计数：排除 listing_kind 条件，保留其他条件
       const kindBase = buildBaseWhere()
-      if (resolvedCategoryDefId) {
-        kindBase.parts.push('ml.offer_category_def_id = :item_cat')
-        kindBase.replacements.item_cat = resolvedCategoryDefId
+      if (resolvedCategoryId) {
+        kindBase.parts.push('ml.offer_category_id = :item_cat')
+        kindBase.replacements.item_cat = resolvedCategoryId
       }
       if (rarity_code) {
         kindBase.parts.push('ml.offer_item_rarity = :rarity')
@@ -513,9 +513,9 @@ class MarketListingQueryService {
       // 3. 稀有度计数：排除 rarity_code 条件，限定 listing_kind='item'
       const rarityBase = buildBaseWhere()
       rarityBase.parts.push("ml.listing_kind = 'item'")
-      if (resolvedCategoryDefId) {
-        rarityBase.parts.push('ml.offer_category_def_id = :item_cat_r')
-        rarityBase.replacements.item_cat_r = resolvedCategoryDefId
+      if (resolvedCategoryId) {
+        rarityBase.parts.push('ml.offer_category_id = :item_cat_r')
+        rarityBase.replacements.item_cat_r = resolvedCategoryId
       }
       if (min_price) {
         rarityBase.parts.push('ml.price_amount >= :min_p_r')
@@ -609,7 +609,7 @@ class MarketListingQueryService {
     const { include_disabled = false } = options
 
     const {
-      CategoryDef,
+      Category,
       RarityDef,
       AssetGroupDef,
       MediaAttachment,
@@ -618,9 +618,9 @@ class MarketListingQueryService {
 
     // 1. 查询物品类目列表（图标通过 media_attachments 多态关联获取）
     const categoryWhere = include_disabled ? {} : { is_enabled: true }
-    const categories = await CategoryDef.findAll({
+    const categories = await Category.findAll({
       where: categoryWhere,
-      attributes: ['category_def_id', 'category_code', 'display_name', 'description', 'sort_order'],
+      attributes: ['category_id', 'category_code', 'display_name', 'description', 'sort_order'],
       include: [
         {
           model: MediaAttachment,
@@ -698,7 +698,7 @@ class MarketListingQueryService {
       const plain = cat.get ? cat.get({ plain: true }) : cat
       const iconKey = plain.iconAttachment?.media?.object_key || null
       return {
-        category_def_id: plain.category_def_id,
+        category_id: plain.category_id,
         category_code: plain.category_code,
         display_name: plain.display_name,
         description: plain.description,

@@ -37,10 +37,10 @@ class Category extends Model {
       as: 'children'
     })
 
-    if (models.Product) {
-      Category.hasMany(models.Product, {
+    if (models.ExchangeItem) {
+      Category.hasMany(models.ExchangeItem, {
         foreignKey: 'category_id',
-        as: 'products'
+        as: 'exchangeItems'
       })
     }
 
@@ -51,19 +51,82 @@ class Category extends Model {
       })
     }
 
+    if (models.ItemTemplate) {
+      Category.hasMany(models.ItemTemplate, {
+        foreignKey: 'category_id',
+        as: 'item_templates'
+      })
+    }
+
+    if (models.MarketListing) {
+      Category.hasMany(models.MarketListing, {
+        foreignKey: 'offer_category_id',
+        as: 'market_listings'
+      })
+    }
+
     if (models.MediaFile) {
       Category.belongsTo(models.MediaFile, {
         foreignKey: 'icon_media_id',
         as: 'icon_media'
       })
     }
+
+    if (models.MediaAttachment) {
+      Category.hasOne(models.MediaAttachment, {
+        foreignKey: 'attachable_id',
+        constraints: false,
+        scope: { attachable_type: 'category' },
+        as: 'iconAttachment'
+      })
+    }
+  }
+
+  /**
+   * 构建品类树（一级+二级嵌套）
+   *
+   * @returns {Promise<Array>} 顶级品类数组，每项含 children 子品类
+   */
+  static async getTree() {
+    const all = await this.findAll({
+      order: [['sort_order', 'ASC']],
+      raw: true
+    })
+    const topLevel = all.filter(c => c.parent_category_id == null)
+    return topLevel.map(t => ({
+      ...t,
+      children: all.filter(c => c.parent_category_id === t.category_id)
+    }))
+  }
+
+  /**
+   * 获取指定品类及其所有子品类的 ID 数组（用于 WHERE IN 查询）
+   *
+   * @param {number} parentId - 父品类 ID
+   * @returns {Promise<number[]>} [parentId, ...childIds]
+   */
+  static async getIdsWithChildren(parentId) {
+    const children = await this.findAll({
+      where: { parent_category_id: parentId },
+      attributes: ['category_id'],
+      raw: true
+    })
+    return [parentId, ...children.map(c => c.category_id)]
+  }
+
+  /**
+   * 通过 category_code 查找品类
+   *
+   * @param {string} code - 品类编码
+   * @returns {Promise<Category|null>} 匹配的品类实例，未找到时返回 null
+   */
+  static async findByCode(code) {
+    return this.findOne({ where: { category_code: code } })
   }
 }
 
-/**
- * @param {import('sequelize').Sequelize} sequelize - Sequelize 实例
- * @returns {typeof Category} 初始化后的品类模型
- */
+// eslint-disable-next-line valid-jsdoc
+/** @param {import('sequelize').Sequelize} sequelize */
 module.exports = sequelize => {
   Category.init(
     {

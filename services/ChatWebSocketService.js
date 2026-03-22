@@ -1082,27 +1082,28 @@ class ChatWebSocketService {
   // ==================== 业务推送方法（2026-02-15 新增 - 微信小程序前端适配）====================
 
   /**
-   * 推送商品更新通知给所有在线用户
+   * 推送兑换商品更新通知给所有在线用户
    *
    * @description 管理员创建/修改/删除兑换商品后，实时通知所有在线用户刷新商品列表
+   * @event exchange_item_updated
    *
-   * @param {Object} productData - 商品变更数据
-   * @param {string} productData.action - 操作类型（created/updated/deleted/status_changed）
-   * @param {number} productData.exchange_item_id - 商品ID
-   * @param {string} [productData.name] - 商品名称
-   * @param {number} [productData.stock] - 当前库存
-   * @param {string} [productData.status] - 当前状态
-   * @param {number} [productData.operator_id] - 操作人ID
+   * @param {Object} itemData - 兑换商品变更数据
+   * @param {string} itemData.action - 操作类型（created/updated/deleted/status_changed）
+   * @param {number} itemData.exchange_item_id - 商品ID
+   * @param {string} [itemData.name] - 商品名称
+   * @param {number} [itemData.stock] - 当前库存
+   * @param {string} [itemData.status] - 当前状态
+   * @param {number} [itemData.operator_id] - 操作人ID
    * @returns {number} 成功推送的用户数量
    */
-  broadcastProductUpdated(productData) {
+  broadcastExchangeItemUpdated(itemData) {
     if (!this.io) {
-      wsLogger.warn('WebSocket服务未初始化，无法推送商品更新')
+      wsLogger.warn('WebSocket服务未初始化，无法推送兑换商品更新')
       return 0
     }
 
     const payload = {
-      ...productData,
+      ...itemData,
       timestamp: BeijingTimeHelper.now()
     }
 
@@ -1111,26 +1112,26 @@ class ChatWebSocketService {
     // 推送给所有在线普通用户
     for (const [userId, socketId] of this.connectedUsers.entries()) {
       try {
-        this.io.to(socketId).emit('product_updated', payload)
+        this.io.to(socketId).emit('exchange_item_updated', payload)
         successCount++
       } catch (error) {
-        wsLogger.error('推送商品更新给用户失败', { user_id: userId, error: error.message })
+        wsLogger.error('推送兑换商品更新给用户失败', { user_id: userId, error: error.message })
       }
     }
 
     // 同时推送给管理员（管理后台也可能需要实时刷新）
     for (const [adminId, socketId] of this.connectedAdmins.entries()) {
       try {
-        this.io.to(socketId).emit('product_updated', payload)
+        this.io.to(socketId).emit('exchange_item_updated', payload)
         successCount++
       } catch (error) {
-        wsLogger.error('推送商品更新给管理员失败', { admin_id: adminId, error: error.message })
+        wsLogger.error('推送兑换商品更新给管理员失败', { admin_id: adminId, error: error.message })
       }
     }
 
-    wsLogger.info('📦 商品更新通知已广播', {
-      action: productData.action,
-      exchange_item_id: productData.exchange_item_id,
+    wsLogger.info('📦 兑换商品更新通知已广播', {
+      action: itemData.action,
+      exchange_item_id: itemData.exchange_item_id,
       pushed_count: successCount,
       online_users: this.connectedUsers.size,
       online_admins: this.connectedAdmins.size

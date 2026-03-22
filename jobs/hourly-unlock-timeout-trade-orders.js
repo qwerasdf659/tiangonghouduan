@@ -9,7 +9,7 @@
  *
  * 业务规则：
  * - 仅处理 hold_type='trade' 且 status='active' 的锁
- * - 超时阈值从 system_configs 读取，兜底 15 分钟
+ * - 超时阈值从 system_settings 读取，兜底 15 分钟
  * - 不处理 redemption / security / trade_cooldown 锁
  * - 订单超时后：自动取消并解冻资产
  *
@@ -40,6 +40,9 @@ const logger = require('../utils/logger')
  * @description 释放超时锁定的物品和取消超时订单（仅处理 trade 锁）
  */
 class HourlyUnlockTimeoutTradeOrders {
+  /** @type {number} 交易锁定超时阈值（分钟），默认 15 分钟，execute() 时从 system_settings 动态刷新 */
+  static LOCK_TIMEOUT_MINUTES = 15
+
   /**
    * 获取锁定超时阈值（从 system_settings 读取，兜底 15 分钟）
    * @returns {Promise<number>} 超时分钟数
@@ -65,7 +68,7 @@ class HourlyUnlockTimeoutTradeOrders {
     logger.info('开始执行交易市场超时解锁任务（三表模型版本）')
 
     try {
-      // 从 system_configs 获取超时阈值（修复 LOCK_TIMEOUT_MINUTES 未定义导致 Invalid Date 错误）
+      // 从 system_settings 获取超时阈值（修复 LOCK_TIMEOUT_MINUTES 未定义导致 Invalid Date 错误）
       this.LOCK_TIMEOUT_MINUTES = await this.getLockTimeoutMinutes()
       // 1. 释放超时锁定的物品（仅 trade 锁）
       const items_result = await this._releaseTimeoutLockedItems()

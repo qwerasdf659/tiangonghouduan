@@ -357,7 +357,7 @@ class UserDataQueryService {
    * @returns {Promise<Object>} 分页兑换记录列表 + 汇总统计
    */
   static async getExchangeRecords(models, user_id, params = {}) {
-    const { ExchangeRecord, Product } = models
+    const { ExchangeRecord, ExchangeItem } = models
     const { status, start_date, end_date, page = 1, page_size = 20 } = params
 
     const { offset, limit, pageNum, pageSizeNum } = parsePagination(page, page_size)
@@ -370,9 +370,9 @@ class UserDataQueryService {
 
     const includeOpts = [
       {
-        model: Product,
-        as: 'product',
-        attributes: ['product_id', 'product_name', 'status'],
+        model: ExchangeItem,
+        as: 'exchangeItem',
+        attributes: ['exchange_item_id', 'item_name', 'status'],
         required: false
       }
     ]

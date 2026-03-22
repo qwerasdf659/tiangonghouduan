@@ -328,11 +328,18 @@
             <div>
               <label class="block text-sm font-medium themed-text-secondary mb-1">告警类型 <span class="text-red-500">*</span></label>
               <select x-model="silenceRuleForm.alert_type" class="w-full px-3 py-2 border rounded-lg">
-                <option value="risk">风控告警</option>
-                <option value="lottery">抽奖告警</option>
-                <option value="system">系统告警</option>
-                <option value="budget">预算告警</option>
-                <option value="user">用户行为告警</option>
+                <optgroup label="抽奖告警">
+                  <option value="win_rate">中奖率异常</option>
+                  <option value="budget">预算告警</option>
+                  <option value="inventory">库存不足</option>
+                  <option value="user">用户行为异常</option>
+                </optgroup>
+                <optgroup label="风控告警">
+                  <option value="frequency_limit">频次超限</option>
+                  <option value="amount_limit">金额超限</option>
+                  <option value="duplicate_user">重复用户</option>
+                  <option value="suspicious_pattern">可疑模式</option>
+                </optgroup>
               </select>
             </div>
             <div>

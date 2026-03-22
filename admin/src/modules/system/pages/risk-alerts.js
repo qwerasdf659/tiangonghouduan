@@ -300,7 +300,7 @@ function riskAlertsPage() {
     silenceRuleForm: {
       alert_silence_rule_id: null,
       rule_name: '',
-      alert_type: 'risk',
+      alert_type: 'win_rate',
       alert_level: 'all',
       start_time: '',
       end_time: '',
@@ -318,11 +318,14 @@ function riskAlertsPage() {
         label: '告警类型',
         type: 'status',
         statusMap: {
-          risk: { class: 'red', label: '风控' },
-          lottery: { class: 'yellow', label: '抽奖' },
-          system: { class: 'blue', label: '系统' },
+          win_rate: { class: 'yellow', label: '中奖率' },
           budget: { class: 'purple', label: '预算' },
-          user: { class: 'gray', label: '用户' }
+          inventory: { class: 'orange', label: '库存' },
+          user: { class: 'gray', label: '用户' },
+          frequency_limit: { class: 'red', label: '频次超限' },
+          amount_limit: { class: 'red', label: '金额超限' },
+          duplicate_user: { class: 'red', label: '重复用户' },
+          suspicious_pattern: { class: 'red', label: '可疑模式' }
         }
       },
       {
@@ -1873,7 +1876,7 @@ function riskAlertsPage() {
         this.silenceRuleForm = {
           alert_silence_rule_id: rule.alert_silence_rule_id,
           rule_name: rule.rule_name || '',
-          alert_type: rule.alert_type || 'risk',
+          alert_type: rule.alert_type || 'win_rate',
           alert_level: rule.alert_level || 'all',
           start_time: rule.start_time || '',
           end_time: rule.end_time || '',
@@ -1885,7 +1888,7 @@ function riskAlertsPage() {
         this.silenceRuleForm = {
           alert_silence_rule_id: null,
           rule_name: '',
-          alert_type: 'risk',
+          alert_type: 'win_rate',
           alert_level: 'all',
           start_time: '',
           end_time: '',

@@ -4,7 +4,7 @@
  * 数据自动清理定时任务
  *
  * 每日凌晨 3:10（北京时间）执行 L3 级别表的自动清理
- * 读取 system_configs.data_cleanup_policies 策略配置，按保留天数分批删除过期数据
+ * 读取 system_settings.data_cleanup_policies 策略配置，按保留天数分批删除过期数据
  *
  * 环境变量控制：
  * - ENABLE_DATA_CLEANUP=true 时启用（默认禁用）

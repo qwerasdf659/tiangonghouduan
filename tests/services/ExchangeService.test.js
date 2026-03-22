@@ -24,7 +24,7 @@
 'use strict'
 
 const models = require('../../models')
-const { sequelize, Product, ExchangeRecord, User } = models
+const { sequelize, ExchangeItem, ExchangeRecord, User } = models
 const TransactionManager = require('../../utils/TransactionManager')
 
 /**
@@ -134,9 +134,9 @@ describe('ExchangeService - 兑换市场服务测试', () => {
     created_records.length = 0
 
     // 清理商品记录
-    for (const product_id of created_items) {
+    for (const exchangeItemId of created_items) {
       try {
-        await Product.destroy({ where: { product_id }, force: true })
+        await ExchangeItem.destroy({ where: { exchange_item_id: exchangeItemId }, force: true })
       } catch (error) {
         // 忽略清理错误
       }
@@ -231,16 +231,16 @@ describe('ExchangeService - 兑换市场服务测试', () => {
         return
       }
 
-      const product_id = listResult.items[0].product_id
+      const exchangeItemId = listResult.items[0].exchange_item_id
 
       // 执行：获取商品详情
-      const result = await ExchangeService.getItemDetail(product_id)
+      const result = await ExchangeService.getItemDetail(exchangeItemId)
 
-      // 验证：详情包含必要字段（统一商品中心 Product 模型）
+      // 验证：详情包含必要字段（ExchangeItem 模型）
       expect(result).toBeDefined()
       expect(result.item).toBeDefined()
-      expect(result.item.product_id).toBe(product_id)
-      expect(result.item.product_name).toBeDefined()
+      expect(result.item.exchange_item_id).toBe(exchangeItemId)
+      expect(result.item.item_name).toBeDefined()
       expect(result.item.status).toBeDefined()
     })
 
@@ -310,14 +310,14 @@ describe('ExchangeService - 兑换市场服务测试', () => {
           return item
         })
 
-        // 验证：商品创建成功（统一商品中心 Product 模型）
+        // 验证：商品创建成功（ExchangeItem 模型）
         expect(result).toBeDefined()
         expect(result.item).toBeDefined()
-        expect(result.item.product_id).toBeDefined()
-        expect(result.item.product_name).toContain('测试商品')
+        expect(result.item.exchange_item_id).toBeDefined()
+        expect(result.item.item_name).toContain('测试商品')
 
         // 记录用于清理
-        created_items.push(result.item.product_id)
+        created_items.push(result.item.exchange_item_id)
       })
 
       it('创建商品时缺少必填字段应该报错', async () => {
@@ -377,7 +377,7 @@ describe('ExchangeService - 兑换市场服务测试', () => {
             test_user_id,
             { transaction }
           )
-          test_item_id = result.item.product_id
+          test_item_id = result.item.exchange_item_id
           created_items.push(test_item_id)
         })
 
@@ -394,7 +394,7 @@ describe('ExchangeService - 兑换市场服务测试', () => {
 
         // 验证：更新成功
         expect(result).toBeDefined()
-        expect(result.item.product_name).toBe('已更新商品名称')
+        expect(result.item.item_name).toBe('已更新商品名称')
       })
 
       it('更新不存在的商品应该报错', async () => {
@@ -427,7 +427,7 @@ describe('ExchangeService - 兑换市场服务测试', () => {
             test_user_id,
             { transaction }
           )
-          test_item_id = result.item.product_id
+          test_item_id = result.item.exchange_item_id
         })
 
         // 执行：删除商品

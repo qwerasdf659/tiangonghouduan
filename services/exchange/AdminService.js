@@ -46,8 +46,8 @@ class AdminService {
     this.User = models.User
     this.MarketListing = models.MarketListing
     this.Item = models.Item
-    this.Product = models.Product
-    this.ProductSku = models.ProductSku
+    this.ExchangeItem = models.ExchangeItem
+    this.ExchangeItemSku = models.ExchangeItemSku
     this.ExchangeChannelPrice = models.ExchangeChannelPrice
     this.Category = models.Category
     this.sequelize = models.sequelize
@@ -57,8 +57,8 @@ class AdminService {
    * 记录库存变动日志（复用 admin_operation_logs 表）
    *
    * @param {Object} params - 日志参数
-   * @param {number} params.product_id - 商品 ID
-   * @param {string} params.product_name - 商品名称
+   * @param {number} params.exchange_item_id - 商品 ID
+   * @param {string} params.item_name - 商品名称
    * @param {number} params.before_stock - 变动前库存
    * @param {number} params.after_stock - 变动后库存
    * @param {string} params.action - 操作类型（admin_set/purchase/refund/batch_update）
@@ -69,8 +69,8 @@ class AdminService {
    * @private
    */
   async _logStockChange({
-    product_id,
-    product_name,
+    exchange_item_id,
+    item_name,
     before_stock,
     after_stock,
     action,
@@ -87,10 +87,10 @@ class AdminService {
           operator_id,
           operation_type: 'stock_change',
           target_type: 'product',
-          target_id: product_id,
+          target_id: exchange_item_id,
           action,
-          before_data: { stock: before_stock, product_name },
-          after_data: { stock: after_stock, product_name },
+          before_data: { stock: before_stock, item_name },
+          after_data: { stock: after_stock, item_name },
           changed_fields: { stock: { from: before_stock, to: after_stock, delta } },
           reason:
             reason ||
@@ -105,7 +105,7 @@ class AdminService {
     } catch (logError) {
       // 日志记录失败不阻断业务
       logger.warn('[兑换市场] 库存变动日志记录失败', {
-        product_id,
+        exchange_item_id,
         action,
         error: logError.message
       })
@@ -192,9 +192,9 @@ class AdminService {
     // 分类ID（直接使用 category_id，不再兼容旧 category_code 字符串）
     const categoryDefId = itemData.category_id ? parseInt(itemData.category_id) : null
 
-    const item = await this.Product.create(
+    const item = await this.ExchangeItem.create(
       {
-        product_name: name.trim(),
+        item_name: name.trim(),
         description: description.trim(),
         primary_media_id: itemData.primary_media_id ?? null,
         sort_order: parseInt(itemData.sort_order) || 100,
@@ -213,15 +213,15 @@ class AdminService {
       { transaction }
     )
 
-    logger.info(`[兑换市场] 商品创建成功，product_id: ${item.product_id}`)
+    logger.info(`[兑换市场] 商品创建成功，exchange_item_id: ${item.exchange_item_id}`)
 
     // 自动创建默认 SKU + 兑换渠道定价
-    const { ProductSku: ProductSkuModel, ExchangeChannelPrice: ChannelPriceModel } = this.models
-    if (ProductSkuModel) {
-      const defaultSkuCode = `default_${item.product_id}`
-      const sku = await ProductSkuModel.create(
+    const { ExchangeItemSku: ExchangeItemSkuModel, ExchangeChannelPrice: ChannelPriceModel } = this.models
+    if (ExchangeItemSkuModel) {
+      const defaultSkuCode = `default_${item.exchange_item_id}`
+      const sku = await ExchangeItemSkuModel.create(
         {
-          product_id: item.product_id,
+          exchange_item_id: item.exchange_item_id,
           sku_code: defaultSkuCode,
           stock: parseInt(itemData.stock),
           sold_count: 0,
@@ -246,7 +246,7 @@ class AdminService {
       }
 
       logger.info('[兑换市场] 默认 SKU + 渠道定价创建成功', {
-        product_id: item.product_id,
+        exchange_item_id: item.exchange_item_id,
         sku_id: sku.sku_id,
         sku_code: defaultSkuCode
       })
@@ -262,7 +262,7 @@ class AdminService {
         await mediaService.attach(
           primaryMediaId,
           'product',
-          item.product_id,
+          item.exchange_item_id,
           'primary',
           0,
           null,
@@ -270,12 +270,12 @@ class AdminService {
         )
         bound_image = true
         logger.info('[兑换市场] 商品主媒体绑定成功', {
-          product_id: item.product_id,
+          exchange_item_id: item.exchange_item_id,
           media_id: primaryMediaId
         })
       } catch (bindError) {
         logger.warn('[兑换市场] 商品主媒体绑定失败（非致命）', {
-          product_id: item.product_id,
+          exchange_item_id: item.exchange_item_id,
           media_id: primaryMediaId,
           error: bindError.message
         })
@@ -309,7 +309,7 @@ class AdminService {
 
     logger.info('[兑换市场] 管理员更新商品', { item_id })
 
-    const item = await this.Product.findByPk(item_id, { transaction })
+    const item = await this.ExchangeItem.findByPk(item_id, { transaction })
     if (!item) {
       throw new Error('商品不存在')
     }
@@ -324,7 +324,7 @@ class AdminService {
       if (updateData.name.length > 100) {
         throw new Error('商品名称最长100字符')
       }
-      finalUpdateData.product_name = updateData.name.trim()
+      finalUpdateData.item_name = updateData.name.trim()
     }
 
     if (updateData.description !== undefined) {
@@ -334,7 +334,7 @@ class AdminService {
       finalUpdateData.description = updateData.description.trim()
     }
 
-    // price/stock 字段不在 products 表上，路由到 ProductSku + ExchangeChannelPrice（见下方 _syncSkuAndPrice）
+    // price/stock 字段不在 exchange_items 表上，路由到 ExchangeItemSku + ExchangeChannelPrice（见下方 _syncSkuAndPrice）
     const skuPriceUpdates = {}
     if (updateData.cost_asset_code !== undefined) {
       if (!updateData.cost_asset_code) {
@@ -503,10 +503,10 @@ class AdminService {
 
     await item.update(finalUpdateData, { transaction })
 
-    // 将价格/库存变更路由到 ProductSku + ExchangeChannelPrice
+    // 将价格/库存变更路由到 ExchangeItemSku + ExchangeChannelPrice
     if (Object.keys(skuPriceUpdates).length > 0) {
-      const defaultSku = await this.ProductSku.findOne({
-        where: { product_id: item_id },
+      const defaultSku = await this.ExchangeItemSku.findOne({
+        where: { exchange_item_id: item_id },
         order: [['sku_id', 'ASC']],
         transaction
       })
@@ -518,8 +518,8 @@ class AdminService {
           skuFields.stock = skuPriceUpdates.stock
           if (skuPriceUpdates.stock !== oldStock) {
             await this._logStockChange({
-              product_id: item_id,
-              product_name: item.product_name,
+              exchange_item_id: item_id,
+              item_name: item.item_name,
               before_stock: oldStock,
               after_stock: skuPriceUpdates.stock,
               action: 'admin_set',
@@ -600,16 +600,16 @@ class AdminService {
 
     logger.info('[兑换市场] 管理员删除商品', { item_id })
 
-    const item = await this.Product.findByPk(item_id, { transaction })
+    const item = await this.ExchangeItem.findByPk(item_id, { transaction })
     if (!item) {
       throw new Error('商品不存在')
     }
 
     const associated_media_id = item.primary_media_id
 
-    // 检查是否有相关订单（通过 product_id 关联）
+    // 检查是否有相关订单（通过 exchange_item_id 关联）
     const orderCount = await this.ExchangeRecord.count({
-      where: { product_id: item_id },
+      where: { exchange_item_id: item_id },
       transaction
     })
 
@@ -1102,7 +1102,7 @@ class AdminService {
           'exchange_record_id',
           'order_no',
           'user_id',
-          'product_id',
+          'exchange_item_id',
           'pay_amount',
           'created_at'
         ],
@@ -1175,12 +1175,12 @@ class AdminService {
 
       const where = {}
       if (status) where.status = status
-      if (keyword) where.product_name = { [Op.like]: `%${keyword}%` }
+      if (keyword) where.item_name = { [Op.like]: `%${keyword}%` }
 
       const offset = (page - 1) * page_size
       const limit = page_size
 
-      const { count, rows } = await this.Product.findAndCountAll({
+      const { count, rows } = await this.ExchangeItem.findAndCountAll({
         where,
         limit,
         offset,
@@ -1219,11 +1219,11 @@ class AdminService {
       logger.info('[兑换市场-管理] 查询统计数据')
 
       const [totalItems, activeItems, lowStockItems, totalExchanges] = await Promise.all([
-        this.Product.count(),
-        this.Product.count({ where: { status: 'active' } }),
-        this.Product.count({
+        this.ExchangeItem.count(),
+        this.ExchangeItem.count({ where: { status: 'active' } }),
+        this.ExchangeItem.count({
           include: [{
-            model: this.models.ProductSku,
+            model: this.models.ExchangeItemSku,
             as: 'skus',
             where: { stock: { [Op.lt]: 10 }, status: 'active' },
             required: true
@@ -1257,10 +1257,10 @@ class AdminService {
    */
   async getItemDashboard(exchangeItemId) {
     try {
-      const item = await this.Product.findByPk(exchangeItemId, {
+      const item = await this.ExchangeItem.findByPk(exchangeItemId, {
         attributes: [
-          'product_id',
-          'product_name',
+          'exchange_item_id',
+          'item_name',
           'stock',
           'sold_count',
           'min_cost_amount',
@@ -1274,19 +1274,19 @@ class AdminService {
 
       const [recentOrders7d, recentOrders30d, avgRating, statusDistribution] = await Promise.all([
         this.ExchangeRecord.count({
-          where: { product_id: exchangeItemId, created_at: { [Op.gte]: sevenDaysAgo } }
+          where: { exchange_item_id: exchangeItemId, created_at: { [Op.gte]: sevenDaysAgo } }
         }),
         this.ExchangeRecord.count({
-          where: { product_id: exchangeItemId, created_at: { [Op.gte]: thirtyDaysAgo } }
+          where: { exchange_item_id: exchangeItemId, created_at: { [Op.gte]: thirtyDaysAgo } }
         }),
         this.ExchangeRecord.findOne({
           attributes: [[this.sequelize.fn('AVG', this.sequelize.col('rating')), 'avg_rating']],
-          where: { product_id: exchangeItemId, rating: { [Op.ne]: null } },
+          where: { exchange_item_id: exchangeItemId, rating: { [Op.ne]: null } },
           raw: true
         }),
         this.ExchangeRecord.findAll({
           attributes: ['status', [this.sequelize.fn('COUNT', '*'), 'count']],
-          where: { product_id: exchangeItemId },
+          where: { exchange_item_id: exchangeItemId },
           group: ['status'],
           raw: true
         })
@@ -1301,8 +1301,8 @@ class AdminService {
         totalOrders > 0 ? (totalOrders / Math.max(item.stock, 1)).toFixed(2) : 0
 
       return {
-        product_name: item.product_name,
-        product_id: item.product_id,
+        item_name: item.item_name,
+        exchange_item_id: item.exchange_item_id,
         current_stock: item.stock,
         total_sold: totalOrders,
         cost_amount: item.min_cost_amount,
@@ -1330,7 +1330,7 @@ class AdminService {
    * 业务场景：运营在管理后台上传图片后，通过此接口批量绑定图片到对应商品
    *
    * @param {Array<Object>} bindings - 绑定关系数组
-   * @param {number} bindings[].product_id - 商品ID
+   * @param {number} bindings[].exchange_item_id - 商品ID
    * @param {number} bindings[].media_id - 媒体文件ID（media_files.media_id）
    * @param {Object} options - 选项
    * @param {Object} options.transaction - 事务对象（必填）
@@ -1344,8 +1344,8 @@ class AdminService {
     }
 
     for (const binding of bindings) {
-      if (!binding.product_id || !binding.media_id) {
-        throw new Error('每条绑定记录必须包含 product_id 和 media_id')
+      if (!binding.exchange_item_id || !binding.media_id) {
+        throw new Error('每条绑定记录必须包含 exchange_item_id 和 media_id')
       }
     }
 
@@ -1358,11 +1358,11 @@ class AdminService {
     for (const binding of bindings) {
       try {
         // 验证商品存在
-        const item = await this.Product.findByPk(binding.product_id, { transaction })
+        const item = await this.ExchangeItem.findByPk(binding.exchange_item_id, { transaction })
         if (!item) {
           results.failed++
           results.details.push({
-            product_id: binding.product_id,
+            exchange_item_id: binding.exchange_item_id,
             success: false,
             error: '商品不存在'
           })
@@ -1372,7 +1372,7 @@ class AdminService {
         await mediaService.attach(
           binding.media_id,
           'product',
-          binding.product_id,
+          binding.exchange_item_id,
           'primary',
           0,
           null,
@@ -1381,20 +1381,20 @@ class AdminService {
 
         results.success++
         results.details.push({
-          product_id: binding.product_id,
+          exchange_item_id: binding.exchange_item_id,
           media_id: binding.media_id,
           success: true
         })
       } catch (bindError) {
         results.failed++
         results.details.push({
-          product_id: binding.product_id,
+          exchange_item_id: binding.exchange_item_id,
           media_id: binding.media_id,
           success: false,
           error: bindError.message
         })
         logger.warn('[兑换市场-管理] 单条主媒体绑定失败', {
-          product_id: binding.product_id,
+          exchange_item_id: binding.exchange_item_id,
           error: bindError.message
         })
       }
@@ -1438,11 +1438,11 @@ class AdminService {
       const offset = (page - 1) * page_size
       const limit = page_size
 
-      const { count, rows } = await this.Product.findAndCountAll({
+      const { count, rows } = await this.ExchangeItem.findAndCountAll({
         where: { primary_media_id: null },
         attributes: [
-          'product_id',
-          'product_name',
+          'exchange_item_id',
+          'item_name',
           'category_id',
           'status',
           'space',
@@ -1450,7 +1450,7 @@ class AdminService {
         ],
         limit,
         offset,
-        order: [['product_id', 'ASC']]
+        order: [['exchange_item_id', 'ASC']]
       })
 
       logger.info('[兑换市场-管理] 查询缺图商品列表', {
@@ -1502,16 +1502,16 @@ class AdminService {
       target_space: space
     })
 
-    const [affectedRows] = await this.Product.update(
+    const [affectedRows] = await this.ExchangeItem.update(
       { space },
       {
-        where: { product_id: { [Op.in]: exchangeItemIds } },
+        where: { exchange_item_id: { [Op.in]: exchangeItemIds } },
         transaction
       }
     )
 
     // 清除缓存
-    await BusinessCacheHelper.clearExchangeItems()
+    await BusinessCacheHelper.invalidateExchangeItems('batch_space')
 
     logger.info('[兑换市场-管理] 批量更新空间完成', {
       requested: exchangeItemIds.length,
@@ -1549,9 +1549,9 @@ class AdminService {
       target_status: status
     })
 
-    const [affectedRows] = await this.Product.update(
+    const [affectedRows] = await this.ExchangeItem.update(
       { status, updated_at: BeijingTimeHelper.createDatabaseTime() },
-      { where: { product_id: { [Op.in]: exchangeItemIds } }, transaction }
+      { where: { exchange_item_id: { [Op.in]: exchangeItemIds } }, transaction }
     )
 
     await BusinessCacheHelper.invalidateExchangeItems('batch_status_update').catch(() => {})
@@ -1601,8 +1601,8 @@ class AdminService {
     const ChannelPriceModel = this.models.ExchangeChannelPrice
 
     // 查询每个商品的默认 SKU → 渠道定价行
-    const skus = await this.ProductSku.findAll({
-      where: { product_id: { [Op.in]: exchangeItemIds } },
+    const skus = await this.ExchangeItemSku.findAll({
+      where: { exchange_item_id: { [Op.in]: exchangeItemIds } },
       include: [{
         model: ChannelPriceModel,
         as: 'channelPrices',
@@ -1633,7 +1633,7 @@ class AdminService {
         if (newAmount !== oldAmount) {
           await price.update({ cost_amount: newAmount }, { transaction })
           updatedCount++
-          productIdsToRefresh.add(sku.product_id)
+          productIdsToRefresh.add(sku.exchange_item_id)
 
           try {
             await this.models.AdminOperationLog.create(
@@ -1641,7 +1641,7 @@ class AdminService {
                 operator_id: options.operator_id || null,
                 operation_type: 'price_change',
                 target_type: 'product',
-                target_id: sku.product_id,
+                target_id: sku.exchange_item_id,
                 action: 'batch_update',
                 before_data: { cost_amount: oldAmount, sku_id: sku.sku_id },
                 after_data: { cost_amount: newAmount, sku_id: sku.sku_id },
@@ -1692,8 +1692,8 @@ class AdminService {
 
     // 验证分类存在
     if (categoryDefId !== null) {
-      const { CategoryDef } = this.models
-      const category = await CategoryDef.findByPk(categoryDefId, { transaction })
+      const { Category } = this.models
+      const category = await Category.findByPk(categoryDefId, { transaction })
       if (!category) {
         throw new Error(`分类不存在：${categoryDefId}`)
       }
@@ -1704,9 +1704,9 @@ class AdminService {
       category_id: categoryDefId
     })
 
-    const [affectedRows] = await this.Product.update(
+    const [affectedRows] = await this.ExchangeItem.update(
       { category_id: categoryDefId, updated_at: BeijingTimeHelper.createDatabaseTime() },
-      { where: { product_id: { [Op.in]: exchangeItemIds } }, transaction }
+      { where: { exchange_item_id: { [Op.in]: exchangeItemIds } }, transaction }
     )
 
     await BusinessCacheHelper.invalidateExchangeItems('batch_category_update').catch(() => {})
@@ -1750,9 +1750,9 @@ class AdminService {
       rarity_code: rarityCode
     })
 
-    const [affectedRows] = await this.Product.update(
+    const [affectedRows] = await this.ExchangeItem.update(
       { rarity_code: rarityCode, updated_at: BeijingTimeHelper.createDatabaseTime() },
-      { where: { product_id: { [Op.in]: exchangeItemIds } }, transaction }
+      { where: { exchange_item_id: { [Op.in]: exchangeItemIds } }, transaction }
     )
 
     await BusinessCacheHelper.invalidateExchangeItems('batch_rarity_update').catch(() => {})
@@ -1771,10 +1771,10 @@ class AdminService {
    */
   async getSpaceDistribution() {
     try {
-      const distribution = await this.Product.findAll({
+      const distribution = await this.ExchangeItem.findAll({
         attributes: [
           'space',
-          [this.sequelize.fn('COUNT', this.sequelize.col('product_id')), 'count']
+          [this.sequelize.fn('COUNT', this.sequelize.col('exchange_item_id')), 'count']
         ],
         group: ['space'],
         raw: true
@@ -1807,11 +1807,11 @@ class AdminService {
    * @returns {Promise<Object>} SKU 列表和商品基础信息
    */
   async listSkus(exchangeItemId) {
-    const ProductSkuModel = this.models.ProductSku
-    const item = await this.Product.findByPk(exchangeItemId, {
+    const ExchangeItemSkuModel = this.models.ExchangeItemSku
+    const item = await this.ExchangeItem.findByPk(exchangeItemId, {
       attributes: [
-        'product_id',
-        'product_name',
+        'exchange_item_id',
+        'item_name',
         'stock',
         'sold_count',
         'min_cost_amount',
@@ -1823,8 +1823,8 @@ class AdminService {
       throw new Error('商品不存在')
     }
 
-    const skus = await ProductSkuModel.findAll({
-      where: { product_id: exchangeItemId },
+    const skus = await ExchangeItemSkuModel.findAll({
+      where: { exchange_item_id: exchangeItemId },
       order: [
         ['sort_order', 'ASC'],
         ['sku_id', 'ASC']
@@ -1853,9 +1853,9 @@ class AdminService {
    */
   async createSku(exchangeItemId, skuData, options = {}) {
     const transaction = assertAndGetTransaction(options, 'AdminService.createSku')
-    const ProductSkuModel = this.models.ProductSku
+    const ExchangeItemSkuModel = this.models.ExchangeItemSku
 
-    const item = await this.Product.findByPk(exchangeItemId, {
+    const item = await this.ExchangeItem.findByPk(exchangeItemId, {
       lock: transaction.LOCK.UPDATE,
       transaction
     })
@@ -1871,9 +1871,9 @@ class AdminService {
       throw new Error('SKU 库存必须大于等于 0')
     }
 
-    const sku = await ProductSkuModel.create(
+    const sku = await ExchangeItemSkuModel.create(
       {
-        product_id: exchangeItemId,
+        exchange_item_id: exchangeItemId,
         stock: parseInt(skuData.stock),
         sold_count: 0,
         cost_price: parseFloat(skuData.cost_price) || 0,
@@ -1904,7 +1904,7 @@ class AdminService {
 
     logger.info('[兑换市场] SKU 创建成功', {
       sku_id: sku.sku_id,
-      product_id: exchangeItemId,
+      exchange_item_id: exchangeItemId,
       spec_values: skuData.spec_values
     })
 
@@ -1922,9 +1922,9 @@ class AdminService {
    */
   async updateSku(skuId, updateData, options = {}) {
     const transaction = assertAndGetTransaction(options, 'AdminService.updateSku')
-    const ProductSkuModel = this.models.ProductSku
+    const ExchangeItemSkuModel = this.models.ExchangeItemSku
 
-    const sku = await ProductSkuModel.findByPk(skuId, {
+    const sku = await ExchangeItemSkuModel.findByPk(skuId, {
       lock: transaction.LOCK.UPDATE,
       transaction
     })
@@ -1964,7 +1964,7 @@ class AdminService {
       }
     }
 
-    await this._updateSpuSummary(sku.product_id, transaction)
+    await this._updateSpuSummary(sku.exchange_item_id, transaction)
 
     await BusinessCacheHelper.invalidateExchangeItems('sku_updated')
 
@@ -1981,15 +1981,15 @@ class AdminService {
    */
   async deleteSku(skuId, options = {}) {
     const transaction = assertAndGetTransaction(options, 'AdminService.deleteSku')
-    const ProductSkuModel = this.models.ProductSku
+    const ExchangeItemSkuModel = this.models.ExchangeItemSku
 
-    const sku = await ProductSkuModel.findByPk(skuId, { transaction })
+    const sku = await ExchangeItemSkuModel.findByPk(skuId, { transaction })
     if (!sku) {
       throw new Error('SKU 不存在')
     }
 
-    const skuCount = await ProductSkuModel.count({
-      where: { product_id: sku.product_id },
+    const skuCount = await ExchangeItemSkuModel.count({
+      where: { exchange_item_id: sku.exchange_item_id },
       transaction
     })
 
@@ -1997,13 +1997,13 @@ class AdminService {
       throw new Error('不能删除最后一个 SKU，每个商品至少保留一个 SKU')
     }
 
-    const exchangeItemId = sku.product_id
+    const exchangeItemId = sku.exchange_item_id
     await sku.destroy({ transaction })
     await this._updateSpuSummary(exchangeItemId, transaction)
 
     await BusinessCacheHelper.invalidateExchangeItems('sku_deleted')
 
-    logger.info('[兑换市场] SKU 删除成功', { sku_id: skuId, product_id: exchangeItemId })
+    logger.info('[兑换市场] SKU 删除成功', { sku_id: skuId, exchange_item_id: exchangeItemId })
 
     return { action: 'deleted', sku_id: skuId }
   }
@@ -2018,11 +2018,10 @@ class AdminService {
    * @private
    */
   async _updateSpuSummary(exchangeItemId, transaction) {
-    const ProductSkuModel = this.models.ProductSku
-    const ExchangeChannelPriceModel = this.models.ExchangeChannelPrice
+    const ExchangeItemSkuModel = this.models.ExchangeItemSku
 
-    const [skuSummary] = await ProductSkuModel.findAll({
-      where: { product_id: exchangeItemId, status: 'active' },
+    const [skuSummary] = await ExchangeItemSkuModel.findAll({
+      where: { exchange_item_id: exchangeItemId, status: 'active' },
       attributes: [
         [this.sequelize.fn('SUM', this.sequelize.col('stock')), 'total_stock'],
         [this.sequelize.fn('SUM', this.sequelize.col('sold_count')), 'total_sold']
@@ -2033,13 +2032,13 @@ class AdminService {
 
     const [priceSummary] = await this.sequelize.query(
       `SELECT MIN(ecp.cost_amount) AS min_cost, MAX(ecp.cost_amount) AS max_cost
-       FROM product_skus ps
+       FROM exchange_item_skus ps
        JOIN exchange_channel_prices ecp ON ecp.sku_id = ps.sku_id AND ecp.is_enabled = 1
-       WHERE ps.product_id = :productId AND ps.status = 'active'`,
+       WHERE ps.exchange_item_id = :productId AND ps.status = 'active'`,
       { replacements: { productId: exchangeItemId }, type: this.sequelize.QueryTypes.SELECT, transaction }
     )
 
-    await this.Product.update(
+    await this.ExchangeItem.update(
       {
         stock: parseInt(skuSummary.total_stock) || 0,
         sold_count: parseInt(skuSummary.total_sold) || 0,
@@ -2047,125 +2046,17 @@ class AdminService {
         max_cost_amount: priceSummary?.max_cost !== null ? parseInt(priceSummary.max_cost) : null
       },
       {
-        where: { product_id: exchangeItemId },
+        where: { exchange_item_id: exchangeItemId },
         transaction
       }
     )
   }
   /*
    * ================================================================
-   * 统一商品（Product）管理方法 — 委托 ProductService
-   * 迁移路径：ExchangeItem → Product 统一商品模型
+   * 兑换商品管理方法 — 委托 ExchangeItemService
+   * 兑换商品 SPU CRUD 管理
    * ================================================================
    */
-
-  /**
-   * 创建统一商品（委托给 ProductService）
-   *
-   * @param {Object} productData - 商品数据
-   * @param {number} created_by - 操作人ID
-   * @param {Object} options - {transaction}
-   * @returns {Promise<Object>} 创建的商品
-   */
-  async createProduct(productData, created_by, options = {}) {
-    const transaction = assertAndGetTransaction(options, 'AdminService.createProduct')
-    const ProductService = require('../product/ProductService')
-    const svc = new ProductService(this.models)
-    const product = await svc.createProduct(productData, { transaction })
-
-    try {
-      await this.models.AdminOperationLog.create(
-        {
-          operator_id: created_by,
-          operation_type: 'create',
-          target_type: 'product',
-          target_id: product.product_id,
-          action: 'create_product',
-          after_data: product.toJSON(),
-          reason: '创建统一商品',
-          risk_level: 'low',
-          requires_approval: false,
-          approval_status: 'not_required'
-        },
-        { transaction }
-      )
-    } catch (logErr) {
-      logger.warn('[商品中心] 操作日志记录失败', { error: logErr.message })
-    }
-
-    return product
-  }
-
-  /**
-   * 更新统一商品（委托给 ProductService）
-   *
-   * @param {number} product_id - 商品ID
-   * @param {Object} updateData - 更新数据
-   * @param {number} updated_by - 操作人ID
-   * @param {Object} options - {transaction}
-   * @returns {Promise<Object>} 更新后的商品
-   */
-  async updateProduct(product_id, updateData, updated_by, options = {}) {
-    const transaction = assertAndGetTransaction(options, 'AdminService.updateProduct')
-    const svc = new (require('../product/ProductService'))(this.models)
-    const product = await svc.updateProduct(product_id, updateData, { transaction })
-
-    try {
-      await this.models.AdminOperationLog.create(
-        {
-          operator_id: updated_by,
-          operation_type: 'update',
-          target_type: 'product',
-          target_id: product_id,
-          action: 'update_product',
-          after_data: updateData,
-          changed_fields: updateData,
-          reason: '更新统一商品',
-          risk_level: 'low',
-          requires_approval: false,
-          approval_status: 'not_required'
-        },
-        { transaction }
-      )
-    } catch (logErr) {
-      logger.warn('[商品中心] 操作日志记录失败', { error: logErr.message })
-    }
-
-    return product
-  }
-
-  /**
-   * 删除统一商品（委托给 ProductService）
-   *
-   * @param {number} product_id - 商品ID
-   * @param {number} deleted_by - 操作人ID
-   * @param {Object} options - {transaction}
-   * @returns {Promise<void>} 无返回值
-   */
-  async deleteProduct(product_id, deleted_by, options = {}) {
-    const transaction = assertAndGetTransaction(options, 'AdminService.deleteProduct')
-    const svc = new (require('../product/ProductService'))(this.models)
-    await svc.deleteProduct(product_id, { transaction })
-
-    try {
-      await this.models.AdminOperationLog.create(
-        {
-          operator_id: deleted_by,
-          operation_type: 'delete',
-          target_type: 'product',
-          target_id: product_id,
-          action: 'delete_product',
-          reason: '删除统一商品',
-          risk_level: 'medium',
-          requires_approval: false,
-          approval_status: 'not_required'
-        },
-        { transaction }
-      )
-    } catch (logErr) {
-      logger.warn('[商品中心] 操作日志记录失败', { error: logErr.message })
-    }
-  }
 }
 
 module.exports = AdminService

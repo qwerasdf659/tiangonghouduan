@@ -35,7 +35,7 @@ const getDictionaryService = req => {
 
 /*
  * =============================================================================
- * 类目定义（CategoryDef）API
+ * 类目定义（Category）API
  * =============================================================================
  */
 
@@ -152,7 +152,7 @@ router.post(
       description,
       sort_order,
       is_enabled,
-      parent_category_def_id,
+      parent_category_id,
       icon_media_id
     } = req.body
 
@@ -175,7 +175,7 @@ router.post(
     }
 
     // 自动推断 level：有父分类则为二级，否则一级
-    const level = parent_category_def_id ? 2 : 1
+    const level = parent_category_id ? 2 : 1
 
     const DictionaryService = getDictionaryService(req)
 
@@ -187,7 +187,7 @@ router.post(
           description,
           sort_order,
           is_enabled,
-          parent_category_def_id,
+          parent_category_id,
           level,
           icon_media_id
         },

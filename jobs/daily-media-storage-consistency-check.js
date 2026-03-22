@@ -41,7 +41,7 @@ class DailyMediaStorageConsistencyCheck {
 
     try {
       const { MediaFile } = require('../models')
-      const SealosStorageService = require('../services/sealosStorage')
+      const SealosStorageService = require('../services/SealosStorageService')
       const storageService = new SealosStorageService()
 
       let offset = 0

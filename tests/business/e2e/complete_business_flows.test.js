@@ -864,12 +864,12 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
       /* Step 5: 用户B使用red_shard兑换商品 */
       console.log('📝 Step 5: 用户B使用 red_shard 兑换商品')
 
-      /* 查找可用的兑换商品（使用 red_shard 支付）— Product + ProductSku + ExchangeChannelPrice */
-      const { Product: ExchangeProduct, ProductSku, ExchangeChannelPrice } = require('../../../models')
-      const exchangeProduct = await ExchangeProduct.findOne({
+      /* 查找可用的兑换商品（使用 red_shard 支付）— ExchangeItem + ExchangeItemSku + ExchangeChannelPrice */
+      const { ExchangeItem, ExchangeItemSku, ExchangeChannelPrice } = require('../../../models')
+      const exchangeProduct = await ExchangeItem.findOne({
         where: { status: 'active' },
         include: [{
-          model: ProductSku,
+          model: ExchangeItemSku,
           as: 'skus',
           where: { stock: { [sequelize.Sequelize.Op.gt]: 0 }, status: 'active' },
           required: true,
@@ -884,7 +884,7 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
 
       if (!exchangeProduct) {
         console.log('⏭️ 未找到使用 red_shard 支付的兑换商品，跳过兑换步骤')
-        console.log('💡 提示：需要在 products + product_skus + exchange_channel_prices 中配置 cost_asset_code=red_shard 的商品')
+        console.log('💡 提示：需要在 exchange_items + exchange_item_skus + exchange_channel_prices 中配置 cost_asset_code=red_shard 的商品')
         console.log('✅ 11.6 多用户交互场景测试完成（挂牌+购买流程已验证，兑换步骤跳过）')
         return
       }
@@ -893,8 +893,8 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
       const matchedPrice = matchedSku.channelPrices[0]
 
       console.log('📝 找到可兑换商品:', {
-        product_id: exchangeProduct.product_id,
-        product_name: exchangeProduct.product_name,
+        exchange_item_id: exchangeProduct.exchange_item_id,
+        item_name: exchangeProduct.item_name,
         cost_asset_code: matchedPrice.cost_asset_code,
         cost_amount: matchedPrice.cost_amount
       })
@@ -912,7 +912,7 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
         const exchangeResult = await TransactionManager.execute(async transaction => {
           return await ExchangeService.exchangeItem(
             userBId,
-            exchangeProduct.product_id,
+            exchangeProduct.exchange_item_id,
             1,
             {
               idempotency_key: generateIdempotencyKey('multi_user_exchange'),
@@ -924,7 +924,7 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
 
         console.log('✅ 兑换成功:', {
           order_no: exchangeResult?.order_no,
-          product_name: exchangeProduct.product_name
+          item_name: exchangeProduct.item_name
         })
 
         /* 验证兑换后用户B的red_shard余额减少 — Number() 确保 BIGINT/DECIMAL 正确比较 */

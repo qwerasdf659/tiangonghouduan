@@ -49,7 +49,10 @@ module.exports = sequelize => {
       exchange_item_id: {
         type: DataTypes.BIGINT,
         allowNull: true,
-        comment: '兑换商品ID（历史数据保留，新订单使用 product_id）'
+        references: { model: 'exchange_items', key: 'exchange_item_id' },
+        onDelete: 'SET NULL',
+        onUpdate: 'CASCADE',
+        comment: '关联兑换商品 SPU（exchange_items.exchange_item_id）'
       },
 
       // V4.5.0 材料资产支付字段（唯一支付方式）
@@ -297,24 +300,14 @@ module.exports = sequelize => {
         comment: '兑换产出的物品实例（NULL=纯实物兑换无实例，有值=可查"这个物品是哪笔兑换来的"）'
       },
 
-      /** 关联统一商品SPU（新商品中心，2026-03-20 EAV改造） */
-      product_id: {
-        type: DataTypes.BIGINT,
-        allowNull: true,
-        references: { model: 'products', key: 'product_id' },
-        onDelete: 'SET NULL',
-        onUpdate: 'CASCADE',
-        comment: '关联统一商品SPU（新商品中心products表）'
-      },
-
-      /** 关联统一SKU（新商品中心，2026-03-20 EAV改造） */
+      /** 关联兑换商品 SKU */
       sku_id: {
         type: DataTypes.BIGINT,
         allowNull: true,
-        references: { model: 'product_skus', key: 'sku_id' },
+        references: { model: 'exchange_item_skus', key: 'sku_id' },
         onDelete: 'SET NULL',
         onUpdate: 'CASCADE',
-        comment: '关联统一SKU（新商品中心product_skus表）'
+        comment: '关联兑换商品 SKU（exchange_item_skus.sku_id）'
       }
     },
     {
@@ -348,11 +341,11 @@ module.exports = sequelize => {
       as: 'user'
     })
 
-    // 属于商品（Product 统一商品中心）
-    if (models.Product) {
-      ExchangeRecord.belongsTo(models.Product, {
-        foreignKey: 'product_id',
-        as: 'product'
+    // 属于兑换商品（ExchangeItem）
+    if (models.ExchangeItem) {
+      ExchangeRecord.belongsTo(models.ExchangeItem, {
+        foreignKey: 'exchange_item_id',
+        as: 'exchangeItem'
       })
     }
 
@@ -373,11 +366,11 @@ module.exports = sequelize => {
       })
     }
 
-    // 关联统一SKU（新商品中心）
-    if (models.ProductSku) {
-      ExchangeRecord.belongsTo(models.ProductSku, {
+    // 关联兑换商品 SKU
+    if (models.ExchangeItemSku) {
+      ExchangeRecord.belongsTo(models.ExchangeItemSku, {
         foreignKey: 'sku_id',
-        as: 'productSku'
+        as: 'exchangeItemSku'
       })
     }
   }

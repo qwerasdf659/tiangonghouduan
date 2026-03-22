@@ -77,9 +77,9 @@ function getForeignKeyFixes() {
     },
     {
       table: 'exchange_records',
-      column: 'product_id',
-      referenced_table: 'products',
-      referenced_column: 'product_id',
+      column: 'exchange_item_id',
+      referenced_table: 'exchange_items',
+      referenced_column: 'exchange_item_id',
       current: { delete: 'CASCADE', update: 'CASCADE' },
       recommended: { delete: 'RESTRICT', update: 'CASCADE' },
       reason: '有兑换记录的商品不能删除（业务保护）'

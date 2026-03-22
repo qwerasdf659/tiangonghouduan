@@ -37,10 +37,10 @@ class ItemTemplate extends Model {
    * @returns {void} 无返回值，仅定义关联关系
    */
   static associate(models) {
-    // 关联类目字典（多对一，2026-03-16 整数主键迁移）
-    if (models.CategoryDef) {
-      ItemTemplate.belongsTo(models.CategoryDef, {
-        foreignKey: 'category_def_id',
+    // 关联品类（多对一 → categories 表）
+    if (models.Category) {
+      ItemTemplate.belongsTo(models.Category, {
+        foreignKey: 'category_id',
         as: 'category'
       })
     }
@@ -62,11 +62,11 @@ class ItemTemplate extends Model {
       })
     }
 
-    // 物品模板 → 统一商品SPU（一对多，商品关联此模板进行铸造）
-    if (models.Product) {
-      ItemTemplate.hasMany(models.Product, {
+    // 物品模板 → 兑换商品SPU（一对多，商品关联此模板进行铸造）
+    if (models.ExchangeItem) {
+      ItemTemplate.hasMany(models.ExchangeItem, {
         foreignKey: 'item_template_id',
-        as: 'products'
+        as: 'exchangeItems'
       })
     }
 
@@ -140,7 +140,7 @@ class ItemTemplate extends Model {
   static async getByCategory(categoryDefId) {
     return this.findAll({
       where: {
-        category_def_id: categoryDefId,
+        category_id: categoryDefId,
         is_enabled: true
       },
       order: [['display_name', 'ASC']]
@@ -180,14 +180,14 @@ module.exports = sequelize => {
         comment: '物品类型：对应 items.item_type'
       },
 
-      // 类目定义ID（外键 → category_defs，2026-03-16 整数主键迁移）
-      category_def_id: {
+      // 品类ID（外键 → categories）
+      category_id: {
         type: DataTypes.INTEGER,
         allowNull: true,
-        comment: '类目定义ID，FK→category_defs.category_def_id',
+        comment: '品类ID，FK→categories.category_id',
         references: {
-          model: 'category_defs',
-          key: 'category_def_id'
+          model: 'categories',
+          key: 'category_id'
         },
         onUpdate: 'CASCADE',
         onDelete: 'SET NULL'
@@ -284,7 +284,7 @@ module.exports = sequelize => {
       comment: '物品模板表（Item Templates - 不可叠加物品模板定义）',
       indexes: [
         { fields: ['item_type'], name: 'idx_item_templates_item_type' },
-        { fields: ['category_def_id'], name: 'idx_item_templates_category_def_id' },
+        { fields: ['category_id'], name: 'idx_item_templates_category_id' },
         { fields: ['rarity_code'], name: 'idx_item_templates_rarity_code' },
         { fields: ['is_tradable', 'is_enabled'], name: 'idx_item_templates_tradable_enabled' }
       ]

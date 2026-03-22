@@ -194,7 +194,7 @@ describe('NotificationService - 统一通知服务', () => {
     test('应该能够发送兑换申请提交通知', async () => {
       const exchangeData = {
         exchange_id: 'test_exchange_001',
-        product_name: '测试商品',
+        item_name: '测试商品',
         quantity: 2,
         total_points: 500
       }
@@ -211,7 +211,7 @@ describe('NotificationService - 统一通知服务', () => {
     test('应该能够发送兑换审核通过通知', async () => {
       const exchangeData = {
         exchange_id: 'test_exchange_002',
-        product_name: '测试商品',
+        item_name: '测试商品',
         quantity: 1
       }
 
@@ -229,7 +229,7 @@ describe('NotificationService - 统一通知服务', () => {
     test('应该能够发送兑换审核拒绝通知', async () => {
       const exchangeData = {
         exchange_id: 'test_exchange_003',
-        product_name: '测试商品',
+        item_name: '测试商品',
         total_points: 300,
         reject_reason: '库存不足'
       }
@@ -250,7 +250,7 @@ describe('NotificationService - 统一通知服务', () => {
       const exchangeData = {
         exchange_id: 'test_exchange_004',
         user_id: testUser.user_id,
-        product_name: '测试商品',
+        item_name: '测试商品',
         quantity: 1,
         total_points: 200,
         product_category: '优惠券'
@@ -290,7 +290,7 @@ describe('NotificationService - 统一通知服务', () => {
       const auditData = {
         type: 'exchange',
         exchange_id: 'test_005',
-        product_name: '测试商品',
+        item_name: '测试商品',
         quantity: 1
       }
 

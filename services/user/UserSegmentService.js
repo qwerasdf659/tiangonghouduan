@@ -429,23 +429,20 @@ class UserSegmentService {
 
       /*
        * 获取兑换商品详情（关联 ExchangeItem 模型）
-       * 迁移路径：ExchangeItem → Product（统一商品模型）
        */
       const exchangeItemIds = exchangeStats.map(s => s.exchange_item_id)
       const itemDetails = {}
 
-      if (exchangeItemIds.length > 0 && models.Product) {
-        const items = await models.Product.findAll({
-          where: { product_id: { [Op.in]: exchangeItemIds } },
-          attributes: ['product_id', 'product_name', 'min_cost_amount'],
+      if (exchangeItemIds.length > 0 && models.ExchangeItem) {
+        const items = await models.ExchangeItem.findAll({
+          where: { exchange_item_id: { [Op.in]: exchangeItemIds } },
+          attributes: ['exchange_item_id', 'item_name', 'min_cost_amount'],
           raw: true
         })
 
         items.forEach(item => {
-          itemDetails[item.product_id] = {
+          itemDetails[item.exchange_item_id] = {
             ...item,
-            exchange_item_id: item.product_id,
-            item_name: item.product_name,
             cost_amount: item.min_cost_amount
           }
         })

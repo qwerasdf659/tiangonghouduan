@@ -56,8 +56,8 @@ class BidService {
     this.ExchangeRecord = models.ExchangeRecord
     this.Item = models.Item
     this.MaterialAssetType = models.MaterialAssetType
-    this.Product = models.Product
-    this.ProductSku = models.ProductSku
+    this.ExchangeItem = models.ExchangeItem
+    this.ExchangeItemSku = models.ExchangeItemSku
     this.sequelize = models.sequelize
   }
 
@@ -348,15 +348,15 @@ class BidService {
 
     logger.info('[竞价结算] 开始结算', { bid_product_id: bidProductId })
 
-    // 锁定竞价商品记录（Product 替代已废弃的 ExchangeItem）
+    // 锁定竞价商品记录（BidProduct 关联 ExchangeItem）
     const bidProduct = await this.BidProduct.findByPk(bidProductId, {
       lock: transaction.LOCK.UPDATE,
       transaction,
       include: [
         {
-          model: this.Product,
+          model: this.ExchangeItem,
           as: 'exchangeItem',
-          include: [{ model: this.ProductSku, as: 'skus' }]
+          include: [{ model: this.ExchangeItemSku, as: 'skus' }]
         }
       ]
     })
@@ -419,7 +419,7 @@ class BidService {
     await this.ExchangeRecord.create(
       {
         user_id: winnerId,
-        product_id: exchangeItem.product_id,
+        exchange_item_id: exchangeItem.exchange_item_id,
         sku_id: defaultSku?.sku_id || null,
         pay_asset_code: assetCode,
         pay_amount: winningAmount,
@@ -429,7 +429,7 @@ class BidService {
         source: 'bid',
         status: 'completed',
         item_snapshot: {
-          item_name: exchangeItem.product_name,
+          item_name: exchangeItem.item_name,
           description: exchangeItem.description,
           bid_asset_code: assetCode,
           bid_winning_amount: winningAmount
@@ -447,7 +447,7 @@ class BidService {
         item_type: 'product',
         source: 'bid_settlement',
         source_ref_id: String(bidProductId),
-        item_name: exchangeItem.product_name,
+        item_name: exchangeItem.item_name,
         item_description: exchangeItem.description || '',
         item_value: winningAmount || 0,
         item_template_id: exchangeItem.item_template_id || null,
@@ -455,7 +455,7 @@ class BidService {
         idempotency_key: `bid_settle_item_${bidProductId}`,
         meta: {
           bid_product_id: bidProductId,
-          product_id: exchangeItem.product_id,
+          exchange_item_id: exchangeItem.exchange_item_id,
           primary_media_id: exchangeItem.primary_media_id,
           category_id: exchangeItem.category_id,
           bid_winning_amount: winningAmount,
@@ -465,9 +465,9 @@ class BidService {
       { transaction }
     )
 
-    // e. 扣减库存（统一商品中心：库存在 product_skus 表）
+    // e. 扣减库存（统一商品中心：库存在 exchange_item_skus 表）
     if (defaultSku) {
-      const [affectedRows] = await this.ProductSku.update(
+      const [affectedRows] = await this.ExchangeItemSku.update(
         {
           stock: literal('stock - 1'),
           sold_count: literal('sold_count + 1')
@@ -481,7 +481,7 @@ class BidService {
         }
       )
       if (affectedRows === 0) {
-        throw new Error(`商品 ${exchangeItem.product_name} SKU ${defaultSku.sku_code} 库存不足`)
+        throw new Error(`商品 ${exchangeItem.item_name} SKU ${defaultSku.sku_code} 库存不足`)
       }
     }
 

@@ -3,7 +3,7 @@
  * @description 管理配置类字典表的CRUD操作
  *
  * 管理的字典表：
- * - category_defs：物品类目字典表
+ * - categories：品类表
  * - rarity_defs：稀有度字典表
  * - asset_group_defs：资产分组字典表
  *
@@ -36,14 +36,14 @@ class DictionaryService {
     this.models = models
 
     // 获取模型引用
-    this.CategoryDef = models.CategoryDef
+    this.Category = models.Category
     this.RarityDef = models.RarityDef
     this.AssetGroupDef = models.AssetGroupDef
   }
 
   /*
    * =============================================================================
-   * 类目定义（CategoryDef）方法
+   * 类目定义（Category）方法
    * =============================================================================
    */
 
@@ -53,7 +53,7 @@ class DictionaryService {
    * @returns {Promise<Array>} 树形分类结构
    */
   async getCategoryTree() {
-    return this.CategoryDef.getTree()
+    return this.Category.getTree()
   }
 
   /**
@@ -80,14 +80,14 @@ class DictionaryService {
     if (keyword) {
       where[Op.or] = [
         { category_code: { [Op.like]: `%${keyword}%` } },
-        { display_name: { [Op.like]: `%${keyword}%` } }
+        { category_name: { [Op.like]: `%${keyword}%` } }
       ]
     }
 
     const offset = (parseInt(page) - 1) * parseInt(page_size)
     const limit = parseInt(page_size)
 
-    const { count, rows } = await this.CategoryDef.findAndCountAll({
+    const { count, rows } = await this.Category.findAndCountAll({
       where,
       order: [
         ['sort_order', 'ASC'],
@@ -115,7 +115,7 @@ class DictionaryService {
    * @returns {Promise<Object|null>} 类目详情，不存在返回null
    */
   async getCategoryByCode(code) {
-    return this.CategoryDef.findOne({ where: { category_code: code } })
+    return this.Category.findOne({ where: { category_code: code } })
   }
 
   /**
@@ -127,7 +127,7 @@ class DictionaryService {
    * @param {string} [data.description] - 描述
    * @param {number} [data.sort_order=0] - 排序顺序
    * @param {boolean} [data.is_enabled=true] - 是否启用
-   * @param {number} [data.parent_category_def_id] - 父分类 ID（传入则创建二级子分类）
+   * @param {number} [data.parent_category_id] - 父分类 ID（传入则创建二级子分类）
    * @param {number} [data.icon_media_id] - 图标媒体文件ID
    * @param {Object} [options={}] - 操作选项
    * @param {Transaction} [options.transaction] - 事务实例
@@ -137,7 +137,7 @@ class DictionaryService {
   async createCategory(data, options = {}) {
     const { transaction } = options
 
-    const existing = await this.CategoryDef.findOne({
+    const existing = await this.Category.findOne({
       where: { category_code: data.category_code },
       transaction
     })
@@ -150,27 +150,27 @@ class DictionaryService {
 
     // 确定层级：有父分类则为 level=2，否则为 level=1
     let level = 1
-    let parentCategoryDefId = null
-    if (data.parent_category_def_id) {
-      const parent = await this.CategoryDef.findByPk(data.parent_category_def_id, { transaction })
+    let parentCategoryId = null
+    if (data.parent_category_id) {
+      const parent = await this.Category.findByPk(data.parent_category_id, { transaction })
       if (!parent) {
-        throw new Error(`父分类不存在：${data.parent_category_def_id}`)
+        throw new Error(`父分类不存在：${data.parent_category_id}`)
       }
       if (parent.level !== 1) {
         throw new Error('仅支持两级分类，不能在子分类下再创建子分类')
       }
       level = 2
-      parentCategoryDefId = data.parent_category_def_id
+      parentCategoryId = data.parent_category_id
     }
 
-    const category = await this.CategoryDef.create(
+    const category = await this.Category.create(
       {
         category_code: data.category_code,
-        display_name: data.display_name,
+        category_name: data.category_name || data.display_name,
         description: data.description || null,
         sort_order: data.sort_order !== undefined ? data.sort_order : 0,
         is_enabled: data.is_enabled !== undefined ? data.is_enabled : true,
-        parent_category_def_id: parentCategoryDefId,
+        parent_category_id: parentCategoryId,
         level
       },
       { transaction }
@@ -182,8 +182,8 @@ class DictionaryService {
       const mediaService = new MediaService()
       await mediaService.attach(
         data.icon_media_id,
-        'category_def',
-        category.category_def_id,
+        'category',
+        category.category_id,
         'icon',
         0,
         null,
@@ -208,7 +208,7 @@ class DictionaryService {
   async updateCategory(code, data, options = {}) {
     const { transaction } = options
 
-    const category = await this.CategoryDef.findOne({ where: { category_code: code }, transaction })
+    const category = await this.Category.findOne({ where: { category_code: code }, transaction })
     if (!category) {
       const error = new Error(`类目代码 "${code}" 不存在`)
       error.status = 404
@@ -216,7 +216,7 @@ class DictionaryService {
       throw error
     }
 
-    const updateFields = ['display_name', 'description', 'sort_order', 'is_enabled']
+    const updateFields = ['category_name', 'description', 'sort_order', 'is_enabled']
     const updateData = {}
     updateFields.forEach(field => {
       if (data[field] !== undefined) {
@@ -231,8 +231,8 @@ class DictionaryService {
       const { MediaAttachment } = require('../models')
       await MediaAttachment.destroy({
         where: {
-          attachable_type: 'category_def',
-          attachable_id: category.category_def_id,
+          attachable_type: 'category',
+          attachable_id: category.category_id,
           role: 'icon'
         },
         transaction
@@ -241,8 +241,8 @@ class DictionaryService {
       const mediaService = new MediaService()
       await mediaService.attach(
         data.icon_media_id,
-        'category_def',
-        category.category_def_id,
+        'category',
+        category.category_id,
         'icon',
         0,
         null,
@@ -266,7 +266,7 @@ class DictionaryService {
   async deleteCategory(code, options = {}) {
     const { transaction } = options
 
-    const category = await this.CategoryDef.findOne({ where: { category_code: code }, transaction })
+    const category = await this.Category.findOne({ where: { category_code: code }, transaction })
     if (!category) {
       const error = new Error(`类目代码 "${code}" 不存在`)
       error.status = 404
@@ -659,13 +659,13 @@ class DictionaryService {
    */
   async getAllDictionaries() {
     const [categories, rarities, asset_groups] = await Promise.all([
-      this.CategoryDef.findAll({
+      this.Category.findAll({
         where: { is_enabled: true },
         order: [
           ['sort_order', 'ASC'],
           ['category_code', 'ASC']
         ],
-        attributes: ['category_code', 'display_name', 'description', 'sort_order']
+        attributes: ['category_id', 'category_code', 'category_name', 'description', 'sort_order']
       }),
       this.RarityDef.findAll({
         where: { is_enabled: true },

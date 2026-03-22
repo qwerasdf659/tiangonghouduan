@@ -56,7 +56,7 @@ router.get(
 /**
  * GET /policies - 自动清理策略列表
  *
- * @description 返回 system_configs 中的清理策略配置
+ * @description 返回 system_settings 中的清理策略配置
  */
 router.get(
   '/policies',

@@ -42,7 +42,7 @@ function getItemTemplateService(req) {
  *
  * 查询参数：
  * - item_type: 物品类型筛选
- * - category_code: 类目代码筛选（兼容 category_def_id）
+ * - category_code: 类目代码筛选（兼容 category_id）
  * - rarity_code: 稀有度代码筛选
  * - is_enabled: 是否启用（true/false）
  * - is_tradable: 是否可交易（true/false）
@@ -56,7 +56,7 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
     const {
       item_type,
       category_code,
-      category_def_id,
+      category_id,
       rarity_code,
       is_enabled,
       is_tradable,
@@ -67,7 +67,7 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
 
     const result = await service.getTemplates({
       item_type,
-      category_code: category_def_id ? parseInt(category_def_id, 10) : category_code,
+      category_code: category_id ? parseInt(category_id, 10) : category_code,
       rarity_code,
       is_enabled: is_enabled === 'true' ? true : is_enabled === 'false' ? false : undefined,
       is_tradable: is_tradable === 'true' ? true : is_tradable === 'false' ? false : undefined,
@@ -174,7 +174,7 @@ router.get('/:id', authenticateToken, requireRoleLevel(100), async (req, res) =>
  * - template_code: 模板代码（唯一，必填）
  * - item_type: 物品类型（必填）
  * - display_name: 显示名称（必填）
- * - category_code: 类目代码（兼容 category_def_id）
+ * - category_code: 类目代码（兼容 category_id）
  * - rarity_code: 稀有度代码
  * - description: 描述
  * - primary_media_id: 主媒体ID（关联 media_files 表）
@@ -209,7 +209,7 @@ router.post('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
  * 请求体（均为可选）：
  * - item_type: 物品类型
  * - display_name: 显示名称
- * - category_code: 类目代码（兼容 category_def_id）
+ * - category_code: 类目代码（兼容 category_id）
  * - rarity_code: 稀有度代码
  * - description: 描述
  * - primary_media_id: 主媒体ID（关联 media_files 表）

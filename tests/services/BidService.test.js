@@ -19,7 +19,7 @@
 'use strict'
 
 const models = require('../../models')
-const { sequelize, Product, BidProduct, BidRecord } = models
+const { sequelize, ExchangeItem, BidProduct, BidRecord } = models
 
 jest.setTimeout(30000)
 
@@ -51,10 +51,10 @@ describe('竞价系统服务测试（臻选空间/幸运空间/竞价功能）',
 
   // ==================== exchange_items 空间字段测试 ====================
 
-  describe('products 空间字段（Phase 1）', () => {
+  describe('exchange_items 空间字段（Phase 1）', () => {
     test('所有现有商品的 space 字段默认为 lucky', async () => {
-      const items = await Product.findAll({
-        attributes: ['product_id', 'space'],
+      const items = await ExchangeItem.findAll({
+        attributes: ['exchange_item_id', 'space'],
         raw: true
       })
 
@@ -63,12 +63,12 @@ describe('竞价系统服务测试（臻选空间/幸运空间/竞价功能）',
         expect(allLucky).toBe(true)
       }
 
-      const attributes = Product.getAttributes()
+      const attributes = ExchangeItem.getAttributes()
       expect(attributes.space.defaultValue).toBe('lucky')
     })
 
     test('新增字段在模型中正确定义', async () => {
-      const attributes = Product.getAttributes()
+      const attributes = ExchangeItem.getAttributes()
       const newFields = [
         'space',
         'tags',
@@ -116,7 +116,7 @@ describe('竞价系统服务测试（臻选空间/幸运空间/竞价功能）',
 
       expect(stats).toBeDefined()
       expect(stats.space).toBe('lucky')
-      expect(typeof stats.total_products).toBe('number')
+      expect(typeof stats.total_items).toBe('number')
       expect(typeof stats.new_count).toBe('number')
       expect(typeof stats.hot_count).toBe('number')
       expect(stats.asset_code_distribution).toBeDefined()

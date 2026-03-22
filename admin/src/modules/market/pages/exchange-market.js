@@ -16,7 +16,7 @@ import { Alpine, createPageMixin, dataTable } from '../../../alpine/index.js'
 import { request, buildURL } from '../../../api/base.js'
 import { MARKET_ENDPOINTS } from '../../../api/market/index.js'
 import { ExchangeAPI } from '../../../api/market/exchange.js'
-import { ProductAPI } from '../../../api/product/index.js'
+import { ExchangeItemAPI } from '../../../api/exchange-item/index.js'
 import {
   useExchangeItemsState,
   useExchangeItemsMethods,
@@ -198,7 +198,7 @@ document.addEventListener('alpine:init', () => {
       batchCategoryIds: [],
       batchPriceMode: 'percent',
       batchPriceValue: 100,
-      batchCategoryDefId: null,
+      batchCategoryId: null,
 
       // ========== 单品数据看板 ==========
       itemDashboard: null,
@@ -238,9 +238,9 @@ document.addEventListener('alpine:init', () => {
 
       /** 批量修改分类提交 */
       async submitBatchCategory() {
-        if (!this.batchCategoryIds.length || !this.batchCategoryDefId) return
+        if (!this.batchCategoryIds.length || !this.batchCategoryId) return
         try {
-          await ExchangeAPI.batchUpdateCategory(this.batchCategoryIds, this.batchCategoryDefId)
+          await ExchangeAPI.batchUpdateCategory(this.batchCategoryIds, this.batchCategoryId)
           this.showSuccess(`已批量修改分类 ${this.batchCategoryIds.length} 个商品`)
           this.hideModal('batchCategoryModal')
           this._refreshItemsTable()
@@ -251,7 +251,7 @@ document.addEventListener('alpine:init', () => {
 
       /** 查看单品数据看板 */
       async viewItemDashboard(item) {
-        const itemId = item.product_id || item.exchange_item_id || item
+        const itemId = item.exchange_item_id || item
         this.itemDashboard = null
         this.itemDashboardLoading = true
         this.showModal('itemDashboardModal')
@@ -341,7 +341,7 @@ document.addEventListener('alpine:init', () => {
        */
       async deleteItem(itemOrId) {
         const itemId = typeof itemOrId === 'object'
-          ? (itemOrId.product_id || itemOrId.exchange_item_id)
+          ? itemOrId.exchange_item_id
           : itemOrId
         if (!itemId) {
           logger.error('[ExchangeMarket] deleteItem: 无效的商品ID')
@@ -351,7 +351,7 @@ document.addEventListener('alpine:init', () => {
         if (!(await $confirmDanger('确定要删除此商品吗？'))) return
 
         try {
-          const res = await ProductAPI.deleteProduct(itemId)
+          const res = await ExchangeItemAPI.deleteExchangeItem(itemId)
           if (res.success) {
             this.showSuccess?.('删除成功')
             this._refreshItemsTable()
@@ -443,13 +443,13 @@ document.addEventListener('alpine:init', () => {
         }
       ],
       dataSource: async params => {
-        const res = await ProductAPI.listProducts(params)
+        const res = await ExchangeItemAPI.listExchangeItems(params)
         const rawItems = res.data?.items || res.data?.list || res.data?.products || []
         return {
           items: rawItems.map(p => ({
             ...p,
-            exchange_item_id: p.product_id ?? p.exchange_item_id,
-            item_name: p.product_name ?? p.item_name
+            exchange_item_id: p.exchange_item_id,
+            item_name: p.item_name
           })),
           total: res.data?.pagination?.total || 0
         }

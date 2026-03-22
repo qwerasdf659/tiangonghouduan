@@ -1,7 +1,7 @@
 /**
- * 统一商品中心 API 客户端
+ * 兑换商品中心 API 客户端
  *
- * @module api/product
+ * @module api/exchange-item
  * @description 商品、SKU、类目、属性及选项的控制台接口封装
  */
 
@@ -10,22 +10,22 @@ import { request, buildURL, buildQueryString } from '../base.js'
 const API_PREFIX = '/api/v4/console'
 
 /**
- * 统一商品中心相关端点路径常量
+ * 兑换商品中心相关端点路径常量
  * @constant {Object<string, string>}
  */
-export const PRODUCT_ENDPOINTS = {
-  PRODUCT_LIST: `${API_PREFIX}/products`,
-  PRODUCT_DETAIL: `${API_PREFIX}/products/:id`,
-  PRODUCT_CREATE: `${API_PREFIX}/products`,
-  PRODUCT_UPDATE: `${API_PREFIX}/products/:id`,
-  PRODUCT_DELETE: `${API_PREFIX}/products/:id`,
-  SKU_LIST: `${API_PREFIX}/products/:id/skus`,
-  SKU_CREATE: `${API_PREFIX}/products/:id/skus`,
-  SKU_UPDATE: `${API_PREFIX}/products/skus/:sku_id`,
-  SKU_DELETE: `${API_PREFIX}/products/skus/:sku_id`,
-  SKU_GENERATE: `${API_PREFIX}/products/:id/skus/generate`,
-  SKU_STOCK_ADJUST: `${API_PREFIX}/products/skus/:sku_id/stock`,
-  SKU_CHANNEL_PRICES: `${API_PREFIX}/products/skus/:sku_id/channel-prices`,
+export const EXCHANGE_ITEM_ENDPOINTS = {
+  ITEM_LIST: `${API_PREFIX}/exchange-items`,
+  ITEM_DETAIL: `${API_PREFIX}/exchange-items/:id`,
+  ITEM_CREATE: `${API_PREFIX}/exchange-items`,
+  ITEM_UPDATE: `${API_PREFIX}/exchange-items/:id`,
+  ITEM_DELETE: `${API_PREFIX}/exchange-items/:id`,
+  SKU_LIST: `${API_PREFIX}/exchange-items/:id/skus`,
+  SKU_CREATE: `${API_PREFIX}/exchange-items/:id/skus`,
+  SKU_UPDATE: `${API_PREFIX}/exchange-items/skus/:sku_id`,
+  SKU_DELETE: `${API_PREFIX}/exchange-items/skus/:sku_id`,
+  SKU_GENERATE: `${API_PREFIX}/exchange-items/:id/skus/generate`,
+  SKU_STOCK_ADJUST: `${API_PREFIX}/exchange-items/skus/:sku_id/stock`,
+  SKU_CHANNEL_PRICES: `${API_PREFIX}/exchange-items/skus/:sku_id/channel-prices`,
   CATEGORY_LIST: `${API_PREFIX}/categories`,
   CATEGORY_DETAIL: `${API_PREFIX}/categories/:id`,
   CATEGORY_CREATE: `${API_PREFIX}/categories`,
@@ -39,21 +39,23 @@ export const PRODUCT_ENDPOINTS = {
   ATTRIBUTE_DELETE: `${API_PREFIX}/attributes/:id`,
   ATTRIBUTE_OPTION_CREATE: `${API_PREFIX}/attributes/:id/options`,
   ATTRIBUTE_OPTION_UPDATE: `${API_PREFIX}/attributes/options/:option_id`,
-  ATTRIBUTE_OPTION_DELETE: `${API_PREFIX}/attributes/options/:option_id`
+  ATTRIBUTE_OPTION_DELETE: `${API_PREFIX}/attributes/options/:option_id`,
+  ITEM_EXPORT: `${API_PREFIX}/exchange-items/export`,
+  ITEM_IMPORT: `${API_PREFIX}/exchange-items/import`
 }
 
 /**
- * 统一商品中心 API 方法集合
- * @namespace ProductAPI
+ * 兑换商品中心 API 方法集合
+ * @namespace ExchangeItemAPI
  */
-export const ProductAPI = {
+export const ExchangeItemAPI = {
   /**
    * 分页/条件查询商品列表
    * @param {Object} [params={}] 查询参数
    * @returns {Promise<Object>} 标准 API 响应
    */
-  async listProducts(params = {}) {
-    return request({ url: PRODUCT_ENDPOINTS.PRODUCT_LIST + buildQueryString(params) })
+  async listExchangeItems(params = {}) {
+    return request({ url: EXCHANGE_ITEM_ENDPOINTS.ITEM_LIST + buildQueryString(params) })
   },
 
   /**
@@ -61,8 +63,8 @@ export const ProductAPI = {
    * @param {string|number} id 商品 ID
    * @returns {Promise<Object>} 标准 API 响应
    */
-  async getProduct(id) {
-    return request({ url: buildURL(PRODUCT_ENDPOINTS.PRODUCT_DETAIL, { id }) })
+  async getExchangeItem(id) {
+    return request({ url: buildURL(EXCHANGE_ITEM_ENDPOINTS.ITEM_DETAIL, { id }) })
   },
 
   /**
@@ -70,8 +72,8 @@ export const ProductAPI = {
    * @param {Object} data 请求体
    * @returns {Promise<Object>} 标准 API 响应
    */
-  async createProduct(data) {
-    return request({ url: PRODUCT_ENDPOINTS.PRODUCT_CREATE, method: 'POST', data })
+  async createExchangeItem(data) {
+    return request({ url: EXCHANGE_ITEM_ENDPOINTS.ITEM_CREATE, method: 'POST', data })
   },
 
   /**
@@ -80,8 +82,8 @@ export const ProductAPI = {
    * @param {Object} data 请求体
    * @returns {Promise<Object>} 标准 API 响应
    */
-  async updateProduct(id, data) {
-    return request({ url: buildURL(PRODUCT_ENDPOINTS.PRODUCT_UPDATE, { id }), method: 'PUT', data })
+  async updateExchangeItem(id, data) {
+    return request({ url: buildURL(EXCHANGE_ITEM_ENDPOINTS.ITEM_UPDATE, { id }), method: 'PUT', data })
   },
 
   /**
@@ -89,27 +91,27 @@ export const ProductAPI = {
    * @param {string|number} id 商品 ID
    * @returns {Promise<Object>} 标准 API 响应
    */
-  async deleteProduct(id) {
-    return request({ url: buildURL(PRODUCT_ENDPOINTS.PRODUCT_DELETE, { id }), method: 'DELETE' })
+  async deleteExchangeItem(id) {
+    return request({ url: buildURL(EXCHANGE_ITEM_ENDPOINTS.ITEM_DELETE, { id }), method: 'DELETE' })
   },
 
   /**
    * 列出某商品下 SKU
-   * @param {string|number} productId 商品 ID
+   * @param {string|number} exchangeItemId 兑换商品 ID
    * @returns {Promise<Object>} 标准 API 响应
    */
-  async listSkus(productId) {
-    return request({ url: buildURL(PRODUCT_ENDPOINTS.SKU_LIST, { id: productId }) })
+  async listSkus(exchangeItemId) {
+    return request({ url: buildURL(EXCHANGE_ITEM_ENDPOINTS.SKU_LIST, { id: exchangeItemId }) })
   },
 
   /**
    * 创建 SKU
-   * @param {string|number} productId 商品 ID
+   * @param {string|number} exchangeItemId 兑换商品 ID
    * @param {Object} data 请求体
    * @returns {Promise<Object>} 标准 API 响应
    */
-  async createSku(productId, data) {
-    return request({ url: buildURL(PRODUCT_ENDPOINTS.SKU_CREATE, { id: productId }), method: 'POST', data })
+  async createSku(exchangeItemId, data) {
+    return request({ url: buildURL(EXCHANGE_ITEM_ENDPOINTS.SKU_CREATE, { id: exchangeItemId }), method: 'POST', data })
   },
 
   /**
@@ -119,7 +121,7 @@ export const ProductAPI = {
    * @returns {Promise<Object>} 标准 API 响应
    */
   async updateSku(skuId, data) {
-    return request({ url: buildURL(PRODUCT_ENDPOINTS.SKU_UPDATE, { sku_id: skuId }), method: 'PUT', data })
+    return request({ url: buildURL(EXCHANGE_ITEM_ENDPOINTS.SKU_UPDATE, { sku_id: skuId }), method: 'PUT', data })
   },
 
   /**
@@ -128,17 +130,17 @@ export const ProductAPI = {
    * @returns {Promise<Object>} 标准 API 响应
    */
   async deleteSku(skuId) {
-    return request({ url: buildURL(PRODUCT_ENDPOINTS.SKU_DELETE, { sku_id: skuId }), method: 'DELETE' })
+    return request({ url: buildURL(EXCHANGE_ITEM_ENDPOINTS.SKU_DELETE, { sku_id: skuId }), method: 'DELETE' })
   },
 
   /**
    * 按规则批量生成 SKU
-   * @param {string|number} productId 商品 ID
+   * @param {string|number} exchangeItemId 兑换商品 ID
    * @param {Object} data 请求体
    * @returns {Promise<Object>} 标准 API 响应
    */
-  async generateSkus(productId, data) {
-    return request({ url: buildURL(PRODUCT_ENDPOINTS.SKU_GENERATE, { id: productId }), method: 'POST', data })
+  async generateSkus(exchangeItemId, data) {
+    return request({ url: buildURL(EXCHANGE_ITEM_ENDPOINTS.SKU_GENERATE, { id: exchangeItemId }), method: 'POST', data })
   },
 
   /**
@@ -148,7 +150,7 @@ export const ProductAPI = {
    * @returns {Promise<Object>} 标准 API 响应
    */
   async adjustStock(skuId, delta) {
-    return request({ url: buildURL(PRODUCT_ENDPOINTS.SKU_STOCK_ADJUST, { sku_id: skuId }), method: 'PUT', data: { delta } })
+    return request({ url: buildURL(EXCHANGE_ITEM_ENDPOINTS.SKU_STOCK_ADJUST, { sku_id: skuId }), method: 'PUT', data: { delta } })
   },
 
   /**
@@ -157,7 +159,7 @@ export const ProductAPI = {
    * @returns {Promise<Object>} 标准 API 响应
    */
   async getChannelPrices(skuId) {
-    return request({ url: buildURL(PRODUCT_ENDPOINTS.SKU_CHANNEL_PRICES, { sku_id: skuId }) })
+    return request({ url: buildURL(EXCHANGE_ITEM_ENDPOINTS.SKU_CHANNEL_PRICES, { sku_id: skuId }) })
   },
 
   /**
@@ -167,7 +169,7 @@ export const ProductAPI = {
    * @returns {Promise<Object>} 标准 API 响应
    */
   async setChannelPrices(skuId, prices) {
-    return request({ url: buildURL(PRODUCT_ENDPOINTS.SKU_CHANNEL_PRICES, { sku_id: skuId }), method: 'PUT', data: { prices } })
+    return request({ url: buildURL(EXCHANGE_ITEM_ENDPOINTS.SKU_CHANNEL_PRICES, { sku_id: skuId }), method: 'PUT', data: { prices } })
   },
 
   /**
@@ -176,7 +178,7 @@ export const ProductAPI = {
    * @returns {Promise<Object>} 标准 API 响应
    */
   async listCategories(params = {}) {
-    return request({ url: PRODUCT_ENDPOINTS.CATEGORY_LIST + buildQueryString(params) })
+    return request({ url: EXCHANGE_ITEM_ENDPOINTS.CATEGORY_LIST + buildQueryString(params) })
   },
 
   /**
@@ -185,7 +187,7 @@ export const ProductAPI = {
    * @returns {Promise<Object>} 标准 API 响应
    */
   async getCategory(id) {
-    return request({ url: buildURL(PRODUCT_ENDPOINTS.CATEGORY_DETAIL, { id }) })
+    return request({ url: buildURL(EXCHANGE_ITEM_ENDPOINTS.CATEGORY_DETAIL, { id }) })
   },
 
   /**
@@ -194,7 +196,7 @@ export const ProductAPI = {
    * @returns {Promise<Object>} 标准 API 响应
    */
   async createCategory(data) {
-    return request({ url: PRODUCT_ENDPOINTS.CATEGORY_CREATE, method: 'POST', data })
+    return request({ url: EXCHANGE_ITEM_ENDPOINTS.CATEGORY_CREATE, method: 'POST', data })
   },
 
   /**
@@ -204,7 +206,7 @@ export const ProductAPI = {
    * @returns {Promise<Object>} 标准 API 响应
    */
   async updateCategory(id, data) {
-    return request({ url: buildURL(PRODUCT_ENDPOINTS.CATEGORY_UPDATE, { id }), method: 'PUT', data })
+    return request({ url: buildURL(EXCHANGE_ITEM_ENDPOINTS.CATEGORY_UPDATE, { id }), method: 'PUT', data })
   },
 
   /**
@@ -213,7 +215,7 @@ export const ProductAPI = {
    * @returns {Promise<Object>} 标准 API 响应
    */
   async deleteCategory(id) {
-    return request({ url: buildURL(PRODUCT_ENDPOINTS.CATEGORY_DELETE, { id }), method: 'DELETE' })
+    return request({ url: buildURL(EXCHANGE_ITEM_ENDPOINTS.CATEGORY_DELETE, { id }), method: 'DELETE' })
   },
 
   /**
@@ -222,7 +224,7 @@ export const ProductAPI = {
    * @returns {Promise<Object>} 标准 API 响应
    */
   async getCategoryAttributes(id) {
-    return request({ url: buildURL(PRODUCT_ENDPOINTS.CATEGORY_ATTRIBUTES, { id }) })
+    return request({ url: buildURL(EXCHANGE_ITEM_ENDPOINTS.CATEGORY_ATTRIBUTES, { id }) })
   },
 
   /**
@@ -232,7 +234,7 @@ export const ProductAPI = {
    * @returns {Promise<Object>} 标准 API 响应
    */
   async setCategoryAttributes(id, attributeIds) {
-    return request({ url: buildURL(PRODUCT_ENDPOINTS.CATEGORY_ATTRIBUTES, { id }), method: 'PUT', data: { attribute_ids: attributeIds } })
+    return request({ url: buildURL(EXCHANGE_ITEM_ENDPOINTS.CATEGORY_ATTRIBUTES, { id }), method: 'PUT', data: { attribute_ids: attributeIds } })
   },
 
   /**
@@ -241,7 +243,7 @@ export const ProductAPI = {
    * @returns {Promise<Object>} 标准 API 响应
    */
   async listAttributes(params = {}) {
-    return request({ url: PRODUCT_ENDPOINTS.ATTRIBUTE_LIST + buildQueryString(params) })
+    return request({ url: EXCHANGE_ITEM_ENDPOINTS.ATTRIBUTE_LIST + buildQueryString(params) })
   },
 
   /**
@@ -250,7 +252,7 @@ export const ProductAPI = {
    * @returns {Promise<Object>} 标准 API 响应
    */
   async getAttribute(id) {
-    return request({ url: buildURL(PRODUCT_ENDPOINTS.ATTRIBUTE_DETAIL, { id }) })
+    return request({ url: buildURL(EXCHANGE_ITEM_ENDPOINTS.ATTRIBUTE_DETAIL, { id }) })
   },
 
   /**
@@ -259,7 +261,7 @@ export const ProductAPI = {
    * @returns {Promise<Object>} 标准 API 响应
    */
   async createAttribute(data) {
-    return request({ url: PRODUCT_ENDPOINTS.ATTRIBUTE_CREATE, method: 'POST', data })
+    return request({ url: EXCHANGE_ITEM_ENDPOINTS.ATTRIBUTE_CREATE, method: 'POST', data })
   },
 
   /**
@@ -269,7 +271,7 @@ export const ProductAPI = {
    * @returns {Promise<Object>} 标准 API 响应
    */
   async updateAttribute(id, data) {
-    return request({ url: buildURL(PRODUCT_ENDPOINTS.ATTRIBUTE_UPDATE, { id }), method: 'PUT', data })
+    return request({ url: buildURL(EXCHANGE_ITEM_ENDPOINTS.ATTRIBUTE_UPDATE, { id }), method: 'PUT', data })
   },
 
   /**
@@ -278,7 +280,7 @@ export const ProductAPI = {
    * @returns {Promise<Object>} 标准 API 响应
    */
   async deleteAttribute(id) {
-    return request({ url: buildURL(PRODUCT_ENDPOINTS.ATTRIBUTE_DELETE, { id }), method: 'DELETE' })
+    return request({ url: buildURL(EXCHANGE_ITEM_ENDPOINTS.ATTRIBUTE_DELETE, { id }), method: 'DELETE' })
   },
 
   /**
@@ -288,7 +290,7 @@ export const ProductAPI = {
    * @returns {Promise<Object>} 标准 API 响应
    */
   async createAttributeOption(attributeId, data) {
-    return request({ url: buildURL(PRODUCT_ENDPOINTS.ATTRIBUTE_OPTION_CREATE, { id: attributeId }), method: 'POST', data })
+    return request({ url: buildURL(EXCHANGE_ITEM_ENDPOINTS.ATTRIBUTE_OPTION_CREATE, { id: attributeId }), method: 'POST', data })
   },
 
   /**
@@ -298,7 +300,7 @@ export const ProductAPI = {
    * @returns {Promise<Object>} 标准 API 响应
    */
   async updateAttributeOption(optionId, data) {
-    return request({ url: buildURL(PRODUCT_ENDPOINTS.ATTRIBUTE_OPTION_UPDATE, { option_id: optionId }), method: 'PUT', data })
+    return request({ url: buildURL(EXCHANGE_ITEM_ENDPOINTS.ATTRIBUTE_OPTION_UPDATE, { option_id: optionId }), method: 'PUT', data })
   },
 
   /**
@@ -307,8 +309,28 @@ export const ProductAPI = {
    * @returns {Promise<Object>} 标准 API 响应
    */
   async deleteAttributeOption(optionId) {
-    return request({ url: buildURL(PRODUCT_ENDPOINTS.ATTRIBUTE_OPTION_DELETE, { option_id: optionId }), method: 'DELETE' })
+    return request({ url: buildURL(EXCHANGE_ITEM_ENDPOINTS.ATTRIBUTE_OPTION_DELETE, { option_id: optionId }), method: 'DELETE' })
+  },
+
+  /**
+   * 导出兑换商品列表（CSV/Excel 下载）
+   * @param {Object} [params={}] 筛选参数
+   * @returns {Promise<Object>} 标准 API 响应
+   */
+  async exportItems(params = {}) {
+    return request({ url: EXCHANGE_ITEM_ENDPOINTS.ITEM_EXPORT + buildQueryString(params) })
+  },
+
+  /**
+   * 导入兑换商品（文件上传）
+   * @param {File} file 要上传的文件
+   * @returns {Promise<Object>} 标准 API 响应
+   */
+  async importItems(file) {
+    const formData = new FormData()
+    formData.append('file', file)
+    return request({ url: EXCHANGE_ITEM_ENDPOINTS.ITEM_IMPORT, method: 'POST', data: formData })
   }
 }
 
-export default ProductAPI
+export default ExchangeItemAPI

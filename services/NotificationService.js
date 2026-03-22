@@ -492,7 +492,7 @@ class NotificationService {
       content: '您的兑换申请已提交，积分已扣除，请耐心等待管理员审核',
       data: {
         exchange_id: exchangeData.exchange_id,
-        product_name: exchangeData.product_name,
+        item_name: exchangeData.item_name,
         quantity: exchangeData.quantity,
         total_points: exchangeData.total_points
       }
@@ -509,11 +509,11 @@ class NotificationService {
     return await this.sendToAdmins({
       type: 'exchange_audit',
       title: '新的兑换订单待审核',
-      content: `用户${exchangeData.user_id}申请兑换${exchangeData.product_name} × ${exchangeData.quantity}，总计${exchangeData.total_points}分`,
+      content: `用户${exchangeData.user_id}申请兑换${exchangeData.item_name} × ${exchangeData.quantity}，总计${exchangeData.total_points}分`,
       data: {
         exchange_id: exchangeData.exchange_id,
         user_id: exchangeData.user_id,
-        product_name: exchangeData.product_name,
+        item_name: exchangeData.item_name,
         total_points: exchangeData.total_points,
         product_category: exchangeData.product_category
       }
@@ -531,10 +531,10 @@ class NotificationService {
     return await this.send(user_id, {
       type: 'exchange_approved',
       title: '兑换审核通过',
-      content: `您的兑换申请已审核通过，${exchangeData.quantity}个${exchangeData.product_name}已添加到库存`,
+      content: `您的兑换申请已审核通过，${exchangeData.quantity}个${exchangeData.item_name}已添加到库存`,
       data: {
         exchange_id: exchangeData.exchange_id,
-        product_name: exchangeData.product_name,
+        item_name: exchangeData.item_name,
         quantity: exchangeData.quantity
       }
     })
@@ -554,7 +554,7 @@ class NotificationService {
       content: `您的兑换申请审核未通过，${exchangeData.total_points}积分已退回。拒绝原因：${exchangeData.reject_reason}`,
       data: {
         exchange_id: exchangeData.exchange_id,
-        product_name: exchangeData.product_name,
+        item_name: exchangeData.item_name,
         total_points: exchangeData.total_points,
         reject_reason: exchangeData.reject_reason
       }
@@ -688,7 +688,7 @@ class NotificationService {
     const notificationMap = {
       exchange: {
         title: '兑换审核通过',
-        content: `您的兑换申请已审核通过，${auditData.quantity}个${auditData.product_name}已添加到库存`
+        content: `您的兑换申请已审核通过，${auditData.quantity}个${auditData.item_name}已添加到库存`
       },
       image: {
         title: '图片审核通过',

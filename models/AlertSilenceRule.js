@@ -29,14 +29,20 @@ module.exports = sequelize => {
 
   /**
    * 告警类型常量定义（Alert Type Constants）
-   * 与 RiskAlert 模型的告警类型保持一致
+   * 细粒度分类，与 LotteryAlertService / MerchantRiskControlService 实际生产的告警类型对齐
+   *
+   * 抽奖侧（LotteryAlertService）：win_rate / budget / inventory / user
+   * 风控侧（MerchantRiskControlService）：frequency_limit / amount_limit / duplicate_user / suspicious_pattern
    */
   const ALERT_TYPE = {
-    RISK: 'risk', // 风控告警
-    LOTTERY: 'lottery', // 抽奖告警
-    SYSTEM: 'system', // 系统告警
-    BUDGET: 'budget', // 预算告警
-    USER: 'user' // 用户行为告警
+    WIN_RATE: 'win_rate',
+    BUDGET: 'budget',
+    INVENTORY: 'inventory',
+    USER: 'user',
+    FREQUENCY_LIMIT: 'frequency_limit',
+    AMOUNT_LIMIT: 'amount_limit',
+    DUPLICATE_USER: 'duplicate_user',
+    SUSPICIOUS_PATTERN: 'suspicious_pattern'
   }
 
   const AlertSilenceRule = sequelize.define(
@@ -58,7 +64,8 @@ module.exports = sequelize => {
       alert_type: {
         type: DataTypes.STRING(50),
         allowNull: false,
-        comment: '告警类型（如：risk、lottery、system）'
+        comment:
+          '告警类型：抽奖侧（win_rate/budget/inventory/user）、风控侧（frequency_limit/amount_limit/duplicate_user/suspicious_pattern）'
       },
 
       alert_level: {

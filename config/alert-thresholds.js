@@ -74,45 +74,6 @@ const STOCK_THRESHOLDS = {
 }
 
 /**
- * 转化率相关警报阈值
- * @constant
- */
-const CONVERSION_THRESHOLDS = {
-  /**
-   * 高档中奖率过高警告阈值（百分比）
-   * 高档奖品中奖率超过此值时警告（可能预算消耗过快）
-   */
-  high_tier_rate_warning: parseFloat(process.env.ALERT_HIGH_TIER_RATE_WARNING) || 30,
-
-  /**
-   * 高档中奖率过高危险阈值（百分比）
-   */
-  high_tier_rate_danger: parseFloat(process.env.ALERT_HIGH_TIER_RATE_DANGER) || 50,
-
-  /**
-   * 空奖率过高警告阈值（百分比）
-   * 真正空奖（系统异常）比例超过此值时警告
-   */
-  empty_rate_warning: parseFloat(process.env.ALERT_EMPTY_RATE_WARNING) || 5,
-
-  /**
-   * 空奖率过高危险阈值（百分比）
-   */
-  empty_rate_danger: parseFloat(process.env.ALERT_EMPTY_RATE_DANGER) || 10,
-
-  /**
-   * 保底触发率过高警告阈值（百分比）
-   * fallback 机制触发比例超过此值时警告（可能奖品配置有问题）
-   */
-  fallback_rate_warning: parseFloat(process.env.ALERT_FALLBACK_RATE_WARNING) || 20,
-
-  /**
-   * 保底触发率过高危险阈值（百分比）
-   */
-  fallback_rate_danger: parseFloat(process.env.ALERT_FALLBACK_RATE_DANGER) || 40
-}
-
-/**
  * ROI 相关警报阈值
  * @constant
  */
@@ -310,7 +271,6 @@ module.exports = {
   // 阈值配置
   BUDGET_THRESHOLDS,
   STOCK_THRESHOLDS,
-  CONVERSION_THRESHOLDS,
   ROI_THRESHOLDS,
   USER_BEHAVIOR_THRESHOLDS,
 

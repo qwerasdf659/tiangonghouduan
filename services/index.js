@@ -160,7 +160,7 @@ const LotteryCampaignPricingConfigService = require('./LotteryCampaignPricingCon
 const DictionaryService = require('./DictionaryService') // 字典表管理服务（2026-01-21 API覆盖率补齐）
 const LotteryConfigService = require('./LotteryConfigService') // 抽奖配置管理服务（2026-01-21 API覆盖率补齐）
 const ItemTemplateService = require('./ItemTemplateService') // 物品模板管理服务（2026-01-21 API覆盖率补齐）
-const ProductService = require('./product/ProductService') // 统一商品中心 SPU/SKU（2026-03-20 EAV）
+const ExchangeItemService = require('./exchange/ExchangeItemService') // 兑换商品中心 SPU/SKU
 const AttributeService = require('./product/AttributeService') // EAV属性定义管理（品类绑定/预设值）
 const ExchangeChannelPriceService = require('./product/ExchangeChannelPriceService') // 兑换渠道定价管理
 const AttributeRuleEngine = require('./item/AttributeRuleEngine') // 物品实例属性规则引擎（静态类）
@@ -455,7 +455,7 @@ class ServiceManager {
       this._services.set('dictionary', new DictionaryService(this.models)) // 字典表管理服务（category_defs, rarity_defs, asset_group_defs）
       this._services.set('lottery_config', new LotteryConfigService(this.models)) // 抽奖配置管理服务（lottery_strategy_config, lottery_tier_matrix_config）
       this._services.set('item_template', new ItemTemplateService(this.models)) // 物品模板管理服务（item_templates）
-      this._services.set('unified_product', new ProductService(this.models)) // 统一商品中心（products / product_skus）
+      this._services.set('exchange_item_service', new ExchangeItemService(this.models)) // 兑换商品中心（exchange_items / exchange_item_skus）
       this._services.set('product_attribute', new AttributeService(this.models)) // EAV属性定义管理（品类/属性/预设值）
       this._services.set('exchange_channel_price', new ExchangeChannelPriceService(this.models)) // 兑换渠道定价
       this._services.set('attribute_rule_engine', AttributeRuleEngine) // 物品实例随机属性（模板 meta.attribute_rules）

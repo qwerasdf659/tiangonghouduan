@@ -470,7 +470,7 @@ class MarketListingCoreService {
       if (template) {
         snapshotFields = {
           offer_item_template_id: template.item_template_id,
-          offer_category_def_id: template.category_def_id,
+          offer_category_id: template.category_id,
           offer_item_rarity: template.rarity_code,
           offer_item_display_name: template.display_name
         }
@@ -1232,7 +1232,7 @@ class MarketListingCoreService {
   }
 
   /**
-   * 撤回频率限制检查（每用户每日最多撤回次数，从 system_configs 读取）
+   * 撤回频率限制检查（每用户每日最多撤回次数，从 system_settings 读取）
    *
    * @param {number} sellerUserId - 卖家用户ID
    * @param {Object} transaction - Sequelize 事务
@@ -1336,7 +1336,7 @@ class MarketListingCoreService {
   }
 
   /**
-   * 挂牌价格管控检查（价格上下限，从 system_configs 读取）
+   * 挂牌价格管控检查（价格上下限，从 system_settings 读取）
    *
    * @param {number} priceAmount - 挂牌价格
    * @param {string} priceAssetCode - 结算币种

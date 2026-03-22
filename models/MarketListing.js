@@ -120,15 +120,15 @@ module.exports = sequelize => {
           '挂牌物品模板ID（快照 → item_templates.item_template_id）：仅 listing_kind=item 时有值，挂牌时从物品实例关联的模板复制'
       },
 
-      // 物品类目定义ID（快照，2026-03-16 整数主键迁移）
-      offer_category_def_id: {
+      // 物品品类ID（快照）
+      offer_category_id: {
         type: DataTypes.INTEGER,
         allowNull: true,
         comment:
-          '挂牌物品类目定义ID（快照 → category_defs.category_def_id）：用于前端筛选，挂牌时从物品模板复制',
+          '挂牌物品品类ID（快照 → categories.category_id）：用于前端筛选，挂牌时从物品模板复制',
         references: {
-          model: 'category_defs',
-          key: 'category_def_id'
+          model: 'categories',
+          key: 'category_id'
         },
         onUpdate: 'CASCADE',
         onDelete: 'SET NULL'
@@ -339,10 +339,10 @@ module.exports = sequelize => {
       })
     }
 
-    // 物品类目关联（筛选维度，2026-03-16 整数主键迁移）
-    if (models.CategoryDef) {
-      MarketListing.belongsTo(models.CategoryDef, {
-        foreignKey: 'offer_category_def_id',
+    // 物品品类关联（筛选维度 → categories 表）
+    if (models.Category) {
+      MarketListing.belongsTo(models.Category, {
+        foreignKey: 'offer_category_id',
         as: 'offerCategory',
         comment: '物品类目关联（筛选维度）- 关联挂牌物品的类目'
       })

@@ -56,26 +56,6 @@ function buildPaginationOptions(options, defaultSortBy = 'created_at') {
 class BusinessRecordQueryService {
   /*
    * =================================================================
-   * 抽奖清除设置记录查询
-   * =================================================================
-   */
-
-  /**
-   * @deprecated Table lottery_clear_setting_records has been archived (2026-03-20).
-   * Audit trail is in admin_operation_logs.
-   */
-  static async getLotteryClearSettings(options = {}) {
-    const pagination = buildPaginationOptions(options)
-    return { records: [], pagination: { total: 0, page: pagination.page, page_size: pagination.page_size, total_pages: 0 } }
-  }
-
-  /** @deprecated Table archived 2026-03-20. */
-  static async getLotteryClearSettingById(_record_id) {
-    return null
-  }
-
-  /*
-   * =================================================================
    * 核销订单查询
    * =================================================================
    */
@@ -372,42 +352,153 @@ class BusinessRecordQueryService {
 
   /*
    * =================================================================
-   * 用户角色变更记录查询
+   * 用户角色变更记录查询（从 admin_operation_logs 聚合）
    * =================================================================
    */
 
   /**
-   * @deprecated Table user_role_change_records has been archived (2026-03-20).
-   * Audit trail is in admin_operation_logs.
+   * 查询用户角色变更记录（从 admin_operation_logs 聚合）
+   *
+   * @param {Object} options - 查询选项
+   * @param {number} [options.target_id] - 被操作用户ID
+   * @param {number} [options.operator_id] - 操作者ID
+   * @param {string} [options.start_date] - 开始日期
+   * @param {string} [options.end_date] - 结束日期
+   * @param {number} [options.page=1] - 页码
+   * @param {number} [options.page_size=20] - 每页数量
+   * @returns {Promise<Object>} 变更记录列表和分页信息
    */
   static async getUserRoleChanges(options = {}) {
-    const pagination = buildPaginationOptions(options)
-    return { records: [], pagination: { total: 0, page: pagination.page, page_size: pagination.page_size, total_pages: 0 } }
+    return BusinessRecordQueryService._queryAuditLogs('role_change', options)
   }
 
-  /** @deprecated Table archived 2026-03-20. */
-  static async getUserRoleChangeById(_record_id) {
-    return null
+  /**
+   * 查询单条角色变更记录详情
+   *
+   * @param {number} recordId - 审计日志ID
+   * @returns {Promise<Object|null>} 记录详情
+   */
+  static async getUserRoleChangeById(recordId) {
+    return BusinessRecordQueryService._queryAuditLogById(recordId, 'role_change')
   }
 
   /*
    * =================================================================
-   * 用户状态变更记录查询
+   * 用户状态变更记录查询（从 admin_operation_logs 聚合）
    * =================================================================
    */
 
   /**
-   * @deprecated Table user_status_change_records has been archived (2026-03-20).
-   * Audit trail is in admin_operation_logs.
+   * 查询用户状态变更记录（从 admin_operation_logs 聚合）
+   *
+   * @param {Object} options - 查询选项
+   * @param {number} [options.target_id] - 被操作用户ID
+   * @param {number} [options.operator_id] - 操作者ID
+   * @param {string} [options.start_date] - 开始日期
+   * @param {string} [options.end_date] - 结束日期
+   * @param {number} [options.page=1] - 页码
+   * @param {number} [options.page_size=20] - 每页数量
+   * @returns {Promise<Object>} 变更记录列表和分页信息
    */
   static async getUserStatusChanges(options = {}) {
-    const pagination = buildPaginationOptions(options)
-    return { records: [], pagination: { total: 0, page: pagination.page, page_size: pagination.page_size, total_pages: 0 } }
+    return BusinessRecordQueryService._queryAuditLogs('user_status_change', options)
   }
 
-  /** @deprecated Table archived 2026-03-20. */
-  static async getUserStatusChangeById(_record_id) {
-    return null
+  /**
+   * 查询单条状态变更记录详情
+   *
+   * @param {number} recordId - 审计日志ID
+   * @returns {Promise<Object|null>} 记录详情
+   */
+  static async getUserStatusChangeById(recordId) {
+    return BusinessRecordQueryService._queryAuditLogById(recordId, 'user_status_change')
+  }
+
+  /**
+   * 从 admin_operation_logs 聚合查询审计日志（内部通用方法）
+   *
+   * @param {string} operationType - 操作类型（role_change / user_status_change）
+   * @param {Object} options - 查询选项
+   * @returns {Promise<Object>} { records, pagination }
+   * @private
+   */
+  static async _queryAuditLogs(operationType, options = {}) {
+    const { AdminOperationLog, User } = require('../../models')
+    const { Op } = require('sequelize')
+
+    const { target_id, operator_id, keyword, start_date, end_date } = options
+    const pagination = buildPaginationOptions(options)
+
+    const where = { operation_type: operationType }
+
+    if (target_id) where.target_id = target_id
+    if (operator_id) where.operator_id = operator_id
+
+    if (keyword) {
+      where[Op.or] = [
+        { reason: { [Op.like]: `%${keyword}%` } }
+      ]
+    }
+
+    if (start_date || end_date) {
+      where.created_at = {}
+      if (start_date) where.created_at[Op.gte] = new Date(start_date)
+      if (end_date) where.created_at[Op.lte] = new Date(end_date)
+    }
+
+    const { count, rows } = await AdminOperationLog.findAndCountAll({
+      where,
+      include: [
+        {
+          model: User,
+          as: 'operator',
+          attributes: ['user_id', 'nickname', 'mobile'],
+          required: false
+        }
+      ],
+      order: [['created_at', 'DESC']],
+      offset: (pagination.page - 1) * pagination.page_size,
+      limit: pagination.page_size
+    })
+
+    return {
+      records: rows.map(r => r.toJSON()),
+      pagination: {
+        total: count,
+        page: pagination.page,
+        page_size: pagination.page_size,
+        total_pages: Math.ceil(count / pagination.page_size)
+      }
+    }
+  }
+
+  /**
+   * 从 admin_operation_logs 查询单条审计日志详情
+   *
+   * @param {number} recordId - 审计日志ID
+   * @param {string} operationType - 操作类型
+   * @returns {Promise<Object|null>} 记录详情或 null
+   * @private
+   */
+  static async _queryAuditLogById(recordId, operationType) {
+    const { AdminOperationLog, User } = require('../../models')
+
+    const record = await AdminOperationLog.findOne({
+      where: {
+        admin_operation_log_id: recordId,
+        operation_type: operationType
+      },
+      include: [
+        {
+          model: User,
+          as: 'operator',
+          attributes: ['user_id', 'nickname', 'mobile'],
+          required: false
+        }
+      ]
+    })
+
+    return record ? record.toJSON() : null
   }
 
   /*
@@ -431,14 +522,14 @@ class BusinessRecordQueryService {
    * @returns {Promise<Object>} 记录列表和分页信息
    */
   static async getExchangeRecords(options = {}) {
-    const { ExchangeRecord, User, Product } = require('../../models')
+    const { ExchangeRecord, User, ExchangeItem } = require('../../models')
 
     const { user_id, exchange_item_id, status, order_no, start_date, end_date } = options
     const pagination = buildPaginationOptions(options)
 
     const where = {}
     if (user_id) where.user_id = parseInt(user_id)
-    if (exchange_item_id) where.product_id = parseInt(exchange_item_id)
+    if (exchange_item_id) where.exchange_item_id = parseInt(exchange_item_id)
     if (status) where.status = status
     if (order_no) where.order_no = { [Op.like]: `%${order_no}%` }
     if (start_date || end_date) {
@@ -452,9 +543,9 @@ class BusinessRecordQueryService {
       include: [
         { model: User, as: 'user', attributes: ['user_id', 'nickname', 'mobile'] },
         {
-          model: Product,
-          as: 'product',
-          attributes: ['product_id', 'product_name', 'status'],
+          model: ExchangeItem,
+          as: 'exchangeItem',
+          attributes: ['exchange_item_id', 'item_name', 'status'],
           required: false
         }
       ],
@@ -481,14 +572,14 @@ class BusinessRecordQueryService {
    * @returns {Promise<Object|null>} 记录详情
    */
   static async getExchangeRecordById(record_id) {
-    const { ExchangeRecord, User, Product } = require('../../models')
+    const { ExchangeRecord, User, ExchangeItem } = require('../../models')
 
     const record = await ExchangeRecord.findByPk(parseInt(record_id), {
       include: [
         { model: User, as: 'user', attributes: ['user_id', 'nickname', 'mobile'] },
         {
-          model: Product,
-          as: 'product',
+          model: ExchangeItem,
+          as: 'exchangeItem',
           required: false
         }
       ]

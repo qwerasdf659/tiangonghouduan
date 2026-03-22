@@ -13,7 +13,7 @@
  * - 保存后无需版本号管理，前端下次打开页面自动获取最新配置
  * - 配置变更通过审计日志（AuditLogService）追溯
  *
- * 数据来源：system_configs 表，config_key = 'campaign_placement'
+ * 数据来源：system_settings 表，config_key = 'campaign_placement'
  *
  * @date 2026-02-15
  */

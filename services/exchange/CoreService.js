@@ -66,21 +66,21 @@ class CoreService {
   constructor(models) {
     this.models = models
     this.ExchangeRecord = models.ExchangeRecord
-    this.Product = models.Product
-    this.ProductSku = models.ProductSku
+    this.ExchangeItem = models.ExchangeItem
+    this.ExchangeItemSku = models.ExchangeItemSku
     this.ExchangeChannelPrice = models.ExchangeChannelPrice
   }
 
   /**
    * 兑换商品（核心业务逻辑）
    * V4.5.0 材料资产支付版本（2025-12-15）
-   * V4.9.0 统一商品中心 Product-only（ExchangeItem 已废弃）
+   * V4.9.0 统一商品中心 ExchangeItem 模型
    *
    * 支付方式：使用BalanceService扣减材料资产（cost_asset_code + cost_amount）
-   * 定价来源：Product → ProductSku → ExchangeChannelPrice
+   * 定价来源：ExchangeItem → ExchangeItemSku → ExchangeChannelPrice
    *
    * @param {number} user_id - 用户ID
-   * @param {number} product_id_param - 商品 product_id
+   * @param {number} exchange_item_id - 兑换商品ID
    * @param {number} quantity - 兑换数量
    * @param {Object} options - 选项
    * @param {string} options.idempotency_key - 幂等键（必填）
@@ -89,7 +89,7 @@ class CoreService {
    * @param {Object} [options.sku_spec_values] - SKU 规格值（铸造用）
    * @returns {Promise<Object>} 兑换结果和订单信息
    */
-  async exchangeItem(user_id, product_id_param, quantity = 1, options = {}) {
+  async exchangeItem(user_id, exchange_item_id, quantity = 1, options = {}) {
     const { idempotency_key, sku_id } = options
 
     if (!idempotency_key) {
@@ -101,8 +101,6 @@ class CoreService {
     }
 
     const transaction = assertAndGetTransaction(options, 'CoreService.exchangeItem')
-
-    const product_id = product_id_param
 
     /*
      * ✅ 幂等性检查：以 idempotency_key 为唯一键（统一幂等架构）
@@ -122,14 +120,14 @@ class CoreService {
 
       // 冲突保护：验证请求参数是否一致
       if (
-        Number(existingOrder.product_id) !== Number(product_id) ||
+        Number(existingOrder.exchange_item_id) !== Number(exchange_item_id) ||
         Number(existingOrder.sku_id) !== Number(sku_id) ||
         Number(existingOrder.quantity) !== Number(quantity)
       ) {
         const conflictError = new Error(
           `幂等键冲突：idempotency_key="${idempotency_key}" 已被使用于不同参数的订单。` +
-            `原订单：product_id=${existingOrder.product_id}, sku_id=${existingOrder.sku_id}, 数量=${existingOrder.quantity}；` +
-            `当前请求：product_id=${product_id}, sku_id=${sku_id}, 数量=${quantity}。` +
+            `原订单：exchange_item_id=${existingOrder.exchange_item_id}, sku_id=${existingOrder.sku_id}, 数量=${existingOrder.quantity}；` +
+            `当前请求：exchange_item_id=${exchange_item_id}, sku_id=${sku_id}, 数量=${quantity}。` +
             '请使用不同的幂等键或确认请求参数正确。'
         )
         conflictError.statusCode = 409
@@ -201,7 +199,7 @@ class CoreService {
     }
 
     logger.info(
-      `[兑换市场] 用户${user_id}兑换商品 product_id=${product_id}，数量${quantity}，idempotency_key=${idempotency_key}`
+      `[兑换市场] 用户${user_id}兑换商品 exchange_item_id=${exchange_item_id}，数量${quantity}，idempotency_key=${idempotency_key}`
     )
 
     /*
@@ -209,16 +207,8 @@ class CoreService {
      * 1. 商品信息解析：根据路径获取定价、库存、铸造参数
      * ═══════════════════════════════════════════════════
      */
-    let itemName, itemDescription, costAssetCode, costAmount, imageUrl
-    let costPrice = 0
-    let rarityCode = 'common'
-    let mintInstance = false
-    let itemTemplateId = null
-    let _productRecord = null
-    let productSkuRecord = null
-
-    const product = await this.Product.findOne({
-      where: { product_id },
+    const product = await this.ExchangeItem.findOne({
+      where: { exchange_item_id },
       include: [
         {
           model: this.models.MediaFile,
@@ -238,8 +228,8 @@ class CoreService {
       throw new Error('商品已下架')
     }
 
-    const productSku = await this.ProductSku.findOne({
-      where: { sku_id, product_id, status: 'active' },
+    const productSku = await this.ExchangeItemSku.findOne({
+      where: { sku_id, exchange_item_id, status: 'active' },
       lock: transaction.LOCK.UPDATE,
       transaction
     })
@@ -261,19 +251,18 @@ class CoreService {
       throw new Error('该 SKU 兑换定价当前未在发布窗口内')
     }
 
-    itemName = product.product_name
-    itemDescription = product.description
-    costAssetCode = channelPrice.cost_asset_code
-    costAmount = Number(channelPrice.cost_amount)
-    imageUrl = product.primary_media?.object_key
+    const itemName = product.item_name
+    const itemDescription = product.description
+    const costAssetCode = channelPrice.cost_asset_code
+    const costAmount = Number(channelPrice.cost_amount)
+    const imageUrl = product.primary_media?.object_key
       ? getImageUrl(product.primary_media.object_key)
       : null
-    costPrice = productSku.cost_price || 0
-    rarityCode = product.rarity_code || 'common'
-    mintInstance = product.mint_instance
-    itemTemplateId = product.item_template_id
-    _productRecord = product
-    productSkuRecord = productSku
+    const costPrice = productSku.cost_price || 0
+    const rarityCode = product.rarity_code || 'common'
+    const mintInstance = product.mint_instance
+    const itemTemplateId = product.item_template_id
+    const productSkuRecord = productSku
 
     // 2. 计算总支付金额
     const totalPayAmount = costAmount * quantity
@@ -310,9 +299,9 @@ class CoreService {
         counterpart_account_id: burnAccount.account_id,
         meta: {
           idempotency_key,
-          product_id,
+          exchange_item_id,
           sku_id,
-          product_name: itemName,
+          item_name: itemName,
           quantity,
           cost_amount: costAmount,
           total_pay_amount: totalPayAmount
@@ -368,7 +357,7 @@ class CoreService {
      */
     let record
     try {
-      const business_id = `exchange_${user_id}_p${product_id}_s${sku_id}_${Date.now()}`
+      const business_id = `exchange_${user_id}_p${exchange_item_id}_s${sku_id}_${Date.now()}`
 
       record = await this.ExchangeRecord.create(
         {
@@ -377,13 +366,12 @@ class CoreService {
           business_id,
           debit_transaction_id,
           user_id,
-          exchange_item_id: null,
-          product_id,
+          exchange_item_id,
           sku_id,
           item_snapshot: {
-            product_id,
-sku_id,
-item_name: itemName,
+            exchange_item_id,
+            sku_id,
+            item_name: itemName,
             description: itemDescription,
             cost_asset_code: costAssetCode,
             cost_amount: costAmount,
@@ -420,7 +408,7 @@ item_name: itemName,
       throw createError
     }
 
-    // 6. 扣减库存（Product SKU）
+    // 6. 扣减库存（ExchangeItem SKU）
     await productSkuRecord.update(
       {
         stock: productSkuRecord.stock - quantity,
@@ -444,8 +432,8 @@ item_name: itemName,
           target_type: 'product_sku',
           target_id: productSkuRecord.sku_id,
           action: 'purchase',
-          before_data: { stock: productSkuRecord.stock, product_name: itemName },
-          after_data: { stock: productSkuRecord.stock - quantity, product_name: itemName },
+          before_data: { stock: productSkuRecord.stock, item_name: itemName },
+          after_data: { stock: productSkuRecord.stock - quantity, item_name: itemName },
           changed_fields: {
             stock: {
               from: productSkuRecord.stock,
@@ -468,7 +456,7 @@ item_name: itemName,
     /*
      * ═══════════════════════════════════════════════════
      * EAV改造：铸造物品实例分支
-     * Product.item_template_id → ItemTemplate → 铸造
+     * ExchangeItem.item_template_id → ItemTemplate → 铸造
      * ═══════════════════════════════════════════════════
      */
     let mintedItem = null
@@ -482,7 +470,7 @@ item_name: itemName,
         if (!template) {
           logger.warn('[兑换市场] 铸造跳过：关联的物品模板不存在', {
             item_template_id: itemTemplateId,
-            product_id
+            exchange_item_id
           })
         } else {
           // 计算限量编号（按 item_template_id 计数 + 1）
@@ -569,7 +557,7 @@ item_name: itemName,
         }
         logger.error('[兑换市场] ❌ 物品铸造失败（非致命，订单仍创建）', {
           error: mintError.message,
-          product_id,
+          exchange_item_id,
           order_no
         })
       }
@@ -588,8 +576,8 @@ item_name: itemName,
         operator_type: 'user',
         reason: '用户兑换商品',
         metadata: {
-          product_id,
-sku_id,
+          exchange_item_id,
+          sku_id,
           quantity,
           pay_amount: totalPayAmount,
           minted_item_id: mintedItem?.item_id || null
@@ -1252,7 +1240,7 @@ sku_id,
 
     const old_status = order.status
 
-    // 退款防刷检查（三层防护，从 system_configs 读取配置，初始值全 0 = 关闭）
+    // 退款防刷检查（三层防护，从 system_settings 读取配置，初始值全 0 = 关闭）
     await this._checkRefundRules(order, transaction)
 
     // 退还材料资产到用户账户
@@ -1283,15 +1271,15 @@ sku_id,
     )
 
     // 恢复商品库存（退款回补）
-    const restoreProductId = order.product_id || order.exchange_item_id
-    if (restoreProductId) {
-      const product = await this.Product.findByPk(restoreProductId, { transaction })
-      if (product) {
+    const restoreItemId = order.exchange_item_id
+    if (restoreItemId) {
+      const exchangeItem = await this.ExchangeItem.findByPk(restoreItemId, { transaction })
+      if (exchangeItem) {
         const quantity = order.quantity || 1
-        await product.update(
+        await exchangeItem.update(
           {
-            stock: product.stock + quantity,
-            sold_count: Math.max(0, product.sold_count - quantity)
+            stock: exchangeItem.stock + quantity,
+            sold_count: Math.max(0, exchangeItem.sold_count - quantity)
           },
           { transaction }
         )
@@ -1301,13 +1289,13 @@ sku_id,
             {
               operator_id: null,
               operation_type: 'stock_change',
-              target_type: 'product',
-              target_id: product.product_id,
+              target_type: 'exchange_item',
+              target_id: exchangeItem.exchange_item_id,
               action: 'refund',
-              before_data: { stock: product.stock, product_name: product.product_name },
-              after_data: { stock: product.stock + quantity, product_name: product.product_name },
+              before_data: { stock: exchangeItem.stock, item_name: exchangeItem.item_name },
+              after_data: { stock: exchangeItem.stock + quantity, item_name: exchangeItem.item_name },
               changed_fields: {
-                stock: { from: product.stock, to: product.stock + quantity, delta: quantity }
+                stock: { from: exchangeItem.stock, to: exchangeItem.stock + quantity, delta: quantity }
               },
               reason: `退款回补库存（订单：${order.exchange_record_id}，数量：${quantity}）`,
               risk_level: 'low',
@@ -1431,7 +1419,7 @@ sku_id,
 
   /**
    * 退款防刷检查（配置驱动三层防护）
-   * 从 system_configs 读取规则，初始值全 0 = 关闭，上线后按需开启
+   * 从 system_settings 读取规则，初始值全 0 = 关闭，上线后按需开启
    *
    * @param {Object} order - 兑换订单记录
    * @param {Transaction} transaction - 事务对象
@@ -1465,7 +1453,7 @@ sku_id,
     if (cooldownHours > 0) {
       const { getRedisClient } = require('../../utils/UnifiedRedisClient')
       const redis = await getRedisClient()
-      const cooldownKey = `app:v4:refund_cooldown:${order.user_id}:${order.product_id || order.exchange_item_id}`
+      const cooldownKey = `app:v4:refund_cooldown:${order.user_id}:${order.exchange_item_id || order.exchange_item_id}`
       const exists = await redis.exists(cooldownKey)
       if (exists) {
         const error = new Error(`退款冷却期内不可再次兑换同一商品（冷却${cooldownHours}小时）`)

@@ -56,7 +56,7 @@ function asyncHandler(fn) {
  * @query {string} asset_code - 材料资产代码筛选（可选）
  * @query {string} space - 空间筛选：lucky/premium（可选，不传返回全部）
  * @query {string} keyword - 模糊搜索（匹配 item_name，可选）
- * @query {number} category_def_id - 分类ID筛选（category_defs.category_def_id，可选）
+ * @query {number} category_id - 分类ID筛选（category_defs.category_id，可选）
  * @query {number} min_cost - 最低价格（可选）
  * @query {number} max_cost - 最高价格（可选）
  * @query {string} stock_status - 库存状态：in_stock(>5)/low_stock(1-5)（可选）
@@ -79,7 +79,7 @@ router.get(
       asset_code,
       space,
       keyword,
-      category_def_id,
+      category_id,
       exclude_id,
       min_cost,
       max_cost,
@@ -148,7 +148,7 @@ router.get(
       asset_code,
       space: space || null,
       keyword: keyword || null,
-      category: category_def_id || null,
+      category: category_id || null,
       exclude_id: exclude_id || null,
       min_cost: min_cost ? parseInt(min_cost, 10) : null,
       max_cost: max_cost ? parseInt(max_cost, 10) : null,
@@ -354,6 +354,11 @@ router.post(
         is_duplicate: false
       }
 
+      // 铸造了物品实例时，返回实例信息给前端
+      if (result.minted_item) {
+        responseData.minted_item = result.minted_item
+      }
+
       // 标记幂等请求完成
       await IdempotencyService.markAsCompleted(idempotency_key, result.order.order_no, responseData)
 
@@ -372,10 +377,10 @@ router.post(
       NotificationService.notifyNewExchangeAudit({
         exchange_id: result.order.record_id,
         user_id,
-        product_name: result.order.item_name,
+        item_name: result.order.item_name,
         quantity: exchangeQuantity,
         total_points: result.order.pay_amount,
-        product_category: 'exchange'
+        item_category: 'exchange'
       }).catch(notifyError => {
         logger.error('[兑换] 通知管理员失败（不影响兑换结果）', { error: notifyError.message })
       })
@@ -485,7 +490,7 @@ router.post(
  *
  * @query {string} space - 空间类型（必填）：lucky / premium
  *
- * @returns {Object} { space, total_products, new_count, hot_count, asset_code_distribution }
+ * @returns {Object} { space, total_items, new_count, hot_count, asset_code_distribution }
  */
 router.get(
   '/space-stats',

@@ -28,7 +28,7 @@ class AttributeRuleEngine {
    *
    * @param {import('sequelize').Model} itemTemplate - ItemTemplate 实例（需含 meta）
    * @param {Object} [skuSpecValues={}] - SKU 规格快照（透传合并到结果）
-   * @returns {Object} 含 quality_score、quality_grade、pattern_id、instance_attributes 及 skuSpecValues 展开
+   * @returns {Object} 含 quality_score、quality_grade、pattern_id 及 skuSpecValues 展开的扁平对象
    */
   static generate(itemTemplate, skuSpecValues = {}) {
     const meta =
@@ -49,15 +49,12 @@ class AttributeRuleEngine {
     }
 
     const out = { ...skuSpecValues }
-    const instanceAttributes = {}
 
     if (rules.quality_score && typeof rules.quality_score === 'object') {
       const qs = AttributeRuleEngine.generateQualityScore(rules.quality_score)
       if (qs && typeof qs.quality_score === 'number') {
         out.quality_score = qs.quality_score
         out.quality_grade = qs.quality_grade
-        instanceAttributes.quality_score = qs.quality_score
-        instanceAttributes.quality_grade = qs.quality_grade
       }
     }
 
@@ -65,12 +62,7 @@ class AttributeRuleEngine {
       const pid = AttributeRuleEngine.generatePatternId(rules.pattern_id)
       if (pid != null) {
         out.pattern_id = pid
-        instanceAttributes.pattern_id = pid
       }
-    }
-
-    if (Object.keys(instanceAttributes).length > 0) {
-      out.instance_attributes = instanceAttributes
     }
 
     return out

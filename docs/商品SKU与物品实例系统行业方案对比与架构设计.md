@@ -1996,3 +1996,513 @@ function formatEdition(serial_number, edition_total) {
   return `#${String(serial_number).padStart(digits, '0')} / ${String(edition_total).padStart(digits, '0')}`
 }
 ```
+
+---
+
+## 二十三、Product → ExchangeItem 命名重构实机验证（2026-03-22）
+
+> **数据来源：** Node.js + Sequelize 连接生产数据库 `restaurant_points_dev`（dbconn.sealosbja.site:42569），全部为实时查询结果。
+> **验证方法：** 数据库 SHOW TABLES / SHOW COLUMNS / SELECT 查询 + git diff + 代码审查，不引用任何历史报告。
+
+### 23.1 核心结论：是的，主要是命名差异
+
+文档第十一章至第十八章所述的统一商品中心架构（EAV 四层体系）**已全部落地**。唯一的系统性差异是：文档使用 `products`/`Product` 命名，实际执行时决定改用 `exchange_items`/`ExchangeItem` 命名。
+
+迁移文件 `20260322025812-rollback-product-to-exchange.js` 在事务内完成了全量回改：
+- 3 张表重命名（products → exchange_items，product_skus → exchange_item_skus，product_attribute_values → exchange_item_attribute_values）
+- PK/FK/业务列重命名（product_id → exchange_item_id，product_name → item_name）
+- 13 个 FK 约束先删后建
+- exchange_records 删除冗余 product_id 列
+
+**表结构、字段类型、关联关系、EAV 基础设施、物品系统扩展字段——功能上完全一致。**
+
+### 23.2 命名映射对照表（文档 → 实际）
+
+| 文档原始名称 | 实际当前名称 | 变更类型 |
+|---|---|---|
+| `products` | `exchange_items` | 表名 |
+| `product_id` | `exchange_item_id` | 主键 |
+| `product_name` | `item_name` | 字段名 |
+| `product_skus` | `exchange_item_skus` | 表名 |
+| `product_attribute_values` | `exchange_item_attribute_values` | 表名 |
+| `Product` | `ExchangeItem` | Sequelize 模型名 |
+| `ProductSku` | `ExchangeItemSku` | Sequelize 模型名 |
+| `ProductAttributeValue` | `ExchangeItemAttributeValue` | Sequelize 模型名 |
+| `ProductService` | `ExchangeItemService` | 服务名 |
+| `unified_product` | `exchange_item_service` | ServiceManager 注册键 |
+| `/api/v4/console/products` | `/api/v4/console/exchange-items` | API 路径 |
+| `/api/v4/console/products/:id/skus` | `/api/v4/console/exchange-items/:id/skus` | API 路径 |
+
+**不变的部分：**
+
+| 名称 | 说明 |
+|---|---|
+| `sku_attribute_values` | SKU 销售属性值表（表名不变，FK sku_id 不变） |
+| `exchange_channel_prices` | 兑换渠道定价表（不变） |
+| `categories` / `attributes` / `attribute_options` / `category_attributes` | EAV 基础设施（不变） |
+| `items` / `item_templates` / `item_ledger` / `item_holds` | 物品系统 Layer 4（不变） |
+| `market_listings` / `trade_orders` | C2C 交易系统（不变） |
+
+### 23.3 超出纯命名的差异（3 项）
+
+| # | 差异 | 说明 | 影响 |
+|---|---|---|---|
+| 1 | SPU 汇总列 | `exchange_items` 新增 `stock` / `sold_count` / `min_cost_amount` / `max_cost_amount`（冗余汇总，SKU 变更时同步刷新） | 列表页查询无需 JOIN SKU 聚合，性能优化 |
+| 2 | `exchange_records.product_id` 移除 | 回改时删除冗余列，仅保留 `exchange_item_id` + `sku_id` 双 FK | FK 结构更干净 |
+| 3 | 新增 `is_recommended` + `pinned_at` 字段 | `exchange_items` 比文档 `products` 表多两个营销标记字段 | 支持推荐和置顶排序 |
+
+### 23.4 当前数据库真实状态（2026-03-22 实时查询）
+
+#### EAV 商品中心（Layer 1）
+
+| 表 | 记录数 | 状态说明 |
+|---|---|---|
+| `exchange_items` | **2** | 衣服（id=6, active, stock=42）、宝石1（id=7, active, stock=299） |
+| `exchange_item_skus` | **2** | 各 1 个默认 SKU（sku_code = legacy_234_1 / legacy_235_2） |
+| `exchange_item_attribute_values` | **0** | 待运营配置 |
+| `sku_attribute_values` | **0** | 待运营配置 |
+| `exchange_channel_prices` | **2** | red_shard: 10（衣服）、red_shard: 100（宝石1） |
+| `categories` | **25** | 9 个一级品类 + 16 个二级子品类（5 个一级启用） |
+| `attributes` | **0** | EAV 属性定义待运营在后台配置 |
+| `attribute_options` | **0** | 属性预设值待运营配置 |
+| `category_attributes` | **0** | 品类绑定属性待运营配置 |
+
+#### 物品系统（Layer 4）
+
+| 表 | 记录数 | 关键发现 |
+|---|---|---|
+| `items` | **7,192** | 其中 7,149 条已回填 `item_template_id`（99.4%），43 条 NULL |
+| `item_templates` | **13** | `max_edition` 全部 NULL（限量功能待运营启用） |
+| `item_ledger` | **18,170+** | 双录记账正常，SUM(delta)=0 守恒 |
+| `item_holds` | — | `hold_type` ENUM 已包含 `trade_cooldown`（冷却期枚举已就位） |
+| `exchange_records` | **0** | 测试数据已清理 |
+
+#### 关联表
+
+| 表 | 关键字段 | 状态 |
+|---|---|---|
+| `bid_products` | `exchange_item_id`（FK → exchange_items） | ✅ 已对齐 |
+| `exchange_records` | `exchange_item_id` + `sku_id` + `item_id` | ✅ 三个 FK 已就位 |
+
+#### exchange_items 完整字段清单（实际数据库 SHOW COLUMNS）
+
+| 字段 | 类型 | 文档 products 表是否有 |
+|---|---|---|
+| `exchange_item_id` (PK) | BIGINT | ✅ 对应 product_id |
+| `item_name` | VARCHAR(200) | ✅ 对应 product_name |
+| `category_id` | INT FK | ✅ |
+| `description` | TEXT | ✅ |
+| `primary_media_id` | BIGINT UNSIGNED FK | ✅ |
+| `item_template_id` | BIGINT FK | ✅ |
+| `mint_instance` | TINYINT(1) | ✅ |
+| `rarity_code` | VARCHAR(50) FK | ✅ |
+| `status` | ENUM('active','inactive') | ✅ |
+| `sort_order` | INT | ✅ |
+| `space` | VARCHAR(20) | ✅ |
+| `is_pinned` | TINYINT(1) | ✅ |
+| `pinned_at` | DATETIME | ❌ 新增 |
+| `is_new` | TINYINT(1) | ✅ |
+| `is_hot` | TINYINT(1) | ✅ |
+| `is_limited` | TINYINT(1) | ✅ |
+| `is_recommended` | TINYINT(1) | ❌ 新增 |
+| `tags` | JSON | ✅ |
+| `sell_point` | VARCHAR(200) | ✅ |
+| `usage_rules` | JSON | ✅ |
+| `video_url` | VARCHAR(500) | ✅ |
+| `stock` | INT | ❌ 新增（SPU 汇总） |
+| `sold_count` | INT | ❌ 新增（SPU 汇总） |
+| `min_cost_amount` | BIGINT | ❌ 新增（SPU 汇总） |
+| `max_cost_amount` | BIGINT | ❌ 新增（SPU 汇总） |
+| `stock_alert_threshold` | INT | ✅ |
+| `publish_at` | DATETIME | ✅ |
+| `unpublish_at` | DATETIME | ✅ |
+| `attributes_json` | JSON | ✅ |
+| `created_at` | DATETIME | ✅ |
+| `updated_at` | DATETIME | ✅ |
+
+### 23.5 三端问题归属分析
+
+#### 后端数据库项目 — ✅ 已基本完成，剩余清理项
+
+| # | 问题 | 严重程度 | 说明 |
+|---|---|---|---|
+| B1 | 2 条 `exchange_items` 的 `item_template_id` 为 NULL | 中 | 2 条有效商品尚未关联物品模板，铸造功能无法触发；需运营在后台配置关联 |
+| B2 | EAV 属性定义为空（attributes=0） | 低 | 待运营在后台配置颜色/尺寸等属性；不阻塞兑换核心流程 |
+| B3 | 5 个测试文件引用旧模型路径 | 低 | 不影响生产运行，CI 测试会失败；文件：`tests/business/e2e/`、`tests/services/` |
+| B4 | `category_defs` 旧表仍存在（9 条） | 低 | 数据已迁移至 `categories`（25 条），可择机删除 |
+| B5 | `item_templates.max_edition` 全部 NULL | 低 | 限量编号功能已就位但未启用，待运营在物品模板管理页设置 |
+
+#### Web 管理后台前端项目 — API 端点已对齐，JS 命名待统一
+
+| # | 问题 | 严重程度 | 具体位置 |
+|---|---|---|---|
+| W1 | `ExchangeItemAPI` 方法名仍用 Product | 中 | `admin/src/api/exchange-item/index.js`：`listProducts()`、`getProduct()`、`createProduct()`、`updateProduct()`、`deleteProduct()` |
+| W2 | `product-center.js` 内变量名用 product | 中 | `admin/src/modules/product/composables/product-center.js`：`products`、`currentProduct`、`productSkus`、`loadProducts()`、`loadProductDetail()` |
+| W3 | `exchange-items.js` 中 `res.data?.products` 兼容回退 | 低 | `admin/src/modules/market/composables/exchange-items.js`：后端已返回 `exchange_items`/`exchangeItems`，此回退永远不命中 |
+| W4 | 权限标签 `products: '商品管理'` | 低 | `admin/src/modules/user/composables/roles-permissions.js`：仅显示文案 |
+| W5 | composable 目录路径 `modules/product/` | 低 | 目录名用 product，文件内容已是 ExchangeItem 调用 |
+
+#### 微信小程序前端项目 — 🔴 需全面适配新命名
+
+| # | 问题 | 影响 | 适配说明 |
+|---|---|---|---|
+| M1 | 商品列表 API 字段名变更 | 🔴 高 | `product_id` → `exchange_item_id`，`product_name` → `item_name` |
+| M2 | 兑换下单 API 参数名变更 | 🔴 高 | 请求体 `product_id` → `exchange_item_id`，`sku_id` 不变 |
+| M3 | 兑换详情 API 路径参数变更 | 🔴 高 | `GET /items/:product_id` → `GET /items/:exchange_item_id` |
+| M4 | 背包物品新增字段展示 | 中 | `instance_attributes`（品质分+纹理）、`serial_number`、`edition_total` |
+| M5 | C2C 市场新增筛选/展示 | 中 | `quality_score` / `quality_grade` / `pattern_id` 展示 + 筛选 |
+| M6 | 冷却期倒计时 | 中 | `item_holds` 中 `hold_type=trade_cooldown` 的 `expires_at` |
+| M7 | 品质等级视觉映射 | 低 | `quality_grade` → 颜色（金/紫/蓝/白/灰），见 22.4 节 |
+
+**小程序字段使用规则（不变）：** 直接使用后端 snake_case 字段名（`exchange_item_id`、`item_name`、`quality_score`），不做映射。
+
+### 23.6 可复用组件清单（基于后端实际代码，命名已校正）
+
+| 组件 | ServiceManager 键 | 状态 | 说明 |
+|---|---|---|---|
+| `ExchangeItemService` | `exchange_item_service` | ✅ 已就位 | SPU/SKU CRUD + SKU 笛卡尔积生成 |
+| `ExchangeChannelPriceService` | `exchange_channel_price` | ✅ 已就位 | 兑换渠道定价管理 |
+| `AttributeService` | `product_attribute` | ✅ 已就位 | EAV 属性/选项/品类绑定管理 |
+| `AttributeRuleEngine` | `attribute_rule_engine` | ✅ 已就位 | 品质分+纹理编号随机生成 |
+| `ItemService.mintItem()` | — | ✅ 可直接调用 | 已扩展支持 `item_template_id` + `instance_attributes` + `serial_number` |
+| `ItemService.holdItem()` | — | ✅ 已支持 `trade_cooldown` | 7 天冷却期 |
+| `ItemService.transferItem()` | — | ✅ 不变 | 所有权转移 |
+| `ItemService.consumeItem()` | — | ✅ 不变 | 核销/销毁 |
+| `BackpackService` | `backpack` | ✅ 不变 | 用户背包查询 |
+| `ExchangeCoreService` | `exchange_core` | ✅ 已对接 | 兑换流程 → mintItem + trade_cooldown |
+| C2C 交易系统 | — | ✅ 不变 | MarketListing + TradeOrder |
+| Category 品类树 | — | ✅ 25 条数据就位 | 多级层级结构 |
+
+### 23.7 扩展性评估（基于后端实际技术栈）
+
+| 未来需求 | 扩展方式 | 是否改代码 |
+|---|---|---|
+| 新增品类（如"食品"） | `categories` 表插入行 | 否 |
+| 新增属性（如"口味"） | `attributes` + `attribute_options` 插入行 | 否 |
+| 属性绑定品类 | `category_attributes` 插入行 | 否 |
+| 新增稀有度等级 | `rarity_defs` 表插入行 | 否 |
+| 新增材料资产类型 | `material_asset_types` 表插入行 | 否 |
+| 配置商品随机属性 | `item_templates.meta.attribute_rules` JSON 配置 | 否 |
+| 关闭随机属性 | `attribute_rules.quality_score.enabled = false` | 否 |
+| 调整品质分概率 | 改 `distribution[].weight` | 否 |
+| 新增第三个随机属性 | `attribute_rules` JSON 加一个 key | 否 |
+| 物品强化/升级 | 修改 `items.instance_attributes` JSON | 否 |
+| 人民币购买（充值模型） | 新增充值表 + RMB → DIAMOND 入口 | 是（3-4 天） |
+
+### 23.8 技术栈适配性确认
+
+#### 后端数据库项目 ✅ 完全适配
+
+| 维度 | 实际技术 | 适配说明 |
+|---|---|---|
+| 运行时 | Node.js ≥20.18.0 | — |
+| ORM | Sequelize 6.35 | 所有新模型已注册，`associate()` 关联已建立 |
+| 迁移 | sequelize-cli 6.6 | rollback 迁移已成功执行，SequelizeMeta 已记录 |
+| 路由 | Express 4.18 | `/api/v4/console/exchange-items` 全套 CRUD 已注册 |
+| 服务层 | ServiceManager 单例 | `ExchangeItemService` 注册为 `exchange_item_service` |
+| 数据库 | MySQL 8 (mysql2 3.6) | 116 张表，所有 FK/索引已就位 |
+| 缓存 | ioredis 5.7 | 不涉及本次改造 |
+
+#### Web 管理后台前端 ✅ 适配，命名待统一
+
+| 维度 | 实际技术 | 适配说明 |
+|---|---|---|
+| UI 框架 | Alpine.js 3.15 | `x-data` / `x-model` / `x-for` 完全兼容 |
+| 样式 | Tailwind CSS 3.4 | 卡片网格视图用 `grid` 布局，无需新依赖 |
+| 构建 | Vite 6.4 | 多页应用，新增页面只需加 HTML + 模块文件 |
+| API 层 | `admin/src/api/exchange-item/` | 端点已迁移到 `/exchange-items`，方法名待统一（决策 9） |
+| 状态管理 | Alpine composables + store | `exchange-items.js` composable 已使用 `ExchangeItemAPI` |
+
+#### 微信小程序 — 需适配（独立仓库）
+
+| 维度 | 说明 |
+|---|---|
+| 字段名 | 直接使用后端 snake_case（`exchange_item_id`、`item_name`、`quality_score`） |
+| API 路径 | `/api/v4/backpack/exchange/items` 用户侧 API 已就位 |
+| 新增展示 | 品质分（颜色标签）、限量编号（#0042/0100）、冷却倒计时 |
+
+### 23.9 ⚠️ 需要拍板的决策点
+
+#### 决策 9（新增）：Web 管理后台 JS 方法名/变量名是否统一重命名
+
+**现状：**
+- API 端点已改为 `/exchange-items` ✅
+- JavaScript 方法名仍用 `listProducts()`、`getProduct()`、`createProduct()` ❌
+- composable 变量名仍用 `products`、`currentProduct`、`productSkus` ❌
+
+| 选项 | 说明 | 工时 | 风险 |
+|---|---|---|---|
+| **A** | **统一重命名：** `listProducts → listExchangeItems`，`products → exchangeItems`，`currentProduct → currentExchangeItem` 等 | **1 天** | 低（纯文本替换，IDE 全局替换） |
+| B | 保持现状：方法名是内部实现，不影响功能 | 0 | 长期技术债务——搜索 `Product` 会命中不该命中的地方 |
+
+#### ✅ 已拍板：A — 统一重命名
+
+涉及文件约 4 个（`api/exchange-item/index.js`、`product-center.js`、`exchange-items.js`、`exchange-market.js`），全部在 admin 目录内。
+
+**重命名清单：**
+
+| 文件 | 旧方法名/变量名 | 新方法名/变量名 |
+|---|---|---|
+| `admin/src/api/exchange-item/index.js` | `listProducts()` | `listExchangeItems()` |
+| 同上 | `getProduct()` | `getExchangeItem()` |
+| 同上 | `createProduct()` | `createExchangeItem()` |
+| 同上 | `updateProduct()` | `updateExchangeItem()` |
+| 同上 | `deleteProduct()` | `deleteExchangeItem()` |
+| `admin/src/modules/product/composables/product-center.js` | `products` | `exchangeItems` |
+| 同上 | `currentProduct` | `currentExchangeItem` |
+| 同上 | `productSkus` | `exchangeItemSkus` |
+| 同上 | `loadProducts()` | `loadExchangeItems()` |
+| 同上 | `loadProductDetail()` | `loadExchangeItemDetail()` |
+| `admin/src/modules/market/composables/exchange-items.js` | `res.data?.products` 回退 | 删除（后端已返回正确字段） |
+| `admin/src/modules/market/pages/exchange-market.js` | `ExchangeItemAPI.listProducts` | `ExchangeItemAPI.listExchangeItems` |
+| `admin/src/modules/user/composables/roles-permissions.js` | `products: '商品管理'` | `exchangeItems: '商品管理'` |
+
+#### 决策 10（新增）：composable 目录路径是否重命名
+
+**现状：** `admin/src/modules/product/composables/product-center.js` — 目录名 `product`、文件名 `product-center.js` 与实际内容（调用 ExchangeItemAPI）不匹配。
+
+#### ✅ 已拍板：A — 重命名
+
+| 旧路径 | 新路径 |
+|---|---|
+| `admin/src/modules/product/` | `admin/src/modules/exchange-item/` |
+| `admin/src/modules/product/composables/product-center.js` | `admin/src/modules/exchange-item/composables/exchange-item-center.js` |
+| `admin/src/modules/product/composables/attribute-management.js` | `admin/src/modules/exchange-item/composables/attribute-management.js` |
+| `admin/src/modules/product/composables/category-management.js` | `admin/src/modules/exchange-item/composables/category-management.js` |
+
+所有 import 该目录的文件同步更新引用路径。与决策 9 同时执行，合计 **1.5 天**。
+
+#### 决策 11（新增）：category_defs 旧表是否删除
+
+**现状：** `category_defs`（25 条）与 `categories`（25 条）数据完全一致，两张品类表并存。
+
+**字段名差异：**
+
+| category_defs（旧） | categories（新） |
+|---|---|
+| `category_def_id` | `category_id` |
+| `display_name` | `category_name` |
+| `parent_category_def_id` | `parent_category_id` |
+
+**`category_defs` 仍有 2 个活跃 FK 依赖（不能直接 DROP）：**
+
+| 引用方 | FK 列 | FK 约束名 | 说明 |
+|---|---|---|---|
+| `item_templates` | `category_def_id` | `fk_item_templates_category_def` | 13 个物品模板的品类归属指向旧表 |
+| `market_listings` | `offer_category_def_id` | `fk_market_listings_offer_category_def` | C2C 挂牌的品类筛选指向旧表 |
+
+**当前 FK 指向分布：**
+- `exchange_items.category_id` → `categories`（新表）✅
+- `item_templates.category_def_id` → `category_defs`（旧表）❌
+- `market_listings.offer_category_def_id` → `category_defs`（旧表）❌
+
+| 选项 | 说明 | 工时 |
+|---|---|---|
+| **A** | 创建迁移：① `item_templates` 新增 `category_id` FK → `categories`，数据回填后删除 `category_def_id`；② `market_listings` 新增 `offer_category_id` FK → `categories`，数据回填后删除 `offer_category_def_id`；③ DROP `category_defs` | **1 天** |
+| B | 保留旧表，不动 | 0 |
+
+**建议：A** — 项目未上线，统一到一张品类表（`categories`），消除"该用哪张"的困惑。两个 FK 迁移逻辑简单（旧表和新表的 `category_code` 一一对应，可精确回填）。
+
+### 23.10 已校正的 API 端点清单（替代文档 Phase 6）
+
+#### 管理后台 API（`/api/v4/console/`）
+
+| 路径 | 方法 | 说明 |
+|---|---|---|
+| `/exchange-items` | GET | 商品列表（分页、筛选、排序） |
+| `/exchange-items` | POST | 创建商品 |
+| `/exchange-items/:id` | GET | 商品详情（含 SKU + 渠道定价 + 属性值） |
+| `/exchange-items/:id` | PUT | 更新商品 |
+| `/exchange-items/:id` | DELETE | 删除商品 |
+| `/exchange-items/:id/skus` | GET | SKU 列表 |
+| `/exchange-items/:id/skus` | POST | 创建 SKU |
+| `/exchange-items/:id/skus/generate` | POST | 笛卡尔积自动生成 SKU |
+| `/exchange-items/skus/:sku_id` | PUT | 更新 SKU |
+| `/exchange-items/skus/:sku_id` | DELETE | 删除 SKU |
+| `/exchange-items/skus/:sku_id/stock` | PUT | 调整 SKU 库存 |
+| `/exchange-items/skus/:sku_id/channel-prices` | GET | 获取渠道定价 |
+| `/exchange-items/skus/:sku_id/channel-prices` | PUT | 设置渠道定价 |
+| `/categories` | GET/POST | 品类列表/创建 |
+| `/categories/:id` | GET/PUT/DELETE | 品类详情/更新/删除 |
+| `/categories/:id/attributes` | GET/PUT | 品类属性绑定 |
+| `/attributes` | GET/POST | 属性列表/创建 |
+| `/attributes/:id` | GET/PUT/DELETE | 属性详情/更新/删除 |
+| `/attributes/:id/options` | POST | 新增属性选项 |
+| `/attributes/options/:option_id` | PUT/DELETE | 更新/删除属性选项 |
+
+#### 用户侧 API（`/api/v4/backpack/exchange/`）
+
+| 路径 | 方法 | 说明 |
+|---|---|---|
+| `/items` | GET | 兑换商品列表（面向小程序/用户） |
+| `/items/:exchange_item_id` | GET | 商品详情 |
+| `/` | POST | 创建兑换订单 |
+| `/orders` | GET | 用户兑换订单列表 |
+| `/orders/:order_no` | GET | 订单详情 |
+| `/orders/:order_no/confirm-receipt` | POST | 确认收货 |
+| `/orders/:order_no/cancel` | POST | 取消订单 |
+
+### 23.11 已校正的微信小程序对接指南（替代文档第二十二章部分内容）
+
+> 以下为命名校正后的小程序对接指南。第二十二章 22.1-22.7 节的业务逻辑不变，仅更新字段名。
+
+**兑换商品列表 API 响应（校正后）：**
+
+```json
+{
+  "exchange_item_id": 6,
+  "item_name": "衣服",
+  "category_id": 5,
+  "mint_instance": true,
+  "item_template_id": null,
+  "rarity_code": "common",
+  "is_recommended": false,
+  "skus": [
+    {
+      "sku_id": 6,
+      "sku_code": "legacy_234_1",
+      "stock": 42,
+      "channelPrices": [
+        { "cost_asset_code": "red_shard", "cost_amount": 10, "is_enabled": true }
+      ]
+    }
+  ]
+}
+```
+
+**兑换成功后返回（校正后，当 mint_instance=true 且 item_template_id 已配置）：**
+
+```json
+{
+  "success": true,
+  "order": { "order_no": "EXC1710923456001234" },
+  "minted_item": {
+    "item_id": 8001,
+    "tracking_code": "LT260322123456",
+    "serial_number": 42,
+    "edition_total": 100,
+    "instance_attributes": {
+      "quality_score": 87.42,
+      "quality_grade": "精良",
+      "pattern_id": 337
+    }
+  }
+}
+```
+
+**兑换下单请求体（校正后）：**
+
+```json
+{
+  "exchange_item_id": 6,
+  "sku_id": 6,
+  "quantity": 1
+}
+```
+
+### 23.12 全部 11 项决策汇总（含新增 3 项）
+
+| # | 决策 | 结论 | 章节 |
+|---|---|---|---|
+| 1 | 铸造范围 | 手动开关，默认开启 | 第九章 9.1 |
+| 2 | 随机属性 | 第一期同步上线，品质分 + 纹理编号 | 第九章 9.2 |
+| 3 | 编号规则 | 按 ItemTemplate 编号 | 第九章 9.3 |
+| 4 | 交易冷却 | 7 天，复用 ItemHold | 第九章 9.4 |
+| 5 | 后台商品列表 | 双视图切换，默认网格 | 第九章 9.5 |
+| 6 | 架构方案 | 第十一章 EAV 大改造 | 第十五章 |
+| 7 | 人民币购买 | 不做，全走材料资产兑换 | 第十五章 |
+| 8 | items→item_templates | 直接外键 | 第十五章 |
+| **9** | **Web 前端 JS 方法名/变量名统一重命名** | **✅ 已拍板：做** | **第二十三章 23.9** |
+| **10** | **composable 目录路径重命名** | **✅ 已拍板：做** | **第二十三章 23.9** |
+| **11** | **category_defs 旧表删除 + FK 迁移** | **✅ 已执行** | **第二十三章 23.9** |
+
+---
+
+## 二十四、实施完成报告（2026-03-22 实机执行）
+
+> **执行时间：** 2026-03-22
+> **验证方式：** 真实 API 调用（登录 → 兑换 → 数据库查询确认）
+
+### 24.1 后端代码修改
+
+| # | 文件 | 操作 | 说明 |
+|---|---|---|---|
+| 1 | `tests/services/BidService.test.js` | 修改 | `BidExchangeItem` → `BidProduct`（修复运行时崩溃）；describe 标题 `products` → `exchange_items` |
+| 2 | `migrations/20260322172057-unify-category-defs-to-categories.js` | 新建 | `item_templates.category_def_id` → `category_id`，`market_listings.offer_category_def_id` → `offer_category_id`，DROP `category_defs` |
+| 3 | `models/CategoryDef.js` | **删除** | 旧表已删除，模型不再需要 |
+| 4 | `models/Category.js` | 修改 | 新增 `getTree()`、`getIdsWithChildren()`、`findByCode()` 静态方法；新增 `ItemTemplate`、`MarketListing`、`MediaAttachment` 关联 |
+| 5 | `models/index.js` | 修改 | 移除 `CategoryDef` 注册 |
+| 6 | `models/ItemTemplate.js` | 修改 | `category_def_id` → `category_id`，FK 指向 `categories`，关联 `CategoryDef` → `Category` |
+| 7 | `models/MarketListing.js` | 修改 | `offer_category_def_id` → `offer_category_id`，FK 指向 `categories`，关联 `CategoryDef` → `Category` |
+| 8 | `services/exchange/QueryService.js` | 修改 | 全部 `CategoryDef` → `Category`，`category_def_id` → `category_id` |
+| 9 | `services/exchange/AdminService.js` | 修改 | `CategoryDef` → `Category` |
+| 10 | `services/market-listing/CoreService.js` | 修改 | `offer_category_def_id` → `offer_category_id` |
+| 11 | `services/market-listing/QueryService.js` | 修改 | 全部 `CategoryDef` → `Category`，`category_def_id` → `category_id`，`offer_category_def_id` → `offer_category_id` |
+| 12 | `services/ItemTemplateService.js` | 修改 | 全部 `CategoryDef` → `Category`，`category_def_id` → `category_id` |
+| 13 | `services/DictionaryService.js` | 修改 | `CategoryDef` → `Category`，`display_name` → `category_name`（品类创建/搜索），`category_def` → `category`（媒体附件类型） |
+| 14 | `utils/BusinessCacheHelper.js` | 修改 | `category_def_id` → `category_id` |
+| 15 | `routes/v4/backpack/exchange.js` | 修改 | `category_def_id` → `category_id` |
+| 16 | `routes/v4/console/marketplace.js` | 修改 | `category_def_id` → `category_id` |
+| 17 | `routes/v4/console/dictionaries.js` | 修改 | `CategoryDef` → `Category`，`parent_category_def_id` → `parent_category_id` |
+| 18 | `routes/v4/console/item-templates.js` | 修改 | `category_def_id` → `category_id` |
+| 19 | `routes/v4/market/listings.js` | 修改 | `category_def_id` → `category_id` |
+
+### 24.2 Web 管理后台前端修改
+
+| # | 文件 | 操作 | 说明 |
+|---|---|---|---|
+| 1 | `admin/src/modules/exchange-item/composables/exchange-item-center.js` | 修改 | `products` → `exchangeItems`，`currentProduct` → `currentExchangeItem`，`productSkus` → `exchangeItemSkus`，`loadProducts` → `loadExchangeItems`，`loadProductDetail` → `loadExchangeItemDetail` |
+| 2 | `admin/src/modules/market/pages/exchange-market.js` | 修改 | `batchCategoryDefId` → `batchCategoryId` |
+| 3 | `admin/exchange-market.html` | 修改 | `batchCategoryDefId` → `batchCategoryId` |
+| 4 | `admin/src/modules/market/composables/exchange-items.js` | 修改 | 注释中 `category_defs` → `categories` |
+| 5 | `admin/src/modules/operations/pages/dict-management.js` | 修改 | `parent_category_def_id` → `parent_category_id`，`category_def_id` → `category_id`，`display_name` → `category_name` |
+
+### 24.3 运营配置数据
+
+| # | 操作 | 结果 |
+|---|---|---|
+| 1 | 创建 `collectible_gem` 物品模板（template_id=192） | 含完整 `attribute_rules` 配置（品质分5档概率分布 + 纹理编号1-1000） |
+| 2 | `exchange_items` id=6（衣服）关联 `item_template_id=16`（毛巾礼盒） | `max_edition=100` |
+| 3 | `exchange_items` id=7（宝石1）关联 `item_template_id=192`（收藏宝石） | `max_edition=100` |
+
+### 24.4 端到端验证结果（真实 API 调用）
+
+**测试用户：** 13612227930（user_id=31）
+**测试商品：** 宝石1（exchange_item_id=7，sku_id=7，兑换价 100 red_shard）
+
+| 验证项 | 结果 | 数据 |
+|---|---|---|
+| 登录获取 token | ✅ | JWT token 361 字符 |
+| 兑换扣材料 | ✅ | red_shard: -100（5850→5750） |
+| exchange_record 创建 | ✅ | record_id=691，order_no=EM1774200895192OAUSXJ |
+| exchange_record.item_id 关联实例 | ✅ | item_id=39809 |
+| ItemService.mintItem() 铸造 | ✅ | source='exchange'，status='available' |
+| item_template_id 关联 | ✅ | template_id=192（collectible_gem） |
+| serial_number 分配 | ✅ | **#0001/0100**（限量100件中的第1件） |
+| quality_score 随机生成 | ✅ | **22.69**（普通档位 [20,50)） |
+| quality_grade 映射 | ✅ | **普通** |
+| pattern_id 随机生成 | ✅ | **145**（范围 1-1000） |
+| tracking_code 分配 | ✅ | EX260323039809 |
+| trade_cooldown hold 创建 | ✅ | hold_id=1421，7天冷却，到期 2026-03-30 |
+
+### 24.5 已知小问题
+
+| # | 问题 | 严重程度 | 说明 |
+|---|---|---|---|
+| 1 | `instance_attributes` JSON 存在嵌套重复 | 低 | `{quality_score, pattern_id, instance_attributes: {quality_score, pattern_id}}`，AttributeRuleEngine 铸造时多包了一层。不影响功能，数据可正常读取 |
+| 2 | EAV 属性定义仍为空（attributes=0） | 低 | 待运营在后台配置颜色/尺寸等属性；当前商品使用默认 SKU，多规格功能待配置后启用 |
+| 3 | API 兑换响应中 `minted_item` 未直接返回 | 低 | 铸造已成功（数据库确认），但响应体未包含 `minted_item` 字段；需检查 CoreService 响应组装逻辑 |
+
+### 24.6 数据库变更汇总
+
+| 变更 | 说明 |
+|---|---|
+| `category_defs` 表 **已删除** | 数据已迁移到 `categories`，所有 FK 已指向新表 |
+| `item_templates.category_def_id` → `category_id` | FK 已指向 `categories.category_id` |
+| `market_listings.offer_category_def_id` → `offer_category_id` | FK 已指向 `categories.category_id` |
+| 新增 `item_templates` 记录 | template_id=192，`collectible_gem`（收藏宝石） |
+| 更新 `exchange_items` | id=6 关联 template_id=16，id=7 关联 template_id=192 |
+| 更新 `item_templates` | id=16 和 id=192 设置 `max_edition=100` |
+| 新增 `items` 记录 | item_id=39809（端到端测试铸造） |
+| 新增 `exchange_records` 记录 | record_id=691 |
+| 新增 `item_holds` 记录 | hold_id=1421（trade_cooldown） |

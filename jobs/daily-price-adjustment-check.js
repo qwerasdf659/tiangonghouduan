@@ -5,7 +5,7 @@
  * 如果是则生成调价建议记录，待运营确认后执行。
  *
  * 依赖 DAU 每日统计数据（ad_dau_daily_stats）和
- * 调价触发配置（system_configs.ad_price_adjustment_trigger）。
+ * 调价触发配置（system_settings.ad_price_adjustment_trigger）。
  *
  * @module jobs/daily-price-adjustment-check
  */

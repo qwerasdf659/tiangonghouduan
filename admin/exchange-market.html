@@ -530,7 +530,7 @@
         <p class="text-sm text-gray-500">已选 <span class="font-bold text-purple-600" x-text="batchCategoryIds.length"></span> 个商品</p>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">目标分类</label>
-          <select x-model.number="batchCategoryDefId" class="w-full border rounded px-3 py-2 text-sm">
+          <select x-model.number="batchCategoryId" class="w-full border rounded px-3 py-2 text-sm">
             <option value="">请选择分类</option>
             <template x-for="cat in (categoryOptions || [])" :key="cat.value">
               <option :value="cat.value" x-text="cat.label"></option>
@@ -540,7 +540,7 @@
       </div>
       <div class="p-4 border-t flex justify-end gap-2">
         <button @click="hideModal('batchCategoryModal')" class="px-4 py-2 text-sm border rounded hover:bg-gray-50">取消</button>
-        <button @click="submitBatchCategory()" :disabled="!batchCategoryDefId" class="px-4 py-2 text-sm bg-purple-500 text-white rounded hover:bg-purple-600 disabled:opacity-50">确认修改</button>
+        <button @click="submitBatchCategory()" :disabled="!batchCategoryId" class="px-4 py-2 text-sm bg-purple-500 text-white rounded hover:bg-purple-600 disabled:opacity-50">确认修改</button>
       </div>
     </div>
   </div>
@@ -635,7 +635,7 @@
         <div class="p-6 space-y-4">
           <div>
             <label class="block text-sm font-medium themed-text-secondary mb-1">商品名称 <span class="text-red-500">*</span></label>
-            <input type="text" x-model="itemForm.product_name" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500" required>
+            <input type="text" x-model="itemForm.item_name" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500" required>
           </div>
           <div>
             <label class="block text-sm font-medium themed-text-secondary mb-1">商品描述</label>

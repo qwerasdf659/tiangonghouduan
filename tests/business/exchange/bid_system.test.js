@@ -116,9 +116,9 @@ describe('竞价系统功能测试 (Bid System — 臻选空间/幸运空间/竞
 
       expect(res.body.success).toBe(true)
       expect(res.body.data).toHaveProperty('space', 'lucky')
-      expect(res.body.data).toHaveProperty('total_products')
-      expect(typeof res.body.data.total_products).toBe('number')
-      expect(res.body.data.total_products).toBeGreaterThanOrEqual(0)
+      expect(res.body.data).toHaveProperty('total_items')
+      expect(typeof res.body.data.total_items).toBe('number')
+      expect(res.body.data.total_items).toBeGreaterThanOrEqual(0)
     })
 
     test('缺少 space 参数应返回错误', async () => {

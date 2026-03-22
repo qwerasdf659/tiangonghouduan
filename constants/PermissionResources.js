@@ -162,12 +162,6 @@ const PERMISSION_RESOURCES = Object.freeze([
     name: '活动预算',
     actions: [{ code: 'read', name: '查看' }]
   },
-  {
-    code: 'popup-banners',
-    name: '弹窗横幅',
-    actions: [{ code: 'read', name: '查看' }]
-  },
-
   // ==================== 系统配置模块 ====================
   {
     code: 'profile',

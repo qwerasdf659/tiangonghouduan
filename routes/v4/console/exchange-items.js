@@ -14,16 +14,18 @@ const TransactionManager = require('../../../utils/TransactionManager')
 const logger = require('../../../utils/logger').logger
 
 /**
- * @param {import('express').Request} req - 请求
- * @returns {import('../../../services/product/ProductService')}
+ * 获取兑换商品服务
+ * @param {Object} req - Express 请求对象
+ * @returns {Object} ExchangeItemService 实例
  */
-function getProductService(req) {
-  return req.app.locals.services.getService('unified_product')
+function getExchangeItemService(req) {
+  return req.app.locals.services.getService('exchange_item_service')
 }
 
 /**
- * @param {import('express').Request} req - 请求
- * @returns {import('../../../services/product/ExchangeChannelPriceService')}
+ * 获取渠道定价服务
+ * @param {Object} req - Express 请求对象
+ * @returns {Object} ExchangeChannelPriceService 实例
  */
 function getExchangeChannelPriceService(req) {
   return req.app.locals.services.getService('exchange_channel_price')
@@ -34,10 +36,10 @@ function getExchangeChannelPriceService(req) {
  */
 router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const service = getProductService(req)
+    const service = getExchangeItemService(req)
     const { category_id, status, space, rarity_code, keyword, page, page_size } = req.query
 
-    const result = await service.listProducts(
+    const result = await service.listExchangeItems(
       { category_id, status, space, rarity_code, keyword },
       { page, page_size }
     )
@@ -116,11 +118,11 @@ router.put(
  */
 router.put('/skus/:sku_id/stock', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const productService = getProductService(req)
+    const exchangeItemService = getExchangeItemService(req)
     const { delta } = req.body || {}
 
     const sku = await TransactionManager.execute(async transaction => {
-      return await productService.adjustStock(req.params.sku_id, delta, { transaction })
+      return await exchangeItemService.adjustStock(req.params.sku_id, delta, { transaction })
     })
 
     return res.apiSuccess(sku.get ? sku.get({ plain: true }) : sku, '调整库存成功')
@@ -140,10 +142,10 @@ router.put('/skus/:sku_id/stock', authenticateToken, requireRoleLevel(100), asyn
  */
 router.put('/skus/:sku_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const productService = getProductService(req)
+    const exchangeItemService = getExchangeItemService(req)
 
     const sku = await TransactionManager.execute(async transaction => {
-      return await productService.updateSku(req.params.sku_id, req.body || {}, { transaction })
+      return await exchangeItemService.updateSku(req.params.sku_id, req.body || {}, { transaction })
     })
 
     return res.apiSuccess(sku.get ? sku.get({ plain: true }) : sku, '更新 SKU 成功')
@@ -163,10 +165,10 @@ router.put('/skus/:sku_id', authenticateToken, requireRoleLevel(100), async (req
  */
 router.delete('/skus/:sku_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const productService = getProductService(req)
+    const exchangeItemService = getExchangeItemService(req)
 
     await TransactionManager.execute(async transaction => {
-      return await productService.deleteSku(req.params.sku_id, { transaction })
+      return await exchangeItemService.deleteSku(req.params.sku_id, { transaction })
     })
 
     return res.apiSuccess({ sku_id: parseInt(req.params.sku_id, 10) }, '删除 SKU 成功')
@@ -188,11 +190,11 @@ router.delete('/skus/:sku_id', authenticateToken, requireRoleLevel(100), async (
  */
 router.post('/:id/skus/generate', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const productService = getProductService(req)
+    const exchangeItemService = getExchangeItemService(req)
     const { sale_attribute_options } = req.body || {}
 
     const created = await TransactionManager.execute(async transaction => {
-      return await productService.generateSkuCartesian(req.params.id, sale_attribute_options, {
+      return await exchangeItemService.generateSkuCartesian(req.params.id, sale_attribute_options, {
         transaction
       })
     })
@@ -205,7 +207,7 @@ router.post('/:id/skus/generate', authenticateToken, requireRoleLevel(100), asyn
       '批量生成 SKU 成功'
     )
   } catch (error) {
-    logger.error('生成 SKU 失败', { product_id: req.params.id, error: error.message })
+    logger.error('生成 SKU 失败', { exchange_item_id: req.params.id, error: error.message })
     return res.apiError(
       `生成 SKU 失败: ${error.message}`,
       error.code || 'PRODUCT_CENTER_SKU_GENERATE_FAILED',
@@ -220,16 +222,16 @@ router.post('/:id/skus/generate', authenticateToken, requireRoleLevel(100), asyn
  */
 router.get('/:id/skus', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const { ProductSku, SkuAttributeValue, Attribute, AttributeOption, ExchangeChannelPrice } =
-      getProductService(req).models
+    const { ExchangeItemSku, SkuAttributeValue, Attribute, AttributeOption, ExchangeChannelPrice } =
+      getExchangeItemService(req).models
 
     const pid = parseInt(req.params.id, 10)
     if (Number.isNaN(pid)) {
-      return res.apiError('product_id 无效', 'PRODUCT_CENTER_INVALID_PRODUCT_ID', null, 400)
+      return res.apiError('exchange_item_id 无效', 'PRODUCT_CENTER_INVALID_PRODUCT_ID', null, 400)
     }
 
-    const rows = await ProductSku.findAll({
-      where: { product_id: pid },
+    const rows = await ExchangeItemSku.findAll({
+      where: { exchange_item_id: pid },
       order: [
         ['sort_order', 'ASC'],
         ['sku_id', 'ASC']
@@ -250,7 +252,7 @@ router.get('/:id/skus', authenticateToken, requireRoleLevel(100), async (req, re
 
     return res.apiSuccess({ items: rows.map(r => r.get({ plain: true })) }, '获取 SKU 列表成功')
   } catch (error) {
-    logger.error('获取 SKU 列表失败', { product_id: req.params.id, error: error.message })
+    logger.error('获取 SKU 列表失败', { exchange_item_id: req.params.id, error: error.message })
     return res.apiError(
       `获取 SKU 列表失败: ${error.message}`,
       error.code || 'PRODUCT_CENTER_SKU_LIST_FAILED',
@@ -265,15 +267,15 @@ router.get('/:id/skus', authenticateToken, requireRoleLevel(100), async (req, re
  */
 router.post('/:id/skus', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const productService = getProductService(req)
+    const exchangeItemService = getExchangeItemService(req)
 
     const sku = await TransactionManager.execute(async transaction => {
-      return await productService.createSku(req.params.id, req.body || {}, { transaction })
+      return await exchangeItemService.createSku(req.params.id, req.body || {}, { transaction })
     })
 
     return res.apiSuccess(sku.get ? sku.get({ plain: true }) : sku, '创建 SKU 成功')
   } catch (error) {
-    logger.error('创建 SKU 失败', { product_id: req.params.id, error: error.message })
+    logger.error('创建 SKU 失败', { exchange_item_id: req.params.id, error: error.message })
     return res.apiError(
       `创建 SKU 失败: ${error.message}`,
       error.code || 'PRODUCT_CENTER_SKU_CREATE_FAILED',
@@ -288,14 +290,14 @@ router.post('/:id/skus', authenticateToken, requireRoleLevel(100), async (req, r
  */
 router.get('/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const service = getProductService(req)
-    const row = await service.getProductDetail(req.params.id)
+    const service = getExchangeItemService(req)
+    const row = await service.getExchangeItemDetail(req.params.id)
     if (!row) {
       return res.apiError('商品不存在', 'PRODUCT_CENTER_PRODUCT_NOT_FOUND', null, 404)
     }
     return res.apiSuccess(row.get({ plain: true }), '获取商品详情成功')
   } catch (error) {
-    logger.error('获取商品详情失败', { product_id: req.params.id, error: error.message })
+    logger.error('获取商品详情失败', { exchange_item_id: req.params.id, error: error.message })
     return res.apiError(
       `获取商品详情失败: ${error.message}`,
       error.code || 'PRODUCT_CENTER_PRODUCT_DETAIL_FAILED',
@@ -310,10 +312,10 @@ router.get('/:id', authenticateToken, requireRoleLevel(100), async (req, res) =>
  */
 router.post('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const productService = getProductService(req)
+    const exchangeItemService = getExchangeItemService(req)
 
     const created = await TransactionManager.execute(async transaction => {
-      return await productService.createProduct(req.body || {}, { transaction })
+      return await exchangeItemService.createExchangeItem(req.body || {}, { transaction })
     })
 
     return res.apiSuccess(created.get ? created.get({ plain: true }) : created, '创建商品成功')
@@ -333,15 +335,17 @@ router.post('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
  */
 router.put('/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const productService = getProductService(req)
+    const exchangeItemService = getExchangeItemService(req)
 
     const row = await TransactionManager.execute(async transaction => {
-      return await productService.updateProduct(req.params.id, req.body || {}, { transaction })
+      return await exchangeItemService.updateExchangeItem(req.params.id, req.body || {}, {
+        transaction
+      })
     })
 
     return res.apiSuccess(row.get ? row.get({ plain: true }) : row, '更新商品成功')
   } catch (error) {
-    logger.error('更新商品失败', { product_id: req.params.id, error: error.message })
+    logger.error('更新商品失败', { exchange_item_id: req.params.id, error: error.message })
     return res.apiError(
       `更新商品失败: ${error.message}`,
       error.code || 'PRODUCT_CENTER_PRODUCT_UPDATE_FAILED',
@@ -356,15 +360,15 @@ router.put('/:id', authenticateToken, requireRoleLevel(100), async (req, res) =>
  */
 router.delete('/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const productService = getProductService(req)
+    const exchangeItemService = getExchangeItemService(req)
 
     await TransactionManager.execute(async transaction => {
-      return await productService.deleteProduct(req.params.id, { transaction })
+      return await exchangeItemService.deleteExchangeItem(req.params.id, { transaction })
     })
 
-    return res.apiSuccess({ product_id: req.params.id }, '删除商品成功')
+    return res.apiSuccess({ exchange_item_id: req.params.id }, '删除商品成功')
   } catch (error) {
-    logger.error('删除商品失败', { product_id: req.params.id, error: error.message })
+    logger.error('删除商品失败', { exchange_item_id: req.params.id, error: error.message })
     return res.apiError(
       `删除商品失败: ${error.message}`,
       error.code || 'PRODUCT_CENTER_PRODUCT_DELETE_FAILED',

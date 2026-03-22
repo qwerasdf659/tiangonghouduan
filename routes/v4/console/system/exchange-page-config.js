@@ -13,7 +13,7 @@
  * - 保存后清除 Redis 缓存，小程序下次打开页面自动获取最新配置
  * - 配置变更通过审计日志（AuditLogService）追溯
  *
- * 数据来源：system_configs 表，config_key = 'exchange_page'
+ * 数据来源：system_settings 表，config_key = 'exchange_page'
  *
  * @date 2026-02-19
  */

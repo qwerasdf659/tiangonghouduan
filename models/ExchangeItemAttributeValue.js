@@ -1,15 +1,13 @@
 /**
- * SPU 非销售属性值模型（EAV — 商品层）
+ * SPU 非销售属性值模型（EAV — 兑换商品层）
  *
  * 业务用途：
- * - 存储「不拆 SKU」的商品描述型属性（如材质、产地、证书编号），与统一 SPU（products）绑定
+ * - 存储「不拆 SKU」的商品描述型属性（如材质、产地、证书编号），与兑换商品 SPU（exchange_items）绑定
  * - 与 SKU 级销售属性（sku_attribute_values）区分：本表不参与规格组合，仅用于详情展示与检索
  *
  * 数据关系：
- * - 多对一归属某商品（product_id），并指向属性定义（attribute_id）
- * - 库表层对 (product_id, attribute_id) 唯一，避免同一属性重复录入
- *
- * @see migrations/20260320200000-create-table-unified-product-center.js
+ * - 多对一归属某商品（exchange_item_id），并指向属性定义（attribute_id）
+ * - 库表层对 (exchange_item_id, attribute_id) 唯一，避免同一属性重复录入
  */
 
 'use strict'
@@ -17,21 +15,21 @@
 const { Model, DataTypes } = require('sequelize')
 
 /**
- * @class ProductAttributeValue
- * @description 商品（SPU）非销售属性值
+ * @class ExchangeItemAttributeValue
+ * @description 兑换商品（SPU）非销售属性值
  */
-class ProductAttributeValue extends Model {
+class ExchangeItemAttributeValue extends Model {
   /**
    * 定义模型关联
    * @param {Object} models - Sequelize 已加载的模型集合
    * @returns {void}
    */
   static associate(models) {
-    ProductAttributeValue.belongsTo(models.Product, {
-      foreignKey: 'product_id',
-      as: 'product'
+    ExchangeItemAttributeValue.belongsTo(models.ExchangeItem, {
+      foreignKey: 'exchange_item_id',
+      as: 'exchangeItem'
     })
-    ProductAttributeValue.belongsTo(models.Attribute, {
+    ExchangeItemAttributeValue.belongsTo(models.Attribute, {
       foreignKey: 'attribute_id',
       as: 'attribute'
     })
@@ -40,10 +38,10 @@ class ProductAttributeValue extends Model {
 
 /**
  * @param {import('sequelize').Sequelize} sequelize - Sequelize 实例
- * @returns {typeof ProductAttributeValue}
+ * @returns {typeof ExchangeItemAttributeValue}
  */
 module.exports = sequelize => {
-  ProductAttributeValue.init(
+  ExchangeItemAttributeValue.init(
     {
       /** 主键 */
       id: {
@@ -52,14 +50,14 @@ module.exports = sequelize => {
         autoIncrement: true,
         comment: '主键'
       },
-      /** 所属统一商品 SPU */
-      product_id: {
+      /** 所属兑换商品 SPU */
+      exchange_item_id: {
         type: DataTypes.BIGINT,
         allowNull: false,
-        comment: '所属商品（products.product_id）',
+        comment: '所属兑换商品（exchange_items.exchange_item_id）',
         references: {
-          model: 'products',
-          key: 'product_id'
+          model: 'exchange_items',
+          key: 'exchange_item_id'
         },
         onUpdate: 'CASCADE',
         onDelete: 'CASCADE'
@@ -85,15 +83,15 @@ module.exports = sequelize => {
     },
     {
       sequelize,
-      modelName: 'ProductAttributeValue',
-      tableName: 'product_attribute_values',
+      modelName: 'ExchangeItemAttributeValue',
+      tableName: 'exchange_item_attribute_values',
       underscored: true,
       timestamps: true,
       createdAt: 'created_at',
       updatedAt: 'updated_at',
-      comment: 'SPU 非销售属性值（EAV 商品中心）'
+      comment: '兑换商品 SPU 非销售属性值（EAV 商品中心）'
     }
   )
 
-  return ProductAttributeValue
+  return ExchangeItemAttributeValue
 }

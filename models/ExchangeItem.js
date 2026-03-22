@@ -1,18 +1,18 @@
 /**
- * 统一商品 SPU 模型（统一商品中心 Layer 1）
+ * 兑换商品 SPU 模型（统一商品中心 Layer 1）
  *
  * 业务场景：
  * - 作为兑换/商城侧的「商品主数据」，承载名称、品类、图文、营销标签与上下架节奏
  * - 关联物品模板与稀有度，支撑铸造实例与展示策略
- * - 具体库存与渠道定价在 SKU 层（product_skus、exchange_channel_prices）维护
+ * - 具体库存与渠道定价在 SKU 层（exchange_item_skus、exchange_channel_prices）维护
  *
- * 表名：products；主键：product_id（BIGINT）
+ * 表名：exchange_items；主键：exchange_item_id（BIGINT）
  *
  * 关联说明（兑换渠道定价）：
- * - 定价行挂在 SKU 上（exchange_channel_prices.sku_id → product_skus）
- * - 商品与定价无直接外键；预加载请使用 Product → ProductSku → ExchangeChannelPrice 嵌套 include
+ * - 定价行挂在 SKU 上（exchange_channel_prices.sku_id → exchange_item_skus）
+ * - 商品与定价无直接外键；预加载请使用 ExchangeItem → ExchangeItemSku → ExchangeChannelPrice 嵌套 include
  *
- * @module models/Product
+ * @module models/ExchangeItem
  */
 
 'use strict'
@@ -20,10 +20,10 @@
 const { Model, DataTypes } = require('sequelize')
 
 /**
- * 商品（SPU）模型类
+ * 兑换商品（SPU）模型类
  * 职责：描述可售卖商品主体，聚合 SKU 与属性值
  */
-class Product extends Model {
+class ExchangeItem extends Model {
   /**
    * 定义模型关联
    *
@@ -31,20 +31,20 @@ class Product extends Model {
    * @returns {void}
    */
   static associate(models) {
-    Product.belongsTo(models.Category, {
+    ExchangeItem.belongsTo(models.Category, {
       foreignKey: 'category_id',
       as: 'category'
     })
 
     if (models.ItemTemplate) {
-      Product.belongsTo(models.ItemTemplate, {
+      ExchangeItem.belongsTo(models.ItemTemplate, {
         foreignKey: 'item_template_id',
         as: 'itemTemplate'
       })
     }
 
     if (models.RarityDef) {
-      Product.belongsTo(models.RarityDef, {
+      ExchangeItem.belongsTo(models.RarityDef, {
         foreignKey: 'rarity_code',
         targetKey: 'rarity_code',
         as: 'rarityDef'
@@ -52,30 +52,30 @@ class Product extends Model {
     }
 
     if (models.MediaFile) {
-      Product.belongsTo(models.MediaFile, {
+      ExchangeItem.belongsTo(models.MediaFile, {
         foreignKey: 'primary_media_id',
         as: 'primary_media'
       })
     }
 
-    if (models.ProductSku) {
-      Product.hasMany(models.ProductSku, {
-        foreignKey: 'product_id',
+    if (models.ExchangeItemSku) {
+      ExchangeItem.hasMany(models.ExchangeItemSku, {
+        foreignKey: 'exchange_item_id',
         as: 'skus'
       })
     }
 
-    if (models.ProductAttributeValue) {
-      Product.hasMany(models.ProductAttributeValue, {
-        foreignKey: 'product_id',
+    if (models.ExchangeItemAttributeValue) {
+      ExchangeItem.hasMany(models.ExchangeItemAttributeValue, {
+        foreignKey: 'exchange_item_id',
         as: 'attributeValues'
       })
     }
 
     /**
-     * 兑换渠道定价经 SKU 中转，不在此声明 Product.hasMany(ExchangeChannelPrice)，
+     * 兑换渠道定价经 SKU 中转，不在此声明 ExchangeItem.hasMany(ExchangeChannelPrice)，
      * 避免与表结构（定价表仅含 sku_id）不一致。
-     * 典型查询：include: [{ model: ProductSku, as: 'skus', include: [{ model: ExchangeChannelPrice, as: '...' }] }]
+     * 典型查询：include: [{ model: ExchangeItemSku, as: 'skus', include: [{ model: ExchangeChannelPrice, as: '...' }] }]
      */
   }
 
@@ -85,12 +85,12 @@ class Product extends Model {
    * @returns {Promise<boolean>} 存在 active SKU 时为 true
    */
   async hasActiveSkus() {
-    const ProductSku = this.sequelize.models.ProductSku
-    if (!ProductSku) return false
+    const ExchangeItemSku = this.sequelize.models.ExchangeItemSku
+    if (!ExchangeItemSku) return false
 
-    const count = await ProductSku.count({
+    const count = await ExchangeItemSku.count({
       where: {
-        product_id: this.product_id,
+        exchange_item_id: this.exchange_item_id,
         status: 'active'
       }
     })
@@ -127,18 +127,18 @@ class Product extends Model {
 
 /**
  * @param {import('sequelize').Sequelize} sequelize - Sequelize 实例
- * @returns {typeof Product} 初始化后的商品模型
+ * @returns {typeof ExchangeItem} 初始化后的兑换商品模型
  */
 module.exports = sequelize => {
-  Product.init(
+  ExchangeItem.init(
     {
-      product_id: {
+      exchange_item_id: {
         type: DataTypes.BIGINT,
         primaryKey: true,
         autoIncrement: true,
-        comment: '商品主键（SPU）'
+        comment: '兑换商品主键（SPU）'
       },
-      product_name: {
+      item_name: {
         type: DataTypes.STRING(200),
         allowNull: false,
         comment: '商品名称'
@@ -256,13 +256,13 @@ module.exports = sequelize => {
         type: DataTypes.INTEGER,
         allowNull: false,
         defaultValue: 0,
-        comment: 'SPU 汇总库存（= SUM(product_skus.stock)）'
+        comment: 'SPU 汇总库存（= SUM(exchange_item_skus.stock)）'
       },
       sold_count: {
         type: DataTypes.INTEGER,
         allowNull: false,
         defaultValue: 0,
-        comment: 'SPU 汇总已售（= SUM(product_skus.sold_count)）'
+        comment: 'SPU 汇总已售（= SUM(exchange_item_skus.sold_count)）'
       },
       min_cost_amount: {
         type: DataTypes.BIGINT,
@@ -300,15 +300,15 @@ module.exports = sequelize => {
     },
     {
       sequelize,
-      modelName: 'Product',
-      tableName: 'products',
+      modelName: 'ExchangeItem',
+      tableName: 'exchange_items',
       underscored: true,
       timestamps: true,
       createdAt: 'created_at',
       updatedAt: 'updated_at',
-      comment: '统一 SPU（EAV 商品中心）'
+      comment: '兑换商品 SPU（EAV 商品中心）'
     }
   )
 
-  return Product
+  return ExchangeItem
 }

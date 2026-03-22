@@ -174,7 +174,7 @@ module.exports = sequelize => {
         type: DataTypes.JSON,
         allowNull: true,
         comment:
-          '订单元数据（Meta）：保存关键请求参数指纹和扩展信息，用于 409 冲突保护和数据审计；示例：{ product_id, product_name, request_params_hash }'
+          '订单元数据（Meta）：保存关键请求参数指纹和扩展信息，用于 409 冲突保护和数据审计；示例：{ exchange_item_id, item_name, request_params_hash }'
       },
 
       // 完成时间

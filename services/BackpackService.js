@@ -39,7 +39,7 @@ const logger = require('../utils/logger').logger
 
 /**
  * allowed_actions 配置缓存
- * 避免每次请求都查询 system_configs，TTL 5 分钟
+ * 避免每次请求都查询 system_settings，TTL 5 分钟
  */
 const _actionRulesCacheHolder = { value: null, time: 0 }
 const ACTION_RULES_CACHE_TTL = 5 * 60 * 1000
@@ -262,7 +262,7 @@ class BackpackService {
         })
       }
 
-      /* 附加 allowed_actions（按 item_type 从 system_configs 读取） */
+      /* 附加 allowed_actions（按 item_type 从 system_settings 读取） */
       const now = Date.now()
       if (
         !_actionRulesCacheHolder.value ||

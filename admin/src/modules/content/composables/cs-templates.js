@@ -3,7 +3,7 @@
  *
  * @file admin/src/modules/content/composables/cs-templates.js
  * @description 知识库雏形，分类快捷回复模板
- * 从 system_configs(config_key='cs_reply_templates') 加载
+ * 数据来源：system_settings(setting_key='cs_reply_templates')
  */
 
 import { logger } from '../../../utils/logger.js'
@@ -32,7 +32,7 @@ export function useCsTemplatesState () {
  */
 export function useCsTemplatesMethods () {
   return {
-    /** 加载消息模板库（从 system_configs 获取） */
+    /** 加载消息模板库（从 system_settings 获取） */
     async loadTemplates () {
       this.templatesLoading = true
       try {

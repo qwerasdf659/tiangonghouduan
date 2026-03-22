@@ -350,5 +350,5 @@ class LotteryUserService {
   }
 }
 
-// 导出类本身，而不是实例，保持与LotteryHistoryService一致
+// 导出类本身，而不是实例
 module.exports = LotteryUserService

@@ -9,7 +9,7 @@
  * - 价格预览计算
  *
  * 架构规范：
- * - 配置存储在 system_configs 表，通过 SystemConfigService 读写
+ * - 配置存储在 system_settings 表，通过 SystemConfigService 读写
  * - DAU 数据从 ad_dau_daily_stats 表查询
  * - 通过 ServiceManager 获取 AdPricingService
  * - 使用 res.apiSuccess / res.apiError 统一响应

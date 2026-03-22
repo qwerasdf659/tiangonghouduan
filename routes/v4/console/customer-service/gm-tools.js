@@ -3,7 +3,7 @@
  *
  * 业务范围：
  * - 补偿发放：资产/物品补偿（事务内原子操作）
- * - 消息模板：获取/更新回复模板（存储在 system_configs）
+ * - 消息模板：获取/更新回复模板（存储在 system_settings）
  *
  * 路径前缀：/api/v4/console/customer-service/gm-tools
  *
@@ -103,7 +103,7 @@ router.post('/compensate', requireRoleLevel(100), async (req, res) => {
  * GET /gm-tools/templates - 获取消息模板库
  *
  * @route GET /api/v4/console/customer-service/gm-tools/templates
- * @description 从 system_configs 读取 cs_reply_templates 配置
+ * @description 从 system_settings 读取 cs_reply_templates 配置
  */
 router.get('/templates', async (req, res) => {
   try {

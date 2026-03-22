@@ -165,13 +165,10 @@ models.LotteryUserDailyDrawQuota = require('./LotteryUserDailyDrawQuota')(sequel
  *    - 业务场景：抽奖前配额检查、原子扣减、连抽支持（10连抽一次扣减10次）
  */
 
-// 🔴 物品分类字典表（ItemTemplate 的依赖）
-models.CategoryDef = require('./CategoryDef')(sequelize, DataTypes)
 /*
- * ✅ CategoryDef：物品类目字典
- *    - 用途：定义商品/物品的分类（如电子产品、餐饮美食、优惠券等）
- *    - 特点：标准化分类，支持前端筛选和分类展示
- *    - 表名：category_defs，主键：category_code（字符串主键）
+ * ❌ CategoryDef 已废弃（2026-03-22 迁移 unify-category-defs-to-categories）
+ *    - category_defs 表已删除，item_templates 和 market_listings 的 FK 已迁移到 categories
+ *    - 所有品类功能统一使用 Category 模型（categories 表）
  */
 
 models.RarityDef = require('./RarityDef')(sequelize, DataTypes)
@@ -430,13 +427,13 @@ models.Category = require('./Category')(sequelize, DataTypes)
 models.Attribute = require('./Attribute')(sequelize, DataTypes)
 models.AttributeOption = require('./AttributeOption')(sequelize, DataTypes)
 models.CategoryAttribute = require('./CategoryAttribute')(sequelize, DataTypes)
-models.Product = require('./Product')(sequelize, DataTypes)
-models.ProductAttributeValue = require('./ProductAttributeValue')(sequelize, DataTypes)
-models.ProductSku = require('./ProductSku')(sequelize, DataTypes)
+models.ExchangeItem = require('./ExchangeItem')(sequelize, DataTypes)
+models.ExchangeItemAttributeValue = require('./ExchangeItemAttributeValue')(sequelize, DataTypes)
+models.ExchangeItemSku = require('./ExchangeItemSku')(sequelize, DataTypes)
 models.SkuAttributeValue = require('./SkuAttributeValue')(sequelize, DataTypes)
 models.ExchangeChannelPrice = require('./ExchangeChannelPrice')(sequelize, DataTypes)
 
-// 🔴 兑换市场系统（ExchangeItem/ExchangeItemSku 已迁移至 Product/ProductSku）
+// 🔴 兑换市场系统
 
 models.ExchangeRecord = require('./ExchangeRecord')(sequelize, DataTypes)
 /*

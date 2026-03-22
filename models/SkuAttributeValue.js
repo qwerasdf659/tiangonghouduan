@@ -6,7 +6,7 @@
  * - 支持 SQL 级筛选与唯一约束（同一 SKU 同一属性只能选一个选项）
  *
  * 数据关系：
- * - 多对一归属 SKU、属性定义、属性选项；与 SPU 非销售属性（product_attribute_values）互补
+ * - 多对一归属 SKU、属性定义、属性选项；与 SPU 非销售属性（exchange_item_attribute_values）互补
  *
  * @see migrations/20260320200000-create-table-unified-product-center.js
  */
@@ -26,7 +26,7 @@ class SkuAttributeValue extends Model {
    * @returns {void}
    */
   static associate(models) {
-    SkuAttributeValue.belongsTo(models.ProductSku, {
+    SkuAttributeValue.belongsTo(models.ExchangeItemSku, {
       foreignKey: 'sku_id',
       as: 'sku'
     })
@@ -59,9 +59,9 @@ module.exports = sequelize => {
       sku_id: {
         type: DataTypes.BIGINT,
         allowNull: false,
-        comment: '所属 SKU（product_skus.sku_id）',
+        comment: '所属 SKU（exchange_item_skus.sku_id）',
         references: {
-          model: 'product_skus',
+          model: 'exchange_item_skus',
           key: 'sku_id'
         },
         onUpdate: 'CASCADE',

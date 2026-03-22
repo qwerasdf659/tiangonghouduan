@@ -21,7 +21,7 @@ class ExchangeChannelPriceService {
   constructor(models) {
     this.models = models
     this.ExchangeChannelPrice = models.ExchangeChannelPrice
-    this.ProductSku = models.ProductSku
+    this.ExchangeItemSku = models.ExchangeItemSku
   }
 
   /**
@@ -88,7 +88,7 @@ class ExchangeChannelPriceService {
       throw new BusinessError('sku_id 无效', 'PRODUCT_CENTER_INVALID_SKU_ID', 400)
     }
 
-    const sku = await this.ProductSku.findByPk(sid, { transaction })
+    const sku = await this.ExchangeItemSku.findByPk(sid, { transaction })
     if (!sku) {
       throw new BusinessError('SKU 不存在', 'PRODUCT_CENTER_SKU_NOT_FOUND', 404, { sku_id: sid })
     }
@@ -275,7 +275,7 @@ class ExchangeChannelPriceService {
       throw new BusinessError('sku_id 无效', 'PRODUCT_CENTER_INVALID_SKU_ID', 400)
     }
 
-    const sku = await this.ProductSku.findByPk(sid, { transaction })
+    const sku = await this.ExchangeItemSku.findByPk(sid, { transaction })
     if (!sku) {
       throw new BusinessError('SKU 不存在', 'PRODUCT_CENTER_SKU_NOT_FOUND', 404, { sku_id: sid })
     }

@@ -10,7 +10,8 @@
 import { logger } from '../../../utils/logger.js'
 import { buildURL, request } from '../../../api/base.js'
 import { MARKET_ENDPOINTS } from '../../../api/market/index.js'
-import { ProductAPI } from '../../../api/product/index.js'
+import { ExchangeItemAPI } from '../../../api/exchange-item/index.js'
+import { ExchangeAPI } from '../../../api/market/exchange.js'
 import { ASSET_ENDPOINTS } from '../../../api/asset.js'
 import { SYSTEM_ADMIN_ENDPOINTS } from '../../../api/system/admin.js'
 import { useSortable } from '../../../alpine/mixins/sortable.js'
@@ -35,9 +36,9 @@ export function useExchangeItemsState() {
     itemPageSize: 20,
     /** @type {Object} 商品分页信息 */
     itemPagination: { total_pages: 1, total: 0 },
-    /** @type {Object} 商品表单数据 - 使用 Product 模型字段名 */
+    /** @type {Object} 商品表单数据 */
     itemForm: {
-      product_name: '',
+      item_name: '',
       description: '',
       cost_asset_code: '',
       cost_amount: 1,
@@ -74,7 +75,7 @@ export function useExchangeItemsState() {
     _richEditorInstance: null,
     /** @type {Array<Object>} 稀有度选项（动态加载自 rarity_defs 字典表） */
     rarityOptions: [],
-    /** @type {Array<Object>} 分类选项（动态加载自 category_defs 字典表） */
+    /** @type {Array<Object>} 分类选项（动态加载自 categories 品类表） */
     categoryOptions: [],
     /** @type {Array<Object>} 物品模板选项（铸造实例时关联的模板） */
     itemTemplateOptions: [],
@@ -173,14 +174,14 @@ export function useExchangeItemsMethods() {
         }
         Object.keys(params).forEach(k => !params[k] && delete params[k])
 
-        const res = await ProductAPI.listProducts(params)
+        const res = await ExchangeItemAPI.listExchangeItems(params)
 
         if (res.success) {
           const rawItems = res.data?.items || res.data?.list || res.data?.products || []
           this.items = (Array.isArray(rawItems) ? rawItems : []).map(p => ({
             ...p,
-            exchange_item_id: p.product_id ?? p.exchange_item_id,
-            item_name: p.product_name ?? p.item_name
+            exchange_item_id: p.exchange_item_id,
+            item_name: p.item_name
           }))
           this.itemPagination = {
             total_pages: res.data?.pagination?.total_pages || 1,
@@ -247,7 +248,7 @@ export function useExchangeItemsMethods() {
             }))
           }
           // 分类选项从统一商品中心品类树加载
-          this.loadProductCategories()
+          this.loadItemCategories()
           this.dictionariesLoaded = true
           logger.info('[ExchangeItems] 字典数据加载完成', {
             rarities: this.rarityOptions.length,
@@ -286,11 +287,11 @@ export function useExchangeItemsMethods() {
     },
 
     /**
-     * 从统一商品中心加载品类树（替代旧 category_defs 字典）
+     * 从统一商品中心加载品类树（categories 表）
      */
-    async loadProductCategories() {
+    async loadItemCategories() {
       try {
-        const res = await ProductAPI.listCategories()
+        const res = await ExchangeItemAPI.listCategories()
         if (res.success && res.data) {
           const cats = res.data.categories || res.data || []
           const enabled = cats
@@ -327,7 +328,7 @@ export function useExchangeItemsMethods() {
     openAddItemModal() {
       this.editingItemId = null
       this.itemForm = {
-        product_name: '',
+        item_name: '',
         description: '',
         cost_asset_code: '',
         cost_amount: 1,
@@ -369,9 +370,9 @@ export function useExchangeItemsMethods() {
      * @param {Object} item - 商品对象（字段名与后端模型一致）
      */
     editItem(item) {
-      this.editingItemId = item.product_id || item.exchange_item_id
+      this.editingItemId = item.exchange_item_id
       this.itemForm = {
-        product_name: item.product_name || item.item_name || '',
+        item_name: item.item_name || '',
         description: item.description || '',
         cost_asset_code: item.cost_asset_code || '',
         cost_amount: item.cost_amount || 1,
@@ -411,7 +412,7 @@ export function useExchangeItemsMethods() {
       this.tagInput = ''
       this.usageRuleInput = ''
       this.loadDictionaries()
-      const itemId = item.product_id || item.exchange_item_id
+      const itemId = item.exchange_item_id
       this.loadDetailImages(itemId)
       this.loadShowcaseImages(itemId)
       this.loadItemSkus(itemId)
@@ -423,7 +424,7 @@ export function useExchangeItemsMethods() {
      * 保存商品（新增或更新）
      */
     async saveItem() {
-      if (!this.itemForm.product_name || !this.itemForm.cost_asset_code) {
+      if (!this.itemForm.item_name || !this.itemForm.cost_asset_code) {
         this.showError?.('请填写必填项')
         return
       }
@@ -450,9 +451,9 @@ export function useExchangeItemsMethods() {
         this.saving = true
         let res
         if (this.editingItemId) {
-          res = await ProductAPI.updateProduct(this.editingItemId, this.itemForm)
+          res = await ExchangeItemAPI.updateExchangeItem(this.editingItemId, this.itemForm)
         } else {
-          res = await ProductAPI.createProduct(this.itemForm)
+          res = await ExchangeItemAPI.createExchangeItem(this.itemForm)
         }
 
         if (res.success) {
@@ -506,7 +507,7 @@ export function useExchangeItemsMethods() {
         const formData = new FormData()
         formData.append('image', file)
         formData.append('business_type', 'exchange')
-        formData.append('category', 'products')
+        formData.append('category', 'exchange_items')
 
         const res = await request({
           url: SYSTEM_ADMIN_ENDPOINTS.MEDIA_UPLOAD,
@@ -684,7 +685,7 @@ export function useExchangeItemsMethods() {
       if (!confirmed) return
 
       try {
-        const res = await ProductAPI.deleteProduct(itemId)
+        const res = await ExchangeItemAPI.deleteExchangeItem(itemId)
         if (res.success) {
           this.showSuccess?.('删除成功')
           window.dispatchEvent(new CustomEvent('refresh-exchange-items'))
@@ -705,10 +706,10 @@ export function useExchangeItemsMethods() {
     async toggleItemStatus(item) {
       const newStatus = item.status === 'active' ? 'inactive' : 'active'
       const actionText = newStatus === 'active' ? '上架' : '下架'
-      const itemId = item.product_id || item.exchange_item_id
+      const itemId = item.exchange_item_id
 
       try {
-        const res = await ProductAPI.updateProduct(itemId, { status: newStatus })
+        const res = await ExchangeItemAPI.updateExchangeItem(itemId, { status: newStatus })
         if (res.success) {
           this.showSuccess?.(`商品已${actionText}`)
           window.dispatchEvent(new CustomEvent('refresh-exchange-items'))
@@ -900,7 +901,7 @@ export function useExchangeItemsMethods() {
      */
     async loadItemSkus(itemId) {
       try {
-        const res = await ProductAPI.listSkus(itemId)
+        const res = await ExchangeItemAPI.listSkus(itemId)
         if (res.success) {
           this.itemSkus = res.data?.skus || res.data?.items || []
         }
@@ -918,9 +919,9 @@ export function useExchangeItemsMethods() {
       try {
         let res
         if (this.editingSkuId) {
-          res = await ProductAPI.updateSku(this.editingSkuId, this.skuForm)
+          res = await ExchangeItemAPI.updateSku(this.editingSkuId, this.skuForm)
         } else {
-          res = await ProductAPI.createSku(itemId, this.skuForm)
+          res = await ExchangeItemAPI.createSku(itemId, this.skuForm)
         }
         if (res.success) {
           this.showSuccess?.(this.editingSkuId ? 'SKU 已更新' : 'SKU 已创建')
@@ -958,7 +959,7 @@ export function useExchangeItemsMethods() {
     async deleteSku(itemId, skuId) {
       if (!confirm('确定要删除此 SKU 吗？')) return
       try {
-        const res = await ProductAPI.deleteSku(skuId)
+        const res = await ExchangeItemAPI.deleteSku(skuId)
         if (res.success) {
           this.showSuccess?.('SKU 已删除')
           await this.loadItemSkus(itemId)

@@ -46,8 +46,8 @@ module.exports = sequelize => {
         allowNull: false,
         comment: '关联兑换商品ID',
         references: {
-          model: 'products',
-          key: 'product_id'
+          model: 'exchange_items',
+          key: 'exchange_item_id'
         },
         onUpdate: 'CASCADE',
         onDelete: 'RESTRICT'
@@ -194,9 +194,9 @@ module.exports = sequelize => {
    * @returns {void}
    */
   BidProduct.associate = function (models) {
-    // 竞价商品关联商品（Product 统一商品中心）
-    if (models.Product) {
-      BidProduct.belongsTo(models.Product, {
+    // 竞价商品关联兑换商品
+    if (models.ExchangeItem) {
+      BidProduct.belongsTo(models.ExchangeItem, {
         foreignKey: 'exchange_item_id',
         as: 'exchangeItem'
       })

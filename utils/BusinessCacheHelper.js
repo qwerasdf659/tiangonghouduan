@@ -623,7 +623,7 @@ class BusinessCacheHelper {
    * @param {Object} params - 查询参数
    * @param {string} [params.listing_kind='all'] - 挂牌类型（item_instance/fungible_asset/all）
    * @param {string} [params.asset_code='all'] - 资产代码
-   * @param {string|number} [params.item_category_code='all'] - 物品类目代码或 category_def_id
+   * @param {string|number} [params.item_category_code='all'] - 物品类目代码或 category_id
    * @param {string} [params.asset_group_code='all'] - 资产分组代码
    * @param {string} [params.rarity_code='all'] - 稀有度代码
    * @param {number} [params.min_price=0] - 最低价格
@@ -639,7 +639,7 @@ class BusinessCacheHelper {
       listing_kind = 'all',
       asset_code = 'all',
       item_category_code = 'all',
-      category_def_id,
+      category_id,
       asset_group_code = 'all',
       rarity_code = 'all',
       min_price = 0,
@@ -650,8 +650,8 @@ class BusinessCacheHelper {
       page_size = 20
     } = params
 
-    // 2026-03-16：支持 category_def_id（整数）或 item_category_code（字符串）
-    const categoryKey = category_def_id ?? item_category_code ?? 'all'
+    // 2026-03-16：支持 category_id（整数）或 item_category_code（字符串）
+    const categoryKey = category_id ?? item_category_code ?? 'all'
 
     // 缓存 key 格式：按筛选维度组合（含 with_counts 区分聚合计数缓存）
     const keyParts = [

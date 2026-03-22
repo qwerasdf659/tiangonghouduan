@@ -76,7 +76,7 @@ router.get('/placement', async (req, res) => {
  *
  * 业务场景：
  * - 前端兑换商品列表页面使用筛选功能时，拉取筛选范围的配置值
- * - 配置内容由运营通过管理后台维护（system_configs 表 config_key = 'product_filter'）
+ * - 配置内容由运营通过管理后台维护（system_settings 表 config_key = 'product_filter'）
  * - 前端启动时拉取，减少硬编码
  *
  * 数据结构设计依据：
@@ -142,7 +142,7 @@ router.get('/product-filter', async (req, res) => {
  *
  * 业务场景：
  * - 前端反馈表单页面需要获取类别列表、字段限制等配置
- * - 配置内容优先从 system_configs 表获取（运营可维护）
+ * - 配置内容优先从 system_settings 表获取（运营可维护）
  * - 如不存在则返回数据库 feedbacks 表 enum 定义导出的默认值
  *
  * @returns {Object} 反馈表单配置
@@ -212,7 +212,7 @@ router.get('/feedback', async (req, res) => {
  *
  * 业务场景：
  * - 小程序兑换页面启动时拉取 Tab/空间/筛选/卡片主题/运营参数配置
- * - 配置由运营通过管理后台维护（system_configs 表 config_key = 'exchange_page'）
+ * - 配置由运营通过管理后台维护（system_settings 表 config_key = 'exchange_page'）
  * - 替代前端硬编码，运营无需前端发版即可调整兑换页面呈现
  * - 前端使用 4 层降级缓存策略，本接口不可用时降级到本地缓存 → 默认值
  *
@@ -344,7 +344,7 @@ router.get('/exchange-page', async (req, res) => {
  *
  * 业务场景：
  * - 小程序启动时拉取全局氛围主题，控制所有 Tab 页的视觉风格
- * - 配置由运营通过管理后台维护（system_configs 表 config_key = 'app_theme'）
+ * - 配置由运营通过管理后台维护（system_settings 表 config_key = 'app_theme'）
  * - 前端使用 4 层降级策略，本接口不可用时自动使用内置默认主题 'default'
  *
  * 可选主题：default / gold_luxury / purple_mystery / spring_festival / christmas / summer

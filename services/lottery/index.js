@@ -8,7 +8,6 @@
  */
 
 const LotteryUserService = require('./LotteryUserService')
-const LotteryHistoryService = require('./LotteryHistoryService')
 const LotteryQuotaService = require('./LotteryQuotaService')
 const LotteryPricingService = require('./LotteryPricingService')
 const LotteryHealthService = require('./LotteryHealthService')
@@ -25,7 +24,6 @@ const LotteryAnalyticsQueryService = require('./AnalyticsQueryService')
  *
  * 管理的服务：
  * - LotteryUserService：用户抽奖资格验证服务
- * - LotteryHistoryService：抽奖历史查询服务
  *
  * 设计模式：
  * - 单例模式：确保每个服务只有一个实例
@@ -34,13 +32,13 @@ const LotteryAnalyticsQueryService = require('./AnalyticsQueryService')
  *
  * 命名约定：
  * - 使用snake_case命名（符合项目统一规范）
- * - 服务实例：user_service、history_service
+ * - 服务实例：user_service
  *
  * 使用方式：
  * ```javascript
  * const { lottery_service_container } = require('./services/lottery')
  *
- * const { user_service, history_service } = lottery_service_container.get_all_services()
+ * const { user_service } = lottery_service_container.get_all_services()
  * ```
  *
  * 性能优化：
@@ -58,7 +56,6 @@ class LotteryServiceContainer {
    *
    * 功能说明：
    * - 实例化LotteryUserService（用户服务）
-   * - 实例化LotteryHistoryService（历史服务）
    * - 使用snake_case命名存储服务实例
    *
    * 设计决策：
@@ -68,19 +65,17 @@ class LotteryServiceContainer {
    * @constructor
    */
   constructor() {
-    // LotteryUserService 和 LotteryHistoryService 都是类，需要实例化
+    // LotteryUserService 是类，需要实例化
     this.user_service = new LotteryUserService()
-    this.history_service = new LotteryHistoryService()
   }
 
   /**
    * 获取所有服务实例
-   * @returns {Object} 包含所有服务实例的对象 {user_service, history_service}
+   * @returns {Object} 包含所有服务实例的对象 {user_service}
    */
   get_all_services() {
     return {
-      user_service: this.user_service,
-      history_service: this.history_service
+      user_service: this.user_service
     }
   }
 }
@@ -90,7 +85,6 @@ const lottery_service_container = new LotteryServiceContainer()
 
 module.exports = {
   LotteryUserService,
-  LotteryHistoryService,
   LotteryQuotaService,
   LotteryPricingService,
   LotteryHealthService,

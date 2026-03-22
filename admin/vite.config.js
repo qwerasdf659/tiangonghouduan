@@ -141,19 +141,18 @@ export default defineConfig({
           if (id.includes('alpinejs')) {
             return 'alpine'
           }
-          // 静态命名导入后 tree-shaking 生效，仅包含实际使用的 7 图表 + 9 组件
           if (id.includes('echarts')) {
             return 'echarts'
           }
-          // xlsx + jspdf 仅在导出/打印页面使用（~800KB → 单独 chunk）
           if (id.includes('xlsx') || id.includes('jspdf')) {
             return 'vendor-export'
           }
-          // sortablejs 仅在拖拽排序页面使用（~50KB → 单独 chunk）
           if (id.includes('sortablejs')) {
             return 'vendor-ui'
           }
-          // socket.io 与 vendor 有循环依赖，合并入 vendor 避免 circular chunk 警告
+          if (id.includes('socket.io')) {
+            return 'vendor-socketio'
+          }
           if (id.includes('node_modules')) {
             return 'vendor'
           }
@@ -164,8 +163,8 @@ export default defineConfig({
     minify: 'esbuild',
     sourcemap: true,
     
-    // vendor-export（xlsx+jspdf ~776KB）是预期行为，阈值设为 800 避免误告警
-    chunkSizeWarningLimit: 800
+    // vendor-export（xlsx+jspdf ~776KB）、vendor（核心运行时 ~1062KB）均为预期行为
+    chunkSizeWarningLimit: 1100
   },
   
   resolve: {

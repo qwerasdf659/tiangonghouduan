@@ -15,13 +15,13 @@ const logger = require('../../../utils/logger').logger
 const BusinessError = require('../../../utils/BusinessError')
 
 /**
- * 从 unified_product 服务取 Sequelize 模型集合
+ * 从 exchange_item_service 取 Sequelize 模型集合
  *
  * @param {import('express').Request} req - 请求
  * @returns {Object} models
  */
-function getProductModels(req) {
-  return req.app.locals.services.getService('unified_product').models
+function getExchangeItemModels(req) {
+  return req.app.locals.services.getService('exchange_item_service').models
 }
 
 /**
@@ -77,7 +77,7 @@ function buildCategoryTree(rows) {
  */
 router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const { Category, MediaFile } = getProductModels(req)
+    const { Category, MediaFile } = getExchangeItemModels(req)
     const wantTree = req.query.tree === 'true' || req.query.tree === '1'
 
     const rows = await Category.findAll({
@@ -154,7 +154,7 @@ router.put('/:id/attributes', authenticateToken, requireRoleLevel(100), async (r
  */
 router.get('/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const { Category, MediaFile } = getProductModels(req)
+    const { Category, MediaFile } = getExchangeItemModels(req)
     const cid = parseInt(req.params.id, 10)
     if (Number.isNaN(cid)) {
       return res.apiError('category_id 无效', 'PRODUCT_CENTER_INVALID_CATEGORY_ID', null, 400)
@@ -230,7 +230,7 @@ router.post('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
     }
 
     const created = await TransactionManager.execute(async transaction => {
-      const { Category } = getProductModels(req)
+      const { Category } = getExchangeItemModels(req)
       return await Category.create(
         {
           category_name: String(category_name).trim(),
@@ -279,7 +279,7 @@ router.put('/:id', authenticateToken, requireRoleLevel(100), async (req, res) =>
     }
 
     const updated = await TransactionManager.execute(async transaction => {
-      const { Category } = getProductModels(req)
+      const { Category } = getExchangeItemModels(req)
       const row = await Category.findByPk(cid, { transaction, lock: transaction.LOCK.UPDATE })
       if (!row) {
         throw new BusinessError('品类不存在', 'PRODUCT_CENTER_CATEGORY_NOT_FOUND', 404, {
@@ -340,7 +340,7 @@ router.delete('/:id', authenticateToken, requireRoleLevel(100), async (req, res)
     }
 
     await TransactionManager.execute(async transaction => {
-      const { Category } = getProductModels(req)
+      const { Category } = getExchangeItemModels(req)
 
       const childCount = await Category.count({
         where: { parent_category_id: cid },

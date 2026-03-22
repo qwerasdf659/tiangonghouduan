@@ -8,7 +8,6 @@
  * - 包括：抽奖清除设置记录、兑换订单、内容审核记录、用户变更记录等
  *
  * 涵盖表：
- * - lottery_clear_setting_records（抽奖清除设置记录）
  * - redemption_orders（核销订单）
  * - content_review_records（内容审核记录）
  * - user_role_change_records（用户角色变更记录）
@@ -64,68 +63,6 @@ function handleServiceError(error, res, operation) {
  * 抽奖清除设置记录查询接口
  * =================================================================
  */
-
-/**
- * GET /api/v4/console/business-records/lottery-clear-settings
- * @desc 查询抽奖清除设置记录列表
- * @access Admin only (role_level >= 30)
- *
- * @query {number} [user_id] - 被清除设置的用户ID
- * @query {number} [admin_id] - 执行清除的管理员ID
- * @query {string} [setting_type] - 清除的设置类型（all/force_win/force_lose等）
- * @query {string} [start_date] - 开始日期
- * @query {string} [end_date] - 结束日期
- * @query {number} [page=1] - 页码
- * @query {number} [page_size=20] - 每页数量
- */
-router.get('/lottery-clear-settings', authenticateToken, requireRoleLevel(30), async (req, res) => {
-  try {
-    const BusinessRecordQueryService = req.app.locals.services.getService(
-      'console_business_record_query'
-    )
-
-    const result = await BusinessRecordQueryService.getLotteryClearSettings(req.query)
-
-    logger.info('查询抽奖清除设置记录成功', {
-      admin_id: req.user.user_id,
-      total: result.pagination.total,
-      page: result.pagination.page
-    })
-
-    return res.apiSuccess(result, '获取抽奖清除设置记录列表成功')
-  } catch (error) {
-    return handleServiceError(error, res, '查询抽奖清除设置记录')
-  }
-})
-
-/**
- * GET /api/v4/console/business-records/lottery-clear-settings/:record_id
- * @desc 获取抽奖清除设置记录详情
- * @access Admin only (role_level >= 30)
- */
-router.get(
-  '/lottery-clear-settings/:record_id',
-  authenticateToken,
-  requireRoleLevel(30),
-  async (req, res) => {
-    try {
-      const { record_id } = req.params
-      const BusinessRecordQueryService = req.app.locals.services.getService(
-        'console_business_record_query'
-      )
-
-      const record = await BusinessRecordQueryService.getLotteryClearSettingById(record_id)
-
-      if (!record) {
-        return res.apiError('记录不存在', 'NOT_FOUND', null, 404)
-      }
-
-      return res.apiSuccess(record, '获取抽奖清除设置记录详情成功')
-    } catch (error) {
-      return handleServiceError(error, res, '获取抽奖清除设置记录详情')
-    }
-  }
-)
 
 /*
  * =================================================================

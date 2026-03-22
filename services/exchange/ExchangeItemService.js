@@ -17,7 +17,7 @@ const EXCHANGE_RECORD_BLOCKING_STATUSES = ['approved', 'shipped', 'received', 'r
 /**
  * 统一商品中心服务（实例服务，依赖 models）
  */
-class ProductService {
+class ExchangeItemService {
   /**
    * @param {Object} models - Sequelize 模型集合
    */
@@ -34,14 +34,14 @@ class ProductService {
    * @param {string} [filters.status] - 商品状态
    * @param {string} [filters.space] - 空间标识
    * @param {string} [filters.rarity_code] - 稀有度编码
-   * @param {string} [filters.keyword] - 模糊匹配 product_name
+   * @param {string} [filters.keyword] - 模糊匹配 item_name
    * @param {Object} [pagination={}] - 分页参数
    * @param {number} [pagination.page=1] - 页码
    * @param {number} [pagination.page_size=20] - 每页条数
    * @returns {Promise<{items:Array,total:number,page:number,page_size:number,total_pages:number}>} 分页结果
    */
-  async listProducts(filters = {}, pagination = {}) {
-    const { Product, Category, RarityDef, MediaFile, ProductSku, ExchangeChannelPrice } =
+  async listExchangeItems(filters = {}, pagination = {}) {
+    const { ExchangeItem, Category, RarityDef, MediaFile, ExchangeItemSku, ExchangeChannelPrice } =
       this.models
 
     const page = Math.max(1, parseInt(pagination.page, 10) || 1)
@@ -58,24 +58,24 @@ class ProductService {
     if (filters.space) where.space = filters.space
     if (filters.rarity_code) where.rarity_code = filters.rarity_code
     if (filters.keyword && String(filters.keyword).trim()) {
-      where.product_name = { [Op.like]: `%${String(filters.keyword).trim()}%` }
+      where.item_name = { [Op.like]: `%${String(filters.keyword).trim()}%` }
     }
 
-    const { rows, count } = await Product.findAndCountAll({
+    const { rows, count } = await ExchangeItem.findAndCountAll({
       where,
       distinct: true,
       limit: pageSize,
       offset,
       order: [
         ['sort_order', 'ASC'],
-        ['product_id', 'DESC']
+        ['exchange_item_id', 'DESC']
       ],
       include: [
         { model: Category, as: 'category', required: false },
         { model: RarityDef, as: 'rarityDef', required: false },
         { model: MediaFile, as: 'primary_media', required: false },
         {
-          model: ProductSku,
+          model: ExchangeItemSku,
           as: 'skus',
           required: false,
           separate: true,
@@ -103,43 +103,43 @@ class ProductService {
   /**
    * 商品详情：全量关联（SPU 属性、SKU 销售属性、渠道价）
    *
-   * @param {number|string} productId - 商品 ID
+   * @param {number|string} exchangeItemId - 商品 ID
    * @returns {Promise<Object|null>} 商品详情对象（含关联数据），不存在返回 null
    */
-  async getProductDetail(productId) {
+  async getExchangeItemDetail(exchangeItemId) {
     const {
-      Product,
+      ExchangeItem,
       Category,
       RarityDef,
       ItemTemplate,
       MediaFile,
-      ProductSku,
-      ProductAttributeValue,
+      ExchangeItemSku,
+      ExchangeItemAttributeValue,
       SkuAttributeValue,
       Attribute,
       AttributeOption,
       ExchangeChannelPrice
     } = this.models
 
-    const pid = Number(productId)
+    const pid = Number(exchangeItemId)
     if (Number.isNaN(pid)) {
-      throw new BusinessError('product_id 无效', 'PRODUCT_CENTER_INVALID_PRODUCT_ID', 400)
+      throw new BusinessError('exchange_item_id 无效', 'PRODUCT_CENTER_INVALID_PRODUCT_ID', 400)
     }
 
-    return Product.findByPk(pid, {
+    return ExchangeItem.findByPk(pid, {
       include: [
         { model: Category, as: 'category', required: false },
         { model: RarityDef, as: 'rarityDef', required: false },
         { model: ItemTemplate, as: 'itemTemplate', required: false },
         { model: MediaFile, as: 'primary_media', required: false },
         {
-          model: ProductAttributeValue,
+          model: ExchangeItemAttributeValue,
           as: 'attributeValues',
           required: false,
           include: [{ model: Attribute, as: 'attribute', required: false }]
         },
         {
-          model: ProductSku,
+          model: ExchangeItemSku,
           as: 'skus',
           required: false,
           separate: true,
@@ -167,19 +167,19 @@ class ProductService {
   /**
    * 创建 SPU
    *
-   * @param {Object} data - 商品字段（与 Product 模型一致）
+   * @param {Object} data - 商品字段（与 ExchangeItem 模型一致）
    * @param {Object} [options={}] - 可选配置
    * @param {Object} options.transaction - Sequelize 事务实例
    * @returns {Promise<Object>} 创建的商品记录
    */
-  async createProduct(data, options = {}) {
-    const transaction = assertAndGetTransaction(options, 'ProductService.createProduct')
-    const { Product } = this.models
+  async createExchangeItem(data, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'ExchangeItemService.createExchangeItem')
+    const { ExchangeItem } = this.models
 
-    const payload = ProductService._pickProductPayload(data)
-    const created = await Product.create(payload, { transaction })
-    logger.info('ProductService.createProduct 成功', {
-      product_id: created.product_id,
+    const payload = ExchangeItemService._pickExchangeItemPayload(data)
+    const created = await ExchangeItem.create(payload, { transaction })
+    logger.info('ExchangeItemService.createExchangeItem 成功', {
+      exchange_item_id: created.exchange_item_id,
       ts: BeijingTimeHelper.apiTimestamp()
     })
     return created
@@ -188,30 +188,30 @@ class ProductService {
   /**
    * 更新 SPU
    *
-   * @param {number|string} productId - 商品 ID
+   * @param {number|string} exchangeItemId - 商品 ID
    * @param {Object} data - 要更新的字段
    * @param {Object} [options={}] - 可选配置
    * @param {Object} options.transaction - Sequelize 事务实例
    * @returns {Promise<Object>} 更新后的商品记录
    */
-  async updateProduct(productId, data, options = {}) {
-    const transaction = assertAndGetTransaction(options, 'ProductService.updateProduct')
-    const { Product } = this.models
+  async updateExchangeItem(exchangeItemId, data, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'ExchangeItemService.updateExchangeItem')
+    const { ExchangeItem } = this.models
 
-    const pid = Number(productId)
+    const pid = Number(exchangeItemId)
     if (Number.isNaN(pid)) {
-      throw new BusinessError('product_id 无效', 'PRODUCT_CENTER_INVALID_PRODUCT_ID', 400)
+      throw new BusinessError('exchange_item_id 无效', 'PRODUCT_CENTER_INVALID_PRODUCT_ID', 400)
     }
 
-    const row = await Product.findByPk(pid, { transaction })
+    const row = await ExchangeItem.findByPk(pid, { transaction })
     if (!row) {
       throw new BusinessError('商品不存在', 'PRODUCT_CENTER_PRODUCT_NOT_FOUND', 404)
     }
 
-    const payload = ProductService._pickProductPayload(data)
+    const payload = ExchangeItemService._pickExchangeItemPayload(data)
     await row.update(payload, { transaction })
-    logger.info('ProductService.updateProduct 成功', {
-      product_id: pid,
+    logger.info('ExchangeItemService.updateExchangeItem 成功', {
+      exchange_item_id: pid,
       ts: BeijingTimeHelper.apiTimestamp()
     })
     return row
@@ -220,22 +220,22 @@ class ProductService {
   /**
    * 硬删除 SPU（级联 SKU / 属性值 / 渠道价，库表 ON DELETE CASCADE）
    *
-   * @param {number|string} productId - 商品 ID
+   * @param {number|string} exchangeItemId - 商品 ID
    * @param {Object} [options={}] - 可选配置
    * @param {Object} options.transaction - Sequelize 事务实例
    * @returns {Promise<void>} 无返回值，不存在时抛异常
    */
-  async deleteProduct(productId, options = {}) {
-    const transaction = assertAndGetTransaction(options, 'ProductService.deleteProduct')
-    const { Product, ExchangeRecord } = this.models
+  async deleteExchangeItem(exchangeItemId, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'ExchangeItemService.deleteExchangeItem')
+    const { ExchangeItem, ExchangeRecord } = this.models
 
-    const pid = Number(productId)
+    const pid = Number(exchangeItemId)
     if (Number.isNaN(pid)) {
-      throw new BusinessError('product_id 无效', 'PRODUCT_CENTER_INVALID_PRODUCT_ID', 400)
+      throw new BusinessError('exchange_item_id 无效', 'PRODUCT_CENTER_INVALID_PRODUCT_ID', 400)
     }
 
     const refCount = await ExchangeRecord.count({
-      where: { product_id: pid },
+      where: { exchange_item_id: pid },
       transaction
     })
     if (refCount > 0) {
@@ -246,12 +246,12 @@ class ProductService {
       )
     }
 
-    const deleted = await Product.destroy({ where: { product_id: pid }, transaction })
+    const deleted = await ExchangeItem.destroy({ where: { exchange_item_id: pid }, transaction })
     if (!deleted) {
       throw new BusinessError('商品不存在', 'PRODUCT_CENTER_PRODUCT_NOT_FOUND', 404)
     }
-    logger.info('ProductService.deleteProduct 成功', {
-      product_id: pid,
+    logger.info('ExchangeItemService.deleteExchangeItem 成功', {
+      exchange_item_id: pid,
       ts: BeijingTimeHelper.apiTimestamp()
     })
   }
@@ -259,7 +259,7 @@ class ProductService {
   /**
    * 创建 SKU 及销售属性行
    *
-   * @param {number|string} productId - 商品 ID
+   * @param {number|string} exchangeItemId - 商品 ID
    * @param {Object} data - SKU 数据
    * @param {string} data.sku_code - SKU 编码（唯一）
    * @param {number} [data.stock] - 库存数量
@@ -272,16 +272,16 @@ class ProductService {
    * @param {Object} options.transaction - Sequelize 事务实例
    * @returns {Promise<Object>} 创建的 SKU 记录（含属性值关联）
    */
-  async createSku(productId, data, options = {}) {
-    const transaction = assertAndGetTransaction(options, 'ProductService.createSku')
-    const { Product, ProductSku, SkuAttributeValue } = this.models
+  async createSku(exchangeItemId, data, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'ExchangeItemService.createSku')
+    const { ExchangeItem, ExchangeItemSku, SkuAttributeValue } = this.models
 
-    const pid = Number(productId)
+    const pid = Number(exchangeItemId)
     if (Number.isNaN(pid)) {
-      throw new BusinessError('product_id 无效', 'PRODUCT_CENTER_INVALID_PRODUCT_ID', 400)
+      throw new BusinessError('exchange_item_id 无效', 'PRODUCT_CENTER_INVALID_PRODUCT_ID', 400)
     }
 
-    const product = await Product.findByPk(pid, { transaction })
+    const product = await ExchangeItem.findByPk(pid, { transaction })
     if (!product) {
       throw new BusinessError('商品不存在', 'PRODUCT_CENTER_PRODUCT_NOT_FOUND', 404)
     }
@@ -290,9 +290,9 @@ class ProductService {
       throw new BusinessError('sku_code 必填', 'PRODUCT_CENTER_SKU_CODE_REQUIRED', 400)
     }
 
-    const sku = await ProductSku.create(
+    const sku = await ExchangeItemSku.create(
       {
-        product_id: pid,
+        exchange_item_id: pid,
         sku_code: String(data.sku_code),
         stock: data.stock != null ? Number(data.stock) : 0,
         cost_price: data.cost_price != null ? data.cost_price : null,
@@ -303,14 +303,14 @@ class ProductService {
       { transaction }
     )
 
-    await ProductService._replaceSkuAttributeValues(
+    await ExchangeItemService._replaceSkuAttributeValues(
       this.models,
       sku.sku_id,
       data.attribute_values,
       transaction
     )
 
-    const full = await ProductSku.findByPk(sku.sku_id, {
+    const full = await ExchangeItemSku.findByPk(sku.sku_id, {
       transaction,
       include: [
         {
@@ -324,9 +324,9 @@ class ProductService {
       ]
     })
 
-    logger.info('ProductService.createSku 成功', {
+    logger.info('ExchangeItemService.createSku 成功', {
       sku_id: sku.sku_id,
-      product_id: pid,
+      exchange_item_id: pid,
       ts: BeijingTimeHelper.apiTimestamp()
     })
     return full
@@ -342,15 +342,15 @@ class ProductService {
    * @returns {Promise<Object>} 更新后的 SKU 记录
    */
   async updateSku(skuId, data, options = {}) {
-    const transaction = assertAndGetTransaction(options, 'ProductService.updateSku')
-    const { ProductSku, SkuAttributeValue } = this.models
+    const transaction = assertAndGetTransaction(options, 'ExchangeItemService.updateSku')
+    const { ExchangeItemSku, SkuAttributeValue } = this.models
 
     const sid = Number(skuId)
     if (Number.isNaN(sid)) {
       throw new BusinessError('sku_id 无效', 'PRODUCT_CENTER_INVALID_SKU_ID', 400)
     }
 
-    const sku = await ProductSku.findByPk(sid, { transaction })
+    const sku = await ExchangeItemSku.findByPk(sid, { transaction })
     if (!sku) {
       throw new BusinessError('SKU 不存在', 'PRODUCT_CENTER_SKU_NOT_FOUND', 404)
     }
@@ -367,7 +367,7 @@ class ProductService {
 
     if (data.attribute_values !== undefined) {
       await SkuAttributeValue.destroy({ where: { sku_id: sid }, transaction })
-      await ProductService._replaceSkuAttributeValues(
+      await ExchangeItemService._replaceSkuAttributeValues(
         this.models,
         sid,
         data.attribute_values,
@@ -375,7 +375,7 @@ class ProductService {
       )
     }
 
-    const full = await ProductSku.findByPk(sid, {
+    const full = await ExchangeItemSku.findByPk(sid, {
       transaction,
       include: [
         {
@@ -390,7 +390,7 @@ class ProductService {
       ]
     })
 
-    logger.info('ProductService.updateSku 成功', {
+    logger.info('ExchangeItemService.updateSku 成功', {
       sku_id: sid,
       ts: BeijingTimeHelper.apiTimestamp()
     })
@@ -406,8 +406,8 @@ class ProductService {
    * @returns {Promise<void>} 无返回值，不存在时抛异常
    */
   async deleteSku(skuId, options = {}) {
-    const transaction = assertAndGetTransaction(options, 'ProductService.deleteSku')
-    const { ProductSku, ExchangeChannelPrice, ExchangeRecord } = this.models
+    const transaction = assertAndGetTransaction(options, 'ExchangeItemService.deleteSku')
+    const { ExchangeItemSku, ExchangeChannelPrice, ExchangeRecord } = this.models
 
     const sid = Number(skuId)
     if (Number.isNaN(sid)) {
@@ -438,11 +438,11 @@ class ProductService {
       )
     }
 
-    const deleted = await ProductSku.destroy({ where: { sku_id: sid }, transaction })
+    const deleted = await ExchangeItemSku.destroy({ where: { sku_id: sid }, transaction })
     if (!deleted) {
       throw new BusinessError('SKU 不存在', 'PRODUCT_CENTER_SKU_NOT_FOUND', 404)
     }
-    logger.info('ProductService.deleteSku 成功', {
+    logger.info('ExchangeItemService.deleteSku 成功', {
       sku_id: sid,
       ts: BeijingTimeHelper.apiTimestamp()
     })
@@ -451,22 +451,22 @@ class ProductService {
   /**
    * 销售属性选项笛卡尔积批量生成 SKU
    *
-   * @param {number|string} productId - 商品 ID
+   * @param {number|string} exchangeItemId - 商品 ID
    * @param {Object<number, number[]>} saleAttributeOptions - attribute_id -> option_id[]
    * @param {Object} [options={}] - 可选配置
    * @param {Object} options.transaction - Sequelize 事务实例
    * @returns {Promise<Array>} 已创建 SKU 列表
    */
-  async generateSkuCartesian(productId, saleAttributeOptions, options = {}) {
-    const transaction = assertAndGetTransaction(options, 'ProductService.generateSkuCartesian')
-    const { Product, ProductSku, AttributeOption, SkuAttributeValue } = this.models
+  async generateSkuCartesian(exchangeItemId, saleAttributeOptions, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'ExchangeItemService.generateSkuCartesian')
+    const { ExchangeItem, ExchangeItemSku, AttributeOption, SkuAttributeValue } = this.models
 
-    const pid = Number(productId)
+    const pid = Number(exchangeItemId)
     if (Number.isNaN(pid)) {
-      throw new BusinessError('product_id 无效', 'PRODUCT_CENTER_INVALID_PRODUCT_ID', 400)
+      throw new BusinessError('exchange_item_id 无效', 'PRODUCT_CENTER_INVALID_PRODUCT_ID', 400)
     }
 
-    const product = await Product.findByPk(pid, { transaction })
+    const product = await ExchangeItem.findByPk(pid, { transaction })
     if (!product) {
       throw new BusinessError('商品不存在', 'PRODUCT_CENTER_PRODUCT_NOT_FOUND', 404)
     }
@@ -501,7 +501,7 @@ class ProductService {
       return raw.map(oid => ({ attribute_id: aid, option_id: Number(oid) }))
     })
 
-    const combos = ProductService._cartesian(optionArrays)
+    const combos = ExchangeItemService._cartesian(optionArrays)
     const created = []
 
     for (const combo of combos) {
@@ -519,18 +519,18 @@ class ProductService {
         }
       }
 
-      const skuCode = ProductService._buildCartesianSkuCode(pid, combo)
-      const existing = await ProductSku.findOne({ where: { sku_code: skuCode }, transaction })
+      const skuCode = ExchangeItemService._buildCartesianSkuCode(pid, combo)
+      const existing = await ExchangeItemSku.findOne({ where: { sku_code: skuCode }, transaction })
       if (existing) {
-        logger.warn('ProductService.generateSkuCartesian 跳过已存在 sku_code', {
+        logger.warn('ExchangeItemService.generateSkuCartesian 跳过已存在 sku_code', {
           sku_code: skuCode
         })
         continue
       }
 
-      const sku = await ProductSku.create(
+      const sku = await ExchangeItemSku.create(
         {
-          product_id: pid,
+          exchange_item_id: pid,
           sku_code: skuCode,
           stock: 0,
           status: 'active',
@@ -548,8 +548,8 @@ class ProductService {
       created.push(sku)
     }
 
-    logger.info('ProductService.generateSkuCartesian 完成', {
-      product_id: pid,
+    logger.info('ExchangeItemService.generateSkuCartesian 完成', {
+      exchange_item_id: pid,
       created_count: created.length,
       ts: BeijingTimeHelper.apiTimestamp()
     })
@@ -566,8 +566,8 @@ class ProductService {
    * @returns {Promise<Object>} 更新后的 SKU
    */
   async adjustStock(skuId, delta, options = {}) {
-    const transaction = assertAndGetTransaction(options, 'ProductService.adjustStock')
-    const { ProductSku } = this.models
+    const transaction = assertAndGetTransaction(options, 'ExchangeItemService.adjustStock')
+    const { ExchangeItemSku } = this.models
 
     const sid = Number(skuId)
     if (Number.isNaN(sid)) {
@@ -579,7 +579,7 @@ class ProductService {
       throw new BusinessError('delta 必须为整数', 'PRODUCT_CENTER_INVALID_STOCK_DELTA', 400)
     }
 
-    const sku = await ProductSku.findByPk(sid, {
+    const sku = await ExchangeItemSku.findByPk(sid, {
       transaction,
       lock: transaction.LOCK.UPDATE
     })
@@ -597,7 +597,7 @@ class ProductService {
     }
 
     await sku.update({ stock: next }, { transaction })
-    logger.info('ProductService.adjustStock 成功', {
+    logger.info('ExchangeItemService.adjustStock 成功', {
       sku_id: sid,
       delta: d,
       new_stock: next,
@@ -607,15 +607,15 @@ class ProductService {
   }
 
   /**
-   * 从请求体提取允许写入 Product 的字段
+   * 从请求体提取允许写入 ExchangeItem 的字段
    * @private
    * @param {Object} data - 请求体数据
    * @returns {Object} 过滤后的安全字段对象
    */
-  static _pickProductPayload(data) {
+  static _pickExchangeItemPayload(data) {
     if (!data || typeof data !== 'object') return {}
     const keys = [
-      'product_name',
+      'item_name',
       'category_id',
       'description',
       'primary_media_id',
@@ -701,16 +701,16 @@ class ProductService {
   /**
    * 根据属性组合生成 SKU 编码（如 P5_1_2__3_4）
    * @private
-   * @param {number} productId - 商品 ID
+   * @param {number} exchangeItemId - 商品 ID
    * @param {Array<{attribute_id: number, option_id: number}>} combo - 属性选项组合
    * @returns {string} 生成的 SKU 编码
    */
-  static _buildCartesianSkuCode(productId, combo) {
+  static _buildCartesianSkuCode(exchangeItemId, combo) {
     const parts = [...combo]
       .sort((a, b) => a.attribute_id - b.attribute_id)
       .map(p => `${p.attribute_id}_${p.option_id}`)
-    return `P${productId}_${parts.join('__')}`
+    return `P${exchangeItemId}_${parts.join('__')}`
   }
 }
 
-module.exports = ProductService
+module.exports = ExchangeItemService

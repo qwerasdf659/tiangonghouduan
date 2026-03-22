@@ -54,10 +54,10 @@ const BID_ATTRIBUTES = {
     'updated_at'
   ],
 
-  /** 关联的商品视图（Product 统一商品中心） */
+  /** 关联的商品视图（ExchangeItem 兑换商品） */
   exchangeItemBriefView: [
-    'product_id',
-    'product_name',
+    'exchange_item_id',
+    'item_name',
     'description',
     'category_id',
     'primary_media_id'
@@ -89,7 +89,7 @@ class BidQueryService {
     this.models = models
     this.BidProduct = models.BidProduct
     this.BidRecord = models.BidRecord
-    this.Product = models.Product
+    this.ExchangeItem = models.ExchangeItem
     this.sequelize = models.sequelize
   }
 
@@ -121,7 +121,7 @@ class BidQueryService {
         attributes: BID_ATTRIBUTES.bidProductListView,
         include: [
           {
-            model: this.Product,
+            model: this.ExchangeItem,
             as: 'exchangeItem',
             attributes: BID_ATTRIBUTES.exchangeItemBriefView,
             include: [
@@ -198,7 +198,7 @@ class BidQueryService {
         attributes: BID_ATTRIBUTES.bidProductDetailView,
         include: [
           {
-            model: this.Product,
+            model: this.ExchangeItem,
             as: 'exchangeItem',
             attributes: BID_ATTRIBUTES.exchangeItemBriefView,
             include: [
@@ -299,9 +299,9 @@ class BidQueryService {
             ],
             include: [
               {
-                model: this.Product,
+                model: this.ExchangeItem,
                 as: 'exchangeItem',
-                attributes: ['product_id', 'product_name', 'primary_media_id']
+                attributes: ['exchange_item_id', 'item_name', 'primary_media_id']
               }
             ]
           }

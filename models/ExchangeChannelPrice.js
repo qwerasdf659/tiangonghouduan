@@ -6,7 +6,7 @@
  * - 同一 SKU 同一资产代码一条记录（库表唯一约束），实现多渠道共享库存但独立定价
  *
  * 数据关系：
- * - 多对一归属 ProductSku；上架与否由 is_enabled 与 publish_at / unpublish_at 共同决定
+ * - 多对一归属 ExchangeItemSku；上架与否由 is_enabled 与 publish_at / unpublish_at 共同决定
  *
  * @see migrations/20260320200000-create-table-unified-product-center.js
  */
@@ -26,7 +26,7 @@ class ExchangeChannelPrice extends Model {
    * @returns {void}
    */
   static associate(models) {
-    ExchangeChannelPrice.belongsTo(models.ProductSku, {
+    ExchangeChannelPrice.belongsTo(models.ExchangeItemSku, {
       foreignKey: 'sku_id',
       as: 'sku'
     })
@@ -66,9 +66,9 @@ module.exports = sequelize => {
       sku_id: {
         type: DataTypes.BIGINT,
         allowNull: false,
-        comment: 'SKU（product_skus.sku_id）',
+        comment: 'SKU（exchange_item_skus.sku_id）',
         references: {
-          model: 'product_skus',
+          model: 'exchange_item_skus',
           key: 'sku_id'
         },
         onUpdate: 'CASCADE',

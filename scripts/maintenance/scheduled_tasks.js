@@ -3587,7 +3587,7 @@ class ScheduledTasks {
    * 定时任务38: 数据自动清理
    * Cron表达式: 10 3 * * * (每天凌晨3:10，错开3:00的通知清理)
    *
-   * 读取 system_configs.data_cleanup_policies 策略，按保留天数清理 L3 级别表
+   * 读取 system_settings.data_cleanup_policies 策略，按保留天数清理 L3 级别表
    * 环境变量 ENABLE_DATA_CLEANUP=true 时启用
    *
    * @returns {void}
@@ -3611,15 +3611,15 @@ class ScheduledTasks {
   static scheduleExchangeItemAutoPublish() {
     cron.schedule('*/10 * * * *', async () => {
       try {
-        const { Product } = require('../../models')
+        const { ExchangeItem } = require('../../models')
         const now = new Date()
 
-        const [publishedCount] = await Product.update(
+        const [publishedCount] = await ExchangeItem.update(
           { status: 'active', publish_at: null },
           { where: { publish_at: { [Op.lte]: now }, status: 'inactive' } }
         )
 
-        const [unpublishedCount] = await Product.update(
+        const [unpublishedCount] = await ExchangeItem.update(
           { status: 'inactive', unpublish_at: null },
           { where: { unpublish_at: { [Op.lte]: now }, status: 'active' } }
         )
@@ -3647,23 +3647,23 @@ class ScheduledTasks {
   static scheduleExchangeStockAlert() {
     cron.schedule('20 * * * *', async () => {
       try {
-        const { Product, ProductSku, AdminNotification } = require('../../models')
+        const { ExchangeItem, ExchangeItemSku, AdminNotification } = require('../../models')
 
-        // 售罄自动下架（库存在 product_skus，检查全部 SKU 归零的商品）
-        const activeProducts = await Product.findAll({
+        // 售罄自动下架（库存在 exchange_item_skus，检查全部 SKU 归零的商品）
+        const activeItems = await ExchangeItem.findAll({
           where: { status: 'active' },
-          attributes: ['product_id', 'product_name'],
-          include: [{ model: ProductSku, as: 'skus', attributes: ['stock'], where: { status: 'active' }, required: true }],
+          attributes: ['exchange_item_id', 'item_name'],
+          include: [{ model: ExchangeItemSku, as: 'skus', attributes: ['stock'], where: { status: 'active' }, required: true }],
           raw: false
         })
-        const zeroStockIds = activeProducts
+        const zeroStockIds = activeItems
           .filter(p => p.skus.every(s => s.stock <= 0))
-          .map(p => p.product_id)
+          .map(p => p.exchange_item_id)
         let soldOutCount = 0
         if (zeroStockIds.length > 0) {
-          ;[soldOutCount] = await Product.update(
+          ;[soldOutCount] = await ExchangeItem.update(
             { status: 'inactive' },
-            { where: { product_id: { [Op.in]: zeroStockIds } } }
+            { where: { exchange_item_id: { [Op.in]: zeroStockIds } } }
           )
         }
 
@@ -3673,33 +3673,33 @@ class ScheduledTasks {
           await BusinessCacheHelper.invalidateExchangeItems('sold_out_auto_unpublish').catch(() => {})
         }
 
-        // 库存预警检测（统一商品中心：库存在 product_skus + 预警阈值在 products）
-        const alertProducts = await Product.findAll({
+        // 库存预警检测（统一商品中心：库存在 exchange_item_skus + 预警阈值在 exchange_items）
+        const alertItems = await ExchangeItem.findAll({
           where: { status: 'active', stock_alert_threshold: { [Op.gt]: 0 } },
-          attributes: ['product_id', 'product_name', 'stock_alert_threshold'],
-          include: [{ model: ProductSku, as: 'skus', attributes: ['stock'], where: { status: 'active' }, required: false }],
+          attributes: ['exchange_item_id', 'item_name', 'stock_alert_threshold'],
+          include: [{ model: ExchangeItemSku, as: 'skus', attributes: ['stock'], where: { status: 'active' }, required: false }],
           raw: false
         })
 
-        const alertItems = alertProducts.filter(p => {
+        const lowStockItems = alertItems.filter(p => {
           const totalStock = (p.skus || []).reduce((sum, s) => sum + s.stock, 0)
           return totalStock > 0 && totalStock <= p.stock_alert_threshold
         })
 
-        if (alertItems.length > 0 && AdminNotification) {
-          for (const item of alertItems) {
+        if (lowStockItems.length > 0 && AdminNotification) {
+          for (const item of lowStockItems) {
             const totalStock = (item.skus || []).reduce((sum, s) => sum + s.stock, 0)
             await AdminNotification.create({
-              title: `库存预警：${item.product_name}`,
-              content: `商品「${item.product_name}」(ID:${item.product_id}) 库存仅剩 ${totalStock}，低于预警阈值 ${item.stock_alert_threshold}`,
+              title: `库存预警：${item.item_name}`,
+              content: `商品「${item.item_name}」(ID:${item.exchange_item_id}) 库存仅剩 ${totalStock}，低于预警阈值 ${item.stock_alert_threshold}`,
               notification_type: 'stock_alert',
               priority: totalStock <= 1 ? 'high' : 'medium',
-              target_type: 'product',
-              target_id: item.product_id,
+              target_type: 'exchange_item',
+              target_id: item.exchange_item_id,
               is_read: false
-            }).catch(e => logger.warn(`库存预警通知创建失败(product ${item.product_id}):`, e.message))
+            }).catch(e => logger.warn(`库存预警通知创建失败(exchange_item ${item.exchange_item_id}):`, e.message))
           }
-          logger.info(`[定时任务40] 库存预警: ${alertItems.length} 个商品低于阈值`)
+          logger.info(`[定时任务40] 库存预警: ${lowStockItems.length} 个商品低于阈值`)
         }
       } catch (error) {
         logger.error('[定时任务40] 库存预警检测失败:', error.message)

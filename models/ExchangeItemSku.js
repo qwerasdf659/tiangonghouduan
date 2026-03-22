@@ -1,14 +1,12 @@
 /**
- * 统一商品 SKU 模型（规格变体 + 库存真源）
+ * 兑换商品 SKU 模型（规格变体 + 库存真源）
  *
  * 业务用途：
- * - 每个 SPU（products）下可有多个 SKU，承载独立 sku_code、库存、成本与展示图
+ * - 每个 SPU（exchange_items）下可有多个 SKU，承载独立 sku_code、库存、成本与展示图
  * - 兑换渠道定价（exchange_channel_prices）与 SKU 销售属性（sku_attribute_values）均挂载在本表
  *
  * 数据关系：
  * - 库存与已售为运营/交易核心字段；成本价用于财务核算（可选）
- *
- * @see migrations/20260320200000-create-table-unified-product-center.js
  */
 
 'use strict'
@@ -16,37 +14,37 @@
 const { Model, DataTypes } = require('sequelize')
 
 /**
- * @class ProductSku
- * @description 统一商品 SKU（规格、库存、媒体）
+ * @class ExchangeItemSku
+ * @description 兑换商品 SKU（规格、库存、媒体）
  */
-class ProductSku extends Model {
+class ExchangeItemSku extends Model {
   /**
    * 定义模型关联（部分关联在对应模型尚未注册时跳过，避免启动失败）
    * @param {Object} models - Sequelize 已加载的模型集合
    * @returns {void}
    */
   static associate(models) {
-    ProductSku.belongsTo(models.Product, {
-      foreignKey: 'product_id',
-      as: 'product'
+    ExchangeItemSku.belongsTo(models.ExchangeItem, {
+      foreignKey: 'exchange_item_id',
+      as: 'exchangeItem'
     })
 
     if (models.SkuAttributeValue) {
-      ProductSku.hasMany(models.SkuAttributeValue, {
+      ExchangeItemSku.hasMany(models.SkuAttributeValue, {
         foreignKey: 'sku_id',
         as: 'attributeValues'
       })
     }
 
     if (models.ExchangeChannelPrice) {
-      ProductSku.hasMany(models.ExchangeChannelPrice, {
+      ExchangeItemSku.hasMany(models.ExchangeChannelPrice, {
         foreignKey: 'sku_id',
         as: 'channelPrices'
       })
     }
 
     if (models.MediaFile) {
-      ProductSku.belongsTo(models.MediaFile, {
+      ExchangeItemSku.belongsTo(models.MediaFile, {
         foreignKey: 'image_id',
         targetKey: 'media_id',
         as: 'skuImage'
@@ -66,10 +64,10 @@ class ProductSku extends Model {
 
 /**
  * @param {import('sequelize').Sequelize} sequelize - Sequelize 实例
- * @returns {typeof ProductSku}
+ * @returns {typeof ExchangeItemSku}
  */
 module.exports = sequelize => {
-  ProductSku.init(
+  ExchangeItemSku.init(
     {
       /** SKU 主键 */
       sku_id: {
@@ -78,14 +76,14 @@ module.exports = sequelize => {
         autoIncrement: true,
         comment: 'SKU 主键'
       },
-      /** 所属 SPU */
-      product_id: {
+      /** 所属兑换商品 SPU */
+      exchange_item_id: {
         type: DataTypes.BIGINT,
         allowNull: false,
-        comment: '所属商品（products.product_id）',
+        comment: '所属兑换商品（exchange_items.exchange_item_id）',
         references: {
-          model: 'products',
-          key: 'product_id'
+          model: 'exchange_items',
+          key: 'exchange_item_id'
         },
         onUpdate: 'CASCADE',
         onDelete: 'CASCADE'
@@ -157,15 +155,15 @@ module.exports = sequelize => {
     },
     {
       sequelize,
-      modelName: 'ProductSku',
-      tableName: 'product_skus',
+      modelName: 'ExchangeItemSku',
+      tableName: 'exchange_item_skus',
       underscored: true,
       timestamps: true,
       createdAt: 'created_at',
       updatedAt: 'updated_at',
-      comment: '统一 SKU 表（EAV 商品中心）'
+      comment: '兑换商品 SKU 表（EAV 商品中心）'
     }
   )
 
-  return ProductSku
+  return ExchangeItemSku
 }

@@ -1,7 +1,7 @@
 /**
  * 统一商品中心 — 品类树管理页面
  *
- * @file admin/src/modules/product/pages/category-management.js
+ * @file admin/src/modules/exchange-item/pages/category-management.js
  * @description 品类树形表格、CRUD、品类与属性绑定
  */
 

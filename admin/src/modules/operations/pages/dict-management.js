@@ -76,7 +76,7 @@ function registerDictManagementComponents() {
     // ========== 分类树形管理 ==========
     categoryTree: [],
     subcategoryForm: {
-      parent_category_def_id: null,
+      parent_category_id: null,
       parent_name: '',
       category_code: '',
       display_name: '',
@@ -100,8 +100,8 @@ function registerDictManagementComponents() {
     /** 打开添加子分类弹窗 */
     openAddSubcategoryModal(parent) {
       this.subcategoryForm = {
-        parent_category_def_id: parent.category_def_id,
-        parent_name: parent.display_name,
+        parent_category_id: parent.category_id,
+        parent_name: parent.category_name,
         category_code: '',
         display_name: '',
         description: ''
@@ -126,7 +126,7 @@ function registerDictManagementComponents() {
             category_code: this.subcategoryForm.category_code,
             display_name: this.subcategoryForm.display_name,
             description: this.subcategoryForm.description,
-            parent_category_def_id: this.subcategoryForm.parent_category_def_id,
+            parent_category_id: this.subcategoryForm.parent_category_id,
             is_enabled: true
           }
         })

@@ -1,7 +1,7 @@
 /**
  * 统一商品中心 — EAV 属性定义管理页面
  *
- * @file admin/src/modules/product/pages/attribute-management.js
+ * @file admin/src/modules/exchange-item/pages/attribute-management.js
  * @description 属性列表筛选、CRUD、选项增删改
  */
 

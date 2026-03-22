@@ -7,7 +7,7 @@
  * - 数据量统计（按安全等级分组）
  * - 清理影响预览（计算各表将删除行数 + FK 级联分析）
  * - 清理执行（分批删除 + FK 拓扑排序 + 审计日志）
- * - 自动清理策略管理（读写 system_configs）
+ * - 自动清理策略管理（读写 system_settings）
  *
  * 数据安全等级：
  * - L0 不可删（系统基石）：sequelizemeta, administrative_regions, accounts(system), roles 等
@@ -87,8 +87,6 @@ const L3_AUTO_CLEANUP_TABLES = Object.freeze({
   reminder_history: 'created_at',
   merchant_operation_logs: 'created_at',
   batch_operation_logs: 'created_at',
-  user_role_change_records: 'created_at',
-  user_status_change_records: 'created_at',
   risk_alerts: 'created_at',
   alert_silence_rules: 'created_at',
   ad_report_daily_snapshots: 'report_date',
@@ -108,7 +106,6 @@ const L2_CLEANUP_CATEGORIES = Object.freeze({
       'lottery_draw_decisions',
       'lottery_draws',
       'lottery_management_settings',
-      'lottery_clear_setting_records',
       'lottery_presets',
       'lottery_user_daily_draw_quota',
       'lottery_campaign_user_quota',
@@ -210,12 +207,9 @@ const DELETE_TOPOLOGY = Object.freeze([
     'user_behavior_tracks',
     'user_ad_tags',
     'batch_operation_logs',
-    'user_role_change_records',
-    'user_status_change_records',
     'reminder_history',
     'alert_silence_rules',
     'lottery_simulation_records',
-    'lottery_clear_setting_records',
     'lottery_user_daily_draw_quota',
     'lottery_campaign_user_quota',
     'lottery_campaign_quota_grants',
@@ -272,9 +266,9 @@ const DELETE_TOPOLOGY = Object.freeze([
   ['market_listings', 'customer_service_sessions', 'ad_campaigns'],
   /*
    * 第四层
-   * products 表由 Product 模型管理（原 exchange_items 已 DROP）
+   * products 表由 ExchangeItem 模型管理（原 exchange_items 已 DROP）
    */
-  ['items', 'lottery_prizes', 'products'],
+  ['items', 'lottery_prizes', 'exchange_items'],
   // 第五层（核心配置表 - 通常不删，仅清档模式时按需处理）
   [
     'lottery_campaigns',
@@ -1089,7 +1083,6 @@ class DataManagementService {
               'lottery_draws',
               'lottery_draw_decisions',
               'lottery_management_settings',
-              'lottery_clear_setting_records',
               'lottery_user_daily_draw_quota',
               'lottery_campaign_user_quota',
               'lottery_campaign_quota_grants',

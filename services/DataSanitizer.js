@@ -216,7 +216,7 @@ class DataSanitizer {
    * @returns {boolean} return[].has_redemption_code - 是否有核销码（布尔标识，不暴露完整码）
    * @returns {string} return[].acquired_at - 获得时间（映射自 created_at）
    * @returns {string} return[].expires_at - 过期时间（来自 meta JSON）
-   * @returns {Array<string>} return[].allowed_actions - 允许操作列表（来自 system_configs 缓存）
+   * @returns {Array<string>} return[].allowed_actions - 允许操作列表（来自 system_settings 缓存）
    * @returns {string} return[].status_display_name - 状态中文显示名
    * @returns {string} return[].item_type_display_name - 物品类型中文显示名
    * @returns {string} return[].rarity_display_name - 稀有度中文显示名
@@ -1312,7 +1312,7 @@ class DataSanitizer {
    * 兑换市场商品列表数据脱敏
    *
    * 🗄️ 数据库表：exchange_items（主键：exchange_item_id）
-   * 迁移路径：ExchangeItem → Product（统一商品模型），本方法同时兼容两种数据源
+   * 数据模型：ExchangeItem（兑换商品 SPU 表）
    *
    * 业务场景：兑换市场商品列表API响应时调用，防止泄露商业敏感信息
    *
@@ -1321,15 +1321,15 @@ class DataSanitizer {
    * - 普通用户（dataLevel='public'）：移除cost_price（成本价）、sold_count（销量统计）等敏感字段
    *
    * 输入契约：
-   * - 输入数据必须来自 exchange_items 或 products 表的 Sequelize 查询结果
-   * - 必须包含 exchange_item_id 或 product_id 字段（数据库主键）
+   * - 输入数据必须来自 exchange_items 表的 Sequelize 查询结果
+   * - 必须包含 exchange_item_id 字段（数据库主键）
    * - 🔧 2026-03-16 媒体体系：需要 include primary_media（MediaFile 关联）
    *
    * 输出字段（统一规范）：
    * - primary_media_id: 主图媒体ID（关联 media_files 表）
    * - primary_image: 图片对象 { primary_media_id, url, mime, thumbnail_url }，缺失时为 null
    *
-   * @param {Array<Object>} items - 商品数据数组（来自 exchange_items/products 表，需 include primary_media）
+   * @param {Array<Object>} items - 商品数据数组（来自 exchange_items 表，需 include primary_media）
    * @param {string} dataLevel - 数据级别：'full'（管理员）或'public'（普通用户）
    * @returns {Array<Object>} 脱敏后的商品数组
    */
