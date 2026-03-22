@@ -11,7 +11,6 @@ import { logger } from '../../../utils/logger.js'
 import { buildURL, request } from '../../../api/base.js'
 import { MARKET_ENDPOINTS } from '../../../api/market/index.js'
 import { ExchangeItemAPI } from '../../../api/exchange-item/index.js'
-import { ExchangeAPI } from '../../../api/market/exchange.js'
 import { ASSET_ENDPOINTS } from '../../../api/asset.js'
 import { SYSTEM_ADMIN_ENDPOINTS } from '../../../api/system/admin.js'
 import { useSortable } from '../../../alpine/mixins/sortable.js'
@@ -146,7 +145,6 @@ export function useExchangeItemsMethods() {
       try {
         const res = await request({ url: ASSET_ENDPOINTS.MATERIAL_ASSET_TYPES, method: 'GET' })
         if (res.success) {
-          // 后端返回 { asset_types: [...] }，按 asset_code 去重
           const rawTypes = res.data?.asset_types || []
           const typeMap = new Map()
           for (const type of rawTypes) {
@@ -155,6 +153,14 @@ export function useExchangeItemsMethods() {
             }
           }
           this.assetTypes = Array.from(typeMap.values())
+
+          // 同步到 Alpine.store 供 data-table 等独立组件使用
+          const { Alpine } = await import('../../../alpine/index.js')
+          const displayMap = {}
+          for (const [code, t] of typeMap) {
+            displayMap[code] = t.display_name || code
+          }
+          Alpine.store('assetTypeMap', displayMap)
         }
       } catch (e) {
         logger.error('[ExchangeItems] 加载资产类型失败:', e)
@@ -177,15 +183,15 @@ export function useExchangeItemsMethods() {
         const res = await ExchangeItemAPI.listExchangeItems(params)
 
         if (res.success) {
-          const rawItems = res.data?.items || res.data?.list || res.data?.products || []
+          const rawItems = res.data?.items || []
           this.items = (Array.isArray(rawItems) ? rawItems : []).map(p => ({
             ...p,
             exchange_item_id: p.exchange_item_id,
             item_name: p.item_name
           }))
           this.itemPagination = {
-            total_pages: res.data?.pagination?.total_pages || 1,
-            total: res.data?.pagination?.total || this.items.length
+            total_pages: res.data?.total_pages || 1,
+            total: res.data?.total || this.items.length
           }
         }
       } catch (e) {
@@ -197,20 +203,20 @@ export function useExchangeItemsMethods() {
     },
 
     /**
-     * 加载商品统计信息
+     * 加载商品统计信息（从商品列表聚合）
      */
     async loadItemStats() {
       try {
-        const res = await request({
-          url: MARKET_ENDPOINTS.EXCHANGE_STATS,
-          method: 'GET'
-        })
-        if (res.success && res.data) {
+        const res = await ExchangeItemAPI.listExchangeItems({ page: 1, page_size: 200 })
+        if (res.success) {
+          const allItems = res.data?.items || []
           this.itemStats = {
-            total: res.data.total || 0,
-            active: res.data.active || 0,
-            lowStock: res.data.lowStock || res.data.low_stock || 0,
-            totalSold: res.data.totalSold || res.data.total_sold || 0
+            total: res.data?.total || allItems.length,
+            active: allItems.filter(i => i.status === 'active').length,
+            lowStock: allItems.filter(
+              i => i.status === 'active' && i.stock <= (i.stock_alert_threshold || 5)
+            ).length,
+            totalSold: allItems.reduce((sum, i) => sum + (i.sold_count || 0), 0)
           }
         }
       } catch (e) {
@@ -1138,7 +1144,7 @@ export function useExchangeItemsMethods() {
      * @param {string} [params.status] - 按状态筛选（active/inactive）
      */
     exportItems(params = {}) {
-      ExchangeAPI.exportItems(params)
+      ExchangeItemAPI.exportItems(params)
     },
 
     /**
@@ -1153,7 +1159,7 @@ export function useExchangeItemsMethods() {
 
       try {
         this.saving = true
-        const res = await ExchangeAPI.importItems(file)
+        const res = await ExchangeItemAPI.importItems(file)
         if (res.success) {
           const msg = `成功导入 ${res.data?.imported_count || 0} 个商品`
           const errMsg = res.data?.error_count ? `，${res.data.error_count} 行失败` : ''

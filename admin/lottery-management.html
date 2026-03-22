@@ -345,7 +345,8 @@
                   <tr class="themed-hover-bg cursor-grab" :class="{ 'bg-yellow-50': prize.stock_quantity === 0 && (prize.win_weight || 0) > 0 }" :data-prize-id="prize.lottery_prize_id">
                     <td class="px-4 py-3">
                       <div class="flex items-center">
-                        <div class="w-10 h-10 rounded overflow-hidden mr-3 img-blur-load">
+                        <div class="w-10 h-10 rounded overflow-hidden mr-3 img-blur-load cursor-pointer hover:opacity-80 transition-opacity"
+                             @click.stop="openImagePreview(prize.public_url || prize.image_url, prize.prize_name)">
                           <img :data-src="(prize.public_url || prize.image_url) || '/admin/images/placeholder.svg'" 
                                :alt="prize.prize_name" 
                                class="w-full h-full object-cover img-lazy"
@@ -7581,6 +7582,25 @@
             <span x-show="!saving">确认提交</span>
           </button>
         </div>
+      </div>
+    </div>
+
+    <!-- 图片预览弹窗 -->
+    <div x-ref="imagePreviewModal"
+         x-show="isModalOpen('imagePreviewModal')"
+         x-cloak
+         class="fixed inset-0 z-[60] flex items-center justify-center"
+         style="display: none;"
+         @keydown.escape.window="closeImagePreview()">
+      <div class="fixed inset-0 bg-black/80" @click="closeImagePreview()"></div>
+      <div class="relative z-10 max-w-[90vw] max-h-[90vh] flex items-center justify-center">
+        <button @click="closeImagePreview()"
+                class="absolute -top-10 right-0 text-white/80 hover:text-white text-3xl font-light leading-none"
+                title="关闭">✕</button>
+        <img :src="previewImageUrl"
+             :alt="previewImageAlt"
+             class="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
+             @click.stop />
       </div>
     </div>
 

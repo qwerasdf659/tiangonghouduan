@@ -13,8 +13,8 @@
  * @version 2.0.0
  * @since 2026-01-23
  * @see routes/v4/console/assets/transactions.js - 资产流水查询
- * @see routes/v4/console/asset-adjustment.js - 资产调整（含钻石）
- * @see routes/v4/console/material.js - 材料转换规则管理
+ * @see routes/v4/console/config/asset-adjustment.js - 资产调整（含钻石）
+ * @see routes/v4/console/operations/material.js - 材料转换规则管理
  */
 
 import { API_PREFIX, request, buildURL, buildQueryString } from './base.js'

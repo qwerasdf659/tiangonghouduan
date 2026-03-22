@@ -103,7 +103,7 @@ class ItemTemplateService {
         include: [
           {
             association: 'category',
-            attributes: ['category_code', 'display_name']
+            attributes: ['category_code', 'category_name']
           },
           {
             association: 'rarity',
@@ -145,7 +145,7 @@ class ItemTemplateService {
         include: [
           {
             association: 'category',
-            attributes: ['category_code', 'display_name', 'description']
+            attributes: ['category_code', 'category_name']
           },
           {
             association: 'rarity',

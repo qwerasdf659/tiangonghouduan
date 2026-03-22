@@ -56,13 +56,90 @@
  * 最后更新：2026年01月05日（事务边界治理改造）
  */
 
-const { LotteryPrize, LotteryCampaign, MaterialAssetType } = require('../models')
+const {
+  LotteryPrize,
+  LotteryCampaign,
+  MaterialAssetType,
+  MediaFile,
+  MediaAttachment
+} = require('../models')
 const DecimalConverter = require('../utils/formatters/DecimalConverter')
 const AuditLogService = require('./AuditLogService') // 审计日志服务
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 const { BusinessCacheHelper } = require('../utils/BusinessCacheHelper') // 缓存失效服务
+const { getImageUrl } = require('../utils/ImageUrlHelper')
 
 const logger = require('../utils/logger').logger
+
+/**
+ * 从 Sequelize primary_media 关联生成公网图片 URL
+ *
+ * @param {Object} prize - Sequelize 奖品实例（需 include primary_media）
+ * @returns {string|null} 公网图片 URL
+ */
+function resolvePrizeImageUrl(prize) {
+  const media = prize.primary_media
+  if (!media) return null
+
+  if (typeof media.getPublicUrl === 'function') {
+    return media.getPublicUrl()
+  }
+  if (media.object_key) {
+    return getImageUrl(media.object_key)
+  }
+  return null
+}
+
+/**
+ * 批量查询材料资产类型图标 URL（通过 media_attachments 关联）
+ *
+ * 用于奖品没有自身图片时，回退到其材料资产的图标
+ * 链路: material_asset_code → material_asset_types → media_attachments → media_files
+ *
+ * @param {string[]} assetCodes - 材料资产编码列表
+ * @returns {Promise<Map<string, string>>} asset_code → 图标 URL 映射
+ */
+async function batchResolveAssetIconUrls(assetCodes) {
+  const iconMap = new Map()
+  if (!assetCodes.length || !MediaAttachment) return iconMap
+
+  try {
+    const assetTypes = await MaterialAssetType.findAll({
+      where: { asset_code: assetCodes },
+      attributes: ['material_asset_type_id', 'asset_code']
+    })
+    if (!assetTypes.length) return iconMap
+
+    const idToCode = new Map()
+    assetTypes.forEach(at => idToCode.set(String(at.material_asset_type_id), at.asset_code))
+
+    const attachments = await MediaAttachment.findAll({
+      where: {
+        attachable_type: 'material_asset_type',
+        attachable_id: Array.from(idToCode.keys()),
+        role: 'icon'
+      },
+      include: [
+        {
+          model: MediaFile,
+          as: 'media',
+          required: true,
+          attributes: ['media_id', 'object_key']
+        }
+      ]
+    })
+
+    attachments.forEach(att => {
+      const code = idToCode.get(String(att.attachable_id))
+      if (code && att.media?.object_key) {
+        iconMap.set(code, getImageUrl(att.media.object_key))
+      }
+    })
+  } catch (err) {
+    logger.warn('批量查询材料图标失败（非致命）', { error: err.message })
+  }
+  return iconMap
+}
 
 /**
  * 奖品池服务类
@@ -338,9 +415,17 @@ class PrizePoolService {
         throw new Error(`活动不存在: ${campaign_code}`)
       }
 
-      // 2. 获取奖品列表
+      // 2. 获取奖品列表（含主图媒体文件，用于生成 public_url）
       const prizes = await LotteryPrize.findAll({
         where: { lottery_campaign_id: campaign.lottery_campaign_id },
+        include: [
+          {
+            model: MediaFile,
+            as: 'primary_media',
+            required: false,
+            attributes: ['media_id', 'object_key', 'mime_type', 'thumbnail_keys']
+          }
+        ],
         order: [['created_at', 'DESC']],
         attributes: [
           'lottery_prize_id',
@@ -382,37 +467,54 @@ class PrizePoolService {
       }, 0)
       const usedQuantity = prizes.reduce((sum, prize) => sum + (prize.total_win_count || 0), 0)
 
-      // 4. 格式化奖品数据（virtual_amount 和 category 已移除）
-      const formattedPrizes = prizes.map(prize => ({
-        lottery_prize_id: prize.lottery_prize_id,
-        lottery_campaign_id: prize.lottery_campaign_id,
-        prize_name: prize.prize_name,
-        prize_type: prize.prize_type,
-        prize_value: prize.prize_value,
-        prize_value_points: prize.prize_value_points,
-        budget_cost: prize.budget_cost || 0,
-        material_asset_code: prize.material_asset_code || null,
-        material_amount: prize.material_amount || null,
-        stock_quantity: prize.stock_quantity,
-        remaining_quantity: Math.max(0, (prize.stock_quantity || 0) - (prize.total_win_count || 0)),
-        win_probability: prize.win_probability,
-        prize_description: prize.prize_description,
-        primary_media_id: prize.primary_media_id,
-        angle: prize.angle,
-        color: prize.color,
-        cost_points: prize.cost_points,
-        status: prize.status,
-        sort_order: prize.sort_order,
-        rarity_code: prize.rarity_code || 'common',
-        win_weight: prize.win_weight || 0,
-        reward_tier: prize.reward_tier || 'low',
-        is_fallback: prize.is_fallback || false,
-        total_win_count: prize.total_win_count,
-        daily_win_count: prize.daily_win_count,
-        max_daily_wins: prize.max_daily_wins,
-        created_at: prize.created_at,
-        updated_at: prize.updated_at
-      }))
+      // 4. 批量查询材料资产图标
+      const assetCodes = [
+        ...new Set(prizes.filter(p => p.material_asset_code).map(p => p.material_asset_code))
+      ]
+      const assetIconMap = await batchResolveAssetIconUrls(assetCodes)
+
+      // 5. 格式化奖品数据（含主图公网 URL，支持材料图标回退）
+      const formattedPrizes = prizes.map(prize => {
+        const selfUrl = resolvePrizeImageUrl(prize)
+        const fallbackUrl = prize.material_asset_code
+          ? assetIconMap.get(prize.material_asset_code) || null
+          : null
+
+        return {
+          lottery_prize_id: prize.lottery_prize_id,
+          lottery_campaign_id: prize.lottery_campaign_id,
+          prize_name: prize.prize_name,
+          prize_type: prize.prize_type,
+          prize_value: prize.prize_value,
+          prize_value_points: prize.prize_value_points,
+          budget_cost: prize.budget_cost || 0,
+          material_asset_code: prize.material_asset_code || null,
+          material_amount: prize.material_amount || null,
+          stock_quantity: prize.stock_quantity,
+          remaining_quantity: Math.max(
+            0,
+            (prize.stock_quantity || 0) - (prize.total_win_count || 0)
+          ),
+          win_probability: prize.win_probability,
+          prize_description: prize.prize_description,
+          primary_media_id: prize.primary_media_id,
+          public_url: selfUrl || fallbackUrl,
+          angle: prize.angle,
+          color: prize.color,
+          cost_points: prize.cost_points,
+          status: prize.status,
+          sort_order: prize.sort_order,
+          rarity_code: prize.rarity_code || 'common',
+          win_weight: prize.win_weight || 0,
+          reward_tier: prize.reward_tier || 'low',
+          is_fallback: prize.is_fallback || false,
+          total_win_count: prize.total_win_count,
+          daily_win_count: prize.daily_win_count,
+          max_daily_wins: prize.max_daily_wins,
+          created_at: prize.created_at,
+          updated_at: prize.updated_at
+        }
+      })
 
       // 5. 转换DECIMAL字段为数字类型
       const convertedPrizes = DecimalConverter.convertPrizeData(formattedPrizes)
@@ -466,7 +568,7 @@ class PrizePoolService {
       if (status) where.status = status
       if (merchant_id) where.merchant_id = parseInt(merchant_id)
 
-      // 2. 查询奖品列表
+      // 2. 查询奖品列表（含主图媒体文件，用于生成 public_url）
       const prizes = await LotteryPrize.findAll({
         where,
         include: [
@@ -474,6 +576,12 @@ class PrizePoolService {
             model: LotteryCampaign,
             as: 'campaign',
             attributes: ['lottery_campaign_id', 'campaign_code', 'campaign_name', 'status']
+          },
+          {
+            model: MediaFile,
+            as: 'primary_media',
+            required: false,
+            attributes: ['media_id', 'object_key', 'mime_type', 'thumbnail_keys']
           }
         ],
         order: [['created_at', 'DESC']],
@@ -524,39 +632,56 @@ class PrizePoolService {
         }, 0)
       }
 
-      // 4. 格式化奖品数据
-      const formattedPrizes = prizes.map(prize => ({
-        lottery_prize_id: prize.lottery_prize_id,
-        lottery_campaign_id: prize.lottery_campaign_id,
-        campaign_name: prize.campaign?.campaign_name || '未关联活动',
-        campaign_code: prize.campaign?.campaign_code,
-        prize_name: prize.prize_name,
-        prize_type: prize.prize_type,
-        prize_value: prize.prize_value,
-        prize_value_points: prize.prize_value_points,
-        budget_cost: prize.budget_cost || 0,
-        material_asset_code: prize.material_asset_code || null,
-        material_amount: prize.material_amount || null,
-        stock_quantity: prize.stock_quantity,
-        remaining_quantity: Math.max(0, (prize.stock_quantity || 0) - (prize.total_win_count || 0)),
-        total_win_count: prize.total_win_count || 0,
-        daily_win_count: prize.daily_win_count || 0,
-        max_daily_wins: prize.max_daily_wins,
-        win_probability: prize.win_probability,
-        prize_description: prize.prize_description,
-        primary_media_id: prize.primary_media_id,
-        angle: prize.angle,
-        color: prize.color,
-        cost_points: prize.cost_points,
-        status: prize.status,
-        sort_order: prize.sort_order,
-        rarity_code: prize.rarity_code || 'common',
-        win_weight: prize.win_weight || 0,
-        reward_tier: prize.reward_tier || 'low',
-        is_fallback: prize.is_fallback || false,
-        created_at: prize.created_at,
-        updated_at: prize.updated_at
-      }))
+      // 4. 批量查询材料资产图标（用于奖品无自身图片时的回退）
+      const assetCodes = [
+        ...new Set(prizes.filter(p => p.material_asset_code).map(p => p.material_asset_code))
+      ]
+      const assetIconMap = await batchResolveAssetIconUrls(assetCodes)
+
+      // 5. 格式化奖品数据（含主图公网 URL，支持材料图标回退）
+      const formattedPrizes = prizes.map(prize => {
+        const selfUrl = resolvePrizeImageUrl(prize)
+        const fallbackUrl = prize.material_asset_code
+          ? assetIconMap.get(prize.material_asset_code) || null
+          : null
+
+        return {
+          lottery_prize_id: prize.lottery_prize_id,
+          lottery_campaign_id: prize.lottery_campaign_id,
+          campaign_name: prize.campaign?.campaign_name || '未关联活动',
+          campaign_code: prize.campaign?.campaign_code,
+          prize_name: prize.prize_name,
+          prize_type: prize.prize_type,
+          prize_value: prize.prize_value,
+          prize_value_points: prize.prize_value_points,
+          budget_cost: prize.budget_cost || 0,
+          material_asset_code: prize.material_asset_code || null,
+          material_amount: prize.material_amount || null,
+          stock_quantity: prize.stock_quantity,
+          remaining_quantity: Math.max(
+            0,
+            (prize.stock_quantity || 0) - (prize.total_win_count || 0)
+          ),
+          total_win_count: prize.total_win_count || 0,
+          daily_win_count: prize.daily_win_count || 0,
+          max_daily_wins: prize.max_daily_wins,
+          win_probability: prize.win_probability,
+          prize_description: prize.prize_description,
+          primary_media_id: prize.primary_media_id,
+          public_url: selfUrl || fallbackUrl,
+          angle: prize.angle,
+          color: prize.color,
+          cost_points: prize.cost_points,
+          status: prize.status,
+          sort_order: prize.sort_order,
+          rarity_code: prize.rarity_code || 'common',
+          win_weight: prize.win_weight || 0,
+          reward_tier: prize.reward_tier || 'low',
+          is_fallback: prize.is_fallback || false,
+          created_at: prize.created_at,
+          updated_at: prize.updated_at
+        }
+      })
 
       // 5. 转换DECIMAL字段为数字类型
       const convertedPrizes = DecimalConverter.convertPrizeData(formattedPrizes)
@@ -1243,6 +1368,14 @@ class PrizePoolService {
 
       const prizes = await LotteryPrize.findAll({
         where: { lottery_campaign_id: campaign.lottery_campaign_id },
+        include: [
+          {
+            model: MediaFile,
+            as: 'primary_media',
+            required: false,
+            attributes: ['media_id', 'object_key', 'mime_type', 'thumbnail_keys']
+          }
+        ],
         order: [
           ['reward_tier', 'ASC'],
           ['sort_order', 'ASC']
@@ -1274,6 +1407,12 @@ class PrizePoolService {
           'updated_at'
         ]
       })
+
+      /** 批量查询材料资产图标 */
+      const assetCodes = [
+        ...new Set(prizes.filter(p => p.material_asset_code).map(p => p.material_asset_code))
+      ]
+      const assetIconMap = await batchResolveAssetIconUrls(assetCodes)
 
       /** 档位中文标签映射 */
       const tierLabels = { high: '高档', mid: '中档', low: '低档' }
@@ -1328,6 +1467,10 @@ class PrizePoolService {
               win_probability: p.win_probability,
               prize_description: p.prize_description,
               primary_media_id: p.primary_media_id,
+              public_url:
+                resolvePrizeImageUrl(p) ||
+                (p.material_asset_code ? assetIconMap.get(p.material_asset_code) : null) ||
+                null,
               angle: p.angle,
               color: p.color,
               cost_points: p.cost_points,

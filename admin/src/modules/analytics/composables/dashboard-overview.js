@@ -593,22 +593,21 @@ export function useDashboardOverviewMethods() {
     // ==================== P1-6: 市场活跃度 ====================
     /**
      * 获取市场活跃度数据
-     * 使用兑换市场统计API
+     * 使用市场概览统计API（后端实际端点: /marketplace/stats/overview）
      */
     async fetchMarketActivity() {
       try {
         const result = await request({
-          url: `${API_PREFIX}/console/marketplace/exchange_market/statistics`
+          url: `${API_PREFIX}/console/marketplace/stats/overview`
         })
         if (result.success && result.data) {
           const data = result.data
+          const totals = data.totals || {}
           return {
-            active_listings: data.active_items || 0,
-            total_trades: data.total_exchanges || 0,
-            completed_trades: data.completed_exchanges || data.total_exchanges || 0,
-            trade_completion_rate: data.total_exchanges > 0
-              ? Math.round((data.completed_exchanges || data.total_exchanges) / Math.max(data.total_exchanges, 1) * 100)
-              : 0
+            active_listings: (data.on_sale_summary || []).reduce((sum, s) => sum + (s.count || 0), 0),
+            total_trades: totals.total_trades || 0,
+            completed_trades: totals.total_trades || 0,
+            trade_completion_rate: totals.total_trades > 0 ? 100 : 0
           }
         }
         return null

@@ -60,24 +60,29 @@ export function useExchangeStatsMethods() {
   return {
     /**
      * 加载兑换统计数据
+     * 从商品列表 + 订单列表两个可用端点聚合统计
      */
     async loadExchangeStats() {
       try {
         this.loading = true
-        // 并行请求统计数据和订单数据
-        const [statsRes, ordersRes] = await Promise.all([
-          request({ url: MARKET_ENDPOINTS.EXCHANGE_FULL_STATS, method: 'GET' }),
+        const { ExchangeItemAPI } = await import('../../../api/exchange-item/index.js')
+
+        const [itemsRes, ordersRes] = await Promise.all([
+          ExchangeItemAPI.listExchangeItems({ page: 1, page_size: 200 }),
           request({
             url: MARKET_ENDPOINTS.EXCHANGE_ORDERS,
             method: 'GET',
-            params: { page: 1, page_size: 100 }
+            params: { page: 1, page_size: 200 }
           })
         ])
 
-        // 后端统计接口返回：total_items, active_items, low_stock_items, total_exchanges
-        const stats = statsRes.success ? statsRes.data : {}
+        const allItems = itemsRes.success ? itemsRes.data?.items || [] : []
+        const activeItems = allItems.filter(i => i.status === 'active')
+        const inactiveItems = allItems.filter(i => i.status !== 'active')
+        const lowStockItems = allItems.filter(
+          i => i.status === 'active' && i.stock <= (i.stock_alert_threshold || 5)
+        )
 
-        // 从订单列表计算订单统计
         const orders = ordersRes.success ? ordersRes.data?.orders || [] : []
         const orderStats = {
           total: ordersRes.data?.pagination?.total || orders.length,
@@ -87,7 +92,6 @@ export function useExchangeStatsMethods() {
           cancelled: orders.filter(o => o.status === 'cancelled').length
         }
 
-        // 计算总消耗（从订单中累计，确保转换为数字）
         const totalConsumed = orders.reduce((sum, o) => {
           const amount = parseInt(o.cost_amount) || parseInt(o.pay_amount) || 0
           return sum + amount
@@ -97,18 +101,17 @@ export function useExchangeStatsMethods() {
           orders: orderStats,
           revenue: {
             total_virtual_value: totalConsumed,
-            total_points: stats.total_exchanges || 0
+            total_points: orders.length
           },
           items: {
-            activeCount: stats.active_items || 0,
-            activeStock: 0, // 后端暂无此数据
-            inactiveCount: (stats.total_items || 0) - (stats.active_items || 0),
-            inactiveStock: 0,
-            lowStockCount: stats.low_stock_items || 0
+            activeCount: activeItems.length,
+            activeStock: activeItems.reduce((sum, i) => sum + (i.stock || 0), 0),
+            inactiveCount: inactiveItems.length,
+            inactiveStock: inactiveItems.reduce((sum, i) => sum + (i.stock || 0), 0),
+            lowStockCount: lowStockItems.length
           }
         }
 
-        // P1-8: 缓存订单数据并计算履约追踪
         this.orders = orders
         this.calculateFulfillmentTracking()
       } catch (e) {

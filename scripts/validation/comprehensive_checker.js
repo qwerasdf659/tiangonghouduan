@@ -54,27 +54,21 @@ const ROUTE_PREFIX_MAP = {
  * 📌 2026-01-09 更新：根据实际 index.js 挂载配置修复路径映射
  */
 const SUB_ROUTE_MAP = {
-  // console 子模块（来自 routes/v4/console/index.js）
+  // console 域目录（2026-03-22 路由目录化重构后的结构）
+  // 9 个域目录均挂载在 '/'，不增加 URL 路径层级
   'routes/v4/console': {
-    auth: '/auth',
+    lottery: '',
+    ad: '',
+    user: '',
+    market: '',
+    merchant: '',
+    risk: '',
+    analytics: '',
+    operations: '',
+    config: '',
     system: '/system',
-    config: '/config',
-    settings: '', // 挂载到根路径
-    prize_pool: '/prize-pool',
-    user_management: '/user-management',
-    'lottery-management': '/lottery-management',
-    analytics: '/analytics',
     'customer-service': '/customer-service',
-    marketplace: '/marketplace',
-    material: '/material',
-    'lottery-quota': '/lottery-quota',
-    'asset-adjustment': '/asset-adjustment',
-    'campaign-budget': '/campaign-budget',
-    assets: '/assets',
-    images: '/images',
-    'orphan-frozen': '/orphan-frozen',
-    'merchant-points': '/merchant-points',
-    'user-hierarchy': '/user-hierarchy'
+    assets: '/assets'
   },
   // auth 子模块（来自 routes/v4/auth/index.js）
   'routes/v4/auth': {

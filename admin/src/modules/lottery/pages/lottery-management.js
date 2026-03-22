@@ -656,6 +656,23 @@ function registerLotteryManagementComponents() {
       formatCurrency(value) {
         if (value === undefined || value === null) return '¥0.00'
         return `¥${parseFloat(value).toFixed(2)}`
+      },
+
+      // ========== 图片预览 ==========
+      previewImageUrl: '',
+      previewImageAlt: '',
+
+      openImagePreview(url, alt) {
+        if (!url) return
+        this.previewImageUrl = url
+        this.previewImageAlt = alt || ''
+        this.showModal('imagePreviewModal')
+      },
+
+      closeImagePreview() {
+        this.hideModal('imagePreviewModal')
+        this.previewImageUrl = ''
+        this.previewImageAlt = ''
       }
     }
     

@@ -989,7 +989,7 @@ function riskAlertsPage() {
      * 后端API:
      * - GET /api/v4/console/marketplace/listing-stats （挂单统计）
      * - GET /api/v4/console/settings/marketplace （市场阈值配置）
-     * - GET /api/v4/console/marketplace/exchange_market/statistics （兑换市场统计）
+     * - GET /api/v4/console/marketplace/stats/overview （市场概览统计）
      */
     async loadMarketPriceMonitor() {
       this.loadingMarketMonitor = true
@@ -997,7 +997,7 @@ function riskAlertsPage() {
         const [listingStatsRes, settingsRes, exchangeStatsRes] = await Promise.allSettled([
           apiRequest(SYSTEM_ENDPOINTS.SETTING_MARKETPLACE.replace('/settings/marketplace', '/marketplace/listing-stats') + '?page=1&limit=50'),
           apiRequest(SYSTEM_ENDPOINTS.SETTING_MARKETPLACE),
-          apiRequest(EXCHANGE_ENDPOINTS.EXCHANGE_STATS)
+          apiRequest(EXCHANGE_ENDPOINTS.MARKET_STATS_OVERVIEW)
         ])
 
         const listingData = listingStatsRes.status === 'fulfilled' && listingStatsRes.value?.success
@@ -1018,11 +1018,13 @@ function riskAlertsPage() {
         // 后端 listing-stats → summary 字段
         const summary = listingData?.summary || {}
 
-        // 后端 exchange_market/statistics → 兑换市场统计
-        const totalItems = exchangeData?.total_items || 0
-        const activeItems = exchangeData?.active_items || 0
-        const totalExchanges = exchangeData?.total_exchanges || 0
-        const lowStockItems = exchangeData?.low_stock_items || 0
+        // 后端 marketplace/stats/overview → 市场概览统计
+        const totals = exchangeData?.totals || {}
+        const onSale = exchangeData?.on_sale_summary || []
+        const totalItems = onSale.reduce((s, i) => s + (i.count || 0), 0)
+        const activeItems = totalItems
+        const totalExchanges = totals.total_trades || 0
+        const lowStockItems = 0
 
         // 计算成交率（有商品数据时）: 总兑换次数 / 上架商品数
         const dealRate = activeItems > 0 ? (totalExchanges / activeItems * 100) : 0
@@ -1035,7 +1037,7 @@ function riskAlertsPage() {
           total_listings: summary.total_listings || 0,
           users_at_limit: summary.users_at_limit || 0,
           users_near_limit: summary.users_near_limit || 0,
-          // 兑换市场统计（来自 exchange_market/statistics）
+          // 市场统计（来自 marketplace/stats/overview）
           deal_rate: parseFloat(dealRate.toFixed(1)),
           low_stock_rate: parseFloat(lowStockRate.toFixed(1)),
           price_anomaly_count: lowStockItems,

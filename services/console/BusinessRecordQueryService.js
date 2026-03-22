@@ -5,7 +5,7 @@
  *
  * @description 提供管理后台业务记录的只读查询功能
  *
- * 收口来源：routes/v4/console/business-records.js 的读操作
+ * 收口来源：routes/v4/console/analytics/business-records.js 的读操作
  * 遵循架构规范：读写分层策略 Phase 3
  *
  * 涵盖查询：
@@ -435,9 +435,7 @@ class BusinessRecordQueryService {
     if (operator_id) where.operator_id = operator_id
 
     if (keyword) {
-      where[Op.or] = [
-        { reason: { [Op.like]: `%${keyword}%` } }
-      ]
+      where[Op.or] = [{ reason: { [Op.like]: `%${keyword}%` } }]
     }
 
     if (start_date || end_date) {

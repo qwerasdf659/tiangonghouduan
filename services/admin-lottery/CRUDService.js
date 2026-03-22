@@ -21,7 +21,7 @@
  * - Service 层通过 assertAndGetTransaction() 强制验证事务存在
  *
  * 创建时间：2026-01-31
- * 拆分自：routes/v4/console/system-data.js（路由层直接操作模型）
+ * 拆分自：routes/v4/console/analytics/system-data.js（路由层直接操作模型）
  */
 
 const {
@@ -991,7 +991,7 @@ class LotteryCampaignCRUDService {
    * @param {Object} options - { transaction }
    * @returns {Promise<Object>} 更新后的活动
    */
-  async toggleFeatured(lottery_campaign_id, is_featured, options = {}) {
+  static async toggleFeatured(lottery_campaign_id, is_featured, options = {}) {
     const { transaction } = options
     const models = require('../../models')
 
@@ -1015,7 +1015,7 @@ class LotteryCampaignCRUDService {
    * @param {Object} options - { transaction }
    * @returns {Promise<Object>} 更新后的活动
    */
-  async toggleHidden(lottery_campaign_id, is_hidden, options = {}) {
+  static async toggleHidden(lottery_campaign_id, is_hidden, options = {}) {
     const { transaction } = options
     const models = require('../../models')
 
@@ -1045,7 +1045,7 @@ class LotteryCampaignCRUDService {
    * @param {Object} options - { transaction }
    * @returns {Promise<Object>} 更新后的活动
    */
-  async updateDisplayConfig(lottery_campaign_id, displayConfig, options = {}) {
+  static async updateDisplayConfig(lottery_campaign_id, displayConfig, options = {}) {
     const { transaction } = options
     const models = require('../../models')
 
@@ -1083,7 +1083,7 @@ class LotteryCampaignCRUDService {
    * @param {Object} options - { transaction }
    * @returns {Promise<Object>} 更新结果
    */
-  async batchSort(items, options = {}) {
+  static async batchSort(items, options = {}) {
     const { transaction } = options
     const models = require('../../models')
 

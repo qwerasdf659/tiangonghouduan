@@ -111,7 +111,7 @@
         <div x-show="!sortMode" x-data="exchangeItemsTable()" x-init="init()">
 
           <!-- 批量操作栏（选中商品时显示） -->
-          <div x-show="hasSelection" x-cloak class="mb-3 p-3 bg-blue-50 rounded-lg border border-blue-200 flex items-center gap-3 flex-wrap">
+          <div x-show="hasSelected" x-cloak class="mb-3 p-3 bg-blue-50 rounded-lg border border-blue-200 flex items-center gap-3 flex-wrap">
             <span class="text-sm text-blue-700 font-medium">已选 <span x-text="selectedCount"></span> 个商品</span>
             <button @click="$dispatch('batch-status', { ids: selectedRows, status: 'active' })" class="px-3 py-1.5 bg-green-500 text-white text-sm rounded hover:bg-green-600">批量上架</button>
             <button @click="$dispatch('batch-status', { ids: selectedRows, status: 'inactive' })" class="px-3 py-1.5 bg-gray-500 text-white text-sm rounded hover:bg-gray-600">批量下架</button>
@@ -129,15 +129,16 @@
             <button @click="loadData()" class="text-sm themed-text-primary hover:underline">🔄 重试</button>
           </div>
           <!-- 宫格视图：与表格共用本组件 data 与分页 -->
-          <div x-show="hasData && $root.view_mode === 'grid'" x-cloak class="p-2">
+          <div x-show="hasData && view_mode === 'grid'" x-cloak class="p-2">
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               <template x-for="(row, idx) in data" :key="row.exchange_item_id || idx">
                 <div class="themed-card rounded-lg border overflow-hidden flex flex-col shadow-sm hover:shadow-md transition-shadow">
-                  <div class="aspect-square bg-gray-50 flex items-center justify-center overflow-hidden">
-                    <template x-if="$root.exchangeItemImageUrl(row)">
-                      <img :src="$root.exchangeItemImageUrl(row)" :alt="row.item_name || ''" class="w-full h-full object-cover" loading="lazy" />
+                  <div class="aspect-square bg-gray-50 flex items-center justify-center overflow-hidden cursor-pointer group"
+                       @click="openImagePreview(exchangeItemFullImageUrl(row), row.item_name)">
+                    <template x-if="exchangeItemImageUrl(row)">
+                      <img :src="exchangeItemImageUrl(row)" :alt="row.item_name || ''" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" loading="lazy" />
                     </template>
-                    <template x-if="!$root.exchangeItemImageUrl(row)">
+                    <template x-if="!exchangeItemImageUrl(row)">
                       <span class="text-gray-400 text-sm">暂无图片</span>
                     </template>
                   </div>
@@ -145,13 +146,13 @@
                     <h3 class="font-medium text-sm line-clamp-2" x-text="row.item_name || '-'"></h3>
                     <div class="text-sm text-green-600 font-mono">
                       <span x-text="row.cost_amount || 0"></span>
-                      <span class="text-xs text-gray-500" x-text="' ' + (row.cost_asset_code || '积分')"></span>
+                      <span class="text-xs text-gray-500" x-text="' ' + getAssetTypeName(row.cost_asset_code)"></span>
                     </div>
                     <div class="text-xs themed-text-muted">库存 <span class="font-semibold themed-text-secondary" x-text="row.stock ?? '-'"></span></div>
                     <div>
                       <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
                             :class="row.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'"
-                            x-text="$root.exchangeItemStatusLabel(row.status)"></span>
+                            x-text="exchangeItemStatusLabel(row.status)"></span>
                     </div>
                     <div class="flex flex-wrap gap-1.5 pt-2 mt-auto border-t border-gray-100">
                       <button type="button" @click="$dispatch('edit-item', row)" class="text-xs text-green-600 hover:underline">编辑</button>
@@ -164,7 +165,7 @@
               </template>
             </div>
           </div>
-          <div x-show="hasData && $root.view_mode === 'list'" class="overflow-x-auto">
+          <div x-show="hasData && view_mode === 'list'" class="overflow-x-auto">
             <table class="w-full">
               <thead class="themed-bg-base">
                 <tr>
@@ -204,7 +205,7 @@
             <div class="text-4xl mb-4">📦</div>
             <p>暂无商品数据</p>
           </div>
-          <template x-if="total_pages > 1 && ($root.view_mode === 'list' || $root.view_mode === 'grid')">
+          <template x-if="total_pages > 1 && (view_mode === 'list' || view_mode === 'grid')">
             <div class="p-4 border-t flex justify-between items-center">
               <span class="text-sm themed-text-muted" x-text="paginationInfo"></span>
               <div class="flex space-x-1">
@@ -950,7 +951,7 @@
                           <span class="inline-block px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-xs mr-1" x-text="key + ':' + val"></span>
                         </template>
                       </td>
-                      <td class="px-3 py-2 font-mono" x-text="sku.cost_amount + ' ' + (sku.cost_asset_code || '')"></td>
+                      <td class="px-3 py-2 font-mono" x-text="sku.cost_amount + ' ' + getAssetTypeName(sku.cost_asset_code)"></td>
                       <td class="px-3 py-2" x-text="sku.stock"></td>
                       <td class="px-3 py-2" x-text="sku.sold_count || 0"></td>
                       <td class="px-3 py-2">
@@ -1010,7 +1011,7 @@
             </div>
             <div class="flex justify-between border-b pb-2">
               <span class="themed-text-muted">消耗资产</span>
-              <span class="font-mono text-green-600" x-text="(selectedOrder.pay_amount || 0) + ' ' + (selectedOrder.pay_asset_code || '')"></span>
+              <span class="font-mono text-green-600" x-text="(selectedOrder.pay_amount || 0) + ' ' + getAssetTypeName(selectedOrder.pay_asset_code)"></span>
             </div>
             <div class="flex justify-between border-b pb-2">
               <span class="themed-text-muted">状态</span>
@@ -1191,6 +1192,25 @@
           保存规格
         </button>
       </div>
+    </div>
+  </div>
+
+  <!-- 图片预览弹窗 -->
+  <div x-ref="imagePreviewModal"
+       x-show="isModalOpen('imagePreviewModal')"
+       x-cloak
+       class="fixed inset-0 z-[60] flex items-center justify-center"
+       style="display: none;"
+       @keydown.escape.window="closeImagePreview()">
+    <div class="fixed inset-0 bg-black/80" @click="closeImagePreview()"></div>
+    <div class="relative z-10 max-w-[90vw] max-h-[90vh] flex items-center justify-center">
+      <button @click="closeImagePreview()"
+              class="absolute -top-10 right-0 text-white/80 hover:text-white text-3xl font-light leading-none"
+              title="关闭">✕</button>
+      <img :src="previewImageUrl"
+           :alt="previewImageAlt"
+           class="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
+           @click.stop />
     </div>
   </div>
 

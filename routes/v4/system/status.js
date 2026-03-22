@@ -121,7 +121,7 @@ router.get('/business-config', optionalAuth, dataAccessControl, async (req, res)
      * - 活动级定价计算已迁移至 LotteryPricingService.getDrawPricing()
      *
      * @see services/lottery/LotteryPricingService.js - 统一定价服务
-     * @see routes/v4/console/lottery-management/pricing-config.js - 定价配置管理
+     * @see routes/v4/console/lottery/pricing-config.js - 定价配置管理
      */
     const defaultDiscounts = {
       single: { count: 1, discount: 1.0, label: '单抽' },

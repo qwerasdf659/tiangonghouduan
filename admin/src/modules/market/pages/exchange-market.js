@@ -41,6 +41,9 @@ document.addEventListener('alpine:init', () => {
   // 存储当前子页面
   Alpine.store('exchangePage', 'items')
 
+  // 资产类型字典（供 data-table 等独立组件使用）
+  Alpine.store('assetTypeMap', {})
+
   /**
    * 兑换市场导航组件
    */
@@ -138,6 +141,15 @@ document.addEventListener('alpine:init', () => {
         this.$el.addEventListener('batch-category-modal', e => {
           this.batchCategoryIds = e.detail.ids
           this.showModal('batchCategoryModal')
+        })
+
+        // 事件委托：列表视图中 data-table 渲染的图片点击预览
+        this.$el.addEventListener('click', e => {
+          const trigger = e.target.closest('[data-preview-trigger]')
+          if (trigger) {
+            const url = trigger.dataset.previewUrl || trigger.src
+            if (url) this.openImagePreview(url, trigger.alt || '')
+          }
         })
 
         await this.loadAssetTypes()
@@ -249,15 +261,24 @@ document.addEventListener('alpine:init', () => {
         }
       },
 
-      /** 查看单品数据看板 */
+      /** 查看单品数据看板（后端暂未实现此端点，从订单数据聚合） */
       async viewItemDashboard(item) {
         const itemId = item.exchange_item_id || item
         this.itemDashboard = null
         this.itemDashboardLoading = true
         this.showModal('itemDashboardModal')
         try {
-          const res = await ExchangeAPI.getItemDashboard(itemId)
-          this.itemDashboard = res.data || res
+          const itemOrders = (this.orders || []).filter(o => o.exchange_item_id === itemId)
+          const now = new Date()
+          const d7 = new Date(now - 7 * 86400000)
+          const d30 = new Date(now - 30 * 86400000)
+          this.itemDashboard = {
+            orders_7d: itemOrders.filter(o => new Date(o.created_at) >= d7).length,
+            orders_30d: itemOrders.filter(o => new Date(o.created_at) >= d30).length,
+            total_orders: itemOrders.length,
+            completed: itemOrders.filter(o => o.status === 'completed').length,
+            item_name: item.item_name
+          }
         } catch (error) {
           this.showError(`看板数据加载失败: ${error.message}`)
         } finally {
@@ -267,17 +288,21 @@ document.addEventListener('alpine:init', () => {
 
       /**
        * 更新市场统计数据
+       * 优先使用 exchangeStats（统计tab加载），其次 itemStats（商品tab加载），最后 items 数组长度
        * @private
        */
       _updateMarketStats() {
         this.marketStats = {
-          total_items: this.exchangeStats?.items?.activeCount || this.items?.length || 0,
+          total_items:
+            this.exchangeStats?.items?.activeCount ||
+            this.itemStats?.total ||
+            this.items?.length ||
+            0,
           today_orders: this.exchangeStats?.orders?.total || this.orders?.length || 0,
           pending_shipments:
             this.exchangeStats?.orders?.pending ||
             this.orders?.filter(o => o.status === 'pending')?.length ||
             0,
-          // 使用累计消耗的资产数量
           points_consumed: this.exchangeStats?.revenue?.total_virtual_value || 0
         }
       },
@@ -318,7 +343,26 @@ document.addEventListener('alpine:init', () => {
 
       getAssetTypeName(code) {
         const type = this.assetTypes.find(t => t.asset_code === code)
-        return type?.asset_name || code || '-'
+        return type?.display_name || code || '-'
+      },
+
+      // ========== 图片预览 ==========
+      previewImageUrl: '',
+      previewImageAlt: '',
+
+      /** 打开图片预览弹窗 */
+      openImagePreview(url, alt) {
+        if (!url) return
+        this.previewImageUrl = url
+        this.previewImageAlt = alt || ''
+        this.showModal('imagePreviewModal')
+      },
+
+      /** 关闭图片预览弹窗 */
+      closeImagePreview() {
+        this.hideModal('imagePreviewModal')
+        this.previewImageUrl = ''
+        this.previewImageAlt = ''
       },
 
       /** 商品主图 URL（网格卡片用） */
@@ -326,6 +370,12 @@ document.addEventListener('alpine:init', () => {
         const img = row?.primary_image
         const url = img?.thumbnail_url || img?.url
         return url || ''
+      },
+
+      /** 商品原图 URL（预览用，优先原图） */
+      exchangeItemFullImageUrl(row) {
+        const img = row?.primary_image
+        return img?.url || img?.thumbnail_url || ''
       },
 
       /** 商品状态徽章文案（网格卡片用） */
@@ -417,9 +467,10 @@ document.addEventListener('alpine:init', () => {
           key: 'primary_image',
           label: '图片',
           render: val => {
-            const url = val?.thumbnail_url || val?.url
-            if (url) {
-              return `<img src="${url}" alt="商品图片" class="w-10 h-10 object-cover rounded" />`
+            const thumbUrl = val?.thumbnail_url || val?.url
+            const fullUrl = val?.url || val?.thumbnail_url
+            if (thumbUrl) {
+              return `<img src="${thumbUrl}" alt="商品图片" class="w-10 h-10 object-cover rounded cursor-pointer hover:opacity-80 transition-opacity" data-preview-url="${fullUrl}" data-preview-trigger />`
             }
             return '<span class="text-gray-400 text-xs">暂无图片</span>'
           }
@@ -429,7 +480,12 @@ document.addEventListener('alpine:init', () => {
           key: 'cost_amount',
           label: '兑换价格',
           sortable: true,
-          render: (val, row) => `${val || 0} ${row.cost_asset_code || '积分'}`
+          render: (val, row) => {
+            const code = row.cost_asset_code || ''
+            const nameMap = Alpine.store('assetTypeMap') || {}
+            const displayName = nameMap[code] || code || '积分'
+            return `${val || 0} ${displayName}`
+          }
         },
         { key: 'stock', label: '库存', type: 'number', sortable: true },
         {
@@ -487,16 +543,26 @@ document.addEventListener('alpine:init', () => {
         {
           key: 'pay_amount',
           label: '消耗积分',
-          render: (val, row) =>
-            `${val || row.cost_amount || 0} ${row.pay_asset_code || row.cost_asset_code || ''}`
+          render: (val, row) => {
+            const amount = val || row.cost_amount || 0
+            const code = row.pay_asset_code || row.cost_asset_code || ''
+            const nameMap = Alpine.store('assetTypeMap') || {}
+            const displayName = nameMap[code] || code
+            return `${amount} ${displayName}`
+          }
         },
         {
           key: 'status',
           label: '状态',
           type: 'status',
           statusMap: {
-            pending: { class: 'yellow', label: '待发货' },
+            pending: { class: 'yellow', label: '待处理' },
+            approved: { class: 'blue', label: '已审核' },
             shipped: { class: 'blue', label: '已发货' },
+            received: { class: 'green', label: '已收货' },
+            rated: { class: 'green', label: '已评价' },
+            rejected: { class: 'red', label: '已拒绝' },
+            refunded: { class: 'gray', label: '已退款' },
             completed: { class: 'green', label: '已完成' },
             cancelled: { class: 'gray', label: '已取消' }
           }

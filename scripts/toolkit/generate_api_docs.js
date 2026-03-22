@@ -109,7 +109,7 @@ function scanRoutes(baseDir) {
     { file: 'routes/v4/lottery/draw.js', prefix: '/api/v4/lottery' },
     { file: 'routes/v4/assets/balance.js', prefix: '/api/v4/assets' },
     { file: 'routes/v4/shop/consumption/submit.js', prefix: '/api/v4/shop/consumption' },
-    { file: 'routes/v4/console/dashboard.js', prefix: '/api/v4/console' },
+    { file: 'routes/v4/console/analytics/dashboard.js', prefix: '/api/v4/console' },
     { file: 'routes/v4/system/status.js', prefix: '/api/v4/system' },
     { file: 'routes/v4/auth/permissions.js', prefix: '/api/v4/permissions' }
   ]

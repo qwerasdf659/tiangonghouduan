@@ -8,7 +8,7 @@
 
 import { API_PREFIX, request } from './base.js'
 
-// 健康度端点（与后端 routes/v4/console/lottery-health.js 对齐）
+// 健康度端点（与后端 routes/v4/console/lottery/lottery-health.js 对齐）
 export const LOTTERY_HEALTH_ENDPOINTS = {
   // GET /console/lottery-health/:id - 获取活动健康度报告
   CAMPAIGN: campaignId => `${API_PREFIX}/console/lottery-health/${campaignId}`,
@@ -23,7 +23,7 @@ export const LOTTERY_HEALTH_ENDPOINTS = {
 
 /**
  * 抽奖健康度 API
- * @description 与后端 routes/v4/console/lottery-health.js 对齐
+ * @description 与后端 routes/v4/console/lottery/lottery-health.js 对齐
  */
 export const LotteryHealthAPI = {
   /**

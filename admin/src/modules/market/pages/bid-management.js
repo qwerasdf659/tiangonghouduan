@@ -18,6 +18,7 @@ import { logger, $confirm } from '../../../utils/index.js'
 import { Alpine, createPageMixin } from '../../../alpine/index.js'
 import { BidAPI } from '../../../api/market/bid.js'
 import { ExchangeAPI } from '../../../api/market/exchange.js'
+import { ExchangeItemAPI } from '../../../api/exchange-item/index.js'
 
 /**
  * 竞价状态中文映射（基于后端 BidProduct 模型的 7 态状态机）
@@ -265,7 +266,7 @@ document.addEventListener('alpine:init', () => {
       async loadExchangeItems() {
         this.loading_exchange_items = true
         try {
-          const res = await ExchangeAPI.getExchangeItems({ status: 'active', page_size: 100 })
+          const res = await ExchangeItemAPI.listExchangeItems({ status: 'active', page_size: 100 })
           if (res.success) {
             this.exchange_items = res.data?.items || res.data?.list || []
             logger.info('[BidManagement] 兑换商品加载成功:', this.exchange_items.length)

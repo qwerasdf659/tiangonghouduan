@@ -157,8 +157,8 @@ module.exports = {
       files: [
         'config/segment_rules.js',
         'utils/CampaignCodeGenerator.js',
-        'routes/v4/console/merchant-points.js',
-        'routes/v4/console/ad-pricing.js'
+        'routes/v4/console/merchant/merchant-points.js',
+        'routes/v4/console/ad/ad-pricing.js'
       ],
       rules: {
         'no-await-in-loop': 'off'

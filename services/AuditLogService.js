@@ -684,7 +684,7 @@ class AuditLogService {
    * 记录资产调整操作（V4.5.0新增）
    *
    * @description 用于管理员资产调整路由的审计日志记录
-   * @see routes/v4/console/asset-adjustment.js
+   * @see routes/v4/console/config/asset-adjustment.js
    *
    * @param {Object} params - 参数
    * @param {number} params.operator_id - 操作员ID（管理员）
