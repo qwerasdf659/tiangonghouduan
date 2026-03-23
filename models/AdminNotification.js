@@ -8,7 +8,6 @@
  * - 支持消息过期机制
  *
  * 表名：admin_notifications
- * 创建时间：2026年02月01日
  */
 
 'use strict'

@@ -7,10 +7,6 @@
  * - 用户浏览兑换商品列表
  * - 用户使用材料资产兑换商品
  *
- * 域边界说明（2026-02-07 阻塞项核实决策）：
- * - 兑换本质是"用户用积分/材料换物品"，语义上属于用户域
- * - 从 /shop/exchange 迁移到 /backpack/exchange
- * - /shop 域 = 100% 商家专属，不再包含用户兑换功能
  *
  * 子路由清单：
  * - GET  /items                  - 获取兑换商品列表
@@ -22,7 +18,7 @@
  * - 写操作通过 TransactionManager.execute() 管理事务边界
  * - 统一使用 res.apiSuccess / res.apiError 响应
  *
- * 创建时间：2026-02-07（从 routes/v4/shop/exchange/ 迁移）
+ *
  */
 
 'use strict'
@@ -530,7 +526,6 @@ router.get(
  * @access Private（所有登录用户可访问）
  *
  * 复用 PremiumService.getPremiumStatus(user_id)
- * 从 /api/v4/shop/premium/status 迁移到此路由（决策2）
  *
  * @returns {Object} 解锁状态和条件信息
  */
@@ -591,7 +586,6 @@ router.get(
  * @access Private（所有登录用户可访问，需满足解锁条件）
  *
  * 复用 PremiumService.unlockPremium(user_id, {transaction})
- * 从 /api/v4/shop/premium/unlock 迁移到此路由（决策2）
  *
  * @returns {Object} 解锁结果
  */

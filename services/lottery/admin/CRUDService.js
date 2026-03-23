@@ -20,7 +20,6 @@
  * - 路由层使用 TransactionManager.execute() 创建事务
  * - Service 层通过 assertAndGetTransaction() 强制验证事务存在
  *
- * 创建时间：2026-01-31
  * 拆分自：routes/v4/console/analytics/system-data.js（路由层直接操作模型）
  */
 
@@ -290,7 +289,7 @@ class LotteryCampaignCRUDService {
           type: 'number',
           desc: '防连高灰度百分比'
         },
-        // ======== 从 lottery_campaigns 表迁移的策略参数（2026-02-24） ========
+        // ======== 策略参数 ========
         {
           group: 'segment',
           key: 'resolver_version',

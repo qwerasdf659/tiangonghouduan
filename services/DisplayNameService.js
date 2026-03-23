@@ -15,7 +15,7 @@
  *
  * @module services/DisplayNameService
  * @author 中文化显示名称系统
- * @since 2026-01-22
+ * @since 2026
  */
 
 'use strict'

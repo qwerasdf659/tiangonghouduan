@@ -21,7 +21,7 @@
  *
  * @module models/LotteryDailyMetrics
  * @author 抽奖策略引擎监控方案实施
- * @since 2026-01-21
+ * @since 2026
  */
 
 const { Model, DataTypes, Op } = require('sequelize')

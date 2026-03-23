@@ -58,7 +58,6 @@ const BeijingTimeHelper = require('../../utils/timeHelper')
  * }
  * ```
  *
- * 创建时间：2025-12-23
  * 作者：Claude Code
  */
 
@@ -478,9 +477,9 @@ class LotteryQuotaService {
     return {
       rules: rows,
       pagination: {
-        current_page: parseInt(page),
+        page: parseInt(page),
         page_size: parseInt(page_size),
-        total_count: count,
+        total: count,
         total_pages: Math.ceil(count / parseInt(page_size))
       }
     }
@@ -489,7 +488,7 @@ class LotteryQuotaService {
   /**
    * 获取单个配额规则详情
    *
-   * API路径参数设计规范 V2.2（2026-01-20）：
+   * API路径参数设计规范 V2.2：
    * - 配额规则是事务实体（按需创建），使用数字ID（:id）作为标识符
    * - 对应路由：GET /api/v4/console/lottery-quota/rules/:id
    *

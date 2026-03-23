@@ -10,8 +10,6 @@
  * - 路由层不直连 models（通过 ServiceManager 获取 QueryService）
  * - 路由层不开启事务（事务管理在 Service 层）
  *
- * 创建时间：2025-12-29
- * 更新时间：2026-02-16（补充 description/title 字段输出，修正主键字段名）
  */
 
 'use strict'
@@ -72,7 +70,7 @@ router.get(
     )
 
     /*
-     * γ 模式（2026-02-21）：通过 DataSanitizer 统一脱敏
+     * γ 模式：通过 DataSanitizer 统一脱敏
      * - BUDGET_POINTS 等禁止资产自动过滤（安全关键）
      * - business_type_display 中文映射自动添加
      * - 内部字段（account_id、idempotency_key 等）自动删除

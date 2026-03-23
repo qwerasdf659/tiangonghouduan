@@ -90,7 +90,7 @@ describe('物品模板管理API测试 - P2优先级', () => {
       expect(Array.isArray(data.list)).toBe(true)
 
       // 验证分页结构
-      expect(data.pagination).toHaveProperty('total_count')
+      expect(data.pagination).toHaveProperty('total')
       expect(data.pagination).toHaveProperty('page')
       expect(data.pagination).toHaveProperty('page_size')
     })

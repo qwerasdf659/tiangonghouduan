@@ -22,7 +22,7 @@
  *
  * @module services/UnifiedLotteryEngine/pipeline/stages/LoadDecisionSourceStage
  * @author 统一抽奖架构重构 - Pipeline 统一化
- * @since 2026-01-18
+ * @since 2026
  */
 
 const BaseStage = require('./BaseStage')
@@ -450,7 +450,7 @@ class LoadDecisionSourceStage extends BaseStage {
    *
    * @param {number} user_id - 用户ID
    * @param {number} lottery_campaign_id - 活动ID
-   * @param {Object} _campaign - 活动配置（保底配置已迁移到 strategy_config，此参数保留兼容调用签名）
+   * @param {Object} _campaign - 活动对象（当前未使用，预留扩展）
    * @returns {Promise<Object>} 保底检查结果
    * @private
    */

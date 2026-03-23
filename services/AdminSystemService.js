@@ -110,7 +110,6 @@
  * await AdminSystemService.clearCache('rate_limit:*');
  * ```
  *
- * 创建时间：2025年12月09日
  * 最后更新：2025年12月11日（合并SystemSettingsService）
  * 使用模型：Claude Sonnet 4.5
  */
@@ -627,7 +626,7 @@ class AdminSystemService {
    * @returns {string} return.timestamp - 更新时间戳
    *
    * @description
-   * 配置管理三层分离方案（2025-12-30）：
+   * 配置管理三层分离方案：
    * - 所有配置修改必须通过白名单校验
    * - 范围约束是硬性防护，超出范围直接拒绝
    * - 高影响配置（businessImpact: HIGH/CRITICAL）强制审计日志
@@ -1080,10 +1079,22 @@ class AdminSystemService {
 
   // ==================== Config Key-Based Access (system_settings) ====================
 
+  /**
+   * 生成系统配置的 Redis 缓存键
+   * @param {string} setting_key - 配置项标识
+   * @returns {string} Redis 缓存键
+   * @private
+   */
   static _getConfigCacheKey(setting_key) {
     return `system_config:${setting_key}`
   }
 
+  /**
+   * 从 Redis 缓存读取系统配置
+   * @param {string} setting_key - 配置项标识
+   * @returns {Promise<Object|null>} 缓存值或 null
+   * @private
+   */
   static async _getConfigFromCache(setting_key) {
     try {
       const { getRedisClient } = require('../utils/UnifiedRedisClient')
@@ -1096,6 +1107,14 @@ class AdminSystemService {
     }
   }
 
+  /**
+   * 将系统配置写入 Redis 缓存
+   * @param {string} setting_key - 配置项标识
+   * @param {Object} value - 待缓存的配置值
+   * @param {number} ttl - 缓存过期时间（秒），默认 300
+   * @returns {Promise<void>} 无返回值
+   * @private
+   */
   static async _setConfigToCache(setting_key, value, ttl = 300) {
     try {
       const { getRedisClient } = require('../utils/UnifiedRedisClient')
@@ -1107,6 +1126,12 @@ class AdminSystemService {
     }
   }
 
+  /**
+   * 清除指定配置项的 Redis 缓存
+   * @param {string} setting_key - 配置项标识
+   * @returns {Promise<void>} 无返回值
+   * @private
+   */
   static async _clearConfigCache(setting_key) {
     try {
       const { getRedisClient } = require('../utils/UnifiedRedisClient')
@@ -1119,7 +1144,10 @@ class AdminSystemService {
   }
 
   /**
-   * Get a config value by setting_key only (no category needed).
+   * 通过 setting_key 获取系统配置值（带缓存）
+   * @param {string} setting_key - 配置项标识
+   * @param {*} defaultValue - 未找到时的默认值
+   * @returns {Promise<*>} 配置值或默认值
    */
   static async getConfigValue(setting_key, defaultValue = null) {
     try {
@@ -1139,7 +1167,11 @@ class AdminSystemService {
   }
 
   /**
-   * Get a nested property from a JSON config value.
+   * 从 JSON 类型配置中获取指定属性值
+   * @param {string} setting_key - 配置项标识
+   * @param {string} property - JSON 内的属性名
+   * @param {*} defaultValue - 未找到时的默认值
+   * @returns {Promise<*>} 属性值或默认值
    */
   static async getConfigProperty(setting_key, property, defaultValue = null) {
     const value = await this.getConfigValue(setting_key)
@@ -1150,7 +1182,9 @@ class AdminSystemService {
   }
 
   /**
-   * Batch rate-limit config from system_settings.
+   * 获取批量操作限流配置
+   * @param {string} operation_type - 操作类型标识
+   * @returns {Promise<Object>} 限流配置（max_items_per_request, cooldown_seconds）
    */
   static async getBatchRateLimitConfig(operation_type) {
     const keyMap = {
@@ -1175,7 +1209,8 @@ class AdminSystemService {
   }
 
   /**
-   * Batch global config from system_settings.
+   * 获取批量操作全局配置
+   * @returns {Promise<Object>} 全局配置（max_concurrent_batches, retry 等）
    */
   static async getBatchGlobalConfig() {
     const config = await this.getConfigValue('batch_operation_global')
@@ -1191,7 +1226,11 @@ class AdminSystemService {
   }
 
   /**
-   * Create-or-update a config row in system_settings by setting_key.
+   * 创建或更新系统配置项（Upsert）
+   * @param {string} setting_key - 配置项标识
+   * @param {*} setting_value - 配置值（支持 JSON/number/boolean/string）
+   * @param {Object} options - 可选参数（description, category, transaction）
+   * @returns {Promise<Object>} 操作结果 { setting_key, created }
    */
   static async upsertConfig(setting_key, setting_value, options = {}) {
     const { description, category = 'general', transaction } = options
@@ -1239,7 +1278,8 @@ class AdminSystemService {
   }
 
   /**
-   * Get all batch-operation configs from system_settings.
+   * 获取全部批量操作配置列表
+   * @returns {Promise<Array>} 配置项数组
    */
   static async getAllBatchConfigs() {
     try {
@@ -1261,7 +1301,8 @@ class AdminSystemService {
   }
 
   /**
-   * Pre-warm batch-operation config cache at startup.
+   * 启动时预热批量操作配置缓存
+   * @returns {Promise<void>} 无返回值
    */
   static async warmupBatchConfigs() {
     try {

@@ -231,7 +231,6 @@ class SmsService {
     const smsProvider = process.env.SMS_PROVIDER
 
     if (!smsProvider) {
-      // Phase 1：未配置SMS服务商，仅记录日志，不真实发送
       logger.info('📱 [SMS-Mock] 验证码已生成（未配置SMS服务商，验证码仅存Redis）', {
         mobile: mobile.substring(0, 3) + '****' + mobile.substring(7),
         code_hint: `验证码为 ${code}（开发日志，生产环境禁止输出）`
@@ -239,7 +238,6 @@ class SmsService {
       return false
     }
 
-    // Phase 2：对接真实SMS SDK
     try {
       if (smsProvider === 'aliyun') {
         return await SmsService._sendAliyunSms(mobile, code)

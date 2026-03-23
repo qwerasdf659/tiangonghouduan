@@ -297,7 +297,6 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
         // 前端展示配置字段（多活动抽奖系统 - Web后台活动列表需要展示玩法和主题）
         'display_mode',
         'effect_theme',
-        // Phase 3 展示控制字段
         'sort_order',
         'is_featured',
         'is_hidden',
@@ -376,9 +375,9 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
     const response = {
       campaigns: enrichedCampaigns,
       pagination: {
-        current_page: parseInt(page),
+        page: parseInt(page),
         page_size: limit,
-        total_count: count,
+        total: count,
         total_pages: totalPages,
         has_next: parseInt(page) < totalPages,
         has_prev: parseInt(page) > 1
@@ -390,7 +389,7 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
       status,
       merchant_id: parsedMerchantId || null,
       page,
-      total_count: count,
+      total: count,
       returned_count: enrichedCampaigns.length
     })
 

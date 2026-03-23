@@ -50,7 +50,6 @@ function getUserSegmentService(req) {
  * @returns {Object} Sequelize 模型集合
  */
 function getModels(req) {
-  // Phase 3 收口：通过 ServiceManager 获取 models，避免直连
   return req.models || req.app.locals.models
 }
 
@@ -418,7 +417,7 @@ router.get('/segment-rules', authenticateToken, requireRoleLevel(100), async (re
  * @apiSuccess {Boolean} success 请求是否成功
  * @apiSuccess {Object} data 审核率数据
  * @apiSuccess {Number} data.approval_rate 审核通过率（0-1）
- * @apiSuccess {Number} data.total_count 总提交数
+ * @apiSuccess {Number} data.total 总提交数
  * @apiSuccess {Number} data.approved_count 通过数
  * @apiSuccess {Number} data.rejected_count 拒绝数
  * @apiSuccess {Number} data.pending_count 待审核数
@@ -437,7 +436,7 @@ router.get('/segment-rules', authenticateToken, requireRoleLevel(100), async (re
  *   "data": {
  *     "user_id": 1001,
  *     "approval_rate": 0.92,
- *     "total_count": 25,
+ *     "total": 25,
  *     "approved_count": 23,
  *     "rejected_count": 2,
  *     "pending_count": 0,

@@ -8,7 +8,6 @@
  * - 审计统计：操作审计统计分析
  *
  * 任务编号：B-43 回滚接口, B-45 审计统计接口
- * 创建时间：2026年01月31日
  *
  * @module routes/v4/console/config/audit-rollback
  */

@@ -19,7 +19,6 @@
  * - 路由层不直连 models（通过 ServiceManager 获取 QueryService）
  * - 读操作无需事务
  *
- * 创建时间：2026-02-21（决策 D-1 实施）
  */
 
 'use strict'

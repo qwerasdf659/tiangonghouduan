@@ -37,7 +37,7 @@ class ExchangeChannelPrice extends Model {
    * - publish_at 为空：不限制开始时间（视为已可展示）
    * - unpublish_at 为空：不限制结束时间
    * - 到达 unpublish_at 时刻起视为已下架（含边界）
-   * @returns {boolean}
+   * @returns {boolean} 判断结果
    */
   isPublished() {
     if (!this.is_enabled) return false
@@ -49,8 +49,8 @@ class ExchangeChannelPrice extends Model {
 }
 
 /**
- * @param {import('sequelize').Sequelize} sequelize - Sequelize 实例
- * @returns {typeof ExchangeChannelPrice}
+ * @param {Object} sequelize - Sequelize 实例
+ * @returns {Model} 初始化后的模型类
  */
 module.exports = sequelize => {
   ExchangeChannelPrice.init(

@@ -10,7 +10,6 @@
  * - 路由层不直连 models（通过 Service 层）
  * - 通过 ServiceManager 统一获取服务实例
  *
- * 创建时间：2025-12-22
  */
 
 const express = require('express')
@@ -58,8 +57,6 @@ router.get(
  * @description 获取反馈按状态分类的统计数据
  * @route GET /api/v4/console/system/feedbacks/stats
  * @access Private (需要管理员权限)
- *
- * @since 2026-01-18 路由层合规性治理：移除直接模型访问，使用 FeedbackService.getStats()
  */
 router.get(
   '/stats',
@@ -89,7 +86,7 @@ router.get(
  * @body {string} status - 目标状态（必填，pending/processing/replied/closed）
  * @body {string} [internal_notes] - 内部备注（可选）
  *
- * @since 2026-02-20 新增批量状态更新，满足运营快速处理需求
+ * @since 2026
  */
 router.put(
   '/batch-status',
@@ -163,7 +160,7 @@ router.put(
  * @body {string} reply_content - 统一回复内容（必填）
  * @body {string} [internal_notes] - 内部备注（可选）
  *
- * @since 2026-03-09 新增批量回复功能，满足运营批量回复相同信息的需求
+ * @since 2026
  */
 router.put(
   '/batch-reply',

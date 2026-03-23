@@ -12,7 +12,6 @@
  *
  * 表名（snake_case）：bid_records
  * 主键命名：bid_record_id
- * 创建时间：2026-02-16
  *
  */
 

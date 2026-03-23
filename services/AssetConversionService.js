@@ -78,7 +78,6 @@
  *   - business_type: material_convert_credit（目标资产入账分录）
  *   - business_type: material_convert_fee（手续费入账分录）
  *
- * 创建时间：2025-12-15
  * 最后更新：2026-01-05（事务边界治理改造）
  * 最后更新：2026-01-13（规则驱动 + 手续费三方记账）
  * 使用模型：Claude Sonnet 4.5
@@ -87,7 +86,7 @@
 'use strict'
 
 const { sequelize } = require('../config/database')
-// V4.7.0 AssetService 拆分：使用子服务替代原 AssetService（2026-01-31）
+// V4.7.0 AssetService 拆分：使用子服务替代原 AssetService
 const BalanceService = require('./asset/BalanceService')
 const QueryService = require('./asset/QueryService')
 // 🔴 从 models/index.js 获取已初始化的 Sequelize Model（避免直接 require 模型定义文件导致未初始化）

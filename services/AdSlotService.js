@@ -10,7 +10,6 @@
  * - /api/v4/ad/slots（小程序端 - 获取可用广告位）
  * - /api/v4/console/ad-slots（管理端 - 广告位管理）
  *
- * 创建时间：2026-02-18
  */
 
 const logger = require('../utils/logger').logger

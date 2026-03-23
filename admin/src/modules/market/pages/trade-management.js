@@ -444,7 +444,7 @@ document.addEventListener('alpine:init', () => {
         this.loading = true
         const params = {
           page: this.marketplaceCurrentPage,
-          limit: this.marketplacePageSize
+          page_size: this.marketplacePageSize
         }
         if (this.marketplaceFilters.status && this.marketplaceFilters.status !== 'all') {
           params.filter = this.marketplaceFilters.status
@@ -540,7 +540,7 @@ document.addEventListener('alpine:init', () => {
           const listingRes = await request({
             url: MARKET_ENDPOINTS.LISTING_STATS,
             method: 'GET',
-            params: { page: 1, limit: 1 }
+            params: { page: 1, page_size: 1 }
           })
           if (listingRes?.success && listingRes.data?.summary) {
             this.marketOverview.active_listings = listingRes.data.summary.total_listings || 0

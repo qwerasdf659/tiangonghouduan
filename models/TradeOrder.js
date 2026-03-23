@@ -50,7 +50,6 @@
  * - MarketListing：挂牌状态更新
  * - Item：物品所有权转移
  *
- * 创建时间：2025年12月15日
  * 最后更新：2025年12月15日
  * 使用模型：Claude Sonnet 4.5
  */
@@ -79,7 +78,7 @@ module.exports = sequelize => {
       },
 
       /**
-       * 业务唯一键（business_id）- 事务边界治理（2026-01-05）
+       * 业务唯一键（business_id）- 事务边界治理
        *
        * 与 idempotency_key 的区别：
        * - idempotency_key：请求级幂等（防止同一请求重复提交）

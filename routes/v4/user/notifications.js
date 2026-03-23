@@ -14,7 +14,6 @@
  * - 读写操作均通过 NotificationService（经 ServiceManager 获取），路由层不直接访问 models
  * - NotificationService 为静态类，注册键: 'notification'
  *
- * 创建时间：2026年02月24日
  */
 
 'use strict'

@@ -18,7 +18,6 @@
  * - API 参数使用 snake_case（如 from_asset_code/to_asset_code/effective_at）
  * - "版本化"意味着：改比例必须新增规则（禁止 UPDATE 覆盖历史），禁用仅允许修改 is_enabled
  *
- * 创建时间：2025年12月
  * 最后更新：2026年01月05日（事务边界治理改造）
  */
 
@@ -94,7 +93,7 @@ class MaterialManagementService {
       rules: rows.map(r => r.toJSON()),
       pagination: {
         total: count,
-        page: current_page,
+        page,
         page_size: limit,
         total_pages: Math.ceil(count / limit)
       }
@@ -328,7 +327,7 @@ class MaterialManagementService {
   /**
    * 获取单个材料资产类型详情（管理员）
    *
-   * API路径参数设计规范 V2.2（2026-01-20）：
+   * API路径参数设计规范 V2.2：
    * - 配置实体使用业务码（:code）作为标识符
    * - 对应路由：GET /api/v4/console/material/asset-types/:code
    *
@@ -440,7 +439,7 @@ class MaterialManagementService {
    * - 强制要求外部事务传入（options.transaction）
    * - 未提供事务时直接报错，由入口层统一管理事务
    *
-   * API路径参数设计规范 V2.2（2026-01-20）：
+   * API路径参数设计规范 V2.2：
    * - 配置实体使用业务码（:code）作为标识符
    * - 对应 CANONICAL_OPERATION_MAP: 'ADMIN_MATERIAL_TYPE_UPDATE'
    *

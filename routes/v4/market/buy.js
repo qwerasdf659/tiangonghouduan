@@ -17,18 +17,15 @@
  * - 缺失幂等键直接返回 400
  * - 接入请求级幂等服务（IdempotencyService），统一回放/冲突/处理中语义
  *
- * 创建时间：2025年12月22日
- * 更新时间：2026年01月02日 - 接入请求级幂等服务
  */
 
 const express = require('express')
 const router = express.Router()
 const { authenticateToken } = require('../../../middleware/auth')
-const { requireValidSession } = require('../../../middleware/sensitiveOperation') // 🔐 会话管理功能（2026-01-21）
+const { requireValidSession } = require('../../../middleware/sensitiveOperation')
 const { validatePositiveInteger, handleServiceError } = require('../../../middleware/validation')
 const logger = require('../../../utils/logger').logger
 const TransactionManager = require('../../../utils/TransactionManager')
-// P1-9：服务通过 ServiceManager 获取（B1-Injected + E2-Strict snake_case）
 
 /*
  * 风控中间件（2026-01-14 多币种扩展新增）
@@ -74,7 +71,6 @@ router.post(
   marketRiskMiddleware.createBuyRiskMiddleware(),
   validatePositiveInteger('market_listing_id', 'params'),
   async (req, res) => {
-    // P1-9：通过 ServiceManager 获取服务（B1-Injected + E2-Strict snake_case）
     const IdempotencyService = req.app.locals.services.getService('idempotency')
     const MarketListingQueryService = req.app.locals.services.getService('market_listing_query')
     const TradeOrderService = req.app.locals.services.getService('trade_order')
@@ -268,7 +264,6 @@ router.post(
         idempotency_key
       })
 
-      // Phase 6: 广告归因追踪（非关键路径，错误不影响业务）
       try {
         const AdAttributionService = req.app.locals.services.getService('ad_attribution')
         await AdAttributionService.checkConversion(

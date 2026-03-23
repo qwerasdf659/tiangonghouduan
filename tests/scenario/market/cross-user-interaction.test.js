@@ -466,9 +466,8 @@ describe('交易市场跨用户交互场景测试（P0-2 系列）', () => {
      * 3. 验证任务执行报告结构
      */
     it('应正确配置订单超时阈值', () => {
-      // 验证超时阈值配置（默认3分钟）
       expect(HourlyUnlockTimeoutTradeOrders.LOCK_TIMEOUT_MINUTES).toBeDefined()
-      expect(HourlyUnlockTimeoutTradeOrders.LOCK_TIMEOUT_MINUTES).toBe(3)
+      expect(HourlyUnlockTimeoutTradeOrders.LOCK_TIMEOUT_MINUTES).toBe(15)
       console.log(`✅ 订单超时阈值: ${HourlyUnlockTimeoutTradeOrders.LOCK_TIMEOUT_MINUTES} 分钟`)
     })
 

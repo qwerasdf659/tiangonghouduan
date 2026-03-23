@@ -30,7 +30,6 @@
  * - 所有写操作方法强制要求 options.transaction 参数
  * - Service 层通过 assertAndGetTransaction() 验证事务存在性
  *
- * 创建时间：2025-12-17
  * 最后更新：2026年01月05日（事务边界治理改造）
  */
 

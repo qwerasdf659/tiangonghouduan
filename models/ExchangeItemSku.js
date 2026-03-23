@@ -55,7 +55,7 @@ class ExchangeItemSku extends Model {
   /**
    * 判断库存是否不少于指定数量
    * @param {number} [quantity=1] - 需求数量
-   * @returns {boolean}
+   * @returns {boolean} 判断结果
    */
   hasStock(quantity = 1) {
     return this.stock >= quantity
@@ -63,8 +63,8 @@ class ExchangeItemSku extends Model {
 }
 
 /**
- * @param {import('sequelize').Sequelize} sequelize - Sequelize 实例
- * @returns {typeof ExchangeItemSku}
+ * @param {Object} sequelize - Sequelize 实例
+ * @returns {Model} 初始化后的模型类
  */
 module.exports = sequelize => {
   ExchangeItemSku.init(
@@ -115,8 +115,8 @@ module.exports = sequelize => {
         allowNull: true,
         comment: '成本价（人民币，可选）',
         /**
-         * @description 将 DECIMAL 字符串安全转为 number，便于业务计算
-         * @returns {number|null}
+         * 将 DECIMAL 字符串安全转为 number，便于业务计算
+         * @returns {number|null} 转换后的数值或 null
          */
         get() {
           const raw = this.getDataValue('cost_price')

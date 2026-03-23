@@ -1352,6 +1352,42 @@ class AdminService {
   }
 
   /**
+   * B2C 兑换商城顶线数据（dashboard 跨域概览专用）
+   * @param {number} [days=7] - 统计周期天数
+   * @returns {Promise<Object>} B2C 顶线指标
+   */
+  async getExchangeTopline(days = 7) {
+    const safeDays = parseInt(days) || 7
+    const [[activeRow], [exchangeRow], [lowStockRow]] = await Promise.all([
+      this.sequelize.query(
+        `SELECT COUNT(*) AS active_items FROM exchange_items WHERE status = 'active'`,
+        { type: QueryTypes.SELECT }
+      ),
+      this.sequelize.query(
+        `SELECT COUNT(*) AS period_exchanges, COALESCE(SUM(pay_amount), 0) AS period_pay_amount FROM exchange_records WHERE status != 'cancelled' AND created_at >= DATE_SUB(NOW(), INTERVAL ${safeDays} DAY)`,
+        { type: QueryTypes.SELECT }
+      ),
+      this.sequelize.query(
+        `SELECT COUNT(DISTINCT ei.exchange_item_id) AS low_stock_items FROM exchange_items ei JOIN exchange_item_skus eis ON ei.exchange_item_id = eis.exchange_item_id WHERE ei.status = 'active' AND eis.stock <= COALESCE(ei.stock_alert_threshold, 5) AND eis.stock > 0`,
+        { type: QueryTypes.SELECT }
+      )
+    ])
+    const [fulfillRow] = await this.sequelize.query(
+      `SELECT SUM(CASE WHEN status IN ('shipped','completed') THEN 1 ELSE 0 END) AS fulfilled, SUM(CASE WHEN status != 'cancelled' THEN 1 ELSE 0 END) AS valid_total FROM exchange_records`,
+      { type: QueryTypes.SELECT }
+    )
+    const fulfilled = Number(fulfillRow?.fulfilled) || 0
+    const validTotal = Number(fulfillRow?.valid_total) || 0
+    return {
+      active_items: Number(activeRow?.active_items) || 0,
+      period_exchanges: Number(exchangeRow?.period_exchanges) || 0,
+      period_pay_amount: Number(exchangeRow?.period_pay_amount) || 0,
+      low_stock_items: Number(lowStockRow?.low_stock_items) || 0,
+      fulfillment_rate: validTotal > 0 ? Math.round((fulfilled / validTotal) * 10000) / 100 : 0
+    }
+  }
+
+  /**
    * 获取单品维度统计数据（Admin Only）
    *
    * @param {number} exchangeItemId - 商品ID
@@ -2149,12 +2185,15 @@ class AdminService {
 
     // 渠道定价更新（cost_asset_code / cost_amount 在 exchange_channel_prices 表）
     const priceUpdate = {}
-    if (updateData.cost_asset_code !== undefined)
+    if (updateData.cost_asset_code !== undefined) {
       priceUpdate.cost_asset_code = updateData.cost_asset_code
-    if (updateData.cost_amount !== undefined)
+    }
+    if (updateData.cost_amount !== undefined) {
       priceUpdate.cost_amount = parseInt(updateData.cost_amount)
-    if (updateData.original_amount !== undefined)
+    }
+    if (updateData.original_amount !== undefined) {
       priceUpdate.original_amount = updateData.original_amount
+    }
 
     if (Object.keys(priceUpdate).length > 0) {
       const ChannelPriceModel = this.models.ExchangeChannelPrice

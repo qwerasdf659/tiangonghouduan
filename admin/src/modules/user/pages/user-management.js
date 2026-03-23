@@ -479,7 +479,7 @@ document.addEventListener('alpine:init', () => {
       try {
         const data = await request({
           url: `${API_PREFIX}/console/users/${userId}/activities`,
-          params: { limit: 10 }
+          params: { page_size: 10 }
         })
         if (data?.success) {
           this.userActivities = data.data?.activities || data.data || []
@@ -541,7 +541,7 @@ document.addEventListener('alpine:init', () => {
           // 获取用户行为轨迹
           request({
             url: `${API_PREFIX}/console/users/${user.user_id}/activities`,
-            params: { limit: 20 }
+            params: { page_size: 20 }
           }),
           // 获取用户资产汇总
           request({

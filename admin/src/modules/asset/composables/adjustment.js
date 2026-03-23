@@ -192,7 +192,7 @@ export function useAdjustmentMethods() {
       try {
         const result = await request({
           url: `${API_BASE_URL}/console/campaign-budget/batch-status`,
-          params: { limit: 50 }
+          params: { page_size: 50 }
         })
         if (result.success) {
           this.campaigns = result.data?.campaigns || []

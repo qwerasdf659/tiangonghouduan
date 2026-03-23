@@ -14,7 +14,7 @@
  *
  * @module services/FeatureFlagService
  * @author Feature Flag 灰度发布模块
- * @since 2026-01-21
+ * @since 2026
  */
 
 'use strict'

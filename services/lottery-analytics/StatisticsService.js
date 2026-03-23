@@ -527,7 +527,7 @@ class StatisticsService {
     const LotteryDraw = this.models.LotteryDraw
 
     // 修正：通过关联 LotteryDraw 来过滤 lottery_campaign_id
-    const [total_count, triggers] = await Promise.all([
+    const [totalDrawCount, triggers] = await Promise.all([
       LotteryDrawDecision.count({
         include: [
           {
@@ -613,36 +613,36 @@ class StatisticsService {
     ])
 
     const row = triggers[0] || {}
-    const total = total_count || 1
+    const safeTotal = totalDrawCount || 1
 
     return {
       experience_triggers: {
         pity: {
           count: parseInt(row.pity_count) || 0,
-          rate: (parseInt(row.pity_count) || 0) / total
+          rate: (parseInt(row.pity_count) || 0) / safeTotal
         },
         anti_empty: {
           count: parseInt(row.anti_empty_count) || 0,
-          rate: (parseInt(row.anti_empty_count) || 0) / total
+          rate: (parseInt(row.anti_empty_count) || 0) / safeTotal
         },
         guarantee: {
           count: parseInt(row.guarantee_count) || 0,
-          rate: (parseInt(row.guarantee_count) || 0) / total
+          rate: (parseInt(row.guarantee_count) || 0) / safeTotal
         },
         luck_debt: {
           count: parseInt(row.luck_debt_count) || 0,
-          rate: (parseInt(row.luck_debt_count) || 0) / total
+          rate: (parseInt(row.luck_debt_count) || 0) / safeTotal
         },
         system_advance: {
           count: parseInt(row.system_advance_count) || 0,
-          rate: (parseInt(row.system_advance_count) || 0) / total
+          rate: (parseInt(row.system_advance_count) || 0) / safeTotal
         },
         tier_downgrade: {
           count: parseInt(row.tier_downgrade_count) || 0,
-          rate: (parseInt(row.tier_downgrade_count) || 0) / total
+          rate: (parseInt(row.tier_downgrade_count) || 0) / safeTotal
         }
       },
-      total_draws: total_count,
+      total_draws: totalDrawCount,
       data_source: 'lottery_draw_decisions',
       generated_at: new Date().toISOString()
     }
@@ -996,7 +996,7 @@ class StatisticsService {
     return {
       metrics: rows.map(row => row.get({ plain: true })),
       pagination: {
-        total_count: count,
+        total: count,
         page,
         page_size,
         total_pages: Math.ceil(count / page_size)

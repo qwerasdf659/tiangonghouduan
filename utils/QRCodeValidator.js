@@ -30,7 +30,7 @@
  * - 真实案例：同一二维码8分钟内被提交9次的情况已真实发生
  *
  * 创建时间：2025年10月30日
- * 最后更新：2026年01月12日（V2动态码版本，完全废弃V1永久码）
+ * 最后更新：2026年01月12日
  */
 
 'use strict'
@@ -43,7 +43,7 @@ const logger = require('./logger').logger
  * 二维码生成和验证工具类（V2动态码版本）
  *
  * @class QRCodeValidator
- * @description 仅支持V2动态身份码，V1永久码已完全废弃
+ * @description V2 动态身份码生成与验证
  */
 class QRCodeValidator {
   /**

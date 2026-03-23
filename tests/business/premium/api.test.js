@@ -82,7 +82,7 @@ describe('高级空间管理API测试 - P2优先级', () => {
       expect(Array.isArray(data.statuses)).toBe(true)
 
       // 验证分页结构
-      expect(data.pagination).toHaveProperty('total_count')
+      expect(data.pagination).toHaveProperty('total')
       expect(data.pagination).toHaveProperty('page')
       expect(data.pagination).toHaveProperty('page_size')
       expect(data.pagination).toHaveProperty('total_pages')
@@ -177,13 +177,13 @@ describe('高级空间管理API测试 - P2优先级', () => {
       expect(data).toHaveProperty('by_unlock_method')
 
       // 验证summary结构
-      expect(data.summary).toHaveProperty('total_records')
+      expect(data.summary).toHaveProperty('total')
       expect(data.summary).toHaveProperty('total_unlock_count')
       expect(data.summary).toHaveProperty('active_users')
       expect(data.summary).toHaveProperty('expired_users')
 
       // 验证数据类型
-      expect(typeof data.summary.total_records).toBe('number')
+      expect(typeof data.summary.total).toBe('number')
       expect(typeof data.summary.active_users).toBe('number')
       expect(typeof data.summary.expired_users).toBe('number')
     })
@@ -315,7 +315,7 @@ describe('高级空间管理API测试 - P2优先级', () => {
       const stats = statsResponse.body.data.summary
 
       // 总记录数应该 >= 活跃用户数 + 过期用户数（因为可能有从未解锁的记录）
-      expect(stats.total_records).toBeGreaterThanOrEqual(0)
+      expect(stats.total).toBeGreaterThanOrEqual(0)
       expect(stats.active_users).toBeGreaterThanOrEqual(0)
       expect(stats.expired_users).toBeGreaterThanOrEqual(0)
     })

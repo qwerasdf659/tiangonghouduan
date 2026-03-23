@@ -53,7 +53,7 @@ router.get(
       {
         list: result.rows,
         pagination: {
-          total_count: result.count,
+          total: result.count,
           page: result.page,
           page_size: result.page_size
         }

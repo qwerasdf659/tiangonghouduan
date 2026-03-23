@@ -7,8 +7,6 @@
  * - 同一 user_type + platform 内互斥（同浏览器重复登录踢旧会话）
  * - 管理后台登出时失效会话
  *
- * 创建时间：2025年01月21日
- * 更新时间：2026-03-01（跨平台共存：user_type 按上下文确定，非按角色等级）
  */
 
 const express = require('express')

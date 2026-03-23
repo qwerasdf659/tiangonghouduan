@@ -284,7 +284,7 @@ function dashboardPanelPage() {
       try {
         const result = await request({
           url: `${API_PREFIX}/console/lottery/campaign-ranking`,
-          params: { range: this.lotteryAnalysis.chart_range, limit: 10 }
+          params: { range: this.lotteryAnalysis.chart_range, page_size: 10 }
         })
         // 后端返回 { ranking: [...], range, sort_by, updated_at }，需要提取 ranking 数组
         // 后端字段: lottery_campaign_id, campaign_name, status, draws, wins, win_rate, users
@@ -1256,7 +1256,7 @@ function dashboardPanelPage() {
         // 并行获取门店统计和贡献度数据
         const [storesResult, contributionResult] = await Promise.allSettled([
           request({ url: `${API_PREFIX}/console/stores/stats` }),
-          request({ url: `${API_PREFIX}/console/stores/contribution`, params: { days: 30, limit: 100 } })
+          request({ url: `${API_PREFIX}/console/stores/contribution`, params: { days: 30, page_size: 100 } })
         ])
         
         let total_merchants = 0
@@ -1295,7 +1295,7 @@ function dashboardPanelPage() {
         
         const result = await request({
           url: `${API_PREFIX}/console/stores/contribution`,
-          params: { days, limit: 20 }
+          params: { days, page_size: 20 }
         })
         if (!result.success || !result.data.rankings) {
           return []
@@ -1372,7 +1372,7 @@ function dashboardPanelPage() {
         // 先获取商户列表
         const listResult = await request({
           url: `${API_PREFIX}/console/stores/contribution`,
-          params: { days, limit: 5 }
+          params: { days, page_size: 5 }
         })
         if (!listResult.success || !listResult.data.rankings) {
           return []

@@ -3,7 +3,7 @@
 /**
  * NormalDrawPipeline - 统一抽奖管线
  *
- * ⚠️ V4.6 Phase 5 重构（2026-01-19）：
+ * ⚠️ V4.6  重构：
  * - 原 3 条管线（Normal/Preset/Override）已合并为统一管线
  * - 决策来源由 LoadDecisionSourceStage 内部判断
  * - TierPickStage / PrizePickStage 根据决策来源自动跳过正常抽取逻辑
@@ -29,8 +29,8 @@
  *
  * @module services/UnifiedLotteryEngine/pipeline/NormalDrawPipeline
  * @author 统一抽奖架构重构
- * @since 2026-01-18
- * @updated 2026-01-19 Phase 5 统一管线合并
+ * @since 2026
+ * @updated 2026-01-19  统一管线合并
  */
 
 const PipelineRunner = require('./PipelineRunner')
@@ -68,7 +68,7 @@ class NormalDrawPipeline extends PipelineRunner {
    * 初始化 Stage
    *
    * 执行顺序严格按照架构文档定义
-   * ⚠️ Phase 5 更新：增加 LoadDecisionSourceStage
+   * ⚠️  更新：增加 LoadDecisionSourceStage
    *
    * @returns {void}
    * @private
@@ -80,7 +80,7 @@ class NormalDrawPipeline extends PipelineRunner {
     // 2. 检查用户资格 - 验证用户是否有权参与
     this.addStage(new EligibilityStage())
 
-    // 3. 加载决策来源 - 判断 normal/preset/override（Phase 5 新增）
+    // 3. 加载决策来源 - 判断 normal/preset/override（ 新增）
     this.addStage(new LoadDecisionSourceStage())
 
     // 4. 初始化预算上下文 - 根据预算模式创建 BudgetProvider
@@ -119,7 +119,7 @@ class NormalDrawPipeline extends PipelineRunner {
   /**
    * 执行抽奖
    *
-   * ⚠️ Phase 5 更新：
+   * ⚠️  更新：
    * - pipeline_type 现在为 'unified'，表示统一管线
    * - 决策来源由 LoadDecisionSourceStage 在管线内部判断
    *

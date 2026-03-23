@@ -25,7 +25,7 @@
  * - POST   /disable/:user_id       - 禁用员工（所有门店）
  * - POST   /enable                 - 启用员工（指定门店）
  *
- * @since 2026-01-12
+ * @since 2026
  */
 
 'use strict'
@@ -573,7 +573,7 @@ router.put('/:store_staff_id/role', authenticateToken, requireRoleLevel(100), as
  *   - force: 是否强制删除（仅对 active 状态有效）
  *
  * @access Admin only (role_level >= 100)
- * @since 2026-01-26 重构：支持离职+删除双操作
+ * @since 2026
  */
 router.delete('/:store_staff_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {

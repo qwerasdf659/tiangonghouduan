@@ -14,7 +14,6 @@
  * - GET /stats - 商家员工查询消费统计
  *
  * @since 2026-01-12
- * @updated 2026-01-18 路由层合规性治理：移除直接模型访问，使用 Service 层
  */
 
 'use strict'
@@ -133,7 +132,7 @@ router.get(
  * @desc 商家员工查询消费记录详情（权限验证）
  * @access Private (merchant_staff / merchant_manager)
  *
- * API路径参数设计规范 V2.2（2026-01-20）：
+ * API路径参数设计规范 V2.2：
  * - 消费记录是事务实体，使用数字ID（:id）作为标识符
  *
  * @param {number} id - 消费记录ID

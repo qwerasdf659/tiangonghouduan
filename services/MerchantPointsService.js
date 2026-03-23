@@ -18,12 +18,11 @@
  * - auditable_id = user_id（申请商家的用户ID）
  * - audit_data = JSON格式存储申请详情（points_amount, description等）
  *
- * 创建时间：2026年01月09日
  * 作者：AI Assistant
  */
 
 const { ContentReviewRecord, User } = require('../models')
-// V4.7.0 AssetService 拆分：使用子服务替代原 AssetService（2026-01-31）
+// V4.7.0 AssetService 拆分：使用子服务替代原 AssetService
 const BalanceService = require('./asset/BalanceService')
 const AuditLogService = require('./AuditLogService')
 const ContentAuditEngine = require('./ContentAuditEngine')

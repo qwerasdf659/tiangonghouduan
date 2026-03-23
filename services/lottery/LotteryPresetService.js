@@ -28,7 +28,6 @@ const logger = require('../../utils/logger').logger
  * - LotteryPrize：奖品表（验证奖品存在）
  * - User：用户表（验证用户存在）
  *
- * 创建时间：2025年12月10日
  * 使用模型：Claude Sonnet 4.5
  */
 

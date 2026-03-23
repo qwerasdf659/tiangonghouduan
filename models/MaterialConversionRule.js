@@ -20,7 +20,6 @@
  * - 表名：material_conversion_rules
  * - 主键：rule_id
  *
- * 创建时间：2025-12-15
  */
 
 'use strict'

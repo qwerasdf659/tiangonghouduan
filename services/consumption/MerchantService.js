@@ -35,7 +35,7 @@ class MerchantService {
    * @param {number} [params.page_size=20] - 每页数量
    * @returns {Promise<Object>} 消费记录列表及分页信息
    *
-   * @since 2026-01-18 路由层合规性治理：移除路由直接访问模型
+   * @since 2026
    */
   static async getMerchantRecords(params) {
     const { user_id, store_id, is_manager, status, page = 1, page_size = 20 } = params
@@ -97,9 +97,9 @@ class MerchantService {
       return {
         records: recordsWithDisplayNames,
         pagination: {
-          current_page: finalPage,
+          page: finalPage,
           page_size: finalPageSize,
-          total_count: count,
+          total: count,
           total_pages: Math.ceil(count / finalPageSize)
         },
         query_scope: is_manager ? 'store' : 'self',
@@ -122,7 +122,7 @@ class MerchantService {
    * @param {number} recordId - 记录ID
    * @returns {Promise<Object|null>} 消费记录详情（包含关联信息）
    *
-   * @since 2026-01-18 路由层合规性治理
+   * @since 2026
    */
   static async getMerchantRecordDetail(recordId) {
     try {
@@ -182,7 +182,7 @@ class MerchantService {
    * @param {boolean} params.is_manager - 是否为店长
    * @returns {Promise<Object>} 消费统计数据
    *
-   * @since 2026-01-18 路由层合规性治理
+   * @since 2026
    */
   static async getMerchantStats(params) {
     const { user_id, store_id, is_manager } = params

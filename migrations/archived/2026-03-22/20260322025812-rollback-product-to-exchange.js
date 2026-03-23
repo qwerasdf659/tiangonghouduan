@@ -19,8 +19,6 @@ module.exports = {
 
     try {
       // ==========================================
-      // Phase 1: 删除所有入方向 FK（指向 products / product_skus 的）
-      // ==========================================
       await queryInterface.sequelize.query(
         'ALTER TABLE bid_products DROP FOREIGN KEY fk_bid_products_product',
         { transaction }
@@ -59,8 +57,6 @@ module.exports = {
       )
 
       // ==========================================
-      // Phase 2: 删除 products 表自身的出方向 FK
-      // ==========================================
       await queryInterface.sequelize.query(
         'ALTER TABLE products DROP FOREIGN KEY products_ibfk_1',
         { transaction }
@@ -79,14 +75,10 @@ module.exports = {
       )
 
       // ==========================================
-      // Phase 3: 重命名 3 张表
-      // ==========================================
       await queryInterface.renameTable('products', 'exchange_items', { transaction })
       await queryInterface.renameTable('product_skus', 'exchange_item_skus', { transaction })
       await queryInterface.renameTable('product_attribute_values', 'exchange_item_attribute_values', { transaction })
 
-      // ==========================================
-      // Phase 4: 重命名 PK / 业务列（exchange_items，原 products）
       // ==========================================
       await queryInterface.sequelize.query(
         'ALTER TABLE exchange_items CHANGE COLUMN product_id exchange_item_id BIGINT NOT NULL AUTO_INCREMENT',
@@ -98,15 +90,11 @@ module.exports = {
       )
 
       // ==========================================
-      // Phase 5: 重命名 FK 列（exchange_item_skus，原 product_skus）
-      // ==========================================
       await queryInterface.sequelize.query(
         'ALTER TABLE exchange_item_skus CHANGE COLUMN product_id exchange_item_id BIGINT NOT NULL',
         { transaction }
       )
 
-      // ==========================================
-      // Phase 6: 重命名 FK 列（exchange_item_attribute_values，原 product_attribute_values）
       // ==========================================
       await queryInterface.sequelize.query(
         'ALTER TABLE exchange_item_attribute_values CHANGE COLUMN product_id exchange_item_id BIGINT NOT NULL',
@@ -114,16 +102,12 @@ module.exports = {
       )
 
       // ==========================================
-      // Phase 7: exchange_records 删除冗余 product_id 列及相关索引
-      // ==========================================
       await queryInterface.sequelize.query(
         'DROP INDEX idx_exchange_records_product_sku ON exchange_records',
         { transaction }
       )
       await queryInterface.removeColumn('exchange_records', 'product_id', { transaction })
 
-      // ==========================================
-      // Phase 8: 重建 exchange_items 自身的出方向 FK
       // ==========================================
       await queryInterface.sequelize.query(
         'ALTER TABLE exchange_items ADD CONSTRAINT exchange_items_ibfk_1 FOREIGN KEY (category_id) REFERENCES categories(category_id)',
@@ -143,8 +127,6 @@ module.exports = {
       )
 
       // ==========================================
-      // Phase 9: 重建 exchange_item_skus 的 FK
-      // ==========================================
       await queryInterface.sequelize.query(
         'ALTER TABLE exchange_item_skus ADD CONSTRAINT exchange_item_skus_ibfk_1 FOREIGN KEY (exchange_item_id) REFERENCES exchange_items(exchange_item_id)',
         { transaction }
@@ -155,8 +137,6 @@ module.exports = {
       )
 
       // ==========================================
-      // Phase 10: 重建 exchange_item_attribute_values 的 FK
-      // ==========================================
       await queryInterface.sequelize.query(
         'ALTER TABLE exchange_item_attribute_values ADD CONSTRAINT exchange_item_attribute_values_ibfk_1 FOREIGN KEY (exchange_item_id) REFERENCES exchange_items(exchange_item_id)',
         { transaction }
@@ -166,8 +146,6 @@ module.exports = {
         { transaction }
       )
 
-      // ==========================================
-      // Phase 11: 重建指向 exchange_items / exchange_item_skus 的入方向 FK
       // ==========================================
       await queryInterface.sequelize.query(
         'ALTER TABLE bid_products ADD CONSTRAINT fk_bid_products_exchange_item FOREIGN KEY (exchange_item_id) REFERENCES exchange_items(exchange_item_id)',

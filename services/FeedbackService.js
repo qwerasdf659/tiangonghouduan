@@ -62,7 +62,6 @@
  * );
  * ```
  *
- * 创建时间：2025年12月09日
  * 使用模型：Claude Sonnet 4.5
  */
 
@@ -315,7 +314,7 @@ class FeedbackService {
    * @returns {Promise<Object>} 批量回复结果 { updated_count, requested_count }
    * @throws {Error} 参数校验失败或数据库操作失败
    *
-   * @since 2026-03-09 新增批量回复功能，满足运营批量回复相同信息的需求
+   * @since 2026
    */
   static async batchReplyFeedback(
     feedbackIds,
@@ -500,7 +499,7 @@ class FeedbackService {
    * @returns {Promise<Object>} 批量更新结果 { updated_count, requested_count, target_status }
    * @throws {Error} 参数校验失败或数据库操作失败
    *
-   * @since 2026-02-20 新增批量状态更新，满足运营批量处理需求
+   * @since 2026
    */
   static async batchUpdateStatus(feedbackIds, status, internalNotes = null, options = {}) {
     const { transaction } = options
@@ -566,7 +565,7 @@ class FeedbackService {
    * @description 按状态分类统计反馈数量
    * @returns {Promise<Object>} 统计数据
    *
-   * @since 2026-01-18 路由层合规性治理：支持管理后台统计查询
+   * @since 2026
    */
   static async getStats() {
     const models = FeedbackService._getModels()

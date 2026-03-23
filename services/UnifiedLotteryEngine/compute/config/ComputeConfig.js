@@ -25,7 +25,7 @@ const { logger } = require('../../../../utils/logger')
  *
  * @module services/UnifiedLotteryEngine/compute/config/ComputeConfig
  * @author 抽奖模块策略重构
- * @since 2026-01-20
+ * @since 2026
  */
 
 /**
@@ -1031,7 +1031,6 @@ module.exports = {
   isFeatureEnabledForContext, // Phase P2：带上下文的灰度判断
   getGrayscaleSummary, // Phase P2：获取灰度配置摘要
 
-  // Phase 3+：动态配置加载
   DynamicConfigLoader,
   getFullConfigAsync,
   getMatrixValueAsync,

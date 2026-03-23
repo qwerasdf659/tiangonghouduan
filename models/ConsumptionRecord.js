@@ -20,7 +20,6 @@
  * 数据库表名：consumption_records
  * 主键：record_id（BIGINT，自增）
  *
- * 创建时间：2025年10月30日
  * 最后更新：2025年12月30日
  */
 
@@ -525,7 +524,7 @@ module.exports = sequelize => {
       },
 
       /**
-       * 业务唯一键（business_id）- 事务边界治理（2026-01-05）
+       * 业务唯一键（business_id）- 事务边界治理
        *
        * 与 idempotency_key 的区别：
        * - idempotency_key：请求级幂等（防止同一请求重复提交）
@@ -554,7 +553,7 @@ module.exports = sequelize => {
       /**
        * 关联奖励积分流水ID（逻辑外键，用于对账）
        *
-       * 事务边界治理（2026-01-05）：
+       * 事务边界治理：
        * - 审核通过后发放奖励积分时，记录对应的 asset_transactions.transaction_id
        * - 用于定时对账脚本检查数据一致性
        * - 审核拒绝或待审核时为 NULL
@@ -900,10 +899,7 @@ module.exports = sequelize => {
               association: 'reviewer',
               attributes: ['user_id', 'mobile', 'nickname', 'role']
             }
-            /*
-             * ⚠️ points_transaction 已移除（2026-01-02）
-             * 新架构中通过 meta 字段查询 AssetTransaction
-             */
+            /* 积分关联通过 meta 字段查询 AssetTransaction */
           ]
         },
 

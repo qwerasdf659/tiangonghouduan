@@ -1,7 +1,7 @@
 /**
  * 市场挂牌核心服务（CoreService）
  *
- * V4.7.0 大文件拆分方案 Phase 2（2026-01-31）
+ * V4.7.0 大文件拆分方案 Phase 2
  * 从 MarketListingService.js (2295行) 拆分
  *
  * 职责：

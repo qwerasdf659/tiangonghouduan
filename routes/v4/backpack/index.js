@@ -10,19 +10,12 @@
  * - 用户直接使用物品（use）
  * - 用户兑换商品（exchange 子路由）
  *
- * 域边界说明（2026-02-07 阻塞项核实决策）：
- * - /backpack = 100% 用户域，所有登录用户可访问
- * - /shop = 100% 商家专属，不在此域
- * - 用户"生成核销码"是用户侧操作，放在用户域（参考美团模式）
- * - 商家"扫码核销"是商家侧操作，保留在 /shop 域
  *
  * 架构原则：
  * - 路由层不直连 models（通过 ServiceManager 获取服务）
  * - 写操作通过 TransactionManager.execute() 管理事务边界
  * - 路由通过 ServiceManager 获取 Service，不直接 require
  *
- * 创建时间：2025-12-29
- * 更新时间：2026-02-07（新增物品详情/核销码/使用/兑换路由）
  */
 
 'use strict'
@@ -450,7 +443,7 @@ router.post(
 /*
  * ========================================
  * 兑换子路由挂载
- * 用户端兑换商品（从 /shop/exchange 迁移到 /backpack/exchange）
+ * 用户端兑换商品
  * ========================================
  */
 const exchangeRoutes = require('./exchange')

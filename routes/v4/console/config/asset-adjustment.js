@@ -19,14 +19,12 @@
  * - 所有调整操作记录审计日志
  * - 支持幂等性控制（idempotency_key）
  *
- * 审计整合方案（2026-01-08）：
+ * 审计整合方案：
  * - 决策5：资产调整是关键操作，审计失败阻断业务
  * - 决策6：幂等键由业务主键派生（禁止自动生成）
  * - 决策7：审计日志在同一事务内
  * - 决策10：target_id 指向 AssetTransaction.asset_transaction_id
  *
- * 创建时间：2025-12-30
- * 更新时间：2026-01-08（审计整合决策5/6/7/10实现）
  */
 
 'use strict'
@@ -35,11 +33,6 @@ const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const TransactionManager = require('../../../../utils/TransactionManager')
-/*
- * P1-9：服务通过 ServiceManager 获取（B1-Injected + E2-Strict snake_case）
- * const MaterialManagementService = require('../../../../services/MaterialManagementService')
- * const UserService = require('../../../../services/UserService')
- */
 
 /**
  * 错误处理包装器
@@ -106,7 +99,7 @@ router.post(
       )
     }
 
-    // V4.7.0 AssetService 拆分：通过 ServiceManager 获取 BalanceService（2026-01-31）
+    // V4.7.0 AssetService 拆分：通过 ServiceManager 获取 BalanceService
     const BalanceService = req.app.locals.services.getService('asset_balance')
     const AuditLogService = req.app.locals.services.getService('audit_log')
 
@@ -255,7 +248,7 @@ router.post(
       )
     }
 
-    // V4.7.0 AssetService 拆分：通过 ServiceManager 获取 BalanceService（2026-01-31）
+    // V4.7.0 AssetService 拆分：通过 ServiceManager 获取 BalanceService
     const BalanceService = req.app.locals.services.getService('asset_balance')
     const results = []
     const errors = []
@@ -385,7 +378,6 @@ router.get(
   authenticateToken,
   requireRoleLevel(100),
   asyncHandler(async (req, res) => {
-    // P1-9：通过 ServiceManager 获取服务（snake_case key）
     const MaterialManagementService = req.app.locals.services.getService('material_management')
 
     // 1. 内置资产类型（系统核心资产）
@@ -453,7 +445,6 @@ router.get(
   asyncHandler(async (req, res) => {
     const { user_id } = req.params
 
-    // P1-9：通过 ServiceManager 获取服务（snake_case key）
     const UserService = req.app.locals.services.getService('user')
 
     // 1. 通过 Service 层获取用户基本信息（符合路由层规范）

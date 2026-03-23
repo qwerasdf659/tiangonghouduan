@@ -3,7 +3,6 @@ const logger = require('../utils/logger').logger
 /**
  * 层级权限管理服务（简化版） - 餐厅积分抽奖系统 V4.0 统一引擎架构
  * 业务场景：管理区域负责人→业务经理→业务员三级层级关系和权限操作
- * 创建时间：2025年11月07日
  * 最后更新：2026年01月05日（事务边界治理改造）
  * 设计理念：简单实用，避免过度设计
  *
@@ -317,7 +316,7 @@ class HierarchyManagementService {
 
     /*
      * 5. 记录操作日志（用于审计追踪）
-     * 根据功能重复检查报告决策（2026-01-09）：改用 AdminOperationLog
+     * 根据功能重复检查报告决策：改用 AdminOperationLog
      * 2026-01-25: 添加 idempotency_key（关键操作必需）
      * idempotency_key 使用业务主键派生：hierarchy_deactivate_{target}_{operator}_{timestamp}
      */
@@ -428,7 +427,7 @@ class HierarchyManagementService {
 
     /*
      * 5. 记录操作日志
-     * 根据功能重复检查报告决策（2026-01-09）：改用 AdminOperationLog
+     * 根据功能重复检查报告决策：改用 AdminOperationLog
      * 2026-01-25: 添加 idempotency_key（关键操作必需）
      */
     const activateTimestamp = BeijingTimeHelper.generateIdTimestamp()

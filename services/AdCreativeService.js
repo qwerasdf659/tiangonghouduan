@@ -10,7 +10,6 @@
  * - /api/v4/ad/creatives（小程序端 - 用户管理自己的创意）
  * - /api/v4/console/ad-creatives（管理端 - 创意审核）
  *
- * 创建时间：2026-02-18
  */
 
 const logger = require('../utils/logger').logger

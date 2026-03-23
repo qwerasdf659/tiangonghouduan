@@ -400,7 +400,6 @@ class CoreService {
       )
     }
 
-    // 7. 钻石配额发放（双池隔离第二轨道，配置已迁移到 system_settings）
     let diamondQuotaAllocated = 0
     try {
       const quotaConfig = await CoreService._getDiamondQuotaConfig()
@@ -730,12 +729,7 @@ class CoreService {
   }
 
   /**
-   * 读取钻石配额配置（通过 AdminSystemService 统一读取）
-   *
-   * 配额配置已统一迁移到 system_settings 表 points 分类，
-   * 通过 AdminSystemService.getSettingValue() 读取，享有 Redis L2 缓存。
-   *
-   * 不再依赖 lottery_campaign_id（配额是全局配置，与具体活动无关）。
+   * 读取钻石配额配置（通过 AdminSystemService 统一读取 system_settings）
    *
    * @returns {Promise<{enabled: boolean, ratio: number, action: string}>} 配额配置
    * @private

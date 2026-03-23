@@ -17,8 +17,6 @@
  * API 路径前缀：/api/v4/console/risk-alerts
  * 访问权限：admin（role_level >= 100）
  *
- * 创建时间：2026-01-12
- * 更新时间：2026-01-18 路由层合规性治理：移除直接模型访问，使用 MerchantRiskControlService
  * 依据文档：docs/商家员工域权限体系升级方案.md
  */
 
@@ -259,7 +257,7 @@ router.get('/types', authenticateToken, requireRoleLevel(100), async (req, res) 
  * @body {string} [alert_type] - 告警类型筛选（可选）
  * @body {string} [severity] - 严重程度筛选（可选）
  *
- * @since 2026-01-30 前端告警中心功能支持
+ * @since 2026
  */
 router.post('/mark-all-read', authenticateToken, requireRoleLevel(100), async (req, res) => {
   const reviewed_by = req.user.user_id

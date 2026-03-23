@@ -15,10 +15,9 @@
  * - GET /api/v4/admin/pending/summary - 分类汇总
  * - GET /api/v4/admin/pending/list - 统一列表（分页、筛选）
  *
- * 创建时间：2026年01月31日
  * 关联文档：后端数据库开发任务清单-2026年1月.md（P0-B6、P0-B7）
  *
- * @module services/pending/PendingCenterService
+ * @module services/dashboard/PendingCenterService
  */
 
 'use strict'
@@ -176,7 +175,7 @@ class PendingCenterService {
       const result = {
         segments,
         total: {
-          total_count: totalCount,
+          total: totalCount,
           urgent_count: urgentCount,
           updated_at: BeijingTimeHelper.apiTimestamp()
         }

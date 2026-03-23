@@ -71,7 +71,7 @@ router.get(
 
     logger.info('[dictionaries] 查询类目列表', {
       admin_id: req.user.user_id,
-      total: result.pagination.total_count
+      total: result.pagination.total
     })
 
     return res.apiSuccess(result, '获取类目列表成功')
@@ -299,7 +299,7 @@ router.get(
 
     logger.info('[dictionaries] 查询稀有度列表', {
       admin_id: req.user.user_id,
-      total: result.pagination.total_count
+      total: result.pagination.total
     })
 
     return res.apiSuccess(result, '获取稀有度列表成功')
@@ -478,7 +478,7 @@ router.get(
 
     logger.info('[dictionaries] 查询资产分组列表', {
       admin_id: req.user.user_id,
-      total: result.pagination.total_count
+      total: result.pagination.total
     })
 
     return res.apiSuccess(result, '获取资产分组列表成功')

@@ -22,8 +22,6 @@
  * - 审核通过后自动奖励积分（1元=1分）
  * - 审核拒绝需要填写原因（5-500字符）
  *
- * 创建时间：2026年01月12日
- * 迁移说明：从 routes/v4/shop/consumption/review.js 迁移至 console 域
  */
 
 const express = require('express')
@@ -145,7 +143,7 @@ router.get('/records', authenticateToken, requireRoleLevel(100), async (req, res
  * @desc 管理员审核通过消费记录
  * @access Private (role_level >= 60，审核链场景由 ApprovalChainService 精确鉴权)
  *
- * API路径参数设计规范 V2.2（2026-01-20）：
+ * API路径参数设计规范 V2.2：
  * - 消费记录是事务实体，使用数字ID（:id）作为标识符
  *
  * @param {number} id - 消费记录ID
@@ -315,7 +313,7 @@ router.post('/batch-review', authenticateToken, requireRoleLevel(100), async (re
  * @desc 管理员审核拒绝消费记录
  * @access Private (role_level >= 60，审核链场景由 ApprovalChainService 精确鉴权)
  *
- * API路径参数设计规范 V2.2（2026-01-20）：
+ * API路径参数设计规范 V2.2：
  * - 消费记录是事务实体，使用数字ID（:id）作为标识符
  *
  * @param {number} id - 消费记录ID
@@ -413,8 +411,8 @@ router.post('/reject/:id', authenticateToken, requireRoleLevel(60), async (req, 
  * @desc 管理员生成指定用户的动态身份二维码（v2版本）
  * @access Private (管理员，role_level >= 100)
  *
- * 路由分离：
- * - 用户端：GET /api/v4/user/consumption/qrcode（从JWT Token取身份，DB-3 迁移到 user 域）
+ * 路由分布：
+ * - 用户端：GET /api/v4/user/consumption/qrcode（从 JWT Token 取身份）
  * - 管理端：GET /api/v4/console/consumption/qrcode/:user_id（admin专用，带审计日志）
  *
  * @param {number} user_id - 目标用户ID

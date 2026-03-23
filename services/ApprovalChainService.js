@@ -136,6 +136,7 @@ class ApprovalChainService {
       const isFirst = i === 0
       const timeoutAt = isFirst ? new Date(Date.now() + node.timeout_hours * 3600 * 1000) : null
 
+      // eslint-disable-next-line no-await-in-loop
       await ApprovalChainStep.create(
         {
           instance_id: instance.instance_id,
@@ -160,6 +161,7 @@ class ApprovalChainService {
         transaction
       )
       for (const adminId of notifyUserIds) {
+        // eslint-disable-next-line no-await-in-loop
         await AdminNotification.create(
           {
             admin_id: adminId,
@@ -336,6 +338,7 @@ class ApprovalChainService {
         transaction
       })
       for (const remainingStep of remainingSteps) {
+        // eslint-disable-next-line no-await-in-loop
         await remainingStep.update({ status: 'skipped' }, { transaction })
       }
 
@@ -429,6 +432,7 @@ class ApprovalChainService {
       if (node) {
         const notifyUserIds = await ApprovalChainService._resolveAssigneeUserIds(node, transaction)
         for (const adminId of notifyUserIds) {
+          // eslint-disable-next-line no-await-in-loop
           await AdminNotification.create(
             {
               admin_id: adminId,
@@ -654,6 +658,7 @@ class ApprovalChainService {
     const template = await ApprovalChainTemplate.create(templateData, { transaction })
 
     for (const nodeData of nodes) {
+      // eslint-disable-next-line no-await-in-loop
       await ApprovalChainNode.create(
         {
           ...nodeData,
@@ -699,6 +704,7 @@ class ApprovalChainService {
       templateData.total_nodes = nodes.filter(n => n.step_number > 1).length
       await ApprovalChainNode.destroy({ where: { template_id: templateId }, transaction })
       for (const nodeData of nodes) {
+        // eslint-disable-next-line no-await-in-loop
         await ApprovalChainNode.create(
           {
             ...nodeData,

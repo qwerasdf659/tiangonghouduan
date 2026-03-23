@@ -73,8 +73,8 @@ describe('API契约测试 - 管理员模块 (/api/v4/console)', () => {
 
         if (response.body.data.pagination) {
           expect(response.body.data.pagination).toHaveProperty('total')
-          // user-management 使用 current_page 而非 page
-          expect(response.body.data.pagination).toHaveProperty('current_page')
+          // user-management 使用 page 而非 page
+          expect(response.body.data.pagination).toHaveProperty('page')
         }
       } else if ([401, 403].includes(response.status)) {
         validateApiContract(response.body, false)

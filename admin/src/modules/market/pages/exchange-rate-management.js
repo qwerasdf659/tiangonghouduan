@@ -10,7 +10,7 @@
  * @requires createPageMixin - 页面基础功能混入
  * @requires ExchangeRateAPI - 汇率管理API调用方法
  *
- * 后端路由：/api/v4/console/exchange-rates
+ * 后端路由：/api/v4/console/assets/rates
  */
 
 import { logger } from '../../../utils/index.js'

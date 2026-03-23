@@ -12,14 +12,14 @@ import { API_PREFIX, request, buildURL, buildQueryString } from '../base.js'
 // ========== API 端点 ==========
 
 export const EXCHANGE_RATE_ENDPOINTS = {
-  /** 汇率规则列表 */
-  EXCHANGE_RATE_LIST: `${API_PREFIX}/console/exchange-rates`,
+  /** 汇率规则列表（后端: routes/v4/console/assets/rates） */
+  EXCHANGE_RATE_LIST: `${API_PREFIX}/console/assets/rates`,
   /** 创建汇率规则 */
-  EXCHANGE_RATE_CREATE: `${API_PREFIX}/console/exchange-rates`,
+  EXCHANGE_RATE_CREATE: `${API_PREFIX}/console/assets/rates`,
   /** 更新汇率规则 */
-  EXCHANGE_RATE_UPDATE: `${API_PREFIX}/console/exchange-rates/:id`,
+  EXCHANGE_RATE_UPDATE: `${API_PREFIX}/console/assets/rates/:id`,
   /** 更新汇率规则状态 */
-  EXCHANGE_RATE_STATUS: `${API_PREFIX}/console/exchange-rates/:id/status`
+  EXCHANGE_RATE_STATUS: `${API_PREFIX}/console/assets/rates/:id/status`
 }
 
 // ========== API 调用方法 ==========

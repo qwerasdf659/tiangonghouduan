@@ -12,20 +12,17 @@
  * - 卖家撤回已上架的商品/可叠加资产
  * - 撤回后物品状态恢复为可用，资产解冻至可用余额
  *
- * 创建时间：2025年12月22日
  * 从inventory-market.js拆分而来
- * 更新时间：2026年01月08日 - 实现可叠加资产撤回功能（交易市场材料交易）
  */
 
 const express = require('express')
 const router = express.Router()
 const { authenticateToken } = require('../../../middleware/auth')
-const { requireValidSession } = require('../../../middleware/sensitiveOperation') // 🔐 会话管理功能（2026-01-21）
+const { requireValidSession } = require('../../../middleware/sensitiveOperation')
 const { validatePositiveInteger, handleServiceError } = require('../../../middleware/validation')
 const logger = require('../../../utils/logger').logger
 // 事务边界治理 - 统一事务管理器
 const TransactionManager = require('../../../utils/TransactionManager')
-// P1-9：服务通过 ServiceManager 获取（B1-Injected + E2-Strict snake_case）
 
 /*
  * 风控中间件（2026-01-14 多币种扩展新增）
@@ -59,7 +56,6 @@ router.post(
   marketRiskMiddleware.createWithdrawRiskMiddleware(),
   validatePositiveInteger('market_listing_id', 'params'),
   async (req, res) => {
-    // P1-9：通过 ServiceManager 获取服务（B1-Injected + E2-Strict snake_case）
     const MarketListingService = req.app.locals.services.getService('market_listing_core')
 
     try {
@@ -145,7 +141,6 @@ router.post(
   marketRiskMiddleware.createWithdrawRiskMiddleware(),
   validatePositiveInteger('market_listing_id', 'params'),
   async (req, res) => {
-    // P1-9：通过 ServiceManager 获取服务（B1-Injected + E2-Strict snake_case）
     const MarketListingService = req.app.locals.services.getService('market_listing_core')
 
     try {

@@ -9,7 +9,6 @@
  * - 路由层不直连 models（通过 Service 层）
  * - 通过 ServiceManager 统一获取服务实例
  *
- * 创建时间：2025-12-22
  */
 
 const express = require('express')

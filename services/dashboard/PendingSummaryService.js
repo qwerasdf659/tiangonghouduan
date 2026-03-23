@@ -14,7 +14,6 @@
  * API 端点：
  * - GET /api/v4/console/dashboard/pending-summary
  *
- * 创建时间：2026年01月31日
  * 关联文档：后端数据库开发任务清单-2026年1月.md（P0-B5）
  *
  * @module services/dashboard/PendingSummaryService
@@ -106,7 +105,7 @@ class PendingSummaryService {
         risk_alerts: riskAlerts,
         lottery_alerts: lotteryAlerts,
         summary: {
-          total_count: totalCount,
+          total: totalCount,
           urgent_count: urgentCount,
           updated_at: BeijingTimeHelper.apiTimestamp()
         }
@@ -116,7 +115,7 @@ class PendingSummaryService {
       await BusinessCacheHelper.set(cacheKey, result, DEFAULT_TTL.STATS)
 
       logger.info('[待处理汇总] 数据更新完成', {
-        total_count: totalCount,
+        total: totalCount,
         urgent_count: urgentCount
       })
 

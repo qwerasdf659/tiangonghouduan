@@ -145,7 +145,7 @@ describe('交易市场管理页面 API', () => {
     expect(res.status).toBe(200)
     expect(res.body.success).toBe(true)
     expect(res.body.data).toHaveProperty('orders')
-    expect(res.body.data.pagination.total_count).toBeGreaterThan(0)
+    expect(res.body.data.pagination.total).toBeGreaterThan(0)
   })
 
   test('GET /console/marketplace/listing-stats - 上架统计应返回用户分组数据', async () => {

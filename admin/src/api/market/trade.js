@@ -13,8 +13,8 @@ import { API_PREFIX, request, buildURL, buildQueryString } from '../base.js'
 
 export const TRADE_ENDPOINTS = {
   // 交易订单（marketplace）
-  TRADE_ORDERS: `${API_PREFIX}/console/marketplace/trade_orders`,
-  MARKETPLACE_ORDER_DETAIL: `${API_PREFIX}/console/marketplace/trade_orders/:order_id`,
+  TRADE_ORDERS: `${API_PREFIX}/console/marketplace/orders`,
+  MARKETPLACE_ORDER_DETAIL: `${API_PREFIX}/console/marketplace/orders/:order_id`,
 
   // 市场上架
   LISTING_LIST: `${API_PREFIX}/console/marketplace/listings`,
@@ -66,11 +66,11 @@ export const TRADE_ENDPOINTS = {
   BUSINESS_RECORD_CHAT_STATS: `${API_PREFIX}/console/business-records/chat-messages/statistics/summary`,
 
   // 交易订单扩展
-  TRADE_ORDER_LIST: `${API_PREFIX}/console/trade-orders`,
-  TRADE_ORDER_DETAIL: `${API_PREFIX}/console/trade-orders/:id`,
-  TRADE_ORDER_STATS: `${API_PREFIX}/console/trade-orders/stats`,
-  TRADE_ORDER_USER_STATS: `${API_PREFIX}/console/trade-orders/user/:user_id/stats`,
-  TRADE_ORDER_BY_BUSINESS_ID: `${API_PREFIX}/console/trade-orders/by-business-id/:business_id`
+  TRADE_ORDER_LIST: `${API_PREFIX}/console/marketplace/orders`,
+  TRADE_ORDER_DETAIL: `${API_PREFIX}/console/marketplace/orders/:id`,
+  TRADE_ORDER_STATS: `${API_PREFIX}/console/marketplace/orders/stats`,
+  TRADE_ORDER_USER_STATS: `${API_PREFIX}/console/marketplace/orders/user/:user_id/stats`,
+  TRADE_ORDER_BY_BUSINESS_ID: `${API_PREFIX}/console/marketplace/orders/by-business-id/:business_id`
 }
 
 // ========== API 调用方法 ==========

@@ -1,6 +1,5 @@
 /**
  * 📋 抽奖决策快照模型 - 统一抽奖架构核心组件
- * 创建时间：2026年01月18日 北京时间
  *
  * 业务职责：
  * - 记录每次抽奖的完整决策路径
@@ -322,9 +321,7 @@ module.exports = sequelize => {
         comment: '是否触发了fallback兜底'
       },
 
-      /**
-       * 选中的档位（兼容旧字段）
-       */
+      /** 选中的档位（high/mid/low/fallback） */
       selected_tier: {
         type: DataTypes.ENUM('high', 'mid', 'low', 'fallback'),
         allowNull: true,

@@ -113,13 +113,12 @@ describe('体验策略模块测试套件', () => {
         tier_weights: original_weights
       })
 
-      // 非空奖权重应该增加
+      // 高价值档位（high/mid）权重应该增加
       expect(result.adjusted_weights.high).toBeGreaterThan(original_weights.high)
       expect(result.adjusted_weights.mid).toBeGreaterThan(original_weights.mid)
-      expect(result.adjusted_weights.low).toBeGreaterThan(original_weights.low)
-
-      // 空奖权重应该降低
-      expect(result.adjusted_weights.fallback).toBeLessThan(original_weights.fallback)
+      // low 和 fallback 都是真实奖品，保持不变（只通过提升 high/mid 相对占比改善体验）
+      expect(result.adjusted_weights.low).toBe(original_weights.low)
+      expect(result.adjusted_weights.fallback).toBe(original_weights.fallback)
 
       console.log('✅ Pity 权重调整正确')
     })
@@ -154,18 +153,21 @@ describe('体验策略模块测试套件', () => {
     })
 
     test('历史空奖率等于预期时无运气债务', () => {
+      /*
+       * 100%出奖系统中 expected_empty_rate=0.0
+       * 要测试"无债务"场景，global_empty_count 必须为 0
+       */
       const result = calculator.calculate({
         global_state: {
           global_draw_count: 100,
-          global_empty_count: 35 // 35% 空奖率（假设预期 35%）
+          global_empty_count: 0
         }
       })
 
       expect(result.sample_sufficient).toBe(true)
-      // 空奖率低于或等于预期时，乘数应该是 1（无债务）
       expect(result.multiplier).toBe(1.0)
       expect(result.debt_level).toBe('none')
-      console.log(`✅ 预期空奖率：乘数=${result.multiplier}`)
+      console.log(`✅ 零空奖率：乘数=${result.multiplier}`)
     })
 
     test('历史空奖率高于预期时产生运气债务', () => {
@@ -235,24 +237,34 @@ describe('体验策略模块测试套件', () => {
       console.log('✅ 空奖连击 5 次：未触发强制非空奖')
     })
 
-    test('空奖连击达到阈值时强制非空奖', () => {
-      // 提供完整的可用档位信息：available_tiers, prizes_by_tier, effective_budget
+    test('空奖连击达到阈值时强制非空奖（100%出奖：仅empty档位触发）', () => {
       const result = handler.handle({
+        empty_streak: 10,
+        selected_tier: 'empty',
+        available_tiers: { low: true, mid: true, high: false },
+        effective_budget: 100,
+        prizes_by_tier: {
+          low: [{ lottery_prize_id: 1, prize_value_points: 10, budget_cost: 10 }],
+          mid: [{ lottery_prize_id: 2, prize_value_points: 50, budget_cost: 50 }]
+        }
+      })
+
+      expect(result.forced).toBe(true)
+      expect(['low', 'mid', 'high']).toContain(result.final_tier)
+      console.log(`✅ 空奖连击 10 次：强制非空奖触发，档位=${result.final_tier}`)
+
+      const resultFallback = handler.handle({
         empty_streak: 10,
         selected_tier: 'fallback',
         available_tiers: { low: true, mid: true, high: false },
         effective_budget: 100,
-        // 必须提供 prizes_by_tier 才能让 _selectForcedTier 选择档位
         prizes_by_tier: {
-          low: [{ lottery_prize_id: 1, prize_value_points: 10 }],
-          mid: [{ lottery_prize_id: 2, prize_value_points: 50 }]
+          low: [{ lottery_prize_id: 1, prize_value_points: 10, budget_cost: 10 }]
         }
       })
-
-      // 达到阈值且有可用档位，forced 应该为 true
-      expect(result.forced).toBe(true)
-      expect(['low', 'mid', 'high']).toContain(result.final_tier)
-      console.log(`✅ 空奖连击 10 次：强制非空奖触发，档位=${result.final_tier}`)
+      expect(resultFallback.forced).toBe(false)
+      expect(resultFallback.final_tier).toBe('fallback')
+      console.log('✅ fallback 是真实奖品，不需要强制干预')
     })
 
     test('选中档位已经是非空奖时不做修改', () => {

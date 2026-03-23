@@ -13,7 +13,7 @@
  *
  * V4.6 业务流程：
  *
- * ⚠️ Phase 5 架构变更：原 3 条管线已合并为 1 条统一管线（NormalDrawPipeline）
+ * ⚠️  架构变更：原 3 条管线已合并为 1 条统一管线（NormalDrawPipeline）
  * - 决策来源判断由 LoadDecisionSourceStage 在管线内统一处理
  * - 预设/覆盖/普通 三种模式通过 decision_source 字段区分
  *
@@ -125,7 +125,6 @@
  * @timezone Asia/Shanghai (北京时间)
  * @description 基于餐厅积分抽奖系统的真实业务需求设计
  *
- * 创建时间：2025年01月21日
  * 最后更新：2025年10月30日
  * 使用模型：Claude Sonnet 4.5
  */
@@ -141,10 +140,7 @@ const CacheManager = require('./utils/CacheManager')
  */
 const DrawOrchestrator = require('./pipeline/DrawOrchestrator')
 
-/**
- * 抽奖定价服务 - 统一定价计算入口
- * 注意：BusinessCacheHelper 已迁移到 LotteryQueryService 使用
- */
+/** 抽奖定价服务 - 统一定价计算入口 */
 const LotteryPricingService = require('../lottery/LotteryPricingService')
 
 /**
@@ -775,10 +771,6 @@ class UnifiedLotteryEngine {
    * ============================================
    */
 
-  // 注意：get_campaign_prizes 已迁移到 LotteryQueryService.getCampaignPrizes
-
-  // 注意：get_campaign_config 已迁移到 LotteryQueryService.getCampaignConfig
-
   /**
    * 执行抽奖（路由层调用接口）
    *
@@ -979,7 +971,7 @@ class UnifiedLotteryEngine {
       }
 
       /**
-       * 🔥 核心修复：统一扣除折扣后的总积分（2025-10-23）
+       * 🔥 核心修复：统一扣除折扣后的总积分
        *
        * 问题根因：
        * - 原逻辑：每次抽奖都扣除100积分，10连抽实际扣除1000积分
@@ -1242,10 +1234,6 @@ class UnifiedLotteryEngine {
       throw new Error(`抽奖执行失败: ${error.message}`)
     }
   }
-
-  // 注意：get_user_history 已迁移到 LotteryQueryService.getUserHistory
-
-  // 注意：get_campaigns 已迁移到 LotteryQueryService.getCampaigns
 }
 
 // 🔥 导出单例实例（供路由层直接调用）

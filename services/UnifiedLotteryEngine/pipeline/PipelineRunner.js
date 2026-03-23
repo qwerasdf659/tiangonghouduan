@@ -16,7 +16,7 @@
  *
  * @module services/UnifiedLotteryEngine/pipeline/PipelineRunner
  * @author 统一抽奖架构重构
- * @since 2026-01-18
+ * @since 2026
  */
 
 const { logger } = require('../../../utils/logger')

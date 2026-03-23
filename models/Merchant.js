@@ -13,7 +13,7 @@
  * - 商家角色（merchant_staff/merchant_manager）通过 RBAC 已就绪
  * - 查询层统一加 WHERE merchant_id = ? 条件实现数据隔离
  *
- * @since 2026-02-23
+ * @since 2026
  */
 
 'use strict'

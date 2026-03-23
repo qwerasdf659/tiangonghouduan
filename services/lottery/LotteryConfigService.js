@@ -86,7 +86,7 @@ class LotteryConfigService {
           parsed_value: row.getParsedValue() // 解析后的配置值
         })),
         pagination: {
-          total_count: count,
+          total: count,
           page,
           page_size,
           total_pages: Math.ceil(count / page_size)
@@ -421,7 +421,7 @@ class LotteryConfigService {
 
       return {
         list: rows.map(row => row.getFormattedConfig()),
-        total_count: rows.length
+        total: rows.length
       }
     } catch (error) {
       logger.error('获取矩阵配置列表失败:', error)

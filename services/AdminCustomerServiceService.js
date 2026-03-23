@@ -65,7 +65,6 @@
  * });
  * ```
  *
- * 创建时间：2025年12月09日
  * 使用模型：Claude Sonnet 4.5
  */
 
@@ -162,7 +161,7 @@ class AdminCustomerServiceService {
 
       logger.info('会话列表查询成功', {
         total_sessions: result.pagination.total,
-        current_page: result.pagination.current_page
+        page: result.pagination.page
       })
 
       return result

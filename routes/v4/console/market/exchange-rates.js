@@ -1,8 +1,8 @@
 /**
  * 管理后台 - 汇率兑换管理
  *
- * @route /api/v4/console/exchange-rates
- * @description 管理后台汇率规则CRUD + 启停操作
+ * @route /api/v4/console/assets/rates（从 /console/exchange-rates 迁移）
+ * @description 管理后台汇率规则CRUD + 启停操作（B2C + C2C 共享，挂载在平台级资产域下）
  *
  * API列表：
  * - GET    /              - 查询汇率规则列表（分页+筛选）
@@ -23,7 +23,7 @@ const { handleServiceError } = require('../../../../middleware/validation')
 const logger = require('../../../../utils/logger').logger
 
 /**
- * @route GET /api/v4/console/exchange-rates
+ * @route GET /api/v4/console/assets/rates
  * @desc 查询汇率规则列表（管理员）
  * @access Admin (role_level >= 100)
  * @query {string} status - 筛选状态（active/paused/disabled）
@@ -51,7 +51,7 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
 })
 
 /**
- * @route POST /api/v4/console/exchange-rates
+ * @route POST /api/v4/console/assets/rates
  * @desc 新增汇率规则（管理员）
  * @access Admin (role_level >= 100)
  */
@@ -125,7 +125,7 @@ router.post('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
 })
 
 /**
- * @route PUT /api/v4/console/exchange-rates/:id
+ * @route PUT /api/v4/console/assets/rates/:id
  * @desc 更新汇率规则（管理员）
  * @access Admin (role_level >= 100)
  */
@@ -174,7 +174,7 @@ router.put('/:id', authenticateToken, requireRoleLevel(100), async (req, res) =>
 })
 
 /**
- * @route PATCH /api/v4/console/exchange-rates/:id/status
+ * @route PATCH /api/v4/console/assets/rates/:id/status
  * @desc 更新汇率规则状态（启停）
  * @access Admin (role_level >= 100)
  * @body {string} status - 新状态（active/paused/disabled）

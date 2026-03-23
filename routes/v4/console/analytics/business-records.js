@@ -21,7 +21,6 @@
  * - 读操作通过 BusinessRecordQueryService 执行（Phase 3 收口）
  * - 写操作通过对应的 Service 执行（事务边界在入口层管理）
  *
- * 创建时间：2026-01-21
  * 最后更新：2026-02-02（Phase 3 读写分层收口）
  */
 

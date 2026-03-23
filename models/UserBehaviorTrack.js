@@ -7,7 +7,6 @@
  * - 用于用户画像和运营决策
  *
  * 表名：user_behavior_tracks
- * 创建时间：2026年01月31日
  */
 
 'use strict'

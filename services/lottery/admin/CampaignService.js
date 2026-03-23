@@ -286,11 +286,6 @@ class AdminLotteryCampaignService {
       }
     }
 
-    /*
-     * preset_debt_enabled 已迁移到 lottery_strategy_config.preset.debt_enabled
-     * 通过 PUT /api/v4/console/lottery-campaigns/:id/strategy-config 管理
-     */
-
     // 获取活动
     const campaign = await LotteryCampaign.findByPk(parseInt(lottery_campaign_id), { transaction })
     if (!campaign) {

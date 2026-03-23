@@ -9,7 +9,7 @@
  * 表名：store_staff
  * 主键：store_staff_id（BIGINT，自增）
  *
- * @since 2026-01-12
+ * @since 2026
  */
 
 'use strict'
@@ -146,7 +146,7 @@ module.exports = sequelize => {
       /**
        * 删除时间（软删除）
        * @description 当 status='deleted' 时设置，记录删除操作的时间
-       * @since 2026-01-26
+       * @since 2026
        */
       deleted_at: {
         type: DataTypes.DATE,
@@ -157,7 +157,7 @@ module.exports = sequelize => {
       /**
        * 删除原因
        * @description 记录删除操作的原因（录入错误、数据清理等）
-       * @since 2026-01-26
+       * @since 2026
        */
       delete_reason: {
         type: DataTypes.STRING(500),
@@ -236,7 +236,7 @@ module.exports = sequelize => {
         /**
          * 仅已删除（软删除记录）
          * @description 用于查询已删除的员工记录
-         * @since 2026-01-26
+         * @since 2026
          */
         deleted: {
           where: { status: 'deleted' }
@@ -245,7 +245,7 @@ module.exports = sequelize => {
         /**
          * 排除已删除（推荐用于列表查询）
          * @description 排除已删除的记录，返回所有有效记录
-         * @since 2026-01-26
+         * @since 2026
          */
         notDeleted: {
           where: {

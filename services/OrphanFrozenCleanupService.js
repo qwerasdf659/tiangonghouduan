@@ -20,8 +20,6 @@
  * - 综合检测方法（detectAllOrphanFrozen）同时检测卖家和买家
  * - 根因：cleanup_historical_data.js 删除数据时未解冻买家资产
  *
- * 创建时间：2026-01-09
- * 更新时间：2026-01-30
  * 版本：V4.1.0
  */
 
@@ -30,7 +28,7 @@
 const { Op } = require('sequelize')
 const { sequelize } = require('../models')
 const { Account, AccountAssetBalance, MarketListing, TradeOrder } = require('../models')
-// V4.7.0 AssetService 拆分：使用子服务替代原 AssetService（2026-01-31）
+// V4.7.0 AssetService 拆分：使用子服务替代原 AssetService
 const BalanceService = require('./asset/BalanceService')
 const AuditLogService = require('./AuditLogService')
 const logger = require('../utils/logger')
@@ -50,7 +48,7 @@ class OrphanFrozenCleanupService {
    *
    * 查找所有 frozen_amount > 实际活跃挂牌冻结总额 的记录
    *
-   * 🔴 P0 决策（2026-01-15）：返回稳定 DTO 对象而非数组
+   * 🔴 P0 决策：返回稳定 DTO 对象而非数组
    * - Service 为权威契约，Job 适配 Service
    * - DTO 包含检测结果汇总和明细列表
    *
@@ -243,7 +241,7 @@ class OrphanFrozenCleanupService {
    *
    * 🔴 P0-2唯一入口：所有孤儿冻结清理必须通过此方法
    * 🔴 P0-2分布式锁：使用 Redis 分布式锁防止多实例并发执行
-   * 🔴 P0 决策（2026-01-15）：统一返回契约字段
+   * 🔴 P0 决策：统一返回契约字段
    *
    * @param {Object} options - 选项
    * @param {boolean} options.dry_run - 干跑模式（仅检测不清理，默认 true）
@@ -439,7 +437,7 @@ class OrphanFrozenCleanupService {
   /**
    * 获取孤儿冻结统计
    *
-   * 🔴 P0 适配（2026-01-15）：使用 DTO 返回结构
+   * 🔴 P0 适配：使用 DTO 返回结构
    *
    * @returns {Promise<Object>} 统计信息
    */

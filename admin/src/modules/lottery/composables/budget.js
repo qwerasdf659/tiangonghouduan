@@ -59,7 +59,7 @@ export function useBudgetMethods() {
       try {
         logger.debug('📊 [Budget] loadBudgetData 开始执行')
         const params = new URLSearchParams()
-        params.append('limit', 50)
+        params.append('page_size', 50)
         if (this.budgetFilters.status) {
           params.append('status', this.budgetFilters.status)
         }

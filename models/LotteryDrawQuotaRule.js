@@ -21,7 +21,6 @@
  * 数据库表名：lottery_draw_quota_rules
  * 主键：lottery_draw_quota_rule_id（BIGINT，自增）
  *
- * 创建时间：2025-12-23
  */
 
 const { DataTypes, Op } = require('sequelize')
@@ -296,7 +295,7 @@ module.exports = sequelize => {
        * 1. DB system_settings.daily_lottery_limit（全局配置）
        * 2. 代码默认值 50（兜底降级）
        *
-       * 🔧 循环依赖修复（2026-01-31）：
+       * 🔧 循环依赖修复：
        * 使用延迟加载模式，避免 models/index.js -> LotteryDrawQuotaRule -> AdminSystemService -> models 循环依赖
        *
        */

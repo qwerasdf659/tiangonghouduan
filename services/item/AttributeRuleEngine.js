@@ -26,7 +26,7 @@ class AttributeRuleEngine {
   /**
    * 主入口：读取模板 meta.attribute_rules，生成实例属性对象
    *
-   * @param {import('sequelize').Model} itemTemplate - ItemTemplate 实例（需含 meta）
+   * @param {Object} itemTemplate - ItemTemplate 实例（需含 meta）
    * @param {Object} [skuSpecValues={}] - SKU 规格快照（透传合并到结果）
    * @returns {Object} 含 quality_score、quality_grade、pattern_id 及 skuSpecValues 展开的扁平对象
    */
@@ -108,10 +108,10 @@ class AttributeRuleEngine {
    * 在 [min,max] 内均匀随机整数花纹编号
    *
    * @param {Object} config - attribute_rules.pattern_id
-   * @param {boolean} [config.enabled]
-   * @param {number} [config.min]
-   * @param {number} [config.max]
-   * @returns {number|null}
+   * @param {boolean} [config.enabled] - 是否启用
+   * @param {number} [config.min] - 最小值
+   * @param {number} [config.max] - 最大值
+   * @returns {number|null} 花纹编号或 null
    */
   static generatePatternId(config) {
     if (!config || config.enabled === false) {
@@ -132,8 +132,8 @@ class AttributeRuleEngine {
   /**
    * 加权随机选择一档（权重之和为总权重，随机数落点所在档）
    *
-   * @param {Array<{weight:number,min?:number,max?:number,grade?:string}>} distribution
-   * @returns {Object|null}
+   * @param {Array} distribution - 权重分布数组（含 weight, min, max, grade 字段）
+   * @returns {Object|null} 选中的档位或 null
    */
   static selectWeightedTier(distribution) {
     if (!Array.isArray(distribution) || distribution.length === 0) {
@@ -166,10 +166,10 @@ class AttributeRuleEngine {
   /**
    * [min,max] 均匀随机浮点数，保留指定位小数
    *
-   * @param {number} min
-   * @param {number} max
-   * @param {number} [decimals=2]
-   * @returns {number}
+   * @param {number} min - 最小值
+   * @param {number} max - 最大值
+   * @param {number} [decimals=2] - 小数位数
+   * @returns {number} 随机浮点数
    */
   static uniformRandom(min, max, decimals = 2) {
     const lo = Number(min)
@@ -184,9 +184,9 @@ class AttributeRuleEngine {
   /**
    * [min,max] 闭区间均匀随机整数
    *
-   * @param {number} min
-   * @param {number} max
-   * @returns {number}
+   * @param {number} min - 最小值
+   * @param {number} max - 最大值
+   * @returns {number} 随机整数
    */
   static uniformRandomInt(min, max) {
     const lo = Math.ceil(Number(min))

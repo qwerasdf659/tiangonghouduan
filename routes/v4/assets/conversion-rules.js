@@ -13,7 +13,6 @@
  * - /api/v4/shop/assets/conversion-rules - 商家域（需要 requireMerchantDomainAccess）
  * - /api/v4/assets/conversion-rules - 用户域（普通用户可访问）
  *
- * 创建时间：2026年01月14日
  * 使用 Claude Sonnet 4.5 模型
  */
 

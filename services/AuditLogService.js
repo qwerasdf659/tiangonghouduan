@@ -71,7 +71,6 @@ const { attachDisplayNames, DICT_TYPES } = require('../utils/displayNameHelper')
  * });
  * ```
  *
- * 创建时间：2025年12月09日
  * 最后更新：2026年01月08日（V4.5.0 审计统一入口整合）
  */
 
@@ -230,7 +229,6 @@ class AuditLogService {
         created_at: BeijingTimeHelper.createDatabaseTime()
       }
 
-      // P0-5: 如果原始值与规范化后不同，保存原始值到 target_type_raw
       if (targetTypeRaw) {
         logData.target_type_raw = targetTypeRaw
       }
@@ -854,7 +852,6 @@ class AuditLogService {
     }
 
     if (target_type) {
-      // P0-5: 查询时也规范化（前端传入 PascalCase 也能查到）
       whereClause.target_type = normalizeTargetType(target_type)
     }
 
@@ -965,7 +962,6 @@ class AuditLogService {
     }
 
     if (target_type) {
-      // P0-5: 查询时也规范化（前端传入 PascalCase 也能查到）
       whereClause.target_type = normalizeTargetType(target_type)
     }
 

@@ -30,16 +30,17 @@ const { authenticateToken, requireRoleLevel } = require('../../../middleware/aut
 const { handleServiceError } = require('../../../middleware/validation')
 
 /**
- * Append a worksheet from an array of row objects (keys become column headers).
- * @param {import('exceljs').Workbook} workbook - ExcelJS workbook
- * @param {string} sheetName
- * @param {object[]} rows
+ * 向工作簿追加一个工作表（以对象键为列头）
+ * @param {Object} workbook - ExcelJS 工作簿实例
+ * @param {string} sheetName - 工作表名称
+ * @param {Array<Object>} rows - 数据行数组
+ * @returns {void} 无返回值
  */
 function addJsonSheet(workbook, sheetName, rows) {
   if (!rows || rows.length === 0) return
   const ws = workbook.addWorksheet(sheetName)
   const keys = Object.keys(rows[0])
-  ws.columns = keys.map((key) => ({ header: key, key, width: 18 }))
+  ws.columns = keys.map(key => ({ header: key, key, width: 18 }))
   ws.getRow(1).font = { bold: true }
   ws.addRows(rows)
 }

@@ -13,7 +13,7 @@
  * - 未提供事务时直接报错（使用 assertAndGetTransaction）
  * - 服务层禁止自建事务，由入口层统一使用 TransactionManager.execute()
  *
- * @since 2026-01-12
+ * @since 2026
  */
 
 const logger = require('../utils/logger').logger
@@ -819,7 +819,7 @@ class StaffManagementService {
    * @param {number} store_id - 门店ID
    * @returns {Promise<Object|null>} 员工角色信息，如果用户不在该门店则返回null
    *
-   * @since 2026-01-18 路由层合规性治理：封装门店角色查询
+   * @since 2026
    */
   static async getUserStoreRole(user_id, store_id) {
     const staffRecord = await StoreStaff.findOne({
@@ -851,7 +851,7 @@ class StaffManagementService {
    * @param {number} [role_level] - 系统角色级别（可选，>=40 视为店长）
    * @returns {Promise<boolean>} 是否为店长
    *
-   * @since 2026-01-18 路由层合规性治理
+   * @since 2026
    */
   static async isStoreManager(user_id, store_id, role_level = 0) {
     // 系统管理员或高级角色直接视为店长
@@ -884,7 +884,7 @@ class StaffManagementService {
    * @returns {Promise<StoreStaff>} 更新后的员工记录
    * @throws {Error} 员工不存在、状态不允许删除等情况
    *
-   * @since 2026-01-26
+   * @since 2026
    */
   static async permanentDeleteStaff(data, options = {}) {
     // 强制要求事务边界 - 2026-01-05 治理决策

@@ -7,7 +7,6 @@
  * - 验证核销码有效性（格式、状态、过期时间）
  * - 标记订单为已核销
  *
- * 创建时间：2025年12月22日
  * 使用 Claude Sonnet 4.5 模型
  */
 
@@ -29,7 +28,7 @@ const TransactionManager = require('../../../../utils/TransactionManager')
  * - 标记物品为已使用（Item.status = used）
  *
  * 规范遵循：
- * - API设计与契约标准规范 v2.0（2025-12-23）
+ * - API设计与契约标准规范 v2.0
  * - 参数命名规范：禁止语义不清的裸 code，使用 redeem_code 替代
  *
  * 请求参数：

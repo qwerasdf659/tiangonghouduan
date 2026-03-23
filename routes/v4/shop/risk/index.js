@@ -15,7 +15,6 @@
  * - 需要 staff:manage 权限（店长/管理员）
  * - 非管理员只能查看/处理所属门店的告警
  *
- * 创建时间：2026-01-12
  * 依据文档：docs/商家员工域权限体系升级方案.md AC5
  */
 
@@ -26,13 +25,6 @@ const { handleServiceError } = require('../../../../middleware/validation')
 const logger = require('../../../../utils/logger').logger
 const TransactionManager = require('../../../../utils/TransactionManager')
 const BeijingTimeHelper = require('../../../../utils/timeHelper')
-
-/*
- * 路由层合规性治理（2026-01-18）：
- * - 移除直接 require models
- * - 通过 ServiceManager 统一获取服务
- * - 所有数据库操作收口到 MerchantRiskControlService
- */
 
 /**
  * @route GET /api/v4/shop/risk/alerts
@@ -106,7 +98,7 @@ router.get(
         filters.end_date = endDateTime
       }
 
-      // 通过 ServiceManager 获取服务（路由层合规性治理 2026-01-18）
+      // 通过 ServiceManager 获取服务
       const MerchantRiskControlService = req.app.locals.services.getService('merchant_risk_control')
       const result = await MerchantRiskControlService.queryRiskAlerts(filters, {
         page: parseInt(page, 10),
@@ -139,7 +131,7 @@ router.get(
         return res.apiError('无效的告警ID', 'BAD_REQUEST', null, 400)
       }
 
-      // 通过 ServiceManager 获取服务（路由层合规性治理 2026-01-18）
+      // 通过 ServiceManager 获取服务
       const MerchantRiskControlService = req.app.locals.services.getService('merchant_risk_control')
       const alert = await MerchantRiskControlService.getAlertDetail(alertId)
 
@@ -185,7 +177,7 @@ router.post(
         return res.apiError('无效的告警ID', 'BAD_REQUEST', null, 400)
       }
 
-      // 通过 ServiceManager 获取服务（路由层合规性治理 2026-01-18）
+      // 通过 ServiceManager 获取服务
       const MerchantRiskControlService = req.app.locals.services.getService('merchant_risk_control')
 
       // 验证告警存在且用户有权限
@@ -253,7 +245,7 @@ router.post(
         return res.apiError('无效的告警ID', 'BAD_REQUEST', null, 400)
       }
 
-      // 通过 ServiceManager 获取服务（路由层合规性治理 2026-01-18）
+      // 通过 ServiceManager 获取服务
       const MerchantRiskControlService = req.app.locals.services.getService('merchant_risk_control')
 
       // 验证告警存在且用户有权限
@@ -324,7 +316,7 @@ router.get(
         }
       }
 
-      // 通过 ServiceManager 获取服务（路由层合规性治理 2026-01-18）
+      // 通过 ServiceManager 获取服务
       const MerchantRiskControlService = req.app.locals.services.getService('merchant_risk_control')
       const stats = await MerchantRiskControlService.getAlertStats({
         store_id: resolved_store_id

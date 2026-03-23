@@ -85,7 +85,7 @@ export function useCampaignBudgetMethods() {
     async loadBudgets() {
       try {
         const params = new URLSearchParams()
-        params.append('limit', 50)
+        params.append('page_size', 50)
         if (this.budgetFilters.lottery_campaign_id) {
           params.append('lottery_campaign_ids', this.budgetFilters.lottery_campaign_id)
         }

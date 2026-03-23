@@ -4,10 +4,6 @@
  * @route /api/v4/market
  * @description 交易市场用户间交易市场（类似Steam市场、BUFF），用户可以上架/购买物品
  *
- * 📌 重构记录（2025-12-22）：
- * - 从 /api/v4/market 迁移到 /api/v4/market
- * - 明确业务语义：market域专门负责交易市场用户间交易
- * - shop/exchange 负责B2C官方兑换
  *
  * 子模块划分（按业务职责）：
  * - listings.js - 市场挂单查询（GET /listings, GET /listings/:market_listing_id, GET /listing-status）
@@ -26,7 +22,6 @@
  * - 统一使用 res.apiSuccess / res.apiError 响应
  * - 通过 ServiceManager 获取 TradeOrderService
  *
- * 创建时间：2025年12月22日
  */
 
 const express = require('express')

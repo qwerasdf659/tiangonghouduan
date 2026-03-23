@@ -10,7 +10,6 @@
  * - /api/v4/ads/impression（小程序端 - 记录曝光）
  * - /api/v4/ads/click（小程序端 - 记录点击）
  *
- * 创建时间：2026-02-18
  */
 
 const logger = require('../utils/logger').logger

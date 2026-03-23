@@ -3,7 +3,7 @@
 /**
  * DrawOrchestrator - 抽奖管线编排器
  *
- * ⚠️ V4.6 Phase 5 重构（2026-01-19）：
+ * ⚠️ V4.6  重构：
  * - 原 3 条管线（Normal/Preset/Override）已合并为统一管线
  * - 决策来源由管线内部的 LoadDecisionSourceStage 判断
  * - Orchestrator 现在只负责创建和执行统一管线
@@ -20,21 +20,21 @@
  *
  * @module services/UnifiedLotteryEngine/pipeline/DrawOrchestrator
  * @author 统一抽奖架构重构
- * @since 2026-01-18
- * @updated 2026-01-19 Phase 5 统一管线合并
+ * @since 2026
+ * @updated 2026-01-19  统一管线合并
  */
 
 const { logger } = require('../../../utils/logger')
 
 // 管线类型常量（保留用于日志和状态报告）
 const PIPELINE_TYPES = {
-  UNIFIED: 'unified' // Phase 5: 统一管线
+  UNIFIED: 'unified' // 统一管线
 }
 
 /**
  * 抽奖管线编排器
  *
- * Phase 5 重构：使用统一管线替代原 3 条管线
+ *  重构：使用统一管线替代原 3 条管线
  */
 class DrawOrchestrator {
   /**
@@ -54,7 +54,7 @@ class DrawOrchestrator {
   /**
    * 获取统一管线实例（延迟加载）
    *
-   * ⚠️ Phase 5 更新：
+   * ⚠️  更新：
    * - 原 3 条管线已合并为 NormalDrawPipeline（统一管线）
    * - 决策来源由管线内部的 LoadDecisionSourceStage 判断
    *
@@ -72,7 +72,7 @@ class DrawOrchestrator {
   /**
    * 执行抽奖
    *
-   * ⚠️ Phase 5 重构：
+   * ⚠️  重构：
    * - 不再需要选择管线，直接执行统一管线
    * - 决策来源由管线内部的 LoadDecisionSourceStage 判断
    *
@@ -172,7 +172,7 @@ class DrawOrchestrator {
       options: this.options,
       pipeline_type: PIPELINE_TYPES.UNIFIED,
       pipeline_loaded: this._pipeline !== null,
-      architecture: 'unified_pipeline', // Phase 5: 统一管线架构
+      architecture: 'unified_pipeline', // 统一管线架构
       decision_source_stage: 'LoadDecisionSourceStage' // 决策来源判断移至 Stage 内部
     }
   }

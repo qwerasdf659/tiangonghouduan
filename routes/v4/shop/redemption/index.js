@@ -5,7 +5,6 @@
  * - 新版核销系统HTTP API层
  * - 12位Base32核销码生成和核销
  * - 30天有效期管理
- * - 替代旧版8位HEX核销码系统
  *
  * 功能模块：
  * - orders.js   - 订单生成和取消
@@ -19,7 +18,6 @@
  * 4. POST /api/v4/redemption/orders/:order_id/cancel - 取消订单
  * 5. GET /api/v4/redemption/items/:item_id/order - 查询物品的核销订单
  *
- * 创建时间：2025年12月22日
  * 使用 Claude Sonnet 4.5 模型
  */
 

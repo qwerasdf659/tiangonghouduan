@@ -316,7 +316,7 @@ models.AdBidLog = require('./AdBidLog')(sequelize, DataTypes)
  *    - 表名：ad_bid_logs，主键：ad_bid_log_id（BIGINT）
  */
 
-// 🔴 Phase 5：DMP 人群定向 + 反作弊
+// 🔴 ：DMP 人群定向 + 反作弊
 models.UserAdTag = require('./UserAdTag')(sequelize, DataTypes)
 /*
  * ✅ UserAdTag：用户行为标签（DMP）
@@ -412,7 +412,7 @@ models.AdInteractionLog = require('./AdInteractionLog')(sequelize, DataTypes)
  *    - 表名：ad_interaction_logs，主键：ad_interaction_log_id（BIGINT）
  */
 
-// 🔴 媒体文件与多态关联（2026-03-16）
+// 🔴 媒体文件与多态关联
 models.MediaFile = require('./MediaFile')(sequelize, DataTypes)
 models.MediaAttachment = require('./MediaAttachment')(sequelize, DataTypes)
 
@@ -627,11 +627,7 @@ models.AlertSilenceRule = require('./AlertSilenceRule')(sequelize, DataTypes)
  *    - 业务场景：节假日静默、夜间静默、测试环境静默
  */
 
-/*
- * 🗄️ Audit thin-tables archived 2026-03-20 (CSV backups in backups/).
- * Dropped: UserStatusChangeRecord, UserRoleChangeRecord, LotteryClearSettingRecord
- * Authoritative audit trail lives in admin_operation_logs.
- */
+/* 审计日志统一使用 admin_operation_logs */
 
 models.WebSocketStartupLog = require('./WebSocketStartupLog')(sequelize, DataTypes)
 /*
@@ -750,8 +746,6 @@ models.BatchOperationLog = require('./BatchOperationLog').initModel(sequelize)
  *    - 设计决策来源：需求文档阶段C技术决策（美团独立幂等表 + Redis/MySQL双重校验）
  */
 
-/* SystemConfig model removed - merged into SystemSettings (migration 20260320230000) */
-
 models.LotteryDailyMetrics = require('./LotteryDailyMetrics')(sequelize, DataTypes)
 /*
  * ✅ LotteryDailyMetrics：抽奖日报统计表（按日聚合）
@@ -864,7 +858,7 @@ models.UserNotification = require('./UserNotification')(sequelize, DataTypes)
  *    - 业务场景：业务事件触发→写入通知表→WebSocket实时推送→用户查看→标记已读
  */
 
-// 🔴 策略效果模拟分析（2026-02-20）
+// 🔴 策略效果模拟分析
 models.LotterySimulationRecord = require('./LotterySimulationRecord')(sequelize, DataTypes)
 /*
  * ✅ LotterySimulationRecord：策略效果模拟记录表

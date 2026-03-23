@@ -6,7 +6,7 @@
  * 2. 动态竞价底价：底价 = 过去 N 天平均成交价 × 比例系数
  * 3. 阶梯折扣：连续投放天数越多折扣越大
  *
- * 配置数据存储在 system_settings 表中，通过 SystemConfigService 读取，
+ * 配置数据存储在 system_settings 表中，通过 AdminSystemService 读取，
  * 支持运营在管理后台动态调整所有参数。
  *
  * @module services/AdPricingService

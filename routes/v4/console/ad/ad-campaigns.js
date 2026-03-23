@@ -9,8 +9,8 @@
  * - 广告概览仪表板
  * - 弹窗队列配置管理
  * - 竞价日志查询（Phase 4）
- * - 用户标签浏览（Phase 5 DMP）
- * - 反作弊日志查询（Phase 5）
+ * - 用户标签浏览（DMP）
+ * - 反作弊日志查询（）
  * - 归因追踪日志查询（Phase 6）
  * - 管理员创建广告活动
  *
@@ -136,7 +136,7 @@ const ALLOWED_ADMIN_CREATE_FIELDS = [
  * @body {number} [fixed_days] - 固定包天天数（fixed_daily 模式必填）
  * @body {string} [start_date] - 投放开始日期（YYYY-MM-DD）
  * @body {string} [end_date] - 投放结束日期（YYYY-MM-DD）
- * @body {Object} [targeting_rules] - 定向规则 JSON（Phase 5 启用）
+ * @body {Object} [targeting_rules] - 定向规则 JSON
  * @body {number} [priority] - 展示优先级（1~99，默认50）
  */
 router.post(
@@ -456,7 +456,7 @@ router.get(
 )
 
 /**
- * GET /interaction-stats/:id - 获取计划交互统计（统一替代旧的 popup/carousel 独立统计）
+ * GET /interaction-stats/:id - 获取计划交互统计
  * @route GET /api/v4/console/ad-campaigns/interaction-stats/:id
  * @access Private (Admin)
  * @param {number} id - 广告计划ID
@@ -591,7 +591,7 @@ router.get(
 )
 
 /**
- * GET /user-ad-tags - 用户广告标签查询（Phase 5 DMP）
+ * GET /user-ad-tags - 用户广告标签查询（DMP）
  *
  * @route GET /api/v4/console/ad-campaigns/user-ad-tags
  * @access Private (Admin)
@@ -624,7 +624,7 @@ router.get(
 )
 
 /**
- * GET /antifraud-logs - 反作弊日志查询（Phase 5）
+ * GET /antifraud-logs - 反作弊日志查询（）
  *
  * @route GET /api/v4/console/ad-campaigns/antifraud-logs
  * @access Private (Admin)

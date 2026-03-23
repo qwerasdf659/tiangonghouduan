@@ -28,7 +28,6 @@
  * - NotificationService：发送回复通知给用户
  * - BeijingTimeHelper：统一北京时间处理
  *
- * 创建时间：2025年01月28日
  * 最后更新：2025年10月30日
  * 使用模型：Claude Sonnet 4.5
  */

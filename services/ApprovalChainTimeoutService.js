@@ -87,6 +87,7 @@ class ApprovalChainTimeoutService {
 
     for (const step of timeoutSteps) {
       try {
+        // eslint-disable-next-line no-await-in-loop
         await ApprovalChainTimeoutService._processTimeoutStep(step)
       } catch (error) {
         logger.error(`[审核链超时] 处理步骤失败: step_id=${step.step_id}, error=${error.message}`)

@@ -30,7 +30,6 @@ const logger = require('../utils/logger').logger
  * - LotteryDraw：抽奖记录表
  * - User：用户表
  *
- * 创建时间：2025年12月10日
  * 使用模型：Claude Sonnet 4.5
  */
 
@@ -137,7 +136,6 @@ class ActivityService {
           'campaign_code',
           'campaign_type',
           'description',
-          'banner_image_url',
           'start_time',
           'end_time',
           'max_draws_per_user_daily',
@@ -640,7 +638,6 @@ class ActivityService {
         'pool_budget_total',
         'pool_budget_remaining',
         'allowed_campaign_ids',
-        // preset_debt_enabled 已迁移到 lottery_strategy_config 表（config_group=preset）
         'preset_budget_policy',
         'status'
       ]
@@ -664,7 +661,6 @@ class ActivityService {
         used:
           (Number(campaign.pool_budget_total) || 0) - (Number(campaign.pool_budget_remaining) || 0)
       },
-      // preset_debt_enabled 已迁移到 lottery_strategy_config.preset.debt_enabled
       preset_budget_policy: campaign.preset_budget_policy,
       allowed_campaign_ids: campaign.allowed_campaign_ids || [],
       status: campaign.status

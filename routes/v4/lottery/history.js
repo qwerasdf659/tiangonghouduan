@@ -12,8 +12,6 @@
  * - 用户端路由不含 :user_id 参数，身份纯从 JWT Token 获取
  * - 管理员查看他人数据走 /api/v4/console/lottery-user-analysis/
  *
- * 创建时间：2025年12月22日
- * 更新时间：2026年2月12日（路由分离方案 - 抽奖接口安全改造）
  */
 
 const express = require('express')

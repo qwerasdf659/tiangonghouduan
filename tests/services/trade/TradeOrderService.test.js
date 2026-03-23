@@ -626,7 +626,7 @@ describe('TradeOrderService - 交易订单服务', () => {
       expect(Array.isArray(result.orders)).toBe(true)
 
       // 验证分页结构
-      expect(result.pagination).toHaveProperty('total_count')
+      expect(result.pagination).toHaveProperty('total')
       expect(result.pagination).toHaveProperty('page')
       expect(result.pagination).toHaveProperty('page_size')
       expect(result.pagination).toHaveProperty('total_pages')

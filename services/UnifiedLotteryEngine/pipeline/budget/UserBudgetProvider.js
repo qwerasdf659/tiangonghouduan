@@ -14,11 +14,11 @@
  *
  * @module services/UnifiedLotteryEngine/pipeline/budget/UserBudgetProvider
  * @author 统一抽奖架构重构
- * @since 2026-01-18
+ * @since 2026
  */
 
 const BudgetProvider = require('./BudgetProvider')
-// V4.7.0 AssetService 拆分：使用子服务替代原 AssetService（2026-01-31）
+// V4.7.0 AssetService 拆分：使用子服务替代原 AssetService
 const BalanceService = require('../../../asset/BalanceService')
 const QueryService = require('../../../asset/QueryService')
 
@@ -40,7 +40,7 @@ class UserBudgetProvider extends BudgetProvider {
   /**
    * 获取用户可用预算
    *
-   * 🔧 修复（2026-01-27）：
+   * 🔧 修复：
    * 从 allowed_campaign_ids 指定的所有桶汇总 BUDGET_POINTS 余额，
    * 而不是只查询单个 lottery_campaign_id 的余额。
    *
@@ -115,7 +115,7 @@ class UserBudgetProvider extends BudgetProvider {
   /**
    * 扣减用户预算
    *
-   * 🔧 修复（2026-01-27）：
+   * 🔧 修复：
    * 从 allowed_campaign_ids 指定的桶中按顺序扣减，
    * 优先扣减第一个有足够余额的桶。
    *
@@ -221,7 +221,7 @@ class UserBudgetProvider extends BudgetProvider {
   /**
    * 回滚用户预算
    *
-   * 🔧 修复（2026-01-27）：
+   * 🔧 修复：
    * 回滚到 allowed_campaign_ids 中的第一个桶（与扣减逻辑保持一致）
    *
    * @param {Object} params - 回滚参数

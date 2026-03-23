@@ -145,7 +145,7 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
       keyword,
       start_date,
       end_date,
-      limit = 20,
+      page_size = 20,
       offset = 0
     } = req.query
 
@@ -180,7 +180,7 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
     const { count, rows } = await AdminNotification.findAndCountAll({
       where,
       order: [['created_at', 'DESC']],
-      limit: Math.min(parseInt(limit) || 20, 100),
+      limit: Math.min(parseInt(page_size) || 20, 100),
       offset: parseInt(offset) || 0
     })
 

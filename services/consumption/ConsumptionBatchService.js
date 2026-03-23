@@ -16,7 +16,6 @@
  * API 端点：
  * - POST /api/v4/console/consumption/batch-review
  *
- * 创建时间：2026年01月31日
  * 修复时间：2026年03月08日 - 复用 CoreService 完整审核逻辑
  *
  * @module services/consumption/ConsumptionBatchService

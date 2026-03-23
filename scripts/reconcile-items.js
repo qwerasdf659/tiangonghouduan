@@ -193,6 +193,7 @@ async function executeReconciliation(options = {}) {
  * @returns {Promise<Object>} 修复结果
  */
 async function autoFixGlobalResiduals(sequelize, globalResults) {
+  const OrderNoGenerator = require('../utils/OrderNoGenerator')
   const residuals = globalResults.filter(r => r.total_net !== 0)
   if (residuals.length === 0) return { fixed: 0 }
 
@@ -219,16 +220,19 @@ async function autoFixGlobalResiduals(sequelize, globalResults) {
         timestamp: new Date().toISOString()
       })
 
+      const txNo = OrderNoGenerator.generate('TX', Date.now() % 1000000)
+
       await sequelize.query(`
         INSERT INTO asset_transactions 
           (account_id, asset_code, delta_amount, 
-           balance_before, balance_after, business_type, idempotency_key, meta, created_at)
-        VALUES (12, :asset_code, :adjustment, 0, 0, 'system_reconciliation', :key, :meta, NOW())
+           balance_before, balance_after, business_type, idempotency_key, transaction_no, meta, created_at)
+        VALUES (12, :asset_code, :adjustment, 0, 0, 'system_reconciliation', :key, :txNo, :meta, NOW())
       `, {
         replacements: {
           asset_code: r.asset_code,
           adjustment: -r.total_net,
           key,
+          txNo,
           meta
         },
         transaction
@@ -258,6 +262,7 @@ async function autoFixGlobalResiduals(sequelize, globalResults) {
  * @returns {Promise<Object>} 修复结果
  */
 async function autoFixBalanceMismatches(sequelize) {
+  const OrderNoGenerator = require('../utils/OrderNoGenerator')
   const [mismatches] = await sequelize.query(`
     SELECT 
       b.account_id, b.asset_code,
@@ -292,12 +297,15 @@ async function autoFixBalanceMismatches(sequelize) {
       )
       if (Number(exists.cnt) > 0) continue
 
+      const txNo1 = OrderNoGenerator.generate('TX', Date.now() % 1000000)
+      const txNo2 = OrderNoGenerator.generate('TX', (Date.now() + 1) % 1000000)
+
       await sequelize.query(`
         INSERT INTO asset_transactions 
           (account_id, counterpart_account_id, asset_code, delta_amount, 
-           balance_before, balance_after, business_type, idempotency_key, meta, created_at)
+           balance_before, balance_after, business_type, idempotency_key, transaction_no, meta, created_at)
         VALUES (:account_id, 12, :asset_code, :diff, :calculated, :current_balance, 
-           'data_migration', :key, :meta, NOW())
+           'data_migration', :key, :txNo, :meta, NOW())
       `, {
         replacements: {
           account_id: m.account_id,
@@ -306,6 +314,7 @@ async function autoFixBalanceMismatches(sequelize) {
           calculated: Number(m.calculated),
           current_balance: Number(m.current_balance),
           key,
+          txNo: txNo1,
           meta: JSON.stringify({
             type: 'balance_reconciliation_hourly',
             balance: Number(m.current_balance),
@@ -320,15 +329,16 @@ async function autoFixBalanceMismatches(sequelize) {
       await sequelize.query(`
         INSERT INTO asset_transactions 
           (account_id, counterpart_account_id, asset_code, delta_amount, 
-           balance_before, balance_after, business_type, idempotency_key, meta, created_at)
+           balance_before, balance_after, business_type, idempotency_key, transaction_no, meta, created_at)
         VALUES (12, :account_id, :asset_code, :neg_diff, 0, 0, 
-           'data_migration_counterpart', :ckey, :meta, NOW())
+           'data_migration_counterpart', :ckey, :txNo, :meta, NOW())
       `, {
         replacements: {
           account_id: m.account_id,
           asset_code: m.asset_code,
           neg_diff: -diff,
           ckey: `${key}:counterpart`,
+          txNo: txNo2,
           meta: JSON.stringify({ counterpart_of: key })
         },
         transaction

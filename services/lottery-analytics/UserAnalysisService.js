@@ -90,7 +90,7 @@ class UserAnalysisService {
     return {
       states: rows.map(row => row.get({ plain: true })),
       pagination: {
-        total_count: count,
+        total: count,
         page,
         page_size,
         total_pages: Math.ceil(count / page_size)
@@ -165,7 +165,7 @@ class UserAnalysisService {
     return {
       states: rows.map(row => row.get({ plain: true })),
       pagination: {
-        total_count: count,
+        total: count,
         page,
         page_size,
         total_pages: Math.ceil(count / page_size)
@@ -261,7 +261,7 @@ class UserAnalysisService {
     return {
       grants: rows.map(row => row.get({ plain: true })),
       pagination: {
-        total_count: count,
+        total: count,
         page,
         page_size,
         total_pages: Math.ceil(count / page_size)
@@ -348,7 +348,7 @@ class UserAnalysisService {
     return {
       quotas: rows.map(row => row.get({ plain: true })),
       pagination: {
-        total_count: count,
+        total: count,
         page,
         page_size,
         total_pages: Math.ceil(count / page_size)

@@ -8,7 +8,7 @@
  * - 用户个人信息管理
  * - 用户设置
  * - 用户数据查询（/me端点）
- * - 消费二维码生成（DB-3 迁移，2026-02-20）
+ * - 消费二维码生成
  *
  * 📌 遵循规范：
  * - 用户端禁止/:id参数（使用/me端点）
@@ -18,7 +18,6 @@
  * - 用户profile相关功能在/auth域的/profile端点
  * - 本域主要提供用户中心的扩展功能
  *
- * 创建时间：2025年01月21日
  * 适用区域：中国（北京时间 Asia/Shanghai）
  */
 
@@ -28,7 +27,7 @@ const { authenticateToken } = require('../../../middleware/auth')
 // 🔐 P0-1修复：导入手机号脱敏函数
 const { sanitize } = require('../../../utils/logger')
 
-// 消费二维码路由（DB-3 迁移：从 /shop/consumption/qrcode 迁入，2026-02-20）
+// 消费二维码路由
 const consumptionQrcodeRoutes = require('./consumption-qrcode')
 
 // 广告系统路由（Phase 3: 广告主自助投放）
@@ -72,7 +71,7 @@ router.get('/me', authenticateToken, async (req, res) => {
   }
 })
 
-// 消费二维码（用户生成码供商家扫描，仅需 authenticateToken，DB-3 迁移 2026-02-20）
+// 消费二维码（用户生成码供商家扫描）
 router.use('/consumption', authenticateToken, consumptionQrcodeRoutes)
 
 // 挂载广告位查询路由（Phase 3 广告主自助投放 - 用户端只读查询）

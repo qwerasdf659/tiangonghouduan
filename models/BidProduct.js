@@ -22,7 +22,6 @@
  *
  * 表名（snake_case）：bid_products
  * 主键命名：bid_product_id
- * 创建时间：2026-02-16
  *
  */
 

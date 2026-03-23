@@ -11,7 +11,6 @@
  * - 通过 ServiceManager 统一获取服务实例
  * - 写操作使用 TransactionManager.execute 包裹事务
  *
- * 创建时间：2025-12-22
  * 最后更新：2026-01-09（事务边界修复）
  */
 
@@ -28,7 +27,7 @@ router.use(authenticateToken, requireRoleLevel(1))
 /**
  * GET /:id/messages - 获取会话消息
  *
- * API路径参数设计规范 V2.2（2026-01-20）：
+ * API路径参数设计规范 V2.2：
  * - 会话是事务实体，使用数字ID（:id）作为标识符
  *
  * @description 获取指定会话的消息历史
@@ -72,7 +71,7 @@ router.get('/:id/messages', async (req, res) => {
 /**
  * POST /:id/send - 发送消息
  *
- * API路径参数设计规范 V2.2（2026-01-20）：
+ * API路径参数设计规范 V2.2：
  * - 会话是事务实体，使用数字ID（:id）作为标识符
  *
  * @description 管理员发送消息给用户
@@ -180,7 +179,7 @@ router.post('/:id/send', async (req, res) => {
 /**
  * POST /:id/mark-read - 标记消息已读
  *
- * API路径参数设计规范 V2.2（2026-01-20）：
+ * API路径参数设计规范 V2.2：
  * - 会话是事务实体，使用数字ID（:id）作为标识符
  *
  * @description 标记会话中用户发送的消息为已读

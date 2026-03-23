@@ -9,7 +9,6 @@
  * 服务对象：
  * - 定时任务：jobs/ad-cron-jobs.js（03:00执行）
  *
- * 创建时间：2026-02-18
  */
 
 const logger = require('../utils/logger').logger
@@ -203,7 +202,7 @@ class AdTagAggregationService {
       })
       tags.set('lottery_active_30d', lotteryCount30d > 50 ? 'true' : 'false')
 
-      // 3. lottery_total_count: 总抽奖次数
+      // 3. lottery_total: 总抽奖次数
       const totalLotteryCount = await LotteryDraw.count({
         where: { user_id: userId },
         transaction

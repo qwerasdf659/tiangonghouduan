@@ -224,7 +224,13 @@ describe('🔴 孤儿冻结问题回归测试 - 2026-01-30', () => {
       const frozenOrders = await TradeOrder.findAll({
         where: { status: 'frozen' },
         limit: 5,
-        attributes: ['order_id', 'market_listing_id', 'buyer_user_id', 'status', 'gross_amount']
+        attributes: [
+          'trade_order_id',
+          'market_listing_id',
+          'buyer_user_id',
+          'status',
+          'gross_amount'
+        ]
       })
 
       console.log(`   📊 当前 frozen 状态订单数量: ${frozenOrders.length}`)
@@ -271,7 +277,7 @@ describe('🔴 孤儿冻结问题回归测试 - 2026-01-30', () => {
       // 查询该挂牌关联的订单
       const relatedOrders = await TradeOrder.findAll({
         where: { market_listing_id: listingId },
-        attributes: ['order_id', 'status', 'buyer_user_id']
+        attributes: ['trade_order_id', 'status', 'buyer_user_id']
       })
 
       console.log(`   📊 market_listing_id=${listingId} 关联订单数量: ${relatedOrders.length}`)
@@ -371,7 +377,13 @@ describe('🔴 孤儿冻结问题回归测试 - 2026-01-30', () => {
           }
         ],
         limit: 10,
-        attributes: ['order_id', 'market_listing_id', 'buyer_user_id', 'status', 'gross_amount']
+        attributes: [
+          'trade_order_id',
+          'market_listing_id',
+          'buyer_user_id',
+          'status',
+          'gross_amount'
+        ]
       })
 
       console.log(`   📊 孤儿冻结订单数量: ${orphanFrozenOrders.length}`)
@@ -418,7 +430,7 @@ describe('🔴 孤儿冻结问题回归测试 - 2026-01-30', () => {
           }
         ],
         limit: 10,
-        attributes: ['order_id', 'market_listing_id', 'buyer_user_id', 'status']
+        attributes: ['trade_order_id', 'market_listing_id', 'buyer_user_id', 'status']
       })
 
       console.log(`   📊 无效状态订单数量: ${invalidOrders.length}`)

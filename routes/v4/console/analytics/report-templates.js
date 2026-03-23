@@ -8,7 +8,6 @@
  * - 报表导出：导出报表数据
  *
  * 任务编号：B-36 报表模板CRUD, B-37 动态报表生成, B-38 报表预览, B-40 报表导出
- * 创建时间：2026年01月31日
  *
  * @module routes/v4/console/analytics/report-templates
  */

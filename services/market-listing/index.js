@@ -1,7 +1,7 @@
 /**
  * 市场挂牌服务模块入口（market-listing）
  *
- * V4.7.0 大文件拆分方案 Phase 2（2026-01-31）
+ * V4.7.0 大文件拆分方案 Phase 2
  * 原 MarketListingService.js (2295行) 拆分为3个子服务：
  *
  * 子服务划分：

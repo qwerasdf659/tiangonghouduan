@@ -26,8 +26,6 @@
  * - 统一只接受 Header Idempotency-Key
  * - 服务端不再自动生成幂等键，缺失幂等键直接返回 400
  *
- * 创建时间：2025年12月22日
- * 更新时间：2026年01月12日 - 商家员工域权限体系升级 + V2动态码
  */
 
 const express = require('express')
@@ -38,14 +36,6 @@ const { logger, sanitize } = require('../../../../utils/logger')
 const BeijingTimeHelper = require('../../../../utils/timeHelper')
 const TransactionManager = require('../../../../utils/TransactionManager')
 const QRCodeValidator = require('../../../../utils/QRCodeValidator')
-
-/*
- * 路由层合规性治理（2026-01-18）：
- * - 移除直接 require models
- * - 通过 ServiceManager 统一获取服务（B1-Injected + E2-Strict snake_case）
- * - 商家域审计日志（AC4.2）通过 MerchantOperationLogService 访问
- * - 商家域风控服务（AC5）通过 MerchantRiskControlService 访问
- */
 
 /**
  * @route POST /api/v4/shop/consumption/submit
@@ -86,7 +76,6 @@ router.post(
   authenticateToken,
   requireMerchantPermission('consumption:create', { scope: 'store', storeIdParam: 'body' }),
   async (req, res) => {
-    // P1-9：通过 ServiceManager 获取服务（V4.7.0 服务拆分）
     const IdempotencyService = req.app.locals.services.getService('idempotency')
     const CoreService = req.app.locals.services.getService('consumption_core')
 
@@ -192,7 +181,7 @@ router.post(
        * 🛡️ 【AC5 风控检查】执行频次阻断 + 金额/关联告警
        * - 频次超限（10次/60秒）→ 阻断提交返回 429
        * - 金额/关联异常 → 仅告警，不阻断
-       * - 通过 ServiceManager 获取服务（路由层合规性治理 2026-01-18）
+       * - 通过 ServiceManager 获取服务
        */
       const MerchantRiskControlService = req.app.locals.services.getService('merchant_risk_control')
       const riskCheckResult = await MerchantRiskControlService.performFullRiskCheck({

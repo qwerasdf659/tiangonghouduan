@@ -14,7 +14,6 @@
  * - 通过 ServiceManager 统一获取服务实例
  * - 写操作使用 TransactionManager.execute 包裹事务
  *
- * 创建时间：2025-12-22
  * 最后更新：2026-02-15（新增管理员在线状态 API）
  */
 
@@ -30,7 +29,7 @@ router.use(authenticateToken, requireRoleLevel(1))
 /**
  * POST /:id/transfer - 转接会话
  *
- * API路径参数设计规范 V2.2（2026-01-20）：
+ * API路径参数设计规范 V2.2：
  * - 会话是事务实体，使用数字ID（:id）作为标识符
  *
  * @description 将会话转接给其他客服
@@ -100,7 +99,7 @@ router.post('/:id/transfer', async (req, res) => {
 /**
  * POST /:id/close - 关闭会话
  *
- * API路径参数设计规范 V2.2（2026-01-20）：
+ * API路径参数设计规范 V2.2：
  * - 会话是事务实体，使用数字ID（:id）作为标识符
  *
  * @description 关闭客服会话

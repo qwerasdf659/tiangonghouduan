@@ -23,7 +23,6 @@
  * - 默认为干跑模式（dry_run=true），确认后才能实际清理
  * - 审计日志强制记录
  *
- * 创建时间：2026-01-09（P0-2实施）
  * 版本：V4.5.0
  */
 
@@ -82,7 +81,7 @@ router.get(
     if (asset_code) options.asset_code = asset_code
     if (limit) options.limit = Number(limit)
 
-    // 🔴 P0 决策（2026-01-15）：detectOrphanFrozen 返回稳定 DTO 对象
+    // 🔴 P0 决策：detectOrphanFrozen 返回稳定 DTO 对象
     const dto = await OrphanFrozenCleanupService.detectOrphanFrozen(options)
 
     return res.apiSuccess({
@@ -191,7 +190,7 @@ router.post(
     // 通过 ServiceManager 获取服务
     const OrphanFrozenCleanupService = req.app.locals.services.getService('orphan_frozen_cleanup')
 
-    // 🔴 P0 决策（2026-01-15）：cleanupOrphanFrozen 返回统一契约字段
+    // 🔴 P0 决策：cleanupOrphanFrozen 返回统一契约字段
     const result = await OrphanFrozenCleanupService.cleanupOrphanFrozen({
       dry_run,
       user_id: user_id ? Number(user_id) : undefined,

@@ -1,7 +1,7 @@
 /**
  * 竞价管理路由 - 管理后台
  *
- * 路径：/api/v4/console/bid-management
+ * 路径：/api/v4/console/bids
  *
  * 职责：
  * - 创建竞价商品（关联兑换商品，设定起拍价、时间段）
@@ -51,7 +51,7 @@ function asyncHandler(fn) {
 // ==================== 所有路由需要管理员权限（role_level >= 100）====================
 
 /**
- * POST /api/v4/console/bid-management
+ * POST /api/v4/console/bids
  *
  * @description 创建竞价商品（关联一个兑换商品，设定竞价参数）
  * @access Admin（role_level >= 100）
@@ -199,7 +199,7 @@ router.post(
 )
 
 /**
- * GET /api/v4/console/bid-management
+ * GET /api/v4/console/bids
  *
  * @description 获取竞价商品列表（管理视图，含出价统计）
  * @access Admin（role_level >= 100）
@@ -255,7 +255,7 @@ router.get(
 )
 
 /**
- * GET /api/v4/console/bid-management/:id
+ * GET /api/v4/console/bids/:id
  *
  * @description 获取竞价商品详情（管理视图，含完整出价记录列表）
  * @access Admin（role_level >= 100）
@@ -315,7 +315,7 @@ router.get(
 )
 
 /**
- * POST /api/v4/console/bid-management/:id/settle
+ * POST /api/v4/console/bids/:id/settle
  *
  * @description 手动结算竞价（管理员强制结算，即使未到结束时间）
  * @access Admin（role_level >= 100）
@@ -388,7 +388,7 @@ router.post(
 )
 
 /**
- * POST /api/v4/console/bid-management/:id/cancel
+ * POST /api/v4/console/bids/:id/cancel
  *
  * @description 取消竞价（所有出价者的冻结资产解冻返还）
  * @access Admin（role_level >= 100）

@@ -14,18 +14,18 @@ const API_PREFIX = '/api/v4/console'
  * @constant {Object<string, string>}
  */
 export const EXCHANGE_ITEM_ENDPOINTS = {
-  ITEM_LIST: `${API_PREFIX}/exchange-items`,
-  ITEM_DETAIL: `${API_PREFIX}/exchange-items/:id`,
-  ITEM_CREATE: `${API_PREFIX}/exchange-items`,
-  ITEM_UPDATE: `${API_PREFIX}/exchange-items/:id`,
-  ITEM_DELETE: `${API_PREFIX}/exchange-items/:id`,
-  SKU_LIST: `${API_PREFIX}/exchange-items/:id/skus`,
-  SKU_CREATE: `${API_PREFIX}/exchange-items/:id/skus`,
-  SKU_UPDATE: `${API_PREFIX}/exchange-items/skus/:sku_id`,
-  SKU_DELETE: `${API_PREFIX}/exchange-items/skus/:sku_id`,
-  SKU_GENERATE: `${API_PREFIX}/exchange-items/:id/skus/generate`,
-  SKU_STOCK_ADJUST: `${API_PREFIX}/exchange-items/skus/:sku_id/stock`,
-  SKU_CHANNEL_PRICES: `${API_PREFIX}/exchange-items/skus/:sku_id/channel-prices`,
+  ITEM_LIST: `${API_PREFIX}/exchange/items`,
+  ITEM_DETAIL: `${API_PREFIX}/exchange/items/:id`,
+  ITEM_CREATE: `${API_PREFIX}/exchange/items`,
+  ITEM_UPDATE: `${API_PREFIX}/exchange/items/:id`,
+  ITEM_DELETE: `${API_PREFIX}/exchange/items/:id`,
+  SKU_LIST: `${API_PREFIX}/exchange/items/:id/skus`,
+  SKU_CREATE: `${API_PREFIX}/exchange/items/:id/skus`,
+  SKU_UPDATE: `${API_PREFIX}/exchange/items/skus/:sku_id`,
+  SKU_DELETE: `${API_PREFIX}/exchange/items/skus/:sku_id`,
+  SKU_GENERATE: `${API_PREFIX}/exchange/items/:id/skus/generate`,
+  SKU_STOCK_ADJUST: `${API_PREFIX}/exchange/items/skus/:sku_id/stock`,
+  SKU_CHANNEL_PRICES: `${API_PREFIX}/exchange/items/skus/:sku_id/channel-prices`,
   CATEGORY_LIST: `${API_PREFIX}/categories`,
   CATEGORY_DETAIL: `${API_PREFIX}/categories/:id`,
   CATEGORY_CREATE: `${API_PREFIX}/categories`,
@@ -40,8 +40,8 @@ export const EXCHANGE_ITEM_ENDPOINTS = {
   ATTRIBUTE_OPTION_CREATE: `${API_PREFIX}/attributes/:id/options`,
   ATTRIBUTE_OPTION_UPDATE: `${API_PREFIX}/attributes/options/:option_id`,
   ATTRIBUTE_OPTION_DELETE: `${API_PREFIX}/attributes/options/:option_id`,
-  ITEM_EXPORT: `${API_PREFIX}/exchange-items/export`,
-  ITEM_IMPORT: `${API_PREFIX}/exchange-items/import`
+  ITEM_EXPORT: `${API_PREFIX}/exchange/items/export`,
+  ITEM_IMPORT: `${API_PREFIX}/exchange/items/import`
 }
 
 /**

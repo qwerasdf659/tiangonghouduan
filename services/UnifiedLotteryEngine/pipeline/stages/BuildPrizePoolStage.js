@@ -18,7 +18,7 @@
  * - allowed_tiers: 预算分层允许的档位（来自 BudgetContextStage，保留用于分析）
  * - has_valuable_prizes: 是否有有价值的奖品可用
  *
- * 架构重构（2026-03-04）：
+ * 架构重构：
  * - 合并 _filterByBudget + _filterByDiamondQuota → _filterByResourceEligibility（资源级过滤）
  * - 删除 _filterByAllowedTiers 调用（档位系统只管概率分配，不做准入门控）
  * - 资格检查下沉到单个奖品，按资源类型独立判断（行业最佳实践）
@@ -31,7 +31,7 @@
  *
  * @module services/UnifiedLotteryEngine/pipeline/stages/BuildPrizePoolStage
  * @author 统一抽奖架构重构
- * @since 2026-01-18
+ * @since 2026
  * @updated 2026-01-20 集成预算分层限制
  * @updated 2026-03-04 去预算门控改资源级过滤（合并 _filterByBudget + _filterByDiamondQuota → _filterByResourceEligibility）
  */

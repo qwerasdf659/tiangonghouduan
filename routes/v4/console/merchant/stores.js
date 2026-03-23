@@ -26,7 +26,7 @@
  *
  * 关联路由：区域列表查询 → /api/v4/console/regions
  *
- * @since 2026-01-12
+ * @since 2026
  */
 
 'use strict'
@@ -209,19 +209,19 @@ router.get('/stats', authenticateToken, requireRoleLevel(100), async (req, res) 
  */
 router.get('/contribution', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const { days = 30, limit = 20 } = req.query
+    const { days = 30, page_size = 20 } = req.query
 
     logger.info('[门店管理] 获取商户贡献度排行', {
       admin_id: req.user.user_id,
       days: parseInt(days),
-      limit: parseInt(limit)
+      page_size: parseInt(page_size)
     })
 
     // 🔄 通过 ServiceManager 获取 StoreContributionService
     const StoreContributionService = req.app.locals.services.getService('store_contribution')
     const result = await StoreContributionService.getContributionRanking({
       days: parseInt(days) || 30,
-      limit: Math.min(parseInt(limit) || 20, 100)
+      limit: Math.min(parseInt(page_size) || 20, 100)
     })
 
     return res.apiSuccess(result, '获取成功')

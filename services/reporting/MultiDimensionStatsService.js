@@ -389,7 +389,7 @@ class MultiDimensionStatsService {
         pagination: {
           page,
           page_size,
-          total_count: totalCount,
+          total: totalCount,
           total_pages: totalPages,
           has_next: page < totalPages,
           has_prev: page > 1
@@ -399,7 +399,7 @@ class MultiDimensionStatsService {
 
       logger.info('[下钻查询] 完成', {
         source,
-        total_count: totalCount,
+        total: totalCount,
         returned_count: formattedRows.length
       })
 
@@ -956,7 +956,7 @@ class MultiDimensionStatsService {
    * @returns {Promise<Object>} 时间对比数据
    *
    * 关联需求：§4.8.1 核心指标时间对比接口
-   * @since 2026-02-03
+   * @since 2026
    */
   static async getTimeComparison(options = {}) {
     const { period = 'daily', metrics = ['consumption', 'lottery_draws', 'users'] } = options

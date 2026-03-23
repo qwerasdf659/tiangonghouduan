@@ -21,7 +21,7 @@
  * - min_prize_cost: 最低奖品成本
  * - budget_sufficient: 预算是否充足
  *
- * 计算引擎集成（2026-01-20）：
+ * 计算引擎集成：
  * - 集成 LotteryComputeEngine.computeBudgetContext()
  * - 支持 BxPx 矩阵预算分层控制
  * - 为后续 BuildPrizePoolStage 和 TierPickStage 提供分层信息
@@ -33,7 +33,7 @@
  *
  * @module services/UnifiedLotteryEngine/pipeline/stages/BudgetContextStage
  * @author 统一抽奖架构重构
- * @since 2026-01-18
+ * @since 2026
  * @updated 2026-01-20 集成 LotteryComputeEngine
  */
 

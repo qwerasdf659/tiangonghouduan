@@ -26,7 +26,7 @@
 
 const BeijingTimeHelper = require('../../utils/timeHelper')
 const DataSanitizer = require('../DataSanitizer')
-// V4.7.0 AssetService 拆分：使用子服务替代原 AssetService（2026-01-31）
+// V4.7.0 AssetService 拆分：使用子服务替代原 AssetService
 const BalanceService = require('../asset/BalanceService')
 const models = require('../../models')
 const { Op, fn, col, literal } = require('sequelize')
@@ -943,7 +943,7 @@ class StatsService {
    * @returns {Array} returns.recent_registrations - 近期注册趋势（7日）
    * @returns {string} returns.generated_at - 生成时间（北京时间ISO格式）
    *
-   * @since 2026-02-05（用户管理模块统计接口）
+   * @since 2026
    */
   static async getUserManagementStats(options = {}) {
     const { refresh = false } = options

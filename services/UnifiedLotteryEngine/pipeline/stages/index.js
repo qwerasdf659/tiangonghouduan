@@ -5,16 +5,9 @@
  *
  * 统一导出所有 Stage 类，用于 Pipeline 组装
  *
- * ⚠️ V4.6 Phase 5 重构（2026-01-19）：
- * - 已归档：LoadPresetStage, PresetBudgetStage, PresetSettleStage
- * - 已归档：LoadOverrideStage, OverrideSettleStage
- * - 新增：LoadDecisionSourceStage（统一决策来源判断）
- * - 已删除：QuotaDeductStage（功能与 SettleStage._updateUserQuota 重复）
  *
  * @module services/UnifiedLotteryEngine/pipeline/stages
- * @author 统一抽奖架构重构
- * @since 2026-01-18
- * @updated 2026-01-19 Phase 5 统一管线合并
+ * @module services/UnifiedLotteryEngine/pipeline/stages
  */
 
 // 基础阶段
@@ -22,7 +15,7 @@ const BaseStage = require('./BaseStage')
 const LoadCampaignStage = require('./LoadCampaignStage')
 const EligibilityStage = require('./EligibilityStage')
 
-// 决策来源阶段（Phase 5 新增：统一判断 normal/preset/override）
+// 决策来源阶段（ 新增：统一判断 normal/preset/override）
 const LoadDecisionSourceStage = require('./LoadDecisionSourceStage')
 
 // 预算阶段
@@ -49,7 +42,7 @@ module.exports = {
   LoadCampaignStage,
   EligibilityStage,
 
-  // 决策来源（Phase 5：统一判断 normal/preset/override）
+  // 决策来源（：统一判断 normal/preset/override）
   LoadDecisionSourceStage,
 
   // 预算

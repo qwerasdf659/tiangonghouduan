@@ -27,7 +27,6 @@ const logger = require('../utils/logger').logger
  * - 未提供事务时直接报错（使用 assertAndGetTransaction）
  * - 服务层禁止自建事务，由入口层统一使用 TransactionManager.execute()
  *
- * 创建时间：2025-10-11
  * 最后更新：2026年01月05日（事务边界治理改造）
  */
 

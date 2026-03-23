@@ -50,7 +50,6 @@
  * - TradeOrderService：订单创建和状态管理
  * - ItemService：物品状态管理（三表模型双录）
  *
- * 创建时间：2025年12月15日
  * 最后更新：2025年12月15日
  * 使用模型：Claude Sonnet 4.5
  */
@@ -230,7 +229,7 @@ module.exports = sequelize => {
           '挂牌状态（Status）：on_sale-在售中 | locked-已锁定 | sold-已售出 | withdrawn-已撤回 | admin_withdrawn-管理员强制撤回；业务规则：on_sale → locked → sold/withdrawn/admin_withdrawn，locked 超时自动回滚为 on_sale'
       },
 
-      // === Phase 0 新增字段：运营排序控制（2026-03-16） ===
+      // === Phase 0 新增字段：运营排序控制 ===
 
       /** 运营排序权重（数值越小越靠前，全项目统一 sort_order INT ASC 约定） */
       sort_order: {

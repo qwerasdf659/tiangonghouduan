@@ -45,7 +45,6 @@ const LotteryAnalyticsQueryService = require('./AnalyticsQueryService')
  * - 单例模式避免重复实例化（减少内存占用）
  * - 统一容器管理（便于依赖注入和测试）
  *
- * 创建时间：2025年09月25日
  * 最后更新：2025年10月30日
  *
  * @class LotteryServiceContainer

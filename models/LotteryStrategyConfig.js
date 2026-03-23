@@ -19,7 +19,7 @@
  *
  * @module models/LotteryStrategyConfig
  * @author 抽奖模块策略引擎
- * @since 2026-01-20
+ * @since 2026
  */
 
 const { Model } = require('sequelize')

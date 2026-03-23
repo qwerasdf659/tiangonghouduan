@@ -25,7 +25,7 @@ const BeijingTimeHelper = require('../../../utils/timeHelper')
 const express = require('express')
 const router = express.Router()
 
-// ── 域级路由挂载（13 个域，替代原 85 条逐文件挂载）──
+// ── 域级路由挂载（16 个域）──
 router.use('/', require('./lottery'))
 router.use('/', require('./ad'))
 router.use('/', require('./user'))
@@ -38,6 +38,9 @@ router.use('/', require('./config'))
 router.use('/system', require('./system'))
 router.use('/customer-service', require('./customer-service'))
 router.use('/assets', require('./assets'))
+router.use('/exchange', require('./exchange'))
+router.use('/bids', require('./bids'))
+router.use('/dashboard', require('./dashboard'))
 
 /**
  * GET / - Console API 根路径信息

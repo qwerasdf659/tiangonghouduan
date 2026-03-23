@@ -10,8 +10,6 @@
  * - 写操作使用 TransactionManager.execute() 统一管理事务
  * - 使用 AdminLotteryCoreService (admin_lottery_core) 封装核心干预逻辑（V4.7.0 拆分后）
  *
- * 创建时间：2025-12-22
- * 更新时间：2026-01-05（事务边界治理改造）
  */
 
 const express = require('express')

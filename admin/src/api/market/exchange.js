@@ -13,30 +13,30 @@ import { API_PREFIX, request, buildURL, buildQueryString } from '../base.js'
 
 export const EXCHANGE_ENDPOINTS = {
   // 兑换订单（后端: routes/v4/console/market/marketplace.js）
-  EXCHANGE_ORDERS: `${API_PREFIX}/console/marketplace/exchange_market/orders`,
-  EXCHANGE_ORDER_DETAIL: `${API_PREFIX}/console/marketplace/exchange_market/orders/:order_no`,
-  EXCHANGE_ORDER_APPROVE: `${API_PREFIX}/console/marketplace/exchange_market/orders/:order_no/approve`,
-  EXCHANGE_ORDER_SHIP: `${API_PREFIX}/console/marketplace/exchange_market/orders/:order_no/ship`,
-  EXCHANGE_ORDER_REJECT: `${API_PREFIX}/console/marketplace/exchange_market/orders/:order_no/reject`,
-  EXCHANGE_ORDER_REFUND: `${API_PREFIX}/console/marketplace/exchange_market/orders/:order_no/refund`,
-  EXCHANGE_ORDER_COMPLETE: `${API_PREFIX}/console/marketplace/exchange_market/orders/:order_no/complete`,
+  EXCHANGE_ORDERS: `${API_PREFIX}/console/exchange/orders`,
+  EXCHANGE_ORDER_DETAIL: `${API_PREFIX}/console/exchange/orders/:order_no`,
+  EXCHANGE_ORDER_APPROVE: `${API_PREFIX}/console/exchange/orders/:order_no/approve`,
+  EXCHANGE_ORDER_SHIP: `${API_PREFIX}/console/exchange/orders/:order_no/ship`,
+  EXCHANGE_ORDER_REJECT: `${API_PREFIX}/console/exchange/orders/:order_no/reject`,
+  EXCHANGE_ORDER_REFUND: `${API_PREFIX}/console/exchange/orders/:order_no/refund`,
+  EXCHANGE_ORDER_COMPLETE: `${API_PREFIX}/console/exchange/orders/:order_no/complete`,
 
   // 排序管理（后端: routes/v4/console/market/marketplace.js）
-  EXCHANGE_ITEM_PIN: `${API_PREFIX}/console/marketplace/exchange_market/items/:exchange_item_id/pin`,
-  EXCHANGE_ITEM_RECOMMEND: `${API_PREFIX}/console/marketplace/exchange_market/items/:exchange_item_id/recommend`,
-  EXCHANGE_ITEMS_BATCH_SORT: `${API_PREFIX}/console/marketplace/exchange_market/items/batch-sort`,
-  EXCHANGE_ITEMS_BATCH_STATUS: `${API_PREFIX}/console/marketplace/exchange_market/items/batch-status`,
-  EXCHANGE_ITEMS_BATCH_PRICE: `${API_PREFIX}/console/marketplace/exchange_market/items/batch-price`,
-  EXCHANGE_ITEMS_BATCH_CATEGORY: `${API_PREFIX}/console/marketplace/exchange_market/items/batch-category`,
+  EXCHANGE_ITEM_PIN: `${API_PREFIX}/console/exchange/items/:exchange_item_id/pin`,
+  EXCHANGE_ITEM_RECOMMEND: `${API_PREFIX}/console/exchange/items/:exchange_item_id/recommend`,
+  EXCHANGE_ITEMS_BATCH_SORT: `${API_PREFIX}/console/exchange/items/batch-sort`,
+  EXCHANGE_ITEMS_BATCH_STATUS: `${API_PREFIX}/console/exchange/items/batch-status`,
+  EXCHANGE_ITEMS_BATCH_PRICE: `${API_PREFIX}/console/exchange/items/batch-price`,
+  EXCHANGE_ITEMS_BATCH_CATEGORY: `${API_PREFIX}/console/exchange/items/batch-category`,
 
   // 快递查询（后端: routes/v4/console/market/marketplace.js）
-  EXCHANGE_SHIPPING_COMPANIES: `${API_PREFIX}/console/marketplace/exchange_market/shipping-companies`,
-  EXCHANGE_ORDER_TRACK: `${API_PREFIX}/console/marketplace/exchange_market/orders/:order_no/track`,
+  EXCHANGE_SHIPPING_COMPANIES: `${API_PREFIX}/console/exchange/orders/shipping-companies`,
+  EXCHANGE_ORDER_TRACK: `${API_PREFIX}/console/exchange/orders/:order_no/track`,
 
   // 市场概览统计（二级市场成交，后端: marketplace.js）
   MARKET_STATS_OVERVIEW: `${API_PREFIX}/console/marketplace/stats/overview`,
   // 兑换市场聚合统计（服务端聚合，后端: exchange_market/statistics）
-  EXCHANGE_MARKET_STATISTICS: `${API_PREFIX}/console/marketplace/exchange_market/statistics`
+  EXCHANGE_MARKET_STATISTICS: `${API_PREFIX}/console/exchange/stats`
 }
 
 // ========== API 调用方法 ==========

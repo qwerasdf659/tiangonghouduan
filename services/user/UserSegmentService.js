@@ -238,7 +238,7 @@ class UserSegmentService {
           segment: SEGMENT_RULES[segmentType],
           users: [],
           pagination: {
-            total_count: 0,
+            total: 0,
             page,
             page_size,
             total_pages: 0
@@ -271,7 +271,7 @@ class UserSegmentService {
           last_login: u.last_login
         })),
         pagination: {
-          total_count: totalCount,
+          total: totalCount,
           page,
           page_size,
           total_pages: Math.ceil(totalCount / page_size)
@@ -1110,7 +1110,7 @@ class UserSegmentService {
       return {
         user_id,
         approval_rate: parseFloat(approvalRate.toFixed(4)),
-        total_count: totalCount,
+        total: totalCount,
         approved_count: approvedCount,
         rejected_count: rejectedCount,
         pending_count: pendingCount,

@@ -144,7 +144,7 @@ router.get(
  * @route GET /api/v4/console/prize-pool/:code
  * @access Private (需要管理员权限)
  *
- * API路径参数设计规范 V2.2（2026-01-20）：
+ * API路径参数设计规范 V2.2：
  * - 奖品池（按活动查询）是配置实体，使用业务码（:code）作为标识符
  * - 业务码格式：snake_case（如 spring_festival）
  */
@@ -187,7 +187,7 @@ router.get(
  * @route PUT /api/v4/console/prize-pool/prize/:id
  * @access Private (需要管理员权限)
  *
- * API路径参数设计规范 V2.2（2026-01-20）：
+ * API路径参数设计规范 V2.2：
  * - 奖品配置实例是事务实体，使用数字ID（:id）作为标识符
  *
  * 🔒 P0修复：修正模型名称和字段映射
@@ -258,7 +258,7 @@ router.put(
  * @route POST /api/v4/console/prize-pool/prize/:id/add-stock
  * @access Private (需要管理员权限)
  *
- * API路径参数设计规范 V2.2（2026-01-20）：
+ * API路径参数设计规范 V2.2：
  * - 奖品配置实例是事务实体，使用数字ID（:id）作为标识符
  */
 router.post(
@@ -314,7 +314,7 @@ router.post(
  * @route DELETE /api/v4/console/prize-pool/prize/:id
  * @access Private (需要管理员权限)
  *
- * API路径参数设计规范 V2.2（2026-01-20）：
+ * API路径参数设计规范 V2.2：
  * - 奖品配置实例是事务实体，使用数字ID（:id）作为标识符
  */
 router.delete(

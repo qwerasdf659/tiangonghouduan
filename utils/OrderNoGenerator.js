@@ -38,6 +38,10 @@ function toBeijingYyMmDd(d) {
   return `${yy}${mm}${dd}`
 }
 
+/**
+ * 订单号/业务编号统一生成器
+ * 格式: {BizCode}{YYMMDD}{sequence} 共 16 位
+ */
 class OrderNoGenerator {
   /**
    * 生成统一格式编号

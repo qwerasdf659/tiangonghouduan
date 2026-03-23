@@ -64,7 +64,7 @@ router.get('/hourly', authenticateToken, requireRoleLevel(100), async (req, res)
       lottery_campaign_id,
       start_time,
       end_time,
-      total: result.pagination.total_count
+      total: result.pagination.total
     })
 
     return res.apiSuccess(result, '查询小时统计成功')

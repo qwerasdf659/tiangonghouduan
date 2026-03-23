@@ -310,7 +310,7 @@ describe('E2E - 新用户完整旅程测试', () => {
       if (response.body.data && response.body.data.records) {
         console.log('[Step 6] 抽奖历史:', {
           total: response.body.data.pagination?.total || 0,
-          current_page_count: response.body.data.records.length
+          page_count: response.body.data.records.length
         })
       }
     })
@@ -431,7 +431,8 @@ describe('E2E - 新用户完整旅程测试', () => {
      */
     test('应该能查看系统公告', async () => {
       const response = await request(app)
-        .get('/api/v4/system/announcements')
+        .get('/api/v4/system/ad-delivery')
+        .query({ slot_type: 'announcement' })
         .set('Authorization', `Bearer ${accessToken}`)
         .expect('Content-Type', /json/)
 
@@ -439,7 +440,7 @@ describe('E2E - 新用户完整旅程测试', () => {
       expect(response.body.success).toBe(true)
 
       console.log('[Step 10] 系统公告:', {
-        announcement_count: response.body.data?.announcements?.length || 0
+        announcement_count: response.body.data?.items?.length || 0
       })
     })
   })

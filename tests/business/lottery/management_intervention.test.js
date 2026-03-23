@@ -387,12 +387,12 @@ describe('抽奖管理干预测试 - P1优先级', () => {
       expect(dashboard.budget_debt).toBeDefined()
 
       // 验证库存欠账统计结构
-      expect(typeof dashboard.inventory_debt.total_count).toBe('number')
+      expect(typeof dashboard.inventory_debt.total).toBe('number')
       expect(typeof dashboard.inventory_debt.total_quantity).toBe('number')
       expect(typeof dashboard.inventory_debt.pending_count).toBe('number')
 
       // 验证预算欠账统计结构
-      expect(typeof dashboard.budget_debt.total_count).toBe('number')
+      expect(typeof dashboard.budget_debt.total).toBe('number')
       expect(typeof dashboard.budget_debt.total_amount).toBe('number')
       expect(typeof dashboard.budget_debt.pending_count).toBe('number')
 

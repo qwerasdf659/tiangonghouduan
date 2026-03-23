@@ -16,7 +16,7 @@ const logger = require('../utils/logger').logger
  */
 
 const { User, Role } = require('../models')
-// V4.7.0 AssetService 拆分：使用子服务替代原 AssetService（2026-01-31）
+// V4.7.0 AssetService 拆分：使用子服务替代原 AssetService
 const BalanceService = require('./asset/BalanceService')
 const BeijingTimeHelper = require('../utils/timeHelper')
 

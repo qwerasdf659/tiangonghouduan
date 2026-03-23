@@ -24,7 +24,7 @@
  *
  * @module services/UnifiedLotteryEngine/pipeline/stages/DecisionSnapshotStage
  * @author 统一抽奖架构重构
- * @since 2026-01-18
+ * @since 2026
  * @updated 2026-01-20 - 增加策略引擎决策审计字段
  */
 

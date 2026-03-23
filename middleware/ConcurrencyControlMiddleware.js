@@ -3,7 +3,6 @@ const logger = require('../utils/logger').logger
 /**
  * 并发控制中间件 V4
  * 使用统一分布式锁管理器，提供用户并发控制和分布式锁功能
- * 更新时间：2025/01/21
  */
 
 const BeijingTimeHelper = require('../utils/timeHelper')

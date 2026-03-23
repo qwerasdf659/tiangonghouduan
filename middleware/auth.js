@@ -4,8 +4,6 @@ const logger = require('../utils/logger').logger
  * 统一认证中间件 - V4.0 统一架构版本
  * 🛡️ 权限认证：完全使用UUID角色系统，移除is_admin字段依赖
  * 🚀 性能优化：集成内存+Redis双层缓存，智能降级
- * 创建时间：2025年01月21日
- * 更新时间：2025年01月28日
  */
 
 const jwt = require('jsonwebtoken')
@@ -325,7 +323,7 @@ async function getUserRoles(user_id, forceRefresh = false) {
  * const sessionToken = require('uuid').v4()
  * const tokens = await generateTokens(user, { session_token: sessionToken })
  *
- * @since 2025-12-22（创建）
+ * @since 2025
  * @updated 2026-01-21（新增 session_token 支持，用于会话管理）
  */
 async function generateTokens(user, options = {}) {
@@ -874,7 +872,7 @@ function requirePermission(requiredPermission) {
  * const stores = await getUserStores(123)
  * // 返回：[{ store_id: 1, store_name: '测试门店', role_in_store: 'staff' }]
  *
- * @since 2026-01-12
+ * @since 2026
  */
 async function getUserStores(user_id) {
   try {
@@ -913,7 +911,7 @@ async function getUserStores(user_id) {
  * @param {number} store_id - 门店ID
  * @returns {Promise<boolean>} 是否在职
  *
- * @since 2026-01-12
+ * @since 2026
  */
 async function isUserActiveInStore(user_id, store_id) {
   try {
@@ -957,7 +955,7 @@ async function isUserActiveInStore(user_id, store_id) {
  * // 在 routes/v4/shop/index.js 入口使用
  * router.use(authenticateToken, requireMerchantDomainAccess())
  *
- * @since 2026-01-12
+ * @since 2026
  */
 function requireMerchantDomainAccess() {
   // 允许访问商家域的角色名称列表
@@ -1088,7 +1086,7 @@ function requireMerchantDomainAccess() {
  * // 门店范围权限检查（验证用户是否在 request.body.store_id 对应门店在职）
  * router.post('/submit', authenticateToken, requireMerchantPermission('consumption:create', { scope: 'store' }), handler)
  *
- * @since 2026-01-12
+ * @since 2026
  */
 function requireMerchantPermission(capability, options = {}) {
   const { scope = 'global', storeIdParam = 'body' } = options

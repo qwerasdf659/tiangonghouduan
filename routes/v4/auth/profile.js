@@ -8,7 +8,6 @@
  * - 路由层只负责：认证/鉴权、参数校验、调用Service、统一响应
  * - 使用统一响应 res.apiSuccess / res.apiError
  *
- * 创建时间：2025-12-22
  */
 
 const express = require('express')

@@ -242,12 +242,12 @@ describe('截图页面API联动测试', () => {
 
       expect(res.status).toBe(200)
       expect(res.body.success).toBe(true)
-      expect(res.body.data).toHaveProperty('total_count')
+      expect(res.body.data).toHaveProperty('total')
       expect(res.body.data).toHaveProperty('enabled_count')
       expect(res.body.data).toHaveProperty('item_type_count')
       expect(res.body.data).toHaveProperty('type_distribution')
       expect(res.body.data).toHaveProperty('rarity_distribution')
-      expect(res.body.data.total_count).toBeGreaterThan(0)
+      expect(res.body.data.total).toBeGreaterThan(0)
     })
   })
 

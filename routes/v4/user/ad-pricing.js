@@ -12,7 +12,6 @@
  * - 路由层不开启事务（只读查询）
  * - 使用 res.apiSuccess/apiError 统一响应格式
  *
- * 创建时间：2026-03-06
  */
 
 'use strict'

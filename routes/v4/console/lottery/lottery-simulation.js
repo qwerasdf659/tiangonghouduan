@@ -18,7 +18,7 @@
  * 权限：authenticateToken + requireRoleLevel(100)（管理员）
  *
  * @module routes/v4/console/lottery/lottery-simulation
- * @since 2026-02-20
+ * @since 2026
  */
 
 const express = require('express')

@@ -29,7 +29,7 @@ class ExchangeChannelPriceService {
    *
    * @param {Date|string|null|undefined} v - 原始值
    * @param {string} fieldName - 字段名（用于错误信息）
-   * @returns {Date|null}
+   * @returns {Date|null} 解析后的日期或 null
    */
   _parseOptionalDate(v, fieldName) {
     if (v === undefined || v === null || v === '') {
@@ -48,7 +48,7 @@ class ExchangeChannelPriceService {
    * 查询某 SKU 下全部渠道定价
    *
    * @param {number|string} skuId - SKU ID
-   * @returns {Promise<Array>}
+   * @returns {Promise<Array>} 列表结果
    */
   async getSkuPrices(skuId) {
     const sid = Number(skuId)
@@ -75,11 +75,11 @@ class ExchangeChannelPriceService {
    * @param {string} data.cost_asset_code - 材料资产代码
    * @param {number|string} data.cost_amount - 所需数量
    * @param {number|string} [data.original_amount] - 划线价
-   * @param {boolean} [data.is_enabled]
-   * @param {Date|string|null} [data.publish_at]
-   * @param {Date|string|null} [data.unpublish_at]
-   * @param {Object} [options={}]
-   * @returns {Promise<Object>}
+   * @param {boolean} [data.is_enabled] - 是否启用
+   * @param {Date|string|null} [data.publish_at] - 发布时间
+   * @param {Date|string|null} [data.unpublish_at] - 下架时间
+   * @param {Object} [options={}] - 事务选项
+   * @returns {Promise<Object>} 操作结果
    */
   async setSkuPrice(skuId, data, options = {}) {
     const transaction = assertAndGetTransaction(options, 'ExchangeChannelPriceService.setSkuPrice')
@@ -188,8 +188,8 @@ class ExchangeChannelPriceService {
    * 硬删除单条渠道定价
    *
    * @param {number|string} priceId - exchange_channel_prices.id
-   * @param {Object} [options={}]
-   * @returns {Promise<void>}
+   * @param {Object} [options={}] - 事务选项
+   * @returns {Promise<void>} 无返回值
    */
   async deleteSkuPrice(priceId, options = {}) {
     const transaction = assertAndGetTransaction(
@@ -222,7 +222,7 @@ class ExchangeChannelPriceService {
    *
    * @param {number|string} skuId - SKU ID
    * @param {string} assetCode - 材料资产代码
-   * @returns {Promise<Object|null>}
+   * @returns {Promise<Object|null>} 定价记录或 null
    */
   async getActivePrice(skuId, assetCode) {
     const sid = Number(skuId)
@@ -262,7 +262,7 @@ class ExchangeChannelPriceService {
    *
    * @param {number|string} skuId - SKU ID
    * @param {Array<Object>} prices - 定价行列表
-   * @param {Object} [options={}]
+   * @param {Object} [options={}] - 事务选项
    * @returns {Promise<Array>} 新建记录 plain 列表
    */
   async bulkSetPrices(skuId, prices, options = {}) {

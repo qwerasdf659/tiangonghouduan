@@ -5,21 +5,16 @@
  *
  * 统一导出所有 Pipeline 相关类
  *
- * ⚠️ V4.6 Phase 5 重构（2026-01-19）：
- * - 已删除：PresetAwardPipeline, OverridePipeline（不再需要）
- * - 统一使用 NormalDrawPipeline + LoadDecisionSourceStage 处理所有决策来源
  *
  * @module services/UnifiedLotteryEngine/pipeline
- * @author 统一抽奖架构重构
- * @since 2026-01-18
- * @updated 2026-01-19 Phase 5 统一管线合并，归档目录已清理
+ * @module services/UnifiedLotteryEngine/pipeline
  */
 
 // 核心组件
 const PipelineRunner = require('./PipelineRunner')
 const DrawOrchestrator = require('./DrawOrchestrator')
 
-// 统一管线（Phase 5：原 3 条管线合并为 1 条）
+// 统一管线（：原 3 条管线合并为 1 条）
 const NormalDrawPipeline = require('./NormalDrawPipeline')
 
 // 预算提供者
@@ -39,7 +34,7 @@ module.exports = {
   PipelineRunner,
   DrawOrchestrator,
 
-  // 统一管线（Phase 5：原三条管线已合并）
+  // 统一管线（：原三条管线已合并）
   NormalDrawPipeline,
 
   // 预算提供者

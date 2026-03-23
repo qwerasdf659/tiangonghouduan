@@ -4,18 +4,11 @@
  * @route GET /api/v4/user/consumption/qrcode
  * @description 消费者生成自己的动态身份二维码，供商家扫码录入消费
  *
- * DB-3 修复（2026-02-20 方案B）：
- * - 原路径 GET /api/v4/shop/consumption/qrcode 位于商家域
- * - requireMerchantDomainAccess() 拦截普通用户（403）
- * - 迁移到 /api/v4/user/ 域，仅需 authenticateToken
- * - 与 exchange → backpack、premium → backpack 迁移决策一致
- *
  * 三端路由分布：
  * - 用户端 GET /api/v4/user/consumption/qrcode（本文件，仅需登录）
  * - 商家端 GET /api/v4/shop/consumption/user-info（需商家域权限）
  * - 管理端 GET /api/v4/console/consumption/qrcode/:user_id（admin专用）
  *
- * 创建时间：2026-02-20
  * 适用区域：中国（北京时间 Asia/Shanghai）
  */
 

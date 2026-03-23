@@ -23,12 +23,10 @@
  *    - 解锁挂牌（MarketListing.status = on_sale）
  *    - 更新订单状态（TradeOrder.status = cancelled）
  *
- * 服务合并记录（2026-01-21）：
+ * 服务合并记录：
  * - 合并 TradeOrderQueryService 的所有查询方法到本服务
  * - 原因：减少服务数量，统一订单相关操作
  *
- * 创建时间：2025-12-15（Phase 2）
- * 更新时间：2026-01-21 - 合并 TradeOrderQueryService
  */
 
 const crypto = require('crypto')
@@ -37,7 +35,7 @@ const { sequelize, TradeOrder, MarketListing, Item, User, Account } = require('.
 const { attachDisplayNames, DICT_TYPES } = require('../utils/displayNameHelper')
 const OrderNoGenerator = require('../utils/OrderNoGenerator')
 const { generateTradeOrderBusinessId } = require('../utils/IdempotencyHelper')
-// V4.7.0 AssetService 拆分：使用子服务替代原 AssetService（2026-01-31）
+// V4.7.0 AssetService 拆分：使用子服务替代原 AssetService
 const BalanceService = require('./asset/BalanceService')
 const ItemService = require('./asset/ItemService')
 const AdminSystemService = require('./AdminSystemService')
@@ -1014,7 +1012,7 @@ class TradeOrderService {
 
   /*
    * ==========================================
-   * 以下方法合并自 TradeOrderQueryService（2026-01-21）
+   * 以下方法合并自 TradeOrderQueryService
    * 管理后台专用的只读查询方法
    * ==========================================
    */
@@ -1119,7 +1117,6 @@ class TradeOrderService {
       distinct: true
     })
 
-    // 添加中文显示名称（2026-01-22 迁移到数据库字典表）
     const ordersData = rows.map(row => row.get({ plain: true }))
 
     // 为订单状态添加显示名称
@@ -1140,7 +1137,7 @@ class TradeOrderService {
     return {
       orders: ordersData,
       pagination: {
-        total_count: count,
+        total: count,
         page,
         page_size,
         total_pages: Math.ceil(count / page_size)
@@ -1186,7 +1183,6 @@ class TradeOrderService {
 
     if (!order) return null
 
-    // 添加中文显示名称（2026-01-22 迁移到数据库字典表）
     const orderData = order.get({ plain: true })
     await attachDisplayNames(orderData, [
       { field: 'status', dictType: DICT_TYPES.TRADE_ORDER_STATUS }
@@ -1240,7 +1236,6 @@ class TradeOrderService {
 
     if (!order) return null
 
-    // 添加中文显示名称（2026-01-22 迁移到数据库字典表）
     const orderData = order.get({ plain: true })
     await attachDisplayNames(orderData, [
       { field: 'status', dictType: DICT_TYPES.TRADE_ORDER_STATUS }
@@ -1298,7 +1293,6 @@ class TradeOrderService {
       raw: true
     })
 
-    // 添加中文显示名称（2026-01-22 迁移到数据库字典表）
     const byStatusWithDisplayNames = {}
     for (const item of statusStats) {
       // 为每个状态添加显示名称

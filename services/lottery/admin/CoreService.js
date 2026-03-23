@@ -669,7 +669,7 @@ class AdminLotteryCoreService {
     await setting.update({ status: 'cancelled' }, { transaction })
 
     // 记录审计日志
-    await AuditLogService.log(
+    await AuditLogService.logOperation(
       {
         business_type: 'lottery_management',
         action_type: 'cancel_intervention',

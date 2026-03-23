@@ -21,7 +21,7 @@
  *
  * @module models/LotteryHourlyMetrics
  * @author 抽奖模块策略重构
- * @since 2026-01-20
+ * @since 2026
  */
 
 const { Model, DataTypes, Op } = require('sequelize')
@@ -398,6 +398,19 @@ function initModel(sequelize) {
         allowNull: false,
         defaultValue: 0,
         comment: '该小时总预算消耗（积分）'
+      },
+
+      /** 该小时内平均每次抽奖预算消耗 */
+      avg_budget_per_draw: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: false,
+        defaultValue: 0,
+        comment: '该小时内平均每次抽奖预算消耗',
+        /** @returns {number} DECIMAL 转数值 */
+        get() {
+          const value = this.getDataValue('avg_budget_per_draw')
+          return value !== null ? parseFloat(value) : 0
+        }
       },
 
       total_prize_value: {

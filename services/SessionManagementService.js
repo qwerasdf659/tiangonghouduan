@@ -17,7 +17,6 @@
  * - 写操作强制要求外部事务传入（options.transaction）
  * - 读操作和清理操作可不传事务（批量操作自行管理）
  *
- * 创建时间：2026-01-31
  * 拆分自：routes/v4/console/config/sessions.js（路由层直接操作模型）
  */
 

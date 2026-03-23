@@ -94,6 +94,35 @@ class BidQueryService {
   }
 
   /**
+   * 竞拍顶线数据（dashboard 跨域概览专用）
+   * @param {number} [days=7] - 统计周期天数
+   * @returns {Promise<Object>} 竞拍顶线指标
+   */
+  async getBidTopline(days = 7) {
+    const safeDays = parseInt(days) || 7
+    try {
+      const [[productRow], [bidRow]] = await Promise.all([
+        this.sequelize.query(
+          `SELECT COUNT(*) AS active_products FROM bid_products WHERE status IN ('active', 'pending')`,
+          { type: this.sequelize.QueryTypes.SELECT }
+        ),
+        this.sequelize.query(
+          `SELECT COUNT(*) AS period_bids, (SELECT COUNT(*) FROM bid_products WHERE status = 'settled' AND updated_at >= DATE_SUB(NOW(), INTERVAL ${safeDays} DAY)) AS period_settled FROM bid_records WHERE created_at >= DATE_SUB(NOW(), INTERVAL ${safeDays} DAY)`,
+          { type: this.sequelize.QueryTypes.SELECT }
+        )
+      ])
+      return {
+        active_products: Number(productRow?.active_products) || 0,
+        period_bids: Number(bidRow?.period_bids) || 0,
+        period_settled: Number(bidRow?.period_settled) || 0
+      }
+    } catch (error) {
+      logger.error('[竞价查询] 获取竞拍顶线数据失败:', error.message)
+      return { active_products: 0, period_bids: 0, period_settled: 0 }
+    }
+  }
+
+  /**
    * 获取竞价商品列表
    *
    * @param {Object} options - 查询选项

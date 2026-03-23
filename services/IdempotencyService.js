@@ -19,14 +19,12 @@
  * - processing → failed：处理失败或超时
  * - failed → processing：重试（更新状态）
  *
- * 业界标准形态升级（2026-01-02）：
+ * 业界标准形态升级：
  * - TTL 从 24h 升级到 7 天
  * - fingerprint 包含 user_id, method, path, query, body
  * - 清理策略包含 failed 记录
  * - processing 超时自动转 failed（60秒）
  *
- * 创建时间：2025-12-26
- * 更新时间：2026-01-02 - 业界标准形态破坏性重构
  * 版本：2.0.0 - 业界标准幂等架构
  */
 
@@ -140,8 +138,8 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/shop/consumption/:id': 'CONSUMPTION_DELETE', // 删除消费记录（canonical 路径）
   '/api/v4/shop/consumption/:id/restore': 'CONSUMPTION_RESTORE', // 恢复消费记录（canonical 路径）
 
-  // ===== 会员解锁（2026-02-16 从 shop/premium 迁移到 backpack/exchange，决策2） =====
-  '/api/v4/backpack/exchange/unlock-premium': 'PREMIUM_UNLOCK', // 解锁高级空间（新路径）
+  // ===== 会员解锁 =====
+  '/api/v4/backpack/exchange/unlock-premium': 'PREMIUM_UNLOCK', // 解锁高级空间
 
   // ===== 竞价系统（臻选空间/幸运空间竞价功能 2026-02-16） =====
   '/api/v4/backpack/bid': 'BID_PLACE_BID', // 提交竞价出价
@@ -152,7 +150,7 @@ const CANONICAL_OPERATION_MAP = {
   // ===== 商户积分 =====
   '/api/v4/merchant-points': 'MERCHANT_POINTS_CREATE', // 商户积分申请（canonical 路径，去尾斜杠）
 
-  // ===== 用户数据查询 - 兑换订单审核（2026-02-18） =====
+  // ===== 用户数据查询 - 兑换订单审核 =====
   '/api/v4/console/user-data-query/:id/exchange-records/:id/review':
     'CONSOLE_EXCHANGE_ORDER_REVIEW', // 管理员审核兑换订单（完成/发货/取消）
 
@@ -277,7 +275,7 @@ const CANONICAL_OPERATION_MAP = {
   // ===== GM工作台 — 消息模板 =====
   '/api/v4/console/customer-service/gm-tools/templates': 'ADMIN_CS_TEMPLATE_UPDATE', // 更新消息模板
 
-  // ===== 媒体管理（2026-03-16 迁移至 media 体系） =====
+  // ===== 媒体管理 =====
   '/api/v4/console/media/upload': 'ADMIN_MEDIA_UPLOAD', // 上传媒体文件
   '/api/v4/console/media/batch-upload': 'ADMIN_MEDIA_BATCH_UPLOAD', // 批量上传媒体文件
   '/api/v4/console/media/batch-attach': 'ADMIN_MEDIA_BATCH_ATTACH', // 批量关联媒体
@@ -456,7 +454,6 @@ const CANONICAL_OPERATION_MAP = {
   // 统一交互日志上报（D2 定论：替代已移除的 popup_show_log / carousel_show_log 两个分散端点）
   '/api/v4/system/ad-events/interaction-log': 'AD_INTERACTION_LOG_CREATE', // 统一内容交互日志上报
 
-  // Phase 3: 广告计划管理（用户端）
   '/api/v4/user/ad-campaigns/': 'USER_AD_CAMPAIGN_CREATE', // 创建广告计划
   '/api/v4/user/ad-campaigns/:id': 'USER_AD_CAMPAIGN_UPDATE', // 更新广告计划
   '/api/v4/user/ad-campaigns/:id/submit': 'USER_AD_CAMPAIGN_SUBMIT', // 提交审核（含钻石冻结）
@@ -467,7 +464,6 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/user/notifications/mark-read': 'USER_NOTIFICATION_BATCH_READ', // 批量标记已读（含全部已读）
   '/api/v4/user/notifications/:id/read': 'USER_NOTIFICATION_SINGLE_READ', // 单条标记已读
 
-  // Phase 3: 广告计划管理（管理端）
   '/api/v4/console/ad-campaigns/': 'ADMIN_AD_CAMPAIGN_CREATE', // 管理员创建广告计划
   '/api/v4/console/ad-campaigns/:id': 'ADMIN_AD_CAMPAIGN_UPDATE_STATUS', // 管理员更新活动状态（发布/暂停）
   '/api/v4/console/ad-campaigns/:id/review': 'ADMIN_AD_CAMPAIGN_REVIEW', // 审核广告计划
@@ -476,7 +472,6 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/console/ad-campaigns/:id/publish': 'ADMIN_AD_CAMPAIGN_PUBLISH', // 发布运营/系统类型计划（draft→active）
   '/api/v4/console/ad-campaigns/:id/pause': 'ADMIN_AD_CAMPAIGN_PAUSE', // 暂停投放中的计划（active→paused）
 
-  // Phase 3: 广告位管理（管理端）
   '/api/v4/console/ad-slots/': 'ADMIN_AD_SLOT_CREATE', // 创建广告位
   '/api/v4/console/ad-slots/:id': 'ADMIN_AD_SLOT_UPDATE', // 更新广告位
   '/api/v4/console/ad-slots/:id/toggle': 'ADMIN_AD_SLOT_TOGGLE', // 切换广告位状态
@@ -493,7 +488,7 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/console/ad-pricing/adjustments/:id/reject': 'ADMIN_PRICE_ADJUSTMENT_REJECT', // 拒绝调价建议
   '/api/v4/console/ad-pricing/adjustments/:id/apply': 'ADMIN_PRICE_ADJUSTMENT_APPLY', // 执行已确认的调价
 
-  // Phase 5: 广告事件上报
+  // 广告事件上报
   '/api/v4/system/ad-events/impression': 'AD_IMPRESSION_REPORT', // 广告曝光上报
   '/api/v4/system/ad-events/click': 'AD_CLICK_REPORT', // 广告点击上报
 
@@ -670,7 +665,7 @@ class IdempotencyService {
    * @returns {string} 规范化后的路径
    *
    * @description
-   * API路径参数设计规范 V2.2（2026-01-20）
+   * API路径参数设计规范 V2.2
    *
    * 三种资源类型对应三种占位符：
    * 1. 事务实体（数字ID）→ :id

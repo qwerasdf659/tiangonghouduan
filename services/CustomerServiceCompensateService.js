@@ -71,6 +71,7 @@ class CustomerServiceCompensateService {
           { system_code: 'SYSTEM_RESERVE' },
           { transaction }
         )
+        // eslint-disable-next-line no-restricted-syntax
         await BalanceService.changeBalance(
           {
             user_id,

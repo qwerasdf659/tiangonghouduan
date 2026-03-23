@@ -309,8 +309,10 @@ class MediaService {
 
     // 检查引用计数，若为 0 则移入回收站
     for (const mediaId of mediaIds) {
+      // eslint-disable-next-line no-await-in-loop
       const refCount = await MediaAttachment.count({ where: { media_id: mediaId }, ...opts })
       if (refCount === 0) {
+        // eslint-disable-next-line no-await-in-loop
         await MediaFile.update(
           { status: 'trashed', trashed_at: new Date() },
           { where: { media_id: mediaId }, ...opts }
@@ -478,9 +480,9 @@ class MediaService {
     return {
       items,
       pagination: {
-        current_page: page,
+        page,
         page_size: pageSize,
-        total_count: count,
+        total: count,
         total_pages: Math.ceil(count / pageSize)
       },
       stats: { total: count }
@@ -665,7 +667,9 @@ class MediaService {
 
     for (const m of orphans) {
       try {
+        // eslint-disable-next-line no-await-in-loop
         await storage.deleteImageWithThumbnails(m.object_key, m.thumbnail_keys)
+        // eslint-disable-next-line no-await-in-loop
         await MediaFile.destroy({ where: { media_id: m.media_id } })
         cleanedCount++
         details.push({ media_id: m.media_id, success: true })
@@ -714,7 +718,9 @@ class MediaService {
 
     for (const m of trashed) {
       try {
+        // eslint-disable-next-line no-await-in-loop
         await storage.deleteImageWithThumbnails(m.object_key, m.thumbnail_keys)
+        // eslint-disable-next-line no-await-in-loop
         await MediaFile.destroy({ where: { media_id: m.media_id } })
         cleanedCount++
         details.push({ media_id: m.media_id, success: true })
@@ -797,9 +803,9 @@ class MediaService {
     return {
       items,
       pagination: {
-        current_page: page,
+        page,
         page_size: pageSize,
-        total_count: count,
+        total: count,
         total_pages: Math.ceil(count / pageSize)
       }
     }
@@ -845,6 +851,7 @@ class MediaService {
     const results = []
     for (const { buffer, options = {} } of files) {
       try {
+        // eslint-disable-next-line no-await-in-loop
         const result = await this.upload(buffer, options)
         results.push({ success: true, ...result })
       } catch (err) {
@@ -864,6 +871,7 @@ class MediaService {
     const results = []
     for (const att of attachments) {
       try {
+        // eslint-disable-next-line no-await-in-loop
         const a = await this.attach(
           att.mediaId,
           att.attachableType,
@@ -891,6 +899,7 @@ class MediaService {
   async batchDetach(attachableType, attachableIds) {
     let total = 0
     for (const id of attachableIds) {
+      // eslint-disable-next-line no-await-in-loop
       const count = await this.detach(attachableType, id)
       total += count
     }

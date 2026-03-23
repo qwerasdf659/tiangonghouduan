@@ -7,7 +7,6 @@
  * - 支持多种通知渠道（管理员广播、WebSocket、微信等）
  *
  * 表名：reminder_rules
- * 创建时间：2026年01月31日
  */
 
 'use strict'

@@ -7,7 +7,7 @@
  *
  * @module services/DebtManagementService
  * @version 1.0.0
- * @since 2026-01-18 路由层合规性治理
+ * @since 2026
  */
 
 'use strict'
@@ -100,7 +100,7 @@ class DebtManagementService {
 
     return {
       inventory_debt: {
-        total_count: parseInt(inventoryStats?.total_count, 10) || 0,
+        total: parseInt(inventoryStats?.total_count, 10) || 0,
         total_quantity: parseInt(inventoryStats?.total_quantity, 10) || 0,
         cleared_quantity: parseInt(inventoryStats?.cleared_quantity, 10) || 0,
         remaining_quantity:

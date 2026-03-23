@@ -18,8 +18,6 @@
  * - 同一 user_type + 同一 platform 互斥（新登录使旧会话失效）
  * - 不同 user_type 或不同 platform 可共存（小程序 + Web管理后台同时在线）
  *
- * 创建时间：2025-12-22
- * 更新时间：2026-01-21（新增会话存储功能）
  */
 
 const express = require('express')
@@ -30,8 +28,6 @@ const { generateTokens, getUserRoles } = require('../../../middleware/auth')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 const TransactionManager = require('../../../utils/TransactionManager')
 const { detectLoginPlatform } = require('../../../utils/platformDetector')
-
-// Phase 3 收口：AuthenticationSession 在路由内通过 ServiceManager 获取，避免顶部直连 models
 
 /**
  * 📱 发送短信验证码
@@ -331,7 +327,7 @@ router.post('/login', async (req, res) => {
  * 功能说明: 解密微信加密的手机号数据，返回明文手机号
  *
  * 规范遵循：
- * - API设计与契约标准规范 v2.0（2025-12-23）
+ * - API设计与契约标准规范 v2.0
  * - 参数命名规范：禁止语义不清的裸 code，使用 wx_code 替代
  *
  * @param {string} wx_code - 微信登录凭证（wx.login获取）

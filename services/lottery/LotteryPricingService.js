@@ -20,7 +20,7 @@
  * - **缓存优化**：60秒短缓存 + 写后精准失效
  *
  * @author 统一抽奖架构
- * @since 2026-01-21
+ * @since 2026
  */
 
 const logger = require('../../utils/logger').logger

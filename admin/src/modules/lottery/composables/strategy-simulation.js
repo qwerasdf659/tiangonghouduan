@@ -646,7 +646,7 @@ export function useStrategySimulationMethods() {
       try {
         const response = await this.apiGet(
           `${SIMULATION_ENDPOINTS.VERSION_HISTORY}/${this.simulation_campaign_id}`,
-          { limit: 50, offset: 0 },
+          { page_size: 50, offset: 0 },
           { showLoading: false }
         )
         const data = response?.success ? response.data : response
@@ -745,7 +745,7 @@ export function useStrategySimulationMethods() {
       try {
         const response = await this.apiGet(
           `${SIMULATION_ENDPOINTS.HISTORY}/${this.simulation_campaign_id}`,
-          { limit: 20, offset: 0 },
+          { page_size: 20, offset: 0 },
           { showLoading: false }
         )
         const data = response?.success ? response.data : response

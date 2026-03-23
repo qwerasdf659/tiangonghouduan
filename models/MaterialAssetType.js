@@ -17,7 +17,6 @@
  * - 表名：material_asset_types
  * - 主键：material_asset_type_id
  *
- * 创建时间：2025-12-15
  */
 
 'use strict'
@@ -44,7 +43,7 @@ class MaterialAssetType extends Model {
       })
     }
 
-    /** 图标通过 media_attachments 多态关联获取（替代已删除的 icon_url 列） */
+    /** 图标通过 media_attachments 多态关联获取 */
     if (models.MediaAttachment) {
       MaterialAssetType.hasOne(models.MediaAttachment, {
         foreignKey: 'attachable_id',

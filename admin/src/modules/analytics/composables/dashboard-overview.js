@@ -569,7 +569,7 @@ export function useDashboardOverviewMethods() {
     async fetchRedemptionFulfillment() {
       try {
         const result = await request({
-          url: `${API_PREFIX}/console/marketplace/exchange_market/orders`,
+          url: `${API_PREFIX}/console/exchange/orders`,
           params: { page: 1, page_size: 1000 }
         })
         if (result.success && result.data) {

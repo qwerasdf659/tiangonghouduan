@@ -241,7 +241,7 @@ router.get('/drill-down', authenticateToken, requireRoleLevel(100), async (req, 
       admin_id: req.user.user_id,
       source,
       filters,
-      total_count: result.pagination.total_count
+      total: result.pagination.total
     })
 
     return res.apiSuccess(result, '下钻明细查询成功')

@@ -264,7 +264,7 @@ export function useMetricsMethods() {
         if (this.monitoringFilters.campaign_id) {
           params.append('campaign_id', this.monitoringFilters.campaign_id)
         }
-        params.append('limit', 50)
+        params.append('page_size', 50)
 
         // apiGet 通过 withLoading 包装，返回 { success: true, data: {...} }
         const response = await this.apiGet(
@@ -293,7 +293,7 @@ export function useMetricsMethods() {
         if (this.monitoringFilters.user_id) {
           params.append('user_id', this.monitoringFilters.user_id)
         }
-        params.append('limit', 50)
+        params.append('page_size', 50)
 
         // apiGet 通过 withLoading 包装，返回 { success: true, data: {...} }
         const response = await this.apiGet(
@@ -322,7 +322,7 @@ export function useMetricsMethods() {
         if (this.monitoringFilters.user_id) {
           params.append('user_id', this.monitoringFilters.user_id)
         }
-        params.append('limit', 50)
+        params.append('page_size', 50)
 
         // apiGet 通过 withLoading 包装，返回 { success: true, data: {...} }
         const response = await this.apiGet(

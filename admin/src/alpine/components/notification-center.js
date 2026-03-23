@@ -210,7 +210,7 @@ export function notificationCenter() {
       try {
         const result = await request({
           url: SYSTEM_ADMIN_ENDPOINTS.NOTIFICATION_LIST,
-          params: { limit: 20 }
+          params: { page_size: 20 }
         })
         if (result.data) {
           const oldUnreadCount = this.unreadCount

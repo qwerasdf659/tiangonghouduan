@@ -13,7 +13,6 @@
  * - 奖品发放统计报表
  * - 积分流水汇总报表
  *
- * 创建时间：2026年01月31日
  * 任务编号：B-36 报表模板CRUD, B-37 动态报表生成, B-38~B-40 报表相关接口
  */
 
@@ -36,7 +35,7 @@ const DATA_SOURCE_CONFIG = {
     model: 'User',
     defaultFields: ['user_id', 'nickname', 'mobile', 'status', 'created_at'],
     aggregateFields: {
-      total_count: 'COUNT(*)',
+      total: 'COUNT(*)',
       active_count: "COUNT(CASE WHEN status = 'active' THEN 1 END)",
       today_new: 'COUNT(CASE WHEN DATE(created_at) = CURDATE() THEN 1 END)'
     }
@@ -122,7 +121,7 @@ const DATA_SOURCE_CONFIG = {
     model: 'LotteryCampaign',
     defaultFields: ['lottery_campaign_id', 'name', 'status', 'start_time', 'end_time'],
     aggregateFields: {
-      total_count: 'COUNT(*)',
+      total: 'COUNT(*)',
       active_count: "COUNT(CASE WHEN status = 'active' THEN 1 END)"
     }
   }
@@ -508,7 +507,7 @@ class CustomReportService {
     return {
       type: 'detail',
       data: result,
-      total_count: result.length
+      total: result.length
     }
   }
 

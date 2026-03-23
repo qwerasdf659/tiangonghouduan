@@ -48,7 +48,7 @@ const FORBIDDEN_FRONTEND_ASSET_CODES = ['BUDGET_POINTS']
  *    - 如果业务逻辑依赖该字段，会在后续处理中报错
  *    - 不做"可能有、可能没有"的容错处理
  *
- * 5. 图片字段策略（2026-03-16 媒体体系迁移）
+ *
  *    - 仅使用 primary_media_id 关联 media_files 表
  *    - DataSanitizer 输出 image 对象（含 url、primary_media_id）
  *
@@ -107,15 +107,13 @@ class DataSanitizer {
       const plainPrizes = (Array.isArray(prizes) ? prizes : [prizes]).map(p => {
         const plain = p.toJSON ? p.toJSON() : p
 
-        // 管理员视图：材料图标通过 material_asset_types.media_attachments 关联获取（icon_url 已删除）
-
         return plain
       })
       return DecimalConverter.convertPrizeData(plainPrizes)
     }
 
     /*
-     * γ 模式（2026-02-21）：黑名单删除敏感字段，而非白名单构造新对象
+     * γ 模式：黑名单删除敏感字段，而非白名单构造新对象
      * 优势：Service 层新增字段自动透传，不会产生 ghost field
      */
     return prizes.map(prize => {
@@ -196,7 +194,7 @@ class DataSanitizer {
    *
    * 🗄️ 数据库表：items（主键：item_id）
    *
-   * ⚠️ D2 决策（2026-02-21）：此方法当前不被任何路由调用。
+   * ⚠️ D2 决策：此方法当前不被任何路由调用。
    * BackpackService 已是完整的领域转换层，背包列表和详情都直接使用 BackpackService 输出。
    * 保留此方法以供未来需要额外脱敏层时使用。
    *
@@ -240,7 +238,7 @@ class DataSanitizer {
      * status_display_name, item_type_display_name, rarity_display_name
      */
     /*
-     * γ 模式（2026-02-21）：黑名单删除敏感字段
+     * γ 模式：黑名单删除敏感字段
      */
     return inventory.map(item => {
       const sanitized = { ...(item.toJSON ? item.toJSON() : item) }
@@ -289,7 +287,7 @@ class DataSanitizer {
     }
 
     /*
-     * γ 模式（2026-02-21）：黑名单删除敏感字段
+     * γ 模式：黑名单删除敏感字段
      */
     const sanitized = { ...(user.toJSON ? user.toJSON() : user) }
 
@@ -523,7 +521,7 @@ class DataSanitizer {
     }
 
     /*
-     * γ 模式（2026-02-21）：黑名单删除敏感字段
+     * γ 模式：黑名单删除敏感字段
      */
     return sessions.map(session => {
       const sanitized = { ...(session.toJSON ? session.toJSON() : session) }
@@ -592,7 +590,7 @@ class DataSanitizer {
     }
 
     /*
-     * γ 模式（2026-02-21）：黑名单删除敏感字段
+     * γ 模式：黑名单删除敏感字段
      */
     return listings.map(listing => {
       const sanitized = { ...(listing.toJSON ? listing.toJSON() : listing) }
@@ -696,7 +694,7 @@ class DataSanitizer {
       exchange_count: statistics.exchange_count,
       exchange_points_spent: statistics.exchange_points_spent, // 🔥 方案A修复：添加兑换花费积分
 
-      // 🔄 新业务：商家扫码录入消费记录统计（替代旧的upload_count）
+      // 商家扫码录入消费记录统计
       consumption_count: statistics.consumption_count,
       consumption_amount: statistics.consumption_amount,
       consumption_points: statistics.consumption_points,
@@ -722,7 +720,7 @@ class DataSanitizer {
    *   admin_id（管理员ID）、internal_notes（内部备注）等敏感字段
    * - 使用maskAdminName()对管理员名称进行脱敏处理（如"张**"）
    *
-   * ✅ P0修复（2025-11-08）：
+   * ✅ P0修复：
    * - 修复字段映射：id → feedback_id（使用正确的主键字段）
    * - 添加缺失字段：priority、estimated_response_time、attachments
    * - 完善回复信息：支持reply_content字段和admin关联对象
@@ -750,7 +748,7 @@ class DataSanitizer {
     }
 
     /*
-     * γ 模式（2026-02-21）：黑名单删除敏感字段
+     * γ 模式：黑名单删除敏感字段
      */
     return feedbacks.map(feedback => {
       const sanitized = { ...(feedback.toJSON ? feedback.toJSON() : feedback) }
@@ -827,7 +825,7 @@ class DataSanitizer {
     }
 
     /*
-     * γ 模式（2026-02-21）：先过滤禁止资产，再黑名单删除敏感字段
+     * γ 模式：先过滤禁止资产，再黑名单删除敏感字段
      */
     const filtered = this.filterForbiddenAssets(records)
 
@@ -1336,7 +1334,7 @@ class DataSanitizer {
    */
   static sanitizeExchangeMarketItems(items, dataLevel) {
     /*
-     * γ 模式（2026-02-21）：黑名单删除敏感字段
+     * γ 模式：黑名单删除敏感字段
      */
     return items.map(item => {
       const plain = item.toJSON ? item.toJSON() : item
@@ -1434,7 +1432,7 @@ class DataSanitizer {
    */
   static sanitizeExchangeMarketOrders(orders, _dataLevel) {
     /*
-     * γ 模式（2026-02-21）：黑名单删除敏感字段
+     * γ 模式：黑名单删除敏感字段
      */
     return orders.map(order => {
       const sanitized = { ...(order.toJSON ? order.toJSON() : order) }

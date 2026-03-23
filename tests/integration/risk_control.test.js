@@ -399,7 +399,7 @@ describe('【P1】风控规则测试 - 限流规则、黑名单、异常检测',
       if (response.status === 200) {
         expect(response.body.success).toBe(true)
         const data = response.body.data
-        console.log(`   冻结用户总数: ${data?.pagination?.total_count || data?.total_count || 0}`)
+        console.log(`   冻结用户总数: ${data?.pagination?.total || data?.total || 0}`)
         console.log('   ✅ 获取冻结用户列表成功')
       } else if (response.status === 404) {
         console.log('   ⚠️ 接口不存在')

@@ -25,7 +25,7 @@
  *
  * @module services/UnifiedLotteryEngine/compute/calculators/PressureTierCalculator
  * @author 抽奖模块策略重构 - Phase 4
- * @since 2026-01-20
+ * @since 2026
  */
 
 const { logger } = require('../../../../utils/logger')

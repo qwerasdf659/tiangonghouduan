@@ -12,8 +12,6 @@
  * - 管理员列表（admins）
  * - 权限统计（statistics）
  *
- * 创建时间：2025年01月21日
- * 更新时间：2026年01-19日 - 改用 UserRoleService（删除 UserPermissionModule）
  */
 
 const BeijingTimeHelper = require('../../../utils/timeHelper')
@@ -179,7 +177,7 @@ router.get('/admins', authenticateToken, async (req, res) => {
     const admins = await UserRoleService.getAllAdmins()
 
     const response_data = {
-      total_count: admins.length,
+      total: admins.length,
       admins: admins.map(admin => ({
         ...admin,
         role_level: admin.role_level // 角色级别（>= 100 为管理员）

@@ -4,7 +4,6 @@
  * @description 聚合系统监控、公告管理、反馈管理相关路由
  * @version 6.0.0
  * @date 2025-12-22
- * @updated 2026-02-06（审计日志已迁移到 /api/v4/console/admin-audit-logs 统一管理）
  *
  * 模块结构：
  * - monitoring.js: 系统监控（/status, /dashboard, /management-status）

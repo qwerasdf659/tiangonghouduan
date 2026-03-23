@@ -383,7 +383,7 @@ class LotteryAlertService {
        * 使用 ChatWebSocketService 的告警推送方法
        * 异步推送，不阻塞主流程
        *
-       * 🔧 循环依赖修复（2026-01-31）：
+       * 🔧 循环依赖修复：
        * 使用 setImmediate 延迟加载 ChatWebSocketService
        * 避免静态分析工具检测到循环依赖
        */

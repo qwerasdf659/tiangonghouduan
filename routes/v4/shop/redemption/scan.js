@@ -8,7 +8,6 @@
  * QR码格式：RQRV1_{base64_payload}_{signature}
  * 有效期：5分钟，过期需用户刷新
  *
- * 创建时间：2026-02-21
  */
 
 'use strict'

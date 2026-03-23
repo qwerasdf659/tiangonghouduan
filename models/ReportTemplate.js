@@ -7,7 +7,6 @@
  * - 支持定时调度和多格式导出
  *
  * 表名：report_templates
- * 创建时间：2026年01月31日
  */
 
 'use strict'

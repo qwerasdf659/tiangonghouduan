@@ -12,7 +12,6 @@
  * API列表：
  * - GET /badges - 获取所有徽标计数
  *
- * 创建时间：2026年01月31日
  * 关联文档：后端数据库开发任务清单-2026年1月.md（P0-B13）
  *
  * @module routes/v4/console/operations/nav

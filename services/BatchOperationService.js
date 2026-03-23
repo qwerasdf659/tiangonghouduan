@@ -330,7 +330,7 @@ class BatchOperationService {
    * @returns {Promise<BatchOperationLog>} 创建的日志记录
    */
   static async createOperationLog(params, options = {}) {
-    const { operation_type, operator_id, total_count, operation_params, idempotency_key } = params
+    const { operation_type, operator_id, total, operation_params, idempotency_key } = params
 
     // 生成幂等键（如果未提供）
     const key =
@@ -343,7 +343,7 @@ class BatchOperationService {
         {
           operation_type,
           operator_id,
-          total_count,
+          total_count: total,
           operation_params,
           idempotency_key: key
         },
@@ -361,7 +361,7 @@ class BatchOperationService {
         batch_operation_log_id: log.batch_operation_log_id,
         operation_type,
         operator_id,
-        total_count,
+        total,
         idempotency_key: key
       })
 
@@ -489,7 +489,7 @@ class BatchOperationService {
         operation_type_name: log.getOperationTypeName(),
         status: log.status,
         status_name: log.getStatusDisplayName(),
-        total_count: log.total_count,
+        total: log.total,
         success_count: log.success_count,
         fail_count: log.fail_count,
         success_rate: log.getSuccessRate(),
@@ -554,7 +554,7 @@ class BatchOperationService {
         operation_type_name: log.getOperationTypeName(),
         status: log.status,
         status_name: log.getStatusDisplayName(),
-        total_count: log.total_count,
+        total: log.total,
         success_count: log.success_count,
         fail_count: log.fail_count,
         success_rate: log.getSuccessRate(),

@@ -515,8 +515,8 @@ class UserRoleService {
     return {
       users: usersWithDisplayNames,
       pagination: {
-        current_page: parseInt(page),
-        per_page: finalLimit,
+        page: parseInt(page),
+        page_size: finalLimit,
         total: count,
         total_pages: Math.ceil(count / finalLimit)
       },

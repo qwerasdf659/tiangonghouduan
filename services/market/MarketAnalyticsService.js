@@ -67,65 +67,73 @@ class MarketAnalyticsService {
    *
    * @returns {Promise<Object>} 市场总览数据
    */
-  static async getMarketOverview() {
-    // 近7天各资产成交统计（多行结果，不解构）
+  static async getMarketOverview(days = 7) {
+    const safeDays = parseInt(days) || 7
+
     const assetStats = await sequelize.query(
-      `SELECT
-        ml.offer_asset_code AS asset_code,
-        ml.listing_kind,
-        COUNT(*) AS trade_count,
-        SUM(t.gross_amount) AS total_diamond_volume,
-        ROUND(AVG(t.gross_amount)) AS avg_price,
-        MIN(t.gross_amount) AS min_price,
-        MAX(t.gross_amount) AS max_price
-      FROM trade_orders t
-      JOIN market_listings ml ON t.market_listing_id = ml.market_listing_id
-      WHERE t.status = 'completed'
-        AND t.completed_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-      GROUP BY ml.offer_asset_code, ml.listing_kind
-      ORDER BY trade_count DESC`,
+      `SELECT ml.offer_asset_code AS asset_code, ml.listing_kind,
+        COUNT(*) AS trade_count, SUM(t.gross_amount) AS total_diamond_volume,
+        ROUND(AVG(t.gross_amount)) AS avg_price, MIN(t.gross_amount) AS min_price, MAX(t.gross_amount) AS max_price
+      FROM trade_orders t JOIN market_listings ml ON t.market_listing_id = ml.market_listing_id
+      WHERE t.status = 'completed' AND t.completed_at >= DATE_SUB(NOW(), INTERVAL ${safeDays} DAY)
+      GROUP BY ml.offer_asset_code, ml.listing_kind ORDER BY trade_count DESC`,
       { type: sequelize.QueryTypes.SELECT }
     )
 
-    // 当前在售统计（多行结果，不解构）
     const onSaleStats = await sequelize.query(
-      `SELECT
-        offer_asset_code AS asset_code,
-        listing_kind,
-        COUNT(*) AS on_sale_count,
-        MIN(price_amount) AS min_price,
-        MAX(price_amount) AS max_price,
-        ROUND(AVG(price_amount)) AS avg_price
-      FROM market_listings
-      WHERE status = 'active'
-      GROUP BY offer_asset_code, listing_kind
-      ORDER BY on_sale_count DESC`,
+      `SELECT offer_asset_code AS asset_code, listing_kind,
+        COUNT(*) AS on_sale_count, MIN(price_amount) AS min_price,
+        MAX(price_amount) AS max_price, ROUND(AVG(price_amount)) AS avg_price
+      FROM market_listings WHERE status = 'on_sale'
+      GROUP BY offer_asset_code, listing_kind ORDER BY on_sale_count DESC`,
       { type: sequelize.QueryTypes.SELECT }
     )
 
-    // 汇总统计（单行聚合，解构取首行）
     const [totals] = await sequelize.query(
-      `SELECT
-        COUNT(*) AS total_trades_7d,
-        SUM(gross_amount) AS total_volume_7d,
-        COUNT(DISTINCT buyer_user_id) AS unique_buyers_7d,
-        COUNT(DISTINCT seller_user_id) AS unique_sellers_7d
-      FROM trade_orders
-      WHERE status = 'completed'
-        AND completed_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)`,
+      `SELECT COUNT(*) AS total_trades, SUM(gross_amount) AS total_volume,
+        COUNT(DISTINCT buyer_user_id) AS unique_buyers, COUNT(DISTINCT seller_user_id) AS unique_sellers
+      FROM trade_orders WHERE status = 'completed' AND completed_at >= DATE_SUB(NOW(), INTERVAL ${safeDays} DAY)`,
       { type: sequelize.QueryTypes.SELECT }
     )
 
     return {
-      period: '7d',
+      period: `${safeDays}d`,
       totals: {
-        total_trades: Number(totals?.total_trades_7d) || 0,
-        total_volume: Number(totals?.total_volume_7d) || 0,
-        unique_buyers: Number(totals?.unique_buyers_7d) || 0,
-        unique_sellers: Number(totals?.unique_sellers_7d) || 0
+        total_trades: Number(totals?.total_trades) || 0,
+        total_volume: Number(totals?.total_volume) || 0,
+        unique_buyers: Number(totals?.unique_buyers) || 0,
+        unique_sellers: Number(totals?.unique_sellers) || 0
       },
       asset_ranking: assetStats || [],
       on_sale_summary: onSaleStats || []
+    }
+  }
+
+  /**
+   * C2C 交易市场顶线数据（dashboard 跨域概览专用）
+   * @param {number} [days=7] - 统计周期天数
+   * @returns {Promise<Object>} C2C 顶线指标
+   */
+  static async getTradingTopline(days = 7) {
+    const safeDays = parseInt(days) || 7
+    const [[onSaleRow], [tradeRow]] = await Promise.all([
+      sequelize.query(
+        `SELECT COUNT(*) AS on_sale_count FROM market_listings WHERE status = 'on_sale'`,
+        { type: sequelize.QueryTypes.SELECT }
+      ),
+      sequelize.query(
+        `SELECT COUNT(*) AS period_trades, COALESCE(SUM(gross_amount), 0) AS period_volume,
+          COUNT(DISTINCT buyer_user_id) AS unique_buyers, COUNT(DISTINCT seller_user_id) AS unique_sellers
+        FROM trade_orders WHERE status = 'completed' AND completed_at >= DATE_SUB(NOW(), INTERVAL ${safeDays} DAY)`,
+        { type: sequelize.QueryTypes.SELECT }
+      )
+    ])
+    return {
+      on_sale_count: Number(onSaleRow?.on_sale_count) || 0,
+      period_trades: Number(tradeRow?.period_trades) || 0,
+      period_volume: Number(tradeRow?.period_volume) || 0,
+      unique_buyers: Number(tradeRow?.unique_buyers) || 0,
+      unique_sellers: Number(tradeRow?.unique_sellers) || 0
     }
   }
 
@@ -157,7 +165,7 @@ class MarketAnalyticsService {
    * @private
    */
   static async _getLowestOnSalePrice(asset_code, template_id) {
-    let whereClause = "status = 'active'"
+    let whereClause = "status = 'on_sale'"
     const replacements = {}
 
     if (asset_code) {

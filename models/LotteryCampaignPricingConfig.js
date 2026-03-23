@@ -1,6 +1,5 @@
 /**
  * 📊 活动级定价配置模型 - 统一抽奖架构核心组件
- * 创建时间：2026年01月18日 北京时间
  *
  * 业务职责：
  * - 定义各活动的连抽定价规则（支持 1-20 次抽奖）
@@ -20,7 +19,7 @@
  *
  * @module models/LotteryCampaignPricingConfig
  * @author 统一抽奖架构重构 - Phase 3
- * @since 2026-01-18
+ * @since 2026
  */
 
 'use strict'

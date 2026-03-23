@@ -37,7 +37,6 @@
  * - 事务保护：预设创建、使用均在事务中执行（避免数据不一致）
  * - 队列排序：按queue_order严格排序（确保预设按顺序使用）
  *
- * 创建时间：2025年01月21日
  * 最新修订：2025年10月20日（支持外部事务参数，确保连抽场景下的事务一致性）
  */
 
@@ -211,8 +210,7 @@ module.exports = (sequelize, DataTypes) => {
        * 业务含义：预设关联到具体的抽奖活动，支持活动级别的预设管理
        *
        * 业务规则：
-       * - 可选字段（允许为空，向后兼容旧预设）
-       * - 新预设建议关联活动（便于按活动管理预设）
+       * - 建议关联活动（便于按活动管理预设）
        * - 外键约束：引用lottery_campaigns.lottery_campaign_id
        *
        * 示例：lottery_campaign_id = 1（关联到活动1的预设）
@@ -425,7 +423,7 @@ module.exports = (sequelize, DataTypes) => {
       as: 'admin'
     })
 
-    // 🔴 统一抽奖架构新增关联（2026-01-18）
+    // 🔴 统一抽奖架构新增关联
 
     // 关联抽奖活动
     LotteryPreset.belongsTo(models.LotteryCampaign, {

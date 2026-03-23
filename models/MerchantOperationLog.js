@@ -21,7 +21,6 @@
  * 数据库表名：merchant_operation_logs
  * 主键：merchant_log_id（BIGINT，自增）
  *
- * 创建时间：2026-01-12
  * 依据文档：docs/商家员工域权限体系升级方案.md
  */
 

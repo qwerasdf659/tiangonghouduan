@@ -26,8 +26,6 @@
  * - 路由层通过 req.app.locals.services.getService() 获取服务
  * - 路由层禁止直接 require models（所有数据库操作通过 Service 层）
  *
- * 创建时间：2025-12-28
- * 更新时间：2026-01-09（路由层规范治理 - 移除直接require models）
  */
 
 const express = require('express')
@@ -60,7 +58,7 @@ const logger = require('../../../../utils/logger')
  *       }
  *     ],
  *     "non_fungible_items": {
- *       "total_count": 10,
+ *       "total": 10,
  *       "available_count": 8,
  *       "locked_count": 2,
  *       "by_type": {
@@ -82,7 +80,7 @@ router.get('/portfolio', authenticateToken, requireRoleLevel(30), async (req, re
 
     logger.info('📦 获取用户资产总览', { user_id, include_items })
 
-    // V4.7.0 AssetService 拆分：通过 ServiceManager 获取 QueryService（2026-01-31）
+    // V4.7.0 AssetService 拆分：通过 ServiceManager 获取 QueryService
     const QueryService = req.app.locals.services.getService('asset_query')
     const portfolio = await QueryService.getAssetPortfolio({ user_id }, { include_items })
 
@@ -117,7 +115,7 @@ router.get('/portfolio/items', authenticateToken, requireRoleLevel(30), async (r
     const item_type = req.query.item_type || null
     const status = req.query.status || null
 
-    // V4.7.0 AssetService 拆分：通过 ServiceManager 获取 ItemService（2026-01-31）
+    // V4.7.0 AssetService 拆分：通过 ServiceManager 获取 ItemService
     const ItemService = req.app.locals.services.getService('asset_item')
 
     const result = await ItemService.getUserItems(
@@ -154,7 +152,7 @@ router.get(
         return res.apiError('无效的物品ID', 400)
       }
 
-      // V4.7.0 AssetService 拆分：通过 ServiceManager 获取 ItemService（2026-01-31）
+      // V4.7.0 AssetService 拆分：通过 ServiceManager 获取 ItemService
       const ItemService = req.app.locals.services.getService('asset_item')
 
       const result = await ItemService.getItemDetail({ user_id, item_id }, { event_limit: 10 })

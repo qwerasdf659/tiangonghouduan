@@ -93,7 +93,7 @@ export const ASSET_ENDPOINTS = {
   DEBT_LIMITS: `${API_PREFIX}/console/debt-management/limits`, // 欠账上限配置
 
   // 交易订单
-  TRADE_ORDER_LIST: `${API_PREFIX}/console/trade-orders`
+  TRADE_ORDER_LIST: `${API_PREFIX}/console/marketplace/orders`
 }
 
 // ========== API 调用方法 ==========

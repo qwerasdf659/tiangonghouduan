@@ -32,7 +32,6 @@
  * - LotteryCampaignPricingConfig：定价配置表
  * - LotteryCampaign：抽奖活动表
  *
- * 创建时间：2026-01-19
  * 使用模型：Claude Sonnet 4.5
  */
 

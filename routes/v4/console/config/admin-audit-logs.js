@@ -26,8 +26,6 @@
  * 因此所有静态路径（/report、/statistics、/operation-types、/target-types）
  * 必须在动态参数路由 /:log_id 之前定义。
  *
- * 创建时间：2026-01-21
- * 更新时间：2026-02-06（合并 system/audit-logs.js 的 report 和 statistics 端点，修正路由定义顺序）
  */
 
 const express = require('express')

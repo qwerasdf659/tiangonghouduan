@@ -26,7 +26,7 @@
  *
  * @module services/UnifiedLotteryEngine/compute/calculators/LuckDebtCalculator
  * @author 抽奖模块策略重构 - Phase 10
- * @since 2026-01-20
+ * @since 2026
  */
 
 const { logger } = require('../../../../utils/logger')

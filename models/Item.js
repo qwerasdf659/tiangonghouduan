@@ -231,7 +231,8 @@ module.exports = sequelize => {
       instance_attributes: {
         type: DataTypes.JSON,
         allowNull: true,
-        comment: '实例属性 {"quality_score":87.42,"quality_grade":"精良","pattern_id":337,"颜色":"冰蓝"}'
+        comment:
+          '实例属性 {"quality_score":87.42,"quality_grade":"精良","pattern_id":337,"颜色":"冰蓝"}'
       },
 
       /** 限量编号 — 按ItemTemplate独立计数，铸造时自动分配 */

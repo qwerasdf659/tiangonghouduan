@@ -47,7 +47,7 @@ class LotteryDraw extends Model {
     })
 
     /*
-     * 🔴 统一抽奖架构新增关联（2026-01-18）
+     * 🔴 统一抽奖架构新增关联
      * 一对一：每次抽奖有一个决策快照
      */
     LotteryDraw.hasOne(models.LotteryDrawDecision, {
@@ -175,7 +175,7 @@ module.exports = sequelize => {
         comment: '幂等键（业界标准命名），用于防止重复提交，客户端通过 Header Idempotency-Key 传入'
       },
       /**
-       * 业务唯一键（business_id）- 事务边界治理（2026-01-05）
+       * 业务唯一键（business_id）- 事务边界治理
        *
        * 与 idempotency_key 的区别：
        * - idempotency_key：请求级幂等（防止同一请求重复提交）
@@ -193,15 +193,12 @@ module.exports = sequelize => {
       /**
        * 抽奖会话ID（lottery_session_id）
        *
-       * 事务边界治理（2026-01-05）：
+       * 事务边界治理：
        * - 一个 lottery_session_id 对应一条扣款流水（批量抽奖一次性扣 N×cost）
        * - 多条 lottery_draws 允许指向同一个 lottery_session_id
        * - 用于定时对账脚本检查数据一致性
        * - 格式：lottery_tx_{timestamp}_{random}_{user_id}
        *
-       * 强制约束（2026-01-05 迁移）：
-       * - 必填字段（NOT NULL）
-       * - 历史数据已清理/回填
        */
       lottery_session_id: {
         type: DataTypes.STRING(100),
@@ -211,14 +208,11 @@ module.exports = sequelize => {
       /**
        * 关联资产流水ID（逻辑外键，用于对账）
        *
-       * 事务边界治理（2026-01-05）：
+       * 事务边界治理：
        * - 每次抽奖扣减积分时，记录对应的 asset_transactions.transaction_id
        * - 用于定时对账脚本检查数据一致性
        * - 不使用物理外键约束，支持未来分库分表
        *
-       * 强制约束（2026-01-05 迁移）：
-       * - 必填字段（NOT NULL）
-       * - 历史数据已清理/回填
        */
       asset_transaction_id: {
         type: DataTypes.BIGINT,
@@ -418,7 +412,7 @@ module.exports = sequelize => {
         comment: '抽奖结果元数据'
       },
 
-      // ========== 统一抽奖架构字段（2026-01-18） ==========
+      // ========== 统一抽奖架构字段 ==========
 
       /**
        * 管线类型
@@ -690,7 +684,7 @@ module.exports = sequelize => {
           fields: ['created_at', 'reward_tier'],
           comment: '时间档位索引（按时间查询档位分布）'
         },
-        // 事务边界治理：对账关联字段索引（2026-01-05）
+        // 事务边界治理：对账关联字段索引
         {
           name: 'idx_lottery_draws_session_id',
           fields: ['lottery_session_id'],

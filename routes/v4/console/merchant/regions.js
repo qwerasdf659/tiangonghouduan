@@ -15,7 +15,7 @@
  * - 使用 RegionService 进行业务处理
  * - 统一 ApiResponse 响应格式
  *
- * @since 2026-01-12
+ * @since 2026
  */
 
 'use strict'

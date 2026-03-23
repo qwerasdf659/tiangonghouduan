@@ -55,10 +55,14 @@ router.get('/placement', async (req, res) => {
       return res.apiError('配置不存在', 'CONFIG_NOT_FOUND', null, 404)
     }
 
+    const updatedAt = configData.updated_at || new Date().toISOString()
+    const versionTs = new Date(updatedAt).getTime().toString()
+
     return res.apiSuccess(
       {
         placements: configData.placements || [],
-        version: Date.now().toString()
+        version: versionTs,
+        updated_at: updatedAt
       },
       '获取配置成功',
       'PLACEMENT_CONFIG_SUCCESS'
@@ -326,8 +330,16 @@ router.get('/exchange-page', async (req, res) => {
       }
     }
 
+    const updatedAtExchange = configData.updated_at || new Date().toISOString()
+    const versionTsExchange = new Date(updatedAtExchange).getTime().toString()
+
     return res.apiSuccess(
-      { ...configData, version: Date.now().toString(), is_default: false },
+      {
+        ...configData,
+        version: versionTsExchange,
+        updated_at: updatedAtExchange,
+        is_default: false
+      },
       '获取兑换页面配置成功',
       'EXCHANGE_PAGE_CONFIG_SUCCESS'
     )

@@ -49,7 +49,6 @@
  * - 统一枚举定义文件：constants/AuditOperationTypes.js
  * - 确保模型、服务、迁移文件引用同一来源
  *
- * 创建时间：2025-10-12
  * 最后更新：2026-01-08（V4.5.0 审计统一入口整合 - 使用统一枚举定义）
  */
 
@@ -84,7 +83,7 @@ module.exports = sequelize => {
 
       /*
        * 操作类型（来源：constants/AuditOperationTypes.js 统一枚举定义）
-       * 2026-02-20：ENUM → VARCHAR(50)，值校验在应用层，避免新增操作类型时反复迁移
+       * VARCHAR(50)，值校验在应用层
        */
       operation_type: {
         type: DataTypes.STRING(50),

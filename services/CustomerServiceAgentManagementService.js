@@ -158,7 +158,7 @@ class CustomerServiceAgentManagementService {
       agents,
       pagination: {
         total: count,
-        current_page: parseInt(page),
+        page: parseInt(page),
         page_size: limit,
         total_pages: Math.ceil(count / limit)
       }
@@ -432,7 +432,7 @@ class CustomerServiceAgentManagementService {
       assignments: rows.map(a => a.toJSON()),
       pagination: {
         total: count,
-        current_page: parseInt(page),
+        page: parseInt(page),
         page_size: limit,
         total_pages: Math.ceil(count / limit)
       }

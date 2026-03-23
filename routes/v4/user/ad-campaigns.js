@@ -120,7 +120,7 @@ const ALLOWED_CAMPAIGN_UPDATE_FIELDS = [
  * @body {number} [fixed_days] - 固定包天天数（fixed_daily 模式必填）
  * @body {string} [start_date] - 投放开始日期（YYYY-MM-DD）
  * @body {string} [end_date] - 投放结束日期（YYYY-MM-DD）
- * @body {Object} [targeting_rules] - 定向规则 JSON（Phase 5 启用）
+ * @body {Object} [targeting_rules] - 定向规则 JSON
  */
 router.post(
   '/',

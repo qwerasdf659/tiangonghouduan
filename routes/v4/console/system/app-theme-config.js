@@ -140,7 +140,7 @@ router.put('/', async (req, res) => {
 
     try {
       const AuditLogService = req.app.locals.services.getService('audit_log')
-      await AuditLogService.log({
+      await AuditLogService.logOperation({
         operator_id: req.user.user_id,
         operation_type: 'config_update',
         target_type: 'system_config',

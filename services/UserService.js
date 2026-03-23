@@ -18,12 +18,11 @@
  * - 未提供事务时直接报错（使用 assertAndGetTransaction）
  * - 服务层禁止自建事务，由入口层统一使用 TransactionManager.execute()
  *
- * 创建时间：2025年12月09日
  * 最后更新：2026年01月05日（事务边界治理改造）
  */
 
 const { User, Role, UserRole } = require('../models')
-// V4.7.0 AssetService 拆分：使用子服务替代原 AssetService（2026-01-31）
+// V4.7.0 AssetService 拆分：使用子服务替代原 AssetService
 const BalanceService = require('./asset/BalanceService')
 const BeijingTimeHelper = require('../utils/timeHelper')
 const logger = require('../utils/logger')
@@ -624,7 +623,7 @@ class UserService {
        */
       let pointsAccount = null
       if (checkPointsAccount) {
-        // V4.7.0 AssetService 拆分：使用顶部引入的 BalanceService（2026-01-31）
+        // V4.7.0 AssetService 拆分：使用顶部引入的 BalanceService
         try {
           // 获取或创建用户资产账户（决策G：自动创建）
           const account = await BalanceService.getOrCreateAccount(

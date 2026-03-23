@@ -10,7 +10,7 @@
  *
  * @module services/UnifiedLotteryEngine/pipeline/budget/BudgetProviderFactory
  * @author 统一抽奖架构重构
- * @since 2026-01-18
+ * @since 2026
  */
 
 const BudgetProvider = require('./BudgetProvider')

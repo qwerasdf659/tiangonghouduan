@@ -9,7 +9,6 @@
  * 服务对象：
  * - 业务钩子：LotteryDrawService, ExchangeService, MarketService（转化时调用）
  *
- * 创建时间：2026-02-18
  */
 
 const logger = require('../utils/logger').logger

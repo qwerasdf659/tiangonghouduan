@@ -18,14 +18,14 @@
  * | ALL  | 略提高 | 正常   | 压低高 |  <- 不区分 Budget Tier
  * +------+--------+--------+--------+
  *
- * 架构重构说明（2026-03-04）：
+ * 架构重构说明：
  * Budget Tier 降级为纯监控指标，不再参与概率决策。
  * 概率调整只保留 Pressure Tier 维度（活动消耗压力）。
  * 资格控制由 BuildPrizePoolStage._filterByResourceEligibility 唯一负责。
  *
  * @module models/LotteryTierMatrixConfig
  * @author 抽奖模块策略引擎
- * @since 2026-01-20
+ * @since 2026
  */
 
 const { Model } = require('sequelize')

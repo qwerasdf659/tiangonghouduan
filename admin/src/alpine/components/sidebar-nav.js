@@ -460,7 +460,7 @@ export function sidebarNav() {
 
         const data = await request({
           url: `${API_PREFIX}/console/lottery-realtime/alerts`,
-          params: { status: 'active', limit: 1 }
+          params: { status: 'active', page_size: 1 }
         })
         if (data.success && data.data) {
           // 从 summary 获取 danger + warning 数量
@@ -480,7 +480,7 @@ export function sidebarNav() {
         if (!getToken()) return
         const data = await request({
           url: `${API_PREFIX}/console/ad-campaigns`,
-          params: { status: 'pending_review', limit: 1 }
+          params: { status: 'pending_review', page_size: 1 }
         })
         if (data.success && data.data?.pagination) {
           this.adPendingReviewCount = data.data.pagination.total || 0

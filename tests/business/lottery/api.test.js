@@ -336,9 +336,9 @@ describe('抽奖系统API测试（V4架构）', () => {
       if (response.status === 200) {
         expect(response.data.data).toHaveProperty('distribution_history')
         expect(Array.isArray(response.data.data.distribution_history)).toBe(true)
-        expect(response.data.data).toHaveProperty('total_count')
+        expect(response.data.data).toHaveProperty('total')
 
-        console.log('✅ 奖品分发历史记录数:', response.data.data.total_count)
+        console.log('✅ 奖品分发历史记录数:', response.data.data.total)
       }
     })
 

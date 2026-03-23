@@ -19,8 +19,6 @@
  * - participate：管理员模拟测试参与资格
  * - configure-conditions：仅管理员可配置活动条件
  *
- * 创建时间：2026年01月08日
- * 更新时间：2026年01月09日（权限收紧：全部端点仅管理员）
  * 适用区域：中国（北京时间 Asia/Shanghai）
  */
 
@@ -28,10 +26,6 @@ const express = require('express')
 const router = express.Router()
 const logger = require('../../utils/logger').logger
 const { authenticateToken, requireRoleLevel } = require('../../middleware/auth')
-/*
- * P1-9：服务通过 ServiceManager 获取（B1-Injected + E2-Strict snake_case）
- * const ActivityService = require('../../services/ActivityService')
- */
 
 /**
  * @route GET /api/v4/activities
@@ -60,7 +54,6 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
       request_id: req.id
     })
 
-    // P1-9：通过 ServiceManager 获取 ActivityService（snake_case key）
     const ActivityService = req.app.locals.services.getService('activity')
     const activities = await ActivityService.getAllActivities({ status, limit })
 
@@ -114,7 +107,6 @@ router.get('/available', authenticateToken, requireRoleLevel(100), async (req, r
       request_id: req.id
     })
 
-    // P1-9：通过 ServiceManager 获取 ActivityService（snake_case key）
     const ActivityService = req.app.locals.services.getService('activity')
     // 调用 ActivityService 获取可参与的活动
     const result = await ActivityService.getAvailableActivitiesForUser(user_id)
@@ -171,7 +163,6 @@ router.get(
         request_id: req.id
       })
 
-      // P1-9：通过 ServiceManager 获取 ActivityService（snake_case key）
       const ActivityService = req.app.locals.services.getService('activity')
       // 调用 ActivityService 检查资格
       const result = await ActivityService.checkEligibility(user_id, idOrCode)
@@ -243,7 +234,6 @@ router.post(
         request_id: req.id
       })
 
-      // P1-9：通过 ServiceManager 获取 ActivityService（snake_case key）
       const ActivityService = req.app.locals.services.getService('activity')
       // 调用 ActivityService 检查资格
       const eligibility = await ActivityService.checkEligibility(user_id, idOrCode)
@@ -312,7 +302,6 @@ router.get('/:idOrCode/conditions', authenticateToken, requireRoleLevel(100), as
       request_id: req.id
     })
 
-    // P1-9：通过 ServiceManager 获取 ActivityService（snake_case key）
     const ActivityService = req.app.locals.services.getService('activity')
     // 通过 Service 层查询活动条件（符合路由层规范）
     const conditionConfig = await ActivityService.getConditionConfig(idOrCode)
@@ -385,7 +374,6 @@ router.post(
         request_id: req.id
       })
 
-      // P1-9：通过 ServiceManager 获取 ActivityService（snake_case key）
       const ActivityService = req.app.locals.services.getService('activity')
       // 调用 ActivityService 配置条件
       const result = await ActivityService.configureConditions(

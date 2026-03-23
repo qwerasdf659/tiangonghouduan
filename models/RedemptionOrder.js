@@ -18,7 +18,6 @@
  * 主键：redemption_order_id（UUID）
  * 唯一键：code_hash（SHA-256哈希）
  *
- * 创建时间：2025-12-17
  * 使用模型：Claude Sonnet 4.5
  */
 

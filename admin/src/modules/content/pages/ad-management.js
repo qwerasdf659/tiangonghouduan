@@ -383,7 +383,7 @@ document.addEventListener('alpine:init', () => {
         const response = await request({
           url: SYSTEM_ENDPOINTS.AD_SLOT_LIST,
           method: 'GET',
-          params: { limit: 100 }
+          params: { page_size: 100 }
         })
         if (response?.success) {
           this.allSlotsList = response.data?.slots || []
@@ -503,7 +503,7 @@ document.addEventListener('alpine:init', () => {
     async loadCampaigns() {
       this.campaignsLoading = true
       try {
-        const params = { page: this.campaignPage, limit: 20 }
+        const params = { page: this.campaignPage, page_size: 20 }
         if (this.category_filter) params.category = this.category_filter
         if (this.campaignFilters.status) params.status = this.campaignFilters.status
         if (this.campaignFilters.billing_mode)
@@ -977,7 +977,7 @@ document.addEventListener('alpine:init', () => {
     async loadBidLogs() {
       this.bidLogsLoading = true
       try {
-        const params = { page: this.bidLogsPage, limit: 20 }
+        const params = { page: this.bidLogsPage, page_size: 20 }
         if (this.bidLogsFilters.ad_campaign_id)
           params.ad_campaign_id = this.bidLogsFilters.ad_campaign_id
         if (this.bidLogsFilters.is_winner) params.is_winner = this.bidLogsFilters.is_winner
@@ -998,7 +998,7 @@ document.addEventListener('alpine:init', () => {
     async loadUserAdTags() {
       this.userAdTagsLoading = true
       try {
-        const params = { page: this.userAdTagsPage, limit: 50 }
+        const params = { page: this.userAdTagsPage, page_size: 50 }
         if (this.userAdTagsFilters.user_id) params.user_id = this.userAdTagsFilters.user_id
         if (this.userAdTagsFilters.tag_key) params.tag_key = this.userAdTagsFilters.tag_key
         const response = await request({
@@ -1022,7 +1022,7 @@ document.addEventListener('alpine:init', () => {
     async loadAntifraudLogs() {
       this.antifraudLogsLoading = true
       try {
-        const params = { page: this.antifraudPage, limit: 20 }
+        const params = { page: this.antifraudPage, page_size: 20 }
         if (this.antifraudFilters.ad_campaign_id)
           params.ad_campaign_id = this.antifraudFilters.ad_campaign_id
         if (this.antifraudFilters.verdict) params.verdict = this.antifraudFilters.verdict
@@ -1048,7 +1048,7 @@ document.addEventListener('alpine:init', () => {
     async loadAttributionLogs() {
       this.attributionLogsLoading = true
       try {
-        const params = { page: this.attributionPage, limit: 20 }
+        const params = { page: this.attributionPage, page_size: 20 }
         if (this.attributionFilters.ad_campaign_id)
           params.ad_campaign_id = this.attributionFilters.ad_campaign_id
         if (this.attributionFilters.conversion_type)

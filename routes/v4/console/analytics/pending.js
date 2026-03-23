@@ -12,7 +12,6 @@
  * - GET /summary - 分类汇总统计（按业务分类）
  * - GET /list - 统一待处理列表（分页、筛选、紧急优先）
  *
- * 创建时间：2026年01月31日
  * 关联文档：后端数据库开发任务清单-2026年1月.md（P0-B6、P0-B7）
  *
  * @module routes/v4/console/analytics/pending
@@ -49,7 +48,7 @@ const logger = require('../../../../utils/logger').logger
  *       { "category": "risk_alert", "category_name": "风控告警", "count": 1, "urgent_count": 0 },
  *       { "category": "lottery_alert", "category_name": "抽奖告警", "count": 2, "urgent_count": 1 }
  *     ],
- *     "total": { "total_count": 11, "urgent_count": 4 },
+ *     "total": { "total": 11, "urgent_count": 4 },
  *     "updated_at": "2026-01-31T14:30:00.000+08:00"
  *   },
  *   "message": "获取成功"

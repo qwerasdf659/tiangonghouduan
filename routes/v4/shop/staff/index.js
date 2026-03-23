@@ -21,7 +21,6 @@
  * - 需要 staff:manage 或 staff:read 权限
  * - 已集成 requireMerchantPermission 门店范围校验
  *
- * 创建时间：2026年01月12日
  * 依据文档：docs/商家员工域权限体系升级方案.md AC3
  */
 

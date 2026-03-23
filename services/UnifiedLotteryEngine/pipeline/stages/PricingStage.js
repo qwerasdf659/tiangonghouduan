@@ -38,7 +38,7 @@
  *
  * @module services/UnifiedLotteryEngine/pipeline/stages/PricingStage
  * @author 统一抽奖架构重构
- * @since 2026-01-19
+ * @since 2026
  */
 
 const BaseStage = require('./BaseStage')

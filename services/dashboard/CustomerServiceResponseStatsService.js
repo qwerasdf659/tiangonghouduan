@@ -8,7 +8,7 @@
  * - 提供7日趋势数据
  *
  * 依赖表：customer_service_sessions
- * 依赖字段：first_response_at（需通过 DB-1 迁移添加）
+ *
  *
  * API 端点：
  * - GET /api/v4/console/customer-service/response-stats
@@ -18,7 +18,6 @@
  * 关联需求：
  * - 《运营后台优化 - 后端需求文档》§4.15
  *
- * 创建时间：2026-02-03
  * @version 1.0.0
  */
 

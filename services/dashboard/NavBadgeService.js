@@ -14,10 +14,9 @@
  * API 端点：
  * - GET /api/v4/admin/nav/badges
  *
- * 创建时间：2026年01月31日
  * 关联文档：后端数据库开发任务清单-2026年1月.md（P0-B13）
  *
- * @module services/nav/NavBadgeService
+ * @module services/dashboard/NavBadgeService
  */
 
 'use strict'

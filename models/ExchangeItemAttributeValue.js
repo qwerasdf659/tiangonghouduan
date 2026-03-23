@@ -37,8 +37,8 @@ class ExchangeItemAttributeValue extends Model {
 }
 
 /**
- * @param {import('sequelize').Sequelize} sequelize - Sequelize 实例
- * @returns {typeof ExchangeItemAttributeValue}
+ * @param {Object} sequelize - Sequelize 实例
+ * @returns {Model} 初始化后的模型类
  */
 module.exports = sequelize => {
   ExchangeItemAttributeValue.init(

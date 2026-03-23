@@ -3,8 +3,8 @@
  *
  * 业务范围：
  * - 统一内容交互日志上报（D2 定论：替代 popup-banners/carousel-items 独立上报）
- * - 广告曝光事件上报（Phase 5，commercial 类型专用）
- * - 广告点击事件上报（Phase 5，commercial 类型专用）
+ * - 广告曝光事件上报（，commercial 类型专用）
+ * - 广告点击事件上报（，commercial 类型专用）
  *
  * 架构规范：
  * - 路由层不直连 models，通过 ServiceManager 获取相应 Service
@@ -29,11 +29,7 @@ const asyncHandler = fn => (req, res, next) => {
 const logger = require('../../../utils/logger').logger
 
 /**
- * POST /interaction-log - 统一内容交互日志上报（D2 定论：替代旧的独立上报端点）
- *
- * 替代原来的 2 个独立端点：
- * - POST /popup-banners/show-log → interaction_type='impression', extra_data.show_duration_ms
- * - POST /carousel-items/show-log → interaction_type='impression', extra_data.exposure_duration_ms
+ * 统一内容交互日志上报（支持 impression/click/close/swipe 等交互类型）
  *
  * @route POST /api/v4/system/ad-events/interaction-log
  * @access Private
@@ -89,7 +85,7 @@ router.post(
 )
 
 /**
- * POST /impression - 上报广告曝光事件（Phase 5）
+ * POST /impression - 上报广告曝光事件（）
  * @route POST /api/v4/system/ad-events/impression
  * @access Private
  * @body {number} ad_campaign_id - 广告活动ID
@@ -187,7 +183,7 @@ router.post(
 )
 
 /**
- * POST /click - 上报广告点击事件（Phase 5）
+ * POST /click - 上报广告点击事件（）
  * @route POST /api/v4/system/ad-events/click
  * @access Private
  * @body {number} ad_campaign_id - 广告活动ID

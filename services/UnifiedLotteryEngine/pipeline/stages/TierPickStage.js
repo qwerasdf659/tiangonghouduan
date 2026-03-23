@@ -32,7 +32,7 @@
  *
  * @module services/UnifiedLotteryEngine/pipeline/stages/TierPickStage
  * @author 统一抽奖架构重构
- * @since 2026-01-18
+ * @since 2026
  */
 
 const BaseStage = require('./BaseStage')

@@ -10,7 +10,6 @@
  * - 定时任务：jobs/ad-cron-jobs.js（04:00执行）
  * - /api/v4/console/ad-reports（管理端 - 报表查询）
  *
- * 创建时间：2026-02-18
  */
 
 const logger = require('../utils/logger').logger

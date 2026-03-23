@@ -119,7 +119,7 @@ class ItemTemplateService {
       return {
         list: rows,
         pagination: {
-          total_count: count,
+          total: count,
           page,
           page_size,
           total_pages: Math.ceil(count / page_size)
@@ -540,7 +540,7 @@ class ItemTemplateService {
       })
 
       return {
-        total_count: totalCount,
+        total: totalCount,
         enabled_count: enabledCount,
         disabled_count: disabledCount,
         item_type_count: typeDistribution.length,

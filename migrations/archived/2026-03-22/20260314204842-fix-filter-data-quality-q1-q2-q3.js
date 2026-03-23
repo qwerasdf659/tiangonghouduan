@@ -18,7 +18,7 @@
  * - category_defs 表中 home_life/lifestyle/food/collectible/other 处于启用状态
  * - rarity_defs 表中 common/uncommon/rare/epic/legendary 处于启用状态
  *
- * @since 2026-03-14
+ * @since 2026
  */
 module.exports = {
   async up(queryInterface) {

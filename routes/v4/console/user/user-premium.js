@@ -11,7 +11,7 @@
  * - 严格遵循项目 snake_case 命名规范
  * - 使用 res.apiSuccess/res.apiError 统一响应格式
  *
- * 服务合并记录（2026-01-21）：
+ * 服务合并记录：
  * - 原使用 UserPremiumQueryService，现已合并到 PremiumService
  * - 通过 ServiceManager 获取 'premium' 服务调用查询方法
  *
@@ -66,7 +66,7 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
     logger.info('查询用户高级空间状态列表', {
       admin_id: req.user.user_id,
       filters: { user_id, is_unlocked, unlock_method, is_valid },
-      total: result.pagination.total_count
+      total: result.pagination.total
     })
 
     return res.apiSuccess(result, '查询用户高级空间状态成功')
@@ -119,7 +119,7 @@ router.get('/expiring', authenticateToken, requireRoleLevel(100), async (req, re
     logger.info('获取即将过期用户列表', {
       admin_id: req.user.user_id,
       hours,
-      total: result.pagination.total_count
+      total: result.pagination.total
     })
 
     return res.apiSuccess(result, '获取即将过期用户列表成功')

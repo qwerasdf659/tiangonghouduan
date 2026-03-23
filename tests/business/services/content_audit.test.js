@@ -43,9 +43,12 @@ describe('ContentAuditEngine - 内容审核引擎测试', () => {
 
   describe('submitForAudit - 提交审核', () => {
     it('应该成功创建审核记录', async () => {
-      const result = await ContentAuditEngine.submitForAudit('exchange', 1, {
-        priority: 'high',
-        auditData: { test: 'data' }
+      const result = await TransactionManager.execute(async transaction => {
+        return await ContentAuditEngine.submitForAudit('exchange', 1, {
+          priority: 'high',
+          auditData: { test: 'data' },
+          transaction
+        })
       })
 
       expect(result).toBeDefined()
@@ -58,18 +61,21 @@ describe('ContentAuditEngine - 内容审核引擎测试', () => {
     })
 
     it('应该防止重复提交审核', async () => {
-      const result = await ContentAuditEngine.submitForAudit('exchange', 1)
+      const result = await TransactionManager.execute(async transaction => {
+        return await ContentAuditEngine.submitForAudit('exchange', 1, { transaction })
+      })
 
-      // 应该返回已存在的审核记录（BIGINT类型转换为字符串）
       expect(result.content_review_record_id.toString()).toBe(
         testContentReviewRecord.content_review_record_id.toString()
       )
     })
 
     it('应该拒绝不支持的审核类型', async () => {
-      await expect(ContentAuditEngine.submitForAudit('invalid_type', 1)).rejects.toThrow(
-        '不支持的审核类型'
-      )
+      await expect(
+        TransactionManager.execute(async transaction => {
+          return await ContentAuditEngine.submitForAudit('invalid_type', 1, { transaction })
+        })
+      ).rejects.toThrow('不支持的审核类型')
     })
   })
 

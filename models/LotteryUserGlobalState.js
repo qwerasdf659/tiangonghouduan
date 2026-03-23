@@ -26,7 +26,7 @@
  *
  * @module models/LotteryUserGlobalState
  * @author 抽奖模块策略重构
- * @since 2026-01-20
+ * @since 2026
  */
 
 const { Model, DataTypes } = require('sequelize')

@@ -8,12 +8,11 @@ const logger = require('../utils/logger').logger
  * 2. 发送管理员通知（新订单待审核、超时告警）→ WebSocket 广播
  * 3. 支持 WebSocket 实时推送（在线用户）+ 消息持久化（离线用户）
  *
- * 方案B改造（2026-02-24）：
+ * 方案B改造：
  * - send() 写入目标从 chat_messages 切换到 user_notifications
  * - 客服聊天回归纯粹人工对话，不再被系统通知淹没
  * - sendToChat() 代码保留但不再作为默认通道
  *
- * 创建时间：2025-10-10
  * 最后更新：2026-02-24 - 方案B通知通道独立化
  *
  */
@@ -1369,9 +1368,9 @@ class NotificationService {
     return {
       notifications,
       pagination: {
-        current_page: page,
+        page,
         page_size: pageSize,
-        total_count: totalCount,
+        total: totalCount,
         total_pages: totalPages,
         has_next: page < totalPages,
         has_prev: page > 1

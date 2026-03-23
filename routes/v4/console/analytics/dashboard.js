@@ -11,7 +11,6 @@
  * API列表：
  * - GET /pending-summary - 待处理事项聚合统计
  *
- * 创建时间：2026年01月31日
  * 关联文档：后端数据库开发任务清单-2026年1月.md（P0-B5）
  *
  * @module routes/v4/console/analytics/dashboard
@@ -49,7 +48,7 @@ const logger = require('../../../../utils/logger').logger
  *     "customer_service_pending": { "count": 3, "urgent_count": 1, "oldest_minutes": 45 },
  *     "risk_alerts": { "count": 1, "urgent_count": 0 },
  *     "lottery_alerts": { "count": 2, "urgent_count": 1 },
- *     "total": { "total_count": 11, "urgent_count": 4 },
+ *     "total": { "total": 11, "urgent_count": 4 },
  *     "updated_at": "2026-01-31T14:30:00.000+08:00"
  *   },
  *   "message": "获取成功"

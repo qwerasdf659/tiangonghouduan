@@ -25,7 +25,6 @@
  * - GET /api/v4/console/batch-operations/logs                 批量操作日志列表
  * - GET /api/v4/console/batch-operations/logs/:id             批量操作日志详情
  *
- * 创建时间：2026-01-30
  * @version 1.0.0
  */
 
@@ -127,7 +126,7 @@ function getActivityService(req) {
  * {
  *   batch_operation_log_id: number,     // 批处理日志ID
  *   status: string,           // 处理状态
- *   total_count: number,      // 总处理数量
+ *   total: number,      // 总处理数量
  *   success_count: number,    // 成功数量
  *   fail_count: number,       // 失败数量
  *   success_rate: number,     // 成功率（百分比）
@@ -207,7 +206,7 @@ router.post('/quota-grant', authenticateToken, requireRoleLevel(100), async (req
     const batchLog = await getBatchOperationService(req).createOperationLog({
       operation_type,
       operator_id,
-      total_count: user_ids.length,
+      total: user_ids.length,
       operation_params: { lottery_campaign_id, user_ids, bonus_count, reason },
       idempotency_key: preCheckResult.idempotency_key
     })
@@ -277,7 +276,7 @@ router.post('/quota-grant', authenticateToken, requireRoleLevel(100), async (req
       batch_operation_log_id: batchLog.batch_operation_log_id,
       operator_id,
       lottery_campaign_id,
-      total_count: user_ids.length,
+      total: user_ids.length,
       success_count: successItems.length,
       fail_count: failedItems.length
     })
@@ -287,7 +286,7 @@ router.post('/quota-grant', authenticateToken, requireRoleLevel(100), async (req
         batch_operation_log_id: finalLog.batch_operation_log_id,
         status: finalLog.status,
         status_name: finalLog.status_name,
-        total_count: finalLog.total_count,
+        total: finalLog.total,
         success_count: finalLog.success_count,
         fail_count: finalLog.fail_count,
         success_rate: finalLog.success_rate,
@@ -386,7 +385,7 @@ router.post('/campaign-status', authenticateToken, requireRoleLevel(100), async 
     const batchLog = await getBatchOperationService(req).createOperationLog({
       operation_type,
       operator_id,
-      total_count: lottery_campaign_ids.length,
+      total: lottery_campaign_ids.length,
       operation_params: { lottery_campaign_ids, target_status, reason },
       idempotency_key: preCheckResult.idempotency_key
     })
@@ -454,7 +453,7 @@ router.post('/campaign-status', authenticateToken, requireRoleLevel(100), async 
       batch_operation_log_id: batchLog.batch_operation_log_id,
       operator_id,
       target_status,
-      total_count: lottery_campaign_ids.length,
+      total: lottery_campaign_ids.length,
       success_count: successItems.length,
       fail_count: failedItems.length
     })
@@ -464,7 +463,7 @@ router.post('/campaign-status', authenticateToken, requireRoleLevel(100), async 
         batch_operation_log_id: finalLog.batch_operation_log_id,
         status: finalLog.status,
         status_name: finalLog.status_name,
-        total_count: finalLog.total_count,
+        total: finalLog.total,
         success_count: finalLog.success_count,
         fail_count: finalLog.fail_count,
         success_rate: finalLog.success_rate,
@@ -576,7 +575,7 @@ router.post('/preset-rules', authenticateToken, requireRoleLevel(100), async (re
     const batchLog = await getBatchOperationService(req).createOperationLog({
       operation_type,
       operator_id,
-      total_count: rules.length,
+      total: rules.length,
       operation_params: { rules, reason },
       idempotency_key: preCheckResult.idempotency_key
     })
@@ -650,7 +649,7 @@ router.post('/preset-rules', authenticateToken, requireRoleLevel(100), async (re
     logger.info('批量设置干预规则完成', {
       batch_operation_log_id: batchLog.batch_operation_log_id,
       operator_id,
-      total_count: rules.length,
+      total: rules.length,
       success_count: successItems.length,
       fail_count: failedItems.length
     })
@@ -660,7 +659,7 @@ router.post('/preset-rules', authenticateToken, requireRoleLevel(100), async (re
         batch_operation_log_id: finalLog.batch_operation_log_id,
         status: finalLog.status,
         status_name: finalLog.status_name,
-        total_count: finalLog.total_count,
+        total: finalLog.total,
         success_count: finalLog.success_count,
         fail_count: finalLog.fail_count,
         success_rate: finalLog.success_rate,
@@ -748,7 +747,7 @@ router.post('/redemption-verify', authenticateToken, requireRoleLevel(100), asyn
     const batchLog = await getBatchOperationService(req).createOperationLog({
       operation_type,
       operator_id,
-      total_count: order_ids.length,
+      total: order_ids.length,
       operation_params: { order_ids, reason },
       idempotency_key: preCheckResult.idempotency_key
     })
@@ -810,7 +809,7 @@ router.post('/redemption-verify', authenticateToken, requireRoleLevel(100), asyn
     logger.info('批量核销确认完成', {
       batch_operation_log_id: batchLog.batch_operation_log_id,
       operator_id,
-      total_count: order_ids.length,
+      total: order_ids.length,
       success_count: successItems.length,
       fail_count: failedItems.length
     })
@@ -820,7 +819,7 @@ router.post('/redemption-verify', authenticateToken, requireRoleLevel(100), asyn
         batch_operation_log_id: finalLog.batch_operation_log_id,
         status: finalLog.status,
         status_name: finalLog.status_name,
-        total_count: finalLog.total_count,
+        total: finalLog.total,
         success_count: finalLog.success_count,
         fail_count: finalLog.fail_count,
         success_rate: finalLog.success_rate,
@@ -939,7 +938,7 @@ router.post('/budget-adjust', authenticateToken, requireRoleLevel(100), async (r
     const batchLog = await getBatchOperationService(req).createOperationLog({
       operation_type,
       operator_id,
-      total_count: adjustments.length,
+      total: adjustments.length,
       operation_params: { adjustments, reason },
       idempotency_key: preCheckResult.idempotency_key
     })
@@ -1013,7 +1012,7 @@ router.post('/budget-adjust', authenticateToken, requireRoleLevel(100), async (r
     logger.info('批量预算调整完成', {
       batch_operation_log_id: batchLog.batch_operation_log_id,
       operator_id,
-      total_count: adjustments.length,
+      total: adjustments.length,
       success_count: successItems.length,
       fail_count: failedItems.length
     })
@@ -1023,7 +1022,7 @@ router.post('/budget-adjust', authenticateToken, requireRoleLevel(100), async (r
         batch_operation_log_id: finalLog.batch_operation_log_id,
         status: finalLog.status,
         status_name: finalLog.status_name,
-        total_count: finalLog.total_count,
+        total: finalLog.total,
         success_count: finalLog.success_count,
         fail_count: finalLog.fail_count,
         success_rate: finalLog.success_rate,
@@ -1080,7 +1079,7 @@ router.get('/logs', authenticateToken, requireRoleLevel(100), async (req, res) =
         pagination: {
           page: parseInt(page),
           page_size: parseInt(page_size),
-          total_count: result.total,
+          total: result.total,
           total_pages: Math.ceil(result.total / parseInt(page_size))
         }
       },

@@ -506,6 +506,7 @@ class ExchangeItemService {
 
     for (const combo of combos) {
       for (const pair of combo) {
+        // eslint-disable-next-line no-await-in-loop
         const opt = await AttributeOption.findOne({
           where: { option_id: pair.option_id, attribute_id: pair.attribute_id },
           transaction
@@ -520,6 +521,7 @@ class ExchangeItemService {
       }
 
       const skuCode = ExchangeItemService._buildCartesianSkuCode(pid, combo)
+      // eslint-disable-next-line no-await-in-loop
       const existing = await ExchangeItemSku.findOne({ where: { sku_code: skuCode }, transaction })
       if (existing) {
         logger.warn('ExchangeItemService.generateSkuCartesian 跳过已存在 sku_code', {
@@ -528,6 +530,7 @@ class ExchangeItemService {
         continue
       }
 
+      // eslint-disable-next-line no-await-in-loop
       const sku = await ExchangeItemSku.create(
         {
           exchange_item_id: pid,
@@ -544,6 +547,7 @@ class ExchangeItemService {
         attribute_id: pair.attribute_id,
         option_id: pair.option_id
       }))
+      // eslint-disable-next-line no-await-in-loop
       await SkuAttributeValue.bulkCreate(rows, { transaction })
       created.push(sku)
     }

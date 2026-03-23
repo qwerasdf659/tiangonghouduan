@@ -13,7 +13,6 @@
  * - Key 格式：escrow:{trade_order_id}
  * - 超时策略（决策P3 阶梯式）：4h 提醒 → 24h 自动取消
  *
- * 创建时间：2026-02-21
  */
 
 'use strict'

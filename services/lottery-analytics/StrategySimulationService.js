@@ -18,7 +18,7 @@
  * - TierPickStage: 8% 硬顶 + 随机选档位
  *
  * @module services/lottery-analytics/StrategySimulationService
- * @since 2026-02-20
+ * @since 2026
  */
 
 const { Op } = require('sequelize')

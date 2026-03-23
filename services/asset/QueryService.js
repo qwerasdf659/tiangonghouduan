@@ -380,7 +380,7 @@ class QueryService {
 
     // 整理物品统计
     const non_fungible_items = {
-      total_count: 0,
+      total: 0,
       available_count: 0,
       locked_count: 0,
       by_type: {}
@@ -422,7 +422,7 @@ class QueryService {
       user_id,
       points_available: points.available,
       fungible_count: fungible_assets.length,
-      item_total: non_fungible_items.total_count
+      item_total: non_fungible_items.total
     })
 
     return {
@@ -453,7 +453,7 @@ class QueryService {
    * // 导出所有POINTS资产
    * const data = await QueryService.getBalancesForExport({ asset_type: 'POINTS', limit: 5000 })
    *
-   * @since 2026-01-30 P2任务：资产导出API实现
+   * @since 2026
    */
   static async getBalancesForExport(params = {}, options = {}) {
     const { asset_type, user_id, limit = 1000 } = params
@@ -526,7 +526,7 @@ class QueryService {
    *
    * @returns {Promise<Object>} 各资产类型的统计数据和汇总
    *
-   * @since 2026-01-18 路由层合规性治理：从路由层移动到服务层
+   * @since 2026
    */
   static async getSystemStats() {
     const { sequelize } = require('../../models')

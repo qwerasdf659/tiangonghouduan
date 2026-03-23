@@ -387,7 +387,7 @@ class AnomalyService {
       })
 
       const summary = {
-        total_count: totalCount,
+        total: totalCount,
         anomaly_count: anomalyCount,
         anomaly_ratio: totalCount > 0 ? Math.round((anomalyCount / totalCount) * 10000) / 100 : 0,
         risk_distribution: riskLevelMap,
@@ -476,7 +476,7 @@ class AnomalyService {
       return {
         records,
         pagination: {
-          total_count: count,
+          total: count,
           page,
           page_size,
           total_pages: Math.ceil(count / page_size)

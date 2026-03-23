@@ -9,7 +9,6 @@
  * - 版本回滚（需管理员权限）
  * - 缓存刷新（需管理员权限）
  *
- * 创建时间：2026-01-22
  * 版本：V4.7.0
  * 适用区域：中国（北京时间 Asia/Shanghai）
  */
@@ -199,7 +198,6 @@ router.get('/:dictId', authenticateToken, requireRoleLevel(30), async (req, res)
   try {
     const DisplayNameService = getDisplayNameService(req)
     const { dictId } = req.params
-    // Phase 3 收口：通过 ServiceManager 获取 SystemDictionary
     const { SystemDictionary } = req.app.locals.models
 
     const dictionary = await SystemDictionary.findByPk(dictId, {

@@ -92,7 +92,7 @@ class AttributeService {
    * 获取属性详情（含选项，按 sort_order）
    *
    * @param {number} attributeId - 属性 ID
-   * @returns {Promise<Object|null>}
+   * @returns {Promise<Object|null>} 属性详情或 null
    */
   async getAttributeDetail(attributeId) {
     const id = Number(attributeId)
@@ -127,12 +127,12 @@ class AttributeService {
    * @param {string} data.attribute_name - 显示名
    * @param {string} data.attribute_code - 唯一编码
    * @param {string} [data.input_type] - select | text | number
-   * @param {boolean} [data.is_required]
-   * @param {boolean} [data.is_sale_attr]
-   * @param {boolean} [data.is_searchable]
-   * @param {number} [data.sort_order]
-   * @param {Object} [options={}] - 含 transaction
-   * @returns {Promise<Object>}
+   * @param {boolean} [data.is_required] - 是否必填
+   * @param {boolean} [data.is_sale_attr] - 是否销售属性
+   * @param {boolean} [data.is_searchable] - 是否可搜索
+   * @param {number} [data.sort_order] - 排序权重
+   * @param {Object} [options={}] - 事务选项（含 transaction）
+   * @returns {Promise<Object>} 操作结果
    */
   async createAttribute(data, options = {}) {
     const transaction = assertAndGetTransaction(options, 'AttributeService.createAttribute')
@@ -193,8 +193,8 @@ class AttributeService {
    *
    * @param {number} attributeId - 属性 ID
    * @param {Object} data - 可更新字段（与创建类似）
-   * @param {Object} [options={}]
-   * @returns {Promise<Object>}
+   * @param {Object} [options={}] - 事务选项
+   * @returns {Promise<Object>} 操作结果
    */
   async updateAttribute(attributeId, data, options = {}) {
     const transaction = assertAndGetTransaction(options, 'AttributeService.updateAttribute')
@@ -275,8 +275,8 @@ class AttributeService {
    * 硬删除属性（依赖数据库级联清理选项与品类绑定）
    *
    * @param {number} attributeId - 属性 ID
-   * @param {Object} [options={}]
-   * @returns {Promise<void>}
+   * @param {Object} [options={}] - 事务选项
+   * @returns {Promise<void>} 无返回值
    */
   async deleteAttribute(attributeId, options = {}) {
     const transaction = assertAndGetTransaction(options, 'AttributeService.deleteAttribute')
@@ -305,8 +305,8 @@ class AttributeService {
    *
    * @param {number} attributeId - 属性 ID
    * @param {Object} data - option_value, sort_order
-   * @param {Object} [options={}]
-   * @returns {Promise<Object>}
+   * @param {Object} [options={}] - 事务选项
+   * @returns {Promise<Object>} 操作结果
    */
   async createAttributeOption(attributeId, data, options = {}) {
     const transaction = assertAndGetTransaction(options, 'AttributeService.createAttributeOption')
@@ -351,8 +351,8 @@ class AttributeService {
    *
    * @param {number} optionId - 选项 ID
    * @param {Object} data - option_value, sort_order, is_enabled
-   * @param {Object} [options={}]
-   * @returns {Promise<Object>}
+   * @param {Object} [options={}] - 事务选项
+   * @returns {Promise<Object>} 操作结果
    */
   async updateAttributeOption(optionId, data, options = {}) {
     const transaction = assertAndGetTransaction(options, 'AttributeService.updateAttributeOption')
@@ -409,8 +409,8 @@ class AttributeService {
    * 硬删除属性选项（若已被 SKU 引用则禁止）
    *
    * @param {number} optionId - 选项 ID
-   * @param {Object} [options={}]
-   * @returns {Promise<void>}
+   * @param {Object} [options={}] - 事务选项
+   * @returns {Promise<void>} 无返回值
    */
   async deleteAttributeOption(optionId, options = {}) {
     const transaction = assertAndGetTransaction(options, 'AttributeService.deleteAttributeOption')
@@ -453,7 +453,7 @@ class AttributeService {
    *
    * @param {number} categoryId - 品类 ID
    * @param {number[]} attributeIds - 属性 ID 列表（顺序即品类内 sort_order）
-   * @param {Object} [options={}]
+   * @param {Object} [options={}] - 事务选项
    * @returns {Promise<Object[]>} 新建绑定行（plain）
    */
   async bindCategoryAttributes(categoryId, attributeIds, options = {}) {
@@ -543,7 +543,7 @@ class AttributeService {
    * 查询品类已绑定的属性（含选项，按绑定 sort_order）
    *
    * @param {number} categoryId - 品类 ID
-   * @returns {Promise<Array>}
+   * @returns {Promise<Array>} 列表结果
    */
   async getCategoryAttributes(categoryId) {
     const cid = Number(categoryId)

@@ -1,16 +1,24 @@
 /**
  * 市场/交易域路由聚合入口
  *
- * @description 市场统计、竞价管理、兑换商品、汇率、交易订单
- * @route /api/v4/console/marketplace  /api/v4/console/bid-management  /api/v4/console/exchange-*  /api/v4/console/trade-orders
+ * @description C2C 二级市场管理（瘦身后仅 C2C 挂牌管理 + 市场统计 + 可交易资产配置）
+ * @route /api/v4/console/marketplace/*
+ *
+ * 已迁移到独立顶级域的路由：
+ * - B2C 兑换商品 → /console/exchange/items
+ * - B2C 兑换订单 → /console/exchange/orders
+ * - B2C 兑换统计 → /console/exchange/stats
+ * - 汇率管理 → /console/assets/rates
+ * - 竞拍管理 → /console/bids
+ * - C2C 订单 → /console/marketplace/orders
  */
 const express = require('express')
 const router = express.Router()
 
+/** C2C 挂牌管理 + 市场统计 + 可交易资产配置 */
 router.use('/marketplace', require('./marketplace'))
-router.use('/bid-management', require('./bid-management'))
-router.use('/exchange-items', require('./exchange-items'))
-router.use('/exchange-rates', require('./exchange-rates'))
-router.use('/trade-orders', require('./trade-orders'))
+
+/** C2C 交易订单（合并原 trade_orders + trade-orders 两处重复） */
+router.use('/marketplace/orders', require('../marketplace/orders'))
 
 module.exports = router

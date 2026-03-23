@@ -21,8 +21,6 @@ module.exports = {
 
     try {
       // ========================================
-      // Phase 1: item_templates — category_def_id → category_id
-      // ========================================
 
       // 1a. 添加新列
       await queryInterface.sequelize.query(
@@ -52,8 +50,6 @@ module.exports = {
       )
 
       // ========================================
-      // Phase 2: market_listings — offer_category_def_id → offer_category_id
-      // ========================================
 
       // 2a. 添加新列
       await queryInterface.sequelize.query(
@@ -82,8 +78,6 @@ module.exports = {
         { transaction }
       )
 
-      // ========================================
-      // Phase 3: 删除 category_defs 自引用 FK 后 DROP 表
       // ========================================
 
       await queryInterface.sequelize.query(

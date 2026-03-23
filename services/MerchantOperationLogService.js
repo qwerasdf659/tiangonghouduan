@@ -18,7 +18,6 @@
  * - 静态服务类 + ServiceManager 统一入口
  * - 所有写操作通过 TransactionManager 处理
  *
- * 创建时间：2026-01-12
  * 依据文档：docs/商家员工域权限体系升级方案.md
  */
 
@@ -432,7 +431,7 @@ class MerchantOperationLogService {
 
       return {
         store_id: storeId,
-        total_count: totalCount,
+        total: totalCount,
         by_operation_type: operationTypeStats,
         by_result: resultStats,
         success_rate:
@@ -528,7 +527,7 @@ class MerchantOperationLogService {
 
       return {
         operator_id: operatorId,
-        total_count: totalCount,
+        total: totalCount,
         by_operation_type: operationTypeStats,
         by_result: resultStats,
         success_rate:
@@ -572,7 +571,7 @@ class MerchantOperationLogService {
    * @param {number} [filters.limit=10000] - 最大导出条数
    * @returns {Promise<Array>} 审计日志列表
    *
-   * @since 2026-01-18 路由层合规性治理：支持 CSV 导出功能
+   * @since 2026
    */
   static async exportLogs(filters = {}) {
     const { MerchantOperationLog, User, Store } = getModels()

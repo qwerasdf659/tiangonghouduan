@@ -109,14 +109,17 @@ class ShippingTrackService {
     // 依次尝试各 Provider
     for (const provider of this.providers) {
       try {
+        // eslint-disable-next-line no-await-in-loop
         const result = await provider.query(shippingNo, companyCode)
         if (result.success) {
           // 写入缓存（已签收 24h，其他 10min）
           try {
             const { getRedisClient } = require('../../utils/UnifiedRedisClient')
+            // eslint-disable-next-line no-await-in-loop
             const redis = await getRedisClient()
             const cacheKey = `app:v4:shipping:track:${shippingNo}`
             const ttl = result.state === 'delivered' ? 86400 : 600
+            // eslint-disable-next-line no-await-in-loop
             await redis.setex(cacheKey, ttl, JSON.stringify(result))
           } catch {
             /* 缓存写入失败不影响返回 */

@@ -20,15 +20,9 @@
  * - 快速失败，资格不满足时立即返回
  * - 提供详细的不满足原因
  *
- * 🔄 2026-01-19 架构迁移说明：
- * - 配额检查已迁移到 LotteryQuotaService（单一真相源）
- * - 不再直接查询 LotteryDraw.count，而是使用 LotteryQuotaService.checkQuotaSufficient
- * - 支持四维度配额控制：全局/活动/角色/用户
+ * 配额检查使用 LotteryQuotaService（四维度：全局/活动/角色/用户）
  *
  * @module services/UnifiedLotteryEngine/pipeline/stages/EligibilityStage
- * @author 统一抽奖架构重构
- * @since 2026-01-18
- * @updated 2026-01-19 - 集成 LotteryQuotaService 作为配额真相源
  */
 
 const BaseStage = require('./BaseStage')
@@ -85,15 +79,7 @@ class EligibilityStage extends BaseStage {
       // 2. 获取用户的活动配额（可选，用于特殊配额控制）
       const user_quota = await this._getUserQuota(user_id, lottery_campaign_id)
 
-      /*
-       * 3. 使用 LotteryQuotaService 检查配额（单一真相源）
-       *
-       * 🔄 2026-01-19 架构迁移：
-       * - 不再直接查询 LotteryDraw.count
-       * - 使用 LotteryQuotaService.checkQuotaSufficient 作为配额真相源
-       * - 支持四维度配额控制：全局/活动/角色/用户
-       * - 支持连抽场景的配额检查
-       */
+      /* 使用 LotteryQuotaService 检查配额（四维度：全局/活动/角色/用户） */
       const quota_check = await LotteryQuotaService.checkQuotaSufficient({
         user_id,
         lottery_campaign_id,

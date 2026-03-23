@@ -11,8 +11,6 @@
  * - B-34: 提醒规则CRUD
  * - B-35: 提醒历史接口
  *
- * 创建时间：2026年01月31日
- * 更新时间：2026年02月01日 - 添加提醒历史接口 (B-35)
  *
  * @module routes/v4/console/operations/reminder-rules
  */
@@ -400,7 +398,7 @@ router.get('/history/stats', authenticateToken, requireRoleLevel(100), async (re
 
     return res.apiSuccess(
       {
-        total_count: result.stats?.total || 0,
+        total: result.stats?.total || 0,
         by_status: result.stats?.by_status || {},
         by_rule: result.stats?.by_rule || [],
         success_rate:

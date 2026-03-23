@@ -20,8 +20,6 @@
  * - 统一使用 res.apiSuccess / res.apiError 响应
  * - 通过 ServiceManager 获取 ConsumptionService
  *
- * 创建时间：2025年12月22日
- * 更新时间：2026年01月14日
  */
 
 const express = require('express')

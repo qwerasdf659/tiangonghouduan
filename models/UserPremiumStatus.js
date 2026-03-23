@@ -16,7 +16,6 @@
  * - 条件2: account_asset_balances 中用户积分余额 ≥ 100（当前余额≥100积分）
  *
  * 数据表：user_premium_status
- * 创建时间：2025-11-02
  */
 
 const { DataTypes } = require('sequelize')

@@ -18,7 +18,6 @@
  *
  * API路径：/api/v4/console/user-hierarchy/*
  *
- * 创建时间：2026年01月09日
  */
 
 const express = require('express')
@@ -26,14 +25,13 @@ const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const TransactionManager = require('../../../../utils/TransactionManager')
 const { logger } = require('../../../../utils/logger')
-// P1-9：服务通过 ServiceManager 获取（B1-Injected + E2-Strict snake_case）
 
 // 所有路由都需要管理员权限
 router.use(authenticateToken)
 router.use(requireRoleLevel(30))
 
 /**
- * P1-9：通过中间件注入 HierarchyManagementService
+ * 通过中间件注入 HierarchyManagementService
  * 所有路由都可以通过 req.hierarchyService 访问服务
  */
 router.use((req, res, next) => {

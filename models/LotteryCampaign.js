@@ -1,6 +1,5 @@
 /**
  * 🔥 抽奖活动配置模型 - 全新分离式架构
- * 创建时间：2025年08月19日 UTC
  * 特点：智能抽奖管理 + 动态概率控制 + 完整的活动生命周期
  * 描述：管理抽奖活动的完整配置，支持多种抽奖类型和概率算法
  */
@@ -39,7 +38,7 @@ class LotteryCampaign extends Model {
       comment: '抽奖记录'
     })
 
-    /** banner/背景图通过 media_attachments 多态关联获取（旧列已删除） */
+    /** banner/背景图通过 media_attachments 多态关联获取 */
     if (models.MediaAttachment) {
       LotteryCampaign.hasMany(models.MediaAttachment, {
         foreignKey: 'attachable_id',
@@ -49,7 +48,7 @@ class LotteryCampaign extends Model {
       })
     }
 
-    // 🔴 统一抽奖架构新增关联（2026-01-18）
+    // 🔴 统一抽奖架构新增关联
 
     // 一对多：一个活动有多个档位规则
     LotteryCampaign.hasMany(models.LotteryTierRule, {
@@ -99,10 +98,7 @@ class LotteryCampaign extends Model {
      * 获取活动的欠账上限配置请使用: PresetDebtLimit.getOrCreateForCampaign(lottery_campaign_id)
      */
 
-    /*
-     * 档位降级兜底奖品和固定间隔保底奖品已迁移到 lottery_strategy_config 表
-     * config_group: tier_fallback / guarantee，通过 DynamicConfigLoader 读取
-     */
+    /* 档位降级/保底配置：config_group tier_fallback / guarantee，通过 DynamicConfigLoader 读取 */
 
     /*
      * 🔥 LotteryRecord已合并到LotteryDraw，使用draws关联即可
@@ -752,10 +748,7 @@ module.exports = sequelize => {
         comment: '档位权重比例因子（默认1000000，所有档位权重之和必须等于此值）'
       },
 
-      /*
-       * segment_resolver_version / preset_debt_enabled 已迁移到 lottery_strategy_config 表
-       * config_group: segment / preset，通过 DynamicConfigLoader 读取
-       */
+      /* 分群/预设配置：config_group segment / preset，通过 DynamicConfigLoader 读取 */
 
       /**
        * 预设预算扣减策略
@@ -1038,7 +1031,7 @@ module.exports = sequelize => {
         comment: '中奖动画类型: simple（简单弹窗）/card_flip（卡牌翻转）/fireworks（烟花特效）'
       },
 
-      // === Phase 0 新增字段：活动展示控制（2026-03-16） ===
+      // === Phase 0 新增字段：活动展示控制 ===
 
       /** 展示排序（数值越小越靠前，全项目统一 sort_order INT ASC 约定） */
       sort_order: {

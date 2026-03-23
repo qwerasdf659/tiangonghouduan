@@ -8,7 +8,6 @@
  * 服务对象：
  * - /api/v4/system/ad-events/impression（小程序端 - 曝光事件上报）
  *
- * 创建时间：2026-02-18
  */
 
 const logger = require('../utils/logger').logger

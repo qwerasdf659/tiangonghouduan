@@ -76,7 +76,7 @@ class CoreService {
 
   /**
    * 兑换商品（核心业务逻辑）
-   * V4.5.0 材料资产支付版本（2025-12-15）
+   * V4.5.0 材料资产支付版本
    * V4.9.0 统一商品中心 ExchangeItem 模型
    *
    * 支付方式：使用BalanceService扣减材料资产（cost_asset_code + cost_amount）
@@ -348,7 +348,7 @@ class CoreService {
     )
 
     /*
-     * 🔴 P0治理：提取扣减流水ID用于对账（2026-01-09）
+     * 🔴 P0治理：提取扣减流水ID用于对账
      */
     const debit_transaction_id = materialResult.transaction_record?.transaction_id || null
 
@@ -969,6 +969,7 @@ class CoreService {
     if (affectedCount > 0) {
       // 批量写入事件记录（SYSTEM_DAILY_JOB_USER_ID = 11021）
       for (const row of pendingOrders) {
+        // eslint-disable-next-line no-await-in-loop
         await this._recordEvent(
           {
             order_no: row.order_no,

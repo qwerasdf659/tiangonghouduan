@@ -30,7 +30,7 @@
  *
  * @module services/UnifiedLotteryEngine/pipeline/stages/SettleStage
  * @author 统一抽奖架构重构
- * @since 2026-01-18
+ * @since 2026
  * @updated 2026-01-19 - Phase 2 增强（积分扣减、派生幂等键）
  */
 
@@ -49,7 +49,7 @@ const {
 const BeijingTimeHelper = require('../../../../utils/timeHelper')
 const { generateLotteryDrawBusinessId } = require('../../../../utils/IdempotencyHelper')
 const OrderNoGenerator = require('../../../../utils/OrderNoGenerator')
-// V4.7.0 AssetService 拆分：使用子服务替代原 AssetService（2026-01-31）
+// V4.7.0 AssetService 拆分：使用子服务替代原 AssetService
 const BalanceService = require('../../../asset/BalanceService')
 const ItemService = require('../../../asset/ItemService')
 const {

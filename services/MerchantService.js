@@ -15,7 +15,7 @@
  * - 字典表类型校验（merchant_type）
  * - 北京时间统一处理
  *
- * @since 2026-02-23
+ * @since 2026
  */
 
 'use strict'
@@ -166,10 +166,13 @@ class MerchantService {
     const result = merchant.toJSON()
     result.store_count = result.stores ? result.stores.length : 0
 
-    await attachDisplayNames([result], [
-      { field: 'merchant_type', dictType: DICT_TYPES.MERCHANT_TYPE },
-      { field: 'status', dictType: DICT_TYPES.MERCHANT_STATUS }
-    ])
+    await attachDisplayNames(
+      [result],
+      [
+        { field: 'merchant_type', dictType: DICT_TYPES.MERCHANT_TYPE },
+        { field: 'status', dictType: DICT_TYPES.MERCHANT_STATUS }
+      ]
+    )
 
     return result
   }

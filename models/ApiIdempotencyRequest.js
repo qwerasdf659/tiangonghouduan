@@ -21,7 +21,6 @@
  * - 表名：api_idempotency_requests
  * - 主键：request_id
  *
- * 创建时间：2025-12-26
  * 版本：1.0.0 - 业界标准幂等架构（方案B）
  */
 

@@ -133,7 +133,7 @@ describe('背包API测试 - P2优先级', () => {
       })
     })
 
-    test('不应该返回已禁用的资产类型（如 POINTS is_enabled=false）', async () => {
+    test('不应该返回已禁用或系统内部的资产类型', async () => {
       const response = await request(app)
         .get('/api/v4/backpack')
         .set('Authorization', `Bearer ${user_token}`)
@@ -142,13 +142,13 @@ describe('背包API测试 - P2优先级', () => {
 
       const { assets } = response.body.data
 
-      // POINTS（is_enabled=0）不应出现在背包资产列表中
-      const hasPOINTS = assets.some(a => a.asset_code === 'POINTS')
-      expect(hasPOINTS).toBe(false)
-
-      // BUDGET_POINTS（系统内部资产）也不应出现
+      // BUDGET_POINTS（is_enabled=0，系统内部资产）不应出现在背包资产列表中
       const hasBudgetPoints = assets.some(a => a.asset_code === 'BUDGET_POINTS')
       expect(hasBudgetPoints).toBe(false)
+
+      // DIAMOND_QUOTA（form=quota，配额类资产）不应出现在背包资产列表中
+      const hasQuota = assets.some(a => a.asset_code === 'DIAMOND_QUOTA')
+      expect(hasQuota).toBe(false)
     })
 
     test('应该返回正确的物品数据结构', async () => {

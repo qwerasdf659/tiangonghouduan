@@ -23,7 +23,7 @@
  *
  * @module services/UnifiedLotteryEngine/compute/calculators/BudgetTierCalculator
  * @author 抽奖模块策略重构 - Phase 3
- * @since 2026-01-20
+ * @since 2026
  */
 
 const { logger } = require('../../../../utils/logger')
@@ -190,7 +190,7 @@ class BudgetTierCalculator {
       return Infinity
     }
 
-    // V4.7.0 AssetService 拆分：延迟加载 QueryService 和 LotteryCampaign 避免循环依赖（2026-01-31）
+    // V4.7.0 AssetService 拆分：延迟加载 QueryService 和 LotteryCampaign 避免循环依赖
     const QueryService = require('../../../asset/QueryService')
     const { LotteryCampaign } = require('../../../../models')
 

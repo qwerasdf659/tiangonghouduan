@@ -11,8 +11,6 @@
  * - 路由层不直连 models（通过 ServiceManager 获取 BalanceService）
  * - 路由层不开启事务（事务管理在 Service 层）
  *
- * 创建时间：2025-12-29
- * 更新时间：2026-01-31（V4.7.0 AssetService 拆分）
  */
 
 'use strict'
@@ -73,7 +71,7 @@ router.get(
       return res.apiError('无效的资产类型', 'BAD_REQUEST', null, 400)
     }
 
-    // V4.7.0 AssetService 拆分：通过 ServiceManager 获取 BalanceService（2026-01-31）
+    // V4.7.0 AssetService 拆分：通过 ServiceManager 获取 BalanceService
     const BalanceService = req.app.locals.services.getService('asset_balance')
 
     const balance = await BalanceService.getBalance({ user_id, asset_code })
@@ -110,7 +108,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const user_id = req.user.user_id
 
-    // V4.7.0 AssetService 拆分：通过 ServiceManager 获取 BalanceService（2026-01-31）
+    // V4.7.0 AssetService 拆分：通过 ServiceManager 获取 BalanceService
     const BalanceService = req.app.locals.services.getService('asset_balance')
 
     const balances = await BalanceService.getAllBalances({ user_id })

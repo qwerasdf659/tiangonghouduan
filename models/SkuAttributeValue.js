@@ -42,8 +42,8 @@ class SkuAttributeValue extends Model {
 }
 
 /**
- * @param {import('sequelize').Sequelize} sequelize - Sequelize 实例
- * @returns {typeof SkuAttributeValue}
+ * @param {Object} sequelize - Sequelize 实例
+ * @returns {Model} 初始化后的模型类
  */
 module.exports = sequelize => {
   SkuAttributeValue.init(

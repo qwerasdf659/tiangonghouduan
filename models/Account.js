@@ -22,7 +22,6 @@
  * 主键：account_id（BIGINT，自增）
  * 外键：user_id → users.user_id（CASCADE更新，RESTRICT删除）
  *
- * 创建时间：2025-12-15
  * 最后更新：2025-12-15
  */
 

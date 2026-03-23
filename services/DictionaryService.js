@@ -100,7 +100,7 @@ class DictionaryService {
     return {
       list: rows,
       pagination: {
-        total_count: count,
+        total: count,
         page: parseInt(page),
         page_size: parseInt(page_size),
         total_pages: Math.ceil(count / page_size)
@@ -330,7 +330,7 @@ class DictionaryService {
     return {
       list: rows,
       pagination: {
-        total_count: count,
+        total: count,
         page: parseInt(page),
         page_size: parseInt(page_size),
         total_pages: Math.ceil(count / page_size)
@@ -515,7 +515,7 @@ class DictionaryService {
     return {
       list: rows,
       pagination: {
-        total_count: count,
+        total: count,
         page: parseInt(page),
         page_size: parseInt(page_size),
         total_pages: Math.ceil(count / page_size)

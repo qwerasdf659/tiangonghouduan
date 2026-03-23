@@ -20,7 +20,6 @@
  * - owner_user_id → owner_account_id（统一账户体系）
  * - meta.name → item_name, meta.rarity → rarity_code, meta.description → item_description
  *
- * 创建时间：2025-12-17
  * 三表模型迁移：2026-02-22
  */
 
@@ -269,7 +268,8 @@ class BackpackService {
         now - _actionRulesCacheHolder.time > ACTION_RULES_CACHE_TTL
       ) {
         const AdminSystemService = require('./AdminSystemService')
-        _actionRulesCacheHolder.value = await AdminSystemService.getConfigValue('item_type_action_rules', {}) // eslint-disable-line require-atomic-updates
+        const freshRules = await AdminSystemService.getConfigValue('item_type_action_rules', {})
+        _actionRulesCacheHolder.value = freshRules // eslint-disable-line require-atomic-updates
         _actionRulesCacheHolder.time = Date.now() // eslint-disable-line require-atomic-updates
       }
 
@@ -346,7 +346,8 @@ class BackpackService {
         detailNow - _actionRulesCacheHolder.time > ACTION_RULES_CACHE_TTL
       ) {
         const AdminSystemService = require('./AdminSystemService')
-        _actionRulesCacheHolder.value = await AdminSystemService.getConfigValue('item_type_action_rules', {}) // eslint-disable-line require-atomic-updates
+        const freshRules = await AdminSystemService.getConfigValue('item_type_action_rules', {})
+        _actionRulesCacheHolder.value = freshRules // eslint-disable-line require-atomic-updates
         _actionRulesCacheHolder.time = Date.now() // eslint-disable-line require-atomic-updates
       }
       const detailActionRules = _actionRulesCacheHolder.value
@@ -456,7 +457,10 @@ class BackpackService {
     const { ItemTemplate } = require('../models')
     const AdminSystemService = require('./AdminSystemService')
 
-    const instructionsConfig = await AdminSystemService.getConfigValue('backpack_use_instructions', {})
+    const instructionsConfig = await AdminSystemService.getConfigValue(
+      'backpack_use_instructions',
+      {}
+    )
     const itemType = item.item_type
 
     if (item.prize_definition_id) {

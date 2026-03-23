@@ -16,8 +16,6 @@
  * - 路由层通过 req.app.locals.services.getService() 获取服务
  * - 路由层禁止直接 require models（所有数据库操作通过 Service 层）
  *
- * 创建时间：2026-01-09
- * 更新时间：2026-02-16（统一字段名为数据库真实字段名，修复 description 从 meta 提取）
  */
 
 'use strict'
@@ -75,7 +73,7 @@ router.get(
     const pageNum = Math.max(1, parseInt(page) || 1)
     const pageSizeNum = Math.min(100, Math.max(1, parseInt(page_size) || 20))
 
-    // V4.7.0 AssetService 拆分：通过 ServiceManager 获取 QueryService（2026-01-31）
+    // V4.7.0 AssetService 拆分：通过 ServiceManager 获取 QueryService
     const QueryService = req.app.locals.services.getService('asset_query')
 
     try {

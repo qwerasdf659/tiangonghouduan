@@ -30,9 +30,6 @@
  * - 支持手续费三方记账
  * - 返回手续费信息给前端
  *
- * 创建时间：2025年12月22日
- * 更新时间：2026年01月05日 - 事务边界治理改造
- * 更新时间：2026年01月13日 - 规则驱动 + 手续费支持
  */
 
 const express = require('express')
@@ -41,7 +38,6 @@ const { authenticateToken } = require('../../../../middleware/auth')
 const { handleServiceError } = require('../../../../middleware/validation')
 const logger = require('../../../../utils/logger').logger
 const TransactionManager = require('../../../../utils/TransactionManager')
-// P1-9：服务通过 ServiceManager 获取（B1-Injected + E2-Strict snake_case）
 
 /**
  * 材料转换接口（显式转换 - 规则驱动）
@@ -98,7 +94,6 @@ const TransactionManager = require('../../../../utils/TransactionManager')
  * 幂等性控制（业界标准形态）：统一通过 Header Idempotency-Key 防止重复转换
  */
 router.post('/convert', authenticateToken, async (req, res) => {
-  // P1-9：通过 ServiceManager 获取服务（B1-Injected + E2-Strict snake_case）
   const IdempotencyService = req.app.locals.services.getService('idempotency')
   const AssetConversionService = req.app.locals.services.getService('asset_conversion')
 

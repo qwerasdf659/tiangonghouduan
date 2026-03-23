@@ -23,7 +23,7 @@
  * - PUT    /:id             - 更新商家信息
  * - DELETE /:id             - 删除商家（硬删除，需无关联数据）
  *
- * @since 2026-02-23
+ * @since 2026
  */
 
 'use strict'

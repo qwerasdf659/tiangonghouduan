@@ -17,20 +17,16 @@
  * - 统一只接受 Header Idempotency-Key，不接受 body 中的 business_id
  * - 缺失幂等键直接返回 400
  *
- * 创建时间：2025年12月22日
- * 更新时间：2026年01月02日 - 业界标准形态破坏性重构
- * 更新时间：2026年01月08日 - 实现可叠加资产挂牌功能（交易市场材料交易）
  */
 
 const express = require('express')
 const router = express.Router()
 const { authenticateToken } = require('../../../middleware/auth')
-const { requireValidSession } = require('../../../middleware/sensitiveOperation') // 🔐 会话管理功能（2026-01-21）
+const { requireValidSession } = require('../../../middleware/sensitiveOperation')
 const { handleServiceError } = require('../../../middleware/validation')
 const logger = require('../../../utils/logger').logger
 // 事务边界治理 - 统一事务管理器
 const TransactionManager = require('../../../utils/TransactionManager')
-// P1-9：服务通过 ServiceManager 获取（B1-Injected + E2-Strict snake_case）
 
 /*
  * 风控中间件（2026-01-14 多币种扩展新增）
@@ -68,7 +64,7 @@ const marketRiskMiddleware = getMarketRiskControlMiddleware()
  * 上架限制：最多同时上架10件商品
  * 幂等性控制（业界标准形态）：统一通过 Header Idempotency-Key 防止重复上架
  *
- * 多币种扩展（2026-01-14）：
+ * 多币种扩展：
  * - price_asset_code 参数支持选择结算币种
  * - 白名单由 system_settings.allowed_settlement_assets 控制
  * - 不同币种有不同的手续费计算逻辑
@@ -79,7 +75,6 @@ router.post(
   requireValidSession, // 🔐 市场挂牌属于敏感操作，需验证会话（2026-01-21 会话管理功能）
   marketRiskMiddleware.createListingRiskMiddleware(),
   async (req, res) => {
-    // P1-9：通过 ServiceManager 获取服务（B1-Injected + E2-Strict snake_case）
     const IdempotencyService = req.app.locals.services.getService('idempotency')
     const MarketListingService = req.app.locals.services.getService('market_listing_core')
 
@@ -120,8 +115,8 @@ router.post(
       }
 
       /*
-       * 多币种扩展（2026-01-14）：price_asset_code 参数
-       * - 必填参数（2026-01-20 清理兼容代码：移除默认值）
+       * 多币种扩展：price_asset_code 参数
+       * - 必填参数
        * - 支持值：DIAMOND、red_shard（由 system_settings.allowed_settlement_assets 控制）
        * - 校验逻辑在 Service 层统一处理（白名单校验）
        */
@@ -307,7 +302,7 @@ router.post(
  *
  * 业务场景：用户将可叠加资产（如材料）挂牌到交易市场出售
  *
- * 多币种扩展（2026-01-14）：
+ * 多币种扩展：
  * - price_asset_code 参数支持选择结算币种
  * - 白名单由 system_settings.allowed_settlement_assets 控制
  * 挂牌限制：材料和物品共享，最多同时上架10件
@@ -319,7 +314,6 @@ router.post(
   requireValidSession, // 🔐 可叠加资产挂牌属于敏感操作，需验证会话（2026-01-21 会话管理功能）
   marketRiskMiddleware.createListingRiskMiddleware(),
   async (req, res) => {
-    // P1-9：通过 ServiceManager 获取服务（B1-Injected + E2-Strict snake_case）
     const IdempotencyService = req.app.locals.services.getService('idempotency')
     const MarketListingService = req.app.locals.services.getService('market_listing_core')
 
@@ -384,8 +378,8 @@ router.post(
       }
 
       /*
-       * 多币种扩展（2026-01-14）：price_asset_code 参数
-       * - 必填参数（2026-01-20 清理兼容代码：移除默认值）
+       * 多币种扩展：price_asset_code 参数
+       * - 必填参数
        * - 支持值：DIAMOND、red_shard（由 system_settings.allowed_settlement_assets 控制）
        */
       const priceAssetCode = req.body.price_asset_code

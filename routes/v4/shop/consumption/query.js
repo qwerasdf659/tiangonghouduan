@@ -10,10 +10,9 @@
  * - DELETE /:id - 软删除消费记录
  * - POST /:id/restore - 管理员恢复已删除记录
  *
- * API路径参数设计规范 V2.2（2026-01-20）：
+ * API路径参数设计规范 V2.2：
  * - 消费记录是事务实体，使用数字ID（:id）作为标识符
  *
- * 创建时间：2025年12月22日
  * 从consumption.js拆分而来
  */
 
@@ -76,7 +75,7 @@ router.get('/me', authenticateToken, async (req, res) => {
  * @desc 查询消费记录详情
  * @access Private (相关用户或管理员)
  *
- * API路径参数设计规范 V2.2（2026-01-20）：
+ * API路径参数设计规范 V2.2：
  * - 消费记录是事务实体，使用数字ID（:id）作为标识符
  *
  * @param {number} id - 消费记录ID
@@ -135,7 +134,7 @@ router.get('/detail/:id', authenticateToken, async (req, res) => {
  * @desc 软删除消费记录（用户端隐藏记录，管理员可恢复）
  * @access Private (用户自己的记录)
  *
- * API路径参数设计规范 V2.2（2026-01-20）：
+ * API路径参数设计规范 V2.2：
  * - 消费记录是事务实体，使用数字ID（:id）作为标识符
  *
  * @param {number} id - 消费记录ID（路径参数）
@@ -200,7 +199,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
  * @desc 管理员恢复已删除的消费记录（管理员专用）
  * @access Private (仅管理员)
  *
- * API路径参数设计规范 V2.2（2026-01-20）：
+ * API路径参数设计规范 V2.2：
  * - 消费记录是事务实体，使用数字ID（:id）作为标识符
  *
  * @param {number} id - 消费记录ID（路径参数）

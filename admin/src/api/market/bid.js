@@ -6,7 +6,7 @@
  * @version 1.0.0
  * @date 2026-02-16
  *
- * 后端路由：/api/v4/console/bid-management
+ * 后端路由：/api/v4/console/bids
  * 后端权限：role_level >= 100
  */
 
@@ -16,11 +16,11 @@ import { API_PREFIX, request, buildURL, buildQueryString } from '../base.js'
 
 export const BID_ENDPOINTS = {
   // 竞价商品 CRUD
-  BID_LIST: `${API_PREFIX}/console/bid-management`,
-  BID_CREATE: `${API_PREFIX}/console/bid-management`,
-  BID_DETAIL: `${API_PREFIX}/console/bid-management/:id`,
-  BID_SETTLE: `${API_PREFIX}/console/bid-management/:id/settle`,
-  BID_CANCEL: `${API_PREFIX}/console/bid-management/:id/cancel`
+  BID_LIST: `${API_PREFIX}/console/bids`,
+  BID_CREATE: `${API_PREFIX}/console/bids`,
+  BID_DETAIL: `${API_PREFIX}/console/bids/:id`,
+  BID_SETTLE: `${API_PREFIX}/console/bids/:id/settle`,
+  BID_CANCEL: `${API_PREFIX}/console/bids/:id/cancel`
 }
 
 // ========== API 调用方法 ==========

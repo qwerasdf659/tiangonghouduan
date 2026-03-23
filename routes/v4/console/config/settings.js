@@ -28,7 +28,7 @@ const { sharedComponents, adminAuthMiddleware, asyncHandler } = require('../shar
  * @route GET /api/v4/console/settings/security
  * @access Private (需要管理员权限)
  *
- * API路径参数设计规范 V2.2（2026-01-20）：
+ * API路径参数设计规范 V2.2：
  * - 系统设置是配置实体，使用业务码（:code）作为标识符
  * - 业务码格式：lowercase（如 basic, lottery, points）
  */
@@ -80,7 +80,7 @@ router.get(
  * @route PUT /api/v4/console/settings/security
  * @access Private (需要管理员权限)
  *
- * API路径参数设计规范 V2.2（2026-01-20）：
+ * API路径参数设计规范 V2.2：
  * - 系统设置是配置实体，使用业务码（:code）作为标识符
  * - 业务码格式：lowercase（如 basic, lottery, points）
  *

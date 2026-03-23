@@ -4,8 +4,6 @@ const TransactionManager = require('../../../../utils/TransactionManager')
 /**
  * 管理员用户管理路由 - V4.0 UUID角色系统版本
  * 权限管理：完全使用UUID角色系统，移除is_admin字段依赖
- * 创建时间：2025年01月21日
- * 更新时间：2026年01月05日（事务边界治理改造）
  *
  * 架构原则：
  * - 路由层不直连 models（所有数据库操作通过 Service 层）
@@ -36,7 +34,7 @@ router.use(requireRoleLevel(100))
  * - role_distribution: 用户角色分布
  * - recent_registrations: 近期注册趋势（7日）
  *
- * @since 2026-02-05（用户管理模块统计接口）
+ * @since 2026
  */
 router.get('/stats', async (req, res) => {
   try {
@@ -94,7 +92,7 @@ router.get('/stats', async (req, res) => {
  *
  * 响应格式：标准 ApiResponse（res.apiSuccess / res.apiError）
  *
- * @since 2026-02-06（手机号主导搜索改造）
+ * @since 2026
  */
 router.get('/users/resolve', async (req, res) => {
   try {
@@ -246,7 +244,6 @@ router.put('/users/:user_id/role', async (req, res) => {
 
       if (result.post_commit_actions.disconnect_ws) {
         try {
-          // P1-9：通过 ServiceManager 获取 ChatWebSocketService（snake_case key）
           const ChatWebSocketService = req.app.locals.services.getService('chat_web_socket')
           ChatWebSocketService.disconnectUser(user_id, 'user')
           ChatWebSocketService.disconnectUser(user_id, 'admin')
@@ -374,7 +371,7 @@ router.get('/roles', async (req, res) => {
  * - 角色名称唯一性检查
  * - 角色等级不能高于操作者等级
  *
- * @since 2026-01-26（角色权限管理功能）
+ * @since 2026
  */
 router.post('/roles', async (req, res) => {
   try {
@@ -442,7 +439,7 @@ router.post('/roles', async (req, res) => {
  * - 系统内置角色不可编辑
  * - 角色等级不能修改为高于操作者等级
  *
- * @since 2026-01-26（角色权限管理功能）
+ * @since 2026
  */
 router.put('/roles/:role_id', async (req, res) => {
   try {
@@ -536,7 +533,7 @@ router.put('/roles/:role_id', async (req, res) => {
  * - 现有用户保持原权限不受影响
  * - 角色从"可分配列表"中消失
  *
- * @since 2026-01-26（角色权限管理功能）
+ * @since 2026
  */
 router.delete('/roles/:role_id', async (req, res) => {
   try {
@@ -611,7 +608,7 @@ router.delete('/roles/:role_id', async (req, res) => {
  *
  * 返回系统定义的所有权限资源和可用操作，用于角色权限配置界面。
  *
- * @since 2026-01-26（角色权限管理功能）
+ * @since 2026
  */
 router.get('/permission-resources', async (req, res) => {
   try {

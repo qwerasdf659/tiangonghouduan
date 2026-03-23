@@ -200,10 +200,10 @@ describe('API契约测试 - 抽奖模块 (/api/v4/lottery)', () => {
       expect(response.status).toBe(200)
       validateApiContract(response.body)
 
-      // 验证分页结构 - 抽奖历史使用 total_records 和 current_page
+      // 验证分页结构 - 抽奖历史使用 total 和 page
       if (response.body.data.pagination) {
-        expect(response.body.data.pagination).toHaveProperty('total_records')
-        expect(response.body.data.pagination).toHaveProperty('current_page')
+        expect(response.body.data.pagination).toHaveProperty('total')
+        expect(response.body.data.pagination).toHaveProperty('page')
         expect(response.body.data.pagination).toHaveProperty('page_size')
       }
     })

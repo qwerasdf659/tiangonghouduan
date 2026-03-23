@@ -322,7 +322,7 @@ function messageCenterPage() {
       this.loading = true
       try {
         const params = {
-          limit: this.pagination.page_size,
+          page_size: this.pagination.page_size,
           offset: (this.pagination.page - 1) * this.pagination.page_size
         }
 

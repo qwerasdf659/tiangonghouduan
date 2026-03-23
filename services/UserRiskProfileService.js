@@ -94,7 +94,7 @@ class UserRiskProfileService {
       return {
         list: rows,
         pagination: {
-          total_count: count,
+          total: count,
           page,
           page_size,
           total_pages: Math.ceil(count / page_size)
@@ -570,7 +570,7 @@ class UserRiskProfileService {
       return {
         list: rows,
         pagination: {
-          total_count: count,
+          total: count,
           page,
           page_size,
           total_pages: Math.ceil(count / page_size)

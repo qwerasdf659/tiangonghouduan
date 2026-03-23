@@ -29,7 +29,7 @@
  * - 记录变动前后余额用于完整对账（before + delta = after）
  * - 冻结模型：交易市场购买和资产挂牌必须走冻结→结算链路
  *
- * V1.1.0 双录变更（2026-02-23）：
+ * V1.1.0 双录变更：
  * - freeze/unfreeze 自动在 SYSTEM_ESCROW 账户写反向流水，保证全局 SUM(delta_amount)=0
  * - settleFromFrozen 的 delta_amount=0，仅记录 counterpart_account_id 用于审计追踪
  * - 所有冻结/解冻操作记录 counterpart_account_id，支持完整的对手方追溯

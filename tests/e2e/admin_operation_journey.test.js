@@ -121,7 +121,7 @@ describe('E2E - 管理员运营流程测试', () => {
         const users = response.body.data.users || response.body.data.list || []
         console.log('[Step 2] 用户列表:', {
           total: response.body.data.pagination?.total || users.length,
-          current_page: users.length
+          page: users.length
         })
 
         if (users.length > 0) {

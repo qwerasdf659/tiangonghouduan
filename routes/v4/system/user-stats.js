@@ -7,7 +7,6 @@
  *
  * 路由前缀：/api/v4/system
  *
- * 创建时间：2025年12月22日
  */
 
 const express = require('express')

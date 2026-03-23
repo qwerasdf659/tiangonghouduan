@@ -12,8 +12,6 @@
  * - 用户端路由不含 :user_id 参数，身份纯从 JWT Token 获取
  * - 管理员查看他人数据走 /api/v4/console/lottery-user-analysis/
  *
- * 创建时间：2025年12月22日
- * 更新时间：2026年2月12日（路由分离方案 - 抽奖接口安全改造）
  */
 
 const express = require('express')
@@ -42,7 +40,7 @@ router.get('/points', authenticateToken, pointsRateLimiter, async (req, res) => 
     const UserService = req.app.locals.services.getService('user')
 
     /*
-     * 决策 D-1（2026-02-21）：today_summary 已拆分到 /api/v4/assets/today-summary
+     * 决策 D-1：today_summary 已拆分到 /api/v4/assets/today-summary
      * 本接口回归纯积分余额查询职责，不再跨域拼接资产汇总
      */
     const pointsResult = await UserService.getUserWithPoints(user_id, {
@@ -115,7 +113,6 @@ router.get('/statistics', authenticateToken, async (req, res) => {
 /**
  * V4.6 抽奖系统健康检查（Pipeline 架构）
  *
- * 2026-01-19 Phase 5 迁移：
  * - 更新为 Pipeline 管线名称
  * - 保留 ManagementStrategy 用于管理 API
  */
@@ -127,12 +124,12 @@ router.get('/health', (req, res) => {
         service: 'V4.6统一抽奖引擎',
         version: '4.6.0',
         architecture: 'pipeline',
-        pipelines: ['NormalDrawPipeline'], // Phase 5：统一管线
+        pipelines: ['NormalDrawPipeline'], // ：统一管线
         decision_sources: ['normal', 'preset', 'override'], // 决策来源类型
         management_strategy: 'ManagementStrategy',
         timestamp: BeijingTimeHelper.apiTimestamp()
       },
-      'V4.6抽奖系统运行正常（Phase 5 统一管线架构）'
+      'V4.6抽奖系统运行正常（ 统一管线架构）'
     )
   } catch (error) {
     logger.error('抽奖系统健康检查失败:', error)

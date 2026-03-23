@@ -101,7 +101,7 @@ module.exports = sequelize => {
           '幂等键（业界标准命名 - 必填），用于防止重复提交，客户端通过 Header Idempotency-Key 传入'
       },
       /**
-       * 业务唯一键（business_id）- 事务边界治理（2026-01-05）
+       * 业务唯一键（business_id）- 事务边界治理
        *
        * 与 idempotency_key 的区别：
        * - idempotency_key：请求级幂等（防止同一请求重复提交）
@@ -119,7 +119,7 @@ module.exports = sequelize => {
       /**
        * 关联扣减流水ID（逻辑外键，用于对账）
        *
-       * 事务边界治理（2026-01-05）：
+       * 事务边界治理：
        * - 兑换扣减资产时，记录对应的 asset_transactions.transaction_id
        * - 用于定时对账脚本检查数据一致性
        * - 不使用物理外键约束，支持未来分库分表
@@ -265,7 +265,7 @@ module.exports = sequelize => {
         comment: '退款时间（退款完成的时间）'
       },
 
-      // === Phase 0 新增字段：快递信息（2026-03-16） ===
+      // === Phase 0 新增字段：快递信息 ===
 
       /** 快递公司代码（如 sf/yt/zt/yto），用于调用快递查询 API */
       shipping_company: {

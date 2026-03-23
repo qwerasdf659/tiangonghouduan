@@ -31,13 +31,13 @@ const BeijingTimeHelper = require('../../../../utils/timeHelper')
 function rowsToCsv(rows) {
   if (!rows.length) return ''
   const keys = Object.keys(rows[0])
-  const esc = (v) => {
+  const esc = v => {
     const s = String(v ?? '')
     if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`
     return s
   }
   const header = keys.map(esc).join(',')
-  const body = rows.map((row) => keys.map((k) => esc(row[k])).join(','))
+  const body = rows.map(row => keys.map(k => esc(row[k])).join(','))
   return [header, ...body].join('\n')
 }
 
@@ -209,5 +209,8 @@ router.get('/export', authenticateToken, requireRoleLevel(100), async (req, res)
  */
 router.use('/', portfolioRoutes)
 router.use('/transactions', transactionsRoutes)
+
+/** 汇率管理（B2C + C2C 共享，从 market/exchange-rates.js 迁移） */
+router.use('/rates', require('../market/exchange-rates'))
 
 module.exports = router

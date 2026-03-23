@@ -572,7 +572,7 @@ class LotteryAnalyticsQueryService {
    * @param {Object} options - 查询选项
    * @param {string} [options.range='7d'] - 时间范围
    * @param {number} [options.merchant_id] - 按商家筛选
-   * @returns {Promise<Object>} { distribution, total_count, range, updated_at }
+   * @returns {Promise<Object>} { distribution, total, range, updated_at }
    */
   static async getDashboardPrizeDistribution(options = {}) {
     const { range = '7d', merchant_id } = options
@@ -626,7 +626,7 @@ class LotteryAnalyticsQueryService {
       }))
       .sort((a, b) => b.count - a.count)
 
-    return { distribution, total_count: totalCount, range, updated_at: new Date().toISOString() }
+    return { distribution, total: totalCount, range, updated_at: new Date().toISOString() }
   }
 
   /**

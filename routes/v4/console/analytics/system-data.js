@@ -24,7 +24,6 @@
  * - 事务边界：路由层使用 TransactionManager.execute() 管理
  * - 采用模式A：外部传入事务（跨服务事务支持、事务边界清晰）
  *
- * 创建时间：2026-01-21
  * 最后更新：2026-02-02（事务管理模式A确定）
  */
 
@@ -461,10 +460,7 @@ router.put(
       }
       if (win_animation !== undefined) updateData.win_animation = win_animation
       if (background_image_url !== undefined) updateData.background_image_url = background_image_url
-      /*
-       * guarantee_enabled/threshold/prize_id 已迁移到 lottery_strategy_config.guarantee.*
-       * 通过 PUT /api/v4/console/lottery-campaigns/:id/strategy-config 管理
-       */
+      /* 保底/档位配置通过 PUT /api/v4/console/lottery-campaigns/:id/strategy-config 管理 */
 
       // 通过 ServiceManager 获取服务
       const LotteryCampaignCRUDService = req.app.locals.services.getService('lottery_campaign_crud')

@@ -16,7 +16,6 @@
  * API 路径前缀：/api/v4/console/audit-logs
  * 访问权限：admin（role_level >= 100）
  *
- * 创建时间：2026-01-12
  * 依据文档：docs/商家员工域权限体系升级方案.md
  */
 

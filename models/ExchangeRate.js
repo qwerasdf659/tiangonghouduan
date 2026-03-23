@@ -14,7 +14,6 @@
  * - 表名：exchange_rates
  * - 主键：exchange_rate_id
  *
- * 创建时间：2026-02-23
  */
 
 'use strict'

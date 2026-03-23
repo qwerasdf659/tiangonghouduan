@@ -1,20 +1,18 @@
 /**
  * 抽奖查询服务 - 读操作分层服务（LotteryQueryService）
  *
- * @description 从 UnifiedLotteryEngine 迁移的读操作服务
- *   - 分层策略：热点读操作收口 + Redis 缓存
- *   - 迁移来源：UnifiedLotteryEngine.js（暴力迁移，不保留兼容）
+ * @description 热点读操作收口 + Redis 缓存
  *   - 缓存策略：使用 BusinessCacheHelper 统一管理
  *
- * 迁移的方法清单（共8个）：
- *   1. getCampaignPrizes     - 获取活动奖品列表（原 get_campaign_prizes）
- *   2. getCampaignConfig     - 获取活动配置（原 get_campaign_config，已有缓存）
- *   3. getUserHistory        - 获取用户抽奖历史（原 get_user_history）
- *   4. getActiveCampaigns    - 获取活动列表（原 get_campaigns）
- *   5. getUserStatistics     - 获取用户抽奖统计（原 get_user_statistics）
- *   6. getCampaignByCode     - 通过code获取活动（原 getCampaignByCode）
- *   7. getCampaignWithPrizes - 获取活动及奖品（原 getCampaignWithPrizes）
- *   8. getCampaignConfigByCode - 通过code获取配置（原 getCampaignConfigByCode）
+ * 方法清单（共8个）：
+ *   1. getCampaignPrizes       - 获取活动奖品列表
+ *   2. getCampaignConfig       - 获取活动配置（带缓存）
+ *   3. getUserHistory          - 获取用户抽奖历史
+ *   4. getActiveCampaigns      - 获取活动列表
+ *   5. getUserStatistics       - 获取用户抽奖统计
+ *   6. getCampaignByCode       - 通过 code 获取活动
+ *   7. getCampaignWithPrizes   - 获取活动及奖品
+ *   8. getCampaignConfigByCode - 通过 code 获取配置
  *
  * 缓存策略（已实现）：
  *   - getCampaignConfig：60s TTL（使用 BusinessCacheHelper.getLotteryCampaign）
@@ -179,7 +177,7 @@ class LotteryQueryService {
       }
 
       /**
-       * V4.6 Phase 5：保底规则现在由 Pipeline 架构内部处理
+       * 保底规则由 Pipeline 架构内部处理
        * 此字段保留为 null，仅用于活动配置的返回结构完整性
        */
       const guaranteeRule = null
@@ -303,9 +301,9 @@ class LotteryQueryService {
           draw_time: record.created_at
         })),
         pagination: {
-          current_page: parseInt(page),
+          page: parseInt(page),
           page_size: parseInt(limit),
-          total_records: total,
+          total,
           total_pages: totalPages
         }
       }
@@ -357,7 +355,6 @@ class LotteryQueryService {
         whereClause.status = status
       }
 
-      // Phase 3 展示控制：排除隐藏活动 + 展示时间窗口过滤
       whereClause.is_hidden = 0
 
       const now = new Date()
@@ -387,7 +384,6 @@ class LotteryQueryService {
           // 前端展示配置字段
           'display_mode',
           'effect_theme',
-          // Phase 3 展示控制字段
           'sort_order',
           'is_featured',
           'display_tags',
@@ -459,8 +455,7 @@ class LotteryQueryService {
             remaining_prize_pool: campaign.remaining_prize_pool,
             // 前端展示配置字段（多活动抽奖系统）
             display_mode: campaign.display_mode,
-            effect_theme: campaign.effect_theme, // null = 继承全局 app_theme
-            banner_image_url: campaign.banner_image_url,
+            effect_theme: campaign.effect_theme,
             user_today_draws: user_id
               ? userDrawCounts[campaign.lottery_campaign_id] || 0
               : undefined,

@@ -19,7 +19,6 @@
  * - AC5.2: 金额告警 - 单笔>5000元或日累计>50000元，仅告警
  * - AC5.3: 关联告警 - 同一用户10分钟内被不同门店录入>3次，仅告警
  *
- * 创建时间：2026-01-12
  * 依据文档：docs/商家员工域权限体系升级方案.md
  */
 
@@ -633,7 +632,7 @@ class MerchantRiskControlService {
    * @param {Object} [options.transaction] - Sequelize事务对象（可选）
    * @returns {Promise<Object>} 更新后的告警记录
    *
-   * @since 2026-01-12 支持事务边界（TS2.2）
+   * @since 2026
    */
   static async updateAlertStatus(alert_id, updateData, options = {}) {
     const { transaction } = options
@@ -692,7 +691,7 @@ class MerchantRiskControlService {
    * @param {number} alertId - 告警ID
    * @returns {Promise<Object|null>} 告警详情（包含关联的用户、门店、消费记录信息）
    *
-   * @since 2026-01-18 路由层合规性治理：移除路由直接访问模型
+   * @since 2026
    */
   static async getAlertDetail(alertId) {
     const models = MerchantRiskControlService._getModels()
@@ -790,7 +789,7 @@ class MerchantRiskControlService {
    * @param {number} [filters.store_id] - 门店ID（可选）
    * @returns {Promise<Object>} 统计数据（按状态、类型、严重程度分组）
    *
-   * @since 2026-01-18 路由层合规性治理：移除路由直接访问模型
+   * @since 2026
    */
   static async getAlertStats(filters = {}) {
     const models = MerchantRiskControlService._getModels()
@@ -876,7 +875,7 @@ class MerchantRiskControlService {
    * @param {number} alertId - 告警ID
    * @returns {Promise<Object|null>} 告警记录（仅基本字段）
    *
-   * @since 2026-01-18 路由层合规性治理：支持路由层权限检查
+   * @since 2026
    */
   static async getAlertBasic(alertId) {
     const models = MerchantRiskControlService._getModels()
@@ -898,7 +897,7 @@ class MerchantRiskControlService {
    * @param {Object} pagination - 分页参数
    * @returns {Promise<Object>} 告警列表及分页信息
    *
-   * @since 2026-01-18 路由层合规性治理：支持 console/risk-alerts.js
+   * @since 2026
    */
   static async queryRiskAlertsWithDetails(filters = {}, pagination = {}) {
     const models = MerchantRiskControlService._getModels()
@@ -1032,7 +1031,7 @@ class MerchantRiskControlService {
    * @param {Object} pagination - 分页参数
    * @returns {Promise<Object>} 待处理告警列表
    *
-   * @since 2026-01-18 路由层合规性治理
+   * @since 2026
    */
   static async getPendingAlerts(filters = {}, pagination = {}) {
     const models = MerchantRiskControlService._getModels()
@@ -1058,7 +1057,7 @@ class MerchantRiskControlService {
    * @param {string} [params.review_notes] - 复核备注
    * @returns {Promise<Object>} 复核后的告警信息
    *
-   * @since 2026-01-18 路由层合规性治理：事务收口到服务层
+   * @since 2026
    */
   static async reviewAlert(alertId, params) {
     const models = MerchantRiskControlService._getModels()
@@ -1112,7 +1111,7 @@ class MerchantRiskControlService {
    * @param {string} [filters.severity] - 严重程度筛选
    * @returns {Promise<Object>} 更新结果 { updated_count, message }
    *
-   * @since 2026-01-30 前端告警中心功能支持
+   * @since 2026
    */
   static async markAllAsRead(reviewed_by, filters = {}) {
     const models = MerchantRiskControlService._getModels()
@@ -1174,7 +1173,7 @@ class MerchantRiskControlService {
    * @param {Object} filters - 筛选条件（时间范围）
    * @returns {Promise<Object>} 统计摘要数据
    *
-   * @since 2026-01-18 路由层合规性治理
+   * @since 2026
    */
   static async getStatsSummary(filters = {}) {
     const models = MerchantRiskControlService._getModels()
@@ -1271,7 +1270,7 @@ class MerchantRiskControlService {
    * @param {Object} filters - 筛选条件（时间范围）
    * @returns {Promise<Object>} 门店统计数据
    *
-   * @since 2026-01-18 路由层合规性治理
+   * @since 2026
    */
   static async getStoreStats(storeId, filters = {}) {
     const models = MerchantRiskControlService._getModels()
@@ -1351,7 +1350,7 @@ class MerchantRiskControlService {
    *
    * @returns {Promise<Object>} 告警类型、严重程度、状态列表
    *
-   * @since 2026-01-18 路由层合规性治理
+   * @since 2026
    */
   static async getAlertTypesList() {
     const models = MerchantRiskControlService._getModels()

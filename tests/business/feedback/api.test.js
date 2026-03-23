@@ -101,7 +101,7 @@ describe('GET /api/v4/system/feedback/my - 获取我的反馈列表', () => {
       // 验证：page元数据正确
       expect(page.limit).toBe(10)
       expect(page.offset).toBe(0)
-      expect(page.current_page).toBe(1)
+      expect(page.page).toBe(1)
       expect(page.total_pages).toBe(Math.ceil(total / 10))
 
       // 业务逻辑验证：如果total > 10，说明有多页数据
@@ -132,8 +132,8 @@ describe('GET /api/v4/system/feedback/my - 获取我的反馈列表', () => {
       // ✅ 核心验证：第1页和第2页的total应该一致（总记录数不变）
       expect(page2_total).toBe(page1_total)
 
-      // 验证：第2页的current_page应该是2
-      expect(page2_response.body.data.page.current_page).toBe(2)
+      // 验证：第2页的page应该是2
+      expect(page2_response.body.data.page.page).toBe(2)
     })
   })
 
@@ -225,7 +225,7 @@ describe('GET /api/v4/system/feedback/my - 获取我的反馈列表', () => {
 
       // 验证：应该使用默认值0
       expect(response.body.data.page.offset).toBe(0)
-      expect(response.body.data.page.current_page).toBe(1)
+      expect(response.body.data.page.page).toBe(1)
     })
   })
 

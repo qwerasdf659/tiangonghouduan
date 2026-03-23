@@ -77,7 +77,7 @@ function getModels(req) {
  *
  * @apiSuccess {Boolean} success 请求是否成功
  * @apiSuccess {Object} data 汇总数据
- * @apiSuccess {Number} data.total_count 总记录数
+ * @apiSuccess {Number} data.total 总记录数
  * @apiSuccess {Number} data.anomaly_count 异常记录数
  * @apiSuccess {Number} data.anomaly_ratio 异常比例（%）
  * @apiSuccess {Object} data.risk_distribution 风险等级分布
@@ -108,7 +108,7 @@ router.get('/summary', authenticateToken, requireRoleLevel(100), async (req, res
     })
 
     logger.info('异常汇总统计获取成功', {
-      total: summary.total_count,
+      total: summary.total,
       anomaly: summary.anomaly_count
     })
 
@@ -171,7 +171,7 @@ router.get('/high-risk', authenticateToken, requireRoleLevel(100), async (req, r
     })
 
     logger.info('高风险记录获取成功', {
-      total: result.pagination.total_count,
+      total: result.pagination.total,
       returned: result.records.length
     })
 

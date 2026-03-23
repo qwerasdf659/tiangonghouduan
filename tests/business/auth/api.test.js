@@ -414,11 +414,11 @@ describe('认证和权限系统API测试（V4架构）', () => {
 
       expect([200, 401, 403]).toContain(response.status)
       if (response.status === 200) {
-        expect(response.data.data).toHaveProperty('total_count')
+        expect(response.data.data).toHaveProperty('total')
         expect(response.data.data).toHaveProperty('admins')
         expect(Array.isArray(response.data.data.admins)).toBe(true)
 
-        console.log('✅ 获取管理员列表成功, 总数:', response.data.data.total_count)
+        console.log('✅ 获取管理员列表成功, 总数:', response.data.data.total)
       }
     })
 

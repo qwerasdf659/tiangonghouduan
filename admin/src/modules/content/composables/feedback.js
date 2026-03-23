@@ -132,8 +132,8 @@ export function useFeedbackMethods() {
         if (this.feedbackFilters.status) params.status = this.feedbackFilters.status
         if (this.feedbackFilters.category) params.category = this.feedbackFilters.category
         if (this.feedbackFilters.priority) params.priority = this.feedbackFilters.priority
-        params.limit = this.feedbackFilters.page_size
-        params.offset = (this.feedbackFilters.page - 1) * this.feedbackFilters.page_size
+        params.page_size = this.feedbackFilters.page_size
+        params.page = this.feedbackFilters.page
 
         const response = await ContentAPI.getFeedbacks(params)
 

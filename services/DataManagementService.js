@@ -640,6 +640,7 @@ class DataManagementService {
             deletedCount = item.rows_to_delete
             logger.info(`[数据清理][干跑] ${item.table_name}: 将删除 ${deletedCount} 行`)
           } else {
+            // eslint-disable-next-line no-await-in-loop
             deletedCount = await this._batchDelete(
               item.table_name,
               item.where_clause || '1=1',
@@ -867,6 +868,7 @@ class DataManagementService {
       const replacements = { cutoff_date: cutoffDate.toISOString().slice(0, 19) }
 
       try {
+        // eslint-disable-next-line no-await-in-loop
         const deletedCount = await this._batchDelete(
           policy.table,
           whereClause,
@@ -970,6 +972,7 @@ class DataManagementService {
       if (L0_PROTECTED_TABLES.has(tableName)) continue
 
       try {
+        // eslint-disable-next-line no-await-in-loop
         const [result] = await sequelize.query(`SELECT COUNT(*) AS cnt FROM \`${tableName}\``, {
           raw: true
         })
@@ -1115,6 +1118,7 @@ class DataManagementService {
         const whereClause = conditions.length > 0 ? conditions.join(' AND ') : '1=1'
 
         try {
+          // eslint-disable-next-line no-await-in-loop
           const [result] = await sequelize.query(
             `SELECT COUNT(*) AS cnt FROM \`${tableName}\` WHERE ${whereClause}`,
             { replacements }
@@ -1161,6 +1165,7 @@ class DataManagementService {
       const whereClause = `\`${timeField}\` < :cutoff_date`
 
       try {
+        // eslint-disable-next-line no-await-in-loop
         const [result] = await sequelize.query(
           `SELECT COUNT(*) AS cnt FROM \`${policy.table}\` WHERE ${whereClause}`,
           { replacements: { cutoff_date: cutoffStr } }
@@ -1221,6 +1226,7 @@ class DataManagementService {
     let batchDeleted = 0
 
     do {
+      // eslint-disable-next-line no-await-in-loop
       const [, meta] = await sequelize.query(
         `DELETE FROM \`${tableName}\` WHERE ${whereClause} LIMIT :batch_limit`,
         { replacements: { ...replacements, batch_limit: batchSize } }
@@ -1229,6 +1235,7 @@ class DataManagementService {
       totalDeleted += batchDeleted
 
       if (batchDeleted > 0) {
+        // eslint-disable-next-line no-await-in-loop
         await new Promise(resolve => {
           setTimeout(resolve, 100)
         })

@@ -17,7 +17,6 @@
  * 四维度优先级（写死，不可配置）：
  * - user > role > campaign > global
  *
- * 创建时间：2025-12-23
  * 重构时间：2025-12-31（移除直接 Model 操作，统一通过 Service）
  */
 
@@ -25,10 +24,9 @@ const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const logger = require('../../../../utils/logger').logger
-// P1-9：服务通过 ServiceManager 获取（B1-Injected + E2-Strict snake_case）
 
 /**
- * P1-9：获取 LotteryQuotaService 的辅助函数
+ * 获取 LotteryQuotaService 的辅助函数
  * @param {Object} req - Express 请求对象
  * @returns {Object} LotteryQuotaService
  */
@@ -104,7 +102,7 @@ router.get('/rules', authenticateToken, requireRoleLevel(100), async (req, res) 
     logger.info('查询配额规则列表', {
       admin_id: req.user.user_id,
       filters: { rule_type, lottery_campaign_id, is_active },
-      total: pagination.total_count
+      total: pagination.total
     })
 
     return res.apiSuccess(
@@ -124,7 +122,7 @@ router.get('/rules', authenticateToken, requireRoleLevel(100), async (req, res) 
  * 获取单个配额规则详情
  * GET /api/v4/console/lottery-quota/rules/:id
  *
- * API路径参数设计规范 V2.2（2026-01-20）：
+ * API路径参数设计规范 V2.2：
  * - 配额规则是事务实体（按需创建），使用数字ID（:id）作为标识符
  *
  * 返回：规则详情（含优先级信息）
@@ -245,7 +243,7 @@ router.post('/rules', authenticateToken, requireRoleLevel(100), async (req, res)
  * 禁用配额规则
  * PUT /api/v4/console/lottery-quota/rules/:id/disable
  *
- * API路径参数设计规范 V2.2（2026-01-20）：
+ * API路径参数设计规范 V2.2：
  * - 配额规则是事务实体（按需创建），使用数字ID（:id）作为标识符
  *
  * 硬约束：

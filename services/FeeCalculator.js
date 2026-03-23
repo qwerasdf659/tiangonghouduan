@@ -10,7 +10,7 @@ const _logger = require('../utils/logger').logger
  * - 支持单一费率模式（red_shard 等非 DIAMOND 币种）
  * - 集成到TradeOrder交易订单系统（交易市场）
  *
- * 多币种扩展（2026-01-14）：
+ * 多币种扩展：
  * - DIAMOND：保持分档逻辑（基于 itemValue 分档 + ceil + 最低费 1）
  * - red_shard：单一费率 5%，最低手续费 1（从 system_settings 读取）
  * - 其他币种：根据 system_settings 配置的费率和最低费计算

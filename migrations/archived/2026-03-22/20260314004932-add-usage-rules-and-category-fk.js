@@ -11,7 +11,7 @@
  * - category_defs 表已存在（baseline 迁移创建）
  * - exchange_items.category 为 VARCHAR(50)，与 category_defs.category_code 类型一致
  *
- * @since 2026-03-14
+ * @since 2026
  */
 module.exports = {
   async up(queryInterface, Sequelize) {

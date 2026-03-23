@@ -20,8 +20,6 @@
  * - 写操作使用 TransactionManager.execute() 统一管理事务
  * - 通过 ServiceManager 统一获取服务实例
  *
- * 创建时间：2025-12-15
- * 更新时间：2026-01-05（事务边界治理改造）
  */
 
 const express = require('express')
@@ -71,7 +69,7 @@ router.get('/conversion-rules', authenticateToken, requireRoleLevel(100), async 
  * 获取单个材料转换规则详情（管理员）
  * GET /api/v4/console/material/conversion-rules/:id
  *
- * API路径参数设计规范 V2.2（2026-01-20）：
+ * API路径参数设计规范 V2.2：
  * - 转换规则是事务实体（高频创建），使用数字ID（:id）作为标识符
  *
  * 返回：规则详情
@@ -240,7 +238,7 @@ router.post('/conversion-rules', authenticateToken, requireRoleLevel(100), async
  * 禁用材料转换规则（管理员）
  * PUT /api/v4/console/material/conversion-rules/:id/disable
  *
- * API路径参数设计规范 V2.2（2026-01-20）：
+ * API路径参数设计规范 V2.2：
  * - 转换规则是事务实体（高频创建），使用数字ID（:id）作为标识符
  *
  * 硬约束：
@@ -312,7 +310,7 @@ router.get('/asset-types', authenticateToken, requireRoleLevel(100), async (req,
  * @description 配置实体使用业务码（:code）作为标识符
  * @param {string} code - 资产类型代码（如 red_shard、DIAMOND）
  *
- * API路径参数设计规范 V2.2（2026-01-20）：
+ * API路径参数设计规范 V2.2：
  * - 配置实体使用 :code 占位符
  * - 业务码格式：snake_case 或 UPPER_SNAKE
  *
@@ -418,7 +416,7 @@ router.post('/asset-types', authenticateToken, requireRoleLevel(100), async (req
  * @description 配置实体使用业务码（:code）作为标识符
  * @param {string} code - 资产类型代码（如 red_shard、DIAMOND）
  *
- * API路径参数设计规范 V2.2（2026-01-20）：
+ * API路径参数设计规范 V2.2：
  * - 配置实体使用 :code 占位符
  * - 对应 CANONICAL_OPERATION_MAP: 'ADMIN_MATERIAL_TYPE_UPDATE'
  *
@@ -501,7 +499,7 @@ router.put('/asset-types/:code', authenticateToken, requireRoleLevel(100), async
  * @description 配置实体使用业务码（:code）作为标识符
  * @param {string} code - 资产类型代码（如 red_shard、DIAMOND）
  *
- * API路径参数设计规范 V2.2（2026-01-20）：
+ * API路径参数设计规范 V2.2：
  * - 配置实体使用 :code 占位符
  * - 业务码格式：snake_case 或 UPPER_SNAKE
  *

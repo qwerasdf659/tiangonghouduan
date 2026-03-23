@@ -21,7 +21,6 @@
  * 主键：lottery_user_daily_draw_quota_id（BIGINT，自增）
  * 唯一索引：user_id + lottery_campaign_id + quota_date
  *
- * 创建时间：2025-12-23
  */
 
 const { DataTypes } = require('sequelize')

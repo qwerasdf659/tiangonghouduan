@@ -26,8 +26,6 @@
  * - 主键：asset_transaction_id
  * - 外键：account_id（关联 accounts 表）
  *
- * 创建时间：2025-12-15
- * 更新时间：2025-12-26（方案B - 业界标准幂等架构：删除 business_id，lottery_session_id 允许 NULL）
  */
 
 'use strict'

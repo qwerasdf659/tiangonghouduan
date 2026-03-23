@@ -11,11 +11,10 @@
  * - 活动（campaign）是配置实体，使用业务码（:code）作为标识符
  * - 业务码格式：snake_case（如 spring_festival）
  *
- * 路由重构（2026-01-20）：
+ * 路由重构：
  * - /prizes/:campaignCode → /campaigns/:code/prizes
  * - /config/:campaignCode → /campaigns/:code/config
  *
- * 创建时间：2026年01月20日
  * 适用区域：中国（北京时间 Asia/Shanghai）
  */
 
@@ -102,7 +101,6 @@ router.get('/active', authenticateToken, async (req, res) => {
       },
       start_time: campaign.start_time,
       end_time: campaign.end_time,
-      // Phase 3 展示控制字段
       is_featured: !!campaign.is_featured,
       display_tags: campaign.display_tags || [],
       display_start_time: campaign.display_start_time || null,
@@ -131,7 +129,6 @@ router.get('/active', authenticateToken, async (req, res) => {
  */
 router.get('/:code/prizes', authenticateToken, dataAccessControl, async (req, res) => {
   try {
-    // P1-9：通过 ServiceManager 获取服务（snake_case key）
     const DataSanitizer = req.app.locals.services.getService('data_sanitizer')
 
     const campaign_code = req.params.code

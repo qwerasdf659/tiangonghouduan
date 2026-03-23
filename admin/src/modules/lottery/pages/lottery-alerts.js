@@ -449,7 +449,7 @@ function lotteryAlertsPage() {
      * @param {Object} params - data-table 内部传入的分页/排序参数
      */
     async fetchAlertsTableData(params) {
-      const queryParams = { limit: params.page_size || 20 }
+      const queryParams = { page_size: params.page_size || 20 }
 
       // 从父组件 filters 读取筛选条件（外部筛选栏控制）
       if (this.filters.level) queryParams.level = this.filters.level
@@ -509,7 +509,7 @@ function lotteryAlertsPage() {
     async refreshAlertStats() {
       const result = await this.withLoading(async () => {
         const params = {
-          limit: this.page_size
+          page_size: this.page_size
         }
 
         if (this.filters.level) params.level = this.filters.level

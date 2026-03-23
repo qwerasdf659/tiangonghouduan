@@ -8,7 +8,6 @@
  * - 轨迹导出：导出行为数据
  *
  * 任务编号：B-47 轨迹列表接口, B-48 轨迹详情接口, B-49 轨迹导出服务
- * 创建时间：2026年01月31日
  *
  * @module routes/v4/console/user/user-behavior-tracks
  */

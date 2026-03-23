@@ -19,18 +19,17 @@
  * - 未提供事务时直接报错（使用 assertAndGetTransaction）
  * - 服务层禁止自建事务，由入口层统一使用 TransactionManager.execute()
  *
- * 服务合并记录（2026-01-21）：
+ * 服务合并记录：
  * - 合并 UserPremiumQueryService 的所有查询方法到本服务
  * - 原因：减少服务数量，统一高级空间相关操作
  *
- * 创建时间：2025年12月09日
  * 最后更新：2026年01月21日（合并 UserPremiumQueryService）
  */
 
 const { Op, fn, col } = require('sequelize')
 const BeijingTimeHelper = require('../utils/timeHelper')
 const { User, UserPremiumStatus } = require('../models')
-// V4.7.0 AssetService 拆分：使用子服务替代原 AssetService（2026-01-31）
+// V4.7.0 AssetService 拆分：使用子服务替代原 AssetService
 const BalanceService = require('./asset/BalanceService')
 const logger = require('../utils/logger')
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
@@ -362,7 +361,7 @@ class PremiumService {
 
   /*
    * ==========================================
-   * 以下方法合并自 UserPremiumQueryService（2026-01-21）
+   * 以下方法合并自 UserPremiumQueryService
    * 管理后台专用的只读查询方法
    * ==========================================
    */
@@ -428,7 +427,7 @@ class PremiumService {
     return {
       statuses,
       pagination: {
-        total_count: count,
+        total: count,
         page,
         page_size,
         total_pages: Math.ceil(count / page_size)
@@ -571,7 +570,7 @@ class PremiumService {
     return {
       statuses,
       pagination: {
-        total_count: count,
+        total: count,
         page,
         page_size,
         total_pages: Math.ceil(count / page_size)

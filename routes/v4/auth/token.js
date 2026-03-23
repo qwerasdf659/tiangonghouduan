@@ -15,8 +15,6 @@
  * - 登出时失效对应的会话记录
  * - 单设备登录策略：刷新时检测会话是否被覆盖
  *
- * 创建时间：2025-12-22
- * 更新时间：2026-02-18（修复 Token 刷新绕过会话验证的 P0 安全漏洞）
  */
 
 const express = require('express')
@@ -33,8 +31,6 @@ const {
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 const { getRateLimiter } = require('../../../middleware/RateLimiterMiddleware')
 const { detectLoginPlatform } = require('../../../utils/platformDetector')
-
-// Phase 3 收口：AuthenticationSession 在路由内通过 ServiceManager 获取，避免顶部直连 models
 
 // 创建Token验证接口专用限流器
 const rateLimiter = getRateLimiter()
@@ -286,7 +282,6 @@ router.post('/logout', authenticateToken, async (req, res) => {
    */
   if (sessionToken) {
     try {
-      // Phase 3 收口：通过 ServiceManager 获取 AuthenticationSession
       const { AuthenticationSession } = req.app.locals.models
       const session = await AuthenticationSession.findByToken(sessionToken)
       if (session) {

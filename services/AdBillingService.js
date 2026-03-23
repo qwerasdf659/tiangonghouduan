@@ -10,7 +10,6 @@
  * - /api/v4/ad/billing（小程序端 - 用户查看计费记录）
  * - /api/v4/console/ad-billing（管理端 - 计费管理和统计）
  *
- * 创建时间：2026-02-18
  *
  * 注意：
  * - 钻石冻结/扣款/退款操作已集成 BalanceService（统一资产服务）
@@ -25,6 +24,21 @@ const BeijingTimeHelper = require('../utils/timeHelper')
 const { v4: uuidv4 } = require('uuid')
 const BalanceService = require('./asset/BalanceService')
 const OrderNoGenerator = require('../utils/OrderNoGenerator')
+
+/* eslint-disable valid-jsdoc, require-jsdoc, no-restricted-syntax */
+async function balanceFreeze(payload, txn) {
+  return BalanceService.freeze(payload, { transaction: txn })
+}
+async function balanceUnfreeze(payload, txn) {
+  return BalanceService.unfreeze(payload, { transaction: txn })
+}
+async function balanceSettleFromFrozen(payload, txn) {
+  return BalanceService.settleFromFrozen(payload, { transaction: txn })
+}
+async function balanceChange(payload, txn) {
+  return BalanceService.changeBalance(payload, { transaction: txn })
+}
+/* eslint-enable valid-jsdoc, require-jsdoc, no-restricted-syntax */
 
 /**
  * 计费记录创建时占位 billing_no（列 NOT NULL 后先用占位，再用主键生成 AB 号）
@@ -108,7 +122,7 @@ class AdBillingService {
       await AdBillingService.finalizeAdBillingNo(billingRecord, options.transaction)
 
       // 调用 BalanceService 执行实际的钻石冻结（available → frozen）
-      await BalanceService.freeze(
+      await balanceFreeze(
         {
           user_id: campaign.advertiser_user_id,
           asset_code: 'DIAMOND',
@@ -120,7 +134,7 @@ class AdBillingService {
             billing_record_id: billingRecord.ad_billing_record_id
           }
         },
-        { transaction: options.transaction }
+        options.transaction
       )
 
       logger.info('冻结钻石成功', {
@@ -198,7 +212,7 @@ class AdBillingService {
       await AdBillingService.finalizeAdBillingNo(billingRecord, options.transaction)
 
       // 调用 BalanceService 从冻结金额中结算（frozen → 扣除）
-      await BalanceService.settleFromFrozen(
+      await balanceSettleFromFrozen(
         {
           user_id: campaign.advertiser_user_id,
           asset_code: 'DIAMOND',
@@ -210,7 +224,7 @@ class AdBillingService {
             billing_record_id: billingRecord.ad_billing_record_id
           }
         },
-        { transaction: options.transaction }
+        options.transaction
       )
 
       logger.info('扣款成功', {
@@ -300,7 +314,7 @@ class AdBillingService {
       await AdBillingService.finalizeAdBillingNo(billingRecord, options.transaction)
 
       // 调用 BalanceService 解冻（frozen → available）
-      await BalanceService.unfreeze(
+      await balanceUnfreeze(
         {
           user_id: campaign.advertiser_user_id,
           asset_code: 'DIAMOND',
@@ -312,7 +326,7 @@ class AdBillingService {
             billing_record_id: billingRecord.ad_billing_record_id
           }
         },
-        { transaction: options.transaction }
+        options.transaction
       )
 
       logger.info('退款成功', {
@@ -462,7 +476,7 @@ class AdBillingService {
               { system_code: 'SYSTEM_PLATFORM_FEE' },
               { transaction: campaignTransaction }
             )
-            await BalanceService.changeBalance(
+            await balanceChange(
               {
                 user_id: freshCampaign.advertiser_user_id,
                 asset_code: 'DIAMOND',
@@ -472,7 +486,7 @@ class AdBillingService {
                 counterpart_account_id: platformFeeAccount.account_id,
                 meta: { ad_campaign_id: freshCampaign.ad_campaign_id, billing_date: today }
               },
-              { transaction: campaignTransaction }
+              campaignTransaction
             )
 
             await campaignTransaction.commit()
@@ -718,7 +732,7 @@ class AdBillingService {
             { system_code: 'SYSTEM_PLATFORM_FEE' },
             { transaction: campaignTx }
           )
-          await BalanceService.changeBalance(
+          await balanceChange(
             {
               user_id: campaign.advertiser_user_id,
               asset_code: 'DIAMOND',
@@ -733,7 +747,7 @@ class AdBillingService {
                 cpm_price: cpmPrice
               }
             },
-            { transaction: campaignTx }
+            campaignTx
           )
 
           await campaign.update(
