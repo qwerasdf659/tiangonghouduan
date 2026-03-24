@@ -70,9 +70,16 @@ export function formatDate(dateValue, options = {}) {
     }
 
     // 处理后端返回的中文预格式化日期字符串（如 "2026年2月6日星期五 02:57:16"）
-    if (typeof dateStr === 'string' && dateStr.includes('年') && dateStr.includes('月') && dateStr.includes('日')) {
+    if (
+      typeof dateStr === 'string' &&
+      dateStr.includes('年') &&
+      dateStr.includes('月') &&
+      dateStr.includes('日')
+    ) {
       // 后端已格式化为中文日期，直接返回（去掉星期部分以保持简洁）
-      const cnMatch = dateStr.match(/(\d{4})年(\d{1,2})月(\d{1,2})日(?:星期.)?[\s]*(\d{2}):(\d{2}):?(\d{2})?/)
+      const cnMatch = dateStr.match(
+        /(\d{4})年(\d{1,2})月(\d{1,2})日(?:星期.)?[\s]*(\d{2}):(\d{2}):?(\d{2})?/
+      )
       if (cnMatch) {
         const [, year, month, day, hour, minute, second] = cnMatch
         const m = month.padStart(2, '0')

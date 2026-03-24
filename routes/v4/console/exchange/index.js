@@ -11,8 +11,8 @@
 const express = require('express')
 const router = express.Router()
 
-/** 商品 CRUD + SKU 管理（复用原 market/exchange-items.js） */
-router.use('/items', require('../market/exchange-items'))
+/** 商品 CRUD + SKU 管理 */
+router.use('/items', require('./items'))
 
 /** 兑换订单管理 */
 router.use('/orders', require('./orders'))

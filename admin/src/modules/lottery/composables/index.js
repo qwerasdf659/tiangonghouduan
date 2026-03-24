@@ -8,10 +8,7 @@
  */
 
 import { usePlacementState, usePlacementMethods } from './placement.js'
-import {
-  useStrategySimulationState,
-  useStrategySimulationMethods
-} from './strategy-simulation.js'
+import { useStrategySimulationState, useStrategySimulationMethods } from './strategy-simulation.js'
 
 // 活动管理模块
 export { useCampaignsState, useCampaignsMethods } from './campaigns.js'

@@ -359,12 +359,14 @@ class ActivityService {
    * @param {Object} options - 查询选项
    * @param {Array<number>} options.lottery_campaign_ids - 活动ID列表（可选）
    * @param {string} options.status - 活动状态筛选（可选，如：active/draft/completed/paused）
-   * @param {number} options.limit - 限制返回数量（默认50，最大100）
+   * @param {number} options.page_size - 限制返回数量（默认50，最大100）
+   * @param {number} [options.limit] - 兼容旧参数名
    * @returns {Promise<Object>} 按预算模式分组的活动预算状态
    */
   static async getBatchBudgetStatus(options = {}) {
-    const { lottery_campaign_ids = [], status = '', limit = 50 } = options
-    const maxLimit = Math.min(parseInt(limit) || 50, 100)
+    const { lottery_campaign_ids = [], status = '', page_size, limit = 50 } = options
+    const raw = page_size !== undefined ? page_size : limit
+    const maxLimit = Math.min(parseInt(raw) || 50, 100)
 
     let whereCondition = {}
     if (lottery_campaign_ids.length > 0) {

@@ -241,9 +241,8 @@ export function drillDownMixin() {
       logger.debug('[DrillDown] 跳转到页面:', url, options)
 
       // 构建URL参数
-      const queryString = Object.keys(params).length > 0
-        ? '?' + new URLSearchParams(params).toString()
-        : ''
+      const queryString =
+        Object.keys(params).length > 0 ? '?' + new URLSearchParams(params).toString() : ''
       const targetUrl = url + queryString
 
       if (newTab) {
@@ -374,13 +373,10 @@ export function drillDownMixin() {
      * @param {Object} [userData] - 可选的用户数据
      */
     openUserDrawer(userId, userData = null) {
-      this.drillDownToDrawer(
-        userData || { user_id: userId },
-        {
-          title: `用户详情 #${userId}`,
-          size: 'drawerWide'
-        }
-      )
+      this.drillDownToDrawer(userData || { user_id: userId }, {
+        title: `用户详情 #${userId}`,
+        size: 'drawerWide'
+      })
     },
 
     /**
@@ -423,4 +419,3 @@ export function drillDownMixin() {
 }
 
 export default drillDownMixin
-

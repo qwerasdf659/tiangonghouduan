@@ -418,7 +418,7 @@ describe('🔴 P0级回归测试入口 - 核心业务路径', () => {
      * 测试用例：市场列表API可用性
      *
      * 业务场景：获取市场挂牌列表
-     * API端点：GET /api/v4/market/listings
+     * API端点：GET /api/v4/marketplace/listings
      *
      * 验收标准：
      * - API端点响应正常
@@ -428,7 +428,7 @@ describe('🔴 P0级回归测试入口 - 核心业务路径', () => {
       console.log('📋 P0-4-2: 验证市场列表API...')
 
       const response = await request(app)
-        .get('/api/v4/market/listings')
+        .get('/api/v4/marketplace/listings')
         .query({ page: 1, limit: 10 })
 
       // 可能需要认证
@@ -437,7 +437,7 @@ describe('🔴 P0级回归测试入口 - 核心业务路径', () => {
 
         if (authToken) {
           const authResponse = await request(app)
-            .get('/api/v4/market/listings')
+            .get('/api/v4/marketplace/listings')
             .set('Authorization', `Bearer ${authToken}`)
             .query({ page: 1, limit: 10 })
 
@@ -458,7 +458,7 @@ describe('🔴 P0级回归测试入口 - 核心业务路径', () => {
         TestAssertions.validateApiResponse(response.body, true)
         console.log('   ✅ 市场列表获取成功（无需认证）')
       } else if (response.status === 404) {
-        console.log('   ℹ️ /api/v4/market/listings 端点不存在')
+        console.log('   ℹ️ /api/v4/marketplace/listings 端点不存在')
       }
 
       expect(true).toBe(true)

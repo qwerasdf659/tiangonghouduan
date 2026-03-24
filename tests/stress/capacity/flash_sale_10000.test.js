@@ -602,7 +602,7 @@ describe('🔥 10000并发秒杀场景测试（P2-4）', () => {
         .map((_, index) => async () => {
           try {
             const result = await IdempotencyService.getOrCreateRequest(idempotencyKey, {
-              api_path: '/api/v4/market/purchase',
+              api_path: '/api/v4/marketplace/purchase',
               http_method: 'POST',
               request_params: { product_id: 1, quantity: 1 },
               user_id: testUserId || generateMockUserId(index)
@@ -681,7 +681,7 @@ describe('🔥 10000并发秒杀场景测试（P2-4）', () => {
 
           try {
             const result = await IdempotencyService.getOrCreateRequest(idempotencyKey, {
-              api_path: '/api/v4/market/purchase',
+              api_path: '/api/v4/marketplace/purchase',
               http_method: 'POST',
               request_params: { product_id: 1, quantity: 1 },
               user_id: testUserId || generateMockUserId(index)

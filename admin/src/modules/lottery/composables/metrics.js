@@ -399,7 +399,11 @@ export function useMetricsMethods() {
         const trend = this.hourlyMetrics || []
         // 后端趋势数据按日期排序
         this.hourlyTrend24h = trend
-          .sort((a, b) => new Date(a.date || a.hour || a.hour_start) - new Date(b.date || b.hour || b.hour_start))
+          .sort(
+            (a, b) =>
+              new Date(a.date || a.hour || a.hour_start) -
+              new Date(b.date || b.hour || b.hour_start)
+          )
           .slice(-24)
           .map(item => ({
             // 后端 trend API 使用 date 字段, 统计 API 使用 hour 字段
@@ -486,8 +490,7 @@ export function useMetricsMethods() {
         }
 
         // 2. 100%出奖系统异常检测：正常情况下不应出现 'empty' 类型数据
-        const emptyCount =
-          this.prizeDistribution.find(p => p.name === 'empty')?.value || 0
+        const emptyCount = this.prizeDistribution.find(p => p.name === 'empty')?.value || 0
         if (emptyCount > 0) {
           const emptyRate = (emptyCount / this.lotteryMetrics.total_draws) * 100
           alerts.push({
@@ -989,7 +992,9 @@ export function useMetricsMethods() {
 
         if (response?.success && response.data) {
           this.dailyReportData = response.data
-          this.showSuccess(`日报已生成（日期: ${reportDate}，抽奖: ${response.data.summary?.total_draws || 0}次）`)
+          this.showSuccess(
+            `日报已生成（日期: ${reportDate}，抽奖: ${response.data.summary?.total_draws || 0}次）`
+          )
           logger.info('[P2-10] 日报生成成功', {
             report_date: reportDate,
             total_draws: response.data.summary?.total_draws || 0
@@ -1048,7 +1053,9 @@ export function useMetricsMethods() {
 <div class="footer"><p>报告生成时间：${report.generated_at || new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}</p><p>本报告由运营后台自动生成</p></div>
 </body></html>`)
       printWindow.document.close()
-      setTimeout(() => { if (!printWindow.closed) printWindow.print() }, 1000)
+      setTimeout(() => {
+        if (!printWindow.closed) printWindow.print()
+      }, 1000)
       logger.info('[P2-10] 日报PDF导出完成')
     },
 
@@ -1218,8 +1225,17 @@ export function useMetricsMethods() {
         if (response?.success && response.data) {
           const data = response.data
           this.lotteryHeatmap = data.heatmap || []
-          this.heatmapDayLabels = data.day_labels || ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
-          this.heatmapHourLabels = data.hour_labels || Array.from({ length: 24 }, (_, i) => `${i}:00`)
+          this.heatmapDayLabels = data.day_labels || [
+            '周日',
+            '周一',
+            '周二',
+            '周三',
+            '周四',
+            '周五',
+            '周六'
+          ]
+          this.heatmapHourLabels =
+            data.hour_labels || Array.from({ length: 24 }, (_, i) => `${i}:00`)
           this.heatmapPeak = data.peak || null
 
           logger.info('[Metrics] 热力图数据加载成功', {
@@ -1284,7 +1300,7 @@ export function useMetricsMethods() {
         const option = {
           tooltip: {
             position: 'top',
-            formatter: (params) => {
+            formatter: params => {
               const dayName = this.heatmapDayLabels[params.data[1]] || ''
               const hour = params.data[0]
               const value = params.data[2]
@@ -1303,7 +1319,7 @@ export function useMetricsMethods() {
             data: Array.from({ length: 24 }, (_, i) => i),
             splitArea: { show: true },
             axisLabel: {
-              formatter: (val) => `${val}时`
+              formatter: val => `${val}时`
             }
           },
           yAxis: {

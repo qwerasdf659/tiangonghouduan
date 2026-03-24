@@ -89,6 +89,3 @@ export const BidAPI = {
 }
 
 export default BidAPI
-
-
-

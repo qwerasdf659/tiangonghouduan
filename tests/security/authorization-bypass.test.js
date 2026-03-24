@@ -76,7 +76,7 @@ describe('P3-9: 授权绕过安全测试', () => {
   const adminEndpoints = [
     { method: 'GET', path: '/api/v4/console/user-management/users', description: '用户管理' },
     { method: 'GET', path: '/api/v4/console/lottery-campaigns', description: '活动管理' },
-    { method: 'GET', path: '/api/v4/console/trade-orders', description: '订单管理' },
+    { method: 'GET', path: '/api/v4/console/marketplace/orders', description: 'C2C 订单管理' },
     { method: 'GET', path: '/api/v4/console/analytics/overview', description: '统计数据' },
     {
       method: 'POST',

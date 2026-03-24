@@ -80,7 +80,7 @@ export function useAdjustmentState() {
         key: 'amount',
         label: '变动',
         sortable: true,
-        render: (val) => {
+        render: val => {
           const num = Number(val)
           const cls = num >= 0 ? 'text-green-600' : 'text-red-600'
           const prefix = num >= 0 ? '+' : ''
@@ -103,9 +103,7 @@ export function useAdjustmentState() {
         label: '操作',
         type: 'actions',
         width: '80px',
-        actions: [
-          { name: 'view', label: '详情', class: 'text-blue-600 hover:text-blue-800' }
-        ]
+        actions: [{ name: 'view', label: '详情', class: 'text-blue-600 hover:text-blue-800' }]
       }
     ],
 
@@ -164,7 +162,9 @@ export function useAdjustmentMethods() {
 
     async loadAssetTypes() {
       try {
-        const result = await request({ url: `${API_BASE_URL}/console/asset-adjustment/asset-types` })
+        const result = await request({
+          url: `${API_BASE_URL}/console/asset-adjustment/asset-types`
+        })
         if (result.success) {
           const rawAssetTypes = result.data?.asset_types || result.data || []
 
@@ -379,7 +379,8 @@ export function useAdjustmentMethods() {
         const key = balance.asset_code
         if (balanceMap.has(key)) {
           const existing = balanceMap.get(key)
-          existing.available_amount = (existing.available_amount || 0) + (balance.available_amount || 0)
+          existing.available_amount =
+            (existing.available_amount || 0) + (balance.available_amount || 0)
           existing.frozen_amount = (existing.frozen_amount || 0) + (balance.frozen_amount || 0)
           existing.total = (existing.total || 0) + (balance.total || 0)
         } else {
@@ -717,4 +718,3 @@ export function useAdjustmentMethods() {
     }
   }
 }
-

@@ -334,11 +334,13 @@ class UserBehaviorTrackService {
    * @param {Object} params - 查询参数
    * @param {Date} params.start_date - 开始日期
    * @param {Date} params.end_date - 结束日期
-   * @param {number} [params.limit] - 返回数量限制
+   * @param {number} [params.page_size] - 返回数量限制
+   * @param {number} [params.limit] - 兼容旧参数名
    * @returns {Promise<Array>} 用户活跃度排名
    */
   static async getActiveUsersRanking(params) {
-    const { start_date, end_date, limit = 10 } = params
+    const { start_date, end_date, page_size, limit: legacyLimit } = params
+    const limit = legacyLimit !== undefined ? legacyLimit : (page_size ?? 10)
 
     const results = await models.UserBehaviorTrack.findAll({
       where: {

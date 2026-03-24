@@ -9,7 +9,7 @@
  *   lottery/      21 文件  抽奖核心 + 监控 + 强控
  *   ad/            5 文件  广告活动/广告位/定价/报表/地域
  *   user/          8 文件  用户管理/分层/行为/高级空间/分群
- *   market/        5 文件  市场统计/竞价/兑换商品/汇率/订单
+ *   market/        2 文件  C2C 二级市场挂牌 + C2C 订单（竞价/兑换商品/汇率已迁出）
  *   merchant/      7 文件  商家/门店/员工/区划/积分/欠账/消费
  *   risk/          6 文件  风控告警/配置/静默/孤儿冻结/异常/对账
  *   analytics/     8 文件  分析/看板/统计/报表/记录/数据/预算/待处理
@@ -134,13 +134,24 @@ router.get('/', (req, res) => {
         ]
       },
       marketplace: {
-        description: '市场统计管理',
-        endpoints: ['/marketplace/listing-stats']
+        description: 'C2C 二级市场管理（挂牌 / 统计 / 订单 / 可交易配置）',
+        endpoints: [
+          '/marketplace/listing-stats',
+          '/marketplace/user-listings',
+          '/marketplace/user-listing-limit',
+          '/marketplace/listings',
+          '/marketplace/stats/overview',
+          '/marketplace/stats/price-history',
+          '/marketplace/config/tradable-assets',
+          '/marketplace/orders',
+          '/marketplace/orders/stats'
+        ],
+        note: 'B2C 兑换已迁至 /exchange/*；汇率运营在 /assets/rates；竞拍在 /bids'
       },
       material: {
         description: '材料系统管理（V4.5.0）',
         endpoints: ['/material/asset-types', '/material/conversion-rules'],
-        note: '材料资产类型管理、转换规则管理（用户余额管理已迁移至 asset-adjustment 模块）'
+        note: '材料资产类型管理、转换规则管理'
       },
       lottery_quota: {
         description: '抽奖配额管理（2025-12-23）',
@@ -385,8 +396,8 @@ router.get('/', (req, res) => {
       },
       unified_product_center: {
         description: '统一商品中心（品类 / EAV 属性 / SPU·SKU / 渠道定价）',
-        endpoints: ['/categories', '/attributes', '/exchange-items'],
-        note: '管理后台商品主数据：categories 树、attributes 与选项、exchange_items 与 skus'
+        endpoints: ['/categories', '/attributes', '/exchange/items'],
+        note: '管理后台商品主数据：categories 树、attributes 与选项、/exchange/items（SPU/SKU）'
       },
       risk_profiles: {
         description: '用户风控配置管理（2026-01-21）',
@@ -450,16 +461,16 @@ router.get('/', (req, res) => {
         ],
         note: '抽奖监控数据只读查询'
       },
-      trade_orders: {
-        description: '交易订单查询（2026-01-21 P2）',
+      marketplace_orders: {
+        description: 'C2C 交易订单查询（挂载于 /marketplace/orders）',
         endpoints: [
-          '/trade-orders',
-          '/trade-orders/stats',
-          '/trade-orders/user/:user_id/stats',
-          '/trade-orders/by-business-id/:business_id',
-          '/trade-orders/:id'
+          '/marketplace/orders',
+          '/marketplace/orders/stats',
+          '/marketplace/orders/user/:user_id/stats',
+          '/marketplace/orders/by-business-id/:business_id',
+          '/marketplace/orders/:id'
         ],
-        note: '交易订单只读查询，支持买家/卖家/状态筛选和统计汇总'
+        note: '交易订单只读查询'
       },
       user_premium: {
         description: '用户高级空间状态查询（2026-01-21 P2）',

@@ -116,7 +116,12 @@ function registerAttributeManagement() {
         type: 'actions',
         width: '140px',
         actions: [
-          { name: 'edit', label: '编辑', icon: '✏️', class: 'text-emerald-600 hover:text-emerald-800' },
+          {
+            name: 'edit',
+            label: '编辑',
+            icon: '✏️',
+            class: 'text-emerald-600 hover:text-emerald-800'
+          },
           { name: 'delete', label: '删除', icon: '🗑️', class: 'text-red-500 hover:text-red-700' }
         ]
       }
@@ -282,7 +287,9 @@ function registerAttributeManagement() {
         this.saving = true
         if (this.editingOption) {
           await request({
-            url: buildURL(`${ATTR_API}/options/:option_id`, { option_id: this.editingOption.option_id }),
+            url: buildURL(`${ATTR_API}/options/:option_id`, {
+              option_id: this.editingOption.option_id
+            }),
             method: 'PUT',
             data: {
               option_value: v,

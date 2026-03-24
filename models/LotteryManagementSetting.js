@@ -130,7 +130,7 @@ module.exports = sequelize => {
         type: DataTypes.STRING(50),
         primaryKey: true,
         defaultValue: () =>
-          `setting_${BeijingTimeHelper.generateIdTimestamp()}_${Math.random().toString(36).substr(2, 6)}`,
+          `setting_${BeijingTimeHelper.generateIdTimestamp()}_${require('crypto').randomBytes(3).toString('hex')}`,
         comment: '设置记录唯一标识（格式：setting_时间戳_随机码）'
       },
 

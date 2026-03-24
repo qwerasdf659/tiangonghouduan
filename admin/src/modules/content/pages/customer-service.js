@@ -31,7 +31,7 @@ import {
  * 创建客服工作台页面组件
  * @returns {Object} Alpine.js组件配置对象
  */
-function customerServicePage () {
+function customerServicePage() {
   return {
     // ==================== Mixin 组合 ====================
     ...createPageMixin(),
@@ -66,7 +66,7 @@ function customerServicePage () {
 
     // ==================== 生命周期 ====================
 
-    init () {
+    init() {
       logger.info('客服工作台页面初始化 (v4.0 全量集成)')
 
       if (!this.checkAuth()) return
@@ -105,7 +105,7 @@ function customerServicePage () {
     /**
      * 组件销毁时清理资源
      */
-    destroy () {
+    destroy() {
       if (this._beforeUnloadHandler) {
         window.removeEventListener('beforeunload', this._beforeUnloadHandler)
       }
@@ -120,7 +120,7 @@ function customerServicePage () {
     // ==================== 模板库 getter ====================
 
     /** 按关键词过滤后的模板列表（供 HTML x-for 使用） */
-    get filteredTemplates () {
+    get filteredTemplates() {
       return this.getFilteredTemplates()
     },
 
@@ -131,7 +131,7 @@ function customerServicePage () {
      * 紧急(>15min) → 排队中 → 处理中 → 今日已关闭
      * @returns {Array<{group:string, sessions:Array}>}
      */
-    get groupedSessions () {
+    get groupedSessions() {
       const now = Date.now()
       const urgent = []
       const waiting = []
@@ -153,8 +153,14 @@ function customerServicePage () {
       /* 紧急和排队按等待时间倒序（等得最久排最前） */
       urgent.sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
       waiting.sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
-      active.sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at))
-      closed.sort((a, b) => new Date(b.updated_at || b.closed_at || b.created_at) - new Date(a.updated_at || a.closed_at || a.created_at))
+      active.sort(
+        (a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at)
+      )
+      closed.sort(
+        (a, b) =>
+          new Date(b.updated_at || b.closed_at || b.created_at) -
+          new Date(a.updated_at || a.closed_at || a.created_at)
+      )
 
       const groups = []
       if (urgent.length) groups.push({ group: '紧急', icon: '🔴', sessions: urgent })
@@ -169,7 +175,7 @@ function customerServicePage () {
      * @param {Object} session - 会话对象
      * @returns {Array<{icon:string, label:string}>}
      */
-    getSessionTags (session) {
+    getSessionTags(session) {
       const lastMsg = this.getSessionLastMessage(session)
       if (!lastMsg || lastMsg === '暂无消息') return []
       const msg = lastMsg.toLowerCase()
@@ -188,7 +194,7 @@ function customerServicePage () {
      * @param {Object} session - 会话对象
      * @returns {string} 等待时长
      */
-    getSessionWaitTime (session) {
+    getSessionWaitTime(session) {
       if (session.status !== 'waiting') return ''
       return this.getWaitTimeDisplay(session.created_at)
     },
@@ -198,7 +204,7 @@ function customerServicePage () {
      * @param {Object} session - 会话对象
      * @returns {string} CSS类
      */
-    getSessionWaitColor (session) {
+    getSessionWaitColor(session) {
       if (session.status !== 'waiting') return ''
       return this.getWaitColorDot(session.created_at)
     }

@@ -27,7 +27,7 @@ const logger = require('../../../utils/logger').logger
 const TransactionManager = require('../../../utils/TransactionManager')
 
 /**
- * @route POST /api/v4/market/trade-orders/:trade_order_id/confirm-delivery
+ * @route POST /api/v4/marketplace/trade-orders/:trade_order_id/confirm-delivery
  * @desc 买方确认收货（输入担保码完成交易）
  * @access Private (需要登录，必须是买方)
  *
@@ -96,7 +96,7 @@ router.post(
 )
 
 /**
- * @route GET /api/v4/market/trade-orders/:trade_order_id/escrow-status
+ * @route GET /api/v4/marketplace/trade-orders/:trade_order_id/escrow-status
  * @desc 查询担保码状态（不返回明文码）
  * @access Private (买方/卖方/管理员)
  *
@@ -129,7 +129,7 @@ router.get(
 )
 
 /**
- * @route POST /api/v4/market/trade-orders/:trade_order_id/cancel
+ * @route POST /api/v4/marketplace/trade-orders/:trade_order_id/cancel
  * @desc 取消交易（买方主动取消或系统超时取消）
  * @access Private (买方/管理员)
  *

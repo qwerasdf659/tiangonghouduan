@@ -104,7 +104,9 @@
     @apply bg-white rounded-xl border;
     border-color: var(--color-border, #dde1e9);
     box-shadow: var(--shadow-card, 0 1px 3px 0 rgb(0 0 0 / 0.08));
-    transition: box-shadow 0.25s ease, transform 0.25s ease;
+    transition:
+      box-shadow 0.25s ease,
+      transform 0.25s ease;
   }
 
   .card:hover {
@@ -448,7 +450,11 @@
 /* 页面区块（替代纯白卡片） - 带品牌色微妙渐变 */
 .section-panel {
   @apply rounded-xl border overflow-hidden;
-  background: linear-gradient(180deg, var(--card-bg, #ffffff) 0%, var(--card-bg-warm, #fafbff) 100%);
+  background: linear-gradient(
+    180deg,
+    var(--card-bg, #ffffff) 0%,
+    var(--card-bg-warm, #fafbff) 100%
+  );
   border-color: var(--color-border, #dde1e9);
   box-shadow: var(--shadow-section, 0 2px 8px -2px rgb(0 0 0 / 0.06));
 }
@@ -485,12 +491,14 @@
 }
 
 .filter-bar select,
-.filter-bar input[type="text"],
-.filter-bar input[type="date"],
-.filter-bar input[type="number"] {
+.filter-bar input[type='text'],
+.filter-bar input[type='date'],
+.filter-bar input[type='number'] {
   @apply px-3 py-2 border rounded-lg text-sm bg-white shadow-sm;
   border-color: var(--color-border, #d1d5db);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .filter-bar select:focus,
@@ -558,10 +566,21 @@
 .status-dot {
   @apply inline-block w-2 h-2 rounded-full mr-2;
 }
-.status-dot-active { @apply bg-green-500; box-shadow: 0 0 6px rgba(16, 185, 129, 0.5); }
-.status-dot-inactive { @apply bg-gray-400; }
-.status-dot-warning { @apply bg-yellow-500; box-shadow: 0 0 6px rgba(245, 158, 11, 0.5); }
-.status-dot-danger { @apply bg-red-500; box-shadow: 0 0 6px rgba(239, 68, 68, 0.5); }
+.status-dot-active {
+  @apply bg-green-500;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.5);
+}
+.status-dot-inactive {
+  @apply bg-gray-400;
+}
+.status-dot-warning {
+  @apply bg-yellow-500;
+  box-shadow: 0 0 6px rgba(245, 158, 11, 0.5);
+}
+.status-dot-danger {
+  @apply bg-red-500;
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.5);
+}
 
 /* 数值高亮 */
 .value-highlight {
@@ -569,9 +588,15 @@
   font-variant-numeric: tabular-nums;
 }
 
-.value-positive { @apply text-green-600; }
-.value-negative { @apply text-red-600; }
-.value-neutral { @apply text-gray-500; }
+.value-positive {
+  @apply text-green-600;
+}
+.value-negative {
+  @apply text-red-600;
+}
+.value-neutral {
+  @apply text-gray-500;
+}
 
 /* ========== 动画 ========== */
 @keyframes fadeIn {
@@ -1255,7 +1280,9 @@
   background-color: var(--card-bg, #ffffff);
   border: 1px solid var(--color-border-light, #e5e7eb);
   @apply rounded-xl shadow-sm;
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  transition:
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
 }
 
 .themed-card:hover {
@@ -1299,7 +1326,7 @@
   transform: translateX(-50%);
   display: none;
 }
-.zero-value-hint[data-value="0"]::after {
+.zero-value-hint[data-value='0']::after {
   display: block;
 }
 

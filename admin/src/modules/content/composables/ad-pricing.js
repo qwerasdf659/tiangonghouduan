@@ -57,16 +57,21 @@ export function useAdPricingState() {
           method: 'GET'
         })
         if (res.success && res.data) {
-          this.dau_pricing_enabled = res.data.ad_dau_pricing_enabled === true || res.data.ad_dau_pricing_enabled === 'true'
+          this.dau_pricing_enabled =
+            res.data.ad_dau_pricing_enabled === true || res.data.ad_dau_pricing_enabled === 'true'
           this.dau_coefficient_tiers = Array.isArray(res.data.ad_dau_coefficient_tiers)
             ? res.data.ad_dau_coefficient_tiers
             : JSON.parse(res.data.ad_dau_coefficient_tiers || '[]')
-          this.discount_enabled = res.data.ad_discount_enabled === true || res.data.ad_discount_enabled === 'true'
+          this.discount_enabled =
+            res.data.ad_discount_enabled === true || res.data.ad_discount_enabled === 'true'
           this.discount_tiers = Array.isArray(res.data.ad_consecutive_discount_tiers)
             ? res.data.ad_consecutive_discount_tiers
             : JSON.parse(res.data.ad_consecutive_discount_tiers || '[]')
           const floorCfg = res.data.ad_dynamic_floor_price_config
-          this.floor_price_config = typeof floorCfg === 'string' ? JSON.parse(floorCfg) : (floorCfg || this.floor_price_config)
+          this.floor_price_config =
+            typeof floorCfg === 'string'
+              ? JSON.parse(floorCfg)
+              : floorCfg || this.floor_price_config
         }
       } catch (error) {
         logger.error('[AdPricing] 加载配置失败', error)
@@ -221,7 +226,8 @@ export function useAdPricingState() {
         const dauCounts = this.dau_stats.map(s => s.dau_count || 0)
         const coefficients = this.dau_stats.map(s =>
           s.dau_coefficient !== null && s.dau_coefficient !== undefined
-            ? parseFloat(s.dau_coefficient) : 1.0
+            ? parseFloat(s.dau_coefficient)
+            : 1.0
         )
 
         chart.setOption({
@@ -271,7 +277,12 @@ export function useAdPricingState() {
       }
       try {
         const res = await request({
-          url: SYSTEM_ENDPOINTS.AD_PRICING_PREVIEW + '?ad_slot_id=' + this.preview_slot_id + '&days=' + (this.preview_days || 1),
+          url:
+            SYSTEM_ENDPOINTS.AD_PRICING_PREVIEW +
+            '?ad_slot_id=' +
+            this.preview_slot_id +
+            '&days=' +
+            (this.preview_days || 1),
           method: 'GET'
         })
         if (res.success) {

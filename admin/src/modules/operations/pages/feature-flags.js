@@ -61,10 +61,13 @@ function registerFeatureFlagsComponents() {
     tableColumns: [
       { key: 'flag_key', label: '开关键名', sortable: true, type: 'code' },
       { key: 'flag_name', label: '名称', sortable: true },
-      { key: 'description', label: '功能描述',
-        render: (val) => val
-          ? `<span class="text-gray-600 text-sm">${val.length > 40 ? val.slice(0, 40) + '...' : val}</span>`
-          : '<span class="text-gray-300">-</span>'
+      {
+        key: 'description',
+        label: '功能描述',
+        render: val =>
+          val
+            ? `<span class="text-gray-600 text-sm">${val.length > 40 ? val.slice(0, 40) + '...' : val}</span>`
+            : '<span class="text-gray-300">-</span>'
       },
       {
         key: 'is_enabled',

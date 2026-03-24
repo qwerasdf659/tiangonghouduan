@@ -17,10 +17,7 @@ import { logger } from '../../../utils/logger.js'
 import { API_PREFIX, request } from '../../../api/base.js'
 import { loadECharts } from '../../../utils/echarts-lazy.js'
 import { createPageMixin } from '../../../alpine/mixins/index.js'
-import {
-  useDashboardOverviewState,
-  useDashboardOverviewMethods
-} from '../composables/index.js'
+import { useDashboardOverviewState, useDashboardOverviewMethods } from '../composables/index.js'
 
 /**
  * 创建数据驾驶舱页面组件
@@ -34,7 +31,7 @@ function dashboardPanelPage() {
     // ==================== Tab 1: 运营大盘 (Composable) ====================
     ...useDashboardOverviewState(),
     ...useDashboardOverviewMethods(),
-    
+
     // ==================== Tab 2: 抽奖分析数据 ====================
     lotteryAnalysis: {
       total_draws: 0,
@@ -48,7 +45,7 @@ function dashboardPanelPage() {
     },
     lotteryTrendChart: null,
     prizeDistributionChart: null,
-    
+
     // ==================== Tab 3: 用户分析数据 ====================
     userAnalysis: {
       total_users: 0,
@@ -61,7 +58,7 @@ function dashboardPanelPage() {
     },
     userGrowthChart: null,
     userTierChart: null,
-    
+
     // ==================== Tab 4: 资产流动数据 (P2-1) ====================
     assetFlow: {
       system_balance: 0,
@@ -78,7 +75,7 @@ function dashboardPanelPage() {
     },
     assetSankeyChart: null,
     assetTrendChart: null,
-    
+
     // ==================== Tab 5: 转化漏斗数据 (P3-2) ====================
     funnelData: {
       range: '7d',
@@ -87,7 +84,7 @@ function dashboardPanelPage() {
     },
     funnelChart: null,
     funnelTrendChart: null,
-    
+
     // ==================== Tab 6: 商户贡献度数据 (P3-3) ====================
     merchantData: {
       range: '7d',
@@ -111,7 +108,7 @@ function dashboardPanelPage() {
 
       // 加载默认Tab数据（运营大盘）
       await this.loadDashboardData()
-      
+
       // P2-11: 加载今日核心事件
       await this.loadTodayEvents()
 
@@ -119,9 +116,9 @@ function dashboardPanelPage() {
       this.$watch('trendType', () => {
         this.renderTrendChart()
       })
-      
+
       // P2-2: 监听Tab切换
-      this.$watch('activeTab', async (newTab) => {
+      this.$watch('activeTab', async newTab => {
         logger.info(`[DashboardPanel] 切换到Tab: ${newTab}`)
         await this.loadTabData(newTab)
       })
@@ -136,7 +133,7 @@ function dashboardPanelPage() {
 
       logger.info('[DashboardPanel] 初始化完成')
     },
-    
+
     /**
      * P2-2: 加载指定Tab的数据
      * @param {string} tabName - Tab名称
@@ -164,7 +161,7 @@ function dashboardPanelPage() {
             await this.loadMerchantData()
             break
         }
-        
+
         this.lastUpdateTime = new Date().toLocaleTimeString('zh-CN', {
           hour12: false,
           timeZone: 'Asia/Shanghai'
@@ -178,14 +175,13 @@ function dashboardPanelPage() {
 
     // Tab 1 方法已移至 composables/dashboard-overview.js
 
-    
     // ==================== Tab 2: 抽奖分析 ====================
     /**
      * 加载抽奖分析数据
      */
     async loadLotteryAnalysis() {
       logger.info('[DashboardPanel] 加载抽奖分析数据')
-      
+
       try {
         const [statsRes, trendRes, distributionRes, rankingRes] = await Promise.allSettled([
           this.fetchLotteryStats(),
@@ -193,21 +189,21 @@ function dashboardPanelPage() {
           this.fetchPrizeDistribution(),
           this.fetchCampaignRanking()
         ])
-        
+
         if (statsRes.status === 'fulfilled' && statsRes.value) {
           Object.assign(this.lotteryAnalysis, statsRes.value)
         }
-        
+
         if (trendRes.status === 'fulfilled' && trendRes.value) {
           this.lotteryAnalysis.trend_data = trendRes.value
           await this.renderLotteryTrendChart()
         }
-        
+
         if (distributionRes.status === 'fulfilled' && distributionRes.value) {
           this.lotteryAnalysis.prize_distribution = distributionRes.value
           await this.renderPrizeDistributionChart()
         }
-        
+
         if (rankingRes.status === 'fulfilled' && rankingRes.value) {
           this.lotteryAnalysis.campaign_ranking = rankingRes.value
         }
@@ -215,7 +211,7 @@ function dashboardPanelPage() {
         logger.error('[DashboardPanel] loadLotteryAnalysis 失败:', e)
       }
     },
-    
+
     async fetchLotteryStats() {
       try {
         const result = await request({
@@ -230,7 +226,7 @@ function dashboardPanelPage() {
       logger.error('[DashboardPanel] fetchLotteryStats 失败，返回空数据')
       return null
     },
-    
+
     async fetchLotteryTrendData() {
       try {
         const result = await request({
@@ -239,10 +235,10 @@ function dashboardPanelPage() {
         })
         // 后端返回 { trend: [...], range, granularity, updated_at }，需要提取 trend 数组
         if (result.success && result.data?.trend) {
-            logger.info('[DashboardPanel] fetchLotteryTrendData 成功', {
-              count: result.data.trend.length
-            })
-            return result.data.trend
+          logger.info('[DashboardPanel] fetchLotteryTrendData 成功', {
+            count: result.data.trend.length
+          })
+          return result.data.trend
         }
         logger.warn('[DashboardPanel] fetchLotteryTrendData API 返回非 success')
       } catch (e) {
@@ -252,7 +248,7 @@ function dashboardPanelPage() {
       logger.error('[DashboardPanel] fetchLotteryTrendData 失败，返回空数组')
       return []
     },
-    
+
     async fetchPrizeDistribution() {
       try {
         const result = await request({
@@ -279,7 +275,7 @@ function dashboardPanelPage() {
       logger.error('[DashboardPanel] fetchPrizeDistribution 失败，返回空数组')
       return []
     },
-    
+
     async fetchCampaignRanking() {
       try {
         const result = await request({
@@ -303,7 +299,7 @@ function dashboardPanelPage() {
       logger.error('[DashboardPanel] fetchCampaignRanking 失败，返回空数组')
       return []
     },
-    
+
     /**
      * 加载抽奖趋势（供HTML @change调用）
      */
@@ -314,30 +310,43 @@ function dashboardPanelPage() {
         await this.renderLotteryTrendChart()
       }
     },
-    
+
     /**
      * 渲染抽奖趋势图
      */
     async renderLotteryTrendChart() {
       const chartDom = document.getElementById('lottery-trend-chart')
       if (!chartDom) return
-      
+
       const echarts = await loadECharts()
       if (!echarts) return
-      
+
       if (!this.lotteryTrendChart) {
         this.lotteryTrendChart = echarts.init(chartDom)
       }
-      
+
       const data = this.lotteryAnalysis.trend_data || []
-      
+
       const option = {
-        tooltip: { trigger: 'axis', backgroundColor: 'rgba(255,255,255,0.95)', borderColor: '#e2e8f0' },
+        tooltip: {
+          trigger: 'axis',
+          backgroundColor: 'rgba(255,255,255,0.95)',
+          borderColor: '#e2e8f0'
+        },
         legend: { data: ['中奖率', '抽奖次数'], bottom: 0 },
         grid: { left: '3%', right: '4%', bottom: '15%', top: '10%', containLabel: true },
-        xAxis: { type: 'category', data: data.map(d => d.date), axisLine: { lineStyle: { color: '#e2e8f0' } } },
+        xAxis: {
+          type: 'category',
+          data: data.map(d => d.date),
+          axisLine: { lineStyle: { color: '#e2e8f0' } }
+        },
         yAxis: [
-          { type: 'value', name: '中奖率(%)', axisLine: { show: false }, splitLine: { lineStyle: { color: '#f1f5f9' } } },
+          {
+            type: 'value',
+            name: '中奖率(%)',
+            axisLine: { show: false },
+            splitLine: { lineStyle: { color: '#f1f5f9' } }
+          },
           { type: 'value', name: '抽奖次数', axisLine: { show: false } }
         ],
         series: [
@@ -347,7 +356,19 @@ function dashboardPanelPage() {
             smooth: true,
             data: data.map(d => d.win_rate),
             lineStyle: { color: '#3b82f6', width: 3 },
-            areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: '#3b82f640' }, { offset: 1, color: '#3b82f605' }] } }
+            areaStyle: {
+              color: {
+                type: 'linear',
+                x: 0,
+                y: 0,
+                x2: 0,
+                y2: 1,
+                colorStops: [
+                  { offset: 0, color: '#3b82f640' },
+                  { offset: 1, color: '#3b82f605' }
+                ]
+              }
+            }
           },
           {
             name: '抽奖次数',
@@ -358,52 +379,54 @@ function dashboardPanelPage() {
           }
         ]
       }
-      
+
       this.lotteryTrendChart.setOption(option)
     },
-    
+
     /**
      * 渲染奖品分布饼图
      */
     async renderPrizeDistributionChart() {
       const chartDom = document.getElementById('prize-distribution-chart')
       if (!chartDom) return
-      
+
       const echarts = await loadECharts()
       if (!echarts) return
-      
+
       if (!this.prizeDistributionChart) {
         this.prizeDistributionChart = echarts.init(chartDom)
       }
-      
+
       const data = this.lotteryAnalysis.prize_distribution || []
       const colors = ['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#6b7280']
-      
+
       const option = {
         tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
         legend: { orient: 'vertical', left: 'left', top: 'center' },
-        series: [{
-          type: 'pie',
-          radius: ['40%', '70%'],
-          center: ['60%', '50%'],
-          avoidLabelOverlap: true,
-          itemStyle: { borderRadius: 8, borderColor: '#fff', borderWidth: 2 },
-          label: { show: false },
-          emphasis: { label: { show: true, fontSize: 14, fontWeight: 'bold' } },
-          data: data.map((d, i) => ({ ...d, itemStyle: { color: colors[i % colors.length] } }))
-        }]
+        series: [
+          {
+            type: 'pie',
+            radius: ['40%', '70%'],
+            center: ['60%', '50%'],
+            avoidLabelOverlap: true,
+            itemStyle: { borderRadius: 8, borderColor: '#fff', borderWidth: 2 },
+            label: { show: false },
+            emphasis: { label: { show: true, fontSize: 14, fontWeight: 'bold' } },
+            data: data.map((d, i) => ({ ...d, itemStyle: { color: colors[i % colors.length] } }))
+          }
+        ]
       }
-      
+
       this.prizeDistributionChart.setOption(option)
     },
-    
+
     // ==================== Tab 3: 用户分析 ====================
     /**
      * 加载用户分析数据
      */
     async loadUserAnalysis() {
       logger.info('[DashboardPanel] 加载用户分析数据')
-      
+
       try {
         const [statsRes, growthRes, tierRes, rankingRes] = await Promise.allSettled([
           this.fetchUserStats(),
@@ -411,21 +434,21 @@ function dashboardPanelPage() {
           this.fetchUserTierDistribution(),
           this.fetchActiveRanking()
         ])
-        
+
         if (statsRes.status === 'fulfilled' && statsRes.value) {
           Object.assign(this.userAnalysis, statsRes.value)
         }
-        
+
         if (growthRes.status === 'fulfilled' && growthRes.value) {
           this.userAnalysis.growth_data = growthRes.value
           await this.renderUserGrowthChart()
         }
-        
+
         if (tierRes.status === 'fulfilled' && tierRes.value) {
           this.userAnalysis.tier_distribution = tierRes.value
           await this.renderUserTierChart()
         }
-        
+
         if (rankingRes.status === 'fulfilled' && rankingRes.value) {
           this.userAnalysis.active_ranking = rankingRes.value
         }
@@ -433,7 +456,7 @@ function dashboardPanelPage() {
         logger.error('[DashboardPanel] loadUserAnalysis 失败:', e)
       }
     },
-    
+
     /**
      * 获取用户统计数据
      * @description 使用后端实际API: /api/v4/console/users/segments 获取用户分层统计
@@ -447,12 +470,12 @@ function dashboardPanelPage() {
           // 从分层统计中提取用户数据
           const segments = result.data.segments || []
           const totalUsers = result.data.total_users || 0
-          
+
           // 计算各分层数量 - 后端返回字段是 code，不是 type
           const highValueUsers = segments.find(s => s.code === 'high_value')?.count || 0
           const activeUsers = segments.find(s => s.code === 'active')?.count || 0
           const silentUsers = segments.find(s => s.code === 'silent')?.count || 0
-          
+
           logger.info('[DashboardPanel] fetchUserStats 成功', {
             total_users: totalUsers,
             high_value: highValueUsers,
@@ -460,7 +483,7 @@ function dashboardPanelPage() {
             silent: silentUsers,
             segments_count: segments.length
           })
-          
+
           return {
             total_users: totalUsers,
             new_users_today: result.data.new_users_today || Math.round(totalUsers * 0.01),
@@ -481,7 +504,7 @@ function dashboardPanelPage() {
         vip_users: 0
       }
     },
-    
+
     /**
      * 获取用户增长数据
      * @description 后端没有直接的用户增长趋势API（/api/v4/console/user/growth 不存在）
@@ -496,12 +519,16 @@ function dashboardPanelPage() {
           // 基于系统概览数据生成7天趋势（后端暂无详细趋势API）
           const baseNewUsers = overview.new_users_today || 200
           const baseActiveUsers = overview.active_users || 5000
-          
+
           return Array.from({ length: 7 }, (_, i) => {
             const date = new Date()
             date.setDate(date.getDate() - (6 - i))
             return {
-              date: date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit', timeZone: 'Asia/Shanghai' }),
+              date: date.toLocaleDateString('zh-CN', {
+                month: '2-digit',
+                day: '2-digit',
+                timeZone: 'Asia/Shanghai'
+              }),
               new_users: i === 6 ? baseNewUsers : 0,
               active_users: i === 6 ? baseActiveUsers : 0
             }
@@ -513,7 +540,7 @@ function dashboardPanelPage() {
       /* API 失败时返回空数组，不使用模拟数据 */
       return []
     },
-    
+
     /**
      * 获取用户分层分布
      * @description 使用后端实际API: /api/v4/console/users/segments 获取用户分层分布
@@ -530,11 +557,11 @@ function dashboardPanelPage() {
             silent: { name: '沉默用户', color: '#6b7280' },
             churned: { name: '流失用户', color: '#94a3b8' }
           }
-          
+
           logger.info('[DashboardPanel] fetchUserTierDistribution 成功', {
             segments_count: result.data.segments.length
           })
-          
+
           // 使用 segment.code 而不是 segment.type
           return result.data.segments.map(segment => ({
             name: segmentConfig[segment.code]?.name || segment.name || segment.code,
@@ -550,7 +577,7 @@ function dashboardPanelPage() {
       logger.error('[DashboardPanel] fetchUserTierDistribution 失败，返回空数据')
       return []
     },
-    
+
     /**
      * 获取活跃用户排行
      * @description 使用后端实际API: /api/v4/console/users/segments/high_value 获取高价值用户列表
@@ -572,7 +599,7 @@ function dashboardPanelPage() {
             user_id: user.user_id,
             nickname: user.nickname || user.mobile || `用户${user.user_id}`,
             phone: user.mobile || '--',
-            activity_score: user.activity_score || user.total_consumption || (1000 - index * 50)
+            activity_score: user.activity_score || user.total_consumption || 1000 - index * 50
           }))
         }
         logger.warn('[DashboardPanel] fetchActiveRanking API 返回非 success')
@@ -583,20 +610,20 @@ function dashboardPanelPage() {
       logger.error('[DashboardPanel] fetchActiveRanking 失败，返回空数据')
       return []
     },
-    
+
     async renderUserGrowthChart() {
       const chartDom = document.getElementById('user-growth-chart')
       if (!chartDom) return
-      
+
       const echarts = await loadECharts()
       if (!echarts) return
-      
+
       if (!this.userGrowthChart) {
         this.userGrowthChart = echarts.init(chartDom)
       }
-      
+
       const data = this.userAnalysis.growth_data || []
-      
+
       const option = {
         tooltip: { trigger: 'axis' },
         legend: { data: ['新增用户', '活跃用户'], bottom: 0 },
@@ -604,64 +631,77 @@ function dashboardPanelPage() {
         xAxis: { type: 'category', data: data.map(d => d.date) },
         yAxis: { type: 'value' },
         series: [
-          { name: '新增用户', type: 'bar', data: data.map(d => d.new_users), itemStyle: { color: '#10b981' } },
-          { name: '活跃用户', type: 'line', smooth: true, data: data.map(d => d.active_users), lineStyle: { color: '#3b82f6', width: 3 } }
+          {
+            name: '新增用户',
+            type: 'bar',
+            data: data.map(d => d.new_users),
+            itemStyle: { color: '#10b981' }
+          },
+          {
+            name: '活跃用户',
+            type: 'line',
+            smooth: true,
+            data: data.map(d => d.active_users),
+            lineStyle: { color: '#3b82f6', width: 3 }
+          }
         ]
       }
-      
+
       this.userGrowthChart.setOption(option)
     },
-    
+
     async renderUserTierChart() {
       const chartDom = document.getElementById('user-tier-chart')
       if (!chartDom) return
-      
+
       const echarts = await loadECharts()
       if (!echarts) return
-      
+
       // 销毁旧实例再创建新实例
       if (this.userTierChart) {
         this.userTierChart.dispose()
         this.userTierChart = null
       }
       this.userTierChart = echarts.init(chartDom)
-      
+
       const data = this.userAnalysis.tier_distribution || []
-      
+
       const option = {
         tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
         legend: { orient: 'vertical', left: 'left', top: 'center' },
-        series: [{
-          type: 'pie',
-          radius: ['40%', '70%'],
-          center: ['60%', '50%'],
-          data: data.map(d => ({ value: d.value, name: d.name, itemStyle: { color: d.color } })),
-          itemStyle: { borderRadius: 8, borderColor: '#fff', borderWidth: 2 },
-          label: { show: false }
-        }]
+        series: [
+          {
+            type: 'pie',
+            radius: ['40%', '70%'],
+            center: ['60%', '50%'],
+            data: data.map(d => ({ value: d.value, name: d.name, itemStyle: { color: d.color } })),
+            itemStyle: { borderRadius: 8, borderColor: '#fff', borderWidth: 2 },
+            label: { show: false }
+          }
+        ]
       }
-      
+
       this.userTierChart.setOption(option)
     },
-    
+
     // ==================== Tab 4: 资产流动 (P2-1 桑基图) ====================
     /**
      * 加载资产流动数据
      */
     async loadAssetFlowData() {
       logger.info('[DashboardPanel] 加载资产流动数据')
-      
+
       try {
         const [summaryRes, flowRes, trendRes] = await Promise.allSettled([
           this.fetchAssetSummary(),
           this.fetchAssetFlowDetails(),
           this.fetchAssetTrend()
         ])
-        
+
         if (summaryRes.status === 'fulfilled' && summaryRes.value) {
           Object.assign(this.assetFlow, summaryRes.value)
         }
-        
+
         if (flowRes.status === 'fulfilled' && flowRes.value) {
           this.assetFlow.inflows = flowRes.value.inflows || []
           this.assetFlow.outflows = flowRes.value.outflows || []
@@ -670,7 +710,7 @@ function dashboardPanelPage() {
           this.assetFlow.sankey_data = flowRes.value.sankey_data || { nodes: [], links: [] }
           await this.renderAssetSankeyChart()
         }
-        
+
         if (trendRes.status === 'fulfilled' && trendRes.value) {
           this.assetFlow.trend_data = trendRes.value
           await this.renderAssetTrendChart()
@@ -679,7 +719,7 @@ function dashboardPanelPage() {
         logger.error('[DashboardPanel] loadAssetFlowData 失败:', e)
       }
     },
-    
+
     /**
      * 获取资产摘要数据
      * @description 使用后端 /api/v4/console/assets/stats API
@@ -692,14 +732,15 @@ function dashboardPanelPage() {
         if (result.success && result.data) {
           // 适配后端数据结构到前端期望格式
           const { summary, asset_stats } = result.data
-          
+
           // 计算主要资产（POINTS类型）的数据
           const pointsAsset = asset_stats?.find(a => a.asset_code === 'POINTS') || {}
           const _diamondAsset = asset_stats?.find(a => a.asset_code === 'DIAMOND') || {}
-          
+
           return {
             system_balance: Number(summary?.total_circulation) || 0,
-            user_holding: (Number(summary?.total_circulation) || 0) - (Number(summary?.total_frozen) || 0),
+            user_holding:
+              (Number(summary?.total_circulation) || 0) - (Number(summary?.total_frozen) || 0),
             frozen_amount: Number(summary?.total_frozen) || 0,
             net_flow: Number(pointsAsset?.total_circulation) || 0,
             total_asset_types: summary?.total_asset_types || 0,
@@ -712,7 +753,7 @@ function dashboardPanelPage() {
       // API失败时返回null，前端不显示降级数据
       return null
     },
-    
+
     /**
      * 获取资产流动详情
      * @description 使用后端 /api/v4/console/analytics/stats/today 获取今日资产流动数据
@@ -724,22 +765,34 @@ function dashboardPanelPage() {
         const result = await request({ url: `${API_PREFIX}/console/analytics/stats/today` })
         if (result.success && result.data) {
           const { points_stats, lottery_stats, inventory_stats } = result.data
-          
+
           // 根据后端实际数据构建流入流出
           const inflows = [
-            { type: 'lottery_win', label: '抽奖获得', amount: points_stats?.points_earned_today || 0 },
+            {
+              type: 'lottery_win',
+              label: '抽奖获得',
+              amount: points_stats?.points_earned_today || 0
+            },
             { type: 'activity', label: '活动奖励', amount: inventory_stats?.new_items_today || 0 }
           ].filter(i => i.amount > 0)
-          
+
           const outflows = [
-            { type: 'lottery_cost', label: '抽奖消耗', amount: lottery_stats?.total_points_consumed || 0 },
-            { type: 'consumption', label: '消费核销', amount: points_stats?.points_spent_today || 0 },
+            {
+              type: 'lottery_cost',
+              label: '抽奖消耗',
+              amount: lottery_stats?.total_points_consumed || 0
+            },
+            {
+              type: 'consumption',
+              label: '消费核销',
+              amount: points_stats?.points_spent_today || 0
+            },
             { type: 'item_use', label: '物品使用', amount: inventory_stats?.used_items_today || 0 }
           ].filter(o => o.amount > 0)
-          
+
           const total_inflow = inflows.reduce((sum, i) => sum + i.amount, 0)
           const total_outflow = outflows.reduce((sum, o) => sum + o.amount, 0)
-          
+
           // 构建桑基图数据
           const sankey_data = {
             nodes: [
@@ -754,7 +807,7 @@ function dashboardPanelPage() {
               ...outflows.map(o => ({ source: '用户余额', target: o.label, value: o.amount }))
             ]
           }
-          
+
           return { inflows, outflows, total_inflow, total_outflow, sankey_data }
         }
       } catch (e) {
@@ -769,7 +822,7 @@ function dashboardPanelPage() {
         sankey_data: { nodes: [], links: [] }
       }
     },
-    
+
     /**
      * 获取资产趋势数据
      * @description 使用后端 /api/v4/console/dashboard/time-comparison 获取时间对比数据
@@ -781,19 +834,20 @@ function dashboardPanelPage() {
         const result = await request({ url: `${API_PREFIX}/console/dashboard/time-comparison` })
         if (result.success && result.data) {
           const { day_comparison } = result.data
-            
-            // 后端返回的是日对比数据，转换为前端需要的趋势格式
-            // 由于后端只提供今日vs昨日对比，我们构建两天的数据
-            const today = new Date()
-            const yesterday = new Date(today)
-            yesterday.setDate(yesterday.getDate() - 1)
-            
-            const formatDate = (d) => d.toLocaleDateString('zh-CN', { 
-              month: '2-digit', 
-              day: '2-digit', 
-              timeZone: 'Asia/Shanghai' 
+
+          // 后端返回的是日对比数据，转换为前端需要的趋势格式
+          // 由于后端只提供今日vs昨日对比，我们构建两天的数据
+          const today = new Date()
+          const yesterday = new Date(today)
+          yesterday.setDate(yesterday.getDate() - 1)
+
+          const formatDate = d =>
+            d.toLocaleDateString('zh-CN', {
+              month: '2-digit',
+              day: '2-digit',
+              timeZone: 'Asia/Shanghai'
             })
-            
+
           return [
             {
               date: formatDate(yesterday),
@@ -815,7 +869,7 @@ function dashboardPanelPage() {
       // API失败时返回空数组
       return []
     },
-    
+
     /**
      * 加载资产流动图表（供HTML @change调用）
      */
@@ -830,21 +884,20 @@ function dashboardPanelPage() {
         await this.renderAssetSankeyChart()
       }
     },
-    
+
     /**
      * P2-1: 渲染资产流动桑基图
      * 修复x-if时序问题：等待DOM创建后再渲染
      */
     async renderAssetSankeyChart() {
-      
       // 等待Alpine.js完成DOM更新（解决x-if时序问题）
       await this.$nextTick()
-      
+
       // 增加短暂延迟确保DOM完全渲染
       await new Promise(resolve => setTimeout(resolve, 50))
-      
+
       let chartDom = document.getElementById('asset-sankey-chart')
-      
+
       if (!chartDom) {
         logger.warn('[DashboardPanel] 桑基图容器未找到，稍后重试')
         // 再等待一次，某些情况下DOM还未完全创建
@@ -855,19 +908,19 @@ function dashboardPanelPage() {
           return
         }
       }
-      
+
       const echarts = await loadECharts()
       if (!echarts) {
         logger.error('[DashboardPanel] ECharts加载失败')
         return
       }
-      
+
       if (!this.assetSankeyChart) {
         this.assetSankeyChart = echarts.init(chartDom)
       }
-      
+
       const { nodes, links } = this.assetFlow.sankey_data
-      
+
       // 检查数据是否有效
       if (!nodes || nodes.length === 0 || !links || links.length === 0) {
         logger.warn('[DashboardPanel] 桑基图数据为空，无法渲染')
@@ -882,56 +935,57 @@ function dashboardPanelPage() {
         })
         return
       }
-      
+
       const option = {
         tooltip: {
           trigger: 'item',
           triggerOn: 'mousemove',
-          formatter: (params) => {
+          formatter: params => {
             if (params.dataType === 'edge') {
               return `${params.data.source} → ${params.data.target}<br/>流量: ${this.formatNumber(params.data.value)}`
             }
             return params.name
           }
         },
-        series: [{
-          type: 'sankey',
-          layout: 'none',
-          emphasis: { focus: 'adjacency' },
-          nodeAlign: 'left',
-          data: nodes,
-          links: links,
-          lineStyle: {
-            color: 'gradient',
-            curveness: 0.5
-          },
-          itemStyle: {
-            color: '#3b82f6',
-            borderColor: '#fff',
-            borderWidth: 1
-          },
-          label: {
-            color: '#334155',
-            fontSize: 12
+        series: [
+          {
+            type: 'sankey',
+            layout: 'none',
+            emphasis: { focus: 'adjacency' },
+            nodeAlign: 'left',
+            data: nodes,
+            links: links,
+            lineStyle: {
+              color: 'gradient',
+              curveness: 0.5
+            },
+            itemStyle: {
+              color: '#3b82f6',
+              borderColor: '#fff',
+              borderWidth: 1
+            },
+            label: {
+              color: '#334155',
+              fontSize: 12
+            }
           }
-        }]
+        ]
       }
-      
+
       this.assetSankeyChart.setOption(option)
     },
-    
+
     /**
      * 渲染资产趋势图
      * 修复x-if时序问题：等待DOM创建后再渲染
      */
     async renderAssetTrendChart() {
-      
       // 等待Alpine.js完成DOM更新
       await this.$nextTick()
       await new Promise(resolve => setTimeout(resolve, 50))
-      
+
       let chartDom = document.getElementById('asset-trend-chart')
-      
+
       if (!chartDom) {
         logger.warn('[DashboardPanel] 趋势图容器未找到，稍后重试')
         await new Promise(resolve => setTimeout(resolve, 100))
@@ -941,19 +995,19 @@ function dashboardPanelPage() {
           return
         }
       }
-      
+
       const echarts = await loadECharts()
       if (!echarts) {
         logger.error('[DashboardPanel] ECharts加载失败')
         return
       }
-      
+
       if (!this.assetTrendChart) {
         this.assetTrendChart = echarts.init(chartDom)
       }
-      
+
       const data = this.assetFlow.trend_data || []
-      
+
       // 检查数据是否有效
       if (data.length === 0) {
         logger.warn('[DashboardPanel] 趋势图数据为空')
@@ -967,7 +1021,7 @@ function dashboardPanelPage() {
         })
         return
       }
-      
+
       const option = {
         tooltip: { trigger: 'axis' },
         legend: { data: ['流入', '流出', '余额'], bottom: 0 },
@@ -978,28 +1032,46 @@ function dashboardPanelPage() {
           { type: 'value', name: '余额' }
         ],
         series: [
-          { name: '流入', type: 'bar', stack: 'flow', data: data.map(d => d.inflow), itemStyle: { color: '#10b981' } },
-          { name: '流出', type: 'bar', stack: 'flow', data: data.map(d => -d.outflow), itemStyle: { color: '#ef4444' } },
-          { name: '余额', type: 'line', yAxisIndex: 1, data: data.map(d => d.balance), lineStyle: { color: '#3b82f6', width: 3 } }
+          {
+            name: '流入',
+            type: 'bar',
+            stack: 'flow',
+            data: data.map(d => d.inflow),
+            itemStyle: { color: '#10b981' }
+          },
+          {
+            name: '流出',
+            type: 'bar',
+            stack: 'flow',
+            data: data.map(d => -d.outflow),
+            itemStyle: { color: '#ef4444' }
+          },
+          {
+            name: '余额',
+            type: 'line',
+            yAxisIndex: 1,
+            data: data.map(d => d.balance),
+            lineStyle: { color: '#3b82f6', width: 3 }
+          }
         ]
       }
-      
+
       this.assetTrendChart.setOption(option)
     },
-    
+
     // ==================== Tab 5: 转化漏斗 (P3-2) ====================
     /**
      * 加载漏斗数据
      */
     async loadFunnelData() {
       logger.info('[DashboardPanel] 加载转化漏斗数据')
-      
+
       try {
         const [funnelRes, trendRes] = await Promise.allSettled([
           this.fetchFunnelStages(),
           this.fetchFunnelTrend()
         ])
-        
+
         if (funnelRes.status === 'fulfilled' && funnelRes.value) {
           this.funnelData.stages = funnelRes.value
           await this.renderFunnelChart()
@@ -1007,7 +1079,7 @@ function dashboardPanelPage() {
         } else {
           logger.warn('[DashboardPanel] 漏斗数据加载失败或为空')
         }
-        
+
         if (trendRes.status === 'fulfilled' && trendRes.value) {
           this.funnelData.trend_data = trendRes.value
         }
@@ -1017,11 +1089,12 @@ function dashboardPanelPage() {
         logger.error('[DashboardPanel] loadFunnelData 失败:', e)
       }
     },
-    
+
     async fetchFunnelStages() {
       try {
         // 使用后端正确的API路径: /api/v4/console/users/funnel
-        const days = this.funnelData.range === '90d' ? '90' : this.funnelData.range === '30d' ? '30' : '7'
+        const days =
+          this.funnelData.range === '90d' ? '90' : this.funnelData.range === '30d' ? '30' : '7'
         const result = await request({
           url: `${API_PREFIX}/console/users/funnel`,
           params: { days }
@@ -1035,7 +1108,7 @@ function dashboardPanelPage() {
       }
       return null
     },
-    
+
     async fetchFunnelTrend() {
       // 后端已实现漏斗趋势 API: /api/v4/console/users/funnel/trend
       try {
@@ -1045,7 +1118,9 @@ function dashboardPanelPage() {
           { showLoading: false }
         )
         if (response?.success && response.data?.trend) {
-          logger.info('[DashboardPanel] 漏斗趋势数据加载成功', { points: response.data.trend.length })
+          logger.info('[DashboardPanel] 漏斗趋势数据加载成功', {
+            points: response.data.trend.length
+          })
           return response.data.trend
         }
         logger.warn('[DashboardPanel] 漏斗趋势API返回空数据')
@@ -1055,21 +1130,20 @@ function dashboardPanelPage() {
         return null
       }
     },
-    
+
     /**
      * P3-2: 渲染漏斗图
      * 修复x-if时序问题：等待DOM创建后再渲染
      */
     async renderFunnelChart() {
-      
       // 等待Alpine.js完成DOM更新（解决x-if时序问题）
       await this.$nextTick()
-      
+
       // 增加短暂延迟确保DOM完全渲染（备用方案）
       await new Promise(resolve => setTimeout(resolve, 50))
-      
+
       const chartDom = document.getElementById('conversion-funnel-chart')
-      
+
       if (!chartDom) {
         logger.warn('[DashboardPanel] 漏斗图容器未找到，稍后重试')
         // 再等待一次，某些情况下DOM还未完全创建
@@ -1081,10 +1155,10 @@ function dashboardPanelPage() {
         }
         return this._doRenderFunnelChart(retryDom)
       }
-      
+
       return this._doRenderFunnelChart(chartDom)
     },
-    
+
     /**
      * 实际执行漏斗图渲染
      * @private
@@ -1094,60 +1168,63 @@ function dashboardPanelPage() {
       if (!echarts) {
         return
       }
-      
+
       // 销毁旧实例再创建新实例（解决x-if切换时的问题）
       if (this.funnelChart) {
         this.funnelChart.dispose()
         this.funnelChart = null
       }
       this.funnelChart = echarts.init(chartDom)
-      
+
       const data = this.funnelData.stages || []
       if (data.length === 0) {
         return
       }
-      
+
       const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
-      
+
       const option = {
-        tooltip: { 
-          trigger: 'item', 
-          formatter: params => `${params.name}: ${params.data.count}人 (${params.value.toFixed(1)}%)`
+        tooltip: {
+          trigger: 'item',
+          formatter: params =>
+            `${params.name}: ${params.data.count}人 (${params.value.toFixed(1)}%)`
         },
-        series: [{
-          type: 'funnel',
-          left: '10%',
-          top: 60,
-          bottom: 60,
-          width: '80%',
-          min: 0,
-          max: 100,
-          minSize: '0%',
-          maxSize: '100%',
-          sort: 'descending',
-          gap: 2,
-          label: { 
-            show: true, 
-            position: 'inside', 
-            formatter: params => `${params.name}\n${params.data.count}人`
-          },
-          labelLine: { length: 10, lineStyle: { width: 1, type: 'solid' } },
-          itemStyle: { borderColor: '#fff', borderWidth: 1 },
-          emphasis: { label: { fontSize: 16 } },
-          data: data.map((d, i) => ({
-            value: d.percentage,
-            name: d.name,
-            count: d.count,
-            itemStyle: { color: colors[i % colors.length] }
-          }))
-        }]
+        series: [
+          {
+            type: 'funnel',
+            left: '10%',
+            top: 60,
+            bottom: 60,
+            width: '80%',
+            min: 0,
+            max: 100,
+            minSize: '0%',
+            maxSize: '100%',
+            sort: 'descending',
+            gap: 2,
+            label: {
+              show: true,
+              position: 'inside',
+              formatter: params => `${params.name}\n${params.data.count}人`
+            },
+            labelLine: { length: 10, lineStyle: { width: 1, type: 'solid' } },
+            itemStyle: { borderColor: '#fff', borderWidth: 1 },
+            emphasis: { label: { fontSize: 16 } },
+            data: data.map((d, i) => ({
+              value: d.percentage,
+              name: d.name,
+              count: d.count,
+              itemStyle: { color: colors[i % colors.length] }
+            }))
+          }
+        ]
       }
-      
+
       this.funnelChart.setOption(option)
       this.funnelChart.resize()
       logger.info('[DashboardPanel] 漏斗图渲染完成', { stages: data.length })
     },
-    
+
     /**
      * 渲染漏斗趋势图
      * 修复x-if时序问题：等待DOM创建后再渲染
@@ -1156,9 +1233,9 @@ function dashboardPanelPage() {
       // 等待Alpine.js完成DOM更新
       await this.$nextTick()
       await new Promise(resolve => setTimeout(resolve, 50))
-      
+
       let chartDom = document.getElementById('funnel-trend-chart')
-      
+
       if (!chartDom) {
         logger.warn('[DashboardPanel] 漏斗趋势图容器未找到，稍后重试')
         await new Promise(resolve => setTimeout(resolve, 100))
@@ -1168,19 +1245,19 @@ function dashboardPanelPage() {
           return
         }
       }
-      
+
       const echarts = await loadECharts()
       if (!echarts) return
-      
+
       // 销毁旧实例再创建新实例
       if (this.funnelTrendChart) {
         this.funnelTrendChart.dispose()
         this.funnelTrendChart = null
       }
       this.funnelTrendChart = echarts.init(chartDom)
-      
+
       const data = this.funnelData.trend_data || []
-      
+
       // 数据为空时显示提示
       if (data.length === 0) {
         this.funnelTrendChart.setOption({
@@ -1195,7 +1272,7 @@ function dashboardPanelPage() {
         })
         return
       }
-      
+
       // 字段适配后端API: lottery_rate, consumption_rate, exchange_rate
       const option = {
         tooltip: { trigger: 'axis' },
@@ -1204,22 +1281,40 @@ function dashboardPanelPage() {
         xAxis: { type: 'category', data: data.map(d => d.date) },
         yAxis: { type: 'value', name: '%', max: 100 },
         series: [
-          { name: '抽奖率', type: 'line', smooth: true, data: data.map(d => d.lottery_rate), lineStyle: { color: '#3b82f6' } },
-          { name: '消费率', type: 'line', smooth: true, data: data.map(d => d.consumption_rate), lineStyle: { color: '#10b981' } },
-          { name: '兑换率', type: 'line', smooth: true, data: data.map(d => d.exchange_rate), lineStyle: { color: '#f59e0b' } }
+          {
+            name: '抽奖率',
+            type: 'line',
+            smooth: true,
+            data: data.map(d => d.lottery_rate),
+            lineStyle: { color: '#3b82f6' }
+          },
+          {
+            name: '消费率',
+            type: 'line',
+            smooth: true,
+            data: data.map(d => d.consumption_rate),
+            lineStyle: { color: '#10b981' }
+          },
+          {
+            name: '兑换率',
+            type: 'line',
+            smooth: true,
+            data: data.map(d => d.exchange_rate),
+            lineStyle: { color: '#f59e0b' }
+          }
         ]
       }
-      
+
       this.funnelTrendChart.setOption(option)
     },
-    
+
     // ==================== Tab 6: 商户贡献度 (P3-3) ====================
     /**
      * 加载商户贡献度数据
      */
     async loadMerchantData() {
       logger.info('[DashboardPanel] 加载商户贡献度数据')
-      
+
       try {
         const [statsRes, rankingRes, trendRes, comparisonRes] = await Promise.allSettled([
           this.fetchMerchantStats(),
@@ -1227,21 +1322,21 @@ function dashboardPanelPage() {
           this.fetchMerchantTrend(),
           this.fetchMerchantComparison()
         ])
-        
+
         if (statsRes.status === 'fulfilled' && statsRes.value) {
           Object.assign(this.merchantData, statsRes.value)
         }
-        
+
         if (rankingRes.status === 'fulfilled' && rankingRes.value) {
           this.merchantData.ranking = rankingRes.value
           await this.renderMerchantPieChart()
         }
-        
+
         if (trendRes.status === 'fulfilled' && trendRes.value) {
           this.merchantData.trend_data = trendRes.value
           await this.renderMerchantTrendChart()
         }
-        
+
         if (comparisonRes.status === 'fulfilled' && comparisonRes.value) {
           this.merchantData.comparison = comparisonRes.value
         }
@@ -1249,32 +1344,35 @@ function dashboardPanelPage() {
         logger.error('[DashboardPanel] loadMerchantData 失败:', e)
       }
     },
-    
+
     async fetchMerchantStats() {
       // 后端 API: /api/v4/console/stores/stats + /api/v4/console/stores/contribution
       try {
         // 并行获取门店统计和贡献度数据
         const [storesResult, contributionResult] = await Promise.allSettled([
           request({ url: `${API_PREFIX}/console/stores/stats` }),
-          request({ url: `${API_PREFIX}/console/stores/contribution`, params: { days: 30, page_size: 100 } })
+          request({
+            url: `${API_PREFIX}/console/stores/contribution`,
+            params: { days: 30, page_size: 100 }
+          })
         ])
-        
+
         let total_merchants = 0
         let total_consumption = 0
         let total_orders = 0
-        
+
         if (storesResult.status === 'fulfilled' && storesResult.value?.success) {
           total_merchants = storesResult.value.data.total || 0
         }
-        
+
         if (contributionResult.status === 'fulfilled' && contributionResult.value?.success) {
           total_consumption = contributionResult.value.data.platform_total || 0
           const rankings = contributionResult.value.data.rankings || []
           total_orders = rankings.reduce((sum, r) => sum + (r.order_count || 0), 0)
         }
-        
+
         const avg_order_value = total_orders > 0 ? Math.round(total_consumption / total_orders) : 0
-        
+
         return {
           total_merchants,
           total_consumption,
@@ -1286,13 +1384,13 @@ function dashboardPanelPage() {
         return null
       }
     },
-    
+
     async fetchMerchantRanking() {
       // 后端 API: /api/v4/console/stores/contribution
       // 并为每个商户调用 health-score API 获取健康度
       try {
         const days = this.merchantData.range === '30d' ? 30 : 7
-        
+
         const result = await request({
           url: `${API_PREFIX}/console/stores/contribution`,
           params: { days, page_size: 20 }
@@ -1300,12 +1398,12 @@ function dashboardPanelPage() {
         if (!result.success || !result.data.rankings) {
           return []
         }
-        
+
         const rankings = result.data.rankings
-        
+
         // 并行获取每个商户的健康度评分
         const rankingsWithHealth = await Promise.all(
-          rankings.map(async (merchant) => {
+          rankings.map(async merchant => {
             let healthScore = null
             try {
               const healthResult = await request({
@@ -1323,7 +1421,7 @@ function dashboardPanelPage() {
             }
           })
         )
-        
+
         logger.info('[DashboardPanel] fetchMerchantRanking 成功:', rankingsWithHealth.length, '条')
         return rankingsWithHealth
       } catch (e) {
@@ -1331,7 +1429,7 @@ function dashboardPanelPage() {
       }
       return []
     },
-    
+
     async fetchMerchantTrend() {
       // 注意: 后端 /api/v4/console/stores/:store_id/trend 是单店趋势，不是全平台趋势
       // 全平台消费趋势需要后端实现新的 API，暂时使用 time-comparison 数据
@@ -1350,7 +1448,11 @@ function dashboardPanelPage() {
             const dayComparison = data.day_comparison?.consumption || {}
             const baseAmount = dayComparison.current || 0
             return {
-              date: date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit', timeZone: 'Asia/Shanghai' }),
+              date: date.toLocaleDateString('zh-CN', {
+                month: '2-digit',
+                day: '2-digit',
+                timeZone: 'Asia/Shanghai'
+              }),
               consumption: i === 6 ? baseAmount : 0,
               orders: i === 6 ? Math.round(baseAmount / 50) : 0
             }
@@ -1361,14 +1463,14 @@ function dashboardPanelPage() {
       }
       return [] // API 失败时返回空数组
     },
-    
+
     async fetchMerchantComparison() {
       // 获取前5个商户的环比数据
       // 1. 先从 contribution API 获取商户列表
       // 2. 对每个商户调用 /:store_id/comparison 和 /:store_id/health-score API
       try {
         const days = this.merchantData.range === '30d' ? 30 : 7
-        
+
         // 先获取商户列表
         const listResult = await request({
           url: `${API_PREFIX}/console/stores/contribution`,
@@ -1377,16 +1479,16 @@ function dashboardPanelPage() {
         if (!listResult.success || !listResult.data.rankings) {
           return []
         }
-        
+
         const merchants = listResult.data.rankings.slice(0, 5)
-        
+
         // 并行获取每个商户的环比数据和健康度
         const comparisonData = await Promise.all(
-          merchants.map(async (merchant) => {
+          merchants.map(async merchant => {
             const merchantId = merchant.merchant_id
             let compData = null
             let healthScore = null
-            
+
             // 获取环比数据
             try {
               const compResult = await request({
@@ -1398,7 +1500,7 @@ function dashboardPanelPage() {
             } catch (e) {
               logger.warn(`[DashboardPanel] 获取商户${merchantId}环比数据失败:`, e.message)
             }
-            
+
             // 获取健康度评分
             try {
               const healthResult = await request({
@@ -1410,7 +1512,7 @@ function dashboardPanelPage() {
             } catch (e) {
               logger.warn(`[DashboardPanel] 获取商户${merchantId}健康度失败:`, e.message)
             }
-            
+
             // 组合数据，使用后端实际字段名
             return {
               merchant_id: merchantId,
@@ -1423,7 +1525,7 @@ function dashboardPanelPage() {
             }
           })
         )
-        
+
         logger.info('[DashboardPanel] fetchMerchantComparison 成功:', comparisonData.length, '条')
         return comparisonData
       } catch (e) {
@@ -1431,26 +1533,26 @@ function dashboardPanelPage() {
       }
       return []
     },
-    
+
     /**
      * 渲染商户消费趋势图
      */
     async renderMerchantTrendChart() {
       const chartDom = document.getElementById('merchant-trend-chart')
       if (!chartDom) return
-      
+
       const echarts = await loadECharts()
       if (!echarts) return
-      
+
       // 销毁旧实例再创建新实例
       if (this.merchantTrendChart) {
         this.merchantTrendChart.dispose()
         this.merchantTrendChart = null
       }
       this.merchantTrendChart = echarts.init(chartDom)
-      
+
       const data = this.merchantData.trend_data || []
-      
+
       const option = {
         tooltip: { trigger: 'axis' },
         legend: { data: ['消费金额', '订单数'], bottom: 0 },
@@ -1461,58 +1563,74 @@ function dashboardPanelPage() {
           { type: 'value', name: '订单数' }
         ],
         series: [
-          { name: '消费金额', type: 'bar', data: data.map(d => d.consumption), itemStyle: { color: '#3b82f6' } },
-          { name: '订单数', type: 'line', yAxisIndex: 1, data: data.map(d => d.orders), lineStyle: { color: '#10b981', width: 3 } }
+          {
+            name: '消费金额',
+            type: 'bar',
+            data: data.map(d => d.consumption),
+            itemStyle: { color: '#3b82f6' }
+          },
+          {
+            name: '订单数',
+            type: 'line',
+            yAxisIndex: 1,
+            data: data.map(d => d.orders),
+            lineStyle: { color: '#10b981', width: 3 }
+          }
         ]
       }
-      
+
       this.merchantTrendChart.setOption(option)
     },
-    
+
     /**
      * P3-3: 渲染商户贡献度饼图
      */
     async renderMerchantPieChart() {
       const chartDom = document.getElementById('merchant-pie-chart')
       if (!chartDom) return
-      
+
       const echarts = await loadECharts()
       if (!echarts) return
-      
+
       // 销毁旧实例再创建新实例
       if (this.merchantPieChart) {
         this.merchantPieChart.dispose()
         this.merchantPieChart = null
       }
       this.merchantPieChart = echarts.init(chartDom)
-      
+
       const ranking = this.merchantData.ranking || []
       const top5 = ranking.slice(0, 5)
       // 使用后端字段名 total_amount
       const othersAmount = ranking.slice(5).reduce((sum, m) => sum + (m.total_amount || 0), 0)
-      
+
       const data = [
         // 使用后端字段名 merchant_name, total_amount
-        ...top5.map(m => ({ name: m.merchant_name || `商户${m.merchant_id}`, value: m.total_amount || 0 })),
+        ...top5.map(m => ({
+          name: m.merchant_name || `商户${m.merchant_id}`,
+          value: m.total_amount || 0
+        })),
         { name: '其他门店', value: othersAmount }
       ]
-      
+
       const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#6b7280']
-      
+
       const option = {
         tooltip: { trigger: 'item', formatter: '{b}: ¥{c} ({d}%)' },
         legend: { orient: 'vertical', left: 'left', top: 'center' },
-        series: [{
-          type: 'pie',
-          radius: ['40%', '70%'],
-          center: ['60%', '50%'],
-          data: data.map((d, i) => ({ ...d, itemStyle: { color: colors[i % colors.length] } })),
-          itemStyle: { borderRadius: 8, borderColor: '#fff', borderWidth: 2 },
-          label: { show: false },
-          emphasis: { label: { show: true, fontSize: 14, fontWeight: 'bold' } }
-        }]
+        series: [
+          {
+            type: 'pie',
+            radius: ['40%', '70%'],
+            center: ['60%', '50%'],
+            data: data.map((d, i) => ({ ...d, itemStyle: { color: colors[i % colors.length] } })),
+            itemStyle: { borderRadius: 8, borderColor: '#fff', borderWidth: 2 },
+            label: { show: false },
+            emphasis: { label: { show: true, fontSize: 14, fontWeight: 'bold' } }
+          }
+        ]
       }
-      
+
       this.merchantPieChart.setOption(option)
     },
 

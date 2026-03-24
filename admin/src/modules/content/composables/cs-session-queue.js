@@ -145,7 +145,11 @@ export function useCsSessionQueueMethods() {
       return typeof lastMessage === 'string' ? lastMessage : '暂无消息'
     },
     getSessionStatusBadge(status) {
-      const badges = { waiting: 'bg-warning text-dark', active: 'bg-success', closed: 'bg-secondary' }
+      const badges = {
+        waiting: 'bg-warning text-dark',
+        active: 'bg-success',
+        closed: 'bg-secondary'
+      }
       return badges[status] || 'bg-secondary'
     }
   }

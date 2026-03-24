@@ -865,7 +865,8 @@ export function usePrizesMethods() {
             budget_cost: parseInt(this.prizeForm.budget_cost) || 0,
             material_asset_code: this.prizeForm.material_asset_code || null,
             material_amount: this.prizeForm.material_amount
-              ? parseInt(this.prizeForm.material_amount) : null,
+              ? parseInt(this.prizeForm.material_amount)
+              : null,
             win_probability: winProbability,
             stock_quantity: this.prizeForm.stock_quantity,
             status: this.prizeForm.status,
@@ -898,7 +899,8 @@ export function usePrizesMethods() {
             budget_cost: parseInt(this.prizeForm.budget_cost) || 0,
             material_asset_code: this.prizeForm.material_asset_code || null,
             material_amount: this.prizeForm.material_amount
-              ? parseInt(this.prizeForm.material_amount) : null,
+              ? parseInt(this.prizeForm.material_amount)
+              : null,
             stock_quantity:
               this.prizeForm.stock_quantity === -1 ? 999999 : this.prizeForm.stock_quantity,
             prize_description: this.prizeForm.prize_description,

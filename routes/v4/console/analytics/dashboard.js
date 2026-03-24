@@ -233,8 +233,8 @@ router.get(
   async (req, res) => {
     try {
       const MarketHealthService = req.app.locals.services.getService('market_health')
-      const { days, limit } = req.query
-      const filters = { days: parseInt(days) || 30, limit: parseInt(limit) || 10 }
+      const { days, page_size } = req.query
+      const filters = { days: parseInt(days) || 30, page_size: parseInt(page_size) || 10 }
 
       const [topBuyers, topSellers] = await Promise.all([
         MarketHealthService.getTopBuyers(filters),

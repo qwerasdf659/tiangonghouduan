@@ -253,7 +253,7 @@ class AdminService {
       })
     }
 
-    // 媒体绑定（使用 MediaService.attach，2026-03-16 媒体体系迁移）
+    // 媒体绑定（使用 MediaService.attach）
     let bound_image = false
     const primaryMediaId = itemData.primary_media_id
     if (primaryMediaId) {
@@ -450,7 +450,7 @@ class AdminService {
       finalUpdateData.usage_rules = updateData.usage_rules || null
     }
 
-    // 处理主媒体更换（使用 MediaService.detach/attach，2026-03-16 媒体体系迁移）
+    // 处理主媒体更换（使用 MediaService.detach/attach）
     let deleted_old_image = false
     let bound_new_image = false
     const new_media_id = updateData.primary_media_id
@@ -637,7 +637,7 @@ class AdminService {
       }
     }
 
-    // 删除关联主媒体（使用 MediaService.detach，2026-03-16 媒体体系迁移）
+    // 删除关联主媒体（使用 MediaService.detach）
     if (associated_media_id) {
       try {
         const MediaService = require('../MediaService')
@@ -1208,11 +1208,15 @@ class AdminService {
   /**
    * 获取兑换市场统计数据（Admin Only）
    *
+   * @param {Object} [options={}] - 可选参数
+   * @param {number} [options.trend_days=90] - 订单趋势图查询天数（1–366）
    * @returns {Promise<Object>} 统计数据
    */
-  async getMarketItemStatistics() {
+  async getMarketItemStatistics(options = {}) {
     try {
-      logger.info('[兑换市场-管理] 查询统计数据')
+      const rawTrend = parseInt(options.trend_days, 10)
+      const trend_days = Number.isFinite(rawTrend) ? Math.min(Math.max(rawTrend, 1), 366) : 90
+      logger.info('[兑换市场-管理] 查询统计数据', { trend_days })
 
       const [totalItems, activeItems, lowStockItems, totalExchanges] = await Promise.all([
         this.ExchangeItem.count(),
@@ -1285,10 +1289,10 @@ class AdminService {
           COUNT(*) AS order_count,
           COALESCE(SUM(CASE WHEN status <> 'cancelled' THEN pay_amount ELSE 0 END), 0) AS revenue
         FROM exchange_records
-        WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 90 DAY)
+        WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL :trend_days DAY)
         GROUP BY DATE(created_at)
         ORDER BY day ASC`,
-        { type: QueryTypes.SELECT }
+        { type: QueryTypes.SELECT, replacements: { trend_days } }
       )
 
       const order_trend_by_day = trendRows.map(r => {

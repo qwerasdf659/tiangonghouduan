@@ -85,7 +85,7 @@ router.post('/feedback', authenticateToken, async (req, res) => {
  * @access Private（需要JWT认证，用户只能查询自己的数据）
  *
  * @query {string} status - 反馈状态筛选（pending/processing/replied/closed/all，默认all）
- * @query {number} limit - 每页数量（范围1-50，默认10）
+ * @query {number} page_size - 每页数量（范围1-50，默认10）
  * @query {number} offset - 偏移量（默认0）
  *
  * @returns {Object} 反馈列表和分页信息
@@ -95,7 +95,7 @@ router.get('/feedback/my', authenticateToken, async (req, res) => {
     // 🔄 通过 ServiceManager 获取 FeedbackService（符合TR-005规范）
     const FeedbackService = req.app.locals.services.getService('feedback')
 
-    const { status = null, limit = 10, offset = 0 } = req.query
+    const { status = null, page_size = 10, offset = 0 } = req.query
     const user_id = req.user.user_id
 
     // 参数验证
@@ -109,7 +109,7 @@ router.get('/feedback/my', authenticateToken, async (req, res) => {
       )
     }
 
-    const parsed_limit = parseInt(limit)
+    const parsed_limit = parseInt(page_size)
     const valid_limit = isNaN(parsed_limit) || parsed_limit < 1 ? 10 : Math.min(parsed_limit, 50)
 
     const parsed_offset = parseInt(offset)
@@ -118,7 +118,7 @@ router.get('/feedback/my', authenticateToken, async (req, res) => {
     logger.info('📊 [反馈列表查询]', {
       user_id,
       status: status || 'all',
-      limit: valid_limit,
+      page_size: valid_limit,
       offset: valid_offset,
       timestamp: new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
     })
@@ -138,15 +138,20 @@ router.get('/feedback/my', authenticateToken, async (req, res) => {
     const DataSanitizer = req.app.locals.services.getService('data_sanitizer')
     const sanitized_data = DataSanitizer.sanitizeFeedbacks(result.feedbacks, 'public')
 
+    const current_page = Math.floor(valid_offset / valid_limit) + 1
+    const total_pages = Math.ceil(result.total / valid_limit)
+
     return res.apiSuccess(
       {
         feedbacks: sanitized_data,
         total: result.total,
         page: {
-          limit: valid_limit,
+          page_size: valid_limit,
           offset: valid_offset,
-          current_page: Math.floor(valid_offset / valid_limit) + 1,
-          total_pages: Math.ceil(result.total / valid_limit)
+          current_page,
+          /** 与 current_page 同值，兼容误用 data.page.page 表示页码的客户端 */
+          page: current_page,
+          total_pages
         }
       },
       '获取反馈列表成功'
@@ -157,7 +162,11 @@ router.get('/feedback/my', authenticateToken, async (req, res) => {
       error_message: error.message,
       error_name: error.name,
       error_stack: error.stack,
-      query_params: { status: req.query.status, limit: req.query.limit, offset: req.query.offset }
+      query_params: {
+        status: req.query.status,
+        page_size: req.query.page_size,
+        offset: req.query.offset
+      }
     })
 
     return handleServiceError(error, res, '获取反馈列表失败')

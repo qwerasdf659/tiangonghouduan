@@ -255,7 +255,9 @@ export function useAdvancedStatusMethods() {
           // 后端返回 { list: [...], pagination: { total_count } }
           const list = response.data?.list || response.data?.profiles || []
           // 过滤掉可能的无效数据
-          this.riskProfiles = list.filter(item => item && (item.user_risk_profile_id || item.user_id))
+          this.riskProfiles = list.filter(
+            item => item && (item.user_risk_profile_id || item.user_id)
+          )
           if (response.data?.pagination) {
             // 只更新 total，total_pages 由 getter 计算
             this.riskPagination.total =

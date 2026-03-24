@@ -975,7 +975,7 @@ describe('阶段九：压力测试与高并发（P1）', () => {
           .map(() => async () => {
             try {
               const response = await request(app)
-                .get('/api/v4/market/listings')
+                .get('/api/v4/marketplace/listings')
                 .set('Authorization', `Bearer ${auth_token}`)
                 .query({ page: 1, page_size: 10 })
               return { type: 'market', success: response.status === 200, status: response.status }

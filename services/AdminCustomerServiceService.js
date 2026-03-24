@@ -266,7 +266,7 @@ class AdminCustomerServiceService {
     try {
       logger.info('管理员获取会话消息', {
         session_id: sessionId,
-        limit: options.limit
+        page_size: options.page_size ?? options.limit
       })
 
       // 🎯 使用初始化时注入的依赖

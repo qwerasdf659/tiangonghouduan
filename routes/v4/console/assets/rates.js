@@ -1,7 +1,7 @@
 /**
  * 管理后台 - 汇率兑换管理
  *
- * @route /api/v4/console/assets/rates（从 /console/exchange-rates 迁移）
+ * @route /api/v4/console/assets/rates
  * @description 管理后台汇率规则CRUD + 启停操作（B2C + C2C 共享，挂载在平台级资产域下）
  *
  * API列表：

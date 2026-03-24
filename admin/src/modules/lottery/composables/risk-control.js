@@ -76,7 +76,12 @@ export function useRiskControlMethods() {
           this.abnormalUsers = users
 
           // 后端返回 summary（按风险等级统计），前端从 users 计算按类型统计
-          const typeCounts = { high_frequency: 0, high_win_rate: 0, high_tier_abnormal: 0, rapid_wins: 0 }
+          const typeCounts = {
+            high_frequency: 0,
+            high_win_rate: 0,
+            high_tier_abnormal: 0,
+            rapid_wins: 0
+          }
           for (const u of users) {
             const types = u.abnormal_types || [u.abnormal_type]
             for (const t of types) {

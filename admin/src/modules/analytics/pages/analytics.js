@@ -467,7 +467,7 @@ function analyticsPage() {
             end: this.filters.end_date
           })
         }
-        
+
         const response = await apiRequest(`${ANALYTICS_ENDPOINTS.DECISIONS}?${queryParams}`)
 
         if (response && response.success) {
@@ -627,9 +627,7 @@ function analyticsPage() {
           queryParams += `&start_time=${this.filters.start_date}&end_time=${this.filters.end_date}`
         }
 
-        const response = await apiRequest(
-          `${ANALYTICS_ENDPOINTS.LOTTERY_TRENDS}?${queryParams}`
-        )
+        const response = await apiRequest(`${ANALYTICS_ENDPOINTS.LOTTERY_TRENDS}?${queryParams}`)
 
         if (response && response.success) {
           const data = response.data
@@ -826,9 +824,11 @@ function analyticsPage() {
         window.removeEventListener('resize', this._resizeHandler)
       }
       // 销毁 ECharts 实例
-      ;['_userTrendChart', '_lotteryTrendChart', '_pointsFlowChart', '_userSourceChart'].forEach(key => {
-        if (this[key]) this[key].dispose()
-      })
+      ;['_userTrendChart', '_lotteryTrendChart', '_pointsFlowChart', '_userSourceChart'].forEach(
+        key => {
+          if (this[key]) this[key].dispose()
+        }
+      )
       logger.info('[Analytics] 资源已清理')
     }
   }

@@ -105,7 +105,7 @@ describe('页面2: 批量工具 (lottery-management.html 批量操作Tab)', () =
       expect(log).toHaveProperty('operation_type');
       expect(log).toHaveProperty('operation_type_name');
       expect(log).toHaveProperty('status');
-      expect(log).toHaveProperty('total');
+      expect(log).toHaveProperty('total_count');
       expect(log).toHaveProperty('success_count');
       expect(log).toHaveProperty('fail_count');
       expect(log).toHaveProperty('operator_name');

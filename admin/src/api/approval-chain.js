@@ -55,12 +55,19 @@ export const ApprovalChainAPI = {
 
   /** 更新模板 */
   async updateTemplate(templateId, data) {
-    return request({ url: buildURL(APPROVAL_CHAIN_ENDPOINTS.TEMPLATE_UPDATE, { id: templateId }), method: 'PUT', data })
+    return request({
+      url: buildURL(APPROVAL_CHAIN_ENDPOINTS.TEMPLATE_UPDATE, { id: templateId }),
+      method: 'PUT',
+      data
+    })
   },
 
   /** 启用/禁用模板 */
   async toggleTemplate(templateId) {
-    return request({ url: buildURL(APPROVAL_CHAIN_ENDPOINTS.TEMPLATE_TOGGLE, { id: templateId }), method: 'PUT' })
+    return request({
+      url: buildURL(APPROVAL_CHAIN_ENDPOINTS.TEMPLATE_TOGGLE, { id: templateId }),
+      method: 'PUT'
+    })
   },
 
   // ========== 实例查询 ==========

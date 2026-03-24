@@ -62,16 +62,17 @@ module.exports = (sequelize, DataTypes) => {
      *
      * @param {number} lottery_campaign_id - 活动ID
      * @param {Object} options - 查询选项
-     * @param {number} options.limit - 返回条数，默认20
+     * @param {number} options.page_size - 返回条数，默认20（兼容 options.limit）
      * @param {number} options.offset - 偏移量，默认0
      * @returns {Promise<Object>} 分页查询结果 { rows, count }
      */
     static async getHistoryByCampaign(lottery_campaign_id, options = {}) {
-      const { limit = 20, offset = 0 } = options
+      const page_size = options.page_size ?? options.limit ?? 20
+      const { offset = 0 } = options
       return this.findAndCountAll({
         where: { lottery_campaign_id },
         order: [['created_at', 'DESC']],
-        limit,
+        limit: page_size,
         offset,
         attributes: [
           'lottery_simulation_record_id',

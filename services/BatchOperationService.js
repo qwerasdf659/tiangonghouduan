@@ -482,6 +482,13 @@ class BatchOperationService {
         return null
       }
 
+      const successCount = parseInt(log.success_count, 10) || 0
+      const failCount = parseInt(log.fail_count, 10) || 0
+      const storedTotal =
+        log.total_count != null && log.total_count !== '' ? parseInt(log.total_count, 10) : null
+      const totalCount =
+        storedTotal != null && !Number.isNaN(storedTotal) ? storedTotal : successCount + failCount
+
       return {
         batch_operation_log_id: log.batch_operation_log_id,
         idempotency_key: log.idempotency_key,
@@ -489,7 +496,8 @@ class BatchOperationService {
         operation_type_name: log.getOperationTypeName(),
         status: log.status,
         status_name: log.getStatusDisplayName(),
-        total: log.total,
+        total_count: totalCount,
+        total: totalCount,
         success_count: log.success_count,
         fail_count: log.fail_count,
         success_rate: log.getSuccessRate(),
@@ -548,21 +556,29 @@ class BatchOperationService {
         offset: parseInt(offset)
       })
 
-      const logs = rows.map(log => ({
-        batch_operation_log_id: log.batch_operation_log_id,
-        operation_type: log.operation_type,
-        operation_type_name: log.getOperationTypeName(),
-        status: log.status,
-        status_name: log.getStatusDisplayName(),
-        total: log.total,
-        success_count: log.success_count,
-        fail_count: log.fail_count,
-        success_rate: log.getSuccessRate(),
-        operator_id: log.operator_id,
-        operator_name: log.operator?.nickname || null,
-        created_at: log.created_at,
-        completed_at: log.completed_at
-      }))
+      const logs = rows.map(log => {
+        const successCount = parseInt(log.success_count, 10) || 0
+        const failCount = parseInt(log.fail_count, 10) || 0
+        const storedTotal =
+          log.total_count != null && log.total_count !== '' ? parseInt(log.total_count, 10) : null
+        const totalCount =
+          storedTotal != null && !Number.isNaN(storedTotal) ? storedTotal : successCount + failCount
+        return {
+          batch_operation_log_id: log.batch_operation_log_id,
+          operation_type: log.operation_type,
+          operation_type_name: log.getOperationTypeName(),
+          status: log.status,
+          status_name: log.getStatusDisplayName(),
+          total_count: totalCount,
+          success_count: log.success_count,
+          fail_count: log.fail_count,
+          success_rate: log.getSuccessRate(),
+          operator_id: log.operator_id,
+          operator_name: log.operator?.nickname || null,
+          created_at: log.created_at,
+          completed_at: log.completed_at
+        }
+      })
 
       return { total: count, logs }
     } catch (error) {

@@ -632,8 +632,7 @@ export const AssetAPI = {
    * @returns {Promise<Object>} 物品列表（分页）
    */
   async getUserItems(userId, params = {}) {
-    const url =
-      buildURL(ASSET_ENDPOINTS.ITEM_USER, { user_id: userId }) + buildQueryString(params)
+    const url = buildURL(ASSET_ENDPOINTS.ITEM_USER, { user_id: userId }) + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 

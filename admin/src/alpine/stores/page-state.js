@@ -38,9 +38,9 @@ const CACHE_INVALIDATION_RULES = {
   user: ['user', 'customer', 'segment'],
   alert: ['alert', 'risk', 'lottery-alert'],
   // 操作类型触发的失效
-  create: (type) => [`${type}`, 'dashboard', 'stats'],
-  update: (type) => [`${type}`],
-  delete: (type) => [`${type}`, 'dashboard', 'stats']
+  create: type => [`${type}`, 'dashboard', 'stats'],
+  update: type => [`${type}`],
+  delete: type => [`${type}`, 'dashboard', 'stats']
 }
 
 document.addEventListener('alpine:init', () => {
@@ -250,9 +250,10 @@ document.addEventListener('alpine:init', () => {
     invalidateOnDataChange(dataType, recordId = null, operation = 'update') {
       // 获取关联的缓存键
       const relatedKeys = CACHE_INVALIDATION_RULES[dataType] || []
-      const operationKeys = typeof CACHE_INVALIDATION_RULES[operation] === 'function'
-        ? CACHE_INVALIDATION_RULES[operation](dataType)
-        : []
+      const operationKeys =
+        typeof CACHE_INVALIDATION_RULES[operation] === 'function'
+          ? CACHE_INVALIDATION_RULES[operation](dataType)
+          : []
 
       // 合并所有需要失效的键
       const allKeys = [...new Set([...relatedKeys, ...operationKeys])]
@@ -262,7 +263,9 @@ document.addEventListener('alpine:init', () => {
         totalCleared += this.invalidateByPattern(keyPattern)
       })
 
-      logger.info(`[PageState] 数据变更失效: ${dataType}${recordId ? '#' + recordId : ''}, 操作: ${operation}, 清除 ${totalCleared} 条`)
+      logger.info(
+        `[PageState] 数据变更失效: ${dataType}${recordId ? '#' + recordId : ''}, 操作: ${operation}, 清除 ${totalCleared} 条`
+      )
       return totalCleared
     },
 
@@ -273,11 +276,13 @@ document.addEventListener('alpine:init', () => {
     forceRefresh() {
       this.clearAll()
       logger.info('[PageState] 强制刷新: 所有缓存已清除')
-      
+
       // 触发全局事件，让页面组件重新加载数据
-      window.dispatchEvent(new CustomEvent('cache-invalidated', {
-        detail: { timestamp: Date.now() }
-      }))
+      window.dispatchEvent(
+        new CustomEvent('cache-invalidated', {
+          detail: { timestamp: Date.now() }
+        })
+      )
     },
 
     /**

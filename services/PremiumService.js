@@ -510,9 +510,12 @@ class PremiumService {
       raw: true
     })
 
+    const totalRecords = parseInt(totalStats?.total_records, 10) || 0
     return {
       summary: {
-        total_records: parseInt(totalStats?.total_records) || 0,
+        total_records: totalRecords,
+        // total：与 total_records 相同，兼容旧契约与部分测试/前端字段名
+        total: totalRecords,
         total_unlock_count: parseInt(totalStats?.total_unlock_count) || 0,
         active_users: activeCount,
         expired_users: expiredCount

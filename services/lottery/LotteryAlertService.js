@@ -112,11 +112,12 @@ class LotteryAlertService {
    * @param {string} [params.type] - 告警类型 (win_rate/budget/inventory/user/system)
    * @param {string} [params.status] - 告警状态 (active/acknowledged/resolved)
    * @param {number} [params.lottery_campaign_id] - 活动ID
-   * @param {number} [params.limit=50] - 返回数量
+   * @param {number} [params.page_size=50] - 返回数量（兼容 params.limit）
    * @returns {Promise<Object>} 告警列表和统计信息
    */
   static async getAlertList(params = {}) {
-    const { level, type, status, lottery_campaign_id, limit = 50 } = params
+    const { level, type, status, lottery_campaign_id } = params
+    const page_size = params.page_size ?? params.limit ?? 50
 
     try {
       // 构建查询条件
@@ -154,7 +155,7 @@ class LotteryAlertService {
           ['severity', 'DESC'], // 严重程度降序（danger > warning > info）
           ['created_at', 'DESC'] // 创建时间降序
         ],
-        limit: parseInt(limit)
+        limit: parseInt(page_size)
       })
 
       // 统计各状态数量

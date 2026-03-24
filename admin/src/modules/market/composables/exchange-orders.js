@@ -9,7 +9,7 @@
 
 import { logger } from '../../../utils/logger.js'
 import { buildURL, request } from '../../../api/base.js'
-import { MARKET_ENDPOINTS } from '../../../api/market/index.js'
+import { EXCHANGE_ENDPOINTS } from '../../../api/market/exchange.js'
 
 /**
  * 订单管理状态
@@ -62,7 +62,7 @@ export function useExchangeOrdersMethods() {
         Object.keys(params).forEach(k => !params[k] && delete params[k])
 
         const res = await request({
-          url: MARKET_ENDPOINTS.EXCHANGE_ORDERS,
+          url: EXCHANGE_ENDPOINTS.ORDERS,
           method: 'GET',
           params
         })
@@ -137,7 +137,7 @@ export function useExchangeOrdersMethods() {
     async viewOrderDetail(order) {
       try {
         const res = await request({
-          url: buildURL(MARKET_ENDPOINTS.EXCHANGE_ORDER_DETAIL, {
+          url: buildURL(EXCHANGE_ENDPOINTS.ORDER_DETAIL, {
             order_no: order.order_no
           }),
           method: 'GET'
@@ -168,7 +168,7 @@ export function useExchangeOrdersMethods() {
       try {
         this.saving = true
         const res = await request({
-          url: buildURL(MARKET_ENDPOINTS.EXCHANGE_ORDER_SHIP, {
+          url: buildURL(EXCHANGE_ENDPOINTS.ORDER_SHIP, {
             order_no: order.order_no
           }),
           method: 'POST',
@@ -206,7 +206,7 @@ export function useExchangeOrdersMethods() {
       try {
         this.saving = true
         const res = await request({
-          url: buildURL(MARKET_ENDPOINTS.EXCHANGE_ORDER_APPROVE, {
+          url: buildURL(EXCHANGE_ENDPOINTS.ORDER_APPROVE, {
             order_no: order.order_no
           }),
           method: 'POST',
@@ -242,7 +242,7 @@ export function useExchangeOrdersMethods() {
       try {
         this.saving = true
         const res = await request({
-          url: buildURL(MARKET_ENDPOINTS.EXCHANGE_ORDER_REFUND, {
+          url: buildURL(EXCHANGE_ENDPOINTS.ORDER_REFUND, {
             order_no: order.order_no
           }),
           method: 'POST',
@@ -275,7 +275,7 @@ export function useExchangeOrdersMethods() {
       try {
         this.saving = true
         const res = await request({
-          url: buildURL(MARKET_ENDPOINTS.EXCHANGE_ORDER_COMPLETE, {
+          url: buildURL(EXCHANGE_ENDPOINTS.ORDER_COMPLETE, {
             order_no: order.order_no
           }),
           method: 'POST',
@@ -311,7 +311,7 @@ export function useExchangeOrdersMethods() {
       try {
         this.saving = true
         const res = await request({
-          url: buildURL(MARKET_ENDPOINTS.EXCHANGE_ORDER_REJECT, {
+          url: buildURL(EXCHANGE_ENDPOINTS.ORDER_REJECT, {
             order_no: order.order_no
           }),
           method: 'POST',
@@ -339,7 +339,12 @@ export function useExchangeOrdersMethods() {
      */
     openShipModal(order) {
       this.selectedOrder = order
-      this.shipForm = { shipping_company: '', shipping_company_name: '', shipping_no: '', remark: '' }
+      this.shipForm = {
+        shipping_company: '',
+        shipping_company_name: '',
+        shipping_no: '',
+        remark: ''
+      }
       this.showModal('shipModal')
     },
 
@@ -370,7 +375,7 @@ export function useExchangeOrdersMethods() {
       if (this.shippingCompaniesLoaded) return
       try {
         const res = await request({
-          url: MARKET_ENDPOINTS.EXCHANGE_SHIPPING_COMPANIES,
+          url: EXCHANGE_ENDPOINTS.SHIPPING_COMPANIES,
           method: 'GET'
         })
         if (res.success) {
@@ -388,7 +393,7 @@ export function useExchangeOrdersMethods() {
      */
     async queryOrderTrack(orderNo) {
       try {
-        const url = buildURL(MARKET_ENDPOINTS.EXCHANGE_ORDER_TRACK, { order_no: orderNo })
+        const url = buildURL(EXCHANGE_ENDPOINTS.ORDER_TRACK, { order_no: orderNo })
         const res = await request({ url, method: 'GET' })
         if (res.success) {
           this.orderTrack = res.data

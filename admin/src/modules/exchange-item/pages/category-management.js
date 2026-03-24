@@ -115,8 +115,18 @@ function registerCategoryManagement() {
         type: 'actions',
         width: '200px',
         actions: [
-          { name: 'edit', label: '编辑', icon: '✏️', class: 'text-emerald-600 hover:text-emerald-800' },
-          { name: 'bindAttrs', label: '属性', icon: '🔗', class: 'text-indigo-600 hover:text-indigo-800' },
+          {
+            name: 'edit',
+            label: '编辑',
+            icon: '✏️',
+            class: 'text-emerald-600 hover:text-emerald-800'
+          },
+          {
+            name: 'bindAttrs',
+            label: '属性',
+            icon: '🔗',
+            class: 'text-indigo-600 hover:text-indigo-800'
+          },
           { name: 'delete', label: '删除', icon: '🗑️', class: 'text-red-500 hover:text-red-700' }
         ]
       }

@@ -973,7 +973,7 @@ class PerformanceMonitor {
    * @returns {string} 唯一监控ID
    */
   generateMonitorId() {
-    return `monitor_${BeijingTimeHelper.generateIdTimestamp()}_${Math.random().toString(36).substr(2, 9)}`
+    return `monitor_${BeijingTimeHelper.generateIdTimestamp()}_${require('crypto').randomBytes(5).toString('hex')}`
   }
 
   /**

@@ -11,7 +11,7 @@ import { CONTENT_ENDPOINTS } from '../../../api/content.js'
  * @param {number} userId - 用户ID
  * @returns {Promise<Object|null>} 风控数据
  */
-export async function loadRisk (userId) {
+export async function loadRisk(userId) {
   const url = buildURL(CONTENT_ENDPOINTS.CS_USER_CONTEXT_RISK, { userId })
   const res = await request({ url, method: 'GET' })
   return res.success ? res.data : null

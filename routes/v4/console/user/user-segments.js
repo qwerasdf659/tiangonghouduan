@@ -211,7 +211,7 @@ router.get('/activity-heatmap', authenticateToken, requireRoleLevel(100), async 
  * @apiDescription P1 需求 B-23：获取用户兑换偏好统计
  *
  * @apiQuery {Number} [days=30] 统计天数
- * @apiQuery {Number} [limit=10] 返回数量
+ * @apiQuery {Number} [page_size=10] 返回数量
  *
  * @apiSuccess {Boolean} success 请求是否成功
  * @apiSuccess {Object} data 兑换偏好数据
@@ -223,11 +223,11 @@ router.get('/activity-heatmap', authenticateToken, requireRoleLevel(100), async 
  * @apiPermission admin
  */
 router.get('/exchange-preferences', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  const { days = '30', limit = '10' } = req.query
+  const { days = '30', page_size = '10' } = req.query
 
   logger.info('获取兑换偏好', {
     days,
-    limit,
+    page_size,
     user_id: req.user?.user_id
   })
 
@@ -236,7 +236,7 @@ router.get('/exchange-preferences', authenticateToken, requireRoleLevel(100), as
     const UserSegmentService = getUserSegmentService(req)
     const preferences = await UserSegmentService.getExchangePreferences(models, {
       days: parseInt(days, 10) || 30,
-      limit: parseInt(limit, 10) || 10
+      page_size: parseInt(page_size, 10) || 10
     })
 
     return res.apiSuccess(preferences, '获取兑换偏好成功')

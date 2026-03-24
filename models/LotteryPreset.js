@@ -66,7 +66,7 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING(50),
         primaryKey: true,
         defaultValue: () =>
-          `preset_${BeijingTimeHelper.generateIdTimestamp()}_${Math.random().toString(36).substr(2, 6)}`,
+          `preset_${BeijingTimeHelper.generateIdTimestamp()}_${require('crypto').randomBytes(3).toString('hex')}`,
         comment: '预设记录唯一标识'
       },
 

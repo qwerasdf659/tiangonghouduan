@@ -65,6 +65,7 @@ class MarketAnalyticsService {
   /**
    * 市场总览（各资产成交量排行）
    *
+   * @param {number} [days=7] - 统计天数
    * @returns {Promise<Object>} 市场总览数据
    */
   static async getMarketOverview(days = 7) {

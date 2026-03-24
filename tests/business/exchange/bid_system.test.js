@@ -4,13 +4,13 @@
  * 臻选空间/幸运空间/竞价功能 — 后端实施方案验证
  *
  * 测试范围：
- * 1. 竞价商品列表 API — GET /api/v4/backpack/bid/products
- * 2. 竞价商品详情 API — GET /api/v4/backpack/bid/products/:bid_product_id
- * 3. 提交出价 API — POST /api/v4/backpack/bid
- * 4. 竞价历史 API — GET /api/v4/backpack/bid/history
- * 5. 空间统计 API — GET /api/v4/backpack/exchange/space-stats
- * 6. 高级空间状态 API — GET /api/v4/backpack/exchange/premium-status
- * 7. 商品列表 space 筛选 — GET /api/v4/backpack/exchange/items?space=lucky
+ * 1. 竞价商品列表 API — GET /api/v4/exchange/bid/products
+ * 2. 竞价商品详情 API — GET /api/v4/exchange/bid/products/:bid_product_id
+ * 3. 提交出价 API — POST /api/v4/exchange/bid
+ * 4. 竞价历史 API — GET /api/v4/exchange/bid/history
+ * 5. 空间统计 API — GET /api/v4/exchange/space-stats
+ * 6. 高级空间状态 API — GET /api/v4/exchange/premium-status
+ * 7. 商品列表 space 筛选 — GET /api/v4/exchange/items?space=lucky
  * 8. BidService 核心逻辑（动态白名单、幂等键）
  * 9. BidSettlementJob 定时任务逻辑
  *
@@ -62,10 +62,10 @@ describe('竞价系统功能测试 (Bid System — 臻选空间/幸运空间/竞
    * 1. 商品列表 space 筛选
    * ===================================================================
    */
-  describe('GET /api/v4/backpack/exchange/items（space 筛选）', () => {
+  describe('GET /api/v4/exchange/items（space 筛选）', () => {
     test('space=lucky 应返回幸运空间商品', async () => {
       const res = await request(app)
-        .get('/api/v4/backpack/exchange/items')
+        .get('/api/v4/exchange/items')
         .set('Authorization', `Bearer ${authToken}`)
         .query({ space: 'lucky', page: 1, page_size: 5 })
         .expect(200)
@@ -90,7 +90,7 @@ describe('竞价系统功能测试 (Bid System — 臻选空间/幸运空间/竞
 
     test('space=premium 应返回臻选空间商品（当前为空）', async () => {
       const res = await request(app)
-        .get('/api/v4/backpack/exchange/items')
+        .get('/api/v4/exchange/items')
         .set('Authorization', `Bearer ${authToken}`)
         .query({ space: 'premium', page: 1, page_size: 5, refresh: true })
         .expect(200)
@@ -106,10 +106,10 @@ describe('竞价系统功能测试 (Bid System — 臻选空间/幸运空间/竞
    * 2. 空间统计
    * ===================================================================
    */
-  describe('GET /api/v4/backpack/exchange/space-stats', () => {
+  describe('GET /api/v4/exchange/space-stats', () => {
     test('应返回 lucky 空间统计数据', async () => {
       const res = await request(app)
-        .get('/api/v4/backpack/exchange/space-stats')
+        .get('/api/v4/exchange/space-stats')
         .set('Authorization', `Bearer ${authToken}`)
         .query({ space: 'lucky' })
         .expect(200)
@@ -123,7 +123,7 @@ describe('竞价系统功能测试 (Bid System — 臻选空间/幸运空间/竞
 
     test('缺少 space 参数应返回错误', async () => {
       const res = await request(app)
-        .get('/api/v4/backpack/exchange/space-stats')
+        .get('/api/v4/exchange/space-stats')
         .set('Authorization', `Bearer ${authToken}`)
 
       /* 根据实际业务逻辑：space 是必填参数 */
@@ -136,10 +136,10 @@ describe('竞价系统功能测试 (Bid System — 臻选空间/幸运空间/竞
    * 3. 高级空间状态
    * ===================================================================
    */
-  describe('GET /api/v4/backpack/exchange/premium-status', () => {
+  describe('GET /api/v4/exchange/premium-status', () => {
     test('应返回高级空间状态和解锁条件', async () => {
       const res = await request(app)
-        .get('/api/v4/backpack/exchange/premium-status')
+        .get('/api/v4/exchange/premium-status')
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200)
 
@@ -171,7 +171,7 @@ describe('竞价系统功能测试 (Bid System — 臻选空间/幸运空间/竞
     })
 
     test('未登录应返回401', async () => {
-      await request(app).get('/api/v4/backpack/exchange/premium-status').expect(401)
+      await request(app).get('/api/v4/exchange/premium-status').expect(401)
     })
   })
 
@@ -180,10 +180,10 @@ describe('竞价系统功能测试 (Bid System — 臻选空间/幸运空间/竞
    * 4. 竞价商品列表
    * ===================================================================
    */
-  describe('GET /api/v4/backpack/bid/products', () => {
+  describe('GET /api/v4/exchange/bid/products', () => {
     test('应返回竞价商品列表（当前可能为空）', async () => {
       const res = await request(app)
-        .get('/api/v4/backpack/bid/products')
+        .get('/api/v4/exchange/bid/products')
         .set('Authorization', `Bearer ${authToken}`)
         .query({ status: 'active', page: 1, page_size: 10 })
         .expect(200)
@@ -200,7 +200,7 @@ describe('竞价系统功能测试 (Bid System — 臻选空间/幸运空间/竞
 
     test('status=all 应返回所有状态的竞价', async () => {
       const res = await request(app)
-        .get('/api/v4/backpack/bid/products')
+        .get('/api/v4/exchange/bid/products')
         .set('Authorization', `Bearer ${authToken}`)
         .query({ status: 'all' })
         .expect(200)
@@ -210,7 +210,7 @@ describe('竞价系统功能测试 (Bid System — 臻选空间/幸运空间/竞
 
     test('无效 status 应返回400错误', async () => {
       const res = await request(app)
-        .get('/api/v4/backpack/bid/products')
+        .get('/api/v4/exchange/bid/products')
         .set('Authorization', `Bearer ${authToken}`)
         .query({ status: 'invalid_status' })
         .expect(400)
@@ -219,7 +219,7 @@ describe('竞价系统功能测试 (Bid System — 臻选空间/幸运空间/竞
     })
 
     test('未登录应返回401', async () => {
-      await request(app).get('/api/v4/backpack/bid/products').expect(401)
+      await request(app).get('/api/v4/exchange/bid/products').expect(401)
     })
   })
 
@@ -228,10 +228,10 @@ describe('竞价系统功能测试 (Bid System — 臻选空间/幸运空间/竞
    * 5. 竞价商品详情
    * ===================================================================
    */
-  describe('GET /api/v4/backpack/bid/products/:bid_product_id', () => {
+  describe('GET /api/v4/exchange/bid/products/:bid_product_id', () => {
     test('不存在的竞价商品应返回404', async () => {
       const res = await request(app)
-        .get('/api/v4/backpack/bid/products/999999')
+        .get('/api/v4/exchange/bid/products/999999')
         .set('Authorization', `Bearer ${authToken}`)
 
       /* 服务层抛出 404 错误 */
@@ -240,7 +240,7 @@ describe('竞价系统功能测试 (Bid System — 臻选空间/幸运空间/竞
 
     test('无效ID应返回400', async () => {
       const res = await request(app)
-        .get('/api/v4/backpack/bid/products/abc')
+        .get('/api/v4/exchange/bid/products/abc')
         .set('Authorization', `Bearer ${authToken}`)
         .expect(400)
 
@@ -253,10 +253,10 @@ describe('竞价系统功能测试 (Bid System — 臻选空间/幸运空间/竞
    * 6. 提交出价
    * ===================================================================
    */
-  describe('POST /api/v4/backpack/bid', () => {
+  describe('POST /api/v4/exchange/bid', () => {
     test('缺少幂等键应返回400', async () => {
       const res = await request(app)
-        .post('/api/v4/backpack/bid')
+        .post('/api/v4/exchange/bid')
         .set('Authorization', `Bearer ${authToken}`)
         .send({ bid_product_id: 1, bid_amount: 100 })
         .expect(400)
@@ -267,7 +267,7 @@ describe('竞价系统功能测试 (Bid System — 臻选空间/幸运空间/竞
 
     test('缺少必填参数应返回400', async () => {
       const res = await request(app)
-        .post('/api/v4/backpack/bid')
+        .post('/api/v4/exchange/bid')
         .set('Authorization', `Bearer ${authToken}`)
         .set('Idempotency-Key', `bid_test_${Date.now()}`)
         .send({})
@@ -278,7 +278,7 @@ describe('竞价系统功能测试 (Bid System — 臻选空间/幸运空间/竞
 
     test('不存在的竞价商品应返回错误', async () => {
       const res = await request(app)
-        .post('/api/v4/backpack/bid')
+        .post('/api/v4/exchange/bid')
         .set('Authorization', `Bearer ${authToken}`)
         .set('Idempotency-Key', `bid_test_${Date.now()}_notfound`)
         .send({ bid_product_id: 999999, bid_amount: 100 })
@@ -289,7 +289,7 @@ describe('竞价系统功能测试 (Bid System — 臻选空间/幸运空间/竞
 
     test('未登录应返回401', async () => {
       await request(app)
-        .post('/api/v4/backpack/bid')
+        .post('/api/v4/exchange/bid')
         .set('Idempotency-Key', `bid_test_${Date.now()}`)
         .send({ bid_product_id: 1, bid_amount: 100 })
         .expect(401)
@@ -301,10 +301,10 @@ describe('竞价系统功能测试 (Bid System — 臻选空间/幸运空间/竞
    * 7. 竞价历史
    * ===================================================================
    */
-  describe('GET /api/v4/backpack/bid/history', () => {
+  describe('GET /api/v4/exchange/bid/history', () => {
     test('应返回当前用户的竞价历史', async () => {
       const res = await request(app)
-        .get('/api/v4/backpack/bid/history')
+        .get('/api/v4/exchange/bid/history')
         .set('Authorization', `Bearer ${authToken}`)
         .query({ status: 'all', page: 1, page_size: 10 })
         .expect(200)
@@ -316,7 +316,7 @@ describe('竞价系统功能测试 (Bid System — 臻选空间/幸运空间/竞
     })
 
     test('未登录应返回401', async () => {
-      await request(app).get('/api/v4/backpack/bid/history').expect(401)
+      await request(app).get('/api/v4/exchange/bid/history').expect(401)
     })
   })
 
@@ -436,10 +436,10 @@ describe('竞价系统功能测试 (Bid System — 臻选空间/幸运空间/竞
    * 11. 管理后台竞价接口
    * ===================================================================
    */
-  describe('管理后台竞价接口 /api/v4/console/bid-management', () => {
+  describe('管理后台竞价接口 /api/v4/console/bids', () => {
     test('GET / 应返回竞价列表（管理员视图）', async () => {
       const res = await request(app)
-        .get('/api/v4/console/bid-management')
+        .get('/api/v4/console/bids')
         .set('Authorization', `Bearer ${authToken}`)
         .query({ page: 1, page_size: 10 })
         .expect(200)
@@ -451,7 +451,7 @@ describe('竞价系统功能测试 (Bid System — 臻选空间/幸运空间/竞
 
     test('创建竞价缺少必填字段应返回400', async () => {
       const res = await request(app)
-        .post('/api/v4/console/bid-management')
+        .post('/api/v4/console/bids')
         .set('Authorization', `Bearer ${authToken}`)
         .send({})
 

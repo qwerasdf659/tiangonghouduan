@@ -375,7 +375,10 @@ export async function request(options) {
             window.top.location.href = redirectUrl
           } catch (e) {
             logger.warn('[Auth] 无法直接跳转顶层窗口，尝试 postMessage', e)
-            window.parent.postMessage({ type: 'AUTH_EXPIRED', redirect: redirectUrl, code: errorCode }, '*')
+            window.parent.postMessage(
+              { type: 'AUTH_EXPIRED', redirect: redirectUrl, code: errorCode },
+              '*'
+            )
           }
         } else {
           window.location.href = redirectUrl
@@ -520,7 +523,10 @@ export async function handleResponse(response) {
         try {
           window.top.location.href = redirectUrl
         } catch (_e) {
-          window.parent.postMessage({ type: 'AUTH_EXPIRED', redirect: redirectUrl, code: errorCode }, '*')
+          window.parent.postMessage(
+            { type: 'AUTH_EXPIRED', redirect: redirectUrl, code: errorCode },
+            '*'
+          )
         }
       } else {
         window.location.href = redirectUrl

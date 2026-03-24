@@ -128,9 +128,10 @@ export function useExchangeRateActions() {
      * @param {number} page - 目标页码
      */
     changeRatePage(page) {
-      const totalPages = this.pagination.page_size > 0
-        ? Math.ceil(this.pagination.total / this.pagination.page_size)
-        : 1
+      const totalPages =
+        this.pagination.page_size > 0
+          ? Math.ceil(this.pagination.total / this.pagination.page_size)
+          : 1
       if (page < 1 || page > totalPages) return
       this.pagination.page = page
       this.loadRates()

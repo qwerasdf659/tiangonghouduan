@@ -293,7 +293,8 @@ class CustomerServiceSessionService {
   static async getSessionMessages(session_id, options = {}) {
     try {
       const {
-        limit = 50,
+        limit: legacyLimit,
+        page_size,
         before_message_id,
         page,
         offset,
@@ -301,6 +302,7 @@ class CustomerServiceSessionService {
         mark_as_read = false,
         include_all_fields = false
       } = options
+      const limit = legacyLimit ?? page_size ?? 50
 
       logger.info(`📋 获取会话 ${session_id} 的消息，参数:`, JSON.stringify(options, null, 2))
 

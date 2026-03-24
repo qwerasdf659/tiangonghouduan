@@ -58,7 +58,8 @@ function assetsPortfolioPage() {
       {
         key: 'user_nickname',
         label: '用户',
-        render: (val, row) => `<div>${val || row.user_id}</div><div class="text-gray-400 text-xs">ID: ${row.user_id}</div>`
+        render: (val, row) =>
+          `<div>${val || row.user_id}</div><div class="text-gray-400 text-xs">ID: ${row.user_id}</div>`
       },
       {
         key: 'asset_type',
@@ -72,13 +73,15 @@ function assetsPortfolioPage() {
       {
         key: 'unit_price',
         label: '单价',
-        render: (val) => `<span class="font-mono text-gray-500">¥${Number(val || 0).toFixed(2)}</span>`
+        render: val =>
+          `<span class="font-mono text-gray-500">¥${Number(val || 0).toFixed(2)}</span>`
       },
       {
         key: 'total_value',
         label: '总价值',
         sortable: true,
-        render: (val) => `<span class="font-mono text-emerald-600 font-medium">¥${Number(val || 0).toFixed(2)}</span>`
+        render: val =>
+          `<span class="font-mono text-emerald-600 font-medium">¥${Number(val || 0).toFixed(2)}</span>`
       },
       { key: 'updated_at', label: '更新时间', type: 'datetime' },
       {
@@ -116,7 +119,9 @@ function assetsPortfolioPage() {
             user_nickname: data.user?.nickname || `用户${_portfolioUserId}`,
             asset_type: item.asset_code || item.asset_type || 'unknown',
             asset_type_display: item.display_name || item.asset_code,
-            asset_name: (item.asset_name || item.display_name || item.asset_code || '未知资产') + campaignInfo,
+            asset_name:
+              (item.asset_name || item.display_name || item.asset_code || '未知资产') +
+              campaignInfo,
             quantity: item.available_amount || item.balance || item.amount || 0,
             frozen_amount: item.frozen_amount || 0,
             unit_price: item.unit_price || 1,
@@ -290,7 +295,11 @@ function assetsPortfolioPage() {
           }
           this.assetTypes = Array.from(typeMap.values())
 
-          logger.debug('[AssetsPortfolioPage] 资产类型加载成功:', this.assetTypes.length, '种类型（去重后）')
+          logger.debug(
+            '[AssetsPortfolioPage] 资产类型加载成功:',
+            this.assetTypes.length,
+            '种类型（去重后）'
+          )
         }
       } catch (error) {
         logger.error('[AssetsPortfolioPage] 加载资产类型失败:', error)
@@ -354,16 +363,12 @@ function assetsPortfolioPage() {
 
           // 客户端筛选：如果指定了资产类型
           if (this.searchForm.asset_type) {
-            this.assets = this.assets.filter(
-              a => a.asset_type === this.searchForm.asset_type
-            )
+            this.assets = this.assets.filter(a => a.asset_type === this.searchForm.asset_type)
           }
 
           // 客户端筛选：如果指定了最低价值
           if (this.searchForm.min_value && this.searchForm.min_value > 0) {
-            this.assets = this.assets.filter(
-              a => a.total_value >= this.searchForm.min_value
-            )
+            this.assets = this.assets.filter(a => a.total_value >= this.searchForm.min_value)
           }
 
           // 资产余额无分页，直接使用数组长度
@@ -560,7 +565,7 @@ function assetsPortfolioPage() {
     _scheduleChartInit() {
       let initialized = false
 
-      const doInit = (source) => {
+      const doInit = source => {
         if (initialized) return
         initialized = true
         logger.info(`[AssetsPortfolioPage] 图表容器可见（${source}），开始初始化图表`)
@@ -572,7 +577,7 @@ function assetsPortfolioPage() {
 
       // 方案1：ResizeObserver - iframe Tab 切换场景
       if (chartDom && typeof ResizeObserver !== 'undefined') {
-        const observer = new ResizeObserver((entries) => {
+        const observer = new ResizeObserver(entries => {
           for (const entry of entries) {
             if (entry.contentRect.width > 0 && entry.contentRect.height > 0) {
               observer.disconnect()

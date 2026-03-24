@@ -1,7 +1,7 @@
 /**
- * market域 - 交易市场用户交易市场聚合入口
+ * marketplace域 - C2C 用户间交易市场聚合入口
  *
- * @route /api/v4/market
+ * @route /api/v4/marketplace
  * @description 交易市场用户间交易市场（类似Steam市场、BUFF），用户可以上架/购买物品
  *
  *
@@ -33,7 +33,6 @@ const sellRoutes = require('./sell')
 const buyRoutes = require('./buy')
 const manageRoutes = require('./manage')
 const escrowRoutes = require('./escrow')
-const exchangeRateRoutes = require('./exchange-rate') // 固定汇率兑换（2026-02-23 市场增强）
 const priceRoutes = require('./price') // 价格发现（2026-02-23 市场增强）
 const analyticsRoutes = require('./analytics') // 市场数据分析（2026-02-23 市场增强）
 
@@ -43,7 +42,6 @@ router.use('/', sellRoutes) // 上架商品
 router.use('/', buyRoutes) // 购买商品
 router.use('/', manageRoutes) // 撤回/管理
 router.use('/', escrowRoutes) // 交易市场担保码确认（Phase 4）
-router.use('/', exchangeRateRoutes) // 固定汇率兑换
 router.use('/', priceRoutes) // 价格发现
 router.use('/', analyticsRoutes) // 市场数据分析
 

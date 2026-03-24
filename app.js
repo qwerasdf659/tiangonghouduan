@@ -564,10 +564,11 @@ appLogger.info(' Web管理后台静态文件托管已配置', {
  * ========================================
  *
  *  API顶层域规范（共8个标准域）：
- * - /market    交易市场
+ * - /marketplace C2C用户间交易市场（原/market）
+ * - /exchange   B2C用户兑换（原/backpack/exchange）
  * - /shop      积分商城（积分、兑换、消费、会员）
  * - /lottery   抽奖系统
- * - /backpack  背包系统（用户资产统一入口）
+ * - /backpack  背包系统（物品查看/核销/竞价；兑换已迁至/exchange）
  * - /user      用户中心
  * - /admin     管理后台
  * - /auth      认证授权
@@ -626,11 +627,11 @@ try {
 
   /*
    * ========================================
-   * 4. /market - 交易市场域
+   * 4. /marketplace - C2C 用户间交易市场域（从 /market 迁移，与 console/marketplace 语义对齐）
    * ========================================
    */
-  app.use('/api/v4/market', require('./routes/v4/market'))
-  appLogger.info(' market域加载成功', { route: '/api/v4/market' })
+  app.use('/api/v4/marketplace', require('./routes/v4/marketplace'))
+  appLogger.info(' marketplace域加载成功', { route: '/api/v4/marketplace' })
 
   /*
    * ========================================
@@ -670,11 +671,19 @@ try {
 
   /*
    * ========================================
-   * 10. /backpack - 背包查询域（2025-12-29 资产域标准架构新增）
+   * 10. /backpack - 背包查询域（物品 + 核销 + 竞价；兑换已迁至 /exchange）
    * ========================================
    */
   app.use('/api/v4/backpack', require('./routes/v4/backpack'))
   appLogger.info(' backpack域加载成功', { route: '/api/v4/backpack' })
+
+  /*
+   * ========================================
+   * 10b. /exchange - B2C 用户兑换域（权威路径，旧 /backpack/exchange 已移除）
+   * ========================================
+   */
+  app.use('/api/v4/exchange', require('./routes/v4/exchange'))
+  appLogger.info(' exchange域加载成功', { route: '/api/v4/exchange' })
 
   /*
    * ========================================
@@ -711,7 +720,8 @@ try {
       '/auth',
       '/admin',
       '/lottery',
-      '/market',
+      '/marketplace',
+      '/exchange',
       '/shop',
       '/system',
       '/user',

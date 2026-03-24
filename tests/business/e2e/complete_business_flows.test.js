@@ -868,23 +868,29 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
       const { ExchangeItem, ExchangeItemSku, ExchangeChannelPrice } = require('../../../models')
       const exchangeProduct = await ExchangeItem.findOne({
         where: { status: 'active' },
-        include: [{
-          model: ExchangeItemSku,
-          as: 'skus',
-          where: { stock: { [sequelize.Sequelize.Op.gt]: 0 }, status: 'active' },
-          required: true,
-          include: [{
-            model: ExchangeChannelPrice,
-            as: 'channelPrices',
-            where: { cost_asset_code: 'red_shard', is_enabled: true },
-            required: true
-          }]
-        }]
+        include: [
+          {
+            model: ExchangeItemSku,
+            as: 'skus',
+            where: { stock: { [sequelize.Sequelize.Op.gt]: 0 }, status: 'active' },
+            required: true,
+            include: [
+              {
+                model: ExchangeChannelPrice,
+                as: 'channelPrices',
+                where: { cost_asset_code: 'red_shard', is_enabled: true },
+                required: true
+              }
+            ]
+          }
+        ]
       })
 
       if (!exchangeProduct) {
         console.log('⏭️ 未找到使用 red_shard 支付的兑换商品，跳过兑换步骤')
-        console.log('💡 提示：需要在 exchange_items + exchange_item_skus + exchange_channel_prices 中配置 cost_asset_code=red_shard 的商品')
+        console.log(
+          '💡 提示：需要在 exchange_items + exchange_item_skus + exchange_channel_prices 中配置 cost_asset_code=red_shard 的商品'
+        )
         console.log('✅ 11.6 多用户交互场景测试完成（挂牌+购买流程已验证，兑换步骤跳过）')
         return
       }
@@ -910,16 +916,11 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
       /* 执行兑换 */
       try {
         const exchangeResult = await TransactionManager.execute(async transaction => {
-          return await ExchangeService.exchangeItem(
-            userBId,
-            exchangeProduct.exchange_item_id,
-            1,
-            {
-              idempotency_key: generateIdempotencyKey('multi_user_exchange'),
-              sku_id: matchedSku.sku_id,
-              transaction
-            }
-          )
+          return await ExchangeService.exchangeItem(userBId, exchangeProduct.exchange_item_id, 1, {
+            idempotency_key: generateIdempotencyKey('multi_user_exchange'),
+            sku_id: matchedSku.sku_id,
+            transaction
+          })
         })
 
         console.log('✅ 兑换成功:', {

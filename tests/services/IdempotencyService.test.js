@@ -888,9 +888,9 @@ describe('IdempotencyService - 幂等服务单元测试', () => {
       expect(IdempotencyService.getCanonicalOperation('/api/v4/lottery/draw')).toBe('LOTTERY_DRAW')
 
       // 带动态参数
-      expect(IdempotencyService.getCanonicalOperation('/api/v4/market/listings/123/purchase')).toBe(
-        'MARKET_PURCHASE_LISTING'
-      )
+      expect(
+        IdempotencyService.getCanonicalOperation('/api/v4/marketplace/listings/123/purchase')
+      ).toBe('MARKET_PURCHASE_LISTING')
 
       // 测试路径
       expect(IdempotencyService.getCanonicalOperation('/api/v4/test/action')).toBe('TEST_ACTION')
@@ -901,8 +901,8 @@ describe('IdempotencyService - 幂等服务单元测试', () => {
      */
     it('normalizePath 应正确规范化路径', () => {
       // 数字ID → :id
-      expect(IdempotencyService.normalizePath('/api/v4/market/listings/123')).toBe(
-        '/api/v4/market/listings/:id'
+      expect(IdempotencyService.normalizePath('/api/v4/marketplace/listings/123')).toBe(
+        '/api/v4/marketplace/listings/:id'
       )
 
       // UUID → :uuid

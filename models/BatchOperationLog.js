@@ -236,7 +236,7 @@ class BatchOperationLog extends Model {
    */
   static generateIdempotencyKey(operation_type, operator_id, content_hash = '') {
     const timestamp = Date.now()
-    const hash = content_hash || Math.random().toString(36).substring(2, 10)
+    const hash = content_hash || require('crypto').randomBytes(4).toString('hex')
     return `${operation_type}:${operator_id}:${timestamp}:${hash}`
   }
 

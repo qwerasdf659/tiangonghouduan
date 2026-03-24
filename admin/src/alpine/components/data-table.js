@@ -274,7 +274,8 @@ export function dataTable(config = {}) {
         // 解析结果
         if (result && typeof result === 'object') {
           this.data = result.items || result.list || result.rows || result.data || []
-          this.total_records = result.total ?? result.count ?? result.total_records ?? this.data.length
+          this.total_records =
+            result.total ?? result.count ?? result.total_records ?? this.data.length
         } else {
           this.data = []
           this.total_records = 0
@@ -518,7 +519,7 @@ export function dataTable(config = {}) {
           currentPageCount: this.data.length,
           filteredCount: this.total_records,
           totalCount: this.total_records,
-          onExport: async (options) => {
+          onExport: async options => {
             return this._handleExport(options)
           }
         })
@@ -603,7 +604,10 @@ export function dataTable(config = {}) {
         case 'tags': {
           if (!Array.isArray(value)) return this._escapeHtml(String(value))
           return value
-            .map(tag => `<span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-700 mr-1">${this._escapeHtml(tag)}</span>`)
+            .map(
+              tag =>
+                `<span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-700 mr-1">${this._escapeHtml(tag)}</span>`
+            )
             .join('')
         }
 

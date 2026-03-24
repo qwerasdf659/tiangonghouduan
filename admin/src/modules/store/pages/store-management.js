@@ -119,19 +119,19 @@ function registerStoreManagementComponents() {
             name: 'edit',
             label: '✏️ 编辑',
             class: 'text-blue-600 hover:text-blue-800',
-            condition: (row) => row.status === 'active' || row.status === 'pending'
+            condition: row => row.status === 'active' || row.status === 'pending'
           },
           {
             name: 'resign',
             label: '📤 离职',
             class: 'text-amber-600 hover:text-amber-800',
-            condition: (row) => row.status === 'active'
+            condition: row => row.status === 'active'
           },
           {
             name: 'delete',
             label: '🗑️ 删除',
             class: 'text-red-600 hover:text-red-800',
-            condition: (row) => row.status === 'inactive'
+            condition: row => row.status === 'inactive'
           }
         ]
       }

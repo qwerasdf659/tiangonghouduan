@@ -77,7 +77,10 @@ export function usePresetVisualizationMethods() {
         if (this.presetFilters.mobile) {
           const user = await this.resolveUserByMobile(this.presetFilters.mobile)
           if (user) params.append('user_id', user.user_id)
-          else { this.presets = []; return }
+          else {
+            this.presets = []
+            return
+          }
         }
 
         const response = await this.apiGet(
@@ -224,7 +227,7 @@ export function usePresetVisualizationMethods() {
         this.showError('请输入手机号')
         return
       }
-      if (this.createPresetForm.presets.some((p) => !p.lottery_prize_id)) {
+      if (this.createPresetForm.presets.some(p => !p.lottery_prize_id)) {
         this.showError('请选择所有预设的奖品')
         return
       }
@@ -237,7 +240,7 @@ export function usePresetVisualizationMethods() {
         this.saving = true
         const response = await this.apiPost(LOTTERY_CORE_ENDPOINTS.PRESET_CREATE, {
           user_id: user.user_id,
-          presets: this.createPresetForm.presets.map((p) => ({
+          presets: this.createPresetForm.presets.map(p => ({
             lottery_prize_id: parseInt(p.lottery_prize_id),
             queue_order: p.queue_order
           }))
@@ -331,4 +334,3 @@ export function usePresetVisualizationMethods() {
 }
 
 export default { usePresetVisualizationState, usePresetVisualizationMethods }
-

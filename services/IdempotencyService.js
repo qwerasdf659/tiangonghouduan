@@ -106,26 +106,26 @@ const CANONICAL_OPERATION_MAP = {
 
   // ===== 背包域写操作 =====
   '/api/v4/backpack/items/:id/redeem': 'BACKPACK_ITEM_REDEEM', // 用户生成核销码（创建核销订单+锁定物品）
-  '/api/v4/backpack/exchange': 'BACKPACK_EXCHANGE_CREATE_ORDER', // 用户端兑换商品（新路径）
+  '/api/v4/exchange': 'EXCHANGE_CREATE_ORDER', // 用户端 B2C 兑换商品
   // ===== 材料转换 =====
   '/api/v4/shop/assets/convert': 'SHOP_ASSET_CONVERT', // 资产转换（canonical 路径）
 
   // ===== 汇率兑换（2026-02-23 市场增强） =====
-  '/api/v4/market/exchange-rates/convert': 'EXCHANGE_RATE_CONVERT', // 执行汇率兑换
+  '/api/v4/assets/rates/convert': 'EXCHANGE_RATE_CONVERT', // 执行汇率兑换
 
   // ===== 交易市场 - 物品 =====
-  '/api/v4/market/list': 'MARKET_CREATE_LISTING', // 物品上架
-  '/api/v4/market/listings/:id/purchase': 'MARKET_PURCHASE_LISTING', // 购买物品
-  '/api/v4/market/listings/:id/withdraw': 'MARKET_CANCEL_LISTING', // 撤回物品
+  '/api/v4/marketplace/list': 'MARKET_CREATE_LISTING', // C2C 物品上架
+  '/api/v4/marketplace/listings/:id/purchase': 'MARKET_PURCHASE_LISTING', // C2C 购买物品
+  '/api/v4/marketplace/listings/:id/withdraw': 'MARKET_CANCEL_LISTING', // C2C 撤回物品
 
   // ===== 交易市场 - 担保码确认（Phase 4） =====
-  '/api/v4/market/trade-orders/:id/confirm-delivery': 'MARKET_ESCROW_CONFIRM', // 担保码确认收货
-  '/api/v4/market/trade-orders/:id/cancel': 'MARKET_ESCROW_CANCEL', // 担保码交易取消
+  '/api/v4/marketplace/trade-orders/:id/confirm-delivery': 'MARKET_ESCROW_CONFIRM', // C2C 担保码确认收货
+  '/api/v4/marketplace/trade-orders/:id/cancel': 'MARKET_ESCROW_CANCEL', // C2C 担保码交易取消
 
   // ===== 交易市场 - 可叠加资产（材料） =====
-  '/api/v4/market/fungible-assets/list': 'MARKET_CREATE_FUNGIBLE_LISTING', // 材料上架
-  '/api/v4/market/fungible-assets/:id/purchase': 'MARKET_PURCHASE_FUNGIBLE', // 购买材料
-  '/api/v4/market/fungible-assets/:id/withdraw': 'MARKET_CANCEL_FUNGIBLE_LISTING', // 材料撤回
+  '/api/v4/marketplace/fungible-assets/list': 'MARKET_CREATE_FUNGIBLE_LISTING', // C2C 材料上架
+  '/api/v4/marketplace/fungible-assets/:id/purchase': 'MARKET_PURCHASE_FUNGIBLE', // C2C 购买材料
+  '/api/v4/marketplace/fungible-assets/:id/withdraw': 'MARKET_CANCEL_FUNGIBLE_LISTING', // C2C 材料撤回
 
   // ===== 核销系统 =====
   '/api/v4/shop/redemption/orders': 'REDEMPTION_CREATE_ORDER', // 创建核销订单（canonical 路径）
@@ -139,13 +139,13 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/shop/consumption/:id/restore': 'CONSUMPTION_RESTORE', // 恢复消费记录（canonical 路径）
 
   // ===== 会员解锁 =====
-  '/api/v4/backpack/exchange/unlock-premium': 'PREMIUM_UNLOCK', // 解锁高级空间
+  '/api/v4/exchange/unlock-premium': 'PREMIUM_UNLOCK', // 解锁高级空间
 
   // ===== 竞价系统（臻选空间/幸运空间竞价功能 2026-02-16） =====
-  '/api/v4/backpack/bid': 'BID_PLACE_BID', // 提交竞价出价
-  '/api/v4/console/bid-management': 'CONSOLE_BID_CREATE', // 管理后台创建竞价商品
-  '/api/v4/console/bid-management/:id/settle': 'CONSOLE_BID_SETTLE', // 管理后台手动结算竞价
-  '/api/v4/console/bid-management/:id/cancel': 'CONSOLE_BID_CANCEL', // 管理后台取消竞价
+  '/api/v4/exchange/bid': 'BID_PLACE_BID', // 用户竞价出价（底表 FK→exchange_items）
+  '/api/v4/console/bids': 'CONSOLE_BID_CREATE', // 管理后台创建竞价商品
+  '/api/v4/console/bids/:id/settle': 'CONSOLE_BID_SETTLE', // 管理后台手动结算竞价
+  '/api/v4/console/bids/:id/cancel': 'CONSOLE_BID_CANCEL', // 管理后台取消竞价
 
   // ===== 商户积分 =====
   '/api/v4/merchant-points': 'MERCHANT_POINTS_CREATE', // 商户积分申请（canonical 路径，去尾斜杠）
@@ -188,9 +188,9 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/system/chat/sessions/:id/messages': 'CHAT_MESSAGE_SEND', // 发送聊天消息
   '/api/v4/system/chat/sessions/:id/upload': 'CHAT_IMAGE_UPLOAD', // 聊天图片上传
   '/api/v4/system/chat/sessions/:id/rate': 'CHAT_SESSION_RATE', // 用户提交满意度评分
-  '/api/v4/backpack/exchange/orders/:id/rate': 'EXCHANGE_ORDER_RATE', // 兑换订单评分（需求6）
-  '/api/v4/backpack/exchange/orders/:id/confirm-receipt': 'EXCHANGE_ORDER_CONFIRM_RECEIPT', // 用户确认收货
-  '/api/v4/backpack/exchange/orders/:id/cancel': 'EXCHANGE_ORDER_USER_CANCEL', // 用户取消订单
+  '/api/v4/exchange/orders/:id/rate': 'EXCHANGE_ORDER_RATE', // 兑换订单评分
+  '/api/v4/exchange/orders/:id/confirm-receipt': 'EXCHANGE_ORDER_CONFIRM_RECEIPT', // 用户确认收货
+  '/api/v4/exchange/orders/:id/cancel': 'EXCHANGE_ORDER_USER_CANCEL', // 用户取消订单
   '/api/v4/system/notifications/:id/read': 'NOTIFICATION_MARK_READ', // 标记通知已读（修复：system/:id/read → system/notifications/:id/read）
   '/api/v4/system/notifications/read-all': 'NOTIFICATION_READ_ALL', // 全部已读（修复：system/read-all → system/notifications/read-all）
   '/api/v4/system/notifications/clear': 'NOTIFICATION_CLEAR', // 清空通知（修复：system/clear → system/notifications/clear）
@@ -355,10 +355,10 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/console/material/conversion-rules/': 'ADMIN_MATERIAL_RULE_CREATE', // 创建转换规则
   '/api/v4/console/material/conversion-rules/:id': 'ADMIN_MATERIAL_RULE_UPDATE', // 更新或删除转换规则
   '/api/v4/console/material/conversion-rules/:id/disable': 'ADMIN_MATERIAL_RULE_DISABLE', // 禁用转换规则
-  // 汇率兑换管理（2026-02-23 市场增强）
-  '/api/v4/console/exchange-rates': 'ADMIN_EXCHANGE_RATE_CREATE', // 创建汇率规则
-  '/api/v4/console/exchange-rates/:id': 'ADMIN_EXCHANGE_RATE_UPDATE', // 更新汇率规则
-  '/api/v4/console/exchange-rates/:id/status': 'ADMIN_EXCHANGE_RATE_STATUS', // 更新汇率规则状态
+  // 汇率兑换管理（平台资产域 /console/assets/rates）
+  '/api/v4/console/assets/rates': 'ADMIN_EXCHANGE_RATE_CREATE', // 创建汇率规则
+  '/api/v4/console/assets/rates/:id': 'ADMIN_EXCHANGE_RATE_UPDATE', // 更新汇率规则
+  '/api/v4/console/assets/rates/:id/status': 'ADMIN_EXCHANGE_RATE_STATUS', // 更新汇率规则状态
   // 资产类型：配置实体，使用 :code
   '/api/v4/console/material/asset-types/': 'ADMIN_MATERIAL_TYPE_CREATE', // 创建资产类型
   '/api/v4/console/material/asset-types/:code': 'ADMIN_MATERIAL_TYPE_UPDATE', // 更新资产类型（配置实体用业务码）
@@ -372,22 +372,22 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/console/settings/:code': 'ADMIN_SETTINGS_UPDATE', // 更新设置（配置实体用业务码）
   '/api/v4/console/cache/clear': 'ADMIN_CACHE_CLEAR', // 清除缓存
 
-  // ===== 市场管理 =====
-  '/api/v4/console/marketplace/exchange_market/items': 'ADMIN_EXCHANGE_ITEM_CREATE', // 创建兑换商品（修复：添加 marketplace 前缀）
-  '/api/v4/console/marketplace/exchange_market/items/:id': 'ADMIN_EXCHANGE_ITEM_UPDATE', // 更新兑换商品（修复：添加 marketplace 前缀）或删除（DELETE）
-  '/api/v4/console/marketplace/exchange_market/orders/:id/approve': 'ADMIN_EXCHANGE_ORDER_APPROVE', // 管理员审核通过
-  '/api/v4/console/marketplace/exchange_market/orders/:id/ship': 'ADMIN_EXCHANGE_ORDER_SHIP', // 管理员发货
-  '/api/v4/console/marketplace/exchange_market/orders/:id/reject': 'ADMIN_EXCHANGE_ORDER_REJECT', // 管理员拒绝订单
-  '/api/v4/console/marketplace/exchange_market/orders/:id/refund': 'ADMIN_EXCHANGE_ORDER_REFUND', // 管理员退款
-  '/api/v4/console/marketplace/exchange_market/orders/:id/complete':
-    'ADMIN_EXCHANGE_ORDER_COMPLETE', // 管理员标记完成
-  '/api/v4/console/marketplace/exchange_market/batch-bind-images':
-    'ADMIN_EXCHANGE_BATCH_BIND_IMAGES', // 批量绑定商品图片
-  '/api/v4/console/marketplace/exchange_market/items/batch-status': 'ADMIN_EXCHANGE_BATCH_STATUS', // 批量上下架
-  '/api/v4/console/marketplace/exchange_market/items/batch-price': 'ADMIN_EXCHANGE_BATCH_PRICE', // 批量改价
-  '/api/v4/console/marketplace/exchange_market/items/batch-category':
-    'ADMIN_EXCHANGE_BATCH_CATEGORY', // 批量修改分类
-  '/api/v4/console/marketplace/exchange_market/items/import': 'ADMIN_EXCHANGE_BATCH_IMPORT', // 批量导入兑换商品（Excel/CSV）
+  // ===== B2C 兑换商城（/console/exchange/*，与 C2C /console/marketplace/* 物理拆分）=====
+  '/api/v4/console/exchange/items': 'ADMIN_EXCHANGE_ITEM_CREATE', // 创建兑换商品（POST /items）
+  '/api/v4/console/exchange/items/:id': 'ADMIN_EXCHANGE_ITEM_UPDATE', // 更新或删除兑换商品
+  '/api/v4/console/exchange/orders/:id/approve': 'ADMIN_EXCHANGE_ORDER_APPROVE', // 管理员审核通过（路由参数 :order_no，normalizePath→:id）
+  '/api/v4/console/exchange/orders/:id/ship': 'ADMIN_EXCHANGE_ORDER_SHIP', // 管理员发货（路由参数 :order_no，normalizePath→:id）
+  '/api/v4/console/exchange/orders/:id/reject': 'ADMIN_EXCHANGE_ORDER_REJECT', // 管理员拒绝订单（路由参数 :order_no，normalizePath→:id）
+  '/api/v4/console/exchange/orders/:id/refund': 'ADMIN_EXCHANGE_ORDER_REFUND', // 管理员退款（路由参数 :order_no，normalizePath→:id）
+  '/api/v4/console/exchange/orders/:id/complete': 'ADMIN_EXCHANGE_ORDER_COMPLETE', // 管理员标记完成（路由参数 :order_no，normalizePath→:id）
+  '/api/v4/console/exchange/batch-bind-images': 'ADMIN_EXCHANGE_BATCH_BIND_IMAGES', // 批量绑定商品图片
+  '/api/v4/console/exchange/items/import': 'ADMIN_EXCHANGE_ITEM_IMPORT', // 批量导入兑换商品
+  '/api/v4/console/exchange/items/batch-status': 'ADMIN_EXCHANGE_BATCH_STATUS', // 批量上下架
+  '/api/v4/console/exchange/items/batch-price': 'ADMIN_EXCHANGE_BATCH_PRICE', // 批量改价
+  '/api/v4/console/exchange/items/batch-category': 'ADMIN_EXCHANGE_BATCH_CATEGORY', // 批量修改分类
+  '/api/v4/console/exchange/items/batch-sort': 'ADMIN_EXCHANGE_BATCH_SORT', // B2C 兑换商品批量排序
+  '/api/v4/console/exchange/items/:id/pin': 'ADMIN_EXCHANGE_ITEM_PIN', // B2C 兑换商品置顶/取消置顶
+  '/api/v4/console/exchange/items/:id/recommend': 'ADMIN_EXCHANGE_ITEM_RECOMMEND', // B2C 兑换商品推荐/取消推荐
   '/api/v4/console/marketplace/listings/:id/force-withdraw': 'ADMIN_FORCE_WITHDRAW', // 强制下架
   '/api/v4/console/marketplace/listings/:id/pin': 'ADMIN_LISTING_PIN', // 挂牌置顶/取消置顶
   '/api/v4/console/marketplace/listings/:id/recommend': 'ADMIN_LISTING_RECOMMEND', // 挂牌推荐/取消推荐
@@ -682,8 +682,8 @@ class IdempotencyService {
    *    - 如：用户分享链接
    *
    * @example
-   * normalizePath('/api/v4/market/listings/123')
-   * // 返回: '/api/v4/market/listings/:id'
+   * normalizePath('/api/v4/marketplace/listings/123')
+   * // 返回: '/api/v4/marketplace/listings/:id'
    *
    * normalizePath('/api/v4/lottery/campaigns/spring_festival/prizes')
    * // 返回: '/api/v4/lottery/campaigns/:code/prizes'

@@ -922,11 +922,17 @@ document.addEventListener('alpine:init', () => {
         { key: 'dict_code', label: '字典代码', sortable: true },
         { key: 'dict_name', label: '字典名称', sortable: true },
         { key: 'dict_value', label: '字典值/描述', type: 'truncate', maxLength: 40 },
-        { key: 'dict_type', label: '类型', type: 'badge', badgeMap: { category: 'blue', rarity: 'purple', asset_group: 'green' }, labelMap: { category: '类目', rarity: '稀有度', asset_group: '资产组' } },
+        {
+          key: 'dict_type',
+          label: '类型',
+          type: 'badge',
+          badgeMap: { category: 'blue', rarity: 'purple', asset_group: 'green' },
+          labelMap: { category: '类目', rarity: '稀有度', asset_group: '资产组' }
+        },
         { key: 'sort_order', label: '排序', type: 'number' },
         { key: 'status', label: '状态', type: 'status' }
       ],
-      dataSource: async (_params) => {
+      dataSource: async _params => {
         const res = await request({ url: SYSTEM_ENDPOINTS.DICT_ALL })
         const categories = (res.data?.categories || []).map((d, idx) => ({
           dict_id: `cat_${d.category_code || idx}`,
@@ -980,13 +986,35 @@ document.addEventListener('alpine:init', () => {
     const table = dataTable({
       columns: [
         { key: 'id', label: '日志ID', sortable: true },
-        { key: 'operator_name', label: '操作人', render: (val, row) => val || row.admin_name || `管理员#${row.admin_id || row.operator_id || '-'}` },
-        { key: 'action', label: '操作类型', render: (val) => { const map = { create: '创建', update: '更新', delete: '删除', login: '登录', logout: '登出' }; return map[val] || val || '-' } },
-        { key: 'target', label: '操作目标', render: (val, row) => val || row.operation_type_name || row.resource_type || '-' },
+        {
+          key: 'operator_name',
+          label: '操作人',
+          render: (val, row) =>
+            val || row.admin_name || `管理员#${row.admin_id || row.operator_id || '-'}`
+        },
+        {
+          key: 'action',
+          label: '操作类型',
+          render: val => {
+            const map = {
+              create: '创建',
+              update: '更新',
+              delete: '删除',
+              login: '登录',
+              logout: '登出'
+            }
+            return map[val] || val || '-'
+          }
+        },
+        {
+          key: 'target',
+          label: '操作目标',
+          render: (val, row) => val || row.operation_type_name || row.resource_type || '-'
+        },
         { key: 'ip_address', label: 'IP地址' },
         { key: 'created_at', label: '操作时间', type: 'datetime', sortable: true }
       ],
-      dataSource: async (params) => {
+      dataSource: async params => {
         const res = await request({ url: SYSTEM_ENDPOINTS.AUDIT_LOG_LIST, method: 'GET', params })
         return {
           items: res.data?.logs || res.data?.list || [],

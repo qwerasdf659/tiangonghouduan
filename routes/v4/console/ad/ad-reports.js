@@ -153,4 +153,30 @@ router.get(
   })
 )
 
+/**
+ * GET /billing-records - 广告计费流水列表（含 billing_no）
+ *
+ * @route GET /api/v4/console/ad-reports/billing-records
+ * @access Private (Admin)
+ * @query {number} [page=1] - 页码
+ * @query {number} [page_size=20] - 每页条数
+ * @query {string} [billing_type] - 计费类型筛选（freeze/deduct/refund/daily_deduct/cpm_deduct）
+ * @query {number} [ad_campaign_id] - 按广告活动筛选
+ * @returns {Object} { billing_records, pagination }
+ */
+router.get(
+  '/billing-records',
+  adminAuthMiddleware,
+  asyncHandler(async (req, res) => {
+    try {
+      const AdBillingService = req.app.locals.services.getService('ad_billing')
+      const result = await AdBillingService.listBillingRecords(req.query)
+      return res.apiSuccess(result, '获取计费流水成功')
+    } catch (error) {
+      logger.error('获取计费流水失败', { error: error.message })
+      return res.apiInternalError('获取计费流水失败', error.message, 'AD_BILLING_LIST_ERROR')
+    }
+  })
+)
+
 module.exports = router

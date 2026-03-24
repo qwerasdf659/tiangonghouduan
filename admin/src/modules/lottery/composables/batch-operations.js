@@ -146,9 +146,8 @@ export function useBatchOperationsMethods() {
         return
       }
       // 处理自定义原因
-      const reason = form.reason === '__custom__'
-        ? (form._custom_reason || '').trim()
-        : form.reason.trim()
+      const reason =
+        form.reason === '__custom__' ? (form._custom_reason || '').trim() : form.reason.trim()
 
       if (!reason) {
         this.showError('请选择或输入赠送原因')
@@ -222,9 +221,10 @@ export function useBatchOperationsMethods() {
 
         if (response?.success) {
           this.batchOperationResult = response.data
-          const msg = failedMobiles.length > 0
-            ? `批量赠送完成：成功 ${response.data.success_count}/${mobiles.length}（跳过 ${failedMobiles.length} 个无效手机号）`
-            : `批量赠送完成：成功 ${response.data.success_count}/${response.data.total_count}`
+          const msg =
+            failedMobiles.length > 0
+              ? `批量赠送完成：成功 ${response.data.success_count}/${mobiles.length}（跳过 ${failedMobiles.length} 个无效手机号）`
+              : `批量赠送完成：成功 ${response.data.success_count}/${response.data.total_count}`
           this.showSuccess(msg)
           logger.info('[BatchOps] 批量赠送成功', response.data)
         } else {
@@ -390,7 +390,9 @@ export function useBatchOperationsMethods() {
         this.batchCampaignStatusForm.lottery_campaign_ids.push(campaignId)
       }
       // 同步到预算调整表单
-      this.batchBudgetAdjustForm.lottery_campaign_ids = [...this.batchCampaignStatusForm.lottery_campaign_ids]
+      this.batchBudgetAdjustForm.lottery_campaign_ids = [
+        ...this.batchCampaignStatusForm.lottery_campaign_ids
+      ]
     },
 
     /**

@@ -326,9 +326,7 @@ export function userDrawer(_config = {}) {
           this.assetDetails.transactions =
             result.data?.transactions || result.data?.rows || result.data || []
           this.assetPagination.total = result.data?.pagination?.total || result.data?.count || 0
-          logger.debug(
-            `[UserDrawer] 加载资产明细成功: ${this.assetDetails.transactions.length} 条`
-          )
+          logger.debug(`[UserDrawer] 加载资产明细成功: ${this.assetDetails.transactions.length} 条`)
         } else {
           this.assetDetails.transactions = []
           logger.warn('[UserDrawer] 加载资产明细失败: API 返回非成功状态')
@@ -343,7 +341,7 @@ export function userDrawer(_config = {}) {
 
     /**
      * 加载行为轨迹
-     * 
+     *
      * 后端 API: GET /api/v4/console/user-behavior-tracks
      * 参数: user_id, page, page_size
      */
@@ -353,14 +351,14 @@ export function userDrawer(_config = {}) {
         const { page, page_size } = this.behaviorPagination
         const response = await this.apiGet(
           `${API_PREFIX}/console/user-behavior-tracks`,
-          { 
+          {
             user_id: this.user_id,
             page,
             page_size
           },
           { showLoading: false }
         )
-        
+
         if (response?.success && response.data) {
           // 转换后端数据格式为前端展示格式
           const tracks = response.data.tracks || response.data.list || []
@@ -369,10 +367,14 @@ export function userDrawer(_config = {}) {
             action_type: track.behavior_type || track.action_type,
             action_label: this._getBehaviorLabel(track.behavior_type || track.action_type),
             action_icon: this._getBehaviorIcon(track.behavior_type || track.action_type),
-            detail: track.detail || track.description || `用户进行了${this._getBehaviorLabel(track.behavior_type)}操作`,
+            detail:
+              track.detail ||
+              track.description ||
+              `用户进行了${this._getBehaviorLabel(track.behavior_type)}操作`,
             created_at: track.created_at
           }))
-          this.behaviorPagination.total = response.data.pagination?.total || response.data.total || tracks.length
+          this.behaviorPagination.total =
+            response.data.pagination?.total || response.data.total || tracks.length
           logger.debug(`[UserDrawer] 加载行为轨迹成功: ${this.behaviorTracks.length} 条`)
         } else {
           logger.warn('[UserDrawer] 行为轨迹API返回空数据')
@@ -387,7 +389,7 @@ export function userDrawer(_config = {}) {
         this.loading = false
       }
     },
-    
+
     /**
      * 获取行为类型的中文标签
      * @private
@@ -405,7 +407,7 @@ export function userDrawer(_config = {}) {
       }
       return labels[type] || type || '未知操作'
     },
-    
+
     /**
      * 获取行为类型的图标
      * @private
@@ -568,7 +570,7 @@ export function userDrawer(_config = {}) {
         banned: 'text-red-600 bg-red-100'
       }
       return colors[status] || 'text-gray-600 bg-gray-100'
-    },
+    }
 
     /* mock 数据生成器已清除（项目规则：禁止使用模拟数据）*/
   }
@@ -617,4 +619,3 @@ export function registerUserDrawerComponents(Alpine) {
 }
 
 export default userDrawer
-

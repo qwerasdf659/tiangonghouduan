@@ -194,7 +194,9 @@ export function useCsAgentManagementMethods() {
         mobile: agent.user?.mobile || '',
         display_name: agent.display_name,
         max_concurrent_sessions: agent.max_concurrent_sessions,
-        specialty: Array.isArray(agent.specialty) ? agent.specialty.join(',') : (agent.specialty || ''),
+        specialty: Array.isArray(agent.specialty)
+          ? agent.specialty.join(',')
+          : agent.specialty || '',
         priority: agent.priority,
         is_auto_assign_enabled: agent.is_auto_assign_enabled,
         status: agent.status
@@ -216,7 +218,10 @@ export function useCsAgentManagementMethods() {
         const payload = {
           display_name: this.agentForm.display_name,
           specialty: this.agentForm.specialty
-            ? this.agentForm.specialty.split(',').map(s => s.trim()).filter(Boolean)
+            ? this.agentForm.specialty
+                .split(',')
+                .map(s => s.trim())
+                .filter(Boolean)
             : [],
           max_concurrent_sessions: parseInt(this.agentForm.max_concurrent_sessions),
           priority: parseInt(this.agentForm.priority),

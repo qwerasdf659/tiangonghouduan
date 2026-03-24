@@ -74,7 +74,7 @@ export function useCsWorkStatusMethods() {
       const prevBreachCount = this.slaBreachCount
       this.slaBreachCount = waiting.filter(s => {
         const created = new Date(s.created_at).getTime()
-        return (now - created) > 15 * 60000
+        return now - created > 15 * 60000
       }).length
 
       if (this.slaBreachCount > prevBreachCount) {
@@ -102,7 +102,10 @@ export function useCsWorkStatusMethods() {
             tag: 'sla-breach',
             requireInteraction: true
           })
-          n.onclick = () => { window.focus(); n.close() }
+          n.onclick = () => {
+            window.focus()
+            n.close()
+          }
         } catch {
           /* Service Worker 环境下 Notification 构造函数可能不可用 */
         }
@@ -122,9 +125,10 @@ export function useCsWorkStatusMethods() {
     /**
      * 加载待处理工单数（定期轮询）
      */
-    async loadPendingIssueCount () {
+    async loadPendingIssueCount() {
       try {
-        const url = CONTENT_ENDPOINTS.CS_ISSUE_LIST + buildQueryString({ status: 'open', page_size: 1 })
+        const url =
+          CONTENT_ENDPOINTS.CS_ISSUE_LIST + buildQueryString({ status: 'open', page_size: 1 })
         const response = await request({ url, method: 'GET' })
         if (response?.success) {
           this.pendingIssueCount = response.data?.count || response.data?.total || 0

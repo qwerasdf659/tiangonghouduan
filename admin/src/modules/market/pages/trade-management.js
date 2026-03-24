@@ -19,8 +19,7 @@
  */
 
 import { logger } from '../../../utils/logger.js'
-import { MARKET_ENDPOINTS } from '../../../api/market/index.js'
-import { TradeAPI } from '../../../api/market/trade.js'
+import { TRADE_ENDPOINTS, TradeAPI } from '../../../api/market/trade.js'
 import { MERCHANT_ENDPOINTS } from '../../../api/merchant.js'
 import { buildURL, request } from '../../../api/base.js'
 import { Alpine, createPageMixin } from '../../../alpine/index.js'
@@ -174,8 +173,8 @@ document.addEventListener('alpine:init', () => {
     tradeStats: { total: 0, created: 0, frozen: 0, completed: 0 },
     /** @type {{totalTrades: number, completedTrades: number, pendingTrades: number, totalVolume: number}} HTML 统计卡片使用 */
     stats: { totalTrades: 0, completedTrades: 0, pendingTrades: 0, totalVolume: 0 },
-    /** @type {Object} 交易订单筛选条件（手机号主导搜索） */
-    tradeFilters: { status: '', buyer_mobile: '', seller_mobile: '', listing_id: '' },
+    /** @type {Object} 交易订单筛选条件（支持单号/手机号/状态搜索） */
+    tradeFilters: { status: '', buyer_mobile: '', seller_mobile: '', listing_id: '', order_no: '' },
     /** @type {Object|null} 买家解析结果 */
     resolvedBuyer: null,
     /** @type {Object|null} 卖家解析结果 */
@@ -358,6 +357,7 @@ document.addEventListener('alpine:init', () => {
         const queryParams = {
           status: this.tradeFilters.status,
           market_listing_id: this.tradeFilters.listing_id,
+          order_no: this.tradeFilters.order_no || undefined,
           merchant_id: this.tradeOrderMerchantFilter || undefined,
           page: this.tradeCurrentPage,
           page_size: this.tradePageSize
@@ -392,7 +392,7 @@ document.addEventListener('alpine:init', () => {
         Object.keys(queryParams).forEach(k => !queryParams[k] && delete queryParams[k])
 
         // apiGet 返回 { success, data } 结构
-        const result = await this.apiGet(MARKET_ENDPOINTS.TRADE_ORDER_LIST, queryParams)
+        const result = await this.apiGet(TRADE_ENDPOINTS.TRADE_ORDER_LIST, queryParams)
 
         logger.info('[TradeManagement] API 响应:', result)
 
@@ -457,7 +457,7 @@ document.addEventListener('alpine:init', () => {
         }
 
         const result = await request({
-          url: MARKET_ENDPOINTS.LISTING_STATS,
+          url: TRADE_ENDPOINTS.LISTING_STATS,
           method: 'GET',
           params
         })
@@ -504,8 +504,8 @@ document.addEventListener('alpine:init', () => {
 
         // 并行请求：市场分析数据 + 交易订单统计
         const [analyticsRes, statsRes] = await Promise.allSettled([
-          request({ url: MARKET_ENDPOINTS.MARKET_OVERVIEW, method: 'GET' }),
-          request({ url: MARKET_ENDPOINTS.TRADE_ORDER_STATS, method: 'GET' })
+          request({ url: TRADE_ENDPOINTS.STATS_OVERVIEW, method: 'GET' }),
+          request({ url: TRADE_ENDPOINTS.TRADE_ORDER_STATS, method: 'GET' })
         ])
 
         // 处理市场分析数据（MarketAnalyticsService）
@@ -538,7 +538,7 @@ document.addEventListener('alpine:init', () => {
         // 获取在售挂牌数
         try {
           const listingRes = await request({
-            url: MARKET_ENDPOINTS.LISTING_STATS,
+            url: TRADE_ENDPOINTS.LISTING_STATS,
             method: 'GET',
             params: { page: 1, page_size: 1 }
           })
@@ -703,7 +703,7 @@ document.addEventListener('alpine:init', () => {
           params.sort_order = sort === 'quality_score_asc' ? 'asc' : 'desc'
         }
         const result = await request({
-          url: MARKET_ENDPOINTS.LISTING_USER_LISTINGS,
+          url: TRADE_ENDPOINTS.LISTING_USER_LISTINGS,
           method: 'GET',
           params
         })
@@ -889,7 +889,7 @@ document.addEventListener('alpine:init', () => {
       try {
         this.saving = true
         const result = await request({
-          url: buildURL(MARKET_ENDPOINTS.LISTING_FORCE_WITHDRAW, {
+          url: buildURL(TRADE_ENDPOINTS.LISTING_FORCE_WITHDRAW, {
             market_listing_id: this.forceWithdrawForm.market_listing_id
           }),
           method: 'POST',
@@ -943,7 +943,7 @@ document.addEventListener('alpine:init', () => {
           reason: this.adjustLimitForm.reason || ''
         }
         const result = await request({
-          url: MARKET_ENDPOINTS.LISTING_USER_LIMIT,
+          url: TRADE_ENDPOINTS.LISTING_USER_LIMIT,
           method: 'PUT',
           data
         })
@@ -977,7 +977,7 @@ document.addEventListener('alpine:init', () => {
         if (this.tradeOrderMerchantFilter) {
           queryParams.merchant_id = this.tradeOrderMerchantFilter
         }
-        const result = await this.apiGet(MARKET_ENDPOINTS.BUSINESS_RECORD_REDEMPTION, queryParams)
+        const result = await this.apiGet(TRADE_ENDPOINTS.BUSINESS_RECORD_REDEMPTION, queryParams)
         if (result && result.success && result.data) {
           const data = result.data
           this.redemptionOrders = Array.isArray(data.orders) ? data.orders : []
@@ -1093,7 +1093,7 @@ document.addEventListener('alpine:init', () => {
       Object.keys(queryParams).forEach(k => !queryParams[k] && delete queryParams[k])
 
       const result = await request({
-        url: MARKET_ENDPOINTS.TRADE_ORDER_LIST,
+        url: TRADE_ENDPOINTS.TRADE_ORDER_LIST,
         method: 'GET',
         params: queryParams
       })
@@ -1130,7 +1130,7 @@ document.addEventListener('alpine:init', () => {
       }
 
       const result = await request({
-        url: MARKET_ENDPOINTS.LISTING_STATS,
+        url: TRADE_ENDPOINTS.LISTING_STATS,
         method: 'GET',
         params: queryParams
       })

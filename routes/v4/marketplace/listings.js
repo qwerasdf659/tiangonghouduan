@@ -34,12 +34,12 @@ const logger = require('../../../utils/logger').logger
  */
 
 /**
- * @route GET /api/v4/market/listings
+ * @route GET /api/v4/marketplace/listings
  * @desc 获取交易市场挂牌列表（带缓存）
  * @access Private (需要登录)
  *
  * @query {number} page - 页码（默认1）
- * @query {number} limit - 每页数量（默认20）
+ * @query {number} page_size - 每页数量（默认20）
  * @query {string} listing_kind - 挂牌类型筛选（item / fungible_asset，可选）
  * @query {string} asset_code - 资产代码筛选（如 red_shard，仅对 fungible_asset 有效）
  * @query {string|number} item_category_code - 物品类目筛选（category_code 或 category_id，仅对 item 类型有效）
@@ -144,7 +144,7 @@ router.get('/listings', authenticateToken, async (req, res) => {
 })
 
 /**
- * @route GET /api/v4/market/listings/facets
+ * @route GET /api/v4/marketplace/listings/facets
  * @desc 获取市场筛选维度配置（类目、稀有度、资产分组、挂牌类型）
  * @access Private (需要登录)
  *
@@ -189,7 +189,7 @@ router.get('/listings/facets', authenticateToken, async (req, res) => {
 })
 
 /**
- * @route GET /api/v4/market/listings/:market_listing_id
+ * @route GET /api/v4/marketplace/listings/:market_listing_id
  * @desc 获取市场挂牌详情
  * @access Private (需要登录)
  *
@@ -285,7 +285,7 @@ router.get(
 )
 
 /**
- * @route GET /api/v4/market/settlement-currencies
+ * @route GET /api/v4/marketplace/settlement-currencies
  * @desc 获取允许的结算币种列表（用户端）
  * @access Private (需要登录)
  *
@@ -318,12 +318,12 @@ router.get('/settlement-currencies', authenticateToken, async (req, res) => {
 })
 
 /**
- * @route GET /api/v4/market/my-listings
+ * @route GET /api/v4/marketplace/my-listings
  * @desc 获取当前用户的挂单列表（我的挂单）
  * @access Private (需要登录)
  *
  * @query {number} page - 页码（默认1）
- * @query {number} limit - 每页数量（默认20）
+ * @query {number} page_size - 每页数量（默认20）
  * @query {string} status - 状态筛选（on_sale/locked/sold/withdrawn/admin_withdrawn，可选）
  *
  * @returns {Object} 用户挂单列表和分页信息
@@ -379,7 +379,7 @@ router.get('/my-listings', authenticateToken, async (req, res) => {
 })
 
 /**
- * @route GET /api/v4/market/listing-status
+ * @route GET /api/v4/marketplace/listing-status
  * @desc 获取用户上架状态
  * @access Private (需要登录)
  *

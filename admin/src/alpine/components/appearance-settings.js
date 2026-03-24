@@ -320,10 +320,7 @@ export function appearanceSettings() {
       // 同步到iframe
       document.querySelectorAll('iframe').forEach(iframe => {
         try {
-          iframe.contentDocument?.documentElement?.setAttribute(
-            'data-theme',
-            themeId
-          )
+          iframe.contentDocument?.documentElement?.setAttribute('data-theme', themeId)
         } catch (_e) {
           // 跨域iframe通过广播同步
         }
@@ -334,9 +331,7 @@ export function appearanceSettings() {
      * 快速切换深色/浅色
      */
     toggleDarkMode() {
-      const isDark = this.darkSidebarThemes.some(
-        t => t.id === this.currentTheme
-      )
+      const isDark = this.darkSidebarThemes.some(t => t.id === this.currentTheme)
       this.setTheme(isDark ? 'minimal-light' : 'dark')
     },
 
@@ -344,9 +339,7 @@ export function appearanceSettings() {
      * 验证主题ID是否有效
      */
     isValidTheme(themeId) {
-      return [...this.darkSidebarThemes, ...this.lightSidebarThemes].some(
-        t => t.id === themeId
-      )
+      return [...this.darkSidebarThemes, ...this.lightSidebarThemes].some(t => t.id === themeId)
     },
 
     /**
@@ -386,10 +379,7 @@ export function appearanceSettings() {
       // 同步到iframe
       document.querySelectorAll('iframe').forEach(iframe => {
         try {
-          iframe.contentDocument?.documentElement?.setAttribute(
-            'data-font',
-            fontId
-          )
+          iframe.contentDocument?.documentElement?.setAttribute('data-font', fontId)
         } catch (_e) {
           // 跨域iframe通过广播同步
         }
@@ -422,10 +412,7 @@ export function appearanceSettings() {
       try {
         const channel = new BroadcastChannel(THEME_CHANNEL_NAME)
         // 兼容现有格式：主题用 theme 字段，字体用 font 字段
-        const payload =
-          type === 'theme_change'
-            ? { type, theme: value }
-            : { type, font: value }
+        const payload = type === 'theme_change' ? { type, theme: value } : { type, font: value }
         channel.postMessage(payload)
         channel.close()
       } catch (e) {
@@ -467,5 +454,3 @@ export function appearanceSettings() {
 }
 
 export default appearanceSettings
-
-

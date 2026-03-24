@@ -108,7 +108,7 @@ function reminderRulesPage() {
       {
         key: 'check_interval_minutes',
         label: '检查间隔',
-        render: (val) => {
+        render: val => {
           if (!val) return '-'
           if (val < 60) return `${val}分钟`
           if (val < 1440) return `${Math.floor(val / 60)}小时`
@@ -129,7 +129,12 @@ function reminderRulesPage() {
             icon: '🔄',
             class: 'text-green-600 hover:text-green-800'
           },
-          { name: 'test', label: '测试', icon: '🧪', class: 'text-purple-600 hover:text-purple-800' },
+          {
+            name: 'test',
+            label: '测试',
+            icon: '🧪',
+            class: 'text-purple-600 hover:text-purple-800'
+          },
           { name: 'delete', label: '删除', icon: '🗑️', class: 'text-red-500 hover:text-red-700' }
         ]
       }

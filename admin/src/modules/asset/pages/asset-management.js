@@ -523,7 +523,11 @@ document.addEventListener('alpine:init', () => {
 
     /** 获取形态的中文标签 */
     getFormLabel(form) {
-      const labels = { shard: '碎片（shard）', crystal: '水晶（crystal）', currency: '货币（currency）' }
+      const labels = {
+        shard: '碎片（shard）',
+        crystal: '水晶（crystal）',
+        currency: '货币（currency）'
+      }
       return labels[form] || form || '-'
     },
 
@@ -554,7 +558,7 @@ document.addEventListener('alpine:init', () => {
     viewInstanceDetail(instance) {
       this.instanceDetail = instance
       this.showModal('instanceDetailModal')
-    },
+    }
   }))
 
   // ==================== data-table 组件注册 ====================
@@ -567,17 +571,34 @@ document.addEventListener('alpine:init', () => {
         { key: 'display_name', label: '显示名称', sortable: true },
         { key: 'group_code', label: '分组' },
         { key: 'form', label: '形态' },
-        { key: 'is_enabled', label: '状态', type: 'status', statusMap: { true: { class: 'green', label: '启用' }, false: { class: 'gray', label: '禁用' } } }
+        {
+          key: 'is_enabled',
+          label: '状态',
+          type: 'status',
+          statusMap: {
+            true: { class: 'green', label: '启用' },
+            false: { class: 'gray', label: '禁用' }
+          }
+        }
       ],
-      dataSource: async (params) => {
-        const res = await request({ url: ASSET_ENDPOINTS.MATERIAL_ASSET_TYPES, method: 'GET', params })
+      dataSource: async params => {
+        const res = await request({
+          url: ASSET_ENDPOINTS.MATERIAL_ASSET_TYPES,
+          method: 'GET',
+          params
+        })
         const types = res.data?.asset_types || res.data?.list || res.data || []
         return { items: types, total: types.length }
       },
-      primaryKey: 'asset_code', sortable: true, page_size: 50
+      primaryKey: 'asset_code',
+      sortable: true,
+      page_size: 50
     })
     const origInit = table.init
-    table.init = async function () { window.addEventListener('refresh-asset-types', () => this.loadData()); if (origInit) await origInit.call(this) }
+    table.init = async function () {
+      window.addEventListener('refresh-asset-types', () => this.loadData())
+      if (origInit) await origInit.call(this)
+    }
     return table
   })
 
@@ -589,17 +610,33 @@ document.addEventListener('alpine:init', () => {
         { key: 'user_id', label: '用户ID', sortable: true },
         { key: 'nickname', label: '用户', render: (val, row) => row.user?.nickname || val || '-' },
         { key: 'account_type', label: '账户类型' },
-        { key: 'status', label: '状态', type: 'status', statusMap: { active: { class: 'green', label: '正常' }, frozen: { class: 'red', label: '冻结' } } },
+        {
+          key: 'status',
+          label: '状态',
+          type: 'status',
+          statusMap: {
+            active: { class: 'green', label: '正常' },
+            frozen: { class: 'red', label: '冻结' }
+          }
+        },
         { key: 'created_at', label: '创建时间', type: 'datetime', sortable: true }
       ],
-      dataSource: async (params) => {
+      dataSource: async params => {
         const res = await request({ url: ASSET_ENDPOINTS.SYSTEM_ACCOUNTS, method: 'GET', params })
-        return { items: res.data?.accounts || res.data?.list || [], total: res.data?.pagination?.total || 0 }
+        return {
+          items: res.data?.accounts || res.data?.list || [],
+          total: res.data?.pagination?.total || 0
+        }
       },
-      primaryKey: 'account_id', sortable: true, page_size: 20
+      primaryKey: 'account_id',
+      sortable: true,
+      page_size: 20
     })
     const origInit = table.init
-    table.init = async function () { window.addEventListener('refresh-asset-accounts', () => this.loadData()); if (origInit) await origInit.call(this) }
+    table.init = async function () {
+      window.addEventListener('refresh-asset-accounts', () => this.loadData())
+      if (origInit) await origInit.call(this)
+    }
     return table
   })
 
@@ -614,10 +651,10 @@ document.addEventListener('alpine:init', () => {
         { key: 'delta_amount', label: '变动金额', type: 'number', sortable: true },
         { key: 'tx_type', label: '类型', render: (val, row) => row.tx_type_display || val || '-' },
         { key: 'balance_after', label: '变动后余额', type: 'number' },
-        { key: 'description', label: '描述', render: (val) => val || '-' },
+        { key: 'description', label: '描述', render: val => val || '-' },
         { key: 'created_at', label: '时间', type: 'datetime', sortable: true }
       ],
-      dataSource: async (params) => {
+      dataSource: async params => {
         // 后端 /console/assets/transactions 要求 user_id 必填
         // 如果有 mobile，先解析为 user_id
         const userId = await resolveUserIdFromParams(params)
@@ -627,13 +664,25 @@ document.addEventListener('alpine:init', () => {
         }
         const queryParams = { ...params, user_id: userId }
         delete queryParams.mobile // 后端不需要 mobile 参数
-        const res = await request({ url: ASSET_ENDPOINTS.TRANSACTIONS, method: 'GET', params: queryParams })
-        return { items: res.data?.transactions || res.data?.list || [], total: res.data?.pagination?.total || 0 }
+        const res = await request({
+          url: ASSET_ENDPOINTS.TRANSACTIONS,
+          method: 'GET',
+          params: queryParams
+        })
+        return {
+          items: res.data?.transactions || res.data?.list || [],
+          total: res.data?.pagination?.total || 0
+        }
       },
-      primaryKey: 'asset_transaction_id', sortable: true, page_size: 20
+      primaryKey: 'asset_transaction_id',
+      sortable: true,
+      page_size: 20
     })
     const origInit = table.init
-    table.init = async function () { window.addEventListener('refresh-asset-transactions', () => this.loadData()); if (origInit) await origInit.call(this) }
+    table.init = async function () {
+      window.addEventListener('refresh-asset-transactions', () => this.loadData())
+      if (origInit) await origInit.call(this)
+    }
     return table
   })
 
@@ -642,20 +691,32 @@ document.addEventListener('alpine:init', () => {
     const table = dataTable({
       columns: [
         { key: 'item_id', label: '物品ID', sortable: true },
-        { key: 'item_name', label: '物品名称', render: (val, row) => val || row.template_name || '-' },
+        {
+          key: 'item_name',
+          label: '物品名称',
+          render: (val, row) => val || row.template_name || '-'
+        },
         { key: 'owner_user_id', label: '持有者' },
         { key: 'status', label: '状态', type: 'status' },
         { key: 'source', label: '来源', render: (val, row) => row.source_display || val || '-' },
         { key: 'created_at', label: '获取时间', type: 'datetime', sortable: true }
       ],
-      dataSource: async (params) => {
+      dataSource: async params => {
         const res = await request({ url: ASSET_ENDPOINTS.ITEM_LIST, method: 'GET', params })
-        return { items: res.data?.list || res.data?.instances || res.data || [], total: res.data?.pagination?.total || res.data?.count || 0 }
+        return {
+          items: res.data?.list || res.data?.instances || res.data || [],
+          total: res.data?.pagination?.total || res.data?.count || 0
+        }
       },
-      primaryKey: 'item_id', sortable: true, page_size: 20
+      primaryKey: 'item_id',
+      sortable: true,
+      page_size: 20
     })
     const origInit = table.init
-    table.init = async function () { window.addEventListener('refresh-items', () => this.loadData()); if (origInit) await origInit.call(this) }
+    table.init = async function () {
+      window.addEventListener('refresh-items', () => this.loadData())
+      if (origInit) await origInit.call(this)
+    }
     return table
   })
 
@@ -667,17 +728,33 @@ document.addEventListener('alpine:init', () => {
         { key: 'user_id', label: '用户ID', sortable: true },
         { key: 'nickname', label: '用户', render: (val, row) => row.user?.nickname || val || '-' },
         { key: 'account_type', label: '账户类型' },
-        { key: 'status', label: '状态', type: 'status', statusMap: { active: { class: 'green', label: '正常' }, frozen: { class: 'red', label: '冻结' } } },
+        {
+          key: 'status',
+          label: '状态',
+          type: 'status',
+          statusMap: {
+            active: { class: 'green', label: '正常' },
+            frozen: { class: 'red', label: '冻结' }
+          }
+        },
         { key: 'updated_at', label: '更新时间', type: 'datetime', sortable: true }
       ],
-      dataSource: async (params) => {
+      dataSource: async params => {
         const res = await request({ url: ASSET_ENDPOINTS.SYSTEM_ACCOUNTS, method: 'GET', params })
-        return { items: res.data?.accounts || res.data?.list || [], total: res.data?.pagination?.total || 0 }
+        return {
+          items: res.data?.accounts || res.data?.list || [],
+          total: res.data?.pagination?.total || 0
+        }
       },
-      primaryKey: 'account_id', sortable: true, page_size: 20
+      primaryKey: 'account_id',
+      sortable: true,
+      page_size: 20
     })
     const origInit = table.init
-    table.init = async function () { window.addEventListener('refresh-virtual-accounts', () => this.loadData()); if (origInit) await origInit.call(this) }
+    table.init = async function () {
+      window.addEventListener('refresh-virtual-accounts', () => this.loadData())
+      if (origInit) await origInit.call(this)
+    }
     return table
   })
 
@@ -692,10 +769,10 @@ document.addEventListener('alpine:init', () => {
         // delta_amount：与后端数据库字段名一致（正数=增加，负数=扣减）
         { key: 'delta_amount', label: '变动金额', type: 'number', sortable: true },
         { key: 'balance_after', label: '变动后余额', type: 'number' },
-        { key: 'description', label: '描述', render: (val) => val || '-' },
+        { key: 'description', label: '描述', render: val => val || '-' },
         { key: 'created_at', label: '时间', type: 'datetime', sortable: true }
       ],
-      dataSource: async (params) => {
+      dataSource: async params => {
         // 后端 /console/assets/transactions 要求 user_id 必填
         // 如果有 mobile，先解析为 user_id
         const userId = await resolveUserIdFromParams(params)
@@ -705,13 +782,25 @@ document.addEventListener('alpine:init', () => {
         }
         const queryParams = { ...params, user_id: userId }
         delete queryParams.mobile // 后端不需要 mobile 参数
-        const res = await request({ url: ASSET_ENDPOINTS.TRANSACTIONS, method: 'GET', params: queryParams })
-        return { items: res.data?.transactions || res.data?.list || [], total: res.data?.pagination?.total || 0 }
+        const res = await request({
+          url: ASSET_ENDPOINTS.TRANSACTIONS,
+          method: 'GET',
+          params: queryParams
+        })
+        return {
+          items: res.data?.transactions || res.data?.list || [],
+          total: res.data?.pagination?.total || 0
+        }
       },
-      primaryKey: 'asset_transaction_id', sortable: true, page_size: 20
+      primaryKey: 'asset_transaction_id',
+      sortable: true,
+      page_size: 20
     })
     const origInit = table.init
-    table.init = async function () { window.addEventListener('refresh-virtual-transactions', () => this.loadData()); if (origInit) await origInit.call(this) }
+    table.init = async function () {
+      window.addEventListener('refresh-virtual-transactions', () => this.loadData())
+      if (origInit) await origInit.call(this)
+    }
     return table
   })
 

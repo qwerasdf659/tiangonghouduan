@@ -473,8 +473,9 @@
             </div>
             <div x-show="scan.result?.data" class="space-y-2 text-sm">
               <template x-if="scan.result?.data?.order">
-                <div class="bg-green-50 p-3 rounded">
-                  <p>订单ID：<span class="font-mono" x-text="scan.result.data.order.redemption_order_id"></span></p>
+                <div class="bg-green-50 p-3 rounded space-y-1">
+                  <p>核销单号(RD)：<span class="font-mono text-blue-600 font-semibold" x-text="scan.result.data.order.order_no || '-'"></span></p>
+                  <p>订单ID：<span class="font-mono text-xs" x-text="scan.result.data.order.redemption_order_id"></span></p>
                   <p x-show="scan.result.data.order.item_id">物品ID：<span x-text="scan.result.data.order.item_id"></span></p>
                 </div>
               </template>

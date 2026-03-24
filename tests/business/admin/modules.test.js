@@ -107,7 +107,7 @@ describe('GET /api/v4/console/ - 管理员模块信息API', () => {
 
     // 验证新增的模块（2026-01-21 API覆盖率补齐 P2 只读查询）
     expect(modules).toHaveProperty('lottery_monitoring')
-    expect(modules).toHaveProperty('trade_orders')
+    expect(modules).toHaveProperty('marketplace_orders')
     expect(modules).toHaveProperty('user_premium')
 
     // 验证新增的模块（2026-01-22 API覆盖率补齐 P1 只读查询）

@@ -1068,7 +1068,10 @@ export function useStrategyMethods() {
 
         this.showSuccess(`策略配置已更新: ${config_group}.${config_key}`)
         logger.info('[Strategy] 活动策略配置更新成功', {
-          lottery_campaign_id, config_group, config_key, config_value
+          lottery_campaign_id,
+          config_group,
+          config_key,
+          config_value
         })
       } catch (error) {
         this.showError('更新策略配置失败: ' + (error.message || '未知错误'))

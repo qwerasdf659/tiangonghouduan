@@ -29,9 +29,10 @@ import { useAdjustmentState, useAdjustmentMethods } from '../composables/index.j
 function assetAdjustmentPage() {
   let baseMixin = {}
   try {
-    baseMixin = typeof createCrudMixin === 'function'
-      ? createCrudMixin({ page_size: 20, enableFormValidation: true })
-      : {}
+    baseMixin =
+      typeof createCrudMixin === 'function'
+        ? createCrudMixin({ page_size: 20, enableFormValidation: true })
+        : {}
   } catch (e) {
     logger.error('[AssetAdjustmentPage] createCrudMixin 失败:', e.message)
   }

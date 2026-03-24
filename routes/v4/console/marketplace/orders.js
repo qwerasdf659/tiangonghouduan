@@ -14,7 +14,12 @@ const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const logger = require('../../../../utils/logger').logger
 
-/** @param {Object} req @returns {Object} TradeOrderService */
+/**
+ * 获取 TradeOrderService 实例
+ *
+ * @param {Object} req - Express 请求对象
+ * @returns {Object} TradeOrderService 服务实例
+ */
 function getTradeOrderService(req) {
   return req.app.locals.services.getService('trade_order')
 }
@@ -32,6 +37,7 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
       merchant_id,
       status,
       asset_code,
+      order_no,
       start_time,
       end_time,
       page = 1,
@@ -43,6 +49,7 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
       seller_user_id: seller_user_id ? parseInt(seller_user_id) : undefined,
       market_listing_id: market_listing_id ? parseInt(market_listing_id) : undefined,
       merchant_id: merchant_id ? parseInt(merchant_id) : undefined,
+      order_no: order_no || undefined,
       status,
       asset_code,
       start_time,

@@ -21,7 +21,11 @@
 .empty-state {
   @apply flex flex-col items-center justify-center py-16 px-4 text-center relative;
   animation: fadeIn 0.3s ease-out;
-  background: linear-gradient(180deg, rgba(248,250,252,0.8) 0%, var(--color-bg-muted, #f1f5f9) 100%);
+  background: linear-gradient(
+    180deg,
+    rgba(248, 250, 252, 0.8) 0%,
+    var(--color-bg-muted, #f1f5f9) 100%
+  );
   min-height: 320px;
   border-radius: 0.75rem;
   border: 1px dashed var(--color-border, #d1d5db);

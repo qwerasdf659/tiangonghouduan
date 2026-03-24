@@ -31,7 +31,6 @@ import {
 // 导入提醒规则 API (P2-1)
 import { ReminderRulesAPI } from '../../../api/reminder.js'
 
-
 /**
  * 注册系统设置相关的 Alpine.js 组件
  */
@@ -157,13 +156,20 @@ function registerSystemSettingsComponents() {
      * 回滚操作
      */
     async rollbackOperation(log) {
-      if (!(await $confirmDanger(`确定要回滚此操作吗？\n操作：${log.action_name || log.action}\n目标：${log.target || log.operation_type_name}`))) {
+      if (
+        !(await $confirmDanger(
+          `确定要回滚此操作吗？\n操作：${log.action_name || log.action}\n目标：${log.target || log.operation_type_name}`
+        ))
+      ) {
         return
       }
 
       try {
         this.saving = true
-        const response = await this.apiPost(`${API_PREFIX}/console/operations/${log.id}/rollback`, {})
+        const response = await this.apiPost(
+          `${API_PREFIX}/console/operations/${log.id}/rollback`,
+          {}
+        )
         if (response?.success) {
           this.showSuccess('操作已回滚')
           await this.loadAuditLogs()
@@ -299,8 +305,11 @@ function registerSystemSettingsComponents() {
           if (dateValue.beijing) return dateValue.beijing
           if (dateValue.iso) {
             return new Date(dateValue.iso).toLocaleString('zh-CN', {
-              year: 'numeric', month: '2-digit', day: '2-digit',
-              hour: '2-digit', minute: '2-digit'
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit'
             })
           }
           if (dateValue.relative) return dateValue.relative
@@ -308,8 +317,11 @@ function registerSystemSettingsComponents() {
         const date = new Date(dateValue)
         if (isNaN(date.getTime())) return '-'
         return date.toLocaleString('zh-CN', {
-          year: 'numeric', month: '2-digit', day: '2-digit',
-          hour: '2-digit', minute: '2-digit'
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit'
         })
       } catch {
         return '-'
@@ -325,12 +337,38 @@ function registerSystemSettingsComponents() {
       columns: [
         { key: 'reminder_rule_id', label: '规则ID', sortable: true },
         { key: 'rule_name', label: '规则名称', sortable: true },
-        { key: 'rule_type', label: '规则类型', render: (val, row) => row.rule_type_display || val || '-' },
-        { key: 'notification_priority', label: '优先级', type: 'status', statusMap: { urgent: { class: 'red', label: '紧急' }, high: { class: 'orange', label: '高' }, normal: { class: 'yellow', label: '普通' }, low: { class: 'green', label: '低' } } },
-        { key: 'check_interval_minutes', label: '检查间隔', render: (val) => val ? `${val}分钟` : '-' },
-        { key: 'is_enabled', label: '状态', type: 'status', statusMap: { true: { class: 'green', label: '启用' }, false: { class: 'gray', label: '禁用' } } }
+        {
+          key: 'rule_type',
+          label: '规则类型',
+          render: (val, row) => row.rule_type_display || val || '-'
+        },
+        {
+          key: 'notification_priority',
+          label: '优先级',
+          type: 'status',
+          statusMap: {
+            urgent: { class: 'red', label: '紧急' },
+            high: { class: 'orange', label: '高' },
+            normal: { class: 'yellow', label: '普通' },
+            low: { class: 'green', label: '低' }
+          }
+        },
+        {
+          key: 'check_interval_minutes',
+          label: '检查间隔',
+          render: val => (val ? `${val}分钟` : '-')
+        },
+        {
+          key: 'is_enabled',
+          label: '状态',
+          type: 'status',
+          statusMap: {
+            true: { class: 'green', label: '启用' },
+            false: { class: 'gray', label: '禁用' }
+          }
+        }
       ],
-      dataSource: async (params) => {
+      dataSource: async params => {
         const res = await ReminderRulesAPI.getRules(params)
         return {
           items: res.data?.items || res.data?.rules || [],
@@ -356,14 +394,30 @@ function registerSystemSettingsComponents() {
     const table = dataTable({
       columns: [
         { key: 'id', label: '日志ID', sortable: true },
-        { key: 'operator_name', label: '操作人', render: (val, row) => val || row.admin_name || `管理员#${row.admin_id || '-'}` },
-        { key: 'action', label: '操作', render: (val, row) => row.action_name || row.operation_type_display || val || '-' },
-        { key: 'target', label: '目标', render: (val, row) => val || row.operation_type_name || row.resource_type || '-' },
+        {
+          key: 'operator_name',
+          label: '操作人',
+          render: (val, row) => val || row.admin_name || `管理员#${row.admin_id || '-'}`
+        },
+        {
+          key: 'action',
+          label: '操作',
+          render: (val, row) => row.action_name || row.operation_type_display || val || '-'
+        },
+        {
+          key: 'target',
+          label: '目标',
+          render: (val, row) => val || row.operation_type_name || row.resource_type || '-'
+        },
         { key: 'ip_address', label: 'IP' },
         { key: 'created_at', label: '时间', type: 'datetime', sortable: true }
       ],
-      dataSource: async (params) => {
-        const res = await request({ url: `${API_PREFIX}/console/admin-audit-logs`, method: 'GET', params })
+      dataSource: async params => {
+        const res = await request({
+          url: `${API_PREFIX}/console/admin-audit-logs`,
+          method: 'GET',
+          params
+        })
         return {
           items: res.data?.logs || [],
           total: res.data?.pagination?.total || 0

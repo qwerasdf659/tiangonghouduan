@@ -179,7 +179,7 @@ describe('P3-7: SQL注入安全测试', () => {
   describe('市场接口SQL注入测试', () => {
     test('市场搜索接口应防护SQL注入', async () => {
       for (const payload of sqlInjectionPayloads.slice(0, 5)) {
-        const response = await request(app).get('/api/v4/market/listings').query({
+        const response = await request(app).get('/api/v4/marketplace/listings').query({
           keyword: payload,
           sort: 'price; DROP TABLE market_listings'
         })
@@ -193,7 +193,7 @@ describe('P3-7: SQL注入安全测试', () => {
     })
 
     test('市场过滤参数应防护SQL注入', async () => {
-      const response = await request(app).get('/api/v4/market/listings').query({
+      const response = await request(app).get('/api/v4/marketplace/listings').query({
         min_price: '0 OR 1=1',
         max_price: '999999 UNION SELECT * FROM users',
         asset_code: "' OR '1'='1"

@@ -110,7 +110,7 @@ class DebtManagementService {
         written_off_count: parseInt(inventoryStats?.written_off_count, 10) || 0
       },
       budget_debt: {
-        total_count: parseInt(budgetStats?.total_count, 10) || 0,
+        total: parseInt(budgetStats?.total_count, 10) || 0,
         total_amount: parseInt(budgetStats?.total_amount, 10) || 0,
         cleared_amount: parseInt(budgetStats?.cleared_amount, 10) || 0,
         remaining_amount:

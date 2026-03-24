@@ -9,7 +9,7 @@
  * 3. GET /api/v4/backpack/items/:item_id - 获取物品详情
  * 4. POST /api/v4/backpack/items/:item_id/redeem - 生成核销码
  * 5. POST /api/v4/backpack/items/:item_id/use - 直接使用物品
- * 6. GET /api/v4/backpack/exchange/items - 用户端兑换商品列表
+ * 6. GET /api/v4/exchange/items - 用户端兑换商品列表
  *
  * 相关模型：
  * - Item: 物品实例
@@ -445,15 +445,15 @@ describe('背包API测试 - P2优先级', () => {
   })
 
   // ===== 测试用例8：兑换商品列表（从 /shop 迁移到 /backpack） =====
-  describe('GET /api/v4/backpack/exchange/items - 用户端兑换商品列表', () => {
+  describe('GET /api/v4/exchange/items - 用户端兑换商品列表', () => {
     /*
      * 业务场景：用户浏览兑换市场中的商品
-     * 域迁移说明：从 /shop/exchange/items 迁移到 /backpack/exchange/items
+     * 域迁移说明：从 /backpack/exchange/items 迁移到 /exchange/items
      * 原因：兑换是用户侧操作，不应被商家域准入中间件拦截
      */
     test('应该返回商品列表和分页信息', async () => {
       const response = await request(app)
-        .get('/api/v4/backpack/exchange/items?page=1&page_size=5')
+        .get('/api/v4/exchange/items?page=1&page_size=5')
         .set('Authorization', `Bearer ${user_token}`)
 
       expect(response.status).toBe(200)
@@ -469,7 +469,7 @@ describe('背包API测试 - P2优先级', () => {
 
     test('应该支持分页参数', async () => {
       const response = await request(app)
-        .get('/api/v4/backpack/exchange/items?page=1&page_size=2')
+        .get('/api/v4/exchange/items?page=1&page_size=2')
         .set('Authorization', `Bearer ${user_token}`)
 
       expect(response.status).toBe(200)
@@ -478,7 +478,7 @@ describe('背包API测试 - P2优先级', () => {
 
     test('无效status参数应该返回400', async () => {
       const response = await request(app)
-        .get('/api/v4/backpack/exchange/items?status=invalid')
+        .get('/api/v4/exchange/items?status=invalid')
         .set('Authorization', `Bearer ${user_token}`)
 
       expect(response.status).toBe(400)
@@ -486,7 +486,7 @@ describe('背包API测试 - P2优先级', () => {
     })
 
     test('应该拒绝无token的请求', async () => {
-      const response = await request(app).get('/api/v4/backpack/exchange/items')
+      const response = await request(app).get('/api/v4/exchange/items')
 
       expect(response.status).toBe(401)
     })

@@ -59,7 +59,7 @@ function registerPricingConfigComponents() {
         label: '当前值',
         sortable: true,
         render: (val, row) => {
-          const value = val !== undefined && val !== null ? val : (row.setting_value || '-')
+          const value = val !== undefined && val !== null ? val : row.setting_value || '-'
           return `<span class="font-semibold text-yellow-600">${value}</span>`
         }
       },
@@ -67,7 +67,7 @@ function registerPricingConfigComponents() {
       {
         key: 'updated_at',
         label: '最后更新',
-        render: (val) => {
+        render: val => {
           if (!val) return '-'
           try {
             return new Date(val).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })

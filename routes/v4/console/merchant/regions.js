@@ -175,7 +175,7 @@ router.get('/children/:parent_code', async (req, res) => {
  */
 router.get('/search', async (req, res) => {
   try {
-    const { keyword, level, limit } = req.query
+    const { keyword, level, page_size } = req.query
 
     if (!keyword || keyword.trim().length < 2) {
       return res.apiError('搜索关键词至少需要2个字符', 'INVALID_PARAMS', null, 400)
@@ -185,8 +185,8 @@ router.get('/search', async (req, res) => {
     if (level) {
       options.level = parseInt(level, 10)
     }
-    if (limit) {
-      options.limit = parseInt(limit, 10)
+    if (page_size) {
+      options.limit = parseInt(page_size, 10)
     }
 
     const regionService = ServiceManager.getService('region')

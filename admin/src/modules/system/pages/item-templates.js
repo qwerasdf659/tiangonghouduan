@@ -354,7 +354,11 @@ document.addEventListener('alpine:init', () => {
           delete metaCopy.attribute_rules
 
           this.max_edition =
-            t.max_edition != null ? Number(t.max_edition) : metaObj.max_edition != null ? Number(metaObj.max_edition) : null
+            t.max_edition != null
+              ? Number(t.max_edition)
+              : metaObj.max_edition != null
+                ? Number(metaObj.max_edition)
+                : null
           this.attribute_rules = this.normalizeAttributeRules(metaObj.attribute_rules)
 
           this.form = {
@@ -440,7 +444,9 @@ document.addEventListener('alpine:init', () => {
         reference_price_points: this.form.reference_price_points || 0,
         description: this.form.description || null,
         max_edition:
-          this.max_edition != null && this.max_edition !== '' && !Number.isNaN(Number(this.max_edition))
+          this.max_edition != null &&
+          this.max_edition !== '' &&
+          !Number.isNaN(Number(this.max_edition))
             ? Number(this.max_edition)
             : null,
         meta: Object.keys(finalMeta).length > 0 ? finalMeta : null
@@ -563,7 +569,12 @@ document.addEventListener('alpine:init', () => {
           this.form.primary_media_id = res.data.media_id ?? null
           this.image_preview_url = res.data.public_url || res.data.url || null
           this.showSuccess('图片上传成功')
-          logger.info('[ItemTemplates] 图片上传成功:', res.data.object_key || res.data.public_url, 'primary_media_id:', this.form.primary_media_id)
+          logger.info(
+            '[ItemTemplates] 图片上传成功:',
+            res.data.object_key || res.data.public_url,
+            'primary_media_id:',
+            this.form.primary_media_id
+          )
         } else {
           this.showError('上传失败', res.message || '图片上传失败')
         }

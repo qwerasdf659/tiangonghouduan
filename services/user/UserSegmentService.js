@@ -389,11 +389,13 @@ class UserSegmentService {
    * @param {Object} models - Sequelize 模型集合
    * @param {Object} [options] - 查询选项
    * @param {number} [options.days=30] - 统计天数
-   * @param {number} [options.limit=10] - 返回数量
+   * @param {number} [options.page_size=10] - 返回数量
+   * @param {number} [options.limit] - 兼容旧参数名
    * @returns {Promise<Object>} 兑换偏好数据
    */
   static async getExchangePreferences(models, options = {}) {
-    const { days = 30, limit = 10 } = options
+    const { days = 30, page_size, limit: legacyLimit } = options
+    const limit = legacyLimit !== undefined ? legacyLimit : (page_size ?? 10)
     const cacheParams = { type: 'preferences', days, limit }
 
     // 尝试从缓存获取

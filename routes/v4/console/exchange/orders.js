@@ -67,8 +67,9 @@ router.get('/:order_no', authenticateToken, requireRoleLevel(100), async (req, r
     const result = await ExchangeQueryService.getAdminOrderDetail(req.params.order_no)
     return res.apiSuccess({ order: result.order }, '订单详情查询成功')
   } catch (error) {
-    if (error.errorCode === 'ORDER_NOT_FOUND' || error.statusCode === 404)
+    if (error.errorCode === 'ORDER_NOT_FOUND' || error.statusCode === 404) {
       return res.apiError(error.message, 'NOT_FOUND', null, 404)
+    }
     return res.apiError(error.message || '查询订单详情失败', 'INTERNAL_ERROR', null, 500)
   }
 })
@@ -83,9 +84,12 @@ router.get('/:order_no/track', authenticateToken, requireRoleLevel(100), async (
       where: { order_no },
       attributes: ['shipping_company', 'shipping_company_name', 'shipping_no', 'shipped_at']
     })
-    if (!order) return res.apiError('订单不存在', 'NOT_FOUND', null, 404)
-    if (!order.shipping_no)
+    if (!order) {
+      return res.apiError('订单不存在', 'NOT_FOUND', null, 404)
+    }
+    if (!order.shipping_no) {
       return res.apiSuccess({ has_shipping: false, message: '该订单尚未填写快递信息' })
+    }
     const ShippingService = req.app.locals.services.getService('shipping_track')
     const track = await ShippingService.queryTrack(order.shipping_no, order.shipping_company)
     return res.apiSuccess({
@@ -108,8 +112,9 @@ router.post('/:order_no/approve', authenticateToken, requireRoleLevel(100), asyn
     const ExchangeCoreService = req.app.locals.services.getService('exchange_core')
     const { order_no } = req.params
     const { remark = '' } = req.body
-    if (!order_no || order_no.trim().length === 0)
+    if (!order_no || order_no.trim().length === 0) {
       return res.apiError('订单号不能为空', 'BAD_REQUEST', null, 400)
+    }
     const result = await TransactionManager.execute(async transaction => {
       return await ExchangeCoreService.updateOrderStatus(
         order_no,
@@ -122,8 +127,12 @@ router.post('/:order_no/approve', authenticateToken, requireRoleLevel(100), asyn
     logger.info('[B2C兑换-订单] 审核通过', { operator_id: req.user.user_id, order_no })
     return res.apiSuccess(result.order, '订单审核通过')
   } catch (error) {
-    if (error.statusCode === 404) return res.apiError(error.message, 'NOT_FOUND', null, 404)
-    if (error.statusCode === 400) return res.apiError(error.message, 'BAD_REQUEST', error.data, 400)
+    if (error.statusCode === 404) {
+      return res.apiError(error.message, 'NOT_FOUND', null, 404)
+    }
+    if (error.statusCode === 400) {
+      return res.apiError(error.message, 'BAD_REQUEST', error.data, 400)
+    }
     return res.apiError(error.message || '审核失败', 'INTERNAL_ERROR', null, 500)
   }
 })
@@ -134,8 +143,9 @@ router.post('/:order_no/ship', authenticateToken, requireRoleLevel(100), async (
     const ExchangeCoreService = req.app.locals.services.getService('exchange_core')
     const { order_no } = req.params
     const { remark = '', shipping_company, shipping_company_name, shipping_no } = req.body
-    if (!order_no || order_no.trim().length === 0)
+    if (!order_no || order_no.trim().length === 0) {
       return res.apiError('订单号不能为空', 'BAD_REQUEST', null, 400)
+    }
     const result = await TransactionManager.execute(async transaction => {
       const updateResult = await ExchangeCoreService.updateOrderStatus(
         order_no,
@@ -166,8 +176,12 @@ router.post('/:order_no/ship', authenticateToken, requireRoleLevel(100), async (
     })
     return res.apiSuccess(result.order, result.message)
   } catch (error) {
-    if (error.statusCode === 404) return res.apiError(error.message, 'NOT_FOUND', null, 404)
-    if (error.statusCode === 400) return res.apiError(error.message, 'BAD_REQUEST', error.data, 400)
+    if (error.statusCode === 404) {
+      return res.apiError(error.message, 'NOT_FOUND', null, 404)
+    }
+    if (error.statusCode === 400) {
+      return res.apiError(error.message, 'BAD_REQUEST', error.data, 400)
+    }
     return res.apiError(error.message || '发货失败', 'INTERNAL_ERROR', null, 500)
   }
 })
@@ -178,8 +192,9 @@ router.post('/:order_no/refund', authenticateToken, requireRoleLevel(100), async
     const ExchangeCoreService = req.app.locals.services.getService('exchange_core')
     const { order_no } = req.params
     const { remark = '' } = req.body
-    if (!order_no || order_no.trim().length === 0)
+    if (!order_no || order_no.trim().length === 0) {
       return res.apiError('订单号不能为空', 'BAD_REQUEST', null, 400)
+    }
     const result = await TransactionManager.execute(async transaction => {
       return await ExchangeCoreService.refundOrder(order_no, req.user.user_id, remark, {
         transaction
@@ -187,8 +202,12 @@ router.post('/:order_no/refund', authenticateToken, requireRoleLevel(100), async
     })
     return res.apiSuccess(result.order, result.message)
   } catch (error) {
-    if (error.statusCode === 404) return res.apiError(error.message, 'NOT_FOUND', null, 404)
-    if (error.statusCode === 400) return res.apiError(error.message, 'BAD_REQUEST', error.data, 400)
+    if (error.statusCode === 404) {
+      return res.apiError(error.message, 'NOT_FOUND', null, 404)
+    }
+    if (error.statusCode === 400) {
+      return res.apiError(error.message, 'BAD_REQUEST', error.data, 400)
+    }
     return res.apiError(error.message || '退款失败', 'INTERNAL_ERROR', null, 500)
   }
 })
@@ -199,8 +218,9 @@ router.post('/:order_no/reject', authenticateToken, requireRoleLevel(100), async
     const ExchangeCoreService = req.app.locals.services.getService('exchange_core')
     const { order_no } = req.params
     const { remark = '' } = req.body
-    if (!order_no || order_no.trim().length === 0)
+    if (!order_no || order_no.trim().length === 0) {
       return res.apiError('订单号不能为空', 'BAD_REQUEST', null, 400)
+    }
     const result = await TransactionManager.execute(async transaction => {
       return await ExchangeCoreService.rejectOrder(order_no, req.user.user_id, remark, {
         transaction
@@ -208,8 +228,12 @@ router.post('/:order_no/reject', authenticateToken, requireRoleLevel(100), async
     })
     return res.apiSuccess(result.order, result.message)
   } catch (error) {
-    if (error.statusCode === 404) return res.apiError(error.message, 'NOT_FOUND', null, 404)
-    if (error.statusCode === 400) return res.apiError(error.message, 'BAD_REQUEST', error.data, 400)
+    if (error.statusCode === 404) {
+      return res.apiError(error.message, 'NOT_FOUND', null, 404)
+    }
+    if (error.statusCode === 400) {
+      return res.apiError(error.message, 'BAD_REQUEST', error.data, 400)
+    }
     return res.apiError(error.message || '拒绝失败', 'INTERNAL_ERROR', null, 500)
   }
 })
@@ -220,8 +244,9 @@ router.post('/:order_no/complete', authenticateToken, requireRoleLevel(100), asy
     const ExchangeCoreService = req.app.locals.services.getService('exchange_core')
     const { order_no } = req.params
     const { remark = '' } = req.body
-    if (!order_no || order_no.trim().length === 0)
+    if (!order_no || order_no.trim().length === 0) {
       return res.apiError('订单号不能为空', 'BAD_REQUEST', null, 400)
+    }
     const result = await TransactionManager.execute(async transaction => {
       return await ExchangeCoreService.updateOrderStatus(
         order_no,
@@ -233,8 +258,12 @@ router.post('/:order_no/complete', authenticateToken, requireRoleLevel(100), asy
     })
     return res.apiSuccess(result.order, '订单已完成')
   } catch (error) {
-    if (error.statusCode === 404) return res.apiError(error.message, 'NOT_FOUND', null, 404)
-    if (error.statusCode === 400) return res.apiError(error.message, 'BAD_REQUEST', error.data, 400)
+    if (error.statusCode === 404) {
+      return res.apiError(error.message, 'NOT_FOUND', null, 404)
+    }
+    if (error.statusCode === 400) {
+      return res.apiError(error.message, 'BAD_REQUEST', error.data, 400)
+    }
     return res.apiError(error.message || '完成订单失败', 'INTERNAL_ERROR', null, 500)
   }
 })

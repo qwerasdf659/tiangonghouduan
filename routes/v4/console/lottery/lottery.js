@@ -135,18 +135,18 @@ router.get('/prize-distribution', authenticateToken, requireRoleLevel(100), asyn
  *
  * @query {string} [range=7d] - 统计时间范围（7d/30d/90d）
  * @query {string} [sort_by=draws] - 排序字段（draws/wins）
- * @query {number} [limit=10] - 返回数量
+ * @query {number} [page_size=10] - 返回数量
  * @query {number} [merchant_id] - 按商家筛选（可选）
  */
 router.get('/campaign-ranking', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const { range = '7d', sort_by = 'draws', limit = 10, merchant_id } = req.query
+    const { range = '7d', sort_by = 'draws', page_size = 10, merchant_id } = req.query
 
     logger.info('[抽奖分析] 获取活动排行数据', {
       admin_id: req.user.user_id,
       range,
       sort_by,
-      limit,
+      page_size,
       merchant_id: merchant_id || null
     })
 
@@ -155,7 +155,7 @@ router.get('/campaign-ranking', authenticateToken, requireRoleLevel(100), async 
     const result = await LotteryAnalyticsQueryService.getDashboardCampaignRanking({
       range,
       sort_by,
-      limit: parseInt(limit),
+      page_size: parseInt(page_size),
       merchant_id: merchant_id ? parseInt(merchant_id) : undefined
     })
 

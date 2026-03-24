@@ -23,7 +23,7 @@
  * - 统一使用 res.apiSuccess / res.apiError 响应
  * - 管理员权限要求：role_level >= 100
  *
- * @module routes/v4/console/market/bid-management
+ * @module routes/v4/console/bids/management
  * @created 2026-02-16（臻选空间/幸运空间/竞价功能 Phase 3 §7 步骤 3.7）
  */
 

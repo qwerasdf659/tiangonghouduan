@@ -809,13 +809,14 @@ class StrategySimulationService {
    * 获取策略配置的变更历史
    *
    * @param {number} lottery_campaign_id - 活动ID
-   * @param {Object} options - { limit, offset }
+   * @param {Object} options - { page_size, offset }（兼容 limit）
    * @returns {Promise<Object>} { records, total }
    */
   async getConfigVersionHistory(lottery_campaign_id, options = {}) {
     const { AdminOperationLog } = this.models
     const { OPERATION_TYPES } = require('../../constants/AuditOperationTypes')
-    const { limit = 50, offset = 0 } = options
+    const page_size = options.page_size ?? options.limit ?? 50
+    const { offset = 0 } = options
 
     const relevantTypes = [
       OPERATION_TYPES.STRATEGY_CONFIG_UPDATE,
@@ -837,7 +838,7 @@ class StrategySimulationService {
         ]
       },
       order: [['created_at', 'DESC']],
-      limit: Math.min(Number(limit), 50),
+      limit: Math.min(Number(page_size), 50),
       offset: Number(offset)
     })
 
@@ -2295,7 +2296,7 @@ class StrategySimulationService {
    *
    * @param {number} lottery_campaign_id - 活动ID
    * @param {Object} options - 查询选项
-   * @param {number} options.limit - 返回条数
+   * @param {number} options.page_size - 返回条数（兼容 options.limit）
    * @param {number} options.offset - 偏移量
    * @returns {Promise<{rows: Object[], count: number}>} 分页历史列表
    */

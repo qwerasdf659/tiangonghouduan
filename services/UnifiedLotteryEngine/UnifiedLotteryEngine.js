@@ -1053,7 +1053,7 @@ class UnifiedLotteryEngine {
        */
       const batch_id =
         draw_count > 1
-          ? `batch_${user_id}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
+          ? `batch_${user_id}_${Date.now()}_${require('crypto').randomBytes(3).toString('hex')}`
           : null // 单抽不需要 batch_id
 
       // 步骤2：执行多次抽奖（不再重复扣除积分）

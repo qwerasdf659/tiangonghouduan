@@ -99,7 +99,13 @@ function auditLogsPage() {
         key: 'operation_type',
         label: '操作类型',
         type: 'badge',
-        badgeMap: { create: 'green', update: 'blue', delete: 'red', login: 'purple', logout: 'gray' },
+        badgeMap: {
+          create: 'green',
+          update: 'blue',
+          delete: 'red',
+          login: 'purple',
+          logout: 'gray'
+        },
         labelMap: { create: '创建', update: '更新', delete: '删除', login: '登录', logout: '登出' }
       },
       {
@@ -118,9 +124,7 @@ function auditLogsPage() {
         label: '操作',
         type: 'actions',
         width: '100px',
-        actions: [
-          { name: 'detail', label: '查看详情', class: 'text-blue-600 hover:text-blue-800' }
-        ]
+        actions: [{ name: 'detail', label: '查看详情', class: 'text-blue-600 hover:text-blue-800' }]
       }
     ],
 
@@ -243,10 +247,7 @@ function auditLogsPage() {
       this.chartsLoading = true
       try {
         // 并行加载趋势数据和目标类型数据
-        await Promise.all([
-          this.loadTrendStats(),
-          this.loadTargetTypeStats()
-        ])
+        await Promise.all([this.loadTrendStats(), this.loadTargetTypeStats()])
         // 初始化图表
         await this.initCharts()
       } catch (error) {
@@ -373,7 +374,7 @@ function auditLogsPage() {
         },
         tooltip: {
           trigger: 'axis',
-          formatter: (params) => {
+          formatter: params => {
             const data = params[0]
             const item = this.trendStats.items[data.dataIndex]
             return `${item.date} (${item.day_of_week})<br/>操作数: <b>${item.count}</b>`
@@ -390,7 +391,7 @@ function auditLogsPage() {
           boundaryGap: false,
           data: dates,
           axisLabel: {
-            formatter: (value) => {
+            formatter: value => {
               // 只显示月-日
               return value.substring(5)
             }
@@ -400,40 +401,43 @@ function auditLogsPage() {
           type: 'value',
           minInterval: 1
         },
-        series: [{
-          name: '操作数',
-          type: 'line',
-          smooth: true,
-          data: counts,
-          areaStyle: {
-            color: {
-              type: 'linear',
-              x: 0, y: 0, x2: 0, y2: 1,
-              colorStops: [
-                { offset: 0, color: 'rgba(59, 130, 246, 0.3)' },
-                { offset: 1, color: 'rgba(59, 130, 246, 0.05)' }
+        series: [
+          {
+            name: '操作数',
+            type: 'line',
+            smooth: true,
+            data: counts,
+            areaStyle: {
+              color: {
+                type: 'linear',
+                x: 0,
+                y: 0,
+                x2: 0,
+                y2: 1,
+                colorStops: [
+                  { offset: 0, color: 'rgba(59, 130, 246, 0.3)' },
+                  { offset: 1, color: 'rgba(59, 130, 246, 0.05)' }
+                ]
+              }
+            },
+            lineStyle: {
+              color: '#3b82f6',
+              width: 2
+            },
+            itemStyle: {
+              color: '#3b82f6'
+            },
+            markPoint: {
+              data: [
+                { type: 'max', name: '最大值' },
+                { type: 'min', name: '最小值' }
               ]
+            },
+            markLine: {
+              data: [{ type: 'average', name: '平均值' }]
             }
-          },
-          lineStyle: {
-            color: '#3b82f6',
-            width: 2
-          },
-          itemStyle: {
-            color: '#3b82f6'
-          },
-          markPoint: {
-            data: [
-              { type: 'max', name: '最大值' },
-              { type: 'min', name: '最小值' }
-            ]
-          },
-          markLine: {
-            data: [
-              { type: 'average', name: '平均值' }
-            ]
           }
-        }]
+        ]
       }
 
       this.trendChart.setOption(option)
@@ -466,7 +470,7 @@ function auditLogsPage() {
         },
         tooltip: {
           trigger: 'item',
-          formatter: (params) => {
+          formatter: params => {
             return `${params.name}<br/>数量: <b>${params.value}</b> (${params.data.percentage}%)`
           }
         },
@@ -475,34 +479,36 @@ function auditLogsPage() {
           left: 'left',
           top: 'middle'
         },
-        series: [{
-          name: '目标类型',
-          type: 'pie',
-          radius: ['40%', '70%'],
-          center: ['60%', '55%'],
-          avoidLabelOverlap: false,
-          itemStyle: {
-            borderRadius: 6,
-            borderColor: '#fff',
-            borderWidth: 2
-          },
-          label: {
-            show: false,
-            position: 'center'
-          },
-          emphasis: {
+        series: [
+          {
+            name: '目标类型',
+            type: 'pie',
+            radius: ['40%', '70%'],
+            center: ['60%', '55%'],
+            avoidLabelOverlap: false,
+            itemStyle: {
+              borderRadius: 6,
+              borderColor: '#fff',
+              borderWidth: 2
+            },
             label: {
-              show: true,
-              fontSize: 16,
-              fontWeight: 'bold',
-              formatter: '{b}\n{c}'
-            }
-          },
-          labelLine: {
-            show: false
-          },
-          data: pieData
-        }]
+              show: false,
+              position: 'center'
+            },
+            emphasis: {
+              label: {
+                show: true,
+                fontSize: 16,
+                fontWeight: 'bold',
+                formatter: '{b}\n{c}'
+              }
+            },
+            labelLine: {
+              show: false
+            },
+            data: pieData
+          }
+        ]
       }
 
       this.targetTypeChart.setOption(option)
@@ -546,7 +552,7 @@ function auditLogsPage() {
 
         if (response?.success && response.data) {
           this.reportData = response.data
-          logger.info('[AuditLogs] 审计报告加载成功', { 
+          logger.info('[AuditLogs] 审计报告加载成功', {
             summary: this.reportData.summary,
             by_risk_level: this.reportData.by_risk_level,
             by_operator: this.reportData.by_operator
@@ -696,29 +702,31 @@ function auditLogsPage() {
           top: 'center',
           type: 'scroll'
         },
-        series: [{
-          name: '操作类型',
-          type: 'pie',
-          radius: ['40%', '70%'],
-          center: ['60%', '50%'],
-          avoidLabelOverlap: false,
-          itemStyle: {
-            borderRadius: 6,
-            borderColor: '#fff',
-            borderWidth: 2
-          },
-          label: { show: false, position: 'center' },
-          emphasis: {
-            label: {
-              show: true,
-              fontSize: 14,
-              fontWeight: 'bold',
-              formatter: '{b}\n{c}'
-            }
-          },
-          labelLine: { show: false },
-          data: pieData
-        }]
+        series: [
+          {
+            name: '操作类型',
+            type: 'pie',
+            radius: ['40%', '70%'],
+            center: ['60%', '50%'],
+            avoidLabelOverlap: false,
+            itemStyle: {
+              borderRadius: 6,
+              borderColor: '#fff',
+              borderWidth: 2
+            },
+            label: { show: false, position: 'center' },
+            emphasis: {
+              label: {
+                show: true,
+                fontSize: 14,
+                fontWeight: 'bold',
+                formatter: '{b}\n{c}'
+              }
+            },
+            labelLine: { show: false },
+            data: pieData
+          }
+        ]
       }
 
       this.reportOperationChart.setOption(option)
@@ -748,29 +756,31 @@ function auditLogsPage() {
           top: 'center',
           type: 'scroll'
         },
-        series: [{
-          name: '目标类型',
-          type: 'pie',
-          radius: ['40%', '70%'],
-          center: ['60%', '50%'],
-          avoidLabelOverlap: false,
-          itemStyle: {
-            borderRadius: 6,
-            borderColor: '#fff',
-            borderWidth: 2
-          },
-          label: { show: false, position: 'center' },
-          emphasis: {
-            label: {
-              show: true,
-              fontSize: 14,
-              fontWeight: 'bold',
-              formatter: '{b}\n{c}'
-            }
-          },
-          labelLine: { show: false },
-          data: pieData
-        }]
+        series: [
+          {
+            name: '目标类型',
+            type: 'pie',
+            radius: ['40%', '70%'],
+            center: ['60%', '50%'],
+            avoidLabelOverlap: false,
+            itemStyle: {
+              borderRadius: 6,
+              borderColor: '#fff',
+              borderWidth: 2
+            },
+            label: { show: false, position: 'center' },
+            emphasis: {
+              label: {
+                show: true,
+                fontSize: 14,
+                fontWeight: 'bold',
+                formatter: '{b}\n{c}'
+              }
+            },
+            labelLine: { show: false },
+            data: pieData
+          }
+        ]
       }
 
       this.reportTargetChart.setOption(option)
@@ -790,7 +800,7 @@ function auditLogsPage() {
       const option = {
         tooltip: {
           trigger: 'axis',
-          formatter: (params) => {
+          formatter: params => {
             const data = params[0]
             return `${data.name}<br/>操作数: <b>${data.value}</b>`
           }
@@ -806,40 +816,45 @@ function auditLogsPage() {
           boundaryGap: false,
           data: dates,
           axisLabel: {
-            formatter: (value) => value.substring(5) // 只显示月-日
+            formatter: value => value.substring(5) // 只显示月-日
           }
         },
         yAxis: {
           type: 'value',
           minInterval: 1
         },
-        series: [{
-          name: '操作数',
-          type: 'line',
-          smooth: true,
-          data: counts,
-          areaStyle: {
-            color: {
-              type: 'linear',
-              x: 0, y: 0, x2: 0, y2: 1,
-              colorStops: [
-                { offset: 0, color: 'rgba(59, 130, 246, 0.3)' },
-                { offset: 1, color: 'rgba(59, 130, 246, 0.05)' }
+        series: [
+          {
+            name: '操作数',
+            type: 'line',
+            smooth: true,
+            data: counts,
+            areaStyle: {
+              color: {
+                type: 'linear',
+                x: 0,
+                y: 0,
+                x2: 0,
+                y2: 1,
+                colorStops: [
+                  { offset: 0, color: 'rgba(59, 130, 246, 0.3)' },
+                  { offset: 1, color: 'rgba(59, 130, 246, 0.05)' }
+                ]
+              }
+            },
+            lineStyle: { color: '#3b82f6', width: 2 },
+            itemStyle: { color: '#3b82f6' },
+            markPoint: {
+              data: [
+                { type: 'max', name: '最大值' },
+                { type: 'min', name: '最小值' }
               ]
+            },
+            markLine: {
+              data: [{ type: 'average', name: '平均值' }]
             }
-          },
-          lineStyle: { color: '#3b82f6', width: 2 },
-          itemStyle: { color: '#3b82f6' },
-          markPoint: {
-            data: [
-              { type: 'max', name: '最大值' },
-              { type: 'min', name: '最小值' }
-            ]
-          },
-          markLine: {
-            data: [{ type: 'average', name: '平均值' }]
           }
-        }]
+        ]
       }
 
       this.reportTrendChart.setOption(option)
@@ -856,9 +871,9 @@ function auditLogsPage() {
 
       // 风险级别颜色映射
       const riskColors = {
-        high: '#ef4444',    // 红色 - 高风险
-        medium: '#f59e0b',  // 黄色 - 中风险
-        low: '#22c55e'      // 绿色 - 低风险
+        high: '#ef4444', // 红色 - 高风险
+        medium: '#f59e0b', // 黄色 - 中风险
+        low: '#22c55e' // 绿色 - 低风险
       }
 
       // 风险级别中文映射
@@ -885,29 +900,31 @@ function auditLogsPage() {
           top: 'center',
           type: 'scroll'
         },
-        series: [{
-          name: '风险级别',
-          type: 'pie',
-          radius: ['40%', '70%'],
-          center: ['60%', '50%'],
-          avoidLabelOverlap: false,
-          itemStyle: {
-            borderRadius: 6,
-            borderColor: '#fff',
-            borderWidth: 2
-          },
-          label: { show: false, position: 'center' },
-          emphasis: {
-            label: {
-              show: true,
-              fontSize: 14,
-              fontWeight: 'bold',
-              formatter: '{b}\n{c}'
-            }
-          },
-          labelLine: { show: false },
-          data: pieData
-        }]
+        series: [
+          {
+            name: '风险级别',
+            type: 'pie',
+            radius: ['40%', '70%'],
+            center: ['60%', '50%'],
+            avoidLabelOverlap: false,
+            itemStyle: {
+              borderRadius: 6,
+              borderColor: '#fff',
+              borderWidth: 2
+            },
+            label: { show: false, position: 'center' },
+            emphasis: {
+              label: {
+                show: true,
+                fontSize: 14,
+                fontWeight: 'bold',
+                formatter: '{b}\n{c}'
+              }
+            },
+            labelLine: { show: false },
+            data: pieData
+          }
+        ]
       }
 
       this.reportRiskLevelChart.setOption(option)
@@ -931,7 +948,8 @@ function auditLogsPage() {
         params.append('page', this.logPage)
         params.append('page_size', this.logPageSize)
         if (this.logFilters.operator_id) params.append('operator_id', this.logFilters.operator_id)
-        if (this.logFilters.operation_type) params.append('operation_type', this.logFilters.operation_type)
+        if (this.logFilters.operation_type)
+          params.append('operation_type', this.logFilters.operation_type)
         if (this.logFilters.target_type) params.append('target_type', this.logFilters.target_type)
         if (this.logFilters.start_date) params.append('start_date', this.logFilters.start_date)
         if (this.logFilters.end_date) params.append('end_date', this.logFilters.end_date)
@@ -945,7 +963,7 @@ function auditLogsPage() {
         if (response?.success) {
           this.auditLogs = response.data?.logs || []
           logger.debug('[AuditLogs] 加载到日志数量:', this.auditLogs.length)
-          
+
           this.logPagination.total = response.data?.pagination?.total || 0
           this.logPagination.total_pages = response.data?.pagination?.total_pages || 1
         }
@@ -1005,7 +1023,7 @@ function auditLogsPage() {
     resetLogFilters() {
       const today = new Date()
       const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)
-      
+
       this.logFilters = {
         operator_id: '',
         action: '',
@@ -1032,7 +1050,8 @@ function auditLogsPage() {
     exportAuditLogs() {
       const params = new URLSearchParams()
       if (this.logFilters.operator_id) params.append('operator_id', this.logFilters.operator_id)
-      if (this.logFilters.operation_type) params.append('operation_type', this.logFilters.operation_type)
+      if (this.logFilters.operation_type)
+        params.append('operation_type', this.logFilters.operation_type)
       if (this.logFilters.target_type) params.append('target_type', this.logFilters.target_type)
       if (this.logFilters.start_date) params.append('start_date', this.logFilters.start_date)
       if (this.logFilters.end_date) params.append('end_date', this.logFilters.end_date)
@@ -1040,7 +1059,7 @@ function auditLogsPage() {
 
       const exportUrl = `${API_PREFIX}/console/admin-audit-logs/export?${params.toString()}`
       window.open(exportUrl, '_blank')
-      
+
       this.showSuccess('正在导出审计日志...')
       logger.info('[AuditLogs] 导出审计日志')
     },
@@ -1154,4 +1173,3 @@ document.addEventListener('alpine:init', () => {
 
 export { auditLogsPage }
 export default auditLogsPage
-

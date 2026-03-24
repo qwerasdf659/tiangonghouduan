@@ -138,7 +138,7 @@ export function asyncDataMixin() {
     error: null,
 
     // ========== P1-19: 网络超时分阶段提示状态 ==========
-    /** 
+    /**
      * 加载阶段：
      * - 'normal': 正常加载 (0-5秒)
      * - 'slow': 加载较慢 (5-15秒)
@@ -158,7 +158,7 @@ export function asyncDataMixin() {
 
     /** 超时阈值配置（毫秒） */
     loadingPhaseThresholds: {
-      slow: 5000,    // 5秒后显示"加载较慢"
+      slow: 5000, // 5秒后显示"加载较慢"
       timeout: 15000 // 15秒后显示"请求超时"
     },
 
@@ -173,11 +173,11 @@ export function asyncDataMixin() {
     _startLoadingPhaseTracking() {
       // 清除之前的定时器
       this._clearLoadingPhaseTimers()
-      
+
       // 设置开始时间
       this._loadingStartTime = Date.now()
       this.loadingPhase = 'normal'
-      
+
       // 设置"加载较慢"阶段定时器 (5秒)
       const slowTimer = setTimeout(() => {
         if (this.loading || this.globalLoading) {
@@ -186,7 +186,7 @@ export function asyncDataMixin() {
         }
       }, this.loadingPhaseThresholds.slow)
       this._loadingPhaseTimers.push(slowTimer)
-      
+
       // 设置"请求超时"阶段定时器 (15秒)
       const timeoutTimer = setTimeout(() => {
         if (this.loading || this.globalLoading) {
@@ -298,10 +298,10 @@ export function asyncDataMixin() {
       const loadingKey = global ? 'globalLoading' : 'loading'
       this[loadingKey] = true
       this.error = null
-      
+
       // P1-19: 保存请求函数用于重试
       this._lastFailedRequest = () => this.withLoading(asyncFn, options)
-      
+
       // P1-19: 开始跟踪加载阶段
       if (trackPhase) {
         this._startLoadingPhaseTracking()
@@ -313,7 +313,7 @@ export function asyncDataMixin() {
         if (showSuccess) {
           this.showSuccess(successMessage)
         }
-        
+
         // P1-19: 成功后清除重试函数
         this._lastFailedRequest = null
 
@@ -329,7 +329,7 @@ export function asyncDataMixin() {
         return { success: false, error }
       } finally {
         this[loadingKey] = false
-        
+
         // P1-19: 停止跟踪加载阶段
         if (trackPhase) {
           this._stopLoadingPhaseTracking()

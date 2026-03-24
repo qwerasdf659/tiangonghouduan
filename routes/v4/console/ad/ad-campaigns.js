@@ -39,7 +39,7 @@ const TransactionManager = require('../../../../utils/TransactionManager')
  * @query {number} [ad_slot_id] - 广告位ID筛选
  * @query {number} [advertiser_user_id] - 广告主用户ID筛选
  * @query {number} [page=1] - 页码
- * @query {number} [limit=20] - 每页数量
+ * @query {number} [page_size=20] - 每页数量
  */
 router.get(
   '/',
@@ -53,11 +53,11 @@ router.get(
         advertiser_user_id = null,
         campaign_category = null,
         page = 1,
-        limit = 20
+        page_size = 20
       } = req.query
 
       const pageNum = parseInt(page) || 1
-      const pageSize = parseInt(limit) || 20
+      const pageSize = parseInt(page_size) || 20
 
       if (campaign_category && !VALID_CAMPAIGN_CATEGORIES.includes(campaign_category)) {
         return res.apiBadRequest(
@@ -82,7 +82,7 @@ router.get(
           pagination: {
             total: result.total,
             page: result.page,
-            limit: pageSize,
+            page_size: pageSize,
             total_pages: Math.ceil(result.total / pageSize)
           }
         },
@@ -564,14 +564,14 @@ router.put(
  * @query {number} [ad_campaign_id] - 广告活动ID筛选
  * @query {string} [is_winner] - 是否胜出（true/false）
  * @query {number} [page=1] - 页码
- * @query {number} [limit=20] - 每页数量
+ * @query {number} [page_size=20] - 每页数量
  */
 router.get(
   '/bid-logs',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
     try {
-      const { ad_slot_id, ad_campaign_id, is_winner, page = 1, limit = 20 } = req.query
+      const { ad_slot_id, ad_campaign_id, is_winner, page = 1, page_size = 20 } = req.query
 
       const AdCampaignQueryService = req.app.locals.services.getService('ad_campaign_query')
       const result = await AdCampaignQueryService.getBidLogs({
@@ -579,7 +579,7 @@ router.get(
         ad_campaign_id,
         is_winner,
         page: parseInt(page),
-        pageSize: parseInt(limit)
+        pageSize: parseInt(page_size)
       })
 
       return res.apiSuccess(result)
@@ -598,21 +598,21 @@ router.get(
  * @query {number} [user_id] - 用户ID筛选
  * @query {string} [tag_key] - 标签键筛选
  * @query {number} [page=1] - 页码
- * @query {number} [limit=50] - 每页数量
+ * @query {number} [page_size=50] - 每页数量
  */
 router.get(
   '/user-ad-tags',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
     try {
-      const { user_id, tag_key, page = 1, limit = 50 } = req.query
+      const { user_id, tag_key, page = 1, page_size = 50 } = req.query
 
       const AdCampaignQueryService = req.app.locals.services.getService('ad_campaign_query')
       const result = await AdCampaignQueryService.getUserAdTags({
         user_id,
         tag_key,
         page: parseInt(page),
-        pageSize: parseInt(limit)
+        pageSize: parseInt(page_size)
       })
 
       return res.apiSuccess(result)
@@ -632,14 +632,14 @@ router.get(
  * @query {string} [verdict] - 判定结果筛选（valid/invalid/suspicious）
  * @query {string} [event_type] - 事件类型（impression/click）
  * @query {number} [page=1] - 页码
- * @query {number} [limit=20] - 每页数量
+ * @query {number} [page_size=20] - 每页数量
  */
 router.get(
   '/antifraud-logs',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
     try {
-      const { ad_campaign_id, verdict, event_type, page = 1, limit = 20 } = req.query
+      const { ad_campaign_id, verdict, event_type, page = 1, page_size = 20 } = req.query
 
       const AdCampaignQueryService = req.app.locals.services.getService('ad_campaign_query')
       const result = await AdCampaignQueryService.getAntifraudLogs({
@@ -647,7 +647,7 @@ router.get(
         verdict,
         event_type,
         page: parseInt(page),
-        pageSize: parseInt(limit)
+        pageSize: parseInt(page_size)
       })
 
       return res.apiSuccess(result)
@@ -666,21 +666,21 @@ router.get(
  * @query {number} [ad_campaign_id] - 广告活动ID筛选
  * @query {string} [conversion_type] - 转化类型（lottery_draw/exchange/market_buy/page_view）
  * @query {number} [page=1] - 页码
- * @query {number} [limit=20] - 每页数量
+ * @query {number} [page_size=20] - 每页数量
  */
 router.get(
   '/attribution-logs',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
     try {
-      const { ad_campaign_id, conversion_type, page = 1, limit = 20 } = req.query
+      const { ad_campaign_id, conversion_type, page = 1, page_size = 20 } = req.query
 
       const AdCampaignQueryService = req.app.locals.services.getService('ad_campaign_query')
       const result = await AdCampaignQueryService.getAttributionLogs({
         ad_campaign_id,
         conversion_type,
         page: parseInt(page),
-        pageSize: parseInt(limit)
+        pageSize: parseInt(page_size)
       })
 
       return res.apiSuccess(result)

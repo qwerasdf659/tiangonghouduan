@@ -627,8 +627,6 @@ models.AlertSilenceRule = require('./AlertSilenceRule')(sequelize, DataTypes)
  *    - 业务场景：节假日静默、夜间静默、测试环境静默
  */
 
-/* 审计日志统一使用 admin_operation_logs */
-
 models.WebSocketStartupLog = require('./WebSocketStartupLog')(sequelize, DataTypes)
 /*
  * ✅ WebSocketStartupLog：WebSocket服务启动日志

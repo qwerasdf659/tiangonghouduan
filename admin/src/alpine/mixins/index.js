@@ -36,7 +36,6 @@ import { formValidationMixin } from './form-validation.js'
 import { authGuardMixin } from './auth-guard.js'
 import { drillDownMixin } from './drill-down.js'
 import { userResolverMixin } from './user-resolver.js'
-import { useSortable } from './sortable.js'
 
 // 导入统一的日期格式化函数（北京时间）
 import {

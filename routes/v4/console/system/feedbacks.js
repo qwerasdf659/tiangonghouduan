@@ -29,7 +29,13 @@ router.get(
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
     try {
-      const { status = null, category = null, priority = null, limit = 20, offset = 0 } = req.query
+      const {
+        status = null,
+        category = null,
+        priority = null,
+        page_size = 20,
+        offset = 0
+      } = req.query
 
       // 获取反馈服务
       const FeedbackService = req.app.locals.services.getService('feedback')
@@ -39,7 +45,7 @@ router.get(
         status,
         category,
         priority,
-        limit,
+        page_size,
         offset
       })
 

@@ -191,7 +191,7 @@ router.get('/stats', authenticateToken, requireRoleLevel(100), async (req, res) 
  * 查询参数:
  * - start_time: 开始时间
  * - end_time: 结束时间
- * - limit: 返回数量（默认10）
+ * - page_size: 返回数量（默认10）
  */
 router.get('/stats/by-operator', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
@@ -200,12 +200,12 @@ router.get('/stats/by-operator', authenticateToken, requireRoleLevel(100), async
       'console_business_record_query'
     )
 
-    const { start_time, end_time, limit } = req.query
+    const { start_time, end_time, page_size } = req.query
 
     const result = await BusinessRecordQueryService.getAuditStatsByOperator({
       start_time,
       end_time,
-      limit: limit ? parseInt(limit, 10) : 10
+      page_size: page_size ? parseInt(page_size, 10) : 10
     })
 
     return res.apiSuccess(result, '获取操作者统计成功')

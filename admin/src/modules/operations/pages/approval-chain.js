@@ -52,8 +52,13 @@ function approvalChainPage() {
     templates_loading: false,
     template_form_visible: false,
     template_form: {
-      template_code: '', template_name: '', auditable_type: 'consumption',
-      description: '', priority: 0, match_conditions: '{}', is_active: 1,
+      template_code: '',
+      template_name: '',
+      auditable_type: 'consumption',
+      description: '',
+      priority: 0,
+      match_conditions: '{}',
+      is_active: 1,
       nodes: []
     },
     editing_template_id: null,
@@ -118,9 +123,24 @@ function approvalChainPage() {
     openCreateTemplate() {
       this.editing_template_id = null
       this.template_form = {
-        template_code: '', template_name: '', auditable_type: 'consumption',
-        description: '', priority: 0, match_conditions: '{}', is_active: 1,
-        nodes: [{ step_number: 9, node_name: '管理员终审', assignee_type: 'role', assignee_role_id: 2, is_final: 1, timeout_hours: 12, timeout_action: 'notify' }]
+        template_code: '',
+        template_name: '',
+        auditable_type: 'consumption',
+        description: '',
+        priority: 0,
+        match_conditions: '{}',
+        is_active: 1,
+        nodes: [
+          {
+            step_number: 9,
+            node_name: '管理员终审',
+            assignee_type: 'role',
+            assignee_role_id: 2,
+            is_final: 1,
+            timeout_hours: 12,
+            timeout_action: 'notify'
+          }
+        ]
       }
       this.template_form_visible = true
     },
@@ -139,10 +159,14 @@ function approvalChainPage() {
           match_conditions: JSON.stringify(t.match_conditions || {}),
           is_active: t.is_active,
           nodes: (t.nodes || []).map(n => ({
-            step_number: n.step_number, node_name: n.node_name,
-            assignee_type: n.assignee_type, assignee_role_id: n.assignee_role_id,
-            assignee_user_id: n.assignee_user_id, is_final: n.is_final,
-            timeout_hours: n.timeout_hours, timeout_action: n.timeout_action
+            step_number: n.step_number,
+            node_name: n.node_name,
+            assignee_type: n.assignee_type,
+            assignee_role_id: n.assignee_role_id,
+            assignee_user_id: n.assignee_user_id,
+            is_final: n.is_final,
+            timeout_hours: n.timeout_hours,
+            timeout_action: n.timeout_action
           }))
         }
         this.template_form_visible = true
@@ -154,9 +178,14 @@ function approvalChainPage() {
     addNode() {
       const maxStep = this.template_form.nodes.reduce((max, n) => Math.max(max, n.step_number), 1)
       this.template_form.nodes.push({
-        step_number: Math.min(maxStep + 1, 9), node_name: '', assignee_type: 'role',
-        assignee_role_id: null, assignee_user_id: null, is_final: 0,
-        timeout_hours: 12, timeout_action: 'escalate'
+        step_number: Math.min(maxStep + 1, 9),
+        node_name: '',
+        assignee_type: 'role',
+        assignee_role_id: null,
+        assignee_user_id: null,
+        is_final: 0,
+        timeout_hours: 12,
+        timeout_action: 'escalate'
       })
     },
 
@@ -167,7 +196,11 @@ function approvalChainPage() {
     async saveTemplate() {
       try {
         let matchConditions = {}
-        try { matchConditions = JSON.parse(this.template_form.match_conditions) } catch { /* 空对象 */ }
+        try {
+          matchConditions = JSON.parse(this.template_form.match_conditions)
+        } catch {
+          /* 空对象 */
+        }
 
         const payload = {
           ...this.template_form,
@@ -255,7 +288,10 @@ function approvalChainPage() {
 
     async submitReview() {
       try {
-        if (this.review_action === 'reject' && (!this.review_reason || this.review_reason.trim().length < 5)) {
+        if (
+          this.review_action === 'reject' &&
+          (!this.review_reason || this.review_reason.trim().length < 5)
+        ) {
           Alpine.store('notification').show('拒绝原因不少于5个字符', 'error')
           return
         }

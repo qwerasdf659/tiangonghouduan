@@ -65,7 +65,9 @@ export function useCsChatConversationMethods() {
 
       try {
         const response = await request({
-          url: buildURL(CONTENT_ENDPOINTS.CUSTOMER_SERVICE_SESSION_MESSAGES, { session_id: sessionId })
+          url: buildURL(CONTENT_ENDPOINTS.CUSTOMER_SERVICE_SESSION_MESSAGES, {
+            session_id: sessionId
+          })
         })
 
         if (response && response.success) {
@@ -100,7 +102,9 @@ export function useCsChatConversationMethods() {
       if (!silent) this.loadingOverlay = true
       try {
         const response = await request({
-          url: buildURL(CONTENT_ENDPOINTS.CUSTOMER_SERVICE_SESSION_MESSAGES, { session_id: sessionId })
+          url: buildURL(CONTENT_ENDPOINTS.CUSTOMER_SERVICE_SESSION_MESSAGES, {
+            session_id: sessionId
+          })
         })
         if (response && response.success) {
           this.messages = response.data.messages || []
@@ -118,8 +122,14 @@ export function useCsChatConversationMethods() {
      */
     async sendMessage() {
       const content = this.messageInput.trim()
-      if (!content) { this.showError('请输入消息内容'); return }
-      if (!this.currentSessionId) { this.showError('请先选择一个会话'); return }
+      if (!content) {
+        this.showError('请输入消息内容')
+        return
+      }
+      if (!this.currentSessionId) {
+        this.showError('请先选择一个会话')
+        return
+      }
 
       try {
         const response = await request({
@@ -168,14 +178,23 @@ export function useCsChatConversationMethods() {
 
     /** 打开转接弹窗 */
     transferSession() {
-      if (!this.currentSessionId) { this.showError('请先选择一个会话'); return }
+      if (!this.currentSessionId) {
+        this.showError('请先选择一个会话')
+        return
+      }
       this.showModal('transferModal')
     },
 
     /** 提交转接 */
     async submitTransfer() {
-      if (!this.currentSessionId) { this.showError('请先选择一个会话'); return }
-      if (!this.transferTargetId) { this.showError('请选择接收客服'); return }
+      if (!this.currentSessionId) {
+        this.showError('请先选择一个会话')
+        return
+      }
+      if (!this.transferTargetId) {
+        this.showError('请选择接收客服')
+        return
+      }
 
       this.loadingOverlay = true
       try {
@@ -205,7 +224,10 @@ export function useCsChatConversationMethods() {
 
     /** 关闭会话 */
     async closeSession() {
-      if (!this.currentSessionId) { this.showError('请先选择一个会话'); return }
+      if (!this.currentSessionId) {
+        this.showError('请先选择一个会话')
+        return
+      }
 
       const result = await this.confirmAndExecute(
         '确认结束当前会话？',
@@ -250,17 +272,26 @@ export function useCsChatConversationMethods() {
 
     /** 查看当前会话用户详情 */
     async viewUserInfo() {
-      if (!this.currentSessionId) { this.showError('请先选择一个会话'); return }
+      if (!this.currentSessionId) {
+        this.showError('请先选择一个会话')
+        return
+      }
       this.loadingOverlay = true
 
       try {
         const session = this.sessions.find(
           s => String(s.customer_service_session_id) === String(this.currentSessionId)
         )
-        if (!session) { this.showError('找不到会话信息'); return }
+        if (!session) {
+          this.showError('找不到会话信息')
+          return
+        }
 
         const userId = session.user?.user_id || session.user_id
-        if (!userId) { this.showError('无法获取用户ID'); return }
+        if (!userId) {
+          this.showError('无法获取用户ID')
+          return
+        }
 
         const url = buildURL(USER_ENDPOINTS.DETAIL, { user_id: userId })
         const response = await request({ url })
@@ -282,7 +313,10 @@ export function useCsChatConversationMethods() {
     /** 加载管理员列表（转接用） */
     async loadAdminList() {
       try {
-        const response = await request({ url: USER_ENDPOINTS.LIST, params: { role_filter: 'admin' } })
+        const response = await request({
+          url: USER_ENDPOINTS.LIST,
+          params: { role_filter: 'admin' }
+        })
         if (response && response.success) {
           this.adminList = response.data.users || []
         }
@@ -310,7 +344,10 @@ export function useCsChatConversationMethods() {
         const date = new Date(dateStr)
         return date.toLocaleString('zh-CN', {
           timeZone: 'Asia/Shanghai',
-          month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit'
         })
       } catch {
         return dateStr

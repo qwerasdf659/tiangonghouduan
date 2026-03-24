@@ -38,16 +38,16 @@ const TransactionManager = require('../../../utils/TransactionManager')
  * @access Private
  * @query {string} [status] - 活动状态筛选（draft/submitted/approved/rejected/running/paused/completed/cancelled）
  * @query {number} [page=1] - 页码
- * @query {number} [limit=20] - 每页数量
+ * @query {number} [page_size=20] - 每页数量
  */
 router.get(
   '/',
   authenticateToken,
   asyncHandler(async (req, res) => {
     try {
-      const { status = null, page = 1, limit = 20 } = req.query
+      const { status = null, page = 1, page_size = 20 } = req.query
       const pageNum = parseInt(page) || 1
-      const pageSize = parseInt(limit) || 20
+      const pageSize = parseInt(page_size) || 20
 
       const AdCampaignService = req.app.locals.services.getService('ad_campaign')
       const result = await AdCampaignService.getMyAdCampaigns(req.user.user_id, {
@@ -62,7 +62,7 @@ router.get(
           pagination: {
             total: result.total,
             page: result.page,
-            limit: pageSize,
+            page_size: pageSize,
             total_pages: Math.ceil(result.total / pageSize)
           }
         },

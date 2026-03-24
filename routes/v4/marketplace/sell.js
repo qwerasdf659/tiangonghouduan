@@ -39,7 +39,7 @@ const {
 const marketRiskMiddleware = getMarketRiskControlMiddleware()
 
 /**
- * @route POST /api/v4/market/list
+ * @route POST /api/v4/marketplace/list
  * @desc 上架商品到交易市场
  * @access Private (需要登录)
  *
@@ -135,7 +135,7 @@ router.post(
        * 统一使用 IdempotencyService 进行请求级幂等控制
        */
       const idempotencyResult = await IdempotencyService.getOrCreateRequest(idempotency_key, {
-        api_path: '/api/v4/market/list',
+        api_path: '/api/v4/marketplace/list',
         http_method: 'POST',
         request_params: {
           item_id: itemId,
@@ -279,7 +279,7 @@ router.post(
 )
 
 /**
- * @route POST /api/v4/market/fungible-assets/list
+ * @route POST /api/v4/marketplace/fungible-assets/list
  * @desc 挂牌可叠加资产到市场（交易市场材料交易）
  * @access Private (需要登录)
  *
@@ -396,7 +396,7 @@ router.post(
        * 【入口幂等检查】防止同一次请求被重复提交
        */
       const idempotencyResult = await IdempotencyService.getOrCreateRequest(idempotency_key, {
-        api_path: '/api/v4/market/fungible-assets/list',
+        api_path: '/api/v4/marketplace/fungible-assets/list',
         http_method: 'POST',
         request_params: {
           offer_asset_code,

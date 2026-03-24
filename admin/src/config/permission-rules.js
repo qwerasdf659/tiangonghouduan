@@ -55,7 +55,10 @@ export const MENU_ACCESS_RULES = {
   'pending-center': { minLevel: 1, description: '待处理中心（分组）' },
   'pending-center.consumption-review': { minLevel: 30, description: '消费记录审核' },
   'pending-center.customer-service': { minLevel: 1, description: '客服工作台' },
-  'pending-center.cs-agent-management': { minLevel: 100, description: '客服管理（座席管理/用户分配）' },
+  'pending-center.cs-agent-management': {
+    minLevel: 100,
+    description: '客服管理（座席管理/用户分配）'
+  },
   'pending-center.risk-alerts': { minLevel: 30, description: '风控告警' },
   'pending-center.lottery-alerts': { minLevel: 30, description: '抽奖告警' },
   'pending-center.feedback-mgmt': { minLevel: 30, description: '用户反馈处理' },

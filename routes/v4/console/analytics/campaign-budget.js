@@ -60,7 +60,7 @@ function getServices(req) {
  * @access Private (需要管理员权限)
  *
  * @query {string} lottery_campaign_ids - 活动ID列表（逗号分隔，如：1,2,3）
- * @query {number} limit - 限制返回数量（默认20，最大50）
+ * @query {number} page_size - 限制返回数量（默认20，最大50）
  *
  * @returns {Object} 多个活动的预算状态列表
  */
@@ -68,7 +68,7 @@ router.get(
   '/batch-status',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    const { lottery_campaign_ids, status, limit = 20 } = req.query
+    const { lottery_campaign_ids, status, page_size = 20 } = req.query
 
     try {
       // 解析 lottery_campaign_ids（支持逗号分隔或单独指定）
@@ -94,7 +94,7 @@ router.get(
       } = await ActivityService.getBatchBudgetStatus({
         lottery_campaign_ids: targetIds,
         status: status || '',
-        limit: parseInt(limit) || 50
+        page_size: parseInt(page_size) || 50
       })
 
       if (results.length === 0) {

@@ -1,7 +1,7 @@
 /**
  * 市场域 - 市场数据分析（用户端 + 管理端共用）
  *
- * @route /api/v4/market/analytics
+ * @route /api/v4/marketplace/analytics
  * @description 定价建议、市场总览、价格历史
  *
  * API列表：
@@ -22,7 +22,7 @@ const { handleServiceError } = require('../../../middleware/validation')
 const logger = require('../../../utils/logger').logger
 
 /**
- * @route GET /api/v4/market/analytics/pricing-advice
+ * @route GET /api/v4/marketplace/analytics/pricing-advice
  * @desc 获取定价建议（卖家挂牌定价参考）
  * @access Private
  * @query {string} asset_code - 资产代码（与 template_id 二选一）
@@ -46,7 +46,7 @@ router.get('/analytics/pricing-advice', authenticateToken, async (req, res) => {
 })
 
 /**
- * @route GET /api/v4/market/analytics/overview
+ * @route GET /api/v4/marketplace/analytics/overview
  * @desc 市场总览（各资产成交量排行）
  * @access Private
  */
@@ -63,7 +63,7 @@ router.get('/analytics/overview', authenticateToken, async (req, res) => {
 })
 
 /**
- * @route GET /api/v4/market/analytics/history
+ * @route GET /api/v4/marketplace/analytics/history
  * @desc 价格历史
  * @access Private
  * @query {string} asset_code - 资产代码

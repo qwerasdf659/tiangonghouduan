@@ -28,7 +28,7 @@ let access_token
 /** Jest测试超时设置（毫秒） */
 jest.setTimeout(30000)
 
-describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
+describe('API契约测试 - 市场模块 (/api/v4/marketplace)', () => {
   /**
    * 测试套件初始化
    * - 加载应用
@@ -114,7 +114,7 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
        */
       test('已认证用户应返回符合契约的市场列表数据', async () => {
         const response = await request(app)
-          .get('/api/v4/market/listings')
+          .get('/api/v4/marketplace/listings')
           .set('Authorization', `Bearer ${access_token}`)
 
         expect(response.status).toBe(200)
@@ -133,7 +133,7 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
        * Case 2: 未认证用户应返回401
        */
       test('未认证用户应返回401', async () => {
-        const response = await request(app).get('/api/v4/market/listings')
+        const response = await request(app).get('/api/v4/marketplace/listings')
 
         expect(response.status).toBe(401)
         validateApiContract(response.body, false)
@@ -144,7 +144,7 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
        */
       test('带分页参数应返回正确的分页数据', async () => {
         const response = await request(app)
-          .get('/api/v4/market/listings')
+          .get('/api/v4/marketplace/listings')
           .set('Authorization', `Bearer ${access_token}`)
           .query({ page: 1, page_size: 5 })
 
@@ -160,7 +160,7 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
        */
       test('按listing_kind筛选应返回对应类型的挂牌', async () => {
         const response = await request(app)
-          .get('/api/v4/market/listings')
+          .get('/api/v4/marketplace/listings')
           .set('Authorization', `Bearer ${access_token}`)
           .query({ listing_kind: 'item' })
 
@@ -181,7 +181,7 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
        */
       test('无效的page参数应返回错误或使用默认值', async () => {
         const response = await request(app)
-          .get('/api/v4/market/listings')
+          .get('/api/v4/marketplace/listings')
           .set('Authorization', `Bearer ${access_token}`)
           .query({ page: -1 })
 
@@ -198,7 +198,7 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
        * Case 1: 未认证用户应返回401
        */
       test('未认证用户应返回401', async () => {
-        const response = await request(app).get('/api/v4/market/listings/1')
+        const response = await request(app).get('/api/v4/marketplace/listings/1')
 
         expect(response.status).toBe(401)
         validateApiContract(response.body, false)
@@ -209,7 +209,7 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
        */
       test('不存在的listing_id应返回404', async () => {
         const response = await request(app)
-          .get('/api/v4/market/listings/999999999')
+          .get('/api/v4/marketplace/listings/999999999')
           .set('Authorization', `Bearer ${access_token}`)
 
         expect(response.status).toBe(404)
@@ -222,7 +222,7 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
        */
       test('无效的listing_id格式应返回400', async () => {
         const response = await request(app)
-          .get('/api/v4/market/listings/invalid_id')
+          .get('/api/v4/marketplace/listings/invalid_id')
           .set('Authorization', `Bearer ${access_token}`)
 
         expect(response.status).toBe(400)
@@ -239,7 +239,7 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
        */
       test('已认证用户应返回挂牌状态', async () => {
         const response = await request(app)
-          .get('/api/v4/market/listing-status')
+          .get('/api/v4/marketplace/listing-status')
           .set('Authorization', `Bearer ${access_token}`)
 
         expect(response.status).toBe(200)
@@ -260,7 +260,7 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
        * Case 2: 未认证应返回401
        */
       test('未认证用户应返回401', async () => {
-        const response = await request(app).get('/api/v4/market/listing-status')
+        const response = await request(app).get('/api/v4/marketplace/listing-status')
 
         expect(response.status).toBe(401)
         validateApiContract(response.body, false)
@@ -275,7 +275,7 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
        */
       test('缺少item_id应返回400', async () => {
         const response = await request(app)
-          .post('/api/v4/market/list')
+          .post('/api/v4/marketplace/list')
           .set('Authorization', `Bearer ${access_token}`)
           .set('Idempotency-Key', `test_list_${Date.now()}_1`)
           .send({
@@ -292,7 +292,7 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
        */
       test('缺少price_amount应返回400', async () => {
         const response = await request(app)
-          .post('/api/v4/market/list')
+          .post('/api/v4/marketplace/list')
           .set('Authorization', `Bearer ${access_token}`)
           .set('Idempotency-Key', `test_list_${Date.now()}_2`)
           .send({
@@ -309,7 +309,7 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
        */
       test('缺少Idempotency-Key应返回400', async () => {
         const response = await request(app)
-          .post('/api/v4/market/list')
+          .post('/api/v4/marketplace/list')
           .set('Authorization', `Bearer ${access_token}`)
           .send({
             item_id: 1,
@@ -327,7 +327,7 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
        */
       test('未认证用户应返回401', async () => {
         const response = await request(app)
-          .post('/api/v4/market/list')
+          .post('/api/v4/marketplace/list')
           .set('Idempotency-Key', `test_list_${Date.now()}_3`)
           .send({
             item_id: 1,
@@ -344,7 +344,7 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
        */
       test('price_amount为0或负数应返回400', async () => {
         const response = await request(app)
-          .post('/api/v4/market/list')
+          .post('/api/v4/marketplace/list')
           .set('Authorization', `Bearer ${access_token}`)
           .set('Idempotency-Key', `test_list_${Date.now()}_4`)
           .send({
@@ -362,7 +362,7 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
        */
       test('不存在的item_id应返回404或400', async () => {
         const response = await request(app)
-          .post('/api/v4/market/list')
+          .post('/api/v4/marketplace/list')
           .set('Authorization', `Bearer ${access_token}`)
           .set('Idempotency-Key', `test_list_${Date.now()}_5`)
           .send({
@@ -385,7 +385,7 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
        */
       test('缺少offer_asset_code应返回400', async () => {
         const response = await request(app)
-          .post('/api/v4/market/fungible-assets/list')
+          .post('/api/v4/marketplace/fungible-assets/list')
           .set('Authorization', `Bearer ${access_token}`)
           .set('Idempotency-Key', `test_fungible_list_${Date.now()}_1`)
           .send({
@@ -403,7 +403,7 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
        */
       test('缺少offer_amount应返回400', async () => {
         const response = await request(app)
-          .post('/api/v4/market/fungible-assets/list')
+          .post('/api/v4/marketplace/fungible-assets/list')
           .set('Authorization', `Bearer ${access_token}`)
           .set('Idempotency-Key', `test_fungible_list_${Date.now()}_2`)
           .send({
@@ -421,7 +421,7 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
        */
       test('未认证用户应返回401', async () => {
         const response = await request(app)
-          .post('/api/v4/market/fungible-assets/list')
+          .post('/api/v4/marketplace/fungible-assets/list')
           .set('Idempotency-Key', `test_fungible_list_${Date.now()}_3`)
           .send({
             offer_asset_code: 'red_shard',
@@ -439,7 +439,7 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
        */
       test('offer_amount为0或负数应返回400', async () => {
         const response = await request(app)
-          .post('/api/v4/market/fungible-assets/list')
+          .post('/api/v4/marketplace/fungible-assets/list')
           .set('Authorization', `Bearer ${access_token}`)
           .set('Idempotency-Key', `test_fungible_list_${Date.now()}_4`)
           .send({
@@ -462,7 +462,7 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
        */
       test('不存在的listing_id应返回404', async () => {
         const response = await request(app)
-          .post('/api/v4/market/listings/999999999/withdraw')
+          .post('/api/v4/marketplace/listings/999999999/withdraw')
           .set('Authorization', `Bearer ${access_token}`)
           .set('Idempotency-Key', `test_withdraw_${Date.now()}_1`)
 
@@ -475,7 +475,7 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
        */
       test('未认证用户应返回401', async () => {
         const response = await request(app)
-          .post('/api/v4/market/listings/1/withdraw')
+          .post('/api/v4/marketplace/listings/1/withdraw')
           .set('Idempotency-Key', `test_withdraw_${Date.now()}_2`)
 
         expect(response.status).toBe(401)
@@ -487,7 +487,7 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
        */
       test('无效的listing_id格式应返回400', async () => {
         const response = await request(app)
-          .post('/api/v4/market/listings/invalid_id/withdraw')
+          .post('/api/v4/marketplace/listings/invalid_id/withdraw')
           .set('Authorization', `Bearer ${access_token}`)
           .set('Idempotency-Key', `test_withdraw_${Date.now()}_3`)
 
@@ -504,7 +504,7 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
        */
       test('不存在的listing_id应返回404', async () => {
         const response = await request(app)
-          .post('/api/v4/market/fungible-assets/999999999/withdraw')
+          .post('/api/v4/marketplace/fungible-assets/999999999/withdraw')
           .set('Authorization', `Bearer ${access_token}`)
           .set('Idempotency-Key', `test_fungible_withdraw_${Date.now()}_1`)
 
@@ -517,7 +517,7 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
        */
       test('未认证用户应返回401', async () => {
         const response = await request(app)
-          .post('/api/v4/market/fungible-assets/1/withdraw')
+          .post('/api/v4/marketplace/fungible-assets/1/withdraw')
           .set('Idempotency-Key', `test_fungible_withdraw_${Date.now()}_2`)
 
         expect(response.status).toBe(401)
@@ -537,7 +537,7 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
        */
       test('不存在的listing_id应返回404', async () => {
         const response = await request(app)
-          .post('/api/v4/market/listings/999999999/purchase')
+          .post('/api/v4/marketplace/listings/999999999/purchase')
           .set('Authorization', `Bearer ${access_token}`)
           .set('Idempotency-Key', `test_purchase_${Date.now()}_1`)
 
@@ -550,7 +550,7 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
        */
       test('未认证用户应返回401', async () => {
         const response = await request(app)
-          .post('/api/v4/market/listings/1/purchase')
+          .post('/api/v4/marketplace/listings/1/purchase')
           .set('Idempotency-Key', `test_purchase_${Date.now()}_2`)
 
         expect(response.status).toBe(401)
@@ -562,7 +562,7 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
        */
       test('缺少Idempotency-Key应返回400', async () => {
         const response = await request(app)
-          .post('/api/v4/market/listings/1/purchase')
+          .post('/api/v4/marketplace/listings/1/purchase')
           .set('Authorization', `Bearer ${access_token}`)
 
         expect(response.status).toBe(400)
@@ -575,7 +575,7 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
        */
       test('无效的listing_id格式应返回400', async () => {
         const response = await request(app)
-          .post('/api/v4/market/listings/invalid_id/purchase')
+          .post('/api/v4/marketplace/listings/invalid_id/purchase')
           .set('Authorization', `Bearer ${access_token}`)
           .set('Idempotency-Key', `test_purchase_${Date.now()}_4`)
 
@@ -593,7 +593,7 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
        */
       test('查询交易订单应需要认证', async () => {
         // 尝试查询交易订单（未认证）
-        const response = await request(app).get('/api/v4/market/orders')
+        const response = await request(app).get('/api/v4/marketplace/orders')
 
         /*
          * 如果接口存在，未认证应返回401
@@ -608,7 +608,7 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
        */
       test('已认证用户查询交易订单应返回正确格式', async () => {
         const response = await request(app)
-          .get('/api/v4/market/orders')
+          .get('/api/v4/marketplace/orders')
           .set('Authorization', `Bearer ${access_token}`)
 
         // 如果接口存在
@@ -636,7 +636,7 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
      */
     test('超大page_size请求应返回正确的响应格式', async () => {
       const response = await request(app)
-        .get('/api/v4/market/listings')
+        .get('/api/v4/marketplace/listings')
         .set('Authorization', `Bearer ${access_token}`)
         .query({ page_size: 10000 })
 
@@ -654,7 +654,7 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
      */
     test('空Authorization header应返回401', async () => {
       const response = await request(app)
-        .get('/api/v4/market/listing-status')
+        .get('/api/v4/marketplace/listing-status')
         .set('Authorization', '')
 
       expect(response.status).toBe(401)
@@ -666,7 +666,7 @@ describe('API契约测试 - 市场模块 (/api/v4/market)', () => {
      */
     test('无效的Authorization token应返回401', async () => {
       const response = await request(app)
-        .get('/api/v4/market/listing-status')
+        .get('/api/v4/marketplace/listing-status')
         .set('Authorization', 'Bearer invalid_token_12345')
 
       expect(response.status).toBe(401)

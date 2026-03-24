@@ -11,8 +11,10 @@ import { CONTENT_ENDPOINTS } from '../../../api/content.js'
  * @param {number} userId - 用户ID
  * @returns {Promise<Object|null>} 时间线数据
  */
-export async function loadTimeline (userId) {
-  const url = buildURL(CONTENT_ENDPOINTS.CS_USER_CONTEXT_TIMELINE, { userId }) + buildQueryString({ page_size: 20 })
+export async function loadTimeline(userId) {
+  const url =
+    buildURL(CONTENT_ENDPOINTS.CS_USER_CONTEXT_TIMELINE, { userId }) +
+    buildQueryString({ page_size: 20 })
   const res = await request({ url, method: 'GET' })
   return res.success ? res.data : null
 }

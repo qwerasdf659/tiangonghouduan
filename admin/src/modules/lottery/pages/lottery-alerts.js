@@ -70,7 +70,11 @@ function lotteryAlertsPage() {
         }
       },
       { key: 'type', label: '类型', render: (val, row) => row.type_display || val || '-' },
-      { key: 'campaign_name', label: '关联活动', render: (val, row) => val || row.related_entity?.name || '-' },
+      {
+        key: 'campaign_name',
+        label: '关联活动',
+        render: (val, row) => val || row.related_entity?.name || '-'
+      },
       { key: 'message', label: '告警描述', type: 'truncate', maxLength: 40 },
       {
         key: 'threshold_actual',
@@ -104,13 +108,13 @@ function lotteryAlertsPage() {
             name: 'acknowledge',
             label: '确认',
             class: 'text-orange-500 hover:text-orange-700',
-            condition: (row) => row.status === 'active'
+            condition: row => row.status === 'active'
           },
           {
             name: 'resolve',
             label: '解决',
             class: 'text-green-500 hover:text-green-700',
-            condition: (row) => row.status !== 'resolved'
+            condition: row => row.status !== 'resolved'
           }
         ]
       }
@@ -1000,9 +1004,10 @@ function lotteryAlertsPage() {
         const responseTime = Date.now() - startTime
 
         // 解析系统状态（后端字段：database.status, database.host, database.database, api.last_check）
-        const statusData = statusResult.status === 'fulfilled' && statusResult.value?.success
-          ? statusResult.value.data
-          : null
+        const statusData =
+          statusResult.status === 'fulfilled' && statusResult.value?.success
+            ? statusResult.value.data
+            : null
 
         // 解析健康检查（后端字段：data.systems.database, data.systems.redis）
         const healthData = healthResult.status === 'fulfilled' ? healthResult.value : null

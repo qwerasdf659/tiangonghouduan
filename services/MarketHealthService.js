@@ -98,12 +98,14 @@ class MarketHealthService {
    *
    * @param {Object} [filters] - 筛选条件
    * @param {number} [filters.days=30] - 统计天数
-   * @param {number} [filters.limit=10] - Top N
+   * @param {number} [filters.page_size=10] - Top N
+   * @param {number} [filters.limit] - 兼容旧参数名
    * @returns {Promise<Array>} [{user_id, nickname, buy_count, total_amount}]
    */
   async getTopBuyers(filters = {}) {
     this._ensureModels()
-    const { days = 30, limit = 10 } = filters
+    const { days = 30, page_size = 10, limit: legacyLimit } = filters
+    const limit = legacyLimit !== undefined ? legacyLimit : page_size
     const startDate = new Date()
     startDate.setDate(startDate.getDate() - days)
 
@@ -133,12 +135,14 @@ class MarketHealthService {
    *
    * @param {Object} [filters] - 筛选条件
    * @param {number} [filters.days=30] - 统计天数
-   * @param {number} [filters.limit=10] - Top N
+   * @param {number} [filters.page_size=10] - Top N
+   * @param {number} [filters.limit] - 兼容旧参数名
    * @returns {Promise<Array>} [{user_id, nickname, sell_count, total_amount}]
    */
   async getTopSellers(filters = {}) {
     this._ensureModels()
-    const { days = 30, limit = 10 } = filters
+    const { days = 30, page_size = 10, limit: legacyLimit } = filters
+    const limit = legacyLimit !== undefined ? legacyLimit : page_size
     const startDate = new Date()
     startDate.setDate(startDate.getDate() - days)
 

@@ -9,7 +9,7 @@
 
 import { logger } from '../../../utils/logger.js'
 import { buildURL, request } from '../../../api/base.js'
-import { MARKET_ENDPOINTS } from '../../../api/market/index.js'
+import { EXCHANGE_ENDPOINTS } from '../../../api/market/exchange.js'
 import { ExchangeItemAPI } from '../../../api/exchange-item/index.js'
 import { ASSET_ENDPOINTS } from '../../../api/asset.js'
 import { SYSTEM_ADMIN_ENDPOINTS } from '../../../api/system/admin.js'
@@ -998,7 +998,7 @@ export function useExchangeItemsMethods() {
      */
     async togglePin(item) {
       try {
-        const url = buildURL(MARKET_ENDPOINTS.EXCHANGE_ITEM_PIN, {
+        const url = buildURL(EXCHANGE_ENDPOINTS.ITEM_PIN, {
           exchange_item_id: item.exchange_item_id
         })
         const res = await request({ url, method: 'PUT', data: { is_pinned: !item.is_pinned } })
@@ -1018,7 +1018,7 @@ export function useExchangeItemsMethods() {
      */
     async toggleRecommend(item) {
       try {
-        const url = buildURL(MARKET_ENDPOINTS.EXCHANGE_ITEM_RECOMMEND, {
+        const url = buildURL(EXCHANGE_ENDPOINTS.ITEM_RECOMMEND, {
           exchange_item_id: item.exchange_item_id
         })
         const res = await request({
@@ -1045,7 +1045,7 @@ export function useExchangeItemsMethods() {
       try {
         this.saving = true
         const res = await request({
-          url: MARKET_ENDPOINTS.EXCHANGE_ITEMS_BATCH_SORT,
+          url: EXCHANGE_ENDPOINTS.ITEMS_BATCH_SORT,
           method: 'PUT',
           data: { items: sortItems }
         })
@@ -1106,7 +1106,7 @@ export function useExchangeItemsMethods() {
       if (this.shippingCompaniesLoaded) return
       try {
         const res = await request({
-          url: MARKET_ENDPOINTS.EXCHANGE_SHIPPING_COMPANIES,
+          url: EXCHANGE_ENDPOINTS.SHIPPING_COMPANIES,
           method: 'GET'
         })
         if (res.success) {
@@ -1125,7 +1125,7 @@ export function useExchangeItemsMethods() {
      */
     async queryOrderTrack(orderNo) {
       try {
-        const url = buildURL(MARKET_ENDPOINTS.EXCHANGE_ORDER_TRACK, { order_no: orderNo })
+        const url = buildURL(EXCHANGE_ENDPOINTS.ORDER_TRACK, { order_no: orderNo })
         const res = await request({ url, method: 'GET' })
         if (res.success) return res.data
         this.showError?.(res.message || '查询物流失败')

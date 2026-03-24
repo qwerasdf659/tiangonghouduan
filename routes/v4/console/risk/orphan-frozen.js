@@ -50,7 +50,7 @@ function asyncHandler(fn) {
  * @description 检测孤儿冻结（仅检测，不清理）
  * @query {number} [user_id] - 指定用户ID（可选，不传则检测所有）
  * @query {string} [asset_code] - 指定资产代码（可选）
- * @query {number} [limit=1000] - 最大返回条数（默认 1000）
+ * @query {number} [page_size=1000] - 最大返回条数（默认 1000）
  * @access Admin
  * @returns {Object} 孤儿冻结 DTO（包含统计汇总和明细列表）
  *
@@ -71,7 +71,7 @@ router.get(
   authenticateToken,
   requireRoleLevel(100),
   asyncHandler(async (req, res) => {
-    const { user_id, asset_code, limit } = req.query
+    const { user_id, asset_code, page_size } = req.query
 
     // 通过 ServiceManager 获取服务
     const OrphanFrozenCleanupService = req.app.locals.services.getService('orphan_frozen_cleanup')
@@ -79,7 +79,7 @@ router.get(
     const options = {}
     if (user_id) options.user_id = Number(user_id)
     if (asset_code) options.asset_code = asset_code
-    if (limit) options.limit = Number(limit)
+    if (page_size) options.limit = Number(page_size)
 
     // 🔴 P0 决策：detectOrphanFrozen 返回稳定 DTO 对象
     const dto = await OrphanFrozenCleanupService.detectOrphanFrozen(options)

@@ -66,32 +66,80 @@ const ROUNDING_MODE_MAP = {
 
 /** 资产分组中文映射与颜色配置 */
 const GROUP_CONFIG = {
-  points:   { name: '积分',     emoji: '💰', dot: 'bg-amber-400',   border: ' border-l-amber-400',   iconBg: 'bg-amber-50' },
-  currency: { name: '货币资产', emoji: '💎', dot: 'bg-sky-400',     border: ' border-l-sky-400',     iconBg: 'bg-sky-50' },
-  red:      { name: '红色系',   emoji: '🔴', dot: 'bg-red-500',     border: ' border-l-red-400',     iconBg: 'bg-red-50' },
-  orange:   { name: '橙色系',   emoji: '🟠', dot: 'bg-orange-500',  border: ' border-l-orange-400',  iconBg: 'bg-orange-50' },
-  yellow:   { name: '黄色系',   emoji: '🟡', dot: 'bg-yellow-500',  border: ' border-l-yellow-400',  iconBg: 'bg-yellow-50' },
-  green:    { name: '绿色系',   emoji: '🟢', dot: 'bg-green-500',   border: ' border-l-green-400',   iconBg: 'bg-green-50' },
-  blue:     { name: '蓝色系',   emoji: '🔵', dot: 'bg-blue-500',    border: ' border-l-blue-400',    iconBg: 'bg-blue-50' },
-  purple:   { name: '紫色系',   emoji: '🟣', dot: 'bg-purple-500',  border: ' border-l-purple-400',  iconBg: 'bg-purple-50' }
+  points: {
+    name: '积分',
+    emoji: '💰',
+    dot: 'bg-amber-400',
+    border: ' border-l-amber-400',
+    iconBg: 'bg-amber-50'
+  },
+  currency: {
+    name: '货币资产',
+    emoji: '💎',
+    dot: 'bg-sky-400',
+    border: ' border-l-sky-400',
+    iconBg: 'bg-sky-50'
+  },
+  red: {
+    name: '红色系',
+    emoji: '🔴',
+    dot: 'bg-red-500',
+    border: ' border-l-red-400',
+    iconBg: 'bg-red-50'
+  },
+  orange: {
+    name: '橙色系',
+    emoji: '🟠',
+    dot: 'bg-orange-500',
+    border: ' border-l-orange-400',
+    iconBg: 'bg-orange-50'
+  },
+  yellow: {
+    name: '黄色系',
+    emoji: '🟡',
+    dot: 'bg-yellow-500',
+    border: ' border-l-yellow-400',
+    iconBg: 'bg-yellow-50'
+  },
+  green: {
+    name: '绿色系',
+    emoji: '🟢',
+    dot: 'bg-green-500',
+    border: ' border-l-green-400',
+    iconBg: 'bg-green-50'
+  },
+  blue: {
+    name: '蓝色系',
+    emoji: '🔵',
+    dot: 'bg-blue-500',
+    border: ' border-l-blue-400',
+    iconBg: 'bg-blue-50'
+  },
+  purple: {
+    name: '紫色系',
+    emoji: '🟣',
+    dot: 'bg-purple-500',
+    border: ' border-l-purple-400',
+    iconBg: 'bg-purple-50'
+  }
 }
 
 /** 资产代码 → 标签样式（规则表格中展示用） */
 const ASSET_TAG_STYLES = {
-  POINTS:         'bg-amber-100 text-amber-800',
-  DIAMOND:        'bg-sky-100 text-sky-800',
-  BUDGET_POINTS:  'bg-amber-50 text-amber-700',
-  red_shard:      'bg-red-100 text-red-700',
-  red_crystal:    'bg-red-200 text-red-800',
-  orange_shard:   'bg-orange-100 text-orange-700',
+  POINTS: 'bg-amber-100 text-amber-800',
+  DIAMOND: 'bg-sky-100 text-sky-800',
+  BUDGET_POINTS: 'bg-amber-50 text-amber-700',
+  red_shard: 'bg-red-100 text-red-700',
+  red_crystal: 'bg-red-200 text-red-800',
+  orange_shard: 'bg-orange-100 text-orange-700',
   orange_crystal: 'bg-orange-200 text-orange-800',
-  yellow_shard:   'bg-yellow-100 text-yellow-700',
+  yellow_shard: 'bg-yellow-100 text-yellow-700',
   yellow_crystal: 'bg-yellow-200 text-yellow-800',
-  green_shard:    'bg-green-100 text-green-700',
-  green_crystal:  'bg-green-200 text-green-800',
-  blue_shard:     'bg-blue-100 text-blue-700',
-  blue_crystal:   'bg-blue-200 text-blue-800',
-  purple_shard:   'bg-purple-100 text-purple-700',
+  green_shard: 'bg-green-100 text-green-700',
+  green_crystal: 'bg-green-200 text-green-800',
+  blue_shard: 'bg-blue-100 text-blue-700',
+  blue_crystal: 'bg-blue-200 text-blue-800',
+  purple_shard: 'bg-purple-100 text-purple-700',
   purple_crystal: 'bg-purple-200 text-purple-800'
 }
 
@@ -231,10 +279,7 @@ document.addEventListener('alpine:init', () => {
           await pageMixin.init.call(this)
         }
 
-        await Promise.all([
-          this.loadConversionRules(),
-          this.loadAssetTypes()
-        ])
+        await Promise.all([this.loadConversionRules(), this.loadAssetTypes()])
       },
 
       // ========== Tab 切换 ==========
@@ -692,7 +737,9 @@ document.addEventListener('alpine:init', () => {
             this.create_type_form.icon_media_id = res.data.media_id
             this.create_icon_preview = res.data.public_url || res.data.url || null
             Alpine.store('notification').success('图标上传成功')
-            logger.info('[MaterialConversion] 创建表单图标上传成功:', { media_id: res.data.media_id })
+            logger.info('[MaterialConversion] 创建表单图标上传成功:', {
+              media_id: res.data.media_id
+            })
           } else {
             Alpine.store('notification').error(res.message || '图标上传失败')
           }
@@ -739,7 +786,9 @@ document.addEventListener('alpine:init', () => {
             this.edit_type_form.icon_media_id = res.data.media_id
             this.edit_icon_preview = res.data.public_url || res.data.url || null
             Alpine.store('notification').success('图标上传成功')
-            logger.info('[MaterialConversion] 编辑表单图标上传成功:', { media_id: res.data.media_id })
+            logger.info('[MaterialConversion] 编辑表单图标上传成功:', {
+              media_id: res.data.media_id
+            })
           } else {
             Alpine.store('notification').error(res.message || '图标上传失败')
           }

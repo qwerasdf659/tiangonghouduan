@@ -33,7 +33,7 @@
 // ES Module 导入
 import { logger } from '../../../utils/logger.js'
 import { SYSTEM_ENDPOINTS, SystemAPI } from '../../../api/system/index.js'
-import { EXCHANGE_ENDPOINTS } from '../../../api/market/exchange.js'
+import { TRADE_ENDPOINTS } from '../../../api/market/trade.js'
 import { buildURL, request } from '../../../api/base.js'
 import { loadECharts } from '../../../utils/echarts-lazy.js'
 import { createPageMixin } from '../../../alpine/mixins/index.js'
@@ -118,13 +118,15 @@ function riskAlertsPage() {
           low: { class: 'blue', label: '低' }
         }
       },
-      { key: 'alert_type', label: '类型',
+      {
+        key: 'alert_type',
+        label: '类型',
         render: (val, row) => row.alert_type_display || val || '-'
       },
       {
         key: 'target_user_info',
         label: '关联用户',
-        render: (val) => val?.nickname || val?.user_id || '-'
+        render: val => val?.nickname || val?.user_id || '-'
       },
       { key: 'alert_message', label: '描述', type: 'truncate', maxLength: 40 },
       {
@@ -150,7 +152,7 @@ function riskAlertsPage() {
             name: 'handle',
             label: '处理',
             class: 'text-green-500 hover:text-green-700',
-            condition: (row) => row.status === 'pending'
+            condition: row => row.status === 'pending'
           }
         ]
       }
@@ -393,7 +395,8 @@ function riskAlertsPage() {
       queryParams.append('page', params.page || 1)
       queryParams.append('page_size', params.page_size || 20)
 
-      const url = SYSTEM_ENDPOINTS.RISK_ALERT_LIST +
+      const url =
+        SYSTEM_ENDPOINTS.RISK_ALERT_LIST +
         (queryParams.toString() ? `?${queryParams.toString()}` : '')
       const response = await apiRequest(url)
 
@@ -995,23 +998,35 @@ function riskAlertsPage() {
       this.loadingMarketMonitor = true
       try {
         const [listingStatsRes, settingsRes, exchangeStatsRes] = await Promise.allSettled([
-          apiRequest(SYSTEM_ENDPOINTS.SETTING_MARKETPLACE.replace('/settings/marketplace', '/marketplace/listing-stats') + '?page=1&limit=50'),
+          apiRequest(
+            SYSTEM_ENDPOINTS.SETTING_MARKETPLACE.replace(
+              '/settings/marketplace',
+              '/marketplace/listing-stats'
+            ) + '?page=1&limit=50'
+          ),
           apiRequest(SYSTEM_ENDPOINTS.SETTING_MARKETPLACE),
-          apiRequest(EXCHANGE_ENDPOINTS.MARKET_STATS_OVERVIEW)
+          apiRequest(TRADE_ENDPOINTS.STATS_OVERVIEW)
         ])
 
-        const listingData = listingStatsRes.status === 'fulfilled' && listingStatsRes.value?.success
-          ? listingStatsRes.value.data : null
-        const settingsRaw = settingsRes.status === 'fulfilled' && settingsRes.value?.success
-          ? settingsRes.value.data : null
-        const exchangeData = exchangeStatsRes.status === 'fulfilled' && exchangeStatsRes.value?.success
-          ? exchangeStatsRes.value.data : null
+        const listingData =
+          listingStatsRes.status === 'fulfilled' && listingStatsRes.value?.success
+            ? listingStatsRes.value.data
+            : null
+        const settingsRaw =
+          settingsRes.status === 'fulfilled' && settingsRes.value?.success
+            ? settingsRes.value.data
+            : null
+        const exchangeData =
+          exchangeStatsRes.status === 'fulfilled' && exchangeStatsRes.value?.success
+            ? exchangeStatsRes.value.data
+            : null
 
         // 后端 settings/marketplace → 键值对转换
         const settingsMap = {}
         if (settingsRaw?.settings && Array.isArray(settingsRaw.settings)) {
           settingsRaw.settings.forEach(s => {
-            settingsMap[s.setting_key] = s.parsed_value !== undefined ? s.parsed_value : s.setting_value
+            settingsMap[s.setting_key] =
+              s.parsed_value !== undefined ? s.parsed_value : s.setting_value
           })
         }
 
@@ -1027,9 +1042,9 @@ function riskAlertsPage() {
         const lowStockItems = 0
 
         // 计算成交率（有商品数据时）: 总兑换次数 / 上架商品数
-        const dealRate = activeItems > 0 ? (totalExchanges / activeItems * 100) : 0
+        const dealRate = activeItems > 0 ? (totalExchanges / activeItems) * 100 : 0
         // 计算库存预警率: 库存预警商品数 / 商品总数
-        const lowStockRate = totalItems > 0 ? (lowStockItems / totalItems * 100) : 0
+        const lowStockRate = totalItems > 0 ? (lowStockItems / totalItems) * 100 : 0
 
         this.marketMonitor = {
           // 挂单统计（直接使用后端字段名）
@@ -1049,7 +1064,9 @@ function riskAlertsPage() {
           thresholds: {
             price_low: settingsMap.monitor_price_low_threshold ?? '未配置',
             price_high: settingsMap.monitor_price_high_threshold ?? '未配置',
-            alert_enabled: settingsMap.monitor_alert_enabled === true || settingsMap.monitor_alert_enabled === 'true',
+            alert_enabled:
+              settingsMap.monitor_alert_enabled === true ||
+              settingsMap.monitor_alert_enabled === 'true',
             long_listing_days: settingsMap.monitor_long_listing_days ?? '未配置',
             min_price: settingsMap.min_price_red_shard ?? '未配置',
             max_price: settingsMap.max_price_red_shard ?? '未配置'
@@ -1324,7 +1341,10 @@ function riskAlertsPage() {
           this.hideModal('handleModal')
           this.showSuccess(`告警已${this.handleForm.status === 'reviewed' ? '复核' : '处理'}`)
           await this.loadAlerts()
-          if (this.selectedAlert && this.selectedAlert.risk_alert_id == this.handleForm.risk_alert_id) {
+          if (
+            this.selectedAlert &&
+            this.selectedAlert.risk_alert_id == this.handleForm.risk_alert_id
+          ) {
             await this.loadAlertTimeline(this.handleForm.risk_alert_id)
           }
         } else {
@@ -1609,10 +1629,13 @@ function riskAlertsPage() {
       this.showSuccess(`已静默该告警 ${duration} 分钟`)
 
       // 自动解除静默
-      setTimeout(() => {
-        this.silencedAlerts.risk_alert_ids.delete(alert.risk_alert_id)
-        logger.info('[P2-8] 解除告警静默:', alert.risk_alert_id)
-      }, duration * 60 * 1000)
+      setTimeout(
+        () => {
+          this.silencedAlerts.risk_alert_ids.delete(alert.risk_alert_id)
+          logger.info('[P2-8] 解除告警静默:', alert.risk_alert_id)
+        },
+        duration * 60 * 1000
+      )
     },
 
     /**
@@ -1626,10 +1649,13 @@ function riskAlertsPage() {
       this.showSuccess(`已静默 ${alertType} 类型告警 ${duration} 分钟`)
 
       // 自动解除静默
-      setTimeout(() => {
-        this.silencedAlerts.alert_types.delete(alertType)
-        logger.info('[P2-8] 解除告警类型静默:', alertType)
-      }, duration * 60 * 1000)
+      setTimeout(
+        () => {
+          this.silencedAlerts.alert_types.delete(alertType)
+          logger.info('[P2-8] 解除告警类型静默:', alertType)
+        },
+        duration * 60 * 1000
+      )
     },
 
     /**
@@ -1643,10 +1669,13 @@ function riskAlertsPage() {
       this.showSuccess(`已静默用户 ${userId} 的告警 ${duration} 分钟`)
 
       // 自动解除静默
-      setTimeout(() => {
-        this.silencedAlerts.user_ids.delete(userId)
-        logger.info('[P2-8] 解除用户告警静默:', userId)
-      }, duration * 60 * 1000)
+      setTimeout(
+        () => {
+          this.silencedAlerts.user_ids.delete(userId)
+          logger.info('[P2-8] 解除用户告警静默:', userId)
+        },
+        duration * 60 * 1000
+      )
     },
 
     /**
@@ -1661,7 +1690,7 @@ function riskAlertsPage() {
 
       const existingGroup = this.alertMergeTracker.get(mergeKey)
 
-      if (existingGroup && (now - existingGroup.first_time) < oneHour) {
+      if (existingGroup && now - existingGroup.first_time < oneHour) {
         // 1小时内同类告警，增加计数
         existingGroup.count++
         existingGroup.last_alert = alert
@@ -1721,7 +1750,9 @@ function riskAlertsPage() {
           severity: severity,
           count: group.count,
           alerts: group.alerts || [],
-          first_time: new Date(group.first_time).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
+          first_time: new Date(group.first_time).toLocaleString('zh-CN', {
+            timeZone: 'Asia/Shanghai'
+          })
         }
         this.showMergedAlertsModal = true
       }
@@ -1769,10 +1800,18 @@ function riskAlertsPage() {
         if (this.escalatedAlertIds.has(`${alertId}_2h`) && elapsed >= twoHours) {
           return
         }
-        if (this.escalatedAlertIds.has(`${alertId}_1h`) && elapsed >= oneHour && elapsed < twoHours) {
+        if (
+          this.escalatedAlertIds.has(`${alertId}_1h`) &&
+          elapsed >= oneHour &&
+          elapsed < twoHours
+        ) {
           return
         }
-        if (this.escalatedAlertIds.has(`${alertId}_30m`) && elapsed >= thirtyMinutes && elapsed < oneHour) {
+        if (
+          this.escalatedAlertIds.has(`${alertId}_30m`) &&
+          elapsed >= thirtyMinutes &&
+          elapsed < oneHour
+        ) {
           return
         }
 

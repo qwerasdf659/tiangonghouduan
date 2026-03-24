@@ -154,8 +154,14 @@ export function usePlacementMethods() {
         }
 
         const priority = Number(p.priority)
-        if (isNaN(priority) || priority < PLACEMENT_ENUMS.priority.min || priority > PLACEMENT_ENUMS.priority.max) {
-          errors.push(`${prefix}: 优先级超出范围（${p.priority}），允许 ${PLACEMENT_ENUMS.priority.min}-${PLACEMENT_ENUMS.priority.max}`)
+        if (
+          isNaN(priority) ||
+          priority < PLACEMENT_ENUMS.priority.min ||
+          priority > PLACEMENT_ENUMS.priority.max
+        ) {
+          errors.push(
+            `${prefix}: 优先级超出范围（${p.priority}），允许 ${PLACEMENT_ENUMS.priority.min}-${PLACEMENT_ENUMS.priority.max}`
+          )
         }
 
         // 每页最多 1 个 main
@@ -163,7 +169,9 @@ export function usePlacementMethods() {
           mainCountByPage[p.page] = (mainCountByPage[p.page] || 0) + 1
           if (mainCountByPage[p.page] > 1) {
             const pageLabel = PLACEMENT_ENUMS.pages.find(o => o.value === p.page)?.label || p.page
-            errors.push(`${prefix}: ${pageLabel}最多 1 个主位置，当前已有 ${mainCountByPage[p.page]} 个`)
+            errors.push(
+              `${prefix}: ${pageLabel}最多 1 个主位置，当前已有 ${mainCountByPage[p.page]} 个`
+            )
           }
         }
       })

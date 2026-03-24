@@ -108,7 +108,12 @@ function redemptionManagementPage() {
       if (!this.checkAuth()) return
 
       // 并行加载数据
-      await Promise.all([this.loadStats(), this.loadOrders(), this.loadStores(), this.loadMerchantOptions()])
+      await Promise.all([
+        this.loadStats(),
+        this.loadOrders(),
+        this.loadStores(),
+        this.loadMerchantOptions()
+      ])
 
       logger.info('[RedemptionMgmt] 初始化完成')
     },
@@ -198,7 +203,11 @@ function redemptionManagementPage() {
      */
     async loadMerchantOptions() {
       try {
-        const result = await this.apiGet(MERCHANT_ENDPOINTS.OPTIONS, {}, { showLoading: false, showError: false })
+        const result = await this.apiGet(
+          MERCHANT_ENDPOINTS.OPTIONS,
+          {},
+          { showLoading: false, showError: false }
+        )
         const data = result?.success ? result.data : result
         this.merchantOptions = Array.isArray(data) ? data : []
         logger.debug('[RedemptionMgmt] 商家选项加载完成', { count: this.merchantOptions.length })
@@ -232,7 +241,14 @@ function redemptionManagementPage() {
      * 重置筛选条件
      */
     resetFilter() {
-      this.filter = { keyword: '', status: '', mobile: '', merchant_id: '', start_date: '', end_date: '' }
+      this.filter = {
+        keyword: '',
+        status: '',
+        mobile: '',
+        merchant_id: '',
+        start_date: '',
+        end_date: ''
+      }
       this.current_page = 1
       this.loadOrders()
     },
@@ -570,8 +586,7 @@ function redemptionManagementPage() {
     get selectedPendingCount() {
       if (!this.selectedIds || this.selectedIds.length === 0) return 0
       return this.orders.filter(
-        o =>
-          o.status === 'pending' && this.selectedIds.includes(o.redemption_order_id)
+        o => o.status === 'pending' && this.selectedIds.includes(o.redemption_order_id)
       ).length
     },
 
@@ -626,7 +641,7 @@ function redemptionManagementPage() {
       if (order.fulfilled_store?.store_name) return order.fulfilled_store.store_name
       if (order.fulfilled_store_id) {
         const store = this.stores.find(s => s.store_id === order.fulfilled_store_id)
-        return store ? (store.store_name || store.name) : `门店#${order.fulfilled_store_id}`
+        return store ? store.store_name || store.name : `门店#${order.fulfilled_store_id}`
       }
       return '-'
     },
@@ -709,7 +724,12 @@ function redemptionManagementPage() {
           this.loadStats()
         } else {
           this.scan.result = { type: 'error', message: res.message }
-          this.scan.history.unshift({ code: displayCode, status: 'failed', time, error: res.message })
+          this.scan.history.unshift({
+            code: displayCode,
+            status: 'failed',
+            time,
+            error: res.message
+          })
           Alpine.store('notification').show(res.message || '扫码核销失败', 'error')
         }
       } catch (error) {

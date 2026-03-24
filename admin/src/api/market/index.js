@@ -3,16 +3,18 @@
  *
  * @module api/market
  * @description 聚合导出市场交易相关的所有 API 模块
- * @version 2.0.0
- * @date 2026-01-30
+ * @version 3.0.0
+ * @date 2026-03-24
+ *
+ * 推荐：各模块直接导入域常量（模式 A — §14.3），barrel 仅用于全局审计。
  *
  * @example
- * // 导入全部
- * import { MarketAPI, MARKET_ENDPOINTS } from './api/market'
+ * // 推荐：域直接导入（依赖图清晰）
+ * import { EXCHANGE_ENDPOINTS } from './api/market/exchange.js'
+ * import { TRADE_ENDPOINTS } from './api/market/trade.js'
  *
- * // 按需导入
- * import { ExchangeAPI } from './api/market/exchange.js'
- * import { TradeAPI } from './api/market/trade.js'
+ * // 兼容：全域合并（仅用于全局审计场景）
+ * import { MARKET_ENDPOINTS } from './api/market'
  */
 
 // 导入子模块

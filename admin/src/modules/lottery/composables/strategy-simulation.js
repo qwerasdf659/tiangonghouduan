@@ -760,9 +760,7 @@ export function useStrategySimulationMethods() {
     // ===== 矩阵操作辅助方法 =====
 
     getProposedMatrixValue(pressure_tier, field) {
-      const cell = this.proposed_config.matrix_config?.find(
-        m => m.pressure_tier === pressure_tier
-      )
+      const cell = this.proposed_config.matrix_config?.find(m => m.pressure_tier === pressure_tier)
       return cell ? (cell[field] ?? 0) : 0
     },
 
@@ -1195,4 +1193,3 @@ export function useStrategySimulationMethods() {
 }
 
 export default { useStrategySimulationState, useStrategySimulationMethods }
-

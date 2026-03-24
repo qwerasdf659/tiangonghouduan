@@ -63,7 +63,8 @@ export function useMerchantLogsMethods() {
         params.append('page_size', this.financePagination?.page_size || 20)
         // 后端支持的筛选参数：operator_id, operation_type, start_time, end_time
         if (this.logFilters.operator_id) params.append('operator_id', this.logFilters.operator_id)
-        if (this.logFilters.operation_type) params.append('operation_type', this.logFilters.operation_type)
+        if (this.logFilters.operation_type)
+          params.append('operation_type', this.logFilters.operation_type)
         // 后端期望完整时间格式 (YYYY-MM-DD HH:mm:ss)
         // 日期自动补全为当天开始/结束时间
         if (this.logFilters.start_time) {
@@ -160,7 +161,8 @@ export function useMerchantLogsMethods() {
       try {
         const params = new URLSearchParams()
         if (this.logFilters.operator_id) params.append('operator_id', this.logFilters.operator_id)
-        if (this.logFilters.operation_type) params.append('operation_type', this.logFilters.operation_type)
+        if (this.logFilters.operation_type)
+          params.append('operation_type', this.logFilters.operation_type)
         // 后端期望完整时间格式 (YYYY-MM-DD HH:mm:ss)
         if (this.logFilters.start_time) {
           const startTime = this.logFilters.start_time.includes(' ')

@@ -33,7 +33,7 @@ const { authenticateToken, requireRoleLevel } = require('../../middleware/auth')
  * @access Private（仅管理员）
  *
  * @query {string} [status] - 筛选活动状态（可选）
- * @query {number} [limit] - 限制返回数量（可选）
+ * @query {number} [page_size] - 限制返回数量（可选）
  *
  * @returns {Object} 活动列表
  * @returns {boolean} return.success - 请求是否成功
@@ -45,17 +45,17 @@ const { authenticateToken, requireRoleLevel } = require('../../middleware/auth')
  */
 router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const { status, limit } = req.query
+    const { status, page_size } = req.query
 
     logger.info('获取所有活动列表', {
       status,
-      limit,
+      page_size,
       admin_id: req.user.user_id,
       request_id: req.id
     })
 
     const ActivityService = req.app.locals.services.getService('activity')
-    const activities = await ActivityService.getAllActivities({ status, limit })
+    const activities = await ActivityService.getAllActivities({ status, limit: page_size })
 
     logger.info('获取所有活动列表成功', {
       total: activities.length,

@@ -7,15 +7,12 @@
  * - portfolio.js - 资产总览接口（含物品列表、物品详情、物品事件历史）
  * - stats - 系统级资产统计（管理员运营视角）
  * - export - 资产数据导出（Excel/CSV格式）
+ * - rates.js - 汇率管理（B2C + C2C 共享）
  *
  * 权限要求：admin（可写）或 ops（只读）角色
  *
- * 迁移说明（2026-01-07）：
- * - 从 /api/v4/shop/assets/portfolio 迁移到 /api/v4/console/assets/portfolio
- * - 这些是后台运营能力，而非 shop 业务的一部分
- *
  * 创建时间：2026-01-07
- * 更新时间：2026-01-30（添加 export 资产导出端点）
+ * 更新时间：2026-03-24（补充 rates 模块说明）
  */
 
 'use strict'
@@ -27,7 +24,12 @@ const logger = require('../../../../utils/logger')
 const ExcelJS = require('exceljs')
 const BeijingTimeHelper = require('../../../../utils/timeHelper')
 
-/** RFC 4180-style CSV from row objects (UTF-8; caller adds BOM for Excel). */
+/**
+ * RFC 4180-style CSV from row objects (UTF-8; caller adds BOM for Excel).
+ *
+ * @param {Array<Object>} rows - 行数据对象数组
+ * @returns {string} CSV 格式字符串
+ */
 function rowsToCsv(rows) {
   if (!rows.length) return ''
   const keys = Object.keys(rows[0])
@@ -78,7 +80,7 @@ router.get('/stats', authenticateToken, requireRoleLevel(100), async (req, res) 
  * @query {string} [status] - 状态筛选（如 active, frozen）
  * @query {string} [format=excel] - 导出格式：excel | csv
  * @query {number} [user_id] - 筛选指定用户的资产
- * @query {number} [limit=1000] - 导出数据条数限制（最大10000）
+ * @query {number} [page_size=1000] - 导出数据条数限制（最大10000）
  *
  * @returns {Stream} 文件流（Excel或CSV格式）
  *
@@ -86,7 +88,7 @@ router.get('/stats', authenticateToken, requireRoleLevel(100), async (req, res) 
  */
 router.get('/export', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const { type: asset_type, status, format = 'excel', user_id, limit = 1000 } = req.query
+    const { type: asset_type, status, format = 'excel', user_id, page_size = 1000 } = req.query
 
     // 参数验证
     const validFormats = ['excel', 'csv']
@@ -94,7 +96,7 @@ router.get('/export', authenticateToken, requireRoleLevel(100), async (req, res)
       return res.apiError('format 必须是 excel 或 csv', 'BAD_REQUEST', null, 400)
     }
 
-    const exportLimit = Math.min(Math.max(1, parseInt(limit) || 1000), 10000)
+    const exportLimit = Math.min(Math.max(1, parseInt(page_size) || 1000), 10000)
 
     logger.info('📊 导出资产数据', {
       admin_id: req.user.user_id,
@@ -102,7 +104,7 @@ router.get('/export', authenticateToken, requireRoleLevel(100), async (req, res)
       status,
       format,
       user_id,
-      limit: exportLimit
+      page_size: exportLimit
     })
 
     // V4.7.0 AssetService 拆分：通过 ServiceManager 获取 QueryService（2026-01-31）
@@ -210,7 +212,7 @@ router.get('/export', authenticateToken, requireRoleLevel(100), async (req, res)
 router.use('/', portfolioRoutes)
 router.use('/transactions', transactionsRoutes)
 
-/** 汇率管理（B2C + C2C 共享，从 market/exchange-rates.js 迁移） */
-router.use('/rates', require('../market/exchange-rates'))
+/** 汇率管理（B2C + C2C 共享，平台级资产域） */
+router.use('/rates', require('./rates'))
 
 module.exports = router

@@ -519,7 +519,7 @@ router.get('/abnormal', authenticateToken, requireRoleLevel(100), async (req, re
  *
  * Query参数：
  * - page: 页码（默认1）
- * - limit: 每页数量（默认20，最大50）
+ * - page_size: 每页数量（默认20，最大50）
  *
  * 审计日志：记录管理员查看用户数据的操作
  *
@@ -535,15 +535,15 @@ router.get('/history/:user_id', authenticateToken, requireRoleLevel(100), async 
       return res.apiError('无效的用户ID', 'INVALID_USER_ID', null, 400)
     }
 
-    const { page = 1, limit = 20 } = req.query
+    const { page = 1, page_size = 20 } = req.query
     const finalPage = Math.max(parseInt(page) || 1, 1)
-    const finalLimit = Math.min(Math.max(parseInt(limit) || 20, 1), 50)
+    const finalPageSize = Math.min(Math.max(parseInt(page_size) || 20, 1), 50)
 
     // 通过 ServiceManager 获取 LotteryQueryService
     const LotteryQueryService = req.app.locals.services.getService('lottery_query')
     const history = await LotteryQueryService.getUserHistory(targetUserId, {
       page: finalPage,
-      limit: finalLimit
+      limit: finalPageSize
     })
 
     // 审计日志：记录管理员查看用户抽奖历史
@@ -570,7 +570,7 @@ router.get('/history/:user_id', authenticateToken, requireRoleLevel(100), async 
       admin_id: req.user.user_id,
       target_user_id: targetUserId,
       page: finalPage,
-      limit: finalLimit,
+      page_size: finalPageSize,
       record_count: history.records?.length || 0
     })
 

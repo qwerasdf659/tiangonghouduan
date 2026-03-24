@@ -9,7 +9,7 @@
 
 // ES Module 导入
 import { logger } from '../../../utils/logger.js'
-import { MARKET_ENDPOINTS } from '../../../api/market/index.js'
+import { EXCHANGE_ENDPOINTS } from '../../../api/market/exchange.js'
 import { request } from '../../../api/base.js'
 import { loadECharts } from '../../../utils/echarts-lazy.js'
 
@@ -68,7 +68,7 @@ export function useExchangeStatsMethods() {
       try {
         this.loading = true
         const statsRes = await request({
-          url: MARKET_ENDPOINTS.EXCHANGE_MARKET_STATISTICS,
+          url: EXCHANGE_ENDPOINTS.STATS,
           method: 'GET'
         })
 
@@ -153,7 +153,7 @@ export function useExchangeStatsMethods() {
         } else {
           if (!this.orders || this.orders.length === 0) {
             const ordersRes = await request({
-              url: MARKET_ENDPOINTS.EXCHANGE_ORDERS,
+              url: EXCHANGE_ENDPOINTS.ORDERS,
               method: 'GET',
               params: { page: 1, page_size: 100 }
             })
@@ -394,17 +394,23 @@ export function useExchangeStatsMethods() {
       // 履约率 = (已完成 + 已发货) / (总数 - 已取消)
       const validOrders = total - cancelled
       const fulfilledOrders = completed + shipped
-      const fulfillment_rate = validOrders > 0 ? Math.round((fulfilledOrders / validOrders) * 10000) / 100 : 0
+      const fulfillment_rate =
+        validOrders > 0 ? Math.round((fulfilledOrders / validOrders) * 10000) / 100 : 0
 
       // 计算平均履约时间（从创建到完成/发货）
       let totalFulfillmentHours = 0
       let fulfilledCount = 0
       orders.forEach(order => {
-        if ((order.status === 'completed' || order.status === 'shipped') && order.created_at && order.updated_at) {
+        if (
+          (order.status === 'completed' || order.status === 'shipped') &&
+          order.created_at &&
+          order.updated_at
+        ) {
           const created = new Date(order.created_at)
           const updated = new Date(order.updated_at)
           const hours = (updated - created) / (1000 * 60 * 60)
-          if (hours > 0 && hours < 720) { // 排除异常数据（超过30天）
+          if (hours > 0 && hours < 720) {
+            // 排除异常数据（超过30天）
             totalFulfillmentHours += hours
             fulfilledCount++
           }
@@ -418,7 +424,8 @@ export function useExchangeStatsMethods() {
         completed_count: completed,
         cancelled_count: cancelled,
         fulfillment_rate,
-        avg_fulfillment_time: fulfilledCount > 0 ? Math.round(totalFulfillmentHours / fulfilledCount * 10) / 10 : 0
+        avg_fulfillment_time:
+          fulfilledCount > 0 ? Math.round((totalFulfillmentHours / fulfilledCount) * 10) / 10 : 0
       }
 
       logger.info('[ExchangeStats] 履约追踪数据计算完成', this.fulfillmentTracking)

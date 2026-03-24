@@ -855,13 +855,15 @@ class BusinessRecordQueryService {
    * @param {Object} options - 查询选项
    * @param {string} [options.start_time] - 开始时间
    * @param {string} [options.end_time] - 结束时间
-   * @param {number} [options.limit=10] - 返回数量
+   * @param {number} [options.page_size=10] - 返回数量
+   * @param {number} [options.limit] - 兼容旧参数名
    * @returns {Promise<Array>} 操作者统计数据
    */
   static async getAuditStatsByOperator(options = {}) {
     const { AdminOperationLog, User } = require('../../models')
 
-    const { start_time, end_time, limit = 10 } = options
+    const { start_time, end_time, page_size, limit: legacyLimit = 10 } = options
+    const limit = page_size !== undefined ? page_size : legacyLimit
 
     // 构建时间范围条件
     const where = {}

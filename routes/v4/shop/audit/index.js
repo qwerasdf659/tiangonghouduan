@@ -189,7 +189,7 @@ router.get(
  * @query {string} end_date - 结束日期（必填，格式：YYYY-MM-DD）
  * @query {string} operation_type - 操作类型（可选）
  * @query {string} result - 操作结果（可选：success/failed/blocked）
- * @query {number} limit - 最大导出条数（可选，默认10000，最大50000）
+ * @query {number} page_size - 最大导出条数（可选，默认10000，最大50000）
  *
  * 响应：
  * - Content-Type: text/csv
@@ -206,7 +206,14 @@ router.get(
   requireMerchantPermission('staff:read', { scope: 'store', storeIdParam: 'query' }),
   async (req, res) => {
     try {
-      const { store_id, start_date, end_date, operation_type, result, limit = 10000 } = req.query
+      const {
+        store_id,
+        start_date,
+        end_date,
+        operation_type,
+        result,
+        page_size = 10000
+      } = req.query
 
       const user_stores = req.user_stores || []
 
@@ -263,7 +270,7 @@ router.get(
         req.app.locals.services.getService('merchant_operation_log')
 
       // 4. 限制导出条数
-      const exportLimit = Math.min(Math.max(parseInt(limit) || 10000, 100), 50000)
+      const exportLimit = Math.min(Math.max(parseInt(page_size) || 10000, 100), 50000)
 
       logger.info('开始导出商家审计日志', {
         user_id: req.user.user_id,

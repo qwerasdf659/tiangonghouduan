@@ -31,13 +31,24 @@
 // ========== 静态命名导入（Rollup tree-shaking 生效） ==========
 import * as echarts from 'echarts/core'
 import {
-  LineChart, BarChart, PieChart, ScatterChart,
-  FunnelChart, SankeyChart, HeatmapChart
+  LineChart,
+  BarChart,
+  PieChart,
+  ScatterChart,
+  FunnelChart,
+  SankeyChart,
+  HeatmapChart
 } from 'echarts/charts'
 import {
-  TitleComponent, TooltipComponent, GridComponent,
-  LegendComponent, DatasetComponent, TransformComponent,
-  MarkPointComponent, MarkLineComponent, VisualMapComponent
+  TitleComponent,
+  TooltipComponent,
+  GridComponent,
+  LegendComponent,
+  DatasetComponent,
+  TransformComponent,
+  MarkPointComponent,
+  MarkLineComponent,
+  VisualMapComponent
 } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 
@@ -45,11 +56,22 @@ import { logger } from './logger.js'
 
 // 同步注册：模块加载时立即执行，use() 只跑一次
 echarts.use([
-  LineChart, BarChart, PieChart, ScatterChart,
-  FunnelChart, SankeyChart, HeatmapChart,
-  TitleComponent, TooltipComponent, GridComponent,
-  LegendComponent, DatasetComponent, TransformComponent,
-  MarkPointComponent, MarkLineComponent, VisualMapComponent,
+  LineChart,
+  BarChart,
+  PieChart,
+  ScatterChart,
+  FunnelChart,
+  SankeyChart,
+  HeatmapChart,
+  TitleComponent,
+  TooltipComponent,
+  GridComponent,
+  LegendComponent,
+  DatasetComponent,
+  TransformComponent,
+  MarkPointComponent,
+  MarkLineComponent,
+  VisualMapComponent,
   CanvasRenderer
 ])
 

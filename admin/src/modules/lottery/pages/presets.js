@@ -405,7 +405,11 @@ function presetsPage() {
       try {
         const response = await apiRequest(LOTTERY_ENDPOINTS.CAMPAIGN_LIST)
         const data = response?.data || response
-        this.campaignsForIntervention = Array.isArray(data?.campaigns) ? data.campaigns : (Array.isArray(data) ? data : [])
+        this.campaignsForIntervention = Array.isArray(data?.campaigns)
+          ? data.campaigns
+          : Array.isArray(data)
+            ? data
+            : []
         logger.debug('[PRESETS] 活动列表加载完成', { count: this.campaignsForIntervention.length })
       } catch (error) {
         logger.warn('[PRESETS] 加载活动列表失败（干预创建将使用全局模式）:', error.message)

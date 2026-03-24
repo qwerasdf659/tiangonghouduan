@@ -7,11 +7,6 @@
  * API列表：
  * - GET /user-info - 验证二维码并获取用户详细信息（商家扫码后使用，需商家域权限）
  *
- * 📌 DB-3 迁移记录（2026-02-20）：
- * - GET /qrcode 已迁移到 /api/v4/user/consumption/qrcode（用户域）
- * - 原因：QR 码生成是消费者行为，不属于商家域（与 exchange → backpack 迁移同理）
- * - 迁移文件：routes/v4/user/consumption-qrcode.js
- *
  * 路由分布：
  * - 用户端 GET /qrcode → /api/v4/user/consumption/qrcode（仅需 authenticateToken）
  * - 商家端 GET /user-info → 本文件（需 requireMerchantDomainAccess + requireMerchantPermission）
@@ -41,13 +36,6 @@ const logger = require('../../../../utils/logger').logger
  * - 通过 ServiceManager 统一获取服务（B1-Injected + E2-Strict snake_case）
  * - UserService 通过 req.app.locals.services.getService('user') 获取
  * - 商家域审计日志（AC4.2）通过 MerchantOperationLogService 访问
- */
-
-/*
- * GET /qrcode 已迁移到用户域（DB-3 修复，2026-02-20 方案B）
- * 新端点：GET /api/v4/user/consumption/qrcode
- * 迁移文件：routes/v4/user/consumption-qrcode.js
- * 原因：QR 码生成是消费者行为，按行为发起者归入 /user/ 域
  */
 
 /**

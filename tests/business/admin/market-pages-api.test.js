@@ -36,9 +36,9 @@ beforeAll(async () => {
 // ==================== 兑换市场（exchange-market.html）====================
 
 describe('兑换市场管理页面 API', () => {
-  test('GET /console/exchange-items - 商品列表应返回分页数据', async () => {
+  test('GET /console/exchange/items - 商品列表应返回分页数据', async () => {
     const res = await request
-      .get('/api/v4/console/exchange-items')
+      .get('/api/v4/console/exchange/items')
       .set('Authorization', `Bearer ${adminToken}`)
       .query({ page: 1, page_size: 10 })
 
@@ -66,9 +66,9 @@ describe('兑换市场管理页面 API', () => {
     }
   })
 
-  test('GET /console/marketplace/exchange_market/orders - 兑换订单列表应返回分页数据', async () => {
+  test('GET /console/exchange/orders - 兑换订单列表应返回分页数据', async () => {
     const res = await request
-      .get('/api/v4/console/marketplace/exchange_market/orders')
+      .get('/api/v4/console/exchange/orders')
       .set('Authorization', `Bearer ${adminToken}`)
       .query({ page: 1, page_size: 10 })
 
@@ -79,9 +79,9 @@ describe('兑换市场管理页面 API', () => {
     expect(Array.isArray(res.body.data.orders)).toBe(true)
   })
 
-  test('GET /console/marketplace/exchange_market/statistics - 统计数据应包含核心指标', async () => {
+  test('GET /console/exchange/stats - 统计数据应包含核心指标', async () => {
     const res = await request
-      .get('/api/v4/console/marketplace/exchange_market/statistics')
+      .get('/api/v4/console/exchange/stats')
       .set('Authorization', `Bearer ${adminToken}`)
 
     expect(res.status).toBe(200)
@@ -102,9 +102,9 @@ describe('兑换市场管理页面 API', () => {
 // ==================== 交易市场管理（trade-management.html）====================
 
 describe('交易市场管理页面 API', () => {
-  test('GET /console/trade-orders - 交易订单列表应返回分页数据', async () => {
+  test('GET /console/marketplace/orders - 交易订单列表应返回分页数据', async () => {
     const res = await request
-      .get('/api/v4/console/trade-orders')
+      .get('/api/v4/console/marketplace/orders')
       .set('Authorization', `Bearer ${adminToken}`)
       .query({ page: 1, page_size: 10 })
 
@@ -122,9 +122,9 @@ describe('交易市场管理页面 API', () => {
     }
   })
 
-  test('GET /console/trade-orders/stats - 交易统计应包含状态分布', async () => {
+  test('GET /console/marketplace/orders/stats - 交易统计应包含状态分布', async () => {
     const res = await request
-      .get('/api/v4/console/trade-orders/stats')
+      .get('/api/v4/console/marketplace/orders/stats')
       .set('Authorization', `Bearer ${adminToken}`)
 
     expect(res.status).toBe(200)
@@ -134,18 +134,6 @@ describe('交易市场管理页面 API', () => {
 
     const { by_status } = res.body.data
     expect(by_status).toHaveProperty('completed')
-  })
-
-  test('GET /console/marketplace/trade_orders - 交易市场订单列表应返回分页数据', async () => {
-    const res = await request
-      .get('/api/v4/console/marketplace/trade_orders')
-      .set('Authorization', `Bearer ${adminToken}`)
-      .query({ page: 1, page_size: 5 })
-
-    expect(res.status).toBe(200)
-    expect(res.body.success).toBe(true)
-    expect(res.body.data).toHaveProperty('orders')
-    expect(res.body.data.pagination.total).toBeGreaterThan(0)
   })
 
   test('GET /console/marketplace/listing-stats - 上架统计应返回用户分组数据', async () => {
@@ -162,6 +150,34 @@ describe('交易市场管理页面 API', () => {
     const { summary } = res.body.data
     expect(summary).toHaveProperty('total_users_with_listings')
     expect(summary).toHaveProperty('total_listings')
+  })
+
+  test('GET /console/dashboard/stats - 跨域顶线应包含 exchange / marketplace / bids', async () => {
+    const res = await request
+      .get('/api/v4/console/dashboard/stats')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .query({ days: 7 })
+
+    expect(res.status).toBe(200)
+    expect(res.body.success).toBe(true)
+    expect(res.body.data).toHaveProperty('period_days')
+    expect(res.body.data).toHaveProperty('exchange')
+    expect(res.body.data).toHaveProperty('marketplace')
+    expect(res.body.data).toHaveProperty('bids')
+    expect(res.body.data.exchange).toHaveProperty('active_items')
+    expect(res.body.data.marketplace).toHaveProperty('on_sale_count')
+  })
+
+  test('GET /console/marketplace/config/tradable-assets - 可交易资产配置', async () => {
+    const res = await request
+      .get('/api/v4/console/marketplace/config/tradable-assets')
+      .set('Authorization', `Bearer ${adminToken}`)
+
+    expect(res.status).toBe(200)
+    expect(res.body.success).toBe(true)
+    expect(res.body.data).toHaveProperty('assets')
+    expect(res.body.data).toHaveProperty('summary')
+    expect(Array.isArray(res.body.data.assets)).toBe(true)
   })
 })
 
@@ -261,11 +277,11 @@ describe('跨页面数据一致性', () => {
   test('兑换市场商品数 vs 统计数据应一致', async () => {
     const [itemsRes, statsRes] = await Promise.all([
       request
-        .get('/api/v4/console/exchange-items')
+        .get('/api/v4/console/exchange/items')
         .set('Authorization', `Bearer ${adminToken}`)
         .query({ page: 1, page_size: 1 }),
       request
-        .get('/api/v4/console/marketplace/exchange_market/statistics')
+        .get('/api/v4/console/exchange/stats')
         .set('Authorization', `Bearer ${adminToken}`)
     ])
 

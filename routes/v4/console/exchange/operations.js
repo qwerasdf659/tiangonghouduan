@@ -88,10 +88,12 @@ router.put(
 router.put('/items/batch-status', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { exchange_item_ids, status } = req.body
-    if (!Array.isArray(exchange_item_ids) || exchange_item_ids.length === 0)
+    if (!Array.isArray(exchange_item_ids) || exchange_item_ids.length === 0) {
       return res.apiError('商品ID列表不能为空', 'BAD_REQUEST', null, 400)
-    if (!['active', 'inactive'].includes(status))
+    }
+    if (!['active', 'inactive'].includes(status)) {
       return res.apiError('无效的状态值', 'BAD_REQUEST', null, 400)
+    }
     const ExchangeAdminService = req.app.locals.services.getService('exchange_admin')
     const result = await TransactionManager.execute(
       async transaction => {
@@ -131,8 +133,9 @@ router.put('/items/batch-price', authenticateToken, requireRoleLevel(100), async
       )
       return res.apiSuccess(result, `已更新 ${result.affected_rows} 个商品价格`)
     }
-    if (!Array.isArray(items) || items.length === 0)
+    if (!Array.isArray(items) || items.length === 0) {
       return res.apiError('价格数据不能为空', 'BAD_REQUEST', null, 400)
+    }
     const result = await TransactionManager.execute(
       async transaction => {
         return await ExchangeAdminService.batchSetIndividualPrices(items, {
@@ -152,10 +155,12 @@ router.put('/items/batch-price', authenticateToken, requireRoleLevel(100), async
 router.put('/items/batch-category', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { exchange_item_ids, category_id } = req.body
-    if (!Array.isArray(exchange_item_ids) || exchange_item_ids.length === 0)
+    if (!Array.isArray(exchange_item_ids) || exchange_item_ids.length === 0) {
       return res.apiError('商品ID列表不能为空', 'BAD_REQUEST', null, 400)
-    if (category_id === undefined)
+    }
+    if (category_id === undefined) {
       return res.apiError('目标分类ID不能为空', 'BAD_REQUEST', null, 400)
+    }
     const ExchangeAdminService = req.app.locals.services.getService('exchange_admin')
     const result = await TransactionManager.execute(
       async transaction => {
@@ -177,8 +182,9 @@ router.put('/items/batch-category', authenticateToken, requireRoleLevel(100), as
 router.put('/items/batch-sort', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { items } = req.body
-    if (!Array.isArray(items) || items.length === 0)
+    if (!Array.isArray(items) || items.length === 0) {
       return res.apiError('items 数组不能为空', 'INVALID_PARAMS', null, 400)
+    }
     const ExchangeService = req.app.locals.services.getService('exchange_admin')
     const result = await TransactionManager.execute(
       async transaction => {
@@ -236,10 +242,12 @@ router.get('/missing-images', authenticateToken, requireRoleLevel(100), async (r
 router.post('/batch-bind-images', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const { bindings } = req.body
-    if (!Array.isArray(bindings) || bindings.length === 0)
+    if (!Array.isArray(bindings) || bindings.length === 0) {
       return res.apiError('bindings 必须是非空数组', 'BAD_REQUEST', null, 400)
-    if (bindings.length > 100)
+    }
+    if (bindings.length > 100) {
       return res.apiError('单次批量绑定最多100条', 'BAD_REQUEST', null, 400)
+    }
     const ExchangeAdminService = req.app.locals.services.getService('exchange_admin')
     const result = await TransactionManager.execute(
       async transaction => {

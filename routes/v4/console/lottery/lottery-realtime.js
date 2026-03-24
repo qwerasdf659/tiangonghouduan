@@ -94,7 +94,7 @@ router.get('/stats', authenticateToken, requireRoleLevel(100), async (req, res) 
  * - level: 告警级别过滤（danger/warning/info，可选）
  * - type: 告警类型过滤（win_rate/budget/inventory/user/system，可选）
  * - status: 告警状态过滤（active/acknowledged/resolved，可选）
- * - limit: 返回数量（默认50）
+ * - page_size: 返回数量（默认50）
  *
  * 返回数据：
  * - alerts: 告警列表（包含 lottery_alert_id 用于确认/解决操作）
@@ -102,7 +102,7 @@ router.get('/stats', authenticateToken, requireRoleLevel(100), async (req, res) 
  */
 router.get('/alerts', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const { lottery_campaign_id, level, type, status, limit = 50 } = req.query
+    const { lottery_campaign_id, level, type, status, page_size = 50 } = req.query
 
     const alertService = getLotteryAlertService(req)
 
@@ -112,7 +112,7 @@ router.get('/alerts', authenticateToken, requireRoleLevel(100), async (req, res)
       level,
       type,
       status,
-      limit: parseInt(limit)
+      page_size: parseInt(page_size)
     })
 
     // 转换为前端期望的格式（以后端字段为准）
@@ -176,7 +176,7 @@ router.get('/alerts', authenticateToken, requireRoleLevel(100), async (req, res)
         pagination: {
           total: result.total,
           page: 1,
-          page_size: parseInt(limit),
+          page_size: parseInt(page_size),
           total_pages: 1
         }
       },

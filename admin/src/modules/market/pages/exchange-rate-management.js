@@ -216,7 +216,10 @@ document.addEventListener('alpine:init', () => {
         const newStatus = rate.status === 'active' ? 'paused' : 'active'
         const label = newStatus === 'active' ? '启用' : '暂停'
         try {
-          const res = await ExchangeRateAPI.updateExchangeRateStatus(rate.exchange_rate_id, newStatus)
+          const res = await ExchangeRateAPI.updateExchangeRateStatus(
+            rate.exchange_rate_id,
+            newStatus
+          )
           if (res.success) {
             Alpine.store('notification').show(`汇率规则已${label}`, 'success')
             await this.loadRates()

@@ -148,7 +148,11 @@ export function useDataManagementMethods() {
           if (pieEl) {
             const pieChart = echarts.init(pieEl)
             const levelColors = {
-              L0: '#ef4444', L1: '#f97316', L2: '#eab308', L3: '#22c55e', other: '#6b7280'
+              L0: '#ef4444',
+              L1: '#f97316',
+              L2: '#eab308',
+              L3: '#22c55e',
+              other: '#6b7280'
             }
             const pieData = Object.entries(this.stats.by_level).map(([level, info]) => ({
               name: level === 'other' ? '其他' : level,
@@ -160,14 +164,18 @@ export function useDataManagementMethods() {
               title: { text: '各安全等级数据量分布', left: 'center', textStyle: { fontSize: 14 } },
               tooltip: {
                 trigger: 'item',
-                formatter: (p) => `${p.name}: ${Number(p.value).toLocaleString()} 行 (${p.percent}%)`
+                formatter: p => `${p.name}: ${Number(p.value).toLocaleString()} 行 (${p.percent}%)`
               },
               legend: { bottom: 0, textStyle: { fontSize: 11 } },
-              series: [{
-                type: 'pie', radius: ['35%', '65%'], center: ['50%', '45%'],
-                label: { formatter: '{b}\n{d}%', fontSize: 11 },
-                data: pieData
-              }]
+              series: [
+                {
+                  type: 'pie',
+                  radius: ['35%', '65%'],
+                  center: ['50%', '45%'],
+                  label: { formatter: '{b}\n{d}%', fontSize: 11 },
+                  data: pieData
+                }
+              ]
             })
             window.addEventListener('resize', () => pieChart.resize())
           }
@@ -181,8 +189,9 @@ export function useDataManagementMethods() {
             barChart.setOption({
               title: { text: '数据量 Top 20 表', left: 'center', textStyle: { fontSize: 14 } },
               tooltip: {
-                trigger: 'axis', axisPointer: { type: 'shadow' },
-                formatter: (params) => {
+                trigger: 'axis',
+                axisPointer: { type: 'shadow' },
+                formatter: params => {
                   const p = params[0]
                   return `${p.name}<br/>预估行数: ${Number(p.value).toLocaleString()}`
                 }
@@ -190,21 +199,29 @@ export function useDataManagementMethods() {
               grid: { left: 10, right: 30, bottom: 5, top: 40, containLabel: true },
               xAxis: { type: 'value', axisLabel: { fontSize: 10 } },
               yAxis: {
-                type: 'category', inverse: true,
+                type: 'category',
+                inverse: true,
                 data: top20.map(t => t.table_name),
                 axisLabel: { fontSize: 10, width: 160, overflow: 'truncate' }
               },
-              series: [{
-                type: 'bar',
-                data: top20.map(t => Number(t.estimated_rows || 0)),
-                itemStyle: {
-                  color: (params) => {
-                    const colors = ['#6366f1', '#8b5cf6', '#a78bfa', '#c4b5fd']
-                    return colors[params.dataIndex % colors.length]
+              series: [
+                {
+                  type: 'bar',
+                  data: top20.map(t => Number(t.estimated_rows || 0)),
+                  itemStyle: {
+                    color: params => {
+                      const colors = ['#6366f1', '#8b5cf6', '#a78bfa', '#c4b5fd']
+                      return colors[params.dataIndex % colors.length]
+                    }
+                  },
+                  label: {
+                    show: true,
+                    position: 'right',
+                    fontSize: 10,
+                    formatter: p => p.value.toLocaleString()
                   }
-                },
-                label: { show: true, position: 'right', fontSize: 10, formatter: (p) => p.value.toLocaleString() }
-              }]
+                }
+              ]
             })
             window.addEventListener('resize', () => barChart.resize())
           }
@@ -248,13 +265,10 @@ export function useDataManagementMethods() {
     async savePolicy() {
       if (!this.editingPolicy) return
       try {
-        const res = await DataManagementAPI.updatePolicy(
-          this.editingPolicy.table,
-          {
-            retention_days: this.editingPolicy.retention_days,
-            enabled: this.editingPolicy.enabled
-          }
-        )
+        const res = await DataManagementAPI.updatePolicy(this.editingPolicy.table, {
+          retention_days: this.editingPolicy.retention_days,
+          enabled: this.editingPolicy.enabled
+        })
         if (res.success) {
           this.showSuccess('策略更新成功')
           this.editingPolicy = null
@@ -273,10 +287,7 @@ export function useDataManagementMethods() {
      */
     async togglePolicy(policy) {
       try {
-        const res = await DataManagementAPI.updatePolicy(
-          policy.table,
-          { enabled: !policy.enabled }
-        )
+        const res = await DataManagementAPI.updatePolicy(policy.table, { enabled: !policy.enabled })
         if (res.success) {
           policy.enabled = !policy.enabled
         }
@@ -411,7 +422,9 @@ export function useDataManagementMethods() {
           this.cleanupResult = res.data
           this.cleanupStep = 5
           const modeLabel = this.dry_run ? '干跑模式完成（未实际删除）' : '清理完成'
-          this.showSuccess(`${modeLabel}，共${this.dry_run ? '影响' : '删除'} ${res.data.total_deleted} 条数据`)
+          this.showSuccess(
+            `${modeLabel}，共${this.dry_run ? '影响' : '删除'} ${res.data.total_deleted} 条数据`
+          )
         } else {
           this.showError(res.message || '清理失败')
         }

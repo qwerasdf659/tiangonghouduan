@@ -3,9 +3,7 @@
  *
  * @description 管理员管理 C2C 二级市场：用户上架统计、挂牌运营、强制撤回、市场统计、可交易资产配置
  * @route /api/v4/console/marketplace/*
- * @version 4.0.0（命名空间重构：B2C 路由已迁移到 /console/exchange/*）
- *
- * 已迁移：exchange_market/* → /console/exchange/*，trade_orders → /console/marketplace/orders
+ * @version 4.0.0
  */
 
 const express = require('express')
@@ -567,11 +565,10 @@ router.get('/stats/price-history', authenticateToken, requireRoleLevel(100), asy
   }
 })
 
+// ==================== C2C 可交易资产配置 ====================
+
 /**
- *
- * // ==================== C2C 可交易资产配置 ====================
- *
- * GET /api/v4/console/marketplace/tradable-assets
+ * GET /api/v4/console/marketplace/config/tradable-assets
  *
  * P0-4: 管理端查看"交易市场可交易资产配置"的接口
  *
@@ -597,86 +594,89 @@ router.get('/stats/price-history', authenticateToken, requireRoleLevel(100), asy
  *
  * @created 2026-01-09（P0-4）
  */
-router.get('/tradable-assets', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const admin_id = req.user.user_id
+router.get(
+  '/config/tradable-assets',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const admin_id = req.user.user_id
 
-    logger.info('管理员查看交易市场可交易资产配置', { admin_id })
+      logger.info('管理员查看交易市场可交易资产配置', { admin_id })
 
-    // P1-9：通过 ServiceManager 获取服务（snake_case key）
-    const MaterialManagementService = req.app.locals.services.getService('material_management')
+      // P1-9：通过 ServiceManager 获取服务（snake_case key）
+      const MaterialManagementService = req.app.locals.services.getService('material_management')
 
-    // 导入黑名单相关常量和函数
-    const {
-      MARKET_BLACKLISTED_ASSET_CODES,
-      isBlacklistedForMarket,
-      getBlacklistReason
-    } = require('../../../../constants/TradableAssetTypes')
+      // 导入黑名单相关常量和函数
+      const {
+        MARKET_BLACKLISTED_ASSET_CODES,
+        isBlacklistedForMarket,
+        getBlacklistReason
+      } = require('../../../../constants/TradableAssetTypes')
 
-    // 通过 Service 层查询材料资产类型（符合路由层规范）
-    const assets = await MaterialManagementService.getAllAssetTypesForTradeConfig()
+      // 通过 Service 层查询材料资产类型（符合路由层规范）
+      const assets = await MaterialManagementService.getAllAssetTypesForTradeConfig()
 
-    // 构建响应数据，添加黑名单检查结果
-    const assetConfigs = assets.map(asset => {
-      const inBlacklist = isBlacklistedForMarket(asset.asset_code)
-      const blacklistReason = getBlacklistReason(asset.asset_code)
+      // 构建响应数据，添加黑名单检查结果
+      const assetConfigs = assets.map(asset => {
+        const inBlacklist = isBlacklistedForMarket(asset.asset_code)
+        const blacklistReason = getBlacklistReason(asset.asset_code)
 
-      /*
-       * 最终有效的可交易状态计算：
-       * 1. 必须是启用状态（is_enabled = true）
-       * 2. 数据库配置允许交易（is_tradable = true）
-       * 3. 不在硬编码黑名单中（!inBlacklist）
-       */
-      const effectiveTradable = asset.is_enabled && asset.is_tradable && !inBlacklist
+        /*
+         * 最终有效的可交易状态计算：
+         * 1. 必须是启用状态（is_enabled = true）
+         * 2. 数据库配置允许交易（is_tradable = true）
+         * 3. 不在硬编码黑名单中（!inBlacklist）
+         */
+        const effectiveTradable = asset.is_enabled && asset.is_tradable && !inBlacklist
 
-      return {
-        asset_code: asset.asset_code,
-        display_name: asset.display_name,
-        group_code: asset.group_code,
-        form: asset.form,
-        tier: asset.tier,
-        is_tradable: asset.is_tradable,
-        is_enabled: asset.is_enabled,
-        in_blacklist: inBlacklist,
-        blacklist_reason: blacklistReason,
-        effective_tradable: effectiveTradable
+        return {
+          asset_code: asset.asset_code,
+          display_name: asset.display_name,
+          group_code: asset.group_code,
+          form: asset.form,
+          tier: asset.tier,
+          is_tradable: asset.is_tradable,
+          is_enabled: asset.is_enabled,
+          in_blacklist: inBlacklist,
+          blacklist_reason: blacklistReason,
+          effective_tradable: effectiveTradable
+        }
+      })
+
+      // 统计摘要
+      const summary = {
+        total_assets: assetConfigs.length,
+        enabled_count: assetConfigs.filter(a => a.is_enabled).length,
+        tradable_count: assetConfigs.filter(a => a.effective_tradable).length,
+        blacklisted_count: assetConfigs.filter(a => a.in_blacklist).length,
+        blacklisted_codes: [...MARKET_BLACKLISTED_ASSET_CODES]
       }
-    })
 
-    // 统计摘要
-    const summary = {
-      total_assets: assetConfigs.length,
-      enabled_count: assetConfigs.filter(a => a.is_enabled).length,
-      tradable_count: assetConfigs.filter(a => a.effective_tradable).length,
-      blacklisted_count: assetConfigs.filter(a => a.in_blacklist).length,
-      blacklisted_codes: [...MARKET_BLACKLISTED_ASSET_CODES]
+      logger.info('交易市场可交易资产配置查询成功', {
+        admin_id,
+        total: summary.total_assets,
+        tradable: summary.tradable_count,
+        blacklisted: summary.blacklisted_count
+      })
+
+      return res.apiSuccess(
+        {
+          assets: assetConfigs,
+          summary
+        },
+        '交易市场可交易资产配置'
+      )
+    } catch (error) {
+      logger.error('查看交易市场可交易资产配置失败', {
+        error: error.message,
+        stack: error.stack,
+        admin_id: req.user?.user_id
+      })
+
+      return res.apiError(error.message || '查询失败', 'INTERNAL_ERROR', null, 500)
     }
-
-    logger.info('交易市场可交易资产配置查询成功', {
-      admin_id,
-      total: summary.total_assets,
-      tradable: summary.tradable_count,
-      blacklisted: summary.blacklisted_count
-    })
-
-    return res.apiSuccess(
-      {
-        assets: assetConfigs,
-        summary
-      },
-      '交易市场可交易资产配置'
-    )
-  } catch (error) {
-    logger.error('查看交易市场可交易资产配置失败', {
-      error: error.message,
-      stack: error.stack,
-      admin_id: req.user?.user_id
-    })
-
-    return res.apiError(error.message || '查询失败', 'INTERNAL_ERROR', null, 500)
   }
-})
-
-// ==================== 兑换订单管理员操作路由 ====================
+)
 
 module.exports = router

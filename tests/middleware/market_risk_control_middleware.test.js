@@ -386,7 +386,7 @@ describe('MarketRiskControlMiddleware - 交易市场风控中间件测试', () =
       const req = {
         user: { user_id: testUserId },
         body: { price_asset_code: 'DIAMOND' },
-        path: '/api/v4/market/listings'
+        path: '/api/v4/marketplace/listings'
       }
       const res = {
         apiError: jest.fn()
@@ -410,7 +410,7 @@ describe('MarketRiskControlMiddleware - 交易市场风控中间件测试', () =
 
       const req = {
         user: { user_id: testUserId },
-        path: '/api/v4/market/listings/123/withdraw'
+        path: '/api/v4/marketplace/listings/123/withdraw'
       }
       const res = {
         apiError: jest.fn()

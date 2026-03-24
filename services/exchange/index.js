@@ -24,11 +24,19 @@ const QueryService = require('./QueryService')
 const AdminService = require('./AdminService')
 const BidService = require('./BidService')
 const BidQueryService = require('./BidQueryService')
+const ExchangeRateService = require('./ExchangeRateService')
+const ExchangeItemService = require('./ExchangeItemService')
+const AttributeService = require('./AttributeService')
+const ExchangeChannelPriceService = require('./ExchangeChannelPriceService')
 
 module.exports = {
   CoreService,
   QueryService,
   AdminService,
   BidService,
-  BidQueryService
+  BidQueryService,
+  ExchangeRateService,
+  ExchangeItemService,
+  AttributeService,
+  ExchangeChannelPriceService
 }

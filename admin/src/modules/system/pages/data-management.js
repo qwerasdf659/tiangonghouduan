@@ -43,4 +43,3 @@ function dataManagementPage() {
 Alpine.data('dataManagementPage', dataManagementPage)
 
 export default dataManagementPage
-

@@ -19,8 +19,6 @@
  * - ItemInstance → Item（items 表，正式列替代 meta JSON）
  * - owner_user_id → owner_account_id（统一账户体系）
  * - meta.name → item_name, meta.rarity → rarity_code, meta.description → item_description
- *
- * 三表模型迁移：2026-02-22
  */
 
 const {

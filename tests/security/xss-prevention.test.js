@@ -69,7 +69,7 @@ describe('P3-8: XSS防护安全测试', () => {
 
   describe('API响应Content-Type验证', () => {
     test('所有API响应应设置正确的Content-Type', async () => {
-      const endpoints = ['/api/v4/campaigns', '/api/v4/health', '/api/v4/market/listings']
+      const endpoints = ['/api/v4/campaigns', '/api/v4/health', '/api/v4/marketplace/listings']
 
       for (const endpoint of endpoints) {
         const response = await request(app).get(endpoint)
@@ -113,7 +113,7 @@ describe('P3-8: XSS防护安全测试', () => {
     test('市场搜索应防护XSS', async () => {
       for (const payload of xssPayloads.slice(0, 5)) {
         const response = await request(app)
-          .get('/api/v4/market/listings')
+          .get('/api/v4/marketplace/listings')
           .query({ keyword: payload })
 
         // 响应中不应该包含可执行的脚本

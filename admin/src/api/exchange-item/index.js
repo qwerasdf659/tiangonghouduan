@@ -83,7 +83,11 @@ export const ExchangeItemAPI = {
    * @returns {Promise<Object>} 标准 API 响应
    */
   async updateExchangeItem(id, data) {
-    return request({ url: buildURL(EXCHANGE_ITEM_ENDPOINTS.ITEM_UPDATE, { id }), method: 'PUT', data })
+    return request({
+      url: buildURL(EXCHANGE_ITEM_ENDPOINTS.ITEM_UPDATE, { id }),
+      method: 'PUT',
+      data
+    })
   },
 
   /**
@@ -111,7 +115,11 @@ export const ExchangeItemAPI = {
    * @returns {Promise<Object>} 标准 API 响应
    */
   async createSku(exchangeItemId, data) {
-    return request({ url: buildURL(EXCHANGE_ITEM_ENDPOINTS.SKU_CREATE, { id: exchangeItemId }), method: 'POST', data })
+    return request({
+      url: buildURL(EXCHANGE_ITEM_ENDPOINTS.SKU_CREATE, { id: exchangeItemId }),
+      method: 'POST',
+      data
+    })
   },
 
   /**
@@ -121,7 +129,11 @@ export const ExchangeItemAPI = {
    * @returns {Promise<Object>} 标准 API 响应
    */
   async updateSku(skuId, data) {
-    return request({ url: buildURL(EXCHANGE_ITEM_ENDPOINTS.SKU_UPDATE, { sku_id: skuId }), method: 'PUT', data })
+    return request({
+      url: buildURL(EXCHANGE_ITEM_ENDPOINTS.SKU_UPDATE, { sku_id: skuId }),
+      method: 'PUT',
+      data
+    })
   },
 
   /**
@@ -130,7 +142,10 @@ export const ExchangeItemAPI = {
    * @returns {Promise<Object>} 标准 API 响应
    */
   async deleteSku(skuId) {
-    return request({ url: buildURL(EXCHANGE_ITEM_ENDPOINTS.SKU_DELETE, { sku_id: skuId }), method: 'DELETE' })
+    return request({
+      url: buildURL(EXCHANGE_ITEM_ENDPOINTS.SKU_DELETE, { sku_id: skuId }),
+      method: 'DELETE'
+    })
   },
 
   /**
@@ -140,7 +155,11 @@ export const ExchangeItemAPI = {
    * @returns {Promise<Object>} 标准 API 响应
    */
   async generateSkus(exchangeItemId, data) {
-    return request({ url: buildURL(EXCHANGE_ITEM_ENDPOINTS.SKU_GENERATE, { id: exchangeItemId }), method: 'POST', data })
+    return request({
+      url: buildURL(EXCHANGE_ITEM_ENDPOINTS.SKU_GENERATE, { id: exchangeItemId }),
+      method: 'POST',
+      data
+    })
   },
 
   /**
@@ -150,7 +169,11 @@ export const ExchangeItemAPI = {
    * @returns {Promise<Object>} 标准 API 响应
    */
   async adjustStock(skuId, delta) {
-    return request({ url: buildURL(EXCHANGE_ITEM_ENDPOINTS.SKU_STOCK_ADJUST, { sku_id: skuId }), method: 'PUT', data: { delta } })
+    return request({
+      url: buildURL(EXCHANGE_ITEM_ENDPOINTS.SKU_STOCK_ADJUST, { sku_id: skuId }),
+      method: 'PUT',
+      data: { delta }
+    })
   },
 
   /**
@@ -169,7 +192,11 @@ export const ExchangeItemAPI = {
    * @returns {Promise<Object>} 标准 API 响应
    */
   async setChannelPrices(skuId, prices) {
-    return request({ url: buildURL(EXCHANGE_ITEM_ENDPOINTS.SKU_CHANNEL_PRICES, { sku_id: skuId }), method: 'PUT', data: { prices } })
+    return request({
+      url: buildURL(EXCHANGE_ITEM_ENDPOINTS.SKU_CHANNEL_PRICES, { sku_id: skuId }),
+      method: 'PUT',
+      data: { prices }
+    })
   },
 
   /**
@@ -206,7 +233,11 @@ export const ExchangeItemAPI = {
    * @returns {Promise<Object>} 标准 API 响应
    */
   async updateCategory(id, data) {
-    return request({ url: buildURL(EXCHANGE_ITEM_ENDPOINTS.CATEGORY_UPDATE, { id }), method: 'PUT', data })
+    return request({
+      url: buildURL(EXCHANGE_ITEM_ENDPOINTS.CATEGORY_UPDATE, { id }),
+      method: 'PUT',
+      data
+    })
   },
 
   /**
@@ -215,7 +246,10 @@ export const ExchangeItemAPI = {
    * @returns {Promise<Object>} 标准 API 响应
    */
   async deleteCategory(id) {
-    return request({ url: buildURL(EXCHANGE_ITEM_ENDPOINTS.CATEGORY_DELETE, { id }), method: 'DELETE' })
+    return request({
+      url: buildURL(EXCHANGE_ITEM_ENDPOINTS.CATEGORY_DELETE, { id }),
+      method: 'DELETE'
+    })
   },
 
   /**
@@ -234,7 +268,11 @@ export const ExchangeItemAPI = {
    * @returns {Promise<Object>} 标准 API 响应
    */
   async setCategoryAttributes(id, attributeIds) {
-    return request({ url: buildURL(EXCHANGE_ITEM_ENDPOINTS.CATEGORY_ATTRIBUTES, { id }), method: 'PUT', data: { attribute_ids: attributeIds } })
+    return request({
+      url: buildURL(EXCHANGE_ITEM_ENDPOINTS.CATEGORY_ATTRIBUTES, { id }),
+      method: 'PUT',
+      data: { attribute_ids: attributeIds }
+    })
   },
 
   /**
@@ -271,7 +309,11 @@ export const ExchangeItemAPI = {
    * @returns {Promise<Object>} 标准 API 响应
    */
   async updateAttribute(id, data) {
-    return request({ url: buildURL(EXCHANGE_ITEM_ENDPOINTS.ATTRIBUTE_UPDATE, { id }), method: 'PUT', data })
+    return request({
+      url: buildURL(EXCHANGE_ITEM_ENDPOINTS.ATTRIBUTE_UPDATE, { id }),
+      method: 'PUT',
+      data
+    })
   },
 
   /**
@@ -280,7 +322,10 @@ export const ExchangeItemAPI = {
    * @returns {Promise<Object>} 标准 API 响应
    */
   async deleteAttribute(id) {
-    return request({ url: buildURL(EXCHANGE_ITEM_ENDPOINTS.ATTRIBUTE_DELETE, { id }), method: 'DELETE' })
+    return request({
+      url: buildURL(EXCHANGE_ITEM_ENDPOINTS.ATTRIBUTE_DELETE, { id }),
+      method: 'DELETE'
+    })
   },
 
   /**
@@ -290,7 +335,11 @@ export const ExchangeItemAPI = {
    * @returns {Promise<Object>} 标准 API 响应
    */
   async createAttributeOption(attributeId, data) {
-    return request({ url: buildURL(EXCHANGE_ITEM_ENDPOINTS.ATTRIBUTE_OPTION_CREATE, { id: attributeId }), method: 'POST', data })
+    return request({
+      url: buildURL(EXCHANGE_ITEM_ENDPOINTS.ATTRIBUTE_OPTION_CREATE, { id: attributeId }),
+      method: 'POST',
+      data
+    })
   },
 
   /**
@@ -300,7 +349,11 @@ export const ExchangeItemAPI = {
    * @returns {Promise<Object>} 标准 API 响应
    */
   async updateAttributeOption(optionId, data) {
-    return request({ url: buildURL(EXCHANGE_ITEM_ENDPOINTS.ATTRIBUTE_OPTION_UPDATE, { option_id: optionId }), method: 'PUT', data })
+    return request({
+      url: buildURL(EXCHANGE_ITEM_ENDPOINTS.ATTRIBUTE_OPTION_UPDATE, { option_id: optionId }),
+      method: 'PUT',
+      data
+    })
   },
 
   /**
@@ -309,7 +362,10 @@ export const ExchangeItemAPI = {
    * @returns {Promise<Object>} 标准 API 响应
    */
   async deleteAttributeOption(optionId) {
-    return request({ url: buildURL(EXCHANGE_ITEM_ENDPOINTS.ATTRIBUTE_OPTION_DELETE, { option_id: optionId }), method: 'DELETE' })
+    return request({
+      url: buildURL(EXCHANGE_ITEM_ENDPOINTS.ATTRIBUTE_OPTION_DELETE, { option_id: optionId }),
+      method: 'DELETE'
+    })
   },
 
   /**

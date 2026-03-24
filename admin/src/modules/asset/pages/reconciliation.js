@@ -96,15 +96,17 @@ document.addEventListener('alpine:init', () => {
             axisLabel: { rotate: 30 }
           },
           yAxis: { type: 'value', name: '变动金额合计' },
-          series: [{
-            name: '变动金额',
-            type: 'bar',
-            data: data.map(r => ({
-              value: Number(r.total_delta) || 0,
-              itemStyle: { color: Number(r.total_delta) === 0 ? '#10b981' : '#ef4444' }
-            })),
-            label: { show: true, position: 'top', formatter: '{c}' }
-          }],
+          series: [
+            {
+              name: '变动金额',
+              type: 'bar',
+              data: data.map(r => ({
+                value: Number(r.total_delta) || 0,
+                itemStyle: { color: Number(r.total_delta) === 0 ? '#10b981' : '#ef4444' }
+              })),
+              label: { show: true, position: 'top', formatter: '{c}' }
+            }
+          ],
           grid: { left: '10%', right: '5%', bottom: '15%', top: '15%' }
         }
 

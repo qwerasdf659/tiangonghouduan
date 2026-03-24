@@ -66,11 +66,7 @@ export function useBudgetMethods() {
 
         const apiUrl = `${LOTTERY_ENDPOINTS.CAMPAIGN_BUDGET_BATCH_STATUS}?${params}`
 
-        const response = await this.apiGet(
-          apiUrl,
-          {},
-          { showLoading: false }
-        )
+        const response = await this.apiGet(apiUrl, {}, { showLoading: false })
 
         // 解包 withLoading 返回的结构
         const data = response?.success ? response.data : response
@@ -221,9 +217,7 @@ export function useBudgetMethods() {
         const dailyMetrics = result?.data || []
 
         /* 查找活动预算配置用于计算 remaining */
-        const campaign = this.budgetCampaigns.find(
-          c => c.lottery_campaign_id === targetCampaignId
-        )
+        const campaign = this.budgetCampaigns.find(c => c.lottery_campaign_id === targetCampaignId)
         const totalBudget = campaign?.pool_budget?.total || 0
 
         /* 将后端 daily_metrics 转换为图表所需格式 */

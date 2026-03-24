@@ -12,8 +12,8 @@ import { API_PREFIX, request } from './base.js'
 export const DASHBOARD_ENDPOINTS = {
   // 运营看板核心接口
   PENDING_SUMMARY: `${API_PREFIX}/console/dashboard/pending-summary`,
-  BUSINESS_HEALTH: `${API_PREFIX}/console/dashboard/business-health`, // 业务健康度评分
-  TIME_COMPARISON: `${API_PREFIX}/console/dashboard/time-comparison`, // 时间对比数据
+  BUSINESS_HEALTH: `${API_PREFIX}/console/dashboard/business-health`,
+  TIME_COMPARISON: `${API_PREFIX}/console/dashboard/time-comparison`,
 
   // 统计分析接口
   TODAY_STATS: `${API_PREFIX}/console/analytics/stats/today`,
@@ -32,7 +32,13 @@ export const DASHBOARD_ENDPOINTS = {
   // 市场健康看板（MarketHealthService）
   MARKET_HEALTH_SUMMARY: `${API_PREFIX}/console/dashboard/market-health`,
   MARKET_HEALTH_ORDER_TREND: `${API_PREFIX}/console/dashboard/market-health/order-trend`,
-  MARKET_HEALTH_TOP_USERS: `${API_PREFIX}/console/dashboard/market-health/top-users`
+  MARKET_HEALTH_TOP_USERS: `${API_PREFIX}/console/dashboard/market-health/top-users`,
+
+  /**
+   * 跨域顶线：B2C 兑换 + C2C 市场 + 竞拍（一次请求）
+   * 后端: GET /api/v4/console/dashboard/stats?days=7
+   */
+  PLATFORM_CROSS_STATS: `${API_PREFIX}/console/dashboard/stats`
 }
 
 /**
@@ -167,6 +173,14 @@ export const DashboardAPI = {
    */
   async getMarketHealthTopUsers(params = {}) {
     return request({ url: DASHBOARD_ENDPOINTS.MARKET_HEALTH_TOP_USERS, params })
+  },
+
+  /**
+   * 跨域平台顶线（兑换 + 二级市场 + 竞拍）
+   * @param {Object} [params={}] - { days?: number }
+   */
+  async getPlatformCrossStats(params = {}) {
+    return request({ url: DASHBOARD_ENDPOINTS.PLATFORM_CROSS_STATS, params })
   }
 }
 

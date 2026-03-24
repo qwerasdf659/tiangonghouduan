@@ -435,7 +435,7 @@ export function usePricingMethods() {
         scheduled: 'bg-info'
       }
       return classes[status] || 'bg-secondary'
-    },
+    }
 
     /**
      * 获取定价状态文本

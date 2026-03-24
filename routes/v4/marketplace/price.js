@@ -1,7 +1,7 @@
 /**
  * 市场域 - 价格发现（用户端）
  *
- * @route /api/v4/market/price
+ * @route /api/v4/marketplace/price
  * @description 价格走势、成交量、价格摘要、最近成交
  *
  * API列表：
@@ -23,7 +23,7 @@ const { handleServiceError } = require('../../../middleware/validation')
 const logger = require('../../../utils/logger').logger
 
 /**
- * @route GET /api/v4/market/price/trend
+ * @route GET /api/v4/marketplace/price/trend
  * @desc 价格走势（按时间粒度聚合）
  * @access Private
  * @query {string} asset_code - 资产代码（与 template_id 二选一）
@@ -54,7 +54,7 @@ router.get('/price/trend', authenticateToken, async (req, res) => {
 })
 
 /**
- * @route GET /api/v4/market/price/volume
+ * @route GET /api/v4/marketplace/price/volume
  * @desc 成交量走势
  * @access Private
  */
@@ -81,7 +81,7 @@ router.get('/price/volume', authenticateToken, async (req, res) => {
 })
 
 /**
- * @route GET /api/v4/market/price/summary
+ * @route GET /api/v4/marketplace/price/summary
  * @desc 价格摘要（中位数、极值、均值、总成交数）
  * @access Private
  */
@@ -103,19 +103,19 @@ router.get('/price/summary', authenticateToken, async (req, res) => {
 })
 
 /**
- * @route GET /api/v4/market/price/recent-trades
+ * @route GET /api/v4/marketplace/price/recent-trades
  * @desc 最近成交列表
  * @access Private
- * @query {number} limit - 数量限制（默认10，最大50）
+ * @query {number} page_size - 数量限制（默认10，最大50）
  */
 router.get('/price/recent-trades', authenticateToken, async (req, res) => {
   try {
-    const { asset_code, template_id, limit = 10 } = req.query
+    const { asset_code, template_id, page_size = 10 } = req.query
     if (!asset_code && !template_id) {
       return res.apiError('需要 asset_code 或 template_id 参数', 'MISSING_PARAMS', null, 400)
     }
 
-    const safeLimit = Math.min(parseInt(limit) || 10, 50)
+    const safeLimit = Math.min(parseInt(page_size) || 10, 50)
     const PriceDiscoveryService = req.app.locals.services.getService('price_discovery')
     const result = await PriceDiscoveryService.getLatestTrades({
       asset_code,

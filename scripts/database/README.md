@@ -13,7 +13,7 @@
 
 ## 工具简介
 
-本目录以 **`migration_toolkit.js`** 为统一入口（合并了历史上的 `create-migration.js` / `verify-migrations.js` 能力），与 `package.json` 中脚本一致：
+本目录以 **`migration_toolkit.js`** 为统一入口（合并了历史上的 `create-migration.js` / `verify-migrations.js` 能力），与 `package.json` 中脚本一致。基线压测（Baseline Squash）之后，历史迁移脚本不再放在已废弃的 `migrations/legacy/`，而统一归档在 **`migrations/archived/`**（按日期分子目录）；日常开发与校验仅针对 **`migrations/`** 根目录下的活跃迁移文件。
 
 ### 1️⃣ `migration_toolkit.js` — 创建 + 验证 + 可选同步/状态
 
@@ -455,25 +455,12 @@ $ npm start
 # 服务不会启动，必须先修复问题
 ```
 
-### Q3: 我已经有不规范的旧迁移文件怎么办？
+### Q3: 旧迁移文件如何处理？
 
-**方案A**: 保留旧文件，新文件使用规范（推荐给已上线项目）
-
-```bash
-# 1. 将旧文件移到 migrations/legacy/ 目录
-mkdir -p migrations/legacy
-mv migrations/20250110_fix_*.js migrations/legacy/
-
-# 2. 从现在开始使用规范工具
-npm run migration:create
-```
-
-**方案B**: 完全重构（推荐给新项目或测试环境）
-
-```bash
-# 参考《数据库变更历史混乱问题解决方案_V1.0.md》中的方案C
-# 完全重建，创建基准迁移
-```
+本项目已执行 **Baseline Squash**（D1 方案 B）：
+- 旧迁移已归档至 `migrations/archived/2026-03-22/`
+- 当前活跃迁移仅含基线 + 增量（`migrations/` 根目录）
+- 新增迁移使用 `npm run migration:create` 创建
 
 ### Q4: VERSION.js 有什么用？
 
@@ -665,7 +652,7 @@ user.vip.level     # 使用点号
 
 ---
 
-**文档版本**: V1.0.0  
+**文档版本**: V1.0.1  
 **创建时间**: 2025年10月12日  
-**最后更新**: 2025年10月12日
+**最后更新**: 2026年3月24日
 

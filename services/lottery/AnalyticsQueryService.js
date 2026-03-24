@@ -635,12 +635,13 @@ class LotteryAnalyticsQueryService {
    * @param {Object} options - 查询选项
    * @param {string} [options.range='7d'] - 时间范围
    * @param {string} [options.sort_by='draws'] - 排序字段
-   * @param {number} [options.limit=10] - 返回数量
+   * @param {number} [options.page_size=10] - 返回数量（兼容 options.limit）
    * @param {number} [options.merchant_id] - 按商家筛选
    * @returns {Promise<Object>} { ranking, range, sort_by, updated_at }
    */
   static async getDashboardCampaignRanking(options = {}) {
-    const { range = '7d', sort_by = 'draws', limit = 10, merchant_id } = options
+    const { range = '7d', sort_by = 'draws', merchant_id } = options
+    const page_size = options.page_size ?? options.limit ?? 10
     const { start_time, end_time } = this._getTimeRange(range)
     const { LotteryDraw, LotteryCampaign, LotteryPrize } = require('../../models')
 
@@ -682,7 +683,7 @@ class LotteryAnalyticsQueryService {
       include: includeList,
       group: ['lottery_campaign_id'],
       order: [[literal(sort_by === 'wins' ? 'wins' : 'draws'), 'DESC']],
-      limit: parseInt(limit),
+      limit: parseInt(page_size),
       raw: false
     })
 

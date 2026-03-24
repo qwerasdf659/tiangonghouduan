@@ -3,8 +3,11 @@
  *
  * @module api/market/exchange
  * @description 兑换市场商品管理、兑换订单管理相关的 API 调用
- * @version 2.0.0
- * @date 2026-01-30
+ * @version 3.0.0
+ * @date 2026-03-24
+ *
+ * 决策 3 落地：域直接导入 + key 去冗余前缀（§14.3）
+ * 域上下文由变量名 EXCHANGE_ENDPOINTS 承载，key 不再重复 EXCHANGE_ 前缀
  */
 
 import { API_PREFIX, request, buildURL, buildQueryString } from '../base.js'
@@ -12,31 +15,40 @@ import { API_PREFIX, request, buildURL, buildQueryString } from '../base.js'
 // ========== API 端点（仅包含后端实际存在的路由） ==========
 
 export const EXCHANGE_ENDPOINTS = {
-  // 兑换订单（后端: routes/v4/console/market/marketplace.js）
-  EXCHANGE_ORDERS: `${API_PREFIX}/console/exchange/orders`,
-  EXCHANGE_ORDER_DETAIL: `${API_PREFIX}/console/exchange/orders/:order_no`,
-  EXCHANGE_ORDER_APPROVE: `${API_PREFIX}/console/exchange/orders/:order_no/approve`,
-  EXCHANGE_ORDER_SHIP: `${API_PREFIX}/console/exchange/orders/:order_no/ship`,
-  EXCHANGE_ORDER_REJECT: `${API_PREFIX}/console/exchange/orders/:order_no/reject`,
-  EXCHANGE_ORDER_REFUND: `${API_PREFIX}/console/exchange/orders/:order_no/refund`,
-  EXCHANGE_ORDER_COMPLETE: `${API_PREFIX}/console/exchange/orders/:order_no/complete`,
+  /** 兑换商品 SPU/SKU 列表与 CRUD（后端: routes/v4/console/exchange/items.js） */
+  ITEMS: `${API_PREFIX}/console/exchange/items`,
 
-  // 排序管理（后端: routes/v4/console/market/marketplace.js）
-  EXCHANGE_ITEM_PIN: `${API_PREFIX}/console/exchange/items/:exchange_item_id/pin`,
-  EXCHANGE_ITEM_RECOMMEND: `${API_PREFIX}/console/exchange/items/:exchange_item_id/recommend`,
-  EXCHANGE_ITEMS_BATCH_SORT: `${API_PREFIX}/console/exchange/items/batch-sort`,
-  EXCHANGE_ITEMS_BATCH_STATUS: `${API_PREFIX}/console/exchange/items/batch-status`,
-  EXCHANGE_ITEMS_BATCH_PRICE: `${API_PREFIX}/console/exchange/items/batch-price`,
-  EXCHANGE_ITEMS_BATCH_CATEGORY: `${API_PREFIX}/console/exchange/items/batch-category`,
+  // 兑换订单（后端: routes/v4/console/exchange/orders.js）
+  ORDERS: `${API_PREFIX}/console/exchange/orders`,
+  ORDER_DETAIL: `${API_PREFIX}/console/exchange/orders/:order_no`,
+  ORDER_APPROVE: `${API_PREFIX}/console/exchange/orders/:order_no/approve`,
+  ORDER_SHIP: `${API_PREFIX}/console/exchange/orders/:order_no/ship`,
+  ORDER_REJECT: `${API_PREFIX}/console/exchange/orders/:order_no/reject`,
+  ORDER_REFUND: `${API_PREFIX}/console/exchange/orders/:order_no/refund`,
+  ORDER_COMPLETE: `${API_PREFIX}/console/exchange/orders/:order_no/complete`,
 
-  // 快递查询（后端: routes/v4/console/market/marketplace.js）
-  EXCHANGE_SHIPPING_COMPANIES: `${API_PREFIX}/console/exchange/orders/shipping-companies`,
-  EXCHANGE_ORDER_TRACK: `${API_PREFIX}/console/exchange/orders/:order_no/track`,
+  // 商品运营（后端: routes/v4/console/exchange/operations.js）
+  ITEM_PIN: `${API_PREFIX}/console/exchange/items/:exchange_item_id/pin`,
+  ITEM_RECOMMEND: `${API_PREFIX}/console/exchange/items/:exchange_item_id/recommend`,
+  ITEMS_BATCH_SORT: `${API_PREFIX}/console/exchange/items/batch-sort`,
+  ITEMS_BATCH_STATUS: `${API_PREFIX}/console/exchange/items/batch-status`,
+  ITEMS_BATCH_PRICE: `${API_PREFIX}/console/exchange/items/batch-price`,
+  ITEMS_BATCH_CATEGORY: `${API_PREFIX}/console/exchange/items/batch-category`,
 
-  // 市场概览统计（二级市场成交，后端: marketplace.js）
-  MARKET_STATS_OVERVIEW: `${API_PREFIX}/console/marketplace/stats/overview`,
-  // 兑换市场聚合统计（服务端聚合，后端: exchange_market/statistics）
-  EXCHANGE_MARKET_STATISTICS: `${API_PREFIX}/console/exchange/stats`
+  /** 缺图商品查询（后端: GET /exchange/missing-images） */
+  MISSING_IMAGES: `${API_PREFIX}/console/exchange/missing-images`,
+  /** 批量绑定商品图片（后端: POST /exchange/batch-bind-images） */
+  BATCH_BIND_IMAGES: `${API_PREFIX}/console/exchange/batch-bind-images`,
+
+  // 快递（后端: routes/v4/console/exchange/orders.js — shipping-companies 挂在 orders 子路由中）
+  SHIPPING_COMPANIES: `${API_PREFIX}/console/exchange/orders/shipping-companies`,
+  ORDER_TRACK: `${API_PREFIX}/console/exchange/orders/:order_no/track`,
+
+  /**
+   * B2C 兑换聚合统计（订单/商品/履约/趋势）
+   * 后端: GET /api/v4/console/exchange/stats ，query: trend_days（默认 90）
+   */
+  STATS: `${API_PREFIX}/console/exchange/stats`
 }
 
 // ========== API 调用方法 ==========
@@ -56,7 +68,7 @@ export const ExchangeAPI = {
    * @returns {Promise<Object>} API 响应
    */
   async getExchangeOrders(params = {}) {
-    const url = EXCHANGE_ENDPOINTS.EXCHANGE_ORDERS + buildQueryString(params)
+    const url = EXCHANGE_ENDPOINTS.ORDERS + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 
@@ -66,7 +78,7 @@ export const ExchangeAPI = {
    * @returns {Promise<Object>} API 响应
    */
   async getExchangeOrderDetail(orderNo) {
-    const url = buildURL(EXCHANGE_ENDPOINTS.EXCHANGE_ORDER_DETAIL, { order_no: orderNo })
+    const url = buildURL(EXCHANGE_ENDPOINTS.ORDER_DETAIL, { order_no: orderNo })
     return await request({ url, method: 'GET' })
   },
 
@@ -78,7 +90,7 @@ export const ExchangeAPI = {
    * @returns {Promise<Object>} API 响应
    */
   async approveExchangeOrder(orderNo, data = {}) {
-    const url = buildURL(EXCHANGE_ENDPOINTS.EXCHANGE_ORDER_APPROVE, { order_no: orderNo })
+    const url = buildURL(EXCHANGE_ENDPOINTS.ORDER_APPROVE, { order_no: orderNo })
     return await request({ url, method: 'POST', data })
   },
 
@@ -90,7 +102,7 @@ export const ExchangeAPI = {
    * @returns {Promise<Object>} API 响应
    */
   async rejectExchangeOrder(orderNo, data = {}) {
-    const url = buildURL(EXCHANGE_ENDPOINTS.EXCHANGE_ORDER_REJECT, { order_no: orderNo })
+    const url = buildURL(EXCHANGE_ENDPOINTS.ORDER_REJECT, { order_no: orderNo })
     return await request({ url, method: 'POST', data })
   },
 
@@ -102,7 +114,7 @@ export const ExchangeAPI = {
    * @returns {Promise<Object>} API 响应
    */
   async shipExchangeOrder(orderNo, data = {}) {
-    const url = buildURL(EXCHANGE_ENDPOINTS.EXCHANGE_ORDER_SHIP, { order_no: orderNo })
+    const url = buildURL(EXCHANGE_ENDPOINTS.ORDER_SHIP, { order_no: orderNo })
     return await request({ url, method: 'POST', data })
   },
 
@@ -114,7 +126,7 @@ export const ExchangeAPI = {
    * @returns {Promise<Object>} API 响应
    */
   async refundExchangeOrder(orderNo, data = {}) {
-    const url = buildURL(EXCHANGE_ENDPOINTS.EXCHANGE_ORDER_REFUND, { order_no: orderNo })
+    const url = buildURL(EXCHANGE_ENDPOINTS.ORDER_REFUND, { order_no: orderNo })
     return await request({ url, method: 'POST', data })
   },
 
@@ -126,11 +138,11 @@ export const ExchangeAPI = {
    * @returns {Promise<Object>} API 响应
    */
   async completeExchangeOrder(orderNo, data = {}) {
-    const url = buildURL(EXCHANGE_ENDPOINTS.EXCHANGE_ORDER_COMPLETE, { order_no: orderNo })
+    const url = buildURL(EXCHANGE_ENDPOINTS.ORDER_COMPLETE, { order_no: orderNo })
     return await request({ url, method: 'POST', data })
   },
 
-  // ===== 排序管理（Phase 3） =====
+  // ===== 商品运营 =====
 
   /**
    * 置顶/取消置顶商品
@@ -139,7 +151,7 @@ export const ExchangeAPI = {
    * @returns {Promise<Object>} 操作结果
    */
   async toggleItemPin(itemId, isPinned) {
-    const url = buildURL(EXCHANGE_ENDPOINTS.EXCHANGE_ITEM_PIN, { exchange_item_id: itemId })
+    const url = buildURL(EXCHANGE_ENDPOINTS.ITEM_PIN, { exchange_item_id: itemId })
     return await request({ url, method: 'PUT', data: { is_pinned: isPinned } })
   },
 
@@ -150,7 +162,7 @@ export const ExchangeAPI = {
    * @returns {Promise<Object>} 操作结果
    */
   async toggleItemRecommend(itemId, isRecommended) {
-    const url = buildURL(EXCHANGE_ENDPOINTS.EXCHANGE_ITEM_RECOMMEND, { exchange_item_id: itemId })
+    const url = buildURL(EXCHANGE_ENDPOINTS.ITEM_RECOMMEND, { exchange_item_id: itemId })
     return await request({ url, method: 'PUT', data: { is_recommended: isRecommended } })
   },
 
@@ -161,7 +173,7 @@ export const ExchangeAPI = {
    */
   async batchSortItems(items) {
     return await request({
-      url: EXCHANGE_ENDPOINTS.EXCHANGE_ITEMS_BATCH_SORT,
+      url: EXCHANGE_ENDPOINTS.ITEMS_BATCH_SORT,
       method: 'PUT',
       data: { items }
     })
@@ -170,7 +182,7 @@ export const ExchangeAPI = {
   /** 批量上下架 */
   async batchUpdateStatus(exchangeItemIds, status) {
     return await request({
-      url: EXCHANGE_ENDPOINTS.EXCHANGE_ITEMS_BATCH_STATUS,
+      url: EXCHANGE_ENDPOINTS.ITEMS_BATCH_STATUS,
       method: 'PUT',
       data: { exchange_item_ids: exchangeItemIds, status }
     })
@@ -179,7 +191,7 @@ export const ExchangeAPI = {
   /** 批量改价 */
   async batchUpdatePrice(items) {
     return await request({
-      url: EXCHANGE_ENDPOINTS.EXCHANGE_ITEMS_BATCH_PRICE,
+      url: EXCHANGE_ENDPOINTS.ITEMS_BATCH_PRICE,
       method: 'PUT',
       data: { items }
     })
@@ -188,20 +200,46 @@ export const ExchangeAPI = {
   /** 批量修改分类 */
   async batchUpdateCategory(exchangeItemIds, categoryId) {
     return await request({
-      url: EXCHANGE_ENDPOINTS.EXCHANGE_ITEMS_BATCH_CATEGORY,
+      url: EXCHANGE_ENDPOINTS.ITEMS_BATCH_CATEGORY,
       method: 'PUT',
       data: { exchange_item_ids: exchangeItemIds, category_id: categoryId }
     })
   },
 
-  // ===== 快递查询（Phase 4） =====
+  // ===== 缺图 / 绑图 =====
+
+  /**
+   * 查询缺少图片的兑换商品
+   * @param {Object} [params={}] - 查询参数
+   * @param {number} [params.page=1] - 页码
+   * @param {number} [params.page_size=50] - 每页数量
+   * @returns {Promise<Object>} API 响应
+   */
+  async getMissingImages(params = {}) {
+    return await request({ url: EXCHANGE_ENDPOINTS.MISSING_IMAGES, params })
+  },
+
+  /**
+   * 批量绑定商品图片
+   * @param {Array<{exchange_item_id: number, media_id: number}>} bindings - 绑定数据
+   * @returns {Promise<Object>} API 响应
+   */
+  async batchBindImages(bindings) {
+    return await request({
+      url: EXCHANGE_ENDPOINTS.BATCH_BIND_IMAGES,
+      method: 'POST',
+      data: { bindings }
+    })
+  },
+
+  // ===== 快递查询 =====
 
   /**
    * 获取快递公司列表（供发货弹窗下拉）
    * @returns {Promise<Object>} 快递公司列表
    */
   async getShippingCompanies() {
-    return await request({ url: EXCHANGE_ENDPOINTS.EXCHANGE_SHIPPING_COMPANIES, method: 'GET' })
+    return await request({ url: EXCHANGE_ENDPOINTS.SHIPPING_COMPANIES, method: 'GET' })
   },
 
   /**
@@ -210,16 +248,8 @@ export const ExchangeAPI = {
    * @returns {Promise<Object>} 物流轨迹
    */
   async getOrderTrack(orderNo) {
-    const url = buildURL(EXCHANGE_ENDPOINTS.EXCHANGE_ORDER_TRACK, { order_no: orderNo })
+    const url = buildURL(EXCHANGE_ENDPOINTS.ORDER_TRACK, { order_no: orderNo })
     return await request({ url, method: 'GET' })
-  },
-
-  /**
-   * 获取市场概览统计（C2C + B2C 总览）
-   * @returns {Promise<Object>} 市场概览数据（totals/asset_ranking/on_sale_summary）
-   */
-  async getMarketStatsOverview() {
-    return await request({ url: EXCHANGE_ENDPOINTS.MARKET_STATS_OVERVIEW, method: 'GET' })
   }
 }
 

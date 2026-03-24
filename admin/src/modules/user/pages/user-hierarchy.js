@@ -169,13 +169,13 @@ document.addEventListener('alpine:init', () => {
             name: 'deactivate',
             label: '⏸️',
             class: 'text-yellow-600 hover:text-yellow-800',
-            condition: (row) => row.is_active
+            condition: row => row.is_active
           },
           {
             name: 'activate',
             label: '▶️',
             class: 'text-green-600 hover:text-green-800',
-            condition: (row) => !row.is_active
+            condition: row => !row.is_active
           }
         ]
       }

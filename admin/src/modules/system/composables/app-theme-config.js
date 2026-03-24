@@ -149,7 +149,7 @@ export function useAppThemeConfigMethods() {
         summer: '🏖️'
       }
 
-      return themeOrder.map((key) => {
+      return themeOrder.map(key => {
         const meta = this.themeMeta[key] || {}
         return {
           value: key,
@@ -163,4 +163,3 @@ export function useAppThemeConfigMethods() {
     }
   }
 }
-

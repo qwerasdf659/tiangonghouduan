@@ -34,9 +34,9 @@ module.exports = {
      * 📝 注释规范 - 强制要求中文注释（2025年10月20日新增）
      * 规则：提供任何技术信息时必须添加详细的中文注释
      */
-    // 历史代码量大，全量补齐 JSDoc 与 valid-jsdoc 等价于重写文档；先降级为 warn，保证 `npm run lint` 可跑通门禁
+    // JSDoc 告警已治理完毕；对业务代码强制 error，保证文档与签名一致
     'require-jsdoc': [
-      'warn',
+      'error',
       {
         require: {
           FunctionDeclaration: true,
@@ -48,7 +48,7 @@ module.exports = {
       }
     ],
     'valid-jsdoc': [
-      'warn',
+      'error',
       {
         requireReturn: true,
         requireReturnType: true,

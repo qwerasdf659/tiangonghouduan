@@ -52,6 +52,7 @@ module.exports = sequelize => {
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: true,
         unique: true,
+        autoIncrement: true,
         comment:
           '辅助序号（表级 AUTO_INCREMENT）：用于 RD 单号序列段；模型 allowNull 避免 Sequelize 校验阻塞插入'
       },

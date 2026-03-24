@@ -175,10 +175,7 @@ class MarketListingQueryService {
       item_category_code !== null &&
       item_category_code !== ''
     ) {
-      resolvedCategoryId =
-        typeof item_category_code === 'number'
-          ? item_category_code
-          : (await Category.findByCode(item_category_code))?.category_id
+      resolvedCategoryId = await Category.resolveToId(item_category_code)
     }
 
     // 构建缓存参数对象（BusinessCacheHelper 使用对象来构建缓存键）
@@ -431,10 +428,7 @@ class MarketListingQueryService {
       item_category_code !== null &&
       item_category_code !== ''
     ) {
-      resolvedCategoryId =
-        typeof item_category_code === 'number'
-          ? item_category_code
-          : (await Category.findByCode(item_category_code))?.category_id
+      resolvedCategoryId = await Category.resolveToId(item_category_code)
     }
 
     try {

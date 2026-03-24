@@ -821,7 +821,10 @@ function statisticsPage() {
       // 延迟启动动画，产生交错效果
       setTimeout(() => this.animateValue('total_users', this.stats.total_users, 1200), 0)
       setTimeout(() => this.animateValue('total_draws', this.stats.total_draws, 1200), 100)
-      setTimeout(() => this.animateValue('win_rate', parseFloat(this.stats.win_rate) || 0, 1200), 200)
+      setTimeout(
+        () => this.animateValue('win_rate', parseFloat(this.stats.win_rate) || 0, 1200),
+        200
+      )
       setTimeout(() => this.animateValue('total_revenue', this.stats.total_revenue, 1200), 300)
     },
 
@@ -897,8 +900,12 @@ function statisticsPage() {
      * @returns {string} 该维度的显示名称
      */
     _getDimensionDisplay(item) {
-      return item.store_name || item.name || item.period
-        || (item.lottery_campaign_id ? `活动#${item.lottery_campaign_id}` : '未知')
+      return (
+        item.store_name ||
+        item.name ||
+        item.period ||
+        (item.lottery_campaign_id ? `活动#${item.lottery_campaign_id}` : '未知')
+      )
     },
 
     /**
@@ -999,7 +1006,7 @@ function statisticsPage() {
           if (dimension === 'store') {
             return d.store_name || d.name || '未知门店'
           } else if (dimension === 'campaign') {
-            return d.name || ('活动#' + d.lottery_campaign_id) || '未知活动'
+            return d.name || '活动#' + d.lottery_campaign_id || '未知活动'
           }
           return d.name || d.period || '未知'
         }

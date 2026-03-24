@@ -10,14 +10,13 @@
  * @requires createPageMixin - 页面基础功能混入
  * @requires BidAPI - 竞价管理API调用方法
  *
- * 后端路由：/api/v4/console/bid-management
+ * 后端路由：/api/v4/console/bids
  * 状态机：pending → active → ended → settled / no_bid / settlement_failed / cancelled
  */
 
 import { logger, $confirm } from '../../../utils/index.js'
 import { Alpine, createPageMixin } from '../../../alpine/index.js'
 import { BidAPI } from '../../../api/market/bid.js'
-import { ExchangeAPI } from '../../../api/market/exchange.js'
 import { ExchangeItemAPI } from '../../../api/exchange-item/index.js'
 
 /**
@@ -102,9 +101,8 @@ document.addEventListener('alpine:init', () => {
         return this.bid_products.filter(b => b.status === 'settled').length
       },
       get inactiveCount() {
-        return this.bid_products.filter(
-          b => b.status === 'no_bid' || b.status === 'cancelled'
-        ).length
+        return this.bid_products.filter(b => b.status === 'no_bid' || b.status === 'cancelled')
+          .length
       },
 
       // ========== 筛选 ==========
@@ -480,6 +478,3 @@ document.addEventListener('alpine:init', () => {
     }
   })
 })
-
-
-

@@ -1,7 +1,7 @@
 /**
- * 用户端兑换路由 - 背包域
+ * 用户域 B2C 兑换路由
  *
- * 路径：/api/v4/backpack/exchange
+ * 路径：/api/v4/exchange
  *
  * 职责：
  * - 用户浏览兑换商品列表
@@ -43,7 +43,7 @@ function asyncHandler(fn) {
 }
 
 /**
- * GET /api/v4/backpack/exchange/items
+ * GET /api/v4/exchange/items
  *
  * @description 获取兑换商品列表（展示材料成本，支持空间筛选/搜索/价格范围）
  * @access Private（所有登录用户可访问）
@@ -189,7 +189,7 @@ router.get(
 )
 
 /**
- * GET /api/v4/backpack/exchange/items/:exchange_item_id
+ * GET /api/v4/exchange/items/:exchange_item_id
  *
  * @description 获取兑换商品详情（展示 cost_asset_code + cost_amount）
  * @access Private（所有登录用户可访问）
@@ -237,7 +237,7 @@ router.get(
 )
 
 /**
- * POST /api/v4/backpack/exchange
+ * POST /api/v4/exchange
  *
  * @description 用户兑换商品（V4.5.0 材料资产支付）
  * @access Private（所有登录用户可访问）
@@ -306,10 +306,9 @@ router.post(
 
       /*
        * 入口幂等检查
-       * 路径更新为 /api/v4/backpack/exchange（从 /api/v4/shop/exchange 迁移）
        */
       const idempotencyResult = await IdempotencyService.getOrCreateRequest(idempotency_key, {
-        api_path: '/api/v4/backpack/exchange',
+        api_path: '/api/v4/exchange',
         http_method: 'POST',
         request_params: { exchange_item_id: itemId, quantity: exchangeQuantity },
         user_id
@@ -424,7 +423,7 @@ router.post(
 )
 
 /**
- * POST /api/v4/backpack/exchange/orders/:order_no/rate
+ * POST /api/v4/exchange/orders/:order_no/rate
  *
  * @description 用户对兑换订单评分（需求6：兑换商品统计字段）
  * @access Private（订单归属用户）
@@ -479,7 +478,7 @@ router.post(
 )
 
 /**
- * GET /api/v4/backpack/exchange/space-stats
+ * GET /api/v4/exchange/space-stats
  *
  * @description 获取空间统计数据（臻选空间/幸运空间）
  * @access Private（所有登录用户可访问）
@@ -520,7 +519,7 @@ router.get(
 )
 
 /**
- * GET /api/v4/backpack/exchange/premium-status
+ * GET /api/v4/exchange/premium-status
  *
  * @description 查询高级空间（臻选空间）状态
  * @access Private（所有登录用户可访问）
@@ -580,7 +579,7 @@ router.get(
 )
 
 /**
- * POST /api/v4/backpack/exchange/unlock-premium
+ * POST /api/v4/exchange/unlock-premium
  *
  * @description 解锁高级空间（臻选空间）
  * @access Private（所有登录用户可访问，需满足解锁条件）
@@ -634,10 +633,10 @@ router.post(
   })
 )
 
-// ==================== 兑换订单路由（从 shop/exchange/orders.js 迁移） ====================
+// ==================== 兑换订单路由 ====================
 
 /**
- * GET /api/v4/backpack/exchange/orders
+ * GET /api/v4/exchange/orders
  *
  * @description 获取用户兑换订单列表（支持状态筛选 + 分页）
  * @access Private（登录用户查看自己的订单）
@@ -709,7 +708,7 @@ router.get(
 )
 
 /**
- * GET /api/v4/backpack/exchange/orders/:order_no
+ * GET /api/v4/exchange/orders/:order_no
  *
  * @description 获取用户兑换订单详情（含 user_id 权限校验）
  * @access Private（登录用户查看自己的订单）
@@ -744,7 +743,7 @@ router.get(
 )
 
 /**
- * POST /api/v4/backpack/exchange/orders/:order_no/confirm-receipt
+ * POST /api/v4/exchange/orders/:order_no/confirm-receipt
  *
  * @description 用户确认收货（shipped → received）
  * @access Private（登录用户确认自己的订单）
@@ -774,7 +773,7 @@ router.post(
 )
 
 /**
- * POST /api/v4/backpack/exchange/orders/:order_no/cancel
+ * POST /api/v4/exchange/orders/:order_no/cancel
  *
  * @description 用户取消订单（仅 pending 状态，退还材料资产）
  * @access Private（登录用户取消自己的订单）
@@ -805,7 +804,7 @@ router.post(
 
 /**
  * 用户端查询兑换订单物流轨迹
- * GET /api/v4/backpack/exchange/orders/:order_no/track
+ * GET /api/v4/exchange/orders/:order_no/track
  *
  * @description 用户查看已发货订单的快递物流轨迹
  */
@@ -843,5 +842,12 @@ router.get('/orders/:order_no/track', authenticateToken, async (req, res) => {
     return res.apiError(error.message || '查询物流失败', 'INTERNAL_ERROR', null, 500)
   }
 })
+
+/**
+ * 竞价子路由（B2C 兑换商品竞拍）
+ * 底表 FK→exchange_items
+ */
+const bidRoutes = require('./bid')
+router.use('/bid', bidRoutes)
 
 module.exports = router

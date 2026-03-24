@@ -294,11 +294,11 @@ router.post('/schedule/:lottery_simulation_record_id', async (req, res) => {
 router.get('/version-history/:lottery_campaign_id', async (req, res) => {
   try {
     const { lottery_campaign_id } = req.params
-    const { limit = 50, offset = 0 } = req.query
+    const { page_size = 50, offset = 0 } = req.query
 
     const service = getSimulationService(req)
     const result = await service.getConfigVersionHistory(Number(lottery_campaign_id), {
-      limit: Number(limit),
+      page_size: Number(page_size),
       offset: Number(offset)
     })
 
@@ -407,11 +407,11 @@ router.get('/circuit-breaker-status/:lottery_campaign_id', async (req, res) => {
 router.get('/history/:lottery_campaign_id', async (req, res) => {
   try {
     const { lottery_campaign_id } = req.params
-    const { limit = 20, offset = 0 } = req.query
+    const { page_size = 20, offset = 0 } = req.query
 
     const service = getSimulationService(req)
     const result = await service.getSimulationHistory(Number(lottery_campaign_id), {
-      limit: Math.min(Number(limit), 50),
+      page_size: Math.min(Number(page_size), 50),
       offset: Number(offset)
     })
 
@@ -419,7 +419,7 @@ router.get('/history/:lottery_campaign_id', async (req, res) => {
       {
         records: result.rows,
         total: result.count,
-        limit: Number(limit),
+        page_size: Number(page_size),
         offset: Number(offset)
       },
       '模拟历史查询成功'

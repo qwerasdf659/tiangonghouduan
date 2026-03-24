@@ -236,7 +236,7 @@ describe('【P1-14】混合负载场景测试', () => {
     const startTime = Date.now()
     try {
       const response = await request(app)
-        .get('/api/v4/market/listings')
+        .get('/api/v4/marketplace/listings')
         .set('Authorization', `Bearer ${token}`)
         .query({ status: 'active', page: 1, page_size: 10 })
         .timeout(5000)

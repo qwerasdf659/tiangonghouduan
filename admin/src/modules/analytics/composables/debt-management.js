@@ -66,9 +66,10 @@ export function useDebtManagementMethods() {
         )
 
         if (response?.success) {
-          const campaigns = response.data?.campaigns || response.data?.list || response.data?.items || []
+          const campaigns =
+            response.data?.campaigns || response.data?.list || response.data?.items || []
           // 转换为下拉框选项格式
-          this.campaignOptions = campaigns.map((c) => ({
+          this.campaignOptions = campaigns.map(c => ({
             value: c.lottery_campaign_id || c.campaign_id,
             label: c.campaign_name || c.name || `活动#${c.lottery_campaign_id || c.campaign_id}`,
             status: c.status
@@ -275,7 +276,7 @@ export function useDebtManagementMethods() {
         written_off: 'bg-secondary'
       }
       return map[status] || 'bg-secondary'
-    },
+    }
 
     /**
      * 获取债务状态文本

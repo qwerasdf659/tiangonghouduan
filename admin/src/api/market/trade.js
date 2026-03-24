@@ -37,14 +37,12 @@ export const TRADE_ENDPOINTS = {
   ORPHAN_STATS: `${API_PREFIX}/console/orphan-frozen/stats`,
   ORPHAN_CLEANUP: `${API_PREFIX}/console/orphan-frozen/cleanup`,
 
-  // 市场统计扩展
-  MARKETPLACE_STATS_ITEM_STATS: `${API_PREFIX}/console/marketplace/stats/items`,
-  MARKETPLACE_STATS_ORDER_STATS: `${API_PREFIX}/console/marketplace/stats/orders`,
-  MARKETPLACE_STATS: `${API_PREFIX}/console/marketplace/stats`,
+  // C2C 市场分析（MarketAnalyticsService）
+  STATS_OVERVIEW: `${API_PREFIX}/console/marketplace/stats/overview`,
+  STATS_PRICE_HISTORY: `${API_PREFIX}/console/marketplace/stats/price-history`,
 
-  // 市场分析（MarketAnalyticsService）
-  MARKET_OVERVIEW: `${API_PREFIX}/console/marketplace/stats/overview`,
-  MARKET_PRICE_HISTORY: `${API_PREFIX}/console/marketplace/stats/price-history`,
+  // C2C 可交易资产配置
+  CONFIG_TRADABLE: `${API_PREFIX}/console/marketplace/config/tradable-assets`,
 
   // 业务记录查询
   BUSINESS_RECORD_LOTTERY_CLEAR: `${API_PREFIX}/console/business-records/lottery-clear-settings`,
@@ -476,18 +474,6 @@ export const TradeAPI = {
    */
   async getTradeOrderByBusinessId(businessId) {
     const url = buildURL(TRADE_ENDPOINTS.TRADE_ORDER_BY_BUSINESS_ID, { business_id: businessId })
-    return await request({ url, method: 'GET' })
-  },
-
-  // ===== 市场综合统计 =====
-
-  /**
-   * 获取市场综合统计
-   * @param {Object} [params={}] - 查询参数
-   * @returns {Promise<Object>} 市场统计数据
-   */
-  async getMarketplaceStats(params = {}) {
-    const url = TRADE_ENDPOINTS.MARKETPLACE_STATS + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 

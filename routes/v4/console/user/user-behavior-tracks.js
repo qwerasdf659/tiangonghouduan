@@ -197,7 +197,7 @@ router.get('/aggregate/by-date', authenticateToken, requireRoleLevel(100), async
  * 查询参数:
  * - start_date: 开始日期（必需）
  * - end_date: 结束日期（必需）
- * - limit: 返回数量（默认10）
+ * - page_size: 返回数量（默认10）
  */
 router.get(
   '/aggregate/active-users',
@@ -206,7 +206,7 @@ router.get(
   async (req, res) => {
     try {
       const trackService = ServiceManager.getService('user_behavior_track')
-      const { start_date, end_date, limit } = req.query
+      const { start_date, end_date, page_size } = req.query
 
       if (!start_date || !end_date) {
         return res.apiError('开始日期和结束日期不能为空', 'MISSING_DATE_RANGE', null, 400)
@@ -215,7 +215,7 @@ router.get(
       const result = await trackService.getActiveUsersRanking({
         start_date: new Date(start_date),
         end_date: new Date(end_date),
-        limit: parseInt(limit, 10) || 10
+        page_size: parseInt(page_size, 10) || 10
       })
 
       return res.apiSuccess(result, '获取活跃用户排名成功')

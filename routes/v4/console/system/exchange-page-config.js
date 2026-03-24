@@ -135,7 +135,7 @@ function validateExchangePageConfig(config) {
     if (!Array.isArray(mf.sort_options)) errors.push('market_filters.sort_options 必须是数组')
   }
 
-  // ---- card_display 校验（theme 已迁移到全局氛围主题 app_theme，此处仅校验 effects 等） ----
+  // ---- card_display 校验（theme 由全局 app_theme 管理，此处仅校验 effects 等） ----
   if (!config.card_display || typeof config.card_display !== 'object') {
     errors.push('card_display 必须是对象')
   } else {

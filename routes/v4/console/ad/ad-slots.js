@@ -56,14 +56,14 @@ const ALLOWED_UPDATE_FIELDS = [
  * @query {string} [slot_type] - 广告位类型筛选（popup/carousel）
  * @query {string} [is_active] - 是否启用筛选（true/false）
  * @query {number} [page=1] - 页码
- * @query {number} [limit=20] - 每页数量
+ * @query {number} [page_size=20] - 每页数量
  */
 router.get(
   '/',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
     try {
-      const { slot_type = null, is_active = null, page = 1, limit = 20 } = req.query
+      const { slot_type = null, is_active = null, page = 1, page_size = 20 } = req.query
 
       if (slot_type && !VALID_SLOT_TYPES.includes(slot_type)) {
         return res.apiBadRequest(`slot_type 必须是以下之一：${VALID_SLOT_TYPES.join(', ')}`)
@@ -75,7 +75,7 @@ router.get(
       }
 
       const pageNum = Math.max(1, parseInt(page) || 1)
-      const pageSize = Math.min(100, Math.max(1, parseInt(limit) || 20))
+      const pageSize = Math.min(100, Math.max(1, parseInt(page_size) || 20))
 
       const AdSlotService = req.app.locals.services.getService('ad_slot')
       const result = await AdSlotService.getAdminSlotList({
@@ -91,7 +91,7 @@ router.get(
           pagination: {
             total: result.total,
             page: pageNum,
-            limit: pageSize,
+            page_size: pageSize,
             total_pages: Math.ceil(result.total / pageSize)
           }
         },

@@ -55,26 +55,26 @@ describe('P1-7.3: 敏感操作二次认证测试', () => {
 
   /*
    * 敏感操作接口列表（基于项目实际路由）
-   * POST /api/v4/market/list - 上架商品（需要会话验证）
-   * POST /api/v4/market/listings/:market_listing_id/withdraw - 撤回商品（需要会话验证）
-   * POST /api/v4/market/listings/:market_listing_id/purchase - 购买商品（需要会话验证）
+   * POST /api/v4/marketplace/list - 上架商品（需要会话验证）
+   * POST /api/v4/marketplace/listings/:market_listing_id/withdraw - 撤回商品（需要会话验证）
+   * POST /api/v4/marketplace/listings/:market_listing_id/purchase - 购买商品（需要会话验证）
    */
   const sensitiveEndpoints = [
     {
       method: 'POST',
-      path: '/api/v4/market/list',
+      path: '/api/v4/marketplace/list',
       description: '市场挂牌',
       body: { item_id: 1, price_points: 100 }
     },
     {
       method: 'POST',
-      path: '/api/v4/market/listings/1/withdraw',
+      path: '/api/v4/marketplace/listings/1/withdraw',
       description: '市场撤回',
       body: {}
     },
     {
       method: 'POST',
-      path: '/api/v4/market/listings/1/purchase',
+      path: '/api/v4/marketplace/listings/1/purchase',
       description: '市场购买',
       body: {}
     }
@@ -87,7 +87,7 @@ describe('P1-7.3: 敏感操作二次认证测试', () => {
   const normalEndpoints = [
     { method: 'GET', path: '/api/v4/user/me', description: '查看用户信息' },
     { method: 'GET', path: '/api/v4/backpack', description: '查看背包' },
-    { method: 'GET', path: '/api/v4/market/listings', description: '浏览市场' },
+    { method: 'GET', path: '/api/v4/marketplace/listings', description: '浏览市场' },
     { method: 'GET', path: '/api/v4/lottery/history/campaigns', description: '查看活动' }
   ]
 
@@ -206,7 +206,7 @@ describe('P1-7.3: 敏感操作二次认证测试', () => {
 
       // 尝试用已失效Token访问敏感操作
       const sensitiveResponse = await request(app)
-        .post('/api/v4/market/list')
+        .post('/api/v4/marketplace/list')
         .set('Authorization', `Bearer ${freshToken}`)
         .send({ item_id: 1, price_points: 100 })
 
@@ -251,7 +251,7 @@ describe('P1-7.3: 敏感操作二次认证测试', () => {
 
       // 尝试访问查看类敏感操作（不会真正执行业务逻辑）
       const response = await request(app)
-        .get('/api/v4/market/listings')
+        .get('/api/v4/marketplace/listings')
         .set('Authorization', `Bearer ${freshToken}`)
 
       // 查看市场列表应该成功
@@ -467,7 +467,7 @@ describe('P1-7.3: 敏感操作二次认证测试', () => {
       })
 
       const noSessionResponse = await request(app)
-        .post('/api/v4/market/list')
+        .post('/api/v4/marketplace/list')
         .set('Authorization', `Bearer ${tokenNoSession}`)
         .send({ item_id: 1, price_points: 100 })
 

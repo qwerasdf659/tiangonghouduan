@@ -191,16 +191,16 @@ router.get('/chat/sessions', authenticateToken, async (req, res) => {
  *
  * @param {number} id - 会话ID（事务实体）
  * @query {number} page - 页码（默认1）
- * @query {number} limit - 每页数量（默认50，最大100）
+ * @query {number} page_size - 每页数量（默认50，最大100）
  *
  * @returns {Object} 消息列表和分页信息
  */
 router.get('/chat/sessions/:id/messages', authenticateToken, async (req, res) => {
   try {
     const sessionId = req.params.id
-    const { page = 1, limit = 50 } = req.query
+    const { page = 1, page_size = 50 } = req.query
     // 分页安全保护：最大100条记录
-    const finalLimit = Math.min(parseInt(limit), 100)
+    const finalLimit = Math.min(parseInt(page_size), 100)
 
     // 通过 ServiceManager 获取服务（符合TR-005规范）
     const CustomerServiceSessionService = req.app.locals.services.getService(
@@ -222,7 +222,7 @@ router.get('/chat/sessions/:id/messages', authenticateToken, async (req, res) =>
         pagination: {
           total: result.total,
           page: parseInt(page),
-          limit: finalLimit,
+          page_size: finalLimit,
           total_pages: Math.ceil(result.total / finalLimit)
         }
       },

@@ -417,7 +417,7 @@ module.exports = sequelize => {
          */
         generateFeedbackId() {
           const timestamp = BeijingTimeHelper.generateIdTimestamp()
-          const random = Math.random().toString(36).substr(2, 6)
+          const random = require('crypto').randomBytes(3).toString('hex')
           return `fb_${timestamp}_${random}`
         },
 

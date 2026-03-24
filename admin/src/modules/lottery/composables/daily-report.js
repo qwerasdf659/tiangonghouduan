@@ -289,12 +289,14 @@ export function useDailyReportMethods() {
      * @returns {string} CSS类
      */
     getBudgetHealthClass(level) {
-      return {
-        healthy: 'text-green-600 bg-green-50 border-green-200',
-        warning: 'text-yellow-600 bg-yellow-50 border-yellow-200',
-        critical: 'text-red-600 bg-red-50 border-red-200',
-        unknown: 'text-gray-600 bg-gray-50 border-gray-200'
-      }[level] || 'text-gray-600 bg-gray-50 border-gray-200'
+      return (
+        {
+          healthy: 'text-green-600 bg-green-50 border-green-200',
+          warning: 'text-yellow-600 bg-yellow-50 border-yellow-200',
+          critical: 'text-red-600 bg-red-50 border-red-200',
+          unknown: 'text-gray-600 bg-gray-50 border-gray-200'
+        }[level] || 'text-gray-600 bg-gray-50 border-gray-200'
+      )
     },
 
     /**
@@ -303,12 +305,14 @@ export function useDailyReportMethods() {
      * @returns {string} 标签文本
      */
     getBudgetHealthLabel(level) {
-      return {
-        healthy: '✅ 健康',
-        warning: '⚠️ 警告',
-        critical: '🔴 异常',
-        unknown: '❓ 未知'
-      }[level] || '❓ 未知'
+      return (
+        {
+          healthy: '✅ 健康',
+          warning: '⚠️ 警告',
+          critical: '🔴 异常',
+          unknown: '❓ 未知'
+        }[level] || '❓ 未知'
+      )
     },
 
     /**

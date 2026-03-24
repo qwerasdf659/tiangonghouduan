@@ -182,7 +182,9 @@ export function useCustomerServiceMethods() {
 
       try {
         const response = await request({
-          url: buildURL(CONTENT_ENDPOINTS.CUSTOMER_SERVICE_SESSION_MESSAGES, { session_id: sessionId })
+          url: buildURL(CONTENT_ENDPOINTS.CUSTOMER_SERVICE_SESSION_MESSAGES, {
+            session_id: sessionId
+          })
         })
 
         if (response && response.success) {
@@ -212,7 +214,9 @@ export function useCustomerServiceMethods() {
       if (!silent) this.loadingOverlay = true
       try {
         const response = await request({
-          url: buildURL(CONTENT_ENDPOINTS.CUSTOMER_SERVICE_SESSION_MESSAGES, { session_id: sessionId })
+          url: buildURL(CONTENT_ENDPOINTS.CUSTOMER_SERVICE_SESSION_MESSAGES, {
+            session_id: sessionId
+          })
         })
         if (response && response.success) {
           this.messages = response.data.messages || []
@@ -229,8 +233,14 @@ export function useCustomerServiceMethods() {
 
     async sendMessage() {
       const content = this.messageInput.trim()
-      if (!content) { this.showError('请输入消息内容'); return }
-      if (!this.currentSessionId) { this.showError('请先选择一个会话'); return }
+      if (!content) {
+        this.showError('请输入消息内容')
+        return
+      }
+      if (!this.currentSessionId) {
+        this.showError('请先选择一个会话')
+        return
+      }
 
       try {
         const response = await request({
@@ -279,23 +289,32 @@ export function useCustomerServiceMethods() {
     },
 
     transferSession() {
-      if (!this.currentSessionId) { this.showError('请先选择一个会话'); return }
+      if (!this.currentSessionId) {
+        this.showError('请先选择一个会话')
+        return
+      }
       this.showModal('transferModal')
     },
 
     async submitTransfer() {
-      if (!this.currentSessionId) { this.showError('请先选择一个会话'); return }
-      if (!this.transferTargetId) { this.showError('请选择接收客服'); return }
+      if (!this.currentSessionId) {
+        this.showError('请先选择一个会话')
+        return
+      }
+      if (!this.transferTargetId) {
+        this.showError('请选择接收客服')
+        return
+      }
 
       this.loadingOverlay = true
       try {
-          const response = await request({
-            url: buildURL(CONTENT_ENDPOINTS.CUSTOMER_SERVICE_TRANSFER, {
-              session_id: this.currentSessionId
-            }),
-            method: 'POST',
-            data: { target_admin_id: parseInt(this.transferTargetId) }
-          })
+        const response = await request({
+          url: buildURL(CONTENT_ENDPOINTS.CUSTOMER_SERVICE_TRANSFER, {
+            session_id: this.currentSessionId
+          }),
+          method: 'POST',
+          data: { target_admin_id: parseInt(this.transferTargetId) }
+        })
 
         if (response && response.success) {
           this.showSuccess('会话已转接')
@@ -314,7 +333,10 @@ export function useCustomerServiceMethods() {
     },
 
     async closeSession() {
-      if (!this.currentSessionId) { this.showError('请先选择一个会话'); return }
+      if (!this.currentSessionId) {
+        this.showError('请先选择一个会话')
+        return
+      }
 
       const result = await this.confirmAndExecute(
         '确认结束当前会话？',
@@ -338,7 +360,7 @@ export function useCustomerServiceMethods() {
       }
     },
 
-    closeCurrentChat () {
+    closeCurrentChat() {
       this.currentSessionId = null
       this.selectedSession = null
       this.messages = []
@@ -350,7 +372,7 @@ export function useCustomerServiceMethods() {
      * 请求用户满意度评价（通过WebSocket推送评分邀请给小程序端）
      * 后端 closeSession 时会自动发起，此按钮用于客服手动补发
      */
-    async requestSatisfaction () {
+    async requestSatisfaction() {
       if (!this.currentSessionId) return
       try {
         if (this.wsConnection && this.wsConnection.connected) {
@@ -369,17 +391,26 @@ export function useCustomerServiceMethods() {
     // ==================== 用户信息 ====================
 
     async viewUserInfo() {
-      if (!this.currentSessionId) { this.showError('请先选择一个会话'); return }
+      if (!this.currentSessionId) {
+        this.showError('请先选择一个会话')
+        return
+      }
       this.loadingOverlay = true
 
       try {
         const session = this.sessions.find(
           s => String(s.customer_service_session_id) === String(this.currentSessionId)
         )
-        if (!session) { this.showError('找不到会话信息'); return }
+        if (!session) {
+          this.showError('找不到会话信息')
+          return
+        }
 
         const userId = session.user?.user_id || session.user_id
-        if (!userId) { this.showError('无法获取用户ID'); return }
+        if (!userId) {
+          this.showError('无法获取用户ID')
+          return
+        }
 
         const url = buildURL(USER_ENDPOINTS.DETAIL, { user_id: userId })
         const response = await request({ url })
@@ -400,7 +431,10 @@ export function useCustomerServiceMethods() {
 
     async loadAdminList() {
       try {
-        const response = await request({ url: USER_ENDPOINTS.LIST, params: { role_filter: 'admin' } })
+        const response = await request({
+          url: USER_ENDPOINTS.LIST,
+          params: { role_filter: 'admin' }
+        })
         if (response && response.success) {
           this.adminList = response.data.users || []
         }
@@ -477,7 +511,11 @@ export function useCustomerServiceMethods() {
       return typeof lastMessage === 'string' ? lastMessage : '暂无消息'
     },
     getSessionStatusBadge(status) {
-      const badges = { waiting: 'bg-warning text-dark', active: 'bg-success', closed: 'bg-secondary' }
+      const badges = {
+        waiting: 'bg-warning text-dark',
+        active: 'bg-success',
+        closed: 'bg-secondary'
+      }
       return badges[status] || 'bg-secondary'
     },
 
@@ -506,7 +544,10 @@ export function useCustomerServiceMethods() {
       try {
         const date = new Date(dateStr)
         return date.toLocaleString('zh-CN', {
-          month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit'
         })
       } catch {
         return dateStr
@@ -517,17 +558,32 @@ export function useCustomerServiceMethods() {
 
     async loadResponseStats() {
       try {
-        const response = await request({ url: CONTENT_ENDPOINTS.CUSTOMER_SERVICE_RESPONSE_STATS, params: { days: 1 } })
+        const response = await request({
+          url: CONTENT_ENDPOINTS.CUSTOMER_SERVICE_RESPONSE_STATS,
+          params: { days: 1 }
+        })
 
         if (response && response.success && response.data) {
           const data = response.data
           this.responseStats = {
-            avg_first_response_seconds: data.summary?.avg_first_response_seconds || data.avg_first_response_seconds || 0,
-            avg_first_response_display: data.summary?.avg_first_response_display || data.avg_first_response_display || this.formatSeconds(data.summary?.avg_first_response_seconds || data.avg_first_response_seconds),
-            avg_response_seconds: data.summary?.avg_response_seconds || data.avg_response_seconds || 0,
-            avg_response_display: data.summary?.avg_response_display || data.avg_response_display || this.formatSeconds(data.summary?.avg_response_seconds || data.avg_response_seconds),
-            today_sessions: data.summary?.total_sessions || data.today_sessions || data.total_sessions || 0,
-            today_resolved: data.summary?.resolved_sessions || data.today_resolved || data.resolved_sessions || 0,
+            avg_first_response_seconds:
+              data.summary?.avg_first_response_seconds || data.avg_first_response_seconds || 0,
+            avg_first_response_display:
+              data.summary?.avg_first_response_display ||
+              data.avg_first_response_display ||
+              this.formatSeconds(
+                data.summary?.avg_first_response_seconds || data.avg_first_response_seconds
+              ),
+            avg_response_seconds:
+              data.summary?.avg_response_seconds || data.avg_response_seconds || 0,
+            avg_response_display:
+              data.summary?.avg_response_display ||
+              data.avg_response_display ||
+              this.formatSeconds(data.summary?.avg_response_seconds || data.avg_response_seconds),
+            today_sessions:
+              data.summary?.total_sessions || data.today_sessions || data.total_sessions || 0,
+            today_resolved:
+              data.summary?.resolved_sessions || data.today_resolved || data.resolved_sessions || 0,
             compliance_rate: data.summary?.compliance_rate || null,
             distribution: data.distribution || null,
             trend: data.trend || null
@@ -565,4 +621,3 @@ export function useCustomerServiceMethods() {
     }
   }
 }
-

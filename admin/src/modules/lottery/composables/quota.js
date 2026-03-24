@@ -268,7 +268,9 @@ export function useQuotaMethods() {
         '确认禁用此配额规则？（规则将被禁用而非删除，以保留审计记录）',
         async () => {
           await this.apiCall(
-            buildURL(LOTTERY_ENDPOINTS.QUOTA_RULE_DISABLE, { id: quota.lottery_draw_quota_rule_id }),
+            buildURL(LOTTERY_ENDPOINTS.QUOTA_RULE_DISABLE, {
+              id: quota.lottery_draw_quota_rule_id
+            }),
             { method: 'PUT' }
           )
           await this.loadQuotas()

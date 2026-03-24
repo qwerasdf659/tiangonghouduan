@@ -1081,10 +1081,9 @@ class QueryService {
    */
 
   /**
-   * 查询统一商品列表（替代 getMarketItems 的 ExchangeItem 版本）
+   * 查询统一商品列表
    *
    * 数据来源：exchange_items → exchange_item_skus → exchange_channel_prices
-   * 前端兼容：返回结果包含 exchange_item_id / item_name 等兼容字段
    *
    * @param {Object} [filters={}] - 筛选条件
    * @param {string}  [filters.status='active']    - 商品状态
@@ -1472,18 +1471,13 @@ class QueryService {
     const categoryId = await CategoryModel.resolveToId(category)
     if (!categoryId) return null
 
-    const children = await CategoryModel.findAll({
-      where: { parent_category_id: categoryId },
-      attributes: ['category_id']
-    })
-
-    return [categoryId, ...children.map(c => c.category_id)]
+    return CategoryModel.getIdsWithChildren(categoryId)
   }
 
   /**
-   * 将 ExchangeItem 实例格式化为列表视图 JSON（含前端兼容字段）
+   * 将 ExchangeItem 实例格式化为列表视图 JSON
    *
-   * 兼容映射：exchange_item_id → exchange_item_id、item_name → item_name 等
+   * 聚合 SKU 库存、销量和最低渠道定价
    *
    * @param {Model} product - ExchangeItem Sequelize 实例
    * @returns {Object} 格式化后的商品 JSON
@@ -1518,7 +1512,7 @@ class QueryService {
   }
 
   /**
-   * 将 ExchangeItem 实例格式化为详情视图 JSON（含前端兼容字段）
+   * 将 ExchangeItem 实例格式化为详情视图 JSON
    *
    * @param {Model} product - ExchangeItem Sequelize 实例（含 skus、channelPrices 等嵌套）
    * @returns {Object} 格式化后的商品详情 JSON

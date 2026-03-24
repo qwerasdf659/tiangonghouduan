@@ -2052,6 +2052,7 @@
                   <table class="w-full text-sm">
                     <thead>
                       <tr class="bg-gray-50 border-b">
+                        <th class="px-4 py-2.5 text-left text-xs font-semibold themed-text-muted">流水号(TX)</th>
                         <th class="px-4 py-2.5 text-left text-xs font-semibold themed-text-muted">时间</th>
                         <th class="px-4 py-2.5 text-left text-xs font-semibold themed-text-muted">交易类型</th>
                         <th class="px-4 py-2.5 text-right text-xs font-semibold themed-text-muted">变动数量</th>
@@ -2062,6 +2063,7 @@
                     <tbody class="divide-y divide-gray-100">
                       <template x-for="tx in selectedDiamondAccount.transactions" :key="tx.asset_transaction_id">
                         <tr class="hover:bg-gray-50/80 transition-colors">
+                          <td class="px-4 py-2.5 font-mono text-xs text-blue-600" x-text="tx.transaction_no || '-'"></td>
                           <td class="px-4 py-2.5 text-xs themed-text-muted whitespace-nowrap" x-text="formatDateTimeShort(tx.created_at)"></td>
                           <td class="px-4 py-2.5">
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"

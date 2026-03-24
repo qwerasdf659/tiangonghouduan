@@ -13,7 +13,7 @@ import { ContentAPI } from '../../../api/content.js'
  * 消息模板状态
  * @returns {Object} 状态对象
  */
-export function useCsTemplatesState () {
+export function useCsTemplatesState() {
   return {
     /** @type {Array} 模板分类列表 [{ category, templates: [{title, content}] }] */
     templateCategories: [],
@@ -30,10 +30,10 @@ export function useCsTemplatesState () {
  * 消息模板方法
  * @returns {Object} 方法对象
  */
-export function useCsTemplatesMethods () {
+export function useCsTemplatesMethods() {
   return {
     /** 加载消息模板库（从 system_settings 获取） */
-    async loadTemplates () {
+    async loadTemplates() {
       this.templatesLoading = true
       try {
         const response = await ContentAPI.getMessageTemplates()
@@ -48,7 +48,7 @@ export function useCsTemplatesMethods () {
     },
 
     /** 切换模板面板显示/隐藏 */
-    toggleTemplatePanel () {
+    toggleTemplatePanel() {
       this.showTemplatePanel = !this.showTemplatePanel
       if (this.showTemplatePanel && !this.templateCategories.length) {
         this.loadTemplates()
@@ -59,7 +59,7 @@ export function useCsTemplatesMethods () {
      * 选择模板内容插入到消息输入框
      * @param {string} content - 模板文本
      */
-    selectTemplate (content) {
+    selectTemplate(content) {
       this.messageInput = content
       this.showTemplatePanel = false
     },
@@ -68,14 +68,15 @@ export function useCsTemplatesMethods () {
      * 获取按关键词过滤后的模板列表
      * @returns {Array} 过滤结果
      */
-    getFilteredTemplates () {
+    getFilteredTemplates() {
       if (!this.templateFilter) return this.templateCategories
       const keyword = this.templateFilter.toLowerCase()
       return this.templateCategories
         .map(cat => ({
           ...cat,
           items: (cat.items || []).filter(
-            t => t.title?.toLowerCase().includes(keyword) || t.content?.toLowerCase().includes(keyword)
+            t =>
+              t.title?.toLowerCase().includes(keyword) || t.content?.toLowerCase().includes(keyword)
           )
         }))
         .filter(cat => cat.items.length > 0)

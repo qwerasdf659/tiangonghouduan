@@ -431,7 +431,7 @@ class ApiResponse {
             const crypto = require('crypto')
             return `req_${crypto.randomUUID()}`
           } catch (_e) {
-            return `req_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`
+            return `req_${Date.now()}_${require('crypto').randomBytes(4).toString('hex')}`
           }
         })()
 

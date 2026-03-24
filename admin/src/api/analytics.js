@@ -414,7 +414,9 @@ export const AnalyticsAPI = {
    * logger.debug(result.data.spent) // 已使用金额
    */
   async getCampaignBudgetDetail(lotteryCampaignId) {
-    const url = buildURL(ANALYTICS_ENDPOINTS.CAMPAIGN_BUDGET_DETAIL, { lottery_campaign_id: lotteryCampaignId })
+    const url = buildURL(ANALYTICS_ENDPOINTS.CAMPAIGN_BUDGET_DETAIL, {
+      lottery_campaign_id: lotteryCampaignId
+    })
     return await request({ url, method: 'GET' })
   }
 }

@@ -349,6 +349,41 @@ function isValidBusinessId(businessId, type) {
 }
 
 /**
+ * 生成管理员操作幂等键（Admin Operation Idempotency Key）
+ *
+ * 用途：将前端 Date.now() 拼接的幂等键收口到后端统一生成，
+ * 保证管理员批量操作（资产调整、批量发放等）的幂等性安全。
+ *
+ * 格式：admin_{operationType}_{operatorId}_{timestamp}_{random6}
+ *
+ * @param {number|string} operatorId - 管理员用户ID
+ * @param {string} operationType - 操作类型（如 asset_adjust / batch_grant / diamond_adjust）
+ * @param {Object} [context] - 可选上下文（如目标用户ID、资产类型，用于提高唯一性）
+ * @param {number|string} [context.target_user_id] - 目标用户ID
+ * @param {string} [context.asset_code] - 资产编码
+ * @returns {string} 管理员操作幂等键
+ *
+ * @example
+ * generateAdminOperationKey(31, 'asset_adjust', { target_user_id: 100, asset_code: 'DIAMOND' })
+ * // => 'admin_asset_adjust_31_100_DIAMOND_1703511234567_a1b2c3'
+ *
+ * generateAdminOperationKey(31, 'batch_grant')
+ * // => 'admin_batch_grant_31_1703511234567_a1b2c3'
+ */
+function generateAdminOperationKey(operatorId, operationType, context = {}) {
+  if (!operatorId || !operationType) {
+    throw new Error('operatorId 和 operationType 不能为空')
+  }
+  const timestamp = Date.now()
+  const random = crypto.randomBytes(3).toString('hex')
+  const contextParts = []
+  if (context.target_user_id) contextParts.push(context.target_user_id)
+  if (context.asset_code) contextParts.push(context.asset_code)
+  const contextStr = contextParts.length > 0 ? `_${contextParts.join('_')}` : ''
+  return `admin_${operationType}_${operatorId}${contextStr}_${timestamp}_${random}`
+}
+
+/**
  * BusinessIdGenerator 类封装（便于对象形式调用）
  *
  * @example
@@ -360,6 +395,7 @@ const BusinessIdGenerator = {
   generateConsumptionId: generateConsumptionBusinessId,
   generateExchangeId: generateExchangeBusinessId,
   generateTradeOrderId: generateTradeOrderBusinessId,
+  generateAdminOperationKey,
   isValidBusinessId
 }
 
@@ -380,6 +416,9 @@ module.exports = {
   generateTradeIdempotencyKey,
   isValidBusinessId,
 
-  // 新增：BusinessIdGenerator 类封装
+  // 管理员操作幂等键
+  generateAdminOperationKey,
+
+  // BusinessIdGenerator 类封装
   BusinessIdGenerator
 }

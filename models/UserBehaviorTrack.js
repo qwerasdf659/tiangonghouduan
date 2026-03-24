@@ -148,7 +148,7 @@ module.exports = sequelize => {
       },
 
       /**
-       * 用户行为会话ID（P5迁移重命名：session_id → behavior_session_id）
+       * 用户行为会话ID
        * @type {string|null}
        * @业务含义 关联同一次会话内的多个行为记录
        */

@@ -18,7 +18,7 @@
  *
  * 真实场景负载分布（基于生产环境监控数据）：
  * - 浏览类（只读）：30%
- *   - 市场商品列表 GET /api/v4/market/listings
+ *   - 市场商品列表 GET /api/v4/marketplace/listings
  *   - 背包查询 GET /api/v4/backpack
  *   - 抽奖历史 GET /api/v4/lottery/history
  *   - 用户信息 GET /api/v4/user/me
@@ -344,7 +344,7 @@ describe('【P2-2】混合负载压力测试', () => {
   /**
    * 模拟市场列表查询
    *
-   * @description 模拟 GET /api/v4/market/listings 请求
+   * @description 模拟 GET /api/v4/marketplace/listings 请求
    * @returns {Object} 查询结果
    */
   async function simulateMarketListingsQuery() {
@@ -486,7 +486,7 @@ describe('【P2-2】混合负载压力测试', () => {
   /**
    * 模拟市场购买操作
    *
-   * @description 模拟 POST /api/v4/market/listings/:id/purchase 请求
+   * @description 模拟 POST /api/v4/marketplace/listings/:id/purchase 请求
    * @param {string} idempotencyKey - 幂等键
    * @returns {Object} 购买结果
    */
@@ -498,7 +498,7 @@ describe('【P2-2】混合负载压力测试', () => {
 
       // 通过幂等服务模拟购买请求
       const result = await IdempotencyService.getOrCreateRequest(idempotencyKey, {
-        api_path: '/api/v4/market/listings/:id/purchase',
+        api_path: '/api/v4/marketplace/listings/:id/purchase',
         http_method: 'POST',
         request_params: { market_listing_id: Math.floor(Math.random() * 100) + 1 },
         user_id: testUserId

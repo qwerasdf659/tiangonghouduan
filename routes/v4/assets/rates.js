@@ -1,17 +1,17 @@
 /**
- * 市场域 - 固定汇率兑换（用户端）
+ * 用户域 - 汇率查询与兑换（平台级资产域，与 console/assets/rates 对齐）
  *
- * @route /api/v4/market/exchange-rates
+ * @route /api/v4/assets/rates
  * @description 用户端汇率兑换功能：查询汇率、预览兑换、执行兑换
  *
  * API列表：
- * - GET  /exchange-rates          - 所有可用汇率列表
- * - GET  /exchange-rates/:from/:to - 特定币对汇率
- * - POST /exchange-rates/preview  - 预览兑换结果（不执行）
- * - POST /exchange-rates/convert  - 执行兑换（需幂等键）
+ * - GET  /                 - 所有可用汇率列表
+ * - GET  /:from/:to        - 特定币对汇率
+ * - POST /preview          - 预览兑换结果（不执行）
+ * - POST /convert          - 执行兑换（需幂等键）
  *
- * @version 1.0.0
- * @date 2026-02-23
+ * @version 2.0.0
+ * @date 2026-03-23
  */
 
 'use strict'
@@ -25,11 +25,11 @@ const logger = require('../../../utils/logger').logger
 const TransactionManager = require('../../../utils/TransactionManager')
 
 /**
- * @route GET /api/v4/market/exchange-rates
+ * @route GET /api/v4/assets/rates
  * @desc 获取所有可用的汇率兑换规则
  * @access Private (需要登录)
  */
-router.get('/exchange-rates', authenticateToken, async (req, res) => {
+router.get('/', authenticateToken, async (req, res) => {
   try {
     const ExchangeRateService = req.app.locals.services.getService('exchange_rate')
     const rates = await ExchangeRateService.getAllRates()
@@ -42,11 +42,11 @@ router.get('/exchange-rates', authenticateToken, async (req, res) => {
 })
 
 /**
- * @route GET /api/v4/market/exchange-rates/:from/:to
+ * @route GET /api/v4/assets/rates/:from/:to
  * @desc 获取特定币对的汇率
  * @access Private (需要登录)
  */
-router.get('/exchange-rates/:from/:to', authenticateToken, async (req, res) => {
+router.get('/:from/:to', authenticateToken, async (req, res) => {
   try {
     const { from, to } = req.params
     const ExchangeRateService = req.app.locals.services.getService('exchange_rate')
@@ -64,14 +64,14 @@ router.get('/exchange-rates/:from/:to', authenticateToken, async (req, res) => {
 })
 
 /**
- * @route POST /api/v4/market/exchange-rates/preview
+ * @route POST /api/v4/assets/rates/preview
  * @desc 预览兑换结果（不执行，仅计算）
  * @access Private (需要登录)
  * @body {string} from_asset_code - 源资产代码
  * @body {string} to_asset_code - 目标资产代码
  * @body {number} from_amount - 兑换数量
  */
-router.post('/exchange-rates/preview', authenticateToken, async (req, res) => {
+router.post('/preview', authenticateToken, async (req, res) => {
   try {
     const { from_asset_code, to_asset_code, from_amount } = req.body
     const user_id = req.user.user_id
@@ -110,7 +110,7 @@ router.post('/exchange-rates/preview', authenticateToken, async (req, res) => {
 })
 
 /**
- * @route POST /api/v4/market/exchange-rates/convert
+ * @route POST /api/v4/assets/rates/convert
  * @desc 执行汇率兑换（需要幂等键）
  * @access Private (需要登录 + 有效会话)
  * @header {string} Idempotency-Key - 幂等键（必填）
@@ -118,7 +118,7 @@ router.post('/exchange-rates/preview', authenticateToken, async (req, res) => {
  * @body {string} to_asset_code - 目标资产代码
  * @body {number} from_amount - 兑换数量
  */
-router.post('/exchange-rates/convert', authenticateToken, requireValidSession, async (req, res) => {
+router.post('/convert', authenticateToken, requireValidSession, async (req, res) => {
   try {
     const { from_asset_code, to_asset_code, from_amount } = req.body
     const user_id = req.user.user_id

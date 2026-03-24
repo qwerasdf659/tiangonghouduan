@@ -1041,6 +1041,7 @@ class TradeOrderService {
       merchant_id,
       status,
       asset_code,
+      order_no,
       start_time,
       end_time,
       page = 1,
@@ -1054,6 +1055,7 @@ class TradeOrderService {
     if (market_listing_id) where.market_listing_id = market_listing_id
     if (status) where.status = status
     if (asset_code) where.asset_code = asset_code
+    if (order_no) where.order_no = { [Op.like]: `%${order_no}%` }
 
     // 时间范围过滤
     if (start_time || end_time) {

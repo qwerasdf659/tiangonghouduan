@@ -362,7 +362,7 @@ function initModel(sequelize) {
       },
 
       /**
-       * 最后一次抽奖活动ID（P2迁移重命名：last_campaign_id → last_lottery_campaign_id）
+       * 最后一次抽奖活动ID
        * @外键关联 lottery_campaigns.lottery_campaign_id
        */
       last_lottery_campaign_id: {

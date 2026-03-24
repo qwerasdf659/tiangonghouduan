@@ -3,10 +3,14 @@
 /**
  * 市场域目录入口
  *
- * @description PriceDiscoveryService、MarketAnalyticsService 等从此目录按文件直接 require；
- * 原 MarketQueryService 已无路由消费，已移除。
- *
+ * @description 价格发现、市场数据分析等 C2C 市场公共服务
  * @module services/market
  */
 
-module.exports = {}
+const PriceDiscoveryService = require('./PriceDiscoveryService')
+const MarketAnalyticsService = require('./MarketAnalyticsService')
+
+module.exports = {
+  PriceDiscoveryService,
+  MarketAnalyticsService
+}

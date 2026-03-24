@@ -14,8 +14,7 @@
 import { logger, $confirmDanger, $confirm } from '../../../utils/index.js'
 import { Alpine, createPageMixin, dataTable } from '../../../alpine/index.js'
 import { request, buildURL } from '../../../api/base.js'
-import { MARKET_ENDPOINTS } from '../../../api/market/index.js'
-import { ExchangeAPI } from '../../../api/market/exchange.js'
+import { EXCHANGE_ENDPOINTS, ExchangeAPI } from '../../../api/market/exchange.js'
 import { ExchangeItemAPI } from '../../../api/exchange-item/index.js'
 import {
   useExchangeItemsState,
@@ -390,9 +389,7 @@ document.addEventListener('alpine:init', () => {
        * @param {Object|number} itemOrId - 商品对象或商品ID
        */
       async deleteItem(itemOrId) {
-        const itemId = typeof itemOrId === 'object'
-          ? itemOrId.exchange_item_id
-          : itemOrId
+        const itemId = typeof itemOrId === 'object' ? itemOrId.exchange_item_id : itemOrId
         if (!itemId) {
           logger.error('[ExchangeMarket] deleteItem: 无效的商品ID')
           return
@@ -431,7 +428,7 @@ document.addEventListener('alpine:init', () => {
         try {
           this.saving = true
           const res = await request({
-            url: buildURL(MARKET_ENDPOINTS.EXCHANGE_ORDER_REJECT, {
+            url: buildURL(EXCHANGE_ENDPOINTS.ORDER_REJECT, {
               order_no: order.order_no
             }),
             method: 'POST',
@@ -571,7 +568,7 @@ document.addEventListener('alpine:init', () => {
       ],
       dataSource: async params => {
         const res = await request({
-          url: MARKET_ENDPOINTS.EXCHANGE_ORDERS,
+          url: EXCHANGE_ENDPOINTS.ORDERS,
           method: 'GET',
           params
         })

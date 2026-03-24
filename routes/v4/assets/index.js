@@ -31,4 +31,8 @@ router.use('/', transactionsRoutes)
 router.use('/', conversionRulesRoutes) // GET /conversion-rules
 router.use('/', todaySummaryRoutes) // GET /today-summary（决策 D-1：资产域通用今日汇总）
 
+/** 汇率查询与兑换（平台级，与 console/assets/rates 对齐） */
+const ratesRoutes = require('./rates')
+router.use('/rates', ratesRoutes) // GET /rates, GET /rates/:from/:to, POST /rates/preview, POST /rates/convert
+
 module.exports = router

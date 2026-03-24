@@ -35,7 +35,7 @@ const {
 const marketRiskMiddleware = getMarketRiskControlMiddleware()
 
 /**
- * @route POST /api/v4/market/listings/:market_listing_id/withdraw
+ * @route POST /api/v4/marketplace/listings/:market_listing_id/withdraw
  * @desc 撤回市场挂牌
  * @access Private (需要登录，只能撤回自己的商品)
  *
@@ -118,7 +118,7 @@ router.post(
 )
 
 /**
- * @route POST /api/v4/market/fungible-assets/:market_listing_id/withdraw
+ * @route POST /api/v4/marketplace/fungible-assets/:market_listing_id/withdraw
  * @desc 撤回可叠加资产挂牌（交易市场材料交易）
  * @access Private (需要登录，只能撤回自己的挂牌)
  *

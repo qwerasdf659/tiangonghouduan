@@ -11,8 +11,10 @@ import { CONTENT_ENDPOINTS } from '../../../api/content.js'
  * @param {number} userId - 用户ID
  * @returns {Promise<Object|null>} 抽奖数据
  */
-export async function loadLottery (userId) {
-  const url = buildURL(CONTENT_ENDPOINTS.CS_USER_CONTEXT_LOTTERY, { userId }) + buildQueryString({ page_size: 10 })
+export async function loadLottery(userId) {
+  const url =
+    buildURL(CONTENT_ENDPOINTS.CS_USER_CONTEXT_LOTTERY, { userId }) +
+    buildQueryString({ page_size: 10 })
   const res = await request({ url, method: 'GET' })
   return res.success ? res.data : null
 }

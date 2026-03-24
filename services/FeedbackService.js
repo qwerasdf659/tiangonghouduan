@@ -87,7 +87,8 @@ class FeedbackService {
    * @param {string|null} filters.status - 反馈状态（可选）
    * @param {string|null} filters.category - 反馈分类（可选）
    * @param {string|null} filters.priority - 优先级（可选）
-   * @param {number} filters.limit - 查询数量限制（默认20）
+   * @param {number} filters.page_size - 查询数量限制（默认20）
+   * @param {number} [filters.limit] - 兼容旧参数名
    * @param {number} filters.offset - 查询偏移量（默认0）
    * @returns {Promise<Object>} 反馈列表和统计信息
    * @returns {Array<Object>} return.feedbacks - 反馈列表
@@ -100,9 +101,11 @@ class FeedbackService {
         status = null,
         category = null,
         priority = null,
-        limit = 20,
+        page_size,
+        limit: legacyLimit,
         offset = 0
       } = filters
+      const limit = legacyLimit !== undefined ? legacyLimit : (page_size ?? 20)
 
       logger.info('获取反馈列表', { filters })
 

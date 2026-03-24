@@ -539,6 +539,53 @@ class AdBillingService {
   }
 
   /**
+   * 分页查询全部广告计费流水（运营后台用）
+   *
+   * @param {Object} params - 查询参数
+   * @param {number} [params.page=1] - 页码
+   * @param {number} [params.page_size=20] - 每页条数
+   * @param {string} [params.billing_type] - 按计费类型筛选
+   * @param {number} [params.ad_campaign_id] - 按广告活动筛选
+   * @returns {Promise<Object>} { billing_records, pagination }
+   */
+  static async listBillingRecords(params = {}) {
+    const page = Math.max(parseInt(params.page) || 1, 1)
+    const pageSize = Math.min(Math.max(parseInt(params.page_size) || 20, 1), 100)
+    const where = {}
+
+    if (params.billing_type) {
+      where.billing_type = params.billing_type
+    }
+    if (params.ad_campaign_id) {
+      where.ad_campaign_id = parseInt(params.ad_campaign_id)
+    }
+
+    const { count, rows } = await AdBillingRecord.findAndCountAll({
+      where,
+      include: [
+        {
+          model: AdCampaign,
+          as: 'campaign',
+          attributes: ['ad_campaign_id', 'campaign_name', 'billing_mode']
+        }
+      ],
+      order: [['created_at', 'DESC']],
+      limit: pageSize,
+      offset: (page - 1) * pageSize
+    })
+
+    return {
+      billing_records: rows,
+      pagination: {
+        total: count,
+        page,
+        page_size: pageSize,
+        total_pages: Math.ceil(count / pageSize)
+      }
+    }
+  }
+
+  /**
    * 获取计费统计信息
    *
    * @param {Object} options - 查询选项

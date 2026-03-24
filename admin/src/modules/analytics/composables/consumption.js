@@ -1017,7 +1017,10 @@ export function useConsumptionMethods() {
       for (const record of pendingRecords) {
         if (!this.approvalChainCache[record.record_id]) {
           try {
-            const resp = await ApprovalChainAPI.getInstanceByAuditable('consumption', record.record_id)
+            const resp = await ApprovalChainAPI.getInstanceByAuditable(
+              'consumption',
+              record.record_id
+            )
             if (resp?.success && resp.data) {
               this.approvalChainCache[record.record_id] = resp.data
             }

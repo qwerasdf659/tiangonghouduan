@@ -1,7 +1,7 @@
 /**
- * 竞价路由 - 背包域
+ * 用户域竞价路由（B2C 兑换商品竞拍，底表 FK→exchange_items）
  *
- * 路径：/api/v4/backpack/bid
+ * 路径：/api/v4/exchange/bid
  *
  * 职责：
  * - 用户浏览竞价商品列表和详情
@@ -19,7 +19,7 @@
  * - 写操作通过 TransactionManager.execute() 管理事务边界
  * - 统一使用 res.apiSuccess / res.apiError 响应
  *
- * @module routes/v4/backpack/bid
+ * @module routes/v4/exchange/bid
  * @created 2026-02-16（臻选空间/幸运空间/竞价功能）
  */
 
@@ -45,7 +45,7 @@ function asyncHandler(fn) {
 }
 
 /**
- * GET /api/v4/backpack/bid/products
+ * GET /api/v4/exchange/bid/products
  *
  * @description 获取竞价商品列表
  * @access Private（所有登录用户可访问，需要JWT认证获取个性化字段）
@@ -93,7 +93,7 @@ router.get(
 )
 
 /**
- * GET /api/v4/backpack/bid/products/:bid_product_id
+ * GET /api/v4/exchange/bid/products/:bid_product_id
  *
  * @description 获取竞价商品详情（含用户出价记录 + Top N 排行）
  * @access Private
@@ -129,7 +129,7 @@ router.get(
 )
 
 /**
- * POST /api/v4/backpack/bid
+ * POST /api/v4/exchange/bid
  *
  * @description 提交出价（冻结资产，事务保护）
  * @access Private
@@ -254,7 +254,7 @@ router.post(
 )
 
 /**
- * GET /api/v4/backpack/bid/history
+ * GET /api/v4/exchange/bid/history
  *
  * @description 获取用户竞价记录
  * @access Private

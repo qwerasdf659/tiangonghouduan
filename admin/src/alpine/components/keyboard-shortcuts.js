@@ -232,13 +232,13 @@ export function shortcutsStore() {
      */
     handleGKeyNavigation(shortcut) {
       logger.info(`[Shortcuts] G键导航: ${shortcut.description} -> ${shortcut.url}`)
-      
+
       // 显示导航提示
       const notification = Alpine.store('notification')
       if (notification) {
         notification.show(`⌨️ ${shortcut.description}`, 'info')
       }
-      
+
       // 延迟跳转，让用户看到提示
       setTimeout(() => {
         window.location.href = shortcut.url
@@ -403,31 +403,41 @@ export function shortcutsStore() {
      */
     triggerForceRefresh() {
       logger.info('[Shortcuts] 触发强制刷新（跳过缓存）')
-      
+
       // 显示刷新提示
       const notification = Alpine.store('notification')
       if (notification) {
         notification.show('🔄 正在强制刷新...', 'info')
       }
-      
+
       // 清除sessionStorage缓存
       const keysToRemove = []
       for (let i = 0; i < sessionStorage.length; i++) {
         const key = sessionStorage.key(i)
-        if (key && (key.includes('cache') || key.includes('pending') || key.includes('dashboard') || key.includes('stats'))) {
+        if (
+          key &&
+          (key.includes('cache') ||
+            key.includes('pending') ||
+            key.includes('dashboard') ||
+            key.includes('stats'))
+        ) {
           keysToRemove.push(key)
         }
       }
       keysToRemove.forEach(key => sessionStorage.removeItem(key))
-      
+
       // 触发强制刷新事件
       document.dispatchEvent(new CustomEvent('shortcuts:force-refresh'))
-      
+
       // 如果没有处理器监听，则重新加载页面
       setTimeout(() => {
         // 检查是否有页面组件处理了刷新
         const pageComponent = document.querySelector('[x-data]')
-        if (pageComponent && pageComponent.__x && typeof pageComponent.__x.$data.refreshAll === 'function') {
+        if (
+          pageComponent &&
+          pageComponent.__x &&
+          typeof pageComponent.__x.$data.refreshAll === 'function'
+        ) {
           pageComponent.__x.$data.refreshAll()
         } else {
           // 回退：强制重新加载页面
@@ -495,14 +505,14 @@ export function shortcutsStore() {
         description: config.description,
         scope: config.scope
       }))
-      
+
       // P1-7: G键组合快捷键
       const gShortcuts = Object.entries(this.gKeyShortcuts).map(([key, config]) => ({
         key: `G + ${key.toUpperCase()}`,
         description: config.description,
         scope: 'global'
       }))
-      
+
       return [...shortcuts, ...gShortcuts]
     },
 
@@ -512,24 +522,30 @@ export function shortcutsStore() {
     showHelp() {
       const help = this.getHelp()
       const modal = Alpine.store('modal')
-      
+
       if (modal) {
         // 使用modal store显示帮助
         const helpHtml = `
           <div class="space-y-4">
             <h3 class="text-lg font-semibold themed-text">⌨️ 快捷键列表</h3>
             <div class="divide-y themed-divide">
-              ${help.map(item => `
+              ${help
+                .map(
+                  item => `
                 <div class="py-2 flex justify-between">
                   <span class="themed-text-muted">${item.description}</span>
                   <kbd class="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-sm font-mono">${item.key}</kbd>
                 </div>
-              `).join('')}
+              `
+                )
+                .join('')}
             </div>
           </div>
         `
         // 可以触发自定义事件让页面处理
-        document.dispatchEvent(new CustomEvent('shortcuts:show-help', { detail: { help, helpHtml } }))
+        document.dispatchEvent(
+          new CustomEvent('shortcuts:show-help', { detail: { help, helpHtml } })
+        )
       } else {
         // 简单的console输出
         logger.info('[Shortcuts] 快捷键帮助:')

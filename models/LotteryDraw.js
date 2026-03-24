@@ -294,6 +294,7 @@ module.exports = sequelize => {
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: true,
         unique: true,
+        autoIncrement: true,
         comment:
           '辅助序号（表级 AUTO_INCREMENT，插入后由 DB 填充）：用于统一抽奖订单号 LT 的序列段；模型 allowNull 避免 Sequelize 校验阻塞插入'
       },
@@ -312,7 +313,7 @@ module.exports = sequelize => {
         comment: '本次抽奖包含的次数'
       },
       /**
-       * 抽奖批次ID（P5迁移重命名：batch_id → lottery_batch_id）
+       * 抽奖批次ID
        * @业务含义 用于关联同一批次的多次抽奖（如10连抽）
        * @格式 batch_<timestamp>_<user_id>
        */
@@ -322,7 +323,7 @@ module.exports = sequelize => {
         comment: '抽奖批次ID（用于关联同一批次的多次抽奖）'
       },
       /**
-       * 批次内抽奖序号ID（P5迁移重命名：batch_draw_id → lottery_batch_draw_id）
+       * 批次内抽奖序号ID
        *
        * 业务含义：
        * - 用于关联同一批次（10连抽）的多条抽奖记录
@@ -493,7 +494,7 @@ module.exports = sequelize => {
       },
 
       /**
-       * 关联预设ID（P1迁移重命名：preset_id → lottery_preset_id）
+       * 关联预设ID
        * @业务含义 预设发放时关联的预设记录
        * @外键关联 lottery_presets.lottery_preset_id
        */
@@ -504,7 +505,7 @@ module.exports = sequelize => {
       },
 
       /**
-       * 关联库存欠账ID（P4迁移重命名：inventory_debt_id → preset_inventory_debt_id）
+       * 关联库存欠账ID
        * @业务含义 预设发放产生库存欠账时的关联ID
        * @外键关联 preset_inventory_debt.preset_inventory_debt_id
        */
@@ -515,7 +516,7 @@ module.exports = sequelize => {
       },
 
       /**
-       * 关联预算欠账ID（P4迁移重命名：budget_debt_id → preset_budget_debt_id）
+       * 关联预算欠账ID
        * @业务含义 预设发放产生预算欠账时的关联ID
        * @外键关联 preset_budget_debt.preset_budget_debt_id
        */
@@ -537,7 +538,7 @@ module.exports = sequelize => {
       },
 
       /**
-       * 关联决策快照ID（P4迁移重命名：decision_id → lottery_draw_decision_id）
+       * 关联决策快照ID
        * @业务含义 关联lottery_draw_decisions表，用于审计追溯
        * @外键关联 lottery_draw_decisions.lottery_draw_decision_id
        */
@@ -658,7 +659,7 @@ module.exports = sequelize => {
         {
           name: 'idx_draws_lottery_batch',
           fields: ['lottery_batch_id'],
-          comment: '抽奖批次ID索引（P5迁移更新）'
+          comment: '抽奖批次ID索引'
         },
         {
           name: 'idx_created_at',

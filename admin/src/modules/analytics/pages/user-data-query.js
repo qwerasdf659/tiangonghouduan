@@ -369,11 +369,10 @@ export function userDataQueryPage() {
 
         try {
           const { order_no, target_status, admin_remark } = this.review_modal
-          const res = await UserDataQueryAPI.reviewExchangeRecord(
-            this.selected_user_id,
-            order_no,
-            { status: target_status, admin_remark }
-          )
+          const res = await UserDataQueryAPI.reviewExchangeRecord(this.selected_user_id, order_no, {
+            status: target_status,
+            admin_remark
+          })
 
           if (res.success) {
             Alpine.store('notification').show(

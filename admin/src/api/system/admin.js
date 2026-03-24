@@ -91,6 +91,7 @@ export const SYSTEM_ADMIN_ENDPOINTS = {
   AD_REPORT_OVERVIEW: `${API_PREFIX}/console/ad-reports/overview`,
   AD_REPORT_CAMPAIGN: `${API_PREFIX}/console/ad-reports/campaigns/:id`,
   AD_REPORT_SLOT: `${API_PREFIX}/console/ad-reports/slots/:id`,
+  AD_BILLING_RECORDS: `${API_PREFIX}/console/ad-reports/billing-records`,
 
   // 媒体文件管理端点（替代旧 IMAGE_* 端点）
   MEDIA_UPLOAD: `${API_PREFIX}/console/media/upload`,

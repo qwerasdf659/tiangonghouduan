@@ -90,4 +90,3 @@ if (!ENABLE_DATA_CLEANUP) {
   DataCleanupJob.init()
   module.exports = DataCleanupJob
 }
-

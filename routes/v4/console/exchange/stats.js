@@ -20,11 +20,12 @@ const logger = require('../../../../utils/logger').logger
 router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const admin_id = req.user.user_id
+    const { trend_days } = req.query
 
-    logger.info('[B2C兑换-统计] 查询统计数据', { admin_id })
+    logger.info('[B2C兑换-统计] 查询统计数据', { admin_id, trend_days })
 
     const ExchangeAdminService = req.app.locals.services.getService('exchange_admin')
-    const statistics = await ExchangeAdminService.getMarketItemStatistics()
+    const statistics = await ExchangeAdminService.getMarketItemStatistics({ trend_days })
 
     logger.info('[B2C兑换-统计] 查询成功', {
       admin_id,

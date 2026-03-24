@@ -1682,6 +1682,87 @@
       </div>
     </div>
 
+    <!-- ===== 计费流水（billing_no 展示） ===== -->
+    <div x-show="current_page === 'billing-records'" x-cloak>
+      <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold mb-4">计费流水</h3>
+        <!-- 筛选 -->
+        <div class="flex gap-4 mb-4 flex-wrap">
+          <select x-model="billing_records_filter.billing_type" @change="filterBillingRecords()"
+            class="border rounded px-3 py-2 text-sm">
+            <option value="">全部类型</option>
+            <option value="freeze">冻结</option>
+            <option value="deduct">扣款</option>
+            <option value="refund">退款</option>
+            <option value="daily_deduct">日扣</option>
+            <option value="cpm_deduct">CPM扣费</option>
+          </select>
+          <input type="number" x-model="billing_records_filter.ad_campaign_id" @change="filterBillingRecords()"
+            placeholder="按广告活动ID筛选" class="border rounded px-3 py-2 text-sm w-48">
+        </div>
+        <!-- 列表 -->
+        <template x-if="billing_records_loading">
+          <div class="text-center py-8 text-gray-400">加载中...</div>
+        </template>
+        <template x-if="!billing_records_loading && billing_records.length === 0">
+          <div class="text-center py-8 text-gray-400">暂无计费流水记录</div>
+        </template>
+        <template x-if="!billing_records_loading && billing_records.length > 0">
+          <div class="overflow-x-auto">
+            <table class="min-w-full text-sm">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-4 py-2 text-left">账单号(AB)</th>
+                  <th class="px-4 py-2 text-left">广告活动</th>
+                  <th class="px-4 py-2 text-left">计费类型</th>
+                  <th class="px-4 py-2 text-right">金额(钻石)</th>
+                  <th class="px-4 py-2 text-left">计费日期</th>
+                  <th class="px-4 py-2 text-left">备注</th>
+                  <th class="px-4 py-2 text-left">创建时间</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="rec in billing_records" :key="rec.ad_billing_record_id">
+                  <tr class="border-t hover:bg-gray-50">
+                    <td class="px-4 py-2 font-mono text-xs font-medium" x-text="rec.billing_no || '-'"></td>
+                    <td class="px-4 py-2" x-text="rec.campaign?.campaign_name || ('ID:' + rec.ad_campaign_id)"></td>
+                    <td class="px-4 py-2">
+                      <span class="px-2 py-0.5 rounded text-xs text-white"
+                        :class="{
+                          'bg-blue-500': rec.billing_type === 'freeze',
+                          'bg-red-500': rec.billing_type === 'deduct',
+                          'bg-green-500': rec.billing_type === 'refund',
+                          'bg-orange-500': rec.billing_type === 'daily_deduct',
+                          'bg-purple-500': rec.billing_type === 'cpm_deduct'
+                        }"
+                        x-text="billingTypeText(rec.billing_type)"></span>
+                    </td>
+                    <td class="px-4 py-2 text-right font-mono" x-text="rec.amount_diamond"></td>
+                    <td class="px-4 py-2" x-text="rec.billing_date || '-'"></td>
+                    <td class="px-4 py-2 text-gray-500 text-xs max-w-[200px] truncate" x-text="rec.remark || '-'"></td>
+                    <td class="px-4 py-2 text-xs text-gray-400" x-text="formatDate(rec.created_at)"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </template>
+        <!-- 分页 -->
+        <div class="flex justify-between items-center mt-4" x-show="billing_records_pagination.total > 0">
+          <span class="text-sm text-gray-500" x-text="'共 ' + billing_records_pagination.total + ' 条记录'"></span>
+          <div class="flex gap-2">
+            <button @click="billingRecordsGoPage(billing_records_page - 1)"
+              :disabled="billing_records_page <= 1"
+              class="px-3 py-1 border rounded text-sm disabled:opacity-50">上一页</button>
+            <span class="px-3 py-1 text-sm" x-text="billing_records_page + ' / ' + billing_records_pagination.total_pages"></span>
+            <button @click="billingRecordsGoPage(billing_records_page + 1)"
+              :disabled="billing_records_page >= billing_records_pagination.total_pages"
+              class="px-3 py-1 border rounded text-sm disabled:opacity-50">下一页</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <%- include('partials/footer') %>

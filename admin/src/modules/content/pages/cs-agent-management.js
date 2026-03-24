@@ -9,10 +9,7 @@
 
 import { logger } from '../../../utils/logger.js'
 import { Alpine, createPageMixin } from '../../../alpine/index.js'
-import {
-  useCsAgentManagementState,
-  useCsAgentManagementMethods
-} from '../composables/index.js'
+import { useCsAgentManagementState, useCsAgentManagementMethods } from '../composables/index.js'
 
 /**
  * 创建客服管理页面组件

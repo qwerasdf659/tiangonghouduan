@@ -230,7 +230,7 @@ describe('P2-3.4: 告警规则测试', () => {
       })
 
       test('响应时间500ms-2000ms应触发warning告警', () => {
-        const alert = evaluateResponseTimeAlert(800, '/api/v4/market/listings')
+        const alert = evaluateResponseTimeAlert(800, '/api/v4/marketplace/listings')
 
         expect(alert).not.toBeNull()
         expect(alert.level).toBe('warning')

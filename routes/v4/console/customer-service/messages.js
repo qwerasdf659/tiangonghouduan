@@ -48,7 +48,7 @@ router.get('/:id/messages', async (req, res) => {
     }
 
     const options = {
-      limit: req.query.limit,
+      page_size: req.query.page_size,
       before_message_id: req.query.before_message_id
     }
 

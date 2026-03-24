@@ -137,11 +137,8 @@ class ScheduledTasks {
 
       /*
        * P1-9：使用 snake_case 服务键获取服务
-       * V4.7.0 大文件拆分：
-       * - exchange_market → exchange_core / exchange_admin
-       * - admin_lottery → admin_lottery_core (核心干预) + admin_lottery_campaign (活动管理)
-       * 2026-01-30 新增：unified_lottery_engine（用于 Task 27 CacheManager 缓存清理）
-       * 2026-02-06 新增：exchange_admin（包含 checkTimeoutAndAlert 方法）
+       * 服务拆分：exchange_core（核心交易）/ exchange_admin（管理后台操作）
+       *          admin_lottery_core（核心干预）/ admin_lottery_campaign（活动管理）
        */
       this.ExchangeService = serviceManager.getService('exchange_core') // V4.7.0 拆分后使用 exchange_core
       this.ExchangeAdminService = serviceManager.getService('exchange_admin') // 2026-02-06：管理后台操作

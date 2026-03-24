@@ -37,7 +37,8 @@ document.addEventListener('alpine:init', () => {
       { id: 'antifraud', name: '反作弊', icon: '🛡️' },
       { id: 'attribution', name: '归因追踪', icon: '🔗' },
       { id: 'pricing', name: '定价配置', icon: '💰' },
-      { id: 'adjustments', name: '调价历史', icon: '📝' }
+      { id: 'adjustments', name: '调价历史', icon: '📝' },
+      { id: 'billing-records', name: '计费流水', icon: '🧾' }
     ],
 
     /** 当前选中的 category 筛选（system/operational/commercial）*/
@@ -200,11 +201,11 @@ document.addEventListener('alpine:init', () => {
       return this.CONVERSION_MAP[type]?.color || 'bg-gray-100 text-gray-700'
     },
     /** 获取标签键中文 */
-    tagKeyText (key) {
+    tagKeyText(key) {
       return this.TAG_KEY_MAP[key] || key
     },
     /** 获取频次规则中文 */
-    frequencyText (rule) {
+    frequencyText(rule) {
       return this.FREQUENCY_MAP[rule] || rule || '-'
     },
 
@@ -355,6 +356,21 @@ document.addEventListener('alpine:init', () => {
       manual: '运营手动触发'
     },
 
+    /** 计费流水列表（billing_no 展示） */
+    billing_records: [],
+    billing_records_loading: false,
+    billing_records_pagination: { total: 0, total_pages: 0 },
+    billing_records_page: 1,
+    billing_records_filter: { billing_type: '', ad_campaign_id: '' },
+    /** 计费类型 → 中文 */
+    BILLING_TYPE_MAP: {
+      freeze: '冻结',
+      deduct: '扣款',
+      refund: '退款',
+      daily_deduct: '日扣',
+      cpm_deduct: 'CPM扣费'
+    },
+
     /** 单活动/广告位详细报表 */
     campaignReport: null,
     campaignReportLoading: false,
@@ -442,6 +458,9 @@ document.addEventListener('alpine:init', () => {
           break
         case 'adjustments':
           await this.loadPriceAdjustments()
+          break
+        case 'billing-records':
+          await this.loadBillingRecords()
           break
       }
     },
@@ -538,7 +557,7 @@ document.addEventListener('alpine:init', () => {
         campaign_name: '',
         campaign_category: this.category_filter || 'commercial',
         ad_slot_id: this.allSlotsList.length > 0 ? this.allSlotsList[0].ad_slot_id : '',
-        billing_mode: (isSystem || isOperational) ? 'free' : 'fixed_daily',
+        billing_mode: isSystem || isOperational ? 'free' : 'fixed_daily',
         advertiser_user_id: '',
         daily_bid_diamond: 50,
         budget_total_diamond: 500,
@@ -592,7 +611,10 @@ document.addEventListener('alpine:init', () => {
           const slotInfo = this.getSelectedSlotInfo()
           const minBid = slotInfo?.min_bid_diamond || 50
           const minBudget = slotInfo?.min_budget_diamond || 500
-          if (!this.campaignForm.daily_bid_diamond || this.campaignForm.daily_bid_diamond < minBid) {
+          if (
+            !this.campaignForm.daily_bid_diamond ||
+            this.campaignForm.daily_bid_diamond < minBid
+          ) {
             this.showError(`竞价模式每日出价不能低于 ${minBid} 钻石`)
             return
           }
@@ -633,8 +655,10 @@ document.addEventListener('alpine:init', () => {
         if (this.campaignForm.end_date) data.end_date = this.campaignForm.end_date
 
         if (category === 'operational' || category === 'system') {
-          if (this.campaignForm.frequency_rule) data.frequency_rule = this.campaignForm.frequency_rule
-          if (this.campaignForm.frequency_value) data.frequency_value = Number(this.campaignForm.frequency_value)
+          if (this.campaignForm.frequency_rule)
+            data.frequency_rule = this.campaignForm.frequency_rule
+          if (this.campaignForm.frequency_value)
+            data.frequency_value = Number(this.campaignForm.frequency_value)
           data.force_show = !!this.campaignForm.force_show
         }
         if (category === 'system' && this.campaignForm.internal_notes) {
@@ -703,7 +727,7 @@ document.addEventListener('alpine:init', () => {
     },
 
     /** 发布活动（draft → active，用于 operational/system 类型跳过审核） */
-    async publishCampaign (campaign) {
+    async publishCampaign(campaign) {
       if (!confirm(`确认发布「${campaign.campaign_name}」？发布后立即投放。`)) return
       this.saving = true
       try {
@@ -724,7 +748,7 @@ document.addEventListener('alpine:init', () => {
     },
 
     /** 暂停活动（active → paused） */
-    async pauseCampaign (campaign) {
+    async pauseCampaign(campaign) {
       if (!confirm(`确认暂停「${campaign.campaign_name}」？暂停后停止投放。`)) return
       this.saving = true
       try {
@@ -744,14 +768,14 @@ document.addEventListener('alpine:init', () => {
       }
     },
 
-    reviewCampaign (campaign, action) {
+    reviewCampaign(campaign, action) {
       this.reviewTarget = campaign
       this.reviewAction = action
       this.reviewNote = ''
       this.showModal('reviewModal')
     },
 
-    async submitReview () {
+    async submitReview() {
       if (!this.reviewTarget) return
       this.saving = true
       try {
@@ -1086,7 +1110,10 @@ document.addEventListener('alpine:init', () => {
         }
 
         const response = await request({
-          url: SYSTEM_ENDPOINTS.AD_PRICE_ADJUSTMENT_LIST + '?' + new URLSearchParams(params).toString(),
+          url:
+            SYSTEM_ENDPOINTS.AD_PRICE_ADJUSTMENT_LIST +
+            '?' +
+            new URLSearchParams(params).toString(),
           method: 'GET'
         })
         if (response?.success) {
@@ -1189,6 +1216,55 @@ document.addEventListener('alpine:init', () => {
       } catch (error) {
         logger.warn('渲染报表图表失败:', error.message)
       }
+    },
+
+    // ==================== 计费流水（billing_no 展示） ====================
+    async loadBillingRecords() {
+      this.billing_records_loading = true
+      try {
+        const params = { page: this.billing_records_page, page_size: 20 }
+        if (this.billing_records_filter.billing_type) {
+          params.billing_type = this.billing_records_filter.billing_type
+        }
+        if (this.billing_records_filter.ad_campaign_id) {
+          params.ad_campaign_id = this.billing_records_filter.ad_campaign_id
+        }
+        const response = await request({
+          url: SYSTEM_ENDPOINTS.AD_BILLING_RECORDS,
+          method: 'GET',
+          params
+        })
+        if (response?.success) {
+          this.billing_records = response.data?.billing_records || []
+          this.billing_records_pagination = response.data?.pagination || {
+            total: 0,
+            total_pages: 0
+          }
+        }
+      } catch (error) {
+        logger.error('加载计费流水失败:', error)
+        this.billing_records = []
+      } finally {
+        this.billing_records_loading = false
+      }
+    },
+
+    /** 计费流水翻页 */
+    billingRecordsGoPage(p) {
+      if (p < 1 || p > (this.billing_records_pagination.total_pages || 1)) return
+      this.billing_records_page = p
+      this.loadBillingRecords()
+    },
+
+    /** 计费流水筛选 */
+    filterBillingRecords() {
+      this.billing_records_page = 1
+      this.loadBillingRecords()
+    },
+
+    /** 计费类型中文 */
+    billingTypeText(type) {
+      return this.BILLING_TYPE_MAP[type] || type || '-'
     }
   }))
 

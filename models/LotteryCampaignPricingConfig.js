@@ -240,7 +240,7 @@ class LotteryCampaignPricingConfig extends Model {
 
     // 生成配置ID
     const timestamp = Date.now()
-    const randomCode = Math.random().toString(36).substring(2, 8)
+    const randomCode = require('crypto').randomBytes(3).toString('hex')
     const configId = `pricing_${timestamp}_${randomCode}`
 
     return await this.create(

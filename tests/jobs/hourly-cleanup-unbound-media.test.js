@@ -90,7 +90,9 @@ describe('每小时孤立媒体文件清理任务', () => {
       })
 
       expect(remainingFiles.length).toBe(uniqueIds.length)
-      console.log(`[孤立清理] 验证确认：${uniqueIds.length} 个已关联文件未被误删（来自 ${attachedMediaIds.length} 条关联记录）`)
+      console.log(
+        `[孤立清理] 验证确认：${uniqueIds.length} 个已关联文件未被误删（来自 ${attachedMediaIds.length} 条关联记录）`
+      )
     })
   })
 })

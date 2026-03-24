@@ -11,8 +11,10 @@ import { CONTENT_ENDPOINTS } from '../../../api/content.js'
  * @param {number} userId - 用户ID
  * @returns {Promise<Object|null>} 背包数据
  */
-export async function loadBackpack (userId) {
-  const url = buildURL(CONTENT_ENDPOINTS.CS_USER_CONTEXT_BACKPACK, { userId }) + buildQueryString({ page_size: 20 })
+export async function loadBackpack(userId) {
+  const url =
+    buildURL(CONTENT_ENDPOINTS.CS_USER_CONTEXT_BACKPACK, { userId }) +
+    buildQueryString({ page_size: 20 })
   const res = await request({ url, method: 'GET' })
   return res.success ? res.data : null
 }

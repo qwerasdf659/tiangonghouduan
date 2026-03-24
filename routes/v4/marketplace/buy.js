@@ -38,7 +38,7 @@ const {
 const marketRiskMiddleware = getMarketRiskControlMiddleware()
 
 /**
- * @route POST /api/v4/market/listings/:market_listing_id/purchase
+ * @route POST /api/v4/marketplace/listings/:market_listing_id/purchase
  * @desc 购买市场商品
  * @access Private (需要登录)
  *
@@ -102,7 +102,7 @@ router.post(
        * 统一使用 IdempotencyService 进行请求级幂等控制
        */
       const idempotencyResult = await IdempotencyService.getOrCreateRequest(idempotency_key, {
-        api_path: '/api/v4/market/listings/:market_listing_id/purchase',
+        api_path: '/api/v4/marketplace/listings/:market_listing_id/purchase',
         http_method: 'POST',
         request_params: { market_listing_id, purchase_note },
         user_id: buyer_id

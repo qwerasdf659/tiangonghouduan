@@ -58,7 +58,7 @@ function getSharedComponents(serviceManager = null) {
   _sharedComponents = {
     lotteryEngine: new UnifiedLotteryEngine(),
     /**
-     * V4.6 管线编排器（2026-01-19 Phase 5 迁移）
+     * V4.6 管线编排器（2026-01-19）
      *
      * drawOrchestrator: 抽奖执行入口（替代原 basic_guarantee_strategy）
      * managementStrategy: 管理操作 API（forceWin/forceLose 等）- 继续保留
@@ -85,7 +85,7 @@ const sharedComponents = {
     return getSharedComponents().lotteryEngine
   },
   /**
-   * V4.6 管线编排器（2026-01-19 Phase 5 迁移）
+   * V4.6 管线编排器（2026-01-19）
    *
    * 获取管线编排器实例（抽奖执行入口）
    *

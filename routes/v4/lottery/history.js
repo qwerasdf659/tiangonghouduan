@@ -27,7 +27,7 @@ const BeijingTimeHelper = require('../../../utils/timeHelper')
  * @access Private（JWT Token 认证，用户只能查看自己的数据）
  *
  * @query {number} page - 页码（默认1）
- * @query {number} limit - 每页数量（默认20，最大50）
+ * @query {number} page_size - 每页数量（默认20，最大50）
  *
  * @returns {Object} 抽奖历史记录 { records: Array, pagination: Object }
  *
@@ -38,16 +38,16 @@ const BeijingTimeHelper = require('../../../utils/timeHelper')
 router.get('/history', authenticateToken, async (req, res) => {
   try {
     const user_id = req.user.user_id
-    const { page = 1, limit = 20 } = req.query
+    const { page = 1, page_size = 20 } = req.query
 
     const finalPage = Math.max(parseInt(page) || 1, 1)
-    const finalLimit = Math.min(Math.max(parseInt(limit) || 20, 1), 50)
+    const pageSize = Math.min(Math.max(parseInt(page_size) || 20, 1), 50)
 
     // 获取抽奖历史（通过 ServiceManager 获取 LotteryQueryService）
     const LotteryQueryService = req.app.locals.services.getService('lottery_query')
     const history = await LotteryQueryService.getUserHistory(user_id, {
       page: finalPage,
-      limit: finalLimit
+      limit: pageSize
     })
 
     return res.apiSuccess(history, '抽奖历史获取成功', 'HISTORY_SUCCESS')
@@ -56,7 +56,7 @@ router.get('/history', authenticateToken, async (req, res) => {
       error_message: error.message,
       error_stack: error.stack,
       user_id: req.user?.user_id,
-      query_params: { page: req.query.page, limit: req.query.limit },
+      query_params: { page: req.query.page, page_size: req.query.page_size },
       timestamp: BeijingTimeHelper.now()
     })
 
