@@ -291,7 +291,7 @@ export function useDiamondAccountsMethods() {
             : -Math.abs(this.diamondAdjustForm.amount)
 
         // 生成幂等键（后端要求必填）
-        const idempotencyKey = `admin_adjust_diamond_${targetUserId}_${Date.now()}`
+        const idempotencyKey = `admin_adjust_diamond_${targetUserId}_${crypto.randomUUID()}`
 
         const response = await this.apiCall(ASSET_ENDPOINTS.ADJUSTMENT_ADJUST, {
           method: 'POST',

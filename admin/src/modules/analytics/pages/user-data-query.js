@@ -102,6 +102,7 @@ export function userDataQueryPage() {
       trade_records: { list: [], total: 0, summary: {} },
       market_listings: { list: [], total: 0, summary: {} },
       conversions: { list: [], total: 0, summary: {} },
+      consumption_records: { list: [], total: 0, summary: {} },
 
       // ========== 筛选参数 ==========
       filters: {
@@ -244,6 +245,9 @@ export function userDataQueryPage() {
             case 'conversions':
               await this._loadConversions(params)
               break
+            case 'consumption_records':
+              await this._loadConsumptionRecords(params)
+              break
           }
         } catch (err) {
           logger.error(`[UserDataQuery] 加载 ${this.active_tab} 失败`, err)
@@ -310,6 +314,16 @@ export function userDataQueryPage() {
         const res = await UserDataQueryAPI.getConversions(this.selected_user_id, params)
         if (res.success && res.data) {
           this.conversions = res.data
+          this.updatePagination(res.data)
+        }
+      },
+
+      async _loadConsumptionRecords(params) {
+        if (this.filters.status) params.status = this.filters.status
+
+        const res = await UserDataQueryAPI.getConsumption(this.selected_user_id, params)
+        if (res.success && res.data) {
+          this.consumption_records = res.data
           this.updatePagination(res.data)
         }
       },

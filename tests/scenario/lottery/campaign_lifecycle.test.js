@@ -420,7 +420,7 @@ describe('📊 任务11.2：活动全生命周期测试', () => {
       const response = await request(app)
         .get('/api/v4/console/campaign-budget/batch-status')
         .set('Authorization', `Bearer ${adminToken}`)
-        .query({ status: 'active', limit: 10 })
+        .query({ status: 'active', page_size: 10 })
 
       console.log(`   响应状态: ${response.status}`)
 

@@ -466,6 +466,25 @@ models.BidRecord = require('./BidRecord')(sequelize, DataTypes)
  *    - 业务场景：用户出价 → 冻结资产 → 记录出价 → 结算时标记 is_final_winner
  */
 
+// 🔴 C2C 用户间竞拍系统模型（2026-03-24）
+models.AuctionListing = require('./AuctionListing')(sequelize, DataTypes)
+/*
+ * ✅ AuctionListing：C2C拍卖挂牌表
+ *    - 用途：用户间竞拍活动（与 BidProduct 的区别：卖方是普通用户，商品来自 items 表）
+ *    - 特点：7态状态机（复用 bid_products 同一 ENUM）+ 手续费 + 一口价 + 物品快照
+ *    - 表名：auction_listings，主键：auction_listing_id
+ *    - 业务场景：用户发起拍卖 → holdItem锁定物品 → 其他用户出价 → 到期结算/流拍
+ */
+
+models.AuctionBid = require('./AuctionBid')(sequelize, DataTypes)
+/*
+ * ✅ AuctionBid：C2C拍卖出价记录表
+ *    - 用途：记录C2C拍卖用户出价（含冻结流水对账、幂等性控制）
+ *    - 特点：FK → auction_listings，idempotency_key UNIQUE
+ *    - 表名：auction_bids，主键：auction_bid_id
+ *    - 业务场景：用户出价 → 冻结资产 → 记录出价 → 结算时标记 is_final_winner
+ */
+
 /*
  * 🔥 统一资产底座系统（V4.5.0 资产域标准架构）
  *    当前架构：Account + AccountAssetBalance + AssetTransaction

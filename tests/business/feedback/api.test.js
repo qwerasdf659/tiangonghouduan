@@ -83,7 +83,7 @@ describe('GET /api/v4/system/feedback/my - 获取我的反馈列表', () => {
       // 查询第1页，每页10条
       const response = await request(app)
         .get('/api/v4/system/feedback/my')
-        .query({ limit: 10, offset: 0 })
+        .query({ page_size: 10, offset: 0 })
         .set('Authorization', `Bearer ${test_token}`)
 
       expect(response.status).toBe(200)
@@ -99,7 +99,7 @@ describe('GET /api/v4/system/feedback/my - 获取我的反馈列表', () => {
       expect(total).toBeGreaterThanOrEqual(feedbacks.length)
 
       // 验证：page元数据正确
-      expect(page.limit).toBe(10)
+      expect(page.page_size).toBe(10)
       expect(page.offset).toBe(0)
       expect(page.current_page).toBe(1)
       expect(page.page).toBe(page.current_page)
@@ -115,7 +115,7 @@ describe('GET /api/v4/system/feedback/my - 获取我的反馈列表', () => {
       // 查询第1页
       const page1_response = await request(app)
         .get('/api/v4/system/feedback/my')
-        .query({ limit: 10, offset: 0 })
+        .query({ page_size: 10, offset: 0 })
         .set('Authorization', `Bearer ${test_token}`)
 
       expect(page1_response.status).toBe(200)
@@ -124,7 +124,7 @@ describe('GET /api/v4/system/feedback/my - 获取我的反馈列表', () => {
       // 查询第2页
       const page2_response = await request(app)
         .get('/api/v4/system/feedback/my')
-        .query({ limit: 10, offset: 10 })
+        .query({ page_size: 10, offset: 10 })
         .set('Authorization', `Bearer ${test_token}`)
 
       expect(page2_response.status).toBe(200)
@@ -143,7 +143,7 @@ describe('GET /api/v4/system/feedback/my - 获取我的反馈列表', () => {
     test('应该接受合法的status参数（pending）', async () => {
       const response = await request(app)
         .get('/api/v4/system/feedback/my')
-        .query({ status: 'pending', limit: 10, offset: 0 })
+        .query({ status: 'pending', page_size: 10, offset: 0 })
         .set('Authorization', `Bearer ${test_token}`)
 
       expect(response.status).toBe(200)
@@ -161,7 +161,7 @@ describe('GET /api/v4/system/feedback/my - 获取我的反馈列表', () => {
     test('应该接受status=all参数（查询全部状态）', async () => {
       const response = await request(app)
         .get('/api/v4/system/feedback/my')
-        .query({ status: 'all', limit: 10, offset: 0 })
+        .query({ status: 'all', page_size: 10, offset: 0 })
         .set('Authorization', `Bearer ${test_token}`)
 
       expect(response.status).toBe(200)
@@ -171,7 +171,7 @@ describe('GET /api/v4/system/feedback/my - 获取我的反馈列表', () => {
     test('应该拒绝非法的status参数并返回400错误', async () => {
       const response = await request(app)
         .get('/api/v4/system/feedback/my')
-        .query({ status: 'invalid_status', limit: 10, offset: 0 })
+        .query({ status: 'invalid_status', page_size: 10, offset: 0 })
         .set('Authorization', `Bearer ${test_token}`)
 
       // ✅ 核心验证：应该返回400错误
@@ -190,7 +190,7 @@ describe('GET /api/v4/system/feedback/my - 获取我的反馈列表', () => {
     test('应该限制limit最大值为50', async () => {
       const response = await request(app)
         .get('/api/v4/system/feedback/my')
-        .query({ limit: 100, offset: 0 }) // 请求100条，但应该被限制为50
+        .query({ page_size: 100, offset: 0 }) // 请求100条，但应该被限制为50
         .set('Authorization', `Bearer ${test_token}`)
 
       expect(response.status).toBe(200)
@@ -199,26 +199,26 @@ describe('GET /api/v4/system/feedback/my - 获取我的反馈列表', () => {
       // ✅ 核心验证：返回的记录数不超过50
       const feedbacks = response.body.data.feedbacks
       expect(feedbacks.length).toBeLessThanOrEqual(50)
-      expect(response.body.data.page.limit).toBe(50)
+      expect(response.body.data.page.page_size).toBe(50)
     })
 
     test('应该处理无效的limit参数（非数字）', async () => {
       const response = await request(app)
         .get('/api/v4/system/feedback/my')
-        .query({ limit: 'abc', offset: 0 })
+        .query({ page_size: 'abc', offset: 0 })
         .set('Authorization', `Bearer ${test_token}`)
 
       expect(response.status).toBe(200)
       expect(response.body.code).toBe('SUCCESS') // ✅ code字段是字符串类型
 
       // 验证：应该使用默认值10
-      expect(response.body.data.page.limit).toBe(10)
+      expect(response.body.data.page.page_size).toBe(10)
     })
 
     test('应该处理负数offset参数', async () => {
       const response = await request(app)
         .get('/api/v4/system/feedback/my')
-        .query({ limit: 10, offset: -5 })
+        .query({ page_size: 10, offset: -5 })
         .set('Authorization', `Bearer ${test_token}`)
 
       expect(response.status).toBe(200)
@@ -235,7 +235,7 @@ describe('GET /api/v4/system/feedback/my - 获取我的反馈列表', () => {
     test('应该隐藏敏感字段（user_ip、device_info、internal_notes）', async () => {
       const response = await request(app)
         .get('/api/v4/system/feedback/my')
-        .query({ limit: 10, offset: 0 })
+        .query({ page_size: 10, offset: 0 })
         .set('Authorization', `Bearer ${test_token}`)
 
       expect(response.status).toBe(200)
@@ -268,7 +268,7 @@ describe('GET /api/v4/system/feedback/my - 获取我的反馈列表', () => {
     test('应该拒绝无token的请求并返回401错误', async () => {
       const response = await request(app)
         .get('/api/v4/system/feedback/my')
-        .query({ limit: 10, offset: 0 })
+        .query({ page_size: 10, offset: 0 })
       // 不设置Authorization头
 
       expect(response.status).toBe(401)
@@ -277,7 +277,7 @@ describe('GET /api/v4/system/feedback/my - 获取我的反馈列表', () => {
     test('应该只返回当前用户的反馈（用户隔离）', async () => {
       const response = await request(app)
         .get('/api/v4/system/feedback/my')
-        .query({ limit: 100, offset: 0 }) // 查询尽可能多的数据
+        .query({ page_size: 100, offset: 0 }) // 查询尽可能多的数据
         .set('Authorization', `Bearer ${test_token}`)
 
       expect(response.status).toBe(200)
@@ -308,7 +308,7 @@ describe('GET /api/v4/system/feedback/my - 获取我的反馈列表', () => {
     test('应该按创建时间降序排列（最新反馈在前）', async () => {
       const response = await request(app)
         .get('/api/v4/system/feedback/my')
-        .query({ limit: 10, offset: 0 })
+        .query({ page_size: 10, offset: 0 })
         .set('Authorization', `Bearer ${test_token}`)
 
       expect(response.status).toBe(200)

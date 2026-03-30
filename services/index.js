@@ -101,6 +101,12 @@ const {
   BidQueryService: ExchangeBidQueryService // 竞价查询服务（列表/详情/历史）
 } = require('./exchange')
 
+// Auction 域子服务（C2C 用户间竞拍，2026-03-24）
+const {
+  AuctionService, // 核心拍卖操作（创建/出价/结算/取消/流拍）
+  AuctionQueryService // 拍卖查询服务（列表/详情/卖方视角/出价历史）
+} = require('./auction')
+
 // Consumption 域子服务
 const {
   CoreService: ConsumptionCoreService, // 核心操作（提交/审核/删除/恢复）
@@ -306,6 +312,10 @@ class ServiceManager {
       this._services.set('exchange_admin', new ExchangeAdminService(this.models)) // 管理后台操作（需实例化）
       this._services.set('exchange_bid_core', new ExchangeBidService(this.models)) // 竞价核心服务（出价/结算/取消）
       this._services.set('exchange_bid_query', new ExchangeBidQueryService(this.models)) // 竞价查询服务（列表/详情/历史）
+
+      // C2C 用户间竞拍（2026-03-24）
+      this._services.set('auction_core', new AuctionService(this.models)) // C2C拍卖核心操作（创建/出价/结算/取消/流拍）
+      this._services.set('auction_query', new AuctionQueryService(this.models)) // C2C拍卖查询服务（列表/详情/卖方视角/出价历史）
       this._services.set('exchange_rate', ExchangeRateService) // 固定汇率兑换服务（静态类，2026-02-23 市场增强）
 
       // 快递查询服务（双通道降级：快递100主 + 快递鸟备，Phase 4 快递对接）

@@ -169,7 +169,7 @@ router.get('/stats', authenticateToken, requireRoleLevel(100), async (req, res) 
  *
  * Query Parameters:
  * - days: 统计天数（默认30天）
- * - limit: 返回数量限制（默认20条，最大100）
+ * - page_size: 返回数量限制（默认20条，最大100）
  *
  * @returns {Object} 贡献度排行数据
  * @returns {Array} data.rankings - 商户排行列表
@@ -178,7 +178,7 @@ router.get('/stats', authenticateToken, requireRoleLevel(100), async (req, res) 
  * @returns {string} data.updated_at - 数据更新时间
  *
  * @example
- * GET /api/v4/console/stores/contribution?days=30&limit=20
+ * GET /api/v4/console/stores/contribution?days=30&page_size=20
  *
  * Response:
  * {

@@ -211,7 +211,7 @@ router.get('/chat/sessions/:id/messages', authenticateToken, async (req, res) =>
     const result = await CustomerServiceSessionService.getSessionMessages(sessionId, {
       user_id: req.user.user_id, // 权限验证：用户只能查看自己的会话
       page: parseInt(page),
-      limit: finalLimit,
+      page_size: finalLimit,
       mark_as_read: true, // 自动标记管理员发送的未读消息为已读
       include_all_fields: true // 返回所有字段（包括metadata、temp_message_id等）
     })
@@ -457,7 +457,7 @@ router.post(
       const session = await CustomerServiceSessionService.getSessionMessages(sessionId, {
         user_id: userId,
         page: 1,
-        limit: 1
+        page_size: 1
       })
 
       if (!session) {

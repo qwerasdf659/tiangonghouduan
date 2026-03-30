@@ -30,7 +30,7 @@ import { API_PREFIX, request, buildURL, buildQueryString } from './base.js'
  * 用户列表查询参数
  * @typedef {Object} UserListParams
  * @property {number} [page=1] - 页码，从1开始
- * @property {number} [limit=20] - 每页数量，后端使用 limit 字段
+ * @property {number} [page_size=20] - 每页数量
  * @property {string} [search] - 搜索关键词，支持用户名/手机号搜索
  * @property {UserRole} [role_filter] - 角色筛选
  */
@@ -190,7 +190,7 @@ import { API_PREFIX, request, buildURL, buildQueryString } from './base.js'
 export const USER_ENDPOINTS = {
   /** @type {string} [GET] 根据手机号解析用户 - Query: { mobile } */
   RESOLVE: `${API_PREFIX}/console/user-management/users/resolve`,
-  /** @type {string} [GET] 获取用户列表 - Query: { page?, limit?, search?, role_filter? } */
+  /** @type {string} [GET] 获取用户列表 - Query: { page?, page_size?, search?, role_filter? } */
   LIST: `${API_PREFIX}/console/user-management/users`,
   /** @type {string} [GET] 获取用户详情 - Path: :user_id */
   DETAIL: `${API_PREFIX}/console/user-management/users/:user_id`,
@@ -355,7 +355,7 @@ export const UserAPI = {
    * @async
    * @param {UserListParams} [params={}] - 查询参数
    * @param {number} [params.page=1] - 页码，从1开始
-   * @param {number} [params.limit=20] - 每页数量（后端使用 limit 字段）
+   * @param {number} [params.page_size=20] - 每页数量
    * @param {string} [params.search] - 搜索关键词，支持用户名/手机号搜索
    * @param {UserRole} [params.role_filter] - 角色筛选
    * @returns {Promise<ApiResponse>} 用户列表响应
@@ -369,7 +369,7 @@ export const UserAPI = {
    * // 带筛选条件
    * const result = await UserAPI.getList({
    *   page: 1,
-   *   limit: 20,
+   *   page_size: 20,
    *   search: '138',
    *   role_filter: 'admin'
    * })

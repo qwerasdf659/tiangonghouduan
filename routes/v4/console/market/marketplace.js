@@ -3,7 +3,24 @@
  *
  * @description 管理员管理 C2C 二级市场：用户上架统计、挂牌运营、强制撤回、市场统计、可交易资产配置
  * @route /api/v4/console/marketplace/*
- * @version 4.0.0
+ * @version 4.1.0
+ *
+ * 路由清单：
+ * - GET    /listings                                 - 挂牌列表（管理视图，多维筛选）
+ * - GET    /listings/:market_listing_id              - 挂牌详情
+ * - POST   /listings                                 - 管理员代创建挂牌
+ * - PUT    /listings/:market_listing_id              - 管理员修改挂牌（改价/排序/备注）
+ * - DELETE /listings/:market_listing_id              - 管理员硬删除（仅终态可删）
+ * - GET    /listing-stats                            - 用户上架统计
+ * - GET    /user-listings                            - 查指定用户的挂牌
+ * - PUT    /user-listing-limit                       - 调整用户上架上限
+ * - PUT    /listings/:id/pin                         - 挂牌置顶
+ * - PUT    /listings/:id/recommend                   - 挂牌推荐
+ * - PUT    /listings/batch-sort                      - 批量排序
+ * - POST   /listings/:market_listing_id/force-withdraw - 强制撤回
+ * - GET    /stats/overview                           - 市场概览
+ * - GET    /stats/price-history                      - 价格走势
+ * - GET    /config/tradable-assets                   - 可交易资产配置
  */
 
 const express = require('express')
@@ -11,6 +28,276 @@ const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const TransactionManager = require('../../../../utils/TransactionManager')
 const logger = require('../../../../utils/logger').logger
+
+// ==================== C2C 挂牌管理 CRUD ====================
+
+/**
+ * GET /api/v4/console/marketplace/listings
+ * @desc 管理员查看全部挂牌列表（支持多维筛选、分页、排序）
+ */
+router.get('/listings', authenticateToken, requireRoleLevel(100), async (req, res) => {
+  try {
+    const admin_id = req.user.user_id
+    const {
+      status,
+      listing_kind,
+      asset_code,
+      seller_user_id,
+      sort = 'newest',
+      page = 1,
+      page_size = 20
+    } = req.query
+
+    logger.info('[C2C管理] 查询挂牌列表', { admin_id, status, listing_kind, asset_code })
+
+    const { MarketListing, User, Item, ItemTemplate } = require('../../../../models')
+    const where = {}
+    if (status) where.status = status
+    if (listing_kind) where.listing_kind = listing_kind
+    if (asset_code) where.offer_asset_code = asset_code
+    if (seller_user_id) where.seller_user_id = parseInt(seller_user_id)
+
+    const sortMap = {
+      newest: [['created_at', 'DESC']],
+      oldest: [['created_at', 'ASC']],
+      price_asc: [['asking_price', 'ASC']],
+      price_desc: [['asking_price', 'DESC']]
+    }
+
+    const safePage = Math.max(1, parseInt(page) || 1)
+    const safePageSize = Math.min(100, Math.max(1, parseInt(page_size) || 20))
+
+    const { count, rows } = await MarketListing.findAndCountAll({
+      where,
+      include: [
+        { model: User, as: 'seller', attributes: ['user_id', 'nickname', 'mobile'] },
+        { model: Item, as: 'offerItem', required: false },
+        {
+          model: ItemTemplate,
+          as: 'offerItemTemplate',
+          attributes: ['item_template_id', 'display_name'],
+          required: false
+        }
+      ],
+      order: sortMap[sort] || sortMap.newest,
+      limit: safePageSize,
+      offset: (safePage - 1) * safePageSize
+    })
+
+    return res.apiSuccess(
+      {
+        listings: rows,
+        pagination: {
+          page: safePage,
+          page_size: safePageSize,
+          total: count,
+          total_pages: Math.ceil(count / safePageSize)
+        }
+      },
+      '获取挂牌列表成功'
+    )
+  } catch (error) {
+    logger.error('[C2C管理] 查询挂牌列表失败', {
+      error: error.message,
+      admin_id: req.user?.user_id
+    })
+    return res.apiError(error.message || '查询失败', 'INTERNAL_ERROR', null, 500)
+  }
+})
+
+/**
+ * GET /api/v4/console/marketplace/listings/:market_listing_id
+ * @desc 管理员查看挂牌详情
+ */
+router.get(
+  '/listings/:market_listing_id',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const listingId = parseInt(req.params.market_listing_id)
+      if (isNaN(listingId) || listingId <= 0) {
+        return res.apiError('无效的挂牌ID', 'BAD_REQUEST', null, 400)
+      }
+
+      const MarketListingQueryService = req.app.locals.services.getService('market_listing_query')
+      const listing = await MarketListingQueryService.getListingById(listingId)
+      if (!listing) {
+        return res.apiError('挂牌不存在', 'NOT_FOUND', null, 404)
+      }
+
+      return res.apiSuccess(listing, '获取挂牌详情成功')
+    } catch (error) {
+      logger.error('[C2C管理] 查询挂牌详情失败', { error: error.message })
+      return res.apiError(error.message || '查询失败', 'INTERNAL_ERROR', null, 500)
+    }
+  }
+)
+
+/**
+ * POST /api/v4/console/marketplace/listings
+ * @desc 管理员代创建挂牌（运营干预：测试/补偿/活动）
+ */
+router.post('/listings', authenticateToken, requireRoleLevel(100), async (req, res) => {
+  try {
+    const admin_id = req.user.user_id
+    const {
+      seller_user_id,
+      listing_kind,
+      offer_item_id,
+      offer_asset_code,
+      offer_amount,
+      asking_price,
+      admin_note
+    } = req.body
+
+    if (!seller_user_id || !listing_kind || !asking_price) {
+      return res.apiError(
+        'seller_user_id、listing_kind、asking_price 为必填',
+        'VALIDATION_ERROR',
+        null,
+        400
+      )
+    }
+
+    logger.info('[C2C管理] 管理员创建挂牌', {
+      admin_id,
+      seller_user_id,
+      listing_kind,
+      asking_price
+    })
+
+    const MarketListingService = req.app.locals.services.getService('market_listing_core')
+    const result = await TransactionManager.execute(
+      async transaction => {
+        return await MarketListingService.createListing(
+          {
+            seller_user_id,
+            listing_kind,
+            offer_item_id,
+            offer_asset_code,
+            offer_amount,
+            asking_price,
+            admin_note,
+            operator_id: admin_id
+          },
+          { transaction }
+        )
+      },
+      { description: `管理员创建挂牌 seller=${seller_user_id}`, maxRetries: 1 }
+    )
+
+    return res.apiSuccess(result, '挂牌创建成功')
+  } catch (error) {
+    logger.error('[C2C管理] 创建挂牌失败', { error: error.message, admin_id: req.user?.user_id })
+    if (error.message.includes('不存在') || error.message.includes('not found')) {
+      return res.apiError(error.message, 'NOT_FOUND', null, 404)
+    }
+    if (
+      error.message.includes('不能') ||
+      error.message.includes('无效') ||
+      error.message.includes('必填')
+    ) {
+      return res.apiError(error.message, 'VALIDATION_ERROR', null, 400)
+    }
+    return res.apiError(error.message || '创建失败', 'INTERNAL_ERROR', null, 500)
+  }
+})
+
+/**
+ * PUT /api/v4/console/marketplace/listings/:market_listing_id
+ * @desc 管理员修改挂牌（改价/排序权重/备注，仅 on_sale 状态可改）
+ */
+router.put(
+  '/listings/:market_listing_id',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const listingId = parseInt(req.params.market_listing_id)
+      if (isNaN(listingId) || listingId <= 0) {
+        return res.apiError('无效的挂牌ID', 'BAD_REQUEST', null, 400)
+      }
+
+      const { asking_price, sort_order, admin_note } = req.body
+      const { MarketListing } = require('../../../../models')
+      const listing = await MarketListing.findByPk(listingId)
+      if (!listing) {
+        return res.apiError('挂牌不存在', 'NOT_FOUND', null, 404)
+      }
+      if (listing.status !== 'on_sale') {
+        return res.apiError(
+          `仅在售挂牌可修改，当前状态: ${listing.status}`,
+          'INVALID_LISTING_STATUS',
+          null,
+          400
+        )
+      }
+
+      const updateFields = {}
+      if (asking_price !== undefined) updateFields.asking_price = asking_price
+      if (sort_order !== undefined) updateFields.sort_order = sort_order
+      if (admin_note !== undefined) updateFields.admin_note = admin_note
+
+      await listing.update(updateFields)
+
+      logger.info('[C2C管理] 修改挂牌成功', {
+        admin_id: req.user.user_id,
+        market_listing_id: listingId
+      })
+      return res.apiSuccess(listing, '挂牌修改成功')
+    } catch (error) {
+      logger.error('[C2C管理] 修改挂牌失败', { error: error.message })
+      return res.apiError(error.message || '修改失败', 'INTERNAL_ERROR', null, 500)
+    }
+  }
+)
+
+/**
+ * DELETE /api/v4/console/marketplace/listings/:market_listing_id
+ * @desc 管理员硬删除挂牌（仅 withdrawn/admin_withdrawn 终态可删）
+ */
+router.delete(
+  '/listings/:market_listing_id',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const listingId = parseInt(req.params.market_listing_id)
+      if (isNaN(listingId) || listingId <= 0) {
+        return res.apiError('无效的挂牌ID', 'BAD_REQUEST', null, 400)
+      }
+
+      const { MarketListing } = require('../../../../models')
+      const listing = await MarketListing.findByPk(listingId)
+      if (!listing) {
+        return res.apiError('挂牌不存在', 'NOT_FOUND', null, 404)
+      }
+
+      const deletableStatuses = ['withdrawn', 'admin_withdrawn']
+      if (!deletableStatuses.includes(listing.status)) {
+        return res.apiError(
+          `仅已撤回的挂牌可删除，当前状态: ${listing.status}`,
+          'INVALID_LISTING_STATUS',
+          { current_status: listing.status, deletable_statuses: deletableStatuses },
+          400
+        )
+      }
+
+      logger.info('[C2C管理] 管理员删除挂牌', {
+        admin_id: req.user.user_id,
+        market_listing_id: listingId,
+        status: listing.status
+      })
+      await listing.destroy()
+
+      return res.apiSuccess({ market_listing_id: listingId }, '挂牌已删除')
+    } catch (error) {
+      logger.error('[C2C管理] 删除挂牌失败', { error: error.message })
+      return res.apiError(error.message || '删除失败', 'INTERNAL_ERROR', null, 500)
+    }
+  }
+)
 
 // ==================== C2C 用户上架统计 ====================
 

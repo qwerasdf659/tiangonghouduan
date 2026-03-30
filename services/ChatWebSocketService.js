@@ -1303,7 +1303,7 @@ class ChatWebSocketService {
       }
       this.io.to(socketId).emit(eventName, payload)
       wsLogger.info(`📤 竞价通知 ${eventName} 已推送给用户 ${userId}`, {
-        bid_product_id: data.bid_product_id,
+        bid_product_id: data.bid_product_id || data.auction_listing_id,
         event: eventName
       })
       return true
@@ -1314,6 +1314,64 @@ class ChatWebSocketService {
       })
       return false
     }
+  }
+
+  // ==================== C2C 拍卖通知WebSocket事件（2026-03-24 C2C用户间竞拍）====================
+
+  /**
+   * 推送C2C拍卖被超越通知
+   *
+   * WebSocket事件名：auction_outbid
+   * 触发场景：用户 A 对某拍卖出价后，用户 B 提交更高出价，通知用户 A
+   *
+   * @param {number} userId - 被超越的出价者用户ID
+   * @param {Object} data - { auction_listing_id, item_name, new_highest, price_asset_code }
+   * @returns {boolean} 是否推送成功
+   */
+  pushAuctionOutbid(userId, data) {
+    return this._pushBidEvent(userId, 'auction_outbid', data)
+  }
+
+  /**
+   * 推送C2C拍卖中标通知
+   *
+   * WebSocket事件名：auction_won
+   * 触发场景：拍卖结算完成，通知中标用户
+   *
+   * @param {number} userId - 中标用户ID
+   * @param {Object} data - { auction_listing_id, item_name, winning_amount, price_asset_code }
+   * @returns {boolean} 是否推送成功
+   */
+  pushAuctionWon(userId, data) {
+    return this._pushBidEvent(userId, 'auction_won', data)
+  }
+
+  /**
+   * 推送C2C拍卖落选通知
+   *
+   * WebSocket事件名：auction_lost
+   * 触发场景：拍卖结算完成，通知落选用户（冻结资产已解冻）
+   *
+   * @param {number} userId - 落选用户ID
+   * @param {Object} data - { auction_listing_id, item_name, my_bid_amount, winning_amount, price_asset_code }
+   * @returns {boolean} 是否推送成功
+   */
+  pushAuctionLost(userId, data) {
+    return this._pushBidEvent(userId, 'auction_lost', data)
+  }
+
+  /**
+   * 推送C2C拍卖新出价通知（给卖方）
+   *
+   * WebSocket事件名：auction_new_bid
+   * 触发场景：有用户对卖方的拍卖出价，通知卖方
+   *
+   * @param {number} userId - 卖方用户ID
+   * @param {Object} data - { auction_listing_id, item_name, bid_amount, bidder_user_id, price_asset_code }
+   * @returns {boolean} 是否推送成功
+   */
+  pushAuctionNewBid(userId, data) {
+    return this._pushBidEvent(userId, 'auction_new_bid', data)
   }
 
   /**

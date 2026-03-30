@@ -281,7 +281,7 @@ class CustomerServiceSessionService {
    *
    * @param {number} session_id - 会话ID
    * @param {Object} options - 查询选项
-   * @param {number} [options.limit=50] - 消息数量限制
+   * @param {number} [options.page_size=50] - 每页消息数量（与全站分页字段一致）
    * @param {number} [options.before_message_id] - 加载指定消息之前的历史（用于分页）
    * @param {number} [options.page] - 页码（用于分页，与offset配合使用）
    * @param {number} [options.offset] - 偏移量（用于分页）
@@ -293,8 +293,7 @@ class CustomerServiceSessionService {
   static async getSessionMessages(session_id, options = {}) {
     try {
       const {
-        limit: legacyLimit,
-        page_size,
+        page_size = 50,
         before_message_id,
         page,
         offset,
@@ -302,7 +301,7 @@ class CustomerServiceSessionService {
         mark_as_read = false,
         include_all_fields = false
       } = options
-      const limit = legacyLimit ?? page_size ?? 50
+      const limit = page_size
 
       logger.info(`📋 获取会话 ${session_id} 的消息，参数:`, JSON.stringify(options, null, 2))
 

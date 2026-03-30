@@ -532,7 +532,7 @@ export const StoreAPI = {
    * @param {Object} params - 搜索参数
    * @param {string} params.keyword - 搜索关键词（至少2个字符）
    * @param {number} [params.level] - 限制层级（1=省, 2=市, 3=区县, 4=街道）
-   * @param {number} [params.limit=20] - 结果数量限制
+   * @param {number} [params.page_size=20] - 结果数量限制
    * @returns {Promise<Object>} 搜索结果列表
    * @throws {Error} 网络请求失败
    */

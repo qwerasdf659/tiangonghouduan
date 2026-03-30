@@ -141,11 +141,17 @@ const CANONICAL_OPERATION_MAP = {
   // ===== 会员解锁 =====
   '/api/v4/exchange/unlock-premium': 'PREMIUM_UNLOCK', // 解锁高级空间
 
-  // ===== 竞价系统（臻选空间/幸运空间竞价功能 2026-02-16） =====
+  // ===== B2C 竞价系统（臻选空间/幸运空间竞价功能 2026-02-16） =====
   '/api/v4/exchange/bid': 'BID_PLACE_BID', // 用户竞价出价（底表 FK→exchange_items）
   '/api/v4/console/bids': 'CONSOLE_BID_CREATE', // 管理后台创建竞价商品
   '/api/v4/console/bids/:id/settle': 'CONSOLE_BID_SETTLE', // 管理后台手动结算竞价
   '/api/v4/console/bids/:id/cancel': 'CONSOLE_BID_CANCEL', // 管理后台取消竞价
+
+  // ===== C2C 用户间竞拍（2026-03-24） =====
+  '/api/v4/marketplace/auctions': 'AUCTION_CREATE_LISTING', // 用户创建C2C拍卖
+  '/api/v4/marketplace/auctions/:id/bid': 'AUCTION_PLACE_BID', // 用户竞拍出价
+  '/api/v4/marketplace/auctions/:id/cancel': 'AUCTION_SELLER_CANCEL', // 卖方取消拍卖
+  '/api/v4/marketplace/auctions/:id/dispute': 'AUCTION_CREATE_DISPUTE', // 买方发起争议
 
   // ===== 商户积分 =====
   '/api/v4/merchant-points': 'MERCHANT_POINTS_CREATE', // 商户积分申请（canonical 路径，去尾斜杠）
@@ -388,6 +394,13 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/console/exchange/items/batch-sort': 'ADMIN_EXCHANGE_BATCH_SORT', // B2C 兑换商品批量排序
   '/api/v4/console/exchange/items/:id/pin': 'ADMIN_EXCHANGE_ITEM_PIN', // B2C 兑换商品置顶/取消置顶
   '/api/v4/console/exchange/items/:id/recommend': 'ADMIN_EXCHANGE_ITEM_RECOMMEND', // B2C 兑换商品推荐/取消推荐
+  '/api/v4/console/exchange/items/:id/skus': 'ADMIN_EXCHANGE_SKU_CREATE', // 创建 SKU（POST）
+  '/api/v4/console/exchange/items/:id/skus/generate': 'ADMIN_EXCHANGE_SKU_GENERATE', // 按规则批量生成 SKU
+  '/api/v4/console/exchange/items/skus/:id': 'ADMIN_EXCHANGE_SKU_UPDATE', // 更新/删除 SKU（PUT/DELETE，:sku_id → :id）
+  '/api/v4/console/exchange/items/skus/:id/stock': 'ADMIN_EXCHANGE_SKU_STOCK_ADJUST', // SKU 库存增量调整
+  '/api/v4/console/exchange/items/skus/:id/channel-prices': 'ADMIN_EXCHANGE_SKU_CHANNEL_PRICES', // SKU 渠道价格设置
+  '/api/v4/console/marketplace/listings': 'ADMIN_LISTING_CREATE', // 管理员代创建挂牌（POST）
+  '/api/v4/console/marketplace/listings/:id': 'ADMIN_LISTING_UPDATE', // 管理员修改/删除挂牌（PUT/DELETE）
   '/api/v4/console/marketplace/listings/:id/force-withdraw': 'ADMIN_FORCE_WITHDRAW', // 强制下架
   '/api/v4/console/marketplace/listings/:id/pin': 'ADMIN_LISTING_PIN', // 挂牌置顶/取消置顶
   '/api/v4/console/marketplace/listings/:id/recommend': 'ADMIN_LISTING_RECOMMEND', // 挂牌推荐/取消推荐

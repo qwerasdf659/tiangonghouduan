@@ -9,13 +9,14 @@
  * - 获取竞价详情（含完整出价记录）
  * - 手动结算竞价（提前结算到期竞价）
  * - 取消竞价（全部出价者解冻返还）
+ * - C2C 用户间竞拍管理（通过 ?type=c2c 查询参数区分，复用同一路由入口）
  *
  * 子路由清单：
- * - POST /                         - 创建竞价商品
- * - GET  /                         - 竞价商品列表（管理视图）
- * - GET  /:id                      - 竞价商品详情（管理视图，含完整出价记录）
- * - POST /:id/settle               - 手动结算竞价
- * - POST /:id/cancel               - 取消竞价
+ * - POST /                         - 创建竞价商品（B2C）
+ * - GET  /                         - 竞价商品列表（B2C；?type=c2c 切换为 C2C 拍卖列表）
+ * - GET  /:id                      - 竞价商品详情（B2C；?type=c2c 切换为 C2C 拍卖详情）
+ * - POST /:id/settle               - 手动结算（B2C；type=c2c 切换为 C2C 拍卖结算）
+ * - POST /:id/cancel               - 取消（B2C；type=c2c 切换为 C2C 拍卖取消）
  *
  * 架构规范：
  * - 通过 ServiceManager 获取 BidService/BidQueryService
@@ -204,20 +205,19 @@ router.post(
  * @description 获取竞价商品列表（管理视图，含出价统计）
  * @access Admin（role_level >= 100）
  *
+ * @query {string} [type='b2c'] - 竞拍类型：b2c（默认，BidProduct）/ c2c（AuctionListing）/ all（全部）
  * @query {string} [status='all'] - 状态筛选：all/pending/active/ended/settled/no_bid/cancelled/settlement_failed
  * @query {number} [page=1] - 页码
  * @query {number} [page_size=20] - 每页数量（默认 20，最大 100）
  *
- * @returns {Object} { bid_products, pagination }
+ * @returns {Object} { bid_products/auction_listings, pagination }
  */
 router.get(
   '/',
   authenticateToken,
   requireRoleLevel(100),
   asyncHandler(async (req, res) => {
-    const BidQueryService = req.app.locals.services.getService('exchange_bid_query')
-
-    const { status = 'all', page = 1, page_size = 20 } = req.query
+    const { type: bidType = 'b2c', status = 'all', page = 1, page_size = 20 } = req.query
 
     const validStatuses = [
       'all',
@@ -241,9 +241,30 @@ router.get(
     const finalPage = Math.max(parseInt(page, 10) || 1, 1)
     const finalPageSize = Math.min(Math.max(parseInt(page_size, 10) || 20, 1), 100)
 
+    // C2C 拍卖列表（通过 type=c2c 区分）
+    if (bidType === 'c2c') {
+      const AuctionQueryService = req.app.locals.services.getService('auction_query')
+
+      logger.info('[竞价管理] 查询C2C拍卖列表', {
+        status,
+        page: finalPage,
+        page_size: finalPageSize
+      })
+
+      const result = await AuctionQueryService.getAdminAuctionListings({
+        status: status === 'all' ? undefined : status,
+        page: finalPage,
+        page_size: finalPageSize
+      })
+
+      return res.apiSuccess(result, '获取C2C拍卖列表成功')
+    }
+
+    // B2C 竞价列表（默认逻辑）
+    const BidQueryService = req.app.locals.services.getService('exchange_bid_query')
+
     logger.info('[竞价管理] 查询竞价列表', { status, page: finalPage, page_size: finalPageSize })
 
-    // 管理视图不传 user_id（不附加个人出价信息）
     const result = await BidQueryService.getBidProducts({
       status,
       page: finalPage,
@@ -260,7 +281,8 @@ router.get(
  * @description 获取竞价商品详情（管理视图，含完整出价记录列表）
  * @access Admin（role_level >= 100）
  *
- * @param {number} id - 竞价商品ID（事务实体）
+ * @param {number} id - 竞价商品ID / 拍卖ID（事务实体）
+ * @query {string} [type='b2c'] - 竞拍类型：b2c（默认）或 c2c
  *
  * @returns {Object} 竞价商品详情 + 所有出价记录
  */
@@ -269,12 +291,29 @@ router.get(
   authenticateToken,
   requireRoleLevel(100),
   asyncHandler(async (req, res) => {
+    const entityId = parseInt(req.params.id, 10)
+    if (isNaN(entityId) || entityId <= 0) {
+      return res.apiError('无效的ID', 'BAD_REQUEST', null, 400)
+    }
+
+    const bidType = req.query.type || 'b2c'
+
+    // C2C 拍卖详情（通过 type=c2c 区分）
+    if (bidType === 'c2c') {
+      const AuctionQueryService = req.app.locals.services.getService('auction_query')
+      logger.info('[竞价管理] 查询C2C拍卖详情', { auction_listing_id: entityId })
+
+      const result = await AuctionQueryService.getAuctionDetail(entityId, {})
+      if (!result) {
+        return res.apiError('C2C拍卖不存在', 'NOT_FOUND', null, 404)
+      }
+      return res.apiSuccess(result, '获取C2C拍卖详情成功')
+    }
+
+    // B2C 竞价详情（默认逻辑）
     const BidQueryService = req.app.locals.services.getService('exchange_bid_query')
 
-    const bidProductId = parseInt(req.params.id, 10)
-    if (isNaN(bidProductId) || bidProductId <= 0) {
-      return res.apiError('无效的竞价商品ID', 'BAD_REQUEST', null, 400)
-    }
+    const bidProductId = entityId
 
     logger.info('[竞价管理] 查询竞价详情', { bid_product_id: bidProductId })
 
@@ -320,7 +359,8 @@ router.get(
  * @description 手动结算竞价（管理员强制结算，即使未到结束时间）
  * @access Admin（role_level >= 100）
  *
- * @param {number} id - 竞价商品ID（事务实体）
+ * @param {number} id - 竞价商品ID / 拍卖ID（事务实体）
+ * @body {string} [type='b2c'] - 竞拍类型：b2c（默认，BidProduct）或 c2c（AuctionListing）
  *
  * @returns {Object} 结算结果
  */
@@ -329,40 +369,67 @@ router.post(
   authenticateToken,
   requireRoleLevel(100),
   asyncHandler(async (req, res) => {
-    const BidService = req.app.locals.services.getService('exchange_bid_core')
-
-    const bidProductId = parseInt(req.params.id, 10)
-    if (isNaN(bidProductId) || bidProductId <= 0) {
-      return res.apiError('无效的竞价商品ID', 'BAD_REQUEST', null, 400)
+    const entityId = parseInt(req.params.id, 10)
+    if (isNaN(entityId) || entityId <= 0) {
+      return res.apiError('无效的ID', 'BAD_REQUEST', null, 400)
     }
 
+    const bidType = req.body.type || req.query.type || 'b2c'
+
+    // C2C 拍卖结算（通过 type=c2c 区分）
+    if (bidType === 'c2c') {
+      const AuctionService = req.app.locals.services.getService('auction_core')
+
+      logger.info('[竞价管理] 手动结算C2C拍卖', {
+        auction_listing_id: entityId,
+        admin_user_id: req.user.user_id
+      })
+
+      try {
+        const result = await TransactionManager.execute(async transaction => {
+          // 先将状态重置为 ended 再结算（处理 settlement_failed 场景）
+          const models = require('../../../../models')
+          const listing = await models.AuctionListing.findByPk(entityId, { transaction })
+          if (listing && listing.status === 'settlement_failed') {
+            await listing.update({ status: 'ended' }, { transaction })
+          }
+          return await AuctionService.settleAuction(entityId, { transaction })
+        })
+
+        delete result._losers
+        return res.apiSuccess(result, `C2C拍卖结算完成（状态：${result.status}）`)
+      } catch (error) {
+        return handleServiceError(error, res, 'C2C拍卖手动结算失败')
+      }
+    }
+
+    // B2C 竞价结算（默认逻辑）
+    const BidService = req.app.locals.services.getService('exchange_bid_core')
+
     logger.info('[竞价管理] 手动结算竞价', {
-      bid_product_id: bidProductId,
+      bid_product_id: entityId,
       admin_user_id: req.user.user_id
     })
 
     try {
       const result = await TransactionManager.execute(async transaction => {
-        return await BidService.settleBidProduct(bidProductId, { transaction })
+        return await BidService.settleBidProduct(entityId, { transaction })
       })
 
-      /* 事务提交后，异步发送结算通知（通过 ServiceManager 获取，fire-and-forget） */
       if (result.status === 'settled') {
         const NotificationService = req.app.locals.services.getService('notification')
 
-        // 中标通知
         NotificationService.notifyBidWon(result.winner_user_id, {
-          bid_product_id: bidProductId,
+          bid_product_id: entityId,
           item_name: result.item_name,
           winning_amount: result.winning_amount,
           price_asset_code: result.price_asset_code
         }).catch(err => logger.error('发送中标通知失败', { error: err.message }))
 
-        // 落选通知
         if (result._losers) {
           for (const loser of result._losers) {
             NotificationService.notifyBidLost(loser.user_id, {
-              bid_product_id: bidProductId,
+              bid_product_id: entityId,
               item_name: result.item_name,
               my_bid_amount: loser.bid_amount,
               winning_amount: result.winning_amount,
@@ -372,11 +439,10 @@ router.post(
         }
       }
 
-      // 从响应中移除内部字段
       delete result._losers
 
       logger.info('[竞价管理] 手动结算完成', {
-        bid_product_id: bidProductId,
+        bid_product_id: entityId,
         status: result.status
       })
 
@@ -393,8 +459,9 @@ router.post(
  * @description 取消竞价（所有出价者的冻结资产解冻返还）
  * @access Admin（role_level >= 100）
  *
- * @param {number} id - 竞价商品ID（事务实体）
+ * @param {number} id - 竞价商品ID / 拍卖ID（事务实体）
  * @body {string} reason - 取消原因（必填）
+ * @body {string} [type='b2c'] - 竞拍类型：b2c（默认，BidProduct）或 c2c（AuctionListing）
  *
  * @returns {Object} 取消结果
  */
@@ -403,31 +470,61 @@ router.post(
   authenticateToken,
   requireRoleLevel(100),
   asyncHandler(async (req, res) => {
-    const BidService = req.app.locals.services.getService('exchange_bid_core')
-
-    const bidProductId = parseInt(req.params.id, 10)
-    if (isNaN(bidProductId) || bidProductId <= 0) {
-      return res.apiError('无效的竞价商品ID', 'BAD_REQUEST', null, 400)
+    const entityId = parseInt(req.params.id, 10)
+    if (isNaN(entityId) || entityId <= 0) {
+      return res.apiError('无效的ID', 'BAD_REQUEST', null, 400)
     }
 
-    const { reason } = req.body
+    const { reason, type: bidType = 'b2c' } = req.body
     if (!reason || !reason.trim()) {
       return res.apiError('取消原因不能为空', 'BAD_REQUEST', null, 400)
     }
 
+    // C2C 拍卖取消（管理员强制取消，通过 type=c2c 区分）
+    if (bidType === 'c2c') {
+      const AuctionService = req.app.locals.services.getService('auction_core')
+
+      logger.info('[竞价管理] 管理员强制取消C2C拍卖', {
+        auction_listing_id: entityId,
+        reason,
+        admin_user_id: req.user.user_id
+      })
+
+      try {
+        const result = await TransactionManager.execute(async transaction => {
+          return await AuctionService.cancelAuction(
+            entityId,
+            req.user.user_id,
+            true, // isAdmin = true（管理员强制取消，不受 bid_count 限制）
+            { transaction }
+          )
+        })
+
+        return res.apiSuccess(
+          result,
+          `C2C拍卖已取消，${result.refunded_users} 名用户的冻结资产已解冻返还`
+        )
+      } catch (error) {
+        return handleServiceError(error, res, 'C2C拍卖取消失败')
+      }
+    }
+
+    // B2C 竞价取消（默认逻辑）
+    const BidService = req.app.locals.services.getService('exchange_bid_core')
+
     logger.info('[竞价管理] 取消竞价', {
-      bid_product_id: bidProductId,
+      bid_product_id: entityId,
       reason,
       admin_user_id: req.user.user_id
     })
 
     try {
       const result = await TransactionManager.execute(async transaction => {
-        return await BidService.cancelBidProduct(bidProductId, reason.trim(), { transaction })
+        return await BidService.cancelBidProduct(entityId, reason.trim(), { transaction })
       })
 
       logger.info('[竞价管理] 竞价取消完成', {
-        bid_product_id: bidProductId,
+        bid_product_id: entityId,
         refunded_users: result.refunded_users
       })
 

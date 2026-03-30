@@ -3255,6 +3255,18 @@ class ScheduledTasks {
     })
 
     logger.info('✅ 定时任务已设置: 竞价结算（每分钟执行，含 pending→active 激活 + 到期结算/流拍，Task 33）')
+
+    // ====== Task 34: C2C拍卖结算定时任务（每分钟，C2C用户间竞拍 2026-03-24）======
+    const AuctionSettlementJob = require('../../jobs/auction-settlement-job')
+    cron.schedule('* * * * *', async () => {
+      try {
+        await AuctionSettlementJob.execute()
+      } catch (error) {
+        logger.error('[C2C拍卖结算任务] 执行异常', { error: error.message })
+      }
+    })
+
+    logger.info('✅ 定时任务已设置: C2C拍卖结算（每分钟执行，含激活/结算/流拍/重试，Task 34）')
   }
 
   /**

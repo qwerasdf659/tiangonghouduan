@@ -66,7 +66,7 @@ describe('API契约测试 - 管理员模块 (/api/v4/console)', () => {
       const response = await request(app)
         .get('/api/v4/console/user-management/users')
         .set('Authorization', `Bearer ${accessToken}`)
-        .query({ page: 1, limit: 10 })
+        .query({ page: 1, page_size: 10 })
 
       if (response.status === 200) {
         validateApiContract(response.body)

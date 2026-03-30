@@ -131,7 +131,7 @@ router.post('/send', authenticateToken, requireRoleLevel(100), async (req, res) 
  * @query {string} [keyword] - 模糊搜索标题和内容
  * @query {string} [start_date] - 创建时间起始（ISO8601）
  * @query {string} [end_date] - 创建时间截止（ISO8601）
- * @query {number} [limit=20] - 每页数量
+ * @query {number} [page_size=20] - 每页数量
  * @query {number} [offset=0] - 偏移量
  */
 router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {

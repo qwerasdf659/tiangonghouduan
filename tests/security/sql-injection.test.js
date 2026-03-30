@@ -240,7 +240,7 @@ describe('P3-7: SQL注入安全测试', () => {
       for (const payload of pagePayloads) {
         const response = await request(app).get('/api/v4/campaigns').query({
           page: payload,
-          limit: '10; DROP TABLE campaigns'
+          page_size: '10; DROP TABLE campaigns'
         })
 
         /*
@@ -303,7 +303,7 @@ describe('P3-7: SQL注入安全测试', () => {
     test('数字参数应拒绝非数字输入', async () => {
       const response = await request(app).get('/api/v4/campaigns').query({
         page: 'abc',
-        limit: "'; DROP TABLE"
+        page_size: "'; DROP TABLE"
       })
 
       // 应该返回参数错误或使用默认值

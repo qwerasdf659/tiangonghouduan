@@ -174,7 +174,7 @@ export const AssetAPI = {
    * @param {string} [params.type] - 资产类型筛选（如 'POINTS', 'DIAMOND'）
    * @param {string} [params.format='excel'] - 导出格式（excel/csv）
    * @param {number} [params.user_id] - 筛选指定用户
-   * @param {number} [params.limit=1000] - 导出数据条数限制（最大10000）
+   * @param {number} [params.page_size=1000] - 导出数据条数限制（最大10000）
    *
    * @returns {Promise<Blob>} 文件流
    *

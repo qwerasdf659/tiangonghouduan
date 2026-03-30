@@ -3,8 +3,10 @@
  *
  * @module api/market/exchange-rate
  * @description 汇率兑换规则管理（管理后台）相关的 API 调用
- * @version 1.0.0
- * @date 2026-02-23
+ * @version 2.0.0
+ * @date 2026-03-24
+ *
+ * 决策 3 Phase C 落地：key 去冗余 EXCHANGE_RATE_ 前缀，域上下文由变量名 EXCHANGE_RATE_ENDPOINTS 承载
  */
 
 import { API_PREFIX, request, buildURL, buildQueryString } from '../base.js'
@@ -12,14 +14,14 @@ import { API_PREFIX, request, buildURL, buildQueryString } from '../base.js'
 // ========== API 端点 ==========
 
 export const EXCHANGE_RATE_ENDPOINTS = {
-  /** 汇率规则列表（后端: routes/v4/console/assets/rates） */
-  EXCHANGE_RATE_LIST: `${API_PREFIX}/console/assets/rates`,
-  /** 创建汇率规则 */
-  EXCHANGE_RATE_CREATE: `${API_PREFIX}/console/assets/rates`,
-  /** 更新汇率规则 */
-  EXCHANGE_RATE_UPDATE: `${API_PREFIX}/console/assets/rates/:id`,
-  /** 更新汇率规则状态 */
-  EXCHANGE_RATE_STATUS: `${API_PREFIX}/console/assets/rates/:id/status`
+  /** 汇率规则列表（后端: GET /api/v4/console/assets/rates） */
+  LIST: `${API_PREFIX}/console/assets/rates`,
+  /** 创建汇率规则（后端: POST /api/v4/console/assets/rates） */
+  CREATE: `${API_PREFIX}/console/assets/rates`,
+  /** 更新汇率规则（后端: PUT /api/v4/console/assets/rates/:id） */
+  UPDATE: `${API_PREFIX}/console/assets/rates/:id`,
+  /** 更新汇率规则状态（后端: PATCH /api/v4/console/assets/rates/:id/status） */
+  STATUS: `${API_PREFIX}/console/assets/rates/:id/status`
 }
 
 // ========== API 调用方法 ==========
@@ -35,7 +37,7 @@ export const ExchangeRateAPI = {
    * @returns {Promise<Object>} API 响应
    */
   async getExchangeRates(params = {}) {
-    const url = EXCHANGE_RATE_ENDPOINTS.EXCHANGE_RATE_LIST + buildQueryString(params)
+    const url = EXCHANGE_RATE_ENDPOINTS.LIST + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 
@@ -46,7 +48,7 @@ export const ExchangeRateAPI = {
    */
   async createExchangeRate(data) {
     return await request({
-      url: EXCHANGE_RATE_ENDPOINTS.EXCHANGE_RATE_CREATE,
+      url: EXCHANGE_RATE_ENDPOINTS.CREATE,
       method: 'POST',
       data
     })
@@ -59,7 +61,7 @@ export const ExchangeRateAPI = {
    * @returns {Promise<Object>} API 响应
    */
   async updateExchangeRate(id, data) {
-    const url = buildURL(EXCHANGE_RATE_ENDPOINTS.EXCHANGE_RATE_UPDATE, { id })
+    const url = buildURL(EXCHANGE_RATE_ENDPOINTS.UPDATE, { id })
     return await request({ url, method: 'PUT', data })
   },
 
@@ -70,7 +72,7 @@ export const ExchangeRateAPI = {
    * @returns {Promise<Object>} API 响应
    */
   async updateExchangeRateStatus(id, status) {
-    const url = buildURL(EXCHANGE_RATE_ENDPOINTS.EXCHANGE_RATE_STATUS, { id })
+    const url = buildURL(EXCHANGE_RATE_ENDPOINTS.STATUS, { id })
     return await request({ url, method: 'PATCH', data: { status } })
   }
 }

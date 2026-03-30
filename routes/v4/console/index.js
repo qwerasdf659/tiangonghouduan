@@ -17,7 +17,7 @@
  *   config/       10 文件  认证/配置/设置/会话/审批/审计/调整/钻石
  *   system/        6 文件  (保留) 系统监控
  *   customer-service/ 10 文件  (保留) 客服管理
- *   assets/        3 文件  (保留) 资产中心
+ *   assets/        4 文件  资产中心（portfolio/transactions/rates/stats+export）
  *   shared/        1 文件  (保留) 公共中间件
  */
 
@@ -25,7 +25,7 @@ const BeijingTimeHelper = require('../../../utils/timeHelper')
 const express = require('express')
 const router = express.Router()
 
-// ── 域级路由挂载（16 个域）──
+// ── 域级路由挂载（15 个域）──
 router.use('/', require('./lottery'))
 router.use('/', require('./ad'))
 router.use('/', require('./user'))
@@ -146,7 +146,7 @@ router.get('/', (req, res) => {
           '/marketplace/orders',
           '/marketplace/orders/stats'
         ],
-        note: 'B2C 兑换已迁至 /exchange/*；汇率运营在 /assets/rates；竞拍在 /bids'
+        note: 'B2C 兑换见 /exchange/*；汇率运营见 /assets/rates；竞拍见 /bids'
       },
       material: {
         description: '材料系统管理（V4.5.0）',
@@ -185,14 +185,18 @@ router.get('/', (req, res) => {
         note: '活动预算配置（budget_mode）、空奖约束验证、活动池预算补充、用户BUDGET_POINTS查询'
       },
       assets: {
-        description: '后台运营资产中心（2026-01-07 架构重构）',
+        description: '后台运营资产中心（2026-01-07 架构重构，2026-03-24 补充 rates）',
         endpoints: [
           '/assets/portfolio',
           '/assets/portfolio/items',
           '/assets/portfolio/items/:id',
-          '/assets/item-events'
+          '/assets/item-events',
+          '/assets/stats',
+          '/assets/export',
+          '/assets/transactions',
+          '/assets/rates'
         ],
-        note: '资产总览、物品列表、物品详情、物品事件历史；权限要求：admin（可写）或 ops（只读）'
+        note: '资产总览、物品管理、流水查询、统计导出、汇率管理（B2C+C2C 共享）；权限要求：admin（可写）或 ops（只读）'
       },
       orphan_frozen: {
         description: '孤儿冻结清理（P0-2 2026-01-09）',
@@ -235,9 +239,21 @@ router.get('/', (req, res) => {
         note: '仅限 admin（role_level >= 100）访问'
       },
       dashboard: {
-        description: '运营看板（2026-01-31 P0 待处理聚合）',
-        endpoints: ['/dashboard/pending-summary'],
-        note: '运营首页看板待处理事项聚合统计；仅限 admin 访问'
+        description: '运营看板（2026-01-31 P0 待处理聚合 + 2026-03-24 跨域顶线）',
+        endpoints: [
+          '/dashboard/pending-summary',
+          '/dashboard/business-health',
+          '/dashboard/time-comparison',
+          '/dashboard/stats',
+          '/dashboard/revenue/overview',
+          '/dashboard/revenue/by-source',
+          '/dashboard/revenue/trend',
+          '/dashboard/revenue/fee-stats',
+          '/dashboard/market-health',
+          '/dashboard/market-health/order-trend',
+          '/dashboard/market-health/top-users'
+        ],
+        note: '运营首页看板、业务健康度、跨域顶线（B2C+C2C+竞拍）、平台收入、市场健康；仅限 admin 访问'
       },
       pending: {
         description: '待处理中心（2026-01-31 P0）',

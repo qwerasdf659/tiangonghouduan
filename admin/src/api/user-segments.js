@@ -52,7 +52,7 @@ export const UserSegmentsAPI = {
   /**
    * 获取兑换偏好分析
    * @param {Object} params - 查询参数
-   * @param {number} [params.limit] - 返回条数
+   * @param {number} [params.page_size] - 返回条数
    * @returns {Promise<Object>} 偏好数据
    */
   async getExchangePreferences(params = {}) {

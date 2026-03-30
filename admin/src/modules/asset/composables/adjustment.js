@@ -507,7 +507,7 @@ export function useAdjustmentMethods() {
           asset_code: this.adjustForm.asset_code,
           amount: amount,
           reason: this.adjustForm.reason,
-          idempotency_key: `asset_adjust_${this.current_user.user_id}_${this.adjustForm.asset_code}_${Date.now()}`
+          idempotency_key: `asset_adjust_${this.current_user.user_id}_${this.adjustForm.asset_code}_${crypto.randomUUID()}`
         }
 
         if (this.adjustForm.asset_code === 'BUDGET_POINTS') {
@@ -676,7 +676,7 @@ export function useAdjustmentMethods() {
           asset_code: assetCode,
           amount: amount,
           reason: `[${this.form.reason_type}] ${this.form.reason}`,
-          idempotency_key: `admin_adjust_${this.current_user?.user_id || 0}_${this.form.user_id}_${assetCode}_${Date.now()}`
+          idempotency_key: `admin_adjust_${this.current_user?.user_id || 0}_${this.form.user_id}_${assetCode}_${crypto.randomUUID()}`
         }
 
         if (this.form.asset_type === 'BUDGET_POINTS' && this.form.campaign_id) {

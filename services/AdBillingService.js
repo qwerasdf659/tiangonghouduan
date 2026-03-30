@@ -716,7 +716,7 @@ class AdBillingService {
         include: [
           {
             model: AdSlot,
-            as: 'ad_slot',
+            as: 'adSlot',
             attributes: ['cpm_price_diamond']
           }
         ]
@@ -733,7 +733,7 @@ class AdBillingService {
           continue
         }
 
-        const cpmPrice = campaign.ad_slot?.cpm_price_diamond || 0
+        const cpmPrice = campaign.adSlot?.cpm_price_diamond || 0
         if (cpmPrice <= 0) {
           results.skipped++
           continue

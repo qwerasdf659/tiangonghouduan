@@ -6,11 +6,14 @@
  *
  *
  * 子模块划分（按业务职责）：
- * - listings.js - 市场挂单查询（GET /listings, GET /listings/:market_listing_id, GET /listing-status）
- * - sell.js     - 上架商品（POST /list, POST /fungible-assets/list）
- * - buy.js      - 购买商品（POST /listings/:market_listing_id/purchase）
- * - manage.js   - 撤回/管理（POST /listings/:market_listing_id/withdraw, POST /fungible-assets/:market_listing_id/withdraw）
- * - escrow.js   - 交易市场担保码（POST /trade-orders/:id/confirm-delivery, GET /trade-orders/:id/escrow-status, POST /trade-orders/:id/cancel）
+ * - listings.js  - 市场挂单查询（GET /listings, GET /listings/:market_listing_id, GET /listing-status）
+ * - sell.js      - 上架商品（POST /list, POST /fungible-assets/list）
+ * - buy.js       - 购买商品（POST /listings/:market_listing_id/purchase）
+ * - manage.js    - 撤回/管理（POST /listings/:market_listing_id/withdraw, POST /fungible-assets/:market_listing_id/withdraw）
+ * - escrow.js    - 交易市场担保码（POST /trade-orders/:id/confirm-delivery, GET /trade-orders/:id/escrow-status, POST /trade-orders/:id/cancel）
+ * - price.js     - 价格发现（GET /price/*, 2026-02-23 市场增强）
+ * - analytics.js - 市场数据分析（GET /analytics/*, 2026-02-23 市场增强）
+ * - auctions.js  - C2C 用户间竞拍（/auctions/*, 2026-03-24 新增）
  *
  * 业务说明：
  * - 用户可以将 inventory 中的物品挂单出售
@@ -35,6 +38,7 @@ const manageRoutes = require('./manage')
 const escrowRoutes = require('./escrow')
 const priceRoutes = require('./price') // 价格发现（2026-02-23 市场增强）
 const analyticsRoutes = require('./analytics') // 市场数据分析（2026-02-23 市场增强）
+const auctionsRoutes = require('./auctions') // C2C 用户间竞拍（2026-03-24）
 
 // 挂载子路由
 router.use('/', listingsRoutes) // 市场列表查询
@@ -44,5 +48,6 @@ router.use('/', manageRoutes) // 撤回/管理
 router.use('/', escrowRoutes) // 交易市场担保码确认（Phase 4）
 router.use('/', priceRoutes) // 价格发现
 router.use('/', analyticsRoutes) // 市场数据分析
+router.use('/auctions', auctionsRoutes) // C2C 用户间竞拍
 
 module.exports = router

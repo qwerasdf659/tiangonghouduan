@@ -168,7 +168,7 @@ export const DashboardAPI = {
   /**
    * 获取市场活跃用户排行
    * @param {Object} params - 查询参数
-   * @param {number} [params.limit=5] - 排行数量
+   * @param {number} [params.page_size=5] - 排行数量
    * @returns {Promise<Object>} Top买家/卖家排行
    */
   async getMarketHealthTopUsers(params = {}) {

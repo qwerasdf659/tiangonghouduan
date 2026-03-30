@@ -63,6 +63,65 @@ function handleServiceError(error, res, operation) {
  * =================================================================
  */
 
+/**
+ * GET /api/v4/console/business-records/lottery-clear-settings
+ * @desc 查询管理员清除用户抽奖设置的操作记录
+ * @access Admin only (role_level >= 30)
+ * @query {number} [admin_id] - 操作管理员 ID
+ * @query {number} [target_user_id] - 被清除的用户 ID
+ * @query {number} [page=1]
+ * @query {number} [page_size=20]
+ */
+router.get('/lottery-clear-settings', authenticateToken, requireRoleLevel(30), async (req, res) => {
+  try {
+    const BusinessRecordQueryService = req.app.locals.services.getService(
+      'console_business_record_query'
+    )
+
+    const result = await BusinessRecordQueryService.getLotteryClearSettings(req.query)
+
+    logger.info('查询抽奖清除设置记录成功', {
+      admin_id: req.user.user_id,
+      total: result.pagination.total,
+      page: result.pagination.page
+    })
+
+    return res.apiSuccess(result, '获取抽奖清除设置记录成功')
+  } catch (error) {
+    return handleServiceError(error, res, '查询抽奖清除设置记录')
+  }
+})
+
+/**
+ * GET /api/v4/console/business-records/lottery-clear-settings/:record_id
+ * @desc 查询单条抽奖清除设置记录详情
+ * @access Admin only (role_level >= 30)
+ */
+router.get(
+  '/lottery-clear-settings/:record_id',
+  authenticateToken,
+  requireRoleLevel(30),
+  async (req, res) => {
+    try {
+      const { record_id } = req.params
+      const logId = parseInt(record_id)
+      if (isNaN(logId) || logId <= 0) {
+        return res.apiError('无效的记录ID', 'BAD_REQUEST', null, 400)
+      }
+
+      const BusinessRecordQueryService = req.app.locals.services.getService(
+        'console_business_record_query'
+      )
+
+      const record = await BusinessRecordQueryService.getLotteryClearSettingDetail(logId)
+
+      return res.apiSuccess(record, '获取抽奖清除设置记录详情成功')
+    } catch (error) {
+      return handleServiceError(error, res, '查询抽奖清除设置记录详情')
+    }
+  }
+)
+
 /*
  * =================================================================
  * 核销订单查询接口

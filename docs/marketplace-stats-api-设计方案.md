@@ -2,7 +2,7 @@
 
 > 对应技术债务 §3.3。本文从根因出发，修正命名空间语义错误并完成物理拆分。
 
-## ✅ 实施进度总览（2026-03-24 第四次审计 — 后端数据库为唯一权威）
+## ✅ 实施进度总览（2026-03-24 第七次审计 — 全量代码+注释漂移修正+测试+构建验证通过）
 
 | 阶段 | 状态 | 说明 |
 |---|---|---|
@@ -10,6 +10,7 @@
 | Phase 2 — Web 管理后台前端常量 | ✅ 已完成 | key 去冗余前缀 + 域直接导入 + 补全 MISSING_IMAGES/BATCH_BIND_IMAGES + 构建通过 |
 | Phase 3 — 用户侧路由（后端） | ✅ 后端已完成 | `/api/v4/exchange/`、`/api/v4/marketplace/`、`/api/v4/assets/` 已挂载，旧路径已删除 |
 | Phase 3 — 用户侧路由（小程序） | ⏳ 待排期 | 小程序端接口地址尚未从旧路径切换到新路径（详见 §13.3） |
+| Phase 4 — C2C 用户间竞拍 | ✅ 已完成 | 后端路由 + 服务 + 模型 + 数据表 + 前端 API + 管理页面（详见 §12.3） |
 | 决策 1 — 补全 import/export 路由 | ✅ 已完成 | `GET /export` + `POST /import` 已实现，CANONICAL_OPERATION_MAP 已更新 |
 | 决策 2 — 补前端 MISSING_IMAGES 等 | ✅ 已完成 | exchange.js 已添加 MISSING_IMAGES + BATCH_BIND_IMAGES 及对应 API 方法 |
 | 决策 3 — 模式 A 域直接导入 | ✅ 已完成 | 5 个 consumer 文件改为域直接导入，key 去冗余前缀，barrel 保留仅供审计 |
@@ -176,7 +177,16 @@
 │   ├── manage/
 │   ├── escrow/
 │   ├── price/
-│   └── analytics/
+│   ├── analytics/
+│   └── auctions/                     ← C2C 用户间竞拍 ✅（2026-03-24 新增）
+│       ├── POST /                    ← 创建拍卖（从背包选物品发起）
+│       ├── GET  /                    ← 拍卖列表
+│       ├── GET  /my                  ← 我发起的拍卖
+│       ├── GET  /my-bids             ← 我的出价记录
+│       ├── GET  /:auction_listing_id ← 拍卖详情（含出价排行）
+│       ├── POST /:id/bid             ← 出价竞拍（需 Idempotency-Key）
+│       ├── POST /:id/cancel          ← 卖方取消
+│       └── POST /:id/dispute         ← 买方发起争议
 │
 ├── assets/                            ← 共享资产操作 ✅（与 admin /console/assets/ 对齐）
 │   ├── rates/                         ← 汇率查询/兑换（原 /market/exchange-rates，已迁移）
@@ -393,7 +403,7 @@ ITEM_IMPORT: '/api/v4/console/exchange/items/import',  // ✅ 后端已实现（
 ITEM_EXPORT: '/api/v4/console/exchange/items/export',  // ✅ 后端已实现（GET，返回 Excel 文件）
 ```
 
-### 6.5 前端常量修正方案（🔴 需拍板 — 见 §13）
+### 6.5 前端常量修正方案 — ✅ 已执行方案 A（2026-03-24）
 
 **方案 A（推荐 — 更新文档适配代码）**：接受当前"一域一文件"组织方式（`exchange.js` / `trade.js` / `bid.js` / `exchange-rate.js` / `dashboard.js`），更新本文档。仅修正：key 命名去冗余前缀、补缺失常量、删无后端路由的常量。
 
@@ -579,35 +589,145 @@ GET  /api/v4/console/bids                             ← 竞拍管理
 GET  /api/v4/console/assets/rates                     ← 汇率管理
 ```
 
-### 11.6 后端代码注释问题 — ✅ 已修正（2026-03-24）
+### 11.6 后端代码注释问题 — ✅ 已修正（2026-03-24 第七次审计补充修正）
 
 | 文件 | 修正内容 |
 |---|---|
 | `routes/v4/console/assets/index.js` 头部注释 | ✅ 已添加 `rates.js - 汇率管理` 模块说明 |
+| `routes/v4/console/assets/index.js` 内联子路由注释块 | ✅ 已补充 `/rates/*` 子路由说明（第七次审计） |
 | `routes/v4/console/index.js` 头部注释第 12 行 | ✅ 已更新为 `market/ 2 文件 C2C 二级市场挂牌 + C2C 订单` |
+| `routes/v4/console/index.js` 头部域目录描述 | ✅ 已修正 `assets/ 3 文件` → `assets/ 4 文件`（含 rates.js）（第七次审计） |
+| `routes/v4/console/index.js` 域挂载计数 | ✅ 已修正 `16 个域` → `15 个域`（第七次审计） |
+| `routes/v4/console/index.js` modules.assets 端点清单 | ✅ 已补充 `/assets/stats`、`/assets/export`、`/assets/transactions`、`/assets/rates`（第七次审计） |
+| `routes/v4/console/index.js` modules.dashboard 端点清单 | ✅ 已补充 `/dashboard/stats`、`/dashboard/business-health` 等 11 个端点（第七次审计） |
+| `routes/v4/marketplace/index.js` 子模块划分注释 | ✅ 已补充 `price.js`、`analytics.js`、`auctions.js` 三个子模块（第七次审计） |
+| `routes/v4/console/bids/management.js` 头部注释 | ✅ 已补充 C2C 用户间竞拍管理（`?type=c2c`）说明（第七次审计） |
 | `routes/v4/backpack/index.js` 第 11 行注释 | ✅ 已移除 "exchange 子路由"，标注迁移说明 |
 
 ---
 
-## 12. 数据库真实数据审计（2026-03-23 直连 `restaurant_points_dev`）
+## 12. 数据库真实数据审计（2026-03-24 第四次审计直连 `restaurant_points_dev`）
 
 | 表 | 总行数 | 状态分布 | 业务观察 |
 |---|---|---|---|
 | `bid_products` | **0** | — | 竞拍功能已建好但从未创建过竞拍商品 |
 | `bid_records` | **0** | — | 无出价记录 |
-| `exchange_records` | **22** | pending=22, completed=0 | B2C 兑换订单全部停在 pending，**履约流程未跑通** |
+| `exchange_records` | **22** | pending=21, completed=1 | B2C 兑换订单大部分停在 pending，1 笔已完成（fulfillment_rate=4.55%） |
 | `trade_orders` | **154** | completed=23, cancelled=131 (85%) | C2C 交易取消率极高，仅 23 笔完成 |
 | `market_listings` | **327** | on_sale=21, sold=22, withdrawn=284 (87%) | 绝大部分挂牌已撤回 |
 | `exchange_items` | **102** | active=20, inactive=82 | 仅 20 个在售商品 |
 | `exchange_rates` | **7** | active=6, paused=1 | 汇率兑换规则正常 |
 
+**Dashboard Stats 实际返回值（2026-03-24 验证）**：
+
+```jsonc
+{
+  "period_days": 7,
+  "exchange": { "active_items": 20, "period_exchanges": 22, "period_pay_amount": 2200, "low_stock_items": 0, "fulfillment_rate": 4.55 },
+  "marketplace": { "on_sale_count": 21, "period_trades": 1, "period_volume": 500, "unique_buyers": 1, "unique_sellers": 1 },
+  "bids": { "active_products": 0, "period_bids": 0, "period_settled": 0 }
+}
+```
+
 **业务影响分析**：
 
-- `GET /console/dashboard/stats` 的 `bids` 段永远返回全零（无数据）
-- `GET /console/dashboard/stats` 的 `exchange.fulfillment_rate` 为 0（22 笔 pending，0 笔完成）
+- `GET /console/dashboard/stats` 的 `bids` 段返回全零（竞拍功能无业务数据）
+- `GET /console/dashboard/stats` 的 `exchange.fulfillment_rate` 为 4.55%（22 笔中 1 笔完成）
 - `GET /console/marketplace/stats/overview` 的 `completed_summary` 仅反映 23 笔成交
 
-**性质判断**：这些是测试/开发阶段的正常数据状态，不是代码 bug。竞拍模块代码完整可用，待产品侧决定是否上线启用并灌入初始数据。
+### 12.2 数据根因分析（2026-03-24 第六次审计深入排查）
+
+#### 问题 A：bid_products / bid_records 0 行 → B2C 管理员竞拍从未使用
+
+```
+根因：B2C 竞拍是管理员主导的活动（管理员选择兑换商品 → 创建竞拍 → 用户出价）。
+      管理员从未在后台创建过 bid_product，因此 bid_records 也为 0。
+      代码层面：POST /console/bids 路由 + BidProductService.createBidProduct() 已实现且可用。
+      数据库层面：bid_products 表结构完整，外键 → exchange_items 正常。
+
+结论：功能完整，等待产品侧决定上线并创建初始竞拍商品。不是代码问题。
+```
+
+#### 问题 B：exchange_records 21 pending / 1 completed → 管理员未审批
+
+```
+数据流图：
+
+  用户下单 → [pending] → 管理员审批 → [approved] → 管理员发货 → [shipped] → 用户确认收货 → [completed]
+                  ↑                                                              
+           21 笔卡在这里（管理员未点"审批"按钮）
+
+根因分析：
+  - 22 笔订单全部来自测试用户 31 和 32（开发阶段测试数据）
+  - 20 笔来自 user 32，2 笔来自 user 31
+  - 全部兑换同一商品 item 248，金额均为 100 red_shard
+  - exchange_order_events 表有 559 条事件记录，说明审批流程代码已跑通
+  - 唯一 1 笔 completed 订单（ID 917，user 32）证明完整流程可以走通
+  - 21 笔 pending 的最早创建距今 ~49 小时
+
+结论：B2C 履约流程代码完整可用（pending→approved→shipped→completed 全链路已验证）。
+      低 fulfillment_rate 是因为开发阶段批量下单测试但未逐一走审批流程。不是代码问题。
+```
+
+#### 问题 C：trade_orders 85% 取消率 → 开发测试行为 + 自动取消机制
+
+```
+数据流图：
+
+  买方购买 → [created] → 冻结钻石 → [frozen] → 卖方确认/系统结算 → [completed]
+                                         ↓
+                                    买方取消 / 超时 / 余额不足 → [cancelled]
+
+取消分类：
+  - 自动取消（created_at == cancelled_at）: 56 笔 → 购买瞬间即失败（余额不足/自买/挂牌已售出）
+  - 超时/手动取消（created_at != cancelled_at）: 75 笔 → 超时未确认或手动取消
+
+用户行为分析：
+  - user 32（测试）: 108 笔订单，91 笔取消（84.3%）→ 大量重复测试购买
+  - user 9992:     15 笔订单，15 笔取消（100%）→ 可能是自动化测试账号
+  - user 33/34:    各 9-10 笔，全部取消 → 测试账号
+  - 完成的 23 笔主要是 user 32 → seller 31 的真实测试交易
+
+结论：C2C 交易流程代码正确。高取消率是开发阶段测试行为：
+      1）批量测试购买（测试各种边界条件）
+      2）余额不足的自动取消（正常业务逻辑）
+      3）超时未确认的自动清理（正常业务逻辑）
+      不是代码问题。
+```
+
+### 12.3 C2C 用户间竞拍模块（2026-03-24 新增）
+
+> 与 B2C 管理员竞拍（`/console/bids/`，bid_products + bid_records）是**独立的两套系统**。
+
+| 维度 | B2C 管理员竞拍 | C2C 用户间竞拍 |
+|---|---|---|
+| 发起方 | 管理员（从 exchange_items 选品） | 用户（从背包选物品） |
+| 路由 | `/console/bids/*` | `/marketplace/auctions/*` |
+| 数据表 | `bid_products` + `bid_records` | `auction_listings` + `auction_bids` |
+| 服务 | `BidProductService` + `BidQueryService` | `AuctionCoreService` + `AuctionQueryService` |
+| 模型 | `BidProduct` + `BidRecord` | `AuctionListing` + `AuctionBid` |
+| 前端 API | `bid.js`（BID_ENDPOINTS） | `auction.js`（AUCTION_ENDPOINTS） |
+| 前端页面 | `bid-management.html` | `auction-management.html` |
+| 当前数据 | 0 行（未使用） | 0 行（刚上线） |
+
+**C2C 竞拍路由清单**：
+
+```
+# 用户端（/api/v4/marketplace/auctions）
+POST /                           ← 创建拍卖（需 Idempotency-Key）
+GET  /                           ← 拍卖列表
+GET  /my                         ← 我发起的拍卖
+GET  /my-bids                    ← 我的出价记录
+GET  /:auction_listing_id        ← 拍卖详情（含出价排行）
+POST /:auction_listing_id/bid    ← 出价（需 Idempotency-Key）
+POST /:auction_listing_id/cancel ← 卖方取消
+POST /:auction_listing_id/dispute← 买方发起争议
+
+# 管理后台（复用 /console/bids/ 路由，type=c2c 区分）
+GET  /console/bids?type=c2c      ← C2C 拍卖列表
+POST /console/bids/:id/cancel    ← 管理员强制取消
+POST /console/bids/:id/settle    ← 管理员手动结算
+```
 
 ---
 
@@ -645,7 +765,7 @@ GET  /api/v4/console/assets/rates                     ← 汇率管理
 | F2 | `exchange-item/index.js` 的 `ITEM_IMPORT` / `ITEM_EXPORT` | ✅ 前后端对齐 | 后端路由已补全（B1） |
 | F3 | 常量 key 命名冗余前缀 | ✅ 已重构 | key 去前缀 + 5 文件域直接导入（决策 3） |
 | F4 | `admin/dist/` 构建产物过期 | ✅ 已重建 | 2026-03-24 `npm run build` 通过 |
-| F5 | admin/ Prettier 格式化技术债 | ⏳ 待排期 | 与本次改动无关，需单独排期 |
+| F5 | admin/ Prettier 格式化 | ✅ 已符合 | 2026-03-24 验证 `npx prettier --check src/**/*.js` 全部通过 |
 
 **F1 执行步骤**：
 ```
@@ -1009,3 +1129,79 @@ Phase F — 构建验证：
 | `console/exchange/items.js` | `api/exchange-item/index.js` | ✅ |
 
 这种"一域一文件"实际上比原设计"全部塞 trade.js"更好维护，与后端 1:1 对应，新人上手更清晰。**决策 3 已锁定为模式 A（域直接导入 + key 去前缀）**，详见 §14.3。
+
+---
+
+## 16. 第七次全量验证报告（2026-03-24 注释漂移修正 + 全量验证）
+
+### 16.1 API 端点全量验证（9/9 通过）
+
+| 端点 | HTTP | 结果 |
+|---|---|---|
+| `GET /health` | 200 | SYSTEM_HEALTHY（DB connected, Redis PONG） |
+| `GET /console/exchange/stats?trend_days=7` | 200 | SUCCESS |
+| `GET /console/exchange/missing-images` | 200 | SUCCESS |
+| `GET /console/exchange/items/export` | 200 | Excel 文件返回 |
+| `GET /console/dashboard/stats?days=7` | 200 | SUCCESS（含 exchange + marketplace + bids 三域） |
+| `GET /console/marketplace/stats/overview?days=7` | 200 | SUCCESS |
+| `GET /console/bids` | 200 | SUCCESS |
+| `GET /console/assets/rates` | 200 | SUCCESS |
+| `GET /console/marketplace/orders` | 200 | SUCCESS |
+
+### 16.2 CANONICAL_OPERATION_MAP 验证（19/19 通过）
+
+全部 19 个关键写操作路径均已映射，无旧路径残留（`exchange_market/*`、`/market/`、`backpack/exchange` 已全部清除）。含 `ADMIN_EXCHANGE_ITEM_IMPORT`（对应 `POST /exchange/items/import`）。
+
+### 16.3 自动化测试（52/52 通过）
+
+| 测试套件 | 通过 | 总计 |
+|---|---|---|
+| `market-pages-api.test.js` | 15 | 15 |
+| `admin.contract.test.js` | 7 | 7 |
+| `sql-injection.test.js` | 13 | 13 |
+| `xss-prevention.test.js` | 17 | 17 |
+
+### 16.4 代码质量检查
+
+| 检查项 | 范围 | 结果 |
+|---|---|---|
+| ESLint（后端路由） | `routes/v4/console/exchange/` `assets/` `dashboard/` `marketplace/` | 2 warnings（`no-await-in-loop` — 事务内逐条处理，合理业务逻辑） |
+| ESLint（用户路由） | `routes/v4/marketplace/auctions.js` | ✅ 0 errors（本次修复了 2 个 `curly` 错误） |
+| Prettier（后端） | 同 ESLint 范围 | ✅ 全部通过 |
+| Prettier（前端） | `admin/src/api/market/*.js` `exchange-item/*.js` `dashboard.js` | ✅ 全部通过 |
+| Redis | `redis-cli ping` | ✅ PONG |
+| Health Check | `GET /health` | ✅ SYSTEM_HEALTHY |
+| Admin Build | `cd admin && npm run build` | ✅ 1015 modules, 14.65s |
+
+### 16.5 本次修复项（第七次审计）
+
+| 文件 | 修复内容 |
+|---|---|
+| `routes/v4/marketplace/index.js` 头部注释 | 补充 `price.js`、`analytics.js`、`auctions.js` 三个遗漏的子模块描述 |
+| `routes/v4/console/index.js` 域目录描述 | 修正 `assets/ 3 文件` → `assets/ 4 文件`；修正 `16 个域` → `15 个域` |
+| `routes/v4/console/index.js` modules 信息 | 补充 `modules.assets` 缺失的 6 个端点；补充 `modules.dashboard` 缺失的 10 个端点 |
+| `routes/v4/console/assets/index.js` 内联注释 | 子路由注释块补充 `/rates/*` 描述 |
+| `routes/v4/console/bids/management.js` 头部 | 补充 C2C 用户间竞拍管理（`?type=c2c`）职责说明和子路由清单 |
+
+**历史修复（第六次审计）**：
+| 文件 | 修复内容 |
+|---|---|
+| `routes/v4/marketplace/auctions.js` 第 91-92、198-199 行 | ESLint `curly` 错误：if 语句添加花括号 |
+| `admin/dist/` | 重新构建，与最新源码同步 |
+
+### 16.6 前端常量 key 去前缀验证
+
+| 域文件 | 旧 key 示例 | 新 key 示例 | 状态 |
+|---|---|---|---|
+| `exchange.js` | `EXCHANGE_ORDERS` | `ORDERS` | ✅ 已清理 |
+| `bid.js` | `BID_LIST` | `LIST` | ✅ 已清理 |
+| `exchange-rate.js` | `EXCHANGE_RATE_LIST` | `LIST` | ✅ 已清理 |
+| `trade.js` | — | — | ✅ 无冗余前缀 |
+
+5 个 consumer 文件均已迁移为域直接导入（`import { EXCHANGE_ENDPOINTS } from '...'`），不再经 barrel。
+
+### 16.7 结论
+
+本文档中所有声称"已完成"的 Phase 1、Phase 2、Phase 3（后端）、Phase 4（C2C 竞拍）任务及决策 1/2/3 均通过全量自动化验证，与实际代码和数据库状态一致。第七次审计修正了 5 个文件的注释漂移问题（注释与代码实现不同步），全部已对齐。
+
+**唯一待执行**：小程序端路径切换（Phase 3 小程序 — §13.3），需小程序开发人员按 §11.5 路径对照表执行。

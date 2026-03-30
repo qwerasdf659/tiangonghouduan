@@ -16,12 +16,14 @@ export const TRADE_ENDPOINTS = {
   TRADE_ORDERS: `${API_PREFIX}/console/marketplace/orders`,
   MARKETPLACE_ORDER_DETAIL: `${API_PREFIX}/console/marketplace/orders/:order_id`,
 
-  // 市场上架
+  // 市场挂牌管理（CRUD + 运营操作）
   LISTING_LIST: `${API_PREFIX}/console/marketplace/listings`,
-  LISTING_DETAIL: `${API_PREFIX}/console/marketplace/listings/:listing_id`,
+  LISTING_DETAIL: `${API_PREFIX}/console/marketplace/listings/:market_listing_id`,
   LISTING_CREATE: `${API_PREFIX}/console/marketplace/listings`,
-  LISTING_UPDATE: `${API_PREFIX}/console/marketplace/listings/:listing_id`,
-  LISTING_DELETE: `${API_PREFIX}/console/marketplace/listings/:listing_id`,
+  LISTING_UPDATE: `${API_PREFIX}/console/marketplace/listings/:market_listing_id`,
+  LISTING_DELETE: `${API_PREFIX}/console/marketplace/listings/:market_listing_id`,
+
+  // 挂牌统计与查询
   LISTING_STATS: `${API_PREFIX}/console/marketplace/listing-stats`,
   LISTING_USER_LISTINGS: `${API_PREFIX}/console/marketplace/user-listings`,
   LISTING_USER_LIMIT: `${API_PREFIX}/console/marketplace/user-listing-limit`,
@@ -32,11 +34,6 @@ export const TRADE_ENDPOINTS = {
   LISTING_RECOMMEND: `${API_PREFIX}/console/marketplace/listings/:id/recommend`,
   LISTING_BATCH_SORT: `${API_PREFIX}/console/marketplace/listings/batch-sort`,
 
-  // 孤儿冻结检测
-  ORPHAN_DETECT: `${API_PREFIX}/console/orphan-frozen/detect`,
-  ORPHAN_STATS: `${API_PREFIX}/console/orphan-frozen/stats`,
-  ORPHAN_CLEANUP: `${API_PREFIX}/console/orphan-frozen/cleanup`,
-
   // C2C 市场分析（MarketAnalyticsService）
   STATS_OVERVIEW: `${API_PREFIX}/console/marketplace/stats/overview`,
   STATS_PRICE_HISTORY: `${API_PREFIX}/console/marketplace/stats/price-history`,
@@ -45,8 +42,6 @@ export const TRADE_ENDPOINTS = {
   CONFIG_TRADABLE: `${API_PREFIX}/console/marketplace/config/tradable-assets`,
 
   // 业务记录查询
-  BUSINESS_RECORD_LOTTERY_CLEAR: `${API_PREFIX}/console/business-records/lottery-clear-settings`,
-  BUSINESS_RECORD_LOTTERY_CLEAR_DETAIL: `${API_PREFIX}/console/business-records/lottery-clear-settings/:record_id`,
   BUSINESS_RECORD_REDEMPTION: `${API_PREFIX}/console/business-records/redemption-orders`,
   BUSINESS_RECORD_REDEMPTION_DETAIL: `${API_PREFIX}/console/business-records/redemption-orders/:order_id`,
   BUSINESS_RECORD_REDEMPTION_REDEEM: `${API_PREFIX}/console/business-records/redemption-orders/:order_id/redeem`,
@@ -62,6 +57,15 @@ export const TRADE_ENDPOINTS = {
   BUSINESS_RECORD_CHAT: `${API_PREFIX}/console/business-records/chat-messages`,
   BUSINESS_RECORD_CHAT_DETAIL: `${API_PREFIX}/console/business-records/chat-messages/:message_id`,
   BUSINESS_RECORD_CHAT_STATS: `${API_PREFIX}/console/business-records/chat-messages/statistics/summary`,
+
+  // 孤儿冻结检测
+  ORPHAN_DETECT: `${API_PREFIX}/console/orphan-frozen/detect`,
+  ORPHAN_STATS: `${API_PREFIX}/console/orphan-frozen/stats`,
+  ORPHAN_CLEANUP: `${API_PREFIX}/console/orphan-frozen/cleanup`,
+
+  // 抽奖清除设置记录
+  BUSINESS_RECORD_LOTTERY_CLEAR: `${API_PREFIX}/console/business-records/lottery-clear-settings`,
+  BUSINESS_RECORD_LOTTERY_CLEAR_DETAIL: `${API_PREFIX}/console/business-records/lottery-clear-settings/:record_id`,
 
   // 交易订单扩展
   TRADE_ORDER_LIST: `${API_PREFIX}/console/marketplace/orders`,
@@ -107,7 +111,7 @@ export const TradeAPI = {
    * 获取上架列表
    * @param {Object} [params={}] - 查询参数
    * @param {number} [params.page=1] - 页码
-   * @param {number} [params.limit=20] - 每页数量
+   * @param {number} [params.page_size=20] - 每页数量
    * @param {string} [params.listing_kind] - 挂牌类型
    * @param {string} [params.sort='newest'] - 排序方式
    * @returns {Promise<Object>} API 响应
@@ -163,7 +167,7 @@ export const TradeAPI = {
    * @param {string} [params.mobile] - 手机号搜索
    * @param {string} [params.filter] - 筛选条件（all/near_limit/at_limit）
    * @param {number} [params.page=1] - 页码
-   * @param {number} [params.limit=20] - 每页数量
+   * @param {number} [params.page_size=20] - 每页数量
    * @returns {Promise<Object>} API 响应
    */
   async getListingStats(params = {}) {
@@ -218,7 +222,7 @@ export const TradeAPI = {
    * @returns {Promise<Object>} API 响应
    */
   async detectOrphanFrozen() {
-    return await request({ url: TRADE_ENDPOINTS.ORPHAN_DETECT, method: 'POST' })
+    return await request({ url: TRADE_ENDPOINTS.ORPHAN_DETECT, method: 'GET' })
   },
 
   /**

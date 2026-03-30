@@ -33,7 +33,18 @@ import { AuthAPI, AUTH_ENDPOINTS } from './auth.js'
 import { UserAPI, USER_ENDPOINTS } from './user.js'
 import { LotteryAPI, LOTTERY_ENDPOINTS } from './lottery/index.js'
 import { AssetAPI, ASSET_ENDPOINTS } from './asset.js'
-import { MarketAPI, MARKET_ENDPOINTS } from './market/index.js'
+import {
+  ExchangeAPI,
+  EXCHANGE_ENDPOINTS,
+  TradeAPI,
+  TRADE_ENDPOINTS,
+  BidAPI,
+  BID_ENDPOINTS,
+  ExchangeRateAPI,
+  EXCHANGE_RATE_ENDPOINTS,
+  AuctionAPI,
+  AUCTION_ENDPOINTS
+} from './market/index.js'
 import { StoreAPI, STORE_ENDPOINTS } from './store.js'
 import { SystemAPI, SYSTEM_ENDPOINTS } from './system/index.js'
 import { AnalyticsAPI, ANALYTICS_ENDPOINTS } from './analytics.js'
@@ -48,7 +59,11 @@ export { AuthAPI, AUTH_ENDPOINTS }
 export { UserAPI, USER_ENDPOINTS }
 export { LotteryAPI, LOTTERY_ENDPOINTS }
 export { AssetAPI, ASSET_ENDPOINTS }
-export { MarketAPI, MARKET_ENDPOINTS }
+export { ExchangeAPI, EXCHANGE_ENDPOINTS }
+export { TradeAPI, TRADE_ENDPOINTS }
+export { BidAPI, BID_ENDPOINTS }
+export { ExchangeRateAPI, EXCHANGE_RATE_ENDPOINTS }
+export { AuctionAPI, AUCTION_ENDPOINTS }
 export { StoreAPI, STORE_ENDPOINTS }
 export { SystemAPI, SYSTEM_ENDPOINTS }
 export { AnalyticsAPI, ANALYTICS_ENDPOINTS }
@@ -68,7 +83,11 @@ export default {
   UserAPI,
   LotteryAPI,
   AssetAPI,
-  MarketAPI,
+  ExchangeAPI,
+  TradeAPI,
+  BidAPI,
+  ExchangeRateAPI,
+  AuctionAPI,
   StoreAPI,
   SystemAPI,
   AnalyticsAPI,

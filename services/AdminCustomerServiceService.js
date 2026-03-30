@@ -254,11 +254,11 @@ class AdminCustomerServiceService {
    *
    * @example
    * const result = await AdminCustomerServiceService.getSessionMessages(123, {
-   *   limit: 50
+   *   page_size: 50
    * });
    * // 加载更多历史消息
    * const more = await AdminCustomerServiceService.getSessionMessages(123, {
-   *   limit: 50,
+   *   page_size: 50,
    *   before_message_id: result.messages[0].chat_message_id
    * });
    */

@@ -962,7 +962,7 @@ describe('阶段九：压力测试与高并发（P1）', () => {
               const response = await request(app)
                 .get('/api/v4/lottery/history')
                 .set('Authorization', `Bearer ${auth_token}`)
-                .query({ page: 1, limit: 10 })
+                .query({ page: 1, page_size: 10 })
               return { type: 'query', success: response.status === 200, status: response.status }
             } catch (error) {
               return { type: 'query', success: false, error: error.message }

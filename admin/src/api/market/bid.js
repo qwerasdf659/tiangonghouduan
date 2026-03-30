@@ -3,9 +3,10 @@
  *
  * @module api/market/bid
  * @description 竞价商品管理、手动结算、取消竞价相关的 API 调用
- * @version 1.0.0
- * @date 2026-02-16
+ * @version 2.0.0
+ * @date 2026-03-24
  *
+ * 决策 3 Phase B 落地：key 去冗余 BID_ 前缀，域上下文由变量名 BID_ENDPOINTS 承载
  * 后端路由：/api/v4/console/bids
  * 后端权限：role_level >= 100
  */
@@ -15,12 +16,16 @@ import { API_PREFIX, request, buildURL, buildQueryString } from '../base.js'
 // ========== API 端点 ==========
 
 export const BID_ENDPOINTS = {
-  // 竞价商品 CRUD
-  BID_LIST: `${API_PREFIX}/console/bids`,
-  BID_CREATE: `${API_PREFIX}/console/bids`,
-  BID_DETAIL: `${API_PREFIX}/console/bids/:id`,
-  BID_SETTLE: `${API_PREFIX}/console/bids/:id/settle`,
-  BID_CANCEL: `${API_PREFIX}/console/bids/:id/cancel`
+  /** 竞价商品列表（后端: GET /api/v4/console/bids） */
+  LIST: `${API_PREFIX}/console/bids`,
+  /** 创建竞价商品（后端: POST /api/v4/console/bids） */
+  CREATE: `${API_PREFIX}/console/bids`,
+  /** 竞价商品详情 + 出价记录（后端: GET /api/v4/console/bids/:id） */
+  DETAIL: `${API_PREFIX}/console/bids/:id`,
+  /** 手动结算竞价（后端: POST /api/v4/console/bids/:id/settle） */
+  SETTLE: `${API_PREFIX}/console/bids/:id/settle`,
+  /** 取消竞价（后端: POST /api/v4/console/bids/:id/cancel） */
+  CANCEL: `${API_PREFIX}/console/bids/:id/cancel`
 }
 
 // ========== API 调用方法 ==========
@@ -35,7 +40,7 @@ export const BidAPI = {
    * @returns {Promise<Object>} API 响应 { bid_products, pagination }
    */
   async getBidProducts(params = {}) {
-    const url = BID_ENDPOINTS.BID_LIST + buildQueryString(params)
+    const url = BID_ENDPOINTS.LIST + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 
@@ -52,7 +57,7 @@ export const BidAPI = {
    * @returns {Promise<Object>} API 响应
    */
   async createBidProduct(data) {
-    return await request({ url: BID_ENDPOINTS.BID_CREATE, method: 'POST', data })
+    return await request({ url: BID_ENDPOINTS.CREATE, method: 'POST', data })
   },
 
   /**
@@ -61,7 +66,7 @@ export const BidAPI = {
    * @returns {Promise<Object>} API 响应
    */
   async getBidProductDetail(id) {
-    const url = buildURL(BID_ENDPOINTS.BID_DETAIL, { id })
+    const url = buildURL(BID_ENDPOINTS.DETAIL, { id })
     return await request({ url, method: 'GET' })
   },
 
@@ -71,7 +76,7 @@ export const BidAPI = {
    * @returns {Promise<Object>} API 响应
    */
   async settleBidProduct(id) {
-    const url = buildURL(BID_ENDPOINTS.BID_SETTLE, { id })
+    const url = buildURL(BID_ENDPOINTS.SETTLE, { id })
     return await request({ url, method: 'POST' })
   },
 
@@ -83,7 +88,7 @@ export const BidAPI = {
    * @returns {Promise<Object>} API 响应
    */
   async cancelBidProduct(id, data) {
-    const url = buildURL(BID_ENDPOINTS.BID_CANCEL, { id })
+    const url = buildURL(BID_ENDPOINTS.CANCEL, { id })
     return await request({ url, method: 'POST', data })
   }
 }

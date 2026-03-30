@@ -5,43 +5,43 @@
  * @description 商品、SKU、类目、属性及选项的控制台接口封装
  */
 
-import { request, buildURL, buildQueryString } from '../base.js'
+import { API_PREFIX, request, buildURL, buildQueryString } from '../base.js'
 
-const API_PREFIX = '/api/v4/console'
+const CONSOLE_PREFIX = `${API_PREFIX}/console`
 
 /**
  * 兑换商品中心相关端点路径常量
  * @constant {Object<string, string>}
  */
 export const EXCHANGE_ITEM_ENDPOINTS = {
-  ITEM_LIST: `${API_PREFIX}/exchange/items`,
-  ITEM_DETAIL: `${API_PREFIX}/exchange/items/:id`,
-  ITEM_CREATE: `${API_PREFIX}/exchange/items`,
-  ITEM_UPDATE: `${API_PREFIX}/exchange/items/:id`,
-  ITEM_DELETE: `${API_PREFIX}/exchange/items/:id`,
-  SKU_LIST: `${API_PREFIX}/exchange/items/:id/skus`,
-  SKU_CREATE: `${API_PREFIX}/exchange/items/:id/skus`,
-  SKU_UPDATE: `${API_PREFIX}/exchange/items/skus/:sku_id`,
-  SKU_DELETE: `${API_PREFIX}/exchange/items/skus/:sku_id`,
-  SKU_GENERATE: `${API_PREFIX}/exchange/items/:id/skus/generate`,
-  SKU_STOCK_ADJUST: `${API_PREFIX}/exchange/items/skus/:sku_id/stock`,
-  SKU_CHANNEL_PRICES: `${API_PREFIX}/exchange/items/skus/:sku_id/channel-prices`,
-  CATEGORY_LIST: `${API_PREFIX}/categories`,
-  CATEGORY_DETAIL: `${API_PREFIX}/categories/:id`,
-  CATEGORY_CREATE: `${API_PREFIX}/categories`,
-  CATEGORY_UPDATE: `${API_PREFIX}/categories/:id`,
-  CATEGORY_DELETE: `${API_PREFIX}/categories/:id`,
-  CATEGORY_ATTRIBUTES: `${API_PREFIX}/categories/:id/attributes`,
-  ATTRIBUTE_LIST: `${API_PREFIX}/attributes`,
-  ATTRIBUTE_DETAIL: `${API_PREFIX}/attributes/:id`,
-  ATTRIBUTE_CREATE: `${API_PREFIX}/attributes`,
-  ATTRIBUTE_UPDATE: `${API_PREFIX}/attributes/:id`,
-  ATTRIBUTE_DELETE: `${API_PREFIX}/attributes/:id`,
-  ATTRIBUTE_OPTION_CREATE: `${API_PREFIX}/attributes/:id/options`,
-  ATTRIBUTE_OPTION_UPDATE: `${API_PREFIX}/attributes/options/:option_id`,
-  ATTRIBUTE_OPTION_DELETE: `${API_PREFIX}/attributes/options/:option_id`,
-  ITEM_EXPORT: `${API_PREFIX}/exchange/items/export`,
-  ITEM_IMPORT: `${API_PREFIX}/exchange/items/import`
+  ITEM_LIST: `${CONSOLE_PREFIX}/exchange/items`,
+  ITEM_DETAIL: `${CONSOLE_PREFIX}/exchange/items/:id`,
+  ITEM_CREATE: `${CONSOLE_PREFIX}/exchange/items`,
+  ITEM_UPDATE: `${CONSOLE_PREFIX}/exchange/items/:id`,
+  ITEM_DELETE: `${CONSOLE_PREFIX}/exchange/items/:id`,
+  SKU_LIST: `${CONSOLE_PREFIX}/exchange/items/:id/skus`,
+  SKU_CREATE: `${CONSOLE_PREFIX}/exchange/items/:id/skus`,
+  SKU_UPDATE: `${CONSOLE_PREFIX}/exchange/items/skus/:sku_id`,
+  SKU_DELETE: `${CONSOLE_PREFIX}/exchange/items/skus/:sku_id`,
+  SKU_GENERATE: `${CONSOLE_PREFIX}/exchange/items/:id/skus/generate`,
+  SKU_STOCK_ADJUST: `${CONSOLE_PREFIX}/exchange/items/skus/:sku_id/stock`,
+  SKU_CHANNEL_PRICES: `${CONSOLE_PREFIX}/exchange/items/skus/:sku_id/channel-prices`,
+  CATEGORY_LIST: `${CONSOLE_PREFIX}/categories`,
+  CATEGORY_DETAIL: `${CONSOLE_PREFIX}/categories/:id`,
+  CATEGORY_CREATE: `${CONSOLE_PREFIX}/categories`,
+  CATEGORY_UPDATE: `${CONSOLE_PREFIX}/categories/:id`,
+  CATEGORY_DELETE: `${CONSOLE_PREFIX}/categories/:id`,
+  CATEGORY_ATTRIBUTES: `${CONSOLE_PREFIX}/categories/:id/attributes`,
+  ATTRIBUTE_LIST: `${CONSOLE_PREFIX}/attributes`,
+  ATTRIBUTE_DETAIL: `${CONSOLE_PREFIX}/attributes/:id`,
+  ATTRIBUTE_CREATE: `${CONSOLE_PREFIX}/attributes`,
+  ATTRIBUTE_UPDATE: `${CONSOLE_PREFIX}/attributes/:id`,
+  ATTRIBUTE_DELETE: `${CONSOLE_PREFIX}/attributes/:id`,
+  ATTRIBUTE_OPTION_CREATE: `${CONSOLE_PREFIX}/attributes/:id/options`,
+  ATTRIBUTE_OPTION_UPDATE: `${CONSOLE_PREFIX}/attributes/options/:option_id`,
+  ATTRIBUTE_OPTION_DELETE: `${CONSOLE_PREFIX}/attributes/options/:option_id`,
+  ITEM_EXPORT: `${CONSOLE_PREFIX}/exchange/items/export`,
+  ITEM_IMPORT: `${CONSOLE_PREFIX}/exchange/items/import`
 }
 
 /**

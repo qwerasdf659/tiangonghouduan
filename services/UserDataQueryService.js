@@ -596,6 +596,7 @@ class UserDataQueryService {
       where,
       attributes: [
         'asset_transaction_id',
+        'transaction_no',
         'asset_code',
         'delta_amount',
         'balance_before',
@@ -641,6 +642,75 @@ class UserDataQueryService {
       page_size: pageSizeNum,
       summary: {
         total_conversions: totalConversions
+      }
+    }
+  }
+
+  /**
+   * 获取用户消费记录（含 CS 单号）
+   *
+   * @param {Object} models - Sequelize models
+   * @param {number} user_id - 用户 ID
+   * @param {Object} params - 查询参数
+   * @param {string} [params.status] - 状态筛选
+   * @param {string} [params.start_date] - 起始日期
+   * @param {string} [params.end_date] - 截止日期
+   * @param {number} [params.page=1] - 页码
+   * @param {number} [params.page_size=20] - 每页条数
+   * @returns {Promise<Object>} 消费记录列表 + 分页 + 汇总
+   */
+  static async getConsumptionRecords(models, user_id, params = {}) {
+    const { ConsumptionRecord, Store } = models
+    const { offset, limit, pageNum, pageSizeNum } = parsePagination(params.page, params.page_size)
+
+    const where = { user_id, is_deleted: 0 }
+    if (params.status && params.status !== 'all') {
+      where.status = params.status
+    }
+    const dateRange = buildDateRange(params.start_date, params.end_date)
+    if (dateRange) Object.assign(where, dateRange)
+
+    const { count, rows } = await ConsumptionRecord.findAndCountAll({
+      where,
+      attributes: [
+        'consumption_record_id',
+        'order_no',
+        'user_id',
+        'merchant_id',
+        'store_id',
+        'consumption_amount',
+        'points_to_award',
+        'status',
+        'created_at'
+      ],
+      include: [
+        {
+          model: Store,
+          as: 'store',
+          attributes: ['store_id', 'store_name'],
+          required: false
+        }
+      ],
+      order: [['created_at', 'DESC']],
+      offset,
+      limit
+    })
+
+    const totalConsumption = await ConsumptionRecord.sum('consumption_amount', {
+      where: { user_id, is_deleted: 0, status: 'completed' }
+    })
+
+    return {
+      list: rows.map(r => ({
+        ...r.toJSON(),
+        consumption_amount: Number(r.consumption_amount),
+        store_name: r.store?.store_name || '-'
+      })),
+      total: count,
+      page: pageNum,
+      page_size: pageSizeNum,
+      summary: {
+        total_consumption: Number(totalConsumption) || 0
       }
     }
   }

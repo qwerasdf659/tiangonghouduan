@@ -184,7 +184,9 @@ describe('📊 任务11.1：积分发放→抽奖消费完整链路测试', () =
          * 验证余额增加正确（允许其他操作影响余额，只验证增量关系）
          * 由于多次测试可能导致余额累加，只验证余额确实增加了
          */
-        expect(balanceAfter).toBeGreaterThanOrEqual(initialPointsBalance + GRANT_POINTS_AMOUNT)
+        expect(Number(balanceAfter)).toBeGreaterThanOrEqual(
+          Number(initialPointsBalance) + GRANT_POINTS_AMOUNT
+        )
       } else if (response.status === 403) {
         console.log(`   ⚠️ 权限不足（可能需要更高级别管理员权限）`)
         // 跳过后续测试

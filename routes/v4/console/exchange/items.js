@@ -17,6 +17,9 @@ const multer = require('multer')
 const ExcelJS = require('exceljs')
 const BeijingTimeHelper = require('../../../../utils/timeHelper')
 
+/** 路由保留字 — 防止 "export"/"import" 等被 /:id 参数捕获 */
+const RESERVED_PATHS = new Set(['export', 'import', 'batch', 'generate-skus', 'skus'])
+
 const uploadExcel = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },
@@ -118,8 +121,8 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
 router.get('/export', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
     const exchangeItemService = getExchangeItemService(req)
-    const { status, category_id, keyword, limit = 1000 } = req.query
-    const exportLimit = Math.min(Math.max(1, parseInt(limit) || 1000), 10000)
+    const { status, category_id, keyword, page_size = 1000 } = req.query
+    const exportLimit = Math.min(Math.max(1, parseInt(page_size) || 1000), 10000)
 
     const result = await exchangeItemService.listExchangeItems(
       { status, category_id, keyword },
@@ -477,6 +480,14 @@ router.post('/:id/skus/generate', authenticateToken, requireRoleLevel(100), asyn
  */
 router.get('/:id/skus', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
+    if (RESERVED_PATHS.has(req.params.id)) {
+      return res.apiError(
+        `路径 "${req.params.id}" 是保留字，不是有效的商品ID`,
+        'BAD_REQUEST',
+        null,
+        400
+      )
+    }
     const { ExchangeItemSku, SkuAttributeValue, Attribute, AttributeOption, ExchangeChannelPrice } =
       getExchangeItemService(req).models
 
@@ -545,6 +556,14 @@ router.post('/:id/skus', authenticateToken, requireRoleLevel(100), async (req, r
  */
 router.get('/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
+    if (RESERVED_PATHS.has(req.params.id)) {
+      return res.apiError(
+        `路径 "${req.params.id}" 是保留字，不是有效的商品ID`,
+        'BAD_REQUEST',
+        null,
+        400
+      )
+    }
     const service = getExchangeItemService(req)
     const row = await service.getExchangeItemDetail(req.params.id)
     if (!row) {

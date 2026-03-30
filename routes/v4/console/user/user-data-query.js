@@ -271,6 +271,32 @@ router.get(
 )
 
 /**
+ * GET /:user_id/consumption - 查询用户消费记录（含 CS 单号）
+ *
+ * @param {number} user_id - 用户 ID
+ * @query {string} [status] - 状态筛选（pending/completed/cancelled）
+ * @query {string} [start_date]
+ * @query {string} [end_date]
+ * @query {number} [page=1]
+ * @query {number} [page_size=20]
+ */
+router.get(
+  '/:user_id/consumption',
+  asyncHandler(async (req, res) => {
+    const userId = parseInt(req.params.user_id)
+    if (!userId || isNaN(userId)) {
+      return res.apiError('无效的用户 ID', 'BAD_REQUEST', null, 400)
+    }
+
+    const Service = getService(req)
+    const models = getModels(req)
+    const result = await Service.getConsumptionRecords(models, userId, req.query)
+
+    return res.apiSuccess(result, '获取消费记录成功')
+  })
+)
+
+/**
  * PATCH /:user_id/exchange-records/:order_no/review - 兑换订单审核操作
  *
  * 管理员对指定用户的兑换订单执行审核操作：

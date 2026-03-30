@@ -56,6 +56,80 @@ function buildPaginationOptions(options, defaultSortBy = 'created_at') {
 class BusinessRecordQueryService {
   /*
    * =================================================================
+   * 抽奖清除设置记录查询（数据源：admin_operation_logs, operation_type='lottery_clear_settings'）
+   * =================================================================
+   */
+
+  /**
+   * 查询管理员清除用户抽奖设置的操作记录列表
+   *
+   * @param {Object} options - 查询参数
+   * @param {number} [options.admin_id] - 操作管理员 ID
+   * @param {number} [options.target_user_id] - 被清除用户 ID
+   * @param {number} [options.page=1] - 页码
+   * @param {number} [options.page_size=20] - 每页数量
+   * @returns {Promise<Object>} { records, pagination }
+   */
+  static async getLotteryClearSettings(options = {}) {
+    const { AdminOperationLog, User } = require('../../models')
+    const { admin_id, target_user_id } = options
+    const { page, page_size, limit, offset } = buildPaginationOptions(options)
+
+    const where = { operation_type: 'lottery_clear_settings' }
+    if (admin_id) where.admin_id = parseInt(admin_id)
+    if (target_user_id) where.target_id = parseInt(target_user_id)
+
+    const { count, rows } = await AdminOperationLog.findAndCountAll({
+      where,
+      include: [
+        {
+          model: User,
+          as: 'operator',
+          attributes: ['user_id', 'nickname', 'mobile'],
+          required: false
+        }
+      ],
+      order: [['created_at', 'DESC']],
+      limit,
+      offset
+    })
+
+    return {
+      records: rows,
+      pagination: { page, page_size, total: count, total_pages: Math.ceil(count / page_size) }
+    }
+  }
+
+  /**
+   * 查询单条抽奖清除设置记录详情
+   *
+   * @param {number} logId - 操作日志 ID（admin_operation_logs.log_id）
+   * @returns {Promise<Object|null>} 记录详情
+   */
+  static async getLotteryClearSettingDetail(logId) {
+    const { AdminOperationLog, User } = require('../../models')
+
+    const record = await AdminOperationLog.findOne({
+      where: { log_id: logId, operation_type: 'lottery_clear_settings' },
+      include: [
+        {
+          model: User,
+          as: 'operator',
+          attributes: ['user_id', 'nickname', 'mobile'],
+          required: false
+        }
+      ]
+    })
+
+    if (!record) {
+      throw new Error('抽奖清除设置记录不存在')
+    }
+
+    return record
+  }
+
+  /*
+   * =================================================================
    * 核销订单查询
    * =================================================================
    */

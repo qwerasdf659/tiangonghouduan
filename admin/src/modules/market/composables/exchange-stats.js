@@ -35,11 +35,9 @@ export function useExchangeStatsState() {
     orderTrendByDay: null,
     /** @type {string} 趋势时间范围 */
     trendRange: '7d',
-    // ========== P1-8: 履约追踪看板 ==========
     /**
-     * 履约追踪数据
+     * 履约追踪数据（由后端 GET /console/exchange/stats → fulfillment_tracking 字段返回）
      * 后端 ExchangeRecord 状态枚举：pending / completed / shipped / cancelled
-     * 注意：exchange_records 表没有 expired 状态（expired 是 redemption_orders 表的）
      * @type {Object}
      */
     fulfillmentTracking: {
@@ -113,7 +111,6 @@ export function useExchangeStatsMethods() {
         }
 
         this.orderTrendByDay = Array.isArray(d.order_trend_by_day) ? d.order_trend_by_day : null
-        this.orders = []
       } catch (e) {
         logger.error('[ExchangeStats] 加载统计数据失败:', e)
         this.showError?.('加载统计数据失败')
@@ -124,7 +121,7 @@ export function useExchangeStatsMethods() {
 
     /**
      * 加载趋势数据
-     * 基于现有订单数据计算趋势（前端聚合）
+     * 使用后端 order_trend_by_day 服务端聚合数据，不再前端拉取订单聚合
      */
     async loadTrendData() {
       try {
@@ -150,30 +147,13 @@ export function useExchangeStatsMethods() {
               cell.revenue = Number(row.revenue) || 0
             }
           })
-        } else {
-          if (!this.orders || this.orders.length === 0) {
-            const ordersRes = await request({
-              url: EXCHANGE_ENDPOINTS.ORDERS,
-              method: 'GET',
-              params: { page: 1, page_size: 100 }
-            })
-            this.orders = ordersRes.success ? ordersRes.data?.orders || [] : []
-          }
-          this.orders.forEach(order => {
-            if (!order.created_at) return
-            const orderDate = new Date(order.created_at).toISOString().split('T')[0]
-            if (dateMap.has(orderDate)) {
-              const data = dateMap.get(orderDate)
-              data.order_count++
-              data.revenue += parseInt(order.cost_amount, 10) || parseInt(order.pay_amount, 10) || 0
-            }
-          })
         }
 
         this.trendData = Array.from(dateMap.values())
-        logger.info('[ExchangeStats] 趋势数据计算完成', {
+        logger.info('[ExchangeStats] 趋势数据加载完成', {
           days,
           dataPoints: this.trendData.length,
+          source: this.orderTrendByDay?.length ? 'server' : 'empty',
           totalOrders: this.trendData.reduce((sum, d) => sum + d.order_count, 0)
         })
 
@@ -374,61 +354,6 @@ export function useExchangeStatsMethods() {
     changeTrendRange(range) {
       this.trendRange = range
       this.loadTrendData()
-    },
-
-    // ==================== P1-8: 履约追踪看板 ====================
-    /**
-     * 计算履约追踪数据
-     * 从订单列表中聚合各状态的数量和履约率
-     */
-    calculateFulfillmentTracking() {
-      const orders = this.orders || []
-      const total = orders.length
-
-      // 后端 ExchangeRecord 状态枚举：pending / completed / shipped / cancelled
-      const pending = orders.filter(o => o.status === 'pending').length
-      const shipped = orders.filter(o => o.status === 'shipped').length
-      const completed = orders.filter(o => o.status === 'completed').length
-      const cancelled = orders.filter(o => o.status === 'cancelled').length
-
-      // 履约率 = (已完成 + 已发货) / (总数 - 已取消)
-      const validOrders = total - cancelled
-      const fulfilledOrders = completed + shipped
-      const fulfillment_rate =
-        validOrders > 0 ? Math.round((fulfilledOrders / validOrders) * 10000) / 100 : 0
-
-      // 计算平均履约时间（从创建到完成/发货）
-      let totalFulfillmentHours = 0
-      let fulfilledCount = 0
-      orders.forEach(order => {
-        if (
-          (order.status === 'completed' || order.status === 'shipped') &&
-          order.created_at &&
-          order.updated_at
-        ) {
-          const created = new Date(order.created_at)
-          const updated = new Date(order.updated_at)
-          const hours = (updated - created) / (1000 * 60 * 60)
-          if (hours > 0 && hours < 720) {
-            // 排除异常数据（超过30天）
-            totalFulfillmentHours += hours
-            fulfilledCount++
-          }
-        }
-      })
-
-      this.fulfillmentTracking = {
-        total_orders: total,
-        pending_count: pending,
-        shipped_count: shipped,
-        completed_count: completed,
-        cancelled_count: cancelled,
-        fulfillment_rate,
-        avg_fulfillment_time:
-          fulfilledCount > 0 ? Math.round((totalFulfillmentHours / fulfilledCount) * 10) / 10 : 0
-      }
-
-      logger.info('[ExchangeStats] 履约追踪数据计算完成', this.fulfillmentTracking)
     },
 
     /**

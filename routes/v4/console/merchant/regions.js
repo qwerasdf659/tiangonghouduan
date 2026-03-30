@@ -154,7 +154,7 @@ router.get('/children/:parent_code', async (req, res) => {
  *
  * @apiQuery {string} keyword 搜索关键词（至少2个字符）
  * @apiQuery {number} [level] 限制层级（1=省, 2=市, 3=区县, 4=街道）
- * @apiQuery {number} [limit=20] 结果数量限制
+ * @apiQuery {number} [page_size=20] 结果数量限制
  *
  * @apiSuccess {boolean} success 是否成功
  * @apiSuccess {string} code 业务码

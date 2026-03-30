@@ -208,6 +208,7 @@ router.get('/export', authenticateToken, requireRoleLevel(100), async (req, res)
  * GET /portfolio/items/:id - 物品详情
  * GET /item-events - 物品事件历史
  * GET /transactions - 资产流水查询（管理员视角）
+ * /rates/* - 汇率管理（B2C + C2C 共享，平台级资产域）
  */
 router.use('/', portfolioRoutes)
 router.use('/transactions', transactionsRoutes)

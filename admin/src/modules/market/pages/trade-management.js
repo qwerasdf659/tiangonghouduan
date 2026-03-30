@@ -8,7 +8,7 @@
  *
  * @requires Alpine.js
  * @requires createPageMixin - 页面基础功能混入
- * @requires MARKET_ENDPOINTS - 市场模块API端点（交易市场、业务记录等）
+ * @requires TRADE_ENDPOINTS - C2C 交易市场 API 端点（订单、挂牌、统计、业务记录等）
  *
  * @example
  * <div x-data="tradeManagementPage()">

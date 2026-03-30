@@ -27,7 +27,9 @@ export const USER_DATA_QUERY_ENDPOINTS = {
   /** 市场挂牌（上架/下架） */
   MARKET_LISTINGS: `${API_PREFIX}/console/user-data-query/:user_id/market-listings`,
   /** 材料转换（分解/合成） */
-  CONVERSIONS: `${API_PREFIX}/console/user-data-query/:user_id/conversions`
+  CONVERSIONS: `${API_PREFIX}/console/user-data-query/:user_id/conversions`,
+  /** 消费记录（含 CS 单号） */
+  CONSUMPTION: `${API_PREFIX}/console/user-data-query/:user_id/consumption`
 }
 
 /**
@@ -155,6 +157,19 @@ export const UserDataQueryAPI = {
   async getConversions(user_id, params = {}) {
     return request({
       url: buildURL(USER_DATA_QUERY_ENDPOINTS.CONVERSIONS, { user_id }),
+      params
+    })
+  },
+
+  /**
+   * 获取用户消费记录
+   * @param {number} user_id - 用户 ID
+   * @param {Object} params - 查询参数
+   * @returns {Promise<Object>} 分页消费记录 + 汇总
+   */
+  async getConsumption(user_id, params = {}) {
+    return request({
+      url: buildURL(USER_DATA_QUERY_ENDPOINTS.CONSUMPTION, { user_id }),
       params
     })
   }

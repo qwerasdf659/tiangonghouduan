@@ -203,20 +203,22 @@ export function useExchangeItemsMethods() {
     },
 
     /**
-     * 加载商品统计信息（从商品列表聚合）
+     * 加载商品统计信息（使用后端统计接口，不再前端拉取全量商品聚合）
      */
     async loadItemStats() {
       try {
-        const res = await ExchangeItemAPI.listExchangeItems({ page: 1, page_size: 200 })
-        if (res.success) {
-          const allItems = res.data?.items || []
+        const res = await request({
+          url: EXCHANGE_ENDPOINTS.STATS,
+          method: 'GET'
+        })
+        if (res.success && res.data) {
+          const isu = res.data.items_summary || {}
+          const os = res.data.orders_summary || {}
           this.itemStats = {
-            total: res.data?.total || allItems.length,
-            active: allItems.filter(i => i.status === 'active').length,
-            lowStock: allItems.filter(
-              i => i.status === 'active' && i.stock <= (i.stock_alert_threshold || 5)
-            ).length,
-            totalSold: allItems.reduce((sum, i) => sum + (i.sold_count || 0), 0)
+            total: (isu.active_count ?? 0) + (isu.inactive_count ?? 0),
+            active: isu.active_count ?? 0,
+            lowStock: isu.low_stock_count ?? 0,
+            totalSold: os.completed ?? 0
           }
         }
       } catch (e) {

@@ -154,12 +154,13 @@ module.exports = {
       }
     },
     {
-      /** 配置/工具文件：批量处理中的 await-in-loop 是顺序生成/校验的正常模式 */
+      /** 配置/工具/批量导入文件：批量处理中的 await-in-loop 是顺序生成/校验的正常模式 */
       files: [
         'config/segment_rules.js',
         'utils/CampaignCodeGenerator.js',
         'routes/v4/console/merchant/merchant-points.js',
-        'routes/v4/console/ad/ad-pricing.js'
+        'routes/v4/console/ad/ad-pricing.js',
+        'routes/v4/console/exchange/items.js'
       ],
       rules: {
         'no-await-in-loop': 'off'

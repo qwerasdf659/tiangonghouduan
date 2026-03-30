@@ -42,10 +42,10 @@ class ItemTemplateService {
   }
 
   /**
-   * 从请求体统一解析 `max_edition`：优先顶层 `data.max_edition`，否则取 `data.meta.max_edition`。
-   * 顶层用 `Number` 规范化；meta 侧保留 `Number(x) || null` 以兼容历史行为（如 0 视为空）。
+   * 从请求体顶层解析 `max_edition`（限量版数量）。
+   * 仅接受 `data.max_edition`，不再从 `data.meta` 回退读取。
    *
-   * @param {Object} data - 原始 payload（含可选 `meta`）
+   * @param {Object} data - 原始 payload
    * @returns {number|null} 解析后的限量值，无有效值时为 `null`
    * @private
    */
@@ -54,9 +54,6 @@ class ItemTemplateService {
     if (data.max_edition != null) {
       const n = Number(data.max_edition)
       return Number.isNaN(n) ? null : n
-    }
-    if (data.meta?.max_edition != null) {
-      return Number(data.meta.max_edition) || null
     }
     return null
   }
@@ -399,7 +396,7 @@ class ItemTemplateService {
         }
       }
 
-      if (updateData.max_edition === undefined && updateData.meta?.max_edition != null) {
+      if (updateData.max_edition !== undefined) {
         updateData.max_edition = this._extractMaxEdition(updateData)
       }
       if (updateData.meta) {

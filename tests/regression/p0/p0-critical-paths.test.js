@@ -429,7 +429,7 @@ describe('🔴 P0级回归测试入口 - 核心业务路径', () => {
 
       const response = await request(app)
         .get('/api/v4/marketplace/listings')
-        .query({ page: 1, limit: 10 })
+        .query({ page: 1, page_size: 10 })
 
       // 可能需要认证
       if (response.status === 401) {
@@ -439,7 +439,7 @@ describe('🔴 P0级回归测试入口 - 核心业务路径', () => {
           const authResponse = await request(app)
             .get('/api/v4/marketplace/listings')
             .set('Authorization', `Bearer ${authToken}`)
-            .query({ page: 1, limit: 10 })
+            .query({ page: 1, page_size: 10 })
 
           // 可能返回200（成功）、404（端点不存在）、401（认证失效/会话过期）
           expect([200, 404, 401]).toContain(authResponse.status)

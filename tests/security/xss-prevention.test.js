@@ -209,7 +209,7 @@ describe('P3-8: XSS防护安全测试', () => {
 
       const response = await request(app).get('/api/v4/campaigns').query({
         page: xssQuery,
-        limit: '<script>alert("XSS")</script>'
+        page_size: '<script>alert("XSS")</script>'
       })
 
       // 响应中不应该包含可执行的SVG或脚本

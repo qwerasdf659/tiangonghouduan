@@ -411,7 +411,7 @@ function assetsPortfolioPage() {
           // 构建导出参数
           const params = {
             format: 'excel',
-            limit: 1000
+            page_size: 1000
           }
 
           // 如果有筛选条件，添加到参数
