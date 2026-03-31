@@ -312,7 +312,12 @@ class ScheduledTasks {
     // 任务40: 每小时第20分钟执行库存预警检测 + 售罄自动下架
     this.scheduleExchangeStockAlert()
 
-    logger.info('所有定时任务已初始化完成（包含统一对账+物品锁定过期释放+市场价格快照+数据自动清理+定时上下架+库存预警）')
+    // ========== 2026-03-31 DIY 饰品设计引擎 V2.0 ==========
+
+    // 任务41: 每小时第35分钟执行 DIY 作品超时自动解冻（frozen_at 超过 24 小时）
+    this.registerDiyFrozenTimeoutTask()
+
+    logger.info('所有定时任务已初始化完成（包含统一对账+物品锁定过期释放+市场价格快照+数据自动清理+定时上下架+库存预警+DIY超时解冻）')
   }
 
   /**
@@ -3716,6 +3721,70 @@ class ScheduledTasks {
     })
 
     logger.info('✅ 定时任务已设置: 库存预警检测+售罄自动下架（每小时第20分钟，Task 40）')
+  }
+
+  /**
+   * Task 41: DIY 作品超时自动解冻（每小时第35分钟）
+   *
+   * 扫描 status='frozen' 且 frozen_at 超过 24 小时的作品，
+   * 自动调用 cancelDesign 解冻材料并将状态改为 cancelled。
+   *
+   * @since 2026-03-31（DIY 饰品设计引擎 V2.0）
+   */
+  static registerDiyFrozenTimeoutTask() {
+    cron.schedule('35 * * * *', async () => {
+      try {
+        await ScheduledTasks.initializeServices()
+        const { DiyWork, Account } = require('../../models')
+        const { Op } = require('sequelize')
+        const DIYService = require('../../services/DIYService')
+        const TransactionManager = require('../../utils/TransactionManager')
+
+        // 查找冻结超过 24 小时的作品（关联 account 获取 user_id）
+        const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000)
+        const expiredWorks = await DiyWork.findAll({
+          where: {
+            status: 'frozen',
+            frozen_at: { [Op.lt]: cutoff }
+          },
+          attributes: ['diy_work_id', 'account_id', 'work_code', 'frozen_at'],
+          include: [{ model: Account, as: 'account', attributes: ['user_id'] }]
+        })
+
+        if (expiredWorks.length === 0) {
+          logger.info('[定时任务41] DIY 超时解冻: 无超时冻结作品')
+          return
+        }
+
+        logger.info(`[定时任务41] DIY 超时解冻: 发现 ${expiredWorks.length} 个超时冻结作品`)
+
+        let successCount = 0
+        let failCount = 0
+
+        for (const work of expiredWorks) {
+          try {
+            await TransactionManager.execute(async (transaction) => {
+              await DIYService.cancelDesign(
+                work.diy_work_id,
+                work.account_id,
+                { transaction, userId: work.account?.user_id }
+              )
+            })
+            successCount++
+            logger.info(`[定时任务41] 自动解冻成功: work_code=${work.work_code}, frozen_at=${work.frozen_at}`)
+          } catch (error) {
+            failCount++
+            logger.error(`[定时任务41] 自动解冻失败: work_code=${work.work_code}`, error.message)
+          }
+        }
+
+        logger.info(`[定时任务41] DIY 超时解冻完成: 成功=${successCount}, 失败=${failCount}`)
+      } catch (error) {
+        logger.error('[定时任务41] DIY 超时解冻任务异常:', error.message)
+      }
+    })
+
+    logger.info('✅ 定时任务已设置: DIY 作品超时自动解冻（每小时第35分钟，Task 41）')
   }
 }
 

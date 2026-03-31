@@ -36,6 +36,8 @@ const { Model, DataTypes } = require('sequelize')
  * material_asset_type — 材料资产类型图标
  * merchant           — 商家 logo
  * lottery_campaign   — 活动 banner/背景
+ * diy_template       — DIY 款式模板预览图/底图（2026-03-31 DIY V2.0）
+ * diy_work           — DIY 用户作品预览图（2026-03-31 DIY V2.0）
  */
 
 /** @description 媒体关联模型类 */

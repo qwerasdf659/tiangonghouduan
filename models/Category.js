@@ -65,6 +65,13 @@ class Category extends Model {
       })
     }
 
+    if (models.DiyTemplate) {
+      Category.hasMany(models.DiyTemplate, {
+        foreignKey: 'category_id',
+        as: 'diy_templates'
+      })
+    }
+
     if (models.MediaFile) {
       Category.belongsTo(models.MediaFile, {
         foreignKey: 'icon_media_id',

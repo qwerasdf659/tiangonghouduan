@@ -1208,7 +1208,7 @@ POST /api/v4/console/diy/templates/:id/publish → publishTemplate(templateId)
 |------|----------|-------------|
 | 媒体上传/存储 | `MediaService`（upload/attach/detach/replaceMedia）+ Sealos S3 + `media_files`（28 条）/ `media_attachments`（29 条），自动生成 small/medium/large 三档缩略图，SHA-256 去重 | 模板预览图、底图、作品截图直接走现有上传流程，`attachable_type='diy_template'` / `'diy_work'` |
 | 材料资产 | `material_asset_types`（16 种），按颜色分组：red/orange/yellow/green/blue/purple 各有 shard(碎片,tier=1) + crystal(水晶,tier=2)，另有 DIAMOND(钻石)、POINTS(积分)、BUDGET_POINTS(预算积分)、DIAMOND_QUOTA(钻石配额) | **碎片/水晶就是珠子/宝石素材**，用 `asset_code` 标识（如 `red_shard`、`blue_crystal`），`media_attachments` 已挂载 15 条 icon 图片 |
-| 材料图片 | 15 条 `media_attachments`（`attachable_type='material_asset_type'`, `role='icon'`）已关联到每种材料 | 珠子/宝石的展示图片已有，通过 `MediaService.getMediaForEntity('material_asset_type', id)` 获取 public_url + thumbnails |
+| 材料图片 | 15 条 `media_attachments`（`attachable_type='material_asset_type'`, `role='icon'`）已关联到每种材料 | 珠子/宝石的展示图片已有，通过 `MediaService.getMediaForEntity('material_asset_type', id)` 获取 `object_key`（由 `ImageUrlHelper.getImageUrl()` 动态生成完整 URL）+ `thumbnail_keys` |
 | 账户余额 | `accounts`（114 个）+ `account_asset_balances`（104 条），`available_amount` + `frozen_amount` 双余额 | 用户持有的材料数量直接查 `account_asset_balances WHERE account_id=? AND asset_code=?` |
 | 资产扣减 | `AssetService`（事务 + 幂等 `idempotency_key`），`asset_transactions`（82179 条流水） | 确认设计时扣减材料，现有事务体系直接可用，`business_type='diy_exchange'` |
 | 分类体系 | `categories`（25 个，2 级树形），9 个顶级分类（家居生活/生活日用/美食饮品/收藏品/其他等已启用，电子产品/餐饮美食/优惠券/礼品卡已禁用） | DIY 模板分类复用，新增顶级分类"DIY 饰品"（`category_code='diy_jewelry'`），下挂手链/项链/戒指/吊坠子分类 |
@@ -1655,7 +1655,7 @@ Alpine.data('diySlotEditorPage', () => ({
 | `template.categoryIds` | `material_group_codes` | `diy_templates.material_group_codes` JSON 数组，存的是 `asset_group_defs.group_code`（如 `["red","blue"]`） |
 | `bead.id` | `asset_code` | `material_asset_types.asset_code`（如 `red_shard`、`blue_crystal`） |
 | `bead.name` | `display_name` | `material_asset_types.display_name`（如"红水晶碎片"） |
-| `bead.imageUrl` | 通过 `media_attachments` 关联查出 | `MediaService.getMediaForEntity('material_asset_type', id)` 返回 `public_url` + `thumbnails` |
+| `bead.imageUrl` | 通过 `media_attachments` 关联查出 | `MediaService.getMediaForEntity('material_asset_type', id)` 返回 `object_key`（由 `ImageUrlHelper.getImageUrl()` 动态生成完整 URL）+ `thumbnail_keys` |
 | `bead.category` | `group_code` | `material_asset_types.group_code`（如 `red`、`blue`） |
 | `bead.price` | `visible_value_points` | `material_asset_types.visible_value_points`（展示价值） |
 | `bead.stock` | `available_amount` | `account_asset_balances.available_amount`（用户持有量，不是全局库存） |
@@ -1699,7 +1699,7 @@ Mock 开发方案可以保留，但 Mock 数据的字段名必须改成后端实
 | 素材接口 | `getBeadsByCategory` 独立接口 | 统一 `GET /api/v4/diy/materials` 查 `material_asset_types` + `media_attachments` + `account_asset_balances` | 后端 + 小程序 |
 | 素材分类 | `categoryIds` 关联 `categories` 表 | `material_group_codes` 关联 `asset_group_defs.group_code`（红/橙/黄/绿/蓝/紫） | 后端 + 小程序 |
 | 用户余额 | `userBalance` | `account_asset_balances.available_amount` | 小程序 |
-| 图片 URL | `imageUrl` 平铺字段 | 通过 `media_attachments` 多态关联查出 `media_files` 的 `public_url` + `thumbnails`（small/medium/large） | 后端 |
+| 图片 URL | `imageUrl` 平铺字段 | 通过 `media_attachments` 多态关联查出 `media_files.object_key`，再由 `ImageUrlHelper.getImageUrl(object_key)` 动态生成完整 URL（含 CDN 前缀）；缩略图通过 `media_files.thumbnail_keys` JSON 字段获取 | 后端 |
 | 库存概念 | `stock: 999`（全局库存） | `available_amount`（用户持有量），材料资产无全局库存上限 | 小程序 |
 | 稀有度等级 | 6 级（含 mythic） | 5 级（common/uncommon/rare/epic/legendary，**无 mythic**） | 文档 |
 | 材料分组 | `group_code=gem_shard` | 实际按颜色分组：`red`/`orange`/`yellow`/`green`/`blue`/`purple` | 文档 |

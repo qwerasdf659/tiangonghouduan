@@ -573,7 +573,22 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/test/empty': 'TEST_EMPTY', // 空值测试
   '/api/v4/test/long': 'TEST_LONG', // 超长键测试
   '/api/v4/test/concurrent': 'TEST_CONCURRENT', // 并发测试
-  '/api/v4/internal/reconciliation': 'INTERNAL_RECONCILIATION' // 内部对账任务
+  '/api/v4/internal/reconciliation': 'INTERNAL_RECONCILIATION', // 内部对账任务
+
+  /*
+   * ===== DIY 饰品设计引擎（2026-03-31 V2.0）=====
+   * --- 用户端写操作 ---
+   */
+  '/api/v4/diy/works': 'DIY_WORK_SAVE', // 保存/创建 DIY 作品草稿
+  '/api/v4/diy/works/:id': 'DIY_WORK_DELETE', // 删除 DIY 作品草稿（DELETE 方法）
+  '/api/v4/diy/works/:id/confirm': 'DIY_WORK_CONFIRM', // 确认设计（冻结材料）
+  '/api/v4/diy/works/:id/complete': 'DIY_WORK_COMPLETE', // 完成设计（扣减+铸造）
+  '/api/v4/diy/works/:id/cancel': 'DIY_WORK_CANCEL', // 取消设计（解冻材料）
+
+  // --- 管理端写操作 ---
+  '/api/v4/console/diy/templates': 'ADMIN_DIY_TEMPLATE_CREATE', // 创建款式模板
+  '/api/v4/console/diy/templates/:id': 'ADMIN_DIY_TEMPLATE_UPDATE', // 更新/删除款式模板（PUT/DELETE）
+  '/api/v4/console/diy/templates/:id/status': 'ADMIN_DIY_TEMPLATE_STATUS' // 发布/下线模板
 }
 
 /**

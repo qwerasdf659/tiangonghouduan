@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <%- include('partials/head', {
+    title: 'DIY 槽位标注编辑器',
+    pageStyle: '[x-cloak] { display: none !important; } #konva-container { border: 1px solid #e5e7eb; border-radius: 8px; background: #f9fafb; }'
+  }) %>
+</head>
+<body class="themed-bg-subtle min-h-screen">
+
+  <nav class="page-navbar">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/diy-template-management.html" class="text-blue-200 hover:text-white transition-colors">← 返回模板管理</a>
+        <span class="text-lg font-semibold" x-data x-text="'🎯 槽位标注 — ' + (window.__slotEditorState?.templateName || '加载中...')">🎯 槽位标注编辑器</span>
+      </div>
+      <div class="flex items-center space-x-2" x-data="slotEditorToolbar()">
+        <button @click="clearAllPreviews()" class="px-3 py-1.5 bg-gray-500 text-white text-sm rounded-lg hover:bg-gray-600">🧹 清除预览</button>
+        <button @click="addSlot()" class="px-3 py-1.5 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600">+ 添加槽位</button>
+        <button @click="saveSlots()" :disabled="saving" class="px-3 py-1.5 bg-green-500 text-white text-sm rounded-lg hover:bg-green-600 disabled:opacity-50">
+          <span x-show="!saving">💾 保存</span>
+          <span x-show="saving">保存中...</span>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mx-auto px-4 py-4">
+    <div class="flex flex-col gap-3" style="height: calc(100vh - 120px);">
+
+      <!-- 上半部分：画布 + 右侧属性面板 -->
+      <div class="flex gap-4 flex-1 min-h-0">
+
+        <!-- 左侧：Konva Canvas -->
+        <div class="flex-1 bg-white rounded-xl shadow overflow-hidden flex flex-col">
+          <div class="px-3 py-2 border-b text-xs text-gray-500 flex justify-between">
+            <span>画布区域（拖拽移动槽位，手柄缩放/旋转）</span>
+            <span>选中槽位后，点击下方珠子可预览镶嵌效果</span>
+          </div>
+          <div id="konva-container" class="flex-1 relative"></div>
+          <div class="px-3 py-1 border-t text-xs text-gray-400" x-data x-text="'底图: ' + (window.__slotEditorState?.bgNaturalWidth || 800) + ' x ' + (window.__slotEditorState?.bgNaturalHeight || 1000) + 'px'"></div>
+        </div>
+
+        <!-- 右侧：属性面板 -->
+        <div class="w-72 bg-white rounded-xl shadow overflow-y-auto flex flex-col" x-data="slotPropertyPanel()">
+          <div class="p-3 border-b">
+            <h3 class="text-sm font-semibold">属性面板</h3>
+          </div>
+
+          <div x-show="!selectedSlot" class="p-4 text-center text-gray-400 text-sm">
+            点击画布上的槽位进行编辑
+          </div>
+
+          <div x-show="selectedSlot" class="p-3 space-y-3">
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">槽位ID</label>
+              <input type="text" :value="selectedSlot?.slot_id" @input="updateProp('slot_id', $event.target.value)"
+                     class="input-field w-full text-sm" readonly>
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">标签名称</label>
+              <input type="text" :value="selectedSlot?.label" @input="updateProp('label', $event.target.value)"
+                     class="input-field w-full text-sm">
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-xs text-gray-500 mb-1">X (0~1)</label>
+                <input type="number" :value="selectedSlot?.x" @input="updateProp('x', parseFloat($event.target.value))"
+                       step="0.01" min="0" max="1" class="input-field w-full text-sm">
+              </div>
+              <div>
+                <label class="block text-xs text-gray-500 mb-1">Y (0~1)</label>
+                <input type="number" :value="selectedSlot?.y" @input="updateProp('y', parseFloat($event.target.value))"
+                       step="0.01" min="0" max="1" class="input-field w-full text-sm">
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-xs text-gray-500 mb-1">宽度 (0~1)</label>
+                <input type="number" :value="selectedSlot?.width" @input="updateProp('width', parseFloat($event.target.value))"
+                       step="0.01" min="0.02" max="0.5" class="input-field w-full text-sm">
+              </div>
+              <div>
+                <label class="block text-xs text-gray-500 mb-1">高度 (0~1)</label>
+                <input type="number" :value="selectedSlot?.height" @input="updateProp('height', parseFloat($event.target.value))"
+                       step="0.01" min="0.02" max="0.5" class="input-field w-full text-sm">
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">旋转角度 (°)</label>
+              <input type="number" :value="selectedSlot?.rotation" @input="updateProp('rotation', parseFloat($event.target.value))"
+                     step="1" min="-180" max="180" class="input-field w-full text-sm">
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">允许形状</label>
+              <div class="flex gap-2">
+                <label class="flex items-center text-xs">
+                  <input type="checkbox" :checked="selectedSlot?.allowed_shapes?.includes('circle')"
+                         @change="toggleShape('circle')"> <span class="ml-1">圆形</span>
+                </label>
+                <label class="flex items-center text-xs">
+                  <input type="checkbox" :checked="selectedSlot?.allowed_shapes?.includes('ellipse')"
+                         @change="toggleShape('ellipse')"> <span class="ml-1">椭圆</span>
+                </label>
+              </div>
+            </div>
+            <div>
+              <label class="flex items-center text-xs">
+                <input type="checkbox" :checked="selectedSlot?.required"
+                       @change="updateProp('required', $event.target.checked)">
+                <span class="ml-1">必填槽位</span>
+              </label>
+            </div>
+            <!-- 当前槽位已镶嵌的珠子 -->
+            <div x-show="selectedSlot?._previewMaterial" class="pt-2 border-t">
+              <label class="block text-xs text-gray-500 mb-1">已镶嵌预览</label>
+              <div class="flex items-center gap-2 bg-blue-50 rounded p-2">
+                <img :src="selectedSlot?._previewMaterial?.image_url" class="w-8 h-8 rounded object-contain" x-show="selectedSlot?._previewMaterial?.image_url">
+                <div class="text-xs">
+                  <div class="font-medium" x-text="selectedSlot?._previewMaterial?.display_name"></div>
+                  <div class="text-gray-500" x-text="selectedSlot?._previewMaterial?.diameter + 'mm · ¥' + selectedSlot?._previewMaterial?.price"></div>
+                </div>
+                <button @click="clearSlotPreview()" class="ml-auto text-red-400 hover:text-red-600 text-xs">✕</button>
+              </div>
+            </div>
+            <div class="pt-2 border-t">
+              <button @click="deleteSelectedSlot()" class="w-full px-3 py-1.5 bg-red-50 text-red-600 text-sm rounded-lg hover:bg-red-100">
+                删除此槽位
+              </button>
+            </div>
+          </div>
+
+          <!-- 槽位列表 -->
+          <div class="border-t p-3 mt-auto">
+            <h4 class="text-xs font-semibold text-gray-500 mb-2">全部槽位</h4>
+            <div class="space-y-1" x-data="slotListPanel()">
+              <template x-for="(slot, idx) in slots" :key="slot.slot_id">
+                <div @click="selectSlotByIndex(idx)"
+                     :class="selectedIndex === idx ? 'bg-blue-50 border-blue-300' : 'bg-gray-50 border-gray-200'"
+                     class="px-2 py-1.5 border rounded text-xs cursor-pointer hover:bg-blue-50 flex justify-between">
+                  <span x-text="slot.label + (slot._previewMaterial ? ' 💎' : '')"></span>
+                  <span class="text-gray-400" x-text="'(' + slot.x.toFixed(2) + ', ' + slot.y.toFixed(2) + ')'"></span>
+                </div>
+              </template>
+              <div x-show="slots.length === 0" class="text-center text-gray-400 text-xs py-2">暂无槽位</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- 下半部分：珠子素材选择面板 -->
+      <div class="h-48 bg-white rounded-xl shadow flex flex-col overflow-hidden" x-data="materialPickerPanel()">
+        <div class="px-3 py-2 border-b flex items-center gap-3 shrink-0">
+          <h3 class="text-sm font-semibold whitespace-nowrap">💎 珠子素材</h3>
+          <!-- 分组 Tab -->
+          <div class="flex gap-1 overflow-x-auto">
+            <button @click="activeGroup = ''"
+                    :class="activeGroup === '' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+                    class="px-2.5 py-1 text-xs rounded-full whitespace-nowrap transition-colors">全部</button>
+            <template x-for="g in groups" :key="g.code">
+              <button @click="activeGroup = g.code"
+                      :class="activeGroup === g.code ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+                      class="px-2.5 py-1 text-xs rounded-full whitespace-nowrap transition-colors"
+                      x-text="g.label + ' (' + g.count + ')'"></button>
+            </template>
+          </div>
+          <div class="ml-auto text-xs text-gray-400" x-show="!hasSelectedSlot">
+            ⚠️ 请先选中一个槽位
+          </div>
+          <div class="ml-auto text-xs text-green-600 font-medium" x-show="hasSelectedSlot">
+            ✓ 点击珠子镶嵌到选中槽位
+          </div>
+        </div>
+        <div class="flex-1 overflow-x-auto overflow-y-hidden px-3 py-2">
+          <div class="flex gap-3 h-full">
+            <template x-for="mat in filteredMaterials" :key="mat.diy_material_id">
+              <div @click="applyToSlot(mat)"
+                   :class="hasSelectedSlot ? 'cursor-pointer hover:border-blue-400 hover:shadow-md' : 'opacity-50 cursor-not-allowed'"
+                   class="shrink-0 w-24 border rounded-lg p-2 flex flex-col items-center transition-all bg-white">
+                <div class="w-14 h-14 rounded-full overflow-hidden bg-gray-50 flex items-center justify-center border">
+                  <img x-show="mat.image_url" :src="mat.image_url" class="w-full h-full object-contain">
+                  <span x-show="!mat.image_url" class="text-2xl">💎</span>
+                </div>
+                <div class="text-xs font-medium mt-1 text-center leading-tight truncate w-full" x-text="mat.display_name"></div>
+                <div class="text-xs text-gray-500" x-text="mat.diameter + 'mm'"></div>
+                <div class="text-xs font-medium text-blue-600" x-text="'¥' + mat.price"></div>
+              </div>
+            </template>
+            <div x-show="filteredMaterials.length === 0" class="flex items-center text-gray-400 text-sm px-4">
+              暂无素材数据
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <%- include('partials/footer') %>
+  <script type="module" src="./src/modules/diy/pages/diy-slot-editor.js"></script>
+</body>
+</html>

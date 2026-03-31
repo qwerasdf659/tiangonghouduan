@@ -192,6 +192,19 @@ export function sidebarNav() {
         ]
       },
 
+      // 4.5 DIY 饰品设计引擎
+      {
+        id: 'diy-engine',
+        name: 'DIY饰品',
+        icon: '💎',
+        items: [
+          { id: 'diy-templates', name: '款式模板管理', url: '/admin/diy-template-management.html' },
+          { id: 'diy-materials', name: '珠子素材管理', url: '/admin/diy-material-management.html' },
+          { id: 'diy-works', name: '用户作品管理', url: '/admin/diy-work-management.html' },
+          { id: 'diy-slot-editor', name: '槽位标注编辑器', url: '/admin/diy-slot-editor.html' }
+        ]
+      },
+
       // 5️⃣ 用户门店
       {
         id: 'users',

@@ -41,6 +41,7 @@ router.use('/assets', require('./assets'))
 router.use('/exchange', require('./exchange'))
 router.use('/bids', require('./bids'))
 router.use('/dashboard', require('./dashboard'))
+router.use('/diy', require('./diy'))
 
 /**
  * GET / - Console API 根路径信息

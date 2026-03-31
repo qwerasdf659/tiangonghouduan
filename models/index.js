@@ -928,6 +928,23 @@ models.ApprovalChainStep = require('./ApprovalChainStep')(sequelize, DataTypes)
  *    - 业务场景：活动奖励、投诉补偿、VIP关怀、内部测试
  */
 
+// 🔴 DIY 饰品设计引擎模型
+models.DiyTemplate = require('./DiyTemplate')(sequelize, DataTypes)
+/*
+ * ✅ DiyTemplate：DIY 款式模板（管理端配置，前端根据模板参数渲染设计器）
+ *    - 表名：diy_templates，主键：diy_template_id，外键：category_id, preview_media_id, base_image_media_id
+ */
+models.DiyWork = require('./DiyWork')(sequelize, DataTypes)
+/*
+ * ✅ DiyWork：DIY 用户作品（用户保存的设计方案）
+ *    - 表名：diy_works，主键：diy_work_id，外键：account_id + diy_template_id
+ */
+models.DiyMaterial = require('./DiyMaterial')(sequelize, DataTypes)
+/*
+ * ✅ DiyMaterial：DIY 珠子/宝石素材（实物商品，供设计器选择）
+ *    - 表名：diy_materials，主键：diy_material_id，外键：image_media_id, category_id
+ */
+
 // 🔴 设置模型关联关系
 Object.keys(models).forEach(modelName => {
   if (models[modelName].associate) {

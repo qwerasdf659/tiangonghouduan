@@ -119,6 +119,21 @@ module.exports = sequelize => {
         unique: true,
         comment: '原图 Sealos object key'
       },
+      /**
+       * 公网访问 URL（虚拟字段，不存数据库，序列化时自动输出）
+       */
+      public_url: {
+        type: DataTypes.VIRTUAL,
+        /**
+         * @returns {string|null} 公网访问 URL
+         */
+        get() {
+          const key = this.getDataValue('object_key')
+          if (!key) return null
+          const { getImageUrl } = require('../utils/ImageUrlHelper')
+          return getImageUrl(key)
+        }
+      },
       thumbnail_keys: {
         type: DataTypes.JSON,
         defaultValue: null,

@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <%- include('partials/head', { 
+    title: 'DIY 款式模板管理', 
+    pageStyle: '[x-cloak] { display: none !important; }' 
+  }) %>
+</head>
+<body class="themed-bg-subtle min-h-screen">
+
+  <nav class="page-navbar">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/workspace.html" class="text-blue-200 hover:text-white transition-colors">← 返回工作台</a>
+        <span class="text-lg font-semibold">💎 DIY 款式模板管理</span>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mx-auto px-4 py-6"
+       x-data="diyTemplateManagement()"
+       x-init="init()">
+
+    <div x-cloak class="space-y-6">
+
+      <div class="page-banner mb-2">
+        <h1>💎 DIY 饰品设计引擎 · 款式模板管理</h1>
+        <p>管理手链/项链/戒指/吊坠等款式模板，配置排列形状、珠子尺寸、可用材料</p>
+      </div>
+
+      <!-- 统计概览 -->
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div class="bg-white rounded-xl shadow p-4">
+          <div class="text-xs text-gray-500">模板总数</div>
+          <div class="text-2xl font-bold text-blue-600 mt-1" x-text="stats.templates?.total ?? '-'"></div>
+        </div>
+        <div class="bg-white rounded-xl shadow p-4">
+          <div class="text-xs text-gray-500">已发布</div>
+          <div class="text-2xl font-bold text-green-600 mt-1" x-text="stats.templates?.published ?? 0"></div>
+        </div>
+        <div class="bg-white rounded-xl shadow p-4">
+          <div class="text-xs text-gray-500">用户作品总数</div>
+          <div class="text-2xl font-bold text-purple-600 mt-1" x-text="stats.works?.total ?? 0"></div>
+        </div>
+        <div class="bg-white rounded-xl shadow p-4">
+          <div class="text-xs text-gray-500">已完成作品</div>
+          <div class="text-2xl font-bold text-green-600 mt-1" x-text="stats.works?.by_status?.completed ?? 0"></div>
+        </div>
+        <div class="bg-white rounded-xl shadow p-4">
+          <div class="text-xs text-gray-500">热门模板</div>
+          <div class="text-sm font-semibold text-amber-600 mt-1" x-text="stats.template_ranking?.[0]?.display_name ?? '-'"></div>
+          <div class="text-xs text-gray-400" x-text="stats.template_ranking?.[0]?.work_count ? stats.template_ranking[0].work_count + ' 个作品' : ''"></div>
+        </div>
+      </div>
+
+      <!-- 筛选栏 -->
+      <div class="card p-4">
+        <div class="flex flex-wrap gap-3 items-end">
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">模板状态</label>
+            <select x-model="filterStatus" class="input-field text-sm w-32">
+              <option value="">全部</option>
+              <template x-for="opt in statusOptions" :key="opt.value">
+                <option :value="opt.value" x-text="opt.label"></option>
+              </template>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">启用状态</label>
+            <select x-model="filterEnabled" class="input-field text-sm w-28">
+              <option value="">全部</option>
+              <option value="true">已启用</option>
+              <option value="false">已禁用</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">关键词</label>
+            <input type="text" x-model="filterKeyword" placeholder="搜索模板名称" class="input-field text-sm w-40">
+          </div>
+          <button @click="applyFilter()" class="btn-primary text-sm px-4 py-2">筛选</button>
+          <button @click="resetFilter()" class="btn-secondary text-sm px-4 py-2">重置</button>
+          <div class="flex-1"></div>
+          <button @click="openCreateForm()" class="btn-primary text-sm px-4 py-2">+ 新建模板</button>
+        </div>
+      </div>
+
+      <!-- 模板列表 -->
+      <div class="card overflow-hidden">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-4 py-3 text-left">ID</th>
+              <th class="px-4 py-3 text-left">模板编号</th>
+              <th class="px-4 py-3 text-left">预览图</th>
+              <th class="px-4 py-3 text-left">名称</th>
+              <th class="px-4 py-3 text-left">分类</th>
+              <th class="px-4 py-3 text-left">布局</th>
+              <th class="px-4 py-3 text-center">状态</th>
+              <th class="px-4 py-3 text-center">启用</th>
+              <th class="px-4 py-3 text-center">排序</th>
+              <th class="px-4 py-3 text-right">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="tpl in templates" :key="tpl.diy_template_id">
+              <tr class="border-t hover:bg-gray-50">
+                <td class="px-4 py-3 text-gray-500" x-text="tpl.diy_template_id"></td>
+                <td class="px-4 py-3 font-mono text-xs" x-text="tpl.template_code"></td>
+                <td class="px-4 py-3">
+                  <img x-show="tpl.preview_media?.public_url"
+                       :src="tpl.preview_media?.public_url"
+                       class="w-12 h-12 object-cover rounded border"
+                       loading="lazy">
+                  <span x-show="!tpl.preview_media?.public_url" class="text-gray-300 text-xs">无图</span>
+                </td>
+                <td class="px-4 py-3 font-medium" x-text="tpl.display_name"></td>
+                <td class="px-4 py-3 text-gray-600" x-text="tpl.category?.category_name || '-'"></td>
+                <td class="px-4 py-3">
+                  <span class="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-800"
+                        x-text="shapeLabels[tpl.layout?.shape] || tpl.layout?.shape || '-'"></span>
+                  <span class="text-xs text-gray-500 ml-1" x-text="formatBeadCount(tpl.layout)"></span>
+                </td>
+                <td class="px-4 py-3 text-center">
+                  <span class="text-xs px-2 py-0.5 rounded-full"
+                        :class="getStatusBadgeClass(tpl.status)"
+                        x-text="statusLabels[tpl.status] || tpl.status"></span>
+                </td>
+                <td class="px-4 py-3 text-center">
+                  <span x-show="tpl.is_enabled" class="text-green-600">✓</span>
+                  <span x-show="!tpl.is_enabled" class="text-red-400">✗</span>
+                </td>
+                <td class="px-4 py-3 text-center text-gray-500" x-text="tpl.sort_order"></td>
+                <td class="px-4 py-3 text-right space-x-2">
+                  <button @click="openEditForm(tpl.diy_template_id)" class="text-blue-600 hover:underline text-xs">编辑</button>
+                  <button x-show="tpl.layout?.shape === 'slots'"
+                          @click="openSlotEditor(tpl.diy_template_id)"
+                          class="text-purple-600 hover:underline text-xs">槽位标注</button>
+                  <button @click="handleDelete(tpl.diy_template_id, tpl.display_name)" class="text-red-500 hover:underline text-xs">删除</button>
+                </td>
+              </tr>
+            </template>
+            <tr x-show="!loading && templates.length === 0">
+              <td colspan="9" class="px-4 py-8 text-center text-gray-400">暂无模板数据</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- 分页 -->
+        <div x-show="total > page_size" class="px-4 py-3 border-t flex justify-between items-center text-sm text-gray-500">
+          <span>共 <span x-text="total"></span> 条</span>
+          <div class="flex gap-1">
+            <button @click="goToPage(page - 1)" :disabled="page <= 1" class="px-3 py-1 border rounded disabled:opacity-30">上一页</button>
+            <span class="px-3 py-1">第 <span x-text="page"></span> / <span x-text="totalPages"></span> 页</span>
+            <button @click="goToPage(page + 1)" :disabled="page >= totalPages" class="px-3 py-1 border rounded disabled:opacity-30">下一页</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 创建/编辑模态框 -->
+      <div x-show="showFormModal" x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+          <div class="p-4 border-b flex justify-between items-center">
+            <h3 class="text-lg font-semibold" x-text="editingId ? '编辑款式模板' : '新建款式模板'"></h3>
+            <button @click="showFormModal = false" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+          </div>
+          <div class="p-4 space-y-4">
+            <!-- 基本信息 -->
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs text-gray-500 mb-1">模板名称 *</label>
+                <input type="text" x-model="form.display_name" class="input-field w-full" placeholder="如：经典串珠手链">
+              </div>
+              <div>
+                <label class="block text-xs text-gray-500 mb-1">所属分类 *</label>
+                <select x-model="form.category_id" class="input-field w-full">
+                  <option value="">请选择</option>
+                  <template x-for="cat in categories" :key="cat.category_id">
+                    <option :value="cat.category_id" x-text="cat.category_name"></option>
+                  </template>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-3 gap-4">
+              <div>
+                <label class="block text-xs text-gray-500 mb-1">模板状态</label>
+                <select x-model="form.status" class="input-field w-full">
+                  <template x-for="opt in statusOptions" :key="opt.value">
+                    <option :value="opt.value" x-text="opt.label"></option>
+                  </template>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs text-gray-500 mb-1">是否启用</label>
+                <select x-model="form.is_enabled" class="input-field w-full">
+                  <option :value="true">启用</option>
+                  <option :value="false">禁用</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs text-gray-500 mb-1">排序权重</label>
+                <input type="number" x-model.number="form.sort_order" class="input-field w-full" min="0">
+              </div>
+            </div>
+
+            <!-- 布局配置 -->
+            <div class="border-t pt-4">
+              <h4 class="text-sm font-semibold mb-2">布局配置</h4>
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1">排列形状</label>
+                  <select x-model="form.layout.shape" @change="onShapeChange()" class="input-field w-full">
+                    <template x-for="opt in shapeOptions" :key="opt.value">
+                      <option :value="opt.value" x-text="opt.label"></option>
+                    </template>
+                  </select>
+                </div>
+                <template x-if="!isSlotMode">
+                  <div>
+                    <label class="block text-xs text-gray-500 mb-1">珠子数量</label>
+                    <input type="number" x-model.number="form.layout.bead_count" class="input-field w-full" min="1" max="50">
+                  </div>
+                </template>
+              </div>
+            </div>
+
+            <!-- 珠子规则（串珠模式，仅 bead_rules 非 null 时渲染） -->
+            <template x-if="!isSlotMode && form.bead_rules">
+              <div class="border-t pt-4">
+                <h4 class="text-sm font-semibold mb-2">珠子规则</h4>
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-xs text-gray-500 mb-1">默认直径 (mm)</label>
+                    <input type="number" x-model.number="form.bead_rules.default_diameter" class="input-field w-full" min="1">
+                  </div>
+                  <div>
+                    <label class="block text-xs text-gray-500 mb-1">间距 (px)</label>
+                    <input type="number" x-model.number="form.bead_rules.margin" class="input-field w-full" min="0">
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <!-- 预览图上传 -->
+            <div class="border-t pt-4">
+              <h4 class="text-sm font-semibold mb-2">预览图</h4>
+              <div class="flex items-center gap-4">
+                <div x-show="iconPreviewUrl" class="w-20 h-20 border rounded overflow-hidden">
+                  <img :src="iconPreviewUrl" class="w-full h-full object-cover">
+                </div>
+                <div>
+                  <input type="file" accept="image/*" @change="handleIconUpload($event)" class="text-sm">
+                  <button x-show="iconPreviewUrl" @click="removeIcon()" class="text-xs text-red-500 ml-2">移除</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="p-4 border-t flex justify-end gap-2">
+            <button @click="showFormModal = false" class="px-4 py-2 text-sm border rounded-lg">取消</button>
+            <button @click="saveTemplate()" :disabled="saving" class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg disabled:opacity-50">
+              <span x-show="!saving" x-text="editingId ? '保存修改' : '创建模板'"></span>
+              <span x-show="saving">保存中...</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <%- include('partials/footer') %>
+  <script type="module" src="./src/modules/diy/pages/diy-template-management.js"></script>
+</body>
+</html>

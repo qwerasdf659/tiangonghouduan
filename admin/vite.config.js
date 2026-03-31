@@ -77,6 +77,13 @@ const pageConfigs = {
 
   // 审核链配置管理
   'approval-chain': { title: '审核链配置管理', pageIcon: '🔗', pageTitle: '审核链配置管理' },
+
+  // DIY 饰品设计引擎（2026-03-31）
+  'diy-template-management': { title: 'DIY款式模板管理', pageIcon: '💎', pageTitle: 'DIY款式模板管理' },
+  'diy-material-management': { title: 'DIY珠子素材管理', pageIcon: '🔮', pageTitle: 'DIY珠子素材管理' },
+  'diy-work-management': { title: 'DIY用户作品管理', pageIcon: '🎨', pageTitle: 'DIY用户作品管理' },
+  'diy-slot-editor': { title: 'DIY槽位标注编辑器', pageIcon: '✏️', pageTitle: 'DIY槽位标注编辑器' },
+
   // 默认配置
   'default': { title: '管理后台', pageIcon: '🏠', pageTitle: '管理后台' }
 }
@@ -141,16 +148,22 @@ export default defineConfig({
           if (id.includes('alpinejs')) {
             return 'alpine'
           }
-          if (id.includes('echarts')) {
+          if (id.includes('echarts') || id.includes('zrender')) {
             return 'echarts'
           }
-          if (id.includes('xlsx') || id.includes('jspdf')) {
+          if (id.includes('konva')) {
+            return 'vendor-konva'
+          }
+          if (id.includes('@wangeditor')) {
+            return 'vendor-editor'
+          }
+          if (id.includes('xlsx') || id.includes('exceljs') || id.includes('jspdf')) {
             return 'vendor-export'
           }
           if (id.includes('sortablejs')) {
             return 'vendor-ui'
           }
-          if (id.includes('socket.io')) {
+          if (id.includes('socket.io') || id.includes('engine.io')) {
             return 'vendor-socketio'
           }
           if (id.includes('node_modules')) {
@@ -163,8 +176,12 @@ export default defineConfig({
     minify: 'esbuild',
     sourcemap: true,
     
-    // vendor-export（xlsx+jspdf ~776KB）、vendor（核心运行时 ~1062KB）均为预期行为
-    chunkSizeWarningLimit: 1100
+    // MPA 架构下各页面独立加载，以下大 chunk 仅在对应页面引入：
+    // - echarts (~675kB): 仅仪表板页面
+    // - vendor-export (~776kB): 仅导出 Excel/PDF 功能
+    // - vendor-editor (~810kB): 仅富文本编辑页面
+    // 核心 vendor.js 已降至 ~72kB，不影响其他页面首屏
+    chunkSizeWarningLimit: 850
   },
   
   resolve: {

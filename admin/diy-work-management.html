@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <%- include('partials/head', {
+    title: 'DIY 用户作品管理',
+    pageStyle: '[x-cloak] { display: none !important; }'
+  }) %>
+</head>
+<body class="themed-bg-subtle min-h-screen">
+
+  <nav class="page-navbar">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/workspace.html" class="text-blue-200 hover:text-white transition-colors">← 返回工作台</a>
+        <span class="text-lg font-semibold">🎨 DIY 用户作品管理</span>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mx-auto px-4 py-6"
+       x-data="diyWorkManagement()"
+       x-init="init()">
+
+    <div x-cloak class="space-y-6">
+
+      <!-- 统计卡片 -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="bg-white rounded-xl shadow p-4">
+          <div class="text-xs text-gray-500">作品总数</div>
+          <div class="text-2xl font-bold text-blue-600 mt-1" x-text="stats.works?.total ?? '-'"></div>
+        </div>
+        <div class="bg-white rounded-xl shadow p-4">
+          <div class="text-xs text-gray-500">草稿中</div>
+          <div class="text-2xl font-bold text-gray-600 mt-1" x-text="stats.works?.by_status?.draft ?? 0"></div>
+        </div>
+        <div class="bg-white rounded-xl shadow p-4">
+          <div class="text-xs text-gray-500">已冻结</div>
+          <div class="text-2xl font-bold text-amber-600 mt-1" x-text="stats.works?.by_status?.frozen ?? 0"></div>
+        </div>
+        <div class="bg-white rounded-xl shadow p-4">
+          <div class="text-xs text-gray-500">已完成</div>
+          <div class="text-2xl font-bold text-green-600 mt-1" x-text="stats.works?.by_status?.completed ?? 0"></div>
+        </div>
+      </div>
+
+      <!-- 筛选栏 -->
+      <div class="bg-white rounded-xl shadow p-4">
+        <div class="flex flex-wrap items-end gap-3">
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">作品状态</label>
+            <select x-model="filterStatus" class="input-field text-sm">
+              <option value="">全部</option>
+              <option value="draft">草稿</option>
+              <option value="frozen">已冻结</option>
+              <option value="completed">已完成</option>
+              <option value="cancelled">已取消</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">使用模板</label>
+            <select x-model="filterTemplateId" class="input-field text-sm">
+              <option value="">全部</option>
+              <template x-for="tpl in templateOptions" :key="tpl.diy_template_id">
+                <option :value="tpl.diy_template_id" x-text="tpl.display_name"></option>
+              </template>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">关键词</label>
+            <input type="text" x-model="filterKeyword" placeholder="作品名称/编号" class="input-field text-sm">
+          </div>
+          <button @click="applyFilter()" class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">筛选</button>
+          <button @click="resetFilter()" class="px-4 py-2 border text-sm rounded-lg hover:bg-gray-50">重置</button>
+        </div>
+      </div>
+
+      <!-- 作品列表 -->
+      <div class="bg-white rounded-xl shadow overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-gray-600">
+              <tr>
+                <th class="px-4 py-3 text-left">ID</th>
+                <th class="px-4 py-3 text-left">作品编号</th>
+                <th class="px-4 py-3 text-left">作品名称</th>
+                <th class="px-4 py-3 text-left">用户</th>
+                <th class="px-4 py-3 text-left">使用模板</th>
+                <th class="px-4 py-3 text-left">状态</th>
+                <th class="px-4 py-3 text-left">创建时间</th>
+                <th class="px-4 py-3 text-left">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="work in works" :key="work.diy_work_id">
+                <tr class="border-t hover:bg-gray-50">
+                  <td class="px-4 py-3 text-gray-500" x-text="work.diy_work_id"></td>
+                  <td class="px-4 py-3 font-mono text-xs" x-text="work.work_code"></td>
+                  <td class="px-4 py-3" x-text="work.work_name || '-'"></td>
+                  <td class="px-4 py-3">
+                    <div class="text-xs">
+                      <span x-text="work.account?.user?.nickname || '-'"></span>
+                      <span class="text-gray-400 ml-1" x-text="work.account?.user?.mobile || ''"></span>
+                    </div>
+                  </td>
+                  <td class="px-4 py-3">
+                    <span class="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded"
+                          x-text="work.template?.display_name || '-'"></span>
+                  </td>
+                  <td class="px-4 py-3">
+                    <span class="px-2 py-0.5 rounded text-xs"
+                          :class="getStatusBadgeClass(work.status)"
+                          x-text="statusLabels[work.status] || work.status"></span>
+                  </td>
+                  <td class="px-4 py-3 text-xs text-gray-500" x-text="formatDate(work.created_at)"></td>
+                  <td class="px-4 py-3">
+                    <button @click="viewDetail(work.diy_work_id)" class="text-blue-600 hover:underline text-xs">查看详情</button>
+                  </td>
+                </tr>
+              </template>
+              <tr x-show="!loading && works.length === 0">
+                <td colspan="8" class="px-4 py-8 text-center text-gray-400">暂无作品数据</td>
+              </tr>
+              <tr x-show="loading">
+                <td colspan="8" class="px-4 py-8 text-center text-gray-400">加载中...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 分页 -->
+        <div class="px-4 py-3 border-t flex justify-between items-center text-sm text-gray-500">
+          <span>共 <span x-text="total"></span> 条</span>
+          <div class="flex gap-2">
+            <button @click="goToPage(page - 1)" :disabled="page <= 1"
+                    class="px-3 py-1 border rounded disabled:opacity-40">上一页</button>
+            <span class="px-3 py-1">第 <span x-text="page"></span> / <span x-text="totalPages"></span> 页</span>
+            <button @click="goToPage(page + 1)" :disabled="page >= totalPages"
+                    class="px-3 py-1 border rounded disabled:opacity-40">下一页</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 详情弹窗 -->
+      <div x-show="showDetail" x-transition class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+          <div class="p-4 border-b flex justify-between items-center">
+            <h3 class="text-lg font-semibold">作品详情</h3>
+            <button @click="showDetail = false" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+          </div>
+          <div class="p-4 space-y-4" x-show="detailData">
+            <div class="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span class="text-gray-500">作品编号：</span>
+                <span class="font-mono" x-text="detailData?.work_code"></span>
+              </div>
+              <div>
+                <span class="text-gray-500">作品名称：</span>
+                <span x-text="detailData?.work_name"></span>
+              </div>
+              <div>
+                <span class="text-gray-500">用户：</span>
+                <span x-text="(detailData?.account?.user?.nickname || '-') + ' (' + (detailData?.account?.user?.mobile || '-') + ')'"></span>
+              </div>
+              <div>
+                <span class="text-gray-500">状态：</span>
+                <span class="px-2 py-0.5 rounded text-xs"
+                      :class="getStatusBadgeClass(detailData?.status)"
+                      x-text="statusLabels[detailData?.status] || detailData?.status"></span>
+              </div>
+              <div>
+                <span class="text-gray-500">使用模板：</span>
+                <span x-text="detailData?.template?.display_name || '-'"></span>
+              </div>
+              <div>
+                <span class="text-gray-500">模板分类：</span>
+                <span x-text="detailData?.template?.category?.category_name || '-'"></span>
+              </div>
+              <div>
+                <span class="text-gray-500">创建时间：</span>
+                <span x-text="formatDate(detailData?.created_at)"></span>
+              </div>
+              <div>
+                <span class="text-gray-500">冻结时间：</span>
+                <span x-text="detailData?.frozen_at ? formatDate(detailData.frozen_at) : '-'"></span>
+              </div>
+            </div>
+
+            <!-- 材料消耗 -->
+            <div x-show="detailData?.total_cost?.length > 0">
+              <h4 class="text-sm font-semibold text-gray-600 mb-2">材料消耗</h4>
+              <div class="flex flex-wrap gap-2">
+                <template x-for="cost in (detailData?.total_cost || [])" :key="cost.asset_code">
+                  <span class="px-2 py-1 bg-gray-100 rounded text-xs">
+                    <span x-text="cost.asset_code"></span>: <span x-text="cost.amount"></span>
+                  </span>
+                </template>
+              </div>
+            </div>
+
+            <!-- 设计数据 JSON -->
+            <div>
+              <h4 class="text-sm font-semibold text-gray-600 mb-2">设计数据</h4>
+              <pre class="bg-gray-50 rounded p-3 text-xs overflow-x-auto max-h-60"
+                   x-text="JSON.stringify(detailData?.design_data, null, 2)"></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <%- include('partials/footer') %>
+  <script type="module" src="./src/modules/diy/pages/diy-work-management.js"></script>
+</body>
+</html>
