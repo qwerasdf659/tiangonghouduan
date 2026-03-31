@@ -1,26 +1,29 @@
 /**
- * 竞价管理页面 - Alpine.js 组件
+ * 竞价管理页面 - Alpine.js 组件（B2C 竞价 + C2C 拍卖 Tab 切换）
  *
  * @file admin/src/modules/market/pages/bid-management.js
- * @description 竞价商品列表、创建、详情、手动结算、取消竞价
- * @version 1.0.0
- * @date 2026-02-16
+ * @description B2C 竞价商品管理 + C2C 用户间拍卖管理，通过 Tab 切换
+ * @version 2.0.0
+ * @date 2026-03-30
  *
  * @requires Alpine.js
  * @requires createPageMixin - 页面基础功能混入
- * @requires BidAPI - 竞价管理API调用方法
+ * @requires BidAPI - B2C 竞价管理 API
+ * @requires AuctionAPI - C2C 拍卖管理 API
  *
- * 后端路由：/api/v4/console/bids
- * 状态机：pending → active → ended → settled / no_bid / settlement_failed / cancelled
+ * B2C 后端路由：/api/v4/console/bids
+ * C2C 后端路由：/api/v4/marketplace/auctions（查询） + /api/v4/console/bids（管理操作，type=c2c）
+ * 状态机（B2C/C2C 共用）：pending → active → ended → settled / no_bid / settlement_failed / cancelled
  */
 
 import { logger, $confirm } from '../../../utils/index.js'
 import { Alpine, createPageMixin } from '../../../alpine/index.js'
 import { BidAPI } from '../../../api/market/bid.js'
+import { AuctionAPI } from '../../../api/market/auction.js'
 import { ExchangeItemAPI } from '../../../api/exchange-item/index.js'
 
 /**
- * 竞价状态中文映射（基于后端 BidProduct 模型的 7 态状态机）
+ * B2C/C2C 共用状态中文映射（7 态状态机）
  */
 const BID_STATUS_MAP = {
   pending: { label: '待开始', color: 'bg-gray-100 text-gray-700' },
@@ -32,9 +35,7 @@ const BID_STATUS_MAP = {
   settlement_failed: { label: '结算失败', color: 'bg-red-100 text-red-800' }
 }
 
-/**
- * 有效的状态筛选选项（对应后端 validStatuses）
- */
+/** B2C 状态筛选选项 */
 const STATUS_OPTIONS = [
   { value: 'all', label: '全部' },
   { value: 'pending', label: '待开始' },
@@ -46,11 +47,23 @@ const STATUS_OPTIONS = [
   { value: 'settlement_failed', label: '结算失败' }
 ]
 
+/** C2C 状态筛选选项 */
+const AUCTION_STATUS_OPTIONS = [
+  { value: '', label: '全部状态' },
+  { value: 'active', label: '进行中' },
+  { value: 'pending', label: '待开始' },
+  { value: 'ended', label: '已结束' },
+  { value: 'settled', label: '已结算' },
+  { value: 'no_bid', label: '流拍' },
+  { value: 'settlement_failed', label: '结算失败' },
+  { value: 'cancelled', label: '已取消' }
+]
+
 document.addEventListener('alpine:init', () => {
   logger.info('[BidManagement] 注册 Alpine 组件...')
 
   /**
-   * 竞价管理主组件
+   * 竞价管理主组件（B2C + C2C Tab 切换）
    */
   Alpine.data('bidManagementPage', () => {
     const pageMixin = createPageMixin({
@@ -61,28 +74,22 @@ document.addEventListener('alpine:init', () => {
     return {
       ...pageMixin,
 
-      // ========== 状态配置 ==========
-      /** 状态选项 */
+      // ==================== Tab 切换 ====================
+      /** @type {'b2c'|'c2c'} 当前激活的 Tab */
+      activeTab: 'b2c',
+
+      // ==================== B2C 状态配置 ====================
       statusOptions: STATUS_OPTIONS,
-      /** 状态映射 */
       statusMap: BID_STATUS_MAP,
 
-      // ========== 列表数据 ==========
-      /** @type {Array<Object>} 竞价商品列表 */
+      // ==================== B2C 列表数据 ====================
+      /** @type {Array<Object>} B2C 竞价商品列表 */
       bid_products: [],
-      /** 加载状态 */
       list_loading: false,
-      /** 列表错误信息 */
       list_error: '',
 
-      // ========== 分页 ==========
-      pagination: {
-        page: 1,
-        page_size: 20,
-        total: 0
-      },
-
-      /** 计算总页数 */
+      // ========== B2C 分页 ==========
+      pagination: { page: 1, page_size: 20, total: 0 },
       get totalPages() {
         return Math.ceil(this.pagination.total / this.pagination.page_size) || 1
       },
@@ -93,7 +100,7 @@ document.addEventListener('alpine:init', () => {
         return this.pagination.page < this.totalPages
       },
 
-      // ========== 统计计数（从当前列表数据派生） ==========
+      // ========== B2C 统计（从列表数据派生） ==========
       get activeCount() {
         return this.bid_products.filter(b => b.status === 'active').length
       },
@@ -105,16 +112,12 @@ document.addEventListener('alpine:init', () => {
           .length
       },
 
-      // ========== 筛选 ==========
-      /** @type {string} 当前状态筛选 */
+      // ========== B2C 筛选 ==========
       filter_status: 'all',
 
-      // ========== 创建表单 ==========
-      /** 是否显示创建模态框 */
+      // ========== B2C 创建表单 ==========
       show_create_modal: false,
-      /** 创建提交中 */
       creating: false,
-      /** 创建表单数据 */
       create_form: {
         exchange_item_id: '',
         start_price: '',
@@ -124,102 +127,124 @@ document.addEventListener('alpine:init', () => {
         end_time: '',
         batch_no: ''
       },
-      /** 可选兑换商品列表（用于创建表单的下拉选择） */
       exchange_items: [],
-      /** 加载兑换商品列表状态 */
       loading_exchange_items: false,
 
-      // ========== 详情模态框 ==========
-      /** 是否显示详情模态框 */
+      // ========== B2C 详情弹窗 ==========
       show_detail_modal: false,
-      /** 详情数据 */
       detail_data: null,
-      /** 详情加载中 */
+      detail_bids: [],
       detail_loading: false,
 
-      // ========== 取消模态框 ==========
-      /** 是否显示取消模态框 */
+      // ========== B2C 取消弹窗 ==========
       show_cancel_modal: false,
-      /** 取消操作的竞价 ID */
-      cancel_bid_id: null,
-      /** 取消原因 */
+      cancel_target: null,
       cancel_reason: '',
-      /** 取消提交中 */
       cancelling: false,
 
-      // ========== 初始化 ==========
+      // ==================== C2C 拍卖数据 ====================
+      /** @type {Array<Object>} C2C 拍卖列表 */
+      auction_listings: [],
+      auction_loading: false,
+      auction_error: '',
+
+      // ========== C2C 分页 ==========
+      auction_pagination: { page: 1, page_size: 20, total: 0 },
+      get auctionTotalPages() {
+        return Math.ceil(this.auction_pagination.total / this.auction_pagination.page_size) || 1
+      },
+      get auctionHasPrevPage() {
+        return this.auction_pagination.page > 1
+      },
+      get auctionHasNextPage() {
+        return this.auction_pagination.page < this.auctionTotalPages
+      },
+
+      // ========== C2C 筛选 ==========
+      auction_filter_status: '',
+      auctionStatusOptions: AUCTION_STATUS_OPTIONS,
+
+      // ========== C2C 统计（从列表数据派生） ==========
+      get auctionActiveCount() {
+        return this.auction_listings.filter(a => a.status === 'active').length
+      },
+      get auctionSettledCount() {
+        return this.auction_listings.filter(a => a.status === 'settled').length
+      },
+      get auctionFailedCount() {
+        return this.auction_listings.filter(a => a.status === 'settlement_failed').length
+      },
+
+      // ========== C2C 详情弹窗 ==========
+      show_auction_detail: false,
+      auction_detail: null,
+      auction_detail_bids: [],
+      auction_detail_loading: false,
+
+      // ========== C2C 取消弹窗 ==========
+      show_auction_cancel: false,
+      auction_cancel_target: null,
+      auction_cancel_reason: '',
+      auction_cancelling: false,
+
+      // ==================== 初始化 ====================
       async init() {
-        logger.info('[BidManagement] 初始化组件...')
-
-        if (typeof pageMixin.init === 'function') {
-          await pageMixin.init.call(this)
-        }
-
+        logger.info('[BidManagement] 初始化...')
+        if (pageMixin.init) pageMixin.init.call(this)
         await this.loadBidProducts()
       },
 
-      // ========== 状态格式化 ==========
-
+      // ==================== Tab 切换 ====================
       /**
-       * 获取状态标签文本
-       * @param {string} status - 后端状态值
-       * @returns {string} 中文标签
+       * 切换 B2C/C2C Tab
+       * @param {'b2c'|'c2c'} tab - 目标 Tab
        */
-      getStatusLabel(status) {
-        return BID_STATUS_MAP[status]?.label || status
+      async switchTab(tab) {
+        if (this.activeTab === tab) return
+        this.activeTab = tab
+        logger.info(`[BidManagement] 切换到 ${tab} Tab`)
+
+        if (tab === 'c2c' && this.auction_listings.length === 0) {
+          await this.loadAuctionListings()
+        }
       },
 
-      /**
-       * 获取状态样式类名
-       * @param {string} status - 后端状态值
-       * @returns {string} CSS 类名
-       */
-      getStatusColor(status) {
-        return BID_STATUS_MAP[status]?.color || 'bg-gray-100 text-gray-700'
-      },
-
-      // ========== 列表操作 ==========
+      // ==================== B2C 竞价方法 ====================
 
       /**
-       * 加载竞价商品列表
+       * 加载 B2C 竞价商品列表
        */
       async loadBidProducts() {
         this.list_loading = true
         this.list_error = ''
-
         try {
           const params = {
-            status: this.filter_status,
             page: this.pagination.page,
             page_size: this.pagination.page_size
           }
-
-          logger.info('[BidManagement] 加载竞价列表', params)
+          if (this.filter_status !== 'all') {
+            params.status = this.filter_status
+          }
           const res = await BidAPI.getBidProducts(params)
-
           if (res.success) {
             this.bid_products = res.data?.bid_products || []
-            const paginationData = res.data?.pagination || {}
-            this.pagination.total = paginationData.total || 0
-            this.pagination.page = paginationData.page || this.pagination.page
-            logger.info('[BidManagement] 加载成功', {
-              count: this.bid_products.length,
-              total: this.pagination.total
-            })
+            if (res.data?.pagination) {
+              this.pagination.total = res.data.pagination.total || 0
+            }
+            logger.info('[BidManagement] B2C 列表加载成功:', this.bid_products.length)
           } else {
-            this.list_error = res.message || '加载竞价列表失败'
-            logger.error('[BidManagement] 列表加载失败:', res.message)
+            this.list_error = res.message || '加载失败'
           }
         } catch (e) {
           this.list_error = e.message || '网络请求失败'
-          logger.error('[BidManagement] 列表加载异常:', e)
+          logger.error('[BidManagement] B2C 列表加载异常:', e)
         } finally {
           this.list_loading = false
         }
       },
 
       /**
-       * 切换状态筛选
+       * B2C 状态筛选
        * @param {string} status - 状态值
        */
       async filterByStatus(status) {
@@ -229,7 +254,7 @@ document.addEventListener('alpine:init', () => {
       },
 
       /**
-       * 翻页
+       * B2C 翻页
        * @param {number} page - 页码
        */
       async goToPage(page) {
@@ -238,11 +263,8 @@ document.addEventListener('alpine:init', () => {
         await this.loadBidProducts()
       },
 
-      // ========== 创建竞价 ==========
+      // ========== B2C 创建竞价 ==========
 
-      /**
-       * 打开创建模态框
-       */
       async openCreateModal() {
         this.show_create_modal = true
         this.create_form = {
@@ -254,13 +276,9 @@ document.addEventListener('alpine:init', () => {
           end_time: '',
           batch_no: ''
         }
-        // 加载可选的兑换商品
         await this.loadExchangeItems()
       },
 
-      /**
-       * 加载兑换商品列表（用于下拉选择）
-       */
       async loadExchangeItems() {
         this.loading_exchange_items = true
         try {
@@ -277,45 +295,18 @@ document.addEventListener('alpine:init', () => {
         }
       },
 
-      /**
-       * 提交创建竞价
-       */
       async submitCreate() {
-        // 表单校验
         if (!this.create_form.exchange_item_id) {
           Alpine.store('notification').warning('请选择关联的兑换商品')
           return
         }
-        if (!this.create_form.start_price || parseInt(this.create_form.start_price, 10) <= 0) {
-          Alpine.store('notification').warning('起拍价必须为正整数')
+        if (!this.create_form.start_price || parseInt(this.create_form.start_price) <= 0) {
+          Alpine.store('notification').warning('请输入有效的起拍价')
           return
         }
-        if (!this.create_form.start_time || !this.create_form.end_time) {
-          Alpine.store('notification').warning('请设置竞价开始和结束时间')
-          return
-        }
-        if (new Date(this.create_form.end_time) <= new Date(this.create_form.start_time)) {
-          Alpine.store('notification').warning('结束时间必须晚于开始时间')
-          return
-        }
-
         this.creating = true
         try {
-          const data = {
-            exchange_item_id: parseInt(this.create_form.exchange_item_id, 10),
-            start_price: parseInt(this.create_form.start_price, 10),
-            price_asset_code: this.create_form.price_asset_code,
-            min_bid_increment: parseInt(this.create_form.min_bid_increment, 10) || 10,
-            start_time: new Date(this.create_form.start_time).toISOString(),
-            end_time: new Date(this.create_form.end_time).toISOString()
-          }
-          if (this.create_form.batch_no) {
-            data.batch_no = this.create_form.batch_no
-          }
-
-          logger.info('[BidManagement] 创建竞价', data)
-          const res = await BidAPI.createBidProduct(data)
-
+          const res = await BidAPI.createBidProduct(this.create_form)
           if (res.success) {
             Alpine.store('notification').success('竞价商品创建成功')
             this.show_create_modal = false
@@ -324,145 +315,252 @@ document.addEventListener('alpine:init', () => {
             Alpine.store('notification').error(res.message || '创建失败')
           }
         } catch (e) {
-          logger.error('[BidManagement] 创建竞价失败:', e)
-          Alpine.store('notification').error('创建竞价失败: ' + e.message)
+          Alpine.store('notification').error('创建失败: ' + e.message)
         } finally {
           this.creating = false
         }
       },
 
-      // ========== 详情 ==========
+      // ========== B2C 详情 ==========
 
-      /**
-       * 查看竞价详情
-       * @param {number} bid_product_id - 竞价商品 ID
-       */
       async viewDetail(bid_product_id) {
         this.show_detail_modal = true
         this.detail_loading = true
         this.detail_data = null
-
+        this.detail_bids = []
         try {
-          logger.info('[BidManagement] 加载竞价详情', { bid_product_id })
           const res = await BidAPI.getBidProductDetail(bid_product_id)
-
           if (res.success) {
-            this.detail_data = res.data
-            logger.info('[BidManagement] 详情加载成功', {
-              bid_product_id,
-              bid_records_count: res.data?.all_bid_records?.length || 0
-            })
-          } else {
-            Alpine.store('notification').error(res.message || '加载详情失败')
-            this.show_detail_modal = false
+            this.detail_data = res.data?.bid_product || res.data
+            this.detail_bids = res.data?.bids || []
           }
         } catch (e) {
-          logger.error('[BidManagement] 加载详情失败:', e)
           Alpine.store('notification').error('加载详情失败: ' + e.message)
-          this.show_detail_modal = false
         } finally {
           this.detail_loading = false
         }
       },
 
-      // ========== 手动结算 ==========
+      // ========== B2C 手动结算 ==========
 
-      /**
-       * 手动结算竞价
-       * @param {number} bid_product_id - 竞价商品 ID
-       */
-      async settleBid(bid_product_id) {
-        const confirmed = await $confirm(
-          '确认手动结算该竞价？结算后将根据最高出价确定中标者，落选者的冻结资产将解冻返还。',
-          '手动结算确认'
-        )
-        if (!confirmed) return
-
+      async manualSettle(bid_product_id) {
+        const ok = await $confirm('确认手动结算此竞价？此操作不可撤销。')
+        if (!ok) return
         try {
-          logger.info('[BidManagement] 手动结算', { bid_product_id })
           const res = await BidAPI.settleBidProduct(bid_product_id)
-
           if (res.success) {
-            Alpine.store('notification').success(res.message || '结算成功')
-            // 如果详情模态框开着则关闭
-            this.show_detail_modal = false
+            Alpine.store('notification').success('结算成功')
             await this.loadBidProducts()
+            if (this.show_detail_modal) await this.viewDetail(bid_product_id)
           } else {
             Alpine.store('notification').error(res.message || '结算失败')
           }
         } catch (e) {
-          logger.error('[BidManagement] 结算失败:', e)
           Alpine.store('notification').error('结算失败: ' + e.message)
         }
       },
 
-      // ========== 取消竞价 ==========
+      // ========== B2C 取消 ==========
 
-      /**
-       * 打开取消模态框
-       * @param {number} bid_product_id - 竞价商品 ID
-       */
-      openCancelModal(bid_product_id) {
-        this.cancel_bid_id = bid_product_id
+      openCancelModal(bid) {
+        this.cancel_target = bid
         this.cancel_reason = ''
         this.show_cancel_modal = true
       },
 
-      /**
-       * 提交取消竞价
-       */
       async submitCancel() {
         if (!this.cancel_reason.trim()) {
           Alpine.store('notification').warning('请输入取消原因')
           return
         }
-
         this.cancelling = true
         try {
-          logger.info('[BidManagement] 取消竞价', {
-            bid_product_id: this.cancel_bid_id,
-            reason: this.cancel_reason
-          })
-          const res = await BidAPI.cancelBidProduct(this.cancel_bid_id, {
-            reason: this.cancel_reason.trim()
-          })
-
+          const id = this.cancel_target?.bid_product_id
+          const res = await BidAPI.cancelBidProduct(id, { reason: this.cancel_reason })
           if (res.success) {
-            Alpine.store('notification').success(res.message || '竞价已取消')
+            Alpine.store('notification').success('取消成功')
             this.show_cancel_modal = false
-            this.show_detail_modal = false
             await this.loadBidProducts()
           } else {
             Alpine.store('notification').error(res.message || '取消失败')
           }
         } catch (e) {
-          logger.error('[BidManagement] 取消竞价失败:', e)
-          Alpine.store('notification').error('取消竞价失败: ' + e.message)
+          Alpine.store('notification').error('取消失败: ' + e.message)
         } finally {
           this.cancelling = false
         }
       },
 
-      // ========== 辅助方法 ==========
+      // ==================== C2C 拍卖方法 ====================
 
       /**
-       * 判断竞价是否可结算
-       * @param {Object|null} bid - 竞价商品对象（Alpine.js 初始化时可能为 null）
-       * @returns {boolean}
+       * 加载 C2C 拍卖列表
        */
-      canSettle(bid) {
-        if (!bid) return false
-        return ['active', 'ended'].includes(bid.status)
+      async loadAuctionListings() {
+        this.auction_loading = true
+        this.auction_error = ''
+        try {
+          const params = {
+            page: this.auction_pagination.page,
+            page_size: this.auction_pagination.page_size
+          }
+          if (this.auction_filter_status) {
+            params.status = this.auction_filter_status
+          }
+          const res = await AuctionAPI.getAuctionListings(params)
+          if (res.success) {
+            this.auction_listings = res.data?.auction_listings || []
+            if (res.data?.pagination) {
+              this.auction_pagination.total = res.data.pagination.total || 0
+            }
+            logger.info('[BidManagement] C2C 列表加载成功:', this.auction_listings.length)
+          } else {
+            this.auction_error = res.message || '加载失败'
+          }
+        } catch (e) {
+          this.auction_error = e.message || '网络请求失败'
+          logger.error('[BidManagement] C2C 列表加载异常:', e)
+        } finally {
+          this.auction_loading = false
+        }
       },
 
       /**
-       * 判断竞价是否可取消
-       * @param {Object|null} bid - 竞价商品对象（Alpine.js 初始化时可能为 null）
+       * C2C 状态筛选
+       * @param {string} status - 状态值
+       */
+      async auctionFilterByStatus(status) {
+        this.auction_filter_status = status
+        this.auction_pagination.page = 1
+        await this.loadAuctionListings()
+      },
+
+      /**
+       * C2C 翻页
+       * @param {number} page - 页码
+       */
+      async auctionGoToPage(page) {
+        if (page < 1 || page > this.auctionTotalPages) return
+        this.auction_pagination.page = page
+        await this.loadAuctionListings()
+      },
+
+      // ========== C2C 详情 ==========
+
+      /**
+       * 查看 C2C 拍卖详情
+       * @param {number} auction_listing_id - 拍卖挂牌 ID
+       */
+      async viewAuctionDetail(auction_listing_id) {
+        this.show_auction_detail = true
+        this.auction_detail_loading = true
+        this.auction_detail = null
+        this.auction_detail_bids = []
+        try {
+          const res = await AuctionAPI.getAuctionDetail(auction_listing_id)
+          if (res.success) {
+            this.auction_detail = res.data?.auction_listing || res.data
+            this.auction_detail_bids = res.data?.top_bids || []
+          }
+        } catch (e) {
+          Alpine.store('notification').error('加载拍卖详情失败: ' + e.message)
+        } finally {
+          this.auction_detail_loading = false
+        }
+      },
+
+      // ========== C2C 手动结算 ==========
+
+      /**
+       * 管理员手动结算 C2C 拍卖
+       * @param {number} auction_listing_id - 拍卖挂牌 ID
+       */
+      async auctionManualSettle(auction_listing_id) {
+        const ok = await $confirm('确认手动结算此 C2C 拍卖？此操作不可撤销。')
+        if (!ok) return
+        try {
+          const res = await AuctionAPI.settleAuction(auction_listing_id)
+          if (res.success) {
+            Alpine.store('notification').success('C2C 拍卖结算成功')
+            await this.loadAuctionListings()
+            if (this.show_auction_detail) await this.viewAuctionDetail(auction_listing_id)
+          } else {
+            Alpine.store('notification').error(res.message || '结算失败')
+          }
+        } catch (e) {
+          Alpine.store('notification').error('结算失败: ' + e.message)
+        }
+      },
+
+      // ========== C2C 取消 ==========
+
+      /**
+       * 打开 C2C 取消弹窗
+       * @param {Object} auction - 拍卖对象
+       */
+      openAuctionCancelModal(auction) {
+        this.auction_cancel_target = auction
+        this.auction_cancel_reason = ''
+        this.show_auction_cancel = true
+      },
+
+      /**
+       * 提交 C2C 取消
+       */
+      async submitAuctionCancel() {
+        if (!this.auction_cancel_reason.trim()) {
+          Alpine.store('notification').warning('请输入取消原因')
+          return
+        }
+        this.auction_cancelling = true
+        try {
+          const id = this.auction_cancel_target?.auction_listing_id
+          const res = await AuctionAPI.cancelAuction(id, { reason: this.auction_cancel_reason })
+          if (res.success) {
+            Alpine.store('notification').success('C2C 拍卖已取消')
+            this.show_auction_cancel = false
+            await this.loadAuctionListings()
+          } else {
+            Alpine.store('notification').error(res.message || '取消失败')
+          }
+        } catch (e) {
+          Alpine.store('notification').error('取消失败: ' + e.message)
+        } finally {
+          this.auction_cancelling = false
+        }
+      },
+
+      // ==================== 共用工具方法 ====================
+
+      /**
+       * 获取状态显示信息
+       * @param {string} status - 状态值
+       * @returns {{ label: string, color: string }}
+       */
+      getStatusInfo(status) {
+        return (
+          BID_STATUS_MAP[status] || { label: status || '未知', color: 'bg-gray-100 text-gray-500' }
+        )
+      },
+
+      /**
+       * 判断是否可取消（pending/active 状态）
+       * @param {Object} item - 竞价/拍卖对象
        * @returns {boolean}
        */
-      canCancel(bid) {
-        if (!bid) return false
-        return ['pending', 'active'].includes(bid.status)
+      canCancel(item) {
+        if (!item) return false
+        return ['pending', 'active'].includes(item.status)
+      },
+
+      /**
+       * 判断是否可手动结算（ended/settlement_failed 状态）
+       * @param {Object} item - 竞价/拍卖对象
+       * @returns {boolean}
+       */
+      canSettle(item) {
+        if (!item) return false
+        return ['ended', 'settlement_failed'].includes(item.status)
       },
 
       /**
@@ -474,6 +572,20 @@ document.addEventListener('alpine:init', () => {
       formatAssetAmount(amount, asset_code) {
         if (amount === null || amount === undefined) return '-'
         return `${Number(amount).toLocaleString()} ${asset_code || ''}`
+      },
+
+      /**
+       * 获取 C2C 拍卖物品名称（从 item_snapshot 提取）
+       * @param {Object} auction - 拍卖对象
+       * @returns {string}
+       */
+      getAuctionItemName(auction) {
+        if (!auction) return '-'
+        const snap = auction.item_snapshot
+        if (snap && typeof snap === 'object') {
+          return snap.item_name || snap.name || '-'
+        }
+        return '-'
       }
     }
   })

@@ -1,5 +1,6 @@
 'use strict'
 
+const crypto = require('crypto')
 const { logger } = require('../../../../utils/logger')
 
 /**
@@ -586,8 +587,8 @@ async function isFeatureEnabledForContext(feature, context = {}) {
     }
   }
 
-  // 6. 按用户ID hash 计算灰度命中
-  const hash_value = user_id ? calculateUserHash(user_id) : Math.floor(Math.random() * 100)
+  // 6. 按用户ID hash 计算灰度命中（无 user_id 时使用密码学安全随机数）
+  const hash_value = user_id ? calculateUserHash(user_id) : crypto.randomInt(0, 100)
   const is_hit = hash_value < effective_percentage
 
   return {
