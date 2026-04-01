@@ -1,0 +1,121 @@
+TABLE_NAME	ENGINE	TABLE_ROWS	DATA_LENGTH	INDEX_LENGTH	AUTO_INCREMENT	TABLE_COLLATION	CREATE_TIME	UPDATE_TIME
+account_asset_balances	InnoDB	103	16384	65536	504	utf8mb4_unicode_ci	2026-02-01 22:27:21	NULL
+accounts	InnoDB	113	16384	49152	493	utf8mb4_unicode_ci	2025-12-15 16:36:41	NULL
+ad_antifraud_logs	InnoDB	0	16384	32768	11	utf8mb4_unicode_ci	2026-02-18 13:57:51	NULL
+ad_attribution_logs	InnoDB	0	16384	81920	6	utf8mb4_unicode_ci	2026-02-18 13:57:51	NULL
+ad_bid_logs	InnoDB	0	16384	49152	122	utf8mb4_unicode_ci	2026-02-18 13:57:51	NULL
+ad_billing_records	InnoDB	0	16384	98304	1	utf8mb4_unicode_ci	2026-03-22 21:11:46	NULL
+ad_campaigns	InnoDB	0	16384	114688	143	utf8mb4_unicode_ci	2026-02-22 04:12:49	NULL
+ad_click_logs	InnoDB	0	16384	49152	11	utf8mb4_unicode_ci	2026-02-18 13:57:51	NULL
+ad_creatives	InnoDB	0	16384	65536	131	utf8mb4_unicode_ci	2026-03-17 12:21:29	NULL
+ad_dau_daily_stats	InnoDB	8	16384	16384	37	utf8mb4_unicode_ci	2026-03-01 23:12:30	2026-04-01 16:30:00
+ad_impression_logs	InnoDB	0	16384	65536	17	utf8mb4_unicode_ci	2026-02-18 13:57:51	NULL
+ad_interaction_logs	InnoDB	0	16384	81920	117	utf8mb4_unicode_ci	2026-02-22 04:12:49	NULL
+ad_price_adjustment_logs	InnoDB	0	16384	0	1	utf8mb4_unicode_ci	2026-03-01 23:17:12	NULL
+ad_report_daily_snapshots	InnoDB	0	16384	49152	13	utf8mb4_unicode_ci	2026-02-18 13:57:51	NULL
+ad_slots	InnoDB	7	16384	32768	16	utf8mb4_unicode_ci	2026-03-02 12:20:04	NULL
+ad_target_zones	InnoDB	1	16384	16384	3	utf8mb4_unicode_ci	2026-03-01 23:17:12	NULL
+ad_zone_group_members	InnoDB	0	16384	32768	2	utf8mb4_unicode_ci	2026-03-01 23:17:12	NULL
+ad_zone_groups	InnoDB	0	16384	0	1	utf8mb4_unicode_ci	2026-03-01 23:17:12	NULL
+admin_notifications	InnoDB	14650	11026432	2359296	23402	utf8mb4_unicode_ci	2026-02-01 07:58:13	2026-04-01 18:05:02
+admin_operation_logs	InnoDB	6199	4734976	3588096	8026	utf8mb4_unicode_ci	2026-03-14 22:41:42	2026-03-31 19:10:00
+administrative_regions	InnoDB	44569	3686400	8454144	NULL	utf8mb4_unicode_ci	2026-01-12 00:17:42	NULL
+alert_silence_rules	InnoDB	0	16384	0	1	utf8mb4_unicode_ci	2026-02-03 00:20:01	NULL
+api_idempotency_requests	InnoDB	0	16384	65536	4026741	utf8mb4_unicode_ci	2026-02-01 07:58:14	2026-03-31 19:10:00
+approval_chain_instances	InnoDB	56	16384	98304	269	utf8mb4_unicode_ci	2026-03-10 00:15:30	NULL
+approval_chain_nodes	InnoDB	4	16384	65536	11	utf8mb4_unicode_ci	2026-03-10 00:15:30	NULL
+approval_chain_steps	InnoDB	56	16384	98304	269	utf8mb4_unicode_ci	2026-03-10 00:15:30	NULL
+approval_chain_templates	InnoDB	2	16384	49152	7	utf8mb4_unicode_ci	2026-03-10 00:15:30	NULL
+asset_group_defs	InnoDB	9	16384	0	NULL	utf8mb4_unicode_ci	2026-01-14 22:13:46	NULL
+asset_transactions	InnoDB	76705	32047104	43712512	133640	utf8mb4_unicode_ci	2026-03-22 21:11:46	NULL
+attribute_options	InnoDB	0	16384	16384	1	utf8mb4_unicode_ci	2026-03-20 18:11:13	NULL
+attributes	InnoDB	0	16384	16384	1	utf8mb4_unicode_ci	2026-03-20 18:11:13	NULL
+auction_bids	InnoDB	0	16384	49152	1	utf8mb4_unicode_ci	2026-03-24 16:42:06	NULL
+auction_listings	InnoDB	0	16384	98304	2	utf8mb4_unicode_ci	2026-03-24 16:42:06	NULL
+authentication_sessions	InnoDB	67	16384	81920	15889	utf8mb4_unicode_ci	2026-02-20 12:20:05	2026-03-31 21:00:00
+batch_operation_logs	InnoDB	88	81920	98304	91	utf8mb4_unicode_ci	2026-02-01 07:58:13	NULL
+bid_products	InnoDB	0	16384	114688	5	utf8mb4_unicode_ci	2026-03-22 02:59:34	NULL
+bid_records	InnoDB	0	16384	49152	1	utf8mb4_unicode_ci	2026-02-14 22:06:46	NULL
+categories	InnoDB	29	16384	81920	195	utf8mb4_unicode_ci	2026-03-23 12:20:04	2026-03-31 11:32:12
+category_attributes	InnoDB	0	16384	32768	1	utf8mb4_unicode_ci	2026-03-20 18:11:13	NULL
+chat_messages	InnoDB	38	16384	98304	22719	utf8mb4_unicode_ci	2026-02-01 07:59:17	NULL
+consumption_records	InnoDB	48	16384	262144	2818	utf8mb4_unicode_ci	2026-03-22 21:11:46	NULL
+content_review_records	InnoDB	113	49152	81920	5861	utf8mb4_unicode_ci	2026-02-01 07:58:13	NULL
+customer_service_agents	InnoDB	0	16384	49152	4	utf8mb4_unicode_ci	2026-02-20 03:58:00	NULL
+customer_service_issues	InnoDB	0	16384	131072	5	utf8mb4_unicode_ci	2026-03-19 12:20:05	NULL
+customer_service_notes	InnoDB	0	16384	65536	2	utf8mb4_unicode_ci	2026-02-22 08:34:20	NULL
+customer_service_sessions	InnoDB	41	16384	147456	2118	utf8mb4_unicode_ci	2026-02-22 12:20:05	NULL
+customer_service_user_assignments	InnoDB	2	16384	65536	4	utf8mb4_unicode_ci	2026-02-20 03:58:00	NULL
+diy_materials	InnoDB	20	16384	81920	22	utf8mb4_unicode_ci	2026-03-31 14:16:24	2026-03-31 14:39:38
+diy_templates	InnoDB	7	16384	114688	21	utf8mb4_unicode_ci	2026-03-31 12:41:44	2026-04-01 14:30:00
+diy_works	InnoDB	5	16384	98304	19	utf8mb4_unicode_ci	2026-04-01 12:27:28	NULL
+exchange_channel_prices	InnoDB	99	16384	32768	276	utf8mb4_unicode_ci	2026-03-22 02:59:34	NULL
+exchange_item_attribute_values	InnoDB	0	16384	32768	1	utf8mb4_unicode_ci	2026-03-22 02:59:34	NULL
+exchange_item_skus	InnoDB	102	16384	65536	276	utf8mb4_unicode_ci	2026-03-22 02:59:33	NULL
+exchange_items	InnoDB	99	16384	114688	408	utf8mb4_unicode_ci	2026-03-22 02:59:33	NULL
+exchange_order_events	InnoDB	25	16384	65536	568	utf8mb4_unicode_ci	2026-03-22 22:07:09	NULL
+exchange_rates	InnoDB	7	16384	32768	8	utf8mb4_unicode_ci	2026-02-23 17:47:02	NULL
+exchange_records	InnoDB	22	16384	229376	926	utf8mb4_unicode_ci	2026-03-22 22:07:09	NULL
+feature_flags	InnoDB	8	16384	49152	3051	utf8mb4_unicode_ci	2026-02-01 07:58:13	NULL
+feedbacks	InnoDB	180	49152	65536	295	utf8mb4_unicode_ci	2025-11-09 12:24:32	NULL
+item_holds	InnoDB	127	16384	49152	1756	utf8mb4_unicode_ci	2026-03-20 18:11:14	NULL
+item_ledger	InnoDB	17995	3686400	9256960	29653	utf8mb4_unicode_ci	2026-02-22 11:21:06	NULL
+item_templates	InnoDB	30	16384	98304	217	utf8mb4_unicode_ci	2026-03-22 17:21:33	NULL
+items	InnoDB	7529	1589248	1884160	42033	utf8mb4_unicode_ci	2026-03-21 12:20:08	NULL
+lottery_alerts	InnoDB	211	81920	81920	222	utf8mb4_unicode_ci	2026-02-20 16:42:35	NULL
+lottery_campaign_pricing_config	InnoDB	18	16384	114688	NULL	utf8mb4_unicode_ci	2026-02-01 07:58:14	NULL
+lottery_campaign_quota_grants	InnoDB	0	16384	49152	1	utf8mb4_unicode_ci	2026-02-05 18:36:39	NULL
+lottery_campaign_user_quota	InnoDB	0	16384	49152	1	utf8mb4_unicode_ci	2026-02-05 18:36:39	NULL
+lottery_campaigns	InnoDB	4	16384	147456	50	utf8mb4_unicode_ci	2026-03-17 12:21:29	NULL
+lottery_daily_metrics	InnoDB	20	16384	65536	36	utf8mb4_unicode_ci	2026-02-01 07:58:14	NULL
+lottery_draw_decisions	InnoDB	2173	4734976	917504	6667	utf8mb4_unicode_ci	2026-02-05 18:36:39	NULL
+lottery_draw_quota_rules	InnoDB	13	16384	32768	14	utf8mb4_unicode_ci	2026-02-01 07:58:13	NULL
+lottery_draws	InnoDB	2400	1589248	4734976	2649	utf8mb4_unicode_ci	2026-03-22 21:11:46	NULL
+lottery_hourly_metrics	InnoDB	149	49152	65536	161	utf8mb4_unicode_ci	2026-03-23 12:20:04	NULL
+lottery_management_settings	InnoDB	3572	1589248	1097728	NULL	utf8mb4_unicode_ci	2026-02-23 17:52:44	NULL
+lottery_presets	InnoDB	2	16384	114688	NULL	utf8mb4_unicode_ci	2026-02-05 18:38:02	NULL
+lottery_prizes	InnoDB	37	16384	294912	210	utf8mb4_unicode_ci	2026-03-16 23:19:50	2026-04-01 16:00:00
+lottery_simulation_records	InnoDB	311	393216	98304	342	utf8mb4_unicode_ci	2026-02-21 12:20:04	NULL
+lottery_strategy_config	InnoDB	112	16384	49152	163	utf8mb4_unicode_ci	2026-02-20 16:42:35	NULL
+lottery_tier_matrix_config	InnoDB	3	16384	32768	30	utf8mb4_unicode_ci	2026-03-06 09:08:45	NULL
+lottery_tier_rules	InnoDB	9	16384	32768	15	utf8mb4_unicode_ci	2026-02-05 18:36:39	NULL
+lottery_user_daily_draw_quota	InnoDB	16	16384	49152	410	utf8mb4_unicode_ci	2026-02-01 08:18:09	NULL
+lottery_user_experience_state	InnoDB	4	16384	65536	65	utf8mb4_unicode_ci	2026-02-15 12:20:06	NULL
+lottery_user_global_state	InnoDB	1	16384	81920	2	utf8mb4_unicode_ci	2026-02-01 23:56:50	NULL
+market_listings	InnoDB	331	81920	327680	13008	utf8mb4_unicode_ci	2026-03-22 17:21:33	NULL
+market_price_snapshots	InnoDB	2	16384	49152	5	utf8mb4_unicode_ci	2026-02-23 23:08:11	NULL
+material_asset_types	InnoDB	16	16384	98304	1208	utf8mb4_unicode_ci	2026-03-18 12:20:06	NULL
+material_conversion_rules	InnoDB	2	16384	65536	84	utf8mb4_unicode_ci	2026-02-01 07:58:13	NULL
+media_attachments	InnoDB	30	16384	32768	31	utf8mb4_unicode_ci	2026-03-16 22:41:24	NULL
+media_files	InnoDB	25	16384	81920	32	utf8mb4_unicode_ci	2026-03-16 22:41:24	2026-04-01 15:30:01
+merchant_operation_logs	InnoDB	109	49152	180224	268	utf8mb4_unicode_ci	2026-02-01 07:59:17	NULL
+merchants	InnoDB	1	16384	49152	7	utf8mb4_unicode_ci	2026-02-23 17:47:04	NULL
+preset_budget_debt	InnoDB	0	16384	65536	1	utf8mb4_unicode_ci	2026-02-05 18:38:02	NULL
+preset_debt_limits	InnoDB	1	16384	32768	2	utf8mb4_unicode_ci	2026-02-05 18:36:39	NULL
+preset_inventory_debt	InnoDB	0	16384	81920	1	utf8mb4_unicode_ci	2026-02-05 18:38:02	NULL
+rarity_defs	InnoDB	5	16384	0	NULL	utf8mb4_unicode_ci	2026-01-14 22:13:46	NULL
+redemption_orders	InnoDB	1476	376832	1327104	1693	utf8mb4_unicode_ci	2026-03-22 21:11:46	2026-03-30 18:00:00
+reminder_history	InnoDB	1040	1589248	180224	1755	utf8mb4_unicode_ci	2026-01-31 20:54:14	2026-04-01 18:00:00
+reminder_rules	InnoDB	3	16384	114688	NULL	utf8mb4_unicode_ci	2026-03-02 12:19:14	2026-04-01 18:15:00
+report_templates	InnoDB	2	16384	114688	NULL	utf8mb4_unicode_ci	2026-01-31 19:15:41	NULL
+risk_alerts	InnoDB	9	16384	114688	105	utf8mb4_unicode_ci	2026-02-01 07:58:14	NULL
+roles	InnoDB	11	16384	65536	218	utf8mb4_unicode_ci	2026-01-02 18:25:27	NULL
+segment_rule_configs	InnoDB	5	16384	16384	5	utf8mb4_unicode_ci	2026-02-22 09:23:48	NULL
+sequelizemeta	InnoDB	8	16384	16384	NULL	utf8mb3_unicode_ci	2025-08-04 21:52:00	2026-03-31 14:16:24
+sku_attribute_values	InnoDB	0	16384	49152	1	utf8mb4_unicode_ci	2026-03-22 02:59:34	NULL
+store_staff	InnoDB	5	16384	98304	8	utf8mb4_unicode_ci	2026-01-26 12:20:05	NULL
+stores	InnoDB	5	16384	147456	663	utf8mb4_unicode_ci	2026-02-23 17:47:04	NULL
+system_dictionaries	InnoDB	314	65536	65536	454	utf8mb4_unicode_ci	2026-02-01 07:58:13	NULL
+system_dictionary_history	InnoDB	0	16384	49152	1	utf8mb4_unicode_ci	2026-02-01 07:59:17	NULL
+system_settings	InnoDB	76	65536	81920	86	utf8mb4_unicode_ci	2026-03-20 22:13:05	NULL
+trade_orders	InnoDB	157	81920	147456	8446	utf8mb4_unicode_ci	2026-03-22 21:11:46	2026-03-30 19:33:20
+user_ad_tags	InnoDB	0	16384	32768	5	utf8mb4_unicode_ci	2026-02-18 13:57:51	NULL
+user_behavior_tracks	InnoDB	0	16384	65536	NULL	utf8mb4_unicode_ci	2026-02-01 23:56:50	NULL
+user_hierarchy	InnoDB	9	16384	98304	19	utf8mb4_unicode_ci	2026-02-01 07:58:14	NULL
+user_notifications	InnoDB	5499	2637824	606208	7586	utf8mb4_unicode_ci	2026-02-24 21:47:43	2026-03-30 19:00:00
+user_premium_status	InnoDB	1	16384	49152	2	utf8mb4_unicode_ci	2026-02-01 07:58:14	2026-03-30 19:00:00
+user_ratio_overrides	InnoDB	0	16384	65536	2	utf8mb4_unicode_ci	2026-03-02 18:50:44	NULL
+user_risk_profiles	InnoDB	3	16384	81920	8	utf8mb4_unicode_ci	2026-02-15 22:00:43	NULL
+user_roles	InnoDB	107	16384	65536	833	utf8mb4_unicode_ci	2025-10-10 00:09:34	NULL
+users	InnoDB	116	16384	114688	12399	utf8mb4_unicode_ci	2026-02-18 12:20:04	2026-03-31 20:05:31
+websocket_startup_logs	InnoDB	58	16384	65536	2980	utf8mb4_unicode_ci	2026-02-01 07:58:13	2026-03-31 19:10:00
