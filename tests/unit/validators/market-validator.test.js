@@ -264,7 +264,7 @@ describe('P1-3.1: 市场API参数验证单元测试', () => {
     const assetCodeValidator = validateBusinessCode('asset_code', 'query', { optional: true })
 
     test('有效的资产代码应通过验证', async () => {
-      const validCodes = ['DIAMOND', 'red_shard', 'POINTS', 'material_001']
+      const validCodes = ['star_stone', 'red_core_shard', 'points', 'material_001']
 
       for (const code of validCodes) {
         const req = createMockRequest({ query: { asset_code: code } })

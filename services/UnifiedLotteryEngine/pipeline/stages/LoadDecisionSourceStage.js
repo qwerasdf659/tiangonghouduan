@@ -26,6 +26,7 @@
  */
 
 const BaseStage = require('./BaseStage')
+const { AssetCode } = require('../../../../constants/AssetCode')
 const {
   LotteryPreset,
   LotteryManagementSetting,
@@ -238,8 +239,8 @@ class LoadDecisionSourceStage extends BaseStage {
       const BalanceService = require('../../../asset/BalanceService')
       let spendEstimate = 0
       try {
-        const pointsBalance = await BalanceService.getBalance(user_id, 'POINTS')
-        const quotaBalance = await BalanceService.getBalance(user_id, 'DIAMOND_QUOTA')
+        const pointsBalance = await BalanceService.getBalance(user_id, AssetCode.POINTS)
+        const quotaBalance = await BalanceService.getBalance(user_id, AssetCode.STAR_STONE_QUOTA)
         spendEstimate = Math.max(pointsBalance || 0, quotaBalance || 0)
       } catch {
         spendEstimate = 0

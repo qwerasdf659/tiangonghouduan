@@ -54,8 +54,8 @@ const {
 } = require('../../helpers/test-points-setup')
 
 // 测试配置
-const TEST_ASSET_CODE = 'DIAMOND'
-const TEST_OFFER_ASSET = 'red_shard'
+const TEST_ASSET_CODE = 'star_stone'
+const TEST_OFFER_ASSET = 'red_core_shard'
 
 // ==================== 辅助函数（提前定义）====================
 
@@ -143,7 +143,7 @@ async function ensureBalance(userId, assetCode, minBalance) {
 async function ensureTestAssets() {
   const testUserId = await getRealTestUserId()
 
-  // 确保卖家有足够的 red_shard
+  // 确保卖家有足够的 red_core_shard
   await ensureBalance(testUserId, TEST_OFFER_ASSET, 5000)
 
   // 查找买家用户
@@ -155,7 +155,7 @@ async function ensureTestAssets() {
   })
 
   if (buyerUser) {
-    // 确保买家有足够的 DIAMOND
+    // 确保买家有足够的 star_stone
     await ensureBalance(buyerUser.user_id, TEST_ASSET_CODE, 10000)
   }
 }
@@ -396,7 +396,7 @@ describe('【8.8】订单取消退款测试 - 资产解冻和状态恢复', () =
         `📊 取消前 - 卖家 ${TEST_OFFER_ASSET}: available=${sellerBalance.available}, frozen=${sellerBalance.frozen}`
       )
 
-      // 买家应该有冻结的 DIAMOND
+      // 买家应该有冻结的 star_stone
       expect(Number(buyerBalance.frozen)).toBeGreaterThan(0)
     }, 15000)
 

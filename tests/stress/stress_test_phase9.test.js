@@ -412,7 +412,7 @@ describe('阶段九：压力测试与高并发（P1）', () => {
             {
               seller_user_id: test_user_id,
               item_id,
-              price_asset_code: 'DIAMOND',
+              price_asset_code: 'star_stone',
               price_amount: 10,
               idempotency_key: generateIdempotencyKey('stress_listing')
             },
@@ -441,7 +441,7 @@ describe('阶段九：压力测试与高并发（P1）', () => {
               try {
                 await BalanceService.changeBalance({
                   user_id: buyer.user_id,
-                  asset_code: 'DIAMOND',
+                  asset_code: 'star_stone',
                   delta_amount: 100,
                   business_type: 'stress_test_recharge',
                   idempotency_key: generateIdempotencyKey(`recharge_${buyer.user_id}`)
@@ -557,7 +557,7 @@ describe('阶段九：压力测试与高并发（P1）', () => {
             try {
               await BalanceService.changeBalance({
                 user_id: test_user_id,
-                asset_code: 'POINTS',
+                asset_code: 'points',
                 delta_amount: -DEDUCT_AMOUNT,
                 business_type: 'stress_test_deduct',
                 idempotency_key

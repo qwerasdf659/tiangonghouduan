@@ -40,15 +40,15 @@ const logger = require('../../../utils/logger').logger
  *     "rules": [
  *       {
  *         "rule_id": 1,
- *         "from_asset_code": "red_shard",
- *         "to_asset_code": "DIAMOND",
+ *         "from_asset_code": "red_core_shard",
+ *         "to_asset_code": "star_stone",
  *         "from_amount": 1,
  *         "to_amount": 20,
  *         "conversion_rate": "1:20",
  *         "enabled": true,
  *         "limits": { "min_from_amount": 1, "max_from_amount": null },
  *         "fee": { "fee_rate": 0.05, "fee_min_amount": 10 },
- *         "display": { "title": "红水晶碎片分解", "description": "...", "risk_level": "low" }
+ *         "display": { "title": "红源晶碎片分解", "description": "...", "risk_level": "low" }
  *       }
  *     ],
  *     "total_rules": 1

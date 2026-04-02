@@ -25,6 +25,7 @@
 const logger = require('../utils/logger').logger
 const { getRedisClient, isRedisHealthy } = require('../utils/UnifiedRedisClient')
 const BeijingTimeHelper = require('../utils/timeHelper')
+const { AssetCode } = require('../constants/AssetCode')
 
 /**
  * Redis Key 前缀（风控计数器）
@@ -89,7 +90,7 @@ class MarketRiskControlMiddleware {
         }
 
         // 2. 从请求体获取定价币种（用于风控统计维度）
-        const priceAssetCode = req.body?.price_asset_code || 'DIAMOND'
+        const priceAssetCode = req.body?.price_asset_code || AssetCode.STAR_STONE
 
         // 3. Redis 健康检查（fail-closed 策略）
         const redisHealthy = await isRedisHealthy()
@@ -393,7 +394,7 @@ class MarketRiskControlMiddleware {
     const result = {}
 
     // 使用 Promise.all 避免循环中的 await
-    const assetCodes = assetCode ? [assetCode] : ['DIAMOND', 'red_shard']
+    const assetCodes = assetCode ? [assetCode] : [AssetCode.STAR_STONE, AssetCode.RED_CORE_SHARD]
 
     const counterPromises = metrics.map(async metric => {
       if (assetCode) {

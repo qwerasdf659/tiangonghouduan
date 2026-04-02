@@ -712,7 +712,7 @@ class BusinessCacheHelper {
   /**
    * 获取汇率兑换缓存
    *
-   * @param {string} subKey - 子键（如 'all_active', 'red_shard:DIAMOND'）
+   * @param {string} subKey - 子键（如 'all_active', 'red_core_shard:star_stone'）
    * @returns {Promise<Object|null>} 缓存数据或 null
    */
   static async getExchangeRate(subKey) {
@@ -747,7 +747,7 @@ class BusinessCacheHelper {
   /**
    * 获取价格趋势缓存
    *
-   * @param {string} subKey - 子键（如 'red_shard:7d:1d'）
+   * @param {string} subKey - 子键（如 'red_core_shard:7d:1d'）
    * @returns {Promise<Object|null>} 缓存数据或 null
    */
   static async getPriceTrend(subKey) {

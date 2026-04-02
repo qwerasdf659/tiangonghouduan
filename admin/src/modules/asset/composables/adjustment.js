@@ -489,7 +489,7 @@ export function useAdjustmentMethods() {
         return
       }
 
-      if (this.adjustForm.asset_code === 'BUDGET_POINTS' && !this.adjustForm.campaign_id) {
+      if (this.adjustForm.asset_code === 'budget_points' && !this.adjustForm.campaign_id) {
         this.showError('调整预算积分必须选择活动')
         return
       }
@@ -510,7 +510,7 @@ export function useAdjustmentMethods() {
           idempotency_key: `asset_adjust_${this.current_user.user_id}_${this.adjustForm.asset_code}_${crypto.randomUUID()}`
         }
 
-        if (this.adjustForm.asset_code === 'BUDGET_POINTS') {
+        if (this.adjustForm.asset_code === 'budget_points') {
           data.campaign_id = parseInt(this.adjustForm.campaign_id)
         }
 
@@ -540,7 +540,7 @@ export function useAdjustmentMethods() {
     getAssetIcon(assetCode) {
       const icons = {
         POINTS: 'bi-star-fill text-warning',
-        DIAMOND: 'bi-gem text-info',
+        star_stone: 'bi-gem text-info',
         BUDGET_POINTS: 'bi-wallet2 text-success',
         GOLD: 'bi-coin text-warning',
         SILVER: 'bi-circle-fill text-secondary'
@@ -552,7 +552,7 @@ export function useAdjustmentMethods() {
       const assetType = this.assetTypes.find(t => t.asset_code === assetCode)
       if (assetType) return assetType.display_name || assetType.name || assetCode
 
-      const builtInNames = { POINTS: '积分', DIAMOND: '钻石', BUDGET_POINTS: '预算积分' }
+      const builtInNames = { points: '积分', star_stone: '星石', budget_points: '预算积分' }
       return builtInNames[assetCode] || assetCode
     },
 
@@ -646,7 +646,7 @@ export function useAdjustmentMethods() {
 
       if (!this.form.user_id) errors.push('• 用户ID（必填）')
       if (!this.form.asset_type) errors.push('• 资产类型（必填）')
-      if (this.form.asset_type === 'BUDGET_POINTS' && !this.form.campaign_id)
+      if (this.form.asset_type === 'budget_points' && !this.form.campaign_id)
         errors.push('• 关联活动（预算积分必填）')
       if (this.form.asset_type === 'material' && !this.form.material_code)
         errors.push('• 材料类型（必填）')
@@ -679,7 +679,7 @@ export function useAdjustmentMethods() {
           idempotency_key: `admin_adjust_${this.current_user?.user_id || 0}_${this.form.user_id}_${assetCode}_${crypto.randomUUID()}`
         }
 
-        if (this.form.asset_type === 'BUDGET_POINTS' && this.form.campaign_id) {
+        if (this.form.asset_type === 'budget_points' && this.form.campaign_id) {
           data.campaign_id = parseInt(this.form.campaign_id)
         }
 

@@ -6,7 +6,7 @@
  * 职责：
  * - 管理员调整用户积分（POINTS）
  * - 管理员调整预算积分（BUDGET_POINTS）
- * - 管理员调整其他资产（DIAMOND、材料等）
+ * - 管理员调整其他资产（star_stone、材料等）
  *
  * 业务场景：
  * - 客服补偿用户积分
@@ -31,6 +31,7 @@
 
 const express = require('express')
 const router = express.Router()
+const { AssetCode } = require('../../../../constants/AssetCode')
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const TransactionManager = require('../../../../utils/TransactionManager')
 
@@ -51,7 +52,7 @@ function asyncHandler(fn) {
  *
  * @description 管理员调整用户资产
  * @body {number} user_id - 目标用户ID（必填）
- * @body {string} asset_code - 资产代码（必填，如 POINTS, BUDGET_POINTS, DIAMOND）
+ * @body {string} asset_code - 资产代码（必填，如 POINTS, BUDGET_POINTS, star_stone）
  * @body {number} amount - 调整数量（必填，正数=增加，负数=扣减）
  * @body {string} reason - 调整原因（必填）
  * @body {number} [lottery_campaign_id] - 活动ID（BUDGET_POINTS 必填）
@@ -81,7 +82,7 @@ router.post(
     }
 
     // BUDGET_POINTS 必须提供 lottery_campaign_id
-    if (asset_code === 'BUDGET_POINTS' && !lottery_campaign_id) {
+    if (asset_code === AssetCode.BUDGET_POINTS && !lottery_campaign_id) {
       return res.apiError('调整预算积分必须提供 lottery_campaign_id', 'BAD_REQUEST', null, 400)
     }
 
@@ -370,7 +371,7 @@ router.post(
  * @access Admin
  *
  * 设计说明：
- * - 暴露DB已存在能力：material_asset_types + 内置资产类型（POINTS/DIAMOND/BUDGET_POINTS）
+ * - 暴露DB已存在能力：material_asset_types + 内置资产类型（POINTS/star_stone/BUDGET_POINTS）
  * - 只读接口，不创造新业务能力
  */
 router.get(
@@ -383,21 +384,21 @@ router.get(
     // 1. 内置资产类型（系统核心资产）
     const builtInTypes = [
       {
-        asset_code: 'POINTS',
+        asset_code: AssetCode.POINTS,
         name: '积分',
         display_name: '积分',
         category: 'builtin',
         is_enabled: true
       },
       {
-        asset_code: 'DIAMOND',
-        name: '钻石',
-        display_name: '钻石',
+        asset_code: AssetCode.STAR_STONE,
+        name: '星石',
+        display_name: '星石',
         category: 'builtin',
         is_enabled: true
       },
       {
-        asset_code: 'BUDGET_POINTS',
+        asset_code: AssetCode.BUDGET_POINTS,
         name: '预算积分',
         display_name: '预算积分',
         category: 'builtin',

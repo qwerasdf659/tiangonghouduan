@@ -22,6 +22,7 @@ const OrderNoGenerator = require('../../utils/OrderNoGenerator')
 const { generateConsumptionBusinessId } = require('../../utils/IdempotencyHelper')
 const AuditLogService = require('../AuditLogService')
 const { assertAndGetTransaction } = require('../../utils/transactionHelpers')
+const { AssetCode } = require('../../constants/AssetCode')
 
 /**
  * 消费记录核心服务类
@@ -292,7 +293,7 @@ class CoreService {
     const pointsResult = await BalanceService.changeBalance(
       {
         user_id: record.user_id,
-        asset_code: 'POINTS',
+        asset_code: AssetCode.POINTS,
         delta_amount: record.points_to_award,
         business_type: 'consumption_reward',
         idempotency_key: `consumption_reward:approve:${recordId}`,
@@ -378,7 +379,7 @@ class CoreService {
       const budgetResult = await BalanceService.changeBalance(
         {
           user_id: record.user_id,
-          asset_code: 'BUDGET_POINTS',
+          asset_code: AssetCode.BUDGET_POINTS,
           delta_amount: budgetPointsToAllocate,
           business_type: 'consumption_budget_allocation',
           idempotency_key: `consumption_budget:approve:${recordId}`,
@@ -400,13 +401,13 @@ class CoreService {
       )
     }
 
-    let diamondQuotaAllocated = 0
+    let starStoneQuotaAllocated = 0
     try {
-      const quotaConfig = await CoreService._getDiamondQuotaConfig()
+      const quotaConfig = await CoreService._getStarStoneQuotaConfig()
       if (quotaConfig.enabled) {
         const effectiveRatio = await CoreService.getEffectiveRatio(
           record.user_id,
-          'diamond_quota_ratio',
+          'star_stone_quota_ratio',
           quotaConfig.ratio
         )
         const quotaAmount = Math.floor(parseFloat(record.consumption_amount) * effectiveRatio)
@@ -415,7 +416,7 @@ class CoreService {
           const quotaResult = await BalanceService.changeBalance(
             {
               user_id: record.user_id,
-              asset_code: 'DIAMOND_QUOTA',
+              asset_code: 'STAR_STONE_QUOTA',
               delta_amount: quotaAmount,
               business_type: 'consumption_quota_allocation',
               idempotency_key: `consumption_quota:approve:${recordId}`,
@@ -425,20 +426,20 @@ class CoreService {
                 reference_id: recordId,
                 consumption_amount: record.consumption_amount,
                 quota_ratio: effectiveRatio,
-                description: `消费${record.consumption_amount}元，发放钻石配额${quotaAmount}`
+                description: `消费${record.consumption_amount}元，发放星石配额${quotaAmount}`
               }
             },
             { transaction }
           )
 
-          diamondQuotaAllocated = quotaAmount
+          starStoneQuotaAllocated = quotaAmount
           logger.info(
-            `💎 钻石配额发放成功: user_id=${record.user_id}, 配额=${quotaAmount}, 幂等=${quotaResult.is_duplicate ? '重复' : '新增'}`
+            `💎 星石配额发放成功: user_id=${record.user_id}, 配额=${quotaAmount}, 幂等=${quotaResult.is_duplicate ? '重复' : '新增'}`
           )
         }
       }
     } catch (quotaError) {
-      logger.error(`[ConsumptionService] 钻石配额发放失败（非致命）: ${quotaError.message}`)
+      logger.error(`[ConsumptionService] 星石配额发放失败（非致命）: ${quotaError.message}`)
     }
 
     // 8. 记录审计日志
@@ -457,7 +458,7 @@ class CoreService {
           consumption_record_id: recordId,
           amount: record.consumption_amount,
           points_to_award: record.points_to_award,
-          diamond_quota_allocated: diamondQuotaAllocated
+          star_stone_quota_allocated: starStoneQuotaAllocated
         },
         reason: reviewData.admin_notes || '审核通过',
         idempotency_key: `consumption_audit:approve:${reviewRecord.review_id}`,
@@ -468,7 +469,7 @@ class CoreService {
     }
 
     logger.info(
-      `✅ 消费记录审核通过: record_id=${recordId}, 奖励积分=${record.points_to_award}, 预算积分=${budgetPointsToAllocate}, 钻石配额=${diamondQuotaAllocated}`
+      `✅ 消费记录审核通过: record_id=${recordId}, 奖励积分=${record.points_to_award}, 预算积分=${budgetPointsToAllocate}, 星石配额=${starStoneQuotaAllocated}`
     )
 
     return {
@@ -476,7 +477,7 @@ class CoreService {
       points_transaction: pointsResult.transaction,
       points_awarded: record.points_to_award,
       budget_points_allocated: budgetPointsToAllocate,
-      diamond_quota_allocated: diamondQuotaAllocated,
+      star_stone_quota_allocated: starStoneQuotaAllocated,
       new_balance: pointsResult.new_balance
     }
   }
@@ -729,18 +730,18 @@ class CoreService {
   }
 
   /**
-   * 读取钻石配额配置（通过 AdminSystemService 统一读取 system_settings）
+   * 读取星石配额配置（通过 AdminSystemService 统一读取 system_settings）
    *
    * @returns {Promise<{enabled: boolean, ratio: number, action: string}>} 配额配置
    * @private
    */
-  static async _getDiamondQuotaConfig() {
+  static async _getStarStoneQuotaConfig() {
     try {
       const AdminSystemService = require('../AdminSystemService')
       const [enabled, ratio, action] = await Promise.all([
-        AdminSystemService.getSettingValue('points', 'diamond_quota_enabled', true),
-        AdminSystemService.getSettingValue('points', 'diamond_quota_ratio', 1.0),
-        AdminSystemService.getSettingValue('points', 'diamond_quota_exhausted_action', 'filter')
+        AdminSystemService.getSettingValue('points', 'star_stone_quota_enabled', true),
+        AdminSystemService.getSettingValue('points', 'star_stone_quota_ratio', 1.0),
+        AdminSystemService.getSettingValue('points', 'star_stone_quota_exhausted_action', 'filter')
       ])
 
       return {
@@ -749,7 +750,7 @@ class CoreService {
         action: String(action || 'filter').replace(/"/g, '')
       }
     } catch (error) {
-      logger.warn(`[ConsumptionService] 读取钻石配额配置失败: ${error.message}`)
+      logger.warn(`[ConsumptionService] 读取星石配额配置失败: ${error.message}`)
       return { enabled: false, ratio: 1.0, action: 'filter' }
     }
   }
@@ -765,7 +766,7 @@ class CoreService {
    * - effective_end IS NULL 或 effective_end > NOW()
    *
    * @param {number} user_id - 用户ID
-   * @param {string} ratio_key - 比例类型（points_award_ratio / budget_allocation_ratio / diamond_quota_ratio）
+   * @param {string} ratio_key - 比例类型（points_award_ratio / budget_allocation_ratio / star_stone_quota_ratio）
    * @param {number} globalDefault - 全局默认值（来自 system_settings）
    * @returns {Promise<number>} 有效比例值
    */

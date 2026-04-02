@@ -302,7 +302,7 @@
           <div class="gradient-stat-card gradient-stat-orange">
             <div class="stat-icon">💰</div>
             <div class="stat-value" x-text="formatNumber(marketOverview.total_volume)">0</div>
-            <div class="stat-label">总成交额(钻石)</div>
+            <div class="stat-label">总成交额(星石)</div>
           </div>
           <div class="gradient-stat-card gradient-stat-rose">
             <div class="stat-icon">💎</div>
@@ -387,7 +387,7 @@
                   <th class="py-2 text-left">资产代码</th>
                   <th class="py-2 text-left">挂牌类型</th>
                   <th class="py-2 text-right">成交笔数</th>
-                  <th class="py-2 text-right">成交总量(钻石)</th>
+                  <th class="py-2 text-right">成交总量(星石)</th>
                   <th class="py-2 text-right">均价</th>
                   <th class="py-2 text-right">最低价</th>
                   <th class="py-2 text-right">最高价</th>
@@ -403,7 +403,7 @@
                             x-text="item.listing_kind === 'item' ? '物品' : '可叠加资产'"></span>
                     </td>
                     <td class="py-2 text-right font-bold" x-text="Number(item.trade_count || 0).toLocaleString()"></td>
-                    <td class="py-2 text-right" x-text="Number(item.total_diamond_volume || 0).toLocaleString()"></td>
+                    <td class="py-2 text-right" x-text="Number(item.total_star_stone_volume || 0).toLocaleString()"></td>
                     <td class="py-2 text-right" x-text="Number(item.avg_price || 0).toLocaleString()"></td>
                     <td class="py-2 text-right" x-text="Number(item.min_price || 0).toLocaleString()"></td>
                     <td class="py-2 text-right" x-text="Number(item.max_price || 0).toLocaleString()"></td>

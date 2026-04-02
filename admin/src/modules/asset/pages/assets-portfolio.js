@@ -270,8 +270,8 @@ function assetsPortfolioPage() {
     /**
      * 加载资产类型
      *
-     * 后端 /asset-adjustment/asset-types 会返回 builtin (POINTS/DIAMOND/BUDGET_POINTS)
-     * 和 material (DIAMOND/BUDGET_POINTS/red_shard) 两组，存在 asset_code 重复。
+     * 后端 /asset-adjustment/asset-types 会返回 builtin (POINTS/star_stone/BUDGET_POINTS)
+     * 和 material (star_stone/BUDGET_POINTS/red_core_shard) 两组，存在 asset_code 重复。
      * 前端按 asset_code 去重，优先保留 builtin 分类。
      */
     async loadAssetTypes() {

@@ -805,7 +805,7 @@
                   <option value="asset">资产</option>
                   <option value="item">物品</option>
                 </select>
-                <input x-show="item.type === 'asset'" x-model="item.asset_code" placeholder="DIAMOND" class="flex-1 text-xs border rounded themed-input px-2 py-1.5">
+                <input x-show="item.type === 'asset'" x-model="item.asset_code" placeholder="star_stone" class="flex-1 text-xs border rounded themed-input px-2 py-1.5">
                 <input x-show="item.type === 'item'" x-model="item.template_id" placeholder="物品模板ID" class="flex-1 text-xs border rounded themed-input px-2 py-1.5">
                 <input type="number" x-model.number="item.amount" placeholder="数量" min="1" class="w-20 text-xs border rounded themed-input px-2 py-1.5">
                 <button @click="removeCompensationItem(idx)" class="text-red-400 hover:text-red-600 text-xs">✕</button>

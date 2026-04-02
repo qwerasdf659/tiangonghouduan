@@ -81,7 +81,7 @@ async function ensureTestUserHasPoints(requiredPoints = 1500000, options = {}) {
      * 🔴 修复：getBalance 返回对象 { available_amount, frozen_amount, ... }
      */
     const currentBalanceResult = await BalanceService.getBalance(
-      { user_id, asset_code: 'POINTS' },
+      { user_id, asset_code: 'points' },
       { transaction }
     )
     // 提取 available_amount，确保为数字类型
@@ -113,7 +113,7 @@ async function ensureTestUserHasPoints(requiredPoints = 1500000, options = {}) {
     await BalanceService.changeBalance(
       {
         user_id,
-        asset_code: 'POINTS',
+        asset_code: 'points',
         delta_amount: shortage,
         business_type: 'test_topup',
         idempotency_key,
@@ -179,7 +179,7 @@ async function getTestUserPointsBalance(userId = null) {
   }
 
   // 获取积分余额
-  const balanceResult = await BalanceService.getBalance({ user_id, asset_code: 'POINTS' })
+  const balanceResult = await BalanceService.getBalance({ user_id, asset_code: 'points' })
 
   // 直接返回数字余额（方便测试中进行数学计算）
   return Number(balanceResult?.available_amount) || 0
@@ -407,7 +407,7 @@ async function resetTestUserDailyQuota(userId = null, campaignId = 1) {
  * 警告：此函数会删除挂牌及相关订单，仅用于测试环境！
  *
  * @param {number} [userId] - 可选的用户ID，不传则使用测试用户
- * @param {string} [assetCode='DIAMOND'] - 可选的币种代码
+ * @param {string} [assetCode='star_stone'] - 可选的币种代码
  * @returns {Promise<{deleted_listings: number, deleted_orders: number}>}
  * 
  * @example
@@ -506,14 +506,14 @@ async function resetTestUserDailyListings(userId = null, assetCode = null) {
  *
  * @param {number} dailyMaxListings - 新的每日挂牌上限（默认 1000）
  * @param {number} [userId] - 可选的用户ID（用于获取用户等级）
- * @param {string} [assetCode='DIAMOND'] - 币种代码
+ * @param {string} [assetCode='star_stone'] - 币种代码
  * @returns {Promise<Object>} 配置结果
  * 
  * @example
  * // 将测试用户的挂牌上限提高到 500
  * await setTestUserListingLimit(500)
  */
-async function setTestUserListingLimit(dailyMaxListings = 1000, userId = null, assetCode = 'DIAMOND') {
+async function setTestUserListingLimit(dailyMaxListings = 1000, userId = null, assetCode = 'star_stone') {
   const { UserRiskProfile, User } = require('../../models')
   
   // 确保测试数据已初始化

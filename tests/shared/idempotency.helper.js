@@ -233,13 +233,13 @@ class IdempotencyTestSuite {
     console.log(`💰 测试资产服务幂等性: user_id=${userId}, idempotency_key=${idempotencyKey}`)
 
     // 获取初始余额
-    const balanceBefore = await BalanceService.getBalance({ user_id: userId, asset_code: 'POINTS' })
+    const balanceBefore = await BalanceService.getBalance({ user_id: userId, asset_code: 'points' })
     const availableBefore = Number(balanceBefore.available_amount)
 
     // 第一次添加资产
     await BalanceService.changeBalance({
       user_id: userId,
-      asset_code: 'POINTS',
+      asset_code: 'points',
       delta_amount: amount,
       business_type: 'idempotency_test',
       idempotency_key: idempotencyKey
@@ -248,7 +248,7 @@ class IdempotencyTestSuite {
     // 验证余额变更
     const balanceAfterFirst = await BalanceService.getBalance({
       user_id: userId,
-      asset_code: 'POINTS'
+      asset_code: 'points'
     })
     const availableAfterFirst = Number(balanceAfterFirst.available_amount)
 
@@ -259,7 +259,7 @@ class IdempotencyTestSuite {
     // 第二次添加资产（相同idempotency_key）
     await BalanceService.changeBalance({
       user_id: userId,
-      asset_code: 'POINTS',
+      asset_code: 'points',
       delta_amount: amount,
       business_type: 'idempotency_test',
       idempotency_key: idempotencyKey // 相同idempotency_key
@@ -268,7 +268,7 @@ class IdempotencyTestSuite {
     // 验证余额未再次变更
     const balanceAfterSecond = await BalanceService.getBalance({
       user_id: userId,
-      asset_code: 'POINTS'
+      asset_code: 'points'
     })
     const availableAfterSecond = Number(balanceAfterSecond.available_amount)
 

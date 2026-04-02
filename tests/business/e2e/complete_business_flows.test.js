@@ -6,16 +6,16 @@
  * 优先级：P0 - 核心业务完整链路验证
  *
  * 测试场景：
- * - 11.4: 碎片交易完整链路 - 抽奖获得red_shard→市场挂单→买家用DIAMOND购买→资产转移
+ * - 11.4: 碎片交易完整链路 - 抽奖获得red_core_shard→市场挂单→买家用star_stone购买→资产转移
  * - 11.5: 预算耗尽完整链路 - 高档奖池耗尽→自动降级→用户继续抽→获得fallback
- * - 11.6: 多用户交互场景 - 用户A抽奖获得red_shard→挂单→用户B用DIAMOND购买→用户B用碎片兑换exchange_items
- * - 11.7: 商户发放→用户消费 - 商户merchant_points_reward→用户获得POINTS→抽奖消费
- * - 11.8: 边界条件场景 - POINTS刚好够1次(cost_points=10)→抽完余额为0→再抽被拦截
+ * - 11.6: 多用户交互场景 - 用户A抽奖获得red_core_shard→挂单→用户B用star_stone购买→用户B用碎片兑换exchange_items
+ * - 11.7: 商户发放→用户消费 - 商户merchant_points_reward→用户获得points→抽奖消费
+ * - 11.8: 边界条件场景 - points刚好够1次(cost_points=10)→抽完余额为0→再抽被拦截
  *
  * 技术验证点：
  * 1. 跨服务事务一致性（BalanceService + MarketListingService + TradeOrderService）
  * 2. 抽奖引擎核心流程（UnifiedLotteryEngine）
- * 3. 资产转移完整性（DIAMOND/POINTS/red_shard）
+ * 3. 资产转移完整性（star_stone/points/red_core_shard）
  * 4. 幂等性保护机制
  * 5. 边界条件处理（余额不足、预算耗尽）
  *
@@ -253,15 +253,15 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
   /*
    * ==========================================
    * 🧪 任务 11.4: 碎片交易完整链路
-   * 抽奖获得red_shard→市场挂单→买家用DIAMOND购买→资产转移
+   * 抽奖获得red_core_shard→市场挂单→买家用star_stone购买→资产转移
    *
    * 说明：当前 MarketListingService.createListing 只支持 item_instance 类型
-   * 碎片（red_shard）是可叠加资产，需要通过其他方式交易（如 ExchangeService）
+   * 碎片（red_core_shard）是可叠加资产，需要通过其他方式交易（如 ExchangeService）
    * 本测试验证物品实例的完整交易流程作为替代
    * ==========================================
    */
   describe('📦 11.4 碎片交易完整链路', () => {
-    test('P0-11.4-1: 完整物品交易流程（物品挂单→DIAMOND购买→所有权转移）', async () => {
+    test('P0-11.4-1: 完整物品交易流程（物品挂单→star_stone购买→所有权转移）', async () => {
       if (!testUserB) {
         console.log('⏭️ 跳过：缺少买家测试用户')
         return
@@ -272,19 +272,19 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
 
       const sellerUserId = testUserA.user_id
       const buyerUserId = testUserB.user_id
-      const diamondPrice = 100 // DIAMOND定价
+      const starStonePrice = 100 // star_stone定价
 
-      /* Step 1: 确保买家有足够的DIAMOND */
+      /* Step 1: 确保买家有足够的star_stone */
       console.log('📝 Step 1: 准备测试资产')
-      await ensureAssetBalance(buyerUserId, 'DIAMOND', diamondPrice + 200)
+      await ensureAssetBalance(buyerUserId, 'star_stone', starStonePrice + 200)
 
       /* 记录初始余额 */
-      const buyerDiamondBefore = await getAssetBalance(buyerUserId, 'DIAMOND')
-      const sellerDiamondBefore = await getAssetBalance(sellerUserId, 'DIAMOND')
+      const buyerStarStoneBefore = await getAssetBalance(buyerUserId, 'star_stone')
+      const sellerStarStoneBefore = await getAssetBalance(sellerUserId, 'star_stone')
 
-      console.log('📊 初始DIAMOND余额:', {
-        seller_diamond: sellerDiamondBefore,
-        buyer_diamond: buyerDiamondBefore
+      console.log('📊 初始star_stone余额:', {
+        seller_star_stone: sellerStarStoneBefore,
+        buyer_star_stone: buyerStarStoneBefore
       })
 
       /* Step 2: 创建测试物品实例（模拟抽奖获得） */
@@ -320,7 +320,7 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
             {
               seller_user_id: sellerUserId,
               item_id: testItem.item_id,
-              price_amount: diamondPrice,
+              price_amount: starStonePrice,
               idempotency_key: listingIdempotencyKey
             },
             { transaction }
@@ -395,41 +395,43 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
       expect(testItem.owner_account_id).toBe(buyerUserId)
       expect(testItem.status).toBe('transferred')
 
-      /* 验证DIAMOND转移 */
-      const buyerDiamondFinal = await getAssetBalance(buyerUserId, 'DIAMOND')
-      const sellerDiamondFinal = await getAssetBalance(sellerUserId, 'DIAMOND')
+      /* 验证star_stone转移 */
+      const buyerStarStoneFinal = await getAssetBalance(buyerUserId, 'star_stone')
+      const sellerStarStoneFinal = await getAssetBalance(sellerUserId, 'star_stone')
 
-      console.log('📊 最终DIAMOND余额:', {
-        seller_diamond: sellerDiamondFinal,
-        buyer_diamond: buyerDiamondFinal
+      console.log('📊 最终star_stone余额:', {
+        seller_star_stone: sellerStarStoneFinal,
+        buyer_star_stone: buyerStarStoneFinal
       })
 
-      /* 买家DIAMOND应该减少 */
-      expect(buyerDiamondBefore - buyerDiamondFinal).toBeGreaterThanOrEqual(diamondPrice * 0.9)
-      /* 卖家DIAMOND应该增加（扣除手续费后） */
-      expect(sellerDiamondFinal).toBeGreaterThan(sellerDiamondBefore)
+      /* 买家star_stone应该减少 */
+      expect(buyerStarStoneBefore - buyerStarStoneFinal).toBeGreaterThanOrEqual(
+        starStonePrice * 0.9
+      )
+      /* 卖家star_stone应该增加（扣除手续费后） */
+      expect(sellerStarStoneFinal).toBeGreaterThan(sellerStarStoneBefore)
 
       console.log('✅ 11.4 物品交易完整链路测试通过')
     })
 
-    test('P0-11.4-2: 碎片资产余额变化验证（red_shard）', async () => {
+    test('P0-11.4-2: 碎片资产余额变化验证（red_core_shard）', async () => {
       console.log('🎯 开始测试: 碎片资产余额变化验证')
 
       const userId = testUserA.user_id
 
-      /* Step 1: 确保用户有 red_shard */
-      await ensureAssetBalance(userId, 'red_shard', 100)
+      /* Step 1: 确保用户有 red_core_shard */
+      await ensureAssetBalance(userId, 'red_core_shard', 100)
 
-      const shardBefore = await getAssetBalance(userId, 'red_shard')
-      console.log('📊 初始 red_shard 余额:', shardBefore)
+      const shardBefore = await getAssetBalance(userId, 'red_core_shard')
+      console.log('📊 初始 red_core_shard 余额:', shardBefore)
 
-      /* Step 2: 模拟消耗 red_shard（通过 BalanceService.changeBalance） */
+      /* Step 2: 模拟消耗 red_core_shard（通过 BalanceService.changeBalance） */
       const consumeAmount = 10
       await TransactionManager.execute(async transaction => {
         await BalanceService.changeBalance(
           {
             user_id: userId,
-            asset_code: 'red_shard',
+            asset_code: 'red_core_shard',
             delta_amount: -consumeAmount,
             business_type: 'test_consume',
             counterpart_account_id: 2,
@@ -440,8 +442,8 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
         )
       })
 
-      const shardAfter = await getAssetBalance(userId, 'red_shard')
-      console.log('📊 消耗后 red_shard 余额:', shardAfter)
+      const shardAfter = await getAssetBalance(userId, 'red_core_shard')
+      console.log('📊 消耗后 red_core_shard 余额:', shardAfter)
 
       /* 验证余额减少（使用Number确保BIGINT/DECIMAL正确比较） */
       expect(Number(shardBefore) - Number(shardAfter)).toBe(consumeAmount)
@@ -449,39 +451,39 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
       console.log('✅ 碎片资产余额变化验证通过')
     })
 
-    test('P0-11.4-3: 可叠加资产（red_shard）完整挂牌交易流程', async () => {
+    test('P0-11.4-3: 可叠加资产（red_core_shard）完整挂牌交易流程', async () => {
       if (!testUserB) {
         console.log('⏭️ 跳过：缺少买家测试用户')
         return
       }
 
-      console.log('🎯 开始测试: 可叠加资产（red_shard）完整挂牌交易流程')
+      console.log('🎯 开始测试: 可叠加资产（red_core_shard）完整挂牌交易流程')
 
       const sellerUserId = testUserA.user_id
       const buyerUserId = testUserB.user_id
       const shardAmount = 15 // 挂牌出售的碎片数量
-      const diamondPrice = 30 // DIAMOND 定价
+      const starStonePrice = 30 // star_stone 定价
 
-      /* Step 1: 准备卖家资产（red_shard）和买家资产（DIAMOND） */
+      /* Step 1: 准备卖家资产（red_core_shard）和买家资产（star_stone） */
       console.log('📝 Step 1: 准备测试资产')
-      await ensureAssetBalance(sellerUserId, 'red_shard', shardAmount + 50)
-      await ensureAssetBalance(buyerUserId, 'DIAMOND', diamondPrice + 100)
+      await ensureAssetBalance(sellerUserId, 'red_core_shard', shardAmount + 50)
+      await ensureAssetBalance(buyerUserId, 'star_stone', starStonePrice + 100)
 
       /* 记录初始余额 */
-      const sellerShardBefore = await getAssetBalance(sellerUserId, 'red_shard')
-      const buyerDiamondBefore = await getAssetBalance(buyerUserId, 'DIAMOND')
-      const buyerShardBefore = await getAssetBalance(buyerUserId, 'red_shard')
-      const sellerDiamondBefore = await getAssetBalance(sellerUserId, 'DIAMOND')
+      const sellerShardBefore = await getAssetBalance(sellerUserId, 'red_core_shard')
+      const buyerStarStoneBefore = await getAssetBalance(buyerUserId, 'star_stone')
+      const buyerShardBefore = await getAssetBalance(buyerUserId, 'red_core_shard')
+      const sellerStarStoneBefore = await getAssetBalance(sellerUserId, 'star_stone')
 
       console.log('📊 初始余额:', {
-        seller_red_shard: sellerShardBefore,
-        seller_diamond: sellerDiamondBefore,
-        buyer_red_shard: buyerShardBefore,
-        buyer_diamond: buyerDiamondBefore
+        seller_red_core_shard: sellerShardBefore,
+        seller_star_stone: sellerStarStoneBefore,
+        buyer_red_core_shard: buyerShardBefore,
+        buyer_star_stone: buyerStarStoneBefore
       })
 
       /* Step 2: 卖家创建可叠加资产挂牌（fungible_asset类型） */
-      console.log('📝 Step 2: 卖家创建 red_shard 挂牌（fungible_asset类型）')
+      console.log('📝 Step 2: 卖家创建 red_core_shard 挂牌（fungible_asset类型）')
       const listingIdempotencyKey = generateIdempotencyKey('fungible_listing')
 
       let listing
@@ -490,10 +492,10 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
           return await MarketListingService.createFungibleAssetListing(
             {
               seller_user_id: sellerUserId,
-              offer_asset_code: 'red_shard',
+              offer_asset_code: 'red_core_shard',
               offer_amount: shardAmount,
-              price_amount: diamondPrice,
-              price_asset_code: 'DIAMOND',
+              price_amount: starStonePrice,
+              price_asset_code: 'star_stone',
               idempotency_key: listingIdempotencyKey
             },
             { transaction }
@@ -531,8 +533,8 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
 
       /* Step 3: 验证卖家碎片余额已冻结 */
       console.log('📝 Step 3: 验证卖家碎片已冻结')
-      const sellerShardAfterListing = await getAssetBalance(sellerUserId, 'red_shard')
-      console.log('📊 挂牌后卖家 red_shard 可用余额:', sellerShardAfterListing)
+      const sellerShardAfterListing = await getAssetBalance(sellerUserId, 'red_core_shard')
+      console.log('📊 挂牌后卖家 red_core_shard 可用余额:', sellerShardAfterListing)
       /* 可用余额应该减少（部分被冻结）— 使用Number()确保正确比较 */
       expect(Number(sellerShardAfterListing)).toBeLessThanOrEqual(Number(sellerShardBefore))
 
@@ -578,35 +580,38 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
       console.log('📝 Step 5: 验证资产转移')
       await sleep(500)
 
-      const sellerShardFinal = await getAssetBalance(sellerUserId, 'red_shard')
-      const buyerShardFinal = await getAssetBalance(buyerUserId, 'red_shard')
-      const sellerDiamondFinal = await getAssetBalance(sellerUserId, 'DIAMOND')
-      const buyerDiamondFinal = await getAssetBalance(buyerUserId, 'DIAMOND')
+      const sellerShardFinal = await getAssetBalance(sellerUserId, 'red_core_shard')
+      const buyerShardFinal = await getAssetBalance(buyerUserId, 'red_core_shard')
+      const sellerStarStoneFinal = await getAssetBalance(sellerUserId, 'star_stone')
+      const buyerStarStoneFinal = await getAssetBalance(buyerUserId, 'star_stone')
 
       console.log('📊 最终余额:', {
-        seller_red_shard: sellerShardFinal,
-        seller_diamond: sellerDiamondFinal,
-        buyer_red_shard: buyerShardFinal,
-        buyer_diamond: buyerDiamondFinal
+        seller_red_core_shard: sellerShardFinal,
+        seller_star_stone: sellerStarStoneFinal,
+        buyer_red_core_shard: buyerShardFinal,
+        buyer_star_stone: buyerStarStoneFinal
       })
 
       /* 验证买家碎片余额（购买可能因并发或库存不足未完成，容忍差异） */
       const buyerShardDelta = Number(buyerShardFinal) - Number(buyerShardBefore)
-      console.log('📊 买家 red_shard 变化:', buyerShardDelta, '(预期:', shardAmount, ')')
+      console.log('📊 买家 red_core_shard 变化:', buyerShardDelta, '(预期:', shardAmount, ')')
       expect(Number(buyerShardFinal)).toBeGreaterThanOrEqual(Number(buyerShardBefore))
 
-      /* 验证买家 DIAMOND 变化 */
-      const buyerDiamondDelta = Number(buyerDiamondBefore) - Number(buyerDiamondFinal)
-      console.log('📊 买家 DIAMOND 变化:', buyerDiamondDelta)
-      expect(Number(buyerDiamondFinal)).toBeLessThanOrEqual(Number(buyerDiamondBefore))
-      console.log('✅ 买家 DIAMOND 已支付:', Number(buyerDiamondBefore) - Number(buyerDiamondFinal))
+      /* 验证买家 star_stone 变化 */
+      const buyerStarStoneDelta = Number(buyerStarStoneBefore) - Number(buyerStarStoneFinal)
+      console.log('📊 买家 star_stone 变化:', buyerStarStoneDelta)
+      expect(Number(buyerStarStoneFinal)).toBeLessThanOrEqual(Number(buyerStarStoneBefore))
+      console.log(
+        '✅ 买家 star_stone 已支付:',
+        Number(buyerStarStoneBefore) - Number(buyerStarStoneFinal)
+      )
 
-      /* 验证卖家 DIAMOND 变化（购买如果完成则卖家应收到钻石） */
-      const sellerDiamondDelta = Number(sellerDiamondFinal) - Number(sellerDiamondBefore)
-      console.log('📊 卖家 DIAMOND 变化:', sellerDiamondDelta)
-      expect(Number(sellerDiamondFinal)).toBeGreaterThanOrEqual(Number(sellerDiamondBefore))
+      /* 验证卖家 star_stone 变化（购买如果完成则卖家应收到星石） */
+      const sellerStarStoneDelta = Number(sellerStarStoneFinal) - Number(sellerStarStoneBefore)
+      console.log('📊 卖家 star_stone 变化:', sellerStarStoneDelta)
+      expect(Number(sellerStarStoneFinal)).toBeGreaterThanOrEqual(Number(sellerStarStoneBefore))
 
-      console.log('✅ 11.4-3 可叠加资产（red_shard）完整挂牌交易流程测试通过')
+      console.log('✅ 11.4-3 可叠加资产（red_core_shard）完整挂牌交易流程测试通过')
     })
   })
 
@@ -704,7 +709,7 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
   /*
    * ==========================================
    * 🧪 任务 11.6: 多用户交互场景
-   * 用户A抽奖获得red_shard→挂单→用户B用DIAMOND购买→用户B用碎片兑换exchange_items
+   * 用户A抽奖获得red_core_shard→挂单→用户B用star_stone购买→用户B用碎片兑换exchange_items
    * ==========================================
    */
   describe('👥 11.6 多用户交互场景', () => {
@@ -725,35 +730,35 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
 
       /*
        * 业务流程说明：
-       * 1. 用户A通过抽奖获得red_shard（碎片奖品）- 这里模拟已有red_shard
-       * 2. 用户A在交易市场挂牌出售red_shard
-       * 3. 用户B用DIAMOND购买用户A的red_shard
-       * 4. 用户B用购得的red_shard在兑换市场兑换exchange_items
+       * 1. 用户A通过抽奖获得red_core_shard（碎片奖品）- 这里模拟已有red_core_shard
+       * 2. 用户A在交易市场挂牌出售red_core_shard
+       * 3. 用户B用star_stone购买用户A的red_core_shard
+       * 4. 用户B用购得的red_core_shard在兑换市场兑换exchange_items
        */
 
-      /* Step 1: 准备资产 - 模拟用户A通过抽奖获得red_shard */
-      console.log('📝 Step 1: 准备测试资产（模拟用户A抽奖获得red_shard）')
+      /* Step 1: 准备资产 - 模拟用户A通过抽奖获得red_core_shard */
+      console.log('📝 Step 1: 准备测试资产（模拟用户A抽奖获得red_core_shard）')
       const shardAmount = 20
-      const diamondPrice = 50
+      const starStonePrice = 50
 
-      await ensureAssetBalance(userAId, 'red_shard', shardAmount + 50)
-      await ensureAssetBalance(userBId, 'DIAMOND', diamondPrice + 200)
+      await ensureAssetBalance(userAId, 'red_core_shard', shardAmount + 50)
+      await ensureAssetBalance(userBId, 'star_stone', starStonePrice + 200)
 
       /* 记录初始余额 */
-      const userAShardBefore = await getAssetBalance(userAId, 'red_shard')
-      const userBDiamondBefore = await getAssetBalance(userBId, 'DIAMOND')
-      const userBShardBefore = await getAssetBalance(userBId, 'red_shard')
-      const userADiamondBefore = await getAssetBalance(userAId, 'DIAMOND')
+      const userAShardBefore = await getAssetBalance(userAId, 'red_core_shard')
+      const userBStarStoneBefore = await getAssetBalance(userBId, 'star_stone')
+      const userBShardBefore = await getAssetBalance(userBId, 'red_core_shard')
+      const userAStarStoneBefore = await getAssetBalance(userAId, 'star_stone')
 
       console.log('📊 初始余额:', {
-        userA_red_shard: userAShardBefore,
-        userA_DIAMOND: userADiamondBefore,
-        userB_DIAMOND: userBDiamondBefore,
-        userB_red_shard: userBShardBefore
+        userA_red_core_shard: userAShardBefore,
+        userA_star_stone: userAStarStoneBefore,
+        userB_star_stone: userBStarStoneBefore,
+        userB_red_core_shard: userBShardBefore
       })
 
-      /* Step 2: 用户A挂牌出售red_shard（使用 createFungibleAssetListing） */
-      console.log('📝 Step 2: 用户A创建 red_shard 挂牌（fungible_asset类型）')
+      /* Step 2: 用户A挂牌出售red_core_shard（使用 createFungibleAssetListing） */
+      console.log('📝 Step 2: 用户A创建 red_core_shard 挂牌（fungible_asset类型）')
 
       let listing
       try {
@@ -761,10 +766,10 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
           return await MarketListingService.createFungibleAssetListing(
             {
               seller_user_id: userAId,
-              offer_asset_code: 'red_shard',
+              offer_asset_code: 'red_core_shard',
               offer_amount: shardAmount,
-              price_amount: diamondPrice,
-              price_asset_code: 'DIAMOND',
+              price_amount: starStonePrice,
+              price_asset_code: 'star_stone',
               idempotency_key: generateIdempotencyKey('multi_user_fungible_listing')
             },
             { transaction }
@@ -796,7 +801,7 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
       }
 
       /* Step 3: 用户B购买用户A的挂牌 */
-      console.log('📝 Step 3: 用户B购买用户A的 red_shard 挂牌')
+      console.log('📝 Step 3: 用户B购买用户A的 red_core_shard 挂牌')
 
       let order
       try {
@@ -833,38 +838,41 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
       console.log('📝 Step 4: 验证资产转移')
       await sleep(500)
 
-      const userAShardAfter = await getAssetBalance(userAId, 'red_shard')
-      const userBShardAfter = await getAssetBalance(userBId, 'red_shard')
-      const userADiamondAfter = await getAssetBalance(userAId, 'DIAMOND')
-      const userBDiamondAfter = await getAssetBalance(userBId, 'DIAMOND')
+      const userAShardAfter = await getAssetBalance(userAId, 'red_core_shard')
+      const userBShardAfter = await getAssetBalance(userBId, 'red_core_shard')
+      const userAStarStoneAfter = await getAssetBalance(userAId, 'star_stone')
+      const userBStarStoneAfter = await getAssetBalance(userBId, 'star_stone')
 
       console.log('📊 交易后余额:', {
-        userA_red_shard: userAShardAfter,
-        userA_DIAMOND: userADiamondAfter,
-        userB_red_shard: userBShardAfter,
-        userB_DIAMOND: userBDiamondAfter
+        userA_red_core_shard: userAShardAfter,
+        userA_star_stone: userAStarStoneAfter,
+        userB_red_core_shard: userBShardAfter,
+        userB_star_stone: userBStarStoneAfter
       })
 
       /* 验证用户B碎片余额（购买可能因并发或库存不足未完成，容忍差异） */
       const userBShardDelta = Number(userBShardAfter) - Number(userBShardBefore)
-      console.log('📊 用户B red_shard 变化:', userBShardDelta, '(预期:', shardAmount, ')')
+      console.log('📊 用户B red_core_shard 变化:', userBShardDelta, '(预期:', shardAmount, ')')
       expect(Number(userBShardAfter)).toBeGreaterThanOrEqual(Number(userBShardBefore))
 
-      /* 验证用户B DIAMOND变化 */
-      const userBDiamondDelta = Number(userBDiamondBefore) - Number(userBDiamondAfter)
-      console.log('📊 用户B DIAMOND 变化:', userBDiamondDelta)
-      expect(Number(userBDiamondAfter)).toBeLessThanOrEqual(Number(userBDiamondBefore))
-      console.log('✅ 用户B DIAMOND已支付:', Number(userBDiamondBefore) - Number(userBDiamondAfter))
+      /* 验证用户B star_stone变化 */
+      const userBStarStoneDelta = Number(userBStarStoneBefore) - Number(userBStarStoneAfter)
+      console.log('📊 用户B star_stone 变化:', userBStarStoneDelta)
+      expect(Number(userBStarStoneAfter)).toBeLessThanOrEqual(Number(userBStarStoneBefore))
+      console.log(
+        '✅ 用户B star_stone已支付:',
+        Number(userBStarStoneBefore) - Number(userBStarStoneAfter)
+      )
 
-      /* 验证用户A DIAMOND变化（购买如果完成则卖家应收到钻石） */
-      const userADiamondDelta = Number(userADiamondAfter) - Number(userADiamondBefore)
-      console.log('📊 用户A DIAMOND 变化:', userADiamondDelta)
-      expect(Number(userADiamondAfter)).toBeGreaterThanOrEqual(Number(userADiamondBefore))
+      /* 验证用户A star_stone变化（购买如果完成则卖家应收到星石） */
+      const userAStarStoneDelta = Number(userAStarStoneAfter) - Number(userAStarStoneBefore)
+      console.log('📊 用户A star_stone 变化:', userAStarStoneDelta)
+      expect(Number(userAStarStoneAfter)).toBeGreaterThanOrEqual(Number(userAStarStoneBefore))
 
-      /* Step 5: 用户B使用red_shard兑换商品 */
-      console.log('📝 Step 5: 用户B使用 red_shard 兑换商品')
+      /* Step 5: 用户B使用red_core_shard兑换商品 */
+      console.log('📝 Step 5: 用户B使用 red_core_shard 兑换商品')
 
-      /* 查找可用的兑换商品（使用 red_shard 支付）— ExchangeItem + ExchangeItemSku + ExchangeChannelPrice */
+      /* 查找可用的兑换商品（使用 red_core_shard 支付）— ExchangeItem + ExchangeItemSku + ExchangeChannelPrice */
       const { ExchangeItem, ExchangeItemSku, ExchangeChannelPrice } = require('../../../models')
       const exchangeProduct = await ExchangeItem.findOne({
         where: { status: 'active' },
@@ -878,7 +886,7 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
               {
                 model: ExchangeChannelPrice,
                 as: 'channelPrices',
-                where: { cost_asset_code: 'red_shard', is_enabled: true },
+                where: { cost_asset_code: 'red_core_shard', is_enabled: true },
                 required: true
               }
             ]
@@ -887,9 +895,9 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
       })
 
       if (!exchangeProduct) {
-        console.log('⏭️ 未找到使用 red_shard 支付的兑换商品，跳过兑换步骤')
+        console.log('⏭️ 未找到使用 red_core_shard 支付的兑换商品，跳过兑换步骤')
         console.log(
-          '💡 提示：需要在 exchange_items + exchange_item_skus + exchange_channel_prices 中配置 cost_asset_code=red_shard 的商品'
+          '💡 提示：需要在 exchange_items + exchange_item_skus + exchange_channel_prices 中配置 cost_asset_code=red_core_shard 的商品'
         )
         console.log('✅ 11.6 多用户交互场景测试完成（挂牌+购买流程已验证，兑换步骤跳过）')
         return
@@ -905,10 +913,10 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
         cost_amount: matchedPrice.cost_amount
       })
 
-      /* 确保用户B有足够的red_shard进行兑换 */
+      /* 确保用户B有足够的red_core_shard进行兑换 */
       const requiredShard = matchedPrice.cost_amount || 1
       if (userBShardAfter < requiredShard) {
-        console.log('⏭️ 用户B red_shard 不足，跳过兑换步骤')
+        console.log('⏭️ 用户B red_core_shard 不足，跳过兑换步骤')
         console.log('✅ 11.6 多用户交互场景测试完成（挂牌+购买流程已验证，兑换步骤跳过）')
         return
       }
@@ -928,10 +936,10 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
           item_name: exchangeProduct.item_name
         })
 
-        /* 验证兑换后用户B的red_shard余额减少 — Number() 确保 BIGINT/DECIMAL 正确比较 */
-        const userBShardAfterExchange = await getAssetBalance(userBId, 'red_shard')
+        /* 验证兑换后用户B的red_core_shard余额减少 — Number() 确保 BIGINT/DECIMAL 正确比较 */
+        const userBShardAfterExchange = await getAssetBalance(userBId, 'red_core_shard')
         expect(Number(userBShardAfterExchange)).toBeLessThan(Number(userBShardAfter))
-        console.log('✅ 兑换后用户B red_shard余额:', userBShardAfterExchange)
+        console.log('✅ 兑换后用户B red_core_shard余额:', userBShardAfterExchange)
       } catch (error) {
         console.log('⚠️ 兑换失败:', error.message)
         /* 兑换失败不影响测试整体通过（挂牌+购买流程已验证） */
@@ -1035,7 +1043,7 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
   /*
    * ==========================================
    * 🧪 任务 11.7: 商户发放→用户消费
-   * 商户merchant_points_reward→用户获得POINTS→抽奖消费
+   * 商户merchant_points_reward→用户获得points→抽奖消费
    * ==========================================
    */
   describe('🏪 11.7 商户发放→用户消费', () => {
@@ -1047,8 +1055,8 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
       /*
        * 业务流程说明：
        * 1. 商户通过 MerchantPointsService 申请发放积分给用户
-       * 2. 审核通过后，BalanceService 自动为用户增加 POINTS
-       * 3. 用户使用 POINTS 进行抽奖
+       * 2. 审核通过后，BalanceService 自动为用户增加 points
+       * 3. 用户使用 points 进行抽奖
        *
        * 由于商户积分发放需要审核流程，这里直接模拟步骤2-3
        */
@@ -1059,15 +1067,15 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
       const pointsAmount = 100 // 发放100积分
 
       /* 记录初始余额 */
-      const pointsBefore = await getAssetBalance(userId, 'POINTS')
-      console.log('📊 抽奖前POINTS余额:', pointsBefore)
+      const pointsBefore = await getAssetBalance(userId, 'points')
+      console.log('📊 抽奖前points余额:', pointsBefore)
 
       /* 增加积分（模拟商户发放） - 注意：params 和 options 分开传递 */
       await TransactionManager.execute(async transaction => {
         await BalanceService.changeBalance(
           {
             user_id: userId,
-            asset_code: 'POINTS',
+            asset_code: 'points',
             delta_amount: pointsAmount,
             business_type: 'merchant_points_reward',
             idempotency_key: generateIdempotencyKey('merchant_reward'),
@@ -1078,7 +1086,7 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
       })
 
       /* 验证积分增加 */
-      const pointsAfterReward = await getAssetBalance(userId, 'POINTS')
+      const pointsAfterReward = await getAssetBalance(userId, 'points')
       expect(pointsAfterReward).toBe(pointsBefore + pointsAmount)
       console.log('✅ 积分发放成功，当前余额:', pointsAfterReward)
 
@@ -1092,7 +1100,7 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
 
       /* 获取抽奖成本配置 */
       const costPoints = testCampaign.cost_points || 10
-      console.log('📊 抽奖成本:', costPoints, 'POINTS')
+      console.log('📊 抽奖成本:', costPoints, 'points')
 
       /* 确保有足够积分 */
       if (pointsAfterReward < costPoints) {
@@ -1102,7 +1110,7 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
 
       /*
        * 注意：实际抽奖需要通过 UnifiedLotteryEngine 或 API 调用
-       * 这里通过验证 LotteryDraw 记录来确认抽奖消费 POINTS 的机制
+       * 这里通过验证 LotteryDraw 记录来确认抽奖消费 points 的机制
        */
       const recentDraws = await LotteryDraw.findAll({
         where: {
@@ -1113,7 +1121,7 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
         order: [['created_at', 'DESC']]
       })
 
-      console.log('📊 用户历史抽奖记录（消费POINTS）:', recentDraws.length)
+      console.log('📊 用户历史抽奖记录（消费points）:', recentDraws.length)
 
       if (recentDraws.length > 0) {
         const sample = recentDraws[0]
@@ -1136,12 +1144,12 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
   /*
    * ==========================================
    * 🧪 任务 11.8: 边界条件场景
-   * POINTS刚好够1次(cost_points=10)→抽完余额为0→再抽被拦截
+   * points刚好够1次(cost_points=10)→抽完余额为0→再抽被拦截
    * ==========================================
    */
   describe('🔒 11.8 边界条件场景', () => {
-    test('P0-11.8-1: POINTS精确边界测试（刚好够→余额为0→再抽被拦截）', async () => {
-      console.log('🎯 开始测试: POINTS边界条件')
+    test('P0-11.8-1: points精确边界测试（刚好够→余额为0→再抽被拦截）', async () => {
+      console.log('🎯 开始测试: points边界条件')
 
       const userId = testUserA.user_id
 
@@ -1152,11 +1160,11 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
 
       /* 获取抽奖成本 */
       const costPoints = testCampaign.cost_points || 10
-      console.log('📊 抽奖成本:', costPoints, 'POINTS')
+      console.log('📊 抽奖成本:', costPoints, 'points')
 
       /*
        * 边界条件测试逻辑：
-       * 1. 设置用户POINTS余额为恰好抽奖1次的数量
+       * 1. 设置用户points余额为恰好抽奖1次的数量
        * 2. 执行抽奖后，余额应为0
        * 3. 再次尝试抽奖应被拦截（余额不足）
        *
@@ -1185,16 +1193,16 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
         return
       }
 
-      /* 获取 POINTS 余额记录 */
+      /* 获取 points 余额记录 */
       const pointsBalance = await AccountAssetBalance.findOne({
         where: {
           account_id: account.account_id,
-          asset_code: 'POINTS'
+          asset_code: 'points'
         }
       })
 
       if (!pointsBalance) {
-        console.log('⏭️ 跳过：用户POINTS余额记录不存在')
+        console.log('⏭️ 跳过：用户points余额记录不存在')
         return
       }
 
@@ -1227,7 +1235,7 @@ describe('🎯 完整业务链路测试（任务 11.4 ~ 11.8）', () => {
           await BalanceService.changeBalance(
             {
               user_id: userId,
-              asset_code: 'POINTS',
+              asset_code: 'points',
               delta_amount: -excessiveAmount, // 负数表示扣减
               business_type: 'test_boundary',
               counterpart_account_id: 2,

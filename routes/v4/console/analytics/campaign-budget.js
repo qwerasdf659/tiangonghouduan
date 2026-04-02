@@ -29,6 +29,7 @@ const {
   validators
 } = require('../shared/middleware')
 const TransactionManager = require('../../../../utils/TransactionManager')
+const { AssetCode } = require('../../../../constants/AssetCode')
 // P1-9：服务通过 ServiceManager 获取（B1-Injected + E2-Strict snake_case）
 
 /**
@@ -444,7 +445,7 @@ router.get(
       const allBalances = await BalanceService.getAllBalances({ user_id: validUserId })
 
       // 过滤出 BUDGET_POINTS 余额
-      const budgetBalances = allBalances.filter(b => b.asset_code === 'BUDGET_POINTS')
+      const budgetBalances = allBalances.filter(b => b.asset_code === AssetCode.BUDGET_POINTS)
 
       // 计算总预算积分
       const totalBudgetPoints = budgetBalances.reduce(

@@ -7423,7 +7423,7 @@
             <div class="grid grid-cols-2 gap-4">
               <div>
                 <label class="block text-sm font-medium mb-1">材质资产编码</label>
-                <input type="text" class="w-full px-3 py-2 border rounded" x-model="prizeForm.material_asset_code" placeholder="如 red_shard, DIAMOND 或留空">
+                <input type="text" class="w-full px-3 py-2 border rounded" x-model="prizeForm.material_asset_code" placeholder="如 red_core_shard, star_stone 或留空">
                 <p class="text-xs text-gray-400 mt-1">虚拟物品资产类型标识，传统奖品留空</p>
               </div>
               <div>
@@ -7439,17 +7439,17 @@
               <div>
                 <label class="block text-sm font-medium mb-1">预算成本 <span class="text-red-500">*</span></label>
                 <input type="number" class="w-full px-3 py-2 border rounded" x-model.number="prizeForm.budget_cost" min="0" step="1"
-                  :disabled="(prizeForm.material_asset_code && prizeForm.material_asset_code !== 'DIAMOND') || prizeForm.is_fallback || prizeForm.material_asset_code === 'DIAMOND'"
-                  :class="{ 'bg-gray-100 cursor-not-allowed': (prizeForm.material_asset_code && prizeForm.material_asset_code !== 'DIAMOND') || prizeForm.is_fallback || prizeForm.material_asset_code === 'DIAMOND' }">
+                  :disabled="(prizeForm.material_asset_code && prizeForm.material_asset_code !== 'star_stone') || prizeForm.is_fallback || prizeForm.material_asset_code === 'star_stone'"
+                  :class="{ 'bg-gray-100 cursor-not-allowed': (prizeForm.material_asset_code && prizeForm.material_asset_code !== 'star_stone') || prizeForm.is_fallback || prizeForm.material_asset_code === 'star_stone' }">
                 <p class="text-xs text-gray-400 mt-1">
-                  <template x-if="prizeForm.material_asset_code && prizeForm.material_asset_code !== 'DIAMOND' && !prizeForm.is_fallback">
+                  <template x-if="prizeForm.material_asset_code && prizeForm.material_asset_code !== 'star_stone' && !prizeForm.is_fallback">
                     <span class="text-blue-500">系统自动计算: 材质数量 × 单价</span>
                   </template>
-                  <template x-if="prizeForm.material_asset_code === 'DIAMOND' || prizeForm.is_fallback">
+                  <template x-if="prizeForm.material_asset_code === 'star_stone' || prizeForm.is_fallback">
                     <span class="text-gray-400">不消耗预算，固定为 0</span>
                   </template>
                   <template x-if="!prizeForm.material_asset_code && !prizeForm.is_fallback">
-                    <span>每次中奖实际扣减的 BUDGET_POINTS</span>
+                    <span>每次中奖实际扣减的 budget_points</span>
                   </template>
                 </p>
               </div>

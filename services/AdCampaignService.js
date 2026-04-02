@@ -89,7 +89,10 @@ class AdCampaignService {
           where: { ad_campaign_id: campaign.ad_campaign_id },
           attributes: [
             [
-              AdBillingRecord.sequelize.fn('SUM', AdBillingRecord.sequelize.col('amount_diamond')),
+              AdBillingRecord.sequelize.fn(
+                'SUM',
+                AdBillingRecord.sequelize.col('amount_star_stone')
+              ),
               'total_amount'
             ],
             [
@@ -158,9 +161,9 @@ class AdCampaignService {
               'slot_name',
               'slot_type',
               'position',
-              'daily_price_diamond',
-              'min_bid_diamond',
-              'min_budget_diamond'
+              'daily_price_star_stone',
+              'min_bid_star_stone',
+              'min_budget_star_stone'
             ]
           },
           {
@@ -229,8 +232,8 @@ class AdCampaignService {
    * @param {number} data.ad_slot_id - 广告位ID
    * @param {string} data.campaign_name - 计划名称
    * @param {string} data.billing_mode - 计费模式（fixed_daily/bidding）
-   * @param {number} data.daily_bid_diamond - 竞价模式下的每日出价（竞价模式必填）
-   * @param {number} data.budget_total_diamond - 总预算（竞价模式必填）
+   * @param {number} data.daily_bid_star_stone - 竞价模式下的每日出价（竞价模式必填）
+   * @param {number} data.budget_total_star_stone - 总预算（竞价模式必填）
    * @param {number} data.fixed_days - 固定包天天数（固定包天模式必填）
    * @param {Object} data.targeting_rules - 定向规则（JSON）
    * @param {string} data.start_date - 开始日期（YYYY-MM-DD）
@@ -286,15 +289,18 @@ class AdCampaignService {
         }
 
         // 计算固定包天总价
-        const fixed_total_diamond = adSlot.daily_price_diamond * data.fixed_days
-        data.fixed_total_diamond = fixed_total_diamond
+        const fixed_total_star_stone = adSlot.daily_price_star_stone * data.fixed_days
+        data.fixed_total_star_stone = fixed_total_star_stone
       } else if (data.billing_mode === 'bidding') {
-        if (!data.daily_bid_diamond || data.daily_bid_diamond < adSlot.min_bid_diamond) {
-          throw new Error(`竞价模式每日出价不能低于最低竞价: ${adSlot.min_bid_diamond}钻石`)
+        if (!data.daily_bid_star_stone || data.daily_bid_star_stone < adSlot.min_bid_star_stone) {
+          throw new Error(`竞价模式每日出价不能低于最低竞价: ${adSlot.min_bid_star_stone}星石`)
         }
 
-        if (!data.budget_total_diamond || data.budget_total_diamond < adSlot.min_budget_diamond) {
-          throw new Error(`竞价模式总预算不能低于最低预算: ${adSlot.min_budget_diamond}钻石`)
+        if (
+          !data.budget_total_star_stone ||
+          data.budget_total_star_stone < adSlot.min_budget_star_stone
+        ) {
+          throw new Error(`竞价模式总预算不能低于最低预算: ${adSlot.min_budget_star_stone}星石`)
         }
       } else {
         throw new Error(`无效的计费模式: ${data.billing_mode}`)
@@ -313,11 +319,11 @@ class AdCampaignService {
           campaign_name: data.campaign_name,
           billing_mode: data.billing_mode,
           status: 'draft',
-          daily_bid_diamond: data.daily_bid_diamond || null,
-          budget_total_diamond: data.budget_total_diamond || null,
-          budget_spent_diamond: 0,
+          daily_bid_star_stone: data.daily_bid_star_stone || null,
+          budget_total_star_stone: data.budget_total_star_stone || null,
+          budget_spent_star_stone: 0,
           fixed_days: data.fixed_days || null,
-          fixed_total_diamond: data.fixed_total_diamond || null,
+          fixed_total_star_stone: data.fixed_total_star_stone || null,
           targeting_rules: data.targeting_rules || null,
           start_date: data.start_date || null,
           end_date: data.end_date || null,
@@ -389,8 +395,8 @@ class AdCampaignService {
       if (
         data.billing_mode ||
         data.fixed_days ||
-        data.daily_bid_diamond ||
-        data.budget_total_diamond
+        data.daily_bid_star_stone ||
+        data.budget_total_star_stone
       ) {
         const adSlot = await AdSlot.findByPk(campaign.ad_slot_id, {
           transaction: options.transaction
@@ -403,17 +409,17 @@ class AdCampaignService {
           if (!fixedDays || fixedDays < 1) {
             throw new Error('固定包天模式必须提供包天天数（fixed_days >= 1）')
           }
-          data.fixed_total_diamond = adSlot.daily_price_diamond * fixedDays
+          data.fixed_total_star_stone = adSlot.daily_price_star_stone * fixedDays
         } else if (billingMode === 'bidding') {
-          const dailyBid = data.daily_bid_diamond || campaign.daily_bid_diamond
-          const budgetTotal = data.budget_total_diamond || campaign.budget_total_diamond
+          const dailyBid = data.daily_bid_star_stone || campaign.daily_bid_star_stone
+          const budgetTotal = data.budget_total_star_stone || campaign.budget_total_star_stone
 
-          if (!dailyBid || dailyBid < adSlot.min_bid_diamond) {
-            throw new Error(`竞价模式每日出价不能低于最低竞价: ${adSlot.min_bid_diamond}钻石`)
+          if (!dailyBid || dailyBid < adSlot.min_bid_star_stone) {
+            throw new Error(`竞价模式每日出价不能低于最低竞价: ${adSlot.min_bid_star_stone}星石`)
           }
 
-          if (!budgetTotal || budgetTotal < adSlot.min_budget_diamond) {
-            throw new Error(`竞价模式总预算不能低于最低预算: ${adSlot.min_budget_diamond}钻石`)
+          if (!budgetTotal || budgetTotal < adSlot.min_budget_star_stone) {
+            throw new Error(`竞价模式总预算不能低于最低预算: ${adSlot.min_budget_star_stone}星石`)
           }
         }
       }
@@ -454,7 +460,7 @@ class AdCampaignService {
           {
             model: AdSlot,
             as: 'adSlot',
-            attributes: ['daily_price_diamond']
+            attributes: ['daily_price_star_stone']
           }
         ],
         transaction: options.transaction
@@ -472,7 +478,7 @@ class AdCampaignService {
       await campaign.update({ status: 'pending_review' }, { transaction: options.transaction })
 
       /*
-       * 如果是固定包天模式，冻结钻石（由路由层调用AdBillingService处理）
+       * 如果是固定包天模式，冻结星石（由路由层调用AdBillingService处理）
        * 这里只更新状态，实际的冻结操作在路由层完成
        */
 
@@ -1071,7 +1077,7 @@ class AdCampaignService {
       const spendResult = await AdCampaign.findOne({
         attributes: [
           [
-            AdCampaign.sequelize.fn('SUM', AdCampaign.sequelize.col('budget_spent_diamond')),
+            AdCampaign.sequelize.fn('SUM', AdCampaign.sequelize.col('budget_spent_star_stone')),
             'total_spend'
           ],
           [AdCampaign.sequelize.fn('COUNT', AdCampaign.sequelize.col('ad_campaign_id')), 'total']

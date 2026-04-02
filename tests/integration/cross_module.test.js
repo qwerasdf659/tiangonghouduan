@@ -130,7 +130,7 @@ describe('阶段八：跨模块集成测试', () => {
         )
         const initial_balance = await BalanceService.getOrCreateBalance(
           initial_account.account_id,
-          'POINTS',
+          'points',
           { transaction }
         )
         const initial_points = Number(initial_balance?.available_amount || 0)
@@ -160,7 +160,7 @@ describe('阶段八：跨模块集成测试', () => {
           await BalanceService.changeBalance(
             {
               user_id: test_user_id,
-              asset_code: 'POINTS',
+              asset_code: 'points',
               delta_amount: recharge_amount,
               business_type: 'test_recharge',
               counterpart_account_id: 2,
@@ -175,7 +175,7 @@ describe('阶段八：跨模块集成测试', () => {
         // 5. 获取充值后余额
         const recharged_balance = await BalanceService.getOrCreateBalance(
           initial_account.account_id,
-          'POINTS',
+          'points',
           { transaction }
         )
         const points_before_draw = Number(recharged_balance?.available_amount || 0)
@@ -214,7 +214,7 @@ describe('阶段八：跨模块集成测试', () => {
         // 8. 验证积分变化（考虑奖品可能是积分类型）
         const final_balance = await BalanceService.getOrCreateBalance(
           initial_account.account_id,
-          'POINTS',
+          'points',
           { transaction }
         )
         const points_after_draw = Number(final_balance?.available_amount || 0)
@@ -460,7 +460,7 @@ describe('阶段八：跨模块集成测试', () => {
             {
               seller_user_id,
               item_id: test_item_id, // MarketListingService.createListing 期望 item_id
-              price_asset_code: 'DIAMOND',
+              price_asset_code: 'star_stone',
               price_amount: 50,
               idempotency_key: listing_idempotency_key
             },
@@ -487,17 +487,17 @@ describe('阶段八：跨模块集成测试', () => {
         console.log('📦 物品上架完成', {
           market_listing_id,
           price: 50,
-          asset_code: 'DIAMOND'
+          asset_code: 'star_stone'
         })
 
-        // 3. 确保买家有足够的钻石
+        // 3. 确保买家有足够的星石
         const buyer_account = await BalanceService.getOrCreateAccount(
           { user_id: buyer_user_id },
           { transaction }
         )
         const buyer_balance = await BalanceService.getOrCreateBalance(
           buyer_account.account_id,
-          'DIAMOND',
+          'star_stone',
           { transaction }
         )
         const buyer_diamonds = Number(buyer_balance?.available_amount || 0)
@@ -507,7 +507,7 @@ describe('阶段八：跨模块集成测试', () => {
           await BalanceService.changeBalance(
             {
               user_id: buyer_user_id,
-              asset_code: 'DIAMOND',
+              asset_code: 'star_stone',
               delta_amount: 100,
               business_type: 'test_recharge',
               counterpart_account_id: 2,
@@ -561,7 +561,7 @@ describe('阶段八：跨模块集成测试', () => {
         )
         const seller_final_balance = await BalanceService.getOrCreateBalance(
           seller_account.account_id,
-          'DIAMOND',
+          'star_stone',
           { transaction }
         )
 
@@ -683,7 +683,7 @@ describe('阶段八：跨模块集成测试', () => {
           order_id: 'test_order_123',
           buyer_user_id: buyer_id,
           net_amount: 45,
-          asset_code: 'DIAMOND',
+          asset_code: 'star_stone',
           timestamp: BeijingTimeHelper.timestamp()
         }
       })
@@ -703,7 +703,7 @@ describe('阶段八：跨模块集成测试', () => {
           order_id: 'test_order_123',
           seller_user_id: seller_id,
           gross_amount: 50,
-          asset_code: 'DIAMOND',
+          asset_code: 'star_stone',
           timestamp: BeijingTimeHelper.timestamp()
         }
       })

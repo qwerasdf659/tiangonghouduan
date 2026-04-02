@@ -156,32 +156,32 @@ module.exports = sequelize => {
         comment: '计划状态'
       },
 
-      daily_bid_diamond: {
+      daily_bid_star_stone: {
         type: DataTypes.INTEGER,
         allowNull: true,
         validate: {
           min: { args: [0], msg: '竞价日出价不能为负数' }
         },
-        comment: '竞价模式下的每日出价（钻石）'
+        comment: '竞价模式下的每日出价（星石）'
       },
 
-      budget_total_diamond: {
+      budget_total_star_stone: {
         type: DataTypes.INTEGER,
         allowNull: true,
         validate: {
           min: { args: [0], msg: '总预算不能为负数' }
         },
-        comment: '总预算（钻石）'
+        comment: '总预算（星石）'
       },
 
-      budget_spent_diamond: {
+      budget_spent_star_stone: {
         type: DataTypes.INTEGER,
         allowNull: false,
         defaultValue: 0,
         validate: {
           min: { args: [0], msg: '已消耗预算不能为负数' }
         },
-        comment: '已消耗预算（钻石）'
+        comment: '已消耗预算（星石）'
       },
 
       fixed_days: {
@@ -193,13 +193,13 @@ module.exports = sequelize => {
         comment: '固定包天模式下的天数'
       },
 
-      fixed_total_diamond: {
+      fixed_total_star_stone: {
         type: DataTypes.INTEGER,
         allowNull: true,
         validate: {
           min: { args: [0], msg: '包天总价不能为负数' }
         },
-        comment: '固定包天模式下的总价（钻石）'
+        comment: '固定包天模式下的总价（星石）'
       },
 
       targeting_rules: {

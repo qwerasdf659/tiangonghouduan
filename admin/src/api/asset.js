@@ -2,18 +2,18 @@
  * 资产管理 API 模块
  *
  * @module api/asset
- * @description 资产、材料、钻石账户相关的 API 调用
+ * @description 资产、材料、星石账户相关的 API 调用
  *
  * 后端路由映射：
  * - 资产统计: /api/v4/console/assets/*
- * - 资产调整: /api/v4/console/asset-adjustment/*（POINTS/DIAMOND/BUDGET_POINTS/材料统一入口）
+ * - 资产调整: /api/v4/console/asset-adjustment/*（points/star_stone/budget_points/材料统一入口）
  * - 材料管理: /api/v4/console/material/*
  * - 物品管理: /api/v4/console/item-templates/*, /api/v4/console/items/*
  *
  * @version 2.0.0
  * @since 2026-01-23
  * @see routes/v4/console/assets/transactions.js - 资产流水查询
- * @see routes/v4/console/config/asset-adjustment.js - 资产调整（含钻石）
+ * @see routes/v4/console/config/asset-adjustment.js - 资产调整（含星石）
  * @see routes/v4/console/operations/material.js - 材料转换规则管理
  */
 
@@ -76,7 +76,7 @@ export const ASSET_ENDPOINTS = {
   ORPHAN_FROZEN_CLEANUP: `${API_PREFIX}/console/orphan-frozen/cleanup`,
   ORPHAN_FROZEN_STATS: `${API_PREFIX}/console/orphan-frozen/stats`,
 
-  // 资产调整（统一入口，已合并原钻石/材料调整）
+  // 资产调整（统一入口，已合并原星石/材料调整）
   // 资产类型列表: ADJUSTMENT_ASSET_TYPES
   // 用户余额查询: ADJUSTMENT_USER_BALANCES
   // 资产调整操作: ADJUSTMENT_ADJUST
@@ -119,7 +119,7 @@ export const AssetAPI = {
    *
    * @param {Object} params - 查询参数
    * @param {number} params.user_id - 用户ID（必填）
-   * @param {string} [params.asset_code] - 资产代码筛选（如 'POINTS', 'DIAMOND', 'red_shard'）
+   * @param {string} [params.asset_code] - 资产代码筛选（如 'points', 'star_stone', 'red_core_shard'）
    * @param {string} [params.business_type] - 业务类型筛选（如 'admin_adjustment', 'lottery_reward'）
    * @param {string} [params.start_date] - 开始日期（ISO8601格式）
    * @param {string} [params.end_date] - 结束日期（ISO8601格式）
@@ -151,7 +151,7 @@ export const AssetAPI = {
    * // 查询用户积分流水
    * const result = await AssetAPI.getTransactions({
    *   user_id: 123,
-   *   asset_code: 'POINTS',
+   *   asset_code: 'points',
    *   page: 1,
    *   page_size: 20
    * })
@@ -171,7 +171,7 @@ export const AssetAPI = {
    * @function exportAssets
    *
    * @param {Object} [params] - 导出参数
-   * @param {string} [params.type] - 资产类型筛选（如 'POINTS', 'DIAMOND'）
+   * @param {string} [params.type] - 资产类型筛选（如 'points', 'star_stone'）
    * @param {string} [params.format='excel'] - 导出格式（excel/csv）
    * @param {number} [params.user_id] - 筛选指定用户
    * @param {number} [params.page_size=1000] - 导出数据条数限制（最大10000）
@@ -180,7 +180,7 @@ export const AssetAPI = {
    *
    * @example
    * // 导出所有积分资产
-   * const blob = await AssetAPI.exportAssets({ type: 'POINTS', format: 'excel' })
+   * const blob = await AssetAPI.exportAssets({ type: 'points', format: 'excel' })
    *
    * @see GET /api/v4/console/assets/export
    */
@@ -197,7 +197,7 @@ export const AssetAPI = {
    *
    * @description 整合三类资产域，提供统一的资产查询入口：
    * 1. 积分（POINTS）- 来自 account_asset_balances
-   * 2. 可叠加资产（DIAMOND、材料）- 来自 account_asset_balances
+   * 2. 可叠加资产（star_stone、材料）- 来自 account_asset_balances
    * 3. 不可叠加物品（优惠券、实物商品）- 来自 items
    *
    * @async
@@ -271,11 +271,11 @@ export const AssetAPI = {
    * @returns {string} return.data.user.mobile - 手机号
    * @returns {string} return.data.user.status - 用户状态
    * @returns {Array<Object>} return.data.balances - 资产余额列表
-   * @returns {string} return.data.balances[].asset_code - 资产代码（POINTS/DIAMOND/BUDGET_POINTS/材料代码）
+   * @returns {string} return.data.balances[].asset_code - 资产代码（points/star_stone/budget_points/材料代码）
    * @returns {number} return.data.balances[].available_amount - 可用余额
    * @returns {number} return.data.balances[].frozen_amount - 冻结余额
    * @returns {number} return.data.balances[].total - 总余额（可用+冻结）
-   * @returns {number|null} return.data.balances[].campaign_id - 活动ID（仅 BUDGET_POINTS 有值）
+   * @returns {number|null} return.data.balances[].campaign_id - 活动ID（仅 budget_points 有值）
    *
    * @throws {Error} 用户不存在时返回 404 错误
    *
@@ -294,23 +294,23 @@ export const AssetAPI = {
   /**
    * 管理员调整用户资产（敏感操作）
    *
-   * @description 统一资产调整入口，支持 POINTS/DIAMOND/BUDGET_POINTS/材料等所有资产类型
+   * @description 统一资产调整入口，支持 points/star_stone/budget_points/材料等所有资产类型
    *
    * ⚠️ 安全约束：
    * - idempotency_key 必须由前端提供（禁止自动生成，确保幂等性）
    * - 所有调整操作记录审计日志
-   * - BUDGET_POINTS 调整必须提供 campaign_id
+   * - budget_points 调整必须提供 campaign_id
    *
    * @async
    * @function adjustAsset
    *
    * @param {Object} data - 调整参数
    * @param {number} data.user_id - 目标用户ID（必填）
-   * @param {string} data.asset_code - 资产代码（必填，如 'POINTS', 'DIAMOND', 'BUDGET_POINTS', 'red_shard'）
+   * @param {string} data.asset_code - 资产代码（必填，如 'points', 'star_stone', 'budget_points', 'red_core_shard'）
    * @param {number} data.amount - 调整数量（必填，正数=增加，负数=扣减，不能为0）
    * @param {string} data.reason - 调整原因（必填，用于审计）
    * @param {string} data.idempotency_key - 幂等键（必填，推荐格式：admin_adjust_{admin_id}_{user_id}_{asset_code}_{timestamp}）
-   * @param {number} [data.campaign_id] - 活动ID（BUDGET_POINTS 必填）
+   * @param {number} [data.campaign_id] - 活动ID（budget_points 必填）
    *
    * @returns {Promise<Object>} 响应对象
    * @returns {boolean} return.success - 请求是否成功
@@ -332,19 +332,19 @@ export const AssetAPI = {
    * // 增加用户积分
    * const result = await AssetAPI.adjustAsset({
    *   user_id: 123,
-   *   asset_code: 'POINTS',
+   *   asset_code: 'points',
    *   amount: 1000,
    *   reason: '客服补偿',
-   *   idempotency_key: `admin_adjust_1_123_POINTS_${Date.now()}`
+   *   idempotency_key: `admin_adjust_1_123_points_${Date.now()}`
    * })
    *
-   * // 扣减用户钻石
+   * // 扣减用户星石
    * const result2 = await AssetAPI.adjustAsset({
    *   user_id: 123,
-   *   asset_code: 'DIAMOND',
+   *   asset_code: 'star_stone',
    *   amount: -50,
    *   reason: '数据修正',
-   *   idempotency_key: `admin_adjust_1_123_DIAMOND_${Date.now()}`
+   *   idempotency_key: `admin_adjust_1_123_star_stone_${Date.now()}`
    * })
    *
    * @see POST /api/v4/console/asset-adjustment/adjust
@@ -378,8 +378,8 @@ export const AssetAPI = {
    * @function getConversionRules
    *
    * @param {Object} [params] - 查询参数
-   * @param {string} [params.from_asset_code] - 源资产代码筛选（如 'red_shard'）
-   * @param {string} [params.to_asset_code] - 目标资产代码筛选（如 'DIAMOND'）
+   * @param {string} [params.from_asset_code] - 源资产代码筛选（如 'red_core_shard'）
+   * @param {string} [params.to_asset_code] - 目标资产代码筛选（如 'star_stone'）
    * @param {boolean|string} [params.is_enabled] - 是否启用筛选（true/false）
    * @param {number} [params.page=1] - 页码（从1开始）
    * @param {number} [params.page_size=20] - 每页数量
@@ -406,9 +406,9 @@ export const AssetAPI = {
    * // 查询所有启用的转换规则
    * const result = await AssetAPI.getConversionRules({ is_enabled: true })
    *
-   * // 查询红水晶碎片的转换规则
+   * // 查询红源晶碎片的转换规则
    * const result2 = await AssetAPI.getConversionRules({
-   *   from_asset_code: 'red_shard',
+   *   from_asset_code: 'red_core_shard',
    *   page: 1,
    *   page_size: 10
    * })
@@ -440,8 +440,8 @@ export const AssetAPI = {
    * @async
    * @function createConversionRule
    * @param {Object} data - 规则参数
-   * @param {string} data.from_asset_code - 源资产代码（如 'red_shard'）
-   * @param {string} data.to_asset_code - 目标资产代码（如 'DIAMOND'）
+   * @param {string} data.from_asset_code - 源资产代码（如 'red_core_shard'）
+   * @param {string} data.to_asset_code - 目标资产代码（如 'star_stone'）
    * @param {number} data.from_amount - 源资产数量
    * @param {number} data.to_amount - 目标资产数量
    * @param {string} data.effective_at - 生效时间（ISO8601，含 +08:00 时区）
@@ -483,7 +483,7 @@ export const AssetAPI = {
    * @async
    * @function createAssetType
    * @param {Object} data - 资产类型参数
-   * @param {string} data.asset_code - 资产代码（唯一，如 'red_shard'）
+   * @param {string} data.asset_code - 资产代码（唯一，如 'red_core_shard'）
    * @param {string} data.display_name - 展示名称
    * @param {string} data.group_code - 分组代码（如 'red'、'orange'）
    * @param {string} data.form - 形态（'shard' 或 'crystal'）

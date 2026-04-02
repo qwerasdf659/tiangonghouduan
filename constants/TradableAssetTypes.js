@@ -9,7 +9,7 @@
  * - 作为硬编码保护层，防止积分类资产被误交易
  *
  * 🔴 P0-4已拍板决策：
- * - POINTS 和 BUDGET_POINTS 永久禁止在交易市场交易
+ * - points 和 budget_points 永久禁止在交易市场交易
  * - 即使数据库 is_tradable=true 也不允许
  * - 黑名单优先级高于数据库配置
  *
@@ -28,8 +28,8 @@
  * - 黑名单检查优先于数据库字段检查
  *
  * 业务原因：
- * - POINTS：系统积分，只能通过官方渠道获取/消耗
- * - BUDGET_POINTS：预算积分，专用于特定活动
+ * - points：系统积分，只能通过官方渠道获取/消耗
+ * - budget_points：预算积分，专用于特定活动
  * - 积分类资产如果可交易，会导致：
  *   1. 积分价值体系崩溃
  *   2. 刷分/洗分风险
@@ -38,8 +38,8 @@
  * @type {string[]}
  */
 const MARKET_BLACKLISTED_ASSET_CODES = Object.freeze([
-  'POINTS', // 系统积分 - 永久禁止在交易市场交易
-  'BUDGET_POINTS' // 预算积分 - 永久禁止在交易市场交易
+  'points', // 系统积分 - 永久禁止在交易市场交易
+  'budget_points' // 预算积分 - 永久禁止在交易市场交易
 ])
 
 /**
@@ -49,9 +49,9 @@ const MARKET_BLACKLISTED_ASSET_CODES = Object.freeze([
  * @returns {boolean} true=禁止交易，false=允许（但仍需检查数据库is_tradable字段）
  *
  * @example
- * isBlacklistedForMarket('POINTS') // true - 禁止交易
- * isBlacklistedForMarket('BUDGET_POINTS') // true - 禁止交易
- * isBlacklistedForMarket('GOLD_COIN') // false - 允许（需继续检查数据库）
+ * isBlacklistedForMarket('points') // true - 禁止交易
+ * isBlacklistedForMarket('budget_points') // true - 禁止交易
+ * isBlacklistedForMarket('red_core_shard') // false - 允许（需继续检查数据库）
  */
 function isBlacklistedForMarket(asset_code) {
   return MARKET_BLACKLISTED_ASSET_CODES.includes(asset_code)
@@ -64,8 +64,8 @@ function isBlacklistedForMarket(asset_code) {
  * @returns {string|null} 禁止原因，如果允许交易则返回null
  *
  * @example
- * getBlacklistReason('POINTS') // '系统积分禁止在交易市场交易'
- * getBlacklistReason('GOLD_COIN') // null
+ * getBlacklistReason('points') // '系统积分禁止在交易市场交易'
+ * getBlacklistReason('red_core_shard') // null
  */
 function getBlacklistReason(asset_code) {
   if (!isBlacklistedForMarket(asset_code)) {
@@ -73,8 +73,8 @@ function getBlacklistReason(asset_code) {
   }
 
   const reasons = {
-    POINTS: '系统积分禁止在交易市场交易（只能通过官方渠道获取/消耗）',
-    BUDGET_POINTS: '预算积分禁止在交易市场交易（专用于特定活动预算）'
+    points: '系统积分禁止在交易市场交易（只能通过官方渠道获取/消耗）',
+    budget_points: '预算积分禁止在交易市场交易（专用于特定活动预算）'
   }
 
   return reasons[asset_code] || '该资产类型禁止在交易市场交易'
@@ -93,10 +93,10 @@ function getBlacklistReason(asset_code) {
  * @returns {string|null} returns.reason - 不允许的原因
  *
  * @example
- * validateMarketTradability('POINTS')
+ * validateMarketTradability('points')
  * // { allowed: false, reason: '系统积分禁止在交易市场交易...' }
  *
- * validateMarketTradability('GOLD_COIN')
+ * validateMarketTradability('red_core_shard')
  * // { allowed: true, reason: null } // 但仍需检查数据库is_tradable
  */
 function validateMarketTradability(asset_code) {

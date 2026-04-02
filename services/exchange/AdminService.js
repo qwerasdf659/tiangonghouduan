@@ -23,6 +23,7 @@
  */
 
 const logger = require('../../utils/logger').logger
+const { AssetCode } = require('../../constants/AssetCode')
 const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
 const displayNameHelper = require('../../utils/displayNameHelper')
 const BeijingTimeHelper = require('../../utils/timeHelper')
@@ -2128,7 +2129,7 @@ class AdminService {
       await ChannelPriceModel.create(
         {
           sku_id: sku.sku_id,
-          cost_asset_code: skuData.cost_asset_code || 'DIAMOND',
+          cost_asset_code: skuData.cost_asset_code || AssetCode.STAR_STONE,
           cost_amount: parseInt(skuData.cost_amount),
           original_amount: skuData.original_amount ? parseInt(skuData.original_amount) : null,
           is_enabled: true

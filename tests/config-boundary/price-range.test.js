@@ -42,10 +42,10 @@ describe('P1-1: 配置边界验证测试 - 价格范围', () => {
      * 测试场景：验证最低价配置读取
      * 预期行为：能够正确读取系统配置的最低价格
      */
-    test('应能读取 DIAMOND 币种的最低价配置', async () => {
+    test('应能读取 star_stone 币种的最低价配置', async () => {
       const minPrice = await AdminSystemService.getSettingValue(
         'marketplace',
-        'min_price_DIAMOND',
+        'min_price_star_stone',
         1 // 默认值
       )
 
@@ -53,7 +53,7 @@ describe('P1-1: 配置边界验证测试 - 价格范围', () => {
       expect(typeof minPrice).toBe('number')
       expect(minPrice).toBeGreaterThanOrEqual(0)
 
-      console.log(`✅ DIAMOND 最低价配置: ${minPrice}`)
+      console.log(`✅ star_stone 最低价配置: ${minPrice}`)
     })
 
     /**
@@ -64,12 +64,12 @@ describe('P1-1: 配置边界验证测试 - 价格范围', () => {
       // 获取当前最低价配置
       const minPrice = await AdminSystemService.getSettingValue(
         'marketplace',
-        'min_price_DIAMOND',
+        'min_price_star_stone',
         1
       )
 
       // 验证价格范围
-      const result = await MarketListingService.validatePriceRange('DIAMOND', minPrice - 1)
+      const result = await MarketListingService.validatePriceRange('star_stone', minPrice - 1)
 
       expect(result.valid).toBe(false)
       expect(result.min).toBe(minPrice)
@@ -85,11 +85,11 @@ describe('P1-1: 配置边界验证测试 - 价格范围', () => {
     test('挂牌价格等于最低价应被接受', async () => {
       const minPrice = await AdminSystemService.getSettingValue(
         'marketplace',
-        'min_price_DIAMOND',
+        'min_price_star_stone',
         1
       )
 
-      const result = await MarketListingService.validatePriceRange('DIAMOND', minPrice)
+      const result = await MarketListingService.validatePriceRange('star_stone', minPrice)
 
       expect(result.valid).toBe(true)
       expect(result.min).toBe(minPrice)
@@ -118,19 +118,19 @@ describe('P1-1: 配置边界验证测试 - 价格范围', () => {
   describe('P1-1.2: 商品最高价配置测试', () => {
     /**
      * 测试场景：验证最高价配置读取
-     * 预期行为：DIAMOND无上限（null），其他币种有上限
+     * 预期行为：star_stone无上限（null），其他币种有上限
      */
-    test('DIAMOND 币种应无最高价限制（null）', async () => {
+    test('star_stone 币种应无最高价限制（null）', async () => {
       const maxPrice = await AdminSystemService.getSettingValue(
         'marketplace',
-        'max_price_DIAMOND',
+        'max_price_star_stone',
         null // 默认无上限
       )
 
-      // DIAMOND 默认无上限
+      // star_stone 默认无上限
       expect(maxPrice).toBeNull()
 
-      console.log('✅ DIAMOND 最高价配置: 无限制（null）')
+      console.log('✅ star_stone 最高价配置: 无限制（null）')
     })
 
     /**
@@ -138,15 +138,15 @@ describe('P1-1: 配置边界验证测试 - 价格范围', () => {
      * 预期行为：超过最高价被拒绝
      */
     test('挂牌价格超过最高价应被拒绝（如有配置）', async () => {
-      // 使用 red_shard 作为测试（有上限配置）
+      // 使用 red_core_shard 作为测试（有上限配置）
       const maxPrice = await AdminSystemService.getSettingValue(
         'marketplace',
-        'max_price_red_shard',
+        'max_price_red_core_shard',
         1000000 // 默认上限
       )
 
       if (maxPrice !== null) {
-        const result = await MarketListingService.validatePriceRange('red_shard', maxPrice + 1)
+        const result = await MarketListingService.validatePriceRange('red_core_shard', maxPrice + 1)
 
         expect(result.valid).toBe(false)
         expect(result.max).toBe(maxPrice)
@@ -154,7 +154,7 @@ describe('P1-1: 配置边界验证测试 - 价格范围', () => {
 
         console.log(`✅ 超过最高价 ${maxPrice + 1} 被正确拒绝`)
       } else {
-        console.log('⚠️ red_shard 无最高价限制，跳过此测试')
+        console.log('⚠️ red_core_shard 无最高价限制，跳过此测试')
       }
     })
 
@@ -165,19 +165,19 @@ describe('P1-1: 配置边界验证测试 - 价格范围', () => {
     test('挂牌价格等于最高价应被接受（如有配置）', async () => {
       const maxPrice = await AdminSystemService.getSettingValue(
         'marketplace',
-        'max_price_red_shard',
+        'max_price_red_core_shard',
         1000000
       )
 
       if (maxPrice !== null) {
-        const result = await MarketListingService.validatePriceRange('red_shard', maxPrice)
+        const result = await MarketListingService.validatePriceRange('red_core_shard', maxPrice)
 
         expect(result.valid).toBe(true)
         expect(result.max).toBe(maxPrice)
 
         console.log(`✅ 等于最高价 ${maxPrice} 被正确接受`)
       } else {
-        console.log('⚠️ red_shard 无最高价限制，跳过此测试')
+        console.log('⚠️ red_core_shard 无最高价限制，跳过此测试')
       }
     })
 
@@ -185,10 +185,10 @@ describe('P1-1: 配置边界验证测试 - 价格范围', () => {
      * 测试场景：无最高价限制时大额定价应通过
      * 预期行为：任意正数金额都应通过校验
      */
-    test('DIAMOND 无上限时大额定价应通过', async () => {
+    test('star_stone 无上限时大额定价应通过', async () => {
       const veryLargePrice = 999999999999 // 非常大的价格
 
-      const result = await MarketListingService.validatePriceRange('DIAMOND', veryLargePrice)
+      const result = await MarketListingService.validatePriceRange('star_stone', veryLargePrice)
 
       expect(result.valid).toBe(true)
       expect(result.max).toBeNull()
@@ -209,9 +209,9 @@ describe('P1-1: 配置边界验证测试 - 价格范围', () => {
       // 检查手续费计算方法是否存在
       expect(typeof FeeCalculator.calculateFeeByAsset).toBe('function')
 
-      // 测试基本手续费计算（DIAMOND币种）
+      // 测试基本手续费计算（star_stone币种）
       const testPrice = 100
-      const feeResult = await FeeCalculator.calculateFeeByAsset('DIAMOND', testPrice, testPrice)
+      const feeResult = await FeeCalculator.calculateFeeByAsset('star_stone', testPrice, testPrice)
 
       // FeeCalculator 返回结构：{ fee, rate, net_amount, calculation_mode, tier, asset_code }
       expect(feeResult).toHaveProperty('fee')
@@ -231,7 +231,7 @@ describe('P1-1: 配置边界验证测试 - 价格范围', () => {
     test('手续费不应为负数', async () => {
       const FeeCalculator = require('../../services/FeeCalculator')
 
-      const feeResult = await FeeCalculator.calculateFeeByAsset('DIAMOND', 1, 1)
+      const feeResult = await FeeCalculator.calculateFeeByAsset('star_stone', 1, 1)
 
       expect(feeResult.fee).toBeGreaterThanOrEqual(0)
 
@@ -248,7 +248,7 @@ describe('P1-1: 配置边界验证测试 - 价格范围', () => {
       const testCases = [10, 100, 1000, 10000]
 
       for (const price of testCases) {
-        const feeResult = await FeeCalculator.calculateFeeByAsset('DIAMOND', price, price)
+        const feeResult = await FeeCalculator.calculateFeeByAsset('star_stone', price, price)
 
         expect(feeResult.fee).toBeLessThanOrEqual(price)
 
@@ -268,7 +268,7 @@ describe('P1-1: 配置边界验证测试 - 价格范围', () => {
       const results = []
 
       for (const price of prices) {
-        const feeResult = await FeeCalculator.calculateFeeByAsset('DIAMOND', price, price)
+        const feeResult = await FeeCalculator.calculateFeeByAsset('star_stone', price, price)
 
         results.push({
           price,
@@ -297,8 +297,8 @@ describe('P1-1: 配置边界验证测试 - 价格范围', () => {
      */
     test('应正确校验交易金额边界', async () => {
       // 价格校验应拒绝负数和0
-      const negativeResult = await MarketListingService.validatePriceRange('DIAMOND', -1)
-      const zeroResult = await MarketListingService.validatePriceRange('DIAMOND', 0)
+      const negativeResult = await MarketListingService.validatePriceRange('star_stone', -1)
+      const zeroResult = await MarketListingService.validatePriceRange('star_stone', 0)
 
       expect(negativeResult.valid).toBe(false)
       expect(zeroResult.valid).toBe(false)
@@ -313,7 +313,7 @@ describe('P1-1: 配置边界验证测试 - 价格范围', () => {
      */
     test('小数价格应被正确处理', async () => {
       // 测试小数价格处理
-      const decimalResult = await MarketListingService.validatePriceRange('DIAMOND', 10.5)
+      const decimalResult = await MarketListingService.validatePriceRange('star_stone', 10.5)
 
       /*
        * 业务逻辑：小数应被处理（通过或向下取整）
@@ -334,11 +334,19 @@ describe('P1-1: 配置边界验证测试 - 价格范围', () => {
     test('配置应支持缓存', async () => {
       // 连续读取两次相同配置
       const start1 = Date.now()
-      const value1 = await AdminSystemService.getSettingValue('marketplace', 'min_price_DIAMOND', 1)
+      const value1 = await AdminSystemService.getSettingValue(
+        'marketplace',
+        'min_price_star_stone',
+        1
+      )
       const time1 = Date.now() - start1
 
       const start2 = Date.now()
-      const value2 = await AdminSystemService.getSettingValue('marketplace', 'min_price_DIAMOND', 1)
+      const value2 = await AdminSystemService.getSettingValue(
+        'marketplace',
+        'min_price_star_stone',
+        1
+      )
       const time2 = Date.now() - start2
 
       // 值应该相同
@@ -355,24 +363,24 @@ describe('P1-1: 配置边界验证测试 - 价格范围', () => {
     test('输出配置边界测试总结', async () => {
       // 收集所有配置值
       const configs = {
-        min_price_DIAMOND: await AdminSystemService.getSettingValue(
+        min_price_star_stone: await AdminSystemService.getSettingValue(
           'marketplace',
-          'min_price_DIAMOND',
+          'min_price_star_stone',
           1
         ),
-        max_price_DIAMOND: await AdminSystemService.getSettingValue(
+        max_price_star_stone: await AdminSystemService.getSettingValue(
           'marketplace',
-          'max_price_DIAMOND',
+          'max_price_star_stone',
           null
         ),
-        min_price_red_shard: await AdminSystemService.getSettingValue(
+        min_price_red_core_shard: await AdminSystemService.getSettingValue(
           'marketplace',
-          'min_price_red_shard',
+          'min_price_red_core_shard',
           1
         ),
-        max_price_red_shard: await AdminSystemService.getSettingValue(
+        max_price_red_core_shard: await AdminSystemService.getSettingValue(
           'marketplace',
-          'max_price_red_shard',
+          'max_price_red_core_shard',
           1000000
         )
       }

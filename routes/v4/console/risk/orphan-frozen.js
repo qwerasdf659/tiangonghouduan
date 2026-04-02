@@ -59,7 +59,7 @@ function asyncHandler(fn) {
  *   orphan_count: 5,                    // 孤儿冻结明细条数
  *   total_orphan_amount: 1000,          // 孤儿冻结总额
  *   affected_user_count: 3,             // 受影响用户数
- *   affected_asset_codes: ['POINTS'],   // 受影响资产代码列表
+ *   affected_asset_codes: ['points'],   // 受影响资产代码列表
  *   checked_count: 100,                 // 本次检测的账户数
  *   items_truncated: false,             // 明细是否被截断
  *   generated_at: '2026-01-15T...',     // DTO 生成时间

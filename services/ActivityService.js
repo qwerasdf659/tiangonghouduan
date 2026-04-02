@@ -34,6 +34,7 @@ const logger = require('../utils/logger').logger
  */
 
 const models = require('../models')
+const { AssetCode } = require('../constants/AssetCode')
 const { Op } = require('sequelize')
 const ActivityConditionValidator = require('./ActivityConditionValidator')
 const BeijingTimeHelper = require('../utils/timeHelper')
@@ -579,7 +580,7 @@ class ActivityService {
     // 批量查询这些桶的 BUDGET_POINTS 余额汇总
     const bucketBalances = await models.AccountAssetBalance.findAll({
       where: {
-        asset_code: 'BUDGET_POINTS',
+        asset_code: AssetCode.BUDGET_POINTS,
         lottery_campaign_id: { [Op.in]: Array.from(allBucketIds) }
       },
       attributes: [

@@ -50,7 +50,7 @@ describe('交易市场跨用户交互场景测试（P0-2 系列）', () => {
   let test_admin
 
   // 测试资产配置
-  const TEST_ASSET_CODE = 'DIAMOND'
+  const TEST_ASSET_CODE = 'star_stone'
   const LISTING_OFFER_AMOUNT = 50
   const LISTING_PRICE_AMOUNT = 200
 

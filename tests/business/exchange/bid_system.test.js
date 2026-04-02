@@ -158,7 +158,7 @@ describe('竞价系统功能测试 (Bid System — 臻选空间/幸运空间/竞
 
         /* 决策3：验证后端参数值（以后端为准，前端适配） */
         if (res.body.data.unlock_cost !== undefined) {
-          expect(res.body.data.unlock_cost).toBe(100) // 100 POINTS
+          expect(res.body.data.unlock_cost).toBe(100) // 100 points
         }
         if (res.body.data.validity_hours !== undefined) {
           expect(res.body.data.validity_hours).toBe(24) // 24小时
@@ -341,17 +341,17 @@ describe('竞价系统功能测试 (Bid System — 臻选空间/幸运空间/竞
       expect(typeof BidService.cancelBidProduct).toBe('function')
     })
 
-    test('动态资产白名单应返回 DIAMOND 和 red_shard', async () => {
+    test('动态资产白名单应返回 star_stone 和 red_core_shard', async () => {
       /* 调用私有方法验证白名单逻辑（决策9） */
       const allowed = await BidService._getAllowedBidAssets()
 
       expect(Array.isArray(allowed)).toBe(true)
-      expect(allowed).toContain('DIAMOND')
-      expect(allowed).toContain('red_shard')
+      expect(allowed).toContain('star_stone')
+      expect(allowed).toContain('red_core_shard')
 
-      /* 决策1：POINTS 和 BUDGET_POINTS 绝对禁止 */
-      expect(allowed).not.toContain('POINTS')
-      expect(allowed).not.toContain('BUDGET_POINTS')
+      /* 决策1：points 和 budget_points 绝对禁止 */
+      expect(allowed).not.toContain('points')
+      expect(allowed).not.toContain('budget_points')
     })
 
     test('placeBid 无事务应抛出错误', async () => {

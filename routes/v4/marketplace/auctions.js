@@ -35,6 +35,7 @@
 
 const express = require('express')
 const router = express.Router()
+const { AssetCode } = require('../../../constants/AssetCode')
 const { authenticateToken } = require('../../../middleware/auth')
 const { requireValidSession } = require('../../../middleware/sensitiveOperation')
 const { handleServiceError } = require('../../../middleware/validation')
@@ -63,7 +64,7 @@ function asyncHandler(fn) {
  * @header {string} Idempotency-Key - 幂等键（必填）
  * @body {number} item_id - 拍卖物品ID（必填）
  * @body {number} start_price - 起拍价（必填，大于0）
- * @body {string} [price_asset_code='DIAMOND'] - 出价资产类型
+ * @body {string} [price_asset_code='star_stone'] - 出价资产类型
  * @body {number} [min_bid_increment=10] - 最小加价幅度
  * @body {number|null} [buyout_price] - 一口价（不传或null=不支持）
  * @body {string} start_time - 开始时间（ISO8601）
@@ -219,7 +220,7 @@ router.post(
           auction_listing_id: Number(auctionListingId),
           item_name: snapshot.item_name || '',
           new_highest: result.bid_amount,
-          price_asset_code: result.price_asset_code || 'DIAMOND'
+          price_asset_code: result.price_asset_code || AssetCode.STAR_STONE
         })
       }
 
@@ -229,7 +230,7 @@ router.post(
           item_name: snapshot.item_name || '',
           bid_amount: result.bid_amount,
           bidder_user_id: userId,
-          price_asset_code: result.price_asset_code || 'DIAMOND'
+          price_asset_code: result.price_asset_code || AssetCode.STAR_STONE
         })
       }
     } catch (wsError) {

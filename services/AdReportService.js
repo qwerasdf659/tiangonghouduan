@@ -203,7 +203,7 @@ class AdReportService {
       transaction
     })
 
-    // 4. 统计消耗（钻石）
+    // 4. 统计消耗（星石）
     const spendStats = await AdBillingRecord.findAll({
       where: {
         ad_campaign_id: campaignId,
@@ -212,12 +212,12 @@ class AdReportService {
           [Op.lte]: dateEnd
         }
       },
-      attributes: [[literal('SUM(amount_diamond)'), 'total_spend_diamond']],
+      attributes: [[literal('SUM(amount_star_stone)'), 'total_spend_star_stone']],
       raw: true,
       transaction
     })
 
-    const totalSpendDiamond = parseInt(spendStats[0]?.total_spend_diamond || 0)
+    const totalSpendStarStone = parseInt(spendStats[0]?.total_spend_star_stone || 0)
 
     // 5. UPSERT快照（仅写入数据库实际存在的字段，CTR/CVR 在查询时动态计算）
     await AdReportDailySnapshot.upsert(
@@ -230,7 +230,7 @@ class AdReportService {
         clicks_total: totalClicks,
         clicks_valid: validClicks,
         conversions,
-        spend_diamond: totalSpendDiamond
+        spend_star_stone: totalSpendStarStone
       },
       {
         fields: [
@@ -239,7 +239,7 @@ class AdReportService {
           'clicks_total',
           'clicks_valid',
           'conversions',
-          'spend_diamond'
+          'spend_star_stone'
         ],
         transaction
       }
@@ -283,7 +283,7 @@ class AdReportService {
           acc.clicks_total += s.clicks_total || 0
           acc.clicks_valid += s.clicks_valid || 0
           acc.conversions += s.conversions || 0
-          acc.spend_diamond += s.spend_diamond || 0
+          acc.spend_star_stone += s.spend_star_stone || 0
           return acc
         },
         {
@@ -292,7 +292,7 @@ class AdReportService {
           clicks_total: 0,
           clicks_valid: 0,
           conversions: 0,
-          spend_diamond: 0
+          spend_star_stone: 0
         }
       )
 
@@ -353,7 +353,7 @@ class AdReportService {
           acc.total_clicks += s.clicks_total
           acc.valid_clicks += s.clicks_valid
           acc.conversions += s.conversions
-          acc.total_spend_diamond += s.spend_diamond
+          acc.total_spend_star_stone += s.spend_star_stone
           return acc
         },
         {
@@ -362,7 +362,7 @@ class AdReportService {
           total_clicks: 0,
           valid_clicks: 0,
           conversions: 0,
-          total_spend_diamond: 0
+          total_spend_star_stone: 0
         }
       )
 
@@ -422,7 +422,7 @@ class AdReportService {
           [literal('SUM(impressions_valid)'), 'total_impressions'],
           [literal('SUM(clicks_valid)'), 'total_clicks'],
           [literal('SUM(conversions)'), 'total_conversions'],
-          [literal('SUM(spend_diamond)'), 'total_spend_diamond']
+          [literal('SUM(spend_star_stone)'), 'total_spend_star_stone']
         ],
         raw: true,
         transaction
@@ -431,7 +431,7 @@ class AdReportService {
       const totalImpressions = parseInt(snapshotStats[0]?.total_impressions || 0)
       const totalClicks = parseInt(snapshotStats[0]?.total_clicks || 0)
       const totalConversions = parseInt(snapshotStats[0]?.total_conversions || 0)
-      const totalSpendDiamond = parseInt(snapshotStats[0]?.total_spend_diamond || 0)
+      const totalSpendStarStone = parseInt(snapshotStats[0]?.total_spend_star_stone || 0)
 
       const ctr = totalImpressions > 0 ? totalClicks / totalImpressions : 0
       const cvr = totalClicks > 0 ? totalConversions / totalClicks : 0
@@ -441,7 +441,7 @@ class AdReportService {
         total_impressions: totalImpressions,
         total_clicks: totalClicks,
         total_conversions: totalConversions,
-        total_spend_diamond: totalSpendDiamond,
+        total_spend_star_stone: totalSpendStarStone,
         ctr: parseFloat(ctr.toFixed(4)),
         cvr: parseFloat(cvr.toFixed(4))
       }

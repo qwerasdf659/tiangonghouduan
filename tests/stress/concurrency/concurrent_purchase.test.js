@@ -95,7 +95,7 @@ describe('🛒 并发购买竞态测试', () => {
           seller_user_id: sellerId,
           item_id: itemInstanceId,
           price_amount: priceAmount,
-          price_asset_code: 'DIAMOND'
+          price_asset_code: 'star_stone'
         },
         { transaction }
       )
@@ -117,7 +117,7 @@ describe('🛒 并发购买竞态测试', () => {
       await BalanceService.changeBalance(
         {
           user_id: userId,
-          asset_code: 'DIAMOND',
+          asset_code: 'star_stone',
           delta_amount: amount,
           business_type: 'test_grant',
           counterpart_account_id: 2,

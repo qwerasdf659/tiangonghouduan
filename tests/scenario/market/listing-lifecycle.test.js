@@ -118,7 +118,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
    * @param {string} asset_code - 资产代码
    * @param {number} amount - 金额
    */
-  async function grantTestAsset(user_id, asset_code = 'DIAMOND', amount = 200) {
+  async function grantTestAsset(user_id, asset_code = 'star_stone', amount = 200) {
     const grant_tx = await sequelize.transaction()
     try {
       await BalanceService.changeBalance(
@@ -286,7 +286,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
               seller_user_id: testSeller.user_id,
               item_id: test_item.item_id,
               price_amount: 100,
-              price_asset_code: 'DIAMOND'
+              price_asset_code: 'star_stone'
             },
             { transaction: listing_tx }
           )
@@ -335,7 +335,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
               seller_user_id: testSeller.user_id,
               item_id: test_item.item_id,
               price_amount: 80,
-              price_asset_code: 'DIAMOND'
+              price_asset_code: 'star_stone'
             },
             { transaction: tx1 }
           )
@@ -361,7 +361,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
               seller_user_id: testSeller.user_id,
               item_id: test_item.item_id,
               price_amount: 80,
-              price_asset_code: 'DIAMOND'
+              price_asset_code: 'star_stone'
             },
             { transaction: tx2 }
           )
@@ -402,7 +402,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
               seller_user_id: testSeller.user_id,
               item_id: test_item.item_id,
               price_amount: 60,
-              price_asset_code: 'DIAMOND'
+              price_asset_code: 'star_stone'
             },
             { transaction: listing_tx }
           )
@@ -418,7 +418,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
         expect(listing.status).toBe('on_sale')
 
         // 2. 准备买家资产
-        await grantTestAsset(testBuyer.user_id, 'DIAMOND', 100)
+        await grantTestAsset(testBuyer.user_id, 'star_stone', 100)
 
         // 3. 买家下单
         const order_tx = await sequelize.transaction()
@@ -470,7 +470,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
               seller_user_id: testSeller.user_id,
               item_id: test_item.item_id,
               price_amount: 50,
-              price_asset_code: 'DIAMOND'
+              price_asset_code: 'star_stone'
             },
             { transaction: listing_tx }
           )
@@ -483,7 +483,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
         }
 
         // 2. 准备买家资产并下单
-        await grantTestAsset(testBuyer.user_id, 'DIAMOND', 100)
+        await grantTestAsset(testBuyer.user_id, 'star_stone', 100)
 
         const order_tx = await sequelize.transaction()
         let order_id
@@ -554,7 +554,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
               seller_user_id: testSeller.user_id,
               item_id: test_item.item_id,
               price_amount: 55,
-              price_asset_code: 'DIAMOND'
+              price_asset_code: 'star_stone'
             },
             { transaction: listing_tx }
           )
@@ -567,7 +567,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
         }
 
         // 2. 准备买家资产并下单
-        await grantTestAsset(testBuyer.user_id, 'DIAMOND', 100)
+        await grantTestAsset(testBuyer.user_id, 'star_stone', 100)
 
         const order_tx = await sequelize.transaction()
         let order_id
@@ -635,7 +635,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
               seller_user_id: testSeller.user_id,
               item_id: test_item.item_id,
               price_amount: 70,
-              price_asset_code: 'DIAMOND'
+              price_asset_code: 'star_stone'
             },
             { transaction: listing_tx }
           )
@@ -694,7 +694,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
               seller_user_id: testSeller.user_id,
               item_id: test_item.item_id,
               price_amount: 90,
-              price_asset_code: 'DIAMOND'
+              price_asset_code: 'star_stone'
             },
             { transaction: listing_tx }
           )
@@ -752,7 +752,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
               seller_user_id: testSeller.user_id,
               item_id: test_item.item_id,
               price_amount: 65,
-              price_asset_code: 'DIAMOND'
+              price_asset_code: 'star_stone'
             },
             { transaction: listing_tx }
           )
@@ -765,7 +765,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
         }
 
         // 2. 买家下单锁定挂牌
-        await grantTestAsset(testBuyer.user_id, 'DIAMOND', 100)
+        await grantTestAsset(testBuyer.user_id, 'star_stone', 100)
         const order_tx = await sequelize.transaction()
         let order_id
         try {
@@ -858,7 +858,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
               seller_user_id: testSeller.user_id,
               item_id: buyer_item.item_id,
               price_amount: 100,
-              price_asset_code: 'DIAMOND'
+              price_asset_code: 'star_stone'
             },
             { transaction: listing_tx }
           )
@@ -892,7 +892,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
               seller_user_id: testSeller.user_id,
               item_id: locked_item.item_id,
               price_amount: 80,
-              price_asset_code: 'DIAMOND'
+              price_asset_code: 'star_stone'
             },
             { transaction: listing_tx }
           )
@@ -930,7 +930,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
               seller_user_id: testSeller.user_id,
               item_id: test_item.item_id,
               price_amount: 45,
-              price_asset_code: 'DIAMOND'
+              price_asset_code: 'star_stone'
             },
             { transaction: listing_tx }
           )
@@ -943,7 +943,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
         }
 
         // 买家下单锁定
-        await grantTestAsset(testBuyer.user_id, 'DIAMOND', 100)
+        await grantTestAsset(testBuyer.user_id, 'star_stone', 100)
         const order_tx = await sequelize.transaction()
         try {
           const order_result = await TradeOrderService.createOrder(
@@ -1005,7 +1005,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
               seller_user_id: testSeller.user_id,
               item_id: test_item.item_id,
               price_amount: 40,
-              price_asset_code: 'DIAMOND'
+              price_asset_code: 'star_stone'
             },
             { transaction: listing_tx }
           )
@@ -1018,7 +1018,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
         }
 
         // 完成交易
-        await grantTestAsset(testBuyer.user_id, 'DIAMOND', 100)
+        await grantTestAsset(testBuyer.user_id, 'star_stone', 100)
         const order_tx = await sequelize.transaction()
         let order_id
         try {
@@ -1094,7 +1094,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
               seller_user_id: testSeller.user_id,
               item_id: test_item.item_id,
               price_amount: 75,
-              price_asset_code: 'DIAMOND'
+              price_asset_code: 'star_stone'
             },
             { transaction: listing_tx }
           )
@@ -1188,7 +1188,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
             seller_user_id: testSeller.user_id,
             item_id: test_item.item_id,
             price_amount: 85,
-            price_asset_code: 'DIAMOND'
+            price_asset_code: 'star_stone'
           },
           { transaction: listing_tx }
         )
@@ -1204,7 +1204,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
       console.log(`Step 2: 挂牌创建 market_listing_id=${listing.market_listing_id}, status=on_sale`)
 
       // Step 3: 买家下单
-      await grantTestAsset(testBuyer.user_id, 'DIAMOND', 200)
+      await grantTestAsset(testBuyer.user_id, 'star_stone', 200)
 
       const order_tx = await sequelize.transaction()
       let order_id
@@ -1278,7 +1278,7 @@ describe('🏷️ 挂牌生命周期测试（Listing Lifecycle）', () => {
             seller_user_id: testSeller.user_id,
             item_id: test_item.item_id,
             price_amount: 95,
-            price_asset_code: 'DIAMOND'
+            price_asset_code: 'star_stone'
           },
           { transaction: listing_tx }
         )

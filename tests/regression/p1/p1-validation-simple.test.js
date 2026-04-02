@@ -58,7 +58,7 @@ describe('P1 修复简化验证', () => {
       expect(serviceCode).toMatch(/existingOrder\.asset_code.*!==.*currentAssetCode/)
 
       console.log(
-        '✅ P1-2：TradeOrderService 代码包含多币种白名单校验（支持 DIAMOND + red_shard 等）'
+        '✅ P1-2：TradeOrderService 代码包含多币种白名单校验（支持 star_stone + red_core_shard 等）'
       )
     })
   })

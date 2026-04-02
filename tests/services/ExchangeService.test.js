@@ -189,7 +189,7 @@ describe('ExchangeService - 兑换市场服务测试', () => {
       // 执行：按资产代码筛选
       const result = await ExchangeService.getMarketItems({
         status: 'active',
-        asset_code: 'red_shard',
+        asset_code: 'red_core_shard',
         page: 1,
         page_size: 10
       })
@@ -297,7 +297,7 @@ describe('ExchangeService - 兑换市场服务测试', () => {
             {
               name: '测试商品_' + Date.now(),
               description: '单元测试创建的商品',
-              cost_asset_code: 'red_shard',
+              cost_asset_code: 'red_core_shard',
               cost_amount: 10,
               cost_price: 5.0,
               stock: 100,
@@ -346,7 +346,7 @@ describe('ExchangeService - 兑换市场服务测试', () => {
             return await ExchangeService.createExchangeItem(
               {
                 name: '测试商品',
-                cost_asset_code: 'red_shard',
+                cost_asset_code: 'red_core_shard',
                 cost_amount: 0,
                 cost_price: 5.0,
                 stock: 100
@@ -368,7 +368,7 @@ describe('ExchangeService - 兑换市场服务测试', () => {
             {
               name: '待更新商品_' + Date.now(),
               description: '测试更新',
-              cost_asset_code: 'red_shard',
+              cost_asset_code: 'red_core_shard',
               cost_amount: 10,
               cost_price: 5.0,
               stock: 50,
@@ -418,7 +418,7 @@ describe('ExchangeService - 兑换市场服务测试', () => {
           const result = await ExchangeService.createExchangeItem(
             {
               name: '待删除商品_' + Date.now(),
-              cost_asset_code: 'red_shard',
+              cost_asset_code: 'red_core_shard',
               cost_amount: 10,
               cost_price: 5.0,
               stock: 10,

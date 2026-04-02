@@ -3,12 +3,12 @@
  *
  * 验证三项 P1 修复：
  * 1. P1-1：材料转换风控校验（V2.1：全局套利检测 + 终点货币限制）
- * 2. P1-2：交易下单幂等冲突校验强制 DIAMOND-only
+ * 2. P1-2：交易下单幂等冲突校验强制 star_stone-only
  * 3. P1-3：asset_transactions.user_id 重复外键清理（已通过迁移验证）
  *
  * V2.1 更新（2026-01-26）：
  * - 移除跨组限制，允许不同 group_code 之间的转换
- * - 新增终点货币（DIAMOND）禁止流出检查
+ * - 新增终点货币（star_stone）禁止流出检查
  * - 套利检测范围从"组内"扩大到"全局"
  *
  * P1-9 J2-RepoWide 改造：
@@ -31,7 +31,7 @@ describe('P1 修复验证测试', () => {
     const testMaterials = [
       {
         asset_code: 'test_red_shard',
-        display_name: '测试红水晶碎片',
+        display_name: '测试红源晶碎片',
         group_code: 'red',
         form: 'shard',
         tier: 1,
@@ -53,7 +53,7 @@ describe('P1 修复验证测试', () => {
       },
       {
         asset_code: 'test_red_crystal',
-        display_name: '测试红水晶',
+        display_name: '测试红源晶',
         group_code: 'red',
         form: 'crystal',
         tier: 1,
@@ -120,13 +120,13 @@ describe('P1 修复验证测试', () => {
       expect(result.errors).toHaveLength(0)
     })
 
-    test('V2.1：应该拒绝终点货币（DIAMOND）作为转换源', async () => {
+    test('V2.1：应该拒绝终点货币（star_stone）作为转换源', async () => {
       /*
-       * V2.1 新增硬约束：终点货币（DIAMOND）禁止流出
-       * 业务规则：钻石是系统「终点货币」，只进不出
+       * V2.1 新增硬约束：终点货币（star_stone）禁止流出
+       * 业务规则：星石是系统「终点货币」，只进不出
        */
       const newRule = {
-        from_asset_code: 'DIAMOND',
+        from_asset_code: 'star_stone',
         to_asset_code: 'test_red_shard',
         from_amount: 20,
         to_amount: 1,
@@ -137,11 +137,11 @@ describe('P1 修复验证测试', () => {
       // 执行风控校验
       const result = await MaterialConversionValidator.validate(newRule, { transaction })
 
-      // 验证：应该拒绝 DIAMOND 作为转换源
+      // 验证：应该拒绝 star_stone 作为转换源
       expect(result.valid).toBe(false)
       expect(result.errors.length).toBeGreaterThan(0)
       expect(result.errors[0]).toMatch(/终点货币/)
-      expect(result.errors[0]).toMatch(/DIAMOND/)
+      expect(result.errors[0]).toMatch(/star_stone/)
     })
 
     test('应该允许组内转换规则（red组内：test_red_shard → test_red_crystal）', async () => {
@@ -191,8 +191,8 @@ describe('P1 修复验证测试', () => {
     })
   })
 
-  describe('P1-2：交易下单幂等冲突校验强制 DIAMOND-only', () => {
-    test('TradeOrderService 应该在幂等回放路径强制校验 DIAMOND', async () => {
+  describe('P1-2：交易下单幂等冲突校验强制 star_stone-only', () => {
+    test('TradeOrderService 应该在幂等回放路径强制校验 star_stone', async () => {
       /*
        * 这个测试需要实际的 TradeOrderService 和数据库数据
        * 由于测试环境限制，这里只做基本验证
@@ -207,8 +207,8 @@ describe('P1 修复验证测试', () => {
 
       /*
        * 实际的幂等校验逻辑已在代码中实现：
-       * 1. 检查 existingOrder.asset_code !== 'DIAMOND'
-       * 2. 检查 tempListing.price_asset_code !== 'DIAMOND'
+       * 1. 检查 existingOrder.asset_code !== 'star_stone'
+       * 2. 检查 tempListing.price_asset_code !== 'star_stone'
        */
       console.log('✅ P1-2：TradeOrderService.createOrder 方法存在，幂等校验逻辑已实现')
     })

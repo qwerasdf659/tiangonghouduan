@@ -1,12 +1,12 @@
 /**
- * 平台钻石管理 - Alpine.js 组件
+ * 平台星石管理 - Alpine.js 组件
  *
  * 业务功能：
- * - 展示所有系统账户的钻石余额概览
- * - 运营可从多个系统账户销毁钻石（SYSTEM_BURN 不可逆转账）
+ * - 展示所有系统账户的星石余额概览
+ * - 运营可从多个系统账户销毁星石（SYSTEM_BURN 不可逆转账）
  * - 销毁历史记录查看
  *
- * @module admin/src/modules/content/pages/platform-diamond
+ * @module admin/src/modules/content/pages/platform-star-stone
  */
 
 import { logger } from '../../../utils/logger.js'
@@ -15,9 +15,9 @@ import { SYSTEM_ENDPOINTS } from '../../../api/system/index.js'
 import { Alpine, createPageMixin } from '../../../alpine/index.js'
 
 document.addEventListener('alpine:init', () => {
-  logger.info('[PlatformDiamond] 注册 Alpine 组件...')
+  logger.info('[PlatformStarStone] 注册 Alpine 组件...')
 
-  Alpine.data('platformDiamond', () => ({
+  Alpine.data('platformStarStone', () => ({
     ...createPageMixin(),
 
     /** @type {Object} 余额概览数据 */
@@ -40,17 +40,17 @@ document.addEventListener('alpine:init', () => {
     burn_total: 0,
 
     async init() {
-      logger.info('[PlatformDiamond] 初始化...')
+      logger.info('[PlatformStarStone] 初始化...')
       await Promise.all([this.loadBalance(), this.loadBurnHistory()])
     },
 
     /**
-     * 加载所有系统账户钻石余额
+     * 加载所有系统账户星石余额
      */
     async loadBalance() {
       try {
         const res = await request({
-          url: SYSTEM_ENDPOINTS.PLATFORM_DIAMOND_BALANCE,
+          url: SYSTEM_ENDPOINTS.PLATFORM_STAR_STONE_BALANCE,
           method: 'GET'
         })
         if (res.success) {
@@ -60,7 +60,7 @@ document.addEventListener('alpine:init', () => {
           }
         }
       } catch (error) {
-        logger.error('[PlatformDiamond] 余额查询失败', error)
+        logger.error('[PlatformStarStone] 余额查询失败', error)
         this.showMessage('余额查询失败: ' + error.message, 'error')
       }
     },
@@ -71,7 +71,7 @@ document.addEventListener('alpine:init', () => {
     async loadBurnHistory() {
       try {
         const res = await request({
-          url: SYSTEM_ENDPOINTS.PLATFORM_DIAMOND_BURN_HISTORY,
+          url: SYSTEM_ENDPOINTS.PLATFORM_STAR_STONE_BURN_HISTORY,
           method: 'GET',
           params: { page: 1, page_size: 50 }
         })
@@ -80,7 +80,7 @@ document.addEventListener('alpine:init', () => {
           this.burn_total = res.data.pagination?.total || 0
         }
       } catch (error) {
-        logger.error('[PlatformDiamond] 销毁历史查询失败', error)
+        logger.error('[PlatformStarStone] 销毁历史查询失败', error)
       }
     },
 
@@ -95,13 +95,13 @@ document.addEventListener('alpine:init', () => {
     },
 
     /**
-     * 获取指定系统账户的钻石余额（显示用）
+     * 获取指定系统账户的星石余额（显示用）
      * @param {string} code - 系统账户代码
      * @returns {string}
      */
     getAccountBalance(code) {
       const acc = (this.balance.system_accounts || []).find(a => a.system_code === code)
-      return this.formatNumber(acc?.diamond_balance || 0)
+      return this.formatNumber(acc?.star_stone_balance || 0)
     },
 
     /**
@@ -121,7 +121,7 @@ document.addEventListener('alpine:init', () => {
       }
 
       const confirmed = window.confirm(
-        `确认从【${sourceLabel}】账户销毁 ${this.burn_amount} 钻石？\n此操作不可撤回！`
+        `确认从【${sourceLabel}】账户销毁 ${this.burn_amount} 星石？\n此操作不可撤回！`
       )
       if (!confirmed) return
 
@@ -130,7 +130,7 @@ document.addEventListener('alpine:init', () => {
 
       try {
         const res = await request({
-          url: SYSTEM_ENDPOINTS.PLATFORM_DIAMOND_BURN,
+          url: SYSTEM_ENDPOINTS.PLATFORM_STAR_STONE_BURN,
           method: 'POST',
           data: {
             amount: this.burn_amount,
@@ -142,7 +142,7 @@ document.addEventListener('alpine:init', () => {
         if (res.success) {
           const d = res.data
           this.showMessage(
-            `销毁成功：从【${d.source_label}】销毁 ${d.burned_amount} 钻石，` +
+            `销毁成功：从【${d.source_label}】销毁 ${d.burned_amount} 星石，` +
               `销毁前余额 ${d.balance_before}，销毁后余额 ${d.balance_after}`,
             'success'
           )
@@ -153,7 +153,7 @@ document.addEventListener('alpine:init', () => {
           this.showMessage('销毁失败: ' + (res.message || '未知错误'), 'error')
         }
       } catch (error) {
-        logger.error('[PlatformDiamond] 销毁失败', error)
+        logger.error('[PlatformStarStone] 销毁失败', error)
         this.showMessage('销毁失败: ' + error.message, 'error')
       } finally {
         this.burning = false
@@ -167,7 +167,7 @@ document.addEventListener('alpine:init', () => {
      */
     getAccountBalanceRaw(code) {
       const acc = (this.balance.system_accounts || []).find(a => a.system_code === code)
-      return acc?.diamond_balance || 0
+      return acc?.star_stone_balance || 0
     },
 
     /**
@@ -208,5 +208,5 @@ document.addEventListener('alpine:init', () => {
     }
   }))
 
-  logger.info('[PlatformDiamond] Alpine 组件注册完成')
+  logger.info('[PlatformStarStone] Alpine 组件注册完成')
 })

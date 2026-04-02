@@ -24,6 +24,7 @@ const {
   sequelize
 } = require('../../models')
 const { Op } = sequelize.Sequelize
+const { AssetCode } = require('../../constants/AssetCode')
 const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
 const logger = require('../../utils/logger').logger
 const { attachDisplayNames, DICT_TYPES } = require('../../utils/displayNameHelper')
@@ -695,7 +696,7 @@ class MarketListingQueryService {
     const whitelist = await AdminSystemService.getSettingValue(
       'marketplace',
       'allowed_settlement_assets',
-      ['DIAMOND', 'red_shard']
+      [AssetCode.STAR_STONE, AssetCode.RED_CORE_SHARD]
     )
 
     let assetCodes = whitelist
@@ -703,7 +704,7 @@ class MarketListingQueryService {
       try {
         assetCodes = JSON.parse(whitelist)
       } catch {
-        assetCodes = ['DIAMOND', 'red_shard']
+        assetCodes = [AssetCode.STAR_STONE, AssetCode.RED_CORE_SHARD]
       }
     }
 

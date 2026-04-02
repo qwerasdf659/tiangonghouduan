@@ -61,7 +61,7 @@ module.exports = sequelize => {
         type: DataTypes.STRING(50),
         allowNull: false,
         comment:
-          '资产代码（Asset Code）：如 DIAMOND、POINTS、BUDGET_POINTS、red_shard 等；唯一约束：(account_id, asset_code, lottery_campaign_id)'
+          '资产代码（Asset Code）：如 star_stone、POINTS、BUDGET_POINTS、red_core_shard 等；唯一约束：(account_id, asset_code, lottery_campaign_id)'
       },
 
       // ==================== 抽奖活动ID（BUDGET_POINTS专用） ====================
@@ -98,7 +98,7 @@ module.exports = sequelize => {
         allowNull: false,
         defaultValue: 0,
         comment:
-          '冻结余额（Frozen Amount）：下单冻结、挂牌冻结的余额；业务规则：交易市场购买时冻结买家DIAMOND，挂牌时冻结卖家标的资产；成交后从冻结转为扣减或入账；取消/超时时解冻回到 available_amount；不可为负数'
+          '冻结余额（Frozen Amount）：下单冻结、挂牌冻结的余额；业务规则：交易市场购买时冻结买家star_stone，挂牌时冻结卖家标的资产；成交后从冻结转为扣减或入账；取消/超时时解冻回到 available_amount；不可为负数'
       },
 
       balance_id: {

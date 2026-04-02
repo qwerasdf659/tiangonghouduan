@@ -16,6 +16,7 @@
 
 const logger = require('../utils/logger').logger
 const { ConsumptionRecord } = require('../models')
+const { AssetCode } = require('../constants/AssetCode')
 const BalanceService = require('../services/asset/BalanceService')
 const BeijingTimeHelper = require('../utils/timeHelper')
 const AuditLogService = require('../services/AuditLogService')
@@ -29,7 +30,7 @@ module.exports = {
    *   2. 发放积分（1元=1分）
    *   3. 更新消费记录状态
    *   4. 预算分配（BUDGET_POINTS）
-   *   5. 钻石配额发放（DIAMOND_QUOTA）
+   *   5. 星石配额发放（STAR_STONE_QUOTA）
    *   6. 审计日志
    *
    * @param {number} consumptionId - 消费记录ID（auditable_id）
@@ -63,7 +64,7 @@ module.exports = {
     const pointsResult = await BalanceService.changeBalance(
       {
         user_id: record.user_id,
-        asset_code: 'POINTS',
+        asset_code: AssetCode.POINTS,
         delta_amount: record.points_to_award,
         business_type: 'consumption_reward',
         idempotency_key: `consumption_reward:approve:${consumptionId}`,
@@ -115,7 +116,7 @@ module.exports = {
         await BalanceService.changeBalance(
           {
             user_id: record.user_id,
-            asset_code: 'BUDGET_POINTS',
+            asset_code: AssetCode.BUDGET_POINTS,
             delta_amount: budgetPointsToAllocate,
             business_type: 'consumption_budget_allocation',
             idempotency_key: `consumption_budget:approve:${consumptionId}`,
@@ -137,15 +138,15 @@ module.exports = {
       logger.error(`[消费审核回调] 预算分配失败（非致命）: ${budgetError.message}`)
     }
 
-    // 4. 钻石配额发放
-    let diamondQuotaAllocated = 0
+    // 4. 星石配额发放
+    let starStoneQuotaAllocated = 0
     try {
       const CoreService = require('../services/consumption/CoreService')
-      const quotaConfig = await CoreService._getDiamondQuotaConfig()
+      const quotaConfig = await CoreService._getStarStoneQuotaConfig()
       if (quotaConfig.enabled) {
         const effectiveRatio = await CoreService.getEffectiveRatio(
           record.user_id,
-          'diamond_quota_ratio',
+          'star_stone_quota_ratio',
           quotaConfig.ratio
         )
         const quotaAmount = Math.floor(parseFloat(record.consumption_amount) * effectiveRatio)
@@ -153,7 +154,7 @@ module.exports = {
           await BalanceService.changeBalance(
             {
               user_id: record.user_id,
-              asset_code: 'DIAMOND_QUOTA',
+              asset_code: 'STAR_STONE_QUOTA',
               delta_amount: quotaAmount,
               business_type: 'consumption_quota_allocation',
               idempotency_key: `consumption_quota:approve:${consumptionId}`,
@@ -163,16 +164,16 @@ module.exports = {
                 reference_id: consumptionId,
                 consumption_amount: record.consumption_amount,
                 quota_ratio: effectiveRatio,
-                description: `消费${record.consumption_amount}元，发放钻石配额${quotaAmount}`
+                description: `消费${record.consumption_amount}元，发放星石配额${quotaAmount}`
               }
             },
             { transaction }
           )
-          diamondQuotaAllocated = quotaAmount
+          starStoneQuotaAllocated = quotaAmount
         }
       }
     } catch (quotaError) {
-      logger.error(`[消费审核回调] 钻石配额发放失败（非致命）: ${quotaError.message}`)
+      logger.error(`[消费审核回调] 星石配额发放失败（非致命）: ${quotaError.message}`)
     }
 
     // 5. 审计日志
@@ -192,7 +193,7 @@ module.exports = {
           amount: record.consumption_amount,
           points_to_award: record.points_to_award,
           budget_points_allocated: budgetPointsAllocated,
-          diamond_quota_allocated: diamondQuotaAllocated,
+          star_stone_quota_allocated: starStoneQuotaAllocated,
           source: 'approval_chain_callback'
         },
         reason: auditRecord.audit_reason || '审核通过',
@@ -204,7 +205,7 @@ module.exports = {
     }
 
     logger.info(
-      `✅ [消费审核回调] 审核通过完成: consumption_id=${consumptionId}, 积分=${record.points_to_award}, 预算=${budgetPointsAllocated}, 配额=${diamondQuotaAllocated}`
+      `✅ [消费审核回调] 审核通过完成: consumption_id=${consumptionId}, 积分=${record.points_to_award}, 预算=${budgetPointsAllocated}, 配额=${starStoneQuotaAllocated}`
     )
 
     return {
@@ -212,7 +213,7 @@ module.exports = {
       consumption_record_id: consumptionId,
       points_awarded: record.points_to_award,
       budget_points_allocated: budgetPointsAllocated,
-      diamond_quota_allocated: diamondQuotaAllocated
+      star_stone_quota_allocated: starStoneQuotaAllocated
     }
   },
 

@@ -73,7 +73,7 @@ class MarketAnalyticsService {
 
     const assetStats = await sequelize.query(
       `SELECT ml.offer_asset_code AS asset_code, ml.listing_kind,
-        COUNT(*) AS trade_count, SUM(t.gross_amount) AS total_diamond_volume,
+        COUNT(*) AS trade_count, SUM(t.gross_amount) AS total_star_stone_volume,
         ROUND(AVG(t.gross_amount)) AS avg_price, MIN(t.gross_amount) AS min_price, MAX(t.gross_amount) AS max_price
       FROM trade_orders t JOIN market_listings ml ON t.market_listing_id = ml.market_listing_id
       WHERE t.status = 'completed' AND t.completed_at >= DATE_SUB(NOW(), INTERVAL ${safeDays} DAY)

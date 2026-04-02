@@ -38,7 +38,7 @@ const BOOLEAN_KEYS = new Set([
   'sms_enabled',
   'email_enabled',
   'app_notification_enabled',
-  'diamond_quota_enabled'
+  'star_stone_quota_enabled'
 ])
 
 /**

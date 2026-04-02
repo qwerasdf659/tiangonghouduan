@@ -48,7 +48,7 @@ module.exports = sequelize => {
         type: DataTypes.STRING(100),
         allowNull: false,
         validate: { notEmpty: { msg: '标签值不能为空' } },
-        comment: '标签值（如：high_value_user, morning_active, diamond_spender）'
+        comment: '标签值（如：high_value_user, morning_active, star_stone_spender）'
       },
 
       calculated_at: {

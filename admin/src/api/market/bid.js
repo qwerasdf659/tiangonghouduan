@@ -49,7 +49,7 @@ export const BidAPI = {
    * @param {Object} data - 竞价数据
    * @param {number} data.exchange_item_id - 关联兑换商品 ID
    * @param {number} data.start_price - 起拍价
-   * @param {string} [data.price_asset_code='DIAMOND'] - 竞价资产类型
+   * @param {string} [data.price_asset_code='star_stone'] - 竞价资产类型
    * @param {number} [data.min_bid_increment=10] - 最小加价幅度
    * @param {string} data.start_time - 开始时间（ISO8601）
    * @param {string} data.end_time - 结束时间（ISO8601）

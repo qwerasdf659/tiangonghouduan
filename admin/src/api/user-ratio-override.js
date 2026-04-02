@@ -3,7 +3,7 @@
  *
  * @description 管理员为特定用户设置个性化消费比例的 CRUD 接口
  * @module api/user-ratio-override
- * @since 2026-03-02（钻石配额优化方案）
+ * @since 2026-03-02（星石配额优化方案）
  */
 
 import { API_PREFIX, request, buildURL, buildQueryString } from './base.js'

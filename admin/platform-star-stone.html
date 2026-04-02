@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <%- include('partials/head', { 
-    title: '平台钻石管理', 
+    title: '平台星石管理', 
     pageStyle: '[x-cloak] { display: none !important; }' 
   }) %>
 </head>
@@ -12,12 +12,12 @@
     <div class="container mx-auto px-4 py-3 flex justify-between items-center">
       <div class="flex items-center space-x-4">
         <a href="/admin/workspace.html" class="hover:text-blue-200 transition-colors">← 返回工作台</a>
-        <span class="text-lg font-semibold">💎 平台钻石管理</span>
+        <span class="text-lg font-semibold">💎 平台星石管理</span>
       </div>
     </div>
   </nav>
 
-  <main class="container mx-auto px-4 py-6" x-data="platformDiamond()" x-init="init()" x-cloak>
+  <main class="container mx-auto px-4 py-6" x-data="platformStarStone()" x-init="init()" x-cloak>
 
     <!-- ========== 顶部统计卡片 ========== -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
@@ -27,8 +27,8 @@
           <span class="text-sm font-medium text-blue-600">平台手续费账户余额</span>
           <span class="text-xl">💎</span>
         </div>
-        <div class="text-3xl font-bold text-blue-700" x-text="formatNumber(balance.platform_fee?.diamond_balance)"></div>
-        <div class="text-xs text-blue-400 mt-1">钻石（DIAMOND）</div>
+        <div class="text-3xl font-bold text-blue-700" x-text="formatNumber(balance.platform_fee?.star_stone_balance)"></div>
+        <div class="text-xs text-blue-400 mt-1">星石（STAR_STONE）</div>
       </div>
       <!-- 冻结中 -->
       <div class="rounded-xl shadow-sm border border-amber-100 bg-gradient-to-br from-amber-50 to-white p-5">
@@ -37,7 +37,7 @@
           <span class="text-xl">🔒</span>
         </div>
         <div class="text-3xl font-bold text-amber-600" x-text="formatNumber(balance.platform_fee?.frozen_amount)"></div>
-        <div class="text-xs text-amber-400 mt-1">钻石（冻结）</div>
+        <div class="text-xs text-amber-400 mt-1">星石（冻结）</div>
       </div>
       <!-- 累计已销毁 -->
       <div class="rounded-xl shadow-sm border border-red-100 bg-gradient-to-br from-red-50 to-white p-5">
@@ -46,21 +46,21 @@
           <span class="text-xl">🔥</span>
         </div>
         <div class="text-3xl font-bold text-red-600" x-text="formatNumber(balance.burn?.total_burned)"></div>
-        <div class="text-xs text-red-400 mt-1">钻石（永久移除）</div>
+        <div class="text-xs text-red-400 mt-1">星石（永久移除）</div>
       </div>
     </div>
 
     <!-- ========== 系统账户概览 ========== -->
     <div class="rounded-xl shadow-sm border bg-white mb-6">
       <div class="px-5 py-4 border-b flex items-center justify-between">
-        <h2 class="text-base font-semibold text-gray-800">📊 系统账户钻石概览</h2>
+        <h2 class="text-base font-semibold text-gray-800">📊 系统账户星石概览</h2>
         <button @click="loadBalance()" class="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
           刷新
         </button>
       </div>
       <div class="p-5">
-        <p class="text-xs text-gray-400 mb-3">以下为所有系统账户的钻石持有情况。负数表示该账户已向外发放的净额。</p>
+        <p class="text-xs text-gray-400 mb-3">以下为所有系统账户的星石持有情况。负数表示该账户已向外发放的净额。</p>
         <div class="overflow-x-auto">
           <table class="w-full text-sm">
             <thead>
@@ -81,8 +81,8 @@
                   </td>
                   <td class="py-3 px-3 text-gray-500 text-xs max-w-xs" x-text="acc.description"></td>
                   <td class="py-3 px-3 text-right font-mono"
-                      :class="acc.diamond_balance >= 0 ? 'text-blue-600' : 'text-gray-400'">
-                    <span x-text="formatNumber(acc.diamond_balance)"></span>
+                      :class="acc.star_stone_balance >= 0 ? 'text-blue-600' : 'text-gray-400'">
+                    <span x-text="formatNumber(acc.star_stone_balance)"></span>
                   </td>
                   <td class="py-3 px-3 text-right font-mono text-amber-500" x-text="formatNumber(acc.frozen_amount)"></td>
                   <td class="py-3 px-3 text-center">
@@ -97,14 +97,14 @@
       </div>
     </div>
 
-    <!-- ========== 钻石销毁操作 ========== -->
+    <!-- ========== 星石销毁操作 ========== -->
     <div class="rounded-xl shadow-sm border bg-white mb-6">
       <div class="px-5 py-4 border-b">
-        <h2 class="text-base font-semibold text-gray-800">🔥 钻石销毁（不可撤回）</h2>
+        <h2 class="text-base font-semibold text-gray-800">🔥 星石销毁（不可撤回）</h2>
       </div>
       <div class="p-5">
         <div class="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 text-sm text-red-700">
-          ⚠️ 销毁操作会将钻石从所选系统账户永久转入黑洞账户（SYSTEM_BURN），此操作不可撤回。请谨慎操作。
+          ⚠️ 销毁操作会将星石从所选系统账户永久转入黑洞账户（SYSTEM_BURN），此操作不可撤回。请谨慎操作。
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
@@ -196,6 +196,6 @@
 
   </main>
 
-  <script type="module" src="./src/modules/content/pages/platform-diamond.js"></script>
+  <script type="module" src="./src/modules/content/pages/platform-star-stone.js"></script>
 </body>
 </html>

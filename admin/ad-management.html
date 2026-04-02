@@ -57,7 +57,7 @@
         <div class="stats-card stats-info stats-card-animate" x-show="!dashboardLoading">
           <div class="stats-card-icon stats-card-icon-sm">💎</div>
           <div class="stats-card-value stats-card-value-sm" x-text="(dashboard.campaign_stats?.total_spend || 0).toLocaleString()"></div>
-          <div class="stats-card-label">总消耗钻石</div>
+          <div class="stats-card-label">总消耗星石</div>
         </div>
       </div>
 
@@ -387,7 +387,7 @@
                           x-text="statusText(c.status)"></span>
                   </td>
                   <td class="px-4 py-3 text-sm">
-                    <span x-text="(c.budget_spent_diamond || 0) + ' / ' + (c.budget_total_diamond || c.fixed_total_diamond || '-') + ' 💎'"></span>
+                    <span x-text="(c.budget_spent_star_stone || 0) + ' / ' + (c.budget_total_star_stone || c.fixed_total_star_stone || '-') + ' 💎'"></span>
                   </td>
                   <td class="px-4 py-3 text-sm themed-text-muted" x-text="(c.start_date || '-') + ' ~ ' + (c.end_date || '-')"></td>
                   <td class="px-4 py-3">
@@ -476,15 +476,15 @@
                   </div>
                   <div>
                     <span class="text-xs themed-text-muted block">日价</span>
-                    <span class="font-bold text-amber-600" x-text="slot.daily_price_diamond + ' 💎'"></span>
+                    <span class="font-bold text-amber-600" x-text="slot.daily_price_star_stone + ' 💎'"></span>
                   </div>
                   <div>
                     <span class="text-xs themed-text-muted block">最低出价</span>
-                    <span class="font-medium" x-text="slot.min_bid_diamond + ' 💎'"></span>
+                    <span class="font-medium" x-text="slot.min_bid_star_stone + ' 💎'"></span>
                   </div>
                   <div>
                     <span class="text-xs themed-text-muted block">最低预算</span>
-                    <span class="font-medium" x-text="(slot.min_budget_diamond || 500) + ' 💎'"></span>
+                    <span class="font-medium" x-text="(slot.min_budget_star_stone || 500) + ' 💎'"></span>
                   </div>
                   <div>
                     <span class="text-xs themed-text-muted block">最大展示</span>
@@ -557,8 +557,8 @@
             </div>
             <div class="stats-card stats-danger stats-card-compact stats-card-animate">
               <div class="stats-card-icon stats-card-icon-sm">💎</div>
-              <div class="stats-card-value stats-card-value-sm" x-text="(reportOverview.total_spend_diamond || 0).toLocaleString()"></div>
-              <div class="stats-card-label">总消耗(钻石)</div>
+              <div class="stats-card-value stats-card-value-sm" x-text="(reportOverview.total_spend_star_stone || 0).toLocaleString()"></div>
+              <div class="stats-card-label">总消耗(星石)</div>
             </div>
           </div>
 
@@ -601,7 +601,7 @@
         </div>
         <div class="themed-card rounded-xl p-4 border-l-4 border-l-purple-500">
           <p class="text-xs themed-text-muted">平均出价</p>
-          <p class="text-xl font-bold mt-1 text-purple-600 tabular-nums" x-text="bidLogs.length ? Math.round(bidLogs.reduce((s, l) => s + l.bid_amount_diamond, 0) / bidLogs.length) + ' 💎' : '-'"></p>
+          <p class="text-xl font-bold mt-1 text-purple-600 tabular-nums" x-text="bidLogs.length ? Math.round(bidLogs.reduce((s, l) => s + l.bid_amount_star_stone, 0) / bidLogs.length) + ' 💎' : '-'"></p>
         </div>
       </div>
       <div class="themed-card rounded-xl shadow-sm overflow-hidden">
@@ -644,7 +644,7 @@
                 <tr class="border-t border-gray-100 transition-colors" :class="idx % 2 === 0 ? '' : 'bg-gray-50/50'">
                   <td class="px-4 py-3 text-sm"><span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-mono text-xs">#<span x-text="log.ad_slot_id"></span></span></td>
                   <td class="px-4 py-3 text-sm"><span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 font-mono text-xs">#<span x-text="log.ad_campaign_id"></span></span></td>
-                  <td class="px-4 py-3 text-sm font-semibold tabular-nums" x-text="log.bid_amount_diamond + ' 💎'"></td>
+                  <td class="px-4 py-3 text-sm font-semibold tabular-nums" x-text="log.bid_amount_star_stone + ' 💎'"></td>
                   <td class="px-4 py-3 text-sm">
                     <span class="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-medium text-white shadow-sm"
                           :class="log.is_winner ? 'bg-gradient-to-r from-emerald-500 to-green-500' : 'bg-gradient-to-r from-red-400 to-rose-400'">
@@ -710,8 +710,8 @@
               <option value="">全部标签</option>
               <option value="lottery_active_7d">7天抽奖活跃</option>
               <option value="lottery_active_30d">30天抽奖活跃</option>
-              <option value="diamond_rich">钻石富豪</option>
-              <option value="has_red_shard">持有红水晶碎片</option>
+              <option value="star_stone_rich">星石富豪</option>
+              <option value="has_red_core_shard">持有红源晶碎片</option>
               <option value="market_trader">交易市场用户</option>
               <option value="new_user">新用户</option>
               <option value="active_7d">7天活跃</option>
@@ -957,8 +957,8 @@
             <div><span class="themed-text-muted">状态:</span> <span class="text-xs px-2.5 py-1 rounded-full font-medium text-white" :class="statusColor(campaignDetail?.status)" x-text="statusText(campaignDetail?.status)"></span></div>
             <div><span class="themed-text-muted">广告主:</span> <span x-text="campaignDetail?.advertiser?.nickname || ('用户#' + campaignDetail?.advertiser_user_id)"></span></div>
             <div><span class="themed-text-muted">计费模式:</span> <span x-text="billingText(campaignDetail?.billing_mode)"></span></div>
-            <div><span class="themed-text-muted">预算:</span> <span x-text="(campaignDetail?.budget_total_diamond || campaignDetail?.fixed_total_diamond || 0) + ' 💎'"></span></div>
-            <div><span class="themed-text-muted">已消耗:</span> <span x-text="(campaignDetail?.budget_spent_diamond || 0) + ' 💎'"></span></div>
+            <div><span class="themed-text-muted">预算:</span> <span x-text="(campaignDetail?.budget_total_star_stone || campaignDetail?.fixed_total_star_stone || 0) + ' 💎'"></span></div>
+            <div><span class="themed-text-muted">已消耗:</span> <span x-text="(campaignDetail?.budget_spent_star_stone || 0) + ' 💎'"></span></div>
             <div><span class="themed-text-muted">投放日期:</span> <span x-text="(campaignDetail?.start_date || '-') + ' ~ ' + (campaignDetail?.end_date || '-')"></span></div>
             <div><span class="themed-text-muted">优先级:</span> <span x-text="campaignDetail?.priority || 0"></span></div>
           </div>
@@ -1031,15 +1031,15 @@
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
                 <label class="block text-sm font-medium themed-text-secondary mb-1">日价(💎)</label>
-                <input type="number" x-model.number="slotForm.daily_price_diamond" min="1" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500">
+                <input type="number" x-model.number="slotForm.daily_price_star_stone" min="1" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500">
               </div>
               <div>
                 <label class="block text-sm font-medium themed-text-secondary mb-1">最低出价(💎)</label>
-                <input type="number" x-model.number="slotForm.min_bid_diamond" min="1" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500">
+                <input type="number" x-model.number="slotForm.min_bid_star_stone" min="1" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500">
               </div>
               <div>
                 <label class="block text-sm font-medium themed-text-secondary mb-1">最低预算(💎)</label>
-                <input type="number" x-model.number="slotForm.min_budget_diamond" min="1" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500">
+                <input type="number" x-model.number="slotForm.min_budget_star_stone" min="1" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500">
               </div>
               <div>
                 <label class="block text-sm font-medium themed-text-secondary mb-1">最大展示数</label>
@@ -1098,7 +1098,7 @@
                     <option :value="slot.ad_slot_id" x-text="slot.slot_name + ' (' + slotTypeText(slot.slot_type) + ' · ' + positionText(slot.position) + ')'"></option>
                   </template>
                 </select>
-                <p class="text-xs themed-text-muted mt-1" x-show="getSelectedSlotInfo() && campaignForm.campaign_category === 'commercial'" x-text="'日价: ' + (getSelectedSlotInfo()?.daily_price_diamond || '-') + ' 💎 · 最低出价: ' + (getSelectedSlotInfo()?.min_bid_diamond || '-') + ' 💎'"></p>
+                <p class="text-xs themed-text-muted mt-1" x-show="getSelectedSlotInfo() && campaignForm.campaign_category === 'commercial'" x-text="'日价: ' + (getSelectedSlotInfo()?.daily_price_star_stone || '-') + ' 💎 · 最低出价: ' + (getSelectedSlotInfo()?.min_bid_star_stone || '-') + ' 💎'"></p>
               </div>
               <div x-show="campaignForm.campaign_category === 'commercial'">
                 <label class="block text-sm font-medium themed-text-secondary mb-1">广告主用户ID（可选）</label>
@@ -1216,9 +1216,9 @@
                 <div>
                   <label class="block text-sm themed-text-secondary mb-1">预估总价</label>
                   <div class="w-full px-3 py-2 border rounded themed-bg-base text-lg font-bold text-indigo-600">
-                    <span x-text="((getSelectedSlotInfo()?.daily_price_diamond || 0) * (campaignForm.fixed_days || 0)) + ' 💎'"></span>
+                    <span x-text="((getSelectedSlotInfo()?.daily_price_star_stone || 0) * (campaignForm.fixed_days || 0)) + ' 💎'"></span>
                   </div>
-                  <p class="text-xs themed-text-muted mt-1" x-text="'= ' + (getSelectedSlotInfo()?.daily_price_diamond || '?') + ' 💎/天 × ' + (campaignForm.fixed_days || 0) + ' 天'"></p>
+                  <p class="text-xs themed-text-muted mt-1" x-text="'= ' + (getSelectedSlotInfo()?.daily_price_star_stone || '?') + ' 💎/天 × ' + (campaignForm.fixed_days || 0) + ' 天'"></p>
                 </div>
               </div>
             </div>
@@ -1228,14 +1228,14 @@
               <h6 class="text-sm font-medium mb-3 text-purple-700 dark:text-purple-300">竞价排名参数</h6>
               <div class="grid grid-cols-2 gap-4">
                 <div>
-                  <label class="block text-sm themed-text-secondary mb-1">每日出价（钻石）<span class="text-red-500">*</span></label>
-                  <input type="number" x-model.number="campaignForm.daily_bid_diamond" min="1" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-purple-500">
-                  <p class="text-xs themed-text-muted mt-1" x-text="'最低出价: ' + (getSelectedSlotInfo()?.min_bid_diamond || 50) + ' 💎'"></p>
+                  <label class="block text-sm themed-text-secondary mb-1">每日出价（星石）<span class="text-red-500">*</span></label>
+                  <input type="number" x-model.number="campaignForm.daily_bid_star_stone" min="1" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-purple-500">
+                  <p class="text-xs themed-text-muted mt-1" x-text="'最低出价: ' + (getSelectedSlotInfo()?.min_bid_star_stone || 50) + ' 💎'"></p>
                 </div>
                 <div>
-                  <label class="block text-sm themed-text-secondary mb-1">总预算（钻石）<span class="text-red-500">*</span></label>
-                  <input type="number" x-model.number="campaignForm.budget_total_diamond" min="1" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-purple-500">
-                  <p class="text-xs themed-text-muted mt-1" x-text="'最低预算: ' + (getSelectedSlotInfo()?.min_budget_diamond || 500) + ' 💎 · 预估可投 ' + (campaignForm.daily_bid_diamond > 0 ? Math.floor((campaignForm.budget_total_diamond || 0) / campaignForm.daily_bid_diamond) : '?') + ' 天'"></p>
+                  <label class="block text-sm themed-text-secondary mb-1">总预算（星石）<span class="text-red-500">*</span></label>
+                  <input type="number" x-model.number="campaignForm.budget_total_star_stone" min="1" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-purple-500">
+                  <p class="text-xs themed-text-muted mt-1" x-text="'最低预算: ' + (getSelectedSlotInfo()?.min_budget_star_stone || 500) + ' 💎 · 预估可投 ' + (campaignForm.daily_bid_star_stone > 0 ? Math.floor((campaignForm.budget_total_star_stone || 0) / campaignForm.daily_bid_star_stone) : '?') + ' 天'"></p>
                 </div>
               </div>
             </div>
@@ -1258,7 +1258,7 @@
 
             <!-- 商业广告提示 -->
             <div x-show="campaignForm.campaign_category === 'commercial'" class="p-3 bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-700 rounded text-sm text-yellow-800 dark:text-yellow-300">
-              <span class="font-medium">说明：</span>创建后为草稿状态，需通过「审核」流程才能正式投放。固定包天模式在提交审核时会冻结钻石，审核通过后扣除、拒绝后退回。
+              <span class="font-medium">说明：</span>创建后为草稿状态，需通过「审核」流程才能正式投放。固定包天模式在提交审核时会冻结星石，审核通过后扣除、拒绝后退回。
             </div>
             <!-- 运营/系统提示 -->
             <div x-show="campaignForm.campaign_category !== 'commercial'" class="p-3 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-700 rounded text-sm text-blue-800 dark:text-blue-300">
@@ -1289,7 +1289,7 @@
         </div>
         <div class="p-6">
           <div x-show="reviewAction === 'rejected'" class="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
-            <span class="font-medium">提示：</span>审核拒绝后，广告主冻结的钻石将自动退回。
+            <span class="font-medium">提示：</span>审核拒绝后，广告主冻结的星石将自动退回。
           </div>
           <label class="block text-sm font-medium themed-text-secondary mb-1">审核备注</label>
           <textarea x-model="reviewNote" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500" rows="3" placeholder="请输入审核意见..."></textarea>
@@ -1343,8 +1343,8 @@
                 </div>
                 <div class="grid grid-cols-2 gap-4 mb-6">
                   <div class="p-3 themed-bg-base rounded-lg text-center">
-                    <p class="text-xl font-bold text-purple-500" x-text="(campaignReport?.spend_diamond || 0) + ' 💎'"></p>
-                    <p class="text-xs themed-text-muted">消耗钻石</p>
+                    <p class="text-xl font-bold text-purple-500" x-text="(campaignReport?.spend_star_stone || 0) + ' 💎'"></p>
+                    <p class="text-xs themed-text-muted">消耗星石</p>
                   </div>
                   <div class="p-3 themed-bg-base rounded-lg text-center">
                     <p class="text-xl font-bold" x-text="campaignReport?.clicks_total && campaignReport?.impressions_valid ? ((campaignReport.clicks_total / campaignReport.impressions_valid) * 100).toFixed(2) + '%' : '0%'"></p>
@@ -1375,7 +1375,7 @@
                             <td class="px-3 py-2 text-right" x-text="snap.impressions_valid || 0"></td>
                             <td class="px-3 py-2 text-right" x-text="snap.clicks_total || 0"></td>
                             <td class="px-3 py-2 text-right" x-text="snap.conversions || 0"></td>
-                            <td class="px-3 py-2 text-right" x-text="snap.spend_diamond || 0"></td>
+                            <td class="px-3 py-2 text-right" x-text="snap.spend_star_stone || 0"></td>
                           </tr>
                         </template>
                       </tbody>
@@ -1405,7 +1405,7 @@
                     <p class="text-xs themed-text-muted">总点击</p>
                   </div>
                   <div class="p-3 themed-bg-base rounded-lg text-center">
-                    <p class="text-xl font-bold text-orange-500" x-text="(slotReport?.total_spend_diamond || 0) + ' 💎'"></p>
+                    <p class="text-xl font-bold text-orange-500" x-text="(slotReport?.total_spend_star_stone || 0) + ' 💎'"></p>
                     <p class="text-xs themed-text-muted">总收入</p>
                   </div>
                 </div>
@@ -1429,7 +1429,7 @@
                             <td class="px-3 py-2 text-right" x-text="snap.impressions_total || 0"></td>
                             <td class="px-3 py-2 text-right" x-text="snap.clicks_total || 0"></td>
                             <td class="px-3 py-2 text-right" x-text="snap.conversions || 0"></td>
-                            <td class="px-3 py-2 text-right" x-text="snap.spend_diamond || 0"></td>
+                            <td class="px-3 py-2 text-right" x-text="snap.spend_star_stone || 0"></td>
                           </tr>
                         </template>
                       </tbody>
@@ -1715,7 +1715,7 @@
                   <th class="px-4 py-2 text-left">账单号(AB)</th>
                   <th class="px-4 py-2 text-left">广告活动</th>
                   <th class="px-4 py-2 text-left">计费类型</th>
-                  <th class="px-4 py-2 text-right">金额(钻石)</th>
+                  <th class="px-4 py-2 text-right">金额(星石)</th>
                   <th class="px-4 py-2 text-left">计费日期</th>
                   <th class="px-4 py-2 text-left">备注</th>
                   <th class="px-4 py-2 text-left">创建时间</th>
@@ -1737,7 +1737,7 @@
                         }"
                         x-text="billingTypeText(rec.billing_type)"></span>
                     </td>
-                    <td class="px-4 py-2 text-right font-mono" x-text="rec.amount_diamond"></td>
+                    <td class="px-4 py-2 text-right font-mono" x-text="rec.amount_star_stone"></td>
                     <td class="px-4 py-2" x-text="rec.billing_date || '-'"></td>
                     <td class="px-4 py-2 text-gray-500 text-xs max-w-[200px] truncate" x-text="rec.remark || '-'"></td>
                     <td class="px-4 py-2 text-xs text-gray-400" x-text="formatDate(rec.created_at)"></td>

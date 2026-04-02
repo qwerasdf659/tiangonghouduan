@@ -14,12 +14,12 @@
  *
  * JSON thresholds 结构示例：
  * {
- *   "DIAMOND": {
+ *   "star_stone": {
  *     "daily_max_listings": 20,
  *     "daily_max_trades": 10,
  *     "daily_max_amount": 100000
  *   },
- *   "red_shard": {
+ *   "red_core_shard": {
  *     "daily_max_listings": 20,
  *     "daily_max_trades": 10,
  *     "daily_max_amount": 50000

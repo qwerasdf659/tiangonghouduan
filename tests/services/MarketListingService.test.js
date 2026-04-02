@@ -101,7 +101,7 @@ describe('MarketListingService - 市场挂牌服务', () => {
         listing_kind: 'item',
         offer_item_id: test_item.item_id,
         offer_item_display_name: '市场测试商品', // 快照字段
-        price_asset_code: 'DIAMOND',
+        price_asset_code: 'star_stone',
         price_amount: 100,
         status: 'on_sale',
         idempotency_key // 必填字段

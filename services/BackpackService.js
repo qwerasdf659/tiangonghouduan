@@ -30,6 +30,7 @@ const {
   sequelize
 } = require('../models')
 const BalanceService = require('./asset/BalanceService')
+const { AssetCode } = require('../constants/AssetCode')
 const { attachDisplayNames } = require('../utils/displayNameHelper')
 
 const logger = require('../utils/logger').logger
@@ -108,7 +109,7 @@ class BackpackService {
       const validAssets = assetAccounts.filter(
         account =>
           account.available_amount + account.frozen_amount > 0 &&
-          account.asset_code !== 'BUDGET_POINTS'
+          account.asset_code !== AssetCode.BUDGET_POINTS
       )
 
       if (validAssets.length === 0) {

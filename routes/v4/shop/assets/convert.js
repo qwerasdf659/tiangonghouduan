@@ -44,7 +44,7 @@ const TransactionManager = require('../../../../utils/TransactionManager')
  * POST /api/v4/shop/assets/convert
  *
  * 业务场景：
- * - 用户主动进行材料转换（如红水晶碎片分解为钻石）
+ * - 用户主动进行材料转换（如红源晶碎片分解为星石）
  * - 支持强幂等性，防止重复转换
  * - 规则驱动：支持任意在 material_conversion_rules 表中配置的转换规则
  * - 支持手续费机制（三方记账）
@@ -59,12 +59,12 @@ const TransactionManager = require('../../../../utils/TransactionManager')
  * {
  *   "success": true,
  *   "data": {
- *     "from_asset_code": "red_shard",
- *     "to_asset_code": "DIAMOND",
+ *     "from_asset_code": "red_core_shard",
+ *     "to_asset_code": "star_stone",
  *     "from_amount": 50,
  *     "to_amount": 1000,
  *     "fee_amount": 0,
- *     "fee_asset_code": "DIAMOND",
+ *     "fee_asset_code": "star_stone",
  *     "net_to_amount": 1000,
  *     "from_tx_id": 123,
  *     "to_tx_id": 456,
@@ -74,8 +74,8 @@ const TransactionManager = require('../../../../utils/TransactionManager')
  *     "is_duplicate": false,
  *     "conversion_info": {
  *       "rule_id": 1,
- *       "title": "红水晶碎片分解",
- *       "rate_description": "1红水晶碎片 = 20钻石",
+ *       "title": "红源晶碎片分解",
+ *       "rate_description": "1红源晶碎片 = 20星石",
  *       "fee_rate": 0,
  *       "fee_description": "无手续费"
  *     }
@@ -161,7 +161,7 @@ router.post('/convert', authenticateToken, async (req, res) => {
     /*
      * 🔴 2026-01-13 规则驱动改造：移除硬编码的资产类型校验
      *
-     * 改造前：硬编码校验 from_asset_code === 'red_shard' && to_asset_code === 'DIAMOND'
+     * 改造前：硬编码校验 from_asset_code === 'red_core_shard' && to_asset_code === 'star_stone'
      * 改造后：由 AssetConversionService.convertMaterial 内部查询 material_conversion_rules 表
      *         如果规则不存在或未启用，服务层抛出 RULE_NOT_FOUND 异常
      *
@@ -210,7 +210,7 @@ router.post('/convert', authenticateToken, async (req, res) => {
           parsedAmount,
           {
             idempotency_key,
-            title: '红水晶碎片分解为钻石',
+            title: '红源晶碎片分解为星石',
             meta: {
               source: 'api',
               endpoint: '/api/v4/shop/assets/convert',
@@ -330,7 +330,7 @@ router.post('/convert', authenticateToken, async (req, res) => {
         'INSUFFICIENT_BALANCE',
         {
           error: error.message,
-          hint: '请先获取足够的红水晶碎片再进行转换'
+          hint: '请先获取足够的红源晶碎片再进行转换'
         },
         403
       )

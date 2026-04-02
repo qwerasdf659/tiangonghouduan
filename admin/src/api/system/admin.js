@@ -79,10 +79,10 @@ export const SYSTEM_ADMIN_ENDPOINTS = {
   AD_PRICE_ADJUSTMENT_REJECT: `${API_PREFIX}/console/ad-pricing/adjustments/:id/reject`,
   AD_PRICE_ADJUSTMENT_APPLY: `${API_PREFIX}/console/ad-pricing/adjustments/:id/apply`,
 
-  // 平台钻石管理
-  PLATFORM_DIAMOND_BALANCE: `${API_PREFIX}/console/platform-diamond/balance`,
-  PLATFORM_DIAMOND_BURN: `${API_PREFIX}/console/platform-diamond/burn`,
-  PLATFORM_DIAMOND_BURN_HISTORY: `${API_PREFIX}/console/platform-diamond/burn-history`,
+  // 平台星石管理
+  PLATFORM_STAR_STONE_BALANCE: `${API_PREFIX}/console/platform-star-stone/balance`,
+  PLATFORM_STAR_STONE_BURN: `${API_PREFIX}/console/platform-star-stone/burn`,
+  PLATFORM_STAR_STONE_BURN_HISTORY: `${API_PREFIX}/console/platform-star-stone/burn-history`,
 
   // 统一内容投放获取（系统端只读接口，替代原 popup-banners/carousel-items/announcements）
   AD_DELIVERY: `${API_PREFIX}/system/ad-delivery`,

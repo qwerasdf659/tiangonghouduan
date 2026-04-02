@@ -1035,7 +1035,7 @@ class NotificationService {
     return await this.send(user_id, {
       type: 'listing_created',
       title: '📦 挂牌成功',
-      content: `您的 ${offer_amount} 个 ${offer_asset_code} 已成功上架，标价 ${price_amount} DIAMOND。资产已冻结，等待买家购买。`,
+      content: `您的 ${offer_amount} 个 ${offer_asset_code} 已成功上架，标价 ${price_amount} 星石。资产已冻结，等待买家购买。`,
       data: {
         market_listing_id,
         offer_asset_code,
@@ -1065,7 +1065,7 @@ class NotificationService {
     return await this.send(user_id, {
       type: 'listing_sold',
       title: '💰 售出成功',
-      content: `恭喜！您的 ${offer_amount} 个 ${offer_asset_code} 已售出，成交价 ${price_amount} DIAMOND，实际到账 ${net_amount} DIAMOND（扣除5%手续费）。`,
+      content: `恭喜！您的 ${offer_amount} 个 ${offer_asset_code} 已售出，成交价 ${price_amount} 星石，实际到账 ${net_amount} 星石（扣除5%手续费）。`,
       data: {
         market_listing_id,
         offer_asset_code,
@@ -1094,7 +1094,7 @@ class NotificationService {
     return await this.send(user_id, {
       type: 'purchase_completed',
       title: '🎉 购买成功',
-      content: `您已成功购买 ${offer_amount} 个 ${offer_asset_code}，支付 ${price_amount} DIAMOND。资产已到账，请在背包中查看。`,
+      content: `您已成功购买 ${offer_amount} 个 ${offer_asset_code}，支付 ${price_amount} 星石。资产已到账，请在背包中查看。`,
       data: {
         order_id,
         offer_asset_code,

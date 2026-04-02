@@ -196,10 +196,10 @@ describe('资产调账页面 API', () => {
     expect(Array.isArray(types)).toBe(true)
     expect(types.length).toBeGreaterThan(0)
 
-    const hasPoints = types.some(t => t.asset_code === 'POINTS')
-    const hasDiamond = types.some(t => t.asset_code === 'DIAMOND')
+    const hasPoints = types.some(t => t.asset_code === 'points')
+    const hasStarStone = types.some(t => t.asset_code === 'star_stone')
     expect(hasPoints).toBe(true)
-    expect(hasDiamond).toBe(true)
+    expect(hasStarStone).toBe(true)
   })
 
   test('GET /console/asset-adjustment/user/:user_id/balances - 应返回用户资产余额', async () => {

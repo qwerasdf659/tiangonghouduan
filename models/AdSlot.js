@@ -92,37 +92,37 @@ module.exports = sequelize => {
         comment: '最大展示次数（同一用户每天最多看到几次）'
       },
 
-      daily_price_diamond: {
+      daily_price_star_stone: {
         type: DataTypes.INTEGER,
         allowNull: false,
         validate: {
           min: { args: [0], msg: '每日价格不能为负数' }
         },
-        comment: '每日固定价格（钻石），用于固定价格模式'
+        comment: '每日固定价格（星石），用于固定价格模式'
       },
 
-      min_bid_diamond: {
+      min_bid_star_stone: {
         type: DataTypes.INTEGER,
         allowNull: false,
         defaultValue: 50,
         validate: {
           min: { args: [1], msg: '最低竞价不能小于1' }
         },
-        comment: '最低竞价（钻石），用于竞价模式'
+        comment: '最低竞价（星石），用于竞价模式'
       },
 
-      min_budget_diamond: {
+      min_budget_star_stone: {
         type: DataTypes.INTEGER,
         allowNull: false,
         defaultValue: 500,
         validate: {
           min: { args: [1], msg: '最低预算不能小于1' }
         },
-        comment: '最低预算（钻石），用于竞价模式'
+        comment: '最低预算（星石），用于竞价模式'
       },
 
       /** DAU 系数计算结果不得低于此值，0 表示不限制 */
-      min_daily_price_diamond: {
+      min_daily_price_star_stone: {
         type: DataTypes.INTEGER,
         allowNull: false,
         defaultValue: 0,
@@ -154,12 +154,12 @@ module.exports = sequelize => {
         comment: '广告位大类：display=展示广告, feed=信息流广告'
       },
 
-      /** 每千次曝光价格（钻石），仅 slot_category=feed 时使用 */
-      cpm_price_diamond: {
+      /** 每千次曝光价格（星石），仅 slot_category=feed 时使用 */
+      cpm_price_star_stone: {
         type: DataTypes.INTEGER,
         allowNull: false,
         defaultValue: 0,
-        comment: '每千次曝光价格（钻石），仅信息流广告使用'
+        comment: '每千次曝光价格（星石），仅信息流广告使用'
       },
 
       is_active: {

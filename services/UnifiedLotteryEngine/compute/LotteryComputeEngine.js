@@ -70,7 +70,7 @@ const {
  * 概率调整只保留 Pressure Tier 维度。
  *
  * allowed_tiers 字段仅作为监控参考元数据，描述该预算层级理论上可触达的档位。
- * 实际用户能抽到哪些奖品，完全由资源级过滤（DIAMOND_QUOTA / BUDGET_POINTS）决定。
+ * 实际用户能抽到哪些奖品，完全由资源级过滤（star_stone_quota / BUDGET_POINTS）决定。
  *
  * @type {Object<string, {min: number, max: number, description: string, allowed_tiers: string[]}>}
  */

@@ -5,7 +5,7 @@
  * - 管理员批量审核多条消费记录
  * - 支持部分成功模式（单条失败不影响其他）
  * - 自动幂等性检查，防止重复处理
- * - 审批通过自动发放全部资产（积分 + 预算积分 + 钻石配额）
+ * - 审批通过自动发放全部资产（积分 + 预算积分 + 星石配额）
  *
  * 技术特性：
  * - 复用 CoreService.approveConsumption / rejectConsumption 完整业务逻辑
@@ -205,7 +205,7 @@ class ConsumptionBatchService {
    * 通过 TransactionManager.execute 管理事务边界，
    * 内部调用 CoreService.approveConsumption / rejectConsumption，
    * 确保批量审核与单条审核走完全相同的流程：
-   * - approve: 积分 + 预算积分 + 钻石配额 + ContentReviewRecord + reward_transaction_id
+   * - approve: 积分 + 预算积分 + 星石配额 + ContentReviewRecord + reward_transaction_id
    * - reject: 状态更新 + ContentReviewRecord + 审计日志
    *
    * @private
@@ -249,7 +249,7 @@ class ConsumptionBatchService {
         new_status: 'approved',
         points_awarded: approveResult.points_awarded || 0,
         budget_points_allocated: approveResult.budget_points_allocated || 0,
-        diamond_quota_allocated: approveResult.diamond_quota_allocated || 0,
+        star_stone_quota_allocated: approveResult.star_stone_quota_allocated || 0,
         processed_at: BeijingTimeHelper.apiTimestamp()
       }
     } else if (action === BATCH_REVIEW_ACTIONS.REJECT) {

@@ -32,6 +32,7 @@
 
 const express = require('express')
 const router = express.Router()
+const { AssetCode } = require('../../../../constants/AssetCode')
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const { handleServiceError } = require('../../../../middleware/validation')
 const TransactionManager = require('../../../../utils/TransactionManager')
@@ -59,7 +60,7 @@ function asyncHandler(fn) {
  *
  * @body {number} exchange_item_id - 关联的兑换商品ID（必填）
  * @body {number} start_price - 起拍价（必填，正整数）
- * @body {string} [price_asset_code='DIAMOND'] - 竞价资产类型（默认 DIAMOND）
+ * @body {string} [price_asset_code='star_stone'] - 竞价资产类型（默认 star_stone）
  * @body {number} [min_bid_increment=10] - 最小加价幅度（默认 10）
  * @body {string} start_time - 竞价开始时间（必填，ISO8601 格式）
  * @body {string} end_time - 竞价结束时间（必填，ISO8601 格式，必须晚于 start_time）
@@ -75,7 +76,7 @@ router.post(
     const {
       exchange_item_id,
       start_price,
-      price_asset_code = 'DIAMOND',
+      price_asset_code = AssetCode.STAR_STONE,
       min_bid_increment = 10,
       start_time,
       end_time,
@@ -106,7 +107,7 @@ router.post(
     }
 
     // 禁止的资产类型（POINTS / BUDGET_POINTS）
-    const forbiddenAssets = ['POINTS', 'BUDGET_POINTS']
+    const forbiddenAssets = [AssetCode.POINTS, AssetCode.BUDGET_POINTS]
     if (forbiddenAssets.includes(price_asset_code)) {
       return res.apiError(
         `资产类型 ${price_asset_code} 不允许用于竞价`,

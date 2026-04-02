@@ -231,7 +231,7 @@ export function sidebarNav() {
             url: '/admin/ad-management.html',
             badgeKey: 'adPendingReviewCount'
           },
-          { id: 'platform-diamond', name: '平台钻石管理', url: '/admin/platform-diamond.html' },
+          { id: 'platform-star-stone', name: '平台星石管理', url: '/admin/platform-star-stone.html' },
           { id: 'zone-management', name: '地域管理', url: '/admin/zone-management.html' },
           { id: 'dict-mgmt', name: '字典管理', url: '/admin/dict-management.html' },
           { id: 'message-center', name: '消息中心', url: '/admin/message-center.html' }

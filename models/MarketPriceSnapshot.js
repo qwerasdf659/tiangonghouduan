@@ -60,8 +60,8 @@ MarketPriceSnapshot.initModel = function (sequelize) {
       price_asset_code: {
         type: DataTypes.STRING(50),
         allowNull: false,
-        defaultValue: 'DIAMOND',
-        comment: '定价币种代码'
+        defaultValue: 'star_stone',
+        comment: '定价币种代码（星石）'
       },
       active_listings: {
         type: DataTypes.INTEGER,

@@ -31,9 +31,9 @@ const ALLOWED_CREATE_FIELDS = [
   'slot_type',
   'position',
   'max_display_count',
-  'daily_price_diamond',
-  'min_bid_diamond',
-  'min_budget_diamond',
+  'daily_price_star_stone',
+  'min_bid_star_stone',
+  'min_budget_star_stone',
   'is_active',
   'description'
 ]
@@ -42,9 +42,9 @@ const ALLOWED_UPDATE_FIELDS = [
   'slot_name',
   'position',
   'max_display_count',
-  'daily_price_diamond',
-  'min_bid_diamond',
-  'min_budget_diamond',
+  'daily_price_star_stone',
+  'min_bid_star_stone',
+  'min_budget_star_stone',
   'is_active',
   'description'
 ]
@@ -166,10 +166,10 @@ router.get(
  * @body {string} slot_name - 广告位名称（如「首页弹窗位」）
  * @body {string} slot_type - 广告位类型（popup/carousel）
  * @body {string} position - 页面位置（如 home/lottery/profile）
- * @body {number} daily_price_diamond - 固定包天日价（钻石）
+ * @body {number} daily_price_star_stone - 固定包天日价（星石）
  * @body {number} [max_display_count=3] - 该位每次最多展示广告数
- * @body {number} [min_bid_diamond=50] - 竞价最低日出价（钻石）
- * @body {number} [min_budget_diamond=500] - 竞价最低总预算（钻石）
+ * @body {number} [min_bid_star_stone=50] - 竞价最低日出价（星石）
+ * @body {number} [min_budget_star_stone=500] - 竞价最低总预算（星石）
  * @body {boolean} [is_active=true] - 是否启用
  * @body {string} [description] - 广告位描述
  */
@@ -178,12 +178,18 @@ router.post(
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
     try {
-      const { slot_key, slot_name, slot_type, position, daily_price_diamond } = req.body
+      const { slot_key, slot_name, slot_type, position, daily_price_star_stone } = req.body
 
       // 必填字段校验
-      if (!slot_key || !slot_name || !slot_type || !position || daily_price_diamond === undefined) {
+      if (
+        !slot_key ||
+        !slot_name ||
+        !slot_type ||
+        !position ||
+        daily_price_star_stone === undefined
+      ) {
         return res.apiBadRequest(
-          '缺少必需参数：slot_key, slot_name, slot_type, position, daily_price_diamond'
+          '缺少必需参数：slot_key, slot_name, slot_type, position, daily_price_star_stone'
         )
       }
 
@@ -193,9 +199,9 @@ router.post(
       }
 
       // 数值校验
-      const dailyPrice = parseInt(daily_price_diamond)
+      const dailyPrice = parseInt(daily_price_star_stone)
       if (isNaN(dailyPrice) || dailyPrice < 0) {
-        return res.apiBadRequest('daily_price_diamond 必须是非负整数')
+        return res.apiBadRequest('daily_price_star_stone 必须是非负整数')
       }
 
       // 白名单字段提取
@@ -207,14 +213,14 @@ router.post(
       })
 
       // 类型转换
-      if (createData.daily_price_diamond !== undefined) {
-        createData.daily_price_diamond = parseInt(createData.daily_price_diamond)
+      if (createData.daily_price_star_stone !== undefined) {
+        createData.daily_price_star_stone = parseInt(createData.daily_price_star_stone)
       }
-      if (createData.min_bid_diamond !== undefined) {
-        createData.min_bid_diamond = parseInt(createData.min_bid_diamond)
+      if (createData.min_bid_star_stone !== undefined) {
+        createData.min_bid_star_stone = parseInt(createData.min_bid_star_stone)
       }
-      if (createData.min_budget_diamond !== undefined) {
-        createData.min_budget_diamond = parseInt(createData.min_budget_diamond)
+      if (createData.min_budget_star_stone !== undefined) {
+        createData.min_budget_star_stone = parseInt(createData.min_budget_star_stone)
       }
       if (createData.max_display_count !== undefined) {
         createData.max_display_count = parseInt(createData.max_display_count)
@@ -247,9 +253,9 @@ router.post(
  * @param {number} id - 广告位ID
  * @body {string} [slot_name] - 广告位名称
  * @body {string} [position] - 页面位置
- * @body {number} [daily_price_diamond] - 固定包天日价
- * @body {number} [min_bid_diamond] - 竞价最低日出价
- * @body {number} [min_budget_diamond] - 竞价最低总预算
+ * @body {number} [daily_price_star_stone] - 固定包天日价
+ * @body {number} [min_bid_star_stone] - 竞价最低日出价
+ * @body {number} [min_budget_star_stone] - 竞价最低总预算
  * @body {number} [max_display_count] - 最大展示数
  * @body {boolean} [is_active] - 是否启用
  * @body {string} [description] - 描述
@@ -278,9 +284,9 @@ router.put(
 
       // 数值字段类型转换
       const intFields = [
-        'daily_price_diamond',
-        'min_bid_diamond',
-        'min_budget_diamond',
+        'daily_price_star_stone',
+        'min_bid_star_stone',
+        'min_budget_star_stone',
         'max_display_count'
       ]
       for (const field of intFields) {

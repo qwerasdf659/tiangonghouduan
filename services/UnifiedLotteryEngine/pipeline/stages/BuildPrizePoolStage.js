@@ -5,7 +5,7 @@
  *
  * 职责：
  * 1. 根据库存和权重过滤奖品（排除缺货/零权重奖品）
- * 2. 按资源类型统一过滤奖品（DIAMOND→配额检查，其余→预算检查）
+ * 2. 按资源类型统一过滤奖品（星石→配额检查，其余→预算检查）
  * 3. 根据用户总中奖次数过滤奖品
  * 4. 按档位分组奖品（high/mid/low/fallback）
  * 5. 确保有兜底奖品
@@ -19,7 +19,7 @@
  * - has_valuable_prizes: 是否有有价值的奖品可用
  *
  * 架构重构：
- * - 合并 _filterByBudget + _filterByDiamondQuota → _filterByResourceEligibility（资源级过滤）
+ * - 合并 _filterByBudget + _filterByStarStoneQuota → _filterByResourceEligibility（资源级过滤）
  * - 删除 _filterByAllowedTiers 调用（档位系统只管概率分配，不做准入门控）
  * - 资格检查下沉到单个奖品，按资源类型独立判断（行业最佳实践）
  *
@@ -33,12 +33,13 @@
  * @author 统一抽奖架构重构
  * @since 2026
  * @updated 2026-01-20 集成预算分层限制
- * @updated 2026-03-04 去预算门控改资源级过滤（合并 _filterByBudget + _filterByDiamondQuota → _filterByResourceEligibility）
+ * @updated 2026-03-04 去预算门控改资源级过滤（合并 _filterByBudget + _filterByStarStoneQuota → _filterByResourceEligibility）
  */
 
 const BaseStage = require('./BaseStage')
 const { sequelize } = require('../../../../models')
 const BalanceService = require('../../../asset/BalanceService')
+const { AssetCode } = require('../../../../constants/AssetCode')
 
 /**
  * 档位定义（降级顺序）
@@ -114,7 +115,7 @@ class BuildPrizePoolStage extends BaseStage {
       /* 1. 根据库存和每日上限过滤奖品 */
       let filtered_prizes = await this._filterByAvailability(prizes)
 
-      /* 2. 按资源类型统一过滤（合并原 _filterByBudget + _filterByDiamondQuota） */
+      /* 2. 按资源类型统一过滤（合并原 _filterByBudget + _filterByStarStoneQuota） */
       if (budget_mode !== 'none') {
         filtered_prizes = await this._filterByResourceEligibility(
           filtered_prizes,
@@ -137,7 +138,7 @@ class BuildPrizePoolStage extends BaseStage {
       /*
        * 6. 档位门控已移除（2026-03-04 架构重构）
        *    资格检查由 _filterByResourceEligibility 唯一负责，档位系统只管概率分配。
-       *    原 _filterByAllowedTiers 按 BudgetTier 整档删除的逻辑导致 DIAMOND 等
+       *    原 _filterByAllowedTiers 按 BudgetTier 整档删除的逻辑导致星石等
        *    免费奖品被预算门控连带封杀，违背资源隔离原则。
        */
       const filtered_prizes_by_tier = prizes_by_tier
@@ -243,11 +244,11 @@ class BuildPrizePoolStage extends BaseStage {
   }
 
   /**
-   * 按资源类型统一过滤奖品（合并原 _filterByBudget + _filterByDiamondQuota）
+   * 按资源类型统一过滤奖品（合并原 _filterByBudget + _filterByStarStoneQuota）
    *
    * 每个奖品按自身消耗的资源类型独立判断资格：
-   * - DIAMOND 奖品（material_asset_code='DIAMOND'）：仅受 DIAMOND_QUOTA 控制
-   * - 保底奖品（prize_value_points=0 且非 DIAMOND）：永远通过
+   * - 星石奖品（material_asset_code=AssetCode.STAR_STONE）：仅受星石配额控制
+   * - 保底奖品（prize_value_points=0 且非星石）：永远通过
    * - 其余奖品（物理/券/积分/虚拟）：检查 BUDGET_POINTS 余额
    *
    * 设计原则：资格检查唯一关卡，按资源类型判断，不做档位级门控
@@ -259,58 +260,59 @@ class BuildPrizePoolStage extends BaseStage {
    * @private
    */
   async _filterByResourceEligibility(prizes, user_id, budget_before) {
-    let user_diamond_quota = 0
+    let user_star_stone_quota = 0
 
     const AdminSystemService = require('../../../AdminSystemService')
-    const diamond_quota_enabled = await AdminSystemService.getSettingValue(
+    const star_stone_quota_enabled = await AdminSystemService.getSettingValue(
       'points',
-      'diamond_quota_enabled',
+      'star_stone_quota_enabled',
       true
     )
 
-    if (diamond_quota_enabled) {
+    if (star_stone_quota_enabled) {
       try {
         await BalanceService.getOrCreateAccount({ user_id }, { transaction: null })
         const balance = await BalanceService.getBalance(
-          { user_id, asset_code: 'DIAMOND_QUOTA' },
+          { user_id, asset_code: AssetCode.STAR_STONE_QUOTA },
           { transaction: null }
         )
-        user_diamond_quota = balance?.available_amount || 0
+        user_star_stone_quota = balance?.available_amount || 0
       } catch (error) {
-        this.log('warn', '查询钻石配额失败，钻石奖品将跳过配额过滤', {
+        this.log('warn', '查询星石配额失败，星石奖品将跳过配额过滤', {
           user_id,
           error: error.message
         })
-        user_diamond_quota = Infinity
+        user_star_stone_quota = Infinity
       }
     } else {
-      user_diamond_quota = Infinity
+      user_star_stone_quota = Infinity
     }
 
     this.log('info', '资源级过滤参数', {
       user_id,
       budget_before,
-      user_diamond_quota: user_diamond_quota === Infinity ? 'unlimited' : user_diamond_quota,
-      diamond_quota_enabled,
+      user_star_stone_quota:
+        user_star_stone_quota === Infinity ? 'unlimited' : user_star_stone_quota,
+      star_stone_quota_enabled,
       total_prizes: prizes.length
     })
 
     const result = prizes.filter(prize => {
-      /* DIAMOND 奖品：仅受 DIAMOND_QUOTA 控制，不受 BUDGET_POINTS 影响 */
-      if (prize.material_asset_code === 'DIAMOND' && prize.material_amount > 0) {
-        const eligible = user_diamond_quota >= prize.material_amount
+      /* 星石奖品：仅受星石配额控制，不受 BUDGET_POINTS 影响 */
+      if (prize.material_asset_code === AssetCode.STAR_STONE && prize.material_amount > 0) {
+        const eligible = user_star_stone_quota >= prize.material_amount
         if (!eligible) {
-          this.log('debug', 'DIAMOND 奖品因配额不足被过滤', {
+          this.log('debug', '星石奖品因配额不足被过滤', {
             lottery_prize_id: prize.lottery_prize_id,
             prize_name: prize.prize_name,
             material_amount: prize.material_amount,
-            user_diamond_quota
+            user_star_stone_quota
           })
         }
         return eligible
       }
 
-      /* 所有非 DIAMOND 奖品：统一用 budget_cost 判断（pvp 仅管分层阈值） */
+      /* 所有非星石奖品：统一用 budget_cost 判断（pvp 仅管分层阈值） */
       const budget_cost = prize.budget_cost || 0
       if (budget_cost === 0) return true
 

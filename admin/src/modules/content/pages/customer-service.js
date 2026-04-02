@@ -180,7 +180,7 @@ function customerServicePage() {
       if (!lastMsg || lastMsg === '暂无消息') return []
       const msg = lastMsg.toLowerCase()
       const tags = []
-      if (/钻石|余额|积分|到账|扣款|冻结/.test(msg)) tags.push({ icon: '💎', label: '资产' })
+      if (/星石|余额|积分|到账|扣款|冻结/.test(msg)) tags.push({ icon: '💎', label: '资产' })
       if (/交易|买|卖|挂单|订单/.test(msg)) tags.push({ icon: '🔄', label: '交易' })
       if (/抽奖|抽|中奖|概率|保底/.test(msg)) tags.push({ icon: '🎰', label: '抽奖' })
       if (/物品|背包|锁|锁定|道具/.test(msg)) tags.push({ icon: '🎒', label: '背包' })

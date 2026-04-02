@@ -280,7 +280,7 @@ describe('API契约测试 - 市场模块 (/api/v4/marketplace)', () => {
           .set('Idempotency-Key', `test_list_${Date.now()}_1`)
           .send({
             price_amount: 100,
-            price_asset_code: 'DIAMOND'
+            price_asset_code: 'star_stone'
           })
 
         expect(response.status).toBe(400)
@@ -297,7 +297,7 @@ describe('API契约测试 - 市场模块 (/api/v4/marketplace)', () => {
           .set('Idempotency-Key', `test_list_${Date.now()}_2`)
           .send({
             item_id: 1,
-            price_asset_code: 'DIAMOND'
+            price_asset_code: 'star_stone'
           })
 
         expect(response.status).toBe(400)
@@ -314,7 +314,7 @@ describe('API契约测试 - 市场模块 (/api/v4/marketplace)', () => {
           .send({
             item_id: 1,
             price_amount: 100,
-            price_asset_code: 'DIAMOND'
+            price_asset_code: 'star_stone'
           })
 
         expect(response.status).toBe(400)
@@ -332,7 +332,7 @@ describe('API契约测试 - 市场模块 (/api/v4/marketplace)', () => {
           .send({
             item_id: 1,
             price_amount: 100,
-            price_asset_code: 'DIAMOND'
+            price_asset_code: 'star_stone'
           })
 
         expect(response.status).toBe(401)
@@ -350,7 +350,7 @@ describe('API契约测试 - 市场模块 (/api/v4/marketplace)', () => {
           .send({
             item_id: 1,
             price_amount: -100,
-            price_asset_code: 'DIAMOND'
+            price_asset_code: 'star_stone'
           })
 
         expect(response.status).toBe(400)
@@ -368,7 +368,7 @@ describe('API契约测试 - 市场模块 (/api/v4/marketplace)', () => {
           .send({
             item_id: 999999999,
             price_amount: 100,
-            price_asset_code: 'DIAMOND'
+            price_asset_code: 'star_stone'
           })
 
         // 可能返回404（物品不存在）或400（业务校验失败）
@@ -391,7 +391,7 @@ describe('API契约测试 - 市场模块 (/api/v4/marketplace)', () => {
           .send({
             offer_amount: 100,
             price_amount: 50,
-            price_asset_code: 'DIAMOND'
+            price_asset_code: 'star_stone'
           })
 
         expect(response.status).toBe(400)
@@ -407,9 +407,9 @@ describe('API契约测试 - 市场模块 (/api/v4/marketplace)', () => {
           .set('Authorization', `Bearer ${access_token}`)
           .set('Idempotency-Key', `test_fungible_list_${Date.now()}_2`)
           .send({
-            offer_asset_code: 'red_shard',
+            offer_asset_code: 'red_core_shard',
             price_amount: 50,
-            price_asset_code: 'DIAMOND'
+            price_asset_code: 'star_stone'
           })
 
         expect(response.status).toBe(400)
@@ -424,10 +424,10 @@ describe('API契约测试 - 市场模块 (/api/v4/marketplace)', () => {
           .post('/api/v4/marketplace/fungible-assets/list')
           .set('Idempotency-Key', `test_fungible_list_${Date.now()}_3`)
           .send({
-            offer_asset_code: 'red_shard',
+            offer_asset_code: 'red_core_shard',
             offer_amount: 100,
             price_amount: 50,
-            price_asset_code: 'DIAMOND'
+            price_asset_code: 'star_stone'
           })
 
         expect(response.status).toBe(401)
@@ -443,10 +443,10 @@ describe('API契约测试 - 市场模块 (/api/v4/marketplace)', () => {
           .set('Authorization', `Bearer ${access_token}`)
           .set('Idempotency-Key', `test_fungible_list_${Date.now()}_4`)
           .send({
-            offer_asset_code: 'red_shard',
+            offer_asset_code: 'red_core_shard',
             offer_amount: 0,
             price_amount: 50,
-            price_asset_code: 'DIAMOND'
+            price_asset_code: 'star_stone'
           })
 
         expect(response.status).toBe(400)

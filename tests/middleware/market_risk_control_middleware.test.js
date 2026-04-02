@@ -29,7 +29,7 @@ describe('MarketRiskControlMiddleware - 交易市场风控中间件测试', () =
   let middlewareInstance = null
   let redisClient = null
   const testUserId = 99999 // 使用特殊测试用户ID避免影响真实数据
-  const testAssetCode = 'DIAMOND'
+  const testAssetCode = 'star_stone'
 
   beforeAll(async () => {
     // 获取中间件单例
@@ -51,7 +51,7 @@ describe('MarketRiskControlMiddleware - 交易市场风控中间件测试', () =
         // 清理所有测试用户的 Redis key
         const dateStr = BeijingTimeHelper.formatDate(new Date(), 'YYYY-MM-DD')
         const metrics = ['listings', 'trades', 'amount']
-        const assetCodes = ['DIAMOND', 'red_shard']
+        const assetCodes = ['star_stone', 'red_core_shard']
 
         for (const metric of metrics) {
           for (const assetCode of assetCodes) {
@@ -81,23 +81,23 @@ describe('MarketRiskControlMiddleware - 交易市场风控中间件测试', () =
    */
   describe('Redis Key 生成规则验证', () => {
     test('generateRedisKey - 正确生成 Redis Key', () => {
-      const key = generateRedisKey(123, 'DIAMOND', 'listings', '2026-01-14')
+      const key = generateRedisKey(123, 'star_stone', 'listings', '2026-01-14')
 
-      expect(key).toBe('market_risk:123:DIAMOND:2026-01-14:listings')
+      expect(key).toBe('market_risk:123:star_stone:2026-01-14:listings')
       expect(key.startsWith(REDIS_KEY_PREFIX)).toBe(true)
     })
 
     test('generateRedisKey - 不传日期时使用今天（北京时间）', () => {
-      const key = generateRedisKey(456, 'red_shard', 'trades')
+      const key = generateRedisKey(456, 'red_core_shard', 'trades')
       const todayBeijing = BeijingTimeHelper.formatDate(new Date(), 'YYYY-MM-DD')
 
-      expect(key).toBe(`market_risk:456:red_shard:${todayBeijing}:trades`)
+      expect(key).toBe(`market_risk:456:red_core_shard:${todayBeijing}:trades`)
     })
 
     test('generateRedisKey - 支持不同指标类型', () => {
-      const listingsKey = generateRedisKey(100, 'DIAMOND', 'listings')
-      const tradesKey = generateRedisKey(100, 'DIAMOND', 'trades')
-      const amountKey = generateRedisKey(100, 'DIAMOND', 'amount')
+      const listingsKey = generateRedisKey(100, 'star_stone', 'listings')
+      const tradesKey = generateRedisKey(100, 'star_stone', 'trades')
+      const amountKey = generateRedisKey(100, 'star_stone', 'amount')
 
       expect(listingsKey).toContain(':listings')
       expect(tradesKey).toContain(':trades')
@@ -206,13 +206,17 @@ describe('MarketRiskControlMiddleware - 交易市场风控中间件测试', () =
 
       // 先清理再预占用
       const dateStr = BeijingTimeHelper.formatDate(new Date(), 'YYYY-MM-DD')
-      const key = generateRedisKey(testUserId, 'red_shard', 'listings', dateStr)
+      const key = generateRedisKey(testUserId, 'red_core_shard', 'listings', dateStr)
       await redisClient.del(key)
 
-      await middlewareInstance.preOccupy(testUserId, 'red_shard', 'listings', 1)
-      await middlewareInstance.preOccupy(testUserId, 'red_shard', 'listings', 1)
+      await middlewareInstance.preOccupy(testUserId, 'red_core_shard', 'listings', 1)
+      await middlewareInstance.preOccupy(testUserId, 'red_core_shard', 'listings', 1)
 
-      const count = await middlewareInstance.getCurrentCount(testUserId, 'red_shard', 'listings')
+      const count = await middlewareInstance.getCurrentCount(
+        testUserId,
+        'red_core_shard',
+        'listings'
+      )
       expect(count).toBe(2)
     })
 
@@ -266,18 +270,18 @@ describe('MarketRiskControlMiddleware - 交易市场风控中间件测试', () =
 
       // 清理并设置测试数据
       const dateStr = BeijingTimeHelper.formatDate(new Date(), 'YYYY-MM-DD')
-      await redisClient.del(generateRedisKey(testUserId, 'DIAMOND', 'listings', dateStr))
-      await redisClient.del(generateRedisKey(testUserId, 'red_shard', 'listings', dateStr))
+      await redisClient.del(generateRedisKey(testUserId, 'star_stone', 'listings', dateStr))
+      await redisClient.del(generateRedisKey(testUserId, 'red_core_shard', 'listings', dateStr))
 
-      await middlewareInstance.preOccupy(testUserId, 'DIAMOND', 'listings', 5)
-      await middlewareInstance.preOccupy(testUserId, 'red_shard', 'listings', 3)
+      await middlewareInstance.preOccupy(testUserId, 'star_stone', 'listings', 5)
+      await middlewareInstance.preOccupy(testUserId, 'red_core_shard', 'listings', 3)
 
       const counters = await middlewareInstance.getUserRiskCounters(testUserId, null)
 
       expect(counters.user_id).toBe(testUserId)
       expect(counters.asset_code).toBeNull() // 未指定币种
-      expect(counters.counters.listings.DIAMOND).toBe(5)
-      expect(counters.counters.listings.red_shard).toBe(3)
+      expect(counters.counters.listings.star_stone).toBe(5)
+      expect(counters.counters.listings.red_core_shard).toBe(3)
     })
   })
 
@@ -385,7 +389,7 @@ describe('MarketRiskControlMiddleware - 交易市场风控中间件测试', () =
 
       const req = {
         user: { user_id: testUserId },
-        body: { price_asset_code: 'DIAMOND' },
+        body: { price_asset_code: 'star_stone' },
         path: '/api/v4/marketplace/listings'
       }
       const res = {
@@ -401,7 +405,7 @@ describe('MarketRiskControlMiddleware - 交易市场风控中间件测试', () =
       // 验证 riskContext 注入
       expect(req.riskContext).toBeDefined()
       expect(req.riskContext.user_id).toBe(testUserId)
-      expect(req.riskContext.price_asset_code).toBe('DIAMOND')
+      expect(req.riskContext.price_asset_code).toBe('star_stone')
       expect(req.riskContext.redis_healthy).toBe(true)
     })
 
@@ -481,28 +485,32 @@ describe('MarketRiskControlMiddleware - 交易市场风控中间件测试', () =
       const dateStr = BeijingTimeHelper.formatDate(new Date(), 'YYYY-MM-DD')
 
       // 清理
-      await redisClient.del(generateRedisKey(userId, 'DIAMOND', 'listings', dateStr))
-      await redisClient.del(generateRedisKey(userId, 'red_shard', 'listings', dateStr))
+      await redisClient.del(generateRedisKey(userId, 'star_stone', 'listings', dateStr))
+      await redisClient.del(generateRedisKey(userId, 'red_core_shard', 'listings', dateStr))
 
-      // DIAMOND 挂牌 10 次
+      // star_stone 挂牌 10 次
       for (let i = 0; i < 10; i++) {
-        await middlewareInstance.preOccupy(userId, 'DIAMOND', 'listings', 1)
+        await middlewareInstance.preOccupy(userId, 'star_stone', 'listings', 1)
       }
 
-      // red_shard 挂牌 7 次
+      // red_core_shard 挂牌 7 次
       for (let i = 0; i < 7; i++) {
-        await middlewareInstance.preOccupy(userId, 'red_shard', 'listings', 1)
+        await middlewareInstance.preOccupy(userId, 'red_core_shard', 'listings', 1)
       }
 
-      const diamondCount = await middlewareInstance.getCurrentCount(userId, 'DIAMOND', 'listings')
-      const redShardCount = await middlewareInstance.getCurrentCount(
+      const starStoneCount = await middlewareInstance.getCurrentCount(
         userId,
-        'red_shard',
+        'star_stone',
+        'listings'
+      )
+      const redCoreShardCount = await middlewareInstance.getCurrentCount(
+        userId,
+        'red_core_shard',
         'listings'
       )
 
-      expect(diamondCount).toBe(10)
-      expect(redShardCount).toBe(7)
+      expect(starStoneCount).toBe(10)
+      expect(redCoreShardCount).toBe(7)
     })
 
     test('不同日期的计数器相互独立', async () => {

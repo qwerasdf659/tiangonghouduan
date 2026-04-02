@@ -13,7 +13,7 @@
  * - **套利闭环拦截（必拦截）**：存在任意闭环使得"沿环路换一圈资产数量不减反增"
  *   - 判定方法：将每条规则倍率 r=to_amount/from_amount 对数化为边权 w=-log(r)，做有向图负环检测（Bellman-Ford）
  *   - 范围限定：全局所有已生效（effective_at <= NOW()）+ is_enabled=true 的规则集合内
- * - **终点货币禁止流出（必拦截）**：DIAMOND 等终点货币禁止作为 from_asset_code
+ * - **终点货币禁止流出（必拦截）**：星石等终点货币禁止作为 from_asset_code
  *
  * 创建时间：2025-12-15
  * 更新时间：2026-01-26（V2.1 支持跨组转换 + 终点货币限制）
@@ -24,6 +24,7 @@
 // ✅ 必须从 models/index 获取已初始化的模型（避免直接 require 模型文件导致拿到“初始化函数”）
 const { MaterialConversionRule } = require('../models')
 const { Op } = require('sequelize')
+const { AssetCode } = require('../constants/AssetCode')
 
 /**
  * 材料转换规则风控校验器
@@ -217,7 +218,7 @@ class MaterialConversionValidator {
    *
    * 🔴 V2.1 更新：
    * - 移除跨组限制，允许不同 group_code 之间的转换
-   * - 新增终点货币（DIAMOND）禁止流出检查
+   * - 新增终点货币（star_stone）禁止流出检查
    * - 套利检测范围从"组内"扩大到"全局"
    *
    * @param {MaterialConversionRule} newRule - 新增的规则（或待启用的规则）
@@ -255,10 +256,10 @@ class MaterialConversionValidator {
       }
 
       /*
-       * 🔴 V2.1 硬约束：终点货币（如 DIAMOND）禁止作为转换源
-       * 业务规则：钻石是系统「终点货币」，只进不出
+       * 🔴 V2.1 硬约束：终点货币（如 星石）禁止作为转换源
+       * 业务规则：星石是系统「终点货币」，只进不出
        */
-      const TERMINAL_CURRENCIES = ['DIAMOND']
+      const TERMINAL_CURRENCIES = [AssetCode.STAR_STONE]
       if (TERMINAL_CURRENCIES.includes(newRule.from_asset_code)) {
         errors.push(
           `转换规则被拒绝：${newRule.from_asset_code} 是终点货币（只进不出），禁止转化为其他资产。` +

@@ -367,7 +367,7 @@ const DICT_TYPES = {
   BUDGET_STATUS: 'budget_status', // 预算运行状态（active/paused/exhausted/warning）
   USER_PHASE: 'user_phase', // 用户生命周期阶段（newcomer/growth/mature/decline）
   DIMENSION_TYPE: 'dimension_type', // 分析维度类型（store/campaign/user_segment/time_period）
-  ASSET_TYPE: 'asset_type' // 资产类型（points/balance/coupon/diamond/item）
+  ASSET_TYPE: 'asset_type' // 资产类型（points/balance/coupon/star_stone/item）
 }
 
 module.exports = {

@@ -21,6 +21,7 @@ const BudgetProvider = require('./BudgetProvider')
 // V4.7.0 AssetService 拆分：使用子服务替代原 AssetService
 const BalanceService = require('../../../asset/BalanceService')
 const QueryService = require('../../../asset/QueryService')
+const { AssetCode } = require('../../../../constants/AssetCode')
 
 /**
  * 用户预算提供者
@@ -94,7 +95,7 @@ class UserBudgetProvider extends BudgetProvider {
       return {
         available: available_amount,
         details: {
-          asset_code: 'BUDGET_POINTS',
+          asset_code: AssetCode.BUDGET_POINTS,
           user_id,
           lottery_campaign_id,
           allowed_campaign_ids: this.allowed_campaign_ids,
@@ -174,7 +175,7 @@ class UserBudgetProvider extends BudgetProvider {
       const deduct_result = await BalanceService.changeBalance(
         {
           user_id,
-          asset_code: 'BUDGET_POINTS',
+          asset_code: AssetCode.BUDGET_POINTS,
           delta_amount: -amount,
           business_type: 'lottery_budget_deduct',
           idempotency_key: reference_id,
@@ -253,7 +254,7 @@ class UserBudgetProvider extends BudgetProvider {
       const refund_result = await BalanceService.changeBalance(
         {
           user_id,
-          asset_code: 'BUDGET_POINTS',
+          asset_code: AssetCode.BUDGET_POINTS,
           delta_amount: amount,
           business_type: 'lottery_budget_rollback',
           idempotency_key: `${original_reference_id}_rollback`,

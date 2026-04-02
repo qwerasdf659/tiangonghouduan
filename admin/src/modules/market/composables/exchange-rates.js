@@ -64,7 +64,7 @@ export function useExchangeRateState() {
     /** @type {Object} 表单数据 */
     rate_form: {
       from_asset_code: '',
-      to_asset_code: 'DIAMOND',
+      to_asset_code: 'star_stone',
       rate_numerator: 1,
       rate_denominator: 1,
       min_from_amount: 1,
@@ -154,7 +154,7 @@ export function useExchangeRateActions() {
     _getEmptyRateForm() {
       return {
         from_asset_code: '',
-        to_asset_code: 'DIAMOND',
+        to_asset_code: 'star_stone',
         rate_numerator: 1,
         rate_denominator: 1,
         min_from_amount: 1,

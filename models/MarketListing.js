@@ -6,7 +6,7 @@
  * 核心功能：
  * 1. 挂牌类型区分（item 不可叠加物品、fungible_asset 可叠加资产）
  * 2. 标的资产管理（物品实例或可叠加资产数量）
- * 3. 定价管理（固定使用 DIAMOND 结算）
+ * 3. 定价管理（固定使用星石结算）
  * 4. 锁定机制（防止并发购买，支持超时解锁）
  * 5. 冻结标记（可叠加资产挂牌必须冻结卖家标的）
  * 6. 状态流转（on_sale → locked → sold/withdrawn）
@@ -17,7 +17,7 @@
  *    - 可叠加资产：冻结卖家资产（seller_offer_frozen=true），写入 offer_asset_code + offer_amount
  * 2. 购买挂牌
  *    - 锁定挂牌：status=on_sale → locked，记录 locked_by_order_id + locked_at
- *    - 冻结买家 DIAMOND：通过 BalanceService 冻结 gross_amount
+ *    - 冻结买家星石：通过 BalanceService 冻结 gross_amount
  *    - 成交结算：多分录（买家扣减、卖家入账、平台手续费）
  *    - 转移所有权：物品实例转移或资产交付
  *    - 完成订单：status=locked → sold
@@ -27,7 +27,7 @@
  *    - 更新状态：status=on_sale → withdrawn
  * 4. 超时解锁
  *    - 定时任务扫描 status=locked 且 locked_at 超时（默认 15 分钟）
- *    - 解冻买家 DIAMOND
+ *    - 解冻买家星石
  *    - 回滚挂牌：status=locked → on_sale
  *
  * 状态流转规则：
@@ -74,7 +74,7 @@ module.exports = sequelize => {
         type: DataTypes.ENUM('item', 'fungible_asset'),
         allowNull: false,
         comment:
-          '挂牌类型（Listing Kind）：item-不可叠加物品（如装备、卡牌）| fungible_asset-可叠加资产（如材料、钻石）；业务规则：决定标的资产字段的填充规则'
+          '挂牌类型（Listing Kind）：item-不可叠加物品（如装备、卡牌）| fungible_asset-可叠加资产（如材料、星石）；业务规则：决定标的资产字段的填充规则'
       },
 
       // 卖家信息
@@ -171,7 +171,7 @@ module.exports = sequelize => {
         type: DataTypes.STRING(50),
         allowNull: true,
         comment:
-          '标的资产代码（Offer Asset Code）：当 listing_kind=fungible_asset 时必填，如 red_shard、DIAMOND；业务规则：挂牌时必须冻结卖家该资产的 offer_amount 数量'
+          '标的资产代码（Offer Asset Code）：当 listing_kind=fungible_asset 时必填，如 red_core_shard、star_stone；业务规则：挂牌时必须冻结卖家该资产的 offer_amount 数量'
       },
 
       offer_amount: {
@@ -185,16 +185,16 @@ module.exports = sequelize => {
       price_asset_code: {
         type: DataTypes.STRING(50),
         allowNull: false,
-        defaultValue: 'DIAMOND',
+        defaultValue: 'star_stone',
         comment:
-          '结算资产代码（Price Asset Code）：交易市场结算币种，固定为 DIAMOND；业务规则：前端和后端都强制校验只允许 DIAMOND'
+          '结算资产代码（Price Asset Code）：交易市场结算币种，固定为星石（star_stone）；业务规则：前端和后端都强制校验只允许 star_stone'
       },
 
       price_amount: {
         type: DataTypes.BIGINT,
         allowNull: false,
         comment:
-          '挂牌价格（Price Amount）：卖家设定的总价，单位为 price_asset_code（DIAMOND）；业务规则：必须 >0，成交时买家支付该金额（含手续费）'
+          '挂牌价格（Price Amount）：卖家设定的总价，单位为 price_asset_code（star_stone）；业务规则：必须 >0，成交时买家支付该金额（含手续费）'
       },
 
       // 冻结与锁定

@@ -18,7 +18,7 @@ const FEE_RULES = {
    *
    * 硬约束（来自文档）：
    * - 默认统一费率：5%
-   * - 最小手续费：1 DIAMOND
+   * - 最小手续费：1 STAR_STONE
    * - 手续费策略：monetize（平台收入）
    * - 计算公式：gross_amount = fee_amount + net_amount
    *
@@ -54,7 +54,7 @@ const FEE_RULES = {
    * 交易类型手续费配置（Trade Type Fee Config - 不同交易类型的费率）
    * inventory_transfer: 物品转让手续费配置
    * point_transfer: 积分转账手续费配置
-   * market_purchase: 市场购买手续费配置（交易市场DIAMOND结算）
+   * market_purchase: 市场购买手续费配置（交易市场STAR_STONE结算）
    */
   trade_type_fees: {
     inventory_transfer: {
@@ -68,10 +68,10 @@ const FEE_RULES = {
       fixed_rate: 0.02 // 固定2%手续费
     },
     market_purchase: {
-      enabled: true, // 是否启用市场购买手续费（交易市场DIAMOND结算）
+      enabled: true, // 是否启用市场购买手续费（交易市场STAR_STONE结算）
       use_tiers: false, // 🔴 修复：不使用分档计费，改为固定费率
       fixed_rate: 0.05, // 🔴 修复：固定 5% 手续费
-      description: '交易市场DIAMOND结算手续费，统一5%从selling_amount中扣除，平台收入'
+      description: '交易市场STAR_STONE结算手续费，统一5%从selling_amount中扣除，平台收入'
     }
   }
 }

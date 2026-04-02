@@ -129,7 +129,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
           seller_user_id: seller_id,
           item_id: test_item.item_id,
           price_amount,
-          price_asset_code: 'DIAMOND'
+          price_asset_code: 'star_stone'
         },
         { transaction: listing_tx }
       )
@@ -155,7 +155,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
       await BalanceService.changeBalance(
         {
           user_id,
-          asset_code: 'DIAMOND',
+          asset_code: 'star_stone',
           delta_amount: amount,
           business_type: 'test_grant',
           counterpart_account_id: 2,
@@ -300,7 +300,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
         // 3. 记录冻结前的资产状态
         const balance_before = await BalanceService.getBalance({
           user_id: testBuyer.user_id,
-          asset_code: 'DIAMOND'
+          asset_code: 'star_stone'
         })
         const frozen_before = Number(balance_before?.frozen_amount || 0)
 
@@ -332,7 +332,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
         // 6. 验证资产已冻结
         const balance_after = await BalanceService.getBalance({
           user_id: testBuyer.user_id,
-          asset_code: 'DIAMOND'
+          asset_code: 'star_stone'
         })
         const frozen_after = Number(balance_after?.frozen_amount || 0)
         expect(frozen_after).toBeGreaterThan(frozen_before)
@@ -387,7 +387,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
         // 3. 记录卖家资产（用于验证结算）
         const seller_balance_before = await BalanceService.getBalance({
           user_id: testSeller.user_id,
-          asset_code: 'DIAMOND'
+          asset_code: 'star_stone'
         })
         const seller_available_before = Number(seller_balance_before?.available_amount || 0)
 
@@ -425,7 +425,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
         // 8. 验证卖家收到款项
         const seller_balance_after = await BalanceService.getBalance({
           user_id: testSeller.user_id,
-          asset_code: 'DIAMOND'
+          asset_code: 'star_stone'
         })
         const seller_available_after = Number(seller_balance_after?.available_amount || 0)
         const seller_received = seller_available_after - seller_available_before
@@ -479,7 +479,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
         // 3. 记录冻结金额
         const balance_before_cancel = await BalanceService.getBalance({
           user_id: testBuyer.user_id,
-          asset_code: 'DIAMOND'
+          asset_code: 'star_stone'
         })
         const frozen_before_cancel = Number(balance_before_cancel?.frozen_amount || 0)
 
@@ -513,7 +513,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
         // 7. 验证买家资产解冻
         const balance_after_cancel = await BalanceService.getBalance({
           user_id: testBuyer.user_id,
-          asset_code: 'DIAMOND'
+          asset_code: 'star_stone'
         })
         const frozen_after_cancel = Number(balance_after_cancel?.frozen_amount || 0)
         expect(frozen_after_cancel).toBeLessThan(frozen_before_cancel)
@@ -605,7 +605,7 @@ describe('📋 订单生命周期测试（Order Lifecycle）', () => {
         // 1. 查询买家当前余额
         const balance_before = await BalanceService.getBalance({
           user_id: testBuyer.user_id,
-          asset_code: 'DIAMOND'
+          asset_code: 'star_stone'
         })
         const available = Number(balance_before?.available_amount || 0)
         console.log(`买家当前余额: ${available}`)

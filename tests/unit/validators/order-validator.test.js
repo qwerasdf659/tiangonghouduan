@@ -405,7 +405,7 @@ describe('P1-3.3: 订单API参数验证单元测试', () => {
 
   describe('7. 结算资产代码参数验证 (asset_code)', () => {
     // 市场支持的结算资产代码（基于 MarketListingService 定义）
-    const SETTLEMENT_ASSETS = ['DIAMOND', 'red_shard']
+    const SETTLEMENT_ASSETS = ['star_stone', 'red_core_shard']
     const assetCodeValidator = validateEnumValue('asset_code', SETTLEMENT_ASSETS, 'query', {
       optional: true
     })
@@ -422,7 +422,7 @@ describe('P1-3.3: 订单API参数验证单元测试', () => {
     })
 
     test('不支持的结算资产代码应被拒绝', async () => {
-      const unsupportedCodes = ['GOLD', 'POINTS', 'USD', 'unknown']
+      const unsupportedCodes = ['GOLD', 'points', 'USD', 'unknown']
 
       for (const code of unsupportedCodes) {
         const req = createMockRequest({ query: { asset_code: code } })
@@ -529,7 +529,7 @@ describe('P1-3.3: 订单API参数验证单元测试', () => {
   describe('10. 组合参数验证场景', () => {
     test('订单列表查询多参数组合验证', async () => {
       const ORDER_STATUSES = ['created', 'frozen', 'completed', 'cancelled', 'failed']
-      const SETTLEMENT_ASSETS = ['DIAMOND', 'red_shard']
+      const SETTLEMENT_ASSETS = ['star_stone', 'red_core_shard']
 
       const statusValidator = validateEnumValue('status', ORDER_STATUSES, 'query', {
         optional: true
@@ -549,7 +549,7 @@ describe('P1-3.3: 订单API参数验证单元测试', () => {
       const req = createMockRequest({
         query: {
           status: 'completed',
-          asset_code: 'DIAMOND',
+          asset_code: 'star_stone',
           page: '1',
           limit: '20',
           buyer_user_id: '100',
@@ -576,7 +576,7 @@ describe('P1-3.3: 订单API参数验证单元测试', () => {
 
       // 验证所有参数都被正确存储
       expect(req.validated.status).toBe('completed')
-      expect(req.validated.asset_code).toBe('DIAMOND')
+      expect(req.validated.asset_code).toBe('star_stone')
       expect(req.validated.limit).toBe(20)
       expect(req.validated.buyer_user_id).toBe(100)
       expect(req.validated.seller_user_id).toBe(200)

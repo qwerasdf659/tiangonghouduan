@@ -24,6 +24,7 @@
 const { User, Role, UserRole } = require('../models')
 // V4.7.0 AssetService 拆分：使用子服务替代原 AssetService
 const BalanceService = require('./asset/BalanceService')
+const { AssetCode } = require('../constants/AssetCode')
 const BeijingTimeHelper = require('../utils/timeHelper')
 const logger = require('../utils/logger')
 const { BusinessCacheHelper } = require('../utils/BusinessCacheHelper')
@@ -632,9 +633,13 @@ class UserService {
           )
 
           // 获取或创建 POINTS 余额记录（决策G：自动创建）
-          const balance = await BalanceService.getOrCreateBalance(account.account_id, 'POINTS', {
-            transaction
-          })
+          const balance = await BalanceService.getOrCreateBalance(
+            account.account_id,
+            AssetCode.POINTS,
+            {
+              transaction
+            }
+          )
 
           // 决策H：账户冻结时返回 403
           if (account.status !== 'active') {

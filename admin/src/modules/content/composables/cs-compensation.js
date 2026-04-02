@@ -46,7 +46,7 @@ export function useCsCompensationMethods() {
         session_id: sessionId || null,
         issue_id: issueId || null,
         reason: '',
-        items: [{ type: 'asset', asset_code: 'DIAMOND', amount: 0 }]
+        items: [{ type: 'asset', asset_code: 'star_stone', amount: 0 }]
       }
       this.showCompensationModal = true
     },
@@ -65,7 +65,7 @@ export function useCsCompensationMethods() {
 
     /** 添加补偿项 */
     addCompensationItem() {
-      this.compensationForm.items.push({ type: 'asset', asset_code: 'DIAMOND', amount: 0 })
+      this.compensationForm.items.push({ type: 'asset', asset_code: 'star_stone', amount: 0 })
     },
 
     /**

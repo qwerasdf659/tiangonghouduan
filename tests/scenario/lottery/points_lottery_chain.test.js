@@ -116,7 +116,7 @@ describe('📊 任务11.1：积分发放→抽奖消费完整链路测试', () =
 
     if (balanceResponse.status === 200 && balanceResponse.body.data) {
       const assets = balanceResponse.body.data.assets || balanceResponse.body.data
-      const pointsAsset = Array.isArray(assets) ? assets.find(a => a.asset_code === 'POINTS') : null
+      const pointsAsset = Array.isArray(assets) ? assets.find(a => a.asset_code === 'points') : null
       initialPointsBalance = pointsAsset ? Number(pointsAsset.available_amount || 0) : 0
       console.log(`   💰 初始POINTS余额: ${initialPointsBalance}`)
     } else {
@@ -156,7 +156,7 @@ describe('📊 任务11.1：积分发放→抽奖消费完整链路测试', () =
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           user_id: testUserId,
-          asset_code: 'POINTS',
+          asset_code: 'points',
           amount: GRANT_POINTS_AMOUNT,
           reason: '测试任务11.1-积分发放链路测试',
           idempotency_key: grantIdempotencyKey
@@ -170,7 +170,7 @@ describe('📊 任务11.1：积分发放→抽奖消费完整链路测试', () =
         TestAssertions.validateApiResponse(response.body, true)
 
         expect(response.body.data).toHaveProperty('user_id', testUserId)
-        expect(response.body.data).toHaveProperty('asset_code', 'POINTS')
+        expect(response.body.data).toHaveProperty('asset_code', 'points')
         expect(response.body.data).toHaveProperty('amount', GRANT_POINTS_AMOUNT)
         expect(response.body.data).toHaveProperty('balance_after')
 
@@ -204,7 +204,7 @@ describe('📊 任务11.1：积分发放→抽奖消费完整链路测试', () =
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           user_id: testUserId,
-          asset_code: 'POINTS',
+          asset_code: 'points',
           amount: GRANT_POINTS_AMOUNT,
           reason: '测试任务11.1-积分发放链路测试（重复请求）',
           idempotency_key: grantIdempotencyKey
@@ -240,7 +240,7 @@ describe('📊 任务11.1：积分发放→抽奖消费完整链路测试', () =
 
         const assets = response.body.data.assets || response.body.data
         const pointsAsset = Array.isArray(assets)
-          ? assets.find(a => a.asset_code === 'POINTS')
+          ? assets.find(a => a.asset_code === 'points')
           : null
 
         if (pointsAsset) {
@@ -280,7 +280,7 @@ describe('📊 任务11.1：积分发放→抽奖消费完整链路测试', () =
       if (balanceResponse.status === 200 && balanceResponse.body.data) {
         const assets = balanceResponse.body.data.assets || balanceResponse.body.data
         const pointsAsset = Array.isArray(assets)
-          ? assets.find(a => a.asset_code === 'POINTS')
+          ? assets.find(a => a.asset_code === 'points')
           : null
         pointsBeforeDraw = pointsAsset ? Number(pointsAsset.available_amount || 0) : 0
       }
@@ -337,7 +337,7 @@ describe('📊 任务11.1：积分发放→抽奖消费完整链路测试', () =
       if (response.status === 200 && response.body.data) {
         const assets = response.body.data.assets || response.body.data
         const pointsAsset = Array.isArray(assets)
-          ? assets.find(a => a.asset_code === 'POINTS')
+          ? assets.find(a => a.asset_code === 'points')
           : null
         const pointsAfterDraw = pointsAsset ? Number(pointsAsset.available_amount || 0) : 0
 

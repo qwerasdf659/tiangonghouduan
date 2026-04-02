@@ -1,12 +1,12 @@
 /**
  * 资产流水模型 - AssetTransaction
- * 记录所有资产变动流水（DIAMOND和材料资产）
+ * 记录所有资产变动流水（star_stone和材料资产）
  *
  * 业务场景：
  * - 抽奖消耗与奖励（lottery_consume/lottery_reward）
  * - 交易市场购买（买家扣减、卖家入账、平台手续费）
  * - 兑换市场扣减（材料资产消耗）
- * - 材料转换（红水晶碎片扣减、DIAMOND入账）
+ * - 材料转换（红源晶碎片扣减、star_stone入账）
  * - 管理员调整（资产增加/扣减）
  *
  * 设计特点：
@@ -97,15 +97,15 @@ class AssetTransaction extends Model {
     LOTTERY_REWARD: 'lottery_reward', // 抽奖奖励发放
     CONSUMPTION_REWARD: 'consumption_reward', // 消费奖励
 
-    // 市场购买相关（Market Purchase - 交易市场DIAMOND结算）
+    // 市场购买相关（Market Purchase - 交易市场star_stone结算）
     MARKET_PURCHASE_BUYER_DEBIT: 'market_purchase_buyer_debit', // 市场购买买家扣减
     MARKET_PURCHASE_SELLER_CREDIT: 'market_purchase_seller_credit', // 市场购买卖家入账
     MARKET_PURCHASE_PLATFORM_FEE_CREDIT: 'market_purchase_platform_fee_credit', // 市场购买平台手续费
 
     // 冻结相关（Freeze/Unfreeze/Settle - 资产冻结管理）
-    ORDER_FREEZE_BUYER: 'order_freeze_buyer', // 订单冻结（买家DIAMOND）
-    ORDER_UNFREEZE_BUYER: 'order_unfreeze_buyer', // 订单取消解冻（买家DIAMOND）
-    ORDER_TIMEOUT_UNFREEZE: 'order_timeout_unfreeze', // 订单超时自动解冻（买家DIAMOND）
+    ORDER_FREEZE_BUYER: 'order_freeze_buyer', // 订单冻结（买家star_stone）
+    ORDER_UNFREEZE_BUYER: 'order_unfreeze_buyer', // 订单取消解冻（买家star_stone）
+    ORDER_TIMEOUT_UNFREEZE: 'order_timeout_unfreeze', // 订单超时自动解冻（买家star_stone）
     ORDER_SETTLE_BUYER_DEBIT: 'order_settle_buyer_debit', // 订单结算买家扣减（从冻结扣减）
     ORDER_SETTLE_SELLER_CREDIT: 'order_settle_seller_credit', // 订单结算卖家入账
     ORDER_SETTLE_PLATFORM_FEE_CREDIT: 'order_settle_platform_fee_credit', // 订单结算平台手续费入账
@@ -117,9 +117,9 @@ class AssetTransaction extends Model {
     // 兑换市场相关（Exchange Market - 材料资产扣减）
     EXCHANGE_DEBIT: 'exchange_debit', // 兑换扣减
 
-    // 材料转换相关（Material Conversion - 材料→DIAMOND + 手续费）
+    // 材料转换相关（Material Conversion - 材料→star_stone + 手续费）
     MATERIAL_CONVERT_DEBIT: 'material_convert_debit', // 材料转换扣减
-    MATERIAL_CONVERT_CREDIT: 'material_convert_credit', // 材料转换入账（DIAMOND）
+    MATERIAL_CONVERT_CREDIT: 'material_convert_credit', // 材料转换入账（star_stone）
     MATERIAL_CONVERT_FEE: 'material_convert_fee', // 材料转换手续费入账（系统账户）
 
     // 管理员调整相关（Admin Adjustment）
@@ -163,7 +163,8 @@ module.exports = sequelize => {
       asset_code: {
         type: DataTypes.STRING(50),
         allowNull: false,
-        comment: '资产代码（Asset Code - 资产类型标识）：DIAMOND-钻石资产, red_shard-红水晶碎片, 等'
+        comment:
+          '资产代码（Asset Code - 资产类型标识）：star_stone-星石资产, red_core_shard-红源晶碎片, 等'
       },
 
       // 变动金额（Delta Amount - 资产变动数量）
@@ -171,7 +172,7 @@ module.exports = sequelize => {
         type: DataTypes.BIGINT,
         allowNull: false,
         comment:
-          '变动金额（Delta Amount - 资产变动数量）：正数表示增加，负数表示扣减，单位为1个资产单位（如1 DIAMOND），不能为0'
+          '变动金额（Delta Amount - 资产变动数量）：正数表示增加，负数表示扣减，单位为1个资产单位（如1 star_stone），不能为0'
       },
 
       // 变动前余额（Balance Before - 变动前的资产余额）

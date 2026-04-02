@@ -24,12 +24,12 @@ const TestCoordinator = require('../api/TestCoordinator')
  * @returns {Promise<number>} 用户可用积分余额
  *
  * 数据来源：GET /api/v4/backpack
- * - 从背包接口的 assets[] 中筛选 asset_code === 'POINTS'
+ * - 从背包接口的 assets[] 中筛选 asset_code === 'points'
  * - 返回 available_amount（可用余额，与数据库字段名一致）
  *
  * 设计说明：
  * - 决策8已决定不提供 /api/v4/points/* 接口
- * - 积分统一从背包接口获取，与其他可叠加资产（DIAMOND、材料）同一口径
+ * - 积分统一从背包接口获取，与其他可叠加资产（star_stone、材料）同一口径
  */
 async function getUserPoints(tester, user_id) {
   const response = await tester.make_authenticated_request(
@@ -46,7 +46,7 @@ async function getUserPoints(tester, user_id) {
 
   // 从 assets 数组中查找 POINTS 资产
   const assets = response.data.data?.assets || []
-  const pointsAsset = assets.find(asset => asset.asset_code === 'POINTS')
+  const pointsAsset = assets.find(asset => asset.asset_code === 'points')
 
   // 返回可用余额（available_amount），字段名与数据库 account_asset_balances 表一致
   return pointsAsset?.available_amount || pointsAsset?.total_amount || 0

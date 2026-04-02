@@ -129,7 +129,7 @@ describe('MySQL数据约束和参照完整性专项测试', () => {
       if (userAccount) {
         // 查询POINTS资产余额
         const pointsBalance = await AccountAssetBalance.findOne({
-          where: { account_id: userAccount.account_id, asset_code: 'POINTS' }
+          where: { account_id: userAccount.account_id, asset_code: 'points' }
         })
 
         if (pointsBalance) {

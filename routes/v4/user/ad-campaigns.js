@@ -83,8 +83,8 @@ const ALLOWED_CAMPAIGN_CREATE_FIELDS = [
   'campaign_name',
   'ad_slot_id',
   'billing_mode',
-  'daily_bid_diamond',
-  'budget_total_diamond',
+  'daily_bid_star_stone',
+  'budget_total_star_stone',
   'fixed_days',
   'start_date',
   'end_date',
@@ -100,8 +100,8 @@ const ALLOWED_CAMPAIGN_UPDATE_FIELDS = [
   'campaign_name',
   'ad_slot_id',
   'billing_mode',
-  'daily_bid_diamond',
-  'budget_total_diamond',
+  'daily_bid_star_stone',
+  'budget_total_star_stone',
   'fixed_days',
   'start_date',
   'end_date',
@@ -115,8 +115,8 @@ const ALLOWED_CAMPAIGN_UPDATE_FIELDS = [
  * @body {string} campaign_name - 活动名称
  * @body {number} ad_slot_id - 广告位ID
  * @body {string} billing_mode - 计费模式（fixed_daily=固定包天 / bidding=竞价排名）
- * @body {number} [daily_bid_diamond] - 竞价日出价（钻石，bidding 模式必填）
- * @body {number} [budget_total_diamond] - 总预算（钻石，bidding 模式必填）
+ * @body {number} [daily_bid_star_stone] - 竞价日出价（星石，bidding 模式必填）
+ * @body {number} [budget_total_star_stone] - 总预算（星石，bidding 模式必填）
  * @body {number} [fixed_days] - 固定包天天数（fixed_daily 模式必填）
  * @body {string} [start_date] - 投放开始日期（YYYY-MM-DD）
  * @body {string} [end_date] - 投放结束日期（YYYY-MM-DD）
@@ -149,11 +149,11 @@ router.post(
       if (createData.ad_slot_id) {
         createData.ad_slot_id = parseInt(createData.ad_slot_id)
       }
-      if (createData.daily_bid_diamond) {
-        createData.daily_bid_diamond = parseInt(createData.daily_bid_diamond)
+      if (createData.daily_bid_star_stone) {
+        createData.daily_bid_star_stone = parseInt(createData.daily_bid_star_stone)
       }
-      if (createData.budget_total_diamond) {
-        createData.budget_total_diamond = parseInt(createData.budget_total_diamond)
+      if (createData.budget_total_star_stone) {
+        createData.budget_total_star_stone = parseInt(createData.budget_total_star_stone)
       }
       if (createData.fixed_days) {
         createData.fixed_days = parseInt(createData.fixed_days)
@@ -284,7 +284,7 @@ router.put(
 /**
  * POST /:id/submit - 提交广告活动审核
  *
- * 固定包天模式提交审核时，自动冻结广告主的钻石余额。
+ * 固定包天模式提交审核时，自动冻结广告主的星石余额。
  * 冻结操作和状态变更在同一事务内完成，保证数据一致性。
  *
  * @route POST /api/v4/user/ad-campaigns/:id/submit
@@ -311,11 +311,11 @@ router.post(
           throw new Error('广告活动不存在或无权限提交')
         }
 
-        // 2. 固定包天模式：冻结钻石
-        if (submitted.billing_mode === 'fixed_daily' && submitted.fixed_total_diamond > 0) {
-          await AdBillingService.freezeDiamonds(
+        // 2. 固定包天模式：冻结星石
+        if (submitted.billing_mode === 'fixed_daily' && submitted.fixed_total_star_stone > 0) {
+          await AdBillingService.freezeStarStone(
             submitted.ad_campaign_id,
-            submitted.fixed_total_diamond,
+            submitted.fixed_total_star_stone,
             { transaction }
           )
         }
@@ -344,7 +344,7 @@ router.post(
 /**
  * POST /:id/cancel - 取消广告活动
  *
- * 取消待审核状态的固定包天计划时，自动退还已冻结的钻石。
+ * 取消待审核状态的固定包天计划时，自动退还已冻结的星石。
  *
  * @route POST /api/v4/user/ad-campaigns/:id/cancel
  * @access Private
@@ -369,9 +369,9 @@ router.post(
           throw new Error('广告活动不存在或无权限取消')
         }
 
-        // 如果有冻结的钻石，执行退款
+        // 如果有冻结的星石，执行退款
         if (cancelled.billing_mode === 'fixed_daily') {
-          await AdBillingService.refundDiamonds(cancelled.ad_campaign_id, { transaction })
+          await AdBillingService.refundStarStone(cancelled.ad_campaign_id, { transaction })
         }
 
         return cancelled

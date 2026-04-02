@@ -31,6 +31,7 @@ const BeijingTimeHelper = require('../utils/timeHelper')
 const { User, UserPremiumStatus } = require('../models')
 // V4.7.0 AssetService 拆分：使用子服务替代原 AssetService
 const BalanceService = require('./asset/BalanceService')
+const { AssetCode } = require('../constants/AssetCode')
 const logger = require('../utils/logger')
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 
@@ -116,7 +117,7 @@ class PremiumService {
 
     // 通过 BalanceService 获取积分余额
     const pointsBalance = await BalanceService.getBalance(
-      { user_id, asset_code: 'POINTS' },
+      { user_id, asset_code: AssetCode.POINTS },
       { transaction }
     )
 
@@ -190,7 +191,7 @@ class PremiumService {
     const consumeResult = await BalanceService.changeBalance(
       {
         user_id,
-        asset_code: 'POINTS',
+        asset_code: AssetCode.POINTS,
         delta_amount: -UNLOCK_COST,
         business_type: 'premium_unlock',
         idempotency_key,
@@ -299,7 +300,10 @@ class PremiumService {
       }
 
       // 通过 BalanceService 获取积分余额
-      const pointsBalance = await BalanceService.getBalance({ user_id, asset_code: 'POINTS' })
+      const pointsBalance = await BalanceService.getBalance({
+        user_id,
+        asset_code: AssetCode.POINTS
+      })
 
       const historyPoints = user.history_total_points || 0
       const availablePoints = Number(pointsBalance.available_amount) || 0

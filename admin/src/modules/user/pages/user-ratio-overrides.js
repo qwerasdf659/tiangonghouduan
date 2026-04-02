@@ -3,7 +3,7 @@
  *
  * @description Alpine.js 组件注册，管理员为特定用户设置个性化消费比例
  * @module modules/user/pages/user-ratio-overrides
- * @since 2026-03-02（钻石配额优化方案）
+ * @since 2026-03-02（星石配额优化方案）
  */
 
 import { createPageMixin } from '../../../alpine/index.js'

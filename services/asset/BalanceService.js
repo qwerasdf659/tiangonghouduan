@@ -42,6 +42,7 @@ const { Account, AccountAssetBalance, AssetTransaction, User } = require('../../
 const logger = require('../../utils/logger')
 const OrderNoGenerator = require('../../utils/OrderNoGenerator')
 const { requireTransaction } = require('../../utils/transactionHelpers')
+const { AssetCode } = require('../../constants/AssetCode')
 
 /**
  * 资产流水创建时占位 transaction_no（迁移后列 NOT NULL，写入后用主键生成正式 TX 号）
@@ -175,7 +176,7 @@ class BalanceService {
    * - 其他资产类型 lottery_campaign_id 可选
    *
    * @param {number} account_id - 账户ID
-   * @param {string} asset_code - 资产代码（如DIAMOND、red_shard、BUDGET_POINTS）
+   * @param {string} asset_code - 资产代码（如star_stone、red_core_shard、BUDGET_POINTS）
    * @param {Object} options - 选项
    * @param {Object} options.transaction - Sequelize事务对象
    * @param {string|number} options.lottery_campaign_id - 活动ID（BUDGET_POINTS 必填，其他资产可选）
@@ -185,7 +186,7 @@ class BalanceService {
     const { transaction, lottery_campaign_id } = options
 
     // 🔥 BUDGET_POINTS 必须指定 lottery_campaign_id
-    if (asset_code === 'BUDGET_POINTS' && !lottery_campaign_id) {
+    if (asset_code === AssetCode.BUDGET_POINTS && !lottery_campaign_id) {
       throw new Error('BUDGET_POINTS 必须指定 lottery_campaign_id 参数（活动隔离规则）')
     }
 
@@ -196,7 +197,7 @@ class BalanceService {
     }
 
     // BUDGET_POINTS 按活动隔离（lottery_campaign_id 隔离规则）
-    if (asset_code === 'BUDGET_POINTS' && lottery_campaign_id) {
+    if (asset_code === AssetCode.BUDGET_POINTS && lottery_campaign_id) {
       whereCondition.lottery_campaign_id = String(lottery_campaign_id)
     }
 
@@ -209,7 +210,7 @@ class BalanceService {
     }
 
     // BUDGET_POINTS 需要记录 lottery_campaign_id（活动隔离）
-    if (asset_code === 'BUDGET_POINTS' && lottery_campaign_id) {
+    if (asset_code === AssetCode.BUDGET_POINTS && lottery_campaign_id) {
       defaults.lottery_campaign_id = String(lottery_campaign_id)
     }
 
@@ -298,7 +299,7 @@ class BalanceService {
     }
 
     // 🔥 BUDGET_POINTS 必须指定 lottery_campaign_id（活动隔离规则）
-    if (asset_code === 'BUDGET_POINTS' && !lottery_campaign_id) {
+    if (asset_code === AssetCode.BUDGET_POINTS && !lottery_campaign_id) {
       throw new Error('BUDGET_POINTS 必须指定 lottery_campaign_id 参数（活动隔离规则）')
     }
 
@@ -343,7 +344,7 @@ class BalanceService {
       }
 
       // BUDGET_POINTS 按活动隔离查询
-      if (asset_code === 'BUDGET_POINTS' && lottery_campaign_id) {
+      if (asset_code === AssetCode.BUDGET_POINTS && lottery_campaign_id) {
         balanceWhereCondition.lottery_campaign_id = String(lottery_campaign_id)
       }
 
@@ -1223,7 +1224,7 @@ class BalanceService {
     const { transaction } = options
 
     // 🔥 BUDGET_POINTS 必须指定 lottery_campaign_id
-    if (asset_code === 'BUDGET_POINTS' && !lottery_campaign_id) {
+    if (asset_code === AssetCode.BUDGET_POINTS && !lottery_campaign_id) {
       throw new Error('BUDGET_POINTS 必须指定 lottery_campaign_id 参数（活动隔离规则）')
     }
 
@@ -1238,7 +1239,7 @@ class BalanceService {
       }
 
       // BUDGET_POINTS 按活动隔离查询
-      if (asset_code === 'BUDGET_POINTS' && lottery_campaign_id) {
+      if (asset_code === AssetCode.BUDGET_POINTS && lottery_campaign_id) {
         whereCondition.lottery_campaign_id = String(lottery_campaign_id)
       }
 

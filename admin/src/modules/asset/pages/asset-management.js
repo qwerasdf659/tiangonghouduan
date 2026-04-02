@@ -341,10 +341,10 @@ document.addEventListener('alpine:init', () => {
         })
         const response = await this.apiGet(url)
         if (response.success && response.data) {
-          // 过滤出虚拟资产类型（DIAMOND, POINTS 等）
+          // 过滤出虚拟资产类型（star_stone, points 等）
           const balances = response.data?.balances || response.data
           this.virtualAccounts = Array.isArray(balances)
-            ? balances.filter(b => ['DIAMOND', 'POINTS', 'CREDITS'].includes(b.asset_code))
+            ? balances.filter(b => ['star_stone', 'points', 'CREDITS'].includes(b.asset_code))
             : []
         }
       } catch (error) {
@@ -389,8 +389,8 @@ document.addEventListener('alpine:init', () => {
           const assetStats = response.data.asset_stats || []
           const summary = response.data.summary || {}
 
-          // 计算材料资产总值（排除 POINTS, DIAMOND, BUDGET_POINTS 等虚拟资产）
-          const virtualAssetCodes = ['POINTS', 'DIAMOND', 'BUDGET_POINTS', 'CREDITS']
+          // 计算材料资产总值（排除 points, star_stone, budget_points 等虚拟资产）
+          const virtualAssetCodes = ['points', 'star_stone', 'budget_points', 'CREDITS']
           const materialAssets = assetStats.filter(a => !virtualAssetCodes.includes(a.asset_code))
           const virtualAssets = assetStats.filter(a => virtualAssetCodes.includes(a.asset_code))
 

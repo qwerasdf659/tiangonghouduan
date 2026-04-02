@@ -40,7 +40,7 @@ const VALID_SLOT_TYPES = ['popup', 'carousel', 'announcement', 'feed']
  *
  * 仅返回 is_active=true 的广告位，供用户创建广告活动时选择。
  * 返回字段：ad_slot_id, slot_key, slot_name, slot_type, position,
- *           daily_price_diamond, min_bid_diamond, min_budget_diamond, description
+ *           daily_price_star_stone, min_bid_star_stone, min_budget_star_stone, description
  *
  * @route GET /api/v4/user/ad-slots
  * @access Private（JWT 认证，普通用户可调用）

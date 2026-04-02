@@ -11,7 +11,7 @@
  * @description
  * 财务管理整合页面，提供多个财务相关子模块的统一管理界面：
  * - 消费记录 (consumption) - 用户消费流水查询和统计
- * - 钻石账户 (diamond-accounts) - 用户钻石余额管理和调整
+ * - 星石账户 (star-stone-accounts) - 用户星石余额管理和调整
  * - 商户积分 (merchant-points) - 商户积分余额和历史查询
  * - 债务管理 (debt-management) - 欠款记录管理、还款和核销
  * - 活动预算 (campaign-budget) - 活动预算配置和使用率监控
@@ -29,8 +29,8 @@ import { DashboardAPI } from '../../../api/dashboard.js'
 import {
   useConsumptionState,
   useConsumptionMethods,
-  useDiamondAccountsState,
-  useDiamondAccountsMethods,
+  useStarStoneAccountsState,
+  useStarStoneAccountsMethods,
   useMerchantPointsState,
   useMerchantPointsMethods,
   useDebtManagementState,
@@ -46,7 +46,7 @@ import {
  */
 const SUB_PAGES = [
   { id: 'consumption', title: '消费记录', icon: 'bi-receipt' },
-  { id: 'diamond-accounts', title: '钻石账户', icon: 'bi-gem' },
+  { id: 'star-stone-accounts', title: '星石账户', icon: 'bi-gem' },
   { id: 'merchant-points', title: '商户积分', icon: 'bi-coin' },
   { id: 'debt-management', title: '债务管理', icon: 'bi-cash-stack' },
   { id: 'campaign-budget', title: '活动预算', icon: 'bi-piggy-bank' },
@@ -132,8 +132,8 @@ document.addEventListener('alpine:init', () => {
         note: ''
       },
 
-      // ========== 钻石调整表单 ==========
-      diamondAdjustForm: {
+      // ========== 星石调整表单 ==========
+      starStoneAdjustForm: {
         type: 'add',
         amount: 0,
         reason: ''
@@ -160,12 +160,12 @@ document.addEventListener('alpine:init', () => {
       // ========== 选中项 ==========
       selectedConsumption: null,
       selectedDebt: null,
-      selectedDiamondAccount: null,
+      selectedStarStoneAccount: null,
       selectedMerchant: null,
 
       // ========== 各模块状态 ==========
       ...useConsumptionState(),
-      ...useDiamondAccountsState(),
+      ...useStarStoneAccountsState(),
       ...useMerchantPointsState(),
       ...useDebtManagementState(),
       ...useCampaignBudgetState(),
@@ -219,8 +219,8 @@ document.addEventListener('alpine:init', () => {
             case 'consumption':
               await Promise.all([this.loadConsumptions(), this.loadConsumptionStats()])
               break
-            case 'diamond-accounts':
-              await Promise.all([this.loadDiamondAccounts(), this.loadDiamondStats()])
+            case 'star-stone-accounts':
+              await Promise.all([this.loadStarStoneAccounts(), this.loadStarStoneStats()])
               break
             case 'merchant-points':
               await Promise.all([this.loadMerchantPoints(), this.loadMerchantStats()])
@@ -304,7 +304,7 @@ document.addEventListener('alpine:init', () => {
         }
       },
       ...useConsumptionMethods(),
-      ...useDiamondAccountsMethods(),
+      ...useStarStoneAccountsMethods(),
       ...useMerchantPointsMethods(),
       ...useDebtManagementMethods(),
       ...useCampaignBudgetMethods(),
@@ -400,8 +400,8 @@ document.addEventListener('alpine:init', () => {
     return table
   })
 
-  /** 钻石账户 - 使用 /console/system-data/accounts */
-  Alpine.data('diamondAccountsDataTable', () => {
+  /** 星石账户 - 使用 /console/system-data/accounts */
+  Alpine.data('starStoneAccountsDataTable', () => {
     const table = dataTable({
       columns: [
         { key: 'account_id', label: '账户ID', sortable: true },
@@ -436,7 +436,7 @@ document.addEventListener('alpine:init', () => {
     })
     const origInit = table.init
     table.init = async function () {
-      window.addEventListener('refresh-diamond-accounts', () => this.loadData())
+      window.addEventListener('refresh-star-stone-accounts', () => this.loadData())
       if (origInit) await origInit.call(this)
     }
     return table
@@ -649,8 +649,8 @@ document.addEventListener('alpine:init', () => {
     return table
   })
 
-  /** 钻石交易明细 - 需要 user_id（通过页面搜索功能提供） */
-  Alpine.data('diamondTransactionsDataTable', () => {
+  /** 星石交易明细 - 需要 user_id（通过页面搜索功能提供） */
+  Alpine.data('starStoneTransactionsDataTable', () => {
     const table = dataTable({
       columns: [
         { key: 'asset_transaction_id', label: '交易ID', sortable: true },
@@ -671,7 +671,7 @@ document.addEventListener('alpine:init', () => {
         const res = await request({
           url: `${API_PREFIX}/console/assets/transactions`,
           method: 'GET',
-          params: { ...params, asset_code: 'DIAMOND' }
+          params: { ...params, asset_code: 'star_stone' }
         })
         return {
           items: res.data?.transactions || res.data?.list || [],
@@ -684,7 +684,7 @@ document.addEventListener('alpine:init', () => {
     })
     const origInit = table.init
     table.init = async function () {
-      window.addEventListener('refresh-diamond-transactions', () => this.loadData())
+      window.addEventListener('refresh-star-stone-transactions', () => this.loadData())
       if (origInit) await origInit.call(this)
     }
     return table

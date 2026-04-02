@@ -44,11 +44,11 @@ module.exports = sequelize => {
         comment: '广告活动ID（外键→ad_campaigns）'
       },
 
-      bid_amount_diamond: {
+      bid_amount_star_stone: {
         type: DataTypes.INTEGER,
         allowNull: false,
         validate: { min: { args: [0], msg: '出价金额不能为负数' } },
-        comment: '出价金额（钻石）'
+        comment: '出价金额（星石）'
       },
 
       is_winner: {

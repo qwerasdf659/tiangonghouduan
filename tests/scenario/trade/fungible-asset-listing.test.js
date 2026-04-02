@@ -27,7 +27,7 @@ jest.setTimeout(30000)
 
 describe('交易市场材料交易功能集成测试', () => {
   let testUser
-  const testAssetCode = 'red_shard' // 测试资产代码
+  const testAssetCode = 'red_core_shard' // 测试资产代码
   let skipTests = false
   let createdListingIds = [] // 用于清理的挂牌ID列表
 
@@ -647,19 +647,19 @@ describe('交易市场材料交易功能集成测试', () => {
 
   describe('多币种扩展功能测试', () => {
     /**
-     * 测试场景：使用 red_shard 定价创建挂牌
+     * 测试场景：使用 red_core_shard 定价创建挂牌
      *
      * 业务决策（2026-01-14）：
-     * - 支持 red_shard 作为定价结算币种
+     * - 支持 red_core_shard 作为定价结算币种
      * - 白名单校验：price_asset_code 必须在 allowed_listing_assets 中
      */
-    test('支持 red_shard 定价创建挂牌', async () => {
+    test('支持 red_core_shard 定价创建挂牌', async () => {
       if (skipTests) {
         console.log('⏭️ 跳过测试')
         return
       }
 
-      // 1. 确保用户有足够的 red_shard 余额
+      // 1. 确保用户有足够的 red_core_shard 余额
       const initialBalance = await BalanceService.getBalance({
         user_id: testUser.user_id,
         asset_code: testAssetCode
@@ -670,11 +670,11 @@ describe('交易市场材料交易功能集成测试', () => {
         return
       }
 
-      // 2. 创建使用 red_shard 定价的挂牌
+      // 2. 创建使用 red_core_shard 定价的挂牌
       const idempotencyKey = `test_multi_currency_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
       const offerAmount = 3
       const priceAmount = 50
-      const priceAssetCode = 'red_shard' // 使用 red_shard 定价
+      const priceAssetCode = 'red_core_shard' // 使用 red_core_shard 定价
 
       const result = await TransactionManager.execute(
         async transaction => {
@@ -702,7 +702,7 @@ describe('交易市场材料交易功能集成测试', () => {
       expect(Number(result.listing.price_amount)).toBe(priceAmount)
       expect(result.listing.status).toBe('on_sale')
 
-      console.log('✅ red_shard 定价挂牌创建成功:', {
+      console.log('✅ red_core_shard 定价挂牌创建成功:', {
         market_listing_id: result.listing.market_listing_id,
         price_asset_code: result.listing.price_asset_code,
         price_amount: result.listing.price_amount
@@ -761,7 +761,7 @@ describe('交易市场材料交易功能集成测试', () => {
      * 测试场景：价格区间校验
      *
      * 业务决策（2026-01-14）：
-     * - red_shard 价格区间 [1, 1000000]
+     * - red_core_shard 价格区间 [1, 1000000]
      * - 超出范围应该被拒绝
      */
     test('价格区间校验 - 超出最大值被拒绝', async () => {
@@ -793,8 +793,8 @@ describe('交易市场材料交易功能集成测试', () => {
                 seller_user_id: testUser.user_id,
                 offer_asset_code: testAssetCode,
                 offer_amount: 3,
-                price_amount: 2000000, // 超过 red_shard 最大价格 1000000
-                price_asset_code: 'red_shard'
+                price_amount: 2000000, // 超过 red_core_shard 最大价格 1000000
+                price_asset_code: 'red_core_shard'
               },
               { transaction }
             )
@@ -846,7 +846,7 @@ describe('交易市场材料交易功能集成测试', () => {
                 offer_asset_code: testAssetCode,
                 offer_amount: 3,
                 price_amount: 0.5, // 低于最小价格 1（但大于 0 以通过参数校验）
-                price_asset_code: 'red_shard'
+                price_asset_code: 'red_core_shard'
               },
               { transaction }
             )
@@ -872,14 +872,15 @@ describe('交易市场材料交易功能集成测试', () => {
       }
 
       // 测试有效币种
-      const validResult = await MarketListingService.validateListingAssetWhitelist('DIAMOND')
+      const validResult = await MarketListingService.validateListingAssetWhitelist('star_stone')
       expect(validResult.valid).toBe(true)
-      expect(validResult.whitelist).toContain('DIAMOND')
+      expect(validResult.whitelist).toContain('star_stone')
 
-      // 测试有效币种（red_shard）
-      const redShardResult = await MarketListingService.validateListingAssetWhitelist('red_shard')
+      // 测试有效币种（red_core_shard）
+      const redShardResult =
+        await MarketListingService.validateListingAssetWhitelist('red_core_shard')
       expect(redShardResult.valid).toBe(true)
-      expect(redShardResult.whitelist).toContain('red_shard')
+      expect(redShardResult.whitelist).toContain('red_core_shard')
 
       // 测试无效币种
       const invalidResult = await MarketListingService.validateListingAssetWhitelist('INVALID')
@@ -895,21 +896,30 @@ describe('交易市场材料交易功能集成测试', () => {
         return
       }
 
-      // 测试 DIAMOND 有效价格（无上限）
-      const diamondValidResult = await MarketListingService.validatePriceRange('DIAMOND', 1000000)
+      // 测试 star_stone 有效价格（无上限）
+      const diamondValidResult = await MarketListingService.validatePriceRange(
+        'star_stone',
+        1000000
+      )
       expect(diamondValidResult.valid).toBe(true)
 
-      // 测试 red_shard 有效价格
-      const redShardValidResult = await MarketListingService.validatePriceRange('red_shard', 500)
+      // 测试 red_core_shard 有效价格
+      const redShardValidResult = await MarketListingService.validatePriceRange(
+        'red_core_shard',
+        500
+      )
       expect(redShardValidResult.valid).toBe(true)
 
-      // 测试 red_shard 超出最大价格
-      const redShardOverResult = await MarketListingService.validatePriceRange('red_shard', 2000000)
+      // 测试 red_core_shard 超出最大价格
+      const redShardOverResult = await MarketListingService.validatePriceRange(
+        'red_core_shard',
+        2000000
+      )
       expect(redShardOverResult.valid).toBe(false)
       expect(redShardOverResult.message).toContain('超过最大价格')
 
       // 测试低于最小价格
-      const underMinResult = await MarketListingService.validatePriceRange('red_shard', 0)
+      const underMinResult = await MarketListingService.validatePriceRange('red_core_shard', 0)
       expect(underMinResult.valid).toBe(false)
       expect(underMinResult.message).toContain('低于最小价格')
 

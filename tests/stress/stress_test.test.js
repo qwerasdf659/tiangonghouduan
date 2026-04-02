@@ -422,7 +422,7 @@ describe('🚀 压力测试与高并发测试（阶段九：P1）', () => {
 
       const concurrentCount = 100 // 100次并发扣费请求
       const deductAmount = 1 // 每次扣费1单位（使用小金额避免余额不足）
-      const testAssetCode = 'POINTS' // 使用积分测试
+      const testAssetCode = 'points' // 使用积分测试
 
       console.log(`📋 测试配置: ${concurrentCount}次并发扣费，每次${deductAmount}${testAssetCode}`)
 

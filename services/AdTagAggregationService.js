@@ -4,7 +4,7 @@
  * 业务场景：
  * - DMP用户标签聚合：从业务表计算用户行为标签
  * - 定时任务：每日凌晨3点执行，更新所有活跃用户的标签
- * - 支持10个标签维度：抽奖活跃度、钻石余额、交易行为等
+ * - 支持10个标签维度：抽奖活跃度、星石余额、交易行为等
  *
  * 服务对象：
  * - 定时任务：jobs/ad-cron-jobs.js（03:00执行）
@@ -22,6 +22,7 @@ const {
 } = require('../models')
 const { Op } = require('sequelize')
 const BeijingTimeHelper = require('../utils/timeHelper')
+const { AssetCode } = require('../constants/AssetCode')
 
 /**
  * 广告标签聚合服务类
@@ -209,32 +210,32 @@ class AdTagAggregationService {
       })
       tags.set('lottery_total_count', String(totalLotteryCount))
 
-      // 4. diamond_balance: 当前钻石余额
-      const diamondBalance = await AccountAssetBalance.findOne({
+      // 4. star_stone_balance: 当前星石余额
+      const starStoneBalance = await AccountAssetBalance.findOne({
         where: {
           user_id: userId,
-          asset_code: 'DIAMOND'
+          asset_code: AssetCode.STAR_STONE
         },
         attributes: ['balance'],
         transaction
       })
-      const diamondBalanceValue = diamondBalance ? parseFloat(diamondBalance.balance) : 0
-      tags.set('diamond_balance', String(diamondBalanceValue))
+      const starStoneBalanceValue = starStoneBalance ? parseFloat(starStoneBalance.balance) : 0
+      tags.set('star_stone_balance', String(starStoneBalanceValue))
 
-      // 5. diamond_rich: 钻石余额 > 1000
-      tags.set('diamond_rich', diamondBalanceValue > 1000 ? 'true' : 'false')
+      // 5. star_stone_rich: 星石余额 > 1000
+      tags.set('star_stone_rich', starStoneBalanceValue > 1000 ? 'true' : 'false')
 
-      // 6. has_red_shard: 红色碎片余额 > 0
+      // 6. has_red_core_shard: 红源晶碎片余额 > 0
       const redShardBalance = await AccountAssetBalance.findOne({
         where: {
           user_id: userId,
-          asset_code: 'RED_SHARD'
+          asset_code: AssetCode.RED_CORE_SHARD
         },
         attributes: ['balance'],
         transaction
       })
       const redShardValue = redShardBalance ? parseFloat(redShardBalance.balance) : 0
-      tags.set('has_red_shard', redShardValue > 0 ? 'true' : 'false')
+      tags.set('has_red_core_shard', redShardValue > 0 ? 'true' : 'false')
 
       // 7. market_trader: 有交易市场记录
       const marketListingCount = await MarketListing.count({

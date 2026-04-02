@@ -17,6 +17,7 @@
 
 const express = require('express')
 const router = express.Router()
+const { AssetCode } = require('../../../constants/AssetCode')
 const { authenticateToken } = require('../../../middleware/auth')
 
 /**
@@ -35,7 +36,7 @@ function asyncHandler(fn) {
  * GET /api/v4/assets/balance
  *
  * @description 查询单个资产余额
- * @query {string} asset_code - 资产代码（如 POINTS, DIAMOND, red_shard）
+ * @query {string} asset_code - 资产代码（如 POINTS, star_stone, red_core_shard）
  * @access Private
  */
 router.get(
@@ -49,8 +50,8 @@ router.get(
       return res.apiError('asset_code 是必填参数', 'BAD_REQUEST', null, 400)
     }
 
-    // 系统内部资产禁止前端直接查询（BUDGET_POINTS 预算积分、DIAMOND_QUOTA 钻石配额等）
-    const BLOCKED_ASSET_CODES = new Set(['BUDGET_POINTS'])
+    // 系统内部资产禁止前端直接查询（BUDGET_POINTS 预算积分、STAR_STONE_QUOTA 星石配额等）
+    const BLOCKED_ASSET_CODES = new Set([AssetCode.BUDGET_POINTS])
     if (BLOCKED_ASSET_CODES.has(asset_code)) {
       return res.apiError('无效的资产类型', 'BAD_REQUEST', null, 400)
     }
@@ -117,7 +118,7 @@ router.get(
      * 过滤策略（与 BackpackService._getAssets 一致）：
      * ① 必须有 material_asset_types 类型定义（排除孤儿数据如 MATERIAL_001）
      * ② is_enabled 非 false
-     * ③ form 非 'quota'（排除 DIAMOND_QUOTA 等内部配额类资产）
+     * ③ form 非 'quota'（排除 star_stone_quota 等内部配额类资产）
      * ④ 非 BUDGET_POINTS（活动预算积分，仅抽奖引擎内部使用）
      */
     const { Op } = require('sequelize')
@@ -131,7 +132,7 @@ router.get(
       assetTypes.filter(t => t.is_enabled !== false && t.form !== 'quota').map(t => t.asset_code)
     )
     const filteredBalances = balances.filter(
-      b => b.asset_code !== 'BUDGET_POINTS' && validAssetCodes.has(b.asset_code)
+      b => b.asset_code !== AssetCode.BUDGET_POINTS && validAssetCodes.has(b.asset_code)
     )
 
     // 返回字段命名与 BalanceService.getBalance() 保持一致（全链路统一）

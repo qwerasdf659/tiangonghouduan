@@ -157,7 +157,7 @@ describe('TradeOrderService - 交易订单服务', () => {
       listing_kind: 'item',
       offer_item_id: test_item.item_id,
       offer_item_display_name: '交易测试物品',
-      price_asset_code: 'DIAMOND',
+      price_asset_code: 'star_stone',
       price_amount: 100,
       status: 'on_sale',
       seller_offer_frozen: false, // 物品实例不需要冻结
@@ -325,11 +325,11 @@ describe('TradeOrderService - 交易订单服务', () => {
       // 确保买家有足够余额（使用 BalanceService.getBalance）
       const buyer_balance = await BalanceService.getBalance({
         user_id: test_buyer.user_id,
-        asset_code: 'DIAMOND'
+        asset_code: 'star_stone'
       })
 
       if (buyer_balance.available_amount < 100) {
-        console.log('⏭️ 跳过：买家 DIAMOND 余额不足')
+        console.log('⏭️ 跳过：买家 star_stone 余额不足')
         return
       }
 
@@ -398,11 +398,11 @@ describe('TradeOrderService - 交易订单服务', () => {
       // 确保买家有足够余额（使用 BalanceService.getBalance）
       const buyer_balance = await BalanceService.getBalance({
         user_id: test_buyer.user_id,
-        asset_code: 'DIAMOND'
+        asset_code: 'star_stone'
       })
 
       if (buyer_balance.available_amount < 200) {
-        console.log('⏭️ 跳过：买家 DIAMOND 余额不足')
+        console.log('⏭️ 跳过：买家 star_stone 余额不足')
         return
       }
 
@@ -445,7 +445,7 @@ describe('TradeOrderService - 交易订单服务', () => {
         listing_kind: 'item',
         offer_item_id: another_item.item_id,
         offer_item_display_name: '另一个测试物品',
-        price_asset_code: 'DIAMOND',
+        price_asset_code: 'star_stone',
         price_amount: 100,
         status: 'on_sale',
         seller_offer_frozen: false,
@@ -521,7 +521,7 @@ describe('TradeOrderService - 交易订单服务', () => {
         market_listing_id: test_listing.market_listing_id,
         buyer_user_id: test_buyer.user_id,
         seller_user_id: test_seller.user_id,
-        asset_code: 'DIAMOND',
+        asset_code: 'star_stone',
         gross_amount: 100,
         fee_amount: 5,
         net_amount: 95,
@@ -562,7 +562,7 @@ describe('TradeOrderService - 交易订单服务', () => {
         market_listing_id: test_listing.market_listing_id,
         buyer_user_id: test_buyer.user_id,
         seller_user_id: test_seller.user_id,
-        asset_code: 'DIAMOND',
+        asset_code: 'star_stone',
         gross_amount: 100,
         fee_amount: 5,
         net_amount: 95,
@@ -715,7 +715,7 @@ describe('TradeOrderService - 交易订单服务', () => {
         market_listing_id: test_listing.market_listing_id,
         buyer_user_id: test_buyer.user_id,
         seller_user_id: test_seller.user_id,
-        asset_code: 'DIAMOND',
+        asset_code: 'star_stone',
         gross_amount,
         fee_amount,
         net_amount,
@@ -746,7 +746,7 @@ describe('TradeOrderService - 交易订单服务', () => {
         market_listing_id: test_listing.market_listing_id,
         buyer_user_id: test_buyer.user_id,
         seller_user_id: test_seller.user_id,
-        asset_code: 'DIAMOND',
+        asset_code: 'star_stone',
         gross_amount: 100,
         fee_amount: 5,
         net_amount: 90, // 错误：应该是 95
@@ -778,7 +778,7 @@ describe('TradeOrderService - 交易订单服务', () => {
         market_listing_id: test_listing.market_listing_id,
         buyer_user_id: test_buyer.user_id,
         seller_user_id: test_seller.user_id,
-        asset_code: 'DIAMOND',
+        asset_code: 'star_stone',
         gross_amount: 100,
         fee_amount: 5,
         net_amount: 95,
@@ -799,7 +799,7 @@ describe('TradeOrderService - 交易订单服务', () => {
         market_listing_id: test_listing.market_listing_id,
         buyer_user_id: test_buyer.user_id,
         seller_user_id: test_seller.user_id,
-        asset_code: 'DIAMOND',
+        asset_code: 'star_stone',
         gross_amount: 100,
         fee_amount: 5,
         net_amount: 95,
@@ -820,7 +820,7 @@ describe('TradeOrderService - 交易订单服务', () => {
         market_listing_id: test_listing.market_listing_id,
         buyer_user_id: test_buyer.user_id,
         seller_user_id: test_seller.user_id,
-        asset_code: 'DIAMOND',
+        asset_code: 'star_stone',
         gross_amount: 100,
         fee_amount: 5,
         net_amount: 95,
@@ -841,7 +841,7 @@ describe('TradeOrderService - 交易订单服务', () => {
         market_listing_id: test_listing.market_listing_id,
         buyer_user_id: test_buyer.user_id,
         seller_user_id: test_seller.user_id,
-        asset_code: 'DIAMOND',
+        asset_code: 'star_stone',
         gross_amount: 100,
         fee_amount: 5,
         net_amount: 95,
@@ -874,7 +874,7 @@ describe('TradeOrderService - 交易订单服务', () => {
           market_listing_id: test_listing.market_listing_id,
           buyer_user_id: test_buyer.user_id,
           seller_user_id: test_seller.user_id,
-          asset_code: 'DIAMOND',
+          asset_code: 'star_stone',
           gross_amount: 100,
           fee_amount: 5,
           net_amount: 95,
@@ -903,7 +903,7 @@ describe('TradeOrderService - 交易订单服务', () => {
         market_listing_id: test_listing.market_listing_id,
         buyer_user_id: test_buyer.user_id,
         seller_user_id: test_seller.user_id,
-        asset_code: 'DIAMOND',
+        asset_code: 'star_stone',
         gross_amount: 100,
         fee_amount: 5,
         net_amount: 95,

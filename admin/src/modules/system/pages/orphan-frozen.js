@@ -645,9 +645,21 @@ function orphanFrozenPage() {
     getAssetName(assetCode) {
       const assetNames = {
         points: '积分',
-        diamond: '钻石',
-        gold_coin: '金币',
-        silver_coin: '银币'
+        budget_points: '预算积分',
+        star_stone: '星石',
+        star_stone_quota: '星石配额',
+        red_core_shard: '红源晶碎片',
+        red_core_gem: '红源晶',
+        orange_core_shard: '橙源晶碎片',
+        orange_core_gem: '橙源晶',
+        yellow_core_shard: '黄源晶碎片',
+        yellow_core_gem: '黄源晶',
+        green_core_shard: '绿源晶碎片',
+        green_core_gem: '绿源晶',
+        blue_core_shard: '蓝源晶碎片',
+        blue_core_gem: '蓝源晶',
+        purple_core_shard: '紫源晶碎片',
+        purple_core_gem: '紫源晶'
       }
       return assetNames[assetCode] || assetCode
     },

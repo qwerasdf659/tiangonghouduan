@@ -18,6 +18,7 @@ const logger = require('../utils/logger').logger
 const { User, Role } = require('../models')
 // V4.7.0 AssetService 拆分：使用子服务替代原 AssetService
 const BalanceService = require('./asset/BalanceService')
+const { AssetCode } = require('../constants/AssetCode')
 const BeijingTimeHelper = require('../utils/timeHelper')
 
 /**
@@ -175,7 +176,7 @@ class ActivityConditionValidator {
     let pointsBalance = null
     try {
       const account = await BalanceService.getOrCreateAccount({ user_id: userId })
-      const balance = await BalanceService.getOrCreateBalance(account.account_id, 'POINTS')
+      const balance = await BalanceService.getOrCreateBalance(account.account_id, AssetCode.POINTS)
       pointsBalance = {
         available_points: Number(balance.available_amount) || 0,
         is_active: account.status === 'active'

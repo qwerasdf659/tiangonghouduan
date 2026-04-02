@@ -78,7 +78,7 @@ module.exports = sequelize => {
       cost_asset_code: {
         type: DataTypes.STRING(50),
         allowNull: false,
-        comment: '材料资产类型（如 red_shard）'
+        comment: '材料资产类型（如 red_core_shard）'
       },
       /** 所需材料数量 */
       cost_amount: {

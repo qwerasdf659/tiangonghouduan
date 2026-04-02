@@ -61,7 +61,7 @@ const { attachDisplayNames, DICT_TYPES } = require('../utils/displayNameHelper')
  * await AuditLogService.logAssetAdjustment({
  *   operator_id: adminId,
  *   user_id: targetUserId,
- *   asset_code: 'POINTS',
+ *   asset_code: 'points',
  *   delta_amount: 100,
  *   balance_before: 500,
  *   balance_after: 600,
@@ -687,7 +687,7 @@ class AuditLogService {
    * @param {Object} params - 参数
    * @param {number} params.operator_id - 操作员ID（管理员）
    * @param {number} params.user_id - 目标用户ID
-   * @param {string} params.asset_code - 资产代码（POINTS/BUDGET_POINTS/DIAMOND等）
+   * @param {string} params.asset_code - 资产代码（POINTS/BUDGET_POINTS/star_stone等）
    * @param {number} params.delta_amount - 调整数量（正数=增加，负数=扣减）
    * @param {number} params.balance_before - 调整前余额
    * @param {number} params.balance_after - 调整后余额
@@ -701,7 +701,7 @@ class AuditLogService {
    * await AuditLogService.logAssetAdjustment({
    *   operator_id: adminId,
    *   user_id: 12345,
-   *   asset_code: 'POINTS',
+   *   asset_code: 'points',
    *   delta_amount: 100,
    *   balance_before: 500,
    *   balance_after: 600,

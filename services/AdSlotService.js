@@ -184,9 +184,9 @@ class AdSlotService {
    * @param {string} data.slot_type - 广告位类型（必填）
    * @param {string} data.position - 显示位置（必填）
    * @param {number} data.max_display_count - 最大展示次数（默认3）
-   * @param {number} data.daily_price_diamond - 每日固定价格（钻石）
-   * @param {number} data.min_bid_diamond - 最低竞价（钻石，默认50）
-   * @param {number} data.min_budget_diamond - 最低预算（钻石，默认500）
+   * @param {number} data.daily_price_star_stone - 每日固定价格（星石）
+   * @param {number} data.min_bid_star_stone - 最低竞价（星石，默认50）
+   * @param {number} data.min_budget_star_stone - 最低预算（星石，默认500）
    * @param {boolean} data.is_active - 是否启用（默认true）
    * @param {string} data.description - 描述
    * @param {Object} options - 操作选项
@@ -213,9 +213,9 @@ class AdSlotService {
           slot_type: data.slot_type,
           position: data.position,
           max_display_count: data.max_display_count || 3,
-          daily_price_diamond: data.daily_price_diamond || 0,
-          min_bid_diamond: data.min_bid_diamond || 50,
-          min_budget_diamond: data.min_budget_diamond || 500,
+          daily_price_star_stone: data.daily_price_star_stone || 0,
+          min_bid_star_stone: data.min_bid_star_stone || 50,
+          min_budget_star_stone: data.min_budget_star_stone || 500,
           is_active: data.is_active !== undefined ? data.is_active : true,
           description: data.description || null
         },

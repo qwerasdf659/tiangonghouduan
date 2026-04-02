@@ -28,7 +28,7 @@ class TransactionTestSuite {
    * await TransactionTestSuite.testTransactionCommit(
    *   async (transaction) => {
    *     await AccountAssetBalance.update({ available_amount: 1000 }, {
-   *       where: { account_id: 1, asset_code: 'POINTS' },
+   *       where: { account_id: 1, asset_code: 'points' },
    *       transaction
    *     })
    *     await AssetTransaction.create({ account_id: 1, delta_amount: 100 }, { transaction })
@@ -76,7 +76,7 @@ class TransactionTestSuite {
    * await TransactionTestSuite.testTransactionRollback(
    *   async (transaction) => {
    *     await AccountAssetBalance.update({ available_amount: 999 }, {
-   *       where: { account_id: 1, asset_code: 'POINTS' },
+   *       where: { account_id: 1, asset_code: 'points' },
    *       transaction
    *     })
    *     throw new Error('模拟业务错误')
@@ -172,7 +172,7 @@ class TransactionTestSuite {
    *   {
    *     model: AccountAssetBalance,
    *     action: 'update',
-   *     where: { account_id: 1, asset_code: 'POINTS' },
+   *     where: { account_id: 1, asset_code: 'points' },
    *     data: { available_amount: 1000 }
    *   },
    *   {

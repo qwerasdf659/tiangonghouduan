@@ -29,7 +29,7 @@
     <!-- ==================== 页面横幅 ==================== -->
     <div class="themed-card rounded-lg shadow p-4 mb-6 border-l-4 border-emerald-500">
       <h1 class="text-xl font-bold themed-text mb-1">💱 汇率兑换管理</h1>
-      <p class="themed-text-muted text-sm">管理资产间的固定汇率兑换规则（如碎片→钻石的兑换比例）。运营可实时调整汇率、启停规则、设置每日限额。</p>
+      <p class="themed-text-muted text-sm">管理资产间的固定汇率兑换规则（如碎片→星石的兑换比例）。运营可实时调整汇率、启停规则、设置每日限额。</p>
     </div>
 
     <!-- ==================== 筛选区域 ==================== -->
@@ -147,12 +147,12 @@
               <div class="grid grid-cols-2 gap-4">
                 <div>
                   <label class="block text-sm themed-text-muted mb-1">源资产代码 *</label>
-                  <input type="text" x-model="form.from_asset_code" placeholder="如 red_shard"
+                  <input type="text" x-model="form.from_asset_code" placeholder="如 red_core_shard"
                          :disabled="is_editing" class="w-full themed-input rounded px-3 py-2 text-sm">
                 </div>
                 <div>
                   <label class="block text-sm themed-text-muted mb-1">目标资产代码 *</label>
-                  <input type="text" x-model="form.to_asset_code" placeholder="如 DIAMOND"
+                  <input type="text" x-model="form.to_asset_code" placeholder="如 star_stone"
                          :disabled="is_editing" class="w-full themed-input rounded px-3 py-2 text-sm">
                 </div>
               </div>

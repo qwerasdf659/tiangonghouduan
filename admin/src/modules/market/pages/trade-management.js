@@ -611,7 +611,7 @@ document.addEventListener('alpine:init', () => {
             },
             yAxis: [
               { type: 'value', name: '成交笔数' },
-              { type: 'value', name: '成交量(钻石)', position: 'right' }
+              { type: 'value', name: '成交量(星石)', position: 'right' }
             ],
             series: [
               {
@@ -621,10 +621,10 @@ document.addEventListener('alpine:init', () => {
                 itemStyle: { color: '#3b82f6' }
               },
               {
-                name: '成交量(钻石)',
+                name: '成交量(星石)',
                 type: 'bar',
                 yAxisIndex: 1,
-                data: ranking.map(r => Number(r.total_diamond_volume) || 0),
+                data: ranking.map(r => Number(r.total_star_stone_volume) || 0),
                 itemStyle: { color: '#10b981' }
               }
             ]

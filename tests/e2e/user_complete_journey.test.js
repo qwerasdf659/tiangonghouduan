@@ -144,7 +144,7 @@ describe('E2E - 新用户完整旅程测试', () => {
       expect(response.body.data).toHaveProperty('balances')
 
       // 验证积分账户（POINTS）存在
-      const pointsAccount = response.body.data.balances.find(b => b.asset_code === 'POINTS')
+      const pointsAccount = response.body.data.balances.find(b => b.asset_code === 'points')
 
       // 新用户可能有或没有积分账户，取决于业务逻辑
       console.log('[Step 2] 用户资产状态:', {

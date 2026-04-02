@@ -131,6 +131,7 @@
 
 const BeijingTimeHelper = require('../../utils/timeHelper')
 const PerformanceMonitor = require('./utils/PerformanceMonitor')
+const { AssetCode } = require('../../constants/AssetCode')
 const CacheManager = require('./utils/CacheManager')
 
 /**
@@ -855,7 +856,7 @@ class UnifiedLotteryEngine {
       }
       const userPointsBalance = await BalanceService.getOrCreateBalance(
         userAccountEntity.account_id,
-        'POINTS',
+        AssetCode.POINTS,
         { transaction }
       )
       if (!userPointsBalance) {
@@ -1000,7 +1001,7 @@ class UnifiedLotteryEngine {
       const assetChangeResult = await BalanceService.changeBalance(
         {
           user_id,
-          asset_code: 'POINTS',
+          asset_code: AssetCode.POINTS,
           delta_amount: -requiredPoints,
           business_type: 'lottery_consume',
           idempotency_key: consumeIdempotencyKey,
@@ -1157,7 +1158,7 @@ class UnifiedLotteryEngine {
       const updatedAccountEntity = await BalanceService.getOrCreateAccount({ user_id })
       const updatedPointsBalance = await BalanceService.getOrCreateBalance(
         updatedAccountEntity.account_id,
-        'POINTS'
+        AssetCode.POINTS
       )
 
       const remainingPoints = updatedPointsBalance

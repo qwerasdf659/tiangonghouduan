@@ -108,7 +108,7 @@ describe('SettleStage — budget_cost 扣减验证（BUG-2 修复）', () => {
     })
 
     test('prize.budget_cost 为 0 时跳过扣减', () => {
-      const prize = { prize_value_points: 0, budget_cost: 0, material_asset_code: 'DIAMOND' }
+      const prize = { prize_value_points: 0, budget_cost: 0, material_asset_code: 'star_stone' }
       const budget_cost = prize.budget_cost || 0
       expect(budget_cost).toBe(0)
     })

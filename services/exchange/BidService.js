@@ -25,13 +25,14 @@
 const logger = require('../../utils/logger').logger
 const BalanceService = require('../asset/BalanceService')
 const { Op, literal } = require('sequelize')
+const { AssetCode } = require('../../constants/AssetCode')
 
 /**
  * 竞价资产硬编码黑名单（绝对禁止，决策1）
  * POINTS: 保留用于高级空间解锁等核心消费
  * BUDGET_POINTS: 系统内部资产，绝对不可暴露给前端
  */
-const BID_FORBIDDEN_ASSETS = ['POINTS', 'BUDGET_POINTS']
+const BID_FORBIDDEN_ASSETS = [AssetCode.POINTS, AssetCode.BUDGET_POINTS]
 
 /*
  * 在事务内调用 BalanceService 写方法（始终传入 `{ transaction }`）。
@@ -82,7 +83,7 @@ class BidService {
    *
    * 查询逻辑（决策9）：
    * SELECT asset_code FROM material_asset_types
-   * WHERE is_tradable = 1 AND asset_code NOT IN ('POINTS', 'BUDGET_POINTS')
+   * WHERE is_tradable = 1 AND asset_code NOT IN ('points', 'budget_points')
    *
    * @returns {Promise<string[]>} 允许竞价的资产类型代码数组
    * @private

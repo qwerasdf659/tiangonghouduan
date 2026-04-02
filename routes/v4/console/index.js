@@ -14,7 +14,7 @@
  *   risk/          6 文件  风控告警/配置/静默/孤儿冻结/异常/对账
  *   analytics/     8 文件  分析/看板/统计/报表/记录/数据/预算/待处理
  *   operations/   15 文件  数据管理/字典/品类/物品/属性/开关/批量/媒体/存储/材料/导航/提醒
- *   config/       10 文件  认证/配置/设置/会话/审批/审计/调整/钻石
+ *   config/       10 文件  认证/配置/设置/会话/审批/审计/调整/星石
  *   system/        6 文件  (保留) 系统监控
  *   customer-service/ 10 文件  (保留) 客服管理
  *   assets/        4 文件  资产中心（portfolio/transactions/rates/stats+export）
@@ -172,7 +172,7 @@ router.get('/', (req, res) => {
           '/asset-adjustment/batch-adjust',
           '/asset-adjustment/user/:user_id/balances'
         ],
-        note: '管理员调整用户积分、预算积分、钻石等资产，支持批量操作和幂等控制'
+        note: '管理员调整用户积分、预算积分、星石等资产，支持批量操作和幂等控制'
       },
       campaign_budget: {
         description: '活动预算管理（2026-01-03 BUDGET_POINTS架构）',

@@ -7,7 +7,7 @@
  *
  * 功能说明：
  * - 整合两类资产域，提供统一的资产查询入口
- * - 可叠加资产（POINTS、DIAMOND、材料） - 来自 account_asset_balances 表
+ * - 可叠加资产（POINTS、star_stone、材料） - 来自 account_asset_balances 表
  * - 不可叠加物品（优惠券、实物商品） - 来自 items 表（三表架构）
  *
  * 业务场景：
@@ -50,8 +50,8 @@ const logger = require('../../../../utils/logger')
  *     },
  *     "fungible_assets": [
  *       {
- *         "asset_code": "DIAMOND",
- *         "display_name": "钻石",
+ *         "asset_code": "star_stone",
+ *         "display_name": "星石",
  *         "available_amount": 1000,
  *         "frozen_amount": 0,
  *         "total_amount": 1000

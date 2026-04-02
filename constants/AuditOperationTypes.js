@@ -43,7 +43,7 @@ const OPERATION_TYPES = Object.freeze({
 
   /**
    * 资产调整（V4.5.0新增）
-   * @description 管理员调整用户资产（POINTS、BUDGET_POINTS、DIAMOND等）
+   * @description 管理员调整用户资产（POINTS、BUDGET_POINTS、star_stone等）
    * @example 管理员资产调整路由 /api/v4/console/asset-adjustment/adjust
    */
   ASSET_ADJUSTMENT: 'asset_adjustment',

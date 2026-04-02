@@ -96,8 +96,8 @@ module.exports = sequelize => {
       price_asset_code: {
         type: DataTypes.STRING(50),
         allowNull: false,
-        defaultValue: 'DIAMOND',
-        comment: '定价币种'
+        defaultValue: 'star_stone',
+        comment: '定价币种（星石）'
       },
       stock: {
         type: DataTypes.INTEGER,

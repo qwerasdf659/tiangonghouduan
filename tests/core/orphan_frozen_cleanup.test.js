@@ -131,7 +131,7 @@ describe('P0-2: 孤儿冻结清理服务测试', () => {
 
     test('detectOrphanFrozen 支持按资产代码过滤', async () => {
       const dto = await OrphanFrozenCleanupService.detectOrphanFrozen({
-        asset_code: 'DIAMOND'
+        asset_code: 'star_stone'
       })
 
       // 验证返回 DTO 对象
@@ -139,7 +139,7 @@ describe('P0-2: 孤儿冻结清理服务测试', () => {
       expect(Array.isArray(dto.orphan_items)).toBe(true)
       // 如果有结果，所有结果应该是该资产类型
       dto.orphan_items.forEach(orphan => {
-        expect(orphan.asset_code).toBe('DIAMOND')
+        expect(orphan.asset_code).toBe('star_stone')
       })
     })
   })

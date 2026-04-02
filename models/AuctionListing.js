@@ -63,8 +63,8 @@ module.exports = sequelize => {
       price_asset_code: {
         type: DataTypes.STRING(50),
         allowNull: false,
-        defaultValue: 'DIAMOND',
-        comment: '竞价使用的资产类型（禁止 POINTS/BUDGET_POINTS）'
+        defaultValue: 'star_stone',
+        comment: '竞价使用的资产类型（禁止 points/budget_points）'
       },
 
       /** 起拍价（材料资产数量） */

@@ -13,6 +13,8 @@
 
 'use strict'
 
+const { AssetCode } = require('../constants/AssetCode')
+
 const { Op } = require('sequelize')
 const logger = require('../utils/logger').logger
 const { getImageUrl } = require('../utils/ImageUrlHelper')
@@ -1089,7 +1091,7 @@ class DIYService {
           diameter: data.diameter || null,
           shape: data.shape || 'round',
           price: data.price || 0,
-          price_asset_code: data.price_asset_code || 'POINTS',
+          price_asset_code: data.price_asset_code || AssetCode.POINTS,
           stock: data.stock ?? -1,
           is_stackable: data.is_stackable ?? true,
           image_media_id: data.image_media_id || null,

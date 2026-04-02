@@ -106,8 +106,8 @@ const ALLOWED_ADMIN_CREATE_FIELDS = [
   'campaign_name',
   'ad_slot_id',
   'billing_mode',
-  'daily_bid_diamond',
-  'budget_total_diamond',
+  'daily_bid_star_stone',
+  'budget_total_star_stone',
   'fixed_days',
   'start_date',
   'end_date',
@@ -131,8 +131,8 @@ const ALLOWED_ADMIN_CREATE_FIELDS = [
  * @body {number} ad_slot_id - 广告位ID
  * @body {string} billing_mode - 计费模式（fixed_daily=固定包天 / bidding=竞价排名）
  * @body {number} [advertiser_user_id] - 广告主用户ID（不传则默认为当前管理员）
- * @body {number} [daily_bid_diamond] - 竞价日出价（钻石，bidding 模式必填）
- * @body {number} [budget_total_diamond] - 总预算（钻石，bidding 模式必填）
+ * @body {number} [daily_bid_star_stone] - 竞价日出价（星石，bidding 模式必填）
+ * @body {number} [budget_total_star_stone] - 总预算（星石，bidding 模式必填）
  * @body {number} [fixed_days] - 固定包天天数（fixed_daily 模式必填）
  * @body {string} [start_date] - 投放开始日期（YYYY-MM-DD）
  * @body {string} [end_date] - 投放结束日期（YYYY-MM-DD）
@@ -168,11 +168,11 @@ router.post(
       if (createData.ad_slot_id) {
         createData.ad_slot_id = parseInt(createData.ad_slot_id)
       }
-      if (createData.daily_bid_diamond) {
-        createData.daily_bid_diamond = parseInt(createData.daily_bid_diamond)
+      if (createData.daily_bid_star_stone) {
+        createData.daily_bid_star_stone = parseInt(createData.daily_bid_star_stone)
       }
-      if (createData.budget_total_diamond) {
-        createData.budget_total_diamond = parseInt(createData.budget_total_diamond)
+      if (createData.budget_total_star_stone) {
+        createData.budget_total_star_stone = parseInt(createData.budget_total_star_stone)
       }
       if (createData.fixed_days) {
         createData.fixed_days = parseInt(createData.fixed_days)
@@ -772,9 +772,9 @@ router.patch(
 
         if (reviewed.billing_mode === 'fixed_daily') {
           if (action === 'approve') {
-            await AdBillingService.deductFrozenDiamonds(reviewed.ad_campaign_id, { transaction })
+            await AdBillingService.deductFrozenStarStone(reviewed.ad_campaign_id, { transaction })
           } else if (action === 'reject') {
-            await AdBillingService.refundDiamonds(reviewed.ad_campaign_id, { transaction })
+            await AdBillingService.refundStarStone(reviewed.ad_campaign_id, { transaction })
           }
         }
 

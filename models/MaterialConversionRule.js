@@ -5,7 +5,7 @@
  *
  * 业务场景：
  * - 材料合成/分解/逐级转换规则配置
- * - 材料→DIAMOND 显式分解规则（固定比例 1 red_shard = 20 DIAMOND）
+ * - 材料→star_stone 显式分解规则（固定比例 1 red_core_shard = 20 star_stone）
  * - 规则版本化管理（effective_at 生效时间）
  *
  * 硬约束（来自文档）：
@@ -125,7 +125,7 @@ module.exports = sequelize => {
       from_asset_code: {
         type: DataTypes.STRING(50),
         allowNull: false,
-        comment: '源资产代码（From Asset Code - 转换源）：如 red_shard，表示从哪种资产转换出去'
+        comment: '源资产代码（From Asset Code - 转换源）：如 red_core_shard，表示从哪种资产转换出去'
       },
 
       // 目标资产代码（To Asset Code - 转换目标）
@@ -133,7 +133,7 @@ module.exports = sequelize => {
         type: DataTypes.STRING(50),
         allowNull: false,
         comment:
-          '目标资产代码（To Asset Code - 转换目标）：如 DIAMOND/red_crystal，表示转换成哪种资产'
+          '目标资产代码（To Asset Code - 转换目标）：如 star_stone/red_core_gem，表示转换成哪种资产'
       },
 
       // 源资产数量（From Amount - 转换输入数量）
@@ -141,7 +141,7 @@ module.exports = sequelize => {
         type: DataTypes.BIGINT,
         allowNull: false,
         comment:
-          '源资产数量（From Amount - 转换输入数量）：如 1，表示消耗 1 个源资产（如 1 red_shard）'
+          '源资产数量（From Amount - 转换输入数量）：如 1，表示消耗 1 个源资产（如 1 red_core_shard）'
       },
 
       // 目标资产数量（To Amount - 转换输出数量）
@@ -149,7 +149,7 @@ module.exports = sequelize => {
         type: DataTypes.BIGINT,
         allowNull: false,
         comment:
-          '目标资产数量（To Amount - 转换输出数量）：如 20，表示获得 20 个目标资产（如 20 DIAMOND），比例 = to_amount / from_amount'
+          '目标资产数量（To Amount - 转换输出数量）：如 20，表示获得 20 个目标资产（如 20 star_stone），比例 = to_amount / from_amount'
       },
 
       // 生效时间（Effective At - 版本化关键字段）
@@ -234,7 +234,7 @@ module.exports = sequelize => {
         type: DataTypes.STRING(100),
         allowNull: true,
         defaultValue: null,
-        comment: '显示标题（Title）：前端展示的规则名称，如"红水晶碎片分解"'
+        comment: '显示标题（Title）：前端展示的规则名称，如"红源晶碎片分解"'
       },
 
       description: {

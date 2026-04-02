@@ -43,8 +43,8 @@
     <div x-data="financePageContent()" x-init="init()"
          @approve-consumption="approveConsumption($event.detail)"
          @reject-consumption="rejectConsumption($event.detail)"
-         @view-diamond-detail="viewDiamondDetail($event.detail)"
-         @open-diamond-adjust="openDiamondAdjustModal($event.detail)"
+         @view-star-stone-detail="viewStarStoneDetail($event.detail)"
+         @open-star-stone-adjust="openStarStoneAdjustModal($event.detail)"
          @view-merchant-detail="viewMerchantDetail($event.detail)"
          @approve-merchant="approveMerchantPoints($event.detail)"
          @reject-merchant="rejectMerchantPoints($event.detail)"
@@ -383,45 +383,45 @@
       </div>
     </div>
 
-    <!-- 钻石账户 -->
-    <div x-show="current_page === 'diamond-accounts'" x-cloak>
+    <!-- 星石账户 -->
+    <div x-show="current_page === 'star-stone-accounts'" x-cloak>
       <!-- 统计卡片 - 使用统一 stats-card 组件 -->
       <div class="stats-grid stats-grid-4 mb-6">
         <div class="stats-card stats-primary stats-card-animate">
           <div class="flex items-center justify-between">
             <div>
               <p class="stats-card-label">持有用户数</p>
-              <p class="stats-card-value themed-text-primary" x-text="diamondStats.holder_count || 0"></p>
+              <p class="stats-card-value themed-text-primary" x-text="starStoneStats.holder_count || 0"></p>
             </div>
             <div class="stats-card-icon bg-gradient-to-br from-blue-100 to-blue-200 text-blue-600">👤</div>
           </div>
-          <p class="text-xs themed-text-muted mt-2">已开通钻石账户的用户</p>
+          <p class="text-xs themed-text-muted mt-2">已开通星石账户的用户</p>
         </div>
         <div class="stats-card stats-success stats-card-animate">
           <div class="flex items-center justify-between">
             <div>
               <p class="stats-card-label">流通总量</p>
-              <p class="stats-card-value text-green-600" x-text="formatNumber(diamondStats.total_circulation || 0)"></p>
+              <p class="stats-card-value text-green-600" x-text="formatNumber(starStoneStats.total_circulation || 0)"></p>
             </div>
             <div class="stats-card-icon bg-gradient-to-br from-green-100 to-green-200 text-green-600">💎</div>
           </div>
-          <p class="text-xs themed-text-muted mt-2">当前可自由使用的钻石</p>
+          <p class="text-xs themed-text-muted mt-2">当前可自由使用的星石</p>
         </div>
         <div class="stats-card stats-warning stats-card-animate" style="border-left-color: #eab308;">
           <div class="flex items-center justify-between">
             <div>
               <p class="stats-card-label">冻结总量</p>
-              <p class="stats-card-value text-yellow-600" x-text="formatNumber(diamondStats.total_frozen || 0)"></p>
+              <p class="stats-card-value text-yellow-600" x-text="formatNumber(starStoneStats.total_frozen || 0)"></p>
             </div>
             <div class="stats-card-icon bg-gradient-to-br from-yellow-100 to-yellow-200 text-yellow-600">🔒</div>
           </div>
-          <p class="text-xs themed-text-muted mt-2">挂单交易中冻结的钻石</p>
+          <p class="text-xs themed-text-muted mt-2">挂单交易中冻结的星石</p>
         </div>
         <div class="stats-card stats-info stats-card-animate">
           <div class="flex items-center justify-between">
             <div>
               <p class="stats-card-label">累计发放</p>
-              <p class="stats-card-value text-purple-600" x-text="formatNumber(diamondStats.total_issued || 0)"></p>
+              <p class="stats-card-value text-purple-600" x-text="formatNumber(starStoneStats.total_issued || 0)"></p>
             </div>
             <div class="stats-card-icon bg-gradient-to-br from-purple-100 to-purple-200 text-purple-600">📊</div>
           </div>
@@ -434,12 +434,12 @@
           <div class="flex items-center gap-2">
             <span class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center text-base">💎</span>
             <div>
-              <h5 class="font-semibold text-gray-800">钻石账户查询</h5>
-              <p class="text-xs text-gray-400 mt-0.5">输入用户手机号，查看钻石余额和交易流水</p>
+              <h5 class="font-semibold text-gray-800">星石账户查询</h5>
+              <p class="text-xs text-gray-400 mt-0.5">输入用户手机号，查看星石余额和交易流水</p>
             </div>
           </div>
-          <button @click="openDiamondAdjustModal({})" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm flex items-center gap-1 transition shadow-sm">
-            <span>➕</span> 调整用户钻石
+          <button @click="openStarStoneAdjustModal({})" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm flex items-center gap-1 transition shadow-sm">
+            <span>➕</span> 调整用户星石
           </button>
         </div>
         <!-- 搜索区域 -->
@@ -449,23 +449,23 @@
               <label class="block text-sm font-medium themed-text-secondary mb-1">手机号</label>
               <input 
                 type="text" 
-                x-model="diamondFilters.mobile" 
+                x-model="starStoneFilters.mobile" 
                 placeholder="请输入11位手机号"
                 maxlength="11"
-                @keyup.enter="searchDiamondAccounts()"
+                @keyup.enter="searchStarStoneAccounts()"
                 class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
             </div>
             <button 
-              @click="searchDiamondAccounts()" 
+              @click="searchStarStoneAccounts()" 
               class="px-5 py-2 themed-bg-primary text-white rounded-lg themed-hover-primary flex items-center gap-1"
             >
               🔍 查询
             </button>
             <button 
-              @click="clearDiamondSearch()" 
+              @click="clearStarStoneSearch()" 
               class="px-4 py-2 themed-bg-muted themed-text-secondary rounded-lg hover:bg-gray-300"
-              x-show="diamondFilters.mobile"
+              x-show="starStoneFilters.mobile"
               x-transition
             >
               清空
@@ -476,25 +476,25 @@
         <!-- 搜索结果 -->
         <div class="p-4">
           <!-- 未搜索提示 -->
-          <div x-show="!diamondSearched && !diamondFilters.mobile" class="text-center py-12 themed-text-muted">
+          <div x-show="!starStoneSearched && !starStoneFilters.mobile" class="text-center py-12 themed-text-muted">
             <div class="text-5xl mb-3">💎</div>
-            <p class="text-base font-medium themed-text-secondary mb-1">钻石账户查询</p>
-            <p class="text-sm" x-text="diamondSearchTip"></p>
+            <p class="text-base font-medium themed-text-secondary mb-1">星石账户查询</p>
+            <p class="text-sm" x-text="starStoneSearchTip"></p>
           </div>
 
           <!-- 搜索中/搜索结果 -->
-          <div x-show="diamondSearched || diamondFilters.mobile">
+          <div x-show="starStoneSearched || starStoneFilters.mobile">
             <!-- 无结果 -->
-            <template x-if="diamondAccounts.length === 0 && diamondSearched">
+            <template x-if="starStoneAccounts.length === 0 && starStoneSearched">
               <div class="text-center py-12 themed-text-muted">
                 <div class="text-5xl mb-3">🔍</div>
                 <p class="text-base font-medium themed-text-secondary mb-1">未找到结果</p>
-                <p class="text-sm" x-text="diamondSearchTip || '未找到该用户的钻石账户信息'"></p>
+                <p class="text-sm" x-text="starStoneSearchTip || '未找到该用户的星石账户信息'"></p>
               </div>
             </template>
 
             <!-- 结果列表 -->
-            <template x-if="diamondAccounts.length > 0">
+            <template x-if="starStoneAccounts.length > 0">
               <div class="overflow-x-auto">
                 <table class="w-full">
                   <thead>
@@ -509,7 +509,7 @@
                     </tr>
                   </thead>
                   <tbody class="divide-y">
-                    <template x-for="account in diamondAccounts" :key="account.user_id">
+                    <template x-for="account in starStoneAccounts" :key="account.user_id">
                       <tr class="themed-hover-bg transition-colors">
                         <td class="px-4 py-3 text-sm font-mono themed-text-primary font-medium" x-text="account.user_id"></td>
                         <td class="px-4 py-3 text-sm" x-text="account.nickname || '-'"></td>
@@ -522,15 +522,15 @@
                         </td>
                         <td class="px-4 py-3 text-center">
                           <span 
-                            :class="account.has_diamond ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-gray-100 themed-text-muted border border-gray-200'"
+                            :class="account.has_star_stone ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-gray-100 themed-text-muted border border-gray-200'"
                             class="px-2.5 py-1 text-xs rounded-full font-medium"
-                            x-text="account.has_diamond ? '已开通' : '未开通'"
+                            x-text="account.has_star_stone ? '已开通' : '未开通'"
                           ></span>
                         </td>
                         <td class="px-4 py-3 text-center">
                           <div class="flex justify-center space-x-1">
-                            <button @click="viewDiamondDetail(account)" class="px-3 py-1 text-xs bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 transition-colors font-medium">查看流水</button>
-                            <button @click="openDiamondAdjustModal(account)" class="px-3 py-1 text-xs bg-green-50 text-green-600 rounded-md hover:bg-green-100 transition-colors font-medium">调整</button>
+                            <button @click="viewStarStoneDetail(account)" class="px-3 py-1 text-xs bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 transition-colors font-medium">查看流水</button>
+                            <button @click="openStarStoneAdjustModal(account)" class="px-3 py-1 text-xs bg-green-50 text-green-600 rounded-md hover:bg-green-100 transition-colors font-medium">调整</button>
                           </div>
                         </td>
                       </tr>
@@ -1894,26 +1894,26 @@
       </div>
     </div>
 
-    <!-- 5. 调整钻石 Modal -->
-    <div x-ref="diamondAdjustModal" 
-         x-show="isModalOpen('diamondAdjustModal')" 
+    <!-- 5. 调整星石 Modal -->
+    <div x-ref="starStoneAdjustModal" 
+         x-show="isModalOpen('starStoneAdjustModal')" 
          x-cloak
          class="fixed inset-0 z-50 flex items-center justify-center"
          style="display: none;">
-      <div class="fixed inset-0 bg-black/50" @click="hideModal('diamondAdjustModal')"></div>
+      <div class="fixed inset-0 bg-black/50" @click="hideModal('starStoneAdjustModal')"></div>
       <div class="relative themed-card rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
         <div class="p-4 border-b flex justify-between items-center">
-          <h5 class="font-semibold">💎 调整用户钻石</h5>
-          <button @click="hideModal('diamondAdjustModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
+          <h5 class="font-semibold">💎 调整用户星石</h5>
+          <button @click="hideModal('starStoneAdjustModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
         </div>
-        <form @submit.prevent="submitDiamondAdjust()">
+        <form @submit.prevent="submitStarStoneAdjust()">
           <div class="p-6 space-y-4">
             <!-- 手机号输入 -->
             <div>
               <label class="block text-sm font-medium themed-text-secondary mb-1">手机号 <span class="text-red-500">*</span></label>
               <input 
                 type="text" 
-                x-model="diamondAdjustForm.mobile" 
+                x-model="starStoneAdjustForm.mobile" 
                 class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" 
                 required
                 maxlength="11"
@@ -1928,16 +1928,16 @@
             </div>
 
             <!-- 当前余额显示（如有） -->
-            <div x-show="selectedDiamondAccount?.balance !== undefined" class="themed-bg-primary-light rounded p-3 text-center">
-              <p class="text-sm themed-text-muted">当前钻石余额</p>
-              <p class="text-xl font-bold themed-text-primary" x-text="formatNumber(selectedDiamondAccount?.balance || 0)"></p>
+            <div x-show="selectedStarStoneAccount?.balance !== undefined" class="themed-bg-primary-light rounded p-3 text-center">
+              <p class="text-sm themed-text-muted">当前星石余额</p>
+              <p class="text-xl font-bold themed-text-primary" x-text="formatNumber(selectedStarStoneAccount?.balance || 0)"></p>
             </div>
 
             <div>
               <label class="block text-sm font-medium themed-text-secondary mb-1">调整类型</label>
-              <select x-model="diamondAdjustForm.type" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
-                <option value="add">➕ 增加钻石</option>
-                <option value="subtract">➖ 扣除钻石</option>
+              <select x-model="starStoneAdjustForm.type" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+                <option value="add">➕ 增加星石</option>
+                <option value="subtract">➖ 扣除星石</option>
               </select>
             </div>
 
@@ -1945,7 +1945,7 @@
               <label class="block text-sm font-medium themed-text-secondary mb-1">调整数量 <span class="text-red-500">*</span></label>
               <input 
                 type="number" 
-                x-model.number="diamondAdjustForm.amount" 
+                x-model.number="starStoneAdjustForm.amount" 
                 min="1" 
                 class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" 
                 required
@@ -1956,7 +1956,7 @@
             <div>
               <label class="block text-sm font-medium themed-text-secondary mb-1">调整原因 <span class="text-red-500">*</span></label>
               <textarea 
-                x-model="diamondAdjustForm.reason" 
+                x-model="starStoneAdjustForm.reason" 
                 class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" 
                 rows="2" 
                 required
@@ -1967,14 +1967,14 @@
             <!-- 预览 -->
             <div class="themed-bg-base rounded p-3 text-sm">
               <p class="themed-text-muted">
-                <span x-show="diamondAdjustForm.type === 'add'">将为用户 <span class="font-mono" x-text="diamondAdjustForm.mobile || '?'"></span> <span class="text-green-600 font-medium">增加</span></span>
-                <span x-show="diamondAdjustForm.type === 'subtract'">将为用户 <span class="font-mono" x-text="diamondAdjustForm.mobile || '?'"></span> <span class="text-red-600 font-medium">扣除</span></span>
-                <span class="font-bold" x-text="diamondAdjustForm.amount || 0"></span> 钻石
+                <span x-show="starStoneAdjustForm.type === 'add'">将为用户 <span class="font-mono" x-text="starStoneAdjustForm.mobile || '?'"></span> <span class="text-green-600 font-medium">增加</span></span>
+                <span x-show="starStoneAdjustForm.type === 'subtract'">将为用户 <span class="font-mono" x-text="starStoneAdjustForm.mobile || '?'"></span> <span class="text-red-600 font-medium">扣除</span></span>
+                <span class="font-bold" x-text="starStoneAdjustForm.amount || 0"></span> 星石
               </p>
             </div>
           </div>
           <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-2">
-            <button type="button" @click="hideModal('diamondAdjustModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">取消</button>
+            <button type="button" @click="hideModal('starStoneAdjustModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">取消</button>
             <button type="submit" class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary" :disabled="saving">
               <span x-show="saving" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
               确认调整
@@ -1984,28 +1984,28 @@
       </div>
     </div>
 
-    <!-- 6. 钻石账户详情 Modal（含流水记录） -->
-    <div x-ref="diamondDetailModal" 
-         x-show="isModalOpen('diamondDetailModal')" 
+    <!-- 6. 星石账户详情 Modal（含流水记录） -->
+    <div x-ref="starStoneDetailModal" 
+         x-show="isModalOpen('starStoneDetailModal')" 
          x-cloak
          class="fixed inset-0 z-50 flex items-center justify-center"
          style="display: none;">
-      <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" @click="hideModal('diamondDetailModal')"></div>
+      <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" @click="hideModal('starStoneDetailModal')"></div>
       <div class="relative themed-card rounded-xl shadow-2xl w-full max-w-3xl mx-4 z-10 max-h-[90vh] overflow-hidden flex flex-col">
         <!-- 渐变色标题栏 -->
         <div class="bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-4 flex justify-between items-center">
           <div class="flex items-center gap-3">
             <div class="w-9 h-9 bg-white/20 rounded-lg flex items-center justify-center text-lg">💎</div>
             <div>
-              <h5 class="font-semibold text-white text-lg">钻石账户详情</h5>
-              <p class="text-blue-100 text-xs" x-text="'用户 #' + (selectedDiamondAccount?.user_id || '') + ' · ' + (selectedDiamondAccount?.mobile || '')"></p>
+              <h5 class="font-semibold text-white text-lg">星石账户详情</h5>
+              <p class="text-blue-100 text-xs" x-text="'用户 #' + (selectedStarStoneAccount?.user_id || '') + ' · ' + (selectedStarStoneAccount?.mobile || '')"></p>
             </div>
           </div>
-          <button @click="hideModal('diamondDetailModal')" class="text-white/70 hover:text-white text-xl transition-colors">✕</button>
+          <button @click="hideModal('starStoneDetailModal')" class="text-white/70 hover:text-white text-xl transition-colors">✕</button>
         </div>
 
         <div class="flex-1 overflow-y-auto">
-          <div x-show="selectedDiamondAccount">
+          <div x-show="selectedStarStoneAccount">
             <!-- 账户概览 - 带彩色边框和图标 -->
             <div class="px-6 py-4 bg-gradient-to-b from-gray-50 to-white">
               <div class="grid grid-cols-3 gap-4">
@@ -2014,15 +2014,15 @@
                     <span class="w-7 h-7 bg-blue-100 rounded-md flex items-center justify-center text-sm">👤</span>
                     <span class="text-xs themed-text-muted font-medium">用户ID</span>
                   </div>
-                  <p class="text-2xl font-bold themed-text-primary tabular-nums" x-text="selectedDiamondAccount?.user_id || '-'"></p>
-                  <p class="text-xs themed-text-muted mt-1" x-text="selectedDiamondAccount?.nickname || '昵称未设置'"></p>
+                  <p class="text-2xl font-bold themed-text-primary tabular-nums" x-text="selectedStarStoneAccount?.user_id || '-'"></p>
+                  <p class="text-xs themed-text-muted mt-1" x-text="selectedStarStoneAccount?.nickname || '昵称未设置'"></p>
                 </div>
                 <div class="themed-card rounded-xl p-4 border border-green-100 bg-green-50/50">
                   <div class="flex items-center gap-2 mb-2">
                     <span class="w-7 h-7 bg-green-100 rounded-md flex items-center justify-center text-sm">💎</span>
                     <span class="text-xs themed-text-muted font-medium">可用余额</span>
                   </div>
-                  <p class="text-2xl font-bold text-green-600 tabular-nums" x-text="formatNumber(selectedDiamondAccount?.balance || 0)"></p>
+                  <p class="text-2xl font-bold text-green-600 tabular-nums" x-text="formatNumber(selectedStarStoneAccount?.balance || 0)"></p>
                   <p class="text-xs text-green-500 mt-1">可自由使用</p>
                 </div>
                 <div class="themed-card rounded-xl p-4 border border-yellow-100 bg-yellow-50/50">
@@ -2030,7 +2030,7 @@
                     <span class="w-7 h-7 bg-yellow-100 rounded-md flex items-center justify-center text-sm">🔒</span>
                     <span class="text-xs themed-text-muted font-medium">冻结余额</span>
                   </div>
-                  <p class="text-2xl font-bold text-yellow-600 tabular-nums" x-text="formatNumber(selectedDiamondAccount?.frozen || 0)"></p>
+                  <p class="text-2xl font-bold text-yellow-600 tabular-nums" x-text="formatNumber(selectedStarStoneAccount?.frozen || 0)"></p>
                   <p class="text-xs text-yellow-500 mt-1">交易中暂时冻结</p>
                 </div>
               </div>
@@ -2043,11 +2043,11 @@
                   <span class="w-1 h-5 bg-blue-500 rounded-full"></span>
                   <h6 class="font-semibold text-sm themed-text">最近交易流水</h6>
                   <span class="text-xs bg-gray-100 themed-text-muted px-2 py-0.5 rounded-full" 
-                        x-text="(selectedDiamondAccount?.transactions?.length || 0) + '条'"></span>
+                        x-text="(selectedStarStoneAccount?.transactions?.length || 0) + '条'"></span>
                 </div>
               </div>
 
-              <template x-if="selectedDiamondAccount?.transactions?.length > 0">
+              <template x-if="selectedStarStoneAccount?.transactions?.length > 0">
                 <div class="rounded-lg border overflow-hidden">
                   <table class="w-full text-sm">
                     <thead>
@@ -2061,7 +2061,7 @@
                       </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100">
-                      <template x-for="tx in selectedDiamondAccount.transactions" :key="tx.asset_transaction_id">
+                      <template x-for="tx in selectedStarStoneAccount.transactions" :key="tx.asset_transaction_id">
                         <tr class="hover:bg-gray-50/80 transition-colors">
                           <td class="px-4 py-2.5 font-mono text-xs text-blue-600" x-text="tx.transaction_no || '-'"></td>
                           <td class="px-4 py-2.5 text-xs themed-text-muted whitespace-nowrap" x-text="formatDateTimeShort(tx.created_at)"></td>
@@ -2083,11 +2083,11 @@
                   </table>
                 </div>
               </template>
-              <template x-if="!selectedDiamondAccount?.transactions || selectedDiamondAccount.transactions.length === 0">
+              <template x-if="!selectedStarStoneAccount?.transactions || selectedStarStoneAccount.transactions.length === 0">
                 <div class="text-center py-10 rounded-lg border-2 border-dashed border-gray-200">
                   <div class="text-4xl mb-2">📭</div>
                   <p class="themed-text-muted text-sm">暂无交易流水记录</p>
-                  <p class="themed-text-hint text-xs mt-1">该用户尚未产生钻石相关交易</p>
+                  <p class="themed-text-hint text-xs mt-1">该用户尚未产生星石相关交易</p>
                 </div>
               </template>
             </div>
@@ -2098,9 +2098,9 @@
         <div class="px-6 py-3 border-t bg-gray-50 flex justify-between items-center rounded-b-xl">
           <p class="text-xs themed-text-muted">仅展示最近 20 条记录</p>
           <div class="flex space-x-2">
-            <button @click="hideModal('diamondDetailModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded-lg hover:bg-gray-300 text-sm transition-colors">关闭</button>
-            <button @click="openDiamondAdjustModal(selectedDiamondAccount)" class="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 text-sm transition-colors flex items-center gap-1">
-              <span>✏️</span> 调整钻石
+            <button @click="hideModal('starStoneDetailModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded-lg hover:bg-gray-300 text-sm transition-colors">关闭</button>
+            <button @click="openStarStoneAdjustModal(selectedStarStoneAccount)" class="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 text-sm transition-colors flex items-center gap-1">
+              <span>✏️</span> 调整星石
             </button>
           </div>
         </div>

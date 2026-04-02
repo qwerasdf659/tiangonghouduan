@@ -5,7 +5,7 @@
  *
  * 职责：
  * - 查询指定资产类型的今日收支汇总（获得/消费/交易笔数）
- * - 支持任意 asset_code（POINTS、DIAMOND、red_shard 等）
+ * - 支持任意 asset_code（POINTS、star_stone、red_core_shard 等）
  *
  * 服务层复用：
  * - QueryService.getTodaySummary()（已有通用方法，支持任意 asset_code）
@@ -25,6 +25,7 @@
 
 const express = require('express')
 const router = express.Router()
+const { AssetCode } = require('../../../constants/AssetCode')
 const { authenticateToken } = require('../../../middleware/auth')
 
 /**
@@ -43,7 +44,7 @@ function asyncHandler(fn) {
  * GET /api/v4/assets/today-summary
  *
  * @description 查询指定资产的今日收支汇总
- * @query {string} asset_code - 资产代码（必填，如 POINTS、DIAMOND、red_shard）
+ * @query {string} asset_code - 资产代码（必填，如 POINTS、star_stone、red_core_shard）
  * @access Private（JWT Token 认证）
  *
  * @returns {Object} 今日汇总数据
@@ -54,7 +55,7 @@ function asyncHandler(fn) {
  *
  * @example
  * GET /api/v4/assets/today-summary?asset_code=POINTS
- * → { today_earned: 3128762, today_consumed: 24960, transaction_count: 279, asset_code: 'POINTS' }
+ * → { today_earned: 3128762, today_consumed: 24960, transaction_count: 279, asset_code: 'points' }
  */
 router.get(
   '/today-summary',
@@ -68,7 +69,7 @@ router.get(
     }
 
     /* BUDGET_POINTS 是系统内部资产，禁止前端直接查询 */
-    if (asset_code === 'BUDGET_POINTS') {
+    if (asset_code === AssetCode.BUDGET_POINTS) {
       return res.apiError('无效的资产类型', 'BAD_REQUEST', null, 400)
     }
 

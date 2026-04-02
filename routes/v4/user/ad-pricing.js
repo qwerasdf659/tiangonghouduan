@@ -50,7 +50,7 @@ const asyncHandler = fn => (req, res, next) => {
  * @returns {number} returns.discount - 折扣率
  * @returns {string} returns.discount_label - 折扣描述
  * @returns {number} returns.total_price - 折后总价
- * @returns {number} returns.saved - 节省钻石数
+ * @returns {number} returns.saved - 节省星石数
  */
 router.get(
   '/preview',

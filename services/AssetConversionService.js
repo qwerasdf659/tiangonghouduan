@@ -21,7 +21,7 @@
  *
  * 降维护成本方案（2026-01-13 升级）：
  * - ✅ 规则驱动：转换规则配置在 material_conversion_rules 表中
- * - ✅ 移除硬编码：不再限制只能 red_shard → DIAMOND
+ * - ✅ 移除硬编码：不再限制只能 red_core_shard → star_stone
  * - ✅ 支持手续费：fee_rate / fee_min_amount 配置
  * - ✅ 三方记账：用户扣减 + 用户入账 + 系统手续费入账
  * - ✅ 数量限制：min_from_amount / max_from_amount 配置
@@ -67,7 +67,7 @@
  *
  * 关键方法列表：
  * - convertMaterial() - 材料转换（核心方法，支持手续费三方记账）
- * - convertRedShardToDiamond() - 红水晶碎片转钻石（便捷方法）
+ * - convertRedCoreShardToStarStone() - 红源晶碎片转星石（便捷方法）
  * - getConversionRules() - 获取可用转换规则列表
  *
  * 数据模型关联（Phase 4最终态）：
@@ -93,10 +93,11 @@ const QueryService = require('./asset/QueryService')
 const { MaterialConversionRule } = require('../models')
 const logger = require('../utils/logger')
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
+const { AssetCode } = require('../constants/AssetCode')
 
 /**
  * 资产转换服务类
- * 职责：提供材料资产的显式转换功能，组合MaterialService和DiamondService
+ * 职责：提供材料资产的显式转换功能，组合MaterialService和StarStoneService
  * 设计模式：服务层模式 + 事务管理模式 + 组合模式
  */
 class AssetConversionService {
@@ -121,8 +122,8 @@ class AssetConversionService {
    * - 验证转换规则、材料余额、数量限制
    *
    * @param {number} user_id - 用户ID（User ID）
-   * @param {string} from_asset_code - 源材料资产代码（Source Asset Code）如：red_shard
-   * @param {string} to_asset_code - 目标资产代码（Target Asset Code）如：DIAMOND
+   * @param {string} from_asset_code - 源材料资产代码（Source Asset Code）如：red_core_shard
+   * @param {string} to_asset_code - 目标资产代码（Target Asset Code）如：star_stone
    * @param {number} from_amount - 源材料数量（Source Material Amount）必须大于0
    * @param {Object} options - 选项参数（Options）
    * @param {Object} options.transaction - Sequelize事务对象（必填）
@@ -135,12 +136,12 @@ class AssetConversionService {
    * 返回对象结构：
    * {
    *   success: true,
-   *   from_asset_code: 'red_shard',
-   *   to_asset_code: 'DIAMOND',
+   *   from_asset_code: 'red_core_shard',
+   *   to_asset_code: 'star_stone',
    *   from_amount: 50,
    *   gross_to_amount: 1000,  // 原始产出（未扣手续费）
    *   fee_amount: 50,         // 手续费
-   *   fee_asset_code: 'DIAMOND',
+   *   fee_asset_code: 'star_stone',
    *   to_amount: 950,         // 实际入账（已扣手续费）
    *   from_tx_id: 123,        // 材料扣减流水ID
    *   to_tx_id: 456,          // 目标资产入账流水ID
@@ -149,7 +150,7 @@ class AssetConversionService {
    *   to_balance: 5000,       // 转换后的目标资产余额
    *   is_duplicate: false,    // 是否为重复请求
    *   rule_id: 1,             // 使用的规则ID
-   *   title: '红水晶碎片分解',    // 规则标题
+   *   title: '红源晶碎片分解',    // 规则标题
    *   fee_rate: 0.05,         // 手续费费率
    *   conversion_rate: 20,    // 转换比例
    *   display_icon: '💎'      // 显示图标
@@ -516,44 +517,44 @@ class AssetConversionService {
   }
 
   /**
-   * 红水晶碎片转钻石（便捷方法）
+   * 红源晶碎片转星石（便捷方法）
    *
    * 业务规则：
-   * - 1个红水晶碎片（red_shard）= 20个钻石（DIAMOND）
+   * - 1个红源晶碎片（red_core_shard）= 20个星石（star_stone）
    * - 这是convertMaterial()的便捷封装
-   * - 固定转换类型：red_shard → DIAMOND
+   * - 固定转换类型：red_core_shard → star_stone
    *
    * @param {number} user_id - 用户ID（User ID）
-   * @param {number} red_shard_amount - 红水晶碎片数量（Red Shard Amount）必须大于0
+   * @param {number} red_core_shard_amount - 红源晶碎片数量（Red Core Shard Amount）必须大于0
    * @param {Object} options - 选项参数（Options）
    * @param {string} options.idempotency_key - 业务唯一ID（Business ID）必填，用于幂等性控制
    * @returns {Promise<Object>} 转换结果（Conversion Result）
    *
    * 使用示例：
    * ```javascript
-   * // 将50个红水晶碎片转换为1000个钻石
-   * const result = await AssetConversionService.convertRedShardToDiamond(
+   * // 将50个红源晶碎片转换为1000个星石
+   * const result = await AssetConversionService.convertRedCoreShardToStarStone(
    *   1, // user_id
-   *   50, // red_shard_amount
+   *   50, // red_core_shard_amount
    *   {
    *     idempotency_key: `convert_${Date.now()}`
    *   }
    * )
    * ```
    */
-  static async convertRedShardToDiamond(user_id, red_shard_amount, options = {}) {
+  static async convertRedCoreShardToStarStone(user_id, red_core_shard_amount, options = {}) {
     if (!options.idempotency_key) {
       throw new Error('idempotency_key不能为空（幂等性控制必需）')
     }
 
     return await this.convertMaterial(
       user_id,
-      'red_shard', // 固定源材料：红水晶碎片
-      'DIAMOND', // 固定目标资产：钻石
-      red_shard_amount,
+      AssetCode.RED_CORE_SHARD, // 固定源材料：红源晶碎片
+      AssetCode.STAR_STONE, // 固定目标资产：星石
+      red_core_shard_amount,
       {
         ...options,
-        title: options.title || '红水晶碎片分解为钻石'
+        title: options.title || '红源晶碎片分解为星石'
       }
     )
   }

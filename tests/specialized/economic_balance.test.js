@@ -113,7 +113,7 @@ async function getPointsProduction(hours = 1) {
   const result = await AssetTransaction.findOne({
     attributes: [[sequelize.fn('SUM', sequelize.col('delta_amount')), 'total_production']],
     where: {
-      asset_code: 'POINTS',
+      asset_code: 'points',
       business_type: { [Op.in]: POINTS_BUSINESS_TYPES.PRODUCTION },
       delta_amount: { [Op.gt]: 0 },
       created_at: { [Op.gte]: startTime }
@@ -138,7 +138,7 @@ async function getPointsConsumption(hours = 1) {
       [sequelize.fn('SUM', sequelize.fn('ABS', sequelize.col('delta_amount'))), 'total_consumption']
     ],
     where: {
-      asset_code: 'POINTS',
+      asset_code: 'points',
       business_type: { [Op.in]: POINTS_BUSINESS_TYPES.CONSUMPTION },
       delta_amount: { [Op.lt]: 0 },
       created_at: { [Op.gte]: startTime }
@@ -260,7 +260,7 @@ async function getUserPointsMedian() {
   // 查询所有有效积分余额
   const balances = await AccountAssetBalance.findAll({
     where: {
-      asset_code: 'POINTS',
+      asset_code: 'points',
       available_amount: { [Op.gt]: 0 }
     },
     attributes: ['available_amount'],
@@ -427,7 +427,7 @@ describe('【P2】经济平衡测试', () => {
 
         const productionRecords = await AssetTransaction.findAll({
           where: {
-            asset_code: 'POINTS',
+            asset_code: 'points',
             business_type: { [Op.in]: POINTS_BUSINESS_TYPES.PRODUCTION },
             created_at: { [Op.gte]: startTime }
           },
@@ -493,7 +493,7 @@ describe('【P2】经济平衡测试', () => {
 
         const consumptionRecords = await AssetTransaction.findAll({
           where: {
-            asset_code: 'POINTS',
+            asset_code: 'points',
             business_type: { [Op.in]: POINTS_BUSINESS_TYPES.CONSUMPTION },
             created_at: { [Op.gte]: startTime }
           },
@@ -826,7 +826,7 @@ describe('【P2】经济平衡测试', () => {
       '验证 AssetTransaction 表数据可查询',
       async () => {
         const count = await AssetTransaction.count({
-          where: { asset_code: 'POINTS' }
+          where: { asset_code: 'points' }
         })
 
         console.log(`📊 积分流水总记录数: ${count}`)
@@ -848,7 +848,7 @@ describe('【P2】经济平衡测试', () => {
       '验证 AccountAssetBalance 表数据可查询',
       async () => {
         const count = await AccountAssetBalance.count({
-          where: { asset_code: 'POINTS' }
+          where: { asset_code: 'points' }
         })
 
         console.log(`📊 积分余额记录数: ${count}`)

@@ -28,6 +28,7 @@ const BeijingTimeHelper = require('../../utils/timeHelper')
 const DataSanitizer = require('../DataSanitizer')
 // V4.7.0 AssetService 拆分：使用子服务替代原 AssetService
 const BalanceService = require('../asset/BalanceService')
+const { AssetCode } = require('../../constants/AssetCode')
 const models = require('../../models')
 const { Op, fn, col, literal } = require('sequelize')
 const logger = require('../../utils/logger').logger
@@ -227,10 +228,10 @@ class StatsService {
           }
         }) || 0,
 
-        // 积分交易统计（使用 AssetTransaction，过滤 asset_code='POINTS'）
+        // 积分交易统计（使用 AssetTransaction，过滤 asset_code='points'）
         models.AssetTransaction.count({
           where: {
-            asset_code: 'POINTS',
+            asset_code: AssetCode.POINTS,
             created_at: {
               [Op.gte]: todayStart,
               [Op.lte]: todayEnd
@@ -240,7 +241,7 @@ class StatsService {
         // 积分收入（delta_amount > 0 表示增加）
         models.AssetTransaction.sum('delta_amount', {
           where: {
-            asset_code: 'POINTS',
+            asset_code: AssetCode.POINTS,
             created_at: {
               [Op.gte]: todayStart,
               [Op.lte]: todayEnd
@@ -254,7 +255,7 @@ class StatsService {
         (async () => {
           const spent = await models.AssetTransaction.sum('delta_amount', {
             where: {
-              asset_code: 'POINTS',
+              asset_code: AssetCode.POINTS,
               created_at: {
                 [Op.gte]: todayStart,
                 [Op.lte]: todayEnd
@@ -541,11 +542,11 @@ class StatsService {
               if (!account) {
                 return { total_earned: 0, total_consumed: 0, total_transactions: 0 }
               }
-              // 统计积分流水（asset_code='POINTS'）
+              // 统计积分流水（asset_code='points'）
               const stats = await models.AssetTransaction.findAll({
                 where: {
                   account_id: account.account_id,
-                  asset_code: 'POINTS'
+                  asset_code: AssetCode.POINTS
                 },
                 attributes: [
                   [
@@ -576,7 +577,10 @@ class StatsService {
           (async () => {
             try {
               const account = await BalanceService.getOrCreateAccount({ user_id })
-              const balance = await BalanceService.getOrCreateBalance(account.account_id, 'POINTS')
+              const balance = await BalanceService.getOrCreateBalance(
+                account.account_id,
+                AssetCode.POINTS
+              )
               return {
                 available_points: Number(balance.available_amount) || 0,
                 total_earned: Number(balance.total_earned) || 0,
@@ -747,10 +751,10 @@ class StatsService {
           raw: true
         }),
 
-        // 积分统计（使用 AssetTransaction，过滤 asset_code='POINTS'）
+        // 积分统计（使用 AssetTransaction，过滤 asset_code='points'）
         models.AssetTransaction.findAll({
           where: {
-            asset_code: 'POINTS'
+            asset_code: AssetCode.POINTS
           },
           attributes: [
             [

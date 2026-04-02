@@ -52,6 +52,7 @@ const OrderNoGenerator = require('../../../../utils/OrderNoGenerator')
 // V4.7.0 AssetService 拆分：使用子服务替代原 AssetService
 const BalanceService = require('../../../asset/BalanceService')
 const ItemService = require('../../../asset/ItemService')
+const { AssetCode } = require('../../../../constants/AssetCode')
 const {
   getInstance: getLotteryMetricsCollector
 } = require('../../../lottery/LotteryMetricsCollector') // 🆕 实时Redis指标采集
@@ -203,7 +204,7 @@ class SettleStage extends BaseStage {
         const asset_result = await BalanceService.changeBalance(
           {
             user_id,
-            asset_code: 'POINTS',
+            asset_code: AssetCode.POINTS,
             delta_amount: -draw_cost,
             idempotency_key: consume_idempotency_key,
             lottery_session_id,
@@ -431,7 +432,7 @@ class SettleStage extends BaseStage {
           rarity_code: final_prize.rarity_code || 'common',
           /**
            * 虚拟物品展示字段（碎片配额修复方案新增）
-           * material_asset_code: 资产类型标识（如 red_shard / DIAMOND），用于图标/动效
+           * material_asset_code: 资产类型标识（如 red_core_shard / star_stone），用于图标/动效
            * material_amount: 虚拟物品数量（展示"获得碎片×3"）
            * budget_cost: 本次中奖实际消耗的 BUDGET_POINTS（小程序端可展示"消耗 xx 预算积分"）
            */
@@ -622,7 +623,7 @@ class SettleStage extends BaseStage {
           await BalanceService.changeBalance(
             {
               user_id,
-              asset_code: 'POINTS',
+              asset_code: AssetCode.POINTS,
               delta_amount: parseInt(prize.prize_value),
               idempotency_key: `${idempotency_key}:points`,
               lottery_session_id,
@@ -684,9 +685,9 @@ class SettleStage extends BaseStage {
               { transaction }
             )
 
-            /* 钻石奖品扣减 DIAMOND_QUOTA（双池隔离第二轨道） */
-            if (prize.material_asset_code === 'DIAMOND') {
-              await this._deductDiamondQuota(user_id, prize.material_amount, {
+            /* 星石奖品扣减星石配额（双池隔离第二轨道） */
+            if (prize.material_asset_code === AssetCode.STAR_STONE) {
+              await this._deductStarStoneQuota(user_id, prize.material_amount, {
                 idempotency_key: `${idempotency_key}:quota_deduct`,
                 lottery_prize_id: prize.lottery_prize_id,
                 transaction
@@ -718,13 +719,13 @@ class SettleStage extends BaseStage {
   }
 
   /**
-   * 扣减钻石配额（抽中钻石奖品时）
+   * 扣减星石配额（抽中星石奖品时）
    *
-   * 双池隔离第二轨道：预算积分管实物/券/水晶，钻石配额管钻石。
+   * 双池隔离第二轨道：预算积分管实物/券/水晶，星石配额管星石。
    * 扣减失败不阻断结算（配额可能未启用或余额不足），仅记录日志。
    *
    * @param {number} user_id - 用户ID
-   * @param {number} diamond_amount - 发放的钻石数量
+   * @param {number} star_stone_amount - 发放的星石数量
    * @param {Object} options - 扣减选项
    * @param {string} options.idempotency_key - 幂等键
    * @param {number} options.lottery_prize_id - 奖品ID
@@ -732,7 +733,7 @@ class SettleStage extends BaseStage {
    * @returns {Promise<void>} 无返回值
    * @private
    */
-  async _deductDiamondQuota(user_id, diamond_amount, options) {
+  async _deductStarStoneQuota(user_id, star_stone_amount, options) {
     const { idempotency_key, lottery_prize_id, transaction } = options
 
     try {
@@ -745,29 +746,29 @@ class SettleStage extends BaseStage {
       await BalanceService.changeBalance(
         {
           user_id,
-          asset_code: 'DIAMOND_QUOTA',
-          delta_amount: -diamond_amount,
+          asset_code: AssetCode.STAR_STONE_QUOTA,
+          delta_amount: -star_stone_amount,
           idempotency_key,
           business_type: 'lottery_quota_deduct',
           counterpart_account_id: burnAccount.account_id,
           meta: {
             lottery_prize_id,
-            diamond_amount,
-            description: `抽奖扣减钻石配额 ${diamond_amount}`
+            star_stone_amount,
+            description: `抽奖扣减星石配额 ${star_stone_amount}`
           }
         },
         { transaction }
       )
 
-      this.log('info', '钻石配额扣减成功', {
+      this.log('info', '星石配额扣减成功', {
         user_id,
-        diamond_amount,
+        star_stone_amount,
         lottery_prize_id
       })
     } catch (error) {
-      this.log('warn', '钻石配额扣减失败（非致命，配额可能未初始化）', {
+      this.log('warn', '星石配额扣减失败（非致命，配额可能未初始化）', {
         user_id,
-        diamond_amount,
+        star_stone_amount,
         lottery_prize_id,
         error: error.message
       })

@@ -105,14 +105,14 @@ module.exports = sequelize => {
         },
         comment: '折扣率（0.01-1.00）'
       },
-      /** 固定联合价（fixed模式下使用，单位：钻石） */
+      /** 固定联合价（fixed模式下使用，单位：星石） */
       fixed_price: {
         type: DataTypes.INTEGER,
         allowNull: true,
         validate: {
           min: { args: [0], msg: 'fixed_price 不能为负数' }
         },
-        comment: '固定联合价（钻石）'
+        comment: '固定联合价（星石）'
       },
       /** 状态：active=启用, inactive=停用 */
       status: {

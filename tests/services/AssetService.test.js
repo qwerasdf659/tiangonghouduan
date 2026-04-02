@@ -3,7 +3,7 @@
  *
  * 测试范围：
  * - P0-1-2: getOrCreateAccount - 账户获取/创建（用户账户、系统账户、参数校验）
- * - P0-1-3: getOrCreateBalance - 余额获取（POINTS、DIAMOND、red_shard）
+ * - P0-1-3: getOrCreateBalance - 余额获取（points、star_stone、red_core_shard）
  * - P0-1-4: getBalance - 余额查询（可用/冻结/总计）
  * - P0-1-5: changeBalance - 增加余额测试（正常增加、大额增加、幂等检查）
  *
@@ -286,46 +286,46 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
     })
 
     describe('不同资产类型', () => {
-      it('应该为 POINTS 资产创建余额记录', async () => {
+      it('应该为 points 资产创建余额记录', async () => {
         // 执行：getOrCreateBalance(account_id, asset_code, options) 非对象形式
         const result = await TransactionManager.execute(async transaction => {
-          return await BalanceService.getOrCreateBalance(test_account_id, 'POINTS', { transaction })
+          return await BalanceService.getOrCreateBalance(test_account_id, 'points', { transaction })
         })
 
         // 验证
         expect(result).toBeDefined()
         expect(result.balance_id).toBeDefined()
         expect(result.account_id).toBe(test_account_id)
-        expect(result.asset_code).toBe('POINTS')
+        expect(result.asset_code).toBe('points')
         expect(Number(result.available_amount)).toBeGreaterThanOrEqual(0)
         expect(Number(result.frozen_amount)).toBeGreaterThanOrEqual(0)
       })
 
-      it('应该为 DIAMOND 资产创建余额记录', async () => {
+      it('应该为 star_stone 资产创建余额记录', async () => {
         // 执行
         const result = await TransactionManager.execute(async transaction => {
-          return await BalanceService.getOrCreateBalance(test_account_id, 'DIAMOND', {
+          return await BalanceService.getOrCreateBalance(test_account_id, 'star_stone', {
             transaction
           })
         })
 
         // 验证
         expect(result).toBeDefined()
-        expect(result.asset_code).toBe('DIAMOND')
+        expect(result.asset_code).toBe('star_stone')
         expect(Number(result.available_amount)).toBeGreaterThanOrEqual(0)
       })
 
-      it('应该为 red_shard 材料资产创建余额记录', async () => {
+      it('应该为 red_core_shard 材料资产创建余额记录', async () => {
         // 执行
         const result = await TransactionManager.execute(async transaction => {
-          return await BalanceService.getOrCreateBalance(test_account_id, 'red_shard', {
+          return await BalanceService.getOrCreateBalance(test_account_id, 'red_core_shard', {
             transaction
           })
         })
 
         // 验证
         expect(result).toBeDefined()
-        expect(result.asset_code).toBe('red_shard')
+        expect(result.asset_code).toBe('red_core_shard')
       })
     })
 
@@ -333,11 +333,11 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
       it('相同账户和资产类型应返回相同余额记录', async () => {
         // 执行：两次获取相同余额
         const first_balance = await TransactionManager.execute(async transaction => {
-          return await BalanceService.getOrCreateBalance(test_account_id, 'POINTS', { transaction })
+          return await BalanceService.getOrCreateBalance(test_account_id, 'points', { transaction })
         })
 
         const second_balance = await TransactionManager.execute(async transaction => {
-          return await BalanceService.getOrCreateBalance(test_account_id, 'POINTS', { transaction })
+          return await BalanceService.getOrCreateBalance(test_account_id, 'points', { transaction })
         })
 
         // 验证：balance_id 相同
@@ -347,19 +347,19 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
       it('相同账户不同资产类型应返回不同余额记录', async () => {
         // 执行：获取两种不同资产的余额
         const points_balance = await TransactionManager.execute(async transaction => {
-          return await BalanceService.getOrCreateBalance(test_account_id, 'POINTS', { transaction })
+          return await BalanceService.getOrCreateBalance(test_account_id, 'points', { transaction })
         })
 
-        const diamond_balance = await TransactionManager.execute(async transaction => {
-          return await BalanceService.getOrCreateBalance(test_account_id, 'DIAMOND', {
+        const star_stone_balance = await TransactionManager.execute(async transaction => {
+          return await BalanceService.getOrCreateBalance(test_account_id, 'star_stone', {
             transaction
           })
         })
 
         // 验证：balance_id 不同
-        expect(diamond_balance.balance_id).not.toBe(points_balance.balance_id)
-        expect(diamond_balance.asset_code).toBe('DIAMOND')
-        expect(points_balance.asset_code).toBe('POINTS')
+        expect(star_stone_balance.balance_id).not.toBe(points_balance.balance_id)
+        expect(star_stone_balance.asset_code).toBe('star_stone')
+        expect(points_balance.asset_code).toBe('points')
       })
     })
 
@@ -367,7 +367,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
       it('新创建的余额记录可用余额应为0或已有值', async () => {
         // 执行：获取余额
         const result = await TransactionManager.execute(async transaction => {
-          return await BalanceService.getOrCreateBalance(test_account_id, 'POINTS', { transaction })
+          return await BalanceService.getOrCreateBalance(test_account_id, 'points', { transaction })
         })
 
         // 验证：余额应为非负整数
@@ -378,7 +378,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
       it('新创建的余额记录冻结余额应为0或已有值', async () => {
         // 执行
         const result = await TransactionManager.execute(async transaction => {
-          return await BalanceService.getOrCreateBalance(test_account_id, 'POINTS', { transaction })
+          return await BalanceService.getOrCreateBalance(test_account_id, 'points', { transaction })
         })
 
         // 验证
@@ -396,7 +396,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         // 执行：getBalance 返回 { available_amount, frozen_amount, total_amount }
         const result = await BalanceService.getBalance({
           user_id: test_user_id,
-          asset_code: 'POINTS'
+          asset_code: 'points'
         })
 
         // 验证：结果包含 available_amount 字段
@@ -409,7 +409,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         // 执行
         const result = await BalanceService.getBalance({
           user_id: test_user_id,
-          asset_code: 'POINTS'
+          asset_code: 'points'
         })
 
         // 验证
@@ -422,7 +422,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         // 执行
         const result = await BalanceService.getBalance({
           user_id: test_user_id,
-          asset_code: 'POINTS'
+          asset_code: 'points'
         })
 
         /*
@@ -439,11 +439,11 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
     })
 
     describe('不同资产类型查询', () => {
-      it('应该能查询 DIAMOND 余额', async () => {
+      it('应该能查询 star_stone 余额', async () => {
         // 执行
         const result = await BalanceService.getBalance({
           user_id: test_user_id,
-          asset_code: 'DIAMOND'
+          asset_code: 'star_stone'
         })
 
         // 验证：返回数据库记录，包含 available_amount 和 frozen_amount
@@ -453,11 +453,11 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         // 注意：total_amount 不是数据库字段，需要业务层计算
       })
 
-      it('应该能查询 red_shard 余额', async () => {
+      it('应该能查询 red_core_shard 余额', async () => {
         // 执行
         const result = await BalanceService.getBalance({
           user_id: test_user_id,
-          asset_code: 'red_shard'
+          asset_code: 'red_core_shard'
         })
 
         // 验证：结果为对象，包含标准字段
@@ -491,7 +491,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
          */
         const result = await BalanceService.getBalance({
           user_id: 999999999,
-          asset_code: 'POINTS'
+          asset_code: 'points'
         })
 
         // 验证：不存在的用户返回 null
@@ -504,11 +504,11 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
 
   describe('changeBalance - 增加余额测试', () => {
     describe('正常增加余额', () => {
-      it('应该能增加 POINTS 余额', async () => {
+      it('应该能增加 points 余额', async () => {
         // 准备：记录变更前余额
         const before_balance = await BalanceService.getBalance({
           user_id: test_user_id,
-          asset_code: 'POINTS'
+          asset_code: 'points'
         })
         const before_available = Number(before_balance.available_amount)
 
@@ -520,7 +520,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
           return await BalanceService.changeBalance(
             {
               user_id: test_user_id,
-              asset_code: 'POINTS',
+              asset_code: 'points',
               delta_amount,
               idempotency_key,
               business_type: 'test_increase',
@@ -541,41 +541,41 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         expect(result.transaction_record).toBeDefined()
         expect(result.transaction_record.asset_transaction_id).toBeDefined()
         expect(Number(result.transaction_record.delta_amount)).toBe(delta_amount)
-        expect(result.transaction_record.asset_code).toBe('POINTS')
+        expect(result.transaction_record.asset_code).toBe('points')
         expect(result.transaction_record.business_type).toBe('test_increase')
         expect(result.is_duplicate).toBe(false)
 
         // 验证：变更后余额
         const after_balance = await BalanceService.getBalance({
           user_id: test_user_id,
-          asset_code: 'POINTS'
+          asset_code: 'points'
         })
 
         expect(Number(after_balance.available_amount)).toBe(before_available + delta_amount)
       })
 
-      it('应该能增加 DIAMOND 余额', async () => {
+      it('应该能增加 star_stone 余额', async () => {
         // 准备
         const before_balance = await BalanceService.getBalance({
           user_id: test_user_id,
-          asset_code: 'DIAMOND'
+          asset_code: 'star_stone'
         })
         const before_available = Number(before_balance.available_amount)
 
         // 执行
         const delta_amount = 50
-        const idempotency_key = generateIdempotencyKey('test_add_diamond')
+        const idempotency_key = generateIdempotencyKey('test_add_star_stone')
 
         const result = await TransactionManager.execute(async transaction => {
           return await BalanceService.changeBalance(
             {
               user_id: test_user_id,
-              asset_code: 'DIAMOND',
+              asset_code: 'star_stone',
               delta_amount,
               idempotency_key,
               business_type: 'test_increase',
               counterpart_account_id: 2,
-              meta: { description: '单元测试-增加钻石' }
+              meta: { description: '单元测试-增加星石' }
             },
             { transaction }
           )
@@ -590,12 +590,12 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         expect(result).toBeDefined()
         expect(result.transaction_record).toBeDefined()
         expect(Number(result.transaction_record.delta_amount)).toBe(delta_amount)
-        expect(result.transaction_record.asset_code).toBe('DIAMOND')
+        expect(result.transaction_record.asset_code).toBe('star_stone')
 
         // 验证余额变化
         const after_balance = await BalanceService.getBalance({
           user_id: test_user_id,
-          asset_code: 'DIAMOND'
+          asset_code: 'star_stone'
         })
 
         expect(Number(after_balance.available_amount)).toBe(before_available + delta_amount)
@@ -607,7 +607,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         // 准备
         const before_balance = await BalanceService.getBalance({
           user_id: test_user_id,
-          asset_code: 'POINTS'
+          asset_code: 'points'
         })
         const before_available = Number(before_balance.available_amount)
 
@@ -619,7 +619,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
           return await BalanceService.changeBalance(
             {
               user_id: test_user_id,
-              asset_code: 'POINTS',
+              asset_code: 'points',
               delta_amount,
               idempotency_key,
               business_type: 'test_large_increase',
@@ -643,7 +643,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         // 验证余额变化
         const after_balance = await BalanceService.getBalance({
           user_id: test_user_id,
-          asset_code: 'POINTS'
+          asset_code: 'points'
         })
 
         expect(Number(after_balance.available_amount)).toBe(before_available + delta_amount)
@@ -653,7 +653,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         // 准备
         const before_balance = await BalanceService.getBalance({
           user_id: test_user_id,
-          asset_code: 'POINTS'
+          asset_code: 'points'
         })
         const before_available = Number(before_balance.available_amount)
 
@@ -665,7 +665,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
           return await BalanceService.changeBalance(
             {
               user_id: test_user_id,
-              asset_code: 'POINTS',
+              asset_code: 'points',
               delta_amount,
               idempotency_key,
               business_type: 'test_min_increase',
@@ -689,7 +689,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         // 验证余额变化
         const after_balance = await BalanceService.getBalance({
           user_id: test_user_id,
-          asset_code: 'POINTS'
+          asset_code: 'points'
         })
 
         expect(Number(after_balance.available_amount)).toBe(before_available + 1)
@@ -701,7 +701,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         // 准备：记录初始余额
         const initial_balance = await BalanceService.getBalance({
           user_id: test_user_id,
-          asset_code: 'POINTS'
+          asset_code: 'points'
         })
         const initial_available = Number(initial_balance.available_amount)
 
@@ -713,7 +713,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
           return await BalanceService.changeBalance(
             {
               user_id: test_user_id,
-              asset_code: 'POINTS',
+              asset_code: 'points',
               delta_amount,
               idempotency_key,
               business_type: 'test_idempotent',
@@ -742,7 +742,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         // 记录第一次执行后的余额
         const after_first = await BalanceService.getBalance({
           user_id: test_user_id,
-          asset_code: 'POINTS'
+          asset_code: 'points'
         })
         const after_first_available = Number(after_first.available_amount)
 
@@ -751,7 +751,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
           return await BalanceService.changeBalance(
             {
               user_id: test_user_id,
-              asset_code: 'POINTS',
+              asset_code: 'points',
               delta_amount,
               idempotency_key, // 相同的幂等键
               business_type: 'test_idempotent',
@@ -773,7 +773,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         // 验证：余额应该与第一次执行后相同（没有重复增加）
         const after_second = await BalanceService.getBalance({
           user_id: test_user_id,
-          asset_code: 'POINTS'
+          asset_code: 'points'
         })
 
         expect(Number(after_second.available_amount)).toBe(after_first_available)
@@ -784,7 +784,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         // 准备
         const initial_balance = await BalanceService.getBalance({
           user_id: test_user_id,
-          asset_code: 'POINTS'
+          asset_code: 'points'
         })
         const initial_available = Number(initial_balance.available_amount)
 
@@ -795,7 +795,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
           return await BalanceService.changeBalance(
             {
               user_id: test_user_id,
-              asset_code: 'POINTS',
+              asset_code: 'points',
               delta_amount,
               idempotency_key: generateIdempotencyKey('test_diff_key_1'),
               business_type: 'test_diff_key',
@@ -810,7 +810,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
           return await BalanceService.changeBalance(
             {
               user_id: test_user_id,
-              asset_code: 'POINTS',
+              asset_code: 'points',
               delta_amount,
               idempotency_key: generateIdempotencyKey('test_diff_key_2'),
               business_type: 'test_diff_key',
@@ -847,7 +847,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         // 验证：余额应该增加两次
         const final_balance = await BalanceService.getBalance({
           user_id: test_user_id,
-          asset_code: 'POINTS'
+          asset_code: 'points'
         })
 
         expect(Number(final_balance.available_amount)).toBe(initial_available + delta_amount * 2)
@@ -860,7 +860,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         await expect(
           BalanceService.changeBalance({
             user_id: test_user_id,
-            asset_code: 'POINTS',
+            asset_code: 'points',
             delta_amount: 100,
             idempotency_key: generateIdempotencyKey('test_no_transaction'),
             business_type: 'test'
@@ -879,7 +879,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
           return await BalanceService.changeBalance(
             {
               user_id: test_user_id,
-              asset_code: 'POINTS',
+              asset_code: 'points',
               delta_amount,
               idempotency_key,
               business_type: 'lottery_reward',
@@ -899,7 +899,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         expect(tx).toBeDefined()
         expect(tx.asset_transaction_id).toBeDefined()
         expect(tx.account_id).toBeDefined()
-        expect(tx.asset_code).toBe('POINTS')
+        expect(tx.asset_code).toBe('points')
         expect(Number(tx.delta_amount)).toBe(delta_amount)
         expect(tx.business_type).toBe('lottery_reward')
         expect(tx.idempotency_key).toBe(idempotency_key)
@@ -914,14 +914,14 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
 
   describe('P0-1-6: changeBalance - 扣减余额测试', () => {
     describe('正常扣减余额', () => {
-      it('应该能扣减 POINTS 余额', async () => {
+      it('应该能扣减 points 余额', async () => {
         // 准备：先增加足够的余额
         const setup_key = generateIdempotencyKey('setup_deduct')
         await TransactionManager.execute(async transaction => {
           return await BalanceService.changeBalance(
             {
               user_id: test_user_id,
-              asset_code: 'POINTS',
+              asset_code: 'points',
               delta_amount: 500,
               idempotency_key: setup_key,
               business_type: 'test_setup',
@@ -935,7 +935,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         // 记录变更前余额
         const before_balance = await BalanceService.getBalance({
           user_id: test_user_id,
-          asset_code: 'POINTS'
+          asset_code: 'points'
         })
         const before_available = Number(before_balance.available_amount)
 
@@ -947,7 +947,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
           return await BalanceService.changeBalance(
             {
               user_id: test_user_id,
-              asset_code: 'POINTS',
+              asset_code: 'points',
               delta_amount,
               idempotency_key,
               business_type: 'test_deduct',
@@ -972,7 +972,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         // 验证余额变化
         const after_balance = await BalanceService.getBalance({
           user_id: test_user_id,
-          asset_code: 'POINTS'
+          asset_code: 'points'
         })
         expect(Number(after_balance.available_amount)).toBe(before_available + delta_amount)
       })
@@ -983,7 +983,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         // 获取当前余额
         const current_balance = await BalanceService.getBalance({
           user_id: test_user_id,
-          asset_code: 'POINTS'
+          asset_code: 'points'
         })
         const current_available = Number(current_balance.available_amount)
 
@@ -996,7 +996,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
             return await BalanceService.changeBalance(
               {
                 user_id: test_user_id,
-                asset_code: 'POINTS',
+                asset_code: 'points',
                 delta_amount: excessive_amount,
                 idempotency_key,
                 business_type: 'test_insufficient',
@@ -1011,7 +1011,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         // 验证：余额应保持不变
         const after_balance = await BalanceService.getBalance({
           user_id: test_user_id,
-          asset_code: 'POINTS'
+          asset_code: 'points'
         })
         expect(Number(after_balance.available_amount)).toBe(current_available)
       })
@@ -1020,7 +1020,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
     describe('边界值测试', () => {
       it('扣减金额恰好等于可用余额时应成功（余额归零）', async () => {
         // 准备：创建一个新的资产类型用于边界测试，避免影响其他测试
-        const test_asset_code = 'DIAMOND' // 使用 DIAMOND 进行边界测试
+        const test_asset_code = 'star_stone' // 使用 star_stone 进行边界测试
 
         // 先增加一个固定金额
         const setup_amount = 500
@@ -1084,7 +1084,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
 
       it('零余额时扣减任意金额应失败', async () => {
         // 使用一个不常用的资产类型进行测试
-        const rare_asset_code = 'orange_shard'
+        const rare_asset_code = 'orange_core_shard'
 
         // 获取当前余额（可能返回 null 表示没有该资产）
         const balance = await BalanceService.getBalance({
@@ -1124,14 +1124,14 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
 
   describe('P0-1-7: freeze/unfreeze - 冻结解冻测试', () => {
     describe('冻结资产', () => {
-      it('应该能冻结 POINTS 资产', async () => {
+      it('应该能冻结 points 资产', async () => {
         // 准备：确保有足够的可用余额
         const setup_key = generateIdempotencyKey('setup_freeze')
         await TransactionManager.execute(async transaction => {
           return await BalanceService.changeBalance(
             {
               user_id: test_user_id,
-              asset_code: 'POINTS',
+              asset_code: 'points',
               delta_amount: 300,
               idempotency_key: setup_key,
               business_type: 'test_setup',
@@ -1145,7 +1145,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         // 记录冻结前余额
         const before_balance = await BalanceService.getBalance({
           user_id: test_user_id,
-          asset_code: 'POINTS'
+          asset_code: 'points'
         })
         const before_available = Number(before_balance.available_amount)
         const before_frozen = Number(before_balance.frozen_amount)
@@ -1158,7 +1158,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
           return await BalanceService.freeze(
             {
               user_id: test_user_id,
-              asset_code: 'POINTS',
+              asset_code: 'points',
               amount: freeze_amount,
               idempotency_key,
               business_type: 'test_freeze',
@@ -1180,7 +1180,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         // 验证余额变化
         const after_balance = await BalanceService.getBalance({
           user_id: test_user_id,
-          asset_code: 'POINTS'
+          asset_code: 'points'
         })
 
         // 可用余额减少，冻结余额增加
@@ -1194,7 +1194,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         // 获取当前余额
         const current_balance = await BalanceService.getBalance({
           user_id: test_user_id,
-          asset_code: 'POINTS'
+          asset_code: 'points'
         })
         const current_available = Number(current_balance.available_amount)
 
@@ -1207,7 +1207,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
             return await BalanceService.freeze(
               {
                 user_id: test_user_id,
-                asset_code: 'POINTS',
+                asset_code: 'points',
                 amount: excessive_amount,
                 idempotency_key,
                 business_type: 'test_freeze_insufficient',
@@ -1230,7 +1230,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
           await BalanceService.changeBalance(
             {
               user_id: test_user_id,
-              asset_code: 'POINTS',
+              asset_code: 'points',
               delta_amount: 200,
               idempotency_key: setup_add_key,
               business_type: 'test_setup',
@@ -1243,7 +1243,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
           await BalanceService.freeze(
             {
               user_id: test_user_id,
-              asset_code: 'POINTS',
+              asset_code: 'points',
               amount: 150,
               idempotency_key: setup_freeze_key,
               business_type: 'test_setup',
@@ -1256,7 +1256,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         // 记录解冻前余额
         const before_balance = await BalanceService.getBalance({
           user_id: test_user_id,
-          asset_code: 'POINTS'
+          asset_code: 'points'
         })
         const before_available = Number(before_balance.available_amount)
         const before_frozen = Number(before_balance.frozen_amount)
@@ -1269,7 +1269,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
           return await BalanceService.unfreeze(
             {
               user_id: test_user_id,
-              asset_code: 'POINTS',
+              asset_code: 'points',
               amount: unfreeze_amount,
               idempotency_key,
               business_type: 'test_unfreeze',
@@ -1291,7 +1291,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         // 验证余额变化
         const after_balance = await BalanceService.getBalance({
           user_id: test_user_id,
-          asset_code: 'POINTS'
+          asset_code: 'points'
         })
 
         // 可用余额增加，冻结余额减少
@@ -1305,7 +1305,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         // 获取当前余额
         const current_balance = await BalanceService.getBalance({
           user_id: test_user_id,
-          asset_code: 'POINTS'
+          asset_code: 'points'
         })
         const current_frozen = Number(current_balance.frozen_amount)
 
@@ -1318,7 +1318,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
             return await BalanceService.unfreeze(
               {
                 user_id: test_user_id,
-                asset_code: 'POINTS',
+                asset_code: 'points',
                 amount: excessive_amount,
                 idempotency_key,
                 business_type: 'test_unfreeze_insufficient',
@@ -1345,7 +1345,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
           await BalanceService.changeBalance(
             {
               user_id: test_user_id,
-              asset_code: 'POINTS',
+              asset_code: 'points',
               delta_amount: 400,
               idempotency_key: setup_add_key,
               business_type: 'test_setup',
@@ -1358,7 +1358,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
           await BalanceService.freeze(
             {
               user_id: test_user_id,
-              asset_code: 'POINTS',
+              asset_code: 'points',
               amount: 300,
               idempotency_key: setup_freeze_key,
               business_type: 'test_setup',
@@ -1371,7 +1371,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         // 记录结算前余额
         const before_balance = await BalanceService.getBalance({
           user_id: test_user_id,
-          asset_code: 'POINTS'
+          asset_code: 'points'
         })
         const before_frozen = Number(before_balance.frozen_amount)
         const before_total = Number(before_balance.total_amount)
@@ -1384,7 +1384,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
           return await BalanceService.settleFromFrozen(
             {
               user_id: test_user_id,
-              asset_code: 'POINTS',
+              asset_code: 'points',
               amount: settle_amount,
               idempotency_key,
               business_type: 'test_settle',
@@ -1406,7 +1406,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         // 验证余额变化
         const after_balance = await BalanceService.getBalance({
           user_id: test_user_id,
-          asset_code: 'POINTS'
+          asset_code: 'points'
         })
 
         // 冻结余额减少，总余额减少（已结算扣款）
@@ -1420,7 +1420,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         // 获取当前余额
         const current_balance = await BalanceService.getBalance({
           user_id: test_user_id,
-          asset_code: 'POINTS'
+          asset_code: 'points'
         })
         const current_frozen = Number(current_balance.frozen_amount)
 
@@ -1433,7 +1433,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
             return await BalanceService.settleFromFrozen(
               {
                 user_id: test_user_id,
-                asset_code: 'POINTS',
+                asset_code: 'points',
                 amount: excessive_amount,
                 idempotency_key,
                 business_type: 'test_settle_insufficient',
@@ -1455,7 +1455,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         // 记录初始余额
         const initial_balance = await BalanceService.getBalance({
           user_id: test_user_id,
-          asset_code: 'POINTS'
+          asset_code: 'points'
         })
         const initial_available = Number(initial_balance.available_amount)
 
@@ -1468,7 +1468,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
           return await BalanceService.changeBalance(
             {
               user_id: test_user_id,
-              asset_code: 'POINTS',
+              asset_code: 'points',
               delta_amount,
               idempotency_key,
               business_type: 'test_idempotent',
@@ -1494,7 +1494,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
           return await BalanceService.changeBalance(
             {
               user_id: test_user_id,
-              asset_code: 'POINTS',
+              asset_code: 'points',
               delta_amount,
               idempotency_key,
               business_type: 'test_idempotent',
@@ -1515,7 +1515,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
           return await BalanceService.changeBalance(
             {
               user_id: test_user_id,
-              asset_code: 'POINTS',
+              asset_code: 'points',
               delta_amount,
               idempotency_key,
               business_type: 'test_idempotent',
@@ -1531,7 +1531,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         // 验证余额只增加一次
         const final_balance = await BalanceService.getBalance({
           user_id: test_user_id,
-          asset_code: 'POINTS'
+          asset_code: 'points'
         })
         expect(Number(final_balance.available_amount)).toBe(initial_available + delta_amount)
       })
@@ -1540,7 +1540,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         // 记录初始余额
         const initial_balance = await BalanceService.getBalance({
           user_id: test_user_id,
-          asset_code: 'POINTS'
+          asset_code: 'points'
         })
         const initial_available = Number(initial_balance.available_amount)
 
@@ -1553,7 +1553,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
             return await BalanceService.changeBalance(
               {
                 user_id: test_user_id,
-                asset_code: 'POINTS',
+                asset_code: 'points',
                 delta_amount,
                 idempotency_key: generateIdempotencyKey(`test_diff_key_${i}`),
                 business_type: 'test_diff_key',
@@ -1588,7 +1588,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         // 验证余额增加了三次
         const final_balance = await BalanceService.getBalance({
           user_id: test_user_id,
-          asset_code: 'POINTS'
+          asset_code: 'points'
         })
         expect(Number(final_balance.available_amount)).toBe(initial_available + delta_amount * 3)
       })
@@ -1602,7 +1602,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
           return await BalanceService.changeBalance(
             {
               user_id: test_user_id,
-              asset_code: 'POINTS',
+              asset_code: 'points',
               delta_amount: 200,
               idempotency_key: setup_key,
               business_type: 'test_setup',
@@ -1621,7 +1621,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
           return await BalanceService.freeze(
             {
               user_id: test_user_id,
-              asset_code: 'POINTS',
+              asset_code: 'points',
               amount: freeze_amount,
               idempotency_key,
               business_type: 'test_freeze_idempotent',
@@ -1646,7 +1646,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
           return await BalanceService.freeze(
             {
               user_id: test_user_id,
-              asset_code: 'POINTS',
+              asset_code: 'points',
               amount: freeze_amount,
               idempotency_key,
               business_type: 'test_freeze_idempotent',
@@ -1668,7 +1668,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
           return await BalanceService.changeBalance(
             {
               user_id: test_user_id,
-              asset_code: 'POINTS',
+              asset_code: 'points',
               delta_amount: 500,
               idempotency_key: setup_key,
               business_type: 'test_setup',
@@ -1686,7 +1686,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         // 记录初始余额
         const initial_balance = await BalanceService.getBalance({
           user_id: test_user_id,
-          asset_code: 'POINTS'
+          asset_code: 'points'
         })
         const initial_available = Number(initial_balance.available_amount)
 
@@ -1696,7 +1696,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
             return await BalanceService.changeBalance(
               {
                 user_id: test_user_id,
-                asset_code: 'POINTS',
+                asset_code: 'points',
                 delta_amount,
                 idempotency_key,
                 business_type: 'test_concurrent',
@@ -1735,7 +1735,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         // 验证余额只增加一次
         const final_balance = await BalanceService.getBalance({
           user_id: test_user_id,
-          asset_code: 'POINTS'
+          asset_code: 'points'
         })
         expect(Number(final_balance.available_amount)).toBe(initial_available + delta_amount)
       })
@@ -1750,7 +1750,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         await expect(
           BalanceService.changeBalance({
             user_id: test_user_id,
-            asset_code: 'POINTS',
+            asset_code: 'points',
             delta_amount: 10,
             idempotency_key: generateIdempotencyKey('test_no_tx_change'),
             business_type: 'test_no_tx',
@@ -1763,7 +1763,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         await expect(
           BalanceService.freeze({
             user_id: test_user_id,
-            asset_code: 'POINTS',
+            asset_code: 'points',
             amount: 10,
             idempotency_key: generateIdempotencyKey('test_no_tx_freeze'),
             business_type: 'test_no_tx'
@@ -1775,7 +1775,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         await expect(
           BalanceService.unfreeze({
             user_id: test_user_id,
-            asset_code: 'POINTS',
+            asset_code: 'points',
             amount: 10,
             idempotency_key: generateIdempotencyKey('test_no_tx_unfreeze'),
             business_type: 'test_no_tx'
@@ -1787,7 +1787,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         await expect(
           BalanceService.settleFromFrozen({
             user_id: test_user_id,
-            asset_code: 'POINTS',
+            asset_code: 'points',
             amount: 10,
             idempotency_key: generateIdempotencyKey('test_no_tx_settle'),
             business_type: 'test_no_tx'
@@ -1801,7 +1801,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         // 记录初始余额
         const initial_balance = await BalanceService.getBalance({
           user_id: test_user_id,
-          asset_code: 'POINTS'
+          asset_code: 'points'
         })
         const initial_available = Number(initial_balance.available_amount)
 
@@ -1812,7 +1812,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
             await BalanceService.changeBalance(
               {
                 user_id: test_user_id,
-                asset_code: 'POINTS',
+                asset_code: 'points',
                 delta_amount: 1000,
                 idempotency_key: generateIdempotencyKey('test_rollback_add'),
                 business_type: 'test_rollback',
@@ -1833,7 +1833,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         // 验证余额没有变化（已回滚）
         const after_balance = await BalanceService.getBalance({
           user_id: test_user_id,
-          asset_code: 'POINTS'
+          asset_code: 'points'
         })
 
         expect(Number(after_balance.available_amount)).toBe(initial_available)
@@ -1843,7 +1843,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         // 记录初始余额
         const initial_balance = await BalanceService.getBalance({
           user_id: test_user_id,
-          asset_code: 'POINTS'
+          asset_code: 'points'
         })
         const initial_available = Number(initial_balance.available_amount)
         const initial_frozen = Number(initial_balance.frozen_amount)
@@ -1855,7 +1855,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
             await BalanceService.changeBalance(
               {
                 user_id: test_user_id,
-                asset_code: 'POINTS',
+                asset_code: 'points',
                 delta_amount: 500,
                 idempotency_key: generateIdempotencyKey('test_multi_rollback_1'),
                 business_type: 'test_rollback',
@@ -1869,7 +1869,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
             await BalanceService.freeze(
               {
                 user_id: test_user_id,
-                asset_code: 'POINTS',
+                asset_code: 'points',
                 amount: 200,
                 idempotency_key: generateIdempotencyKey('test_multi_rollback_2'),
                 business_type: 'test_rollback',
@@ -1888,7 +1888,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         // 验证所有操作都已回滚
         const after_balance = await BalanceService.getBalance({
           user_id: test_user_id,
-          asset_code: 'POINTS'
+          asset_code: 'points'
         })
 
         expect(Number(after_balance.available_amount)).toBe(initial_available)
@@ -1901,7 +1901,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         // 记录初始余额
         const initial_balance = await BalanceService.getBalance({
           user_id: test_user_id,
-          asset_code: 'POINTS'
+          asset_code: 'points'
         })
         const initial_available = Number(initial_balance.available_amount)
 
@@ -1913,7 +1913,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
           const add_result = await BalanceService.changeBalance(
             {
               user_id: test_user_id,
-              asset_code: 'POINTS',
+              asset_code: 'points',
               delta_amount: add_amount,
               idempotency_key: generateIdempotencyKey('test_commit_add'),
               business_type: 'test_commit',
@@ -1926,7 +1926,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
           const freeze_result = await BalanceService.freeze(
             {
               user_id: test_user_id,
-              asset_code: 'POINTS',
+              asset_code: 'points',
               amount: freeze_amount,
               idempotency_key: generateIdempotencyKey('test_commit_freeze'),
               business_type: 'test_commit',
@@ -1949,7 +1949,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         // 验证事务已提交
         const after_balance = await BalanceService.getBalance({
           user_id: test_user_id,
-          asset_code: 'POINTS'
+          asset_code: 'points'
         })
 
         // 可用余额 = 初始余额 + 增加金额 - 冻结金额
@@ -1976,7 +1976,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
 
       // 2. 获取余额：getOrCreateBalance(account_id, asset_code, options)
       const balance = await TransactionManager.execute(async transaction => {
-        return await BalanceService.getOrCreateBalance(account.account_id, 'POINTS', {
+        return await BalanceService.getOrCreateBalance(account.account_id, 'points', {
           transaction
         })
       })
@@ -1990,7 +1990,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
         return await BalanceService.changeBalance(
           {
             user_id: test_user_id,
-            asset_code: 'POINTS',
+            asset_code: 'points',
             delta_amount: 500,
             idempotency_key,
             business_type: 'test_full_flow',
@@ -2017,7 +2017,7 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
       // 4. 查询余额验证
       const final_balance = await BalanceService.getBalance({
         user_id: test_user_id,
-        asset_code: 'POINTS'
+        asset_code: 'points'
       })
 
       expect(final_balance).toBeDefined()

@@ -331,7 +331,7 @@ class MaterialManagementService {
    * - 配置实体使用业务码（:code）作为标识符
    * - 对应路由：GET /api/v4/console/material/asset-types/:code
    *
-   * @param {string} assetCode - 资产类型代码（如 red_shard、DIAMOND）
+   * @param {string} assetCode - 资产类型代码（如 red_core_shard、star_stone）
    * @returns {Promise<Object>} 资产类型详情
    * @throws {Error} 404 - 资产类型不存在
    */

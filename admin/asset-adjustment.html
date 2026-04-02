@@ -116,14 +116,14 @@
               <label class="block text-sm font-medium themed-text-secondary mb-1">资产类型</label>
               <select x-model="form.asset_type" class="w-full px-3 py-2 border rounded-lg">
                 <option value="">请选择</option>
-                <option value="POINTS">积分</option>
-                <option value="DIAMOND">钻石</option>
-                <option value="BUDGET_POINTS">预算积分</option>
+                <option value="points">积分</option>
+                <option value="star_stone">星石</option>
+                <option value="budget_points">预算积分</option>
                 <option value="material">材料</option>
               </select>
             </div>
             <!-- 活动选择 (仅预算积分时显示) -->
-            <div x-show="form.asset_type === 'BUDGET_POINTS'" x-cloak>
+            <div x-show="form.asset_type === 'budget_points'" x-cloak>
               <label class="block text-sm font-medium themed-text-secondary mb-1">关联活动 <span class="text-red-500">*</span></label>
               <select x-model="form.campaign_id" class="w-full px-3 py-2 border rounded-lg">
                 <option value="">请选择活动</option>
@@ -231,7 +231,7 @@
           </div>
           
           <!-- 活动选择 (仅预算积分时显示) -->
-          <div x-show="adjustForm.asset_code === 'BUDGET_POINTS'">
+          <div x-show="adjustForm.asset_code === 'budget_points'">
             <label class="block text-sm font-medium themed-text-secondary mb-1">关联活动 <span class="text-red-500">*</span></label>
             <select x-model="adjustForm.campaign_id" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500">
               <option value="">请选择活动</option>

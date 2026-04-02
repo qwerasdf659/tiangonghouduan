@@ -27,6 +27,7 @@ const {
 } = require('../../models')
 const { Op } = sequelize.Sequelize
 /* V4.7.0 AssetService 拆分：使用子服务替代原 AssetService */
+const { AssetCode } = require('../../constants/AssetCode')
 const BalanceService = require('../asset/BalanceService')
 const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
 const { assertAndGetTransaction } = require('../../utils/transactionHelpers')
@@ -44,8 +45,8 @@ const DEFAULT_LISTING_CONFIG = {
  * 多币种扩展 - 价格区间配置
  */
 const DEFAULT_PRICE_RANGE_CONFIG = {
-  DIAMOND: { min: 1, max: null },
-  red_shard: { min: 1, max: 1000000 }
+  [AssetCode.STAR_STONE]: { min: 1, max: null },
+  [AssetCode.RED_CORE_SHARD]: { min: 1, max: 1000000 }
 }
 
 /**
@@ -130,7 +131,7 @@ class MarketListingCoreService {
     const whitelist = await AdminSystemService.getSettingValue(
       'marketplace',
       'allowed_listing_assets',
-      ['DIAMOND', 'red_shard']
+      [AssetCode.STAR_STONE, AssetCode.RED_CORE_SHARD]
     )
 
     const whitelistArray = Array.isArray(whitelist) ? whitelist : JSON.parse(whitelist || '[]')
@@ -326,7 +327,7 @@ class MarketListingCoreService {
    * @param {number} params.seller_user_id - 卖家用户ID
    * @param {number} params.item_id - 物品ID
    * @param {number} params.price_amount - 价格金额
-   * @param {string} [params.price_asset_code='DIAMOND'] - 价格资产类型
+   * @param {string} [params.price_asset_code=AssetCode.STAR_STONE] - 价格资产类型（星石）
    * @param {Object} [options] - 事务选项
    * @returns {Promise<Object>} 挂牌创建结果
    */
@@ -336,7 +337,7 @@ class MarketListingCoreService {
       seller_user_id,
       item_id,
       price_amount,
-      price_asset_code = 'DIAMOND'
+      price_asset_code = AssetCode.STAR_STONE
     } = params
 
     // 1. 参数验证
@@ -703,7 +704,7 @@ class MarketListingCoreService {
    * @param {string} params.offer_asset_code - 出售资产代码
    * @param {number} params.offer_amount - 出售数量
    * @param {number} params.price_amount - 价格
-   * @param {string} [params.price_asset_code='DIAMOND'] - 价格资产代码
+   * @param {string} [params.price_asset_code=AssetCode.STAR_STONE] - 价格资产代码（星石）
    * @param {Object} [options] - 事务选项
    * @param {Object} options.transaction - Sequelize事务对象（必填）
    * @returns {Promise<Object>} 挂牌创建结果 {listing, freeze_result, is_duplicate}
@@ -715,7 +716,7 @@ class MarketListingCoreService {
       offer_asset_code,
       offer_amount,
       price_amount,
-      price_asset_code = 'DIAMOND'
+      price_asset_code = AssetCode.STAR_STONE
     } = params
 
     // 参数验证

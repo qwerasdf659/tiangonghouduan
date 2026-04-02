@@ -3,7 +3,7 @@
  *
  * @description 用户消费比例覆盖的状态管理和 CRUD 方法
  * @module modules/user/composables/ratio-overrides
- * @since 2026-03-02（钻石配额优化方案）
+ * @since 2026-03-02（星石配额优化方案）
  */
 
 import { logger } from '../../../utils/logger.js'
@@ -15,7 +15,7 @@ import { UserRatioOverrideAPI } from '../../../api/user-ratio-override.js'
 const RATIO_KEY_OPTIONS = [
   { value: 'points_award_ratio', label: '消费积分比例' },
   { value: 'budget_allocation_ratio', label: '预算分配比例' },
-  { value: 'diamond_quota_ratio', label: '钻石配额比例' }
+  { value: 'star_stone_quota_ratio', label: '星石配额比例' }
 ]
 
 /**

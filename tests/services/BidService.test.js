@@ -221,12 +221,12 @@ describe('竞价系统服务测试（臻选空间/幸运空间/竞价功能）',
       const allowed = await BidService._getAllowedBidAssets()
 
       expect(Array.isArray(allowed)).toBe(true)
-      // 根据数据库实际数据：red_shard 和 DIAMOND 可交易
-      expect(allowed).toContain('red_shard')
-      expect(allowed).toContain('DIAMOND')
+      // 根据数据库实际数据：red_core_shard 和 star_stone 可交易
+      expect(allowed).toContain('red_core_shard')
+      expect(allowed).toContain('star_stone')
       // POINTS 和 BUDGET_POINTS 不应在白名单中
-      expect(allowed).not.toContain('POINTS')
-      expect(allowed).not.toContain('BUDGET_POINTS')
+      expect(allowed).not.toContain('points')
+      expect(allowed).not.toContain('budget_points')
     })
   })
 

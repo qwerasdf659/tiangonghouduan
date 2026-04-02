@@ -27,6 +27,7 @@
 
 const express = require('express')
 const router = express.Router()
+const { AssetCode } = require('../../../constants/AssetCode')
 const { authenticateToken } = require('../../../middleware/auth')
 const { handleServiceError } = require('../../../middleware/validation')
 const TransactionManager = require('../../../utils/TransactionManager')
@@ -214,7 +215,7 @@ router.post(
         BidQueryService.getBidProductDetail(productId, {})
           .then(detail => {
             const itemName = detail?.exchangeItem?.item_name || '竞价商品'
-            const assetCode = detail?.price_asset_code || 'DIAMOND'
+            const assetCode = detail?.price_asset_code || AssetCode.STAR_STONE
             return NotificationService.notifyBidOutbid(result._outbid_info.user_id, {
               bid_product_id: productId,
               item_name: itemName,

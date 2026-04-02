@@ -37,19 +37,19 @@ describe('ExchangeRateService - 固定汇率兑换服务测试', () => {
   })
 
   describe('getRate - 获取特定币对汇率', () => {
-    it('应能获取 red_shard → DIAMOND 汇率', async () => {
-      const rate = await ExchangeRateService.getRate('red_shard', 'DIAMOND')
+    it('应能获取 red_core_shard → star_stone 汇率', async () => {
+      const rate = await ExchangeRateService.getRate('red_core_shard', 'star_stone')
       expect(rate).not.toBeNull()
-      expect(rate.from_asset_code).toBe('red_shard')
-      expect(rate.to_asset_code).toBe('DIAMOND')
+      expect(rate.from_asset_code).toBe('red_core_shard')
+      expect(rate.to_asset_code).toBe('star_stone')
       expect(rate.rate_numerator).toBe(1)
       expect(rate.rate_denominator).toBe(10)
-      expect(rate.rate_display).toContain('red_shard')
-      expect(rate.rate_display).toContain('DIAMOND')
+      expect(rate.rate_display).toContain('red_core_shard')
+      expect(rate.rate_display).toContain('star_stone')
     })
 
     it('不存在的币对应返回 null', async () => {
-      const rate = await ExchangeRateService.getRate('NONEXISTENT', 'DIAMOND')
+      const rate = await ExchangeRateService.getRate('NONEXISTENT', 'star_stone')
       expect(rate).toBeNull()
     })
   })
@@ -60,23 +60,23 @@ describe('ExchangeRateService - 固定汇率兑换服务测试', () => {
       expect(Array.isArray(rates)).toBe(true)
       expect(rates.length).toBeGreaterThanOrEqual(6)
 
-      const redShard = rates.find(r => r.from_asset_code === 'red_shard')
+      const redShard = rates.find(r => r.from_asset_code === 'red_core_shard')
       expect(redShard).toBeDefined()
-      expect(redShard.to_asset_code).toBe('DIAMOND')
+      expect(redShard.to_asset_code).toBe('star_stone')
     })
   })
 
   describe('previewConvert - 兑换预览', () => {
-    it('应正确计算 100 red_shard → 10 DIAMOND', async () => {
+    it('应正确计算 100 red_core_shard → 10 star_stone', async () => {
       const preview = await ExchangeRateService.previewConvert(
         TEST_USER_ID,
-        'red_shard',
-        'DIAMOND',
+        'red_core_shard',
+        'star_stone',
         100
       )
 
-      expect(preview.from_asset_code).toBe('red_shard')
-      expect(preview.to_asset_code).toBe('DIAMOND')
+      expect(preview.from_asset_code).toBe('red_core_shard')
+      expect(preview.to_asset_code).toBe('star_stone')
       expect(preview.from_amount).toBe(100)
       expect(preview.gross_to_amount).toBe(10)
       expect(preview.net_to_amount).toBe(10)
@@ -87,32 +87,32 @@ describe('ExchangeRateService - 固定汇率兑换服务测试', () => {
 
     it('不存在的币对应抛出 RATE_NOT_FOUND', async () => {
       await expect(
-        ExchangeRateService.previewConvert(TEST_USER_ID, 'NONEXISTENT', 'DIAMOND', 100)
+        ExchangeRateService.previewConvert(TEST_USER_ID, 'NONEXISTENT', 'star_stone', 100)
       ).rejects.toThrow('汇率规则不存在')
     })
 
     it('数量为0应抛出错误', async () => {
       await expect(
-        ExchangeRateService.previewConvert(TEST_USER_ID, 'red_shard', 'DIAMOND', 0)
+        ExchangeRateService.previewConvert(TEST_USER_ID, 'red_core_shard', 'star_stone', 0)
       ).rejects.toThrow('兑换数量必须大于0')
     })
 
     it('数量低于最小限制应抛出错误', async () => {
       await expect(
-        ExchangeRateService.previewConvert(TEST_USER_ID, 'red_shard', 'DIAMOND', 1)
+        ExchangeRateService.previewConvert(TEST_USER_ID, 'red_core_shard', 'star_stone', 1)
       ).rejects.toThrow('兑换数量低于最小限制')
     })
   })
 
   describe('executeConvert - 执行汇率兑换', () => {
-    it('应成功执行 red_shard → DIAMOND 兑换并产生双录流水', async () => {
+    it('应成功执行 red_core_shard → star_stone 兑换并产生双录流水', async () => {
       const idempotencyKey = `test_rate_convert_${Date.now()}`
 
       const result = await TransactionManager.execute(async transaction => {
         return await ExchangeRateService.executeConvert(
           TEST_USER_ID,
-          'red_shard',
-          'DIAMOND',
+          'red_core_shard',
+          'star_stone',
           10,
           idempotencyKey,
           { transaction }
@@ -120,8 +120,8 @@ describe('ExchangeRateService - 固定汇率兑换服务测试', () => {
       })
 
       expect(result.success).toBe(true)
-      expect(result.from_asset_code).toBe('red_shard')
-      expect(result.to_asset_code).toBe('DIAMOND')
+      expect(result.from_asset_code).toBe('red_core_shard')
+      expect(result.to_asset_code).toBe('star_stone')
       expect(result.from_amount).toBe(10)
       expect(result.net_to_amount).toBe(1)
       expect(result.is_duplicate).toBe(false)
@@ -137,8 +137,8 @@ describe('ExchangeRateService - 固定汇率兑换服务测试', () => {
       await TransactionManager.execute(async transaction => {
         return await ExchangeRateService.executeConvert(
           TEST_USER_ID,
-          'red_shard',
-          'DIAMOND',
+          'red_core_shard',
+          'star_stone',
           10,
           idempotencyKey,
           { transaction }
@@ -148,8 +148,8 @@ describe('ExchangeRateService - 固定汇率兑换服务测试', () => {
       const result2 = await TransactionManager.execute(async transaction => {
         return await ExchangeRateService.executeConvert(
           TEST_USER_ID,
-          'red_shard',
-          'DIAMOND',
+          'red_core_shard',
+          'star_stone',
           10,
           idempotencyKey,
           { transaction }
@@ -165,8 +165,8 @@ describe('ExchangeRateService - 固定汇率兑换服务测试', () => {
         TransactionManager.execute(async transaction => {
           return await ExchangeRateService.executeConvert(
             TEST_USER_ID,
-            'red_shard',
-            'DIAMOND',
+            'red_core_shard',
+            'star_stone',
             10,
             null,
             { transaction }

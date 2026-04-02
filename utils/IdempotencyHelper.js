@@ -357,15 +357,15 @@ function isValidBusinessId(businessId, type) {
  * 格式：admin_{operationType}_{operatorId}_{timestamp}_{random6}
  *
  * @param {number|string} operatorId - 管理员用户ID
- * @param {string} operationType - 操作类型（如 asset_adjust / batch_grant / diamond_adjust）
+ * @param {string} operationType - 操作类型（如 asset_adjust / batch_grant / star_stone_adjust）
  * @param {Object} [context] - 可选上下文（如目标用户ID、资产类型，用于提高唯一性）
  * @param {number|string} [context.target_user_id] - 目标用户ID
  * @param {string} [context.asset_code] - 资产编码
  * @returns {string} 管理员操作幂等键
  *
  * @example
- * generateAdminOperationKey(31, 'asset_adjust', { target_user_id: 100, asset_code: 'DIAMOND' })
- * // => 'admin_asset_adjust_31_100_DIAMOND_1703511234567_a1b2c3'
+ * generateAdminOperationKey(31, 'asset_adjust', { target_user_id: 100, asset_code: 'STAR_STONE' })
+ * // => 'admin_asset_adjust_31_100_STAR_STONE_1703511234567_a1b2c3'
  *
  * generateAdminOperationKey(31, 'batch_grant')
  * // => 'admin_batch_grant_31_1703511234567_a1b2c3'

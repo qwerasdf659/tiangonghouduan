@@ -326,7 +326,7 @@ describe('🔴 孤儿冻结问题回归测试 - 2026-01-30', () => {
         return
       }
 
-      // 查询用户的 DIAMOND 余额
+      // 查询用户的 star_stone 余额
       const balance = await AccountAssetBalance.findOne({
         where: {},
         attributes: ['balance_id', 'available_amount', 'frozen_amount']

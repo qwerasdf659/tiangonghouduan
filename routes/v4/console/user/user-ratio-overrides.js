@@ -3,7 +3,7 @@
  *
  * @description 管理员为特定用户设置个性化消费比例（CRUD）
  * @version 1.0.0
- * @date 2026-03-02（钻石配额优化方案）
+ * @date 2026-03-02（星石配额优化方案）
  *
  * 业务场景：
  * - 活动奖励：某次推广活动中给参与用户临时 ×3.0
@@ -22,12 +22,12 @@ const router = express.Router()
 const TransactionManager = require('../../../../utils/TransactionManager')
 const { sharedComponents, adminAuthMiddleware, asyncHandler } = require('../shared/middleware')
 
-const VALID_RATIO_KEYS = ['points_award_ratio', 'budget_allocation_ratio', 'diamond_quota_ratio']
+const VALID_RATIO_KEYS = ['points_award_ratio', 'budget_allocation_ratio', 'star_stone_quota_ratio']
 
 const RATIO_KEY_LABELS = {
   points_award_ratio: '消费积分比例',
   budget_allocation_ratio: '预算分配比例',
-  diamond_quota_ratio: '钻石配额比例'
+  star_stone_quota_ratio: '星石配额比例'
 }
 
 /**

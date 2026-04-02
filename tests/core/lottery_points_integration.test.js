@@ -41,7 +41,7 @@ describe('抽奖积分集成测试 - V4.6 Pipeline 架构', () => {
    * 辅助函数：获取用户 POINTS 余额（使用资产系统）
    */
   async function getPointsBalance(userId) {
-    const result = await BalanceService.getBalance({ user_id: userId, asset_code: 'POINTS' })
+    const result = await BalanceService.getBalance({ user_id: userId, asset_code: 'points' })
     return result ? Number(result.available_amount) : 0
   }
 
@@ -141,7 +141,7 @@ describe('抽奖积分集成测试 - V4.6 Pipeline 架构', () => {
         const consumeRecords = await AssetTransaction.findAll({
           where: {
             user_id: testUserId,
-            asset_code: 'POINTS',
+            asset_code: 'points',
             business_type: 'lottery_consume'
           },
           order: [['created_at', 'DESC']],
@@ -153,7 +153,7 @@ describe('抽奖积分集成测试 - V4.6 Pipeline 架构', () => {
 
         // 3. 验证流水记录详情
         expect(Number(consumeRecord.delta_amount)).toBe(-baseCost)
-        expect(consumeRecord.asset_code).toBe('POINTS')
+        expect(consumeRecord.asset_code).toBe('points')
 
         console.log('\n✅ 积分消费记录验证通过：')
         console.log({
@@ -237,7 +237,7 @@ describe('抽奖积分集成测试 - V4.6 Pipeline 架构', () => {
       const rewardRecords = await AssetTransaction.findAll({
         where: {
           user_id: testUserId,
-          asset_code: 'POINTS',
+          asset_code: 'points',
           business_type: 'lottery_reward'
         },
         order: [['created_at', 'DESC']],
@@ -248,7 +248,7 @@ describe('抽奖积分集成测试 - V4.6 Pipeline 架构', () => {
       const rewardRecord = rewardRecords[0]
 
       expect(Number(rewardRecord.delta_amount)).toBe(prizeValue)
-      expect(rewardRecord.asset_code).toBe('POINTS')
+      expect(rewardRecord.asset_code).toBe('points')
 
       console.log('\n✅ 积分奖励记录验证通过：')
       console.log({
@@ -273,7 +273,7 @@ describe('抽奖积分集成测试 - V4.6 Pipeline 架构', () => {
       }
 
       const assetBalance = await AccountAssetBalance.findOne({
-        where: { account_id: account.account_id, asset_code: 'POINTS' }
+        where: { account_id: account.account_id, asset_code: 'points' }
       })
 
       if (!assetBalance) {

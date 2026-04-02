@@ -94,13 +94,13 @@ describe('API契约测试 - 资产模块 (/api/v4/assets)', () => {
 
     describe('GET /balance - 查询单个资产余额', () => {
       /**
-       * Case 1: 查询DIAMOND余额
+       * Case 1: 查询star_stone余额
        */
-      test('查询DIAMOND余额应返回符合契约的数据', async () => {
+      test('查询star_stone余额应返回符合契约的数据', async () => {
         const response = await request(app)
           .get('/api/v4/assets/balance')
           .set('Authorization', `Bearer ${access_token}`)
-          .query({ asset_code: 'DIAMOND' })
+          .query({ asset_code: 'star_stone' })
 
         expect(response.status).toBe(200)
         validateApiContract(response.body)
@@ -108,25 +108,25 @@ describe('API契约测试 - 资产模块 (/api/v4/assets)', () => {
         // 验证data结构
         expect(response.body.data).toHaveProperty('asset_code')
         expect(response.body.data).toHaveProperty('available_amount')
-        expect(response.body.data.asset_code).toBe('DIAMOND')
+        expect(response.body.data.asset_code).toBe('star_stone')
         expect(typeof response.body.data.available_amount).toBe('number')
       })
 
       /**
-       * Case 2: 查询red_shard余额
+       * Case 2: 查询red_core_shard余额
        */
-      test('查询red_shard余额应返回符合契约的数据', async () => {
+      test('查询red_core_shard余额应返回符合契约的数据', async () => {
         const response = await request(app)
           .get('/api/v4/assets/balance')
           .set('Authorization', `Bearer ${access_token}`)
-          .query({ asset_code: 'red_shard' })
+          .query({ asset_code: 'red_core_shard' })
 
         expect(response.status).toBe(200)
         validateApiContract(response.body)
 
         expect(response.body.data).toHaveProperty('asset_code')
         expect(response.body.data).toHaveProperty('available_amount')
-        expect(response.body.data.asset_code).toBe('red_shard')
+        expect(response.body.data.asset_code).toBe('red_core_shard')
       })
 
       /**
@@ -147,7 +147,7 @@ describe('API契约测试 - 资产模块 (/api/v4/assets)', () => {
       test('未认证用户应返回401', async () => {
         const response = await request(app)
           .get('/api/v4/assets/balance')
-          .query({ asset_code: 'DIAMOND' })
+          .query({ asset_code: 'star_stone' })
 
         expect(response.status).toBe(401)
         validateApiContract(response.body, false)
@@ -223,7 +223,7 @@ describe('API契约测试 - 资产模块 (/api/v4/assets)', () => {
        */
       test('冻结资产应需要认证', async () => {
         const response = await request(app).post('/api/v4/assets/freeze').send({
-          asset_code: 'DIAMOND',
+          asset_code: 'star_stone',
           amount: 100
         })
 
@@ -237,7 +237,7 @@ describe('API契约测试 - 资产模块 (/api/v4/assets)', () => {
        */
       test('解冻资产应需要认证', async () => {
         const response = await request(app).post('/api/v4/assets/unfreeze').send({
-          asset_code: 'DIAMOND',
+          asset_code: 'star_stone',
           amount: 100
         })
 
@@ -281,7 +281,7 @@ describe('API契约测试 - 资产模块 (/api/v4/assets)', () => {
         const response = await request(app)
           .get('/api/v4/assets/transactions')
           .set('Authorization', `Bearer ${access_token}`)
-          .query({ asset_code: 'DIAMOND' })
+          .query({ asset_code: 'star_stone' })
 
         expect(response.status).toBe(200)
         validateApiContract(response.body)
@@ -289,7 +289,7 @@ describe('API契约测试 - 资产模块 (/api/v4/assets)', () => {
         // 如果有数据，验证类型匹配
         if (response.body.data.transactions.length > 0) {
           response.body.data.transactions.forEach(tx => {
-            expect(tx.asset_code).toBe('DIAMOND')
+            expect(tx.asset_code).toBe('star_stone')
           })
         }
       })
@@ -350,7 +350,7 @@ describe('API契约测试 - 资产模块 (/api/v4/assets)', () => {
         const response = await request(app)
           .get('/api/v4/assets/transactions')
           .set('Authorization', `Bearer ${access_token}`)
-          .query({ asset_code: 'POINTS', page_size: 1 })
+          .query({ asset_code: 'points', page_size: 1 })
 
         expect(response.status).toBe(200)
         validateApiContract(response.body)
@@ -438,8 +438,8 @@ describe('API契约测试 - 资产模块 (/api/v4/assets)', () => {
        */
       test('执行资产转换应需要认证', async () => {
         const response = await request(app).post('/api/v4/assets/convert').send({
-          from_asset_code: 'red_shard',
-          to_asset_code: 'DIAMOND',
+          from_asset_code: 'red_core_shard',
+          to_asset_code: 'star_stone',
           from_amount: 10
         })
 
@@ -457,7 +457,7 @@ describe('API契约测试 - 资产模块 (/api/v4/assets)', () => {
           .set('Authorization', `Bearer ${access_token}`)
           .set('Idempotency-Key', `test_convert_${Date.now()}_1`)
           .send({
-            from_asset_code: 'red_shard'
+            from_asset_code: 'red_core_shard'
             // 缺少 to_asset_code 和 from_amount
           })
 
@@ -477,8 +477,8 @@ describe('API契约测试 - 资产模块 (/api/v4/assets)', () => {
           .set('Authorization', `Bearer ${access_token}`)
           .set('Idempotency-Key', `test_convert_${Date.now()}_2`)
           .send({
-            from_asset_code: 'red_shard',
-            to_asset_code: 'DIAMOND',
+            from_asset_code: 'red_core_shard',
+            to_asset_code: 'star_stone',
             from_amount: -10
           })
 
@@ -499,7 +499,7 @@ describe('API契约测试 - 资产模块 (/api/v4/assets)', () => {
       test('转账应需要认证', async () => {
         const response = await request(app).post('/api/v4/assets/transfer').send({
           to_user_id: 999,
-          asset_code: 'DIAMOND',
+          asset_code: 'star_stone',
           amount: 100
         })
 
@@ -517,7 +517,7 @@ describe('API契约测试 - 资产模块 (/api/v4/assets)', () => {
           .set('Authorization', `Bearer ${access_token}`)
           .set('Idempotency-Key', `test_transfer_${Date.now()}_1`)
           .send({
-            asset_code: 'DIAMOND'
+            asset_code: 'star_stone'
             // 缺少 to_user_id 和 amount
           })
 
@@ -550,7 +550,7 @@ describe('API契约测试 - 资产模块 (/api/v4/assets)', () => {
           .set('Idempotency-Key', `test_transfer_${Date.now()}_2`)
           .send({
             to_user_id: current_user_id,
-            asset_code: 'DIAMOND',
+            asset_code: 'star_stone',
             amount: 100
           })
 

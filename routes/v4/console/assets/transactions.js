@@ -162,7 +162,7 @@ router.get(
 function getAssetDisplayName(asset_code) {
   const builtInAssets = {
     POINTS: '积分',
-    DIAMOND: '钻石',
+    star_stone: '星石',
     BUDGET_POINTS: '预算积分'
   }
   return builtInAssets[asset_code] || asset_code

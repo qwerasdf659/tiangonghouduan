@@ -16,6 +16,7 @@ const { MarketListing, TradeOrder, MarketPriceSnapshot, sequelize } = require('.
 const { Op, fn, col, literal } = require('sequelize')
 const logger = require('../utils/logger').logger
 const BeijingTimeHelper = require('../utils/timeHelper')
+const { AssetCode } = require('../constants/AssetCode')
 
 /**
  * 市场价格快照聚合任务类
@@ -203,7 +204,7 @@ class DailyMarketPriceSnapshot {
             snapshot_date: targetDate,
             asset_code: assetCode,
             listing_kind: 'item',
-            price_asset_code: 'DIAMOND',
+            price_asset_code: AssetCode.STAR_STONE,
             active_listings: 0,
             min_price: null,
             max_price: null,

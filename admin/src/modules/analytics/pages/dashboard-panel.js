@@ -733,9 +733,9 @@ function dashboardPanelPage() {
           // 适配后端数据结构到前端期望格式
           const { summary, asset_stats } = result.data
 
-          // 计算主要资产（POINTS类型）的数据
-          const pointsAsset = asset_stats?.find(a => a.asset_code === 'POINTS') || {}
-          const _diamondAsset = asset_stats?.find(a => a.asset_code === 'DIAMOND') || {}
+          // 计算主要资产（points类型）的数据
+          const pointsAsset = asset_stats?.find(a => a.asset_code === 'points') || {}
+          const _starStoneAsset = asset_stats?.find(a => a.asset_code === 'star_stone') || {}
 
           return {
             system_balance: Number(summary?.total_circulation) || 0,

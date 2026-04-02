@@ -12,7 +12,7 @@
  *
  *
  * 注意：
- * - 钻石冻结/扣款/退款操作已集成 BalanceService（统一资产服务）
+ * - 星石冻结/扣款/退款操作已集成 BalanceService（统一资产服务）
  * - 每个操作同时创建 AdBillingRecord 记录和实际执行资产变动
  */
 
@@ -24,6 +24,7 @@ const BeijingTimeHelper = require('../utils/timeHelper')
 const { v4: uuidv4 } = require('uuid')
 const BalanceService = require('./asset/BalanceService')
 const OrderNoGenerator = require('../utils/OrderNoGenerator')
+const { AssetCode } = require('../constants/AssetCode')
 
 /* eslint-disable valid-jsdoc, require-jsdoc, no-restricted-syntax */
 async function balanceFreeze(payload, txn) {
@@ -76,15 +77,15 @@ class AdBillingService {
   }
 
   /**
-   * 冻结钻石（固定包天模式提交审核时）
+   * 冻结星石（固定包天模式提交审核时）
    *
    * @param {number} campaignId - 广告计划ID
-   * @param {number} amount - 冻结金额（钻石）
+   * @param {number} amount - 冻结金额（星石）
    * @param {Object} options - 操作选项
    * @param {Object} options.transaction - 数据库事务
    * @returns {Promise<Object>} 创建的计费记录对象
    */
-  static async freezeDiamonds(campaignId, amount, options = {}) {
+  static async freezeStarStone(campaignId, amount, options = {}) {
     try {
       const campaign = await AdCampaign.findByPk(campaignId, {
         transaction: options.transaction
@@ -95,7 +96,7 @@ class AdBillingService {
       }
 
       if (campaign.billing_mode !== 'fixed_daily') {
-        throw new Error(`只有固定包天模式需要冻结钻石，当前模式: ${campaign.billing_mode}`)
+        throw new Error(`只有固定包天模式需要冻结星石，当前模式: ${campaign.billing_mode}`)
       }
 
       // 生成business_id
@@ -113,19 +114,19 @@ class AdBillingService {
           ad_campaign_id: campaignId,
           advertiser_user_id: campaign.advertiser_user_id,
           billing_date: billingDate,
-          amount_diamond: amount,
+          amount_star_stone: amount,
           billing_type: 'freeze',
-          remark: `固定包天计划冻结钻石: ${amount}钻石`
+          remark: `固定包天计划冻结星石: ${amount}星石`
         },
         { transaction: options.transaction }
       )
       await AdBillingService.finalizeAdBillingNo(billingRecord, options.transaction)
 
-      // 调用 BalanceService 执行实际的钻石冻结（available → frozen）
+      // 调用 BalanceService 执行实际的星石冻结（available → frozen）
       await balanceFreeze(
         {
           user_id: campaign.advertiser_user_id,
-          asset_code: 'DIAMOND',
+          asset_code: AssetCode.STAR_STONE,
           amount,
           business_type: 'ad_campaign_freeze',
           idempotency_key: `ad_freeze_${business_id}`,
@@ -137,7 +138,7 @@ class AdBillingService {
         options.transaction
       )
 
-      logger.info('冻结钻石成功', {
+      logger.info('冻结星石成功', {
         campaign_id: campaignId,
         amount,
         billing_record_id: billingRecord.ad_billing_record_id
@@ -145,7 +146,7 @@ class AdBillingService {
 
       return billingRecord
     } catch (error) {
-      logger.error('冻结钻石失败', { campaignId, amount, error: error.message })
+      logger.error('冻结星石失败', { campaignId, amount, error: error.message })
       throw error
     }
   }
@@ -158,7 +159,7 @@ class AdBillingService {
    * @param {Object} options.transaction - 数据库事务
    * @returns {Promise<Object>} 创建的扣款记录对象
    */
-  static async deductFrozenDiamonds(campaignId, options = {}) {
+  static async deductFrozenStarStone(campaignId, options = {}) {
     try {
       const campaign = await AdCampaign.findByPk(campaignId, {
         transaction: options.transaction
@@ -168,8 +169,8 @@ class AdBillingService {
         throw new Error(`广告计划不存在: ${campaignId}`)
       }
 
-      if (campaign.billing_mode !== 'fixed_daily' || !campaign.fixed_total_diamond) {
-        throw new Error(`固定包天模式必须提供fixed_total_diamond`)
+      if (campaign.billing_mode !== 'fixed_daily' || !campaign.fixed_total_star_stone) {
+        throw new Error(`固定包天模式必须提供fixed_total_star_stone`)
       }
 
       // 查找冻结记录
@@ -186,7 +187,7 @@ class AdBillingService {
         throw new Error(`未找到冻结记录: ${campaignId}`)
       }
 
-      const amount = campaign.fixed_total_diamond
+      const amount = campaign.fixed_total_star_stone
 
       // 生成business_id
       const business_id = `deduct_${campaignId}_${Date.now()}_${uuidv4().substring(0, 8)}`
@@ -203,9 +204,9 @@ class AdBillingService {
           ad_campaign_id: campaignId,
           advertiser_user_id: campaign.advertiser_user_id,
           billing_date: billingDate,
-          amount_diamond: amount,
+          amount_star_stone: amount,
           billing_type: 'deduct',
-          remark: `固定包天计划扣款: ${amount}钻石（从冻结转为扣款）`
+          remark: `固定包天计划扣款: ${amount}星石（从冻结转为扣款）`
         },
         { transaction: options.transaction }
       )
@@ -215,7 +216,7 @@ class AdBillingService {
       await balanceSettleFromFrozen(
         {
           user_id: campaign.advertiser_user_id,
-          asset_code: 'DIAMOND',
+          asset_code: AssetCode.STAR_STONE,
           amount,
           business_type: 'ad_campaign_deduct',
           idempotency_key: `ad_deduct_${business_id}`,
@@ -248,7 +249,7 @@ class AdBillingService {
    * @param {Object} options.transaction - 数据库事务
    * @returns {Promise<Object>} 创建的退款记录对象
    */
-  static async refundDiamonds(campaignId, options = {}) {
+  static async refundStarStone(campaignId, options = {}) {
     try {
       const campaign = await AdCampaign.findByPk(campaignId, {
         transaction: options.transaction
@@ -260,19 +261,19 @@ class AdBillingService {
 
       // 计算实际冻结净额：总冻结 - 已扣款 - 已退款
       const freezeSum =
-        (await AdBillingRecord.sum('amount_diamond', {
+        (await AdBillingRecord.sum('amount_star_stone', {
           where: { ad_campaign_id: campaignId, billing_type: 'freeze' },
           transaction: options.transaction
         })) || 0
 
       const deductSum =
-        (await AdBillingRecord.sum('amount_diamond', {
+        (await AdBillingRecord.sum('amount_star_stone', {
           where: { ad_campaign_id: campaignId, billing_type: 'deduct' },
           transaction: options.transaction
         })) || 0
 
       const refundSum =
-        (await AdBillingRecord.sum('amount_diamond', {
+        (await AdBillingRecord.sum('amount_star_stone', {
           where: { ad_campaign_id: campaignId, billing_type: 'refund' },
           transaction: options.transaction
         })) || 0
@@ -305,9 +306,9 @@ class AdBillingService {
           ad_campaign_id: campaignId,
           advertiser_user_id: campaign.advertiser_user_id,
           billing_date: billingDate,
-          amount_diamond: amount,
+          amount_star_stone: amount,
           billing_type: 'refund',
-          remark: `广告计划退款: ${amount}钻石（审核拒绝或取消）`
+          remark: `广告计划退款: ${amount}星石（审核拒绝或取消）`
         },
         { transaction: options.transaction }
       )
@@ -317,7 +318,7 @@ class AdBillingService {
       await balanceUnfreeze(
         {
           user_id: campaign.advertiser_user_id,
-          asset_code: 'DIAMOND',
+          asset_code: AssetCode.STAR_STONE,
           amount,
           business_type: 'ad_campaign_refund',
           idempotency_key: `ad_refund_${business_id}`,
@@ -347,7 +348,7 @@ class AdBillingService {
    *
    * 竞争排名机制（2026-03-01 重构）：
    * - 按 ad_slot_id 分组查询当日 active bidding 计划
-   * - 每组按 daily_bid_diamond DESC 排序
+   * - 每组按 daily_bid_star_stone DESC 排序
    * - 取前 N 名（N = ad_slots.max_display_count）为中标
    * - 仅对中标者创建 daily_deduct 记录并扣费
    * - 落选者不扣费（保持 active 状态，次日继续参与竞价）
@@ -366,7 +367,7 @@ class AdBillingService {
         where: {
           status: 'active',
           billing_mode: 'bidding',
-          daily_bid_diamond: { [Op.gt]: 0 }
+          daily_bid_star_stone: { [Op.gt]: 0 }
         }
       })
 
@@ -394,7 +395,9 @@ class AdBillingService {
         const maxWinners = slot?.max_display_count || 1
 
         /* 按出价降序排列，取前 N 名为中标者 */
-        const sorted = [...campaigns].sort((a, b) => b.daily_bid_diamond - a.daily_bid_diamond)
+        const sorted = [...campaigns].sort(
+          (a, b) => b.daily_bid_star_stone - a.daily_bid_star_stone
+        )
         const winners = sorted.slice(0, maxWinners)
         const losers = sorted.slice(maxWinners)
 
@@ -430,9 +433,10 @@ class AdBillingService {
               continue
             }
 
-            const newSpent = freshCampaign.budget_spent_diamond + freshCampaign.daily_bid_diamond
+            const newSpent =
+              freshCampaign.budget_spent_star_stone + freshCampaign.daily_bid_star_stone
 
-            if (newSpent > freshCampaign.budget_total_diamond) {
+            if (newSpent > freshCampaign.budget_total_star_stone) {
               await freshCampaign.update(
                 { status: 'completed' },
                 { transaction: campaignTransaction }
@@ -451,20 +455,20 @@ class AdBillingService {
                 ad_campaign_id: freshCampaign.ad_campaign_id,
                 advertiser_user_id: freshCampaign.advertiser_user_id,
                 billing_date: today,
-                amount_diamond: freshCampaign.daily_bid_diamond,
+                amount_star_stone: freshCampaign.daily_bid_star_stone,
                 billing_type: 'daily_deduct',
-                remark: `竞价中标扣款: ${freshCampaign.daily_bid_diamond}钻石（排名${winners.indexOf(campaign) + 1}/${sorted.length}）`
+                remark: `竞价中标扣款: ${freshCampaign.daily_bid_star_stone}星石（排名${winners.indexOf(campaign) + 1}/${sorted.length}）`
               },
               { transaction: campaignTransaction }
             )
             await AdBillingService.finalizeAdBillingNo(daily_billing_row, campaignTransaction)
 
             await freshCampaign.update(
-              { budget_spent_diamond: newSpent },
+              { budget_spent_star_stone: newSpent },
               { transaction: campaignTransaction }
             )
 
-            if (newSpent >= freshCampaign.budget_total_diamond) {
+            if (newSpent >= freshCampaign.budget_total_star_stone) {
               await freshCampaign.update(
                 { status: 'completed' },
                 { transaction: campaignTransaction }
@@ -479,8 +483,8 @@ class AdBillingService {
             await balanceChange(
               {
                 user_id: freshCampaign.advertiser_user_id,
-                asset_code: 'DIAMOND',
-                delta_amount: -freshCampaign.daily_bid_diamond,
+                asset_code: AssetCode.STAR_STONE,
+                delta_amount: -freshCampaign.daily_bid_star_stone,
                 business_type: 'ad_campaign_daily_deduct',
                 idempotency_key: `ad_daily_${business_id}`,
                 counterpart_account_id: platformFeeAccount.account_id,
@@ -491,7 +495,7 @@ class AdBillingService {
 
             await campaignTransaction.commit()
             results.processed++
-            results.total_deducted += freshCampaign.daily_bid_diamond
+            results.total_deducted += freshCampaign.daily_bid_star_stone
           } catch (error) {
             if (!campaignTransaction.finished) {
               await campaignTransaction.rollback()
@@ -596,25 +600,25 @@ class AdBillingService {
     try {
       // 统计各类型的总金额
       const freezeTotal =
-        (await AdBillingRecord.sum('amount_diamond', {
+        (await AdBillingRecord.sum('amount_star_stone', {
           where: { billing_type: 'freeze' },
           transaction: options.transaction
         })) || 0
 
       const deductTotal =
-        (await AdBillingRecord.sum('amount_diamond', {
+        (await AdBillingRecord.sum('amount_star_stone', {
           where: { billing_type: 'deduct' },
           transaction: options.transaction
         })) || 0
 
       const refundTotal =
-        (await AdBillingRecord.sum('amount_diamond', {
+        (await AdBillingRecord.sum('amount_star_stone', {
           where: { billing_type: 'refund' },
           transaction: options.transaction
         })) || 0
 
       const dailyDeductTotal =
-        (await AdBillingRecord.sum('amount_diamond', {
+        (await AdBillingRecord.sum('amount_star_stone', {
           where: { billing_type: 'daily_deduct' },
           transaction: options.transaction
         })) || 0
@@ -689,8 +693,8 @@ class AdBillingService {
   /**
    * CPM 每日结算（定时任务，凌晨 01:15 执行）
    *
-   * 读取前日各 CPM 计划的 Redis 曝光计数，按 cpm_price_diamond 计费扣款。
-   * 公式：扣费 = Math.ceil(曝光次数 / 1000 * cpm_price_diamond)
+   * 读取前日各 CPM 计划的 Redis 曝光计数，按 cpm_price_star_stone 计费扣款。
+   * 公式：扣费 = Math.ceil(曝光次数 / 1000 * cpm_price_star_stone)
    *
    * @returns {Promise<Object>} 结算结果统计
    */
@@ -717,7 +721,7 @@ class AdBillingService {
           {
             model: AdSlot,
             as: 'adSlot',
-            attributes: ['cpm_price_diamond']
+            attributes: ['cpm_price_star_stone']
           }
         ]
       })
@@ -733,7 +737,7 @@ class AdBillingService {
           continue
         }
 
-        const cpmPrice = campaign.adSlot?.cpm_price_diamond || 0
+        const cpmPrice = campaign.adSlot?.cpm_price_star_stone || 0
         if (cpmPrice <= 0) {
           results.skipped++
           continue
@@ -767,9 +771,9 @@ class AdBillingService {
               ad_campaign_id: campaign.ad_campaign_id,
               advertiser_user_id: campaign.advertiser_user_id,
               billing_date: billingDate,
-              amount_diamond: amount,
+              amount_star_stone: amount,
               billing_type: 'cpm_deduct',
-              remark: `CPM结算: ${impressionCount}次曝光 × ${cpmPrice}钻/千次 = ${amount}钻石`
+              remark: `CPM结算: ${impressionCount}次曝光 × ${cpmPrice}钻/千次 = ${amount}星石`
             },
             { transaction: campaignTx }
           )
@@ -782,7 +786,7 @@ class AdBillingService {
           await balanceChange(
             {
               user_id: campaign.advertiser_user_id,
-              asset_code: 'DIAMOND',
+              asset_code: AssetCode.STAR_STONE,
               delta_amount: -amount,
               business_type: 'ad_campaign_cpm_deduct',
               idempotency_key: `ad_cpm_${businessId}`,
@@ -798,7 +802,7 @@ class AdBillingService {
           )
 
           await campaign.update(
-            { budget_spent_diamond: campaign.budget_spent_diamond + amount },
+            { budget_spent_star_stone: campaign.budget_spent_star_stone + amount },
             { transaction: campaignTx }
           )
 

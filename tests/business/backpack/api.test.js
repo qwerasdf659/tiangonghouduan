@@ -142,12 +142,12 @@ describe('背包API测试 - P2优先级', () => {
 
       const { assets } = response.body.data
 
-      // BUDGET_POINTS（is_enabled=0，系统内部资产）不应出现在背包资产列表中
-      const hasBudgetPoints = assets.some(a => a.asset_code === 'BUDGET_POINTS')
+      // budget_points（is_enabled=0，系统内部资产）不应出现在背包资产列表中
+      const hasBudgetPoints = assets.some(a => a.asset_code === 'budget_points')
       expect(hasBudgetPoints).toBe(false)
 
-      // DIAMOND_QUOTA（form=quota，配额类资产）不应出现在背包资产列表中
-      const hasQuota = assets.some(a => a.asset_code === 'DIAMOND_QUOTA')
+      // star_stone_quota（form=quota，配额类资产）不应出现在背包资产列表中
+      const hasQuota = assets.some(a => a.asset_code === 'star_stone_quota')
       expect(hasQuota).toBe(false)
     })
 

@@ -729,7 +729,7 @@ export const ContentAPI = {
    * @param {Object} data - 补偿数据
    * @param {number} data.user_id - 目标用户ID
    * @param {string} data.reason - 补偿原因
-   * @param {Array} data.items - 补偿项目列表 [{type:'asset',asset_code:'DIAMOND',amount:100}]
+   * @param {Array} data.items - 补偿项目列表 [{type:'asset',asset_code:'star_stone',amount:100}]
    * @param {number} [data.session_id] - 关联会话ID
    * @param {number} [data.issue_id] - 关联工单ID
    * @returns {Promise<Object>} 补偿结果

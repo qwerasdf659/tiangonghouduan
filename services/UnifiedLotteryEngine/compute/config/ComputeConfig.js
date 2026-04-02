@@ -953,7 +953,7 @@ class DynamicConfigLoader {
    *
    * 默认值来源链：DB活动级配置 → isFeatureEnabled(全局开关) → default_value
    *
-   * @param {string} config_group - 策略分组（如 pity / anti_empty / diamond_quota / tier_fallback）
+   * @param {string} config_group - 策略分组（如 pity / anti_empty / star_stone_quota / tier_fallback）
    * @param {boolean} [default_value=true] - DB 无记录时的默认值
    * @param {Object} [options={}] - 透传给 getValue 的选项
    * @param {number} [options.lottery_campaign_id] - 活动ID

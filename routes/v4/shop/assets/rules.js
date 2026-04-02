@@ -31,8 +31,8 @@ const logger = require('../../../../utils/logger').logger
  *     "rules": [
  *       {
  *         "rule_id": 1,
- *         "from_asset_code": "red_shard",
- *         "to_asset_code": "DIAMOND",
+ *         "from_asset_code": "red_core_shard",
+ *         "to_asset_code": "star_stone",
  *         "from_amount": 1,
  *         "to_amount": 20,
  *         "conversion_rate": "1:20",
@@ -45,11 +45,11 @@ const logger = require('../../../../utils/logger').logger
  *         "fee": {
  *           "fee_rate": 0.05,
  *           "fee_min_amount": 10,
- *           "fee_asset_code": "DIAMOND"
+ *           "fee_asset_code": "star_stone"
  *         },
  *         "display": {
- *           "title": "红水晶碎片分解",
- *           "description": "将红水晶碎片分解为钻石",
+ *           "title": "红源晶碎片分解",
+ *           "description": "将红源晶碎片分解为星石",
  *           "display_icon": "/icons/red-shard.png",
  *           "risk_level": "low"
  *         }

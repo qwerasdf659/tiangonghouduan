@@ -19,6 +19,7 @@
 'use strict'
 
 const models = require('../models')
+const { AssetCode } = require('../constants/AssetCode')
 const logger = require('../utils/logger')
 const BeijingTimeHelper = require('../utils/timeHelper')
 const { Op } = require('sequelize')
@@ -52,7 +53,7 @@ const DATA_SOURCE_CONFIG = {
       avg_points: 'AVG(available_amount)',
       user_count: 'COUNT(DISTINCT user_id)'
     },
-    filter: { asset_code: 'POINTS' }
+    filter: { asset_code: AssetCode.POINTS }
   },
 
   /**

@@ -24,6 +24,7 @@
 const { ContentReviewRecord, User } = require('../models')
 // V4.7.0 AssetService 拆分：使用子服务替代原 AssetService
 const BalanceService = require('./asset/BalanceService')
+const { AssetCode } = require('../constants/AssetCode')
 const AuditLogService = require('./AuditLogService')
 const ContentAuditEngine = require('./ContentAuditEngine')
 const BeijingTimeHelper = require('../utils/timeHelper')
@@ -166,7 +167,7 @@ class MerchantPointsService {
     await BalanceService.changeBalance(
       {
         user_id: userId,
-        asset_code: 'POINTS',
+        asset_code: AssetCode.POINTS,
         delta_amount: pointsAmount,
         business_type: 'merchant_points_reward',
         idempotency_key: `merchant_points_reward:${auditId}`,

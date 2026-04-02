@@ -170,7 +170,7 @@ describe('📊 任务11.3：保底触发完整链路测试', () => {
       .set('Authorization', `Bearer ${adminToken}`)
       .send({
         user_id: testUserId,
-        asset_code: 'POINTS',
+        asset_code: 'points',
         amount: GRANT_POINTS_AMOUNT,
         reason: '测试任务11.3-保底链路测试积分补充',
         idempotency_key: generateIdempotencyKey('pity_grant', 0)

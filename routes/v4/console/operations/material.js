@@ -100,8 +100,8 @@ router.get('/conversion-rules/:id', authenticateToken, requireRoleLevel(100), as
  * POST /api/v4/console/material/conversion-rules
  *
  * Body参数（必填）：
- * - from_asset_code: 源资产代码（如 'red_shard'）
- * - to_asset_code: 目标资产代码（如 'DIAMOND'）
+ * - from_asset_code: 源资产代码（如 'red_core_shard'）
+ * - to_asset_code: 目标资产代码（如 'star_stone'）
  * - from_amount: 源资产数量（如 1）
  * - to_amount: 目标资产数量（如 20）
  * - effective_at: 生效时间（ISO8601格式，如 '2025-12-20T00:00:00.000+08:00'）
@@ -308,7 +308,7 @@ router.get('/asset-types', authenticateToken, requireRoleLevel(100), async (req,
  * GET /api/v4/console/material/asset-types/:code
  *
  * @description 配置实体使用业务码（:code）作为标识符
- * @param {string} code - 资产类型代码（如 red_shard、DIAMOND）
+ * @param {string} code - 资产类型代码（如 red_core_shard、star_stone）
  *
  * API路径参数设计规范 V2.2：
  * - 配置实体使用 :code 占位符
@@ -337,8 +337,8 @@ router.get('/asset-types/:code', authenticateToken, requireRoleLevel(100), async
  * POST /api/v4/console/material/asset-types
  *
  * Body参数（必填）：
- * - asset_code: 资产代码（如 'red_shard'，必须唯一）
- * - display_name: 展示名称（如 '红水晶碎片'）
+ * - asset_code: 资产代码（如 'red_core_shard'，必须唯一）
+ * - display_name: 展示名称（如 '红源晶碎片'）
  * - group_code: 分组代码（如 'red'）
  * - form: 形态（'shard' 或 'crystal'）
  * - tier: 层级（数字，如 1）
@@ -414,7 +414,7 @@ router.post('/asset-types', authenticateToken, requireRoleLevel(100), async (req
  * PUT /api/v4/console/material/asset-types/:code
  *
  * @description 配置实体使用业务码（:code）作为标识符
- * @param {string} code - 资产类型代码（如 red_shard、DIAMOND）
+ * @param {string} code - 资产类型代码（如 red_core_shard、star_stone）
  *
  * API路径参数设计规范 V2.2：
  * - 配置实体使用 :code 占位符
@@ -497,7 +497,7 @@ router.put('/asset-types/:code', authenticateToken, requireRoleLevel(100), async
  * PUT /api/v4/console/material/asset-types/:code/disable
  *
  * @description 配置实体使用业务码（:code）作为标识符
- * @param {string} code - 资产类型代码（如 red_shard、DIAMOND）
+ * @param {string} code - 资产类型代码（如 red_core_shard、star_stone）
  *
  * API路径参数设计规范 V2.2：
  * - 配置实体使用 :code 占位符

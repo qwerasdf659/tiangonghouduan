@@ -26,21 +26,21 @@ import { SYSTEM_ADMIN_ENDPOINTS } from '../../../api/system/admin.js'
  * 与 public/assets/icons/materials/_mapping.js 保持同步
  */
 const MATERIAL_ICON_MAP = {
-  DIAMOND: '/admin/assets/icons/materials/diamond.png',
-  POINTS: '/admin/assets/icons/materials/points.png',
-  BUDGET_POINTS: '/admin/assets/icons/materials/budget-points.png',
-  red_shard: '/admin/assets/icons/materials/red-shard.png',
-  red_crystal: '/admin/assets/icons/materials/red-crystal.png',
-  orange_shard: '/admin/assets/icons/materials/orange-shard.png',
-  orange_crystal: '/admin/assets/icons/materials/orange-crystal.png',
-  yellow_shard: '/admin/assets/icons/materials/yellow-shard.png',
-  yellow_crystal: '/admin/assets/icons/materials/yellow-crystal.png',
-  green_shard: '/admin/assets/icons/materials/green-shard.png',
-  green_crystal: '/admin/assets/icons/materials/green-crystal.png',
-  blue_shard: '/admin/assets/icons/materials/blue-shard.png',
-  blue_crystal: '/admin/assets/icons/materials/blue-crystal.png',
-  purple_shard: '/admin/assets/icons/materials/purple-shard.png',
-  purple_crystal: '/admin/assets/icons/materials/purple-crystal.png'
+  star_stone: '/admin/assets/icons/materials/star-stone.png',
+  points: '/admin/assets/icons/materials/points.png',
+  budget_points: '/admin/assets/icons/materials/budget-points.png',
+  red_core_shard: '/admin/assets/icons/materials/red-shard.png',
+  red_core_gem: '/admin/assets/icons/materials/red-crystal.png',
+  orange_core_shard: '/admin/assets/icons/materials/orange-shard.png',
+  orange_core_gem: '/admin/assets/icons/materials/orange-crystal.png',
+  yellow_core_shard: '/admin/assets/icons/materials/yellow-shard.png',
+  yellow_core_gem: '/admin/assets/icons/materials/yellow-crystal.png',
+  green_core_shard: '/admin/assets/icons/materials/green-shard.png',
+  green_core_gem: '/admin/assets/icons/materials/green-crystal.png',
+  blue_core_shard: '/admin/assets/icons/materials/blue-shard.png',
+  blue_core_gem: '/admin/assets/icons/materials/blue-crystal.png',
+  purple_core_shard: '/admin/assets/icons/materials/purple-shard.png',
+  purple_core_gem: '/admin/assets/icons/materials/purple-crystal.png'
 }
 
 /** 风险等级中文映射 */
@@ -126,21 +126,21 @@ const GROUP_CONFIG = {
 
 /** 资产代码 → 标签样式（规则表格中展示用） */
 const ASSET_TAG_STYLES = {
-  POINTS: 'bg-amber-100 text-amber-800',
-  DIAMOND: 'bg-sky-100 text-sky-800',
-  BUDGET_POINTS: 'bg-amber-50 text-amber-700',
-  red_shard: 'bg-red-100 text-red-700',
-  red_crystal: 'bg-red-200 text-red-800',
-  orange_shard: 'bg-orange-100 text-orange-700',
-  orange_crystal: 'bg-orange-200 text-orange-800',
-  yellow_shard: 'bg-yellow-100 text-yellow-700',
-  yellow_crystal: 'bg-yellow-200 text-yellow-800',
-  green_shard: 'bg-green-100 text-green-700',
-  green_crystal: 'bg-green-200 text-green-800',
-  blue_shard: 'bg-blue-100 text-blue-700',
-  blue_crystal: 'bg-blue-200 text-blue-800',
-  purple_shard: 'bg-purple-100 text-purple-700',
-  purple_crystal: 'bg-purple-200 text-purple-800'
+  points: 'bg-amber-100 text-amber-800',
+  star_stone: 'bg-sky-100 text-sky-800',
+  budget_points: 'bg-amber-50 text-amber-700',
+  red_core_shard: 'bg-red-100 text-red-700',
+  red_core_gem: 'bg-red-200 text-red-800',
+  orange_core_shard: 'bg-orange-100 text-orange-700',
+  orange_core_gem: 'bg-orange-200 text-orange-800',
+  yellow_core_shard: 'bg-yellow-100 text-yellow-700',
+  yellow_core_gem: 'bg-yellow-200 text-yellow-800',
+  green_core_shard: 'bg-green-100 text-green-700',
+  green_core_gem: 'bg-green-200 text-green-800',
+  blue_core_shard: 'bg-blue-100 text-blue-700',
+  blue_core_gem: 'bg-blue-200 text-blue-800',
+  purple_core_shard: 'bg-purple-100 text-purple-700',
+  purple_core_gem: 'bg-purple-200 text-purple-800'
 }
 
 document.addEventListener('alpine:init', () => {

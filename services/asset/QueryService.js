@@ -35,6 +35,7 @@
 'use strict'
 
 const { Op } = require('sequelize')
+const { AssetCode } = require('../../constants/AssetCode')
 const {
   Account,
   AccountAssetBalance,
@@ -86,7 +87,7 @@ class QueryService {
     const result = await AccountAssetBalance.sum('available_amount', {
       where: {
         account_id: account.account_id,
-        asset_code: 'BUDGET_POINTS'
+        asset_code: AssetCode.BUDGET_POINTS
       },
       transaction
     })
@@ -141,7 +142,7 @@ class QueryService {
     const result = await AccountAssetBalance.sum('available_amount', {
       where: {
         account_id: account.account_id,
-        asset_code: 'BUDGET_POINTS',
+        asset_code: AssetCode.BUDGET_POINTS,
         lottery_campaign_id: { [Op.in]: campaignIdStrings }
       },
       transaction
@@ -265,8 +266,8 @@ class QueryService {
    * 获取用户资产总览（统一资产域入口）
    *
    * 整合三个资产域：
-   * 1. 积分（POINTS） - 来自 account_asset_balances（asset_code='POINTS'）
-   * 2. 可叠加资产（DIAMOND、材料） - 来自 account_asset_balances
+   * 1. 积分（POINTS） - 来自 account_asset_balances（asset_code='points'）
+   * 2. 可叠加资产（star_stone、材料） - 来自 account_asset_balances
    * 3. 不可叠加物品 - 来自 items（三表模型：items + item_ledger + item_holds）
    *
    * 业务场景：
@@ -328,14 +329,14 @@ class QueryService {
 
       for (const balance of balances) {
         // 跳过系统内部资产类型（BUDGET_POINTS 不暴露给前端）
-        if (balance.asset_code === 'BUDGET_POINTS') {
+        if (balance.asset_code === AssetCode.BUDGET_POINTS) {
           continue
         }
 
         const materialInfo = materialTypeMap.get(balance.asset_code)
 
         // 🆕 方案C：从 POINTS 资产中提取积分数据
-        if (balance.asset_code === 'POINTS') {
+        if (balance.asset_code === AssetCode.POINTS) {
           points = {
             available: Number(balance.available_amount),
             frozen: Number(balance.frozen_amount),
@@ -441,7 +442,7 @@ class QueryService {
    * 业务场景：后台运营导出资产报表
    *
    * @param {Object} params - 筛选参数
-   * @param {string} [params.asset_type] - 资产类型筛选（如 POINTS, DIAMOND）
+   * @param {string} [params.asset_type] - 资产类型筛选（如 POINTS, star_stone）
    * @param {string} [params.status] - 状态筛选（预留，暂不使用）
    * @param {number} [params.user_id] - 指定用户ID筛选
    * @param {number} [params.limit=1000] - 返回数据条数限制
@@ -451,7 +452,7 @@ class QueryService {
    *
    * @example
    * // 导出所有POINTS资产
-   * const data = await QueryService.getBalancesForExport({ asset_type: 'POINTS', limit: 5000 })
+   * const data = await QueryService.getBalancesForExport({ asset_type: 'points', limit: 5000 })
    *
    * @since 2026
    */
@@ -585,11 +586,11 @@ class QueryService {
    *
    * @param {Object} params - 参数对象
    * @param {number} params.user_id - 用户ID（必填）
-   * @param {string} [params.asset_code='POINTS'] - 资产代码（默认查询 POINTS）
+   * @param {string} [params.asset_code='points'] - 资产代码（默认查询 POINTS）
    * @returns {Promise<Object>} 今日汇总 {today_earned, today_consumed, transaction_count}
    */
   static async getTodaySummary(params) {
-    const { user_id, asset_code = 'POINTS' } = params
+    const { user_id, asset_code = AssetCode.POINTS } = params
 
     if (!user_id) {
       throw new Error('getTodaySummary: user_id 参数必填')

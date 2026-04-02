@@ -162,13 +162,13 @@ module.exports = sequelize => {
       from_asset_code: {
         type: DataTypes.STRING(50),
         allowNull: false,
-        comment: '源资产代码（兑换输入）：如 red_shard'
+        comment: '源资产代码（兑换输入）：如 red_core_shard'
       },
 
       to_asset_code: {
         type: DataTypes.STRING(50),
         allowNull: false,
-        comment: '目标资产代码（兑换输出）：如 DIAMOND'
+        comment: '目标资产代码（兑换输出）：如 star_stone'
       },
 
       rate_numerator: {

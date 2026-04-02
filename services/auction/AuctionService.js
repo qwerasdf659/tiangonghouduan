@@ -27,6 +27,7 @@
 'use strict'
 
 const logger = require('../../utils/logger').logger
+const { AssetCode } = require('../../constants/AssetCode')
 const BalanceService = require('../asset/BalanceService')
 const ItemService = require('../asset/ItemService')
 const FeeCalculator = require('../FeeCalculator')
@@ -35,7 +36,7 @@ const { Op } = require('sequelize')
 /**
  * 竞价资产硬编码黑名单（与 BidService 共享，决策1）
  */
-const BID_FORBIDDEN_ASSETS = ['POINTS', 'BUDGET_POINTS']
+const BID_FORBIDDEN_ASSETS = [AssetCode.POINTS, AssetCode.BUDGET_POINTS]
 
 /* eslint-disable valid-jsdoc, require-jsdoc */
 async function balanceFreeze(BS, payload, transaction) {
@@ -110,7 +111,7 @@ class AuctionService {
    * @param {number} userId - 卖方用户ID
    * @param {number} itemId - 拍卖物品ID
    * @param {Object} params - 拍卖参数
-   * @param {string} [params.price_asset_code='DIAMOND'] - 出价资产类型
+   * @param {string} [params.price_asset_code=AssetCode.STAR_STONE] - 出价资产类型（星石）
    * @param {number} params.start_price - 起拍价
    * @param {number} [params.min_bid_increment=10] - 最小加价幅度
    * @param {number|null} [params.buyout_price=null] - 一口价
@@ -127,7 +128,7 @@ class AuctionService {
     }
 
     const {
-      price_asset_code = 'DIAMOND',
+      price_asset_code = AssetCode.STAR_STONE,
       start_price,
       min_bid_increment = 10,
       buyout_price = null,

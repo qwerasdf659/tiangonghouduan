@@ -71,14 +71,14 @@ module.exports = sequelize => {
         comment: '计费日期'
       },
 
-      amount_diamond: {
+      amount_star_stone: {
         type: DataTypes.INTEGER,
         allowNull: false,
         validate: {
           notEmpty: { msg: '计费金额不能为空' },
           min: { args: [0], msg: '计费金额不能为负数' }
         },
-        comment: '计费金额（钻石）'
+        comment: '计费金额（星石）'
       },
 
       billing_type: {

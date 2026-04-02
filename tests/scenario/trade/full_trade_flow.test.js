@@ -50,8 +50,8 @@ const {
 } = require('../../helpers/test-points-setup')
 
 // 测试配置
-const TEST_ASSET_CODE = 'DIAMOND' // 默认结算币种
-const TEST_OFFER_ASSET = 'red_shard' // 可叠加资产类型
+const TEST_ASSET_CODE = 'star_stone' // 默认结算币种
+const TEST_OFFER_ASSET = 'red_core_shard' // 可叠加资产类型
 const PLATFORM_FEE_RATE = 0.05 // 平台手续费率 5%
 
 /**
@@ -155,8 +155,8 @@ describe('【8.6】完整交易流程测试 - 挂单→购买→交割', () => {
   describe('场景1：可叠加资产挂牌交易完整流程', () => {
     let listingId
     let orderId
-    const offerAmount = 100 // 出售100个 red_shard
-    const priceAmount = 500 // 定价500 DIAMOND
+    const offerAmount = 100 // 出售100个 red_core_shard
+    const priceAmount = 500 // 定价500 star_stone
 
     test('步骤1：卖家创建挂牌', async () => {
       const idempotencyKey = `listing_fungible_${sellerUserId}_${Date.now()}_${uuidv4().slice(0, 8)}`
@@ -224,7 +224,7 @@ describe('【8.6】完整交易流程测试 - 挂单→购买→交割', () => {
         return
       }
 
-      // 记录买家购买前的 DIAMOND 余额
+      // 记录买家购买前的 star_stone 余额
       const buyerBalanceBefore = await getBalance(buyerUserId, TEST_ASSET_CODE)
       console.log(`📊 买家 ${TEST_ASSET_CODE} 余额（购买前）: ${buyerBalanceBefore}`)
 
@@ -262,7 +262,7 @@ describe('【8.6】完整交易流程测试 - 挂单→购买→交割', () => {
         throw error
       }
 
-      // 验证买家 DIAMOND 已冻结
+      // 验证买家 star_stone 已冻结
       const buyerBalance = await getBalanceDetails(buyerUserId, TEST_ASSET_CODE)
       console.log(
         `📊 买家 ${TEST_ASSET_CODE} 余额（下单后）: available=${buyerBalance.available}, frozen=${buyerBalance.frozen}`
@@ -333,7 +333,7 @@ describe('【8.6】完整交易流程测试 - 挂单→购买→交割', () => {
 
       /*
        * 验证资产转移
-       * 1. 卖家应该收到 DIAMOND（扣除手续费后）
+       * 1. 卖家应该收到 star_stone（扣除手续费后）
        */
       const sellerDiamondAfter = await getBalance(sellerUserId, TEST_ASSET_CODE)
       const netAmount = priceAmount * (1 - PLATFORM_FEE_RATE) // 扣除5%手续费
@@ -347,7 +347,7 @@ describe('【8.6】完整交易流程测试 - 挂单→购买→交割', () => {
       expect(sellerReceived).toBeGreaterThanOrEqual(netAmount - 1)
       expect(sellerReceived).toBeLessThanOrEqual(netAmount + 1)
 
-      // 2. 买家应该收到 red_shard
+      // 2. 买家应该收到 red_core_shard
       const buyerOfferAssetAfter = await getBalance(buyerUserId, TEST_OFFER_ASSET)
       const buyerReceived = buyerOfferAssetAfter - buyerOfferAssetBefore
 
@@ -788,10 +788,10 @@ async function cleanupActiveListings(userId) {
 async function ensureSellerAssets() {
   const sellerUserId = await getRealTestUserId()
 
-  // 确保卖家有 red_shard（用于挂牌出售）
+  // 确保卖家有 red_core_shard（用于挂牌出售）
   await ensureBalance(sellerUserId, TEST_OFFER_ASSET, 1000)
 
-  // 确保卖家有 DIAMOND（用于接收支付）
+  // 确保卖家有 star_stone（用于接收支付）
   await ensureBalance(sellerUserId, TEST_ASSET_CODE, 100)
 }
 
@@ -810,10 +810,10 @@ async function ensureBuyerAssets() {
   })
 
   if (buyerUser) {
-    // 确保买家有 DIAMOND（用于购买）
+    // 确保买家有 star_stone（用于购买）
     await ensureBalance(buyerUser.user_id, TEST_ASSET_CODE, 10000)
 
-    // 确保买家有少量 red_shard（用于接收交易物品）
+    // 确保买家有少量 red_core_shard（用于接收交易物品）
     await ensureBalance(buyerUser.user_id, TEST_OFFER_ASSET, 100)
   }
 }

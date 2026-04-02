@@ -18,7 +18,7 @@
  *    - 初始状态：created
  * 2. 冻结资产
  *    - 锁定挂牌：market_listings.status=on_sale → locked
- *    - 冻结买家 DIAMOND：通过 BalanceService 冻结 gross_amount
+ *    - 冻结买家星石：通过 BalanceService 冻结 gross_amount
  *    - 更新订单状态：created → frozen
  * 3. 成交结算
  *    - 多分录写入：买家扣减、卖家入账、平台手续费
@@ -26,7 +26,7 @@
  *    - 更新订单状态：frozen → completed
  *    - 更新挂牌状态：locked → sold
  * 4. 取消订单
- *    - 解冻买家 DIAMOND
+ *    - 解冻买家星石
  *    - 更新订单状态：frozen → cancelled
  *    - 回滚挂牌状态：locked → on_sale
  *
@@ -141,9 +141,9 @@ module.exports = sequelize => {
       asset_code: {
         type: DataTypes.STRING(50),
         allowNull: false,
-        defaultValue: 'DIAMOND',
+        defaultValue: 'star_stone',
         comment:
-          '结算资产代码（Asset Code）：交易市场结算币种，固定为 DIAMOND；业务规则：前端和后端都强制校验只允许 DIAMOND'
+          '结算资产代码（Asset Code）：交易市场结算币种，固定为星石（star_stone）；业务规则：前端和后端都强制校验只允许 star_stone'
       },
 
       // 对账金额字段（强校验：gross_amount = fee_amount + net_amount）
@@ -151,7 +151,7 @@ module.exports = sequelize => {
         type: DataTypes.BIGINT,
         allowNull: false,
         comment:
-          '买家支付总额（Gross Amount）：买家本次交易支付的总金额，单位为 asset_code（DIAMOND）；业务规则：必须 >0，等于 fee_amount + net_amount'
+          '买家支付总额（Gross Amount）：买家本次交易支付的总金额，单位为 asset_code（star_stone）；业务规则：必须 >0，等于 fee_amount + net_amount'
       },
 
       fee_amount: {
@@ -159,14 +159,14 @@ module.exports = sequelize => {
         allowNull: false,
         defaultValue: 0,
         comment:
-          '平台手续费（Fee Amount）：从成交总额中拆分的平台手续费，单位为 asset_code（DIAMOND）；业务规则：≥0，手续费入系统账户 SYSTEM_PLATFORM_FEE'
+          '平台手续费（Fee Amount）：从成交总额中拆分的平台手续费，单位为 asset_code（star_stone）；业务规则：≥0，手续费入系统账户 SYSTEM_PLATFORM_FEE'
       },
 
       net_amount: {
         type: DataTypes.BIGINT,
         allowNull: false,
         comment:
-          '卖家实收金额（Net Amount）：卖家实际收到的金额，单位为 asset_code（DIAMOND）；业务规则：必须 >0，等于 gross_amount - fee_amount'
+          '卖家实收金额（Net Amount）：卖家实际收到的金额，单位为 asset_code（star_stone）；业务规则：必须 >0，等于 gross_amount - fee_amount'
       },
 
       // 订单状态

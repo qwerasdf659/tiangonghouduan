@@ -28,11 +28,11 @@ const {
 describe('交易市场资产黑名单功能 (P0-4)', () => {
   describe('MARKET_BLACKLISTED_ASSET_CODES - 黑名单常量', () => {
     test('POINTS 应该在黑名单中', () => {
-      expect(MARKET_BLACKLISTED_ASSET_CODES).toContain('POINTS')
+      expect(MARKET_BLACKLISTED_ASSET_CODES).toContain('points')
     })
 
     test('BUDGET_POINTS 应该在黑名单中', () => {
-      expect(MARKET_BLACKLISTED_ASSET_CODES).toContain('BUDGET_POINTS')
+      expect(MARKET_BLACKLISTED_ASSET_CODES).toContain('budget_points')
     })
 
     test('黑名单应该是不可变的（Object.freeze）', () => {
@@ -48,11 +48,11 @@ describe('交易市场资产黑名单功能 (P0-4)', () => {
 
   describe('isBlacklistedForMarket - 黑名单检查函数', () => {
     test('POINTS 应该被识别为禁止交易', () => {
-      expect(isBlacklistedForMarket('POINTS')).toBe(true)
+      expect(isBlacklistedForMarket('points')).toBe(true)
     })
 
     test('BUDGET_POINTS 应该被识别为禁止交易', () => {
-      expect(isBlacklistedForMarket('BUDGET_POINTS')).toBe(true)
+      expect(isBlacklistedForMarket('budget_points')).toBe(true)
     })
 
     test('非黑名单资产应该返回 false', () => {
@@ -64,7 +64,7 @@ describe('交易市场资产黑名单功能 (P0-4)', () => {
     test('应该区分大小写', () => {
       expect(isBlacklistedForMarket('points')).toBe(false)
       expect(isBlacklistedForMarket('Points')).toBe(false)
-      expect(isBlacklistedForMarket('POINTS')).toBe(true)
+      expect(isBlacklistedForMarket('points')).toBe(true)
     })
 
     test('空字符串应该返回 false', () => {
@@ -79,14 +79,14 @@ describe('交易市场资产黑名单功能 (P0-4)', () => {
 
   describe('getBlacklistReason - 获取禁止原因', () => {
     test('POINTS 应该返回系统积分禁止交易原因', () => {
-      const reason = getBlacklistReason('POINTS')
+      const reason = getBlacklistReason('points')
       expect(reason).not.toBeNull()
       expect(reason).toContain('系统积分')
       expect(reason).toContain('禁止')
     })
 
     test('BUDGET_POINTS 应该返回预算积分禁止交易原因', () => {
-      const reason = getBlacklistReason('BUDGET_POINTS')
+      const reason = getBlacklistReason('budget_points')
       expect(reason).not.toBeNull()
       expect(reason).toContain('预算积分')
       expect(reason).toContain('禁止')
@@ -100,7 +100,7 @@ describe('交易市场资产黑名单功能 (P0-4)', () => {
 
   describe('validateMarketTradability - 综合验证函数', () => {
     test('POINTS 验证应该返回不允许交易', () => {
-      const result = validateMarketTradability('POINTS')
+      const result = validateMarketTradability('points')
 
       expect(result.allowed).toBe(false)
       expect(result.reason).not.toBeNull()
@@ -108,7 +108,7 @@ describe('交易市场资产黑名单功能 (P0-4)', () => {
     })
 
     test('BUDGET_POINTS 验证应该返回不允许交易', () => {
-      const result = validateMarketTradability('BUDGET_POINTS')
+      const result = validateMarketTradability('budget_points')
 
       expect(result.allowed).toBe(false)
       expect(result.reason).not.toBeNull()
@@ -126,7 +126,7 @@ describe('交易市场资产黑名单功能 (P0-4)', () => {
 
   describe('createMarketBlacklistError - 创建错误对象', () => {
     test('应该创建带有正确错误码的错误对象', () => {
-      const error = createMarketBlacklistError('POINTS', '系统积分')
+      const error = createMarketBlacklistError('points', '系统积分')
 
       expect(error).toBeInstanceOf(Error)
       expect(error.code).toBe('ASSET_MARKET_BLACKLISTED')
@@ -134,10 +134,10 @@ describe('交易市场资产黑名单功能 (P0-4)', () => {
     })
 
     test('错误对象应该包含详细信息', () => {
-      const error = createMarketBlacklistError('POINTS', '系统积分')
+      const error = createMarketBlacklistError('points', '系统积分')
 
       expect(error.details).toBeDefined()
-      expect(error.details.asset_code).toBe('POINTS')
+      expect(error.details.asset_code).toBe('points')
       expect(error.details.display_name).toBe('系统积分')
       expect(error.details.reason).toBeDefined()
       expect(error.details.blacklist_source).toBe('HARDCODED_PROTECTION')
@@ -145,7 +145,7 @@ describe('交易市场资产黑名单功能 (P0-4)', () => {
     })
 
     test('错误消息应该包含资产名称', () => {
-      const error = createMarketBlacklistError('POINTS', '系统积分')
+      const error = createMarketBlacklistError('points', '系统积分')
 
       expect(error.message).toContain('系统积分')
       expect(error.message).toContain('禁止')
@@ -165,7 +165,7 @@ describe('交易市场资产黑名单功能 (P0-4)', () => {
 
   describe('P0-4业务场景验证', () => {
     test('场景1：用户尝试挂卖 POINTS（应被拒绝）', () => {
-      const asset_code = 'POINTS'
+      const asset_code = 'points'
 
       expect(isBlacklistedForMarket(asset_code)).toBe(true)
 
@@ -175,7 +175,7 @@ describe('交易市场资产黑名单功能 (P0-4)', () => {
     })
 
     test('场景2：用户尝试挂卖 BUDGET_POINTS（应被拒绝）', () => {
-      const asset_code = 'BUDGET_POINTS'
+      const asset_code = 'budget_points'
 
       expect(isBlacklistedForMarket(asset_code)).toBe(true)
 
@@ -193,7 +193,7 @@ describe('交易市场资产黑名单功能 (P0-4)', () => {
     })
 
     test('场景4：错误信息应该对用户友好', () => {
-      const error = createMarketBlacklistError('POINTS', '系统积分')
+      const error = createMarketBlacklistError('points', '系统积分')
 
       expect(error.message).toMatch(/[\u4e00-\u9fa5]/)
       expect(error.details.suggestion).toMatch(/[\u4e00-\u9fa5]/)

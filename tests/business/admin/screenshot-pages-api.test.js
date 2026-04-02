@@ -98,13 +98,13 @@ describe('截图页面API联动测试', () => {
     test('支持按资产类型筛选', async () => {
       const res = await request(app)
         .get(`${API_BASE}/console/assets/transactions`)
-        .query({ user_id: 31, asset_code: 'DIAMOND', page: 1, page_size: 5 })
+        .query({ user_id: 31, asset_code: 'star_stone', page: 1, page_size: 5 })
         .set('Authorization', `Bearer ${token}`)
 
       expect(res.body.success).toBe(true)
       if (res.body.data.transactions.length > 0) {
         res.body.data.transactions.forEach(tx => {
-          expect(tx.asset_code).toBe('DIAMOND')
+          expect(tx.asset_code).toBe('star_stone')
         })
       }
     })
@@ -311,8 +311,8 @@ describe('截图页面API联动测试', () => {
       expect(res.body.data.asset_types.length).toBeGreaterThan(0)
 
       const codes = res.body.data.asset_types.map(t => t.asset_code)
-      expect(codes).toContain('POINTS')
-      expect(codes).toContain('DIAMOND')
+      expect(codes).toContain('points')
+      expect(codes).toContain('star_stone')
     })
   })
 })

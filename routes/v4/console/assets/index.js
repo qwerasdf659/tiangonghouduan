@@ -76,7 +76,7 @@ router.get('/stats', authenticateToken, requireRoleLevel(100), async (req, res) 
  * @description 导出系统资产数据，支持筛选条件和多种格式
  * @access Admin (role_level >= 100)
  *
- * @query {string} [type] - 资产类型筛选（如 POINTS, DIAMOND, 材料代码）
+ * @query {string} [type] - 资产类型筛选（如 POINTS, star_stone, 材料代码）
  * @query {string} [status] - 状态筛选（如 active, frozen）
  * @query {string} [format=excel] - 导出格式：excel | csv
  * @query {number} [user_id] - 筛选指定用户的资产

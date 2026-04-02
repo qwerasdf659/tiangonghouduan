@@ -356,7 +356,7 @@ describe('🔴 P0级回归测试入口 - 核心业务路径', () => {
 
         const balance = await BalanceService.getBalance({
           user_id: testUserId,
-          asset_code: 'DIAMOND'
+          asset_code: 'star_stone'
         })
 
         expect(balance).toHaveProperty('available_amount')
@@ -365,7 +365,7 @@ describe('🔴 P0级回归测试入口 - 核心业务路径', () => {
 
         console.log('   ✅ 余额查询成功')
         console.log(
-          `   💎 DIAMOND: 可用=${balance.available_amount}, 冻结=${balance.frozen_amount}`
+          `   💎 star_stone: 可用=${balance.available_amount}, 冻结=${balance.frozen_amount}`
         )
       } catch (error) {
         console.warn(`   ⚠️ 余额查询警告: ${error.message}`)

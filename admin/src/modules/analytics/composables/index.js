@@ -10,8 +10,8 @@
 // 消费记录模块
 import { useConsumptionState, useConsumptionMethods } from './consumption.js'
 
-// 钻石账户模块
-import { useDiamondAccountsState, useDiamondAccountsMethods } from './diamond-accounts.js'
+// 星石账户模块
+import { useStarStoneAccountsState, useStarStoneAccountsMethods } from './star-stone-accounts.js'
 
 // 商户积分模块
 import { useMerchantPointsState, useMerchantPointsMethods } from './merchant-points.js'
@@ -29,7 +29,7 @@ import { useMerchantLogsState, useMerchantLogsMethods } from './merchant-logs.js
 import { useDashboardOverviewState, useDashboardOverviewMethods } from './dashboard-overview.js'
 
 export { useConsumptionState, useConsumptionMethods }
-export { useDiamondAccountsState, useDiamondAccountsMethods }
+export { useStarStoneAccountsState, useStarStoneAccountsMethods }
 export { useMerchantPointsState, useMerchantPointsMethods }
 export { useDebtManagementState, useDebtManagementMethods }
 export { useCampaignBudgetState, useCampaignBudgetMethods }
@@ -40,8 +40,8 @@ export { useDashboardOverviewState, useDashboardOverviewMethods }
 export default {
   useConsumptionState,
   useConsumptionMethods,
-  useDiamondAccountsState,
-  useDiamondAccountsMethods,
+  useStarStoneAccountsState,
+  useStarStoneAccountsMethods,
   useMerchantPointsState,
   useMerchantPointsMethods,
   useDebtManagementState,

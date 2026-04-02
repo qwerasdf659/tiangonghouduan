@@ -81,7 +81,7 @@ class AdPricingService {
     const startDate = BeijingTimeHelper.daysAgo(lookbackDays)
 
     const [results] = await sequelize.query(
-      `SELECT AVG(amount_diamond) as avg_price
+      `SELECT AVG(amount_star_stone) as avg_price
        FROM ad_billing_records abr
        JOIN ad_campaigns ac ON abr.ad_campaign_id = ac.ad_campaign_id
        JOIN ad_slots s ON ac.ad_slot_id = s.ad_slot_id
@@ -145,8 +145,8 @@ class AdPricingService {
       throw new Error(`广告位不存在: ${ad_slot_id}`)
     }
 
-    const basePrice = slot.daily_price_diamond || 0
-    const minDailyPrice = slot.min_daily_price_diamond || 0
+    const basePrice = slot.daily_price_star_stone || 0
+    const minDailyPrice = slot.min_daily_price_star_stone || 0
 
     const dauResult = await AdPricingService.getCurrentDauCoefficient()
     const adjustedPrice = Math.ceil(basePrice * dauResult.coefficient)
@@ -193,7 +193,7 @@ class AdPricingService {
 
       const priceResult = await AdPricingService.calculateDynamicFloorPrice(slot.slot_key)
       if (priceResult.floor_price !== null && priceResult.floor_price > 0) {
-        await slot.update({ min_bid_diamond: priceResult.floor_price })
+        await slot.update({ min_bid_star_stone: priceResult.floor_price })
         results.push({
           slot_key: slot.slot_key,
           action: 'updated',

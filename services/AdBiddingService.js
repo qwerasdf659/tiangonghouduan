@@ -66,8 +66,8 @@ class AdBiddingService {
           start_date: { [Op.lte]: now },
           end_date: { [Op.gte]: now },
           [Op.or]: [
-            { budget_total_diamond: null },
-            { budget_total_diamond: { [Op.gt]: sequelize.col('budget_spent_diamond') } }
+            { budget_total_star_stone: null },
+            { budget_total_star_stone: { [Op.gt]: sequelize.col('budget_spent_star_stone') } }
           ]
         },
         include: [
@@ -121,7 +121,7 @@ class AdBiddingService {
                 ad_slot_id: adSlot.ad_slot_id,
                 ad_campaign_id: campaign.ad_campaign_id,
                 target_user_id: userId,
-                bid_amount_diamond: campaign.daily_bid_diamond || 0,
+                bid_amount_star_stone: campaign.daily_bid_star_stone || 0,
                 is_winner: false,
                 lose_reason: 'targeting_mismatch'
               },
@@ -145,7 +145,7 @@ class AdBiddingService {
       // 5. 各层内部排序
       systemCampaigns.sort((a, b) => (b.priority || 0) - (a.priority || 0))
       operationalCampaigns.sort((a, b) => (b.priority || 0) - (a.priority || 0))
-      biddingCampaigns.sort((a, b) => (b.daily_bid_diamond || 0) - (a.daily_bid_diamond || 0))
+      biddingCampaigns.sort((a, b) => (b.daily_bid_star_stone || 0) - (a.daily_bid_star_stone || 0))
 
       // 6. 合并：system 最先 → operational 其次 → commercial（固定包天 + 竞价）最后
       const allCandidates = [
@@ -166,7 +166,7 @@ class AdBiddingService {
           ad_slot_id: adSlot.ad_slot_id,
           ad_campaign_id: campaign.ad_campaign_id,
           target_user_id: userId,
-          bid_amount_diamond: campaign.daily_bid_diamond || 0,
+          bid_amount_star_stone: campaign.daily_bid_star_stone || 0,
           is_winner: isWinner,
           lose_reason: isWinner ? null : i >= adSlot.max_display_count ? 'outbid' : null
         })

@@ -43,8 +43,8 @@ describe('P1-1 余额边界测试', () => {
   // 测试数据
   let test_user_id
 
-  // 测试用资产代码（使用标准的 DIAMOND 资产进行测试）
-  const TEST_ASSET_CODE = 'DIAMOND'
+  // 测试用资产代码（使用标准的 star_stone 资产进行测试）
+  const TEST_ASSET_CODE = 'star_stone'
 
   beforeAll(async () => {
     // 从全局测试数据获取测试用户

@@ -304,7 +304,7 @@ models.AdCreative = require('./AdCreative')(sequelize, DataTypes)
 models.AdBillingRecord = require('./AdBillingRecord')(sequelize, DataTypes)
 /*
  * ✅ AdBillingRecord：广告计费流水
- *    - 用途：钻石冻结/扣款/退款/日扣费记录
+ *    - 用途：星石冻结/扣款/退款/日扣费记录
  *    - 表名：ad_billing_records，主键：ad_billing_record_id（BIGINT）
  */
 
@@ -496,7 +496,7 @@ models.AuctionBid = require('./AuctionBid')(sequelize, DataTypes)
 models.AssetTransaction = require('./AssetTransaction')(sequelize, DataTypes)
 /*
  * ✅ AssetTransaction：资产流水表（记录所有资产变动流水）
- *    - 用途：记录DIAMOND和材料资产的所有变动流水
+ *    - 用途：记录star_stone和材料资产的所有变动流水
  *    - 特点：业界标准幂等架构（idempotency_key唯一约束），delta_amount可正可负，记录变动后余额
  *    - 表名：asset_transactions，主键：asset_transaction_id，外键：account_id
  *    - 业务场景：市场购买（买家扣减、卖家入账、平台手续费）、兑换扣减、材料转换、对账审计
@@ -530,7 +530,7 @@ models.AccountAssetBalance = require('./AccountAssetBalance')(sequelize, DataTyp
  *    - 用途：管理每个账户的每种资产余额（支持冻结模型）
  *    - 特点：available_amount（可用余额）+ frozen_amount（冻结余额），交易市场必须走冻结链路
  *    - 表名：account_asset_balances，主键：balance_id，外键：account_id，唯一约束：(account_id, asset_code)
- *    - 业务场景：下单冻结买家DIAMOND → 成交从冻结扣减 → 取消解冻；挂牌冻结卖家标的 → 成交扣减 → 撤单解冻
+ *    - 业务场景：下单冻结买家star_stone → 成交从冻结扣减 → 取消解冻；挂牌冻结卖家标的 → 成交扣减 → 撤单解冻
  *    - 冻结操作：freeze（可用→冻结）、unfreeze（冻结→可用）、deductFromFrozen（从冻结扣减）
  */
 
@@ -669,7 +669,7 @@ models.MaterialConversionRule = require('./MaterialConversionRule')(sequelize, D
 models.ExchangeRate = require('./ExchangeRate')(sequelize, DataTypes)
 /*
  * ✅ ExchangeRate：固定汇率兑换规则
- *    - 用途：管理资产间的固定汇率兑换配置（如 10 red_shard = 1 DIAMOND）
+ *    - 用途：管理资产间的固定汇率兑换配置（如 10 red_core_shard = 1 star_stone）
  *    - 与 MaterialConversionRule 语义分离：材料转换是"合成"，汇率兑换是"货币兑换"
  *    - 表名：exchange_rates，主键：exchange_rate_id
  */
@@ -885,7 +885,7 @@ models.LotterySimulationRecord = require('./LotterySimulationRecord')(sequelize,
  *    - 业务场景：策略调参预览→模拟运行→对比分析→风险评估→一键应用→偏差追踪
  */
 
-// 🔴 用户消费比例覆盖（2026-03-02 钻石配额优化方案）
+// 🔴 用户消费比例覆盖（2026-03-02 星石配额优化方案）
 models.UserRatioOverride = require('./UserRatioOverride')(sequelize, DataTypes)
 
 // 🔴 审核链系统（2026-03-10 多级审核链）

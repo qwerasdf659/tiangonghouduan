@@ -535,7 +535,7 @@ describe('【P2-2】混合负载压力测试', () => {
       // 查询用户积分余额
       const balanceResult = await BalanceService.getBalance({
         user_id: testUserId,
-        asset_code: 'POINTS'
+        asset_code: 'points'
       })
 
       return {

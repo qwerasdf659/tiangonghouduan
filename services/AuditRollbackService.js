@@ -23,6 +23,7 @@ const logger = require('../utils/logger')
 const BeijingTimeHelper = require('../utils/timeHelper')
 const { Op } = require('sequelize')
 const { attachDisplayNames, DICT_TYPES } = require('../utils/displayNameHelper')
+const { AssetCode } = require('../constants/AssetCode')
 
 /**
  * 可回滚的操作类型和对应的回滚处理器
@@ -54,7 +55,7 @@ const ROLLBACK_HANDLERS = {
     const result = await balanceService.changeBalance(
       {
         user_id: target_id,
-        asset_code: 'DIAMOND',
+        asset_code: AssetCode.STAR_STONE,
         delta_amount: deltaPoints,
         business_type: 'audit_rollback',
         idempotency_key: `rollback_points_${log.admin_operation_log_id}_${Date.now()}`,

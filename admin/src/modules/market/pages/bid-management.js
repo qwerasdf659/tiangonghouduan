@@ -121,7 +121,7 @@ document.addEventListener('alpine:init', () => {
       create_form: {
         exchange_item_id: '',
         start_price: '',
-        price_asset_code: 'DIAMOND',
+        price_asset_code: 'star_stone',
         min_bid_increment: 10,
         start_time: '',
         end_time: '',
@@ -270,7 +270,7 @@ document.addEventListener('alpine:init', () => {
         this.create_form = {
           exchange_item_id: '',
           start_price: '',
-          price_asset_code: 'DIAMOND',
+          price_asset_code: 'star_stone',
           min_bid_increment: 10,
           start_time: '',
           end_time: '',

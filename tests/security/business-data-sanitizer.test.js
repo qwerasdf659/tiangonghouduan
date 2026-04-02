@@ -716,7 +716,7 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
         offer_item_display_name: '红宝石碎片',
         offer_category_id: 1,
         price_amount: 500,
-        price_asset_code: 'DIAMOND',
+        price_asset_code: 'star_stone',
         status: 'on_sale',
         item_info: { rarity: 'rare' },
         asset_info: null,
@@ -736,7 +736,7 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
         offer_item_display_name: '积分',
         offer_category_id: 2,
         price_amount: 100,
-        price_asset_code: 'DIAMOND',
+        price_asset_code: 'star_stone',
         status: 'on_sale',
         item_info: null,
         asset_info: { amount: 1000 },
@@ -820,7 +820,7 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
     const mockRecords = [
       {
         asset_transaction_id: 501,
-        asset_code: 'POINTS',
+        asset_code: 'points',
         business_type: 'lottery_consume',
         delta_amount: -100,
         balance_before: 5000,
@@ -834,7 +834,7 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
       },
       {
         asset_transaction_id: 502,
-        asset_code: 'POINTS',
+        asset_code: 'points',
         business_type: 'lottery_reward',
         delta_amount: 500,
         balance_before: 4900,
@@ -848,7 +848,7 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
       },
       {
         asset_transaction_id: 503,
-        asset_code: 'BUDGET_POINTS',
+        asset_code: 'budget_points',
         business_type: 'budget_deduction',
         delta_amount: -500,
         balance_before: 100000,
@@ -892,7 +892,7 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
 
       expect(result.length).toBe(2)
       result.forEach(record => {
-        expect(record.asset_code).not.toBe('BUDGET_POINTS')
+        expect(record.asset_code).not.toBe('budget_points')
       })
     })
 
@@ -934,7 +934,7 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
     const mockTransactions = [
       {
         asset_transaction_id: 601,
-        asset_code: 'DIAMOND',
+        asset_code: 'star_stone',
         business_type: 'market_listing_freeze',
         delta_amount: -500,
         balance_before: 10000,
@@ -944,11 +944,11 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
         idempotency_key: 'market_freeze_001',
         frozen_amount_change: 500,
         lottery_session_id: null,
-        meta: { title: '市场挂单冻结500钻石' }
+        meta: { title: '市场挂单冻结500星石' }
       },
       {
         asset_transaction_id: 602,
-        asset_code: 'DIAMOND',
+        asset_code: 'star_stone',
         business_type: 'order_settle_seller_credit',
         delta_amount: 300,
         balance_before: 9500,
@@ -958,7 +958,7 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
         idempotency_key: 'settle_seller_001',
         frozen_amount_change: 0,
         lottery_session_id: null,
-        meta: { title: '卖出商品收入300钻石' }
+        meta: { title: '卖出商品收入300星石' }
       }
     ]
 
@@ -984,8 +984,8 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
     test('B-5-13-3 普通用户（public）meta.title 提取为顶层 description', () => {
       const result = DataSanitizer.sanitizeTransactionRecords(mockTransactions, 'public')
 
-      expect(result[0].description).toBe('市场挂单冻结500钻石')
-      expect(result[1].description).toBe('卖出商品收入300钻石')
+      expect(result[0].description).toBe('市场挂单冻结500星石')
+      expect(result[1].description).toBe('卖出商品收入300星石')
     })
 
     test('B-5-13-4 普通用户（public）保留业务必需字段', () => {

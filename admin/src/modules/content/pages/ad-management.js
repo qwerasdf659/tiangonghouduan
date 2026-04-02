@@ -147,9 +147,9 @@ document.addEventListener('alpine:init', () => {
       lottery_active_7d: '7天抽奖活跃',
       lottery_active_30d: '30天抽奖活跃',
       lottery_total_count: '累计抽奖次数',
-      diamond_balance: '钻石余额',
-      diamond_rich: '钻石富豪',
-      has_red_shard: '持有红水晶碎片',
+      star_stone_balance: '星石余额',
+      star_stone_rich: '星石富豪',
+      has_red_core_shard: '持有红源晶碎片',
       market_trader: '交易市场用户',
       new_user: '新用户',
       register_days: '注册天数',
@@ -270,8 +270,8 @@ document.addEventListener('alpine:init', () => {
       ad_slot_id: '',
       billing_mode: 'fixed_daily',
       advertiser_user_id: '',
-      daily_bid_diamond: 50,
-      budget_total_diamond: 500,
+      daily_bid_star_stone: 50,
+      budget_total_star_stone: 500,
       fixed_days: 7,
       start_date: '',
       end_date: '',
@@ -295,11 +295,11 @@ document.addEventListener('alpine:init', () => {
       slot_category: 'display',
       position: 'home',
       max_display_count: 3,
-      daily_price_diamond: 100,
-      min_bid_diamond: 50,
-      min_budget_diamond: 500,
-      min_daily_price_diamond: 0,
-      cpm_price_diamond: 0,
+      daily_price_star_stone: 100,
+      min_bid_star_stone: 50,
+      min_budget_star_stone: 500,
+      min_daily_price_star_stone: 0,
+      cpm_price_star_stone: 0,
       zone_id: null,
       description: ''
     },
@@ -559,8 +559,8 @@ document.addEventListener('alpine:init', () => {
         ad_slot_id: this.allSlotsList.length > 0 ? this.allSlotsList[0].ad_slot_id : '',
         billing_mode: isSystem || isOperational ? 'free' : 'fixed_daily',
         advertiser_user_id: '',
-        daily_bid_diamond: 50,
-        budget_total_diamond: 500,
+        daily_bid_star_stone: 50,
+        budget_total_star_stone: 500,
         fixed_days: 7,
         start_date: today.toISOString().slice(0, 10),
         end_date: nextWeek.toISOString().slice(0, 10),
@@ -609,20 +609,20 @@ document.addEventListener('alpine:init', () => {
           }
         } else if (this.campaignForm.billing_mode === 'bidding') {
           const slotInfo = this.getSelectedSlotInfo()
-          const minBid = slotInfo?.min_bid_diamond || 50
-          const minBudget = slotInfo?.min_budget_diamond || 500
+          const minBid = slotInfo?.min_bid_star_stone || 50
+          const minBudget = slotInfo?.min_budget_star_stone || 500
           if (
-            !this.campaignForm.daily_bid_diamond ||
-            this.campaignForm.daily_bid_diamond < minBid
+            !this.campaignForm.daily_bid_star_stone ||
+            this.campaignForm.daily_bid_star_stone < minBid
           ) {
-            this.showError(`竞价模式每日出价不能低于 ${minBid} 钻石`)
+            this.showError(`竞价模式每日出价不能低于 ${minBid} 星石`)
             return
           }
           if (
-            !this.campaignForm.budget_total_diamond ||
-            this.campaignForm.budget_total_diamond < minBudget
+            !this.campaignForm.budget_total_star_stone ||
+            this.campaignForm.budget_total_star_stone < minBudget
           ) {
-            this.showError(`竞价模式总预算不能低于 ${minBudget} 钻石`)
+            this.showError(`竞价模式总预算不能低于 ${minBudget} 星石`)
             return
           }
         }
@@ -646,8 +646,8 @@ document.addEventListener('alpine:init', () => {
           if (this.campaignForm.billing_mode === 'fixed_daily') {
             data.fixed_days = Number(this.campaignForm.fixed_days)
           } else {
-            data.daily_bid_diamond = Number(this.campaignForm.daily_bid_diamond)
-            data.budget_total_diamond = Number(this.campaignForm.budget_total_diamond)
+            data.daily_bid_star_stone = Number(this.campaignForm.daily_bid_star_stone)
+            data.budget_total_star_stone = Number(this.campaignForm.budget_total_star_stone)
           }
         }
 
@@ -831,11 +831,11 @@ document.addEventListener('alpine:init', () => {
         slot_category: 'display',
         position: 'home',
         max_display_count: 3,
-        daily_price_diamond: 100,
-        min_bid_diamond: 50,
-        min_budget_diamond: 500,
-        min_daily_price_diamond: 0,
-        cpm_price_diamond: 0,
+        daily_price_star_stone: 100,
+        min_bid_star_stone: 50,
+        min_budget_star_stone: 500,
+        min_daily_price_star_stone: 0,
+        cpm_price_star_stone: 0,
         zone_id: null,
         description: ''
       }
@@ -852,11 +852,11 @@ document.addEventListener('alpine:init', () => {
         slot_category: slot.slot_category || 'display',
         position: slot.position,
         max_display_count: slot.max_display_count,
-        daily_price_diamond: slot.daily_price_diamond,
-        min_bid_diamond: slot.min_bid_diamond,
-        min_budget_diamond: slot.min_budget_diamond || 500,
-        min_daily_price_diamond: slot.min_daily_price_diamond || 0,
-        cpm_price_diamond: slot.cpm_price_diamond || 0,
+        daily_price_star_stone: slot.daily_price_star_stone,
+        min_bid_star_stone: slot.min_bid_star_stone,
+        min_budget_star_stone: slot.min_budget_star_stone || 500,
+        min_daily_price_star_stone: slot.min_daily_price_star_stone || 0,
+        cpm_price_star_stone: slot.cpm_price_star_stone || 0,
         zone_id: slot.zone_id || null,
         description: slot.description || ''
       }

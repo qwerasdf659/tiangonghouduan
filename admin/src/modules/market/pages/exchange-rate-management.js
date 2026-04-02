@@ -35,7 +35,7 @@ const STATUS_OPTIONS = [
 function getEmptyForm() {
   return {
     from_asset_code: '',
-    to_asset_code: 'DIAMOND',
+    to_asset_code: 'star_stone',
     rate_numerator: 1,
     rate_denominator: 1,
     min_from_amount: 1,

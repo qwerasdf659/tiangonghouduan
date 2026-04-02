@@ -138,12 +138,12 @@
  * 资产余额信息
  *
  * @typedef {Object} AssetBalance
- * @property {string} asset_code - 资产代码（POINTS/DIAMOND/BUDGET_POINTS/材料代码）
+ * @property {string} asset_code - 资产代码（points/star_stone/budget_points/材料代码）
  * @property {string} [display_name] - 资产显示名称
  * @property {number} available_amount - 可用余额
  * @property {number} frozen_amount - 冻结余额
  * @property {number} total - 总余额（可用+冻结）
- * @property {number|null} [campaign_id] - 活动ID（仅 BUDGET_POINTS 有值）
+ * @property {number|null} [campaign_id] - 活动ID（仅 budget_points 有值）
  */
 
 /**
@@ -168,26 +168,26 @@
  *
  * @typedef {Object} AssetAdjustParams
  * @property {number} user_id - 目标用户ID
- * @property {string} asset_code - 资产代码（POINTS/DIAMOND/BUDGET_POINTS/材料代码）
+ * @property {string} asset_code - 资产代码（points/star_stone/budget_points/材料代码）
  * @property {number} amount - 调整数量（正数=增加，负数=扣减）
  * @property {string} reason - 调整原因
  * @property {string} idempotency_key - 幂等键（必填，前端生成）
- * @property {number} [campaign_id] - 活动ID（BUDGET_POINTS 必填）
+ * @property {number} [campaign_id] - 活动ID（budget_points 必填）
  */
 
 /**
  * 资产代码枚举
  *
- * @typedef {'POINTS'|'DIAMOND'|'BUDGET_POINTS'|string} AssetCode
+ * @typedef {'points'|'star_stone'|'budget_points'|string} AssetCode
  * @description
  * 内置资产类型：
- * - POINTS: 积分
- * - DIAMOND: 钻石
- * - BUDGET_POINTS: 预算积分（关联活动）
+ * - points: 积分
+ * - star_stone: 星石
+ * - budget_points: 预算积分（关联活动）
  *
  * 材料资产类型（动态）：
- * - red_shard, blue_shard 等碎片
- * - red_crystal, blue_crystal 等水晶
+ * - red_core_shard, blue_shard 等碎片
+ * - red_core_gem, blue_crystal 等水晶
  */
 
 // ========== 抽奖相关类型 ==========
@@ -252,7 +252,7 @@
  * @property {string} item_code - 物品代码
  * @property {string} item_name - 物品名称
  * @property {number} quantity - 出售数量
- * @property {number} price - 单价（钻石）
+ * @property {number} price - 单价（星石）
  * @property {number} total_price - 总价
  * @property {string} status - 状态（active/sold/cancelled/expired）
  * @property {string} created_at - 创建时间
@@ -321,8 +321,8 @@
  * 材料资产类型
  *
  * @typedef {Object} MaterialAssetType
- * @property {string} asset_code - 资产代码（如 'red_shard'）
- * @property {string} display_name - 显示名称（如 '红水晶碎片'）
+ * @property {string} asset_code - 资产代码（如 'red_core_shard'）
+ * @property {string} display_name - 显示名称（如 '红源晶碎片'）
  * @property {string} group_code - 分组代码（如 'red', 'blue'）
  * @property {string} form - 形态（'shard' 碎片 / 'crystal' 水晶）
  * @property {number} tier - 层级

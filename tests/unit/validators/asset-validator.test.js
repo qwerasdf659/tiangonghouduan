@@ -119,9 +119,9 @@ describe('P1-3.2: 资产API参数验证单元测试', () => {
     test('有效的资产代码应通过验证', async () => {
       // 项目实际使用的资产代码
       const validCodes = [
-        'DIAMOND', // 钻石
-        'red_shard', // 红水晶碎片
-        'POINTS', // 积分
+        'star_stone', // 星石
+        'red_core_shard', // 红源晶碎片
+        'points', // 积分
         'GOLD', // 金币
         'material_001', // 材料资产
         'rare_item_type' // 稀有物品类型
@@ -497,7 +497,7 @@ describe('P1-3.2: 资产API参数验证单元测试', () => {
           transaction_type: 'credit',
           page: '1',
           limit: '50',
-          asset_code: 'DIAMOND'
+          asset_code: 'star_stone'
         }
       })
       const res = createMockResponse()
@@ -515,7 +515,7 @@ describe('P1-3.2: 资产API参数验证单元测试', () => {
       // 验证所有参数都被正确存储
       expect(req.validated.transaction_type).toBe('credit')
       expect(req.validated.limit).toBe(50)
-      expect(req.validated.asset_code).toBe('DIAMOND')
+      expect(req.validated.asset_code).toBe('star_stone')
     })
 
     test('资产余额查询参数验证', async () => {
@@ -525,7 +525,7 @@ describe('P1-3.2: 资产API参数验证单元测试', () => {
       const req = createMockRequest({
         params: {
           user_id: '100',
-          asset_code: 'DIAMOND'
+          asset_code: 'star_stone'
         }
       })
       const res = createMockResponse()
@@ -537,7 +537,7 @@ describe('P1-3.2: 资产API参数验证单元测试', () => {
       expect(result.passed).toBe(true)
 
       expect(req.validated.user_id).toBe(100)
-      expect(req.validated.asset_code).toBe('DIAMOND')
+      expect(req.validated.asset_code).toBe('star_stone')
     })
   })
 })

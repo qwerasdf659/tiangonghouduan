@@ -90,12 +90,12 @@ module.exports = sequelize => {
         comment: '转化数'
       },
 
-      spend_diamond: {
+      spend_star_stone: {
         type: DataTypes.INTEGER,
         allowNull: false,
         defaultValue: 0,
-        validate: { min: { args: [0], msg: '消耗钻石数不能为负数' } },
-        comment: '消耗钻石数'
+        validate: { min: { args: [0], msg: '消耗星石数不能为负数' } },
+        comment: '消耗星石数'
       },
 
       created_at: {

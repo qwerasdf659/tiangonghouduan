@@ -97,7 +97,7 @@ class PriceDiscoveryService {
       `SELECT
         DATE_FORMAT(t.completed_at, '${dateFormat}') AS time_bucket,
         COUNT(*) AS trade_count,
-        SUM(t.gross_amount) AS total_diamond_volume,
+        SUM(t.gross_amount) AS total_star_stone_volume,
         SUM(COALESCE(ml.offer_amount, 1)) AS total_item_volume
       FROM trade_orders t
       JOIN market_listings ml ON t.market_listing_id = ml.market_listing_id

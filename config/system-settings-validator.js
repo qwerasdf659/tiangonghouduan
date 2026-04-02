@@ -32,7 +32,7 @@ const CRITICAL_SETTINGS_REQUIRED_AT_STARTUP = [
   'security/password_min_length', // 密码长度（影响安全）
   'security/api_rate_limit', // API限流（影响风控）
   'points/points_award_ratio', // 消费积分比例（影响积分发放，缺失掩盖 migration 失败）
-  'points/diamond_quota_ratio' // 钻石配额比例（影响配额发放，缺失掩盖 migration 失败）
+  'points/star_stone_quota_ratio' // 星石配额比例（影响配额发放，缺失掩盖 migration 失败）
 ]
 
 /**

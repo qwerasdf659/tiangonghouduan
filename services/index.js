@@ -67,7 +67,7 @@ const ActivityService = require('./ActivityService') // 活动管理服务
 const AuditLogService = require('./AuditLogService') // 审计日志服务
 
 // V4.5.0 材料系统服务
-const AssetConversionService = require('./AssetConversionService') // 资产转换服务（材料转钻石）
+const AssetConversionService = require('./AssetConversionService') // 资产转换服务（材料转星石）
 const ExchangeRateService = require('./exchange/ExchangeRateService') // 固定汇率兑换服务（2026-02-23 市场增强）
 
 // Asset 域子服务

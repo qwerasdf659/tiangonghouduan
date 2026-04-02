@@ -243,7 +243,7 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/console/config/config': 'ADMIN_CONFIG_UPDATE', // 更新系统配置（修复：console/config → console/config/config）
   '/api/v4/console/config/test/simulate': 'ADMIN_CONFIG_TEST', // 测试配置（修复：console/test/simulate → console/config/test/simulate）
 
-  // ===== 用户比例覆盖管理（2026-03-02 钻石配额优化方案）=====
+  // ===== 用户比例覆盖管理（2026-03-02 星石配额优化方案）=====
   '/api/v4/console/user-ratio-overrides': 'ADMIN_USER_RATIO_OVERRIDE_CREATE',
   '/api/v4/console/user-ratio-overrides/:id': 'ADMIN_USER_RATIO_OVERRIDE_UPDATE',
 
@@ -469,8 +469,8 @@ const CANONICAL_OPERATION_MAP = {
 
   '/api/v4/user/ad-campaigns/': 'USER_AD_CAMPAIGN_CREATE', // 创建广告计划
   '/api/v4/user/ad-campaigns/:id': 'USER_AD_CAMPAIGN_UPDATE', // 更新广告计划
-  '/api/v4/user/ad-campaigns/:id/submit': 'USER_AD_CAMPAIGN_SUBMIT', // 提交审核（含钻石冻结）
-  '/api/v4/user/ad-campaigns/:id/cancel': 'USER_AD_CAMPAIGN_CANCEL', // 取消计划（含钻石退回）
+  '/api/v4/user/ad-campaigns/:id/submit': 'USER_AD_CAMPAIGN_SUBMIT', // 提交审核（含星石冻结）
+  '/api/v4/user/ad-campaigns/:id/cancel': 'USER_AD_CAMPAIGN_CANCEL', // 取消计划（含星石退回）
   '/api/v4/user/ad-campaigns/:id/interaction': 'USER_AD_CAMPAIGN_INTERACTION', // 用户端交互日志上报
 
   // 方案B: 用户通知操作（标记已读本身具备幂等性）
@@ -703,7 +703,7 @@ class IdempotencyService {
    * 2. 配置实体（业务码）→ :code
    *    - 低频变更、语义稳定、数量有限
    *    - 如：活动、资产类型、设置分类
-   *    - 业务码格式：snake_case（如 red_shard）或 UPPER_SNAKE（如 DIAMOND）
+   *    - 业务码格式：snake_case（如 red_core_shard）或 UPPER_SNAKE（如 star_stone）
    *
    * 3. 外部暴露实体（UUID）→ :uuid
    *    - 需要隐藏内部ID、防枚举
@@ -731,7 +731,7 @@ class IdempotencyService {
      * 2. 纯数字 → :id（事务实体）
      * 3. 配置实体路径中的业务码 → :code
      *    - 只对特定配置实体路径进行匹配，避免误匹配
-     *    - 匹配 snake_case 业务标识符（如 red_shard, spring_festival）
+     *    - 匹配 snake_case 业务标识符（如 red_core_shard, spring_festival）
      * 4. 其他路由参数占位符 → :id（默认）
      *    - 保留已经是 :id, :code, :uuid 的情况
      */

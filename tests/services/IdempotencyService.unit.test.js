@@ -254,12 +254,12 @@ describe('IdempotencyService - 单元测试（核心逻辑验证）', () => {
       )
 
       // 资产类型（asset-types）
-      expect(IdempotencyService.normalizePath('/api/v4/console/material/asset-types/DIAMOND')).toBe(
-        '/api/v4/console/material/asset-types/:code'
-      )
+      expect(
+        IdempotencyService.normalizePath('/api/v4/console/material/asset-types/star_stone')
+      ).toBe('/api/v4/console/material/asset-types/:code')
 
       expect(
-        IdempotencyService.normalizePath('/api/v4/console/material/asset-types/red_shard')
+        IdempotencyService.normalizePath('/api/v4/console/material/asset-types/red_core_shard')
       ).toBe('/api/v4/console/material/asset-types/:code')
 
       // 功能开关（feature-flags）

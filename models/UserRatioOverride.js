@@ -8,7 +8,7 @@
  * 支持的比例类型（ratio_key）：
  * - points_award_ratio：消费→积分比例
  * - budget_allocation_ratio：消费→预算积分比例
- * - diamond_quota_ratio：消费→钻石配额比例
+ * - star_stone_quota_ratio：消费→星石配额比例
  *
  * @module models/UserRatioOverride
  */
@@ -32,9 +32,9 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING(50),
         allowNull: false,
         validate: {
-          isIn: [['points_award_ratio', 'budget_allocation_ratio', 'diamond_quota_ratio']]
+          isIn: [['points_award_ratio', 'budget_allocation_ratio', 'star_stone_quota_ratio']]
         },
-        comment: '比例类型：points_award_ratio / budget_allocation_ratio / diamond_quota_ratio'
+        comment: '比例类型：points_award_ratio / budget_allocation_ratio / star_stone_quota_ratio'
       },
       ratio_value: {
         type: DataTypes.DECIMAL(5, 2),

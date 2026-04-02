@@ -65,6 +65,9 @@ const {
   validatePermissions
 } = require('./PermissionResources')
 
+// 虚拟资产代码常量（V4.1.0 资产命名重构）
+const { AssetCode, ASSET_CODE_MIGRATION_MAP, AssetForm } = require('./AssetCode')
+
 module.exports = {
   // 审计操作类型
   OPERATION_TYPES,
@@ -108,10 +111,16 @@ module.exports = {
   getPermissionResources,
   validatePermissions,
 
+  // 虚拟资产代码（AssetCode V4.1.0）
+  AssetCode,
+  ASSET_CODE_MIGRATION_MAP,
+  AssetForm,
+
   // 命名空间导出（便于按模块引用）
   AuditOperationTypes: require('./AuditOperationTypes'),
   ErrorCodes: require('./ErrorCodes'),
   TradableAssetTypes: require('./TradableAssetTypes'),
   AuditTargetTypes: require('./AuditTargetTypes'),
-  PermissionResources: require('./PermissionResources')
+  PermissionResources: require('./PermissionResources'),
+  AssetCodeModule: require('./AssetCode')
 }

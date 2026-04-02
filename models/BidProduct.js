@@ -61,14 +61,14 @@ module.exports = sequelize => {
 
       /**
        * 竞价使用的资产类型
-       * - 禁止 POINTS 和 BUDGET_POINTS（决策1，硬编码黑名单）
-       * - 允许 DIAMOND、red_shard 等（决策9，动态白名单）
+       * - 禁止 points 和 budget_points（决策1，硬编码黑名单）
+       * - 允许 star_stone、red_core_shard 等（决策9，动态白名单）
        */
       price_asset_code: {
         type: DataTypes.STRING(50),
         allowNull: false,
-        defaultValue: 'DIAMOND',
-        comment: '竞价使用的资产类型（禁止 POINTS/BUDGET_POINTS）'
+        defaultValue: 'star_stone',
+        comment: '竞价使用的资产类型（禁止 points/budget_points）'
       },
 
       /** 当前最高出价（冗余字段，提升查询性能） */

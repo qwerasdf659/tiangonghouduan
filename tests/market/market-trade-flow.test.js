@@ -204,7 +204,7 @@ describe('市场交易流程测试（阶段四：P2）', () => {
               seller_user_id: test_seller.user_id,
               item_id: test_item.item_id,
               price_amount: 100,
-              price_asset_code: 'DIAMOND'
+              price_asset_code: 'star_stone'
             },
             { transaction }
           )
@@ -221,7 +221,7 @@ describe('市场交易流程测试（阶段四：P2）', () => {
           expect(result.listing.status).toBe('on_sale')
           expect(result.listing.seller_user_id).toBe(test_seller.user_id)
           expect(Number(result.listing.price_amount)).toBe(100)
-          expect(result.listing.price_asset_code).toBe('DIAMOND')
+          expect(result.listing.price_asset_code).toBe('star_stone')
 
           // 5. 验证物品状态已变为 locked
           const updated_item = await Item.findByPk(test_item.item_id)
@@ -250,7 +250,7 @@ describe('市场交易流程测试（阶段四：P2）', () => {
           seller_user_id: Number(test_seller.user_id),
           item_id: Number(test_item.item_id),
           price_amount: 200,
-          price_asset_code: 'DIAMOND'
+          price_asset_code: 'star_stone'
         }
 
         // 3. 第一次挂牌
@@ -321,7 +321,7 @@ describe('市场交易流程测试（阶段四：P2）', () => {
               seller_user_id: test_seller.user_id,
               item_id: test_item.item_id,
               price_amount: 100,
-              price_asset_code: 'DIAMOND'
+              price_asset_code: 'star_stone'
             },
             { transaction }
           )
@@ -357,7 +357,7 @@ describe('市场交易流程测试（阶段四：P2）', () => {
               seller_user_id: test_buyer.user_id, // 买家试图挂牌
               item_id: test_item.item_id,
               price_amount: 100,
-              price_asset_code: 'DIAMOND'
+              price_asset_code: 'star_stone'
             },
             { transaction }
           )
@@ -373,23 +373,23 @@ describe('市场交易流程测试（阶段四：P2）', () => {
 
     describe('可叠加资产挂牌（fungible_asset）', () => {
       it('应成功创建可叠加资产挂牌', async () => {
-        // 1. 确保卖家有足够的 red_shard 资产
+        // 1. 确保卖家有足够的 red_core_shard 资产
         const balance = await BalanceService.getBalance({
           user_id: test_seller.user_id,
-          asset_code: 'red_shard'
+          asset_code: 'red_core_shard'
         })
 
         if (Number(balance?.available_amount || 0) < 10) {
           // 添加测试资产
           await BalanceService.changeBalance({
             user_id: test_seller.user_id,
-            asset_code: 'red_shard',
+            asset_code: 'red_core_shard',
             delta_amount: 100,
             business_type: 'test_grant',
             counterpart_account_id: 2,
             idempotency_key: generateIdempotencyKey('grant_shard')
           })
-          console.log('✅ 已为卖家添加测试 red_shard 资产')
+          console.log('✅ 已为卖家添加测试 red_core_shard 资产')
         }
 
         // 2. 生成幂等键
@@ -402,10 +402,10 @@ describe('市场交易流程测试（阶段四：P2）', () => {
             {
               idempotency_key,
               seller_user_id: test_seller.user_id,
-              offer_asset_code: 'red_shard',
+              offer_asset_code: 'red_core_shard',
               offer_amount: 10,
               price_amount: 50,
-              price_asset_code: 'DIAMOND'
+              price_asset_code: 'star_stone'
             },
             { transaction }
           )
@@ -419,7 +419,7 @@ describe('市场交易流程测试（阶段四：P2）', () => {
           expect(result).toHaveProperty('listing')
           expect(result.listing.listing_kind).toBe('fungible_asset')
           expect(result.listing.status).toBe('on_sale')
-          expect(result.listing.offer_asset_code).toBe('red_shard')
+          expect(result.listing.offer_asset_code).toBe('red_core_shard')
           expect(Number(result.listing.offer_amount)).toBe(10)
           expect(Number(result.listing.price_amount)).toBe(50)
           expect(result.listing.seller_offer_frozen).toBe(true)
@@ -438,7 +438,7 @@ describe('市场交易流程测试（阶段四：P2）', () => {
         // 1. 获取当前余额
         const balance = await BalanceService.getBalance({
           user_id: test_seller.user_id,
-          asset_code: 'red_shard'
+          asset_code: 'red_core_shard'
         })
         const available = Number(balance?.available_amount || 0)
 
@@ -451,10 +451,10 @@ describe('市场交易流程测试（阶段四：P2）', () => {
             {
               idempotency_key,
               seller_user_id: test_seller.user_id,
-              offer_asset_code: 'red_shard',
+              offer_asset_code: 'red_core_shard',
               offer_amount: available + 10000, // 超过余额
               price_amount: 100,
-              price_asset_code: 'DIAMOND'
+              price_asset_code: 'star_stone'
             },
             { transaction }
           )
@@ -489,7 +489,7 @@ describe('市场交易流程测试（阶段四：P2）', () => {
             seller_user_id: test_seller.user_id,
             item_id: test_item.item_id,
             price_amount: 100,
-            price_asset_code: 'DIAMOND'
+            price_asset_code: 'star_stone'
           },
           { transaction: listing_tx }
         )
@@ -544,7 +544,7 @@ describe('市场交易流程测试（阶段四：P2）', () => {
             seller_user_id: test_seller.user_id,
             item_id: test_item.item_id,
             price_amount: 150,
-            price_asset_code: 'DIAMOND'
+            price_asset_code: 'star_stone'
           },
           { transaction: listing_tx }
         )
@@ -590,7 +590,7 @@ describe('市场交易流程测试（阶段四：P2）', () => {
               seller_user_id: test_seller.user_id,
               item_id: test_item.item_id,
               price_amount: 100,
-              price_asset_code: 'DIAMOND'
+              price_asset_code: 'star_stone'
             },
             { transaction: listing_tx }
           )
@@ -649,7 +649,7 @@ describe('市场交易流程测试（阶段四：P2）', () => {
               seller_user_id: test_seller.user_id,
               item_id: test_item.item_id,
               price_amount: 100,
-              price_asset_code: 'DIAMOND'
+              price_asset_code: 'star_stone'
             },
             { transaction: listing_tx }
           )
@@ -689,7 +689,7 @@ describe('市场交易流程测试（阶段四：P2）', () => {
           await BalanceService.changeBalance(
             {
               user_id: test_seller.user_id,
-              asset_code: 'red_shard',
+              asset_code: 'red_core_shard',
               delta_amount: 50,
               business_type: 'test_grant',
               counterpart_account_id: 2,
@@ -713,10 +713,10 @@ describe('市场交易流程测试（阶段四：P2）', () => {
             {
               idempotency_key,
               seller_user_id: test_seller.user_id,
-              offer_asset_code: 'red_shard',
+              offer_asset_code: 'red_core_shard',
               offer_amount: 20,
               price_amount: 100,
-              price_asset_code: 'DIAMOND'
+              price_asset_code: 'star_stone'
             },
             { transaction: listing_tx }
           )
@@ -731,7 +731,7 @@ describe('市场交易流程测试（阶段四：P2）', () => {
         // 3. 验证资产已冻结
         const balance_after_listing = await BalanceService.getBalance({
           user_id: test_seller.user_id,
-          asset_code: 'red_shard'
+          asset_code: 'red_core_shard'
         })
         expect(Number(balance_after_listing.frozen_amount)).toBeGreaterThan(0)
 

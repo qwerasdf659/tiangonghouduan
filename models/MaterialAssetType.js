@@ -78,14 +78,14 @@ module.exports = sequelize => {
         allowNull: false,
         unique: true,
         comment:
-          '资产代码（Asset Code - 唯一标识）：如 red_shard/red_crystal/orange_shard，必须唯一，与 account_asset_balances.asset_code 关联'
+          '资产代码（Asset Code - 唯一标识）：如 red_core_shard/red_core_gem/orange_core_shard，必须唯一，与 account_asset_balances.asset_code 关联'
       },
 
       // 展示名称（Display Name - 用户可见名称）
       display_name: {
         type: DataTypes.STRING(100),
         allowNull: false,
-        comment: '展示名称（Display Name - 用户可见名称）：如"红水晶碎片""红水晶"'
+        comment: '展示名称（Display Name - 用户可见名称）：如"红碎片""红源晶"'
       },
 
       // 分组代码（Group Code - 材料分组）
@@ -98,9 +98,9 @@ module.exports = sequelize => {
 
       // 形态（Form - 碎片/水晶）
       form: {
-        type: DataTypes.ENUM('shard', 'crystal', 'currency', 'quota'),
+        type: DataTypes.ENUM('shard', 'gem', 'currency', 'quota'),
         allowNull: false,
-        comment: '形态：shard-碎片, crystal-水晶, currency-货币, quota-配额'
+        comment: '形态：shard-碎片, gem-源晶, currency-货币, quota-配额'
       },
 
       // 层级（Tier - 材料层级）
@@ -108,7 +108,7 @@ module.exports = sequelize => {
         type: DataTypes.INTEGER,
         allowNull: false,
         comment:
-          '层级（Tier - 材料层级）：数字越大层级越高，如 1-碎片层级，2-水晶层级，用于转换规则校验'
+          '层级（Tier - 材料层级）：数字越大层级越高，如 1-碎片层级，2-源晶层级，用于转换规则校验'
       },
 
       // 排序权重（Sort Order - 展示排序）
@@ -124,7 +124,7 @@ module.exports = sequelize => {
         type: DataTypes.BIGINT,
         allowNull: true,
         comment:
-          '可见价值锚点（Visible Value Points - 展示口径）：用户可见的材料价值锚点，如 1 red_shard = 10 visible_value_points，用于展示与比较，可选'
+          '可见价值锚点（Visible Value Points - 展示口径）：用户可见的材料价值锚点，如 1 red_core_shard = 10 visible_value_points，用于展示与比较，可选'
       },
 
       // 预算价值锚点（Budget Value Points - 系统口径）

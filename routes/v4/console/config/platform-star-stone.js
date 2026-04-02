@@ -1,9 +1,9 @@
 /**
- * 管理后台 - 平台钻石管理模块
+ * 管理后台 - 平台星石管理模块
  *
  * 业务范围：
- * - 查询所有系统账户的钻石余额概览
- * - 运营手动销毁钻石（可选来源账户 → SYSTEM_BURN 不可逆转账）
+ * - 查询所有系统账户的星石余额概览
+ * - 运营手动销毁星石（可选来源账户 → SYSTEM_BURN 不可逆转账）
  * - 销毁历史记录查询
  *
  * 系统账户说明：
@@ -15,11 +15,12 @@
  * - SYSTEM_CAMPAIGN_POOL：活动奖池账户（可销毁）
  * - SYSTEM_EXCHANGE：兑换中转账户（可销毁）
  *
- * @module routes/v4/console/config/platform-diamond
+ * @module routes/v4/console/config/platform-star-stone
  */
 
 const express = require('express')
 const router = express.Router()
+const { AssetCode } = require('../../../../constants/AssetCode')
 const { adminAuthMiddleware, asyncHandler } = require('../shared/middleware')
 const logger = require('../../../../utils/logger').logger
 
@@ -45,27 +46,27 @@ const SYSTEM_ACCOUNT_LABELS = {
   },
   SYSTEM_MINT: {
     label: '铸币账户',
-    description: '钻石铸造源头，负数表示已铸造总量',
+    description: '星石铸造源头，负数表示已铸造总量',
     burnable: false
   },
-  SYSTEM_BURN: { label: '黑洞账户', description: '钻石销毁目标，只增不减', burnable: false },
+  SYSTEM_BURN: { label: '黑洞账户', description: '星石销毁目标，只增不减', burnable: false },
   SYSTEM_ESCROW: {
     label: '交易托管',
-    description: '用户交易中冻结的钻石，不可销毁',
+    description: '用户交易中冻结的星石，不可销毁',
     burnable: false
   },
-  SYSTEM_RESERVE: { label: '储备金', description: '平台钻石储备，可销毁', burnable: true },
+  SYSTEM_RESERVE: { label: '储备金', description: '平台星石储备，可销毁', burnable: true },
   SYSTEM_CAMPAIGN_POOL: {
     label: '活动奖池',
-    description: '抽奖活动钻石奖池，可销毁',
+    description: '抽奖活动星石奖池，可销毁',
     burnable: true
   },
   SYSTEM_EXCHANGE: { label: '兑换中转', description: '材料兑换中转，可销毁', burnable: true }
 }
 
 /**
- * GET /api/v4/console/platform-diamond/balance
- * 查询所有系统账户的钻石余额概览
+ * GET /api/v4/console/platform-star-stone/balance
+ * 查询所有系统账户的星石余额概览
  */
 router.get(
   '/balance',
@@ -75,11 +76,11 @@ router.get(
 
     const [systemAccounts] = await sequelize.query(`
       SELECT a.system_code,
-             COALESCE(aab.available_amount, 0) AS diamond_balance,
+             COALESCE(aab.available_amount, 0) AS star_stone_balance,
              COALESCE(aab.frozen_amount, 0) AS frozen_amount
       FROM accounts a
       LEFT JOIN account_asset_balances aab
-        ON a.account_id = aab.account_id AND aab.asset_code = 'DIAMOND'
+        ON a.account_id = aab.account_id AND aab.asset_code = 'star_stone'
       WHERE a.account_type = 'system'
       ORDER BY a.account_id
     `)
@@ -94,7 +95,7 @@ router.get(
         system_code: acc.system_code,
         label: meta.label,
         description: meta.description,
-        diamond_balance: Number(acc.diamond_balance),
+        star_stone_balance: Number(acc.star_stone_balance),
         frozen_amount: Number(acc.frozen_amount),
         burnable: meta.burnable
       }
@@ -106,23 +107,23 @@ router.get(
     return res.apiSuccess(
       {
         platform_fee: {
-          diamond_balance: platformFee?.diamond_balance || 0,
+          star_stone_balance: platformFee?.star_stone_balance || 0,
           frozen_amount: platformFee?.frozen_amount || 0
         },
         burn: {
-          total_burned: Math.abs(burnAccount?.diamond_balance || 0)
+          total_burned: Math.abs(burnAccount?.star_stone_balance || 0)
         },
         system_accounts: accounts,
         burnable_accounts: BURNABLE_ACCOUNTS
       },
-      '平台钻石余额查询成功'
+      '平台星石余额查询成功'
     )
   })
 )
 
 /**
- * GET /api/v4/console/platform-diamond/burn-history
- * 查询钻石销毁历史记录
+ * GET /api/v4/console/platform-star-stone/burn-history
+ * 查询星石销毁历史记录
  *
  * @query {number} page - 页码，默认1
  * @query {number} page_size - 每页条数，默认20
@@ -143,8 +144,8 @@ router.get(
              a.system_code
       FROM asset_transactions at
       JOIN accounts a ON at.account_id = a.account_id
-      WHERE at.business_type = 'platform_diamond_burn'
-        AND at.asset_code = 'DIAMOND'
+      WHERE at.business_type = 'platform_star_stone_burn'
+        AND at.asset_code = 'star_stone'
       ORDER BY at.created_at DESC
       LIMIT :limit OFFSET :offset
     `,
@@ -154,7 +155,7 @@ router.get(
     const [[{ total }]] = await sequelize.query(`
       SELECT COUNT(*) AS total
       FROM asset_transactions
-      WHERE business_type = 'platform_diamond_burn' AND asset_code = 'DIAMOND'
+      WHERE business_type = 'platform_star_stone_burn' AND asset_code = 'star_stone'
     `)
 
     const items = records.map(r => {
@@ -187,8 +188,8 @@ router.get(
 )
 
 /**
- * POST /api/v4/console/platform-diamond/burn
- * 销毁指定系统账户的钻石（不可逆转账到黑洞账户）
+ * POST /api/v4/console/platform-star-stone/burn
+ * 销毁指定系统账户的星石（不可逆转账到黑洞账户）
  *
  * @body {number} amount - 销毁数量（必填，> 0）
  * @body {string} reason - 销毁原因（可选）
@@ -208,7 +209,7 @@ router.post(
 
     if (!BURNABLE_ACCOUNTS.includes(sourceCode)) {
       return res.apiError(
-        `不允许从 ${sourceCode} 账户销毁钻石，允许的账户: ${BURNABLE_ACCOUNTS.join(', ')}`,
+        `不允许从 ${sourceCode} 账户销毁星石，允许的账户: ${BURNABLE_ACCOUNTS.join(', ')}`,
         'INVALID_SOURCE_ACCOUNT',
         null,
         400
@@ -225,7 +226,7 @@ router.post(
       )
 
       const balanceBefore = await BalanceService.getBalance(
-        { system_code: sourceCode, asset_code: 'DIAMOND' },
+        { system_code: sourceCode, asset_code: AssetCode.STAR_STONE },
         { transaction }
       )
 
@@ -239,9 +240,9 @@ router.post(
       const burnResult = await BalanceService.changeBalance(
         {
           system_code: sourceCode,
-          asset_code: 'DIAMOND',
+          asset_code: AssetCode.STAR_STONE,
           delta_amount: -amount,
-          business_type: 'platform_diamond_burn',
+          business_type: 'platform_star_stone_burn',
           idempotency_key: `burn:${sourceCode}:${Date.now()}:${operatorId}`,
           counterpart_account_id: burnAccount.account_id,
           meta: {
@@ -249,13 +250,13 @@ router.post(
             source_account: sourceCode,
             reason: reason || '运营手动销毁',
             balance_before: balanceBefore?.available_amount || 0,
-            description: `运营手动销毁 ${amount} 钻石（来源: ${SYSTEM_ACCOUNT_LABELS[sourceCode]?.label || sourceCode}）`
+            description: `运营手动销毁 ${amount} 星石（来源: ${SYSTEM_ACCOUNT_LABELS[sourceCode]?.label || sourceCode}）`
           }
         },
         { transaction }
       )
 
-      logger.info('[平台钻石] 销毁操作完成', {
+      logger.info('[平台星石] 销毁操作完成', {
         operator_id: operatorId,
         source_account: sourceCode,
         amount,
@@ -274,7 +275,7 @@ router.post(
       }
     })
 
-    return res.apiSuccess(result, '钻石销毁成功（不可撤回）')
+    return res.apiSuccess(result, '星石销毁成功（不可撤回）')
   })
 )
 

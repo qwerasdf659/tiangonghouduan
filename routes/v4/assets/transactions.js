@@ -34,7 +34,7 @@ function asyncHandler(fn) {
  * GET /api/v4/assets/transactions
  *
  * @description 查询当前用户的资产流水记录
- * @query {string} [asset_code] - 资产代码筛选（如 POINTS、DIAMOND、red_shard）
+ * @query {string} [asset_code] - 资产代码筛选（如 POINTS、star_stone、red_core_shard）
  * @query {string} [business_type] - 业务类型筛选（如 lottery_consume、lottery_reward、exchange_debit）
  * @query {number} [page=1] - 页码（默认1）
  * @query {number} [page_size=20] - 每页数量（默认20，最大100）

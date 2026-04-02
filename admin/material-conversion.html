@@ -90,7 +90,7 @@
           <span class="text-xl mt-0.5">💡</span>
           <div class="text-sm themed-text-primary">
             <p class="font-semibold mb-1">转换规则说明</p>
-            <p>转换规则定义了用户可以将一种材料资产转换为另一种的比例和条件。例如「100 红水晶碎片 → 1 钻石」。规则采用<strong>版本化管理</strong>，修改比例需新增规则并禁用旧规则。</p>
+            <p>转换规则定义了用户可以将一种材料资产转换为另一种的比例和条件。例如「100 红源晶碎片 → 1 星石」。规则采用<strong>版本化管理</strong>，修改比例需新增规则并禁用旧规则。</p>
           </div>
         </div>
       </div>
@@ -270,7 +270,7 @@
           <span class="text-xl mt-0.5">💡</span>
           <div class="text-sm themed-text-primary">
             <p class="font-semibold mb-1">资产类型说明</p>
-            <p>资产类型是系统中所有可流通资产的基础定义。每种资产有唯一的代码（如 <code class="px-1 py-0.5 rounded bg-white/50">red_shard</code>）、分组归属、形态层级。运营可以创建新类型、编辑展示信息或禁用不再使用的类型。</p>
+            <p>资产类型是系统中所有可流通资产的基础定义。每种资产有唯一的代码（如 <code class="px-1 py-0.5 rounded bg-white/50">red_core_shard</code>）、分组归属、形态层级。运营可以创建新类型、编辑展示信息或禁用不再使用的类型。</p>
           </div>
         </div>
       </div>
@@ -457,7 +457,7 @@
           <!-- 规则标题 -->
           <div>
             <label class="block text-sm font-medium mb-1.5">规则标题（选填）</label>
-            <input type="text" x-model="create_rule_form.title" placeholder="如：红水晶碎片兑换钻石"
+            <input type="text" x-model="create_rule_form.title" placeholder="如：红源晶碎片兑换星石"
                    class="w-full border rounded-lg px-3 py-2.5 text-sm themed-bg-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow">
           </div>
 
@@ -658,12 +658,12 @@
         <div class="p-5 space-y-5">
           <div>
             <label class="block text-sm font-medium mb-1.5">资产代码 <span class="text-red-500">*</span></label>
-            <input type="text" x-model="create_type_form.asset_code" placeholder="如 red_shard（唯一标识，创建后不可修改）"
+            <input type="text" x-model="create_type_form.asset_code" placeholder="如 red_core_shard（唯一标识，创建后不可修改）"
                    class="w-full border rounded-lg px-3 py-2.5 text-sm themed-bg-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow">
           </div>
           <div>
             <label class="block text-sm font-medium mb-1.5">展示名称 <span class="text-red-500">*</span></label>
-            <input type="text" x-model="create_type_form.display_name" placeholder="如 红水晶碎片"
+            <input type="text" x-model="create_type_form.display_name" placeholder="如 红源晶碎片"
                    class="w-full border rounded-lg px-3 py-2.5 text-sm themed-bg-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow">
           </div>
           <!-- 图标上传 -->

@@ -83,7 +83,7 @@ describe('MarketListingService - 撤回挂牌时买家订单处理', () => {
      * 这是之前缺失的关键测试用例
      *
      * 场景：
-     * 1. 卖家创建可叠加资产挂牌（如100钻石）
+     * 1. 卖家创建可叠加资产挂牌（如100星石）
      * 2. 买家下单购买（冻结买家资产）
      * 3. 卖家撤回挂牌
      * 4. 验证：买家的冻结资产应自动解冻
@@ -94,7 +94,7 @@ describe('MarketListingService - 撤回挂牌时买家订单处理', () => {
         return
       }
 
-      const test_asset_code = 'DIAMOND'
+      const test_asset_code = 'star_stone'
       const listing_amount = 10
       const price_amount = 100
 
@@ -241,7 +241,7 @@ describe('MarketListingService - 撤回挂牌时买家订单处理', () => {
     })
 
     it('撤回时没有买家订单，应正常完成', async () => {
-      const test_asset_code = 'DIAMOND'
+      const test_asset_code = 'star_stone'
 
       // 1. 准备卖家资产
       const prep_tx = await sequelize.transaction()

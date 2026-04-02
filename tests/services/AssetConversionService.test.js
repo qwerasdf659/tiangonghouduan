@@ -4,12 +4,12 @@
  * 测试范围（P0-3系列 任务编号55-59）：
  * - P0-3-6: 实现转换幂等性测试 - 相同幂等键重复请求
  * - P0-3-7: 实现手续费计算测试 - fee_rate 计算、fee_min_amount
- * - P0-3-8: 实现 convertRedShardToDiamond 便捷方法测试 - 红水晶碎片→钻石
+ * - P0-3-8: 实现 convertRedCoreShardToStarStone 便捷方法测试 - 红源晶碎片→星石
  * - P0-3-9: 实现数量限制测试 - min_from_amount、max_from_amount
  * - P0-3-10: 运行测试并修复问题
  *
  * 业务场景：
- * - 材料转换（红水晶碎片→钻石等）
+ * - 材料转换（红源晶碎片→星石等）
  * - 幂等性保护（防止重复转换）
  * - 手续费三方记账（用户扣减 + 用户入账 + 系统手续费入账）
  *
@@ -108,11 +108,11 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
       console.log(`✅ 从数据库获取测试用户: user_id=${test_user_id}`)
     }
 
-    // 确保 red_shard → DIAMOND 转换规则已启用（测试依赖）
+    // 确保 red_core_shard → star_stone 转换规则已启用（测试依赖）
     await sequelize.query(
-      "UPDATE material_conversion_rules SET is_enabled = 1 WHERE from_asset_code = 'red_shard' AND to_asset_code = 'DIAMOND'"
+      "UPDATE material_conversion_rules SET is_enabled = 1 WHERE from_asset_code = 'red_core_shard' AND to_asset_code = 'star_stone'"
     )
-    console.log('✅ 测试前已启用 red_shard → DIAMOND 转换规则')
+    console.log('✅ 测试前已启用 red_core_shard → star_stone 转换规则')
   })
 
   afterEach(async () => {
@@ -149,7 +149,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
     // 恢复转换规则到测试前状态（禁用）
     try {
       await sequelize.query(
-        "UPDATE material_conversion_rules SET is_enabled = 0 WHERE from_asset_code = 'red_shard' AND to_asset_code = 'DIAMOND'"
+        "UPDATE material_conversion_rules SET is_enabled = 0 WHERE from_asset_code = 'red_core_shard' AND to_asset_code = 'star_stone'"
       )
       console.log('✅ 测试后已恢复转换规则状态')
     } catch (_e) {
@@ -165,37 +165,37 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
 
   describe('P0-3-6: 转换幂等性测试 - 相同幂等键重复请求', () => {
     /**
-     * 测试前置：确保测试用户有足够的 red_shard 余额
+     * 测试前置：确保测试用户有足够的 red_core_shard 余额
      */
-    let initial_red_shard_balance
-    let initial_diamond_balance
+    let initial_red_core_shard_balance
+    let initial_star_stone_balance
 
     beforeAll(async () => {
       // 获取初始余额（只是记录，不做修改）
       try {
         const redShardBalance = await TransactionManager.execute(async transaction => {
           return await BalanceService.getBalance(
-            { user_id: test_user_id, asset_code: 'red_shard' },
+            { user_id: test_user_id, asset_code: 'red_core_shard' },
             { transaction }
           )
         })
-        initial_red_shard_balance = redShardBalance?.available_amount || 0
+        initial_red_core_shard_balance = redShardBalance?.available_amount || 0
 
         const diamondBalance = await TransactionManager.execute(async transaction => {
           return await BalanceService.getBalance(
-            { user_id: test_user_id, asset_code: 'DIAMOND' },
+            { user_id: test_user_id, asset_code: 'star_stone' },
             { transaction }
           )
         })
-        initial_diamond_balance = diamondBalance?.available_amount || 0
+        initial_star_stone_balance = diamondBalance?.available_amount || 0
 
         console.log(
-          `✅ 测试用户初始余额: red_shard=${initial_red_shard_balance}, DIAMOND=${initial_diamond_balance}`
+          `✅ 测试用户初始余额: red_core_shard=${initial_red_core_shard_balance}, star_stone=${initial_star_stone_balance}`
         )
       } catch (error) {
         console.warn('⚠️ 获取初始余额失败:', error.message)
-        initial_red_shard_balance = 0
-        initial_diamond_balance = 0
+        initial_red_core_shard_balance = 0
+        initial_star_stone_balance = 0
       }
     })
 
@@ -208,15 +208,15 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
        * 3. 源材料扣减 + 目标资产增加
        */
 
-      // 先为用户增加足够的 red_shard（确保有余额可转换）
+      // 先为用户增加足够的 red_core_shard（确保有余额可转换）
       const prepare_key = generateIdempotencyKey('convert_prepare')
 
       await TransactionManager.execute(async transaction => {
         await BalanceService.changeBalance(
           {
             user_id: test_user_id,
-            asset_code: 'red_shard',
-            delta_amount: 100, // 增加 100 个 red_shard
+            asset_code: 'red_core_shard',
+            delta_amount: 100, // 增加 100 个 red_core_shard
             idempotency_key: prepare_key,
             business_type: 'test_mint',
             counterpart_account_id: 2,
@@ -228,13 +228,13 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
 
       // 执行首次转换
       const idempotency_key = generateIdempotencyKey('convert_test')
-      const from_amount = 5 // 转换 5 个 red_shard
+      const from_amount = 5 // 转换 5 个 red_core_shard
 
       const result = await TransactionManager.execute(async transaction => {
         return await AssetConversionService.convertMaterial(
           test_user_id,
-          'red_shard', // 源材料
-          'DIAMOND', // 目标资产
+          'red_core_shard', // 源材料
+          'star_stone', // 目标资产
           from_amount, // 转换数量
           {
             transaction,
@@ -254,9 +254,9 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
       expect(result.success).toBe(true)
       expect(result.is_duplicate).toBe(false)
       expect(result.from_amount).toBe(from_amount)
-      expect(result.from_asset_code).toBe('red_shard')
-      expect(result.to_asset_code).toBe('DIAMOND')
-      expect(result.to_amount).toBeGreaterThan(0) // 应该转换出 DIAMOND
+      expect(result.from_asset_code).toBe('red_core_shard')
+      expect(result.to_asset_code).toBe('star_stone')
+      expect(result.to_amount).toBeGreaterThan(0) // 应该转换出 star_stone
       expect(result.from_tx_id).toBeDefined()
       expect(result.to_tx_id).toBeDefined()
     })
@@ -270,14 +270,14 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
        * 3. is_duplicate = true
        */
 
-      // 先为用户增加足够的 red_shard
+      // 先为用户增加足够的 red_core_shard
       const prepare_key = generateIdempotencyKey('convert_prepare')
 
       await TransactionManager.execute(async transaction => {
         await BalanceService.changeBalance(
           {
             user_id: test_user_id,
-            asset_code: 'red_shard',
+            asset_code: 'red_core_shard',
             delta_amount: 50,
             idempotency_key: prepare_key,
             business_type: 'test_mint',
@@ -296,8 +296,8 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
       const first_result = await TransactionManager.execute(async transaction => {
         return await AssetConversionService.convertMaterial(
           test_user_id,
-          'red_shard',
-          'DIAMOND',
+          'red_core_shard',
+          'star_stone',
           from_amount,
           {
             transaction,
@@ -315,8 +315,8 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
       const second_result = await TransactionManager.execute(async transaction => {
         return await AssetConversionService.convertMaterial(
           test_user_id,
-          'red_shard',
-          'DIAMOND',
+          'red_core_shard',
+          'star_stone',
           from_amount, // 相同数量
           {
             transaction,
@@ -345,14 +345,14 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
        * 3. 错误码为 IDEMPOTENCY_KEY_CONFLICT
        */
 
-      // 先为用户增加足够的 red_shard
+      // 先为用户增加足够的 red_core_shard
       const prepare_key = generateIdempotencyKey('convert_prepare')
 
       await TransactionManager.execute(async transaction => {
         await BalanceService.changeBalance(
           {
             user_id: test_user_id,
-            asset_code: 'red_shard',
+            asset_code: 'red_core_shard',
             delta_amount: 100,
             idempotency_key: prepare_key,
             business_type: 'test_mint',
@@ -369,8 +369,8 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
       const first_result = await TransactionManager.execute(async transaction => {
         return await AssetConversionService.convertMaterial(
           test_user_id,
-          'red_shard',
-          'DIAMOND',
+          'red_core_shard',
+          'star_stone',
           3, // 首次转换 3 个
           {
             transaction,
@@ -389,8 +389,8 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
         TransactionManager.execute(async transaction => {
           return await AssetConversionService.convertMaterial(
             test_user_id,
-            'red_shard',
-            'DIAMOND',
+            'red_core_shard',
+            'star_stone',
             5, // 不同数量
             {
               transaction,
@@ -414,14 +414,14 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
        * 3. 生成不同的流水ID
        */
 
-      // 先为用户增加足够的 red_shard
+      // 先为用户增加足够的 red_core_shard
       const prepare_key = generateIdempotencyKey('convert_prepare')
 
       await TransactionManager.execute(async transaction => {
         await BalanceService.changeBalance(
           {
             user_id: test_user_id,
-            asset_code: 'red_shard',
+            asset_code: 'red_core_shard',
             delta_amount: 100,
             idempotency_key: prepare_key,
             business_type: 'test_mint',
@@ -439,8 +439,8 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
       const first_result = await TransactionManager.execute(async transaction => {
         return await AssetConversionService.convertMaterial(
           test_user_id,
-          'red_shard',
-          'DIAMOND',
+          'red_core_shard',
+          'star_stone',
           from_amount,
           {
             transaction,
@@ -455,8 +455,8 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
       const second_result = await TransactionManager.execute(async transaction => {
         return await AssetConversionService.convertMaterial(
           test_user_id,
-          'red_shard',
-          'DIAMOND',
+          'red_core_shard',
+          'star_stone',
           from_amount, // 相同参数
           {
             transaction,
@@ -485,7 +485,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
   describe('P0-3-7: 手续费计算测试 - fee_rate 计算、fee_min_amount', () => {
     /**
      * 测试前置：需要有带手续费配置的转换规则
-     * 数据库中现有规则：red_shard → DIAMOND，fee_rate=0.0000（无手续费）
+     * 数据库中现有规则：red_core_shard → star_stone，fee_rate=0.0000（无手续费）
      * 测试需要临时创建带手续费的规则
      */
 
@@ -513,8 +513,8 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
            min_from_amount, max_from_amount, 
            is_enabled, effective_at, title, rounding_mode, created_at, updated_at)
           VALUES 
-          ('red_shard', 'DIAMOND', 1, 20, 
-           0.05, 5, 'DIAMOND',
+          ('red_core_shard', 'star_stone', 1, 20, 
+           0.05, 5, 'star_stone',
            1, 1000,
            1, NOW(), '测试手续费规则', 'floor', NOW(), NOW())
         `)
@@ -557,11 +557,11 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
         to_amount: 20,
         fee_rate: 0.05, // 5% 手续费
         fee_min_amount: 0,
-        fee_asset_code: 'DIAMOND',
+        fee_asset_code: 'star_stone',
         rounding_mode: 'floor'
       }
 
-      // 转换 10 个 red_shard
+      // 转换 10 个 red_core_shard
       const from_amount = 10
 
       // 调用内部计算方法
@@ -579,7 +579,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
       // net_to_amount = 200 - 10 = 190
       expect(result.net_to_amount).toBe(190)
 
-      expect(result.fee_asset_code).toBe('DIAMOND')
+      expect(result.fee_asset_code).toBe('star_stone')
     })
 
     it('_calculateConversion 应应用最低手续费（fee_min_amount）', () => {
@@ -592,11 +592,11 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
         to_amount: 20,
         fee_rate: 0.01, // 1% 手续费
         fee_min_amount: 10, // 最低手续费 10
-        fee_asset_code: 'DIAMOND',
+        fee_asset_code: 'star_stone',
         rounding_mode: 'floor'
       }
 
-      // 转换 2 个 red_shard
+      // 转换 2 个 red_core_shard
       const from_amount = 2
 
       const result = AssetConversionService._calculateConversion(from_amount, mockRule)
@@ -648,8 +648,8 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
        */
 
       const baseRule = {
-        from_amount: 3, // 3 个 red_shard
-        to_amount: 50, // 转换为 50 个 DIAMOND
+        from_amount: 3, // 3 个 red_core_shard
+        to_amount: 50, // 转换为 50 个 star_stone
         fee_rate: 0,
         fee_min_amount: 0,
         rounding_mode: 'floor'
@@ -684,26 +684,26 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
     })
   })
 
-  // ==================== P0-3-8: convertRedShardToDiamond 便捷方法测试 ====================
+  // ==================== P0-3-8: convertRedCoreShardToStarStone 便捷方法测试 ====================
 
-  describe('P0-3-8: convertRedShardToDiamond 便捷方法测试 - 红水晶碎片→钻石', () => {
-    it('应该成功将红水晶碎片转换为钻石', async () => {
+  describe('P0-3-8: convertRedCoreShardToStarStone 便捷方法测试 - 红源晶碎片→星石', () => {
+    it('应该成功将红源晶碎片转换为星石', async () => {
       /*
-       * 业务场景：用户使用便捷方法将红水晶碎片分解为钻石
+       * 业务场景：用户使用便捷方法将红源晶碎片分解为星石
        * 期望行为：
        * 1. 调用内部 convertMaterial 方法
-       * 2. 固定源材料：red_shard
-       * 3. 固定目标资产：DIAMOND
+       * 2. 固定源材料：red_core_shard
+       * 3. 固定目标资产：star_stone
        */
 
-      // 先为用户增加足够的 red_shard
+      // 先为用户增加足够的 red_core_shard
       const prepare_key = generateIdempotencyKey('convert_prepare')
 
       await TransactionManager.execute(async transaction => {
         await BalanceService.changeBalance(
           {
             user_id: test_user_id,
-            asset_code: 'red_shard',
+            asset_code: 'red_core_shard',
             delta_amount: 50,
             idempotency_key: prepare_key,
             business_type: 'test_mint',
@@ -715,13 +715,13 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
       })
 
       const idempotency_key = generateIdempotencyKey('convert_convenient')
-      const red_shard_amount = 3
+      const red_core_shard_amount = 3
 
       // 使用便捷方法
       const result = await TransactionManager.execute(async transaction => {
-        return await AssetConversionService.convertRedShardToDiamond(
+        return await AssetConversionService.convertRedCoreShardToStarStone(
           test_user_id,
-          red_shard_amount,
+          red_core_shard_amount,
           {
             transaction,
             idempotency_key
@@ -736,9 +736,9 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
 
       // 验证
       expect(result.success).toBe(true)
-      expect(result.from_asset_code).toBe('red_shard')
-      expect(result.to_asset_code).toBe('DIAMOND')
-      expect(result.from_amount).toBe(red_shard_amount)
+      expect(result.from_asset_code).toBe('red_core_shard')
+      expect(result.to_asset_code).toBe('star_stone')
+      expect(result.from_amount).toBe(red_core_shard_amount)
       expect(result.to_amount).toBeGreaterThan(0)
     })
 
@@ -750,7 +750,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
 
       await expect(
         TransactionManager.execute(async transaction => {
-          return await AssetConversionService.convertRedShardToDiamond(
+          return await AssetConversionService.convertRedCoreShardToStarStone(
             test_user_id,
             5,
             { transaction } // 缺少 idempotency_key
@@ -771,7 +771,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
         await BalanceService.changeBalance(
           {
             user_id: test_user_id,
-            asset_code: 'red_shard',
+            asset_code: 'red_core_shard',
             delta_amount: 50,
             idempotency_key: prepare_key,
             business_type: 'test_mint',
@@ -785,7 +785,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
       const idempotency_key = generateIdempotencyKey('convert_title_test')
 
       const result = await TransactionManager.execute(async transaction => {
-        return await AssetConversionService.convertRedShardToDiamond(test_user_id, 2, {
+        return await AssetConversionService.convertRedCoreShardToStarStone(test_user_id, 2, {
           transaction,
           idempotency_key
           // 不传 title
@@ -819,7 +819,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
         await BalanceService.changeBalance(
           {
             user_id: test_user_id,
-            asset_code: 'red_shard',
+            asset_code: 'red_core_shard',
             delta_amount: 100,
             idempotency_key: prepare_key,
             business_type: 'test_mint',
@@ -833,7 +833,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
       // 获取规则的最小数量限制
       const [rules] = await sequelize.query(`
         SELECT min_from_amount FROM material_conversion_rules 
-        WHERE from_asset_code = 'red_shard' AND to_asset_code = 'DIAMOND' AND is_enabled = 1
+        WHERE from_asset_code = 'red_core_shard' AND to_asset_code = 'star_stone' AND is_enabled = 1
         LIMIT 1
       `)
 
@@ -852,8 +852,8 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
         TransactionManager.execute(async transaction => {
           return await AssetConversionService.convertMaterial(
             test_user_id,
-            'red_shard',
-            'DIAMOND',
+            'red_core_shard',
+            'star_stone',
             min_amount - 1, // 低于最小限制
             {
               transaction,
@@ -877,7 +877,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
       // 获取规则的最大数量限制
       const [rules] = await sequelize.query(`
         SELECT max_from_amount FROM material_conversion_rules 
-        WHERE from_asset_code = 'red_shard' AND to_asset_code = 'DIAMOND' AND is_enabled = 1
+        WHERE from_asset_code = 'red_core_shard' AND to_asset_code = 'star_stone' AND is_enabled = 1
         LIMIT 1
       `)
 
@@ -896,7 +896,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
         await BalanceService.changeBalance(
           {
             user_id: test_user_id,
-            asset_code: 'red_shard',
+            asset_code: 'red_core_shard',
             delta_amount: max_amount + 100,
             idempotency_key: prepare_key,
             business_type: 'test_mint',
@@ -914,8 +914,8 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
         TransactionManager.execute(async transaction => {
           return await AssetConversionService.convertMaterial(
             test_user_id,
-            'red_shard',
-            'DIAMOND',
+            'red_core_shard',
+            'star_stone',
             max_amount + 1, // 超过最大限制
             {
               transaction,
@@ -941,7 +941,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
         await BalanceService.changeBalance(
           {
             user_id: test_user_id,
-            asset_code: 'red_shard',
+            asset_code: 'red_core_shard',
             delta_amount: 50,
             idempotency_key: prepare_key,
             business_type: 'test_mint',
@@ -955,7 +955,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
       // 获取规则的数量限制
       const [rules] = await sequelize.query(`
         SELECT min_from_amount, max_from_amount FROM material_conversion_rules 
-        WHERE from_asset_code = 'red_shard' AND to_asset_code = 'DIAMOND' AND is_enabled = 1
+        WHERE from_asset_code = 'red_core_shard' AND to_asset_code = 'star_stone' AND is_enabled = 1
         LIMIT 1
       `)
 
@@ -970,8 +970,8 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
       const result = await TransactionManager.execute(async transaction => {
         return await AssetConversionService.convertMaterial(
           test_user_id,
-          'red_shard',
-          'DIAMOND',
+          'red_core_shard',
+          'star_stone',
           valid_amount,
           {
             transaction,
@@ -1001,8 +1001,8 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
         TransactionManager.execute(async transaction => {
           return await AssetConversionService.convertMaterial(
             test_user_id,
-            'red_shard',
-            'DIAMOND',
+            'red_core_shard',
+            'star_stone',
             0, // 无效数量
             {
               transaction,
@@ -1025,8 +1025,8 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
         TransactionManager.execute(async transaction => {
           return await AssetConversionService.convertMaterial(
             test_user_id,
-            'red_shard',
-            'DIAMOND',
+            'red_core_shard',
+            'star_stone',
             -5, // 负数
             {
               transaction,
@@ -1053,7 +1053,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
       // 获取当前余额
       const balanceResult = await TransactionManager.execute(async transaction => {
         return await BalanceService.getBalance(
-          { user_id: test_user_id, asset_code: 'red_shard' },
+          { user_id: test_user_id, asset_code: 'red_core_shard' },
           { transaction }
         )
       })
@@ -1067,7 +1067,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
           await BalanceService.changeBalance(
             {
               user_id: test_user_id,
-              asset_code: 'red_shard',
+              asset_code: 'red_core_shard',
               delta_amount: -reduction,
               idempotency_key: generateIdempotencyKey('reduce_for_insufficient_test'),
               business_type: 'test_burn',
@@ -1086,8 +1086,8 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
         TransactionManager.execute(async transaction => {
           return await AssetConversionService.convertMaterial(
             test_user_id,
-            'red_shard',
-            'DIAMOND',
+            'red_core_shard',
+            'star_stone',
             5,
             {
               transaction,
@@ -1108,12 +1108,12 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
       const exact_amount = 5
       const prepare_key = generateIdempotencyKey('convert_prepare_exact')
 
-      // 增加精确数量的红水晶碎片
+      // 增加精确数量的红源晶碎片
       await TransactionManager.execute(async transaction => {
         await BalanceService.changeBalance(
           {
             user_id: test_user_id,
-            asset_code: 'red_shard',
+            asset_code: 'red_core_shard',
             delta_amount: exact_amount,
             idempotency_key: prepare_key,
             business_type: 'test_mint',
@@ -1127,7 +1127,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
       // 获取增加后的余额
       const balanceResult = await TransactionManager.execute(async transaction => {
         return await BalanceService.getBalance(
-          { user_id: test_user_id, asset_code: 'red_shard' },
+          { user_id: test_user_id, asset_code: 'red_core_shard' },
           { transaction }
         )
       })
@@ -1141,8 +1141,8 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
       const result = await TransactionManager.execute(async transaction => {
         return await AssetConversionService.convertMaterial(
           test_user_id,
-          'red_shard',
-          'DIAMOND',
+          'red_core_shard',
+          'star_stone',
           convert_amount,
           {
             transaction,
@@ -1179,14 +1179,14 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
 
         await expect(
           // 注意：直接调用，不在 TransactionManager.execute 内
-          AssetConversionService.convertMaterial(test_user_id, 'red_shard', 'DIAMOND', 5, {
+          AssetConversionService.convertMaterial(test_user_id, 'red_core_shard', 'star_stone', 5, {
             idempotency_key
             // 没有 transaction 参数
           })
         ).rejects.toThrow(/事务边界|TRANSACTION_REQUIRED|必须在事务中/)
       })
 
-      it('convertRedShardToDiamond 便捷方法无事务调用应抛出错误', async () => {
+      it('convertRedCoreShardToStarStone 便捷方法无事务调用应抛出错误', async () => {
         /*
          * 便捷方法同样需要事务边界检查
          */
@@ -1194,7 +1194,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
         const idempotency_key = generateIdempotencyKey('convert_shortcut_no_tx')
 
         await expect(
-          AssetConversionService.convertRedShardToDiamond(test_user_id, 5, {
+          AssetConversionService.convertRedCoreShardToStarStone(test_user_id, 5, {
             idempotency_key
             // 没有 transaction 参数
           })
@@ -1214,13 +1214,13 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
         // 记录初始余额
         const initial_shard_result = await TransactionManager.execute(async transaction => {
           return await BalanceService.getBalance(
-            { user_id: test_user_id, asset_code: 'red_shard' },
+            { user_id: test_user_id, asset_code: 'red_core_shard' },
             { transaction }
           )
         })
         const initial_diamond_result = await TransactionManager.execute(async transaction => {
           return await BalanceService.getBalance(
-            { user_id: test_user_id, asset_code: 'DIAMOND' },
+            { user_id: test_user_id, asset_code: 'star_stone' },
             { transaction }
           )
         })
@@ -1231,11 +1231,11 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
         // 模拟事务中途失败的场景
         try {
           await TransactionManager.execute(async transaction => {
-            // 先增加一些红水晶碎片
+            // 先增加一些红源晶碎片
             await BalanceService.changeBalance(
               {
                 user_id: test_user_id,
-                asset_code: 'red_shard',
+                asset_code: 'red_core_shard',
                 delta_amount: 50,
                 idempotency_key: generateIdempotencyKey('rollback_test_mint'),
                 business_type: 'test_mint',
@@ -1246,10 +1246,16 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
             )
 
             // 执行转换
-            await AssetConversionService.convertMaterial(test_user_id, 'red_shard', 'DIAMOND', 5, {
-              transaction,
-              idempotency_key: generateIdempotencyKey('rollback_test_convert')
-            })
+            await AssetConversionService.convertMaterial(
+              test_user_id,
+              'red_core_shard',
+              'star_stone',
+              5,
+              {
+                transaction,
+                idempotency_key: generateIdempotencyKey('rollback_test_convert')
+              }
+            )
 
             // 故意抛出错误以触发回滚
             throw new Error('测试事务回滚 - 模拟业务错误')
@@ -1262,13 +1268,13 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
         // 验证：余额应与初始状态一致（所有变更已回滚）
         const after_shard_result = await TransactionManager.execute(async transaction => {
           return await BalanceService.getBalance(
-            { user_id: test_user_id, asset_code: 'red_shard' },
+            { user_id: test_user_id, asset_code: 'red_core_shard' },
             { transaction }
           )
         })
         const after_diamond_result = await TransactionManager.execute(async transaction => {
           return await BalanceService.getBalance(
-            { user_id: test_user_id, asset_code: 'DIAMOND' },
+            { user_id: test_user_id, asset_code: 'star_stone' },
             { transaction }
           )
         })
@@ -1289,13 +1295,13 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
         // 记录初始余额
         const initial_shard_result = await TransactionManager.execute(async transaction => {
           return await BalanceService.getBalance(
-            { user_id: test_user_id, asset_code: 'red_shard' },
+            { user_id: test_user_id, asset_code: 'red_core_shard' },
             { transaction }
           )
         })
         const initial_diamond_result = await TransactionManager.execute(async transaction => {
           return await BalanceService.getBalance(
-            { user_id: test_user_id, asset_code: 'DIAMOND' },
+            { user_id: test_user_id, asset_code: 'star_stone' },
             { transaction }
           )
         })
@@ -1309,7 +1315,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
           await BalanceService.changeBalance(
             {
               user_id: test_user_id,
-              asset_code: 'red_shard',
+              asset_code: 'red_core_shard',
               delta_amount: prepare_amount,
               idempotency_key: generateIdempotencyKey('commit_test_mint'),
               business_type: 'test_mint',
@@ -1325,8 +1331,8 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
         const result = await TransactionManager.execute(async transaction => {
           return await AssetConversionService.convertMaterial(
             test_user_id,
-            'red_shard',
-            'DIAMOND',
+            'red_core_shard',
+            'star_stone',
             convert_amount,
             {
               transaction,
@@ -1342,13 +1348,13 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
         // 验证：事务已提交，余额已变更
         const after_shard_result = await TransactionManager.execute(async transaction => {
           return await BalanceService.getBalance(
-            { user_id: test_user_id, asset_code: 'red_shard' },
+            { user_id: test_user_id, asset_code: 'red_core_shard' },
             { transaction }
           )
         })
         const after_diamond_result = await TransactionManager.execute(async transaction => {
           return await BalanceService.getBalance(
-            { user_id: test_user_id, asset_code: 'DIAMOND' },
+            { user_id: test_user_id, asset_code: 'star_stone' },
             { transaction }
           )
         })
@@ -1358,10 +1364,10 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
 
         /*
          * 关键断言：余额应该正确变更
-         * 红水晶碎片：初始 + 准备 - 转换
+         * 红源晶碎片：初始 + 准备 - 转换
          */
         expect(after_shard_amount).toBe(initial_shard_amount + prepare_amount - convert_amount)
-        // 钻石：初始 + 转换产出
+        // 星石：初始 + 转换产出
         expect(after_diamond_amount).toBe(initial_diamond_amount + result.to_amount)
       })
     })
@@ -1375,8 +1381,8 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
         TransactionManager.execute(async transaction => {
           return await AssetConversionService.convertMaterial(
             test_user_id,
-            'red_shard',
-            'DIAMOND',
+            'red_core_shard',
+            'star_stone',
             5,
             { transaction } // 缺少 idempotency_key
           )
@@ -1391,8 +1397,8 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
         TransactionManager.execute(async transaction => {
           return await AssetConversionService.convertMaterial(
             0, // 无效 user_id
-            'red_shard',
-            'DIAMOND',
+            'red_core_shard',
+            'star_stone',
             5,
             { transaction, idempotency_key }
           )
@@ -1408,7 +1414,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
           return await AssetConversionService.convertMaterial(
             test_user_id,
             '', // 空源材料
-            'DIAMOND',
+            'star_stone',
             5,
             { transaction, idempotency_key }
           )
@@ -1423,7 +1429,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
         TransactionManager.execute(async transaction => {
           return await AssetConversionService.convertMaterial(
             test_user_id,
-            'red_shard',
+            'red_core_shard',
             '', // 空目标资产
             5,
             { transaction, idempotency_key }
@@ -1440,7 +1446,7 @@ describe('AssetConversionService - 资产转换服务单元测试', () => {
           return await AssetConversionService.convertMaterial(
             test_user_id,
             'nonexistent_material', // 不存在的材料
-            'DIAMOND',
+            'star_stone',
             5,
             { transaction, idempotency_key }
           )

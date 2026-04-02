@@ -42,12 +42,13 @@ const AdminSystemService = require('./AdminSystemService')
 const logger = require('../utils/logger')
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 const { BusinessCacheHelper } = require('../utils/BusinessCacheHelper')
+const { AssetCode } = require('../constants/AssetCode')
 
 /**
  * 获取允许的结算币种白名单（多币种扩展 - 2026-01-14）
  *
  * 从 system_settings 读取 allowed_settlement_assets 配置
- * 默认值：['DIAMOND', 'red_shard']
+ * 默认值：[AssetCode.STAR_STONE, AssetCode.RED_CORE_SHARD]
  *
  * @returns {Promise<string[]>} 允许的结算币种代码数组
  */
@@ -55,7 +56,7 @@ async function getAllowedSettlementAssets() {
   const whitelist = await AdminSystemService.getSettingValue(
     'marketplace',
     'allowed_settlement_assets',
-    ['DIAMOND', 'red_shard'] // 默认值
+    [AssetCode.STAR_STONE, AssetCode.RED_CORE_SHARD] // 默认值
   )
 
   // 如果是字符串（JSON格式），解析为数组
@@ -66,11 +67,11 @@ async function getAllowedSettlementAssets() {
       logger.warn('[TradeOrderService] 解析 allowed_settlement_assets 失败，使用默认值', {
         whitelist
       })
-      return ['DIAMOND', 'red_shard']
+      return [AssetCode.STAR_STONE, AssetCode.RED_CORE_SHARD]
     }
   }
 
-  return Array.isArray(whitelist) ? whitelist : ['DIAMOND', 'red_shard']
+  return Array.isArray(whitelist) ? whitelist : [AssetCode.STAR_STONE, AssetCode.RED_CORE_SHARD]
 }
 
 /**
@@ -333,8 +334,8 @@ class TradeOrderService {
        * 多币种手续费计算（2026-01-14 扩展）
        *
        * 计费模式：
-       * - DIAMOND：分档模式（基于 itemValue 分档 + ceil + 最低费 1）
-       * - red_shard 等其他币种：单一费率模式（从 system_settings 读取费率和最低费）
+       * - star_stone：分档模式（基于 itemValue 分档 + ceil + 最低费 1）
+       * - red_core_shard 等其他币种：单一费率模式（从 system_settings 读取费率和最低费）
        *
        * 价值锚点：
        * - item：优先取 Item.meta.value 作为"价值锚点"
@@ -348,7 +349,7 @@ class TradeOrderService {
       // 使用多币种手续费计算方法（2026-01-14 多币种扩展）
       const feeInfo = await FeeCalculator.calculateFeeByAsset(
         listing.price_asset_code, // 结算币种
-        itemValue, // 价值锚点（DIAMOND 分档模式使用）
+        itemValue, // 价值锚点（star_stone 分档模式使用）
         listing.price_amount // 用户定价
       )
       feeAmount = feeInfo.fee

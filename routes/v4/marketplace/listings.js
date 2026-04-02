@@ -24,6 +24,7 @@
 
 const express = require('express')
 const router = express.Router()
+const { AssetCode } = require('../../../constants/AssetCode')
 const { authenticateToken } = require('../../../middleware/auth')
 const { validatePositiveInteger, handleServiceError } = require('../../../middleware/validation')
 const logger = require('../../../utils/logger').logger
@@ -41,7 +42,7 @@ const logger = require('../../../utils/logger').logger
  * @query {number} page - 页码（默认1）
  * @query {number} page_size - 每页数量（默认20）
  * @query {string} listing_kind - 挂牌类型筛选（item / fungible_asset，可选）
- * @query {string} asset_code - 资产代码筛选（如 red_shard，仅对 fungible_asset 有效）
+ * @query {string} asset_code - 资产代码筛选（如 red_core_shard，仅对 fungible_asset 有效）
  * @query {string|number} item_category_code - 物品类目筛选（category_code 或 category_id，仅对 item 类型有效）
  * @query {string} asset_group_code - 资产分组代码筛选（仅对 fungible_asset 有效）
  * @query {string} rarity_code - 稀有度代码筛选（仅对 item_instance 有效）
@@ -201,7 +202,7 @@ router.get('/listings/facets', authenticateToken, async (req, res) => {
  * @returns {string} data.name - 物品名称（2026-01-20 统一字段名）
  * @returns {string} data.item_type - 物品类型
  * @returns {number} data.price_amount - 价格数量
- * @returns {string} data.price_asset_code - 价格资产类型（如DIAMOND）
+ * @returns {string} data.price_asset_code - 价格资产类型（如star_stone）
  * @returns {number} data.seller_user_id - 卖家用户ID
  * @returns {string} data.status - 状态（on_sale/sold/withdrawn）
  * @returns {string} data.listed_at - 上架时间
@@ -259,7 +260,7 @@ router.get(
         : null
       plainListing.asset_group_code = plainListing.offer_asset_group_code || null
       plainListing.asset_display_name = plainListing.offer_asset_display_name || null
-      plainListing.price_asset_code = plainListing.price_asset_code || 'DIAMOND'
+      plainListing.price_asset_code = plainListing.price_asset_code || AssetCode.STAR_STONE
       plainListing.listed_at = plainListing.created_at
       plainListing.description = plainListing.offerItem?.meta?.description || ''
       plainListing.is_own = plainListing.seller_user_id === req.user.user_id

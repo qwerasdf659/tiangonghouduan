@@ -3,7 +3,7 @@
  *
  * 测试目标：
  * 1. 兑换市场材料扣减改为统一账本（business_type: exchange_debit）
- * 2. 材料→DIAMOND转换改为统一账本双分录（material_convert_debit + material_convert_credit）
+ * 2. 材料→star_stone转换改为统一账本双分录（material_convert_debit + material_convert_credit）
  * 3. 统一409幂等冲突语义（参数不同返回409）
  *
  * 创建时间：2025-12-15
@@ -56,11 +56,11 @@ describe('Phase 3迁移测试：统一账本域', () => {
       console.log('✅ 使用已存在测试用户:', testUser.user_id)
     }
 
-    // 确保 red_shard → DIAMOND 转换规则存在（固定比例 1:20）
+    // 确保 red_core_shard → star_stone 转换规则存在（固定比例 1:20）
     const existingRule = await MaterialConversionRule.findOne({
       where: {
-        from_asset_code: 'red_shard',
-        to_asset_code: 'DIAMOND',
+        from_asset_code: 'red_core_shard',
+        to_asset_code: 'star_stone',
         is_enabled: true
       }
     })
@@ -68,8 +68,8 @@ describe('Phase 3迁移测试：统一账本域', () => {
     if (!existingRule) {
       try {
         await MaterialConversionRule.create({
-          from_asset_code: 'red_shard',
-          to_asset_code: 'DIAMOND',
+          from_asset_code: 'red_core_shard',
+          to_asset_code: 'star_stone',
           from_amount: 1,
           to_amount: 20,
           fee_rate: 0,
@@ -78,7 +78,7 @@ describe('Phase 3迁移测试：统一账本域', () => {
           created_by: testUser.user_id
         })
         createdConversionRule = true
-        console.log('✅ 创建转换规则: red_shard → DIAMOND (1:20)')
+        console.log('✅ 创建转换规则: red_core_shard → star_stone (1:20)')
       } catch (createError) {
         console.warn('⚠️ 通过ORM创建规则失败，尝试原生SQL:', createError.message)
         try {
@@ -86,18 +86,18 @@ describe('Phase 3迁移测试：统一账本域', () => {
             `
             INSERT INTO material_conversion_rules 
             (from_asset_code, to_asset_code, from_amount, to_amount, fee_rate, min_from_amount, is_enabled, effective_at, created_by, created_at, updated_at)
-            VALUES ('red_shard', 'DIAMOND', 1, 20, 0.0000, 1, 1, '2025-01-01', :userId, NOW(), NOW())
+            VALUES ('red_core_shard', 'star_stone', 1, 20, 0.0000, 1, 1, '2025-01-01', :userId, NOW(), NOW())
           `,
             { replacements: { userId: testUser.user_id } }
           )
           createdConversionRule = true
-          console.log('✅ 通过原生SQL创建转换规则: red_shard → DIAMOND (1:20)')
+          console.log('✅ 通过原生SQL创建转换规则: red_core_shard → star_stone (1:20)')
         } catch (sqlError) {
           console.error('❌ 转换规则创建失败（测试可能会跳过）:', sqlError.message)
         }
       }
     } else {
-      console.log('✅ 转换规则已存在: red_shard → DIAMOND')
+      console.log('✅ 转换规则已存在: red_core_shard → star_stone')
     }
   })
 
@@ -116,8 +116,8 @@ describe('Phase 3迁移测试：统一账本域', () => {
     if (createdConversionRule) {
       await MaterialConversionRule.destroy({
         where: {
-          from_asset_code: 'red_shard',
-          to_asset_code: 'DIAMOND',
+          from_asset_code: 'red_core_shard',
+          to_asset_code: 'star_stone',
           created_by: testUser?.user_id
         }
       })
@@ -134,13 +134,13 @@ describe('Phase 3迁移测试：统一账本域', () => {
         }
       })
 
-      // 给测试用户添加red_shard余额（使用事务包裹）
+      // 给测试用户添加red_core_shard余额（使用事务包裹）
       await TransactionManager.execute(async transaction => {
         await BalanceService.changeBalance(
           {
             user_id: testUser.user_id,
-            asset_code: 'red_shard',
-            delta_amount: 100, // 添加100个red_shard
+            asset_code: 'red_core_shard',
+            delta_amount: 100, // 添加100个red_core_shard
             idempotency_key: `test_phase3_init_${Date.now()}`,
             business_type: 'admin_adjustment',
             meta: { reason: 'Phase 3测试初始化' }
@@ -152,7 +152,7 @@ describe('Phase 3迁移测试：统一账本域', () => {
 
     test('材料转换应使用统一账本双分录', async () => {
       const ruleExists = await MaterialConversionRule.findOne({
-        where: { from_asset_code: 'red_shard', to_asset_code: 'DIAMOND', is_enabled: true }
+        where: { from_asset_code: 'red_core_shard', to_asset_code: 'star_stone', is_enabled: true }
       })
       if (!ruleExists) {
         console.log('⏭️ 跳过：转换规则不存在')
@@ -162,29 +162,29 @@ describe('Phase 3迁移测试：统一账本域', () => {
       const idempotency_key = `test_phase3_convert_${Date.now()}`
 
       // 记录转换前的余额
-      const before_red_shard = await BalanceService.getBalance(
-        { user_id: testUser.user_id, asset_code: 'red_shard' },
+      const before_red_core_shard = await BalanceService.getBalance(
+        { user_id: testUser.user_id, asset_code: 'red_core_shard' },
         {}
       )
       const before_diamond = await BalanceService.getBalance(
-        { user_id: testUser.user_id, asset_code: 'DIAMOND' },
+        { user_id: testUser.user_id, asset_code: 'star_stone' },
         {}
       )
 
-      // 执行转换：10个red_shard → 200个DIAMOND（使用事务包裹）
+      // 执行转换：10个red_core_shard → 200个star_stone（使用事务包裹）
       const result = await TransactionManager.execute(async transaction => {
         return await AssetConversionService.convertMaterial(
           testUser.user_id,
-          'red_shard',
-          'DIAMOND',
+          'red_core_shard',
+          'star_stone',
           10,
           { idempotency_key, transaction }
         )
       })
 
       expect(result.success).toBe(true)
-      expect(result.from_asset_code).toBe('red_shard')
-      expect(result.to_asset_code).toBe('DIAMOND')
+      expect(result.from_asset_code).toBe('red_core_shard')
+      expect(result.to_asset_code).toBe('star_stone')
       expect(result.from_amount).toBe(10)
       expect(result.to_amount).toBe(200) // 1:20比例
       expect(result.is_duplicate).toBe(false)
@@ -197,7 +197,7 @@ describe('Phase 3迁移测试：统一账本域', () => {
         where: {
           idempotency_key: `${idempotency_key}:debit`,
           business_type: 'material_convert_debit',
-          asset_code: 'red_shard'
+          asset_code: 'red_core_shard'
         }
       })
 
@@ -205,27 +205,27 @@ describe('Phase 3迁移测试：统一账本域', () => {
         where: {
           idempotency_key: `${idempotency_key}:credit`,
           business_type: 'material_convert_credit',
-          asset_code: 'DIAMOND'
+          asset_code: 'star_stone'
         }
       })
 
       expect(debit_tx).not.toBeNull()
       expect(credit_tx).not.toBeNull()
-      expect(Number(debit_tx.delta_amount)).toBe(-10) // 扣减10个red_shard
-      expect(Number(credit_tx.delta_amount)).toBe(200) // 增加200个DIAMOND
+      expect(Number(debit_tx.delta_amount)).toBe(-10) // 扣减10个red_core_shard
+      expect(Number(credit_tx.delta_amount)).toBe(200) // 增加200个star_stone
 
       // 验证余额变化（基于转换前余额）
-      const after_red_shard = await BalanceService.getBalance(
-        { user_id: testUser.user_id, asset_code: 'red_shard' },
+      const after_red_core_shard = await BalanceService.getBalance(
+        { user_id: testUser.user_id, asset_code: 'red_core_shard' },
         {}
       )
       const after_diamond = await BalanceService.getBalance(
-        { user_id: testUser.user_id, asset_code: 'DIAMOND' },
+        { user_id: testUser.user_id, asset_code: 'star_stone' },
         {}
       )
 
-      expect(Number(after_red_shard.available_amount)).toBe(
-        Number(before_red_shard.available_amount) - 10
+      expect(Number(after_red_core_shard.available_amount)).toBe(
+        Number(before_red_core_shard.available_amount) - 10
       )
       expect(Number(after_diamond.available_amount)).toBe(
         Number(before_diamond.available_amount) + 200
@@ -236,7 +236,7 @@ describe('Phase 3迁移测试：统一账本域', () => {
 
     test('材料转换幂等性测试（参数相同）', async () => {
       const ruleExists = await MaterialConversionRule.findOne({
-        where: { from_asset_code: 'red_shard', to_asset_code: 'DIAMOND', is_enabled: true }
+        where: { from_asset_code: 'red_core_shard', to_asset_code: 'star_stone', is_enabled: true }
       })
       if (!ruleExists) {
         console.log('⏭️ 跳过：转换规则不存在')
@@ -247,7 +247,7 @@ describe('Phase 3迁移测试：统一账本域', () => {
 
       // 记录转换前的余额
       const before_balance = await BalanceService.getBalance(
-        { user_id: testUser.user_id, asset_code: 'red_shard' },
+        { user_id: testUser.user_id, asset_code: 'red_core_shard' },
         {}
       )
 
@@ -255,8 +255,8 @@ describe('Phase 3迁移测试：统一账本域', () => {
       const result1 = await TransactionManager.execute(async transaction => {
         return await AssetConversionService.convertMaterial(
           testUser.user_id,
-          'red_shard',
-          'DIAMOND',
+          'red_core_shard',
+          'star_stone',
           5,
           { idempotency_key, transaction }
         )
@@ -269,8 +269,8 @@ describe('Phase 3迁移测试：统一账本域', () => {
       const result2 = await TransactionManager.execute(async transaction => {
         return await AssetConversionService.convertMaterial(
           testUser.user_id,
-          'red_shard',
-          'DIAMOND',
+          'red_core_shard',
+          'star_stone',
           5,
           { idempotency_key, transaction }
         )
@@ -285,7 +285,7 @@ describe('Phase 3迁移测试：统一账本域', () => {
 
       // 验证余额只扣减一次（基于转换前余额）
       const after_balance = await BalanceService.getBalance(
-        { user_id: testUser.user_id, asset_code: 'red_shard' },
+        { user_id: testUser.user_id, asset_code: 'red_core_shard' },
         {}
       )
 
@@ -298,7 +298,7 @@ describe('Phase 3迁移测试：统一账本域', () => {
 
     test('材料转换409冲突检查（参数不同）', async () => {
       const ruleExists = await MaterialConversionRule.findOne({
-        where: { from_asset_code: 'red_shard', to_asset_code: 'DIAMOND', is_enabled: true }
+        where: { from_asset_code: 'red_core_shard', to_asset_code: 'star_stone', is_enabled: true }
       })
       if (!ruleExists) {
         console.log('⏭️ 跳过：转换规则不存在')
@@ -307,12 +307,12 @@ describe('Phase 3迁移测试：统一账本域', () => {
 
       const idempotency_key = `test_phase3_convert_conflict_${Date.now()}`
 
-      // 第一次转换：5个red_shard（使用事务包裹）
+      // 第一次转换：5个red_core_shard（使用事务包裹）
       await TransactionManager.execute(async transaction => {
         return await AssetConversionService.convertMaterial(
           testUser.user_id,
-          'red_shard',
-          'DIAMOND',
+          'red_core_shard',
+          'star_stone',
           5,
           {
             idempotency_key,
@@ -326,8 +326,8 @@ describe('Phase 3迁移测试：统一账本域', () => {
         TransactionManager.execute(async transaction => {
           return await AssetConversionService.convertMaterial(
             testUser.user_id,
-            'red_shard',
-            'DIAMOND',
+            'red_core_shard',
+            'star_stone',
             10, // 不同数量
             { idempotency_key, transaction }
           )
@@ -338,8 +338,8 @@ describe('Phase 3迁移测试：统一账本域', () => {
         await TransactionManager.execute(async transaction => {
           return await AssetConversionService.convertMaterial(
             testUser.user_id,
-            'red_shard',
-            'DIAMOND',
+            'red_core_shard',
+            'star_stone',
             10,
             {
               idempotency_key,
@@ -361,12 +361,12 @@ describe('Phase 3迁移测试：统一账本域', () => {
     test('验证材料转换的business_type', async () => {
       const idempotency_key = `test_phase3_business_type_${Date.now()}`
 
-      // 添加red_shard余额（使用事务包裹）
+      // 添加red_core_shard余额（使用事务包裹）
       await TransactionManager.execute(async transaction => {
         await BalanceService.changeBalance(
           {
             user_id: testUser.user_id,
-            asset_code: 'red_shard',
+            asset_code: 'red_core_shard',
             delta_amount: 20,
             idempotency_key: `test_init_${Date.now()}`,
             business_type: 'admin_adjustment',
@@ -380,8 +380,8 @@ describe('Phase 3迁移测试：统一账本域', () => {
       await TransactionManager.execute(async transaction => {
         return await AssetConversionService.convertMaterial(
           testUser.user_id,
-          'red_shard',
-          'DIAMOND',
+          'red_core_shard',
+          'star_stone',
           10,
           {
             idempotency_key,
@@ -394,7 +394,7 @@ describe('Phase 3迁移测试：统一账本域', () => {
       const debit_tx = await AssetTransaction.findOne({
         where: {
           idempotency_key: `${idempotency_key}:debit`,
-          asset_code: 'red_shard'
+          asset_code: 'red_core_shard'
         }
       })
 
@@ -402,7 +402,7 @@ describe('Phase 3迁移测试：统一账本域', () => {
       const credit_tx = await AssetTransaction.findOne({
         where: {
           idempotency_key: `${idempotency_key}:credit`,
-          asset_code: 'DIAMOND'
+          asset_code: 'star_stone'
         }
       })
 
@@ -419,12 +419,12 @@ describe('Phase 3迁移测试：统一账本域', () => {
     test('验证所有资产变动都记录在asset_transactions表', async () => {
       const idempotency_key = `test_phase3_unified_ledger_${Date.now()}`
 
-      // 添加red_shard余额（使用事务包裹）
+      // 添加red_core_shard余额（使用事务包裹）
       await TransactionManager.execute(async transaction => {
         await BalanceService.changeBalance(
           {
             user_id: testUser.user_id,
-            asset_code: 'red_shard',
+            asset_code: 'red_core_shard',
             delta_amount: 30,
             idempotency_key: `test_init_${Date.now()}`,
             business_type: 'admin_adjustment',
@@ -438,8 +438,8 @@ describe('Phase 3迁移测试：统一账本域', () => {
       await TransactionManager.execute(async transaction => {
         return await AssetConversionService.convertMaterial(
           testUser.user_id,
-          'red_shard',
-          'DIAMOND',
+          'red_core_shard',
+          'star_stone',
           15,
           {
             idempotency_key,
@@ -463,12 +463,12 @@ describe('Phase 3迁移测试：统一账本域', () => {
       const creditTx = transactions.find(t => t.business_type === 'material_convert_credit')
 
       expect(debitTx).toBeTruthy()
-      expect(debitTx.asset_code).toBe('red_shard')
+      expect(debitTx.asset_code).toBe('red_core_shard')
       expect(Number(debitTx.delta_amount)).toBe(-15)
       expect(debitTx.business_type).toBe('material_convert_debit')
 
       expect(creditTx).toBeTruthy()
-      expect(creditTx.asset_code).toBe('DIAMOND')
+      expect(creditTx.asset_code).toBe('star_stone')
       expect(Number(creditTx.delta_amount)).toBe(300) // 15 * 20 = 300
       expect(creditTx.business_type).toBe('material_convert_credit')
 

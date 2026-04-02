@@ -109,8 +109,8 @@ module.exports = sequelize => {
       /**
        * 核心设计数据（JSON）
        *
-       * 串珠模式示例：{ mode: 'beading', beads: [{ position: 0, asset_code: 'red_shard', diameter: 10 }, ...] }
-       * 镶嵌模式示例：{ mode: 'slots', fillings: { slot_center: { asset_code: 'blue_crystal' }, ... } }
+       * 串珠模式示例：{ mode: 'beading', beads: [{ position: 0, asset_code: 'red_core_shard', diameter: 10 }, ...] }
+       * 镶嵌模式示例：{ mode: 'slots', fillings: { slot_center: { asset_code: 'blue_core_gem' }, ... } }
        */
       design_data: {
         type: DataTypes.JSON,
@@ -120,7 +120,7 @@ module.exports = sequelize => {
 
       /**
        * 总消耗明细（JSON 数组）
-       * [{ asset_code: 'red_shard', amount: 5 }, { asset_code: 'blue_crystal', amount: 2 }]
+       * [{ asset_code: 'red_core_shard', amount: 5 }, { asset_code: 'blue_core_gem', amount: 2 }]
        */
       total_cost: {
         type: DataTypes.JSON,

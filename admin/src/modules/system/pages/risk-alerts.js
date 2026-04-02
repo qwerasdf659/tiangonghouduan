@@ -1068,8 +1068,8 @@ function riskAlertsPage() {
               settingsMap.monitor_alert_enabled === true ||
               settingsMap.monitor_alert_enabled === 'true',
             long_listing_days: settingsMap.monitor_long_listing_days ?? '未配置',
-            min_price: settingsMap.min_price_red_shard ?? '未配置',
-            max_price: settingsMap.max_price_red_shard ?? '未配置'
+            min_price: settingsMap.min_price_red_core_shard ?? '未配置',
+            max_price: settingsMap.max_price_red_core_shard ?? '未配置'
           }
         }
 

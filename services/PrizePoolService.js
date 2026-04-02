@@ -67,6 +67,7 @@ const AuditLogService = require('./AuditLogService') // 审计日志服务
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 const { BusinessCacheHelper } = require('../utils/BusinessCacheHelper') // 缓存失效服务
 const { getImageUrl } = require('../utils/ImageUrlHelper')
+const { AssetCode } = require('../constants/AssetCode')
 
 const logger = require('../utils/logger').logger
 
@@ -221,20 +222,20 @@ class PrizePoolService {
 
       /*
        * 按奖品类型分治计算 budget_cost（决定 1 方案 D）
-       * - 虚拟物品（非 DIAMOND）：强制 material_amount × budget_value_points
-       * - DIAMOND / 保底：固定 0
+       * - 虚拟物品（非 star_stone）：强制 material_amount × budget_value_points
+       * - star_stone / 保底：固定 0
        * - 传统奖品：接受运营填写，回退到 pvp
        */
       // eslint-disable-next-line no-await-in-loop -- 碎片奖品需要查询 MaterialAssetType 计算 budget_cost
       let computed_budget_cost
-      if (prizeData.material_asset_code && prizeData.material_asset_code !== 'DIAMOND') {
+      if (prizeData.material_asset_code && prizeData.material_asset_code !== AssetCode.STAR_STONE) {
         const assetType = await MaterialAssetType.findOne({
           where: { asset_code: prizeData.material_asset_code },
           transaction
         })
         computed_budget_cost =
           (parseInt(prizeData.material_amount) || 0) * (assetType?.budget_value_points || 0)
-      } else if (prizeData.material_asset_code === 'DIAMOND' || prizeData.is_fallback) {
+      } else if (prizeData.material_asset_code === AssetCode.STAR_STONE || prizeData.is_fallback) {
         computed_budget_cost = 0
       } else {
         computed_budget_cost =
@@ -248,7 +249,7 @@ class PrizePoolService {
       let resolvedMaterialAssetCode = prizeData.material_asset_code || null
       if (!resolvedMaterialAssetCode && !prizeData.primary_media_id) {
         if (prizeData.prize_type === 'points') {
-          resolvedMaterialAssetCode = 'POINTS'
+          resolvedMaterialAssetCode = AssetCode.POINTS
           logger.info('[奖品池] 积分类奖品自动关联 POINTS 材料图标', {
             prize_name: prizeData.prize_name
           })
@@ -848,18 +849,18 @@ class PrizePoolService {
 
     /*
      * 4a. budget_cost 分治重算：当 material_amount 或 material_asset_code 变更时
-     * 按奖品类型分治：虚拟物品强制 material_amount × budget_value_points，DIAMOND/保底=0
+     * 按奖品类型分治：虚拟物品强制 material_amount × budget_value_points，star_stone/保底=0
      */
     const mac = filteredUpdateData.material_asset_code ?? prize.material_asset_code
     const ma = filteredUpdateData.material_amount ?? prize.material_amount
     const isFallback = filteredUpdateData.is_fallback ?? prize.is_fallback
-    if (mac && mac !== 'DIAMOND') {
+    if (mac && mac !== AssetCode.STAR_STONE) {
       const assetType = await MaterialAssetType.findOne({
         where: { asset_code: mac },
         transaction
       })
       filteredUpdateData.budget_cost = (parseInt(ma) || 0) * (assetType?.budget_value_points || 0)
-    } else if (mac === 'DIAMOND' || isFallback) {
+    } else if (mac === AssetCode.STAR_STONE || isFallback) {
       filteredUpdateData.budget_cost = 0
     }
 

@@ -32,6 +32,8 @@
  * - approvalRequired: 是否需要审批（业务决策 2025-12-30：无需审批）
  * - conflict: 配置冲突说明和解决方案
  */
+const { AssetCode } = require('../constants/AssetCode')
+
 const SYSTEM_SETTINGS_WHITELIST = {
   // ===== 基础设置（展示类，适合 DB）=====
   'basic/system_name': {
@@ -172,7 +174,7 @@ const SYSTEM_SETTINGS_WHITELIST = {
     approvalRequired: false // ✅ 业务决策：无需审批，运营主管可直接修改
   },
 
-  // ===== 消费比例配置（2026-03-02 钻石配额优化方案）=====
+  // ===== 消费比例配置（2026-03-02 星石配额优化方案）=====
   'points/points_award_ratio': {
     type: 'number',
     min: 0.1, // 防止接近零导致消费无积分
@@ -187,37 +189,37 @@ const SYSTEM_SETTINGS_WHITELIST = {
     approvalRequired: false
   },
 
-  'points/diamond_quota_ratio': {
+  'points/star_stone_quota_ratio': {
     type: 'number',
     min: 0.1,
     max: 5.0,
     step: 0.01,
     default: 1.0,
     readonly: false,
-    description: '钻石配额比例（消费金额×该系数=钻石配额数量）',
+    description: '星石配额比例（消费金额×该系数=星石配额数量）',
     changeRequiresRestart: false,
     businessImpact: 'CRITICAL',
     auditRequired: true,
     approvalRequired: false
   },
 
-  'points/diamond_quota_enabled': {
+  'points/star_stone_quota_enabled': {
     type: 'boolean',
     default: true, // 保护类机制默认开启（运营忘配也安全）
     readonly: false,
-    description: '抽奖钻石配额控制（开启后配额不足的用户不会抽到钻石奖品）',
+    description: '抽奖星石配额控制（开启后配额不足的用户不会抽到星石奖品）',
     changeRequiresRestart: false,
     businessImpact: 'HIGH',
     auditRequired: true,
     approvalRequired: false
   },
 
-  'points/diamond_quota_exhausted_action': {
+  'points/star_stone_quota_exhausted_action': {
     type: 'string',
     pattern: /^(filter|downgrade)$/,
     default: 'filter', // filter=更严格，安全默认值
     readonly: false,
-    description: '配额不足策略（filter=移除全部钻石奖品，downgrade=保留最小额钻石）',
+    description: '配额不足策略（filter=移除全部星石奖品，downgrade=保留最小额星石）',
     changeRequiresRestart: false,
     businessImpact: 'HIGH',
     auditRequired: true,
@@ -283,7 +285,7 @@ const SYSTEM_SETTINGS_WHITELIST = {
   // ===== 多币种扩展配置（2026-01-14 新增）=====
   'marketplace/allowed_listing_assets': {
     type: 'json',
-    default: ['DIAMOND', 'red_shard'],
+    default: [AssetCode.STAR_STONE, AssetCode.RED_CORE_SHARD],
     readonly: false,
     description: '挂牌白名单：允许用于新挂牌定价的币种列表（用于"灰度下线"：禁新挂牌但存量可成交）',
     changeRequiresRestart: false,
@@ -294,7 +296,7 @@ const SYSTEM_SETTINGS_WHITELIST = {
 
   'marketplace/allowed_settlement_assets': {
     type: 'json',
-    default: ['DIAMOND', 'red_shard'],
+    default: [AssetCode.STAR_STONE, AssetCode.RED_CORE_SHARD],
     readonly: false,
     description: '结算白名单：允许用于订单结算的币种列表（创建订单时校验）',
     changeRequiresRestart: false,
@@ -304,28 +306,28 @@ const SYSTEM_SETTINGS_WHITELIST = {
   },
 
   // ----- 手续费率配置（按币种）-----
-  'marketplace/fee_rate_DIAMOND': {
+  'marketplace/fee_rate_star_stone': {
     type: 'number',
     min: 0.01,
     max: 0.3,
     step: 0.01,
     default: 0.05,
     readonly: false,
-    description: 'DIAMOND币种交易手续费率（5% = 0.05）',
+    description: '星石币种交易手续费率（5% = 0.05）',
     changeRequiresRestart: false,
     businessImpact: 'CRITICAL',
     auditRequired: true,
     approvalRequired: false
   },
 
-  'marketplace/fee_rate_red_shard': {
+  'marketplace/fee_rate_red_core_shard': {
     type: 'number',
     min: 0.01,
     max: 0.3,
     step: 0.01,
     default: 0.05,
     readonly: false,
-    description: 'red_shard币种交易手续费率（5% = 0.05）',
+    description: '红源晶碎片币种交易手续费率（5% = 0.05）',
     changeRequiresRestart: false,
     businessImpact: 'CRITICAL',
     auditRequired: true,
@@ -333,26 +335,26 @@ const SYSTEM_SETTINGS_WHITELIST = {
   },
 
   // ----- 最低手续费配置（按币种）-----
-  'marketplace/fee_min_DIAMOND': {
+  'marketplace/fee_min_star_stone': {
     type: 'number',
     min: 1,
     max: 100,
     default: 1,
     readonly: false,
-    description: 'DIAMOND币种最低手续费（防止低价商品零手续费）',
+    description: '星石币种最低手续费（防止低价商品零手续费）',
     changeRequiresRestart: false,
     businessImpact: 'HIGH',
     auditRequired: true,
     approvalRequired: false
   },
 
-  'marketplace/fee_min_red_shard': {
+  'marketplace/fee_min_red_core_shard': {
     type: 'number',
     min: 1,
     max: 100,
     default: 1,
     readonly: false,
-    description: 'red_shard币种最低手续费（防止低价商品零手续费）',
+    description: '红源晶碎片币种最低手续费（防止低价商品零手续费）',
     changeRequiresRestart: false,
     businessImpact: 'HIGH',
     auditRequired: true,
@@ -360,92 +362,118 @@ const SYSTEM_SETTINGS_WHITELIST = {
   },
 
   // ----- 价格区间配置（按币种）-----
-  'marketplace/min_price_DIAMOND': {
+  'marketplace/min_price_star_stone': {
     type: 'number',
     min: 1,
     max: 1000,
     default: 1,
     readonly: false,
-    description: 'DIAMOND币种挂牌最低价格',
+    description: '星石币种挂牌最低价格',
     changeRequiresRestart: false,
     businessImpact: 'MEDIUM',
     auditRequired: true,
     approvalRequired: false
   },
 
-  'marketplace/min_price_red_shard': {
+  'marketplace/min_price_red_core_shard': {
     type: 'number',
     min: 1,
     max: 1000,
     default: 1,
     readonly: false,
-    description: 'red_shard币种挂牌最低价格',
+    description: '红源晶碎片币种挂牌最低价格',
     changeRequiresRestart: false,
     businessImpact: 'MEDIUM',
     auditRequired: true,
     approvalRequired: false
   },
 
-  'marketplace/max_price_red_shard': {
+  'marketplace/max_price_red_core_shard': {
     type: 'number',
     min: 1000,
     max: 10000000,
     default: 1000000,
     readonly: false,
-    description: 'red_shard币种挂牌最高价格（防止恶意定价）',
+    description: '红源晶碎片币种挂牌最高价格（防止恶意定价）',
     changeRequiresRestart: false,
     businessImpact: 'MEDIUM',
     auditRequired: true,
     approvalRequired: false
   },
 
-  // ----- 风控日限配置（按等级和币种）-----
-  'marketplace/daily_max_listings_normal': {
+  // ----- 风控日限配置（按币种）-----
+  'marketplace/daily_max_listings_star_stone': {
     type: 'number',
     min: 1,
     max: 100,
     default: 20,
     readonly: false,
-    description: 'normal等级用户每日最大挂牌次数',
+    description: '每日星石最大挂牌次数',
     changeRequiresRestart: false,
     businessImpact: 'HIGH',
     auditRequired: true,
     approvalRequired: false
   },
 
-  'marketplace/daily_max_trades_normal': {
+  'marketplace/daily_max_listings_red_core_shard': {
+    type: 'number',
+    min: 1,
+    max: 100,
+    default: 20,
+    readonly: false,
+    description: '每日红源晶碎片最大挂牌次数',
+    changeRequiresRestart: false,
+    businessImpact: 'HIGH',
+    auditRequired: true,
+    approvalRequired: false
+  },
+
+  'marketplace/daily_max_trades_star_stone': {
     type: 'number',
     min: 1,
     max: 100,
     default: 10,
     readonly: false,
-    description: 'normal等级用户每日最大成交次数',
+    description: '每日星石最大成交次数',
     changeRequiresRestart: false,
     businessImpact: 'HIGH',
     auditRequired: true,
     approvalRequired: false
   },
 
-  'marketplace/daily_max_amount_normal_DIAMOND': {
+  'marketplace/daily_max_trades_red_core_shard': {
+    type: 'number',
+    min: 1,
+    max: 100,
+    default: 10,
+    readonly: false,
+    description: '每日红源晶碎片最大成交次数',
+    changeRequiresRestart: false,
+    businessImpact: 'HIGH',
+    auditRequired: true,
+    approvalRequired: false
+  },
+
+  'marketplace/daily_max_amount_star_stone': {
     type: 'number',
     min: 1000,
     max: 10000000,
     default: 100000,
     readonly: false,
-    description: 'normal等级用户每日DIAMOND最大交易金额',
+    description: '每日星石最大交易金额',
     changeRequiresRestart: false,
     businessImpact: 'HIGH',
     auditRequired: true,
     approvalRequired: false
   },
 
-  'marketplace/daily_max_amount_normal_red_shard': {
+  'marketplace/daily_max_amount_red_core_shard': {
     type: 'number',
     min: 1000,
     max: 10000000,
     default: 50000,
     readonly: false,
-    description: 'normal等级用户每日red_shard最大交易金额',
+    description: '每日红源晶碎片最大交易金额',
     changeRequiresRestart: false,
     businessImpact: 'HIGH',
     auditRequired: true,

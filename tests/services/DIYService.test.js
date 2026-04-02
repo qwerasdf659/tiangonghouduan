@@ -184,13 +184,13 @@ describe('DIY 用户作品 — 小程序端 API', () => {
         design_data: {
           mode: 'beading',
           beads: [
-            { position: 0, asset_code: 'red_shard', diameter: 10 },
-            { position: 1, asset_code: 'blue_shard', diameter: 10 }
+            { position: 0, asset_code: 'red_core_shard', diameter: 10 },
+            { position: 1, asset_code: 'blue_core_shard', diameter: 10 }
           ]
         },
         total_cost: [
-          { asset_code: 'red_shard', amount: 1 },
-          { asset_code: 'blue_shard', amount: 1 }
+          { asset_code: 'red_core_shard', amount: 1 },
+          { asset_code: 'blue_core_shard', amount: 1 }
         ]
       })
 
@@ -255,15 +255,15 @@ describe('DIY 用户作品 — 小程序端 API', () => {
         design_data: {
           mode: 'beading',
           beads: [
-            { position: 0, asset_code: 'red_shard', diameter: 10 },
-            { position: 1, asset_code: 'blue_shard', diameter: 10 },
-            { position: 2, asset_code: 'green_shard', diameter: 10 }
+            { position: 0, asset_code: 'red_core_shard', diameter: 10 },
+            { position: 1, asset_code: 'blue_core_shard', diameter: 10 },
+            { position: 2, asset_code: 'green_core_shard', diameter: 10 }
           ]
         },
         total_cost: [
-          { asset_code: 'red_shard', amount: 1 },
-          { asset_code: 'blue_shard', amount: 1 },
-          { asset_code: 'green_shard', amount: 1 }
+          { asset_code: 'red_core_shard', amount: 1 },
+          { asset_code: 'blue_core_shard', amount: 1 },
+          { asset_code: 'green_core_shard', amount: 1 }
         ]
       })
 

@@ -181,7 +181,7 @@ module.exports = {
       {
         group_code: 'system',
         display_name: '系统资产',
-        description: '系统级别资产（积分、钻石等）',
+        description: '系统级别资产（积分、星石等）',
         group_type: 'system',
         color_hex: '#607D8B',
         sort_order: 1,
@@ -193,7 +193,7 @@ module.exports = {
       {
         group_code: 'red',
         display_name: '红色材料',
-        description: '红色系列水晶材料',
+        description: '红色系列源晶材料',
         group_type: 'material',
         color_hex: '#F44336',
         sort_order: 10,
@@ -205,7 +205,7 @@ module.exports = {
       {
         group_code: 'orange',
         display_name: '橙色材料',
-        description: '橙色系列水晶材料',
+        description: '橙色系列源晶材料',
         group_type: 'material',
         color_hex: '#FF9800',
         sort_order: 20,
@@ -217,7 +217,7 @@ module.exports = {
       {
         group_code: 'yellow',
         display_name: '黄色材料',
-        description: '黄色系列水晶材料',
+        description: '黄色系列源晶材料',
         group_type: 'material',
         color_hex: '#FFEB3B',
         sort_order: 30,
@@ -229,7 +229,7 @@ module.exports = {
       {
         group_code: 'green',
         display_name: '绿色材料',
-        description: '绿色系列水晶材料',
+        description: '绿色系列源晶材料',
         group_type: 'material',
         color_hex: '#4CAF50',
         sort_order: 40,
@@ -241,7 +241,7 @@ module.exports = {
       {
         group_code: 'blue',
         display_name: '蓝色材料',
-        description: '蓝色系列水晶材料',
+        description: '蓝色系列源晶材料',
         group_type: 'material',
         color_hex: '#2196F3',
         sort_order: 50,
@@ -253,7 +253,7 @@ module.exports = {
       {
         group_code: 'purple',
         display_name: '紫色材料',
-        description: '紫色系列水晶材料',
+        description: '紫色系列源晶材料',
         group_type: 'material',
         color_hex: '#9C27B0',
         sort_order: 60,
@@ -341,11 +341,11 @@ module.exports = {
 
     const materialAssetTypes = [
       {
-        asset_code: 'POINTS',
+        asset_code: 'points',
         display_name: '积分',
 
         group_code: 'system',
-        form: 'crystal',
+        form: 'gem',
         tier: 0,
         sort_order: 1,
         visible_value_points: 1,
@@ -356,11 +356,11 @@ module.exports = {
         updated_at: now
       },
       {
-        asset_code: 'DIAMOND',
-        display_name: '钻石',
+        asset_code: 'star_stone',
+        display_name: '星石',
 
         group_code: 'system',
-        form: 'crystal',
+        form: 'gem',
         tier: 0,
         sort_order: 2,
         visible_value_points: 10,
@@ -371,11 +371,11 @@ module.exports = {
         updated_at: now
       },
       {
-        asset_code: 'BUDGET_POINTS',
+        asset_code: 'budget_points',
         display_name: '预算积分',
 
         group_code: 'system',
-        form: 'crystal',
+        form: 'gem',
         tier: 0,
         sort_order: 3,
         visible_value_points: 1,
@@ -386,8 +386,8 @@ module.exports = {
         updated_at: now
       },
       {
-        asset_code: 'red_shard',
-        display_name: '红水晶碎片',
+        asset_code: 'red_core_shard',
+        display_name: '红源晶碎片',
 
         group_code: 'red',
         form: 'shard',
@@ -401,11 +401,11 @@ module.exports = {
         updated_at: now
       },
       {
-        asset_code: 'red_crystal',
-        display_name: '红水晶',
+        asset_code: 'red_core_gem',
+        display_name: '红源晶',
 
         group_code: 'red',
-        form: 'crystal',
+        form: 'gem',
         tier: 2,
         sort_order: 11,
         visible_value_points: 100,
@@ -416,8 +416,8 @@ module.exports = {
         updated_at: now
       },
       {
-        asset_code: 'orange_shard',
-        display_name: '橙水晶碎片',
+        asset_code: 'orange_core_shard',
+        display_name: '橙源晶碎片',
 
         group_code: 'orange',
         form: 'shard',
@@ -431,11 +431,11 @@ module.exports = {
         updated_at: now
       },
       {
-        asset_code: 'orange_crystal',
-        display_name: '橙水晶',
+        asset_code: 'orange_core_gem',
+        display_name: '橙源晶',
 
         group_code: 'orange',
-        form: 'crystal',
+        form: 'gem',
         tier: 2,
         sort_order: 21,
         visible_value_points: 200,
@@ -446,8 +446,8 @@ module.exports = {
         updated_at: now
       },
       {
-        asset_code: 'yellow_shard',
-        display_name: '黄水晶碎片',
+        asset_code: 'yellow_core_shard',
+        display_name: '黄源晶碎片',
 
         group_code: 'yellow',
         form: 'shard',
@@ -461,11 +461,11 @@ module.exports = {
         updated_at: now
       },
       {
-        asset_code: 'yellow_crystal',
-        display_name: '黄水晶',
+        asset_code: 'yellow_core_gem',
+        display_name: '黄源晶',
 
         group_code: 'yellow',
-        form: 'crystal',
+        form: 'gem',
         tier: 2,
         sort_order: 31,
         visible_value_points: 400,
@@ -476,8 +476,8 @@ module.exports = {
         updated_at: now
       },
       {
-        asset_code: 'green_shard',
-        display_name: '绿水晶碎片',
+        asset_code: 'green_core_shard',
+        display_name: '绿源晶碎片',
 
         group_code: 'green',
         form: 'shard',
@@ -491,11 +491,11 @@ module.exports = {
         updated_at: now
       },
       {
-        asset_code: 'green_crystal',
-        display_name: '绿水晶',
+        asset_code: 'green_core_gem',
+        display_name: '绿源晶',
 
         group_code: 'green',
-        form: 'crystal',
+        form: 'gem',
         tier: 2,
         sort_order: 41,
         visible_value_points: 800,
@@ -506,8 +506,8 @@ module.exports = {
         updated_at: now
       },
       {
-        asset_code: 'blue_shard',
-        display_name: '蓝水晶碎片',
+        asset_code: 'blue_core_shard',
+        display_name: '蓝源晶碎片',
 
         group_code: 'blue',
         form: 'shard',
@@ -521,11 +521,11 @@ module.exports = {
         updated_at: now
       },
       {
-        asset_code: 'blue_crystal',
-        display_name: '蓝水晶',
+        asset_code: 'blue_core_gem',
+        display_name: '蓝源晶',
 
         group_code: 'blue',
-        form: 'crystal',
+        form: 'gem',
         tier: 2,
         sort_order: 51,
         visible_value_points: 1600,
@@ -536,8 +536,8 @@ module.exports = {
         updated_at: now
       },
       {
-        asset_code: 'purple_shard',
-        display_name: '紫水晶碎片',
+        asset_code: 'purple_core_shard',
+        display_name: '紫源晶碎片',
 
         group_code: 'purple',
         form: 'shard',
@@ -551,11 +551,11 @@ module.exports = {
         updated_at: now
       },
       {
-        asset_code: 'purple_crystal',
-        display_name: '紫水晶',
+        asset_code: 'purple_core_gem',
+        display_name: '紫源晶',
 
         group_code: 'purple',
-        form: 'crystal',
+        form: 'gem',
         tier: 2,
         sort_order: 61,
         visible_value_points: 3200,
@@ -589,7 +589,7 @@ module.exports = {
         'account_id'
       ])
       if (!acctId) continue
-      const balanceCodes = ['DIAMOND', 'red_shard', 'red_crystal', 'orange_shard']
+      const balanceCodes = ['star_stone', 'red_core_shard', 'red_core_gem', 'orange_core_shard']
       for (const code of balanceCodes) {
         const balExists = await queryInterface.rawSelect(
           'account_asset_balances',
@@ -600,11 +600,11 @@ module.exports = {
         )
         if (!balExists) {
           const amt =
-            code === 'DIAMOND'
+            code === 'star_stone'
               ? 5000
-              : code === 'red_shard'
+              : code === 'red_core_shard'
                 ? 2000
-                : code === 'red_crystal'
+                : code === 'red_core_gem'
                   ? 200
                   : 500
           await queryInterface.bulkInsert('account_asset_balances', [
@@ -949,7 +949,7 @@ module.exports = {
         item_name: '[测试]AirPods Pro 2代',
         description: '苹果 AirPods Pro 第二代，主动降噪，适应性音频',
         primary_media_id: mediaIds[0],
-        cost_asset_code: 'orange_crystal',
+        cost_asset_code: 'orange_core_gem',
         cost_amount: 50,
         cost_price: 1499.0,
         stock: 10,
@@ -973,7 +973,7 @@ module.exports = {
         item_name: '[测试]小米手环8 NFC版',
         description: '小米手环8 NFC版，1.62英寸AMOLED屏幕，16天超长续航',
         primary_media_id: mediaIds[1],
-        cost_asset_code: 'red_shard',
+        cost_asset_code: 'red_core_shard',
         cost_amount: 300,
         cost_price: 249.0,
         stock: 50,
@@ -997,7 +997,7 @@ module.exports = {
         item_name: '[测试]星巴克100元礼品卡',
         description: '星巴克100元电子礼品卡，全国门店通用',
         primary_media_id: mediaIds[2],
-        cost_asset_code: 'red_shard',
+        cost_asset_code: 'red_core_shard',
         cost_amount: 100,
         cost_price: 95.0,
         stock: 100,
@@ -1021,7 +1021,7 @@ module.exports = {
         item_name: '[测试]品牌帆布环保袋',
         description: '加厚环保帆布袋，时尚百搭，大容量收纳',
         primary_media_id: mediaIds[3],
-        cost_asset_code: 'red_shard',
+        cost_asset_code: 'red_core_shard',
         cost_amount: 30,
         cost_price: 15.0,
         stock: 500,
@@ -1045,7 +1045,7 @@ module.exports = {
         item_name: '[测试]Cherry MX 机械键盘',
         description: 'Cherry MX 红轴 87键 RGB 机械键盘，金属面板',
         primary_media_id: mediaIds[4],
-        cost_asset_code: 'orange_shard',
+        cost_asset_code: 'orange_core_shard',
         cost_amount: 200,
         cost_price: 399.0,
         stock: 20,
@@ -1069,7 +1069,7 @@ module.exports = {
         item_name: '[测试]LED护眼台灯',
         description: 'AA级护眼LED台灯，三色调光，无频闪',
         primary_media_id: mediaIds[5],
-        cost_asset_code: 'red_shard',
+        cost_asset_code: 'red_core_shard',
         cost_amount: 150,
         cost_price: 129.0,
         stock: 80,
@@ -1093,7 +1093,7 @@ module.exports = {
         item_name: '[测试]已下架-过期活动商品',
         description: '此商品已停止兑换',
         primary_media_id: null,
-        cost_asset_code: 'red_shard',
+        cost_asset_code: 'red_core_shard',
         cost_amount: 999,
         cost_price: 10.0,
         stock: 0,
@@ -1151,7 +1151,7 @@ module.exports = {
 
     const campaigns = [
       {
-        campaign_name: '[测试]每日水晶抽奖',
+        campaign_name: '[测试]每日源晶抽奖',
         campaign_code: 'test_daily_crystal',
         campaign_type: 'daily',
         max_draws_per_user_daily: 5,
@@ -1162,7 +1162,7 @@ module.exports = {
         participation_conditions: JSON.stringify({ min_level: 'normal' }),
         start_time: now,
         end_time: new Date(now.getTime() + 90 * 24 * 3600 * 1000),
-        description: '每天都有机会抽取水晶大奖！',
+        description: '每天都有机会抽取源晶大奖！',
         rules_text: '每天最多抽奖5次，每次消耗10积分',
         status: 'active',
         budget_mode: 'user',
@@ -1241,7 +1241,7 @@ module.exports = {
       const prizeExists = await queryInterface.rawSelect(
         'lottery_prizes',
         {
-          where: { lottery_campaign_id: campaignIds[0], prize_name: '[测试]紫水晶*1' }
+          where: { lottery_campaign_id: campaignIds[0], prize_name: '[测试]紫源晶*1' }
         },
         ['lottery_prize_id']
       )
@@ -1249,11 +1249,11 @@ module.exports = {
         const prizes = [
           {
             lottery_campaign_id: campaignIds[0],
-            prize_name: '[测试]紫水晶*1',
+            prize_name: '[测试]紫源晶*1',
             prize_type: 'virtual',
             prize_value: 3200,
             prize_value_points: 1600,
-            prize_description: '获得紫水晶1个',
+            prize_description: '获得紫源晶1个',
             primary_media_id: mediaIds[6] || null,
             win_probability: 0.01,
             win_weight: 1,
@@ -1265,7 +1265,7 @@ module.exports = {
             daily_win_count: 0,
             is_fallback: false,
             reserved_for_vip: false,
-            material_asset_code: 'purple_crystal',
+            material_asset_code: 'purple_core_gem',
             material_amount: 1,
             angle: 0,
             color: '#9C27B0',
@@ -1276,11 +1276,11 @@ module.exports = {
           },
           {
             lottery_campaign_id: campaignIds[0],
-            prize_name: '[测试]蓝水晶碎片*5',
+            prize_name: '[测试]蓝源晶碎片*5',
             prize_type: 'virtual',
             prize_value: 800,
             prize_value_points: 400,
-            prize_description: '获得蓝水晶碎片5个',
+            prize_description: '获得蓝源晶碎片5个',
             primary_media_id: mediaIds[7] || null,
             win_probability: 0.05,
             win_weight: 5,
@@ -1292,7 +1292,7 @@ module.exports = {
             daily_win_count: 0,
             is_fallback: false,
             reserved_for_vip: false,
-            material_asset_code: 'blue_shard',
+            material_asset_code: 'blue_core_shard',
             material_amount: 5,
             angle: 45,
             color: '#2196F3',
@@ -1303,11 +1303,11 @@ module.exports = {
           },
           {
             lottery_campaign_id: campaignIds[0],
-            prize_name: '[测试]绿水晶碎片*10',
+            prize_name: '[测试]绿源晶碎片*10',
             prize_type: 'virtual',
             prize_value: 800,
             prize_value_points: 400,
-            prize_description: '获得绿水晶碎片10个',
+            prize_description: '获得绿源晶碎片10个',
             primary_media_id: null,
             win_probability: 0.1,
             win_weight: 10,
@@ -1319,7 +1319,7 @@ module.exports = {
             daily_win_count: 0,
             is_fallback: false,
             reserved_for_vip: false,
-            material_asset_code: 'green_shard',
+            material_asset_code: 'green_core_shard',
             material_amount: 10,
             angle: 90,
             color: '#4CAF50',
@@ -1330,11 +1330,11 @@ module.exports = {
           },
           {
             lottery_campaign_id: campaignIds[0],
-            prize_name: '[测试]橙水晶碎片*20',
+            prize_name: '[测试]橙源晶碎片*20',
             prize_type: 'virtual',
             prize_value: 400,
             prize_value_points: 200,
-            prize_description: '获得橙水晶碎片20个',
+            prize_description: '获得橙源晶碎片20个',
             primary_media_id: null,
             win_probability: 0.25,
             win_weight: 25,
@@ -1346,7 +1346,7 @@ module.exports = {
             daily_win_count: 0,
             is_fallback: false,
             reserved_for_vip: false,
-            material_asset_code: 'orange_shard',
+            material_asset_code: 'orange_core_shard',
             material_amount: 20,
             angle: 135,
             color: '#FF9800',
@@ -1357,11 +1357,11 @@ module.exports = {
           },
           {
             lottery_campaign_id: campaignIds[0],
-            prize_name: '[测试]红水晶碎片*30',
+            prize_name: '[测试]红源晶碎片*30',
             prize_type: 'virtual',
             prize_value: 300,
             prize_value_points: 150,
-            prize_description: '获得红水晶碎片30个',
+            prize_description: '获得红源晶碎片30个',
             primary_media_id: null,
             win_probability: 0.3,
             win_weight: 30,
@@ -1373,7 +1373,7 @@ module.exports = {
             daily_win_count: 0,
             is_fallback: false,
             reserved_for_vip: false,
-            material_asset_code: 'red_shard',
+            material_asset_code: 'red_core_shard',
             material_amount: 30,
             angle: 180,
             color: '#F44336',
@@ -1384,11 +1384,11 @@ module.exports = {
           },
           {
             lottery_campaign_id: campaignIds[0],
-            prize_name: '[测试]红水晶碎片*10(保底)',
+            prize_name: '[测试]红源晶碎片*10(保底)',
             prize_type: 'virtual',
             prize_value: 100,
             prize_value_points: 50,
-            prize_description: '获得红水晶碎片10个（保底奖励）',
+            prize_description: '获得红源晶碎片10个（保底奖励）',
             primary_media_id: null,
             win_probability: 0.29,
             win_weight: 29,
@@ -1400,7 +1400,7 @@ module.exports = {
             daily_win_count: 0,
             is_fallback: true,
             reserved_for_vip: false,
-            material_asset_code: 'red_shard',
+            material_asset_code: 'red_core_shard',
             material_amount: 10,
             angle: 270,
             color: '#E57373',
@@ -1423,8 +1423,8 @@ module.exports = {
 
     const conversionRules = [
       {
-        from_asset_code: 'red_shard',
-        to_asset_code: 'red_crystal',
+        from_asset_code: 'red_core_shard',
+        to_asset_code: 'red_core_gem',
         from_amount: 10,
         to_amount: 1,
         effective_at: now,
@@ -1434,8 +1434,8 @@ module.exports = {
         min_from_amount: 10,
         max_from_amount: 1000,
         fee_rate: 0,
-        title: '红碎片→红水晶',
-        description: '10个红水晶碎片合成1个红水晶',
+        title: '红碎片→红源晶',
+        description: '10个红源晶碎片合成1个红源晶',
         display_icon: null,
         risk_level: 'low',
         is_visible: true,
@@ -1444,8 +1444,8 @@ module.exports = {
         updated_at: now
       },
       {
-        from_asset_code: 'orange_shard',
-        to_asset_code: 'orange_crystal',
+        from_asset_code: 'orange_core_shard',
+        to_asset_code: 'orange_core_gem',
         from_amount: 10,
         to_amount: 1,
         effective_at: now,
@@ -1455,8 +1455,8 @@ module.exports = {
         min_from_amount: 10,
         max_from_amount: 1000,
         fee_rate: 0,
-        title: '橙碎片→橙水晶',
-        description: '10个橙水晶碎片合成1个橙水晶',
+        title: '橙碎片→橙源晶',
+        description: '10个橙源晶碎片合成1个橙源晶',
         display_icon: null,
         risk_level: 'low',
         is_visible: true,
@@ -1465,8 +1465,8 @@ module.exports = {
         updated_at: now
       },
       {
-        from_asset_code: 'red_crystal',
-        to_asset_code: 'orange_shard',
+        from_asset_code: 'red_core_gem',
+        to_asset_code: 'orange_core_shard',
         from_amount: 1,
         to_amount: 5,
         effective_at: now,
@@ -1477,9 +1477,9 @@ module.exports = {
         max_from_amount: 100,
         fee_rate: 0.05,
         fee_min_amount: 1,
-        fee_asset_code: 'red_crystal',
-        title: '红水晶→橙碎片',
-        description: '1个红水晶转换为5个橙水晶碎片（5%手续费）',
+        fee_asset_code: 'red_core_gem',
+        title: '红源晶→橙碎片',
+        description: '1个红源晶转换为5个橙源晶碎片（5%手续费）',
         display_icon: null,
         risk_level: 'medium',
         is_visible: true,
@@ -1488,8 +1488,8 @@ module.exports = {
         updated_at: now
       },
       {
-        from_asset_code: 'yellow_shard',
-        to_asset_code: 'yellow_crystal',
+        from_asset_code: 'yellow_core_shard',
+        to_asset_code: 'yellow_core_gem',
         from_amount: 10,
         to_amount: 1,
         effective_at: now,
@@ -1499,8 +1499,8 @@ module.exports = {
         min_from_amount: 10,
         max_from_amount: 500,
         fee_rate: 0,
-        title: '黄碎片→黄水晶',
-        description: '10个黄水晶碎片合成1个黄水晶',
+        title: '黄碎片→黄源晶',
+        description: '10个黄源晶碎片合成1个黄源晶',
         display_icon: null,
         risk_level: 'low',
         is_visible: true,
@@ -1509,8 +1509,8 @@ module.exports = {
         updated_at: now
       },
       {
-        from_asset_code: 'DIAMOND',
-        to_asset_code: 'red_shard',
+        from_asset_code: 'star_stone',
+        to_asset_code: 'red_core_shard',
         from_amount: 1,
         to_amount: 10,
         effective_at: now,
@@ -1520,7 +1520,7 @@ module.exports = {
         min_from_amount: 1,
         max_from_amount: 100,
         fee_rate: 0,
-        title: '钻石→红碎片（已停用）',
+        title: '星石→红碎片（已停用）',
         description: '此规则已停用',
         display_icon: null,
         risk_level: 'high',
@@ -1555,9 +1555,9 @@ module.exports = {
         slot_type: 'popup',
         position: 'home',
         max_display_count: 3,
-        daily_price_diamond: 500,
-        min_bid_diamond: 100,
-        min_budget_diamond: 1000,
+        daily_price_star_stone: 500,
+        min_bid_star_stone: 100,
+        min_budget_star_stone: 1000,
         is_active: true,
         description: '首页主弹窗广告位，高曝光量',
         created_at: now,
@@ -1569,9 +1569,9 @@ module.exports = {
         slot_type: 'carousel',
         position: 'home',
         max_display_count: 5,
-        daily_price_diamond: 300,
-        min_bid_diamond: 50,
-        min_budget_diamond: 500,
+        daily_price_star_stone: 300,
+        min_bid_star_stone: 50,
+        min_budget_star_stone: 500,
         is_active: true,
         description: '首页轮播图第一位，高点击率',
         created_at: now,
@@ -1583,9 +1583,9 @@ module.exports = {
         slot_type: 'popup',
         position: 'lottery',
         max_display_count: 2,
-        daily_price_diamond: 200,
-        min_bid_diamond: 50,
-        min_budget_diamond: 300,
+        daily_price_star_stone: 200,
+        min_bid_star_stone: 50,
+        min_budget_star_stone: 300,
         is_active: true,
         description: '抽奖页面弹窗广告位',
         created_at: now,
@@ -1629,11 +1629,11 @@ module.exports = {
             campaign_name: '[测试]新品推广-首页弹窗',
             billing_mode: 'fixed_daily',
             status: 'active',
-            daily_bid_diamond: 0,
-            budget_total_diamond: 15000,
-            budget_spent_diamond: 3000,
+            daily_bid_star_stone: 0,
+            budget_total_star_stone: 15000,
+            budget_spent_star_stone: 3000,
             fixed_days: 30,
-            fixed_total_diamond: 15000,
+            fixed_total_star_stone: 15000,
             targeting_rules: JSON.stringify({ user_level: ['normal', 'vip'], min_login_count: 3 }),
             priority: 100,
             start_date: now,
@@ -1651,11 +1651,11 @@ module.exports = {
             campaign_name: '[测试]品牌宣传-首页轮播',
             billing_mode: 'bidding',
             status: 'pending_review',
-            daily_bid_diamond: 100,
-            budget_total_diamond: 5000,
-            budget_spent_diamond: 0,
+            daily_bid_star_stone: 100,
+            budget_total_star_stone: 5000,
+            budget_spent_star_stone: 0,
             fixed_days: null,
-            fixed_total_diamond: null,
+            fixed_total_star_stone: null,
             targeting_rules: JSON.stringify({ user_level: ['vip'] }),
             priority: 50,
             start_date: now,
@@ -1673,11 +1673,11 @@ module.exports = {
             campaign_name: '[测试]限时促销-抽奖页',
             billing_mode: 'fixed_daily',
             status: 'completed',
-            daily_bid_diamond: 0,
-            budget_total_diamond: 3000,
-            budget_spent_diamond: 3000,
+            daily_bid_star_stone: 0,
+            budget_total_star_stone: 3000,
+            budget_spent_star_stone: 3000,
             fixed_days: 10,
-            fixed_total_diamond: 3000,
+            fixed_total_star_stone: 3000,
             targeting_rules: null,
             priority: 80,
             start_date: new Date(now.getTime() - 15 * 24 * 3600 * 1000),

@@ -1,4 +1,5 @@
 const BeijingTimeHelper = require('../utils/timeHelper')
+const { AssetCode } = require('../constants/AssetCode')
 const DecimalConverter = require('../utils/formatters/DecimalConverter') // 🔧 DECIMAL字段类型转换工具
 const { getImageUrl, getPlaceholderImageUrl } = require('../utils/ImageUrlHelper') // 🔧 Sealos 对象存储 URL 生成
 
@@ -10,7 +11,7 @@ const { getImageUrl, getPlaceholderImageUrl } = require('../utils/ImageUrlHelper
  *
  * @constant {string[]}
  */
-const FORBIDDEN_FRONTEND_ASSET_CODES = ['BUDGET_POINTS']
+const FORBIDDEN_FRONTEND_ASSET_CODES = [AssetCode.BUDGET_POINTS]
 
 /**
  * 统一数据脱敏服务（DataSanitizer）

@@ -2,7 +2,7 @@
  * Phase 2 资产账户测试（P1）- 测试审计标准文档 3.1-3.5
  *
  * 测试目标：
- * - 3.1 资产扣费流程：测试 POINTS/red_shard 资产扣费
+ * - 3.1 资产扣费流程：测试 POINTS/red_core_shard 资产扣费
  * - 3.2 资产增加流程：测试中奖后资产发放
  * - 3.3 余额校验：测试余额不足拦截逻辑
  * - 3.4 事务一致性：测试扣费与抽奖原子性（失败回滚）
@@ -97,7 +97,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
   /**
    * ============================================================
    * 3.1 资产扣费流程测试
-   * 测试目标：验证 POINTS 和 red_shard 资产扣费功能
+   * 测试目标：验证 POINTS 和 red_core_shard 资产扣费功能
    * ============================================================
    */
   describe('3.1 资产扣费流程', () => {
@@ -116,7 +116,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
         await BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
-            asset_code: 'POINTS',
+            asset_code: 'points',
             delta_amount: 1000, // 添加 1000 积分
             idempotency_key: `${TEST_PREFIX}_init_points_${Date.now()}`,
             business_type: 'admin_adjustment',
@@ -125,15 +125,15 @@ describe('Phase 2 资产账户测试（P1）', () => {
           { transaction }
         )
 
-        // 添加 red_shard 余额
+        // 添加 red_core_shard 余额
         await BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
-            asset_code: 'red_shard',
+            asset_code: 'red_core_shard',
             delta_amount: 100, // 添加 100 个红碎片
             idempotency_key: `${TEST_PREFIX}_init_redshard_${Date.now()}`,
             business_type: 'admin_adjustment',
-            meta: { reason: 'Phase 2 测试初始化 - red_shard' }
+            meta: { reason: 'Phase 2 测试初始化 - red_core_shard' }
           },
           { transaction }
         )
@@ -146,7 +146,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
 
       // 记录扣费前余额
       const beforeBalance = await BalanceService.getBalance(
-        { user_id: testUserContext.user_id, asset_code: 'POINTS' },
+        { user_id: testUserContext.user_id, asset_code: 'points' },
         {}
       )
 
@@ -155,7 +155,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
         return await BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
-            asset_code: 'POINTS',
+            asset_code: 'points',
             delta_amount: -deductAmount, // 负数表示扣减
             idempotency_key: idempotencyKey,
             business_type: 'lottery_consume', // 抽奖消费业务类型
@@ -177,7 +177,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
 
       // 验证余额变化
       const afterBalance = await BalanceService.getBalance(
-        { user_id: testUserContext.user_id, asset_code: 'POINTS' },
+        { user_id: testUserContext.user_id, asset_code: 'points' },
         {}
       )
       expect(Number(afterBalance.available_amount)).toBe(
@@ -190,13 +190,13 @@ describe('Phase 2 资产账户测试（P1）', () => {
       console.log(`   - 扣费后余额: ${afterBalance.available_amount}`)
     })
 
-    test('3.1.2 red_shard 扣费应正确扣减可用余额', async () => {
+    test('3.1.2 red_core_shard 扣费应正确扣减可用余额', async () => {
       const idempotencyKey = `${TEST_PREFIX}_deduct_redshard_${Date.now()}`
       const deductAmount = 10 // 扣除 10 个红碎片
 
       // 记录扣费前余额
       const beforeBalance = await BalanceService.getBalance(
-        { user_id: testUserContext.user_id, asset_code: 'red_shard' },
+        { user_id: testUserContext.user_id, asset_code: 'red_core_shard' },
         {}
       )
 
@@ -205,11 +205,11 @@ describe('Phase 2 资产账户测试（P1）', () => {
         return await BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
-            asset_code: 'red_shard',
+            asset_code: 'red_core_shard',
             delta_amount: -deductAmount,
             idempotency_key: idempotencyKey,
             business_type: 'exchange_debit', // 兑换扣减业务类型
-            meta: { reason: '3.1.2 测试 - red_shard 扣费' }
+            meta: { reason: '3.1.2 测试 - red_core_shard 扣费' }
           },
           { transaction }
         )
@@ -226,14 +226,14 @@ describe('Phase 2 资产账户测试（P1）', () => {
 
       // 验证余额变化
       const afterBalance = await BalanceService.getBalance(
-        { user_id: testUserContext.user_id, asset_code: 'red_shard' },
+        { user_id: testUserContext.user_id, asset_code: 'red_core_shard' },
         {}
       )
       expect(Number(afterBalance.available_amount)).toBe(
         Number(beforeBalance.available_amount) - deductAmount
       )
 
-      console.log('✅ 3.1.2 red_shard 扣费测试通过')
+      console.log('✅ 3.1.2 red_core_shard 扣费测试通过')
       console.log(`   - 扣费前余额: ${beforeBalance.available_amount}`)
       console.log(`   - 扣费金额: ${deductAmount}`)
       console.log(`   - 扣费后余额: ${afterBalance.available_amount}`)
@@ -245,7 +245,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
 
       // 记录初始余额
       const initialBalance = await BalanceService.getBalance(
-        { user_id: testUserContext.user_id, asset_code: 'POINTS' },
+        { user_id: testUserContext.user_id, asset_code: 'points' },
         {}
       )
 
@@ -254,7 +254,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
         return await BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
-            asset_code: 'POINTS',
+            asset_code: 'points',
             delta_amount: -deductAmount,
             idempotency_key: idempotencyKey,
             business_type: 'lottery_consume',
@@ -271,7 +271,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
         return await BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
-            asset_code: 'POINTS',
+            asset_code: 'points',
             delta_amount: -deductAmount,
             idempotency_key: idempotencyKey,
             business_type: 'lottery_consume',
@@ -289,7 +289,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
 
       // 验证余额只扣减一次
       const finalBalance = await BalanceService.getBalance(
-        { user_id: testUserContext.user_id, asset_code: 'POINTS' },
+        { user_id: testUserContext.user_id, asset_code: 'points' },
         {}
       )
       expect(Number(finalBalance.available_amount)).toBe(
@@ -322,7 +322,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
 
       // 记录发放前余额
       const beforeBalance = await BalanceService.getBalance(
-        { user_id: testUserContext.user_id, asset_code: 'POINTS' },
+        { user_id: testUserContext.user_id, asset_code: 'points' },
         {}
       )
 
@@ -331,7 +331,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
         return await BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
-            asset_code: 'POINTS',
+            asset_code: 'points',
             delta_amount: rewardAmount, // 正数表示增加
             idempotency_key: idempotencyKey,
             business_type: 'lottery_reward', // 抽奖奖励业务类型
@@ -357,7 +357,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
 
       // 验证余额变化
       const afterBalance = await BalanceService.getBalance(
-        { user_id: testUserContext.user_id, asset_code: 'POINTS' },
+        { user_id: testUserContext.user_id, asset_code: 'points' },
         {}
       )
       expect(Number(afterBalance.available_amount)).toBe(
@@ -370,13 +370,13 @@ describe('Phase 2 资产账户测试（P1）', () => {
       console.log(`   - 发放后余额: ${afterBalance.available_amount}`)
     })
 
-    test('3.2.2 DIAMOND 奖励发放应正确增加余额', async () => {
+    test('3.2.2 star_stone 奖励发放应正确增加余额', async () => {
       const idempotencyKey = `${TEST_PREFIX}_increase_diamond_${Date.now()}`
-      const rewardAmount = 100 // 奖励 100 钻石
+      const rewardAmount = 100 // 奖励 100 星石
 
       // 记录发放前余额
       const beforeBalance = await BalanceService.getBalance(
-        { user_id: testUserContext.user_id, asset_code: 'DIAMOND' },
+        { user_id: testUserContext.user_id, asset_code: 'star_stone' },
         {}
       )
 
@@ -385,13 +385,13 @@ describe('Phase 2 资产账户测试（P1）', () => {
         return await BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
-            asset_code: 'DIAMOND',
+            asset_code: 'star_stone',
             delta_amount: rewardAmount,
             idempotency_key: idempotencyKey,
             business_type: 'lottery_reward',
             meta: {
-              reason: '3.2.2 测试 - DIAMOND 奖励发放',
-              prize_name: '钻石奖励'
+              reason: '3.2.2 测试 - star_stone 奖励发放',
+              prize_name: '星石奖励'
             }
           },
           { transaction }
@@ -408,23 +408,23 @@ describe('Phase 2 资产账户测试（P1）', () => {
 
       // 验证余额变化
       const afterBalance = await BalanceService.getBalance(
-        { user_id: testUserContext.user_id, asset_code: 'DIAMOND' },
+        { user_id: testUserContext.user_id, asset_code: 'star_stone' },
         {}
       )
       expect(Number(afterBalance.available_amount)).toBe(
         Number(beforeBalance.available_amount) + rewardAmount
       )
 
-      console.log('✅ 3.2.2 DIAMOND 奖励发放测试通过')
+      console.log('✅ 3.2.2 star_stone 奖励发放测试通过')
     })
 
-    test('3.2.3 red_shard 奖励发放应正确增加余额', async () => {
+    test('3.2.3 red_core_shard 奖励发放应正确增加余额', async () => {
       const idempotencyKey = `${TEST_PREFIX}_increase_redshard_${Date.now()}`
       const rewardAmount = 20 // 奖励 20 个红碎片
 
       // 记录发放前余额
       const beforeBalance = await BalanceService.getBalance(
-        { user_id: testUserContext.user_id, asset_code: 'red_shard' },
+        { user_id: testUserContext.user_id, asset_code: 'red_core_shard' },
         {}
       )
 
@@ -433,11 +433,11 @@ describe('Phase 2 资产账户测试（P1）', () => {
         return await BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
-            asset_code: 'red_shard',
+            asset_code: 'red_core_shard',
             delta_amount: rewardAmount,
             idempotency_key: idempotencyKey,
             business_type: 'lottery_reward',
-            meta: { reason: '3.2.3 测试 - red_shard 奖励发放' }
+            meta: { reason: '3.2.3 测试 - red_core_shard 奖励发放' }
           },
           { transaction }
         )
@@ -445,14 +445,14 @@ describe('Phase 2 资产账户测试（P1）', () => {
 
       // 验证余额变化
       const afterBalance = await BalanceService.getBalance(
-        { user_id: testUserContext.user_id, asset_code: 'red_shard' },
+        { user_id: testUserContext.user_id, asset_code: 'red_core_shard' },
         {}
       )
       expect(Number(afterBalance.available_amount)).toBe(
         Number(beforeBalance.available_amount) + rewardAmount
       )
 
-      console.log('✅ 3.2.3 red_shard 奖励发放测试通过')
+      console.log('✅ 3.2.3 red_core_shard 奖励发放测试通过')
     })
   })
 
@@ -468,7 +468,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
 
       // 获取当前余额
       const currentBalance = await BalanceService.getBalance(
-        { user_id: testUserContext.user_id, asset_code: 'POINTS' },
+        { user_id: testUserContext.user_id, asset_code: 'points' },
         {}
       )
 
@@ -481,7 +481,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
           return await BalanceService.changeBalance(
             {
               user_id: testUserContext.user_id,
-              asset_code: 'POINTS',
+              asset_code: 'points',
               delta_amount: -excessiveAmount,
               idempotency_key: idempotencyKey,
               business_type: 'lottery_consume',
@@ -494,7 +494,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
 
       // 验证余额未变化
       const afterBalance = await BalanceService.getBalance(
-        { user_id: testUserContext.user_id, asset_code: 'POINTS' },
+        { user_id: testUserContext.user_id, asset_code: 'points' },
         {}
       )
       expect(Number(afterBalance.available_amount)).toBe(Number(currentBalance.available_amount))
@@ -514,7 +514,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
         await BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
-            asset_code: 'POINTS',
+            asset_code: 'points',
             delta_amount: knownAmount,
             idempotency_key: `${TEST_PREFIX}_boundary_init_${Date.now()}`,
             business_type: 'admin_adjustment',
@@ -526,7 +526,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
 
       // 获取当前余额
       const currentBalance = await BalanceService.getBalance(
-        { user_id: testUserContext.user_id, asset_code: 'POINTS' },
+        { user_id: testUserContext.user_id, asset_code: 'points' },
         {}
       )
 
@@ -537,7 +537,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
         return await BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
-            asset_code: 'POINTS',
+            asset_code: 'points',
             delta_amount: -exactAmount,
             idempotency_key: idempotencyKey,
             business_type: 'lottery_consume',
@@ -553,7 +553,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
 
       // 验证余额为0
       const afterBalance = await BalanceService.getBalance(
-        { user_id: testUserContext.user_id, asset_code: 'POINTS' },
+        { user_id: testUserContext.user_id, asset_code: 'points' },
         {}
       )
       expect(Number(afterBalance.available_amount)).toBe(0)
@@ -626,7 +626,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
         await BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
-            asset_code: 'POINTS',
+            asset_code: 'points',
             delta_amount: 500,
             idempotency_key: `${TEST_PREFIX}_atomic_init_${Date.now()}`,
             business_type: 'admin_adjustment',
@@ -638,7 +638,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
 
       // 记录事务开始前的余额
       const beforeBalance = await BalanceService.getBalance(
-        { user_id: testUserContext.user_id, asset_code: 'POINTS' },
+        { user_id: testUserContext.user_id, asset_code: 'points' },
         {}
       )
 
@@ -649,7 +649,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
           await BalanceService.changeBalance(
             {
               user_id: testUserContext.user_id,
-              asset_code: 'POINTS',
+              asset_code: 'points',
               delta_amount: -100,
               idempotency_key: idempotencyKeyDeduct,
               business_type: 'lottery_consume',
@@ -667,7 +667,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
 
       // 验证余额回滚到事务前状态
       const afterBalance = await BalanceService.getBalance(
-        { user_id: testUserContext.user_id, asset_code: 'POINTS' },
+        { user_id: testUserContext.user_id, asset_code: 'points' },
         {}
       )
       expect(Number(afterBalance.available_amount)).toBe(Number(beforeBalance.available_amount))
@@ -693,7 +693,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
         await BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
-            asset_code: 'POINTS',
+            asset_code: 'points',
             delta_amount: 1000,
             idempotency_key: `${TEST_PREFIX}_atomic_success_init_${Date.now()}`,
             business_type: 'admin_adjustment',
@@ -705,11 +705,11 @@ describe('Phase 2 资产账户测试（P1）', () => {
 
       // 记录事务开始前的余额
       const beforePointsBalance = await BalanceService.getBalance(
-        { user_id: testUserContext.user_id, asset_code: 'POINTS' },
+        { user_id: testUserContext.user_id, asset_code: 'points' },
         {}
       )
       const beforeDiamondBalance = await BalanceService.getBalance(
-        { user_id: testUserContext.user_id, asset_code: 'DIAMOND' },
+        { user_id: testUserContext.user_id, asset_code: 'star_stone' },
         {}
       )
 
@@ -719,7 +719,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
         await BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
-            asset_code: 'POINTS',
+            asset_code: 'points',
             delta_amount: -200,
             idempotency_key: idempotencyKeyDeduct,
             business_type: 'lottery_consume',
@@ -733,7 +733,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
         await BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
-            asset_code: 'DIAMOND',
+            asset_code: 'star_stone',
             delta_amount: 50,
             idempotency_key: idempotencyKeyReward,
             business_type: 'lottery_reward',
@@ -746,7 +746,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
 
       // 验证扣费生效
       const afterPointsBalance = await BalanceService.getBalance(
-        { user_id: testUserContext.user_id, asset_code: 'POINTS' },
+        { user_id: testUserContext.user_id, asset_code: 'points' },
         {}
       )
       expect(Number(afterPointsBalance.available_amount)).toBe(
@@ -755,7 +755,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
 
       // 验证奖励生效
       const afterDiamondBalance = await BalanceService.getBalance(
-        { user_id: testUserContext.user_id, asset_code: 'DIAMOND' },
+        { user_id: testUserContext.user_id, asset_code: 'star_stone' },
         {}
       )
       expect(Number(afterDiamondBalance.available_amount)).toBe(
@@ -785,7 +785,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
         BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
-            asset_code: 'POINTS',
+            asset_code: 'points',
             delta_amount: 10,
             idempotency_key: idempotencyKey,
             business_type: 'admin_adjustment',
@@ -815,7 +815,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
         await BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
-            asset_code: 'POINTS',
+            asset_code: 'points',
             delta_amount: 500,
             idempotency_key: `${TEST_PREFIX}_txlog_init_${Date.now()}`,
             business_type: 'admin_adjustment',
@@ -827,7 +827,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
 
       // 记录扣费前余额
       const beforeBalance = await BalanceService.getBalance(
-        { user_id: testUserContext.user_id, asset_code: 'POINTS' },
+        { user_id: testUserContext.user_id, asset_code: 'points' },
         {}
       )
 
@@ -836,7 +836,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
         await BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
-            asset_code: 'POINTS',
+            asset_code: 'points',
             delta_amount: -deductAmount,
             idempotency_key: idempotencyKey,
             business_type: 'lottery_consume',
@@ -860,7 +860,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
 
       // 验证必需字段
       expect(txRecord.account_id).toBeDefined()
-      expect(txRecord.asset_code).toBe('POINTS')
+      expect(txRecord.asset_code).toBe('points')
       expect(Number(txRecord.delta_amount)).toBe(-deductAmount)
       expect(txRecord.business_type).toBe('lottery_consume')
       expect(txRecord.idempotency_key).toBe(idempotencyKey)
@@ -889,7 +889,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
 
       // 记录发放前余额
       const beforeBalance = await BalanceService.getBalance(
-        { user_id: testUserContext.user_id, asset_code: 'DIAMOND' },
+        { user_id: testUserContext.user_id, asset_code: 'star_stone' },
         {}
       )
 
@@ -898,14 +898,14 @@ describe('Phase 2 资产账户测试（P1）', () => {
         await BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
-            asset_code: 'DIAMOND',
+            asset_code: 'star_stone',
             delta_amount: rewardAmount,
             idempotency_key: idempotencyKey,
             business_type: 'lottery_reward',
             lottery_session_id: 'test_session_3.5.2',
             meta: {
               lottery_prize_id: 999,
-              prize_name: '测试钻石奖励',
+              prize_name: '测试星石奖励',
               reason: '3.5.2 奖励交易记录测试'
             }
           },
@@ -921,7 +921,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
       expect(txRecord).not.toBeNull()
 
       // 验证必需字段
-      expect(txRecord.asset_code).toBe('DIAMOND')
+      expect(txRecord.asset_code).toBe('star_stone')
       expect(Number(txRecord.delta_amount)).toBe(rewardAmount)
       expect(txRecord.business_type).toBe('lottery_reward')
       expect(txRecord.lottery_session_id).toBe('test_session_3.5.2')
@@ -945,7 +945,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
         await BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
-            asset_code: 'POINTS',
+            asset_code: 'points',
             delta_amount: 1000,
             idempotency_key: `${TEST_PREFIX}_session_init_${Date.now()}`,
             business_type: 'admin_adjustment',
@@ -961,7 +961,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
         await BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
-            asset_code: 'POINTS',
+            asset_code: 'points',
             delta_amount: -100,
             idempotency_key: idempotencyKeyDeduct,
             business_type: 'lottery_consume',
@@ -975,7 +975,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
         await BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
-            asset_code: 'DIAMOND',
+            asset_code: 'star_stone',
             delta_amount: 50,
             idempotency_key: idempotencyKeyReward,
             business_type: 'lottery_reward',
@@ -998,13 +998,13 @@ describe('Phase 2 资产账户测试（P1）', () => {
       // 验证扣费记录
       const deductTx = relatedTransactions.find(tx => tx.business_type === 'lottery_consume')
       expect(deductTx).toBeDefined()
-      expect(deductTx.asset_code).toBe('POINTS')
+      expect(deductTx.asset_code).toBe('points')
       expect(Number(deductTx.delta_amount)).toBe(-100)
 
       // 验证奖励记录
       const rewardTx = relatedTransactions.find(tx => tx.business_type === 'lottery_reward')
       expect(rewardTx).toBeDefined()
-      expect(rewardTx.asset_code).toBe('DIAMOND')
+      expect(rewardTx.asset_code).toBe('star_stone')
       expect(Number(rewardTx.delta_amount)).toBe(50)
 
       console.log('✅ 3.5.3 lottery_session_id 关联查询测试通过')
@@ -1020,7 +1020,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
         await BalanceService.changeBalance(
           {
             user_id: testUserContext.user_id,
-            asset_code: 'POINTS',
+            asset_code: 'points',
             delta_amount: 5000,
             idempotency_key: `${TEST_PREFIX}_order_init_${Date.now()}`,
             business_type: 'admin_adjustment',
@@ -1043,7 +1043,7 @@ describe('Phase 2 资产账户测试（P1）', () => {
           await BalanceService.changeBalance(
             {
               user_id: testUserContext.user_id,
-              asset_code: 'POINTS',
+              asset_code: 'points',
               delta_amount: op.amount,
               idempotency_key: `${baseIdempotencyKey}_${op.order}`,
               business_type: op.amount > 0 ? 'lottery_reward' : 'lottery_consume',

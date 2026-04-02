@@ -22,6 +22,7 @@
  */
 
 const models = require('../../models')
+const { AssetCode } = require('../../constants/AssetCode')
 const { Op, fn, col, literal } = require('sequelize')
 const logger = require('../../utils/logger').logger
 const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
@@ -408,7 +409,7 @@ class ChartsService {
   static async getPointsFlowData(start_date, end_date, days) {
     try {
       /**
-       * 查询每天积分流水（使用 AssetTransaction，过滤 asset_code='POINTS'）
+       * 查询每天积分流水（使用 AssetTransaction，过滤 asset_code='points'）
        * delta_amount > 0 表示收入，delta_amount < 0 表示支出
        */
       const daily_points = await models.AssetTransaction.findAll({
@@ -426,7 +427,7 @@ class ChartsService {
           ]
         ],
         where: {
-          asset_code: 'POINTS',
+          asset_code: AssetCode.POINTS,
           created_at: {
             [Op.between]: [start_date, end_date]
           }
