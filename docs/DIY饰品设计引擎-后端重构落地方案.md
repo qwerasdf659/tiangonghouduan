@@ -1,15 +1,17 @@
-# DIY 双数据源架构决策 — 落地方案
+# DIY 饰品设计引擎 — 后端重构落地方案
 
-> 最后更新：2026-04-06，基于真实数据库查询和代码审计（非历史报告）
+> 最后更新：2026-04-06，基于真实数据库查询和代码审计（非历史报告）。含第五部分：可叠加资产支付 DIY 实物饰品可行性验证。
 
 ## 待解决问题清单（6 个后端问题，全部未修复，2026-04-06 验证）
+
+> 业务规则：源晶/源晶碎片（可叠加资产）兑换 DIY 实物珠子，每颗珠子的定价货币（price_asset_code）由运营动态设定
 
 | # | 问题 | 严重程度 | 代码位置 | 验证结果 |
 |---|---|---|---|---|
 | B1 | `getTemplateMaterials()` 查的是 `material_asset_types`（货币表），不是 `diy_materials`（珠子商品表），导致小程序用户看到"红源晶碎片"而不是"巴西黄水晶 8mm" | 🔴 核心缺陷 | `services/DIYService.js` 第 281/302 行 | 代码仍然 `MaterialAssetType.findAll()` |
-| B2 | `confirmDesign()` 从 `work.total_cost` 直接读取冻结明细，这个值是前端传入的，后端没有校验价格是否正确（安全漏洞：前端可以传 0 元） | 🔴 核心缺陷 | `services/DIYService.js` 第 591 行 | 代码仍然 `const totalCost = work.total_cost` |
+| B2 | `confirmDesign()` 从 `work.total_cost` 直接读取冻结明细，这个值是前端传入的，后端没有校验价格是否正确（安全漏洞：前端可以传 0 元）。正确做法：后端根据 design_data 查 diy_materials 的 price + price_asset_code 计算应冻结金额 | 🔴 核心缺陷 | `services/DIYService.js` 第 591 行 | 代码仍然 `const totalCost = work.total_cost` |
 | B3 | `_validateDesignMaterials()` 查错表（查 `MaterialAssetType` 而非 `DiyMaterial`），且当 `material_group_codes` 为空数组时直接 return 跳过校验 — 当前 7 个模板全部空数组，校验永远不执行 | 🔴 核心缺陷 | `services/DIYService.js` 第 1314/1318 行 | 代码仍然查 `MaterialAssetType`，空数组直接 `return` |
-| B4 | `star_stone.budget_value_points = 0`，换算公式会除以 0。星石是直接定价货币，需要在换算逻辑中特殊处理 | 🟡 需决策 | 数据库 `material_asset_types` 表 | 真实查询确认 `budget_value_points = 0` |
+| B4 | `confirmDesign()` 没有按 `price_asset_code` 分组汇总冻结，而是直接读前端传的 asset_code。正确做法：按每颗珠子的 price_asset_code 分组，逐种资产冻结（不需要 budget_value_points 换算） | 🔴 核心缺陷 | `services/DIYService.js` 第 599-608 行 | 代码直接遍历前端传的 total_cost 数组 |
 | B5 | `diy_materials.price` 是 decimal(10,2)（如 6.50），但 `account_asset_balances.available_amount` 是 bigint 整数，冻结时无精度转换逻辑 | 🟡 需处理 | 数据库 `yellow_topaz_8mm` 价格 6.50 | 真实查询确认存在非整数价格 |
 | B6 | `diy_materials` 表 DDL 中 `price_asset_code` 默认值是 `'DIAMOND'`（历史遗留），新增珠子时不指定会默认为不存在的资产 | 🟢 低优先级 | 数据库 INFORMATION_SCHEMA | 真实查询确认 `COLUMN_DEFAULT = 'DIAMOND'` |
 
@@ -385,7 +387,7 @@ BalanceService.getAllBalances(params, options = {})
 
 8. **getTemplateMaterials 接口语义**：当前这个接口返回的是用户虚拟资产余额（钱包），但名字叫"materials"容易混淆。是否改名为更清晰的语义，比如 `/api/v4/diy/payment-assets`？还是保持现有路径不变？
 
-9. **price_asset_code 默认值修复**：diy_materials 表 DDL 中 price_asset_code 默认值是 'DIAMOND'（历史遗留），是否通过迁移脚本改为 'star_stone'？
+9. **price_asset_code 默认值修复**：diy_materials 表 DDL 中 price_asset_code 默认值是 'DIAMOND'（历史遗留），应通过迁移脚本移除默认值（NOT NULL，无默认值），新增珠子时必须显式指定 price_asset_code，为空直接报错
 
 ---
 
@@ -437,39 +439,53 @@ diy_materials groups:        blue,           green, orange,          purple, red
 
 ## 二、架构决策
 
-### 2.1 核心业务模型
+### 2.1 核心业务规则（业主确认）
 
 ```
-diy_materials = 商品目录（用户选什么珠子）
-material_asset_types = 支付手段（用户用什么付钱）
+用户用 源晶/源晶碎片（可叠加资产）兑换 DIY 实物珠子
+每颗珠子的定价货币由运营动态设定，可以是星石、源晶、源晶碎片中的任意一种
+```
+
+### 2.2 核心业务模型
+
+```
+diy_materials = 商品目录（用户选什么珠子）+ 定价（price + price_asset_code 由运营设定）
+material_asset_types = 可叠加资产定义（源晶/碎片/星石，都是支付手段）
+account_asset_balances = 用户持有各种可叠加资产的余额（钱包）
 ```
 
 - `diy_materials` 是**唯一的珠子商品目录**，用户在设计器里只从这张表选珠子
-- `material_asset_types` 里的碎片/宝石和星石都是**支付货币**，不是珠子本身
-- 用户选好珠子后，结算时选择支付方式：用星石付，或用源晶（碎片/宝石）付
+- 每颗珠子有 `price`（数量）+ `price_asset_code`（定价货币），由运营在管理后台动态设定
+- `price_asset_code` 可以是 `material_asset_types` 中任意一种已启用的可叠加资产（星石、源晶、碎片）
+- 确认设计时，后端按每颗珠子的 `price_asset_code` 分组汇总，逐种资产调用 `BalanceService.freeze` 冻结
 
-### 2.2 两张表的职责划分
+### 2.3 两张表的职责划分
 
 | 表 | 职责 | 角色 |
 |---|---|---|
-| `diy_materials` | 珠子商品目录：名称、直径、形状、颜色、图片、标价 | 商品 |
-| `material_asset_types` | 虚拟资产定义：碎片/宝石/星石的属性和预算积分 | 货币 |
-| `account_asset_balances` | 用户持有各种资产的余额（星石、碎片、宝石） | 钱包 |
+| `diy_materials` | 珠子商品目录：名称、直径、形状、颜色、图片、定价（price + price_asset_code） | 商品 + 定价 |
+| `material_asset_types` | 可叠加资产定义：源晶/碎片/星石的属性（form、budget_value_points） | 货币定义 |
+| `account_asset_balances` | 用户持有各种可叠加资产的余额 | 钱包 |
 
-### 2.3 支付方式
+### 2.4 支付方式
 
-每颗珠子在 `diy_materials` 中有一个星石标价（`price` + `price_asset_code = star_stone`）。用户结算时可以选择：
+每颗珠子的定价货币由运营设定（`price_asset_code` 字段，varchar(50)，可以是任意 asset_code）。
 
-| 支付方式 | 扣什么 | 换算规则 |
-|---|---|---|
-| 星石支付 | 扣 star_stone | 直接按 diy_materials.price 扣减 |
-| 源晶支付 | 扣碎片/宝石（如 red_core_shard） | 按 budget_value_points 换算成星石等价 |
+**当前数据库现状**：20 颗珠子全部 `price_asset_code = star_stone`（运营目前统一用星石定价）。
 
-换算示例：一颗巴西黄水晶 8mm 标价 32 星石。用户可以：
-- 付 32 星石
-- 或付 N 颗红源晶碎片（budget_value_points=1，需要 32 颗）
-- 或付 N 颗蓝源晶（budget_value_points=800，1 颗就够）
-- 或混合支付
+**未来可能的场景**：
+
+| 珠子 | price | price_asset_code | 含义 |
+|---|---|---|---|
+| 巴西黄水晶 8mm | 32 | star_stone | 32 星石 |
+| 粉水晶 10mm | 5 | red_core_gem | 5 颗红源晶 |
+| 紫水晶 12mm | 100 | purple_core_shard | 100 颗紫源晶碎片 |
+
+**结算逻辑**：用户选好珠子后，后端根据 design_data 查每颗珠子的 `price` + `price_asset_code`，按 `price_asset_code` 分组汇总，逐种资产冻结。不需要换算，不需要 budget_value_points，直接扣对应资产。
+
+示例：用户选了 10 颗巴西黄水晶（32 星石/颗）+ 8 颗粉水晶（5 红源晶/颗），后端冻结：
+- star_stone: 320
+- red_core_gem: 40
 
 ---
 
@@ -590,7 +606,7 @@ Step 1: 遍历 total_cost.payments，逐项 BalanceService.unfreeze(asset_code, 
 | getTemplateMaterials | services/DIYService.js | 改路径为 /api/v4/diy/payment-assets，方法语义改为"获取 DIY 可用支付资产 + 用户余额" |
 | 用户端路由 | routes/v4/diy.js | confirm 接口增加 payments 参数；新增 /payment-assets 路由；移除 /templates/:id/materials |
 | 价格精度处理 | services/DIYService.js | 新增价格取整逻辑（diy_materials.price decimal → bigint 冻结金额） |
-| price_asset_code 默认值 | 迁移脚本 | 修改 diy_materials 表 DDL，将 price_asset_code 默认值从 'DIAMOND' 改为 'star_stone' |
+| price_asset_code 默认值 | 迁移脚本 | 移除 diy_materials 表 price_asset_code 的默认值（NOT NULL，无默认值），新增珠子时必须显式指定，为空报错 |
 
 ### 6.2 不需要改的
 
@@ -646,53 +662,58 @@ Step 1: 遍历 total_cost.payments，逐项 BalanceService.unfreeze(asset_code, 
 
 ---
 
-## 八、换算规则说明（基于真实数据库 budget_value_points）
+## 八、结算规则说明（无需换算，直接按 price_asset_code 扣减）
 
-> ⚠️ **关键纠正**：`star_stone` 的 `budget_value_points = 0`（不是 100）。星石是直接定价货币，不参与 budget_value_points 换算。
+> 业务规则确认：每颗珠子的定价货币由运营动态设定（price_asset_code），不需要 budget_value_points 换算。
 
-### 8.1 换算模型
+### 8.1 结算模型
 
-`budget_value_points` 是每种源晶资产的"积分价值"。换算逻辑分两种情况：
-
-**星石支付**：直接按 diy_materials.price 扣减，不需要换算
 ```
-需要星石数 = diy_materials.price（直接 1:1）
+每颗珠子有 price（数量）+ price_asset_code（定价货币）
+确认设计时：按 price_asset_code 分组汇总 → 逐种资产调用 BalanceService.freeze
 ```
 
-**源晶支付**：按 budget_value_points 换算成星石等价
-```
-N 颗源晶的星石等价 = N × budget_value_points
-需要源晶数 = ceil(珠子星石价格 ÷ budget_value_points)
-```
+**不需要换算**。运营给珠子定价时已经决定了"这颗珠子值多少个什么资产"，后端直接按定价扣减，不做跨资产换算。
 
-### 8.2 换算示例
+### 8.2 结算示例
 
-一颗巴西黄水晶 8mm 标价 32 星石，用户可以：
+假设运营设定了以下定价：
 
-| 支付方式 | 计算 | 需要数量 |
+| 珠子 | price | price_asset_code |
 |---|---|---|
-| 纯星石 | 直接 32 | 32 星石 |
-| 纯红源晶碎片(bvp=1) | 32 ÷ 1 = 32 | 32 颗 |
-| 纯红源晶(bvp=50) | ceil(32 ÷ 50) = 1（多付 18 星石等价） | 1 颗（⚠️ 有溢价） |
-| 纯蓝源晶(bvp=800) | ceil(32 ÷ 800) = 1（多付 768 星石等价） | 1 颗（⚠️ 严重溢价） |
-| 混合：20 星石 + 红源晶碎片 | 剩余 12 ÷ 1 = 12 | 20 星石 + 12 颗红源晶碎片 |
+| 巴西黄水晶 8mm | 32 | star_stone |
+| 粉水晶 10mm | 5 | red_core_gem |
+| 紫水晶 12mm | 100 | purple_core_shard |
 
-> ⚠️ **溢价问题**：高价值源晶（如蓝源晶 bvp=800）用来买低价珠子（32 星石）会严重溢价。需要决定：是否允许溢价支付？还是要求源晶支付时总等价必须精确等于 total_price（不允许多付）？
+用户选了 10 颗巴西黄水晶 + 4 颗粉水晶 + 4 颗紫水晶，后端计算：
+
+| price_asset_code | 汇总 | 冻结调用 |
+|---|---|---|
+| star_stone | 10 × 32 = 320 | `BalanceService.freeze({ asset_code: 'star_stone', amount: 320 })` |
+| red_core_gem | 4 × 5 = 20 | `BalanceService.freeze({ asset_code: 'red_core_gem', amount: 20 })` |
+| purple_core_shard | 4 × 100 = 400 | `BalanceService.freeze({ asset_code: 'purple_core_shard', amount: 400 })` |
+
+**没有溢价问题，没有换算精度问题，没有 budget_value_points 除以 0 的问题。**
+
+### 8.3 当前数据库现状
+
+当前 20 颗珠子全部 `price_asset_code = star_stone`，所以当前只会冻结星石。未来运营改了定价货币后，代码自动适配（因为是按 price_asset_code 动态分组的）。
 
 ---
 
 ## 九、待办事项
 
-- [ ] 后端：confirmDesign 接收 payments，校验换算，逐项冻结
+- [ ] 后端：confirmDesign 改为根据 design_data 查 diy_materials 的 price + price_asset_code，按 price_asset_code 分组汇总，逐种资产冻结
 - [ ] 后端：completeDesign / cancelDesign 从 total_cost.payments 逐项结算/解冻
-- [ ] 后端：_validateDesignMaterials 校验 material_code 合法性
-- [ ] 后端：saveWork 适配新 design_data 格式（只存 material_code）
-- [ ] 后端：getTemplateMaterials 改为返回用户资产余额（钱包视角）
+- [ ] 后端：_validateDesignMaterials 改查 DiyMaterial 表，校验 material_code 合法性
+- [ ] 后端：saveWork 适配新 design_data 格式（只存 material_code，不存 total_cost）
+- [ ] 后端：新增 /payment-assets 接口（返回用户可用支付资产余额）
+- [ ] 后端：price_asset_code 移除默认值（NOT NULL，无默认值），新增珠子时必须显式指定，为空报错
 - [ ] 数据：diy_materials 19 条珠子补齐图片
 - [ ] 数据：清理 5 条测试 works
-- [ ] 前端（小程序）：设计器从 /beads 接口加载珠子列表
-- [ ] 前端（小程序）：确认设计时展示钱包余额，支持选择支付方式
-- [ ] 前端（小程序）：计算 payments 并提交 confirm 请求
+- [ ] 前端（小程序）：设计器从 /beads 接口加载珠子列表，直接用后端字段名
+- [ ] 前端（小程序）：确认设计时展示用户持有的相关资产余额
+- [ ] 前端（管理后台）：素材管理页 price_asset_code 移除硬编码默认值，改为必填下拉框（为空不允许提交），下拉选项从 material_asset_types 已启用资产动态加载
 
 ---
 
@@ -1111,8 +1132,8 @@ GET /api/v4/diy/templates/:id/beads     → 返回珠子商品列表（保持不
 -- 清理脏测试数据（5 条 works 全部是不存在编码的测试数据）
 DELETE FROM diy_works WHERE diy_work_id IN (1, 3, 6, 7, 8);
 
--- 修复 diy_materials 表 price_asset_code 默认值（从 DIAMOND 改为 star_stone）
-ALTER TABLE diy_materials ALTER COLUMN price_asset_code SET DEFAULT 'star_stone';
+-- 移除 diy_materials 表 price_asset_code 默认值（NOT NULL，无默认值，新增时必须显式指定）
+ALTER TABLE diy_materials ALTER COLUMN price_asset_code DROP DEFAULT;
 ```
 
 ### 步骤 1：修复 `_validateDesignMaterials()`（后端）
@@ -1252,3 +1273,115 @@ Step 6: 生成 total_cost 快照，保存到 diy_works
 | 微信小程序前端 | ✅ 是（适配） | 珠子列表字段适配 + 支付资产接口对接 + design_data 字段名改为 material_code + confirm 传 payments |
 
 改动的本质：后端把"查错表"改为"查对表"，小程序前端把"显示资产类型"改为"显示珠子商品"。Web 管理后台不动。
+
+---
+
+# 第五部分：可叠加资产支付 DIY 实物饰品 — 可行性验证（2026-04-06 真实数据库验证）
+
+> 本章节基于连接真实数据库（dbconn.sealosbja.site:42569/restaurant_points_dev）查询验证，不引用任何历史报告。
+
+## 一、验证问题
+
+**能否用可叠加资产（星石、源晶、源晶碎片）支付 DIY 中的实物饰品？**
+
+## 二、真实数据库验证结果
+
+### 2.1 支付引擎能力（已就绪 ✅）
+
+`DIYService.js` 已实现完整的 freeze→settle→mint 链路：
+
+| 方法 | 功能 | 状态 |
+|---|---|---|
+| `confirmDesign` | 遍历 `total_cost[]`，逐项调用 `BalanceService.freeze()` 冻结资产 | ✅ 已实现 |
+| `completeDesign` | 逐项调用 `BalanceService.settleFromFrozen()` 扣减，调用 `ItemService.mintItem()` 铸造 item | ✅ 已实现 |
+| `cancelDesign` | 逐项调用 `BalanceService.unfreeze()` 释放冻结 | ✅ 已实现 |
+
+支付介质是 `total_cost` 数组，格式 `[{asset_code, amount}]`，BalanceService 对所有 asset_code 走同一套逻辑，不区分资产类型。
+
+### 2.2 实物珠子商品数据（已就绪 ✅）
+
+`diy_materials` 表 20 条启用数据，全部 `star_stone` 定价：
+
+| 珠子 | 规格 | 价格（星石） | group_code |
+|---|---|---|---|
+| 巴西黄水晶 | 8mm/10mm | 32/67 | yellow |
+| 透体柠檬黄水晶 | 8mm/10mm/12mm | 6/12/19 | yellow |
+| 黄塔晶 | 8mm | 6.5 | yellow |
+| 粉水晶 | 8mm/10mm | 15/28 | red |
+| 紫水晶 | 8mm/10mm | 18/35 | purple |
+| 海蓝宝 | 8mm/10mm | 22/45 | blue |
+| 绿幽灵 | 8mm/10mm | 25/50 | green |
+| 橙石榴石 | 8mm/10mm | 20/40 | orange |
+| 幻影绿 | 8mm | 68 | green |
+
+### 2.3 可叠加资产持有情况（流动性充足 ✅）
+
+数据库实查 `account_asset_balances`：
+
+| asset_code | 持有人数 | 总可用余额 |
+|---|---|---|
+| star_stone | 多人 | 最高单人 393,355 |
+| red_core_shard | 多人 | 最高单人 267,065 |
+| 其他源晶/碎片 | 均有持有 | 余额充足 |
+
+### 2.4 DIY 材料 group_code 与可叠加资产 group_code 完全一致
+
+| group_code | diy_materials 有 | material_asset_types 有 |
+|---|---|---|
+| red | ✅ | ✅ |
+| orange | ✅ | ✅ |
+| yellow | ✅ | ✅ |
+| green | ✅ | ✅ |
+| blue | ✅ | ✅ |
+| purple | ✅ | ✅ |
+
+这意味着运营可以把珠子的 `price_asset_code` 设为对应颜色的源晶（如绿幽灵用 `green_core_gem` 定价），实现「同色源晶兑换同色珠子」的业务逻辑。
+
+## 三、核心问题定位：商品与货币混为一谈
+
+当前代码存在两张「材料表」，但只接入了一张：
+
+| | `material_asset_types`（货币表） | `diy_materials`（商品表） |
+|---|---|---|
+| 是什么 | 虚拟可叠加资产（绿源晶、红源晶碎片…） | 实物珠子（巴西黄水晶、粉水晶…） |
+| 接入设计流程 | ✅ 被 `getTemplateMaterials` 查询 | ❌ 未接入 |
+| 接入支付流程 | ✅ 被 `confirmDesign` 冻结 | ❌ 未接入 |
+| 有定价 | 无单价概念，直接扣数量 | 有（price + price_asset_code） |
+
+**问题本质**：代码把虚拟资产当珠子用了。用户在小程序设计手链时，往上面放的「珠子」是绿源晶、红源晶碎片这些虚拟资产本身，而不是巴西黄水晶、粉水晶这些实物珠子。`diy_materials` 表虽然数据已录好 20 条，但是个孤岛——没有任何 service 方法在支付链路里读它。
+
+### 具体场景说明
+
+以「巴西红水晶定价 50 绿源晶」为例：
+
+**当前代码的执行路径（错误）**：
+1. 用户设计时看到的是「绿源晶」（来自 `material_asset_types`）
+2. 放到手链上的「珠子」就是绿源晶本身
+3. `total_cost` = `[{asset_code: 'green_core_gem', amount: 5}]`（前端传入，后端不校验）
+4. 冻结 5 个绿源晶 → 扣减 → 铸造 item
+5. 用户拿到的是一个「由绿源晶组成的虚拟手链」，不是实物
+
+**文档方案修复后的执行路径（正确）**：
+1. 用户设计时看到的是「巴西红水晶 8mm」（来自 `diy_materials`，有图片、尺寸、形状）
+2. 放到手链上的珠子记录 `material_code: 'pink_crystal_8mm'`
+3. 确认设计时，后端查 `diy_materials` 算出总价：3 颗 × 50 绿源晶 = 150 绿源晶
+4. 后端生成 `total_cost = [{asset_code: 'green_core_gem', amount: 150}]`
+5. 冻结 150 绿源晶 → 扣减 → 铸造 item
+6. 用户拿到的是一个「由巴西红水晶组成的实物手链」
+
+## 四、结论
+
+### 可行性判定：✅ 可行，支付引擎已就绪，缺的是计价桥接层
+
+| 能力 | 状态 | 说明 |
+|---|---|---|
+| BalanceService freeze/settle/unfreeze | ✅ 已就绪 | 对所有 asset_code 通用，不需要改 |
+| ItemService.mintItem | ✅ 已就绪 | 通用铸造接口，不需要改 |
+| diy_materials 商品数据 | ✅ 已就绪 | 20 条珠子，定价完整 |
+| 用户可叠加资产余额 | ✅ 充足 | star_stone/源晶/碎片均有持有 |
+| 计价桥接（珠子→资产价格） | ❌ 未接通 | 本文档 B1-B4 修复后即可打通 |
+| 实物履约（收货地址+物流） | ❌ 未建设 | 需要额外建设，不在本文档范围 |
+
+### 修复优先级
+
+本文档第六章「代码改动清单」中的 B1-B4 修复完成后，「用可叠加资产支付 DIY 实物饰品」的核心链路即可跑通。实物履约（收货地址、物流追踪）是独立的后续需求，不阻塞支付链路的打通。
