@@ -21,8 +21,8 @@
 
 'use strict'
 
-// ✅ 必须从 models/index 获取已初始化的模型（避免直接 require 模型文件导致拿到“初始化函数”）
-const { MaterialConversionRule } = require('../models')
+// ✅ 使用统一的 AssetConversionRule 模型（2026-04-05 合并后）
+const { AssetConversionRule } = require('../models')
 const { Op } = require('sequelize')
 const { AssetCode } = require('../constants/AssetCode')
 
@@ -44,14 +44,18 @@ class MaterialConversionValidator {
       nodes.add(rule.from_asset_code)
       nodes.add(rule.to_asset_code)
 
+      /* 统一使用 rate_numerator / rate_denominator（AssetConversionRule 字段） */
+      const toAmount = Number(rule.rate_numerator)
+      const fromAmount = Number(rule.rate_denominator)
+
       edges.push({
         from: rule.from_asset_code,
         to: rule.to_asset_code,
-        from_amount: rule.from_amount,
-        to_amount: rule.to_amount,
-        rate: rule.to_amount / rule.from_amount, // 转换比例
-        weight: -Math.log(rule.to_amount / rule.from_amount), // 边权（用于负环检测）
-        rule_id: rule.rule_id
+        from_amount: fromAmount,
+        to_amount: toAmount,
+        rate: toAmount / fromAmount, // 转换比例
+        weight: -Math.log(toAmount / fromAmount), // 边权（用于负环检测）
+        rule_id: rule.conversion_rule_id
       })
     })
 
@@ -278,21 +282,12 @@ class MaterialConversionValidator {
        * 查询所有已生效且启用的规则（不再按 group_code 过滤）
        * 这样可以检测跨组规则组合形成的闭环和套利路径
        */
-      const effectiveRules = await MaterialConversionRule.findAll({
+      const effectiveRules = await AssetConversionRule.findAll({
         where: {
-          is_enabled: true,
-          effective_at: {
-            [Op.lte]: new Date()
-          }
+          status: 'active',
+          [Op.or]: [{ effective_from: null }, { effective_from: { [Op.lte]: new Date() } }]
         },
-        include: [
-          {
-            model: MaterialAssetType,
-            as: 'fromMaterial',
-            // 🔴 V2.1 移除 where: { group_code: targetGroupCode } 条件
-            attributes: ['asset_code', 'group_code']
-          }
-        ],
+        /* AssetConversionRule 已直接包含 from_asset_code / to_asset_code，无需 include */
         transaction: options.transaction
       })
 

@@ -40,8 +40,6 @@ import {
   TRADE_ENDPOINTS,
   BidAPI,
   BID_ENDPOINTS,
-  ExchangeRateAPI,
-  EXCHANGE_RATE_ENDPOINTS,
   AuctionAPI,
   AUCTION_ENDPOINTS
 } from './market/index.js'
@@ -62,7 +60,6 @@ export { AssetAPI, ASSET_ENDPOINTS }
 export { ExchangeAPI, EXCHANGE_ENDPOINTS }
 export { TradeAPI, TRADE_ENDPOINTS }
 export { BidAPI, BID_ENDPOINTS }
-export { ExchangeRateAPI, EXCHANGE_RATE_ENDPOINTS }
 export { AuctionAPI, AUCTION_ENDPOINTS }
 export { StoreAPI, STORE_ENDPOINTS }
 export { SystemAPI, SYSTEM_ENDPOINTS }
@@ -86,7 +83,6 @@ export default {
   ExchangeAPI,
   TradeAPI,
   BidAPI,
-  ExchangeRateAPI,
   AuctionAPI,
   StoreAPI,
   SystemAPI,

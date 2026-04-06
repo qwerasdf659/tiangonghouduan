@@ -2,7 +2,7 @@
  * 统一图片上传 Mixin（媒体 API 版本）
  *
  * @description 封装图片上传的通用逻辑：文件校验、FormData 构建、API 请求、状态管理
- *              消除各模块（exchange-items/item-templates/images/material-conversion）中
+ *              消除各模块（exchange-items/item-templates/images/conversion-rules）中
  *              重复的上传代码（6 处 80% 重复逻辑）
  *              使用新媒体 API：upload 仅上传文件，attach 单独绑定实体
  *

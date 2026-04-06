@@ -52,7 +52,7 @@ const pageConfigs = {
   'order-list': { title: '订单管理', pageIcon: '📋', pageTitle: '订单管理' },
   
   // 市场管理模块
-  'exchange-rate-management': { title: '汇率兑换管理', pageIcon: '💱', pageTitle: '汇率兑换管理' },
+  'conversion-rule-management': { title: '资产转换规则管理', pageIcon: '🔄', pageTitle: '资产转换规则管理' },
   'trade-management': { title: '交易管理', pageIcon: '💹', pageTitle: '交易管理' },
   'listing-management': { title: '上架管理', pageIcon: '📊', pageTitle: '上架管理' },
   'market-stats': { title: '市场统计', pageIcon: '📈', pageTitle: '市场统计' },

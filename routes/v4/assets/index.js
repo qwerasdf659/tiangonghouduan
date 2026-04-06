@@ -4,16 +4,14 @@
  * 顶层路径：/api/v4/assets
  *
  * 职责：
- * - 聚合资产相关路由
  * - 余额查询 (/balance, /balances)
  * - 流水查询 (/transactions)
- * - 转换规则查询 (/conversion-rules) - 2026-01-14 新增
  * - 今日收支汇总 (/today-summary) - 2026-02-21 新增（决策 D-1）
+ * - 统一资产转换 (/conversion) - 2026-04-05 合并 rates + shop/assets/convert
  *
  * 架构原则：
  * - 路由层不直连 models（通过 ServiceManager 获取服务）
  * - 路由层不开启事务（事务管理在 Service 层）
- *
  */
 
 'use strict'
@@ -23,16 +21,14 @@ const router = express.Router()
 
 const balanceRoutes = require('./balance')
 const transactionsRoutes = require('./transactions')
-const conversionRulesRoutes = require('./conversion-rules')
 const todaySummaryRoutes = require('./today-summary')
 
 router.use('/', balanceRoutes)
 router.use('/', transactionsRoutes)
-router.use('/', conversionRulesRoutes) // GET /conversion-rules
 router.use('/', todaySummaryRoutes) // GET /today-summary（决策 D-1：资产域通用今日汇总）
 
-/** 汇率查询与兑换（平台级，与 console/assets/rates 对齐） */
-const ratesRoutes = require('./rates')
-router.use('/rates', ratesRoutes) // GET /rates, GET /rates/:from/:to, POST /rates/preview, POST /rates/convert
+/** 统一资产转换（2026-04-05 合并 rates + shop/assets/convert） */
+const conversionRoutes = require('./conversion')
+router.use('/conversion', conversionRoutes) // GET /conversion/rules, POST /conversion/preview, POST /conversion/convert
 
 module.exports = router

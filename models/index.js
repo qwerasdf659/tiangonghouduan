@@ -663,15 +663,19 @@ models.WebSocketStartupLog = require('./WebSocketStartupLog')(sequelize, DataTyp
  * - 材料余额真相：account_asset_balances / asset_transactions（统一账本）
  */
 models.MaterialAssetType = require('./MaterialAssetType')(sequelize, DataTypes)
-models.MaterialConversionRule = require('./MaterialConversionRule')(sequelize, DataTypes)
-
-// 🔴 固定汇率兑换规则模型（2026-02-23 市场增强）
-models.ExchangeRate = require('./ExchangeRate')(sequelize, DataTypes)
+// 🔴 统一资产转换规则模型（2026-04-05 合并 ExchangeRate + MaterialConversionRule）
+models.AssetConversionRule = require('./AssetConversionRule')(sequelize, DataTypes)
 /*
- * ✅ ExchangeRate：固定汇率兑换规则
- *    - 用途：管理资产间的固定汇率兑换配置（如 10 red_core_shard = 1 star_stone）
- *    - 与 MaterialConversionRule 语义分离：材料转换是"合成"，汇率兑换是"货币兑换"
- *    - 表名：exchange_rates，主键：exchange_rate_id
+ * ✅ AssetConversionRule：统一资产转换规则
+ *    - 用途：管理所有资产间的转换规则配置（合并原汇率兑换与材料转换）
+ *    - 表名：asset_conversion_rules，主键：conversion_rule_id
+ *    - 转换公式：gross = FLOOR(from_amount × rate_numerator ÷ rate_denominator)
+ */
+
+/*
+ * ⚠️ 旧模型已删除（2026-04-05 暴力重构）
+ * - ExchangeRate → 已合并到 AssetConversionRule，旧表 _bak_exchange_rates 保留 30 天后 DROP
+ * - MaterialConversionRule → 已合并到 AssetConversionRule，旧表 _bak_material_conversion_rules 保留 30 天后 DROP
  */
 
 // 🔴 V4.2 交易市场升级模型（Phase 2）

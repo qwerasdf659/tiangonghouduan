@@ -37,9 +37,7 @@ export const ASSET_ENDPOINTS = {
   MATERIAL_ASSET_TYPES: `${API_PREFIX}/console/material/asset-types`,
   MATERIAL_ASSET_TYPE_DETAIL: `${API_PREFIX}/console/material/asset-types/:asset_code`,
   MATERIAL_ASSET_TYPE_DISABLE: `${API_PREFIX}/console/material/asset-types/:asset_code/disable`,
-  MATERIAL_CONVERSION_RULES: `${API_PREFIX}/console/material/conversion-rules`,
-  MATERIAL_CONVERSION_RULE_DETAIL: `${API_PREFIX}/console/material/conversion-rules/:rule_id`,
-  MATERIAL_CONVERSION_RULE_DISABLE: `${API_PREFIX}/console/material/conversion-rules/:rule_id/disable`,
+  // ⚠️ 旧转换规则端点已废弃（2026-04-05），新端点见 api/asset/conversion-rule.js
   // 材料用户余额查询通过 ADJUSTMENT_USER_BALANCES 统一接口
   // 材料交易记录通过 TRANSACTIONS（需要 user_id）统一接口
 
@@ -364,118 +362,11 @@ export const AssetAPI = {
     return await request({ url: ASSET_ENDPOINTS.MATERIAL_ASSET_TYPES, method: 'GET' })
   },
 
-  /**
-   * 获取材料转换规则列表（管理员）
-   *
-   * @description 查询材料转换规则，支持分页和筛选。
-   *
-   * 业务规则说明：
-   * - 规则采用版本化管理，改比例必须新增规则（禁止 UPDATE 覆盖历史）
-   * - 通过 effective_at 生效时间控制规则切换
-   * - 创建规则时会进行风控校验（循环拦截 + 套利闭环检测）
-   *
-   * @async
-   * @function getConversionRules
-   *
-   * @param {Object} [params] - 查询参数
-   * @param {string} [params.from_asset_code] - 源资产代码筛选（如 'red_core_shard'）
-   * @param {string} [params.to_asset_code] - 目标资产代码筛选（如 'star_stone'）
-   * @param {boolean|string} [params.is_enabled] - 是否启用筛选（true/false）
-   * @param {number} [params.page=1] - 页码（从1开始）
-   * @param {number} [params.page_size=20] - 每页数量
-   *
-   * @returns {Promise<Object>} 响应对象
-   * @returns {boolean} return.success - 请求是否成功
-   * @returns {Object} return.data - 响应数据
-   * @returns {Array<Object>} return.data.rules - 转换规则列表
-   * @returns {number} return.data.rules[].rule_id - 规则ID
-   * @returns {string} return.data.rules[].from_asset_code - 源资产代码
-   * @returns {string} return.data.rules[].to_asset_code - 目标资产代码
-   * @returns {number} return.data.rules[].from_amount - 源资产数量
-   * @returns {number} return.data.rules[].to_amount - 目标资产数量
-   * @returns {string} return.data.rules[].effective_at - 生效时间（ISO8601）
-   * @returns {boolean} return.data.rules[].is_enabled - 是否启用
-   * @returns {number} [return.data.rules[].min_from_amount] - 最小转换数量
-   * @returns {number} [return.data.rules[].max_from_amount] - 最大转换数量
-   * @returns {number} [return.data.rules[].fee_rate] - 手续费费率（如 0.05 = 5%）
-   * @returns {string} [return.data.rules[].title] - 规则标题
-   * @returns {Object} return.data.pagination - 分页信息
-   * @returns {number} return.data.total - 总记录数
-   *
-   * @example
-   * // 查询所有启用的转换规则
-   * const result = await AssetAPI.getConversionRules({ is_enabled: true })
-   *
-   * // 查询红源晶碎片的转换规则
-   * const result2 = await AssetAPI.getConversionRules({
-   *   from_asset_code: 'red_core_shard',
-   *   page: 1,
-   *   page_size: 10
-   * })
-   *
-   * @see GET /api/v4/console/material/conversion-rules
+  /*
+   * ⚠️ 旧转换规则方法已删除（2026-04-05）
+   * - getConversionRules / getConversionRuleDetail / createConversionRule / disableConversionRule
+   * - 新方法见 api/asset/conversion-rule.js → ConversionRuleAPI
    */
-  async getConversionRules(params = {}) {
-    const url = ASSET_ENDPOINTS.MATERIAL_CONVERSION_RULES + buildQueryString(params)
-    return await request({ url, method: 'GET' })
-  },
-
-  /**
-   * 获取单个材料转换规则详情（管理员）
-   *
-   * @async
-   * @function getConversionRuleDetail
-   * @param {number} ruleId - 转换规则ID（事务实体，使用数字ID）
-   * @returns {Promise<Object>} 规则详情
-   * @see GET /api/v4/console/material/conversion-rules/:id
-   */
-  async getConversionRuleDetail(ruleId) {
-    const url = buildURL(ASSET_ENDPOINTS.MATERIAL_CONVERSION_RULE_DETAIL, { rule_id: ruleId })
-    return await request({ url, method: 'GET' })
-  },
-
-  /**
-   * 创建材料转换规则（管理员，版本化：改比例必须新增规则）
-   *
-   * @async
-   * @function createConversionRule
-   * @param {Object} data - 规则参数
-   * @param {string} data.from_asset_code - 源资产代码（如 'red_core_shard'）
-   * @param {string} data.to_asset_code - 目标资产代码（如 'star_stone'）
-   * @param {number} data.from_amount - 源资产数量
-   * @param {number} data.to_amount - 目标资产数量
-   * @param {string} data.effective_at - 生效时间（ISO8601，含 +08:00 时区）
-   * @param {boolean} [data.is_enabled=true] - 是否启用
-   * @param {number} [data.min_from_amount] - 最小转换数量
-   * @param {number} [data.max_from_amount] - 最大转换数量（null=无上限）
-   * @param {number} [data.fee_rate] - 手续费费率（如 0.05 = 5%）
-   * @param {number} [data.fee_min_amount] - 最低手续费
-   * @param {string} [data.fee_asset_code] - 手续费资产类型
-   * @param {string} [data.title] - 规则标题
-   * @param {string} [data.description] - 规则描述
-   * @param {string} [data.risk_level] - 风险等级（low/medium/high）
-   * @param {boolean} [data.is_visible=true] - 前端是否可见
-   * @param {string} [data.rounding_mode='floor'] - 舍入模式（floor/ceil/round）
-   * @returns {Promise<Object>} 创建结果
-   * @see POST /api/v4/console/material/conversion-rules
-   */
-  async createConversionRule(data) {
-    return await request({ url: ASSET_ENDPOINTS.MATERIAL_CONVERSION_RULES, method: 'POST', data })
-  },
-
-  /**
-   * 禁用材料转换规则（管理员，不可删除/修改，仅禁用）
-   *
-   * @async
-   * @function disableConversionRule
-   * @param {number} ruleId - 转换规则ID
-   * @returns {Promise<Object>} 禁用结果
-   * @see PUT /api/v4/console/material/conversion-rules/:id/disable
-   */
-  async disableConversionRule(ruleId) {
-    const url = buildURL(ASSET_ENDPOINTS.MATERIAL_CONVERSION_RULE_DISABLE, { rule_id: ruleId })
-    return await request({ url, method: 'PUT' })
-  },
 
   /**
    * 创建材料资产类型（管理员）

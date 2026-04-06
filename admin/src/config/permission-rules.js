@@ -131,7 +131,7 @@ export const PAGE_ACCESS_RULES = {
   'asset-management.html': { minLevel: 30, menuId: 'assets.asset-mgmt' },
   'asset-adjustment.html': { minLevel: 30, menuId: 'assets.asset-adj' },
   'orphan-frozen.html': { minLevel: 30, menuId: 'assets.orphan' },
-  'material-conversion.html': { minLevel: 30, menuId: 'assets.material-rules' },
+  'conversion-rule-management.html': { minLevel: 30, menuId: 'assets.conversion-rules' },
   'assets-portfolio.html': { minLevel: 30, menuId: 'assets.assets-portfolio' },
 
   'exchange-market.html': { minLevel: 30, menuId: 'market.exchange' },

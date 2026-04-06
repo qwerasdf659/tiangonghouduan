@@ -107,11 +107,9 @@ const CANONICAL_OPERATION_MAP = {
   // ===== 背包域写操作 =====
   '/api/v4/backpack/items/:id/redeem': 'BACKPACK_ITEM_REDEEM', // 用户生成核销码（创建核销订单+锁定物品）
   '/api/v4/exchange': 'EXCHANGE_CREATE_ORDER', // 用户端 B2C 兑换商品
-  // ===== 材料转换 =====
-  '/api/v4/shop/assets/convert': 'SHOP_ASSET_CONVERT', // 资产转换（canonical 路径）
 
-  // ===== 汇率兑换（2026-02-23 市场增强） =====
-  '/api/v4/assets/rates/convert': 'EXCHANGE_RATE_CONVERT', // 执行汇率兑换
+  // ===== 统一资产转换（2026-04-05 合并） =====
+  '/api/v4/assets/conversion/convert': 'ASSET_CONVERSION_CONVERT', // 执行资产转换
 
   // ===== 交易市场 - 物品 =====
   '/api/v4/marketplace/list': 'MARKET_CREATE_LISTING', // C2C 物品上架
@@ -358,13 +356,10 @@ const CANONICAL_OPERATION_MAP = {
    * ===== 材料管理（2026-01-20 V2.2 路由重构）=====
    * 转换规则：事务实体，使用 :id
    */
-  '/api/v4/console/material/conversion-rules/': 'ADMIN_MATERIAL_RULE_CREATE', // 创建转换规则
-  '/api/v4/console/material/conversion-rules/:id': 'ADMIN_MATERIAL_RULE_UPDATE', // 更新或删除转换规则
-  '/api/v4/console/material/conversion-rules/:id/disable': 'ADMIN_MATERIAL_RULE_DISABLE', // 禁用转换规则
-  // 汇率兑换管理（平台资产域 /console/assets/rates）
-  '/api/v4/console/assets/rates': 'ADMIN_EXCHANGE_RATE_CREATE', // 创建汇率规则
-  '/api/v4/console/assets/rates/:id': 'ADMIN_EXCHANGE_RATE_UPDATE', // 更新汇率规则
-  '/api/v4/console/assets/rates/:id/status': 'ADMIN_EXCHANGE_RATE_STATUS', // 更新汇率规则状态
+  // 统一资产转换规则管理（2026-04-05 合并）
+  '/api/v4/console/assets/conversion-rules': 'ADMIN_CONVERSION_RULE_CREATE', // 创建转换规则
+  '/api/v4/console/assets/conversion-rules/:id': 'ADMIN_CONVERSION_RULE_UPDATE', // 更新转换规则
+  '/api/v4/console/assets/conversion-rules/:id/status': 'ADMIN_CONVERSION_RULE_STATUS', // 更新规则状态
   // 资产类型：配置实体，使用 :code
   '/api/v4/console/material/asset-types/': 'ADMIN_MATERIAL_TYPE_CREATE', // 创建资产类型
   '/api/v4/console/material/asset-types/:code': 'ADMIN_MATERIAL_TYPE_UPDATE', // 更新资产类型（配置实体用业务码）

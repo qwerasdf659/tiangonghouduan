@@ -707,39 +707,39 @@ class BusinessCacheHelper {
     return await this.delByPattern(`${KEY_PREFIX}${CACHE_PREFIX.MARKET}:listings:*`, reason)
   }
 
-  // ==================== 汇率兑换缓存专用方法（2026-02-23 市场增强） ====================
+  // ==================== 资产转换规则缓存专用方法（2026-04-05 统一转换规则） ====================
 
   /**
-   * 获取汇率兑换缓存
+   * 获取资产转换规则缓存
    *
-   * @param {string} subKey - 子键（如 'all_active', 'red_core_shard:star_stone'）
+   * @param {string} subKey - 子键（如 'available_rules', 'red_core_shard:star_stone'）
    * @returns {Promise<Object|null>} 缓存数据或 null
    */
-  static async getExchangeRate(subKey) {
-    const key = `${KEY_PREFIX}exchange_rate:${subKey}`
+  static async getConversionRule(subKey) {
+    const key = `${KEY_PREFIX}asset_conversion_rule:${subKey}`
     return await this.get(key)
   }
 
   /**
-   * 写入汇率兑换缓存（TTL 60秒）
+   * 写入资产转换规则缓存（TTL 60秒）
    *
    * @param {string} subKey - 子键
    * @param {Object} data - 缓存数据
    * @returns {Promise<boolean>} 是否成功
    */
-  static async setExchangeRate(subKey, data) {
-    const key = `${KEY_PREFIX}exchange_rate:${subKey}`
+  static async setConversionRule(subKey, data) {
+    const key = `${KEY_PREFIX}asset_conversion_rule:${subKey}`
     return await this.set(key, data, DEFAULT_TTL.SYSCONFIG)
   }
 
   /**
-   * 失效所有汇率缓存（规则变更时调用）
+   * 失效所有资产转换规则缓存（规则变更时调用）
    *
    * @param {string} reason - 失效原因
    * @returns {Promise<number>} 失效的 key 数量
    */
-  static async invalidateExchangeRate(reason = 'exchange_rate_updated') {
-    return await this.delByPattern(`${KEY_PREFIX}exchange_rate:*`, reason)
+  static async invalidateConversionRule(reason = 'conversion_rule_updated') {
+    return await this.delByPattern(`${KEY_PREFIX}asset_conversion_rule:*`, reason)
   }
 
   // ==================== 价格发现缓存专用方法（2026-02-23 市场增强） ====================

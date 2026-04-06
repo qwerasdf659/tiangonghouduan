@@ -24,7 +24,7 @@ const QueryService = require('./QueryService')
 const AdminService = require('./AdminService')
 const BidService = require('./BidService')
 const BidQueryService = require('./BidQueryService')
-const ExchangeRateService = require('./ExchangeRateService')
+// ⚠️ ExchangeRateService 已合并到 AssetConversionRuleService（2026-04-05）
 const ExchangeItemService = require('./ExchangeItemService')
 const AttributeService = require('./AttributeService')
 const ExchangeChannelPriceService = require('./ExchangeChannelPriceService')
@@ -35,7 +35,6 @@ module.exports = {
   AdminService,
   BidService,
   BidQueryService,
-  ExchangeRateService,
   ExchangeItemService,
   AttributeService,
   ExchangeChannelPriceService

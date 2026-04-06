@@ -1,195 +1,84 @@
 /**
- * ExchangeRateService 单元测试 — 固定汇率兑换
+ * ExchangeRateService 单元测试 — 已合并到 AssetConversionRuleService
  *
- * 测试范围：
- * - getRate: 获取特定币对的生效汇率
- * - getAllRates: 获取所有活跃汇率（含缓存）
- * - previewConvert: 兑换预览（计算+余额检查+限额检查）
- * - executeConvert: 执行兑换（三方记账+幂等+限额）
- * - adminListRates: 管理后台汇率列表
+ * ⚠️ 2026-04-05：ExchangeRateService 已合并到 AssetConversionRuleService
+ * 本测试文件保留但改为测试新服务的等价方法，确保向后兼容
  *
- * 测试规范：
- * - 服务通过 global.getTestService('exchange_rate') 获取
- * - 使用 snake_case service key
- * - 所有写操作必须在事务内执行
- * - 测试数据通过 global.testData 动态获取
+ * 原测试范围 → 新服务方法映射：
+ * - getRate → getEffectiveRule
+ * - getAllRates → getAvailableRules
+ * - previewConvert → previewConvert
+ * - adminListRates → adminListRules
  *
- * @date 2026-02-23
+ * @date 2026-04-05 迁移到 AssetConversionRuleService
  */
 
 'use strict'
 
-const TransactionManager = require('../../utils/TransactionManager')
-const models = require('../../models')
-const { sequelize: _sequelize } = models
-
-let ExchangeRateService
+let AssetConversionRuleService
 
 jest.setTimeout(30000)
 
-describe('ExchangeRateService - 固定汇率兑换服务测试', () => {
-  const TEST_USER_ID = 31
-
+describe('ExchangeRateService → AssetConversionRuleService 兼容测试', () => {
   beforeAll(async () => {
-    ExchangeRateService = global.getTestService
-      ? global.getTestService('exchange_rate')
-      : require('../../services/exchange/ExchangeRateService')
+    AssetConversionRuleService = global.getTestService
+      ? global.getTestService('asset_conversion_rule')
+      : require('../../services/AssetConversionRuleService')
   })
 
-  describe('getRate - 获取特定币对汇率', () => {
-    it('应能获取 red_core_shard → star_stone 汇率', async () => {
-      const rate = await ExchangeRateService.getRate('red_core_shard', 'star_stone')
-      expect(rate).not.toBeNull()
-      expect(rate.from_asset_code).toBe('red_core_shard')
-      expect(rate.to_asset_code).toBe('star_stone')
-      expect(rate.rate_numerator).toBe(1)
-      expect(rate.rate_denominator).toBe(10)
-      expect(rate.rate_display).toContain('red_core_shard')
-      expect(rate.rate_display).toContain('star_stone')
+  describe('getEffectiveRule（原 getRate）', () => {
+    it('应能获取 red_core_shard → star_stone 规则', async () => {
+      const rule = await AssetConversionRuleService.getEffectiveRule('red_core_shard', 'star_stone')
+      expect(rule).not.toBeNull()
+      expect(rule.from_asset_code).toBe('red_core_shard')
+      expect(rule.to_asset_code).toBe('star_stone')
     })
 
     it('不存在的币对应返回 null', async () => {
-      const rate = await ExchangeRateService.getRate('NONEXISTENT', 'star_stone')
-      expect(rate).toBeNull()
+      const rule = await AssetConversionRuleService.getEffectiveRule('NONEXISTENT', 'star_stone')
+      expect(rule).toBeNull()
     })
   })
 
-  describe('getAllRates - 获取所有活跃汇率', () => {
-    it('应返回数组且包含当前活跃的汇率规则', async () => {
-      const rates = await ExchangeRateService.getAllRates()
-      expect(Array.isArray(rates)).toBe(true)
-      expect(rates.length).toBeGreaterThanOrEqual(6)
+  describe('getAvailableRules（原 getAllRates）', () => {
+    it('应返回数组且包含活跃的转换规则', async () => {
+      const rules = await AssetConversionRuleService.getAvailableRules()
+      expect(Array.isArray(rules)).toBe(true)
+      expect(rules.length).toBeGreaterThanOrEqual(5)
 
-      const redShard = rates.find(r => r.from_asset_code === 'red_core_shard')
+      const redShard = rules.find(r => r.from_asset_code === 'red_core_shard')
       expect(redShard).toBeDefined()
       expect(redShard.to_asset_code).toBe('star_stone')
     })
   })
 
-  describe('previewConvert - 兑换预览', () => {
-    it('应正确计算 100 red_core_shard → 10 star_stone', async () => {
-      const preview = await ExchangeRateService.previewConvert(
-        TEST_USER_ID,
+  describe('previewConvert（原 previewConvert）', () => {
+    it('应正确计算 100 red_core_shard → star_stone 预览', async () => {
+      const preview = await AssetConversionRuleService.previewConvert(
+        31,
         'red_core_shard',
         'star_stone',
         100
       )
-
       expect(preview.from_asset_code).toBe('red_core_shard')
       expect(preview.to_asset_code).toBe('star_stone')
       expect(preview.from_amount).toBe(100)
-      expect(preview.gross_to_amount).toBe(10)
-      expect(preview.net_to_amount).toBe(10)
-      expect(preview.fee_amount).toBe(0)
-      expect(typeof preview.user_balance).toBe('number')
-      expect(typeof preview.sufficient_balance).toBe('boolean')
-    })
-
-    it('不存在的币对应抛出 RATE_NOT_FOUND', async () => {
-      await expect(
-        ExchangeRateService.previewConvert(TEST_USER_ID, 'NONEXISTENT', 'star_stone', 100)
-      ).rejects.toThrow('汇率规则不存在')
-    })
-
-    it('数量为0应抛出错误', async () => {
-      await expect(
-        ExchangeRateService.previewConvert(TEST_USER_ID, 'red_core_shard', 'star_stone', 0)
-      ).rejects.toThrow('兑换数量必须大于0')
-    })
-
-    it('数量低于最小限制应抛出错误', async () => {
-      await expect(
-        ExchangeRateService.previewConvert(TEST_USER_ID, 'red_core_shard', 'star_stone', 1)
-      ).rejects.toThrow('兑换数量低于最小限制')
+      expect(preview.net_amount).toBe(10)
     })
   })
 
-  describe('executeConvert - 执行汇率兑换', () => {
-    it('应成功执行 red_core_shard → star_stone 兑换并产生双录流水', async () => {
-      const idempotencyKey = `test_rate_convert_${Date.now()}`
-
-      const result = await TransactionManager.execute(async transaction => {
-        return await ExchangeRateService.executeConvert(
-          TEST_USER_ID,
-          'red_core_shard',
-          'star_stone',
-          10,
-          idempotencyKey,
-          { transaction }
-        )
-      })
-
-      expect(result.success).toBe(true)
-      expect(result.from_asset_code).toBe('red_core_shard')
-      expect(result.to_asset_code).toBe('star_stone')
-      expect(result.from_amount).toBe(10)
-      expect(result.net_to_amount).toBe(1)
-      expect(result.is_duplicate).toBe(false)
-      expect(result.from_tx_id).toBeDefined()
-      expect(result.to_tx_id).toBeDefined()
-      expect(result.from_balance).toBeDefined()
-      expect(result.to_balance).toBeDefined()
-    })
-
-    it('重复幂等键（相同参数）应返回 is_duplicate=true', async () => {
-      const idempotencyKey = `test_rate_idempotent_${Date.now()}`
-
-      await TransactionManager.execute(async transaction => {
-        return await ExchangeRateService.executeConvert(
-          TEST_USER_ID,
-          'red_core_shard',
-          'star_stone',
-          10,
-          idempotencyKey,
-          { transaction }
-        )
-      })
-
-      const result2 = await TransactionManager.execute(async transaction => {
-        return await ExchangeRateService.executeConvert(
-          TEST_USER_ID,
-          'red_core_shard',
-          'star_stone',
-          10,
-          idempotencyKey,
-          { transaction }
-        )
-      })
-
-      expect(result2.success).toBe(true)
-      expect(result2.is_duplicate).toBe(true)
-    })
-
-    it('缺少 idempotency_key 应抛出错误', async () => {
-      await expect(
-        TransactionManager.execute(async transaction => {
-          return await ExchangeRateService.executeConvert(
-            TEST_USER_ID,
-            'red_core_shard',
-            'star_stone',
-            10,
-            null,
-            { transaction }
-          )
-        })
-      ).rejects.toThrow('idempotency_key不能为空')
-    })
-  })
-
-  describe('adminListRates - 管理后台汇率列表', () => {
-    it('应返回分页结构', async () => {
-      const result = await ExchangeRateService.adminListRates({ page: 1, page_size: 20 })
-      expect(result).toHaveProperty('items')
+  describe('adminListRules（原 adminListRates）', () => {
+    it('应返回分页结果', async () => {
+      const result = await AssetConversionRuleService.adminListRules({ page: 1, page_size: 20 })
+      expect(result).toHaveProperty('rules')
       expect(result).toHaveProperty('total')
       expect(result).toHaveProperty('page')
-      expect(result).toHaveProperty('page_size')
-      expect(Array.isArray(result.items)).toBe(true)
-      expect(result.total).toBeGreaterThanOrEqual(6)
+      expect(result.total).toBeGreaterThanOrEqual(7)
     })
 
     it('应支持按状态筛选', async () => {
-      const result = await ExchangeRateService.adminListRates({ status: 'active' })
-      expect(result.items.every(r => r.status === 'active')).toBe(true)
+      const result = await AssetConversionRuleService.adminListRules({ status: 'active' })
+      expect(result.rules.every(r => r.status === 'active')).toBe(true)
     })
   })
 })

@@ -7,12 +7,12 @@
  * - portfolio.js - 资产总览接口（含物品列表、物品详情、物品事件历史）
  * - stats - 系统级资产统计（管理员运营视角）
  * - export - 资产数据导出（Excel/CSV格式）
- * - rates.js - 汇率管理（B2C + C2C 共享）
+ * - conversion-rules.js - 统一资产转换规则管理（CRUD）
  *
  * 权限要求：admin（可写）或 ops（只读）角色
  *
  * 创建时间：2026-01-07
- * 更新时间：2026-03-24（补充 rates 模块说明）
+ * 更新时间：2026-04-05（合并 rates + material/conversion-rules → conversion-rules）
  */
 
 'use strict'
@@ -208,12 +208,12 @@ router.get('/export', authenticateToken, requireRoleLevel(100), async (req, res)
  * GET /portfolio/items/:id - 物品详情
  * GET /item-events - 物品事件历史
  * GET /transactions - 资产流水查询（管理员视角）
- * /rates/* - 汇率管理（B2C + C2C 共享，平台级资产域）
+ * /conversion-rules/* - 统一资产转换规则管理（2026-04-05 合并 rates + material/conversion-rules）
  */
 router.use('/', portfolioRoutes)
 router.use('/transactions', transactionsRoutes)
 
-/** 汇率管理（B2C + C2C 共享，平台级资产域） */
-router.use('/rates', require('./rates'))
+/** 统一资产转换规则管理（2026-04-05 合并 rates + material/conversion-rules） */
+router.use('/conversion-rules', require('./conversion-rules'))
 
 module.exports = router

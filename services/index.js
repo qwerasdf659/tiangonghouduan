@@ -66,9 +66,13 @@ const LotteryPresetService = require('./lottery/LotteryPresetService') // 抽奖
 const ActivityService = require('./ActivityService') // 活动管理服务
 const AuditLogService = require('./AuditLogService') // 审计日志服务
 
-// V4.5.0 材料系统服务
-const AssetConversionService = require('./AssetConversionService') // 资产转换服务（材料转星石）
-const ExchangeRateService = require('./exchange/ExchangeRateService') // 固定汇率兑换服务（2026-02-23 市场增强）
+/*
+ * V4.5.0 材料系统服务
+ * ⚠️ AssetConversionService 和 ExchangeRateService 已合并到 AssetConversionRuleService（2026-04-05）
+ */
+
+// 统一资产转换规则服务（2026-04-05 合并 ExchangeRate + MaterialConversion）
+const AssetConversionRuleService = require('./AssetConversionRuleService')
 
 // Asset 域子服务
 const BalanceService = require('./asset/BalanceService') // 资产余额服务（8个方法）
@@ -317,7 +321,6 @@ class ServiceManager {
       // C2C 用户间竞拍（2026-03-24）
       this._services.set('auction_core', new AuctionService(this.models)) // C2C拍卖核心操作（创建/出价/结算/取消/流拍）
       this._services.set('auction_query', new AuctionQueryService(this.models)) // C2C拍卖查询服务（列表/详情/卖方视角/出价历史）
-      this._services.set('exchange_rate', ExchangeRateService) // 固定汇率兑换服务（静态类，2026-02-23 市场增强）
 
       // 快递查询服务（双通道降级：快递100主 + 快递鸟备，Phase 4 快递对接）
       const ShippingTrackService = require('./shipping/ShippingTrackService')
@@ -403,7 +406,7 @@ class ServiceManager {
       this._services.set('asset_query', QueryService) // 资产查询服务（7个方法，静态类）
       this._services.set('asset_item_lifecycle', ItemLifecycleService) // 物品全链路追踪服务（静态类）
 
-      this._services.set('asset_conversion', AssetConversionService)
+      this._services.set('asset_conversion_rule', AssetConversionRuleService) // 统一资产转换规则服务（2026-04-05）
 
       // ========== 幂等架构服务（使用 snake_case key） ==========
 
