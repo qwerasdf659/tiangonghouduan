@@ -195,7 +195,19 @@ module.exports = sequelize => {
         type: DataTypes.STRING(20),
         allowNull: false,
         defaultValue: 'exchange',
-        comment: '来源：exchange=普通兑换, bid=竞价中标'
+        comment: '来源：exchange=普通兑换, bid=竞价中标, diy=DIY设计兑换'
+      },
+
+      /**
+       * 下单时收货地址快照（JSON）
+       * 包含：receiver_name, receiver_phone, province, city, district, detail_address
+       * DIY 实物兑换场景使用
+       */
+      address_snapshot: {
+        type: DataTypes.JSON,
+        allowNull: true,
+        defaultValue: null,
+        comment: '下单时收货地址快照（JSON）'
       },
 
       /**

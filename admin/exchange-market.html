@@ -247,6 +247,12 @@
                 <option value="refunded">已退款</option>
                 <option value="cancelled">已取消</option>
               </select>
+              <select x-model="activeFilters.source" class="px-3 py-2 border rounded">
+                <option value="">全部来源</option>
+                <option value="exchange">普通兑换</option>
+                <option value="bid">竞价中标</option>
+                <option value="diy">DIY 设计</option>
+              </select>
               <button @click="search()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">🔍 搜索</button>
               <button @click="handleFilterReset()" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">🔄 重置</button>
             </div>

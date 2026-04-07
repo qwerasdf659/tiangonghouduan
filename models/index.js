@@ -949,6 +949,12 @@ models.DiyMaterial = require('./DiyMaterial')(sequelize, DataTypes)
  *    - 表名：diy_materials，主键：diy_material_id，外键：image_media_id, category_id
  */
 
+models.UserAddress = require('./UserAddress')(sequelize, DataTypes)
+/*
+ * ✅ UserAddress：用户收货地址（DIY 实物兑换、奖品发货等场景）
+ *    - 表名：user_addresses，主键：address_id，外键：user_id
+ */
+
 // 🔴 设置模型关联关系
 Object.keys(models).forEach(modelName => {
   if (models[modelName].associate) {

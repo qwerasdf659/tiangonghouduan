@@ -43,6 +43,9 @@ const adPricingRoutes = require('./ad-pricing')
 // 用户端图片上传路由（广告主上传广告素材，与管理端 console/images 权限隔离）
 const userImagesRoutes = require('./images')
 
+// 用户收货地址管理路由（DIY 实物兑换、奖品发货等场景）
+const addressesRoutes = require('./addresses')
+
 /**
  * GET /api/v4/user/me
  * @desc 获取当前用户基本信息（通过token识别）
@@ -88,5 +91,8 @@ router.use('/ad-pricing', adPricingRoutes)
 
 // 挂载用户端图片上传路由（/api/v4/user/images/upload）
 router.use('/images', userImagesRoutes)
+
+// 挂载用户收货地址路由（/api/v4/user/addresses）
+router.use('/addresses', authenticateToken, addressesRoutes)
 
 module.exports = router

@@ -609,6 +609,7 @@ class QueryService {
       user_id = null,
       exchange_item_id = null,
       order_no = null,
+      source = null,
       page = 1,
       page_size = 20,
       sort_by = 'created_at',
@@ -621,6 +622,7 @@ class QueryService {
         user_id,
         exchange_item_id,
         order_no,
+        source,
         page,
         page_size
       })
@@ -629,6 +631,7 @@ class QueryService {
       if (status) where.status = status
       if (user_id) where.user_id = user_id
       if (exchange_item_id) where.exchange_item_id = exchange_item_id
+      if (source) where.source = source
       if (order_no) {
         where.order_no = { [Op.like]: `%${order_no}%` }
       }

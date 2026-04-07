@@ -3,17 +3,19 @@
  *
  * 顶层路径：/api/v4/diy
  *
- * 接口清单（10 个）：
+ * 接口清单（11 个）：
  * - GET    /templates                获取模板列表（按分类分组，仅已发布+已启用）
  * - GET    /templates/:id            获取模板详情
- * - GET    /templates/:id/materials  获取模板可用材料（含用户持有量）
+ * - GET    /templates/:id/beads      获取模板可用珠子素材（查 diy_materials）
+ * - GET    /templates/:id/payment-assets  获取用户可用支付资产余额（钱包）
+ * - GET    /material-groups          获取材料分组列表（用于前端 Tab）
  * - GET    /works                    获取用户作品列表
  * - GET    /works/:id                获取作品详情
  * - POST   /works                    保存作品（创建或更新草稿）
  * - DELETE /works/:id                删除作品（仅 draft 状态）
- * - POST   /works/:id/confirm        确认设计（冻结材料，draft → frozen）
+ * - POST   /works/:id/confirm        确认设计（服务端计算价格 + 冻结资产，draft → frozen）
  * - POST   /works/:id/complete       完成设计（从冻结扣减 + 铸造物品，frozen → completed）
- * - POST   /works/:id/cancel         取消设计（解冻材料，frozen → cancelled）
+ * - POST   /works/:id/cancel         取消设计（解冻资产，frozen → cancelled）
  *
  * @module routes/v4/diy
  */
@@ -58,25 +60,30 @@ router.get(
   })
 )
 
-/** 获取模板可用材料（需登录，含用户持有量） */
-router.get(
-  '/templates/:id/materials',
-  authenticateToken,
-  asyncHandler(async (req, res) => {
-    const DIYService = require('../../services').getService('diy')
-    const accountId = await DIYService.getAccountIdByUserId(req.user.user_id)
-    const materials = await DIYService.getTemplateMaterials(Number(req.params.id), accountId)
-    return res.apiSuccess(materials, '获取可用材料成功')
-  })
-)
-
-/** 获取模板可用的实物珠子/宝石素材 */
+/** 获取模板可用的实物珠子/宝石素材（查 diy_materials 表） */
 router.get(
   '/templates/:id/beads',
   asyncHandler(async (req, res) => {
     const DIYService = require('../../services').getService('diy')
     const materials = await DIYService.getUserMaterials(Number(req.params.id), req.query)
     return res.apiSuccess(materials, '获取珠子素材成功')
+  })
+)
+
+/**
+ * 获取用户可用支付资产余额（钱包）
+ *
+ * 返回该模板下珠子实际使用的定价货币 + 用户在这些货币上的余额
+ * 用途：小程序"确认设计"时展示用户钱包，供选择支付方式
+ */
+router.get(
+  '/templates/:id/payment-assets',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const DIYService = require('../../services').getService('diy')
+    const accountId = await DIYService.getAccountIdByUserId(req.user.user_id)
+    const assets = await DIYService.getPaymentAssets(Number(req.params.id), accountId)
+    return res.apiSuccess(assets, '获取支付资产成功')
   })
 )
 
@@ -150,7 +157,13 @@ router.delete(
   })
 )
 
-/** 确认设计（冻结材料，draft → frozen） */
+/**
+ * 确认设计（服务端计算价格 + 冻结资产，draft → frozen）
+ *
+ * 请求体：{ payments: [{ asset_code: 'star_stone', amount: 180 }] }
+ * 后端从 design_data 中提取 material_code，查 diy_materials 获取真实价格，
+ * 校验 payments 总额 ≥ 应付金额后冻结资产。
+ */
 router.post(
   '/works/:id/confirm',
   asyncHandler(async (req, res) => {
@@ -159,10 +172,11 @@ router.post(
     await TransactionManager.execute(async transaction => {
       work = await DIYService.confirmDesign(Number(req.params.id), req.accountId, {
         transaction,
-        userId: req.user.user_id
+        userId: req.user.user_id,
+        payments: req.body.payments
       })
     })
-    return res.apiSuccess(work, '设计确认成功，材料已冻结')
+    return res.apiSuccess(work, '设计确认成功，资产已冻结')
   })
 )
 
@@ -182,7 +196,7 @@ router.post(
   })
 )
 
-/** 取消设计（解冻材料，frozen → cancelled） */
+/** 取消设计（解冻资产，frozen → cancelled） */
 router.post(
   '/works/:id/cancel',
   asyncHandler(async (req, res) => {
@@ -194,7 +208,7 @@ router.post(
         userId: req.user.user_id
       })
     })
-    return res.apiSuccess(work, '设计已取消，材料已解冻')
+    return res.apiSuccess(work, '设计已取消，资产已解冻')
   })
 )
 

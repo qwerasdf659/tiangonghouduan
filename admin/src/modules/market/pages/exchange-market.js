@@ -535,7 +535,10 @@ document.addEventListener('alpine:init', () => {
         {
           key: 'item_name',
           label: '商品',
-          render: (val, row) => row.item_snapshot?.item_name || val || '-'
+          render: (val, row) => {
+            if (row.source === 'diy') return '🎨 DIY 设计兑换'
+            return row.item_snapshot?.item_name || val || '-'
+          }
         },
         {
           key: 'pay_amount',

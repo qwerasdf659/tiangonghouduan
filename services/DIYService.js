@@ -4,11 +4,12 @@
  * 职责：
  * - 款式模板 CRUD（管理端）
  * - 用户作品 CRUD + 状态流转（小程序端）
- * - 可用材料查询（联动 material_asset_types + account_asset_balances）
- * - 确认设计（冻结材料）/ 取消设计（解冻材料）/ 完成设计（扣减 + 铸造）
+ * - 珠子商品查询（联动 diy_materials + media_files）
+ * - 用户支付资产查询（联动 material_asset_types + account_asset_balances）
+ * - 确认设计（服务端计算价格 + 冻结资产）/ 取消设计（解冻）/ 完成设计（扣减 + 铸造）
  *
  * @module services/DIYService
- * @version 2.0.0
+ * @version 3.0.0
  */
 
 'use strict'
@@ -17,7 +18,6 @@ const { AssetCode } = require('../constants/AssetCode')
 
 const { Op } = require('sequelize')
 const logger = require('../utils/logger').logger
-const { getImageUrl } = require('../utils/ImageUrlHelper')
 const OrderNoGenerator = require('../utils/OrderNoGenerator')
 
 /** DIY 饰品设计引擎核心业务服务 */
@@ -267,21 +267,22 @@ class DIYService {
   }
 
   /**
-   * 获取模板可用材料列表（含用户持有量）
+   * 获取用户可用支付资产列表（钱包余额）
    *
-   * 联动 material_asset_types + media_attachments + account_asset_balances
+   * 查询 diy_materials 中实际使用的定价货币（price_asset_code），
+   * 再查用户在这些货币上的余额。
+   * 用途：小程序"确认设计"时展示用户钱包，供选择支付方式。
    *
-   * @param {number} templateId - diy_template_id
+   * @param {number} templateId - diy_template_id（用于校验模板存在性）
    * @param {number} accountId - 用户 account_id
-   * @returns {Object[]} 材料列表
+   * @returns {Object[]} 支付资产列表 [{ asset_code, display_name, available_amount, frozen_amount }]
    */
-  static async getTemplateMaterials(templateId, accountId) {
+  static async getPaymentAssets(templateId, accountId) {
     const {
       DiyTemplate,
+      DiyMaterial,
       MaterialAssetType,
-      AccountAssetBalance,
-      MediaAttachment,
-      MediaFile
+      AccountAssetBalance
     } = require('../models')
 
     const template = await DiyTemplate.findByPk(templateId)
@@ -291,71 +292,48 @@ class DIYService {
       throw error
     }
 
-    // 构建材料查询条件
-    const materialWhere = {}
+    // 查询该模板下珠子实际使用的定价货币编码（去重）
+    const materialWhere = { is_enabled: true }
     const groupCodes = template.material_group_codes
     if (groupCodes && Array.isArray(groupCodes) && groupCodes.length > 0) {
       materialWhere.group_code = { [Op.in]: groupCodes }
     }
 
-    // 查询所有符合条件的材料类型
-    const materials = await MaterialAssetType.findAll({
+    const materials = await DiyMaterial.findAll({
       where: materialWhere,
-      order: [
-        ['group_code', 'ASC'],
-        ['display_name', 'ASC']
-      ]
+      attributes: ['price_asset_code'],
+      group: ['price_asset_code'],
+      raw: true
     })
 
-    // 批量查询用户持有量
-    const assetCodes = materials.map(m => m.asset_code)
+    const paymentAssetCodes = materials.map(m => m.price_asset_code)
+    if (paymentAssetCodes.length === 0) {
+      return []
+    }
+
+    // 查询这些资产的显示信息
+    const assetTypes = await MaterialAssetType.findAll({
+      where: { asset_code: { [Op.in]: paymentAssetCodes } },
+      attributes: ['asset_code', 'display_name', 'form']
+    })
+    const assetTypeMap = new Map(assetTypes.map(a => [a.asset_code, a]))
+
+    // 查询用户在这些资产上的余额
     const balances = await AccountAssetBalance.findAll({
       where: {
         account_id: accountId,
-        asset_code: { [Op.in]: assetCodes }
+        asset_code: { [Op.in]: paymentAssetCodes }
       }
     })
     const balanceMap = new Map(balances.map(b => [b.asset_code, b]))
 
-    // 批量查询材料图片（通过 media_attachments 多态关联）
-    const attachments = await MediaAttachment.findAll({
-      where: {
-        attachable_type: 'material_asset_type',
-        attachable_id: { [Op.in]: materials.map(m => m.material_asset_type_id) }
-      },
-      include: [
-        { model: MediaFile, as: 'media', attributes: ['media_id', 'object_key', 'thumbnail_keys'] }
-      ]
-    })
-    const imageMap = new Map()
-    for (const att of attachments) {
-      if (att.media) {
-        let thumbnailKey = att.media.object_key
-        if (att.media.thumbnail_keys) {
-          const keys =
-            typeof att.media.thumbnail_keys === 'string'
-              ? JSON.parse(att.media.thumbnail_keys)
-              : att.media.thumbnail_keys
-          if (Array.isArray(keys) && keys.length > 0) thumbnailKey = keys[0]
-        }
-        imageMap.set(Number(att.attachable_id), {
-          image_url: getImageUrl(att.media.object_key),
-          thumbnail_url: getImageUrl(thumbnailKey)
-        })
-      }
-    }
-
-    // 组装返回数据
-    return materials.map(m => {
-      const balance = balanceMap.get(m.asset_code)
-      const images = imageMap.get(m.material_asset_type_id) || {}
+    return paymentAssetCodes.map(code => {
+      const assetType = assetTypeMap.get(code)
+      const balance = balanceMap.get(code)
       return {
-        asset_code: m.asset_code,
-        display_name: m.display_name,
-        group_code: m.group_code,
-        form: m.form,
-        image_url: images.image_url || null,
-        thumbnail_url: images.thumbnail_url || null,
+        asset_code: code,
+        display_name: assetType ? assetType.display_name : code,
+        form: assetType ? assetType.form : null,
         available_amount: balance ? Number(balance.available_amount) : 0,
         frozen_amount: balance ? Number(balance.frozen_amount) : 0
       }
@@ -484,7 +462,7 @@ class DIYService {
         {
           work_name: data.work_name || work.work_name,
           design_data: data.design_data || work.design_data,
-          total_cost: data.total_cost || work.total_cost,
+          // total_cost 由 confirmDesign 服务端计算，saveWork 不接受前端传入
           preview_media_id:
             data.preview_media_id !== undefined ? data.preview_media_id : work.preview_media_id
         },
@@ -502,7 +480,7 @@ class DIYService {
         diy_template_id: data.diy_template_id,
         work_name: data.work_name || '我的设计',
         design_data: data.design_data,
-        total_cost: data.total_cost || [],
+        total_cost: [], // 由 confirmDesign 服务端计算，创建时为空
         preview_media_id: data.preview_media_id || null,
         work_code: 'DW_TEMP', // 临时占位
         status: 'draft'
@@ -559,17 +537,24 @@ class DIYService {
   /**
    * 确认设计 — 冻结材料
    *
-   * draft → frozen：根据 total_cost 逐项调用 BalanceService.freeze 冻结用户材料
+   * draft → frozen：
+   * 1. 从 design_data 中提取每个槽位使用的 material_code
+   * 2. 查 diy_materials 获取每颗珠子的 price + price_asset_code（服务端定价，不信任前端）
+   * 3. 按 price_asset_code 分组汇总应冻结金额
+   * 4. 接收前端传入的 payments（用户选择的支付方式），校验总额 ≥ 应付
+   * 5. 逐项调用 BalanceService.freeze 冻结用户资产
+   * 6. 生成 total_cost 快照保存到 diy_works
    *
    * @param {number} workId - diy_work_id
    * @param {number} accountId - 用户 account_id（权限校验用）
-   * @param {Object} options - { transaction, userId }（必须在事务中）
+   * @param {Object} options - { transaction, userId, payments }
+   *   payments: [{ asset_code: 'star_stone', amount: 180 }]（前端传入的支付方式）
    * @returns {DiyWork} 冻结后的作品
    */
   static async confirmDesign(workId, accountId, options = {}) {
-    const { DiyWork } = require('../models')
+    const { DiyWork, DiyMaterial } = require('../models')
     const BalanceService = require('./asset/BalanceService')
-    const { transaction, userId } = options
+    const { transaction, userId, payments } = options
 
     const work = await DiyWork.findByPk(workId, { transaction, lock: true })
     if (!work) {
@@ -588,39 +573,113 @@ class DIYService {
       throw error
     }
 
-    const totalCost = work.total_cost
-    if (!totalCost || !Array.isArray(totalCost) || totalCost.length === 0) {
-      const error = new Error('作品材料消耗明细为空，无法确认')
+    // ========== 服务端计算应付金额（不信任前端 total_cost）==========
+    const designData = work.design_data
+    if (!designData) {
+      const error = new Error('作品设计数据为空，无法确认')
       error.statusCode = 400
       throw error
     }
 
-    // 逐项冻结材料（BalanceService.freeze 要求 user_id + idempotency_key）
-    for (const cost of totalCost) {
+    // 提取所有槽位使用的 material_code（兼容多种 design_data 格式）
+    let usedMaterialCodes = []
+    if (designData.slots && Array.isArray(designData.slots)) {
+      usedMaterialCodes = designData.slots.map(s => s.material_code).filter(Boolean)
+    } else if (designData.mode === 'beading' && Array.isArray(designData.beads)) {
+      usedMaterialCodes = designData.beads.map(b => b.material_code).filter(Boolean)
+    } else if (designData.mode === 'slots' && designData.fillings) {
+      usedMaterialCodes = Object.values(designData.fillings)
+        .map(f => f.material_code)
+        .filter(Boolean)
+    }
+
+    if (usedMaterialCodes.length === 0) {
+      const error = new Error('作品未放置任何珠子，无法确认')
+      error.statusCode = 400
+      throw error
+    }
+
+    // 查 diy_materials 获取每颗珠子的真实价格
+    const materialRows = await DiyMaterial.findAll({
+      where: { material_code: { [Op.in]: [...new Set(usedMaterialCodes)] } },
+      attributes: ['material_code', 'price', 'price_asset_code']
+    })
+    const materialPriceMap = new Map(materialRows.map(m => [m.material_code, m]))
+
+    // 按 price_asset_code 分组汇总应付金额
+    const requiredPayments = new Map() // asset_code → 应付总额
+    for (const code of usedMaterialCodes) {
+      const mat = materialPriceMap.get(code)
+      if (!mat) {
+        const error = new Error(`珠子 ${code} 不存在或已下架`)
+        error.statusCode = 400
+        throw error
+      }
+      const assetCode = mat.price_asset_code
+      const price = parseFloat(mat.price) // 使用 parseFloat 保留小数精度
+      const current = requiredPayments.get(assetCode) || 0
+      requiredPayments.set(assetCode, current + price)
+    }
+
+    // ========== 校验前端传入的 payments ==========
+    if (!payments || !Array.isArray(payments) || payments.length === 0) {
+      const error = new Error('缺少支付方式（payments 参数）')
+      error.statusCode = 400
+      throw error
+    }
+
+    // 校验每种货币的支付金额 ≥ 应付金额
+    const paymentMap = new Map()
+    for (const p of payments) {
+      if (!p.asset_code || !p.amount || p.amount <= 0) {
+        const error = new Error('payments 中每项必须包含 asset_code 和正数 amount')
+        error.statusCode = 400
+        throw error
+      }
+      const current = paymentMap.get(p.asset_code) || 0
+      paymentMap.set(p.asset_code, current + parseFloat(p.amount))
+    }
+
+    for (const [assetCode, requiredAmount] of requiredPayments) {
+      const paidAmount = paymentMap.get(assetCode) || 0
+      if (paidAmount < requiredAmount) {
+        const error = new Error(`${assetCode} 支付不足：应付 ${requiredAmount}，实付 ${paidAmount}`)
+        error.statusCode = 400
+        throw error
+      }
+    }
+
+    // ========== 逐项冻结资产 ==========
+    const totalCostSnapshot = []
+    for (const [assetCode, amount] of requiredPayments) {
       await BalanceService.freeze(
         {
           user_id: userId,
-          asset_code: cost.asset_code,
-          amount: cost.amount,
+          system_code: 'diy',
+          asset_code: assetCode,
+          amount,
           business_type: 'diy_freeze_material',
-          idempotency_key: `diy_freeze_${work.diy_work_id}_${cost.asset_code}`
+          idempotency_key: `diy_freeze_${work.diy_work_id}_${assetCode}`
         },
         { transaction }
       )
+      totalCostSnapshot.push({ asset_code: assetCode, amount })
     }
 
+    // ========== 更新作品状态 + 保存 total_cost 快照 ==========
     await work.update(
       {
         status: 'frozen',
-        frozen_at: new Date()
+        frozen_at: new Date(),
+        total_cost: totalCostSnapshot
       },
       { transaction }
     )
 
-    logger.info('[DIYService] 确认设计，材料已冻结', {
+    logger.info('[DIYService] 确认设计，资产已冻结', {
       diy_work_id: workId,
       account_id: accountId,
-      frozen_items: totalCost.length
+      total_cost: totalCostSnapshot
     })
 
     return work
@@ -682,8 +741,9 @@ class DIYService {
       await BalanceService.settleFromFrozen(
         {
           user_id: userId,
+          system_code: 'diy',
           asset_code: cost.asset_code,
-          amount: cost.amount,
+          amount: parseFloat(cost.amount),
           business_type: 'diy_settle_material',
           idempotency_key: `diy_settle_${work.diy_work_id}_${cost.asset_code}`
         },
@@ -714,7 +774,43 @@ class DIYService {
       { transaction }
     )
 
-    // Step 3: 更新作品状态
+    // Step 3: 创建兑换记录（exchange_record），打通实物履约链路
+    const { ExchangeRecord } = require('../models')
+    const exchangeOrderNo = OrderNoGenerator.generate('EM') // 兑换订单号
+
+    // 计算主支付资产（取 total_cost 中金额最大的那个）
+    const primaryPayment = totalCost.reduce(
+      (max, c) => (parseFloat(c.amount) > parseFloat(max.amount) ? c : max),
+      totalCost[0]
+    )
+    // 计算总支付金额（所有资产折算合计）
+    const totalPayAmount = totalCost.reduce((sum, c) => sum + parseFloat(c.amount), 0)
+
+    await ExchangeRecord.create(
+      {
+        order_no: exchangeOrderNo,
+        user_id: userId,
+        item_id: item.item_id,
+        source: 'diy',
+        status: 'pending',
+        pay_asset_code: primaryPayment.asset_code,
+        pay_amount: Math.round(totalPayAmount),
+        quantity: 1,
+        address_snapshot: null, // 用户后续填写收货地址时更新
+        idempotency_key: `diy_exchange_${work.diy_work_id}`,
+        business_id: `diy_exchange_${work.diy_work_id}`,
+        exchange_time: new Date(),
+        meta: {
+          diy_work_id: work.diy_work_id,
+          work_code: work.work_code,
+          template_name: work.template?.display_name || null,
+          total_cost: totalCost
+        }
+      },
+      { transaction }
+    )
+
+    // Step 4: 更新作品状态
     await work.update(
       {
         status: 'completed',
@@ -768,13 +864,14 @@ class DIYService {
 
     const totalCost = work.total_cost || []
 
-    // 逐项解冻材料（BalanceService.unfreeze 要求 user_id + idempotency_key）
+    // 逐项解冻材料（BalanceService.unfreeze 要求 user_id + system_code + idempotency_key）
     for (const cost of totalCost) {
       await BalanceService.unfreeze(
         {
           user_id: userId,
+          system_code: 'diy',
           asset_code: cost.asset_code,
-          amount: cost.amount,
+          amount: parseFloat(cost.amount),
           business_type: 'diy_unfreeze_material',
           idempotency_key: `diy_unfreeze_${work.diy_work_id}_${cost.asset_code}`
         },
@@ -1302,41 +1399,67 @@ class DIYService {
   }
 
   /**
-   * 校验设计数据中的材料是否在模板允许范围内
+   * 校验设计数据中的材料是否合法
+   *
+   * 两层校验：
+   * 1. material_code 必须存在于 diy_materials 表且 is_enabled=true（防止前端传入不存在的编码）
+   * 2. 如果模板设置了 material_group_codes，还要校验 group_code 在允许范围内
+   *
    * @param {DiyTemplate} template - 款式模板
    * @param {Object} designData - 设计数据
    * @returns {void}
    * @private
    */
   static async _validateDesignMaterials(template, designData) {
-    const groupCodes = template.material_group_codes
-    // 空数组或 null 表示全部允许
-    if (!groupCodes || !Array.isArray(groupCodes) || groupCodes.length === 0) {
-      return
-    }
+    const { DiyMaterial } = require('../models')
 
-    const { MaterialAssetType } = require('../models')
-    const allowedMaterials = await MaterialAssetType.findAll({
-      where: { group_code: { [Op.in]: groupCodes } },
-      attributes: ['asset_code']
-    })
-    const allowedCodes = new Set(allowedMaterials.map(m => m.asset_code))
-
-    // 提取设计数据中使用的 asset_code
+    // 提取设计数据中使用的 material_code
     let usedCodes = []
-    if (designData.mode === 'beading' && Array.isArray(designData.beads)) {
-      usedCodes = designData.beads.map(b => b.asset_code).filter(Boolean)
+    if (designData.slots && Array.isArray(designData.slots)) {
+      usedCodes = designData.slots.map(s => s.material_code).filter(Boolean)
+    } else if (designData.mode === 'beading' && Array.isArray(designData.beads)) {
+      usedCodes = designData.beads.map(b => b.material_code).filter(Boolean)
     } else if (designData.mode === 'slots' && designData.fillings) {
       usedCodes = Object.values(designData.fillings)
-        .map(f => f.asset_code)
+        .map(f => f.material_code)
         .filter(Boolean)
     }
 
-    for (const code of usedCodes) {
-      if (!allowedCodes.has(code)) {
-        const error = new Error(`材料 ${code} 不在该模板允许的材料列表中`)
+    // 没有使用任何材料，跳过校验（空设计允许保存草稿）
+    if (usedCodes.length === 0) return
+
+    // 第一层：校验 material_code 是否存在于 diy_materials 且已启用
+    const uniqueCodes = [...new Set(usedCodes)]
+    const existingMaterials = await DiyMaterial.findAll({
+      where: {
+        material_code: { [Op.in]: uniqueCodes },
+        is_enabled: true
+      },
+      attributes: ['material_code', 'group_code']
+    })
+    const existingMap = new Map(existingMaterials.map(m => [m.material_code, m]))
+
+    for (const code of uniqueCodes) {
+      if (!existingMap.has(code)) {
+        const error = new Error(`材料 ${code} 不存在或已下架`)
         error.statusCode = 400
         throw error
+      }
+    }
+
+    // 第二层：如果模板限定了 material_group_codes，校验 group_code
+    const groupCodes = template.material_group_codes
+    if (groupCodes && Array.isArray(groupCodes) && groupCodes.length > 0) {
+      const allowedGroups = new Set(groupCodes)
+      for (const code of uniqueCodes) {
+        const mat = existingMap.get(code)
+        if (!allowedGroups.has(mat.group_code)) {
+          const error = new Error(
+            `材料 ${code}（分组 ${mat.group_code}）不在该模板允许的分组 [${groupCodes.join(', ')}] 中`
+          )
+          error.statusCode = 400
+          throw error
+        }
       }
     }
   }

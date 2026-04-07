@@ -87,10 +87,10 @@ module.exports = sequelize => {
         allowNull: false,
         defaultValue: 0,
         comment: '单价（资产单位）',
-        /** @returns {number} 单价数值 */
+        /** @returns {number} 单价数值（保留两位小数精度） */
         get() {
           const val = this.getDataValue('price')
-          return val !== null ? Number(val) : 0
+          return val !== null ? parseFloat(parseFloat(val).toFixed(2)) : 0
         }
       },
       price_asset_code: {
@@ -145,6 +145,8 @@ module.exports = sequelize => {
       tableName: 'diy_materials',
       timestamps: true,
       underscored: true,
+      createdAt: 'created_at',
+      updatedAt: 'updated_at',
       comment: 'DIY 珠子/宝石素材表'
     }
   )

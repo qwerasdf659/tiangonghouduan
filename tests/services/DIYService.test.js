@@ -4,7 +4,8 @@
  * 测试范围：
  * - 模板 CRUD（管理端）
  * - 用户作品 CRUD + 状态流转（小程序端）
- * - 材料查询（联动 material_asset_types + account_asset_balances）
+ * - 材料查询（联动 diy_materials + media_files）
+ * - 支付资产查询（联动 material_asset_types + account_asset_balances）
  *
  * 使用真实数据库，不使用 mock 数据
  * 测试用户：13612227930（既是用户也是管理员）
@@ -174,7 +175,7 @@ describe('DIY 款式模板 — 管理端 API', () => {
 
 describe('DIY 用户作品 — 小程序端 API', () => {
   test('POST /api/v4/diy/works — 创建作品草稿', async () => {
-    // 使用已有的模板（ID=1，经典串珠手链）
+    /* 使用已有的模板（ID=1，经典串珠手链），真实的 diy_materials 中的 material_code */
     const res = await request(app)
       .post('/api/v4/diy/works')
       .set('Authorization', `Bearer ${adminToken}`)
@@ -182,16 +183,11 @@ describe('DIY 用户作品 — 小程序端 API', () => {
         diy_template_id: 1,
         work_name: '自动化测试作品',
         design_data: {
-          mode: 'beading',
-          beads: [
-            { position: 0, asset_code: 'red_core_shard', diameter: 10 },
-            { position: 1, asset_code: 'blue_core_shard', diameter: 10 }
+          slots: [
+            { position: 0, material_code: 'yellow_crystal_8mm', diameter: 8 },
+            { position: 1, material_code: 'blue_crystal_8mm', diameter: 8 }
           ]
-        },
-        total_cost: [
-          { asset_code: 'red_core_shard', amount: 1 },
-          { asset_code: 'blue_core_shard', amount: 1 }
-        ]
+        }
       })
 
     expect(res.status).toBe(200)
@@ -253,18 +249,12 @@ describe('DIY 用户作品 — 小程序端 API', () => {
         diy_template_id: 1,
         work_name: '自动化测试作品_已更新',
         design_data: {
-          mode: 'beading',
-          beads: [
-            { position: 0, asset_code: 'red_core_shard', diameter: 10 },
-            { position: 1, asset_code: 'blue_core_shard', diameter: 10 },
-            { position: 2, asset_code: 'green_core_shard', diameter: 10 }
+          slots: [
+            { position: 0, material_code: 'yellow_crystal_8mm', diameter: 8 },
+            { position: 1, material_code: 'blue_crystal_8mm', diameter: 8 },
+            { position: 2, material_code: 'yellow_lemon_8mm', diameter: 8 }
           ]
-        },
-        total_cost: [
-          { asset_code: 'red_core_shard', amount: 1 },
-          { asset_code: 'blue_core_shard', amount: 1 },
-          { asset_code: 'green_core_shard', amount: 1 }
-        ]
+        }
       })
 
     expect(res.status).toBe(200)
