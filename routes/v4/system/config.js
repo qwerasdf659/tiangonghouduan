@@ -27,6 +27,44 @@ const logger = require('../../../utils/logger').logger
 const ServiceManager = require('../../../services')
 
 /**
+ * app_theme 进程级内存缓存
+ *
+ * 背景：此接口是微信小程序每次启动必调的高频读接口。
+ * AdminSystemService.getConfigValue 已有 Redis 缓存（TTL 300s），
+ * 但 Sealos 冷启动时 Redis 也可能刚建立连接，首次查询仍需 ~60ms。
+ * 加一层进程内存缓存后，热路径响应 <5ms。
+ *
+ * 缓存失效策略：
+ * - TTL 5 分钟（与 Redis 缓存 TTL 对齐）
+ * - 管理后台更新主题时，AdminSystemService 会清除 Redis 缓存，
+ *   内存缓存在 TTL 到期后自动刷新
+ * - 启动预热阶段（app.js initializeApp 步骤6）会预填充此缓存
+ */
+const appThemeMemCache = {
+  data: null,
+  expires_at: 0,
+  ttl_ms: 5 * 60 * 1000, // 5 分钟
+
+  /**
+   * 读取缓存，过期返回 null
+   * @returns {Object|null} 缓存的主题数据或 null
+   */
+  get() {
+    return this.data && Date.now() < this.expires_at ? this.data : null
+  },
+
+  /**
+   * 写入缓存
+   * @param {Object} value - 待缓存的主题配置数据
+   * @returns {void}
+   */
+  set(value) {
+    this.data = value
+    this.expires_at = Date.now() + this.ttl_ms
+  }
+}
+
+/**
  * @route GET /api/v4/system/config/placement
  * @desc 获取活动位置配置 - 公开接口（无需登录）
  * @access Public
@@ -368,25 +406,28 @@ router.get('/exchange-page', async (req, res) => {
  */
 router.get('/app-theme', async (req, res) => {
   try {
+    // 内存缓存命中 → 直接返回，响应 <5ms
+    const cached = appThemeMemCache.get()
+    if (cached) {
+      return res.apiSuccess(cached, '获取全局主题配置成功', 'APP_THEME_CONFIG_SUCCESS')
+    }
+
+    // 缓存未命中 → 查 Redis/DB（AdminSystemService 内部有 Redis 缓存）
     const AdminSystemService = ServiceManager.getService('admin_system')
     const configData = await AdminSystemService.getConfigValue('app_theme')
 
-    if (!configData) {
-      return res.apiSuccess(
-        { theme: 'default' },
-        '获取默认全局主题配置',
-        'APP_THEME_CONFIG_DEFAULT'
-      )
+    const responseData = {
+      theme: configData?.theme || 'default',
+      version: Date.now().toString()
     }
 
-    return res.apiSuccess(
-      {
-        theme: configData.theme || 'default',
-        version: Date.now().toString()
-      },
-      '获取全局主题配置成功',
-      'APP_THEME_CONFIG_SUCCESS'
-    )
+    // 写入内存缓存
+    appThemeMemCache.set(responseData)
+
+    const code = configData ? 'APP_THEME_CONFIG_SUCCESS' : 'APP_THEME_CONFIG_DEFAULT'
+    const message = configData ? '获取全局主题配置成功' : '获取默认全局主题配置'
+
+    return res.apiSuccess(responseData, message, code)
   } catch (error) {
     logger.error('获取全局主题配置失败', { error: error.message, stack: error.stack })
     return res.apiError('获取配置失败', 'INTERNAL_ERROR', null, 500)

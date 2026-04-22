@@ -1013,7 +1013,7 @@
             </div>
             <div class="flex justify-between border-b pb-2">
               <span class="themed-text-muted">商品</span>
-              <span x-text="selectedOrder.item_snapshot?.item_name || '-'"></span>
+              <span x-text="selectedOrder.source === 'diy' ? '🎨 DIY 设计兑换' : (selectedOrder.item_snapshot?.item_name || '-')"></span>
             </div>
             <div class="flex justify-between border-b pb-2">
               <span class="themed-text-muted">消耗资产</span>
@@ -1040,9 +1040,24 @@
               <span class="themed-text-muted">完成时间</span>
               <span x-text="formatDate(selectedOrder.completed_at)"></span>
             </div>
-            <div x-show="selectedOrder.address">
+            <div x-show="selectedOrder.address_snapshot || selectedOrder.address">
               <span class="themed-text-muted block mb-1">收货地址</span>
-              <p class="themed-bg-base rounded p-2 text-sm" x-text="selectedOrder.address"></p>
+              <template x-if="selectedOrder.address_snapshot">
+                <div class="themed-bg-base rounded p-2 text-sm space-y-1">
+                  <div><span class="text-gray-500">收件人：</span><span x-text="selectedOrder.address_snapshot.receiver_name || '-'"></span></div>
+                  <div><span class="text-gray-500">手机号：</span><span x-text="selectedOrder.address_snapshot.receiver_phone || '-'"></span></div>
+                  <div><span class="text-gray-500">地址：</span><span x-text="(selectedOrder.address_snapshot.province || '') + (selectedOrder.address_snapshot.city || '') + (selectedOrder.address_snapshot.district || '') + ' ' + (selectedOrder.address_snapshot.detail_address || '')"></span></div>
+                </div>
+              </template>
+              <template x-if="!selectedOrder.address_snapshot && selectedOrder.address">
+                <p class="themed-bg-base rounded p-2 text-sm" x-text="selectedOrder.address"></p>
+              </template>
+            </div>
+            <div x-show="selectedOrder.source === 'diy' && !selectedOrder.address_snapshot && !selectedOrder.address">
+              <span class="themed-text-muted block mb-1">收货地址</span>
+              <div class="bg-yellow-50 border border-yellow-200 rounded p-2 text-sm text-yellow-700">
+                ⚠️ 尚未填写收货地址，请前往 DIY 作品管理页面补录
+              </div>
             </div>
             <!-- 快递信息 -->
             <div x-show="selectedOrder.shipping_no" class="border-t pt-3 mt-3">

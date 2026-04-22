@@ -119,13 +119,14 @@ module.exports = sequelize => {
       },
 
       /**
-       * 总消耗明细（JSON 数组）
-       * [{ asset_code: 'red_core_shard', amount: 5 }, { asset_code: 'blue_core_gem', amount: 2 }]
+       * 总消耗明细（JSON 对象，confirmDesign 时由服务端计算写入）
+       * 新格式：{ price_snapshot: [{ material_code, price, price_asset_code }], payments: [{ asset_code, amount }] }
+       * 旧格式（兼容）：[{ asset_code, amount }]
        */
       total_cost: {
         type: DataTypes.JSON,
         allowNull: true,
-        comment: '总消耗明细 [{ asset_code, amount }]'
+        comment: '总消耗明细 { price_snapshot, payments }'
       },
 
       /** 预览图媒体文件ID（FK → media_files.media_id） */

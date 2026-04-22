@@ -277,6 +277,62 @@ app.use('/api/', (req, res, next) => {
   next()
 })
 
+/**
+ * 就绪探针端点 — Sealos Ingress readiness probe
+ *
+ * 与 /health（存活探针）的区别：
+ * - /health：进程存活即返回 200（liveness）
+ * - /ready：DB 连接池 + Redis 均就绪才返回 200（readiness）
+ *
+ * Sealos 配置 readiness probe 指向此端点后，
+ * 容器冷启动期间不会将流量转发到尚未初始化完成的进程，
+ * 从而避免微信小程序 wx.request timeout。
+ *
+ * @route GET /ready
+ * @access Public（基础设施探针，无需鉴权）
+ * @returns {Object} 就绪状态
+ */
+app.get('/ready', async (req, res) => {
+  try {
+    const { sequelize } = require('./models')
+    const { isRedisHealthy } = require('./utils/UnifiedRedisClient')
+
+    // 并行检查 DB 和 Redis
+    const [dbOk, redisOk] = await Promise.all([
+      sequelize
+        .authenticate()
+        .then(() => true)
+        .catch(() => false),
+      isRedisHealthy().catch(() => false)
+    ])
+
+    if (dbOk && redisOk) {
+      return res.status(200).json({
+        ready: true,
+        checks: { database: 'connected', redis: 'connected' },
+        timestamp: BeijingTimeHelper.apiTimestamp()
+      })
+    }
+
+    // 任一依赖未就绪 → 503，Sealos 不转发流量
+    return res.status(503).json({
+      ready: false,
+      checks: {
+        database: dbOk ? 'connected' : 'disconnected',
+        redis: redisOk ? 'connected' : 'disconnected'
+      },
+      timestamp: BeijingTimeHelper.apiTimestamp()
+    })
+  } catch (error) {
+    appLogger.error('就绪探针检查异常', { error: error.message })
+    return res.status(503).json({
+      ready: false,
+      error: error.message,
+      timestamp: BeijingTimeHelper.apiTimestamp()
+    })
+  }
+})
+
 //  健康检查端点
 app.get('/health', async (req, res) => {
   try {
@@ -1002,6 +1058,37 @@ async function initializeApp() {
     appLogger.error('DisplayNameService 初始化失败（非致命）', { error: error.message })
     // 显示名称服务初始化失败不阻断启动，降级为使用内存缓存或直接数据库查询
   }
+
+  // 步骤6：冷启动预热 — 预建 DB 连接池 + Redis 连接 + 高频配置缓存
+  /*
+   * 背景：Sealos DevBox 容器休眠唤醒后，首个用户请求需等待连接池建立，
+   *       导致微信小程序 wx.request 15s 超时。预热确保第一个请求到达时
+   *       DB/Redis 连接已就绪，app_theme 等高频配置已在 Redis 缓存中。
+   */
+  try {
+    const { sequelize } = require('./models')
+    const { isRedisHealthy } = require('./utils/UnifiedRedisClient')
+
+    // 6a. 预建 DB 连接池（sequelize.authenticate 会触发连接池创建）
+    await sequelize.authenticate()
+    appLogger.info('冷启动预热: DB 连接池已建立')
+
+    // 6b. 确认 Redis 连接就绪
+    const redisReady = await isRedisHealthy()
+    appLogger.info('冷启动预热: Redis 连接状态', { ready: redisReady })
+
+    // 6c. 预热高频系统配置到 Redis 缓存（app_theme 是小程序每次启动必调的接口）
+    const AdminSystemService = require('./services/AdminSystemService')
+    const themeConfig = await AdminSystemService.getConfigValue('app_theme')
+    appLogger.info('冷启动预热: app_theme 配置已缓存', {
+      theme: themeConfig?.theme || 'default'
+    })
+  } catch (error) {
+    // 预热失败不阻断启动 — 首个请求会触发懒加载，只是慢一点
+    appLogger.warn('冷启动预热部分失败（非致命，首个请求将触发懒加载）', {
+      error: error.message
+    })
+  }
 }
 
 /*
@@ -1155,9 +1242,10 @@ if (require.main === module) {
           start_time: BeijingTimeHelper.apiTimestamp(),
           endpoints: {
             health: `http://${HOST}:${PORT}/health`,
+            ready: `http://${HOST}:${PORT}/ready`,
             lottery: `http://${HOST}:${PORT}/api/v4/lottery`,
             admin: `http://${HOST}:${PORT}/api/v4/console`,
-            websocket: `ws://${HOST}:${PORT}/socket.io` // 新增WebSocket端点
+            websocket: `ws://${HOST}:${PORT}/socket.io`
           }
         })
 

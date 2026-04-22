@@ -241,9 +241,26 @@
               </div>
             </template>
 
-            <!-- 预览图上传 -->
+            <!-- 底图上传（必填） -->
             <div class="border-t pt-4">
-              <h4 class="text-sm font-semibold mb-2">预览图</h4>
+              <h4 class="text-sm font-semibold mb-2">款式底图 <span class="text-red-500">*</span></h4>
+              <p class="text-xs text-gray-400 mb-2">小程序设计器渲染底图，建议透明背景 PNG，尺寸 800×1000px</p>
+              <div class="flex items-center gap-4">
+                <div x-show="baseImagePreviewUrl" class="w-20 h-20 border rounded overflow-hidden">
+                  <img :src="baseImagePreviewUrl" class="w-full h-full object-cover">
+                </div>
+                <div>
+                  <input type="file" accept="image/*" @change="handleBaseImageUpload($event)" class="text-sm">
+                  <button x-show="baseImagePreviewUrl" @click="removeBaseImage()" class="text-xs text-red-500 ml-2">移除</button>
+                </div>
+              </div>
+              <p x-show="!baseImageMediaId" class="text-xs text-red-500 mt-1">必须上传底图才能保存</p>
+            </div>
+
+            <!-- 预览图上传（必填） -->
+            <div class="border-t pt-4">
+              <h4 class="text-sm font-semibold mb-2">预览图 <span class="text-red-500">*</span></h4>
+              <p class="text-xs text-gray-400 mb-2">模板列表展示缩略图</p>
               <div class="flex items-center gap-4">
                 <div x-show="iconPreviewUrl" class="w-20 h-20 border rounded overflow-hidden">
                   <img :src="iconPreviewUrl" class="w-full h-full object-cover">
@@ -253,6 +270,7 @@
                   <button x-show="iconPreviewUrl" @click="removeIcon()" class="text-xs text-red-500 ml-2">移除</button>
                 </div>
               </div>
+              <p x-show="!iconMediaId" class="text-xs text-red-500 mt-1">必须上传预览图才能保存</p>
             </div>
           </div>
           <div class="p-4 border-t flex justify-end gap-2">

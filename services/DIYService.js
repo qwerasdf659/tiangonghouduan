@@ -98,6 +98,20 @@ class DIYService {
     const { DiyTemplate } = require('../models')
     const { transaction } = options
 
+    /* 强制校验：底图和预览图是前端渲染的必要素材 */
+    if (!data.base_image_media_id) {
+      const error = new Error(
+        '请上传款式底图（base_image_media_id），底图是小程序设计器渲染的必要素材'
+      )
+      error.statusCode = 400
+      throw error
+    }
+    if (!data.preview_media_id) {
+      const error = new Error('请上传模板预览图（preview_media_id），预览图用于模板列表展示')
+      error.statusCode = 400
+      throw error
+    }
+
     /*
      * 生成 template_code（bizCode=DT）
      * 先创建记录获取自增ID，再回填 code
@@ -148,6 +162,22 @@ class DIYService {
     delete data.template_code
     delete data.diy_template_id
 
+    /* 如果通过 update 直接设置 status=published，也要校验图片 */
+    if (data.status === 'published') {
+      const baseImageId = data.base_image_media_id || template.base_image_media_id
+      const previewId = data.preview_media_id || template.preview_media_id
+      if (!baseImageId) {
+        const error = new Error('发布失败：请先上传款式底图（base_image_media_id）')
+        error.statusCode = 400
+        throw error
+      }
+      if (!previewId) {
+        const error = new Error('发布失败：请先上传模板预览图（preview_media_id）')
+        error.statusCode = 400
+        throw error
+      }
+    }
+
     await template.update(data, { transaction })
 
     logger.info('[DIYService] 更新款式模板', {
@@ -192,6 +222,20 @@ class DIYService {
       )
       error.statusCode = 409
       throw error
+    }
+
+    /* 发布前强制校验：底图 + 预览图必须存在 */
+    if (newStatus === 'published') {
+      if (!template.base_image_media_id) {
+        const error = new Error('发布失败：请先上传款式底图（base_image_media_id）')
+        error.statusCode = 400
+        throw error
+      }
+      if (!template.preview_media_id) {
+        const error = new Error('发布失败：请先上传模板预览图（preview_media_id）')
+        error.statusCode = 400
+        throw error
+      }
     }
 
     await template.update({ status: newStatus }, { transaction })
@@ -403,7 +447,7 @@ class DIYService {
       error.statusCode = 404
       throw error
     }
-    if (work.account_id !== accountId) {
+    if (Number(work.account_id) !== Number(accountId)) {
       const error = new Error('无权访问该作品')
       error.statusCode = 403
       throw error
@@ -447,7 +491,7 @@ class DIYService {
         error.statusCode = 404
         throw error
       }
-      if (work.account_id !== accountId) {
+      if (Number(work.account_id) !== Number(accountId)) {
         const error = new Error('无权修改该作品')
         error.statusCode = 403
         throw error
@@ -517,7 +561,7 @@ class DIYService {
       error.statusCode = 404
       throw error
     }
-    if (work.account_id !== accountId) {
+    if (Number(work.account_id) !== Number(accountId)) {
       const error = new Error('无权删除该作品')
       error.statusCode = 403
       throw error
@@ -562,7 +606,7 @@ class DIYService {
       error.statusCode = 404
       throw error
     }
-    if (work.account_id !== accountId) {
+    if (Number(work.account_id) !== Number(accountId)) {
       const error = new Error('无权操作该作品')
       error.statusCode = 403
       throw error
@@ -606,8 +650,12 @@ class DIYService {
     })
     const materialPriceMap = new Map(materialRows.map(m => [m.material_code, m]))
 
-    // 按 price_asset_code 分组汇总应付金额
-    const requiredPayments = new Map() // asset_code → 应付总额
+    /*
+     * 按 price_asset_code 分组汇总应付金额
+     * 同时构建 price_snapshot（每颗珠子的定价快照，防止后续改价导致对账不一致）
+     */
+    const requiredPayments = new Map() // asset_code → 应付总额（精确浮点）
+    const priceSnapshot = [] // 每颗珠子的定价快照
     for (const code of usedMaterialCodes) {
       const mat = materialPriceMap.get(code)
       if (!mat) {
@@ -616,9 +664,18 @@ class DIYService {
         throw error
       }
       const assetCode = mat.price_asset_code
-      const price = parseFloat(mat.price) // 使用 parseFloat 保留小数精度
+      const price = parseFloat(mat.price)
       const current = requiredPayments.get(assetCode) || 0
       requiredPayments.set(assetCode, current + price)
+      priceSnapshot.push({ material_code: code, price, price_asset_code: assetCode })
+    }
+
+    /*
+     * B5 修复：account_asset_balances.available_amount 是 bigint，
+     * diy_materials.price 是 decimal(10,2)，汇总后必须向上取整再冻结
+     */
+    for (const [assetCode, amount] of requiredPayments) {
+      requiredPayments.set(assetCode, Math.ceil(amount))
     }
 
     // ========== 校验前端传入的 payments ==========
@@ -650,12 +707,11 @@ class DIYService {
     }
 
     // ========== 逐项冻结资产 ==========
-    const totalCostSnapshot = []
+    const totalCostPayments = []
     for (const [assetCode, amount] of requiredPayments) {
       await BalanceService.freeze(
         {
           user_id: userId,
-          system_code: 'diy',
           asset_code: assetCode,
           amount,
           business_type: 'diy_freeze_material',
@@ -663,15 +719,24 @@ class DIYService {
         },
         { transaction }
       )
-      totalCostSnapshot.push({ asset_code: assetCode, amount })
+      totalCostPayments.push({ asset_code: assetCode, amount })
     }
 
-    // ========== 更新作品状态 + 保存 total_cost 快照 ==========
+    /*
+     * 更新作品状态 + 保存 total_cost 快照
+     * total_cost 格式：{ price_snapshot: [...], payments: [...] }
+     * price_snapshot: 每颗珠子的定价快照（确认时刻的价格，不可篡改）
+     * payments: 按 asset_code 汇总的实际冻结金额（Math.ceil 取整后）
+     */
+    const totalCostData = {
+      price_snapshot: priceSnapshot,
+      payments: totalCostPayments
+    }
     await work.update(
       {
         status: 'frozen',
         frozen_at: new Date(),
-        total_cost: totalCostSnapshot
+        total_cost: totalCostData
       },
       { transaction }
     )
@@ -679,7 +744,7 @@ class DIYService {
     logger.info('[DIYService] 确认设计，资产已冻结', {
       diy_work_id: workId,
       account_id: accountId,
-      total_cost: totalCostSnapshot
+      total_cost: totalCostData
     })
 
     return work
@@ -692,19 +757,21 @@ class DIYService {
    * 1. 逐项调用 BalanceService.settleFromFrozen 从冻结余额扣减
    * 2. 调用 ItemService.mintItem 铸造 diy_product 实例（写 item_ledger 双录）
    * 3. 更新 diy_works.item_id + status + completed_at
+   * 4. 创建 ExchangeRecord（含 address_snapshot 收货地址快照）
    *
    * 三表互锁安全：items ↔ item_ledger ↔ item_holds 全部在同一事务内
    *
    * @param {number} workId - diy_work_id
    * @param {number} accountId - 用户 account_id（权限校验用）
-   * @param {Object} options - { transaction, userId }（必须在事务中）
+   * @param {Object} options - { transaction, userId, addressId }（必须在事务中）
+   * @param {number} [options.addressId] - 收货地址 ID（查 user_addresses 生成快照）
    * @returns {DiyWork} 完成后的作品（含 item_id）
    */
   static async completeDesign(workId, accountId, options = {}) {
-    const { DiyWork, DiyTemplate } = require('../models')
+    const { DiyWork, DiyTemplate, UserAddress } = require('../models')
     const BalanceService = require('./asset/BalanceService')
     const ItemService = require('./asset/ItemService')
-    const { transaction, userId } = options
+    const { transaction, userId, addressId } = options
 
     const work = await DiyWork.findByPk(workId, {
       transaction,
@@ -718,7 +785,7 @@ class DIYService {
       error.statusCode = 404
       throw error
     }
-    if (work.account_id !== accountId) {
+    if (Number(work.account_id) !== Number(accountId)) {
       const error = new Error('无权操作该作品')
       error.statusCode = 403
       throw error
@@ -730,18 +797,19 @@ class DIYService {
     }
 
     const totalCost = work.total_cost
-    if (!totalCost || !Array.isArray(totalCost) || totalCost.length === 0) {
+    // 兼容新格式 { price_snapshot, payments } 和旧格式 [{ asset_code, amount }]
+    const payments = Array.isArray(totalCost) ? totalCost : totalCost?.payments || []
+    if (!payments || payments.length === 0) {
       const error = new Error('作品材料消耗明细为空')
       error.statusCode = 400
       throw error
     }
 
     // Step 1: 逐项从冻结余额扣减（settleFromFrozen = frozen_amount -= amount）
-    for (const cost of totalCost) {
+    for (const cost of payments) {
       await BalanceService.settleFromFrozen(
         {
           user_id: userId,
-          system_code: 'diy',
           asset_code: cost.asset_code,
           amount: parseFloat(cost.amount),
           business_type: 'diy_settle_material',
@@ -774,21 +842,43 @@ class DIYService {
       { transaction }
     )
 
-    // Step 3: 创建兑换记录（exchange_record），打通实物履约链路
-    const { ExchangeRecord } = require('../models')
-    const exchangeOrderNo = OrderNoGenerator.generate('EM') // 兑换订单号
+    // Step 3: 查询收货地址，生成 address_snapshot（实物履约链路）
+    let addressSnapshot = null
+    if (addressId) {
+      const address = await UserAddress.findOne({
+        where: { address_id: addressId, user_id: userId },
+        transaction
+      })
+      if (!address) {
+        const error = new Error('收货地址不存在或不属于当前用户')
+        error.statusCode = 400
+        throw error
+      }
+      addressSnapshot = {
+        address_id: address.address_id,
+        receiver_name: address.receiver_name,
+        receiver_phone: address.receiver_phone,
+        province: address.province,
+        city: address.city,
+        district: address.district,
+        detail_address: address.detail_address
+      }
+    }
 
-    // 计算主支付资产（取 total_cost 中金额最大的那个）
-    const primaryPayment = totalCost.reduce(
+    // Step 4: 创建兑换记录（exchange_record），打通实物履约链路
+    const { ExchangeRecord } = require('../models')
+
+    // 计算主支付资产（取 payments 中金额最大的那个）
+    const primaryPayment = payments.reduce(
       (max, c) => (parseFloat(c.amount) > parseFloat(max.amount) ? c : max),
-      totalCost[0]
+      payments[0]
     )
     // 计算总支付金额（所有资产折算合计）
-    const totalPayAmount = totalCost.reduce((sum, c) => sum + parseFloat(c.amount), 0)
+    const totalPayAmount = payments.reduce((sum, c) => sum + parseFloat(c.amount), 0)
 
-    await ExchangeRecord.create(
+    const exchangeRecord = await ExchangeRecord.create(
       {
-        order_no: exchangeOrderNo,
+        order_no: `EM_TEMP_${work.diy_work_id}`, // 临时占位，创建后用 ID 生成正式编号
         user_id: userId,
         item_id: item.item_id,
         source: 'diy',
@@ -796,7 +886,7 @@ class DIYService {
         pay_asset_code: primaryPayment.asset_code,
         pay_amount: Math.round(totalPayAmount),
         quantity: 1,
-        address_snapshot: null, // 用户后续填写收货地址时更新
+        address_snapshot: addressSnapshot, // 收货地址快照（用户传入 address_id 时生成）
         idempotency_key: `diy_exchange_${work.diy_work_id}`,
         business_id: `diy_exchange_${work.diy_work_id}`,
         exchange_time: new Date(),
@@ -804,11 +894,19 @@ class DIYService {
           diy_work_id: work.diy_work_id,
           work_code: work.work_code,
           template_name: work.template?.display_name || null,
-          total_cost: totalCost
+          total_cost: work.total_cost
         }
       },
       { transaction }
     )
+
+    // 用记录 ID 生成正式订单号（项目统一模式：先创建再生成编号）
+    const exchangeOrderNo = OrderNoGenerator.generate(
+      'EM',
+      exchangeRecord.exchange_record_id,
+      exchangeRecord.created_at
+    )
+    await exchangeRecord.update({ order_no: exchangeOrderNo }, { transaction })
 
     // Step 4: 更新作品状态
     await work.update(
@@ -824,7 +922,7 @@ class DIYService {
       diy_work_id: workId,
       account_id: accountId,
       item_id: item.item_id,
-      settled_items: totalCost.length
+      settled_items: payments.length
     })
 
     return work
@@ -851,7 +949,7 @@ class DIYService {
       error.statusCode = 404
       throw error
     }
-    if (work.account_id !== accountId) {
+    if (Number(work.account_id) !== Number(accountId)) {
       const error = new Error('无权操作该作品')
       error.statusCode = 403
       throw error
@@ -863,13 +961,14 @@ class DIYService {
     }
 
     const totalCost = work.total_cost || []
+    // 兼容新格式 { price_snapshot, payments } 和旧格式 [{ asset_code, amount }]
+    const payments = Array.isArray(totalCost) ? totalCost : totalCost?.payments || []
 
-    // 逐项解冻材料（BalanceService.unfreeze 要求 user_id + system_code + idempotency_key）
-    for (const cost of totalCost) {
+    // 逐项解冻材料（BalanceService.unfreeze 要求 user_id + idempotency_key）
+    for (const cost of payments) {
       await BalanceService.unfreeze(
         {
           user_id: userId,
-          system_code: 'diy',
           asset_code: cost.asset_code,
           amount: parseFloat(cost.amount),
           business_type: 'diy_unfreeze_material',
@@ -1085,6 +1184,68 @@ class DIYService {
     }
   }
 
+  /**
+   * 管理端获取作品关联的兑换订单
+   *
+   * 通过 exchange_records.source = 'diy' AND business_id = 'diy_exchange_{workId}' 关联
+   *
+   * @param {number} workId - diy_work_id
+   * @returns {Object|null} 关联的兑换订单（含 address_snapshot、发货信息）
+   */
+  static async getWorkExchangeRecord(workId) {
+    const { ExchangeRecord } = require('../models')
+
+    const record = await ExchangeRecord.findOne({
+      where: {
+        source: 'diy',
+        business_id: `diy_exchange_${workId}`
+      }
+    })
+
+    return record
+  }
+
+  /**
+   * 管理端更新 DIY 订单的收货地址快照
+   *
+   * 场景：用户完成设计时未传 address_id，管理员在后台补录地址
+   *
+   * @param {number} workId - diy_work_id
+   * @param {Object} addressData - 地址信息 { receiver_name, receiver_phone, province, city, district, detail_address }
+   * @param {Object} options - { transaction }
+   * @returns {ExchangeRecord} 更新后的兑换记录
+   */
+  static async updateWorkAddress(workId, addressData, options = {}) {
+    const { transaction } = options
+    const record = await this.getWorkExchangeRecord(workId)
+
+    if (!record) {
+      const error = new Error('该作品尚未完成设计或无关联兑换订单')
+      error.statusCode = 404
+      throw error
+    }
+
+    const addressSnapshot = {
+      receiver_name: addressData.receiver_name,
+      receiver_phone: addressData.receiver_phone,
+      province: addressData.province,
+      city: addressData.city,
+      district: addressData.district,
+      detail_address: addressData.detail_address,
+      updated_by: 'admin',
+      updated_at: new Date().toISOString()
+    }
+
+    await record.update({ address_snapshot: addressSnapshot }, { transaction })
+
+    logger.info('[DIYService] 管理员更新 DIY 订单地址', {
+      diy_work_id: workId,
+      exchange_record_id: record.exchange_record_id
+    })
+
+    return record
+  }
+
   // ==================== 管理端：材料/珠子素材 CRUD ====================
 
   /**
@@ -1173,12 +1334,47 @@ class DIYService {
     const { DiyMaterial } = require('../models')
     const TransactionManager = require('../utils/TransactionManager')
 
+    /* 强制校验：珠子素材图片是前端渲染的必要素材 */
+    if (!data.image_media_id) {
+      const error = new Error(
+        '请上传珠子素材图片（image_media_id），图片是小程序设计器渲染的必要素材'
+      )
+      error.statusCode = 400
+      throw error
+    }
+
     // 生成 material_code
     const timestamp = Date.now().toString(36).toUpperCase()
     const random = Math.random().toString(36).substring(2, 6).toUpperCase()
     const materialCode = `DM${timestamp}${random}`
 
     return TransactionManager.execute(async transaction => {
+      // 安全校验：price_asset_code 不允许设为 points 或 budget_points（文档决策 4）
+      const assetCode = data.price_asset_code || AssetCode.STAR_STONE
+      const forbidden = ['points', 'budget_points']
+      if (forbidden.includes(assetCode)) {
+        const error = new Error(
+          `price_asset_code 不允许设为 ${assetCode}，DIY 支付仅限星石和源晶体系`
+        )
+        error.statusCode = 400
+        throw error
+      }
+
+      // 强制整数定价校验（文档决策 A：管理后台和后端各加一条整数校验）
+      if (data.price !== undefined && data.price !== null) {
+        const price = Number(data.price)
+        if (!Number.isFinite(price) || price < 0) {
+          const error = new Error('价格必须为非负数')
+          error.statusCode = 400
+          throw error
+        }
+        if (price % 1 !== 0) {
+          const error = new Error(`价格必须为整数（当前值 ${price}），强制整数定价策略`)
+          error.statusCode = 400
+          throw error
+        }
+      }
+
       const material = await DiyMaterial.create(
         {
           material_code: materialCode,
@@ -1188,7 +1384,7 @@ class DIYService {
           diameter: data.diameter || null,
           shape: data.shape || 'round',
           price: data.price || 0,
-          price_asset_code: data.price_asset_code || AssetCode.POINTS,
+          price_asset_code: assetCode,
           stock: data.stock ?? -1,
           is_stackable: data.is_stackable ?? true,
           image_media_id: data.image_media_id || null,
@@ -1250,6 +1446,33 @@ class DIYService {
         if (data[f] !== undefined) updates[f] = data[f]
       }
 
+      // 安全校验：price_asset_code 不允许设为 points 或 budget_points（文档决策 4）
+      if (updates.price_asset_code) {
+        const forbidden = ['points', 'budget_points']
+        if (forbidden.includes(updates.price_asset_code)) {
+          const error = new Error(
+            `price_asset_code 不允许设为 ${updates.price_asset_code}，DIY 支付仅限星石和源晶体系`
+          )
+          error.statusCode = 400
+          throw error
+        }
+      }
+
+      // 强制整数定价校验（文档决策 A：管理后台和后端各加一条整数校验）
+      if (updates.price !== undefined && updates.price !== null) {
+        const price = Number(updates.price)
+        if (!Number.isFinite(price) || price < 0) {
+          const error = new Error('价格必须为非负数')
+          error.statusCode = 400
+          throw error
+        }
+        if (price % 1 !== 0) {
+          const error = new Error(`价格必须为整数（当前值 ${price}），强制整数定价策略`)
+          error.statusCode = 400
+          throw error
+        }
+      }
+
       await material.update(updates, { transaction })
 
       logger.info('[DIYService] 更新材料', {
@@ -1300,8 +1523,9 @@ class DIYService {
   /**
    * 用户端：获取模板可用材料列表
    * 根据模板的 material_group_codes 和 category_id 筛选
+   * 支持按 slot_id 的 allowed_diameters 约束过滤
    * @param {number} templateId - 模板 ID
-   * @param {Object} params - { group_code, diameter, keyword }
+   * @param {Object} params - { group_code, diameter, keyword, slot_id }
    * @returns {Object[]} 用户可见的材料列表
    */
   static async getUserMaterials(templateId, params = {}) {
@@ -1321,6 +1545,14 @@ class DIYService {
     const allowedGroups = template.material_group_codes
     if (allowedGroups && allowedGroups.length > 0) {
       where.group_code = { [Op.in]: allowedGroups }
+    }
+
+    // 按槽位的 allowed_diameters 约束过滤
+    if (params.slot_id && template.layout?.slot_definitions) {
+      const slot = template.layout.slot_definitions.find(s => s.slot_id === params.slot_id)
+      if (slot?.allowed_diameters?.length > 0) {
+        where.diameter = { [Op.in]: slot.allowed_diameters }
+      }
     }
 
     // 额外筛选条件

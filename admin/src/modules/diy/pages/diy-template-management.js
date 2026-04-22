@@ -103,6 +103,10 @@ function diyTemplateManagement() {
     iconPreviewUrl: null,
     iconMediaId: null,
 
+    // ========== 底图（base_image） ==========
+    baseImagePreviewUrl: null,
+    baseImageMediaId: null,
+
     // ========== 统计数据 ==========
     stats: {},
 
@@ -219,6 +223,8 @@ function diyTemplateManagement() {
       this.form = emptyForm()
       this.iconPreviewUrl = null
       this.iconMediaId = null
+      this.baseImagePreviewUrl = null
+      this.baseImageMediaId = null
       this.showFormModal = true
     },
 
@@ -247,11 +253,20 @@ function diyTemplateManagement() {
 
         // 预览图
         if (t.preview_media?.object_key) {
-          this.iconPreviewUrl = `/api/v4/media/file/${t.preview_media.object_key}`
+          this.iconPreviewUrl = `/api/v4/images/${t.preview_media.object_key}`
           this.iconMediaId = t.preview_media.media_id
         } else {
           this.iconPreviewUrl = null
           this.iconMediaId = null
+        }
+
+        // 底图
+        if (t.base_image_media?.object_key) {
+          this.baseImagePreviewUrl = `/api/v4/images/${t.base_image_media.object_key}`
+          this.baseImageMediaId = t.base_image_media.media_id
+        } else {
+          this.baseImagePreviewUrl = null
+          this.baseImageMediaId = null
         }
 
         this.showFormModal = true
@@ -271,6 +286,15 @@ function diyTemplateManagement() {
         Alpine.store('notification')?.show('请选择所属分类', 'warning')
         return
       }
+      /* 强制校验：底图和预览图必须上传 */
+      if (!this.baseImageMediaId) {
+        Alpine.store('notification')?.show('请上传款式底图（小程序设计器渲染必需）', 'warning')
+        return
+      }
+      if (!this.iconMediaId) {
+        Alpine.store('notification')?.show('请上传模板预览图（模板列表展示必需）', 'warning')
+        return
+      }
 
       this.saving = true
       try {
@@ -286,6 +310,11 @@ function diyTemplateManagement() {
         // 绑定预览图
         if (this.iconMediaId) {
           data.preview_media_id = this.iconMediaId
+        }
+
+        // 绑定底图
+        if (this.baseImageMediaId) {
+          data.base_image_media_id = this.baseImageMediaId
         }
 
         // category_id 转数字
@@ -359,6 +388,7 @@ function diyTemplateManagement() {
 
     // ==================== 图片上传 ====================
 
+    /** 预览图上传（模板列表展示用） */
     async handleIconUpload(event) {
       const file = event.target?.files?.[0]
       if (!file) return
@@ -380,6 +410,28 @@ function diyTemplateManagement() {
     removeIcon() {
       this.iconPreviewUrl = null
       this.iconMediaId = null
+    },
+
+    /** 底图上传（小程序设计器渲染用，建议透明背景 PNG） */
+    async handleBaseImageUpload(event) {
+      const file = event.target?.files?.[0]
+      if (!file) return
+
+      this.baseImagePreviewUrl = URL.createObjectURL(file)
+
+      const result = await this.uploadImage(file)
+      if (result) {
+        this.baseImageMediaId = result.media_id
+        if (result.public_url) {
+          this.baseImagePreviewUrl = result.public_url
+        }
+        logger.info('[DIY] 底图上传成功', { media_id: result.media_id })
+      }
+    },
+
+    removeBaseImage() {
+      this.baseImagePreviewUrl = null
+      this.baseImageMediaId = null
     },
 
     // ==================== 跳转槽位标注页 ====================

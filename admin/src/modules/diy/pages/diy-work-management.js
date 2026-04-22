@@ -18,7 +18,9 @@ import {
   getAdminWorkList,
   getAdminWorkDetail,
   getDiyStats,
-  getTemplateList
+  getTemplateList,
+  getWorkOrder,
+  updateWorkAddress
 } from '@/api/diy.js'
 
 /** 作品状态标签（对齐后端 ENUM） */
@@ -57,6 +59,24 @@ function diyWorkManagement() {
     // ========== 详情弹窗 ==========
     showDetail: false,
     detailData: null,
+
+    // ========== 关联订单弹窗 ==========
+    showOrder: false,
+    orderData: null,
+    orderLoading: false,
+
+    // ========== 地址编辑弹窗 ==========
+    showAddressForm: false,
+    addressForm: {
+      receiver_name: '',
+      receiver_phone: '',
+      province: '',
+      city: '',
+      district: '',
+      detail_address: ''
+    },
+    addressSaving: false,
+    currentWorkIdForAddress: null,
 
     // ========== 常量 ==========
     statusLabels: STATUS_LABELS,
@@ -157,6 +177,79 @@ function diyWorkManagement() {
       } catch (e) {
         logger.error('[DIY-Works] 加载作品详情失败', e)
         Alpine.store('notification')?.show(e.message || '加载失败', 'error')
+      }
+    },
+
+    // ==================== 关联订单 ====================
+
+    /** 查看作品关联的兑换订单 */
+    async viewOrder(workId) {
+      this.orderLoading = true
+      this.showOrder = true
+      this.orderData = null
+      this.currentWorkIdForAddress = workId
+      try {
+        const res = await getWorkOrder(workId)
+        if (res.success) {
+          this.orderData = res.data
+        }
+      } catch (err) {
+        logger.error('[DIY-Works] 获取关联订单失败', err)
+        Alpine.store('notification').show('获取关联订单失败: ' + (err.message || '未知错误'), 'error')
+      } finally {
+        this.orderLoading = false
+      }
+    },
+
+    /** 打开地址编辑弹窗 */
+    openAddressForm(workId) {
+      this.currentWorkIdForAddress = workId
+      // 如果已有地址快照，预填
+      if (this.orderData?.address_snapshot) {
+        const snap = this.orderData.address_snapshot
+        this.addressForm = {
+          receiver_name: snap.receiver_name || '',
+          receiver_phone: snap.receiver_phone || '',
+          province: snap.province || '',
+          city: snap.city || '',
+          district: snap.district || '',
+          detail_address: snap.detail_address || ''
+        }
+      } else {
+        this.addressForm = {
+          receiver_name: '',
+          receiver_phone: '',
+          province: '',
+          city: '',
+          district: '',
+          detail_address: ''
+        }
+      }
+      this.showAddressForm = true
+    },
+
+    /** 保存地址 */
+    async saveAddress() {
+      if (!this.addressForm.receiver_name || !this.addressForm.receiver_phone || !this.addressForm.detail_address) {
+        Alpine.store('notification').show('收件人姓名、手机号、详细地址为必填项', 'warning')
+        return
+      }
+      this.addressSaving = true
+      try {
+        const res = await updateWorkAddress(this.currentWorkIdForAddress, this.addressForm)
+        if (res.success) {
+          Alpine.store('notification').show('地址更新成功', 'success')
+          this.showAddressForm = false
+          // 刷新订单数据
+          if (this.showOrder) {
+            await this.viewOrder(this.currentWorkIdForAddress)
+          }
+        }
+      } catch (err) {
+        logger.error('[DIY-Works] 更新地址失败', err)
+        Alpine.store('notification').show('更新地址失败: ' + (err.message || '未知错误'), 'error')
+      } finally {
+        this.addressSaving = false
       }
     },
 

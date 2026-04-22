@@ -86,18 +86,29 @@ module.exports = sequelize => {
         type: DataTypes.DECIMAL(10, 2),
         allowNull: false,
         defaultValue: 0,
-        comment: '单价（资产单位）',
-        /** @returns {number} 单价数值（保留两位小数精度） */
+        comment: '单价（资产单位，强制整数定价）',
+        /** @returns {number} 单价数值 */
         get() {
           const val = this.getDataValue('price')
           return val !== null ? parseFloat(parseFloat(val).toFixed(2)) : 0
+        },
+        validate: {
+          /**
+           * 强制整数定价校验（文档决策 A）
+           * @param {*} value - 待校验的价格值
+           * @returns {void}
+           */
+          isIntegerPrice(value) {
+            if (value !== null && value !== undefined && Number(value) % 1 !== 0) {
+              throw new Error('价格必须为整数（强制整数定价策略）')
+            }
+          }
         }
       },
       price_asset_code: {
         type: DataTypes.STRING(50),
         allowNull: false,
-        defaultValue: 'star_stone',
-        comment: '定价币种（星石）'
+        comment: '定价币种（新增时必须显式指定，无默认值）'
       },
       stock: {
         type: DataTypes.INTEGER,

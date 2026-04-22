@@ -320,6 +320,8 @@ function addSlot() {
     rotation: 0,
     allowed_shapes: ['circle', 'ellipse'],
     allowed_group_codes: [],
+    allowed_diameters: [],
+    render_diameter: null,
     required: false
   })
   rebuildCanvas()
@@ -404,6 +406,27 @@ Alpine.data('slotPropertyPanel', () => ({
     } else {
       slot.allowed_shapes.push(shape)
     }
+    this.selectedSlot = { ...slot }
+  },
+
+  toggleDiameter(d) {
+    if (state.selectedIndex < 0) return
+    const slot = state.slots[state.selectedIndex]
+    if (!slot.allowed_diameters) slot.allowed_diameters = []
+    const idx = slot.allowed_diameters.indexOf(d)
+    if (idx >= 0) {
+      slot.allowed_diameters.splice(idx, 1)
+    } else {
+      slot.allowed_diameters.push(d)
+      slot.allowed_diameters.sort((a, b) => a - b)
+    }
+    this.selectedSlot = { ...slot }
+  },
+
+  updateRenderDiameter(val) {
+    if (state.selectedIndex < 0) return
+    const slot = state.slots[state.selectedIndex]
+    slot.render_diameter = val ? Number(val) : null
     this.selectedSlot = { ...slot }
   },
 
@@ -635,8 +658,22 @@ Alpine.data('materialPickerPanel', () => ({
   },
 
   get filteredMaterials() {
-    if (!this.activeGroup) return this.materials
-    return this.materials.filter(m => m.group_code === this.activeGroup)
+    let list = this.materials
+    if (this.activeGroup) {
+      list = list.filter(m => m.group_code === this.activeGroup)
+    }
+    if (state.selectedIndex >= 0) {
+      const slot = state.slots[state.selectedIndex]
+      if (slot?.allowed_diameters?.length > 0) {
+        list = list.map(m => ({
+          ...m,
+          _diameterAllowed: slot.allowed_diameters.includes(Number(m.diameter))
+        }))
+      } else {
+        list = list.map(m => ({ ...m, _diameterAllowed: true }))
+      }
+    }
+    return list
   },
 
   applyToSlot(material) {

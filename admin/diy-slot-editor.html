@@ -111,6 +111,29 @@
                 <span class="ml-1">必填槽位</span>
               </label>
             </div>
+            <!-- 允许直径 -->
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">允许珠子直径 (mm)</label>
+              <p class="text-xs text-gray-400 mb-1">不勾选 = 不限制</p>
+              <div class="flex flex-wrap gap-2">
+                <template x-for="d in [6, 8, 10, 12, 14, 16]" :key="d">
+                  <label class="flex items-center text-xs">
+                    <input type="checkbox" :checked="selectedSlot?.allowed_diameters?.includes(d)"
+                           @change="toggleDiameter(d)">
+                    <span class="ml-1" x-text="d + 'mm'"></span>
+                  </label>
+                </template>
+              </div>
+            </div>
+            <!-- 渲染直径 -->
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">渲染直径 (mm)</label>
+              <p class="text-xs text-gray-400 mb-1">小程序中珠子显示的实际大小，留空则按槽位尺寸拉伸</p>
+              <input type="number" :value="selectedSlot?.render_diameter"
+                     @input="updateRenderDiameter($event.target.value)"
+                     step="1" min="4" max="30" placeholder="如 10"
+                     class="input-field w-full text-sm">
+            </div>
             <!-- 当前槽位已镶嵌的珠子 -->
             <div x-show="selectedSlot?._previewMaterial" class="pt-2 border-t">
               <label class="block text-xs text-gray-500 mb-1">已镶嵌预览</label>
@@ -175,9 +198,13 @@
         <div class="flex-1 overflow-x-auto overflow-y-hidden px-3 py-2">
           <div class="flex gap-3 h-full">
             <template x-for="mat in filteredMaterials" :key="mat.diy_material_id">
-              <div @click="applyToSlot(mat)"
-                   :class="hasSelectedSlot ? 'cursor-pointer hover:border-blue-400 hover:shadow-md' : 'opacity-50 cursor-not-allowed'"
-                   class="shrink-0 w-24 border rounded-lg p-2 flex flex-col items-center transition-all bg-white">
+              <div @click="mat._diameterAllowed !== false && applyToSlot(mat)"
+                   :class="[
+                     hasSelectedSlot && mat._diameterAllowed !== false ? 'cursor-pointer hover:border-blue-400 hover:shadow-md' : '',
+                     !hasSelectedSlot ? 'opacity-50 cursor-not-allowed' : '',
+                     mat._diameterAllowed === false ? 'opacity-30 cursor-not-allowed border-red-200' : ''
+                   ]"
+                   class="shrink-0 w-24 border rounded-lg p-2 flex flex-col items-center transition-all bg-white relative">
                 <div class="w-14 h-14 rounded-full overflow-hidden bg-gray-50 flex items-center justify-center border">
                   <img x-show="mat.image_url" :src="mat.image_url" class="w-full h-full object-contain">
                   <span x-show="!mat.image_url" class="text-2xl">💎</span>

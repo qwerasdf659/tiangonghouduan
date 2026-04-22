@@ -222,6 +222,16 @@ function diyMaterialManagement() {
         Alpine.store('notification')?.show('请选择材料分组', 'warning')
         return
       }
+      // 强制整数定价校验（文档决策 A）
+      if (this.form.price !== undefined && this.form.price % 1 !== 0) {
+        Alpine.store('notification')?.show('价格必须为整数（强制整数定价策略）', 'warning')
+        return
+      }
+      /* 强制校验：素材图片必须上传 */
+      if (!this.imageMediaId) {
+        Alpine.store('notification')?.show('请上传素材图片（小程序设计器渲染必需）', 'warning')
+        return
+      }
 
       this.saving = true
       try {

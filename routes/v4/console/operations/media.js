@@ -38,6 +38,10 @@ const uploadBatch = multer({
 
 /**
  * POST /api/v4/console/media/upload
+ *
+ * @description 上传单张图片到媒体库
+ * @body {string} [folder='uploads'] - 存储文件夹
+ * @body {string} [trim_transparent='false'] - 是否裁剪透明边距（DIY 素材图场景传 'true'）
  */
 router.post(
   '/upload',
@@ -53,7 +57,8 @@ router.post(
       folder: req.body.folder || 'uploads',
       original_name: req.file.originalname,
       mime_type: req.file.mimetype,
-      uploaded_by: req.user?.user_id
+      uploaded_by: req.user?.user_id,
+      trim_transparent: req.body.trim_transparent === 'true' || req.body.trim_transparent === true
     })
     return res.apiSuccess(result, '文件上传成功')
   })

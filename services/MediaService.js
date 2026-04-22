@@ -84,6 +84,7 @@ class MediaService {
    * @param {string} [options.original_name] - 原始文件名
    * @param {string} [options.mime_type='image/jpeg'] - MIME 类型
    * @param {number} [options.uploaded_by] - 上传用户 ID
+   * @param {boolean} [options.trim_transparent=false] - 是否裁剪透明边距（DIY 素材图场景）
    *
    * @returns {Promise<Object>} 上传结果
    * @returns {boolean} result.duplicate - 是否为重复文件
@@ -97,11 +98,35 @@ class MediaService {
     const originalName = options.original_name || 'image.jpg'
     const mimeType = options.mime_type || 'image/jpeg'
     const uploadedBy = options.uploaded_by ?? null
+    const trimTransparent = options.trim_transparent ?? false
 
     this._validateFile(mimeType, fileBuffer.length)
 
-    // 1. 计算 content_hash（SHA-256）
-    const contentHash = crypto.createHash('sha256').update(fileBuffer).digest('hex')
+    /*
+     * 0. 裁剪透明边距（DIY 素材图等场景）
+     *    上传时一次性处理，下游消费端拿到的永远是可直接使用的图
+     */
+    let processedBuffer = fileBuffer
+    if (trimTransparent && (mimeType === 'image/png' || mimeType === 'image/webp')) {
+      try {
+        const trimResult = await sharp(fileBuffer)
+          .trim({ background: { r: 0, g: 0, b: 0, alpha: 0 }, threshold: 30 })
+          .toBuffer({ resolveWithObject: true })
+        processedBuffer = trimResult.data
+        _logger.info('MediaService: 已裁剪透明边距', {
+          original_size: fileBuffer.length,
+          trimmed_size: processedBuffer.length,
+          trimmed_width: trimResult.info.width,
+          trimmed_height: trimResult.info.height
+        })
+      } catch (trimErr) {
+        _logger.warn('MediaService: 裁剪透明边距失败，使用原图', { error: trimErr.message })
+        processedBuffer = fileBuffer
+      }
+    }
+
+    // 1. 计算 content_hash（SHA-256）— 基于处理后的 buffer
+    const contentHash = crypto.createHash('sha256').update(processedBuffer).digest('hex')
 
     const { MediaFile } = require('../models')
 
@@ -135,16 +160,16 @@ class MediaService {
       }
     }
 
-    // 3. 上传到 Sealos（含缩略图）
+    // 3. 上传到 Sealos（含缩略图）— 使用处理后的 buffer
     const storage = this._getStorageService()
     const { original_key: objectKey, thumbnail_keys: thumbnailKeys } =
-      await storage.uploadImageWithThumbnails(fileBuffer, originalName, folder)
+      await storage.uploadImageWithThumbnails(processedBuffer, originalName, folder)
 
-    // 4. 获取 width/height（sharp.metadata）
+    // 4. 获取 width/height（sharp.metadata）— 基于处理后的 buffer
     let width = null
     let height = null
     try {
-      const metadata = await sharp(fileBuffer).metadata()
+      const metadata = await sharp(processedBuffer).metadata()
       width = metadata.width ?? null
       height = metadata.height ?? null
     } catch (err) {
@@ -156,7 +181,7 @@ class MediaService {
       object_key: objectKey,
       thumbnail_keys: thumbnailKeys,
       original_name: originalName,
-      file_size: fileBuffer.length,
+      file_size: processedBuffer.length,
       mime_type: mimeType,
       width,
       height,
@@ -188,7 +213,7 @@ class MediaService {
       thumbnails,
       width,
       height,
-      file_size: fileBuffer.length,
+      file_size: processedBuffer.length,
       mime_type: mimeType,
       original_name: originalName
     }

@@ -10,6 +10,11 @@
  * - DELETE /:id             删除收货地址
  * - PUT    /:id/default     设为默认地址
  *
+ * 📌 遵循规范：
+ * - 路由不直连 models，写操作收口到 UserAddressService
+ * - 事务边界由路由层通过 TransactionManager.execute() 管理
+ * - Service 层通过 assertAndGetTransaction() 强制要求事务传入
+ *
  * @module routes/v4/user/addresses
  */
 
@@ -18,6 +23,7 @@
 const express = require('express')
 const router = express.Router()
 const TransactionManager = require('../../../utils/TransactionManager')
+const UserAddressService = require('../../../services/UserAddressService')
 
 /**
  * 异步路由处理器包装
@@ -30,182 +36,89 @@ function asyncHandler(fn) {
   }
 }
 
-/** 获取用户地址列表 */
+/** 获取用户地址列表（读操作，无需事务） */
 router.get(
   '/',
   asyncHandler(async (req, res) => {
-    const { UserAddress } = require('../../../models')
-    const addresses = await UserAddress.findAll({
-      where: { user_id: req.user.user_id },
-      order: [
-        ['is_default', 'DESC'],
-        ['updated_at', 'DESC']
-      ]
-    })
+    const addresses = await UserAddressService.getList(req.user.user_id)
     return res.apiSuccess(addresses, '获取地址列表成功')
   })
 )
 
-/** 新增收货地址 */
+/** 新增收货地址（写操作，事务保护） */
 router.post(
   '/',
   asyncHandler(async (req, res) => {
-    const { UserAddress } = require('../../../models')
-    const {
-      receiver_name,
-      receiver_phone,
-      province,
-      city,
-      district,
-      detail_address,
-      postal_code,
-      is_default
-    } = req.body
+    const { receiver_name, receiver_phone, province, city, district, detail_address, is_default } =
+      req.body
 
     // 参数校验
-    if (!receiver_name || !receiver_phone || !province || !city || !detail_address) {
+    if (!receiver_name || !receiver_phone || !province || !city || !district || !detail_address) {
       return res.apiError(
-        '收件人姓名、手机号、省、市、详细地址为必填项',
+        '收件人姓名、手机号、省市区、详细地址均为必填',
         'VALIDATION_ERROR',
         null,
         400
       )
     }
 
-    let address
-    await TransactionManager.execute(async transaction => {
-      // 如果设为默认，先取消其他默认地址
-      if (is_default) {
-        await UserAddress.update(
-          { is_default: false },
-          { where: { user_id: req.user.user_id, is_default: true }, transaction }
-        )
-      }
-
-      address = await UserAddress.create(
-        {
-          user_id: req.user.user_id,
-          receiver_name,
-          receiver_phone,
-          province,
-          city,
-          district: district || '',
-          detail_address,
-          postal_code: postal_code || null,
-          is_default: is_default || false
-        },
+    const address = await TransactionManager.execute(async transaction => {
+      return UserAddressService.create(
+        req.user.user_id,
+        { receiver_name, receiver_phone, province, city, district, detail_address, is_default },
         { transaction }
       )
     })
 
-    return res.apiSuccess(address, '地址添加成功')
+    return res.apiSuccess(address, '新增地址成功')
   })
 )
 
-/** 修改收货地址 */
+/** 修改收货地址（写操作，事务保护） */
 router.put(
   '/:id',
   asyncHandler(async (req, res) => {
-    const { UserAddress } = require('../../../models')
-    const addressId = Number(req.params.id)
-    const {
-      receiver_name,
-      receiver_phone,
-      province,
-      city,
-      district,
-      detail_address,
-      postal_code,
-      is_default
-    } = req.body
+    const addressId = parseInt(req.params.id, 10)
+    if (isNaN(addressId)) {
+      return res.apiError('地址 ID 无效', 'VALIDATION_ERROR', null, 400)
+    }
 
-    let address
-    await TransactionManager.execute(async transaction => {
-      address = await UserAddress.findOne({
-        where: { address_id: addressId, user_id: req.user.user_id },
-        transaction,
-        lock: true
-      })
-      if (!address) {
-        const error = new Error('地址不存在')
-        error.statusCode = 404
-        throw error
-      }
-
-      // 如果设为默认，先取消其他默认地址
-      if (is_default && !address.is_default) {
-        await UserAddress.update(
-          { is_default: false },
-          { where: { user_id: req.user.user_id, is_default: true }, transaction }
-        )
-      }
-
-      await address.update(
-        {
-          receiver_name: receiver_name || address.receiver_name,
-          receiver_phone: receiver_phone || address.receiver_phone,
-          province: province || address.province,
-          city: city || address.city,
-          district: district !== undefined ? district : address.district,
-          detail_address: detail_address || address.detail_address,
-          postal_code: postal_code !== undefined ? postal_code : address.postal_code,
-          is_default: is_default !== undefined ? is_default : address.is_default
-        },
-        { transaction }
-      )
+    const address = await TransactionManager.execute(async transaction => {
+      return UserAddressService.update(req.user.user_id, addressId, req.body, { transaction })
     })
 
-    return res.apiSuccess(address, '地址修改成功')
+    return res.apiSuccess(address, '修改地址成功')
   })
 )
 
-/** 删除收货地址（硬删除） */
+/** 删除收货地址（写操作，事务保护） */
 router.delete(
   '/:id',
   asyncHandler(async (req, res) => {
-    const { UserAddress } = require('../../../models')
-    const addressId = Number(req.params.id)
-
-    const deleted = await UserAddress.destroy({
-      where: { address_id: addressId, user_id: req.user.user_id }
-    })
-
-    if (!deleted) {
-      return res.apiError('地址不存在', 'NOT_FOUND', null, 404)
+    const addressId = parseInt(req.params.id, 10)
+    if (isNaN(addressId)) {
+      return res.apiError('地址 ID 无效', 'VALIDATION_ERROR', null, 400)
     }
 
-    return res.apiSuccess(null, '地址删除成功')
+    await TransactionManager.execute(async transaction => {
+      return UserAddressService.remove(req.user.user_id, addressId, { transaction })
+    })
+
+    return res.apiSuccess(null, '删除地址成功')
   })
 )
 
-/** 设为默认地址 */
+/** 设为默认地址（写操作，事务保护） */
 router.put(
   '/:id/default',
   asyncHandler(async (req, res) => {
-    const { UserAddress } = require('../../../models')
-    const addressId = Number(req.params.id)
+    const addressId = parseInt(req.params.id, 10)
+    if (isNaN(addressId)) {
+      return res.apiError('地址 ID 无效', 'VALIDATION_ERROR', null, 400)
+    }
 
-    let address
-    await TransactionManager.execute(async transaction => {
-      address = await UserAddress.findOne({
-        where: { address_id: addressId, user_id: req.user.user_id },
-        transaction,
-        lock: true
-      })
-      if (!address) {
-        const error = new Error('地址不存在')
-        error.statusCode = 404
-        throw error
-      }
-
-      // 取消其他默认地址
-      await UserAddress.update(
-        { is_default: false },
-        { where: { user_id: req.user.user_id, is_default: true }, transaction }
-      )
-
-      // 设为默认
-      await address.update({ is_default: true }, { transaction })
+    const address = await TransactionManager.execute(async transaction => {
+      return UserAddressService.setDefault(req.user.user_id, addressId, { transaction })
     })
 
     return res.apiSuccess(address, '已设为默认地址')

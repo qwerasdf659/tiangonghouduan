@@ -112,8 +112,9 @@
                           x-text="statusLabels[work.status] || work.status"></span>
                   </td>
                   <td class="px-4 py-3 text-xs text-gray-500" x-text="formatDate(work.created_at)"></td>
-                  <td class="px-4 py-3">
-                    <button @click="viewDetail(work.diy_work_id)" class="text-blue-600 hover:underline text-xs">查看详情</button>
+                  <td class="px-4 py-3 space-x-2">
+                    <button @click="viewDetail(work.diy_work_id)" class="text-blue-600 hover:underline text-xs">详情</button>
+                    <button x-show="work.status === 'completed'" @click="viewOrder(work.diy_work_id)" class="text-green-600 hover:underline text-xs">关联订单</button>
                   </td>
                 </tr>
               </template>
@@ -185,11 +186,11 @@
               </div>
             </div>
 
-            <!-- 材料消耗 -->
-            <div x-show="detailData?.total_cost?.length > 0">
+            <!-- 材料消耗（兼容新格式 { price_snapshot, payments } 和旧格式 [{ asset_code, amount }]） -->
+            <div x-show="detailData?.total_cost && (Array.isArray(detailData.total_cost) ? detailData.total_cost.length > 0 : detailData.total_cost.payments?.length > 0)">
               <h4 class="text-sm font-semibold text-gray-600 mb-2">材料消耗</h4>
               <div class="flex flex-wrap gap-2">
-                <template x-for="cost in (detailData?.total_cost || [])" :key="cost.asset_code">
+                <template x-for="cost in (Array.isArray(detailData?.total_cost) ? detailData.total_cost : (detailData?.total_cost?.payments || []))" :key="cost.asset_code">
                   <span class="px-2 py-1 bg-gray-100 rounded text-xs">
                     <span x-text="cost.asset_code"></span>: <span x-text="cost.amount"></span>
                   </span>
@@ -202,6 +203,110 @@
               <h4 class="text-sm font-semibold text-gray-600 mb-2">设计数据</h4>
               <pre class="bg-gray-50 rounded p-3 text-xs overflow-x-auto max-h-60"
                    x-text="JSON.stringify(detailData?.design_data, null, 2)"></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 关联订单弹窗 -->
+      <div x-show="showOrder" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center" x-cloak>
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 max-h-[80vh] overflow-y-auto">
+          <div class="flex justify-between items-center p-4 border-b">
+            <h3 class="text-lg font-semibold">📦 关联兑换订单</h3>
+            <button @click="showOrder = false" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+          </div>
+          <div class="p-4 space-y-4">
+            <template x-if="orderLoading">
+              <div class="text-center py-8 text-gray-400">加载中...</div>
+            </template>
+            <template x-if="!orderLoading && !orderData">
+              <div class="text-center py-8 text-gray-400">该作品暂无关联兑换订单（作品尚未完成设计）</div>
+            </template>
+            <template x-if="!orderLoading && orderData">
+              <div class="space-y-3">
+                <div class="grid grid-cols-2 gap-2 text-sm">
+                  <div><span class="text-gray-500">订单号：</span><span x-text="orderData.order_no || '-'"></span></div>
+                  <div><span class="text-gray-500">状态：</span><span x-text="orderData.status || '-'"></span></div>
+                  <div><span class="text-gray-500">来源：</span><span x-text="orderData.source || '-'"></span></div>
+                  <div><span class="text-gray-500">创建时间：</span><span x-text="orderData.created_at ? new Date(orderData.created_at).toLocaleString('zh-CN') : '-'"></span></div>
+                </div>
+
+                <!-- 收货地址 -->
+                <div class="border-t pt-3">
+                  <div class="flex justify-between items-center mb-2">
+                    <h4 class="text-sm font-semibold text-gray-600">📍 收货地址</h4>
+                    <button @click="openAddressForm(currentWorkIdForAddress)" class="text-xs text-blue-600 hover:underline">
+                      <span x-text="orderData.address_snapshot ? '修改地址' : '补录地址'"></span>
+                    </button>
+                  </div>
+                  <template x-if="orderData.address_snapshot">
+                    <div class="bg-gray-50 rounded p-3 text-sm space-y-1">
+                      <div><span class="text-gray-500">收件人：</span><span x-text="orderData.address_snapshot.receiver_name"></span></div>
+                      <div><span class="text-gray-500">手机号：</span><span x-text="orderData.address_snapshot.receiver_phone"></span></div>
+                      <div><span class="text-gray-500">地址：</span><span x-text="(orderData.address_snapshot.province || '') + (orderData.address_snapshot.city || '') + (orderData.address_snapshot.district || '') + ' ' + (orderData.address_snapshot.detail_address || '')"></span></div>
+                    </div>
+                  </template>
+                  <template x-if="!orderData.address_snapshot">
+                    <div class="bg-yellow-50 border border-yellow-200 rounded p-3 text-sm text-yellow-700">
+                      ⚠️ 尚未填写收货地址，请点击"补录地址"填写
+                    </div>
+                  </template>
+                </div>
+
+                <!-- 物流信息 -->
+                <div class="border-t pt-3" x-show="orderData.shipping_company || orderData.shipping_no">
+                  <h4 class="text-sm font-semibold text-gray-600 mb-2">🚚 物流信息</h4>
+                  <div class="bg-gray-50 rounded p-3 text-sm space-y-1">
+                    <div><span class="text-gray-500">快递公司：</span><span x-text="orderData.shipping_company_name || orderData.shipping_company || '-'"></span></div>
+                    <div><span class="text-gray-500">快递单号：</span><span x-text="orderData.shipping_no || '-'"></span></div>
+                    <div><span class="text-gray-500">发货时间：</span><span x-text="orderData.shipped_at ? new Date(orderData.shipped_at).toLocaleString('zh-CN') : '-'"></span></div>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <!-- 地址编辑弹窗 -->
+      <div x-show="showAddressForm" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center" x-cloak>
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-md mx-4">
+          <div class="flex justify-between items-center p-4 border-b">
+            <h3 class="text-lg font-semibold">📍 编辑收货地址</h3>
+            <button @click="showAddressForm = false" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+          </div>
+          <div class="p-4 space-y-3">
+            <div>
+              <label class="block text-sm text-gray-600 mb-1">收件人姓名 <span class="text-red-500">*</span></label>
+              <input type="text" x-model="addressForm.receiver_name" class="w-full border rounded px-3 py-2 text-sm" placeholder="请输入收件人姓名">
+            </div>
+            <div>
+              <label class="block text-sm text-gray-600 mb-1">手机号 <span class="text-red-500">*</span></label>
+              <input type="text" x-model="addressForm.receiver_phone" class="w-full border rounded px-3 py-2 text-sm" placeholder="请输入手机号">
+            </div>
+            <div class="grid grid-cols-3 gap-2">
+              <div>
+                <label class="block text-sm text-gray-600 mb-1">省</label>
+                <input type="text" x-model="addressForm.province" class="w-full border rounded px-3 py-2 text-sm" placeholder="省">
+              </div>
+              <div>
+                <label class="block text-sm text-gray-600 mb-1">市</label>
+                <input type="text" x-model="addressForm.city" class="w-full border rounded px-3 py-2 text-sm" placeholder="市">
+              </div>
+              <div>
+                <label class="block text-sm text-gray-600 mb-1">区</label>
+                <input type="text" x-model="addressForm.district" class="w-full border rounded px-3 py-2 text-sm" placeholder="区">
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm text-gray-600 mb-1">详细地址 <span class="text-red-500">*</span></label>
+              <textarea x-model="addressForm.detail_address" class="w-full border rounded px-3 py-2 text-sm" rows="2" placeholder="请输入详细地址"></textarea>
+            </div>
+            <div class="flex justify-end space-x-2 pt-2">
+              <button @click="showAddressForm = false" class="px-4 py-2 text-sm text-gray-600 border rounded hover:bg-gray-50">取消</button>
+              <button @click="saveAddress()" :disabled="addressSaving" class="px-4 py-2 text-sm text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50">
+                <span x-text="addressSaving ? '保存中...' : '保存'"></span>
+              </button>
             </div>
           </div>
         </div>

@@ -180,7 +180,15 @@ router.post(
   })
 )
 
-/** 完成设计（从冻结扣减 + 铸造物品，frozen → completed） */
+/**
+ * 完成设计（从冻结扣减 + 铸造物品，frozen → completed）
+ *
+ * 请求体：{ address_id?: number }
+ * address_id 为收货地址 ID，后端查 user_addresses 生成 address_snapshot 快照
+ * 写入 exchange_records，打通实物发货链路。
+ * 如果不传 address_id，exchange_records.address_snapshot 为 null，
+ * 管理员可在后台补录地址。
+ */
 router.post(
   '/works/:id/complete',
   asyncHandler(async (req, res) => {
@@ -189,7 +197,8 @@ router.post(
     await TransactionManager.execute(async transaction => {
       work = await DIYService.completeDesign(Number(req.params.id), req.accountId, {
         transaction,
-        userId: req.user.user_id
+        userId: req.user.user_id,
+        addressId: req.body.address_id || null
       })
     })
     return res.apiSuccess(work, '设计完成，物品已铸造')

@@ -192,7 +192,7 @@ module.exports = sequelize => {
         type: DataTypes.STRING(20),
         allowNull: false,
         comment:
-          '物品来源：lottery=抽奖 / bid_settlement=竞价结算 / exchange=兑换 / admin=管理员 / test=测试 / legacy=历史数据'
+          '物品来源：lottery=抽奖 / bid_settlement=竞价结算 / exchange=兑换 / diy=DIY设计 / admin=管理员 / test=测试 / legacy=历史数据'
       },
 
       source_ref_id: {

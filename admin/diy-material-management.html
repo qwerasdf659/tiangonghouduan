@@ -215,7 +215,7 @@
             <div class="grid grid-cols-3 gap-4">
               <div>
                 <label class="block text-xs text-gray-500 mb-1">单价 *</label>
-                <input type="number" x-model.number="form.price" class="input-field w-full" min="0" step="0.01">
+                <input type="number" x-model.number="form.price" class="input-field w-full" min="0" step="1">
               </div>
               <div>
                 <label class="block text-xs text-gray-500 mb-1">定价币种</label>
@@ -225,7 +225,6 @@
                   <option value="red_core_gem">红源晶</option>
                   <option value="blue_core_shard">蓝源晶碎片</option>
                   <option value="blue_core_gem">蓝源晶</option>
-                  <option value="points">积分</option>
                 </select>
               </div>
               <div>
@@ -251,9 +250,9 @@
               </div>
             </div>
 
-            <!-- 素材图片上传 -->
+            <!-- 素材图片上传（必填） -->
             <div>
-              <label class="block text-xs text-gray-500 mb-1">素材图片（PNG 透明底）</label>
+              <label class="block text-xs text-gray-500 mb-1">素材图片（PNG 透明底）<span class="text-red-500">*</span></label>
               <div class="flex items-center gap-4">
                 <div class="w-20 h-20 border rounded bg-gray-50 flex items-center justify-center overflow-hidden">
                   <img x-show="imagePreviewUrl" :src="imagePreviewUrl" class="w-full h-full object-contain">
@@ -262,6 +261,7 @@
                 <div>
                   <input type="file" accept="image/png,image/webp" @change="handleImageUpload($event)" class="text-sm">
                   <p class="text-xs text-gray-400 mt-1">建议 PNG 透明底，600×600px</p>
+                  <p x-show="!imageMediaId" class="text-xs text-red-500 mt-1">必须上传素材图片才能保存</p>
                 </div>
               </div>
             </div>

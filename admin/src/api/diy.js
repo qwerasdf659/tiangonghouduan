@@ -27,6 +27,8 @@ export const DIY_ENDPOINTS = {
   TEMPLATE_STATUS: `${API_PREFIX}/console/diy/templates/:id/status`,
   WORKS: `${API_PREFIX}/console/diy/works`,
   WORK_DETAIL: `${API_PREFIX}/console/diy/works/:id`,
+  WORK_ORDER: `${API_PREFIX}/console/diy/works/:id/order`,
+  WORK_ADDRESS: `${API_PREFIX}/console/diy/works/:id/address`,
   MATERIALS: `${API_PREFIX}/console/diy/materials`,
   MATERIAL_DETAIL: `${API_PREFIX}/console/diy/materials/:id`,
   STATS: `${API_PREFIX}/console/diy/stats`,
@@ -198,4 +200,25 @@ export async function updateMaterial(id, data) {
 export async function deleteMaterial(id) {
   const url = buildURL(DIY_ENDPOINTS.MATERIAL_DETAIL, { id })
   return request({ url, method: 'DELETE' })
+}
+
+/**
+ * 获取作品关联的兑换订单（含 address_snapshot、发货信息）
+ * @param {number|string} workId - diy_work_id
+ * @returns {Promise<{success, data: ExchangeRecord|null}>}
+ */
+export async function getWorkOrder(workId) {
+  const url = buildURL(DIY_ENDPOINTS.WORK_ORDER, { id: workId })
+  return request({ url })
+}
+
+/**
+ * 管理员补录/更新 DIY 订单收货地址
+ * @param {number|string} workId - diy_work_id
+ * @param {Object} addressData - { receiver_name, receiver_phone, province, city, district, detail_address }
+ * @returns {Promise<{success, data: ExchangeRecord}>}
+ */
+export async function updateWorkAddress(workId, addressData) {
+  const url = buildURL(DIY_ENDPOINTS.WORK_ADDRESS, { id: workId })
+  return request({ url, method: 'PUT', data: addressData })
 }
