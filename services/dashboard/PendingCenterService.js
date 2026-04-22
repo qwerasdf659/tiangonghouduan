@@ -26,6 +26,19 @@ const { Op } = require('sequelize')
 const { BusinessCacheHelper, DEFAULT_TTL, KEY_PREFIX } = require('../../utils/BusinessCacheHelper')
 const BeijingTimeHelper = require('../../utils/timeHelper')
 const logger = require('../../utils/logger').logger
+const {
+  ConsumptionRecord,
+  CustomerServiceSession,
+  RedemptionOrder,
+  User,
+  Item,
+  Feedback,
+  ApprovalChainStep,
+  ApprovalChainInstance,
+  ApprovalChainTemplate,
+  ApprovalChainNode
+} = require('../../models')
+const LotteryAlertService = require('../lottery/LotteryAlertService')
 
 /**
  * 超时阈值配置（单位：分钟）
@@ -354,8 +367,6 @@ class PendingCenterService {
    * @returns {Promise<Object>} 消费记录审核统计信息
    */
   static async _getConsumptionStats() {
-    const { ConsumptionRecord } = require('../../models')
-
     const records = await ConsumptionRecord.scope('pending').findAll({
       attributes: ['consumption_record_id', 'created_at']
     })
@@ -388,7 +399,6 @@ class PendingCenterService {
    * @returns {Promise<Array<Object>>} 消费记录审核列表项
    */
   static async _getConsumptionItems(options = {}) {
-    const { ConsumptionRecord } = require('../../models')
     const { urgent_only = false } = options
 
     const records = await ConsumptionRecord.scope(['pending', 'withUser']).findAll({
@@ -435,8 +445,6 @@ class PendingCenterService {
    * @returns {Promise<Object>} 客服会话统计信息
    */
   static async _getCustomerServiceStats() {
-    const { CustomerServiceSession } = require('../../models')
-
     const sessions = await CustomerServiceSession.findAll({
       where: {
         status: { [Op.in]: ['waiting', 'assigned', 'active'] }
@@ -473,7 +481,6 @@ class PendingCenterService {
    * @returns {Promise<Array<Object>>} 客服会话列表项
    */
   static async _getCustomerServiceItems(options = {}) {
-    const { CustomerServiceSession } = require('../../models')
     const { urgent_only = false } = options
 
     const sessions = await CustomerServiceSession.findAll({
@@ -537,7 +544,6 @@ class PendingCenterService {
    */
   static async _getRiskAlertStats() {
     try {
-      const LotteryAlertService = require('../lottery/LotteryAlertService')
       const result = await LotteryAlertService.getAlertList({
         type: 'user',
         status: 'active',
@@ -579,7 +585,6 @@ class PendingCenterService {
    */
   static async _getRiskAlertItems(options = {}) {
     try {
-      const LotteryAlertService = require('../lottery/LotteryAlertService')
       const { urgent_only = false } = options
       const result = await LotteryAlertService.getAlertList({
         type: 'user',
@@ -627,7 +632,6 @@ class PendingCenterService {
    */
   static async _getLotteryAlertStats() {
     try {
-      const LotteryAlertService = require('../lottery/LotteryAlertService')
       const result = await LotteryAlertService.getAlertList({
         status: 'active',
         limit: 100
@@ -669,7 +673,6 @@ class PendingCenterService {
    */
   static async _getLotteryAlertItems(options = {}) {
     try {
-      const LotteryAlertService = require('../lottery/LotteryAlertService')
       const { urgent_only = false } = options
       const result = await LotteryAlertService.getAlertList({
         status: 'active',
@@ -718,8 +721,6 @@ class PendingCenterService {
    */
   static async _getRedemptionStats() {
     try {
-      const { RedemptionOrder } = require('../../models')
-
       const pendingOrders = await RedemptionOrder.findAll({
         where: { status: 'pending' },
         attributes: ['redemption_order_id', 'created_at'],
@@ -758,7 +759,6 @@ class PendingCenterService {
    */
   static async _getRedemptionItems(options = {}) {
     try {
-      const { RedemptionOrder, User, Item } = require('../../models')
       const { urgent_only = false } = options
 
       const pendingOrders = await RedemptionOrder.findAll({
@@ -825,8 +825,6 @@ class PendingCenterService {
    */
   static async _getFeedbackStats() {
     try {
-      const { Feedback } = require('../../models')
-
       const pendingFeedbacks = await Feedback.findAll({
         where: { status: 'pending' },
         attributes: ['feedback_id', 'created_at'],
@@ -865,7 +863,6 @@ class PendingCenterService {
    */
   static async _getFeedbackItems(options = {}) {
     try {
-      const { Feedback, User } = require('../../models')
       const { urgent_only = false } = options
 
       const pendingFeedbacks = await Feedback.findAll({
@@ -970,8 +967,6 @@ class PendingCenterService {
    * @returns {Promise<Object>} { count, urgent_count, oldest_minutes }
    */
   static async _getApprovalChainStats() {
-    const { ApprovalChainStep, ApprovalChainInstance } = require('../../models')
-
     const pendingSteps = await ApprovalChainStep.findAll({
       where: { status: 'pending' },
       include: [{ model: ApprovalChainInstance, as: 'instance', attributes: ['auditable_type'] }],
@@ -1003,13 +998,6 @@ class PendingCenterService {
    * @returns {Promise<Array>} 列表项
    */
   static async _getApprovalChainItems(options = {}) {
-    const {
-      ApprovalChainStep,
-      ApprovalChainInstance,
-      ApprovalChainTemplate,
-      ApprovalChainNode
-    } = require('../../models')
-
     const steps = await ApprovalChainStep.findAll({
       where: { status: 'pending' },
       include: [

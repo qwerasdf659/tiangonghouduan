@@ -33,6 +33,8 @@
 const crypto = require('crypto')
 const { sequelize } = require('../config/database')
 const logger = require('../utils/logger')
+const { ApiIdempotencyRequest } = require('../models')
+const { Op } = require('sequelize')
 
 // 配置常量
 const TTL_DAYS = 7 // 幂等记录保留天数
@@ -934,7 +936,6 @@ class IdempotencyService {
    */
   static async getOrCreateRequest(idempotency_key, request_data) {
     // 延迟加载模型，避免循环依赖
-    const { ApiIdempotencyRequest } = require('../models')
 
     const { api_path, http_method = 'POST', request_params, query, user_id } = request_data
 
@@ -1104,8 +1105,6 @@ class IdempotencyService {
    * @returns {Promise<void>} 无返回值
    */
   static async markAsCompleted(idempotency_key, business_event_id, response_data) {
-    const { ApiIdempotencyRequest } = require('../models')
-
     // 【决策6】使用脱敏和大小检查处理 response_snapshot
     const response_snapshot = this.prepareResponseSnapshot(
       response_data,
@@ -1142,8 +1141,6 @@ class IdempotencyService {
    * @returns {Promise<void>} 无返回值
    */
   static async markAsFailed(idempotency_key, error_message) {
-    const { ApiIdempotencyRequest } = require('../models')
-
     await ApiIdempotencyRequest.update(
       {
         status: 'failed',
@@ -1168,9 +1165,6 @@ class IdempotencyService {
    * @returns {Promise<Object>} { updated_count }
    */
   static async autoFailProcessingTimeout() {
-    const { ApiIdempotencyRequest } = require('../models')
-    const { Op } = require('sequelize')
-
     const timeoutThreshold = new Date()
     timeoutThreshold.setSeconds(timeoutThreshold.getSeconds() - PROCESSING_TIMEOUT_SECONDS)
 
@@ -1205,9 +1199,6 @@ class IdempotencyService {
    * @returns {Promise<Object>} { deleted_count }
    */
   static async cleanupExpired() {
-    const { ApiIdempotencyRequest } = require('../models')
-    const { Op } = require('sequelize')
-
     // 先处理超时的 processing
     await this.autoFailProcessingTimeout()
 
@@ -1233,8 +1224,6 @@ class IdempotencyService {
    * @returns {Promise<Object|null>} 请求记录或null
    */
   static async findByKey(idempotency_key) {
-    const { ApiIdempotencyRequest } = require('../models')
-
     return await ApiIdempotencyRequest.findOne({
       where: { idempotency_key }
     })
@@ -1247,8 +1236,6 @@ class IdempotencyService {
    * @returns {Promise<Object|null>} 请求记录或null
    */
   static async findByBusinessEventId(business_event_id) {
-    const { ApiIdempotencyRequest } = require('../models')
-
     return await ApiIdempotencyRequest.findOne({
       where: { business_event_id }
     })

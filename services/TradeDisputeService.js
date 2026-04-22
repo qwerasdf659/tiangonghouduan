@@ -20,6 +20,7 @@
 const logger = require('../utils/logger').logger
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 const { Op } = require('sequelize')
+const ApprovalChainService = require('./ApprovalChainService')
 
 /** 纠纷类型枚举 */
 const DISPUTE_TYPE = {
@@ -186,7 +187,6 @@ class TradeDisputeService {
     if (issue.approval_chain_instance_id) throw new Error('该纠纷已进入仲裁流程')
 
     // 尝试匹配审批链模板
-    const ApprovalChainService = require('./ApprovalChainService')
     const template = await ApprovalChainService.matchTemplate('trade_dispute', {
       dispute_type: issue.dispute_type,
       priority: issue.priority

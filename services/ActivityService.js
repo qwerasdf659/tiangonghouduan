@@ -38,6 +38,8 @@ const { AssetCode } = require('../constants/AssetCode')
 const { Op } = require('sequelize')
 const ActivityConditionValidator = require('./ActivityConditionValidator')
 const BeijingTimeHelper = require('../utils/timeHelper')
+const LotteryPricingService = require('./lottery/LotteryPricingService')
+const NotificationService = require('./NotificationService')
 
 /**
  * 活动管理服务类
@@ -181,7 +183,6 @@ class ActivityService {
           let base_cost = null
           let per_draw_cost = null
           try {
-            const LotteryPricingService = require('./lottery/LotteryPricingService')
             const pricing = await LotteryPricingService.getDrawPricing(
               1,
               activity.lottery_campaign_id
@@ -270,8 +271,6 @@ class ActivityService {
    * @throws {Error} 活动不存在
    */
   static async getConditionConfig(idOrCode) {
-    const { Op } = require('sequelize')
-
     // 查找活动（支持ID或代码）
     const activity = await models.LotteryCampaign.findOne({
       where: {
@@ -1137,7 +1136,6 @@ class ActivityService {
     // 6. 发送WebSocket通知（非阻塞，失败不影响主流程）
     let notificationResult = null
     try {
-      const NotificationService = require('./NotificationService')
       notificationResult = await NotificationService.notifyActivityStatusChange({
         campaign_code: campaign.campaign_code,
         campaign_name: campaign.campaign_name,

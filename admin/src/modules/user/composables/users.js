@@ -95,7 +95,7 @@ export function useUsersState() {
       user_nickname: '',
       mode: 'global',
       multiplier: 1.0,
-      target_prize_id: '',
+      lottery_prize_id: '',
       custom_probability: 0,
       duration: 60,
       reason: ''
@@ -595,7 +595,7 @@ export function useUsersMethods() {
         user_nickname: user.nickname || user.user_id || '',
         mode: 'global',
         multiplier: 1.0,
-        target_prize_id: '',
+        lottery_prize_id: '',
         custom_probability: 0,
         duration: 60,
         reason: ''

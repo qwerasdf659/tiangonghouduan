@@ -21,16 +21,7 @@ const express = require('express')
 const router = express.Router()
 const { authenticateToken } = require('../../../middleware/auth')
 const logger = require('../../../utils/logger').logger
-
-/**
- * 异步路由包装器 - 自动捕获 async/await 错误
- *
- * @param {Function} fn - 异步路由处理函数
- * @returns {Function} Express 中间件函数
- */
-const asyncHandler = fn => (req, res, next) => {
-  Promise.resolve(fn(req, res, next)).catch(next)
-}
+const { asyncHandler } = require('../../../middleware/validation')
 
 /** 广告位类型枚举（用于参数校验，与 models/AdSlot.js VALID_SLOT_TYPES 保持一致） */
 const VALID_SLOT_TYPES = ['popup', 'carousel', 'announcement', 'feed']

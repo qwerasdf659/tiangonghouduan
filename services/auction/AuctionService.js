@@ -32,6 +32,7 @@ const BalanceService = require('../asset/BalanceService')
 const ItemService = require('../asset/ItemService')
 const FeeCalculator = require('../FeeCalculator')
 const { Op } = require('sequelize')
+const AdminSystemService = require('../AdminSystemService')
 
 /**
  * 竞价资产硬编码黑名单（与 BidService 共享，决策1）
@@ -160,7 +161,6 @@ class AuctionService {
       throw new Error('结束时间必须晚于开始时间')
     }
     const durationHours = (endDate - startDate) / (1000 * 60 * 60)
-    const AdminSystemService = require('../AdminSystemService')
     const minDuration =
       Number(
         await AdminSystemService.getSettingValue('auction', 'auction_min_duration_hours', 2)

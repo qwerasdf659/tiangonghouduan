@@ -25,6 +25,7 @@
  */
 
 const { logger } = require('../../../../utils/logger')
+const { LotteryUserGlobalState, LotteryUserExperienceState } = require('../../../../models')
 
 /**
  * 全局状态管理器
@@ -49,7 +50,6 @@ class GlobalStateManager {
    */
   _getModel() {
     if (!this.model) {
-      const { LotteryUserGlobalState } = require('../../../../models')
       this.model = LotteryUserGlobalState
     }
     return this.model
@@ -266,7 +266,6 @@ class GlobalStateManager {
 
     try {
       // 延迟加载 LotteryUserExperienceState 模型
-      const { LotteryUserExperienceState } = require('../../../../models')
 
       const experience_state = await LotteryUserExperienceState.findOne({
         where: { user_id, lottery_campaign_id },

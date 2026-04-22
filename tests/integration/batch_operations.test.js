@@ -83,7 +83,7 @@ describe('批量操作功能测试', () => {
       expect(typeof res.body.data.batch_operation_log_id).toBe('number')
 
       // 验证业务结果
-      expect(res.body.data.total).toBe(1)
+      expect(res.body.data.total_count).toBe(1)
       expect(res.body.data.success_count).toBe(1)
       expect(res.body.data.fail_count).toBe(0)
       expect(res.body.data.success_rate).toBe(100)
@@ -146,7 +146,7 @@ describe('批量操作功能测试', () => {
         expect(firstLog.batch_operation_log_id).not.toBeNull()
         expect(firstLog.operation_type).toBeDefined()
         expect(firstLog.status).toBeDefined()
-        expect(firstLog.total).toBeDefined()
+        expect(firstLog.total_count).toBeDefined()
       }
 
       // 验证分页结构
@@ -226,7 +226,7 @@ describe('批量操作功能测试', () => {
 
       expect(res.body.success).toBe(true)
       expect(res.body.data.batch_operation_log_id).toBeDefined()
-      expect(res.body.data.total).toBe(1)
+      expect(res.body.data.total_count).toBe(1)
 
       // 如果活动是 pool 模式，应成功；否则记录 fail
       const resultItem =

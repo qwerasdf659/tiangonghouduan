@@ -26,17 +26,7 @@ const express = require('express')
 const router = express.Router()
 const { authenticateToken } = require('../../middleware/auth')
 const TransactionManager = require('../../utils/TransactionManager')
-
-/**
- * 异步路由处理器包装
- * @param {Function} fn - 异步路由处理函数
- * @returns {Function} Express 中间件
- */
-function asyncHandler(fn) {
-  return (req, res, next) => {
-    Promise.resolve(fn(req, res, next)).catch(next)
-  }
-}
+const { asyncHandler } = require('../../middleware/validation')
 
 // ==================== 模板接口（公开 + 认证） ====================
 
@@ -44,7 +34,7 @@ function asyncHandler(fn) {
 router.get(
   '/templates',
   asyncHandler(async (req, res) => {
-    const DIYService = require('../../services').getService('diy')
+    const DIYService = req.app.locals.services.getService('diy')
     const templates = await DIYService.getUserTemplates()
     return res.apiSuccess(templates, '获取模板列表成功')
   })
@@ -54,7 +44,7 @@ router.get(
 router.get(
   '/templates/:id',
   asyncHandler(async (req, res) => {
-    const DIYService = require('../../services').getService('diy')
+    const DIYService = req.app.locals.services.getService('diy')
     const template = await DIYService.getTemplateDetail(Number(req.params.id))
     return res.apiSuccess(template, '获取模板详情成功')
   })
@@ -64,7 +54,7 @@ router.get(
 router.get(
   '/templates/:id/beads',
   asyncHandler(async (req, res) => {
-    const DIYService = require('../../services').getService('diy')
+    const DIYService = req.app.locals.services.getService('diy')
     const materials = await DIYService.getUserMaterials(Number(req.params.id), req.query)
     return res.apiSuccess(materials, '获取珠子素材成功')
   })
@@ -80,7 +70,7 @@ router.get(
   '/templates/:id/payment-assets',
   authenticateToken,
   asyncHandler(async (req, res) => {
-    const DIYService = require('../../services').getService('diy')
+    const DIYService = req.app.locals.services.getService('diy')
     const accountId = await DIYService.getAccountIdByUserId(req.user.user_id)
     const assets = await DIYService.getPaymentAssets(Number(req.params.id), accountId)
     return res.apiSuccess(assets, '获取支付资产成功')
@@ -91,7 +81,7 @@ router.get(
 router.get(
   '/material-groups',
   asyncHandler(async (req, res) => {
-    const DIYService = require('../../services').getService('diy')
+    const DIYService = req.app.locals.services.getService('diy')
     const groups = await DIYService.getMaterialGroups()
     return res.apiSuccess(groups, '获取材料分组成功')
   })
@@ -105,7 +95,7 @@ router.use('/works', authenticateToken)
 router.use(
   '/works',
   asyncHandler(async (req, _res, next) => {
-    const DIYService = require('../../services').getService('diy')
+    const DIYService = req.app.locals.services.getService('diy')
     const accountId = await DIYService.getAccountIdByUserId(req.user.user_id)
     req.accountId = accountId // eslint-disable-line require-atomic-updates
     next()
@@ -116,7 +106,7 @@ router.use(
 router.get(
   '/works',
   asyncHandler(async (req, res) => {
-    const DIYService = require('../../services').getService('diy')
+    const DIYService = req.app.locals.services.getService('diy')
     const result = await DIYService.getWorkList(req.accountId, req.query)
     return res.apiSuccess(result, '获取作品列表成功')
   })
@@ -126,7 +116,7 @@ router.get(
 router.get(
   '/works/:id',
   asyncHandler(async (req, res) => {
-    const DIYService = require('../../services').getService('diy')
+    const DIYService = req.app.locals.services.getService('diy')
     const work = await DIYService.getWorkDetail(Number(req.params.id), req.accountId)
     return res.apiSuccess(work, '获取作品详情成功')
   })
@@ -136,7 +126,7 @@ router.get(
 router.post(
   '/works',
   asyncHandler(async (req, res) => {
-    const DIYService = require('../../services').getService('diy')
+    const DIYService = req.app.locals.services.getService('diy')
     let work
     await TransactionManager.execute(async transaction => {
       work = await DIYService.saveWork(req.accountId, req.body, { transaction })
@@ -149,7 +139,7 @@ router.post(
 router.delete(
   '/works/:id',
   asyncHandler(async (req, res) => {
-    const DIYService = require('../../services').getService('diy')
+    const DIYService = req.app.locals.services.getService('diy')
     await TransactionManager.execute(async transaction => {
       await DIYService.deleteWork(Number(req.params.id), req.accountId, { transaction })
     })
@@ -167,7 +157,7 @@ router.delete(
 router.post(
   '/works/:id/confirm',
   asyncHandler(async (req, res) => {
-    const DIYService = require('../../services').getService('diy')
+    const DIYService = req.app.locals.services.getService('diy')
     let work
     await TransactionManager.execute(async transaction => {
       work = await DIYService.confirmDesign(Number(req.params.id), req.accountId, {
@@ -192,7 +182,7 @@ router.post(
 router.post(
   '/works/:id/complete',
   asyncHandler(async (req, res) => {
-    const DIYService = require('../../services').getService('diy')
+    const DIYService = req.app.locals.services.getService('diy')
     let work
     await TransactionManager.execute(async transaction => {
       work = await DIYService.completeDesign(Number(req.params.id), req.accountId, {
@@ -209,7 +199,7 @@ router.post(
 router.post(
   '/works/:id/cancel',
   asyncHandler(async (req, res) => {
-    const DIYService = require('../../services').getService('diy')
+    const DIYService = req.app.locals.services.getService('diy')
     let work
     await TransactionManager.execute(async transaction => {
       work = await DIYService.cancelDesign(Number(req.params.id), req.accountId, {

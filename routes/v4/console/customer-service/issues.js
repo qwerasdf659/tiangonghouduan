@@ -21,6 +21,7 @@ const router = express.Router()
 const logger = require('../../../../utils/logger').logger
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const TransactionManager = require('../../../../utils/TransactionManager')
+const { handleServiceError } = require('../../../../middleware/validation')
 
 /* 所有路由需要后台访问权限 */
 router.use(authenticateToken, requireRoleLevel(1))
@@ -46,7 +47,7 @@ router.get('/', async (req, res) => {
     return res.apiSuccess(result, '获取工单列表成功')
   } catch (error) {
     logger.error('获取工单列表失败:', error)
-    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -96,7 +97,7 @@ router.post('/', async (req, res) => {
     return res.apiSuccess(result, '工单创建成功')
   } catch (error) {
     logger.error('创建工单失败:', error)
-    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -120,7 +121,7 @@ router.get('/:id', async (req, res) => {
     return res.apiSuccess(result, '获取工单详情成功')
   } catch (error) {
     logger.error('获取工单详情失败:', error)
-    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -154,7 +155,7 @@ router.put('/:id', async (req, res) => {
     return res.apiSuccess(result, '工单更新成功')
   } catch (error) {
     logger.error('更新工单失败:', error)
-    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -184,7 +185,7 @@ router.get('/:id/notes', async (req, res) => {
     return res.apiSuccess(result, '获取工单备注成功')
   } catch (error) {
     logger.error('获取工单备注失败:', error)
-    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -227,7 +228,7 @@ router.post('/:id/notes', async (req, res) => {
     return res.apiSuccess(result, '备注添加成功')
   } catch (error) {
     logger.error('添加工单备注失败:', error)
-    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 

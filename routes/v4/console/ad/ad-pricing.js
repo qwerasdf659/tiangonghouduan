@@ -39,8 +39,7 @@ router.get(
   '/config',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    const ServiceManager = require('../../../../services')
-    const AdminSystemService = ServiceManager.getService('admin_system')
+    const AdminSystemService = req.app.locals.services.getService('admin_system')
 
     const config = {}
     for (const key of PRICING_CONFIG_KEYS) {
@@ -69,9 +68,7 @@ router.put(
     if (config_value === undefined) {
       return res.apiError('缺少 config_value 参数', 'MISSING_PARAM', null, 400)
     }
-
-    const ServiceManager = require('../../../../services')
-    const AdminSystemService = ServiceManager.getService('admin_system')
+    const AdminSystemService = req.app.locals.services.getService('admin_system')
 
     await AdminSystemService.upsertConfig(config_key, config_value, {
       category: 'ad_pricing',
@@ -135,9 +132,7 @@ router.get(
     if (!ad_slot_id) {
       return res.apiError('缺少 ad_slot_id 参数', 'MISSING_PARAM', null, 400)
     }
-
-    const ServiceManager = require('../../../../services')
-    const AdPricingService = ServiceManager.getService('ad_pricing')
+    const AdPricingService = req.app.locals.services.getService('ad_pricing')
 
     const result = await AdPricingService.calculateFinalDailyPrice(
       parseInt(ad_slot_id),
@@ -156,8 +151,7 @@ router.get(
   '/current-coefficient',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    const ServiceManager = require('../../../../services')
-    const AdPricingService = ServiceManager.getService('ad_pricing')
+    const AdPricingService = req.app.locals.services.getService('ad_pricing')
 
     const result = await AdPricingService.getCurrentDauCoefficient()
     return res.apiSuccess(result, '当前 DAU 系数查询成功')
@@ -325,9 +319,7 @@ router.post(
       if (log.status !== 'confirmed') {
         throw new Error(`只有已确认的调价才能执行（当前状态：${log.status}）`)
       }
-
-      const ServiceManager = require('../../../../services')
-      const AdminSystemService = ServiceManager.getService('admin_system')
+      const AdminSystemService = req.app.locals.services.getService('admin_system')
 
       const currentTiers = await AdminSystemService.getConfigValue('ad_dau_coefficient_tiers', null)
       if (currentTiers && log.new_coefficient) {

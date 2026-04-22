@@ -32,7 +32,7 @@ router.post(
     try {
       const {
         user_id,
-        prize_id,
+        lottery_prize_id,
         reason = '管理员强制中奖',
         duration_minutes = null,
         lottery_campaign_id = null
@@ -40,7 +40,7 @@ router.post(
 
       // 参数验证
       const validatedUserId = validators.validateUserId(user_id)
-      const validatedPrizeId = validators.validatePrizeId(prize_id)
+      const validatedPrizeId = validators.validatePrizeId(lottery_prize_id)
       const validatedCampaignId = lottery_campaign_id ? parseInt(lottery_campaign_id, 10) : null
 
       // 计算过期时间（如果提供了持续时间）

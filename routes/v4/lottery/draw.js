@@ -32,11 +32,7 @@ const logger = require('../../../utils/logger').logger
 const { authenticateToken } = require('../../../middleware/auth')
 const dataAccessControl = require('../../../middleware/dataAccessControl')
 const { handleServiceError } = require('../../../middleware/validation')
-/*
- * P1-9：服务通过 ServiceManager 获取（B1-Injected + E2-Strict snake_case）
- * const DataSanitizer = require('../../../services/DataSanitizer')
- * const IdempotencyService = require('../../../services/IdempotencyService')
- */
+/* P1-9：服务通过 ServiceManager 获取 */
 const LotteryDrawFormatter = require('../../../utils/formatters/LotteryDrawFormatter')
 const { requestDeduplication, lotteryRateLimiter } = require('./middleware')
 // 事务边界治理（2026-01-05 决策）- 统一事务管理器

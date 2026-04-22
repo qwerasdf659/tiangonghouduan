@@ -14,17 +14,7 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
-
-/**
- * 异步路由处理器包装
- * @param {Function} fn - 异步路由处理函数
- * @returns {Function} Express 中间件
- */
-function asyncHandler(fn) {
-  return (req, res, next) => {
-    Promise.resolve(fn(req, res, next)).catch(next)
-  }
-}
+const { asyncHandler } = require('../../../../middleware/validation')
 
 router.use(authenticateToken, requireRoleLevel(60))
 
@@ -32,7 +22,7 @@ router.use(authenticateToken, requireRoleLevel(60))
 router.get(
   '/',
   asyncHandler(async (req, res) => {
-    const DIYService = require('../../../../services').getService('diy')
+    const DIYService = req.app.locals.services.getService('diy')
     const stats = await DIYService.getAdminStats()
     return res.apiSuccess(stats, '获取统计数据成功')
   })

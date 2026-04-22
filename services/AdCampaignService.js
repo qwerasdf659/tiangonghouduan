@@ -29,6 +29,7 @@ const {
 const BeijingTimeHelper = require('../utils/timeHelper')
 const { attachDisplayNames, DICT_TYPES } = require('../utils/displayNameHelper')
 const { v4: uuidv4 } = require('uuid')
+const AdBillingService = require('./AdBillingService')
 
 /**
  * 广告计划服务类
@@ -773,7 +774,6 @@ class AdCampaignService {
     try {
       const stats = await AdCampaignService.getStatistics()
 
-      const AdBillingService = require('./AdBillingService')
       const billingStats = await AdBillingService.getStatistics()
 
       return {
@@ -1170,7 +1170,6 @@ class AdCampaignService {
    * @returns {Promise<Object>} { notifications, statistics }
    */
   static async getSystemNotifications(options = {}) {
-    const { Op } = require('sequelize')
     const pageSize = Math.min(parseInt(options.limit) || 50, 100)
 
     const campaigns = await AdCampaign.findAll({

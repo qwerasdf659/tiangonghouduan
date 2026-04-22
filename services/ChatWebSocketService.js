@@ -16,6 +16,16 @@
  */
 const wsLogger = require('../utils/logger').logger
 const BeijingTimeHelper = require('../utils/timeHelper')
+const socketIO = require('socket.io')
+const {
+  WebSocketStartupLog,
+  AuthenticationSession,
+  ChatMessage,
+  CustomerServiceSession
+} = require('../models')
+const jwt = require('jsonwebtoken')
+const TransactionManager = require('../utils/TransactionManager')
+const os = require('os')
 
 /**
  * 聊天WebSocket服务类
@@ -61,8 +71,6 @@ class ChatWebSocketService {
       throw new Error('服务器实例不能为空')
     }
 
-    const socketIO = require('socket.io')
-
     // 初始化Socket.IO
     this.io = socketIO(server, {
       cors: {
@@ -100,8 +108,6 @@ class ChatWebSocketService {
      * 用途：提供服务运行时长、重启历史、SLA统计
      */
     try {
-      const { WebSocketStartupLog } = require('../models')
-
       const startupLog = await WebSocketStartupLog.recordStartup({
         ip: this.getServerIP(),
         hostname: require('os').hostname()
@@ -120,8 +126,6 @@ class ChatWebSocketService {
     }
 
     // 🔐 强制握手JWT鉴权 + 会话有效性检查（与REST API认证逻辑一致）
-    const jwt = require('jsonwebtoken')
-    const { AuthenticationSession } = require('../models')
     this.io.use(async (socket, next) => {
       const token = socket.handshake.auth?.token
 
@@ -340,8 +344,6 @@ class ChatWebSocketService {
             setImmediate(async () => {
               try {
                 const CustomerServiceSessionService = require('./CustomerServiceSessionService')
-                const TransactionManager = require('../utils/TransactionManager')
-
                 const result = await TransactionManager.execute(
                   async transaction => {
                     return await CustomerServiceSessionService.sendUserMessage(
@@ -787,7 +789,6 @@ class ChatWebSocketService {
    */
   async getStatus() {
     try {
-      const { WebSocketStartupLog } = require('../models')
       const currentLog = await WebSocketStartupLog.getCurrentRunning()
 
       /*
@@ -949,7 +950,6 @@ class ChatWebSocketService {
     try {
       // 记录服务停止事件到数据库
       if (this.currentStartupLogId) {
-        const { WebSocketStartupLog } = require('../models')
         await WebSocketStartupLog.recordStop(this.currentStartupLogId, {
           reason,
           peak_connections: this.connectedUsers.size + this.connectedAdmins.size,
@@ -1426,7 +1426,6 @@ class ChatWebSocketService {
    */
   getServerIP() {
     try {
-      const os = require('os')
       const interfaces = os.networkInterfaces()
       for (const name of Object.keys(interfaces)) {
         for (const iface of interfaces[name]) {
@@ -1484,8 +1483,6 @@ class ChatWebSocketService {
     }
 
     try {
-      const { ChatMessage, CustomerServiceSession } = require('../models')
-
       // 1. 查找用户的聊天会话
       const sessions = await CustomerServiceSession.findAll({
         where: { user_id },

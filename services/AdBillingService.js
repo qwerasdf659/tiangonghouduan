@@ -18,13 +18,14 @@
 
 const crypto = require('crypto')
 const logger = require('../utils/logger').logger
-const { AdBillingRecord, AdCampaign, AdSlot } = require('../models')
+const { AdBillingRecord, AdCampaign, AdSlot, sequelize } = require('../models')
 const { Op } = require('sequelize')
 const BeijingTimeHelper = require('../utils/timeHelper')
 const { v4: uuidv4 } = require('uuid')
 const BalanceService = require('./asset/BalanceService')
 const OrderNoGenerator = require('../utils/OrderNoGenerator')
 const { AssetCode } = require('../constants/AssetCode')
+const { getRedisClient } = require('../utils/UnifiedRedisClient')
 
 /* eslint-disable valid-jsdoc, require-jsdoc, no-restricted-syntax */
 async function balanceFreeze(payload, txn) {
@@ -357,8 +358,6 @@ class AdBillingService {
    * @returns {Promise<Object>} 处理结果统计
    */
   static async processDailyBidding(_options = {}) {
-    const { sequelize, AdSlot } = require('../models')
-
     try {
       const todayDate = BeijingTimeHelper.createBeijingTime()
       const today = todayDate.toISOString().split('T')[0]
@@ -674,7 +673,6 @@ class AdBillingService {
    */
   static async recordCPMImpression(campaignId, billingDate) {
     try {
-      const { getRedisClient } = require('../utils/UnifiedRedisClient')
       const rawRedis = getRedisClient().getClient()
       const key = `ad_cpm_count:${campaignId}:${billingDate}`
       const count = await rawRedis.incr(key)
@@ -699,12 +697,8 @@ class AdBillingService {
    * @returns {Promise<Object>} 结算结果统计
    */
   static async processDailyCPM() {
-    const { sequelize } = require('../models')
-
     try {
-      const { getRedisClient } = require('../utils/UnifiedRedisClient')
       const rawRedis = getRedisClient().getClient()
-      const BeijingTimeHelper = require('../utils/timeHelper')
 
       const yesterday = BeijingTimeHelper.daysAgo(1)
       const billingDate =

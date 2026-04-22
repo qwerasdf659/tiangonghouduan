@@ -1,5 +1,12 @@
 const logger = require('../../utils/logger').logger
 const BeijingTimeHelper = require('../../utils/timeHelper')
+const {
+  LotteryDrawQuotaRule,
+  UserRole,
+  Role,
+  LotteryUserDailyDrawQuota,
+  sequelize
+} = require('../../models')
 
 /**
  * 抽奖配额服务 - V4.0
@@ -83,8 +90,6 @@ class LotteryQuotaService {
    */
   static async getEffectiveDailyLimit({ user_id, lottery_campaign_id }) {
     try {
-      const { LotteryDrawQuotaRule, UserRole, Role } = require('../../models')
-
       /*
        * 获取用户角色UUID列表
        * 🔧 修复：使用正确的关联别名 'role'（小写，与 UserRole.js 中定义的一致）
@@ -143,8 +148,6 @@ class LotteryQuotaService {
    */
   static async ensureDailyQuota({ user_id, lottery_campaign_id }, options = {}) {
     try {
-      const { LotteryUserDailyDrawQuota, UserRole, Role } = require('../../models')
-
       /*
        * 获取用户角色UUID列表
        * 🔧 修复：使用正确的关联别名 'role'（小写，与 UserRole.js 中定义的一致）
@@ -219,8 +222,6 @@ class LotteryQuotaService {
     }
 
     try {
-      const { LotteryUserDailyDrawQuota } = require('../../models')
-
       // 确保配额行存在
       await this.ensureDailyQuota({ user_id, lottery_campaign_id }, { transaction })
 
@@ -271,8 +272,6 @@ class LotteryQuotaService {
    */
   static async getDailyQuotaStatus({ user_id, lottery_campaign_id }, options = {}) {
     try {
-      const { LotteryUserDailyDrawQuota } = require('../../models')
-
       const status = await LotteryUserDailyDrawQuota.getDailyQuotaStatus(
         {
           user_id,
@@ -304,8 +303,6 @@ class LotteryQuotaService {
     options = {}
   ) {
     try {
-      const { LotteryUserDailyDrawQuota } = require('../../models')
-
       const result = await LotteryUserDailyDrawQuota.addBonusDrawCount(
         {
           user_id,
@@ -435,8 +432,6 @@ class LotteryQuotaService {
     page = 1,
     page_size = 20
   }) {
-    const { LotteryDrawQuotaRule } = require('../../models')
-
     // 构建查询条件
     const whereClause = {}
 
@@ -497,8 +492,6 @@ class LotteryQuotaService {
    * @throws {Error} 404 - 规则不存在
    */
   static async getRuleById(ruleId) {
-    const { LotteryDrawQuotaRule } = require('../../models')
-
     if (!ruleId || isNaN(parseInt(ruleId))) {
       const error = new Error('缺少必填参数：rule_id')
       error.code = 'MISSING_RULE_ID'
@@ -546,8 +539,6 @@ class LotteryQuotaService {
     reason,
     created_by
   }) {
-    const { LotteryDrawQuotaRule } = require('../../models')
-
     // 优先级映射（user:100 > role:80 > campaign:50 > global:10）
     const priorityMap = {
       user: 100,
@@ -600,8 +591,6 @@ class LotteryQuotaService {
    * @throws {Error} 规则不存在或已禁用
    */
   static async disableRule({ rule_id, updated_by }) {
-    const { LotteryDrawQuotaRule } = require('../../models')
-
     const rule = await LotteryDrawQuotaRule.findByPk(rule_id)
 
     if (!rule) {
@@ -650,8 +639,6 @@ class LotteryQuotaService {
    * // }
    */
   static async getStatistics({ lottery_campaign_id } = {}) {
-    const { LotteryDrawQuotaRule, LotteryUserDailyDrawQuota, sequelize } = require('../../models')
-
     // 获取当日日期（北京时间，格式：YYYY-MM-DD）
     const today = BeijingTimeHelper.todayStart().toISOString().split('T')[0]
 

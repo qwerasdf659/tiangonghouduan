@@ -86,6 +86,7 @@ const {
 
 // 引用 target_type 规范化工具（P0-5 实施 - 2026-01-09）
 const { normalizeTargetType, isValidTargetType } = require('../constants/AuditTargetTypes')
+const { Op, fn, col, literal } = require('sequelize')
 
 /**
  * 审计日志服务类
@@ -829,8 +830,6 @@ class AuditLogService {
       sort_order = 'DESC'
     } = options
 
-    const { Op } = require('sequelize')
-
     logger.info('[审计日志] 管理员查询审计日志列表', {
       operator_id,
       operation_type,
@@ -1127,7 +1126,6 @@ class AuditLogService {
    */
   static async getAuditStatisticsEnhanced(filters = {}) {
     const { operator_id = null, start_date = null, end_date = null } = filters
-    const { Op } = require('sequelize')
 
     try {
       // 计算时间范围（北京时间）
@@ -1263,7 +1261,6 @@ class AuditLogService {
    * })
    */
   static async generateAuditReport(options = {}) {
-    const { Op, fn, col, literal } = require('sequelize')
     const { time_range = '7d', start_date, end_date, operator_id } = options
 
     logger.info('[审计报告] 开始生成审计报告', { time_range, start_date, end_date, operator_id })

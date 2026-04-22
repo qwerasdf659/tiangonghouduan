@@ -33,6 +33,7 @@
 const { BusinessCacheHelper, KEY_PREFIX } = require('../../utils/BusinessCacheHelper')
 const BeijingTimeHelper = require('../../utils/timeHelper')
 const logger = require('../../utils/logger').logger
+const PendingSummaryService = require('../dashboard/PendingSummaryService')
 
 /**
  * 健康度评分配置常量
@@ -103,7 +104,6 @@ class PendingHealthScoreService {
       }
 
       // 2. 获取待办汇总数据
-      const PendingSummaryService = require('../dashboard/PendingSummaryService')
       const pendingSummary = await PendingSummaryService.getPendingSummary()
 
       // 3. 计算健康度分数

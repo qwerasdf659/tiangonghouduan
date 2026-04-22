@@ -488,18 +488,25 @@ function validateUUID(paramName, source = 'params', options = {}) {
   }
 }
 
-module.exports = {
-  // 原有的验证中间件
-  validationMiddleware,
+/**
+ * 统一异步路由处理器包装 — 捕获 async handler 抛出的异常并交给 Express 错误中间件
+ * @param {Function} fn - async (req, res, next) => {}
+ * @returns {Function} Express 中间件
+ */
+function asyncHandler(fn) {
+  return (req, res, next) => {
+    Promise.resolve(fn(req, res, next)).catch(next)
+  }
+}
 
-  // 新增的验证辅助函数
+module.exports = {
+  validationMiddleware,
   validatePositiveInteger,
   validateEnumValue,
   validatePaginationParams,
   handleServiceError,
-
-  // API路径参数验证器（符合 API路径参数设计规范.md）
-  validateNumericId, // 事务实体 :id 验证
-  validateBusinessCode, // 配置实体 :code 验证
-  validateUUID // 外部实体 :uuid 验证
+  asyncHandler,
+  validateNumericId,
+  validateBusinessCode,
+  validateUUID
 }

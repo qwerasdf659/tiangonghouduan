@@ -22,6 +22,7 @@
 const { Op, fn, col } = require('sequelize')
 const logger = require('../../utils/logger').logger
 const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
+const { Account, AccountAssetBalance, Item, AssetTransaction } = require('../../models')
 
 /**
  * 缓存配置
@@ -56,8 +57,6 @@ class AssetPortfolioQueryService {
       logger.debug('用户资产组合概览命中缓存', { user_id, cacheKey })
       return cached
     }
-
-    const { Account, AccountAssetBalance, Item } = require('../../models')
 
     // 获取用户账户
     const account = await Account.findOne({
@@ -147,8 +146,6 @@ class AssetPortfolioQueryService {
       return cached
     }
 
-    const { AccountAssetBalance } = require('../../models')
-
     // 构建查询条件
     const where = { balance: { [Op.gt]: 0 } }
     if (asset_code) where.asset_code = asset_code
@@ -204,8 +201,6 @@ class AssetPortfolioQueryService {
    * @returns {Promise<Object>} 资产变动历史
    */
   static async getAssetTransactionHistory(user_id, options = {}) {
-    const { AssetTransaction, Account } = require('../../models')
-
     const { asset_code, start_date, end_date, page = 1, page_size = 20 } = options
 
     // 获取用户账户
@@ -265,8 +260,6 @@ class AssetPortfolioQueryService {
    * @returns {Promise<Object>} 物品持有分析
    */
   static async getItemHoldingAnalysis(user_id) {
-    const { Item, Account } = require('../../models')
-
     const account = await Account.findOne({
       where: { user_id: parseInt(user_id), account_type: 'user' },
       attributes: ['account_id']

@@ -75,7 +75,7 @@ export function useCampaignsState() {
       win_animation: 'simple',
       /** 活动背景图URL */
       background_image_url: null
-      // guarantee_enabled/threshold/prize_id 已迁移到策略开关页面管理
+      // guarantee_enabled/threshold/lottery_prize_id 已迁移到策略开关页面管理
     },
     /** @type {Array} 活动类型选项 */
     campaignTypeOptions: [

@@ -196,11 +196,11 @@ router.put(
   '/prize/:id',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    const prize_id = parseInt(req.params.id, 10)
+    const lotteryPrizeId = parseInt(req.params.id, 10)
     const updateData = req.body
 
     try {
-      if (!prize_id || isNaN(prize_id) || prize_id <= 0) {
+      if (!lotteryPrizeId || isNaN(lotteryPrizeId) || lotteryPrizeId <= 0) {
         return res.apiError('无效的奖品ID', 'INVALID_PRIZE_ID')
       }
 
@@ -213,7 +213,7 @@ router.put(
        */
       const result = await TransactionManager.execute(
         async transaction => {
-          return await PrizePoolService.updatePrize(prize_id, updateData, {
+          return await PrizePoolService.updatePrize(lotteryPrizeId, updateData, {
             updated_by: req.user?.user_id,
             transaction
           })
@@ -222,7 +222,7 @@ router.put(
       )
 
       sharedComponents.logger.info('奖品信息更新成功', {
-        prize_id,
+        lottery_prize_id: lotteryPrizeId,
         updated_fields: result.updated_fields,
         updated_by: req.user?.user_id
       })
@@ -237,10 +237,10 @@ router.put(
       ) {
         sharedComponents.logger.warn('奖品排序冲突', {
           error: error.message,
-          prize_id
+          lottery_prize_id: lotteryPrizeId
         })
         return res.apiError(error.message, 'SORT_ORDER_DUPLICATE', {
-          prize_id,
+          lottery_prize_id: lotteryPrizeId,
           suggestion: '该排序值已被同一活动的其他奖品使用，请使用不同的排序值'
         })
       }
@@ -465,11 +465,11 @@ router.put(
   '/prize/:id/stock',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    const prize_id = parseInt(req.params.id, 10)
+    const lotteryPrizeId = parseInt(req.params.id, 10)
     const { stock_quantity } = req.body
 
     try {
-      if (!prize_id || isNaN(prize_id)) {
+      if (!lotteryPrizeId || isNaN(lotteryPrizeId)) {
         return res.apiError('无效的奖品ID', 'INVALID_PRIZE_ID')
       }
       if (stock_quantity === undefined || stock_quantity === null) {
@@ -480,7 +480,7 @@ router.put(
 
       const result = await TransactionManager.execute(
         async transaction => {
-          return await PrizePoolService.setPrizeStock(prize_id, stock_quantity, {
+          return await PrizePoolService.setPrizeStock(lotteryPrizeId, stock_quantity, {
             operated_by: req.user?.user_id,
             transaction
           })

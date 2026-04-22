@@ -51,7 +51,9 @@
     "health:check": "node scripts/system/final_quality_check.js",
     "check:config-conflicts": "node scripts/check_config_conflicts.js",
     "check:validators": "node scripts/check_validators.js",
-    "check:prevention": "npm run check:config-conflicts && npm run check:validators",
+    "check:prevention": "npm run check:validators && npm run check:fields && npm run check:api-contract",
+    "check:fields": "node scripts/validation/check_field_blacklist.js",
+    "check:api-contract": "node scripts/validation/check_api_field_contract.js",
     "quality:check": "node scripts/system/final_quality_check.js",
     "quality:test-standards": "node tests/helpers/test-quality-reporter.js",
     "check:sequelize-init": "node scripts/validation/check_sequelize_initialization.js",
@@ -98,7 +100,8 @@
     "sealos:setup": "bash scripts/sealos/setup_sealos.sh",
     "check:env": "node -e \"require('./config/environment').validateConfig()\"",
     "check:config": "npm run check:env",
-    "cleanup:idempotency": "node scripts/maintenance/cleanup_expired_idempotency.js"
+    "cleanup:idempotency": "node scripts/maintenance/cleanup_expired_idempotency.js",
+    "lint:mappings": "node scripts/validation/check_field_blacklist.js"
   },
   "dependencies": {
     "aws-sdk": "^2.1691.0",

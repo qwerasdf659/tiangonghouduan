@@ -37,6 +37,7 @@
 const logger = require('../../utils/logger').logger
 const BeijingTimeHelper = require('../../utils/timeHelper')
 const { Op, fn, col, literal } = require('sequelize')
+const { CampaignAnalysisService, UserAnalysisService } = require('../lottery-analytics')
 
 /**
  * 健康度评分阈值配置
@@ -99,7 +100,6 @@ class LotteryHealthService {
    */
   get campaignAnalysisService() {
     if (!this._campaignAnalysisService) {
-      const { CampaignAnalysisService } = require('../lottery-analytics')
       this._campaignAnalysisService = new CampaignAnalysisService(this.models)
     }
     return this._campaignAnalysisService
@@ -122,7 +122,6 @@ class LotteryHealthService {
    */
   get userAnalysisService() {
     if (!this._userAnalysisService) {
-      const { UserAnalysisService } = require('../lottery-analytics')
       this._userAnalysisService = new UserAnalysisService(this.models)
     }
     return this._userAnalysisService

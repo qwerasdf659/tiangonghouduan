@@ -34,6 +34,7 @@
 
 const { Op, fn, col, literal } = require('sequelize')
 const models = require('../../models')
+const { ConsumptionRecord, LotteryDraw, User } = models
 const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
 const BeijingTimeHelper = require('../../utils/timeHelper')
 const logger = require('../../utils/logger').logger
@@ -1037,7 +1038,6 @@ class MultiDimensionStatsService {
    * @returns {Promise<Object>} 统计数据
    */
   static async _getPeriodStats(startTime, endTime, metrics) {
-    const { ConsumptionRecord, LotteryDraw, User } = require('../../models')
     const stats = {}
 
     try {

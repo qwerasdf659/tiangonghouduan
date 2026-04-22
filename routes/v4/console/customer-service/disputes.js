@@ -10,6 +10,7 @@ const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const TransactionManager = require('../../../../utils/TransactionManager')
 const logger = require('../../../../utils/logger').logger
+const { handleServiceError } = require('../../../../middleware/validation')
 
 /**
  * 获取纠纷列表
@@ -31,7 +32,7 @@ router.get('/', authenticateToken, requireRoleLevel(1), async (req, res) => {
     return res.apiSuccess(result, '获取纠纷列表成功')
   } catch (error) {
     logger.error('获取纠纷列表失败', { error: error.message })
-    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -46,7 +47,7 @@ router.get('/stats', authenticateToken, requireRoleLevel(1), async (req, res) =>
     return res.apiSuccess(stats, '获取纠纷统计成功')
   } catch (error) {
     logger.error('获取纠纷统计失败', { error: error.message })
-    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -64,7 +65,7 @@ router.get('/:id', authenticateToken, requireRoleLevel(1), async (req, res) => {
     if (error.message.includes('不存在')) {
       return res.apiError(error.message, 'NOT_FOUND', null, 404)
     }
-    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -113,7 +114,7 @@ router.post('/', authenticateToken, requireRoleLevel(50), async (req, res) => {
     if (error.message.includes('已有进行中')) {
       return res.apiError(error.message, 'CONFLICT', null, 409)
     }
-    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -139,7 +140,7 @@ router.post('/:id/escalate', authenticateToken, requireRoleLevel(100), async (re
     return res.apiSuccess(result, '纠纷已升级为仲裁')
   } catch (error) {
     logger.error('升级仲裁失败', { error: error.message })
-    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -170,7 +171,7 @@ router.post('/:id/resolve', authenticateToken, requireRoleLevel(50), async (req,
     return res.apiSuccess(result, refund ? '纠纷已解决（已退款）' : '纠纷已解决')
   } catch (error) {
     logger.error('解决纠纷失败', { error: error.message })
-    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 

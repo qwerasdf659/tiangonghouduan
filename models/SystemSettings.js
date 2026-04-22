@@ -1,7 +1,7 @@
 /**
  * 系统设置模型
  *
- * 业务场景：存储系统各模块的配置设置（基础设置、抽奖设置、积分设置、通知设置、安全设置）
+ * 业务场景：存储系统各模块的配置设置
  * 数据库表：system_settings
  *
  * 核心功能：
@@ -10,9 +10,15 @@
  * 3. 积分系统规则配置（抽奖消耗、积分有效期、预算分配比例等）
  * 4. 通知系统设置（短信、邮件、站内信开关及模板）
  * 5. 安全策略配置（登录限制、密码规则、API限流等）
+ * 6. 广告定价配置（DAU系数、折扣阶梯、动态底价等）
+ * 7. 市场交易配置（挂单资产白名单、手续费率、价格区间等）
+ * 8. 兑换系统配置（退款审批阈值、冷却期、月度限额等）
+ * 9. 客服系统配置（快捷回复模板等）
+ * 10. 批量操作配置（并发数、频率限制等）
  *
  * 数据结构：
- * - 使用category字段分类（basic/lottery/points/notification/security）
+ * - 使用category字段分类（ad_pricing/ad_system/auction/backpack/basic/batch_operation/
+ *   customer_service/exchange/feature/general/marketplace/notification/points/redemption/security）
  * - 使用setting_key存储具体配置项名称
  * - 使用setting_value存储配置值（支持字符串、数字、JSON）
  * - 使用value_type标识数据类型（string/number/boolean/json）

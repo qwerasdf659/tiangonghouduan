@@ -29,6 +29,8 @@
  */
 
 const { logger } = require('../../../../utils/logger')
+const { LotteryCampaign, LotteryDraw, LotteryPrize, sequelize } = require('../../../../models')
+const { Op } = require('sequelize')
 
 /**
  * 压力分层（Pressure Tier）等级常量
@@ -235,8 +237,6 @@ class PressureTierCalculator {
 
     try {
       // 延迟加载模型避免循环依赖
-      const { LotteryCampaign, LotteryDraw, LotteryPrize } = require('../../../../models')
-      const { Op } = require('sequelize')
 
       // 获取活动配置
       const campaign_record = await LotteryCampaign.findByPk(lottery_campaign_id, {
@@ -254,7 +254,6 @@ class PressureTierCalculator {
        * 与 BuildPrizePoolStage/SettleStage 的 budget_cost 口径一致
        * pvp（prize_value_points）仅管分层阈值，不参与消耗统计
        */
-      const { sequelize } = require('../../../../models')
       const consumed_result = await LotteryDraw.findOne({
         attributes: [
           [

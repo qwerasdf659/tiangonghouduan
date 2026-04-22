@@ -30,6 +30,7 @@ const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const TransactionManager = require('../../../../utils/TransactionManager')
 const logger = require('../../../../utils/logger').logger
+const { asyncHandler } = require('../../../../middleware/validation')
 
 /**
  * 获取 UserDataQueryService（通过 ServiceManager 统一入口）
@@ -47,17 +48,6 @@ function getService(req) {
  */
 function getModels(req) {
   return req.app.locals.services.models
-}
-
-/**
- * 异步路由处理器包装
- * @param {Function} fn - 异步处理函数
- * @returns {Function} Express 中间件
- */
-function asyncHandler(fn) {
-  return (req, res, next) => {
-    Promise.resolve(fn(req, res, next)).catch(next)
-  }
 }
 
 /* 所有接口均需管理员权限（role_level >= 100） */

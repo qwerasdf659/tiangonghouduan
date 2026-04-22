@@ -20,11 +20,7 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
-/*
- * P1-9：服务通过 ServiceManager 获取（B1-Injected + E2-Strict snake_case）
- * const ContentAuditEngine = require('../../../../services/ContentAuditEngine')
- * const MerchantPointsService = require('../../../../services/MerchantPointsService')
- */
+/* P1-9：服务通过 ServiceManager 获取 */
 const TransactionManager = require('../../../../utils/TransactionManager')
 const { logger } = require('../../../../utils/logger')
 

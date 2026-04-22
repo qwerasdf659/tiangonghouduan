@@ -737,7 +737,7 @@ function registerLotteryManagementComponents() {
   Alpine.data('prizesDataTable', () => {
     const t = dataTable({
       columns: [
-        { key: 'prize_id', label: '奖品ID', sortable: true },
+        { key: 'lottery_prize_id', label: '奖品ID', sortable: true },
         { key: 'prize_name', label: '奖品名称', sortable: true },
         { key: 'tier', label: '等级', render: (v, r) => r.tier_display || v || '-' },
         {
@@ -759,7 +759,7 @@ function registerLotteryManagementComponents() {
           total: r.data?.pagination?.total || 0
         }
       },
-      primaryKey: 'prize_id',
+      primaryKey: 'lottery_prize_id',
       page_size: 20
     })
     const o = t.init

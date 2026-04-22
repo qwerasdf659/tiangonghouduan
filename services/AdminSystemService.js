@@ -130,6 +130,7 @@ const {
   isForbidden,
   validateSettingValue
 } = require('../config/system-settings-whitelist')
+const { getRedisClient, getRawClient } = require('../utils/UnifiedRedisClient')
 
 /**
  * 业务缓存助手（2026-01-03 Redis L2 缓存方案）
@@ -1097,7 +1098,6 @@ class AdminSystemService {
    */
   static async _getConfigFromCache(setting_key) {
     try {
-      const { getRedisClient } = require('../utils/UnifiedRedisClient')
       const redis = getRedisClient()
       if (!redis) return null
       const cached = await redis.get(this._getConfigCacheKey(setting_key))
@@ -1117,7 +1117,6 @@ class AdminSystemService {
    */
   static async _setConfigToCache(setting_key, value, ttl = 300) {
     try {
-      const { getRedisClient } = require('../utils/UnifiedRedisClient')
       const redis = getRedisClient()
       if (!redis) return
       await redis.set(this._getConfigCacheKey(setting_key), JSON.stringify(value), 'EX', ttl)
@@ -1134,7 +1133,6 @@ class AdminSystemService {
    */
   static async _clearConfigCache(setting_key) {
     try {
-      const { getRedisClient } = require('../utils/UnifiedRedisClient')
       const redis = getRedisClient()
       if (!redis) return
       await redis.del(this._getConfigCacheKey(setting_key))
@@ -1332,7 +1330,6 @@ class AdminSystemService {
    */
   static async clearCache(pattern = '*') {
     try {
-      const { getRawClient } = require('../utils/UnifiedRedisClient')
       const rawClient = getRawClient()
 
       let clearedCount = 0

@@ -81,7 +81,7 @@ class DataSanitizer {
    * @param {Array<Object>} prizes - 奖品数据数组（来自 lottery_prizes 表的 Sequelize 查询结果）
    * @param {string} dataLevel - 数据级别：'full'（管理员完整数据）或'public'（普通用户脱敏数据）
    * @returns {Array<Object>} 脱敏后的奖品数组（字段名与 lottery_prizes 表一致）
-   * @returns {number} return[].prize_id - 奖品ID（剥离 lottery_ 模块前缀，源自 lottery_prize_id）
+   * @returns {number} return[].lottery_prize_id - 奖品ID（数据库真实主键，不做映射）
    * @returns {number} return[].lottery_campaign_id - 关联活动ID
    * @returns {string} return[].prize_name - 奖品名称
    * @returns {string} return[].prize_type - 奖品类型（points/coupon/physical/virtual/service/product/special）
@@ -122,10 +122,6 @@ class DataSanitizer {
       const rawPrimaryMedia = prize.primary_media || plain.primary_media
       const rawMaterial = prize.materialAssetType || plain.materialAssetType
       const sanitized = { ...plain }
-
-      // 主键统一（决策 A：剥离 lottery_ 模块前缀）
-      sanitized.prize_id = sanitized.lottery_prize_id
-      delete sanitized.lottery_prize_id
 
       // 图片处理：仅 primary_media（MediaFile）
       if (rawPrimaryMedia && typeof rawPrimaryMedia.toSafeJSON === 'function') {
@@ -570,14 +566,14 @@ class DataSanitizer {
    *
    * γ 模式职责：
    * - 接收 MarketListingQueryService 已转换的 V4 格式数据
-   * - 主键统一：market_listing_id → listing_id（剥离 market_ 模块前缀）
+   * - 主键保留原样输出：market_listing_id 不再映射为 listing_id
    * - PII 脱敏：seller_nickname 经 maskUserName() 处理
    * - 删除内部字段：locked_by_order_id、seller_contact 等
    *
    * @param {Array<Object>} listings - 挂单数据数组（来自 MarketListingQueryService）
    * @param {string} dataLevel - 数据级别：'full'（管理员）或 'public'（普通用户）
    * @returns {Array<Object>} 脱敏后的挂单数组
-   * @returns {number} return[].listing_id - 挂单ID（剥离 market_ 前缀）
+   * @returns {number} return[].market_listing_id - 挂单ID（数据库真实主键，不做映射）
    * @returns {string} return[].listing_kind - 挂单类型（item/fungible_asset）
    * @returns {number} return[].seller_user_id - 卖家用户ID
    * @returns {string} return[].seller_nickname - 卖家昵称（经 maskUserName 脱敏）
@@ -595,10 +591,6 @@ class DataSanitizer {
      */
     return listings.map(listing => {
       const sanitized = { ...(listing.toJSON ? listing.toJSON() : listing) }
-
-      // 主键统一（剥离 market_ 模块前缀）
-      sanitized.listing_id = sanitized.market_listing_id
-      delete sanitized.market_listing_id
 
       // PII 脱敏：卖家昵称（保留首尾字符，中间用 * 替代）
       sanitized.seller_nickname = this.maskUserName(

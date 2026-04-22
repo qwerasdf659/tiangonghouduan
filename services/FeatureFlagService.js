@@ -24,6 +24,8 @@ const { getRedisClient, isRedisHealthy } = require('../utils/UnifiedRedisClient'
 const { OPERATION_TYPES } = require('../constants/AuditOperationTypes')
 const crypto = require('crypto')
 const { attachDisplayNames, DICT_TYPES } = require('../utils/displayNameHelper')
+const { FeatureFlag, User } = require('../models')
+const AuditLogService = require('./AuditLogService')
 
 // Redis 缓存 Key 前缀
 const CACHE_PREFIX = 'feature_flag'
@@ -40,7 +42,6 @@ class FeatureFlagService {
    * @returns {Object} FeatureFlag 模型
    */
   static getModel() {
-    const { FeatureFlag } = require('../models')
     return FeatureFlag
   }
 
@@ -49,7 +50,6 @@ class FeatureFlagService {
    * @returns {Object} User 模型
    */
   static getUserModel() {
-    const { User } = require('../models')
     return User
   }
 
@@ -58,7 +58,6 @@ class FeatureFlagService {
    * @returns {Object} 审计日志服务（使用 AuditLogService.logOperation 方法）
    */
   static getAuditService() {
-    const AuditLogService = require('./AuditLogService')
     return AuditLogService
   }
 

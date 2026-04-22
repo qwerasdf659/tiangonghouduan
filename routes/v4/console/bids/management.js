@@ -34,21 +34,9 @@ const express = require('express')
 const router = express.Router()
 const { AssetCode } = require('../../../../constants/AssetCode')
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
-const { handleServiceError } = require('../../../../middleware/validation')
+const { handleServiceError, asyncHandler } = require('../../../../middleware/validation')
 const TransactionManager = require('../../../../utils/TransactionManager')
 const logger = require('../../../../utils/logger').logger
-
-/**
- * 错误处理包装器
- *
- * @param {Function} fn - 异步处理函数
- * @returns {Function} 包装后的中间件函数
- */
-function asyncHandler(fn) {
-  return (req, res, next) => {
-    Promise.resolve(fn(req, res, next)).catch(next)
-  }
-}
 
 // ==================== 所有路由需要管理员权限（role_level >= 100）====================
 

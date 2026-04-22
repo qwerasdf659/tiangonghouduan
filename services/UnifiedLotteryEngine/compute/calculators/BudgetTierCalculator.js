@@ -27,6 +27,8 @@
  */
 
 const { logger } = require('../../../../utils/logger')
+const QueryService = require('../../../asset/QueryService')
+const { LotteryCampaign } = require('../../../../models')
 
 /**
  * 预算分层（Budget Tier）等级常量
@@ -191,8 +193,6 @@ class BudgetTierCalculator {
     }
 
     // V4.7.0 AssetService 拆分：延迟加载 QueryService 和 LotteryCampaign 避免循环依赖
-    const QueryService = require('../../../asset/QueryService')
-    const { LotteryCampaign } = require('../../../../models')
 
     let user_budget = 0
     let pool_budget = 0

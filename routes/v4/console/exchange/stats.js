@@ -13,6 +13,7 @@ const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const logger = require('../../../../utils/logger').logger
+const { handleServiceError } = require('../../../../middleware/validation')
 
 /**
  * GET / - 兑换市场统计数据（Admin Only）
@@ -39,7 +40,7 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
       error: error.message,
       admin_id: req.user?.user_id
     })
-    return res.apiError(error.message || '查询统计数据失败', 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 

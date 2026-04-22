@@ -28,11 +28,7 @@ const { AssetCode } = require('../../../constants/AssetCode')
 const { authenticateToken } = require('../../../middleware/auth')
 const { validatePositiveInteger, handleServiceError } = require('../../../middleware/validation')
 const logger = require('../../../utils/logger').logger
-/*
- * 决策7：路由层不直连 models，通过 Service 层操作
- * P1-9：服务通过 ServiceManager 获取（B1-Injected + E2-Strict snake_case）
- * const MarketListingService = require('../../../services/MarketListingService')
- */
+/* 决策7：路由层不直连 models，服务通过 ServiceManager 获取 */
 
 /**
  * @route GET /api/v4/marketplace/listings

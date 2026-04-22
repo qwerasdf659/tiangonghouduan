@@ -162,16 +162,8 @@ const adminAuthMiddleware = [authenticateToken, requireRoleLevel(100)]
  */
 const adminOpsAuthMiddleware = [authenticateToken, requireRoleLevel(PERMISSION_LEVELS.OPS)]
 
-/**
- * 错误处理包装器
- * @param {Function} fn 异步处理函数
- * @returns {Function} 包装后的中间件函数
- */
-function asyncHandler(fn) {
-  return (req, res, next) => {
-    Promise.resolve(fn(req, res, next)).catch(next)
-  }
-}
+// 统一使用 middleware/validation 的 asyncHandler（消除本地重复定义）
+const { asyncHandler } = require('../../../../middleware/validation')
 
 /**
  * 参数验证工具集合

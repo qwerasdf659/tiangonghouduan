@@ -30,6 +30,7 @@ const ContentAuditEngine = require('./ContentAuditEngine')
 const BeijingTimeHelper = require('../utils/timeHelper')
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 const { logger } = require('../utils/logger')
+const { Sequelize } = require('sequelize')
 
 /**
  * 商家积分申请服务
@@ -413,8 +414,6 @@ class MerchantPointsService {
    * @returns {Promise<Object>} 统计信息
    */
   static async getUserApplicationStats(userId) {
-    const { Sequelize } = require('sequelize')
-
     const stats = await ContentReviewRecord.findAll({
       where: {
         auditable_type: 'merchant_points',

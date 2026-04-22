@@ -121,6 +121,19 @@ module.exports = sequelize => {
         allowNull: true,
         defaultValue: null,
         comment: '用户个性化最大上架数量限制（NULL=使用全局默认值）'
+      },
+
+      /**
+       * 微信小程序 openid（7.20 拍板：微信静默登录）
+       * wx.login → code → 后端调 jscode2session → 获取 openid
+       * 首次绑定后，后续打开小程序可直接静默登录，无需再输手机号
+       */
+      wx_openid: {
+        type: DataTypes.STRING(64),
+        allowNull: true,
+        unique: true,
+        defaultValue: null,
+        comment: '微信小程序 openid，用于静默登录'
       }
     },
     {

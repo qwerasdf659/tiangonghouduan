@@ -25,6 +25,7 @@
 
 const {
   LotteryCampaign,
+  LotteryCampaignPricingConfig,
   LotteryPrize,
   LotteryStrategyConfig,
   LotteryDrawQuotaRule
@@ -33,6 +34,7 @@ const logger = require('../../../utils/logger').logger
 const { assertAndGetTransaction } = require('../../../utils/transactionHelpers')
 const { BusinessCacheHelper } = require('../../../utils/BusinessCacheHelper')
 const CampaignCodeGenerator = require('../../../utils/CampaignCodeGenerator')
+const AdminSystemService = require('../../AdminSystemService')
 
 /**
  * 抽奖活动 CRUD 服务类
@@ -161,7 +163,6 @@ class LotteryCampaignCRUDService {
 
     // ✅ 自动生成默认策略配置（13策略活动级开关：创建即完整，每活动30条配置）
     try {
-      const { LotteryStrategyConfig } = require('../../../models')
       const STRATEGY_DEFAULTS = [
         { group: 'anti_empty', key: 'enabled', value: true, type: 'boolean', desc: '防连空开关' },
         {
@@ -313,14 +314,14 @@ class LotteryCampaignCRUDService {
         },
         {
           group: 'guarantee',
-          key: 'prize_id',
+          key: 'lottery_prize_id',
           value: null,
           type: 'number',
           desc: '保底指定奖品ID（null=自动选最高档）'
         },
         {
           group: 'tier_fallback',
-          key: 'prize_id',
+          key: 'lottery_prize_id',
           value: null,
           type: 'number',
           desc: '档位降级兜底奖品ID'
@@ -366,8 +367,6 @@ class LotteryCampaignCRUDService {
 
     // ✅ 自动生成默认定价配置（决策 3：创建即可用，运营可后续修改）
     try {
-      const AdminSystemService = require('../../AdminSystemService')
-      const { LotteryCampaignPricingConfig } = require('../../../models')
 
       // 从 system_settings 读取全局单抽成本（运营可动态调整，非硬编码）
       let defaultBaseCost
@@ -992,9 +991,8 @@ class LotteryCampaignCRUDService {
    */
   static async toggleFeatured(lottery_campaign_id, is_featured, options = {}) {
     const { transaction } = options
-    const models = require('../../../models')
 
-    const campaign = await models.LotteryCampaign.findByPk(lottery_campaign_id, { transaction })
+    const campaign = await LotteryCampaign.findByPk(lottery_campaign_id, { transaction })
     if (!campaign) {
       const err = new Error('活动不存在')
       err.statusCode = 404
@@ -1016,9 +1014,8 @@ class LotteryCampaignCRUDService {
    */
   static async toggleHidden(lottery_campaign_id, is_hidden, options = {}) {
     const { transaction } = options
-    const models = require('../../../models')
 
-    const campaign = await models.LotteryCampaign.findByPk(lottery_campaign_id, { transaction })
+    const campaign = await LotteryCampaign.findByPk(lottery_campaign_id, { transaction })
     if (!campaign) {
       const err = new Error('活动不存在')
       err.statusCode = 404
@@ -1046,9 +1043,8 @@ class LotteryCampaignCRUDService {
    */
   static async updateDisplayConfig(lottery_campaign_id, displayConfig, options = {}) {
     const { transaction } = options
-    const models = require('../../../models')
 
-    const campaign = await models.LotteryCampaign.findByPk(lottery_campaign_id, { transaction })
+    const campaign = await LotteryCampaign.findByPk(lottery_campaign_id, { transaction })
     if (!campaign) {
       const err = new Error('活动不存在')
       err.statusCode = 404
@@ -1084,7 +1080,6 @@ class LotteryCampaignCRUDService {
    */
   static async batchSort(items, options = {}) {
     const { transaction } = options
-    const models = require('../../../models')
 
     if (!Array.isArray(items) || items.length === 0) {
       const err = new Error('排序数据不能为空')
@@ -1095,7 +1090,7 @@ class LotteryCampaignCRUDService {
     let updated = 0
     for (const { lottery_campaign_id, sort_order } of items) {
       if (!lottery_campaign_id || sort_order === undefined) continue
-      const [count] = await models.LotteryCampaign.update(
+      const [count] = await LotteryCampaign.update(
         { sort_order: parseInt(sort_order) },
         { where: { lottery_campaign_id }, transaction }
       )

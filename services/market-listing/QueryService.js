@@ -12,6 +12,7 @@
  * @module services/market-listing/QueryService
  */
 
+const models = require('../../models')
 const {
   MarketListing,
   Item,
@@ -22,7 +23,7 @@ const {
   MediaFile,
   User,
   sequelize
-} = require('../../models')
+} = models
 const { Op } = sequelize.Sequelize
 const { AssetCode } = require('../../constants/AssetCode')
 const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
@@ -30,6 +31,7 @@ const logger = require('../../utils/logger').logger
 const { attachDisplayNames, DICT_TYPES } = require('../../utils/displayNameHelper')
 const { getImageUrl } = require('../../utils/ImageUrlHelper')
 const { categoryIconAttachmentInclude } = require('../../utils/mediaAttachmentGallery')
+const AdminSystemService = require('../AdminSystemService')
 
 /**
  * 市场挂牌查询服务类
@@ -576,7 +578,6 @@ class MarketListingQueryService {
   static async getFilterFacets(options = {}) {
     const { include_disabled = false } = options
 
-    const models = require('../../models')
     const { Category, RarityDef, AssetGroupDef, MediaAttachment, MediaFile } = models
 
     // 1. 查询物品类目列表（图标通过 media_attachments 多态关联获取）
@@ -691,8 +692,6 @@ class MarketListingQueryService {
    * @returns {Promise<Object[]>} 结算币种列表 [{asset_code, display_name}]
    */
   static async getSettlementCurrencies() {
-    const AdminSystemService = require('../AdminSystemService')
-
     const whitelist = await AdminSystemService.getSettingValue(
       'marketplace',
       'allowed_settlement_assets',

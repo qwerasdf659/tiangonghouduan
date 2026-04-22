@@ -144,6 +144,16 @@ const DrawOrchestrator = require('./pipeline/DrawOrchestrator')
 /** 抽奖定价服务 - 统一定价计算入口 */
 const LotteryPricingService = require('../lottery/LotteryPricingService')
 
+const {
+  generateLotterySessionId,
+  deriveTransactionIdempotencyKey,
+  generateRequestIdempotencyKey
+} = require('../../utils/IdempotencyHelper')
+const models = require('../../models')
+const { Sequelize } = require('sequelize')
+const BalanceService = require('../asset/BalanceService')
+const LotteryQuotaService = require('../lottery/LotteryQuotaService')
+
 /**
  * V4统一抽奖引擎核心类
  *
@@ -678,7 +688,6 @@ class UnifiedLotteryEngine {
    */
   generateExecutionId() {
     // 使用 IdempotencyHelper 生成标准的 lottery_session_id
-    const { generateLotterySessionId } = require('../../utils/IdempotencyHelper')
     return generateLotterySessionId()
   }
 
@@ -795,13 +804,7 @@ class UnifiedLotteryEngine {
    */
   async execute_draw(user_id, lottery_campaign_id, draw_count = 1, options = {}) {
     // 方案B：从请求参数获取或生成幂等键
-    const {
-      generateLotterySessionId,
-      deriveTransactionIdempotencyKey
-    } = require('../../utils/IdempotencyHelper')
-    const requestIdempotencyKey =
-      options.idempotency_key ||
-      require('../../utils/IdempotencyHelper').generateRequestIdempotencyKey()
+    const requestIdempotencyKey = options.idempotency_key || generateRequestIdempotencyKey()
     const lotterySessionId = generateLotterySessionId()
 
     /*
@@ -817,8 +820,6 @@ class UnifiedLotteryEngine {
      * - 确保保底计数的准确性（如果失败，保底计数自动回滚）
      * - 符合"路由层统一开事务"的架构规范
      */
-    const models = require('../../models')
-    const { Sequelize } = require('sequelize')
 
     // 判断是否使用外部事务
     const externalTransaction = options.transaction
@@ -846,7 +847,6 @@ class UnifiedLotteryEngine {
       }
 
       // 🔧 V4.3修复：使用新的资产系统获取用户积分信息
-      const BalanceService = require('../asset/BalanceService')
       const userAccountEntity = await BalanceService.getOrCreateAccount(
         { user_id },
         { transaction }
@@ -921,7 +921,6 @@ class UnifiedLotteryEngine {
        * 2. 原子扣减配额（UPDATE ... WHERE 条件扣减）
        * 3. 如果配额不足，返回 403 错误（整笔拒绝，不支持部分成功）
        */
-      const LotteryQuotaService = require('../lottery/LotteryQuotaService')
 
       // 原子扣减配额（事务内执行，支持连抽）
       const quotaResult = await LotteryQuotaService.tryDeductQuota(

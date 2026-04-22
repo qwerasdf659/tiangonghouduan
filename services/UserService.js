@@ -32,6 +32,7 @@ const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 
 // 引用中文显示名称辅助函数（V4.7 中文化显示名称系统 - 2026-01-22）
 const { attachDisplayNames, DICT_TYPES } = require('../utils/displayNameHelper')
+const { getUserRoles } = require('../middleware/auth')
 
 /**
  * 用户服务类
@@ -525,7 +526,6 @@ class UserService {
       }
 
       // 步骤4: 后台访问权限检查（role_level > 0 即可登录后台，菜单按权限过滤）
-      const { getUserRoles } = require('../middleware/auth')
       const userRoles = await getUserRoles(user.user_id)
 
       if (userRoles.role_level <= 0) {

@@ -16,7 +16,6 @@
 
 const express = require('express')
 const router = express.Router()
-const ServiceManager = require('../../../../services')
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const logger = require('../../../../utils/logger')
 
@@ -37,7 +36,7 @@ const logger = require('../../../../utils/logger')
  */
 router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const reportService = ServiceManager.getService('custom_report')
+    const reportService = req.app.locals.services.getService('custom_report')
     const { template_type, data_source, is_system, is_enabled, page, page_size } = req.query
 
     const result = await reportService.getTemplateList({
@@ -63,7 +62,7 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
  */
 router.get('/data-sources', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const reportService = ServiceManager.getService('custom_report')
+    const reportService = req.app.locals.services.getService('custom_report')
     const dataSources = reportService.getAvailableDataSources()
 
     return res.apiSuccess(dataSources, '获取数据源列表成功')
@@ -80,7 +79,7 @@ router.get('/data-sources', authenticateToken, requireRoleLevel(100), async (req
  */
 router.get('/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const reportService = ServiceManager.getService('custom_report')
+    const reportService = req.app.locals.services.getService('custom_report')
     const templateId = parseInt(req.params.id, 10)
 
     if (!templateId || isNaN(templateId)) {
@@ -113,7 +112,7 @@ router.get('/:id', authenticateToken, requireRoleLevel(100), async (req, res) =>
  */
 router.post('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const reportService = ServiceManager.getService('custom_report')
+    const reportService = req.app.locals.services.getService('custom_report')
     const { name, data_source, description, query_config, display_config } = req.body
 
     // 参数验证
@@ -155,7 +154,7 @@ router.post('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
  */
 router.put('/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const reportService = ServiceManager.getService('custom_report')
+    const reportService = req.app.locals.services.getService('custom_report')
     const templateId = parseInt(req.params.id, 10)
 
     if (!templateId || isNaN(templateId)) {
@@ -189,7 +188,7 @@ router.put('/:id', authenticateToken, requireRoleLevel(100), async (req, res) =>
  */
 router.delete('/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const reportService = ServiceManager.getService('custom_report')
+    const reportService = req.app.locals.services.getService('custom_report')
     const templateId = parseInt(req.params.id, 10)
 
     if (!templateId || isNaN(templateId)) {
@@ -230,7 +229,7 @@ router.delete('/:id', authenticateToken, requireRoleLevel(100), async (req, res)
  */
 router.post('/:id/generate', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const reportService = ServiceManager.getService('custom_report')
+    const reportService = req.app.locals.services.getService('custom_report')
     const templateId = parseInt(req.params.id, 10)
 
     if (!templateId || isNaN(templateId)) {
@@ -268,7 +267,7 @@ router.post('/:id/generate', authenticateToken, requireRoleLevel(100), async (re
  */
 router.post('/:id/preview', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const reportService = ServiceManager.getService('custom_report')
+    const reportService = req.app.locals.services.getService('custom_report')
     const templateId = parseInt(req.params.id, 10)
 
     if (!templateId || isNaN(templateId)) {
@@ -306,7 +305,7 @@ router.post('/:id/preview', authenticateToken, requireRoleLevel(100), async (req
  */
 router.post('/:id/export', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const reportService = ServiceManager.getService('custom_report')
+    const reportService = req.app.locals.services.getService('custom_report')
     const templateId = parseInt(req.params.id, 10)
 
     if (!templateId || isNaN(templateId)) {

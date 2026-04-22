@@ -385,7 +385,7 @@ export function usePrizesMethods() {
           // 中奖概率：前端表单是百分比(0-100)，后端需要小数(0-1)
           const winProbability = (this.prizeForm.win_probability || 0) / 100
           const url = buildURL(LOTTERY_ENDPOINTS.PRIZE_UPDATE, {
-            prize_id: this.editingLotteryPrizeId
+            lottery_prize_id: this.editingLotteryPrizeId
           })
           const updateData = {
             prize_name: this.prizeForm.prize_name,
@@ -855,7 +855,7 @@ export function usePrizesMethods() {
         if (this.isEditMode) {
           const winProbability = (this.prizeForm.win_probability || 0) / 100
           const url = buildURL(LOTTERY_ENDPOINTS.PRIZE_UPDATE, {
-            prize_id: this.editingLotteryPrizeId
+            lottery_prize_id: this.editingLotteryPrizeId
           })
           const updateData = {
             prize_name: this.prizeForm.prize_name,

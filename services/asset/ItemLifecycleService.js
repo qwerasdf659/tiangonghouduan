@@ -20,6 +20,16 @@
 const logger = require('../../utils/logger')
 const TrackingCodeGenerator = require('../../utils/TrackingCodeGenerator')
 const BeijingTimeHelper = require('../../utils/timeHelper')
+const {
+  Item,
+  ItemLedger,
+  ItemHold,
+  Account,
+  LotteryDraw,
+  sequelize,
+  MaterialAssetType
+} = require('../../models')
+const BalanceService = require('./BalanceService')
 
 /**
  * 物品全链路追踪服务
@@ -38,7 +48,6 @@ class ItemLifecycleService {
    */
   static async getItemLifecycle(identifier, options = {}) {
     const { transaction } = options
-    const { Item, ItemLedger, ItemHold, Account, LotteryDraw } = require('../../models')
 
     const resolved = TrackingCodeGenerator.resolveIdentifier(identifier)
 
@@ -107,8 +116,6 @@ class ItemLifecycleService {
    * @returns {Promise<Object>} 对账结果
    */
   static async reconcileItems() {
-    const { sequelize } = require('../../models')
-
     // 物品守恒：SUM(delta) GROUP BY item_id 是否全为 0
     const [imbalanced] = await sequelize.query(`
       SELECT item_id, SUM(delta) AS balance
@@ -197,8 +204,6 @@ class ItemLifecycleService {
    * @returns {Promise<Object>} 对账结果
    */
   static async reconcileAssets() {
-    const { sequelize } = require('../../models')
-
     // 全局守恒：SUM(delta_amount) GROUP BY asset_code 是否全为 0
     const [globalCheck] = await sequelize.query(`
       SELECT asset_code, SUM(delta_amount) AS total_delta
@@ -207,7 +212,6 @@ class ItemLifecycleService {
     `)
 
     // 查询资产代码的中文显示名称
-    const { MaterialAssetType } = require('../../models')
     const assetTypes = await MaterialAssetType.findAll({
       attributes: ['asset_code', 'display_name'],
       raw: true
@@ -263,8 +267,6 @@ class ItemLifecycleService {
    */
   static async getUserItemTimeline(userId, itemId, options = {}) {
     const { transaction } = options
-    const { Item, ItemLedger } = require('../../models')
-    const BalanceService = require('./BalanceService')
 
     const userAccount = await BalanceService.getOrCreateAccount(
       { user_id: userId },

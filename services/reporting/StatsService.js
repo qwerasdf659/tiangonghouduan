@@ -26,6 +26,7 @@
 
 const BeijingTimeHelper = require('../../utils/timeHelper')
 const DataSanitizer = require('../DataSanitizer')
+const os = require('os')
 // V4.7.0 AssetService 拆分：使用子服务替代原 AssetService
 const BalanceService = require('../asset/BalanceService')
 const { AssetCode } = require('../../constants/AssetCode')
@@ -418,8 +419,6 @@ class StatsService {
    * @returns {Promise<Object>} 简化的系统统计数据
    */
   static async getSimpleSystemStats() {
-    const os = require('os')
-
     try {
       const today = BeijingTimeHelper.createBeijingTime()
       const todayStart = new Date(today.setHours(0, 0, 0, 0))

@@ -25,6 +25,14 @@ const { Op } = require('sequelize')
 const { BusinessCacheHelper, DEFAULT_TTL, KEY_PREFIX } = require('../../utils/BusinessCacheHelper')
 const BeijingTimeHelper = require('../../utils/timeHelper')
 const logger = require('../../utils/logger').logger
+const {
+  ConsumptionRecord,
+  CustomerServiceSession,
+  RedemptionOrder,
+  Feedback,
+  AdCampaign
+} = require('../../models')
+const LotteryAlertService = require('../lottery/LotteryAlertService')
 
 /**
  * 缓存 Key
@@ -141,7 +149,6 @@ class NavBadgeService {
    */
   static async _getConsumptionCount() {
     try {
-      const { ConsumptionRecord } = require('../../models')
       const count = await ConsumptionRecord.scope('pending').count()
       return count
     } catch (error) {
@@ -158,7 +165,6 @@ class NavBadgeService {
    */
   static async _getCustomerServiceCount() {
     try {
-      const { CustomerServiceSession } = require('../../models')
       const count = await CustomerServiceSession.count({
         where: {
           status: { [Op.in]: ['waiting', 'assigned', 'active'] }
@@ -179,7 +185,6 @@ class NavBadgeService {
    */
   static async _getRiskAlertCount() {
     try {
-      const LotteryAlertService = require('../lottery/LotteryAlertService')
       const result = await LotteryAlertService.getAlertList({
         type: 'user',
         status: 'active',
@@ -200,7 +205,6 @@ class NavBadgeService {
    */
   static async _getLotteryAlertCount() {
     try {
-      const LotteryAlertService = require('../lottery/LotteryAlertService')
       const result = await LotteryAlertService.getAlertList({
         status: 'active',
         limit: 100
@@ -221,7 +225,6 @@ class NavBadgeService {
    */
   static async _getRedemptionPendingCount() {
     try {
-      const { RedemptionOrder } = require('../../models')
       const count = await RedemptionOrder.count({
         where: { status: 'pending' }
       })
@@ -240,7 +243,6 @@ class NavBadgeService {
    */
   static async _getFeedbackPendingCount() {
     try {
-      const { Feedback } = require('../../models')
       const count = await Feedback.count({
         where: { status: 'pending' }
       })
@@ -259,7 +261,6 @@ class NavBadgeService {
    */
   static async _getAdPendingReviewCount() {
     try {
-      const { AdCampaign } = require('../../models')
       const count = await AdCampaign.count({
         where: { status: 'pending_review' }
       })

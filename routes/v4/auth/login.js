@@ -613,4 +613,157 @@ router.post('/quick-login', async (req, res) => {
   return res.apiSuccess(responseData, message)
 })
 
+/**
+ * 微信静默登录（wx.login → code → openid）
+ *
+ * POST /api/v4/auth/wx-code-login
+ *
+ * 对应文档决策：7.20
+ * 流程：
+ * 1. 小程序调 wx.login 拿到 code
+ * 2. 后端用 WX_APPID + WX_SECRET 调微信 jscode2session 换 openid
+ * 3. 查 users.wx_openid：存在 → 直接登录；不存在 → 返回 NEED_BIND_MOBILE
+ * 4. 首次绑定：小程序调 wx.getPhoneNumber → decrypt-phone → quick-login（同步回写 openid）
+ *
+ * @param {string} wx_code - 微信登录凭证（wx.login 获取）
+ */
+router.post('/wx-code-login', async (req, res) => {
+  const { wx_code } = req.body
+
+  if (!wx_code) {
+    return res.apiError('缺少 wx_code 参数', 'INVALID_PARAMS', null, 400)
+  }
+
+  try {
+    const axios = require('axios')
+    const appId = process.env.WX_APPID
+    const appSecret = process.env.WX_SECRET
+
+    if (!appId || !appSecret) {
+      logger.error('❌ 微信小程序配置缺失：WX_APPID 或 WX_SECRET 未配置')
+      return res.apiError('微信登录服务暂不可用', 'WX_CONFIG_MISSING', null, 500)
+    }
+
+    // 调用微信 jscode2session 接口
+    const wxUrl = `https://api.weixin.qq.com/sns/jscode2session?appid=${appId}&secret=${appSecret}&js_code=${wx_code}&grant_type=authorization_code`
+    const wxRes = await axios.get(wxUrl, { timeout: 5000 })
+
+    if (wxRes.data.errcode) {
+      logger.warn('⚠️ 微信 jscode2session 失败:', {
+        errcode: wxRes.data.errcode,
+        errmsg: wxRes.data.errmsg
+      })
+      return res.apiError('微信登录凭证无效', 'WX_CODE_INVALID', null, 400)
+    }
+
+    const { openid } = wxRes.data
+    if (!openid) {
+      return res.apiError('未获取到微信 openid', 'WX_OPENID_MISSING', null, 500)
+    }
+
+    // 查找已绑定 openid 的用户
+    const { User } = require('../../../models')
+    const user = await User.findOne({ where: { wx_openid: openid } })
+
+    if (!user) {
+      // 用户未绑定，需要先绑定手机号
+      return res.apiSuccess(
+        {
+          need_bind: true,
+          openid,
+          timestamp: BeijingTimeHelper.apiTimestamp()
+        },
+        '需要绑定手机号'
+      )
+    }
+
+    // 已绑定用户，直接登录
+    const userRoles = await getUserRoles(user.user_id)
+    const userType = userRoles.maxRoleLevel >= 100 ? 'admin' : 'user'
+    const loginPlatform = 'wechat_mp'
+
+    const result = await TransactionManager.execute(async transaction => {
+      // 更新登录信息
+      await user.update(
+        {
+          last_login: new Date(),
+          login_count: (user.login_count || 0) + 1,
+          last_active_at: new Date()
+        },
+        { transaction }
+      )
+
+      // 创建会话
+      const { AuthenticationSession } = require('../../../models')
+      const sessionToken = uuidv4()
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+
+      // 使旧会话失效（同 user_type + 同 platform 互斥）
+      await AuthenticationSession.update(
+        { is_active: false },
+        {
+          where: {
+            user_id: user.user_id,
+            user_type: userType,
+            login_platform: loginPlatform,
+            is_active: true
+          },
+          transaction
+        }
+      )
+
+      await AuthenticationSession.create(
+        {
+          user_id: user.user_id,
+          session_token: sessionToken,
+          user_type: userType,
+          login_platform: loginPlatform,
+          is_active: true,
+          expires_at: expiresAt,
+          ip_address: req.ip,
+          user_agent: req.get('User-Agent')
+        },
+        { transaction }
+      )
+
+      // 生成 JWT
+      const tokens = generateTokens({
+        user_id: user.user_id,
+        user_uuid: user.user_uuid,
+        mobile: user.mobile,
+        session_token: sessionToken,
+        user_type: userType,
+        roles: userRoles.roles
+      })
+
+      return { tokens, sessionToken }
+    })
+
+    logger.info(`✅ 微信静默登录成功 (user_id: ${user.user_id})`)
+
+    return res.apiSuccess(
+      {
+        need_bind: false,
+        access_token: result.tokens.accessToken,
+        refresh_token: result.tokens.refreshToken,
+        user: {
+          user_id: user.user_id,
+          user_uuid: user.user_uuid,
+          nickname: user.nickname,
+          mobile: user.mobile,
+          user_level: user.user_level,
+          roles: userRoles.roles,
+          status: user.status
+        },
+        expires_in: 7 * 24 * 60 * 60,
+        timestamp: BeijingTimeHelper.apiTimestamp()
+      },
+      '微信静默登录成功'
+    )
+  } catch (error) {
+    logger.error('❌ 微信静默登录失败:', { error: error.message })
+    return res.apiError('微信登录失败', 'WX_LOGIN_FAILED', null, 500)
+  }
+})
+
 module.exports = router

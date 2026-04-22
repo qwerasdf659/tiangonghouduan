@@ -25,8 +25,6 @@ const router = express.Router()
 const logger = require('../../../../utils/logger').logger
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const { handleServiceError } = require('../../../../middleware/validation')
-const ServiceManager = require('../../../../services')
-
 // 所有路由强制管理员权限（role_level >= 100）
 router.use(authenticateToken, requireRoleLevel(100))
 
@@ -133,7 +131,7 @@ function validatePlacements(placements) {
  */
 router.get('/', async (req, res) => {
   try {
-    const AdminSystemService = ServiceManager.getService('admin_system')
+    const AdminSystemService = req.app.locals.services.getService('admin_system')
     const configData = await AdminSystemService.getConfigValue('campaign_placement')
 
     if (!configData) {
@@ -175,7 +173,7 @@ router.put('/', async (req, res) => {
       )
     }
 
-    const AdminSystemService = ServiceManager.getService('admin_system')
+    const AdminSystemService = req.app.locals.services.getService('admin_system')
 
     await AdminSystemService.upsertConfig(
       'campaign_placement',

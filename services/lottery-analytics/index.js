@@ -30,7 +30,7 @@ const StatisticsService = require('./StatisticsService')
 const ReportService = require('./ReportService')
 const UserAnalysisService = require('./UserAnalysisService')
 const CampaignAnalysisService = require('./CampaignAnalysisService')
-const StrategySimulationService = require('./StrategySimulationService')
+const StrategySimulationService = require('./simulation')
 
 module.exports = {
   RealtimeService,

@@ -26,6 +26,7 @@ const {
   Account,
   Merchant,
   MaterialAssetType,
+  ItemTemplate,
   RedemptionOrder,
   sequelize
 } = require('../models')
@@ -34,6 +35,7 @@ const { AssetCode } = require('../constants/AssetCode')
 const { attachDisplayNames } = require('../utils/displayNameHelper')
 
 const logger = require('../utils/logger').logger
+const AdminSystemService = require('./AdminSystemService')
 
 /**
  * allowed_actions 配置缓存
@@ -266,7 +268,6 @@ class BackpackService {
         !_actionRulesCacheHolder.value ||
         now - _actionRulesCacheHolder.time > ACTION_RULES_CACHE_TTL
       ) {
-        const AdminSystemService = require('./AdminSystemService')
         const freshRules = await AdminSystemService.getConfigValue('item_type_action_rules', {})
         _actionRulesCacheHolder.value = freshRules // eslint-disable-line require-atomic-updates
         _actionRulesCacheHolder.time = Date.now() // eslint-disable-line require-atomic-updates
@@ -344,7 +345,6 @@ class BackpackService {
         !_actionRulesCacheHolder.value ||
         detailNow - _actionRulesCacheHolder.time > ACTION_RULES_CACHE_TTL
       ) {
-        const AdminSystemService = require('./AdminSystemService')
         const freshRules = await AdminSystemService.getConfigValue('item_type_action_rules', {})
         _actionRulesCacheHolder.value = freshRules // eslint-disable-line require-atomic-updates
         _actionRulesCacheHolder.time = Date.now() // eslint-disable-line require-atomic-updates
@@ -452,9 +452,6 @@ class BackpackService {
    */
   static async getUseInstructions(item) {
     if (!item) return null
-
-    const { ItemTemplate } = require('../models')
-    const AdminSystemService = require('./AdminSystemService')
 
     const instructionsConfig = await AdminSystemService.getConfigValue(
       'backpack_use_instructions',

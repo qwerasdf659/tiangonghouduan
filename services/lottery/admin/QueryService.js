@@ -16,6 +16,7 @@
 const models = require('../../../models')
 const { attachDisplayNames, DICT_TYPES } = require('../../../utils/displayNameHelper')
 const _logger = require('../../../utils/logger').logger
+const { Op } = require('sequelize')
 
 /**
  * 管理后台抽奖干预规则查询服务类
@@ -36,7 +37,6 @@ class AdminLotteryQueryService {
    * @returns {Promise<Object>} 干预规则列表和分页信息
    */
   static async getInterventionList(query = {}) {
-    const { Op } = require('sequelize')
     const { page = 1, page_size = 20, status, user_search, setting_type } = query
 
     const where = {}
@@ -354,7 +354,6 @@ class AdminLotteryQueryService {
    * @returns {Promise<{ draws: Object[], pagination: Object }>}
    */
   static async getDrawRecordsList(query = {}) {
-    const { Op } = require('sequelize')
     const {
       page = 1,
       page_size = 20,

@@ -33,6 +33,8 @@ const { Sequelize } = require('sequelize')
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 const { Op } = Sequelize
 const businessConfig = require('../config/business.config')
+const ChatRateLimitService = require('./ChatRateLimitService')
+const chatWsInstance = require('./ChatWebSocketService')
 
 /*
  * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -88,7 +90,6 @@ function checkSensitiveWords(content) {
  * ✅ P2-F架构重构：统一使用 ChatRateLimitService 管理所有频率限制逻辑
  * 移除重复代码，避免多处维护同一逻辑
  */
-const ChatRateLimitService = require('./ChatRateLimitService')
 
 /**
  * 客服会话服务类
@@ -1505,7 +1506,6 @@ class CustomerServiceSessionService {
     }
 
     /* ChatWebSocketService 导出的是单例实例（非类），直接调用实例方法 */
-    const chatWsInstance = require('./ChatWebSocketService')
 
     let pushed = false
     if (chatWsInstance && chatWsInstance.pushMessageToUser) {

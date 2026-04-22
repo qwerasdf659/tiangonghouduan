@@ -35,6 +35,8 @@ const { logger } = require('../../utils/logger')
 const BeijingTimeHelper = require('../../utils/timeHelper')
 const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
 const { attachDisplayNames, DICT_TYPES } = require('../../utils/displayNameHelper')
+const models = require('../../models')
+const LotteryPricingService = require('../lottery/LotteryPricingService')
 
 /**
  * 抽奖查询服务类 - 静态服务模式
@@ -60,8 +62,6 @@ class LotteryQueryService {
    */
   static async getCampaignPrizes(lottery_campaign_id) {
     try {
-      const models = require('../../models')
-
       const prizes = await models.LotteryPrize.findAll({
         where: {
           lottery_campaign_id,
@@ -150,8 +150,6 @@ class LotteryQueryService {
         }
       }
 
-      const models = require('../../models')
-
       const campaign = await models.LotteryCampaign.findOne({
         where: { lottery_campaign_id },
         attributes: [
@@ -220,7 +218,6 @@ class LotteryQueryService {
    */
   static async getUserHistory(user_id, options = {}) {
     try {
-      const models = require('../../models')
       const { page = 1, limit = 20, lottery_campaign_id } = options
 
       const offset = (page - 1) * limit
@@ -333,7 +330,6 @@ class LotteryQueryService {
    */
   static async getActiveCampaigns(options = {}) {
     try {
-      const models = require('../../models')
       const { status = 'active', user_id } = options
 
       // ========== 缓存策略：无 user_id 时使用缓存 ==========
@@ -358,7 +354,6 @@ class LotteryQueryService {
       whereClause.is_hidden = 0
 
       const now = new Date()
-      const { Op } = require('sequelize')
       whereClause[Op.and] = [
         {
           [Op.or]: [{ display_start_time: null }, { display_start_time: { [Op.lte]: now } }]
@@ -438,7 +433,6 @@ class LotteryQueryService {
       })
 
       // ========== 批量补充定价信息（LotteryPricingService 有 60s Redis 缓存，性能安全）==========
-      const LotteryPricingService = require('../lottery/LotteryPricingService')
 
       const result = await Promise.all(
         campaigns.map(async campaign => {
@@ -529,8 +523,6 @@ class LotteryQueryService {
    */
   static async getUserStatistics(user_id) {
     try {
-      const models = require('../../models')
-
       // 第1次查询：统计总抽奖次数
       const totalDraws = await models.LotteryDraw.count({
         where: { user_id }
@@ -686,8 +678,6 @@ class LotteryQueryService {
     const { checkStatus = true, refresh = false } = options
 
     try {
-      const models = require('../../models')
-
       // ========== 缓存策略 ==========
       const cacheKey = `lottery:campaigns:code:${campaign_code}`
       const CACHE_TTL = 60 // 60秒 TTL

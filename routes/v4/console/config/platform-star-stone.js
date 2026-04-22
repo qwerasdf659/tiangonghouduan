@@ -216,7 +216,7 @@ router.post(
       )
     }
 
-    const BalanceService = require('../../../../services/asset/BalanceService')
+    const BalanceService = req.app.locals.services.getService('asset_balance')
     const TransactionManager = require('../../../../utils/TransactionManager')
 
     const result = await TransactionManager.execute(async transaction => {

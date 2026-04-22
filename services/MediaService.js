@@ -16,10 +16,13 @@
 
 const crypto = require('crypto')
 const sharp = require('sharp')
-const { Op } = require('sequelize')
+const { Op, QueryTypes } = require('sequelize')
 const { sequelize } = require('../config/database')
 const { getImageUrl } = require('../utils/ImageUrlHelper')
 const _logger = require('../utils/logger').logger
+const BeijingTimeHelper = require('../utils/timeHelper')
+const { MediaFile, MediaAttachment } = require('../models')
+const models = require('../models')
 
 /** 业务表 primary_media_id 映射（attach role='primary' 时自动更新） */
 const PRIMARY_MEDIA_TABLES = {
@@ -127,8 +130,6 @@ class MediaService {
 
     // 1. 计算 content_hash（SHA-256）— 基于处理后的 buffer
     const contentHash = crypto.createHash('sha256').update(processedBuffer).digest('hex')
-
-    const { MediaFile } = require('../models')
 
     // 2. 检查重复（按 content_hash）
     const existing = await MediaFile.findOne({
@@ -241,8 +242,6 @@ class MediaService {
     meta = null,
     transaction = null
   ) {
-    const { MediaFile, MediaAttachment } = require('../models')
-    const models = require('../models')
     const opts = transaction ? { transaction } : {}
 
     const media = await MediaFile.findByPk(mediaId, opts)
@@ -298,8 +297,6 @@ class MediaService {
    * @returns {Promise<number>} 删除的 attachment 数量
    */
   async detach(attachableType, attachableId, role = null, transaction = null) {
-    const { MediaAttachment, MediaFile } = require('../models')
-    const models = require('../models')
     const opts = transaction ? { transaction } : {}
 
     const where = {
@@ -359,8 +356,6 @@ class MediaService {
    * @returns {Promise<Array>} 媒体列表
    */
   async getMediaForEntity(attachableType, attachableId, role = null) {
-    const { MediaAttachment, MediaFile } = require('../models')
-
     const where = {
       attachable_type: attachableType,
       attachable_id: attachableId
@@ -447,7 +442,6 @@ class MediaService {
    * @returns {Promise<Object>} { items, pagination, stats }
    */
   async listMedia(filters = {}, pagination = {}) {
-    const { MediaFile } = require('../models')
     const page = Math.max(1, parseInt(pagination.page, 10) || 1)
     const pageSize = Math.min(100, Math.max(1, parseInt(pagination.page_size, 10) || 24))
 
@@ -521,7 +515,6 @@ class MediaService {
    * @returns {Promise<Object|null>} 媒体详情
    */
   async getMediaById(mediaId) {
-    const { MediaFile, MediaAttachment } = require('../models')
     const media = await MediaFile.findByPk(mediaId, {
       include: [{ model: MediaAttachment, as: 'attachments', required: false }]
     })
@@ -556,7 +549,6 @@ class MediaService {
    * @returns {Promise<boolean>} 是否成功
    */
   async moveToTrash(mediaId) {
-    const { MediaFile } = require('../models')
     const [affected] = await MediaFile.update(
       { status: 'trashed', trashed_at: new Date() },
       { where: { media_id: mediaId, status: { [Op.ne]: 'trashed' } } }
@@ -571,7 +563,6 @@ class MediaService {
    * @returns {Promise<boolean>} 是否成功
    */
   async restore(mediaId) {
-    const { MediaFile } = require('../models')
     const [affected] = await MediaFile.update(
       { status: 'active', trashed_at: null },
       { where: { media_id: mediaId, status: 'trashed' } }
@@ -589,7 +580,6 @@ class MediaService {
    * @returns {Promise<boolean>} 是否成功
    */
   async updateMetadata(mediaId, updates = {}) {
-    const { MediaFile } = require('../models')
     const toUpdate = {}
     if (updates.tags !== undefined) {
       toUpdate.tags = Array.isArray(updates.tags)
@@ -614,7 +604,6 @@ class MediaService {
    * @returns {Promise<number>} 删除的 attachment 数量
    */
   async detachMediaFromEntity(mediaId, attachableType, attachableId, role = null) {
-    const { MediaAttachment, MediaFile } = require('../models')
     const where = {
       media_id: mediaId,
       attachable_type: attachableType,
@@ -643,7 +632,6 @@ class MediaService {
    * @returns {Promise<Array>} 孤立的 media_files
    */
   async getOrphanedMedia(olderThanHours = 24) {
-    const { MediaFile, MediaAttachment } = require('../models')
     const threshold = new Date(Date.now() - olderThanHours * 60 * 60 * 1000)
 
     const attachedMediaIds = await MediaAttachment.findAll({
@@ -671,7 +659,6 @@ class MediaService {
    * @returns {Promise<Object>} { cleaned_count, failed_count, total_found, details, timestamp }
    */
   async cleanupOrphanedMedia(olderThanHours = 24) {
-    const BeijingTimeHelper = require('../utils/timeHelper')
     const orphans = await this.getOrphanedMedia(olderThanHours)
 
     if (orphans.length === 0) {
@@ -685,7 +672,7 @@ class MediaService {
     }
 
     const storage = this._getStorageService()
-    const { MediaFile } = require('../models')
+
     let cleanedCount = 0
     let failedCount = 0
     const details = []
@@ -725,8 +712,6 @@ class MediaService {
    * @returns {Promise<Object>} { cleaned_count, failed_count, details }
    */
   async cleanup(olderThanDays = 7) {
-    const { MediaFile } = require('../models')
-    const BeijingTimeHelper = require('../utils/timeHelper')
     const threshold = new Date(Date.now() - olderThanDays * 24 * 60 * 60 * 1000)
 
     const trashed = await MediaFile.findAll({
@@ -771,8 +756,6 @@ class MediaService {
    * @returns {Promise<Array>} 文件夹统计列表
    */
   async getStorageOverview() {
-    const { MediaFile } = require('../models')
-    const { QueryTypes } = require('sequelize')
     const rows = await MediaFile.sequelize.query(
       `
       SELECT folder, COUNT(*) as file_count, COALESCE(SUM(file_size), 0) as total_size
@@ -797,7 +780,6 @@ class MediaService {
    * @returns {Promise<Object>} { items, pagination }
    */
   async getTrashList(pagination = {}) {
-    const { MediaFile } = require('../models')
     const page = Math.max(1, parseInt(pagination.page, 10) || 1)
     const pageSize = Math.min(100, Math.max(1, parseInt(pagination.page_size, 10) || 24))
 
@@ -842,8 +824,6 @@ class MediaService {
    * @returns {Promise<Array>} 重复组列表
    */
   async getDuplicates() {
-    const { MediaFile } = require('../models')
-    const { QueryTypes } = require('sequelize')
     const rows = await MediaFile.sequelize.query(
       `
       SELECT content_hash, COUNT(*) as cnt, GROUP_CONCAT(media_id) as media_ids

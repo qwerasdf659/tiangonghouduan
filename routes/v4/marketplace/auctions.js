@@ -38,23 +38,13 @@ const router = express.Router()
 const { AssetCode } = require('../../../constants/AssetCode')
 const { authenticateToken } = require('../../../middleware/auth')
 const { requireValidSession } = require('../../../middleware/sensitiveOperation')
-const { handleServiceError } = require('../../../middleware/validation')
+const { handleServiceError, asyncHandler } = require('../../../middleware/validation')
 const TransactionManager = require('../../../utils/TransactionManager')
 const logger = require('../../../utils/logger').logger
 const {
   getMarketRiskControlMiddleware
 } = require('../../../middleware/MarketRiskControlMiddleware')
 const marketRiskMiddleware = getMarketRiskControlMiddleware().createListingRiskMiddleware()
-
-/**
- * @param {Function} fn - 异步处理函数
- * @returns {Function} 包装后的中间件函数
- */
-function asyncHandler(fn) {
-  return (req, res, next) => {
-    Promise.resolve(fn(req, res, next)).catch(next)
-  }
-}
 
 /**
  * @route POST /api/v4/marketplace/auctions
@@ -212,7 +202,7 @@ router.post(
 
     // 事务提交后：WebSocket 推送（fire-and-forget）
     try {
-      const ChatWebSocketService = require('../../../services/ChatWebSocketService')
+      const ChatWebSocketService = req.app.locals.services.getService('chat_web_socket')
       const snapshot = result._item_snapshot || {}
 
       if (result._outbid_user_id) {

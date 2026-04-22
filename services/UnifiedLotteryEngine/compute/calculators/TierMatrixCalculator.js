@@ -26,6 +26,7 @@
 
 const { logger } = require('../../../../utils/logger')
 const PressureTierCalculator = require('./PressureTierCalculator')
+const { LotteryTierMatrixConfig } = require('../../../../models')
 
 const { PRESSURE_TIER } = PressureTierCalculator
 
@@ -234,8 +235,6 @@ class TierMatrixCalculator {
    */
   async loadFromDatabase(lottery_campaign_id = null, _options = {}) {
     try {
-      const { LotteryTierMatrixConfig } = require('../../../../models')
-
       const db_matrix = await LotteryTierMatrixConfig.getFullMatrix(lottery_campaign_id)
 
       if (!db_matrix || Object.keys(db_matrix).length === 0) {

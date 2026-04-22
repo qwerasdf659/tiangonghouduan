@@ -21,6 +21,7 @@
 
 const { MaterialAssetType, MediaAttachment } = require('../models')
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
+const MediaService = require('./MediaService')
 
 /**
  * 材料系统运营管理服务
@@ -161,7 +162,6 @@ class MaterialManagementService {
 
     // 图标通过 media_attachments 多态关联绑定
     if (icon_media_id) {
-      const MediaService = require('./MediaService')
       const mediaService = new MediaService()
       await mediaService.attach(
         icon_media_id,
@@ -279,7 +279,6 @@ class MaterialManagementService {
         },
         transaction
       })
-      const MediaService = require('./MediaService')
       const mediaService = new MediaService()
       await mediaService.attach(
         payload.icon_media_id,

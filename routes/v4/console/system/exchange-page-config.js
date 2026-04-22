@@ -25,8 +25,6 @@ const router = express.Router()
 const logger = require('../../../../utils/logger').logger
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const { handleServiceError } = require('../../../../middleware/validation')
-const ServiceManager = require('../../../../services')
-
 router.use(authenticateToken, requireRoleLevel(100))
 
 /**
@@ -205,7 +203,7 @@ function validateExchangePageConfig(config) {
  */
 router.get('/', async (req, res) => {
   try {
-    const AdminSystemService = ServiceManager.getService('admin_system')
+    const AdminSystemService = req.app.locals.services.getService('admin_system')
     const configData = await AdminSystemService.getConfigValue('exchange_page')
 
     if (!configData) {
@@ -252,7 +250,7 @@ router.put('/', async (req, res) => {
       )
     }
 
-    const AdminSystemService = ServiceManager.getService('admin_system')
+    const AdminSystemService = req.app.locals.services.getService('admin_system')
 
     await AdminSystemService.upsertConfig('exchange_page', configValue, {
       description: '兑换页面配置 — Tab/空间/筛选/卡片主题/运营参数的统一下发配置',

@@ -13,6 +13,9 @@
 'use strict'
 
 const logger = require('../../utils/logger').logger
+const Kuaidi100Provider = require('./providers/Kuaidi100Provider')
+const KdniaoProvider = require('./providers/KdniaoProvider')
+const { getRedisClient } = require('../../utils/UnifiedRedisClient')
 
 /** 常用快递公司字典（快递100代码 / 快递鸟代码 双映射） */
 const SHIPPING_COMPANIES = [
@@ -46,7 +49,6 @@ class ShippingTrackService {
    */
   _initProviders() {
     try {
-      const Kuaidi100Provider = require('./providers/Kuaidi100Provider')
       if (process.env.KUAIDI100_KEY && process.env.KUAIDI100_CUSTOMER) {
         this.providers.push(
           new Kuaidi100Provider({
@@ -61,7 +63,6 @@ class ShippingTrackService {
     }
 
     try {
-      const KdniaoProvider = require('./providers/KdniaoProvider')
       if (process.env.KDNIAO_APP_ID && process.env.KDNIAO_APP_KEY) {
         this.providers.push(
           new KdniaoProvider({
@@ -94,7 +95,6 @@ class ShippingTrackService {
 
     // Redis 缓存检查
     try {
-      const { getRedisClient } = require('../../utils/UnifiedRedisClient')
       const redis = await getRedisClient()
       const cacheKey = `app:v4:shipping:track:${shippingNo}`
       const cached = await redis.get(cacheKey)
@@ -114,7 +114,6 @@ class ShippingTrackService {
         if (result.success) {
           // 写入缓存（已签收 24h，其他 10min）
           try {
-            const { getRedisClient } = require('../../utils/UnifiedRedisClient')
             // eslint-disable-next-line no-await-in-loop
             const redis = await getRedisClient()
             const cacheKey = `app:v4:shipping:track:${shippingNo}`

@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",
-    "lint:mappings": "node scripts/check-frontend-mappings.js",
+    "lint:mappings": "node scripts/check-frontend-mappings.cjs",
     "lint:all": "npm run lint && npm run lint:mappings",
     "format": "prettier --write \"src/**/*.{js,html,css}\"",
     "format:check": "prettier --check \"src/**/*.{js,html,css}\""

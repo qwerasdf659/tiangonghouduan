@@ -47,6 +47,7 @@ const AntiHighStreakHandler = require('./calculators/AntiHighStreakHandler')
 
 /* ========== Phase 15 状态管理器 ========== */
 const { ExperienceStateManager, GlobalStateManager } = require('./state')
+const { DynamicConfigLoader } = require('./config/ComputeConfig')
 
 /* ========== Phase 6 策略配置（配置与代码分离） ========== */
 const {
@@ -61,6 +62,7 @@ const {
   isFeatureEnabled,
   getGrayscaleSummary // Phase P2：获取灰度配置摘要
 } = require('./config/ComputeConfig')
+const QueryService = require('../../asset/QueryService')
 
 /**
  * 预算档位定义（B0-B3）— 仅用于监控/诊断/报表，不参与概率决策
@@ -387,7 +389,6 @@ class LotteryComputeEngine {
       selected_tier
     })
 
-    const { DynamicConfigLoader } = require('./config/ComputeConfig')
     const campaign_opts = { lottery_campaign_id }
 
     /**
@@ -700,7 +701,6 @@ class LotteryComputeEngine {
       }
 
       // 使用 QueryService.getBudgetPointsByCampaigns 正确获取预算
-      const QueryService = require('../../asset/QueryService')
       const user_budget = await QueryService.getBudgetPointsByCampaigns(
         { user_id, lottery_campaign_ids: allowed_ids },
         { transaction }
@@ -740,7 +740,6 @@ class LotteryComputeEngine {
       let user_wallet_available = false
 
       if (allowed_ids && allowed_ids.length > 0) {
-        const QueryService = require('../../asset/QueryService')
         user_budget = await QueryService.getBudgetPointsByCampaigns(
           { user_id, lottery_campaign_ids: allowed_ids },
           { transaction }

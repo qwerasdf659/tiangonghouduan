@@ -88,7 +88,7 @@ export function useAdvancedStatusState() {
       user_nickname: '',
       mode: 'global',
       multiplier: 1,
-      target_prize_id: '',
+      lottery_prize_id: '',
       custom_probability: 0,
       duration: 60,
       reason: ''
@@ -556,7 +556,7 @@ export function useAdvancedStatusMethods() {
         user_nickname: user.nickname || `用户${user.user_id}`,
         mode: 'global',
         multiplier: 1,
-        target_prize_id: '',
+        lottery_prize_id: '',
         custom_probability: 0,
         duration: 60,
         reason: ''
@@ -584,7 +584,7 @@ export function useAdvancedStatusMethods() {
             data: {
               mode: this.probabilityModal.mode,
               multiplier: this.probabilityModal.multiplier,
-              target_prize_id: this.probabilityModal.target_prize_id || null,
+              lottery_prize_id: this.probabilityModal.lottery_prize_id || null,
               custom_probability: this.probabilityModal.custom_probability || null,
               duration_minutes: this.probabilityModal.duration,
               reason: this.probabilityModal.reason

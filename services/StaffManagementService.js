@@ -23,6 +23,7 @@ const { invalidateUserPermissions } = require('../middleware/auth')
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 const AuditLogService = require('./AuditLogService')
 const { attachDisplayNames, DICT_TYPES } = require('../utils/displayNameHelper')
+const { Op } = require('sequelize')
 
 /**
  * 员工管理服务类
@@ -617,7 +618,6 @@ class StaffManagementService {
       whereClause.status = status
     } else if (!include_deleted) {
       // 默认排除已删除的记录（V4.6.1 新增）
-      const { Op } = require('sequelize')
       whereClause.status = { [Op.ne]: 'deleted' }
     }
     if (role_in_store) {

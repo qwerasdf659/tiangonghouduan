@@ -26,6 +26,10 @@ const logger = require('../../utils/logger').logger
 const BalanceService = require('../asset/BalanceService')
 const { Op, literal } = require('sequelize')
 const { AssetCode } = require('../../constants/AssetCode')
+const crypto = require('crypto')
+const OrderNoGenerator = require('../../utils/OrderNoGenerator')
+const { generateExchangeBusinessId } = require('../../utils/IdempotencyHelper')
+const ItemService = require('../asset/ItemService')
 
 /**
  * 竞价资产硬编码黑名单（绝对禁止，决策1）
@@ -433,9 +437,6 @@ class BidService {
 
     // c. 创建 ExchangeRecord（决策10：source = 'bid'，使用统一商品中心字段）
     const defaultSku = exchangeItem.skus?.[0] || null
-    const crypto = require('crypto')
-    const OrderNoGenerator = require('../../utils/OrderNoGenerator')
-    const { generateExchangeBusinessId } = require('../../utils/IdempotencyHelper')
     const skuKey = defaultSku?.sku_id ?? exchangeItem.exchange_item_id
     if (!skuKey) {
       throw new Error(`竞价 ${bidProductId} 结算失败：商品缺少 sku_id 与 exchange_item_id`)
@@ -476,7 +477,6 @@ class BidService {
     )
 
     // d. 中标商品入背包（三表模型：通过 ItemService.mintItem 双录写入）
-    const ItemService = require('../asset/ItemService')
     await ItemService.mintItem(
       {
         user_id: winnerId,

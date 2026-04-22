@@ -19,7 +19,6 @@
 
 const express = require('express')
 const router = express.Router()
-const ServiceManager = require('../../../../services')
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const logger = require('../../../../utils/logger')
 
@@ -39,7 +38,7 @@ const logger = require('../../../../utils/logger')
  */
 router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const reminderService = ServiceManager.getService('reminder_engine')
+    const reminderService = req.app.locals.services.getService('reminder_engine')
     const { rule_type, is_enabled, is_system, page, page_size } = req.query
 
     const result = await reminderService.getRuleList({
@@ -64,7 +63,7 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
  */
 router.get('/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const reminderService = ServiceManager.getService('reminder_engine')
+    const reminderService = req.app.locals.services.getService('reminder_engine')
     const ruleId = parseInt(req.params.id, 10)
 
     if (!ruleId || isNaN(ruleId)) {
@@ -101,7 +100,7 @@ router.get('/:id', authenticateToken, requireRoleLevel(100), async (req, res) =>
  */
 router.post('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const reminderService = ServiceManager.getService('reminder_engine')
+    const reminderService = req.app.locals.services.getService('reminder_engine')
     const {
       name,
       rule_type,
@@ -155,7 +154,7 @@ router.post('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
  */
 router.put('/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const reminderService = ServiceManager.getService('reminder_engine')
+    const reminderService = req.app.locals.services.getService('reminder_engine')
     const ruleId = parseInt(req.params.id, 10)
 
     if (!ruleId || isNaN(ruleId)) {
@@ -189,7 +188,7 @@ router.put('/:id', authenticateToken, requireRoleLevel(100), async (req, res) =>
  */
 router.delete('/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const reminderService = ServiceManager.getService('reminder_engine')
+    const reminderService = req.app.locals.services.getService('reminder_engine')
     const ruleId = parseInt(req.params.id, 10)
 
     if (!ruleId || isNaN(ruleId)) {
@@ -222,7 +221,7 @@ router.delete('/:id', authenticateToken, requireRoleLevel(100), async (req, res)
  */
 router.put('/:id/toggle', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const reminderService = ServiceManager.getService('reminder_engine')
+    const reminderService = req.app.locals.services.getService('reminder_engine')
     const ruleId = parseInt(req.params.id, 10)
     const { is_enabled } = req.body
 
@@ -261,7 +260,7 @@ router.put('/:id/toggle', authenticateToken, requireRoleLevel(100), async (req, 
  */
 router.post('/:id/test', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const reminderService = ServiceManager.getService('reminder_engine')
+    const reminderService = req.app.locals.services.getService('reminder_engine')
     const ruleId = parseInt(req.params.id, 10)
 
     if (!ruleId || isNaN(ruleId)) {
@@ -299,7 +298,7 @@ router.post('/:id/test', authenticateToken, requireRoleLevel(100), async (req, r
  */
 router.post('/:id/execute', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const reminderService = ServiceManager.getService('reminder_engine')
+    const reminderService = req.app.locals.services.getService('reminder_engine')
     const ruleId = parseInt(req.params.id, 10)
 
     if (!ruleId || isNaN(ruleId)) {
@@ -346,7 +345,7 @@ router.post('/:id/execute', authenticateToken, requireRoleLevel(100), async (req
  */
 router.get('/history', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const reminderService = ServiceManager.getService('reminder_engine')
+    const reminderService = req.app.locals.services.getService('reminder_engine')
     const { rule_id, status, start_date, end_date, page, page_size } = req.query
 
     const result = await reminderService.getReminderHistory({
@@ -384,7 +383,7 @@ router.get('/history', authenticateToken, requireRoleLevel(100), async (req, res
  */
 router.get('/history/stats', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const reminderService = ServiceManager.getService('reminder_engine')
+    const reminderService = req.app.locals.services.getService('reminder_engine')
     const { rule_id, start_date, end_date } = req.query
 
     const result = await reminderService.getReminderHistory({

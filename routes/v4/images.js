@@ -21,7 +21,6 @@
 
 const express = require('express')
 const router = express.Router()
-const SealosStorageService = require('../../services/SealosStorageService')
 const logger = require('../../utils/logger').logger
 
 /** 允许代理的图片文件扩展名 */
@@ -50,6 +49,7 @@ router.get('/*', async (req, res) => {
   }
 
   try {
+    const SealosStorageService = req.app.locals.services.getService('sealos_storage')
     const storageService = new SealosStorageService()
     const { body, contentType, contentLength, etag } =
       await storageService.getImageBuffer(objectKey)

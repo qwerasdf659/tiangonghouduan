@@ -16,7 +16,7 @@
  * @date 2026-01-31
  */
 
-const { Op, fn, col, literal } = require('sequelize')
+const { Op, fn, col, literal, QueryTypes } = require('sequelize')
 const logger = require('../../utils/logger').logger
 
 /**
@@ -224,7 +224,6 @@ class ReportService {
     // 新用户统计查询
     let newUsers = 0
     try {
-      const { QueryTypes } = require('sequelize')
       const [newUserResult] = await this.models.sequelize.query(
         `SELECT COUNT(DISTINCT ld.user_id) as new_users
          FROM lottery_draws ld

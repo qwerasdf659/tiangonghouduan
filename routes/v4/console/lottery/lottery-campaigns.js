@@ -28,6 +28,9 @@ const { Op } = require('sequelize')
 const logger = require('../../../../utils/logger').logger
 const alertThresholds = require('../../../../config/alert-thresholds')
 const { attachDisplayNames, DICT_TYPES } = require('../../../../utils/displayNameHelper')
+const {
+  DynamicConfigLoader
+} = require('../../../../services/UnifiedLotteryEngine/compute/config/ComputeConfig')
 const { getRedisClient, isRedisHealthy } = require('../../../../utils/UnifiedRedisClient')
 
 /*
@@ -599,9 +602,6 @@ router.put(
       })
 
       /* 更新后清除该活动的配置缓存 */
-      const {
-        DynamicConfigLoader
-      } = require('../../../../services/UnifiedLotteryEngine/compute/config/ComputeConfig')
       DynamicConfigLoader.clearCache(parseInt(lottery_campaign_id))
 
       return res.apiSuccess(result, '策略配置更新成功')

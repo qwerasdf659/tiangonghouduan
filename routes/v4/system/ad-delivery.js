@@ -21,15 +21,7 @@ const express = require('express')
 const router = express.Router()
 const { authenticateToken } = require('../../../middleware/auth')
 const logger = require('../../../utils/logger').logger
-
-/**
- * 异步路由包装器
- * @param {Function} fn - 异步路由处理函数
- * @returns {Function} Express 中间件函数
- */
-const asyncHandler = fn => (req, res, next) => {
-  Promise.resolve(fn(req, res, next)).catch(next)
-}
+const { asyncHandler } = require('../../../middleware/validation')
 
 /**
  * GET / - 统一内容获取接口

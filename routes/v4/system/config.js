@@ -5,18 +5,30 @@
  *
  * 功能：
  * - 获取活动位置配置（公开接口，无需登录）
+ * - 获取系统基础配置（公开接口，无需登录）
  *
- * 业务场景：
- * - 前端小程序每次打开页面直接调此API获取最新活动位置配置
- * - 后端/Web后台修改配置后，用户下次打开页面立即生效
- * - 前端调用成功后存一份到本地（断网兜底），失败时读上次存的数据
- * - 响应包含 version 字段（基于 updated_at 时间戳），供前端缓存模块对比版本
+ * system_settings 表 15 个 category（2026-04-22 真实数据库快照）：
+ * - ad_pricing: 广告定价配置
+ * - ad_system: 广告系统配置
+ * - auction: 竞拍系统配置
+ * - backpack: 背包系统配置
+ * - basic: 基础设置（系统名称、客服信息等）
+ * - batch_operation: 批量操作配置
+ * - customer_service: 客服系统配置
+ * - exchange: 兑换系统配置
+ * - feature: 功能开关配置
+ * - general: 通用配置
+ * - marketplace: 市场配置
+ * - notification: 通知配置
+ * - points: 积分配置
+ * - redemption: 核销配置
+ * - security: 安全配置
  *
  * 安全说明：
- * - 位置配置不含敏感信息（仅包含 campaign_code、页面、位置、尺寸、优先级）
- * - 无需 authenticateToken 中间件
+ * - 公开接口仅返回 PUBLIC_SETTING_KEYS 白名单内的配置项
+ * - 敏感配置（security、batch_operation 等）不对外暴露
  *
- * @date 2026-02-15
+ * @date 2026-04-23
  */
 
 'use strict'
@@ -24,7 +36,24 @@
 const express = require('express')
 const router = express.Router()
 const logger = require('../../../utils/logger').logger
-const ServiceManager = require('../../../services')
+const { handleServiceError } = require('../../../middleware/validation')
+
+/**
+ * 小程序前端可访问的公开配置项白名单
+ *
+ * 按 category 分组，仅白名单内的 key 会通过公开 API 返回
+ * 敏感 category（security、batch_operation 等）不在此列
+ *
+ * @type {Object<string, string[]>}
+ */
+const PUBLIC_SETTING_KEYS = {
+  basic: ['system_name', 'system_version', 'customer_email', 'customer_phone', 'customer_wechat'],
+  feature: ['marketplace_enabled', 'exchange_enabled', 'auction_enabled', 'diy_enabled'],
+  general: ['maintenance_mode', 'announcement_text'],
+  marketplace: ['marketplace_fee_rate', 'marketplace_min_price'],
+  points: ['daily_sign_in_points', 'points_expiry_days'],
+  notification: ['push_enabled']
+}
 
 /**
  * app_theme 进程级内存缓存
@@ -86,7 +115,7 @@ const appThemeMemCache = {
  */
 router.get('/placement', async (req, res) => {
   try {
-    const AdminSystemService = ServiceManager.getService('admin_system')
+    const AdminSystemService = req.app.locals.services.getService('admin_system')
     const configData = await AdminSystemService.getConfigValue('campaign_placement')
 
     if (!configData) {
@@ -107,7 +136,7 @@ router.get('/placement', async (req, res) => {
     )
   } catch (error) {
     logger.error('获取位置配置失败', { error: error.message, stack: error.stack })
-    return res.apiError('获取配置失败', 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -129,7 +158,7 @@ router.get('/placement', async (req, res) => {
  */
 router.get('/product-filter', async (req, res) => {
   try {
-    const AdminSystemService = ServiceManager.getService('admin_system')
+    const AdminSystemService = req.app.locals.services.getService('admin_system')
     const configData = await AdminSystemService.getConfigValue('product_filter')
 
     if (!configData) {
@@ -173,7 +202,7 @@ router.get('/product-filter', async (req, res) => {
     )
   } catch (error) {
     logger.error('获取商品筛选配置失败', { error: error.message, stack: error.stack })
-    return res.apiError('获取配置失败', 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -191,7 +220,7 @@ router.get('/product-filter', async (req, res) => {
  */
 router.get('/feedback', async (req, res) => {
   try {
-    const AdminSystemService = ServiceManager.getService('admin_system')
+    const AdminSystemService = req.app.locals.services.getService('admin_system')
     const configData = await AdminSystemService.getConfigValue('feedback_config')
 
     if (configData) {
@@ -243,7 +272,7 @@ router.get('/feedback', async (req, res) => {
     )
   } catch (error) {
     logger.error('获取反馈表单配置失败', { error: error.message, stack: error.stack })
-    return res.apiError('获取配置失败', 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -271,7 +300,7 @@ router.get('/feedback', async (req, res) => {
  */
 router.get('/exchange-page', async (req, res) => {
   try {
-    const AdminSystemService = ServiceManager.getService('admin_system')
+    const AdminSystemService = req.app.locals.services.getService('admin_system')
     const configData = await AdminSystemService.getConfigValue('exchange_page')
 
     if (!configData) {
@@ -383,7 +412,7 @@ router.get('/exchange-page', async (req, res) => {
     )
   } catch (error) {
     logger.error('获取兑换页面配置失败', { error: error.message, stack: error.stack })
-    return res.apiError('获取配置失败', 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -413,7 +442,7 @@ router.get('/app-theme', async (req, res) => {
     }
 
     // 缓存未命中 → 查 Redis/DB（AdminSystemService 内部有 Redis 缓存）
-    const AdminSystemService = ServiceManager.getService('admin_system')
+    const AdminSystemService = req.app.locals.services.getService('admin_system')
     const configData = await AdminSystemService.getConfigValue('app_theme')
 
     const responseData = {
@@ -430,7 +459,7 @@ router.get('/app-theme', async (req, res) => {
     return res.apiSuccess(responseData, message, code)
   } catch (error) {
     logger.error('获取全局主题配置失败', { error: error.message, stack: error.stack })
-    return res.apiError('获取配置失败', 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -450,18 +479,23 @@ router.get('/app-theme', async (req, res) => {
  */
 router.get('/', async (req, res) => {
   try {
-    const AdminSystemService = ServiceManager.getService('admin_system')
-    const settingsData = await AdminSystemService.getSettingsByCategory('basic')
+    const AdminSystemService = req.app.locals.services.getService('admin_system')
 
+    /* 只返回白名单内的公开配置项 */
     const configMap = {}
-    for (const s of settingsData.settings) {
-      configMap[s.setting_key] = s.setting_value
+    for (const [category, keys] of Object.entries(PUBLIC_SETTING_KEYS)) {
+      const settingsData = await AdminSystemService.getSettingsByCategory(category)
+      for (const s of settingsData.settings) {
+        if (keys.includes(s.setting_key)) {
+          configMap[s.setting_key] = s.setting_value
+        }
+      }
     }
 
     return res.apiSuccess(configMap, '获取系统配置成功')
   } catch (error) {
     logger.error('获取系统基础配置失败', { error: error.message })
-    return res.apiError('获取配置失败', 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 

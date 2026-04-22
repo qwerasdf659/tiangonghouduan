@@ -14,7 +14,7 @@ import { API_PREFIX, request, buildURL, buildQueryString } from '../base.js'
 export const TRADE_ENDPOINTS = {
   // 交易订单（marketplace）
   TRADE_ORDERS: `${API_PREFIX}/console/marketplace/orders`,
-  MARKETPLACE_ORDER_DETAIL: `${API_PREFIX}/console/marketplace/orders/:order_id`,
+  MARKETPLACE_ORDER_DETAIL: `${API_PREFIX}/console/marketplace/orders/:id`,
 
   // 市场挂牌管理（CRUD + 运营操作）
   LISTING_LIST: `${API_PREFIX}/console/marketplace/listings`,
@@ -30,8 +30,8 @@ export const TRADE_ENDPOINTS = {
   LISTING_FORCE_WITHDRAW: `${API_PREFIX}/console/marketplace/listings/:market_listing_id/force-withdraw`,
 
   // 挂牌排序管理（Phase 3 — 排序增强）
-  LISTING_PIN: `${API_PREFIX}/console/marketplace/listings/:id/pin`,
-  LISTING_RECOMMEND: `${API_PREFIX}/console/marketplace/listings/:id/recommend`,
+  LISTING_PIN: `${API_PREFIX}/console/marketplace/listings/:market_listing_id/pin`,
+  LISTING_RECOMMEND: `${API_PREFIX}/console/marketplace/listings/:market_listing_id/recommend`,
   LISTING_BATCH_SORT: `${API_PREFIX}/console/marketplace/listings/batch-sort`,
 
   // C2C 市场分析（MarketAnalyticsService）
@@ -101,7 +101,7 @@ export const TradeAPI = {
    * @returns {Promise<Object>} API 响应
    */
   async getMarketplaceOrderDetail(orderId) {
-    const url = buildURL(TRADE_ENDPOINTS.MARKETPLACE_ORDER_DETAIL, { order_id: orderId })
+    const url = buildURL(TRADE_ENDPOINTS.MARKETPLACE_ORDER_DETAIL, { id: orderId })
     return await request({ url, method: 'GET' })
   },
 
@@ -127,7 +127,7 @@ export const TradeAPI = {
    * @returns {Promise<Object>} API 响应
    */
   async getListingDetail(listingId) {
-    const url = buildURL(TRADE_ENDPOINTS.LISTING_DETAIL, { listing_id: listingId })
+    const url = buildURL(TRADE_ENDPOINTS.LISTING_DETAIL, { market_listing_id: listingId })
     return await request({ url, method: 'GET' })
   },
 
@@ -147,7 +147,7 @@ export const TradeAPI = {
    * @returns {Promise<Object>} API 响应
    */
   async updateListing(listingId, data) {
-    const url = buildURL(TRADE_ENDPOINTS.LISTING_UPDATE, { listing_id: listingId })
+    const url = buildURL(TRADE_ENDPOINTS.LISTING_UPDATE, { market_listing_id: listingId })
     return await request({ url, method: 'PUT', data })
   },
 
@@ -157,7 +157,7 @@ export const TradeAPI = {
    * @returns {Promise<Object>} API 响应
    */
   async deleteListing(listingId) {
-    const url = buildURL(TRADE_ENDPOINTS.LISTING_DELETE, { listing_id: listingId })
+    const url = buildURL(TRADE_ENDPOINTS.LISTING_DELETE, { market_listing_id: listingId })
     return await request({ url, method: 'DELETE' })
   },
 
@@ -490,7 +490,7 @@ export const TradeAPI = {
    * @returns {Promise<Object>} 操作结果
    */
   async toggleListingPin(listingId, isPinned) {
-    const url = buildURL(TRADE_ENDPOINTS.LISTING_PIN, { id: listingId })
+    const url = buildURL(TRADE_ENDPOINTS.LISTING_PIN, { market_listing_id: listingId })
     return await request({ url, method: 'PUT', data: { is_pinned: isPinned } })
   },
 
@@ -501,7 +501,7 @@ export const TradeAPI = {
    * @returns {Promise<Object>} 操作结果
    */
   async toggleListingRecommend(listingId, isRecommended) {
-    const url = buildURL(TRADE_ENDPOINTS.LISTING_RECOMMEND, { id: listingId })
+    const url = buildURL(TRADE_ENDPOINTS.LISTING_RECOMMEND, { market_listing_id: listingId })
     return await request({ url, method: 'PUT', data: { is_recommended: isRecommended } })
   },
 

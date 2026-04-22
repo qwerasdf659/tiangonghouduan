@@ -40,6 +40,7 @@ const BaseStage = require('./BaseStage')
 const { sequelize } = require('../../../../models')
 const BalanceService = require('../../../asset/BalanceService')
 const { AssetCode } = require('../../../../constants/AssetCode')
+const AdminSystemService = require('../../../AdminSystemService')
 
 /**
  * 档位定义（降级顺序）
@@ -262,7 +263,6 @@ class BuildPrizePoolStage extends BaseStage {
   async _filterByResourceEligibility(prizes, user_id, budget_before) {
     let user_star_stone_quota = 0
 
-    const AdminSystemService = require('../../../AdminSystemService')
     const star_stone_quota_enabled = await AdminSystemService.getSettingValue(
       'points',
       'star_stone_quota_enabled',

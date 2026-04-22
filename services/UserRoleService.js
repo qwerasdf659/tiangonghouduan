@@ -48,6 +48,15 @@ const AuditLogService = require('./AuditLogService')
  * 中文显示名称助手（2026-01-22 中文化显示名称系统）
  */
 const displayNameHelper = require('../utils/displayNameHelper')
+const { getUserRoles } = require('../middleware/auth')
+const { Op } = require('sequelize')
+const {
+  isSystemRole,
+  validatePermissions,
+  getPermissionResources,
+  SYSTEM_ROLES
+} = require('../constants/PermissionResources')
+const { OPERATION_TYPES } = require('../constants/AuditOperationTypes')
 
 /**
  * 用户角色服务类
@@ -198,7 +207,6 @@ class UserRoleService {
     // 强制要求事务边界 - 2026-01-05 治理决策
     const transaction = assertAndGetTransaction(options, 'UserRoleService.updateUserRole')
     const { reason, ip_address, user_agent } = options
-    const { getUserRoles } = require('../middleware/auth')
 
     // 验证目标用户
     const targetUser = await User.findByPk(user_id, { transaction })
@@ -391,7 +399,6 @@ class UserRoleService {
    * @returns {Promise<Object>} 用户列表和分页信息
    */
   static async getUserList(filters = {}) {
-    const { Op } = require('sequelize')
     const { page = 1, page_size = 20, search, role_filter } = filters
 
     const finalLimit = Math.min(parseInt(page_size, 10) || 20, 100)
@@ -1019,7 +1026,6 @@ class UserRoleService {
     }
 
     // 引入权限资源常量
-    const { isSystemRole, validatePermissions } = require('../constants/PermissionResources')
 
     // 检查是否尝试创建系统内置角色名称
     if (isSystemRole(role_name.trim())) {
@@ -1035,7 +1041,6 @@ class UserRoleService {
     }
 
     // 获取操作者权限级别
-    const { getUserRoles } = require('../middleware/auth')
     const operatorRoles = await getUserRoles(operator_id)
     const operatorMaxLevel =
       operatorRoles.roles.length > 0 ? Math.max(...operatorRoles.roles.map(r => r.role_level)) : 0
@@ -1070,7 +1075,6 @@ class UserRoleService {
     )
 
     // 记录审计日志
-    const { OPERATION_TYPES } = require('../constants/AuditOperationTypes')
     const idempotencyKey = `role_create_${newRole.role_id}_${Date.now()}`
 
     await AuditLogService.logOperation({
@@ -1151,7 +1155,6 @@ class UserRoleService {
     }
 
     // 引入权限资源常量
-    const { isSystemRole, validatePermissions } = require('../constants/PermissionResources')
 
     // 系统内置角色保护
     if (isSystemRole(role.role_name)) {
@@ -1159,7 +1162,6 @@ class UserRoleService {
     }
 
     // 获取操作者权限级别
-    const { getUserRoles } = require('../middleware/auth')
     const operatorRoles = await getUserRoles(operator_id)
     const operatorMaxLevel =
       operatorRoles.roles.length > 0 ? Math.max(...operatorRoles.roles.map(r => r.role_level)) : 0
@@ -1211,7 +1213,6 @@ class UserRoleService {
     const affectedUserIds = affectedUserRoles.map(ur => ur.user_id)
 
     // 记录审计日志
-    const { OPERATION_TYPES } = require('../constants/AuditOperationTypes')
     const idempotencyKey = `role_update_${role_id}_${Date.now()}`
 
     await AuditLogService.logOperation({
@@ -1297,7 +1298,6 @@ class UserRoleService {
     }
 
     // 引入权限资源常量
-    const { isSystemRole } = require('../constants/PermissionResources')
 
     // 系统内置角色保护
     if (isSystemRole(role.role_name)) {
@@ -1332,7 +1332,6 @@ class UserRoleService {
     await role.update({ is_active: false }, { transaction })
 
     // 记录审计日志
-    const { OPERATION_TYPES } = require('../constants/AuditOperationTypes')
     const idempotencyKey = `role_delete_${role_id}_${Date.now()}`
 
     await AuditLogService.logOperation({
@@ -1382,8 +1381,6 @@ class UserRoleService {
    * @returns {Object} 权限资源列表
    */
   static getPermissionResources() {
-    const { getPermissionResources, SYSTEM_ROLES } = require('../constants/PermissionResources')
-
     return {
       resources: getPermissionResources(),
       system_roles: SYSTEM_ROLES

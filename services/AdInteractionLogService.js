@@ -14,6 +14,7 @@
 
 const logger = require('../utils/logger').logger
 const { AdInteractionLog, AdCampaign } = require('../models')
+const { Op } = require('sequelize')
 
 /**
  * 内容交互日志服务类
@@ -79,7 +80,6 @@ class AdInteractionLogService {
    */
   static async getShowStats(campaignId, options = {}) {
     try {
-      const { Op } = require('sequelize')
       const where = { ad_campaign_id: campaignId }
 
       if (options.start_date || options.end_date) {

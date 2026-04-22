@@ -16,7 +16,6 @@
 
 const express = require('express')
 const router = express.Router()
-const ServiceManager = require('../../../../services')
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const logger = require('../../../../utils/logger')
 
@@ -38,7 +37,7 @@ const logger = require('../../../../utils/logger')
  */
 router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const trackService = ServiceManager.getService('user_behavior_track')
+    const trackService = req.app.locals.services.getService('user_behavior_track')
     const { user_id, behavior_type, start_time, end_time, session_id, page, page_size } = req.query
 
     if (!user_id) {
@@ -73,7 +72,7 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
  */
 router.get('/stats/:user_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const trackService = ServiceManager.getService('user_behavior_track')
+    const trackService = req.app.locals.services.getService('user_behavior_track')
     const userId = parseInt(req.params.user_id, 10)
 
     if (!userId || isNaN(userId)) {
@@ -103,7 +102,7 @@ router.get('/stats/:user_id', authenticateToken, requireRoleLevel(100), async (r
  */
 router.get('/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const trackService = ServiceManager.getService('user_behavior_track')
+    const trackService = req.app.locals.services.getService('user_behavior_track')
     const trackId = parseInt(req.params.id, 10)
 
     if (!trackId || isNaN(trackId)) {
@@ -130,7 +129,7 @@ router.get('/:id', authenticateToken, requireRoleLevel(100), async (req, res) =>
  */
 router.get('/session/:session_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const trackService = ServiceManager.getService('user_behavior_track')
+    const trackService = req.app.locals.services.getService('user_behavior_track')
     const sessionId = req.params.session_id
 
     if (!sessionId) {
@@ -168,7 +167,7 @@ router.get('/session/:session_id', authenticateToken, requireRoleLevel(100), asy
  */
 router.get('/aggregate/by-date', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const trackService = ServiceManager.getService('user_behavior_track')
+    const trackService = req.app.locals.services.getService('user_behavior_track')
     const { start_date, end_date, user_id, behavior_type } = req.query
 
     if (!start_date || !end_date) {
@@ -205,7 +204,7 @@ router.get(
   requireRoleLevel(100),
   async (req, res) => {
     try {
-      const trackService = ServiceManager.getService('user_behavior_track')
+      const trackService = req.app.locals.services.getService('user_behavior_track')
       const { start_date, end_date, page_size } = req.query
 
       if (!start_date || !end_date) {
@@ -241,7 +240,7 @@ router.get(
  */
 router.post('/export', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const trackService = ServiceManager.getService('user_behavior_track')
+    const trackService = req.app.locals.services.getService('user_behavior_track')
     const { user_id, start_time, end_time, format } = req.body
 
     if (!user_id) {

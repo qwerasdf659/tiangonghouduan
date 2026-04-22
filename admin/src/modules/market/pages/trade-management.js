@@ -174,7 +174,7 @@ document.addEventListener('alpine:init', () => {
     /** @type {{totalTrades: number, completedTrades: number, pendingTrades: number, totalVolume: number}} HTML 统计卡片使用 */
     stats: { totalTrades: 0, completedTrades: 0, pendingTrades: 0, totalVolume: 0 },
     /** @type {Object} 交易订单筛选条件（支持单号/手机号/状态搜索） */
-    tradeFilters: { status: '', buyer_mobile: '', seller_mobile: '', listing_id: '', order_no: '' },
+    tradeFilters: { status: '', buyer_mobile: '', seller_mobile: '', market_listing_id: '', order_no: '' },
     /** @type {Object|null} 买家解析结果 */
     resolvedBuyer: null,
     /** @type {Object|null} 卖家解析结果 */
@@ -356,7 +356,7 @@ document.addEventListener('alpine:init', () => {
         // 构建查询参数（手机号 → resolve 获取 user_id）
         const queryParams = {
           status: this.tradeFilters.status,
-          market_listing_id: this.tradeFilters.listing_id,
+          market_listing_id: this.tradeFilters.market_listing_id,
           order_no: this.tradeFilters.order_no || undefined,
           merchant_id: this.tradeOrderMerchantFilter || undefined,
           page: this.tradeCurrentPage,
@@ -1066,8 +1066,8 @@ document.addEventListener('alpine:init', () => {
       }
       // 合并筛选条件
       if (this.tradeFilters?.status) queryParams.status = this.tradeFilters.status
-      if (this.tradeFilters?.listing_id)
-        queryParams.market_listing_id = this.tradeFilters.listing_id
+      if (this.tradeFilters?.market_listing_id)
+        queryParams.market_listing_id = this.tradeFilters.market_listing_id
       if (this.tradeOrderMerchantFilter) queryParams.merchant_id = this.tradeOrderMerchantFilter
       if (this.tradeFilters?.buyer_mobile) {
         const buyer = await this.resolveUserByMobile(this.tradeFilters.buyer_mobile)

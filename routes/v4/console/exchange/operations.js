@@ -14,6 +14,7 @@ const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const TransactionManager = require('../../../../utils/TransactionManager')
 const logger = require('../../../../utils/logger').logger
+const { handleServiceError } = require('../../../../middleware/validation')
 
 /** PUT /items/:exchange_item_id/pin - 置顶/取消置顶商品 */
 router.put(
@@ -48,7 +49,7 @@ router.put(
       return res.apiSuccess(result, result.is_pinned ? '商品已置顶' : '已取消置顶')
     } catch (error) {
       logger.error('[B2C兑换-运营] 置顶失败', { error: error.message })
-      return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+      return handleServiceError(error, res)
     }
   }
 )
@@ -79,7 +80,7 @@ router.put(
       return res.apiSuccess(result, result.is_recommended ? '商品已推荐' : '已取消推荐')
     } catch (error) {
       logger.error('[B2C兑换-运营] 推荐失败', { error: error.message })
-      return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+      return handleServiceError(error, res)
     }
   }
 )
@@ -111,7 +112,7 @@ router.put('/items/batch-status', authenticateToken, requireRoleLevel(100), asyn
       `已批量${status === 'active' ? '上架' : '下架'} ${result.affected_rows} 个商品`
     )
   } catch (error) {
-    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -147,7 +148,7 @@ router.put('/items/batch-price', authenticateToken, requireRoleLevel(100), async
     )
     return res.apiSuccess(result, `已更新 ${result.affected_rows} 个商品价格`)
   } catch (error) {
-    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -174,7 +175,7 @@ router.put('/items/batch-category', authenticateToken, requireRoleLevel(100), as
     )
     return res.apiSuccess(result, `已更新 ${result.affected_rows} 个商品分类`)
   } catch (error) {
-    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -205,7 +206,7 @@ router.put('/items/batch-sort', authenticateToken, requireRoleLevel(100), async 
     )
     const { BusinessCacheHelper } = require('../../../../utils/BusinessCacheHelper')
     await BusinessCacheHelper.invalidateExchangeItems('batch_sort')
-    const AuditLogService = require('../../../../services/AuditLogService')
+    const AuditLogService = req.app.locals.services.getService('audit_log')
     await AuditLogService.logOperation({
       operator_id: req.user.user_id,
       operation_type: 'sort_change',
@@ -219,7 +220,7 @@ router.put('/items/batch-sort', authenticateToken, requireRoleLevel(100), async 
     }).catch(e => logger.warn('排序审计日志写入失败（非致命）', { error: e.message }))
     return res.apiSuccess(result, `已更新 ${result.updated_count} 个商品排序`)
   } catch (error) {
-    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -234,7 +235,7 @@ router.get('/missing-images', authenticateToken, requireRoleLevel(100), async (r
     })
     return res.apiSuccess(result, `共 ${result.pagination.total} 个商品缺少图片`)
   } catch (error) {
-    return res.apiError(error.message || '查询失败', 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -257,7 +258,7 @@ router.post('/batch-bind-images', authenticateToken, requireRoleLevel(100), asyn
     )
     return res.apiSuccess(result, `批量绑定完成：成功 ${result.success}，失败 ${result.failed}`)
   } catch (error) {
-    return res.apiError(error.message || '批量绑定失败', 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 

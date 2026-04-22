@@ -66,7 +66,7 @@ function handleServiceError(error, res, operation) {
     return res.apiError(error.message, 'VALIDATION_ERROR', null, 400)
   }
 
-  return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+  return handleServiceError(error, res)
 }
 
 /*

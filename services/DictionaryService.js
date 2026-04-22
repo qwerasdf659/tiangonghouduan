@@ -20,6 +20,8 @@
 
 const { Op } = require('sequelize')
 const logger = require('../utils/logger').logger
+const MediaService = require('./MediaService')
+const { MediaAttachment } = require('../models')
 
 /**
  * 字典表管理服务类
@@ -178,7 +180,6 @@ class DictionaryService {
 
     // 图标通过 media_attachments 多态关联绑定
     if (data.icon_media_id) {
-      const MediaService = require('./MediaService')
       const mediaService = new MediaService()
       await mediaService.attach(
         data.icon_media_id,
@@ -228,7 +229,6 @@ class DictionaryService {
 
     // 更新图标（先删除旧关联再绑定新图标）
     if (data.icon_media_id !== undefined && data.icon_media_id) {
-      const { MediaAttachment } = require('../models')
       await MediaAttachment.destroy({
         where: {
           attachable_type: 'category',
@@ -237,7 +237,6 @@ class DictionaryService {
         },
         transaction
       })
-      const MediaService = require('./MediaService')
       const mediaService = new MediaService()
       await mediaService.attach(
         data.icon_media_id,

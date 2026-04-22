@@ -1,0 +1,307 @@
+{
+  "timestamp": "2026-04-22T01:38:19.267Z",
+  "diy_template_40": [
+    {
+      "diy_template_id": 40,
+      "category_id": 194,
+      "layout": {
+        "shape": "slots",
+        "background_width": 800,
+        "slot_definitions": [
+          {
+            "x": 0.5,
+            "y": 0.638,
+            "label": "槽位1",
+            "width": 0.623,
+            "height": 0.498,
+            "slot_id": "slot_1",
+            "required": false,
+            "rotation": 0,
+            "allowed_shapes": [
+              "circle",
+              "ellipse"
+            ],
+            "allowed_group_codes": []
+          }
+        ],
+        "background_height": 1000
+      },
+      "sort_order": 0,
+      "created_at": "2026-04-08T16:12:40.000Z",
+      "updated_at": "2026-04-10T20:19:23.000Z",
+      "template_code": "DT26040900004093",
+      "display_name": "吊坠01",
+      "status": "published",
+      "is_enabled": 1,
+      "bead_rules": {
+        "margin": 10,
+        "default_diameter": 10,
+        "allowed_diameters": [
+          8
+        ]
+      },
+      "sizing_rules": null,
+      "capacity_rules": {
+        "max_beads": 24,
+        "min_beads": 12
+      },
+      "material_group_codes": [],
+      "preview_media_id": null,
+      "base_image_media_id": null,
+      "meta": null
+    }
+  ],
+  "negative_frozen": [
+    {
+      "account_asset_balance_id": 25,
+      "account_id": 4,
+      "asset_code": "points",
+      "available_amount": 55040,
+      "frozen_amount": -29900,
+      "created_at": "2025-12-20T19:29:17.000Z",
+      "updated_at": "2026-04-01T20:32:27.000Z",
+      "lottery_campaign_id": null,
+      "lottery_campaign_key": "GLOBAL"
+    },
+    {
+      "account_asset_balance_id": 27,
+      "account_id": 12,
+      "asset_code": "points",
+      "available_amount": -52552,
+      "frozen_amount": -900,
+      "created_at": "2025-12-20T19:29:17.000Z",
+      "updated_at": "2026-04-01T20:32:27.000Z",
+      "lottery_campaign_id": null,
+      "lottery_campaign_key": "GLOBAL"
+    },
+    {
+      "account_asset_balance_id": 257,
+      "account_id": 12,
+      "asset_code": "star_stone",
+      "available_amount": -447897,
+      "frozen_amount": -220,
+      "created_at": "2026-02-23T19:22:38.000Z",
+      "updated_at": "2026-04-01T20:32:27.000Z",
+      "lottery_campaign_id": null,
+      "lottery_campaign_key": "GLOBAL"
+    },
+    {
+      "account_asset_balance_id": 276,
+      "account_id": 4,
+      "asset_code": "star_stone",
+      "available_amount": 255646,
+      "frozen_amount": -45840,
+      "created_at": "2026-02-24T17:11:02.000Z",
+      "updated_at": "2026-04-01T20:32:27.000Z",
+      "lottery_campaign_id": null,
+      "lottery_campaign_key": "GLOBAL"
+    },
+    {
+      "account_asset_balance_id": 277,
+      "account_id": 4,
+      "asset_code": "red_core_shard",
+      "available_amount": 39565,
+      "frozen_amount": -8200,
+      "created_at": "2026-02-24T17:11:02.000Z",
+      "updated_at": "2026-04-01T20:32:27.000Z",
+      "lottery_campaign_id": null,
+      "lottery_campaign_key": "GLOBAL"
+    }
+  ],
+  "negative_available": [
+    {
+      "account_asset_balance_id": 21,
+      "account_id": 2,
+      "asset_code": "points",
+      "available_amount": -87730,
+      "frozen_amount": 0,
+      "created_at": "2025-12-20T19:29:17.000Z",
+      "updated_at": "2026-04-01T20:32:27.000Z",
+      "lottery_campaign_id": null,
+      "lottery_campaign_key": "GLOBAL"
+    },
+    {
+      "account_asset_balance_id": 27,
+      "account_id": 12,
+      "asset_code": "points",
+      "available_amount": -52552,
+      "frozen_amount": -900,
+      "created_at": "2025-12-20T19:29:17.000Z",
+      "updated_at": "2026-04-01T20:32:27.000Z",
+      "lottery_campaign_id": null,
+      "lottery_campaign_key": "GLOBAL"
+    },
+    {
+      "account_asset_balance_id": 257,
+      "account_id": 12,
+      "asset_code": "star_stone",
+      "available_amount": -447897,
+      "frozen_amount": -220,
+      "created_at": "2026-02-23T19:22:38.000Z",
+      "updated_at": "2026-04-01T20:32:27.000Z",
+      "lottery_campaign_id": null,
+      "lottery_campaign_key": "GLOBAL"
+    },
+    {
+      "account_asset_balance_id": 258,
+      "account_id": 12,
+      "asset_code": "red_core_shard",
+      "available_amount": -273220,
+      "frozen_amount": 0,
+      "created_at": "2026-02-23T19:22:38.000Z",
+      "updated_at": "2026-04-01T20:32:27.000Z",
+      "lottery_campaign_id": null,
+      "lottery_campaign_key": "GLOBAL"
+    },
+    {
+      "account_asset_balance_id": 269,
+      "account_id": 2,
+      "asset_code": "star_stone",
+      "available_amount": -434487,
+      "frozen_amount": 0,
+      "created_at": "2026-02-24T17:11:02.000Z",
+      "updated_at": "2026-04-01T20:32:27.000Z",
+      "lottery_campaign_id": null,
+      "lottery_campaign_key": "GLOBAL"
+    },
+    {
+      "account_asset_balance_id": 271,
+      "account_id": 2,
+      "asset_code": "orange_core_shard",
+      "available_amount": -2500,
+      "frozen_amount": 0,
+      "created_at": "2026-02-24T17:11:02.000Z",
+      "updated_at": "2026-04-01T20:32:27.000Z",
+      "lottery_campaign_id": null,
+      "lottery_campaign_key": "GLOBAL"
+    },
+    {
+      "account_asset_balance_id": 272,
+      "account_id": 2,
+      "asset_code": "red_core_gem",
+      "available_amount": -1000,
+      "frozen_amount": 0,
+      "created_at": "2026-02-24T17:11:02.000Z",
+      "updated_at": "2026-04-01T20:32:27.000Z",
+      "lottery_campaign_id": null,
+      "lottery_campaign_key": "GLOBAL"
+    },
+    {
+      "account_asset_balance_id": 273,
+      "account_id": 2,
+      "asset_code": "red_core_shard",
+      "available_amount": -179858,
+      "frozen_amount": 0,
+      "created_at": "2026-02-24T17:11:02.000Z",
+      "updated_at": "2026-04-01T20:32:27.000Z",
+      "lottery_campaign_id": null,
+      "lottery_campaign_key": "GLOBAL"
+    },
+    {
+      "account_asset_balance_id": 279,
+      "account_id": 12,
+      "asset_code": "orange_core_shard",
+      "available_amount": -500,
+      "frozen_amount": 0,
+      "created_at": "2026-02-24T17:11:02.000Z",
+      "updated_at": "2026-04-01T20:32:27.000Z",
+      "lottery_campaign_id": null,
+      "lottery_campaign_key": "GLOBAL"
+    },
+    {
+      "account_asset_balance_id": 280,
+      "account_id": 12,
+      "asset_code": "red_core_gem",
+      "available_amount": -200,
+      "frozen_amount": 0,
+      "created_at": "2026-02-24T17:11:02.000Z",
+      "updated_at": "2026-04-01T20:32:27.000Z",
+      "lottery_campaign_id": null,
+      "lottery_campaign_key": "GLOBAL"
+    },
+    {
+      "account_asset_balance_id": 282,
+      "account_id": 239,
+      "asset_code": "star_stone",
+      "available_amount": -23,
+      "frozen_amount": 0,
+      "created_at": "2026-02-24T17:11:02.000Z",
+      "updated_at": "2026-04-01T20:32:27.000Z",
+      "lottery_campaign_id": null,
+      "lottery_campaign_key": "GLOBAL"
+    },
+    {
+      "account_asset_balance_id": 286,
+      "account_id": 248,
+      "asset_code": "star_stone",
+      "available_amount": -100,
+      "frozen_amount": 0,
+      "created_at": "2026-02-24T19:56:35.000Z",
+      "updated_at": "2026-04-01T20:32:27.000Z",
+      "lottery_campaign_id": null,
+      "lottery_campaign_key": "GLOBAL"
+    }
+  ],
+  "system_settings_categories": [
+    {
+      "category": "marketplace",
+      "cnt": 21
+    },
+    {
+      "category": "points",
+      "cnt": 11
+    },
+    {
+      "category": "basic",
+      "cnt": 8
+    },
+    {
+      "category": "ad_pricing",
+      "cnt": 6
+    },
+    {
+      "category": "batch_operation",
+      "cnt": 6
+    },
+    {
+      "category": "redemption",
+      "cnt": 4
+    },
+    {
+      "category": "security",
+      "cnt": 4
+    },
+    {
+      "category": "exchange",
+      "cnt": 3
+    },
+    {
+      "category": "feature",
+      "cnt": 3
+    },
+    {
+      "category": "general",
+      "cnt": 3
+    },
+    {
+      "category": "notification",
+      "cnt": 3
+    },
+    {
+      "category": "backpack",
+      "cnt": 2
+    },
+    {
+      "category": "ad_system",
+      "cnt": 1
+    },
+    {
+      "category": "auction",
+      "cnt": 1
+    },
+    {
+      "category": "customer_service",
+      "cnt": 1
+    }
+  ]
+}

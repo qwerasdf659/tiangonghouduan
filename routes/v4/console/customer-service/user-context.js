@@ -28,6 +28,7 @@ const express = require('express')
 const router = express.Router()
 const logger = require('../../../../utils/logger').logger
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
+const { handleServiceError } = require('../../../../middleware/validation')
 
 /* 所有路由需要后台访问权限 */
 router.use(authenticateToken, requireRoleLevel(1))
@@ -52,7 +53,7 @@ router.get('/:userId/summary', async (req, res) => {
     return res.apiSuccess(result, '获取用户画像摘要成功')
   } catch (error) {
     logger.error('获取用户画像摘要失败:', error)
-    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -77,7 +78,7 @@ router.get('/:userId/assets', async (req, res) => {
     return res.apiSuccess(result, '获取用户资产信息成功')
   } catch (error) {
     logger.error('获取用户资产信息失败:', error)
-    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -103,7 +104,7 @@ router.get('/:userId/backpack', async (req, res) => {
     return res.apiSuccess(result, '获取用户背包信息成功')
   } catch (error) {
     logger.error('获取用户背包信息失败:', error)
-    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -130,7 +131,7 @@ router.get('/:userId/lottery', async (req, res) => {
     return res.apiSuccess(result, '获取用户抽奖记录成功')
   } catch (error) {
     logger.error('获取用户抽奖记录失败:', error)
-    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -157,7 +158,7 @@ router.get('/:userId/trades', async (req, res) => {
     return res.apiSuccess(result, '获取用户交易信息成功')
   } catch (error) {
     logger.error('获取用户交易信息失败:', error)
-    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -182,7 +183,7 @@ router.get('/:userId/timeline', async (req, res) => {
     return res.apiSuccess(result, '获取用户时间线成功')
   } catch (error) {
     logger.error('获取用户时间线失败:', error)
-    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -205,7 +206,7 @@ router.get('/:userId/risk', async (req, res) => {
     return res.apiSuccess(result, '获取用户风控信息成功')
   } catch (error) {
     logger.error('获取用户风控信息失败:', error)
-    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -230,7 +231,7 @@ router.get('/:userId/history', async (req, res) => {
     return res.apiSuccess(result, '获取用户历史会话成功')
   } catch (error) {
     logger.error('获取用户历史会话失败:', error)
-    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -259,7 +260,7 @@ router.get('/:userId/notes', async (req, res) => {
     return res.apiSuccess(result, '获取用户备注成功')
   } catch (error) {
     logger.error('获取用户备注失败:', error)
-    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -297,7 +298,7 @@ router.post('/:userId/notes', async (req, res) => {
     return res.apiSuccess(result, '备注添加成功')
   } catch (error) {
     logger.error('添加用户备注失败:', error)
-    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -321,7 +322,7 @@ router.get('/:userId/diagnose', async (req, res) => {
     return res.apiSuccess(result, '一键诊断完成')
   } catch (error) {
     logger.error('一键诊断失败:', error)
-    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 

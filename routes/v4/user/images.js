@@ -18,10 +18,7 @@ const router = express.Router()
 const multer = require('multer')
 const { authenticateToken } = require('../../../middleware/auth')
 const { logger } = require('../../../utils/logger')
-
-const asyncHandler = fn => (req, res, next) => {
-  Promise.resolve(fn(req, res, next)).catch(next)
-}
+const { asyncHandler } = require('../../../middleware/validation')
 
 /**
  * 获取 MediaService（通过 ServiceManager）

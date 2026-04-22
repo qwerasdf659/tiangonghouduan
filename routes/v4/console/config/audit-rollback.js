@@ -16,7 +16,6 @@
 
 const express = require('express')
 const router = express.Router()
-const ServiceManager = require('../../../../services')
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const {
   highRiskOperationMiddleware
@@ -40,7 +39,7 @@ const logger = require('../../../../utils/logger')
  */
 router.get('/rollbackable', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const rollbackService = ServiceManager.getService('audit_rollback')
+    const rollbackService = req.app.locals.services.getService('audit_rollback')
     const { operator_id, operation_type, start_time, end_time, page, page_size } = req.query
 
     const result = await rollbackService.getRollbackableLogs({
@@ -70,7 +69,7 @@ router.get('/rollbackable', authenticateToken, requireRoleLevel(100), async (req
  */
 router.get('/history', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const rollbackService = ServiceManager.getService('audit_rollback')
+    const rollbackService = req.app.locals.services.getService('audit_rollback')
     const { page, page_size } = req.query
 
     const result = await rollbackService.getRollbackHistory({
@@ -92,7 +91,7 @@ router.get('/history', authenticateToken, requireRoleLevel(100), async (req, res
  */
 router.get('/check/:log_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const rollbackService = ServiceManager.getService('audit_rollback')
+    const rollbackService = req.app.locals.services.getService('audit_rollback')
     const logId = parseInt(req.params.log_id, 10)
 
     if (!logId || isNaN(logId)) {
@@ -124,7 +123,7 @@ router.post(
   highRiskOperationMiddleware,
   async (req, res) => {
     try {
-      const rollbackService = ServiceManager.getService('audit_rollback')
+      const rollbackService = req.app.locals.services.getService('audit_rollback')
       const logId = parseInt(req.params.log_id, 10)
 
       if (!logId || isNaN(logId)) {
@@ -168,7 +167,7 @@ router.post(
  */
 router.get('/stats', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const rollbackService = ServiceManager.getService('audit_rollback')
+    const rollbackService = req.app.locals.services.getService('audit_rollback')
     const { start_time, end_time } = req.query
 
     const stats = await rollbackService.getAuditStats({
@@ -270,7 +269,7 @@ router.get('/stats/by-risk-level', authenticateToken, requireRoleLevel(100), asy
  */
 router.get('/stats/by-target-type', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const rollbackService = ServiceManager.getService('audit_rollback')
+    const rollbackService = req.app.locals.services.getService('audit_rollback')
     const { start_time, end_time } = req.query
 
     const result = await rollbackService.getStatsByTargetType({
@@ -314,7 +313,7 @@ router.get('/stats/by-target-type', authenticateToken, requireRoleLevel(100), as
  */
 router.get('/stats/trend', authenticateToken, requireRoleLevel(100), async (req, res) => {
   try {
-    const rollbackService = ServiceManager.getService('audit_rollback')
+    const rollbackService = req.app.locals.services.getService('audit_rollback')
     const { days, end_date } = req.query
 
     // 参数校验：天数最大90天

@@ -1050,8 +1050,6 @@ class UserSegmentService {
    */
   static async getUserApprovalRate(models, options = {}) {
     const { user_id, days = 90 } = options
-    const { Op, fn, col } = require('sequelize')
-    const BeijingTimeHelper = require('../../utils/timeHelper')
 
     const startDate = BeijingTimeHelper.daysAgo(days)
 

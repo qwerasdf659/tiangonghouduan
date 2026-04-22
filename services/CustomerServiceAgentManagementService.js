@@ -16,6 +16,7 @@
 
 const logger = require('../utils/logger').logger
 const { Op } = require('sequelize')
+const models = require('../models')
 
 /**
  * 客服座席管理服务类
@@ -32,7 +33,6 @@ class CustomerServiceAgentManagementService {
    * @returns {Promise<Object>} 用户信息，包含是否已注册为座席的标记
    */
   static async lookupUserByMobile(mobile) {
-    const models = require('../models')
     const { User, CustomerServiceAgent } = models
 
     const user = await User.findOne({
@@ -66,7 +66,6 @@ class CustomerServiceAgentManagementService {
    * @returns {Promise<number>} 用户ID
    */
   static async resolveUserIdByMobile(mobile, options = {}) {
-    const models = require('../models')
     const { User } = models
 
     const user = await User.findOne({
@@ -100,7 +99,6 @@ class CustomerServiceAgentManagementService {
   static async getAgentList(options = {}) {
     const { page = 1, page_size = 20, status, search } = options
 
-    const models = require('../models')
     const { CustomerServiceAgent, User, CustomerServiceUserAssignment } = models
 
     const where = {}
@@ -172,7 +170,6 @@ class CustomerServiceAgentManagementService {
    * @returns {Promise<Object>} 操作结果
    */
   static async getAgentDetail(agentId) {
-    const models = require('../models')
     const { CustomerServiceAgent, User, CustomerServiceUserAssignment } = models
 
     const agent = await CustomerServiceAgent.findByPk(agentId, {
@@ -223,7 +220,6 @@ class CustomerServiceAgentManagementService {
     const { transaction } = options
     if (!transaction) throw new Error('createAgent 必须在事务内执行')
 
-    const models = require('../models')
     const { CustomerServiceAgent, User } = models
 
     const user = await User.findByPk(data.user_id, { transaction })
@@ -279,7 +275,6 @@ class CustomerServiceAgentManagementService {
     const { transaction } = options
     if (!transaction) throw new Error('updateAgent 必须在事务内执行')
 
-    const models = require('../models')
     const { CustomerServiceAgent } = models
 
     const agent = await CustomerServiceAgent.findByPk(agentId, { transaction })
@@ -328,7 +323,6 @@ class CustomerServiceAgentManagementService {
     const { transaction } = options
     if (!transaction) throw new Error('deleteAgent 必须在事务内执行')
 
-    const models = require('../models')
     const { CustomerServiceAgent, CustomerServiceUserAssignment } = models
 
     const agent = await CustomerServiceAgent.findByPk(agentId, { transaction })
@@ -382,7 +376,6 @@ class CustomerServiceAgentManagementService {
   static async getAssignmentList(options = {}) {
     const { page = 1, page_size = 20, agent_id, status, search } = options
 
-    const models = require('../models')
     const { CustomerServiceUserAssignment, User, CustomerServiceAgent } = models
 
     const where = {}
@@ -456,7 +449,6 @@ class CustomerServiceAgentManagementService {
     const { transaction } = options
     if (!transaction) throw new Error('createAssignment 必须在事务内执行')
 
-    const models = require('../models')
     const { CustomerServiceUserAssignment, CustomerServiceAgent, User } = models
 
     const user = await User.findByPk(data.user_id, { transaction })
@@ -567,7 +559,6 @@ class CustomerServiceAgentManagementService {
     const { transaction } = options
     if (!transaction) throw new Error('removeAssignment 必须在事务内执行')
 
-    const models = require('../models')
     const { CustomerServiceUserAssignment } = models
 
     const assignment = await CustomerServiceUserAssignment.findByPk(assignmentId, { transaction })
@@ -597,7 +588,6 @@ class CustomerServiceAgentManagementService {
    * @returns {Promise<Object>} 工作负载统计
    */
   static async getWorkloadOverview() {
-    const models = require('../models')
     const { CustomerServiceAgent, User, CustomerServiceSession } = models
 
     const agents = await CustomerServiceAgent.findAll({

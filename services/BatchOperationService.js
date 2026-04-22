@@ -497,7 +497,6 @@ class BatchOperationService {
         status: log.status,
         status_name: log.getStatusDisplayName(),
         total_count: totalCount,
-        total: totalCount,
         success_count: log.success_count,
         fail_count: log.fail_count,
         success_rate: log.getSuccessRate(),

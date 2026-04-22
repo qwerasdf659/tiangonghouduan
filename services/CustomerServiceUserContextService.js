@@ -1,3 +1,4 @@
+const UserDataQueryService = require('./UserDataQueryService')
 /**
  * 客服用户上下文聚合查询服务（CustomerServiceUserContextService）
  *
@@ -38,8 +39,6 @@ class CustomerServiceUserContextService {
    * @returns {Object} 用户基本信息 + 各模块统计计数
    */
   static async getSummary(models, userId) {
-    const UserDataQueryService = require('./UserDataQueryService')
-
     /* 委托 UserDataQueryService 获取用户基本信息和资产汇总 */
     const overview = await UserDataQueryService.getUserOverview(models, userId)
 
@@ -85,8 +84,6 @@ class CustomerServiceUserContextService {
    * @returns {Object} { balances: [...], transactions: { rows: [...], count, page, page_size } }
    */
   static async getAssets(models, userId, params = {}) {
-    const UserDataQueryService = require('./UserDataQueryService')
-
     /* 查询用户账户，获取 account_id 用于余额查询 */
     const account = await models.Account.findOne({
       where: { user_id: userId },
@@ -176,8 +173,6 @@ class CustomerServiceUserContextService {
    * @returns {Object} { summary: {...}, records: { rows, count, page, page_size } }
    */
   static async getLottery(models, userId, params = {}) {
-    const UserDataQueryService = require('./UserDataQueryService')
-
     /* 计算抽奖统计摘要（按档位分布） */
     const [totalCount, tierCounts, guaranteeCount] = await Promise.all([
       models.LotteryDraw.count({ where: { user_id: userId } }),
@@ -226,8 +221,6 @@ class CustomerServiceUserContextService {
    * @returns {Object} { orders: {...}, listings: {...}, stats: {...} }
    */
   static async getTrades(models, userId, params = {}) {
-    const UserDataQueryService = require('./UserDataQueryService')
-
     /* 委托 UserDataQueryService 获取交易订单和市场挂单 */
     const [orders, listings] = await Promise.all([
       UserDataQueryService.getTradeRecords(models, userId, {

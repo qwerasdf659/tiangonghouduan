@@ -19,17 +19,7 @@ const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const TransactionManager = require('../../../../utils/TransactionManager')
 const logger = require('../../../../utils/logger').logger
-
-/**
- * 异步路由处理器包装
- * @param {Function} fn - 异步路由处理函数
- * @returns {Function} Express 中间件
- */
-function asyncHandler(fn) {
-  return (req, res, next) => {
-    Promise.resolve(fn(req, res, next)).catch(next)
-  }
-}
+const { asyncHandler } = require('../../../../middleware/validation')
 
 router.use(authenticateToken, requireRoleLevel(60))
 
@@ -37,7 +27,7 @@ router.use(authenticateToken, requireRoleLevel(60))
 router.get(
   '/',
   asyncHandler(async (req, res) => {
-    const DIYService = require('../../../../services').getService('diy')
+    const DIYService = req.app.locals.services.getService('diy')
     const result = await DIYService.getAdminWorkList(req.query)
     return res.apiSuccess(result, '获取作品列表成功')
   })
@@ -47,7 +37,7 @@ router.get(
 router.get(
   '/:id',
   asyncHandler(async (req, res) => {
-    const DIYService = require('../../../../services').getService('diy')
+    const DIYService = req.app.locals.services.getService('diy')
     const work = await DIYService.getAdminWorkDetail(Number(req.params.id))
     return res.apiSuccess(work, '获取作品详情成功')
   })
@@ -57,7 +47,7 @@ router.get(
 router.get(
   '/:id/order',
   asyncHandler(async (req, res) => {
-    const DIYService = require('../../../../services').getService('diy')
+    const DIYService = req.app.locals.services.getService('diy')
     const record = await DIYService.getWorkExchangeRecord(Number(req.params.id))
     return res.apiSuccess(record, record ? '获取关联订单成功' : '该作品暂无关联订单')
   })
@@ -71,7 +61,7 @@ router.get(
 router.put(
   '/:id/address',
   asyncHandler(async (req, res) => {
-    const DIYService = require('../../../../services').getService('diy')
+    const DIYService = req.app.locals.services.getService('diy')
     const { receiver_name, receiver_phone, province, city, district, detail_address } = req.body
 
     if (!receiver_name || !receiver_phone || !detail_address) {

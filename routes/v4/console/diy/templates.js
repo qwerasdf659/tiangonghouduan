@@ -21,17 +21,7 @@ const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const TransactionManager = require('../../../../utils/TransactionManager')
 const logger = require('../../../../utils/logger').logger
-
-/**
- * 异步路由处理器包装
- * @param {Function} fn - 异步路由处理函数
- * @returns {Function} Express 中间件
- */
-function asyncHandler(fn) {
-  return (req, res, next) => {
-    Promise.resolve(fn(req, res, next)).catch(next)
-  }
-}
+const { asyncHandler } = require('../../../../middleware/validation')
 
 // 全局认证 + 基础权限（role_level >= 60）
 router.use(authenticateToken, requireRoleLevel(60))
@@ -40,7 +30,7 @@ router.use(authenticateToken, requireRoleLevel(60))
 router.get(
   '/',
   asyncHandler(async (req, res) => {
-    const DIYService = require('../../../../services').getService('diy')
+    const DIYService = req.app.locals.services.getService('diy')
     const result = await DIYService.getTemplateList(req.query)
     return res.apiSuccess(result, '获取模板列表成功')
   })
@@ -50,7 +40,7 @@ router.get(
 router.get(
   '/:id',
   asyncHandler(async (req, res) => {
-    const DIYService = require('../../../../services').getService('diy')
+    const DIYService = req.app.locals.services.getService('diy')
     const template = await DIYService.getTemplateDetail(Number(req.params.id))
     return res.apiSuccess(template, '获取模板详情成功')
   })
@@ -60,7 +50,7 @@ router.get(
 router.post(
   '/',
   asyncHandler(async (req, res) => {
-    const DIYService = require('../../../../services').getService('diy')
+    const DIYService = req.app.locals.services.getService('diy')
     let template
     await TransactionManager.execute(async transaction => {
       template = await DIYService.createTemplate(req.body, { transaction })
@@ -81,7 +71,7 @@ router.post(
 router.put(
   '/:id',
   asyncHandler(async (req, res) => {
-    const DIYService = require('../../../../services').getService('diy')
+    const DIYService = req.app.locals.services.getService('diy')
     let template
     await TransactionManager.execute(async transaction => {
       template = await DIYService.updateTemplate(Number(req.params.id), req.body, { transaction })
@@ -108,7 +98,7 @@ router.put(
 router.put(
   '/:id/status',
   asyncHandler(async (req, res) => {
-    const DIYService = require('../../../../services').getService('diy')
+    const DIYService = req.app.locals.services.getService('diy')
     const { status } = req.body
 
     if (!status) {
@@ -137,7 +127,7 @@ router.delete(
   '/:id',
   requireRoleLevel(80),
   asyncHandler(async (req, res) => {
-    const DIYService = require('../../../../services').getService('diy')
+    const DIYService = req.app.locals.services.getService('diy')
     await TransactionManager.execute(async transaction => {
       await DIYService.deleteTemplate(Number(req.params.id), { transaction })
     })

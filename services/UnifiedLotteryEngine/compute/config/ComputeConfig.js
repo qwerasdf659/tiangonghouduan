@@ -2,6 +2,11 @@
 
 const crypto = require('crypto')
 const { logger } = require('../../../../utils/logger')
+const {
+  FeatureFlag,
+  LotteryStrategyConfig,
+  LotteryTierMatrixConfig
+} = require('../../../../models')
 
 /**
  * ComputeConfig - 抽奖策略引擎配置
@@ -532,7 +537,6 @@ async function isFeatureEnabledForContext(feature, context = {}) {
       }
       const flag_key = FEATURE_TO_FLAG_KEY[feature]
       if (flag_key) {
-        const { FeatureFlag } = require('../../../../models')
         const flag = await FeatureFlag.findByKey(flag_key)
         if (flag) {
           feature_flag_hit =
@@ -760,7 +764,6 @@ class DynamicConfigLoader {
 
     try {
       // 3. 动态导入模型（避免循环依赖）
-      const { LotteryStrategyConfig } = require('../../../../models')
 
       if (!LotteryStrategyConfig) {
         logger.warn('[ComputeConfig] LotteryStrategyConfig 模型未就绪，使用默认配置')
@@ -807,7 +810,6 @@ class DynamicConfigLoader {
 
     try {
       // 2. 动态导入模型
-      const { LotteryTierMatrixConfig } = require('../../../../models')
 
       if (!LotteryTierMatrixConfig) {
         logger.warn('[ComputeConfig] LotteryTierMatrixConfig 模型未就绪，使用默认矩阵')

@@ -33,6 +33,15 @@ const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
 const { assertAndGetTransaction } = require('../../utils/transactionHelpers')
 const logger = require('../../utils/logger').logger
 
+const AdminSystemService = require('../AdminSystemService')
+const {
+  isBlacklistedForMarket,
+  createMarketBlacklistError
+} = require('../../constants/TradableAssetTypes')
+const NotificationService = require('../NotificationService')
+const AuditLogService = require('../AuditLogService')
+const { OPERATION_TYPES } = require('../../constants/AuditOperationTypes')
+
 /**
  * 挂牌限制配置默认值（兜底，优先从 DB system_settings 读取）
  */
@@ -82,7 +91,6 @@ class MarketListingCoreService {
     }
 
     try {
-      const AdminSystemService = require('../AdminSystemService')
       const value = await AdminSystemService.getSettingValue(
         'marketplace',
         key,
@@ -126,8 +134,6 @@ class MarketListingCoreService {
    * @returns {Promise<Object>} 校验结果
    */
   static async validateListingAssetWhitelist(priceAssetCode) {
-    const AdminSystemService = require('../AdminSystemService')
-
     const whitelist = await AdminSystemService.getSettingValue(
       'marketplace',
       'allowed_listing_assets',
@@ -155,8 +161,6 @@ class MarketListingCoreService {
    * @returns {Promise<Object>} 校验结果
    */
   static async validatePriceRange(priceAssetCode, priceAmount) {
-    const AdminSystemService = require('../AdminSystemService')
-
     const minPrice = await AdminSystemService.getSettingValue(
       'marketplace',
       `min_price_${priceAssetCode}`,
@@ -838,10 +842,6 @@ class MarketListingCoreService {
     }
 
     // 交易市场黑名单检查
-    const {
-      isBlacklistedForMarket,
-      createMarketBlacklistError
-    } = require('../../constants/TradableAssetTypes')
     if (isBlacklistedForMarket(offer_asset_code)) {
       throw createMarketBlacklistError(offer_asset_code, offer_asset_code)
     }
@@ -937,7 +937,6 @@ class MarketListingCoreService {
 
     // 发送通知
     try {
-      const NotificationService = require('../NotificationService')
       await NotificationService.notifyListingCreated(seller_user_id, {
         market_listing_id: listing.market_listing_id,
         offer_asset_code,
@@ -1057,7 +1056,6 @@ class MarketListingCoreService {
 
     // 发送通知
     try {
-      const NotificationService = require('../NotificationService')
       await NotificationService.notifyListingWithdrawn(seller_user_id, {
         market_listing_id: listing.market_listing_id,
         offer_asset_code: listing.offer_asset_code,
@@ -1200,8 +1198,6 @@ class MarketListingCoreService {
     }
 
     // 记录审计日志（使用正确的操作类型）
-    const AuditLogService = require('../AuditLogService')
-    const { OPERATION_TYPES } = require('../../constants/AuditOperationTypes')
     await AuditLogService.logOperation({
       operator_id,
       operation_type: OPERATION_TYPES.MARKET_LISTING_ADMIN_WITHDRAW,
@@ -1242,7 +1238,6 @@ class MarketListingCoreService {
    */
   static async _checkWithdrawRateLimit(sellerUserId, transaction) {
     try {
-      const AdminSystemService = require('../AdminSystemService')
       const dailyLimit = await AdminSystemService.getSettingValue(
         'marketplace',
         'daily_withdraw_limit',
@@ -1289,7 +1284,6 @@ class MarketListingCoreService {
    */
   static async _checkHighCancelRate(sellerUserId, transaction) {
     try {
-      const AdminSystemService = require('../AdminSystemService')
       const threshold = await AdminSystemService.getSettingValue(
         'marketplace',
         'high_cancel_rate_threshold',
@@ -1345,7 +1339,6 @@ class MarketListingCoreService {
    */
   static async checkPriceControl(priceAmount, priceAssetCode) {
     try {
-      const AdminSystemService = require('../AdminSystemService')
       const minPrice = await AdminSystemService.getSettingValue(
         'marketplace',
         `listing_price_min_${priceAssetCode}`,

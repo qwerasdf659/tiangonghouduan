@@ -31,6 +31,7 @@
 
 const BaseStage = require('./BaseStage')
 const { LotteryDraw, LotteryPrize } = require('../../../../models')
+const { DynamicConfigLoader } = require('../../compute/config/ComputeConfig')
 
 /**
  * 默认保底阈值（抽奖次数）
@@ -80,7 +81,6 @@ class GuaranteeStage extends BaseStage {
       const prizes = campaign_data.prizes || []
 
       // 从 lottery_strategy_config 读取保底配置（三层优先级：DB活动级 > env > 代码默认值）
-      const { DynamicConfigLoader } = require('../../compute/config/ComputeConfig')
       const guarantee_enabled =
         (await DynamicConfigLoader.getValue('guarantee', 'enabled', false, {
           lottery_campaign_id

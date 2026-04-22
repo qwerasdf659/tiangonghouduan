@@ -32,8 +32,6 @@ const router = express.Router()
 const logger = require('../../../../utils/logger').logger
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const { handleServiceError } = require('../../../../middleware/validation')
-const ServiceManager = require('../../../../services')
-
 router.use(authenticateToken, requireRoleLevel(100))
 
 /** 全局氛围主题合法值枚举 */
@@ -79,7 +77,7 @@ const THEME_META = {
  */
 router.get('/', async (req, res) => {
   try {
-    const AdminSystemService = ServiceManager.getService('admin_system')
+    const AdminSystemService = req.app.locals.services.getService('admin_system')
     const configData = await AdminSystemService.getConfigValue('app_theme')
 
     if (!configData) {
@@ -130,7 +128,7 @@ router.put('/', async (req, res) => {
       )
     }
 
-    const AdminSystemService = ServiceManager.getService('admin_system')
+    const AdminSystemService = req.app.locals.services.getService('admin_system')
     const configValue = { theme }
 
     await AdminSystemService.upsertConfig('app_theme', configValue, {

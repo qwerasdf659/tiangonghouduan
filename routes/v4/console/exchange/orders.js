@@ -14,6 +14,7 @@ const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const TransactionManager = require('../../../../utils/TransactionManager')
 const logger = require('../../../../utils/logger').logger
+const { handleServiceError } = require('../../../../middleware/validation')
 
 /** GET /shipping-companies - 快递公司列表 */
 router.get('/shipping-companies', authenticateToken, requireRoleLevel(100), async (req, res) => {
@@ -22,7 +23,7 @@ router.get('/shipping-companies', authenticateToken, requireRoleLevel(100), asyn
     const companies = ShippingService.getCompanies()
     return res.apiSuccess({ companies }, '获取快递公司列表成功')
   } catch (error) {
-    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -58,7 +59,7 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
     )
   } catch (error) {
     logger.error('[B2C兑换-订单] 查询失败', { error: error.message })
-    return res.apiError(error.message || '查询订单列表失败', 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -72,7 +73,7 @@ router.get('/:order_no', authenticateToken, requireRoleLevel(100), async (req, r
     if (error.errorCode === 'ORDER_NOT_FOUND' || error.statusCode === 404) {
       return res.apiError(error.message, 'NOT_FOUND', null, 404)
     }
-    return res.apiError(error.message || '查询订单详情失败', 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -104,7 +105,7 @@ router.get('/:order_no/track', authenticateToken, requireRoleLevel(100), async (
     })
   } catch (error) {
     logger.error('[B2C兑换-订单] 物流查询失败', { error: error.message })
-    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -135,7 +136,7 @@ router.post('/:order_no/approve', authenticateToken, requireRoleLevel(100), asyn
     if (error.statusCode === 400) {
       return res.apiError(error.message, 'BAD_REQUEST', error.data, 400)
     }
-    return res.apiError(error.message || '审核失败', 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -184,7 +185,7 @@ router.post('/:order_no/ship', authenticateToken, requireRoleLevel(100), async (
     if (error.statusCode === 400) {
       return res.apiError(error.message, 'BAD_REQUEST', error.data, 400)
     }
-    return res.apiError(error.message || '发货失败', 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -210,7 +211,7 @@ router.post('/:order_no/refund', authenticateToken, requireRoleLevel(100), async
     if (error.statusCode === 400) {
       return res.apiError(error.message, 'BAD_REQUEST', error.data, 400)
     }
-    return res.apiError(error.message || '退款失败', 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -236,7 +237,7 @@ router.post('/:order_no/reject', authenticateToken, requireRoleLevel(100), async
     if (error.statusCode === 400) {
       return res.apiError(error.message, 'BAD_REQUEST', error.data, 400)
     }
-    return res.apiError(error.message || '拒绝失败', 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -266,7 +267,7 @@ router.post('/:order_no/complete', authenticateToken, requireRoleLevel(100), asy
     if (error.statusCode === 400) {
       return res.apiError(error.message, 'BAD_REQUEST', error.data, 400)
     }
-    return res.apiError(error.message || '完成订单失败', 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 

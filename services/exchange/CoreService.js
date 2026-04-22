@@ -24,6 +24,11 @@ const { assertAndGetTransaction } = require('../../utils/transactionHelpers')
 const { getImageUrl } = require('../../utils/ImageUrlHelper')
 const OrderNoGenerator = require('../../utils/OrderNoGenerator')
 const { generateExchangeBusinessId } = require('../../utils/IdempotencyHelper')
+const BalanceService = require('../asset/BalanceService')
+const ItemService = require('../asset/ItemService')
+const AttributeRuleEngine = require('../item/AttributeRuleEngine')
+const { Op } = require('sequelize')
+const { getRedisClient } = require('../../utils/UnifiedRedisClient')
 
 /**
  * 兑换订单状态机白名单
@@ -146,7 +151,6 @@ class CoreService {
       /*
        * 🔴 幂等回放：补齐指纹字段（pay_asset_code/pay_amount）
        */
-      const BalanceService = require('../asset/BalanceService')
 
       const channelPrice = await this.ExchangeChannelPrice.findOne({
         where: { sku_id, is_enabled: true },
@@ -278,7 +282,6 @@ class CoreService {
     })
 
     // 3. 使用BalanceService统一账本扣减材料资产
-    const BalanceService = require('../asset/BalanceService')
 
     logger.info('[兑换市场] 开始扣减材料资产（统一账本）', {
       user_id,
@@ -477,8 +480,6 @@ class CoreService {
     let mintedItem = null
     if (mintInstance && itemTemplateId) {
       try {
-        const ItemService = require('../asset/ItemService')
-        const AttributeRuleEngine = require('../item/AttributeRuleEngine')
         const { ItemTemplate, ItemHold } = this.models
 
         const template = await ItemTemplate.findByPk(itemTemplateId, { transaction })
@@ -936,7 +937,6 @@ class CoreService {
    */
   async autoConfirmShippedOrders(options = {}) {
     const transaction = assertAndGetTransaction(options, 'CoreService.autoConfirmShippedOrders')
-    const { Op } = require('sequelize')
 
     const sevenDaysAgo = new Date()
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
@@ -1033,7 +1033,6 @@ class CoreService {
     }
 
     // 退还材料资产（与 exchangeItem 扣减完全对称）
-    const BalanceService = require('../asset/BalanceService')
     const burnAccount = await BalanceService.getOrCreateAccount(
       { system_code: 'SYSTEM_BURN' },
       { transaction }
@@ -1142,7 +1141,6 @@ class CoreService {
     }
 
     // 退还材料资产
-    const BalanceService = require('../asset/BalanceService')
     const burnAccount = await BalanceService.getOrCreateAccount(
       { system_code: 'SYSTEM_BURN' },
       { transaction }
@@ -1260,7 +1258,6 @@ class CoreService {
     await this._checkRefundRules(order, transaction)
 
     // 退还材料资产到用户账户
-    const BalanceService = require('../asset/BalanceService')
     const burnAccount = await BalanceService.getOrCreateAccount(
       { system_code: 'SYSTEM_BURN' },
       { transaction }
@@ -1462,7 +1459,6 @@ class CoreService {
     // 第一层：冷却期检查
     const cooldownHours = await getSettingValue('exchange/refund_cooldown_hours')
     if (cooldownHours > 0) {
-      const { getRedisClient } = require('../../utils/UnifiedRedisClient')
       const redis = await getRedisClient()
       const cooldownKey = `app:v4:refund_cooldown:${order.user_id}:${order.exchange_item_id || order.exchange_item_id}`
       const exists = await redis.exists(cooldownKey)
@@ -1477,7 +1473,6 @@ class CoreService {
     // 第二层：月限检查
     const monthlyLimit = await getSettingValue('exchange/refund_monthly_limit')
     if (monthlyLimit > 0) {
-      const { Op } = require('sequelize')
       const startOfMonth = new Date()
       startOfMonth.setDate(1)
       startOfMonth.setHours(0, 0, 0, 0)

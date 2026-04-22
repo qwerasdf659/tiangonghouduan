@@ -22,6 +22,7 @@
 
 const BaseStage = require('./BaseStage')
 const { LotteryCampaign, LotteryPrize, LotteryTierRule } = require('../../../../models')
+const { DynamicConfigLoader } = require('../../compute/config/ComputeConfig')
 
 /**
  * 加载活动配置 Stage
@@ -190,7 +191,6 @@ class LoadCampaignStage extends BaseStage {
    * @private
    */
   async _getFallbackPrize(prizes, campaign) {
-    const { DynamicConfigLoader } = require('../../compute/config/ComputeConfig')
     const campaign_opts = { lottery_campaign_id: campaign.lottery_campaign_id }
 
     /* 检查 tier_fallback 策略开关，关闭时跳过兜底奖品指定 */

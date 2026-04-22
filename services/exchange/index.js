@@ -21,7 +21,7 @@
 
 const CoreService = require('./CoreService')
 const QueryService = require('./QueryService')
-const AdminService = require('./AdminService')
+const AdminService = require('./admin')
 const BidService = require('./BidService')
 const BidQueryService = require('./BidQueryService')
 // ⚠️ ExchangeRateService 已合并到 AssetConversionRuleService（2026-04-05）

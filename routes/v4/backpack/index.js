@@ -22,21 +22,9 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, getUserRoles } = require('../../../middleware/auth')
-const { handleServiceError } = require('../../../middleware/validation')
+const { handleServiceError, asyncHandler } = require('../../../middleware/validation')
 const TransactionManager = require('../../../utils/TransactionManager')
 const logger = require('../../../utils/logger').logger
-
-/**
- * 错误处理包装器
- *
- * @param {Function} fn - 异步处理函数
- * @returns {Function} 包装后的中间件函数
- */
-function asyncHandler(fn) {
-  return (req, res, next) => {
-    Promise.resolve(fn(req, res, next)).catch(next)
-  }
-}
 
 /**
  * GET /api/v4/backpack
@@ -221,7 +209,7 @@ router.post(
       let qrData = null
       try {
         const { getRedemptionQRSigner } = require('../../../utils/RedemptionQRSigner')
-        const AdminSystemService = require('../../../services/AdminSystemService')
+        const AdminSystemService = req.app.locals.services.getService('admin_system')
         const signer = getRedemptionQRSigner()
         const codeHash = require('../../../utils/RedemptionCodeGenerator').hash(result.code)
         const qrExpiryMinutes = Number(
@@ -298,7 +286,7 @@ router.post(
       }
 
       const { getRedemptionQRSigner } = require('../../../utils/RedemptionQRSigner')
-      const AdminSystemService = require('../../../services/AdminSystemService')
+      const AdminSystemService = req.app.locals.services.getService('admin_system')
       const signer = getRedemptionQRSigner()
       const qrExpiryMinutes = Number(
         await AdminSystemService.getSettingValue('redemption', 'qr_code_expiry_minutes', 5)

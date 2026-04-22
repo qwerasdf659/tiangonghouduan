@@ -26,6 +26,7 @@
 const logger = require('../utils/logger').logger
 const { getRawClient } = require('../utils/UnifiedRedisClient')
 const BeijingTimeHelper = require('../utils/timeHelper')
+const crypto = require('crypto')
 
 /**
  * Redis Key 前缀常量
@@ -203,7 +204,6 @@ class SmsService {
    * @private
    */
   static _generateCode(length) {
-    const crypto = require('crypto')
     const digits = '0123456789'
     let code = ''
     for (let i = 0; i < length; i++) {

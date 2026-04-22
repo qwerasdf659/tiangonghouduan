@@ -1,8 +1,13 @@
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
 
+# 字段黑名单扫描（防止已废弃的映射字段名回归）
+node scripts/validation/check_field_blacklist.js || exit 1
+
+# API 响应字段合约扫描（防止路由层引入黑名单字段）
+node scripts/validation/check_api_field_contract.js || exit 1
+
 # 路由层规范检查（增量门禁，仅检查暂存区文件）
-# 注意：当前为警告模式，不阻止提交；启用严格模式：添加 --strict 参数
 node scripts/validation/check_route_layer_compliance.js --staged || echo "⚠️ 路由层规范检查发现问题，请查看上方输出"
 
 npx lint-staged

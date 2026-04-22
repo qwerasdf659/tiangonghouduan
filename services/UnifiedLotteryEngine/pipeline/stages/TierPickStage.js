@@ -553,7 +553,6 @@ class TierPickStage extends BaseStage {
   async _resolveUserSegment(user_id, campaign) {
     try {
       // 从 lottery_strategy_config 读取分群版本（三层优先级：DB活动级 > env > 代码默认值）
-      const { DynamicConfigLoader } = require('../../compute/config/ComputeConfig')
       const resolver_version = await DynamicConfigLoader.getValue(
         'segment',
         'resolver_version',

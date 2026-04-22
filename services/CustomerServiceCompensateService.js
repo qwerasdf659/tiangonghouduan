@@ -20,6 +20,8 @@
  */
 
 const logger = require('../utils/logger').logger
+const BalanceService = require('./asset/BalanceService')
+const ItemService = require('./asset/ItemService')
 
 /**
  * 客服补偿发放服务
@@ -64,7 +66,6 @@ class CustomerServiceCompensateService {
     for (const compensateItem of items) {
       if (compensateItem.type === 'asset') {
         /* 资产补偿：委托 BalanceService */
-        const BalanceService = require('./asset/BalanceService')
         const idempotencyKey = `cs_compensate_${issue_id || session_id || Date.now()}_${compensateItem.asset_code}_${Date.now()}`
 
         const reserveAccount = await BalanceService.getOrCreateAccount(
@@ -102,7 +103,6 @@ class CustomerServiceCompensateService {
         )
       } else if (compensateItem.type === 'item') {
         /* 物品补偿：委托 ItemService */
-        const ItemService = require('./asset/ItemService')
         const quantity = compensateItem.quantity || 1
 
         for (let i = 0; i < quantity; i++) {

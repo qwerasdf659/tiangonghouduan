@@ -24,6 +24,7 @@ const logger = require('../../utils/logger').logger
 const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
 const displayNameHelper = require('../../utils/displayNameHelper')
 const { Op } = require('sequelize')
+const { fetchProductMediaGallery } = require('../../utils/mediaAttachmentGallery')
 
 /**
  * 🎯 统一商品视图常量（ExchangeItem 模型，统一商品中心）
@@ -473,7 +474,6 @@ class QueryService {
         throw new Error('商品不存在')
       }
 
-      const { fetchProductMediaGallery } = require('../../utils/mediaAttachmentGallery')
       const { images, detail_images, showcase_images } = await fetchProductMediaGallery(
         this.models,
         item_id
@@ -1342,7 +1342,6 @@ class QueryService {
         throw err
       }
 
-      const { fetchProductMediaGallery } = require('../../utils/mediaAttachmentGallery')
       const { images, detail_images, showcase_images } = await fetchProductMediaGallery(
         this.models,
         productId

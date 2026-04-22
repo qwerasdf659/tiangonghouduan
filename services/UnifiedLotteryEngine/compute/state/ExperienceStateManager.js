@@ -25,6 +25,7 @@
  */
 
 const { logger } = require('../../../../utils/logger')
+const { LotteryUserExperienceState } = require('../../../../models')
 
 /**
  * 活动级体验状态管理器
@@ -49,7 +50,6 @@ class ExperienceStateManager {
    */
   _getModel() {
     if (!this.model) {
-      const { LotteryUserExperienceState } = require('../../../../models')
       this.model = LotteryUserExperienceState
     }
     return this.model

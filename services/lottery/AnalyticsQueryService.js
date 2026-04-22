@@ -23,6 +23,7 @@
 const { Op, fn, col, literal } = require('sequelize')
 const logger = require('../../utils/logger').logger
 const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
+const { LotteryDraw, LotteryPrize, LotteryCampaign } = require('../../models')
 
 /**
  * 缓存配置
@@ -48,15 +49,15 @@ class LotteryAnalyticsQueryService {
    * 获取抽奖趋势分析（按小时）
    * 热点查询 - 启用缓存
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lotteryCampaignId - 抽奖活动ID
    * @param {Object} options - 查询选项
    * @param {string} [options.start_date] - 开始日期
    * @param {string} [options.end_date] - 结束日期
    * @returns {Promise<Object>} 趋势数据
    */
-  static async getHourlyTrend(campaign_id, options = {}) {
+  static async getHourlyTrend(lotteryCampaignId, options = {}) {
     const { start_date, end_date } = options
-    const cacheKey = `lottery:analytics:hourly:${campaign_id}:${start_date || 'all'}:${end_date || 'all'}`
+    const cacheKey = `lottery:analytics:hourly:${lotteryCampaignId}:${start_date || 'all'}:${end_date || 'all'}`
 
     // 尝试从缓存获取
     const cached = await BusinessCacheHelper.get(cacheKey)
@@ -65,10 +66,8 @@ class LotteryAnalyticsQueryService {
       return cached
     }
 
-    const { LotteryDraw } = require('../../models')
-
     // 构建日期过滤
-    const where = { lottery_campaign_id: parseInt(campaign_id) }
+    const where = { lottery_campaign_id: parseInt(lotteryCampaignId) }
     if (start_date || end_date) {
       where.created_at = {}
       if (start_date) where.created_at[Op.gte] = new Date(start_date)
@@ -93,7 +92,7 @@ class LotteryAnalyticsQueryService {
     })
 
     const result = {
-      campaign_id: parseInt(campaign_id),
+      lottery_campaign_id: parseInt(lotteryCampaignId),
       data_points: trend.map(item => ({
         hour: item.hour,
         draw_count: parseInt(item.draw_count) || 0,
@@ -115,15 +114,15 @@ class LotteryAnalyticsQueryService {
    * 获取抽奖趋势分析（按天）
    * 热点查询 - 启用缓存
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lotteryCampaignId - 抽奖活动ID
    * @param {Object} options - 查询选项
    * @param {string} [options.start_date] - 开始日期
    * @param {string} [options.end_date] - 结束日期
    * @returns {Promise<Object>} 趋势数据
    */
-  static async getDailyTrend(campaign_id, options = {}) {
+  static async getDailyTrend(lotteryCampaignId, options = {}) {
     const { start_date, end_date } = options
-    const cacheKey = `lottery:analytics:daily:${campaign_id}:${start_date || 'all'}:${end_date || 'all'}`
+    const cacheKey = `lottery:analytics:daily:${lotteryCampaignId}:${start_date || 'all'}:${end_date || 'all'}`
 
     // 尝试从缓存获取
     const cached = await BusinessCacheHelper.get(cacheKey)
@@ -132,10 +131,8 @@ class LotteryAnalyticsQueryService {
       return cached
     }
 
-    const { LotteryDraw } = require('../../models')
-
     // 构建日期过滤
-    const where = { lottery_campaign_id: parseInt(campaign_id) }
+    const where = { lottery_campaign_id: parseInt(lotteryCampaignId) }
     if (start_date || end_date) {
       where.created_at = {}
       if (start_date) where.created_at[Op.gte] = new Date(start_date)
@@ -160,7 +157,7 @@ class LotteryAnalyticsQueryService {
     })
 
     const result = {
-      campaign_id: parseInt(campaign_id),
+      lottery_campaign_id: parseInt(lotteryCampaignId),
       data_points: trend.map(item => ({
         date: item.date,
         draw_count: parseInt(item.draw_count) || 0,
@@ -182,11 +179,11 @@ class LotteryAnalyticsQueryService {
    * 获取奖品分布统计
    * 热点查询 - 启用缓存
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lotteryCampaignId - 抽奖活动ID
    * @returns {Promise<Object>} 奖品分布统计
    */
-  static async getPrizeDistribution(campaign_id) {
-    const cacheKey = `lottery:analytics:prize_dist:${campaign_id}`
+  static async getPrizeDistribution(lotteryCampaignId) {
+    const cacheKey = `lottery:analytics:prize_dist:${lotteryCampaignId}`
 
     // 尝试从缓存获取
     const cached = await BusinessCacheHelper.get(cacheKey)
@@ -195,13 +192,11 @@ class LotteryAnalyticsQueryService {
       return cached
     }
 
-    const { LotteryDraw, LotteryPrize } = require('../../models')
-
     // 按奖品分组统计
     const distribution = await LotteryDraw.findAll({
       attributes: ['lottery_prize_id', [fn('COUNT', col('lottery_draw_id')), 'win_count']],
       where: {
-        lottery_campaign_id: parseInt(campaign_id),
+        lottery_campaign_id: parseInt(lotteryCampaignId),
         lottery_prize_id: { [Op.ne]: null }
       },
       include: [
@@ -222,7 +217,7 @@ class LotteryAnalyticsQueryService {
     const totalWins = distribution.reduce((sum, item) => sum + parseInt(item.win_count), 0)
 
     const result = {
-      campaign_id: parseInt(campaign_id),
+      lottery_campaign_id: parseInt(lotteryCampaignId),
       total_wins: totalWins,
       prizes: distribution.map(item => ({
         lottery_prize_id: item.lottery_prize_id,
@@ -243,24 +238,22 @@ class LotteryAnalyticsQueryService {
   /**
    * 获取档位分布统计
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lotteryCampaignId - 抽奖活动ID
    * @returns {Promise<Object>} 档位分布统计
    */
-  static async getTierDistribution(campaign_id) {
-    const cacheKey = `lottery:analytics:tier_dist:${campaign_id}`
+  static async getTierDistribution(lotteryCampaignId) {
+    const cacheKey = `lottery:analytics:tier_dist:${lotteryCampaignId}`
 
     const cached = await BusinessCacheHelper.get(cacheKey)
     if (cached) {
       return cached
     }
 
-    const { LotteryDraw, LotteryPrize } = require('../../models')
-
     // 按档位分组统计
     const distribution = await LotteryDraw.findAll({
       attributes: [[fn('COUNT', col('LotteryDraw.lottery_draw_id')), 'win_count']],
       where: {
-        lottery_campaign_id: parseInt(campaign_id),
+        lottery_campaign_id: parseInt(lotteryCampaignId),
         lottery_prize_id: { [Op.ne]: null }
       },
       include: [
@@ -280,7 +273,7 @@ class LotteryAnalyticsQueryService {
     const totalWins = distribution.reduce((sum, item) => sum + parseInt(item.win_count), 0)
 
     const result = {
-      campaign_id: parseInt(campaign_id),
+      lottery_campaign_id: parseInt(lotteryCampaignId),
       total_wins: totalWins,
       tiers: distribution.map(item => ({
         reward_tier: item.prize?.reward_tier,
@@ -298,11 +291,11 @@ class LotteryAnalyticsQueryService {
    * 获取活动效果分析
    * 热点查询 - 启用缓存
    *
-   * @param {number} campaign_id - 活动ID
+   * @param {number} lotteryCampaignId - 抽奖活动ID
    * @returns {Promise<Object>} 活动效果分析
    */
-  static async getCampaignEffectAnalysis(campaign_id) {
-    const cacheKey = `lottery:analytics:effect:${campaign_id}`
+  static async getCampaignEffectAnalysis(lotteryCampaignId) {
+    const cacheKey = `lottery:analytics:effect:${lotteryCampaignId}`
 
     const cached = await BusinessCacheHelper.get(cacheKey)
     if (cached) {
@@ -310,10 +303,8 @@ class LotteryAnalyticsQueryService {
       return cached
     }
 
-    const { LotteryDraw, LotteryCampaign } = require('../../models')
-
     // 获取活动信息
-    const campaign = await LotteryCampaign.findByPk(parseInt(campaign_id), {
+    const campaign = await LotteryCampaign.findByPk(parseInt(lotteryCampaignId), {
       attributes: ['lottery_campaign_id', 'campaign_name', 'status', 'start_time', 'end_time']
     })
 
@@ -325,18 +316,18 @@ class LotteryAnalyticsQueryService {
     const [totalDraws, winDraws, uniqueUsers, repeatUsers] = await Promise.all([
       // 总抽奖次数
       LotteryDraw.count({
-        where: { lottery_campaign_id: parseInt(campaign_id) }
+        where: { lottery_campaign_id: parseInt(lotteryCampaignId) }
       }),
       // 中奖次数
       LotteryDraw.count({
         where: {
-          lottery_campaign_id: parseInt(campaign_id),
+          lottery_campaign_id: parseInt(lotteryCampaignId),
           lottery_prize_id: { [Op.ne]: null }
         }
       }),
       // 独立用户数
       LotteryDraw.count({
-        where: { lottery_campaign_id: parseInt(campaign_id) },
+        where: { lottery_campaign_id: parseInt(lotteryCampaignId) },
         distinct: true,
         col: 'user_id'
       }),
@@ -344,7 +335,7 @@ class LotteryAnalyticsQueryService {
       (async () => {
         const result = await LotteryDraw.findAll({
           attributes: ['user_id', [fn('COUNT', col('lottery_draw_id')), 'draw_count']],
-          where: { lottery_campaign_id: parseInt(campaign_id) },
+          where: { lottery_campaign_id: parseInt(lotteryCampaignId) },
           group: ['user_id'],
           having: literal('draw_count > 1'),
           raw: true
@@ -354,7 +345,7 @@ class LotteryAnalyticsQueryService {
     ])
 
     const result = {
-      campaign_id: parseInt(campaign_id),
+      lottery_campaign_id: parseInt(lotteryCampaignId),
       campaign_name: campaign.campaign_name,
       status: campaign.status,
       start_time: campaign.start_time,
@@ -381,17 +372,15 @@ class LotteryAnalyticsQueryService {
    *
    * @param {number} user_id - 用户ID
    * @param {Object} options - 查询选项
-   * @param {number} [options.campaign_id] - 活动ID（可选）
+   * @param {number} [options.lottery_campaign_id] - 抽奖活动ID（可选）
    * @returns {Promise<Object>} 用户行为分析
    */
   static async getUserBehaviorAnalysis(user_id, options = {}) {
-    const { LotteryDraw, LotteryPrize } = require('../../models')
-
-    const { campaign_id } = options
+    const { lottery_campaign_id: lotteryCampaignId } = options
 
     // 构建查询条件
     const where = { user_id: parseInt(user_id) }
-    if (campaign_id) where.lottery_campaign_id = parseInt(campaign_id)
+    if (lotteryCampaignId) where.lottery_campaign_id = parseInt(lotteryCampaignId)
 
     // 获取用户抽奖统计
     const [totalDraws, winDraws, prizeStats] = await Promise.all([
@@ -427,7 +416,7 @@ class LotteryAnalyticsQueryService {
 
     return {
       user_id: parseInt(user_id),
-      campaign_id: campaign_id ? parseInt(campaign_id) : null,
+      lottery_campaign_id: lotteryCampaignId ? parseInt(lotteryCampaignId) : null,
       metrics: {
         total_draws: totalDraws,
         win_draws: winDraws,
@@ -453,7 +442,6 @@ class LotteryAnalyticsQueryService {
   static async getDashboardStats(options = {}) {
     const { range = '7d', merchant_id } = options
     const { start_time, end_time } = this._getTimeRange(range)
-    const { LotteryDraw, LotteryPrize } = require('../../models')
 
     const queryOptions = {
       attributes: [
@@ -509,7 +497,6 @@ class LotteryAnalyticsQueryService {
   static async getDashboardTrend(options = {}) {
     const { range = '7d', granularity = 'day', merchant_id } = options
     const { start_time, end_time } = this._getTimeRange(range)
-    const { LotteryDraw, LotteryPrize } = require('../../models')
 
     const dateFormat =
       granularity === 'hour'
@@ -577,7 +564,6 @@ class LotteryAnalyticsQueryService {
   static async getDashboardPrizeDistribution(options = {}) {
     const { range = '7d', merchant_id } = options
     const { start_time, end_time } = this._getTimeRange(range)
-    const { LotteryDraw, LotteryPrize } = require('../../models')
 
     const TIER_NAMES = {
       high: '高级奖品',
@@ -643,7 +629,6 @@ class LotteryAnalyticsQueryService {
     const { range = '7d', sort_by = 'draws', merchant_id } = options
     const page_size = options.page_size ?? options.limit ?? 10
     const { start_time, end_time } = this._getTimeRange(range)
-    const { LotteryDraw, LotteryCampaign, LotteryPrize } = require('../../models')
 
     const includeList = [
       {

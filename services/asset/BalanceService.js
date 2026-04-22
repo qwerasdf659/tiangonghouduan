@@ -629,6 +629,20 @@ class BalanceService {
         )
       }
 
+      // 🛡️ 前置断言：冻结余额不能为负数（防止脏数据传播）
+      if (Number(balance.frozen_amount) < 0) {
+        throw new Error(
+          `冻结余额异常：account_id=${account.account_id}, asset_code=${asset_code}, frozen_amount=${balance.frozen_amount}（不应为负数，请排查数据一致性）`
+        )
+      }
+
+      // 🛡️ 前置断言：可用余额不能为负数
+      if (Number(balance.available_amount) < 0) {
+        throw new Error(
+          `可用余额异常：account_id=${account.account_id}, asset_code=${asset_code}, available_amount=${balance.available_amount}（不应为负数，请排查数据一致性）`
+        )
+      }
+
       // 记录变动前余额
       const available_before = Number(balance.available_amount)
       const frozen_before = Number(balance.frozen_amount)
@@ -862,6 +876,13 @@ class BalanceService {
       if (currentFrozen < unfreezeAmount) {
         throw new Error(
           `冻结余额不足：当前冻结余额${currentFrozen}个${asset_code}，需要解冻${unfreezeAmount}个，差额${unfreezeAmount - currentFrozen}个`
+        )
+      }
+
+      // 🛡️ 前置断言：冻结余额不能为负数（防止脏数据传播）
+      if (currentFrozen < 0) {
+        throw new Error(
+          `冻结余额异常：account_id=${account.account_id}, asset_code=${asset_code}, frozen_amount=${currentFrozen}（不应为负数，请排查数据一致性）`
         )
       }
 

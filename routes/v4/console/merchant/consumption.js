@@ -502,7 +502,7 @@ router.get('/qrcode/:user_id', authenticateToken, requireRoleLevel(100), async (
     const qrCodeInfo = QRCodeValidator.generateQRCodeInfo(userUuid)
 
     // 记录审计日志（非阻断）
-    const AuditLogService = require('../../../../services/AuditLogService')
+    const AuditLogService = req.app.locals.services.getService('audit_log')
     const { OPERATION_TYPES } = require('../../../../constants/AuditOperationTypes')
     AuditLogService.logOperation({
       admin_id,

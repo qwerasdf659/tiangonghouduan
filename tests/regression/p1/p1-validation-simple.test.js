@@ -26,12 +26,12 @@ describe('P1 修复简化验证', () => {
       console.log('✅ P1-1：MaterialConversionValidator.validate 方法存在')
     })
 
-    test('MaterialConversionRule 模型应该有 fromMaterial 和 toMaterial 关联', () => {
-      const { MaterialConversionRule } = require('../../../models')
-      expect(MaterialConversionRule.associations).toBeDefined()
-      expect(MaterialConversionRule.associations.fromMaterial).toBeDefined()
-      expect(MaterialConversionRule.associations.toMaterial).toBeDefined()
-      console.log('✅ P1-1：MaterialConversionRule 模型关联已定义')
+    test('AssetConversionRule 模型应该有 fromAssetType 和 toAssetType 关联', () => {
+      const { AssetConversionRule } = require('../../../models')
+      expect(AssetConversionRule.associations).toBeDefined()
+      expect(AssetConversionRule.associations.fromAssetType).toBeDefined()
+      expect(AssetConversionRule.associations.toAssetType).toBeDefined()
+      console.log('✅ P1-1：AssetConversionRule 模型关联已定义')
     })
   })
 

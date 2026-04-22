@@ -33,6 +33,7 @@ const logger = require('../utils/logger').logger
 const { ContentReviewRecord } = require('../models')
 const BeijingTimeHelper = require('../utils/timeHelper')
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
+const ApprovalChainService = require('./ApprovalChainService')
 
 /**
  * 内容审核引擎类
@@ -118,7 +119,6 @@ class ContentAuditEngine {
 
     // 2026-03-10: 审核链集成 — 创建审核记录后尝试匹配审核链模板
     try {
-      const ApprovalChainService = require('./ApprovalChainService')
       const businessData = {
         ...auditData,
         auditable_type: auditableType,

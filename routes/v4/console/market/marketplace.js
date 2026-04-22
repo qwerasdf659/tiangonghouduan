@@ -28,6 +28,7 @@ const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const TransactionManager = require('../../../../utils/TransactionManager')
 const logger = require('../../../../utils/logger').logger
+const { handleServiceError } = require('../../../../middleware/validation')
 
 // ==================== C2C 挂牌管理 CRUD ====================
 
@@ -101,7 +102,7 @@ router.get('/listings', authenticateToken, requireRoleLevel(100), async (req, re
       error: error.message,
       admin_id: req.user?.user_id
     })
-    return res.apiError(error.message || '查询失败', 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -129,7 +130,7 @@ router.get(
       return res.apiSuccess(listing, '获取挂牌详情成功')
     } catch (error) {
       logger.error('[C2C管理] 查询挂牌详情失败', { error: error.message })
-      return res.apiError(error.message || '查询失败', 'INTERNAL_ERROR', null, 500)
+      return handleServiceError(error, res)
     }
   }
 )
@@ -200,7 +201,7 @@ router.post('/listings', authenticateToken, requireRoleLevel(100), async (req, r
     ) {
       return res.apiError(error.message, 'VALIDATION_ERROR', null, 400)
     }
-    return res.apiError(error.message || '创建失败', 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -248,7 +249,7 @@ router.put(
       return res.apiSuccess(listing, '挂牌修改成功')
     } catch (error) {
       logger.error('[C2C管理] 修改挂牌失败', { error: error.message })
-      return res.apiError(error.message || '修改失败', 'INTERNAL_ERROR', null, 500)
+      return handleServiceError(error, res)
     }
   }
 )
@@ -294,7 +295,7 @@ router.delete(
       return res.apiSuccess({ market_listing_id: listingId }, '挂牌已删除')
     } catch (error) {
       logger.error('[C2C管理] 删除挂牌失败', { error: error.message })
-      return res.apiError(error.message || '删除失败', 'INTERNAL_ERROR', null, 500)
+      return handleServiceError(error, res)
     }
   }
 )
@@ -347,7 +348,7 @@ router.get('/listing-stats', authenticateToken, requireRoleLevel(100), async (re
       admin_id: req.user?.user_id
     })
 
-    return res.apiError(error.message || '查询失败', 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -415,7 +416,7 @@ router.get('/user-listings', authenticateToken, requireRoleLevel(100), async (re
     if (error.message.includes('用户不存在')) {
       return res.apiError(error.message, 'NOT_FOUND', null, 404)
     }
-    return res.apiError(error.message || '查询失败', 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -479,7 +480,7 @@ router.put('/user-listing-limit', authenticateToken, requireRoleLevel(100), asyn
     if (error.message.includes('必须') || error.message.includes('必填')) {
       return res.apiError(error.message, 'BAD_REQUEST', null, 400)
     }
-    return res.apiError(error.message || '调整失败', 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -494,41 +495,46 @@ router.put('/user-listing-limit', authenticateToken, requireRoleLevel(100), asyn
  *
  * @security JWT + Admin权限
  */
-router.put('/listings/:id/pin', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const listingId = parseInt(req.params.id)
-    const { is_pinned } = req.body
-    const { MarketListing } = req.app.locals.services.getService('exchange_admin').models
+router.put(
+  '/listings/:market_listing_id/pin',
+  authenticateToken,
+  requireRoleLevel(100),
+  async (req, res) => {
+    try {
+      const listingId = parseInt(req.params.market_listing_id)
+      const { is_pinned } = req.body
+      const { MarketListing } = req.app.locals.services.getService('exchange_admin').models
 
-    const result = await TransactionManager.execute(
-      async transaction => {
-        const listing = await MarketListing.findByPk(listingId, {
-          lock: transaction.LOCK.UPDATE,
-          transaction
-        })
-        if (!listing) throw new Error('挂牌不存在')
+      const result = await TransactionManager.execute(
+        async transaction => {
+          const listing = await MarketListing.findByPk(listingId, {
+            lock: transaction.LOCK.UPDATE,
+            transaction
+          })
+          if (!listing) throw new Error('挂牌不存在')
 
-        const pinned = is_pinned !== undefined ? !!is_pinned : !listing.is_pinned
-        const BeijingTimeHelper = require('../../../../utils/timeHelper')
-        await listing.update(
-          {
-            is_pinned: pinned,
-            pinned_at: pinned ? BeijingTimeHelper.createDatabaseTime() : null
-          },
-          { transaction }
-        )
+          const pinned = is_pinned !== undefined ? !!is_pinned : !listing.is_pinned
+          const BeijingTimeHelper = require('../../../../utils/timeHelper')
+          await listing.update(
+            {
+              is_pinned: pinned,
+              pinned_at: pinned ? BeijingTimeHelper.createDatabaseTime() : null
+            },
+            { transaction }
+          )
 
-        return { market_listing_id: listingId, is_pinned: pinned }
-      },
-      { description: `置顶挂牌 ${listingId}`, maxRetries: 1 }
-    )
+          return { market_listing_id: listingId, is_pinned: pinned }
+        },
+        { description: `置顶挂牌 ${listingId}`, maxRetries: 1 }
+      )
 
-    return res.apiSuccess(result, result.is_pinned ? '挂牌已置顶' : '已取消置顶')
-  } catch (error) {
-    logger.error('置顶挂牌失败', { error: error.message })
-    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+      return res.apiSuccess(result, result.is_pinned ? '挂牌已置顶' : '已取消置顶')
+    } catch (error) {
+      logger.error('置顶挂牌失败', { error: error.message })
+      return handleServiceError(error, res)
+    }
   }
-})
+)
 
 /**
  * 推荐/取消推荐挂牌
@@ -540,12 +546,12 @@ router.put('/listings/:id/pin', authenticateToken, requireRoleLevel(100), async 
  * @security JWT + Admin权限
  */
 router.put(
-  '/listings/:id/recommend',
+  '/listings/:market_listing_id/recommend',
   authenticateToken,
   requireRoleLevel(100),
   async (req, res) => {
     try {
-      const listingId = parseInt(req.params.id)
+      const listingId = parseInt(req.params.market_listing_id)
       const { is_recommended } = req.body
       const { MarketListing } = req.app.locals.services.getService('exchange_admin').models
 
@@ -569,7 +575,7 @@ router.put(
       return res.apiSuccess(result, result.is_recommended ? '挂牌已推荐' : '已取消推荐')
     } catch (error) {
       logger.error('推荐挂牌失败', { error: error.message })
-      return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+      return handleServiceError(error, res)
     }
   }
 )
@@ -611,7 +617,7 @@ router.put('/listings/batch-sort', authenticateToken, requireRoleLevel(100), asy
     const { BusinessCacheHelper } = require('../../../../utils/BusinessCacheHelper')
     await BusinessCacheHelper.invalidateMarketListings('batch_sort')
 
-    const AuditLogService = require('../../../../services/AuditLogService')
+    const AuditLogService = req.app.locals.services.getService('audit_log')
     await AuditLogService.logOperation({
       operator_id: req.user.user_id,
       operation_type: 'sort_change',
@@ -627,7 +633,7 @@ router.put('/listings/batch-sort', authenticateToken, requireRoleLevel(100), asy
     return res.apiSuccess(result, `已更新 ${result.updated_count} 个挂牌排序`)
   } catch (error) {
     logger.error('批量排序挂牌失败', { error: error.message })
-    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -753,7 +759,7 @@ router.post(
         return res.apiError(error.message, 'MISSING_WITHDRAW_REASON', null, 400)
       }
 
-      return res.apiError(error.message || '强制撤回失败', 'INTERNAL_ERROR', null, 500)
+      return handleServiceError(error, res)
     }
   }
 )
@@ -805,7 +811,7 @@ router.get('/stats/overview', authenticateToken, requireRoleLevel(100), async (r
       admin_id: req.user?.user_id
     })
 
-    return res.apiError(error.message || '查询失败', 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -848,7 +854,7 @@ router.get('/stats/price-history', authenticateToken, requireRoleLevel(100), asy
       admin_id: req.user?.user_id
     })
 
-    return res.apiError(error.message || '查询失败', 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -961,7 +967,7 @@ router.get(
         admin_id: req.user?.user_id
       })
 
-      return res.apiError(error.message || '查询失败', 'INTERNAL_ERROR', null, 500)
+      return handleServiceError(error, res)
     }
   }
 )

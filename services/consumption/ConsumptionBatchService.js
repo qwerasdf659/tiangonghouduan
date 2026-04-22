@@ -27,6 +27,11 @@ const { Op } = require('sequelize')
 const BeijingTimeHelper = require('../../utils/timeHelper')
 const TransactionManager = require('../../utils/TransactionManager')
 const logger = require('../../utils/logger').logger
+const { ConsumptionRecord, AdminOperationLog } = require('../../models')
+const CoreService = require('./CoreService')
+const ApprovalChainService = require('../ApprovalChainService')
+const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
+const AuditLogService = require('../AuditLogService')
 
 /**
  * 批量审核操作类型
@@ -98,7 +103,6 @@ class ConsumptionBatchService {
     }
 
     // 3. 获取待审核记录
-    const { ConsumptionRecord } = require('../../models')
     const records = await ConsumptionRecord.findAll({
       where: {
         consumption_record_id: { [Op.in]: record_ids },
@@ -215,8 +219,6 @@ class ConsumptionBatchService {
    */
   static async _processSingleRecord(record, options) {
     const { action, reason, operator_id } = options
-    const CoreService = require('./CoreService')
-    const ApprovalChainService = require('../ApprovalChainService')
     const recordId = record.consumption_record_id
 
     // 检查是否有进行中的审核链实例（与单条审核路由行为一致）
@@ -316,7 +318,6 @@ class ConsumptionBatchService {
    */
   static async _checkIdempotency(idempotencyKey) {
     try {
-      const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
       const cacheKey = `batch_review:idempotency:${idempotencyKey}`
       const cached = await BusinessCacheHelper.get(cacheKey)
 
@@ -345,7 +346,6 @@ class ConsumptionBatchService {
    */
   static async _cacheIdempotencyResult(idempotencyKey, result) {
     try {
-      const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
       const cacheKey = `batch_review:idempotency:${idempotencyKey}`
       // 缓存 24 小时
       await BusinessCacheHelper.set(cacheKey, result, 24 * 60 * 60)
@@ -364,7 +364,6 @@ class ConsumptionBatchService {
    */
   static async _logBatchOperation(result, operator_id) {
     try {
-      const AuditLogService = require('../AuditLogService')
       await AuditLogService.logOperation({
         operator_id,
         operation_type: 'consumption_batch_review',
@@ -409,8 +408,6 @@ class ConsumptionBatchService {
     const { operator_id, page = 1, page_size = 20 } = options
 
     try {
-      const { AdminOperationLog } = require('../../models')
-
       const where = {
         operation_type: 'consumption_batch_review'
       }

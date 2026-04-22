@@ -23,6 +23,7 @@
 const { AuthenticationSession } = require('../models')
 const logger = require('../utils/logger').logger
 const BeijingTimeHelper = require('../utils/timeHelper')
+const { Op } = require('sequelize')
 // 注：会话管理写操作不强制要求外部事务（单条操作或批量操作自行管理）
 
 /**
@@ -237,7 +238,6 @@ class SessionManagementService {
     )
 
     // 获取待清理的过期会话数
-    const { Op } = require('sequelize')
     const expiredPendingCleanup = await AuthenticationSession.count({
       where: {
         expires_at: { [Op.lt]: BeijingTimeHelper.createBeijingTime() }

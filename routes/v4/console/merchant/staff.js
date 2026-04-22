@@ -81,7 +81,7 @@ function handleServiceError(error, res, operation) {
     return res.apiError('服务繁忙，请稍后重试', 'TRANSACTION_ERROR', null, 500)
   }
 
-  return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+  return handleServiceError(error, res)
 }
 
 /*

@@ -22,7 +22,6 @@
 
 const express = require('express')
 const router = express.Router()
-const ServiceManager = require('../../../../services')
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const logger = require('../../../../utils/logger').logger
 
@@ -73,7 +72,7 @@ router.use(requireRoleLevel(100))
  */
 router.get('/provinces', async (req, res) => {
   try {
-    const regionService = ServiceManager.getService('region')
+    const regionService = req.app.locals.services.getService('region')
     const provinces = await regionService.getProvinces()
 
     return res.apiSuccess(provinces, '获取省级区划列表成功')
@@ -128,7 +127,7 @@ router.get('/children/:parent_code', async (req, res) => {
       return res.apiError('缺少父级区划代码', 'INVALID_PARAMS', null, 400)
     }
 
-    const regionService = ServiceManager.getService('region')
+    const regionService = req.app.locals.services.getService('region')
     const children = await regionService.getChildren(parent_code)
 
     return res.apiSuccess(children, '获取子级区划列表成功')
@@ -189,7 +188,7 @@ router.get('/search', async (req, res) => {
       options.limit = parseInt(page_size, 10)
     }
 
-    const regionService = ServiceManager.getService('region')
+    const regionService = req.app.locals.services.getService('region')
     const results = await regionService.search(keyword.trim(), options)
 
     return res.apiSuccess(results, '搜索区划成功')
@@ -241,7 +240,7 @@ router.get('/path/:region_code', async (req, res) => {
       return res.apiError('缺少区划代码', 'INVALID_PARAMS', null, 400)
     }
 
-    const regionService = ServiceManager.getService('region')
+    const regionService = req.app.locals.services.getService('region')
     const fullPath = await regionService.getFullPath(region_code)
 
     return res.apiSuccess(
@@ -297,7 +296,7 @@ router.get('/path/:region_code', async (req, res) => {
  */
 router.get('/stats', async (req, res) => {
   try {
-    const regionService = ServiceManager.getService('region')
+    const regionService = req.app.locals.services.getService('region')
     const stats = await regionService.getStats()
 
     return res.apiSuccess(stats, '获取区划统计信息成功')
@@ -370,7 +369,7 @@ router.post('/validate', async (req, res) => {
   try {
     const { province_code, city_code, district_code, street_code } = req.body
 
-    const regionService = ServiceManager.getService('region')
+    const regionService = req.app.locals.services.getService('region')
     const result = await regionService.validateStoreCodes({
       province_code,
       city_code,

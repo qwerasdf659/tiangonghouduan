@@ -23,6 +23,7 @@ const { Op } = require('sequelize')
 const logger = require('../../utils/logger').logger
 const BeijingTimeHelper = require('../../utils/timeHelper')
 const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
+const { AuthenticationSession, User } = require('../../models')
 
 /**
  * 缓存配置
@@ -57,7 +58,6 @@ class SessionQueryService {
    */
   static async getSessions(options = {}) {
     // 延迟加载模型，避免循环依赖
-    const { AuthenticationSession, User } = require('../../models')
 
     const {
       page = 1,
@@ -163,8 +163,6 @@ class SessionQueryService {
    * @returns {Promise<Object|null>} 会话详情
    */
   static async getSessionById(session_id) {
-    const { AuthenticationSession, User } = require('../../models')
-
     const sessionId = parseInt(session_id, 10)
     if (isNaN(sessionId) || sessionId <= 0) {
       return null
@@ -229,8 +227,6 @@ class SessionQueryService {
       return cached
     }
 
-    const { AuthenticationSession } = require('../../models')
-
     // 获取活跃会话统计（按用户类型分组）
     const activeStats = await AuthenticationSession.getActiveSessionStats()
 
@@ -294,7 +290,6 @@ class SessionQueryService {
       return cached
     }
 
-    const { AuthenticationSession, User } = require('../../models')
     const now = BeijingTimeHelper.createBeijingTime()
 
     // 查询所有活跃且未过期的会话

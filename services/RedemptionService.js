@@ -41,6 +41,8 @@ const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 const ItemService = require('./asset/ItemService')
 
 const logger = require('../utils/logger').logger
+const { getUserRoles } = require('../middleware/auth')
+const AdminSystemService = require('./AdminSystemService')
 
 /**
  * 兑换订单服务类
@@ -127,7 +129,6 @@ class RedemptionService {
       const isOwner = creatorAccount && item.owner_account_id === creatorAccount.account_id
 
       if (!isOwner) {
-        const { getUserRoles } = require('../middleware/auth')
         const userRoles = await getUserRoles(creator_user_id)
 
         if (userRoles.role_level < 100) {
@@ -169,7 +170,6 @@ class RedemptionService {
     const codeHash = RedemptionCodeGenerator.hash(code)
 
     // 3. 计算过期时间（从 SystemSettings 读取可配置有效期，决策9/P8）
-    const AdminSystemService = require('./AdminSystemService')
     const itemType = item.item_type || 'product'
     const settingKey =
       itemType === 'voucher' ? 'default_expiry_days_voucher' : 'default_expiry_days_product'

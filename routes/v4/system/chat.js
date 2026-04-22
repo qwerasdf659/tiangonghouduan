@@ -27,10 +27,7 @@ const logger = require('../../../utils/logger').logger
 const { authenticateToken } = require('../../../middleware/auth')
 const { handleServiceError } = require('../../../middleware/validation')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
-/*
- * P1-9：服务通过 ServiceManager 获取
- * const ChatRateLimitService = require('../../../services/ChatRateLimitService')
- */
+/* P1-9：服务通过 ServiceManager 获取 */
 const TransactionManager = require('../../../utils/TransactionManager')
 const businessConfig = require('../../../config/business.config')
 

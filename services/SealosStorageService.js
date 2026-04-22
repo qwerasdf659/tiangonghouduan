@@ -15,6 +15,7 @@ const AWS = require('aws-sdk')
 const crypto = require('crypto')
 const path = require('path')
 const BeijingTimeHelper = require('../utils/timeHelper')
+const sharp = require('sharp')
 
 /**
  * Sealos对象存储服务类
@@ -573,9 +574,6 @@ class SealosStorageService {
    * @returns {Object} result.thumbnail_keys - 缩略图对象 key { small, medium, large }
    */
   async uploadImageWithThumbnails(fileBuffer, originalName, folder = 'photos') {
-    const sharp = require('sharp')
-    const path = require('path')
-
     try {
       // 1. 检测原始图片格式是否为透明背景（PNG/WebP with alpha）
       const metadata = await sharp(fileBuffer).metadata()

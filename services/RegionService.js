@@ -21,6 +21,7 @@
 'use strict'
 
 const logger = require('../utils/logger')
+const { Op: _Op } = require('sequelize')
 
 /**
  * 行政区划服务类
@@ -391,7 +392,6 @@ class RegionService {
   async getStats() {
     try {
       // Op保留用于未来扩展复杂查询条件
-      const { Op: _Op } = require('sequelize')
 
       const [total, provinces, cities, districts, streets] = await Promise.all([
         this.AdministrativeRegion.count({ where: { status: 'active' } }),

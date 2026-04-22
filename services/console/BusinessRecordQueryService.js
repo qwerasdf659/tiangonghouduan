@@ -24,6 +24,20 @@
 
 const { Op, fn, col } = require('sequelize')
 const logger = require('../../utils/logger').logger
+const {
+  AdminOperationLog,
+  User,
+  RedemptionOrder,
+  Item,
+  ContentReviewRecord,
+  ExchangeRecord,
+  ExchangeItem,
+  ChatMessage,
+  CustomerServiceSession,
+  ReminderHistory,
+  sequelize,
+  ReminderRule
+} = require('../../models')
 
 /**
  * 构建分页和排序选项
@@ -71,7 +85,6 @@ class BusinessRecordQueryService {
    * @returns {Promise<Object>} { records, pagination }
    */
   static async getLotteryClearSettings(options = {}) {
-    const { AdminOperationLog, User } = require('../../models')
     const { admin_id, target_user_id } = options
     const { page, page_size, limit, offset } = buildPaginationOptions(options)
 
@@ -107,8 +120,6 @@ class BusinessRecordQueryService {
    * @returns {Promise<Object|null>} 记录详情
    */
   static async getLotteryClearSettingDetail(logId) {
-    const { AdminOperationLog, User } = require('../../models')
-
     const record = await AdminOperationLog.findOne({
       where: { log_id: logId, operation_type: 'lottery_clear_settings' },
       include: [
@@ -148,8 +159,6 @@ class BusinessRecordQueryService {
    * @returns {Promise<Object>} 订单列表和分页信息
    */
   static async getRedemptionOrders(options = {}) {
-    const { RedemptionOrder, User, Item } = require('../../models')
-
     const { keyword, status, redeemer_user_id, mobile, merchant_id, start_date, end_date } = options
     const pagination = buildPaginationOptions(options)
 
@@ -250,8 +259,6 @@ class BusinessRecordQueryService {
    * @returns {Promise<Object|null>} 订单详情
    */
   static async getRedemptionOrderById(order_id) {
-    const { RedemptionOrder, User, Item } = require('../../models')
-
     const order = await RedemptionOrder.findByPk(order_id, {
       include: [
         {
@@ -277,8 +284,6 @@ class BusinessRecordQueryService {
    * @returns {Promise<Object>} 统计数据
    */
   static async getRedemptionOrderStats() {
-    const { RedemptionOrder } = require('../../models')
-
     // 按状态分组统计
     const statusCounts = await RedemptionOrder.findAll({
       attributes: ['status', [fn('COUNT', col('redemption_order_id')), 'count']],
@@ -315,8 +320,6 @@ class BusinessRecordQueryService {
    * @returns {Promise<Array>} 订单数组
    */
   static async exportRedemptionOrders(options = {}) {
-    const { RedemptionOrder, User, Item } = require('../../models')
-
     const { status, start_date, end_date, limit = 10000 } = options
 
     // 构建查询条件
@@ -373,8 +376,6 @@ class BusinessRecordQueryService {
    * @returns {Promise<Object>} 记录列表和分页信息
    */
   static async getContentReviews(options = {}) {
-    const { ContentReviewRecord, User } = require('../../models')
-
     const { auditable_type, audit_status, auditor_id, priority, start_date, end_date } = options
     const pagination = buildPaginationOptions(options, 'submitted_at')
 
@@ -416,8 +417,6 @@ class BusinessRecordQueryService {
    * @returns {Promise<Object|null>} 记录详情
    */
   static async getContentReviewById(audit_id) {
-    const { ContentReviewRecord, User } = require('../../models')
-
     const record = await ContentReviewRecord.findByPk(parseInt(audit_id), {
       include: [{ model: User, as: 'auditor', attributes: ['user_id', 'nickname', 'mobile'] }]
     })
@@ -498,9 +497,6 @@ class BusinessRecordQueryService {
    * @private
    */
   static async _queryAuditLogs(operationType, options = {}) {
-    const { AdminOperationLog, User } = require('../../models')
-    const { Op } = require('sequelize')
-
     const { target_id, operator_id, keyword, start_date, end_date } = options
     const pagination = buildPaginationOptions(options)
 
@@ -554,8 +550,6 @@ class BusinessRecordQueryService {
    * @private
    */
   static async _queryAuditLogById(recordId, operationType) {
-    const { AdminOperationLog, User } = require('../../models')
-
     const record = await AdminOperationLog.findOne({
       where: {
         admin_operation_log_id: recordId,
@@ -595,8 +589,6 @@ class BusinessRecordQueryService {
    * @returns {Promise<Object>} 记录列表和分页信息
    */
   static async getExchangeRecords(options = {}) {
-    const { ExchangeRecord, User, ExchangeItem } = require('../../models')
-
     const { user_id, exchange_item_id, status, order_no, start_date, end_date } = options
     const pagination = buildPaginationOptions(options)
 
@@ -645,8 +637,6 @@ class BusinessRecordQueryService {
    * @returns {Promise<Object|null>} 记录详情
    */
   static async getExchangeRecordById(record_id) {
-    const { ExchangeRecord, User, ExchangeItem } = require('../../models')
-
     const record = await ExchangeRecord.findByPk(parseInt(record_id), {
       include: [
         { model: User, as: 'user', attributes: ['user_id', 'nickname', 'mobile'] },
@@ -685,8 +675,6 @@ class BusinessRecordQueryService {
    * @returns {Promise<Object>} 消息列表和分页信息
    */
   static async getChatMessages(options = {}) {
-    const { ChatMessage, User, CustomerServiceSession } = require('../../models')
-
     const {
       session_id,
       sender_id,
@@ -754,8 +742,6 @@ class BusinessRecordQueryService {
    * @returns {Promise<Object|null>} 消息详情
    */
   static async getChatMessageById(message_id) {
-    const { ChatMessage, User, CustomerServiceSession } = require('../../models')
-
     const message = await ChatMessage.findByPk(parseInt(message_id), {
       include: [
         {
@@ -797,8 +783,6 @@ class BusinessRecordQueryService {
    * @returns {Promise<Object>} 统计摘要
    */
   static async getChatMessageStats(options = {}) {
-    const { ChatMessage } = require('../../models')
-
     const { start_date, end_date } = options
 
     // 构建日期过滤条件
@@ -866,8 +850,6 @@ class BusinessRecordQueryService {
    * @returns {Promise<Object>} 统计概览数据
    */
   static async getReminderHistoryStatsOverview(options = {}) {
-    const { ReminderHistory, sequelize } = require('../../models')
-
     const { start_time, end_time } = options
 
     // 构建时间范围条件
@@ -934,8 +916,6 @@ class BusinessRecordQueryService {
    * @returns {Promise<Array>} 操作者统计数据
    */
   static async getAuditStatsByOperator(options = {}) {
-    const { AdminOperationLog, User } = require('../../models')
-
     const { start_time, end_time, page_size, limit: legacyLimit = 10 } = options
     const limit = page_size !== undefined ? page_size : legacyLimit
 
@@ -988,8 +968,6 @@ class BusinessRecordQueryService {
    * @returns {Promise<Object>} 风险等级统计数据
    */
   static async getAuditStatsByRiskLevel(options = {}) {
-    const { AdminOperationLog } = require('../../models')
-
     const { start_time, end_time } = options
 
     // 构建时间范围条件
@@ -1026,8 +1004,6 @@ class BusinessRecordQueryService {
    * @returns {Promise<Object|null>} 提醒历史详情
    */
   static async getReminderHistoryById(historyId) {
-    const { ReminderHistory, ReminderRule } = require('../../models')
-
     const history = await ReminderHistory.findByPk(historyId, {
       include: [
         {

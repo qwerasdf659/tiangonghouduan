@@ -43,6 +43,9 @@ const logger = require('../utils/logger')
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 const { BusinessCacheHelper } = require('../utils/BusinessCacheHelper')
 const { AssetCode } = require('../constants/AssetCode')
+const FeeCalculator = require('./FeeCalculator')
+const FEE_RULES = require('../config/fee_rules')
+const NotificationService = require('./NotificationService')
 
 /**
  * 获取允许的结算币种白名单（多币种扩展 - 2026-01-14）
@@ -316,8 +319,6 @@ class TradeOrderService {
     }
 
     // 3.2 计算手续费
-    const FeeCalculator = require('./FeeCalculator')
-    const FEE_RULES = require('../config/fee_rules')
 
     let feeAmount = 0
     let feeRate = 0
@@ -777,7 +778,6 @@ class TradeOrderService {
     }
 
     // 6. 发送通知给买家和卖家
-    const NotificationService = require('./NotificationService')
     try {
       // 通知卖家：挂牌已售出
       await NotificationService.notifyListingSold(order.seller_user_id, {

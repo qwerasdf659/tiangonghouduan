@@ -69,6 +69,7 @@
  */
 
 const logger = require('../utils/logger').logger
+const { getRedisClient } = require('../utils/UnifiedRedisClient')
 
 /**
  * 管理后台客服管理服务类（Facade模式）
@@ -568,7 +569,6 @@ class AdminCustomerServiceService {
     }
 
     try {
-      const { getRedisClient } = require('../utils/UnifiedRedisClient')
       const redisClient = getRedisClient()
       const client = redisClient.getClient()
 
@@ -625,7 +625,6 @@ class AdminCustomerServiceService {
         return []
       }
 
-      const { getRedisClient } = require('../utils/UnifiedRedisClient')
       const redisClient = getRedisClient()
       const client = redisClient.getClient()
 

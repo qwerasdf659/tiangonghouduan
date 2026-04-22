@@ -27,10 +27,10 @@ export const LOTTERY_CORE_ENDPOINTS = {
   // 奖品池管理
   PRIZE_LIST: `${API_PREFIX}/console/prize-pool/list`,
   PRIZE_BATCH_ADD: `${API_PREFIX}/console/prize-pool/batch-add`,
-  PRIZE_UPDATE: `${API_PREFIX}/console/prize-pool/prize/:prize_id`,
-  PRIZE_DELETE: `${API_PREFIX}/console/prize-pool/prize/:prize_id`,
-  PRIZE_DETAIL: `${API_PREFIX}/console/prize-pool/prize/:prize_id`,
-  PRIZE_ADD_STOCK: `${API_PREFIX}/console/prize-pool/prize/:prize_id/add-stock`,
+  PRIZE_UPDATE: `${API_PREFIX}/console/prize-pool/prize/:id`,
+  PRIZE_DELETE: `${API_PREFIX}/console/prize-pool/prize/:id`,
+  PRIZE_DETAIL: `${API_PREFIX}/console/prize-pool/prize/:id`,
+  PRIZE_ADD_STOCK: `${API_PREFIX}/console/prize-pool/prize/:id/add-stock`,
   /** 按档位分组获取活动奖品（含档内占比、风险警告） */
   PRIZE_GROUPED: `${API_PREFIX}/console/prize-pool/:code/grouped`,
   /** 为指定活动添加单个奖品 */
@@ -40,7 +40,7 @@ export const LOTTERY_CORE_ENDPOINTS = {
   /** 批量更新奖品库存 */
   PRIZE_BATCH_STOCK: `${API_PREFIX}/console/prize-pool/:code/batch-stock`,
   /** 设置单个奖品绝对库存值 */
-  PRIZE_SET_STOCK: `${API_PREFIX}/console/prize-pool/prize/:prize_id/stock`,
+  PRIZE_SET_STOCK: `${API_PREFIX}/console/prize-pool/prize/:id/stock`,
 
   // 分群策略管理
   SEGMENT_RULE_LIST: `${API_PREFIX}/console/segment-rules`,
@@ -207,7 +207,7 @@ export const LotteryCoreAPI = {
    * @returns {Promise<Object>} 更新结果
    */
   async updatePrize(prizeId, data) {
-    const url = buildURL(LOTTERY_CORE_ENDPOINTS.PRIZE_UPDATE, { prize_id: prizeId })
+    const url = buildURL(LOTTERY_CORE_ENDPOINTS.PRIZE_UPDATE, { id: prizeId })
     return await request({ url, method: 'PUT', data })
   },
 
@@ -217,7 +217,7 @@ export const LotteryCoreAPI = {
    * @returns {Promise<Object>} 删除结果
    */
   async deletePrize(prizeId) {
-    const url = buildURL(LOTTERY_CORE_ENDPOINTS.PRIZE_DELETE, { prize_id: prizeId })
+    const url = buildURL(LOTTERY_CORE_ENDPOINTS.PRIZE_DELETE, { id: prizeId })
     return await request({ url, method: 'DELETE' })
   },
 
@@ -229,7 +229,7 @@ export const LotteryCoreAPI = {
    * @returns {Promise<Object>} 补充结果
    */
   async addPrizeStock(prizeId, data) {
-    const url = buildURL(LOTTERY_CORE_ENDPOINTS.PRIZE_ADD_STOCK, { prize_id: prizeId })
+    const url = buildURL(LOTTERY_CORE_ENDPOINTS.PRIZE_ADD_STOCK, { id: prizeId })
     return await request({ url, method: 'POST', data })
   },
 

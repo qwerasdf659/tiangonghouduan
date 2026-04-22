@@ -20,17 +20,9 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken } = require('../../../middleware/auth')
-/**
- * 异步路由包装器 - 自动捕获 async/await 错误
- *
- * @param {Function} fn - 异步路由处理函数
- * @returns {Function} Express 中间件函数
- */
-const asyncHandler = fn => (req, res, next) => {
-  Promise.resolve(fn(req, res, next)).catch(next)
-}
 const logger = require('../../../utils/logger').logger
 const TransactionManager = require('../../../utils/TransactionManager')
+const { asyncHandler } = require('../../../middleware/validation')
 
 /**
  * GET / - 获取我的广告活动列表

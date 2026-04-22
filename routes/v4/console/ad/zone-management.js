@@ -34,8 +34,7 @@ router.get(
   '/zones',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    const ServiceManager = require('../../../../services')
-    const AdTargetZoneService = ServiceManager.getService('ad_target_zone')
+    const AdTargetZoneService = req.app.locals.services.getService('ad_target_zone')
 
     const result = await AdTargetZoneService.listZones({
       zone_type: req.query.zone_type,
@@ -57,8 +56,7 @@ router.get(
   '/zones/:id',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    const ServiceManager = require('../../../../services')
-    const AdTargetZoneService = ServiceManager.getService('ad_target_zone')
+    const AdTargetZoneService = req.app.locals.services.getService('ad_target_zone')
 
     const zone = await AdTargetZoneService.getZoneById(parseInt(req.params.id))
     if (!zone) {
@@ -84,8 +82,7 @@ router.post(
     }
 
     const result = await TransactionManager.execute(async transaction => {
-      const ServiceManager = require('../../../../services')
-      const AdTargetZoneService = ServiceManager.getService('ad_target_zone')
+      const AdTargetZoneService = req.app.locals.services.getService('ad_target_zone')
 
       return AdTargetZoneService.createZone(
         { zone_type, zone_name, priority, parent_zone_id, geo_scope },
@@ -114,8 +111,7 @@ router.put(
     const zoneId = parseInt(req.params.id)
 
     const result = await TransactionManager.execute(async transaction => {
-      const ServiceManager = require('../../../../services')
-      const AdTargetZoneService = ServiceManager.getService('ad_target_zone')
+      const AdTargetZoneService = req.app.locals.services.getService('ad_target_zone')
 
       return AdTargetZoneService.updateZone(zoneId, req.body, { transaction })
     })
@@ -140,8 +136,7 @@ router.delete(
     const zoneId = parseInt(req.params.id)
 
     await TransactionManager.execute(async transaction => {
-      const ServiceManager = require('../../../../services')
-      const AdTargetZoneService = ServiceManager.getService('ad_target_zone')
+      const AdTargetZoneService = req.app.locals.services.getService('ad_target_zone')
 
       return AdTargetZoneService.deleteZone(zoneId, { transaction })
     })
@@ -169,8 +164,7 @@ router.get(
   '/groups',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    const ServiceManager = require('../../../../services')
-    const AdTargetZoneService = ServiceManager.getService('ad_target_zone')
+    const AdTargetZoneService = req.app.locals.services.getService('ad_target_zone')
 
     const result = await AdTargetZoneService.listGroups({
       status: req.query.status,
@@ -191,8 +185,7 @@ router.get(
   '/groups/:id',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    const ServiceManager = require('../../../../services')
-    const AdTargetZoneService = ServiceManager.getService('ad_target_zone')
+    const AdTargetZoneService = req.app.locals.services.getService('ad_target_zone')
 
     const group = await AdTargetZoneService.getGroupById(parseInt(req.params.id))
     if (!group) {
@@ -218,8 +211,7 @@ router.post(
     }
 
     const result = await TransactionManager.execute(async transaction => {
-      const ServiceManager = require('../../../../services')
-      const AdTargetZoneService = ServiceManager.getService('ad_target_zone')
+      const AdTargetZoneService = req.app.locals.services.getService('ad_target_zone')
 
       return AdTargetZoneService.createGroup(
         { group_name, pricing_mode, discount_rate, fixed_price, zone_ids },
@@ -248,8 +240,7 @@ router.put(
     const groupId = parseInt(req.params.id)
 
     const result = await TransactionManager.execute(async transaction => {
-      const ServiceManager = require('../../../../services')
-      const AdTargetZoneService = ServiceManager.getService('ad_target_zone')
+      const AdTargetZoneService = req.app.locals.services.getService('ad_target_zone')
 
       return AdTargetZoneService.updateGroup(groupId, req.body, { transaction })
     })
@@ -274,8 +265,7 @@ router.delete(
     const groupId = parseInt(req.params.id)
 
     await TransactionManager.execute(async transaction => {
-      const ServiceManager = require('../../../../services')
-      const AdTargetZoneService = ServiceManager.getService('ad_target_zone')
+      const AdTargetZoneService = req.app.locals.services.getService('ad_target_zone')
 
       return AdTargetZoneService.deleteGroup(groupId, { transaction })
     })
@@ -311,8 +301,7 @@ router.post(
     }
 
     const result = await TransactionManager.execute(async transaction => {
-      const ServiceManager = require('../../../../services')
-      const AdTargetZoneService = ServiceManager.getService('ad_target_zone')
+      const AdTargetZoneService = req.app.locals.services.getService('ad_target_zone')
 
       return AdTargetZoneService.addGroupMembers(groupId, zone_ids, { transaction })
     })
@@ -337,8 +326,7 @@ router.delete(
     }
 
     const result = await TransactionManager.execute(async transaction => {
-      const ServiceManager = require('../../../../services')
-      const AdTargetZoneService = ServiceManager.getService('ad_target_zone')
+      const AdTargetZoneService = req.app.locals.services.getService('ad_target_zone')
 
       return AdTargetZoneService.removeGroupMembers(groupId, zone_ids, { transaction })
     })

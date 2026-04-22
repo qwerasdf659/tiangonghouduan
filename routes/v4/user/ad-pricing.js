@@ -19,16 +19,7 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken } = require('../../../middleware/auth')
-
-/**
- * 异步错误处理包装器
- *
- * @param {Function} fn - 异步处理函数
- * @returns {Function} 包装后的中间件函数
- */
-const asyncHandler = fn => (req, res, next) => {
-  Promise.resolve(fn(req, res, next)).catch(next)
-}
+const { asyncHandler } = require('../../../middleware/validation')
 
 /**
  * GET /api/v4/user/ad-pricing/preview

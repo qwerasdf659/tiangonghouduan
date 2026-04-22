@@ -19,6 +19,7 @@
 
 const crypto = require('crypto')
 const logger = require('../utils/logger').logger
+const { getRawClient } = require('../utils/UnifiedRedisClient')
 
 /**
  * 交易市场担保码服务
@@ -55,7 +56,6 @@ class EscrowCodeService {
     const code = this._generateSixDigitCode()
     const redisKey = `${this.REDIS_KEY_PREFIX}:${trade_order_id}`
 
-    const { getRawClient } = require('../utils/UnifiedRedisClient')
     const redisClient = getRawClient()
 
     const escrowData = JSON.stringify({
@@ -97,7 +97,6 @@ class EscrowCodeService {
   static async verifyEscrowCode(trade_order_id, code, verifier_user_id) {
     const redisKey = `${this.REDIS_KEY_PREFIX}:${trade_order_id}`
 
-    const { getRawClient } = require('../utils/UnifiedRedisClient')
     const redisClient = getRawClient()
 
     const raw = await redisClient.get(redisKey)
@@ -165,7 +164,6 @@ class EscrowCodeService {
   static async getEscrowStatus(trade_order_id) {
     const redisKey = `${this.REDIS_KEY_PREFIX}:${trade_order_id}`
 
-    const { getRawClient } = require('../utils/UnifiedRedisClient')
     const redisClient = getRawClient()
 
     const raw = await redisClient.get(redisKey)
@@ -204,7 +202,6 @@ class EscrowCodeService {
     }
 
     const redisKey = `${this.REDIS_KEY_PREFIX}:${trade_order_id}`
-    const { getRawClient } = require('../utils/UnifiedRedisClient')
     const redisClient = getRawClient()
     await redisClient.del(redisKey)
 
@@ -224,7 +221,6 @@ class EscrowCodeService {
   static async cancelEscrowCode(trade_order_id) {
     const redisKey = `${this.REDIS_KEY_PREFIX}:${trade_order_id}`
 
-    const { getRawClient } = require('../utils/UnifiedRedisClient')
     const redisClient = getRawClient()
 
     const deleted = await redisClient.del(redisKey)

@@ -49,7 +49,7 @@ class LotteryPresetService {
    * 业务规则：
    * - 单次最多创建20条预设
    * - queue_order必须唯一且为正整数
-   * - prize_id必须存在且有效
+   * - lottery_prize_id必须存在且有效
    * - user_id必须存在且有效
    * - 使用事务保证原子性
    *
@@ -103,7 +103,7 @@ class LotteryPresetService {
         preset.queue_order === undefined ||
         preset.queue_order === null
       ) {
-        const error = new Error('预设数据格式错误：需要prize_id和queue_order')
+        const error = new Error('预设数据格式错误：需要lottery_prize_id和queue_order')
         error.code = 'INVALID_PRESET_DATA'
         throw error
       }

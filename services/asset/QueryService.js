@@ -34,16 +34,19 @@
 
 'use strict'
 
-const { Op } = require('sequelize')
+const { Op, sequelize } = require('sequelize')
 const { AssetCode } = require('../../constants/AssetCode')
 const {
   Account,
   AccountAssetBalance,
   AssetTransaction,
+  Item,
   User,
   MaterialAssetType
 } = require('../../models')
 const logger = require('../../utils/logger')
+const BalanceService = require('./BalanceService')
+const BeijingTimeHelper = require('../../utils/timeHelper')
 
 /**
  * 资产查询服务类
@@ -174,7 +177,6 @@ class QueryService {
     const { transaction } = options
 
     // 获取账户（使用 BalanceService 的方法）
-    const BalanceService = require('./BalanceService')
     const account = await BalanceService.getOrCreateAccount(
       { user_id, system_code },
       { transaction }
@@ -291,8 +293,6 @@ class QueryService {
     }
 
     // 需要动态引入模型（避免循环依赖）
-    const { Item, MaterialAssetType } = require('../../models')
-    const BalanceService = require('./BalanceService')
 
     // 1. 获取或创建用户账户
     let account = null
@@ -357,7 +357,6 @@ class QueryService {
     }
 
     // 3. 获取不可叠加物品统计（通过 account_id 关联查询）
-    const sequelize = require('sequelize')
     const itemWhere = {
       status: { [Op.in]: ['available', 'locked'] }
     }
@@ -530,8 +529,6 @@ class QueryService {
    * @since 2026
    */
   static async getSystemStats() {
-    const { sequelize } = require('../../models')
-
     logger.info('📊 获取系统级资产统计', {
       service: 'QueryService',
       method: 'getSystemStats'
@@ -604,9 +601,6 @@ class QueryService {
     if (!account) {
       return { today_earned: 0, today_consumed: 0, transaction_count: 0 }
     }
-
-    const { sequelize } = require('../../models')
-    const BeijingTimeHelper = require('../../utils/timeHelper')
 
     const todayStart = BeijingTimeHelper.todayStart()
     const todayEnd = BeijingTimeHelper.todayEnd()

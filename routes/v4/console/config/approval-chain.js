@@ -32,8 +32,14 @@ const { authenticateToken, requireRoleLevel } = require('../../../../middleware/
 const { handleServiceError } = require('../../../../middleware/validation')
 const logger = require('../../../../utils/logger').logger
 const TransactionManager = require('../../../../utils/TransactionManager')
-const AuditLogService = require('../../../../services/AuditLogService')
 const { OPERATION_TYPES } = require('../../../../constants/AuditOperationTypes')
+
+/**
+ * 从 ServiceManager 获取审计日志服务
+ * @param {Object} req - Express 请求对象
+ * @returns {Object} AuditLogService 实例
+ */
+const getAuditLogService = req => req.app.locals.services.getService('audit_log')
 
 /**
  * 获取审核链服务
@@ -145,14 +151,16 @@ router.post('/templates', authenticateToken, requireRoleLevel(100), async (req, 
       { description: '创建审核链模板' }
     )
 
-    AuditLogService.logOperation({
-      operator_id: req.user.user_id,
-      operation_type: OPERATION_TYPES.APPROVAL_CHAIN_CONFIG,
-      target_type: 'approval_chain_template',
-      target_id: result.template_id,
-      action: 'create',
-      after_data: { template_code: result.template_code, auditable_type: result.auditable_type }
-    }).catch(err => logger.warn('[审核链] 模板创建审计日志失败（非致命）:', err.message))
+    getAuditLogService(req)
+      .logOperation({
+        operator_id: req.user.user_id,
+        operation_type: OPERATION_TYPES.APPROVAL_CHAIN_CONFIG,
+        target_type: 'approval_chain_template',
+        target_id: result.template_id,
+        action: 'create',
+        after_data: { template_code: result.template_code, auditable_type: result.auditable_type }
+      })
+      .catch(err => logger.warn('[审核链] 模板创建审计日志失败（非致命）:', err.message))
 
     return res.apiCreated(result, '审核链模板创建成功')
   } catch (error) {
@@ -176,14 +184,16 @@ router.put('/templates/:id', authenticateToken, requireRoleLevel(100), async (re
       { description: '更新审核链模板' }
     )
 
-    AuditLogService.logOperation({
-      operator_id: req.user.user_id,
-      operation_type: OPERATION_TYPES.APPROVAL_CHAIN_CONFIG,
-      target_type: 'approval_chain_template',
-      target_id: templateId,
-      action: 'update',
-      after_data: req.body
-    }).catch(err => logger.warn('[审核链] 模板更新审计日志失败（非致命）:', err.message))
+    getAuditLogService(req)
+      .logOperation({
+        operator_id: req.user.user_id,
+        operation_type: OPERATION_TYPES.APPROVAL_CHAIN_CONFIG,
+        target_type: 'approval_chain_template',
+        target_id: templateId,
+        action: 'update',
+        after_data: req.body
+      })
+      .catch(err => logger.warn('[审核链] 模板更新审计日志失败（非致命）:', err.message))
 
     return res.apiSuccess(result, '审核链模板更新成功')
   } catch (error) {
@@ -207,13 +217,15 @@ router.put('/templates/:id/toggle', authenticateToken, requireRoleLevel(100), as
       { description: '启用/禁用审核链模板' }
     )
 
-    AuditLogService.logOperation({
-      operator_id: req.user.user_id,
-      operation_type: OPERATION_TYPES.APPROVAL_CHAIN_CONFIG,
-      target_type: 'approval_chain_template',
-      target_id: templateId,
-      action: result.is_active ? 'enable' : 'disable'
-    }).catch(err => logger.warn('[审核链] 模板启停审计日志失败（非致命）:', err.message))
+    getAuditLogService(req)
+      .logOperation({
+        operator_id: req.user.user_id,
+        operation_type: OPERATION_TYPES.APPROVAL_CHAIN_CONFIG,
+        target_type: 'approval_chain_template',
+        target_id: templateId,
+        action: result.is_active ? 'enable' : 'disable'
+      })
+      .catch(err => logger.warn('[审核链] 模板启停审计日志失败（非致命）:', err.message))
 
     return res.apiSuccess(result, `模板已${result.is_active ? '启用' : '禁用'}`)
   } catch (error) {
@@ -407,18 +419,20 @@ router.post('/steps/:id/approve', authenticateToken, requireRoleLevel(60), async
     })
 
     // 审计日志
-    AuditLogService.logOperation({
-      operator_id: req.user.user_id,
-      operation_type: OPERATION_TYPES.APPROVAL_CHAIN_AUDIT,
-      target_type: 'approval_chain_step',
-      target_id: stepId,
-      action: 'approve',
-      after_data: {
-        is_chain_completed: result.is_chain_completed,
-        final_result: result.final_result
-      },
-      reason: reason || '审核通过'
-    }).catch(err => logger.warn('[审核链] 审计日志写入失败（非致命）:', err.message))
+    getAuditLogService(req)
+      .logOperation({
+        operator_id: req.user.user_id,
+        operation_type: OPERATION_TYPES.APPROVAL_CHAIN_AUDIT,
+        target_type: 'approval_chain_step',
+        target_id: stepId,
+        action: 'approve',
+        after_data: {
+          is_chain_completed: result.is_chain_completed,
+          final_result: result.final_result
+        },
+        reason: reason || '审核通过'
+      })
+      .catch(err => logger.warn('[审核链] 审计日志写入失败（非致命）:', err.message))
 
     // Socket.IO 实时推送审核链事件
     pushApprovalChainSocketEvent(req, 'approval_chain_step_approved', {
@@ -500,15 +514,17 @@ router.post('/steps/:id/reject', authenticateToken, requireRoleLevel(60), async 
     })
 
     // 审计日志
-    AuditLogService.logOperation({
-      operator_id: req.user.user_id,
-      operation_type: OPERATION_TYPES.APPROVAL_CHAIN_AUDIT,
-      target_type: 'approval_chain_step',
-      target_id: stepId,
-      action: 'reject',
-      after_data: { is_chain_completed: true, final_result: 'rejected' },
-      reason
-    }).catch(err => logger.warn('[审核链] 审计日志写入失败（非致命）:', err.message))
+    getAuditLogService(req)
+      .logOperation({
+        operator_id: req.user.user_id,
+        operation_type: OPERATION_TYPES.APPROVAL_CHAIN_AUDIT,
+        target_type: 'approval_chain_step',
+        target_id: stepId,
+        action: 'reject',
+        after_data: { is_chain_completed: true, final_result: 'rejected' },
+        reason
+      })
+      .catch(err => logger.warn('[审核链] 审计日志写入失败（非致命）:', err.message))
 
     // Socket.IO 实时推送审核链事件
     pushApprovalChainSocketEvent(req, 'approval_chain_step_rejected', {

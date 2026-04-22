@@ -25,6 +25,8 @@ const { Op } = require('sequelize')
 const { BusinessCacheHelper, DEFAULT_TTL, KEY_PREFIX } = require('../../utils/BusinessCacheHelper')
 const BeijingTimeHelper = require('../../utils/timeHelper')
 const logger = require('../../utils/logger').logger
+const { ConsumptionRecord, CustomerServiceSession } = require('../../models')
+const LotteryAlertService = require('../lottery/LotteryAlertService')
 
 /**
  * 超时阈值配置（单位：分钟）
@@ -139,8 +141,6 @@ class PendingSummaryService {
    */
   static async _getConsumptionPending() {
     try {
-      const { ConsumptionRecord } = require('../../models')
-
       // 使用 scope 查询待审核记录
       const records = await ConsumptionRecord.scope('pending').findAll({
         attributes: ['consumption_record_id', 'created_at'],
@@ -188,8 +188,6 @@ class PendingSummaryService {
    */
   static async _getCustomerServicePending() {
     try {
-      const { CustomerServiceSession } = require('../../models')
-
       // 查询等待中和活跃的会话
       const sessions = await CustomerServiceSession.findAll({
         where: {
@@ -244,7 +242,6 @@ class PendingSummaryService {
   static async _getRiskAlertsPending() {
     try {
       // 使用 LotteryAlertService 获取风控相关告警
-      const LotteryAlertService = require('../lottery/LotteryAlertService')
 
       // 获取未处理的用户/系统类型告警（作为风控告警）
       const result = await LotteryAlertService.getAlertList({
@@ -296,8 +293,6 @@ class PendingSummaryService {
    */
   static async _getLotteryAlertsPending() {
     try {
-      const LotteryAlertService = require('../lottery/LotteryAlertService')
-
       // 获取未处理的抽奖相关告警（预算、库存、中奖率）
       const result = await LotteryAlertService.getAlertList({
         status: 'active',

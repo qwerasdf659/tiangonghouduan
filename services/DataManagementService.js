@@ -28,6 +28,9 @@ const TransactionManager = require('../utils/TransactionManager')
 const ItemLifecycleService = require('./asset/ItemLifecycleService')
 const crypto = require('crypto')
 const { getRawClient } = require('../utils/UnifiedRedisClient')
+const AdminSystemService = require('./AdminSystemService')
+const UserService = require('./UserService')
+const { UserRole, Role } = require('../models')
 
 /**
  * L0 不可删表白名单（硬编码，任何清理操作均跳过）
@@ -375,7 +378,6 @@ class DataManagementService {
    * @returns {Promise<Object>} 策略配置
    */
   async getPolicies() {
-    const AdminSystemService = require('./AdminSystemService')
     const config = await AdminSystemService.getConfigValue('data_cleanup_policies')
 
     if (!config) {
@@ -394,7 +396,6 @@ class DataManagementService {
    * @returns {Promise<Object>} 更新后的策略
    */
   async updatePolicy(tableName, updates, operatorId) {
-    const AdminSystemService = require('./AdminSystemService')
     const config = await AdminSystemService.getConfigValue('data_cleanup_policies')
 
     if (!config || !config.policies) {
@@ -703,9 +704,6 @@ class DataManagementService {
           if (!superAdminMobile) {
             logger.warn('[数据清理] 未配置 SUPER_ADMIN_MOBILE 环境变量，跳过超管重建')
           } else {
-            const UserService = require('./UserService')
-            const { UserRole, Role } = require('../models')
-
             await TransactionManager.execute(async transaction => {
               let user
               try {
@@ -1197,7 +1195,6 @@ class DataManagementService {
    * @private
    */
   async _setMaintenanceMode(enabled, operatorId, reason) {
-    const AdminSystemService = require('./AdminSystemService')
     await TransactionManager.execute(async transaction => {
       await AdminSystemService.updateSettings(
         'basic',

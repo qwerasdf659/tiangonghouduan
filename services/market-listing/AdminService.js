@@ -13,6 +13,8 @@
  */
 
 const logger = require('../../utils/logger').logger
+const { SystemSetting } = require('../../models')
+const AuditLogService = require('../AuditLogService')
 
 /**
  * 市场挂牌管理服务类
@@ -45,8 +47,6 @@ class MarketListingAdminService {
     if (!reason) {
       throw new Error('暂停原因（reason）不能为空')
     }
-
-    const { SystemSetting } = require('../../models')
 
     // 1. 获取当前已暂停的资产列表
     const settingKey = 'marketplace/paused_assets'
@@ -93,7 +93,6 @@ class MarketListingAdminService {
     }
 
     // 4. 记录审计日志
-    const AuditLogService = require('../AuditLogService')
     await AuditLogService.logOperation({
       operator_id: operator_id || 0,
       operation_type: 'system_config',
@@ -138,8 +137,6 @@ class MarketListingAdminService {
       throw new Error('资产代码（asset_code）不能为空')
     }
 
-    const { SystemSetting } = require('../../models')
-
     const settingKey = 'marketplace/paused_assets'
     const existingSetting = await SystemSetting.findOne({
       where: { setting_key: settingKey }
@@ -173,7 +170,6 @@ class MarketListingAdminService {
     })
 
     // 记录审计日志
-    const AuditLogService = require('../AuditLogService')
     await AuditLogService.logOperation({
       operator_id: operator_id || 0,
       operation_type: 'system_config',
@@ -205,8 +201,6 @@ class MarketListingAdminService {
    * @returns {Promise<Object>} 检查结果 { is_paused, pause_info }
    */
   static async isAssetListingPaused(asset_code) {
-    const { SystemSetting } = require('../../models')
-
     const settingKey = 'marketplace/paused_assets'
     const existingSetting = await SystemSetting.findOne({
       where: { setting_key: settingKey }
@@ -252,8 +246,6 @@ class MarketListingAdminService {
    * @returns {Promise<Object>} 暂停资产列表
    */
   static async getPausedAssets() {
-    const { SystemSetting } = require('../../models')
-
     const settingKey = 'marketplace/paused_assets'
     const existingSetting = await SystemSetting.findOne({
       where: { setting_key: settingKey }

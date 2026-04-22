@@ -23,6 +23,18 @@
 const { Op, fn, col } = require('sequelize')
 const logger = require('../../utils/logger').logger
 const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
+const {
+  Account,
+  User,
+  AccountAssetBalance,
+  UserRole,
+  Role,
+  MarketListing,
+  Item,
+  LotteryCampaign,
+  LotteryPrize,
+  LotteryUserDailyDrawQuota
+} = require('../../models')
 
 /**
  * 缓存配置
@@ -60,7 +72,6 @@ class SystemDataQueryService {
    */
   static async getAccounts(options = {}) {
     // 延迟加载模型，避免循环依赖
-    const { Account, User } = require('../../models')
 
     const {
       account_type,
@@ -121,8 +132,6 @@ class SystemDataQueryService {
    * @returns {Promise<Object|null>} 账户详情
    */
   static async getAccountById(account_id) {
-    const { Account, User, AccountAssetBalance } = require('../../models')
-
     const account = await Account.findByPk(parseInt(account_id), {
       include: [
         {
@@ -155,8 +164,6 @@ class SystemDataQueryService {
    * @returns {Promise<Object>} 用户角色列表和分页信息
    */
   static async getUserRoles(options = {}) {
-    const { UserRole, User, Role } = require('../../models')
-
     const {
       user_id,
       role_name,
@@ -218,8 +225,6 @@ class SystemDataQueryService {
    * @returns {Promise<Object>} 市场挂牌列表和分页信息
    */
   static async getMarketListings(options = {}) {
-    const { MarketListing, User, Item } = require('../../models')
-
     const {
       seller_user_id,
       status,
@@ -282,8 +287,6 @@ class SystemDataQueryService {
    * @returns {Promise<Object|null>} 市场挂牌详情
    */
   static async getMarketListingById(market_listing_id) {
-    const { MarketListing, User, Item } = require('../../models')
-
     const listing = await MarketListing.findByPk(parseInt(market_listing_id), {
       include: [
         { model: User, as: 'seller', attributes: ['user_id', 'nickname', 'mobile'] },
@@ -309,8 +312,6 @@ class SystemDataQueryService {
       logger.debug('市场统计命中缓存', { cacheKey })
       return cached
     }
-
-    const { MarketListing } = require('../../models')
 
     // 并行查询统计数据
     const [statusStats, typeStats, totalCount, todayCount] = await Promise.all([
@@ -367,8 +368,6 @@ class SystemDataQueryService {
    * @returns {Promise<Object>} 抽奖活动列表和分页信息
    */
   static async getLotteryCampaigns(options = {}) {
-    const { LotteryCampaign, LotteryPrize } = require('../../models')
-
     const {
       status,
       budget_mode,
@@ -440,8 +439,6 @@ class SystemDataQueryService {
    * @returns {Promise<Object|null>} 抽奖活动详情
    */
   static async getLotteryCampaignById(lottery_campaign_id) {
-    const { LotteryCampaign, LotteryPrize } = require('../../models')
-
     const campaign = await LotteryCampaign.findByPk(parseInt(lottery_campaign_id), {
       include: [{ model: LotteryPrize, as: 'prizes', required: false }]
     })
@@ -463,8 +460,6 @@ class SystemDataQueryService {
    * @returns {Promise<Object>} 配额列表和分页信息
    */
   static async getLotteryDailyQuotas(options = {}) {
-    const { LotteryUserDailyDrawQuota } = require('../../models')
-
     const {
       user_id,
       lottery_campaign_id,
@@ -514,8 +509,6 @@ class SystemDataQueryService {
    * @returns {Promise<Object|null>} 配额详情
    */
   static async getLotteryDailyQuotaById(quota_id) {
-    const { LotteryUserDailyDrawQuota } = require('../../models')
-
     const quota = await LotteryUserDailyDrawQuota.findByPk(parseInt(quota_id))
 
     return quota

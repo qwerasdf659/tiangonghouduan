@@ -18,6 +18,16 @@ const logger = require('../utils/logger').logger
  */
 
 const BeijingTimeHelper = require('../utils/timeHelper')
+const {
+  UserNotification,
+  ChatMessage,
+  CustomerServiceSession,
+  User,
+  Role,
+  Op,
+  AdminNotification
+} = require('../models')
+const ChatWebSocketService = require('./ChatWebSocketService')
 
 /**
  * 通知服务类（静态类，无内部状态）
@@ -106,9 +116,6 @@ class NotificationService {
   static async sendToNotification(user_id, options) {
     const { type, title, content, metadata = {} } = options
 
-    const { UserNotification } = require('../models')
-    const ChatWebSocketService = require('./ChatWebSocketService')
-
     // 1. 写入 user_notifications 表（持久化）
     const notification = await UserNotification.create({
       user_id,
@@ -167,8 +174,6 @@ class NotificationService {
     const { title, content, notification_type, metadata = {} } = options
 
     // 导入必要的模型和服务
-    const { ChatMessage } = require('../models')
-    const ChatWebSocketService = require('./ChatWebSocketService')
 
     // 1. 获取或创建用户的客服聊天会话
     const session = await this.getOrCreateCustomerServiceSession(user_id)
@@ -247,8 +252,6 @@ class NotificationService {
    * @returns {Promise<Object>} 客服聊天会话对象
    */
   static async getOrCreateCustomerServiceSession(user_id) {
-    const { CustomerServiceSession } = require('../models')
-
     // 1. 查找用户的活跃会话（waiting/assigned/active状态）
     let session = await CustomerServiceSession.findOne({
       where: {
@@ -327,8 +330,6 @@ class NotificationService {
    * @returns {Promise<number[]>} 管理员 user_id 数组
    */
   static async _getAdminUserIds() {
-    const { User, Role, Op } = require('../models')
-
     const admins = await User.findAll({
       where: { status: 'active' },
       include: [
@@ -374,7 +375,6 @@ class NotificationService {
 
     // === Step 1 + 2: 持久化到 admin_notifications 表（失败不阻断广播） ===
     try {
-      const { AdminNotification } = require('../models')
       const adminIds = await NotificationService._getAdminUserIds()
 
       if (adminIds.length > 0) {
@@ -415,8 +415,6 @@ class NotificationService {
     // === Step 3: WebSocket 广播（无论持久化成败都执行） ===
     let broadcastedCount = 0
     try {
-      const ChatWebSocketService = require('./ChatWebSocketService')
-
       const basePayload = {
         notification_type: NotificationService._getNotificationType(type),
         source_type: type,
@@ -1201,7 +1199,6 @@ class NotificationService {
 
     // 2. 额外推送专用 WebSocket 事件（前端可独立监听 bid_outbid 事件）
     try {
-      const ChatWebSocketService = require('./ChatWebSocketService')
       ChatWebSocketService.pushBidOutbid(user_id, {
         bid_product_id,
         item_name,
@@ -1249,7 +1246,6 @@ class NotificationService {
 
     // 2. 额外推送专用 WebSocket 事件（前端可独立监听 bid_won 事件）
     try {
-      const ChatWebSocketService = require('./ChatWebSocketService')
       ChatWebSocketService.pushBidWon(user_id, {
         bid_product_id,
         item_name,
@@ -1298,7 +1294,6 @@ class NotificationService {
 
     // 2. 额外推送专用 WebSocket 事件（前端可独立监听 bid_lost 事件）
     try {
-      const ChatWebSocketService = require('./ChatWebSocketService')
       ChatWebSocketService.pushBidLost(user_id, {
         bid_product_id,
         item_name,
@@ -1331,8 +1326,6 @@ class NotificationService {
    * @returns {Promise<{notifications: Array, pagination: Object}>} 通知列表和分页信息
    */
   static async getNotifications(userId, options = {}) {
-    const { UserNotification } = require('../models')
-
     const page = Math.max(1, parseInt(options.page) || 1)
     const pageSize = Math.min(50, Math.max(1, parseInt(options.pageSize) || 20))
 
@@ -1385,7 +1378,6 @@ class NotificationService {
    * @returns {Promise<number>} 未读数量
    */
   static async getUnreadCount(userId) {
-    const { UserNotification } = require('../models')
     return UserNotification.getUnreadCount(userId)
   }
 
@@ -1397,7 +1389,6 @@ class NotificationService {
    * @returns {Promise<number>} 实际标记数量
    */
   static async markBatchAsRead(userId, notificationIds) {
-    const { UserNotification } = require('../models')
     return UserNotification.markBatchAsRead(userId, notificationIds)
   }
 
@@ -1409,8 +1400,6 @@ class NotificationService {
    * @returns {Promise<{notification_id: number, is_read: number, read_at: Date}|null>} 更新后的通知数据，不存在返回 null
    */
   static async markSingleAsRead(userId, notificationId) {
-    const { UserNotification } = require('../models')
-
     const notification = await UserNotification.findOne({
       where: { notification_id: notificationId, user_id: userId }
     })

@@ -15,7 +15,13 @@
 const crypto = require('crypto')
 const logger = require('../../utils/logger').logger
 const BusinessError = require('../../utils/BusinessError')
-const { ConsumptionRecord, ContentReviewRecord, User } = require('../../models')
+const {
+  ConsumptionRecord,
+  ContentReviewRecord,
+  User,
+  StoreStaff,
+  UserRatioOverride
+} = require('../../models')
 const BalanceService = require('../asset/BalanceService')
 const BeijingTimeHelper = require('../../utils/timeHelper')
 const OrderNoGenerator = require('../../utils/OrderNoGenerator')
@@ -23,6 +29,8 @@ const { generateConsumptionBusinessId } = require('../../utils/IdempotencyHelper
 const AuditLogService = require('../AuditLogService')
 const { assertAndGetTransaction } = require('../../utils/transactionHelpers')
 const { AssetCode } = require('../../constants/AssetCode')
+const AdminSystemService = require('../AdminSystemService')
+const ContentAuditEngine = require('../ContentAuditEngine')
 
 /**
  * 消费记录核心服务类
@@ -154,7 +162,6 @@ class CoreService {
     }
 
     // 步骤6：计算奖励积分（可配置比例，提交时锁定，保证用户承诺一致）
-    const AdminSystemService = require('../AdminSystemService')
     const pointsRatio = await CoreService.getEffectiveRatio(
       data.user_id,
       'points_award_ratio',
@@ -169,7 +176,6 @@ class CoreService {
     // 步骤6.5：处理 store_id
     let storeId = data.store_id
     if (!storeId) {
-      const { StoreStaff } = require('../../models')
       const merchantStores = await StoreStaff.findAll({
         where: {
           user_id: data.merchant_id,
@@ -227,7 +233,6 @@ class CoreService {
     )
 
     // 步骤9：通过 ContentAuditEngine 统一创建审核记录（含审核链匹配）
-    const ContentAuditEngine = require('../ContentAuditEngine')
     await ContentAuditEngine.submitForAudit(
       'consumption',
       consumptionRecord.consumption_record_id,
@@ -716,8 +721,6 @@ class CoreService {
    * @throws {Error} 配置缺失或读取失败时抛出错误
    */
   static async getBudgetRatio() {
-    const AdminSystemService = require('../AdminSystemService')
-
     const ratio = await AdminSystemService.getSettingValue(
       'points',
       'budget_allocation_ratio',
@@ -737,7 +740,6 @@ class CoreService {
    */
   static async _getStarStoneQuotaConfig() {
     try {
-      const AdminSystemService = require('../AdminSystemService')
       const [enabled, ratio, action] = await Promise.all([
         AdminSystemService.getSettingValue('points', 'star_stone_quota_enabled', true),
         AdminSystemService.getSettingValue('points', 'star_stone_quota_ratio', 1.0),
@@ -772,10 +774,7 @@ class CoreService {
    */
   static async getEffectiveRatio(user_id, ratio_key, globalDefault) {
     try {
-      const {
-        UserRatioOverride,
-        Sequelize: { Op }
-      } = require('../../models')
+      const { Op } = require('sequelize')
       const now = new Date()
 
       const override = await UserRatioOverride.findOne({

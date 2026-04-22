@@ -12,7 +12,6 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
-const MarketAnalyticsService = require('../../../../services/market/MarketAnalyticsService')
 const logger = require('../../../../utils/logger').logger
 
 /**
@@ -30,6 +29,7 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
 
     const ExchangeAdminService = req.app.locals.services.getService('exchange_admin')
     const BidQueryService = req.app.locals.services.getService('exchange_bid_query')
+    const MarketAnalyticsService = req.app.locals.services.getService('market_analytics')
 
     const [exchange, marketplace, bids] = await Promise.all([
       ExchangeAdminService.getExchangeTopline(safeDays),

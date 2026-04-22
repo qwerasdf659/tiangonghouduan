@@ -21,6 +21,7 @@ const router = express.Router()
 const logger = require('../../../../utils/logger').logger
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const TransactionManager = require('../../../../utils/TransactionManager')
+const { handleServiceError } = require('../../../../middleware/validation')
 
 /* 补偿操作需要管理员权限（role_level >= 100） */
 router.use(authenticateToken, requireRoleLevel(1))
@@ -95,7 +96,7 @@ router.post('/compensate', requireRoleLevel(100), async (req, res) => {
     return res.apiSuccess(result, '补偿发放成功')
   } catch (error) {
     logger.error('补偿发放失败:', error)
-    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -171,7 +172,7 @@ router.get('/templates', async (req, res) => {
     return res.apiSuccess(templates, '获取消息模板成功')
   } catch (error) {
     logger.error('获取消息模板失败:', error)
-    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -198,7 +199,7 @@ router.put('/templates', requireRoleLevel(100), async (req, res) => {
     return res.apiSuccess(templates, '消息模板更新成功')
   } catch (error) {
     logger.error('更新消息模板失败:', error)
-    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 

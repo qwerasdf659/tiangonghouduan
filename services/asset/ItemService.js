@@ -30,6 +30,8 @@ const logger = require('../../utils/logger')
 const { requireTransaction } = require('../../utils/transactionHelpers')
 const { attachDisplayNames, DICT_TYPES } = require('../../utils/displayNameHelper')
 const TrackingCodeGenerator = require('../../utils/TrackingCodeGenerator')
+const { Item, ItemLedger, Account, ItemHold } = require('../../models')
+const BalanceService = require('./BalanceService')
 
 /**
  * 物品操作服务类（三表模型双录版）
@@ -89,8 +91,6 @@ class ItemService {
     if (!item_name) throw new Error('item_name 是必填参数')
     if (!source) throw new Error('source 是必填参数')
     if (!idempotency_key) throw new Error('idempotency_key 是必填参数（幂等性控制）')
-
-    const { Item, ItemLedger, Account } = require('../../models')
 
     try {
       // 幂等性检查：查找已有的铸造账本条目
@@ -227,8 +227,6 @@ class ItemService {
     if (!hold_type) throw new Error('hold_type 是必填参数')
     if (!holder_ref) throw new Error('holder_ref 是必填参数')
 
-    const { Item, ItemHold } = require('../../models')
-
     try {
       // 悲观锁获取物品
       const item = await Item.findByPk(item_id, {
@@ -329,8 +327,6 @@ class ItemService {
 
     requireTransaction(transaction, 'ItemService.releaseHold')
 
-    const { Item, ItemHold } = require('../../models')
-
     try {
       const hold = await ItemHold.findOne({
         where: { item_id, holder_ref, hold_type, status: 'active' },
@@ -423,8 +419,6 @@ class ItemService {
     if (!item_id) throw new Error('item_id 是必填参数')
     if (!new_owner_user_id) throw new Error('new_owner_user_id 是必填参数')
     if (!idempotency_key) throw new Error('idempotency_key 是必填参数')
-
-    const { Item, ItemLedger } = require('../../models')
 
     try {
       // 幂等性检查
@@ -542,8 +536,6 @@ class ItemService {
     if (!item_id) throw new Error('item_id 是必填参数')
     if (!idempotency_key) throw new Error('idempotency_key 是必填参数')
 
-    const { Item, ItemLedger, Account } = require('../../models')
-
     try {
       // 幂等性检查
       const existingEntry = await ItemLedger.findOne({
@@ -642,8 +634,6 @@ class ItemService {
 
     requireTransaction(transaction, 'ItemService.expireItem')
 
-    const { Item, ItemLedger, Account } = require('../../models')
-
     const item = await Item.findByPk(item_id, {
       lock: transaction.LOCK.UPDATE,
       transaction
@@ -702,8 +692,6 @@ class ItemService {
     const { item_id, account_id, event_types, page = 1, page_size = 20 } = params
     const { transaction } = options
 
-    const { ItemLedger } = require('../../models')
-
     const where = {}
     if (item_id) where.item_id = item_id
     if (account_id) where.account_id = account_id
@@ -746,8 +734,6 @@ class ItemService {
     const { item_type, status, page = 1, page_size = 20 } = filters
     const { transaction } = options
 
-    const { Item } = require('../../models')
-
     const userAccount = await this._getUserAccount(user_id, { transaction })
 
     const where = { owner_account_id: userAccount.account_id }
@@ -787,8 +773,6 @@ class ItemService {
   static async getItemDetail(params, options = {}) {
     const { item_id, tracking_code } = params
     const { transaction, ledger_limit = 20 } = options
-
-    const { Item, ItemLedger, ItemHold } = require('../../models')
 
     const where = {}
     if (item_id) where.item_id = item_id
@@ -831,7 +815,6 @@ class ItemService {
    * @private
    */
   static async _getUserAccount(userId, options = {}) {
-    const BalanceService = require('./BalanceService')
     return await BalanceService.getOrCreateAccount({ user_id: userId }, options)
   }
 
@@ -844,7 +827,6 @@ class ItemService {
    * @private
    */
   static async _getAccountById(accountId, options = {}) {
-    const { Account } = require('../../models')
     const account = await Account.findByPk(accountId, options)
     if (!account) throw new Error(`账户不存在：account_id=${accountId}`)
     return account

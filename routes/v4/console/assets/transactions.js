@@ -24,17 +24,7 @@ const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const { attachDisplayNames, DICT_TYPES } = require('../../../../utils/displayNameHelper')
-
-/**
- * 错误处理包装器
- * @param {Function} fn - 异步处理函数
- * @returns {Function} 包装后的中间件函数
- */
-function asyncHandler(fn) {
-  return (req, res, next) => {
-    Promise.resolve(fn(req, res, next)).catch(next)
-  }
-}
+const { asyncHandler } = require('../../../../middleware/validation')
 
 /**
  * GET /api/v4/console/assets/transactions

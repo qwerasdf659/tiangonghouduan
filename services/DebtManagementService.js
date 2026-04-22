@@ -15,13 +15,13 @@
 const { Op, fn, col, literal } = require('sequelize')
 const logger = require('../utils/logger')
 const { attachDisplayNames, DICT_TYPES } = require('../utils/displayNameHelper')
+const models = require('../models')
 
 /**
  * 延迟加载 models，避免循环依赖
  * @returns {Object} 所有需要的模型
  */
 function getModels() {
-  const models = require('../models')
   return models
 }
 

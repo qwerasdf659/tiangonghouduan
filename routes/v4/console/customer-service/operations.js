@@ -22,6 +22,7 @@ const router = express.Router()
 const logger = require('../../../../utils/logger').logger
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const TransactionManager = require('../../../../utils/TransactionManager')
+const { handleServiceError } = require('../../../../middleware/validation')
 
 // 所有路由都需要后台访问权限（role_level >= 1 即可访问客服功能）
 router.use(authenticateToken, requireRoleLevel(1))
@@ -336,7 +337,7 @@ router.post('/status', async (req, res) => {
       return res.apiError(error.message, 'BAD_REQUEST', null, 400)
     }
 
-    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 
@@ -382,7 +383,7 @@ router.get('/status', async (req, res) => {
     return res.apiSuccess(statuses, '获取在线状态成功')
   } catch (error) {
     logger.error('获取管理员在线状态失败:', error)
-    return res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+    return handleServiceError(error, res)
   }
 })
 

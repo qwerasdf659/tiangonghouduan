@@ -36,7 +36,7 @@
 'use strict'
 
 const BalanceService = require('./asset/BalanceService')
-const { AssetConversionRule } = require('../models')
+const { AssetConversionRule, AssetTransaction } = require('../models')
 const logger = require('../utils/logger')
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 const { AssetCode } = require('../constants/AssetCode')
@@ -568,8 +568,6 @@ class AssetConversionRuleService {
     fromAmount,
     transaction
   ) {
-    const { AssetTransaction } = require('../models')
-
     const existingTx = await AssetTransaction.findOne({
       where: {
         idempotency_key: `${idempotencyKey}_debit`,

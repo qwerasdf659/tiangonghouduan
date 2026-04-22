@@ -25,6 +25,7 @@
  */
 
 const { logger } = require('../../../utils/logger')
+const NormalDrawPipeline = require('./NormalDrawPipeline')
 
 // 管线类型常量（保留用于日志和状态报告）
 const PIPELINE_TYPES = {
@@ -63,7 +64,6 @@ class DrawOrchestrator {
    */
   _getPipeline() {
     if (!this._pipeline) {
-      const NormalDrawPipeline = require('./NormalDrawPipeline')
       this._pipeline = new NormalDrawPipeline()
     }
     return this._pipeline
