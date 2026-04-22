@@ -14,8 +14,8 @@
  * - GET    /listing-stats                            - 用户上架统计
  * - GET    /user-listings                            - 查指定用户的挂牌
  * - PUT    /user-listing-limit                       - 调整用户上架上限
- * - PUT    /listings/:id/pin                         - 挂牌置顶
- * - PUT    /listings/:id/recommend                   - 挂牌推荐
+ * - PUT    /listings/:market_listing_id/pin                         - 挂牌置顶
+ * - PUT    /listings/:market_listing_id/recommend                   - 挂牌推荐
  * - PUT    /listings/batch-sort                      - 批量排序
  * - POST   /listings/:market_listing_id/force-withdraw - 强制撤回
  * - GET    /stats/overview                           - 市场概览

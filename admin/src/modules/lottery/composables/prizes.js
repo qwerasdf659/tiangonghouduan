@@ -328,7 +328,7 @@ export function usePrizesMethods() {
         async () => {
           await this.apiCall(
             buildURL(LOTTERY_ENDPOINTS.PRIZE_UPDATE, {
-              prize_id: prize.lottery_prize_id
+              id: prize.lottery_prize_id
             }),
             { method: 'PUT', data: { status: newStatus } }
           )
@@ -349,7 +349,7 @@ export function usePrizesMethods() {
           // apiCall 成功时返回 response.data，失败时抛出错误
           await this.apiCall(
             buildURL(LOTTERY_ENDPOINTS.PRIZE_DELETE, {
-              prize_id: prize.lottery_prize_id
+              id: prize.lottery_prize_id
             }),
             { method: 'DELETE' }
           )
@@ -385,7 +385,7 @@ export function usePrizesMethods() {
           // 中奖概率：前端表单是百分比(0-100)，后端需要小数(0-1)
           const winProbability = (this.prizeForm.win_probability || 0) / 100
           const url = buildURL(LOTTERY_ENDPOINTS.PRIZE_UPDATE, {
-            lottery_prize_id: this.editingLotteryPrizeId
+            id: this.editingLotteryPrizeId
           })
           const updateData = {
             prize_name: this.prizeForm.prize_name,
@@ -506,7 +506,7 @@ export function usePrizesMethods() {
         // apiCall 成功时返回 response.data，失败时抛出错误
         await this.apiCall(
           buildURL(LOTTERY_ENDPOINTS.PRIZE_ADD_STOCK, {
-            prize_id: this.stockForm.lottery_prize_id
+            id: this.stockForm.lottery_prize_id
           }),
           {
             method: 'POST',
@@ -855,7 +855,7 @@ export function usePrizesMethods() {
         if (this.isEditMode) {
           const winProbability = (this.prizeForm.win_probability || 0) / 100
           const url = buildURL(LOTTERY_ENDPOINTS.PRIZE_UPDATE, {
-            lottery_prize_id: this.editingLotteryPrizeId
+            id: this.editingLotteryPrizeId
           })
           const updateData = {
             prize_name: this.prizeForm.prize_name,
@@ -981,7 +981,7 @@ export function usePrizesMethods() {
         `确认删除奖品「${prize.prize_name}」？删除后该档位的概率分布将自动调整。`,
         async () => {
           await this.apiCall(
-            buildURL(LOTTERY_ENDPOINTS.PRIZE_DELETE, { prize_id: prize.lottery_prize_id }),
+            buildURL(LOTTERY_ENDPOINTS.PRIZE_DELETE, { id: prize.lottery_prize_id }),
             { method: 'DELETE' }
           )
           await this.loadCampaignGroupedPrizes()
@@ -1003,7 +1003,7 @@ export function usePrizesMethods() {
       }
       try {
         await this.apiCall(
-          buildURL(LOTTERY_ENDPOINTS.PRIZE_SET_STOCK, { prize_id: prize.lottery_prize_id }),
+          buildURL(LOTTERY_ENDPOINTS.PRIZE_SET_STOCK, { id: prize.lottery_prize_id }),
           { method: 'PUT', data: { stock_quantity: stockValue } }
         )
         prize.stock_quantity = stockValue
