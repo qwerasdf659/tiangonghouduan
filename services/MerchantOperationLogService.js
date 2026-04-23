@@ -25,20 +25,8 @@ const { Op } = require('sequelize')
 const logger = require('../utils/logger').logger
 const BeijingTimeHelper = require('../utils/timeHelper')
 
-// 延迟加载模型，避免循环依赖
-let modelsCache = null
-
-/**
- * 获取模型（延迟加载）
- *
- * @returns {Object} 模型对象
- */
-function getModels() {
-  if (!modelsCache) {
-    modelsCache = require('../models')
-  }
-  return modelsCache
-}
+const models = require('../models')
+const { MerchantOperationLog, User, Store, ConsumptionRecord } = models
 
 /**
  * 商家操作审计日志服务
@@ -70,7 +58,7 @@ class MerchantOperationLogService {
    * @returns {Promise<Object>} 创建的审计日志实例
    */
   static async createLog(data, options = {}) {
-    const { MerchantOperationLog } = getModels()
+    // 使用顶部导入的 MerchantOperationLog
 
     try {
       const logRecord = await MerchantOperationLog.createLog(data, options)
@@ -137,7 +125,7 @@ class MerchantOperationLogService {
    * @returns {Promise<Object>} 审计日志列表和分页信息
    */
   static async queryLogs(filters = {}) {
-    const { MerchantOperationLog, User, Store } = getModels()
+    // 使用顶部导入的 MerchantOperationLog, User, Store
 
     const {
       store_id,
@@ -282,7 +270,7 @@ class MerchantOperationLogService {
    * @returns {Promise<Object|null>} 审计日志详情，不存在则返回 null
    */
   static async getLogDetail(merchantLogId) {
-    const { MerchantOperationLog, User, Store, ConsumptionRecord } = getModels()
+    // 使用顶部导入的 MerchantOperationLog, User, Store, ConsumptionRecord
 
     try {
       const log = await MerchantOperationLog.findByPk(merchantLogId, {
@@ -371,7 +359,7 @@ class MerchantOperationLogService {
    * @returns {Promise<Object>} 审计日志统计信息
    */
   static async getStoreStats(storeId, options = {}) {
-    const { MerchantOperationLog } = getModels()
+    // 使用顶部导入的 MerchantOperationLog
     const { start_time, end_time } = options
 
     // 构建时间条件
@@ -469,7 +457,7 @@ class MerchantOperationLogService {
    * @returns {Promise<Object>} 审计日志统计信息
    */
   static async getOperatorStats(operatorId, options = {}) {
-    const { MerchantOperationLog } = getModels()
+    // 使用顶部导入的 MerchantOperationLog
     const { start_time, end_time } = options
 
     // 构建时间条件
@@ -574,7 +562,7 @@ class MerchantOperationLogService {
    * @since 2026
    */
   static async exportLogs(filters = {}) {
-    const { MerchantOperationLog, User, Store } = getModels()
+    // 使用顶部导入的 MerchantOperationLog, User, Store
 
     const { store_id, start_time, end_time, operation_type, result, limit = 10000 } = filters
 
@@ -647,7 +635,7 @@ class MerchantOperationLogService {
    * @returns {Promise<Object>} 清理结果
    */
   static async cleanupExpiredLogs(options = {}) {
-    const { MerchantOperationLog } = getModels()
+    // 使用顶部导入的 MerchantOperationLog
     const { retention_days = 180, dry_run = false } = options
 
     // 计算截止时间

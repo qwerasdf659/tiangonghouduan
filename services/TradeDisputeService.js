@@ -37,26 +37,16 @@ const DISPUTABLE_ORDER_STATUSES = ['completed', 'frozen']
 /** 纠纷处理截止天数（默认7天） */
 const DEFAULT_DISPUTE_DEADLINE_DAYS = 7
 
+const models = require('../models')
+
 /**
  * 交易纠纷与售后服务 - 处理买家申诉、仲裁流程、纠纷解决
  */
 class TradeDisputeService {
   /** Creates a new TradeDisputeService instance */
   constructor() {
-    this.models = null
-    this.sequelize = null
-  }
-
-  /**
-   * 延迟初始化模型（避免循环依赖）
-   * @private
-   * @returns {void}
-   */
-  _ensureModels() {
-    if (!this.models) {
-      this.models = require('../models')
-      this.sequelize = this.models.sequelize
-    }
+    this.models = models
+    this.sequelize = models.sequelize
   }
 
   /**
@@ -75,7 +65,7 @@ class TradeDisputeService {
    * @returns {Promise<Object>} 创建的纠纷工单
    */
   async createDispute(params, options = {}) {
-    this._ensureModels()
+    // models 已在构造函数中初始化
     const transaction = assertAndGetTransaction(options, 'TradeDisputeService.createDispute')
 
     const { trade_order_id, user_id, dispute_type, title, description, evidence, created_by } =
@@ -175,7 +165,7 @@ class TradeDisputeService {
    * @returns {Promise<Object>} 仲裁结果
    */
   async escalateToArbitration(issueId, operatorId, options = {}) {
-    this._ensureModels()
+    // models 已在构造函数中初始化
     const transaction = assertAndGetTransaction(
       options,
       'TradeDisputeService.escalateToArbitration'
@@ -242,7 +232,7 @@ class TradeDisputeService {
    * @returns {Promise<Object>} 解决结果
    */
   async resolveDispute(issueId, params, options = {}) {
-    this._ensureModels()
+    // models 已在构造函数中初始化
     const transaction = assertAndGetTransaction(options, 'TradeDisputeService.resolveDispute')
 
     const { resolution, refund = false, operator_id } = params
@@ -310,7 +300,7 @@ class TradeDisputeService {
    * @returns {Promise<Object>} { rows, count, page, page_size }
    */
   async listDisputes(filters = {}) {
-    this._ensureModels()
+    // models 已在构造函数中初始化
 
     const { status, dispute_type, priority, page = 1, page_size = 20 } = filters
     const where = { issue_type: 'trade' }
@@ -343,7 +333,7 @@ class TradeDisputeService {
    * @returns {Promise<Object>} 纠纷详情
    */
   async getDisputeDetail(issueId) {
-    this._ensureModels()
+    // models 已在构造函数中初始化
 
     const issue = await this.models.CustomerServiceIssue.findByPk(issueId, {
       include: [
@@ -397,7 +387,7 @@ class TradeDisputeService {
    * @returns {Promise<Object>} 纠纷统计
    */
   async getDisputeStats() {
-    this._ensureModels()
+    // models 已在构造函数中初始化
 
     const [statusCounts, typeCounts, recentCount] = await Promise.all([
       // 按状态统计

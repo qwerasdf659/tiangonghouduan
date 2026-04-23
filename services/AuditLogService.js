@@ -74,7 +74,7 @@ const { attachDisplayNames, DICT_TYPES } = require('../utils/displayNameHelper')
  * 最后更新：2026年01月08日（V4.5.0 审计统一入口整合）
  */
 
-const { AdminOperationLog } = require('../models')
+const { AdminOperationLog, User } = require('../models')
 const BeijingTimeHelper = require('../utils/timeHelper')
 
 // 引用统一枚举定义（单一真相源 - 2026-01-08 整合）
@@ -877,7 +877,7 @@ class AuditLogService {
         where: whereClause,
         include: [
           {
-            model: require('../models').User,
+            model: User,
             as: 'operator',
             attributes: ['user_id', 'nickname', 'mobile']
           }
@@ -986,7 +986,7 @@ class AuditLogService {
         offset,
         include: [
           {
-            model: require('../models').User,
+            model: User,
             as: 'operator',
             attributes: ['user_id', 'nickname', 'mobile']
           }
@@ -1017,7 +1017,7 @@ class AuditLogService {
       const log = await AdminOperationLog.findByPk(logId, {
         include: [
           {
-            model: require('../models').User,
+            model: User,
             as: 'operator',
             attributes: ['user_id', 'nickname', 'mobile']
           }
@@ -1372,7 +1372,7 @@ class AuditLogService {
           attributes: ['operator_id', [fn('COUNT', col('admin_operation_log_id')), 'count']],
           include: [
             {
-              model: require('../models').User,
+              model: User,
               as: 'operator',
               attributes: ['user_id', 'nickname', 'mobile']
             }

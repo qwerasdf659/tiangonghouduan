@@ -571,7 +571,7 @@ class FeedbackService {
    * @since 2026
    */
   static async getStats() {
-    const models = FeedbackService._getModels()
+    // 使用顶部导入的 models
 
     try {
       // 并行查询各状态数量
@@ -595,16 +595,6 @@ class FeedbackService {
       logger.error('获取反馈统计失败', { error: error.message })
       throw error
     }
-  }
-
-  /**
-   * 延迟加载 models，避免循环依赖
-   *
-   * @private
-   * @returns {Object} 模型集合
-   */
-  static _getModels() {
-    return require('../models')
   }
 }
 

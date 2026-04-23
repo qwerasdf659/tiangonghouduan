@@ -5,25 +5,16 @@
  * @module services/MarketHealthService
  */
 
+const models = require('../models')
+
 /**
  * 市场健康看板服务 - 交易市场运营健康指标
  */
 class MarketHealthService {
   /** Creates a new MarketHealthService instance */
   constructor() {
-    this.models = null
-    this.sequelize = null
-  }
-
-  /**
-   * @private
-   * @returns {void}
-   */
-  _ensureModels() {
-    if (!this.models) {
-      this.models = require('../models')
-      this.sequelize = this.models.sequelize
-    }
+    this.models = models
+    this.sequelize = models.sequelize
   }
 
   /**
@@ -34,7 +25,7 @@ class MarketHealthService {
    * @returns {Promise<Array>} [{date, total, completed, cancelled, failed, completion_rate, cancel_rate}]
    */
   async getOrderStatusTrend(filters = {}) {
-    this._ensureModels()
+    // models 已在构造函数中初始化
     const { days = 30 } = filters
     const startDate = new Date()
     startDate.setDate(startDate.getDate() - days)
@@ -72,7 +63,7 @@ class MarketHealthService {
    * @returns {Promise<Object>} { avg_minutes, median_minutes, total_completed }
    */
   async getAvgSettlementTime(filters = {}) {
-    this._ensureModels()
+    // models 已在构造函数中初始化
     const { days = 30 } = filters
     const startDate = new Date()
     startDate.setDate(startDate.getDate() - days)
@@ -103,7 +94,7 @@ class MarketHealthService {
    * @returns {Promise<Array>} [{user_id, nickname, buy_count, total_amount}]
    */
   async getTopBuyers(filters = {}) {
-    this._ensureModels()
+    // models 已在构造函数中初始化
     const { days = 30, page_size = 10, limit: legacyLimit } = filters
     const limit = legacyLimit !== undefined ? legacyLimit : page_size
     const startDate = new Date()
@@ -140,7 +131,7 @@ class MarketHealthService {
    * @returns {Promise<Array>} [{user_id, nickname, sell_count, total_amount}]
    */
   async getTopSellers(filters = {}) {
-    this._ensureModels()
+    // models 已在构造函数中初始化
     const { days = 30, page_size = 10, limit: legacyLimit } = filters
     const limit = legacyLimit !== undefined ? legacyLimit : page_size
     const startDate = new Date()

@@ -20,7 +20,7 @@
 'use strict'
 
 const crypto = require('crypto')
-const { BatchOperationLog } = require('../models')
+const { BatchOperationLog, User } = require('../models')
 const AdminSystemService = require('./AdminSystemService')
 const logger = require('../utils/logger').logger
 const { getRedisClient: getRedisClientInstance } = require('../utils/UnifiedRedisClient')
@@ -471,7 +471,7 @@ class BatchOperationService {
       const log = await BatchOperationLog.findByPk(batch_operation_log_id, {
         include: [
           {
-            model: require('../models').User,
+            model: User,
             as: 'operator',
             attributes: ['user_id', 'nickname', 'mobile']
           }
@@ -545,7 +545,7 @@ class BatchOperationService {
         where: whereConditions,
         include: [
           {
-            model: require('../models').User,
+            model: User,
             as: 'operator',
             attributes: ['user_id', 'nickname']
           }

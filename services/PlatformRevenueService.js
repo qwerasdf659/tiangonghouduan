@@ -34,26 +34,17 @@ const BUSINESS_TYPE_DISPLAY = {
   bid_unfreeze: '竞价解冻'
 }
 
+const models = require('../models')
+
 /**
  * 平台收入与手续费管理服务
  */
 class PlatformRevenueService {
   /** Creates a new PlatformRevenueService instance */
   constructor() {
-    this.models = null
-    this.sequelize = null
+    this.models = models
+    this.sequelize = models.sequelize
     this._platformFeeAccountId = null
-  }
-
-  /**
-   * @private 延迟初始化
-   * @returns {void}
-   */
-  _ensureModels() {
-    if (!this.models) {
-      this.models = require('../models')
-      this.sequelize = this.models.sequelize
-    }
   }
 
   /**
@@ -63,7 +54,7 @@ class PlatformRevenueService {
    */
   async _getPlatformFeeAccountId() {
     if (this._platformFeeAccountId) return this._platformFeeAccountId
-    this._ensureModels()
+    // models 已在构造函数中初始化
 
     const [rows] = await this.sequelize.query(
       "SELECT account_id FROM accounts WHERE system_code = 'SYSTEM_PLATFORM_FEE' AND account_type = 'system' LIMIT 1"
@@ -79,7 +70,7 @@ class PlatformRevenueService {
    */
   async _getAssetDisplayNames() {
     if (this._assetNameMap) return this._assetNameMap
-    this._ensureModels()
+    // models 已在构造函数中初始化
 
     const [rows] = await this.sequelize.query(
       'SELECT asset_code, display_name FROM material_asset_types'
@@ -96,7 +87,7 @@ class PlatformRevenueService {
    * @returns {Array} return.total_income - 各币种累计收入列表
    */
   async getRevenueOverview() {
-    this._ensureModels()
+    // models 已在构造函数中初始化
     const accountId = await this._getPlatformFeeAccountId()
     if (!accountId) return { balances: [], total_income: [] }
 
@@ -140,7 +131,7 @@ class PlatformRevenueService {
    * @returns {Promise<Array>} 按 business_type 分组的收入统计
    */
   async getRevenueBySource(filters = {}) {
-    this._ensureModels()
+    // models 已在构造函数中初始化
     const accountId = await this._getPlatformFeeAccountId()
     if (!accountId) return []
 
@@ -183,7 +174,7 @@ class PlatformRevenueService {
    * @returns {Promise<Array>} 趋势数据 [{period, total_amount, tx_count}]
    */
   async getRevenueTrend(filters = {}) {
-    this._ensureModels()
+    // models 已在构造函数中初始化
     const accountId = await this._getPlatformFeeAccountId()
     if (!accountId) return []
 
@@ -232,7 +223,7 @@ class PlatformRevenueService {
    * @returns {Promise<Object>} 手续费配置和统计
    */
   async getFeeRateStats() {
-    this._ensureModels()
+    // models 已在构造函数中初始化
     const accountId = await this._getPlatformFeeAccountId()
 
     // 从 system_settings 读取当前费率配置

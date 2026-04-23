@@ -25,6 +25,7 @@
 const logger = require('../utils/logger').logger
 const BeijingTimeHelper = require('../utils/timeHelper')
 const { Op } = require('sequelize')
+const models = require('../models')
 
 /**
  * 风控配置常量（可通过环境变量覆盖）
@@ -81,19 +82,6 @@ class MerchantRiskControlService {
   }
 
   /**
-   * 获取模型（懒加载）
-   *
-   * @private
-   * @returns {Object} Sequelize 模型集合
-   */
-  static _getModels() {
-    if (!MerchantRiskControlService._models) {
-      MerchantRiskControlService._models = require('../models')
-    }
-    return MerchantRiskControlService._models
-  }
-
-  /**
    * 频次风控：检查员工提交频率（硬阻断，防止批量刷单）
    *
    * AC5.1: 同一员工1分钟内提交次数>10次，阻断提交并返回429
@@ -108,7 +96,7 @@ class MerchantRiskControlService {
     const time_window_seconds = options.time_window_seconds || RISK_CONFIG.FREQUENCY_LIMIT_SECONDS
     const max_count = options.max_count || RISK_CONFIG.FREQUENCY_LIMIT_COUNT
 
-    const models = MerchantRiskControlService._getModels()
+    // models 已在文件顶部导入
     const { ConsumptionRecord, RiskAlert } = models
 
     try {
@@ -190,7 +178,7 @@ class MerchantRiskControlService {
     const single_limit = options.single_limit || RISK_CONFIG.SINGLE_AMOUNT_ALERT
     const daily_limit = options.daily_limit || RISK_CONFIG.DAILY_AMOUNT_ALERT
 
-    const models = MerchantRiskControlService._getModels()
+    // models 已在文件顶部导入
     const { ConsumptionRecord, RiskAlert } = models
 
     const alerts = []
@@ -295,7 +283,7 @@ class MerchantRiskControlService {
     const time_window_minutes = options.time_window_minutes || RISK_CONFIG.DUPLICATE_USER_MINUTES
     const store_count_limit = options.store_count_limit || RISK_CONFIG.DUPLICATE_USER_STORE_COUNT
 
-    const models = MerchantRiskControlService._getModels()
+    // models 已在文件顶部导入
     const { ConsumptionRecord, RiskAlert } = models
 
     try {
@@ -495,7 +483,7 @@ class MerchantRiskControlService {
    * @returns {Promise<Object|null>} 创建的告警记录或 null
    */
   static async _createRiskAlert(alertData) {
-    const models = MerchantRiskControlService._getModels()
+    // models 已在文件顶部导入
     const { RiskAlert } = models
 
     // 如果 RiskAlert 模型不存在，仅记录日志
@@ -569,7 +557,7 @@ class MerchantRiskControlService {
    * @returns {Promise<Object>} { alerts: Array, total: number, page: number, page_size: number }
    */
   static async queryRiskAlerts(filters = {}, pagination = {}) {
-    const models = MerchantRiskControlService._getModels()
+    // models 已在文件顶部导入
     const { RiskAlert } = models
 
     if (!RiskAlert) {
@@ -636,7 +624,7 @@ class MerchantRiskControlService {
    */
   static async updateAlertStatus(alert_id, updateData, options = {}) {
     const { transaction } = options
-    const models = MerchantRiskControlService._getModels()
+    // models 已在文件顶部导入
     const { RiskAlert } = models
 
     if (!RiskAlert) {
@@ -694,7 +682,7 @@ class MerchantRiskControlService {
    * @since 2026
    */
   static async getAlertDetail(alertId) {
-    const models = MerchantRiskControlService._getModels()
+    // models 已在文件顶部导入
     const { RiskAlert, User, Store, ConsumptionRecord } = models
 
     if (!RiskAlert) {
@@ -792,7 +780,7 @@ class MerchantRiskControlService {
    * @since 2026
    */
   static async getAlertStats(filters = {}) {
-    const models = MerchantRiskControlService._getModels()
+    // models 已在文件顶部导入
     const { RiskAlert } = models
 
     if (!RiskAlert) {
@@ -878,7 +866,7 @@ class MerchantRiskControlService {
    * @since 2026
    */
   static async getAlertBasic(alertId) {
-    const models = MerchantRiskControlService._getModels()
+    // models 已在文件顶部导入
     const { RiskAlert } = models
 
     if (!RiskAlert) {
@@ -900,7 +888,7 @@ class MerchantRiskControlService {
    * @since 2026
    */
   static async queryRiskAlertsWithDetails(filters = {}, pagination = {}) {
-    const models = MerchantRiskControlService._getModels()
+    // models 已在文件顶部导入
     const { RiskAlert, User, Store } = models
 
     if (!RiskAlert) {
@@ -1034,7 +1022,7 @@ class MerchantRiskControlService {
    * @since 2026
    */
   static async getPendingAlerts(filters = {}, pagination = {}) {
-    const models = MerchantRiskControlService._getModels()
+    // models 已在文件顶部导入
     const { RiskAlert } = models
 
     if (!RiskAlert) {
@@ -1060,7 +1048,7 @@ class MerchantRiskControlService {
    * @since 2026
    */
   static async reviewAlert(alertId, params) {
-    const models = MerchantRiskControlService._getModels()
+    // models 已在文件顶部导入
     const { RiskAlert, sequelize } = models
 
     if (!RiskAlert) {
@@ -1114,7 +1102,7 @@ class MerchantRiskControlService {
    * @since 2026
    */
   static async markAllAsRead(reviewed_by, filters = {}) {
-    const models = MerchantRiskControlService._getModels()
+    // models 已在文件顶部导入
     const { RiskAlert, sequelize } = models
 
     if (!RiskAlert) {
@@ -1176,7 +1164,7 @@ class MerchantRiskControlService {
    * @since 2026
    */
   static async getStatsSummary(filters = {}) {
-    const models = MerchantRiskControlService._getModels()
+    // models 已在文件顶部导入
     const { RiskAlert } = models
 
     if (!RiskAlert) {
@@ -1273,7 +1261,7 @@ class MerchantRiskControlService {
    * @since 2026
    */
   static async getStoreStats(storeId, filters = {}) {
-    const models = MerchantRiskControlService._getModels()
+    // models 已在文件顶部导入
     const { RiskAlert } = models
 
     if (!RiskAlert) {
@@ -1353,7 +1341,7 @@ class MerchantRiskControlService {
    * @since 2026
    */
   static async getAlertTypesList() {
-    const models = MerchantRiskControlService._getModels()
+    // models 已在文件顶部导入
     const { RiskAlert } = models
 
     if (!RiskAlert) {
