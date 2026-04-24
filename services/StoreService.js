@@ -24,6 +24,7 @@
 
 'use strict'
 
+const BusinessError = require('../utils/BusinessError')
 const { Op } = require('sequelize')
 const { sequelize } = require('../models')
 const { Store, User, StoreStaff, AdministrativeRegion } = require('../models')
@@ -71,7 +72,7 @@ class StoreService {
 
     // 1. 数据验证 - 门店名称
     if (!storeData.store_name || storeData.store_name.trim() === '') {
-      throw new Error('门店名称不能为空')
+      throw new BusinessError('门店名称不能为空', 'STORE_NOT_ALLOWED', 400)
     }
 
     // 2. 数据验证 - 行政区划（必填校验）
@@ -79,7 +80,7 @@ class StoreService {
       transaction
     })
     if (!regionValidation.valid) {
-      throw new Error(`行政区划校验失败: ${regionValidation.errors.join(', ')}`)
+      throw new BusinessError(`行政区划校验失败: ${regionValidation.errors.join(', ')}`, 'STORE_FAILED', 500)
     }
 
     // 3. 生成门店编号（如未提供）
@@ -95,21 +96,21 @@ class StoreService {
     })
 
     if (existingStore) {
-      throw new Error(`门店编号 ${storeCode} 已存在`)
+      throw new BusinessError(`门店编号 ${storeCode} 已存在`, 'STORE_ALREADY_EXISTS', 409)
     }
 
     // 5. 验证关联用户（如有）
     if (storeData.assigned_to) {
       const assignedUser = await User.findByPk(storeData.assigned_to, { transaction })
       if (!assignedUser) {
-        throw new Error(`分配的业务员 ID ${storeData.assigned_to} 不存在`)
+        throw new BusinessError(`分配的业务员 ID ${storeData.assigned_to} 不存在`, 'STORE_NOT_FOUND', 404)
       }
     }
 
     if (storeData.merchant_id) {
       const merchantUser = await User.findByPk(storeData.merchant_id, { transaction })
       if (!merchantUser) {
-        throw new Error(`商户 ID ${storeData.merchant_id} 不存在`)
+        throw new BusinessError(`商户 ID ${storeData.merchant_id} 不存在`, 'STORE_NOT_FOUND', 404)
       }
     }
 
@@ -359,7 +360,7 @@ class StoreService {
     // 1. 查找门店
     const store = await Store.findByPk(store_id, { transaction })
     if (!store) {
-      throw new Error(`门店 ID ${store_id} 不存在`)
+      throw new BusinessError(`门店 ID ${store_id} 不存在`, 'STORE_NOT_FOUND', 404)
     }
 
     // 2. 检查门店编号唯一性（如有更新）
@@ -373,7 +374,7 @@ class StoreService {
       })
 
       if (existingStore) {
-        throw new Error(`门店编号 ${updateData.store_code} 已被其他门店使用`)
+        throw new BusinessError(`门店编号 ${updateData.store_code} 已被其他门店使用`, 'STORE_ERROR', 400)
       }
     }
 
@@ -395,7 +396,7 @@ class StoreService {
         transaction
       })
       if (!regionValidation.valid) {
-        throw new Error(`行政区划校验失败: ${regionValidation.errors.join(', ')}`)
+        throw new BusinessError(`行政区划校验失败: ${regionValidation.errors.join(', ')}`, 'STORE_FAILED', 500)
       }
 
       regionNames = regionValidation.names
@@ -405,14 +406,14 @@ class StoreService {
     if (updateData.assigned_to) {
       const assignedUser = await User.findByPk(updateData.assigned_to, { transaction })
       if (!assignedUser) {
-        throw new Error(`分配的业务员 ID ${updateData.assigned_to} 不存在`)
+        throw new BusinessError(`分配的业务员 ID ${updateData.assigned_to} 不存在`, 'STORE_NOT_FOUND', 404)
       }
     }
 
     if (updateData.merchant_id) {
       const merchantUser = await User.findByPk(updateData.merchant_id, { transaction })
       if (!merchantUser) {
-        throw new Error(`商户 ID ${updateData.merchant_id} 不存在`)
+        throw new BusinessError(`商户 ID ${updateData.merchant_id} 不存在`, 'STORE_NOT_FOUND', 404)
       }
     }
 
@@ -490,7 +491,7 @@ class StoreService {
     // 1. 查找门店
     const store = await Store.findByPk(store_id, { transaction })
     if (!store) {
-      throw new Error(`门店 ID ${store_id} 不存在`)
+      throw new BusinessError(`门店 ID ${store_id} 不存在`, 'STORE_NOT_FOUND', 404)
     }
 
     // 2. 检查是否有在职员工
@@ -500,7 +501,7 @@ class StoreService {
     })
 
     if (activeStaffCount > 0 && !force) {
-      throw new Error(`门店 ${store.store_name} 下有 ${activeStaffCount} 名在职员工，无法删除`)
+      throw new BusinessError(`门店 ${store.store_name} 下有 ${activeStaffCount} 名在职员工，无法删除`, 'STORE_ERROR', 400)
     }
 
     // 3. 执行删除

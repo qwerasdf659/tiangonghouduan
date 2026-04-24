@@ -12,6 +12,7 @@
  * @module services/market-listing/AdminService
  */
 
+const BusinessError = require('../../utils/BusinessError')
 const logger = require('../../utils/logger').logger
 const { SystemSetting } = require('../../models')
 const AuditLogService = require('../AuditLogService')
@@ -41,11 +42,11 @@ class MarketListingAdminService {
     const { reason, duration_hours = 24, operator_id } = options
 
     if (!asset_code) {
-      throw new Error('资产代码（asset_code）不能为空')
+      throw new BusinessError('资产代码（asset_code）不能为空', 'MARKET_LISTING_NOT_ALLOWED', 400)
     }
 
     if (!reason) {
-      throw new Error('暂停原因（reason）不能为空')
+      throw new BusinessError('暂停原因（reason）不能为空', 'MARKET_LISTING_NOT_ALLOWED', 400)
     }
 
     // 1. 获取当前已暂停的资产列表
@@ -134,7 +135,7 @@ class MarketListingAdminService {
     const { reason = '手动恢复', operator_id } = options
 
     if (!asset_code) {
-      throw new Error('资产代码（asset_code）不能为空')
+      throw new BusinessError('资产代码（asset_code）不能为空', 'MARKET_LISTING_NOT_ALLOWED', 400)
     }
 
     const settingKey = 'marketplace/paused_assets'

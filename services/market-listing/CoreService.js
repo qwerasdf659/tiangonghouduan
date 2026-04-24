@@ -27,6 +27,7 @@ const {
 } = require('../../models')
 const { Op } = sequelize.Sequelize
 /* V4.7.0 AssetService 拆分：使用子服务替代原 AssetService */
+const BusinessError = require('../../utils/BusinessError')
 const { AssetCode } = require('../../constants/AssetCode')
 const BalanceService = require('../asset/BalanceService')
 const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
@@ -345,10 +346,10 @@ class MarketListingCoreService {
     } = params
 
     // 1. 参数验证
-    if (!idempotency_key) throw new Error('idempotency_key 是必需参数')
-    if (!seller_user_id) throw new Error('seller_user_id 是必需参数')
-    if (!item_id) throw new Error('item_id 是必需参数')
-    if (!price_amount || price_amount <= 0) throw new Error('price_amount 必须大于0')
+    if (!idempotency_key) throw new BusinessError('idempotency_key 是必需参数', 'MARKET_LISTING_REQUIRED', 400)
+    if (!seller_user_id) throw new BusinessError('seller_user_id 是必需参数', 'MARKET_LISTING_REQUIRED', 400)
+    if (!item_id) throw new BusinessError('item_id 是必需参数', 'MARKET_LISTING_REQUIRED', 400)
+    if (!price_amount || price_amount <= 0) throw new BusinessError('price_amount 必须大于0', 'MARKET_LISTING_REQUIRED', 400)
 
     // 2. 幂等性检查
     const existingListing = await MarketListing.findOne({
@@ -530,8 +531,8 @@ class MarketListingCoreService {
   static async withdrawListing(params, options = {}) {
     const { market_listing_id, seller_user_id } = params
 
-    if (!market_listing_id) throw new Error('market_listing_id 是必需参数')
-    if (!seller_user_id) throw new Error('seller_user_id 是必需参数')
+    if (!market_listing_id) throw new BusinessError('market_listing_id 是必需参数', 'MARKET_LISTING_REQUIRED', 400)
+    if (!seller_user_id) throw new BusinessError('seller_user_id 是必需参数', 'MARKET_LISTING_REQUIRED', 400)
 
     const transaction = assertAndGetTransaction(options, 'MarketListingCoreService.withdrawListing')
 
@@ -724,14 +725,14 @@ class MarketListingCoreService {
     } = params
 
     // 参数验证
-    if (!idempotency_key) throw new Error('idempotency_key 是必需参数')
-    if (!seller_user_id) throw new Error('seller_user_id 是必需参数')
-    if (!offer_asset_code) throw new Error('offer_asset_code 是必需参数')
+    if (!idempotency_key) throw new BusinessError('idempotency_key 是必需参数', 'MARKET_LISTING_REQUIRED', 400)
+    if (!seller_user_id) throw new BusinessError('seller_user_id 是必需参数', 'MARKET_LISTING_REQUIRED', 400)
+    if (!offer_asset_code) throw new BusinessError('offer_asset_code 是必需参数', 'MARKET_LISTING_REQUIRED', 400)
     if (!offer_amount || offer_amount <= 0 || !Number.isInteger(offer_amount)) {
-      throw new Error('offer_amount 必须是正整数')
+      throw new BusinessError('offer_amount 必须是正整数', 'MARKET_LISTING_REQUIRED', 400)
     }
     if (!price_amount || price_amount <= 0) {
-      throw new Error('price_amount 必须大于0')
+      throw new BusinessError('price_amount 必须大于0', 'MARKET_LISTING_REQUIRED', 400)
     }
 
     // 挂牌价格管控检查
@@ -971,8 +972,8 @@ class MarketListingCoreService {
   static async withdrawFungibleAssetListing(params, options = {}) {
     const { market_listing_id, seller_user_id } = params
 
-    if (!market_listing_id) throw new Error('market_listing_id 是必需参数')
-    if (!seller_user_id) throw new Error('seller_user_id 是必需参数')
+    if (!market_listing_id) throw new BusinessError('market_listing_id 是必需参数', 'MARKET_LISTING_REQUIRED', 400)
+    if (!seller_user_id) throw new BusinessError('seller_user_id 是必需参数', 'MARKET_LISTING_REQUIRED', 400)
 
     const transaction = assertAndGetTransaction(
       options,

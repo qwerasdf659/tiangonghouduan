@@ -21,6 +21,7 @@
  */
 
 'use strict'
+const BusinessError = require('../../utils/BusinessError')
 
 const logger = require('../../utils/logger').logger
 const BalanceService = require('../asset/BalanceService')
@@ -142,10 +143,10 @@ class BidService {
     const { transaction, idempotency_key } = options
 
     if (!transaction) {
-      throw new Error('BidService.placeBid 需要外部传入事务（事务边界由路由层管理）')
+      throw new BusinessError('BidService.placeBid 需要外部传入事务（事务边界由路由层管理）', 'EXCHANGE_ERROR', 400)
     }
     if (!idempotency_key) {
-      throw new Error('idempotency_key 是必填参数')
+      throw new BusinessError('idempotency_key 是必填参数', 'EXCHANGE_REQUIRED', 400)
     }
 
     logger.info('[竞价服务] 提交出价', {
@@ -366,7 +367,7 @@ class BidService {
     const { transaction } = options
 
     if (!transaction) {
-      throw new Error('BidService.settleBidProduct 需要外部传入事务')
+      throw new BusinessError('BidService.settleBidProduct 需要外部传入事务', 'EXCHANGE_ERROR', 400)
     }
 
     logger.info('[竞价结算] 开始结算', { bid_product_id: bidProductId })
@@ -385,7 +386,7 @@ class BidService {
     })
 
     if (!bidProduct) {
-      throw new Error(`竞价商品 ${bidProductId} 不存在`)
+      throw new BusinessError(`竞价商品 ${bidProductId} 不存在`, 'EXCHANGE_ITEM_NOT_FOUND', 404)
     }
 
     // 更新状态为 ended
@@ -408,8 +409,10 @@ class BidService {
     })
 
     if (!winnerBid) {
-      throw new Error(
-        `竞价 ${bidProductId} 有 ${bidProduct.bid_count} 次出价但找不到 is_winning=true 的记录`
+      throw new BusinessError(
+        `竞价 ${bidProductId} 有 ${bidProduct.bid_count} 次出价但找不到 is_winning=true 的记录`,
+        'EXCHANGE_NOT_FOUND',
+        404
       )
     }
 
@@ -439,7 +442,7 @@ class BidService {
     const defaultSku = exchangeItem.skus?.[0] || null
     const skuKey = defaultSku?.sku_id ?? exchangeItem.exchange_item_id
     if (!skuKey) {
-      throw new Error(`竞价 ${bidProductId} 结算失败：商品缺少 sku_id 与 exchange_item_id`)
+      throw new BusinessError(`竞价 ${bidProductId} 结算失败：商品缺少 sku_id 与 exchange_item_id`, 'EXCHANGE_REQUIRED', 400)
     }
     const settleTs = Date.now()
     const placeholderBidOrder = `PH${crypto.randomBytes(12).toString('hex').toUpperCase()}`
@@ -517,7 +520,7 @@ class BidService {
         }
       )
       if (affectedRows === 0) {
-        throw new Error(`商品 ${exchangeItem.item_name} SKU ${defaultSku.sku_code} 库存不足`)
+        throw new BusinessError(`商品 ${exchangeItem.item_name} SKU ${defaultSku.sku_code} 库存不足`, 'EXCHANGE_STOCK_INSUFFICIENT', 400)
       }
     }
 
@@ -604,7 +607,7 @@ class BidService {
     const { transaction } = options
 
     if (!transaction) {
-      throw new Error('BidService.cancelBidProduct 需要外部传入事务')
+      throw new BusinessError('BidService.cancelBidProduct 需要外部传入事务', 'EXCHANGE_ERROR', 400)
     }
 
     logger.info('[竞价取消] 开始取消', { bid_product_id: bidProductId, reason })
@@ -615,11 +618,11 @@ class BidService {
     })
 
     if (!bidProduct) {
-      throw new Error(`竞价商品 ${bidProductId} 不存在`)
+      throw new BusinessError(`竞价商品 ${bidProductId} 不存在`, 'EXCHANGE_ITEM_NOT_FOUND', 404)
     }
 
     if (!['pending', 'active'].includes(bidProduct.status)) {
-      throw new Error(`竞价状态为 ${bidProduct.status}，无法取消（仅 pending/active 可取消）`)
+      throw new BusinessError(`竞价状态为 ${bidProduct.status}，无法取消（仅 pending/active 可取消）`, 'EXCHANGE_ERROR', 400)
     }
 
     const assetCode = bidProduct.price_asset_code

@@ -1,3 +1,4 @@
+const BusinessError = require('../utils/BusinessError')
 const logger = require('../utils/logger').logger
 
 /**
@@ -331,7 +332,7 @@ class CustomerServiceSessionService {
       })
 
       if (!session) {
-        throw new Error(user_id ? '会话不存在或无权限访问' : '会话不存在')
+        throw new BusinessError(user_id ? '会话不存在或无权限访问' : '会话不存在', 'CUSTOMER_SERVICE_NOT_FOUND', 404)
       }
 
       // 构建消息查询条件
@@ -510,7 +511,7 @@ class CustomerServiceSessionService {
     // ✅ 2. 敏感词检测
     const sensitiveCheck = checkSensitiveWords(sanitized_content)
     if (!sensitiveCheck.passed) {
-      throw new Error(`消息包含敏感词：${sensitiveCheck.matchedWord}`)
+      throw new BusinessError(`消息包含敏感词：${sensitiveCheck.matchedWord}`, 'CUSTOMER_SERVICE_ERROR', 400)
     }
 
     /*
@@ -520,7 +521,7 @@ class CustomerServiceSessionService {
      */
     const rateLimitCheck = ChatRateLimitService.checkMessageRateLimit(admin_id, 100)
     if (!rateLimitCheck.allowed) {
-      throw new Error(`发送消息过于频繁，每分钟最多${rateLimitCheck.limit}条`)
+      throw new BusinessError(`发送消息过于频繁，每分钟最多${rateLimitCheck.limit}条`, 'CUSTOMER_SERVICE_ERROR', 400)
     }
 
     // ✅ 4. 验证会话是否存在
@@ -530,19 +531,19 @@ class CustomerServiceSessionService {
     })
 
     if (!session) {
-      throw new Error('会话不存在')
+      throw new BusinessError('会话不存在', 'CUSTOMER_SERVICE_NOT_FOUND', 404)
     }
 
     // ✅ 4.5. 验证会话状态（只有waiting/assigned/active可回复）
     const ACTIVE_STATUS = ['waiting', 'assigned', 'active']
     if (!ACTIVE_STATUS.includes(session.status)) {
-      throw new Error(`会话已关闭，无法发送消息（当前状态：${session.status}）`)
+      throw new BusinessError(`会话已关闭，无法发送消息（当前状态：${session.status}）`, 'CUSTOMER_SERVICE_ERROR', 400)
     }
 
     // ✅ 5. 权限细分控制（支持超级管理员接管）
     if (session.admin_id && session.admin_id !== admin_id) {
       if (role_level < 200) {
-        throw new Error('无权限操作此会话，需要超级管理员权限')
+        throw new BusinessError('无权限操作此会话，需要超级管理员权限', 'CUSTOMER_SERVICE_FORBIDDEN', 403)
       }
       logger.info(`⚠️ 超级管理员 ${admin_id} 接管会话 ${session_id}`)
     }
@@ -638,13 +639,13 @@ class CustomerServiceSessionService {
     })
 
     if (!session) {
-      throw new Error('会话不存在或无权限访问')
+      throw new BusinessError('会话不存在或无权限访问', 'CUSTOMER_SERVICE_NOT_FOUND', 404)
     }
 
     // ✅ 2. 检查会话状态（只有waiting/assigned/active可发送消息）
     const ACTIVE_STATUS = ['waiting', 'assigned', 'active']
     if (!ACTIVE_STATUS.includes(session.status)) {
-      throw new Error(`会话已关闭，无法发送消息（当前状态：${session.status}）`)
+      throw new BusinessError(`会话已关闭，无法发送消息（当前状态：${session.status}）`, 'CUSTOMER_SERVICE_ERROR', 400)
     }
 
     // ✅ 3. 创建消息记录
@@ -705,7 +706,7 @@ class CustomerServiceSessionService {
       })
 
       if (!session) {
-        throw new Error('会话不存在')
+        throw new BusinessError('会话不存在', 'CUSTOMER_SERVICE_NOT_FOUND', 404)
       }
 
       /*
@@ -775,7 +776,7 @@ class CustomerServiceSessionService {
     })
 
     if (!session) {
-      throw new Error('会话不存在')
+      throw new BusinessError('会话不存在', 'CUSTOMER_SERVICE_NOT_FOUND', 404)
     }
 
     /*
@@ -795,7 +796,7 @@ class CustomerServiceSessionService {
     ])
 
     if (!targetAdmin) {
-      throw new Error('目标客服不存在')
+      throw new BusinessError('目标客服不存在', 'CUSTOMER_SERVICE_NOT_FOUND', 404)
     }
 
     // 更新会话的客服
@@ -868,7 +869,7 @@ class CustomerServiceSessionService {
     })
 
     if (!session) {
-      throw new Error('会话不存在')
+      throw new BusinessError('会话不存在', 'CUSTOMER_SERVICE_NOT_FOUND', 404)
     }
 
     /*
@@ -1047,7 +1048,7 @@ class CustomerServiceSessionService {
 
           // 理论上不应该到达这里（唯一索引冲突说明会话必然存在）
           logger.error(`❌ 异常：唯一索引冲突但查询不到活跃会话（用户${user_id}）`)
-          throw new Error('会话状态异常，请刷新后重试')
+          throw new BusinessError('会话状态异常，请刷新后重试', 'CUSTOMER_SERVICE_ERROR', 400)
         }
 
         // 其他创建错误，直接抛出
@@ -1424,11 +1425,11 @@ class CustomerServiceSessionService {
     })
 
     if (!session) {
-      throw new Error('会话不存在')
+      throw new BusinessError('会话不存在', 'CUSTOMER_SERVICE_NOT_FOUND', 404)
     }
 
     if (session.status !== 'waiting') {
-      throw new Error(`仅等待中的会话可接单，当前状态：${session.status}`)
+      throw new BusinessError(`仅等待中的会话可接单，当前状态：${session.status}`, 'CUSTOMER_SERVICE_ERROR', 400)
     }
 
     await session.update({ admin_id, status: 'assigned' }, { transaction })
@@ -1465,7 +1466,7 @@ class CustomerServiceSessionService {
     })
 
     if (!session) {
-      throw new Error('会话不存在')
+      throw new BusinessError('会话不存在', 'CUSTOMER_SERVICE_NOT_FOUND', 404)
     }
 
     await session.update({ tags }, { transaction })
@@ -1494,15 +1495,15 @@ class CustomerServiceSessionService {
     })
 
     if (!session) {
-      throw new Error('会话不存在')
+      throw new BusinessError('会话不存在', 'CUSTOMER_SERVICE_NOT_FOUND', 404)
     }
 
     if (session.admin_id !== admin_id) {
-      throw new Error('仅负责该会话的客服可以请求评价')
+      throw new BusinessError('仅负责该会话的客服可以请求评价', 'CUSTOMER_SERVICE_ERROR', 400)
     }
 
     if (session.satisfaction_score !== null) {
-      throw new Error('该会话已有评分，无需再次请求')
+      throw new BusinessError('该会话已有评分，无需再次请求', 'CUSTOMER_SERVICE_ERROR', 400)
     }
 
     /* ChatWebSocketService 导出的是单例实例（非类），直接调用实例方法 */
@@ -1552,19 +1553,19 @@ class CustomerServiceSessionService {
     })
 
     if (!session) {
-      throw new Error('会话不存在')
+      throw new BusinessError('会话不存在', 'CUSTOMER_SERVICE_NOT_FOUND', 404)
     }
 
     if (session.user_id !== user_id) {
-      throw new Error('无权对此会话评分')
+      throw new BusinessError('无权对此会话评分', 'CUSTOMER_SERVICE_ERROR', 400)
     }
 
     if (session.status !== 'closed') {
-      throw new Error('仅已关闭的会话可评分')
+      throw new BusinessError('仅已关闭的会话可评分', 'CUSTOMER_SERVICE_ERROR', 400)
     }
 
     if (session.satisfaction_score !== null) {
-      throw new Error('此会话已评分，不可重复评分')
+      throw new BusinessError('此会话已评分，不可重复评分', 'CUSTOMER_SERVICE_ALREADY_EXISTS', 409)
     }
 
     await session.update({ satisfaction_score }, { transaction })

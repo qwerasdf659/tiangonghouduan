@@ -14,6 +14,7 @@
  * @date 2026-03-16
  */
 
+const BusinessError = require('../utils/BusinessError')
 const crypto = require('crypto')
 const sharp = require('sharp')
 const { Op, QueryTypes } = require('sequelize')
@@ -69,12 +70,12 @@ class MediaService {
    */
   _validateFile(mimeType, fileSize) {
     if (!ALLOWED_MIME_TYPES.includes(mimeType)) {
-      throw new Error(`不支持的图片格式：${mimeType}，允许：${ALLOWED_MIME_TYPES.join('/')}`)
+      throw new BusinessError(`不支持的图片格式：${mimeType}，允许：${ALLOWED_MIME_TYPES.join('/')}`, 'SERVICE_NOT_ALLOWED', 400)
     }
     if (fileSize > MAX_FILE_SIZE) {
       const maxMB = MAX_FILE_SIZE / 1024 / 1024
       const actualMB = (fileSize / 1024 / 1024).toFixed(2)
-      throw new Error(`文件过大：${actualMB}MB，最大允许：${maxMB}MB`)
+      throw new BusinessError(`文件过大：${actualMB}MB，最大允许：${maxMB}MB`, 'SERVICE_ERROR', 400)
     }
   }
 
@@ -246,10 +247,10 @@ class MediaService {
 
     const media = await MediaFile.findByPk(mediaId, opts)
     if (!media) {
-      throw new Error(`媒体文件不存在: media_id=${mediaId}`)
+      throw new BusinessError(`媒体文件不存在: media_id=${mediaId}`, 'SERVICE_NOT_FOUND', 404)
     }
     if (media.status !== 'active') {
-      throw new Error(`媒体文件状态异常，无法关联: status=${media.status}`)
+      throw new BusinessError(`媒体文件状态异常，无法关联: status=${media.status}`, 'SERVICE_ERROR', 400)
     }
 
     const attachment = await MediaAttachment.create(

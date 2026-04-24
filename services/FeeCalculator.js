@@ -1,3 +1,4 @@
+const BusinessError = require('../utils/BusinessError')
 const _logger = require('../utils/logger').logger
 const { AssetCode } = require('../constants/AssetCode')
 
@@ -86,7 +87,7 @@ class FeeCalculator {
 
     if (!tier) {
       // 理论上不会发生（因为最后一档max_value=Infinity）
-      throw new Error(`无法找到价值 ${itemValue} 对应的费率档位`)
+      throw new BusinessError(`无法找到价值 ${itemValue} 对应的费率档位`, 'SERVICE_ERROR', 400)
     }
 
     /*

@@ -20,7 +20,7 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
-const logger = require('../../../../utils/logger')
+const { asyncHandler } = require('../../../../middleware/validation')
 
 // ==================== 路由配置 ====================
 
@@ -34,26 +34,21 @@ const logger = require('../../../../utils/logger')
  * - start_time: 开始时间
  * - end_time: 结束时间
  */
-router.get('/stats/overview', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    // 通过 ServiceManager 获取查询服务（Phase 3 收口）
-    const BusinessRecordQueryService = req.app.locals.services.getService(
-      'console_business_record_query'
-    )
+router.get('/stats/overview', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  // 通过 ServiceManager 获取查询服务（Phase 3 收口）
+  const BusinessRecordQueryService = req.app.locals.services.getService(
+    'console_business_record_query'
+  )
 
-    const { start_time, end_time } = req.query
+  const { start_time, end_time } = req.query
 
-    const result = await BusinessRecordQueryService.getReminderHistoryStatsOverview({
-      start_time,
-      end_time
-    })
+  const result = await BusinessRecordQueryService.getReminderHistoryStatsOverview({
+    start_time,
+    end_time
+  })
 
-    return res.apiSuccess(result, '获取提醒统计成功')
-  } catch (error) {
-    logger.error('[提醒历史] 获取统计失败', { error: error.message })
-    return res.apiError('获取提醒统计失败', 'REMINDER_STATS_ERROR', null, 500)
-  }
-})
+  return res.apiSuccess(result, '获取提醒统计成功')
+}))
 
 /**
  * GET /api/v4/console/reminder-history
@@ -69,64 +64,54 @@ router.get('/stats/overview', authenticateToken, requireRoleLevel(100), async (r
  * - page: 页码（默认1）
  * - page_size: 每页数量（默认20）
  */
-router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    // 通过 ServiceManager 获取服务
-    const reminderService = req.app.locals.services.getService('reminder_engine')
+router.get('/', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  // 通过 ServiceManager 获取服务
+  const reminderService = req.app.locals.services.getService('reminder_engine')
 
-    const {
-      reminder_rule_id,
-      user_id,
-      notification_status,
-      start_time,
-      end_time,
-      page,
-      page_size
-    } = req.query
+  const {
+    reminder_rule_id,
+    user_id,
+    notification_status,
+    start_time,
+    end_time,
+    page,
+    page_size
+  } = req.query
 
-    const result = await reminderService.getReminderHistory({
-      reminder_rule_id: reminder_rule_id ? parseInt(reminder_rule_id, 10) : undefined,
-      user_id: user_id ? parseInt(user_id, 10) : undefined,
-      notification_status,
-      start_time: start_time ? new Date(start_time) : undefined,
-      end_time: end_time ? new Date(end_time) : undefined,
-      page: parseInt(page, 10) || 1,
-      page_size: parseInt(page_size, 10) || 20
-    })
+  const result = await reminderService.getReminderHistory({
+    reminder_rule_id: reminder_rule_id ? parseInt(reminder_rule_id, 10) : undefined,
+    user_id: user_id ? parseInt(user_id, 10) : undefined,
+    notification_status,
+    start_time: start_time ? new Date(start_time) : undefined,
+    end_time: end_time ? new Date(end_time) : undefined,
+    page: parseInt(page, 10) || 1,
+    page_size: parseInt(page_size, 10) || 20
+  })
 
-    return res.apiSuccess(result, '获取提醒历史成功')
-  } catch (error) {
-    logger.error('[提醒历史] 获取列表失败', { error: error.message })
-    return res.apiError('获取提醒历史失败', 'REMINDER_HISTORY_LIST_ERROR', null, 500)
-  }
-})
+  return res.apiSuccess(result, '获取提醒历史成功')
+}))
 
 /**
  * GET /api/v4/console/reminder-history/:id
  *
  * 获取单条提醒历史详情
  */
-router.get('/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    // 通过 ServiceManager 获取服务
-    const reminderService = req.app.locals.services.getService('reminder_engine')
-    const historyId = parseInt(req.params.id, 10)
+router.get('/:id', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  // 通过 ServiceManager 获取服务
+  const reminderService = req.app.locals.services.getService('reminder_engine')
+  const historyId = parseInt(req.params.id, 10)
 
-    if (!historyId || isNaN(historyId)) {
-      return res.apiError('无效的历史记录ID', 'INVALID_HISTORY_ID', null, 400)
-    }
-
-    const history = await reminderService.getReminderHistoryById(historyId)
-
-    if (!history) {
-      return res.apiError('提醒历史记录不存在', 'HISTORY_NOT_FOUND', null, 404)
-    }
-
-    return res.apiSuccess(history, '获取提醒历史详情成功')
-  } catch (error) {
-    logger.error('[提醒历史] 获取详情失败', { error: error.message })
-    return res.apiError('获取提醒历史详情失败', 'REMINDER_HISTORY_GET_ERROR', null, 500)
+  if (!historyId || isNaN(historyId)) {
+    return res.apiError('无效的历史记录ID', 'INVALID_HISTORY_ID', null, 400)
   }
-})
+
+  const history = await reminderService.getReminderHistoryById(historyId)
+
+  if (!history) {
+    return res.apiError('提醒历史记录不存在', 'HISTORY_NOT_FOUND', null, 404)
+  }
+
+  return res.apiSuccess(history, '获取提醒历史详情成功')
+}))
 
 module.exports = router

@@ -36,34 +36,29 @@ router.get(
   '/',
   authenticateToken,
   asyncHandler(async (req, res) => {
-    try {
-      const { status = null, page = 1, page_size = 20 } = req.query
-      const pageNum = parseInt(page) || 1
-      const pageSize = parseInt(page_size) || 20
+    const { status = null, page = 1, page_size = 20 } = req.query
+    const pageNum = parseInt(page) || 1
+    const pageSize = parseInt(page_size) || 20
 
-      const AdCampaignService = req.app.locals.services.getService('ad_campaign')
-      const result = await AdCampaignService.getMyAdCampaigns(req.user.user_id, {
-        status,
-        page: pageNum,
-        pageSize
-      })
+    const AdCampaignService = req.app.locals.services.getService('ad_campaign')
+    const result = await AdCampaignService.getMyAdCampaigns(req.user.user_id, {
+      status,
+      page: pageNum,
+      pageSize
+    })
 
-      return res.apiSuccess(
-        {
-          campaigns: result.list,
-          pagination: {
-            total: result.total,
-            page: result.page,
-            page_size: pageSize,
-            total_pages: Math.ceil(result.total / pageSize)
-          }
-        },
-        '获取广告活动列表成功'
-      )
-    } catch (error) {
-      logger.error('获取广告活动列表失败', { error: error.message, user_id: req.user.user_id })
-      return res.apiInternalError('获取广告活动列表失败', error.message, 'AD_CAMPAIGN_LIST_ERROR')
-    }
+    return res.apiSuccess(
+      {
+        campaigns: result.list,
+        pagination: {
+          total: result.total,
+          page: result.page,
+          page_size: pageSize,
+          total_pages: Math.ceil(result.total / pageSize)
+        }
+      },
+      '获取广告活动列表成功'
+    )
   })
 )
 
@@ -118,52 +113,47 @@ router.post(
   '/',
   authenticateToken,
   asyncHandler(async (req, res) => {
-    try {
-      const { campaign_name, ad_slot_id, billing_mode } = req.body
+    const { campaign_name, ad_slot_id, billing_mode } = req.body
 
-      if (!campaign_name || !ad_slot_id || !billing_mode) {
-        return res.apiBadRequest('缺少必需参数：campaign_name, ad_slot_id, billing_mode')
-      }
-
-      if (!VALID_BILLING_MODES.includes(billing_mode)) {
-        return res.apiBadRequest(`billing_mode 必须是以下之一：${VALID_BILLING_MODES.join(', ')}`)
-      }
-
-      // 白名单字段提取
-      const createData = { advertiser_user_id: req.user.user_id }
-      ALLOWED_CAMPAIGN_CREATE_FIELDS.forEach(field => {
-        if (req.body[field] !== undefined) {
-          createData[field] = req.body[field]
-        }
-      })
-
-      // 数值类型转换
-      if (createData.ad_slot_id) {
-        createData.ad_slot_id = parseInt(createData.ad_slot_id)
-      }
-      if (createData.daily_bid_star_stone) {
-        createData.daily_bid_star_stone = parseInt(createData.daily_bid_star_stone)
-      }
-      if (createData.budget_total_star_stone) {
-        createData.budget_total_star_stone = parseInt(createData.budget_total_star_stone)
-      }
-      if (createData.fixed_days) {
-        createData.fixed_days = parseInt(createData.fixed_days)
-      }
-
-      const AdCampaignService = req.app.locals.services.getService('ad_campaign')
-      const campaign = await AdCampaignService.createCampaign(createData)
-
-      logger.info('创建广告活动成功', {
-        campaign_id: campaign.ad_campaign_id,
-        user_id: req.user.user_id
-      })
-
-      return res.apiSuccess(campaign, '创建广告活动成功')
-    } catch (error) {
-      logger.error('创建广告活动失败', { error: error.message, user_id: req.user.user_id })
-      return res.apiInternalError('创建广告活动失败', error.message, 'AD_CAMPAIGN_CREATE_ERROR')
+    if (!campaign_name || !ad_slot_id || !billing_mode) {
+      return res.apiBadRequest('缺少必需参数：campaign_name, ad_slot_id, billing_mode')
     }
+
+    if (!VALID_BILLING_MODES.includes(billing_mode)) {
+      return res.apiBadRequest(`billing_mode 必须是以下之一：${VALID_BILLING_MODES.join(', ')}`)
+    }
+
+    // 白名单字段提取
+    const createData = { advertiser_user_id: req.user.user_id }
+    ALLOWED_CAMPAIGN_CREATE_FIELDS.forEach(field => {
+      if (req.body[field] !== undefined) {
+        createData[field] = req.body[field]
+      }
+    })
+
+    // 数值类型转换
+    if (createData.ad_slot_id) {
+      createData.ad_slot_id = parseInt(createData.ad_slot_id)
+    }
+    if (createData.daily_bid_star_stone) {
+      createData.daily_bid_star_stone = parseInt(createData.daily_bid_star_stone)
+    }
+    if (createData.budget_total_star_stone) {
+      createData.budget_total_star_stone = parseInt(createData.budget_total_star_stone)
+    }
+    if (createData.fixed_days) {
+      createData.fixed_days = parseInt(createData.fixed_days)
+    }
+
+    const AdCampaignService = req.app.locals.services.getService('ad_campaign')
+    const campaign = await AdCampaignService.createCampaign(createData)
+
+    logger.info('创建广告活动成功', {
+      campaign_id: campaign.ad_campaign_id,
+      user_id: req.user.user_id
+    })
+
+    return res.apiSuccess(campaign, '创建广告活动成功')
   })
 )
 
@@ -177,38 +167,29 @@ router.get(
   '/:id',
   authenticateToken,
   asyncHandler(async (req, res) => {
-    try {
-      const { id } = req.params
+    const { id } = req.params
 
-      const AdCampaignService = req.app.locals.services.getService('ad_campaign')
-      const campaign = await AdCampaignService.getCampaignById(id, { userId: req.user.user_id })
+    const AdCampaignService = req.app.locals.services.getService('ad_campaign')
+    const campaign = await AdCampaignService.getCampaignById(id, { userId: req.user.user_id })
 
-      if (!campaign) {
-        return res.apiError('广告活动不存在或无权限访问', 'CAMPAIGN_NOT_FOUND', null, 404)
-      }
-
-      // 展示层转换：将素材的 primary_media 对象 key 拼接为完整代理 URL
-      const baseUrl = process.env.PUBLIC_BASE_URL
-      const result = campaign.toJSON ? campaign.toJSON() : campaign
-      if (result.creatives && baseUrl) {
-        result.creatives = result.creatives.map(c => {
-          const objectKey = c.primary_media?.object_key
-          if (objectKey) {
-            c.public_url = `${baseUrl}/api/v4/images/${objectKey}`
-          }
-          return c
-        })
-      }
-
-      return res.apiSuccess(result, '获取广告活动详情成功')
-    } catch (error) {
-      logger.error('获取广告活动详情失败', {
-        error: error.message,
-        campaign_id: req.params.id,
-        user_id: req.user.user_id
-      })
-      return res.apiInternalError('获取广告活动详情失败', error.message, 'AD_CAMPAIGN_DETAIL_ERROR')
+    if (!campaign) {
+      return res.apiError('广告活动不存在或无权限访问', 'CAMPAIGN_NOT_FOUND', null, 404)
     }
+
+    // 展示层转换：将素材的 primary_media 对象 key 拼接为完整代理 URL
+    const baseUrl = process.env.PUBLIC_BASE_URL
+    const result = campaign.toJSON ? campaign.toJSON() : campaign
+    if (result.creatives && baseUrl) {
+      result.creatives = result.creatives.map(c => {
+        const objectKey = c.primary_media?.object_key
+        if (objectKey) {
+          c.public_url = `${baseUrl}/api/v4/images/${objectKey}`
+        }
+        return c
+      })
+    }
+
+    return res.apiSuccess(result, '获取广告活动详情成功')
   })
 )
 
@@ -223,53 +204,44 @@ router.put(
   '/:id',
   authenticateToken,
   asyncHandler(async (req, res) => {
-    try {
-      const campaignId = parseInt(req.params.id)
-      if (isNaN(campaignId)) {
-        return res.apiBadRequest('广告活动 ID 必须是有效数字')
-      }
-
-      // 白名单字段提取
-      const updateData = {}
-      ALLOWED_CAMPAIGN_UPDATE_FIELDS.forEach(field => {
-        if (req.body[field] !== undefined) {
-          updateData[field] = req.body[field]
-        }
-      })
-
-      if (Object.keys(updateData).length === 0) {
-        return res.apiBadRequest('至少需要提供一个更新字段')
-      }
-
-      if (updateData.billing_mode && !VALID_BILLING_MODES.includes(updateData.billing_mode)) {
-        return res.apiBadRequest(`billing_mode 必须是以下之一：${VALID_BILLING_MODES.join(', ')}`)
-      }
-
-      const AdCampaignService = req.app.locals.services.getService('ad_campaign')
-      const campaign = await AdCampaignService.updateCampaign(
-        campaignId,
-        req.user.user_id,
-        updateData
-      )
-
-      if (!campaign) {
-        return res.apiError('广告活动不存在或无权限修改', 'CAMPAIGN_NOT_FOUND', null, 404)
-      }
-
-      logger.info('更新广告活动成功', {
-        campaign_id: campaignId,
-        user_id: req.user.user_id
-      })
-
-      return res.apiSuccess(campaign, '更新广告活动成功')
-    } catch (error) {
-      logger.error('更新广告活动失败', {
-        error: error.message,
-        campaign_id: req.params.id,
-        user_id: req.user.user_id
-      })
-      return res.apiInternalError('更新广告活动失败', error.message, 'AD_CAMPAIGN_UPDATE_ERROR')
+    const campaignId = parseInt(req.params.id)
+    if (isNaN(campaignId)) {
+      return res.apiBadRequest('广告活动 ID 必须是有效数字')
     }
+
+    // 白名单字段提取
+    const updateData = {}
+    ALLOWED_CAMPAIGN_UPDATE_FIELDS.forEach(field => {
+      if (req.body[field] !== undefined) {
+        updateData[field] = req.body[field]
+      }
+    })
+
+    if (Object.keys(updateData).length === 0) {
+      return res.apiBadRequest('至少需要提供一个更新字段')
+    }
+
+    if (updateData.billing_mode && !VALID_BILLING_MODES.includes(updateData.billing_mode)) {
+      return res.apiBadRequest(`billing_mode 必须是以下之一：${VALID_BILLING_MODES.join(', ')}`)
+    }
+
+    const AdCampaignService = req.app.locals.services.getService('ad_campaign')
+    const campaign = await AdCampaignService.updateCampaign(
+      campaignId,
+      req.user.user_id,
+      updateData
+    )
+
+    if (!campaign) {
+      return res.apiError('广告活动不存在或无权限修改', 'CAMPAIGN_NOT_FOUND', null, 404)
+    }
+
+    logger.info('更新广告活动成功', {
+      campaign_id: campaignId,
+      user_id: req.user.user_id
+    })
+
+    return res.apiSuccess(campaign, '更新广告活动成功')
   })
 )
 
@@ -287,49 +259,40 @@ router.post(
   '/:id/submit',
   authenticateToken,
   asyncHandler(async (req, res) => {
-    try {
-      const { id } = req.params
+    const { id } = req.params
 
-      const AdCampaignService = req.app.locals.services.getService('ad_campaign')
-      const AdBillingService = req.app.locals.services.getService('ad_billing')
+    const AdCampaignService = req.app.locals.services.getService('ad_campaign')
+    const AdBillingService = req.app.locals.services.getService('ad_billing')
 
-      const campaign = await TransactionManager.execute(async transaction => {
-        // 1. 更新状态为待审核
-        const submitted = await AdCampaignService.submitForReview(id, req.user.user_id, {
-          transaction
-        })
-
-        if (!submitted) {
-          throw new Error('广告活动不存在或无权限提交')
-        }
-
-        // 2. 固定包天模式：冻结星石
-        if (submitted.billing_mode === 'fixed_daily' && submitted.fixed_total_star_stone > 0) {
-          await AdBillingService.freezeStarStone(
-            submitted.ad_campaign_id,
-            submitted.fixed_total_star_stone,
-            { transaction }
-          )
-        }
-
-        return submitted
+    const campaign = await TransactionManager.execute(async transaction => {
+      // 1. 更新状态为待审核
+      const submitted = await AdCampaignService.submitForReview(id, req.user.user_id, {
+        transaction
       })
 
-      logger.info('提交广告活动审核成功', {
-        campaign_id: id,
-        user_id: req.user.user_id,
-        billing_mode: campaign.billing_mode
-      })
+      if (!submitted) {
+        throw new Error('广告活动不存在或无权限提交')
+      }
 
-      return res.apiSuccess(campaign, '提交审核成功')
-    } catch (error) {
-      logger.error('提交广告活动审核失败', {
-        error: error.message,
-        campaign_id: req.params.id,
-        user_id: req.user.user_id
-      })
-      return res.apiInternalError('提交审核失败', error.message, 'AD_CAMPAIGN_SUBMIT_ERROR')
-    }
+      // 2. 固定包天模式：冻结星石
+      if (submitted.billing_mode === 'fixed_daily' && submitted.fixed_total_star_stone > 0) {
+        await AdBillingService.freezeStarStone(
+          submitted.ad_campaign_id,
+          submitted.fixed_total_star_stone,
+          { transaction }
+        )
+      }
+
+      return submitted
+    })
+
+    logger.info('提交广告活动审核成功', {
+      campaign_id: id,
+      user_id: req.user.user_id,
+      billing_mode: campaign.billing_mode
+    })
+
+    return res.apiSuccess(campaign, '提交审核成功')
   })
 )
 
@@ -346,43 +309,34 @@ router.post(
   '/:id/cancel',
   authenticateToken,
   asyncHandler(async (req, res) => {
-    try {
-      const { id } = req.params
+    const { id } = req.params
 
-      const AdCampaignService = req.app.locals.services.getService('ad_campaign')
-      const AdBillingService = req.app.locals.services.getService('ad_billing')
+    const AdCampaignService = req.app.locals.services.getService('ad_campaign')
+    const AdBillingService = req.app.locals.services.getService('ad_billing')
 
-      const campaign = await TransactionManager.execute(async transaction => {
-        const cancelled = await AdCampaignService.cancelCampaign(id, req.user.user_id, {
-          transaction
-        })
-
-        if (!cancelled) {
-          throw new Error('广告活动不存在或无权限取消')
-        }
-
-        // 如果有冻结的星石，执行退款
-        if (cancelled.billing_mode === 'fixed_daily') {
-          await AdBillingService.refundStarStone(cancelled.ad_campaign_id, { transaction })
-        }
-
-        return cancelled
+    const campaign = await TransactionManager.execute(async transaction => {
+      const cancelled = await AdCampaignService.cancelCampaign(id, req.user.user_id, {
+        transaction
       })
 
-      logger.info('取消广告活动成功', {
-        campaign_id: id,
-        user_id: req.user.user_id
-      })
+      if (!cancelled) {
+        throw new Error('广告活动不存在或无权限取消')
+      }
 
-      return res.apiSuccess(campaign, '取消广告活动成功')
-    } catch (error) {
-      logger.error('取消广告活动失败', {
-        error: error.message,
-        campaign_id: req.params.id,
-        user_id: req.user.user_id
-      })
-      return res.apiInternalError('取消广告活动失败', error.message, 'AD_CAMPAIGN_CANCEL_ERROR')
-    }
+      // 如果有冻结的星石，执行退款
+      if (cancelled.billing_mode === 'fixed_daily') {
+        await AdBillingService.refundStarStone(cancelled.ad_campaign_id, { transaction })
+      }
+
+      return cancelled
+    })
+
+    logger.info('取消广告活动成功', {
+      campaign_id: id,
+      user_id: req.user.user_id
+    })
+
+    return res.apiSuccess(campaign, '取消广告活动成功')
   })
 )
 
@@ -403,41 +357,32 @@ router.post(
   '/:id/interaction',
   authenticateToken,
   asyncHandler(async (req, res) => {
-    try {
-      const campaignId = parseInt(req.params.id)
-      if (isNaN(campaignId)) {
-        return res.apiBadRequest('广告计划 ID 必须是有效数字')
-      }
-
-      const { interaction_type, ad_slot_id, extra_data } = req.body
-
-      if (!interaction_type) {
-        return res.apiBadRequest('缺少必需参数：interaction_type')
-      }
-
-      const validTypes = ['impression', 'click', 'close', 'swipe']
-      if (!validTypes.includes(interaction_type)) {
-        return res.apiBadRequest('interaction_type 必须是以下之一：' + validTypes.join(', '))
-      }
-
-      const AdCampaignService = req.app.locals.services.getService('ad_campaign')
-      const log = await AdCampaignService.createInteractionLog({
-        ad_campaign_id: campaignId,
-        user_id: req.user.user_id,
-        interaction_type,
-        ad_slot_id: ad_slot_id ? parseInt(ad_slot_id) : null,
-        extra_data: extra_data || null
-      })
-
-      return res.apiSuccess(log, '上报交互日志成功')
-    } catch (error) {
-      logger.error('上报交互日志失败', {
-        error: error.message,
-        campaign_id: req.params.id,
-        user_id: req.user.user_id
-      })
-      return res.apiInternalError('上报交互日志失败', error.message, 'INTERACTION_LOG_ERROR')
+    const campaignId = parseInt(req.params.id)
+    if (isNaN(campaignId)) {
+      return res.apiBadRequest('广告计划 ID 必须是有效数字')
     }
+
+    const { interaction_type, ad_slot_id, extra_data } = req.body
+
+    if (!interaction_type) {
+      return res.apiBadRequest('缺少必需参数：interaction_type')
+    }
+
+    const validTypes = ['impression', 'click', 'close', 'swipe']
+    if (!validTypes.includes(interaction_type)) {
+      return res.apiBadRequest('interaction_type 必须是以下之一：' + validTypes.join(', '))
+    }
+
+    const AdCampaignService = req.app.locals.services.getService('ad_campaign')
+    const log = await AdCampaignService.createInteractionLog({
+      ad_campaign_id: campaignId,
+      user_id: req.user.user_id,
+      interaction_type,
+      ad_slot_id: ad_slot_id ? parseInt(ad_slot_id) : null,
+      extra_data: extra_data || null
+    })
+
+    return res.apiSuccess(log, '上报交互日志成功')
   })
 )
 
@@ -453,29 +398,20 @@ router.get(
   '/:id/report',
   authenticateToken,
   asyncHandler(async (req, res) => {
-    try {
-      const { id } = req.params
-      const { start_date, end_date } = req.query
+    const { id } = req.params
+    const { start_date, end_date } = req.query
 
-      const AdReportService = req.app.locals.services.getService('ad_report')
-      const report = await AdReportService.getCampaignReport(id, req.user.user_id, {
-        start_date,
-        end_date
-      })
+    const AdReportService = req.app.locals.services.getService('ad_report')
+    const report = await AdReportService.getCampaignReport(id, req.user.user_id, {
+      start_date,
+      end_date
+    })
 
-      if (!report) {
-        return res.apiError('报表数据不存在或无权限访问', 'REPORT_NOT_FOUND', null, 404)
-      }
-
-      return res.apiSuccess(report, '获取活动报表成功')
-    } catch (error) {
-      logger.error('获取广告活动报表失败', {
-        error: error.message,
-        campaign_id: req.params.id,
-        user_id: req.user.user_id
-      })
-      return res.apiInternalError('获取活动报表失败', error.message, 'AD_CAMPAIGN_REPORT_ERROR')
+    if (!report) {
+      return res.apiError('报表数据不存在或无权限访问', 'REPORT_NOT_FOUND', null, 404)
     }
+
+    return res.apiSuccess(report, '获取活动报表成功')
   })
 )
 

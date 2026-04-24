@@ -35,6 +35,7 @@
  * @date 2026-01-31
  */
 
+const BusinessError = require('../../utils/BusinessError')
 const { Op, fn, col, literal } = require('sequelize')
 const logger = require('../../utils/logger').logger
 const BeijingTimeHelper = require('../../utils/timeHelper')
@@ -128,7 +129,7 @@ class AnomalyService {
     const { models, save = false, transaction } = options
 
     if (!record) {
-      throw new Error('消费记录不能为空')
+      throw new BusinessError('消费记录不能为空', 'CONSUMPTION_NOT_ALLOWED', 400)
     }
 
     const recordId = record.consumption_record_id
@@ -519,19 +520,19 @@ class AnomalyService {
       // 验证记录存在
       const record = await models.ConsumptionRecord.findByPk(recordId)
       if (!record) {
-        throw new Error('消费记录不存在')
+        throw new BusinessError('消费记录不存在', 'CONSUMPTION_NOT_FOUND', 404)
       }
 
       // 验证异常标记有效性
       const validFlags = Object.keys(ANOMALY_RULES)
       const invalidFlags = flags.filter(f => !validFlags.includes(f))
       if (invalidFlags.length > 0) {
-        throw new Error(`无效的异常标记: ${invalidFlags.join(', ')}`)
+        throw new BusinessError(`无效的异常标记: ${invalidFlags.join(', ')}`, 'CONSUMPTION_INVALID', 400)
       }
 
       // 验证评分范围
       if (score < 0 || score > 100) {
-        throw new Error('异常评分必须在 0-100 之间')
+        throw new BusinessError('异常评分必须在 0-100 之间', 'CONSUMPTION_REQUIRED', 400)
       }
 
       // 更新记录

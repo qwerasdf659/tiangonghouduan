@@ -47,6 +47,7 @@ function uniquePlaceholderOrderNo() {
  * 在 beforeAll 中获取，确保 ServiceManager 已初始化
  */
 let TradeOrderService
+let TradeOrderQueryService
 let BalanceService
 
 // 测试超时设置（交易订单涉及多步骤，需要较长超时）
@@ -83,6 +84,7 @@ describe('TradeOrderService - 交易订单服务', () => {
 
     // 通过 global.getTestService() 获取服务实例（jest.setup.js 初始化）
     TradeOrderService = global.getTestService('trade_order')
+    TradeOrderQueryService = global.getTestService('trade_order_query')
     BalanceService = global.getTestService('asset_balance')
 
     if (!TradeOrderService) {
@@ -578,7 +580,7 @@ describe('TradeOrderService - 交易订单服务', () => {
     })
 
     it('4.1 getOrderDetail 应返回订单详情', async () => {
-      const order = await TradeOrderService.getOrderDetail(query_test_order.trade_order_id)
+      const order = await TradeOrderQueryService.getOrderDetail(query_test_order.trade_order_id)
 
       expect(order).toBeDefined()
       // trade_order_id 可能是字符串类型，统一使用 String() 转换比较
@@ -591,11 +593,11 @@ describe('TradeOrderService - 交易订单服务', () => {
     })
 
     it('4.2 getOrderDetail 应抛出订单不存在错误', async () => {
-      await expect(TradeOrderService.getOrderDetail(999999999)).rejects.toThrow(/订单不存在/)
+      await expect(TradeOrderQueryService.getOrderDetail(999999999)).rejects.toThrow(/订单不存在/)
     })
 
     it('4.3 getUserOrders 应返回用户订单列表', async () => {
-      const result = await TradeOrderService.getUserOrders({
+      const result = await TradeOrderQueryService.getUserOrders({
         user_id: test_buyer.user_id,
         role: 'buyer',
         page: 1,
@@ -616,7 +618,7 @@ describe('TradeOrderService - 交易订单服务', () => {
     })
 
     it('4.4 getOrders（管理后台）应返回订单列表和分页信息', async () => {
-      const result = await TradeOrderService.getOrders({
+      const result = await TradeOrderQueryService.getOrders({
         page: 1,
         page_size: 10
       })
@@ -633,7 +635,7 @@ describe('TradeOrderService - 交易订单服务', () => {
     })
 
     it('4.5 getOrderById（管理后台）应返回订单详情', async () => {
-      const order = await TradeOrderService.getOrderById(query_test_order.trade_order_id)
+      const order = await TradeOrderQueryService.getOrderById(query_test_order.trade_order_id)
 
       expect(order).toBeDefined()
       // trade_order_id 可能是字符串类型，统一使用 String() 转换比较
@@ -646,7 +648,7 @@ describe('TradeOrderService - 交易订单服务', () => {
     })
 
     it('4.6 getOrderByBusinessId 应通过 business_id 查询订单', async () => {
-      const order = await TradeOrderService.getOrderByBusinessId(query_test_order.business_id)
+      const order = await TradeOrderQueryService.getOrderByBusinessId(query_test_order.business_id)
 
       expect(order).toBeDefined()
       // trade_order_id 可能是字符串类型，统一使用 String() 转换比较
@@ -655,7 +657,7 @@ describe('TradeOrderService - 交易订单服务', () => {
     })
 
     it('4.7 getOrderByBusinessId 应返回 null 如果不存在', async () => {
-      const order = await TradeOrderService.getOrderByBusinessId('non_existent_business_id')
+      const order = await TradeOrderQueryService.getOrderByBusinessId('non_existent_business_id')
       expect(order).toBeNull()
     })
   })
@@ -664,7 +666,7 @@ describe('TradeOrderService - 交易订单服务', () => {
 
   describe('5. 订单统计方法测试', () => {
     it('5.1 getOrderStats 应返回订单统计汇总', async () => {
-      const stats = await TradeOrderService.getOrderStats({})
+      const stats = await TradeOrderQueryService.getOrderStats({})
 
       expect(stats).toHaveProperty('period')
       expect(stats).toHaveProperty('by_status')
@@ -678,7 +680,7 @@ describe('TradeOrderService - 交易订单服务', () => {
     })
 
     it('5.2 getUserTradeStats 应返回用户交易统计', async () => {
-      const stats = await TradeOrderService.getUserTradeStats(test_buyer.user_id)
+      const stats = await TradeOrderQueryService.getUserTradeStats(test_buyer.user_id)
 
       expect(stats).toHaveProperty('user_id')
       expect(stats.user_id).toBe(test_buyer.user_id)
@@ -916,7 +918,7 @@ describe('TradeOrderService - 交易订单服务', () => {
         const one_hour_later = new Date(now.getTime() + 3600000)
 
         // 时间范围内应能查到
-        const result_in_range = await TradeOrderService.getOrders({
+        const result_in_range = await TradeOrderQueryService.getOrders({
           start_time: one_hour_ago.toISOString(),
           end_time: one_hour_later.toISOString(),
           page: 1,
@@ -933,7 +935,7 @@ describe('TradeOrderService - 交易订单服务', () => {
         const one_day_ago = new Date(now.getTime() - 86400000)
         const two_hours_ago = new Date(now.getTime() - 7200000)
 
-        const result_out_range = await TradeOrderService.getOrders({
+        const result_out_range = await TradeOrderQueryService.getOrders({
           start_time: one_day_ago.toISOString(),
           end_time: two_hours_ago.toISOString(),
           page: 1,

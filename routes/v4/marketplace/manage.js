@@ -19,7 +19,7 @@ const express = require('express')
 const router = express.Router()
 const { authenticateToken } = require('../../../middleware/auth')
 const { requireValidSession } = require('../../../middleware/sensitiveOperation')
-const { validatePositiveInteger, handleServiceError } = require('../../../middleware/validation')
+const { validatePositiveInteger, asyncHandler } = require('../../../middleware/validation')
 const logger = require('../../../utils/logger').logger
 // 事务边界治理 - 统一事务管理器
 const TransactionManager = require('../../../utils/TransactionManager')
@@ -55,11 +55,10 @@ router.post(
   requireValidSession, // 🔐 市场撤回属于敏感操作，需验证会话（2026-01-21 会话管理功能）
   marketRiskMiddleware.createWithdrawRiskMiddleware(),
   validatePositiveInteger('market_listing_id', 'params'),
-  async (req, res) => {
+  asyncHandler(async (req, res) => {
     const MarketListingService = req.app.locals.services.getService('market_listing_core')
 
-    try {
-      const listingId = req.validated.market_listing_id
+    const listingId = req.validated.market_listing_id
       const sellerId = req.user.user_id
       const { withdraw_reason } = req.body
 
@@ -94,27 +93,7 @@ router.post(
         },
         '撤回成功。您可以重新编辑后再次上架。'
       )
-    } catch (error) {
-      // 处理Service层特定错误码
-      if (error.code === 'LISTING_NOT_FOUND') {
-        return res.apiError('挂牌不存在', error.code, null, error.statusCode || 404)
-      }
-      if (error.code === 'NOT_OWNER') {
-        return res.apiError('无权操作此挂牌', error.code, null, error.statusCode || 403)
-      }
-      if (error.code === 'INVALID_LISTING_STATUS') {
-        return res.apiError('挂牌已下架或状态异常', error.code, null, error.statusCode || 400)
-      }
-
-      logger.error('撤回市场挂牌失败', {
-        error: error.message,
-        market_listing_id: req.validated.market_listing_id,
-        seller_id: req.user?.user_id
-      })
-
-      return handleServiceError(error, res, '撤回失败')
-    }
-  }
+  })
 )
 
 /**
@@ -140,11 +119,10 @@ router.post(
   requireValidSession, // 🔐 可叠加资产撤回属于敏感操作，需验证会话（2026-01-21 会话管理功能）
   marketRiskMiddleware.createWithdrawRiskMiddleware(),
   validatePositiveInteger('market_listing_id', 'params'),
-  async (req, res) => {
+  asyncHandler(async (req, res) => {
     const MarketListingService = req.app.locals.services.getService('market_listing_core')
 
-    try {
-      const listingId = req.validated.market_listing_id
+    const listingId = req.validated.market_listing_id
       const sellerId = req.user.user_id
       const { withdraw_reason } = req.body
 
@@ -187,35 +165,7 @@ router.post(
         },
         '撤回成功。资产已解冻至您的可用余额。'
       )
-    } catch (error) {
-      // 处理Service层特定错误码
-      if (error.code === 'LISTING_NOT_FOUND') {
-        return res.apiError('挂牌不存在', error.code, null, error.statusCode || 404)
-      }
-      if (error.code === 'NOT_OWNER') {
-        return res.apiError('无权操作此挂牌', error.code, null, error.statusCode || 403)
-      }
-      if (error.code === 'INVALID_LISTING_STATUS') {
-        return res.apiError('挂牌已下架或状态异常', error.code, null, error.statusCode || 400)
-      }
-      if (error.code === 'INVALID_LISTING_KIND') {
-        return res.apiError(
-          '此接口仅支持可叠加资产挂牌，请使用 /listings/:market_listing_id/withdraw 撤回物品挂牌',
-          error.code,
-          null,
-          error.statusCode || 400
-        )
-      }
-
-      logger.error('撤回可叠加资产挂牌失败', {
-        error: error.message,
-        market_listing_id: req.validated.market_listing_id,
-        seller_id: req.user?.user_id
-      })
-
-      return handleServiceError(error, res, '撤回失败')
-    }
-  }
+  })
 )
 
 module.exports = router

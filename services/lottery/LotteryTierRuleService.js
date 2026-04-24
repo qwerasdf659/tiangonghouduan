@@ -14,6 +14,7 @@
 
 'use strict'
 
+const BusinessError = require('../../utils/BusinessError')
 const logger = require('../../utils/logger').logger
 
 /**
@@ -198,19 +199,19 @@ class LotteryTierRuleService {
 
     // 验证必填字段
     if (!lottery_campaign_id) {
-      throw new Error('活动ID（lottery_campaign_id）不能为空')
+      throw new BusinessError('活动ID（lottery_campaign_id）不能为空', 'LOTTERY_NOT_ALLOWED', 400)
     }
     if (!tier_name || !['high', 'mid', 'low'].includes(tier_name)) {
-      throw new Error('档位名称（tier_name）必须是 high/mid/low 之一')
+      throw new BusinessError('档位名称（tier_name）必须是 high/mid/low 之一', 'LOTTERY_REQUIRED', 400)
     }
     if (tier_weight === undefined || tier_weight < 0 || tier_weight > this.WEIGHT_SCALE) {
-      throw new Error(`档位权重（tier_weight）必须在 0 到 ${this.WEIGHT_SCALE} 之间`)
+      throw new BusinessError(`档位权重（tier_weight）必须在 0 到 ${this.WEIGHT_SCALE} 之间`, 'LOTTERY_REQUIRED', 400)
     }
 
     // 验证活动是否存在
     const campaign = await this.LotteryCampaign.findByPk(lottery_campaign_id, options)
     if (!campaign) {
-      throw new Error(`活动不存在：lottery_campaign_id=${lottery_campaign_id}`)
+      throw new BusinessError(`活动不存在：lottery_campaign_id=${lottery_campaign_id}`, 'LOTTERY_NOT_FOUND', 404)
     }
 
     // 检查是否已存在相同的规则
@@ -219,8 +220,10 @@ class LotteryTierRuleService {
       ...options
     })
     if (existing) {
-      throw new Error(
-        `规则已存在：活动=${lottery_campaign_id}, 分层=${segment_key}, 档位=${tier_name}`
+      throw new BusinessError(
+        `规则已存在：活动=${lottery_campaign_id}, 分层=${segment_key}, 档位=${tier_name}`,
+        'LOTTERY_ALREADY_EXISTS',
+        409
       )
     }
 
@@ -265,13 +268,13 @@ class LotteryTierRuleService {
     // 验证权重之和
     const totalWeight = (weights.high || 0) + (weights.mid || 0) + (weights.low || 0)
     if (totalWeight !== this.WEIGHT_SCALE) {
-      throw new Error(`权重之和(${totalWeight})必须等于${this.WEIGHT_SCALE}`)
+      throw new BusinessError(`权重之和(${totalWeight})必须等于${this.WEIGHT_SCALE}`, 'LOTTERY_REQUIRED', 400)
     }
 
     // 验证活动是否存在
     const campaign = await this.LotteryCampaign.findByPk(lottery_campaign_id, options)
     if (!campaign) {
-      throw new Error(`活动不存在：lottery_campaign_id=${lottery_campaign_id}`)
+      throw new BusinessError(`活动不存在：lottery_campaign_id=${lottery_campaign_id}`, 'LOTTERY_NOT_FOUND', 404)
     }
 
     // 检查是否已存在规则
@@ -280,8 +283,10 @@ class LotteryTierRuleService {
       ...options
     })
     if (existingCount > 0) {
-      throw new Error(
-        `该活动和分层已存在规则：lottery_campaign_id=${lottery_campaign_id}, segment_key=${segment_key}`
+      throw new BusinessError(
+        `该活动和分层已存在规则：lottery_campaign_id=${lottery_campaign_id}, segment_key=${segment_key}`,
+        'LOTTERY_ALREADY_EXISTS',
+        409
       )
     }
 
@@ -349,13 +354,13 @@ class LotteryTierRuleService {
   async update(tier_rule_id, data, options = {}) {
     const rule = await this.LotteryTierRule.findByPk(tier_rule_id, options)
     if (!rule) {
-      throw new Error(`档位规则不存在：tier_rule_id=${tier_rule_id}`)
+      throw new BusinessError(`档位规则不存在：tier_rule_id=${tier_rule_id}`, 'LOTTERY_NOT_FOUND', 404)
     }
 
     // 验证权重范围
     if (data.tier_weight !== undefined) {
       if (data.tier_weight < 0 || data.tier_weight > this.WEIGHT_SCALE) {
-        throw new Error(`档位权重（tier_weight）必须在 0 到 ${this.WEIGHT_SCALE} 之间`)
+        throw new BusinessError(`档位权重（tier_weight）必须在 0 到 ${this.WEIGHT_SCALE} 之间`, 'LOTTERY_REQUIRED', 400)
       }
     }
 
@@ -386,7 +391,7 @@ class LotteryTierRuleService {
   async delete(tier_rule_id, options = {}) {
     const rule = await this.LotteryTierRule.findByPk(tier_rule_id, options)
     if (!rule) {
-      throw new Error(`档位规则不存在：tier_rule_id=${tier_rule_id}`)
+      throw new BusinessError(`档位规则不存在：tier_rule_id=${tier_rule_id}`, 'LOTTERY_NOT_FOUND', 404)
     }
 
     await rule.destroy(options)

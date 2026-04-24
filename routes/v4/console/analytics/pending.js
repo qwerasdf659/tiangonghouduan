@@ -22,7 +22,7 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
-const { handleServiceError } = require('../../../../middleware/validation')
+const { asyncHandler } = require('../../../../middleware/validation')
 const logger = require('../../../../utils/logger').logger
 
 /**
@@ -54,22 +54,17 @@ const logger = require('../../../../utils/logger').logger
  *   "message": "获取成功"
  * }
  */
-router.get('/summary', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
+router.get('/summary', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
     logger.info('[待处理中心] 获取分类汇总', {
-      admin_id: req.user.user_id
-    })
+    admin_id: req.user.user_id
+  })
 
-    // 🔄 通过 ServiceManager 获取 PendingCenterService（符合TR-005规范）
-    const PendingCenterService = req.app.locals.services.getService('pending_center')
-    const result = await PendingCenterService.getSegmentStats()
+  // 🔄 通过 ServiceManager 获取 PendingCenterService（符合TR-005规范）
+  const PendingCenterService = req.app.locals.services.getService('pending_center')
+  const result = await PendingCenterService.getSegmentStats()
 
-    return res.apiSuccess(result, '获取成功')
-  } catch (error) {
-    logger.error('[待处理中心] 获取分类汇总失败', { error: error.message })
-    return handleServiceError(error, res, '获取分类汇总失败')
-  }
-})
+  return res.apiSuccess(result, '获取成功')
+}))
 
 /**
  * @route GET /api/v4/console/pending/list
@@ -155,49 +150,39 @@ router.get('/summary', authenticateToken, requireRoleLevel(100), async (req, res
  *
  * 关联需求：§3.1.1 待办健康度评分
  */
-router.get('/health-score', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
+router.get('/health-score', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
     logger.info('[待处理中心] 获取健康度评分', {
-      admin_id: req.user.user_id
-    })
+    admin_id: req.user.user_id
+  })
 
-    // 🔄 通过 ServiceManager 获取 PendingHealthScoreService
-    const PendingHealthScoreService = req.app.locals.services.getService('pending_health_score')
-    const result = await PendingHealthScoreService.getHealthScore()
+  // 🔄 通过 ServiceManager 获取 PendingHealthScoreService
+  const PendingHealthScoreService = req.app.locals.services.getService('pending_health_score')
+  const result = await PendingHealthScoreService.getHealthScore()
 
-    return res.apiSuccess(result, '获取成功')
-  } catch (error) {
-    logger.error('[待处理中心] 获取健康度评分失败', { error: error.message })
-    return handleServiceError(error, res, '获取健康度评分失败')
-  }
-})
+  return res.apiSuccess(result, '获取成功')
+}))
 
-router.get('/list', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
+router.get('/list', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
     const { category, urgent_only, page = 1, page_size = 20 } = req.query
 
-    // 参数处理
-    const options = {
-      category: category || null,
-      urgent_only: urgent_only === 'true' || urgent_only === true,
-      page: Math.max(parseInt(page) || 1, 1),
-      page_size: Math.min(Math.max(parseInt(page_size) || 20, 1), 100)
-    }
-
-    logger.info('[待处理中心] 获取统一列表', {
-      admin_id: req.user.user_id,
-      options
-    })
-
-    // 🔄 通过 ServiceManager 获取 PendingCenterService（符合TR-005规范）
-    const PendingCenterService = req.app.locals.services.getService('pending_center')
-    const result = await PendingCenterService.getUnifiedList(options)
-
-    return res.apiSuccess(result, '获取成功')
-  } catch (error) {
-    logger.error('[待处理中心] 获取统一列表失败', { error: error.message })
-    return handleServiceError(error, res, '获取统一列表失败')
+  // 参数处理
+  const options = {
+    category: category || null,
+    urgent_only: urgent_only === 'true' || urgent_only === true,
+    page: Math.max(parseInt(page) || 1, 1),
+    page_size: Math.min(Math.max(parseInt(page_size) || 20, 1), 100)
   }
-})
+
+  logger.info('[待处理中心] 获取统一列表', {
+    admin_id: req.user.user_id,
+    options
+  })
+
+  // 🔄 通过 ServiceManager 获取 PendingCenterService（符合TR-005规范）
+  const PendingCenterService = req.app.locals.services.getService('pending_center')
+  const result = await PendingCenterService.getUnifiedList(options)
+
+  return res.apiSuccess(result, '获取成功')
+}))
 
 module.exports = router

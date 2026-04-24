@@ -36,6 +36,7 @@ const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const logger = require('../../../../utils/logger').logger
 const TransactionManager = require('../../../../utils/TransactionManager')
+const { asyncHandler } = require('../../../../middleware/validation')
 
 /**
  * 获取门店管理服务（通过 ServiceManager 统一入口）
@@ -44,41 +45,6 @@ const TransactionManager = require('../../../../utils/TransactionManager')
  */
 function getStoreService(req) {
   return req.app.locals.services.getService('store')
-}
-
-/**
- * 处理服务层错误
- *
- * @param {Error} error - 错误对象
- * @param {Object} res - Express 响应对象
- * @param {string} operation - 操作名称
- * @returns {Object} Express 响应对象
- */
-function handleServiceError(error, res, operation) {
-  logger.error(`❌ ${operation}失败`, { error: error.message })
-
-  // 根据错误类型返回不同状态码
-  if (error.message.includes('不存在') || error.message.includes('not found')) {
-    return res.apiError(error.message, 'NOT_FOUND', null, 404)
-  }
-
-  if (
-    error.message.includes('已存在') ||
-    error.message.includes('重复') ||
-    error.message.includes('已被')
-  ) {
-    return res.apiError(error.message, 'CONFLICT', null, 409)
-  }
-
-  if (
-    error.message.includes('不能为空') ||
-    error.message.includes('无法删除') ||
-    error.message.includes('必填')
-  ) {
-    return res.apiError(error.message, 'VALIDATION_ERROR', null, 400)
-  }
-
-  return handleServiceError(error, res)
 }
 
 /*
@@ -106,43 +72,39 @@ function handleServiceError(error, res, operation) {
  *
  * @access Admin only (role_level >= 100)
  */
-router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const {
-      page = 1,
-      page_size = 20,
-      status,
-      province_code,
-      city_code,
-      district_code,
-      street_code,
-      keyword,
-      assigned_to,
-      merchant_id
-    } = req.query
+router.get('/', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  const {
+    page = 1,
+    page_size = 20,
+    status,
+    province_code,
+    city_code,
+    district_code,
+    street_code,
+    keyword,
+    assigned_to,
+    merchant_id
+  } = req.query
 
-    // 验证分页参数
-    const validatedPageSize = Math.min(parseInt(page_size, 10) || 20, 100)
+  // 验证分页参数
+  const validatedPageSize = Math.min(parseInt(page_size, 10) || 20, 100)
 
-    const StoreService = getStoreService(req)
-    const result = await StoreService.getStoreList({
-      page,
-      page_size: validatedPageSize,
-      status,
-      province_code,
-      city_code,
-      district_code,
-      street_code,
-      keyword,
-      assigned_to,
-      merchant_id
-    })
+  const StoreService = getStoreService(req)
+  const result = await StoreService.getStoreList({
+    page,
+    page_size: validatedPageSize,
+    status,
+    province_code,
+    city_code,
+    district_code,
+    street_code,
+    keyword,
+    assigned_to,
+    merchant_id
+  })
 
-    return res.apiSuccess(result, '获取门店列表成功')
-  } catch (error) {
-    return handleServiceError(error, res, '获取门店列表')
-  }
-})
+  return res.apiSuccess(result, '获取门店列表成功')
+}))
 
 /**
  * GET /stats - 获取门店统计数据
@@ -151,16 +113,12 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
  *
  * @access Admin only (role_level >= 100)
  */
-router.get('/stats', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const StoreService = getStoreService(req)
-    const stats = await StoreService.getStoreStats()
+router.get('/stats', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  const StoreService = getStoreService(req)
+  const stats = await StoreService.getStoreStats()
 
-    return res.apiSuccess(stats, '获取门店统计成功')
-  } catch (error) {
-    return handleServiceError(error, res, '获取门店统计')
-  }
-})
+  return res.apiSuccess(stats, '获取门店统计成功')
+}))
 
 /**
  * GET /contribution - 获取商户贡献度排行
@@ -207,28 +165,24 @@ router.get('/stats', authenticateToken, requireRoleLevel(100), async (req, res) 
  *
  * 关联需求：§6.2.1 商户贡献度排行接口
  */
-router.get('/contribution', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const { days = 30, page_size = 20 } = req.query
+router.get('/contribution', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  const { days = 30, page_size = 20 } = req.query
 
-    logger.info('[门店管理] 获取商户贡献度排行', {
-      admin_id: req.user.user_id,
-      days: parseInt(days),
-      page_size: parseInt(page_size)
-    })
+  logger.info('[门店管理] 获取商户贡献度排行', {
+    admin_id: req.user.user_id,
+    days: parseInt(days),
+    page_size: parseInt(page_size)
+  })
 
-    // 🔄 通过 ServiceManager 获取 StoreContributionService
-    const StoreContributionService = req.app.locals.services.getService('store_contribution')
-    const result = await StoreContributionService.getContributionRanking({
-      days: parseInt(days) || 30,
-      limit: Math.min(parseInt(page_size) || 20, 100)
-    })
+  // 🔄 通过 ServiceManager 获取 StoreContributionService
+  const StoreContributionService = req.app.locals.services.getService('store_contribution')
+  const result = await StoreContributionService.getContributionRanking({
+    days: parseInt(days) || 30,
+    limit: Math.min(parseInt(page_size) || 20, 100)
+  })
 
-    return res.apiSuccess(result, '获取成功')
-  } catch (error) {
-    return handleServiceError(error, res, '获取商户贡献度排行')
-  }
-})
+  return res.apiSuccess(result, '获取成功')
+}))
 
 /**
  * GET /:store_id/trend - 获取商户消费趋势
@@ -242,31 +196,27 @@ router.get('/contribution', authenticateToken, requireRoleLevel(100), async (req
  *
  * 关联需求：§6.2 商户贡献度服务
  */
-router.get('/:store_id/trend', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const { store_id } = req.params
-    const { days = 30 } = req.query
+router.get('/:store_id/trend', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  const { store_id } = req.params
+  const { days = 30 } = req.query
 
-    if (!store_id || isNaN(parseInt(store_id, 10))) {
-      return res.apiError('商户ID无效', 'INVALID_STORE_ID', null, 400)
-    }
-
-    logger.info('[门店管理] 获取商户消费趋势', {
-      admin_id: req.user.user_id,
-      store_id: parseInt(store_id),
-      days: parseInt(days)
-    })
-
-    const StoreContributionService = req.app.locals.services.getService('store_contribution')
-    const result = await StoreContributionService.getMerchantTrend(parseInt(store_id, 10), {
-      days: parseInt(days) || 30
-    })
-
-    return res.apiSuccess(result, '获取成功')
-  } catch (error) {
-    return handleServiceError(error, res, '获取商户消费趋势')
+  if (!store_id || isNaN(parseInt(store_id, 10))) {
+    return res.apiError('商户ID无效', 'INVALID_STORE_ID', null, 400)
   }
-})
+
+  logger.info('[门店管理] 获取商户消费趋势', {
+    admin_id: req.user.user_id,
+    store_id: parseInt(store_id),
+    days: parseInt(days)
+  })
+
+  const StoreContributionService = req.app.locals.services.getService('store_contribution')
+  const result = await StoreContributionService.getMerchantTrend(parseInt(store_id, 10), {
+    days: parseInt(days) || 30
+  })
+
+  return res.apiSuccess(result, '获取成功')
+}))
 
 /**
  * GET /:store_id/health-score - 获取商户健康度评分
@@ -284,32 +234,27 @@ router.get(
   '/:store_id/health-score',
   authenticateToken,
   requireRoleLevel(100),
-  async (req, res) => {
-    try {
-      const { store_id } = req.params
-      const { days = 30 } = req.query
+  asyncHandler(async (req, res) => {
+    const { store_id } = req.params
+    const { days = 30 } = req.query
 
-      if (!store_id || isNaN(parseInt(store_id, 10))) {
-        return res.apiError('商户ID无效', 'INVALID_STORE_ID', null, 400)
-      }
-
-      logger.info('[门店管理] 获取商户健康度评分', {
-        admin_id: req.user.user_id,
-        store_id: parseInt(store_id),
-        days: parseInt(days)
-      })
-
-      const StoreContributionService = req.app.locals.services.getService('store_contribution')
-      const result = await StoreContributionService.calculateHealthScore(parseInt(store_id, 10), {
-        days: parseInt(days) || 30
-      })
-
-      return res.apiSuccess(result, '获取成功')
-    } catch (error) {
-      return handleServiceError(error, res, '获取商户健康度评分')
+    if (!store_id || isNaN(parseInt(store_id, 10))) {
+      return res.apiError('商户ID无效', 'INVALID_STORE_ID', null, 400)
     }
-  }
-)
+
+    logger.info('[门店管理] 获取商户健康度评分', {
+      admin_id: req.user.user_id,
+      store_id: parseInt(store_id),
+      days: parseInt(days)
+    })
+
+    const StoreContributionService = req.app.locals.services.getService('store_contribution')
+    const result = await StoreContributionService.calculateHealthScore(parseInt(store_id, 10), {
+      days: parseInt(days) || 30
+    })
+
+    return res.apiSuccess(result, '获取成功')
+}))
 
 /**
  * GET /:store_id/comparison - 获取商户环比同比数据
@@ -322,27 +267,23 @@ router.get(
  *
  * 关联需求：§6.2 商户贡献度服务
  */
-router.get('/:store_id/comparison', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const { store_id } = req.params
+router.get('/:store_id/comparison', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  const { store_id } = req.params
 
-    if (!store_id || isNaN(parseInt(store_id, 10))) {
-      return res.apiError('商户ID无效', 'INVALID_STORE_ID', null, 400)
-    }
-
-    logger.info('[门店管理] 获取商户环比同比数据', {
-      admin_id: req.user.user_id,
-      store_id: parseInt(store_id)
-    })
-
-    const StoreContributionService = req.app.locals.services.getService('store_contribution')
-    const result = await StoreContributionService.getComparison(parseInt(store_id, 10))
-
-    return res.apiSuccess(result, '获取成功')
-  } catch (error) {
-    return handleServiceError(error, res, '获取商户环比同比数据')
+  if (!store_id || isNaN(parseInt(store_id, 10))) {
+    return res.apiError('商户ID无效', 'INVALID_STORE_ID', null, 400)
   }
-})
+
+  logger.info('[门店管理] 获取商户环比同比数据', {
+    admin_id: req.user.user_id,
+    store_id: parseInt(store_id)
+  })
+
+  const StoreContributionService = req.app.locals.services.getService('store_contribution')
+  const result = await StoreContributionService.getComparison(parseInt(store_id, 10))
+
+  return res.apiSuccess(result, '获取成功')
+}))
 
 /**
  * GET /:store_id - 获取门店详情
@@ -351,26 +292,22 @@ router.get('/:store_id/comparison', authenticateToken, requireRoleLevel(100), as
  *
  * @access Admin only (role_level >= 100)
  */
-router.get('/:store_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const { store_id } = req.params
+router.get('/:store_id', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  const { store_id } = req.params
 
-    if (!store_id || isNaN(parseInt(store_id, 10))) {
-      return res.apiError('门店ID无效', 'INVALID_STORE_ID', null, 400)
-    }
-
-    const StoreService = getStoreService(req)
-    const store = await StoreService.getStoreById(parseInt(store_id, 10))
-
-    if (!store) {
-      return res.apiError(`门店 ID ${store_id} 不存在`, 'STORE_NOT_FOUND', null, 404)
-    }
-
-    return res.apiSuccess(store, '获取门店详情成功')
-  } catch (error) {
-    return handleServiceError(error, res, '获取门店详情')
+  if (!store_id || isNaN(parseInt(store_id, 10))) {
+    return res.apiError('门店ID无效', 'INVALID_STORE_ID', null, 400)
   }
-})
+
+  const StoreService = getStoreService(req)
+  const store = await StoreService.getStoreById(parseInt(store_id, 10))
+
+  if (!store) {
+    return res.apiError(`门店 ID ${store_id} 不存在`, 'STORE_NOT_FOUND', null, 404)
+  }
+
+  return res.apiSuccess(store, '获取门店详情成功')
+}))
 
 /*
  * =================================================================
@@ -402,41 +339,37 @@ router.get('/:store_id', authenticateToken, requireRoleLevel(100), async (req, r
  *
  * @access Admin only (role_level >= 100)
  */
-router.post('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const storeData = req.body
-    const operator_id = req.user.user_id
+router.post('/', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  const storeData = req.body
+  const operator_id = req.user.user_id
 
-    // 验证必填字段
-    if (!storeData.store_name || storeData.store_name.trim() === '') {
-      return res.apiError('门店名称不能为空', 'STORE_NAME_REQUIRED', null, 400)
-    }
-
-    // 验证行政区划代码必填
-    const requiredRegionFields = ['province_code', 'city_code', 'district_code', 'street_code']
-    const missingFields = requiredRegionFields.filter(field => !storeData[field])
-    if (missingFields.length > 0) {
-      return res.apiError(
-        `缺少必填的行政区划代码: ${missingFields.join(', ')}`,
-        'REGION_CODE_REQUIRED',
-        null,
-        400
-      )
-    }
-
-    const StoreService = getStoreService(req)
-    const result = await TransactionManager.execute(async transaction => {
-      return await StoreService.createStore(storeData, {
-        operator_id,
-        transaction
-      })
-    })
-
-    return res.apiSuccess(result.store, '门店创建成功')
-  } catch (error) {
-    return handleServiceError(error, res, '创建门店')
+  // 验证必填字段
+  if (!storeData.store_name || storeData.store_name.trim() === '') {
+    return res.apiError('门店名称不能为空', 'STORE_NAME_REQUIRED', null, 400)
   }
-})
+
+  // 验证行政区划代码必填
+  const requiredRegionFields = ['province_code', 'city_code', 'district_code', 'street_code']
+  const missingFields = requiredRegionFields.filter(field => !storeData[field])
+  if (missingFields.length > 0) {
+    return res.apiError(
+      `缺少必填的行政区划代码: ${missingFields.join(', ')}`,
+      'REGION_CODE_REQUIRED',
+      null,
+      400
+    )
+  }
+
+  const StoreService = getStoreService(req)
+  const result = await TransactionManager.execute(async transaction => {
+    return await StoreService.createStore(storeData, {
+      operator_id,
+      transaction
+    })
+  })
+
+  return res.apiSuccess(result.store, '门店创建成功')
+}))
 
 /**
  * POST /batch-import - 批量导入门店
@@ -459,93 +392,89 @@ router.post('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
  *
  * @access Admin only (role_level >= 100)
  */
-router.post('/batch-import', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const { stores } = req.body
-    const operator_id = req.user.user_id
+router.post('/batch-import', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  const { stores } = req.body
+  const operator_id = req.user.user_id
 
-    // 验证请求格式
-    if (!Array.isArray(stores) || stores.length === 0) {
-      return res.apiError('请提供有效的门店数据数组', 'INVALID_STORES_DATA', null, 400)
-    }
+  // 验证请求格式
+  if (!Array.isArray(stores) || stores.length === 0) {
+    return res.apiError('请提供有效的门店数据数组', 'INVALID_STORES_DATA', null, 400)
+  }
 
-    // 限制批量导入数量
-    if (stores.length > 100) {
-      return res.apiError('单次批量导入最多支持 100 条记录', 'BATCH_SIZE_EXCEEDED', null, 400)
-    }
+  // 限制批量导入数量
+  if (stores.length > 100) {
+    return res.apiError('单次批量导入最多支持 100 条记录', 'BATCH_SIZE_EXCEEDED', null, 400)
+  }
 
-    const results = {
-      success: [],
-      failed: []
-    }
+  const results = {
+    success: [],
+    failed: []
+  }
 
-    const StoreService = getStoreService(req)
-    // 逐条处理，记录成功和失败（每条记录独立事务，需要按顺序处理）
-    for (let i = 0; i < stores.length; i++) {
-      const storeData = stores[i]
-      const rowIndex = i + 1
+  const StoreService = getStoreService(req)
+  // 逐条处理，记录成功和失败（每条记录独立事务，需要按顺序处理）
+  for (let i = 0; i < stores.length; i++) {
+    const storeData = stores[i]
+    const rowIndex = i + 1
 
-      try {
-        // 验证必填字段
-        if (!storeData.store_name || storeData.store_name.trim() === '') {
-          results.failed.push({
-            row: rowIndex,
-            data: storeData,
-            error: '门店名称不能为空'
-          })
-          continue
-        }
-
-        // 验证行政区划代码必填
-        const requiredFields = ['province_code', 'city_code', 'district_code', 'street_code']
-        const missingFields = requiredFields.filter(field => !storeData[field])
-        if (missingFields.length > 0) {
-          results.failed.push({
-            row: rowIndex,
-            data: storeData,
-            error: `缺少必填的行政区划代码: ${missingFields.join(', ')}`
-          })
-          continue
-        }
-
-        // 创建门店（使用独立事务，需要逐条处理以记录成功/失败）
-        // eslint-disable-next-line no-await-in-loop
-        const result = await TransactionManager.execute(async transaction => {
-          return await StoreService.createStore(storeData, {
-            operator_id,
-            transaction
-          })
-        })
-
-        results.success.push({
-          row: rowIndex,
-          store_id: result.store.store_id,
-          store_name: result.store.store_name
-        })
-      } catch (error) {
+    try {
+      // 验证必填字段
+      if (!storeData.store_name || storeData.store_name.trim() === '') {
         results.failed.push({
           row: rowIndex,
           data: storeData,
-          error: error.message
+          error: '门店名称不能为空'
         })
+        continue
       }
-    }
 
-    // 根据结果返回不同状态
-    const message = `批量导入完成：成功 ${results.success.length} 条，失败 ${results.failed.length} 条`
+      // 验证行政区划代码必填
+      const requiredFields = ['province_code', 'city_code', 'district_code', 'street_code']
+      const missingFields = requiredFields.filter(field => !storeData[field])
+      if (missingFields.length > 0) {
+        results.failed.push({
+          row: rowIndex,
+          data: storeData,
+          error: `缺少必填的行政区划代码: ${missingFields.join(', ')}`
+        })
+        continue
+      }
 
-    if (results.failed.length === 0) {
-      return res.apiSuccess(results, message)
-    } else if (results.success.length === 0) {
-      return res.apiError(message, 'BATCH_IMPORT_ALL_FAILED', results, 400)
-    } else {
-      // 部分成功
-      return res.apiSuccess(results, message)
+      // 创建门店（使用独立事务，需要逐条处理以记录成功/失败）
+      // eslint-disable-next-line no-await-in-loop
+      const result = await TransactionManager.execute(async transaction => {
+        return await StoreService.createStore(storeData, {
+          operator_id,
+          transaction
+        })
+      })
+
+      results.success.push({
+        row: rowIndex,
+        store_id: result.store.store_id,
+        store_name: result.store.store_name
+      })
+    } catch (error) {
+      results.failed.push({
+        row: rowIndex,
+        data: storeData,
+        error: error.message
+      })
     }
-  } catch (error) {
-    return handleServiceError(error, res, '批量导入门店')
   }
-})
+
+  // 根据结果返回不同状态
+  const message = `批量导入完成：成功 ${results.success.length} 条，失败 ${results.failed.length} 条`
+
+  if (results.failed.length === 0) {
+    return res.apiSuccess(results, message)
+  } else if (results.success.length === 0) {
+    return res.apiError(message, 'BATCH_IMPORT_ALL_FAILED', results, 400)
+  } else {
+    // 部分成功
+    return res.apiSuccess(results, message)
+  }
+}))
 
 /*
  * =================================================================
@@ -560,29 +489,25 @@ router.post('/batch-import', authenticateToken, requireRoleLevel(100), async (re
  *
  * @access Admin only (role_level >= 100)
  */
-router.put('/:store_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const { store_id } = req.params
-    const updateData = req.body
-    const operator_id = req.user.user_id
+router.put('/:store_id', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  const { store_id } = req.params
+  const updateData = req.body
+  const operator_id = req.user.user_id
 
-    if (!store_id || isNaN(parseInt(store_id, 10))) {
-      return res.apiError('门店ID无效', 'INVALID_STORE_ID', null, 400)
-    }
-
-    const StoreService = getStoreService(req)
-    const result = await TransactionManager.execute(async transaction => {
-      return await StoreService.updateStore(parseInt(store_id, 10), updateData, {
-        operator_id,
-        transaction
-      })
-    })
-
-    return res.apiSuccess(result.store, '门店更新成功')
-  } catch (error) {
-    return handleServiceError(error, res, '更新门店')
+  if (!store_id || isNaN(parseInt(store_id, 10))) {
+    return res.apiError('门店ID无效', 'INVALID_STORE_ID', null, 400)
   }
-})
+
+  const StoreService = getStoreService(req)
+  const result = await TransactionManager.execute(async transaction => {
+    return await StoreService.updateStore(parseInt(store_id, 10), updateData, {
+      operator_id,
+      transaction
+    })
+  })
+
+  return res.apiSuccess(result.store, '门店更新成功')
+}))
 
 /*
  * =================================================================
@@ -600,30 +525,26 @@ router.put('/:store_id', authenticateToken, requireRoleLevel(100), async (req, r
  *
  * @access Admin only (role_level >= 100)
  */
-router.delete('/:store_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const { store_id } = req.params
-    const { force } = req.query
-    const operator_id = req.user.user_id
+router.delete('/:store_id', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  const { store_id } = req.params
+  const { force } = req.query
+  const operator_id = req.user.user_id
 
-    if (!store_id || isNaN(parseInt(store_id, 10))) {
-      return res.apiError('门店ID无效', 'INVALID_STORE_ID', null, 400)
-    }
-
-    const StoreService = getStoreService(req)
-    const result = await TransactionManager.execute(async transaction => {
-      return await StoreService.deleteStore(parseInt(store_id, 10), {
-        operator_id,
-        force: force === 'true',
-        transaction
-      })
-    })
-
-    return res.apiSuccess(result, result.message)
-  } catch (error) {
-    return handleServiceError(error, res, '删除门店')
+  if (!store_id || isNaN(parseInt(store_id, 10))) {
+    return res.apiError('门店ID无效', 'INVALID_STORE_ID', null, 400)
   }
-})
+
+  const StoreService = getStoreService(req)
+  const result = await TransactionManager.execute(async transaction => {
+    return await StoreService.deleteStore(parseInt(store_id, 10), {
+      operator_id,
+      force: force === 'true',
+      transaction
+    })
+  })
+
+  return res.apiSuccess(result, result.message)
+}))
 
 /*
  * =================================================================
@@ -638,29 +559,25 @@ router.delete('/:store_id', authenticateToken, requireRoleLevel(100), async (req
  *
  * @access Admin only (role_level >= 100)
  */
-router.post('/:store_id/activate', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const { store_id } = req.params
-    const operator_id = req.user.user_id
+router.post('/:store_id/activate', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  const { store_id } = req.params
+  const operator_id = req.user.user_id
 
-    if (!store_id || isNaN(parseInt(store_id, 10))) {
-      return res.apiError('门店ID无效', 'INVALID_STORE_ID', null, 400)
-    }
-
-    const StoreService = getStoreService(req)
-    const result = await TransactionManager.execute(async transaction => {
-      return await StoreService.updateStore(
-        parseInt(store_id, 10),
-        { status: 'active' },
-        { operator_id, transaction }
-      )
-    })
-
-    return res.apiSuccess(result.store, '门店已激活')
-  } catch (error) {
-    return handleServiceError(error, res, '激活门店')
+  if (!store_id || isNaN(parseInt(store_id, 10))) {
+    return res.apiError('门店ID无效', 'INVALID_STORE_ID', null, 400)
   }
-})
+
+  const StoreService = getStoreService(req)
+  const result = await TransactionManager.execute(async transaction => {
+    return await StoreService.updateStore(
+      parseInt(store_id, 10),
+      { status: 'active' },
+      { operator_id, transaction }
+    )
+  })
+
+  return res.apiSuccess(result.store, '门店已激活')
+}))
 
 /**
  * POST /:store_id/deactivate - 停用门店
@@ -669,28 +586,24 @@ router.post('/:store_id/activate', authenticateToken, requireRoleLevel(100), asy
  *
  * @access Admin only (role_level >= 100)
  */
-router.post('/:store_id/deactivate', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const { store_id } = req.params
-    const operator_id = req.user.user_id
+router.post('/:store_id/deactivate', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  const { store_id } = req.params
+  const operator_id = req.user.user_id
 
-    if (!store_id || isNaN(parseInt(store_id, 10))) {
-      return res.apiError('门店ID无效', 'INVALID_STORE_ID', null, 400)
-    }
-
-    const StoreService = getStoreService(req)
-    const result = await TransactionManager.execute(async transaction => {
-      return await StoreService.updateStore(
-        parseInt(store_id, 10),
-        { status: 'inactive' },
-        { operator_id, transaction }
-      )
-    })
-
-    return res.apiSuccess(result.store, '门店已停用')
-  } catch (error) {
-    return handleServiceError(error, res, '停用门店')
+  if (!store_id || isNaN(parseInt(store_id, 10))) {
+    return res.apiError('门店ID无效', 'INVALID_STORE_ID', null, 400)
   }
-})
+
+  const StoreService = getStoreService(req)
+  const result = await TransactionManager.execute(async transaction => {
+    return await StoreService.updateStore(
+      parseInt(store_id, 10),
+      { status: 'inactive' },
+      { operator_id, transaction }
+    )
+  })
+
+  return res.apiSuccess(result.store, '门店已停用')
+}))
 
 module.exports = router

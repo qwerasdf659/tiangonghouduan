@@ -1,4 +1,5 @@
 'use strict'
+const BusinessError = require('../../../utils/BusinessError')
 
 /**
  * 兑换市场管理 - SKU 管理服务
@@ -42,7 +43,7 @@ class SkuService {
     })
 
     if (!item) {
-      throw new Error('商品不存在')
+      throw new BusinessError('商品不存在', 'EXCHANGE_ITEM_NOT_FOUND', 404)
     }
 
     const skus = await ExchangeItemSkuModel.findAll({
@@ -78,15 +79,15 @@ class SkuService {
       transaction
     })
     if (!item) {
-      throw new Error('商品不存在')
+      throw new BusinessError('商品不存在', 'EXCHANGE_ITEM_NOT_FOUND', 404)
     }
 
     if (!skuData.cost_amount || skuData.cost_amount <= 0) {
-      throw new Error('SKU 兑换价格必须大于 0')
+      throw new BusinessError('SKU 兑换价格必须大于 0', 'EXCHANGE_REQUIRED', 400)
     }
 
     if (skuData.stock === undefined || skuData.stock < 0) {
-      throw new Error('SKU 库存必须大于等于 0')
+      throw new BusinessError('SKU 库存必须大于等于 0', 'EXCHANGE_REQUIRED', 400)
     }
 
     const sku = await ExchangeItemSkuModel.create(
@@ -146,7 +147,7 @@ class SkuService {
       transaction
     })
     if (!sku) {
-      throw new Error('SKU 不存在')
+      throw new BusinessError('SKU 不存在', 'EXCHANGE_SKU_NOT_FOUND', 404)
     }
 
     const skuAllowedFields = ['stock', 'cost_price', 'status', 'sort_order']
@@ -158,7 +159,7 @@ class SkuService {
     }
 
     if (updateData.cost_amount !== undefined && updateData.cost_amount <= 0) {
-      throw new Error('SKU 兑换价格必须大于 0')
+      throw new BusinessError('SKU 兑换价格必须大于 0', 'EXCHANGE_REQUIRED', 400)
     }
 
     if (Object.keys(skuUpdate).length > 0) {
@@ -207,7 +208,7 @@ class SkuService {
 
     const sku = await ExchangeItemSkuModel.findByPk(skuId, { transaction })
     if (!sku) {
-      throw new Error('SKU 不存在')
+      throw new BusinessError('SKU 不存在', 'EXCHANGE_SKU_NOT_FOUND', 404)
     }
 
     const skuCount = await ExchangeItemSkuModel.count({
@@ -216,7 +217,7 @@ class SkuService {
     })
 
     if (skuCount <= 1) {
-      throw new Error('不能删除最后一个 SKU，每个商品至少保留一个 SKU')
+      throw new BusinessError('不能删除最后一个 SKU，每个商品至少保留一个 SKU', 'EXCHANGE_NOT_ALLOWED', 400)
     }
 
     const exchangeItemId = sku.exchange_item_id

@@ -18,6 +18,7 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
+const { asyncHandler } = require('../shared/middleware')
 const logger = require('../../../../utils/logger').logger
 
 /**
@@ -47,32 +48,27 @@ function getStatisticsService(req) {
  *
  * 返回：统计指标列表和分页信息
  */
-router.get('/hourly', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const { lottery_campaign_id, start_time, end_time, page = 1, page_size = 24 } = req.query
+router.get('/hourly', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  const { lottery_campaign_id, start_time, end_time, page = 1, page_size = 24 } = req.query
 
-    const result = await getStatisticsService(req).getHourlyMetrics({
-      lottery_campaign_id: lottery_campaign_id ? parseInt(lottery_campaign_id) : undefined,
-      start_time,
-      end_time,
-      page: parseInt(page),
-      page_size: parseInt(page_size)
-    })
+  const result = await getStatisticsService(req).getHourlyMetrics({
+    lottery_campaign_id: lottery_campaign_id ? parseInt(lottery_campaign_id) : undefined,
+    start_time,
+    end_time,
+    page: parseInt(page),
+    page_size: parseInt(page_size)
+  })
 
-    logger.info('查询小时统计指标', {
-      admin_id: req.user.user_id,
-      lottery_campaign_id,
-      start_time,
-      end_time,
-      total: result.pagination.total
-    })
+  logger.info('查询小时统计指标', {
+    admin_id: req.user.user_id,
+    lottery_campaign_id,
+    start_time,
+    end_time,
+    total: result.pagination.total
+  })
 
-    return res.apiSuccess(result, '查询小时统计成功')
-  } catch (error) {
-    logger.error('查询小时统计失败:', error)
-    return res.apiError(`查询失败：${error.message}`, 'QUERY_HOURLY_METRICS_FAILED', null, 500)
-  }
-})
+  return res.apiSuccess(result, '查询小时统计成功')
+}))
 
 /**
  * GET /hourly/:id - 获取单条小时统计指标详情
@@ -82,26 +78,21 @@ router.get('/hourly', authenticateToken, requireRoleLevel(100), async (req, res)
  *
  * 返回：统计指标详情
  */
-router.get('/hourly/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const id = parseInt(req.params.id)
+router.get('/hourly/:id', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  const id = parseInt(req.params.id)
 
-    if (!id || isNaN(id)) {
-      return res.apiError('无效的记录ID', 'INVALID_METRIC_ID', null, 400)
-    }
-
-    const result = await getStatisticsService(req).getHourlyMetricById(id)
-
-    if (!result) {
-      return res.apiError('统计记录不存在', 'METRIC_NOT_FOUND', null, 404)
-    }
-
-    return res.apiSuccess(result, '获取统计详情成功')
-  } catch (error) {
-    logger.error('获取统计详情失败:', error)
-    return res.apiError(`查询失败：${error.message}`, 'GET_HOURLY_METRIC_FAILED', null, 500)
+  if (!id || isNaN(id)) {
+    return res.apiError('无效的记录ID', 'INVALID_METRIC_ID', null, 400)
   }
-})
+
+  const result = await getStatisticsService(req).getHourlyMetricById(id)
+
+  if (!result) {
+    return res.apiError('统计记录不存在', 'METRIC_NOT_FOUND', null, 404)
+  }
+
+  return res.apiSuccess(result, '获取统计详情成功')
+}))
 
 /**
  * GET /hourly/summary/:lottery_campaign_id - 获取活动统计汇总
@@ -119,27 +110,22 @@ router.get(
   '/hourly/summary/:lottery_campaign_id',
   authenticateToken,
   requireRoleLevel(100),
-  async (req, res) => {
-    try {
-      const lottery_campaign_id = parseInt(req.params.lottery_campaign_id)
-      const { start_time, end_time } = req.query
+  asyncHandler(async (req, res) => {
+    const lottery_campaign_id = parseInt(req.params.lottery_campaign_id)
+    const { start_time, end_time } = req.query
 
-      if (!lottery_campaign_id || isNaN(lottery_campaign_id)) {
-        return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID', null, 400)
-      }
-
-      const summary = await getStatisticsService(req).getHourlyMetricsSummary(
-        lottery_campaign_id,
-        start_time,
-        end_time
-      )
-
-      return res.apiSuccess(summary, '获取活动统计汇总成功')
-    } catch (error) {
-      logger.error('获取活动统计汇总失败:', error)
-      return res.apiError(`查询失败：${error.message}`, 'GET_SUMMARY_FAILED', null, 500)
+    if (!lottery_campaign_id || isNaN(lottery_campaign_id)) {
+      return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID', null, 400)
     }
+
+    const summary = await getStatisticsService(req).getHourlyMetricsSummary(
+      lottery_campaign_id,
+      start_time,
+      end_time
+    )
+
+    return res.apiSuccess(summary, '获取活动统计汇总成功')
   }
-)
+))
 
 module.exports = router

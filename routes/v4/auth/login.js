@@ -20,6 +20,7 @@
  *
  */
 
+const { asyncHandler } = require('../../../middleware/validation')
 const express = require('express')
 const router = express.Router()
 const { v4: uuidv4 } = require('uuid') // 🆕 用于生成会话令牌
@@ -42,7 +43,7 @@ const { detectLoginPlatform } = require('../../../utils/platformDetector')
  *
  * @param {string} mobile - 手机号（11位中国大陆手机号）
  */
-router.post('/send-code', async (req, res) => {
+router.post('/send-code', asyncHandler(async (req, res) => {
   const { mobile } = req.body
 
   // 手机号必填验证
@@ -56,27 +57,17 @@ router.post('/send-code', async (req, res) => {
     return res.apiError('手机号格式不正确', 'INVALID_MOBILE_FORMAT', null, 400)
   }
 
-  try {
     // 通过 ServiceManager 获取 SmsService
-    const SmsService = req.app.locals.services.getService('sms')
-    const result = await SmsService.sendVerificationCode(mobile)
+  const SmsService = req.app.locals.services.getService('sms')
+  const result = await SmsService.sendVerificationCode(mobile)
 
-    return res.apiSuccess(
-      {
-        expires_in: result.expires_in
-      },
-      result.message
-    )
-  } catch (error) {
-    // 频率限制或每日限制错误
-    if (error.code === 'SMS_RATE_LIMIT' || error.code === 'SMS_DAILY_LIMIT') {
-      return res.apiError(error.message, error.code, error.data, error.statusCode || 429)
-    }
-
-    logger.error('❌ 发送验证码失败:', error)
-    return res.apiError('验证码发送失败，请稍后重试', 'SMS_SEND_FAILED', null, 500)
-  }
-})
+  return res.apiSuccess(
+    {
+      expires_in: result.expires_in
+    },
+    result.message
+  )
+}))
 
 /**
  * 🛡️ 用户登录（支持自动注册）
@@ -90,7 +81,7 @@ router.post('/send-code', async (req, res) => {
  * @param {string} mobile - 手机号
  * @param {string} verification_code - 验证码
  */
-router.post('/login', async (req, res) => {
+router.post('/login', asyncHandler(async (req, res) => {
   // 登录性能监控：记录开始时间
   const loginStartTime = Date.now()
 
@@ -318,7 +309,7 @@ router.post('/login', async (req, res) => {
   }
 
   return res.apiSuccess(responseData, message)
-})
+}))
 
 /**
  * 🔐 微信手机号解密接口
@@ -334,7 +325,7 @@ router.post('/login', async (req, res) => {
  * @param {string} encryptedData - 加密的手机号数据
  * @param {string} iv - 加密算法的初始向量
  */
-router.post('/decrypt-phone', async (req, res) => {
+router.post('/decrypt-phone', asyncHandler(async (req, res) => {
   const { wx_code, encryptedData, iv } = req.body
 
   // 参数验证（使用语义明确的 wx_code 参数名）
@@ -360,7 +351,7 @@ router.post('/decrypt-phone', async (req, res) => {
 
   if (!wxRes.data.session_key) {
     logger.error('❌ 微信session_key获取失败:', wxRes.data)
-    return res.apiError('微信session_key获取失败', 'WX_SESSION_ERROR', wxRes.data, 500)
+    return res.apiError('微信session_key获取失败', 'WX_SESSION_ERROR', null, 500)
   }
 
   const sessionKey = wxRes.data.session_key
@@ -372,7 +363,7 @@ router.post('/decrypt-phone', async (req, res) => {
 
   if (!data.phoneNumber) {
     logger.error('❌ 手机号解密失败')
-    return res.apiError('手机号解密失败', 'DECRYPT_FAILED', null, 500)
+    return res.apiError('手机号解密失败', 'WX_DECRYPT_ERROR', null, 500)
   }
 
   logger.info(`✅ 手机号解密成功: ${data.phoneNumber}`)
@@ -385,7 +376,7 @@ router.post('/decrypt-phone', async (req, res) => {
     },
     '手机号获取成功'
   )
-})
+}))
 
 /**
  * 🛡️ 微信授权一键登录
@@ -395,7 +386,7 @@ router.post('/decrypt-phone', async (req, res) => {
  *
  * @param {string} mobile - 手机号（必填，来自微信授权）
  */
-router.post('/quick-login', async (req, res) => {
+router.post('/quick-login', asyncHandler(async (req, res) => {
   // 登录性能监控
   const loginStartTime = Date.now()
 
@@ -611,7 +602,7 @@ router.post('/quick-login', async (req, res) => {
   }
 
   return res.apiSuccess(responseData, message)
-})
+}))
 
 /**
  * 微信静默登录（wx.login → code → openid）
@@ -627,143 +618,138 @@ router.post('/quick-login', async (req, res) => {
  *
  * @param {string} wx_code - 微信登录凭证（wx.login 获取）
  */
-router.post('/wx-code-login', async (req, res) => {
+router.post('/wx-code-login', asyncHandler(async (req, res) => {
   const { wx_code } = req.body
 
   if (!wx_code) {
     return res.apiError('缺少 wx_code 参数', 'INVALID_PARAMS', null, 400)
   }
 
-  try {
     const axios = require('axios')
-    const appId = process.env.WX_APPID
-    const appSecret = process.env.WX_SECRET
+  const appId = process.env.WX_APPID
+  const appSecret = process.env.WX_SECRET
 
-    if (!appId || !appSecret) {
-      logger.error('❌ 微信小程序配置缺失：WX_APPID 或 WX_SECRET 未配置')
-      return res.apiError('微信登录服务暂不可用', 'WX_CONFIG_MISSING', null, 500)
-    }
+  if (!appId || !appSecret) {
+    logger.error('❌ 微信小程序配置缺失：WX_APPID 或 WX_SECRET 未配置')
+    return res.apiError('微信小程序配置缺失', 'WX_CONFIG_MISSING', null, 500)
+  }
 
-    // 调用微信 jscode2session 接口
-    const wxUrl = `https://api.weixin.qq.com/sns/jscode2session?appid=${appId}&secret=${appSecret}&js_code=${wx_code}&grant_type=authorization_code`
-    const wxRes = await axios.get(wxUrl, { timeout: 5000 })
+  // 调用微信 jscode2session 接口
+  const wxUrl = `https://api.weixin.qq.com/sns/jscode2session?appid=${appId}&secret=${appSecret}&js_code=${wx_code}&grant_type=authorization_code`
+  const wxRes = await axios.get(wxUrl, { timeout: 5000 })
 
-    if (wxRes.data.errcode) {
-      logger.warn('⚠️ 微信 jscode2session 失败:', {
-        errcode: wxRes.data.errcode,
-        errmsg: wxRes.data.errmsg
-      })
-      return res.apiError('微信登录凭证无效', 'WX_CODE_INVALID', null, 400)
-    }
-
-    const { openid } = wxRes.data
-    if (!openid) {
-      return res.apiError('未获取到微信 openid', 'WX_OPENID_MISSING', null, 500)
-    }
-
-    // 查找已绑定 openid 的用户
-    const { User } = require('../../../models')
-    const user = await User.findOne({ where: { wx_openid: openid } })
-
-    if (!user) {
-      // 用户未绑定，需要先绑定手机号
-      return res.apiSuccess(
-        {
-          need_bind: true,
-          openid,
-          timestamp: BeijingTimeHelper.apiTimestamp()
-        },
-        '需要绑定手机号'
-      )
-    }
-
-    // 已绑定用户，直接登录
-    const userRoles = await getUserRoles(user.user_id)
-    const userType = userRoles.maxRoleLevel >= 100 ? 'admin' : 'user'
-    const loginPlatform = 'wechat_mp'
-
-    const result = await TransactionManager.execute(async transaction => {
-      // 更新登录信息
-      await user.update(
-        {
-          last_login: new Date(),
-          login_count: (user.login_count || 0) + 1,
-          last_active_at: new Date()
-        },
-        { transaction }
-      )
-
-      // 创建会话
-      const { AuthenticationSession } = require('../../../models')
-      const sessionToken = uuidv4()
-      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-
-      // 使旧会话失效（同 user_type + 同 platform 互斥）
-      await AuthenticationSession.update(
-        { is_active: false },
-        {
-          where: {
-            user_id: user.user_id,
-            user_type: userType,
-            login_platform: loginPlatform,
-            is_active: true
-          },
-          transaction
-        }
-      )
-
-      await AuthenticationSession.create(
-        {
-          user_id: user.user_id,
-          session_token: sessionToken,
-          user_type: userType,
-          login_platform: loginPlatform,
-          is_active: true,
-          expires_at: expiresAt,
-          ip_address: req.ip,
-          user_agent: req.get('User-Agent')
-        },
-        { transaction }
-      )
-
-      // 生成 JWT
-      const tokens = generateTokens({
-        user_id: user.user_id,
-        user_uuid: user.user_uuid,
-        mobile: user.mobile,
-        session_token: sessionToken,
-        user_type: userType,
-        roles: userRoles.roles
-      })
-
-      return { tokens, sessionToken }
+  if (wxRes.data.errcode) {
+    logger.warn('⚠️ 微信 jscode2session 失败:', {
+      errcode: wxRes.data.errcode,
+      errmsg: wxRes.data.errmsg
     })
+    return res.apiError('微信登录凭证无效', 'WX_CODE_INVALID', null, 400)
+  }
 
-    logger.info(`✅ 微信静默登录成功 (user_id: ${user.user_id})`)
+  const { openid } = wxRes.data
+  if (!openid) {
+    return res.apiError('未获取到微信 openid', 'WX_OPENID_MISSING', null, 500)
+  }
 
+  // 查找已绑定 openid 的用户
+  const { User } = require('../../../models')
+  const user = await User.findOne({ where: { wx_openid: openid } })
+
+  if (!user) {
+    // 用户未绑定，需要先绑定手机号
     return res.apiSuccess(
       {
-        need_bind: false,
-        access_token: result.tokens.accessToken,
-        refresh_token: result.tokens.refreshToken,
-        user: {
-          user_id: user.user_id,
-          user_uuid: user.user_uuid,
-          nickname: user.nickname,
-          mobile: user.mobile,
-          user_level: user.user_level,
-          roles: userRoles.roles,
-          status: user.status
-        },
-        expires_in: 7 * 24 * 60 * 60,
+        need_bind: true,
+        openid,
         timestamp: BeijingTimeHelper.apiTimestamp()
       },
-      '微信静默登录成功'
+      '需要绑定手机号'
     )
-  } catch (error) {
-    logger.error('❌ 微信静默登录失败:', { error: error.message })
-    return res.apiError('微信登录失败', 'WX_LOGIN_FAILED', null, 500)
   }
-})
+
+  // 已绑定用户，直接登录
+  const userRoles = await getUserRoles(user.user_id)
+  const userType = userRoles.maxRoleLevel >= 100 ? 'admin' : 'user'
+  const loginPlatform = 'wechat_mp'
+
+  const result = await TransactionManager.execute(async transaction => {
+    // 更新登录信息
+    await user.update(
+      {
+        last_login: new Date(),
+        login_count: (user.login_count || 0) + 1,
+        last_active_at: new Date()
+      },
+      { transaction }
+    )
+
+    // 创建会话
+    const { AuthenticationSession } = require('../../../models')
+    const sessionToken = uuidv4()
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+
+    // 使旧会话失效（同 user_type + 同 platform 互斥）
+    await AuthenticationSession.update(
+      { is_active: false },
+      {
+        where: {
+          user_id: user.user_id,
+          user_type: userType,
+          login_platform: loginPlatform,
+          is_active: true
+        },
+        transaction
+      }
+    )
+
+    await AuthenticationSession.create(
+      {
+        user_id: user.user_id,
+        session_token: sessionToken,
+        user_type: userType,
+        login_platform: loginPlatform,
+        is_active: true,
+        expires_at: expiresAt,
+        ip_address: req.ip,
+        user_agent: req.get('User-Agent')
+      },
+      { transaction }
+    )
+
+    // 生成 JWT
+    const tokens = generateTokens({
+      user_id: user.user_id,
+      user_uuid: user.user_uuid,
+      mobile: user.mobile,
+      session_token: sessionToken,
+      user_type: userType,
+      roles: userRoles.roles
+    })
+
+    return { tokens, sessionToken }
+  })
+
+  logger.info(`✅ 微信静默登录成功 (user_id: ${user.user_id})`)
+
+  return res.apiSuccess(
+    {
+      need_bind: false,
+      access_token: result.tokens.accessToken,
+      refresh_token: result.tokens.refreshToken,
+      user: {
+        user_id: user.user_id,
+        user_uuid: user.user_uuid,
+        nickname: user.nickname,
+        mobile: user.mobile,
+        user_level: user.user_level,
+        roles: userRoles.roles,
+        status: user.status
+      },
+      expires_in: 7 * 24 * 60 * 60,
+      timestamp: BeijingTimeHelper.apiTimestamp()
+    },
+    '微信静默登录成功'
+  )
+}))
 
 module.exports = router

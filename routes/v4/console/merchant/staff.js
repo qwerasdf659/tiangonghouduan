@@ -35,6 +35,7 @@ const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const logger = require('../../../../utils/logger').logger
 const TransactionManager = require('../../../../utils/TransactionManager')
+const { asyncHandler } = require('../../../../middleware/validation')
 
 /**
  * 获取员工管理服务（通过 ServiceManager 统一入口）
@@ -43,45 +44,6 @@ const TransactionManager = require('../../../../utils/TransactionManager')
  */
 function getStaffManagementService(req) {
   return req.app.locals.services.getService('staff_management')
-}
-
-/**
- * 处理服务层错误
- *
- * @param {Error} error - 错误对象
- * @param {Object} res - Express 响应对象
- * @param {string} operation - 操作名称
- * @returns {Object} Express 响应对象
- */
-function handleServiceError(error, res, operation) {
-  logger.error(`❌ ${operation}失败`, { error: error.message })
-
-  // 根据错误类型返回不同状态码
-  if (error.message.includes('不存在') || error.message.includes('not found')) {
-    return res.apiError(error.message, 'NOT_FOUND', null, 404)
-  }
-
-  if (
-    error.message.includes('已存在') ||
-    error.message.includes('重复') ||
-    error.message.includes('已在')
-  ) {
-    return res.apiError(error.message, 'CONFLICT', null, 409)
-  }
-
-  if (
-    error.message.includes('不能为空') ||
-    error.message.includes('无效') ||
-    error.message.includes('必须')
-  ) {
-    return res.apiError(error.message, 'VALIDATION_ERROR', null, 400)
-  }
-
-  if (error.message.includes('事务')) {
-    return res.apiError('服务繁忙，请稍后重试', 'TRANSACTION_ERROR', null, 500)
-  }
-
-  return handleServiceError(error, res)
 }
 
 /*
@@ -106,36 +68,32 @@ function handleServiceError(error, res, operation) {
  *
  * @access Admin only (role_level >= 100)
  */
-router.get('/', authenticateToken, requireRoleLevel(30), async (req, res) => {
-  try {
-    const {
-      page = 1,
-      page_size = 20,
-      store_id,
-      user_id,
-      status,
-      role_in_store,
-      include_deleted
-    } = req.query
+router.get('/', authenticateToken, requireRoleLevel(30), asyncHandler(async (req, res) => {
+  const {
+    page = 1,
+    page_size = 20,
+    store_id,
+    user_id,
+    status,
+    role_in_store,
+    include_deleted
+  } = req.query
 
-    // 验证分页参数
-    const validatedPageSize = Math.min(parseInt(page_size, 10) || 20, 100)
+  // 验证分页参数
+  const validatedPageSize = Math.min(parseInt(page_size, 10) || 20, 100)
 
-    const result = await getStaffManagementService(req).getStaffList({
-      page: parseInt(page, 10) || 1,
-      page_size: validatedPageSize,
-      store_id: store_id ? parseInt(store_id, 10) : undefined,
-      user_id: user_id ? parseInt(user_id, 10) : undefined,
-      status,
-      role_in_store,
-      include_deleted: include_deleted === 'true'
-    })
+  const result = await getStaffManagementService(req).getStaffList({
+    page: parseInt(page, 10) || 1,
+    page_size: validatedPageSize,
+    store_id: store_id ? parseInt(store_id, 10) : undefined,
+    user_id: user_id ? parseInt(user_id, 10) : undefined,
+    status,
+    role_in_store,
+    include_deleted: include_deleted === 'true'
+  })
 
-    return res.apiSuccess(result, '获取员工列表成功')
-  } catch (error) {
-    return handleServiceError(error, res, '获取员工列表')
-  }
-})
+  return res.apiSuccess(result, '获取员工列表成功')
+}))
 
 /**
  * GET /stats - 获取员工统计数据
@@ -147,32 +105,28 @@ router.get('/', authenticateToken, requireRoleLevel(30), async (req, res) => {
  *
  * @access Admin only (role_level >= 100)
  */
-router.get('/stats', authenticateToken, requireRoleLevel(30), async (req, res) => {
-  try {
-    const { store_id } = req.query
+router.get('/stats', authenticateToken, requireRoleLevel(30), asyncHandler(async (req, res) => {
+  const { store_id } = req.query
 
-    if (!store_id) {
-      return res.apiError('门店ID不能为空', 'MISSING_STORE_ID', null, 400)
-    }
-
-    const storeId = parseInt(store_id, 10)
-    if (isNaN(storeId)) {
-      return res.apiError('门店ID格式不正确', 'INVALID_STORE_ID', null, 400)
-    }
-
-    const stats = await getStaffManagementService(req).getStoreStaffStats(storeId)
-
-    return res.apiSuccess(
-      {
-        store_id: storeId,
-        ...stats
-      },
-      '获取员工统计成功'
-    )
-  } catch (error) {
-    return handleServiceError(error, res, '获取员工统计')
+  if (!store_id) {
+    return res.apiError('门店ID不能为空', 'MISSING_STORE_ID', null, 400)
   }
-})
+
+  const storeId = parseInt(store_id, 10)
+  if (isNaN(storeId)) {
+    return res.apiError('门店ID格式不正确', 'INVALID_STORE_ID', null, 400)
+  }
+
+  const stats = await getStaffManagementService(req).getStoreStaffStats(storeId)
+
+  return res.apiSuccess(
+    {
+      store_id: storeId,
+      ...stats
+    },
+    '获取员工统计成功'
+  )
+}))
 
 /**
  * GET /by-user/:user_id - 获取用户的所有门店绑定
@@ -181,28 +135,24 @@ router.get('/stats', authenticateToken, requireRoleLevel(30), async (req, res) =
  *
  * @access Admin only (role_level >= 100)
  */
-router.get('/by-user/:user_id', authenticateToken, requireRoleLevel(30), async (req, res) => {
-  try {
-    const { user_id } = req.params
+router.get('/by-user/:user_id', authenticateToken, requireRoleLevel(30), asyncHandler(async (req, res) => {
+  const { user_id } = req.params
 
-    if (!user_id || isNaN(parseInt(user_id, 10))) {
-      return res.apiError('用户ID无效', 'INVALID_USER_ID', null, 400)
-    }
-
-    const stores = await getStaffManagementService(req).getUserStores(parseInt(user_id, 10))
-
-    return res.apiSuccess(
-      {
-        user_id: parseInt(user_id, 10),
-        stores,
-        store_count: stores.length
-      },
-      '获取用户门店列表成功'
-    )
-  } catch (error) {
-    return handleServiceError(error, res, '获取用户门店列表')
+  if (!user_id || isNaN(parseInt(user_id, 10))) {
+    return res.apiError('用户ID无效', 'INVALID_USER_ID', null, 400)
   }
-})
+
+  const stores = await getStaffManagementService(req).getUserStores(parseInt(user_id, 10))
+
+  return res.apiSuccess(
+    {
+      user_id: parseInt(user_id, 10),
+      stores,
+      store_count: stores.length
+    },
+    '获取用户门店列表成功'
+  )
+}))
 
 /**
  * GET /:store_staff_id - 获取员工详情
@@ -211,25 +161,21 @@ router.get('/by-user/:user_id', authenticateToken, requireRoleLevel(30), async (
  *
  * @access Admin only (role_level >= 100)
  */
-router.get('/:store_staff_id', authenticateToken, requireRoleLevel(30), async (req, res) => {
-  try {
-    const { store_staff_id } = req.params
+router.get('/:store_staff_id', authenticateToken, requireRoleLevel(30), asyncHandler(async (req, res) => {
+  const { store_staff_id } = req.params
 
-    if (!store_staff_id || isNaN(parseInt(store_staff_id, 10))) {
-      return res.apiError('员工记录ID无效', 'INVALID_STORE_STAFF_ID', null, 400)
-    }
-
-    const staff = await getStaffManagementService(req).getStaffDetail(parseInt(store_staff_id, 10))
-
-    if (!staff) {
-      return res.apiError('员工记录不存在', 'STAFF_NOT_FOUND', null, 404)
-    }
-
-    return res.apiSuccess(staff, '获取员工详情成功')
-  } catch (error) {
-    return handleServiceError(error, res, '获取员工详情')
+  if (!store_staff_id || isNaN(parseInt(store_staff_id, 10))) {
+    return res.apiError('员工记录ID无效', 'INVALID_STORE_STAFF_ID', null, 400)
   }
-})
+
+  const staff = await getStaffManagementService(req).getStaffDetail(parseInt(store_staff_id, 10))
+
+  if (!staff) {
+    return res.apiError('员工记录不存在', 'STAFF_NOT_FOUND', null, 404)
+  }
+
+  return res.apiSuccess(staff, '获取员工详情成功')
+}))
 
 /*
  * =================================================================
@@ -250,59 +196,55 @@ router.get('/:store_staff_id', authenticateToken, requireRoleLevel(30), async (r
  *
  * @access Admin only (role_level >= 100)
  */
-router.post('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const { user_id, store_id, role_in_store = 'staff', notes } = req.body
-    const operator_id = req.user.user_id
+router.post('/', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  const { user_id, store_id, role_in_store = 'staff', notes } = req.body
+  const operator_id = req.user.user_id
 
-    // 参数验证
-    if (!user_id) {
-      return res.apiError('用户ID不能为空', 'MISSING_USER_ID', null, 400)
-    }
-
-    if (!store_id) {
-      return res.apiError('门店ID不能为空', 'MISSING_STORE_ID', null, 400)
-    }
-
-    if (!['staff', 'manager'].includes(role_in_store)) {
-      return res.apiError('角色类型无效，必须是 staff 或 manager', 'INVALID_ROLE', null, 400)
-    }
-
-    const result = await TransactionManager.execute(async transaction => {
-      return await getStaffManagementService(req).addStaffToStore(
-        {
-          user_id: parseInt(user_id, 10),
-          store_id: parseInt(store_id, 10),
-          role_in_store,
-          operator_id,
-          notes
-        },
-        { transaction }
-      )
-    })
-
-    logger.info('✅ 员工入职成功', {
-      store_staff_id: result.store_staff_id,
-      user_id,
-      store_id,
-      role_in_store,
-      operator_id
-    })
-
-    return res.apiSuccess(
-      {
-        store_staff_id: result.store_staff_id,
-        user_id: result.user_id,
-        store_id: result.store_id,
-        role_in_store: result.role_in_store,
-        status: result.status
-      },
-      '员工入职成功'
-    )
-  } catch (error) {
-    return handleServiceError(error, res, '员工入职')
+  // 参数验证
+  if (!user_id) {
+    return res.apiError('用户ID不能为空', 'MISSING_USER_ID', null, 400)
   }
-})
+
+  if (!store_id) {
+    return res.apiError('门店ID不能为空', 'MISSING_STORE_ID', null, 400)
+  }
+
+  if (!['staff', 'manager'].includes(role_in_store)) {
+    return res.apiError('角色类型无效，必须是 staff 或 manager', 'INVALID_ROLE', null, 400)
+  }
+
+  const result = await TransactionManager.execute(async transaction => {
+    return await getStaffManagementService(req).addStaffToStore(
+      {
+        user_id: parseInt(user_id, 10),
+        store_id: parseInt(store_id, 10),
+        role_in_store,
+        operator_id,
+        notes
+      },
+      { transaction }
+    )
+  })
+
+  logger.info('✅ 员工入职成功', {
+    store_staff_id: result.store_staff_id,
+    user_id,
+    store_id,
+    role_in_store,
+    operator_id
+  })
+
+  return res.apiSuccess(
+    {
+      store_staff_id: result.store_staff_id,
+      user_id: result.user_id,
+      store_id: result.store_id,
+      role_in_store: result.role_in_store,
+      status: result.status
+    },
+    '员工入职成功'
+  )
+}))
 
 /**
  * POST /transfer - 员工调店
@@ -317,62 +259,58 @@ router.post('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
  *
  * @access Admin only (role_level >= 100)
  */
-router.post('/transfer', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const { user_id, from_store_id, to_store_id, notes } = req.body
-    const operator_id = req.user.user_id
+router.post('/transfer', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  const { user_id, from_store_id, to_store_id, notes } = req.body
+  const operator_id = req.user.user_id
 
-    // 参数验证
-    if (!user_id) {
-      return res.apiError('用户ID不能为空', 'MISSING_USER_ID', null, 400)
-    }
+  // 参数验证
+  if (!user_id) {
+    return res.apiError('用户ID不能为空', 'MISSING_USER_ID', null, 400)
+  }
 
-    if (!from_store_id) {
-      return res.apiError('原门店ID不能为空', 'MISSING_FROM_STORE_ID', null, 400)
-    }
+  if (!from_store_id) {
+    return res.apiError('原门店ID不能为空', 'MISSING_FROM_STORE_ID', null, 400)
+  }
 
-    if (!to_store_id) {
-      return res.apiError('新门店ID不能为空', 'MISSING_TO_STORE_ID', null, 400)
-    }
+  if (!to_store_id) {
+    return res.apiError('新门店ID不能为空', 'MISSING_TO_STORE_ID', null, 400)
+  }
 
-    if (parseInt(from_store_id, 10) === parseInt(to_store_id, 10)) {
-      return res.apiError('原门店和新门店不能相同', 'SAME_STORE', null, 400)
-    }
+  if (parseInt(from_store_id, 10) === parseInt(to_store_id, 10)) {
+    return res.apiError('原门店和新门店不能相同', 'SAME_STORE', null, 400)
+  }
 
-    const result = await TransactionManager.execute(async transaction => {
-      return await getStaffManagementService(req).transferStaff(
-        {
-          user_id: parseInt(user_id, 10),
-          from_store_id: parseInt(from_store_id, 10),
-          to_store_id: parseInt(to_store_id, 10),
-          operator_id,
-          notes
-        },
-        { transaction }
-      )
-    })
+  const result = await TransactionManager.execute(async transaction => {
+    return await getStaffManagementService(req).transferStaff(
+      {
+        user_id: parseInt(user_id, 10),
+        from_store_id: parseInt(from_store_id, 10),
+        to_store_id: parseInt(to_store_id, 10),
+        operator_id,
+        notes
+      },
+      { transaction }
+    )
+  })
 
-    logger.info('✅ 员工调店成功', {
+  logger.info('✅ 员工调店成功', {
+    user_id,
+    from_store_id,
+    to_store_id,
+    operator_id
+  })
+
+  return res.apiSuccess(
+    {
       user_id,
       from_store_id,
       to_store_id,
-      operator_id
-    })
-
-    return res.apiSuccess(
-      {
-        user_id,
-        from_store_id,
-        to_store_id,
-        old_record_id: result.old_record.store_staff_id,
-        new_record_id: result.new_record.store_staff_id
-      },
-      '员工调店成功'
-    )
-  } catch (error) {
-    return handleServiceError(error, res, '员工调店')
-  }
-})
+      old_record_id: result.old_record.store_staff_id,
+      new_record_id: result.new_record.store_staff_id
+    },
+    '员工调店成功'
+  )
+}))
 
 /**
  * POST /disable/:user_id - 禁用员工（所有门店）
@@ -384,41 +322,37 @@ router.post('/transfer', authenticateToken, requireRoleLevel(100), async (req, r
  *
  * @access Admin only (role_level >= 100)
  */
-router.post('/disable/:user_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const { user_id } = req.params
-    const { reason } = req.body
-    const operator_id = req.user.user_id
+router.post('/disable/:user_id', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  const { user_id } = req.params
+  const { reason } = req.body
+  const operator_id = req.user.user_id
 
-    if (!user_id || isNaN(parseInt(user_id, 10))) {
-      return res.apiError('用户ID无效', 'INVALID_USER_ID', null, 400)
-    }
-
-    const userId = parseInt(user_id, 10)
-
-    const result = await TransactionManager.execute(async transaction => {
-      return await getStaffManagementService(req).disableStaff(userId, operator_id, reason, {
-        transaction
-      })
-    })
-
-    logger.info('✅ 员工禁用成功', {
-      user_id: userId,
-      affected_stores: result.affected_stores,
-      operator_id
-    })
-
-    return res.apiSuccess(
-      {
-        user_id: userId,
-        affected_stores: result.affected_stores
-      },
-      `员工已禁用，影响 ${result.affected_stores} 个门店`
-    )
-  } catch (error) {
-    return handleServiceError(error, res, '禁用员工')
+  if (!user_id || isNaN(parseInt(user_id, 10))) {
+    return res.apiError('用户ID无效', 'INVALID_USER_ID', null, 400)
   }
-})
+
+  const userId = parseInt(user_id, 10)
+
+  const result = await TransactionManager.execute(async transaction => {
+    return await getStaffManagementService(req).disableStaff(userId, operator_id, reason, {
+      transaction
+    })
+  })
+
+  logger.info('✅ 员工禁用成功', {
+    user_id: userId,
+    affected_stores: result.affected_stores,
+    operator_id
+  })
+
+  return res.apiSuccess(
+    {
+      user_id: userId,
+      affected_stores: result.affected_stores
+    },
+    `员工已禁用，影响 ${result.affected_stores} 个门店`
+  )
+}))
 
 /**
  * POST /enable - 启用员工（指定门店）
@@ -432,48 +366,44 @@ router.post('/disable/:user_id', authenticateToken, requireRoleLevel(100), async
  *
  * @access Admin only (role_level >= 100)
  */
-router.post('/enable', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const { user_id, store_id, notes } = req.body
-    const operator_id = req.user.user_id
+router.post('/enable', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  const { user_id, store_id, notes } = req.body
+  const operator_id = req.user.user_id
 
-    if (!user_id) {
-      return res.apiError('用户ID不能为空', 'MISSING_USER_ID', null, 400)
-    }
-
-    if (!store_id) {
-      return res.apiError('门店ID不能为空', 'MISSING_STORE_ID', null, 400)
-    }
-
-    const result = await TransactionManager.execute(async transaction => {
-      return await getStaffManagementService(req).enableStaff(
-        parseInt(user_id, 10),
-        parseInt(store_id, 10),
-        operator_id,
-        notes,
-        { transaction }
-      )
-    })
-
-    logger.info('✅ 员工启用成功', {
-      user_id,
-      store_id,
-      operator_id
-    })
-
-    return res.apiSuccess(
-      {
-        store_staff_id: result.store_staff_id,
-        user_id: parseInt(user_id, 10),
-        store_id: parseInt(store_id, 10),
-        status: result.status
-      },
-      '员工已启用'
-    )
-  } catch (error) {
-    return handleServiceError(error, res, '启用员工')
+  if (!user_id) {
+    return res.apiError('用户ID不能为空', 'MISSING_USER_ID', null, 400)
   }
-})
+
+  if (!store_id) {
+    return res.apiError('门店ID不能为空', 'MISSING_STORE_ID', null, 400)
+  }
+
+  const result = await TransactionManager.execute(async transaction => {
+    return await getStaffManagementService(req).enableStaff(
+      parseInt(user_id, 10),
+      parseInt(store_id, 10),
+      operator_id,
+      notes,
+      { transaction }
+    )
+  })
+
+  logger.info('✅ 员工启用成功', {
+    user_id,
+    store_id,
+    operator_id
+  })
+
+  return res.apiSuccess(
+    {
+      store_staff_id: result.store_staff_id,
+      user_id: parseInt(user_id, 10),
+      store_id: parseInt(store_id, 10),
+      status: result.status
+    },
+    '员工已启用'
+  )
+}))
 
 /*
  * =================================================================
@@ -492,66 +422,62 @@ router.post('/enable', authenticateToken, requireRoleLevel(100), async (req, res
  *
  * @access Admin only (role_level >= 100)
  */
-router.put('/:store_staff_id/role', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const { store_staff_id } = req.params
-    const { role_in_store, notes } = req.body
-    const operator_id = req.user.user_id
+router.put('/:store_staff_id/role', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  const { store_staff_id } = req.params
+  const { role_in_store, notes } = req.body
+  const operator_id = req.user.user_id
 
-    if (!store_staff_id || isNaN(parseInt(store_staff_id, 10))) {
-      return res.apiError('员工记录ID无效', 'INVALID_STORE_STAFF_ID', null, 400)
-    }
+  if (!store_staff_id || isNaN(parseInt(store_staff_id, 10))) {
+    return res.apiError('员工记录ID无效', 'INVALID_STORE_STAFF_ID', null, 400)
+  }
 
-    if (!role_in_store || !['staff', 'manager'].includes(role_in_store)) {
-      return res.apiError('角色类型无效，必须是 staff 或 manager', 'INVALID_ROLE', null, 400)
-    }
+  if (!role_in_store || !['staff', 'manager'].includes(role_in_store)) {
+    return res.apiError('角色类型无效，必须是 staff 或 manager', 'INVALID_ROLE', null, 400)
+  }
 
-    // 先获取员工记录以获取 user_id 和 store_id
-    const staffDetail = await getStaffManagementService(req).getStaffDetail(
-      parseInt(store_staff_id, 10)
+  // 先获取员工记录以获取 user_id 和 store_id
+  const staffDetail = await getStaffManagementService(req).getStaffDetail(
+    parseInt(store_staff_id, 10)
+  )
+
+  if (!staffDetail) {
+    return res.apiError('员工记录不存在', 'STAFF_NOT_FOUND', null, 404)
+  }
+
+  // 执行角色变更事务（结果用于确认事务成功，响应使用 staffDetail 构建）
+  await TransactionManager.execute(async transaction => {
+    return await getStaffManagementService(req).updateStaffRole(
+      {
+        user_id: staffDetail.user_id,
+        store_id: staffDetail.store_id,
+        role_in_store,
+        operator_id,
+        notes
+      },
+      { transaction }
     )
+  })
 
-    if (!staffDetail) {
-      return res.apiError('员工记录不存在', 'STAFF_NOT_FOUND', null, 404)
-    }
+  logger.info('✅ 员工角色变更成功', {
+    store_staff_id,
+    user_id: staffDetail.user_id,
+    store_id: staffDetail.store_id,
+    old_role: staffDetail.role_in_store,
+    new_role: role_in_store,
+    operator_id
+  })
 
-    // 执行角色变更事务（结果用于确认事务成功，响应使用 staffDetail 构建）
-    await TransactionManager.execute(async transaction => {
-      return await getStaffManagementService(req).updateStaffRole(
-        {
-          user_id: staffDetail.user_id,
-          store_id: staffDetail.store_id,
-          role_in_store,
-          operator_id,
-          notes
-        },
-        { transaction }
-      )
-    })
-
-    logger.info('✅ 员工角色变更成功', {
-      store_staff_id,
+  return res.apiSuccess(
+    {
+      store_staff_id: parseInt(store_staff_id, 10),
       user_id: staffDetail.user_id,
       store_id: staffDetail.store_id,
       old_role: staffDetail.role_in_store,
-      new_role: role_in_store,
-      operator_id
-    })
-
-    return res.apiSuccess(
-      {
-        store_staff_id: parseInt(store_staff_id, 10),
-        user_id: staffDetail.user_id,
-        store_id: staffDetail.store_id,
-        old_role: staffDetail.role_in_store,
-        new_role: role_in_store
-      },
-      '员工角色变更成功'
-    )
-  } catch (error) {
-    return handleServiceError(error, res, '变更员工角色')
-  }
-})
+      new_role: role_in_store
+    },
+    '员工角色变更成功'
+  )
+}))
 
 /*
  * =================================================================
@@ -575,124 +501,120 @@ router.put('/:store_staff_id/role', authenticateToken, requireRoleLevel(100), as
  * @access Admin only (role_level >= 100)
  * @since 2026
  */
-router.delete('/:store_staff_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const { store_staff_id } = req.params
-    const { reason, force } = req.query
-    const operator_id = req.user.user_id
+router.delete('/:store_staff_id', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  const { store_staff_id } = req.params
+  const { reason, force } = req.query
+  const operator_id = req.user.user_id
 
-    // 参数验证
-    if (!store_staff_id || isNaN(parseInt(store_staff_id, 10))) {
-      return res.apiError('员工记录ID无效', 'INVALID_STORE_STAFF_ID', null, 400)
-    }
+  // 参数验证
+  if (!store_staff_id || isNaN(parseInt(store_staff_id, 10))) {
+    return res.apiError('员工记录ID无效', 'INVALID_STORE_STAFF_ID', null, 400)
+  }
 
-    const storeStaffId = parseInt(store_staff_id, 10)
+  const storeStaffId = parseInt(store_staff_id, 10)
 
-    // 获取员工记录
-    const staffDetail = await getStaffManagementService(req).getStaffDetail(storeStaffId)
+  // 获取员工记录
+  const staffDetail = await getStaffManagementService(req).getStaffDetail(storeStaffId)
 
-    if (!staffDetail) {
-      return res.apiError('员工记录不存在', 'STAFF_NOT_FOUND', null, 404)
-    }
+  if (!staffDetail) {
+    return res.apiError('员工记录不存在', 'STAFF_NOT_FOUND', null, 404)
+  }
 
-    // 根据状态分发处理逻辑
-    const isForce = force === 'true'
-    let result
-    let message
+  // 根据状态分发处理逻辑
+  const isForce = force === 'true'
+  let result
+  let message
 
-    switch (staffDetail.status) {
-      case 'active':
-        if (isForce) {
-          // 强制删除在职员工
-          result = await TransactionManager.execute(async transaction => {
-            return await getStaffManagementService(req).permanentDeleteStaff(
-              {
-                store_staff_id: storeStaffId,
-                operator_id,
-                reason: reason || '强制删除',
-                force: true
-              },
-              { transaction }
-            )
-          })
-          message = '员工记录已强制删除'
-
-          logger.info('✅ 员工强制删除成功', {
-            store_staff_id: storeStaffId,
-            user_id: staffDetail.user_id,
-            store_id: staffDetail.store_id,
-            operator_id
-          })
-        } else {
-          // 正常离职操作
-          result = await TransactionManager.execute(async transaction => {
-            return await getStaffManagementService(req).removeStaffFromStore(
-              {
-                user_id: staffDetail.user_id,
-                store_id: staffDetail.store_id,
-                operator_id,
-                reason
-              },
-              { transaction }
-            )
-          })
-          message = '员工离职成功'
-
-          logger.info('✅ 员工离职成功', {
-            store_staff_id: storeStaffId,
-            user_id: staffDetail.user_id,
-            store_id: staffDetail.store_id,
-            operator_id
-          })
-        }
-        break
-
-      case 'inactive':
-        // 删除离职员工记录
+  switch (staffDetail.status) {
+    case 'active':
+      if (isForce) {
+        // 强制删除在职员工
         result = await TransactionManager.execute(async transaction => {
           return await getStaffManagementService(req).permanentDeleteStaff(
             {
               store_staff_id: storeStaffId,
               operator_id,
-              reason: reason || '删除离职员工记录',
-              force: false
+              reason: reason || '强制删除',
+              force: true
             },
             { transaction }
           )
         })
-        message = '员工记录已删除'
+        message = '员工记录已强制删除'
 
-        logger.info('✅ 员工记录删除成功', {
+        logger.info('✅ 员工强制删除成功', {
           store_staff_id: storeStaffId,
           user_id: staffDetail.user_id,
           store_id: staffDetail.store_id,
           operator_id
         })
-        break
+      } else {
+        // 正常离职操作
+        result = await TransactionManager.execute(async transaction => {
+          return await getStaffManagementService(req).removeStaffFromStore(
+            {
+              user_id: staffDetail.user_id,
+              store_id: staffDetail.store_id,
+              operator_id,
+              reason
+            },
+            { transaction }
+          )
+        })
+        message = '员工离职成功'
 
-      case 'deleted':
-        return res.apiError('员工记录已删除', 'STAFF_ALREADY_DELETED', null, 400)
+        logger.info('✅ 员工离职成功', {
+          store_staff_id: storeStaffId,
+          user_id: staffDetail.user_id,
+          store_id: staffDetail.store_id,
+          operator_id
+        })
+      }
+      break
 
-      case 'pending':
-        return res.apiError('待审核员工不能直接删除，请先拒绝审核', 'STAFF_PENDING', null, 400)
+    case 'inactive':
+      // 删除离职员工记录
+      result = await TransactionManager.execute(async transaction => {
+        return await getStaffManagementService(req).permanentDeleteStaff(
+          {
+            store_staff_id: storeStaffId,
+            operator_id,
+            reason: reason || '删除离职员工记录',
+            force: false
+          },
+          { transaction }
+        )
+      })
+      message = '员工记录已删除'
 
-      default:
-        return res.apiError(`员工状态异常: ${staffDetail.status}`, 'INVALID_STATUS', null, 400)
-    }
-
-    return res.apiSuccess(
-      {
+      logger.info('✅ 员工记录删除成功', {
         store_staff_id: storeStaffId,
         user_id: staffDetail.user_id,
         store_id: staffDetail.store_id,
-        previous_status: staffDetail.status,
-        new_status: result.status
-      },
-      message
-    )
-  } catch (error) {
-    return handleServiceError(error, res, '员工离职/删除')
+        operator_id
+      })
+      break
+
+    case 'deleted':
+      return res.apiError('员工记录已删除', 'STAFF_ALREADY_DELETED', null, 400)
+
+    case 'pending':
+      return res.apiError('待审核员工不能直接删除，请先拒绝审核', 'STAFF_PENDING', null, 400)
+
+    default:
+      return res.apiError(`员工状态异常: ${staffDetail.status}`, 'INVALID_STATUS', null, 400)
   }
-})
+
+  return res.apiSuccess(
+    {
+      store_staff_id: storeStaffId,
+      user_id: staffDetail.user_id,
+      store_id: staffDetail.store_id,
+      previous_status: staffDetail.status,
+      new_status: result.status
+    },
+    message
+  )
+}))
 
 module.exports = router

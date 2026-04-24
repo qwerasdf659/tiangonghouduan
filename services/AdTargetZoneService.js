@@ -14,6 +14,7 @@
  * @module services/AdTargetZoneService
  */
 
+const BusinessError = require('../utils/BusinessError')
 const logger = require('../utils/logger').logger
 const { AdTargetZone, AdZoneGroup, AdZoneGroupMember, AdSlot } = require('../models')
 const { Op } = require('sequelize')
@@ -136,7 +137,7 @@ class AdTargetZoneService {
         transaction: options.transaction
       })
       if (!parentZone) {
-        throw new Error(`上级区域不存在: parent_zone_id=${parent_zone_id}`)
+        throw new BusinessError(`上级区域不存在: parent_zone_id=${parent_zone_id}`, 'AD_NOT_FOUND', 404)
       }
     }
 
@@ -165,7 +166,7 @@ class AdTargetZoneService {
   static async updateZone(zoneId, data, options = {}) {
     const zone = await AdTargetZone.findByPk(zoneId, { transaction: options.transaction })
     if (!zone) {
-      throw new Error(`地域不存在: zone_id=${zoneId}`)
+      throw new BusinessError(`地域不存在: zone_id=${zoneId}`, 'AD_NOT_FOUND', 404)
     }
 
     const allowedFields = [
@@ -182,7 +183,7 @@ class AdTargetZoneService {
     }
 
     if (updateData.parent_zone_id && updateData.parent_zone_id === zoneId) {
-      throw new Error('不能将自己设为上级区域')
+      throw new BusinessError('不能将自己设为上级区域', 'AD_NOT_ALLOWED', 400)
     }
 
     await zone.update(updateData, { transaction: options.transaction })
@@ -214,15 +215,15 @@ class AdTargetZoneService {
     })
 
     if (!zone) {
-      throw new Error(`地域不存在: zone_id=${zoneId}`)
+      throw new BusinessError(`地域不存在: zone_id=${zoneId}`, 'AD_NOT_FOUND', 404)
     }
 
     if (zone.child_zones && zone.child_zones.length > 0) {
-      throw new Error(`该地域下有 ${zone.child_zones.length} 个子区域，请先删除子区域`)
+      throw new BusinessError(`该地域下有 ${zone.child_zones.length} 个子区域，请先删除子区域`, 'AD_ERROR', 400)
     }
 
     if (zone.ad_slots && zone.ad_slots.length > 0) {
-      throw new Error(`该地域关联了 ${zone.ad_slots.length} 个广告位，请先解除关联`)
+      throw new BusinessError(`该地域关联了 ${zone.ad_slots.length} 个广告位，请先解除关联`, 'AD_ERROR', 400)
     }
 
     await AdZoneGroupMember.destroy({
@@ -367,7 +368,7 @@ class AdTargetZoneService {
   static async updateGroup(groupId, data, options = {}) {
     const group = await AdZoneGroup.findByPk(groupId, { transaction: options.transaction })
     if (!group) {
-      throw new Error(`联合组不存在: group_id=${groupId}`)
+      throw new BusinessError(`联合组不存在: group_id=${groupId}`, 'AD_NOT_FOUND', 404)
     }
 
     const allowedFields = ['group_name', 'pricing_mode', 'discount_rate', 'fixed_price', 'status']
@@ -396,7 +397,7 @@ class AdTargetZoneService {
   static async deleteGroup(groupId, options = {}) {
     const group = await AdZoneGroup.findByPk(groupId, { transaction: options.transaction })
     if (!group) {
-      throw new Error(`联合组不存在: group_id=${groupId}`)
+      throw new BusinessError(`联合组不存在: group_id=${groupId}`, 'AD_NOT_FOUND', 404)
     }
 
     await AdZoneGroupMember.destroy({
@@ -426,7 +427,7 @@ class AdTargetZoneService {
   static async addGroupMembers(groupId, zoneIds, options = {}) {
     const group = await AdZoneGroup.findByPk(groupId, { transaction: options.transaction })
     if (!group) {
-      throw new Error(`联合组不存在: group_id=${groupId}`)
+      throw new BusinessError(`联合组不存在: group_id=${groupId}`, 'AD_NOT_FOUND', 404)
     }
 
     const zones = await AdTargetZone.findAll({
@@ -437,7 +438,7 @@ class AdTargetZoneService {
     if (zones.length !== zoneIds.length) {
       const foundIds = zones.map(z => z.zone_id)
       const missingIds = zoneIds.filter(id => !foundIds.includes(id))
-      throw new Error(`以下地域不存在: ${missingIds.join(', ')}`)
+      throw new BusinessError(`以下地域不存在: ${missingIds.join(', ')}`, 'AD_NOT_FOUND', 404)
     }
 
     const memberRecords = zoneIds.map(zone_id => ({

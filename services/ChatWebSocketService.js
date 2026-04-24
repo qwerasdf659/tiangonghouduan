@@ -14,6 +14,7 @@
  * ⚡ 引入统一日志系统（2025年01月21日新增）
  * 🕐 引入北京时间工具（2025年10月12日新增 - 时区统一）
  */
+const BusinessError = require('../utils/BusinessError')
 const wsLogger = require('../utils/logger').logger
 const BeijingTimeHelper = require('../utils/timeHelper')
 const socketIO = require('socket.io')
@@ -68,7 +69,7 @@ class ChatWebSocketService {
    */
   async initialize(server) {
     if (!server) {
-      throw new Error('服务器实例不能为空')
+      throw new BusinessError('服务器实例不能为空', 'CUSTOMER_SERVICE_NOT_ALLOWED', 400)
     }
 
     // 初始化Socket.IO

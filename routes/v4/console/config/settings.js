@@ -36,36 +36,19 @@ router.get(
   '/settings/:code',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    try {
-      // 配置实体使用 :code 占位符，内部变量保持业务语义
-      const category = req.params.code
+    const category = req.params.code
 
-      // 获取管理后台系统服务（P2-C架构重构：已合并SystemSettingsService）
-      const AdminSystemService = req.app.locals.services.getService('admin_system')
+    const AdminSystemService = req.app.locals.services.getService('admin_system')
 
-      // 调用服务层方法（服务层负责验证和数据查询）
-      const result = await AdminSystemService.getSettingsByCategory(category)
+    const result = await AdminSystemService.getSettingsByCategory(category)
 
-      sharedComponents.logger.info('管理员查询系统设置', {
-        admin_id: req.user.user_id,
-        category,
-        count: result.count
-      })
+    sharedComponents.logger.info('管理员查询系统设置', {
+      admin_id: req.user.user_id,
+      category,
+      count: result.count
+    })
 
-      return res.apiSuccess(result, `${category}设置获取成功`)
-    } catch (error) {
-      sharedComponents.logger.error('获取系统设置失败', {
-        error: error.message,
-        category: req.params.code
-      })
-
-      // 处理业务错误
-      if (error.message.includes('无效的设置分类')) {
-        return res.apiError(error.message, 'INVALID_CATEGORY', null, 400)
-      }
-
-      return res.apiInternalError('获取系统设置失败', error.message, 'SETTINGS_GET_ERROR')
-    }
+    return res.apiSuccess(result, `${category}设置获取成功`)
   })
 )
 
@@ -91,52 +74,28 @@ router.put(
   '/settings/:code',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    try {
-      // 配置实体使用 :code 占位符，内部变量保持业务语义
-      const category = req.params.code
-      const { settings: settingsToUpdate } = req.body
+    const category = req.params.code
+    const { settings: settingsToUpdate } = req.body
 
-      // 获取管理后台系统服务（P2-C架构重构：已合并SystemSettingsService）
-      const AdminSystemService = req.app.locals.services.getService('admin_system')
+    const AdminSystemService = req.app.locals.services.getService('admin_system')
 
-      /*
-       * 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
-       * 缓存失效已在 Service 层处理（决策7：失效逻辑归 Service 层）
-       */
-      const result = await TransactionManager.execute(
-        async transaction => {
-          return await AdminSystemService.updateSettings(
-            category,
-            settingsToUpdate,
-            req.user.user_id,
-            { transaction }
-          )
-        },
-        { description: 'updateSettings' }
-      )
+    const result = await TransactionManager.execute(
+      async transaction => {
+        return await AdminSystemService.updateSettings(
+          category,
+          settingsToUpdate,
+          req.user.user_id,
+          { transaction }
+        )
+      },
+      { description: 'updateSettings' }
+    )
 
-      // 根据更新结果返回响应
-      if (result.error_count === result.total_requested) {
-        return res.apiError('所有设置项更新失败', 'ALL_SETTINGS_UPDATE_FAILED', result, 400)
-      }
-
-      return res.apiSuccess(result, `${category}设置更新完成`)
-    } catch (error) {
-      sharedComponents.logger.error('更新系统设置失败', {
-        error: error.message,
-        category: req.params.code
-      })
-
-      // 处理业务错误
-      if (error.message.includes('无效的设置分类')) {
-        return res.apiError(error.message, 'INVALID_CATEGORY', null, 400)
-      }
-      if (error.message.includes('请提供要更新的设置项')) {
-        return res.apiError(error.message, 'INVALID_SETTINGS_DATA', null, 400)
-      }
-
-      return res.apiInternalError('更新系统设置失败', error.message, 'SETTINGS_UPDATE_ERROR')
+    if (result.error_count === result.total_requested) {
+      return res.apiError('所有设置项更新失败', 'ALL_SETTINGS_UPDATE_FAILED', result, 400)
     }
+
+    return res.apiSuccess(result, `${category}设置更新完成`)
   })
 )
 
@@ -151,20 +110,11 @@ router.get(
   '/settings',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    try {
-      // 获取管理后台系统服务（P2-C架构重构）
-      const AdminSystemService = req.app.locals.services.getService('admin_system')
+    const AdminSystemService = req.app.locals.services.getService('admin_system')
 
-      // 调用服务层方法
-      const summary = await AdminSystemService.getSettingsSummary()
+    const summary = await AdminSystemService.getSettingsSummary()
 
-      return res.apiSuccess(summary, '系统设置概览获取成功')
-    } catch (error) {
-      sharedComponents.logger.error('获取系统设置概览失败', {
-        error: error.message
-      })
-      return res.apiInternalError('获取系统设置概览失败', error.message, 'SETTINGS_SUMMARY_ERROR')
-    }
+    return res.apiSuccess(summary, '系统设置概览获取成功')
   })
 )
 
@@ -182,37 +132,29 @@ router.post(
   '/cache/clear',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    try {
-      const { pattern, confirm } = req.body
+    const { pattern, confirm } = req.body
 
-      // 安全确认机制
-      if (confirm !== true) {
-        return res.apiError(
-          '清除缓存需要确认，请设置confirm=true',
-          'CACHE_CLEAR_NOT_CONFIRMED',
-          null,
-          400
-        )
-      }
-
-      // 获取管理后台系统服务（P2-C架构重构）
-      const AdminSystemService = req.app.locals.services.getService('admin_system')
-
-      // 调用服务层方法（服务层负责Redis操作）
-      const result = await AdminSystemService.clearCache(pattern)
-
-      sharedComponents.logger.warn('管理员清除系统缓存', {
-        admin_id: req.user.user_id,
-        pattern: result.pattern,
-        cleared_count: result.cleared_count,
-        total_keys: result.matched_keys
-      })
-
-      return res.apiSuccess(result, '缓存清除成功')
-    } catch (error) {
-      sharedComponents.logger.error('清除缓存失败', { error: error.message })
-      return res.apiInternalError('清除缓存失败', error.message, 'CACHE_CLEAR_ERROR')
+    if (confirm !== true) {
+      return res.apiError(
+        '清除缓存需要确认，请设置confirm=true',
+        'CACHE_CLEAR_NOT_CONFIRMED',
+        null,
+        400
+      )
     }
+
+    const AdminSystemService = req.app.locals.services.getService('admin_system')
+
+    const result = await AdminSystemService.clearCache(pattern)
+
+    sharedComponents.logger.warn('管理员清除系统缓存', {
+      admin_id: req.user.user_id,
+      pattern: result.pattern,
+      cleared_count: result.cleared_count,
+      total_keys: result.matched_keys
+    })
+
+    return res.apiSuccess(result, '缓存清除成功')
   })
 )
 

@@ -93,8 +93,8 @@ router.get(
           transaction_no: plainTx.transaction_no || null,
           asset_code: plainTx.asset_code,
           asset_name: getAssetDisplayName(plainTx.asset_code),
-          // 业务类型：使用 tx_type 别名（attachDisplayNames 会附加 tx_type_display）
-          tx_type: plainTx.business_type,
+          // 业务类型：使用数据库真实字段名（attachDisplayNames 会附加 business_type_display）
+          business_type: plainTx.business_type,
           // 变动金额：正数=增加，负数=扣减（与数据库 delta_amount 一致）
           delta_amount: Number(plainTx.delta_amount),
           balance_before: Number(plainTx.balance_before),
@@ -111,9 +111,9 @@ router.get(
         }
       })
 
-      // 附加中文显示名称（tx_type → tx_type_display/tx_type_color）
+      // 附加中文显示名称（business_type → business_type_display/business_type_color）
       await attachDisplayNames(transactions, [
-        { field: 'tx_type', dictType: DICT_TYPES.ASSET_BUSINESS_TYPE }
+        { field: 'business_type', dictType: DICT_TYPES.ASSET_BUSINESS_TYPE }
       ])
 
       return res.apiSuccess({

@@ -1,4 +1,5 @@
 'use strict'
+const BusinessError = require('../../../utils/BusinessError')
 
 /**
  * 兑换市场管理 - 商品 CRUD 服务
@@ -125,36 +126,36 @@ class ItemManagementService {
     logger.info('[兑换市场] 管理员创建商品', { name, created_by })
 
     if (!name || name.trim().length === 0) {
-      throw new Error('商品名称不能为空')
+      throw new BusinessError('商品名称不能为空', 'EXCHANGE_NOT_ALLOWED', 400)
     }
     if (name.length > 100) {
-      throw new Error('商品名称最长100字符')
+      throw new BusinessError('商品名称最长100字符', 'EXCHANGE_ERROR', 400)
     }
     if (description && description.length > 500) {
-      throw new Error('商品描述最长500字符')
+      throw new BusinessError('商品描述最长500字符', 'EXCHANGE_ERROR', 400)
     }
 
     if (!itemData.cost_asset_code) {
-      throw new Error('材料资产代码（cost_asset_code）不能为空')
+      throw new BusinessError('材料资产代码（cost_asset_code）不能为空', 'EXCHANGE_NOT_ALLOWED', 400)
     }
     if (!itemData.cost_amount || itemData.cost_amount <= 0) {
-      throw new Error('材料成本数量（cost_amount）必须大于0')
+      throw new BusinessError('材料成本数量（cost_amount）必须大于0', 'EXCHANGE_REQUIRED', 400)
     }
     if (itemData.cost_price === undefined || itemData.cost_price < 0) {
-      throw new Error('成本价必须大于等于0')
+      throw new BusinessError('成本价必须大于等于0', 'EXCHANGE_REQUIRED', 400)
     }
     if (itemData.stock === undefined || itemData.stock < 0) {
-      throw new Error('库存必须大于等于0')
+      throw new BusinessError('库存必须大于等于0', 'EXCHANGE_REQUIRED', 400)
     }
 
     const validStatuses = ['active', 'inactive']
     if (itemData.status && !validStatuses.includes(itemData.status)) {
-      throw new Error(`无效的status参数，允许值：${validStatuses.join(', ')}`)
+      throw new BusinessError(`无效的status参数，允许值：${validStatuses.join(', ')}`, 'EXCHANGE_INVALID_PARAM', 400)
     }
 
     const validSpaces = ['lucky', 'premium', 'both']
     if (itemData.space && !validSpaces.includes(itemData.space)) {
-      throw new Error(`无效的space参数，允许值：${validSpaces.join(', ')}`)
+      throw new BusinessError(`无效的space参数，允许值：${validSpaces.join(', ')}`, 'EXCHANGE_INVALID_PARAM', 400)
     }
 
     const categoryDefId = itemData.category_id ? parseInt(itemData.category_id) : null
@@ -275,7 +276,7 @@ class ItemManagementService {
 
     const item = await this.ExchangeItem.findByPk(item_id, { transaction })
     if (!item) {
-      throw new Error('商品不存在')
+      throw new BusinessError('商品不存在', 'EXCHANGE_ITEM_NOT_FOUND', 404)
     }
 
     const old_media_id = item.primary_media_id
@@ -283,17 +284,17 @@ class ItemManagementService {
 
     if (updateData.name !== undefined) {
       if (updateData.name.trim().length === 0) {
-        throw new Error('商品名称不能为空')
+        throw new BusinessError('商品名称不能为空', 'EXCHANGE_NOT_ALLOWED', 400)
       }
       if (updateData.name.length > 100) {
-        throw new Error('商品名称最长100字符')
+        throw new BusinessError('商品名称最长100字符', 'EXCHANGE_ERROR', 400)
       }
       finalUpdateData.item_name = updateData.name.trim()
     }
 
     if (updateData.description !== undefined) {
       if (updateData.description.length > 500) {
-        throw new Error('商品描述最长500字符')
+        throw new BusinessError('商品描述最长500字符', 'EXCHANGE_ERROR', 400)
       }
       finalUpdateData.description = updateData.description.trim()
     }
@@ -301,28 +302,28 @@ class ItemManagementService {
     const skuPriceUpdates = {}
     if (updateData.cost_asset_code !== undefined) {
       if (!updateData.cost_asset_code) {
-        throw new Error('材料资产代码不能为空')
+        throw new BusinessError('材料资产代码不能为空', 'EXCHANGE_NOT_ALLOWED', 400)
       }
       skuPriceUpdates.cost_asset_code = updateData.cost_asset_code
     }
 
     if (updateData.cost_amount !== undefined) {
       if (updateData.cost_amount <= 0) {
-        throw new Error('材料成本数量必须大于0')
+        throw new BusinessError('材料成本数量必须大于0', 'EXCHANGE_REQUIRED', 400)
       }
       skuPriceUpdates.cost_amount = parseInt(updateData.cost_amount)
     }
 
     if (updateData.cost_price !== undefined) {
       if (updateData.cost_price < 0) {
-        throw new Error('成本价必须大于等于0')
+        throw new BusinessError('成本价必须大于等于0', 'EXCHANGE_REQUIRED', 400)
       }
       skuPriceUpdates.cost_price = parseFloat(updateData.cost_price)
     }
 
     if (updateData.stock !== undefined) {
       if (updateData.stock < 0) {
-        throw new Error('库存必须大于等于0')
+        throw new BusinessError('库存必须大于等于0', 'EXCHANGE_REQUIRED', 400)
       }
       skuPriceUpdates.stock = parseInt(updateData.stock)
     }
@@ -334,20 +335,20 @@ class ItemManagementService {
     if (updateData.status !== undefined) {
       const validStatuses = ['active', 'inactive']
       if (!validStatuses.includes(updateData.status)) {
-        throw new Error(`无效的status参数，允许值：${validStatuses.join(', ')}`)
+        throw new BusinessError(`无效的status参数，允许值：${validStatuses.join(', ')}`, 'EXCHANGE_INVALID_PARAM', 400)
       }
 
       if (updateData.status === 'active' && item.status !== 'active') {
         const targetMediaId = updateData.primary_media_id ?? item.primary_media_id
         if (!targetMediaId) {
-          throw new Error('商品上架必须上传主图片（primary_media_id 不能为空）')
+          throw new BusinessError('商品上架必须上传主图片（primary_media_id 不能为空）', 'EXCHANGE_NOT_ALLOWED', 400)
         }
         const record = await MediaFile?.findByPk(targetMediaId, { transaction })
         if (!record) {
-          throw new Error(`商品上架失败：关联媒体不存在（media_id=${targetMediaId}）`)
+          throw new BusinessError(`商品上架失败：关联媒体不存在（media_id=${targetMediaId}）`, 'EXCHANGE_ITEM_NOT_FOUND', 404)
         }
         if (record && record.status !== 'active') {
-          throw new Error(`商品上架失败：关联媒体状态异常（status=${record.status}）`)
+          throw new BusinessError(`商品上架失败：关联媒体状态异常（status=${record.status}）`, 'EXCHANGE_STATUS_ABNORMAL', 400)
         }
       }
 
@@ -357,7 +358,7 @@ class ItemManagementService {
     if (updateData.space !== undefined) {
       const validSpaces = ['lucky', 'premium', 'both']
       if (!validSpaces.includes(updateData.space)) {
-        throw new Error(`无效的space参数，允许值：${validSpaces.join(', ')}`)
+        throw new BusinessError(`无效的space参数，允许值：${validSpaces.join(', ')}`, 'EXCHANGE_INVALID_PARAM', 400)
       }
       finalUpdateData.space = updateData.space
     }
@@ -522,7 +523,7 @@ class ItemManagementService {
 
     const item = await this.ExchangeItem.findByPk(item_id, { transaction })
     if (!item) {
-      throw new Error('商品不存在')
+      throw new BusinessError('商品不存在', 'EXCHANGE_ITEM_NOT_FOUND', 404)
     }
 
     const associated_media_id = item.primary_media_id

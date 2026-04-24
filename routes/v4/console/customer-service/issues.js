@@ -18,10 +18,9 @@
 
 const express = require('express')
 const router = express.Router()
-const logger = require('../../../../utils/logger').logger
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const TransactionManager = require('../../../../utils/TransactionManager')
-const { handleServiceError } = require('../../../../middleware/validation')
+const { asyncHandler } = require('../../../../middleware/validation')
 
 /* 所有路由需要后台访问权限 */
 router.use(authenticateToken, requireRoleLevel(1))
@@ -38,18 +37,13 @@ router.use(authenticateToken, requireRoleLevel(1))
  * @query {number} [page=1] - 页码
  * @query {number} [page_size=20] - 每页数量
  */
-router.get('/', async (req, res) => {
-  try {
-    const models = req.app.locals.models
-    const IssueService = req.app.locals.services.getService('cs_issue')
-    const result = await IssueService.list(models, req.query)
+router.get('/', asyncHandler(async (req, res) => {
+  const models = req.app.locals.models
+  const IssueService = req.app.locals.services.getService('cs_issue')
+  const result = await IssueService.list(models, req.query)
 
-    return res.apiSuccess(result, '获取工单列表成功')
-  } catch (error) {
-    logger.error('获取工单列表失败:', error)
-    return handleServiceError(error, res)
-  }
-})
+  return res.apiSuccess(result, '获取工单列表成功')
+}))
 
 /**
  * POST /issues - 创建工单
@@ -63,43 +57,38 @@ router.get('/', async (req, res) => {
  * @body {number} [session_id] - 关联会话ID
  * @body {number} [assigned_to] - 指派给的客服ID
  */
-router.post('/', async (req, res) => {
-  try {
-    const { user_id, issue_type, title, description, priority, session_id, assigned_to } = req.body
+router.post('/', asyncHandler(async (req, res) => {
+  const { user_id, issue_type, title, description, priority, session_id, assigned_to } = req.body
 
-    if (!user_id || !issue_type || !title) {
-      return res.apiError('缺少必填参数：user_id, issue_type, title', 'BAD_REQUEST', null, 400)
-    }
-
-    const models = req.app.locals.models
-    const IssueService = req.app.locals.services.getService('cs_issue')
-
-    const result = await TransactionManager.execute(
-      async transaction => {
-        return await IssueService.create(
-          models,
-          {
-            user_id: parseInt(user_id),
-            created_by: req.user.user_id,
-            issue_type,
-            title,
-            description,
-            priority,
-            session_id: session_id ? parseInt(session_id) : null,
-            assigned_to: assigned_to ? parseInt(assigned_to) : null
-          },
-          { transaction }
-        )
-      },
-      { description: 'createIssue' }
-    )
-
-    return res.apiSuccess(result, '工单创建成功')
-  } catch (error) {
-    logger.error('创建工单失败:', error)
-    return handleServiceError(error, res)
+  if (!user_id || !issue_type || !title) {
+    return res.apiError('缺少必填参数：user_id, issue_type, title', 'BAD_REQUEST', null, 400)
   }
-})
+
+  const models = req.app.locals.models
+  const IssueService = req.app.locals.services.getService('cs_issue')
+
+  const result = await TransactionManager.execute(
+    async transaction => {
+      return await IssueService.create(
+        models,
+        {
+          user_id: parseInt(user_id),
+          created_by: req.user.user_id,
+          issue_type,
+          title,
+          description,
+          priority,
+          session_id: session_id ? parseInt(session_id) : null,
+          assigned_to: assigned_to ? parseInt(assigned_to) : null
+        },
+        { transaction }
+      )
+    },
+    { description: 'createIssue' }
+  )
+
+  return res.apiSuccess(result, '工单创建成功')
+}))
 
 /**
  * GET /issues/:id - 工单详情
@@ -107,23 +96,18 @@ router.post('/', async (req, res) => {
  * @route GET /api/v4/console/customer-service/issues/:id
  * @param {number} id - 工单ID（事务实体）
  */
-router.get('/:id', async (req, res) => {
-  try {
-    const issueId = parseInt(req.params.id)
-    if (isNaN(issueId) || issueId <= 0) {
-      return res.apiError('工单ID无效', 'BAD_REQUEST', null, 400)
-    }
-
-    const models = req.app.locals.models
-    const IssueService = req.app.locals.services.getService('cs_issue')
-    const result = await IssueService.getDetail(models, issueId)
-
-    return res.apiSuccess(result, '获取工单详情成功')
-  } catch (error) {
-    logger.error('获取工单详情失败:', error)
-    return handleServiceError(error, res)
+router.get('/:id', asyncHandler(async (req, res) => {
+  const issueId = parseInt(req.params.id)
+  if (isNaN(issueId) || issueId <= 0) {
+    return res.apiError('工单ID无效', 'BAD_REQUEST', null, 400)
   }
-})
+
+  const models = req.app.locals.models
+  const IssueService = req.app.locals.services.getService('cs_issue')
+  const result = await IssueService.getDetail(models, issueId)
+
+  return res.apiSuccess(result, '获取工单详情成功')
+}))
 
 /**
  * PUT /issues/:id - 更新工单
@@ -135,29 +119,24 @@ router.get('/:id', async (req, res) => {
  * @body {string} [resolution] - 处理结果
  * @body {string} [priority] - 优先级
  */
-router.put('/:id', async (req, res) => {
-  try {
-    const issueId = parseInt(req.params.id)
-    if (isNaN(issueId) || issueId <= 0) {
-      return res.apiError('工单ID无效', 'BAD_REQUEST', null, 400)
-    }
-
-    const models = req.app.locals.models
-    const IssueService = req.app.locals.services.getService('cs_issue')
-
-    const result = await TransactionManager.execute(
-      async transaction => {
-        return await IssueService.update(models, issueId, req.body, { transaction })
-      },
-      { description: 'updateIssue' }
-    )
-
-    return res.apiSuccess(result, '工单更新成功')
-  } catch (error) {
-    logger.error('更新工单失败:', error)
-    return handleServiceError(error, res)
+router.put('/:id', asyncHandler(async (req, res) => {
+  const issueId = parseInt(req.params.id)
+  if (isNaN(issueId) || issueId <= 0) {
+    return res.apiError('工单ID无效', 'BAD_REQUEST', null, 400)
   }
-})
+
+  const models = req.app.locals.models
+  const IssueService = req.app.locals.services.getService('cs_issue')
+
+  const result = await TransactionManager.execute(
+    async transaction => {
+      return await IssueService.update(models, issueId, req.body, { transaction })
+    },
+    { description: 'updateIssue' }
+  )
+
+  return res.apiSuccess(result, '工单更新成功')
+}))
 
 /**
  * GET /issues/:id/notes - 获取工单内部备注
@@ -167,27 +146,22 @@ router.put('/:id', async (req, res) => {
  * @query {number} [page=1] - 页码
  * @query {number} [page_size=20] - 每页数量
  */
-router.get('/:id/notes', async (req, res) => {
-  try {
-    const issueId = parseInt(req.params.id)
-    if (isNaN(issueId) || issueId <= 0) {
-      return res.apiError('工单ID无效', 'BAD_REQUEST', null, 400)
-    }
-
-    const models = req.app.locals.models
-    const IssueService = req.app.locals.services.getService('cs_issue')
-    const result = await IssueService.getNotes(models, {
-      issue_id: issueId,
-      page: req.query.page,
-      page_size: req.query.page_size
-    })
-
-    return res.apiSuccess(result, '获取工单备注成功')
-  } catch (error) {
-    logger.error('获取工单备注失败:', error)
-    return handleServiceError(error, res)
+router.get('/:id/notes', asyncHandler(async (req, res) => {
+  const issueId = parseInt(req.params.id)
+  if (isNaN(issueId) || issueId <= 0) {
+    return res.apiError('工单ID无效', 'BAD_REQUEST', null, 400)
   }
-})
+
+  const models = req.app.locals.models
+  const IssueService = req.app.locals.services.getService('cs_issue')
+  const result = await IssueService.getNotes(models, {
+    issue_id: issueId,
+    page: req.query.page,
+    page_size: req.query.page_size
+  })
+
+  return res.apiSuccess(result, '获取工单备注成功')
+}))
 
 /**
  * POST /issues/:id/notes - 添加工单内部备注
@@ -196,40 +170,35 @@ router.get('/:id/notes', async (req, res) => {
  * @param {number} id - 工单ID
  * @body {string} content - 备注内容
  */
-router.post('/:id/notes', async (req, res) => {
-  try {
-    const issueId = parseInt(req.params.id)
-    if (isNaN(issueId) || issueId <= 0) {
-      return res.apiError('工单ID无效', 'BAD_REQUEST', null, 400)
-    }
-
-    const { content } = req.body
-    if (!content || !content.trim()) {
-      return res.apiError('备注内容不能为空', 'BAD_REQUEST', null, 400)
-    }
-
-    /** 通过 ServiceManager 获取工单服务（不直连 models.CustomerServiceIssue） */
-    const IssueService = req.app.locals.services.getService('cs_issue')
-    const models = req.app.locals.models
-
-    /* 先通过 Service 获取工单详情验证存在性 */
-    const issueDetail = await IssueService.getDetail(models, issueId)
-    if (!issueDetail) {
-      return res.apiError('工单不存在', 'NOT_FOUND', null, 404)
-    }
-
-    const result = await IssueService.addNote(models, {
-      issue_id: issueId,
-      user_id: issueDetail.user_id,
-      author_id: req.user.user_id,
-      content: content.trim()
-    })
-
-    return res.apiSuccess(result, '备注添加成功')
-  } catch (error) {
-    logger.error('添加工单备注失败:', error)
-    return handleServiceError(error, res)
+router.post('/:id/notes', asyncHandler(async (req, res) => {
+  const issueId = parseInt(req.params.id)
+  if (isNaN(issueId) || issueId <= 0) {
+    return res.apiError('工单ID无效', 'BAD_REQUEST', null, 400)
   }
-})
+
+  const { content } = req.body
+  if (!content || !content.trim()) {
+    return res.apiError('备注内容不能为空', 'BAD_REQUEST', null, 400)
+  }
+
+  /** 通过 ServiceManager 获取工单服务（不直连 models.CustomerServiceIssue） */
+  const IssueService = req.app.locals.services.getService('cs_issue')
+  const models = req.app.locals.models
+
+  /* 先通过 Service 获取工单详情验证存在性 */
+  const issueDetail = await IssueService.getDetail(models, issueId)
+  if (!issueDetail) {
+    return res.apiError('工单不存在', 'NOT_FOUND', null, 404)
+  }
+
+  const result = await IssueService.addNote(models, {
+    issue_id: issueId,
+    user_id: issueDetail.user_id,
+    author_id: req.user.user_id,
+    content: content.trim()
+  })
+
+  return res.apiSuccess(result, '备注添加成功')
+}))
 
 module.exports = router

@@ -20,6 +20,7 @@
  * 拆分自：routes/v4/console/config/sessions.js（路由层直接操作模型）
  */
 
+const BusinessError = require('../utils/BusinessError')
 const { AuthenticationSession } = require('../models')
 const logger = require('../utils/logger').logger
 const BeijingTimeHelper = require('../utils/timeHelper')
@@ -58,11 +59,11 @@ class SessionManagementService {
     const { operator_user_id, reason, transaction } = options
 
     if (!operator_user_id) {
-      throw new Error('operator_user_id 是必填参数')
+      throw new BusinessError('operator_user_id 是必填参数', 'SERVICE_REQUIRED', 400)
     }
 
     if (!session_id || session_id <= 0) {
-      throw new Error('无效的会话ID')
+      throw new BusinessError('无效的会话ID', 'SERVICE_INVALID', 400)
     }
 
     logger.info('开始失效会话', { session_id, operator_user_id, reason })
@@ -72,7 +73,7 @@ class SessionManagementService {
     const session = await AuthenticationSession.findByPk(session_id, queryOptions)
 
     if (!session) {
-      throw new Error('会话不存在')
+      throw new BusinessError('会话不存在', 'SERVICE_NOT_FOUND', 404)
     }
 
     if (!session.is_active) {
@@ -133,21 +134,21 @@ class SessionManagementService {
     const { operator_user_id, reason, exclude_session_id } = options
 
     if (!operator_user_id) {
-      throw new Error('operator_user_id 是必填参数')
+      throw new BusinessError('operator_user_id 是必填参数', 'SERVICE_REQUIRED', 400)
     }
 
     // 参数校验
     if (!user_type || !['user', 'admin'].includes(user_type)) {
-      throw new Error('无效的用户类型')
+      throw new BusinessError('无效的用户类型', 'SERVICE_INVALID', 400)
     }
 
     if (!user_id || user_id <= 0) {
-      throw new Error('无效的用户ID')
+      throw new BusinessError('无效的用户ID', 'SERVICE_INVALID', 400)
     }
 
     // 防止管理员踢出自己（如果是管理员操作）
     if (user_type === 'admin' && user_id === operator_user_id && !exclude_session_id) {
-      throw new Error('不能踢出自己的所有会话')
+      throw new BusinessError('不能踢出自己的所有会话', 'SERVICE_NOT_ALLOWED', 400)
     }
 
     logger.info('开始失效用户所有会话', {

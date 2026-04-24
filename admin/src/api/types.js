@@ -176,18 +176,18 @@
  * @property {number} available_amount - 可用余额
  * @property {number} frozen_amount - 冻结余额
  * @property {number} total - 总余额（可用+冻结）
- * @property {number|null} [campaign_id] - 活动ID（仅 budget_points 有值）
+ * @property {number|null} [lottery_campaign_id] - 抽奖活动ID（仅 budget_points 有值，VARCHAR 类型可含 'GLOBAL'）
  */
 
 /**
  * 资产流水记录
  *
  * @typedef {Object} AssetTransaction
- * @property {number} transaction_id - 交易ID
+ * @property {number} asset_transaction_id - 资产流水ID（主键）
  * @property {string} asset_code - 资产代码
  * @property {string} asset_name - 资产显示名称
- * @property {string} tx_type - 业务类型（admin_adjustment/lottery_reward/exchange 等）
- * @property {number} amount - 变动金额（正数增加，负数扣减）
+ * @property {string} business_type - 业务类型（lottery_consume/lottery_reward/order_freeze_buyer/exchange_debit 等，varchar 50+ 种值）
+ * @property {number} delta_amount - 变动金额（正数增加，负数扣减）
  * @property {number} balance_before - 变动前余额
  * @property {number} balance_after - 变动后余额
  * @property {string} [reason] - 变动原因
@@ -205,7 +205,7 @@
  * @property {number} amount - 调整数量（正数=增加，负数=扣减）
  * @property {string} reason - 调整原因
  * @property {string} idempotency_key - 幂等键（必填，前端生成）
- * @property {number} [campaign_id] - 活动ID（budget_points 必填）
+ * @property {string|number} [lottery_campaign_id] - 抽奖活动ID（budget_points 必填，VARCHAR 类型可含 'GLOBAL'）
  */
 
 /**
@@ -298,11 +298,11 @@
  * 抽奖预设配置
  *
  * @typedef {Object} PresetConfig
- * @property {number} preset_id - 预设ID
+ * @property {number} lottery_preset_id - 预设ID（主键）
  * @property {string} name - 预设名称
  * @property {string} description - 预设描述
  * @property {number} cost_points - 单次消耗积分
- * @property {boolean} is_enabled - 是否启用
+ * @property {'pending'|'used'} status - 预设状态
  * @property {string} start_time - 开始时间
  * @property {string} end_time - 结束时间
  * @property {number} daily_limit - 每日限制次数（0=无限制）
@@ -737,7 +737,7 @@
  * @property {number} from_amount - 源资产数量
  * @property {number} to_amount - 目标资产数量
  * @property {string} effective_at - 生效时间（ISO8601格式）
- * @property {boolean} is_enabled - 是否启用
+ * @property {'active'|'paused'|'disabled'} status - 规则状态
  * @property {number} [min_from_amount] - 最小转换数量
  * @property {number} [max_from_amount] - 最大转换数量
  * @property {number} [fee_rate] - 手续费费率（0-1，如 0.05 = 5%）

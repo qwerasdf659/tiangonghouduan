@@ -280,13 +280,13 @@ class CoreService {
     })
 
     if (!record) {
-      throw new Error(`消费记录不存在（ID: ${recordId}）`)
+      throw new BusinessError(`消费记录不存在（ID: ${recordId}）`, 'CONSUMPTION_NOT_FOUND', 404)
     }
 
     // 2. 检查是否可以审核
     const canReview = record.canBeReviewed()
     if (!canReview.can_review) {
-      throw new Error(`不能审核：${canReview.reasons.join('；')}`)
+      throw new BusinessError(`不能审核：${canReview.reasons.join('；')}`, 'CONSUMPTION_NOT_ALLOWED', 400)
     }
 
     // 3. 先发放积分（满足数据库约束 chk_approved_has_reward）
@@ -322,7 +322,7 @@ class CoreService {
     const rewardTransactionId = pointsResult.transaction_record?.asset_transaction_id || null
 
     if (!rewardTransactionId) {
-      throw new Error('积分发放成功但未获取到流水ID，无法完成审核')
+      throw new BusinessError('积分发放成功但未获取到流水ID，无法完成审核', 'CONSUMPTION_ERROR', 400)
     }
 
     logger.info(`🔗 获取积分流水ID: ${rewardTransactionId}`)
@@ -352,7 +352,7 @@ class CoreService {
     })
 
     if (!reviewRecord) {
-      throw new Error(`审核记录不存在: consumption_id=${recordId}`)
+      throw new BusinessError(`审核记录不存在: consumption_id=${recordId}`, 'CONSUMPTION_NOT_FOUND', 404)
     }
 
     await reviewRecord.update(
@@ -504,7 +504,7 @@ class CoreService {
 
     // 1. 验证拒绝原因
     if (!reviewData.admin_notes) {
-      throw new Error('拒绝原因不能为空')
+      throw new BusinessError('拒绝原因不能为空', 'CONSUMPTION_NOT_ALLOWED', 400)
     }
 
     // 2. 查询消费记录
@@ -514,13 +514,13 @@ class CoreService {
     })
 
     if (!record) {
-      throw new Error(`消费记录不存在（ID: ${recordId}）`)
+      throw new BusinessError(`消费记录不存在（ID: ${recordId}）`, 'CONSUMPTION_NOT_FOUND', 404)
     }
 
     // 3. 检查是否可以审核
     const canReview = record.canBeReviewed()
     if (!canReview.can_review) {
-      throw new Error(`不能审核：${canReview.reasons.join('；')}`)
+      throw new BusinessError(`不能审核：${canReview.reasons.join('；')}`, 'CONSUMPTION_NOT_ALLOWED', 400)
     }
 
     // 4. 更新消费记录状态
@@ -547,7 +547,7 @@ class CoreService {
     })
 
     if (!reviewRecord) {
-      throw new Error(`审核记录不存在: consumption_id=${recordId}`)
+      throw new BusinessError(`审核记录不存在: consumption_id=${recordId}`, 'CONSUMPTION_NOT_FOUND', 404)
     }
 
     await reviewRecord.update(
@@ -616,24 +616,26 @@ class CoreService {
     })
 
     if (!record) {
-      throw new Error('消费记录不存在')
+      throw new BusinessError('消费记录不存在', 'CONSUMPTION_NOT_FOUND', 404)
     }
 
     // 权限检查
     if (!has_admin_access && record.user_id !== userId) {
-      throw new Error('无权删除此消费记录')
+      throw new BusinessError('无权删除此消费记录', 'CONSUMPTION_ERROR', 400)
     }
 
     // 状态检查：普通用户只能删除 pending 状态
     if (role_level < 100 && record.status !== 'pending') {
-      throw new Error(
-        `仅允许删除待审核状态的消费记录，当前状态：${record.status}。已审核的记录请联系管理员处理`
+      throw new BusinessError(
+        `仅允许删除待审核状态的消费记录，当前状态：${record.status}。已审核的记录请联系管理员处理`,
+        'CONSUMPTION_ERROR',
+        400
       )
     }
 
     // 检查是否已删除
     if (record.is_deleted === 1) {
-      throw new Error('该消费记录已经被删除，无需重复操作')
+      throw new BusinessError('该消费记录已经被删除，无需重复操作', 'CONSUMPTION_ALREADY_EXISTS', 409)
     }
 
     // 执行软删除
@@ -686,9 +688,9 @@ class CoreService {
     if (!record) {
       const existingRecord = await ConsumptionRecord.findByPk(recordId, { transaction })
       if (existingRecord) {
-        throw new Error('该消费记录未被删除，无需恢复')
+        throw new BusinessError('该消费记录未被删除，无需恢复', 'CONSUMPTION_ERROR', 400)
       }
-      throw new Error('消费记录不存在')
+      throw new BusinessError('消费记录不存在', 'CONSUMPTION_NOT_FOUND', 404)
     }
 
     // 恢复记录

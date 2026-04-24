@@ -34,7 +34,7 @@ const express = require('express')
 const router = express.Router()
 const { AssetCode } = require('../../../../constants/AssetCode')
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
-const { handleServiceError, asyncHandler } = require('../../../../middleware/validation')
+const { asyncHandler } = require('../../../../middleware/validation')
 const TransactionManager = require('../../../../utils/TransactionManager')
 const logger = require('../../../../utils/logger').logger
 
@@ -114,77 +114,73 @@ router.post(
       end_time
     })
 
-    try {
-      const { ExchangeItem, BidProduct } = req.app.locals.models
-      const result = await TransactionManager.execute(async transaction => {
-        const exchangeItem = await ExchangeItem.findByPk(exchange_item_id, { transaction })
-        if (!exchangeItem) {
-          const err = new Error('关联的商品不存在')
-          err.statusCode = 404
-          err.code = 'EXCHANGE_ITEM_NOT_FOUND'
-          throw err
-        }
+        const { ExchangeItem, BidProduct } = req.app.locals.models
+    const result = await TransactionManager.execute(async transaction => {
+      const exchangeItem = await ExchangeItem.findByPk(exchange_item_id, { transaction })
+      if (!exchangeItem) {
+        const err = new Error('关联的商品不存在')
+        err.statusCode = 404
+        err.code = 'EXCHANGE_ITEM_NOT_FOUND'
+        throw err
+      }
 
-        // 一物一拍校验（决策11）：同一兑换商品同时只能有一个 active/pending 竞价
-        const existingBid = await BidProduct.findOne({
-          where: {
-            exchange_item_id,
-            status: ['pending', 'active']
-          },
-          transaction
-        })
+      // 一物一拍校验（决策11）：同一兑换商品同时只能有一个 active/pending 竞价
+      const existingBid = await BidProduct.findOne({
+        where: {
+          exchange_item_id,
+          status: ['pending', 'active']
+        },
+        transaction
+      })
 
-        if (existingBid) {
-          const err = new Error(
-            `兑换商品 ${exchange_item_id} 已有进行中的竞价（ID: ${existingBid.bid_product_id}，状态: ${existingBid.status}）`
-          )
-          err.statusCode = 409
-          err.code = 'BID_ALREADY_EXISTS'
-          throw err
-        }
-
-        // 创建竞价商品
-        const bidProduct = await BidProduct.create(
-          {
-            exchange_item_id: parseInt(exchange_item_id, 10),
-            start_price: parseInt(start_price, 10),
-            price_asset_code,
-            current_price: 0,
-            min_bid_increment: parseInt(min_bid_increment, 10),
-            start_time: parsedStartTime,
-            end_time: parsedEndTime,
-            status: parsedStartTime <= new Date() ? 'active' : 'pending',
-            bid_count: 0,
-            batch_no,
-            created_by: adminUserId
-          },
-          { transaction }
+      if (existingBid) {
+        const err = new Error(
+          `兑换商品 ${exchange_item_id} 已有进行中的竞价（ID: ${existingBid.bid_product_id}，状态: ${existingBid.status}）`
         )
+        err.statusCode = 409
+        err.code = 'BID_ALREADY_EXISTS'
+        throw err
+      }
 
-        return {
-          bid_product_id: bidProduct.bid_product_id,
-          exchange_item_id: bidProduct.exchange_item_id,
-          item_name: exchangeItem.item_name,
-          start_price: Number(bidProduct.start_price),
-          price_asset_code: bidProduct.price_asset_code,
-          min_bid_increment: Number(bidProduct.min_bid_increment),
-          start_time: bidProduct.start_time,
-          end_time: bidProduct.end_time,
-          status: bidProduct.status,
-          batch_no: bidProduct.batch_no,
+      // 创建竞价商品
+      const bidProduct = await BidProduct.create(
+        {
+          exchange_item_id: parseInt(exchange_item_id, 10),
+          start_price: parseInt(start_price, 10),
+          price_asset_code,
+          current_price: 0,
+          min_bid_increment: parseInt(min_bid_increment, 10),
+          start_time: parsedStartTime,
+          end_time: parsedEndTime,
+          status: parsedStartTime <= new Date() ? 'active' : 'pending',
+          bid_count: 0,
+          batch_no,
           created_by: adminUserId
-        }
-      })
+        },
+        { transaction }
+      )
 
-      logger.info('[竞价管理] 竞价商品创建成功', {
-        bid_product_id: result.bid_product_id,
-        status: result.status
-      })
+      return {
+        bid_product_id: bidProduct.bid_product_id,
+        exchange_item_id: bidProduct.exchange_item_id,
+        item_name: exchangeItem.item_name,
+        start_price: Number(bidProduct.start_price),
+        price_asset_code: bidProduct.price_asset_code,
+        min_bid_increment: Number(bidProduct.min_bid_increment),
+        start_time: bidProduct.start_time,
+        end_time: bidProduct.end_time,
+        status: bidProduct.status,
+        batch_no: bidProduct.batch_no,
+        created_by: adminUserId
+      }
+    })
 
-      return res.apiSuccess(result, '竞价商品创建成功')
-    } catch (error) {
-      return handleServiceError(error, res, '创建竞价商品失败')
-    }
+    logger.info('[竞价管理] 竞价商品创建成功', {
+      bid_product_id: result.bid_product_id,
+      status: result.status
+    })
+
+    return res.apiSuccess(result, '竞价商品创建成功')
   })
 )
 
@@ -306,39 +302,35 @@ router.get(
 
     logger.info('[竞价管理] 查询竞价详情', { bid_product_id: bidProductId })
 
-    try {
-      // 管理视图不传 user_id
-      const result = await BidQueryService.getBidProductDetail(bidProductId, {})
+        // 管理视图不传 user_id
+    const result = await BidQueryService.getBidProductDetail(bidProductId, {})
 
-      const { BidRecord } = req.app.locals.models
-      const allBids = await BidRecord.findAll({
-        where: { bid_product_id: bidProductId },
-        order: [['bid_amount', 'DESC']],
-        attributes: [
-          'bid_record_id',
-          'user_id',
-          'bid_amount',
-          'previous_highest',
-          'is_winning',
-          'is_final_winner',
-          'created_at'
-        ]
-      })
+    const { BidRecord } = req.app.locals.models
+    const allBids = await BidRecord.findAll({
+      where: { bid_product_id: bidProductId },
+      order: [['bid_amount', 'DESC']],
+      attributes: [
+        'bid_record_id',
+        'user_id',
+        'bid_amount',
+        'previous_highest',
+        'is_winning',
+        'is_final_winner',
+        'created_at'
+      ]
+    })
 
-      result.all_bid_records = allBids.map(b => ({
-        bid_record_id: b.bid_record_id,
-        user_id: b.user_id,
-        bid_amount: Number(b.bid_amount),
-        previous_highest: Number(b.previous_highest),
-        is_winning: b.is_winning,
-        is_final_winner: b.is_final_winner,
-        created_at: b.created_at
-      }))
+    result.all_bid_records = allBids.map(b => ({
+      bid_record_id: b.bid_record_id,
+      user_id: b.user_id,
+      bid_amount: Number(b.bid_amount),
+      previous_highest: Number(b.previous_highest),
+      is_winning: b.is_winning,
+      is_final_winner: b.is_final_winner,
+      created_at: b.created_at
+    }))
 
-      return res.apiSuccess(result, '获取竞价详情成功')
-    } catch (error) {
-      return handleServiceError(error, res, '获取竞价详情失败')
-    }
+    return res.apiSuccess(result, '获取竞价详情成功')
   })
 )
 
@@ -374,22 +366,18 @@ router.post(
         admin_user_id: req.user.user_id
       })
 
-      try {
-        const result = await TransactionManager.execute(async transaction => {
-          // 先将状态重置为 ended 再结算（处理 settlement_failed 场景）
-          const models = require('../../../../models')
-          const listing = await models.AuctionListing.findByPk(entityId, { transaction })
-          if (listing && listing.status === 'settlement_failed') {
-            await listing.update({ status: 'ended' }, { transaction })
-          }
-          return await AuctionService.settleAuction(entityId, { transaction })
-        })
+            const result = await TransactionManager.execute(async transaction => {
+        // 先将状态重置为 ended 再结算（处理 settlement_failed 场景）
+        const models = require('../../../../models')
+        const listing = await models.AuctionListing.findByPk(entityId, { transaction })
+        if (listing && listing.status === 'settlement_failed') {
+          await listing.update({ status: 'ended' }, { transaction })
+        }
+        return await AuctionService.settleAuction(entityId, { transaction })
+      })
 
-        delete result._losers
-        return res.apiSuccess(result, `C2C拍卖结算完成（状态：${result.status}）`)
-      } catch (error) {
-        return handleServiceError(error, res, 'C2C拍卖手动结算失败')
-      }
+      delete result._losers
+      return res.apiSuccess(result, `C2C拍卖结算完成（状态：${result.status}）`)
     }
 
     // B2C 竞价结算（默认逻辑）
@@ -400,45 +388,41 @@ router.post(
       admin_user_id: req.user.user_id
     })
 
-    try {
-      const result = await TransactionManager.execute(async transaction => {
-        return await BidService.settleBidProduct(entityId, { transaction })
-      })
+        const result = await TransactionManager.execute(async transaction => {
+      return await BidService.settleBidProduct(entityId, { transaction })
+    })
 
-      if (result.status === 'settled') {
-        const NotificationService = req.app.locals.services.getService('notification')
+    if (result.status === 'settled') {
+      const NotificationService = req.app.locals.services.getService('notification')
 
-        NotificationService.notifyBidWon(result.winner_user_id, {
-          bid_product_id: entityId,
-          item_name: result.item_name,
-          winning_amount: result.winning_amount,
-          price_asset_code: result.price_asset_code
-        }).catch(err => logger.error('发送中标通知失败', { error: err.message }))
+      NotificationService.notifyBidWon(result.winner_user_id, {
+        bid_product_id: entityId,
+        item_name: result.item_name,
+        winning_amount: result.winning_amount,
+        price_asset_code: result.price_asset_code
+      }).catch(err => logger.error('发送中标通知失败', { error: err.message }))
 
-        if (result._losers) {
-          for (const loser of result._losers) {
-            NotificationService.notifyBidLost(loser.user_id, {
-              bid_product_id: entityId,
-              item_name: result.item_name,
-              my_bid_amount: loser.bid_amount,
-              winning_amount: result.winning_amount,
-              price_asset_code: result.price_asset_code
-            }).catch(err => logger.error('发送落选通知失败', { error: err.message }))
-          }
+      if (result._losers) {
+        for (const loser of result._losers) {
+          NotificationService.notifyBidLost(loser.user_id, {
+            bid_product_id: entityId,
+            item_name: result.item_name,
+            my_bid_amount: loser.bid_amount,
+            winning_amount: result.winning_amount,
+            price_asset_code: result.price_asset_code
+          }).catch(err => logger.error('发送落选通知失败', { error: err.message }))
         }
       }
-
-      delete result._losers
-
-      logger.info('[竞价管理] 手动结算完成', {
-        bid_product_id: entityId,
-        status: result.status
-      })
-
-      return res.apiSuccess(result, `竞价结算完成（状态：${result.status}）`)
-    } catch (error) {
-      return handleServiceError(error, res, '手动结算失败')
     }
+
+    delete result._losers
+
+    logger.info('[竞价管理] 手动结算完成', {
+      bid_product_id: entityId,
+      status: result.status
+    })
+
+    return res.apiSuccess(result, `竞价结算完成（状态：${result.status}）`)
   })
 )
 
@@ -479,23 +463,19 @@ router.post(
         admin_user_id: req.user.user_id
       })
 
-      try {
-        const result = await TransactionManager.execute(async transaction => {
-          return await AuctionService.cancelAuction(
-            entityId,
-            req.user.user_id,
-            true, // isAdmin = true（管理员强制取消，不受 bid_count 限制）
-            { transaction }
-          )
-        })
-
-        return res.apiSuccess(
-          result,
-          `C2C拍卖已取消，${result.refunded_users} 名用户的冻结资产已解冻返还`
+            const result = await TransactionManager.execute(async transaction => {
+        return await AuctionService.cancelAuction(
+          entityId,
+          req.user.user_id,
+          true, // isAdmin = true（管理员强制取消，不受 bid_count 限制）
+          { transaction }
         )
-      } catch (error) {
-        return handleServiceError(error, res, 'C2C拍卖取消失败')
-      }
+      })
+
+      return res.apiSuccess(
+        result,
+        `C2C拍卖已取消，${result.refunded_users} 名用户的冻结资产已解冻返还`
+      )
     }
 
     // B2C 竞价取消（默认逻辑）
@@ -507,23 +487,19 @@ router.post(
       admin_user_id: req.user.user_id
     })
 
-    try {
-      const result = await TransactionManager.execute(async transaction => {
-        return await BidService.cancelBidProduct(entityId, reason.trim(), { transaction })
-      })
+        const result = await TransactionManager.execute(async transaction => {
+      return await BidService.cancelBidProduct(entityId, reason.trim(), { transaction })
+    })
 
-      logger.info('[竞价管理] 竞价取消完成', {
-        bid_product_id: entityId,
-        refunded_users: result.refunded_users
-      })
+    logger.info('[竞价管理] 竞价取消完成', {
+      bid_product_id: entityId,
+      refunded_users: result.refunded_users
+    })
 
-      return res.apiSuccess(
-        result,
-        `竞价已取消，${result.refunded_users} 名用户的冻结资产已解冻返还`
-      )
-    } catch (error) {
-      return handleServiceError(error, res, '取消竞价失败')
-    }
+    return res.apiSuccess(
+      result,
+      `竞价已取消，${result.refunded_users} 名用户的冻结资产已解冻返还`
+    )
   })
 )
 

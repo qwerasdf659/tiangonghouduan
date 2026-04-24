@@ -17,6 +17,7 @@
  * @since 2026
  */
 
+const BusinessError = require('../../../../utils/BusinessError')
 const BudgetProvider = require('./BudgetProvider')
 const { LotteryCampaign } = require('../../../../models')
 
@@ -162,7 +163,7 @@ class PoolBudgetProvider extends BudgetProvider {
       })
 
       if (!campaign) {
-        throw new Error(`活动不存在: ${lottery_campaign_id}`)
+        throw new BusinessError(`活动不存在: ${lottery_campaign_id}`, 'ENGINE_NOT_FOUND', 404)
       }
 
       // 检查用户是否在白名单中
@@ -208,7 +209,7 @@ class PoolBudgetProvider extends BudgetProvider {
           remaining_amount = 0
         } else {
           // 公共池不够（理论上不应该发生，因为前面检查过）
-          throw new Error('活动池预算不足（并发扣减冲突）')
+          throw new BusinessError('活动池预算不足（并发扣减冲突）', 'ENGINE_INSUFFICIENT', 400)
         }
       }
 
@@ -270,7 +271,7 @@ class PoolBudgetProvider extends BudgetProvider {
       })
 
       if (!campaign) {
-        throw new Error(`活动不存在: ${lottery_campaign_id}`)
+        throw new BusinessError(`活动不存在: ${lottery_campaign_id}`, 'ENGINE_NOT_FOUND', 404)
       }
 
       // 回滚到公共池（简化处理，不区分预留池）

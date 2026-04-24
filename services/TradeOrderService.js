@@ -29,6 +29,7 @@
  *
  */
 
+const BusinessError = require('../utils/BusinessError')
 const crypto = require('crypto')
 const { Op, fn, col } = require('sequelize')
 const { sequelize, TradeOrder, MarketListing, Item, User, Account } = require('../models')
@@ -123,13 +124,13 @@ class TradeOrderService {
 
     // 1. 参数验证
     if (!idempotency_key) {
-      throw new Error('idempotency_key 是必需参数')
+      throw new BusinessError('idempotency_key 是必需参数', 'TRADE_REQUIRED', 400)
     }
     if (!market_listing_id) {
-      throw new Error('market_listing_id 是必需参数')
+      throw new BusinessError('market_listing_id 是必需参数', 'TRADE_REQUIRED', 400)
     }
     if (!buyer_id) {
-      throw new Error('buyer_id 是必需参数')
+      throw new BusinessError('buyer_id 是必需参数', 'TRADE_REQUIRED', 400)
     }
 
     // 2. 幂等性检查（使用业界标准字段名 idempotency_key）
@@ -177,7 +178,7 @@ class TradeOrderService {
       })
 
       if (!tempListing) {
-        throw new Error(`挂牌不存在: ${market_listing_id}`)
+        throw new BusinessError(`挂牌不存在: ${market_listing_id}`, 'TRADE_NOT_FOUND', 404)
       }
 
       // 校验当前挂牌的 price_asset_code 是否在白名单中（多币种扩展 - 2026-01-14）
@@ -262,40 +263,42 @@ class TradeOrderService {
     })
 
     if (!listing) {
-      throw new Error(`挂牌不存在: ${market_listing_id}`)
+      throw new BusinessError(`挂牌不存在: ${market_listing_id}`, 'TRADE_NOT_FOUND', 404)
     }
 
     if (listing.status !== 'on_sale') {
-      throw new Error(`挂牌状态异常: ${listing.status}，期望 on_sale`)
+      throw new BusinessError(`挂牌状态异常: ${listing.status}，期望 on_sale`, 'TRADE_ERROR', 400)
     }
 
     if (listing.seller_user_id === buyer_id) {
-      throw new Error('不能购买自己的挂牌')
+      throw new BusinessError('不能购买自己的挂牌', 'TRADE_NOT_ALLOWED', 400)
     }
 
     // 交易市场结算币种白名单校验（多币种扩展 - 2026-01-14）
     const priceAssetAllowed = await isAssetCodeAllowed(listing.price_asset_code)
     if (!priceAssetAllowed) {
       const whitelist = await getAllowedSettlementAssets()
-      throw new Error(
-        `挂牌定价资产不合法: ${listing.price_asset_code}（不在允许的结算币种白名单中：${whitelist.join(', ')}）`
+      throw new BusinessError(
+        `挂牌定价资产不合法: ${listing.price_asset_code}（不在允许的结算币种白名单中：${whitelist.join(', ')}）`,
+        'TRADE_INVALID',
+        400
       )
     }
 
     // 可叠加资产挂牌购买时必须校验卖家标的已冻结
     if (listing.listing_kind === 'fungible_asset') {
       if (!listing.seller_offer_frozen) {
-        throw new Error('卖家标的资产未冻结，挂牌状态异常（seller_offer_frozen=false）')
+        throw new BusinessError('卖家标的资产未冻结，挂牌状态异常（seller_offer_frozen=false）', 'TRADE_ERROR', 400)
       }
       if (!listing.offer_asset_code || !listing.offer_amount || Number(listing.offer_amount) <= 0) {
-        throw new Error('可叠加资产挂牌标的信息缺失（offer_asset_code/offer_amount）')
+        throw new BusinessError('可叠加资产挂牌标的信息缺失（offer_asset_code/offer_amount）', 'TRADE_ERROR', 400)
       }
     }
 
     // 不可叠加物品购买时必须校验并锁定 items（所有权真相）
     if (listing.listing_kind === 'item') {
       if (!listing.offer_item_id) {
-        throw new Error('挂牌缺少标的物品ID（offer_item_id）')
+        throw new BusinessError('挂牌缺少标的物品ID（offer_item_id）', 'TRADE_REQUIRED', 400)
       }
 
       const itemInstance = await Item.findOne({
@@ -305,16 +308,16 @@ class TradeOrderService {
       })
 
       if (!itemInstance) {
-        throw new Error(`物品不存在: ${listing.offer_item_id}`)
+        throw new BusinessError(`物品不存在: ${listing.offer_item_id}`, 'TRADE_NOT_FOUND', 404)
       }
       // owner_account_id → Account → user_id 校验（Item 模型使用 account_id 而非 user_id）
       const sellerAccount = await Account.findByPk(itemInstance.owner_account_id, { transaction })
       if (!sellerAccount || Number(sellerAccount.user_id) !== Number(listing.seller_user_id)) {
-        throw new Error('物品所有权异常：物品不属于当前卖家，禁止购买')
+        throw new BusinessError('物品所有权异常：物品不属于当前卖家，禁止购买', 'TRADE_NOT_ALLOWED', 400)
       }
       const allowedStatuses = ['held', 'available']
       if (!allowedStatuses.includes(itemInstance.status)) {
-        throw new Error(`物品实例状态不可购买：${itemInstance.status}`)
+        throw new BusinessError(`物品实例状态不可购买：${itemInstance.status}`, 'TRADE_NOT_ALLOWED', 400)
       }
     }
 
@@ -376,8 +379,10 @@ class TradeOrderService {
     // 验证对账公式（使用数值比较，处理可能的浮点精度问题）
     const expectedSum = feeAmount + netAmount
     if (Math.abs(grossAmount - expectedSum) > 0.001) {
-      throw new Error(
-        `对账金额错误：gross_amount(${grossAmount}) ≠ fee_amount(${feeAmount}) + net_amount(${netAmount})`
+      throw new BusinessError(
+        `对账金额错误：gross_amount(${grossAmount}) ≠ fee_amount(${feeAmount}) + net_amount(${netAmount})`,
+        'TRADE_ERROR',
+        400
       )
     }
 
@@ -510,7 +515,7 @@ class TradeOrderService {
 
     // 参数验证
     if (!trade_order_id) {
-      throw new Error('trade_order_id 是必需参数')
+      throw new BusinessError('trade_order_id 是必需参数', 'TRADE_REQUIRED', 400)
     }
 
     // 强制要求事务边界 - 2026-01-05 治理决策
@@ -529,11 +534,11 @@ class TradeOrderService {
     })
 
     if (!order) {
-      throw new Error(`订单不存在: ${trade_order_id}`)
+      throw new BusinessError(`订单不存在: ${trade_order_id}`, 'TRADE_NOT_FOUND', 404)
     }
 
     if (order.status !== 'frozen') {
-      throw new Error(`订单状态异常: ${order.status}，期望 frozen`)
+      throw new BusinessError(`订单状态异常: ${order.status}，期望 frozen`, 'TRADE_ERROR', 400)
     }
 
     const listing = order.listing
@@ -644,7 +649,7 @@ class TradeOrderService {
       })
 
       if (!itemInstance) {
-        throw new Error(`物品不存在: ${listing.offer_item_id}`)
+        throw new BusinessError(`物品不存在: ${listing.offer_item_id}`, 'TRADE_NOT_FOUND', 404)
       }
 
       // 所有权一致性校验：owner_account_id → Account → user_id
@@ -652,7 +657,7 @@ class TradeOrderService {
         transaction
       })
       if (!itemOwnerAccount || Number(itemOwnerAccount.user_id) !== Number(order.seller_user_id)) {
-        throw new Error('物品所有权异常：物品不属于卖家，禁止成交转移')
+        throw new BusinessError('物品所有权异常：物品不属于卖家，禁止成交转移', 'TRADE_NOT_ALLOWED', 400)
       }
 
       // 使用 ItemService.transferItem() 转移所有权（自动记录事件）
@@ -841,7 +846,7 @@ class TradeOrderService {
 
     // 参数验证
     if (!trade_order_id) {
-      throw new Error('trade_order_id 是必需参数')
+      throw new BusinessError('trade_order_id 是必需参数', 'TRADE_REQUIRED', 400)
     }
 
     // 强制要求事务边界 - 2026-01-05 治理决策
@@ -860,11 +865,11 @@ class TradeOrderService {
     })
 
     if (!order) {
-      throw new Error(`订单不存在: ${trade_order_id}`)
+      throw new BusinessError(`订单不存在: ${trade_order_id}`, 'TRADE_NOT_FOUND', 404)
     }
 
     if (order.status !== 'frozen' && order.status !== 'created') {
-      throw new Error(`订单状态异常: ${order.status}，期望 frozen 或 created`)
+      throw new BusinessError(`订单状态异常: ${order.status}，期望 frozen 或 created`, 'TRADE_ERROR', 400)
     }
 
     const listing = order.listing
@@ -955,7 +960,7 @@ class TradeOrderService {
     })
 
     if (!order) {
-      throw new Error(`订单不存在: ${trade_order_id}`)
+      throw new BusinessError(`订单不存在: ${trade_order_id}`, 'TRADE_NOT_FOUND', 404)
     }
 
     return order

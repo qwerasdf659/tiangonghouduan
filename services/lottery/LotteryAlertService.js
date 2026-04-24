@@ -23,6 +23,7 @@
 
 'use strict'
 
+const BusinessError = require('../../utils/BusinessError')
 const { Op, fn, col } = require('sequelize')
 const {
   LotteryAlert,
@@ -435,11 +436,11 @@ class LotteryAlertService {
       const alert = await LotteryAlert.findByPk(alert_id)
 
       if (!alert) {
-        throw new Error(`告警不存在: alert_id=${alert_id}`)
+        throw new BusinessError(`告警不存在: alert_id=${alert_id}`, 'LOTTERY_NOT_FOUND', 404)
       }
 
       if (alert.status === 'resolved') {
-        throw new Error('告警已解决，无需确认')
+        throw new BusinessError('告警已解决，无需确认', 'LOTTERY_ERROR', 400)
       }
 
       await alert.update({
@@ -478,11 +479,11 @@ class LotteryAlertService {
       const alert = await LotteryAlert.findByPk(alert_id)
 
       if (!alert) {
-        throw new Error(`告警不存在: alert_id=${alert_id}`)
+        throw new BusinessError(`告警不存在: alert_id=${alert_id}`, 'LOTTERY_NOT_FOUND', 404)
       }
 
       if (alert.status === 'resolved') {
-        throw new Error('告警已解决')
+        throw new BusinessError('告警已解决', 'LOTTERY_ERROR', 400)
       }
 
       await alert.update({

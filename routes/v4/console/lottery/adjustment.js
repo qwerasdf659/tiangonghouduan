@@ -29,102 +29,91 @@ router.post(
   '/probability-adjust',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    try {
-      const {
-        user_id,
-        probability_multiplier, // 全局倍数
-        lottery_prize_id, // 特定奖品ID
-        custom_probability, // 自定义概率（0-1之间）
-        duration_minutes = 60,
-        reason = '管理员概率调整'
-      } = req.body
+    const {
+      user_id,
+      probability_multiplier, // 全局倍数
+      lottery_prize_id, // 特定奖品ID
+      custom_probability, // 自定义概率（0-1之间）
+      duration_minutes = 60,
+      reason = '管理员概率调整'
+    } = req.body
 
-      // 参数验证
-      const validatedUserId = validators.validateUserId(user_id)
+    // 参数验证
+    const validatedUserId = validators.validateUserId(user_id)
 
-      // 判断是全局调整还是特定奖品调整
-      const isSpecificPrize = !!lottery_prize_id
-      let adjustmentData = {}
+    // 判断是全局调整还是特定奖品调整
+    const isSpecificPrize = !!lottery_prize_id
+    let adjustmentData = {}
 
-      if (isSpecificPrize) {
-        // 特定奖品概率调整
-        const validatedPrizeId = validators.validatePrizeId(lottery_prize_id)
+    if (isSpecificPrize) {
+      // 特定奖品概率调整
+      const validatedPrizeId = validators.validatePrizeId(lottery_prize_id)
 
-        // 验证自定义概率
-        if (!custom_probability || isNaN(parseFloat(custom_probability))) {
-          return res.apiError('自定义概率无效', 'INVALID_CUSTOM_PROBABILITY')
-        }
-
-        const probability = parseFloat(custom_probability)
-        if (probability < 0.01 || probability > 1.0) {
-          return res.apiError('自定义概率必须在0.01-1.0之间（1%-100%）', 'PROBABILITY_OUT_OF_RANGE')
-        }
-
-        adjustmentData = {
-          lottery_prize_id: validatedPrizeId,
-          custom_probability: probability,
-          adjustment_type: 'specific_prize',
-          reason
-        }
-      } else {
-        // 全局概率倍数调整
-        if (!probability_multiplier || isNaN(parseFloat(probability_multiplier))) {
-          return res.apiError('概率倍数无效', 'INVALID_PROBABILITY_MULTIPLIER')
-        }
-
-        const multiplier = parseFloat(probability_multiplier)
-        if (multiplier < 0.1 || multiplier > 10) {
-          return res.apiError('概率倍数必须在0.1-10之间', 'PROBABILITY_MULTIPLIER_OUT_OF_RANGE')
-        }
-
-        adjustmentData = {
-          multiplier,
-          adjustment_type: 'global_multiplier',
-          reason
-        }
+      // 验证自定义概率
+      if (!custom_probability || isNaN(parseFloat(custom_probability))) {
+        return res.apiError('自定义概率无效', 'INVALID_CUSTOM_PROBABILITY')
       }
 
-      // 持续时间验证
-      if (
-        !duration_minutes ||
-        isNaN(parseInt(duration_minutes)) ||
-        parseInt(duration_minutes) < 1 ||
-        parseInt(duration_minutes) > 1440
-      ) {
-        return res.apiError('持续时间必须在1-1440分钟之间', 'INVALID_DURATION')
+      const probability = parseFloat(custom_probability)
+      if (probability < 0.01 || probability > 1.0) {
+        return res.apiError('自定义概率必须在0.01-1.0之间（1%-100%）', 'PROBABILITY_OUT_OF_RANGE')
       }
 
-      // 计算过期时间
-      const expiresAt = BeijingTimeHelper.futureTime(parseInt(duration_minutes) * 60 * 1000)
-
-      // 通过 ServiceManager 获取 AdminLotteryCoreService（V4.7.0 拆分后：核心干预操作）
-      const AdminLotteryCoreService = req.app.locals.services.getService('admin_lottery_core')
-
-      // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
-      const result = await TransactionManager.execute(
-        async transaction => {
-          return await AdminLotteryCoreService.adjustUserProbability(
-            req.user?.user_id || req.user?.id,
-            validatedUserId,
-            adjustmentData,
-            expiresAt,
-            { transaction }
-          )
-        },
-        { description: 'adjustUserProbability' }
-      )
-
-      return res.apiSuccess(result, `用户概率调整成功，持续${duration_minutes}分钟`)
-    } catch (error) {
-      if (
-        error.message.includes('无效的') ||
-        error.code === 'USER_NOT_FOUND' ||
-        error.message.includes('奖品不存在')
-      ) {
-        return res.apiError(error.message, error.code || 'VALIDATION_ERROR')
+      adjustmentData = {
+        lottery_prize_id: validatedPrizeId,
+        custom_probability: probability,
+        adjustment_type: 'specific_prize',
+        reason
       }
-      return res.apiInternalError('概率调整失败', error.message, 'PROBABILITY_ADJUST_ERROR')
+    } else {
+      // 全局概率倍数调整
+      if (!probability_multiplier || isNaN(parseFloat(probability_multiplier))) {
+        return res.apiError('概率倍数无效', 'INVALID_PROBABILITY_MULTIPLIER')
+      }
+
+      const multiplier = parseFloat(probability_multiplier)
+      if (multiplier < 0.1 || multiplier > 10) {
+        return res.apiError('概率倍数必须在0.1-10之间', 'PROBABILITY_MULTIPLIER_OUT_OF_RANGE')
+      }
+
+      adjustmentData = {
+        multiplier,
+        adjustment_type: 'global_multiplier',
+        reason
+      }
     }
+
+    // 持续时间验证
+    if (
+      !duration_minutes ||
+      isNaN(parseInt(duration_minutes)) ||
+      parseInt(duration_minutes) < 1 ||
+      parseInt(duration_minutes) > 1440
+    ) {
+      return res.apiError('持续时间必须在1-1440分钟之间', 'INVALID_DURATION')
+    }
+
+    // 计算过期时间
+    const expiresAt = BeijingTimeHelper.futureTime(parseInt(duration_minutes) * 60 * 1000)
+
+    // 通过 ServiceManager 获取 AdminLotteryCoreService（V4.7.0 拆分后：核心干预操作）
+    const AdminLotteryCoreService = req.app.locals.services.getService('admin_lottery_core')
+
+    // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
+    const result = await TransactionManager.execute(
+      async transaction => {
+        return await AdminLotteryCoreService.adjustUserProbability(
+          req.user?.user_id || req.user?.id,
+          validatedUserId,
+          adjustmentData,
+          expiresAt,
+          { transaction }
+        )
+      },
+      { description: 'adjustUserProbability' }
+    )
+
+    return res.apiSuccess(result, `用户概率调整成功，持续${duration_minutes}分钟`)
   })
 )
 
@@ -139,79 +128,72 @@ router.post(
   '/user-specific-queue',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    try {
-      const {
-        user_id,
-        queue_type = 'priority',
-        priority_level = 1,
-        custom_strategy,
-        duration_minutes = 60,
-        reason = '管理员设置特定队列'
-      } = req.body
+    const {
+      user_id,
+      queue_type = 'priority',
+      priority_level = 1,
+      custom_strategy,
+      duration_minutes = 60,
+      reason = '管理员设置特定队列'
+    } = req.body
 
-      // 参数验证
-      const validatedUserId = validators.validateUserId(user_id)
+    // 参数验证
+    const validatedUserId = validators.validateUserId(user_id)
 
-      const validQueueTypes = ['priority', 'guaranteed', 'custom', 'blocked']
-      if (!validQueueTypes.includes(queue_type)) {
-        return res.apiError('无效的队列类型', 'INVALID_QUEUE_TYPE')
-      }
-
-      if (priority_level < 1 || priority_level > 10) {
-        return res.apiError('优先级必须在1-10之间', 'INVALID_PRIORITY_LEVEL')
-      }
-
-      if (
-        !duration_minutes ||
-        isNaN(parseInt(duration_minutes)) ||
-        parseInt(duration_minutes) < 1 ||
-        parseInt(duration_minutes) > 1440
-      ) {
-        return res.apiError('持续时间必须在1-1440分钟之间', 'INVALID_DURATION')
-      }
-
-      // 计算过期时间
-      const expiresAt = BeijingTimeHelper.futureTime(parseInt(duration_minutes) * 60 * 1000)
-
-      // 准备队列配置
-      const queueConfig = {
-        queue_type,
-        priority_level: parseInt(priority_level),
-        prize_queue: custom_strategy?.prize_queue || []
-      }
-
-      // 通过 ServiceManager 获取 AdminLotteryCoreService（V4.7.0 拆分后：核心干预操作）
-      const AdminLotteryCoreService = req.app.locals.services.getService('admin_lottery_core')
-
-      // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
-      const result = await TransactionManager.execute(
-        async transaction => {
-          return await AdminLotteryCoreService.setUserQueue(
-            req.user?.user_id || req.user?.id,
-            validatedUserId,
-            queueConfig,
-            reason,
-            expiresAt,
-            { transaction }
-          )
-        },
-        { description: 'setUserQueue' }
-      )
-
-      return res.apiSuccess(
-        {
-          ...result,
-          custom_strategy: custom_strategy || null,
-          duration_minutes: parseInt(duration_minutes)
-        },
-        `用户特定队列设置成功，类型：${queue_type}，优先级：${priority_level}，持续${duration_minutes}分钟`
-      )
-    } catch (error) {
-      if (error.message.includes('无效的') || error.code === 'USER_NOT_FOUND') {
-        return res.apiError(error.message, error.code || 'VALIDATION_ERROR')
-      }
-      return res.apiInternalError('用户队列设置失败', error.message, 'USER_QUEUE_SET_ERROR')
+    const validQueueTypes = ['priority', 'guaranteed', 'custom', 'blocked']
+    if (!validQueueTypes.includes(queue_type)) {
+      return res.apiError('无效的队列类型', 'INVALID_QUEUE_TYPE')
     }
+
+    if (priority_level < 1 || priority_level > 10) {
+      return res.apiError('优先级必须在1-10之间', 'INVALID_PRIORITY_LEVEL')
+    }
+
+    if (
+      !duration_minutes ||
+      isNaN(parseInt(duration_minutes)) ||
+      parseInt(duration_minutes) < 1 ||
+      parseInt(duration_minutes) > 1440
+    ) {
+      return res.apiError('持续时间必须在1-1440分钟之间', 'INVALID_DURATION')
+    }
+
+    // 计算过期时间
+    const expiresAt = BeijingTimeHelper.futureTime(parseInt(duration_minutes) * 60 * 1000)
+
+    // 准备队列配置
+    const queueConfig = {
+      queue_type,
+      priority_level: parseInt(priority_level),
+      prize_queue: custom_strategy?.prize_queue || []
+    }
+
+    // 通过 ServiceManager 获取 AdminLotteryCoreService（V4.7.0 拆分后：核心干预操作）
+    const AdminLotteryCoreService = req.app.locals.services.getService('admin_lottery_core')
+
+    // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
+    const result = await TransactionManager.execute(
+      async transaction => {
+        return await AdminLotteryCoreService.setUserQueue(
+          req.user?.user_id || req.user?.id,
+          validatedUserId,
+          queueConfig,
+          reason,
+          expiresAt,
+          { transaction }
+        )
+      },
+      { description: 'setUserQueue' }
+    )
+
+    return res.apiSuccess(
+      {
+        ...result,
+        custom_strategy: custom_strategy || null,
+        duration_minutes: parseInt(duration_minutes)
+      },
+      `用户特定队列设置成功，类型：${queue_type}，优先级：${priority_level}，持续${duration_minutes}分钟`
+    )
   })
 )
 

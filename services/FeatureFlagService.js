@@ -19,6 +19,7 @@
 
 'use strict'
 
+const BusinessError = require('../utils/BusinessError')
 const { logger } = require('../utils/logger')
 const { getRedisClient, isRedisHealthy } = require('../utils/UnifiedRedisClient')
 const { OPERATION_TYPES } = require('../constants/AuditOperationTypes')
@@ -276,7 +277,7 @@ class FeatureFlagService {
       // 检查 flag_key 是否已存在
       const existing = await FeatureFlag.findByKey(flagData.flag_key)
       if (existing) {
-        throw new Error(`功能开关 ${flagData.flag_key} 已存在`)
+        throw new BusinessError(`功能开关 ${flagData.flag_key} 已存在`, 'SERVICE_ALREADY_EXISTS', 409)
       }
 
       // 创建记录
@@ -324,7 +325,7 @@ class FeatureFlagService {
     try {
       const flag = await FeatureFlag.findByKey(flagKey)
       if (!flag) {
-        throw new Error(`功能开关 ${flagKey} 不存在`)
+        throw new BusinessError(`功能开关 ${flagKey} 不存在`, 'SERVICE_NOT_FOUND', 404)
       }
 
       // 记录变更前的值
@@ -382,7 +383,7 @@ class FeatureFlagService {
     try {
       const flag = await FeatureFlag.findByKey(flagKey)
       if (!flag) {
-        throw new Error(`功能开关 ${flagKey} 不存在`)
+        throw new BusinessError(`功能开关 ${flagKey} 不存在`, 'SERVICE_NOT_FOUND', 404)
       }
 
       const previousState = flag.is_enabled
@@ -431,7 +432,7 @@ class FeatureFlagService {
     try {
       const flag = await FeatureFlag.findByKey(flagKey)
       if (!flag) {
-        throw new Error(`功能开关 ${flagKey} 不存在`)
+        throw new BusinessError(`功能开关 ${flagKey} 不存在`, 'SERVICE_NOT_FOUND', 404)
       }
 
       // 记录删除前的数据（用于审计）
@@ -704,7 +705,7 @@ class FeatureFlagService {
    */
   static async addToWhitelist(flagKey, userIds, operator) {
     const flag = await this.getFlagByKey(flagKey, { skipCache: true })
-    if (!flag) throw new Error(`功能开关 ${flagKey} 不存在`)
+    if (!flag) throw new BusinessError(`功能开关 ${flagKey} 不存在`, 'SERVICE_NOT_FOUND', 404)
 
     const currentWhitelist = flag.whitelist_user_ids || []
     const newWhitelist = [...new Set([...currentWhitelist, ...userIds])]
@@ -722,7 +723,7 @@ class FeatureFlagService {
    */
   static async removeFromWhitelist(flagKey, userIds, operator) {
     const flag = await this.getFlagByKey(flagKey, { skipCache: true })
-    if (!flag) throw new Error(`功能开关 ${flagKey} 不存在`)
+    if (!flag) throw new BusinessError(`功能开关 ${flagKey} 不存在`, 'SERVICE_NOT_FOUND', 404)
 
     const currentWhitelist = flag.whitelist_user_ids || []
     const newWhitelist = currentWhitelist.filter(id => !userIds.includes(id))
@@ -740,7 +741,7 @@ class FeatureFlagService {
    */
   static async addToBlacklist(flagKey, userIds, operator) {
     const flag = await this.getFlagByKey(flagKey, { skipCache: true })
-    if (!flag) throw new Error(`功能开关 ${flagKey} 不存在`)
+    if (!flag) throw new BusinessError(`功能开关 ${flagKey} 不存在`, 'SERVICE_NOT_FOUND', 404)
 
     const currentBlacklist = flag.blacklist_user_ids || []
     const newBlacklist = [...new Set([...currentBlacklist, ...userIds])]
@@ -758,7 +759,7 @@ class FeatureFlagService {
    */
   static async removeFromBlacklist(flagKey, userIds, operator) {
     const flag = await this.getFlagByKey(flagKey, { skipCache: true })
-    if (!flag) throw new Error(`功能开关 ${flagKey} 不存在`)
+    if (!flag) throw new BusinessError(`功能开关 ${flagKey} 不存在`, 'SERVICE_NOT_FOUND', 404)
 
     const currentBlacklist = flag.blacklist_user_ids || []
     const newBlacklist = currentBlacklist.filter(id => !userIds.includes(id))

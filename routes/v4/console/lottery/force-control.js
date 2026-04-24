@@ -29,57 +29,44 @@ router.post(
   '/force-win',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    try {
-      const {
-        user_id,
-        lottery_prize_id,
-        reason = '管理员强制中奖',
-        duration_minutes = null,
-        lottery_campaign_id = null
-      } = req.body
+    const {
+      user_id,
+      lottery_prize_id,
+      reason = '管理员强制中奖',
+      duration_minutes = null,
+      lottery_campaign_id = null
+    } = req.body
 
-      // 参数验证
-      const validatedUserId = validators.validateUserId(user_id)
-      const validatedPrizeId = validators.validatePrizeId(lottery_prize_id)
-      const validatedCampaignId = lottery_campaign_id ? parseInt(lottery_campaign_id, 10) : null
+    // 参数验证
+    const validatedUserId = validators.validateUserId(user_id)
+    const validatedPrizeId = validators.validatePrizeId(lottery_prize_id)
+    const validatedCampaignId = lottery_campaign_id ? parseInt(lottery_campaign_id, 10) : null
 
-      // 计算过期时间（如果提供了持续时间）
-      let expiresAt = null
-      if (duration_minutes && !isNaN(parseInt(duration_minutes))) {
-        expiresAt = BeijingTimeHelper.futureTime(parseInt(duration_minutes) * 60 * 1000)
-      }
-
-      // 通过 ServiceManager 获取 AdminLotteryCoreService（V4.7.0 拆分后：核心干预操作）
-      const AdminLotteryCoreService = req.app.locals.services.getService('admin_lottery_core')
-
-      // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
-      const result = await TransactionManager.execute(
-        async transaction => {
-          return await AdminLotteryCoreService.forceWinForUser(
-            req.user?.user_id || req.user?.id,
-            validatedUserId,
-            validatedPrizeId,
-            reason,
-            expiresAt,
-            { transaction, lottery_campaign_id: validatedCampaignId }
-          )
-        },
-        { description: 'forceWinForUser' }
-      )
-
-      return res.apiSuccess(result, '强制中奖设置成功')
-    } catch (error) {
-      if (
-        error.message.includes('无效的') ||
-        error.message.includes('不存在') ||
-        error.message.includes('验证失败') ||
-        error.code === 'USER_NOT_FOUND' ||
-        error.message.includes('奖品不存在')
-      ) {
-        return res.apiError(error.message, error.code || 'VALIDATION_ERROR')
-      }
-      return res.apiInternalError('强制中奖设置失败', error.message, 'FORCE_WIN_ERROR')
+    // 计算过期时间（如果提供了持续时间）
+    let expiresAt = null
+    if (duration_minutes && !isNaN(parseInt(duration_minutes))) {
+      expiresAt = BeijingTimeHelper.futureTime(parseInt(duration_minutes) * 60 * 1000)
     }
+
+    // 通过 ServiceManager 获取 AdminLotteryCoreService（V4.7.0 拆分后：核心干预操作）
+    const AdminLotteryCoreService = req.app.locals.services.getService('admin_lottery_core')
+
+    // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
+    const result = await TransactionManager.execute(
+      async transaction => {
+        return await AdminLotteryCoreService.forceWinForUser(
+          req.user?.user_id || req.user?.id,
+          validatedUserId,
+          validatedPrizeId,
+          reason,
+          expiresAt,
+          { transaction, lottery_campaign_id: validatedCampaignId }
+        )
+      },
+      { description: 'forceWinForUser' }
+    )
+
+    return res.apiSuccess(result, '强制中奖设置成功')
   })
 )
 
@@ -94,59 +81,47 @@ router.post(
   '/force-lose',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    try {
-      const {
-        user_id,
-        count = 1,
-        reason = '管理员强制不中奖',
-        duration_minutes = null,
-        lottery_campaign_id = null
-      } = req.body
+    const {
+      user_id,
+      count = 1,
+      reason = '管理员强制不中奖',
+      duration_minutes = null,
+      lottery_campaign_id = null
+    } = req.body
 
-      // 参数验证
-      const validatedUserId = validators.validateUserId(user_id)
-      const validatedCampaignId = lottery_campaign_id ? parseInt(lottery_campaign_id, 10) : null
+    // 参数验证
+    const validatedUserId = validators.validateUserId(user_id)
+    const validatedCampaignId = lottery_campaign_id ? parseInt(lottery_campaign_id, 10) : null
 
-      if (!count || isNaN(parseInt(count)) || parseInt(count) < 1 || parseInt(count) > 100) {
-        return res.apiError('不中奖次数必须在1-100之间', 'INVALID_COUNT')
-      }
-
-      // 计算过期时间（如果提供了持续时间）
-      let expiresAt = null
-      if (duration_minutes && !isNaN(parseInt(duration_minutes))) {
-        expiresAt = BeijingTimeHelper.futureTime(parseInt(duration_minutes) * 60 * 1000)
-      }
-
-      // 通过 ServiceManager 获取 AdminLotteryCoreService（V4.7.0 拆分后：核心干预操作）
-      const AdminLotteryCoreService = req.app.locals.services.getService('admin_lottery_core')
-
-      // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
-      const result = await TransactionManager.execute(
-        async transaction => {
-          return await AdminLotteryCoreService.forceLoseForUser(
-            req.user?.user_id || req.user?.id,
-            validatedUserId,
-            parseInt(count),
-            reason,
-            expiresAt,
-            { transaction, lottery_campaign_id: validatedCampaignId }
-          )
-        },
-        { description: 'forceLoseForUser' }
-      )
-
-      return res.apiSuccess(result, `强制不中奖设置成功，将在接下来${count}次抽奖中不中奖`)
-    } catch (error) {
-      if (
-        error.message.includes('无效的') ||
-        error.message.includes('不存在') ||
-        error.message.includes('验证失败') ||
-        error.code === 'USER_NOT_FOUND'
-      ) {
-        return res.apiError(error.message, error.code || 'VALIDATION_ERROR')
-      }
-      return res.apiInternalError('强制不中奖设置失败', error.message, 'FORCE_LOSE_ERROR')
+    if (!count || isNaN(parseInt(count)) || parseInt(count) < 1 || parseInt(count) > 100) {
+      return res.apiError('不中奖次数必须在1-100之间', 'INVALID_COUNT')
     }
+
+    // 计算过期时间（如果提供了持续时间）
+    let expiresAt = null
+    if (duration_minutes && !isNaN(parseInt(duration_minutes))) {
+      expiresAt = BeijingTimeHelper.futureTime(parseInt(duration_minutes) * 60 * 1000)
+    }
+
+    // 通过 ServiceManager 获取 AdminLotteryCoreService（V4.7.0 拆分后：核心干预操作）
+    const AdminLotteryCoreService = req.app.locals.services.getService('admin_lottery_core')
+
+    // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
+    const result = await TransactionManager.execute(
+      async transaction => {
+        return await AdminLotteryCoreService.forceLoseForUser(
+          req.user?.user_id || req.user?.id,
+          validatedUserId,
+          parseInt(count),
+          reason,
+          expiresAt,
+          { transaction, lottery_campaign_id: validatedCampaignId }
+        )
+      },
+      { description: 'forceLoseForUser' }
+    )
+
+    return res.apiSuccess(result, `强制不中奖设置成功，将在接下来${count}次抽奖中不中奖`)
   })
 )
 

@@ -1,3 +1,4 @@
+const BusinessError = require('../utils/BusinessError')
 const logger = require('../utils/logger').logger
 
 /**
@@ -268,7 +269,7 @@ class HierarchyManagementService {
     // 1. 验证操作权限（操作人必须是目标用户的上级，且角色级别更高）
     const canOperate = await this.canManageUser(operator_user_id, target_user_id)
     if (!canOperate) {
-      throw new Error(`无权限操作该用户: operator=${operator_user_id}, target=${target_user_id}`)
+      throw new BusinessError(`无权限操作该用户: operator=${operator_user_id}, target=${target_user_id}`, 'SERVICE_FORBIDDEN', 403)
     }
 
     // 2. 获取要停用的用户列表
@@ -382,7 +383,7 @@ class HierarchyManagementService {
     // 1. 验证操作权限
     const canOperate = await this.canManageUser(operator_user_id, target_user_id)
     if (!canOperate) {
-      throw new Error('无权限操作该用户')
+      throw new BusinessError('无权限操作该用户', 'SERVICE_FORBIDDEN', 403)
     }
 
     // 2. 获取要激活的用户列表

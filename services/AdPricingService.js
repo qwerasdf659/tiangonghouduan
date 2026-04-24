@@ -14,6 +14,7 @@
 
 'use strict'
 
+const BusinessError = require('../utils/BusinessError')
 const logger = require('../utils/logger').logger
 const AdminSystemService = require('./AdminSystemService')
 const { AdDauDailyStat, AdSlot, sequelize } = require('../models')
@@ -142,7 +143,7 @@ class AdPricingService {
   static async calculateFinalDailyPrice(ad_slot_id, days = 1) {
     const slot = await AdSlot.findByPk(ad_slot_id)
     if (!slot) {
-      throw new Error(`广告位不存在: ${ad_slot_id}`)
+      throw new BusinessError(`广告位不存在: ${ad_slot_id}`, 'AD_NOT_FOUND', 404)
     }
 
     const basePrice = slot.daily_price_star_stone || 0

@@ -34,6 +34,7 @@
  * @date 2026-01-31
  */
 
+const BusinessError = require('../../utils/BusinessError')
 const logger = require('../../utils/logger').logger
 const BeijingTimeHelper = require('../../utils/timeHelper')
 const { Op, fn, col, literal } = require('sequelize')
@@ -175,7 +176,7 @@ class LotteryHealthService {
       // 1. 获取活动基本信息
       const campaign = await this.models.LotteryCampaign.findByPk(campaignId)
       if (!campaign) {
-        throw new Error('活动不存在')
+        throw new BusinessError('活动不存在', 'LOTTERY_NOT_FOUND', 404)
       }
 
       // 2. 并行获取各维度数据

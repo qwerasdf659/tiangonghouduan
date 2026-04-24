@@ -16,6 +16,7 @@
  * @since 2026
  */
 
+const BusinessError = require('../utils/BusinessError')
 const logger = require('../utils/logger').logger
 const { StoreStaff, User, Store } = require('../models')
 const BeijingTimeHelper = require('../utils/timeHelper')
@@ -57,18 +58,18 @@ class StaffManagementService {
     // 1. 验证员工用户存在
     const user = await User.findByPk(data.user_id, { transaction })
     if (!user) {
-      throw new Error(`用户不存在: user_id=${data.user_id}`)
+      throw new BusinessError(`用户不存在: user_id=${data.user_id}`, 'STAFF_NOT_FOUND', 404)
     }
 
     // 2. 验证门店存在
     const store = await Store.findByPk(data.store_id, { transaction })
     if (!store) {
-      throw new Error(`门店不存在: store_id=${data.store_id}`)
+      throw new BusinessError(`门店不存在: store_id=${data.store_id}`, 'STAFF_NOT_FOUND', 404)
     }
 
     // 3. 验证门店是否激活
     if (store.status !== 'active') {
-      throw new Error(`门店未激活或已关闭: store_id=${data.store_id}, status=${store.status}`)
+      throw new BusinessError(`门店未激活或已关闭: store_id=${data.store_id}, status=${store.status}`, 'STAFF_ERROR', 400)
     }
 
     // 4. 检查员工是否已在该门店在职
@@ -82,8 +83,10 @@ class StaffManagementService {
     })
 
     if (existingActive) {
-      throw new Error(
-        `该员工已在此门店在职，无需重复添加: user_id=${data.user_id}, store_id=${data.store_id}`
+      throw new BusinessError(
+        `该员工已在此门店在职，无需重复添加: user_id=${data.user_id}, store_id=${data.store_id}`,
+        'STAFF_ALREADY_EXISTS',
+        409
       )
     }
 
@@ -159,10 +162,10 @@ class StaffManagementService {
     // 1. 验证新门店存在且激活
     const newStore = await Store.findByPk(data.to_store_id, { transaction })
     if (!newStore) {
-      throw new Error(`新门店不存在: store_id=${data.to_store_id}`)
+      throw new BusinessError(`新门店不存在: store_id=${data.to_store_id}`, 'STAFF_NOT_FOUND', 404)
     }
     if (newStore.status !== 'active') {
-      throw new Error(`新门店未激活或已关闭: store_id=${data.to_store_id}`)
+      throw new BusinessError(`新门店未激活或已关闭: store_id=${data.to_store_id}`, 'STAFF_ERROR', 400)
     }
 
     // 2. 查找员工在原门店的在职记录
@@ -176,8 +179,10 @@ class StaffManagementService {
     })
 
     if (!oldRecord) {
-      throw new Error(
-        `员工不在原门店或已离职: user_id=${data.user_id}, store_id=${data.from_store_id}`
+      throw new BusinessError(
+        `员工不在原门店或已离职: user_id=${data.user_id}, store_id=${data.from_store_id}`,
+        'STAFF_ERROR',
+        400
       )
     }
 
@@ -192,7 +197,7 @@ class StaffManagementService {
     })
 
     if (existingInNewStore) {
-      throw new Error(`员工已在新门店在职: user_id=${data.user_id}, store_id=${data.to_store_id}`)
+      throw new BusinessError(`员工已在新门店在职: user_id=${data.user_id}, store_id=${data.to_store_id}`, 'STAFF_ERROR', 400)
     }
 
     // 4. 将原门店记录置为离职
@@ -292,7 +297,7 @@ class StaffManagementService {
     })
 
     if (!staffRecord) {
-      throw new Error(`员工不在该门店或已离职: user_id=${data.user_id}, store_id=${data.store_id}`)
+      throw new BusinessError(`员工不在该门店或已离职: user_id=${data.user_id}, store_id=${data.store_id}`, 'STAFF_ERROR', 400)
     }
 
     // 2. 更新为离职状态
@@ -361,7 +366,7 @@ class StaffManagementService {
     })
 
     if (activeRecords.length === 0) {
-      throw new Error(`该员工未绑定任何门店或已被禁用: user_id=${user_id}`)
+      throw new BusinessError(`该员工未绑定任何门店或已被禁用: user_id=${user_id}`, 'STAFF_DISABLED', 400)
     }
 
     // 2. 批量更新为离职状态
@@ -431,7 +436,7 @@ class StaffManagementService {
     // 1. 验证门店存在
     const store = await Store.findByPk(store_id, { transaction })
     if (!store) {
-      throw new Error(`门店不存在: store_id=${store_id}`)
+      throw new BusinessError(`门店不存在: store_id=${store_id}`, 'STAFF_NOT_FOUND', 404)
     }
 
     // 2. 查找员工记录（包括已禁用的）
@@ -452,12 +457,14 @@ class StaffManagementService {
       })
 
       if (activeRecord) {
-        throw new Error(
-          `该员工已在此门店在职，无需重复启用: user_id=${user_id}, store_id=${store_id}`
+        throw new BusinessError(
+          `该员工已在此门店在职，无需重复启用: user_id=${user_id}, store_id=${store_id}`,
+          'STAFF_ALREADY_EXISTS',
+          409
         )
       }
 
-      throw new Error(`该员工未在此门店或不存在禁用记录: user_id=${user_id}, store_id=${store_id}`)
+      throw new BusinessError(`该员工未在此门店或不存在禁用记录: user_id=${user_id}, store_id=${store_id}`, 'STAFF_NOT_FOUND', 404)
     }
 
     // 3. 更新为在职状态
@@ -519,7 +526,7 @@ class StaffManagementService {
 
     // 1. 验证角色值
     if (!['staff', 'manager'].includes(data.role_in_store)) {
-      throw new Error(`无效的门店角色: ${data.role_in_store}，必须是 staff 或 manager`)
+      throw new BusinessError(`无效的门店角色: ${data.role_in_store}，必须是 staff 或 manager`, 'STAFF_INVALID', 400)
     }
 
     // 2. 查找员工记录
@@ -533,7 +540,7 @@ class StaffManagementService {
     })
 
     if (!staffRecord) {
-      throw new Error(`员工不在该门店或已离职: user_id=${data.user_id}, store_id=${data.store_id}`)
+      throw new BusinessError(`员工不在该门店或已离职: user_id=${data.user_id}, store_id=${data.store_id}`, 'STAFF_ERROR', 400)
     }
 
     // 3. 保存旧角色
@@ -899,22 +906,24 @@ class StaffManagementService {
     })
 
     if (!staffRecord) {
-      throw new Error(`员工记录不存在: store_staff_id=${data.store_staff_id}`)
+      throw new BusinessError(`员工记录不存在: store_staff_id=${data.store_staff_id}`, 'STAFF_NOT_FOUND', 404)
     }
 
     // 2. 状态检查
     if (staffRecord.status === 'deleted') {
-      throw new Error(`员工记录已删除: store_staff_id=${data.store_staff_id}`)
+      throw new BusinessError(`员工记录已删除: store_staff_id=${data.store_staff_id}`, 'STAFF_ERROR', 400)
     }
 
     if (staffRecord.status === 'active' && !data.force) {
-      throw new Error(
-        `在职员工需要先离职或使用强制删除: store_staff_id=${data.store_staff_id}, status=${staffRecord.status}`
+      throw new BusinessError(
+        `在职员工需要先离职或使用强制删除: store_staff_id=${data.store_staff_id}, status=${staffRecord.status}`,
+        'STAFF_ERROR',
+        400
       )
     }
 
     if (staffRecord.status === 'pending') {
-      throw new Error(`待审核员工不能直接删除，请先拒绝审核: store_staff_id=${data.store_staff_id}`)
+      throw new BusinessError(`待审核员工不能直接删除，请先拒绝审核: store_staff_id=${data.store_staff_id}`, 'STAFF_NOT_ALLOWED', 400)
     }
 
     // 3. 保存删除前状态（用于审计日志）

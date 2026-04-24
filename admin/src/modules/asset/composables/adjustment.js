@@ -61,7 +61,7 @@ export function useAdjustmentState() {
 
     // ========== data-table 列配置 ==========
     recordsTableColumns: [
-      { key: 'transaction_id', label: '交易ID', sortable: true, type: 'code' },
+      { key: 'asset_transaction_id', label: '交易ID', sortable: true, type: 'code' },
       {
         key: 'operator_name',
         label: '操作人',

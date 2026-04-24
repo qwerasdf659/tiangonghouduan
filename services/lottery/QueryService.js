@@ -30,6 +30,7 @@
  * @architecture 读写分离 - 读操作收口服务
  */
 
+const BusinessError = require('../../utils/BusinessError')
 const { Op } = require('sequelize')
 const { logger } = require('../../utils/logger')
 const BeijingTimeHelper = require('../../utils/timeHelper')
@@ -120,7 +121,7 @@ class LotteryQueryService {
         lottery_campaign_id,
         error: error.message
       })
-      throw new Error(`获取活动奖品失败: ${error.message}`)
+      throw new BusinessError(`获取活动奖品失败: ${error.message}`, 'LOTTERY_FAILED', 500)
     }
   }
 
@@ -171,7 +172,7 @@ class LotteryQueryService {
       })
 
       if (!campaign) {
-        throw new Error('活动不存在')
+        throw new BusinessError('活动不存在', 'LOTTERY_NOT_FOUND', 404)
       }
 
       /**
@@ -200,7 +201,7 @@ class LotteryQueryService {
         lottery_campaign_id,
         error: error.message
       })
-      throw new Error(`获取活动配置失败: ${error.message}`)
+      throw new BusinessError(`获取活动配置失败: ${error.message}`, 'LOTTERY_FAILED', 500)
     }
   }
 
@@ -310,7 +311,7 @@ class LotteryQueryService {
         options,
         error: error.message
       })
-      throw new Error(`获取抽奖历史失败: ${error.message}`)
+      throw new BusinessError(`获取抽奖历史失败: ${error.message}`, 'LOTTERY_FAILED', 500)
     }
   }
 
@@ -499,7 +500,7 @@ class LotteryQueryService {
         options,
         error: error.message
       })
-      throw new Error(`获取活动列表失败: ${error.message}`)
+      throw new BusinessError(`获取活动列表失败: ${error.message}`, 'LOTTERY_FAILED', 500)
     }
   }
 
@@ -651,7 +652,7 @@ class LotteryQueryService {
         user_id,
         error: error.message
       })
-      throw new Error(`获取用户统计失败: ${error.message}`)
+      throw new BusinessError(`获取用户统计失败: ${error.message}`, 'LOTTERY_FAILED', 500)
     }
   }
 
@@ -759,7 +760,7 @@ class LotteryQueryService {
         campaign_code,
         error: error.message
       })
-      throw new Error(`获取活动失败: ${error.message}`)
+      throw new BusinessError(`获取活动失败: ${error.message}`, 'LOTTERY_FAILED', 500)
     }
   }
 

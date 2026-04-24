@@ -12,8 +12,7 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken } = require('../../../../middleware/auth')
-const { validatePositiveInteger, handleServiceError } = require('../../../../middleware/validation')
-const logger = require('../../../../utils/logger').logger
+const { validatePositiveInteger, asyncHandler } = require('../../../../middleware/validation')
 
 /**
  * 查询订单详情（Get Redemption Order Detail）
@@ -32,47 +31,29 @@ const logger = require('../../../../utils/logger').logger
  * 错误场景：
  * - 订单不存在 → 404 NOT_FOUND
  */
-router.get('/orders/:order_id', authenticateToken, async (req, res) => {
-  try {
-    const { order_id } = req.params
+router.get('/orders/:order_id', authenticateToken, asyncHandler(async (req, res) => {
+  const { order_id } = req.params
 
-    logger.info('查询订单详情', {
-      order_id,
-      user_id: req.user.user_id
-    })
+  const RedemptionService = req.app.locals.services.getService('redemption_order')
+  const order = await RedemptionService.getOrderDetail(order_id, {
+    include_item: true,
+    include_redeemer: true
+  })
 
-    const RedemptionService = req.app.locals.services.getService('redemption_order')
-    const order = await RedemptionService.getOrderDetail(order_id, {
-      include_item: true,
-      include_redeemer: true
-    })
-
-    return res.apiSuccess(
-      {
-        order_id: order.redemption_order_id,
-        item_id: order.item_id,
-        status: order.status,
-        expires_at: order.expires_at,
-        fulfilled_at: order.fulfilled_at,
-        created_at: order.created_at,
-        item: order.item,
-        redeemer: order.redeemer
-      },
-      '查询成功'
-    )
-  } catch (error) {
-    logger.error('查询订单详情失败', {
-      error: error.message,
-      order_id: req.params.order_id
-    })
-
-    if (error.message.includes('不存在')) {
-      return res.apiError(error.message, 'NOT_FOUND', null, 404)
-    }
-
-    return handleServiceError(error, res, '查询订单详情失败')
-  }
-})
+  return res.apiSuccess(
+    {
+      order_id: order.redemption_order_id,
+      item_id: order.item_id,
+      status: order.status,
+      expires_at: order.expires_at,
+      fulfilled_at: order.fulfilled_at,
+      created_at: order.created_at,
+      item: order.item,
+      redeemer: order.redeemer
+    },
+    '查询成功'
+  )
+}))
 
 /**
  * 查询物品的核销订单（Get Order by Item）
@@ -92,44 +73,30 @@ router.get(
   '/items/:item_id/order',
   authenticateToken,
   validatePositiveInteger('item_id', 'params'),
-  async (req, res) => {
-    try {
-      const itemId = req.validated.item_id
+  asyncHandler(async (req, res) => {
+    const itemId = req.validated.item_id
 
-      logger.info('查询物品的核销订单', {
-        item_id: itemId,
-        user_id: req.user.user_id
-      })
+    const RedemptionService = req.app.locals.services.getService('redemption_order')
+    const order = await RedemptionService.getOrderByItem(itemId)
 
-      const RedemptionService = req.app.locals.services.getService('redemption_order')
-      const order = await RedemptionService.getOrderByItem(itemId)
-
-      if (!order) {
-        return res.apiSuccess({ has_order: false, order: null }, '该物品尚未生成核销订单')
-      }
-
-      return res.apiSuccess(
-        {
-          has_order: true,
-          order: {
-            order_id: order.redemption_order_id,
-            status: order.status,
-            expires_at: order.expires_at,
-            fulfilled_at: order.fulfilled_at,
-            created_at: order.created_at
-          }
-        },
-        '查询成功'
-      )
-    } catch (error) {
-      logger.error('查询物品核销订单失败', {
-        error: error.message,
-        item_id: req.validated.item_id
-      })
-
-      return handleServiceError(error, res, '查询物品核销订单失败')
+    if (!order) {
+      return res.apiSuccess({ has_order: false, order: null }, '该物品尚未生成核销订单')
     }
-  }
+
+    return res.apiSuccess(
+      {
+        has_order: true,
+        order: {
+          order_id: order.redemption_order_id,
+          status: order.status,
+          expires_at: order.expires_at,
+          fulfilled_at: order.fulfilled_at,
+          created_at: order.created_at
+        }
+      },
+      '查询成功'
+    )
+  })
 )
 
 module.exports = router

@@ -20,7 +20,7 @@
 const express = require('express')
 const router = express.Router()
 const TransactionManager = require('../../../../utils/TransactionManager')
-const { sharedComponents, adminAuthMiddleware, asyncHandler } = require('../shared/middleware')
+const { adminAuthMiddleware, asyncHandler } = require('../shared/middleware')
 
 const VALID_RATIO_KEYS = ['points_award_ratio', 'budget_allocation_ratio', 'star_stone_quota_ratio']
 
@@ -37,43 +37,38 @@ router.get(
   '/',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    try {
-      const { UserRatioOverride, User } = require('../../../../models')
+    const { UserRatioOverride, User } = require('../../../../models')
 
-      const { user_id, ratio_key, page = 1, page_size = 20 } = req.query
-      const where = {}
+    const { user_id, ratio_key, page = 1, page_size = 20 } = req.query
+    const where = {}
 
-      if (user_id) where.user_id = user_id
-      if (ratio_key && VALID_RATIO_KEYS.includes(ratio_key)) where.ratio_key = ratio_key
+    if (user_id) where.user_id = user_id
+    if (ratio_key && VALID_RATIO_KEYS.includes(ratio_key)) where.ratio_key = ratio_key
 
-      const offset = (Math.max(1, parseInt(page)) - 1) * parseInt(page_size)
-      const limit = Math.min(100, Math.max(1, parseInt(page_size)))
+    const offset = (Math.max(1, parseInt(page)) - 1) * parseInt(page_size)
+    const limit = Math.min(100, Math.max(1, parseInt(page_size)))
 
-      const { count, rows } = await UserRatioOverride.findAndCountAll({
-        where,
-        include: [
-          { model: User, as: 'target_user', attributes: ['user_id', 'nickname', 'mobile'] },
-          { model: User, as: 'creator', attributes: ['user_id', 'nickname'] }
-        ],
-        order: [['created_at', 'DESC']],
-        offset,
-        limit
-      })
+    const { count, rows } = await UserRatioOverride.findAndCountAll({
+      where,
+      include: [
+        { model: User, as: 'target_user', attributes: ['user_id', 'nickname', 'mobile'] },
+        { model: User, as: 'creator', attributes: ['user_id', 'nickname'] }
+      ],
+      order: [['created_at', 'DESC']],
+      offset,
+      limit
+    })
 
-      return res.apiSuccess(
-        {
-          items: rows,
-          total: count,
-          page: parseInt(page),
-          page_size: limit,
-          ratio_key_labels: RATIO_KEY_LABELS
-        },
-        '查询用户比例覆盖列表成功'
-      )
-    } catch (error) {
-      sharedComponents.logger.error('查询用户比例覆盖列表失败', { error: error.message })
-      return res.apiInternalError('查询失败', error.message, 'USER_RATIO_OVERRIDE_LIST_ERROR')
-    }
+    return res.apiSuccess(
+      {
+        items: rows,
+        total: count,
+        page: parseInt(page),
+        page_size: limit,
+        ratio_key_labels: RATIO_KEY_LABELS
+      },
+      '查询用户比例覆盖列表成功'
+    )
   })
 )
 
@@ -84,25 +79,20 @@ router.get(
   '/user/:user_id',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    try {
-      const { UserRatioOverride } = require('../../../../models')
-      const overrides = await UserRatioOverride.findAll({
-        where: { user_id: req.params.user_id },
-        order: [['ratio_key', 'ASC']]
-      })
+    const { UserRatioOverride } = require('../../../../models')
+    const overrides = await UserRatioOverride.findAll({
+      where: { user_id: req.params.user_id },
+      order: [['ratio_key', 'ASC']]
+    })
 
-      return res.apiSuccess(
-        {
-          items: overrides,
-          user_id: parseInt(req.params.user_id),
-          ratio_key_labels: RATIO_KEY_LABELS
-        },
-        '查询用户比例覆盖成功'
-      )
-    } catch (error) {
-      sharedComponents.logger.error('查询用户比例覆盖失败', { error: error.message })
-      return res.apiInternalError('查询失败', error.message, 'USER_RATIO_OVERRIDE_QUERY_ERROR')
-    }
+    return res.apiSuccess(
+      {
+        items: overrides,
+        user_id: parseInt(req.params.user_id),
+        ratio_key_labels: RATIO_KEY_LABELS
+      },
+      '查询用户比例覆盖成功'
+    )
   })
 )
 
@@ -113,24 +103,19 @@ router.get(
   '/:id',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    try {
-      const { UserRatioOverride, User } = require('../../../../models')
-      const override = await UserRatioOverride.findByPk(req.params.id, {
-        include: [
-          { model: User, as: 'target_user', attributes: ['user_id', 'nickname', 'mobile'] },
-          { model: User, as: 'creator', attributes: ['user_id', 'nickname'] }
-        ]
-      })
+    const { UserRatioOverride, User } = require('../../../../models')
+    const override = await UserRatioOverride.findByPk(req.params.id, {
+      include: [
+        { model: User, as: 'target_user', attributes: ['user_id', 'nickname', 'mobile'] },
+        { model: User, as: 'creator', attributes: ['user_id', 'nickname'] }
+      ]
+    })
 
-      if (!override) {
-        return res.apiError('覆盖记录不存在', 'NOT_FOUND', null, 404)
-      }
-
-      return res.apiSuccess(override, '查询覆盖记录成功')
-    } catch (error) {
-      sharedComponents.logger.error('查询覆盖记录失败', { error: error.message })
-      return res.apiInternalError('查询失败', error.message, 'USER_RATIO_OVERRIDE_DETAIL_ERROR')
+    if (!override) {
+      return res.apiError('覆盖记录不存在', 'NOT_FOUND', null, 404)
     }
+
+    return res.apiSuccess(override, '查询覆盖记录成功')
   })
 )
 
@@ -141,78 +126,59 @@ router.post(
   '/',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    try {
-      const { user_id, ratio_key, ratio_value, reason, effective_start, effective_end } = req.body
+    const { user_id, ratio_key, ratio_value, reason, effective_start, effective_end } = req.body
 
-      if (!user_id || !ratio_key || ratio_value === undefined || ratio_value === null) {
-        return res.apiError(
-          '缺少必填字段：user_id、ratio_key、ratio_value',
-          'VALIDATION_ERROR',
-          null,
-          400
-        )
-      }
-
-      if (!VALID_RATIO_KEYS.includes(ratio_key)) {
-        return res.apiError(
-          `无效的 ratio_key，允许值：${VALID_RATIO_KEYS.join(', ')}`,
-          'INVALID_RATIO_KEY',
-          null,
-          400
-        )
-      }
-
-      const parsedValue = parseFloat(ratio_value)
-      if (isNaN(parsedValue) || parsedValue < 0.1 || parsedValue > 5.0) {
-        return res.apiError('ratio_value 必须在 0.1 ~ 5.0 之间', 'INVALID_RATIO_VALUE', null, 400)
-      }
-
-      const result = await TransactionManager.execute(
-        async transaction => {
-          const { UserRatioOverride, User } = require('../../../../models')
-
-          const user = await User.findByPk(user_id, { transaction })
-          if (!user) {
-            throw new Error(`用户不存在：user_id=${user_id}`)
-          }
-
-          const override = await UserRatioOverride.create(
-            {
-              user_id,
-              ratio_key,
-              ratio_value: parsedValue,
-              reason: reason || null,
-              effective_start: effective_start || null,
-              effective_end: effective_end || null,
-              created_by: req.user.user_id
-            },
-            { transaction }
-          )
-
-          return override
-        },
-        { description: 'createUserRatioOverride' }
+    if (!user_id || !ratio_key || ratio_value === undefined || ratio_value === null) {
+      return res.apiError(
+        '缺少必填字段：user_id、ratio_key、ratio_value',
+        'VALIDATION_ERROR',
+        null,
+        400
       )
-
-      return res.apiSuccess(result, `创建用户比例覆盖成功（${RATIO_KEY_LABELS[ratio_key]}）`)
-    } catch (error) {
-      sharedComponents.logger.error('创建用户比例覆盖失败', { error: error.message })
-
-      if (error.name === 'SequelizeUniqueConstraintError') {
-        return res.apiError(
-          '该用户已有相同类型的比例覆盖，请使用修改功能',
-          'DUPLICATE_OVERRIDE',
-          null,
-          409
-        )
-      }
-
-      if (error.message.includes('用户不存在')) {
-        return res.apiError(error.message, 'USER_NOT_FOUND', null, 404)
-      }
-
-      return res.apiInternalError('创建失败', error.message, 'USER_RATIO_OVERRIDE_CREATE_ERROR')
     }
+
+    if (!VALID_RATIO_KEYS.includes(ratio_key)) {
+      return res.apiError(
+        `无效的 ratio_key，允许值：${VALID_RATIO_KEYS.join(', ')}`,
+        'INVALID_RATIO_KEY',
+        null,
+        400
+      )
+    }
+
+    const parsedValue = parseFloat(ratio_value)
+    if (isNaN(parsedValue) || parsedValue < 0.1 || parsedValue > 5.0) {
+      return res.apiError('ratio_value 必须在 0.1 ~ 5.0 之间', 'INVALID_RATIO_VALUE', null, 400)
+    }
+
+    const result = await TransactionManager.execute(
+      async transaction => {
+        const { UserRatioOverride, User } = require('../../../../models')
+
+        const user = await User.findByPk(user_id, { transaction })
+        if (!user) {
+          throw new Error(`用户不存在：user_id=${user_id}`)
+        }
+
+        const override = await UserRatioOverride.create(
+          {
+            user_id,
+            ratio_key,
+            ratio_value: parsedValue,
+            reason: reason || null,
+            effective_start: effective_start || null,
+            effective_end: effective_end || null,
+            created_by: req.user.user_id
+          },
+          { transaction }
+        )
+
+        return override
+      },
+      { description: 'createUserRatioOverride' }
+    )
+
+    return res.apiSuccess(result, `创建用户比例覆盖成功（${RATIO_KEY_LABELS[ratio_key]}）`)
   })
 )
 
@@ -223,49 +189,36 @@ router.put(
   '/:id',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    try {
-      const { ratio_value, reason, effective_start, effective_end } = req.body
+    const { ratio_value, reason, effective_start, effective_end } = req.body
 
-      const result = await TransactionManager.execute(
-        async transaction => {
-          const { UserRatioOverride } = require('../../../../models')
+    const result = await TransactionManager.execute(
+      async transaction => {
+        const { UserRatioOverride } = require('../../../../models')
 
-          const override = await UserRatioOverride.findByPk(req.params.id, { transaction })
-          if (!override) {
-            throw new Error('覆盖记录不存在')
+        const override = await UserRatioOverride.findByPk(req.params.id, { transaction })
+        if (!override) {
+          throw new Error('覆盖记录不存在')
+        }
+
+        const updateData = {}
+        if (ratio_value !== undefined && ratio_value !== null) {
+          const parsedValue = parseFloat(ratio_value)
+          if (isNaN(parsedValue) || parsedValue < 0.1 || parsedValue > 5.0) {
+            throw new Error('ratio_value 必须在 0.1 ~ 5.0 之间')
           }
+          updateData.ratio_value = parsedValue
+        }
+        if (reason !== undefined) updateData.reason = reason
+        if (effective_start !== undefined) updateData.effective_start = effective_start || null
+        if (effective_end !== undefined) updateData.effective_end = effective_end || null
 
-          const updateData = {}
-          if (ratio_value !== undefined && ratio_value !== null) {
-            const parsedValue = parseFloat(ratio_value)
-            if (isNaN(parsedValue) || parsedValue < 0.1 || parsedValue > 5.0) {
-              throw new Error('ratio_value 必须在 0.1 ~ 5.0 之间')
-            }
-            updateData.ratio_value = parsedValue
-          }
-          if (reason !== undefined) updateData.reason = reason
-          if (effective_start !== undefined) updateData.effective_start = effective_start || null
-          if (effective_end !== undefined) updateData.effective_end = effective_end || null
+        await override.update(updateData, { transaction })
+        return override
+      },
+      { description: 'updateUserRatioOverride' }
+    )
 
-          await override.update(updateData, { transaction })
-          return override
-        },
-        { description: 'updateUserRatioOverride' }
-      )
-
-      return res.apiSuccess(result, '修改用户比例覆盖成功')
-    } catch (error) {
-      sharedComponents.logger.error('修改用户比例覆盖失败', { error: error.message })
-
-      if (error.message === '覆盖记录不存在') {
-        return res.apiError(error.message, 'NOT_FOUND', null, 404)
-      }
-      if (error.message.includes('ratio_value')) {
-        return res.apiError(error.message, 'INVALID_RATIO_VALUE', null, 400)
-      }
-
-      return res.apiInternalError('修改失败', error.message, 'USER_RATIO_OVERRIDE_UPDATE_ERROR')
-    }
+    return res.apiSuccess(result, '修改用户比例覆盖成功')
   })
 )
 
@@ -276,39 +229,29 @@ router.delete(
   '/:id',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    try {
-      const result = await TransactionManager.execute(
-        async transaction => {
-          const { UserRatioOverride } = require('../../../../models')
+    const result = await TransactionManager.execute(
+      async transaction => {
+        const { UserRatioOverride } = require('../../../../models')
 
-          const override = await UserRatioOverride.findByPk(req.params.id, { transaction })
-          if (!override) {
-            throw new Error('覆盖记录不存在')
-          }
+        const override = await UserRatioOverride.findByPk(req.params.id, { transaction })
+        if (!override) {
+          throw new Error('覆盖记录不存在')
+        }
 
-          const info = {
-            user_ratio_override_id: override.user_ratio_override_id,
-            user_id: override.user_id,
-            ratio_key: override.ratio_key,
-            ratio_value: override.ratio_value
-          }
+        const info = {
+          user_ratio_override_id: override.user_ratio_override_id,
+          user_id: override.user_id,
+          ratio_key: override.ratio_key,
+          ratio_value: override.ratio_value
+        }
 
-          await override.destroy({ transaction })
-          return info
-        },
-        { description: 'deleteUserRatioOverride' }
-      )
+        await override.destroy({ transaction })
+        return info
+      },
+      { description: 'deleteUserRatioOverride' }
+    )
 
-      return res.apiSuccess(result, '删除用户比例覆盖成功（已恢复为全局默认值）')
-    } catch (error) {
-      sharedComponents.logger.error('删除用户比例覆盖失败', { error: error.message })
-
-      if (error.message === '覆盖记录不存在') {
-        return res.apiError(error.message, 'NOT_FOUND', null, 404)
-      }
-
-      return res.apiInternalError('删除失败', error.message, 'USER_RATIO_OVERRIDE_DELETE_ERROR')
-    }
+    return res.apiSuccess(result, '删除用户比例覆盖成功（已恢复为全局默认值）')
   })
 )
 

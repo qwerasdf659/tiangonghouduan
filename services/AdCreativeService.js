@@ -12,6 +12,7 @@
  *
  */
 
+const BusinessError = require('../utils/BusinessError')
 const logger = require('../utils/logger').logger
 const { AdCreative, AdCampaign } = require('../models')
 const BeijingTimeHelper = require('../utils/timeHelper')
@@ -75,7 +76,7 @@ class AdCreativeService {
       })
 
       if (!campaign) {
-        throw new Error(`广告计划不存在: ${data.ad_campaign_id}`)
+        throw new BusinessError(`广告计划不存在: ${data.ad_campaign_id}`, 'SERVICE_NOT_FOUND', 404)
       }
 
       // D6/2.6 定论：operational/system 类型的 creative 自动审核通过，跳过人工审核
@@ -131,11 +132,11 @@ class AdCreativeService {
       })
 
       if (!creative) {
-        throw new Error(`广告创意不存在: ${creativeId}`)
+        throw new BusinessError(`广告创意不存在: ${creativeId}`, 'SERVICE_NOT_FOUND', 404)
       }
 
       if (creative.review_status !== 'pending') {
-        throw new Error(`只能审核待审核状态的创意，当前状态: ${creative.review_status}`)
+        throw new BusinessError(`只能审核待审核状态的创意，当前状态: ${creative.review_status}`, 'SERVICE_ERROR', 400)
       }
 
       if (action === 'approve') {
@@ -161,7 +162,7 @@ class AdCreativeService {
           { transaction: options.transaction }
         )
       } else {
-        throw new Error(`无效的审核操作: ${action}`)
+        throw new BusinessError(`无效的审核操作: ${action}`, 'SERVICE_INVALID', 400)
       }
 
       logger.info('审核广告创意成功', {

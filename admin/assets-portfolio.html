@@ -195,7 +195,7 @@
             <tbody class="divide-y">
               <template x-for="tx in assetHistory" :key="tx.asset_transaction_id">
                 <tr class="themed-hover-bg">
-                  <td class="px-3 py-2" x-text="tx.tx_type_display || tx.tx_type || '-'"></td>
+                  <td class="px-3 py-2" x-text="tx.business_type_display || tx.business_type || '-'"></td>
                   <td class="px-3 py-2 text-right font-mono" :class="tx.amount >= 0 ? 'text-green-600' : 'text-red-600'" x-text="(tx.amount >= 0 ? '+' : '') + tx.amount"></td>
                   <td class="px-3 py-2 text-right font-mono themed-text-muted" x-text="tx.balance_before + ' → ' + tx.balance_after"></td>
                   <td class="px-3 py-2 themed-text-muted" x-text="tx.created_at"></td>

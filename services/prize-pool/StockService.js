@@ -1,5 +1,6 @@
 'use strict'
 
+const BusinessError = require('../../utils/BusinessError')
 const { LotteryPrize, LotteryCampaign } = require('../../models')
 const AuditLogService = require('../AuditLogService')
 const { assertAndGetTransaction } = require('../../utils/transactionHelpers')
@@ -33,13 +34,13 @@ class PrizeStockService {
 
     // 1. 验证补充数量
     if (!quantity || quantity <= 0) {
-      throw new Error('补充数量必须大于0')
+      throw new BusinessError('补充数量必须大于0', 'PRIZE_POOL_REQUIRED', 400)
     }
 
     // 2. 查找奖品
     const prize = await LotteryPrize.findByPk(prize_id, { transaction })
     if (!prize) {
-      throw new Error('奖品不存在')
+      throw new BusinessError('奖品不存在', 'PRIZE_POOL_NOT_FOUND', 404)
     }
 
     const oldQuantity = prize.stock_quantity || 0
@@ -134,19 +135,19 @@ class PrizeStockService {
 
     const prize = await LotteryPrize.findByPk(prize_id, { transaction })
     if (!prize) {
-      throw new Error('奖品不存在')
+      throw new BusinessError('奖品不存在', 'PRIZE_POOL_NOT_FOUND', 404)
     }
 
     const oldStock = prize.stock_quantity || 0
     const newStock = parseInt(stock_quantity)
 
     if (isNaN(newStock) || newStock < 0) {
-      throw new Error('库存数量必须为非负整数')
+      throw new BusinessError('库存数量必须为非负整数', 'PRIZE_POOL_REQUIRED', 400)
     }
 
     const currentUsed = prize.total_win_count || 0
     if (newStock < currentUsed) {
-      throw new Error(`新库存(${newStock})不能小于已发放数量(${currentUsed})`)
+      throw new BusinessError(`新库存(${newStock})不能小于已发放数量(${currentUsed})`, 'PRIZE_POOL_NOT_ALLOWED', 400)
     }
 
     await prize.update({ stock_quantity: newStock }, { transaction })
@@ -207,7 +208,7 @@ class PrizeStockService {
       transaction
     })
     if (!campaign) {
-      throw new Error(`活动不存在: ${campaign_code}`)
+      throw new BusinessError(`活动不存在: ${campaign_code}`, 'PRIZE_POOL_NOT_FOUND', 404)
     }
 
     const warnings = []
@@ -251,11 +252,11 @@ class PrizeStockService {
       transaction
     })
     if (!campaign) {
-      throw new Error(`活动不存在: ${campaign_code}`)
+      throw new BusinessError(`活动不存在: ${campaign_code}`, 'PRIZE_POOL_NOT_FOUND', 404)
     }
 
     if (!updates || updates.length === 0) {
-      throw new Error('排序更新列表不能为空')
+      throw new BusinessError('排序更新列表不能为空', 'PRIZE_POOL_NOT_ALLOWED', 400)
     }
 
     // 阶段1：设置临时负值

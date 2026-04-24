@@ -29,9 +29,10 @@
 'use strict'
 
 const express = require('express')
+const { asyncHandler } = require('../../../../middleware/validation')
 const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
-const logger = require('../../../../utils/logger').logger
+
 const TransactionManager = require('../../../../utils/TransactionManager')
 
 /**
@@ -41,35 +42,6 @@ const TransactionManager = require('../../../../utils/TransactionManager')
  */
 function getMerchantService(req) {
   return req.app.locals.services.getService('merchant')
-}
-
-/**
- * 统一错误处理
- * @param {Error} error - 错误对象
- * @param {Object} res - Express 响应对象
- * @param {string} operation - 操作名称
- * @returns {Object} Express 响应对象
- */
-function handleServiceError(error, res, operation) {
-  logger.error(`❌ ${operation}失败`, { error: error.message })
-
-  if (error.message.includes('不存在') || error.message.includes('not found')) {
-    return res.apiError(error.message, 'NOT_FOUND', null, 404)
-  }
-
-  if (error.message.includes('无法删除') || error.message.includes('关联')) {
-    return res.apiError(error.message, 'CONFLICT', null, 409)
-  }
-
-  if (
-    error.message.includes('不能为空') ||
-    error.message.includes('无效') ||
-    error.message.includes('必填')
-  ) {
-    return res.apiError(error.message, 'VALIDATION_ERROR', null, 400)
-  }
-
-  return handleServiceError(error, res)
 }
 
 // 所有接口需要管理员权限
@@ -85,63 +57,47 @@ router.use(authenticateToken, requireRoleLevel(100))
  * @query {string} [keyword] - 名称/联系电话模糊搜索
  * @query {string} [contact_mobile] - 联系电话独立筛选
  */
-router.get('/', async (req, res) => {
-  try {
-    const merchantService = getMerchantService(req)
-    const result = await merchantService.getMerchantList(req.query)
-    return res.apiSuccess(result, '获取商家列表成功')
-  } catch (error) {
-    return handleServiceError(error, res, '获取商家列表')
-  }
-})
+router.get('/', asyncHandler(async (req, res) => {
+  const merchantService = getMerchantService(req)
+  const result = await merchantService.getMerchantList(req.query)
+  return res.apiSuccess(result, '获取商家列表成功')
+}))
 
 /**
  * GET /options - 商家下拉选项（供其他页面筛选器使用）
  * 返回所有活跃商家的 { merchant_id, merchant_name, merchant_type }
  */
-router.get('/options', async (req, res) => {
-  try {
-    const merchantService = getMerchantService(req)
-    const options = await merchantService.getMerchantOptions()
-    return res.apiSuccess(options, '获取商家选项成功')
-  } catch (error) {
-    return handleServiceError(error, res, '获取商家选项')
-  }
-})
+router.get('/options', asyncHandler(async (req, res) => {
+  const merchantService = getMerchantService(req)
+  const options = await merchantService.getMerchantOptions()
+  return res.apiSuccess(options, '获取商家选项成功')
+}))
 
 /**
  * GET /type-options - 商家类型选项（字典表驱动）
  * 返回 [{ code, name, color }]
  */
-router.get('/type-options', async (req, res) => {
-  try {
-    const merchantService = getMerchantService(req)
-    const typeOptions = await merchantService.getMerchantTypeOptions()
-    return res.apiSuccess(typeOptions, '获取商家类型选项成功')
-  } catch (error) {
-    return handleServiceError(error, res, '获取商家类型选项')
-  }
-})
+router.get('/type-options', asyncHandler(async (req, res) => {
+  const merchantService = getMerchantService(req)
+  const typeOptions = await merchantService.getMerchantTypeOptions()
+  return res.apiSuccess(typeOptions, '获取商家类型选项成功')
+}))
 
 /**
  * GET /:id - 商家详情
  *
  * @param {number} id - 商家ID
  */
-router.get('/:id', async (req, res) => {
-  try {
-    const merchantId = parseInt(req.params.id)
-    if (isNaN(merchantId)) {
-      return res.apiError('商家ID必须是数字', 'VALIDATION_ERROR', null, 400)
-    }
-
-    const merchantService = getMerchantService(req)
-    const merchant = await merchantService.getMerchantById(merchantId)
-    return res.apiSuccess(merchant, '获取商家详情成功')
-  } catch (error) {
-    return handleServiceError(error, res, '获取商家详情')
+router.get('/:id', asyncHandler(async (req, res) => {
+  const merchantId = parseInt(req.params.id)
+  if (isNaN(merchantId)) {
+    return res.apiError('商家ID必须是数字', 'VALIDATION_ERROR', null, 400)
   }
-})
+
+  const merchantService = getMerchantService(req)
+  const merchant = await merchantService.getMerchantById(merchantId)
+  return res.apiSuccess(merchant, '获取商家详情成功')
+}))
 
 /**
  * POST / - 创建新商家
@@ -155,19 +111,15 @@ router.get('/:id', async (req, res) => {
  * @body {number} [commission_rate=0] - 抽佣比例
  * @body {string} [notes] - 备注
  */
-router.post('/', async (req, res) => {
-  try {
-    const merchantService = getMerchantService(req)
+router.post('/', asyncHandler(async (req, res) => {
+  const merchantService = getMerchantService(req)
 
-    const result = await TransactionManager.execute(async transaction => {
-      return await merchantService.createMerchant(req.body, { transaction })
-    })
+  const result = await TransactionManager.execute(async transaction => {
+    return await merchantService.createMerchant(req.body, { transaction })
+  })
 
-    return res.apiSuccess(result, '商家创建成功', 201)
-  } catch (error) {
-    return handleServiceError(error, res, '创建商家')
-  }
-})
+  return res.apiSuccess(result, '商家创建成功', 201)
+}))
 
 /**
  * PUT /:id - 更新商家信息
@@ -175,47 +127,39 @@ router.post('/', async (req, res) => {
  * @param {number} id - 商家ID
  * @body {Object} 可更新的字段
  */
-router.put('/:id', async (req, res) => {
-  try {
-    const merchantId = parseInt(req.params.id)
-    if (isNaN(merchantId)) {
-      return res.apiError('商家ID必须是数字', 'VALIDATION_ERROR', null, 400)
-    }
-
-    const merchantService = getMerchantService(req)
-
-    const result = await TransactionManager.execute(async transaction => {
-      return await merchantService.updateMerchant(merchantId, req.body, { transaction })
-    })
-
-    return res.apiSuccess(result, '商家信息更新成功')
-  } catch (error) {
-    return handleServiceError(error, res, '更新商家')
+router.put('/:id', asyncHandler(async (req, res) => {
+  const merchantId = parseInt(req.params.id)
+  if (isNaN(merchantId)) {
+    return res.apiError('商家ID必须是数字', 'VALIDATION_ERROR', null, 400)
   }
-})
+
+  const merchantService = getMerchantService(req)
+
+  const result = await TransactionManager.execute(async transaction => {
+    return await merchantService.updateMerchant(merchantId, req.body, { transaction })
+  })
+
+  return res.apiSuccess(result, '商家信息更新成功')
+}))
 
 /**
  * DELETE /:id - 删除商家
  *
  * @param {number} id - 商家ID
  */
-router.delete('/:id', async (req, res) => {
-  try {
-    const merchantId = parseInt(req.params.id)
-    if (isNaN(merchantId)) {
-      return res.apiError('商家ID必须是数字', 'VALIDATION_ERROR', null, 400)
-    }
-
-    const merchantService = getMerchantService(req)
-
-    await TransactionManager.execute(async transaction => {
-      return await merchantService.deleteMerchant(merchantId, { transaction })
-    })
-
-    return res.apiSuccess(null, '商家删除成功')
-  } catch (error) {
-    return handleServiceError(error, res, '删除商家')
+router.delete('/:id', asyncHandler(async (req, res) => {
+  const merchantId = parseInt(req.params.id)
+  if (isNaN(merchantId)) {
+    return res.apiError('商家ID必须是数字', 'VALIDATION_ERROR', null, 400)
   }
-})
+
+  const merchantService = getMerchantService(req)
+
+  await TransactionManager.execute(async transaction => {
+    return await merchantService.deleteMerchant(merchantId, { transaction })
+  })
+
+  return res.apiSuccess(null, '商家删除成功')
+}))
 
 module.exports = router

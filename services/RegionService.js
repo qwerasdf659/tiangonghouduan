@@ -20,6 +20,7 @@
 
 'use strict'
 
+const BusinessError = require('../utils/BusinessError')
 const logger = require('../utils/logger')
 const { Op: _Op } = require('sequelize')
 
@@ -83,7 +84,7 @@ class RegionService {
    */
   async getChildren(parentCode) {
     if (!parentCode) {
-      throw new Error('父级区划代码不能为空')
+      throw new BusinessError('父级区划代码不能为空', 'SERVICE_NOT_ALLOWED', 400)
     }
 
     try {
@@ -127,7 +128,7 @@ class RegionService {
    */
   async search(keyword, options = {}) {
     if (!keyword || keyword.trim().length < 2) {
-      throw new Error('搜索关键词至少需要2个字符')
+      throw new BusinessError('搜索关键词至少需要2个字符', 'SERVICE_ERROR', 400)
     }
 
     try {
@@ -168,7 +169,7 @@ class RegionService {
    */
   async getFullPath(regionCode) {
     if (!regionCode) {
-      throw new Error('区划代码不能为空')
+      throw new BusinessError('区划代码不能为空', 'SERVICE_NOT_ALLOWED', 400)
     }
 
     try {
@@ -198,7 +199,7 @@ class RegionService {
    * @example
    * const region = await regionService.validateCode('110108', 3)
    * if (!region) {
-   *   throw new Error('无效的区县代码')
+   *   throw new BusinessError('无效的区县代码', 'SERVICE_INVALID', 400)
    * }
    */
   async validateCode(regionCode, expectedLevel = null) {
@@ -360,7 +361,7 @@ class RegionService {
    */
   async getRegionNames(codes) {
     if (!codes) {
-      throw new Error('区划代码不能为空')
+      throw new BusinessError('区划代码不能为空', 'SERVICE_NOT_ALLOWED', 400)
     }
 
     try {

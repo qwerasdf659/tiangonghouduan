@@ -796,23 +796,22 @@ router.post(
  *
  * @description 用户查看已发货订单的快递物流轨迹
  */
-router.get('/orders/:order_no/track', authenticateToken, async (req, res) => {
-  try {
-    const { order_no } = req.params
-    const user_id = req.user.user_id
-    const ExchangeQueryService = req.app.locals.services.getService('exchange_query')
+router.get('/orders/:order_no/track', authenticateToken, asyncHandler(async (req, res) => {
+  const { order_no } = req.params
+  const user_id = req.user.user_id
+  const ExchangeQueryService = req.app.locals.services.getService('exchange_query')
 
-    const orderResult = await ExchangeQueryService.getOrderDetail(user_id, order_no)
-    if (!orderResult || !orderResult.order) {
-      return res.apiError('订单不存在', 'NOT_FOUND', null, 404)
-    }
+  const orderResult = await ExchangeQueryService.getOrderDetail(user_id, order_no)
+  if (!orderResult || !orderResult.order) {
+    return res.apiError('订单不存在', 'NOT_FOUND', null, 404)
+  }
 
-    const order = orderResult.order
-    if (!order.shipping_no) {
-      return res.apiSuccess({ has_shipping: false, message: '该订单尚未填写快递信息' })
-    }
+  const order = orderResult.order
+  if (!order.shipping_no) {
+    return res.apiSuccess({ has_shipping: false, message: '该订单尚未填写快递信息' })
+  }
 
-    const ShippingService = req.app.locals.services.getService('shipping_track')
+  const ShippingService = req.app.locals.services.getService('shipping_track')
     const track = await ShippingService.queryTrack(order.shipping_no, order.shipping_company)
 
     return res.apiSuccess({
@@ -823,13 +822,7 @@ router.get('/orders/:order_no/track', authenticateToken, async (req, res) => {
       shipped_at: order.shipped_at,
       track
     })
-  } catch (error) {
-    if (error.statusCode === 404) {
-      return res.apiError(error.message, 'NOT_FOUND', null, 404)
-    }
-    return handleServiceError(error, res)
-  }
-})
+}))
 
 /**
  * 竞价子路由（B2C 兑换商品竞拍）

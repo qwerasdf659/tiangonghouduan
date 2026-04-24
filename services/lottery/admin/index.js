@@ -1,4 +1,3 @@
-// services/lottery/admin/index.js
 /**
  * V4.7.0 AdminLotteryService 拆分子服务入口
  *
@@ -9,6 +8,7 @@
  *
  * P2 路由层合规治理新增：
  * - CRUDService: 活动 CRUD 操作（创建/更新/删除活动，收口路由层直接操作模型）
+ * - DisplayService: 活动展示控制（精选/隐藏/展示配置/批量排序）
  *
  * 拆分日期：2026-01-31
  * 拆分原因：大文件拆分方案（保持单体架构）Phase 6
@@ -16,11 +16,13 @@
 const CoreService = require('./CoreService')
 const CampaignService = require('./CampaignService')
 const QueryService = require('./QueryService')
-const CRUDService = require('./CRUDService') // P2 路由层合规治理
+const CRUDService = require('./CRUDService')
+const DisplayService = require('./DisplayService')
 
 module.exports = {
   CoreService,
   CampaignService,
   QueryService,
-  CRUDService
+  CRUDService,
+  DisplayService
 }

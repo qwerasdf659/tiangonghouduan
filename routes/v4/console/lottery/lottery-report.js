@@ -17,6 +17,7 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
+const { asyncHandler } = require('../shared/middleware')
 const logger = require('../../../../utils/logger').logger
 
 /**
@@ -48,34 +49,29 @@ function getReportService(req) {
  * - prize_distribution: 奖品分布
  * - user_metrics: 用户指标
  */
-router.get('/daily', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const { date, lottery_campaign_id } = req.query
+router.get('/daily', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  const { date, lottery_campaign_id } = req.query
 
-    const reportService = getReportService(req)
+  const reportService = getReportService(req)
 
-    /**
-     * 调用 generateDailyReport(reportDate, campaignId)
-     * @param reportDate - 报表日期 (YYYY-MM-DD)，不传则默认昨日
-     * @param campaignId - 活动ID，不传则汇总所有活动
-     */
-    const report = await reportService.generateDailyReport(
-      date || null,
-      lottery_campaign_id ? parseInt(lottery_campaign_id, 10) : null
-    )
+  /**
+   * 调用 generateDailyReport(reportDate, campaignId)
+   * @param reportDate - 报表日期 (YYYY-MM-DD)，不传则默认昨日
+   * @param campaignId - 活动ID，不传则汇总所有活动
+   */
+  const report = await reportService.generateDailyReport(
+    date || null,
+    lottery_campaign_id ? parseInt(lottery_campaign_id, 10) : null
+  )
 
-    logger.info('获取每日报表成功', {
-      admin_id: req.user.user_id,
-      report_date: report.report_date,
-      lottery_campaign_id: lottery_campaign_id || 'all'
-    })
+  logger.info('获取每日报表成功', {
+    admin_id: req.user.user_id,
+    report_date: report.report_date,
+    lottery_campaign_id: lottery_campaign_id || 'all'
+  })
 
-    return res.apiSuccess(report, '获取每日报表成功')
-  } catch (error) {
-    logger.error('获取每日报表失败:', error)
-    return res.apiError(`查询失败：${error.message}`, 'GET_DAILY_REPORT_FAILED', null, 500)
-  }
-})
+  return res.apiSuccess(report, '获取每日报表成功')
+}))
 
 /*
  * ==========================================
@@ -105,41 +101,36 @@ router.get(
   '/campaign/:lottery_campaign_id',
   authenticateToken,
   requireRoleLevel(100),
-  async (req, res) => {
-    try {
-      const lottery_campaign_id = parseInt(req.params.lottery_campaign_id)
-      const { start_date, end_date } = req.query
+  asyncHandler(async (req, res) => {
+    const lottery_campaign_id = parseInt(req.params.lottery_campaign_id)
+    const { start_date, end_date } = req.query
 
-      if (!lottery_campaign_id || isNaN(lottery_campaign_id)) {
-        return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID', null, 400)
-      }
-
-      const reportService = getReportService(req)
-
-      /**
-       * 调用 getCampaignROI(lottery_campaign_id, options)
-       * @param lottery_campaign_id - 活动ID
-       * @param options.start_time - 开始时间（ISO8601）
-       * @param options.end_time - 结束时间（ISO8601）
-       */
-      const report = await reportService.getCampaignROI(lottery_campaign_id, {
-        start_time: start_date ? `${start_date}T00:00:00+08:00` : undefined,
-        end_time: end_date ? `${end_date}T23:59:59+08:00` : undefined
-      })
-
-      logger.info('获取活动报表成功', {
-        admin_id: req.user.user_id,
-        lottery_campaign_id,
-        start_date,
-        end_date
-      })
-
-      return res.apiSuccess(report, '获取活动报表成功')
-    } catch (error) {
-      logger.error('获取活动报表失败:', error)
-      return res.apiError(`查询失败：${error.message}`, 'GET_CAMPAIGN_REPORT_FAILED', null, 500)
+    if (!lottery_campaign_id || isNaN(lottery_campaign_id)) {
+      return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID', null, 400)
     }
+
+    const reportService = getReportService(req)
+
+    /**
+     * 调用 getCampaignROI(lottery_campaign_id, options)
+     * @param lottery_campaign_id - 活动ID
+     * @param options.start_time - 开始时间（ISO8601）
+     * @param options.end_time - 结束时间（ISO8601）
+     */
+    const report = await reportService.getCampaignROI(lottery_campaign_id, {
+      start_time: start_date ? `${start_date}T00:00:00+08:00` : undefined,
+      end_time: end_date ? `${end_date}T23:59:59+08:00` : undefined
+    })
+
+    logger.info('获取活动报表成功', {
+      admin_id: req.user.user_id,
+      lottery_campaign_id,
+      start_date,
+      end_date
+    })
+
+    return res.apiSuccess(report, '获取活动报表成功')
   }
-)
+))
 
 module.exports = router

@@ -37,6 +37,7 @@
 
 'use strict'
 
+const BusinessError = require('../../utils/BusinessError')
 const crypto = require('crypto')
 const { Account, AccountAssetBalance, AssetTransaction, User } = require('../../models')
 const logger = require('../../utils/logger')
@@ -109,10 +110,10 @@ class BalanceService {
 
     // 参数验证：user_id 和 system_code 必须二选一
     if (!user_id && !system_code) {
-      throw new Error('user_id 或 system_code 必须提供其中之一')
+      throw new BusinessError('user_id 或 system_code 必须提供其中之一', 'ASSET_REQUIRED', 400)
     }
     if (user_id && system_code) {
-      throw new Error('user_id 和 system_code 不能同时提供')
+      throw new BusinessError('user_id 和 system_code 不能同时提供', 'ASSET_NOT_ALLOWED', 400)
     }
 
     // 用户账户
@@ -120,7 +121,7 @@ class BalanceService {
       // 验证用户是否存在
       const user = await User.findByPk(user_id, { transaction })
       if (!user) {
-        throw new Error(`用户不存在：user_id=${user_id}`)
+        throw new BusinessError(`用户不存在：user_id=${user_id}`, 'ASSET_USER_NOT_FOUND', 404)
       }
 
       // 查找或创建用户账户
@@ -161,7 +162,7 @@ class BalanceService {
       })
 
       if (!account) {
-        throw new Error(`系统账户不存在：system_code=${system_code}，请检查数据库初始化`)
+        throw new BusinessError(`系统账户不存在：system_code=${system_code}，请检查数据库初始化`, 'ASSET_NOT_FOUND', 404)
       }
 
       return account
@@ -187,7 +188,7 @@ class BalanceService {
 
     // 🔥 BUDGET_POINTS 必须指定 lottery_campaign_id
     if (asset_code === AssetCode.BUDGET_POINTS && !lottery_campaign_id) {
-      throw new Error('BUDGET_POINTS 必须指定 lottery_campaign_id 参数（活动隔离规则）')
+      throw new BusinessError('BUDGET_POINTS 必须指定 lottery_campaign_id 参数（活动隔离规则）', 'ASSET_REQUIRED', 400)
     }
 
     // 构建查询条件
@@ -279,28 +280,30 @@ class BalanceService {
 
     // 参数验证
     if (!idempotency_key) {
-      throw new Error('idempotency_key是必填参数（幂等性控制）')
+      throw new BusinessError('idempotency_key是必填参数（幂等性控制）', 'ASSET_REQUIRED', 400)
     }
     if (!business_type) {
-      throw new Error('business_type是必填参数（业务场景分类）')
+      throw new BusinessError('business_type是必填参数（业务场景分类）', 'ASSET_REQUIRED', 400)
     }
     if (delta_amount === 0) {
-      throw new Error('变动金额不能为0')
+      throw new BusinessError('变动金额不能为0', 'ASSET_NOT_ALLOWED', 400)
     }
     if (!asset_code) {
-      throw new Error('asset_code是必填参数')
+      throw new BusinessError('asset_code是必填参数', 'ASSET_REQUIRED', 400)
     }
 
     // 🛡️ 单笔变动金额安全上限校验（防止测试数据污染）
     if (Math.abs(delta_amount) > BALANCE_SAFETY_LIMIT) {
-      throw new Error(
-        `单笔变动金额超出安全上限：|${delta_amount}| > ${BALANCE_SAFETY_LIMIT}（10亿），如确需大额操作请联系管理员调整 BALANCE_SAFETY_LIMIT`
+      throw new BusinessError(
+        `单笔变动金额超出安全上限：|${delta_amount}| > ${BALANCE_SAFETY_LIMIT}（10亿），如确需大额操作请联系管理员调整 BALANCE_SAFETY_LIMIT`,
+        'ASSET_EXCEEDED',
+        400
       )
     }
 
     // 🔥 BUDGET_POINTS 必须指定 lottery_campaign_id（活动隔离规则）
     if (asset_code === AssetCode.BUDGET_POINTS && !lottery_campaign_id) {
-      throw new Error('BUDGET_POINTS 必须指定 lottery_campaign_id 参数（活动隔离规则）')
+      throw new BusinessError('BUDGET_POINTS 必须指定 lottery_campaign_id 参数（活动隔离规则）', 'ASSET_REQUIRED', 400)
     }
 
     try {
@@ -359,7 +362,7 @@ class BalanceService {
       if (!balance) {
         // 余额记录不存在，创建新记录
         if (delta_amount < 0) {
-          throw new Error(`余额不足：账户不存在且尝试扣减${Math.abs(delta_amount)}个${asset_code}`)
+          throw new BusinessError(`余额不足：账户不存在且尝试扣减${Math.abs(delta_amount)}个${asset_code}`, 'ASSET_BALANCE_NOT_FOUND', 404)
         }
         finalBalance = await this.getOrCreateBalance(account.account_id, asset_code, {
           transaction,
@@ -373,8 +376,10 @@ class BalanceService {
       if (delta_amount < 0) {
         const required_amount = Math.abs(delta_amount)
         if (Number(finalBalance.available_amount) < Number(required_amount)) {
-          throw new Error(
-            `可用余额不足：当前可用余额${finalBalance.available_amount}个${asset_code}，需要${required_amount}个，差额${required_amount - Number(finalBalance.available_amount)}个`
+          throw new BusinessError(
+            `可用余额不足：当前可用余额${finalBalance.available_amount}个${asset_code}，需要${required_amount}个，差额${required_amount - Number(finalBalance.available_amount)}个`,
+            'ASSET_BALANCE_INSUFFICIENT',
+            400
           )
         }
       }
@@ -387,15 +392,19 @@ class BalanceService {
 
       // 验证变动后余额不为负数（double check）
       if (balance_after < 0) {
-        throw new Error(
-          `变动后余额不能为负数：当前${balance_before} + 变动${delta_amount} = ${balance_after}`
+        throw new BusinessError(
+          `变动后余额不能为负数：当前${balance_before} + 变动${delta_amount} = ${balance_after}`,
+          'ASSET_NOT_ALLOWED',
+          400
         )
       }
 
       // 🛡️ 验证变动后余额不超过安全上限（防止测试数据/溢出污染统计）
       if (balance_after > BALANCE_SAFETY_LIMIT) {
-        throw new Error(
-          `变动后余额超出安全上限：${balance_before} + ${delta_amount} = ${balance_after} > ${BALANCE_SAFETY_LIMIT}（10亿）`
+        throw new BusinessError(
+          `变动后余额超出安全上限：${balance_before} + ${delta_amount} = ${balance_after} > ${BALANCE_SAFETY_LIMIT}（10亿）`,
+          'ASSET_EXCEEDED',
+          400
         )
       }
 
@@ -559,21 +568,21 @@ class BalanceService {
 
     // 参数验证
     if (!idempotency_key) {
-      throw new Error('idempotency_key是必填参数（幂等性控制）')
+      throw new BusinessError('idempotency_key是必填参数（幂等性控制）', 'ASSET_REQUIRED', 400)
     }
     if (!business_type) {
-      throw new Error('business_type是必填参数（业务场景分类）')
+      throw new BusinessError('business_type是必填参数（业务场景分类）', 'ASSET_REQUIRED', 400)
     }
     if (amount <= 0) {
-      throw new Error('冻结金额必须为正数')
+      throw new BusinessError('冻结金额必须为正数', 'ASSET_REQUIRED', 400)
     }
     if (!asset_code) {
-      throw new Error('asset_code是必填参数')
+      throw new BusinessError('asset_code是必填参数', 'ASSET_REQUIRED', 400)
     }
 
     // 🛡️ 冻结金额安全上限校验
     if (amount > BALANCE_SAFETY_LIMIT) {
-      throw new Error(`冻结金额超出安全上限：${amount} > ${BALANCE_SAFETY_LIMIT}（10亿）`)
+      throw new BusinessError(`冻结金额超出安全上限：${amount} > ${BALANCE_SAFETY_LIMIT}（10亿）`, 'ASSET_EXCEEDED', 400)
     }
 
     try {
@@ -617,29 +626,37 @@ class BalanceService {
       })
 
       if (!balance) {
-        throw new Error(
-          `余额记录不存在：account_id=${account.account_id}, asset_code=${asset_code}`
+        throw new BusinessError(
+          `余额记录不存在：account_id=${account.account_id}, asset_code=${asset_code}`,
+          'ASSET_RECORD_NOT_FOUND',
+          404
         )
       }
 
       // 验证可用余额充足（BIGINT 返回字符串，必须 Number() 转换防止字典序比较）
       if (Number(balance.available_amount) < Number(amount)) {
-        throw new Error(
-          `可用余额不足：当前可用余额${balance.available_amount}个${asset_code}，需要冻结${amount}个，差额${Number(amount) - Number(balance.available_amount)}个`
+        throw new BusinessError(
+          `可用余额不足：当前可用余额${balance.available_amount}个${asset_code}，需要冻结${amount}个，差额${Number(amount) - Number(balance.available_amount)}个`,
+          'ASSET_BALANCE_INSUFFICIENT',
+          400
         )
       }
 
       // 🛡️ 前置断言：冻结余额不能为负数（防止脏数据传播）
       if (Number(balance.frozen_amount) < 0) {
-        throw new Error(
-          `冻结余额异常：account_id=${account.account_id}, asset_code=${asset_code}, frozen_amount=${balance.frozen_amount}（不应为负数，请排查数据一致性）`
+        throw new BusinessError(
+          `冻结余额异常：account_id=${account.account_id}, asset_code=${asset_code}, frozen_amount=${balance.frozen_amount}（不应为负数，请排查数据一致性）`,
+          'ASSET_ERROR',
+          400
         )
       }
 
       // 🛡️ 前置断言：可用余额不能为负数
       if (Number(balance.available_amount) < 0) {
-        throw new Error(
-          `可用余额异常：account_id=${account.account_id}, asset_code=${asset_code}, available_amount=${balance.available_amount}（不应为负数，请排查数据一致性）`
+        throw new BusinessError(
+          `可用余额异常：account_id=${account.account_id}, asset_code=${asset_code}, available_amount=${balance.available_amount}（不应为负数，请排查数据一致性）`,
+          'ASSET_ERROR',
+          400
         )
       }
 
@@ -807,21 +824,21 @@ class BalanceService {
 
     // 参数验证
     if (!idempotency_key) {
-      throw new Error('idempotency_key是必填参数（幂等性控制）')
+      throw new BusinessError('idempotency_key是必填参数（幂等性控制）', 'ASSET_REQUIRED', 400)
     }
     if (!business_type) {
-      throw new Error('business_type是必填参数（业务场景分类）')
+      throw new BusinessError('business_type是必填参数（业务场景分类）', 'ASSET_REQUIRED', 400)
     }
     if (amount <= 0) {
-      throw new Error('解冻金额必须为正数')
+      throw new BusinessError('解冻金额必须为正数', 'ASSET_REQUIRED', 400)
     }
     if (!asset_code) {
-      throw new Error('asset_code是必填参数')
+      throw new BusinessError('asset_code是必填参数', 'ASSET_REQUIRED', 400)
     }
 
     // 🛡️ 解冻金额安全上限校验
     if (amount > BALANCE_SAFETY_LIMIT) {
-      throw new Error(`解冻金额超出安全上限：${amount} > ${BALANCE_SAFETY_LIMIT}（10亿）`)
+      throw new BusinessError(`解冻金额超出安全上限：${amount} > ${BALANCE_SAFETY_LIMIT}（10亿）`, 'ASSET_EXCEEDED', 400)
     }
 
     try {
@@ -865,8 +882,10 @@ class BalanceService {
       })
 
       if (!balance) {
-        throw new Error(
-          `余额记录不存在：account_id=${account.account_id}, asset_code=${asset_code}`
+        throw new BusinessError(
+          `余额记录不存在：account_id=${account.account_id}, asset_code=${asset_code}`,
+          'ASSET_RECORD_NOT_FOUND',
+          404
         )
       }
 
@@ -874,15 +893,19 @@ class BalanceService {
       const currentFrozen = Number(balance.frozen_amount)
       const unfreezeAmount = Number(amount)
       if (currentFrozen < unfreezeAmount) {
-        throw new Error(
-          `冻结余额不足：当前冻结余额${currentFrozen}个${asset_code}，需要解冻${unfreezeAmount}个，差额${unfreezeAmount - currentFrozen}个`
+        throw new BusinessError(
+          `冻结余额不足：当前冻结余额${currentFrozen}个${asset_code}，需要解冻${unfreezeAmount}个，差额${unfreezeAmount - currentFrozen}个`,
+          'ASSET_BALANCE_INSUFFICIENT',
+          400
         )
       }
 
       // 🛡️ 前置断言：冻结余额不能为负数（防止脏数据传播）
       if (currentFrozen < 0) {
-        throw new Error(
-          `冻结余额异常：account_id=${account.account_id}, asset_code=${asset_code}, frozen_amount=${currentFrozen}（不应为负数，请排查数据一致性）`
+        throw new BusinessError(
+          `冻结余额异常：account_id=${account.account_id}, asset_code=${asset_code}, frozen_amount=${currentFrozen}（不应为负数，请排查数据一致性）`,
+          'ASSET_ERROR',
+          400
         )
       }
 
@@ -1051,21 +1074,21 @@ class BalanceService {
 
     // 参数验证
     if (!idempotency_key) {
-      throw new Error('idempotency_key是必填参数（幂等性控制）')
+      throw new BusinessError('idempotency_key是必填参数（幂等性控制）', 'ASSET_REQUIRED', 400)
     }
     if (!business_type) {
-      throw new Error('business_type是必填参数（业务场景分类）')
+      throw new BusinessError('business_type是必填参数（业务场景分类）', 'ASSET_REQUIRED', 400)
     }
     if (amount <= 0) {
-      throw new Error('结算金额必须为正数')
+      throw new BusinessError('结算金额必须为正数', 'ASSET_REQUIRED', 400)
     }
     if (!asset_code) {
-      throw new Error('asset_code是必填参数')
+      throw new BusinessError('asset_code是必填参数', 'ASSET_REQUIRED', 400)
     }
 
     // 🛡️ 结算金额安全上限校验
     if (amount > BALANCE_SAFETY_LIMIT) {
-      throw new Error(`结算金额超出安全上限：${amount} > ${BALANCE_SAFETY_LIMIT}（10亿）`)
+      throw new BusinessError(`结算金额超出安全上限：${amount} > ${BALANCE_SAFETY_LIMIT}（10亿）`, 'ASSET_EXCEEDED', 400)
     }
 
     try {
@@ -1109,15 +1132,19 @@ class BalanceService {
       })
 
       if (!balance) {
-        throw new Error(
-          `余额记录不存在：account_id=${account.account_id}, asset_code=${asset_code}`
+        throw new BusinessError(
+          `余额记录不存在：account_id=${account.account_id}, asset_code=${asset_code}`,
+          'ASSET_RECORD_NOT_FOUND',
+          404
         )
       }
 
       // 验证冻结余额充足（BIGINT 返回字符串，必须 Number() 转换防止字典序比较）
       if (Number(balance.frozen_amount) < Number(amount)) {
-        throw new Error(
-          `冻结余额不足：当前冻结余额${balance.frozen_amount}个${asset_code}，需要结算${amount}个，差额${Number(amount) - Number(balance.frozen_amount)}个`
+        throw new BusinessError(
+          `冻结余额不足：当前冻结余额${balance.frozen_amount}个${asset_code}，需要结算${amount}个，差额${Number(amount) - Number(balance.frozen_amount)}个`,
+          'ASSET_BALANCE_INSUFFICIENT',
+          400
         )
       }
 
@@ -1246,7 +1273,7 @@ class BalanceService {
 
     // 🔥 BUDGET_POINTS 必须指定 lottery_campaign_id
     if (asset_code === AssetCode.BUDGET_POINTS && !lottery_campaign_id) {
-      throw new Error('BUDGET_POINTS 必须指定 lottery_campaign_id 参数（活动隔离规则）')
+      throw new BusinessError('BUDGET_POINTS 必须指定 lottery_campaign_id 参数（活动隔离规则）', 'ASSET_REQUIRED', 400)
     }
 
     try {

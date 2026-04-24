@@ -7,6 +7,7 @@ const {
   MediaFile,
   MediaAttachment
 } = require('../../models')
+const BusinessError = require('../../utils/BusinessError')
 const DecimalConverter = require('../../utils/formatters/DecimalConverter')
 const { getImageUrl } = require('../../utils/ImageUrlHelper')
 
@@ -100,7 +101,7 @@ class PrizeQueryService {
       })
 
       if (!campaign) {
-        throw new Error(`活动不存在: ${campaign_code}`)
+        throw new BusinessError(`活动不存在: ${campaign_code}`, 'PRIZE_POOL_NOT_FOUND', 404)
       }
 
       // 2. 获取奖品列表（含主图媒体文件）
@@ -401,7 +402,7 @@ class PrizeQueryService {
         where: { campaign_code }
       })
       if (!campaign) {
-        throw new Error(`活动不存在: ${campaign_code}`)
+        throw new BusinessError(`活动不存在: ${campaign_code}`, 'PRIZE_POOL_NOT_FOUND', 404)
       }
 
       const prizes = await LotteryPrize.findAll({

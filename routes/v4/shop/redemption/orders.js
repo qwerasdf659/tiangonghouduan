@@ -12,7 +12,7 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken } = require('../../../../middleware/auth')
-const { handleServiceError } = require('../../../../middleware/validation')
+const { asyncHandler } = require('../../../../middleware/validation')
 const logger = require('../../../../utils/logger').logger
 const TransactionManager = require('../../../../utils/TransactionManager')
 
@@ -40,77 +40,47 @@ const TransactionManager = require('../../../../utils/TransactionManager')
  * - 物品不可用（已使用/已锁定等） → 409 CONFLICT
  * - 核销码生成失败（碰撞重试失败） → 500 INTERNAL_ERROR
  */
-router.post('/orders', authenticateToken, async (req, res) => {
-  try {
-    const { item_id } = req.body
-    const userId = req.user.user_id
+router.post('/orders', authenticateToken, asyncHandler(async (req, res) => {
+  const { item_id } = req.body
+  const userId = req.user.user_id
 
-    // 参数验证
-    if (!item_id || !Number.isInteger(item_id) || item_id <= 0) {
-      return res.apiError('item_id必须是正整数', 'BAD_REQUEST', null, 400)
-    }
-
-    logger.info('开始生成核销订单', {
-      item_id,
-      user_id: userId
-    })
-
-    /**
-     * 调用 RedemptionService 生成订单
-     * - 传入 creator_user_id 用于服务层权限校验（所有权/管理员判定）
-     * - 使用 TransactionManager 统一事务边界（符合治理决策）
-     * - 路由层不直接操作 models，所有验证逻辑收口到 Service 层
-     */
-    const RedemptionService = req.app.locals.services.getService('redemption_order')
-    const result = await TransactionManager.execute(async transaction => {
-      return await RedemptionService.createOrder(item_id, {
-        creator_user_id: userId, // 传入创建者ID，供服务层权限校验
-        transaction
-      })
-    })
-
-    logger.info('核销订单生成成功', {
-      order_id: result.order.redemption_order_id,
-      item_id,
-      expires_at: result.order.expires_at
-    })
-
-    return res.apiSuccess(
-      {
-        order: {
-          order_id: result.order.redemption_order_id,
-          item_id: result.order.item_id,
-          status: result.order.status,
-          expires_at: result.order.expires_at,
-          created_at: result.order.created_at
-        },
-        code: result.code // ⚠️ 明文码只返回一次，请用户妥善保存
-      },
-      '核销码生成成功（请妥善保存，仅显示一次）'
-    )
-  } catch (error) {
-    logger.error('核销订单生成失败', {
-      error: error.message,
-      item_id: req.body.item_id,
-      user_id: req.user?.user_id
-    })
-
-    // 业务错误处理（服务层返回的业务错误）
-    if (error.message.includes('物品不存在')) {
-      return res.apiError(error.message, 'NOT_FOUND', null, 404)
-    }
-
-    if (error.message.includes('权限不足')) {
-      return res.apiError(error.message, 'FORBIDDEN', null, 403)
-    }
-
-    if (error.message.includes('不可用') || error.message.includes('已有待核销订单')) {
-      return res.apiError(error.message, 'CONFLICT', null, 409)
-    }
-
-    return handleServiceError(error, res, '核销订单生成失败')
+  if (!item_id || !Number.isInteger(item_id) || item_id <= 0) {
+    return res.apiError('item_id必须是正整数', 'BAD_REQUEST', null, 400)
   }
-})
+
+  logger.info('开始生成核销订单', {
+    item_id,
+    user_id: userId
+  })
+
+  const RedemptionService = req.app.locals.services.getService('redemption_order')
+  const result = await TransactionManager.execute(async transaction => {
+    return await RedemptionService.createOrder(item_id, {
+      creator_user_id: userId,
+      transaction
+    })
+  })
+
+  logger.info('核销订单生成成功', {
+    order_id: result.order.redemption_order_id,
+    item_id,
+    expires_at: result.order.expires_at
+  })
+
+  return res.apiSuccess(
+    {
+      order: {
+        order_id: result.order.redemption_order_id,
+        item_id: result.order.item_id,
+        status: result.order.status,
+        expires_at: result.order.expires_at,
+        created_at: result.order.created_at
+      },
+      code: result.code
+    },
+    '核销码生成成功（请妥善保存，仅显示一次）'
+  )
+}))
 
 /**
  * 取消订单（Cancel Redemption Order）
@@ -130,45 +100,27 @@ router.post('/orders', authenticateToken, async (req, res) => {
  * - 订单不存在 → 404 NOT_FOUND
  * - 订单已核销 → 409 CONFLICT
  */
-router.post('/orders/:order_id/cancel', authenticateToken, async (req, res) => {
-  try {
-    const { order_id } = req.params
+router.post('/orders/:order_id/cancel', authenticateToken, asyncHandler(async (req, res) => {
+  const { order_id } = req.params
 
-    logger.info('取消订单', {
-      order_id,
-      user_id: req.user.user_id
-    })
+  logger.info('取消订单', {
+    order_id,
+    user_id: req.user.user_id
+  })
 
-    // 使用 TransactionManager 统一事务边界（符合治理决策）
-    const RedemptionService = req.app.locals.services.getService('redemption_order')
-    const order = await TransactionManager.execute(async transaction => {
-      return await RedemptionService.cancelOrder(order_id, { transaction })
-    })
+  const RedemptionService = req.app.locals.services.getService('redemption_order')
+  const order = await TransactionManager.execute(async transaction => {
+    return await RedemptionService.cancelOrder(order_id, { transaction })
+  })
 
-    return res.apiSuccess(
-      {
-        order_id: order.redemption_order_id,
-        status: order.status,
-        updated_at: order.updated_at
-      },
-      '订单取消成功'
-    )
-  } catch (error) {
-    logger.error('取消订单失败', {
-      error: error.message,
-      order_id: req.params.order_id
-    })
-
-    if (error.message.includes('不存在')) {
-      return res.apiError(error.message, 'NOT_FOUND', null, 404)
-    }
-
-    if (error.message.includes('已核销')) {
-      return res.apiError(error.message, 'CONFLICT', null, 409)
-    }
-
-    return handleServiceError(error, res, '取消订单失败')
-  }
-})
+  return res.apiSuccess(
+    {
+      order_id: order.redemption_order_id,
+      status: order.status,
+      updated_at: order.updated_at
+    },
+    '订单取消成功'
+  )
+}))
 
 module.exports = router

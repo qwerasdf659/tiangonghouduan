@@ -1,5 +1,6 @@
 'use strict'
 
+const BusinessError = require('../../utils/BusinessError')
 const { LotteryPrize, LotteryCampaign, MaterialAssetType } = require('../../models')
 const DecimalConverter = require('../../utils/formatters/DecimalConverter')
 const AuditLogService = require('../AuditLogService')
@@ -43,7 +44,7 @@ class PrizeCrudService {
       transaction
     })
     if (!campaign) {
-      throw new Error('活动不存在')
+      throw new BusinessError('活动不存在', 'PRIZE_POOL_NOT_FOUND', 404)
     }
 
     // 2. normalize 模式概率校验
@@ -271,7 +272,7 @@ class PrizeCrudService {
       transaction
     })
     if (!campaign) {
-      throw new Error(`活动不存在: ${campaign_code}`)
+      throw new BusinessError(`活动不存在: ${campaign_code}`, 'PRIZE_POOL_NOT_FOUND', 404)
     }
 
     const result = await PrizeCrudService.batchAddPrizes(
@@ -313,7 +314,7 @@ class PrizeCrudService {
     // 1. 查找奖品
     const prize = await LotteryPrize.findByPk(prize_id, { transaction })
     if (!prize) {
-      throw new Error('奖品不存在')
+      throw new BusinessError('奖品不存在', 'PRIZE_POOL_NOT_FOUND', 404)
     }
 
     const beforeData = {
@@ -384,7 +385,7 @@ class PrizeCrudService {
     }
 
     if (Object.keys(filteredUpdateData).length === 0) {
-      throw new Error('没有有效的更新字段')
+      throw new BusinessError('没有有效的更新字段', 'PRIZE_POOL_ERROR', 400)
     }
 
     // 3. 特殊处理库存数量更新（验证库存合法性）
@@ -395,7 +396,7 @@ class PrizeCrudService {
       const currentUsed = prize.total_win_count || 0
 
       if (newQuantity < currentUsed) {
-        throw new Error(`新库存(${newQuantity})不能小于已使用数量(${currentUsed})`)
+        throw new BusinessError(`新库存(${newQuantity})不能小于已使用数量(${currentUsed})`, 'PRIZE_POOL_NOT_ALLOWED', 400)
       }
 
       if (newQuantity === 0) {
@@ -423,7 +424,7 @@ class PrizeCrudService {
       if (prizeType === 'physical') {
         const targetImageId = filteredUpdateData.primary_media_id ?? prize.primary_media_id
         if (!targetImageId) {
-          throw new Error('实物奖品上架必须上传图片（primary_media_id 不能为空）')
+          throw new BusinessError('实物奖品上架必须上传图片（primary_media_id 不能为空）', 'PRIZE_POOL_NOT_ALLOWED', 400)
         }
       }
     }
@@ -677,13 +678,13 @@ class PrizeCrudService {
     // 1. 查找奖品
     const prize = await LotteryPrize.findByPk(prize_id, { transaction })
     if (!prize) {
-      throw new Error('奖品不存在')
+      throw new BusinessError('奖品不存在', 'PRIZE_POOL_NOT_FOUND', 404)
     }
 
     // 2. 检查是否已有用户中奖
     const totalWins = prize.total_win_count || 0
     if (totalWins > 0) {
-      throw new Error(`该奖品已被中奖${totalWins}次，不能删除。建议改为停用状态。`)
+      throw new BusinessError(`该奖品已被中奖${totalWins}次，不能删除。建议改为停用状态。`, 'PRIZE_POOL_NOT_ALLOWED', 400)
     }
 
     /*
@@ -780,7 +781,7 @@ class PrizeCrudService {
       const prize = await LotteryPrize.findByPk(prize_id, { transaction })
 
       if (!prize) {
-        throw new Error('奖品不存在')
+        throw new BusinessError('奖品不存在', 'PRIZE_POOL_NOT_FOUND', 404)
       }
 
       logger.info('奖品查询成功', { prize_id, prize_name: prize.prize_name })

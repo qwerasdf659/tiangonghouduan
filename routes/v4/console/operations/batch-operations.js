@@ -41,6 +41,7 @@ const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const logger = require('../../../../utils/logger').logger
 const TransactionManager = require('../../../../utils/TransactionManager')
+const { asyncHandler } = require('../../../../middleware/validation')
 
 /*
  * Phase 3 收口：通过 ServiceManager 获取 models，避免直连 models
@@ -136,7 +137,7 @@ function getActivityService(req) {
  *   }
  * }
  */
-router.post('/quota-grant', authenticateToken, requireRoleLevel(100), async (req, res) => {
+router.post('/quota-grant', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
   const operator_id = req.user.user_id
   // 通过 ServiceManager 获取 models（Phase 3 收口）
   const { BatchOperationLog } = req.app.locals.models
@@ -305,7 +306,7 @@ router.post('/quota-grant', authenticateToken, requireRoleLevel(100), async (req
     })
     return res.apiError(`批量赠送失败：${error.message}`, 'BATCH_QUOTA_GRANT_FAILED', null, 500)
   }
-})
+}))
 
 // ==================== B9: 批量活动状态切换 ====================
 
@@ -325,7 +326,7 @@ router.post('/quota-grant', authenticateToken, requireRoleLevel(100), async (req
  *   reason: string            // 必填：切换原因
  * }
  */
-router.post('/campaign-status', authenticateToken, requireRoleLevel(100), async (req, res) => {
+router.post('/campaign-status', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
   const operator_id = req.user.user_id
   // 通过 ServiceManager 获取 models（Phase 3 收口）
   const { BatchOperationLog } = req.app.locals.models
@@ -487,7 +488,7 @@ router.post('/campaign-status', authenticateToken, requireRoleLevel(100), async 
       500
     )
   }
-})
+}))
 
 // ==================== B7: 批量设置干预规则 ====================
 
@@ -512,7 +513,7 @@ router.post('/campaign-status', authenticateToken, requireRoleLevel(100), async 
  *   reason: string            // 必填：设置原因
  * }
  */
-router.post('/preset-rules', authenticateToken, requireRoleLevel(100), async (req, res) => {
+router.post('/preset-rules', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
   const operator_id = req.user.user_id
   // 通过 ServiceManager 获取 models（Phase 3 收口）
   const { BatchOperationLog } = req.app.locals.models
@@ -678,7 +679,7 @@ router.post('/preset-rules', authenticateToken, requireRoleLevel(100), async (re
     })
     return res.apiError(`批量设置失败：${error.message}`, 'BATCH_PRESET_FAILED', null, 500)
   }
-})
+}))
 
 // ==================== B8: 批量核销确认 ====================
 
@@ -697,7 +698,7 @@ router.post('/preset-rules', authenticateToken, requireRoleLevel(100), async (re
  *   reason: string            // 必填：核销原因
  * }
  */
-router.post('/redemption-verify', authenticateToken, requireRoleLevel(100), async (req, res) => {
+router.post('/redemption-verify', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
   const operator_id = req.user.user_id
   // 通过 ServiceManager 获取 models（Phase 3 收口）
   const { BatchOperationLog } = req.app.locals.models
@@ -843,7 +844,7 @@ router.post('/redemption-verify', authenticateToken, requireRoleLevel(100), asyn
       500
     )
   }
-})
+}))
 
 // ==================== B10: 批量预算调整 ====================
 
@@ -866,7 +867,7 @@ router.post('/redemption-verify', authenticateToken, requireRoleLevel(100), asyn
  *   reason: string            // 必填：调整原因
  * }
  */
-router.post('/budget-adjust', authenticateToken, requireRoleLevel(100), async (req, res) => {
+router.post('/budget-adjust', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
   const operator_id = req.user.user_id
   // 通过 ServiceManager 获取 models（Phase 3 收口）
   const { BatchOperationLog } = req.app.locals.models
@@ -1046,7 +1047,7 @@ router.post('/budget-adjust', authenticateToken, requireRoleLevel(100), async (r
       500
     )
   }
-})
+}))
 
 // ==================== 通用查询接口 ====================
 
@@ -1061,83 +1062,68 @@ router.post('/budget-adjust', authenticateToken, requireRoleLevel(100), async (r
  * - page: 页码（默认1）
  * - page_size: 每页数量（默认20）
  */
-router.get('/logs', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const { operator_id, operation_type, status, page = 1, page_size = 20 } = req.query
+router.get('/logs', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  const { operator_id, operation_type, status, page = 1, page_size = 20 } = req.query
 
-    const result = await getBatchOperationService(req).queryOperationLogs({
-      operator_id,
-      operation_type,
-      status,
-      limit: parseInt(page_size),
-      offset: (parseInt(page) - 1) * parseInt(page_size)
-    })
+  const result = await getBatchOperationService(req).queryOperationLogs({
+    operator_id,
+    operation_type,
+    status,
+    limit: parseInt(page_size),
+    offset: (parseInt(page) - 1) * parseInt(page_size)
+  })
 
-    return res.apiSuccess(
-      {
-        logs: result.logs,
-        pagination: {
-          page: parseInt(page),
-          page_size: parseInt(page_size),
-          total: result.total,
-          total_pages: Math.ceil(result.total / parseInt(page_size))
-        }
-      },
-      '查询批量操作日志成功'
-    )
-  } catch (error) {
-    logger.error('查询批量操作日志失败', { error: error.message })
-    return res.apiError(`查询失败：${error.message}`, 'QUERY_LOGS_FAILED', null, 500)
-  }
-})
+  return res.apiSuccess(
+    {
+      logs: result.logs,
+      pagination: {
+        page: parseInt(page),
+        page_size: parseInt(page_size),
+        total: result.total,
+        total_pages: Math.ceil(result.total / parseInt(page_size))
+      }
+    },
+    '查询批量操作日志成功'
+  )
+}))
 
 /**
  * 获取批量操作日志详情
  * GET /api/v4/console/batch-operations/logs/:id
  */
-router.get('/logs/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const batch_operation_log_id = parseInt(req.params.id, 10)
+router.get('/logs/:id', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  const batch_operation_log_id = parseInt(req.params.id, 10)
 
-    if (isNaN(batch_operation_log_id) || batch_operation_log_id <= 0) {
-      return res.apiError('无效的日志ID', 'INVALID_LOG_ID', null, 400)
-    }
-
-    const detail = await getBatchOperationService(req).getOperationDetail(batch_operation_log_id)
-
-    if (!detail) {
-      return res.apiError('批量操作日志不存在', 'LOG_NOT_FOUND', null, 404)
-    }
-
-    return res.apiSuccess(detail, '获取批量操作日志详情成功')
-  } catch (error) {
-    logger.error('获取批量操作日志详情失败', { error: error.message })
-    return res.apiError(`获取详情失败：${error.message}`, 'GET_LOG_DETAIL_FAILED', null, 500)
+  if (isNaN(batch_operation_log_id) || batch_operation_log_id <= 0) {
+    return res.apiError('无效的日志ID', 'INVALID_LOG_ID', null, 400)
   }
-})
+
+  const detail = await getBatchOperationService(req).getOperationDetail(batch_operation_log_id)
+
+  if (!detail) {
+    return res.apiError('批量操作日志不存在', 'LOG_NOT_FOUND', null, 404)
+  }
+
+  return res.apiSuccess(detail, '获取批量操作日志详情成功')
+}))
 
 /**
  * 获取系统配置（批量操作限流配置）
  * GET /api/v4/console/batch-operations/config
  */
-router.get('/config', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    // 通过 ServiceManager 获取 models（Phase 3 收口）
-    const { BatchOperationLog } = req.app.locals.models
-    const configs = await getAdminSystemService(req).getAllBatchConfigs()
+router.get('/config', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  // 通过 ServiceManager 获取 models（Phase 3 收口）
+  const { BatchOperationLog } = req.app.locals.models
+  const configs = await getAdminSystemService(req).getAllBatchConfigs()
 
-    return res.apiSuccess(
-      {
-        configs,
-        operation_types: BatchOperationLog.OPERATION_TYPE_NAMES,
-        statuses: BatchOperationLog.STATUS_NAMES
-      },
-      '获取批量操作配置成功'
-    )
-  } catch (error) {
-    logger.error('获取批量操作配置失败', { error: error.message })
-    return res.apiError(`获取配置失败：${error.message}`, 'GET_CONFIG_FAILED', null, 500)
-  }
-})
+  return res.apiSuccess(
+    {
+      configs,
+      operation_types: BatchOperationLog.OPERATION_TYPE_NAMES,
+      statuses: BatchOperationLog.STATUS_NAMES
+    },
+    '获取批量操作配置成功'
+  )
+}))
 
 module.exports = router

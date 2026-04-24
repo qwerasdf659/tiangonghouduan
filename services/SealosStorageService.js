@@ -1,3 +1,4 @@
+const BusinessError = require('../utils/BusinessError')
 const logger = require('../utils/logger').logger
 
 /**
@@ -117,7 +118,7 @@ class SealosStorageService {
       ].join('\n')
 
       logger.error(errorMessage)
-      throw new Error(`Sealos配置缺失: ${missingVars.map(v => v.key).join(', ')}`)
+      throw new BusinessError(`Sealos配置缺失: ${missingVars.map(v => v.key).join(', ')}`, 'SERVICE_ERROR', 400)
     }
   }
 
@@ -169,7 +170,7 @@ class SealosStorageService {
             objectKey: uploadParams.Key,
             fallbackError: fallbackError.message
           })
-          throw new Error(`上传失败（内网+公网均失败）: ${fallbackError.message}`)
+          throw new BusinessError(`上传失败（内网+公网均失败）: ${fallbackError.message}`, 'SERVICE_FAILED', 500)
         }
       }
 
@@ -283,13 +284,13 @@ class SealosStorageService {
             primaryError: primaryError.message,
             fallbackError: fallbackError.message
           })
-          throw new Error(`文件上传失败（内网+公网均失败）: ${fallbackError.message}`)
+          throw new BusinessError(`文件上传失败（内网+公网均失败）: ${fallbackError.message}`, 'SERVICE_FAILED', 500)
         }
       }
 
       // 非内网场景或没有配置公网端点，直接抛出错误
       logger.error('❌ Sealos文件上传失败:', primaryError)
-      throw new Error(`文件上传失败: ${primaryError.message}`)
+      throw new BusinessError(`文件上传失败: ${primaryError.message}`, 'SERVICE_FAILED', 500)
     }
   }
 
@@ -684,7 +685,7 @@ class SealosStorageService {
       }
     } catch (error) {
       logger.error('❌ 图片上传失败（含缩略图）:', error)
-      throw new Error(`图片上传失败: ${error.message}`)
+      throw new BusinessError(`图片上传失败: ${error.message}`, 'SERVICE_FAILED', 500)
     }
   }
 

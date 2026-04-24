@@ -26,7 +26,7 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireMerchantPermission } = require('../../../../middleware/auth')
-const { handleServiceError } = require('../../../../middleware/validation')
+const { asyncHandler } = require('../../../../middleware/validation')
 const QRCodeValidator = require('../../../../utils/QRCodeValidator')
 const logger = require('../../../../utils/logger').logger
 
@@ -89,136 +89,101 @@ router.get(
   '/user-info',
   authenticateToken,
   requireMerchantPermission('consumption:scan_user', { scope: 'store', storeIdParam: 'query' }),
-  async (req, res) => {
-    try {
-      // 🔄 通过 ServiceManager 获取 QueryService（V4.7.0 服务拆分：getUserInfoByQRCode 在 QueryService 中）
-      const QueryService = req.app.locals.services.getService('consumption_query')
+  asyncHandler(async (req, res) => {
+    const QueryService = req.app.locals.services.getService('consumption_query')
 
-      const { qr_code } = req.query
+    const { qr_code } = req.query
 
-      // 参数验证
-      if (!qr_code) {
-        return res.apiError('二维码不能为空', 'BAD_REQUEST', null, 400)
-      }
-
-      // 验证二维码格式（仅支持 V2 动态码，V1 永久码已废弃）
-      if (QRCodeValidator.detectVersion(qr_code) !== 'v2') {
-        return res.apiError(
-          '二维码格式不支持，请刷新获取最新二维码',
-          'INVALID_QRCODE_FORMAT',
-          { hint: '请让顾客重新生成动态二维码' },
-          400
-        )
-      }
-
-      /*
-       * 🏪 门店ID处理逻辑（与 /submit 统一，AC2.3）
-       * - 如果已通过 requireMerchantPermission 验证，使用 req.verified_store_id
-       * - 如果未传 store_id，从 req.user_stores 自动填充（单门店）
-       * - 多门店员工必须传 store_id
-       */
-      let resolved_store_id =
-        req.verified_store_id || (req.query.store_id ? parseInt(req.query.store_id, 10) : null)
-      const user_stores = req.user_stores || []
-
-      if (!resolved_store_id) {
-        // 未传 store_id，尝试自动填充
-        if (user_stores.length === 0) {
-          return res.apiError(
-            '您未绑定任何门店，无法扫码获取用户信息',
-            'NO_STORE_BINDING',
-            null,
-            403
-          )
-        } else if (user_stores.length === 1) {
-          // 单门店员工：自动填充
-          resolved_store_id = user_stores[0].store_id
-          logger.info(`🏪 自动填充门店ID: ${resolved_store_id} (用户仅绑定一个门店)`)
-        } else {
-          // 多门店员工：必须明确指定
-          return res.apiError(
-            '您绑定了多个门店，请明确指定 store_id 参数',
-            'MULTIPLE_STORES_REQUIRE_STORE_ID',
-            {
-              available_stores: user_stores.map(s => ({
-                store_id: s.store_id,
-                store_name: s.store_name
-              }))
-            },
-            400
-          )
-        }
-      }
-
-      logger.info('商家扫码获取用户信息', {
-        qr_code: qr_code.substring(0, 30) + '...',
-        merchant_id: req.user.user_id,
-        store_id: resolved_store_id
-      })
-
-      // 调用服务层获取用户信息（服务层内部会验证v2二维码）
-      const userInfo = await QueryService.getUserInfoByQRCode(qr_code)
-
-      logger.info('用户信息获取成功', {
-        user_id: userInfo.user_id,
-        nickname: userInfo.nickname,
-        merchant_id: req.user.user_id
-      })
-
-      // 【AC4.2】记录商家域审计日志（扫码获取用户信息，通过 ServiceManager 获取服务）
-      try {
-        const MerchantOperationLogService =
-          req.app.locals.services.getService('merchant_operation_log')
-        await MerchantOperationLogService.createLog({
-          operator_id: req.user.user_id,
-          store_id: resolved_store_id,
-          operation_type: 'scan_user',
-          action: 'scan',
-          target_user_id: userInfo.user_id,
-          request_id: req.id || null,
-          ip_address: req.ip,
-          user_agent: req.headers['user-agent'],
-          result: 'success',
-          extra_data: {
-            user_uuid: userInfo.user_uuid
-          }
-        })
-        logger.debug('📝 商家审计日志已记录', { user_id: userInfo.user_id })
-      } catch (logError) {
-        // 审计日志失败不应影响主流程
-        logger.error('⚠️ 商家审计日志记录失败（非阻断）', { error: logError.message })
-      }
-
-      return res.apiSuccess(
-        {
-          user_id: userInfo.user_id,
-          user_uuid: userInfo.user_uuid,
-          nickname: userInfo.nickname,
-          mobile: userInfo.mobile,
-          qr_code
-        },
-        '用户信息获取成功'
-      )
-    } catch (error) {
-      // 处理二维码验证特定错误
-      if (error.code === 'QRCODE_EXPIRED') {
-        return res.apiError('二维码已过期，请刷新后重试', 'QRCODE_EXPIRED', null, 400)
-      }
-      if (error.code === 'REPLAY_DETECTED') {
-        return res.apiError('二维码已使用，请刷新后重试', 'REPLAY_DETECTED', null, 409)
-      }
-      if (error.code === 'INVALID_QRCODE_FORMAT') {
-        return res.apiError(
-          '二维码格式不支持，请刷新获取最新二维码',
-          'INVALID_QRCODE_FORMAT',
-          null,
-          400
-        )
-      }
-      logger.error('获取用户信息失败', { error: error.message })
-      return handleServiceError(error, res, '获取用户信息失败')
+    if (!qr_code) {
+      return res.apiError('二维码不能为空', 'BAD_REQUEST', null, 400)
     }
-  }
+
+    if (QRCodeValidator.detectVersion(qr_code) !== 'v2') {
+      return res.apiError(
+        '二维码格式不支持，请刷新获取最新二维码',
+        'INVALID_QRCODE_FORMAT',
+        { hint: '请让顾客重新生成动态二维码' },
+        400
+      )
+    }
+
+    let resolved_store_id =
+      req.verified_store_id || (req.query.store_id ? parseInt(req.query.store_id, 10) : null)
+    const user_stores = req.user_stores || []
+
+    if (!resolved_store_id) {
+      if (user_stores.length === 0) {
+        return res.apiError(
+          '您未绑定任何门店，无法扫码获取用户信息',
+          'NO_STORE_BINDING',
+          null,
+          403
+        )
+      } else if (user_stores.length === 1) {
+        resolved_store_id = user_stores[0].store_id
+        logger.info(`🏪 自动填充门店ID: ${resolved_store_id} (用户仅绑定一个门店)`)
+      } else {
+        return res.apiError(
+          '您绑定了多个门店，请明确指定 store_id 参数',
+          'MULTIPLE_STORES_REQUIRE_STORE_ID',
+          {
+            available_stores: user_stores.map(s => ({
+              store_id: s.store_id,
+              store_name: s.store_name
+            }))
+          },
+          400
+        )
+      }
+    }
+
+    logger.info('商家扫码获取用户信息', {
+      qr_code: qr_code.substring(0, 30) + '...',
+      merchant_id: req.user.user_id,
+      store_id: resolved_store_id
+    })
+
+    const userInfo = await QueryService.getUserInfoByQRCode(qr_code)
+
+    logger.info('用户信息获取成功', {
+      user_id: userInfo.user_id,
+      nickname: userInfo.nickname,
+      merchant_id: req.user.user_id
+    })
+
+    try {
+      const MerchantOperationLogService =
+        req.app.locals.services.getService('merchant_operation_log')
+      await MerchantOperationLogService.createLog({
+        operator_id: req.user.user_id,
+        store_id: resolved_store_id,
+        operation_type: 'scan_user',
+        action: 'scan',
+        target_user_id: userInfo.user_id,
+        request_id: req.id || null,
+        ip_address: req.ip,
+        user_agent: req.headers['user-agent'],
+        result: 'success',
+        extra_data: {
+          user_uuid: userInfo.user_uuid
+        }
+      })
+      logger.debug('📝 商家审计日志已记录', { user_id: userInfo.user_id })
+    } catch (logError) {
+      logger.error('⚠️ 商家审计日志记录失败（非阻断）', { error: logError.message })
+    }
+
+    return res.apiSuccess(
+      {
+        user_id: userInfo.user_id,
+        user_uuid: userInfo.user_uuid,
+        nickname: userInfo.nickname,
+        mobile: userInfo.mobile,
+        qr_code
+      },
+      '用户信息获取成功'
+    )
+  })
 )
 
 module.exports = router

@@ -26,34 +26,29 @@ router.get(
   '/decisions/analytics',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    try {
-      const { days = 7, user_filter, start_time, end_time } = req.query
+        const { days = 7, user_filter, start_time, end_time } = req.query
 
-      // 获取分析服务（V4.7.0 服务拆分：getDecisionAnalytics 在 AnalyticsService 中）
-      const AnalyticsService = req.app.locals.services.getService('reporting_analytics')
+    // 获取分析服务（V4.7.0 服务拆分：getDecisionAnalytics 在 AnalyticsService 中）
+    const AnalyticsService = req.app.locals.services.getService('reporting_analytics')
 
-      // 调用服务层方法获取决策分析数据（支持自定义日期范围）
-      const analyticsData = await AnalyticsService.getDecisionAnalytics(
-        parseInt(days),
-        user_filter ? parseInt(user_filter) : null,
-        {
-          performanceMonitor: sharedComponents.performanceMonitor,
-          start_time: start_time || null,
-          end_time: end_time || null
-        }
-      )
+    // 调用服务层方法获取决策分析数据（支持自定义日期范围）
+    const analyticsData = await AnalyticsService.getDecisionAnalytics(
+      parseInt(days),
+      user_filter ? parseInt(user_filter) : null,
+      {
+        performanceMonitor: sharedComponents.performanceMonitor,
+        start_time: start_time || null,
+        end_time: end_time || null
+      }
+    )
 
-      sharedComponents.logger.info('决策分析数据生成成功', {
-        period_days: analyticsData.period.days,
-        total_draws: analyticsData.overview.total_draws,
-        admin_id: req.user?.user_id
-      })
+    sharedComponents.logger.info('决策分析数据生成成功', {
+      period_days: analyticsData.period.days,
+      total_draws: analyticsData.overview.total_draws,
+      admin_id: req.user?.user_id
+    })
 
-      return res.apiSuccess(analyticsData, '决策分析数据获取成功')
-    } catch (error) {
-      sharedComponents.logger.error('决策分析数据获取失败', { error: error.message })
-      return res.apiInternalError('决策分析数据获取失败', error.message, 'ANALYTICS_ERROR')
-    }
+    return res.apiSuccess(analyticsData, '决策分析数据获取成功')
   })
 )
 
@@ -68,23 +63,18 @@ router.get(
   '/lottery/trends',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    try {
-      const { period = 'week', granularity = 'daily', start_time, end_time } = req.query
+        const { period = 'week', granularity = 'daily', start_time, end_time } = req.query
 
-      // 获取分析服务（V4.7.0 服务拆分：getLotteryTrends 在 AnalyticsService 中）
-      const AnalyticsService = req.app.locals.services.getService('reporting_analytics')
+    // 获取分析服务（V4.7.0 服务拆分：getLotteryTrends 在 AnalyticsService 中）
+    const AnalyticsService = req.app.locals.services.getService('reporting_analytics')
 
-      // 调用服务层方法获取趋势分析数据（支持自定义日期范围）
-      const trendsData = await AnalyticsService.getLotteryTrends(period, granularity, {
-        start_time: start_time || null,
-        end_time: end_time || null
-      })
+    // 调用服务层方法获取趋势分析数据（支持自定义日期范围）
+    const trendsData = await AnalyticsService.getLotteryTrends(period, granularity, {
+      start_time: start_time || null,
+      end_time: end_time || null
+    })
 
-      return res.apiSuccess(trendsData, '趋势分析数据获取成功')
-    } catch (error) {
-      sharedComponents.logger.error('趋势分析数据获取失败', { error: error.message })
-      return res.apiInternalError('趋势分析数据获取失败', error.message, 'TRENDS_ANALYTICS_ERROR')
-    }
+    return res.apiSuccess(trendsData, '趋势分析数据获取成功')
   })
 )
 
@@ -99,21 +89,16 @@ router.get(
   '/performance/report',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    try {
-      // 获取统计服务（V4.7.0 服务拆分：getPerformanceReport 在 StatsService 中）
-      const StatsService = req.app.locals.services.getService('reporting_stats')
+        // 获取统计服务（V4.7.0 服务拆分：getPerformanceReport 在 StatsService 中）
+    const StatsService = req.app.locals.services.getService('reporting_stats')
 
-      // 调用服务层方法获取性能报告
-      const performanceReport = await StatsService.getPerformanceReport(
-        sharedComponents.performanceMonitor,
-        sharedComponents.lotteryEngine
-      )
+    // 调用服务层方法获取性能报告
+    const performanceReport = await StatsService.getPerformanceReport(
+      sharedComponents.performanceMonitor,
+      sharedComponents.lotteryEngine
+    )
 
-      return res.apiSuccess(performanceReport, '性能报告获取成功')
-    } catch (error) {
-      sharedComponents.logger.error('性能报告获取失败', { error: error.message })
-      return res.apiInternalError('性能报告获取失败', error.message, 'PERFORMANCE_REPORT_ERROR')
-    }
+    return res.apiSuccess(performanceReport, '性能报告获取成功')
   })
 )
 
@@ -128,35 +113,26 @@ router.get(
   '/stats/today',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    try {
-      sharedComponents.logger.info('管理员请求今日统计数据', {
-        admin_id: req.user.user_id
-      })
+        sharedComponents.logger.info('管理员请求今日统计数据', {
+      admin_id: req.user.user_id
+    })
 
-      // 获取报表统计服务（V4.7.0 ReportingService 拆分：getTodayStats 在 StatsService 中）
-      const StatsService = req.app.locals.services.getService('reporting_stats')
+    // 获取报表统计服务（V4.7.0 ReportingService 拆分：getTodayStats 在 StatsService 中）
+    const StatsService = req.app.locals.services.getService('reporting_stats')
 
-      // 调用服务层方法获取今日统计数据
-      const todayStats = await StatsService.getTodayStats()
+    // 调用服务层方法获取今日统计数据
+    const todayStats = await StatsService.getTodayStats()
 
-      sharedComponents.logger.info('管理员今日统计数据获取成功', {
-        admin_id: req.user.user_id,
-        stats_summary: {
-          new_users: todayStats.user_stats.new_users_today,
-          draws: todayStats.lottery_stats.draws_today,
-          active_users: todayStats.user_stats.active_users_today
-        }
-      })
+    sharedComponents.logger.info('管理员今日统计数据获取成功', {
+      admin_id: req.user.user_id,
+      stats_summary: {
+        new_users: todayStats.user_stats.new_users_today,
+        draws: todayStats.lottery_stats.draws_today,
+        active_users: todayStats.user_stats.active_users_today
+      }
+    })
 
-      return res.apiSuccess(todayStats, '今日统计数据获取成功')
-    } catch (error) {
-      sharedComponents.logger.error('管理员今日统计获取失败', {
-        admin_id: req.user.user_id,
-        error: error.message,
-        stack: error.stack
-      })
-      return res.apiInternalError('今日统计数据获取失败', error.message, 'ADMIN_TODAY_STATS_ERROR')
-    }
+    return res.apiSuccess(todayStats, '今日统计数据获取成功')
   })
 )
 

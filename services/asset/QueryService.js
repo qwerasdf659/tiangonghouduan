@@ -34,6 +34,7 @@
 
 'use strict'
 
+const BusinessError = require('../../utils/BusinessError')
 const { Op, sequelize } = require('sequelize')
 const { AssetCode } = require('../../constants/AssetCode')
 const {
@@ -72,7 +73,7 @@ class QueryService {
     const { transaction } = options
 
     if (!user_id) {
-      throw new Error('getTotalBudgetPoints: user_id 参数必填')
+      throw new BusinessError('getTotalBudgetPoints: user_id 参数必填', 'ASSET_REQUIRED', 400)
     }
 
     // 获取用户账户
@@ -116,7 +117,7 @@ class QueryService {
     const { transaction } = options
 
     if (!user_id) {
-      throw new Error('getBudgetPointsByCampaigns: user_id 参数必填')
+      throw new BusinessError('getBudgetPointsByCampaigns: user_id 参数必填', 'ASSET_REQUIRED', 400)
     }
 
     if (
@@ -243,7 +244,7 @@ class QueryService {
     const { transaction } = options
 
     if (!idempotency_key) {
-      throw new Error('idempotency_key是必填参数')
+      throw new BusinessError('idempotency_key是必填参数', 'ASSET_REQUIRED', 400)
     }
 
     const transactionRecord = await AssetTransaction.findOne({
@@ -289,7 +290,7 @@ class QueryService {
     const { transaction, include_items = false } = options
 
     if (!user_id) {
-      throw new Error('user_id是必填参数')
+      throw new BusinessError('user_id是必填参数', 'ASSET_REQUIRED', 400)
     }
 
     // 需要动态引入模型（避免循环依赖）
@@ -590,7 +591,7 @@ class QueryService {
     const { user_id, asset_code = AssetCode.POINTS } = params
 
     if (!user_id) {
-      throw new Error('getTodaySummary: user_id 参数必填')
+      throw new BusinessError('getTodaySummary: user_id 参数必填', 'ASSET_REQUIRED', 400)
     }
 
     const account = await Account.findOne({

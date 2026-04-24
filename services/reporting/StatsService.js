@@ -24,6 +24,7 @@
  * - BeijingTimeHelper: 北京时间处理助手
  */
 
+const BusinessError = require('../../utils/BusinessError')
 const BeijingTimeHelper = require('../../utils/timeHelper')
 const DataSanitizer = require('../DataSanitizer')
 const os = require('os')
@@ -615,7 +616,7 @@ class StatsService {
         ])
 
       if (!userInfo) {
-        throw new Error('用户不存在')
+        throw new BusinessError('用户不存在', 'REPORTING_NOT_FOUND', 404)
       }
 
       // 构建统计数据

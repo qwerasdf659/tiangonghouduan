@@ -131,7 +131,7 @@ export const AssetAPI = {
    * @returns {number} return.data.transactions[].asset_transaction_id - 流水ID（主键）
    * @returns {string} return.data.transactions[].asset_code - 资产代码
    * @returns {string} return.data.transactions[].asset_name - 资产显示名称
-   * @returns {string} return.data.transactions[].tx_type - 业务类型（附带 tx_type_display 中文）
+   * @returns {string} return.data.transactions[].business_type - 业务类型（附带 business_type_display 中文）
    * @returns {number} return.data.transactions[].delta_amount - 变动金额（正数=增加，负数=扣减）
    * @returns {number} return.data.transactions[].balance_before - 变动前余额
    * @returns {number} return.data.transactions[].balance_after - 变动后余额
@@ -319,7 +319,7 @@ export const AssetAPI = {
    * @returns {number} return.data.amount - 调整数量
    * @returns {number} return.data.balance_before - 调整前余额
    * @returns {number} return.data.balance_after - 调整后余额
-   * @returns {number} return.data.transaction_id - 交易流水ID
+   * @returns {number} return.data.asset_transaction_id - 资产流水ID（主键）
    * @returns {string} return.data.idempotency_key - 幂等键
    * @returns {boolean} [return.data.is_duplicate] - 是否为重复请求
    *

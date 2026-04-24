@@ -1,3 +1,4 @@
+const BusinessError = require('../../utils/BusinessError')
 const logger = require('../../utils/logger').logger
 
 /**
@@ -113,7 +114,7 @@ class LotteryUserService {
     try {
       const user = await User.findByPk(user_id)
       if (!user) {
-        throw new Error('用户不存在')
+        throw new BusinessError('用户不存在', 'LOTTERY_NOT_FOUND', 404)
       }
 
       // 🛡️ 获取用户角色信息
@@ -196,7 +197,7 @@ class LotteryUserService {
     try {
       const user = await User.findByPk(user_id)
       if (!user) {
-        throw new Error('用户不存在')
+        throw new BusinessError('用户不存在', 'LOTTERY_NOT_FOUND', 404)
       }
 
       // 🛡️ 获取用户角色信息
@@ -295,7 +296,7 @@ class LotteryUserService {
     try {
       const user = await User.findByPk(user_id)
       if (!user) {
-        throw new Error('用户不存在')
+        throw new BusinessError('用户不存在', 'LOTTERY_NOT_FOUND', 404)
       }
 
       const newCount = increment ? (user.consecutive_fail_count || 0) + 1 : 0
@@ -331,7 +332,7 @@ class LotteryUserService {
     try {
       const user = await User.findByPk(user_id)
       if (!user) {
-        throw new Error('用户不存在')
+        throw new BusinessError('用户不存在', 'LOTTERY_NOT_FOUND', 404)
       }
 
       const newTotal = (user.history_total_points || 0) + points

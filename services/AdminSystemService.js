@@ -114,6 +114,7 @@
  * 使用模型：Claude Sonnet 4.5
  */
 
+const BusinessError = require('../utils/BusinessError')
 const BeijingTimeHelper = require('../utils/timeHelper')
 const models = require('../models')
 const { SystemSettings, sequelize } = models
@@ -347,7 +348,7 @@ class AdminSystemService {
       logger.info('获取管理策略状态')
 
       if (!managementStrategy) {
-        throw new Error('管理策略未初始化')
+        throw new BusinessError('管理策略未初始化', 'ADMIN_NOT_CONFIGURED', 500)
       }
 
       const result = await managementStrategy.getStatus()
@@ -511,7 +512,7 @@ class AdminSystemService {
         'data_management'
       ]
       if (!validCategories.includes(category)) {
-        throw new Error(`无效的设置分类: ${category}。有效分类: ${validCategories.join(', ')}`)
+        throw new BusinessError(`无效的设置分类: ${category}。有效分类: ${validCategories.join(', ')}`, 'ADMIN_INVALID', 400)
       }
 
       // 查询该分类下的所有配置项
@@ -661,7 +662,7 @@ class AdminSystemService {
       'data_management'
     ]
     if (!validCategories.includes(category)) {
-      throw new Error(`无效的设置分类: ${category}。有效分类: ${validCategories.join(', ')}`)
+      throw new BusinessError(`无效的设置分类: ${category}。有效分类: ${validCategories.join(', ')}`, 'ADMIN_INVALID', 400)
     }
 
     // 验证更新数据
@@ -670,7 +671,7 @@ class AdminSystemService {
       typeof settingsToUpdate !== 'object' ||
       Object.keys(settingsToUpdate).length === 0
     ) {
-      throw new Error('请提供要更新的设置项')
+      throw new BusinessError('请提供要更新的设置项', 'ADMIN_ERROR', 400)
     }
 
     const settingKeys = Object.keys(settingsToUpdate)

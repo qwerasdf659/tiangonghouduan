@@ -25,6 +25,7 @@
  * 原文件：services/AdminLotteryService.js (1781行)
  */
 
+const BusinessError = require('../../../utils/BusinessError')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 const models = require('../../../models')
 const AuditLogService = require('../../AuditLogService')
@@ -97,13 +98,13 @@ class AdminLotteryCoreService {
     // 验证用户存在
     const user = await UserService.getUserById(userId)
     if (!user) {
-      throw new Error('用户不存在')
+      throw new BusinessError('用户不存在', 'LOTTERY_NOT_FOUND', 404)
     }
 
     // 验证奖品存在
     const prize = await PrizePoolService.getPrizeById(prizeId)
     if (!prize) {
-      throw new Error('奖品不存在')
+      throw new BusinessError('奖品不存在', 'LOTTERY_NOT_FOUND', 404)
     }
 
     // 获取ManagementStrategy
@@ -116,7 +117,7 @@ class AdminLotteryCoreService {
     })
 
     if (!result.success) {
-      throw new Error(result.error || '强制中奖设置失败')
+      throw new BusinessError(result.error || '强制中奖设置失败', 'LOTTERY_FORCE_WIN_FAILED', 500)
     }
 
     // 记录审计日志
@@ -198,7 +199,7 @@ class AdminLotteryCoreService {
     // 验证用户存在
     const user = await UserService.getUserById(userId)
     if (!user) {
-      throw new Error('用户不存在')
+      throw new BusinessError('用户不存在', 'LOTTERY_NOT_FOUND', 404)
     }
 
     // 获取ManagementStrategy
@@ -211,7 +212,7 @@ class AdminLotteryCoreService {
     })
 
     if (!result.success) {
-      throw new Error(result.error || '强制不中奖设置失败')
+      throw new BusinessError(result.error || '强制不中奖设置失败', 'LOTTERY_FORCE_LOSE_FAILED', 500)
     }
 
     // 记录审计日志
@@ -293,7 +294,7 @@ class AdminLotteryCoreService {
     // 验证用户存在
     const user = await UserService.getUserById(userId)
     if (!user) {
-      throw new Error('用户不存在')
+      throw new BusinessError('用户不存在', 'LOTTERY_NOT_FOUND', 404)
     }
 
     // 如果是特定奖品调整，验证奖品存在
@@ -302,7 +303,7 @@ class AdminLotteryCoreService {
       const PrizePoolService = this._dependencies.prizePool
       prize = await PrizePoolService.getPrizeById(adjustmentData.lottery_prize_id)
       if (!prize) {
-        throw new Error('奖品不存在')
+        throw new BusinessError('奖品不存在', 'LOTTERY_NOT_FOUND', 404)
       }
     }
 
@@ -420,7 +421,7 @@ class AdminLotteryCoreService {
     // 验证用户存在
     const user = await UserService.getUserById(userId)
     if (!user) {
-      throw new Error('用户不存在')
+      throw new BusinessError('用户不存在', 'LOTTERY_NOT_FOUND', 404)
     }
 
     // 获取ManagementStrategy
@@ -437,7 +438,7 @@ class AdminLotteryCoreService {
     )
 
     if (!result.success) {
-      throw new Error(result.error || '用户队列设置失败')
+      throw new BusinessError(result.error || '用户队列设置失败', 'LOTTERY_QUEUE_SET_FAILED', 500)
     }
 
     // 记录审计日志
@@ -499,14 +500,14 @@ class AdminLotteryCoreService {
       // 验证用户存在
       const user = await UserService.getUserById(userId)
       if (!user) {
-        throw new Error('用户不存在')
+        throw new BusinessError('用户不存在', 'LOTTERY_NOT_FOUND', 404)
       }
 
-      // 获取ManagementStrategy
-      const managementStrategy = sharedComponents.managementStrategy
+      // 获取ManagementQueryStrategy
+      const managementQueryStrategy = sharedComponents.managementQueryStrategy
 
       // 获取用户管理状态
-      const managementStatus = await managementStrategy.getUserManagementStatus(userId)
+      const managementStatus = await managementQueryStrategy.getUserManagementStatus(userId)
 
       logger.info('查询用户管理状态成功', {
         user_id: userId,
@@ -567,7 +568,7 @@ class AdminLotteryCoreService {
     // 验证用户存在
     const user = await UserService.getUserById(userId)
     if (!user) {
-      throw new Error('用户不存在')
+      throw new BusinessError('用户不存在', 'LOTTERY_NOT_FOUND', 404)
     }
 
     // 获取ManagementStrategy
@@ -577,7 +578,7 @@ class AdminLotteryCoreService {
     const result = await managementStrategy.clearUserSettings(adminId, userId, settingType)
 
     if (!result.success) {
-      throw new Error(result.error || '清除用户设置失败')
+      throw new BusinessError(result.error || '清除用户设置失败', 'LOTTERY_CLEAR_USER_FAILED', 500)
     }
 
     const idempotencyKey = `lottery_clear_${userId}_${settingType || 'all'}_${adminId}_${Math.floor(Date.now() / 1000)}`

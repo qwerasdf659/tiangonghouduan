@@ -15,51 +15,44 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
+const { asyncHandler } = require('../../../../middleware/validation')
 
 /**
  * GET /:identifier/lifecycle
  * 获取物品完整生命周期（tracking_code 或 item_id）
  */
-router.get('/:identifier/lifecycle', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const services = req.app.locals.services
-    const ItemLifecycleService = services.getService('asset_item_lifecycle')
+router.get('/:identifier/lifecycle', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  const services = req.app.locals.services
+  const ItemLifecycleService = services.getService('asset_item_lifecycle')
 
-    const result = await ItemLifecycleService.getItemLifecycle(req.params.identifier)
+  const result = await ItemLifecycleService.getItemLifecycle(req.params.identifier)
 
-    if (!result) {
-      return res.apiError('物品不存在', 404)
-    }
-
-    return res.apiSuccess(result, '获取物品生命周期成功')
-  } catch (error) {
-    return res.apiError(`获取物品生命周期失败：${error.message}`, 500)
+  if (!result) {
+    return res.apiError('物品不存在', 404)
   }
-})
+
+  return res.apiSuccess(result, '获取物品生命周期成功')
+}))
 
 /**
  * GET /ledger
  * 查询物品账本条目（支持 item_id / account_id / event_type / 时间范围筛选）
  */
-router.get('/ledger', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const services = req.app.locals.services
-    const ItemService = services.getService('asset_item')
+router.get('/ledger', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  const services = req.app.locals.services
+  const ItemService = services.getService('asset_item')
 
-    const { item_id, account_id, event_types, page, page_size } = req.query
+  const { item_id, account_id, event_types, page, page_size } = req.query
 
-    const result = await ItemService.getLedgerEntries({
-      item_id: item_id ? Number(item_id) : undefined,
-      account_id: account_id ? Number(account_id) : undefined,
-      event_types: event_types ? event_types.split(',') : undefined,
-      page: page ? Number(page) : 1,
-      page_size: page_size ? Number(page_size) : 20
-    })
+  const result = await ItemService.getLedgerEntries({
+    item_id: item_id ? Number(item_id) : undefined,
+    account_id: account_id ? Number(account_id) : undefined,
+    event_types: event_types ? event_types.split(',') : undefined,
+    page: page ? Number(page) : 1,
+    page_size: page_size ? Number(page_size) : 20
+  })
 
-    return res.apiSuccess(result, '获取账本条目成功')
-  } catch (error) {
-    return res.apiError(`获取账本条目失败：${error.message}`, 500)
-  }
-})
+  return res.apiSuccess(result, '获取账本条目成功')
+}))
 
 module.exports = router

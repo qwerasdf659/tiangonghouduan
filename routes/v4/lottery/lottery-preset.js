@@ -1,3 +1,4 @@
+const { asyncHandler } = require('../../../middleware/validation')
 const logger = require('../../../utils/logger').logger
 
 /**
@@ -20,79 +21,31 @@ const { authenticateToken, requireRoleLevel } = require('../../../middleware/aut
  * 为用户创建抽奖预设队列
  * POST /api/v4/lottery/preset/create
  */
-router.post('/create', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const adminId = req.user.user_id
-    const { user_id, presets } = req.body
+router.post('/create', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  const adminId = req.user.user_id
+  const { user_id, presets } = req.body
 
-    // 🎯 通过 ServiceManager 获取 LotteryPresetService
-    const LotteryPresetService = req.app.locals.services.getService('lottery_preset')
+  // 🎯 通过 ServiceManager 获取 LotteryPresetService
+  const LotteryPresetService = req.app.locals.services.getService('lottery_preset')
 
-    // 🎯 调用服务层方法（Service层会进行所有验证和业务逻辑处理）
-    const createdPresets = await LotteryPresetService.createPresets(adminId, user_id, presets)
+  // 🎯 调用服务层方法（Service层会进行所有验证和业务逻辑处理）
+  const createdPresets = await LotteryPresetService.createPresets(adminId, user_id, presets)
 
-    // 返回创建结果 - 参数顺序：data第1个, message第2个
-    return res.apiSuccess(
-      {
-        user_id,
-        presets_count: createdPresets.length,
-        created_presets: createdPresets.map(preset => ({
-          lottery_preset_id: preset.lottery_preset_id,
-          lottery_prize_id: preset.lottery_prize_id,
-          queue_order: preset.queue_order,
-          status: preset.status
-        }))
-      },
-      '抽奖预设创建成功'
-    )
-  } catch (error) {
-    // 🎯 细化错误处理：根据Service层抛出的错误类型返回合适的HTTP状态码
-    logger.error('❌ 创建抽奖预设失败:', error.message)
-
-    // Service层的业务错误
-    if (
-      error.code === 'INVALID_PARAMETERS' ||
-      error.code === 'TOO_MANY_PRESETS' ||
-      error.code === 'DUPLICATE_QUEUE_ORDER' ||
-      error.code === 'INVALID_PRESET_DATA' ||
-      error.code === 'INVALID_QUEUE_ORDER'
-    ) {
-      return res.apiError(error.message, error.code, null, 400)
-    }
-
-    if (error.code === 'USER_NOT_FOUND' || error.code === 'PRIZE_NOT_FOUND') {
-      return res.apiError(error.message, error.code, null, 404)
-    }
-
-    // Sequelize数据库错误
-    if (error.name === 'SequelizeDatabaseError') {
-      return res.apiError('数据库操作失败，请稍后重试', 'DATABASE_ERROR', null, 500)
-    }
-
-    // Sequelize外键约束错误
-    if (error.name === 'SequelizeForeignKeyConstraintError') {
-      return res.apiError(
-        '数据关联错误，请检查用户ID或奖品ID是否有效',
-        'FOREIGN_KEY_ERROR',
-        null,
-        400
-      )
-    }
-
-    // Sequelize唯一约束错误
-    if (error.name === 'SequelizeUniqueConstraintError') {
-      return res.apiError(
-        '预设队列顺序重复，同一用户的queue_order不能重复',
-        'DUPLICATE_QUEUE_ORDER',
-        null,
-        400
-      )
-    }
-
-    // 其他未知错误
-    return res.apiInternalError('创建抽奖预设失败')
-  }
-})
+  // 返回创建结果 - 参数顺序：data第1个, message第2个
+  return res.apiSuccess(
+    {
+      user_id,
+      presets_count: createdPresets.length,
+      created_presets: createdPresets.map(preset => ({
+        lottery_preset_id: preset.lottery_preset_id,
+        lottery_prize_id: preset.lottery_prize_id,
+        queue_order: preset.queue_order,
+        status: preset.status
+      }))
+    },
+    '抽奖预设创建成功'
+  )
+}))
 
 /**
  * 获取所有预设列表（管理员视角）
@@ -121,59 +74,24 @@ router.post('/create', authenticateToken, requireRoleLevel(100), async (req, res
  * @returns {Object} pagination - 分页信息（total、page、page_size、total_pages）
  * @returns {Object} filters - 当前筛选条件
  */
-router.get('/list', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const adminId = req.user.user_id
+router.get('/list', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  const adminId = req.user.user_id
 
-    // 🎯 通过 ServiceManager 获取 LotteryPresetService
-    const LotteryPresetService = req.app.locals.services.getService('lottery_preset')
+  // 🎯 通过 ServiceManager 获取 LotteryPresetService
+  const LotteryPresetService = req.app.locals.services.getService('lottery_preset')
 
-    // 🎯 调用服务层方法（将查询参数传递给Service层）
-    const result = await LotteryPresetService.listPresetsWithPagination(req.query)
+  // 🎯 调用服务层方法（将查询参数传递给Service层）
+  const result = await LotteryPresetService.listPresetsWithPagination(req.query)
 
-    logger.info('📋 管理员查看预设列表', {
-      adminId,
-      filters: result.filters,
-      totalCount: result.pagination.total
-    })
+  logger.info('📋 管理员查看预设列表', {
+    adminId,
+    filters: result.filters,
+    totalCount: result.pagination.total
+  })
 
-    // 返回预设列表 - 参数顺序：data第1个, message第2个
-    return res.apiSuccess(result, '获取预设列表成功')
-  } catch (error) {
-    // 🎯 细化错误处理：根据Service层抛出的错误类型返回合适的HTTP状态码
-    logger.error('❌ 获取预设列表失败:', error.message)
-
-    // Service层的业务错误
-    if (
-      error.code === 'INVALID_STATUS' ||
-      error.code === 'INVALID_ORDER_BY' ||
-      error.code === 'INVALID_ORDER_DIR' ||
-      error.code === 'INVALID_PAGE' ||
-      error.code === 'INVALID_PAGE_SIZE' ||
-      error.code === 'INVALID_USER_ID'
-    ) {
-      return res.apiError(error.message, error.code, null, 400)
-    }
-
-    // Sequelize数据库错误
-    if (error.name === 'SequelizeDatabaseError') {
-      return res.apiError('数据库查询失败，请稍后重试', 'DATABASE_ERROR', null, 500)
-    }
-
-    // Sequelize连接错误
-    if (error.name === 'SequelizeConnectionError') {
-      return res.apiError('数据库连接失败，请联系技术支持', 'CONNECTION_ERROR', null, 500)
-    }
-
-    // Sequelize超时错误
-    if (error.name === 'SequelizeTimeoutError') {
-      return res.apiError('数据库查询超时，请重试', 'QUERY_TIMEOUT', null, 504)
-    }
-
-    // 其他未知错误
-    return res.apiInternalError('获取预设列表失败')
-  }
-})
+  // 返回预设列表 - 参数顺序：data第1个, message第2个
+  return res.apiSuccess(result, '获取预设列表成功')
+}))
 
 /**
  * 获取预设统计信息
@@ -196,42 +114,24 @@ router.get('/list', authenticateToken, requireRoleLevel(100), async (req, res) =
  * @returns {string} usage_rate - 预设使用率（百分比）
  * @returns {Array} prize_type_distribution - 奖品类型分布统计
  */
-router.get('/stats', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const adminId = req.user.user_id
+router.get('/stats', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  const adminId = req.user.user_id
 
-    // 🎯 通过 ServiceManager 获取 LotteryPresetService
-    const LotteryPresetService = req.app.locals.services.getService('lottery_preset')
+  // 🎯 通过 ServiceManager 获取 LotteryPresetService
+  const LotteryPresetService = req.app.locals.services.getService('lottery_preset')
 
-    // 🎯 调用服务层方法
-    const stats = await LotteryPresetService.getPresetStats()
+  // 🎯 调用服务层方法
+  const stats = await LotteryPresetService.getPresetStats()
 
-    logger.info('📊 管理员查看预设统计', {
-      adminId,
-      totalPresets: stats.total_presets,
-      pendingPresets: stats.pending_presets,
-      usedPresets: stats.used_presets
-    })
+  logger.info('📊 管理员查看预设统计', {
+    adminId,
+    totalPresets: stats.total_presets,
+    pendingPresets: stats.pending_presets,
+    usedPresets: stats.used_presets
+  })
 
-    // 返回统计数据 - 参数顺序：data第1个, message第2个
-    return res.apiSuccess(stats, '获取预设统计成功')
-  } catch (error) {
-    // 🎯 细化错误处理：根据Service层抛出的错误类型返回合适的HTTP状态码
-    logger.error('❌ 获取预设统计失败:', error.message)
-
-    // Sequelize数据库错误
-    if (error.name === 'SequelizeDatabaseError') {
-      return res.apiError('数据库查询失败，请稍后重试', 'DATABASE_ERROR', null, 500)
-    }
-
-    // Sequelize连接错误
-    if (error.name === 'SequelizeConnectionError') {
-      return res.apiError('数据库连接失败，请联系技术支持', 'CONNECTION_ERROR', null, 500)
-    }
-
-    // 其他未知错误
-    return res.apiInternalError('获取预设统计失败')
-  }
-})
+  // 返回统计数据 - 参数顺序：data第1个, message第2个
+  return res.apiSuccess(stats, '获取预设统计成功')
+}))
 
 module.exports = router

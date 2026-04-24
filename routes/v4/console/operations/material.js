@@ -17,6 +17,7 @@ const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const TransactionManager = require('../../../../utils/TransactionManager')
+const { asyncHandler } = require('../../../../middleware/validation')
 
 /**
  * 查询材料资产类型列表（管理员）
@@ -28,21 +29,12 @@ const TransactionManager = require('../../../../utils/TransactionManager')
  *
  * 返回：材料资产类型列表
  */
-router.get('/asset-types', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const { group_code, is_enabled } = req.query
-    const MaterialManagementService = req.app.locals.services.getService('material_management')
-    const result = await MaterialManagementService.listAssetTypes({ group_code, is_enabled })
-    return res.apiSuccess(result, '查询材料资产类型成功')
-  } catch (error) {
-    return res.apiError(
-      `查询材料资产类型失败：${error.message}`,
-      error.error_code || 'query_asset_types_failed',
-      error.details || null,
-      error.status_code || 500
-    )
-  }
-})
+router.get('/asset-types', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  const { group_code, is_enabled } = req.query
+  const MaterialManagementService = req.app.locals.services.getService('material_management')
+  const result = await MaterialManagementService.listAssetTypes({ group_code, is_enabled })
+  return res.apiSuccess(result, '查询材料资产类型成功')
+}))
 
 /**
  * 获取单个材料资产类型详情（管理员）
@@ -57,21 +49,12 @@ router.get('/asset-types', authenticateToken, requireRoleLevel(100), async (req,
  *
  * 返回：材料资产类型详情
  */
-router.get('/asset-types/:code', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const asset_code = req.params.code
-    const MaterialManagementService = req.app.locals.services.getService('material_management')
-    const result = await MaterialManagementService.getAssetTypeByCode(asset_code)
-    return res.apiSuccess(result, '获取材料资产类型详情成功')
-  } catch (error) {
-    return res.apiError(
-      `获取材料资产类型详情失败：${error.message}`,
-      error.error_code || 'get_asset_type_failed',
-      error.details || null,
-      error.status_code || 500
-    )
-  }
-})
+router.get('/asset-types/:code', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  const asset_code = req.params.code
+  const MaterialManagementService = req.app.locals.services.getService('material_management')
+  const result = await MaterialManagementService.getAssetTypeByCode(asset_code)
+  return res.apiSuccess(result, '获取材料资产类型详情成功')
+}))
 
 /**
  * 创建材料资产类型（管理员）
@@ -88,67 +71,58 @@ router.get('/asset-types/:code', authenticateToken, requireRoleLevel(100), async
  *
  * 返回：创建的材料资产类型信息
  */
-router.post('/asset-types', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const {
-      asset_code,
-      display_name,
-      group_code,
-      form,
-      tier,
-      sort_order = 0,
-      visible_value_points,
-      budget_value_points,
-      is_enabled = true,
-      icon_media_id
-    } = req.body
+router.post('/asset-types', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  const {
+    asset_code,
+    display_name,
+    group_code,
+    form,
+    tier,
+    sort_order = 0,
+    visible_value_points,
+    budget_value_points,
+    is_enabled = true,
+    icon_media_id
+  } = req.body
 
-    if (!asset_code || !display_name || !group_code || !form || tier === undefined) {
-      return res.apiError(
-        '缺少必填参数：asset_code/display_name/group_code/form/tier',
-        'MISSING_PARAMS',
-        null,
-        400
-      )
-    }
-
-    if (!['shard', 'crystal'].includes(form)) {
-      return res.apiError('form 必须为 shard 或 crystal', 'INVALID_FORM', null, 400)
-    }
-
-    const MaterialManagementService = req.app.locals.services.getService('material_management')
-
-    const result = await TransactionManager.execute(
-      async transaction => {
-        return await MaterialManagementService.createAssetType(
-          {
-            asset_code,
-            display_name,
-            group_code,
-            form,
-            tier: parseInt(tier),
-            sort_order: parseInt(sort_order),
-            visible_value_points: visible_value_points ? parseInt(visible_value_points) : null,
-            budget_value_points: budget_value_points ? parseInt(budget_value_points) : null,
-            is_enabled: is_enabled === true || is_enabled === 'true',
-            icon_media_id: icon_media_id || null
-          },
-          { transaction }
-        )
-      },
-      { description: 'createAssetType' }
-    )
-
-    return res.apiSuccess(result, '创建材料资产类型成功')
-  } catch (error) {
+  if (!asset_code || !display_name || !group_code || !form || tier === undefined) {
     return res.apiError(
-      `创建材料资产类型失败：${error.message}`,
-      error.error_code || 'create_asset_type_failed',
-      error.details || null,
-      error.status_code || 500
+      '缺少必填参数：asset_code/display_name/group_code/form/tier',
+      'MISSING_PARAMS',
+      null,
+      400
     )
   }
-})
+
+  if (!['shard', 'crystal'].includes(form)) {
+    return res.apiError('form 必须为 shard 或 crystal', 'INVALID_FORM', null, 400)
+  }
+
+  const MaterialManagementService = req.app.locals.services.getService('material_management')
+
+  const result = await TransactionManager.execute(
+    async transaction => {
+      return await MaterialManagementService.createAssetType(
+        {
+          asset_code,
+          display_name,
+          group_code,
+          form,
+          tier: parseInt(tier),
+          sort_order: parseInt(sort_order),
+          visible_value_points: visible_value_points ? parseInt(visible_value_points) : null,
+          budget_value_points: budget_value_points ? parseInt(budget_value_points) : null,
+          is_enabled: is_enabled === true || is_enabled === 'true',
+          icon_media_id: icon_media_id || null
+        },
+        { transaction }
+      )
+    },
+    { description: 'createAssetType' }
+  )
+
+  return res.apiSuccess(result, '创建材料资产类型成功')
+}))
 
 /**
  * 更新材料资产类型（管理员）
@@ -177,61 +151,52 @@ router.post('/asset-types', authenticateToken, requireRoleLevel(100), async (req
  *
  * 返回：更新后的材料资产类型信息
  */
-router.put('/asset-types/:code', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    // 配置实体使用业务码作为标识符
-    const asset_code = req.params.code
-    const {
-      display_name,
-      group_code,
-      form,
-      tier,
-      sort_order,
-      visible_value_points,
-      budget_value_points,
-      is_enabled,
-      is_tradable,
-      icon_media_id
-    } = req.body
+router.put('/asset-types/:code', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  // 配置实体使用业务码作为标识符
+  const asset_code = req.params.code
+  const {
+    display_name,
+    group_code,
+    form,
+    tier,
+    sort_order,
+    visible_value_points,
+    budget_value_points,
+    is_enabled,
+    is_tradable,
+    icon_media_id
+  } = req.body
 
-    if (form !== undefined && !['shard', 'crystal'].includes(form)) {
-      return res.apiError('form 必须为 shard 或 crystal', 'INVALID_FORM', null, 400)
-    }
-
-    const MaterialManagementService = req.app.locals.services.getService('material_management')
-
-    const result = await TransactionManager.execute(
-      async transaction => {
-        return await MaterialManagementService.updateAssetType(
-          asset_code,
-          {
-            display_name,
-            group_code,
-            form,
-            tier,
-            sort_order,
-            visible_value_points,
-            budget_value_points,
-            is_enabled,
-            is_tradable,
-            icon_media_id
-          },
-          { transaction }
-        )
-      },
-      { description: 'updateAssetType' }
-    )
-
-    return res.apiSuccess(result, '更新材料资产类型成功')
-  } catch (error) {
-    return res.apiError(
-      `更新材料资产类型失败：${error.message}`,
-      error.error_code || 'update_asset_type_failed',
-      error.details || null,
-      error.status_code || 500
-    )
+  if (form !== undefined && !['shard', 'crystal'].includes(form)) {
+    return res.apiError('form 必须为 shard 或 crystal', 'INVALID_FORM', null, 400)
   }
-})
+
+  const MaterialManagementService = req.app.locals.services.getService('material_management')
+
+  const result = await TransactionManager.execute(
+    async transaction => {
+      return await MaterialManagementService.updateAssetType(
+        asset_code,
+        {
+          display_name,
+          group_code,
+          form,
+          tier,
+          sort_order,
+          visible_value_points,
+          budget_value_points,
+          is_enabled,
+          is_tradable,
+          icon_media_id
+        },
+        { transaction }
+      )
+    },
+    { description: 'updateAssetType' }
+  )
+
+  return res.apiSuccess(result, '更新材料资产类型成功')
+}))
 
 /**
  * 禁用材料资产类型（管理员）
@@ -250,30 +215,20 @@ router.put(
   '/asset-types/:code/disable',
   authenticateToken,
   requireRoleLevel(100),
-  async (req, res) => {
-    try {
-      // 配置实体使用业务码作为标识符
-      const asset_code = req.params.code
-      const MaterialManagementService = req.app.locals.services.getService('material_management')
+  asyncHandler(async (req, res) => {
+    // 配置实体使用业务码作为标识符
+    const asset_code = req.params.code
+    const MaterialManagementService = req.app.locals.services.getService('material_management')
 
-      // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
-      const result = await TransactionManager.execute(
-        async transaction => {
-          return await MaterialManagementService.disableAssetType(asset_code, { transaction })
-        },
-        { description: 'disableAssetType' }
-      )
+    // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
+    const result = await TransactionManager.execute(
+      async transaction => {
+        return await MaterialManagementService.disableAssetType(asset_code, { transaction })
+      },
+      { description: 'disableAssetType' }
+    )
 
-      return res.apiSuccess(result, '禁用材料资产类型成功')
-    } catch (error) {
-      return res.apiError(
-        `禁用材料资产类型失败：${error.message}`,
-        error.error_code || 'disable_asset_type_failed',
-        error.details || null,
-        error.status_code || 500
-      )
-    }
-  }
-)
+    return res.apiSuccess(result, '禁用材料资产类型成功')
+}))
 
 module.exports = router

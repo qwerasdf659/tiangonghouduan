@@ -33,6 +33,7 @@
  * 最后更新：2026年01月05日（事务边界治理改造）
  */
 
+const BusinessError = require('../utils/BusinessError')
 const crypto = require('crypto')
 const { sequelize, RedemptionOrder, Item, Account, User, Store, StoreStaff } = require('../models')
 const RedemptionCodeGenerator = require('../utils/RedemptionCodeGenerator')
@@ -93,11 +94,11 @@ class RedemptionService {
     })
 
     if (!item) {
-      throw new Error(`物品不存在: ${item_id}`)
+      throw new BusinessError(`物品不存在: ${item_id}`, 'REDEMPTION_NOT_FOUND', 404)
     }
 
     if (item.status !== 'available') {
-      throw new Error(`物品实例不可用: status=${item.status}`)
+      throw new BusinessError(`物品实例不可用: status=${item.status}`, 'REDEMPTION_NOT_ALLOWED', 400)
     }
 
     // 1.5 幂等性检查：防止同一物品并发创建多个pending订单
@@ -115,7 +116,7 @@ class RedemptionService {
         existing_order_id: existingOrder.redemption_order_id,
         creator_user_id
       })
-      throw new Error('该物品已有待核销订单，请勿重复生成核销码')
+      throw new BusinessError('该物品已有待核销订单，请勿重复生成核销码', 'REDEMPTION_ALREADY_EXISTS', 409)
     }
 
     // 🔐 2. 服务层兜底：所有权或管理员权限校验（防越权）
@@ -138,7 +139,7 @@ class RedemptionService {
             owner_account_id: item.owner_account_id,
             role_level: userRoles.role_level
           })
-          throw new Error('权限不足：仅物品所有者或管理员可生成核销码')
+          throw new BusinessError('权限不足：仅物品所有者或管理员可生成核销码', 'REDEMPTION_INSUFFICIENT', 400)
         }
 
         logger.info('服务层验证：管理员生成核销码', {
@@ -266,7 +267,7 @@ class RedemptionService {
 
     // 1. 验证核销码格式
     if (!RedemptionCodeGenerator.validate(code)) {
-      throw new Error('核销码格式错误')
+      throw new BusinessError('核销码格式错误', 'REDEMPTION_ERROR', 400)
     }
 
     // 2. 计算哈希查找订单
@@ -285,26 +286,26 @@ class RedemptionService {
     })
 
     if (!order) {
-      throw new Error('核销码不存在')
+      throw new BusinessError('核销码不存在', 'REDEMPTION_NOT_FOUND', 404)
     }
 
     // 3. 检查订单状态
     if (order.status === 'fulfilled') {
-      throw new Error('核销码已被使用')
+      throw new BusinessError('核销码已被使用', 'REDEMPTION_ERROR', 400)
     }
 
     if (order.status === 'cancelled') {
-      throw new Error('核销码已取消')
+      throw new BusinessError('核销码已取消', 'REDEMPTION_ERROR', 400)
     }
 
     if (order.status === 'expired') {
-      throw new Error('核销码已过期')
+      throw new BusinessError('核销码已过期', 'REDEMPTION_ERROR', 400)
     }
 
     // 4. 检查是否超过有效期
     if (order.isExpired()) {
       await order.update({ status: 'expired' }, { transaction })
-      throw new Error('核销码已超过有效期')
+      throw new BusinessError('核销码已超过有效期', 'REDEMPTION_EXCEEDED', 400)
     }
 
     // 5. 门店关联：自动查询核销人的 store_staff 绑定关系（决策8/P6）
@@ -349,8 +350,10 @@ class RedemptionService {
           store_id: fulfilledStoreId,
           item_id: order.item_id
         })
-        throw new Error(
-          `核销失败：物品归属商家(${order.item.merchant_id})与核销门店归属商家(${store.merchant_id})不匹配`
+        throw new BusinessError(
+          `核销失败：物品归属商家(${order.item.merchant_id})与核销门店归属商家(${store.merchant_id})不匹配`,
+          'REDEMPTION_FAILED',
+          500
         )
       }
     }
@@ -427,11 +430,11 @@ class RedemptionService {
     })
 
     if (!order) {
-      throw new Error('订单不存在')
+      throw new BusinessError('订单不存在', 'REDEMPTION_NOT_FOUND', 404)
     }
 
     if (order.status === 'fulfilled') {
-      throw new Error('订单已核销，不能取消')
+      throw new BusinessError('订单已核销，不能取消', 'REDEMPTION_NOT_ALLOWED', 400)
     }
 
     if (order.status === 'cancelled') {
@@ -596,7 +599,7 @@ class RedemptionService {
     const order = await RedemptionOrder.findByPk(order_id, queryOptions)
 
     if (!order) {
-      throw new Error('订单不存在')
+      throw new BusinessError('订单不存在', 'REDEMPTION_NOT_FOUND', 404)
     }
 
     return order
@@ -655,7 +658,7 @@ class RedemptionService {
     const { admin_user_id, store_id, staff_id, remark } = options
 
     if (!admin_user_id) {
-      throw new Error('admin_user_id 是必填参数')
+      throw new BusinessError('admin_user_id 是必填参数', 'REDEMPTION_REQUIRED', 400)
     }
 
     logger.info('管理员开始核销订单', {
@@ -678,26 +681,26 @@ class RedemptionService {
     })
 
     if (!order) {
-      throw new Error('订单不存在')
+      throw new BusinessError('订单不存在', 'REDEMPTION_NOT_FOUND', 404)
     }
 
     // 2. 检查订单状态
     if (order.status === 'fulfilled') {
-      throw new Error('订单已核销')
+      throw new BusinessError('订单已核销', 'REDEMPTION_ERROR', 400)
     }
 
     if (order.status === 'cancelled') {
-      throw new Error('订单已取消')
+      throw new BusinessError('订单已取消', 'REDEMPTION_ERROR', 400)
     }
 
     if (order.status === 'expired') {
-      throw new Error('订单已过期')
+      throw new BusinessError('订单已过期', 'REDEMPTION_ERROR', 400)
     }
 
     // 3. 检查是否超过有效期
     if (order.isExpired()) {
       await order.update({ status: 'expired' }, { transaction })
-      throw new Error('订单已超过有效期')
+      throw new BusinessError('订单已超过有效期', 'REDEMPTION_EXCEEDED', 400)
     }
 
     // 4. 门店关联：自动查询核销人的 store_staff 绑定关系
@@ -734,8 +737,10 @@ class RedemptionService {
           item_id: order.item_id,
           admin_user_id
         })
-        throw new Error(
-          `核销失败：物品归属商家(${order.item.merchant_id})与核销门店归属商家(${checkStore.merchant_id})不匹配`
+        throw new BusinessError(
+          `核销失败：物品归属商家(${order.item.merchant_id})与核销门店归属商家(${checkStore.merchant_id})不匹配`,
+          'REDEMPTION_FAILED',
+          500
         )
       }
     }
@@ -815,7 +820,7 @@ class RedemptionService {
     const { admin_user_id, reason } = options
 
     if (!admin_user_id) {
-      throw new Error('admin_user_id 是必填参数')
+      throw new BusinessError('admin_user_id 是必填参数', 'REDEMPTION_REQUIRED', 400)
     }
 
     logger.info('管理员开始取消订单', { order_id, admin_user_id, reason })
@@ -833,12 +838,12 @@ class RedemptionService {
     })
 
     if (!order) {
-      throw new Error('订单不存在')
+      throw new BusinessError('订单不存在', 'REDEMPTION_NOT_FOUND', 404)
     }
 
     // 2. 检查订单状态
     if (order.status === 'fulfilled') {
-      throw new Error('订单已核销，不能取消')
+      throw new BusinessError('订单已核销，不能取消', 'REDEMPTION_NOT_ALLOWED', 400)
     }
 
     if (order.status === 'cancelled') {
@@ -928,11 +933,11 @@ class RedemptionService {
     const { admin_user_id, store_id, remark } = options
 
     if (!admin_user_id) {
-      throw new Error('admin_user_id 是必填参数')
+      throw new BusinessError('admin_user_id 是必填参数', 'REDEMPTION_REQUIRED', 400)
     }
 
     if (!Array.isArray(order_ids) || order_ids.length === 0) {
-      throw new Error('order_ids 必须是非空数组')
+      throw new BusinessError('order_ids 必须是非空数组', 'REDEMPTION_REQUIRED', 400)
     }
 
     logger.info('管理员开始批量核销订单', {
@@ -994,11 +999,11 @@ class RedemptionService {
     const { admin_user_id, reason } = options
 
     if (!admin_user_id) {
-      throw new Error('admin_user_id 是必填参数')
+      throw new BusinessError('admin_user_id 是必填参数', 'REDEMPTION_REQUIRED', 400)
     }
 
     if (!Array.isArray(order_ids) || order_ids.length === 0) {
-      throw new Error('order_ids 必须是非空数组')
+      throw new BusinessError('order_ids 必须是非空数组', 'REDEMPTION_REQUIRED', 400)
     }
 
     logger.info('管理员开始批量过期订单', {
@@ -1093,11 +1098,11 @@ class RedemptionService {
     const { admin_user_id, reason } = options
 
     if (!admin_user_id) {
-      throw new Error('admin_user_id 是必填参数')
+      throw new BusinessError('admin_user_id 是必填参数', 'REDEMPTION_REQUIRED', 400)
     }
 
     if (!Array.isArray(order_ids) || order_ids.length === 0) {
-      throw new Error('order_ids 必须是非空数组')
+      throw new BusinessError('order_ids 必须是非空数组', 'REDEMPTION_REQUIRED', 400)
     }
 
     logger.info('管理员开始批量取消订单', {

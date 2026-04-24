@@ -20,6 +20,7 @@
 
 'use strict'
 
+const BusinessError = require('../utils/BusinessError')
 const { Op } = require('sequelize')
 const { Merchant, Store, SystemDictionary } = require('../models')
 const logger = require('../utils/logger').logger
@@ -52,11 +53,11 @@ class MerchantService {
     const { transaction } = options
 
     if (!merchantData.merchant_name || merchantData.merchant_name.trim() === '') {
-      throw new Error('商家名称不能为空')
+      throw new BusinessError('商家名称不能为空', 'SERVICE_NOT_ALLOWED', 400)
     }
 
     if (!merchantData.merchant_type) {
-      throw new Error('商家类型不能为空')
+      throw new BusinessError('商家类型不能为空', 'SERVICE_NOT_ALLOWED', 400)
     }
 
     // 字典表校验 merchant_type
@@ -100,7 +101,7 @@ class MerchantService {
 
     const merchant = await Merchant.findByPk(merchantId, { transaction })
     if (!merchant) {
-      throw new Error(`商家不存在（merchant_id=${merchantId}）`)
+      throw new BusinessError(`商家不存在（merchant_id=${merchantId}）`, 'SERVICE_NOT_FOUND', 404)
     }
 
     if (updateData.merchant_type) {
@@ -160,7 +161,7 @@ class MerchantService {
     })
 
     if (!merchant) {
-      throw new Error(`商家不存在（merchant_id=${merchantId}）`)
+      throw new BusinessError(`商家不存在（merchant_id=${merchantId}）`, 'SERVICE_NOT_FOUND', 404)
     }
 
     const result = merchant.toJSON()
@@ -265,7 +266,7 @@ class MerchantService {
 
     const merchant = await Merchant.findByPk(merchantId, { transaction })
     if (!merchant) {
-      throw new Error(`商家不存在（merchant_id=${merchantId}）`)
+      throw new BusinessError(`商家不存在（merchant_id=${merchantId}）`, 'SERVICE_NOT_FOUND', 404)
     }
 
     // 检查是否有关联门店
@@ -274,7 +275,7 @@ class MerchantService {
       transaction
     })
     if (storeCount > 0) {
-      throw new Error(`无法删除：该商家下有 ${storeCount} 个关联门店，请先解除关联`)
+      throw new BusinessError(`无法删除：该商家下有 ${storeCount} 个关联门店，请先解除关联`, 'SERVICE_ERROR', 400)
     }
 
     await merchant.destroy({ transaction })
@@ -343,7 +344,7 @@ class MerchantService {
     })
 
     if (!dict) {
-      throw new Error(`商家类型无效（${merchantType}），请在字典管理中配置 merchant_type 字典`)
+      throw new BusinessError(`商家类型无效（${merchantType}），请在字典管理中配置 merchant_type 字典`, 'SERVICE_INVALID', 400)
     }
   }
 }

@@ -28,6 +28,7 @@
  * 最后更新：2025年11月08日（V4.1完整持久化版本）
  */
 
+const BusinessError = require('../../../utils/BusinessError')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 const { User, LotteryManagementSetting, LotteryPrize } = require('../../../models')
 const { getUserRoles } = require('../../../middleware/auth')
@@ -127,13 +128,13 @@ class ManagementStrategy {
           adminId,
           reason: adminValidation.reason
         })
-        throw new Error(`管理员权限验证失败: ${adminValidation.reason}`)
+        throw new BusinessError(`管理员权限验证失败: ${adminValidation.reason}`, 'ENGINE_FAILED', 500)
       }
 
       // 验证目标用户
       const targetUser = await User.findByPk(targetUserId)
       if (!targetUser || targetUser.status !== 'active') {
-        throw new Error('目标用户不存在或已停用')
+        throw new BusinessError('目标用户不存在或已停用', 'ENGINE_NOT_FOUND', 404)
       }
 
       // 🎁 查询奖品信息（获取prize_name用于记录显示）
@@ -249,7 +250,7 @@ class ManagementStrategy {
       // 🛡️ 验证管理员权限
       const adminValidation = await this.validateAdminPermission(adminId)
       if (!adminValidation.valid) {
-        throw new Error(`管理员权限验证失败: ${adminValidation.reason}`)
+        throw new BusinessError(`管理员权限验证失败: ${adminValidation.reason}`, 'ENGINE_FAILED', 500)
       }
 
       // 💾 创建数据库记录（传入事务，确保与外部事务一致）
@@ -365,12 +366,12 @@ class ManagementStrategy {
       // 🛡️ 验证管理员权限
       const adminValidation = await this.validateAdminPermission(adminId)
       if (!adminValidation.valid) {
-        throw new Error(`管理员权限验证失败: ${adminValidation.reason}`)
+        throw new BusinessError(`管理员权限验证失败: ${adminValidation.reason}`, 'ENGINE_FAILED', 500)
       }
 
       // 验证概率倍数合法性（0.1-10倍）
       if (multiplier < 0.1 || multiplier > 10) {
-        throw new Error('概率倍数必须在0.1-10倍之间')
+        throw new BusinessError('概率倍数必须在0.1-10倍之间', 'ENGINE_REQUIRED', 400)
       }
 
       // 💾 创建数据库记录（传入事务，确保与外部事务一致）
@@ -491,7 +492,7 @@ class ManagementStrategy {
       // 🛡️ 验证管理员权限
       const adminValidation = await this.validateAdminPermission(adminId)
       if (!adminValidation.valid) {
-        throw new Error(`管理员权限验证失败: ${adminValidation.reason}`)
+        throw new BusinessError(`管理员权限验证失败: ${adminValidation.reason}`, 'ENGINE_FAILED', 500)
       }
 
       // 验证队列配置合法性
@@ -500,15 +501,15 @@ class ManagementStrategy {
         !queueConfig.priority_level ||
         !Array.isArray(queueConfig.prize_queue)
       ) {
-        throw new Error('队列配置不完整：必须包含queue_type、priority_level、prize_queue')
+        throw new BusinessError('队列配置不完整：必须包含queue_type、priority_level、prize_queue', 'ENGINE_REQUIRED', 400)
       }
 
       if (queueConfig.priority_level < 1 || queueConfig.priority_level > 10) {
-        throw new Error('优先级别必须在1-10之间')
+        throw new BusinessError('优先级别必须在1-10之间', 'ENGINE_REQUIRED', 400)
       }
 
       if (queueConfig.prize_queue.length === 0) {
-        throw new Error('奖品队列不能为空')
+        throw new BusinessError('奖品队列不能为空', 'ENGINE_NOT_ALLOWED', 400)
       }
 
       // 💾 创建数据库记录（传入事务，确保与外部事务一致）
@@ -685,7 +686,7 @@ class ManagementStrategy {
       // 🛡️ 验证管理员权限
       const adminValidation = await this.validateAdminPermission(adminId)
       if (!adminValidation.valid) {
-        throw new Error(`管理员权限验证失败: ${adminValidation.reason}`)
+        throw new BusinessError(`管理员权限验证失败: ${adminValidation.reason}`, 'ENGINE_FAILED', 500)
       }
 
       // 💾 构建查询条件
@@ -1052,7 +1053,7 @@ class ManagementStrategy {
       // 验证管理员权限
       const hasAdminAccess = await this.checkAdminPermission(adminId)
       if (!hasAdminAccess) {
-        throw new Error('管理员权限验证失败')
+        throw new BusinessError('管理员权限验证失败', 'ENGINE_FAILED', 500)
       }
 
       // 占位实现：实际日志查询逻辑需要根据业务需求实现
@@ -1110,7 +1111,7 @@ class ManagementStrategy {
       // 🛡️ 验证管理员权限（只验证一次）
       const adminValidation = await this.validateAdminPermission(adminId)
       if (!adminValidation.valid) {
-        throw new Error(`管理员权限验证失败: ${adminValidation.reason}`)
+        throw new BusinessError(`管理员权限验证失败: ${adminValidation.reason}`, 'ENGINE_FAILED', 500)
       }
 
       const results = {
@@ -1200,7 +1201,7 @@ class ManagementStrategy {
       // 🛡️ 验证管理员权限（只验证一次）
       const adminValidation = await this.validateAdminPermission(adminId)
       if (!adminValidation.valid) {
-        throw new Error(`管理员权限验证失败: ${adminValidation.reason}`)
+        throw new BusinessError(`管理员权限验证失败: ${adminValidation.reason}`, 'ENGINE_FAILED', 500)
       }
 
       const results = {

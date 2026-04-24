@@ -20,7 +20,6 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken } = require('../../../middleware/auth')
-const logger = require('../../../utils/logger').logger
 const { asyncHandler } = require('../../../middleware/validation')
 
 /** 广告位类型枚举（用于参数校验，与 models/AdSlot.js VALID_SLOT_TYPES 保持一致） */
@@ -42,42 +41,30 @@ router.get(
   '/',
   authenticateToken,
   asyncHandler(async (req, res) => {
-    try {
-      const { slot_type = null, position = null } = req.query
+    const { slot_type = null, position = null } = req.query
 
-      if (slot_type && !VALID_SLOT_TYPES.includes(slot_type)) {
-        return res.apiBadRequest(`slot_type 必须是以下之一：${VALID_SLOT_TYPES.join(', ')}`)
-      }
-
-      const AdSlotService = req.app.locals.services.getService('ad_slot')
-      let slots = await AdSlotService.getActiveSlots()
-
-      // 路由层筛选（AdSlotService.getActiveSlots 已过滤 is_active=true）
-      if (slot_type) {
-        slots = slots.filter(s => s.slot_type === slot_type)
-      }
-      if (position) {
-        slots = slots.filter(s => s.position === position)
-      }
-
-      return res.apiSuccess(
-        {
-          slots,
-          total: slots.length
-        },
-        '获取可用广告位列表成功'
-      )
-    } catch (error) {
-      logger.error('获取可用广告位列表失败', {
-        error: error.message,
-        user_id: req.user.user_id
-      })
-      return res.apiInternalError(
-        '获取可用广告位列表失败',
-        error.message,
-        'USER_AD_SLOT_LIST_ERROR'
-      )
+    if (slot_type && !VALID_SLOT_TYPES.includes(slot_type)) {
+      return res.apiBadRequest(`slot_type 必须是以下之一：${VALID_SLOT_TYPES.join(', ')}`)
     }
+
+    const AdSlotService = req.app.locals.services.getService('ad_slot')
+    let slots = await AdSlotService.getActiveSlots()
+
+    // 路由层筛选（AdSlotService.getActiveSlots 已过滤 is_active=true）
+    if (slot_type) {
+      slots = slots.filter(s => s.slot_type === slot_type)
+    }
+    if (position) {
+      slots = slots.filter(s => s.position === position)
+    }
+
+    return res.apiSuccess(
+      {
+        slots,
+        total: slots.length
+      },
+      '获取可用广告位列表成功'
+    )
   })
 )
 

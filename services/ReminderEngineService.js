@@ -18,6 +18,7 @@
 
 'use strict'
 
+const BusinessError = require('../utils/BusinessError')
 const models = require('../models')
 const NotificationService = require('./NotificationService')
 const logger = require('../utils/logger')
@@ -686,7 +687,7 @@ class ReminderEngineService {
     const rule = await models.ReminderRule.findByPk(ruleId)
 
     if (!rule) {
-      throw new Error('提醒规则不存在')
+      throw new BusinessError('提醒规则不存在', 'SERVICE_NOT_FOUND', 404)
     }
 
     // 系统规则不允许修改核心配置
@@ -722,11 +723,11 @@ class ReminderEngineService {
     const rule = await models.ReminderRule.findByPk(ruleId)
 
     if (!rule) {
-      throw new Error('提醒规则不存在')
+      throw new BusinessError('提醒规则不存在', 'SERVICE_NOT_FOUND', 404)
     }
 
     if (rule.is_system) {
-      throw new Error('系统规则不允许删除')
+      throw new BusinessError('系统规则不允许删除', 'SERVICE_NOT_ALLOWED', 400)
     }
 
     await rule.destroy(options)

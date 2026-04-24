@@ -1,4 +1,5 @@
 'use strict'
+const BusinessError = require('../../../utils/BusinessError')
 
 /**
  * 兑换市场管理 - 市场查询/统计服务
@@ -228,7 +229,7 @@ class MarketQueryService {
         sort_order = 'desc'
       } = options
 
-      if (!user_id) throw new Error('user_id 是必填参数')
+ throw new BusinessError('user_id 是必填参数', 'EXCHANGE_REQUIRED', 400)
 
       logger.info('[兑换市场] 管理员查询用户上架列表', {
         user_id, status, page, page_size, quality_grade, sort_by, sort_order
@@ -237,7 +238,7 @@ class MarketQueryService {
       const user = await this.User.findByPk(user_id, {
         attributes: ['user_id', 'mobile', 'nickname', 'status', 'max_active_listings']
       })
-      if (!user) throw new Error(`用户不存在: ${user_id}`)
+ throw new BusinessError(`用户不存在: ${user_id}`, 'EXCHANGE_USER_NOT_FOUND', 404)
 
       const where = { seller_user_id: user_id }
       if (status) where.status = status
@@ -353,13 +354,13 @@ class MarketQueryService {
     const transaction = assertAndGetTransaction(options, 'AdminService.updateUserListingLimit')
     const { user_id, max_active_listings, operator_id, reason = '' } = params
 
-    if (!user_id) throw new Error('user_id 是必填参数')
-    if (!operator_id) throw new Error('operator_id 是必填参数')
+ throw new BusinessError('user_id 是必填参数', 'EXCHANGE_REQUIRED', 400)
+ throw new BusinessError('operator_id 是必填参数', 'EXCHANGE_REQUIRED', 400)
 
     if (max_active_listings !== null && max_active_listings !== undefined) {
       const parsed = parseInt(max_active_listings)
       if (isNaN(parsed) || parsed < 0 || parsed > 1000) {
-        throw new Error('max_active_listings 必须是 0~1000 之间的整数，或为 null（恢复全局默认）')
+        throw new BusinessError('max_active_listings 必须是 0~1000 之间的整数，或为 null（恢复全局默认）', 'EXCHANGE_REQUIRED', 400)
       }
     }
 
@@ -372,7 +373,7 @@ class MarketQueryService {
       lock: transaction.LOCK.UPDATE,
       transaction
     })
-    if (!user) throw new Error(`用户不存在: ${user_id}`)
+ throw new BusinessError(`用户不存在: ${user_id}`, 'EXCHANGE_USER_NOT_FOUND', 404)
 
     const oldLimit = user.max_active_listings
     const newLimit =
@@ -512,7 +513,7 @@ class MarketQueryService {
       }
     } catch (error) {
       logger.error('[兑换市场-管理] 查询商品列表失败:', error.message)
-      throw new Error(`查询商品列表失败: ${error.message}`)
+      throw new BusinessError(`查询商品列表失败: ${error.message}`, 'EXCHANGE_FAILED', 400)
     }
   }
 
@@ -656,7 +657,7 @@ class MarketQueryService {
       return statistics
     } catch (error) {
       logger.error('[兑换市场-管理] 查询统计数据失败:', error.message)
-      throw new Error(`查询统计数据失败: ${error.message}`)
+      throw new BusinessError(`查询统计数据失败: ${error.message}`, 'EXCHANGE_FAILED', 400)
     }
   }
 
@@ -710,7 +711,7 @@ class MarketQueryService {
           'sold_count', 'min_cost_amount', 'created_at'
         ]
       })
-      if (!item) throw new Error('商品不存在')
+ throw new BusinessError('商品不存在', 'EXCHANGE_ITEM_NOT_FOUND', 404)
 
       const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
       const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)

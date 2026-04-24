@@ -31,6 +31,7 @@
 
 'use strict'
 
+const BusinessError = require('../../utils/BusinessError')
 const { Op, fn, col, literal } = require('sequelize')
 const logger = require('../../utils/logger').logger
 const BeijingTimeHelper = require('../../utils/timeHelper')
@@ -213,7 +214,7 @@ class UserSegmentService {
     const { page = 1, page_size = 20 } = options
 
     if (!SEGMENT_RULES[segmentType]) {
-      throw new Error(`无效的分层类型: ${segmentType}`)
+      throw new BusinessError(`无效的分层类型: ${segmentType}`, 'SERVICE_INVALID', 400)
     }
 
     logger.info('获取分层用户列表', { segment: segmentType, page })
@@ -729,7 +730,7 @@ class UserSegmentService {
         whereClause = 'last_activity_days >= 60'
         break
       default:
-        throw new Error(`无效的分层类型: ${segmentType}`)
+        throw new BusinessError(`无效的分层类型: ${segmentType}`, 'SERVICE_INVALID', 400)
     }
 
     const [results] = await models.sequelize.query(

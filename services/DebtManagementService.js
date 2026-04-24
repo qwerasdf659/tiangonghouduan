@@ -12,6 +12,7 @@
 
 'use strict'
 
+const BusinessError = require('../utils/BusinessError')
 const { Op, fn, col, literal } = require('sequelize')
 const logger = require('../utils/logger')
 const { attachDisplayNames, DICT_TYPES } = require('../utils/displayNameHelper')
@@ -646,11 +647,11 @@ class DebtManagementService {
 
     // 参数验证
     if (!debtType || !debtId || !amount) {
-      throw new Error('缺少必要参数: debt_type, debt_id, amount')
+      throw new BusinessError('缺少必要参数: debt_type, debt_id, amount', 'SERVICE_REQUIRED', 400)
     }
 
     if (amount <= 0) {
-      throw new Error('清偿数量/金额必须大于0')
+      throw new BusinessError('清偿数量/金额必须大于0', 'SERVICE_REQUIRED', 400)
     }
 
     // 确定模型
@@ -660,7 +661,7 @@ class DebtManagementService {
     } else if (debtType === 'budget') {
       model = PresetBudgetDebt
     } else {
-      throw new Error('无效的欠账类型，必须是 inventory 或 budget')
+      throw new BusinessError('无效的欠账类型，必须是 inventory 或 budget', 'SERVICE_INVALID', 400)
     }
 
     // 使用外部事务或创建新事务
@@ -671,12 +672,12 @@ class DebtManagementService {
       // 查找欠账记录
       const debt = await model.findByPk(debtId, { transaction })
       if (!debt) {
-        throw new Error('欠账记录不存在')
+        throw new BusinessError('欠账记录不存在', 'SERVICE_NOT_FOUND', 404)
       }
 
       // 检查是否可清偿
       if (!debt.canClear()) {
-        throw new Error('该欠账记录不可清偿（状态非 pending）')
+        throw new BusinessError('该欠账记录不可清偿（状态非 pending）', 'SERVICE_NOT_ALLOWED', 400)
       }
 
       // 执行清偿
@@ -813,7 +814,7 @@ class DebtManagementService {
       attributes: ['lottery_campaign_id', 'campaign_name', 'status']
     })
     if (!campaign) {
-      throw new Error('活动不存在')
+      throw new BusinessError('活动不存在', 'SERVICE_NOT_FOUND', 404)
     }
 
     // 获取或创建欠账上限配置
@@ -874,7 +875,7 @@ class DebtManagementService {
       // 检查活动是否存在
       const campaign = await LotteryCampaign.findByPk(campaignId, { transaction })
       if (!campaign) {
-        throw new Error('活动不存在')
+        throw new BusinessError('活动不存在', 'SERVICE_NOT_FOUND', 404)
       }
 
       // 获取或创建欠账上限配置

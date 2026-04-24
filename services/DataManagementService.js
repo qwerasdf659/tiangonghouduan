@@ -18,6 +18,7 @@
  * @module services/DataManagementService
  */
 
+const BusinessError = require('../utils/BusinessError')
 const { sequelize } = require('../config/database')
 const { logger } = require('../utils/logger')
 const AuditLogService = require('./AuditLogService')
@@ -399,19 +400,19 @@ class DataManagementService {
     const config = await AdminSystemService.getConfigValue('data_cleanup_policies')
 
     if (!config || !config.policies) {
-      throw new Error('清理策略配置不存在')
+      throw new BusinessError('清理策略配置不存在', 'SERVICE_NOT_FOUND', 404)
     }
 
     const policy = config.policies.find(p => p.table === tableName)
     if (!policy) {
-      throw new Error(`未找到表 ${tableName} 的清理策略`)
+      throw new BusinessError(`未找到表 ${tableName} 的清理策略`, 'SERVICE_NOT_FOUND', 404)
     }
 
     const beforeData = { ...policy }
 
     if (updates.retention_days !== undefined) {
       if (updates.retention_days < 1 || updates.retention_days > 365) {
-        throw new Error('保留天数必须在 1-365 之间')
+        throw new BusinessError('保留天数必须在 1-365 之间', 'SERVICE_REQUIRED', 400)
       }
       policy.retention_days = updates.retention_days
     }
@@ -476,7 +477,7 @@ class DataManagementService {
       )
     } catch (redisErr) {
       logger.error('[数据清理] 预览令牌写入 Redis 失败:', { error: redisErr.message })
-      throw new Error('预览令牌存储失败，请检查 Redis 连接')
+      throw new BusinessError('预览令牌存储失败，请检查 Redis 连接', 'SERVICE_FAILED', 500)
     }
 
     return {
@@ -508,7 +509,7 @@ class DataManagementService {
     const { preview_token, dry_run = false, reason, confirmation_text } = options
 
     if (confirmation_text !== '确认删除') {
-      throw new Error('确认文字不正确，请输入"确认删除"')
+      throw new BusinessError('确认文字不正确，请输入"确认删除"', 'SERVICE_ERROR', 400)
     }
 
     let cached
@@ -516,13 +517,13 @@ class DataManagementService {
       const redisClient = await getRawClient()
       const cachedStr = await redisClient.get(`${PREVIEW_TOKEN_PREFIX}${preview_token}`)
       if (!cachedStr) {
-        throw new Error('预览令牌无效或已过期，请重新预览')
+        throw new BusinessError('预览令牌无效或已过期，请重新预览', 'SERVICE_INVALID', 400)
       }
       cached = JSON.parse(cachedStr)
     } catch (redisErr) {
       if (redisErr.message.includes('预览令牌')) throw redisErr
       logger.error('[数据清理] 读取预览令牌失败:', { error: redisErr.message })
-      throw new Error('预览令牌读取失败，请检查 Redis 连接')
+      throw new BusinessError('预览令牌读取失败，请检查 Redis 连接', 'SERVICE_FAILED', 500)
     }
 
     if (new Date() > new Date(cached.expires_at)) {
@@ -530,7 +531,7 @@ class DataManagementService {
         const redisClient = await getRawClient()
         await redisClient.del(`${PREVIEW_TOKEN_PREFIX}${preview_token}`)
       } catch (_) {}
-      throw new Error('预览令牌已过期，请重新预览')
+      throw new BusinessError('预览令牌已过期，请重新预览', 'SERVICE_EXPIRED', 400)
     }
 
     const { details } = cached
@@ -550,7 +551,7 @@ class DataManagementService {
         logger.info('[数据清理] pre_launch 清档：已进入维护模式')
       } catch (mmError) {
         logger.error('[数据清理] 进入维护模式失败，中止清档:', { error: mmError.message })
-        throw new Error('无法进入维护模式，清档操作已中止: ' + mmError.message)
+        throw new BusinessError('无法进入维护模式，清档操作已中止: ' + mmError.message, 'SERVICE_FAILED', 500)
       }
     }
 

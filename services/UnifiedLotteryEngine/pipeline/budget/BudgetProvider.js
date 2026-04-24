@@ -18,6 +18,7 @@
  * @since 2026
  */
 
+const BusinessError = require('../../../../utils/BusinessError')
 const { logger } = require('../../../../utils/logger')
 
 /**
@@ -56,7 +57,7 @@ class BudgetProvider {
    * @abstract
    */
   async getAvailableBudget(params, _options = {}) {
-    throw new Error('BudgetProvider.getAvailableBudget() must be implemented')
+    throw new BusinessError('BudgetProvider.getAvailableBudget() must be implemented', 'ENGINE_ERROR', 400)
   }
 
   /**
@@ -97,7 +98,7 @@ class BudgetProvider {
    * @abstract
    */
   async deductBudget(params, _options = {}) {
-    throw new Error('BudgetProvider.deductBudget() must be implemented')
+    throw new BusinessError('BudgetProvider.deductBudget() must be implemented', 'ENGINE_ERROR', 400)
   }
 
   /**
@@ -114,7 +115,7 @@ class BudgetProvider {
    * @abstract
    */
   async rollbackBudget(params, _options = {}) {
-    throw new Error('BudgetProvider.rollbackBudget() must be implemented')
+    throw new BusinessError('BudgetProvider.rollbackBudget() must be implemented', 'ENGINE_ERROR', 400)
   }
 
   /**

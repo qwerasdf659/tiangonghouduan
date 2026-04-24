@@ -31,6 +31,7 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
+const { asyncHandler } = require('../../../../middleware/validation')
 const logger = require('../../../../utils/logger')
 
 /**
@@ -73,28 +74,18 @@ const logger = require('../../../../utils/logger')
  * 查询参数：
  * - include_items: boolean（可选）- 是否包含物品详细列表（默认false）
  */
-router.get('/portfolio', authenticateToken, requireRoleLevel(30), async (req, res) => {
-  try {
+router.get('/portfolio', authenticateToken, requireRoleLevel(30), asyncHandler(async (req, res) => {
     const user_id = req.user.user_id
-    const include_items = req.query.include_items === 'true'
+  const include_items = req.query.include_items === 'true'
 
-    logger.info('📦 获取用户资产总览', { user_id, include_items })
+  logger.info('📦 获取用户资产总览', { user_id, include_items })
 
-    // V4.7.0 AssetService 拆分：通过 ServiceManager 获取 QueryService
-    const QueryService = req.app.locals.services.getService('asset_query')
-    const portfolio = await QueryService.getAssetPortfolio({ user_id }, { include_items })
+  // V4.7.0 AssetService 拆分：通过 ServiceManager 获取 QueryService
+  const QueryService = req.app.locals.services.getService('asset_query')
+  const portfolio = await QueryService.getAssetPortfolio({ user_id }, { include_items })
 
-    return res.apiSuccess(portfolio, '获取资产总览成功')
-  } catch (error) {
-    logger.error('❌ 获取用户资产总览失败', {
-      user_id: req.user?.user_id,
-      error: error.message,
-      stack: error.stack
-    })
-
-    return res.apiError(error.message || '获取资产总览失败', 500)
-  }
-})
+  return res.apiSuccess(portfolio, '获取资产总览成功')
+}))
 
 /**
  * GET /portfolio/items - 获取用户物品详细列表
@@ -107,32 +98,23 @@ router.get('/portfolio', authenticateToken, requireRoleLevel(30), async (req, re
  * - item_type: string（可选）- 物品类型筛选
  * - status: string（可选）- 状态筛选（available/locked）
  */
-router.get('/portfolio/items', authenticateToken, requireRoleLevel(30), async (req, res) => {
-  try {
+router.get('/portfolio/items', authenticateToken, requireRoleLevel(30), asyncHandler(async (req, res) => {
     const user_id = req.user.user_id
-    const page = Math.max(1, parseInt(req.query.page) || 1)
-    const page_size = Math.min(100, Math.max(1, parseInt(req.query.page_size) || 20))
-    const item_type = req.query.item_type || null
-    const status = req.query.status || null
+  const page = Math.max(1, parseInt(req.query.page) || 1)
+  const page_size = Math.min(100, Math.max(1, parseInt(req.query.page_size) || 20))
+  const item_type = req.query.item_type || null
+  const status = req.query.status || null
 
-    // V4.7.0 AssetService 拆分：通过 ServiceManager 获取 ItemService
-    const ItemService = req.app.locals.services.getService('asset_item')
+  // V4.7.0 AssetService 拆分：通过 ServiceManager 获取 ItemService
+  const ItemService = req.app.locals.services.getService('asset_item')
 
-    const result = await ItemService.getUserItems(
-      { user_id },
-      { item_type, status, page, page_size }
-    )
+  const result = await ItemService.getUserItems(
+    { user_id },
+    { item_type, status, page, page_size }
+  )
 
-    return res.apiSuccess(result, '获取物品列表成功')
-  } catch (error) {
-    logger.error('❌ 获取物品列表失败', {
-      user_id: req.user?.user_id,
-      error: error.message
-    })
-
-    return res.apiError(error.message || '获取物品列表失败', 500)
-  }
-})
+  return res.apiSuccess(result, '获取物品列表成功')
+}))
 
 /**
  * GET /portfolio/items/:item_id - 获取物品详情
@@ -143,35 +125,25 @@ router.get(
   '/portfolio/items/:item_id',
   authenticateToken,
   requireRoleLevel(30),
-  async (req, res) => {
-    try {
-      const user_id = req.user.user_id
-      const item_id = parseInt(req.params.item_id)
+  asyncHandler(async (req, res) => {
+        const user_id = req.user.user_id
+    const item_id = parseInt(req.params.item_id)
 
-      if (!item_id || isNaN(item_id)) {
-        return res.apiError('无效的物品ID', 400)
-      }
-
-      // V4.7.0 AssetService 拆分：通过 ServiceManager 获取 ItemService
-      const ItemService = req.app.locals.services.getService('asset_item')
-
-      const result = await ItemService.getItemDetail({ user_id, item_id }, { event_limit: 10 })
-
-      if (!result) {
-        return res.apiError('物品不存在或无权访问', 404)
-      }
-
-      return res.apiSuccess(result, '获取物品详情成功')
-    } catch (error) {
-      logger.error('❌ 获取物品详情失败', {
-        user_id: req.user?.user_id,
-        item_id: req.params.item_id,
-        error: error.message
-      })
-
-      return res.apiError(error.message || '获取物品详情失败', 500)
+    if (!item_id || isNaN(item_id)) {
+      return res.apiError('无效的物品ID', 400)
     }
-  }
+
+    // V4.7.0 AssetService 拆分：通过 ServiceManager 获取 ItemService
+    const ItemService = req.app.locals.services.getService('asset_item')
+
+    const result = await ItemService.getItemDetail({ user_id, item_id }, { event_limit: 10 })
+
+    if (!result) {
+      return res.apiError('物品不存在或无权访问', 404)
+    }
+
+    return res.apiSuccess(result, '获取物品详情成功')
+  })
 )
 
 /**
@@ -197,36 +169,26 @@ router.get(
  *   }
  * }
  */
-router.get('/item-events', authenticateToken, requireRoleLevel(30), async (req, res) => {
-  try {
+router.get('/item-events', authenticateToken, requireRoleLevel(30), asyncHandler(async (req, res) => {
     const user_id = req.user.user_id
-    const item_id = req.query.item_id ? parseInt(req.query.item_id) : null
-    const event_types = req.query.event_types ? req.query.event_types.split(',') : null
-    const page = Math.max(1, parseInt(req.query.page) || 1)
-    const page_size = Math.min(100, Math.max(1, parseInt(req.query.page_size) || 20))
+  const item_id = req.query.item_id ? parseInt(req.query.item_id) : null
+  const event_types = req.query.event_types ? req.query.event_types.split(',') : null
+  const page = Math.max(1, parseInt(req.query.page) || 1)
+  const page_size = Math.min(100, Math.max(1, parseInt(req.query.page_size) || 20))
 
-    logger.info('📜 获取物品账本事件', { user_id, item_id, event_types, page, page_size })
+  logger.info('📜 获取物品账本事件', { user_id, item_id, event_types, page, page_size })
 
-    const ItemService = req.app.locals.services.getService('asset_item')
+  const ItemService = req.app.locals.services.getService('asset_item')
 
-    const result = await ItemService.getLedgerEntries({
-      item_id,
-      account_id: null,
-      event_types,
-      page,
-      page_size
-    })
+  const result = await ItemService.getLedgerEntries({
+    item_id,
+    account_id: null,
+    event_types,
+    page,
+    page_size
+  })
 
-    return res.apiSuccess(result, '获取物品事件历史成功')
-  } catch (error) {
-    logger.error('❌ 获取物品事件历史失败', {
-      user_id: req.user?.user_id,
-      error: error.message,
-      stack: error.stack
-    })
-
-    return res.apiError(error.message || '获取物品事件历史失败', 500)
-  }
-})
+  return res.apiSuccess(result, '获取物品事件历史成功')
+}))
 
 module.exports = router

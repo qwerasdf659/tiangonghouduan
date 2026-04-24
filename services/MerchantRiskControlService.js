@@ -22,6 +22,7 @@
  * 依据文档：docs/商家员工域权限体系升级方案.md
  */
 
+const BusinessError = require('../utils/BusinessError')
 const logger = require('../utils/logger').logger
 const BeijingTimeHelper = require('../utils/timeHelper')
 const { Op } = require('sequelize')
@@ -628,7 +629,7 @@ class MerchantRiskControlService {
     const { RiskAlert } = models
 
     if (!RiskAlert) {
-      throw new Error('RiskAlert 模型不存在')
+      throw new BusinessError('RiskAlert 模型不存在', 'RISK_NOT_FOUND', 404)
     }
 
     try {
@@ -638,7 +639,7 @@ class MerchantRiskControlService {
       })
 
       if (!alert) {
-        throw new Error(`告警记录不存在 (ID: ${alert_id})`)
+        throw new BusinessError(`告警记录不存在 (ID: ${alert_id})`, 'RISK_NOT_FOUND', 404)
       }
 
       await alert.update(
@@ -686,7 +687,7 @@ class MerchantRiskControlService {
     const { RiskAlert, User, Store, ConsumptionRecord } = models
 
     if (!RiskAlert) {
-      throw new Error('RiskAlert 模型不存在')
+      throw new BusinessError('RiskAlert 模型不存在', 'RISK_NOT_FOUND', 404)
     }
 
     try {
@@ -784,7 +785,7 @@ class MerchantRiskControlService {
     const { RiskAlert } = models
 
     if (!RiskAlert) {
-      throw new Error('RiskAlert 模型不存在')
+      throw new BusinessError('RiskAlert 模型不存在', 'RISK_NOT_FOUND', 404)
     }
 
     try {
@@ -870,7 +871,7 @@ class MerchantRiskControlService {
     const { RiskAlert } = models
 
     if (!RiskAlert) {
-      throw new Error('RiskAlert 模型不存在')
+      throw new BusinessError('RiskAlert 模型不存在', 'RISK_NOT_FOUND', 404)
     }
 
     return await RiskAlert.findByPk(alertId, {
@@ -892,7 +893,7 @@ class MerchantRiskControlService {
     const { RiskAlert, User, Store } = models
 
     if (!RiskAlert) {
-      throw new Error('RiskAlert 模型不存在')
+      throw new BusinessError('RiskAlert 模型不存在', 'RISK_NOT_FOUND', 404)
     }
 
     const page = Math.max(1, parseInt(pagination.page, 10) || 1)
@@ -1026,7 +1027,7 @@ class MerchantRiskControlService {
     const { RiskAlert } = models
 
     if (!RiskAlert) {
-      throw new Error('RiskAlert 模型不存在')
+      throw new BusinessError('RiskAlert 模型不存在', 'RISK_NOT_FOUND', 404)
     }
 
     return await RiskAlert.getPendingAlerts(filters, {
@@ -1052,7 +1053,7 @@ class MerchantRiskControlService {
     const { RiskAlert, sequelize } = models
 
     if (!RiskAlert) {
-      throw new Error('RiskAlert 模型不存在')
+      throw new BusinessError('RiskAlert 模型不存在', 'RISK_NOT_FOUND', 404)
     }
 
     const { reviewed_by, status, review_notes } = params
@@ -1106,7 +1107,7 @@ class MerchantRiskControlService {
     const { RiskAlert, sequelize } = models
 
     if (!RiskAlert) {
-      throw new Error('RiskAlert 模型不存在')
+      throw new BusinessError('RiskAlert 模型不存在', 'RISK_NOT_FOUND', 404)
     }
 
     // 构建筛选条件：仅更新 pending 状态的告警
@@ -1168,7 +1169,7 @@ class MerchantRiskControlService {
     const { RiskAlert } = models
 
     if (!RiskAlert) {
-      throw new Error('RiskAlert 模型不存在')
+      throw new BusinessError('RiskAlert 模型不存在', 'RISK_NOT_FOUND', 404)
     }
 
     const { start_time, end_time } = filters
@@ -1265,7 +1266,7 @@ class MerchantRiskControlService {
     const { RiskAlert } = models
 
     if (!RiskAlert) {
-      throw new Error('RiskAlert 模型不存在')
+      throw new BusinessError('RiskAlert 模型不存在', 'RISK_NOT_FOUND', 404)
     }
 
     const { start_time, end_time } = filters
@@ -1345,7 +1346,7 @@ class MerchantRiskControlService {
     const { RiskAlert } = models
 
     if (!RiskAlert) {
-      throw new Error('RiskAlert 模型不存在')
+      throw new BusinessError('RiskAlert 模型不存在', 'RISK_NOT_FOUND', 404)
     }
 
     const alertTypes = Object.entries(RiskAlert.ALERT_TYPES || {}).map(([key, value]) => ({

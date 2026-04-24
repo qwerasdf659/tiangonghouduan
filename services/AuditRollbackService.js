@@ -17,6 +17,7 @@
 
 'use strict'
 
+const BusinessError = require('../utils/BusinessError')
 const models = require('../models')
 const AuditLogService = require('./AuditLogService')
 const logger = require('../utils/logger')
@@ -43,7 +44,7 @@ const ROLLBACK_HANDLERS = {
     const balanceService = ServiceManager.getService('asset_balance')
 
     if (!before_data || !after_data) {
-      throw new Error('缺少回滚所需的数据快照')
+      throw new BusinessError('缺少回滚所需的数据快照', 'SERVICE_REQUIRED', 400)
     }
 
     const deltaPoints = (before_data.available_points || 0) - (after_data.available_points || 0)
@@ -86,12 +87,12 @@ const ROLLBACK_HANDLERS = {
     const { transaction } = options
 
     if (!before_data || !before_data.status) {
-      throw new Error('缺少回滚所需的状态数据')
+      throw new BusinessError('缺少回滚所需的状态数据', 'SERVICE_REQUIRED', 400)
     }
 
     const user = await models.User.findByPk(target_id, { transaction })
     if (!user) {
-      throw new Error('用户不存在')
+      throw new BusinessError('用户不存在', 'SERVICE_NOT_FOUND', 404)
     }
 
     await user.update({ status: before_data.status }, { transaction })
@@ -113,12 +114,12 @@ const ROLLBACK_HANDLERS = {
     const { transaction } = options
 
     if (!before_data || !before_data.status) {
-      throw new Error('缺少回滚所需的状态数据')
+      throw new BusinessError('缺少回滚所需的状态数据', 'SERVICE_REQUIRED', 400)
     }
 
     const record = await models.ExchangeRecord.findByPk(target_id, { transaction })
     if (!record) {
-      throw new Error('兑换记录不存在')
+      throw new BusinessError('兑换记录不存在', 'SERVICE_NOT_FOUND', 404)
     }
 
     await record.update({ status: before_data.status }, { transaction })
@@ -140,12 +141,12 @@ const ROLLBACK_HANDLERS = {
     const { transaction } = options
 
     if (!before_data || !before_data.audit_status) {
-      throw new Error('缺少回滚所需的状态数据')
+      throw new BusinessError('缺少回滚所需的状态数据', 'SERVICE_REQUIRED', 400)
     }
 
     const record = await models.ConsumptionRecord.findByPk(target_id, { transaction })
     if (!record) {
-      throw new Error('消费记录不存在')
+      throw new BusinessError('消费记录不存在', 'SERVICE_NOT_FOUND', 404)
     }
 
     await record.update({ audit_status: before_data.audit_status }, { transaction })
@@ -233,7 +234,7 @@ class AuditRollbackService {
     const { operator_id, reason } = options
 
     if (!operator_id) {
-      throw new Error('回滚操作需要指定操作者ID')
+      throw new BusinessError('回滚操作需要指定操作者ID', 'SERVICE_ERROR', 400)
     }
 
     const transaction = await models.sequelize.transaction()
@@ -242,7 +243,7 @@ class AuditRollbackService {
       // 1. 验证回滚条件
       const checkResult = await AuditRollbackService.checkRollbackable(logId)
       if (!checkResult.rollbackable) {
-        throw new Error(checkResult.reason)
+        throw new BusinessError(checkResult.reason, 'SERVICE_NOT_ALLOWED', 400)
       }
 
       const log = checkResult.log

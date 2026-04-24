@@ -24,6 +24,7 @@
  * @since 2026
  */
 
+const BusinessError = require('../../../../utils/BusinessError')
 const { logger } = require('../../../../utils/logger')
 const PressureTierCalculator = require('./PressureTierCalculator')
 const { LotteryTierMatrixConfig } = require('../../../../models')
@@ -215,7 +216,7 @@ class TierMatrixCalculator {
   updateMatrix(new_matrix) {
     if (!new_matrix || typeof new_matrix !== 'object') {
       this._log('error', '无效的矩阵配置', { new_matrix })
-      throw new Error('无效的矩阵配置')
+      throw new BusinessError('无效的矩阵配置', 'ENGINE_INVALID', 400)
     }
 
     this.matrix = { ...DEFAULT_PRESSURE_MATRIX, ...new_matrix }

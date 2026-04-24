@@ -11,6 +11,7 @@
  *
  */
 
+const { asyncHandler } = require('../../../../middleware/validation')
 const express = require('express')
 const router = express.Router()
 const logger = require('../../../../utils/logger').logger
@@ -26,30 +27,23 @@ router.use(authenticateToken, requireRoleLevel(1))
  * @route GET /api/v4/console/customer-service/sessions
  * @access Admin
  */
-router.get('/', async (req, res) => {
-  try {
-    // 通过 ServiceManager 获取 AdminCustomerServiceService
-    const AdminCustomerServiceService = req.app.locals.services.getService('admin_customer_service')
+router.get('/', asyncHandler(async (req, res) => {
+  const AdminCustomerServiceService = req.app.locals.services.getService('admin_customer_service')
 
-    const options = {
-      page: req.query.page,
-      page_size: req.query.page_size,
-      status: req.query.status,
-      admin_id: req.query.admin_id,
-      search: req.query.search,
-      sort_by: req.query.sort_by,
-      sort_order: req.query.sort_order
-    }
-
-    // 调用服务层方法
-    const result = await AdminCustomerServiceService.getSessionList(options)
-
-    res.apiSuccess(result, '获取会话列表成功')
-  } catch (error) {
-    logger.error('获取会话列表失败:', error)
-    res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
+  const options = {
+    page: req.query.page,
+    page_size: req.query.page_size,
+    status: req.query.status,
+    admin_id: req.query.admin_id,
+    search: req.query.search,
+    sort_by: req.query.sort_by,
+    sort_order: req.query.sort_order
   }
-})
+
+  const result = await AdminCustomerServiceService.getSessionList(options)
+
+  return res.apiSuccess(result, '获取会话列表成功')
+}))
 
 /**
  * GET /sessions/stats - 获取会话统计
@@ -58,22 +52,15 @@ router.get('/', async (req, res) => {
  * @route GET /api/v4/console/customer-service/sessions/stats
  * @access Admin
  */
-router.get('/stats', async (req, res) => {
-  try {
-    // 通过 ServiceManager 获取 AdminCustomerServiceService
-    const AdminCustomerServiceService = req.app.locals.services.getService('admin_customer_service')
+router.get('/stats', asyncHandler(async (req, res) => {
+  const AdminCustomerServiceService = req.app.locals.services.getService('admin_customer_service')
 
-    const admin_id = req.query.admin_id ? parseInt(req.query.admin_id) : undefined
+  const admin_id = req.query.admin_id ? parseInt(req.query.admin_id) : undefined
 
-    // 调用服务层方法
-    const stats = await AdminCustomerServiceService.getSessionStats(admin_id)
+  const stats = await AdminCustomerServiceService.getSessionStats(admin_id)
 
-    res.apiSuccess(stats, '获取统计信息成功')
-  } catch (error) {
-    logger.error('获取统计信息失败:', error)
-    res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
-  }
-})
+  return res.apiSuccess(stats, '获取统计信息成功')
+}))
 
 /**
  * GET /sessions/response-stats - 获取客服响应时长统计
@@ -124,27 +111,21 @@ router.get('/stats', async (req, res) => {
  *
  * 关联需求：§4.7.1 客服响应统计接口
  */
-router.get('/response-stats', async (req, res) => {
-  try {
-    const { days = 7 } = req.query
+router.get('/response-stats', asyncHandler(async (req, res) => {
+  const { days = 7 } = req.query
 
-    logger.info('[客服管理] 获取响应时长统计', {
-      admin_id: req.user.user_id,
-      days: parseInt(days)
-    })
+  logger.info('[客服管理] 获取响应时长统计', {
+    admin_id: req.user.user_id,
+    days: parseInt(days)
+  })
 
-    // 🔄 通过 ServiceManager 获取 CustomerServiceResponseStatsService
-    const CustomerServiceResponseStatsService =
-      req.app.locals.services.getService('cs_response_stats')
-    const result = await CustomerServiceResponseStatsService.getResponseStats({
-      days: parseInt(days) || 7
-    })
+  const CustomerServiceResponseStatsService =
+    req.app.locals.services.getService('cs_response_stats')
+  const result = await CustomerServiceResponseStatsService.getResponseStats({
+    days: parseInt(days) || 7
+  })
 
-    res.apiSuccess(result, '获取成功')
-  } catch (error) {
-    logger.error('[客服管理] 获取响应时长统计失败:', error)
-    res.apiError(error.message, 'INTERNAL_ERROR', null, 500)
-  }
-})
+  return res.apiSuccess(result, '获取成功')
+}))
 
 module.exports = router

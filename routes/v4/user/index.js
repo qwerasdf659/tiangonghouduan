@@ -21,6 +21,7 @@
  * 适用区域：中国（北京时间 Asia/Shanghai）
  */
 
+const { asyncHandler } = require('../../../middleware/validation')
 const express = require('express')
 const router = express.Router()
 const { authenticateToken } = require('../../../middleware/auth')
@@ -57,22 +58,18 @@ const addressesRoutes = require('./addresses')
  * - mobile 字段已脱敏处理（前3后4，中间****）
  * - 符合《个人信息保护法》第51条、《网络安全法》第42条
  */
-router.get('/me', authenticateToken, async (req, res) => {
-  try {
-    // 从token获取用户信息
-    const userInfo = {
-      user_uuid: req.user.user_uuid,
-      // 🔐 P0-1修复：手机号脱敏（136****7930）
-      mobile: sanitize.mobile(req.user.mobile),
-      nickname: req.user.nickname,
-      status: req.user.status
-    }
-
-    return res.apiSuccess(userInfo, '获取用户信息成功')
-  } catch (error) {
-    return res.apiInternalError('获取用户信息失败')
+router.get('/me', authenticateToken, asyncHandler(async (req, res) => {
+  // 从token获取用户信息
+  const userInfo = {
+    user_uuid: req.user.user_uuid,
+    // 🔐 P0-1修复：手机号脱敏（136****7930）
+    mobile: sanitize.mobile(req.user.mobile),
+    nickname: req.user.nickname,
+    status: req.user.status
   }
-})
+
+  return res.apiSuccess(userInfo, '获取用户信息成功')
+}))
 
 // 消费二维码（用户生成码供商家扫描）
 router.use('/consumption', authenticateToken, consumptionQrcodeRoutes)

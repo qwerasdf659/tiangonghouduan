@@ -18,6 +18,7 @@
  */
 
 const express = require('express')
+const { asyncHandler } = require('../../../../middleware/validation')
 const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 /* P1-9：服务通过 ServiceManager 获取 */
@@ -36,39 +37,34 @@ router.use(requireRoleLevel(100))
  *
  * @returns {Object} 完整统计信息（待审核、已通过、已拒绝、今日发放积分）
  */
-router.get('/stats/pending', async (req, res) => {
-  try {
-    // P1-9：通过 ServiceManager 获取服务（snake_case key）
-    const MerchantPointsService = req.app.locals.services.getService('merchant_points')
+router.get('/stats/pending', asyncHandler(async (req, res) => {
+  // P1-9：通过 ServiceManager 获取服务（snake_case key）
+  const MerchantPointsService = req.app.locals.services.getService('merchant_points')
 
-    // 并行获取各状态统计
-    const [pendingResult, approvedResult, rejectedResult] = await Promise.all([
-      MerchantPointsService.getApplications({ status: 'pending' }, 1, 1),
-      MerchantPointsService.getApplications({ status: 'approved' }, 1, 1000), // 获取足够多来计算积分
-      MerchantPointsService.getApplications({ status: 'rejected' }, 1, 1)
-    ])
+  // 并行获取各状态统计
+  const [pendingResult, approvedResult, rejectedResult] = await Promise.all([
+    MerchantPointsService.getApplications({ status: 'pending' }, 1, 1),
+    MerchantPointsService.getApplications({ status: 'approved' }, 1, 1000), // 获取足够多来计算积分
+    MerchantPointsService.getApplications({ status: 'rejected' }, 1, 1)
+  ])
 
-    // 计算今日发放的积分总额
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const todayPoints = approvedResult.rows
-      .filter(r => new Date(r.audited_at) >= today)
-      .reduce((sum, r) => sum + (r.points_amount || 0), 0)
+  // 计算今日发放的积分总额
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const todayPoints = approvedResult.rows
+    .filter(r => new Date(r.audited_at) >= today)
+    .reduce((sum, r) => sum + (r.points_amount || 0), 0)
 
-    return res.apiSuccess(
-      {
-        pending_count: pendingResult.count,
-        approved_count: approvedResult.count,
-        rejected_count: rejectedResult.count,
-        today_points: todayPoints
-      },
-      '获取统计成功'
-    )
-  } catch (error) {
-    logger.error('❌ 获取统计失败:', error.message)
-    return res.apiError('获取统计失败', 'GET_STATS_FAILED', null, 500)
-  }
-})
+  return res.apiSuccess(
+    {
+      pending_count: pendingResult.count,
+      approved_count: approvedResult.count,
+      rejected_count: rejectedResult.count,
+      today_points: todayPoints
+    },
+    '获取统计成功'
+  )
+}))
 
 /**
  * 获取商家积分申请列表
@@ -84,33 +80,28 @@ router.get('/stats/pending', async (req, res) => {
  * @returns {number} data.count - 总数量
  * @returns {Object} data.pagination - 分页信息
  */
-router.get('/', async (req, res) => {
-  try {
-    // P1-9：通过 ServiceManager 获取服务（snake_case key）
-    const MerchantPointsService = req.app.locals.services.getService('merchant_points')
+router.get('/', asyncHandler(async (req, res) => {
+  // P1-9：通过 ServiceManager 获取服务（snake_case key）
+  const MerchantPointsService = req.app.locals.services.getService('merchant_points')
 
-    const { status, user_id, page = 1, page_size = 10 } = req.query
+  const { status, user_id, page = 1, page_size = 10 } = req.query
 
-    const filters = {}
-    if (status) {
-      filters.status = status
-    }
-    if (user_id) {
-      filters.userId = parseInt(user_id, 10)
-    }
-
-    const result = await MerchantPointsService.getApplications(
-      filters,
-      parseInt(page, 10),
-      parseInt(page_size, 10)
-    )
-
-    return res.apiSuccess(result, '获取商家积分申请列表成功')
-  } catch (error) {
-    logger.error('❌ 获取商家积分申请列表失败:', error.message)
-    return res.apiError('获取商家积分申请列表失败', 'GET_APPLICATIONS_FAILED', null, 500)
+  const filters = {}
+  if (status) {
+    filters.status = status
   }
-})
+  if (user_id) {
+    filters.userId = parseInt(user_id, 10)
+  }
+
+  const result = await MerchantPointsService.getApplications(
+    filters,
+    parseInt(page, 10),
+    parseInt(page_size, 10)
+  )
+
+  return res.apiSuccess(result, '获取商家积分申请列表成功')
+}))
 
 /**
  * 获取单个商家积分申请详情
@@ -120,25 +111,20 @@ router.get('/', async (req, res) => {
  *
  * @returns {Object} 申请详情
  */
-router.get('/:audit_id', async (req, res) => {
-  try {
-    // P1-9：通过 ServiceManager 获取服务（snake_case key）
-    const MerchantPointsService = req.app.locals.services.getService('merchant_points')
+router.get('/:audit_id', asyncHandler(async (req, res) => {
+  // P1-9：通过 ServiceManager 获取服务（snake_case key）
+  const MerchantPointsService = req.app.locals.services.getService('merchant_points')
 
-    const { audit_id } = req.params
+  const { audit_id } = req.params
 
-    const application = await MerchantPointsService.getApplicationById(parseInt(audit_id, 10))
+  const application = await MerchantPointsService.getApplicationById(parseInt(audit_id, 10))
 
-    if (!application) {
-      return res.apiError('商家积分申请不存在', 'APPLICATION_NOT_FOUND', null, 404)
-    }
-
-    return res.apiSuccess(application, '获取商家积分申请详情成功')
-  } catch (error) {
-    logger.error('❌ 获取商家积分申请详情失败:', error.message)
-    return res.apiError('获取商家积分申请详情失败', 'GET_APPLICATION_FAILED', null, 500)
+  if (!application) {
+    return res.apiError('商家积分申请不存在', 'APPLICATION_NOT_FOUND', null, 404)
   }
-})
+
+  return res.apiSuccess(application, '获取商家积分申请详情成功')
+}))
 
 /**
  * 批量审核商家积分申请（通过或拒绝）
@@ -155,78 +141,73 @@ router.get('/:audit_id', async (req, res) => {
  * @returns {number} data.fail_count - 失败数量
  * @returns {Array} data.failed_items - 失败详情列表
  */
-router.post('/batch', async (req, res) => {
-  try {
-    const ContentAuditEngine = req.app.locals.services.getService('content_audit')
+router.post('/batch', asyncHandler(async (req, res) => {
+  const ContentAuditEngine = req.app.locals.services.getService('content_audit')
 
-    const { audit_ids, action, reason = '' } = req.body
-    const auditorId = req.user.user_id
+  const { audit_ids, action, reason = '' } = req.body
+  const auditorId = req.user.user_id
 
-    // 参数校验
-    if (!Array.isArray(audit_ids) || audit_ids.length === 0) {
-      return res.apiError('audit_ids 必须为非空数组', 'INVALID_PARAMS', null, 400)
-    }
-    if (audit_ids.length > 50) {
-      return res.apiError('单次批量操作不能超过50条', 'BATCH_LIMIT_EXCEEDED', null, 400)
-    }
-    if (!['approve', 'reject'].includes(action)) {
-      return res.apiError('action 必须为 approve 或 reject', 'INVALID_ACTION', null, 400)
-    }
-    if (action === 'reject' && (!reason || reason.trim().length === 0)) {
-      return res.apiError('拒绝操作必须提供原因', 'REASON_REQUIRED', null, 400)
-    }
-
-    let successCount = 0
-    const failedItems = []
-
-    /*
-     * 逐条处理：每条记录独立事务，避免一条失败导致全部回滚
-     * 使用 ContentAuditEngine 保持与单条审核一致的业务逻辑
-     */
-    for (const auditId of audit_ids) {
-      try {
-        await TransactionManager.execute(
-          async transaction => {
-            if (action === 'approve') {
-              await ContentAuditEngine.approve(parseInt(auditId, 10), auditorId, reason || null, {
-                transaction
-              })
-            } else {
-              await ContentAuditEngine.reject(parseInt(auditId, 10), auditorId, reason.trim(), {
-                transaction
-              })
-            }
-          },
-          { name: `batch_${action}_merchant_points_${auditId}` }
-        )
-        successCount++
-      } catch (error) {
-        failedItems.push({
-          audit_id: auditId,
-          reason: error.message
-        })
-      }
-    }
-
-    const failCount = failedItems.length
-    const actionText = action === 'approve' ? '通过' : '拒绝'
-    logger.info(
-      `[商家积分管理] 批量${actionText}: 成功=${successCount}, 失败=${failCount}, auditor=${auditorId}`
-    )
-
-    return res.apiSuccess(
-      {
-        success_count: successCount,
-        fail_count: failCount,
-        failed_items: failedItems
-      },
-      `批量${actionText}完成：成功 ${successCount} 条，失败 ${failCount} 条`
-    )
-  } catch (error) {
-    logger.error('❌ 批量审核商家积分申请失败:', error.message)
-    return res.apiError('批量审核失败', 'BATCH_REVIEW_FAILED', null, 500)
+  // 参数校验
+  if (!Array.isArray(audit_ids) || audit_ids.length === 0) {
+    return res.apiError('audit_ids 必须为非空数组', 'INVALID_PARAMS', null, 400)
   }
-})
+  if (audit_ids.length > 50) {
+    return res.apiError('单次批量操作不能超过50条', 'BATCH_LIMIT_EXCEEDED', null, 400)
+  }
+  if (!['approve', 'reject'].includes(action)) {
+    return res.apiError('action 必须为 approve 或 reject', 'INVALID_ACTION', null, 400)
+  }
+  if (action === 'reject' && (!reason || reason.trim().length === 0)) {
+    return res.apiError('拒绝操作必须提供原因', 'REASON_REQUIRED', null, 400)
+  }
+
+  let successCount = 0
+  const failedItems = []
+
+  /*
+   * 逐条处理：每条记录独立事务，避免一条失败导致全部回滚
+   * 使用 ContentAuditEngine 保持与单条审核一致的业务逻辑
+   */
+  for (const auditId of audit_ids) {
+    try {
+      await TransactionManager.execute(
+        async transaction => {
+          if (action === 'approve') {
+            await ContentAuditEngine.approve(parseInt(auditId, 10), auditorId, reason || null, {
+              transaction
+            })
+          } else {
+            await ContentAuditEngine.reject(parseInt(auditId, 10), auditorId, reason.trim(), {
+              transaction
+            })
+          }
+        },
+        { name: `batch_${action}_merchant_points_${auditId}` }
+      )
+      successCount++
+    } catch (error) {
+      failedItems.push({
+        audit_id: auditId,
+        reason: error.message
+      })
+    }
+  }
+
+  const failCount = failedItems.length
+  const actionText = action === 'approve' ? '通过' : '拒绝'
+  logger.info(
+    `[商家积分管理] 批量${actionText}: 成功=${successCount}, 失败=${failCount}, auditor=${auditorId}`
+  )
+
+  return res.apiSuccess(
+    {
+      success_count: successCount,
+      fail_count: failCount,
+      failed_items: failedItems
+    },
+    `批量${actionText}完成：成功 ${successCount} 条，失败 ${failCount} 条`
+  )
+}))
 
 /**
  * 审核通过商家积分申请
@@ -237,52 +218,38 @@ router.post('/batch', async (req, res) => {
  *
  * @returns {Object} 审核结果
  */
-router.post('/:audit_id/approve', async (req, res) => {
-  try {
-    // P1-9：通过 ServiceManager 获取服务（snake_case key）
-    const ContentAuditEngine = req.app.locals.services.getService('content_audit')
+router.post('/:audit_id/approve', asyncHandler(async (req, res) => {
+  // P1-9：通过 ServiceManager 获取服务（snake_case key）
+  const ContentAuditEngine = req.app.locals.services.getService('content_audit')
 
-    const { audit_id } = req.params
-    const { reason = '' } = req.body
-    const auditorId = req.user.user_id
+  const { audit_id } = req.params
+  const { reason = '' } = req.body
+  const auditorId = req.user.user_id
 
-    // 使用 TransactionManager 统一管理事务
-    const result = await TransactionManager.execute(
-      async transaction => {
-        /*
-         * 调用 ContentAuditEngine 进行审核通过操作
-         * 审核引擎会触发 MerchantPointsAuditCallback.approved() 回调
-         * 参数顺序：(auditId, auditorId, reason, options)
-         */
-        return await ContentAuditEngine.approve(
-          parseInt(audit_id, 10),
-          auditorId,
-          reason || null, // 第三个参数：审核原因
-          { transaction } // 第四个参数：选项对象
-        )
-      },
-      {
-        name: `approve_merchant_points_${audit_id}`
-      }
-    )
-
-    logger.info(`[商家积分管理] 审核通过: audit_id=${audit_id}, auditor=${auditorId}`)
-
-    return res.apiSuccess(result, '商家积分申请审核通过')
-  } catch (error) {
-    logger.error('❌ 商家积分申请审核通过失败:', error.message)
-
-    // 处理业务错误
-    if (error.message.includes('不存在')) {
-      return res.apiError(error.message, 'APPLICATION_NOT_FOUND', null, 404)
+  // 使用 TransactionManager 统一管理事务
+  const result = await TransactionManager.execute(
+    async transaction => {
+      /*
+       * 调用 ContentAuditEngine 进行审核通过操作
+       * 审核引擎会触发 MerchantPointsAuditCallback.approved() 回调
+       * 参数顺序：(auditId, auditorId, reason, options)
+       */
+      return await ContentAuditEngine.approve(
+        parseInt(audit_id, 10),
+        auditorId,
+        reason || null, // 第三个参数：审核原因
+        { transaction } // 第四个参数：选项对象
+      )
+    },
+    {
+      name: `approve_merchant_points_${audit_id}`
     }
-    if (error.message.includes('状态')) {
-      return res.apiError(error.message, 'INVALID_STATUS', null, 400)
-    }
+  )
 
-    return res.apiError('商家积分申请审核通过失败', 'APPROVE_FAILED', null, 500)
-  }
-})
+  logger.info(`[商家积分管理] 审核通过: audit_id=${audit_id}, auditor=${auditorId}`)
+
+  return res.apiSuccess(result, '商家积分申请审核通过')
+}))
 
 /**
  * 审核拒绝商家积分申请
@@ -293,58 +260,44 @@ router.post('/:audit_id/approve', async (req, res) => {
  *
  * @returns {Object} 审核结果
  */
-router.post('/:audit_id/reject', async (req, res) => {
-  try {
-    // P1-9：通过 ServiceManager 获取服务（snake_case key）
-    const ContentAuditEngine = req.app.locals.services.getService('content_audit')
+router.post('/:audit_id/reject', asyncHandler(async (req, res) => {
+  // P1-9：通过 ServiceManager 获取服务（snake_case key）
+  const ContentAuditEngine = req.app.locals.services.getService('content_audit')
 
-    const { audit_id } = req.params
-    const { reason } = req.body
-    const auditorId = req.user.user_id
+  const { audit_id } = req.params
+  const { reason } = req.body
+  const auditorId = req.user.user_id
 
-    // 验证拒绝原因
-    if (!reason || typeof reason !== 'string' || reason.trim().length === 0) {
-      return res.apiError('拒绝原因不能为空', 'REASON_REQUIRED', null, 400)
-    }
-
-    // 使用 TransactionManager 统一管理事务
-    const result = await TransactionManager.execute(
-      async transaction => {
-        /*
-         * 调用 ContentAuditEngine 进行审核拒绝操作
-         * 审核引擎会触发 MerchantPointsAuditCallback.rejected() 回调
-         * 参数顺序：(auditId, auditorId, reason, options)
-         */
-        return await ContentAuditEngine.reject(
-          parseInt(audit_id, 10),
-          auditorId,
-          reason.trim(), // 第三个参数：拒绝原因
-          { transaction } // 第四个参数：选项对象
-        )
-      },
-      {
-        name: `reject_merchant_points_${audit_id}`
-      }
-    )
-
-    logger.info(
-      `[商家积分管理] 审核拒绝: audit_id=${audit_id}, auditor=${auditorId}, reason=${reason}`
-    )
-
-    return res.apiSuccess(result, '商家积分申请已拒绝')
-  } catch (error) {
-    logger.error('❌ 商家积分申请审核拒绝失败:', error.message)
-
-    // 处理业务错误
-    if (error.message.includes('不存在')) {
-      return res.apiError(error.message, 'APPLICATION_NOT_FOUND', null, 404)
-    }
-    if (error.message.includes('状态')) {
-      return res.apiError(error.message, 'INVALID_STATUS', null, 400)
-    }
-
-    return res.apiError('商家积分申请审核拒绝失败', 'REJECT_FAILED', null, 500)
+  // 验证拒绝原因
+  if (!reason || typeof reason !== 'string' || reason.trim().length === 0) {
+    return res.apiError('拒绝原因不能为空', 'REASON_REQUIRED', null, 400)
   }
-})
+
+  // 使用 TransactionManager 统一管理事务
+  const result = await TransactionManager.execute(
+    async transaction => {
+      /*
+       * 调用 ContentAuditEngine 进行审核拒绝操作
+       * 审核引擎会触发 MerchantPointsAuditCallback.rejected() 回调
+       * 参数顺序：(auditId, auditorId, reason, options)
+       */
+      return await ContentAuditEngine.reject(
+        parseInt(audit_id, 10),
+        auditorId,
+        reason.trim(), // 第三个参数：拒绝原因
+        { transaction } // 第四个参数：选项对象
+      )
+    },
+    {
+      name: `reject_merchant_points_${audit_id}`
+    }
+  )
+
+  logger.info(
+    `[商家积分管理] 审核拒绝: audit_id=${audit_id}, auditor=${auditorId}, reason=${reason}`
+  )
+
+  return res.apiSuccess(result, '商家积分申请已拒绝')
+}))
 
 module.exports = router

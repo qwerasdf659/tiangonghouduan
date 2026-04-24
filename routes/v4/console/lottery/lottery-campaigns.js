@@ -24,6 +24,7 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
+const { asyncHandler } = require('../shared/middleware')
 const { Op } = require('sequelize')
 const logger = require('../../../../utils/logger').logger
 const alertThresholds = require('../../../../config/alert-thresholds')
@@ -241,167 +242,162 @@ async function calculateStockWarning(analyticsService, campaignId) {
  * - Redis 不可用时降级到 Service 层实时计算
  *
  */
-router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const { status, merchant_id, page = 1, page_size = 20 } = req.query
-    const limit = Math.min(parseInt(page_size) || 20, 100)
-    const offset = (Math.max(parseInt(page) || 1, 1) - 1) * limit
+router.get('/', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  const { status, merchant_id, page = 1, page_size = 20 } = req.query
+  const limit = Math.min(parseInt(page_size) || 20, 100)
+  const offset = (Math.max(parseInt(page) || 1, 1) - 1) * limit
 
-    // 获取 Service 实例
-    const analyticsService = getLotteryAnalyticsService(req)
+  // 获取 Service 实例
+  const analyticsService = getLotteryAnalyticsService(req)
 
-    // 通过 Service 访问 LotteryCampaign 模型
-    const LotteryCampaign = analyticsService.models.LotteryCampaign
+  // 通过 Service 访问 LotteryCampaign 模型
+  const LotteryCampaign = analyticsService.models.LotteryCampaign
 
-    // 构建查询条件
-    const where = {}
+  // 构建查询条件
+  const where = {}
 
-    // 商家筛选：通过 LotteryPrize 关联查找包含指定商家奖品的活动
-    const parsedMerchantId = merchant_id ? parseInt(merchant_id) : undefined
+  // 商家筛选：通过 LotteryPrize 关联查找包含指定商家奖品的活动
+  const parsedMerchantId = merchant_id ? parseInt(merchant_id) : undefined
 
-    if (status) {
-      const now = new Date()
-      switch (status) {
-        case 'active':
-          where.status = 'active'
-          where.start_time = { [Op.lte]: now }
-          where[Op.or] = [{ end_time: null }, { end_time: { [Op.gte]: now } }]
-          break
-        case 'inactive':
-          where.status = 'inactive'
-          break
-        case 'upcoming':
-          where.status = 'active'
-          where.start_time = { [Op.gt]: now }
-          break
-        case 'ended':
-          where.end_time = { [Op.lt]: now }
-          break
-        default:
-          // 无效状态不过滤
-          break
-      }
+  if (status) {
+    const now = new Date()
+    switch (status) {
+      case 'active':
+        where.status = 'active'
+        where.start_time = { [Op.lte]: now }
+        where[Op.or] = [{ end_time: null }, { end_time: { [Op.gte]: now } }]
+        break
+      case 'inactive':
+        where.status = 'inactive'
+        break
+      case 'upcoming':
+        where.status = 'active'
+        where.start_time = { [Op.gt]: now }
+        break
+      case 'ended':
+        where.end_time = { [Op.lt]: now }
+        break
+      default:
+        // 无效状态不过滤
+        break
     }
-
-    // 构建查询选项
-    const queryOptions = {
-      where,
-      attributes: [
-        'lottery_campaign_id',
-        'campaign_name',
-        'campaign_code',
-        'status',
-        'start_time',
-        'end_time',
-        'daily_budget_limit',
-        'pool_budget_total',
-        'pool_budget_remaining',
-        'budget_mode',
-        // 前端展示配置字段（多活动抽奖系统 - Web后台活动列表需要展示玩法和主题）
-        'display_mode',
-        'effect_theme',
-        'sort_order',
-        'is_featured',
-        'is_hidden',
-        'display_tags',
-        'display_start_time',
-        'display_end_time',
-        'created_at',
-        'updated_at'
-      ],
-      order: [['created_at', 'DESC']],
-      limit,
-      offset,
-      distinct: true
-    }
-
-    // 商家筛选：通过 include + required 关联 LotteryPrize 表（避免 SQL 注入）
-    if (parsedMerchantId && !isNaN(parsedMerchantId)) {
-      const LotteryPrize = analyticsService.models.LotteryPrize
-      queryOptions.include = [
-        {
-          model: LotteryPrize,
-          as: 'prizes',
-          where: { merchant_id: parsedMerchantId },
-          required: true,
-          attributes: []
-        }
-      ]
-    }
-
-    // 查询活动列表
-    const { count, rows: campaigns } = await LotteryCampaign.findAndCountAll(queryOptions)
-
-    // 获取 Redis 客户端
-    const redis = await getRedis()
-
-    // 并行计算每个活动的 ROI、复购率、库存预警
-    const enrichedCampaigns = await Promise.all(
-      campaigns.map(async campaign => {
-        const campaignId = campaign.lottery_campaign_id
-        const plainCampaign = campaign.toJSON()
-
-        // 1. 尝试从缓存获取 ROI 和复购率
-        let { roi, repeat_rate } = await getCachedROI(redis, campaignId)
-
-        // 2. 缓存未命中，通过 Service 层实时计算
-        if (roi === null || repeat_rate === null) {
-          const calculated = await calculateROIviaService(analyticsService, campaignId)
-          roi = calculated.roi
-          repeat_rate = calculated.repeat_rate
-
-          // 3. 缓存计算结果
-          await cacheROI(redis, campaignId, roi, repeat_rate)
-        }
-
-        // 4. 计算库存预警
-        const stockWarning = await calculateStockWarning(analyticsService, campaignId)
-
-        return {
-          ...plainCampaign,
-          // P1 新增字段
-          roi,
-          repeat_rate,
-          stock_warning: stockWarning
-        }
-      })
-    )
-
-    // 附加中文显示名称（status → status_display/status_color）
-    await attachDisplayNames(enrichedCampaigns, [
-      { field: 'status', dictType: DICT_TYPES.CAMPAIGN_STATUS },
-      { field: 'budget_mode', dictType: DICT_TYPES.BUDGET_MODE }
-    ])
-
-    // 构建分页响应
-    const totalPages = Math.ceil(count / limit)
-    const response = {
-      campaigns: enrichedCampaigns,
-      pagination: {
-        page: parseInt(page),
-        page_size: limit,
-        total: count,
-        total_pages: totalPages,
-        has_next: parseInt(page) < totalPages,
-        has_prev: parseInt(page) > 1
-      }
-    }
-
-    logger.info('获取活动列表成功', {
-      admin_id: req.user.user_id,
-      status,
-      merchant_id: parsedMerchantId || null,
-      page,
-      total: count,
-      returned_count: enrichedCampaigns.length
-    })
-
-    return res.apiSuccess(response, '获取活动列表成功')
-  } catch (error) {
-    logger.error('获取活动列表失败:', error)
-    return res.apiError(`查询失败：${error.message}`, 'GET_CAMPAIGNS_FAILED', null, 500)
   }
-})
+
+  // 构建查询选项
+  const queryOptions = {
+    where,
+    attributes: [
+      'lottery_campaign_id',
+      'campaign_name',
+      'campaign_code',
+      'status',
+      'start_time',
+      'end_time',
+      'daily_budget_limit',
+      'pool_budget_total',
+      'pool_budget_remaining',
+      'budget_mode',
+      // 前端展示配置字段（多活动抽奖系统 - Web后台活动列表需要展示玩法和主题）
+      'display_mode',
+      'effect_theme',
+      'sort_order',
+      'is_featured',
+      'is_hidden',
+      'display_tags',
+      'display_start_time',
+      'display_end_time',
+      'created_at',
+      'updated_at'
+    ],
+    order: [['created_at', 'DESC']],
+    limit,
+    offset,
+    distinct: true
+  }
+
+  // 商家筛选：通过 include + required 关联 LotteryPrize 表（避免 SQL 注入）
+  if (parsedMerchantId && !isNaN(parsedMerchantId)) {
+    const LotteryPrize = analyticsService.models.LotteryPrize
+    queryOptions.include = [
+      {
+        model: LotteryPrize,
+        as: 'prizes',
+        where: { merchant_id: parsedMerchantId },
+        required: true,
+        attributes: []
+      }
+    ]
+  }
+
+  // 查询活动列表
+  const { count, rows: campaigns } = await LotteryCampaign.findAndCountAll(queryOptions)
+
+  // 获取 Redis 客户端
+  const redis = await getRedis()
+
+  // 并行计算每个活动的 ROI、复购率、库存预警
+  const enrichedCampaigns = await Promise.all(
+    campaigns.map(async campaign => {
+      const campaignId = campaign.lottery_campaign_id
+      const plainCampaign = campaign.toJSON()
+
+      // 1. 尝试从缓存获取 ROI 和复购率
+      let { roi, repeat_rate } = await getCachedROI(redis, campaignId)
+
+      // 2. 缓存未命中，通过 Service 层实时计算
+      if (roi === null || repeat_rate === null) {
+        const calculated = await calculateROIviaService(analyticsService, campaignId)
+        roi = calculated.roi
+        repeat_rate = calculated.repeat_rate
+
+        // 3. 缓存计算结果
+        await cacheROI(redis, campaignId, roi, repeat_rate)
+      }
+
+      // 4. 计算库存预警
+      const stockWarning = await calculateStockWarning(analyticsService, campaignId)
+
+      return {
+        ...plainCampaign,
+        // P1 新增字段
+        roi,
+        repeat_rate,
+        stock_warning: stockWarning
+      }
+    })
+  )
+
+  // 附加中文显示名称（status → status_display/status_color）
+  await attachDisplayNames(enrichedCampaigns, [
+    { field: 'status', dictType: DICT_TYPES.CAMPAIGN_STATUS },
+    { field: 'budget_mode', dictType: DICT_TYPES.BUDGET_MODE }
+  ])
+
+  // 构建分页响应
+  const totalPages = Math.ceil(count / limit)
+  const response = {
+    campaigns: enrichedCampaigns,
+    pagination: {
+      page: parseInt(page),
+      page_size: limit,
+      total: count,
+      total_pages: totalPages,
+      has_next: parseInt(page) < totalPages,
+      has_prev: parseInt(page) > 1
+    }
+  }
+
+  logger.info('获取活动列表成功', {
+    admin_id: req.user.user_id,
+    status,
+    merchant_id: parsedMerchantId || null,
+    page,
+    total: count,
+    returned_count: enrichedCampaigns.length
+  })
+
+  return res.apiSuccess(response, '获取活动列表成功')
+}))
 
 /**
  * GET /global-defaults
@@ -422,45 +418,35 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
  * 配置优先级说明（附在响应中）：
  * - 活动级配置 > 全局配置（活动有配置则覆盖全局，无配置则使用全局兜底）
  */
-router.get('/global-defaults', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const AdminSystemService = req.app.locals.services.getService('admin_system')
+router.get('/global-defaults', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  const AdminSystemService = req.app.locals.services.getService('admin_system')
 
-    const [lottery_cost_points, daily_lottery_limit, sign_in_points, initial_points] =
-      await Promise.all([
-        AdminSystemService.getSettingValue('points', 'lottery_cost_points', 100),
-        AdminSystemService.getSettingValue('points', 'daily_lottery_limit', 10),
-        AdminSystemService.getSettingValue('points', 'sign_in_points', 0),
-        AdminSystemService.getSettingValue('points', 'initial_points', 200)
-      ])
+  const [lottery_cost_points, daily_lottery_limit, sign_in_points, initial_points] =
+    await Promise.all([
+      AdminSystemService.getSettingValue('points', 'lottery_cost_points', 100),
+      AdminSystemService.getSettingValue('points', 'daily_lottery_limit', 10),
+      AdminSystemService.getSettingValue('points', 'sign_in_points', 0),
+      AdminSystemService.getSettingValue('points', 'initial_points', 200)
+    ])
 
-    return res.apiSuccess(
-      {
-        global_defaults: {
-          lottery_cost_points: parseInt(lottery_cost_points, 10),
-          daily_lottery_limit: parseInt(daily_lottery_limit, 10),
-          sign_in_points: parseInt(sign_in_points, 10),
-          initial_points: parseInt(initial_points, 10)
-        },
-        priority_rules: {
-          lottery_cost_points: '活动定价配置(base_cost) > 全局lottery_cost_points',
-          daily_lottery_limit:
-            '配额规则(user > role > campaign > global) > 全局daily_lottery_limit',
-          description: '活动级配置优先，未配置时使用全局默认值兜底'
-        }
+  return res.apiSuccess(
+    {
+      global_defaults: {
+        lottery_cost_points: parseInt(lottery_cost_points, 10),
+        daily_lottery_limit: parseInt(daily_lottery_limit, 10),
+        sign_in_points: parseInt(sign_in_points, 10),
+        initial_points: parseInt(initial_points, 10)
       },
-      '获取全局默认配置成功'
-    )
-  } catch (error) {
-    logger.error('获取全局默认配置失败:', error)
-    return res.apiError(
-      '获取全局默认配置失败',
-      error.code || 'GET_GLOBAL_DEFAULTS_FAILED',
-      null,
-      500
-    )
-  }
-})
+      priority_rules: {
+        lottery_cost_points: '活动定价配置(base_cost) > 全局lottery_cost_points',
+        daily_lottery_limit:
+          '配额规则(user > role > campaign > global) > 全局daily_lottery_limit',
+        description: '活动级配置优先，未配置时使用全局默认值兜底'
+      }
+    },
+    '获取全局默认配置成功'
+  )
+}))
 
 /**
  * GET /:lottery_campaign_id - 获取单个活动详情（含 ROI、复购率、库存预警）
@@ -472,71 +458,66 @@ router.get('/global-defaults', authenticateToken, requireRoleLevel(100), async (
  *
  * 返回：活动详情 + ROI + 复购率 + 库存预警
  */
-router.get('/:lottery_campaign_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const campaignId = parseInt(req.params.lottery_campaign_id)
+router.get('/:lottery_campaign_id', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  const campaignId = parseInt(req.params.lottery_campaign_id)
 
-    if (!campaignId || isNaN(campaignId)) {
-      return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID', null, 400)
-    }
-
-    // 获取 Service 实例
-    const analyticsService = getLotteryAnalyticsService(req)
-
-    // 通过 Service 访问 LotteryCampaign 模型
-    const LotteryCampaign = analyticsService.models.LotteryCampaign
-
-    // 查询活动详情
-    const campaign = await LotteryCampaign.findByPk(campaignId)
-    if (!campaign) {
-      return res.apiError('活动不存在', 'CAMPAIGN_NOT_FOUND', null, 404)
-    }
-
-    // 获取 Redis 客户端
-    const redis = await getRedis()
-
-    // 尝试从缓存获取 ROI 和复购率
-    let { roi, repeat_rate } = await getCachedROI(redis, campaignId)
-
-    // 缓存未命中，通过 Service 层实时计算
-    if (roi === null || repeat_rate === null) {
-      const calculated = await calculateROIviaService(analyticsService, campaignId)
-      roi = calculated.roi
-      repeat_rate = calculated.repeat_rate
-
-      // 缓存计算结果
-      await cacheROI(redis, campaignId, roi, repeat_rate)
-    }
-
-    // 计算库存预警
-    const stockWarning = await calculateStockWarning(analyticsService, campaignId)
-
-    const response = {
-      ...campaign.toJSON(),
-      roi,
-      repeat_rate,
-      stock_warning: stockWarning
-    }
-
-    // 附加中文显示名称（status → status_display/status_color）
-    await attachDisplayNames(response, [
-      { field: 'status', dictType: DICT_TYPES.CAMPAIGN_STATUS },
-      { field: 'budget_mode', dictType: DICT_TYPES.BUDGET_MODE }
-    ])
-
-    logger.info('获取活动详情成功', {
-      admin_id: req.user.user_id,
-      lottery_campaign_id: campaignId,
-      roi,
-      repeat_rate
-    })
-
-    return res.apiSuccess(response, '获取活动详情成功')
-  } catch (error) {
-    logger.error('获取活动详情失败:', error)
-    return res.apiError(`查询失败：${error.message}`, 'GET_CAMPAIGN_DETAIL_FAILED', null, 500)
+  if (!campaignId || isNaN(campaignId)) {
+    return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID', null, 400)
   }
-})
+
+  // 获取 Service 实例
+  const analyticsService = getLotteryAnalyticsService(req)
+
+  // 通过 Service 访问 LotteryCampaign 模型
+  const LotteryCampaign = analyticsService.models.LotteryCampaign
+
+  // 查询活动详情
+  const campaign = await LotteryCampaign.findByPk(campaignId)
+  if (!campaign) {
+    return res.apiError('活动不存在', 'CAMPAIGN_NOT_FOUND', null, 404)
+  }
+
+  // 获取 Redis 客户端
+  const redis = await getRedis()
+
+  // 尝试从缓存获取 ROI 和复购率
+  let { roi, repeat_rate } = await getCachedROI(redis, campaignId)
+
+  // 缓存未命中，通过 Service 层实时计算
+  if (roi === null || repeat_rate === null) {
+    const calculated = await calculateROIviaService(analyticsService, campaignId)
+    roi = calculated.roi
+    repeat_rate = calculated.repeat_rate
+
+    // 缓存计算结果
+    await cacheROI(redis, campaignId, roi, repeat_rate)
+  }
+
+  // 计算库存预警
+  const stockWarning = await calculateStockWarning(analyticsService, campaignId)
+
+  const response = {
+    ...campaign.toJSON(),
+    roi,
+    repeat_rate,
+    stock_warning: stockWarning
+  }
+
+  // 附加中文显示名称（status → status_display/status_color）
+  await attachDisplayNames(response, [
+    { field: 'status', dictType: DICT_TYPES.CAMPAIGN_STATUS },
+    { field: 'budget_mode', dictType: DICT_TYPES.BUDGET_MODE }
+  ])
+
+  logger.info('获取活动详情成功', {
+    admin_id: req.user.user_id,
+    lottery_campaign_id: campaignId,
+    roi,
+    repeat_rate
+  })
+
+  return res.apiSuccess(response, '获取活动详情成功')
+}))
 
 /* ========== 策略配置子路由（9策略活动级开关） ========== */
 
@@ -551,23 +532,12 @@ router.get(
   '/:lottery_campaign_id/strategy-config',
   authenticateToken,
   requireRoleLevel(100),
-  async (req, res) => {
-    try {
-      const queryService = req.app.locals.services.getService('admin_lottery_query')
-      const result = await queryService.getStrategyConfig(req.params.lottery_campaign_id)
-      return res.apiSuccess(result, '获取策略配置成功')
-    } catch (error) {
-      logger.error('获取策略配置失败:', error)
-      const statusCode = error.statusCode || 500
-      return res.apiError(
-        `获取策略配置失败：${error.message}`,
-        error.code || 'GET_STRATEGY_CONFIG_FAILED',
-        null,
-        statusCode
-      )
-    }
+  asyncHandler(async (req, res) => {
+    const queryService = req.app.locals.services.getService('admin_lottery_query')
+    const result = await queryService.getStrategyConfig(req.params.lottery_campaign_id)
+    return res.apiSuccess(result, '获取策略配置成功')
   }
-)
+))
 
 /**
  * PUT /:lottery_campaign_id/strategy-config
@@ -587,36 +557,25 @@ router.put(
   '/:lottery_campaign_id/strategy-config',
   authenticateToken,
   requireRoleLevel(100),
-  async (req, res) => {
-    try {
-      const lottery_campaign_id = req.params.lottery_campaign_id
-      const { config } = req.body
+  asyncHandler(async (req, res) => {
+    const lottery_campaign_id = req.params.lottery_campaign_id
+    const { config } = req.body
 
-      const crudService = req.app.locals.services.getService('lottery_campaign_crud')
+    const crudService = req.app.locals.services.getService('lottery_campaign_crud')
 
-      const result = await TransactionManager.execute(async transaction => {
-        return await crudService.updateStrategyConfig(lottery_campaign_id, config, {
-          transaction,
-          operator_user_id: req.user.user_id
-        })
+    const result = await TransactionManager.execute(async transaction => {
+      return await crudService.updateStrategyConfig(lottery_campaign_id, config, {
+        transaction,
+        operator_user_id: req.user.user_id
       })
+    })
 
-      /* 更新后清除该活动的配置缓存 */
-      DynamicConfigLoader.clearCache(parseInt(lottery_campaign_id))
+    /* 更新后清除该活动的配置缓存 */
+    DynamicConfigLoader.clearCache(parseInt(lottery_campaign_id))
 
-      return res.apiSuccess(result, '策略配置更新成功')
-    } catch (error) {
-      logger.error('更新策略配置失败:', error)
-      const statusCode = error.statusCode || 500
-      return res.apiError(
-        `更新策略配置失败：${error.message}`,
-        error.code || 'UPDATE_STRATEGY_CONFIG_FAILED',
-        null,
-        statusCode
-      )
-    }
+    return res.apiSuccess(result, '策略配置更新成功')
   }
-)
+))
 
 /*
  * ============================================
@@ -637,25 +596,20 @@ router.put(
   '/:lottery_campaign_id/featured',
   authenticateToken,
   requireRoleLevel(100),
-  async (req, res) => {
-    try {
-      const { lottery_campaign_id } = req.params
-      const { is_featured } = req.body
+  asyncHandler(async (req, res) => {
+    const { lottery_campaign_id } = req.params
+    const { is_featured } = req.body
 
-      const crudService = req.app.locals.services.getService('lottery_campaign_crud')
-      const result = await TransactionManager.execute(async transaction => {
-        return await crudService.toggleFeatured(parseInt(lottery_campaign_id), !!is_featured, {
-          transaction
-        })
+    const displayService = req.app.locals.services.getService('lottery_campaign_display')
+    const result = await TransactionManager.execute(async transaction => {
+      return await displayService.toggleFeatured(parseInt(lottery_campaign_id), !!is_featured, {
+        transaction
       })
+    })
 
-      return res.apiSuccess(result, is_featured ? '已设为精选' : '已取消精选')
-    } catch (error) {
-      logger.error('切换精选状态失败:', error)
-      return res.apiError(error.message, 'TOGGLE_FEATURED_FAILED', null, error.statusCode || 500)
-    }
+    return res.apiSuccess(result, is_featured ? '已设为精选' : '已取消精选')
   }
-)
+))
 
 /**
  * PUT /api/v4/console/lottery-campaigns/:lottery_campaign_id/hidden
@@ -670,25 +624,20 @@ router.put(
   '/:lottery_campaign_id/hidden',
   authenticateToken,
   requireRoleLevel(100),
-  async (req, res) => {
-    try {
-      const { lottery_campaign_id } = req.params
-      const { is_hidden } = req.body
+  asyncHandler(async (req, res) => {
+    const { lottery_campaign_id } = req.params
+    const { is_hidden } = req.body
 
-      const crudService = req.app.locals.services.getService('lottery_campaign_crud')
-      const result = await TransactionManager.execute(async transaction => {
-        return await crudService.toggleHidden(parseInt(lottery_campaign_id), !!is_hidden, {
-          transaction
-        })
+    const displayService = req.app.locals.services.getService('lottery_campaign_display')
+    const result = await TransactionManager.execute(async transaction => {
+      return await displayService.toggleHidden(parseInt(lottery_campaign_id), !!is_hidden, {
+        transaction
       })
+    })
 
-      return res.apiSuccess(result, is_hidden ? '已隐藏' : '已显示')
-    } catch (error) {
-      logger.error('切换隐藏状态失败:', error)
-      return res.apiError(error.message, 'TOGGLE_HIDDEN_FAILED', null, error.statusCode || 500)
-    }
+    return res.apiSuccess(result, is_hidden ? '已隐藏' : '已显示')
   }
-)
+))
 
 /**
  * PUT /api/v4/console/lottery-campaigns/:lottery_campaign_id/display-config
@@ -703,30 +652,20 @@ router.put(
   '/:lottery_campaign_id/display-config',
   authenticateToken,
   requireRoleLevel(100),
-  async (req, res) => {
-    try {
-      const { lottery_campaign_id } = req.params
-      const displayConfig = req.body
+  asyncHandler(async (req, res) => {
+    const { lottery_campaign_id } = req.params
+    const displayConfig = req.body
 
-      const crudService = req.app.locals.services.getService('lottery_campaign_crud')
-      const result = await TransactionManager.execute(async transaction => {
-        return await crudService.updateDisplayConfig(parseInt(lottery_campaign_id), displayConfig, {
-          transaction
-        })
+    const displayService = req.app.locals.services.getService('lottery_campaign_display')
+    const result = await TransactionManager.execute(async transaction => {
+      return await displayService.updateDisplayConfig(parseInt(lottery_campaign_id), displayConfig, {
+        transaction
       })
+    })
 
-      return res.apiSuccess(result, '展示配置已更新')
-    } catch (error) {
-      logger.error('更新展示配置失败:', error)
-      return res.apiError(
-        error.message,
-        'UPDATE_DISPLAY_CONFIG_FAILED',
-        null,
-        error.statusCode || 500
-      )
-    }
+    return res.apiSuccess(result, '展示配置已更新')
   }
-)
+))
 
 /**
  * PUT /api/v4/console/lottery-campaigns/batch-sort
@@ -736,19 +675,14 @@ router.put(
  *
  * @body {Array} items - [{ lottery_campaign_id, sort_order }]
  */
-router.put('/batch-sort', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const { items } = req.body
-    const crudService = req.app.locals.services.getService('lottery_campaign_crud')
-    const result = await TransactionManager.execute(async transaction => {
-      return await crudService.batchSort(items, { transaction })
-    })
+router.put('/batch-sort', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  const { items } = req.body
+  const displayService = req.app.locals.services.getService('lottery_campaign_display')
+  const result = await TransactionManager.execute(async transaction => {
+    return await displayService.batchSort(items, { transaction })
+  })
 
-    return res.apiSuccess(result, '批量排序完成')
-  } catch (error) {
-    logger.error('批量排序失败:', error)
-    return res.apiError(error.message, 'BATCH_SORT_FAILED', null, error.statusCode || 500)
-  }
-})
+  return res.apiSuccess(result, '批量排序完成')
+}))
 
 module.exports = router

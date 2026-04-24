@@ -15,6 +15,7 @@
 const logger = require('../utils/logger').logger
 const { AdInteractionLog, AdCampaign } = require('../models')
 const { Op } = require('sequelize')
+const BusinessError = require('../utils/BusinessError')
 
 /**
  * 内容交互日志服务类
@@ -41,7 +42,7 @@ class AdInteractionLogService {
       })
 
       if (!campaign) {
-        throw new Error('广告计划不存在: ' + data.ad_campaign_id)
+        throw new BusinessError('广告计划不存在: ' + data.ad_campaign_id, 'AD_NOT_FOUND', 404)
       }
 
       const log = await AdInteractionLog.create(

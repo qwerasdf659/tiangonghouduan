@@ -28,32 +28,27 @@ router.get(
   '/',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    try {
-      const {
-        status = null,
-        category = null,
-        priority = null,
-        page_size = 20,
-        offset = 0
-      } = req.query
+    const {
+      status = null,
+      category = null,
+      priority = null,
+      page_size = 20,
+      offset = 0
+    } = req.query
 
-      // 获取反馈服务
-      const FeedbackService = req.app.locals.services.getService('feedback')
+    // 获取反馈服务
+    const FeedbackService = req.app.locals.services.getService('feedback')
 
-      // 调用服务层方法查询反馈列表
-      const result = await FeedbackService.getFeedbackList({
-        status,
-        category,
-        priority,
-        page_size,
-        offset
-      })
+    // 调用服务层方法查询反馈列表
+    const result = await FeedbackService.getFeedbackList({
+      status,
+      category,
+      priority,
+      page_size,
+      offset
+    })
 
-      return res.apiSuccess(result, '获取反馈列表成功')
-    } catch (error) {
-      sharedComponents.logger.error('获取反馈列表失败', { error: error.message })
-      return res.apiInternalError('获取反馈列表失败', error.message, 'FEEDBACK_LIST_ERROR')
-    }
+    return res.apiSuccess(result, '获取反馈列表成功')
   })
 )
 
@@ -68,16 +63,11 @@ router.get(
   '/stats',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    try {
-      // 通过 ServiceManager 获取 FeedbackService
-      const FeedbackService = req.app.locals.services.getService('feedback')
-      const stats = await FeedbackService.getStats()
+    // 通过 ServiceManager 获取 FeedbackService
+    const FeedbackService = req.app.locals.services.getService('feedback')
+    const stats = await FeedbackService.getStats()
 
-      return res.apiSuccess(stats, '获取反馈统计成功')
-    } catch (error) {
-      sharedComponents.logger.error('获取反馈统计失败', { error: error.message })
-      return res.apiInternalError('获取反馈统计失败', error.message, 'FEEDBACK_STATS_ERROR')
-    }
+    return res.apiSuccess(stats, '获取反馈统计成功')
   })
 )
 
@@ -119,39 +109,21 @@ router.put(
       )
     }
 
-    try {
-      const result = await TransactionManager.execute(async transaction => {
-        const FeedbackService = req.app.locals.services.getService('feedback')
-        return await FeedbackService.batchUpdateStatus(feedback_ids, status, internal_notes, {
-          transaction
-        })
+    const result = await TransactionManager.execute(async transaction => {
+      const FeedbackService = req.app.locals.services.getService('feedback')
+      return await FeedbackService.batchUpdateStatus(feedback_ids, status, internal_notes, {
+        transaction
       })
+    })
 
-      sharedComponents.logger.info('管理员批量更新反馈状态', {
-        admin_id: req.user.user_id,
-        feedback_ids,
-        target_status: status,
-        updated_count: result.updated_count
-      })
+    sharedComponents.logger.info('管理员批量更新反馈状态', {
+      admin_id: req.user.user_id,
+      feedback_ids,
+      target_status: status,
+      updated_count: result.updated_count
+    })
 
-      return res.apiSuccess(result, `批量更新成功，共更新 ${result.updated_count} 条反馈`)
-    } catch (error) {
-      sharedComponents.logger.error('批量更新反馈状态失败', { error: error.message })
-
-      if (
-        error.message.includes('不能为空') ||
-        error.message.includes('不能超过') ||
-        error.message.includes('无效的状态值')
-      ) {
-        return res.apiError(error.message, 'INVALID_PARAMETERS', null, 400)
-      }
-
-      return res.apiInternalError(
-        '批量更新反馈状态失败',
-        error.message,
-        'FEEDBACK_BATCH_STATUS_ERROR'
-      )
-    }
+    return res.apiSuccess(result, `批量更新成功，共更新 ${result.updated_count} 条反馈`)
   })
 )
 
@@ -186,38 +158,24 @@ router.put(
       return res.apiError('回复内容不能超过3000字符', 'INVALID_PARAMETERS', null, 400)
     }
 
-    try {
-      const result = await TransactionManager.execute(async transaction => {
-        const FeedbackService = req.app.locals.services.getService('feedback')
-        return await FeedbackService.batchReplyFeedback(
-          feedback_ids,
-          reply_content,
-          req.user.user_id,
-          internal_notes,
-          { transaction }
-        )
-      })
-
-      sharedComponents.logger.info('管理员批量回复反馈', {
-        admin_id: req.user.user_id,
+    const result = await TransactionManager.execute(async transaction => {
+      const FeedbackService = req.app.locals.services.getService('feedback')
+      return await FeedbackService.batchReplyFeedback(
         feedback_ids,
-        updated_count: result.updated_count
-      })
+        reply_content,
+        req.user.user_id,
+        internal_notes,
+        { transaction }
+      )
+    })
 
-      return res.apiSuccess(result, `批量回复成功，共回复 ${result.updated_count} 条反馈`)
-    } catch (error) {
-      sharedComponents.logger.error('批量回复反馈失败', { error: error.message })
+    sharedComponents.logger.info('管理员批量回复反馈', {
+      admin_id: req.user.user_id,
+      feedback_ids,
+      updated_count: result.updated_count
+    })
 
-      if (
-        error.message.includes('不能为空') ||
-        error.message.includes('不能超过') ||
-        error.message.includes('ID列表')
-      ) {
-        return res.apiError(error.message, 'INVALID_PARAMETERS', null, 400)
-      }
-
-      return res.apiInternalError('批量回复反馈失败', error.message, 'FEEDBACK_BATCH_REPLY_ERROR')
-    }
+    return res.apiSuccess(result, `批量回复成功，共回复 ${result.updated_count} 条反馈`)
   })
 )
 
@@ -232,24 +190,19 @@ router.get(
   '/:id',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    try {
-      const { id } = req.params
+    const { id } = req.params
 
-      // 获取反馈服务
-      const FeedbackService = req.app.locals.services.getService('feedback')
+    // 获取反馈服务
+    const FeedbackService = req.app.locals.services.getService('feedback')
 
-      // 调用服务层方法获取反馈详情
-      const feedback = await FeedbackService.getFeedbackById(id)
+    // 调用服务层方法获取反馈详情
+    const feedback = await FeedbackService.getFeedbackById(id)
 
-      if (!feedback) {
-        return res.apiError('反馈不存在', 'FEEDBACK_NOT_FOUND', null, 404)
-      }
-
-      return res.apiSuccess({ feedback }, '获取反馈详情成功')
-    } catch (error) {
-      sharedComponents.logger.error('获取反馈详情失败', { error: error.message })
-      return res.apiInternalError('获取反馈详情失败', error.message, 'FEEDBACK_DETAIL_ERROR')
+    if (!feedback) {
+      return res.apiError('反馈不存在', 'FEEDBACK_NOT_FOUND', null, 404)
     }
+
+    return res.apiSuccess({ feedback }, '获取反馈详情成功')
   })
 )
 
@@ -264,50 +217,36 @@ router.post(
   '/:id/reply',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    try {
-      const { id } = req.params
-      const { reply_content, internal_notes = null } = req.body
+    const { id } = req.params
+    const { reply_content, internal_notes = null } = req.body
 
-      if (!reply_content || reply_content.trim().length === 0) {
-        return res.apiError('回复内容不能为空', 'INVALID_PARAMETERS')
-      }
-
-      // 获取反馈服务
-      const FeedbackService = req.app.locals.services.getService('feedback')
-
-      // 调用服务层方法回复反馈
-      const feedback = await FeedbackService.replyFeedback(
-        id,
-        reply_content,
-        req.user.user_id,
-        internal_notes
-      )
-
-      sharedComponents.logger.info('管理员回复用户反馈', {
-        admin_id: req.user.user_id,
-        feedback_id: id,
-        user_id: feedback.user_id
-      })
-
-      return res.apiSuccess(
-        {
-          feedback
-        },
-        '反馈回复成功'
-      )
-    } catch (error) {
-      sharedComponents.logger.error('回复反馈失败', { error: error.message })
-
-      // 处理业务错误
-      if (error.message.includes('反馈不存在')) {
-        return res.apiError(error.message, 'FEEDBACK_NOT_FOUND')
-      }
-      if (error.message.includes('回复内容不能为空')) {
-        return res.apiError(error.message, 'INVALID_PARAMETERS')
-      }
-
-      return res.apiInternalError('回复反馈失败', error.message, 'FEEDBACK_REPLY_ERROR')
+    if (!reply_content || reply_content.trim().length === 0) {
+      return res.apiError('回复内容不能为空', 'INVALID_PARAMETERS')
     }
+
+    // 获取反馈服务
+    const FeedbackService = req.app.locals.services.getService('feedback')
+
+    // 调用服务层方法回复反馈
+    const feedback = await FeedbackService.replyFeedback(
+      id,
+      reply_content,
+      req.user.user_id,
+      internal_notes
+    )
+
+    sharedComponents.logger.info('管理员回复用户反馈', {
+      admin_id: req.user.user_id,
+      feedback_id: id,
+      user_id: feedback.user_id
+    })
+
+    return res.apiSuccess(
+      {
+        feedback
+      },
+      '反馈回复成功'
+    )
   })
 )
 
@@ -322,38 +261,27 @@ router.put(
   '/:id/status',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    try {
-      const { id } = req.params
-      const { status, internal_notes = null } = req.body
+    const { id } = req.params
+    const { status, internal_notes = null } = req.body
 
-      // 获取反馈服务
-      const FeedbackService = req.app.locals.services.getService('feedback')
+    // 获取反馈服务
+    const FeedbackService = req.app.locals.services.getService('feedback')
 
-      // 调用服务层方法更新反馈状态
-      const feedback = await FeedbackService.updateFeedbackStatus(id, status, internal_notes)
+    // 调用服务层方法更新反馈状态
+    const feedback = await FeedbackService.updateFeedbackStatus(id, status, internal_notes)
 
-      sharedComponents.logger.info('管理员更新反馈状态', {
-        admin_id: req.user.user_id,
-        feedback_id: id,
-        new_status: status
-      })
+    sharedComponents.logger.info('管理员更新反馈状态', {
+      admin_id: req.user.user_id,
+      feedback_id: id,
+      new_status: status
+    })
 
-      return res.apiSuccess(
-        {
-          feedback
-        },
-        '反馈状态更新成功'
-      )
-    } catch (error) {
-      sharedComponents.logger.error('更新反馈状态失败', { error: error.message })
-
-      // 处理业务错误
-      if (error.message.includes('反馈不存在')) {
-        return res.apiError(error.message, 'FEEDBACK_NOT_FOUND')
-      }
-
-      return res.apiInternalError('更新反馈状态失败', error.message, 'FEEDBACK_STATUS_ERROR')
-    }
+    return res.apiSuccess(
+      {
+        feedback
+      },
+      '反馈状态更新成功'
+    )
   })
 )
 

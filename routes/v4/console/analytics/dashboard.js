@@ -21,7 +21,7 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
-const { handleServiceError } = require('../../../../middleware/validation')
+const { asyncHandler } = require('../../../../middleware/validation')
 const logger = require('../../../../utils/logger').logger
 
 /**
@@ -54,22 +54,17 @@ const logger = require('../../../../utils/logger').logger
  *   "message": "获取成功"
  * }
  */
-router.get('/pending-summary', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
+router.get('/pending-summary', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
     logger.info('[运营看板] 获取待处理聚合统计', {
-      admin_id: req.user.user_id
-    })
+    admin_id: req.user.user_id
+  })
 
-    // 🔄 通过 ServiceManager 获取 PendingSummaryService（符合TR-005规范）
-    const PendingSummaryService = req.app.locals.services.getService('pending_summary')
-    const result = await PendingSummaryService.getPendingSummary()
+  // 🔄 通过 ServiceManager 获取 PendingSummaryService（符合TR-005规范）
+  const PendingSummaryService = req.app.locals.services.getService('pending_summary')
+  const result = await PendingSummaryService.getPendingSummary()
 
-    return res.apiSuccess(result, '获取成功')
-  } catch (error) {
-    logger.error('[运营看板] 获取待处理统计失败', { error: error.message })
-    return handleServiceError(error, res, '获取待处理统计失败')
-  }
-})
+  return res.apiSuccess(result, '获取成功')
+}))
 
 /**
  * @route GET /api/v4/console/dashboard/business-health
@@ -108,22 +103,17 @@ router.get('/pending-summary', authenticateToken, requireRoleLevel(100), async (
  *
  * 关联需求：§3.1.2 全局业务健康度评分
  */
-router.get('/business-health', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
+router.get('/business-health', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
     logger.info('[运营看板] 获取业务健康度评分', {
-      admin_id: req.user.user_id
-    })
+    admin_id: req.user.user_id
+  })
 
-    // 🔄 通过 ServiceManager 获取 BusinessHealthScoreService
-    const BusinessHealthScoreService = req.app.locals.services.getService('business_health_score')
-    const result = await BusinessHealthScoreService.getBusinessHealthScore()
+  // 🔄 通过 ServiceManager 获取 BusinessHealthScoreService
+  const BusinessHealthScoreService = req.app.locals.services.getService('business_health_score')
+  const result = await BusinessHealthScoreService.getBusinessHealthScore()
 
-    return res.apiSuccess(result, '获取成功')
-  } catch (error) {
-    logger.error('[运营看板] 获取业务健康度失败', { error: error.message })
-    return handleServiceError(error, res, '获取业务健康度失败')
-  }
-})
+  return res.apiSuccess(result, '获取成功')
+}))
 
 /**
  * @route GET /api/v4/console/dashboard/time-comparison
@@ -161,27 +151,22 @@ router.get('/business-health', authenticateToken, requireRoleLevel(100), async (
  *
  * 关联需求：§4.3 时间对比数据
  */
-router.get('/time-comparison', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
+router.get('/time-comparison', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
     const { dimension } = req.query
 
-    logger.info('[运营看板] 获取时间对比数据', {
-      admin_id: req.user.user_id,
-      dimension
-    })
+  logger.info('[运营看板] 获取时间对比数据', {
+    admin_id: req.user.user_id,
+    dimension
+  })
 
-    // 🔄 通过 ServiceManager 获取 MultiDimensionStatsService
-    const MultiDimensionStatsService = req.app.locals.services.getService('multi_dimension_stats')
-    const result = await MultiDimensionStatsService.getTimeComparison({
-      dimension: dimension || null
-    })
+  // 🔄 通过 ServiceManager 获取 MultiDimensionStatsService
+  const MultiDimensionStatsService = req.app.locals.services.getService('multi_dimension_stats')
+  const result = await MultiDimensionStatsService.getTimeComparison({
+    dimension: dimension || null
+  })
 
-    return res.apiSuccess(result, '获取成功')
-  } catch (error) {
-    logger.error('[运营看板] 获取时间对比数据失败', { error: error.message })
-    return handleServiceError(error, res, '获取时间对比数据失败')
-  }
-})
+  return res.apiSuccess(result, '获取成功')
+}))
 
 // ========== 市场健康看板（D1）==========
 
@@ -189,17 +174,12 @@ router.get('/time-comparison', authenticateToken, requireRoleLevel(100), async (
  * 获取市场健康综合数据
  * GET /api/v4/console/dashboard/market-health
  */
-router.get('/market-health', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
+router.get('/market-health', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
     const MarketHealthService = req.app.locals.services.getService('market_health')
-    const { days } = req.query
-    const result = await MarketHealthService.getMarketHealthSummary({ days: parseInt(days) || 30 })
-    return res.apiSuccess(result, '获取市场健康数据成功')
-  } catch (error) {
-    logger.error('[市场健康] 获取综合数据失败', { error: error.message })
-    return handleServiceError(error, res, '获取市场健康数据失败')
-  }
-})
+  const { days } = req.query
+  const result = await MarketHealthService.getMarketHealthSummary({ days: parseInt(days) || 30 })
+  return res.apiSuccess(result, '获取市场健康数据成功')
+}))
 
 /**
  * 获取订单状态趋势（完成率/取消率）
@@ -209,17 +189,12 @@ router.get(
   '/market-health/order-trend',
   authenticateToken,
   requireRoleLevel(100),
-  async (req, res) => {
-    try {
-      const MarketHealthService = req.app.locals.services.getService('market_health')
-      const { days } = req.query
-      const result = await MarketHealthService.getOrderStatusTrend({ days: parseInt(days) || 30 })
-      return res.apiSuccess(result, '获取订单状态趋势成功')
-    } catch (error) {
-      logger.error('[市场健康] 获取订单趋势失败', { error: error.message })
-      return handleServiceError(error, res, '获取订单趋势失败')
-    }
-  }
+  asyncHandler(async (req, res) => {
+        const MarketHealthService = req.app.locals.services.getService('market_health')
+    const { days } = req.query
+    const result = await MarketHealthService.getOrderStatusTrend({ days: parseInt(days) || 30 })
+    return res.apiSuccess(result, '获取订单状态趋势成功')
+  })
 )
 
 /**
@@ -230,26 +205,21 @@ router.get(
   '/market-health/top-users',
   authenticateToken,
   requireRoleLevel(100),
-  async (req, res) => {
-    try {
-      const MarketHealthService = req.app.locals.services.getService('market_health')
-      const { days, page_size } = req.query
-      const filters = { days: parseInt(days) || 30, page_size: parseInt(page_size) || 10 }
+  asyncHandler(async (req, res) => {
+        const MarketHealthService = req.app.locals.services.getService('market_health')
+    const { days, page_size } = req.query
+    const filters = { days: parseInt(days) || 30, page_size: parseInt(page_size) || 10 }
 
-      const [topBuyers, topSellers] = await Promise.all([
-        MarketHealthService.getTopBuyers(filters),
-        MarketHealthService.getTopSellers(filters)
-      ])
+    const [topBuyers, topSellers] = await Promise.all([
+      MarketHealthService.getTopBuyers(filters),
+      MarketHealthService.getTopSellers(filters)
+    ])
 
-      return res.apiSuccess(
-        { top_buyers: topBuyers, top_sellers: topSellers },
-        '获取活跃用户排行成功'
-      )
-    } catch (error) {
-      logger.error('[市场健康] 获取活跃用户排行失败', { error: error.message })
-      return handleServiceError(error, res, '获取活跃用户排行失败')
-    }
-  }
+    return res.apiSuccess(
+      { top_buyers: topBuyers, top_sellers: topSellers },
+      '获取活跃用户排行成功'
+    )
+  })
 )
 
 // ========== 平台收入管理（PlatformRevenueService）==========
@@ -258,69 +228,49 @@ router.get(
  * 获取平台收入概览
  * GET /api/v4/console/dashboard/revenue/overview
  */
-router.get('/revenue/overview', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
+router.get('/revenue/overview', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
     const PlatformRevenueService = req.app.locals.services.getService('platform_revenue')
-    const overview = await PlatformRevenueService.getRevenueOverview()
-    return res.apiSuccess(overview, '获取收入概览成功')
-  } catch (error) {
-    logger.error('[平台收入] 获取收入概览失败', { error: error.message })
-    return handleServiceError(error, res, '获取收入概览失败')
-  }
-})
+  const overview = await PlatformRevenueService.getRevenueOverview()
+  return res.apiSuccess(overview, '获取收入概览成功')
+}))
 
 /**
  * 获取收入来源分类统计
  * GET /api/v4/console/dashboard/revenue/by-source
  */
-router.get('/revenue/by-source', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
+router.get('/revenue/by-source', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
     const PlatformRevenueService = req.app.locals.services.getService('platform_revenue')
-    const { asset_code, days } = req.query
-    const result = await PlatformRevenueService.getRevenueBySource({
-      asset_code,
-      days: parseInt(days) || 30
-    })
-    return res.apiSuccess(result, '获取收入来源统计成功')
-  } catch (error) {
-    logger.error('[平台收入] 获取收入来源统计失败', { error: error.message })
-    return handleServiceError(error, res, '获取收入来源统计失败')
-  }
-})
+  const { asset_code, days } = req.query
+  const result = await PlatformRevenueService.getRevenueBySource({
+    asset_code,
+    days: parseInt(days) || 30
+  })
+  return res.apiSuccess(result, '获取收入来源统计成功')
+}))
 
 /**
  * 获取收入趋势数据
  * GET /api/v4/console/dashboard/revenue/trend
  */
-router.get('/revenue/trend', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
+router.get('/revenue/trend', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
     const PlatformRevenueService = req.app.locals.services.getService('platform_revenue')
-    const { granularity, asset_code, days } = req.query
-    const result = await PlatformRevenueService.getRevenueTrend({
-      granularity: granularity || 'daily',
-      asset_code,
-      days: parseInt(days) || 30
-    })
-    return res.apiSuccess(result, '获取收入趋势成功')
-  } catch (error) {
-    logger.error('[平台收入] 获取收入趋势失败', { error: error.message })
-    return handleServiceError(error, res, '获取收入趋势失败')
-  }
-})
+  const { granularity, asset_code, days } = req.query
+  const result = await PlatformRevenueService.getRevenueTrend({
+    granularity: granularity || 'daily',
+    asset_code,
+    days: parseInt(days) || 30
+  })
+  return res.apiSuccess(result, '获取收入趋势成功')
+}))
 
 /**
  * 获取手续费率配置和实际收费统计
  * GET /api/v4/console/dashboard/revenue/fee-stats
  */
-router.get('/revenue/fee-stats', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
+router.get('/revenue/fee-stats', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
     const PlatformRevenueService = req.app.locals.services.getService('platform_revenue')
-    const result = await PlatformRevenueService.getFeeRateStats()
-    return res.apiSuccess(result, '获取手续费统计成功')
-  } catch (error) {
-    logger.error('[平台收入] 获取手续费统计失败', { error: error.message })
-    return handleServiceError(error, res, '获取手续费统计失败')
-  }
-})
+  const result = await PlatformRevenueService.getFeeRateStats()
+  return res.apiSuccess(result, '获取手续费统计成功')
+}))
 
 module.exports = router

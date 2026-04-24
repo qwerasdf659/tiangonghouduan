@@ -16,9 +16,8 @@
 
 const express = require('express')
 const router = express.Router()
-const logger = require('../../../utils/logger').logger
 const { authenticateToken } = require('../../../middleware/auth')
-const { handleServiceError } = require('../../../middleware/validation')
+const { asyncHandler } = require('../../../middleware/validation')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 const { pointsRateLimiter } = require('./middleware')
 
@@ -33,36 +32,26 @@ const { pointsRateLimiter } = require('./middleware')
  * - 用户端路由不含 :user_id 参数，身份纯从 JWT Token 获取
  * - 管理员查看他人积分走 /api/v4/console/lottery-user-analysis/points/:user_id
  */
-router.get('/points', authenticateToken, pointsRateLimiter, async (req, res) => {
-  try {
-    const user_id = req.user.user_id
+router.get('/points', authenticateToken, pointsRateLimiter, asyncHandler(async (req, res) => {
+  const user_id = req.user.user_id
 
-    const UserService = req.app.locals.services.getService('user')
+  const UserService = req.app.locals.services.getService('user')
 
-    /*
-     * 决策 D-1：today_summary 已拆分到 /api/v4/assets/today-summary
-     * 本接口回归纯积分余额查询职责，不再跨域拼接资产汇总
-     */
-    const pointsResult = await UserService.getUserWithPoints(user_id, {
-      checkPointsAccount: true,
-      checkStatus: true
-    })
+  /*
+   * 决策 D-1：today_summary 已拆分到 /api/v4/assets/today-summary
+   * 本接口回归纯积分余额查询职责，不再跨域拼接资产汇总
+   */
+  const pointsResult = await UserService.getUserWithPoints(user_id, {
+    checkPointsAccount: true,
+    checkStatus: true
+  })
 
-    const responseData = {
-      ...pointsResult.points_account
-    }
-
-    return res.apiSuccess(responseData, '用户积分获取成功', 'POINTS_SUCCESS')
-  } catch (error) {
-    logger.error('[Points API] 获取用户积分失败', {
-      user_id: req.user?.user_id,
-      error: error.message,
-      stack: error.stack,
-      timestamp: BeijingTimeHelper.now()
-    })
-    return handleServiceError(error, res, '获取用户积分失败')
+  const responseData = {
+    ...pointsResult.points_account
   }
-})
+
+  return res.apiSuccess(responseData, '用户积分获取成功', 'POINTS_SUCCESS')
+}))
 
 /**
  * @route GET /api/v4/lottery/statistics
@@ -83,25 +72,15 @@ router.get('/points', authenticateToken, pointsRateLimiter, async (req, res) => 
  * - 用户端路由不含 :user_id 参数，身份纯从 JWT Token 获取
  * - 管理员查看他人统计走 /api/v4/console/lottery-user-analysis/statistics/:user_id
  */
-router.get('/statistics', authenticateToken, async (req, res) => {
-  try {
-    const user_id = req.user.user_id
+router.get('/statistics', authenticateToken, asyncHandler(async (req, res) => {
+  const user_id = req.user.user_id
 
-    // 通过 ServiceManager 获取 LotteryQueryService
-    const LotteryQueryService = req.app.locals.services.getService('lottery_query')
-    const statistics = await LotteryQueryService.getUserStatistics(user_id)
+  // 通过 ServiceManager 获取 LotteryQueryService
+  const LotteryQueryService = req.app.locals.services.getService('lottery_query')
+  const statistics = await LotteryQueryService.getUserStatistics(user_id)
 
-    return res.apiSuccess(statistics, '统计信息获取成功', 'STATISTICS_SUCCESS')
-  } catch (error) {
-    logger.error('获取统计信息失败', {
-      user_id: req.user?.user_id,
-      error: error.message,
-      stack: error.stack,
-      timestamp: BeijingTimeHelper.now()
-    })
-    return handleServiceError(error, res, '获取统计信息失败')
-  }
-})
+  return res.apiSuccess(statistics, '统计信息获取成功', 'STATISTICS_SUCCESS')
+}))
 
 /**
  * @route GET /api/v4/lottery/health
@@ -117,24 +96,19 @@ router.get('/statistics', authenticateToken, async (req, res) => {
  * - 保留 ManagementStrategy 用于管理 API
  */
 router.get('/health', (req, res) => {
-  try {
-    return res.apiSuccess(
-      {
-        status: 'healthy',
-        service: 'V4.6统一抽奖引擎',
-        version: '4.6.0',
-        architecture: 'pipeline',
-        pipelines: ['NormalDrawPipeline'], // ：统一管线
-        decision_sources: ['normal', 'preset', 'override'], // 决策来源类型
-        management_strategy: 'ManagementStrategy',
-        timestamp: BeijingTimeHelper.apiTimestamp()
-      },
-      'V4.6抽奖系统运行正常（ 统一管线架构）'
-    )
-  } catch (error) {
-    logger.error('抽奖系统健康检查失败:', error)
-    return handleServiceError(error, res, '抽奖系统健康检查失败')
-  }
+  return res.apiSuccess(
+    {
+      status: 'healthy',
+      service: 'V4.6统一抽奖引擎',
+      version: '4.6.0',
+      architecture: 'pipeline',
+      pipelines: ['NormalDrawPipeline'], // ：统一管线
+      decision_sources: ['normal', 'preset', 'override'], // 决策来源类型
+      management_strategy: 'ManagementStrategy',
+      timestamp: BeijingTimeHelper.apiTimestamp()
+    },
+    'V4.6抽奖系统运行正常（ 统一管线架构）'
+  )
 })
 
 module.exports = router

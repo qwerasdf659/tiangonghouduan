@@ -33,33 +33,7 @@ const { authenticateToken, requireRoleLevel } = require('../../../../middleware/
 const { PERMISSION_LEVELS } = require('../../../../shared/permission-constants')
 const logger = require('../../../../utils/logger').logger
 const TransactionManager = require('../../../../utils/TransactionManager')
-
-/**
- * 处理服务层错误
- *
- * @param {Error} error - 错误对象
- * @param {Object} res - Express 响应对象
- * @param {string} operation - 操作名称
- * @returns {Object} Express 响应对象
- */
-function handleServiceError(error, res, operation) {
-  logger.error(`❌ ${operation}失败`, { error: error.message, stack: error.stack })
-
-  if (error.message.includes('不存在') || error.message.includes('not found')) {
-    return res.apiError(error.message, 'NOT_FOUND', null, 404)
-  }
-
-  if (
-    error.message.includes('不能为空') ||
-    error.message.includes('无效') ||
-    error.message.includes('必填') ||
-    error.message.includes('缺少')
-  ) {
-    return res.apiError(error.message, 'VALIDATION_ERROR', null, 400)
-  }
-
-  return handleServiceError(error, res)
-}
+const { asyncHandler } = require('../../../../middleware/validation')
 
 /*
  * =================================================================
@@ -83,24 +57,20 @@ router.get(
   '/accounts',
   authenticateToken,
   requireRoleLevel(PERMISSION_LEVELS.OPS),
-  async (req, res) => {
-    try {
-      // 通过 ServiceManager 获取查询服务
-      const SystemDataQueryService = req.app.locals.services.getService('console_system_data_query')
+  asyncHandler(async (req, res) => {
+        // 通过 ServiceManager 获取查询服务
+    const SystemDataQueryService = req.app.locals.services.getService('console_system_data_query')
 
-      const result = await SystemDataQueryService.getAccounts(req.query)
+    const result = await SystemDataQueryService.getAccounts(req.query)
 
-      logger.info('查询账户列表成功', {
-        admin_id: req.user.user_id,
-        total: result.pagination.total,
-        page: result.pagination.page
-      })
+    logger.info('查询账户列表成功', {
+      admin_id: req.user.user_id,
+      total: result.pagination.total,
+      page: result.pagination.page
+    })
 
-      return res.apiSuccess(result, '获取账户列表成功')
-    } catch (error) {
-      return handleServiceError(error, res, '查询账户列表')
-    }
-  }
+    return res.apiSuccess(result, '获取账户列表成功')
+  })
 )
 
 /**
@@ -112,22 +82,18 @@ router.get(
   '/accounts/:account_id',
   authenticateToken,
   requireRoleLevel(PERMISSION_LEVELS.OPS),
-  async (req, res) => {
-    try {
-      const { account_id } = req.params
-      const SystemDataQueryService = req.app.locals.services.getService('console_system_data_query')
+  asyncHandler(async (req, res) => {
+        const { account_id } = req.params
+    const SystemDataQueryService = req.app.locals.services.getService('console_system_data_query')
 
-      const account = await SystemDataQueryService.getAccountById(account_id)
+    const account = await SystemDataQueryService.getAccountById(account_id)
 
-      if (!account) {
-        return res.apiError('账户不存在', 'NOT_FOUND', null, 404)
-      }
-
-      return res.apiSuccess(account, '获取账户详情成功')
-    } catch (error) {
-      return handleServiceError(error, res, '获取账户详情')
+    if (!account) {
+      return res.apiError('账户不存在', 'NOT_FOUND', null, 404)
     }
-  }
+
+    return res.apiSuccess(account, '获取账户详情成功')
+  })
 )
 
 /*
@@ -150,23 +116,19 @@ router.get(
   '/user-roles',
   authenticateToken,
   requireRoleLevel(PERMISSION_LEVELS.OPS),
-  async (req, res) => {
-    try {
-      const SystemDataQueryService = req.app.locals.services.getService('console_system_data_query')
+  asyncHandler(async (req, res) => {
+        const SystemDataQueryService = req.app.locals.services.getService('console_system_data_query')
 
-      const result = await SystemDataQueryService.getUserRoles(req.query)
+    const result = await SystemDataQueryService.getUserRoles(req.query)
 
-      logger.info('查询用户角色列表成功', {
-        admin_id: req.user.user_id,
-        total: result.pagination.total,
-        page: result.pagination.page
-      })
+    logger.info('查询用户角色列表成功', {
+      admin_id: req.user.user_id,
+      total: result.pagination.total,
+      page: result.pagination.page
+    })
 
-      return res.apiSuccess(result, '获取用户角色列表成功')
-    } catch (error) {
-      return handleServiceError(error, res, '查询用户角色列表')
-    }
-  }
+    return res.apiSuccess(result, '获取用户角色列表成功')
+  })
 )
 
 /*
@@ -193,23 +155,19 @@ router.get(
   '/market-listings',
   authenticateToken,
   requireRoleLevel(PERMISSION_LEVELS.OPS),
-  async (req, res) => {
-    try {
-      const SystemDataQueryService = req.app.locals.services.getService('console_system_data_query')
+  asyncHandler(async (req, res) => {
+        const SystemDataQueryService = req.app.locals.services.getService('console_system_data_query')
 
-      const result = await SystemDataQueryService.getMarketListings(req.query)
+    const result = await SystemDataQueryService.getMarketListings(req.query)
 
-      logger.info('查询市场挂牌列表成功', {
-        admin_id: req.user.user_id,
-        total: result.pagination.total,
-        page: result.pagination.page
-      })
+    logger.info('查询市场挂牌列表成功', {
+      admin_id: req.user.user_id,
+      total: result.pagination.total,
+      page: result.pagination.page
+    })
 
-      return res.apiSuccess(result, '获取市场挂牌列表成功')
-    } catch (error) {
-      return handleServiceError(error, res, '查询市场挂牌列表')
-    }
-  }
+    return res.apiSuccess(result, '获取市场挂牌列表成功')
+  })
 )
 
 /**
@@ -221,22 +179,18 @@ router.get(
   '/market-listings/statistics/summary',
   authenticateToken,
   requireRoleLevel(PERMISSION_LEVELS.OPS),
-  async (req, res) => {
-    try {
-      const SystemDataQueryService = req.app.locals.services.getService('console_system_data_query')
+  asyncHandler(async (req, res) => {
+        const SystemDataQueryService = req.app.locals.services.getService('console_system_data_query')
 
-      const result = await SystemDataQueryService.getMarketListingStats()
+    const result = await SystemDataQueryService.getMarketListingStats()
 
-      logger.info('查询市场挂牌统计成功', {
-        admin_id: req.user.user_id,
-        total: result.total_listings
-      })
+    logger.info('查询市场挂牌统计成功', {
+      admin_id: req.user.user_id,
+      total: result.total_listings
+    })
 
-      return res.apiSuccess(result, '获取市场挂牌统计成功')
-    } catch (error) {
-      return handleServiceError(error, res, '查询市场挂牌统计')
-    }
-  }
+    return res.apiSuccess(result, '获取市场挂牌统计成功')
+  })
 )
 
 /**
@@ -248,22 +202,18 @@ router.get(
   '/market-listings/:market_listing_id',
   authenticateToken,
   requireRoleLevel(PERMISSION_LEVELS.OPS),
-  async (req, res) => {
-    try {
-      const { market_listing_id } = req.params
-      const SystemDataQueryService = req.app.locals.services.getService('console_system_data_query')
+  asyncHandler(async (req, res) => {
+        const { market_listing_id } = req.params
+    const SystemDataQueryService = req.app.locals.services.getService('console_system_data_query')
 
-      const listing = await SystemDataQueryService.getMarketListingById(market_listing_id)
+    const listing = await SystemDataQueryService.getMarketListingById(market_listing_id)
 
-      if (!listing) {
-        return res.apiError('挂牌不存在', 'NOT_FOUND', null, 404)
-      }
-
-      return res.apiSuccess(listing, '获取市场挂牌详情成功')
-    } catch (error) {
-      return handleServiceError(error, res, '获取市场挂牌详情')
+    if (!listing) {
+      return res.apiError('挂牌不存在', 'NOT_FOUND', null, 404)
     }
-  }
+
+    return res.apiSuccess(listing, '获取市场挂牌详情成功')
+  })
 )
 
 /*
@@ -288,23 +238,19 @@ router.get(
   '/lottery-campaigns',
   authenticateToken,
   requireRoleLevel(PERMISSION_LEVELS.OPS),
-  async (req, res) => {
-    try {
-      const SystemDataQueryService = req.app.locals.services.getService('console_system_data_query')
+  asyncHandler(async (req, res) => {
+        const SystemDataQueryService = req.app.locals.services.getService('console_system_data_query')
 
-      const result = await SystemDataQueryService.getLotteryCampaigns(req.query)
+    const result = await SystemDataQueryService.getLotteryCampaigns(req.query)
 
-      logger.info('查询抽奖活动列表成功', {
-        admin_id: req.user.user_id,
-        total: result.pagination.total,
-        page: result.pagination.page
-      })
+    logger.info('查询抽奖活动列表成功', {
+      admin_id: req.user.user_id,
+      total: result.pagination.total,
+      page: result.pagination.page
+    })
 
-      return res.apiSuccess(result, '获取抽奖活动列表成功')
-    } catch (error) {
-      return handleServiceError(error, res, '查询抽奖活动列表')
-    }
-  }
+    return res.apiSuccess(result, '获取抽奖活动列表成功')
+  })
 )
 
 /**
@@ -316,22 +262,18 @@ router.get(
   '/lottery-campaigns/:lottery_campaign_id',
   authenticateToken,
   requireRoleLevel(PERMISSION_LEVELS.OPS),
-  async (req, res) => {
-    try {
-      const { lottery_campaign_id } = req.params
-      const SystemDataQueryService = req.app.locals.services.getService('console_system_data_query')
+  asyncHandler(async (req, res) => {
+        const { lottery_campaign_id } = req.params
+    const SystemDataQueryService = req.app.locals.services.getService('console_system_data_query')
 
-      const campaign = await SystemDataQueryService.getLotteryCampaignById(lottery_campaign_id)
+    const campaign = await SystemDataQueryService.getLotteryCampaignById(lottery_campaign_id)
 
-      if (!campaign) {
-        return res.apiError('活动不存在', 'NOT_FOUND', null, 404)
-      }
-
-      return res.apiSuccess(campaign, '获取抽奖活动详情成功')
-    } catch (error) {
-      return handleServiceError(error, res, '获取抽奖活动详情')
+    if (!campaign) {
+      return res.apiError('活动不存在', 'NOT_FOUND', null, 404)
     }
-  }
+
+    return res.apiSuccess(campaign, '获取抽奖活动详情成功')
+  })
 )
 
 /**
@@ -345,40 +287,36 @@ router.post(
   '/lottery-campaigns',
   authenticateToken,
   requireRoleLevel(PERMISSION_LEVELS.OPS),
-  async (req, res) => {
-    try {
-      const campaignData = req.body
+  asyncHandler(async (req, res) => {
+        const campaignData = req.body
 
-      /*
-       * 验证必填字段（路由层基础校验，快速失败）
-       * campaign_code 由后端 CRUDService 自动生成，前端不传
-       */
-      if (!campaignData.campaign_name) {
-        return res.apiError('活动名称不能为空', 'VALIDATION_ERROR', null, 400)
-      }
-      if (!campaignData.campaign_type) {
-        return res.apiError('活动类型不能为空', 'VALIDATION_ERROR', null, 400)
-      }
-
-      // 通过 ServiceManager 获取服务
-      const LotteryCampaignCRUDService = req.app.locals.services.getService('lottery_campaign_crud')
-
-      // 模式A：路由层使用 TransactionManager.execute() 管理事务边界
-      const campaign = await TransactionManager.execute(
-        async transaction => {
-          return await LotteryCampaignCRUDService.createCampaign(campaignData, {
-            transaction,
-            operator_user_id: req.user.user_id
-          })
-        },
-        { description: 'POST /lottery-campaigns - createCampaign' }
-      )
-
-      return res.apiSuccess(campaign, '创建抽奖活动成功')
-    } catch (error) {
-      return handleServiceError(error, res, '创建抽奖活动')
+    /*
+     * 验证必填字段（路由层基础校验，快速失败）
+     * campaign_code 由后端 CRUDService 自动生成，前端不传
+     */
+    if (!campaignData.campaign_name) {
+      return res.apiError('活动名称不能为空', 'VALIDATION_ERROR', null, 400)
     }
-  }
+    if (!campaignData.campaign_type) {
+      return res.apiError('活动类型不能为空', 'VALIDATION_ERROR', null, 400)
+    }
+
+    // 通过 ServiceManager 获取服务
+    const LotteryCampaignCRUDService = req.app.locals.services.getService('lottery_campaign_crud')
+
+    // 模式A：路由层使用 TransactionManager.execute() 管理事务边界
+    const campaign = await TransactionManager.execute(
+      async transaction => {
+        return await LotteryCampaignCRUDService.createCampaign(campaignData, {
+          transaction,
+          operator_user_id: req.user.user_id
+        })
+      },
+      { description: 'POST /lottery-campaigns - createCampaign' }
+    )
+
+    return res.apiSuccess(campaign, '创建抽奖活动成功')
+  })
 )
 
 /**
@@ -392,96 +330,92 @@ router.put(
   '/lottery-campaigns/:lottery_campaign_id',
   authenticateToken,
   requireRoleLevel(PERMISSION_LEVELS.OPS),
-  async (req, res) => {
-    try {
-      const { lottery_campaign_id } = req.params
-      const {
-        campaign_name,
-        campaign_type,
-        description,
-        start_time,
-        end_time,
-        status,
-        rules_text,
-        budget_mode,
-        max_draws_per_user_daily,
-        max_draws_per_user_total,
-        total_prize_pool,
-        remaining_prize_pool,
-        prize_distribution_config,
-        // 抽奖引擎核心配置（pipeline 路径分叉参数）
-        pick_method,
-        preset_budget_policy,
-        default_quota,
-        quota_init_mode,
-        tier_weight_scale,
-        // 前端展示配置字段（多活动抽奖系统）
-        display_mode,
-        grid_cols,
-        effect_theme,
-        rarity_effects_enabled,
-        win_animation,
-        background_image_url
-      } = req.body
-
-      // 构建更新数据（campaign_code 不可修改）
-      const updateData = {}
-      if (campaign_name !== undefined) updateData.campaign_name = campaign_name
-      if (campaign_type !== undefined) updateData.campaign_type = campaign_type
-      if (description !== undefined) updateData.description = description
-      if (start_time !== undefined) updateData.start_time = start_time
-      if (end_time !== undefined) updateData.end_time = end_time
-      if (status !== undefined) updateData.status = status
-      if (rules_text !== undefined) updateData.rules_text = rules_text
-      if (budget_mode !== undefined) updateData.budget_mode = budget_mode
-      if (max_draws_per_user_daily !== undefined) {
-        updateData.max_draws_per_user_daily = max_draws_per_user_daily
-      }
-      if (max_draws_per_user_total !== undefined) {
-        updateData.max_draws_per_user_total = max_draws_per_user_total
-      }
-      if (total_prize_pool !== undefined) updateData.total_prize_pool = total_prize_pool
-      if (remaining_prize_pool !== undefined) updateData.remaining_prize_pool = remaining_prize_pool
-      if (prize_distribution_config !== undefined) {
-        updateData.prize_distribution_config = prize_distribution_config
-      }
-      // 抽奖引擎核心配置
-      if (pick_method !== undefined) updateData.pick_method = pick_method
-      if (preset_budget_policy !== undefined) updateData.preset_budget_policy = preset_budget_policy
-      if (default_quota !== undefined) updateData.default_quota = default_quota
-      if (quota_init_mode !== undefined) updateData.quota_init_mode = quota_init_mode
-      if (tier_weight_scale !== undefined) updateData.tier_weight_scale = tier_weight_scale
+  asyncHandler(async (req, res) => {
+        const { lottery_campaign_id } = req.params
+    const {
+      campaign_name,
+      campaign_type,
+      description,
+      start_time,
+      end_time,
+      status,
+      rules_text,
+      budget_mode,
+      max_draws_per_user_daily,
+      max_draws_per_user_total,
+      total_prize_pool,
+      remaining_prize_pool,
+      prize_distribution_config,
+      // 抽奖引擎核心配置（pipeline 路径分叉参数）
+      pick_method,
+      preset_budget_policy,
+      default_quota,
+      quota_init_mode,
+      tier_weight_scale,
       // 前端展示配置字段（多活动抽奖系统）
-      if (display_mode !== undefined) updateData.display_mode = display_mode
-      if (grid_cols !== undefined) updateData.grid_cols = grid_cols
-      if (effect_theme !== undefined) updateData.effect_theme = effect_theme
-      if (rarity_effects_enabled !== undefined) {
-        updateData.rarity_effects_enabled = rarity_effects_enabled
-      }
-      if (win_animation !== undefined) updateData.win_animation = win_animation
-      if (background_image_url !== undefined) updateData.background_image_url = background_image_url
-      /* 保底/档位配置通过 PUT /api/v4/console/lottery-campaigns/:id/strategy-config 管理 */
+      display_mode,
+      grid_cols,
+      effect_theme,
+      rarity_effects_enabled,
+      win_animation,
+      background_image_url
+    } = req.body
 
-      // 通过 ServiceManager 获取服务
-      const LotteryCampaignCRUDService = req.app.locals.services.getService('lottery_campaign_crud')
-
-      // 模式A：路由层使用 TransactionManager.execute() 管理事务边界
-      const campaign = await TransactionManager.execute(
-        async transaction => {
-          return await LotteryCampaignCRUDService.updateCampaign(
-            parseInt(lottery_campaign_id),
-            updateData,
-            { transaction, operator_user_id: req.user.user_id }
-          )
-        },
-        { description: `PUT /lottery-campaigns/${lottery_campaign_id} - updateCampaign` }
-      )
-
-      return res.apiSuccess(campaign, '更新抽奖活动成功')
-    } catch (error) {
-      return handleServiceError(error, res, '更新抽奖活动')
+    // 构建更新数据（campaign_code 不可修改）
+    const updateData = {}
+    if (campaign_name !== undefined) updateData.campaign_name = campaign_name
+    if (campaign_type !== undefined) updateData.campaign_type = campaign_type
+    if (description !== undefined) updateData.description = description
+    if (start_time !== undefined) updateData.start_time = start_time
+    if (end_time !== undefined) updateData.end_time = end_time
+    if (status !== undefined) updateData.status = status
+    if (rules_text !== undefined) updateData.rules_text = rules_text
+    if (budget_mode !== undefined) updateData.budget_mode = budget_mode
+    if (max_draws_per_user_daily !== undefined) {
+      updateData.max_draws_per_user_daily = max_draws_per_user_daily
     }
-  }
+    if (max_draws_per_user_total !== undefined) {
+      updateData.max_draws_per_user_total = max_draws_per_user_total
+    }
+    if (total_prize_pool !== undefined) updateData.total_prize_pool = total_prize_pool
+    if (remaining_prize_pool !== undefined) updateData.remaining_prize_pool = remaining_prize_pool
+    if (prize_distribution_config !== undefined) {
+      updateData.prize_distribution_config = prize_distribution_config
+    }
+    // 抽奖引擎核心配置
+    if (pick_method !== undefined) updateData.pick_method = pick_method
+    if (preset_budget_policy !== undefined) updateData.preset_budget_policy = preset_budget_policy
+    if (default_quota !== undefined) updateData.default_quota = default_quota
+    if (quota_init_mode !== undefined) updateData.quota_init_mode = quota_init_mode
+    if (tier_weight_scale !== undefined) updateData.tier_weight_scale = tier_weight_scale
+    // 前端展示配置字段（多活动抽奖系统）
+    if (display_mode !== undefined) updateData.display_mode = display_mode
+    if (grid_cols !== undefined) updateData.grid_cols = grid_cols
+    if (effect_theme !== undefined) updateData.effect_theme = effect_theme
+    if (rarity_effects_enabled !== undefined) {
+      updateData.rarity_effects_enabled = rarity_effects_enabled
+    }
+    if (win_animation !== undefined) updateData.win_animation = win_animation
+    if (background_image_url !== undefined) updateData.background_image_url = background_image_url
+    /* 保底/档位配置通过 PUT /api/v4/console/lottery-campaigns/:id/strategy-config 管理 */
+
+    // 通过 ServiceManager 获取服务
+    const LotteryCampaignCRUDService = req.app.locals.services.getService('lottery_campaign_crud')
+
+    // 模式A：路由层使用 TransactionManager.execute() 管理事务边界
+    const campaign = await TransactionManager.execute(
+      async transaction => {
+        return await LotteryCampaignCRUDService.updateCampaign(
+          parseInt(lottery_campaign_id),
+          updateData,
+          { transaction, operator_user_id: req.user.user_id }
+        )
+      },
+      { description: `PUT /lottery-campaigns/${lottery_campaign_id} - updateCampaign` }
+    )
+
+    return res.apiSuccess(campaign, '更新抽奖活动成功')
+  })
 )
 
 /**
@@ -495,37 +429,33 @@ router.put(
   '/lottery-campaigns/:lottery_campaign_id/status',
   authenticateToken,
   requireRoleLevel(PERMISSION_LEVELS.OPS),
-  async (req, res) => {
-    try {
-      const { lottery_campaign_id } = req.params
-      const { status } = req.body
+  asyncHandler(async (req, res) => {
+        const { lottery_campaign_id } = req.params
+    const { status } = req.body
 
-      if (!status || !['draft', 'active', 'paused', 'ended'].includes(status)) {
-        return res.apiError('无效的状态值', 'VALIDATION_ERROR', null, 400)
-      }
-
-      // 通过 ServiceManager 获取服务
-      const LotteryCampaignCRUDService = req.app.locals.services.getService('lottery_campaign_crud')
-
-      // 模式A：路由层使用 TransactionManager.execute() 管理事务边界
-      const campaign = await TransactionManager.execute(
-        async transaction => {
-          return await LotteryCampaignCRUDService.updateCampaignStatus(
-            parseInt(lottery_campaign_id),
-            status,
-            { transaction, operator_user_id: req.user.user_id }
-          )
-        },
-        {
-          description: `PUT /lottery-campaigns/${lottery_campaign_id}/status - updateCampaignStatus`
-        }
-      )
-
-      return res.apiSuccess(campaign, '更新活动状态成功')
-    } catch (error) {
-      return handleServiceError(error, res, '更新抽奖活动状态')
+    if (!status || !['draft', 'active', 'paused', 'ended'].includes(status)) {
+      return res.apiError('无效的状态值', 'VALIDATION_ERROR', null, 400)
     }
-  }
+
+    // 通过 ServiceManager 获取服务
+    const LotteryCampaignCRUDService = req.app.locals.services.getService('lottery_campaign_crud')
+
+    // 模式A：路由层使用 TransactionManager.execute() 管理事务边界
+    const campaign = await TransactionManager.execute(
+      async transaction => {
+        return await LotteryCampaignCRUDService.updateCampaignStatus(
+          parseInt(lottery_campaign_id),
+          status,
+          { transaction, operator_user_id: req.user.user_id }
+        )
+      },
+      {
+        description: `PUT /lottery-campaigns/${lottery_campaign_id}/status - updateCampaignStatus`
+      }
+    )
+
+    return res.apiSuccess(campaign, '更新活动状态成功')
+  })
 )
 
 /**
@@ -539,36 +469,32 @@ router.delete(
   '/lottery-campaigns/:lottery_campaign_id',
   authenticateToken,
   requireRoleLevel(PERMISSION_LEVELS.OPS),
-  async (req, res) => {
-    try {
-      const { lottery_campaign_id } = req.params
+  asyncHandler(async (req, res) => {
+        const { lottery_campaign_id } = req.params
 
-      // 通过 ServiceManager 获取服务
-      const LotteryCampaignCRUDService = req.app.locals.services.getService('lottery_campaign_crud')
+    // 通过 ServiceManager 获取服务
+    const LotteryCampaignCRUDService = req.app.locals.services.getService('lottery_campaign_crud')
 
-      // 模式A：路由层使用 TransactionManager.execute() 管理事务边界
-      const result = await TransactionManager.execute(
-        async transaction => {
-          return await LotteryCampaignCRUDService.deleteCampaign(parseInt(lottery_campaign_id), {
-            transaction,
-            operator_user_id: req.user.user_id
-          })
-        },
-        { description: `DELETE /lottery-campaigns/${lottery_campaign_id} - deleteCampaign` }
-      )
+    // 模式A：路由层使用 TransactionManager.execute() 管理事务边界
+    const result = await TransactionManager.execute(
+      async transaction => {
+        return await LotteryCampaignCRUDService.deleteCampaign(parseInt(lottery_campaign_id), {
+          transaction,
+          operator_user_id: req.user.user_id
+        })
+      },
+      { description: `DELETE /lottery-campaigns/${lottery_campaign_id} - deleteCampaign` }
+    )
 
-      return res.apiSuccess(
-        {
-          lottery_campaign_id: result.lottery_campaign_id,
-          campaign_name: result.campaign_name,
-          deleted: result.deleted
-        },
-        '删除抽奖活动成功'
-      )
-    } catch (error) {
-      return handleServiceError(error, res, '删除抽奖活动')
-    }
-  }
+    return res.apiSuccess(
+      {
+        lottery_campaign_id: result.lottery_campaign_id,
+        campaign_name: result.campaign_name,
+        deleted: result.deleted
+      },
+      '删除抽奖活动成功'
+    )
+  })
 )
 
 /*
@@ -592,23 +518,19 @@ router.get(
   '/lottery-daily-quotas',
   authenticateToken,
   requireRoleLevel(PERMISSION_LEVELS.OPS),
-  async (req, res) => {
-    try {
-      const SystemDataQueryService = req.app.locals.services.getService('console_system_data_query')
+  asyncHandler(async (req, res) => {
+        const SystemDataQueryService = req.app.locals.services.getService('console_system_data_query')
 
-      const result = await SystemDataQueryService.getLotteryDailyQuotas(req.query)
+    const result = await SystemDataQueryService.getLotteryDailyQuotas(req.query)
 
-      logger.info('查询用户每日抽奖配额列表成功', {
-        admin_id: req.user.user_id,
-        total: result.pagination.total,
-        page: result.pagination.page
-      })
+    logger.info('查询用户每日抽奖配额列表成功', {
+      admin_id: req.user.user_id,
+      total: result.pagination.total,
+      page: result.pagination.page
+    })
 
-      return res.apiSuccess(result, '获取用户每日抽奖配额列表成功')
-    } catch (error) {
-      return handleServiceError(error, res, '查询用户每日抽奖配额列表')
-    }
-  }
+    return res.apiSuccess(result, '获取用户每日抽奖配额列表成功')
+  })
 )
 
 /**
@@ -620,22 +542,18 @@ router.get(
   '/lottery-daily-quotas/:quota_id',
   authenticateToken,
   requireRoleLevel(PERMISSION_LEVELS.OPS),
-  async (req, res) => {
-    try {
-      const { quota_id } = req.params
-      const SystemDataQueryService = req.app.locals.services.getService('console_system_data_query')
+  asyncHandler(async (req, res) => {
+        const { quota_id } = req.params
+    const SystemDataQueryService = req.app.locals.services.getService('console_system_data_query')
 
-      const quota = await SystemDataQueryService.getLotteryDailyQuotaById(quota_id)
+    const quota = await SystemDataQueryService.getLotteryDailyQuotaById(quota_id)
 
-      if (!quota) {
-        return res.apiError('配额记录不存在', 'NOT_FOUND', null, 404)
-      }
-
-      return res.apiSuccess(quota, '获取用户每日抽奖配额详情成功')
-    } catch (error) {
-      return handleServiceError(error, res, '获取用户每日抽奖配额详情')
+    if (!quota) {
+      return res.apiError('配额记录不存在', 'NOT_FOUND', null, 404)
     }
-  }
+
+    return res.apiSuccess(quota, '获取用户每日抽奖配额详情成功')
+  })
 )
 
 module.exports = router

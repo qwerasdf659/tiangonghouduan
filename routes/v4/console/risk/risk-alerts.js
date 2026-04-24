@@ -23,48 +23,17 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
-const logger = require('../../../../utils/logger').logger
+const { asyncHandler } = require('../../../../middleware/validation')
 const BeijingTimeHelper = require('../../../../utils/timeHelper')
 
 /**
- * 通过 ServiceManager 获取 MerchantRiskControlService
+ * 通过 ServiceManager 获取 MerchantRiskAlertService
  *
  * @param {Object} req - Express 请求对象
- * @returns {Object} MerchantRiskControlService
+ * @returns {Object} MerchantRiskAlertService
  */
-const getRiskControlService = req => {
-  return req.app.locals.services.getService('merchant_risk_control')
-}
-
-/**
- * 处理服务层错误
- *
- * @param {Error} error - 错误对象
- * @param {Object} res - Express 响应对象
- * @param {string} operation - 操作名称
- * @returns {Object} Express 响应对象
- */
-function handleServiceError(error, res, operation) {
-  logger.error(`❌ ${operation}失败`, { error: error.message, stack: error.stack })
-
-  if (error.message.includes('不存在') || error.message.includes('not found')) {
-    return res.apiError(error.message, 'NOT_FOUND', null, 404)
-  }
-
-  if (error.message.includes('已处理') || error.message.includes('状态')) {
-    return res.apiError(error.message, 'INVALID_STATUS', null, 400)
-  }
-
-  if (
-    error.message.includes('不能为空') ||
-    error.message.includes('无效') ||
-    error.message.includes('必填') ||
-    error.message.includes('缺少')
-  ) {
-    return res.apiError(error.message, 'VALIDATION_ERROR', null, 400)
-  }
-
-  return handleServiceError(error, res)
+const getRiskAlertService = req => {
+  return req.app.locals.services.getService('merchant_risk_alert')
 }
 
 /*
@@ -90,7 +59,7 @@ function handleServiceError(error, res, operation) {
  * @query {number} [page=1] - 页码
  * @query {number} [page_size=20] - 每页数量（最大100）
  */
-router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
+router.get('/', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
   const {
     alert_type,
     severity,
@@ -105,28 +74,24 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
     page_size = 20
   } = req.query
 
-  try {
-    const MerchantRiskControlService = getRiskControlService(req)
-    const result = await MerchantRiskControlService.queryRiskAlertsWithDetails(
-      {
-        alert_type,
-        severity,
-        status,
-        store_id,
-        operator_id,
-        target_user_id,
-        start_time,
-        end_time,
-        is_blocked
-      },
-      { page, page_size }
-    )
+  const MerchantRiskAlertService = getRiskAlertService(req)
+  const result = await MerchantRiskAlertService.queryRiskAlertsWithDetails(
+    {
+      alert_type,
+      severity,
+      status,
+      store_id,
+      operator_id,
+      target_user_id,
+      start_time,
+      end_time,
+      is_blocked
+    },
+    { page, page_size }
+  )
 
-    return res.apiSuccess(result, '获取风控告警列表成功')
-  } catch (error) {
-    return handleServiceError(error, res, '查询风控告警列表')
-  }
-})
+  return res.apiSuccess(result, '获取风控告警列表成功')
+}))
 
 /**
  * GET /api/v4/console/risk-alerts/pending
@@ -140,50 +105,46 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
  * @query {number} [page=1] - 页码
  * @query {number} [page_size=20] - 每页数量
  */
-router.get('/pending', authenticateToken, requireRoleLevel(100), async (req, res) => {
+router.get('/pending', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
   const { alert_type, severity, store_id, operator_id, page = 1, page_size = 20 } = req.query
 
-  try {
-    const MerchantRiskControlService = getRiskControlService(req)
-    const result = await MerchantRiskControlService.getPendingAlerts(
-      { alert_type, severity, store_id, operator_id },
-      { page, page_size }
-    )
+  const MerchantRiskAlertService = getRiskAlertService(req)
+  const result = await MerchantRiskAlertService.getPendingAlerts(
+    { alert_type, severity, store_id, operator_id },
+    { page, page_size }
+  )
 
-    // 格式化响应
-    const items = (result.items || result.alerts || []).map(alert => ({
-      risk_alert_id: alert.risk_alert_id,
-      alert_type: alert.alert_type,
-      severity: alert.severity,
-      rule_name: alert.rule_name,
-      rule_threshold: alert.rule_threshold,
-      actual_value: alert.actual_value,
-      alert_message: alert.alert_message,
-      is_blocked: alert.is_blocked,
-      operator_id: alert.operator_id,
-      store_id: alert.store_id,
-      target_user_id: alert.target_user_id,
-      created_at: alert.created_at
-        ? BeijingTimeHelper.formatForAPI(alert.created_at)
-        : alert.created_at
-    }))
+  // 格式化响应
+  const items = (result.items || result.alerts || []).map(alert => ({
+    risk_alert_id: alert.risk_alert_id,
+    alert_type: alert.alert_type,
+    severity: alert.severity,
+    rule_name: alert.rule_name,
+    rule_threshold: alert.rule_threshold,
+    actual_value: alert.actual_value,
+    alert_message: alert.alert_message,
+    is_blocked: alert.is_blocked,
+    operator_id: alert.operator_id,
+    store_id: alert.store_id,
+    target_user_id: alert.target_user_id,
+    created_at: alert.created_at
+      ? BeijingTimeHelper.formatForAPI(alert.created_at)
+      : alert.created_at
+  }))
 
-    return res.apiSuccess(
-      {
-        items,
-        pagination: {
-          page: result.page || parseInt(page, 10),
-          page_size: result.page_size || parseInt(page_size, 10),
-          total: result.total || 0,
-          total_pages: result.total_pages || 0
-        }
-      },
-      '获取待处理风控告警成功'
-    )
-  } catch (error) {
-    return handleServiceError(error, res, '查询待处理风控告警')
-  }
-})
+  return res.apiSuccess(
+    {
+      items,
+      pagination: {
+        page: result.page || parseInt(page, 10),
+        page_size: result.page_size || parseInt(page_size, 10),
+        total: result.total || 0,
+        total_pages: result.total_pages || 0
+      }
+    },
+    '获取待处理风控告警成功'
+  )
+}))
 
 /**
  * GET /api/v4/console/risk-alerts/stats/summary
@@ -193,18 +154,14 @@ router.get('/pending', authenticateToken, requireRoleLevel(100), async (req, res
  * @query {string} [start_time] - 统计开始时间
  * @query {string} [end_time] - 统计结束时间
  */
-router.get('/stats/summary', authenticateToken, requireRoleLevel(100), async (req, res) => {
+router.get('/stats/summary', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
   const { start_time, end_time } = req.query
 
-  try {
-    const MerchantRiskControlService = getRiskControlService(req)
-    const stats = await MerchantRiskControlService.getStatsSummary({ start_time, end_time })
+  const MerchantRiskAlertService = getRiskAlertService(req)
+  const stats = await MerchantRiskAlertService.getStatsSummary({ start_time, end_time })
 
-    return res.apiSuccess(stats, '获取风控告警统计成功')
-  } catch (error) {
-    return handleServiceError(error, res, '获取风控告警统计')
-  }
-})
+  return res.apiSuccess(stats, '获取风控告警统计成功')
+}))
 
 /**
  * GET /api/v4/console/risk-alerts/stats/store/:store_id
@@ -215,7 +172,7 @@ router.get('/stats/summary', authenticateToken, requireRoleLevel(100), async (re
  * @query {string} [start_time] - 统计开始时间
  * @query {string} [end_time] - 统计结束时间
  */
-router.get('/stats/store/:store_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
+router.get('/stats/store/:store_id', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
   const { store_id } = req.params
   const { start_time, end_time } = req.query
 
@@ -223,31 +180,23 @@ router.get('/stats/store/:store_id', authenticateToken, requireRoleLevel(100), a
     return res.apiError('无效的门店ID', 'INVALID_STORE_ID', null, 400)
   }
 
-  try {
-    const MerchantRiskControlService = getRiskControlService(req)
-    const stats = await MerchantRiskControlService.getStoreStats(store_id, { start_time, end_time })
+  const MerchantRiskAlertService = getRiskAlertService(req)
+  const stats = await MerchantRiskAlertService.getStoreStats(store_id, { start_time, end_time })
 
-    return res.apiSuccess(stats, '获取门店风控统计成功')
-  } catch (error) {
-    return handleServiceError(error, res, '获取门店风控统计')
-  }
-})
+  return res.apiSuccess(stats, '获取门店风控统计成功')
+}))
 
 /**
  * GET /api/v4/console/risk-alerts/types
  * @desc 获取所有告警类型列表
  * @access Admin only (role_level >= 100)
  */
-router.get('/types', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const MerchantRiskControlService = getRiskControlService(req)
-    const types = await MerchantRiskControlService.getAlertTypesList()
+router.get('/types', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  const MerchantRiskAlertService = getRiskAlertService(req)
+  const types = await MerchantRiskAlertService.getAlertTypesList()
 
-    return res.apiSuccess(types, '获取告警类型列表成功')
-  } catch (error) {
-    return handleServiceError(error, res, '获取告警类型列表')
-  }
-})
+  return res.apiSuccess(types, '获取告警类型列表成功')
+}))
 
 /**
  * POST /api/v4/console/risk-alerts/mark-all-read
@@ -259,22 +208,18 @@ router.get('/types', authenticateToken, requireRoleLevel(100), async (req, res) 
  *
  * @since 2026
  */
-router.post('/mark-all-read', authenticateToken, requireRoleLevel(100), async (req, res) => {
+router.post('/mark-all-read', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
   const reviewed_by = req.user.user_id
   const { alert_type, severity } = req.body
 
-  try {
-    const MerchantRiskControlService = getRiskControlService(req)
-    const result = await MerchantRiskControlService.markAllAsRead(reviewed_by, {
-      alert_type,
-      severity
-    })
+  const MerchantRiskAlertService = getRiskAlertService(req)
+  const result = await MerchantRiskAlertService.markAllAsRead(reviewed_by, {
+    alert_type,
+    severity
+  })
 
-    return res.apiSuccess(result, result.message)
-  } catch (error) {
-    return handleServiceError(error, res, '批量标记告警已读')
-  }
-})
+  return res.apiSuccess(result, result.message)
+}))
 
 /**
  * GET /api/v4/console/risk-alerts/:alert_id
@@ -283,26 +228,22 @@ router.post('/mark-all-read', authenticateToken, requireRoleLevel(100), async (r
  *
  * @param {number} alert_id - 告警ID
  */
-router.get('/:alert_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
+router.get('/:alert_id', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
   const { alert_id } = req.params
 
   if (!alert_id || isNaN(parseInt(alert_id, 10))) {
     return res.apiError('无效的告警ID', 'INVALID_ALERT_ID', null, 400)
   }
 
-  try {
-    const MerchantRiskControlService = getRiskControlService(req)
-    const alertDetail = await MerchantRiskControlService.getAlertDetail(parseInt(alert_id, 10))
+  const MerchantRiskAlertService = getRiskAlertService(req)
+  const alertDetail = await MerchantRiskAlertService.getAlertDetail(parseInt(alert_id, 10))
 
-    if (!alertDetail) {
-      return res.apiError('告警记录不存在', 'ALERT_NOT_FOUND', null, 404)
-    }
-
-    return res.apiSuccess(alertDetail, '获取风控告警详情成功')
-  } catch (error) {
-    return handleServiceError(error, res, '获取风控告警详情')
+  if (!alertDetail) {
+    return res.apiError('告警记录不存在', 'ALERT_NOT_FOUND', null, 404)
   }
-})
+
+  return res.apiSuccess(alertDetail, '获取风控告警详情成功')
+}))
 
 /**
  * POST /api/v4/console/risk-alerts/:alert_id/review
@@ -313,7 +254,7 @@ router.get('/:alert_id', authenticateToken, requireRoleLevel(100), async (req, r
  * @body {string} status - 新状态（reviewed/ignored）
  * @body {string} [review_notes] - 复核备注
  */
-router.post('/:alert_id/review', authenticateToken, requireRoleLevel(100), async (req, res) => {
+router.post('/:alert_id/review', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
   const { alert_id } = req.params
   const { status, review_notes } = req.body
   const reviewed_by = req.user.user_id
@@ -326,18 +267,14 @@ router.post('/:alert_id/review', authenticateToken, requireRoleLevel(100), async
     return res.apiError('状态必须为 reviewed 或 ignored', 'INVALID_STATUS', null, 400)
   }
 
-  try {
-    const MerchantRiskControlService = getRiskControlService(req)
-    const result = await MerchantRiskControlService.reviewAlert(parseInt(alert_id, 10), {
-      reviewed_by,
-      status,
-      review_notes
-    })
+  const MerchantRiskAlertService = getRiskAlertService(req)
+  const result = await MerchantRiskAlertService.reviewAlert(parseInt(alert_id, 10), {
+    reviewed_by,
+    status,
+    review_notes
+  })
 
-    return res.apiSuccess(result, `告警已${status === 'reviewed' ? '复核' : '忽略'}`)
-  } catch (error) {
-    return handleServiceError(error, res, '复核风控告警')
-  }
-})
+  return res.apiSuccess(result, `告警已${status === 'reviewed' ? '复核' : '忽略'}`)
+}))
 
 module.exports = router

@@ -25,6 +25,7 @@
 
 'use strict'
 
+const BusinessError = require('../../utils/BusinessError')
 const { Op } = require('sequelize')
 const logger = require('../../utils/logger')
 const { requireTransaction } = require('../../utils/transactionHelpers')
@@ -86,11 +87,11 @@ class ItemService {
 
     requireTransaction(transaction, 'ItemService.mintItem')
 
-    if (!user_id) throw new Error('user_id 是必填参数')
-    if (!item_type) throw new Error('item_type 是必填参数')
-    if (!item_name) throw new Error('item_name 是必填参数')
-    if (!source) throw new Error('source 是必填参数')
-    if (!idempotency_key) throw new Error('idempotency_key 是必填参数（幂等性控制）')
+    if (!user_id) throw new BusinessError('user_id 是必填参数', 'ASSET_REQUIRED', 400)
+    if (!item_type) throw new BusinessError('item_type 是必填参数', 'ASSET_REQUIRED', 400)
+    if (!item_name) throw new BusinessError('item_name 是必填参数', 'ASSET_REQUIRED', 400)
+    if (!source) throw new BusinessError('source 是必填参数', 'ASSET_REQUIRED', 400)
+    if (!idempotency_key) throw new BusinessError('idempotency_key 是必填参数（幂等性控制）', 'ASSET_REQUIRED', 400)
 
     try {
       // 幂等性检查：查找已有的铸造账本条目
@@ -223,9 +224,9 @@ class ItemService {
 
     requireTransaction(transaction, 'ItemService.holdItem')
 
-    if (!item_id) throw new Error('item_id 是必填参数')
-    if (!hold_type) throw new Error('hold_type 是必填参数')
-    if (!holder_ref) throw new Error('holder_ref 是必填参数')
+    if (!item_id) throw new BusinessError('item_id 是必填参数', 'ASSET_REQUIRED', 400)
+    if (!hold_type) throw new BusinessError('hold_type 是必填参数', 'ASSET_REQUIRED', 400)
+    if (!holder_ref) throw new BusinessError('holder_ref 是必填参数', 'ASSET_REQUIRED', 400)
 
     try {
       // 悲观锁获取物品
@@ -234,8 +235,8 @@ class ItemService {
         transaction
       })
 
-      if (!item) throw new Error(`物品不存在：item_id=${item_id}`)
-      if (item.isTerminal()) throw new Error(`物品已终态(${item.status})，不可锁定`)
+      if (!item) throw new BusinessError(`物品不存在：item_id=${item_id}`, 'ASSET_NOT_FOUND', 404)
+      if (item.isTerminal()) throw new BusinessError(`物品已终态(${item.status})，不可锁定`, 'ASSET_NOT_ALLOWED', 400)
 
       // 检查是否已有活跃锁
       const activeHold = await ItemHold.findOne({
@@ -248,8 +249,10 @@ class ItemService {
       if (activeHold) {
         const { canOverride, reason: overrideReason } = activeHold.canBeOverriddenBy(hold_type)
         if (!canOverride) {
-          throw new Error(
-            `物品已被 ${activeHold.hold_type} 锁定（ref: ${activeHold.holder_ref}），${overrideReason}`
+          throw new BusinessError(
+            `物品已被 ${activeHold.hold_type} 锁定（ref: ${activeHold.holder_ref}），${overrideReason}`,
+            'ASSET_ERROR',
+            400
           )
         }
         // 高优先级覆盖：标记旧锁为 overridden
@@ -416,9 +419,9 @@ class ItemService {
 
     requireTransaction(transaction, 'ItemService.transferItem')
 
-    if (!item_id) throw new Error('item_id 是必填参数')
-    if (!new_owner_user_id) throw new Error('new_owner_user_id 是必填参数')
-    if (!idempotency_key) throw new Error('idempotency_key 是必填参数')
+    if (!item_id) throw new BusinessError('item_id 是必填参数', 'ASSET_REQUIRED', 400)
+    if (!new_owner_user_id) throw new BusinessError('new_owner_user_id 是必填参数', 'ASSET_REQUIRED', 400)
+    if (!idempotency_key) throw new BusinessError('idempotency_key 是必填参数', 'ASSET_REQUIRED', 400)
 
     try {
       // 幂等性检查
@@ -437,9 +440,9 @@ class ItemService {
         transaction
       })
 
-      if (!item) throw new Error(`物品不存在：item_id=${item_id}`)
+      if (!item) throw new BusinessError(`物品不存在：item_id=${item_id}`, 'ASSET_NOT_FOUND', 404)
       if (!['available', 'held'].includes(item.status)) {
-        throw new Error(`物品状态不可转移：${item.status}`)
+        throw new BusinessError(`物品状态不可转移：${item.status}`, 'ASSET_ERROR', 400)
       }
 
       // 获取卖方和买方账户
@@ -533,8 +536,8 @@ class ItemService {
 
     requireTransaction(transaction, 'ItemService.consumeItem')
 
-    if (!item_id) throw new Error('item_id 是必填参数')
-    if (!idempotency_key) throw new Error('idempotency_key 是必填参数')
+    if (!item_id) throw new BusinessError('item_id 是必填参数', 'ASSET_REQUIRED', 400)
+    if (!idempotency_key) throw new BusinessError('idempotency_key 是必填参数', 'ASSET_REQUIRED', 400)
 
     try {
       // 幂等性检查
@@ -553,9 +556,9 @@ class ItemService {
         transaction
       })
 
-      if (!item) throw new Error(`物品不存在：item_id=${item_id}`)
+      if (!item) throw new BusinessError(`物品不存在：item_id=${item_id}`, 'ASSET_NOT_FOUND', 404)
       if (!['available', 'held'].includes(item.status)) {
-        throw new Error(`物品状态不可消耗：${item.status}`)
+        throw new BusinessError(`物品状态不可消耗：${item.status}`, 'ASSET_ERROR', 400)
       }
 
       // 获取持有者账户和系统销毁账户
@@ -638,7 +641,7 @@ class ItemService {
       lock: transaction.LOCK.UPDATE,
       transaction
     })
-    if (!item) throw new Error(`物品不存在：item_id=${item_id}`)
+    if (!item) throw new BusinessError(`物品不存在：item_id=${item_id}`, 'ASSET_NOT_FOUND', 404)
 
     const ownerAccount = await this._getAccountById(item.owner_account_id, { transaction })
     const burnAccount = await Account.getSystemAccount('SYSTEM_BURN', { transaction })
@@ -777,7 +780,7 @@ class ItemService {
     const where = {}
     if (item_id) where.item_id = item_id
     else if (tracking_code) where.tracking_code = tracking_code
-    else throw new Error('item_id 或 tracking_code 必须提供其中之一')
+    else throw new BusinessError('item_id 或 tracking_code 必须提供其中之一', 'ASSET_REQUIRED', 400)
 
     const item = await Item.findOne({ where, transaction })
     if (!item) return null
@@ -828,7 +831,7 @@ class ItemService {
    */
   static async _getAccountById(accountId, options = {}) {
     const account = await Account.findByPk(accountId, options)
-    if (!account) throw new Error(`账户不存在：account_id=${accountId}`)
+    if (!account) throw new BusinessError(`账户不存在：account_id=${accountId}`, 'ASSET_NOT_FOUND', 404)
     return account
   }
 }

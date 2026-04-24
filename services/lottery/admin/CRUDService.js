@@ -30,6 +30,7 @@ const {
   LotteryStrategyConfig,
   LotteryDrawQuotaRule
 } = require('../../../models')
+const BusinessError = require('../../../utils/BusinessError')
 const logger = require('../../../utils/logger').logger
 const { assertAndGetTransaction } = require('../../../utils/transactionHelpers')
 const { BusinessCacheHelper } = require('../../../utils/BusinessCacheHelper')
@@ -89,7 +90,7 @@ class LotteryCampaignCRUDService {
     const { operator_user_id } = options
 
     if (!operator_user_id) {
-      throw new Error('operator_user_id 是必填参数')
+      throw new BusinessError('operator_user_id 是必填参数', 'LOTTERY_REQUIRED', 400)
     }
 
     // 验证必填字段（campaign_code 由后端自动生成，前端不传）
@@ -459,7 +460,7 @@ class LotteryCampaignCRUDService {
     const { operator_user_id } = options
 
     if (!operator_user_id) {
-      throw new Error('operator_user_id 是必填参数')
+      throw new BusinessError('operator_user_id 是必填参数', 'LOTTERY_REQUIRED', 400)
     }
 
     logger.info('开始更新抽奖活动', {
@@ -591,7 +592,7 @@ class LotteryCampaignCRUDService {
     const { operator_user_id } = options
 
     if (!operator_user_id) {
-      throw new Error('operator_user_id 是必填参数')
+      throw new BusinessError('operator_user_id 是必填参数', 'LOTTERY_REQUIRED', 400)
     }
 
     // 验证状态值（与数据库 ENUM 对齐：draft/active/paused/ended/cancelled）
@@ -752,7 +753,7 @@ class LotteryCampaignCRUDService {
     const { operator_user_id } = options
 
     if (!operator_user_id) {
-      throw new Error('operator_user_id 是必填参数')
+      throw new BusinessError('operator_user_id 是必填参数', 'LOTTERY_REQUIRED', 400)
     }
 
     logger.info('开始删除抽奖活动', { lottery_campaign_id, operator_user_id })

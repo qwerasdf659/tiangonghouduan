@@ -13,6 +13,7 @@
  *
  * @module services/consumption/QueryService
  */
+const BusinessError = require('../../utils/BusinessError')
 const logger = require('../../utils/logger').logger
 const { attachDisplayNames } = require('../../utils/displayNameHelper')
 const { ConsumptionRecord, User } = require('../../models')
@@ -362,7 +363,7 @@ class QueryService {
       }
     } catch (error) {
       logger.error('❌ 管理员查询消费记录失败:', error.message)
-      throw new Error('查询消费记录失败：' + error.message)
+      throw new BusinessError(`查询消费记录失败：${error.message}`, 'CONSUMPTION_QUERY_FAILED', 500)
     }
   }
 
@@ -454,11 +455,11 @@ class QueryService {
       const record = await ConsumptionRecord.findByPk(recordId, { include })
 
       if (!record) {
-        throw new Error(`消费记录不存在（ID: ${recordId}）`)
+        throw new BusinessError(`消费记录不存在（ID: ${recordId}）`, 'CONSUMPTION_NOT_FOUND', 404)
       }
 
       if (record.is_deleted === 1) {
-        throw new Error(`消费记录不存在或已被删除（ID: ${recordId}）`)
+        throw new BusinessError(`消费记录不存在或已被删除（ID: ${recordId}）`, 'CONSUMPTION_NOT_FOUND', 404)
       }
 
       const formattedRecord = record.toAPIResponse()

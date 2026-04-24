@@ -21,7 +21,7 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireMerchantPermission } = require('../../../../middleware/auth')
-const { handleServiceError } = require('../../../../middleware/validation')
+const { asyncHandler } = require('../../../../middleware/validation')
 const logger = require('../../../../utils/logger').logger
 const BeijingTimeHelper = require('../../../../utils/timeHelper')
 
@@ -52,86 +52,74 @@ router.get(
   '/logs',
   authenticateToken,
   requireMerchantPermission('staff:read', { scope: 'store', storeIdParam: 'query' }),
-  async (req, res) => {
-    try {
-      const {
-        store_id,
-        operator_id,
-        operation_type,
-        result,
-        start_date,
-        end_date,
-        page = 1,
-        page_size = 20
-      } = req.query
+  asyncHandler(async (req, res) => {
+    const {
+      store_id,
+      operator_id,
+      operation_type,
+      result,
+      start_date,
+      end_date,
+      page = 1,
+      page_size = 20
+    } = req.query
 
-      const user_stores = req.user_stores || []
+    const user_stores = req.user_stores || []
 
-      // 确定查询的门店范围
-      let resolved_store_id = req.verified_store_id || (store_id ? parseInt(store_id, 10) : null)
+    let resolved_store_id = req.verified_store_id || (store_id ? parseInt(store_id, 10) : null)
 
-      // 非管理员限制只能查看所属门店
-      if (req.user.role_level < 100 && !resolved_store_id) {
-        if (user_stores.length === 0) {
-          return res.apiError('您未绑定任何门店', 'NO_STORE_BINDING', null, 403)
-        } else if (user_stores.length === 1) {
-          resolved_store_id = user_stores[0].store_id
-        } else {
-          return res.apiError(
-            '您绑定了多个门店，请明确指定 store_id 参数',
-            'MULTIPLE_STORES_REQUIRE_STORE_ID',
-            {
-              available_stores: user_stores.map(s => ({
-                store_id: s.store_id,
-                store_name: s.store_name
-              }))
-            },
-            400
-          )
-        }
+    if (req.user.role_level < 100 && !resolved_store_id) {
+      if (user_stores.length === 0) {
+        return res.apiError('您未绑定任何门店', 'NO_STORE_BINDING', null, 403)
+      } else if (user_stores.length === 1) {
+        resolved_store_id = user_stores[0].store_id
+      } else {
+        return res.apiError(
+          '您绑定了多个门店，请明确指定 store_id 参数',
+          'MULTIPLE_STORES_REQUIRE_STORE_ID',
+          {
+            available_stores: user_stores.map(s => ({
+              store_id: s.store_id,
+              store_name: s.store_name
+            }))
+          },
+          400
+        )
       }
-
-      // 通过 ServiceManager 获取服务（路由层合规性治理 2026-01-18）
-      const MerchantOperationLogService =
-        req.app.locals.services.getService('merchant_operation_log')
-
-      // 构建服务层筛选条件
-      const filters = {
-        page: parseInt(page, 10),
-        page_size: parseInt(page_size, 10)
-      }
-      if (resolved_store_id) filters.store_id = resolved_store_id
-      if (operator_id) filters.operator_id = parseInt(operator_id, 10)
-      if (operation_type) filters.operation_type = operation_type
-      if (result) filters.result = result
-
-      // 日期范围转换为服务层期望的格式
-      if (start_date) {
-        const startDateTime = BeijingTimeHelper.parseFromDateString(start_date)
-        filters.start_time = BeijingTimeHelper.formatForAPI(startDateTime)?.iso
-      }
-      if (end_date) {
-        const endDateTime = BeijingTimeHelper.parseFromDateString(end_date)
-        endDateTime.setHours(23, 59, 59, 999)
-        filters.end_time = BeijingTimeHelper.formatForAPI(endDateTime)?.iso
-      }
-
-      // 调用服务层查询
-      const result_data = await MerchantOperationLogService.queryLogs(filters)
-
-      // 2026-01-26 技术债务清理：移除响应字段别名，前端已更新使用 operator_info/store_info/target_user_info
-      return res.apiSuccess(
-        {
-          logs: result_data.items,
-          pagination: result_data.pagination
-        },
-        '商家操作日志获取成功'
-      )
-    } catch (error) {
-      logger.error('获取商家操作日志失败', { error: error.message })
-      return handleServiceError(error, res, '获取商家操作日志失败')
     }
-  }
+
+    const MerchantOperationLogService =
+      req.app.locals.services.getService('merchant_operation_log')
+
+    const filters = {
+      page: parseInt(page, 10),
+      page_size: parseInt(page_size, 10)
+    }
+    if (resolved_store_id) filters.store_id = resolved_store_id
+    if (operator_id) filters.operator_id = parseInt(operator_id, 10)
+    if (operation_type) filters.operation_type = operation_type
+    if (result) filters.result = result
+
+    if (start_date) {
+      const startDateTime = BeijingTimeHelper.parseFromDateString(start_date)
+      filters.start_time = BeijingTimeHelper.formatForAPI(startDateTime)?.iso
+    }
+    if (end_date) {
+      const endDateTime = BeijingTimeHelper.parseFromDateString(end_date)
+      endDateTime.setHours(23, 59, 59, 999)
+      filters.end_time = BeijingTimeHelper.formatForAPI(endDateTime)?.iso
+    }
+
+    const result_data = await MerchantOperationLogService.queryLogs(filters)
+
+    return res.apiSuccess(
+      {
+        logs: result_data.items,
+        pagination: result_data.pagination
+      },
+      '商家操作日志获取成功'
+    )
+  })
 )
 
 /**
@@ -143,40 +131,32 @@ router.get(
   '/logs/:log_id',
   authenticateToken,
   requireMerchantPermission('staff:read', { scope: 'global' }),
-  async (req, res) => {
-    try {
-      const { log_id } = req.params
-      const logId = parseInt(log_id, 10)
+  asyncHandler(async (req, res) => {
+    const { log_id } = req.params
+    const logId = parseInt(log_id, 10)
 
-      if (isNaN(logId) || logId <= 0) {
-        return res.apiError('无效的日志ID', 'BAD_REQUEST', null, 400)
-      }
-
-      // 通过 ServiceManager 获取服务（路由层合规性治理 2026-01-18）
-      const MerchantOperationLogService =
-        req.app.locals.services.getService('merchant_operation_log')
-      const log = await MerchantOperationLogService.getLogDetail(logId)
-
-      if (!log) {
-        return res.apiError('日志不存在', 'NOT_FOUND', null, 404)
-      }
-
-      // 非管理员只能查看所属门店的日志
-      const user_stores = req.user_stores || []
-      if (req.user.role_level < 100 && log.store_id) {
-        const hasAccess = user_stores.some(s => s.store_id === log.store_id)
-        if (!hasAccess) {
-          return res.apiError('无权查看此日志', 'FORBIDDEN', null, 403)
-        }
-      }
-
-      // 2026-01-26 技术债务清理：移除响应字段别名，直接返回服务层数据
-      return res.apiSuccess(log, '日志详情获取成功')
-    } catch (error) {
-      logger.error('获取日志详情失败', { error: error.message })
-      return handleServiceError(error, res, '获取日志详情失败')
+    if (isNaN(logId) || logId <= 0) {
+      return res.apiError('无效的日志ID', 'BAD_REQUEST', null, 400)
     }
-  }
+
+    const MerchantOperationLogService =
+      req.app.locals.services.getService('merchant_operation_log')
+    const log = await MerchantOperationLogService.getLogDetail(logId)
+
+    if (!log) {
+      return res.apiError('日志不存在', 'NOT_FOUND', null, 404)
+    }
+
+    const user_stores = req.user_stores || []
+    if (req.user.role_level < 100 && log.store_id) {
+      const hasAccess = user_stores.some(s => s.store_id === log.store_id)
+      if (!hasAccess) {
+        return res.apiError('无权查看此日志', 'FORBIDDEN', null, 403)
+      }
+    }
+
+    return res.apiSuccess(log, '日志详情获取成功')
+  })
 )
 
 /**
@@ -204,163 +184,137 @@ router.get(
   '/export',
   authenticateToken,
   requireMerchantPermission('staff:read', { scope: 'store', storeIdParam: 'query' }),
-  async (req, res) => {
-    try {
-      const {
-        store_id,
-        start_date,
-        end_date,
-        operation_type,
-        result,
-        page_size = 10000
-      } = req.query
+  asyncHandler(async (req, res) => {
+    const {
+      store_id,
+      start_date,
+      end_date,
+      operation_type,
+      result,
+      page_size = 10000
+    } = req.query
 
-      const user_stores = req.user_stores || []
+    const user_stores = req.user_stores || []
 
-      // 1. 验证日期参数
-      if (!start_date || !end_date) {
-        return res.apiError('导出需要指定开始日期和结束日期', 'MISSING_DATE_RANGE', null, 400)
-      }
+    if (!start_date || !end_date) {
+      return res.apiError('导出需要指定开始日期和结束日期', 'MISSING_DATE_RANGE', null, 400)
+    }
 
-      // 验证日期格式
-      const dateRegex = /^\d{4}-\d{2}-\d{2}$/
-      if (!dateRegex.test(start_date) || !dateRegex.test(end_date)) {
-        return res.apiError('日期格式不正确，应为 YYYY-MM-DD', 'INVALID_DATE_FORMAT', null, 400)
-      }
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/
+    if (!dateRegex.test(start_date) || !dateRegex.test(end_date)) {
+      return res.apiError('日期格式不正确，应为 YYYY-MM-DD', 'INVALID_DATE_FORMAT', null, 400)
+    }
 
-      // 验证日期范围（最多导出 90 天数据）
-      const startDateTime = BeijingTimeHelper.parseFromDateString(start_date)
-      const endDateTime = BeijingTimeHelper.parseFromDateString(end_date)
-      endDateTime.setHours(23, 59, 59, 999)
+    const startDateTime = BeijingTimeHelper.parseFromDateString(start_date)
+    const endDateTime = BeijingTimeHelper.parseFromDateString(end_date)
+    endDateTime.setHours(23, 59, 59, 999)
 
-      const daysDiff = Math.ceil((endDateTime - startDateTime) / (1000 * 60 * 60 * 24))
-      if (daysDiff > 90) {
+    const daysDiff = Math.ceil((endDateTime - startDateTime) / (1000 * 60 * 60 * 24))
+    if (daysDiff > 90) {
+      return res.apiError(
+        '单次导出最多支持 90 天数据',
+        'DATE_RANGE_TOO_LARGE',
+        { max_days: 90 },
+        400
+      )
+    }
+
+    if (daysDiff < 0) {
+      return res.apiError('结束日期不能早于开始日期', 'INVALID_DATE_RANGE', null, 400)
+    }
+
+    let resolved_store_id = req.verified_store_id || (store_id ? parseInt(store_id, 10) : null)
+
+    if (req.user.role_level < 100 && !resolved_store_id) {
+      if (user_stores.length === 0) {
+        return res.apiError('您未绑定任何门店', 'NO_STORE_BINDING', null, 403)
+      } else if (user_stores.length === 1) {
+        resolved_store_id = user_stores[0].store_id
+      } else {
         return res.apiError(
-          '单次导出最多支持 90 天数据',
-          'DATE_RANGE_TOO_LARGE',
-          { max_days: 90 },
+          '您绑定了多个门店，请明确指定 store_id 参数',
+          'MULTIPLE_STORES_REQUIRE_STORE_ID',
+          null,
           400
         )
       }
-
-      if (daysDiff < 0) {
-        return res.apiError('结束日期不能早于开始日期', 'INVALID_DATE_RANGE', null, 400)
-      }
-
-      // 2. 确定门店范围
-      let resolved_store_id = req.verified_store_id || (store_id ? parseInt(store_id, 10) : null)
-
-      if (req.user.role_level < 100 && !resolved_store_id) {
-        if (user_stores.length === 0) {
-          return res.apiError('您未绑定任何门店', 'NO_STORE_BINDING', null, 403)
-        } else if (user_stores.length === 1) {
-          resolved_store_id = user_stores[0].store_id
-        } else {
-          return res.apiError(
-            '您绑定了多个门店，请明确指定 store_id 参数',
-            'MULTIPLE_STORES_REQUIRE_STORE_ID',
-            null,
-            400
-          )
-        }
-      }
-
-      // 3. 通过 ServiceManager 获取服务（路由层合规性治理 2026-01-18）
-      const MerchantOperationLogService =
-        req.app.locals.services.getService('merchant_operation_log')
-
-      // 4. 限制导出条数
-      const exportLimit = Math.min(Math.max(parseInt(page_size) || 10000, 100), 50000)
-
-      logger.info('开始导出商家审计日志', {
-        user_id: req.user.user_id,
-        store_id: resolved_store_id,
-        start_date,
-        end_date,
-        export_limit: exportLimit
-      })
-
-      // 5. 通过服务层获取数据
-      const logs = await MerchantOperationLogService.exportLogs({
-        store_id: resolved_store_id,
-        start_time: startDateTime,
-        end_time: endDateTime,
-        operation_type,
-        result,
-        limit: exportLimit
-      })
-
-      // 6. 设置响应头（CSV流式输出）
-      const filename = `audit_logs_${resolved_store_id || 'all'}_${start_date}_${end_date}.csv`
-      res.setHeader('Content-Type', 'text/csv; charset=utf-8')
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
-      res.setHeader('Cache-Control', 'no-cache')
-
-      // 7. 写入 BOM（确保 Excel 正确识别 UTF-8）
-      res.write('\uFEFF')
-
-      // 8. 写入 CSV 表头
-      const headers = [
-        '时间',
-        '操作员ID',
-        '操作员名称',
-        '门店ID',
-        '门店名称',
-        '操作类型',
-        '操作动作',
-        '操作结果',
-        '目标用户ID',
-        '消费金额',
-        'IP地址',
-        '请求ID',
-        '错误信息'
-      ]
-      res.write(headers.join(',') + '\n')
-
-      // 9. 逐行写入数据（流式输出）
-      for (const log of logs) {
-        const row = [
-          escapeCSV(BeijingTimeHelper.formatForAPI(log.created_at)?.iso || ''),
-          log.operator_id || '',
-          escapeCSV(log.operator?.nickname || ''),
-          log.store_id || '',
-          escapeCSV(log.store?.store_name || ''),
-          escapeCSV(log.operation_type || ''),
-          escapeCSV(log.action || ''),
-          log.result || '',
-          log.target_user_id || '',
-          log.consumption_amount || '',
-          escapeCSV(log.ip_address || ''),
-          escapeCSV(log.request_id || ''),
-          escapeCSV(log.error_message || '')
-        ]
-        res.write(row.join(',') + '\n')
-      }
-
-      // 10. 结束响应
-      res.end()
-
-      logger.info('商家审计日志导出完成', {
-        user_id: req.user.user_id,
-        store_id: resolved_store_id,
-        exported_count: logs.length
-      })
-    } catch (error) {
-      logger.error('导出商家审计日志失败', { error: error.message })
-
-      // 如果响应头还没发送，返回 JSON 错误
-      if (!res.headersSent) {
-        handleServiceError(error, res, '导出审计日志失败')
-        return undefined
-      }
-
-      // 如果已经开始流式输出，只能结束响应
-      res.end('\n--- 导出过程中发生错误 ---\n')
-      return undefined
     }
 
+    const MerchantOperationLogService =
+      req.app.locals.services.getService('merchant_operation_log')
+
+    const exportLimit = Math.min(Math.max(parseInt(page_size) || 10000, 100), 50000)
+
+    logger.info('开始导出商家审计日志', {
+      user_id: req.user.user_id,
+      store_id: resolved_store_id,
+      start_date,
+      end_date,
+      export_limit: exportLimit
+    })
+
+    const logs = await MerchantOperationLogService.exportLogs({
+      store_id: resolved_store_id,
+      start_time: startDateTime,
+      end_time: endDateTime,
+      operation_type,
+      result,
+      limit: exportLimit
+    })
+
+    const filename = `audit_logs_${resolved_store_id || 'all'}_${start_date}_${end_date}.csv`
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+    res.setHeader('Cache-Control', 'no-cache')
+
+    res.write('\uFEFF')
+
+    const headers = [
+      '时间',
+      '操作员ID',
+      '操作员名称',
+      '门店ID',
+      '门店名称',
+      '操作类型',
+      '操作动作',
+      '操作结果',
+      '目标用户ID',
+      '消费金额',
+      'IP地址',
+      '请求ID',
+      '错误信息'
+    ]
+    res.write(headers.join(',') + '\n')
+
+    for (const log of logs) {
+      const row = [
+        escapeCSV(BeijingTimeHelper.formatForAPI(log.created_at)?.iso || ''),
+        log.operator_id || '',
+        escapeCSV(log.operator?.nickname || ''),
+        log.store_id || '',
+        escapeCSV(log.store?.store_name || ''),
+        escapeCSV(log.operation_type || ''),
+        escapeCSV(log.action || ''),
+        log.result || '',
+        log.target_user_id || '',
+        log.consumption_amount || '',
+        escapeCSV(log.ip_address || ''),
+        escapeCSV(log.request_id || ''),
+        escapeCSV(log.error_message || '')
+      ]
+      res.write(row.join(',') + '\n')
+    }
+
+    res.end()
+
+    logger.info('商家审计日志导出完成', {
+      user_id: req.user.user_id,
+      store_id: resolved_store_id,
+      exported_count: logs.length
+    })
+
     return undefined
-  }
+  })
 )
 
 /**

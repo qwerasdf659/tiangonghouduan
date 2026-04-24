@@ -12,6 +12,7 @@
  *
  */
 
+const BusinessError = require('../utils/BusinessError')
 const logger = require('../utils/logger').logger
 const { AdSlot } = require('../models')
 const { attachDisplayNames, DICT_TYPES } = require('../utils/displayNameHelper')
@@ -202,7 +203,7 @@ class AdSlotService {
       })
 
       if (existing) {
-        throw new Error(`广告位标识 ${data.slot_key} 已存在`)
+        throw new BusinessError(`广告位标识 ${data.slot_key} 已存在`, 'SERVICE_ALREADY_EXISTS', 409)
       }
 
       // 创建广告位
@@ -247,7 +248,7 @@ class AdSlotService {
       })
 
       if (!slot) {
-        throw new Error(`广告位不存在: ${slotId}`)
+        throw new BusinessError(`广告位不存在: ${slotId}`, 'SERVICE_NOT_FOUND', 404)
       }
 
       // 如果更新slot_key，检查是否重复
@@ -258,7 +259,7 @@ class AdSlotService {
         })
 
         if (existing) {
-          throw new Error(`广告位标识 ${data.slot_key} 已存在`)
+          throw new BusinessError(`广告位标识 ${data.slot_key} 已存在`, 'SERVICE_ALREADY_EXISTS', 409)
         }
       }
 
@@ -289,7 +290,7 @@ class AdSlotService {
       })
 
       if (!slot) {
-        throw new Error(`广告位不存在: ${slotId}`)
+        throw new BusinessError(`广告位不存在: ${slotId}`, 'SERVICE_NOT_FOUND', 404)
       }
 
       // 切换状态

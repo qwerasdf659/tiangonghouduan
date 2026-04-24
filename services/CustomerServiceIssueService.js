@@ -14,6 +14,7 @@
  * @date 2026-02-22
  */
 
+const BusinessError = require('../utils/BusinessError')
 const logger = require('../utils/logger').logger
 
 /**
@@ -53,7 +54,7 @@ class CustomerServiceIssueService {
     /* 验证用户存在 */
     const user = await models.User.findByPk(user_id, { transaction: options.transaction })
     if (!user) {
-      throw new Error(`用户 ${user_id} 不存在`)
+      throw new BusinessError(`用户 ${user_id} 不存在`, 'SERVICE_NOT_FOUND', 404)
     }
 
     const issue = await models.CustomerServiceIssue.create(
@@ -164,7 +165,7 @@ class CustomerServiceIssueService {
     })
 
     if (!issue) {
-      throw new Error(`工单 ${issueId} 不存在`)
+      throw new BusinessError(`工单 ${issueId} 不存在`, 'SERVICE_NOT_FOUND', 404)
     }
 
     /* 查询关联此工单的所有会话 */
@@ -206,7 +207,7 @@ class CustomerServiceIssueService {
     })
 
     if (!issue) {
-      throw new Error(`工单 ${issueId} 不存在`)
+      throw new BusinessError(`工单 ${issueId} 不存在`, 'SERVICE_NOT_FOUND', 404)
     }
 
     const updateData = {}

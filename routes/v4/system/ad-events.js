@@ -17,8 +17,8 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken } = require('../../../middleware/auth')
-const logger = require('../../../utils/logger').logger
 const { asyncHandler } = require('../../../middleware/validation')
+const logger = require('../../../utils/logger').logger
 
 /**
  * 统一内容交互日志上报（支持 impression/click/close/swipe 等交互类型）
@@ -33,46 +33,37 @@ router.post(
   '/interaction-log',
   authenticateToken,
   asyncHandler(async (req, res) => {
-    try {
-      const { ad_campaign_id, interaction_type, extra_data } = req.body
+    const { ad_campaign_id, interaction_type, extra_data } = req.body
 
-      if (!ad_campaign_id || !interaction_type) {
-        return res.apiBadRequest('缺少必需参数：ad_campaign_id, interaction_type')
-      }
-
-      const parsedCampaignId = parseInt(ad_campaign_id)
-      if (isNaN(parsedCampaignId)) {
-        return res.apiBadRequest('ad_campaign_id 必须是有效数字')
-      }
-
-      const validTypes = ['impression', 'click', 'close', 'swipe']
-      if (!validTypes.includes(interaction_type)) {
-        return res.apiBadRequest('interaction_type 必须是以下之一：' + validTypes.join(', '))
-      }
-
-      const AdInteractionLogService = req.app.locals.services.getService('ad_interaction_log')
-      const log = await AdInteractionLogService.createLog({
-        ad_campaign_id: parsedCampaignId,
-        user_id: req.user.user_id,
-        interaction_type,
-        extra_data: extra_data || null
-      })
-
-      logger.info('统一交互日志上报成功', {
-        ad_campaign_id: parsedCampaignId,
-        interaction_type,
-        user_id: req.user.user_id
-      })
-
-      return res.apiSuccess(log, '上报交互日志成功')
-    } catch (error) {
-      logger.error('统一交互日志上报失败', {
-        error: error.message,
-        ad_campaign_id: req.body.ad_campaign_id,
-        user_id: req.user?.user_id
-      })
-      return res.apiInternalError('上报交互日志失败', error.message, 'INTERACTION_LOG_ERROR')
+    if (!ad_campaign_id || !interaction_type) {
+      return res.apiBadRequest('缺少必需参数：ad_campaign_id, interaction_type')
     }
+
+    const parsedCampaignId = parseInt(ad_campaign_id)
+    if (isNaN(parsedCampaignId)) {
+      return res.apiBadRequest('ad_campaign_id 必须是有效数字')
+    }
+
+    const validTypes = ['impression', 'click', 'close', 'swipe']
+    if (!validTypes.includes(interaction_type)) {
+      return res.apiBadRequest('interaction_type 必须是以下之一：' + validTypes.join(', '))
+    }
+
+    const AdInteractionLogService = req.app.locals.services.getService('ad_interaction_log')
+    const log = await AdInteractionLogService.createLog({
+      ad_campaign_id: parsedCampaignId,
+      user_id: req.user.user_id,
+      interaction_type,
+      extra_data: extra_data || null
+    })
+
+    logger.info('统一交互日志上报成功', {
+      ad_campaign_id: parsedCampaignId,
+      interaction_type,
+      user_id: req.user.user_id
+    })
+
+    return res.apiSuccess(log, '上报交互日志成功')
   })
 )
 
@@ -87,90 +78,80 @@ router.post(
   '/impression',
   authenticateToken,
   asyncHandler(async (req, res) => {
-    try {
-      const { ad_campaign_id, ad_slot_id } = req.body
+    const { ad_campaign_id, ad_slot_id } = req.body
 
-      if (!ad_campaign_id || !ad_slot_id) {
-        return res.apiBadRequest('缺少必需参数：ad_campaign_id, ad_slot_id')
-      }
+    if (!ad_campaign_id || !ad_slot_id) {
+      return res.apiBadRequest('缺少必需参数：ad_campaign_id, ad_slot_id')
+    }
 
-      const parsedCampaignId = parseInt(ad_campaign_id)
-      const parsedSlotId = parseInt(ad_slot_id)
-      if (isNaN(parsedCampaignId) || isNaN(parsedSlotId)) {
-        return res.apiBadRequest('ad_campaign_id 和 ad_slot_id 必须是有效数字')
-      }
+    const parsedCampaignId = parseInt(ad_campaign_id)
+    const parsedSlotId = parseInt(ad_slot_id)
+    if (isNaN(parsedCampaignId) || isNaN(parsedSlotId)) {
+      return res.apiBadRequest('ad_campaign_id 和 ad_slot_id 必须是有效数字')
+    }
 
-      const AdAntifraudService = req.app.locals.services.getService('ad_antifraud')
-      const AdImpressionLogService = req.app.locals.services.getService('ad_impression_log')
+    const AdAntifraudService = req.app.locals.services.getService('ad_antifraud')
+    const AdImpressionLogService = req.app.locals.services.getService('ad_impression_log')
 
-      // 反作弊检查（位置参数：userId, campaignId, adSlotId）
-      const antifraudResult = await AdAntifraudService.checkImpression(
-        req.user.user_id,
-        parsedCampaignId,
-        parsedSlotId
-      )
+    // 反作弊检查（位置参数：userId, campaignId, adSlotId）
+    const antifraudResult = await AdAntifraudService.checkImpression(
+      req.user.user_id,
+      parsedCampaignId,
+      parsedSlotId
+    )
 
-      if (!antifraudResult.is_valid) {
-        logger.warn('广告曝光反作弊检查未通过', {
-          ad_campaign_id: parsedCampaignId,
-          ad_slot_id: parsedSlotId,
-          user_id: req.user.user_id,
-          reason: antifraudResult.invalid_reason
-        })
-        return res.apiError(
-          '曝光事件无效',
-          'INVALID_IMPRESSION',
-          antifraudResult.invalid_reason,
-          400
-        )
-      }
-
-      // 创建曝光日志
-      const impressionLog = await AdImpressionLogService.createLog({
+    if (!antifraudResult.is_valid) {
+      logger.warn('广告曝光反作弊检查未通过', {
         ad_campaign_id: parsedCampaignId,
         ad_slot_id: parsedSlotId,
-        user_id: req.user.user_id
+        user_id: req.user.user_id,
+        reason: antifraudResult.invalid_reason
       })
+      return res.apiError(
+        '曝光事件无效',
+        'INVALID_IMPRESSION',
+        antifraudResult.invalid_reason,
+        400
+      )
+    }
 
-      // CPM 计费管线：对 CPM 类型广告计划进行 Redis 曝光计数
-      try {
-        const { AdCampaign } = require('../../../models')
-        const campaign = await AdCampaign.findByPk(parsedCampaignId, {
-          attributes: ['ad_campaign_id', 'billing_mode']
-        })
-        if (campaign && campaign.billing_mode === 'cpm') {
-          const AdBillingService = req.app.locals.services.getService('ad_billing')
-          const BeijingTimeHelper = require('../../../utils/timeHelper')
-          const billingDate = BeijingTimeHelper.formatDate(new Date(), 'YYYY-MM-DD')
-          await AdBillingService.recordCPMImpression(parsedCampaignId, billingDate)
-          logger.debug('CPM 曝光计数已记录', {
-            ad_campaign_id: parsedCampaignId,
-            billing_date: billingDate
-          })
-        }
-      } catch (cpmError) {
-        logger.warn('CPM 曝光计数失败（非致命，不影响曝光日志）', {
+    // 创建曝光日志
+    const impressionLog = await AdImpressionLogService.createLog({
+      ad_campaign_id: parsedCampaignId,
+      ad_slot_id: parsedSlotId,
+      user_id: req.user.user_id
+    })
+
+    // CPM 计费管线：对 CPM 类型广告计划进行 Redis 曝光计数
+    try {
+      const { AdCampaign } = require('../../../models')
+      const campaign = await AdCampaign.findByPk(parsedCampaignId, {
+        attributes: ['ad_campaign_id', 'billing_mode']
+      })
+      if (campaign && campaign.billing_mode === 'cpm') {
+        const AdBillingService = req.app.locals.services.getService('ad_billing')
+        const BeijingTimeHelper = require('../../../utils/timeHelper')
+        const billingDate = BeijingTimeHelper.formatDate(new Date(), 'YYYY-MM-DD')
+        await AdBillingService.recordCPMImpression(parsedCampaignId, billingDate)
+        logger.debug('CPM 曝光计数已记录', {
           ad_campaign_id: parsedCampaignId,
-          error: cpmError.message
+          billing_date: billingDate
         })
       }
-
-      logger.info('广告曝光事件上报成功', {
-        ad_campaign_id,
-        ad_slot_id,
-        user_id: req.user.user_id
+    } catch (cpmError) {
+      logger.warn('CPM 曝光计数失败（非致命，不影响曝光日志）', {
+        ad_campaign_id: parsedCampaignId,
+        error: cpmError.message
       })
-
-      return res.apiSuccess(impressionLog, '上报曝光事件成功')
-    } catch (error) {
-      logger.error('广告曝光事件上报失败', {
-        error: error.message,
-        ad_campaign_id: req.body.ad_campaign_id,
-        ad_slot_id: req.body.ad_slot_id,
-        user_id: req.user?.user_id
-      })
-      return res.apiInternalError('上报曝光事件失败', error.message, 'AD_IMPRESSION_ERROR')
     }
+
+    logger.info('广告曝光事件上报成功', {
+      ad_campaign_id,
+      ad_slot_id,
+      user_id: req.user.user_id
+    })
+
+    return res.apiSuccess(impressionLog, '上报曝光事件成功')
   })
 )
 
@@ -186,64 +167,54 @@ router.post(
   '/click',
   authenticateToken,
   asyncHandler(async (req, res) => {
-    try {
-      const { ad_campaign_id, ad_slot_id, click_target } = req.body
+    const { ad_campaign_id, ad_slot_id, click_target } = req.body
 
-      if (!ad_campaign_id || !ad_slot_id) {
-        return res.apiBadRequest('缺少必需参数：ad_campaign_id, ad_slot_id')
-      }
+    if (!ad_campaign_id || !ad_slot_id) {
+      return res.apiBadRequest('缺少必需参数：ad_campaign_id, ad_slot_id')
+    }
 
-      const parsedCampaignId = parseInt(ad_campaign_id)
-      const parsedSlotId = parseInt(ad_slot_id)
-      if (isNaN(parsedCampaignId) || isNaN(parsedSlotId)) {
-        return res.apiBadRequest('ad_campaign_id 和 ad_slot_id 必须是有效数字')
-      }
+    const parsedCampaignId = parseInt(ad_campaign_id)
+    const parsedSlotId = parseInt(ad_slot_id)
+    if (isNaN(parsedCampaignId) || isNaN(parsedSlotId)) {
+      return res.apiBadRequest('ad_campaign_id 和 ad_slot_id 必须是有效数字')
+    }
 
-      const AdAntifraudService = req.app.locals.services.getService('ad_antifraud')
-      const AdClickLogService = req.app.locals.services.getService('ad_click_log')
+    const AdAntifraudService = req.app.locals.services.getService('ad_antifraud')
+    const AdClickLogService = req.app.locals.services.getService('ad_click_log')
 
-      // 反作弊检查（位置参数：userId, campaignId, adSlotId, clickTarget）
-      const antifraudResult = await AdAntifraudService.checkClick(
-        req.user.user_id,
-        parsedCampaignId,
-        parsedSlotId,
-        click_target
-      )
+    // 反作弊检查（位置参数：userId, campaignId, adSlotId, clickTarget）
+    const antifraudResult = await AdAntifraudService.checkClick(
+      req.user.user_id,
+      parsedCampaignId,
+      parsedSlotId,
+      click_target
+    )
 
-      if (!antifraudResult.is_valid) {
-        logger.warn('广告点击反作弊检查未通过', {
-          ad_campaign_id: parsedCampaignId,
-          ad_slot_id: parsedSlotId,
-          user_id: req.user.user_id,
-          reason: antifraudResult.invalid_reason
-        })
-        return res.apiError('点击事件无效', 'INVALID_CLICK', antifraudResult.invalid_reason, 400)
-      }
-
-      // 创建点击日志
-      const clickLog = await AdClickLogService.createLog({
+    if (!antifraudResult.is_valid) {
+      logger.warn('广告点击反作弊检查未通过', {
         ad_campaign_id: parsedCampaignId,
         ad_slot_id: parsedSlotId,
         user_id: req.user.user_id,
-        click_target
+        reason: antifraudResult.invalid_reason
       })
-
-      logger.info('广告点击事件上报成功', {
-        ad_campaign_id,
-        ad_slot_id,
-        user_id: req.user.user_id
-      })
-
-      return res.apiSuccess(clickLog, '上报点击事件成功')
-    } catch (error) {
-      logger.error('广告点击事件上报失败', {
-        error: error.message,
-        ad_campaign_id: req.body.ad_campaign_id,
-        ad_slot_id: req.body.ad_slot_id,
-        user_id: req.user?.user_id
-      })
-      return res.apiInternalError('上报点击事件失败', error.message, 'AD_CLICK_ERROR')
+      return res.apiError('点击事件无效', 'INVALID_CLICK', antifraudResult.invalid_reason, 400)
     }
+
+    // 创建点击日志
+    const clickLog = await AdClickLogService.createLog({
+      ad_campaign_id: parsedCampaignId,
+      ad_slot_id: parsedSlotId,
+      user_id: req.user.user_id,
+      click_target
+    })
+
+    logger.info('广告点击事件上报成功', {
+      ad_campaign_id,
+      ad_slot_id,
+      user_id: req.user.user_id
+    })
+
+    return res.apiSuccess(clickLog, '上报点击事件成功')
   })
 )
 

@@ -475,7 +475,7 @@ function assetsPortfolioPage() {
           this.assetHistory = (data.transactions || []).map(tx => ({
             ...tx,
             // description 复合字段：按优先级取值
-            description: tx.description || tx.reason || tx.tx_type
+            description: tx.description || tx.reason || tx.business_type
           }))
           logger.debug(
             '[AssetsPortfolioPage] 资产历史加载成功:',
@@ -501,7 +501,7 @@ function assetsPortfolioPage() {
     },
 
     // ✅ 已删除 formatTxType 映射函数
-    // HTML 直接使用后端返回的 tx_type_display 字段
+    // HTML 直接使用后端返回的 business_type_display 字段
 
     // ==================== 分页方法 ====================
 

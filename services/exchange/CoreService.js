@@ -16,6 +16,7 @@
  * @created 2026-01-31（大文件拆分方案 Phase 4）
  */
 
+const BusinessError = require('../../utils/BusinessError')
 const crypto = require('crypto')
 const logger = require('../../utils/logger').logger
 const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
@@ -101,11 +102,11 @@ class CoreService {
     const { idempotency_key, sku_id } = options
 
     if (!idempotency_key) {
-      throw new Error('idempotency_key 参数不能为空，用于幂等性控制')
+      throw new BusinessError('idempotency_key 参数不能为空，用于幂等性控制', 'EXCHANGE_NOT_ALLOWED', 400)
     }
 
     if (!sku_id) {
-      throw new Error('sku_id 参数不能为空')
+      throw new BusinessError('sku_id 参数不能为空', 'EXCHANGE_NOT_ALLOWED', 400)
     }
 
     const transaction = assertAndGetTransaction(options, 'CoreService.exchangeItem')
@@ -157,7 +158,7 @@ class CoreService {
         transaction
       })
       if (!channelPrice) {
-        throw new Error('该 SKU 未配置兑换渠道定价')
+        throw new BusinessError('该 SKU 未配置兑换渠道定价', 'EXCHANGE_ERROR', 400)
       }
       const expectedPayAssetCode = channelPrice.cost_asset_code
       const expectedPayAmount = Number(channelPrice.cost_amount) * quantity
@@ -229,10 +230,10 @@ class CoreService {
     })
 
     if (!product) {
-      throw new Error('商品不存在')
+      throw new BusinessError('商品不存在', 'EXCHANGE_ITEM_NOT_FOUND', 404)
     }
     if (product.status !== 'active') {
-      throw new Error('商品已下架')
+      throw new BusinessError('商品已下架', 'EXCHANGE_ERROR', 400)
     }
 
     const productSku = await this.ExchangeItemSku.findOne({
@@ -241,10 +242,10 @@ class CoreService {
       transaction
     })
     if (!productSku) {
-      throw new Error('SKU 不存在或已停售')
+      throw new BusinessError('SKU 不存在或已停售', 'EXCHANGE_SKU_NOT_FOUND', 404)
     }
     if (productSku.stock < quantity) {
-      throw new Error(`库存不足，当前库存：${productSku.stock}`)
+      throw new BusinessError(`库存不足，当前库存：${productSku.stock}`, 'EXCHANGE_STOCK_INSUFFICIENT', 400)
     }
 
     const channelPrice = await this.ExchangeChannelPrice.findOne({
@@ -252,10 +253,10 @@ class CoreService {
       transaction
     })
     if (!channelPrice) {
-      throw new Error('该 SKU 未配置兑换渠道定价')
+      throw new BusinessError('该 SKU 未配置兑换渠道定价', 'EXCHANGE_ERROR', 400)
     }
     if (!channelPrice.isPublished()) {
-      throw new Error('该 SKU 兑换定价当前未在发布窗口内')
+      throw new BusinessError('该 SKU 兑换定价当前未在发布窗口内', 'EXCHANGE_ERROR', 400)
     }
 
     const itemName = product.item_name
@@ -502,8 +503,10 @@ class CoreService {
             })
             serialNumber = currentCount + 1
             if (serialNumber > template.max_edition) {
-              throw new Error(
-                `限量售罄：${template.display_name} 限量${template.max_edition}件，已铸造${currentCount}件`
+              throw new BusinessError(
+                `限量售罄：${template.display_name} 限量${template.max_edition}件，已铸造${currentCount}件`,
+                'EXCHANGE_ERROR',
+                400
               )
             }
           }
@@ -659,7 +662,7 @@ class CoreService {
     })
 
     if (!order) {
-      throw new Error('订单不存在')
+      throw new BusinessError('订单不存在', 'EXCHANGE_ORDER_NOT_FOUND', 404)
     }
 
     const old_status = order.status

@@ -26,6 +26,7 @@
  * @date 2026-01-31
  */
 
+const BusinessError = require('../../utils/BusinessError')
 const { Op, fn, col, literal } = require('sequelize')
 const logger = require('../../utils/logger').logger
 
@@ -583,7 +584,7 @@ class UserAnalysisService {
     })
 
     if (!user) {
-      throw new Error(`用户不存在: ${user_id}`)
+      throw new BusinessError(`用户不存在: ${user_id}`, 'SERVICE_NOT_FOUND', 404)
     }
 
     // 2. 并行查询各维度数据（提高性能）
@@ -725,7 +726,7 @@ class UserAnalysisService {
       })
 
       if (!draw) {
-        throw new Error('抽奖记录不存在')
+        throw new BusinessError('抽奖记录不存在', 'SERVICE_NOT_FOUND', 404)
       }
 
       // 2. 查询决策记录

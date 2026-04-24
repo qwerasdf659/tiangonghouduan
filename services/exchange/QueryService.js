@@ -20,6 +20,7 @@
  * @created 2026-01-31（大文件拆分方案 Phase 4）
  */
 
+const BusinessError = require('../../utils/BusinessError')
 const logger = require('../../utils/logger').logger
 const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
 const displayNameHelper = require('../../utils/displayNameHelper')
@@ -413,7 +414,7 @@ class QueryService {
       return result
     } catch (error) {
       logger.error('[兑换市场] 查询商品列表失败:', error.message)
-      throw new Error(`查询商品列表失败: ${error.message}`)
+      throw new BusinessError(`查询商品列表失败: ${error.message}`, 'EXCHANGE_QUERY_FAILED', 500)
     }
   }
 
@@ -471,7 +472,7 @@ class QueryService {
       })
 
       if (!item) {
-        throw new Error('商品不存在')
+        throw new BusinessError('商品不存在', 'EXCHANGE_ITEM_NOT_FOUND', 404)
       }
 
       const { images, detail_images, showcase_images } = await fetchProductMediaGallery(
@@ -550,7 +551,7 @@ class QueryService {
       }
     } catch (error) {
       logger.error(`[兑换市场] 查询用户订单列表失败(user_id:${user_id}):`, error.message)
-      throw new Error(`查询订单列表失败: ${error.message}`)
+      throw new BusinessError(`查询订单列表失败: ${error.message}`, 'EXCHANGE_QUERY_FAILED', 500)
     }
   }
 
@@ -674,7 +675,7 @@ class QueryService {
       }
     } catch (error) {
       logger.error('[兑换市场] 管理员查询订单列表失败:', error.message)
-      throw new Error(`查询订单列表失败: ${error.message}`)
+      throw new BusinessError(`查询订单列表失败: ${error.message}`, 'EXCHANGE_QUERY_FAILED', 500)
     }
   }
 
@@ -793,7 +794,7 @@ class QueryService {
       }
     } catch (error) {
       logger.error('[兑换市场] 查询统计数据失败:', error.message)
-      throw new Error(`查询统计数据失败: ${error.message}`)
+      throw new BusinessError(`查询统计数据失败: ${error.message}`, 'EXCHANGE_QUERY_FAILED', 500)
     }
   }
 
@@ -1120,7 +1121,7 @@ class QueryService {
 
     try {
       if (!this.ExchangeItem) {
-        throw new Error('ExchangeItem 模型未注册，请检查 models 配置')
+        throw new BusinessError('ExchangeItem 模型未注册，请检查 models 配置', 'EXCHANGE_CONFIG_ERROR', 500)
       }
 
       logger.info('[商品中心] 查询商品列表', {
@@ -1247,7 +1248,7 @@ class QueryService {
       }
     } catch (error) {
       logger.error('[商品中心] 查询商品列表失败:', error.message)
-      throw new Error(`查询商品列表失败: ${error.message}`)
+      throw new BusinessError(`查询商品列表失败: ${error.message}`, 'EXCHANGE_QUERY_FAILED', 500)
     }
   }
 
@@ -1262,7 +1263,7 @@ class QueryService {
   async getExchangeItemDetail(productId) {
     try {
       if (!this.ExchangeItem) {
-        throw new Error('ExchangeItem 模型未注册，请检查 models 配置')
+        throw new BusinessError('ExchangeItem 模型未注册，请检查 models 配置', 'EXCHANGE_CONFIG_ERROR', 500)
       }
 
       logger.info('[商品中心] 查询商品详情', { exchange_item_id: productId })
@@ -1369,7 +1370,7 @@ class QueryService {
   async getExchangeItemStats() {
     try {
       if (!this.ExchangeItem) {
-        throw new Error('ExchangeItem 模型未注册，请检查 models 配置')
+        throw new BusinessError('ExchangeItem 模型未注册，请检查 models 配置', 'EXCHANGE_CONFIG_ERROR', 500)
       }
 
       logger.info('[商品中心] 查询商品统计数据')
@@ -1448,7 +1449,7 @@ class QueryService {
       }
     } catch (error) {
       logger.error('[商品中心] 查询商品统计失败:', error.message)
-      throw new Error(`查询商品统计失败: ${error.message}`)
+      throw new BusinessError(`查询商品统计失败: ${error.message}`, 'EXCHANGE_QUERY_FAILED', 500)
     }
   }
 
@@ -1612,7 +1613,7 @@ class QueryService {
       return { days: validDays, trend }
     } catch (error) {
       logger.error('[兑换市场] 查询兑换趋势失败:', error.message)
-      throw new Error(`查询兑换趋势失败: ${error.message}`)
+      throw new BusinessError(`查询兑换趋势失败: ${error.message}`, 'EXCHANGE_QUERY_FAILED', 500)
     }
   }
 
@@ -1685,7 +1686,7 @@ class QueryService {
       return { sort_by: validSortBy, limit: validLimit, ranking }
     } catch (error) {
       logger.error('[兑换市场] 查询商品排行失败:', error.message)
-      throw new Error(`查询商品排行失败: ${error.message}`)
+      throw new BusinessError(`查询商品排行失败: ${error.message}`, 'EXCHANGE_QUERY_FAILED', 500)
     }
   }
 }

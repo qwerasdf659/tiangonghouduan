@@ -15,7 +15,7 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, getUserRoles } = require('../../../../middleware/auth')
-const { handleServiceError } = require('../../../../middleware/validation')
+const { asyncHandler } = require('../../../../middleware/validation')
 const logger = require('../../../../utils/logger').logger
 const TransactionManager = require('../../../../utils/TransactionManager')
 
@@ -27,10 +27,9 @@ const TransactionManager = require('../../../../utils/TransactionManager')
  *
  * 权限要求：role_level >= 20（商户员工/店长/管理员）
  */
-router.post('/scan', authenticateToken, async (req, res) => {
-  try {
-    const { qr_content } = req.body
-    const redeemerUserId = req.user.user_id
+router.post('/scan', authenticateToken, asyncHandler(async (req, res) => {
+  const { qr_content } = req.body
+  const redeemerUserId = req.user.user_id
 
     if (!qr_content || typeof qr_content !== 'string') {
       return res.apiError('QR码内容不能为空', 'QR_CONTENT_REQUIRED', null, 400)
@@ -75,6 +74,7 @@ router.post('/scan', authenticateToken, async (req, res) => {
 
     // 通过 order_id 查找并核销（QR码内已包含订单ID，无需再输入核销码）
     const RedemptionService = req.app.locals.services.getService('redemption_order')
+    const RedemptionAdminService = req.app.locals.services.getService('redemption_admin')
     const order = await TransactionManager.execute(async transaction => {
       const targetOrder = await RedemptionService.getOrderDetail(redemption_order_id, {
         transaction,
@@ -90,7 +90,7 @@ router.post('/scan', authenticateToken, async (req, res) => {
         throw new Error('QR码数据异常：哈希前缀不匹配')
       }
 
-      return await RedemptionService.adminFulfillOrderById(redemption_order_id, {
+      return await RedemptionAdminService.adminFulfillOrderById(redemption_order_id, {
         transaction,
         admin_user_id: redeemerUserId
       })
@@ -138,26 +138,6 @@ router.post('/scan', authenticateToken, async (req, res) => {
       },
       '扫码核销成功'
     )
-  } catch (error) {
-    logger.error('扫码核销失败', {
-      error: error.message,
-      redeemer_user_id: req.user?.user_id
-    })
-
-    if (error.message.includes('不存在')) {
-      return res.apiError(error.message, 'NOT_FOUND', null, 404)
-    }
-
-    if (error.message.includes('已核销') || error.message.includes('已取消')) {
-      return res.apiError(error.message, 'CONFLICT', null, 409)
-    }
-
-    if (error.message.includes('已过期') || error.message.includes('超过有效期')) {
-      return res.apiError(error.message, 'EXPIRED', null, 400)
-    }
-
-    return handleServiceError(error, res, '扫码核销失败')
-  }
-})
+}))
 
 module.exports = router

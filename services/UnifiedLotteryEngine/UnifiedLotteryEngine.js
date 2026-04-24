@@ -129,6 +129,7 @@
  * 使用模型：Claude Sonnet 4.5
  */
 
+const BusinessError = require('../../utils/BusinessError')
 const BeijingTimeHelper = require('../../utils/timeHelper')
 const PerformanceMonitor = require('./utils/PerformanceMonitor')
 const { AssetCode } = require('../../constants/AssetCode')
@@ -839,11 +840,11 @@ class UnifiedLotteryEngine {
 
       // 🔴 参数验证
       if (!user_id || !lottery_campaign_id) {
-        throw new Error('缺少必需参数：user_id或lottery_campaign_id')
+        throw new BusinessError('缺少必需参数：user_id或lottery_campaign_id', 'ENGINE_REQUIRED', 400)
       }
 
       if (draw_count < 1 || draw_count > 10) {
-        throw new Error('抽奖次数必须在1-10之间')
+        throw new BusinessError('抽奖次数必须在1-10之间', 'ENGINE_REQUIRED', 400)
       }
 
       // 🔧 V4.3修复：使用新的资产系统获取用户积分信息
@@ -852,7 +853,7 @@ class UnifiedLotteryEngine {
         { transaction }
       )
       if (!userAccountEntity || userAccountEntity.status !== 'active') {
-        throw new Error('用户账户不存在或已冻结')
+        throw new BusinessError('用户账户不存在或已冻结', 'ENGINE_NOT_FOUND', 404)
       }
       const userPointsBalance = await BalanceService.getOrCreateBalance(
         userAccountEntity.account_id,
@@ -860,7 +861,7 @@ class UnifiedLotteryEngine {
         { transaction }
       )
       if (!userPointsBalance) {
-        throw new Error('用户积分账户不存在')
+        throw new BusinessError('用户积分账户不存在', 'ENGINE_NOT_FOUND', 404)
       }
       // 构造积分账户结构对象
       const userAccount = {
@@ -875,7 +876,7 @@ class UnifiedLotteryEngine {
       })
 
       if (!campaign) {
-        throw new Error('活动不存在')
+        throw new BusinessError('活动不存在', 'ENGINE_NOT_FOUND', 404)
       }
 
       /**
@@ -965,8 +966,10 @@ class UnifiedLotteryEngine {
 
       // 🆕 积分充足性预检查（连抽事务安全的关键保护）
       if (userAccount.available_points < requiredPoints) {
-        throw new Error(
-          `积分不足：需要${requiredPoints}积分，当前仅有${userAccount.available_points}积分`
+        throw new BusinessError(
+          `积分不足：需要${requiredPoints}积分，当前仅有${userAccount.available_points}积分`,
+          'ENGINE_INSUFFICIENT',
+          400
         )
       }
 
@@ -1134,7 +1137,7 @@ class UnifiedLotteryEngine {
            */
         } else {
           // 抽奖失败，停止后续抽奖
-          throw new Error(drawResult.message || '抽奖执行失败')
+          throw new BusinessError(drawResult.message || '抽奖执行失败', 'ENGINE_DRAW_FAILED', 500)
         }
       }
 
@@ -1231,7 +1234,7 @@ class UnifiedLotteryEngine {
         draw_count,
         error: error.message
       })
-      throw new Error(`抽奖执行失败: ${error.message}`)
+      throw new BusinessError(`抽奖执行失败: ${error.message}`, 'ENGINE_FAILED', 500)
     }
   }
 }

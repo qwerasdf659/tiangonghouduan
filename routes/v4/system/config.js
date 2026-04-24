@@ -43,8 +43,7 @@
 
 const express = require('express')
 const router = express.Router()
-const logger = require('../../../utils/logger').logger
-const { handleServiceError } = require('../../../middleware/validation')
+const { asyncHandler } = require('../../../middleware/validation')
 
 /**
  * 小程序前端可访问的公开配置项白名单
@@ -121,32 +120,27 @@ const appThemeMemCache = {
  * GET /api/v4/system/config/placement
  * → { success: true, data: { placements: [...], version: "1739600000000", updated_at: "2025-02-15T12:00:00.000Z" } }
  */
-router.get('/placement', async (req, res) => {
-  try {
-    const AdminSystemService = req.app.locals.services.getService('admin_system')
-    const configData = await AdminSystemService.getConfigValue('campaign_placement')
+router.get('/placement', asyncHandler(async (req, res) => {
+  const AdminSystemService = req.app.locals.services.getService('admin_system')
+  const configData = await AdminSystemService.getConfigValue('campaign_placement')
 
-    if (!configData) {
-      return res.apiError('配置不存在', 'CONFIG_NOT_FOUND', null, 404)
-    }
-
-    const updatedAt = configData.updated_at || new Date().toISOString()
-    const versionTs = new Date(updatedAt).getTime().toString()
-
-    return res.apiSuccess(
-      {
-        placements: configData.placements || [],
-        version: versionTs,
-        updated_at: updatedAt
-      },
-      '获取配置成功',
-      'PLACEMENT_CONFIG_SUCCESS'
-    )
-  } catch (error) {
-    logger.error('获取位置配置失败', { error: error.message, stack: error.stack })
-    return handleServiceError(error, res)
+  if (!configData) {
+    return res.apiError('配置不存在', 'CONFIG_NOT_FOUND', null, 404)
   }
-})
+
+  const updatedAt = configData.updated_at || new Date().toISOString()
+  const versionTs = new Date(updatedAt).getTime().toString()
+
+  return res.apiSuccess(
+    {
+      placements: configData.placements || [],
+      version: versionTs,
+      updated_at: updatedAt
+    },
+    '获取配置成功',
+    'PLACEMENT_CONFIG_SUCCESS'
+  )
+}))
 
 /**
  * @route GET /api/v4/system/config/product-filter
@@ -164,55 +158,50 @@ router.get('/placement', async (req, res) => {
  *
  * @returns {Object} 商品筛选配置
  */
-router.get('/product-filter', async (req, res) => {
-  try {
-    const AdminSystemService = req.app.locals.services.getService('admin_system')
-    const configData = await AdminSystemService.getConfigValue('product_filter')
+router.get('/product-filter', asyncHandler(async (req, res) => {
+  const AdminSystemService = req.app.locals.services.getService('admin_system')
+  const configData = await AdminSystemService.getConfigValue('product_filter')
 
-    if (!configData) {
-      return res.apiSuccess(
-        {
-          filter_config: {
-            cost_ranges: [
-              { label: '全部', min: null, max: null },
-              { label: '100以内', min: 0, max: 100 },
-              { label: '100-500', min: 100, max: 500 },
-              { label: '500-1000', min: 500, max: 1000 },
-              { label: '1000以上', min: 1000, max: null }
-            ],
-            categories: [],
-            sort_options: [
-              { label: '默认排序', value: 'sort_order' },
-              { label: '价格从低到高', value: 'cost_amount_asc' },
-              { label: '价格从高到低', value: 'cost_amount_desc' },
-              { label: '最新上架', value: 'created_at_desc' },
-              { label: '销量最高', value: 'sold_count_desc' }
-            ],
-            stock_statuses: [
-              { label: '全部', value: 'all' },
-              { label: '有货', value: 'in_stock' },
-              { label: '即将售罄', value: 'low_stock' }
-            ]
-          },
-          is_default: true
-        },
-        '获取默认筛选配置'
-      )
-    }
-
+  if (!configData) {
     return res.apiSuccess(
       {
-        filter_config: configData,
-        version: Date.now().toString(),
-        is_default: false
+        filter_config: {
+          cost_ranges: [
+            { label: '全部', min: null, max: null },
+            { label: '100以内', min: 0, max: 100 },
+            { label: '100-500', min: 100, max: 500 },
+            { label: '500-1000', min: 500, max: 1000 },
+            { label: '1000以上', min: 1000, max: null }
+          ],
+          categories: [],
+          sort_options: [
+            { label: '默认排序', value: 'sort_order' },
+            { label: '价格从低到高', value: 'cost_amount_asc' },
+            { label: '价格从高到低', value: 'cost_amount_desc' },
+            { label: '最新上架', value: 'created_at_desc' },
+            { label: '销量最高', value: 'sold_count_desc' }
+          ],
+          stock_statuses: [
+            { label: '全部', value: 'all' },
+            { label: '有货', value: 'in_stock' },
+            { label: '即将售罄', value: 'low_stock' }
+          ]
+        },
+        is_default: true
       },
-      '获取筛选配置成功'
+      '获取默认筛选配置'
     )
-  } catch (error) {
-    logger.error('获取商品筛选配置失败', { error: error.message, stack: error.stack })
-    return handleServiceError(error, res)
   }
-})
+
+  return res.apiSuccess(
+    {
+      filter_config: configData,
+      version: Date.now().toString(),
+      is_default: false
+    },
+    '获取筛选配置成功'
+  )
+}))
 
 /**
  * @route GET /api/v4/system/config/feedback
@@ -226,63 +215,58 @@ router.get('/product-filter', async (req, res) => {
  *
  * @returns {Object} 反馈表单配置
  */
-router.get('/feedback', async (req, res) => {
-  try {
-    const AdminSystemService = req.app.locals.services.getService('admin_system')
-    const configData = await AdminSystemService.getConfigValue('feedback_config')
+router.get('/feedback', asyncHandler(async (req, res) => {
+  const AdminSystemService = req.app.locals.services.getService('admin_system')
+  const configData = await AdminSystemService.getConfigValue('feedback_config')
 
-    if (configData) {
-      return res.apiSuccess(
-        {
-          feedback_config: configData,
-          version: Date.now().toString(),
-          is_default: false
-        },
-        '获取反馈配置成功'
-      )
-    }
-
-    const defaultConfig = {
-      /** 反馈类别（对应 feedbacks.category enum） */
-      categories: [
-        { value: 'technical', label: '技术问题' },
-        { value: 'feature', label: '功能建议' },
-        { value: 'bug', label: 'Bug反馈' },
-        { value: 'complaint', label: '投诉' },
-        { value: 'suggestion', label: '建议' },
-        { value: 'other', label: '其他' }
-      ],
-      /** 优先级选项（对应 feedbacks.priority enum） */
-      priorities: [
-        { value: 'low', label: '低' },
-        { value: 'medium', label: '中' },
-        { value: 'high', label: '高' }
-      ],
-      /** 内容长度限制（feedbacks.content TEXT类型） */
-      content_rules: {
-        min_length: 10,
-        max_length: 500
-      },
-      /** 附件限制（feedbacks.attachments JSON字段的数组长度限制） */
-      attachment_rules: {
-        max_images: 5,
-        max_file_size: 5 * 1024 * 1024, // 5MB
-        allowed_types: ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
-      }
-    }
-
+  if (configData) {
     return res.apiSuccess(
       {
-        feedback_config: defaultConfig,
-        is_default: true
+        feedback_config: configData,
+        version: Date.now().toString(),
+        is_default: false
       },
-      '获取默认反馈配置'
+      '获取反馈配置成功'
     )
-  } catch (error) {
-    logger.error('获取反馈表单配置失败', { error: error.message, stack: error.stack })
-    return handleServiceError(error, res)
   }
-})
+
+  const defaultConfig = {
+    /** 反馈类别（对应 feedbacks.category enum） */
+    categories: [
+      { value: 'technical', label: '技术问题' },
+      { value: 'feature', label: '功能建议' },
+      { value: 'bug', label: 'Bug反馈' },
+      { value: 'complaint', label: '投诉' },
+      { value: 'suggestion', label: '建议' },
+      { value: 'other', label: '其他' }
+    ],
+    /** 优先级选项（对应 feedbacks.priority enum） */
+    priorities: [
+      { value: 'low', label: '低' },
+      { value: 'medium', label: '中' },
+      { value: 'high', label: '高' }
+    ],
+    /** 内容长度限制（feedbacks.content TEXT类型） */
+    content_rules: {
+      min_length: 10,
+      max_length: 500
+    },
+    /** 附件限制（feedbacks.attachments JSON字段的数组长度限制） */
+    attachment_rules: {
+      max_images: 5,
+      max_file_size: 5 * 1024 * 1024, // 5MB
+      allowed_types: ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+    }
+  }
+
+  return res.apiSuccess(
+    {
+      feedback_config: defaultConfig,
+      is_default: true
+    },
+    '获取默认反馈配置'
+  )
+}))
 
 /**
  * @route GET /api/v4/system/config/exchange-page
@@ -306,123 +290,118 @@ router.get('/feedback', async (req, res) => {
  * @returns {string} data.version - 配置版本标识（基于 updated_at 时间戳）
  * @returns {string} data.updated_at - 配置最后更新时间
  */
-router.get('/exchange-page', async (req, res) => {
-  try {
-    const AdminSystemService = req.app.locals.services.getService('admin_system')
-    const configData = await AdminSystemService.getConfigValue('exchange_page')
+router.get('/exchange-page', asyncHandler(async (req, res) => {
+  const AdminSystemService = req.app.locals.services.getService('admin_system')
+  const configData = await AdminSystemService.getConfigValue('exchange_page')
 
-    if (!configData) {
-      const defaultConfig = {
-        tabs: [
-          { key: 'exchange', label: '商品兑换', icon: 'download', enabled: true, sort_order: 1 },
-          { key: 'market', label: '交易市场', icon: 'success', enabled: true, sort_order: 2 }
-        ],
-        spaces: [
-          {
-            id: 'lucky',
-            name: '🎁 幸运空间',
-            subtitle: '瀑布流卡片',
-            description: '发现随机好物',
-            layout: 'waterfall',
-            color: '#52c41a',
-            bgGradient: 'linear-gradient(135deg, #52c41a 0%, #95de64 100%)',
-            locked: false,
-            enabled: true,
-            sort_order: 1
-          },
-          {
-            id: 'premium',
-            name: '💎 臻选空间',
-            subtitle: '混合精品展示',
-            description: '解锁高级商品',
-            layout: 'simple',
-            color: '#667eea',
-            bgGradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            locked: true,
-            enabled: true,
-            sort_order: 2
-          }
-        ],
-        shop_filters: {
-          categories: [{ value: 'all', label: '全部' }],
-          cost_ranges: [{ label: '全部', min: null, max: null }],
-          basic_filters: [{ value: 'all', label: '全部', showCount: true }],
-          stock_statuses: [{ value: 'all', label: '全部' }],
-          sort_options: [{ value: 'sort_order', label: '默认排序' }]
+  if (!configData) {
+    const defaultConfig = {
+      tabs: [
+        { key: 'exchange', label: '商品兑换', icon: 'download', enabled: true, sort_order: 1 },
+        { key: 'market', label: '交易市场', icon: 'success', enabled: true, sort_order: 2 }
+      ],
+      spaces: [
+        {
+          id: 'lucky',
+          name: '🎁 幸运空间',
+          subtitle: '瀑布流卡片',
+          description: '发现随机好物',
+          layout: 'waterfall',
+          color: '#52c41a',
+          bgGradient: 'linear-gradient(135deg, #52c41a 0%, #95de64 100%)',
+          locked: false,
+          enabled: true,
+          sort_order: 1
         },
-        market_filters: {
-          type_filters: [{ value: 'all', label: '全部', showCount: true }],
-          category_filters: [{ value: 'all', label: '全部' }],
-          sort_options: [{ value: 'default', label: '默认' }]
-        },
-        card_display: {
-          effects: {
-            grain: true,
-            holo: true,
-            rotatingBorder: true,
-            breathingGlow: true,
-            ripple: true,
-            fullbleed: true,
-            listView: false
-          },
-          shop_cta_text: '立即兑换',
-          market_cta_text: '立即购买',
-          show_stock_bar: true,
-          stock_display_mode: 'bar',
-          show_sold_count: true,
-          show_tags: true,
-          price_display_mode: 'highlight',
-          image_placeholder_style: 'gradient',
-          press_effect: 'ripple',
-          show_type_badge: true,
-          price_color_mode: 'type_based',
-          default_view_mode: 'grid'
-        },
-        detail_page: {
-          attr_display_mode: 'grid',
-          tag_style_type: 'game'
-        },
-        ui: {
-          low_stock_threshold: 10,
-          grid_page_size: 4,
-          waterfall_page_size: 20,
-          default_api_page_size: 20,
-          search_debounce_ms: 500
+        {
+          id: 'premium',
+          name: '💎 臻选空间',
+          subtitle: '混合精品展示',
+          description: '解锁高级商品',
+          layout: 'simple',
+          color: '#667eea',
+          bgGradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          locked: true,
+          enabled: true,
+          sort_order: 2
         }
-      }
-
-      return res.apiSuccess(
-        { ...defaultConfig, version: Date.now().toString(), is_default: true },
-        '获取默认兑换页面配置',
-        'EXCHANGE_PAGE_CONFIG_DEFAULT'
-      )
-    }
-
-    if (!configData.detail_page) {
-      configData.detail_page = {
+      ],
+      shop_filters: {
+        categories: [{ value: 'all', label: '全部' }],
+        cost_ranges: [{ label: '全部', min: null, max: null }],
+        basic_filters: [{ value: 'all', label: '全部', showCount: true }],
+        stock_statuses: [{ value: 'all', label: '全部' }],
+        sort_options: [{ value: 'sort_order', label: '默认排序' }]
+      },
+      market_filters: {
+        type_filters: [{ value: 'all', label: '全部', showCount: true }],
+        category_filters: [{ value: 'all', label: '全部' }],
+        sort_options: [{ value: 'default', label: '默认' }]
+      },
+      card_display: {
+        effects: {
+          grain: true,
+          holo: true,
+          rotatingBorder: true,
+          breathingGlow: true,
+          ripple: true,
+          fullbleed: true,
+          listView: false
+        },
+        shop_cta_text: '立即兑换',
+        market_cta_text: '立即购买',
+        show_stock_bar: true,
+        stock_display_mode: 'bar',
+        show_sold_count: true,
+        show_tags: true,
+        price_display_mode: 'highlight',
+        image_placeholder_style: 'gradient',
+        press_effect: 'ripple',
+        show_type_badge: true,
+        price_color_mode: 'type_based',
+        default_view_mode: 'grid'
+      },
+      detail_page: {
         attr_display_mode: 'grid',
         tag_style_type: 'game'
+      },
+      ui: {
+        low_stock_threshold: 10,
+        grid_page_size: 4,
+        waterfall_page_size: 20,
+        default_api_page_size: 20,
+        search_debounce_ms: 500
       }
     }
 
-    const updatedAtExchange = configData.updated_at || new Date().toISOString()
-    const versionTsExchange = new Date(updatedAtExchange).getTime().toString()
-
     return res.apiSuccess(
-      {
-        ...configData,
-        version: versionTsExchange,
-        updated_at: updatedAtExchange,
-        is_default: false
-      },
-      '获取兑换页面配置成功',
-      'EXCHANGE_PAGE_CONFIG_SUCCESS'
+      { ...defaultConfig, version: Date.now().toString(), is_default: true },
+      '获取默认兑换页面配置',
+      'EXCHANGE_PAGE_CONFIG_DEFAULT'
     )
-  } catch (error) {
-    logger.error('获取兑换页面配置失败', { error: error.message, stack: error.stack })
-    return handleServiceError(error, res)
   }
-})
+
+  if (!configData.detail_page) {
+    configData.detail_page = {
+      attr_display_mode: 'grid',
+      tag_style_type: 'game'
+    }
+  }
+
+  const updatedAtExchange = configData.updated_at || new Date().toISOString()
+  const versionTsExchange = new Date(updatedAtExchange).getTime().toString()
+
+  return res.apiSuccess(
+    {
+      ...configData,
+      version: versionTsExchange,
+      updated_at: updatedAtExchange,
+      is_default: false
+    },
+    '获取兑换页面配置成功',
+    'EXCHANGE_PAGE_CONFIG_SUCCESS'
+  )
+}))
 
 /**
  * @route GET /api/v4/system/config/app-theme
@@ -441,35 +420,30 @@ router.get('/exchange-page', async (req, res) => {
  *
  * @date 2026-03-06
  */
-router.get('/app-theme', async (req, res) => {
-  try {
-    // 内存缓存命中 → 直接返回，响应 <5ms
-    const cached = appThemeMemCache.get()
-    if (cached) {
-      return res.apiSuccess(cached, '获取全局主题配置成功', 'APP_THEME_CONFIG_SUCCESS')
-    }
-
-    // 缓存未命中 → 查 Redis/DB（AdminSystemService 内部有 Redis 缓存）
-    const AdminSystemService = req.app.locals.services.getService('admin_system')
-    const configData = await AdminSystemService.getConfigValue('app_theme')
-
-    const responseData = {
-      theme: configData?.theme || 'default',
-      version: Date.now().toString()
-    }
-
-    // 写入内存缓存
-    appThemeMemCache.set(responseData)
-
-    const code = configData ? 'APP_THEME_CONFIG_SUCCESS' : 'APP_THEME_CONFIG_DEFAULT'
-    const message = configData ? '获取全局主题配置成功' : '获取默认全局主题配置'
-
-    return res.apiSuccess(responseData, message, code)
-  } catch (error) {
-    logger.error('获取全局主题配置失败', { error: error.message, stack: error.stack })
-    return handleServiceError(error, res)
+router.get('/app-theme', asyncHandler(async (req, res) => {
+  // 内存缓存命中 → 直接返回，响应 <5ms
+  const cached = appThemeMemCache.get()
+  if (cached) {
+    return res.apiSuccess(cached, '获取全局主题配置成功', 'APP_THEME_CONFIG_SUCCESS')
   }
-})
+
+  // 缓存未命中 → 查 Redis/DB（AdminSystemService 内部有 Redis 缓存）
+  const AdminSystemService = req.app.locals.services.getService('admin_system')
+  const configData = await AdminSystemService.getConfigValue('app_theme')
+
+  const responseData = {
+    theme: configData?.theme || 'default',
+    version: Date.now().toString()
+  }
+
+  // 写入内存缓存
+  appThemeMemCache.set(responseData)
+
+  const code = configData ? 'APP_THEME_CONFIG_SUCCESS' : 'APP_THEME_CONFIG_DEFAULT'
+  const message = configData ? '获取全局主题配置成功' : '获取默认全局主题配置'
+
+  return res.apiSuccess(responseData, message, code)
+}))
 
 /**
  * @route GET /api/v4/system/config
@@ -485,26 +459,21 @@ router.get('/app-theme', async (req, res) => {
  * 业务场景：微信小程序联系客服页面、关于页面等需要读取运营配置的公开信息
  * 数据来源：system_settings 表中 category='basic' 且 is_visible=1 的配置项
  */
-router.get('/', async (req, res) => {
-  try {
-    const AdminSystemService = req.app.locals.services.getService('admin_system')
+router.get('/', asyncHandler(async (req, res) => {
+  const AdminSystemService = req.app.locals.services.getService('admin_system')
 
-    /* 只返回白名单内的公开配置项 */
-    const configMap = {}
-    for (const [category, keys] of Object.entries(PUBLIC_SETTING_KEYS)) {
-      const settingsData = await AdminSystemService.getSettingsByCategory(category)
-      for (const s of settingsData.settings) {
-        if (keys.includes(s.setting_key)) {
-          configMap[s.setting_key] = s.setting_value
-        }
+  /* 只返回白名单内的公开配置项 */
+  const configMap = {}
+  for (const [category, keys] of Object.entries(PUBLIC_SETTING_KEYS)) {
+    const settingsData = await AdminSystemService.getSettingsByCategory(category)
+    for (const s of settingsData.settings) {
+      if (keys.includes(s.setting_key)) {
+        configMap[s.setting_key] = s.setting_value
       }
     }
-
-    return res.apiSuccess(configMap, '获取系统配置成功')
-  } catch (error) {
-    logger.error('获取系统基础配置失败', { error: error.message })
-    return handleServiceError(error, res)
   }
-})
+
+  return res.apiSuccess(configMap, '获取系统配置成功')
+}))
 
 module.exports = router

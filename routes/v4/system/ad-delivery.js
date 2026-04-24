@@ -40,81 +40,71 @@ router.get(
   '/',
   authenticateToken,
   asyncHandler(async (req, res) => {
-    try {
-      const { slot_type, position = 'home' } = req.query
+    const { slot_type, position = 'home' } = req.query
 
-      if (!slot_type) {
-        return res.apiBadRequest(
-          '缺少必需参数：slot_type（popup / carousel / announcement / feed）'
-        )
+    if (!slot_type) {
+      return res.apiBadRequest(
+        '缺少必需参数：slot_type（popup / carousel / announcement / feed）'
+      )
+    }
+
+    const validSlotTypes = ['popup', 'carousel', 'announcement', 'feed']
+    if (!validSlotTypes.includes(slot_type)) {
+      return res.apiBadRequest('slot_type 必须是以下之一：' + validSlotTypes.join(', '))
+    }
+
+    // 构造 slot_key：{position}_{slot_type}（与 ad_slots 种子数据一致）
+    const slotKey = position + '_' + slot_type
+
+    const AdBiddingService = req.app.locals.services.getService('ad_bidding')
+    const items = await AdBiddingService.selectWinners(slotKey, req.user.user_id)
+
+    // 扁平化返回结构：将 campaign + creative 合并为前端直接使用的字段
+    const flatItems = items.map(item => {
+      const creative = item.creative || {}
+      return {
+        ad_campaign_id: item.ad_campaign_id,
+        campaign_name: item.campaign_name,
+        campaign_category: item.campaign_category,
+        ad_creative_id: creative.ad_creative_id || null,
+        title: creative.title || item.campaign_name,
+        content_type: creative.content_type || 'image',
+        image_url: creative.media_object_key
+          ? `${process.env.PUBLIC_BASE_URL}/api/v4/images/${creative.media_object_key}`
+          : null,
+        image_width: creative.media_width || null,
+        image_height: creative.media_height || null,
+        text_content: creative.text_content || null,
+        link_url: creative.link_url || null,
+        link_type: creative.link_type || 'none',
+        display_mode: creative.display_mode || null,
+        frequency_rule: item.frequency_rule,
+        frequency_value: item.frequency_value,
+        force_show: item.force_show,
+        priority: item.priority,
+        slide_interval_ms: item.slide_interval_ms,
+        start_date: item.start_date,
+        end_date: item.end_date
       }
+    })
 
-      const validSlotTypes = ['popup', 'carousel', 'announcement', 'feed']
-      if (!validSlotTypes.includes(slot_type)) {
-        return res.apiBadRequest('slot_type 必须是以下之一：' + validSlotTypes.join(', '))
-      }
+    logger.info('统一内容获取成功', {
+      slot_type,
+      position,
+      slot_key: slotKey,
+      user_id: req.user.user_id,
+      items_count: flatItems.length
+    })
 
-      // 构造 slot_key：{position}_{slot_type}（与 ad_slots 种子数据一致）
-      const slotKey = position + '_' + slot_type
-
-      const AdBiddingService = req.app.locals.services.getService('ad_bidding')
-      const items = await AdBiddingService.selectWinners(slotKey, req.user.user_id)
-
-      // 扁平化返回结构：将 campaign + creative 合并为前端直接使用的字段
-      const flatItems = items.map(item => {
-        const creative = item.creative || {}
-        return {
-          ad_campaign_id: item.ad_campaign_id,
-          campaign_name: item.campaign_name,
-          campaign_category: item.campaign_category,
-          ad_creative_id: creative.ad_creative_id || null,
-          title: creative.title || item.campaign_name,
-          content_type: creative.content_type || 'image',
-          image_url: creative.media_object_key
-            ? `${process.env.PUBLIC_BASE_URL}/api/v4/images/${creative.media_object_key}`
-            : null,
-          image_width: creative.media_width || null,
-          image_height: creative.media_height || null,
-          text_content: creative.text_content || null,
-          link_url: creative.link_url || null,
-          link_type: creative.link_type || 'none',
-          display_mode: creative.display_mode || null,
-          frequency_rule: item.frequency_rule,
-          frequency_value: item.frequency_value,
-          force_show: item.force_show,
-          priority: item.priority,
-          slide_interval_ms: item.slide_interval_ms,
-          start_date: item.start_date,
-          end_date: item.end_date
-        }
-      })
-
-      logger.info('统一内容获取成功', {
+    return res.apiSuccess(
+      {
+        items: flatItems,
         slot_type,
         position,
-        slot_key: slotKey,
-        user_id: req.user.user_id,
-        items_count: flatItems.length
-      })
-
-      return res.apiSuccess(
-        {
-          items: flatItems,
-          slot_type,
-          position,
-          total: flatItems.length
-        },
-        '获取内容成功'
-      )
-    } catch (error) {
-      logger.error('统一内容获取失败', {
-        error: error.message,
-        slot_type: req.query.slot_type,
-        position: req.query.position,
-        user_id: req.user?.user_id
-      })
-      return res.apiInternalError('获取内容失败', error.message, 'AD_DELIVERY_ERROR')
-    }
+        total: flatItems.length
+      },
+      '获取内容成功'
+    )
   })
 )
 

@@ -65,6 +65,7 @@
  * 使用模型：Claude Sonnet 4.5
  */
 
+const BusinessError = require('../utils/BusinessError')
 const BeijingTimeHelper = require('../utils/timeHelper')
 const models = require('../models')
 
@@ -205,11 +206,11 @@ class FeedbackService {
 
       // 参数验证
       if (!content || content.trim().length === 0) {
-        throw new Error('反馈内容不能为空')
+        throw new BusinessError('反馈内容不能为空', 'FEEDBACK_NOT_ALLOWED', 400)
       }
 
       if (content.length > 5000) {
-        throw new Error('反馈内容不能超过5000字符')
+        throw new BusinessError('反馈内容不能超过5000字符', 'FEEDBACK_NOT_ALLOWED', 400)
       }
 
       // 计算预计响应时间
@@ -269,13 +270,13 @@ class FeedbackService {
 
       // 验证回复内容
       if (!replyContent || replyContent.trim().length === 0) {
-        throw new Error('回复内容不能为空')
+        throw new BusinessError('回复内容不能为空', 'FEEDBACK_NOT_ALLOWED', 400)
       }
 
       // 查询反馈
       const feedback = await models.Feedback.findByPk(feedbackId)
       if (!feedback) {
-        throw new Error('反馈不存在')
+        throw new BusinessError('反馈不存在', 'FEEDBACK_NOT_FOUND', 404)
       }
 
       // 更新反馈状态和回复
@@ -335,19 +336,19 @@ class FeedbackService {
       })
 
       if (!replyContent || replyContent.trim().length === 0) {
-        throw new Error('回复内容不能为空')
+        throw new BusinessError('回复内容不能为空', 'FEEDBACK_NOT_ALLOWED', 400)
       }
 
       if (replyContent.trim().length > 3000) {
-        throw new Error('回复内容不能超过3000字符')
+        throw new BusinessError('回复内容不能超过3000字符', 'FEEDBACK_NOT_ALLOWED', 400)
       }
 
       if (!Array.isArray(feedbackIds) || feedbackIds.length === 0) {
-        throw new Error('反馈ID列表不能为空')
+        throw new BusinessError('反馈ID列表不能为空', 'FEEDBACK_NOT_ALLOWED', 400)
       }
 
       if (feedbackIds.length > 100) {
-        throw new Error('单次批量操作不能超过100条')
+        throw new BusinessError('单次批量操作不能超过100条', 'FEEDBACK_NOT_ALLOWED', 400)
       }
 
       const now = BeijingTimeHelper.createBeijingTime()
@@ -464,7 +465,7 @@ class FeedbackService {
       // 查询反馈
       const feedback = await models.Feedback.findByPk(feedbackId)
       if (!feedback) {
-        throw new Error('反馈不存在')
+        throw new BusinessError('反馈不存在', 'FEEDBACK_NOT_FOUND', 404)
       }
 
       // 更新状态
@@ -515,15 +516,15 @@ class FeedbackService {
 
       const validStatuses = ['pending', 'processing', 'replied', 'closed']
       if (!validStatuses.includes(status)) {
-        throw new Error(`无效的状态值: ${status}，有效值为: ${validStatuses.join(', ')}`)
+        throw new BusinessError(`无效的状态值: ${status}，有效值为: ${validStatuses.join(', ')}`, 'FEEDBACK_INVALID_STATUS', 400)
       }
 
       if (!Array.isArray(feedbackIds) || feedbackIds.length === 0) {
-        throw new Error('反馈ID列表不能为空')
+        throw new BusinessError('反馈ID列表不能为空', 'FEEDBACK_NOT_ALLOWED', 400)
       }
 
       if (feedbackIds.length > 100) {
-        throw new Error('单次批量操作不能超过100条')
+        throw new BusinessError('单次批量操作不能超过100条', 'FEEDBACK_NOT_ALLOWED', 400)
       }
 
       const updateData = {

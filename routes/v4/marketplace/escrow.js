@@ -22,7 +22,7 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken } = require('../../../middleware/auth')
-const { validatePositiveInteger, handleServiceError } = require('../../../middleware/validation')
+const { validatePositiveInteger, asyncHandler } = require('../../../middleware/validation')
 const logger = require('../../../utils/logger').logger
 const TransactionManager = require('../../../utils/TransactionManager')
 
@@ -38,10 +38,9 @@ router.post(
   '/trade-orders/:trade_order_id/confirm-delivery',
   authenticateToken,
   validatePositiveInteger('trade_order_id', 'params'),
-  async (req, res) => {
-    try {
-      const EscrowCodeService = req.app.locals.services.getService('escrow_code')
-      const TradeOrderService = req.app.locals.services.getService('trade_order')
+  asyncHandler(async (req, res) => {
+    const EscrowCodeService = req.app.locals.services.getService('escrow_code')
+    const TradeOrderService = req.app.locals.services.getService('trade_order')
 
       const trade_order_id = req.validated.trade_order_id
       const buyer_id = req.user.user_id
@@ -84,15 +83,7 @@ router.post(
         },
         '确认收货成功，交易已完成'
       )
-    } catch (error) {
-      logger.error('确认收货失败', {
-        error: error.message,
-        trade_order_id: req.params.trade_order_id,
-        buyer_id: req.user?.user_id
-      })
-      return handleServiceError(error, res, '确认收货失败')
-    }
-  }
+  })
 )
 
 /**
@@ -106,26 +97,18 @@ router.get(
   '/trade-orders/:trade_order_id/escrow-status',
   authenticateToken,
   validatePositiveInteger('trade_order_id', 'params'),
-  async (req, res) => {
-    try {
-      const EscrowCodeService = req.app.locals.services.getService('escrow_code')
-      const trade_order_id = req.validated.trade_order_id
+  asyncHandler(async (req, res) => {
+    const EscrowCodeService = req.app.locals.services.getService('escrow_code')
+    const trade_order_id = req.validated.trade_order_id
 
-      const status = await EscrowCodeService.getEscrowStatus(trade_order_id)
+    const status = await EscrowCodeService.getEscrowStatus(trade_order_id)
 
-      if (!status) {
-        return res.apiError('该交易无担保码或已过期', 'ESCROW_NOT_FOUND', null, 404)
-      }
-
-      return res.apiSuccess(status, '查询担保码状态成功')
-    } catch (error) {
-      logger.error('查询担保码状态失败', {
-        error: error.message,
-        trade_order_id: req.params.trade_order_id
-      })
-      return handleServiceError(error, res, '查询担保码状态失败')
+    if (!status) {
+      return res.apiError('该交易无担保码或已过期', 'ESCROW_NOT_FOUND', null, 404)
     }
-  }
+
+    return res.apiSuccess(status, '查询担保码状态成功')
+  })
 )
 
 /**
@@ -140,37 +123,29 @@ router.post(
   '/trade-orders/:trade_order_id/cancel',
   authenticateToken,
   validatePositiveInteger('trade_order_id', 'params'),
-  async (req, res) => {
-    try {
-      const TradeOrderService = req.app.locals.services.getService('trade_order')
-      const EscrowCodeService = req.app.locals.services.getService('escrow_code')
+  asyncHandler(async (req, res) => {
+    const TradeOrderService = req.app.locals.services.getService('trade_order')
+    const EscrowCodeService = req.app.locals.services.getService('escrow_code')
 
-      const trade_order_id = req.validated.trade_order_id
-      const { cancel_reason } = req.body
+    const trade_order_id = req.validated.trade_order_id
+    const { cancel_reason } = req.body
 
-      logger.info('取消交易订单', { trade_order_id, user_id: req.user.user_id })
+    logger.info('取消交易订单', { trade_order_id, user_id: req.user.user_id })
 
-      await TransactionManager.execute(async transaction => {
-        return await TradeOrderService.cancelOrder(
-          { trade_order_id, cancel_reason },
-          { transaction }
-        )
-      })
+    await TransactionManager.execute(async transaction => {
+      return await TradeOrderService.cancelOrder(
+        { trade_order_id, cancel_reason },
+        { transaction }
+      )
+    })
 
-      // 清理担保码
-      await EscrowCodeService.cancelEscrowCode(trade_order_id).catch(err => {
-        logger.warn('清理担保码失败（非致命）', { error: err.message })
-      })
+    // 清理担保码
+    await EscrowCodeService.cancelEscrowCode(trade_order_id).catch(err => {
+      logger.warn('清理担保码失败（非致命）', { error: err.message })
+    })
 
-      return res.apiSuccess({ trade_order_id, status: 'cancelled' }, '交易已取消')
-    } catch (error) {
-      logger.error('取消交易失败', {
-        error: error.message,
-        trade_order_id: req.params.trade_order_id
-      })
-      return handleServiceError(error, res, '取消交易失败')
-    }
-  }
+    return res.apiSuccess({ trade_order_id, status: 'cancelled' }, '交易已取消')
+  })
 )
 
 module.exports = router

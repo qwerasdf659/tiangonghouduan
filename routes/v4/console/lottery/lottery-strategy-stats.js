@@ -32,6 +32,7 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
+const { asyncHandler } = require('../shared/middleware')
 const logger = require('../../../../utils/logger').logger
 const BeijingTimeHelper = require('../../../../utils/timeHelper')
 
@@ -140,30 +141,25 @@ router.get(
   '/realtime/:lottery_campaign_id',
   authenticateToken,
   requireRoleLevel(100),
-  async (req, res) => {
-    try {
-      const lottery_campaign_id = parseInt(req.params.lottery_campaign_id)
+  asyncHandler(async (req, res) => {
+    const lottery_campaign_id = parseInt(req.params.lottery_campaign_id)
 
-      if (isNaN(lottery_campaign_id)) {
-        return res.apiError('lottery_campaign_id 必须为有效数字', 'INVALID_CAMPAIGN_ID', null, 400)
-      }
-
-      // 🔴 调用 RealtimeService 的 getRealtimeOverview 方法
-      const result = await getLotteryRealtimeService(req).getRealtimeOverview(lottery_campaign_id)
-
-      logger.info('查询实时概览统计', {
-        admin_id: req.user.user_id,
-        lottery_campaign_id,
-        today_total_draws: result.today?.total_draws || 0
-      })
-
-      return res.apiSuccess(result, '获取实时概览统计成功')
-    } catch (error) {
-      logger.error('获取实时概览统计失败:', error)
-      return res.apiError(`查询失败：${error.message}`, 'GET_REALTIME_STATS_FAILED', null, 500)
+    if (isNaN(lottery_campaign_id)) {
+      return res.apiError('lottery_campaign_id 必须为有效数字', 'INVALID_CAMPAIGN_ID', null, 400)
     }
+
+    // 🔴 调用 RealtimeService 的 getRealtimeOverview 方法
+    const result = await getLotteryRealtimeService(req).getRealtimeOverview(lottery_campaign_id)
+
+    logger.info('查询实时概览统计', {
+      admin_id: req.user.user_id,
+      lottery_campaign_id,
+      today_total_draws: result.today?.total_draws || 0
+    })
+
+    return res.apiSuccess(result, '获取实时概览统计成功')
   }
-)
+))
 
 /*
  * ==========================================
@@ -194,45 +190,40 @@ router.get(
   '/hourly/:lottery_campaign_id',
   authenticateToken,
   requireRoleLevel(100),
-  async (req, res) => {
-    try {
-      const lottery_campaign_id = parseInt(req.params.lottery_campaign_id)
+  asyncHandler(async (req, res) => {
+    const lottery_campaign_id = parseInt(req.params.lottery_campaign_id)
 
-      if (isNaN(lottery_campaign_id)) {
-        return res.apiError('lottery_campaign_id 必须为有效数字', 'INVALID_CAMPAIGN_ID', null, 400)
-      }
+    if (isNaN(lottery_campaign_id)) {
+      return res.apiError('lottery_campaign_id 必须为有效数字', 'INVALID_CAMPAIGN_ID', null, 400)
+    }
 
-      const { start_time, end_time } = parseTimeRange(req.query)
+    const { start_time, end_time } = parseTimeRange(req.query)
 
-      // 🔴 修正：调用正确的服务方法 getHourlyTrend 并使用 options 对象参数格式
-      const result = await getLotteryAnalyticsService(req).getHourlyTrend(lottery_campaign_id, {
-        start_time,
-        end_time
-      })
+    // 🔴 修正：调用正确的服务方法 getHourlyTrend 并使用 options 对象参数格式
+    const result = await getLotteryAnalyticsService(req).getHourlyTrend(lottery_campaign_id, {
+      start_time,
+      end_time
+    })
 
-      logger.info('查询小时级趋势数据', {
-        admin_id: req.user.user_id,
+    logger.info('查询小时级趋势数据', {
+      admin_id: req.user.user_id,
+      lottery_campaign_id,
+      start_time,
+      end_time,
+      data_points: result.length
+    })
+
+    return res.apiSuccess(
+      {
         lottery_campaign_id,
         start_time,
         end_time,
-        data_points: result.length
-      })
-
-      return res.apiSuccess(
-        {
-          lottery_campaign_id,
-          start_time,
-          end_time,
-          data: result
-        },
-        '获取小时级趋势数据成功'
-      )
-    } catch (error) {
-      logger.error('获取小时级趋势数据失败:', error)
-      return res.apiError(`查询失败：${error.message}`, 'GET_HOURLY_STATS_FAILED', null, 500)
-    }
+        data: result
+      },
+      '获取小时级趋势数据成功'
+    )
   }
-)
+))
 
 /*
  * ==========================================
@@ -259,45 +250,40 @@ router.get(
   '/daily/:lottery_campaign_id',
   authenticateToken,
   requireRoleLevel(100),
-  async (req, res) => {
-    try {
-      const lottery_campaign_id = parseInt(req.params.lottery_campaign_id)
+  asyncHandler(async (req, res) => {
+    const lottery_campaign_id = parseInt(req.params.lottery_campaign_id)
 
-      if (isNaN(lottery_campaign_id)) {
-        return res.apiError('lottery_campaign_id 必须为有效数字', 'INVALID_CAMPAIGN_ID', null, 400)
-      }
+    if (isNaN(lottery_campaign_id)) {
+      return res.apiError('lottery_campaign_id 必须为有效数字', 'INVALID_CAMPAIGN_ID', null, 400)
+    }
 
-      const { start_date, end_date } = parseDateRange(req.query)
+    const { start_date, end_date } = parseDateRange(req.query)
 
-      // 🔴 修正：调用正确的服务方法 getDailyTrend 并使用 options 对象参数格式
-      const result = await getLotteryAnalyticsService(req).getDailyTrend(lottery_campaign_id, {
-        start_date,
-        end_date
-      })
+    // 🔴 修正：调用正确的服务方法 getDailyTrend 并使用 options 对象参数格式
+    const result = await getLotteryAnalyticsService(req).getDailyTrend(lottery_campaign_id, {
+      start_date,
+      end_date
+    })
 
-      logger.info('查询日级趋势数据', {
-        admin_id: req.user.user_id,
+    logger.info('查询日级趋势数据', {
+      admin_id: req.user.user_id,
+      lottery_campaign_id,
+      start_date,
+      end_date,
+      data_points: result.length
+    })
+
+    return res.apiSuccess(
+      {
         lottery_campaign_id,
         start_date,
         end_date,
-        data_points: result.length
-      })
-
-      return res.apiSuccess(
-        {
-          lottery_campaign_id,
-          start_date,
-          end_date,
-          data: result
-        },
-        '获取日级趋势数据成功'
-      )
-    } catch (error) {
-      logger.error('获取日级趋势数据失败:', error)
-      return res.apiError(`查询失败：${error.message}`, 'GET_DAILY_STATS_FAILED', null, 500)
-    }
+        data: result
+      },
+      '获取日级趋势数据成功'
+    )
   }
-)
+))
 
 /*
  * ==========================================
@@ -336,40 +322,35 @@ router.get(
   '/tier-distribution/:lottery_campaign_id',
   authenticateToken,
   requireRoleLevel(100),
-  async (req, res) => {
-    try {
-      const lottery_campaign_id = parseInt(req.params.lottery_campaign_id)
+  asyncHandler(async (req, res) => {
+    const lottery_campaign_id = parseInt(req.params.lottery_campaign_id)
 
-      if (isNaN(lottery_campaign_id)) {
-        return res.apiError('lottery_campaign_id 必须为有效数字', 'INVALID_CAMPAIGN_ID', null, 400)
-      }
-
-      const { start_time, end_time } = parseTimeRange(req.query)
-
-      // 🔴 修正：使用 options 对象参数格式
-      const result = await getLotteryAnalyticsService(req).getTierDistribution(
-        lottery_campaign_id,
-        {
-          start_time,
-          end_time
-        }
-      )
-
-      logger.info('查询奖品档位分布', {
-        admin_id: req.user.user_id,
-        lottery_campaign_id,
-        start_time,
-        end_time,
-        total_draws: result.total_draws
-      })
-
-      return res.apiSuccess(result, '获取奖品档位分布成功')
-    } catch (error) {
-      logger.error('获取奖品档位分布失败:', error)
-      return res.apiError(`查询失败：${error.message}`, 'GET_TIER_DISTRIBUTION_FAILED', null, 500)
+    if (isNaN(lottery_campaign_id)) {
+      return res.apiError('lottery_campaign_id 必须为有效数字', 'INVALID_CAMPAIGN_ID', null, 400)
     }
+
+    const { start_time, end_time } = parseTimeRange(req.query)
+
+    // 🔴 修正：使用 options 对象参数格式
+    const result = await getLotteryAnalyticsService(req).getTierDistribution(
+      lottery_campaign_id,
+      {
+        start_time,
+        end_time
+      }
+    )
+
+    logger.info('查询奖品档位分布', {
+      admin_id: req.user.user_id,
+      lottery_campaign_id,
+      start_time,
+      end_time,
+      total_draws: result.total_draws
+    })
+
+    return res.apiSuccess(result, '获取奖品档位分布成功')
   }
-)
+))
 
 /*
  * ==========================================
@@ -408,40 +389,35 @@ router.get(
   '/experience-triggers/:lottery_campaign_id',
   authenticateToken,
   requireRoleLevel(100),
-  async (req, res) => {
-    try {
-      const lottery_campaign_id = parseInt(req.params.lottery_campaign_id)
+  asyncHandler(async (req, res) => {
+    const lottery_campaign_id = parseInt(req.params.lottery_campaign_id)
 
-      if (isNaN(lottery_campaign_id)) {
-        return res.apiError('lottery_campaign_id 必须为有效数字', 'INVALID_CAMPAIGN_ID', null, 400)
-      }
-
-      const { start_time, end_time } = parseTimeRange(req.query)
-
-      // 🔴 修正：调用正确的服务方法 getExperienceTriggers（不是 getExperienceTriggerStats）并使用 options 对象参数格式
-      const result = await getLotteryAnalyticsService(req).getExperienceTriggers(
-        lottery_campaign_id,
-        {
-          start_time,
-          end_time
-        }
-      )
-
-      logger.info('查询体验机制触发统计', {
-        admin_id: req.user.user_id,
-        lottery_campaign_id,
-        start_time,
-        end_time,
-        total_draws: result.total_draws
-      })
-
-      return res.apiSuccess(result, '获取体验机制触发统计成功')
-    } catch (error) {
-      logger.error('获取体验机制触发统计失败:', error)
-      return res.apiError(`查询失败：${error.message}`, 'GET_EXPERIENCE_TRIGGERS_FAILED', null, 500)
+    if (isNaN(lottery_campaign_id)) {
+      return res.apiError('lottery_campaign_id 必须为有效数字', 'INVALID_CAMPAIGN_ID', null, 400)
     }
+
+    const { start_time, end_time } = parseTimeRange(req.query)
+
+    // 🔴 修正：调用正确的服务方法 getExperienceTriggers（不是 getExperienceTriggerStats）并使用 options 对象参数格式
+    const result = await getLotteryAnalyticsService(req).getExperienceTriggers(
+      lottery_campaign_id,
+      {
+        start_time,
+        end_time
+      }
+    )
+
+    logger.info('查询体验机制触发统计', {
+      admin_id: req.user.user_id,
+      lottery_campaign_id,
+      start_time,
+      end_time,
+      total_draws: result.total_draws
+    })
+
+    return res.apiSuccess(result, '获取体验机制触发统计成功')
   }
-)
+))
 
 /*
  * ==========================================
@@ -475,40 +451,35 @@ router.get(
   '/budget-consumption/:lottery_campaign_id',
   authenticateToken,
   requireRoleLevel(100),
-  async (req, res) => {
-    try {
-      const lottery_campaign_id = parseInt(req.params.lottery_campaign_id)
+  asyncHandler(async (req, res) => {
+    const lottery_campaign_id = parseInt(req.params.lottery_campaign_id)
 
-      if (isNaN(lottery_campaign_id)) {
-        return res.apiError('lottery_campaign_id 必须为有效数字', 'INVALID_CAMPAIGN_ID', null, 400)
-      }
-
-      const { start_time, end_time } = parseTimeRange(req.query)
-
-      // 🔴 修正：调用正确的服务方法 getBudgetConsumption（不是 getBudgetConsumptionStats）并使用 options 对象参数格式
-      const result = await getLotteryAnalyticsService(req).getBudgetConsumption(
-        lottery_campaign_id,
-        {
-          start_time,
-          end_time
-        }
-      )
-
-      logger.info('查询预算消耗统计', {
-        admin_id: req.user.user_id,
-        lottery_campaign_id,
-        start_time,
-        end_time,
-        total_budget_consumed: result.total_budget_consumed
-      })
-
-      return res.apiSuccess(result, '获取预算消耗统计成功')
-    } catch (error) {
-      logger.error('获取预算消耗统计失败:', error)
-      return res.apiError(`查询失败：${error.message}`, 'GET_BUDGET_CONSUMPTION_FAILED', null, 500)
+    if (isNaN(lottery_campaign_id)) {
+      return res.apiError('lottery_campaign_id 必须为有效数字', 'INVALID_CAMPAIGN_ID', null, 400)
     }
+
+    const { start_time, end_time } = parseTimeRange(req.query)
+
+    // 🔴 修正：调用正确的服务方法 getBudgetConsumption（不是 getBudgetConsumptionStats）并使用 options 对象参数格式
+    const result = await getLotteryAnalyticsService(req).getBudgetConsumption(
+      lottery_campaign_id,
+      {
+        start_time,
+        end_time
+      }
+    )
+
+    logger.info('查询预算消耗统计', {
+      admin_id: req.user.user_id,
+      lottery_campaign_id,
+      start_time,
+      end_time,
+      total_budget_consumed: result.total_budget_consumed
+    })
+
+    return res.apiSuccess(result, '获取预算消耗统计成功')
   }
-)
+))
 
 /*
  * ==========================================
@@ -549,160 +520,155 @@ router.get(
  *   ]
  * }
  */
-router.get('/config-summary', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const { LotteryStrategyConfig, LotteryTierMatrixConfig, LotteryCampaign, sequelize } =
-      req.app.locals.models
-    const { Op } = require('sequelize')
+router.get('/config-summary', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  const { LotteryStrategyConfig, LotteryTierMatrixConfig, LotteryCampaign, sequelize } =
+    req.app.locals.models
+  const { Op } = require('sequelize')
 
-    // ── 1. 策略配置总览 ──
-    const allStrategies = await LotteryStrategyConfig.findAll({
-      attributes: ['config_group', 'config_key', 'is_active'],
-      order: [
-        ['config_group', 'ASC'],
-        ['priority', 'ASC']
-      ]
-    })
+  // ── 1. 策略配置总览 ──
+  const allStrategies = await LotteryStrategyConfig.findAll({
+    attributes: ['config_group', 'config_key', 'is_active'],
+    order: [
+      ['config_group', 'ASC'],
+      ['priority', 'ASC']
+    ]
+  })
 
-    const activeStrategies = allStrategies.filter(s => s.is_active)
-    const configGroups = {}
-    for (const s of allStrategies) {
-      configGroups[s.config_group] = (configGroups[s.config_group] || 0) + 1
-    }
-
-    const matrixConfigs = await LotteryTierMatrixConfig.findAll({
-      attributes: ['budget_tier', 'pressure_tier', 'is_active']
-    })
-    const activeMatrixConfigs = matrixConfigs.filter(m => m.is_active)
-
-    // ── 2. 活跃活动列表 ──
-    const activeCampaigns = await LotteryCampaign.findAll({
-      where: { status: 'active' },
-      attributes: ['lottery_campaign_id', 'campaign_name', 'pick_method', 'budget_mode'],
-      order: [['lottery_campaign_id', 'ASC']]
-    })
-
-    // 批量查询 guarantee 配置（从 lottery_strategy_config 聚合，避免 N+1）
-    const campaignIds = activeCampaigns.map(c => c.lottery_campaign_id)
-    const guaranteeMap = new Map()
-    if (campaignIds.length > 0) {
-      const guaranteeConfigs = await LotteryStrategyConfig.findAll({
-        where: {
-          lottery_campaign_id: { [Op.in]: campaignIds },
-          config_group: 'guarantee',
-          config_key: { [Op.in]: ['enabled', 'threshold'] },
-          is_active: 1
-        },
-        attributes: ['lottery_campaign_id', 'config_key', 'config_value']
-      })
-      guaranteeConfigs.forEach(gc => {
-        if (!guaranteeMap.has(gc.lottery_campaign_id)) {
-          guaranteeMap.set(gc.lottery_campaign_id, {})
-        }
-        const parsed_value = (() => {
-          try {
-            return JSON.parse(gc.config_value)
-          } catch {
-            return gc.config_value
-          }
-        })()
-        guaranteeMap.get(gc.lottery_campaign_id)[gc.config_key] = parsed_value
-      })
-    }
-
-    // ── 3. 最近24小时策略执行概况（直接查 lottery_draws） ──
-    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
-
-    const [recentStats] = await sequelize.query(
-      `
-        SELECT
-          COUNT(*)                                        AS total_draws,
-          SUM(reward_tier = 'high')                       AS high_count,
-          SUM(reward_tier = 'mid')                        AS mid_count,
-          SUM(reward_tier = 'low')                        AS low_count,
-          SUM(reward_tier = 'fallback')                   AS fallback_count,
-          SUM(guarantee_triggered = 1)                    AS guarantee_triggered,
-          SUM(downgrade_count > 0)                        AS downgrade_records,
-          SUM(fallback_triggered = 1)                     AS fallback_records,
-          ROUND(AVG(cost_points), 1)                      AS avg_cost
-        FROM lottery_draws
-        WHERE created_at >= :since
-      `,
-      {
-        replacements: { since: twentyFourHoursAgo },
-        type: sequelize.QueryTypes.SELECT
-      }
-    )
-
-    const totalDraws = parseInt(recentStats.total_draws) || 0
-    const guaranteeTriggered = parseInt(recentStats.guarantee_triggered) || 0
-
-    // ── 4. BxPx 矩阵命中分布（最近24小时决策表） ──
-    const bxpxHits = await sequelize.query(
-      `
-        SELECT
-          budget_tier,
-          pressure_tier,
-          COUNT(*) AS count
-        FROM lottery_draw_decisions
-        WHERE decision_at >= :since
-          AND budget_tier IS NOT NULL
-          AND pressure_tier IS NOT NULL
-        GROUP BY budget_tier, pressure_tier
-        ORDER BY budget_tier, pressure_tier
-      `,
-      {
-        replacements: { since: twentyFourHoursAgo },
-        type: sequelize.QueryTypes.SELECT
-      }
-    )
-
-    const result = {
-      config_overview: {
-        total_strategies: allStrategies.length,
-        active_strategies: activeStrategies.length,
-        config_groups: configGroups,
-        matrix_configs: matrixConfigs.length,
-        active_matrix_configs: activeMatrixConfigs.length
-      },
-      active_campaigns: activeCampaigns.map(c => {
-        const gConfig = guaranteeMap.get(c.lottery_campaign_id) || {}
-        return {
-          ...c.toJSON(),
-          guarantee_enabled: gConfig.enabled || false,
-          guarantee_threshold: gConfig.threshold || 10
-        }
-      }),
-      recent_24h: {
-        total_draws: totalDraws,
-        tier_distribution: {
-          high: parseInt(recentStats.high_count) || 0,
-          mid: parseInt(recentStats.mid_count) || 0,
-          low: parseInt(recentStats.low_count) || 0,
-          fallback: parseInt(recentStats.fallback_count) || 0
-        },
-        guarantee_triggered: guaranteeTriggered,
-        guarantee_rate:
-          totalDraws > 0 ? parseFloat((guaranteeTriggered / totalDraws).toFixed(4)) : 0,
-        downgrade_records: parseInt(recentStats.downgrade_records) || 0,
-        fallback_records: parseInt(recentStats.fallback_records) || 0,
-        avg_cost: parseFloat(recentStats.avg_cost) || 0
-      },
-      bxpx_hit_distribution: bxpxHits || []
-    }
-
-    logger.info('查询策略配置概览摘要', {
-      admin_id: req.user.user_id,
-      total_strategies: result.config_overview.total_strategies,
-      active_campaigns: result.active_campaigns.length,
-      recent_draws: result.recent_24h.total_draws
-    })
-
-    return res.apiSuccess(result, '获取策略配置概览摘要成功')
-  } catch (error) {
-    logger.error('获取策略配置概览摘要失败:', error)
-    return res.apiError(`查询失败：${error.message}`, 'GET_CONFIG_SUMMARY_FAILED', null, 500)
+  const activeStrategies = allStrategies.filter(s => s.is_active)
+  const configGroups = {}
+  for (const s of allStrategies) {
+    configGroups[s.config_group] = (configGroups[s.config_group] || 0) + 1
   }
-})
+
+  const matrixConfigs = await LotteryTierMatrixConfig.findAll({
+    attributes: ['budget_tier', 'pressure_tier', 'is_active']
+  })
+  const activeMatrixConfigs = matrixConfigs.filter(m => m.is_active)
+
+  // ── 2. 活跃活动列表 ──
+  const activeCampaigns = await LotteryCampaign.findAll({
+    where: { status: 'active' },
+    attributes: ['lottery_campaign_id', 'campaign_name', 'pick_method', 'budget_mode'],
+    order: [['lottery_campaign_id', 'ASC']]
+  })
+
+  // 批量查询 guarantee 配置（从 lottery_strategy_config 聚合，避免 N+1）
+  const campaignIds = activeCampaigns.map(c => c.lottery_campaign_id)
+  const guaranteeMap = new Map()
+  if (campaignIds.length > 0) {
+    const guaranteeConfigs = await LotteryStrategyConfig.findAll({
+      where: {
+        lottery_campaign_id: { [Op.in]: campaignIds },
+        config_group: 'guarantee',
+        config_key: { [Op.in]: ['enabled', 'threshold'] },
+        is_active: 1
+      },
+      attributes: ['lottery_campaign_id', 'config_key', 'config_value']
+    })
+    guaranteeConfigs.forEach(gc => {
+      if (!guaranteeMap.has(gc.lottery_campaign_id)) {
+        guaranteeMap.set(gc.lottery_campaign_id, {})
+      }
+      const parsed_value = (() => {
+        try {
+          return JSON.parse(gc.config_value)
+        } catch {
+          return gc.config_value
+        }
+      })()
+      guaranteeMap.get(gc.lottery_campaign_id)[gc.config_key] = parsed_value
+    })
+  }
+
+  // ── 3. 最近24小时策略执行概况（直接查 lottery_draws） ──
+  const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
+
+  const [recentStats] = await sequelize.query(
+    `
+      SELECT
+        COUNT(*)                                        AS total_draws,
+        SUM(reward_tier = 'high')                       AS high_count,
+        SUM(reward_tier = 'mid')                        AS mid_count,
+        SUM(reward_tier = 'low')                        AS low_count,
+        SUM(reward_tier = 'fallback')                   AS fallback_count,
+        SUM(guarantee_triggered = 1)                    AS guarantee_triggered,
+        SUM(downgrade_count > 0)                        AS downgrade_records,
+        SUM(fallback_triggered = 1)                     AS fallback_records,
+        ROUND(AVG(cost_points), 1)                      AS avg_cost
+      FROM lottery_draws
+      WHERE created_at >= :since
+    `,
+    {
+      replacements: { since: twentyFourHoursAgo },
+      type: sequelize.QueryTypes.SELECT
+    }
+  )
+
+  const totalDraws = parseInt(recentStats.total_draws) || 0
+  const guaranteeTriggered = parseInt(recentStats.guarantee_triggered) || 0
+
+  // ── 4. BxPx 矩阵命中分布（最近24小时决策表） ──
+  const bxpxHits = await sequelize.query(
+    `
+      SELECT
+        budget_tier,
+        pressure_tier,
+        COUNT(*) AS count
+      FROM lottery_draw_decisions
+      WHERE decision_at >= :since
+        AND budget_tier IS NOT NULL
+        AND pressure_tier IS NOT NULL
+      GROUP BY budget_tier, pressure_tier
+      ORDER BY budget_tier, pressure_tier
+    `,
+    {
+      replacements: { since: twentyFourHoursAgo },
+      type: sequelize.QueryTypes.SELECT
+    }
+  )
+
+  const result = {
+    config_overview: {
+      total_strategies: allStrategies.length,
+      active_strategies: activeStrategies.length,
+      config_groups: configGroups,
+      matrix_configs: matrixConfigs.length,
+      active_matrix_configs: activeMatrixConfigs.length
+    },
+    active_campaigns: activeCampaigns.map(c => {
+      const gConfig = guaranteeMap.get(c.lottery_campaign_id) || {}
+      return {
+        ...c.toJSON(),
+        guarantee_enabled: gConfig.enabled || false,
+        guarantee_threshold: gConfig.threshold || 10
+      }
+    }),
+    recent_24h: {
+      total_draws: totalDraws,
+      tier_distribution: {
+        high: parseInt(recentStats.high_count) || 0,
+        mid: parseInt(recentStats.mid_count) || 0,
+        low: parseInt(recentStats.low_count) || 0,
+        fallback: parseInt(recentStats.fallback_count) || 0
+      },
+      guarantee_triggered: guaranteeTriggered,
+      guarantee_rate:
+        totalDraws > 0 ? parseFloat((guaranteeTriggered / totalDraws).toFixed(4)) : 0,
+      downgrade_records: parseInt(recentStats.downgrade_records) || 0,
+      fallback_records: parseInt(recentStats.fallback_records) || 0,
+      avg_cost: parseFloat(recentStats.avg_cost) || 0
+    },
+    bxpx_hit_distribution: bxpxHits || []
+  }
+
+  logger.info('查询策略配置概览摘要', {
+    admin_id: req.user.user_id,
+    total_strategies: result.config_overview.total_strategies,
+    active_campaigns: result.active_campaigns.length,
+    recent_draws: result.recent_24h.total_draws
+  })
+
+  return res.apiSuccess(result, '获取策略配置概览摘要成功')
+}))
 
 module.exports = router

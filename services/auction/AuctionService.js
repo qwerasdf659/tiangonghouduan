@@ -26,6 +26,7 @@
 
 'use strict'
 
+const BusinessError = require('../../utils/BusinessError')
 const logger = require('../../utils/logger').logger
 const { AssetCode } = require('../../constants/AssetCode')
 const BalanceService = require('../asset/BalanceService')
@@ -125,7 +126,7 @@ class AuctionService {
     const { transaction } = options
 
     if (!transaction) {
-      throw new Error('AuctionService.createAuction 需要外部传入事务')
+      throw new BusinessError('AuctionService.createAuction 需要外部传入事务', 'AUCTION_ERROR', 400)
     }
 
     const {
@@ -140,25 +141,25 @@ class AuctionService {
     // ① 校验资产白名单
     const allowedAssets = await this._getAllowedBidAssets()
     if (!allowedAssets.includes(price_asset_code)) {
-      throw new Error(`不允许使用 ${price_asset_code} 作为竞价资产`)
+      throw new BusinessError(`不允许使用 ${price_asset_code} 作为竞价资产`, 'AUCTION_NOT_ALLOWED', 400)
     }
 
     // ② 校验价格参数
     if (!start_price || start_price <= 0) {
-      throw new Error('起拍价必须大于0')
+      throw new BusinessError('起拍价必须大于0', 'AUCTION_REQUIRED', 400)
     }
     if (min_bid_increment <= 0) {
-      throw new Error('最小加价幅度必须大于0')
+      throw new BusinessError('最小加价幅度必须大于0', 'AUCTION_REQUIRED', 400)
     }
     if (buyout_price != null && buyout_price <= start_price) {
-      throw new Error('一口价必须大于起拍价')
+      throw new BusinessError('一口价必须大于起拍价', 'AUCTION_REQUIRED', 400)
     }
 
     // ③ 校验时间窗口（决策2：最低时长从 system_settings 读取）
     const startDate = new Date(start_time)
     const endDate = new Date(end_time)
     if (endDate <= startDate) {
-      throw new Error('结束时间必须晚于开始时间')
+      throw new BusinessError('结束时间必须晚于开始时间', 'AUCTION_REQUIRED', 400)
     }
     const durationHours = (endDate - startDate) / (1000 * 60 * 60)
     const minDuration =
@@ -166,7 +167,7 @@ class AuctionService {
         await AdminSystemService.getSettingValue('auction', 'auction_min_duration_hours', 2)
       ) || 2
     if (durationHours < minDuration) {
-      throw new Error(`拍卖时长不得少于${minDuration}小时（当前${durationHours.toFixed(1)}小时）`)
+      throw new BusinessError(`拍卖时长不得少于${minDuration}小时（当前${durationHours.toFixed(1)}小时）`, 'AUCTION_ERROR', 400)
     }
 
     // ④ 校验物品所有权（items.owner_account_id → accounts.user_id）
@@ -175,15 +176,15 @@ class AuctionService {
       transaction
     })
     if (!item) {
-      throw new Error(`物品 ${itemId} 不存在`)
+      throw new BusinessError(`物品 ${itemId} 不存在`, 'AUCTION_NOT_FOUND', 404)
     }
     if (item.status !== 'available') {
-      throw new Error(`物品状态为 ${item.status}，仅 available 状态可拍卖`)
+      throw new BusinessError(`物品状态为 ${item.status}，仅 available 状态可拍卖`, 'AUCTION_ERROR', 400)
     }
 
     const account = await this.Account.findByPk(item.owner_account_id, { transaction })
     if (!account || account.user_id !== userId) {
-      throw new Error('该物品不属于当前用户，无法拍卖')
+      throw new BusinessError('该物品不属于当前用户，无法拍卖', 'AUCTION_ERROR', 400)
     }
 
     // ⑤ 检查同一物品是否已有进行中的拍卖
@@ -195,7 +196,7 @@ class AuctionService {
       transaction
     })
     if (existingAuction) {
-      throw new Error('该物品已有进行中的拍卖')
+      throw new BusinessError('该物品已有进行中的拍卖', 'AUCTION_ERROR', 400)
     }
 
     // ⑥ 锁定物品（holdItem，hold_type='trade'）
@@ -214,7 +215,7 @@ class AuctionService {
       )
     } catch (holdError) {
       if (holdError.message.includes('已被')) {
-        throw new Error('物品当前有更高优先级的锁定，无法拍卖（可能正在核销或被安全冻结）')
+        throw new BusinessError('物品当前有更高优先级的锁定，无法拍卖（可能正在核销或被安全冻结）', 'AUCTION_ERROR', 400)
       }
       throw holdError
     }
@@ -290,10 +291,10 @@ class AuctionService {
     const { transaction, idempotency_key } = options
 
     if (!transaction) {
-      throw new Error('AuctionService.placeBid 需要外部传入事务')
+      throw new BusinessError('AuctionService.placeBid 需要外部传入事务', 'AUCTION_ERROR', 400)
     }
     if (!idempotency_key) {
-      throw new Error('placeBid 需要 idempotency_key')
+      throw new BusinessError('placeBid 需要 idempotency_key', 'AUCTION_ERROR', 400)
     }
 
     // 锁定拍卖记录
@@ -303,20 +304,20 @@ class AuctionService {
     })
 
     if (!auctionListing) {
-      throw new Error(`拍卖 ${auctionListingId} 不存在`)
+      throw new BusinessError(`拍卖 ${auctionListingId} 不存在`, 'AUCTION_NOT_FOUND', 404)
     }
 
     // 状态校验
     if (auctionListing.status !== 'active') {
-      throw new Error(`拍卖状态为 ${auctionListing.status}，仅 active 可出价`)
+      throw new BusinessError(`拍卖状态为 ${auctionListing.status}，仅 active 可出价`, 'AUCTION_ERROR', 400)
     }
     if (new Date(auctionListing.end_time) <= new Date()) {
-      throw new Error('拍卖已过期')
+      throw new BusinessError('拍卖已过期', 'AUCTION_EXPIRED', 400)
     }
 
     // 卖方自拍校验（C2C核心差异）
     if (auctionListing.seller_user_id === userId) {
-      throw new Error('不能对自己发起的拍卖出价')
+      throw new BusinessError('不能对自己发起的拍卖出价', 'AUCTION_NOT_ALLOWED', 400)
     }
 
     const assetCode = auctionListing.price_asset_code
@@ -324,7 +325,7 @@ class AuctionService {
     // 资产白名单校验
     const allowedAssets = await this._getAllowedBidAssets()
     if (!allowedAssets.includes(assetCode)) {
-      throw new Error(`资产 ${assetCode} 不在允许竞价列表中`)
+      throw new BusinessError(`资产 ${assetCode} 不在允许竞价列表中`, 'AUCTION_ERROR', 400)
     }
 
     // 出价金额校验
@@ -334,12 +335,14 @@ class AuctionService {
 
     if (currentPrice === 0) {
       if (bidAmount < startPrice) {
-        throw new Error(`首次出价不得低于起拍价 ${startPrice}`)
+        throw new BusinessError(`首次出价不得低于起拍价 ${startPrice}`, 'AUCTION_ERROR', 400)
       }
     } else {
       if (bidAmount < currentPrice + minIncrement) {
-        throw new Error(
-          `出价必须 >= ${currentPrice + minIncrement}（当前价 ${currentPrice} + 最小加价 ${minIncrement}）`
+        throw new BusinessError(
+          `出价必须 >= ${currentPrice + minIncrement}（当前价 ${currentPrice} + 最小加价 ${minIncrement}）`,
+          'AUCTION_REQUIRED',
+          400
         )
       }
     }
@@ -354,7 +357,7 @@ class AuctionService {
       transaction
     })
     if (myCurrentWinning) {
-      throw new Error('您已是当前最高出价者，无需重复出价')
+      throw new BusinessError('您已是当前最高出价者，无需重复出价', 'AUCTION_ALREADY_EXISTS', 409)
     }
 
     // 解冻该用户之前的出价冻结（如有）
@@ -502,7 +505,7 @@ class AuctionService {
     const { transaction } = options
 
     if (!transaction) {
-      throw new Error('AuctionService.settleAuction 需要外部传入事务')
+      throw new BusinessError('AuctionService.settleAuction 需要外部传入事务', 'AUCTION_ERROR', 400)
     }
 
     logger.info('[C2C拍卖结算] 开始结算', { auction_listing_id: auctionListingId })
@@ -513,7 +516,7 @@ class AuctionService {
     })
 
     if (!auctionListing) {
-      throw new Error(`拍卖 ${auctionListingId} 不存在`)
+      throw new BusinessError(`拍卖 ${auctionListingId} 不存在`, 'AUCTION_NOT_FOUND', 404)
     }
 
     // 更新状态为 ended
@@ -533,8 +536,10 @@ class AuctionService {
     })
 
     if (!winnerBid) {
-      throw new Error(
-        `拍卖 ${auctionListingId} 有 ${auctionListing.bid_count} 次出价但找不到 is_winning=true 的记录`
+      throw new BusinessError(
+        `拍卖 ${auctionListingId} 有 ${auctionListing.bid_count} 次出价但找不到 is_winning=true 的记录`,
+        'AUCTION_NOT_FOUND',
+        404
       )
     }
 
@@ -737,7 +742,7 @@ class AuctionService {
     const { transaction } = options
 
     if (!transaction) {
-      throw new Error('AuctionService.cancelAuction 需要外部传入事务')
+      throw new BusinessError('AuctionService.cancelAuction 需要外部传入事务', 'AUCTION_ERROR', 400)
     }
 
     logger.info('[C2C拍卖取消] 开始', {
@@ -752,20 +757,20 @@ class AuctionService {
     })
 
     if (!auctionListing) {
-      throw new Error(`拍卖 ${auctionListingId} 不存在`)
+      throw new BusinessError(`拍卖 ${auctionListingId} 不存在`, 'AUCTION_NOT_FOUND', 404)
     }
 
     if (!['pending', 'active'].includes(auctionListing.status)) {
-      throw new Error(`拍卖状态为 ${auctionListing.status}，仅 pending/active 可取消`)
+      throw new BusinessError(`拍卖状态为 ${auctionListing.status}，仅 pending/active 可取消`, 'AUCTION_ERROR', 400)
     }
 
     // 卖方取消：需校验 bid_count === 0
     if (!isAdmin) {
       if (auctionListing.seller_user_id !== operatorId) {
-        throw new Error('只有卖方或管理员可以取消拍卖')
+        throw new BusinessError('只有卖方或管理员可以取消拍卖', 'AUCTION_ERROR', 400)
       }
       if (auctionListing.bid_count > 0) {
-        throw new Error('已有出价后卖方不可取消，如需取消请联系管理员')
+        throw new BusinessError('已有出价后卖方不可取消，如需取消请联系管理员', 'AUCTION_NOT_ALLOWED', 400)
       }
     }
 
@@ -843,12 +848,12 @@ class AuctionService {
     const { transaction } = options
 
     if (!transaction) {
-      throw new Error('AuctionService.handleNoBid 需要外部传入事务')
+      throw new BusinessError('AuctionService.handleNoBid 需要外部传入事务', 'AUCTION_ERROR', 400)
     }
 
     const auctionListing = await this.AuctionListing.findByPk(auctionListingId, { transaction })
     if (!auctionListing) {
-      throw new Error(`拍卖 ${auctionListingId} 不存在`)
+      throw new BusinessError(`拍卖 ${auctionListingId} 不存在`, 'AUCTION_NOT_FOUND', 404)
     }
 
     // 释放物品锁定

@@ -29,7 +29,7 @@ const express = require('express')
 const router = express.Router()
 const { AssetCode } = require('../../../constants/AssetCode')
 const { authenticateToken } = require('../../../middleware/auth')
-const { handleServiceError, asyncHandler } = require('../../../middleware/validation')
+const { asyncHandler, handleServiceError } = require('../../../middleware/validation')
 const TransactionManager = require('../../../utils/TransactionManager')
 const logger = require('../../../utils/logger').logger
 

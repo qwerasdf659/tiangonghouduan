@@ -17,6 +17,7 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
+const { asyncHandler } = require('../shared/middleware')
 const logger = require('../../../../utils/logger').logger
 
 /**
@@ -70,36 +71,31 @@ router.get(
   '/roi/:lottery_campaign_id',
   authenticateToken,
   requireRoleLevel(100),
-  async (req, res) => {
-    try {
-      const lottery_campaign_id = parseInt(req.params.lottery_campaign_id)
-      const { start_time, end_time } = req.query
+  asyncHandler(async (req, res) => {
+    const lottery_campaign_id = parseInt(req.params.lottery_campaign_id)
+    const { start_time, end_time } = req.query
 
-      if (!lottery_campaign_id || isNaN(lottery_campaign_id)) {
-        return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID', null, 400)
-      }
-
-      const reportService = getReportService(req)
-
-      const roi = await reportService.getCampaignROI(lottery_campaign_id, {
-        start_time,
-        end_time
-      })
-
-      logger.info('获取活动ROI成功', {
-        admin_id: req.user.user_id,
-        lottery_campaign_id,
-        roi_percentage: roi.roi,
-        total_draws: roi.total_draws
-      })
-
-      return res.apiSuccess(roi, '获取活动ROI成功')
-    } catch (error) {
-      logger.error('获取活动ROI失败:', error)
-      return res.apiError(`查询失败：${error.message}`, 'GET_CAMPAIGN_ROI_FAILED', null, 500)
+    if (!lottery_campaign_id || isNaN(lottery_campaign_id)) {
+      return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID', null, 400)
     }
+
+    const reportService = getReportService(req)
+
+    const roi = await reportService.getCampaignROI(lottery_campaign_id, {
+      start_time,
+      end_time
+    })
+
+    logger.info('获取活动ROI成功', {
+      admin_id: req.user.user_id,
+      lottery_campaign_id,
+      roi_percentage: roi.roi,
+      total_draws: roi.total_draws
+    })
+
+    return res.apiSuccess(roi, '获取活动ROI成功')
   }
-)
+))
 
 /*
  * ==========================================
@@ -130,37 +126,27 @@ router.get(
   '/strategy-effectiveness',
   authenticateToken,
   requireRoleLevel(100),
-  async (req, res) => {
-    try {
-      const { lottery_campaign_id, time_range = '30d', start_date, end_date } = req.query
+  asyncHandler(async (req, res) => {
+    const { lottery_campaign_id, time_range = '30d', start_date, end_date } = req.query
 
-      const campaignService = getCampaignAnalysisService(req)
+    const campaignService = getCampaignAnalysisService(req)
 
-      const result = await campaignService.getStrategyEffectiveness({
-        lottery_campaign_id: lottery_campaign_id ? parseInt(lottery_campaign_id) : undefined,
-        time_range,
-        start_date,
-        end_date
-      })
+    const result = await campaignService.getStrategyEffectiveness({
+      lottery_campaign_id: lottery_campaign_id ? parseInt(lottery_campaign_id) : undefined,
+      time_range,
+      start_date,
+      end_date
+    })
 
-      logger.info('获取策略效果分析成功', {
-        admin_id: req.user.user_id,
-        lottery_campaign_id: lottery_campaign_id || 'all',
-        time_range,
-        overall_score: result.overall_strategy_score
-      })
+    logger.info('获取策略效果分析成功', {
+      admin_id: req.user.user_id,
+      lottery_campaign_id: lottery_campaign_id || 'all',
+      time_range,
+      overall_score: result.overall_strategy_score
+    })
 
-      return res.apiSuccess(result, '获取策略效果分析成功')
-    } catch (error) {
-      logger.error('获取策略效果分析失败:', error)
-      return res.apiError(
-        `查询失败：${error.message}`,
-        'GET_STRATEGY_EFFECTIVENESS_FAILED',
-        null,
-        500
-      )
-    }
+    return res.apiSuccess(result, '获取策略效果分析成功')
   }
-)
+))
 
 module.exports = router

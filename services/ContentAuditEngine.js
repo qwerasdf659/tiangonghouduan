@@ -1,3 +1,4 @@
+const BusinessError = require('../utils/BusinessError')
 const logger = require('../utils/logger').logger
 
 /**
@@ -74,13 +75,13 @@ class ContentAuditEngine {
      */
     const validTypes = ['exchange', 'feedback', 'consumption', 'merchant_points']
     if (!validTypes.includes(auditableType)) {
-      throw new Error(`不支持的审核类型: ${auditableType}，仅支持: ${validTypes.join(', ')}`)
+      throw new BusinessError(`不支持的审核类型: ${auditableType}，仅支持: ${validTypes.join(', ')}`, 'SERVICE_NOT_ALLOWED', 400)
     }
 
     // 验证优先级
     const validPriorities = ['high', 'medium', 'low']
     if (!validPriorities.includes(priority)) {
-      throw new Error(`无效的优先级: ${priority}，仅支持: ${validPriorities.join(', ')}`)
+      throw new BusinessError(`无效的优先级: ${priority}，仅支持: ${validPriorities.join(', ')}`, 'SERVICE_INVALID', 400)
     }
 
     // 检查是否已存在待审核记录（防止重复提交）
@@ -172,12 +173,12 @@ class ContentAuditEngine {
     const auditRecord = await ContentReviewRecord.findByPk(auditId, { transaction })
 
     if (!auditRecord) {
-      throw new Error(`审核记录不存在: audit_id=${auditId}`)
+      throw new BusinessError(`审核记录不存在: audit_id=${auditId}`, 'SERVICE_NOT_FOUND', 404)
     }
 
     // 2. 验证审核状态
     if (auditRecord.audit_status !== 'pending') {
-      throw new Error(`审核记录状态不正确: 当前状态=${auditRecord.audit_status}，期望状态=pending`)
+      throw new BusinessError(`审核记录状态不正确: 当前状态=${auditRecord.audit_status}，期望状态=pending`, 'SERVICE_ERROR', 400)
     }
 
     // 3. 更新审核记录
@@ -219,7 +220,7 @@ class ContentAuditEngine {
    */
   static async reject(auditId, auditorId, reason, options = {}) {
     if (!reason || reason.trim().length < 5) {
-      throw new Error('拒绝原因必须提供，且不少于5个字符')
+      throw new BusinessError('拒绝原因必须提供，且不少于5个字符', 'SERVICE_REQUIRED', 400)
     }
 
     // 强制要求事务边界 - 2026-01-05 治理决策
@@ -231,12 +232,12 @@ class ContentAuditEngine {
     const auditRecord = await ContentReviewRecord.findByPk(auditId, { transaction })
 
     if (!auditRecord) {
-      throw new Error(`审核记录不存在: audit_id=${auditId}`)
+      throw new BusinessError(`审核记录不存在: audit_id=${auditId}`, 'SERVICE_NOT_FOUND', 404)
     }
 
     // 2. 验证审核状态
     if (auditRecord.audit_status !== 'pending') {
-      throw new Error(`审核记录状态不正确: 当前状态=${auditRecord.audit_status}，期望状态=pending`)
+      throw new BusinessError(`审核记录状态不正确: 当前状态=${auditRecord.audit_status}，期望状态=pending`, 'SERVICE_ERROR', 400)
     }
 
     // 3. 更新审核记录
@@ -279,12 +280,12 @@ class ContentAuditEngine {
     const auditRecord = await ContentReviewRecord.findByPk(auditId, { transaction })
 
     if (!auditRecord) {
-      throw new Error(`审核记录不存在: audit_id=${auditId}`)
+      throw new BusinessError(`审核记录不存在: audit_id=${auditId}`, 'SERVICE_NOT_FOUND', 404)
     }
 
     // 2. 验证审核状态
     if (auditRecord.audit_status !== 'pending') {
-      throw new Error(`只能取消待审核记录: 当前状态=${auditRecord.audit_status}`)
+      throw new BusinessError(`只能取消待审核记录: 当前状态=${auditRecord.audit_status}`, 'SERVICE_ERROR', 400)
     }
 
     // 3. 更新审核记录
@@ -406,7 +407,7 @@ class ContentAuditEngine {
     const audit = await ContentReviewRecord.findByPk(auditId)
 
     if (!audit) {
-      throw new Error(`审核记录不存在: audit_id=${auditId}`)
+      throw new BusinessError(`审核记录不存在: audit_id=${auditId}`, 'SERVICE_NOT_FOUND', 404)
     }
 
     return audit

@@ -17,6 +17,7 @@
  * @since 2026
  */
 
+const BusinessError = require('../../../../utils/BusinessError')
 const BudgetProvider = require('./BudgetProvider')
 const {
   LotteryCampaign,
@@ -161,7 +162,7 @@ class PoolQuotaBudgetProvider extends BudgetProvider {
       })
 
       if (!campaign) {
-        throw new Error(`活动不存在: ${lottery_campaign_id}`)
+        throw new BusinessError(`活动不存在: ${lottery_campaign_id}`, 'ENGINE_NOT_FOUND', 404)
       }
 
       // 执行双层扣减
@@ -216,7 +217,7 @@ class PoolQuotaBudgetProvider extends BudgetProvider {
           await campaign.save({ transaction })
         } else {
           // 活动池不够（理论上不应该发生）
-          throw new Error('活动池预算不足（并发扣减冲突）')
+          throw new BusinessError('活动池预算不足（并发扣减冲突）', 'ENGINE_INSUFFICIENT', 400)
         }
       }
 
@@ -287,7 +288,7 @@ class PoolQuotaBudgetProvider extends BudgetProvider {
       })
 
       if (!campaign) {
-        throw new Error(`活动不存在: ${lottery_campaign_id}`)
+        throw new BusinessError(`活动不存在: ${lottery_campaign_id}`, 'ENGINE_NOT_FOUND', 404)
       }
 
       const refund_details = {

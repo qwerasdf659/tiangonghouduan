@@ -25,7 +25,7 @@ const {
   requireMerchantPermission,
   isUserActiveInStore
 } = require('../../../../middleware/auth')
-const { handleServiceError } = require('../../../../middleware/validation')
+const { asyncHandler } = require('../../../../middleware/validation')
 const logger = require('../../../../utils/logger').logger
 
 /**
@@ -65,66 +65,52 @@ router.get(
   '/list',
   authenticateToken,
   requireMerchantPermission('consumption:read'),
-  async (req, res) => {
-    try {
-      const MerchantService = getService(req, 'consumption_merchant')
-      const StaffManagementService = getService(req, 'staff_management')
+  asyncHandler(async (req, res) => {
+    const MerchantService = getService(req, 'consumption_merchant')
+    const StaffManagementService = getService(req, 'staff_management')
 
-      const userId = req.user.user_id
-      const roleLevel = req.user.role_level || 0
+    const userId = req.user.user_id
+    const roleLevel = req.user.role_level || 0
 
-      // 1. 参数解析
-      const { store_id, status, page = 1, page_size = 20 } = req.query
+    const { store_id, status, page = 1, page_size = 20 } = req.query
 
-      // 2. 验证 store_id 必填
-      if (!store_id) {
-        return res.apiError('门店ID不能为空', 'MISSING_STORE_ID', null, 400)
-      }
-
-      const storeId = parseInt(store_id, 10)
-      if (isNaN(storeId)) {
-        return res.apiError('门店ID格式不正确', 'INVALID_STORE_ID', null, 400)
-      }
-
-      // 3. 验证用户是否在该门店在职
-      const isActiveInStore = await isUserActiveInStore(userId, storeId)
-      if (!isActiveInStore) {
-        logger.warn(`🚫 [MerchantQuery] 用户不在门店在职: user_id=${userId}, store_id=${storeId}`)
-        return res.apiForbidden('STORE_ACCESS_DENIED', '您没有该门店的访问权限')
-      }
-
-      // 4. 获取用户在该门店的角色（通过服务层）
-      const isManager = await StaffManagementService.isStoreManager(userId, storeId, roleLevel)
-
-      logger.info('商家员工查询消费记录', {
-        user_id: userId,
-        store_id: storeId,
-        is_manager: isManager,
-        status,
-        page,
-        page_size
-      })
-
-      // 5. 调用服务层查询
-      const result = await MerchantService.getMerchantRecords({
-        user_id: userId,
-        store_id: storeId,
-        is_manager: isManager,
-        status,
-        page: parseInt(page, 10),
-        page_size: parseInt(page_size, 10)
-      })
-
-      return res.apiSuccess(result, '查询成功')
-    } catch (error) {
-      logger.error('商家侧消费记录查询失败', {
-        error: error.message,
-        stack: error.stack,
-        user_id: req.user?.user_id
-      })
-      return handleServiceError(error, res, '查询消费记录失败')
+    if (!store_id) {
+      return res.apiError('门店ID不能为空', 'MISSING_STORE_ID', null, 400)
     }
-  }
+
+    const storeId = parseInt(store_id, 10)
+    if (isNaN(storeId)) {
+      return res.apiError('门店ID格式不正确', 'INVALID_STORE_ID', null, 400)
+    }
+
+    const isActiveInStore = await isUserActiveInStore(userId, storeId)
+    if (!isActiveInStore) {
+      logger.warn(`🚫 [MerchantQuery] 用户不在门店在职: user_id=${userId}, store_id=${storeId}`)
+      return res.apiForbidden('STORE_ACCESS_DENIED', '您没有该门店的访问权限')
+    }
+
+    const isManager = await StaffManagementService.isStoreManager(userId, storeId, roleLevel)
+
+    logger.info('商家员工查询消费记录', {
+      user_id: userId,
+      store_id: storeId,
+      is_manager: isManager,
+      status,
+      page,
+      page_size
+    })
+
+    const result = await MerchantService.getMerchantRecords({
+      user_id: userId,
+      store_id: storeId,
+      is_manager: isManager,
+      status,
+      page: parseInt(page, 10),
+      page_size: parseInt(page_size, 10)
+    })
+
+    return res.apiSuccess(result, '查询成功')
+  })
 )
 
 /**
@@ -145,62 +131,47 @@ router.get(
   '/detail/:id',
   authenticateToken,
   requireMerchantPermission('consumption:read'),
-  async (req, res) => {
-    try {
-      const MerchantService = getService(req, 'consumption_merchant')
-      const StaffManagementService = getService(req, 'staff_management')
+  asyncHandler(async (req, res) => {
+    const MerchantService = getService(req, 'consumption_merchant')
+    const StaffManagementService = getService(req, 'staff_management')
 
-      const userId = req.user.user_id
-      const roleLevel = req.user.role_level || 0
-      const recordId = parseInt(req.params.id, 10)
+    const userId = req.user.user_id
+    const roleLevel = req.user.role_level || 0
+    const recordId = parseInt(req.params.id, 10)
 
-      // 1. 参数验证
-      if (isNaN(recordId) || recordId <= 0) {
-        return res.apiError('无效的记录ID', 'INVALID_RECORD_ID', null, 400)
-      }
-
-      // 2. 调用服务层查询记录详情
-      const record = await MerchantService.getMerchantRecordDetail(recordId)
-
-      if (!record) {
-        return res.apiError('消费记录不存在', 'RECORD_NOT_FOUND', null, 404)
-      }
-
-      // 3. 权限验证
-      const storeId = record.store_id
-
-      // 验证用户是否在该门店在职
-      const isActiveInStore = await isUserActiveInStore(userId, storeId)
-      if (!isActiveInStore) {
-        return res.apiForbidden('STORE_ACCESS_DENIED', '您没有该记录所属门店的访问权限')
-      }
-
-      // 获取用户在门店的角色（通过服务层）
-      const isManager = await StaffManagementService.isStoreManager(userId, storeId, roleLevel)
-
-      // 店员只能查看自己录入的记录
-      if (!isManager && record.merchant_id !== userId) {
-        return res.apiForbidden('RECORD_ACCESS_DENIED', '您只能查看自己录入的消费记录')
-      }
-
-      logger.info('商家员工查询消费记录详情', {
-        record_id: recordId,
-        user_id: userId,
-        store_id: storeId,
-        is_manager: isManager,
-        access_type: isManager ? 'manager_privilege' : 'self_record'
-      })
-
-      return res.apiSuccess(record.toAPIResponse(), '查询成功')
-    } catch (error) {
-      logger.error('商家侧消费记录详情查询失败', {
-        error: error.message,
-        record_id: req.params.id,
-        user_id: req.user?.user_id
-      })
-      return handleServiceError(error, res, '查询消费记录失败')
+    if (isNaN(recordId) || recordId <= 0) {
+      return res.apiError('无效的记录ID', 'INVALID_RECORD_ID', null, 400)
     }
-  }
+
+    const record = await MerchantService.getMerchantRecordDetail(recordId)
+
+    if (!record) {
+      return res.apiError('消费记录不存在', 'RECORD_NOT_FOUND', null, 404)
+    }
+
+    const storeId = record.store_id
+
+    const isActiveInStore = await isUserActiveInStore(userId, storeId)
+    if (!isActiveInStore) {
+      return res.apiForbidden('STORE_ACCESS_DENIED', '您没有该记录所属门店的访问权限')
+    }
+
+    const isManager = await StaffManagementService.isStoreManager(userId, storeId, roleLevel)
+
+    if (!isManager && record.merchant_id !== userId) {
+      return res.apiForbidden('RECORD_ACCESS_DENIED', '您只能查看自己录入的消费记录')
+    }
+
+    logger.info('商家员工查询消费记录详情', {
+      record_id: recordId,
+      user_id: userId,
+      store_id: storeId,
+      is_manager: isManager,
+      access_type: isManager ? 'manager_privilege' : 'self_record'
+    })
+
+    return res.apiSuccess(record.toAPIResponse(), '查询成功')
+  })
 )
 
 /**
@@ -219,56 +190,44 @@ router.get(
   '/stats',
   authenticateToken,
   requireMerchantPermission('consumption:read'),
-  async (req, res) => {
-    try {
-      const MerchantService = getService(req, 'consumption_merchant')
-      const StaffManagementService = getService(req, 'staff_management')
+  asyncHandler(async (req, res) => {
+    const MerchantService = getService(req, 'consumption_merchant')
+    const StaffManagementService = getService(req, 'staff_management')
 
-      const userId = req.user.user_id
-      const roleLevel = req.user.role_level || 0
-      const { store_id } = req.query
+    const userId = req.user.user_id
+    const roleLevel = req.user.role_level || 0
+    const { store_id } = req.query
 
-      // 1. 验证 store_id
-      if (!store_id) {
-        return res.apiError('门店ID不能为空', 'MISSING_STORE_ID', null, 400)
-      }
-
-      const storeId = parseInt(store_id, 10)
-      if (isNaN(storeId)) {
-        return res.apiError('门店ID格式不正确', 'INVALID_STORE_ID', null, 400)
-      }
-
-      // 2. 验证用户是否在该门店在职
-      const isActiveInStore = await isUserActiveInStore(userId, storeId)
-      if (!isActiveInStore) {
-        return res.apiForbidden('STORE_ACCESS_DENIED', '您没有该门店的访问权限')
-      }
-
-      // 3. 获取用户角色（通过服务层）
-      const isManager = await StaffManagementService.isStoreManager(userId, storeId, roleLevel)
-
-      logger.info('商家员工查询消费统计', {
-        user_id: userId,
-        store_id: storeId,
-        is_manager: isManager
-      })
-
-      // 4. 调用服务层查询统计
-      const stats = await MerchantService.getMerchantStats({
-        user_id: userId,
-        store_id: storeId,
-        is_manager: isManager
-      })
-
-      return res.apiSuccess(stats, '查询成功')
-    } catch (error) {
-      logger.error('商家侧消费统计查询失败', {
-        error: error.message,
-        user_id: req.user?.user_id
-      })
-      return handleServiceError(error, res, '查询统计失败')
+    if (!store_id) {
+      return res.apiError('门店ID不能为空', 'MISSING_STORE_ID', null, 400)
     }
-  }
+
+    const storeId = parseInt(store_id, 10)
+    if (isNaN(storeId)) {
+      return res.apiError('门店ID格式不正确', 'INVALID_STORE_ID', null, 400)
+    }
+
+    const isActiveInStore = await isUserActiveInStore(userId, storeId)
+    if (!isActiveInStore) {
+      return res.apiForbidden('STORE_ACCESS_DENIED', '您没有该门店的访问权限')
+    }
+
+    const isManager = await StaffManagementService.isStoreManager(userId, storeId, roleLevel)
+
+    logger.info('商家员工查询消费统计', {
+      user_id: userId,
+      store_id: storeId,
+      is_manager: isManager
+    })
+
+    const stats = await MerchantService.getMerchantStats({
+      user_id: userId,
+      store_id: storeId,
+      is_manager: isManager
+    })
+
+    return res.apiSuccess(stats, '查询成功')
+  })
 )
 
 module.exports = router

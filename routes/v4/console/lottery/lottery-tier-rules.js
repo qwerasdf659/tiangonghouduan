@@ -30,7 +30,6 @@ const { authenticateToken, requireRoleLevel } = require('../../../../middleware/
 const TransactionManager = require('../../../../utils/TransactionManager')
 const logger = require('../../../../utils/logger').logger
 const { asyncHandler } = require('../shared/middleware')
-const { handleServiceError } = require('../../../../middleware/validation')
 
 /**
  * 通过 ServiceManager 获取 LotteryTierRuleService
@@ -226,36 +225,28 @@ router.post(
     const { lottery_campaign_id, segment_key, tier_name, tier_weight, status } = req.body
     const lotteryTierRuleService = getLotteryTierRuleService(req)
 
-    try {
-      const result = await TransactionManager.executeInTransaction(async transaction => {
-        return await lotteryTierRuleService.create(
-          {
-            lottery_campaign_id,
-            segment_key,
-            tier_name,
-            tier_weight,
-            status,
-            created_by: req.user.user_id
-          },
-          { transaction }
-        )
-      })
+    const result = await TransactionManager.executeInTransaction(async transaction => {
+      return await lotteryTierRuleService.create(
+        {
+          lottery_campaign_id,
+          segment_key,
+          tier_name,
+          tier_weight,
+          status,
+          created_by: req.user.user_id
+        },
+        { transaction }
+      )
+    })
 
-      logger.info('[POST /] 创建档位规则', {
-        admin_id: req.user.user_id,
-        tier_rule_id: result.tier_rule_id,
-        lottery_campaign_id,
-        tier_name
-      })
+    logger.info('[POST /] 创建档位规则', {
+      admin_id: req.user.user_id,
+      tier_rule_id: result.tier_rule_id,
+      lottery_campaign_id,
+      tier_name
+    })
 
-      return res.apiSuccess(result, '创建档位规则成功')
-    } catch (error) {
-      logger.error('[POST /] 创建档位规则失败', {
-        admin_id: req.user.user_id,
-        error: error.message
-      })
-      return handleServiceError(res, error)
-    }
+    return res.apiSuccess(result, '创建档位规则成功')
   })
 )
 
@@ -287,40 +278,32 @@ router.post(
       return res.apiError('权重配置必须包含 high/mid/low 三个档位', 'INVALID_PARAMS', null, 400)
     }
 
-    try {
-      const result = await TransactionManager.executeInTransaction(async transaction => {
-        return await lotteryTierRuleService.createTierRules(
-          {
-            lottery_campaign_id,
-            segment_key,
-            weights,
-            created_by: req.user.user_id
-          },
-          { transaction }
-        )
-      })
-
-      logger.info('[POST /batch] 批量创建档位规则', {
-        admin_id: req.user.user_id,
-        lottery_campaign_id,
-        segment_key,
-        created_count: result.length
-      })
-
-      return res.apiSuccess(
+    const result = await TransactionManager.executeInTransaction(async transaction => {
+      return await lotteryTierRuleService.createTierRules(
         {
-          rules: result,
-          total: result.length
+          lottery_campaign_id,
+          segment_key,
+          weights,
+          created_by: req.user.user_id
         },
-        '批量创建档位规则成功'
+        { transaction }
       )
-    } catch (error) {
-      logger.error('[POST /batch] 批量创建档位规则失败', {
-        admin_id: req.user.user_id,
-        error: error.message
-      })
-      return handleServiceError(res, error)
-    }
+    })
+
+    logger.info('[POST /batch] 批量创建档位规则', {
+      admin_id: req.user.user_id,
+      lottery_campaign_id,
+      segment_key,
+      created_count: result.length
+    })
+
+    return res.apiSuccess(
+      {
+        rules: result,
+        total: result.length
+      },
+      '批量创建档位规则成功'
+    )
   })
 )
 
@@ -341,35 +324,26 @@ router.put(
     const { tier_weight, status } = req.body
     const lotteryTierRuleService = getLotteryTierRuleService(req)
 
-    try {
-      const result = await TransactionManager.executeInTransaction(async transaction => {
-        return await lotteryTierRuleService.update(
-          parseInt(id, 10),
-          {
-            tier_weight,
-            status,
-            updated_by: req.user.user_id
-          },
-          { transaction }
-        )
-      })
+    const result = await TransactionManager.executeInTransaction(async transaction => {
+      return await lotteryTierRuleService.update(
+        parseInt(id, 10),
+        {
+          tier_weight,
+          status,
+          updated_by: req.user.user_id
+        },
+        { transaction }
+      )
+    })
 
-      logger.info('[PUT /:id] 更新档位规则', {
-        admin_id: req.user.user_id,
-        tier_rule_id: id,
-        tier_weight,
-        status
-      })
+    logger.info('[PUT /:id] 更新档位规则', {
+      admin_id: req.user.user_id,
+      tier_rule_id: id,
+      tier_weight,
+      status
+    })
 
-      return res.apiSuccess(result, '更新档位规则成功')
-    } catch (error) {
-      logger.error('[PUT /:id] 更新档位规则失败', {
-        admin_id: req.user.user_id,
-        tier_rule_id: id,
-        error: error.message
-      })
-      return handleServiceError(res, error)
-    }
+    return res.apiSuccess(result, '更新档位规则成功')
   })
 )
 
@@ -385,25 +359,16 @@ router.delete(
     const { id } = req.params
     const lotteryTierRuleService = getLotteryTierRuleService(req)
 
-    try {
-      await TransactionManager.executeInTransaction(async transaction => {
-        return await lotteryTierRuleService.delete(parseInt(id, 10), { transaction })
-      })
+    await TransactionManager.executeInTransaction(async transaction => {
+      return await lotteryTierRuleService.delete(parseInt(id, 10), { transaction })
+    })
 
-      logger.info('[DELETE /:id] 删除档位规则', {
-        admin_id: req.user.user_id,
-        tier_rule_id: id
-      })
+    logger.info('[DELETE /:id] 删除档位规则', {
+      admin_id: req.user.user_id,
+      tier_rule_id: id
+    })
 
-      return res.apiSuccess({ tier_rule_id: parseInt(id, 10) }, '删除档位规则成功')
-    } catch (error) {
-      logger.error('[DELETE /:id] 删除档位规则失败', {
-        admin_id: req.user.user_id,
-        tier_rule_id: id,
-        error: error.message
-      })
-      return handleServiceError(res, error)
-    }
+    return res.apiSuccess({ tier_rule_id: parseInt(id, 10) }, '删除档位规则成功')
   })
 )
 

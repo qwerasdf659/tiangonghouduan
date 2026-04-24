@@ -27,21 +27,15 @@ router.get(
   '/status',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    try {
-      // 获取系统监控服务
-      const AdminSystemService = req.app.locals.services.getService('admin_system')
+    // 获取系统监控服务
+    const SystemMonitoringService = req.app.locals.services.getService('system_monitoring')
 
-      // 调用服务层方法获取系统状态
-      const statusInfo = await AdminSystemService.getSystemStatus(
-        sharedComponents.lotteryEngine,
-        sharedComponents.performanceMonitor
-      )
+    const statusInfo = await SystemMonitoringService.getSystemStatus(
+      sharedComponents.lotteryEngine,
+      sharedComponents.performanceMonitor
+    )
 
-      return res.apiSuccess(statusInfo, '系统状态获取成功')
-    } catch (error) {
-      sharedComponents.logger.error('系统状态获取失败', { error: error.message })
-      return res.apiInternalError('系统状态获取失败', error.message, 'SYSTEM_STATUS_ERROR')
-    }
+    return res.apiSuccess(statusInfo, '系统状态获取成功')
   })
 )
 
@@ -56,21 +50,15 @@ router.get(
   '/dashboard',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    try {
-      // 获取系统监控服务
-      const AdminSystemService = req.app.locals.services.getService('admin_system')
+    // 获取系统监控服务
+    const SystemMonitoringService = req.app.locals.services.getService('system_monitoring')
 
-      // 调用服务层方法获取仪表板数据
-      const dashboardData = await AdminSystemService.getDashboardData(
-        sharedComponents.lotteryEngine,
-        sharedComponents.performanceMonitor
-      )
+    const dashboardData = await SystemMonitoringService.getDashboardData(
+      sharedComponents.lotteryEngine,
+      sharedComponents.performanceMonitor
+    )
 
-      return res.apiSuccess(dashboardData, '仪表板数据获取成功')
-    } catch (error) {
-      sharedComponents.logger.error('仪表板数据获取失败', { error: error.message })
-      return res.apiInternalError('仪表板数据获取失败', error.message, 'DASHBOARD_ERROR')
-    }
+    return res.apiSuccess(dashboardData, '仪表板数据获取成功')
   })
 )
 
@@ -85,23 +73,17 @@ router.get(
   '/management-status',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    try {
-      // 获取系统监控服务
-      const AdminSystemService = req.app.locals.services.getService('admin_system')
+    // 获取系统监控服务
+    const SystemMonitoringService = req.app.locals.services.getService('system_monitoring')
 
-      // 调用服务层方法获取管理策略状态
-      const result = await AdminSystemService.getManagementStatus(
-        sharedComponents.managementStrategy
-      )
+    const result = await SystemMonitoringService.getManagementStatus(
+      sharedComponents.managementQueryStrategy
+    )
 
-      if (result.success) {
-        return res.apiSuccess(result.data, '管理状态获取成功')
-      } else {
-        return res.apiError(result.error || '管理状态获取失败', 'MANAGEMENT_STATUS_FAILED')
-      }
-    } catch (error) {
-      sharedComponents.logger.error('管理状态获取失败', { error: error.message })
-      return res.apiInternalError('管理状态获取失败', error.message, 'MANAGEMENT_STATUS_ERROR')
+    if (result.success) {
+      return res.apiSuccess(result.data, '管理状态获取成功')
+    } else {
+      return res.apiError(result.error || '管理状态获取失败', 'MANAGEMENT_STATUS_FAILED')
     }
   })
 )
@@ -163,27 +145,22 @@ router.get(
   '/api-performance',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    try {
-      const { hours = 24, endpoint } = req.query
+    const { hours = 24, endpoint } = req.query
 
-      sharedComponents.logger.info('[系统监控] 获取API性能统计', {
-        admin_id: req.user?.user_id,
-        hours: parseInt(hours),
-        endpoint
-      })
+    sharedComponents.logger.info('[系统监控] 获取API性能统计', {
+      admin_id: req.user?.user_id,
+      hours: parseInt(hours),
+      endpoint
+    })
 
-      // 🔄 通过 ServiceManager 获取 APIPerformanceService
-      const APIPerformanceService = req.app.locals.services.getService('api_performance')
-      const result = await APIPerformanceService.getPerformanceStats({
-        hours: parseInt(hours) || 24,
-        endpoint: endpoint || null
-      })
+    // 🔄 通过 ServiceManager 获取 APIPerformanceService
+    const APIPerformanceService = req.app.locals.services.getService('api_performance')
+    const result = await APIPerformanceService.getPerformanceStats({
+      hours: parseInt(hours) || 24,
+      endpoint: endpoint || null
+    })
 
-      return res.apiSuccess(result, '获取成功')
-    } catch (error) {
-      sharedComponents.logger.error('[系统监控] API性能统计获取失败', { error: error.message })
-      return res.apiInternalError('API性能统计获取失败', error.message, 'API_PERFORMANCE_ERROR')
-    }
+    return res.apiSuccess(result, '获取成功')
   })
 )
 

@@ -16,6 +16,7 @@
  * @date 2026-01-31
  */
 
+const BusinessError = require('../../utils/BusinessError')
 const { Op, fn, col, literal, QueryTypes } = require('sequelize')
 const logger = require('../../utils/logger').logger
 
@@ -580,7 +581,7 @@ class ReportService {
       })
 
       if (!campaign) {
-        throw new Error('活动不存在')
+        throw new BusinessError('活动不存在', 'SERVICE_NOT_FOUND', 404)
       }
 
       // 构建查询条件

@@ -18,6 +18,7 @@
 
 'use strict'
 
+const BusinessError = require('../utils/BusinessError')
 const models = require('../models')
 const { AssetCode } = require('../constants/AssetCode')
 const logger = require('../utils/logger')
@@ -159,7 +160,7 @@ class CustomReportService {
 
     // 验证数据源是否有效
     if (!DATA_SOURCE_CONFIG[data_source]) {
-      throw new Error(`无效的数据源: ${data_source}`)
+      throw new BusinessError(`无效的数据源: ${data_source}`, 'SERVICE_INVALID', 400)
     }
 
     const template = await models.ReportTemplate.create(
@@ -199,7 +200,7 @@ class CustomReportService {
     const template = await models.ReportTemplate.findByPk(templateId)
 
     if (!template) {
-      throw new Error('报表模板不存在')
+      throw new BusinessError('报表模板不存在', 'SERVICE_NOT_FOUND', 404)
     }
 
     // 系统模板不允许修改核心配置
@@ -235,11 +236,11 @@ class CustomReportService {
     const template = await models.ReportTemplate.findByPk(templateId)
 
     if (!template) {
-      throw new Error('报表模板不存在')
+      throw new BusinessError('报表模板不存在', 'SERVICE_NOT_FOUND', 404)
     }
 
     if (template.is_system) {
-      throw new Error('系统模板不允许删除')
+      throw new BusinessError('系统模板不允许删除', 'SERVICE_NOT_ALLOWED', 400)
     }
 
     await template.destroy(options)
@@ -319,7 +320,7 @@ class CustomReportService {
     })
 
     if (!template) {
-      throw new Error('报表模板不存在')
+      throw new BusinessError('报表模板不存在', 'SERVICE_NOT_FOUND', 404)
     }
 
     return template
@@ -342,18 +343,18 @@ class CustomReportService {
     const template = await models.ReportTemplate.findByPk(templateId)
 
     if (!template) {
-      throw new Error('报表模板不存在')
+      throw new BusinessError('报表模板不存在', 'SERVICE_NOT_FOUND', 404)
     }
 
     if (!template.is_enabled) {
-      throw new Error('该报表模板已禁用')
+      throw new BusinessError('该报表模板已禁用', 'SERVICE_DISABLED', 400)
     }
 
     const { start_time, end_time, filters = {}, group_by } = params
     const dataSourceConfig = DATA_SOURCE_CONFIG[template.data_source]
 
     if (!dataSourceConfig) {
-      throw new Error(`无效的数据源配置: ${template.data_source}`)
+      throw new BusinessError(`无效的数据源配置: ${template.data_source}`, 'SERVICE_INVALID', 400)
     }
 
     // 根据数据源类型生成报表
@@ -399,7 +400,7 @@ class CustomReportService {
     const model = models[config.model]
 
     if (!model) {
-      throw new Error(`模型不存在: ${config.model}`)
+      throw new BusinessError(`模型不存在: ${config.model}`, 'SERVICE_NOT_FOUND', 404)
     }
 
     // 构建查询条件
@@ -651,7 +652,7 @@ class CustomReportService {
     const template = await models.ReportTemplate.findByPk(templateId)
 
     if (!template) {
-      throw new Error('报表模板不存在')
+      throw new BusinessError('报表模板不存在', 'SERVICE_NOT_FOUND', 404)
     }
 
     const scheduleConfig = template.schedule_config || {}

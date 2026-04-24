@@ -20,6 +20,7 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
+const { asyncHandler } = require('../../../../middleware/validation')
 const logger = require('../../../../utils/logger')
 const ExcelJS = require('exceljs')
 const BeijingTimeHelper = require('../../../../utils/timeHelper')
@@ -57,18 +58,13 @@ const transactionsRoutes = require('./transactions')
  * @since 2026-01-18 路由层合规性治理：移除直接 sequelize 访问，使用 QueryService.getSystemStats()
  * @since 2026-01-31 V4.7.0 AssetService 拆分：使用 QueryService
  */
-router.get('/stats', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
+router.get('/stats', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
     // V4.7.0 AssetService 拆分：通过 ServiceManager 获取 QueryService（2026-01-31）
-    const QueryService = req.app.locals.services.getService('asset_query')
-    const result = await QueryService.getSystemStats()
+  const QueryService = req.app.locals.services.getService('asset_query')
+  const result = await QueryService.getSystemStats()
 
-    return res.apiSuccess(result)
-  } catch (error) {
-    logger.error('❌ 获取系统资产统计失败', { error: error.message, stack: error.stack })
-    return res.apiError(error.message || '获取资产统计失败', 'STATS_ERROR', null, 500)
-  }
-})
+  return res.apiSuccess(result)
+}))
 
 /**
  * GET /export - 导出资产数据（Excel/CSV格式）
@@ -86,120 +82,111 @@ router.get('/stats', authenticateToken, requireRoleLevel(100), async (req, res) 
  *
  * @since 2026-01-30 P2任务：资产导出API实现
  */
-router.get('/export', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
+router.get('/export', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
     const { type: asset_type, status, format = 'excel', user_id, page_size = 1000 } = req.query
 
-    // 参数验证
-    const validFormats = ['excel', 'csv']
-    if (!validFormats.includes(format)) {
-      return res.apiError('format 必须是 excel 或 csv', 'BAD_REQUEST', null, 400)
-    }
+  // 参数验证
+  const validFormats = ['excel', 'csv']
+  if (!validFormats.includes(format)) {
+    return res.apiError('format 必须是 excel 或 csv', 'BAD_REQUEST', null, 400)
+  }
 
-    const exportLimit = Math.min(Math.max(1, parseInt(page_size) || 1000), 10000)
+  const exportLimit = Math.min(Math.max(1, parseInt(page_size) || 1000), 10000)
 
-    logger.info('📊 导出资产数据', {
-      admin_id: req.user.user_id,
-      asset_type,
-      status,
-      format,
-      user_id,
-      page_size: exportLimit
-    })
+  logger.info('📊 导出资产数据', {
+    admin_id: req.user.user_id,
+    asset_type,
+    status,
+    format,
+    user_id,
+    page_size: exportLimit
+  })
 
-    // V4.7.0 AssetService 拆分：通过 ServiceManager 获取 QueryService（2026-01-31）
-    const QueryService = req.app.locals.services.getService('asset_query')
+  // V4.7.0 AssetService 拆分：通过 ServiceManager 获取 QueryService（2026-01-31）
+  const QueryService = req.app.locals.services.getService('asset_query')
 
-    // 获取资产余额数据
-    const balancesData = await QueryService.getBalancesForExport({
-      asset_type,
-      status,
-      user_id: user_id ? parseInt(user_id) : null,
-      limit: exportLimit
-    })
+  // 获取资产余额数据
+  const balancesData = await QueryService.getBalancesForExport({
+    asset_type,
+    status,
+    user_id: user_id ? parseInt(user_id) : null,
+    limit: exportLimit
+  })
 
-    // 如果没有数据
-    if (!balancesData || balancesData.length === 0) {
-      return res.apiError('没有符合条件的数据', 'NO_DATA', null, 404)
-    }
+  // 如果没有数据
+  if (!balancesData || balancesData.length === 0) {
+    return res.apiError('没有符合条件的数据', 'NO_DATA', null, 404)
+  }
 
-    // 准备导出数据
-    const exportData = balancesData.map((item, index) => ({
-      序号: index + 1,
-      用户ID: item.user_id,
-      用户昵称: item.nickname || '-',
-      资产代码: item.asset_code,
-      资产名称: item.asset_name || item.asset_code,
-      可用余额: parseFloat(item.available_amount) || 0,
-      冻结余额: parseFloat(item.frozen_amount) || 0,
-      总余额: (parseFloat(item.available_amount) || 0) + (parseFloat(item.frozen_amount) || 0),
-      活动ID: item.lottery_campaign_id || '-',
-      更新时间: item.updated_at ? BeijingTimeHelper.format(item.updated_at) : '-'
-    }))
+  // 准备导出数据
+  const exportData = balancesData.map((item, index) => ({
+    序号: index + 1,
+    用户ID: item.user_id,
+    用户昵称: item.nickname || '-',
+    资产代码: item.asset_code,
+    资产名称: item.asset_name || item.asset_code,
+    可用余额: parseFloat(item.available_amount) || 0,
+    冻结余额: parseFloat(item.frozen_amount) || 0,
+    总余额: (parseFloat(item.available_amount) || 0) + (parseFloat(item.frozen_amount) || 0),
+    活动ID: item.lottery_campaign_id || '-',
+    更新时间: item.updated_at ? BeijingTimeHelper.format(item.updated_at) : '-'
+  }))
 
-    // 生成文件名
-    const timestamp = BeijingTimeHelper.format(new Date(), 'YYYYMMDD_HHmmss')
-    const fileName = `资产导出_${timestamp}`
+  // 生成文件名
+  const timestamp = BeijingTimeHelper.format(new Date(), 'YYYYMMDD_HHmmss')
+  const fileName = `资产导出_${timestamp}`
 
-    if (format === 'csv') {
-      const csvContent = rowsToCsv(exportData)
+  if (format === 'csv') {
+    const csvContent = rowsToCsv(exportData)
 
-      res.setHeader('Content-Type', 'text/csv; charset=utf-8')
-      res.setHeader(
-        'Content-Disposition',
-        `attachment; filename="${encodeURIComponent(fileName)}.csv"`
-      )
-
-      logger.info('✅ 资产数据导出成功', {
-        admin_id: req.user.user_id,
-        format: 'csv',
-        record_count: exportData.length
-      })
-
-      // 添加BOM以支持中文在Excel中正确显示
-      return res.send('\uFEFF' + csvContent)
-    }
-
-    // Excel格式导出（ExcelJS）
-    const workbook = new ExcelJS.Workbook()
-    const worksheet = workbook.addWorksheet('资产数据')
-    const colKeys = Object.keys(exportData[0])
-    const colWidths = [6, 10, 15, 15, 15, 12, 12, 12, 10, 20]
-    worksheet.columns = colKeys.map((key, i) => ({
-      header: key,
-      key,
-      width: colWidths[i] || 15
-    }))
-    worksheet.getRow(1).font = { bold: true }
-    worksheet.addRows(exportData)
-
-    const excelBuffer = Buffer.from(await workbook.xlsx.writeBuffer())
-
-    res.setHeader(
-      'Content-Type',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    )
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8')
     res.setHeader(
       'Content-Disposition',
-      `attachment; filename="${encodeURIComponent(fileName)}.xlsx"`
+      `attachment; filename="${encodeURIComponent(fileName)}.csv"`
     )
 
     logger.info('✅ 资产数据导出成功', {
       admin_id: req.user.user_id,
-      format,
+      format: 'csv',
       record_count: exportData.length
     })
 
-    return res.send(excelBuffer)
-  } catch (error) {
-    logger.error('❌ 资产数据导出失败', {
-      admin_id: req.user?.user_id,
-      error: error.message,
-      stack: error.stack
-    })
-    return res.apiError(error.message || '导出失败', 'EXPORT_ERROR', null, 500)
+    // 添加BOM以支持中文在Excel中正确显示
+    return res.send('\uFEFF' + csvContent)
   }
-})
+
+  // Excel格式导出（ExcelJS）
+  const workbook = new ExcelJS.Workbook()
+  const worksheet = workbook.addWorksheet('资产数据')
+  const colKeys = Object.keys(exportData[0])
+  const colWidths = [6, 10, 15, 15, 15, 12, 12, 12, 10, 20]
+  worksheet.columns = colKeys.map((key, i) => ({
+    header: key,
+    key,
+    width: colWidths[i] || 15
+  }))
+  worksheet.getRow(1).font = { bold: true }
+  worksheet.addRows(exportData)
+
+  const excelBuffer = Buffer.from(await workbook.xlsx.writeBuffer())
+
+  res.setHeader(
+    'Content-Type',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  )
+  res.setHeader(
+    'Content-Disposition',
+    `attachment; filename="${encodeURIComponent(fileName)}.xlsx"`
+  )
+
+  logger.info('✅ 资产数据导出成功', {
+    admin_id: req.user.user_id,
+    format,
+    record_count: exportData.length
+  })
+
+  return res.send(excelBuffer)
+}))
 
 /*
  * 挂载子路由

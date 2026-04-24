@@ -28,25 +28,18 @@ router.get(
   '/user-status/:user_id',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    try {
-      const { user_id } = req.params
+    const { user_id } = req.params
 
-      // 参数验证
-      const validatedUserId = validators.validateUserId(user_id)
+    // 参数验证
+    const validatedUserId = validators.validateUserId(user_id)
 
-      // 通过 ServiceManager 获取 AdminLotteryCoreService（V4.7.0 拆分后：核心干预操作）
-      const AdminLotteryCoreService = req.app.locals.services.getService('admin_lottery_core')
+    // 通过 ServiceManager 获取 AdminLotteryCoreService（V4.7.0 拆分后：核心干预操作）
+    const AdminLotteryCoreService = req.app.locals.services.getService('admin_lottery_core')
 
-      // 🔧 V4.3修复：调用正确的服务层方法名 getUserManagementStatus
-      const result = await AdminLotteryCoreService.getUserManagementStatus(validatedUserId)
+    // 🔧 V4.3修复：调用正确的服务层方法名 getUserManagementStatus
+    const result = await AdminLotteryCoreService.getUserManagementStatus(validatedUserId)
 
-      return res.apiSuccess(result, '用户抽奖控制状态查询成功')
-    } catch (error) {
-      if (error.message.includes('无效的') || error.code === 'USER_NOT_FOUND') {
-        return res.apiError(error.message, error.code || 'VALIDATION_ERROR')
-      }
-      return res.apiInternalError('用户状态查询失败', error.message, 'USER_STATUS_QUERY_ERROR')
-    }
+    return res.apiSuccess(result, '用户抽奖控制状态查询成功')
   })
 )
 
@@ -61,37 +54,30 @@ router.delete(
   '/clear-user-settings/:user_id',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    try {
-      const { user_id } = req.params
-      const { reason = '管理员主动清理' } = req.body || {}
+    const { user_id } = req.params
+    const { reason = '管理员主动清理' } = req.body || {}
 
-      // 参数验证
-      const validatedUserId = validators.validateUserId(user_id)
+    // 参数验证
+    const validatedUserId = validators.validateUserId(user_id)
 
-      // 通过 ServiceManager 获取 AdminLotteryCoreService（V4.7.0 拆分后：核心干预操作）
-      const AdminLotteryCoreService = req.app.locals.services.getService('admin_lottery_core')
+    // 通过 ServiceManager 获取 AdminLotteryCoreService（V4.7.0 拆分后：核心干预操作）
+    const AdminLotteryCoreService = req.app.locals.services.getService('admin_lottery_core')
 
-      // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
-      const result = await TransactionManager.execute(
-        async transaction => {
-          return await AdminLotteryCoreService.clearUserSettings(
-            req.user?.user_id || req.user?.id,
-            validatedUserId,
-            null, // settingType: null表示清除所有设置
-            reason,
-            { transaction }
-          )
-        },
-        { description: 'clearUserSettings' }
-      )
+    // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
+    const result = await TransactionManager.execute(
+      async transaction => {
+        return await AdminLotteryCoreService.clearUserSettings(
+          req.user?.user_id || req.user?.id,
+          validatedUserId,
+          null, // settingType: null表示清除所有设置
+          reason,
+          { transaction }
+        )
+      },
+      { description: 'clearUserSettings' }
+    )
 
-      return res.apiSuccess(result, '用户抽奖设置清理成功')
-    } catch (error) {
-      if (error.message.includes('无效的') || error.code === 'USER_NOT_FOUND') {
-        return res.apiError(error.message, error.code || 'VALIDATION_ERROR')
-      }
-      return res.apiInternalError('用户设置清理失败', error.message, 'USER_SETTINGS_CLEAR_ERROR')
-    }
+    return res.apiSuccess(result, '用户抽奖设置清理成功')
   })
 )
 

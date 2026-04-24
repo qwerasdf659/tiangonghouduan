@@ -9,6 +9,7 @@
  * @module services/SegmentRuleService
  */
 
+const BusinessError = require('../utils/BusinessError')
 const { SegmentRuleConfig } = require('../models')
 const { SEGMENT_FIELD_REGISTRY } = require('../config/segment_field_registry')
 const AuditLogService = require('./AuditLogService')
@@ -57,7 +58,7 @@ class SegmentRuleService {
     })
 
     if (!config) {
-      throw new Error(`分群策略版本不存在: ${version_key}`)
+      throw new BusinessError(`分群策略版本不存在: ${version_key}`, 'SEGMENT_NOT_FOUND', 404)
     }
 
     return config.toJSON()
@@ -75,7 +76,7 @@ class SegmentRuleService {
 
     // version_key 只允许字母、数字、下划线
     if (!/^[a-z0-9_]+$/i.test(data.version_key)) {
-      throw new Error('版本标识只允许字母、数字和下划线')
+      throw new BusinessError('版本标识只允许字母、数字和下划线', 'SEGMENT_ERROR', 400)
     }
 
     // 检查是否已存在
@@ -84,7 +85,7 @@ class SegmentRuleService {
       transaction
     })
     if (existing) {
-      throw new Error(`版本标识已存在: ${data.version_key}`)
+      throw new BusinessError(`版本标识已存在: ${data.version_key}`, 'SEGMENT_ALREADY_EXISTS', 409)
     }
 
     // 验证规则结构
@@ -142,7 +143,7 @@ class SegmentRuleService {
     })
 
     if (!config) {
-      throw new Error(`分群策略版本不存在: ${version_key}`)
+      throw new BusinessError(`分群策略版本不存在: ${version_key}`, 'SEGMENT_NOT_FOUND', 404)
     }
 
     // 验证规则结构（如果提供了新规则）
@@ -198,11 +199,11 @@ class SegmentRuleService {
     })
 
     if (!config) {
-      throw new Error(`分群策略版本不存在: ${version_key}`)
+      throw new BusinessError(`分群策略版本不存在: ${version_key}`, 'SEGMENT_NOT_FOUND', 404)
     }
 
     if (config.is_system) {
-      throw new Error('系统内置策略不可删除')
+      throw new BusinessError('系统内置策略不可删除', 'SEGMENT_NOT_ALLOWED', 400)
     }
 
     await config.update({ status: 'archived' }, { transaction })
@@ -238,7 +239,7 @@ class SegmentRuleService {
     })
 
     if (!config) {
-      throw new Error(`分群策略版本不存在: ${version_key}`)
+      throw new BusinessError(`分群策略版本不存在: ${version_key}`, 'SEGMENT_NOT_FOUND', 404)
     }
 
     const rules = config.rules || []
@@ -285,38 +286,38 @@ class SegmentRuleService {
    */
   static _validateRules(rules) {
     if (!Array.isArray(rules) || rules.length === 0) {
-      throw new Error('规则数组不能为空')
+      throw new BusinessError('规则数组不能为空', 'SEGMENT_NOT_ALLOWED', 400)
     }
 
     // 检查是否有兜底规则（conditions 为空或不存在的规则）
     const hasFallback = rules.some(r => !r.conditions || r.conditions.length === 0)
     if (!hasFallback) {
-      throw new Error('规则必须包含一个兜底规则（conditions 为空）')
+      throw new BusinessError('规则必须包含一个兜底规则（conditions 为空）', 'SEGMENT_REQUIRED', 400)
     }
 
     for (const rule of rules) {
       if (!rule.segment_key) {
-        throw new Error('每条规则必须包含 segment_key')
+        throw new BusinessError('每条规则必须包含 segment_key', 'SEGMENT_REQUIRED', 400)
       }
       if (!rule.label) {
-        throw new Error('每条规则必须包含 label')
+        throw new BusinessError('每条规则必须包含 label', 'SEGMENT_REQUIRED', 400)
       }
       if (rule.priority === undefined || rule.priority === null) {
-        throw new Error('每条规则必须包含 priority')
+        throw new BusinessError('每条规则必须包含 priority', 'SEGMENT_REQUIRED', 400)
       }
 
       // 验证条件中的字段和运算符是否在白名单中
       if (rule.conditions && rule.conditions.length > 0) {
         for (const cond of rule.conditions) {
           if (!SEGMENT_FIELD_REGISTRY.fields[cond.field]) {
-            throw new Error(`不允许的字段: ${cond.field}`)
+            throw new BusinessError(`不允许的字段: ${cond.field}`, 'SEGMENT_NOT_ALLOWED', 400)
           }
           if (!SEGMENT_FIELD_REGISTRY.operators[cond.operator]) {
-            throw new Error(`不允许的运算符: ${cond.operator}`)
+            throw new BusinessError(`不允许的运算符: ${cond.operator}`, 'SEGMENT_NOT_ALLOWED', 400)
           }
           const fieldDef = SEGMENT_FIELD_REGISTRY.fields[cond.field]
           if (!fieldDef.operators.includes(cond.operator)) {
-            throw new Error(`字段 ${cond.field} 不支持运算符 ${cond.operator}`)
+            throw new BusinessError(`字段 ${cond.field} 不支持运算符 ${cond.operator}`, 'SEGMENT_NOT_ALLOWED', 400)
           }
         }
       }

@@ -11,7 +11,7 @@ const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const TransactionManager = require('../../../../utils/TransactionManager')
-const logger = require('../../../../utils/logger').logger
+const { asyncHandler } = require('../../../../middleware/validation')
 
 /**
  * 获取 AttributeService 实例
@@ -41,190 +41,110 @@ function parseQueryBool(v) {
  *
  * 查询：`is_sale_attr`、`is_enabled`、`category_id`
  */
-router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const service = getAttributeService(req)
-    const { category_id } = req.query
-    const filters = {
-      is_sale_attr: parseQueryBool(req.query.is_sale_attr),
-      is_enabled: parseQueryBool(req.query.is_enabled),
-      category_id: category_id !== undefined && category_id !== '' ? category_id : undefined
-    }
-
-    const items = await service.listAttributes(filters)
-    return res.apiSuccess({ items }, '获取属性列表成功')
-  } catch (error) {
-    logger.error('获取属性列表失败', { error: error.message })
-    return res.apiError(
-      `获取属性列表失败: ${error.message}`,
-      error.code || 'PRODUCT_CENTER_ATTR_LIST_FAILED',
-      null,
-      error.statusCode || error.status || 500
-    )
+router.get('/', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  const service = getAttributeService(req)
+  const { category_id } = req.query
+  const filters = {
+    is_sale_attr: parseQueryBool(req.query.is_sale_attr),
+    is_enabled: parseQueryBool(req.query.is_enabled),
+    category_id: category_id !== undefined && category_id !== '' ? category_id : undefined
   }
-})
+
+  const items = await service.listAttributes(filters)
+  return res.apiSuccess({ items }, '获取属性列表成功')
+}))
 
 /**
  * PUT /options/:option_id — 更新属性选项
  */
-router.put('/options/:option_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const service = getAttributeService(req)
-    const { option_id } = req.params
+router.put('/options/:option_id', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  const service = getAttributeService(req)
+  const { option_id } = req.params
 
-    const row = await TransactionManager.execute(async transaction => {
-      return await service.updateAttributeOption(option_id, req.body || {}, { transaction })
-    })
+  const row = await TransactionManager.execute(async transaction => {
+    return await service.updateAttributeOption(option_id, req.body || {}, { transaction })
+  })
 
-    return res.apiSuccess(row, '更新属性选项成功')
-  } catch (error) {
-    logger.error('更新属性选项失败', { option_id: req.params.option_id, error: error.message })
-    return res.apiError(
-      `更新属性选项失败: ${error.message}`,
-      error.code || 'PRODUCT_CENTER_ATTR_OPTION_UPDATE_FAILED',
-      null,
-      error.statusCode || error.status || 500
-    )
-  }
-})
+  return res.apiSuccess(row, '更新属性选项成功')
+}))
 
 /**
  * DELETE /options/:option_id — 删除属性选项
  */
-router.delete('/options/:option_id', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const service = getAttributeService(req)
-    const { option_id } = req.params
+router.delete('/options/:option_id', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  const service = getAttributeService(req)
+  const { option_id } = req.params
 
-    await TransactionManager.execute(async transaction => {
-      return await service.deleteAttributeOption(option_id, { transaction })
-    })
+  await TransactionManager.execute(async transaction => {
+    return await service.deleteAttributeOption(option_id, { transaction })
+  })
 
-    return res.apiSuccess({ option_id: parseInt(option_id, 10) }, '删除属性选项成功')
-  } catch (error) {
-    logger.error('删除属性选项失败', { option_id: req.params.option_id, error: error.message })
-    return res.apiError(
-      `删除属性选项失败: ${error.message}`,
-      error.code || 'PRODUCT_CENTER_ATTR_OPTION_DELETE_FAILED',
-      null,
-      error.statusCode || error.status || 500
-    )
-  }
-})
+  return res.apiSuccess({ option_id: parseInt(option_id, 10) }, '删除属性选项成功')
+}))
 
 /**
  * POST /:id/options — 为属性新增选项
  */
-router.post('/:id/options', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const service = getAttributeService(req)
-    const { id } = req.params
+router.post('/:id/options', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  const service = getAttributeService(req)
+  const { id } = req.params
 
-    const row = await TransactionManager.execute(async transaction => {
-      return await service.createAttributeOption(id, req.body || {}, { transaction })
-    })
+  const row = await TransactionManager.execute(async transaction => {
+    return await service.createAttributeOption(id, req.body || {}, { transaction })
+  })
 
-    return res.apiSuccess(row, '创建属性选项成功')
-  } catch (error) {
-    logger.error('创建属性选项失败', { attribute_id: req.params.id, error: error.message })
-    return res.apiError(
-      `创建属性选项失败: ${error.message}`,
-      error.code || 'PRODUCT_CENTER_ATTR_OPTION_CREATE_FAILED',
-      null,
-      error.statusCode || error.status || 500
-    )
-  }
-})
+  return res.apiSuccess(row, '创建属性选项成功')
+}))
 
 /**
  * GET /:id — 属性详情（含选项）
  */
-router.get('/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const service = getAttributeService(req)
-    const row = await service.getAttributeDetail(req.params.id)
-    if (!row) {
-      return res.apiError('属性不存在', 'PRODUCT_CENTER_ATTRIBUTE_NOT_FOUND', null, 404)
-    }
-    return res.apiSuccess(row, '获取属性详情成功')
-  } catch (error) {
-    logger.error('获取属性详情失败', { attribute_id: req.params.id, error: error.message })
-    return res.apiError(
-      `获取属性详情失败: ${error.message}`,
-      error.code || 'PRODUCT_CENTER_ATTR_DETAIL_FAILED',
-      null,
-      error.statusCode || error.status || 500
-    )
+router.get('/:id', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  const service = getAttributeService(req)
+  const row = await service.getAttributeDetail(req.params.id)
+  if (!row) {
+    return res.apiError('属性不存在', 'PRODUCT_CENTER_ATTRIBUTE_NOT_FOUND', null, 404)
   }
-})
+  return res.apiSuccess(row, '获取属性详情成功')
+}))
 
 /**
  * POST / — 创建属性
  */
-router.post('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const service = getAttributeService(req)
+router.post('/', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  const service = getAttributeService(req)
 
-    const row = await TransactionManager.execute(async transaction => {
-      return await service.createAttribute(req.body || {}, { transaction })
-    })
+  const row = await TransactionManager.execute(async transaction => {
+    return await service.createAttribute(req.body || {}, { transaction })
+  })
 
-    return res.apiSuccess(row, '创建属性成功')
-  } catch (error) {
-    logger.error('创建属性失败', { error: error.message })
-    return res.apiError(
-      `创建属性失败: ${error.message}`,
-      error.code || 'PRODUCT_CENTER_ATTR_CREATE_FAILED',
-      null,
-      error.statusCode || error.status || 500
-    )
-  }
-})
+  return res.apiSuccess(row, '创建属性成功')
+}))
 
 /**
  * PUT /:id — 更新属性
  */
-router.put('/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const service = getAttributeService(req)
+router.put('/:id', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  const service = getAttributeService(req)
 
-    const row = await TransactionManager.execute(async transaction => {
-      return await service.updateAttribute(req.params.id, req.body || {}, { transaction })
-    })
+  const row = await TransactionManager.execute(async transaction => {
+    return await service.updateAttribute(req.params.id, req.body || {}, { transaction })
+  })
 
-    return res.apiSuccess(row, '更新属性成功')
-  } catch (error) {
-    logger.error('更新属性失败', { attribute_id: req.params.id, error: error.message })
-    return res.apiError(
-      `更新属性失败: ${error.message}`,
-      error.code || 'PRODUCT_CENTER_ATTR_UPDATE_FAILED',
-      null,
-      error.statusCode || error.status || 500
-    )
-  }
-})
+  return res.apiSuccess(row, '更新属性成功')
+}))
 
 /**
  * DELETE /:id — 删除属性
  */
-router.delete('/:id', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    const service = getAttributeService(req)
+router.delete('/:id', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  const service = getAttributeService(req)
 
-    await TransactionManager.execute(async transaction => {
-      return await service.deleteAttribute(req.params.id, { transaction })
-    })
+  await TransactionManager.execute(async transaction => {
+    return await service.deleteAttribute(req.params.id, { transaction })
+  })
 
-    return res.apiSuccess({ attribute_id: parseInt(req.params.id, 10) }, '删除属性成功')
-  } catch (error) {
-    logger.error('删除属性失败', { attribute_id: req.params.id, error: error.message })
-    return res.apiError(
-      `删除属性失败: ${error.message}`,
-      error.code || 'PRODUCT_CENTER_ATTR_DELETE_FAILED',
-      null,
-      error.statusCode || error.status || 500
-    )
-  }
-})
+  return res.apiSuccess({ attribute_id: parseInt(req.params.id, 10) }, '删除属性成功')
+}))
 
 module.exports = router

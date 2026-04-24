@@ -9,9 +9,9 @@
  * 访问权限：管理员（role_level >= 100）
  */
 
+const { asyncHandler } = require('../../../../middleware/validation')
 const express = require('express')
 const router = express.Router()
-const logger = require('../../../../utils/logger').logger
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const TransactionManager = require('../../../../utils/TransactionManager')
 
@@ -28,22 +28,17 @@ router.use(authenticateToken, requireRoleLevel(100))
  * @query {string} [status] - 按分配状态筛选（active/expired/transferred）
  * @query {string} [search] - 搜索（用户昵称/手机号）
  */
-router.get('/', async (req, res) => {
-  try {
-    const service = req.app.locals.services.getService('cs_agent_management')
-    const result = await service.getAssignmentList({
-      page: req.query.page,
-      page_size: req.query.page_size,
-      agent_id: req.query.agent_id,
-      status: req.query.status,
-      search: req.query.search
-    })
-    res.apiSuccess(result, '获取用户分配列表成功')
-  } catch (error) {
-    logger.error('获取用户分配列表失败:', error)
-    res.apiError(error.message, error.code || 'INTERNAL_ERROR', null, error.statusCode || 500)
-  }
-})
+router.get('/', asyncHandler(async (req, res) => {
+  const service = req.app.locals.services.getService('cs_agent_management')
+  const result = await service.getAssignmentList({
+    page: req.query.page,
+    page_size: req.query.page_size,
+    agent_id: req.query.agent_id,
+    status: req.query.status,
+    search: req.query.search
+  })
+  return res.apiSuccess(result, '获取用户分配列表成功')
+}))
 
 /**
  * POST / — 分配用户给客服座席
@@ -54,41 +49,34 @@ router.get('/', async (req, res) => {
  * @body {string} [notes] - 分配备注
  * @body {string} [expired_at] - 过期时间
  */
-router.post('/', async (req, res) => {
-  try {
-    const { user_id, mobile, agent_id } = req.body
-    if (!agent_id) {
-      res.apiError('agent_id 为必填字段', 'VALIDATION_ERROR', null, 400)
-      return
-    }
-    if (!user_id && !mobile) {
-      res.apiError('user_id 或 mobile 至少提供一个', 'VALIDATION_ERROR', null, 400)
-      return
-    }
-
-    const service = req.app.locals.services.getService('cs_agent_management')
-    const result = await TransactionManager.execute(async transaction => {
-      /* 支持手机号分配：通过 mobile 解析 user_id */
-      let resolvedUserId = user_id
-      if (!resolvedUserId && mobile) {
-        resolvedUserId = await service.resolveUserIdByMobile(mobile, { transaction })
-      }
-
-      return service.createAssignment(
-        {
-          ...req.body,
-          user_id: resolvedUserId,
-          assigned_by: req.user.user_id
-        },
-        { transaction }
-      )
-    })
-    res.apiSuccess(result, '用户分配成功')
-  } catch (error) {
-    logger.error('分配用户失败:', error)
-    res.apiError(error.message, error.code || 'INTERNAL_ERROR', null, error.statusCode || 500)
+router.post('/', asyncHandler(async (req, res) => {
+  const { user_id, mobile, agent_id } = req.body
+  if (!agent_id) {
+    return res.apiError('agent_id 为必填字段', 'VALIDATION_ERROR', null, 400)
   }
-})
+  if (!user_id && !mobile) {
+    return res.apiError('user_id 或 mobile 至少提供一个', 'VALIDATION_ERROR', null, 400)
+  }
+
+  const service = req.app.locals.services.getService('cs_agent_management')
+  const result = await TransactionManager.execute(async transaction => {
+    /* 支持手机号分配：通过 mobile 解析 user_id */
+    let resolvedUserId = user_id
+    if (!resolvedUserId && mobile) {
+      resolvedUserId = await service.resolveUserIdByMobile(mobile, { transaction })
+    }
+
+    return service.createAssignment(
+      {
+        ...req.body,
+        user_id: resolvedUserId,
+        assigned_by: req.user.user_id
+      },
+      { transaction }
+    )
+  })
+  return res.apiSuccess(result, '用户分配成功')
+}))
 
 /**
  * POST /batch — 批量分配用户
@@ -98,30 +86,24 @@ router.post('/', async (req, res) => {
  * @body {number} agent_id - 目标客服座席ID
  * @body {string} [notes] - 分配备注
  */
-router.post('/batch', async (req, res) => {
-  try {
-    const { user_ids, agent_id } = req.body
-    if (!Array.isArray(user_ids) || user_ids.length === 0 || !agent_id) {
-      res.apiError('user_ids（非空数组）和 agent_id 为必填字段', 'VALIDATION_ERROR', null, 400)
-      return
-    }
-
-    const service = req.app.locals.services.getService('cs_agent_management')
-    const result = await TransactionManager.execute(async transaction => {
-      return service.batchCreateAssignment(
-        {
-          ...req.body,
-          assigned_by: req.user.user_id
-        },
-        { transaction }
-      )
-    })
-    res.apiSuccess(result, '批量分配完成')
-  } catch (error) {
-    logger.error('批量分配用户失败:', error)
-    res.apiError(error.message, error.code || 'INTERNAL_ERROR', null, error.statusCode || 500)
+router.post('/batch', asyncHandler(async (req, res) => {
+  const { user_ids, agent_id } = req.body
+  if (!Array.isArray(user_ids) || user_ids.length === 0 || !agent_id) {
+    return res.apiError('user_ids（非空数组）和 agent_id 为必填字段', 'VALIDATION_ERROR', null, 400)
   }
-})
+
+  const service = req.app.locals.services.getService('cs_agent_management')
+  const result = await TransactionManager.execute(async transaction => {
+    return service.batchCreateAssignment(
+      {
+        ...req.body,
+        assigned_by: req.user.user_id
+      },
+      { transaction }
+    )
+  })
+  return res.apiSuccess(result, '批量分配完成')
+}))
 
 /**
  * DELETE /:id — 解除用户分配
@@ -129,17 +111,12 @@ router.post('/batch', async (req, res) => {
  * @route DELETE /api/v4/console/customer-service/assignments/:id
  * @param {number} id - 分配记录ID
  */
-router.delete('/:id', async (req, res) => {
-  try {
-    const service = req.app.locals.services.getService('cs_agent_management')
-    const result = await TransactionManager.execute(async transaction => {
-      return service.removeAssignment(parseInt(req.params.id), { transaction })
-    })
-    res.apiSuccess(result, '用户分配已解除')
-  } catch (error) {
-    logger.error('解除用户分配失败:', error)
-    res.apiError(error.message, error.code || 'INTERNAL_ERROR', null, error.statusCode || 500)
-  }
-})
+router.delete('/:id', asyncHandler(async (req, res) => {
+  const service = req.app.locals.services.getService('cs_agent_management')
+  const result = await TransactionManager.execute(async transaction => {
+    return service.removeAssignment(parseInt(req.params.id), { transaction })
+  })
+  return res.apiSuccess(result, '用户分配已解除')
+}))
 
 module.exports = router

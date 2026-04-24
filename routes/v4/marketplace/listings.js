@@ -26,7 +26,7 @@ const express = require('express')
 const router = express.Router()
 const { AssetCode } = require('../../../constants/AssetCode')
 const { authenticateToken } = require('../../../middleware/auth')
-const { validatePositiveInteger, handleServiceError } = require('../../../middleware/validation')
+const { validatePositiveInteger, asyncHandler } = require('../../../middleware/validation')
 const logger = require('../../../utils/logger').logger
 /* 决策7：路由层不直连 models，服务通过 ServiceManager 获取 */
 
@@ -56,10 +56,9 @@ const logger = require('../../../utils/logger').logger
  *
  * 业务场景：用户浏览交易市场中其他用户上架的商品（物品和材料）
  */
-router.get('/listings', authenticateToken, async (req, res) => {
-  try {
-    // P1-9：通过 ServiceManager 获取服务（snake_case key）
-    const MarketListingService = req.app.locals.services.getService('market_listing_query')
+router.get('/listings', authenticateToken, asyncHandler(async (req, res) => {
+  // P1-9：通过 ServiceManager 获取服务（snake_case key）
+  const MarketListingService = req.app.locals.services.getService('market_listing_query')
 
     const {
       page = 1,
@@ -129,16 +128,7 @@ router.get('/listings', authenticateToken, async (req, res) => {
     }
 
     return res.apiSuccess(responseData, '获取市场挂牌列表成功')
-  } catch (error) {
-    logger.error('获取交易市场挂牌列表失败', {
-      error: error.message,
-      user_id: req.user?.user_id,
-      query: req.query
-    })
-
-    return handleServiceError(error, res, '获取市场挂牌列表失败')
-  }
-})
+}))
 
 /**
  * @route GET /api/v4/marketplace/listings/facets
@@ -157,10 +147,9 @@ router.get('/listings', authenticateToken, async (req, res) => {
  * - 此接口返回所有可用的筛选维度，用于前端筛选器 UI 渲染
  * - 仅返回已启用（is_enabled=true）且可交易（is_tradable=true）的选项
  */
-router.get('/listings/facets', authenticateToken, async (req, res) => {
-  try {
-    // P1-9：通过 ServiceManager 获取服务（snake_case key）
-    const MarketListingService = req.app.locals.services.getService('market_listing_query')
+router.get('/listings/facets', authenticateToken, asyncHandler(async (req, res) => {
+  // P1-9：通过 ServiceManager 获取服务（snake_case key）
+  const MarketListingService = req.app.locals.services.getService('market_listing_query')
 
     // 获取筛选维度配置（仅返回已启用的选项）
     const facets = await MarketListingService.getFilterFacets({
@@ -175,15 +164,7 @@ router.get('/listings/facets', authenticateToken, async (req, res) => {
     })
 
     return res.apiSuccess(facets, '获取筛选维度配置成功')
-  } catch (error) {
-    logger.error('获取市场筛选维度配置失败', {
-      error: error.message,
-      user_id: req.user?.user_id
-    })
-
-    return handleServiceError(error, res, '获取筛选维度配置失败')
-  }
-})
+}))
 
 /**
  * @route GET /api/v4/marketplace/listings/:market_listing_id
@@ -212,10 +193,9 @@ router.get(
   '/listings/:market_listing_id',
   authenticateToken,
   validatePositiveInteger('market_listing_id', 'params'),
-  async (req, res) => {
-    try {
-      // P1-9：通过 ServiceManager 获取服务（snake_case key）
-      const MarketListingService = req.app.locals.services.getService('market_listing_query')
+  asyncHandler(async (req, res) => {
+    // P1-9：通过 ServiceManager 获取服务（snake_case key）
+    const MarketListingService = req.app.locals.services.getService('market_listing_query')
 
       const listingId = req.validated.market_listing_id
 
@@ -269,16 +249,7 @@ router.get(
       })
 
       return res.apiSuccess(sanitizedDetail, '获取挂牌详情成功')
-    } catch (error) {
-      logger.error('获取市场挂牌详情失败', {
-        error: error.message,
-        market_listing_id: req.validated.market_listing_id,
-        user_id: req.user?.user_id
-      })
-
-      return handleServiceError(error, res, '获取挂牌详情失败')
-    }
-  }
+  })
 )
 
 /**
@@ -292,27 +263,18 @@ router.get(
  * 业务场景：前端卖家上架商品时，需要知道可选的定价币种
  * 数据来源：system_settings.allowed_settlement_assets + material_asset_types.display_name
  */
-router.get('/settlement-currencies', authenticateToken, async (req, res) => {
-  try {
-    const MarketListingService = req.app.locals.services.getService('market_listing_query')
+router.get('/settlement-currencies', authenticateToken, asyncHandler(async (req, res) => {
+  const MarketListingService = req.app.locals.services.getService('market_listing_query')
 
-    const currencies = await MarketListingService.getSettlementCurrencies()
+  const currencies = await MarketListingService.getSettlementCurrencies()
 
-    logger.info('获取结算币种列表成功', {
-      user_id: req.user.user_id,
-      count: currencies.length
-    })
+  logger.info('获取结算币种列表成功', {
+    user_id: req.user.user_id,
+    count: currencies.length
+  })
 
-    return res.apiSuccess({ currencies }, '获取结算币种列表成功')
-  } catch (error) {
-    logger.error('获取结算币种列表失败', {
-      error: error.message,
-      user_id: req.user?.user_id
-    })
-
-    return handleServiceError(error, res, '获取结算币种列表失败')
-  }
-})
+  return res.apiSuccess({ currencies }, '获取结算币种列表成功')
+}))
 
 /**
  * @route GET /api/v4/marketplace/my-listings
@@ -330,9 +292,8 @@ router.get('/settlement-currencies', authenticateToken, async (req, res) => {
  * 业务场景：用户查看自己在市场上架的所有挂单（含历史订单）
  * Service层已完整实现（MarketListingQueryService.getUserListings），路由层仅做参数透传
  */
-router.get('/my-listings', authenticateToken, async (req, res) => {
-  try {
-    const MarketListingService = req.app.locals.services.getService('market_listing_query')
+router.get('/my-listings', authenticateToken, asyncHandler(async (req, res) => {
+  const MarketListingService = req.app.locals.services.getService('market_listing_query')
 
     const userId = req.user.user_id
     const { page = 1, page_size: my_page_size = 20, status } = req.query
@@ -364,16 +325,7 @@ router.get('/my-listings', authenticateToken, async (req, res) => {
       },
       '获取我的挂单列表成功'
     )
-  } catch (error) {
-    logger.error('获取用户挂单列表失败', {
-      error: error.message,
-      user_id: req.user?.user_id,
-      query: req.query
-    })
-
-    return handleServiceError(error, res, '获取我的挂单列表失败')
-  }
-})
+}))
 
 /**
  * @route GET /api/v4/marketplace/listing-status
@@ -388,10 +340,9 @@ router.get('/my-listings', authenticateToken, async (req, res) => {
  *
  * 业务场景：查询用户当前上架商品数量和剩余上架额度
  */
-router.get('/listing-status', authenticateToken, async (req, res) => {
-  try {
-    // P1-9：通过 ServiceManager 获取服务（snake_case key）
-    const MarketListingService = req.app.locals.services.getService('market_listing_query')
+router.get('/listing-status', authenticateToken, asyncHandler(async (req, res) => {
+  // P1-9：通过 ServiceManager 获取服务（snake_case key）
+  const MarketListingService = req.app.locals.services.getService('market_listing_query')
 
     const userId = req.user.user_id
 
@@ -421,14 +372,6 @@ router.get('/listing-status', authenticateToken, async (req, res) => {
       },
       '获取上架状态成功'
     )
-  } catch (error) {
-    logger.error('获取上架状态失败', {
-      error: error.message,
-      user_id: req.user?.user_id
-    })
-
-    return handleServiceError(error, res, '获取上架状态失败')
-  }
-})
+}))
 
 module.exports = router

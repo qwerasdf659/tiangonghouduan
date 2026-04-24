@@ -26,6 +26,7 @@ const express = require('express')
 const router = express.Router()
 const logger = require('../../utils/logger').logger
 const { authenticateToken, requireRoleLevel } = require('../../middleware/auth')
+const { asyncHandler } = require('../../middleware/validation')
 
 /**
  * @route GET /api/v4/activities
@@ -43,47 +44,31 @@ const { authenticateToken, requireRoleLevel } = require('../../middleware/auth')
  * @returns {Array} return.data.activities - 活动列表
  * @returns {number} return.data.total - 活动总数
  */
-router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
+router.get('/', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
     const { status, page_size } = req.query
 
-    logger.info('获取所有活动列表', {
-      status,
-      page_size,
-      admin_id: req.user.user_id,
-      request_id: req.id
-    })
+  logger.info('获取所有活动列表', {
+    status,
+    page_size,
+    admin_id: req.user.user_id,
+    request_id: req.id
+  })
 
-    const ActivityService = req.app.locals.services.getService('activity')
-    const activities = await ActivityService.getAllActivities({ status, limit: page_size })
+  const ActivityService = req.app.locals.services.getService('activity')
+  const activities = await ActivityService.getAllActivities({ status, limit: page_size })
 
-    logger.info('获取所有活动列表成功', {
-      total: activities.length,
-      admin_id: req.user.user_id,
-      request_id: req.id
-    })
+  logger.info('获取所有活动列表成功', {
+    total: activities.length,
+    admin_id: req.user.user_id,
+    request_id: req.id
+  })
 
-    return res.apiSuccess(
-      { activities, total: activities.length },
-      '获取所有活动列表成功',
-      'ACTIVITIES_LIST_SUCCESS'
-    )
-  } catch (error) {
-    logger.error('获取所有活动列表失败', {
-      error: error.message,
-      stack: error.stack,
-      admin_id: req.user?.user_id,
-      request_id: req.id
-    })
-
-    return res.apiError(
-      '获取所有活动列表失败',
-      'ACTIVITIES_LIST_ERROR',
-      { error: error.message },
-      500
-    )
-  }
-})
+  return res.apiSuccess(
+    { activities, total: activities.length },
+    '获取所有活动列表成功',
+    'ACTIVITIES_LIST_SUCCESS'
+  )
+}))
 
 /**
  * @route GET /api/v4/activities/available
@@ -98,41 +83,26 @@ router.get('/', authenticateToken, requireRoleLevel(100), async (req, res) => {
  * @returns {Array} return.data.activities - 活动列表
  * @returns {number} return.data.total - 活动总数
  */
-router.get('/available', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
+router.get('/available', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
     const user_id = req.user.user_id
 
-    logger.info('获取用户可参与的活动列表', {
-      user_id,
-      request_id: req.id
-    })
+  logger.info('获取用户可参与的活动列表', {
+    user_id,
+    request_id: req.id
+  })
 
-    const ActivityService = req.app.locals.services.getService('activity')
-    // 调用 ActivityService 获取可参与的活动
-    const result = await ActivityService.getAvailableActivitiesForUser(user_id)
+  const ActivityService = req.app.locals.services.getService('activity')
+  // 调用 ActivityService 获取可参与的活动
+  const result = await ActivityService.getAvailableActivitiesForUser(user_id)
 
-    logger.info('获取可参与活动成功', {
-      user_id,
-      total: result.total,
-      request_id: req.id
-    })
+  logger.info('获取可参与活动成功', {
+    user_id,
+    total: result.total,
+    request_id: req.id
+  })
 
-    return res.apiSuccess(result, '获取可参与活动列表成功', 'ACTIVITIES_AVAILABLE_SUCCESS')
-  } catch (error) {
-    logger.error('获取可参与活动失败', {
-      error: error.message,
-      user_id: req.user?.user_id,
-      request_id: req.id
-    })
-
-    return res.apiError(
-      '获取可参与活动列表失败',
-      'ACTIVITIES_AVAILABLE_ERROR',
-      { error: error.message },
-      500
-    )
-  }
-})
+  return res.apiSuccess(result, '获取可参与活动列表成功', 'ACTIVITIES_AVAILABLE_SUCCESS')
+}))
 
 /**
  * @route GET /api/v4/activities/:idOrCode/check-eligibility
@@ -152,56 +122,29 @@ router.get(
   '/:idOrCode/check-eligibility',
   authenticateToken,
   requireRoleLevel(100),
-  async (req, res) => {
-    try {
-      const { idOrCode } = req.params
-      const user_id = req.user.user_id
+  asyncHandler(async (req, res) => {
+        const { idOrCode } = req.params
+    const user_id = req.user.user_id
 
-      logger.info('检查活动参与资格', {
-        user_id,
-        activity_id_or_code: idOrCode,
-        request_id: req.id
-      })
+    logger.info('检查活动参与资格', {
+      user_id,
+      activity_id_or_code: idOrCode,
+      request_id: req.id
+    })
 
-      const ActivityService = req.app.locals.services.getService('activity')
-      // 调用 ActivityService 检查资格
-      const result = await ActivityService.checkEligibility(user_id, idOrCode)
+    const ActivityService = req.app.locals.services.getService('activity')
+    // 调用 ActivityService 检查资格
+    const result = await ActivityService.checkEligibility(user_id, idOrCode)
 
-      logger.info('活动资格检查完成', {
-        user_id,
-        activity_id: result.activity_id,
-        eligible: result.eligible,
-        request_id: req.id
-      })
+    logger.info('活动资格检查完成', {
+      user_id,
+      activity_id: result.activity_id,
+      eligible: result.eligible,
+      request_id: req.id
+    })
 
-      return res.apiSuccess(result, '活动资格检查成功', 'ELIGIBILITY_CHECK_SUCCESS')
-    } catch (error) {
-      logger.error('活动资格检查失败', {
-        error: error.message,
-        error_code: error.code,
-        user_id: req.user?.user_id,
-        activity_id_or_code: req.params.idOrCode,
-        request_id: req.id
-      })
-
-      // 处理业务错误
-      if (error.code === 'ACTIVITY_NOT_FOUND') {
-        return res.apiError(
-          '活动不存在',
-          'ACTIVITY_NOT_FOUND',
-          { activity_id_or_code: req.params.idOrCode },
-          404
-        )
-      }
-
-      return res.apiError(
-        '活动资格检查失败',
-        'ELIGIBILITY_CHECK_ERROR',
-        { error: error.message },
-        500
-      )
-    }
-  }
+    return res.apiSuccess(result, '活动资格检查成功', 'ELIGIBILITY_CHECK_SUCCESS')
+  })
 )
 
 /**
@@ -223,62 +166,40 @@ router.post(
   '/:idOrCode/participate',
   authenticateToken,
   requireRoleLevel(100),
-  async (req, res) => {
-    try {
-      const { idOrCode } = req.params
-      const user_id = req.user.user_id
+  asyncHandler(async (req, res) => {
+        const { idOrCode } = req.params
+    const user_id = req.user.user_id
 
-      logger.info('用户尝试参与活动', {
-        user_id,
-        activity_id_or_code: idOrCode,
-        request_id: req.id
-      })
+    logger.info('用户尝试参与活动', {
+      user_id,
+      activity_id_or_code: idOrCode,
+      request_id: req.id
+    })
 
-      const ActivityService = req.app.locals.services.getService('activity')
-      // 调用 ActivityService 检查资格
-      const eligibility = await ActivityService.checkEligibility(user_id, idOrCode)
+    const ActivityService = req.app.locals.services.getService('activity')
+    // 调用 ActivityService 检查资格
+    const eligibility = await ActivityService.checkEligibility(user_id, idOrCode)
 
-      const result = {
-        can_participate: eligibility.eligible,
-        activity_id: eligibility.activity_id,
-        activity_name: eligibility.activity_name,
-        reasons: eligibility.eligible ? [] : eligibility.messages
-      }
-
-      logger.info('参与活动验证完成', {
-        user_id,
-        activity_id: result.activity_id,
-        can_participate: result.can_participate,
-        request_id: req.id
-      })
-
-      if (result.can_participate) {
-        return res.apiSuccess(result, '您可以参与此活动', 'PARTICIPATION_ALLOWED')
-      } else {
-        return res.apiSuccess(result, '您暂时无法参与此活动', 'PARTICIPATION_NOT_ALLOWED')
-      }
-    } catch (error) {
-      logger.error('参与活动验证失败', {
-        error: error.message,
-        error_code: error.code,
-        user_id: req.user?.user_id,
-        activity_id_or_code: req.params.idOrCode,
-        request_id: req.id
-      })
-
-      // 处理业务错误
-      if (error.code === 'ACTIVITY_NOT_FOUND') {
-        return res.apiError(
-          '活动不存在',
-          'ACTIVITY_NOT_FOUND',
-          { activity_id_or_code: req.params.idOrCode },
-          404
-        )
-      }
-
-      return res.apiError('参与活动验证失败', 'PARTICIPATION_ERROR', { error: error.message }, 500)
+    const result = {
+      can_participate: eligibility.eligible,
+      activity_id: eligibility.activity_id,
+      activity_name: eligibility.activity_name,
+      reasons: eligibility.eligible ? [] : eligibility.messages
     }
-  }
+
+    logger.info('参与活动验证完成', {
+      user_id,
+      activity_id: result.activity_id,
+      can_participate: result.can_participate,
+      request_id: req.id
+    })
+
+    if (result.can_participate) {
+      return res.apiSuccess(result, '您可以参与此活动', 'PARTICIPATION_ALLOWED')
+    } else {
+      return res.apiSuccess(result, '您暂时无法参与此活动', 'PARTICIPATION_NOT_ALLOWED')
+    }
+  })
 )
 
 /**
@@ -292,47 +213,21 @@ router.post(
  * @returns {Object} return.data.participation_conditions - 参与条件
  * @returns {Object} return.data.condition_error_messages - 条件错误提示
  */
-router.get('/:idOrCode/conditions', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
+router.get('/:idOrCode/conditions', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
     const { idOrCode } = req.params
 
-    logger.info('管理员获取活动条件配置', {
-      admin_id: req.user.user_id,
-      activity_id_or_code: idOrCode,
-      request_id: req.id
-    })
+  logger.info('管理员获取活动条件配置', {
+    admin_id: req.user.user_id,
+    activity_id_or_code: idOrCode,
+    request_id: req.id
+  })
 
-    const ActivityService = req.app.locals.services.getService('activity')
-    // 通过 Service 层查询活动条件（符合路由层规范）
-    const conditionConfig = await ActivityService.getConditionConfig(idOrCode)
+  const ActivityService = req.app.locals.services.getService('activity')
+  // 通过 Service 层查询活动条件（符合路由层规范）
+  const conditionConfig = await ActivityService.getConditionConfig(idOrCode)
 
-    return res.apiSuccess(conditionConfig, '获取活动条件配置成功', 'CONDITIONS_GET_SUCCESS')
-  } catch (error) {
-    // 处理 Service 层抛出的业务错误
-    if (error.code === 'ACTIVITY_NOT_FOUND') {
-      return res.apiError(
-        '活动不存在',
-        'ACTIVITY_NOT_FOUND',
-        { activity_id_or_code: req.params.idOrCode },
-        404
-      )
-    }
-
-    logger.error('获取活动条件配置失败', {
-      error: error.message,
-      admin_id: req.user?.user_id,
-      activity_id_or_code: req.params.idOrCode,
-      request_id: req.id
-    })
-
-    return res.apiError(
-      '获取活动条件配置失败',
-      'CONDITIONS_GET_ERROR',
-      { error: error.message },
-      500
-    )
-  }
-})
+  return res.apiSuccess(conditionConfig, '获取活动条件配置成功', 'CONDITIONS_GET_SUCCESS')
+}))
 
 /**
  * @route POST /api/v4/activities/:code/configure-conditions
@@ -361,62 +256,35 @@ router.post(
   '/:code/configure-conditions',
   authenticateToken,
   requireRoleLevel(100),
-  async (req, res) => {
-    try {
-      const { code } = req.params
-      const { participation_conditions, condition_error_messages } = req.body
+  asyncHandler(async (req, res) => {
+        const { code } = req.params
+    const { participation_conditions, condition_error_messages } = req.body
 
-      logger.info('管理员配置活动条件', {
-        admin_id: req.user.user_id,
-        campaign_code: code,
-        has_conditions: !!participation_conditions,
-        has_messages: !!condition_error_messages,
-        request_id: req.id
-      })
+    logger.info('管理员配置活动条件', {
+      admin_id: req.user.user_id,
+      campaign_code: code,
+      has_conditions: !!participation_conditions,
+      has_messages: !!condition_error_messages,
+      request_id: req.id
+    })
 
-      const ActivityService = req.app.locals.services.getService('activity')
-      // 调用 ActivityService 配置条件
-      const result = await ActivityService.configureConditions(
-        code,
-        participation_conditions,
-        condition_error_messages
-      )
+    const ActivityService = req.app.locals.services.getService('activity')
+    // 调用 ActivityService 配置条件
+    const result = await ActivityService.configureConditions(
+      code,
+      participation_conditions,
+      condition_error_messages
+    )
 
-      logger.info('活动条件配置成功', {
-        admin_id: req.user.user_id,
-        lottery_campaign_id: result.lottery_campaign_id,
-        campaign_name: result.campaign_name,
-        request_id: req.id
-      })
+    logger.info('活动条件配置成功', {
+      admin_id: req.user.user_id,
+      lottery_campaign_id: result.lottery_campaign_id,
+      campaign_name: result.campaign_name,
+      request_id: req.id
+    })
 
-      return res.apiSuccess(result, '活动条件配置成功', 'CONDITIONS_CONFIGURE_SUCCESS')
-    } catch (error) {
-      logger.error('活动条件配置失败', {
-        error: error.message,
-        error_code: error.code,
-        admin_id: req.user?.user_id,
-        campaign_code: req.params.code,
-        request_id: req.id
-      })
-
-      // 处理业务错误
-      if (error.code === 'ACTIVITY_NOT_FOUND') {
-        return res.apiError(
-          '活动不存在',
-          'ACTIVITY_NOT_FOUND',
-          { campaign_code: req.params.code },
-          404
-        )
-      }
-
-      return res.apiError(
-        '活动条件配置失败',
-        'CONDITIONS_CONFIGURE_ERROR',
-        { error: error.message },
-        500
-      )
-    }
-  }
+    return res.apiSuccess(result, '活动条件配置成功', 'CONDITIONS_CONFIGURE_SUCCESS')
+  })
 )
 
 module.exports = router

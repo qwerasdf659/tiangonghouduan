@@ -16,6 +16,7 @@
  * - 每个操作同时创建 AdBillingRecord 记录和实际执行资产变动
  */
 
+const BusinessError = require('../utils/BusinessError')
 const crypto = require('crypto')
 const logger = require('../utils/logger').logger
 const { AdBillingRecord, AdCampaign, AdSlot, sequelize } = require('../models')
@@ -93,11 +94,11 @@ class AdBillingService {
       })
 
       if (!campaign) {
-        throw new Error(`广告计划不存在: ${campaignId}`)
+        throw new BusinessError(`广告计划不存在: ${campaignId}`, 'SERVICE_NOT_FOUND', 404)
       }
 
       if (campaign.billing_mode !== 'fixed_daily') {
-        throw new Error(`只有固定包天模式需要冻结星石，当前模式: ${campaign.billing_mode}`)
+        throw new BusinessError(`只有固定包天模式需要冻结星石，当前模式: ${campaign.billing_mode}`, 'SERVICE_ERROR', 400)
       }
 
       // 生成business_id
@@ -167,11 +168,11 @@ class AdBillingService {
       })
 
       if (!campaign) {
-        throw new Error(`广告计划不存在: ${campaignId}`)
+        throw new BusinessError(`广告计划不存在: ${campaignId}`, 'SERVICE_NOT_FOUND', 404)
       }
 
       if (campaign.billing_mode !== 'fixed_daily' || !campaign.fixed_total_star_stone) {
-        throw new Error(`固定包天模式必须提供fixed_total_star_stone`)
+        throw new BusinessError(`固定包天模式必须提供fixed_total_star_stone`, 'SERVICE_REQUIRED', 400)
       }
 
       // 查找冻结记录
@@ -185,7 +186,7 @@ class AdBillingService {
       })
 
       if (!freezeRecord) {
-        throw new Error(`未找到冻结记录: ${campaignId}`)
+        throw new BusinessError(`未找到冻结记录: ${campaignId}`, 'SERVICE_NOT_FOUND', 404)
       }
 
       const amount = campaign.fixed_total_star_stone
@@ -257,7 +258,7 @@ class AdBillingService {
       })
 
       if (!campaign) {
-        throw new Error(`广告计划不存在: ${campaignId}`)
+        throw new BusinessError(`广告计划不存在: ${campaignId}`, 'SERVICE_NOT_FOUND', 404)
       }
 
       // 计算实际冻结净额：总冻结 - 已扣款 - 已退款

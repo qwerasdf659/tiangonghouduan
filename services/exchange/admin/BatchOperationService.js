@@ -1,4 +1,5 @@
 'use strict'
+const BusinessError = require('../../../utils/BusinessError')
 
 /**
  * 兑换市场管理 - 批量操作服务
@@ -45,12 +46,12 @@ class BatchOperationService {
     const transaction = assertAndGetTransaction(options, 'AdminService.batchBindImages')
 
     if (!Array.isArray(bindings) || bindings.length === 0) {
-      throw new Error('绑定关系数组不能为空')
+      throw new BusinessError('绑定关系数组不能为空', 'EXCHANGE_NOT_ALLOWED', 400)
     }
 
     for (const binding of bindings) {
       if (!binding.exchange_item_id || !binding.media_id) {
-        throw new Error('每条绑定记录必须包含 exchange_item_id 和 media_id')
+        throw new BusinessError('每条绑定记录必须包含 exchange_item_id 和 media_id', 'EXCHANGE_REQUIRED', 400)
       }
     }
 
@@ -137,11 +138,11 @@ class BatchOperationService {
 
     const validSpaces = ['lucky', 'premium', 'both']
     if (!validSpaces.includes(space)) {
-      throw new Error(`无效的空间类型：${space}，允许值：${validSpaces.join(', ')}`)
+      throw new BusinessError(`无效的空间类型：${space}，允许值：${validSpaces.join(', ')}`, 'EXCHANGE_INVALID_ID', 400)
     }
 
     if (!Array.isArray(exchangeItemIds) || exchangeItemIds.length === 0) {
-      throw new Error('商品ID数组不能为空')
+      throw new BusinessError('商品ID数组不能为空', 'EXCHANGE_NOT_ALLOWED', 400)
     }
 
     logger.info('[兑换市场-管理] 批量更新商品空间', {
@@ -183,11 +184,11 @@ class BatchOperationService {
 
     const validStatuses = ['active', 'inactive']
     if (!validStatuses.includes(status)) {
-      throw new Error(`无效的状态：${status}，允许值：${validStatuses.join(', ')}`)
+      throw new BusinessError(`无效的状态：${status}，允许值：${validStatuses.join(', ')}`, 'EXCHANGE_INVALID_STATUS', 400)
     }
 
     if (!Array.isArray(exchangeItemIds) || exchangeItemIds.length === 0) {
-      throw new Error('商品ID数组不能为空')
+      throw new BusinessError('商品ID数组不能为空', 'EXCHANGE_NOT_ALLOWED', 400)
     }
 
     logger.info('[兑换市场-管理] 批量更新商品状态', {
@@ -225,21 +226,21 @@ class BatchOperationService {
     const transaction = assertAndGetTransaction(options, 'AdminService.batchUpdatePrice')
 
     if (!Array.isArray(exchangeItemIds) || exchangeItemIds.length === 0) {
-      throw new Error('商品ID数组不能为空')
+      throw new BusinessError('商品ID数组不能为空', 'EXCHANGE_NOT_ALLOWED', 400)
     }
 
     const { mode, value } = adjustment
     if (!['ratio', 'fixed', 'set'].includes(mode)) {
-      throw new Error('调整模式必须是 ratio/fixed/set')
+      throw new BusinessError('调整模式必须是 ratio/fixed/set', 'EXCHANGE_REQUIRED', 400)
     }
     if (typeof value !== 'number' || isNaN(value)) {
-      throw new Error('调整值必须是有效数字')
+      throw new BusinessError('调整值必须是有效数字', 'EXCHANGE_REQUIRED', 400)
     }
     if (mode === 'ratio' && value <= 0) {
-      throw new Error('比例调整值必须大于0')
+      throw new BusinessError('比例调整值必须大于0', 'EXCHANGE_REQUIRED', 400)
     }
     if (mode === 'set' && value <= 0) {
-      throw new Error('直接设置的价格必须大于0')
+      throw new BusinessError('直接设置的价格必须大于0', 'EXCHANGE_REQUIRED', 400)
     }
 
     logger.info('[兑换市场-管理] 批量调整商品价格', { count: exchangeItemIds.length, mode, value })
@@ -333,7 +334,7 @@ class BatchOperationService {
     const transaction = assertAndGetTransaction(options, 'AdminService.batchSetIndividualPrices')
 
     if (!Array.isArray(priceItems) || priceItems.length === 0) {
-      throw new Error('价格数据不能为空')
+      throw new BusinessError('价格数据不能为空', 'EXCHANGE_NOT_ALLOWED', 400)
     }
 
     const priceMap = new Map()
@@ -432,14 +433,14 @@ class BatchOperationService {
     const transaction = assertAndGetTransaction(options, 'AdminService.batchUpdateCategory')
 
     if (!Array.isArray(exchangeItemIds) || exchangeItemIds.length === 0) {
-      throw new Error('商品ID数组不能为空')
+      throw new BusinessError('商品ID数组不能为空', 'EXCHANGE_NOT_ALLOWED', 400)
     }
 
     if (categoryDefId !== null) {
       const { Category } = this.models
       const category = await Category.findByPk(categoryDefId, { transaction })
       if (!category) {
-        throw new Error(`分类不存在：${categoryDefId}`)
+        throw new BusinessError(`分类不存在：${categoryDefId}`, 'EXCHANGE_NOT_FOUND', 404)
       }
     }
 
@@ -475,17 +476,17 @@ class BatchOperationService {
     const transaction = assertAndGetTransaction(options, 'AdminService.batchUpdateRarity')
 
     if (!Array.isArray(exchangeItemIds) || exchangeItemIds.length === 0) {
-      throw new Error('商品ID数组不能为空')
+      throw new BusinessError('商品ID数组不能为空', 'EXCHANGE_NOT_ALLOWED', 400)
     }
 
     if (!rarityCode) {
-      throw new Error('稀有度代码不能为空')
+      throw new BusinessError('稀有度代码不能为空', 'EXCHANGE_NOT_ALLOWED', 400)
     }
 
     const { RarityDef } = this.models
     const rarity = await RarityDef.findOne({ where: { rarity_code: rarityCode }, transaction })
     if (!rarity) {
-      throw new Error(`稀有度不存在：${rarityCode}`)
+      throw new BusinessError(`稀有度不存在：${rarityCode}`, 'EXCHANGE_NOT_FOUND', 404)
     }
 
     logger.info('[兑换市场-管理] 批量修改商品稀有度', {

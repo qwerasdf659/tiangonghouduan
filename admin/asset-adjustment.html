@@ -292,7 +292,7 @@
         <div class="flex justify-between"><span class="themed-text-muted">变动数量:</span><span class="font-mono" :class="Number(selectedRecord?.amount) >= 0 ? 'text-green-600' : 'text-red-600'" x-text="(Number(selectedRecord?.amount) >= 0 ? '+' : '') + formatNumber(selectedRecord?.amount)"></span></div>
         <div class="flex justify-between"><span class="themed-text-muted">变动前余额:</span><span class="font-mono" x-text="formatNumber(selectedRecord?.balance_before)"></span></div>
         <div class="flex justify-between"><span class="themed-text-muted">变动后余额:</span><span class="font-mono" x-text="formatNumber(selectedRecord?.balance_after)"></span></div>
-        <div class="flex justify-between"><span class="themed-text-muted">业务类型:</span><span x-text="selectedRecord?.tx_type || '-'"></span></div>
+        <div class="flex justify-between"><span class="themed-text-muted">业务类型:</span><span x-text="selectedRecord?.business_type || '-'"></span></div>
         <div class="flex justify-between"><span class="themed-text-muted">操作人:</span><span x-text="selectedRecord?.operator_name || '-'"></span></div>
         <div class="flex justify-between"><span class="themed-text-muted">创建时间:</span><span x-text="formatDateTimeShort(selectedRecord?.created_at)"></span></div>
         <div>

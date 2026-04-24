@@ -33,6 +33,7 @@
  * @date 2026-01-31
  */
 
+const BusinessError = require('../../utils/BusinessError')
 const { Op, fn, col, literal } = require('sequelize')
 const logger = require('../../utils/logger').logger
 
@@ -67,7 +68,7 @@ class CampaignAnalysisService {
       // 1. 获取活动信息
       const campaign = await this.models.LotteryCampaign.findByPk(campaignId)
       if (!campaign) {
-        throw new Error('活动不存在')
+        throw new BusinessError('活动不存在', 'SERVICE_NOT_FOUND', 404)
       }
 
       const startTime = new Date(campaign.start_time)

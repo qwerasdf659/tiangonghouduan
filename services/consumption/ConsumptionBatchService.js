@@ -23,6 +23,7 @@
 
 'use strict'
 
+const BusinessError = require('../../utils/BusinessError')
 const { Op } = require('sequelize')
 const BeijingTimeHelper = require('../../utils/timeHelper')
 const TransactionManager = require('../../utils/TransactionManager')
@@ -274,7 +275,7 @@ class ConsumptionBatchService {
       }
     }
 
-    throw new Error(`未知的审核动作: ${action}`)
+    throw new BusinessError(`未知的审核动作: ${action}`, 'CONSUMPTION_ERROR', 400)
   }
 
   /**
@@ -289,23 +290,23 @@ class ConsumptionBatchService {
     const { record_ids, action, reason, operator_id } = params
 
     if (!Array.isArray(record_ids) || record_ids.length === 0) {
-      throw new Error('record_ids 必须是非空数组')
+      throw new BusinessError('record_ids 必须是非空数组', 'CONSUMPTION_REQUIRED', 400)
     }
 
     if (record_ids.length > BATCH_LIMITS.MAX_RECORDS) {
-      throw new Error(`单次批量最多处理 ${BATCH_LIMITS.MAX_RECORDS} 条记录`)
+      throw new BusinessError(`单次批量最多处理 ${BATCH_LIMITS.MAX_RECORDS} 条记录`, 'CONSUMPTION_ERROR', 400)
     }
 
     if (!Object.values(BATCH_REVIEW_ACTIONS).includes(action)) {
-      throw new Error(`action 必须是 ${Object.values(BATCH_REVIEW_ACTIONS).join(' 或 ')}`)
+      throw new BusinessError(`action 必须是 ${Object.values(BATCH_REVIEW_ACTIONS).join(' 或 ')}`, 'CONSUMPTION_REQUIRED', 400)
     }
 
     if (action === BATCH_REVIEW_ACTIONS.REJECT && !reason) {
-      throw new Error('拒绝操作必须提供 reason')
+      throw new BusinessError('拒绝操作必须提供 reason', 'CONSUMPTION_REQUIRED', 400)
     }
 
     if (!operator_id) {
-      throw new Error('operator_id 是必填项')
+      throw new BusinessError('operator_id 是必填项', 'CONSUMPTION_REQUIRED', 400)
     }
   }
 

@@ -21,6 +21,7 @@
 
 'use strict'
 
+const { asyncHandler } = require('../../../../middleware/validation')
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
@@ -70,24 +71,15 @@ function getModels(req) {
  *
  * @apiPermission admin
  */
-router.get('/segments', authenticateToken, requireRoleLevel(100), async (req, res) => {
+router.get('/segments', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
   logger.info('获取用户分层统计', { user_id: req.user?.user_id })
 
-  try {
-    const models = getModels(req)
-    const UserSegmentService = getUserSegmentService(req)
-    const stats = await UserSegmentService.getSegmentStats(models)
+  const models = getModels(req)
+  const UserSegmentService = getUserSegmentService(req)
+  const stats = await UserSegmentService.getSegmentStats(models)
 
-    return res.apiSuccess(stats, '获取分层统计成功')
-  } catch (error) {
-    logger.error('获取分层统计失败', {
-      error: error.message,
-      stack: error.stack
-    })
-
-    return res.apiError('获取分层统计失败', 'SEGMENT_STATS_ERROR', { error: error.message }, 500)
-  }
-})
+  return res.apiSuccess(stats, '获取分层统计成功')
+}))
 
 /**
  * @api {get} /api/v4/admin/users/segments/:type 获取分层用户列表
@@ -111,7 +103,7 @@ router.get('/segments', authenticateToken, requireRoleLevel(100), async (req, re
  *
  * @apiPermission admin
  */
-router.get('/segments/:type', authenticateToken, requireRoleLevel(100), async (req, res) => {
+router.get('/segments/:type', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
   const { type } = req.params
   const { page = '1', page_size = '20' } = req.query
 
@@ -132,30 +124,15 @@ router.get('/segments/:type', authenticateToken, requireRoleLevel(100), async (r
     )
   }
 
-  try {
-    const models = getModels(req)
-    const UserSegmentService = getUserSegmentService(req)
-    const result = await UserSegmentService.getSegmentUsers(models, type, {
-      page: parseInt(page, 10) || 1,
-      page_size: parseInt(page_size, 10) || 20
-    })
+  const models = getModels(req)
+  const UserSegmentService = getUserSegmentService(req)
+  const result = await UserSegmentService.getSegmentUsers(models, type, {
+    page: parseInt(page, 10) || 1,
+    page_size: parseInt(page_size, 10) || 20
+  })
 
-    return res.apiSuccess(result, '获取分层用户列表成功')
-  } catch (error) {
-    logger.error('获取分层用户列表失败', {
-      segment_type: type,
-      error: error.message,
-      stack: error.stack
-    })
-
-    return res.apiError(
-      '获取分层用户列表失败',
-      'SEGMENT_USERS_ERROR',
-      { error: error.message },
-      500
-    )
-  }
-})
+  return res.apiSuccess(result, '获取分层用户列表成功')
+}))
 
 /**
  * @api {get} /api/v4/admin/users/activity-heatmap 获取活跃时段热力图
@@ -176,7 +153,7 @@ router.get('/segments/:type', authenticateToken, requireRoleLevel(100), async (r
  *
  * @apiPermission admin
  */
-router.get('/activity-heatmap', authenticateToken, requireRoleLevel(100), async (req, res) => {
+router.get('/activity-heatmap', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
   const { days = '7' } = req.query
 
   logger.info('获取活跃时段热力图', {
@@ -184,23 +161,14 @@ router.get('/activity-heatmap', authenticateToken, requireRoleLevel(100), async 
     user_id: req.user?.user_id
   })
 
-  try {
-    const models = getModels(req)
-    const UserSegmentService = getUserSegmentService(req)
-    const heatmap = await UserSegmentService.getActivityHeatmap(models, {
-      days: parseInt(days, 10) || 7
-    })
+  const models = getModels(req)
+  const UserSegmentService = getUserSegmentService(req)
+  const heatmap = await UserSegmentService.getActivityHeatmap(models, {
+    days: parseInt(days, 10) || 7
+  })
 
-    return res.apiSuccess(heatmap, '获取活跃时段热力图成功')
-  } catch (error) {
-    logger.error('获取活跃时段热力图失败', {
-      error: error.message,
-      stack: error.stack
-    })
-
-    return res.apiError('获取活跃时段热力图失败', 'HEATMAP_ERROR', { error: error.message }, 500)
-  }
-})
+  return res.apiSuccess(heatmap, '获取活跃时段热力图成功')
+}))
 
 /**
  * @api {get} /api/v4/admin/users/exchange-preferences 获取兑换偏好
@@ -222,7 +190,7 @@ router.get('/activity-heatmap', authenticateToken, requireRoleLevel(100), async 
  *
  * @apiPermission admin
  */
-router.get('/exchange-preferences', authenticateToken, requireRoleLevel(100), async (req, res) => {
+router.get('/exchange-preferences', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
   const { days = '30', page_size = '10' } = req.query
 
   logger.info('获取兑换偏好', {
@@ -231,24 +199,15 @@ router.get('/exchange-preferences', authenticateToken, requireRoleLevel(100), as
     user_id: req.user?.user_id
   })
 
-  try {
-    const models = getModels(req)
-    const UserSegmentService = getUserSegmentService(req)
-    const preferences = await UserSegmentService.getExchangePreferences(models, {
-      days: parseInt(days, 10) || 30,
-      page_size: parseInt(page_size, 10) || 10
-    })
+  const models = getModels(req)
+  const UserSegmentService = getUserSegmentService(req)
+  const preferences = await UserSegmentService.getExchangePreferences(models, {
+    days: parseInt(days, 10) || 30,
+    page_size: parseInt(page_size, 10) || 10
+  })
 
-    return res.apiSuccess(preferences, '获取兑换偏好成功')
-  } catch (error) {
-    logger.error('获取兑换偏好失败', {
-      error: error.message,
-      stack: error.stack
-    })
-
-    return res.apiError('获取兑换偏好失败', 'PREFERENCES_ERROR', { error: error.message }, 500)
-  }
-})
+  return res.apiSuccess(preferences, '获取兑换偏好成功')
+}))
 
 /**
  * @api {get} /api/v4/console/users/funnel/trend 获取行为漏斗趋势
@@ -300,7 +259,7 @@ router.get('/exchange-preferences', authenticateToken, requireRoleLevel(100), as
  *     "message": "获取漏斗趋势成功"
  *   }
  */
-router.get('/funnel/trend', authenticateToken, requireRoleLevel(100), async (req, res) => {
+router.get('/funnel/trend', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
   const { days = '7' } = req.query
   const parsedDays = Math.min(parseInt(days, 10) || 7, 14) // 最大14天
 
@@ -309,23 +268,14 @@ router.get('/funnel/trend', authenticateToken, requireRoleLevel(100), async (req
     user_id: req.user?.user_id
   })
 
-  try {
-    const models = getModels(req)
-    const UserSegmentService = getUserSegmentService(req)
-    const trend = await UserSegmentService.getFunnelTrend(models, {
-      days: parsedDays
-    })
+  const models = getModels(req)
+  const UserSegmentService = getUserSegmentService(req)
+  const trend = await UserSegmentService.getFunnelTrend(models, {
+    days: parsedDays
+  })
 
-    return res.apiSuccess(trend, '获取漏斗趋势成功')
-  } catch (error) {
-    logger.error('获取行为漏斗趋势失败', {
-      error: error.message,
-      stack: error.stack
-    })
-
-    return res.apiError('获取漏斗趋势失败', 'FUNNEL_TREND_ERROR', { error: error.message }, 500)
-  }
-})
+  return res.apiSuccess(trend, '获取漏斗趋势成功')
+}))
 
 /**
  * @api {get} /api/v4/admin/users/funnel 获取行为漏斗
@@ -347,7 +297,7 @@ router.get('/funnel/trend', authenticateToken, requireRoleLevel(100), async (req
  *
  * @apiPermission admin
  */
-router.get('/funnel', authenticateToken, requireRoleLevel(100), async (req, res) => {
+router.get('/funnel', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
   const { days = '7' } = req.query
 
   logger.info('获取行为漏斗', {
@@ -355,23 +305,14 @@ router.get('/funnel', authenticateToken, requireRoleLevel(100), async (req, res)
     user_id: req.user?.user_id
   })
 
-  try {
-    const models = getModels(req)
-    const UserSegmentService = getUserSegmentService(req)
-    const funnel = await UserSegmentService.getBehaviorFunnel(models, {
-      days: parseInt(days, 10) || 7
-    })
+  const models = getModels(req)
+  const UserSegmentService = getUserSegmentService(req)
+  const funnel = await UserSegmentService.getBehaviorFunnel(models, {
+    days: parseInt(days, 10) || 7
+  })
 
-    return res.apiSuccess(funnel, '获取行为漏斗成功')
-  } catch (error) {
-    logger.error('获取行为漏斗失败', {
-      error: error.message,
-      stack: error.stack
-    })
-
-    return res.apiError('获取行为漏斗失败', 'FUNNEL_ERROR', { error: error.message }, 500)
-  }
-})
+  return res.apiSuccess(funnel, '获取行为漏斗成功')
+}))
 
 /**
  * @api {get} /api/v4/admin/users/segment-rules 获取分层规则配置
@@ -388,18 +329,13 @@ router.get('/funnel', authenticateToken, requireRoleLevel(100), async (req, res)
  *
  * @apiPermission admin
  */
-router.get('/segment-rules', authenticateToken, requireRoleLevel(100), async (req, res) => {
+router.get('/segment-rules', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
   logger.info('获取分层规则配置', { user_id: req.user?.user_id })
 
-  try {
-    const UserSegmentService = getUserSegmentService(req)
-    const rules = UserSegmentService.getSegmentRules()
-    return res.apiSuccess(rules, '获取分层规则配置成功')
-  } catch (error) {
-    logger.error('获取分层规则配置失败', { error: error.message })
-    return res.apiError('获取分层规则配置失败', 'RULES_ERROR', { error: error.message }, 500)
-  }
-})
+  const UserSegmentService = getUserSegmentService(req)
+  const rules = UserSegmentService.getSegmentRules()
+  return res.apiSuccess(rules, '获取分层规则配置成功')
+}))
 
 /**
  * @api {get} /api/v4/console/users/:user_id/approval-rate 获取用户历史审核率
@@ -454,7 +390,7 @@ router.get(
   '/:user_id/approval-rate',
   authenticateToken,
   requireRoleLevel(100),
-  async (req, res) => {
+  asyncHandler(async (req, res) => {
     const { user_id } = req.params
     const { days = 90 } = req.query
 
@@ -464,32 +400,17 @@ router.get(
       days: parseInt(days)
     })
 
-    try {
-      const models = getModels(req)
-      const UserSegmentService = getUserSegmentService(req)
+    const models = getModels(req)
+    const UserSegmentService = getUserSegmentService(req)
 
-      // 调用 UserSegmentService 获取用户审核率
-      const result = await UserSegmentService.getUserApprovalRate(models, {
-        user_id: parseInt(user_id, 10),
-        days: parseInt(days, 10) || 90
-      })
+    // 调用 UserSegmentService 获取用户审核率
+    const result = await UserSegmentService.getUserApprovalRate(models, {
+      user_id: parseInt(user_id, 10),
+      days: parseInt(days, 10) || 90
+    })
 
-      return res.apiSuccess(result, '获取成功')
-    } catch (error) {
-      logger.error('获取用户历史审核率失败', {
-        error: error.message,
-        user_id,
-        stack: error.stack
-      })
-
-      return res.apiError(
-        '获取用户历史审核率失败',
-        'APPROVAL_RATE_ERROR',
-        { error: error.message },
-        500
-      )
-    }
+    return res.apiSuccess(result, '获取成功')
   }
-)
+))
 
 module.exports = router

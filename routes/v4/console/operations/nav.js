@@ -22,7 +22,7 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
-const { handleServiceError } = require('../../../../middleware/validation')
+const { asyncHandler } = require('../../../../middleware/validation')
 const logger = require('../../../../utils/logger').logger
 
 /**
@@ -60,21 +60,16 @@ const logger = require('../../../../utils/logger').logger
  * - total > 0 时在侧边栏整体图标显示徽标
  * - 各分类 count > 0 时在对应菜单项显示徽标
  */
-router.get('/badges', authenticateToken, requireRoleLevel(100), async (req, res) => {
-  try {
-    logger.debug('[导航徽标] 获取徽标计数', {
-      admin_id: req.user.user_id
-    })
+router.get('/badges', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
+  logger.debug('[导航徽标] 获取徽标计数', {
+    admin_id: req.user.user_id
+  })
 
-    // 🔄 通过 ServiceManager 获取 NavBadgeService（符合TR-005规范）
-    const NavBadgeService = req.app.locals.services.getService('nav_badge')
-    const result = await NavBadgeService.getBadges()
+  // 🔄 通过 ServiceManager 获取 NavBadgeService（符合TR-005规范）
+  const NavBadgeService = req.app.locals.services.getService('nav_badge')
+  const result = await NavBadgeService.getBadges()
 
-    return res.apiSuccess(result, '获取成功')
-  } catch (error) {
-    logger.error('[导航徽标] 获取徽标计数失败', { error: error.message })
-    return handleServiceError(error, res, '获取徽标计数失败')
-  }
-})
+  return res.apiSuccess(result, '获取成功')
+}))
 
 module.exports = router

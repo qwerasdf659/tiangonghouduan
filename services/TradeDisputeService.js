@@ -17,6 +17,7 @@
  * - other: 其他
  */
 
+const BusinessError = require('../utils/BusinessError')
 const logger = require('../utils/logger').logger
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 const { Op } = require('sequelize')
@@ -72,30 +73,32 @@ class TradeDisputeService {
       params
 
     // 参数校验
-    if (!trade_order_id) throw new Error('trade_order_id 是必需参数')
-    if (!user_id) throw new Error('user_id 是必需参数')
+    if (!trade_order_id) throw new BusinessError('trade_order_id 是必需参数', 'TRADE_REQUIRED', 400)
+    if (!user_id) throw new BusinessError('user_id 是必需参数', 'TRADE_REQUIRED', 400)
     if (!dispute_type || !Object.values(DISPUTE_TYPE).includes(dispute_type)) {
-      throw new Error(`无效的纠纷类型：${dispute_type}`)
+      throw new BusinessError(`无效的纠纷类型：${dispute_type}`, 'TRADE_INVALID', 400)
     }
-    if (!title) throw new Error('纠纷标题不能为空')
+    if (!title) throw new BusinessError('纠纷标题不能为空', 'TRADE_NOT_ALLOWED', 400)
 
     // 查询订单（悲观锁）
     const order = await this.models.TradeOrder.findByPk(trade_order_id, {
       lock: transaction.LOCK.UPDATE,
       transaction
     })
-    if (!order) throw new Error('交易订单不存在')
+    if (!order) throw new BusinessError('交易订单不存在', 'TRADE_NOT_FOUND', 404)
 
     // 校验订单状态
     if (!DISPUTABLE_ORDER_STATUSES.includes(order.status)) {
-      throw new Error(
-        `当前订单状态（${order.status}）不允许发起纠纷，仅 ${DISPUTABLE_ORDER_STATUSES.join('/')} 状态可申诉`
+      throw new BusinessError(
+        `当前订单状态（${order.status}）不允许发起纠纷，仅 ${DISPUTABLE_ORDER_STATUSES.join('/')} 状态可申诉`,
+        'TRADE_NOT_ALLOWED',
+        400
       )
     }
 
     // 校验申诉人是买家
     if (order.buyer_user_id !== user_id) {
-      throw new Error('仅买家可以对该订单发起纠纷')
+      throw new BusinessError('仅买家可以对该订单发起纠纷', 'TRADE_ERROR', 400)
     }
 
     // 检查是否已有未关闭的纠纷
@@ -108,7 +111,7 @@ class TradeDisputeService {
       transaction
     })
     if (existingDispute) {
-      throw new Error(`该订单已有进行中的纠纷工单（工单号：${existingDispute.issue_id}）`)
+      throw new BusinessError(`该订单已有进行中的纠纷工单（工单号：${existingDispute.issue_id}）`, 'TRADE_ERROR', 400)
     }
 
     // 计算处理截止时间
@@ -172,9 +175,9 @@ class TradeDisputeService {
     )
 
     const issue = await this.models.CustomerServiceIssue.findByPk(issueId, { transaction })
-    if (!issue) throw new Error('纠纷工单不存在')
-    if (issue.issue_type !== 'trade') throw new Error('仅交易纠纷工单可升级为仲裁')
-    if (issue.approval_chain_instance_id) throw new Error('该纠纷已进入仲裁流程')
+    if (!issue) throw new BusinessError('纠纷工单不存在', 'TRADE_NOT_FOUND', 404)
+    if (issue.issue_type !== 'trade') throw new BusinessError('仅交易纠纷工单可升级为仲裁', 'TRADE_ERROR', 400)
+    if (issue.approval_chain_instance_id) throw new BusinessError('该纠纷已进入仲裁流程', 'TRADE_ERROR', 400)
 
     // 尝试匹配审批链模板
     const template = await ApprovalChainService.matchTemplate('trade_dispute', {
@@ -184,7 +187,7 @@ class TradeDisputeService {
 
     if (!template) {
       logger.warn('[交易纠纷] 未找到匹配的仲裁审批链模板', { issue_id: issueId })
-      throw new Error('未配置交易纠纷仲裁审批链模板，请先在审批链管理中创建 trade_dispute 类型模板')
+      throw new BusinessError('未配置交易纠纷仲裁审批链模板，请先在审批链管理中创建 trade_dispute 类型模板', 'TRADE_NOT_CONFIGURED', 500)
     }
 
     // 创建审批链实例
@@ -236,12 +239,12 @@ class TradeDisputeService {
     const transaction = assertAndGetTransaction(options, 'TradeDisputeService.resolveDispute')
 
     const { resolution, refund = false, operator_id } = params
-    if (!resolution) throw new Error('解决说明不能为空')
+    if (!resolution) throw new BusinessError('解决说明不能为空', 'TRADE_NOT_ALLOWED', 400)
 
     const issue = await this.models.CustomerServiceIssue.findByPk(issueId, { transaction })
-    if (!issue) throw new Error('纠纷工单不存在')
-    if (issue.issue_type !== 'trade') throw new Error('仅交易纠纷工单可执行此操作')
-    if (['resolved', 'closed'].includes(issue.status)) throw new Error('该纠纷已解决或已关闭')
+    if (!issue) throw new BusinessError('纠纷工单不存在', 'TRADE_NOT_FOUND', 404)
+    if (issue.issue_type !== 'trade') throw new BusinessError('仅交易纠纷工单可执行此操作', 'TRADE_ERROR', 400)
+    if (['resolved', 'closed'].includes(issue.status)) throw new BusinessError('该纠纷已解决或已关闭', 'TRADE_ERROR', 400)
 
     const order = await this.models.TradeOrder.findByPk(issue.trade_order_id, {
       lock: transaction.LOCK.UPDATE,
@@ -343,8 +346,8 @@ class TradeDisputeService {
       ]
     })
 
-    if (!issue) throw new Error('纠纷工单不存在')
-    if (issue.issue_type !== 'trade') throw new Error('该工单不是交易纠纷类型')
+    if (!issue) throw new BusinessError('纠纷工单不存在', 'TRADE_NOT_FOUND', 404)
+    if (issue.issue_type !== 'trade') throw new BusinessError('该工单不是交易纠纷类型', 'TRADE_ERROR', 400)
 
     // 关联订单信息
     let orderInfo = null

@@ -38,6 +38,7 @@
  * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  */
 
+const BusinessError = require('../utils/BusinessError')
 const { User, Role, UserRole } = require('../models')
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 const BeijingTimeHelper = require('../utils/timeHelper')
@@ -84,7 +85,7 @@ class UserRoleService {
     })
 
     if (!user) {
-      throw new Error('用户不存在')
+      throw new BusinessError('用户不存在', 'ROLE_NOT_FOUND', 404)
     }
 
     // 整合用户信息和权限
@@ -211,7 +212,7 @@ class UserRoleService {
     // 验证目标用户
     const targetUser = await User.findByPk(user_id, { transaction })
     if (!targetUser) {
-      throw new Error('用户不存在')
+      throw new BusinessError('用户不存在', 'ROLE_NOT_FOUND', 404)
     }
 
     // 验证操作者权限级别（防止低级别管理员修改高级别管理员）
@@ -227,8 +228,10 @@ class UserRoleService {
 
     // 操作者权限必须高于目标用户
     if (operatorMaxLevel <= targetMaxLevel) {
-      throw new Error(
-        `权限不足：无法修改同级或更高级别用户的角色（操作者级别: ${operatorMaxLevel}, 目标用户级别: ${targetMaxLevel}）`
+      throw new BusinessError(
+        `权限不足：无法修改同级或更高级别用户的角色（操作者级别: ${operatorMaxLevel}, 目标用户级别: ${targetMaxLevel}）`,
+        'ROLE_FORBIDDEN',
+        403
       )
     }
 
@@ -238,7 +241,7 @@ class UserRoleService {
       transaction
     })
     if (!targetRole) {
-      throw new Error('角色不存在')
+      throw new BusinessError('角色不存在', 'ROLE_NOT_FOUND', 404)
     }
 
     // 保存旧角色信息
@@ -335,18 +338,18 @@ class UserRoleService {
 
     // 验证状态值
     if (!['active', 'inactive', 'banned', 'pending'].includes(status)) {
-      throw new Error('无效的用户状态')
+      throw new BusinessError('无效的用户状态', 'ROLE_INVALID', 400)
     }
 
     // 禁止管理员修改自己的账号状态
     if (parseInt(user_id) === operator_id) {
-      throw new Error(`禁止修改自己的账号状态（用户ID: ${user_id}, 操作者ID: ${operator_id}）`)
+      throw new BusinessError(`禁止修改自己的账号状态（用户ID: ${user_id}, 操作者ID: ${operator_id}）`, 'ROLE_NOT_ALLOWED', 400)
     }
 
     // 查找用户
     const user = await User.findByPk(user_id, { transaction })
     if (!user) {
-      throw new Error('用户不存在')
+      throw new BusinessError('用户不存在', 'ROLE_NOT_FOUND', 404)
     }
 
     const oldStatus = user.status
@@ -561,7 +564,7 @@ class UserRoleService {
     })
 
     if (!user) {
-      throw new Error('用户不存在')
+      throw new BusinessError('用户不存在', 'ROLE_NOT_FOUND', 404)
     }
 
     // 计算用户权限级别
@@ -766,7 +769,7 @@ class UserRoleService {
   static async batchCheckUserPermissions(user_id, permissions) {
     try {
       if (!Array.isArray(permissions) || permissions.length === 0) {
-        throw new Error('permissions必须为非空数组')
+        throw new BusinessError('permissions必须为非空数组', 'ROLE_REQUIRED', 400)
       }
 
       // 获取用户权限信息（只查询一次）
@@ -1018,25 +1021,25 @@ class UserRoleService {
 
     // 参数校验
     if (!role_name || typeof role_name !== 'string' || role_name.trim() === '') {
-      throw new Error('角色名称不能为空')
+      throw new BusinessError('角色名称不能为空', 'ROLE_NOT_ALLOWED', 400)
     }
 
     if (typeof role_level !== 'number' || role_level < 0) {
-      throw new Error('角色等级必须是非负数字')
+      throw new BusinessError('角色等级必须是非负数字', 'ROLE_REQUIRED', 400)
     }
 
     // 引入权限资源常量
 
     // 检查是否尝试创建系统内置角色名称
     if (isSystemRole(role_name.trim())) {
-      throw new Error(`不能创建与系统内置角色同名的角色: ${role_name}`)
+      throw new BusinessError(`不能创建与系统内置角色同名的角色: ${role_name}`, 'ROLE_NOT_ALLOWED', 400)
     }
 
     // 验证权限格式
     if (permissions && Object.keys(permissions).length > 0) {
       const permissionValidation = validatePermissions(permissions)
       if (!permissionValidation.valid) {
-        throw new Error(`权限配置格式错误: ${permissionValidation.errors.join(', ')}`)
+        throw new BusinessError(`权限配置格式错误: ${permissionValidation.errors.join(', ')}`, 'ROLE_ERROR', 400)
       }
     }
 
@@ -1047,8 +1050,10 @@ class UserRoleService {
 
     // 权限等级校验：不能创建比自己权限更高的角色
     if (role_level > operatorMaxLevel) {
-      throw new Error(
-        `权限不足：不能创建权限等级高于自己的角色（操作者级别: ${operatorMaxLevel}, 目标角色级别: ${role_level}）`
+      throw new BusinessError(
+        `权限不足：不能创建权限等级高于自己的角色（操作者级别: ${operatorMaxLevel}, 目标角色级别: ${role_level}）`,
+        'ROLE_FORBIDDEN',
+        403
       )
     }
 
@@ -1059,7 +1064,7 @@ class UserRoleService {
     })
 
     if (existingRole) {
-      throw new Error(`角色名称已存在: ${role_name}`)
+      throw new BusinessError(`角色名称已存在: ${role_name}`, 'ROLE_ALREADY_EXISTS', 409)
     }
 
     // 创建角色
@@ -1151,14 +1156,14 @@ class UserRoleService {
     // 查找角色
     const role = await Role.findByPk(role_id, { transaction })
     if (!role) {
-      throw new Error('角色不存在')
+      throw new BusinessError('角色不存在', 'ROLE_NOT_FOUND', 404)
     }
 
     // 引入权限资源常量
 
     // 系统内置角色保护
     if (isSystemRole(role.role_name)) {
-      throw new Error(`系统内置角色不可修改: ${role.role_name}`)
+      throw new BusinessError(`系统内置角色不可修改: ${role.role_name}`, 'ROLE_NOT_ALLOWED', 400)
     }
 
     // 获取操作者权限级别
@@ -1168,8 +1173,10 @@ class UserRoleService {
 
     // 权限等级校验：不能修改为比自己权限更高的等级
     if (role_level !== undefined && role_level > operatorMaxLevel) {
-      throw new Error(
-        `权限不足：不能将角色等级设置为高于自己的级别（操作者级别: ${operatorMaxLevel}, 目标角色级别: ${role_level}）`
+      throw new BusinessError(
+        `权限不足：不能将角色等级设置为高于自己的级别（操作者级别: ${operatorMaxLevel}, 目标角色级别: ${role_level}）`,
+        'ROLE_FORBIDDEN',
+        403
       )
     }
 
@@ -1177,7 +1184,7 @@ class UserRoleService {
     if (permissions !== undefined && Object.keys(permissions).length > 0) {
       const permissionValidation = validatePermissions(permissions)
       if (!permissionValidation.valid) {
-        throw new Error(`权限配置格式错误: ${permissionValidation.errors.join(', ')}`)
+        throw new BusinessError(`权限配置格式错误: ${permissionValidation.errors.join(', ')}`, 'ROLE_ERROR', 400)
       }
     }
 
@@ -1198,7 +1205,7 @@ class UserRoleService {
 
     // 检查是否有更新
     if (Object.keys(updateFields).length === 0) {
-      throw new Error('没有可更新的字段')
+      throw new BusinessError('没有可更新的字段', 'ROLE_ERROR', 400)
     }
 
     // 更新角色
@@ -1294,19 +1301,19 @@ class UserRoleService {
     // 查找角色
     const role = await Role.findByPk(role_id, { transaction })
     if (!role) {
-      throw new Error('角色不存在')
+      throw new BusinessError('角色不存在', 'ROLE_NOT_FOUND', 404)
     }
 
     // 引入权限资源常量
 
     // 系统内置角色保护
     if (isSystemRole(role.role_name)) {
-      throw new Error(`系统内置角色不可删除: ${role.role_name}`)
+      throw new BusinessError(`系统内置角色不可删除: ${role.role_name}`, 'ROLE_NOT_ALLOWED', 400)
     }
 
     // 检查角色是否已经被软删除
     if (!role.is_active) {
-      throw new Error(`角色已经被删除: ${role.role_name}`)
+      throw new BusinessError(`角色已经被删除: ${role.role_name}`, 'ROLE_ERROR', 400)
     }
 
     // 查询受影响的用户

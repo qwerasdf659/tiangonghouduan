@@ -62,45 +62,40 @@ router.get(
   '/',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    try {
-      const { slot_type = null, is_active = null, page = 1, page_size = 20 } = req.query
+        const { slot_type = null, is_active = null, page = 1, page_size = 20 } = req.query
 
-      if (slot_type && !VALID_SLOT_TYPES.includes(slot_type)) {
-        return res.apiBadRequest(`slot_type 必须是以下之一：${VALID_SLOT_TYPES.join(', ')}`)
-      }
-
-      let isActiveBool = null
-      if (is_active !== null && is_active !== undefined) {
-        isActiveBool = is_active === 'true' || is_active === '1'
-      }
-
-      const pageNum = Math.max(1, parseInt(page) || 1)
-      const pageSize = Math.min(100, Math.max(1, parseInt(page_size) || 20))
-
-      const AdSlotService = req.app.locals.services.getService('ad_slot')
-      const result = await AdSlotService.getAdminSlotList({
-        slot_type,
-        is_active: isActiveBool,
-        page: pageNum,
-        pageSize
-      })
-
-      return res.apiSuccess(
-        {
-          slots: result.list,
-          pagination: {
-            total: result.total,
-            page: pageNum,
-            page_size: pageSize,
-            total_pages: Math.ceil(result.total / pageSize)
-          }
-        },
-        '获取广告位列表成功'
-      )
-    } catch (error) {
-      logger.error('获取广告位列表失败', { error: error.message })
-      return res.apiInternalError('获取广告位列表失败', error.message, 'AD_SLOT_LIST_ERROR')
+    if (slot_type && !VALID_SLOT_TYPES.includes(slot_type)) {
+      return res.apiBadRequest(`slot_type 必须是以下之一：${VALID_SLOT_TYPES.join(', ')}`)
     }
+
+    let isActiveBool = null
+    if (is_active !== null && is_active !== undefined) {
+      isActiveBool = is_active === 'true' || is_active === '1'
+    }
+
+    const pageNum = Math.max(1, parseInt(page) || 1)
+    const pageSize = Math.min(100, Math.max(1, parseInt(page_size) || 20))
+
+    const AdSlotService = req.app.locals.services.getService('ad_slot')
+    const result = await AdSlotService.getAdminSlotList({
+      slot_type,
+      is_active: isActiveBool,
+      page: pageNum,
+      pageSize
+    })
+
+    return res.apiSuccess(
+      {
+        slots: result.list,
+        pagination: {
+          total: result.total,
+          page: pageNum,
+          page_size: pageSize,
+          total_pages: Math.ceil(result.total / pageSize)
+        }
+      },
+      '获取广告位列表成功'
+    )
   })
 )
 
@@ -115,15 +110,10 @@ router.get(
   '/statistics',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    try {
-      const AdSlotService = req.app.locals.services.getService('ad_slot')
-      const statistics = await AdSlotService.getStatistics()
+        const AdSlotService = req.app.locals.services.getService('ad_slot')
+    const statistics = await AdSlotService.getStatistics()
 
-      return res.apiSuccess(statistics, '获取统计数据成功')
-    } catch (error) {
-      logger.error('获取广告位统计数据失败', { error: error.message })
-      return res.apiInternalError('获取统计数据失败', error.message, 'AD_SLOT_STATISTICS_ERROR')
-    }
+    return res.apiSuccess(statistics, '获取统计数据成功')
   })
 )
 
@@ -137,24 +127,19 @@ router.get(
   '/:id',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    try {
-      const slotId = parseInt(req.params.id)
-      if (isNaN(slotId)) {
-        return res.apiBadRequest('广告位 ID 必须是有效数字')
-      }
-
-      const AdSlotService = req.app.locals.services.getService('ad_slot')
-      const slot = await AdSlotService.getSlotById(slotId)
-
-      if (!slot) {
-        return res.apiError('广告位不存在', 'AD_SLOT_NOT_FOUND', null, 404)
-      }
-
-      return res.apiSuccess(slot, '获取广告位详情成功')
-    } catch (error) {
-      logger.error('获取广告位详情失败', { error: error.message, slot_id: req.params.id })
-      return res.apiInternalError('获取广告位详情失败', error.message, 'AD_SLOT_DETAIL_ERROR')
+        const slotId = parseInt(req.params.id)
+    if (isNaN(slotId)) {
+      return res.apiBadRequest('广告位 ID 必须是有效数字')
     }
+
+    const AdSlotService = req.app.locals.services.getService('ad_slot')
+    const slot = await AdSlotService.getSlotById(slotId)
+
+    if (!slot) {
+      return res.apiError('广告位不存在', 'AD_SLOT_NOT_FOUND', null, 404)
+    }
+
+    return res.apiSuccess(slot, '获取广告位详情成功')
   })
 )
 
@@ -177,72 +162,67 @@ router.post(
   '/',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    try {
-      const { slot_key, slot_name, slot_type, position, daily_price_star_stone } = req.body
+        const { slot_key, slot_name, slot_type, position, daily_price_star_stone } = req.body
 
-      // 必填字段校验
-      if (
-        !slot_key ||
-        !slot_name ||
-        !slot_type ||
-        !position ||
-        daily_price_star_stone === undefined
-      ) {
-        return res.apiBadRequest(
-          '缺少必需参数：slot_key, slot_name, slot_type, position, daily_price_star_stone'
-        )
-      }
-
-      // 枚举校验
-      if (!VALID_SLOT_TYPES.includes(slot_type)) {
-        return res.apiBadRequest(`slot_type 必须是以下之一：${VALID_SLOT_TYPES.join(', ')}`)
-      }
-
-      // 数值校验
-      const dailyPrice = parseInt(daily_price_star_stone)
-      if (isNaN(dailyPrice) || dailyPrice < 0) {
-        return res.apiBadRequest('daily_price_star_stone 必须是非负整数')
-      }
-
-      // 白名单字段提取
-      const createData = {}
-      ALLOWED_CREATE_FIELDS.forEach(field => {
-        if (req.body[field] !== undefined) {
-          createData[field] = req.body[field]
-        }
-      })
-
-      // 类型转换
-      if (createData.daily_price_star_stone !== undefined) {
-        createData.daily_price_star_stone = parseInt(createData.daily_price_star_stone)
-      }
-      if (createData.min_bid_star_stone !== undefined) {
-        createData.min_bid_star_stone = parseInt(createData.min_bid_star_stone)
-      }
-      if (createData.min_budget_star_stone !== undefined) {
-        createData.min_budget_star_stone = parseInt(createData.min_budget_star_stone)
-      }
-      if (createData.max_display_count !== undefined) {
-        createData.max_display_count = parseInt(createData.max_display_count)
-      }
-      if (createData.is_active !== undefined) {
-        createData.is_active = createData.is_active === true || createData.is_active === 'true'
-      }
-
-      const AdSlotService = req.app.locals.services.getService('ad_slot')
-      const slot = await AdSlotService.createSlot(createData)
-
-      logger.info('创建广告位成功', {
-        slot_id: slot.ad_slot_id,
-        slot_key: slot.slot_key,
-        admin_user_id: req.user.user_id
-      })
-
-      return res.apiSuccess(slot, '创建广告位成功')
-    } catch (error) {
-      logger.error('创建广告位失败', { error: error.message, admin_user_id: req.user.user_id })
-      return res.apiInternalError('创建广告位失败', error.message, 'AD_SLOT_CREATE_ERROR')
+    // 必填字段校验
+    if (
+      !slot_key ||
+      !slot_name ||
+      !slot_type ||
+      !position ||
+      daily_price_star_stone === undefined
+    ) {
+      return res.apiBadRequest(
+        '缺少必需参数：slot_key, slot_name, slot_type, position, daily_price_star_stone'
+      )
     }
+
+    // 枚举校验
+    if (!VALID_SLOT_TYPES.includes(slot_type)) {
+      return res.apiBadRequest(`slot_type 必须是以下之一：${VALID_SLOT_TYPES.join(', ')}`)
+    }
+
+    // 数值校验
+    const dailyPrice = parseInt(daily_price_star_stone)
+    if (isNaN(dailyPrice) || dailyPrice < 0) {
+      return res.apiBadRequest('daily_price_star_stone 必须是非负整数')
+    }
+
+    // 白名单字段提取
+    const createData = {}
+    ALLOWED_CREATE_FIELDS.forEach(field => {
+      if (req.body[field] !== undefined) {
+        createData[field] = req.body[field]
+      }
+    })
+
+    // 类型转换
+    if (createData.daily_price_star_stone !== undefined) {
+      createData.daily_price_star_stone = parseInt(createData.daily_price_star_stone)
+    }
+    if (createData.min_bid_star_stone !== undefined) {
+      createData.min_bid_star_stone = parseInt(createData.min_bid_star_stone)
+    }
+    if (createData.min_budget_star_stone !== undefined) {
+      createData.min_budget_star_stone = parseInt(createData.min_budget_star_stone)
+    }
+    if (createData.max_display_count !== undefined) {
+      createData.max_display_count = parseInt(createData.max_display_count)
+    }
+    if (createData.is_active !== undefined) {
+      createData.is_active = createData.is_active === true || createData.is_active === 'true'
+    }
+
+    const AdSlotService = req.app.locals.services.getService('ad_slot')
+    const slot = await AdSlotService.createSlot(createData)
+
+    logger.info('创建广告位成功', {
+      slot_id: slot.ad_slot_id,
+      slot_key: slot.slot_key,
+      admin_user_id: req.user.user_id
+    })
+
+    return res.apiSuccess(slot, '创建广告位成功')
   })
 )
 
@@ -264,67 +244,58 @@ router.put(
   '/:id',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    try {
-      const slotId = parseInt(req.params.id)
-      if (isNaN(slotId)) {
-        return res.apiBadRequest('广告位 ID 必须是有效数字')
-      }
-
-      // 白名单字段提取，防止字段注入
-      const updateData = {}
-      ALLOWED_UPDATE_FIELDS.forEach(field => {
-        if (req.body[field] !== undefined) {
-          updateData[field] = req.body[field]
-        }
-      })
-
-      if (Object.keys(updateData).length === 0) {
-        return res.apiBadRequest('至少需要提供一个更新字段')
-      }
-
-      // 数值字段类型转换
-      const intFields = [
-        'daily_price_star_stone',
-        'min_bid_star_stone',
-        'min_budget_star_stone',
-        'max_display_count'
-      ]
-      for (const field of intFields) {
-        if (updateData[field] !== undefined) {
-          const val = parseInt(updateData[field])
-          if (isNaN(val) || val < 0) {
-            return res.apiBadRequest(`${field} 必须是非负整数`)
-          }
-          updateData[field] = val
-        }
-      }
-
-      if (updateData.is_active !== undefined) {
-        updateData.is_active = updateData.is_active === true || updateData.is_active === 'true'
-      }
-
-      const AdSlotService = req.app.locals.services.getService('ad_slot')
-      const slot = await AdSlotService.updateSlot(slotId, updateData)
-
-      if (!slot) {
-        return res.apiError('广告位不存在', 'AD_SLOT_NOT_FOUND', null, 404)
-      }
-
-      logger.info('更新广告位成功', {
-        slot_id: slotId,
-        admin_user_id: req.user.user_id,
-        updated_fields: Object.keys(updateData)
-      })
-
-      return res.apiSuccess(slot, '更新广告位成功')
-    } catch (error) {
-      logger.error('更新广告位失败', {
-        error: error.message,
-        slot_id: req.params.id,
-        admin_user_id: req.user.user_id
-      })
-      return res.apiInternalError('更新广告位失败', error.message, 'AD_SLOT_UPDATE_ERROR')
+        const slotId = parseInt(req.params.id)
+    if (isNaN(slotId)) {
+      return res.apiBadRequest('广告位 ID 必须是有效数字')
     }
+
+    // 白名单字段提取，防止字段注入
+    const updateData = {}
+    ALLOWED_UPDATE_FIELDS.forEach(field => {
+      if (req.body[field] !== undefined) {
+        updateData[field] = req.body[field]
+      }
+    })
+
+    if (Object.keys(updateData).length === 0) {
+      return res.apiBadRequest('至少需要提供一个更新字段')
+    }
+
+    // 数值字段类型转换
+    const intFields = [
+      'daily_price_star_stone',
+      'min_bid_star_stone',
+      'min_budget_star_stone',
+      'max_display_count'
+    ]
+    for (const field of intFields) {
+      if (updateData[field] !== undefined) {
+        const val = parseInt(updateData[field])
+        if (isNaN(val) || val < 0) {
+          return res.apiBadRequest(`${field} 必须是非负整数`)
+        }
+        updateData[field] = val
+      }
+    }
+
+    if (updateData.is_active !== undefined) {
+      updateData.is_active = updateData.is_active === true || updateData.is_active === 'true'
+    }
+
+    const AdSlotService = req.app.locals.services.getService('ad_slot')
+    const slot = await AdSlotService.updateSlot(slotId, updateData)
+
+    if (!slot) {
+      return res.apiError('广告位不存在', 'AD_SLOT_NOT_FOUND', null, 404)
+    }
+
+    logger.info('更新广告位成功', {
+      slot_id: slotId,
+      admin_user_id: req.user.user_id,
+      updated_fields: Object.keys(updateData)
+    })
+
+    return res.apiSuccess(slot, '更新广告位成功')
   })
 )
 
@@ -338,34 +309,25 @@ router.patch(
   '/:id/toggle',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    try {
-      const slotId = parseInt(req.params.id)
-      if (isNaN(slotId)) {
-        return res.apiBadRequest('广告位 ID 必须是有效数字')
-      }
-
-      const AdSlotService = req.app.locals.services.getService('ad_slot')
-      const slot = await AdSlotService.toggleSlotActive(slotId)
-
-      if (!slot) {
-        return res.apiError('广告位不存在', 'AD_SLOT_NOT_FOUND', null, 404)
-      }
-
-      logger.info('切换广告位状态成功', {
-        slot_id: slotId,
-        is_active: slot.is_active,
-        admin_user_id: req.user.user_id
-      })
-
-      return res.apiSuccess(slot, `广告位已${slot.is_active ? '启用' : '禁用'}`)
-    } catch (error) {
-      logger.error('切换广告位状态失败', {
-        error: error.message,
-        slot_id: req.params.id,
-        admin_user_id: req.user.user_id
-      })
-      return res.apiInternalError('切换广告位状态失败', error.message, 'AD_SLOT_TOGGLE_ERROR')
+        const slotId = parseInt(req.params.id)
+    if (isNaN(slotId)) {
+      return res.apiBadRequest('广告位 ID 必须是有效数字')
     }
+
+    const AdSlotService = req.app.locals.services.getService('ad_slot')
+    const slot = await AdSlotService.toggleSlotActive(slotId)
+
+    if (!slot) {
+      return res.apiError('广告位不存在', 'AD_SLOT_NOT_FOUND', null, 404)
+    }
+
+    logger.info('切换广告位状态成功', {
+      slot_id: slotId,
+      is_active: slot.is_active,
+      admin_user_id: req.user.user_id
+    })
+
+    return res.apiSuccess(slot, `广告位已${slot.is_active ? '启用' : '禁用'}`)
   })
 )
 

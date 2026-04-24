@@ -19,10 +19,9 @@
 
 const express = require('express')
 const router = express.Router()
-const logger = require('../../../../utils/logger').logger
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const TransactionManager = require('../../../../utils/TransactionManager')
-const { handleServiceError } = require('../../../../middleware/validation')
+const { asyncHandler } = require('../../../../middleware/validation')
 
 // 所有路由都需要后台访问权限（role_level >= 1 即可访问客服功能）
 router.use(authenticateToken, requireRoleLevel(1))
@@ -38,64 +37,44 @@ router.use(authenticateToken, requireRoleLevel(1))
  * @param {number} id - 会话ID（事务实体）
  * @access Admin
  */
-router.post('/:id/transfer', async (req, res) => {
-  try {
-    const sessionId = parseInt(req.params.id)
+router.post('/:id/transfer', asyncHandler(async (req, res) => {
+  const sessionId = parseInt(req.params.id)
 
-    // 参数验证：防止NaN导致的SQL错误
-    if (isNaN(sessionId) || sessionId <= 0) {
-      return res.apiError('会话ID无效', 'BAD_REQUEST', null, 400)
-    }
-
-    const { target_admin_id } = req.body
-
-    // 参数验证
-    if (!target_admin_id) {
-      return res.apiError('目标客服ID不能为空', 'BAD_REQUEST', null, 400)
-    }
-
-    const currentAdminId = req.user.user_id
-    const targetId = parseInt(target_admin_id)
-
-    if (currentAdminId === targetId) {
-      return res.apiError('不能转接给自己', 'BAD_REQUEST', null, 400)
-    }
-
-    // 通过 ServiceManager 获取服务
-    const CustomerServiceSessionService = req.app.locals.services.getService(
-      'customer_service_session'
-    )
-
-    // 使用 TransactionManager.execute 包裹事务
-    const result = await TransactionManager.execute(
-      async transaction => {
-        return await CustomerServiceSessionService.transferSession(
-          sessionId,
-          currentAdminId,
-          targetId,
-          { transaction }
-        )
-      },
-      { description: 'transferSession' }
-    )
-
-    return res.apiSuccess(result, '转接会话成功')
-  } catch (error) {
-    logger.error('转接会话失败:', error)
-    let statusCode = 500
-    let errorCode = 'INTERNAL_ERROR'
-
-    if (error.message === '会话不存在' || error.message === '目标客服不存在') {
-      statusCode = 404
-      errorCode = 'NOT_FOUND'
-    } else if (error.message === '无权限转接此会话') {
-      statusCode = 403
-      errorCode = 'FORBIDDEN'
-    }
-
-    return res.apiError(error.message, errorCode, null, statusCode)
+  if (isNaN(sessionId) || sessionId <= 0) {
+    return res.apiError('会话ID无效', 'BAD_REQUEST', null, 400)
   }
-})
+
+  const { target_admin_id } = req.body
+
+  if (!target_admin_id) {
+    return res.apiError('目标客服ID不能为空', 'BAD_REQUEST', null, 400)
+  }
+
+  const currentAdminId = req.user.user_id
+  const targetId = parseInt(target_admin_id)
+
+  if (currentAdminId === targetId) {
+    return res.apiError('不能转接给自己', 'BAD_REQUEST', null, 400)
+  }
+
+  const CustomerServiceSessionService = req.app.locals.services.getService(
+    'customer_service_session'
+  )
+
+  const result = await TransactionManager.execute(
+    async transaction => {
+      return await CustomerServiceSessionService.transferSession(
+        sessionId,
+        currentAdminId,
+        targetId,
+        { transaction }
+      )
+    },
+    { description: 'transferSession' }
+  )
+
+  return res.apiSuccess(result, '转接会话成功')
+}))
 
 /**
  * POST /:id/close - 关闭会话
@@ -108,52 +87,33 @@ router.post('/:id/transfer', async (req, res) => {
  * @param {number} id - 会话ID（事务实体）
  * @access Admin
  */
-router.post('/:id/close', async (req, res) => {
-  try {
-    const sessionId = parseInt(req.params.id)
+router.post('/:id/close', asyncHandler(async (req, res) => {
+  const sessionId = parseInt(req.params.id)
 
-    // 参数验证：防止NaN导致的SQL错误
-    if (isNaN(sessionId) || sessionId <= 0) {
-      return res.apiError('会话ID无效', 'BAD_REQUEST', null, 400)
-    }
-
-    const { close_reason } = req.body
-
-    const data = {
-      admin_id: req.user.user_id,
-      close_reason: close_reason || '问题已解决'
-    }
-
-    // 通过 ServiceManager 获取服务
-    const CustomerServiceSessionService = req.app.locals.services.getService(
-      'customer_service_session'
-    )
-
-    // 使用 TransactionManager.execute 包裹事务
-    const result = await TransactionManager.execute(
-      async transaction => {
-        return await CustomerServiceSessionService.closeSession(sessionId, data, { transaction })
-      },
-      { description: 'closeSession' }
-    )
-
-    return res.apiSuccess(result, '关闭会话成功')
-  } catch (error) {
-    logger.error('关闭会话失败:', error)
-    let statusCode = 500
-    let errorCode = 'INTERNAL_ERROR'
-
-    if (error.message === '会话不存在') {
-      statusCode = 404
-      errorCode = 'NOT_FOUND'
-    } else if (error.message === '无权限关闭此会话') {
-      statusCode = 403
-      errorCode = 'FORBIDDEN'
-    }
-
-    return res.apiError(error.message, errorCode, null, statusCode)
+  if (isNaN(sessionId) || sessionId <= 0) {
+    return res.apiError('会话ID无效', 'BAD_REQUEST', null, 400)
   }
-})
+
+  const { close_reason } = req.body
+
+  const data = {
+    admin_id: req.user.user_id,
+    close_reason: close_reason || '问题已解决'
+  }
+
+  const CustomerServiceSessionService = req.app.locals.services.getService(
+    'customer_service_session'
+  )
+
+  const result = await TransactionManager.execute(
+    async transaction => {
+      return await CustomerServiceSessionService.closeSession(sessionId, data, { transaction })
+    },
+    { description: 'closeSession' }
+  )
+
+  return res.apiSuccess(result, '关闭会话成功')
+}))
 
 /**
  * POST /:id/accept - 客服接单
@@ -163,45 +123,29 @@ router.post('/:id/close', async (req, res) => {
  * @param {number} id - 会话ID（事务实体，customer_service_session_id）
  * @access Admin（role_level >= 1）
  */
-router.post('/:id/accept', async (req, res) => {
-  try {
-    const sessionId = parseInt(req.params.id)
+router.post('/:id/accept', asyncHandler(async (req, res) => {
+  const sessionId = parseInt(req.params.id)
 
-    if (isNaN(sessionId) || sessionId <= 0) {
-      return res.apiError('会话ID无效', 'BAD_REQUEST', null, 400)
-    }
-
-    const adminId = req.user.user_id
-    const CustomerServiceSessionService = req.app.locals.services.getService(
-      'customer_service_session'
-    )
-
-    const result = await TransactionManager.execute(
-      async transaction => {
-        return await CustomerServiceSessionService.acceptSession(sessionId, adminId, {
-          transaction
-        })
-      },
-      { description: 'acceptSession' }
-    )
-
-    return res.apiSuccess(result, '接单成功')
-  } catch (error) {
-    logger.error('客服接单失败:', error)
-    let statusCode = 500
-    let errorCode = 'INTERNAL_ERROR'
-
-    if (error.message === '会话不存在') {
-      statusCode = 404
-      errorCode = 'NOT_FOUND'
-    } else if (error.message.includes('仅等待中')) {
-      statusCode = 409
-      errorCode = 'CONFLICT'
-    }
-
-    return res.apiError(error.message, errorCode, null, statusCode)
+  if (isNaN(sessionId) || sessionId <= 0) {
+    return res.apiError('会话ID无效', 'BAD_REQUEST', null, 400)
   }
-})
+
+  const adminId = req.user.user_id
+  const CustomerServiceSessionService = req.app.locals.services.getService(
+    'customer_service_session'
+  )
+
+  const result = await TransactionManager.execute(
+    async transaction => {
+      return await CustomerServiceSessionService.acceptSession(sessionId, adminId, {
+        transaction
+      })
+    },
+    { description: 'acceptSession' }
+  )
+
+  return res.apiSuccess(result, '接单成功')
+}))
 
 /**
  * POST /:id/tag - 会话打标签
@@ -212,48 +156,35 @@ router.post('/:id/accept', async (req, res) => {
  * @body {string[]} tags - 标签数组（如 ["交易纠纷", "已补偿"]）
  * @access Admin（role_level >= 1）
  */
-router.post('/:id/tag', async (req, res) => {
-  try {
-    const sessionId = parseInt(req.params.id)
+router.post('/:id/tag', asyncHandler(async (req, res) => {
+  const sessionId = parseInt(req.params.id)
 
-    if (isNaN(sessionId) || sessionId <= 0) {
-      return res.apiError('会话ID无效', 'BAD_REQUEST', null, 400)
-    }
-
-    const { tags } = req.body
-
-    if (!Array.isArray(tags)) {
-      return res.apiError('tags 必须是数组', 'BAD_REQUEST', null, 400)
-    }
-
-    const adminId = req.user.user_id
-    const CustomerServiceSessionService = req.app.locals.services.getService(
-      'customer_service_session'
-    )
-
-    const result = await TransactionManager.execute(
-      async transaction => {
-        return await CustomerServiceSessionService.updateSessionTags(sessionId, tags, adminId, {
-          transaction
-        })
-      },
-      { description: 'updateSessionTags' }
-    )
-
-    return res.apiSuccess(result, '标签更新成功')
-  } catch (error) {
-    logger.error('会话打标签失败:', error)
-    let statusCode = 500
-    let errorCode = 'INTERNAL_ERROR'
-
-    if (error.message === '会话不存在') {
-      statusCode = 404
-      errorCode = 'NOT_FOUND'
-    }
-
-    return res.apiError(error.message, errorCode, null, statusCode)
+  if (isNaN(sessionId) || sessionId <= 0) {
+    return res.apiError('会话ID无效', 'BAD_REQUEST', null, 400)
   }
-})
+
+  const { tags } = req.body
+
+  if (!Array.isArray(tags)) {
+    return res.apiError('tags 必须是数组', 'BAD_REQUEST', null, 400)
+  }
+
+  const adminId = req.user.user_id
+  const CustomerServiceSessionService = req.app.locals.services.getService(
+    'customer_service_session'
+  )
+
+  const result = await TransactionManager.execute(
+    async transaction => {
+      return await CustomerServiceSessionService.updateSessionTags(sessionId, tags, adminId, {
+        transaction
+      })
+    },
+    { description: 'updateSessionTags' }
+  )
+
+  return res.apiSuccess(result, '标签更新成功')
+}))
 
 /**
  * POST /:id/satisfaction - 请求满意度评价
@@ -263,41 +194,22 @@ router.post('/:id/tag', async (req, res) => {
  * @param {number} id - 会话ID（事务实体，customer_service_session_id）
  * @access Admin（role_level >= 1）
  */
-router.post('/:id/satisfaction', async (req, res) => {
-  try {
-    const sessionId = parseInt(req.params.id)
+router.post('/:id/satisfaction', asyncHandler(async (req, res) => {
+  const sessionId = parseInt(req.params.id)
 
-    if (isNaN(sessionId) || sessionId <= 0) {
-      return res.apiError('会话ID无效', 'BAD_REQUEST', null, 400)
-    }
-
-    const adminId = req.user.user_id
-    const CustomerServiceSessionService = req.app.locals.services.getService(
-      'customer_service_session'
-    )
-
-    const result = await CustomerServiceSessionService.requestSatisfactionRating(sessionId, adminId)
-
-    return res.apiSuccess(result, '满意度评价邀请已推送')
-  } catch (error) {
-    logger.error('请求满意度评价失败:', error)
-    let statusCode = 500
-    let errorCode = 'INTERNAL_ERROR'
-
-    if (error.message === '会话不存在') {
-      statusCode = 404
-      errorCode = 'NOT_FOUND'
-    } else if (error.message.includes('无需再次')) {
-      statusCode = 409
-      errorCode = 'CONFLICT'
-    } else if (error.message.includes('仅负责')) {
-      statusCode = 403
-      errorCode = 'FORBIDDEN'
-    }
-
-    return res.apiError(error.message, errorCode, null, statusCode)
+  if (isNaN(sessionId) || sessionId <= 0) {
+    return res.apiError('会话ID无效', 'BAD_REQUEST', null, 400)
   }
-})
+
+  const adminId = req.user.user_id
+  const CustomerServiceSessionService = req.app.locals.services.getService(
+    'customer_service_session'
+  )
+
+  const result = await CustomerServiceSessionService.requestSatisfactionRating(sessionId, adminId)
+
+  return res.apiSuccess(result, '满意度评价邀请已推送')
+}))
 
 /**
  * POST /status - 更新管理员在线状态
@@ -315,31 +227,21 @@ router.post('/:id/satisfaction', async (req, res) => {
  *
  * @returns {Object} { admin_id, status, updated_at }
  */
-router.post('/status', async (req, res) => {
-  try {
-    const admin_id = req.user.user_id
-    const { status } = req.body
+router.post('/status', asyncHandler(async (req, res) => {
+  const admin_id = req.user.user_id
+  const { status } = req.body
 
-    if (!status) {
-      return res.apiError('status 是必填参数（online / busy / offline）', 'BAD_REQUEST', null, 400)
-    }
-
-    /* 通过 ServiceManager 获取 AdminCustomerServiceService */
-    const AdminCustomerServiceService = req.app.locals.services.getService('admin_customer_service')
-
-    const result = await AdminCustomerServiceService.updateAdminOnlineStatus(admin_id, status)
-
-    return res.apiSuccess(result, '在线状态更新成功')
-  } catch (error) {
-    logger.error('更新管理员在线状态失败:', error)
-
-    if (error.code === 'BAD_REQUEST') {
-      return res.apiError(error.message, 'BAD_REQUEST', null, 400)
-    }
-
-    return handleServiceError(error, res)
+  if (!status) {
+    return res.apiError('status 是必填参数（online / busy / offline）', 'BAD_REQUEST', null, 400)
   }
-})
+
+  /* 通过 ServiceManager 获取 AdminCustomerServiceService */
+  const AdminCustomerServiceService = req.app.locals.services.getService('admin_customer_service')
+
+  const result = await AdminCustomerServiceService.updateAdminOnlineStatus(admin_id, status)
+
+  return res.apiSuccess(result, '在线状态更新成功')
+}))
 
 /**
  * GET /status - 获取管理员在线状态列表
@@ -352,39 +254,34 @@ router.post('/status', async (req, res) => {
  *
  * @returns {Array<{admin_id: number, status: string}>} 管理员状态列表
  */
-router.get('/status', async (req, res) => {
-  try {
-    const { admin_ids } = req.query
+router.get('/status', asyncHandler(async (req, res) => {
+  const { admin_ids } = req.query
 
-    if (!admin_ids) {
-      return res.apiError(
-        'admin_ids 是必填参数（逗号分隔的管理员ID列表）',
-        'BAD_REQUEST',
-        null,
-        400
-      )
-    }
-
-    /* 解析并验证 admin_ids 参数 */
-    const parsedIds = admin_ids
-      .split(',')
-      .map(id => parseInt(id.trim(), 10))
-      .filter(id => !isNaN(id) && id > 0)
-
-    if (parsedIds.length === 0) {
-      return res.apiError('admin_ids 参数无有效ID', 'BAD_REQUEST', null, 400)
-    }
-
-    /* 通过 ServiceManager 获取 AdminCustomerServiceService */
-    const AdminCustomerServiceService = req.app.locals.services.getService('admin_customer_service')
-
-    const statuses = await AdminCustomerServiceService.getAdminOnlineStatuses(parsedIds)
-
-    return res.apiSuccess(statuses, '获取在线状态成功')
-  } catch (error) {
-    logger.error('获取管理员在线状态失败:', error)
-    return handleServiceError(error, res)
+  if (!admin_ids) {
+    return res.apiError(
+      'admin_ids 是必填参数（逗号分隔的管理员ID列表）',
+      'BAD_REQUEST',
+      null,
+      400
+    )
   }
-})
+
+  /* 解析并验证 admin_ids 参数 */
+  const parsedIds = admin_ids
+    .split(',')
+    .map(id => parseInt(id.trim(), 10))
+    .filter(id => !isNaN(id) && id > 0)
+
+  if (parsedIds.length === 0) {
+    return res.apiError('admin_ids 参数无有效ID', 'BAD_REQUEST', null, 400)
+  }
+
+  /* 通过 ServiceManager 获取 AdminCustomerServiceService */
+  const AdminCustomerServiceService = req.app.locals.services.getService('admin_customer_service')
+
+  const statuses = await AdminCustomerServiceService.getAdminOnlineStatuses(parsedIds)
+
+  return res.apiSuccess(statuses, '获取在线状态成功')
+}))
 
 module.exports = router

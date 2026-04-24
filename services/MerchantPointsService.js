@@ -21,6 +21,7 @@
  * 作者：AI Assistant
  */
 
+const BusinessError = require('../utils/BusinessError')
 const { ContentReviewRecord, User } = require('../models')
 // V4.7.0 AssetService 拆分：使用子服务替代原 AssetService
 const BalanceService = require('./asset/BalanceService')
@@ -63,19 +64,19 @@ class MerchantPointsService {
 
     // 1. 参数校验
     if (!userId || typeof userId !== 'number') {
-      throw new Error('用户ID不能为空且必须为数字')
+      throw new BusinessError('用户ID不能为空且必须为数字', 'SERVICE_NOT_ALLOWED', 400)
     }
     if (!pointsAmount || typeof pointsAmount !== 'number' || pointsAmount <= 0) {
-      throw new Error('申请积分数量必须为正整数')
+      throw new BusinessError('申请积分数量必须为正整数', 'SERVICE_REQUIRED', 400)
     }
     if (!description || typeof description !== 'string' || description.trim().length === 0) {
-      throw new Error('申请描述不能为空')
+      throw new BusinessError('申请描述不能为空', 'SERVICE_NOT_ALLOWED', 400)
     }
 
     // 2. 验证用户存在
     const user = await User.findByPk(userId, { transaction })
     if (!user) {
-      throw new Error(`用户不存在: user_id=${userId}`)
+      throw new BusinessError(`用户不存在: user_id=${userId}`, 'SERVICE_NOT_FOUND', 404)
     }
 
     /*
@@ -142,12 +143,12 @@ class MerchantPointsService {
     // 1. 获取审核记录
     const auditRecord = await ContentReviewRecord.findByPk(auditId, { transaction })
     if (!auditRecord) {
-      throw new Error(`审核记录不存在: audit_id=${auditId}`)
+      throw new BusinessError(`审核记录不存在: audit_id=${auditId}`, 'SERVICE_NOT_FOUND', 404)
     }
 
     // 2. 验证审核类型
     if (auditRecord.auditable_type !== 'merchant_points') {
-      throw new Error(`审核类型不匹配: 期望=merchant_points, 实际=${auditRecord.auditable_type}`)
+      throw new BusinessError(`审核类型不匹配: 期望=merchant_points, 实际=${auditRecord.auditable_type}`, 'SERVICE_ERROR', 400)
     }
 
     // 3. 提取申请信息
@@ -156,7 +157,7 @@ class MerchantPointsService {
     const pointsAmount = auditData.points_amount
 
     if (!pointsAmount || pointsAmount <= 0) {
-      throw new Error(`申请积分数量无效: audit_id=${auditId}, points_amount=${pointsAmount}`)
+      throw new BusinessError(`申请积分数量无效: audit_id=${auditId}, points_amount=${pointsAmount}`, 'SERVICE_INVALID', 400)
     }
 
     // 4. 发放积分（双录：系统铸造 → 用户入账）
@@ -224,12 +225,12 @@ class MerchantPointsService {
     // 1. 获取审核记录
     const auditRecord = await ContentReviewRecord.findByPk(auditId, { transaction })
     if (!auditRecord) {
-      throw new Error(`审核记录不存在: audit_id=${auditId}`)
+      throw new BusinessError(`审核记录不存在: audit_id=${auditId}`, 'SERVICE_NOT_FOUND', 404)
     }
 
     // 2. 验证审核类型
     if (auditRecord.auditable_type !== 'merchant_points') {
-      throw new Error(`审核类型不匹配: 期望=merchant_points, 实际=${auditRecord.auditable_type}`)
+      throw new BusinessError(`审核类型不匹配: 期望=merchant_points, 实际=${auditRecord.auditable_type}`, 'SERVICE_ERROR', 400)
     }
 
     // 3. 提取申请信息用于日志

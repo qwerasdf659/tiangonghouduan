@@ -227,8 +227,8 @@ export function useStarStoneAccountsMethods() {
               delta_amount: tx.delta_amount,
               balance_before: tx.balance_before,
               balance_after: tx.balance_after,
-              tx_type: tx.tx_type,
-              tx_type_display: tx.tx_type_display || tx.tx_type || '-',
+              business_type: tx.business_type,
+              business_type_display: tx.business_type_display || tx.business_type || '-',
               description: tx.description || tx.title || '-',
               created_at: tx.created_at
             }))

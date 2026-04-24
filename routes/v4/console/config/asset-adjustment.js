@@ -34,7 +34,7 @@ const router = express.Router()
 const { AssetCode } = require('../../../../constants/AssetCode')
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const TransactionManager = require('../../../../utils/TransactionManager')
-const { asyncHandler } = require('../../../../middleware/validation')
+const { asyncHandler, handleServiceError } = require('../../../../middleware/validation')
 
 /**
  * POST /api/v4/console/asset-adjustment/adjust
@@ -190,7 +190,7 @@ router.post(
     } catch (error) {
       // 余额不足等业务错误
       if (error.message.includes('余额不足') || error.message.includes('insufficient')) {
-        return res.apiError(error.message, 'INSUFFICIENT_BALANCE', null, 400)
+        return handleServiceError(error, res, '操作失败')
       }
       throw error
     }
@@ -443,7 +443,7 @@ router.get(
       user = await UserService.getUserById(Number(user_id))
     } catch (error) {
       if (error.message === '用户不存在') {
-        return res.apiError('用户不存在', 'USER_NOT_FOUND', null, 404)
+        return handleServiceError(error, res, '操作失败')
       }
       throw error
     }

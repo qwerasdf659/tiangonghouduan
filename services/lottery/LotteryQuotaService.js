@@ -1,3 +1,4 @@
+const BusinessError = require('../../utils/BusinessError')
 const logger = require('../../utils/logger').logger
 const BeijingTimeHelper = require('../../utils/timeHelper')
 const {
@@ -61,7 +62,7 @@ const {
  *
  * if (!result.success) {
  *   // 配额不足，抛出错误
- *   throw new Error('DAILY_DRAW_LIMIT_EXCEEDED')
+ *   throw new BusinessError('DAILY_DRAW_LIMIT_EXCEEDED', 'LOTTERY_ERROR', 400)
  * }
  * ```
  *
@@ -218,7 +219,7 @@ class LotteryQuotaService {
     const { transaction } = options
 
     if (!transaction) {
-      throw new Error('tryDeductQuota 必须在事务内调用')
+      throw new BusinessError('tryDeductQuota 必须在事务内调用', 'LOTTERY_REQUIRED', 400)
     }
 
     try {

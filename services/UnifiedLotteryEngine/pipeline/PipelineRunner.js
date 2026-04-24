@@ -19,6 +19,7 @@
  * @since 2026
  */
 
+const BusinessError = require('../../../utils/BusinessError')
 const { logger } = require('../../../utils/logger')
 
 /**
@@ -51,7 +52,7 @@ class PipelineRunner {
    */
   addStage(stage) {
     if (!stage || typeof stage.execute !== 'function') {
-      throw new Error('Invalid stage: must implement execute(context) method')
+      throw new BusinessError('Invalid stage: must implement execute(context) method', 'ENGINE_ERROR', 400)
     }
     this.stages.push(stage)
     return this

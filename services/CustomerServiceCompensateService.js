@@ -19,6 +19,7 @@
  * @date 2026-02-22
  */
 
+const BusinessError = require('../utils/BusinessError')
 const logger = require('../utils/logger').logger
 const BalanceService = require('./asset/BalanceService')
 const ItemService = require('./asset/ItemService')
@@ -47,17 +48,17 @@ class CustomerServiceCompensateService {
     const transaction = options.transaction
 
     if (!transaction) {
-      throw new Error('补偿操作必须在事务内执行（缺少 options.transaction）')
+      throw new BusinessError('补偿操作必须在事务内执行（缺少 options.transaction）', 'CUSTOMER_SERVICE_REQUIRED', 400)
     }
 
     if (!user_id || !operator_id || !reason || !items || items.length === 0) {
-      throw new Error('补偿参数不完整：需要 user_id, operator_id, reason, items')
+      throw new BusinessError('补偿参数不完整：需要 user_id, operator_id, reason, items', 'CUSTOMER_SERVICE_ERROR', 400)
     }
 
     /* 验证用户存在 */
     const user = await models.User.findByPk(user_id, { transaction })
     if (!user) {
-      throw new Error(`用户 ${user_id} 不存在`)
+      throw new BusinessError(`用户 ${user_id} 不存在`, 'CUSTOMER_SERVICE_NOT_FOUND', 404)
     }
 
     const compensationLog = []

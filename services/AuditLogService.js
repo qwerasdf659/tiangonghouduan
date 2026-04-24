@@ -1,3 +1,4 @@
+const BusinessError = require('../utils/BusinessError')
 const logger = require('../utils/logger').logger
 
 // 引用中文显示名称辅助函数（V4.7 中文化显示名称系统 - 2026-01-22）
@@ -920,7 +921,7 @@ class AuditLogService {
       }
     } catch (error) {
       logger.error('[审计日志] 管理员查询失败:', error.message)
-      throw new Error(`查询审计日志失败: ${error.message}`)
+      throw new BusinessError(`查询审计日志失败: ${error.message}`, 'AUDIT_FAILED', 500)
     }
   }
 
@@ -1011,7 +1012,7 @@ class AuditLogService {
     try {
       // 验证参数
       if (!logId || isNaN(logId) || logId <= 0) {
-        throw new Error('无效的日志ID')
+        throw new BusinessError('无效的日志ID', 'AUDIT_INVALID', 400)
       }
 
       const log = await AdminOperationLog.findByPk(logId, {
@@ -1025,7 +1026,7 @@ class AuditLogService {
       })
 
       if (!log) {
-        throw new Error('审计日志不存在')
+        throw new BusinessError('审计日志不存在', 'AUDIT_NOT_FOUND', 404)
       }
 
       return log
@@ -1482,7 +1483,7 @@ class AuditLogService {
         stack: error.stack,
         options
       })
-      throw new Error(`生成审计报告失败: ${error.message}`)
+      throw new BusinessError(`生成审计报告失败: ${error.message}`, 'AUDIT_FAILED', 500)
     }
   }
 }

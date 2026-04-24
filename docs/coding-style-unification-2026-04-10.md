@@ -876,7 +876,7 @@ ad_system           1    auction             1    customer_service    1
 
 - `admin/src/api/types.js` 里每个 typedef 都必须与 2026-04-22 数据库 schema 对齐
 - 未来 schema 变更必须同步更新这里
-- 引入 lint 规则 `admin/scripts/check-frontend-mappings.js`，对 12.1 表的旧字段黑名单进行静态扫描
+- 引入 lint 规则 `admin/scripts/check-frontend-mappings.cjs`，对 12.1 表的旧字段黑名单进行静态扫描
 
 #### 7.11.1 行业对比（作为拍板依据）
 
@@ -1204,7 +1204,7 @@ ad_system           1    auction             1    customer_service    1
 - 原有 5 个漂移对象同步按 9.7 清单重写（ListingInfo / LotteryRecord / PrizeInfo / UserInfo / UserDetail）
 - 本轮 7 处新发现漂移（AssetBalance / AssetTransaction / AssetAdjustParams / PresetConfig / ConversionRule / SystemNotification / PrizeInfo 扩展字段）一并修正
 - `types.js` 预计从 411 行扩展到 700~900 行
-- 配套新建 `admin/scripts/check-frontend-mappings.js` lint 黑名单脚本（见 13 阶段 5.5）
+- 配套新建 `admin/scripts/check-frontend-mappings.cjs` lint 黑名单脚本（见 13 阶段 5.5）
 - 工作量：2 天（手写 JSDoc + 单元校验 + lint 脚本）
 - **C 方案（自动从 Sequelize models 生成 JSDoc）不在本轮执行**，留到下一轮优化
 
@@ -1943,7 +1943,7 @@ BUSINESS_RECORD_CONTENT_REVIEW_DETAIL: '/console/business-records/content-review
 2026-04-22 第二轮实地核查：
 
 - `admin/scripts/` 目录本身就**不存在**（`ls /home/devbox/project/admin/scripts` 返回 "No such file or directory"）
-- `admin/package.json` 第 12 行写着 `"lint:mappings": "node scripts/check-frontend-mappings.js"`，脚本文件**也不存在**
+- `admin/package.json` 第 12 行写着 `"lint:mappings": "node scripts/check-frontend-mappings.cjs"`，脚本文件**也不存在**
 - 原版文档 7.11、10.2、13 阶段 5.5、13 阶段 7.2 多处引用这个脚本，实际都是"**尚需新建**"的状态
 
 本轮应当把该脚本明确标注为"新建"工作项，并决定：
@@ -2020,7 +2020,7 @@ BUSINESS_RECORD_CONTENT_REVIEW_DETAIL: '/console/business-records/content-review
 7. **缺整个业务实体 typedef**：`DIYTemplate`、`AuctionListing`、`BidProduct`、`ConsumptionRecord`、`RedemptionOrder`、`TradeOrder`、`Item`、`ItemTemplate`、`AuthenticationSession`、`Account` 等共 16 个实体需要新增（7.19 拍板）
 8. **Alpine.js 组件内部 state 的命名**：目前大量用 `campaign_id`，容易跟广告活动混淆，需要按业务域强制使用 `lottery_campaign_id / ad_campaign_id`
 9. **`admin/src/modules/` 多处 Alpine 页面**（如 `trade-management.js`、`lottery-management.js`、`sessions.js`）需要对应字段替换
-10. **`admin/scripts/check-frontend-mappings.js` 与 `admin/scripts/` 目录均不存在**（本轮核实，见 9.11），必须在本轮治理中从零创建
+10. **`admin/scripts/check-frontend-mappings.cjs` 与 `admin/scripts/` 目录均不存在**（本轮核实，见 9.11），必须在本轮治理中从零创建
 11. **`admin/src/api/types.js` 的 `SystemNotificationInfo.notification_id` 注释"即 ad_campaign_id"是严重语义混淆**，必须全量删除该映射假设
 12. **`types.js` 有 `export default {}`**（第 410 行），说明该文件当前没有实际导出任何类型工具，只是文档性 JSDoc —— 是否引入轻量类型校验器（如 AJV + JSON Schema 生成 fixture）需要拍板（7.19）
 
@@ -2479,7 +2479,7 @@ BUSINESS_RECORD_CONTENT_REVIEW_DETAIL: '/console/business-records/content-review
   - （全量替换可用 `scripts/frontend/rename_fields.js` 脚本按此表批量处理）
 - **5.4** 批量替换 HTML 里 `x-text="listing.listing_id"` 等对应绑定（60+ HTML 文件均需扫）
 - **5.5** ~~新建~~ `admin/scripts/` 目录（~~本仓库本不存在~~，2026-04-23 已创建）：
-  - [x] 新建 `admin/scripts/check-frontend-mappings.js`：用 glob 扫 `admin/src/**/*.js` 与 `admin/*.html`，黑名单字段命中即 `process.exit(1)`
+  - [x] 新建 `admin/scripts/check-frontend-mappings.cjs`：用 glob 扫 `admin/src/**/*.js` 与 `admin/*.html`，黑名单字段命中即 `process.exit(1)`
   - 黑名单：`listing_id`（非广告域）、`record_id`（非广告域）、`prize_id`（非广告域）、`preset_id`（非广告域）、`draw_id`、`session_id`（非客服域）
   - 豁免：广告域 `ad_campaign_id`（以 `ad_` 前缀识别）、B 类短命名（`address_id`、`notification_id`、`media_id` 等 12.1 列示白名单）
 - **5.6** 验收：`cd admin && npm run lint:mappings` 全部通过；admin/dist 重新构建无 console.warn 报字段不对齐
@@ -2524,7 +2524,7 @@ BUSINESS_RECORD_CONTENT_REVIEW_DETAIL: '/console/business-records/content-review
 ### 阶段 7：自动化防回归（1 天）
 
 - [x] **7.1** 在 `scripts/validation/` 新增 `check_api_field_contract.js`（2026-04-23 已创建）
-- [x] **7.2** 在 `admin/scripts/` 新增 `check-frontend-mappings.js`（2026-04-23 已创建，替代原 `check_frontend_field_contract.js`）
+- [x] **7.2** 在 `admin/scripts/` 新增 `check-frontend-mappings.cjs`（2026-04-23 已创建，替代原 `check_frontend_field_contract.js`）
 - [x] **7.3** 把 7.1 / 7.2 接入 `npm run check:prevention` 与 husky `pre-commit`（2026-04-23 已接入）
 - [x] **7.4** 把 "后端真实 DB 字段" 作为 `jest --projects` 的契约测试固定 fixture（2026-04-23 已创建 db-field-consistency.contract.test.js 10/10 通过）
 
@@ -2654,7 +2654,7 @@ BUSINESS_RECORD_CONTENT_REVIEW_DETAIL: '/console/business-records/content-review
 | 兑换订单追踪路径 | 未提 | `/api/v4/exchange/orders/:order_no/track`（用 `order_no` 不是数字 id） |
 | 核销订单详情路径 | 未提 | `/api/v4/shop/redemption/orders/:order_id`（`order_id` 对应 `redemption_order_id` char(36) UUID） |
 | console 路径占位符 | 暗示"统一改长" | 实际 20+ 路由 / 10+ admin API 文件大量使用 `:id`/`:order_id`/`:record_id` 等短命名 |
-| `admin/scripts/` 目录 | 引用 `check-frontend-mappings.js` | **目录与脚本均不存在**，需从零新建 |
+| `admin/scripts/` 目录 | 引用 `check-frontend-mappings.cjs` | **目录与脚本均不存在**，需从零新建 |
 | admin `api/types.js` | 7 处漂移 | 实测：**5 个原有对象 + 7 个新发现漂移 + 16 个完全缺失的核心业务实体 typedef** |
 
 ### 15.3 本轮在后端侧可直接复用的能力（不需要新建框架）
@@ -2686,7 +2686,7 @@ BUSINESS_RECORD_CONTENT_REVIEW_DETAIL: '/console/business-records/content-review
 | `scripts/maintenance/fix_negative_balances.js` | 新建（7.13/7.18） | 账本负值修复 | 含在 7.13 工时 |
 | `scripts/validation/check_api_field_contract.js` | 新建（13 阶段 7.1） | 后端响应字段黑名单扫描 | 0.5 天 |
 | `scripts/validation/check_frontend_field_contract.js` | 新建（13 阶段 7.2） | 前端字段黑名单扫描 | 0.5 天 |
-| `admin/scripts/` 目录 + `check-frontend-mappings.js` | 新建（13 阶段 5.5） | Admin 前端 lint | 0.5 天 |
+| `admin/scripts/` 目录 + `check-frontend-mappings.cjs` | 新建（13 阶段 5.5） | Admin 前端 lint | 0.5 天 |
 | `tests/services/diy/TemplateService.publishTemplate.test.js` | 新建（7.12） | DIY 发布校验回归 | 0.5 天 |
 | `tests/services/asset/FreezeLifecycle.test.js` | 新建（7.13） | 冻结/解冻生命周期 | 0.5 天 |
 | `tests/services/asset/NegativeBalanceGuard.test.js` | 新建（7.18） | 负值守卫 | 0.3 天 |
@@ -2785,7 +2785,7 @@ BUSINESS_RECORD_CONTENT_REVIEW_DETAIL: '/console/business-records/content-review
    - `routes/v4/auth/login.js` 新增 `POST /wx-code-login` 端点
 7. **阶段 7b 防回归脚本**：
    - `scripts/validation/check_api_field_contract.js` 已创建
-   - `admin/scripts/check-frontend-mappings.js` 已创建
+   - `admin/scripts/check-frontend-mappings.cjs` 已创建
 
 **质量验证结果**：
 
@@ -2801,3 +2801,54 @@ BUSINESS_RECORD_CONTENT_REVIEW_DETAIL: '/console/business-records/content-review
 | Health Check | healthy（DB connected, Redis connected） |
 | PM2 | online |
 
+
+### 15.9 2026-04-24 第四轮全量审查与修复记录
+
+**执行人**：后端开发
+
+**审查方法**：对照文档全部 8 个阶段逐项检查实际代码状态，不以文档标记为准，以代码实际状态为准。
+
+**各阶段审查结论**：
+
+| 阶段 | 状态 | 详情 |
+|------|------|------|
+| 阶段 0 基线快照 | ✅ 已完成 | schema 快照、路由清单、循环依赖检查均已完成 |
+| 阶段 1 去映射+字段统一 | ✅ 已完成 | DataSanitizer 两处 long→short 映射已删除，change_amount 全部改为 delta_amount |
+| 阶段 2 服务容器/错误链 | ✅ 已完成 | 155 个路由文件使用 getService()，0 个本地 asyncHandler |
+| 阶段 3 懒加载+大文件拆分 | ✅ 已完成 | 0 处方法内懒加载；DIYService.js 已拆分为 services/diy/ |
+| 阶段 4 业务一致性治理 | ✅ 已完成 | DIY 脏模板 0 条；账本负值 0 条；CHECK 约束已存在 |
+| 阶段 5 Web 前端适配 | ⚠️ 本轮修复 | types.js 5 处旧字段名 + tx_type 全链路统一 |
+| 阶段 6 小程序契约 | ✅ 已完成 | 契约文档已在 9.9/12.1-12.7 中冻结 |
+| 阶段 7 防回归+wx_openid | ✅ 已完成 | 防回归脚本已创建；wx_openid 字段+端点已实现 |
+| 阶段 8 最终验收 | ✅ 通过 | 全部质量检查通过 |
+
+**本轮修复内容**：
+
+1. **`admin/src/api/types.js` 旧字段名修复**：
+   - `transaction_id` → `asset_transaction_id`
+   - `tx_type` → `business_type`
+   - `amount`（变动金额）→ `delta_amount`
+   - `campaign_id` → `lottery_campaign_id`（AssetBalance + AssetAdjustParams 两处）
+   - `preset_id` → `lottery_preset_id`（PresetConfig）
+   - PresetConfig `is_enabled: boolean` → `status: 'pending'|'used'`（与数据库 enum 对齐）
+   - ConversionRule `is_enabled: boolean` → `status: 'active'|'paused'|'disabled'`（与数据库 enum 对齐）
+
+2. **`tx_type` → `business_type` 全链路统一**：
+   - 后端：`routes/v4/console/assets/transactions.js`（别名映射 + attachDisplayNames 字段）
+   - 前端 JS（6 文件）：asset.js、star-stone-accounts.js、finance-management.js、assets-portfolio.js、asset-management.js、adjustment.js
+   - 前端 HTML（4 文件）：asset-adjustment.html、assets-portfolio.html、finance-management.html、user-management.html
+
+3. **前端重新构建**：`npm run build` 成功
+
+**质量验证结果**：
+
+| 检查项 | 结果 |
+|--------|------|
+| ESLint | 0 error |
+| check:prevention | 全部通过 |
+| check:circular | 0 真正循环依赖 |
+| API 契约测试 | 187/187 通过 |
+| 回归测试 | 47/47 通过 |
+| Health Check | healthy（DB connected, Redis connected） |
+| PM2 | online |
+| 前端构建 | 成功 |

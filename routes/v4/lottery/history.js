@@ -16,9 +16,8 @@
 
 const express = require('express')
 const router = express.Router()
-const logger = require('../../../utils/logger').logger
 const { authenticateToken, getUserRoles } = require('../../../middleware/auth')
-const { handleServiceError } = require('../../../middleware/validation')
+const { asyncHandler } = require('../../../middleware/validation')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 
 /**
@@ -35,34 +34,22 @@ const BeijingTimeHelper = require('../../../utils/timeHelper')
  * - 用户端路由不含 :user_id 参数，身份纯从 JWT Token 获取
  * - 管理员查看他人数据走 /api/v4/console/lottery-user-analysis/history/:user_id
  */
-router.get('/history', authenticateToken, async (req, res) => {
-  try {
-    const user_id = req.user.user_id
-    const { page = 1, page_size = 20 } = req.query
+router.get('/history', authenticateToken, asyncHandler(async (req, res) => {
+  const user_id = req.user.user_id
+  const { page = 1, page_size = 20 } = req.query
 
-    const finalPage = Math.max(parseInt(page) || 1, 1)
-    const pageSize = Math.min(Math.max(parseInt(page_size) || 20, 1), 50)
+  const finalPage = Math.max(parseInt(page) || 1, 1)
+  const pageSize = Math.min(Math.max(parseInt(page_size) || 20, 1), 50)
 
-    // 获取抽奖历史（通过 ServiceManager 获取 LotteryQueryService）
-    const LotteryQueryService = req.app.locals.services.getService('lottery_query')
-    const history = await LotteryQueryService.getUserHistory(user_id, {
-      page: finalPage,
-      limit: pageSize
-    })
+  // 获取抽奖历史（通过 ServiceManager 获取 LotteryQueryService）
+  const LotteryQueryService = req.app.locals.services.getService('lottery_query')
+  const history = await LotteryQueryService.getUserHistory(user_id, {
+    page: finalPage,
+    limit: pageSize
+  })
 
-    return res.apiSuccess(history, '抽奖历史获取成功', 'HISTORY_SUCCESS')
-  } catch (error) {
-    logger.error('获取抽奖历史失败', {
-      error_message: error.message,
-      error_stack: error.stack,
-      user_id: req.user?.user_id,
-      query_params: { page: req.query.page, page_size: req.query.page_size },
-      timestamp: BeijingTimeHelper.now()
-    })
-
-    return handleServiceError(error, res, '获取抽奖历史失败')
-  }
-})
+  return res.apiSuccess(history, '抽奖历史获取成功', 'HISTORY_SUCCESS')
+}))
 
 /**
  * @route GET /api/v4/lottery/campaigns
@@ -73,23 +60,18 @@ router.get('/history', authenticateToken, async (req, res) => {
  *
  * @returns {Object} 活动列表
  */
-router.get('/campaigns', authenticateToken, async (req, res) => {
-  try {
-    const { status = 'active' } = req.query
+router.get('/campaigns', authenticateToken, asyncHandler(async (req, res) => {
+  const { status = 'active' } = req.query
 
-    // 获取活动列表（读写分离架构）
-    const LotteryQueryService = req.app.locals.services.getService('lottery_query')
-    const campaigns = await LotteryQueryService.getActiveCampaigns({
-      status,
-      user_id: req.user.user_id
-    })
+  // 获取活动列表（读写分离架构）
+  const LotteryQueryService = req.app.locals.services.getService('lottery_query')
+  const campaigns = await LotteryQueryService.getActiveCampaigns({
+    status,
+    user_id: req.user.user_id
+  })
 
-    return res.apiSuccess(campaigns, '活动列表获取成功', 'CAMPAIGNS_SUCCESS')
-  } catch (error) {
-    logger.error('获取活动列表失败:', error)
-    return handleServiceError(error, res, '获取活动列表失败')
-  }
-})
+  return res.apiSuccess(campaigns, '活动列表获取成功', 'CAMPAIGNS_SUCCESS')
+}))
 
 /**
  * @route GET /api/v4/lottery/metrics
@@ -116,66 +98,55 @@ router.get('/campaigns', authenticateToken, async (req, res) => {
  * - 异常检测和预警（过高空奖率等）
  * - 策略调优数据支撑
  */
-router.get('/metrics', authenticateToken, async (req, res) => {
-  try {
-    const { lottery_campaign_id, hours = 24 } = req.query
+router.get('/metrics', authenticateToken, asyncHandler(async (req, res) => {
+  const { lottery_campaign_id, hours = 24 } = req.query
 
-    // 1. 权限验证：仅管理员可访问
-    const currentUserRoles = await getUserRoles(req.user.user_id)
-    if (currentUserRoles.role_level < 100) {
-      return res.apiError('仅管理员可访问策略指标', 'ACCESS_DENIED', {}, 403)
-    }
-
-    // 2. 参数验证
-    if (!lottery_campaign_id) {
-      return res.apiError('lottery_campaign_id 参数必填', 'MISSING_CAMPAIGN_ID', {}, 400)
-    }
-
-    const campaignIdInt = parseInt(lottery_campaign_id)
-    if (isNaN(campaignIdInt) || campaignIdInt <= 0) {
-      return res.apiError('lottery_campaign_id 必须为正整数', 'INVALID_CAMPAIGN_ID', {}, 400)
-    }
-
-    const hoursInt = Math.min(Math.max(parseInt(hours) || 24, 1), 168) // 限制 1-168 小时
-
-    // 3. 查询 LotteryHourlyMetrics 数据（Phase 3 收口：通过 ServiceManager 获取 models）
-    const { LotteryHourlyMetrics } = req.app.locals.models
-
-    const recentMetrics = await LotteryHourlyMetrics.getRecentMetrics(campaignIdInt, hoursInt)
-
-    // 4. 聚合计算总体指标
-    const aggregated = _aggregateMetrics(recentMetrics)
-
-    // 5. 返回指标数据
-    return res.apiSuccess(
-      {
-        lottery_campaign_id: campaignIdInt,
-        time_range: {
-          hours: hoursInt,
-          start_time: _getStartTime(hoursInt),
-          end_time: BeijingTimeHelper.now()
-        },
-        summary: aggregated.summary,
-        tier_distribution: aggregated.tier_distribution,
-        budget_tier_distribution: aggregated.budget_tier_distribution,
-        mechanism_triggers: aggregated.mechanism_triggers,
-        health_indicators: aggregated.health_indicators,
-        hourly_data: recentMetrics.map(_formatHourlyMetrics)
-      },
-      '策略指标获取成功',
-      'METRICS_SUCCESS'
-    )
-  } catch (error) {
-    logger.error('获取策略指标失败:', {
-      error_message: error.message,
-      error_stack: error.stack,
-      lottery_campaign_id: req.query.lottery_campaign_id,
-      hours: req.query.hours,
-      timestamp: BeijingTimeHelper.now()
-    })
-    return handleServiceError(error, res, '获取策略指标失败')
+  // 1. 权限验证：仅管理员可访问
+  const currentUserRoles = await getUserRoles(req.user.user_id)
+  if (currentUserRoles.role_level < 100) {
+    return res.apiError('仅管理员可访问策略指标', 'ACCESS_DENIED', {}, 403)
   }
-})
+
+  // 2. 参数验证
+  if (!lottery_campaign_id) {
+    return res.apiError('lottery_campaign_id 参数必填', 'MISSING_CAMPAIGN_ID', {}, 400)
+  }
+
+  const campaignIdInt = parseInt(lottery_campaign_id)
+  if (isNaN(campaignIdInt) || campaignIdInt <= 0) {
+    return res.apiError('lottery_campaign_id 必须为正整数', 'INVALID_CAMPAIGN_ID', {}, 400)
+  }
+
+  const hoursInt = Math.min(Math.max(parseInt(hours) || 24, 1), 168) // 限制 1-168 小时
+
+  // 3. 查询 LotteryHourlyMetrics 数据（Phase 3 收口：通过 ServiceManager 获取 models）
+  const { LotteryHourlyMetrics } = req.app.locals.models
+
+  const recentMetrics = await LotteryHourlyMetrics.getRecentMetrics(campaignIdInt, hoursInt)
+
+  // 4. 聚合计算总体指标
+  const aggregated = _aggregateMetrics(recentMetrics)
+
+  // 5. 返回指标数据
+  return res.apiSuccess(
+    {
+      lottery_campaign_id: campaignIdInt,
+      time_range: {
+        hours: hoursInt,
+        start_time: _getStartTime(hoursInt),
+        end_time: BeijingTimeHelper.now()
+      },
+      summary: aggregated.summary,
+      tier_distribution: aggregated.tier_distribution,
+      budget_tier_distribution: aggregated.budget_tier_distribution,
+      mechanism_triggers: aggregated.mechanism_triggers,
+      health_indicators: aggregated.health_indicators,
+      hourly_data: recentMetrics.map(_formatHourlyMetrics)
+    },
+    '策略指标获取成功',
+    'METRICS_SUCCESS'
+  )
+}))
 
 /**
  * 聚合多小时指标数据

@@ -28,7 +28,6 @@ const { authenticateToken, requireRoleLevel } = require('../../../../middleware/
 const TransactionManager = require('../../../../utils/TransactionManager')
 const logger = require('../../../../utils/logger').logger
 const { asyncHandler } = require('../shared/middleware')
-const { handleServiceError } = require('../../../../middleware/validation')
 
 /**
  * 通过 ServiceManager 获取 LotteryPresetService
@@ -177,40 +176,32 @@ router.post(
       return res.apiError('预设数组（presets）不能为空', 'INVALID_PARAMS', null, 400)
     }
 
-    try {
-      // 添加额外字段
-      const presetsWithMeta = presets.map(preset => ({
-        ...preset,
-        lottery_campaign_id,
-        reason
-      }))
+    // 添加额外字段
+    const presetsWithMeta = presets.map(preset => ({
+      ...preset,
+      lottery_campaign_id,
+      reason
+    }))
 
-      const result = await getLotteryPresetService(req).createPresets(
-        req.user.user_id,
-        parseInt(user_id, 10),
-        presetsWithMeta
-      )
+    const result = await getLotteryPresetService(req).createPresets(
+      req.user.user_id,
+      parseInt(user_id, 10),
+      presetsWithMeta
+    )
 
-      logger.info('[POST /] 创建预设队列', {
-        admin_id: req.user.user_id,
-        target_user_id: user_id,
-        presets_count: result.length
-      })
+    logger.info('[POST /] 创建预设队列', {
+      admin_id: req.user.user_id,
+      target_user_id: user_id,
+      presets_count: result.length
+    })
 
-      return res.apiSuccess(
-        {
-          presets: result,
-          total: result.length
-        },
-        '创建预设队列成功'
-      )
-    } catch (error) {
-      logger.error('[POST /] 创建预设队列失败', {
-        admin_id: req.user.user_id,
-        error: error.message
-      })
-      return handleServiceError(res, error)
-    }
+    return res.apiSuccess(
+      {
+        presets: result,
+        total: result.length
+      },
+      '创建预设队列成功'
+    )
   })
 )
 
@@ -225,36 +216,27 @@ router.delete(
   asyncHandler(async (req, res) => {
     const { user_id } = req.params
 
-    try {
-      const result = await TransactionManager.executeInTransaction(async transaction => {
-        return await getLotteryPresetService(req).clearUserPresets(
-          req.user.user_id,
-          parseInt(user_id, 10),
-          { transaction }
-        )
-      })
-
-      logger.info('[DELETE /user/:user_id] 清理用户预设', {
-        admin_id: req.user.user_id,
-        target_user_id: user_id,
-        deleted_count: result.deletedCount
-      })
-
-      return res.apiSuccess(
-        {
-          user_id: parseInt(user_id, 10),
-          deleted_count: result.deletedCount
-        },
-        '清理用户预设成功'
+    const result = await TransactionManager.executeInTransaction(async transaction => {
+      return await getLotteryPresetService(req).clearUserPresets(
+        req.user.user_id,
+        parseInt(user_id, 10),
+        { transaction }
       )
-    } catch (error) {
-      logger.error('[DELETE /user/:user_id] 清理用户预设失败', {
-        admin_id: req.user.user_id,
-        user_id,
-        error: error.message
-      })
-      return handleServiceError(res, error)
-    }
+    })
+
+    logger.info('[DELETE /user/:user_id] 清理用户预设', {
+      admin_id: req.user.user_id,
+      target_user_id: user_id,
+      deleted_count: result.deletedCount
+    })
+
+    return res.apiSuccess(
+      {
+        user_id: parseInt(user_id, 10),
+        deleted_count: result.deletedCount
+      },
+      '清理用户预设成功'
+    )
   })
 )
 
@@ -277,28 +259,19 @@ router.put(
     const updateData = req.body
     const LotteryPresetService = getLotteryPresetService(req)
 
-    try {
-      const result = await TransactionManager.executeInTransaction(async transaction => {
-        return await LotteryPresetService.updatePreset(parseInt(id, 10), updateData, {
-          transaction
-        })
+    const result = await TransactionManager.executeInTransaction(async transaction => {
+      return await LotteryPresetService.updatePreset(parseInt(id, 10), updateData, {
+        transaction
       })
+    })
 
-      logger.info('[PUT /:id] 更新预设', {
-        admin_id: req.user.user_id,
-        lottery_preset_id: id,
-        updated_fields: Object.keys(updateData)
-      })
+    logger.info('[PUT /:id] 更新预设', {
+      admin_id: req.user.user_id,
+      lottery_preset_id: id,
+      updated_fields: Object.keys(updateData)
+    })
 
-      return res.apiSuccess(result, '更新预设成功')
-    } catch (error) {
-      logger.error('[PUT /:id] 更新预设失败', {
-        admin_id: req.user.user_id,
-        lottery_preset_id: id,
-        error: error.message
-      })
-      return handleServiceError(res, error)
-    }
+    return res.apiSuccess(result, '更新预设成功')
   })
 )
 
@@ -314,25 +287,16 @@ router.delete(
     const { id } = req.params
     const LotteryPresetService = getLotteryPresetService(req)
 
-    try {
-      const result = await TransactionManager.executeInTransaction(async transaction => {
-        return await LotteryPresetService.deletePreset(parseInt(id, 10), { transaction })
-      })
+    const result = await TransactionManager.executeInTransaction(async transaction => {
+      return await LotteryPresetService.deletePreset(parseInt(id, 10), { transaction })
+    })
 
-      logger.info('[DELETE /:id] 删除预设', {
-        admin_id: req.user.user_id,
-        lottery_preset_id: id
-      })
+    logger.info('[DELETE /:id] 删除预设', {
+      admin_id: req.user.user_id,
+      lottery_preset_id: id
+    })
 
-      return res.apiSuccess(result, '删除预设成功')
-    } catch (error) {
-      logger.error('[DELETE /:id] 删除预设失败', {
-        admin_id: req.user.user_id,
-        lottery_preset_id: id,
-        error: error.message
-      })
-      return handleServiceError(res, error)
-    }
+    return res.apiSuccess(result, '删除预设成功')
   })
 )
 

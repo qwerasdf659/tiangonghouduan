@@ -25,6 +25,7 @@
 
 'use strict'
 
+const BusinessError = require('../utils/BusinessError')
 const { Op } = require('sequelize')
 const { sequelize } = require('../models')
 const { Account, AccountAssetBalance, MarketListing, TradeOrder } = require('../models')
@@ -272,7 +273,7 @@ class OrphanFrozenCleanupService {
 
     // 参数验证
     if (!dry_run && !operator_id) {
-      throw new Error('实际清理操作需要提供 operator_id')
+      throw new BusinessError('实际清理操作需要提供 operator_id', 'SERVICE_ERROR', 400)
     }
 
     logger.info('[孤儿冻结清理] 开始清理...', {
@@ -428,7 +429,7 @@ class OrphanFrozenCleanupService {
           lockKey,
           error: error.message
         })
-        throw new Error('孤儿冻结清理任务正在执行中，请稍后重试')
+        throw new BusinessError('孤儿冻结清理任务正在执行中，请稍后重试', 'SERVICE_ERROR', 400)
       }
       throw error
     }
@@ -722,7 +723,7 @@ class OrphanFrozenCleanupService {
     } = options
 
     if (!dry_run && !operator_id) {
-      throw new Error('实际清理操作需要提供 operator_id')
+      throw new BusinessError('实际清理操作需要提供 operator_id', 'SERVICE_ERROR', 400)
     }
 
     logger.info('[买家孤儿冻结清理] 开始清理...', {
@@ -865,7 +866,7 @@ class OrphanFrozenCleanupService {
     } catch (error) {
       if (error.message.includes('Failed to acquire lock')) {
         logger.warn('[买家孤儿冻结清理] 获取锁失败', { error: error.message })
-        throw new Error('买家孤儿冻结清理任务正在执行中，请稍后重试')
+        throw new BusinessError('买家孤儿冻结清理任务正在执行中，请稍后重试', 'SERVICE_ERROR', 400)
       }
       throw error
     }

@@ -1,3 +1,4 @@
+const BusinessError = require('../utils/BusinessError')
 const logger = require('../utils/logger').logger
 
 /**
@@ -169,7 +170,7 @@ class ActivityConditionValidator {
     })
 
     if (!user) {
-      throw new Error(`用户不存在: ${userId}`)
+      throw new BusinessError(`用户不存在: ${userId}`, 'SERVICE_NOT_FOUND', 404)
     }
 
     // 查询用户积分 - 使用 BalanceService 统一账户体系（V4.7.0 AssetService 拆分）

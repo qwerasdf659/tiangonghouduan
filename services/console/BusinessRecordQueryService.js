@@ -22,6 +22,7 @@
  * @date 2026-02-01
  */
 
+const BusinessError = require('../../utils/BusinessError')
 const { Op, fn, col } = require('sequelize')
 const logger = require('../../utils/logger').logger
 const {
@@ -133,7 +134,7 @@ class BusinessRecordQueryService {
     })
 
     if (!record) {
-      throw new Error('抽奖清除设置记录不存在')
+      throw new BusinessError('抽奖清除设置记录不存在', 'SERVICE_NOT_FOUND', 404)
     }
 
     return record
