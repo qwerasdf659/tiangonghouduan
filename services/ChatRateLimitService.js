@@ -372,7 +372,11 @@ class ChatRateLimitService {
           return true
         } else {
           // 推送失败（客服不在线）
-          throw new BusinessError(`客服不在线或推送失败 (尝试${attempt}/${maxRetries})`, 'CUSTOMER_SERVICE_FAILED', 500)
+          throw new BusinessError(
+            `客服不在线或推送失败 (尝试${attempt}/${maxRetries})`,
+            'CUSTOMER_SERVICE_FAILED',
+            500
+          )
         }
       } catch (wsError) {
         logger.error(`⚠️ WebSocket推送失败 (第${attempt}/${maxRetries}次):`, wsError.message)

@@ -51,41 +51,51 @@ function getPremiumService(req) {
  *
  * 返回：用户高级空间状态列表和分页信息
  */
-router.get('/', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const { user_id, is_unlocked, unlock_method, is_valid, page = 1, page_size = 20 } = req.query
+router.get(
+  '/',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const { user_id, is_unlocked, unlock_method, is_valid, page = 1, page_size = 20 } = req.query
 
-  const result = await getPremiumService(req).getPremiumStatuses({
-    user_id: user_id ? parseInt(user_id) : undefined,
-    is_unlocked: is_unlocked !== undefined ? is_unlocked === 'true' : undefined,
-    unlock_method,
-    is_valid: is_valid !== undefined ? is_valid === 'true' : undefined,
-    page: parseInt(page),
-    page_size: parseInt(page_size)
+    const result = await getPremiumService(req).getPremiumStatuses({
+      user_id: user_id ? parseInt(user_id) : undefined,
+      is_unlocked: is_unlocked !== undefined ? is_unlocked === 'true' : undefined,
+      unlock_method,
+      is_valid: is_valid !== undefined ? is_valid === 'true' : undefined,
+      page: parseInt(page),
+      page_size: parseInt(page_size)
+    })
+
+    logger.info('查询用户高级空间状态列表', {
+      admin_id: req.user.user_id,
+      filters: { user_id, is_unlocked, unlock_method, is_valid },
+      total: result.pagination.total
+    })
+
+    return res.apiSuccess(result, '查询用户高级空间状态成功')
   })
-
-  logger.info('查询用户高级空间状态列表', {
-    admin_id: req.user.user_id,
-    filters: { user_id, is_unlocked, unlock_method, is_valid },
-    total: result.pagination.total
-  })
-
-  return res.apiSuccess(result, '查询用户高级空间状态成功')
-}))
+)
 
 /**
  * GET /stats - 获取高级空间状态统计汇总
  *
  * 返回：统计汇总数据
  */
-router.get('/stats', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const stats = await getPremiumService(req).getPremiumStats()
+router.get(
+  '/stats',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const stats = await getPremiumService(req).getPremiumStats()
 
-  logger.info('获取高级空间状态统计', {
-    admin_id: req.user.user_id
+    logger.info('获取高级空间状态统计', {
+      admin_id: req.user.user_id
+    })
+
+    return res.apiSuccess(stats, '获取高级空间状态统计成功')
   })
-
-  return res.apiSuccess(stats, '获取高级空间状态统计成功')
-}))
+)
 
 /**
  * GET /expiring - 获取即将过期的用户列表
@@ -97,23 +107,28 @@ router.get('/stats', authenticateToken, requireRoleLevel(100), asyncHandler(asyn
  *
  * 返回：即将过期用户列表和分页信息
  */
-router.get('/expiring', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const { hours = 24, page = 1, page_size = 20 } = req.query
+router.get(
+  '/expiring',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const { hours = 24, page = 1, page_size = 20 } = req.query
 
-  const result = await getPremiumService(req).getExpiringUsers(
-    parseInt(hours),
-    parseInt(page),
-    parseInt(page_size)
-  )
+    const result = await getPremiumService(req).getExpiringUsers(
+      parseInt(hours),
+      parseInt(page),
+      parseInt(page_size)
+    )
 
-  logger.info('获取即将过期用户列表', {
-    admin_id: req.user.user_id,
-    hours,
-    total: result.pagination.total
+    logger.info('获取即将过期用户列表', {
+      admin_id: req.user.user_id,
+      hours,
+      total: result.pagination.total
+    })
+
+    return res.apiSuccess(result, '获取即将过期用户列表成功')
   })
-
-  return res.apiSuccess(result, '获取即将过期用户列表成功')
-}))
+)
 
 /**
  * GET /:user_id - 获取单个用户的高级空间状态
@@ -123,26 +138,31 @@ router.get('/expiring', authenticateToken, requireRoleLevel(100), asyncHandler(a
  *
  * 返回：用户高级空间状态详情（无记录时返回默认状态，不返回404）
  */
-router.get('/:user_id', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const user_id = parseInt(req.params.user_id)
+router.get(
+  '/:user_id',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const user_id = parseInt(req.params.user_id)
 
-  const status = await getPremiumService(req).getUserPremiumStatusDetail(user_id)
+    const status = await getPremiumService(req).getUserPremiumStatusDetail(user_id)
 
-  // 用户没有高级空间记录是正常状态，返回默认值而不是404
-  if (!status) {
-    return res.apiSuccess(
-      {
-        user_id,
-        is_unlocked: false,
-        unlock_method: null,
-        expire_time: null,
-        message: '用户尚未解锁高级空间'
-      },
-      '获取用户高级空间状态成功'
-    )
-  }
+    // 用户没有高级空间记录是正常状态，返回默认值而不是404
+    if (!status) {
+      return res.apiSuccess(
+        {
+          user_id,
+          is_unlocked: false,
+          unlock_method: null,
+          expire_time: null,
+          message: '用户尚未解锁高级空间'
+        },
+        '获取用户高级空间状态成功'
+      )
+    }
 
-  return res.apiSuccess(status, '获取用户高级空间状态成功')
-}))
+    return res.apiSuccess(status, '获取用户高级空间状态成功')
+  })
+)
 
 module.exports = router

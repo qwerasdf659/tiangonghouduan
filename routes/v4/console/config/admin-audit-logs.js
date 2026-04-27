@@ -67,48 +67,53 @@ function getAuditLogQueryService(req) {
  * @query {string} [sort_by=created_at] - 排序字段
  * @query {string} [sort_order=DESC] - 排序方向（ASC/DESC）
  */
-router.get('/', authenticateToken, requireRoleLevel(30), asyncHandler(async (req, res) => {
-  const {
-    operator_id,
-    operation_type,
-    target_type,
-    target_id,
-    start_date,
-    end_date,
-    page = 1,
-    page_size = 20,
-    sort_by = 'created_at',
-    sort_order = 'DESC'
-  } = req.query
+router.get(
+  '/',
+  authenticateToken,
+  requireRoleLevel(30),
+  asyncHandler(async (req, res) => {
+    const {
+      operator_id,
+      operation_type,
+      target_type,
+      target_id,
+      start_date,
+      end_date,
+      page = 1,
+      page_size = 20,
+      sort_by = 'created_at',
+      sort_order = 'DESC'
+    } = req.query
 
-  logger.info('管理员查询操作审计日志列表', {
-    admin_id: req.user.user_id,
-    filters: { operator_id, operation_type, target_type, start_date, end_date },
-    page,
-    page_size
+    logger.info('管理员查询操作审计日志列表', {
+      admin_id: req.user.user_id,
+      filters: { operator_id, operation_type, target_type, start_date, end_date },
+      page,
+      page_size
+    })
+
+    const result = await getAuditLogQueryService(req).getAdminAuditLogs({
+      operator_id: operator_id ? parseInt(operator_id) : null,
+      operation_type: operation_type || null,
+      target_type: target_type || null,
+      target_id: target_id ? parseInt(target_id) : null,
+      start_date: start_date || null,
+      end_date: end_date || null,
+      page: parseInt(page),
+      page_size: Math.min(parseInt(page_size), 100),
+      sort_by,
+      sort_order
+    })
+
+    logger.info('查询管理员操作审计日志成功', {
+      admin_id: req.user.user_id,
+      total: result.pagination?.total || 0,
+      page: parseInt(page)
+    })
+
+    return res.apiSuccess(result, '获取管理员操作审计日志列表成功')
   })
-
-  const result = await getAuditLogQueryService(req).getAdminAuditLogs({
-    operator_id: operator_id ? parseInt(operator_id) : null,
-    operation_type: operation_type || null,
-    target_type: target_type || null,
-    target_id: target_id ? parseInt(target_id) : null,
-    start_date: start_date || null,
-    end_date: end_date || null,
-    page: parseInt(page),
-    page_size: Math.min(parseInt(page_size), 100),
-    sort_by,
-    sort_order
-  })
-
-  logger.info('查询管理员操作审计日志成功', {
-    admin_id: req.user.user_id,
-    total: result.pagination?.total || 0,
-    page: parseInt(page)
-  })
-
-  return res.apiSuccess(result, '获取管理员操作审计日志列表成功')
-}))
+)
 
 /**
  * GET /api/v4/console/admin-audit-logs/report
@@ -128,64 +133,69 @@ router.get('/', authenticateToken, requireRoleLevel(30), asyncHandler(async (req
  * @returns {Array} data.trend - 时间趋势数据（按天分组）
  * @returns {Object} data.report_meta - 报告元数据（生成时间、时间范围）
  */
-router.get('/report', authenticateToken, requireRoleLevel(30), asyncHandler(async (req, res) => {
-  const { time_range = '7d', start_date, end_date, operator_id } = req.query
+router.get(
+  '/report',
+  authenticateToken,
+  requireRoleLevel(30),
+  asyncHandler(async (req, res) => {
+    const { time_range = '7d', start_date, end_date, operator_id } = req.query
 
-  logger.info('管理员生成审计报告', {
-    admin_id: req.user.user_id,
-    time_range,
-    start_date,
-    end_date,
-    operator_id
-  })
+    logger.info('管理员生成审计报告', {
+      admin_id: req.user.user_id,
+      time_range,
+      start_date,
+      end_date,
+      operator_id
+    })
 
-  /* 参数验证：时间范围 */
-  const validTimeRanges = ['7d', '30d', '90d', 'custom']
-  if (!validTimeRanges.includes(time_range)) {
-    return res.apiError(
-      '无效的时间范围参数，支持：7d/30d/90d/custom',
-      'VALIDATION_ERROR',
-      { valid_values: validTimeRanges },
-      400
-    )
-  }
-
-  /* 自定义时间范围需要 start_date 和 end_date */
-  if (time_range === 'custom') {
-    if (!start_date || !end_date) {
+    /* 参数验证：时间范围 */
+    const validTimeRanges = ['7d', '30d', '90d', 'custom']
+    if (!validTimeRanges.includes(time_range)) {
       return res.apiError(
-        '自定义时间范围需要提供 start_date 和 end_date 参数',
+        '无效的时间范围参数，支持：7d/30d/90d/custom',
         'VALIDATION_ERROR',
-        null,
+        { valid_values: validTimeRanges },
         400
       )
     }
-    const datePattern = /^\d{4}-\d{2}-\d{2}$/
-    if (!datePattern.test(start_date) || !datePattern.test(end_date)) {
-      return res.apiError(
-        '日期格式无效，应为 YYYY-MM-DD',
-        'VALIDATION_ERROR',
-        { expected_format: 'YYYY-MM-DD' },
-        400
-      )
+
+    /* 自定义时间范围需要 start_date 和 end_date */
+    if (time_range === 'custom') {
+      if (!start_date || !end_date) {
+        return res.apiError(
+          '自定义时间范围需要提供 start_date 和 end_date 参数',
+          'VALIDATION_ERROR',
+          null,
+          400
+        )
+      }
+      const datePattern = /^\d{4}-\d{2}-\d{2}$/
+      if (!datePattern.test(start_date) || !datePattern.test(end_date)) {
+        return res.apiError(
+          '日期格式无效，应为 YYYY-MM-DD',
+          'VALIDATION_ERROR',
+          { expected_format: 'YYYY-MM-DD' },
+          400
+        )
+      }
     }
-  }
 
-  const report = await getAuditLogQueryService(req).generateAuditReport({
-    time_range,
-    start_date: start_date || null,
-    end_date: end_date || null,
-    operator_id: operator_id ? parseInt(operator_id) : null
+    const report = await getAuditLogQueryService(req).generateAuditReport({
+      time_range,
+      start_date: start_date || null,
+      end_date: end_date || null,
+      operator_id: operator_id ? parseInt(operator_id) : null
+    })
+
+    logger.info('管理员审计报告生成成功', {
+      admin_id: req.user.user_id,
+      time_range,
+      total_operations: report.summary?.total_operations
+    })
+
+    return res.apiSuccess(report, '审计报告生成成功')
   })
-
-  logger.info('管理员审计报告生成成功', {
-    admin_id: req.user.user_id,
-    time_range,
-    total_operations: report.summary?.total_operations
-  })
-
-  return res.apiSuccess(report, '审计报告生成成功')
-}))
+)
 
 /**
  * GET /api/v4/console/admin-audit-logs/statistics
@@ -198,30 +208,35 @@ router.get('/report', authenticateToken, requireRoleLevel(30), asyncHandler(asyn
  *
  * @returns {Object} 增强版审计日志统计信息
  */
-router.get('/statistics', authenticateToken, requireRoleLevel(30), asyncHandler(async (req, res) => {
-  const { operator_id, start_date, end_date } = req.query
+router.get(
+  '/statistics',
+  authenticateToken,
+  requireRoleLevel(30),
+  asyncHandler(async (req, res) => {
+    const { operator_id, start_date, end_date } = req.query
 
-  logger.info('管理员查询增强版审计日志统计', {
-    admin_id: req.user.user_id,
-    operator_id,
-    start_date,
-    end_date
+    logger.info('管理员查询增强版审计日志统计', {
+      admin_id: req.user.user_id,
+      operator_id,
+      start_date,
+      end_date
+    })
+
+    const statistics = await getAuditLogQueryService(req).getAuditStatisticsEnhanced({
+      operator_id: operator_id ? parseInt(operator_id) : null,
+      start_date: start_date || null,
+      end_date: end_date || null
+    })
+
+    logger.info('获取增强版审计日志统计成功', {
+      admin_id: req.user.user_id,
+      total: statistics.total,
+      today_count: statistics.today_count
+    })
+
+    return res.apiSuccess(statistics, '审计日志统计查询成功')
   })
-
-  const statistics = await getAuditLogQueryService(req).getAuditStatisticsEnhanced({
-    operator_id: operator_id ? parseInt(operator_id) : null,
-    start_date: start_date || null,
-    end_date: end_date || null
-  })
-
-  logger.info('获取增强版审计日志统计成功', {
-    admin_id: req.user.user_id,
-    total: statistics.total,
-    today_count: statistics.today_count
-  })
-
-  return res.apiSuccess(statistics, '审计日志统计查询成功')
-}))
+)
 
 /**
  * GET /api/v4/console/admin-audit-logs/statistics/summary
@@ -231,77 +246,92 @@ router.get('/statistics', authenticateToken, requireRoleLevel(30), asyncHandler(
  * @query {string} [start_date] - 统计开始日期（北京时间，格式：YYYY-MM-DD）
  * @query {string} [end_date] - 统计结束日期（北京时间，格式：YYYY-MM-DD）
  */
-router.get('/statistics/summary', authenticateToken, requireRoleLevel(30), asyncHandler(async (req, res) => {
-  const { start_date, end_date } = req.query
+router.get(
+  '/statistics/summary',
+  authenticateToken,
+  requireRoleLevel(30),
+  asyncHandler(async (req, res) => {
+    const { start_date, end_date } = req.query
 
-  logger.info('管理员查询操作审计日志基础统计', {
-    admin_id: req.user.user_id,
-    start_date,
-    end_date
+    logger.info('管理员查询操作审计日志基础统计', {
+      admin_id: req.user.user_id,
+      start_date,
+      end_date
+    })
+
+    const statistics = await getAuditLogQueryService(req).getAuditStatistics({
+      start_date: start_date || null,
+      end_date: end_date || null
+    })
+
+    logger.info('获取管理员操作审计日志基础统计成功', {
+      admin_id: req.user.user_id,
+      total_logs: statistics.total_logs || 0
+    })
+
+    return res.apiSuccess(statistics, '获取管理员操作审计日志基础统计成功')
   })
-
-  const statistics = await getAuditLogQueryService(req).getAuditStatistics({
-    start_date: start_date || null,
-    end_date: end_date || null
-  })
-
-  logger.info('获取管理员操作审计日志基础统计成功', {
-    admin_id: req.user.user_id,
-    total_logs: statistics.total_logs || 0
-  })
-
-  return res.apiSuccess(statistics, '获取管理员操作审计日志基础统计成功')
-}))
+)
 
 /**
  * GET /api/v4/console/admin-audit-logs/operation-types
  * @desc 获取所有支持的操作类型列表（枚举查询，供前端筛选器使用）
  * @access admin + ops (role_level >= 30)
  */
-router.get('/operation-types', authenticateToken, requireRoleLevel(30), asyncHandler(async (req, res) => {
-  const {
-    OPERATION_TYPES,
-    OPERATION_TYPE_DESCRIPTIONS
-  } = require('../../../../constants/AuditOperationTypes')
+router.get(
+  '/operation-types',
+  authenticateToken,
+  requireRoleLevel(30),
+  asyncHandler(async (req, res) => {
+    const {
+      OPERATION_TYPES,
+      OPERATION_TYPE_DESCRIPTIONS
+    } = require('../../../../constants/AuditOperationTypes')
 
-  const operationTypes = Object.entries(OPERATION_TYPES).map(([key, value]) => ({
-    code: value,
-    name: OPERATION_TYPE_DESCRIPTIONS[value] || value,
-    key
-  }))
+    const operationTypes = Object.entries(OPERATION_TYPES).map(([key, value]) => ({
+      code: value,
+      name: OPERATION_TYPE_DESCRIPTIONS[value] || value,
+      key
+    }))
 
-  logger.info('获取操作类型列表成功', {
-    admin_id: req.user.user_id,
-    count: operationTypes.length
+    logger.info('获取操作类型列表成功', {
+      admin_id: req.user.user_id,
+      count: operationTypes.length
+    })
+
+    return res.apiSuccess({ operation_types: operationTypes }, '获取操作类型列表成功')
   })
-
-  return res.apiSuccess({ operation_types: operationTypes }, '获取操作类型列表成功')
-}))
+)
 
 /**
  * GET /api/v4/console/admin-audit-logs/target-types
  * @desc 获取所有支持的目标类型列表（枚举查询，供前端筛选器使用）
  * @access admin + ops (role_level >= 30)
  */
-router.get('/target-types', authenticateToken, requireRoleLevel(30), asyncHandler(async (req, res) => {
-  const {
-    AUDIT_TARGET_TYPES,
-    getTargetTypeDisplayName
-  } = require('../../../../constants/AuditTargetTypes')
+router.get(
+  '/target-types',
+  authenticateToken,
+  requireRoleLevel(30),
+  asyncHandler(async (req, res) => {
+    const {
+      AUDIT_TARGET_TYPES,
+      getTargetTypeDisplayName
+    } = require('../../../../constants/AuditTargetTypes')
 
-  const targetTypes = Object.entries(AUDIT_TARGET_TYPES).map(([key, value]) => ({
-    code: value,
-    name: getTargetTypeDisplayName(value) || value,
-    key
-  }))
+    const targetTypes = Object.entries(AUDIT_TARGET_TYPES).map(([key, value]) => ({
+      code: value,
+      name: getTargetTypeDisplayName(value) || value,
+      key
+    }))
 
-  logger.info('获取目标类型列表成功', {
-    admin_id: req.user.user_id,
-    count: targetTypes.length
+    logger.info('获取目标类型列表成功', {
+      admin_id: req.user.user_id,
+      count: targetTypes.length
+    })
+
+    return res.apiSuccess({ target_types: targetTypes }, '获取目标类型列表成功')
   })
-
-  return res.apiSuccess({ target_types: targetTypes }, '获取目标类型列表成功')
-}))
+)
 
 /*
  * =================================================================
@@ -316,31 +346,36 @@ router.get('/target-types', authenticateToken, requireRoleLevel(30), asyncHandle
  *
  * @param {number} log_id - 审计日志ID（事务实体，数字ID）
  */
-router.get('/:log_id', authenticateToken, requireRoleLevel(30), asyncHandler(async (req, res) => {
-  const { log_id } = req.params
+router.get(
+  '/:log_id',
+  authenticateToken,
+  requireRoleLevel(30),
+  asyncHandler(async (req, res) => {
+    const { log_id } = req.params
 
-  if (!log_id || isNaN(parseInt(log_id))) {
-    return res.apiError('无效的审计日志ID', 'INVALID_LOG_ID', null, 400)
-  }
+    if (!log_id || isNaN(parseInt(log_id))) {
+      return res.apiError('无效的审计日志ID', 'INVALID_LOG_ID', null, 400)
+    }
 
-  logger.info('管理员查询操作审计日志详情', {
-    admin_id: req.user.user_id,
-    log_id: parseInt(log_id)
+    logger.info('管理员查询操作审计日志详情', {
+      admin_id: req.user.user_id,
+      log_id: parseInt(log_id)
+    })
+
+    const logDetail = await getAuditLogQueryService(req).getById(parseInt(log_id))
+
+    if (!logDetail) {
+      return res.apiError('审计日志不存在', 'LOG_NOT_FOUND', null, 404)
+    }
+
+    logger.info('获取管理员操作审计日志详情成功', {
+      admin_id: req.user.user_id,
+      log_id: parseInt(log_id),
+      operation_type: logDetail.operation_type
+    })
+
+    return res.apiSuccess(logDetail, '获取管理员操作审计日志详情成功')
   })
-
-  const logDetail = await getAuditLogQueryService(req).getById(parseInt(log_id))
-
-  if (!logDetail) {
-    return res.apiError('审计日志不存在', 'LOG_NOT_FOUND', null, 404)
-  }
-
-  logger.info('获取管理员操作审计日志详情成功', {
-    admin_id: req.user.user_id,
-    log_id: parseInt(log_id),
-    operation_type: logDetail.operation_type
-  })
-
-  return res.apiSuccess(logDetail, '获取管理员操作审计日志详情成功')
-}))
+)
 
 module.exports = router

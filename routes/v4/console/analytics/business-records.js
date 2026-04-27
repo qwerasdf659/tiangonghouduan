@@ -46,21 +46,26 @@ const TransactionManager = require('../../../../utils/TransactionManager')
  * @query {number} [page=1]
  * @query {number} [page_size=20]
  */
-router.get('/lottery-clear-settings', authenticateToken, requireRoleLevel(30), asyncHandler(async (req, res) => {
+router.get(
+  '/lottery-clear-settings',
+  authenticateToken,
+  requireRoleLevel(30),
+  asyncHandler(async (req, res) => {
     const BusinessRecordQueryService = req.app.locals.services.getService(
-    'console_business_record_query'
-  )
+      'console_business_record_query'
+    )
 
-  const result = await BusinessRecordQueryService.getLotteryClearSettings(req.query)
+    const result = await BusinessRecordQueryService.getLotteryClearSettings(req.query)
 
-  logger.info('查询抽奖清除设置记录成功', {
-    admin_id: req.user.user_id,
-    total: result.pagination.total,
-    page: result.pagination.page
+    logger.info('查询抽奖清除设置记录成功', {
+      admin_id: req.user.user_id,
+      total: result.pagination.total,
+      page: result.pagination.page
+    })
+
+    return res.apiSuccess(result, '获取抽奖清除设置记录成功')
   })
-
-  return res.apiSuccess(result, '获取抽奖清除设置记录成功')
-}))
+)
 
 /**
  * GET /api/v4/console/business-records/lottery-clear-settings/:record_id
@@ -72,7 +77,7 @@ router.get(
   authenticateToken,
   requireRoleLevel(30),
   asyncHandler(async (req, res) => {
-        const { record_id } = req.params
+    const { record_id } = req.params
     const logId = parseInt(record_id)
     if (isNaN(logId) || logId <= 0) {
       return res.apiError('无效的记录ID', 'BAD_REQUEST', null, 400)
@@ -109,21 +114,26 @@ router.get(
  * @query {number} [page=1] - 页码
  * @query {number} [page_size=20] - 每页数量
  */
-router.get('/redemption-orders', authenticateToken, requireRoleLevel(30), asyncHandler(async (req, res) => {
+router.get(
+  '/redemption-orders',
+  authenticateToken,
+  requireRoleLevel(30),
+  asyncHandler(async (req, res) => {
     const BusinessRecordQueryService = req.app.locals.services.getService(
-    'console_business_record_query'
-  )
+      'console_business_record_query'
+    )
 
-  const result = await BusinessRecordQueryService.getRedemptionOrders(req.query)
+    const result = await BusinessRecordQueryService.getRedemptionOrders(req.query)
 
-  logger.info('查询核销订单列表成功', {
-    admin_id: req.user.user_id,
-    total: result.pagination.total,
-    page: result.pagination.page
+    logger.info('查询核销订单列表成功', {
+      admin_id: req.user.user_id,
+      total: result.pagination.total,
+      page: result.pagination.page
+    })
+
+    return res.apiSuccess(result, '获取核销订单列表成功')
   })
-
-  return res.apiSuccess(result, '获取核销订单列表成功')
-}))
+)
 
 /**
  * GET /api/v4/console/business-records/redemption-orders/statistics
@@ -135,7 +145,7 @@ router.get(
   authenticateToken,
   requireRoleLevel(30),
   asyncHandler(async (req, res) => {
-        const BusinessRecordQueryService = req.app.locals.services.getService(
+    const BusinessRecordQueryService = req.app.locals.services.getService(
       'console_business_record_query'
     )
 
@@ -166,58 +176,58 @@ router.get(
 
     const orders = await BusinessRecordQueryService.exportRedemptionOrders(req.query)
 
-      // 生成CSV内容
-      const csvHeader =
-        'RD单号,内部订单ID,核销码,用户ID,用户昵称,用户手机,奖品类型,奖品名称,状态,创建时间,过期时间,核销时间\n'
+    // 生成CSV内容
+    const csvHeader =
+      'RD单号,内部订单ID,核销码,用户ID,用户昵称,用户手机,奖品类型,奖品名称,状态,创建时间,过期时间,核销时间\n'
 
-      const csvRows = orders
-        .map(order => {
-          const redeemer = order.redeemer || {}
-          const item = order.item || {}
+    const csvRows = orders
+      .map(order => {
+        const redeemer = order.redeemer || {}
+        const item = order.item || {}
 
-          // 状态映射
-          const statusMap = {
-            pending: '待核销',
-            fulfilled: '已核销',
-            expired: '已过期',
-            cancelled: '已取消'
-          }
+        // 状态映射
+        const statusMap = {
+          pending: '待核销',
+          fulfilled: '已核销',
+          expired: '已过期',
+          cancelled: '已取消'
+        }
 
-          return [
-            order.order_no || '-',
-            order.redemption_order_id,
-            order.code_hash ? order.code_hash.substring(0, 8) + '...' : '-',
-            redeemer.user_id || '-',
-            redeemer.nickname || '-',
-            redeemer.mobile || '-',
-            item.item_type || '-',
-            item.item_name || '-',
-            statusMap[order.status] || order.status,
-            order.created_at ? new Date(order.created_at).toLocaleString('zh-CN') : '-',
-            order.expires_at ? new Date(order.expires_at).toLocaleString('zh-CN') : '-',
-            order.fulfilled_at ? new Date(order.fulfilled_at).toLocaleString('zh-CN') : '-'
-          ]
-            .map(field => `"${String(field).replace(/"/g, '""')}"`)
-            .join(',')
-        })
-        .join('\n')
-
-      const csvContent = '\uFEFF' + csvHeader + csvRows // 添加BOM以支持Excel中文显示
-
-      logger.info('导出核销订单成功', {
-        admin_id: req.user.user_id,
-        count: orders.length,
-        status_filter: req.query.status || 'all'
+        return [
+          order.order_no || '-',
+          order.redemption_order_id,
+          order.code_hash ? order.code_hash.substring(0, 8) + '...' : '-',
+          redeemer.user_id || '-',
+          redeemer.nickname || '-',
+          redeemer.mobile || '-',
+          item.item_type || '-',
+          item.item_name || '-',
+          statusMap[order.status] || order.status,
+          order.created_at ? new Date(order.created_at).toLocaleString('zh-CN') : '-',
+          order.expires_at ? new Date(order.expires_at).toLocaleString('zh-CN') : '-',
+          order.fulfilled_at ? new Date(order.fulfilled_at).toLocaleString('zh-CN') : '-'
+        ]
+          .map(field => `"${String(field).replace(/"/g, '""')}"`)
+          .join(',')
       })
+      .join('\n')
 
-      // 设置响应头
-      res.setHeader('Content-Type', 'text/csv; charset=utf-8')
-      res.setHeader(
-        'Content-Disposition',
-        `attachment; filename="redemption_orders_${new Date().toISOString().slice(0, 10)}.csv"`
-      )
+    const csvContent = '\uFEFF' + csvHeader + csvRows // 添加BOM以支持Excel中文显示
 
-      return res.send(csvContent)
+    logger.info('导出核销订单成功', {
+      admin_id: req.user.user_id,
+      count: orders.length,
+      status_filter: req.query.status || 'all'
+    })
+
+    // 设置响应头
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="redemption_orders_${new Date().toISOString().slice(0, 10)}.csv"`
+    )
+
+    return res.send(csvContent)
   })
 )
 
@@ -231,7 +241,7 @@ router.get(
   authenticateToken,
   requireRoleLevel(30),
   asyncHandler(async (req, res) => {
-        const { order_id } = req.params
+    const { order_id } = req.params
     const BusinessRecordQueryService = req.app.locals.services.getService(
       'console_business_record_query'
     )
@@ -259,7 +269,7 @@ router.post(
   authenticateToken,
   requireRoleLevel(30),
   asyncHandler(async (req, res) => {
-        const { order_id } = req.params
+    const { order_id } = req.params
     const { store_id, remark } = req.body
     const adminUserId = req.user.user_id
 
@@ -309,7 +319,7 @@ router.post(
   authenticateToken,
   requireRoleLevel(30),
   asyncHandler(async (req, res) => {
-        const { order_id } = req.params
+    const { order_id } = req.params
     const { reason } = req.body
     const adminUserId = req.user.user_id
 
@@ -358,7 +368,7 @@ router.post(
   authenticateToken,
   requireRoleLevel(30),
   asyncHandler(async (req, res) => {
-        const { order_ids, store_id, remark } = req.body
+    const { order_ids, store_id, remark } = req.body
     const adminUserId = req.user.user_id
 
     if (!order_ids || !Array.isArray(order_ids) || order_ids.length === 0) {
@@ -413,7 +423,7 @@ router.post(
   authenticateToken,
   requireRoleLevel(30),
   asyncHandler(async (req, res) => {
-        const { order_ids } = req.body
+    const { order_ids } = req.body
     const adminUserId = req.user.user_id
 
     if (!order_ids || !Array.isArray(order_ids) || order_ids.length === 0) {
@@ -465,7 +475,7 @@ router.post(
   authenticateToken,
   requireRoleLevel(30),
   asyncHandler(async (req, res) => {
-        const { order_ids, reason } = req.body
+    const { order_ids, reason } = req.body
     const adminUserId = req.user.user_id
 
     if (!order_ids || !Array.isArray(order_ids) || order_ids.length === 0) {
@@ -527,21 +537,26 @@ router.post(
  * @query {number} [page=1] - 页码
  * @query {number} [page_size=20] - 每页数量
  */
-router.get('/content-reviews', authenticateToken, requireRoleLevel(30), asyncHandler(async (req, res) => {
+router.get(
+  '/content-reviews',
+  authenticateToken,
+  requireRoleLevel(30),
+  asyncHandler(async (req, res) => {
     const BusinessRecordQueryService = req.app.locals.services.getService(
-    'console_business_record_query'
-  )
+      'console_business_record_query'
+    )
 
-  const result = await BusinessRecordQueryService.getContentReviews(req.query)
+    const result = await BusinessRecordQueryService.getContentReviews(req.query)
 
-  logger.info('查询内容审核记录成功', {
-    admin_id: req.user.user_id,
-    total: result.pagination.total,
-    page: result.pagination.page
+    logger.info('查询内容审核记录成功', {
+      admin_id: req.user.user_id,
+      total: result.pagination.total,
+      page: result.pagination.page
+    })
+
+    return res.apiSuccess(result, '获取内容审核记录列表成功')
   })
-
-  return res.apiSuccess(result, '获取内容审核记录列表成功')
-}))
+)
 
 /**
  * GET /api/v4/console/business-records/content-reviews/:audit_id
@@ -553,7 +568,7 @@ router.get(
   authenticateToken,
   requireRoleLevel(30),
   asyncHandler(async (req, res) => {
-        const { audit_id } = req.params
+    const { audit_id } = req.params
     const BusinessRecordQueryService = req.app.locals.services.getService(
       'console_business_record_query'
     )
@@ -588,21 +603,26 @@ router.get(
  * @query {number} [page=1] - 页码
  * @query {number} [page_size=20] - 每页数量
  */
-router.get('/user-role-changes', authenticateToken, requireRoleLevel(30), asyncHandler(async (req, res) => {
+router.get(
+  '/user-role-changes',
+  authenticateToken,
+  requireRoleLevel(30),
+  asyncHandler(async (req, res) => {
     const BusinessRecordQueryService = req.app.locals.services.getService(
-    'console_business_record_query'
-  )
+      'console_business_record_query'
+    )
 
-  const result = await BusinessRecordQueryService.getUserRoleChanges(req.query)
+    const result = await BusinessRecordQueryService.getUserRoleChanges(req.query)
 
-  logger.info('查询用户角色变更记录成功', {
-    admin_id: req.user.user_id,
-    total: result.pagination.total,
-    page: result.pagination.page
+    logger.info('查询用户角色变更记录成功', {
+      admin_id: req.user.user_id,
+      total: result.pagination.total,
+      page: result.pagination.page
+    })
+
+    return res.apiSuccess(result, '获取用户角色变更记录列表成功')
   })
-
-  return res.apiSuccess(result, '获取用户角色变更记录列表成功')
-}))
+)
 
 /**
  * GET /api/v4/console/business-records/user-role-changes/:record_id
@@ -614,7 +634,7 @@ router.get(
   authenticateToken,
   requireRoleLevel(30),
   asyncHandler(async (req, res) => {
-        const { record_id } = req.params
+    const { record_id } = req.params
     const BusinessRecordQueryService = req.app.locals.services.getService(
       'console_business_record_query'
     )
@@ -649,21 +669,26 @@ router.get(
  * @query {number} [page=1] - 页码
  * @query {number} [page_size=20] - 每页数量
  */
-router.get('/user-status-changes', authenticateToken, requireRoleLevel(30), asyncHandler(async (req, res) => {
+router.get(
+  '/user-status-changes',
+  authenticateToken,
+  requireRoleLevel(30),
+  asyncHandler(async (req, res) => {
     const BusinessRecordQueryService = req.app.locals.services.getService(
-    'console_business_record_query'
-  )
+      'console_business_record_query'
+    )
 
-  const result = await BusinessRecordQueryService.getUserStatusChanges(req.query)
+    const result = await BusinessRecordQueryService.getUserStatusChanges(req.query)
 
-  logger.info('查询用户状态变更记录成功', {
-    admin_id: req.user.user_id,
-    total: result.pagination.total,
-    page: result.pagination.page
+    logger.info('查询用户状态变更记录成功', {
+      admin_id: req.user.user_id,
+      total: result.pagination.total,
+      page: result.pagination.page
+    })
+
+    return res.apiSuccess(result, '获取用户状态变更记录列表成功')
   })
-
-  return res.apiSuccess(result, '获取用户状态变更记录列表成功')
-}))
+)
 
 /**
  * GET /api/v4/console/business-records/user-status-changes/:record_id
@@ -675,7 +700,7 @@ router.get(
   authenticateToken,
   requireRoleLevel(30),
   asyncHandler(async (req, res) => {
-        const { record_id } = req.params
+    const { record_id } = req.params
     const BusinessRecordQueryService = req.app.locals.services.getService(
       'console_business_record_query'
     )
@@ -710,21 +735,26 @@ router.get(
  * @query {number} [page=1] - 页码
  * @query {number} [page_size=20] - 每页数量
  */
-router.get('/exchange-records', authenticateToken, requireRoleLevel(30), asyncHandler(async (req, res) => {
+router.get(
+  '/exchange-records',
+  authenticateToken,
+  requireRoleLevel(30),
+  asyncHandler(async (req, res) => {
     const BusinessRecordQueryService = req.app.locals.services.getService(
-    'console_business_record_query'
-  )
+      'console_business_record_query'
+    )
 
-  const result = await BusinessRecordQueryService.getExchangeRecords(req.query)
+    const result = await BusinessRecordQueryService.getExchangeRecords(req.query)
 
-  logger.info('查询B2C兑换记录成功', {
-    admin_id: req.user.user_id,
-    total: result.pagination.total,
-    page: result.pagination.page
+    logger.info('查询B2C兑换记录成功', {
+      admin_id: req.user.user_id,
+      total: result.pagination.total,
+      page: result.pagination.page
+    })
+
+    return res.apiSuccess(result, '获取B2C兑换记录列表成功')
   })
-
-  return res.apiSuccess(result, '获取B2C兑换记录列表成功')
-}))
+)
 
 /**
  * GET /api/v4/console/business-records/exchange-records/:record_id
@@ -736,7 +766,7 @@ router.get(
   authenticateToken,
   requireRoleLevel(30),
   asyncHandler(async (req, res) => {
-        const { record_id } = req.params
+    const { record_id } = req.params
     const BusinessRecordQueryService = req.app.locals.services.getService(
       'console_business_record_query'
     )
@@ -774,21 +804,26 @@ router.get(
  * @query {number} [page=1] - 页码
  * @query {number} [page_size=20] - 每页数量
  */
-router.get('/chat-messages', authenticateToken, requireRoleLevel(30), asyncHandler(async (req, res) => {
+router.get(
+  '/chat-messages',
+  authenticateToken,
+  requireRoleLevel(30),
+  asyncHandler(async (req, res) => {
     const BusinessRecordQueryService = req.app.locals.services.getService(
-    'console_business_record_query'
-  )
+      'console_business_record_query'
+    )
 
-  const result = await BusinessRecordQueryService.getChatMessages(req.query)
+    const result = await BusinessRecordQueryService.getChatMessages(req.query)
 
-  logger.info('查询聊天消息记录成功', {
-    admin_id: req.user.user_id,
-    total: result.pagination.total,
-    page: result.pagination.page
+    logger.info('查询聊天消息记录成功', {
+      admin_id: req.user.user_id,
+      total: result.pagination.total,
+      page: result.pagination.page
+    })
+
+    return res.apiSuccess(result, '获取聊天消息列表成功')
   })
-
-  return res.apiSuccess(result, '获取聊天消息列表成功')
-}))
+)
 
 /**
  * GET /api/v4/console/business-records/chat-messages/:message_id
@@ -800,7 +835,7 @@ router.get(
   authenticateToken,
   requireRoleLevel(30),
   asyncHandler(async (req, res) => {
-        const { message_id } = req.params
+    const { message_id } = req.params
     const BusinessRecordQueryService = req.app.locals.services.getService(
       'console_business_record_query'
     )
@@ -828,7 +863,7 @@ router.get(
   authenticateToken,
   requireRoleLevel(30),
   asyncHandler(async (req, res) => {
-        const BusinessRecordQueryService = req.app.locals.services.getService(
+    const BusinessRecordQueryService = req.app.locals.services.getService(
       'console_business_record_query'
     )
 

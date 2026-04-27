@@ -201,23 +201,26 @@ function validateExchangePageConfig(config) {
  * @desc 获取当前兑换页面配置（管理后台用）
  * @access Admin（requireRoleLevel(100)）
  */
-router.get('/', asyncHandler(async (req, res) => {
-  const AdminSystemService = req.app.locals.services.getService('admin_system')
-  const configData = await AdminSystemService.getConfigValue('exchange_page')
+router.get(
+  '/',
+  asyncHandler(async (req, res) => {
+    const AdminSystemService = req.app.locals.services.getService('admin_system')
+    const configData = await AdminSystemService.getConfigValue('exchange_page')
 
-  if (!configData) {
+    if (!configData) {
+      return res.apiSuccess(
+        { tabs: [], spaces: [], shop_filters: {}, market_filters: {}, card_display: {}, ui: {} },
+        '配置为空（尚未配置兑换页面）'
+      )
+    }
+
     return res.apiSuccess(
-      { tabs: [], spaces: [], shop_filters: {}, market_filters: {}, card_display: {}, ui: {} },
-      '配置为空（尚未配置兑换页面）'
+      { ...configData, version: Date.now().toString() },
+      '获取兑换页面配置成功',
+      'EXCHANGE_PAGE_CONFIG_GET_SUCCESS'
     )
-  }
-
-  return res.apiSuccess(
-    { ...configData, version: Date.now().toString() },
-    '获取兑换页面配置成功',
-    'EXCHANGE_PAGE_CONFIG_GET_SUCCESS'
-  )
-}))
+  })
+)
 
 /**
  * @route PUT /api/v4/console/system/exchange-page-config
@@ -231,53 +234,56 @@ router.get('/', asyncHandler(async (req, res) => {
  * @body {Object} card_display - 卡片主题配置（两个 Tab 共用）
  * @body {Object} ui - 运营参数配置
  */
-router.put('/', asyncHandler(async (req, res) => {
-  const configValue = req.body
+router.put(
+  '/',
+  asyncHandler(async (req, res) => {
+    const configValue = req.body
 
-  const validation = validateExchangePageConfig(configValue)
-  if (!validation.valid) {
-    return res.apiError(
-      '兑换页面配置数据校验失败',
-      'INVALID_EXCHANGE_PAGE_CONFIG',
-      { errors: validation.errors },
-      400
-    )
-  }
+    const validation = validateExchangePageConfig(configValue)
+    if (!validation.valid) {
+      return res.apiError(
+        '兑换页面配置数据校验失败',
+        'INVALID_EXCHANGE_PAGE_CONFIG',
+        { errors: validation.errors },
+        400
+      )
+    }
 
-  const AdminSystemService = req.app.locals.services.getService('admin_system')
+    const AdminSystemService = req.app.locals.services.getService('admin_system')
 
-  await AdminSystemService.upsertConfig('exchange_page', configValue, {
-    description: '兑换页面配置 — Tab/空间/筛选/卡片主题/运营参数的统一下发配置',
-    category: 'feature'
-  })
-
-  // 记录审计日志
-  try {
-    const AuditLogService = req.app.locals.services.getService('audit_log')
-    await AuditLogService.logOperation({
-      operator_id: req.user.user_id,
-      operation_type: 'config_update',
-      target_type: 'system_config',
-      target_id: 'exchange_page',
-      description: `更新兑换页面配置（${configValue.tabs?.length || 0} 个Tab、${configValue.spaces?.length || 0} 个空间、主题 ${configValue.card_display?.theme || '-'}）`,
-      details: configValue
+    await AdminSystemService.upsertConfig('exchange_page', configValue, {
+      description: '兑换页面配置 — Tab/空间/筛选/卡片主题/运营参数的统一下发配置',
+      category: 'feature'
     })
-  } catch (auditError) {
-    logger.warn('记录审计日志失败（非致命）', { error: auditError.message })
-  }
 
-  logger.info('兑换页面配置更新成功', {
-    operator_id: req.user.user_id,
-    tab_count: configValue.tabs?.length,
-    space_count: configValue.spaces?.length,
-    theme: configValue.card_display?.theme
+    // 记录审计日志
+    try {
+      const AuditLogService = req.app.locals.services.getService('audit_log')
+      await AuditLogService.logOperation({
+        operator_id: req.user.user_id,
+        operation_type: 'config_update',
+        target_type: 'system_config',
+        target_id: 'exchange_page',
+        description: `更新兑换页面配置（${configValue.tabs?.length || 0} 个Tab、${configValue.spaces?.length || 0} 个空间、主题 ${configValue.card_display?.theme || '-'}）`,
+        details: configValue
+      })
+    } catch (auditError) {
+      logger.warn('记录审计日志失败（非致命）', { error: auditError.message })
+    }
+
+    logger.info('兑换页面配置更新成功', {
+      operator_id: req.user.user_id,
+      tab_count: configValue.tabs?.length,
+      space_count: configValue.spaces?.length,
+      theme: configValue.card_display?.theme
+    })
+
+    return res.apiSuccess(
+      configValue,
+      '兑换页面配置更新成功（小程序下次打开页面自动生效）',
+      'EXCHANGE_PAGE_CONFIG_UPDATE_SUCCESS'
+    )
   })
-
-  return res.apiSuccess(
-    configValue,
-    '兑换页面配置更新成功（小程序下次打开页面自动生效）',
-    'EXCHANGE_PAGE_CONFIG_UPDATE_SUCCESS'
-  )
-}))
+)
 
 module.exports = router

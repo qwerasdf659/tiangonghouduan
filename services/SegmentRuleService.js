@@ -292,7 +292,11 @@ class SegmentRuleService {
     // 检查是否有兜底规则（conditions 为空或不存在的规则）
     const hasFallback = rules.some(r => !r.conditions || r.conditions.length === 0)
     if (!hasFallback) {
-      throw new BusinessError('规则必须包含一个兜底规则（conditions 为空）', 'SEGMENT_REQUIRED', 400)
+      throw new BusinessError(
+        '规则必须包含一个兜底规则（conditions 为空）',
+        'SEGMENT_REQUIRED',
+        400
+      )
     }
 
     for (const rule of rules) {
@@ -317,7 +321,11 @@ class SegmentRuleService {
           }
           const fieldDef = SEGMENT_FIELD_REGISTRY.fields[cond.field]
           if (!fieldDef.operators.includes(cond.operator)) {
-            throw new BusinessError(`字段 ${cond.field} 不支持运算符 ${cond.operator}`, 'SEGMENT_NOT_ALLOWED', 400)
+            throw new BusinessError(
+              `字段 ${cond.field} 不支持运算符 ${cond.operator}`,
+              'SEGMENT_NOT_ALLOWED',
+              400
+            )
           }
         }
       }

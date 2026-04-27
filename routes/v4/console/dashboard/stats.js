@@ -20,16 +20,20 @@ const logger = require('../../../../utils/logger').logger
  *
  * @query {number} [days=7] - 统计周期天数
  */
-router.get('/', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const { days = 7 } = req.query
-  const safeDays = parseInt(days) || 7
-  const admin_id = req.user.user_id
+router.get(
+  '/',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const { days = 7 } = req.query
+    const safeDays = parseInt(days) || 7
+    const admin_id = req.user.user_id
 
-  logger.info('[Dashboard-统计] 查询跨域顶线数据', { admin_id, days: safeDays })
+    logger.info('[Dashboard-统计] 查询跨域顶线数据', { admin_id, days: safeDays })
 
-  const ExchangeAdminService = req.app.locals.services.getService('exchange_admin')
-  const BidQueryService = req.app.locals.services.getService('exchange_bid_query')
-  const MarketAnalyticsService = req.app.locals.services.getService('market_analytics')
+    const ExchangeAdminService = req.app.locals.services.getService('exchange_admin')
+    const BidQueryService = req.app.locals.services.getService('exchange_bid_query')
+    const MarketAnalyticsService = req.app.locals.services.getService('market_analytics')
 
     const [exchange, marketplace, bids] = await Promise.all([
       ExchangeAdminService.getExchangeTopline(safeDays),
@@ -45,14 +49,15 @@ router.get('/', authenticateToken, requireRoleLevel(100), asyncHandler(async (re
     })
 
     return res.apiSuccess(
-    {
-      period_days: safeDays,
-      exchange,
-      marketplace,
-      bids
-    },
-    '跨域平台概览查询成功'
-  )
-}))
+      {
+        period_days: safeDays,
+        exchange,
+        marketplace,
+        bids
+      },
+      '跨域平台概览查询成功'
+    )
+  })
+)
 
 module.exports = router

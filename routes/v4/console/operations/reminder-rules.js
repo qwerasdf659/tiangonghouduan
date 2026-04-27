@@ -37,42 +37,52 @@ const { asyncHandler } = require('../../../../middleware/validation')
  * - page: 页码（默认1）
  * - page_size: 每页数量（默认20）
  */
-router.get('/', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const reminderService = req.app.locals.services.getService('reminder_engine')
-  const { rule_type, is_enabled, is_system, page, page_size } = req.query
+router.get(
+  '/',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const reminderService = req.app.locals.services.getService('reminder_engine')
+    const { rule_type, is_enabled, is_system, page, page_size } = req.query
 
-  const result = await reminderService.getRuleList({
-    rule_type,
-    is_enabled: is_enabled === 'true' ? true : is_enabled === 'false' ? false : undefined,
-    is_system: is_system === 'true' ? true : is_system === 'false' ? false : undefined,
-    page: parseInt(page, 10) || 1,
-    page_size: parseInt(page_size, 10) || 20
+    const result = await reminderService.getRuleList({
+      rule_type,
+      is_enabled: is_enabled === 'true' ? true : is_enabled === 'false' ? false : undefined,
+      is_system: is_system === 'true' ? true : is_system === 'false' ? false : undefined,
+      page: parseInt(page, 10) || 1,
+      page_size: parseInt(page_size, 10) || 20
+    })
+
+    return res.apiSuccess(result, '获取提醒规则列表成功')
   })
-
-  return res.apiSuccess(result, '获取提醒规则列表成功')
-}))
+)
 
 /**
  * GET /api/v4/console/reminder-rules/:id
  *
  * 获取单个提醒规则详情
  */
-router.get('/:id', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const reminderService = req.app.locals.services.getService('reminder_engine')
-  const ruleId = parseInt(req.params.id, 10)
+router.get(
+  '/:id',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const reminderService = req.app.locals.services.getService('reminder_engine')
+    const ruleId = parseInt(req.params.id, 10)
 
-  if (!ruleId || isNaN(ruleId)) {
-    return res.apiError('无效的规则ID', 'INVALID_RULE_ID', null, 400)
-  }
+    if (!ruleId || isNaN(ruleId)) {
+      return res.apiError('无效的规则ID', 'INVALID_RULE_ID', null, 400)
+    }
 
-  const rule = await reminderService.getRuleDetail(ruleId)
+    const rule = await reminderService.getRuleDetail(ruleId)
 
-  if (!rule) {
-    return res.apiError('提醒规则不存在', 'RULE_NOT_FOUND', null, 404)
-  }
+    if (!rule) {
+      return res.apiError('提醒规则不存在', 'RULE_NOT_FOUND', null, 404)
+    }
 
-  return res.apiSuccess(rule, '获取提醒规则详情成功')
-}))
+    return res.apiSuccess(rule, '获取提醒规则详情成功')
+  })
+)
 
 /**
  * POST /api/v4/console/reminder-rules
@@ -89,183 +99,213 @@ router.get('/:id', authenticateToken, requireRoleLevel(100), asyncHandler(async 
  * - check_interval: 检查间隔（分钟）
  * - priority: 优先级（1-100）
  */
-router.post('/', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const reminderService = req.app.locals.services.getService('reminder_engine')
-  const {
-    name,
-    rule_type,
-    description,
-    trigger_conditions,
-    action_config,
-    notification_template,
-    check_interval,
-    priority
-  } = req.body
+router.post(
+  '/',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const reminderService = req.app.locals.services.getService('reminder_engine')
+    const {
+      name,
+      rule_type,
+      description,
+      trigger_conditions,
+      action_config,
+      notification_template,
+      check_interval,
+      priority
+    } = req.body
 
-  // 参数验证
-  if (!name || !rule_type) {
-    return res.apiError('规则名称和类型不能为空', 'MISSING_REQUIRED_FIELDS', null, 400)
-  }
+    // 参数验证
+    if (!name || !rule_type) {
+      return res.apiError('规则名称和类型不能为空', 'MISSING_REQUIRED_FIELDS', null, 400)
+    }
 
-  const rule = await reminderService.createRule({
-    name,
-    rule_type,
-    description,
-    trigger_conditions,
-    action_config,
-    notification_template,
-    check_interval: check_interval || 60,
-    priority: priority || 50,
-    created_by: req.user.user_id
+    const rule = await reminderService.createRule({
+      name,
+      rule_type,
+      description,
+      trigger_conditions,
+      action_config,
+      notification_template,
+      check_interval: check_interval || 60,
+      priority: priority || 50,
+      created_by: req.user.user_id
+    })
+
+    logger.info('[提醒规则] 创建成功', {
+      reminder_rule_id: rule.reminder_rule_id,
+      name,
+      created_by: req.user.user_id
+    })
+
+    return res.apiSuccess(rule, '创建提醒规则成功', 201)
   })
-
-  logger.info('[提醒规则] 创建成功', {
-    reminder_rule_id: rule.reminder_rule_id,
-    name,
-    created_by: req.user.user_id
-  })
-
-  return res.apiSuccess(rule, '创建提醒规则成功', 201)
-}))
+)
 
 /**
  * PUT /api/v4/console/reminder-rules/:id
  *
  * 更新提醒规则
  */
-router.put('/:id', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const reminderService = req.app.locals.services.getService('reminder_engine')
-  const ruleId = parseInt(req.params.id, 10)
+router.put(
+  '/:id',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const reminderService = req.app.locals.services.getService('reminder_engine')
+    const ruleId = parseInt(req.params.id, 10)
 
-  if (!ruleId || isNaN(ruleId)) {
-    return res.apiError('无效的规则ID', 'INVALID_RULE_ID', null, 400)
-  }
+    if (!ruleId || isNaN(ruleId)) {
+      return res.apiError('无效的规则ID', 'INVALID_RULE_ID', null, 400)
+    }
 
-  const updateData = req.body
-  const rule = await reminderService.updateRule(ruleId, updateData)
+    const updateData = req.body
+    const rule = await reminderService.updateRule(ruleId, updateData)
 
-  logger.info('[提醒规则] 更新成功', {
-    reminder_rule_id: ruleId,
-    updated_by: req.user.user_id
+    logger.info('[提醒规则] 更新成功', {
+      reminder_rule_id: ruleId,
+      updated_by: req.user.user_id
+    })
+
+    return res.apiSuccess(rule, '更新提醒规则成功')
   })
-
-  return res.apiSuccess(rule, '更新提醒规则成功')
-}))
+)
 
 /**
  * DELETE /api/v4/console/reminder-rules/:id
  *
  * 删除提醒规则（系统规则不可删除）
  */
-router.delete('/:id', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const reminderService = req.app.locals.services.getService('reminder_engine')
-  const ruleId = parseInt(req.params.id, 10)
+router.delete(
+  '/:id',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const reminderService = req.app.locals.services.getService('reminder_engine')
+    const ruleId = parseInt(req.params.id, 10)
 
-  if (!ruleId || isNaN(ruleId)) {
-    return res.apiError('无效的规则ID', 'INVALID_RULE_ID', null, 400)
-  }
+    if (!ruleId || isNaN(ruleId)) {
+      return res.apiError('无效的规则ID', 'INVALID_RULE_ID', null, 400)
+    }
 
-  await reminderService.deleteRule(ruleId)
+    await reminderService.deleteRule(ruleId)
 
-  logger.info('[提醒规则] 删除成功', {
-    reminder_rule_id: ruleId,
-    deleted_by: req.user.user_id
+    logger.info('[提醒规则] 删除成功', {
+      reminder_rule_id: ruleId,
+      deleted_by: req.user.user_id
+    })
+
+    return res.apiSuccess(null, '删除提醒规则成功')
   })
-
-  return res.apiSuccess(null, '删除提醒规则成功')
-}))
+)
 
 /**
  * PUT /api/v4/console/reminder-rules/:id/toggle
  *
  * 启用/禁用提醒规则
  */
-router.put('/:id/toggle', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const reminderService = req.app.locals.services.getService('reminder_engine')
-  const ruleId = parseInt(req.params.id, 10)
-  const { is_enabled } = req.body
+router.put(
+  '/:id/toggle',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const reminderService = req.app.locals.services.getService('reminder_engine')
+    const ruleId = parseInt(req.params.id, 10)
+    const { is_enabled } = req.body
 
-  if (!ruleId || isNaN(ruleId)) {
-    return res.apiError('无效的规则ID', 'INVALID_RULE_ID', null, 400)
-  }
+    if (!ruleId || isNaN(ruleId)) {
+      return res.apiError('无效的规则ID', 'INVALID_RULE_ID', null, 400)
+    }
 
-  if (typeof is_enabled !== 'boolean') {
-    return res.apiError('is_enabled 必须是布尔值', 'INVALID_ENABLED_VALUE', null, 400)
-  }
+    if (typeof is_enabled !== 'boolean') {
+      return res.apiError('is_enabled 必须是布尔值', 'INVALID_ENABLED_VALUE', null, 400)
+    }
 
-  const rule = await reminderService.updateRule(ruleId, { is_enabled })
+    const rule = await reminderService.updateRule(ruleId, { is_enabled })
 
-  logger.info('[提醒规则] 切换状态', {
-    reminder_rule_id: ruleId,
-    is_enabled,
-    updated_by: req.user.user_id
+    logger.info('[提醒规则] 切换状态', {
+      reminder_rule_id: ruleId,
+      is_enabled,
+      updated_by: req.user.user_id
+    })
+
+    return res.apiSuccess(rule, `规则已${is_enabled ? '启用' : '禁用'}`)
   })
-
-  return res.apiSuccess(rule, `规则已${is_enabled ? '启用' : '禁用'}`)
-}))
+)
 
 /**
  * POST /api/v4/console/reminder-rules/:id/test
  *
  * 测试提醒规则（检查规则是否会触发）
  */
-router.post('/:id/test', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const reminderService = req.app.locals.services.getService('reminder_engine')
-  const ruleId = parseInt(req.params.id, 10)
+router.post(
+  '/:id/test',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const reminderService = req.app.locals.services.getService('reminder_engine')
+    const ruleId = parseInt(req.params.id, 10)
 
-  if (!ruleId || isNaN(ruleId)) {
-    return res.apiError('无效的规则ID', 'INVALID_RULE_ID', null, 400)
-  }
+    if (!ruleId || isNaN(ruleId)) {
+      return res.apiError('无效的规则ID', 'INVALID_RULE_ID', null, 400)
+    }
 
-  const rule = await reminderService.getRuleDetail(ruleId)
-  if (!rule) {
-    return res.apiError('提醒规则不存在', 'RULE_NOT_FOUND', null, 404)
-  }
+    const rule = await reminderService.getRuleDetail(ruleId)
+    if (!rule) {
+      return res.apiError('提醒规则不存在', 'RULE_NOT_FOUND', null, 404)
+    }
 
-  // 执行规则检查（不实际发送通知）
-  const checkResult = await reminderService.checkRule(rule)
+    // 执行规则检查（不实际发送通知）
+    const checkResult = await reminderService.checkRule(rule)
 
-  return res.apiSuccess(
-    {
-      reminder_rule_id: ruleId,
-      rule_name: rule.name,
-      would_trigger: checkResult.triggered,
-      matched_users: checkResult.users?.length || 0,
-      matched_data: checkResult.data
-    },
-    '规则测试完成'
-  )
-}))
+    return res.apiSuccess(
+      {
+        reminder_rule_id: ruleId,
+        rule_name: rule.name,
+        would_trigger: checkResult.triggered,
+        matched_users: checkResult.users?.length || 0,
+        matched_data: checkResult.data
+      },
+      '规则测试完成'
+    )
+  })
+)
 
 /**
  * POST /api/v4/console/reminder-rules/:id/execute
  *
  * 手动执行提醒规则（立即检查并发送通知）
  */
-router.post('/:id/execute', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const reminderService = req.app.locals.services.getService('reminder_engine')
-  const ruleId = parseInt(req.params.id, 10)
+router.post(
+  '/:id/execute',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const reminderService = req.app.locals.services.getService('reminder_engine')
+    const ruleId = parseInt(req.params.id, 10)
 
-  if (!ruleId || isNaN(ruleId)) {
-    return res.apiError('无效的规则ID', 'INVALID_RULE_ID', null, 400)
-  }
+    if (!ruleId || isNaN(ruleId)) {
+      return res.apiError('无效的规则ID', 'INVALID_RULE_ID', null, 400)
+    }
 
-  const rule = await reminderService.getRuleDetail(ruleId)
-  if (!rule) {
-    return res.apiError('提醒规则不存在', 'RULE_NOT_FOUND', null, 404)
-  }
+    const rule = await reminderService.getRuleDetail(ruleId)
+    if (!rule) {
+      return res.apiError('提醒规则不存在', 'RULE_NOT_FOUND', null, 404)
+    }
 
-  // 执行规则
-  const result = await reminderService.executeRule(rule)
+    // 执行规则
+    const result = await reminderService.executeRule(rule)
 
-  logger.info('[提醒规则] 手动执行完成', {
-    reminder_rule_id: ruleId,
-    triggered: result.triggered,
-    executed_by: req.user.user_id
+    logger.info('[提醒规则] 手动执行完成', {
+      reminder_rule_id: ruleId,
+      triggered: result.triggered,
+      executed_by: req.user.user_id
+    })
+
+    return res.apiSuccess(result, '规则执行完成')
   })
-
-  return res.apiSuccess(result, '规则执行完成')
-}))
+)
 
 // ==================== 提醒历史接口 (B-35) ====================
 
@@ -284,21 +324,26 @@ router.post('/:id/execute', authenticateToken, requireRoleLevel(100), asyncHandl
  *
  * @description 任务编号 B-35：提醒历史接口
  */
-router.get('/history', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const reminderService = req.app.locals.services.getService('reminder_engine')
-  const { rule_id, status, start_date, end_date, page, page_size } = req.query
+router.get(
+  '/history',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const reminderService = req.app.locals.services.getService('reminder_engine')
+    const { rule_id, status, start_date, end_date, page, page_size } = req.query
 
-  const result = await reminderService.getReminderHistory({
-    rule_id: rule_id ? parseInt(rule_id, 10) : undefined,
-    status,
-    start_date,
-    end_date,
-    page: parseInt(page, 10) || 1,
-    page_size: parseInt(page_size, 10) || 20
+    const result = await reminderService.getReminderHistory({
+      rule_id: rule_id ? parseInt(rule_id, 10) : undefined,
+      status,
+      start_date,
+      end_date,
+      page: parseInt(page, 10) || 1,
+      page_size: parseInt(page_size, 10) || 20
+    })
+
+    return res.apiSuccess(result, '获取提醒历史成功')
   })
-
-  return res.apiSuccess(result, '获取提醒历史成功')
-}))
+)
 
 /**
  * GET /api/v4/console/reminder-rules/history/stats
@@ -312,32 +357,37 @@ router.get('/history', authenticateToken, requireRoleLevel(100), asyncHandler(as
  *
  * @description 提供提醒发送成功率、各规则触发次数等统计
  */
-router.get('/history/stats', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const reminderService = req.app.locals.services.getService('reminder_engine')
-  const { rule_id, start_date, end_date } = req.query
+router.get(
+  '/history/stats',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const reminderService = req.app.locals.services.getService('reminder_engine')
+    const { rule_id, start_date, end_date } = req.query
 
-  const result = await reminderService.getReminderHistory({
-    rule_id: rule_id ? parseInt(rule_id, 10) : undefined,
-    start_date,
-    end_date,
-    include_stats: true,
-    page: 1,
-    page_size: 1 // 只需要统计数据
+    const result = await reminderService.getReminderHistory({
+      rule_id: rule_id ? parseInt(rule_id, 10) : undefined,
+      start_date,
+      end_date,
+      include_stats: true,
+      page: 1,
+      page_size: 1 // 只需要统计数据
+    })
+
+    return res.apiSuccess(
+      {
+        total: result.stats?.total || 0,
+        by_status: result.stats?.by_status || {},
+        by_rule: result.stats?.by_rule || [],
+        success_rate:
+          result.stats?.total > 0
+            ? Math.round(((result.stats?.by_status?.sent || 0) / result.stats.total) * 100)
+            : 0
+      },
+      '获取提醒统计成功'
+    )
   })
-
-  return res.apiSuccess(
-    {
-      total: result.stats?.total || 0,
-      by_status: result.stats?.by_status || {},
-      by_rule: result.stats?.by_rule || [],
-      success_rate:
-        result.stats?.total > 0
-          ? Math.round(((result.stats?.by_status?.sent || 0) / result.stats.total) * 100)
-          : 0
-    },
-    '获取提醒统计成功'
-  )
-}))
+)
 
 /**
  * GET /api/v4/console/reminder-rules/history/:id
@@ -346,24 +396,29 @@ router.get('/history/stats', authenticateToken, requireRoleLevel(100), asyncHand
  *
  * @param {number} id - 历史记录ID
  */
-router.get('/history/:id', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  // 通过 ServiceManager 获取查询服务（Phase 3 收口）
-  const BusinessRecordQueryService = req.app.locals.services.getService(
-    'console_business_record_query'
-  )
-  const historyId = parseInt(req.params.id, 10)
+router.get(
+  '/history/:id',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    // 通过 ServiceManager 获取查询服务（Phase 3 收口）
+    const BusinessRecordQueryService = req.app.locals.services.getService(
+      'console_business_record_query'
+    )
+    const historyId = parseInt(req.params.id, 10)
 
-  if (!historyId || isNaN(historyId)) {
-    return res.apiError('无效的历史记录ID', 'INVALID_HISTORY_ID', null, 400)
-  }
+    if (!historyId || isNaN(historyId)) {
+      return res.apiError('无效的历史记录ID', 'INVALID_HISTORY_ID', null, 400)
+    }
 
-  const history = await BusinessRecordQueryService.getReminderHistoryById(historyId)
+    const history = await BusinessRecordQueryService.getReminderHistoryById(historyId)
 
-  if (!history) {
-    return res.apiError('提醒历史记录不存在', 'HISTORY_NOT_FOUND', null, 404)
-  }
+    if (!history) {
+      return res.apiError('提醒历史记录不存在', 'HISTORY_NOT_FOUND', null, 404)
+    }
 
-  return res.apiSuccess(history, '获取提醒历史详情成功')
-}))
+    return res.apiSuccess(history, '获取提醒历史详情成功')
+  })
+)
 
 module.exports = router

@@ -102,7 +102,11 @@ class CoreService {
     const { idempotency_key, sku_id } = options
 
     if (!idempotency_key) {
-      throw new BusinessError('idempotency_key 参数不能为空，用于幂等性控制', 'EXCHANGE_NOT_ALLOWED', 400)
+      throw new BusinessError(
+        'idempotency_key 参数不能为空，用于幂等性控制',
+        'EXCHANGE_NOT_ALLOWED',
+        400
+      )
     }
 
     if (!sku_id) {
@@ -245,7 +249,11 @@ class CoreService {
       throw new BusinessError('SKU 不存在或已停售', 'EXCHANGE_SKU_NOT_FOUND', 404)
     }
     if (productSku.stock < quantity) {
-      throw new BusinessError(`库存不足，当前库存：${productSku.stock}`, 'EXCHANGE_STOCK_INSUFFICIENT', 400)
+      throw new BusinessError(
+        `库存不足，当前库存：${productSku.stock}`,
+        'EXCHANGE_STOCK_INSUFFICIENT',
+        400
+      )
     }
 
     const channelPrice = await this.ExchangeChannelPrice.findOne({

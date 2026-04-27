@@ -10,10 +10,7 @@
  * @module services/market-listing/AdminListingService
  */
 
-const {
-  MarketListing,
-  Item
-} = require('../../models')
+const { MarketListing, Item } = require('../../models')
 const BalanceService = require('../asset/BalanceService')
 const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
 const { assertAndGetTransaction } = require('../../utils/transactionHelpers')

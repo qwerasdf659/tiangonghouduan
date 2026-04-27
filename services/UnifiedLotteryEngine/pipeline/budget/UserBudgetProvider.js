@@ -159,7 +159,11 @@ class UserBudgetProvider extends BudgetProvider {
 
       // 🔴 关键修正：从 allowed_campaign_ids 中选择扣减的桶
       if (!this.allowed_campaign_ids || this.allowed_campaign_ids.length === 0) {
-        throw new BusinessError('allowed_campaign_ids 未配置，无法扣减预算', 'ENGINE_NOT_CONFIGURED', 500)
+        throw new BusinessError(
+          'allowed_campaign_ids 未配置，无法扣减预算',
+          'ENGINE_NOT_CONFIGURED',
+          500
+        )
       }
 
       /*
@@ -242,7 +246,11 @@ class UserBudgetProvider extends BudgetProvider {
     try {
       // 🔴 关键修正：回滚到 allowed_campaign_ids 中的第一个桶
       if (!this.allowed_campaign_ids || this.allowed_campaign_ids.length === 0) {
-        throw new BusinessError('allowed_campaign_ids 未配置，无法回滚预算', 'ENGINE_NOT_CONFIGURED', 500)
+        throw new BusinessError(
+          'allowed_campaign_ids 未配置，无法回滚预算',
+          'ENGINE_NOT_CONFIGURED',
+          500
+        )
       }
 
       const rollback_lottery_campaign_id = this.allowed_campaign_ids[0]

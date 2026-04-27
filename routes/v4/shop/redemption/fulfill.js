@@ -53,94 +53,98 @@ const TransactionManager = require('../../../../utils/TransactionManager')
  * - 核销码已过期 → 400 EXPIRED
  * - 权限不足 → 403 FORBIDDEN
  */
-router.post('/fulfill', authenticateToken, asyncHandler(async (req, res) => {
-  const { redeem_code } = req.body
-  const redeemerUserId = req.user.user_id
+router.post(
+  '/fulfill',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const { redeem_code } = req.body
+    const redeemerUserId = req.user.user_id
 
-  if (!redeem_code || typeof redeem_code !== 'string') {
-    return res.apiError('核销码不能为空', 'REDEEM_CODE_REQUIRED', null, 400)
-  }
+    if (!redeem_code || typeof redeem_code !== 'string') {
+      return res.apiError('核销码不能为空', 'REDEEM_CODE_REQUIRED', null, 400)
+    }
 
-  const { getUserRoles } = require('../../../../middleware/auth')
-  const AdminSystemService = req.app.locals.services.getService('admin_system')
-  const userRoles = await getUserRoles(redeemerUserId)
-  const minRoleLevel = Number(
-    await AdminSystemService.getSettingValue('redemption', 'min_role_level_for_fulfill', 20)
-  )
+    const { getUserRoles } = require('../../../../middleware/auth')
+    const AdminSystemService = req.app.locals.services.getService('admin_system')
+    const userRoles = await getUserRoles(redeemerUserId)
+    const minRoleLevel = Number(
+      await AdminSystemService.getSettingValue('redemption', 'min_role_level_for_fulfill', 20)
+    )
 
-  if (userRoles.role_level < minRoleLevel) {
-    logger.warn('权限不足：非商户或管理员尝试核销', {
-      user_id: redeemerUserId,
-      role_level: userRoles.role_level,
-      min_required: minRoleLevel
+    if (userRoles.role_level < minRoleLevel) {
+      logger.warn('权限不足：非商户或管理员尝试核销', {
+        user_id: redeemerUserId,
+        role_level: userRoles.role_level,
+        min_required: minRoleLevel
+      })
+      return res.apiError('权限不足，只有商户员工或管理员可以核销', 'FORBIDDEN', null, 403)
+    }
+
+    logger.info('开始核销订单', {
+      redeem_code_partial: redeem_code.slice(0, 4) + '****',
+      redeemer_user_id: redeemerUserId
     })
-    return res.apiError('权限不足，只有商户员工或管理员可以核销', 'FORBIDDEN', null, 403)
-  }
 
-  logger.info('开始核销订单', {
-    redeem_code_partial: redeem_code.slice(0, 4) + '****',
-    redeemer_user_id: redeemerUserId
-  })
+    const RedemptionService = req.app.locals.services.getService('redemption_order')
+    const order = await TransactionManager.execute(async transaction => {
+      return await RedemptionService.fulfillOrder(
+        redeem_code.trim().toUpperCase(),
+        redeemerUserId,
+        { transaction }
+      )
+    })
 
-  const RedemptionService = req.app.locals.services.getService('redemption_order')
-  const order = await TransactionManager.execute(async transaction => {
-    return await RedemptionService.fulfillOrder(
-      redeem_code.trim().toUpperCase(),
-      redeemerUserId,
-      { transaction }
+    const NotificationService = req.app.locals.services.getService('notification')
+    if (order.item && order.item.ownerAccount && order.item.ownerAccount.user_id) {
+      NotificationService.send(order.item.ownerAccount.user_id, {
+        type: 'redemption_success',
+        title: '核销通知',
+        content: '您的商品已核销成功',
+        data: {
+          order_id: order.redemption_order_id,
+          item_id: order.item_id,
+          fulfilled_at: order.fulfilled_at
+        }
+      }).catch(error => {
+        logger.warn('核销通知发送失败（不影响核销结果）', {
+          error: error.message,
+          user_id: order.item.ownerAccount?.user_id
+        })
+      })
+    }
+
+    logger.info('核销成功', {
+      order_id: order.redemption_order_id,
+      redeemer_user_id: redeemerUserId
+    })
+
+    return res.apiSuccess(
+      {
+        order: {
+          redemption_order_id: order.redemption_order_id,
+          item_id: order.item_id,
+          status: order.status,
+          fulfilled_at: order.fulfilled_at,
+          redeemer_user_id: order.redeemer_user_id,
+          fulfilled_store_id: order.fulfilled_store_id,
+          fulfilled_by_staff_id: order.fulfilled_by_staff_id
+        },
+        item: order.item
+          ? {
+              item_id: order.item.item_id,
+              item_type: order.item.item_type,
+              name: order.item.meta?.name || '未命名物品',
+              status: order.item.status
+            }
+          : null,
+        redeemer: {
+          user_id: redeemerUserId,
+          nickname: req.user.nickname || userRoles.roleName || '商户'
+        }
+      },
+      '核销成功'
     )
   })
-
-  const NotificationService = req.app.locals.services.getService('notification')
-  if (order.item && order.item.ownerAccount && order.item.ownerAccount.user_id) {
-    NotificationService.send(order.item.ownerAccount.user_id, {
-      type: 'redemption_success',
-      title: '核销通知',
-      content: '您的商品已核销成功',
-      data: {
-        order_id: order.redemption_order_id,
-        item_id: order.item_id,
-        fulfilled_at: order.fulfilled_at
-      }
-    }).catch(error => {
-      logger.warn('核销通知发送失败（不影响核销结果）', {
-        error: error.message,
-        user_id: order.item.ownerAccount?.user_id
-      })
-    })
-  }
-
-  logger.info('核销成功', {
-    order_id: order.redemption_order_id,
-    redeemer_user_id: redeemerUserId
-  })
-
-  return res.apiSuccess(
-    {
-      order: {
-        redemption_order_id: order.redemption_order_id,
-        item_id: order.item_id,
-        status: order.status,
-        fulfilled_at: order.fulfilled_at,
-        redeemer_user_id: order.redeemer_user_id,
-        fulfilled_store_id: order.fulfilled_store_id,
-        fulfilled_by_staff_id: order.fulfilled_by_staff_id
-      },
-      item: order.item
-        ? {
-            item_id: order.item.item_id,
-            item_type: order.item.item_type,
-            name: order.item.meta?.name || '未命名物品',
-            status: order.item.status
-          }
-        : null,
-      redeemer: {
-        user_id: redeemerUserId,
-        nickname: req.user.nickname || userRoles.roleName || '商户'
-      }
-    },
-    '核销成功'
-  )
-}))
+)
 
 module.exports = router

@@ -70,7 +70,11 @@ class MediaService {
    */
   _validateFile(mimeType, fileSize) {
     if (!ALLOWED_MIME_TYPES.includes(mimeType)) {
-      throw new BusinessError(`不支持的图片格式：${mimeType}，允许：${ALLOWED_MIME_TYPES.join('/')}`, 'SERVICE_NOT_ALLOWED', 400)
+      throw new BusinessError(
+        `不支持的图片格式：${mimeType}，允许：${ALLOWED_MIME_TYPES.join('/')}`,
+        'SERVICE_NOT_ALLOWED',
+        400
+      )
     }
     if (fileSize > MAX_FILE_SIZE) {
       const maxMB = MAX_FILE_SIZE / 1024 / 1024
@@ -250,7 +254,11 @@ class MediaService {
       throw new BusinessError(`媒体文件不存在: media_id=${mediaId}`, 'SERVICE_NOT_FOUND', 404)
     }
     if (media.status !== 'active') {
-      throw new BusinessError(`媒体文件状态异常，无法关联: status=${media.status}`, 'SERVICE_ERROR', 400)
+      throw new BusinessError(
+        `媒体文件状态异常，无法关联: status=${media.status}`,
+        'SERVICE_ERROR',
+        400
+      )
     }
 
     const attachment = await MediaAttachment.create(

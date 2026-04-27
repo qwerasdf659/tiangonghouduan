@@ -122,15 +122,14 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
       })
     })
 
-    test('B-5-1-5 普通用户（public）输出描述性 prize_id 字段（行业标准：{entity}_id）', () => {
+    test('B-5-1-5 普通用户（public）保留原始主键 lottery_prize_id（不做映射）', () => {
       const result = DataSanitizer.sanitizePrizes(mockPrizes, 'public')
 
       result.forEach(prize => {
-        expect(prize).toHaveProperty('prize_id')
+        expect(prize).toHaveProperty('lottery_prize_id')
         expect(prize).toHaveProperty('prize_name')
         expect(prize).toHaveProperty('prize_type')
         expect(prize).toHaveProperty('prize_value')
-        expect(prize).not.toHaveProperty('lottery_prize_id')
       })
     })
 
@@ -142,11 +141,11 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
       expect(result.length).toBe(mockPrizes.length)
     })
 
-    test('B-5-1-7 普通用户（public）prize_id 映射自数据库 lottery_prize_id', () => {
+    test('B-5-1-7 普通用户（public）保留原始主键 lottery_prize_id', () => {
       const result = DataSanitizer.sanitizePrizes(mockPrizes, 'public')
 
       result.forEach((prize, index) => {
-        expect(prize.prize_id).toBe(mockPrizes[index].lottery_prize_id)
+        expect(prize.lottery_prize_id).toBe(mockPrizes[index].lottery_prize_id)
         expect(prize.prize_name).toBe(mockPrizes[index].prize_name)
         expect(prize.prize_type).toBe(mockPrizes[index].prize_type)
       })
@@ -774,12 +773,11 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
       })
     })
 
-    test('B-5-11-4 普通用户（public）主键映射 market_listing_id → listing_id', () => {
+    test('B-5-11-4 普通用户（public）保留原始主键 market_listing_id', () => {
       const result = DataSanitizer.sanitizeMarketProducts(mockListings, 'public')
 
-      expect(result[0].listing_id).toBe(101)
-      expect(result[1].listing_id).toBe(102)
-      expect(result[0]).not.toHaveProperty('market_listing_id')
+      expect(result[0].market_listing_id).toBe(101)
+      expect(result[1].market_listing_id).toBe(102)
     })
 
     test('B-5-11-5 普通用户（public）seller_nickname 经 maskUserName 脱敏', () => {
@@ -793,7 +791,7 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
       const result = DataSanitizer.sanitizeMarketProducts(mockListings, 'public')
 
       result.forEach(item => {
-        expect(item).toHaveProperty('listing_id')
+        expect(item).toHaveProperty('market_listing_id')
         expect(item).toHaveProperty('listing_kind')
         expect(item).toHaveProperty('price_amount')
         expect(item).toHaveProperty('price_asset_code')

@@ -32,7 +32,10 @@ class RedemptionAdminService {
    * @returns {Promise<RedemptionOrder>} 核销后的订单对象
    */
   static async adminFulfillOrderById(order_id, options = {}) {
-    const transaction = assertAndGetTransaction(options, 'RedemptionAdminService.adminFulfillOrderById')
+    const transaction = assertAndGetTransaction(
+      options,
+      'RedemptionAdminService.adminFulfillOrderById'
+    )
     const { admin_user_id, store_id, staff_id, remark } = options
 
     if (!admin_user_id) {
@@ -156,7 +159,10 @@ class RedemptionAdminService {
    * @returns {Promise<RedemptionOrder>} 取消后的订单对象
    */
   static async adminCancelOrderById(order_id, options = {}) {
-    const transaction = assertAndGetTransaction(options, 'RedemptionAdminService.adminCancelOrderById')
+    const transaction = assertAndGetTransaction(
+      options,
+      'RedemptionAdminService.adminCancelOrderById'
+    )
     const { admin_user_id, reason } = options
 
     if (!admin_user_id) {
@@ -286,7 +292,10 @@ class RedemptionAdminService {
    * @returns {Promise<Object>} { expired_count, unlocked_count, failed_orders }
    */
   static async adminBatchExpireOrders(order_ids, options = {}) {
-    const transaction = assertAndGetTransaction(options, 'RedemptionAdminService.adminBatchExpireOrders')
+    const transaction = assertAndGetTransaction(
+      options,
+      'RedemptionAdminService.adminBatchExpireOrders'
+    )
     const { admin_user_id, reason } = options
 
     if (!admin_user_id) {
@@ -361,7 +370,10 @@ class RedemptionAdminService {
    * @returns {Promise<Object>} { cancelled_count, failed_orders }
    */
   static async adminBatchCancelOrders(order_ids, options = {}) {
-    const transaction = assertAndGetTransaction(options, 'RedemptionAdminService.adminBatchCancelOrders')
+    const transaction = assertAndGetTransaction(
+      options,
+      'RedemptionAdminService.adminBatchCancelOrders'
+    )
     const { admin_user_id, reason } = options
 
     if (!admin_user_id) {

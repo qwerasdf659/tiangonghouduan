@@ -58,30 +58,40 @@ function getLotteryConfigService(req) {
  * - page: 页码（默认1）
  * - page_size: 每页数量（默认20）
  */
-router.get('/strategies', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const service = getLotteryConfigService(req)
-  const { config_group, is_active, page, page_size } = req.query
+router.get(
+  '/strategies',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const service = getLotteryConfigService(req)
+    const { config_group, is_active, page, page_size } = req.query
 
-  const result = await service.getStrategyConfigs({
-    config_group,
-    is_active: is_active === 'true' ? true : is_active === 'false' ? false : undefined,
-    page: parseInt(page) || 1,
-    page_size: parseInt(page_size) || 20
+    const result = await service.getStrategyConfigs({
+      config_group,
+      is_active: is_active === 'true' ? true : is_active === 'false' ? false : undefined,
+      page: parseInt(page) || 1,
+      page_size: parseInt(page_size) || 20
+    })
+
+    return res.apiSuccess(result, '获取策略配置列表成功')
   })
-
-  return res.apiSuccess(result, '获取策略配置列表成功')
-}))
+)
 
 /**
  * GET /strategies/:id - 获取策略配置详情
  */
-router.get('/strategies/:id', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const service = getLotteryConfigService(req)
-  const { id } = req.params
-  const result = await service.getStrategyConfigById(parseInt(id))
+router.get(
+  '/strategies/:id',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const service = getLotteryConfigService(req)
+    const { id } = req.params
+    const result = await service.getStrategyConfigById(parseInt(id))
 
-  return res.apiSuccess(result, '获取策略配置详情成功')
-}))
+    return res.apiSuccess(result, '获取策略配置详情成功')
+  })
+)
 
 /**
  * POST /strategies - 创建策略配置
@@ -96,16 +106,21 @@ router.get('/strategies/:id', authenticateToken, requireRoleLevel(100), asyncHan
  * - effective_start: 生效开始时间
  * - effective_end: 生效结束时间
  */
-router.post('/strategies', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const service = getLotteryConfigService(req)
-  const admin_id = req.user.user_id
+router.post(
+  '/strategies',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const service = getLotteryConfigService(req)
+    const admin_id = req.user.user_id
 
-  const result = await TransactionManager.execute(async transaction => {
-    return await service.createStrategyConfig(req.body, admin_id, { transaction })
+    const result = await TransactionManager.execute(async transaction => {
+      return await service.createStrategyConfig(req.body, admin_id, { transaction })
+    })
+
+    return res.apiSuccess(result, '创建策略配置成功')
   })
-
-  return res.apiSuccess(result, '创建策略配置成功')
-}))
+)
 
 /**
  * PUT /strategies/:id - 更新策略配置
@@ -120,32 +135,42 @@ router.post('/strategies', authenticateToken, requireRoleLevel(100), asyncHandle
  * - effective_start: 生效开始时间
  * - effective_end: 生效结束时间
  */
-router.put('/strategies/:id', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const service = getLotteryConfigService(req)
-  const { id } = req.params
-  const admin_id = req.user.user_id
+router.put(
+  '/strategies/:id',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const service = getLotteryConfigService(req)
+    const { id } = req.params
+    const admin_id = req.user.user_id
 
-  const result = await TransactionManager.execute(async transaction => {
-    return await service.updateStrategyConfig(parseInt(id), req.body, admin_id, { transaction })
+    const result = await TransactionManager.execute(async transaction => {
+      return await service.updateStrategyConfig(parseInt(id), req.body, admin_id, { transaction })
+    })
+
+    return res.apiSuccess(result, '更新策略配置成功')
   })
-
-  return res.apiSuccess(result, '更新策略配置成功')
-}))
+)
 
 /**
  * DELETE /strategies/:id - 删除策略配置
  */
-router.delete('/strategies/:id', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const service = getLotteryConfigService(req)
-  const { id } = req.params
-  const admin_id = req.user.user_id
+router.delete(
+  '/strategies/:id',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const service = getLotteryConfigService(req)
+    const { id } = req.params
+    const admin_id = req.user.user_id
 
-  await TransactionManager.execute(async transaction => {
-    await service.deleteStrategyConfig(parseInt(id), admin_id, { transaction })
+    await TransactionManager.execute(async transaction => {
+      await service.deleteStrategyConfig(parseInt(id), admin_id, { transaction })
+    })
+
+    return res.apiSuccess(null, '删除策略配置成功')
   })
-
-  return res.apiSuccess(null, '删除策略配置成功')
-}))
+)
 
 /*
  * =============================================================================
@@ -163,31 +188,41 @@ router.delete('/strategies/:id', authenticateToken, requireRoleLevel(100), async
  * - page: 页码（默认1）
  * - page_size: 每页数量（默认20）
  */
-router.get('/matrix', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const service = getLotteryConfigService(req)
-  const { budget_tier, pressure_tier, is_active, page, page_size } = req.query
+router.get(
+  '/matrix',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const service = getLotteryConfigService(req)
+    const { budget_tier, pressure_tier, is_active, page, page_size } = req.query
 
-  const result = await service.getMatrixConfigs({
-    budget_tier,
-    pressure_tier,
-    is_active: is_active === 'true' ? true : is_active === 'false' ? false : undefined,
-    page: parseInt(page) || 1,
-    page_size: parseInt(page_size) || 20
+    const result = await service.getMatrixConfigs({
+      budget_tier,
+      pressure_tier,
+      is_active: is_active === 'true' ? true : is_active === 'false' ? false : undefined,
+      page: parseInt(page) || 1,
+      page_size: parseInt(page_size) || 20
+    })
+
+    return res.apiSuccess(result, '获取矩阵配置列表成功')
   })
-
-  return res.apiSuccess(result, '获取矩阵配置列表成功')
-}))
+)
 
 /**
  * GET /matrix/:id - 获取矩阵配置详情
  */
-router.get('/matrix/:id', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const service = getLotteryConfigService(req)
-  const { id } = req.params
-  const result = await service.getMatrixConfigById(parseInt(id))
+router.get(
+  '/matrix/:id',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const service = getLotteryConfigService(req)
+    const { id } = req.params
+    const result = await service.getMatrixConfigById(parseInt(id))
 
-  return res.apiSuccess(result, '获取矩阵配置详情成功')
-}))
+    return res.apiSuccess(result, '获取矩阵配置详情成功')
+  })
+)
 
 /**
  * POST /matrix - 创建矩阵配置
@@ -200,16 +235,21 @@ router.get('/matrix/:id', authenticateToken, requireRoleLevel(100), asyncHandler
  * - description: 配置描述
  * - is_active: 是否启用（默认true）
  */
-router.post('/matrix', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const service = getLotteryConfigService(req)
-  const admin_id = req.user.user_id
+router.post(
+  '/matrix',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const service = getLotteryConfigService(req)
+    const admin_id = req.user.user_id
 
-  const result = await TransactionManager.execute(async transaction => {
-    return await service.createMatrixConfig(req.body, admin_id, { transaction })
+    const result = await TransactionManager.execute(async transaction => {
+      return await service.createMatrixConfig(req.body, admin_id, { transaction })
+    })
+
+    return res.apiSuccess(result, '创建矩阵配置成功')
   })
-
-  return res.apiSuccess(result, '创建矩阵配置成功')
-}))
+)
 
 /**
  * PUT /matrix/:id - 更新矩阵配置
@@ -222,31 +262,41 @@ router.post('/matrix', authenticateToken, requireRoleLevel(100), asyncHandler(as
  * - description: 配置描述
  * - is_active: 是否启用
  */
-router.put('/matrix/:id', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const service = getLotteryConfigService(req)
-  const { id } = req.params
-  const admin_id = req.user.user_id
+router.put(
+  '/matrix/:id',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const service = getLotteryConfigService(req)
+    const { id } = req.params
+    const admin_id = req.user.user_id
 
-  const result = await TransactionManager.execute(async transaction => {
-    return await service.updateMatrixConfig(parseInt(id), req.body, admin_id, { transaction })
+    const result = await TransactionManager.execute(async transaction => {
+      return await service.updateMatrixConfig(parseInt(id), req.body, admin_id, { transaction })
+    })
+
+    return res.apiSuccess(result, '更新矩阵配置成功')
   })
-
-  return res.apiSuccess(result, '更新矩阵配置成功')
-}))
+)
 
 /**
  * DELETE /matrix/:id - 删除矩阵配置
  */
-router.delete('/matrix/:id', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const service = getLotteryConfigService(req)
-  const { id } = req.params
-  const admin_id = req.user.user_id
+router.delete(
+  '/matrix/:id',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const service = getLotteryConfigService(req)
+    const { id } = req.params
+    const admin_id = req.user.user_id
 
-  await TransactionManager.execute(async transaction => {
-    await service.deleteMatrixConfig(parseInt(id), admin_id, { transaction })
+    await TransactionManager.execute(async transaction => {
+      await service.deleteMatrixConfig(parseInt(id), admin_id, { transaction })
+    })
+
+    return res.apiSuccess(null, '删除矩阵配置成功')
   })
-
-  return res.apiSuccess(null, '删除矩阵配置成功')
-}))
+)
 
 module.exports = router

@@ -31,29 +31,33 @@ const { validatePositiveInteger, asyncHandler } = require('../../../../middlewar
  * 错误场景：
  * - 订单不存在 → 404 NOT_FOUND
  */
-router.get('/orders/:order_id', authenticateToken, asyncHandler(async (req, res) => {
-  const { order_id } = req.params
+router.get(
+  '/orders/:order_id',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const { order_id } = req.params
 
-  const RedemptionService = req.app.locals.services.getService('redemption_order')
-  const order = await RedemptionService.getOrderDetail(order_id, {
-    include_item: true,
-    include_redeemer: true
+    const RedemptionService = req.app.locals.services.getService('redemption_order')
+    const order = await RedemptionService.getOrderDetail(order_id, {
+      include_item: true,
+      include_redeemer: true
+    })
+
+    return res.apiSuccess(
+      {
+        order_id: order.redemption_order_id,
+        item_id: order.item_id,
+        status: order.status,
+        expires_at: order.expires_at,
+        fulfilled_at: order.fulfilled_at,
+        created_at: order.created_at,
+        item: order.item,
+        redeemer: order.redeemer
+      },
+      '查询成功'
+    )
   })
-
-  return res.apiSuccess(
-    {
-      order_id: order.redemption_order_id,
-      item_id: order.item_id,
-      status: order.status,
-      expires_at: order.expires_at,
-      fulfilled_at: order.fulfilled_at,
-      created_at: order.created_at,
-      item: order.item,
-      redeemer: order.redeemer
-    },
-    '查询成功'
-  )
-}))
+)
 
 /**
  * 查询物品的核销订单（Get Order by Item）

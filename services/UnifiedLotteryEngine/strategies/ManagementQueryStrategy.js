@@ -137,7 +137,11 @@ class ManagementQueryStrategy {
     try {
       const settingTypes = ['force_win', 'force_lose', 'probability_adjust', 'user_queue']
       const activeSettings = {
-        force_win: 0, force_lose: 0, probability_adjust: 0, user_queue: 0, total: 0
+        force_win: 0,
+        force_lose: 0,
+        probability_adjust: 0,
+        user_queue: 0,
+        total: 0
       }
 
       for (const settingType of settingTypes) {
@@ -176,12 +180,18 @@ class ManagementQueryStrategy {
       this.logError('获取管理策略状态失败', { error: error.message })
       return {
         strategy_name: 'ManagementStrategy',
-version: '4.1',
-status: 'error',
+        version: '4.1',
+        status: 'error',
         cache_info: { size: this.cache ? this.cache.size : 0, ttl_ms: this.cacheTTL || 300000 },
-        active_settings: { force_win: 0, force_lose: 0, probability_adjust: 0, user_queue: 0, total: 0 },
+        active_settings: {
+          force_win: 0,
+          force_lose: 0,
+          probability_adjust: 0,
+          user_queue: 0,
+          total: 0
+        },
         error: error.message,
-timestamp: BeijingTimeHelper.now()
+        timestamp: BeijingTimeHelper.now()
       }
     }
   }

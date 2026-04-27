@@ -59,40 +59,40 @@ router.post(
     const MarketListingService = req.app.locals.services.getService('market_listing_core')
 
     const listingId = req.validated.market_listing_id
-      const sellerId = req.user.user_id
-      const { withdraw_reason } = req.body
+    const sellerId = req.user.user_id
+    const { withdraw_reason } = req.body
 
-      // 决策5B/0C：使用 MarketListingService 统一处理撤回
-      const result = await TransactionManager.execute(
-        async transaction => {
-          return await MarketListingService.withdrawListing(
-            {
-              market_listing_id: listingId,
-              seller_user_id: sellerId
-            },
-            { transaction }
-          )
-        },
-        { description: 'market_listing_withdraw' }
-      )
+    // 决策5B/0C：使用 MarketListingService 统一处理撤回
+    const result = await TransactionManager.execute(
+      async transaction => {
+        return await MarketListingService.withdrawListing(
+          {
+            market_listing_id: listingId,
+            seller_user_id: sellerId
+          },
+          { transaction }
+        )
+      },
+      { description: 'market_listing_withdraw' }
+    )
 
-      // 缓存失效已在 MarketListingService.withdrawListing 中处理（决策5B）
+    // 缓存失效已在 MarketListingService.withdrawListing 中处理（决策5B）
 
-      logger.info('市场挂牌撤回成功', {
+    logger.info('市场挂牌撤回成功', {
+      market_listing_id: listingId,
+      seller_id: sellerId,
+      item_id: result.listing.offer_item_id,
+      withdraw_reason: withdraw_reason || '用户主动撤回'
+    })
+
+    return res.apiSuccess(
+      {
         market_listing_id: listingId,
-        seller_id: sellerId,
         item_id: result.listing.offer_item_id,
-        withdraw_reason: withdraw_reason || '用户主动撤回'
-      })
-
-      return res.apiSuccess(
-        {
-          market_listing_id: listingId,
-          item_id: result.listing.offer_item_id,
-          withdrawn_at: new Date().toISOString()
-        },
-        '撤回成功。您可以重新编辑后再次上架。'
-      )
+        withdrawn_at: new Date().toISOString()
+      },
+      '撤回成功。您可以重新编辑后再次上架。'
+    )
   })
 )
 
@@ -123,48 +123,48 @@ router.post(
     const MarketListingService = req.app.locals.services.getService('market_listing_core')
 
     const listingId = req.validated.market_listing_id
-      const sellerId = req.user.user_id
-      const { withdraw_reason } = req.body
+    const sellerId = req.user.user_id
+    const { withdraw_reason } = req.body
 
-      // 使用 TransactionManager 执行撤回操作
-      const result = await TransactionManager.execute(
-        async transaction => {
-          return await MarketListingService.withdrawFungibleAssetListing(
-            {
-              market_listing_id: listingId,
-              seller_user_id: sellerId
-            },
-            { transaction }
-          )
-        },
-        { description: 'market_fungible_asset_withdraw' }
-      )
+    // 使用 TransactionManager 执行撤回操作
+    const result = await TransactionManager.execute(
+      async transaction => {
+        return await MarketListingService.withdrawFungibleAssetListing(
+          {
+            market_listing_id: listingId,
+            seller_user_id: sellerId
+          },
+          { transaction }
+        )
+      },
+      { description: 'market_fungible_asset_withdraw' }
+    )
 
-      // 缓存失效已在 MarketListingService.withdrawFungibleAssetListing 中处理
+    // 缓存失效已在 MarketListingService.withdrawFungibleAssetListing 中处理
 
-      logger.info('可叠加资产挂牌撤回成功', {
+    logger.info('可叠加资产挂牌撤回成功', {
+      market_listing_id: listingId,
+      seller_id: sellerId,
+      offer_asset_code: result.listing.offer_asset_code,
+      offer_amount: result.listing.offer_amount,
+      withdraw_reason: withdraw_reason || '用户主动撤回'
+    })
+
+    return res.apiSuccess(
+      {
         market_listing_id: listingId,
-        seller_id: sellerId,
         offer_asset_code: result.listing.offer_asset_code,
-        offer_amount: result.listing.offer_amount,
-        withdraw_reason: withdraw_reason || '用户主动撤回'
-      })
-
-      return res.apiSuccess(
-        {
-          market_listing_id: listingId,
-          offer_asset_code: result.listing.offer_asset_code,
-          offer_amount: Number(result.listing.offer_amount),
-          withdrawn_at: new Date().toISOString(),
-          balance_after: result.unfreeze_result?.balance
-            ? {
-                available_amount: Number(result.unfreeze_result.balance.available_amount),
-                frozen_amount: Number(result.unfreeze_result.balance.frozen_amount)
-              }
-            : null
-        },
-        '撤回成功。资产已解冻至您的可用余额。'
-      )
+        offer_amount: Number(result.listing.offer_amount),
+        withdrawn_at: new Date().toISOString(),
+        balance_after: result.unfreeze_result?.balance
+          ? {
+              available_amount: Number(result.unfreeze_result.balance.available_amount),
+              frozen_amount: Number(result.unfreeze_result.balance.frozen_amount)
+            }
+          : null
+      },
+      '撤回成功。资产已解冻至您的可用余额。'
+    )
   })
 )
 

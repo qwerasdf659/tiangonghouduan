@@ -946,7 +946,11 @@ async function initializeApp() {
 
     // 将Service容器和Models添加到app实例中，供路由使用
     app.locals.services = services
-    app.locals.models = models // 注入models供路由层使用
+    app.locals.models = models
+
+    // 注入 ServiceManager 到共享中间件（消除降级 require）
+    const { setServiceManager } = require('./routes/v4/console/shared/middleware')
+    setServiceManager(services)
 
     appLogger.info('Service层初始化完成', {
       services: Array.from(services.getAllServices().keys())

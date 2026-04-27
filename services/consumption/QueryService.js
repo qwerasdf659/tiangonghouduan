@@ -459,7 +459,11 @@ class QueryService {
       }
 
       if (record.is_deleted === 1) {
-        throw new BusinessError(`消费记录不存在或已被删除（ID: ${recordId}）`, 'CONSUMPTION_NOT_FOUND', 404)
+        throw new BusinessError(
+          `消费记录不存在或已被删除（ID: ${recordId}）`,
+          'CONSUMPTION_NOT_FOUND',
+          404
+        )
       }
 
       const formattedRecord = record.toAPIResponse()

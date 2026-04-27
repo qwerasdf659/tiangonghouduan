@@ -17,12 +17,7 @@
  * @module services/market-listing/ValidationService
  */
 
-const {
-  MarketListing,
-  User,
-  UserRiskProfile,
-  sequelize
-} = require('../../models')
+const { MarketListing, User, UserRiskProfile, sequelize } = require('../../models')
 const { Op } = sequelize.Sequelize
 const { AssetCode } = require('../../constants/AssetCode')
 const AdminSystemService = require('../AdminSystemService')

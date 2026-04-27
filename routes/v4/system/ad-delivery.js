@@ -43,9 +43,7 @@ router.get(
     const { slot_type, position = 'home' } = req.query
 
     if (!slot_type) {
-      return res.apiBadRequest(
-        '缺少必需参数：slot_type（popup / carousel / announcement / feed）'
-      )
+      return res.apiBadRequest('缺少必需参数：slot_type（popup / carousel / announcement / feed）')
     }
 
     const validSlotTypes = ['popup', 'carousel', 'announcement', 'feed']

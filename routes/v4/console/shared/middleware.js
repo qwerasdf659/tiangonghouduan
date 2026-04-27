@@ -22,6 +22,16 @@ const logger = require('../../../../utils/logger').logger
 
 // 共享组件 - 延迟初始化（首次访问时初始化）
 let _sharedComponents = null
+let _cachedServiceManager = null
+
+/**
+ * 注入 ServiceManager 引用（由 app 初始化时调用）
+ * @param {Object} serviceManager - 服务管理器实例
+ * @returns {void}
+ */
+function setServiceManager(serviceManager) {
+  _cachedServiceManager = serviceManager
+}
 
 /**
  * 获取共享组件（懒加载模式）
@@ -33,12 +43,14 @@ function getSharedComponents(serviceManager = null) {
     return _sharedComponents
   }
 
+  const sm = serviceManager || _cachedServiceManager
+
   // P1-9：通过 ServiceManager 获取服务（如果可用）
-  if (serviceManager) {
+  if (sm) {
     try {
       _sharedComponents = {
-        lotteryEngine: serviceManager.getService('unified_lottery_engine'),
-        performanceMonitor: serviceManager.getService('performance_monitor'),
+        lotteryEngine: sm.getService('unified_lottery_engine'),
+        performanceMonitor: sm.getService('performance_monitor'),
         logger
       }
       return _sharedComponents
@@ -53,26 +65,26 @@ function getSharedComponents(serviceManager = null) {
   } = require('../../../../services/UnifiedLotteryEngine/UnifiedLotteryEngine')
   const DrawOrchestrator = require('../../../../services/UnifiedLotteryEngine/pipeline/DrawOrchestrator')
   const ManagementStrategy = require('../../../../services/UnifiedLotteryEngine/strategies/ManagementStrategy')
+  const ManagementQueryStrategy = require('../../../../services/UnifiedLotteryEngine/strategies/ManagementQueryStrategy')
   const PerformanceMonitor = require('../../../../services/UnifiedLotteryEngine/utils/PerformanceMonitor')
 
+  const managementStrategyInstance = new ManagementStrategy()
   _sharedComponents = {
     lotteryEngine: new UnifiedLotteryEngine(),
-    /**
-     * V4.6 管线编排器（2026-01-19）
-     *
-     * drawOrchestrator: 抽奖执行入口（替代原 basic_guarantee_strategy）
-     * managementStrategy: 管理操作 API（forceWin/forceLose 等）- 继续保留
-     */
     drawOrchestrator: new DrawOrchestrator(),
-    managementStrategy: new ManagementStrategy(),
+    managementStrategy: managementStrategyInstance,
     _managementQueryStrategy: null,
     /**
      * 获取管理查询策略实例（懒加载）
-     * @returns {Object} 管理查询策略实例
+     * @returns {ManagementQueryStrategy} 管理查询策略实例
      */
     get managementQueryStrategy() {
       if (!this._managementQueryStrategy) {
-        this._managementQueryStrategy = this.managementStrategy.createQueryStrategy()
+        this._managementQueryStrategy = new ManagementQueryStrategy({
+          cache: managementStrategyInstance.cache,
+          cacheTTL: managementStrategyInstance.cacheTTL,
+          logger: managementStrategyInstance.logger
+        })
       }
       return this._managementQueryStrategy
     },
@@ -320,13 +332,10 @@ const validators = {
 
 module.exports = {
   sharedComponents,
+  setServiceManager,
   getSimpleSystemStats,
   adminAuthMiddleware,
-  adminOpsAuthMiddleware, // 🆕 P1只读API中间件（admin+ops，ops只读）
+  adminOpsAuthMiddleware,
   asyncHandler,
   validators
-  /**
-   * ✅ models / Op / BeijingTimeHelper 已移除
-   * 新代码必须通过 ServiceManager 调用业务 Service
-   */
 }

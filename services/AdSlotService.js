@@ -259,7 +259,11 @@ class AdSlotService {
         })
 
         if (existing) {
-          throw new BusinessError(`广告位标识 ${data.slot_key} 已存在`, 'SERVICE_ALREADY_EXISTS', 409)
+          throw new BusinessError(
+            `广告位标识 ${data.slot_key} 已存在`,
+            'SERVICE_ALREADY_EXISTS',
+            409
+          )
         }
       }
 

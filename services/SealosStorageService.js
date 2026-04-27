@@ -118,7 +118,11 @@ class SealosStorageService {
       ].join('\n')
 
       logger.error(errorMessage)
-      throw new BusinessError(`Sealos配置缺失: ${missingVars.map(v => v.key).join(', ')}`, 'SERVICE_ERROR', 400)
+      throw new BusinessError(
+        `Sealos配置缺失: ${missingVars.map(v => v.key).join(', ')}`,
+        'SERVICE_ERROR',
+        400
+      )
     }
   }
 
@@ -170,7 +174,11 @@ class SealosStorageService {
             objectKey: uploadParams.Key,
             fallbackError: fallbackError.message
           })
-          throw new BusinessError(`上传失败（内网+公网均失败）: ${fallbackError.message}`, 'SERVICE_FAILED', 500)
+          throw new BusinessError(
+            `上传失败（内网+公网均失败）: ${fallbackError.message}`,
+            'SERVICE_FAILED',
+            500
+          )
         }
       }
 
@@ -284,7 +292,11 @@ class SealosStorageService {
             primaryError: primaryError.message,
             fallbackError: fallbackError.message
           })
-          throw new BusinessError(`文件上传失败（内网+公网均失败）: ${fallbackError.message}`, 'SERVICE_FAILED', 500)
+          throw new BusinessError(
+            `文件上传失败（内网+公网均失败）: ${fallbackError.message}`,
+            'SERVICE_FAILED',
+            500
+          )
         }
       }
 

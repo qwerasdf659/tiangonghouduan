@@ -88,32 +88,37 @@ function getModels(req) {
  *
  * @apiPermission admin
  */
-router.get('/summary', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const { status, start_date, end_date } = req.query
+router.get(
+  '/summary',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const { status, start_date, end_date } = req.query
 
-  logger.info('获取异常汇总统计', {
-    status,
-    start_date,
-    end_date,
-    user_id: req.user?.user_id
+    logger.info('获取异常汇总统计', {
+      status,
+      start_date,
+      end_date,
+      user_id: req.user?.user_id
+    })
+
+    const anomalyService = getAnomalyService(req)
+    const models = getModels(req)
+
+    const summary = await anomalyService.getAnomalySummary(models, {
+      status,
+      start_date: start_date ? new Date(start_date) : undefined,
+      end_date: end_date ? new Date(end_date) : undefined
+    })
+
+    logger.info('异常汇总统计获取成功', {
+      total: summary.total,
+      anomaly: summary.anomaly_count
+    })
+
+    return res.apiSuccess(summary, '获取异常汇总统计成功')
   })
-
-  const anomalyService = getAnomalyService(req)
-  const models = getModels(req)
-
-  const summary = await anomalyService.getAnomalySummary(models, {
-    status,
-    start_date: start_date ? new Date(start_date) : undefined,
-    end_date: end_date ? new Date(end_date) : undefined
-  })
-
-  logger.info('异常汇总统计获取成功', {
-    total: summary.total,
-    anomaly: summary.anomaly_count
-  })
-
-  return res.apiSuccess(summary, '获取异常汇总统计成功')
-}))
+)
 
 /**
  * @api {get} /api/v4/admin/consumption-anomaly/high-risk 获取高风险记录列表
@@ -136,33 +141,38 @@ router.get('/summary', authenticateToken, requireRoleLevel(100), asyncHandler(as
  *
  * @apiPermission admin
  */
-router.get('/high-risk', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const { min_score = '61', status = 'pending', page = '1', page_size = '20' } = req.query
+router.get(
+  '/high-risk',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const { min_score = '61', status = 'pending', page = '1', page_size = '20' } = req.query
 
-  logger.info('获取高风险记录', {
-    min_score,
-    status,
-    page,
-    user_id: req.user?.user_id
+    logger.info('获取高风险记录', {
+      min_score,
+      status,
+      page,
+      user_id: req.user?.user_id
+    })
+
+    const anomalyService = getAnomalyService(req)
+    const models = getModels(req)
+
+    const result = await anomalyService.getHighRiskRecords(models, {
+      min_score: parseInt(min_score, 10) || 61,
+      status: status || undefined,
+      page: parseInt(page, 10) || 1,
+      page_size: parseInt(page_size, 10) || 20
+    })
+
+    logger.info('高风险记录获取成功', {
+      total: result.pagination.total,
+      returned: result.records.length
+    })
+
+    return res.apiSuccess(result, '获取高风险记录成功')
   })
-
-  const anomalyService = getAnomalyService(req)
-  const models = getModels(req)
-
-  const result = await anomalyService.getHighRiskRecords(models, {
-    min_score: parseInt(min_score, 10) || 61,
-    status: status || undefined,
-    page: parseInt(page, 10) || 1,
-    page_size: parseInt(page_size, 10) || 20
-  })
-
-  logger.info('高风险记录获取成功', {
-    total: result.pagination.total,
-    returned: result.records.length
-  })
-
-  return res.apiSuccess(result, '获取高风险记录成功')
-}))
+)
 
 /**
  * @api {post} /api/v4/admin/consumption-anomaly/detect/:id 检测单条记录异常
@@ -186,42 +196,47 @@ router.get('/high-risk', authenticateToken, requireRoleLevel(100), asyncHandler(
  *
  * @apiPermission admin
  */
-router.post('/detect/:id', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const recordId = parseInt(req.params.id, 10)
-  if (isNaN(recordId) || recordId <= 0) {
-    return res.apiError('无效的记录ID', 'INVALID_RECORD_ID', null, 400)
-  }
+router.post(
+  '/detect/:id',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const recordId = parseInt(req.params.id, 10)
+    if (isNaN(recordId) || recordId <= 0) {
+      return res.apiError('无效的记录ID', 'INVALID_RECORD_ID', null, 400)
+    }
 
-  const { save = true } = req.body
+    const { save = true } = req.body
 
-  logger.info('检测单条记录异常', {
-    record_id: recordId,
-    save,
-    user_id: req.user?.user_id
+    logger.info('检测单条记录异常', {
+      record_id: recordId,
+      save,
+      user_id: req.user?.user_id
+    })
+
+    const anomalyService = getAnomalyService(req)
+    const models = getModels(req)
+
+    // 获取记录
+    const record = await models.ConsumptionRecord.findByPk(recordId)
+    if (!record) {
+      return res.apiError('消费记录不存在', 'RECORD_NOT_FOUND', null, 404)
+    }
+
+    const result = await anomalyService.detectAnomalies(record, {
+      models,
+      save: save !== false
+    })
+
+    logger.info('异常检测完成', {
+      record_id: recordId,
+      anomaly_flags: result.anomaly_flags,
+      anomaly_score: result.anomaly_score
+    })
+
+    return res.apiSuccess(result, '异常检测完成')
   })
-
-  const anomalyService = getAnomalyService(req)
-  const models = getModels(req)
-
-  // 获取记录
-  const record = await models.ConsumptionRecord.findByPk(recordId)
-  if (!record) {
-    return res.apiError('消费记录不存在', 'RECORD_NOT_FOUND', null, 404)
-  }
-
-  const result = await anomalyService.detectAnomalies(record, {
-    models,
-    save: save !== false
-  })
-
-  logger.info('异常检测完成', {
-    record_id: recordId,
-    anomaly_flags: result.anomaly_flags,
-    anomaly_score: result.anomaly_score
-  })
-
-  return res.apiSuccess(result, '异常检测完成')
-}))
+)
 
 /**
  * @api {post} /api/v4/admin/consumption-anomaly/batch-detect 批量检测异常
@@ -245,52 +260,57 @@ router.post('/detect/:id', authenticateToken, requireRoleLevel(100), asyncHandle
  *
  * @apiPermission admin
  */
-router.post('/batch-detect', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const { record_ids, save = true } = req.body
+router.post(
+  '/batch-detect',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const { record_ids, save = true } = req.body
 
-  if (!Array.isArray(record_ids) || record_ids.length === 0) {
-    return res.apiError('record_ids 必须是非空数组', 'INVALID_RECORD_IDS', null, 400)
-  }
-
-  if (record_ids.length > 100) {
-    return res.apiError('单次批量检测最多100条记录', 'TOO_MANY_RECORDS', null, 400)
-  }
-
-  logger.info('批量检测异常', {
-    record_count: record_ids.length,
-    save,
-    user_id: req.user?.user_id
-  })
-
-  const anomalyService = getAnomalyService(req)
-  const models = getModels(req)
-
-  // 批量获取记录
-  const records = await models.ConsumptionRecord.findAll({
-    where: {
-      record_id: { [require('sequelize').Op.in]: record_ids },
-      is_deleted: 0
+    if (!Array.isArray(record_ids) || record_ids.length === 0) {
+      return res.apiError('record_ids 必须是非空数组', 'INVALID_RECORD_IDS', null, 400)
     }
+
+    if (record_ids.length > 100) {
+      return res.apiError('单次批量检测最多100条记录', 'TOO_MANY_RECORDS', null, 400)
+    }
+
+    logger.info('批量检测异常', {
+      record_count: record_ids.length,
+      save,
+      user_id: req.user?.user_id
+    })
+
+    const anomalyService = getAnomalyService(req)
+    const models = getModels(req)
+
+    // 批量获取记录
+    const records = await models.ConsumptionRecord.findAll({
+      where: {
+        record_id: { [require('sequelize').Op.in]: record_ids },
+        is_deleted: 0
+      }
+    })
+
+    if (records.length === 0) {
+      return res.apiError('未找到有效记录', 'RECORDS_NOT_FOUND', null, 404)
+    }
+
+    const result = await anomalyService.batchDetect(records, {
+      models,
+      save: save !== false
+    })
+
+    logger.info('批量异常检测完成', {
+      total: result.total,
+      anomaly_count: result.anomaly_count,
+      high_risk_count: result.high_risk_count,
+      duration_ms: result.duration_ms
+    })
+
+    return res.apiSuccess(result, '批量异常检测完成')
   })
-
-  if (records.length === 0) {
-    return res.apiError('未找到有效记录', 'RECORDS_NOT_FOUND', null, 404)
-  }
-
-  const result = await anomalyService.batchDetect(records, {
-    models,
-    save: save !== false
-  })
-
-  logger.info('批量异常检测完成', {
-    total: result.total,
-    anomaly_count: result.anomaly_count,
-    high_risk_count: result.high_risk_count,
-    duration_ms: result.duration_ms
-  })
-
-  return res.apiSuccess(result, '批量异常检测完成')
-}))
+)
 
 /**
  * @api {put} /api/v4/admin/consumption-anomaly/:id/mark 手动标记异常
@@ -313,51 +333,56 @@ router.post('/batch-detect', authenticateToken, requireRoleLevel(100), asyncHand
  *
  * @apiPermission admin
  */
-router.put('/:id/mark', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const recordId = parseInt(req.params.id, 10)
-  if (isNaN(recordId) || recordId <= 0) {
-    return res.apiError('无效的记录ID', 'INVALID_RECORD_ID', null, 400)
-  }
-
-  const { flags, score, reason } = req.body
-
-  if (!Array.isArray(flags)) {
-    return res.apiError('flags 必须是数组', 'INVALID_FLAGS', null, 400)
-  }
-
-  if (typeof score !== 'number' || score < 0 || score > 100) {
-    return res.apiError('score 必须是 0-100 之间的数字', 'INVALID_SCORE', null, 400)
-  }
-
-  logger.info('手动标记异常', {
-    record_id: recordId,
-    flags,
-    score,
-    user_id: req.user?.user_id
-  })
-
-  const anomalyService = getAnomalyService(req)
-  const models = getModels(req)
-
-  const result = await anomalyService.markAnomaly(
-    models,
-    recordId,
-    { flags, score },
-    {
-      operator_id: req.user?.user_id,
-      reason,
-      ip_address: req.ip
+router.put(
+  '/:id/mark',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const recordId = parseInt(req.params.id, 10)
+    if (isNaN(recordId) || recordId <= 0) {
+      return res.apiError('无效的记录ID', 'INVALID_RECORD_ID', null, 400)
     }
-  )
 
-  logger.info('手动标记异常成功', {
-    record_id: recordId,
-    new_flags: result.anomaly_flags,
-    new_score: result.anomaly_score
+    const { flags, score, reason } = req.body
+
+    if (!Array.isArray(flags)) {
+      return res.apiError('flags 必须是数组', 'INVALID_FLAGS', null, 400)
+    }
+
+    if (typeof score !== 'number' || score < 0 || score > 100) {
+      return res.apiError('score 必须是 0-100 之间的数字', 'INVALID_SCORE', null, 400)
+    }
+
+    logger.info('手动标记异常', {
+      record_id: recordId,
+      flags,
+      score,
+      user_id: req.user?.user_id
+    })
+
+    const anomalyService = getAnomalyService(req)
+    const models = getModels(req)
+
+    const result = await anomalyService.markAnomaly(
+      models,
+      recordId,
+      { flags, score },
+      {
+        operator_id: req.user?.user_id,
+        reason,
+        ip_address: req.ip
+      }
+    )
+
+    logger.info('手动标记异常成功', {
+      record_id: recordId,
+      new_flags: result.anomaly_flags,
+      new_score: result.anomaly_score
+    })
+
+    return res.apiSuccess(result, '手动标记异常成功')
   })
-
-  return res.apiSuccess(result, '手动标记异常成功')
-}))
+)
 
 /**
  * @api {get} /api/v4/admin/consumption-anomaly/rules 获取异常规则配置
@@ -374,15 +399,20 @@ router.put('/:id/mark', authenticateToken, requireRoleLevel(100), asyncHandler(a
  *
  * @apiPermission admin
  */
-router.get('/rules', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  logger.info('获取异常规则配置', {
-    user_id: req.user?.user_id
+router.get(
+  '/rules',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    logger.info('获取异常规则配置', {
+      user_id: req.user?.user_id
+    })
+
+    const anomalyService = getAnomalyService(req)
+    const rules = anomalyService.getAnomalyRules()
+
+    return res.apiSuccess(rules, '获取异常规则配置成功')
   })
-
-  const anomalyService = getAnomalyService(req)
-  const rules = anomalyService.getAnomalyRules()
-
-  return res.apiSuccess(rules, '获取异常规则配置成功')
-}))
+)
 
 module.exports = router

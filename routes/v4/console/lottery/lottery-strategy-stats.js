@@ -158,8 +158,8 @@ router.get(
     })
 
     return res.apiSuccess(result, '获取实时概览统计成功')
-  }
-))
+  })
+)
 
 /*
  * ==========================================
@@ -222,8 +222,8 @@ router.get(
       },
       '获取小时级趋势数据成功'
     )
-  }
-))
+  })
+)
 
 /*
  * ==========================================
@@ -282,8 +282,8 @@ router.get(
       },
       '获取日级趋势数据成功'
     )
-  }
-))
+  })
+)
 
 /*
  * ==========================================
@@ -332,13 +332,10 @@ router.get(
     const { start_time, end_time } = parseTimeRange(req.query)
 
     // 🔴 修正：使用 options 对象参数格式
-    const result = await getLotteryAnalyticsService(req).getTierDistribution(
-      lottery_campaign_id,
-      {
-        start_time,
-        end_time
-      }
-    )
+    const result = await getLotteryAnalyticsService(req).getTierDistribution(lottery_campaign_id, {
+      start_time,
+      end_time
+    })
 
     logger.info('查询奖品档位分布', {
       admin_id: req.user.user_id,
@@ -349,8 +346,8 @@ router.get(
     })
 
     return res.apiSuccess(result, '获取奖品档位分布成功')
-  }
-))
+  })
+)
 
 /*
  * ==========================================
@@ -416,8 +413,8 @@ router.get(
     })
 
     return res.apiSuccess(result, '获取体验机制触发统计成功')
-  }
-))
+  })
+)
 
 /*
  * ==========================================
@@ -461,13 +458,10 @@ router.get(
     const { start_time, end_time } = parseTimeRange(req.query)
 
     // 🔴 修正：调用正确的服务方法 getBudgetConsumption（不是 getBudgetConsumptionStats）并使用 options 对象参数格式
-    const result = await getLotteryAnalyticsService(req).getBudgetConsumption(
-      lottery_campaign_id,
-      {
-        start_time,
-        end_time
-      }
-    )
+    const result = await getLotteryAnalyticsService(req).getBudgetConsumption(lottery_campaign_id, {
+      start_time,
+      end_time
+    })
 
     logger.info('查询预算消耗统计', {
       admin_id: req.user.user_id,
@@ -478,8 +472,8 @@ router.get(
     })
 
     return res.apiSuccess(result, '获取预算消耗统计成功')
-  }
-))
+  })
+)
 
 /*
  * ==========================================
@@ -520,71 +514,75 @@ router.get(
  *   ]
  * }
  */
-router.get('/config-summary', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const { LotteryStrategyConfig, LotteryTierMatrixConfig, LotteryCampaign, sequelize } =
-    req.app.locals.models
-  const { Op } = require('sequelize')
+router.get(
+  '/config-summary',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const { LotteryStrategyConfig, LotteryTierMatrixConfig, LotteryCampaign, sequelize } =
+      req.app.locals.models
+    const { Op } = require('sequelize')
 
-  // ── 1. 策略配置总览 ──
-  const allStrategies = await LotteryStrategyConfig.findAll({
-    attributes: ['config_group', 'config_key', 'is_active'],
-    order: [
-      ['config_group', 'ASC'],
-      ['priority', 'ASC']
-    ]
-  })
-
-  const activeStrategies = allStrategies.filter(s => s.is_active)
-  const configGroups = {}
-  for (const s of allStrategies) {
-    configGroups[s.config_group] = (configGroups[s.config_group] || 0) + 1
-  }
-
-  const matrixConfigs = await LotteryTierMatrixConfig.findAll({
-    attributes: ['budget_tier', 'pressure_tier', 'is_active']
-  })
-  const activeMatrixConfigs = matrixConfigs.filter(m => m.is_active)
-
-  // ── 2. 活跃活动列表 ──
-  const activeCampaigns = await LotteryCampaign.findAll({
-    where: { status: 'active' },
-    attributes: ['lottery_campaign_id', 'campaign_name', 'pick_method', 'budget_mode'],
-    order: [['lottery_campaign_id', 'ASC']]
-  })
-
-  // 批量查询 guarantee 配置（从 lottery_strategy_config 聚合，避免 N+1）
-  const campaignIds = activeCampaigns.map(c => c.lottery_campaign_id)
-  const guaranteeMap = new Map()
-  if (campaignIds.length > 0) {
-    const guaranteeConfigs = await LotteryStrategyConfig.findAll({
-      where: {
-        lottery_campaign_id: { [Op.in]: campaignIds },
-        config_group: 'guarantee',
-        config_key: { [Op.in]: ['enabled', 'threshold'] },
-        is_active: 1
-      },
-      attributes: ['lottery_campaign_id', 'config_key', 'config_value']
+    // ── 1. 策略配置总览 ──
+    const allStrategies = await LotteryStrategyConfig.findAll({
+      attributes: ['config_group', 'config_key', 'is_active'],
+      order: [
+        ['config_group', 'ASC'],
+        ['priority', 'ASC']
+      ]
     })
-    guaranteeConfigs.forEach(gc => {
-      if (!guaranteeMap.has(gc.lottery_campaign_id)) {
-        guaranteeMap.set(gc.lottery_campaign_id, {})
-      }
-      const parsed_value = (() => {
-        try {
-          return JSON.parse(gc.config_value)
-        } catch {
-          return gc.config_value
+
+    const activeStrategies = allStrategies.filter(s => s.is_active)
+    const configGroups = {}
+    for (const s of allStrategies) {
+      configGroups[s.config_group] = (configGroups[s.config_group] || 0) + 1
+    }
+
+    const matrixConfigs = await LotteryTierMatrixConfig.findAll({
+      attributes: ['budget_tier', 'pressure_tier', 'is_active']
+    })
+    const activeMatrixConfigs = matrixConfigs.filter(m => m.is_active)
+
+    // ── 2. 活跃活动列表 ──
+    const activeCampaigns = await LotteryCampaign.findAll({
+      where: { status: 'active' },
+      attributes: ['lottery_campaign_id', 'campaign_name', 'pick_method', 'budget_mode'],
+      order: [['lottery_campaign_id', 'ASC']]
+    })
+
+    // 批量查询 guarantee 配置（从 lottery_strategy_config 聚合，避免 N+1）
+    const campaignIds = activeCampaigns.map(c => c.lottery_campaign_id)
+    const guaranteeMap = new Map()
+    if (campaignIds.length > 0) {
+      const guaranteeConfigs = await LotteryStrategyConfig.findAll({
+        where: {
+          lottery_campaign_id: { [Op.in]: campaignIds },
+          config_group: 'guarantee',
+          config_key: { [Op.in]: ['enabled', 'threshold'] },
+          is_active: 1
+        },
+        attributes: ['lottery_campaign_id', 'config_key', 'config_value']
+      })
+      guaranteeConfigs.forEach(gc => {
+        if (!guaranteeMap.has(gc.lottery_campaign_id)) {
+          guaranteeMap.set(gc.lottery_campaign_id, {})
         }
-      })()
-      guaranteeMap.get(gc.lottery_campaign_id)[gc.config_key] = parsed_value
-    })
-  }
+        const parsed_value = (() => {
+          try {
+            return JSON.parse(gc.config_value)
+          } catch {
+            return gc.config_value
+          }
+        })()
+        guaranteeMap.get(gc.lottery_campaign_id)[gc.config_key] = parsed_value
+      })
+    }
 
-  // ── 3. 最近24小时策略执行概况（直接查 lottery_draws） ──
-  const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
+    // ── 3. 最近24小时策略执行概况（直接查 lottery_draws） ──
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
 
-  const [recentStats] = await sequelize.query(
-    `
+    const [recentStats] = await sequelize.query(
+      `
       SELECT
         COUNT(*)                                        AS total_draws,
         SUM(reward_tier = 'high')                       AS high_count,
@@ -598,18 +596,18 @@ router.get('/config-summary', authenticateToken, requireRoleLevel(100), asyncHan
       FROM lottery_draws
       WHERE created_at >= :since
     `,
-    {
-      replacements: { since: twentyFourHoursAgo },
-      type: sequelize.QueryTypes.SELECT
-    }
-  )
+      {
+        replacements: { since: twentyFourHoursAgo },
+        type: sequelize.QueryTypes.SELECT
+      }
+    )
 
-  const totalDraws = parseInt(recentStats.total_draws) || 0
-  const guaranteeTriggered = parseInt(recentStats.guarantee_triggered) || 0
+    const totalDraws = parseInt(recentStats.total_draws) || 0
+    const guaranteeTriggered = parseInt(recentStats.guarantee_triggered) || 0
 
-  // ── 4. BxPx 矩阵命中分布（最近24小时决策表） ──
-  const bxpxHits = await sequelize.query(
-    `
+    // ── 4. BxPx 矩阵命中分布（最近24小时决策表） ──
+    const bxpxHits = await sequelize.query(
+      `
       SELECT
         budget_tier,
         pressure_tier,
@@ -621,54 +619,55 @@ router.get('/config-summary', authenticateToken, requireRoleLevel(100), asyncHan
       GROUP BY budget_tier, pressure_tier
       ORDER BY budget_tier, pressure_tier
     `,
-    {
-      replacements: { since: twentyFourHoursAgo },
-      type: sequelize.QueryTypes.SELECT
-    }
-  )
-
-  const result = {
-    config_overview: {
-      total_strategies: allStrategies.length,
-      active_strategies: activeStrategies.length,
-      config_groups: configGroups,
-      matrix_configs: matrixConfigs.length,
-      active_matrix_configs: activeMatrixConfigs.length
-    },
-    active_campaigns: activeCampaigns.map(c => {
-      const gConfig = guaranteeMap.get(c.lottery_campaign_id) || {}
-      return {
-        ...c.toJSON(),
-        guarantee_enabled: gConfig.enabled || false,
-        guarantee_threshold: gConfig.threshold || 10
+      {
+        replacements: { since: twentyFourHoursAgo },
+        type: sequelize.QueryTypes.SELECT
       }
-    }),
-    recent_24h: {
-      total_draws: totalDraws,
-      tier_distribution: {
-        high: parseInt(recentStats.high_count) || 0,
-        mid: parseInt(recentStats.mid_count) || 0,
-        low: parseInt(recentStats.low_count) || 0,
-        fallback: parseInt(recentStats.fallback_count) || 0
+    )
+
+    const result = {
+      config_overview: {
+        total_strategies: allStrategies.length,
+        active_strategies: activeStrategies.length,
+        config_groups: configGroups,
+        matrix_configs: matrixConfigs.length,
+        active_matrix_configs: activeMatrixConfigs.length
       },
-      guarantee_triggered: guaranteeTriggered,
-      guarantee_rate:
-        totalDraws > 0 ? parseFloat((guaranteeTriggered / totalDraws).toFixed(4)) : 0,
-      downgrade_records: parseInt(recentStats.downgrade_records) || 0,
-      fallback_records: parseInt(recentStats.fallback_records) || 0,
-      avg_cost: parseFloat(recentStats.avg_cost) || 0
-    },
-    bxpx_hit_distribution: bxpxHits || []
-  }
+      active_campaigns: activeCampaigns.map(c => {
+        const gConfig = guaranteeMap.get(c.lottery_campaign_id) || {}
+        return {
+          ...c.toJSON(),
+          guarantee_enabled: gConfig.enabled || false,
+          guarantee_threshold: gConfig.threshold || 10
+        }
+      }),
+      recent_24h: {
+        total_draws: totalDraws,
+        tier_distribution: {
+          high: parseInt(recentStats.high_count) || 0,
+          mid: parseInt(recentStats.mid_count) || 0,
+          low: parseInt(recentStats.low_count) || 0,
+          fallback: parseInt(recentStats.fallback_count) || 0
+        },
+        guarantee_triggered: guaranteeTriggered,
+        guarantee_rate:
+          totalDraws > 0 ? parseFloat((guaranteeTriggered / totalDraws).toFixed(4)) : 0,
+        downgrade_records: parseInt(recentStats.downgrade_records) || 0,
+        fallback_records: parseInt(recentStats.fallback_records) || 0,
+        avg_cost: parseFloat(recentStats.avg_cost) || 0
+      },
+      bxpx_hit_distribution: bxpxHits || []
+    }
 
-  logger.info('查询策略配置概览摘要', {
-    admin_id: req.user.user_id,
-    total_strategies: result.config_overview.total_strategies,
-    active_campaigns: result.active_campaigns.length,
-    recent_draws: result.recent_24h.total_draws
+    logger.info('查询策略配置概览摘要', {
+      admin_id: req.user.user_id,
+      total_strategies: result.config_overview.total_strategies,
+      active_campaigns: result.active_campaigns.length,
+      recent_draws: result.recent_24h.total_draws
+    })
+
+    return res.apiSuccess(result, '获取策略配置概览摘要成功')
   })
-
-  return res.apiSuccess(result, '获取策略配置概览摘要成功')
-}))
+)
 
 module.exports = router

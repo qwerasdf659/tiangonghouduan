@@ -236,6 +236,7 @@ function diyMaterialManagement() {
       this.saving = true
       try {
         const data = { ...this.form }
+        delete data.material_code
         if (this.imageMediaId) {
           data.image_media_id = this.imageMediaId
         }

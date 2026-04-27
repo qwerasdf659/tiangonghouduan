@@ -56,9 +56,12 @@ const logger = require('../../../utils/logger').logger
  *
  * 业务场景：用户浏览交易市场中其他用户上架的商品（物品和材料）
  */
-router.get('/listings', authenticateToken, asyncHandler(async (req, res) => {
-  // P1-9：通过 ServiceManager 获取服务（snake_case key）
-  const MarketListingService = req.app.locals.services.getService('market_listing_query')
+router.get(
+  '/listings',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    // P1-9：通过 ServiceManager 获取服务（snake_case key）
+    const MarketListingService = req.app.locals.services.getService('market_listing_query')
 
     const {
       page = 1,
@@ -128,7 +131,8 @@ router.get('/listings', authenticateToken, asyncHandler(async (req, res) => {
     }
 
     return res.apiSuccess(responseData, '获取市场挂牌列表成功')
-}))
+  })
+)
 
 /**
  * @route GET /api/v4/marketplace/listings/facets
@@ -147,9 +151,12 @@ router.get('/listings', authenticateToken, asyncHandler(async (req, res) => {
  * - 此接口返回所有可用的筛选维度，用于前端筛选器 UI 渲染
  * - 仅返回已启用（is_enabled=true）且可交易（is_tradable=true）的选项
  */
-router.get('/listings/facets', authenticateToken, asyncHandler(async (req, res) => {
-  // P1-9：通过 ServiceManager 获取服务（snake_case key）
-  const MarketListingService = req.app.locals.services.getService('market_listing_query')
+router.get(
+  '/listings/facets',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    // P1-9：通过 ServiceManager 获取服务（snake_case key）
+    const MarketListingService = req.app.locals.services.getService('market_listing_query')
 
     // 获取筛选维度配置（仅返回已启用的选项）
     const facets = await MarketListingService.getFilterFacets({
@@ -164,7 +171,8 @@ router.get('/listings/facets', authenticateToken, asyncHandler(async (req, res) 
     })
 
     return res.apiSuccess(facets, '获取筛选维度配置成功')
-}))
+  })
+)
 
 /**
  * @route GET /api/v4/marketplace/listings/:market_listing_id
@@ -197,58 +205,56 @@ router.get(
     // P1-9：通过 ServiceManager 获取服务（snake_case key）
     const MarketListingService = req.app.locals.services.getService('market_listing_query')
 
-      const listingId = req.validated.market_listing_id
+    const listingId = req.validated.market_listing_id
 
-      // 决策7：通过 Service 层获取挂牌详情
-      const listing = await MarketListingService.getListingById(listingId)
+    // 决策7：通过 Service 层获取挂牌详情
+    const listing = await MarketListingService.getListingById(listingId)
 
-      if (!listing) {
-        return res.apiError('挂牌不存在', 'NOT_FOUND', null, 404)
-      }
+    if (!listing) {
+      return res.apiError('挂牌不存在', 'NOT_FOUND', null, 404)
+    }
 
-      /*
-       * γ 模式（2026-02-21）：通过 DataSanitizer 统一脱敏
-       * - 主键 market_listing_id → listing_id（与列表接口一致）
-       * - 卖家昵称 PII 脱敏
-       * - 内部字段自动删除
-       */
-      const DataSanitizer = req.app.locals.services.getService('data_sanitizer')
-      const dataLevel = req.dataLevel || 'public'
+    /*
+     * γ 模式（2026-02-21）：通过 DataSanitizer 统一脱敏
+     * - 主键 market_listing_id → listing_id（与列表接口一致）
+     * - 卖家昵称 PII 脱敏
+     * - 内部字段自动删除
+     */
+    const DataSanitizer = req.app.locals.services.getService('data_sanitizer')
+    const dataLevel = req.dataLevel || 'public'
 
-      const plainListing = listing.toJSON ? listing.toJSON() : { ...listing }
+    const plainListing = listing.toJSON ? listing.toJSON() : { ...listing }
 
-      // 补充详情专有字段（列表接口不包含）
-      plainListing.item_id = plainListing.offer_item_id
-      plainListing.item_template_id = plainListing.offer_item_template_id || null
-      plainListing.name =
-        plainListing.offer_item_display_name ||
-        plainListing.offerItem?.meta?.name ||
-        plainListing.offerItem?.item_type ||
-        '未知商品'
-      plainListing.item_type = plainListing.offerItem?.item_type || 'unknown'
-      plainListing.item_category_code = plainListing.offer_item_category_code ?? null
-      plainListing.offer_category_id = plainListing.offer_category_id ?? null
-      plainListing.rarity_code = plainListing.offer_item_rarity || null
-      plainListing.rarity =
-        plainListing.offer_item_rarity || plainListing.offerItem?.meta?.rarity || 'common'
-      plainListing.offer_amount = plainListing.offer_amount
-        ? Number(plainListing.offer_amount)
-        : null
-      plainListing.asset_group_code = plainListing.offer_asset_group_code || null
-      plainListing.asset_display_name = plainListing.offer_asset_display_name || null
-      plainListing.price_asset_code = plainListing.price_asset_code || AssetCode.STAR_STONE
-      plainListing.listed_at = plainListing.created_at
-      plainListing.description = plainListing.offerItem?.meta?.description || ''
-      plainListing.is_own = plainListing.seller_user_id === req.user.user_id
+    // 补充详情专有字段（列表接口不包含）
+    plainListing.item_id = plainListing.offer_item_id
+    plainListing.item_template_id = plainListing.offer_item_template_id || null
+    plainListing.name =
+      plainListing.offer_item_display_name ||
+      plainListing.offerItem?.meta?.name ||
+      plainListing.offerItem?.item_type ||
+      '未知商品'
+    plainListing.item_type = plainListing.offerItem?.item_type || 'unknown'
+    plainListing.item_category_code = plainListing.offer_item_category_code ?? null
+    plainListing.offer_category_id = plainListing.offer_category_id ?? null
+    plainListing.rarity_code = plainListing.offer_item_rarity || null
+    plainListing.rarity =
+      plainListing.offer_item_rarity || plainListing.offerItem?.meta?.rarity || 'common'
+    plainListing.offer_amount = plainListing.offer_amount ? Number(plainListing.offer_amount) : null
+    plainListing.asset_group_code = plainListing.offer_asset_group_code || null
+    plainListing.asset_display_name = plainListing.offer_asset_display_name || null
+    plainListing.price_asset_code = plainListing.price_asset_code || AssetCode.STAR_STONE
+    plainListing.listed_at = plainListing.created_at
+    plainListing.description = plainListing.offerItem?.meta?.description || ''
+    plainListing.is_own = plainListing.seller_user_id === req.user.user_id
 
-      const [sanitizedDetail] = DataSanitizer.sanitizeMarketProducts([plainListing], dataLevel)
+    const [sanitizedDetail] = DataSanitizer.sanitizeMarketProducts([plainListing], dataLevel)
 
-      logger.info('获取市场挂牌详情成功', {
-        market_listing_id: listingId,
-        user_id: req.user.user_id
-      })
+    logger.info('获取市场挂牌详情成功', {
+      market_listing_id: listingId,
+      user_id: req.user.user_id
+    })
 
-      return res.apiSuccess(sanitizedDetail, '获取挂牌详情成功')
+    return res.apiSuccess(sanitizedDetail, '获取挂牌详情成功')
   })
 )
 
@@ -263,18 +269,22 @@ router.get(
  * 业务场景：前端卖家上架商品时，需要知道可选的定价币种
  * 数据来源：system_settings.allowed_settlement_assets + material_asset_types.display_name
  */
-router.get('/settlement-currencies', authenticateToken, asyncHandler(async (req, res) => {
-  const MarketListingService = req.app.locals.services.getService('market_listing_query')
+router.get(
+  '/settlement-currencies',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const MarketListingService = req.app.locals.services.getService('market_listing_query')
 
-  const currencies = await MarketListingService.getSettlementCurrencies()
+    const currencies = await MarketListingService.getSettlementCurrencies()
 
-  logger.info('获取结算币种列表成功', {
-    user_id: req.user.user_id,
-    count: currencies.length
+    logger.info('获取结算币种列表成功', {
+      user_id: req.user.user_id,
+      count: currencies.length
+    })
+
+    return res.apiSuccess({ currencies }, '获取结算币种列表成功')
   })
-
-  return res.apiSuccess({ currencies }, '获取结算币种列表成功')
-}))
+)
 
 /**
  * @route GET /api/v4/marketplace/my-listings
@@ -292,8 +302,11 @@ router.get('/settlement-currencies', authenticateToken, asyncHandler(async (req,
  * 业务场景：用户查看自己在市场上架的所有挂单（含历史订单）
  * Service层已完整实现（MarketListingQueryService.getUserListings），路由层仅做参数透传
  */
-router.get('/my-listings', authenticateToken, asyncHandler(async (req, res) => {
-  const MarketListingService = req.app.locals.services.getService('market_listing_query')
+router.get(
+  '/my-listings',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const MarketListingService = req.app.locals.services.getService('market_listing_query')
 
     const userId = req.user.user_id
     const { page = 1, page_size: my_page_size = 20, status } = req.query
@@ -325,7 +338,8 @@ router.get('/my-listings', authenticateToken, asyncHandler(async (req, res) => {
       },
       '获取我的挂单列表成功'
     )
-}))
+  })
+)
 
 /**
  * @route GET /api/v4/marketplace/listing-status
@@ -340,9 +354,12 @@ router.get('/my-listings', authenticateToken, asyncHandler(async (req, res) => {
  *
  * 业务场景：查询用户当前上架商品数量和剩余上架额度
  */
-router.get('/listing-status', authenticateToken, asyncHandler(async (req, res) => {
-  // P1-9：通过 ServiceManager 获取服务（snake_case key）
-  const MarketListingService = req.app.locals.services.getService('market_listing_query')
+router.get(
+  '/listing-status',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    // P1-9：通过 ServiceManager 获取服务（snake_case key）
+    const MarketListingService = req.app.locals.services.getService('market_listing_query')
 
     const userId = req.user.user_id
 
@@ -372,6 +389,7 @@ router.get('/listing-status', authenticateToken, asyncHandler(async (req, res) =
       },
       '获取上架状态成功'
     )
-}))
+  })
+)
 
 module.exports = router

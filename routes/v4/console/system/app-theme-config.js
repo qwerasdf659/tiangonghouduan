@@ -75,33 +75,36 @@ const THEME_META = {
  * @desc 获取当前全局氛围主题配置（管理后台用）
  * @access Admin（requireRoleLevel(100)）
  */
-router.get('/', asyncHandler(async (req, res) => {
-  const AdminSystemService = req.app.locals.services.getService('admin_system')
-  const configData = await AdminSystemService.getConfigValue('app_theme')
+router.get(
+  '/',
+  asyncHandler(async (req, res) => {
+    const AdminSystemService = req.app.locals.services.getService('admin_system')
+    const configData = await AdminSystemService.getConfigValue('app_theme')
 
-  if (!configData) {
+    if (!configData) {
+      return res.apiSuccess(
+        {
+          theme: 'default',
+          theme_meta: THEME_META,
+          valid_themes: VALID_THEMES,
+          is_default: true
+        },
+        '配置为空（使用默认主题）'
+      )
+    }
+
     return res.apiSuccess(
       {
-        theme: 'default',
+        theme: configData.theme || 'default',
         theme_meta: THEME_META,
         valid_themes: VALID_THEMES,
-        is_default: true
+        version: Date.now().toString()
       },
-      '配置为空（使用默认主题）'
+      '获取全局主题配置成功',
+      'APP_THEME_CONFIG_GET_SUCCESS'
     )
-  }
-
-  return res.apiSuccess(
-    {
-      theme: configData.theme || 'default',
-      theme_meta: THEME_META,
-      valid_themes: VALID_THEMES,
-      version: Date.now().toString()
-    },
-    '获取全局主题配置成功',
-    'APP_THEME_CONFIG_GET_SUCCESS'
-  )
-}))
+  })
+)
 
 /**
  * @route PUT /api/v4/console/system/app-theme-config
@@ -110,51 +113,54 @@ router.get('/', asyncHandler(async (req, res) => {
  *
  * @body {string} theme - 主题标识（必须是 VALID_THEMES 中的值）
  */
-router.put('/', asyncHandler(async (req, res) => {
-  const { theme } = req.body
+router.put(
+  '/',
+  asyncHandler(async (req, res) => {
+    const { theme } = req.body
 
-  if (!theme || !VALID_THEMES.includes(theme)) {
-    return res.apiError(
-      `theme 值无效（${theme}），允许值: ${VALID_THEMES.join(' / ')}`,
-      'INVALID_THEME',
-      { valid_themes: VALID_THEMES },
-      400
-    )
-  }
+    if (!theme || !VALID_THEMES.includes(theme)) {
+      return res.apiError(
+        `theme 值无效（${theme}），允许值: ${VALID_THEMES.join(' / ')}`,
+        'INVALID_THEME',
+        { valid_themes: VALID_THEMES },
+        400
+      )
+    }
 
-  const AdminSystemService = req.app.locals.services.getService('admin_system')
-  const configValue = { theme }
+    const AdminSystemService = req.app.locals.services.getService('admin_system')
+    const configValue = { theme }
 
-  await AdminSystemService.upsertConfig('app_theme', configValue, {
-    description: '全局氛围主题配置，控制小程序所有页面的视觉主题',
-    category: 'feature'
-  })
-
-  try {
-    const AuditLogService = req.app.locals.services.getService('audit_log')
-    await AuditLogService.logOperation({
-      operator_id: req.user.user_id,
-      operation_type: 'config_update',
-      target_type: 'system_config',
-      target_id: 'app_theme',
-      description: `切换全局氛围主题为「${THEME_META[theme]?.label || theme}」`,
-      details: configValue
+    await AdminSystemService.upsertConfig('app_theme', configValue, {
+      description: '全局氛围主题配置，控制小程序所有页面的视觉主题',
+      category: 'feature'
     })
-  } catch (auditError) {
-    logger.warn('记录审计日志失败（非致命）', { error: auditError.message })
-  }
 
-  logger.info('全局氛围主题配置更新成功', {
-    operator_id: req.user.user_id,
-    theme,
-    theme_label: THEME_META[theme]?.label
+    try {
+      const AuditLogService = req.app.locals.services.getService('audit_log')
+      await AuditLogService.logOperation({
+        operator_id: req.user.user_id,
+        operation_type: 'config_update',
+        target_type: 'system_config',
+        target_id: 'app_theme',
+        description: `切换全局氛围主题为「${THEME_META[theme]?.label || theme}」`,
+        details: configValue
+      })
+    } catch (auditError) {
+      logger.warn('记录审计日志失败（非致命）', { error: auditError.message })
+    }
+
+    logger.info('全局氛围主题配置更新成功', {
+      operator_id: req.user.user_id,
+      theme,
+      theme_label: THEME_META[theme]?.label
+    })
+
+    return res.apiSuccess(
+      { theme, theme_label: THEME_META[theme]?.label },
+      `全局主题已切换为「${THEME_META[theme]?.label || theme}」（小程序下次打开页面自动生效）`,
+      'APP_THEME_CONFIG_UPDATE_SUCCESS'
+    )
   })
-
-  return res.apiSuccess(
-    { theme, theme_label: THEME_META[theme]?.label },
-    `全局主题已切换为「${THEME_META[theme]?.label || theme}」（小程序下次打开页面自动生效）`,
-    'APP_THEME_CONFIG_UPDATE_SUCCESS'
-  )
-}))
+)
 
 module.exports = router

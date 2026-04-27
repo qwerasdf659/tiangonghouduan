@@ -56,25 +56,30 @@ function getLotteryAlertService(req) {
  *
  * 返回：综合监控统计数据
  */
-router.get('/stats', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const { lottery_campaign_id, time_range = 'today', start_date, end_date } = req.query
+router.get(
+  '/stats',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const { lottery_campaign_id, time_range = 'today', start_date, end_date } = req.query
 
-  const stats = await getRealtimeService(req).getMonitoringStats({
-    lottery_campaign_id: lottery_campaign_id ? parseInt(lottery_campaign_id) : undefined,
-    time_range,
-    start_date,
-    end_date
+    const stats = await getRealtimeService(req).getMonitoringStats({
+      lottery_campaign_id: lottery_campaign_id ? parseInt(lottery_campaign_id) : undefined,
+      time_range,
+      start_date,
+      end_date
+    })
+
+    logger.info('获取抽奖监控统计', {
+      admin_id: req.user.user_id,
+      lottery_campaign_id,
+      time_range,
+      total_draws: stats?.total_draws || 0
+    })
+
+    return res.apiSuccess(stats, '获取抽奖监控统计成功')
   })
-
-  logger.info('获取抽奖监控统计', {
-    admin_id: req.user.user_id,
-    lottery_campaign_id,
-    time_range,
-    total_draws: stats?.total_draws || 0
-  })
-
-  return res.apiSuccess(stats, '获取抽奖监控统计成功')
-}))
+)
 
 /*
  * ==========================================
@@ -96,88 +101,93 @@ router.get('/stats', authenticateToken, requireRoleLevel(100), asyncHandler(asyn
  * - alerts: 告警列表（包含 lottery_alert_id 用于确认/解决操作）
  * - summary: 告警汇总统计
  */
-router.get('/alerts', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const { lottery_campaign_id, level, type, status, page_size = 50 } = req.query
+router.get(
+  '/alerts',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const { lottery_campaign_id, level, type, status, page_size = 50 } = req.query
 
-  const alertService = getLotteryAlertService(req)
+    const alertService = getLotteryAlertService(req)
 
-  // 使用 LotteryAlertService 获取持久化的告警列表
-  const result = await alertService.getAlertList({
-    lottery_campaign_id: lottery_campaign_id ? parseInt(lottery_campaign_id) : undefined,
-    level,
-    type,
-    status,
-    page_size: parseInt(page_size)
+    // 使用 LotteryAlertService 获取持久化的告警列表
+    const result = await alertService.getAlertList({
+      lottery_campaign_id: lottery_campaign_id ? parseInt(lottery_campaign_id) : undefined,
+      level,
+      type,
+      status,
+      page_size: parseInt(page_size)
+    })
+
+    // 转换为前端期望的格式（以后端字段为准）
+    const formattedAlerts = result.alerts.map(alert => ({
+      // 主键 - 用于确认/解决操作
+      alert_id: alert.lottery_alert_id,
+      lottery_alert_id: alert.lottery_alert_id,
+      // 关联活动
+      lottery_campaign_id: alert.lottery_campaign_id,
+      campaign_name: alert.campaign_name,
+      campaign_code: alert.campaign_code,
+      // 告警信息
+      level: alert.severity,
+      type: alert.alert_type,
+      type_display: alert.alert_type_display, // 中文显示名称（来自字典表）
+      type_color: alert.alert_type_color, // 颜色样式类（来自字典表）
+      message: alert.message,
+      // 阈值和实际值
+      threshold: alert.threshold_value,
+      current_value: alert.actual_value,
+      deviation_percentage: alert.deviation_percentage,
+      // 状态
+      status: alert.status,
+      status_display: alert.status_display, // 中文显示名称（来自字典表）
+      status_color: alert.status_color, // 颜色样式类（来自字典表）
+      // 严重程度
+      severity_display: alert.severity_display, // 中文显示名称（来自字典表）
+      severity_color: alert.severity_color, // 颜色样式类（来自字典表）
+      acknowledged: alert.status === 'acknowledged' || alert.status === 'resolved',
+      // 时间
+      created_at: alert.created_at,
+      resolved_at: alert.resolved_at,
+      // 处理人
+      resolved_by: alert.resolved_by,
+      resolver_name: alert.resolver_name,
+      resolve_notes: alert.resolve_notes
+    }))
+
+    // 统计汇总
+    const summary = {
+      total: result.total,
+      danger: result.alerts.filter(a => a.severity === 'danger').length,
+      warning: result.alerts.filter(a => a.severity === 'warning').length,
+      info: result.alerts.filter(a => a.severity === 'info').length,
+      active: result.active_count,
+      acknowledged: result.acknowledged_count,
+      resolved: result.resolved_count
+    }
+
+    logger.info('获取告警列表', {
+      admin_id: req.user.user_id,
+      lottery_campaign_id: lottery_campaign_id || 'all',
+      total_alerts: result.total,
+      active_count: result.active_count
+    })
+
+    return res.apiSuccess(
+      {
+        alerts: formattedAlerts,
+        summary,
+        pagination: {
+          total: result.total,
+          page: 1,
+          page_size: parseInt(page_size),
+          total_pages: 1
+        }
+      },
+      '获取告警列表成功'
+    )
   })
-
-  // 转换为前端期望的格式（以后端字段为准）
-  const formattedAlerts = result.alerts.map(alert => ({
-    // 主键 - 用于确认/解决操作
-    alert_id: alert.lottery_alert_id,
-    lottery_alert_id: alert.lottery_alert_id,
-    // 关联活动
-    lottery_campaign_id: alert.lottery_campaign_id,
-    campaign_name: alert.campaign_name,
-    campaign_code: alert.campaign_code,
-    // 告警信息
-    level: alert.severity,
-    type: alert.alert_type,
-    type_display: alert.alert_type_display, // 中文显示名称（来自字典表）
-    type_color: alert.alert_type_color, // 颜色样式类（来自字典表）
-    message: alert.message,
-    // 阈值和实际值
-    threshold: alert.threshold_value,
-    current_value: alert.actual_value,
-    deviation_percentage: alert.deviation_percentage,
-    // 状态
-    status: alert.status,
-    status_display: alert.status_display, // 中文显示名称（来自字典表）
-    status_color: alert.status_color, // 颜色样式类（来自字典表）
-    // 严重程度
-    severity_display: alert.severity_display, // 中文显示名称（来自字典表）
-    severity_color: alert.severity_color, // 颜色样式类（来自字典表）
-    acknowledged: alert.status === 'acknowledged' || alert.status === 'resolved',
-    // 时间
-    created_at: alert.created_at,
-    resolved_at: alert.resolved_at,
-    // 处理人
-    resolved_by: alert.resolved_by,
-    resolver_name: alert.resolver_name,
-    resolve_notes: alert.resolve_notes
-  }))
-
-  // 统计汇总
-  const summary = {
-    total: result.total,
-    danger: result.alerts.filter(a => a.severity === 'danger').length,
-    warning: result.alerts.filter(a => a.severity === 'warning').length,
-    info: result.alerts.filter(a => a.severity === 'info').length,
-    active: result.active_count,
-    acknowledged: result.acknowledged_count,
-    resolved: result.resolved_count
-  }
-
-  logger.info('获取告警列表', {
-    admin_id: req.user.user_id,
-    lottery_campaign_id: lottery_campaign_id || 'all',
-    total_alerts: result.total,
-    active_count: result.active_count
-  })
-
-  return res.apiSuccess(
-    {
-      alerts: formattedAlerts,
-      summary,
-      pagination: {
-        total: result.total,
-        page: 1,
-        page_size: parseInt(page_size),
-        total_pages: 1
-      }
-    },
-    '获取告警列表成功'
-  )
-}))
+)
 
 /**
  * POST /alerts/:id/acknowledge - 确认告警
@@ -214,8 +224,8 @@ router.post(
     })
 
     return res.apiSuccess(result, '确认告警成功')
-  }
-))
+  })
+)
 
 /**
  * POST /alerts/:id/resolve - 解决告警
@@ -226,29 +236,34 @@ router.post(
  * Body参数：
  * - resolution: 解决方案描述
  */
-router.post('/alerts/:id/resolve', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const alert_id = parseInt(req.params.id)
-  const { resolution } = req.body
+router.post(
+  '/alerts/:id/resolve',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const alert_id = parseInt(req.params.id)
+    const { resolution } = req.body
 
-  if (!alert_id || isNaN(alert_id)) {
-    return res.apiError('无效的告警ID', 'INVALID_ALERT_ID', null, 400)
-  }
+    if (!alert_id || isNaN(alert_id)) {
+      return res.apiError('无效的告警ID', 'INVALID_ALERT_ID', null, 400)
+    }
 
-  const alertService = getLotteryAlertService(req)
+    const alertService = getLotteryAlertService(req)
 
-  const result = await alertService.resolveAlert(alert_id, {
-    admin_id: req.user.user_id,
-    resolution
+    const result = await alertService.resolveAlert(alert_id, {
+      admin_id: req.user.user_id,
+      resolution
+    })
+
+    logger.info('解决告警成功', {
+      admin_id: req.user.user_id,
+      alert_id,
+      resolution
+    })
+
+    return res.apiSuccess(result, '解决告警成功')
   })
-
-  logger.info('解决告警成功', {
-    admin_id: req.user.user_id,
-    alert_id,
-    resolution
-  })
-
-  return res.apiSuccess(result, '解决告警成功')
-}))
+)
 
 /*
  * ==========================================
@@ -299,7 +314,7 @@ router.get(
     })
 
     return res.apiSuccess(details, '获取单次抽奖详情成功')
-  }
-))
+  })
+)
 
 module.exports = router

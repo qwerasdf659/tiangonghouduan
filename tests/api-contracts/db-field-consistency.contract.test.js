@@ -19,34 +19,72 @@ const { initializeTestServiceManager } = require('../helpers/UnifiedTestManager'
  */
 const TABLE_FIELD_FIXTURES = {
   users: [
-    'user_id', 'user_uuid', 'mobile', 'nickname', 'avatar_url',
-    'status', 'last_login', 'login_count', 'user_level',
-    'last_active_at', 'consecutive_fail_count', 'history_total_points',
-    'max_active_listings', 'wx_openid', 'created_at', 'updated_at'
+    'user_id',
+    'user_uuid',
+    'mobile',
+    'nickname',
+    'avatar_url',
+    'status',
+    'last_login',
+    'login_count',
+    'user_level',
+    'last_active_at',
+    'consecutive_fail_count',
+    'history_total_points',
+    'max_active_listings',
+    'wx_openid',
+    'created_at',
+    'updated_at'
   ],
   account_asset_balances: [
-    'account_asset_balance_id', 'account_id', 'asset_code',
-    'available_amount', 'frozen_amount',
-    'lottery_campaign_id', 'lottery_campaign_key',
-    'created_at', 'updated_at'
+    'account_asset_balance_id',
+    'account_id',
+    'asset_code',
+    'available_amount',
+    'frozen_amount',
+    'lottery_campaign_id',
+    'lottery_campaign_key',
+    'created_at',
+    'updated_at'
   ],
   lottery_prizes: [
-    'lottery_prize_id', 'lottery_campaign_id', 'prize_name',
-    'reward_tier', 'prize_value', 'win_probability',
-    'stock_quantity', 'total_win_count', 'status',
-    'sort_order', 'created_at', 'updated_at'
+    'lottery_prize_id',
+    'lottery_campaign_id',
+    'prize_name',
+    'reward_tier',
+    'prize_value',
+    'win_probability',
+    'stock_quantity',
+    'total_win_count',
+    'status',
+    'sort_order',
+    'created_at',
+    'updated_at'
   ],
   market_listings: [
-    'market_listing_id', 'seller_user_id', 'listing_kind',
-    'offer_item_id', 'offer_asset_code', 'offer_amount',
-    'price_asset_code', 'price_amount', 'status',
-    'created_at', 'updated_at'
+    'market_listing_id',
+    'seller_user_id',
+    'listing_kind',
+    'offer_item_id',
+    'offer_asset_code',
+    'offer_amount',
+    'price_asset_code',
+    'price_amount',
+    'status',
+    'created_at',
+    'updated_at'
   ],
   diy_templates: [
-    'diy_template_id', 'display_name', 'category_id',
-    'base_image_media_id', 'preview_media_id',
-    'status', 'is_enabled', 'sort_order',
-    'created_at', 'updated_at'
+    'diy_template_id',
+    'display_name',
+    'category_id',
+    'base_image_media_id',
+    'preview_media_id',
+    'status',
+    'is_enabled',
+    'sort_order',
+    'created_at',
+    'updated_at'
   ]
 }
 
@@ -94,7 +132,7 @@ describe('数据库字段一致性契约', () => {
         if (unexpected.length > 0) {
           console.warn(
             `⚠️ ${tableName} 表有 ${unexpected.length} 个字段未在 fixture 中声明: ${unexpected.join(', ')}\n` +
-            '   请更新 tests/api-contracts/db-field-consistency.contract.test.js 的 TABLE_FIELD_FIXTURES'
+              '   请更新 tests/api-contracts/db-field-consistency.contract.test.js 的 TABLE_FIELD_FIXTURES'
           )
         }
       })

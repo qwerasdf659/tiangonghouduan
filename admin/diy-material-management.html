@@ -176,8 +176,13 @@
 
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label class="block text-xs text-gray-500 mb-1">素材编码 *</label>
-                <input type="text" x-model="form.material_code" class="input-field w-full" placeholder="如：yellow_crystal_10mm">
+                <label class="block text-xs text-gray-500 mb-1">素材编码</label>
+                <template x-if="editingId">
+                  <input type="text" :value="form.material_code" class="input-field w-full bg-gray-50 text-gray-500 font-mono text-sm" readonly>
+                </template>
+                <template x-if="!editingId">
+                  <span class="block text-xs text-gray-400 mt-2">系统自动生成（DM 格式）</span>
+                </template>
               </div>
               <div>
                 <label class="block text-xs text-gray-500 mb-1">材料分组 *</label>

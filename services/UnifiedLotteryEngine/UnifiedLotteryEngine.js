@@ -840,7 +840,11 @@ class UnifiedLotteryEngine {
 
       // 🔴 参数验证
       if (!user_id || !lottery_campaign_id) {
-        throw new BusinessError('缺少必需参数：user_id或lottery_campaign_id', 'ENGINE_REQUIRED', 400)
+        throw new BusinessError(
+          '缺少必需参数：user_id或lottery_campaign_id',
+          'ENGINE_REQUIRED',
+          400
+        )
       }
 
       if (draw_count < 1 || draw_count > 10) {

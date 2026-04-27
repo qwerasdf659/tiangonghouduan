@@ -30,7 +30,7 @@ router.get(
   '/overview',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-        const { start_date, end_date } = req.query
+    const { start_date, end_date } = req.query
 
     if (start_date && !DATE_REGEX.test(start_date)) {
       return res.apiBadRequest('start_date 格式必须为 YYYY-MM-DD')
@@ -61,7 +61,7 @@ router.get(
   '/campaigns/:id',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-        const campaignId = parseInt(req.params.id)
+    const campaignId = parseInt(req.params.id)
     if (isNaN(campaignId)) {
       return res.apiBadRequest('广告活动 ID 必须是有效数字')
     }
@@ -100,7 +100,7 @@ router.get(
   '/slots/:id',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-        const slotId = parseInt(req.params.id)
+    const slotId = parseInt(req.params.id)
     if (isNaN(slotId)) {
       return res.apiBadRequest('广告位 ID 必须是有效数字')
     }
@@ -113,11 +113,7 @@ router.get(
     }
 
     const AdReportService = req.app.locals.services.getService('ad_report')
-    const report = await AdReportService.getSlotReport(
-      slotId,
-      start_date || null,
-      end_date || null
-    )
+    const report = await AdReportService.getSlotReport(slotId, start_date || null, end_date || null)
 
     if (!report) {
       return res.apiError('报表数据不存在', 'REPORT_NOT_FOUND', null, 404)
@@ -142,7 +138,7 @@ router.get(
   '/billing-records',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-        const AdBillingService = req.app.locals.services.getService('ad_billing')
+    const AdBillingService = req.app.locals.services.getService('ad_billing')
     const result = await AdBillingService.listBillingRecords(req.query)
     return res.apiSuccess(result, '获取计费流水成功')
   })

@@ -52,7 +52,11 @@ class BaseStage {
    * @abstract
    */
   async execute(_context) {
-    throw new BusinessError(`Stage ${this.stage_name} must implement execute(context) method`, 'ENGINE_ERROR', 400)
+    throw new BusinessError(
+      `Stage ${this.stage_name} must implement execute(context) method`,
+      'ENGINE_ERROR',
+      400
+    )
   }
 
   /**

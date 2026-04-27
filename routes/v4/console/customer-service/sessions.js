@@ -27,23 +27,26 @@ router.use(authenticateToken, requireRoleLevel(1))
  * @route GET /api/v4/console/customer-service/sessions
  * @access Admin
  */
-router.get('/', asyncHandler(async (req, res) => {
-  const AdminCustomerServiceService = req.app.locals.services.getService('admin_customer_service')
+router.get(
+  '/',
+  asyncHandler(async (req, res) => {
+    const AdminCustomerServiceService = req.app.locals.services.getService('admin_customer_service')
 
-  const options = {
-    page: req.query.page,
-    page_size: req.query.page_size,
-    status: req.query.status,
-    admin_id: req.query.admin_id,
-    search: req.query.search,
-    sort_by: req.query.sort_by,
-    sort_order: req.query.sort_order
-  }
+    const options = {
+      page: req.query.page,
+      page_size: req.query.page_size,
+      status: req.query.status,
+      admin_id: req.query.admin_id,
+      search: req.query.search,
+      sort_by: req.query.sort_by,
+      sort_order: req.query.sort_order
+    }
 
-  const result = await AdminCustomerServiceService.getSessionList(options)
+    const result = await AdminCustomerServiceService.getSessionList(options)
 
-  return res.apiSuccess(result, '获取会话列表成功')
-}))
+    return res.apiSuccess(result, '获取会话列表成功')
+  })
+)
 
 /**
  * GET /sessions/stats - 获取会话统计
@@ -52,15 +55,18 @@ router.get('/', asyncHandler(async (req, res) => {
  * @route GET /api/v4/console/customer-service/sessions/stats
  * @access Admin
  */
-router.get('/stats', asyncHandler(async (req, res) => {
-  const AdminCustomerServiceService = req.app.locals.services.getService('admin_customer_service')
+router.get(
+  '/stats',
+  asyncHandler(async (req, res) => {
+    const AdminCustomerServiceService = req.app.locals.services.getService('admin_customer_service')
 
-  const admin_id = req.query.admin_id ? parseInt(req.query.admin_id) : undefined
+    const admin_id = req.query.admin_id ? parseInt(req.query.admin_id) : undefined
 
-  const stats = await AdminCustomerServiceService.getSessionStats(admin_id)
+    const stats = await AdminCustomerServiceService.getSessionStats(admin_id)
 
-  return res.apiSuccess(stats, '获取统计信息成功')
-}))
+    return res.apiSuccess(stats, '获取统计信息成功')
+  })
+)
 
 /**
  * GET /sessions/response-stats - 获取客服响应时长统计
@@ -111,21 +117,24 @@ router.get('/stats', asyncHandler(async (req, res) => {
  *
  * 关联需求：§4.7.1 客服响应统计接口
  */
-router.get('/response-stats', asyncHandler(async (req, res) => {
-  const { days = 7 } = req.query
+router.get(
+  '/response-stats',
+  asyncHandler(async (req, res) => {
+    const { days = 7 } = req.query
 
-  logger.info('[客服管理] 获取响应时长统计', {
-    admin_id: req.user.user_id,
-    days: parseInt(days)
+    logger.info('[客服管理] 获取响应时长统计', {
+      admin_id: req.user.user_id,
+      days: parseInt(days)
+    })
+
+    const CustomerServiceResponseStatsService =
+      req.app.locals.services.getService('cs_response_stats')
+    const result = await CustomerServiceResponseStatsService.getResponseStats({
+      days: parseInt(days) || 7
+    })
+
+    return res.apiSuccess(result, '获取成功')
   })
-
-  const CustomerServiceResponseStatsService =
-    req.app.locals.services.getService('cs_response_stats')
-  const result = await CustomerServiceResponseStatsService.getResponseStats({
-    days: parseInt(days) || 7
-  })
-
-  return res.apiSuccess(result, '获取成功')
-}))
+)
 
 module.exports = router

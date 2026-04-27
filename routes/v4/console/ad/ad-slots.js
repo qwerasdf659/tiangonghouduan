@@ -62,7 +62,7 @@ router.get(
   '/',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-        const { slot_type = null, is_active = null, page = 1, page_size = 20 } = req.query
+    const { slot_type = null, is_active = null, page = 1, page_size = 20 } = req.query
 
     if (slot_type && !VALID_SLOT_TYPES.includes(slot_type)) {
       return res.apiBadRequest(`slot_type 必须是以下之一：${VALID_SLOT_TYPES.join(', ')}`)
@@ -110,7 +110,7 @@ router.get(
   '/statistics',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-        const AdSlotService = req.app.locals.services.getService('ad_slot')
+    const AdSlotService = req.app.locals.services.getService('ad_slot')
     const statistics = await AdSlotService.getStatistics()
 
     return res.apiSuccess(statistics, '获取统计数据成功')
@@ -127,7 +127,7 @@ router.get(
   '/:id',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-        const slotId = parseInt(req.params.id)
+    const slotId = parseInt(req.params.id)
     if (isNaN(slotId)) {
       return res.apiBadRequest('广告位 ID 必须是有效数字')
     }
@@ -162,7 +162,7 @@ router.post(
   '/',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-        const { slot_key, slot_name, slot_type, position, daily_price_star_stone } = req.body
+    const { slot_key, slot_name, slot_type, position, daily_price_star_stone } = req.body
 
     // 必填字段校验
     if (
@@ -244,7 +244,7 @@ router.put(
   '/:id',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-        const slotId = parseInt(req.params.id)
+    const slotId = parseInt(req.params.id)
     if (isNaN(slotId)) {
       return res.apiBadRequest('广告位 ID 必须是有效数字')
     }
@@ -309,7 +309,7 @@ router.patch(
   '/:id/toggle',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-        const slotId = parseInt(req.params.id)
+    const slotId = parseInt(req.params.id)
     if (isNaN(slotId)) {
       return res.apiBadRequest('广告位 ID 必须是有效数字')
     }

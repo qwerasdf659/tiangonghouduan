@@ -38,18 +38,21 @@ router.use(authenticateToken, requireRoleLevel(1))
  * @route GET /api/v4/console/customer-service/user-context/:userId/summary
  * @param {number} userId - 用户ID（事务实体）
  */
-router.get('/:userId/summary', asyncHandler(async (req, res) => {
-  const userId = parseInt(req.params.userId)
-  if (isNaN(userId) || userId <= 0) {
-    return res.apiError('用户ID无效', 'BAD_REQUEST', null, 400)
-  }
+router.get(
+  '/:userId/summary',
+  asyncHandler(async (req, res) => {
+    const userId = parseInt(req.params.userId)
+    if (isNaN(userId) || userId <= 0) {
+      return res.apiError('用户ID无效', 'BAD_REQUEST', null, 400)
+    }
 
-  const models = req.app.locals.models
-  const UserContextService = req.app.locals.services.getService('cs_user_context')
-  const result = await UserContextService.getSummary(models, userId)
+    const models = req.app.locals.models
+    const UserContextService = req.app.locals.services.getService('cs_user_context')
+    const result = await UserContextService.getSummary(models, userId)
 
-  return res.apiSuccess(result, '获取用户画像摘要成功')
-}))
+    return res.apiSuccess(result, '获取用户画像摘要成功')
+  })
+)
 
 /**
  * GET /user-context/:userId/assets - 资产余额 + 最近变动
@@ -58,18 +61,21 @@ router.get('/:userId/summary', asyncHandler(async (req, res) => {
  * @query {number} [page=1] - 页码
  * @query {number} [page_size=10] - 每页数量
  */
-router.get('/:userId/assets', asyncHandler(async (req, res) => {
-  const userId = parseInt(req.params.userId)
-  if (isNaN(userId) || userId <= 0) {
-    return res.apiError('用户ID无效', 'BAD_REQUEST', null, 400)
-  }
+router.get(
+  '/:userId/assets',
+  asyncHandler(async (req, res) => {
+    const userId = parseInt(req.params.userId)
+    if (isNaN(userId) || userId <= 0) {
+      return res.apiError('用户ID无效', 'BAD_REQUEST', null, 400)
+    }
 
-  const models = req.app.locals.models
-  const UserContextService = req.app.locals.services.getService('cs_user_context')
-  const result = await UserContextService.getAssets(models, userId, req.query)
+    const models = req.app.locals.models
+    const UserContextService = req.app.locals.services.getService('cs_user_context')
+    const result = await UserContextService.getAssets(models, userId, req.query)
 
-  return res.apiSuccess(result, '获取用户资产信息成功')
-}))
+    return res.apiSuccess(result, '获取用户资产信息成功')
+  })
+)
 
 /**
  * GET /user-context/:userId/backpack - 背包物品列表
@@ -79,18 +85,21 @@ router.get('/:userId/assets', asyncHandler(async (req, res) => {
  * @query {number} [page=1] - 页码
  * @query {number} [page_size=20] - 每页数量
  */
-router.get('/:userId/backpack', asyncHandler(async (req, res) => {
-  const userId = parseInt(req.params.userId)
-  if (isNaN(userId) || userId <= 0) {
-    return res.apiError('用户ID无效', 'BAD_REQUEST', null, 400)
-  }
+router.get(
+  '/:userId/backpack',
+  asyncHandler(async (req, res) => {
+    const userId = parseInt(req.params.userId)
+    if (isNaN(userId) || userId <= 0) {
+      return res.apiError('用户ID无效', 'BAD_REQUEST', null, 400)
+    }
 
-  const models = req.app.locals.models
-  const UserContextService = req.app.locals.services.getService('cs_user_context')
-  const result = await UserContextService.getBackpack(models, userId, req.query)
+    const models = req.app.locals.models
+    const UserContextService = req.app.locals.services.getService('cs_user_context')
+    const result = await UserContextService.getBackpack(models, userId, req.query)
 
-  return res.apiSuccess(result, '获取用户背包信息成功')
-}))
+    return res.apiSuccess(result, '获取用户背包信息成功')
+  })
+)
 
 /**
  * GET /user-context/:userId/lottery - 抽奖记录 + 统计
@@ -101,18 +110,21 @@ router.get('/:userId/backpack', asyncHandler(async (req, res) => {
  * @query {number} [page=1] - 页码
  * @query {number} [page_size=10] - 每页数量
  */
-router.get('/:userId/lottery', asyncHandler(async (req, res) => {
-  const userId = parseInt(req.params.userId)
-  if (isNaN(userId) || userId <= 0) {
-    return res.apiError('用户ID无效', 'BAD_REQUEST', null, 400)
-  }
+router.get(
+  '/:userId/lottery',
+  asyncHandler(async (req, res) => {
+    const userId = parseInt(req.params.userId)
+    if (isNaN(userId) || userId <= 0) {
+      return res.apiError('用户ID无效', 'BAD_REQUEST', null, 400)
+    }
 
-  const models = req.app.locals.models
-  const UserContextService = req.app.locals.services.getService('cs_user_context')
-  const result = await UserContextService.getLottery(models, userId, req.query)
+    const models = req.app.locals.models
+    const UserContextService = req.app.locals.services.getService('cs_user_context')
+    const result = await UserContextService.getLottery(models, userId, req.query)
 
-  return res.apiSuccess(result, '获取用户抽奖记录成功')
-}))
+    return res.apiSuccess(result, '获取用户抽奖记录成功')
+  })
+)
 
 /**
  * GET /user-context/:userId/trades - 交易订单 + 市场挂单
@@ -123,18 +135,21 @@ router.get('/:userId/lottery', asyncHandler(async (req, res) => {
  * @query {number} [page=1] - 页码
  * @query {number} [page_size=10] - 每页数量
  */
-router.get('/:userId/trades', asyncHandler(async (req, res) => {
-  const userId = parseInt(req.params.userId)
-  if (isNaN(userId) || userId <= 0) {
-    return res.apiError('用户ID无效', 'BAD_REQUEST', null, 400)
-  }
+router.get(
+  '/:userId/trades',
+  asyncHandler(async (req, res) => {
+    const userId = parseInt(req.params.userId)
+    if (isNaN(userId) || userId <= 0) {
+      return res.apiError('用户ID无效', 'BAD_REQUEST', null, 400)
+    }
 
-  const models = req.app.locals.models
-  const UserContextService = req.app.locals.services.getService('cs_user_context')
-  const result = await UserContextService.getTrades(models, userId, req.query)
+    const models = req.app.locals.models
+    const UserContextService = req.app.locals.services.getService('cs_user_context')
+    const result = await UserContextService.getTrades(models, userId, req.query)
 
-  return res.apiSuccess(result, '获取用户交易信息成功')
-}))
+    return res.apiSuccess(result, '获取用户交易信息成功')
+  })
+)
 
 /**
  * GET /user-context/:userId/timeline - 混合业务时间线
@@ -143,36 +158,42 @@ router.get('/:userId/trades', asyncHandler(async (req, res) => {
  * @query {number} [page=1] - 页码
  * @query {number} [page_size=20] - 每页数量
  */
-router.get('/:userId/timeline', asyncHandler(async (req, res) => {
-  const userId = parseInt(req.params.userId)
-  if (isNaN(userId) || userId <= 0) {
-    return res.apiError('用户ID无效', 'BAD_REQUEST', null, 400)
-  }
+router.get(
+  '/:userId/timeline',
+  asyncHandler(async (req, res) => {
+    const userId = parseInt(req.params.userId)
+    if (isNaN(userId) || userId <= 0) {
+      return res.apiError('用户ID无效', 'BAD_REQUEST', null, 400)
+    }
 
-  const models = req.app.locals.models
-  const UserContextService = req.app.locals.services.getService('cs_user_context')
-  const result = await UserContextService.getTimeline(models, userId, req.query)
+    const models = req.app.locals.models
+    const UserContextService = req.app.locals.services.getService('cs_user_context')
+    const result = await UserContextService.getTimeline(models, userId, req.query)
 
-  return res.apiSuccess(result, '获取用户时间线成功')
-}))
+    return res.apiSuccess(result, '获取用户时间线成功')
+  })
+)
 
 /**
  * GET /user-context/:userId/risk - 风控信息
  *
  * @route GET /api/v4/console/customer-service/user-context/:userId/risk
  */
-router.get('/:userId/risk', asyncHandler(async (req, res) => {
-  const userId = parseInt(req.params.userId)
-  if (isNaN(userId) || userId <= 0) {
-    return res.apiError('用户ID无效', 'BAD_REQUEST', null, 400)
-  }
+router.get(
+  '/:userId/risk',
+  asyncHandler(async (req, res) => {
+    const userId = parseInt(req.params.userId)
+    if (isNaN(userId) || userId <= 0) {
+      return res.apiError('用户ID无效', 'BAD_REQUEST', null, 400)
+    }
 
-  const models = req.app.locals.models
-  const UserContextService = req.app.locals.services.getService('cs_user_context')
-  const result = await UserContextService.getRisk(models, userId)
+    const models = req.app.locals.models
+    const UserContextService = req.app.locals.services.getService('cs_user_context')
+    const result = await UserContextService.getRisk(models, userId)
 
-  return res.apiSuccess(result, '获取用户风控信息成功')
-}))
+    return res.apiSuccess(result, '获取用户风控信息成功')
+  })
+)
 
 /**
  * GET /user-context/:userId/history - 历史会话列表
@@ -181,18 +202,21 @@ router.get('/:userId/risk', asyncHandler(async (req, res) => {
  * @query {number} [page=1] - 页码
  * @query {number} [page_size=10] - 每页数量
  */
-router.get('/:userId/history', asyncHandler(async (req, res) => {
-  const userId = parseInt(req.params.userId)
-  if (isNaN(userId) || userId <= 0) {
-    return res.apiError('用户ID无效', 'BAD_REQUEST', null, 400)
-  }
+router.get(
+  '/:userId/history',
+  asyncHandler(async (req, res) => {
+    const userId = parseInt(req.params.userId)
+    if (isNaN(userId) || userId <= 0) {
+      return res.apiError('用户ID无效', 'BAD_REQUEST', null, 400)
+    }
 
-  const models = req.app.locals.models
-  const UserContextService = req.app.locals.services.getService('cs_user_context')
-  const result = await UserContextService.getHistory(models, userId, req.query)
+    const models = req.app.locals.models
+    const UserContextService = req.app.locals.services.getService('cs_user_context')
+    const result = await UserContextService.getHistory(models, userId, req.query)
 
-  return res.apiSuccess(result, '获取用户历史会话成功')
-}))
+    return res.apiSuccess(result, '获取用户历史会话成功')
+  })
+)
 
 /**
  * GET /user-context/:userId/notes - 用户内部备注列表
@@ -201,22 +225,25 @@ router.get('/:userId/history', asyncHandler(async (req, res) => {
  * @query {number} [page=1] - 页码
  * @query {number} [page_size=20] - 每页数量
  */
-router.get('/:userId/notes', asyncHandler(async (req, res) => {
-  const userId = parseInt(req.params.userId)
-  if (isNaN(userId) || userId <= 0) {
-    return res.apiError('用户ID无效', 'BAD_REQUEST', null, 400)
-  }
+router.get(
+  '/:userId/notes',
+  asyncHandler(async (req, res) => {
+    const userId = parseInt(req.params.userId)
+    if (isNaN(userId) || userId <= 0) {
+      return res.apiError('用户ID无效', 'BAD_REQUEST', null, 400)
+    }
 
-  const models = req.app.locals.models
-  const IssueService = req.app.locals.services.getService('cs_issue')
-  const result = await IssueService.getNotes(models, {
-    user_id: userId,
-    page: req.query.page,
-    page_size: req.query.page_size
+    const models = req.app.locals.models
+    const IssueService = req.app.locals.services.getService('cs_issue')
+    const result = await IssueService.getNotes(models, {
+      user_id: userId,
+      page: req.query.page,
+      page_size: req.query.page_size
+    })
+
+    return res.apiSuccess(result, '获取用户备注成功')
   })
-
-  return res.apiSuccess(result, '获取用户备注成功')
-}))
+)
 
 /**
  * POST /user-context/:userId/notes - 添加用户内部备注
@@ -226,30 +253,33 @@ router.get('/:userId/notes', asyncHandler(async (req, res) => {
  * @body {number} [issue_id] - 关联工单ID（可选）
  * @body {number} [session_id] - 关联会话ID（可选）
  */
-router.post('/:userId/notes', asyncHandler(async (req, res) => {
-  const userId = parseInt(req.params.userId)
-  if (isNaN(userId) || userId <= 0) {
-    return res.apiError('用户ID无效', 'BAD_REQUEST', null, 400)
-  }
+router.post(
+  '/:userId/notes',
+  asyncHandler(async (req, res) => {
+    const userId = parseInt(req.params.userId)
+    if (isNaN(userId) || userId <= 0) {
+      return res.apiError('用户ID无效', 'BAD_REQUEST', null, 400)
+    }
 
-  const { content, issue_id, session_id } = req.body
-  if (!content || !content.trim()) {
-    return res.apiError('备注内容不能为空', 'BAD_REQUEST', null, 400)
-  }
+    const { content, issue_id, session_id } = req.body
+    if (!content || !content.trim()) {
+      return res.apiError('备注内容不能为空', 'BAD_REQUEST', null, 400)
+    }
 
-  const models = req.app.locals.models
-  const IssueService = req.app.locals.services.getService('cs_issue')
+    const models = req.app.locals.models
+    const IssueService = req.app.locals.services.getService('cs_issue')
 
-  const result = await IssueService.addNote(models, {
-    user_id: userId,
-    issue_id: issue_id ? parseInt(issue_id) : null,
-    session_id: session_id ? parseInt(session_id) : null,
-    author_id: req.user.user_id,
-    content: content.trim()
+    const result = await IssueService.addNote(models, {
+      user_id: userId,
+      issue_id: issue_id ? parseInt(issue_id) : null,
+      session_id: session_id ? parseInt(session_id) : null,
+      author_id: req.user.user_id,
+      content: content.trim()
+    })
+
+    return res.apiSuccess(result, '备注添加成功')
   })
-
-  return res.apiSuccess(result, '备注添加成功')
-}))
+)
 
 /**
  * GET /user-context/:userId/diagnose - 一键诊断
@@ -257,17 +287,20 @@ router.post('/:userId/notes', asyncHandler(async (req, res) => {
  * @route GET /api/v4/console/customer-service/user-context/:userId/diagnose
  * @description 并行检查用户的资产/交易/物品/抽奖/账号状态，2-3秒内返回诊断结果
  */
-router.get('/:userId/diagnose', asyncHandler(async (req, res) => {
-  const userId = parseInt(req.params.userId)
-  if (isNaN(userId) || userId <= 0) {
-    return res.apiError('用户ID无效', 'BAD_REQUEST', null, 400)
-  }
+router.get(
+  '/:userId/diagnose',
+  asyncHandler(async (req, res) => {
+    const userId = parseInt(req.params.userId)
+    if (isNaN(userId) || userId <= 0) {
+      return res.apiError('用户ID无效', 'BAD_REQUEST', null, 400)
+    }
 
-  const models = req.app.locals.models
-  const DiagnoseService = req.app.locals.services.getService('cs_diagnose')
-  const result = await DiagnoseService.diagnose(models, userId)
+    const models = req.app.locals.models
+    const DiagnoseService = req.app.locals.services.getService('cs_diagnose')
+    const result = await DiagnoseService.diagnose(models, userId)
 
-  return res.apiSuccess(result, '一键诊断完成')
-}))
+    return res.apiSuccess(result, '一键诊断完成')
+  })
+)
 
 module.exports = router

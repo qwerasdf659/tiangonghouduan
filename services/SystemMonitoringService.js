@@ -74,11 +74,17 @@ class SystemMonitoringService {
       const today = BeijingTimeHelper.createBeijingTime()
       const todayStart = new Date(today.setHours(0, 0, 0, 0))
       const [
-        todayLotteries, todayWins, todayNewUsers,
-        todayCustomerSessions, todayMessages, todayPointsConsumedRaw
+        todayLotteries,
+        todayWins,
+        todayNewUsers,
+        todayCustomerSessions,
+        todayMessages,
+        todayPointsConsumedRaw
       ] = await Promise.all([
         models.LotteryDraw.count({ where: { created_at: { [Op.gte]: todayStart } } }),
-        models.LotteryDraw.count({ where: { created_at: { [Op.gte]: todayStart }, reward_tier: 'high' } }),
+        models.LotteryDraw.count({
+          where: { created_at: { [Op.gte]: todayStart }, reward_tier: 'high' }
+        }),
         models.User.count({ where: { created_at: { [Op.gte]: todayStart } } }),
         models.CustomerServiceSession.count({ where: { created_at: { [Op.gte]: todayStart } } }),
         models.ChatMessage.count({ where: { created_at: { [Op.gte]: todayStart } } }),
@@ -169,7 +175,11 @@ class SystemMonitoringService {
         totalLotteries > 0 ? ((totalHighTierWins / totalLotteries) * 100).toFixed(2) : '0.00'
       return {
         users: { total: totalUsers, active: activeUsers },
-        lottery: { total: totalLotteries, high_tier_wins: totalHighTierWins, high_tier_rate: highTierRate },
+        lottery: {
+          total: totalLotteries,
+          high_tier_wins: totalHighTierWins,
+          high_tier_rate: highTierRate
+        },
         // STUB_SYSTEM_INFO
         system: {
           uptime: process.uptime(),

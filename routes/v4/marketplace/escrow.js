@@ -42,47 +42,47 @@ router.post(
     const EscrowCodeService = req.app.locals.services.getService('escrow_code')
     const TradeOrderService = req.app.locals.services.getService('trade_order')
 
-      const trade_order_id = req.validated.trade_order_id
-      const buyer_id = req.user.user_id
-      const { escrow_code } = req.body
+    const trade_order_id = req.validated.trade_order_id
+    const buyer_id = req.user.user_id
+    const { escrow_code } = req.body
 
-      if (!escrow_code || typeof escrow_code !== 'string' || escrow_code.length !== 6) {
-        return res.apiError('请输入6位担保码', 'INVALID_ESCROW_CODE', null, 400)
-      }
+    if (!escrow_code || typeof escrow_code !== 'string' || escrow_code.length !== 6) {
+      return res.apiError('请输入6位担保码', 'INVALID_ESCROW_CODE', null, 400)
+    }
 
-      logger.info('买方确认收货', { trade_order_id, buyer_id })
+    logger.info('买方确认收货', { trade_order_id, buyer_id })
 
-      // 验证担保码
-      const verifyResult = await EscrowCodeService.verifyEscrowCode(
+    // 验证担保码
+    const verifyResult = await EscrowCodeService.verifyEscrowCode(
+      trade_order_id,
+      escrow_code.trim(),
+      buyer_id
+    )
+
+    if (!verifyResult.valid) {
+      return res.apiError(verifyResult.error, 'ESCROW_VERIFY_FAILED', null, 400)
+    }
+
+    // 担保码验证通过，完成交易
+    const completeResult = await TransactionManager.execute(async transaction => {
+      return await TradeOrderService.completeOrder({ trade_order_id, buyer_id }, { transaction })
+    })
+
+    logger.info('担保码验证通过，交易完成', {
+      trade_order_id,
+      buyer_id,
+      fee_amount: completeResult.fee_amount
+    })
+
+    return res.apiSuccess(
+      {
         trade_order_id,
-        escrow_code.trim(),
-        buyer_id
-      )
-
-      if (!verifyResult.valid) {
-        return res.apiError(verifyResult.error, 'ESCROW_VERIFY_FAILED', null, 400)
-      }
-
-      // 担保码验证通过，完成交易
-      const completeResult = await TransactionManager.execute(async transaction => {
-        return await TradeOrderService.completeOrder({ trade_order_id, buyer_id }, { transaction })
-      })
-
-      logger.info('担保码验证通过，交易完成', {
-        trade_order_id,
-        buyer_id,
-        fee_amount: completeResult.fee_amount
-      })
-
-      return res.apiSuccess(
-        {
-          trade_order_id,
-          status: 'completed',
-          fee_amount: completeResult.fee_amount || 0,
-          net_amount: completeResult.net_amount || 0
-        },
-        '确认收货成功，交易已完成'
-      )
+        status: 'completed',
+        fee_amount: completeResult.fee_amount || 0,
+        net_amount: completeResult.net_amount || 0
+      },
+      '确认收货成功，交易已完成'
+    )
   })
 )
 
@@ -133,10 +133,7 @@ router.post(
     logger.info('取消交易订单', { trade_order_id, user_id: req.user.user_id })
 
     await TransactionManager.execute(async transaction => {
-      return await TradeOrderService.cancelOrder(
-        { trade_order_id, cancel_reason },
-        { transaction }
-      )
+      return await TradeOrderService.cancelOrder({ trade_order_id, cancel_reason }, { transaction })
     })
 
     // 清理担保码

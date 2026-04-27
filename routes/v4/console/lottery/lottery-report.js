@@ -49,29 +49,34 @@ function getReportService(req) {
  * - prize_distribution: 奖品分布
  * - user_metrics: 用户指标
  */
-router.get('/daily', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const { date, lottery_campaign_id } = req.query
+router.get(
+  '/daily',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const { date, lottery_campaign_id } = req.query
 
-  const reportService = getReportService(req)
+    const reportService = getReportService(req)
 
-  /**
-   * 调用 generateDailyReport(reportDate, campaignId)
-   * @param reportDate - 报表日期 (YYYY-MM-DD)，不传则默认昨日
-   * @param campaignId - 活动ID，不传则汇总所有活动
-   */
-  const report = await reportService.generateDailyReport(
-    date || null,
-    lottery_campaign_id ? parseInt(lottery_campaign_id, 10) : null
-  )
+    /**
+     * 调用 generateDailyReport(reportDate, campaignId)
+     * @param reportDate - 报表日期 (YYYY-MM-DD)，不传则默认昨日
+     * @param campaignId - 活动ID，不传则汇总所有活动
+     */
+    const report = await reportService.generateDailyReport(
+      date || null,
+      lottery_campaign_id ? parseInt(lottery_campaign_id, 10) : null
+    )
 
-  logger.info('获取每日报表成功', {
-    admin_id: req.user.user_id,
-    report_date: report.report_date,
-    lottery_campaign_id: lottery_campaign_id || 'all'
+    logger.info('获取每日报表成功', {
+      admin_id: req.user.user_id,
+      report_date: report.report_date,
+      lottery_campaign_id: lottery_campaign_id || 'all'
+    })
+
+    return res.apiSuccess(report, '获取每日报表成功')
   })
-
-  return res.apiSuccess(report, '获取每日报表成功')
-}))
+)
 
 /*
  * ==========================================
@@ -130,7 +135,7 @@ router.get(
     })
 
     return res.apiSuccess(report, '获取活动报表成功')
-  }
-))
+  })
+)
 
 module.exports = router

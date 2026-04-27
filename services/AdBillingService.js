@@ -98,7 +98,11 @@ class AdBillingService {
       }
 
       if (campaign.billing_mode !== 'fixed_daily') {
-        throw new BusinessError(`只有固定包天模式需要冻结星石，当前模式: ${campaign.billing_mode}`, 'SERVICE_ERROR', 400)
+        throw new BusinessError(
+          `只有固定包天模式需要冻结星石，当前模式: ${campaign.billing_mode}`,
+          'SERVICE_ERROR',
+          400
+        )
       }
 
       // 生成business_id
@@ -172,7 +176,11 @@ class AdBillingService {
       }
 
       if (campaign.billing_mode !== 'fixed_daily' || !campaign.fixed_total_star_stone) {
-        throw new BusinessError(`固定包天模式必须提供fixed_total_star_stone`, 'SERVICE_REQUIRED', 400)
+        throw new BusinessError(
+          `固定包天模式必须提供fixed_total_star_stone`,
+          'SERVICE_REQUIRED',
+          400
+        )
       }
 
       // 查找冻结记录

@@ -527,7 +527,11 @@ class AnomalyService {
       const validFlags = Object.keys(ANOMALY_RULES)
       const invalidFlags = flags.filter(f => !validFlags.includes(f))
       if (invalidFlags.length > 0) {
-        throw new BusinessError(`无效的异常标记: ${invalidFlags.join(', ')}`, 'CONSUMPTION_INVALID', 400)
+        throw new BusinessError(
+          `无效的异常标记: ${invalidFlags.join(', ')}`,
+          'CONSUMPTION_INVALID',
+          400
+        )
       }
 
       // 验证评分范围

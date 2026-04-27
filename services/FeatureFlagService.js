@@ -277,7 +277,11 @@ class FeatureFlagService {
       // 检查 flag_key 是否已存在
       const existing = await FeatureFlag.findByKey(flagData.flag_key)
       if (existing) {
-        throw new BusinessError(`功能开关 ${flagData.flag_key} 已存在`, 'SERVICE_ALREADY_EXISTS', 409)
+        throw new BusinessError(
+          `功能开关 ${flagData.flag_key} 已存在`,
+          'SERVICE_ALREADY_EXISTS',
+          409
+        )
       }
 
       // 创建记录

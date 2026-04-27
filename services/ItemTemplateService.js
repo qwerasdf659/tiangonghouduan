@@ -21,6 +21,7 @@
 'use strict'
 
 const { Op } = require('sequelize')
+const BusinessError = require('../utils/BusinessError')
 const logger = require('../utils/logger').logger
 
 /**
@@ -170,10 +171,11 @@ class ItemTemplateService {
       })
 
       if (!template) {
-        const error = new Error(`物品模板 ID ${item_template_id} 不存在`)
-        error.status = 404
-        error.code = 'ITEM_TEMPLATE_NOT_FOUND'
-        throw error
+        throw new BusinessError(
+          `物品模板 ID ${item_template_id} 不存在`,
+          'ITEM_TEMPLATE_NOT_FOUND',
+          404
+        )
       }
 
       return template
@@ -194,10 +196,11 @@ class ItemTemplateService {
       const template = await this.ItemTemplate.getByCode(template_code)
 
       if (!template) {
-        const error = new Error(`物品模板代码 ${template_code} 不存在`)
-        error.status = 404
-        error.code = 'ITEM_TEMPLATE_NOT_FOUND'
-        throw error
+        throw new BusinessError(
+          `物品模板代码 ${template_code} 不存在`,
+          'ITEM_TEMPLATE_NOT_FOUND',
+          404
+        )
       }
 
       return template
@@ -262,20 +265,18 @@ class ItemTemplateService {
       })
 
       if (existing) {
-        const error = new Error(`模板代码 ${template_code} 已存在`)
-        error.status = 409
-        error.code = 'TEMPLATE_CODE_EXISTS'
-        throw error
+        throw new BusinessError(`模板代码 ${template_code} 已存在`, 'TEMPLATE_CODE_EXISTS', 409)
       }
 
       // 验证类目
       if (resolvedCategoryIdOrNull != null) {
         const category = await this.Category.findByPk(resolvedCategoryIdOrNull, { transaction })
         if (!category) {
-          const error = new Error(`类目 ID ${resolvedCategoryIdOrNull} 不存在`)
-          error.status = 400
-          error.code = 'INVALID_CATEGORY_CODE'
-          throw error
+          throw new BusinessError(
+            `类目 ID ${resolvedCategoryIdOrNull} 不存在`,
+            'INVALID_CATEGORY_CODE',
+            400
+          )
         }
       }
 
@@ -283,10 +284,7 @@ class ItemTemplateService {
       if (rarity_code) {
         const rarity = await this.RarityDef.findByPk(rarity_code, { transaction })
         if (!rarity) {
-          const error = new Error(`稀有度代码 ${rarity_code} 不存在`)
-          error.status = 400
-          error.code = 'INVALID_RARITY_CODE'
-          throw error
+          throw new BusinessError(`稀有度代码 ${rarity_code} 不存在`, 'INVALID_RARITY_CODE', 400)
         }
       }
 
@@ -344,10 +342,11 @@ class ItemTemplateService {
       const template = await this.ItemTemplate.findByPk(item_template_id, { transaction })
 
       if (!template) {
-        const error = new Error(`物品模板 ID ${item_template_id} 不存在`)
-        error.status = 404
-        error.code = 'ITEM_TEMPLATE_NOT_FOUND'
-        throw error
+        throw new BusinessError(
+          `物品模板 ID ${item_template_id} 不存在`,
+          'ITEM_TEMPLATE_NOT_FOUND',
+          404
+        )
       }
 
       const updateData = {}
@@ -380,17 +379,11 @@ class ItemTemplateService {
         } else {
           const n = parseInt(String(raw), 10)
           if (Number.isNaN(n)) {
-            const error = new Error('category_id 必须为有效数字')
-            error.status = 400
-            error.code = 'INVALID_CATEGORY_ID'
-            throw error
+            throw new BusinessError('category_id 必须为有效数字', 'INVALID_CATEGORY_ID', 400)
           }
           const category = await this.Category.findByPk(n, { transaction })
           if (!category) {
-            const error = new Error(`类目 ID ${n} 不存在`)
-            error.status = 400
-            error.code = 'INVALID_CATEGORY_CODE'
-            throw error
+            throw new BusinessError(`类目 ID ${n} 不存在`, 'INVALID_CATEGORY_CODE', 400)
           }
           updateData.category_id = n
         }
@@ -409,10 +402,11 @@ class ItemTemplateService {
       if (updateData.rarity_code) {
         const rarity = await this.RarityDef.findByPk(updateData.rarity_code, { transaction })
         if (!rarity) {
-          const error = new Error(`稀有度代码 ${updateData.rarity_code} 不存在`)
-          error.status = 400
-          error.code = 'INVALID_RARITY_CODE'
-          throw error
+          throw new BusinessError(
+            `稀有度代码 ${updateData.rarity_code} 不存在`,
+            'INVALID_RARITY_CODE',
+            400
+          )
         }
       }
 
@@ -446,10 +440,11 @@ class ItemTemplateService {
       const template = await this.ItemTemplate.findByPk(item_template_id, { transaction })
 
       if (!template) {
-        const error = new Error(`物品模板 ID ${item_template_id} 不存在`)
-        error.status = 404
-        error.code = 'ITEM_TEMPLATE_NOT_FOUND'
-        throw error
+        throw new BusinessError(
+          `物品模板 ID ${item_template_id} 不存在`,
+          'ITEM_TEMPLATE_NOT_FOUND',
+          404
+        )
       }
 
       // 检查是否有关联的物品实例（仅当模型存在且具有 item_template_id 列时）
@@ -464,10 +459,11 @@ class ItemTemplateService {
         })
 
         if (instanceCount > 0) {
-          const error = new Error(`无法删除模板，存在 ${instanceCount} 个关联的物品实例`)
-          error.status = 400
-          error.code = 'TEMPLATE_HAS_INSTANCES'
-          throw error
+          throw new BusinessError(
+            `无法删除模板，存在 ${instanceCount} 个关联的物品实例`,
+            'TEMPLATE_HAS_INSTANCES',
+            400
+          )
         }
       }
 

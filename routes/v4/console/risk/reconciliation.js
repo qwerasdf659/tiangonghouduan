@@ -21,24 +21,34 @@ const { asyncHandler } = require('../../../../middleware/validation')
  * GET /items
  * 物品守恒对账（SUM(delta) GROUP BY item_id 全部为 0）
  */
-router.get('/items', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const services = req.app.locals.services
-  const ItemLifecycleService = services.getService('asset_item_lifecycle')
+router.get(
+  '/items',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const services = req.app.locals.services
+    const ItemLifecycleService = services.getService('asset_item_lifecycle')
 
-  const result = await ItemLifecycleService.reconcileItems()
-  return res.apiSuccess(result, '物品对账完成')
-}))
+    const result = await ItemLifecycleService.reconcileItems()
+    return res.apiSuccess(result, '物品对账完成')
+  })
+)
 
 /**
  * GET /assets
  * 资产守恒对账（SUM(delta_amount) GROUP BY asset_code 全部为 0）
  */
-router.get('/assets', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const services = req.app.locals.services
-  const ItemLifecycleService = services.getService('asset_item_lifecycle')
+router.get(
+  '/assets',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const services = req.app.locals.services
+    const ItemLifecycleService = services.getService('asset_item_lifecycle')
 
-  const result = await ItemLifecycleService.reconcileAssets()
-  return res.apiSuccess(result, '资产对账完成')
-}))
+    const result = await ItemLifecycleService.reconcileAssets()
+    return res.apiSuccess(result, '资产对账完成')
+  })
+)
 
 module.exports = router

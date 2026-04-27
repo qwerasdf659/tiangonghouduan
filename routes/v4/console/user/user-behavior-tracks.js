@@ -36,26 +36,31 @@ const logger = require('../../../../utils/logger')
  * - page: 页码（默认1）
  * - page_size: 每页数量（默认20）
  */
-router.get('/', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const trackService = req.app.locals.services.getService('user_behavior_track')
-  const { user_id, behavior_type, start_time, end_time, session_id, page, page_size } = req.query
+router.get(
+  '/',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const trackService = req.app.locals.services.getService('user_behavior_track')
+    const { user_id, behavior_type, start_time, end_time, session_id, page, page_size } = req.query
 
-  if (!user_id) {
-    return res.apiError('用户ID不能为空', 'MISSING_USER_ID', null, 400)
-  }
+    if (!user_id) {
+      return res.apiError('用户ID不能为空', 'MISSING_USER_ID', null, 400)
+    }
 
-  const result = await trackService.getUserTracks({
-    user_id: parseInt(user_id, 10),
-    behavior_type,
-    start_time: start_time ? new Date(start_time) : undefined,
-    end_time: end_time ? new Date(end_time) : undefined,
-    session_id,
-    page: parseInt(page, 10) || 1,
-    page_size: parseInt(page_size, 10) || 20
+    const result = await trackService.getUserTracks({
+      user_id: parseInt(user_id, 10),
+      behavior_type,
+      start_time: start_time ? new Date(start_time) : undefined,
+      end_time: end_time ? new Date(end_time) : undefined,
+      session_id,
+      page: parseInt(page, 10) || 1,
+      page_size: parseInt(page_size, 10) || 20
+    })
+
+    return res.apiSuccess(result, '获取用户行为轨迹成功')
   })
-
-  return res.apiSuccess(result, '获取用户行为轨迹成功')
-}))
+)
 
 /**
  * GET /api/v4/console/user-behavior-tracks/stats/:user_id
@@ -66,23 +71,28 @@ router.get('/', authenticateToken, requireRoleLevel(100), asyncHandler(async (re
  * - start_time: 开始时间
  * - end_time: 结束时间
  */
-router.get('/stats/:user_id', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const trackService = req.app.locals.services.getService('user_behavior_track')
-  const userId = parseInt(req.params.user_id, 10)
+router.get(
+  '/stats/:user_id',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const trackService = req.app.locals.services.getService('user_behavior_track')
+    const userId = parseInt(req.params.user_id, 10)
 
-  if (!userId || isNaN(userId)) {
-    return res.apiError('无效的用户ID', 'INVALID_USER_ID', null, 400)
-  }
+    if (!userId || isNaN(userId)) {
+      return res.apiError('无效的用户ID', 'INVALID_USER_ID', null, 400)
+    }
 
-  const { start_time, end_time } = req.query
+    const { start_time, end_time } = req.query
 
-  const stats = await trackService.getUserStats(userId, {
-    start_time: start_time ? new Date(start_time) : undefined,
-    end_time: end_time ? new Date(end_time) : undefined
+    const stats = await trackService.getUserStats(userId, {
+      start_time: start_time ? new Date(start_time) : undefined,
+      end_time: end_time ? new Date(end_time) : undefined
+    })
+
+    return res.apiSuccess(stats, '获取用户行为统计成功')
   })
-
-  return res.apiSuccess(stats, '获取用户行为统计成功')
-}))
+)
 
 // ==================== 轨迹详情 (B-48) ====================
 
@@ -91,47 +101,57 @@ router.get('/stats/:user_id', authenticateToken, requireRoleLevel(100), asyncHan
  *
  * 获取单条行为轨迹详情
  */
-router.get('/:id', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const trackService = req.app.locals.services.getService('user_behavior_track')
-  const trackId = parseInt(req.params.id, 10)
+router.get(
+  '/:id',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const trackService = req.app.locals.services.getService('user_behavior_track')
+    const trackId = parseInt(req.params.id, 10)
 
-  if (!trackId || isNaN(trackId)) {
-    return res.apiError('无效的轨迹ID', 'INVALID_TRACK_ID', null, 400)
-  }
+    if (!trackId || isNaN(trackId)) {
+      return res.apiError('无效的轨迹ID', 'INVALID_TRACK_ID', null, 400)
+    }
 
-  const track = await trackService.getTrackDetail(trackId)
+    const track = await trackService.getTrackDetail(trackId)
 
-  if (!track) {
-    return res.apiError('行为轨迹记录不存在', 'TRACK_NOT_FOUND', null, 404)
-  }
+    if (!track) {
+      return res.apiError('行为轨迹记录不存在', 'TRACK_NOT_FOUND', null, 404)
+    }
 
-  return res.apiSuccess(track, '获取行为轨迹详情成功')
-}))
+    return res.apiSuccess(track, '获取行为轨迹详情成功')
+  })
+)
 
 /**
  * GET /api/v4/console/user-behavior-tracks/session/:session_id
  *
  * 获取会话内的行为序列
  */
-router.get('/session/:session_id', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const trackService = req.app.locals.services.getService('user_behavior_track')
-  const sessionId = req.params.session_id
+router.get(
+  '/session/:session_id',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const trackService = req.app.locals.services.getService('user_behavior_track')
+    const sessionId = req.params.session_id
 
-  if (!sessionId) {
-    return res.apiError('会话ID不能为空', 'MISSING_SESSION_ID', null, 400)
-  }
+    if (!sessionId) {
+      return res.apiError('会话ID不能为空', 'MISSING_SESSION_ID', null, 400)
+    }
 
-  const tracks = await trackService.getSessionTracks(sessionId)
+    const tracks = await trackService.getSessionTracks(sessionId)
 
-  return res.apiSuccess(
-    {
-      session_id: sessionId,
-      track_count: tracks.length,
-      tracks
-    },
-    '获取会话行为序列成功'
-  )
-}))
+    return res.apiSuccess(
+      {
+        session_id: sessionId,
+        track_count: tracks.length,
+        tracks
+      },
+      '获取会话行为序列成功'
+    )
+  })
+)
 
 // ==================== 聚合分析 ====================
 
@@ -146,23 +166,28 @@ router.get('/session/:session_id', authenticateToken, requireRoleLevel(100), asy
  * - user_id: 用户ID（可选）
  * - behavior_type: 行为类型（可选）
  */
-router.get('/aggregate/by-date', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const trackService = req.app.locals.services.getService('user_behavior_track')
-  const { start_date, end_date, user_id, behavior_type } = req.query
+router.get(
+  '/aggregate/by-date',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const trackService = req.app.locals.services.getService('user_behavior_track')
+    const { start_date, end_date, user_id, behavior_type } = req.query
 
-  if (!start_date || !end_date) {
-    return res.apiError('开始日期和结束日期不能为空', 'MISSING_DATE_RANGE', null, 400)
-  }
+    if (!start_date || !end_date) {
+      return res.apiError('开始日期和结束日期不能为空', 'MISSING_DATE_RANGE', null, 400)
+    }
 
-  const result = await trackService.aggregateByDate({
-    start_date: new Date(start_date),
-    end_date: new Date(end_date),
-    user_id: user_id ? parseInt(user_id, 10) : undefined,
-    behavior_type
+    const result = await trackService.aggregateByDate({
+      start_date: new Date(start_date),
+      end_date: new Date(end_date),
+      user_id: user_id ? parseInt(user_id, 10) : undefined,
+      behavior_type
+    })
+
+    return res.apiSuccess(result, '获取按日期聚合成功')
   })
-
-  return res.apiSuccess(result, '获取按日期聚合成功')
-}))
+)
 
 /**
  * GET /api/v4/console/user-behavior-tracks/aggregate/active-users
@@ -193,8 +218,8 @@ router.get(
     })
 
     return res.apiSuccess(result, '获取活跃用户排名成功')
-  }
-))
+  })
+)
 
 // ==================== 轨迹导出 (B-49) ====================
 
@@ -209,39 +234,44 @@ router.get(
  * - end_time: 结束时间
  * - format: 导出格式（json/csv）
  */
-router.post('/export', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const trackService = req.app.locals.services.getService('user_behavior_track')
-  const { user_id, start_time, end_time, format } = req.body
+router.post(
+  '/export',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const trackService = req.app.locals.services.getService('user_behavior_track')
+    const { user_id, start_time, end_time, format } = req.body
 
-  if (!user_id) {
-    return res.apiError('用户ID不能为空', 'MISSING_USER_ID', null, 400)
-  }
+    if (!user_id) {
+      return res.apiError('用户ID不能为空', 'MISSING_USER_ID', null, 400)
+    }
 
-  const exportData = await trackService.exportUserTracks({
-    user_id: parseInt(user_id, 10),
-    start_time: start_time ? new Date(start_time) : undefined,
-    end_time: end_time ? new Date(end_time) : undefined,
-    format: format || 'json'
+    const exportData = await trackService.exportUserTracks({
+      user_id: parseInt(user_id, 10),
+      start_time: start_time ? new Date(start_time) : undefined,
+      end_time: end_time ? new Date(end_time) : undefined,
+      format: format || 'json'
+    })
+
+    logger.info('[用户轨迹] 导出成功', {
+      user_id,
+      format: format || 'json',
+      count: exportData.count,
+      exported_by: req.user.user_id
+    })
+
+    // CSV 格式直接返回文本
+    if (format === 'csv' && exportData.content) {
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename=user_tracks_${user_id}_${Date.now()}.csv`
+      )
+      return res.send(exportData.content)
+    }
+
+    return res.apiSuccess(exportData, '导出用户行为轨迹成功')
   })
-
-  logger.info('[用户轨迹] 导出成功', {
-    user_id,
-    format: format || 'json',
-    count: exportData.count,
-    exported_by: req.user.user_id
-  })
-
-  // CSV 格式直接返回文本
-  if (format === 'csv' && exportData.content) {
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8')
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename=user_tracks_${user_id}_${Date.now()}.csv`
-    )
-    return res.send(exportData.content)
-  }
-
-  return res.apiSuccess(exportData, '导出用户行为轨迹成功')
-}))
+)
 
 module.exports = router

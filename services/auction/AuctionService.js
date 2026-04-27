@@ -141,7 +141,11 @@ class AuctionService {
     // ① 校验资产白名单
     const allowedAssets = await this._getAllowedBidAssets()
     if (!allowedAssets.includes(price_asset_code)) {
-      throw new BusinessError(`不允许使用 ${price_asset_code} 作为竞价资产`, 'AUCTION_NOT_ALLOWED', 400)
+      throw new BusinessError(
+        `不允许使用 ${price_asset_code} 作为竞价资产`,
+        'AUCTION_NOT_ALLOWED',
+        400
+      )
     }
 
     // ② 校验价格参数
@@ -167,7 +171,11 @@ class AuctionService {
         await AdminSystemService.getSettingValue('auction', 'auction_min_duration_hours', 2)
       ) || 2
     if (durationHours < minDuration) {
-      throw new BusinessError(`拍卖时长不得少于${minDuration}小时（当前${durationHours.toFixed(1)}小时）`, 'AUCTION_ERROR', 400)
+      throw new BusinessError(
+        `拍卖时长不得少于${minDuration}小时（当前${durationHours.toFixed(1)}小时）`,
+        'AUCTION_ERROR',
+        400
+      )
     }
 
     // ④ 校验物品所有权（items.owner_account_id → accounts.user_id）
@@ -179,7 +187,11 @@ class AuctionService {
       throw new BusinessError(`物品 ${itemId} 不存在`, 'AUCTION_NOT_FOUND', 404)
     }
     if (item.status !== 'available') {
-      throw new BusinessError(`物品状态为 ${item.status}，仅 available 状态可拍卖`, 'AUCTION_ERROR', 400)
+      throw new BusinessError(
+        `物品状态为 ${item.status}，仅 available 状态可拍卖`,
+        'AUCTION_ERROR',
+        400
+      )
     }
 
     const account = await this.Account.findByPk(item.owner_account_id, { transaction })
@@ -215,7 +227,11 @@ class AuctionService {
       )
     } catch (holdError) {
       if (holdError.message.includes('已被')) {
-        throw new BusinessError('物品当前有更高优先级的锁定，无法拍卖（可能正在核销或被安全冻结）', 'AUCTION_ERROR', 400)
+        throw new BusinessError(
+          '物品当前有更高优先级的锁定，无法拍卖（可能正在核销或被安全冻结）',
+          'AUCTION_ERROR',
+          400
+        )
       }
       throw holdError
     }
@@ -309,7 +325,11 @@ class AuctionService {
 
     // 状态校验
     if (auctionListing.status !== 'active') {
-      throw new BusinessError(`拍卖状态为 ${auctionListing.status}，仅 active 可出价`, 'AUCTION_ERROR', 400)
+      throw new BusinessError(
+        `拍卖状态为 ${auctionListing.status}，仅 active 可出价`,
+        'AUCTION_ERROR',
+        400
+      )
     }
     if (new Date(auctionListing.end_time) <= new Date()) {
       throw new BusinessError('拍卖已过期', 'AUCTION_EXPIRED', 400)
@@ -761,7 +781,11 @@ class AuctionService {
     }
 
     if (!['pending', 'active'].includes(auctionListing.status)) {
-      throw new BusinessError(`拍卖状态为 ${auctionListing.status}，仅 pending/active 可取消`, 'AUCTION_ERROR', 400)
+      throw new BusinessError(
+        `拍卖状态为 ${auctionListing.status}，仅 pending/active 可取消`,
+        'AUCTION_ERROR',
+        400
+      )
     }
 
     // 卖方取消：需校验 bid_count === 0
@@ -770,7 +794,11 @@ class AuctionService {
         throw new BusinessError('只有卖方或管理员可以取消拍卖', 'AUCTION_ERROR', 400)
       }
       if (auctionListing.bid_count > 0) {
-        throw new BusinessError('已有出价后卖方不可取消，如需取消请联系管理员', 'AUCTION_NOT_ALLOWED', 400)
+        throw new BusinessError(
+          '已有出价后卖方不可取消，如需取消请联系管理员',
+          'AUCTION_NOT_ALLOWED',
+          400
+        )
       }
     }
 

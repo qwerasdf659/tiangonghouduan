@@ -58,10 +58,15 @@ function getMerchantOperationLogService(req) {
  * @query {number} [page=1] - 页码
  * @query {number} [page_size=20] - 每页数量（最大100）
  */
-router.get('/', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const result = await getMerchantOperationLogService(req).queryLogs(req.query)
-  return res.apiSuccess(result, '获取商家操作审计日志列表成功')
-}))
+router.get(
+  '/',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const result = await getMerchantOperationLogService(req).queryLogs(req.query)
+    return res.apiSuccess(result, '获取商家操作审计日志列表成功')
+  })
+)
 
 /**
  * GET /api/v4/console/audit-logs/operation-types
@@ -69,13 +74,18 @@ router.get('/', authenticateToken, requireRoleLevel(100), asyncHandler(async (re
  * @access Admin only (role_level >= 100)
  * @returns {Object} { operation_types: Array<{code, name, key}> }
  */
-router.get('/operation-types', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  /** 通过 ServiceManager 获取商家操作日志服务，从中获取操作类型常量 */
-  const logService = getMerchantOperationLogService(req)
-  const operationTypes = logService.getOperationTypes()
+router.get(
+  '/operation-types',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    /** 通过 ServiceManager 获取商家操作日志服务，从中获取操作类型常量 */
+    const logService = getMerchantOperationLogService(req)
+    const operationTypes = logService.getOperationTypes()
 
-  return res.apiSuccess({ operation_types: operationTypes }, '获取操作类型列表成功')
-}))
+    return res.apiSuccess({ operation_types: operationTypes }, '获取操作类型列表成功')
+  })
+)
 
 /**
  * GET /api/v4/console/audit-logs/:merchant_log_id
@@ -84,23 +94,28 @@ router.get('/operation-types', authenticateToken, requireRoleLevel(100), asyncHa
  *
  * @param {number} merchant_log_id - 审计日志ID（事务实体，数字ID）
  */
-router.get('/:merchant_log_id', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const { merchant_log_id } = req.params
+router.get(
+  '/:merchant_log_id',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const { merchant_log_id } = req.params
 
-  if (!merchant_log_id || isNaN(parseInt(merchant_log_id))) {
-    return res.apiError('无效的审计日志ID', 'INVALID_LOG_ID', null, 400)
-  }
+    if (!merchant_log_id || isNaN(parseInt(merchant_log_id))) {
+      return res.apiError('无效的审计日志ID', 'INVALID_LOG_ID', null, 400)
+    }
 
-  const logDetail = await getMerchantOperationLogService(req).getLogDetail(
-    parseInt(merchant_log_id)
-  )
+    const logDetail = await getMerchantOperationLogService(req).getLogDetail(
+      parseInt(merchant_log_id)
+    )
 
-  if (!logDetail) {
-    return res.apiError('审计日志不存在', 'LOG_NOT_FOUND', null, 404)
-  }
+    if (!logDetail) {
+      return res.apiError('审计日志不存在', 'LOG_NOT_FOUND', null, 404)
+    }
 
-  return res.apiSuccess(logDetail, '获取商家操作审计日志详情成功')
-}))
+    return res.apiSuccess(logDetail, '获取商家操作审计日志详情成功')
+  })
+)
 
 /**
  * GET /api/v4/console/audit-logs/stats/store/:store_id
@@ -111,21 +126,26 @@ router.get('/:merchant_log_id', authenticateToken, requireRoleLevel(100), asyncH
  * @query {string} [start_time] - 统计开始时间（北京时间）
  * @query {string} [end_time] - 统计结束时间（北京时间）
  */
-router.get('/stats/store/:store_id', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const { store_id } = req.params
-  const { start_time, end_time } = req.query
+router.get(
+  '/stats/store/:store_id',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const { store_id } = req.params
+    const { start_time, end_time } = req.query
 
-  if (!store_id || isNaN(parseInt(store_id))) {
-    return res.apiError('无效的门店ID', 'INVALID_STORE_ID', null, 400)
-  }
+    if (!store_id || isNaN(parseInt(store_id))) {
+      return res.apiError('无效的门店ID', 'INVALID_STORE_ID', null, 400)
+    }
 
-  const stats = await getMerchantOperationLogService(req).getStoreStats(parseInt(store_id), {
-    start_time,
-    end_time
+    const stats = await getMerchantOperationLogService(req).getStoreStats(parseInt(store_id), {
+      start_time,
+      end_time
+    })
+
+    return res.apiSuccess(stats, '获取门店审计日志统计成功')
   })
-
-  return res.apiSuccess(stats, '获取门店审计日志统计成功')
-}))
+)
 
 /**
  * GET /api/v4/console/audit-logs/stats/operator/:operator_id
@@ -168,32 +188,37 @@ router.get(
  * @body {number} [retention_days=180] - 保留天数（默认180天）
  * @body {boolean} [dry_run=false] - 干跑模式（只统计不删除）
  */
-router.post('/cleanup', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const { retention_days = 180, dry_run = false } = req.body
+router.post(
+  '/cleanup',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const { retention_days = 180, dry_run = false } = req.body
 
-  // 验证参数
-  if (retention_days && (isNaN(parseInt(retention_days)) || retention_days < 30)) {
-    return res.apiError('保留天数必须为大于等于30的整数', 'INVALID_RETENTION_DAYS', null, 400)
-  }
+    // 验证参数
+    if (retention_days && (isNaN(parseInt(retention_days)) || retention_days < 30)) {
+      return res.apiError('保留天数必须为大于等于30的整数', 'INVALID_RETENTION_DAYS', null, 400)
+    }
 
-  const result = await getMerchantOperationLogService(req).cleanupExpiredLogs({
-    retention_days: parseInt(retention_days),
-    dry_run: Boolean(dry_run)
+    const result = await getMerchantOperationLogService(req).cleanupExpiredLogs({
+      retention_days: parseInt(retention_days),
+      dry_run: Boolean(dry_run)
+    })
+
+    logger.info('审计日志清理操作', {
+      operator_id: req.user.user_id,
+      retention_days,
+      dry_run,
+      result
+    })
+
+    return res.apiSuccess(
+      result,
+      dry_run
+        ? `干跑模式：发现 ${result.count_to_delete} 条待清理日志`
+        : `清理完成：已删除 ${result.deleted_count} 条过期日志`
+    )
   })
-
-  logger.info('审计日志清理操作', {
-    operator_id: req.user.user_id,
-    retention_days,
-    dry_run,
-    result
-  })
-
-  return res.apiSuccess(
-    result,
-    dry_run
-      ? `干跑模式：发现 ${result.count_to_delete} 条待清理日志`
-      : `清理完成：已删除 ${result.deleted_count} 条过期日志`
-  )
-}))
+)
 
 module.exports = router

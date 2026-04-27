@@ -26,27 +26,25 @@
 
 import { logger } from '@/utils/logger.js'
 import { loadECharts } from '@/utils/echarts-lazy.js'
-
-/** API 路径前缀 */
-const API_PREFIX = '/api/v4/console/lottery-simulation'
+import { API_PREFIX } from '@/api/base.js'
 
 /** 模拟 API 端点 */
 const SIMULATION_ENDPOINTS = {
-  BASELINE: `${API_PREFIX}/baseline`,
-  RUN: `${API_PREFIX}/run`,
-  USER_JOURNEY: `${API_PREFIX}/user-journey`,
-  SENSITIVITY: `${API_PREFIX}/sensitivity`,
-  RECOMMEND: `${API_PREFIX}/recommend`,
-  APPLY: `${API_PREFIX}/apply`,
-  DRIFT: `${API_PREFIX}/drift`,
-  HISTORY: `${API_PREFIX}/history`,
-  RECORD: `${API_PREFIX}/record`,
-  SCHEDULE: `${API_PREFIX}/schedule`,
-  VERSION_HISTORY: `${API_PREFIX}/version-history`,
-  ROLLBACK: `${API_PREFIX}/rollback`,
-  BUDGET_PACING: `${API_PREFIX}/budget-pacing`,
-  CIRCUIT_BREAKER: `${API_PREFIX}/circuit-breaker`,
-  CIRCUIT_BREAKER_STATUS: `${API_PREFIX}/circuit-breaker-status`
+  BASELINE: `${API_PREFIX}/console/lottery-simulation/baseline`,
+  RUN: `${API_PREFIX}/console/lottery-simulation/run`,
+  USER_JOURNEY: `${API_PREFIX}/console/lottery-simulation/user-journey`,
+  SENSITIVITY: `${API_PREFIX}/console/lottery-simulation/sensitivity`,
+  RECOMMEND: `${API_PREFIX}/console/lottery-simulation/recommend`,
+  APPLY: `${API_PREFIX}/console/lottery-simulation/apply`,
+  DRIFT: `${API_PREFIX}/console/lottery-simulation/drift`,
+  HISTORY: `${API_PREFIX}/console/lottery-simulation/history`,
+  RECORD: `${API_PREFIX}/console/lottery-simulation/record`,
+  SCHEDULE: `${API_PREFIX}/console/lottery-simulation/schedule`,
+  VERSION_HISTORY: `${API_PREFIX}/console/lottery-simulation/version-history`,
+  ROLLBACK: `${API_PREFIX}/console/lottery-simulation/rollback`,
+  BUDGET_PACING: `${API_PREFIX}/console/lottery-simulation/budget-pacing`,
+  CIRCUIT_BREAKER: `${API_PREFIX}/console/lottery-simulation/circuit-breaker`,
+  CIRCUIT_BREAKER_STATUS: `${API_PREFIX}/console/lottery-simulation/circuit-breaker-status`
 }
 
 /**

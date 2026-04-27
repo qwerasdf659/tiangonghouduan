@@ -36,24 +36,27 @@ router.use(authenticateToken, requireRoleLevel(1))
  * @param {number} id - 会话ID（事务实体）
  * @access Admin
  */
-router.get('/:id/messages', asyncHandler(async (req, res) => {
-  const AdminCustomerServiceService = req.app.locals.services.getService('admin_customer_service')
+router.get(
+  '/:id/messages',
+  asyncHandler(async (req, res) => {
+    const AdminCustomerServiceService = req.app.locals.services.getService('admin_customer_service')
 
-  const sessionId = parseInt(req.params.id)
+    const sessionId = parseInt(req.params.id)
 
-  if (isNaN(sessionId) || sessionId <= 0) {
-    return res.apiError('会话ID无效', 'BAD_REQUEST', null, 400)
-  }
+    if (isNaN(sessionId) || sessionId <= 0) {
+      return res.apiError('会话ID无效', 'BAD_REQUEST', null, 400)
+    }
 
-  const options = {
-    page_size: req.query.page_size,
-    before_message_id: req.query.before_message_id
-  }
+    const options = {
+      page_size: req.query.page_size,
+      before_message_id: req.query.before_message_id
+    }
 
-  const result = await AdminCustomerServiceService.getSessionMessages(sessionId, options)
+    const result = await AdminCustomerServiceService.getSessionMessages(sessionId, options)
 
-  return res.apiSuccess(result, '获取会话消息成功')
-}))
+    return res.apiSuccess(result, '获取会话消息成功')
+  })
+)
 
 /**
  * POST /:id/send - 发送消息
@@ -66,70 +69,73 @@ router.get('/:id/messages', asyncHandler(async (req, res) => {
  * @param {number} id - 会话ID（事务实体）
  * @access Admin
  */
-router.post('/:id/send', asyncHandler(async (req, res) => {
-  const sessionId = parseInt(req.params.id)
+router.post(
+  '/:id/send',
+  asyncHandler(async (req, res) => {
+    const sessionId = parseInt(req.params.id)
 
-  if (isNaN(sessionId) || sessionId <= 0) {
-    return res.apiError('会话ID无效', 'BAD_REQUEST', null, 400)
-  }
-
-  const { content, message_type } = req.body
-
-  if (!content || content.trim() === '') {
-    return res.apiError('消息内容不能为空', 'BAD_REQUEST', null, 400)
-  }
-
-  const { message: messageConfig } = businessConfig.chat
-  if (content.length > messageConfig.max_length) {
-    return res.apiError(
-      `消息内容不能超过${messageConfig.max_length}字符（当前${content.length}字符）`,
-      'BAD_REQUEST',
-      null,
-      400
-    )
-  }
-
-  const allowedTypes = ['text', 'image', 'system']
-  if (message_type && !allowedTypes.includes(message_type)) {
-    return res.apiError('消息类型无效（允许值：text/image/system）', 'BAD_REQUEST', null, 400)
-  }
-
-  const data = {
-    admin_id: req.user.user_id,
-    content: content.trim(),
-    message_type: message_type || 'text',
-    role_level: req.user.role_level
-  }
-
-  const CustomerServiceSessionService = req.app.locals.services.getService(
-    'customer_service_session'
-  )
-
-  const result = await TransactionManager.execute(
-    async transaction => {
-      return await CustomerServiceSessionService.sendMessage(sessionId, data, { transaction })
-    },
-    { description: 'sendMessage' }
-  )
-
-  try {
-    const ChatWebSocketService = req.app.locals.services.getService('chat_web_socket')
-    const messageData = {
-      chat_message_id: result.chat_message_id,
-      customer_service_session_id: sessionId,
-      sender_id: req.user.user_id,
-      sender_type: 'admin',
-      content: result.content,
-      message_type: result.message_type,
-      created_at: result.created_at
+    if (isNaN(sessionId) || sessionId <= 0) {
+      return res.apiError('会话ID无效', 'BAD_REQUEST', null, 400)
     }
-    ChatWebSocketService.pushMessageToUser(result.session_user_id, messageData)
-  } catch (wsError) {
-    logger.error('WebSocket推送消息给用户失败:', wsError.message)
-  }
 
-  return res.apiSuccess(result, '发送消息成功')
-}))
+    const { content, message_type } = req.body
+
+    if (!content || content.trim() === '') {
+      return res.apiError('消息内容不能为空', 'BAD_REQUEST', null, 400)
+    }
+
+    const { message: messageConfig } = businessConfig.chat
+    if (content.length > messageConfig.max_length) {
+      return res.apiError(
+        `消息内容不能超过${messageConfig.max_length}字符（当前${content.length}字符）`,
+        'BAD_REQUEST',
+        null,
+        400
+      )
+    }
+
+    const allowedTypes = ['text', 'image', 'system']
+    if (message_type && !allowedTypes.includes(message_type)) {
+      return res.apiError('消息类型无效（允许值：text/image/system）', 'BAD_REQUEST', null, 400)
+    }
+
+    const data = {
+      admin_id: req.user.user_id,
+      content: content.trim(),
+      message_type: message_type || 'text',
+      role_level: req.user.role_level
+    }
+
+    const CustomerServiceSessionService = req.app.locals.services.getService(
+      'customer_service_session'
+    )
+
+    const result = await TransactionManager.execute(
+      async transaction => {
+        return await CustomerServiceSessionService.sendMessage(sessionId, data, { transaction })
+      },
+      { description: 'sendMessage' }
+    )
+
+    try {
+      const ChatWebSocketService = req.app.locals.services.getService('chat_web_socket')
+      const messageData = {
+        chat_message_id: result.chat_message_id,
+        customer_service_session_id: sessionId,
+        sender_id: req.user.user_id,
+        sender_type: 'admin',
+        content: result.content,
+        message_type: result.message_type,
+        created_at: result.created_at
+      }
+      ChatWebSocketService.pushMessageToUser(result.session_user_id, messageData)
+    } catch (wsError) {
+      logger.error('WebSocket推送消息给用户失败:', wsError.message)
+    }
+
+    return res.apiSuccess(result, '发送消息成功')
+  })
+)
 
 /**
  * POST /:id/mark-read - 标记消息已读
@@ -142,20 +148,23 @@ router.post('/:id/send', asyncHandler(async (req, res) => {
  * @param {number} id - 会话ID（事务实体）
  * @access Admin
  */
-router.post('/:id/mark-read', asyncHandler(async (req, res) => {
-  const sessionId = parseInt(req.params.id)
+router.post(
+  '/:id/mark-read',
+  asyncHandler(async (req, res) => {
+    const sessionId = parseInt(req.params.id)
 
-  if (isNaN(sessionId) || sessionId <= 0) {
-    return res.apiError('会话ID无效', 'BAD_REQUEST', null, 400)
-  }
+    if (isNaN(sessionId) || sessionId <= 0) {
+      return res.apiError('会话ID无效', 'BAD_REQUEST', null, 400)
+    }
 
-  const adminId = req.user.user_id
+    const adminId = req.user.user_id
 
-  const AdminCustomerServiceService = req.app.locals.services.getService('admin_customer_service')
+    const AdminCustomerServiceService = req.app.locals.services.getService('admin_customer_service')
 
-  const result = await AdminCustomerServiceService.markSessionAsRead(sessionId, adminId)
+    const result = await AdminCustomerServiceService.markSessionAsRead(sessionId, adminId)
 
-  return res.apiSuccess(result, '标记已读成功')
-}))
+    return res.apiSuccess(result, '标记已读成功')
+  })
+)
 
 module.exports = router

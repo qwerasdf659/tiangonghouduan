@@ -80,7 +80,11 @@ class StoreService {
       transaction
     })
     if (!regionValidation.valid) {
-      throw new BusinessError(`行政区划校验失败: ${regionValidation.errors.join(', ')}`, 'STORE_FAILED', 500)
+      throw new BusinessError(
+        `行政区划校验失败: ${regionValidation.errors.join(', ')}`,
+        'STORE_FAILED',
+        500
+      )
     }
 
     // 3. 生成门店编号（如未提供）
@@ -103,7 +107,11 @@ class StoreService {
     if (storeData.assigned_to) {
       const assignedUser = await User.findByPk(storeData.assigned_to, { transaction })
       if (!assignedUser) {
-        throw new BusinessError(`分配的业务员 ID ${storeData.assigned_to} 不存在`, 'STORE_NOT_FOUND', 404)
+        throw new BusinessError(
+          `分配的业务员 ID ${storeData.assigned_to} 不存在`,
+          'STORE_NOT_FOUND',
+          404
+        )
       }
     }
 
@@ -374,7 +382,11 @@ class StoreService {
       })
 
       if (existingStore) {
-        throw new BusinessError(`门店编号 ${updateData.store_code} 已被其他门店使用`, 'STORE_ERROR', 400)
+        throw new BusinessError(
+          `门店编号 ${updateData.store_code} 已被其他门店使用`,
+          'STORE_ERROR',
+          400
+        )
       }
     }
 
@@ -396,7 +408,11 @@ class StoreService {
         transaction
       })
       if (!regionValidation.valid) {
-        throw new BusinessError(`行政区划校验失败: ${regionValidation.errors.join(', ')}`, 'STORE_FAILED', 500)
+        throw new BusinessError(
+          `行政区划校验失败: ${regionValidation.errors.join(', ')}`,
+          'STORE_FAILED',
+          500
+        )
       }
 
       regionNames = regionValidation.names
@@ -406,7 +422,11 @@ class StoreService {
     if (updateData.assigned_to) {
       const assignedUser = await User.findByPk(updateData.assigned_to, { transaction })
       if (!assignedUser) {
-        throw new BusinessError(`分配的业务员 ID ${updateData.assigned_to} 不存在`, 'STORE_NOT_FOUND', 404)
+        throw new BusinessError(
+          `分配的业务员 ID ${updateData.assigned_to} 不存在`,
+          'STORE_NOT_FOUND',
+          404
+        )
       }
     }
 
@@ -501,7 +521,11 @@ class StoreService {
     })
 
     if (activeStaffCount > 0 && !force) {
-      throw new BusinessError(`门店 ${store.store_name} 下有 ${activeStaffCount} 名在职员工，无法删除`, 'STORE_ERROR', 400)
+      throw new BusinessError(
+        `门店 ${store.store_name} 下有 ${activeStaffCount} 名在职员工，无法删除`,
+        'STORE_ERROR',
+        400
+      )
     }
 
     // 3. 执行删除

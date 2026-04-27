@@ -94,8 +94,8 @@ router.get(
     })
 
     return res.apiSuccess(roi, '获取活动ROI成功')
-  }
-))
+  })
+)
 
 /*
  * ==========================================
@@ -146,7 +146,7 @@ router.get(
     })
 
     return res.apiSuccess(result, '获取策略效果分析成功')
-  }
-))
+  })
+)
 
 module.exports = router

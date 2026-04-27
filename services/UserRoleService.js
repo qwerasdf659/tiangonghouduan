@@ -343,7 +343,11 @@ class UserRoleService {
 
     // 禁止管理员修改自己的账号状态
     if (parseInt(user_id) === operator_id) {
-      throw new BusinessError(`禁止修改自己的账号状态（用户ID: ${user_id}, 操作者ID: ${operator_id}）`, 'ROLE_NOT_ALLOWED', 400)
+      throw new BusinessError(
+        `禁止修改自己的账号状态（用户ID: ${user_id}, 操作者ID: ${operator_id}）`,
+        'ROLE_NOT_ALLOWED',
+        400
+      )
     }
 
     // 查找用户
@@ -1032,14 +1036,22 @@ class UserRoleService {
 
     // 检查是否尝试创建系统内置角色名称
     if (isSystemRole(role_name.trim())) {
-      throw new BusinessError(`不能创建与系统内置角色同名的角色: ${role_name}`, 'ROLE_NOT_ALLOWED', 400)
+      throw new BusinessError(
+        `不能创建与系统内置角色同名的角色: ${role_name}`,
+        'ROLE_NOT_ALLOWED',
+        400
+      )
     }
 
     // 验证权限格式
     if (permissions && Object.keys(permissions).length > 0) {
       const permissionValidation = validatePermissions(permissions)
       if (!permissionValidation.valid) {
-        throw new BusinessError(`权限配置格式错误: ${permissionValidation.errors.join(', ')}`, 'ROLE_ERROR', 400)
+        throw new BusinessError(
+          `权限配置格式错误: ${permissionValidation.errors.join(', ')}`,
+          'ROLE_ERROR',
+          400
+        )
       }
     }
 
@@ -1184,7 +1196,11 @@ class UserRoleService {
     if (permissions !== undefined && Object.keys(permissions).length > 0) {
       const permissionValidation = validatePermissions(permissions)
       if (!permissionValidation.valid) {
-        throw new BusinessError(`权限配置格式错误: ${permissionValidation.errors.join(', ')}`, 'ROLE_ERROR', 400)
+        throw new BusinessError(
+          `权限配置格式错误: ${permissionValidation.errors.join(', ')}`,
+          'ROLE_ERROR',
+          400
+        )
       }
     }
 

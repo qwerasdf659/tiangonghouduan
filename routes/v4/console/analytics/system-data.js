@@ -58,7 +58,7 @@ router.get(
   authenticateToken,
   requireRoleLevel(PERMISSION_LEVELS.OPS),
   asyncHandler(async (req, res) => {
-        // 通过 ServiceManager 获取查询服务
+    // 通过 ServiceManager 获取查询服务
     const SystemDataQueryService = req.app.locals.services.getService('console_system_data_query')
 
     const result = await SystemDataQueryService.getAccounts(req.query)
@@ -83,7 +83,7 @@ router.get(
   authenticateToken,
   requireRoleLevel(PERMISSION_LEVELS.OPS),
   asyncHandler(async (req, res) => {
-        const { account_id } = req.params
+    const { account_id } = req.params
     const SystemDataQueryService = req.app.locals.services.getService('console_system_data_query')
 
     const account = await SystemDataQueryService.getAccountById(account_id)
@@ -117,7 +117,7 @@ router.get(
   authenticateToken,
   requireRoleLevel(PERMISSION_LEVELS.OPS),
   asyncHandler(async (req, res) => {
-        const SystemDataQueryService = req.app.locals.services.getService('console_system_data_query')
+    const SystemDataQueryService = req.app.locals.services.getService('console_system_data_query')
 
     const result = await SystemDataQueryService.getUserRoles(req.query)
 
@@ -156,7 +156,7 @@ router.get(
   authenticateToken,
   requireRoleLevel(PERMISSION_LEVELS.OPS),
   asyncHandler(async (req, res) => {
-        const SystemDataQueryService = req.app.locals.services.getService('console_system_data_query')
+    const SystemDataQueryService = req.app.locals.services.getService('console_system_data_query')
 
     const result = await SystemDataQueryService.getMarketListings(req.query)
 
@@ -180,7 +180,7 @@ router.get(
   authenticateToken,
   requireRoleLevel(PERMISSION_LEVELS.OPS),
   asyncHandler(async (req, res) => {
-        const SystemDataQueryService = req.app.locals.services.getService('console_system_data_query')
+    const SystemDataQueryService = req.app.locals.services.getService('console_system_data_query')
 
     const result = await SystemDataQueryService.getMarketListingStats()
 
@@ -203,7 +203,7 @@ router.get(
   authenticateToken,
   requireRoleLevel(PERMISSION_LEVELS.OPS),
   asyncHandler(async (req, res) => {
-        const { market_listing_id } = req.params
+    const { market_listing_id } = req.params
     const SystemDataQueryService = req.app.locals.services.getService('console_system_data_query')
 
     const listing = await SystemDataQueryService.getMarketListingById(market_listing_id)
@@ -239,7 +239,7 @@ router.get(
   authenticateToken,
   requireRoleLevel(PERMISSION_LEVELS.OPS),
   asyncHandler(async (req, res) => {
-        const SystemDataQueryService = req.app.locals.services.getService('console_system_data_query')
+    const SystemDataQueryService = req.app.locals.services.getService('console_system_data_query')
 
     const result = await SystemDataQueryService.getLotteryCampaigns(req.query)
 
@@ -263,7 +263,7 @@ router.get(
   authenticateToken,
   requireRoleLevel(PERMISSION_LEVELS.OPS),
   asyncHandler(async (req, res) => {
-        const { lottery_campaign_id } = req.params
+    const { lottery_campaign_id } = req.params
     const SystemDataQueryService = req.app.locals.services.getService('console_system_data_query')
 
     const campaign = await SystemDataQueryService.getLotteryCampaignById(lottery_campaign_id)
@@ -288,7 +288,7 @@ router.post(
   authenticateToken,
   requireRoleLevel(PERMISSION_LEVELS.OPS),
   asyncHandler(async (req, res) => {
-        const campaignData = req.body
+    const campaignData = req.body
 
     /*
      * 验证必填字段（路由层基础校验，快速失败）
@@ -331,7 +331,7 @@ router.put(
   authenticateToken,
   requireRoleLevel(PERMISSION_LEVELS.OPS),
   asyncHandler(async (req, res) => {
-        const { lottery_campaign_id } = req.params
+    const { lottery_campaign_id } = req.params
     const {
       campaign_name,
       campaign_type,
@@ -430,7 +430,7 @@ router.put(
   authenticateToken,
   requireRoleLevel(PERMISSION_LEVELS.OPS),
   asyncHandler(async (req, res) => {
-        const { lottery_campaign_id } = req.params
+    const { lottery_campaign_id } = req.params
     const { status } = req.body
 
     if (!status || !['draft', 'active', 'paused', 'ended'].includes(status)) {
@@ -470,7 +470,7 @@ router.delete(
   authenticateToken,
   requireRoleLevel(PERMISSION_LEVELS.OPS),
   asyncHandler(async (req, res) => {
-        const { lottery_campaign_id } = req.params
+    const { lottery_campaign_id } = req.params
 
     // 通过 ServiceManager 获取服务
     const LotteryCampaignCRUDService = req.app.locals.services.getService('lottery_campaign_crud')
@@ -519,7 +519,7 @@ router.get(
   authenticateToken,
   requireRoleLevel(PERMISSION_LEVELS.OPS),
   asyncHandler(async (req, res) => {
-        const SystemDataQueryService = req.app.locals.services.getService('console_system_data_query')
+    const SystemDataQueryService = req.app.locals.services.getService('console_system_data_query')
 
     const result = await SystemDataQueryService.getLotteryDailyQuotas(req.query)
 
@@ -543,7 +543,7 @@ router.get(
   authenticateToken,
   requireRoleLevel(PERMISSION_LEVELS.OPS),
   asyncHandler(async (req, res) => {
-        const { quota_id } = req.params
+    const { quota_id } = req.params
     const SystemDataQueryService = req.app.locals.services.getService('console_system_data_query')
 
     const quota = await SystemDataQueryService.getLotteryDailyQuotaById(quota_id)

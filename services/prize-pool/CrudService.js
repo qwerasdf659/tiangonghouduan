@@ -396,7 +396,11 @@ class PrizeCrudService {
       const currentUsed = prize.total_win_count || 0
 
       if (newQuantity < currentUsed) {
-        throw new BusinessError(`新库存(${newQuantity})不能小于已使用数量(${currentUsed})`, 'PRIZE_POOL_NOT_ALLOWED', 400)
+        throw new BusinessError(
+          `新库存(${newQuantity})不能小于已使用数量(${currentUsed})`,
+          'PRIZE_POOL_NOT_ALLOWED',
+          400
+        )
       }
 
       if (newQuantity === 0) {
@@ -424,7 +428,11 @@ class PrizeCrudService {
       if (prizeType === 'physical') {
         const targetImageId = filteredUpdateData.primary_media_id ?? prize.primary_media_id
         if (!targetImageId) {
-          throw new BusinessError('实物奖品上架必须上传图片（primary_media_id 不能为空）', 'PRIZE_POOL_NOT_ALLOWED', 400)
+          throw new BusinessError(
+            '实物奖品上架必须上传图片（primary_media_id 不能为空）',
+            'PRIZE_POOL_NOT_ALLOWED',
+            400
+          )
         }
       }
     }
@@ -684,7 +692,11 @@ class PrizeCrudService {
     // 2. 检查是否已有用户中奖
     const totalWins = prize.total_win_count || 0
     if (totalWins > 0) {
-      throw new BusinessError(`该奖品已被中奖${totalWins}次，不能删除。建议改为停用状态。`, 'PRIZE_POOL_NOT_ALLOWED', 400)
+      throw new BusinessError(
+        `该奖品已被中奖${totalWins}次，不能删除。建议改为停用状态。`,
+        'PRIZE_POOL_NOT_ALLOWED',
+        400
+      )
     }
 
     /*

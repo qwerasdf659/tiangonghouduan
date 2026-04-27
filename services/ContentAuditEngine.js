@@ -75,13 +75,21 @@ class ContentAuditEngine {
      */
     const validTypes = ['exchange', 'feedback', 'consumption', 'merchant_points']
     if (!validTypes.includes(auditableType)) {
-      throw new BusinessError(`不支持的审核类型: ${auditableType}，仅支持: ${validTypes.join(', ')}`, 'SERVICE_NOT_ALLOWED', 400)
+      throw new BusinessError(
+        `不支持的审核类型: ${auditableType}，仅支持: ${validTypes.join(', ')}`,
+        'SERVICE_NOT_ALLOWED',
+        400
+      )
     }
 
     // 验证优先级
     const validPriorities = ['high', 'medium', 'low']
     if (!validPriorities.includes(priority)) {
-      throw new BusinessError(`无效的优先级: ${priority}，仅支持: ${validPriorities.join(', ')}`, 'SERVICE_INVALID', 400)
+      throw new BusinessError(
+        `无效的优先级: ${priority}，仅支持: ${validPriorities.join(', ')}`,
+        'SERVICE_INVALID',
+        400
+      )
     }
 
     // 检查是否已存在待审核记录（防止重复提交）
@@ -178,7 +186,11 @@ class ContentAuditEngine {
 
     // 2. 验证审核状态
     if (auditRecord.audit_status !== 'pending') {
-      throw new BusinessError(`审核记录状态不正确: 当前状态=${auditRecord.audit_status}，期望状态=pending`, 'SERVICE_ERROR', 400)
+      throw new BusinessError(
+        `审核记录状态不正确: 当前状态=${auditRecord.audit_status}，期望状态=pending`,
+        'SERVICE_ERROR',
+        400
+      )
     }
 
     // 3. 更新审核记录
@@ -237,7 +249,11 @@ class ContentAuditEngine {
 
     // 2. 验证审核状态
     if (auditRecord.audit_status !== 'pending') {
-      throw new BusinessError(`审核记录状态不正确: 当前状态=${auditRecord.audit_status}，期望状态=pending`, 'SERVICE_ERROR', 400)
+      throw new BusinessError(
+        `审核记录状态不正确: 当前状态=${auditRecord.audit_status}，期望状态=pending`,
+        'SERVICE_ERROR',
+        400
+      )
     }
 
     // 3. 更新审核记录
@@ -285,7 +301,11 @@ class ContentAuditEngine {
 
     // 2. 验证审核状态
     if (auditRecord.audit_status !== 'pending') {
-      throw new BusinessError(`只能取消待审核记录: 当前状态=${auditRecord.audit_status}`, 'SERVICE_ERROR', 400)
+      throw new BusinessError(
+        `只能取消待审核记录: 当前状态=${auditRecord.audit_status}`,
+        'SERVICE_ERROR',
+        400
+      )
     }
 
     // 3. 更新审核记录

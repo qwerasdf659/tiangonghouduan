@@ -162,7 +162,11 @@ class BalanceService {
       })
 
       if (!account) {
-        throw new BusinessError(`系统账户不存在：system_code=${system_code}，请检查数据库初始化`, 'ASSET_NOT_FOUND', 404)
+        throw new BusinessError(
+          `系统账户不存在：system_code=${system_code}，请检查数据库初始化`,
+          'ASSET_NOT_FOUND',
+          404
+        )
       }
 
       return account
@@ -188,7 +192,11 @@ class BalanceService {
 
     // 🔥 BUDGET_POINTS 必须指定 lottery_campaign_id
     if (asset_code === AssetCode.BUDGET_POINTS && !lottery_campaign_id) {
-      throw new BusinessError('BUDGET_POINTS 必须指定 lottery_campaign_id 参数（活动隔离规则）', 'ASSET_REQUIRED', 400)
+      throw new BusinessError(
+        'BUDGET_POINTS 必须指定 lottery_campaign_id 参数（活动隔离规则）',
+        'ASSET_REQUIRED',
+        400
+      )
     }
 
     // 构建查询条件
@@ -303,7 +311,11 @@ class BalanceService {
 
     // 🔥 BUDGET_POINTS 必须指定 lottery_campaign_id（活动隔离规则）
     if (asset_code === AssetCode.BUDGET_POINTS && !lottery_campaign_id) {
-      throw new BusinessError('BUDGET_POINTS 必须指定 lottery_campaign_id 参数（活动隔离规则）', 'ASSET_REQUIRED', 400)
+      throw new BusinessError(
+        'BUDGET_POINTS 必须指定 lottery_campaign_id 参数（活动隔离规则）',
+        'ASSET_REQUIRED',
+        400
+      )
     }
 
     try {
@@ -362,7 +374,11 @@ class BalanceService {
       if (!balance) {
         // 余额记录不存在，创建新记录
         if (delta_amount < 0) {
-          throw new BusinessError(`余额不足：账户不存在且尝试扣减${Math.abs(delta_amount)}个${asset_code}`, 'ASSET_BALANCE_NOT_FOUND', 404)
+          throw new BusinessError(
+            `余额不足：账户不存在且尝试扣减${Math.abs(delta_amount)}个${asset_code}`,
+            'ASSET_BALANCE_NOT_FOUND',
+            404
+          )
         }
         finalBalance = await this.getOrCreateBalance(account.account_id, asset_code, {
           transaction,
@@ -582,7 +598,11 @@ class BalanceService {
 
     // 🛡️ 冻结金额安全上限校验
     if (amount > BALANCE_SAFETY_LIMIT) {
-      throw new BusinessError(`冻结金额超出安全上限：${amount} > ${BALANCE_SAFETY_LIMIT}（10亿）`, 'ASSET_EXCEEDED', 400)
+      throw new BusinessError(
+        `冻结金额超出安全上限：${amount} > ${BALANCE_SAFETY_LIMIT}（10亿）`,
+        'ASSET_EXCEEDED',
+        400
+      )
     }
 
     try {
@@ -838,7 +858,11 @@ class BalanceService {
 
     // 🛡️ 解冻金额安全上限校验
     if (amount > BALANCE_SAFETY_LIMIT) {
-      throw new BusinessError(`解冻金额超出安全上限：${amount} > ${BALANCE_SAFETY_LIMIT}（10亿）`, 'ASSET_EXCEEDED', 400)
+      throw new BusinessError(
+        `解冻金额超出安全上限：${amount} > ${BALANCE_SAFETY_LIMIT}（10亿）`,
+        'ASSET_EXCEEDED',
+        400
+      )
     }
 
     try {
@@ -1088,7 +1112,11 @@ class BalanceService {
 
     // 🛡️ 结算金额安全上限校验
     if (amount > BALANCE_SAFETY_LIMIT) {
-      throw new BusinessError(`结算金额超出安全上限：${amount} > ${BALANCE_SAFETY_LIMIT}（10亿）`, 'ASSET_EXCEEDED', 400)
+      throw new BusinessError(
+        `结算金额超出安全上限：${amount} > ${BALANCE_SAFETY_LIMIT}（10亿）`,
+        'ASSET_EXCEEDED',
+        400
+      )
     }
 
     try {
@@ -1273,7 +1301,11 @@ class BalanceService {
 
     // 🔥 BUDGET_POINTS 必须指定 lottery_campaign_id
     if (asset_code === AssetCode.BUDGET_POINTS && !lottery_campaign_id) {
-      throw new BusinessError('BUDGET_POINTS 必须指定 lottery_campaign_id 参数（活动隔离规则）', 'ASSET_REQUIRED', 400)
+      throw new BusinessError(
+        'BUDGET_POINTS 必须指定 lottery_campaign_id 参数（活动隔离规则）',
+        'ASSET_REQUIRED',
+        400
+      )
     }
 
     try {

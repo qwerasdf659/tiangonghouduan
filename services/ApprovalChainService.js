@@ -112,7 +112,11 @@ class ApprovalChainService {
         })
 
     if (auditNodes.length === 0) {
-      throw new BusinessError(`模板 ${template.template_code} 无审核节点（step_number > 1 的节点为空）`, 'APPROVAL_REQUIRED', 400)
+      throw new BusinessError(
+        `模板 ${template.template_code} 无审核节点（step_number > 1 的节点为空）`,
+        'APPROVAL_REQUIRED',
+        400
+      )
     }
 
     const instance = await ApprovalChainInstance.create(
@@ -212,7 +216,11 @@ class ApprovalChainService {
     const transaction = assertAndGetTransaction(options, 'ApprovalChainService.processStep')
 
     if (!['approve', 'reject'].includes(action)) {
-      throw new BusinessError(`无效的审核操作: ${action}，仅支持 approve/reject`, 'APPROVAL_INVALID', 400)
+      throw new BusinessError(
+        `无效的审核操作: ${action}，仅支持 approve/reject`,
+        'APPROVAL_INVALID',
+        400
+      )
     }
 
     const step = await ApprovalChainStep.findByPk(stepId, {
@@ -228,10 +236,18 @@ class ApprovalChainService {
       throw new BusinessError(`审核步骤不存在: step_id=${stepId}`, 'APPROVAL_NOT_FOUND', 404)
     }
     if (step.status !== 'pending') {
-      throw new BusinessError(`审核步骤状态不是 pending: 当前状态=${step.status}`, 'APPROVAL_ERROR', 400)
+      throw new BusinessError(
+        `审核步骤状态不是 pending: 当前状态=${step.status}`,
+        'APPROVAL_ERROR',
+        400
+      )
     }
     if (step.instance.status !== 'in_progress') {
-      throw new BusinessError(`审核链已结束: 当前状态=${step.instance.status}`, 'APPROVAL_ERROR', 400)
+      throw new BusinessError(
+        `审核链已结束: 当前状态=${step.instance.status}`,
+        'APPROVAL_ERROR',
+        400
+      )
     }
 
     await ApprovalChainService._verifyOperatorPermission(step, operatorId, transaction)
@@ -503,7 +519,8 @@ class ApprovalChainService {
    * @returns {Promise<Object>} { rows, count }
    */
   static async getPendingStepsForUser(userId, queryOptions = {}) {
-    const { page = 1, page_size = 20 } = queryOptions
+    const page = parseInt(queryOptions.page, 10) || 1
+    const page_size = parseInt(queryOptions.page_size, 10) || 20
 
     const userRoles = await UserRole.findAll({
       where: { user_id: userId, is_active: 1 },
@@ -551,7 +568,9 @@ class ApprovalChainService {
    * @returns {Promise<Object>} { rows, count, page, page_size, total_pages }
    */
   static async getPendingStepsForRole(roleId, queryOptions = {}) {
-    const { page = 1, page_size = 20, auditable_type } = queryOptions
+    const page = parseInt(queryOptions.page, 10) || 1
+    const page_size = parseInt(queryOptions.page_size, 10) || 20
+    const { auditable_type } = queryOptions
 
     const whereCondition = {
       status: 'pending',
@@ -587,7 +606,9 @@ class ApprovalChainService {
    * @returns {Promise<Object>} 分页结果 { rows, count }
    */
   static async getTemplates(queryOptions = {}) {
-    const { auditable_type, is_active, page = 1, page_size = 20 } = queryOptions
+    const { auditable_type, is_active } = queryOptions
+    const page = parseInt(queryOptions.page, 10) || 1
+    const page_size = parseInt(queryOptions.page_size, 10) || 20
     const where = {}
     if (auditable_type) where.auditable_type = auditable_type
     if (is_active !== undefined) where.is_active = is_active
@@ -641,7 +662,13 @@ class ApprovalChainService {
         }
       ]
     })
-    if (!template) throw new BusinessError(`审核链模板不存在: template_id=${templateId}`, 'APPROVAL_NOT_FOUND', 404)
+    if (!template) {
+      throw new BusinessError(
+        `审核链模板不存在: template_id=${templateId}`,
+        'APPROVAL_NOT_FOUND',
+        404
+      )
+    }
     return template
   }
 
@@ -689,7 +716,13 @@ class ApprovalChainService {
     const transaction = assertAndGetTransaction(options, 'ApprovalChainService.updateTemplate')
 
     const template = await ApprovalChainTemplate.findByPk(templateId, { transaction })
-    if (!template) throw new BusinessError(`审核链模板不存在: template_id=${templateId}`, 'APPROVAL_NOT_FOUND', 404)
+    if (!template) {
+      throw new BusinessError(
+        `审核链模板不存在: template_id=${templateId}`,
+        'APPROVAL_NOT_FOUND',
+        404
+      )
+    }
 
     const activeInstances = await ApprovalChainInstance.count({
       where: { template_id: templateId, status: 'in_progress' },
@@ -735,7 +768,13 @@ class ApprovalChainService {
   static async toggleTemplate(templateId, options = {}) {
     const transaction = assertAndGetTransaction(options, 'ApprovalChainService.toggleTemplate')
     const template = await ApprovalChainTemplate.findByPk(templateId, { transaction })
-    if (!template) throw new BusinessError(`审核链模板不存在: template_id=${templateId}`, 'APPROVAL_NOT_FOUND', 404)
+    if (!template) {
+      throw new BusinessError(
+        `审核链模板不存在: template_id=${templateId}`,
+        'APPROVAL_NOT_FOUND',
+        404
+      )
+    }
 
     await template.update({ is_active: template.is_active ? 0 : 1 }, { transaction })
     logger.info(`[审核链] 模板${template.is_active ? '启用' : '禁用'}: template_id=${templateId}`)
@@ -749,7 +788,9 @@ class ApprovalChainService {
    * @returns {Promise<Object>} 分页结果
    */
   static async getInstances(queryOptions = {}) {
-    const { auditable_type, status, page = 1, page_size = 20 } = queryOptions
+    const { auditable_type, status } = queryOptions
+    const page = parseInt(queryOptions.page, 10) || 1
+    const page_size = parseInt(queryOptions.page_size, 10) || 20
     const where = {}
     if (auditable_type) where.auditable_type = auditable_type
     if (status) where.status = status
@@ -796,7 +837,13 @@ class ApprovalChainService {
         { model: User, as: 'submitter', attributes: ['user_id', 'nickname', 'mobile'] }
       ]
     })
-    if (!instance) throw new BusinessError(`审核链实例不存在: instance_id=${instanceId}`, 'APPROVAL_NOT_FOUND', 404)
+    if (!instance) {
+      throw new BusinessError(
+        `审核链实例不存在: instance_id=${instanceId}`,
+        'APPROVAL_NOT_FOUND',
+        404
+      )
+    }
     return instance
   }
 
@@ -849,7 +896,11 @@ class ApprovalChainService {
 
     if (step.assignee_user_id) {
       if (step.assignee_user_id !== operatorId) {
-        throw new BusinessError(`您不是当前步骤的指定审核人（指定人ID: ${step.assignee_user_id}）`, 'APPROVAL_ERROR', 400)
+        throw new BusinessError(
+          `您不是当前步骤的指定审核人（指定人ID: ${step.assignee_user_id}）`,
+          'APPROVAL_ERROR',
+          400
+        )
       }
       return
     }
@@ -857,7 +908,11 @@ class ApprovalChainService {
     if (step.assignee_role_id) {
       const hasRole = userRoles.some(ur => ur.role_id === step.assignee_role_id)
       if (!hasRole) {
-        throw new BusinessError(`您不具备当前步骤要求的审核角色（要求角色ID: ${step.assignee_role_id}）`, 'APPROVAL_ERROR', 400)
+        throw new BusinessError(
+          `您不具备当前步骤要求的审核角色（要求角色ID: ${step.assignee_role_id}）`,
+          'APPROVAL_ERROR',
+          400
+        )
       }
       return
     }

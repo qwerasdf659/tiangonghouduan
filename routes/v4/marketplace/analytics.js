@@ -27,29 +27,37 @@ const { asyncHandler } = require('../../../middleware/validation')
  * @query {string} asset_code - 资产代码（与 template_id 二选一）
  * @query {number} template_id - 物品模板ID
  */
-router.get('/analytics/pricing-advice', authenticateToken, asyncHandler(async (req, res) => {
-  const { asset_code, template_id } = req.query
-  if (!asset_code && !template_id) {
-    return res.apiError('需要 asset_code 或 template_id 参数', 'MISSING_PARAMS', null, 400)
-  }
+router.get(
+  '/analytics/pricing-advice',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const { asset_code, template_id } = req.query
+    if (!asset_code && !template_id) {
+      return res.apiError('需要 asset_code 或 template_id 参数', 'MISSING_PARAMS', null, 400)
+    }
 
-  const MarketAnalyticsService = req.app.locals.services.getService('market_analytics')
-  const result = await MarketAnalyticsService.getPricingAdvice({ asset_code, template_id })
+    const MarketAnalyticsService = req.app.locals.services.getService('market_analytics')
+    const result = await MarketAnalyticsService.getPricingAdvice({ asset_code, template_id })
 
-  return res.apiSuccess(result, '获取定价建议成功')
-}))
+    return res.apiSuccess(result, '获取定价建议成功')
+  })
+)
 
 /**
  * @route GET /api/v4/marketplace/analytics/overview
  * @desc 市场总览（各资产成交量排行）
  * @access Private
  */
-router.get('/analytics/overview', authenticateToken, asyncHandler(async (req, res) => {
-  const MarketAnalyticsService = req.app.locals.services.getService('market_analytics')
-  const result = await MarketAnalyticsService.getMarketOverview()
+router.get(
+  '/analytics/overview',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const MarketAnalyticsService = req.app.locals.services.getService('market_analytics')
+    const result = await MarketAnalyticsService.getMarketOverview()
 
-  return res.apiSuccess(result, '获取市场总览成功')
-}))
+    return res.apiSuccess(result, '获取市场总览成功')
+  })
+)
 
 /**
  * @route GET /api/v4/marketplace/analytics/history
@@ -58,19 +66,23 @@ router.get('/analytics/overview', authenticateToken, asyncHandler(async (req, re
  * @query {string} asset_code - 资产代码
  * @query {number} days - 天数（默认30）
  */
-router.get('/analytics/history', authenticateToken, asyncHandler(async (req, res) => {
-  const { asset_code, days } = req.query
-  if (!asset_code) {
-    return res.apiError('需要 asset_code 参数', 'MISSING_PARAMS', null, 400)
-  }
+router.get(
+  '/analytics/history',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const { asset_code, days } = req.query
+    if (!asset_code) {
+      return res.apiError('需要 asset_code 参数', 'MISSING_PARAMS', null, 400)
+    }
 
-  const MarketAnalyticsService = req.app.locals.services.getService('market_analytics')
-  const result = await MarketAnalyticsService.getAssetPriceHistory({
-    asset_code,
-    days: parseInt(days) || 30
+    const MarketAnalyticsService = req.app.locals.services.getService('market_analytics')
+    const result = await MarketAnalyticsService.getAssetPriceHistory({
+      asset_code,
+      days: parseInt(days) || 30
+    })
+
+    return res.apiSuccess(result, '获取价格历史成功')
   })
-
-  return res.apiSuccess(result, '获取价格历史成功')
-}))
+)
 
 module.exports = router

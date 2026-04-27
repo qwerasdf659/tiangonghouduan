@@ -51,52 +51,55 @@ router.use((req, res, next) => {
  *
  * @returns {Object} 层级关系列表和分页信息
  */
-router.get('/', asyncHandler(async (req, res) => {
-  const { superior_user_id, is_active, role_level, page = 1, page_size = 20 } = req.query
+router.get(
+  '/',
+  asyncHandler(async (req, res) => {
+    const { superior_user_id, is_active, role_level, page = 1, page_size = 20 } = req.query
 
-  const pageNum = parseInt(page, 10) || 1
-  const pageSize = parseInt(page_size, 10) || 20
+    const pageNum = parseInt(page, 10) || 1
+    const pageSize = parseInt(page_size, 10) || 20
 
-  // 通过 Service 层查询层级列表（符合路由层规范）
-  const { count, rows } = await req.hierarchyService.getHierarchyList({
-    superior_user_id,
-    is_active: is_active !== undefined ? is_active === 'true' : undefined,
-    role_level,
-    page: pageNum,
-    page_size: pageSize
+    // 通过 Service 层查询层级列表（符合路由层规范）
+    const { count, rows } = await req.hierarchyService.getHierarchyList({
+      superior_user_id,
+      is_active: is_active !== undefined ? is_active === 'true' : undefined,
+      role_level,
+      page: pageNum,
+      page_size: pageSize
+    })
+
+    return res.apiSuccess(
+      {
+        rows: rows.map(h => ({
+          hierarchy_id: h.user_hierarchy_id,
+          user_id: h.user_id,
+          user_mobile: h.user?.mobile,
+          user_nickname: h.user?.nickname,
+          user_status: h.user?.status,
+          superior_user_id: h.superior_user_id,
+          superior_mobile: h.superior?.mobile,
+          superior_nickname: h.superior?.nickname,
+          role_id: h.role_id,
+          role_name: h.role?.role_name,
+          role_level: h.role?.role_level,
+          store_id: h.store_id,
+          is_active: h.is_active,
+          activated_at: h.activated_at,
+          deactivated_at: h.deactivated_at,
+          deactivation_reason: h.deactivation_reason,
+          created_at: h.created_at
+        })),
+        count,
+        pagination: {
+          page: pageNum,
+          page_size: pageSize,
+          total_pages: Math.ceil(count / pageSize)
+        }
+      },
+      '获取用户层级列表成功'
+    )
   })
-
-  return res.apiSuccess(
-    {
-      rows: rows.map(h => ({
-        hierarchy_id: h.user_hierarchy_id,
-        user_id: h.user_id,
-        user_mobile: h.user?.mobile,
-        user_nickname: h.user?.nickname,
-        user_status: h.user?.status,
-        superior_user_id: h.superior_user_id,
-        superior_mobile: h.superior?.mobile,
-        superior_nickname: h.superior?.nickname,
-        role_id: h.role_id,
-        role_name: h.role?.role_name,
-        role_level: h.role?.role_level,
-        store_id: h.store_id,
-        is_active: h.is_active,
-        activated_at: h.activated_at,
-        deactivated_at: h.deactivated_at,
-        deactivation_reason: h.deactivation_reason,
-        created_at: h.created_at
-      })),
-      count,
-      pagination: {
-        page: pageNum,
-        page_size: pageSize,
-        total_pages: Math.ceil(count / pageSize)
-      }
-    },
-    '获取用户层级列表成功'
-  )
-}))
+)
 
 /**
  * 获取某用户的所有下级（递归查询）
@@ -107,37 +110,40 @@ router.get('/', asyncHandler(async (req, res) => {
  *
  * @returns {Object} 所有下级用户列表
  */
-router.get('/:user_id/subordinates', asyncHandler(async (req, res) => {
-  const { user_id } = req.params
-  const { include_inactive = 'false' } = req.query
+router.get(
+  '/:user_id/subordinates',
+  asyncHandler(async (req, res) => {
+    const { user_id } = req.params
+    const { include_inactive = 'false' } = req.query
 
-  const subordinates = await req.hierarchyService.getAllSubordinates(
-    parseInt(user_id, 10),
-    include_inactive === 'true'
-  )
+    const subordinates = await req.hierarchyService.getAllSubordinates(
+      parseInt(user_id, 10),
+      include_inactive === 'true'
+    )
 
-  // 格式化返回数据
-  const formattedSubordinates = subordinates.map(sub => ({
-    hierarchy_id: sub.hierarchy_id,
-    user_id: sub.user_id,
-    user_mobile: sub.user?.mobile,
-    user_nickname: sub.user?.nickname,
-    user_status: sub.user?.status,
-    role_id: sub.role_id,
-    role_name: sub.role?.role_name,
-    role_level: sub.role?.role_level,
-    is_active: sub.is_active
-  }))
+    // 格式化返回数据
+    const formattedSubordinates = subordinates.map(sub => ({
+      hierarchy_id: sub.hierarchy_id,
+      user_id: sub.user_id,
+      user_mobile: sub.user?.mobile,
+      user_nickname: sub.user?.nickname,
+      user_status: sub.user?.status,
+      role_id: sub.role_id,
+      role_name: sub.role?.role_name,
+      role_level: sub.role?.role_level,
+      is_active: sub.is_active
+    }))
 
-  return res.apiSuccess(
-    {
-      parent_user_id: parseInt(user_id, 10),
-      subordinates: formattedSubordinates,
-      count: formattedSubordinates.length
-    },
-    '获取下级用户列表成功'
-  )
-}))
+    return res.apiSuccess(
+      {
+        parent_user_id: parseInt(user_id, 10),
+        subordinates: formattedSubordinates,
+        count: formattedSubordinates.length
+      },
+      '获取下级用户列表成功'
+    )
+  })
+)
 
 /**
  * 获取某用户的层级统计信息
@@ -147,13 +153,16 @@ router.get('/:user_id/subordinates', asyncHandler(async (req, res) => {
  *
  * @returns {Object} 层级统计信息（总下级数、直接下级数、按角色分组统计）
  */
-router.get('/:user_id/stats', asyncHandler(async (req, res) => {
-  const { user_id } = req.params
+router.get(
+  '/:user_id/stats',
+  asyncHandler(async (req, res) => {
+    const { user_id } = req.params
 
-  const stats = await req.hierarchyService.getHierarchyStats(parseInt(user_id, 10))
+    const stats = await req.hierarchyService.getHierarchyStats(parseInt(user_id, 10))
 
-  return res.apiSuccess(stats, '获取层级统计信息成功')
-}))
+    return res.apiSuccess(stats, '获取层级统计信息成功')
+  })
+)
 
 /**
  * 创建用户层级关系
@@ -166,35 +175,38 @@ router.get('/:user_id/stats', asyncHandler(async (req, res) => {
  *
  * @returns {Object} 创建的层级关系
  */
-router.post('/', asyncHandler(async (req, res) => {
-  const { user_id, superior_user_id, role_id, store_id } = req.body
+router.post(
+  '/',
+  asyncHandler(async (req, res) => {
+    const { user_id, superior_user_id, role_id, store_id } = req.body
 
-  // 参数验证
-  if (!user_id) {
-    return res.apiError('用户ID不能为空', 'MISSING_USER_ID', null, 400)
-  }
-  if (!role_id) {
-    return res.apiError('角色ID不能为空', 'MISSING_ROLE_ID', null, 400)
-  }
+    // 参数验证
+    if (!user_id) {
+      return res.apiError('用户ID不能为空', 'MISSING_USER_ID', null, 400)
+    }
+    if (!role_id) {
+      return res.apiError('角色ID不能为空', 'MISSING_ROLE_ID', null, 400)
+    }
 
-  const result = await req.hierarchyService.createHierarchy(
-    parseInt(user_id, 10),
-    superior_user_id ? parseInt(superior_user_id, 10) : null,
-    parseInt(role_id, 10),
-    store_id ? parseInt(store_id, 10) : null
-  )
-
-  if (result.success) {
-    return res.apiSuccess(result.hierarchy, '创建层级关系成功', null, 201)
-  } else {
-    return res.apiError(
-      result.message || '创建层级关系失败',
-      'CREATE_HIERARCHY_FAILED',
-      null,
-      400
+    const result = await req.hierarchyService.createHierarchy(
+      parseInt(user_id, 10),
+      superior_user_id ? parseInt(superior_user_id, 10) : null,
+      parseInt(role_id, 10),
+      store_id ? parseInt(store_id, 10) : null
     )
-  }
-}))
+
+    if (result.success) {
+      return res.apiSuccess(result.hierarchy, '创建层级关系成功', null, 201)
+    } else {
+      return res.apiError(
+        result.message || '创建层级关系失败',
+        'CREATE_HIERARCHY_FAILED',
+        null,
+        400
+      )
+    }
+  })
+)
 
 /**
  * 停用用户层级权限
@@ -206,31 +218,34 @@ router.post('/', asyncHandler(async (req, res) => {
  *
  * @returns {Object} 停用结果
  */
-router.post('/:user_id/deactivate', asyncHandler(async (req, res) => {
-  const { user_id } = req.params
-  const { reason, include_subordinates = false } = req.body
-  const operator_user_id = req.user.user_id
+router.post(
+  '/:user_id/deactivate',
+  asyncHandler(async (req, res) => {
+    const { user_id } = req.params
+    const { reason, include_subordinates = false } = req.body
+    const operator_user_id = req.user.user_id
 
-  // 参数验证
-  if (!reason) {
-    return res.apiError('停用原因不能为空', 'MISSING_REASON', null, 400)
-  }
+    // 参数验证
+    if (!reason) {
+      return res.apiError('停用原因不能为空', 'MISSING_REASON', null, 400)
+    }
 
-  const result = await TransactionManager.execute(
-    async transaction => {
-      return await req.hierarchyService.batchDeactivatePermissions(
-        parseInt(user_id, 10),
-        operator_user_id,
-        reason,
-        include_subordinates === true || include_subordinates === 'true',
-        { transaction }
-      )
-    },
-    { description: `停用用户${user_id}层级权限` }
-  )
+    const result = await TransactionManager.execute(
+      async transaction => {
+        return await req.hierarchyService.batchDeactivatePermissions(
+          parseInt(user_id, 10),
+          operator_user_id,
+          reason,
+          include_subordinates === true || include_subordinates === 'true',
+          { transaction }
+        )
+      },
+      { description: `停用用户${user_id}层级权限` }
+    )
 
-  return res.apiSuccess(result, '停用用户权限成功')
-}))
+    return res.apiSuccess(result, '停用用户权限成功')
+  })
+)
 
 /**
  * 激活用户层级权限
@@ -241,25 +256,28 @@ router.post('/:user_id/deactivate', asyncHandler(async (req, res) => {
  *
  * @returns {Object} 激活结果
  */
-router.post('/:user_id/activate', asyncHandler(async (req, res) => {
-  const { user_id } = req.params
-  const { include_subordinates = false } = req.body
-  const operator_user_id = req.user.user_id
+router.post(
+  '/:user_id/activate',
+  asyncHandler(async (req, res) => {
+    const { user_id } = req.params
+    const { include_subordinates = false } = req.body
+    const operator_user_id = req.user.user_id
 
-  const result = await TransactionManager.execute(
-    async transaction => {
-      return await req.hierarchyService.batchActivatePermissions(
-        parseInt(user_id, 10),
-        operator_user_id,
-        include_subordinates === true || include_subordinates === 'true',
-        { transaction }
-      )
-    },
-    { description: `激活用户${user_id}层级权限` }
-  )
+    const result = await TransactionManager.execute(
+      async transaction => {
+        return await req.hierarchyService.batchActivatePermissions(
+          parseInt(user_id, 10),
+          operator_user_id,
+          include_subordinates === true || include_subordinates === 'true',
+          { transaction }
+        )
+      },
+      { description: `激活用户${user_id}层级权限` }
+    )
 
-  return res.apiSuccess(result, '激活用户权限成功')
-}))
+    return res.apiSuccess(result, '激活用户权限成功')
+  })
+)
 
 /**
  * 获取可用角色列表（用于创建层级时选择角色）
@@ -267,20 +285,23 @@ router.post('/:user_id/activate', asyncHandler(async (req, res) => {
  *
  * @returns {Array} 角色列表
  */
-router.get('/roles', asyncHandler(async (req, res) => {
-  // 通过 Service 层查询角色列表（符合路由层规范）
-  const roles = await req.hierarchyService.getHierarchyRoles()
+router.get(
+  '/roles',
+  asyncHandler(async (req, res) => {
+    // 通过 Service 层查询角色列表（符合路由层规范）
+    const roles = await req.hierarchyService.getHierarchyRoles()
 
-  return res.apiSuccess(
-    roles.map(r => ({
-      role_id: r.role_id,
-      role_name: r.role_name,
-      role_level: r.role_level,
-      description: r.description,
-      level_name: r.role_level === 80 ? '区域负责人' : r.role_level === 60 ? '业务经理' : '业务员'
-    })),
-    '获取角色列表成功'
-  )
-}))
+    return res.apiSuccess(
+      roles.map(r => ({
+        role_id: r.role_id,
+        role_name: r.role_name,
+        role_level: r.role_level,
+        description: r.description,
+        level_name: r.role_level === 80 ? '区域负责人' : r.role_level === 60 ? '业务经理' : '业务员'
+      })),
+      '获取角色列表成功'
+    )
+  })
+)
 
 module.exports = router

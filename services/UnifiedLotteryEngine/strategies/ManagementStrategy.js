@@ -128,7 +128,11 @@ class ManagementStrategy {
           adminId,
           reason: adminValidation.reason
         })
-        throw new BusinessError(`管理员权限验证失败: ${adminValidation.reason}`, 'ENGINE_FAILED', 500)
+        throw new BusinessError(
+          `管理员权限验证失败: ${adminValidation.reason}`,
+          'ENGINE_FAILED',
+          500
+        )
       }
 
       // 验证目标用户
@@ -250,7 +254,11 @@ class ManagementStrategy {
       // 🛡️ 验证管理员权限
       const adminValidation = await this.validateAdminPermission(adminId)
       if (!adminValidation.valid) {
-        throw new BusinessError(`管理员权限验证失败: ${adminValidation.reason}`, 'ENGINE_FAILED', 500)
+        throw new BusinessError(
+          `管理员权限验证失败: ${adminValidation.reason}`,
+          'ENGINE_FAILED',
+          500
+        )
       }
 
       // 💾 创建数据库记录（传入事务，确保与外部事务一致）
@@ -366,7 +374,11 @@ class ManagementStrategy {
       // 🛡️ 验证管理员权限
       const adminValidation = await this.validateAdminPermission(adminId)
       if (!adminValidation.valid) {
-        throw new BusinessError(`管理员权限验证失败: ${adminValidation.reason}`, 'ENGINE_FAILED', 500)
+        throw new BusinessError(
+          `管理员权限验证失败: ${adminValidation.reason}`,
+          'ENGINE_FAILED',
+          500
+        )
       }
 
       // 验证概率倍数合法性（0.1-10倍）
@@ -492,7 +504,11 @@ class ManagementStrategy {
       // 🛡️ 验证管理员权限
       const adminValidation = await this.validateAdminPermission(adminId)
       if (!adminValidation.valid) {
-        throw new BusinessError(`管理员权限验证失败: ${adminValidation.reason}`, 'ENGINE_FAILED', 500)
+        throw new BusinessError(
+          `管理员权限验证失败: ${adminValidation.reason}`,
+          'ENGINE_FAILED',
+          500
+        )
       }
 
       // 验证队列配置合法性
@@ -501,7 +517,11 @@ class ManagementStrategy {
         !queueConfig.priority_level ||
         !Array.isArray(queueConfig.prize_queue)
       ) {
-        throw new BusinessError('队列配置不完整：必须包含queue_type、priority_level、prize_queue', 'ENGINE_REQUIRED', 400)
+        throw new BusinessError(
+          '队列配置不完整：必须包含queue_type、priority_level、prize_queue',
+          'ENGINE_REQUIRED',
+          400
+        )
       }
 
       if (queueConfig.priority_level < 1 || queueConfig.priority_level > 10) {
@@ -686,7 +706,11 @@ class ManagementStrategy {
       // 🛡️ 验证管理员权限
       const adminValidation = await this.validateAdminPermission(adminId)
       if (!adminValidation.valid) {
-        throw new BusinessError(`管理员权限验证失败: ${adminValidation.reason}`, 'ENGINE_FAILED', 500)
+        throw new BusinessError(
+          `管理员权限验证失败: ${adminValidation.reason}`,
+          'ENGINE_FAILED',
+          500
+        )
       }
 
       // 💾 构建查询条件
@@ -1111,7 +1135,11 @@ class ManagementStrategy {
       // 🛡️ 验证管理员权限（只验证一次）
       const adminValidation = await this.validateAdminPermission(adminId)
       if (!adminValidation.valid) {
-        throw new BusinessError(`管理员权限验证失败: ${adminValidation.reason}`, 'ENGINE_FAILED', 500)
+        throw new BusinessError(
+          `管理员权限验证失败: ${adminValidation.reason}`,
+          'ENGINE_FAILED',
+          500
+        )
       }
 
       const results = {
@@ -1201,7 +1229,11 @@ class ManagementStrategy {
       // 🛡️ 验证管理员权限（只验证一次）
       const adminValidation = await this.validateAdminPermission(adminId)
       if (!adminValidation.valid) {
-        throw new BusinessError(`管理员权限验证失败: ${adminValidation.reason}`, 'ENGINE_FAILED', 500)
+        throw new BusinessError(
+          `管理员权限验证失败: ${adminValidation.reason}`,
+          'ENGINE_FAILED',
+          500
+        )
       }
 
       const results = {

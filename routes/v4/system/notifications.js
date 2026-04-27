@@ -13,7 +13,7 @@ const { asyncHandler } = require('../../../middleware/validation')
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../middleware/auth')
-const { AdminNotification, Op } = require('../../../models')
+const { Op } = require('sequelize')
 
 /**
  * GET /unread-count - 获取当前管理员的未读通知数量
@@ -22,49 +22,67 @@ const { AdminNotification, Op } = require('../../../models')
  *
  * 注意：固定路径必须在 /:id 参数路由之前注册
  */
-router.get('/unread-count', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const adminId = req.user.user_id
+router.get(
+  '/unread-count',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const { AdminNotification } = req.app.locals.models
+    const adminId = req.user.user_id
 
-  const [unreadCount, urgentUnreadCount] = await Promise.all([
-    AdminNotification.getUnreadCount(adminId),
-    AdminNotification.getUrgentUnreadCount(adminId)
-  ])
+    const [unreadCount, urgentUnreadCount] = await Promise.all([
+      AdminNotification.getUnreadCount(adminId),
+      AdminNotification.getUrgentUnreadCount(adminId)
+    ])
 
-  return res.apiSuccess(
-    {
-      unread_count: unreadCount,
-      urgent_unread_count: urgentUnreadCount
-    },
-    '获取未读数量成功'
-  )
-}))
+    return res.apiSuccess(
+      {
+        unread_count: unreadCount,
+        urgent_unread_count: urgentUnreadCount
+      },
+      '获取未读数量成功'
+    )
+  })
+)
 
 /**
  * POST /read-all - 全部标记已读
  * @route POST /api/v4/system/notifications/read-all
  * @access Private（管理员）
  */
-router.post('/read-all', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const adminId = req.user.user_id
-  const updatedCount = await AdminNotification.markAllAsRead(adminId)
+router.post(
+  '/read-all',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const { AdminNotification } = req.app.locals.models
+    const adminId = req.user.user_id
+    const updatedCount = await AdminNotification.markAllAsRead(adminId)
 
-  return res.apiSuccess({ updated_count: updatedCount }, '全部标记已读成功')
-}))
+    return res.apiSuccess({ updated_count: updatedCount }, '全部标记已读成功')
+  })
+)
 
 /**
  * POST /clear - 清空已读通知（物理删除所有已读）
  * @route POST /api/v4/system/notifications/clear
  * @access Private（管理员）
  */
-router.post('/clear', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const adminId = req.user.user_id
+router.post(
+  '/clear',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const { AdminNotification } = req.app.locals.models
+    const adminId = req.user.user_id
 
-  const clearedCount = await AdminNotification.destroy({
-    where: { admin_id: adminId, is_read: true }
+    const clearedCount = await AdminNotification.destroy({
+      where: { admin_id: adminId, is_read: true }
+    })
+
+    return res.apiSuccess({ cleared_count: clearedCount }, '清空已读通知成功')
   })
-
-  return res.apiSuccess({ cleared_count: clearedCount }, '清空已读通知成功')
-}))
+)
 
 /**
  * POST /send - 管理员手动发送公告
@@ -74,31 +92,36 @@ router.post('/clear', authenticateToken, requireRoleLevel(100), asyncHandler(asy
  * @body {string} content - 内容
  * @body {string} [priority=normal] - 优先级
  */
-router.post('/send', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const { title, content, priority = 'normal' } = req.body
+router.post(
+  '/send',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const { title, content, priority = 'normal' } = req.body
 
-  if (!title || !content) {
-    return res.apiError('标题和内容不能为空', 'MISSING_REQUIRED_FIELDS', null, 400)
-  }
+    if (!title || !content) {
+      return res.apiError('标题和内容不能为空', 'MISSING_REQUIRED_FIELDS', null, 400)
+    }
 
-  const NotificationService = req.app.locals.services.getService('notification')
-  const result = await NotificationService.notifyAnnouncement(null, {
-    title,
-    content,
-    announcement_type: 'admin_broadcast',
-    sender_id: req.user.user_id,
-    sender_name: req.user.nickname || '管理员',
-    priority
+    const NotificationService = req.app.locals.services.getService('notification')
+    const result = await NotificationService.notifyAnnouncement(null, {
+      title,
+      content,
+      announcement_type: 'admin_broadcast',
+      sender_id: req.user.user_id,
+      sender_name: req.user.nickname || '管理员',
+      priority
+    })
+
+    return res.apiSuccess(
+      {
+        notification_count: result.persisted_count,
+        broadcasted_count: result.broadcasted_count
+      },
+      '通知发送成功'
+    )
   })
-
-  return res.apiSuccess(
-    {
-      notification_count: result.persisted_count,
-      broadcasted_count: result.broadcasted_count
-    },
-    '通知发送成功'
-  )
-}))
+)
 
 /**
  * GET / - 获取通知列表
@@ -114,146 +137,170 @@ router.post('/send', authenticateToken, requireRoleLevel(100), asyncHandler(asyn
  * @query {number} [page_size=20] - 每页数量
  * @query {number} [offset=0] - 偏移量
  */
-router.get('/', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const adminId = req.user.user_id
-  const {
-    notification_type,
-    priority,
-    is_read,
-    source_type,
-    keyword,
-    start_date,
-    end_date,
-    page_size = 20,
-    offset = 0
-  } = req.query
+router.get(
+  '/',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const { AdminNotification } = req.app.locals.models
+    const adminId = req.user.user_id
+    const {
+      notification_type,
+      priority,
+      is_read,
+      source_type,
+      keyword,
+      start_date,
+      end_date,
+      page_size = 20,
+      offset = 0
+    } = req.query
 
-  const where = { admin_id: adminId }
+    const where = { admin_id: adminId }
 
-  if (notification_type) {
-    where.notification_type = notification_type
-  }
-  if (priority) {
-    where.priority = priority
-  }
-  if (is_read !== undefined && is_read !== '') {
-    where.is_read = is_read === '1' || is_read === 'true'
-  }
-  if (source_type) {
-    where.source_type = source_type
-  }
+    if (notification_type) {
+      where.notification_type = notification_type
+    }
+    if (priority) {
+      where.priority = priority
+    }
+    if (is_read !== undefined && is_read !== '') {
+      where.is_read = is_read === '1' || is_read === 'true'
+    }
+    if (source_type) {
+      where.source_type = source_type
+    }
 
-  if (keyword) {
-    where[Op.or] = [
-      { title: { [Op.like]: `%${keyword}%` } },
-      { content: { [Op.like]: `%${keyword}%` } }
-    ]
-  }
+    if (keyword) {
+      where[Op.or] = [
+        { title: { [Op.like]: `%${keyword}%` } },
+        { content: { [Op.like]: `%${keyword}%` } }
+      ]
+    }
 
-  if (start_date || end_date) {
-    where.created_at = {}
-    if (start_date) where.created_at[Op.gte] = new Date(start_date)
-    if (end_date) where.created_at[Op.lte] = new Date(end_date)
-  }
+    if (start_date || end_date) {
+      where.created_at = {}
+      if (start_date) where.created_at[Op.gte] = new Date(start_date)
+      if (end_date) where.created_at[Op.lte] = new Date(end_date)
+    }
 
-  const { count, rows } = await AdminNotification.findAndCountAll({
-    where,
-    order: [['created_at', 'DESC']],
-    limit: Math.min(parseInt(page_size) || 20, 100),
-    offset: parseInt(offset) || 0
+    const { count, rows } = await AdminNotification.findAndCountAll({
+      where,
+      order: [['created_at', 'DESC']],
+      limit: Math.min(parseInt(page_size) || 20, 100),
+      offset: parseInt(offset) || 0
+    })
+
+    const unreadCount = await AdminNotification.getUnreadCount(adminId)
+
+    return res.apiSuccess(
+      {
+        items: rows,
+        total: count,
+        unread_count: unreadCount
+      },
+      '获取通知列表成功'
+    )
   })
-
-  const unreadCount = await AdminNotification.getUnreadCount(adminId)
-
-  return res.apiSuccess(
-    {
-      items: rows,
-      total: count,
-      unread_count: unreadCount
-    },
-    '获取通知列表成功'
-  )
-}))
+)
 
 /**
  * GET /:id - 获取通知详情
  * @route GET /api/v4/system/notifications/:id
  * @access Private（管理员）
  */
-router.get('/:id', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const adminId = req.user.user_id
-  const notificationId = parseInt(req.params.id)
+router.get(
+  '/:id',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const { AdminNotification } = req.app.locals.models
+    const adminId = req.user.user_id
+    const notificationId = parseInt(req.params.id)
 
-  if (isNaN(notificationId)) {
-    return res.apiError('通知ID格式无效', 'INVALID_NOTIFICATION_ID', null, 400)
-  }
+    if (isNaN(notificationId)) {
+      return res.apiError('通知ID格式无效', 'INVALID_NOTIFICATION_ID', null, 400)
+    }
 
-  const notification = await AdminNotification.findOne({
-    where: { admin_notification_id: notificationId, admin_id: adminId }
+    const notification = await AdminNotification.findOne({
+      where: { admin_notification_id: notificationId, admin_id: adminId }
+    })
+
+    if (!notification) {
+      return res.apiError('通知不存在', 'NOTIFICATION_NOT_FOUND', null, 404)
+    }
+
+    return res.apiSuccess(notification, '获取通知详情成功')
   })
-
-  if (!notification) {
-    return res.apiError('通知不存在', 'NOTIFICATION_NOT_FOUND', null, 404)
-  }
-
-  return res.apiSuccess(notification, '获取通知详情成功')
-}))
+)
 
 /**
  * POST /:id/read - 标记单条通知已读
  * @route POST /api/v4/system/notifications/:id/read
  * @access Private（管理员）
  */
-router.post('/:id/read', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const adminId = req.user.user_id
-  const notificationId = parseInt(req.params.id)
+router.post(
+  '/:id/read',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const { AdminNotification } = req.app.locals.models
+    const adminId = req.user.user_id
+    const notificationId = parseInt(req.params.id)
 
-  if (isNaN(notificationId)) {
-    return res.apiError('通知ID格式无效', 'INVALID_NOTIFICATION_ID', null, 400)
-  }
+    if (isNaN(notificationId)) {
+      return res.apiError('通知ID格式无效', 'INVALID_NOTIFICATION_ID', null, 400)
+    }
 
-  const notification = await AdminNotification.findOne({
-    where: { admin_notification_id: notificationId, admin_id: adminId }
+    const notification = await AdminNotification.findOne({
+      where: { admin_notification_id: notificationId, admin_id: adminId }
+    })
+
+    if (!notification) {
+      return res.apiError('通知不存在', 'NOTIFICATION_NOT_FOUND', null, 404)
+    }
+
+    await notification.markAsRead()
+
+    return res.apiSuccess(
+      {
+        admin_notification_id: notification.admin_notification_id,
+        is_read: notification.is_read,
+        read_at: notification.read_at
+      },
+      '标记已读成功'
+    )
   })
-
-  if (!notification) {
-    return res.apiError('通知不存在', 'NOTIFICATION_NOT_FOUND', null, 404)
-  }
-
-  await notification.markAsRead()
-
-  return res.apiSuccess(
-    {
-      admin_notification_id: notification.admin_notification_id,
-      is_read: notification.is_read,
-      read_at: notification.read_at
-    },
-    '标记已读成功'
-  )
-}))
+)
 
 /**
  * DELETE /:id - 删除单条通知（物理删除）
  * @route DELETE /api/v4/system/notifications/:id
  * @access Private（管理员）
  */
-router.delete('/:id', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const adminId = req.user.user_id
-  const notificationId = parseInt(req.params.id)
+router.delete(
+  '/:id',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const { AdminNotification } = req.app.locals.models
+    const adminId = req.user.user_id
+    const notificationId = parseInt(req.params.id)
 
-  if (isNaN(notificationId)) {
-    return res.apiError('通知ID格式无效', 'INVALID_NOTIFICATION_ID', null, 400)
-  }
+    if (isNaN(notificationId)) {
+      return res.apiError('通知ID格式无效', 'INVALID_NOTIFICATION_ID', null, 400)
+    }
 
-  const deleted = await AdminNotification.destroy({
-    where: { admin_notification_id: notificationId, admin_id: adminId }
+    const deleted = await AdminNotification.destroy({
+      where: { admin_notification_id: notificationId, admin_id: adminId }
+    })
+
+    if (!deleted) {
+      return res.apiError('通知不存在或无权删除', 'NOTIFICATION_NOT_FOUND', null, 404)
+    }
+
+    return res.apiSuccess({ deleted: true }, '删除通知成功')
   })
-
-  if (!deleted) {
-    return res.apiError('通知不存在或无权删除', 'NOTIFICATION_NOT_FOUND', null, 404)
-  }
-
-  return res.apiSuccess({ deleted: true }, '删除通知成功')
-}))
+)
 
 module.exports = router

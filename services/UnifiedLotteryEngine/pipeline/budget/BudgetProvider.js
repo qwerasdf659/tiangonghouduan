@@ -57,7 +57,11 @@ class BudgetProvider {
    * @abstract
    */
   async getAvailableBudget(params, _options = {}) {
-    throw new BusinessError('BudgetProvider.getAvailableBudget() must be implemented', 'ENGINE_ERROR', 400)
+    throw new BusinessError(
+      'BudgetProvider.getAvailableBudget() must be implemented',
+      'ENGINE_ERROR',
+      400
+    )
   }
 
   /**
@@ -98,7 +102,11 @@ class BudgetProvider {
    * @abstract
    */
   async deductBudget(params, _options = {}) {
-    throw new BusinessError('BudgetProvider.deductBudget() must be implemented', 'ENGINE_ERROR', 400)
+    throw new BusinessError(
+      'BudgetProvider.deductBudget() must be implemented',
+      'ENGINE_ERROR',
+      400
+    )
   }
 
   /**
@@ -115,7 +123,11 @@ class BudgetProvider {
    * @abstract
    */
   async rollbackBudget(params, _options = {}) {
-    throw new BusinessError('BudgetProvider.rollbackBudget() must be implemented', 'ENGINE_ERROR', 400)
+    throw new BusinessError(
+      'BudgetProvider.rollbackBudget() must be implemented',
+      'ENGINE_ERROR',
+      400
+    )
   }
 
   /**

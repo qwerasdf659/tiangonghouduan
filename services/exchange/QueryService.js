@@ -1121,7 +1121,11 @@ class QueryService {
 
     try {
       if (!this.ExchangeItem) {
-        throw new BusinessError('ExchangeItem 模型未注册，请检查 models 配置', 'EXCHANGE_CONFIG_ERROR', 500)
+        throw new BusinessError(
+          'ExchangeItem 模型未注册，请检查 models 配置',
+          'EXCHANGE_CONFIG_ERROR',
+          500
+        )
       }
 
       logger.info('[商品中心] 查询商品列表', {
@@ -1263,7 +1267,11 @@ class QueryService {
   async getExchangeItemDetail(productId) {
     try {
       if (!this.ExchangeItem) {
-        throw new BusinessError('ExchangeItem 模型未注册，请检查 models 配置', 'EXCHANGE_CONFIG_ERROR', 500)
+        throw new BusinessError(
+          'ExchangeItem 模型未注册，请检查 models 配置',
+          'EXCHANGE_CONFIG_ERROR',
+          500
+        )
       }
 
       logger.info('[商品中心] 查询商品详情', { exchange_item_id: productId })
@@ -1370,7 +1378,11 @@ class QueryService {
   async getExchangeItemStats() {
     try {
       if (!this.ExchangeItem) {
-        throw new BusinessError('ExchangeItem 模型未注册，请检查 models 配置', 'EXCHANGE_CONFIG_ERROR', 500)
+        throw new BusinessError(
+          'ExchangeItem 模型未注册，请检查 models 配置',
+          'EXCHANGE_CONFIG_ERROR',
+          500
+        )
       }
 
       logger.info('[商品中心] 查询商品统计数据')

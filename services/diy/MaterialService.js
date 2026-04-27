@@ -10,6 +10,7 @@
 
 const { Op, fn, col } = require('sequelize')
 const logger = require('../../utils/logger').logger
+const OrderNoGenerator = require('../../utils/OrderNoGenerator')
 const { AssetCode } = require('../../constants/AssetCode')
 const { Category, DiyMaterial, DiyTemplate, MediaFile } = require('../../models')
 const TransactionManager = require('../../utils/TransactionManager')
@@ -103,11 +104,7 @@ class DiyMaterialService {
       throw error
     }
 
-    // 生成 material_code
-    const timestamp = Date.now().toString(36).toUpperCase()
-    const random = Math.random().toString(36).substring(2, 6).toUpperCase()
-    const materialCode = `DM${timestamp}${random}`
-
+    // material_code 采用「先创建再回填」模式，与 TemplateService/WorkService 统一
     return TransactionManager.execute(async transaction => {
       // 安全校验：price_asset_code 不允许设为 points 或 budget_points（文档决策 4）
       const assetCode = data.price_asset_code || AssetCode.STAR_STONE
@@ -137,7 +134,7 @@ class DiyMaterialService {
 
       const material = await DiyMaterial.create(
         {
-          material_code: materialCode,
+          material_code: 'DM_TEMP',
           display_name: data.display_name,
           material_name: data.material_name || null,
           group_code: data.group_code || 'default',
@@ -155,6 +152,13 @@ class DiyMaterialService {
         },
         { transaction }
       )
+
+      const materialCode = OrderNoGenerator.generate(
+        'DM',
+        material.diy_material_id,
+        material.created_at
+      )
+      await material.update({ material_code: materialCode }, { transaction })
 
       logger.info('[DIYService] 创建材料', {
         diy_material_id: material.diy_material_id,

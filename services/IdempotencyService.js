@@ -585,7 +585,11 @@ const CANONICAL_OPERATION_MAP = {
   // --- 管理端写操作 ---
   '/api/v4/console/diy/templates': 'ADMIN_DIY_TEMPLATE_CREATE', // 创建款式模板
   '/api/v4/console/diy/templates/:id': 'ADMIN_DIY_TEMPLATE_UPDATE', // 更新/删除款式模板（PUT/DELETE）
-  '/api/v4/console/diy/templates/:id/status': 'ADMIN_DIY_TEMPLATE_STATUS' // 发布/下线模板
+  '/api/v4/console/diy/templates/:id/status': 'ADMIN_DIY_TEMPLATE_STATUS', // 发布/下线模板
+
+  // --- 管理端材料写操作（编码规则统一方案 D14-A 补全）---
+  '/api/v4/console/diy/materials': 'ADMIN_DIY_MATERIAL_CREATE', // 创建珠子素材
+  '/api/v4/console/diy/materials/:id': 'ADMIN_DIY_MATERIAL_UPDATE' // 更新/删除珠子素材（PUT/DELETE）
 }
 
 /**

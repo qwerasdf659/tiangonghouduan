@@ -37,47 +37,50 @@ const ALLOWED_EXTENSIONS = /\.(jpe?g|png|gif|webp)$/i
  *   GET /api/v4/images/defaults/prize-placeholder.png
  *   GET /api/v4/images/prizes/thumbnails/small/20260108_abc123.jpg
  */
-router.get('/*', asyncHandler(async (req, res) => {
-  const objectKey = req.params[0]
+router.get(
+  '/*',
+  asyncHandler(async (req, res) => {
+    const objectKey = req.params[0]
 
-  if (!objectKey || !ALLOWED_EXTENSIONS.test(objectKey)) {
-    return res.apiError('无效的图片路径', 'INVALID_IMAGE_KEY', null, 400)
-  }
+    if (!objectKey || !ALLOWED_EXTENSIONS.test(objectKey)) {
+      return res.apiError('无效的图片路径', 'INVALID_IMAGE_KEY', null, 400)
+    }
 
-  if (objectKey.includes('..') || objectKey.startsWith('/')) {
-    return res.apiError('非法的图片路径', 'INVALID_IMAGE_KEY', null, 400)
-  }
+    if (objectKey.includes('..') || objectKey.startsWith('/')) {
+      return res.apiError('非法的图片路径', 'INVALID_IMAGE_KEY', null, 400)
+    }
 
-  const SealosStorageService = req.app.locals.services.getService('sealos_storage')
-  const storageService = new SealosStorageService()
-  const { body, contentType, contentLength, etag } =
-    await storageService.getImageBuffer(objectKey)
+    const SealosStorageService = req.app.locals.services.getService('sealos_storage')
+    const storageService = new SealosStorageService()
+    const { body, contentType, contentLength, etag } =
+      await storageService.getImageBuffer(objectKey)
 
-  if (req.headers['if-none-match'] === etag) {
-    return res.status(304).end()
-  }
+    if (req.headers['if-none-match'] === etag) {
+      return res.status(304).end()
+    }
 
-  // 移除全局中间件注入的安全头（CSP等会干扰小程序 <image> 组件渲染）
-  res.removeHeader('Content-Security-Policy')
-  res.removeHeader('X-Content-Type-Options')
-  res.removeHeader('X-XSS-Protection')
-  res.removeHeader('X-Frame-Options')
-  res.removeHeader('Strict-Transport-Security')
-  res.removeHeader('Cross-Origin-Opener-Policy')
-  res.removeHeader('Cross-Origin-Resource-Policy')
-  res.removeHeader('X-Permitted-Cross-Domain-Policies')
-  res.removeHeader('Referrer-Policy')
+    // 移除全局中间件注入的安全头（CSP等会干扰小程序 <image> 组件渲染）
+    res.removeHeader('Content-Security-Policy')
+    res.removeHeader('X-Content-Type-Options')
+    res.removeHeader('X-XSS-Protection')
+    res.removeHeader('X-Frame-Options')
+    res.removeHeader('Strict-Transport-Security')
+    res.removeHeader('Cross-Origin-Opener-Policy')
+    res.removeHeader('Cross-Origin-Resource-Policy')
+    res.removeHeader('X-Permitted-Cross-Domain-Policies')
+    res.removeHeader('Referrer-Policy')
 
-  res.set({
-    'Content-Type': contentType || 'image/jpeg',
-    'Content-Length': contentLength,
-    'Content-Disposition': 'inline',
-    'Cache-Control': 'public, max-age=86400',
-    'Access-Control-Allow-Origin': '*',
-    ETag: etag
+    res.set({
+      'Content-Type': contentType || 'image/jpeg',
+      'Content-Length': contentLength,
+      'Content-Disposition': 'inline',
+      'Cache-Control': 'public, max-age=86400',
+      'Access-Control-Allow-Origin': '*',
+      ETag: etag
+    })
+
+    return res.send(body)
   })
-
-  return res.send(body)
-}))
+)
 
 module.exports = router

@@ -136,7 +136,11 @@ class AdCreativeService {
       }
 
       if (creative.review_status !== 'pending') {
-        throw new BusinessError(`只能审核待审核状态的创意，当前状态: ${creative.review_status}`, 'SERVICE_ERROR', 400)
+        throw new BusinessError(
+          `只能审核待审核状态的创意，当前状态: ${creative.review_status}`,
+          'SERVICE_ERROR',
+          400
+        )
       }
 
       if (action === 'approve') {

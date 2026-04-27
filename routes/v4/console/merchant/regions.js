@@ -70,12 +70,15 @@ router.use(requireRoleLevel(100))
  *   ]
  * }
  */
-router.get('/provinces', asyncHandler(async (req, res) => {
-  const regionService = req.app.locals.services.getService('region')
-  const provinces = await regionService.getProvinces()
+router.get(
+  '/provinces',
+  asyncHandler(async (req, res) => {
+    const regionService = req.app.locals.services.getService('region')
+    const provinces = await regionService.getProvinces()
 
-  return res.apiSuccess(provinces, '获取省级区划列表成功')
-}))
+    return res.apiSuccess(provinces, '获取省级区划列表成功')
+  })
+)
 
 /**
  * @api {get} /api/v4/console/regions/children/:parent_code 获取子级区划列表
@@ -110,18 +113,21 @@ router.get('/provinces', asyncHandler(async (req, res) => {
  *
  * @apiError (400) INVALID_PARAMS 缺少父级区划代码
  */
-router.get('/children/:parent_code', asyncHandler(async (req, res) => {
-  const { parent_code } = req.params
+router.get(
+  '/children/:parent_code',
+  asyncHandler(async (req, res) => {
+    const { parent_code } = req.params
 
-  if (!parent_code) {
-    return res.apiError('缺少父级区划代码', 'INVALID_PARAMS', null, 400)
-  }
+    if (!parent_code) {
+      return res.apiError('缺少父级区划代码', 'INVALID_PARAMS', null, 400)
+    }
 
-  const regionService = req.app.locals.services.getService('region')
-  const children = await regionService.getChildren(parent_code)
+    const regionService = req.app.locals.services.getService('region')
+    const children = await regionService.getChildren(parent_code)
 
-  return res.apiSuccess(children, '获取子级区划列表成功')
-}))
+    return res.apiSuccess(children, '获取子级区划列表成功')
+  })
+)
 
 /**
  * @api {get} /api/v4/console/regions/search 搜索区划
@@ -153,26 +159,29 @@ router.get('/children/:parent_code', asyncHandler(async (req, res) => {
  *
  * @apiError (400) INVALID_PARAMS 搜索关键词不能为空或少于2个字符
  */
-router.get('/search', asyncHandler(async (req, res) => {
-  const { keyword, level, page_size } = req.query
+router.get(
+  '/search',
+  asyncHandler(async (req, res) => {
+    const { keyword, level, page_size } = req.query
 
-  if (!keyword || keyword.trim().length < 2) {
-    return res.apiError('搜索关键词至少需要2个字符', 'INVALID_PARAMS', null, 400)
-  }
+    if (!keyword || keyword.trim().length < 2) {
+      return res.apiError('搜索关键词至少需要2个字符', 'INVALID_PARAMS', null, 400)
+    }
 
-  const options = {}
-  if (level) {
-    options.level = parseInt(level, 10)
-  }
-  if (page_size) {
-    options.limit = parseInt(page_size, 10)
-  }
+    const options = {}
+    if (level) {
+      options.level = parseInt(level, 10)
+    }
+    if (page_size) {
+      options.limit = parseInt(page_size, 10)
+    }
 
-  const regionService = req.app.locals.services.getService('region')
-  const results = await regionService.search(keyword.trim(), options)
+    const regionService = req.app.locals.services.getService('region')
+    const results = await regionService.search(keyword.trim(), options)
 
-  return res.apiSuccess(results, '搜索区划成功')
-}))
+    return res.apiSuccess(results, '搜索区划成功')
+  })
+)
 
 /**
  * @api {get} /api/v4/console/regions/path/:region_code 获取区划完整路径
@@ -203,24 +212,27 @@ router.get('/search', asyncHandler(async (req, res) => {
  *   }
  * }
  */
-router.get('/path/:region_code', asyncHandler(async (req, res) => {
-  const { region_code } = req.params
+router.get(
+  '/path/:region_code',
+  asyncHandler(async (req, res) => {
+    const { region_code } = req.params
 
-  if (!region_code) {
-    return res.apiError('缺少区划代码', 'INVALID_PARAMS', null, 400)
-  }
+    if (!region_code) {
+      return res.apiError('缺少区划代码', 'INVALID_PARAMS', null, 400)
+    }
 
-  const regionService = req.app.locals.services.getService('region')
-  const fullPath = await regionService.getFullPath(region_code)
+    const regionService = req.app.locals.services.getService('region')
+    const fullPath = await regionService.getFullPath(region_code)
 
-  return res.apiSuccess(
-    {
-      region_code,
-      full_path: fullPath
-    },
-    '获取区划完整路径成功'
-  )
-}))
+    return res.apiSuccess(
+      {
+        region_code,
+        full_path: fullPath
+      },
+      '获取区划完整路径成功'
+    )
+  })
+)
 
 /**
  * @api {get} /api/v4/console/regions/stats 获取区划统计信息
@@ -255,12 +267,15 @@ router.get('/path/:region_code', asyncHandler(async (req, res) => {
  *   }
  * }
  */
-router.get('/stats', asyncHandler(async (req, res) => {
-  const regionService = req.app.locals.services.getService('region')
-  const stats = await regionService.getStats()
+router.get(
+  '/stats',
+  asyncHandler(async (req, res) => {
+    const regionService = req.app.locals.services.getService('region')
+    const stats = await regionService.getStats()
 
-  return res.apiSuccess(stats, '获取区划统计信息成功')
-}))
+    return res.apiSuccess(stats, '获取区划统计信息成功')
+  })
+)
 
 /**
  * @api {post} /api/v4/console/regions/validate 校验区划代码
@@ -317,20 +332,23 @@ router.get('/stats', asyncHandler(async (req, res) => {
  *   }
  * }
  */
-router.post('/validate', asyncHandler(async (req, res) => {
-  const { province_code, city_code, district_code, street_code } = req.body
+router.post(
+  '/validate',
+  asyncHandler(async (req, res) => {
+    const { province_code, city_code, district_code, street_code } = req.body
 
-  const regionService = req.app.locals.services.getService('region')
-  const result = await regionService.validateStoreCodes({
-    province_code,
-    city_code,
-    district_code,
-    street_code
+    const regionService = req.app.locals.services.getService('region')
+    const result = await regionService.validateStoreCodes({
+      province_code,
+      city_code,
+      district_code,
+      street_code
+    })
+
+    const message = result.valid ? '区划代码校验通过' : '区划代码校验完成'
+
+    return res.apiSuccess(result, message)
   })
-
-  const message = result.valid ? '区划代码校验通过' : '区划代码校验完成'
-
-  return res.apiSuccess(result, message)
-}))
+)
 
 module.exports = router

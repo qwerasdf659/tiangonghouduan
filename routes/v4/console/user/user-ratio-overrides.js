@@ -37,7 +37,7 @@ router.get(
   '/',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    const { UserRatioOverride, User } = require('../../../../models')
+    const { UserRatioOverride, User } = req.app.locals.models
 
     const { user_id, ratio_key, page = 1, page_size = 20 } = req.query
     const where = {}
@@ -79,7 +79,7 @@ router.get(
   '/user/:user_id',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    const { UserRatioOverride } = require('../../../../models')
+    const { UserRatioOverride } = req.app.locals.models
     const overrides = await UserRatioOverride.findAll({
       where: { user_id: req.params.user_id },
       order: [['ratio_key', 'ASC']]
@@ -103,7 +103,7 @@ router.get(
   '/:id',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    const { UserRatioOverride, User } = require('../../../../models')
+    const { UserRatioOverride, User } = req.app.locals.models
     const override = await UserRatioOverride.findByPk(req.params.id, {
       include: [
         { model: User, as: 'target_user', attributes: ['user_id', 'nickname', 'mobile'] },
@@ -153,7 +153,7 @@ router.post(
 
     const result = await TransactionManager.execute(
       async transaction => {
-        const { UserRatioOverride, User } = require('../../../../models')
+        const { UserRatioOverride, User } = req.app.locals.models
 
         const user = await User.findByPk(user_id, { transaction })
         if (!user) {
@@ -193,7 +193,7 @@ router.put(
 
     const result = await TransactionManager.execute(
       async transaction => {
-        const { UserRatioOverride } = require('../../../../models')
+        const { UserRatioOverride } = req.app.locals.models
 
         const override = await UserRatioOverride.findByPk(req.params.id, { transaction })
         if (!override) {
@@ -231,7 +231,7 @@ router.delete(
   asyncHandler(async (req, res) => {
     const result = await TransactionManager.execute(
       async transaction => {
-        const { UserRatioOverride } = require('../../../../models')
+        const { UserRatioOverride } = req.app.locals.models
 
         const override = await UserRatioOverride.findByPk(req.params.id, { transaction })
         if (!override) {

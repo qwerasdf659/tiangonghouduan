@@ -90,90 +90,100 @@ function getExchangeChannelPriceService(req) {
 /**
  * GET / — 商品分页列表
  */
-router.get('/', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const service = getExchangeItemService(req)
-  const { category_id, status, space, rarity_code, keyword, page, page_size } = req.query
+router.get(
+  '/',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const service = getExchangeItemService(req)
+    const { category_id, status, space, rarity_code, keyword, page, page_size } = req.query
 
-  const result = await service.listExchangeItems(
-    { category_id, status, space, rarity_code, keyword },
-    { page, page_size }
-  )
+    const result = await service.listExchangeItems(
+      { category_id, status, space, rarity_code, keyword },
+      { page, page_size }
+    )
 
-  result.items = (result.items || []).map(toItemWithImage)
+    result.items = (result.items || []).map(toItemWithImage)
 
-  return res.apiSuccess(result, '获取商品列表成功')
-}))
+    return res.apiSuccess(result, '获取商品列表成功')
+  })
+)
 
 /**
  * GET /export — 导出兑换商品（Excel）
  *
  * 注意：必须定义在 GET /:id 之前，否则 "export" 会被 Express 当成 :id 参数
  */
-router.get('/export', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const exchangeItemService = getExchangeItemService(req)
-  const { status, category_id, keyword, page_size = 1000 } = req.query
-  const exportLimit = Math.min(Math.max(1, parseInt(page_size) || 1000), 10000)
+router.get(
+  '/export',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const exchangeItemService = getExchangeItemService(req)
+    const { status, category_id, keyword, page_size = 1000 } = req.query
+    const exportLimit = Math.min(Math.max(1, parseInt(page_size) || 1000), 10000)
 
-  const result = await exchangeItemService.listExchangeItems(
-    { status, category_id, keyword },
-    { page: 1, page_size: exportLimit }
-  )
-  const rows = result.items || []
+    const result = await exchangeItemService.listExchangeItems(
+      { status, category_id, keyword },
+      { page: 1, page_size: exportLimit }
+    )
+    const rows = result.items || []
 
-  if (rows.length === 0) {
-    return res.apiError('没有符合条件的商品数据', 'NO_DATA', null, 404)
-  }
-
-  const exportData = rows.map((item, idx) => {
-    const plain = item.get ? item.get({ plain: true }) : { ...item }
-    return {
-      序号: idx + 1,
-      商品ID: plain.exchange_item_id,
-      商品名称: plain.item_name || '',
-      品类ID: plain.category_id || '',
-      状态: plain.status || '',
-      稀有度: plain.rarity_code || '',
-      空间: plain.space || '',
-      排序: plain.sort_order ?? 0,
-      描述: plain.description || '',
-      卖点: plain.sell_point || '',
-      使用规则: plain.usage_rules || '',
-      置顶: plain.is_pinned ? '是' : '否',
-      推荐: plain.is_recommended ? '是' : '否',
-      新品: plain.is_new ? '是' : '否',
-      热门: plain.is_hot ? '是' : '否',
-      限量: plain.is_limited ? '是' : '否'
+    if (rows.length === 0) {
+      return res.apiError('没有符合条件的商品数据', 'NO_DATA', null, 404)
     }
+
+    const exportData = rows.map((item, idx) => {
+      const plain = item.get ? item.get({ plain: true }) : { ...item }
+      return {
+        序号: idx + 1,
+        商品ID: plain.exchange_item_id,
+        商品名称: plain.item_name || '',
+        品类ID: plain.category_id || '',
+        状态: plain.status || '',
+        稀有度: plain.rarity_code || '',
+        空间: plain.space || '',
+        排序: plain.sort_order ?? 0,
+        描述: plain.description || '',
+        卖点: plain.sell_point || '',
+        使用规则: plain.usage_rules || '',
+        置顶: plain.is_pinned ? '是' : '否',
+        推荐: plain.is_recommended ? '是' : '否',
+        新品: plain.is_new ? '是' : '否',
+        热门: plain.is_hot ? '是' : '否',
+        限量: plain.is_limited ? '是' : '否'
+      }
+    })
+
+    const timestamp = BeijingTimeHelper.format(new Date(), 'YYYYMMDD_HHmmss')
+    const fileName = `兑换商品导出_${timestamp}`
+
+    const workbook = new ExcelJS.Workbook()
+    const worksheet = workbook.addWorksheet('兑换商品')
+    const colKeys = Object.keys(exportData[0])
+    worksheet.columns = colKeys.map(key => ({ header: key, key, width: 18 }))
+    worksheet.getRow(1).font = { bold: true }
+    worksheet.addRows(exportData)
+
+    const excelBuffer = Buffer.from(await workbook.xlsx.writeBuffer())
+
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${encodeURIComponent(fileName)}.xlsx"`
+    )
+
+    logger.info('兑换商品导出成功', {
+      admin_id: req.user.user_id,
+      record_count: exportData.length
+    })
+
+    return res.send(excelBuffer)
   })
-
-  const timestamp = BeijingTimeHelper.format(new Date(), 'YYYYMMDD_HHmmss')
-  const fileName = `兑换商品导出_${timestamp}`
-
-  const workbook = new ExcelJS.Workbook()
-  const worksheet = workbook.addWorksheet('兑换商品')
-  const colKeys = Object.keys(exportData[0])
-  worksheet.columns = colKeys.map(key => ({ header: key, key, width: 18 }))
-  worksheet.getRow(1).font = { bold: true }
-  worksheet.addRows(exportData)
-
-  const excelBuffer = Buffer.from(await workbook.xlsx.writeBuffer())
-
-  res.setHeader(
-    'Content-Type',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-  )
-  res.setHeader(
-    'Content-Disposition',
-    `attachment; filename="${encodeURIComponent(fileName)}.xlsx"`
-  )
-
-  logger.info('兑换商品导出成功', {
-    admin_id: req.user.user_id,
-    record_count: exportData.length
-  })
-
-  return res.send(excelBuffer)
-}))
+)
 
 /**
  * POST /import — 批量导入兑换商品（Excel/CSV）
@@ -335,182 +345,232 @@ router.put(
  *
  * Body: `{ delta: number }`
  */
-router.put('/skus/:sku_id/stock', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const exchangeItemService = getExchangeItemService(req)
-  const { delta } = req.body || {}
+router.put(
+  '/skus/:sku_id/stock',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const exchangeItemService = getExchangeItemService(req)
+    const { delta } = req.body || {}
 
-  const sku = await TransactionManager.execute(async transaction => {
-    return await exchangeItemService.adjustStock(req.params.sku_id, delta, { transaction })
+    const sku = await TransactionManager.execute(async transaction => {
+      return await exchangeItemService.adjustStock(req.params.sku_id, delta, { transaction })
+    })
+
+    return res.apiSuccess(sku.get ? sku.get({ plain: true }) : sku, '调整库存成功')
   })
-
-  return res.apiSuccess(sku.get ? sku.get({ plain: true }) : sku, '调整库存成功')
-}))
+)
 
 /**
  * PUT /skus/:sku_id — 更新 SKU
  */
-router.put('/skus/:sku_id', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const exchangeItemService = getExchangeItemService(req)
+router.put(
+  '/skus/:sku_id',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const exchangeItemService = getExchangeItemService(req)
 
-  const sku = await TransactionManager.execute(async transaction => {
-    return await exchangeItemService.updateSku(req.params.sku_id, req.body || {}, { transaction })
+    const sku = await TransactionManager.execute(async transaction => {
+      return await exchangeItemService.updateSku(req.params.sku_id, req.body || {}, { transaction })
+    })
+
+    return res.apiSuccess(sku.get ? sku.get({ plain: true }) : sku, '更新 SKU 成功')
   })
-
-  return res.apiSuccess(sku.get ? sku.get({ plain: true }) : sku, '更新 SKU 成功')
-}))
+)
 
 /**
  * DELETE /skus/:sku_id — 删除 SKU
  */
-router.delete('/skus/:sku_id', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const exchangeItemService = getExchangeItemService(req)
+router.delete(
+  '/skus/:sku_id',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const exchangeItemService = getExchangeItemService(req)
 
-  await TransactionManager.execute(async transaction => {
-    return await exchangeItemService.deleteSku(req.params.sku_id, { transaction })
+    await TransactionManager.execute(async transaction => {
+      return await exchangeItemService.deleteSku(req.params.sku_id, { transaction })
+    })
+
+    return res.apiSuccess({ sku_id: parseInt(req.params.sku_id, 10) }, '删除 SKU 成功')
   })
-
-  return res.apiSuccess({ sku_id: parseInt(req.params.sku_id, 10) }, '删除 SKU 成功')
-}))
+)
 
 /**
  * POST /:id/skus/generate — 销售属性笛卡尔积生成 SKU
  *
  * Body: `{ sale_attribute_options: { [attribute_id]: option_id[] } }`
  */
-router.post('/:id/skus/generate', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const exchangeItemService = getExchangeItemService(req)
-  const { sale_attribute_options } = req.body || {}
+router.post(
+  '/:id/skus/generate',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const exchangeItemService = getExchangeItemService(req)
+    const { sale_attribute_options } = req.body || {}
 
-  const created = await TransactionManager.execute(async transaction => {
-    return await exchangeItemService.generateSkuCartesian(req.params.id, sale_attribute_options, {
-      transaction
+    const created = await TransactionManager.execute(async transaction => {
+      return await exchangeItemService.generateSkuCartesian(req.params.id, sale_attribute_options, {
+        transaction
+      })
     })
-  })
 
-  return res.apiSuccess(
-    {
-      created_count: created.length,
-      skus: created.map(s => (s.get ? s.get({ plain: true }) : s))
-    },
-    '批量生成 SKU 成功'
-  )
-}))
+    return res.apiSuccess(
+      {
+        created_count: created.length,
+        skus: created.map(s => (s.get ? s.get({ plain: true }) : s))
+      },
+      '批量生成 SKU 成功'
+    )
+  })
+)
 
 /**
  * GET /:id/skus — 商品下 SKU 列表
  */
-router.get('/:id/skus', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  if (RESERVED_PATHS.has(req.params.id)) {
-    return res.apiError(
-      `路径 "${req.params.id}" 是保留字，不是有效的商品ID`,
-      'BAD_REQUEST',
-      null,
-      400
-    )
-  }
-  const { ExchangeItemSku, SkuAttributeValue, Attribute, AttributeOption, ExchangeChannelPrice } =
-    getExchangeItemService(req).models
+router.get(
+  '/:id/skus',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    if (RESERVED_PATHS.has(req.params.id)) {
+      return res.apiError(
+        `路径 "${req.params.id}" 是保留字，不是有效的商品ID`,
+        'BAD_REQUEST',
+        null,
+        400
+      )
+    }
+    const { ExchangeItemSku, SkuAttributeValue, Attribute, AttributeOption, ExchangeChannelPrice } =
+      getExchangeItemService(req).models
 
-  const pid = parseInt(req.params.id, 10)
-  if (Number.isNaN(pid)) {
-    return res.apiError('exchange_item_id 无效', 'PRODUCT_CENTER_INVALID_PRODUCT_ID', null, 400)
-  }
+    const pid = parseInt(req.params.id, 10)
+    if (Number.isNaN(pid)) {
+      return res.apiError('exchange_item_id 无效', 'PRODUCT_CENTER_INVALID_PRODUCT_ID', null, 400)
+    }
 
-  const rows = await ExchangeItemSku.findAll({
-    where: { exchange_item_id: pid },
-    order: [
-      ['sort_order', 'ASC'],
-      ['sku_id', 'ASC']
-    ],
-    include: [
-      {
-        model: SkuAttributeValue,
-        as: 'attributeValues',
-        required: false,
-        include: [
-          { model: Attribute, as: 'attribute', required: false },
-          { model: AttributeOption, as: 'option', required: false }
-        ]
-      },
-      { model: ExchangeChannelPrice, as: 'channelPrices', required: false }
-    ]
+    const rows = await ExchangeItemSku.findAll({
+      where: { exchange_item_id: pid },
+      order: [
+        ['sort_order', 'ASC'],
+        ['sku_id', 'ASC']
+      ],
+      include: [
+        {
+          model: SkuAttributeValue,
+          as: 'attributeValues',
+          required: false,
+          include: [
+            { model: Attribute, as: 'attribute', required: false },
+            { model: AttributeOption, as: 'option', required: false }
+          ]
+        },
+        { model: ExchangeChannelPrice, as: 'channelPrices', required: false }
+      ]
+    })
+
+    return res.apiSuccess({ items: rows.map(r => r.get({ plain: true })) }, '获取 SKU 列表成功')
   })
-
-  return res.apiSuccess({ items: rows.map(r => r.get({ plain: true })) }, '获取 SKU 列表成功')
-}))
+)
 
 /**
  * POST /:id/skus — 创建 SKU
  */
-router.post('/:id/skus', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const exchangeItemService = getExchangeItemService(req)
+router.post(
+  '/:id/skus',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const exchangeItemService = getExchangeItemService(req)
 
-  const sku = await TransactionManager.execute(async transaction => {
-    return await exchangeItemService.createSku(req.params.id, req.body || {}, { transaction })
+    const sku = await TransactionManager.execute(async transaction => {
+      return await exchangeItemService.createSku(req.params.id, req.body || {}, { transaction })
+    })
+
+    return res.apiSuccess(sku.get ? sku.get({ plain: true }) : sku, '创建 SKU 成功')
   })
-
-  return res.apiSuccess(sku.get ? sku.get({ plain: true }) : sku, '创建 SKU 成功')
-}))
+)
 
 /**
  * GET /:id — 商品详情（全量关联）
  */
-router.get('/:id', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  if (RESERVED_PATHS.has(req.params.id)) {
-    return res.apiError(
-      `路径 "${req.params.id}" 是保留字，不是有效的商品ID`,
-      'BAD_REQUEST',
-      null,
-      400
-    )
-  }
-  const service = getExchangeItemService(req)
-  const row = await service.getExchangeItemDetail(req.params.id)
-  if (!row) {
-    return res.apiError('商品不存在', 'PRODUCT_CENTER_PRODUCT_NOT_FOUND', null, 404)
-  }
-  return res.apiSuccess(toItemWithImage(row), '获取商品详情成功')
-}))
+router.get(
+  '/:id',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    if (RESERVED_PATHS.has(req.params.id)) {
+      return res.apiError(
+        `路径 "${req.params.id}" 是保留字，不是有效的商品ID`,
+        'BAD_REQUEST',
+        null,
+        400
+      )
+    }
+    const service = getExchangeItemService(req)
+    const row = await service.getExchangeItemDetail(req.params.id)
+    if (!row) {
+      return res.apiError('商品不存在', 'PRODUCT_CENTER_PRODUCT_NOT_FOUND', null, 404)
+    }
+    return res.apiSuccess(toItemWithImage(row), '获取商品详情成功')
+  })
+)
 
 /**
  * POST / — 创建商品（SPU）
  */
-router.post('/', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const exchangeItemService = getExchangeItemService(req)
+router.post(
+  '/',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const exchangeItemService = getExchangeItemService(req)
 
-  const created = await TransactionManager.execute(async transaction => {
-    return await exchangeItemService.createExchangeItem(req.body || {}, { transaction })
+    const created = await TransactionManager.execute(async transaction => {
+      return await exchangeItemService.createExchangeItem(req.body || {}, { transaction })
+    })
+
+    return res.apiSuccess(created.get ? created.get({ plain: true }) : created, '创建商品成功')
   })
-
-  return res.apiSuccess(created.get ? created.get({ plain: true }) : created, '创建商品成功')
-}))
+)
 
 /**
  * PUT /:id — 更新商品
  */
-router.put('/:id', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const exchangeItemService = getExchangeItemService(req)
+router.put(
+  '/:id',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const exchangeItemService = getExchangeItemService(req)
 
-  const row = await TransactionManager.execute(async transaction => {
-    return await exchangeItemService.updateExchangeItem(req.params.id, req.body || {}, {
-      transaction
+    const row = await TransactionManager.execute(async transaction => {
+      return await exchangeItemService.updateExchangeItem(req.params.id, req.body || {}, {
+        transaction
+      })
     })
-  })
 
-  return res.apiSuccess(row.get ? row.get({ plain: true }) : row, '更新商品成功')
-}))
+    return res.apiSuccess(row.get ? row.get({ plain: true }) : row, '更新商品成功')
+  })
+)
 
 /**
  * DELETE /:id — 删除商品
  */
-router.delete('/:id', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const exchangeItemService = getExchangeItemService(req)
+router.delete(
+  '/:id',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const exchangeItemService = getExchangeItemService(req)
 
-  await TransactionManager.execute(async transaction => {
-    return await exchangeItemService.deleteExchangeItem(req.params.id, { transaction })
+    await TransactionManager.execute(async transaction => {
+      return await exchangeItemService.deleteExchangeItem(req.params.id, { transaction })
+    })
+
+    return res.apiSuccess({ exchange_item_id: req.params.id }, '删除商品成功')
   })
-
-  return res.apiSuccess({ exchange_item_id: req.params.id }, '删除商品成功')
-}))
+)
 
 module.exports = router

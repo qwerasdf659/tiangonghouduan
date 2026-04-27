@@ -91,7 +91,9 @@ class ItemService {
     if (!item_type) throw new BusinessError('item_type 是必填参数', 'ASSET_REQUIRED', 400)
     if (!item_name) throw new BusinessError('item_name 是必填参数', 'ASSET_REQUIRED', 400)
     if (!source) throw new BusinessError('source 是必填参数', 'ASSET_REQUIRED', 400)
-    if (!idempotency_key) throw new BusinessError('idempotency_key 是必填参数（幂等性控制）', 'ASSET_REQUIRED', 400)
+    if (!idempotency_key) {
+      throw new BusinessError('idempotency_key 是必填参数（幂等性控制）', 'ASSET_REQUIRED', 400)
+    }
 
     try {
       // 幂等性检查：查找已有的铸造账本条目
@@ -236,7 +238,9 @@ class ItemService {
       })
 
       if (!item) throw new BusinessError(`物品不存在：item_id=${item_id}`, 'ASSET_NOT_FOUND', 404)
-      if (item.isTerminal()) throw new BusinessError(`物品已终态(${item.status})，不可锁定`, 'ASSET_NOT_ALLOWED', 400)
+      if (item.isTerminal()) {
+        throw new BusinessError(`物品已终态(${item.status})，不可锁定`, 'ASSET_NOT_ALLOWED', 400)
+      }
 
       // 检查是否已有活跃锁
       const activeHold = await ItemHold.findOne({
@@ -420,8 +424,12 @@ class ItemService {
     requireTransaction(transaction, 'ItemService.transferItem')
 
     if (!item_id) throw new BusinessError('item_id 是必填参数', 'ASSET_REQUIRED', 400)
-    if (!new_owner_user_id) throw new BusinessError('new_owner_user_id 是必填参数', 'ASSET_REQUIRED', 400)
-    if (!idempotency_key) throw new BusinessError('idempotency_key 是必填参数', 'ASSET_REQUIRED', 400)
+    if (!new_owner_user_id) {
+      throw new BusinessError('new_owner_user_id 是必填参数', 'ASSET_REQUIRED', 400)
+    }
+    if (!idempotency_key) {
+      throw new BusinessError('idempotency_key 是必填参数', 'ASSET_REQUIRED', 400)
+    }
 
     try {
       // 幂等性检查
@@ -537,7 +545,9 @@ class ItemService {
     requireTransaction(transaction, 'ItemService.consumeItem')
 
     if (!item_id) throw new BusinessError('item_id 是必填参数', 'ASSET_REQUIRED', 400)
-    if (!idempotency_key) throw new BusinessError('idempotency_key 是必填参数', 'ASSET_REQUIRED', 400)
+    if (!idempotency_key) {
+      throw new BusinessError('idempotency_key 是必填参数', 'ASSET_REQUIRED', 400)
+    }
 
     try {
       // 幂等性检查
@@ -831,7 +841,9 @@ class ItemService {
    */
   static async _getAccountById(accountId, options = {}) {
     const account = await Account.findByPk(accountId, options)
-    if (!account) throw new BusinessError(`账户不存在：account_id=${accountId}`, 'ASSET_NOT_FOUND', 404)
+    if (!account) {
+      throw new BusinessError(`账户不存在：account_id=${accountId}`, 'ASSET_NOT_FOUND', 404)
+    }
     return account
   }
 }

@@ -82,9 +82,21 @@ class SystemConfigService {
   }
 
   static VALID_CATEGORIES = [
-    'basic', 'points', 'notification', 'security', 'marketplace',
-    'redemption', 'exchange', 'batch_operation', 'rate_limit',
-    'feature', 'general', 'ad_system', 'ad_pricing', 'backpack', 'data_management'
+    'basic',
+    'points',
+    'notification',
+    'security',
+    'marketplace',
+    'redemption',
+    'exchange',
+    'batch_operation',
+    'rate_limit',
+    'feature',
+    'general',
+    'ad_system',
+    'ad_pricing',
+    'backpack',
+    'data_management'
   ]
 
   /**
@@ -95,14 +107,25 @@ class SystemConfigService {
   static async getSettingsByCategory(category) {
     try {
       if (!this.VALID_CATEGORIES.includes(category)) {
-        throw new BusinessError(`无效的设置分类: ${category}。有效分类: ${this.VALID_CATEGORIES.join(', ')}`, 'SERVICE_INVALID', 400)
+        throw new BusinessError(
+          `无效的设置分类: ${category}。有效分类: ${this.VALID_CATEGORIES.join(', ')}`,
+          'SERVICE_INVALID',
+          400
+        )
       }
 
       const settings = await SystemSettings.findAll({
         where: { category, is_visible: true },
         attributes: [
-          'system_setting_id', 'category', 'setting_key', 'setting_value',
-          'value_type', 'description', 'is_readonly', 'updated_by', 'updated_at'
+          'system_setting_id',
+          'category',
+          'setting_key',
+          'setting_value',
+          'value_type',
+          'description',
+          'is_readonly',
+          'updated_by',
+          'updated_at'
         ],
         order: [['system_setting_id', 'ASC']]
       })
@@ -168,7 +191,11 @@ class SystemConfigService {
     const { reason } = options
 
     if (!this.VALID_CATEGORIES.includes(category)) {
-      throw new BusinessError(`无效的设置分类: ${category}。有效分类: ${this.VALID_CATEGORIES.join(', ')}`, 'SERVICE_INVALID', 400)
+      throw new BusinessError(
+        `无效的设置分类: ${category}。有效分类: ${this.VALID_CATEGORIES.join(', ')}`,
+        'SERVICE_INVALID',
+        400
+      )
     }
 
     if (
@@ -205,7 +232,10 @@ class SystemConfigService {
         }
 
         if (whitelist.readonly) {
-          errors.push({ setting_key: settingKey, error: `配置项 ${settingKey} 为只读（白名单定义），禁止修改` })
+          errors.push({
+            setting_key: settingKey,
+            error: `配置项 ${settingKey} 为只读（白名单定义），禁止修改`
+          })
           continue
         }
         const newValue = settingsToUpdate[settingKey]
@@ -245,26 +275,29 @@ class SystemConfigService {
         ) {
           logger.warn('高影响配置修改', {
             setting_key: whitelistKey,
-business_impact: whitelist.businessImpact,
+            business_impact: whitelist.businessImpact,
             operator_id: userId,
-old_value: oldValue,
-new_value: newValue,
+            old_value: oldValue,
+            new_value: newValue,
             reason: reason || '未提供变更原因',
-audit_required: true,
+            audit_required: true,
             timestamp: BeijingTimeHelper.apiTimestamp()
           })
         }
 
         updateResults.push({
           setting_key: settingKey,
-old_value: oldValue,
-new_value: newValue,
+          old_value: oldValue,
+          new_value: newValue,
           success: true,
-business_impact: whitelist.businessImpact
+          business_impact: whitelist.businessImpact
         })
 
         logger.info('系统设置更新成功', {
-          user_id: userId, category, setting_key: settingKey, new_value: newValue
+          user_id: userId,
+          category,
+          setting_key: settingKey,
+          new_value: newValue
         })
       } catch (error) {
         errors.push({ setting_key: settingKey, error: error.message })
@@ -274,29 +307,41 @@ business_impact: whitelist.businessImpact
       try {
         await Promise.all(
           updateResults.map(update =>
-            BusinessCacheHelper.invalidateSysConfig(category, update.setting_key, 'service_settings_updated')
+            BusinessCacheHelper.invalidateSysConfig(
+              category,
+              update.setting_key,
+              'service_settings_updated'
+            )
           )
         )
         logger.info('[缓存] 系统配置缓存已失效', {
-          category, invalidated_keys: updateResults.map(u => u.setting_key)
+          category,
+          invalidated_keys: updateResults.map(u => u.setting_key)
         })
       } catch (cacheError) {
-        logger.warn('[缓存] 系统配置缓存失效失败（非致命）', { error: cacheError.message, category })
+        logger.warn('[缓存] 系统配置缓存失效失败（非致命）', {
+          error: cacheError.message,
+          category
+        })
       }
     }
 
     const responseData = {
       category,
-total_requested: settingKeys.length,
+      total_requested: settingKeys.length,
       success_count: updateResults.length,
-error_count: errors.length,
+      error_count: errors.length,
       updates: updateResults,
-timestamp: BeijingTimeHelper.apiTimestamp()
+      timestamp: BeijingTimeHelper.apiTimestamp()
     }
-    if (errors.length > 0) { responseData.errors = errors }
+    if (errors.length > 0) {
+      responseData.errors = errors
+    }
 
     logger.info('批量更新系统设置完成', {
-      category, success_count: updateResults.length, error_count: errors.length
+      category,
+      success_count: updateResults.length,
+      error_count: errors.length
     })
     return responseData
   }
@@ -326,7 +371,10 @@ timestamp: BeijingTimeHelper.apiTimestamp()
         const parsed_value = setting.getParsedValue()
         await BusinessCacheHelper.setSysConfig(category, setting_key, parsed_value)
         logger.debug('[系统配置] 读取成功（已缓存）', {
-          category, setting_key, value: parsed_value, value_type: setting.value_type
+          category,
+          setting_key,
+          value: parsed_value,
+          value_type: setting.value_type
         })
         return parsed_value
       }
@@ -337,7 +385,10 @@ timestamp: BeijingTimeHelper.apiTimestamp()
         error.category = category
         error.setting_key = setting_key
         logger.error('[系统配置] 严格模式：关键配置缺失，拒绝兜底', {
-          category, setting_key, config_key: configKey, strict: true
+          category,
+          setting_key,
+          config_key: configKey,
+          strict: true
         })
         throw error
       }
@@ -345,7 +396,9 @@ timestamp: BeijingTimeHelper.apiTimestamp()
       logger.warn('[系统配置] 未找到配置项，使用默认值', { category, setting_key, default_value })
       return default_value
     } catch (error) {
-      if (error.code === 'CONFIG_MISSING') { throw error }
+      if (error.code === 'CONFIG_MISSING') {
+        throw error
+      }
 
       if (strict) {
         const configError = new Error(`关键配置读取失败: ${configKey}（${error.message}）`)
@@ -355,13 +408,20 @@ timestamp: BeijingTimeHelper.apiTimestamp()
         configError.setting_key = setting_key
         configError.originalError = error.message
         logger.error('[系统配置] 严格模式：配置读取失败，拒绝兜底', {
-          category, setting_key, config_key: configKey, error: error.message, strict: true
+          category,
+          setting_key,
+          config_key: configKey,
+          error: error.message,
+          strict: true
         })
         throw configError
       }
 
       logger.error('[系统配置] 读取失败，使用默认值', {
-        category, setting_key, default_value, error: error.message
+        category,
+        setting_key,
+        default_value,
+        error: error.message
       })
       return default_value
     }
@@ -376,7 +436,8 @@ timestamp: BeijingTimeHelper.apiTimestamp()
     const result = {}
     try {
       const where_conditions = config_list.map(({ category, setting_key }) => ({
-        category, setting_key
+        category,
+        setting_key
       }))
       const settings = await SystemSettings.findAll({
         where: { [Op.or]: where_conditions }
@@ -393,7 +454,10 @@ timestamp: BeijingTimeHelper.apiTimestamp()
           : default_value
       })
 
-      logger.debug('[系统配置] 批量读取完成', { requested: config_list.length, found: settings.length })
+      logger.debug('[系统配置] 批量读取完成', {
+        requested: config_list.length,
+        found: settings.length
+      })
       return result
     } catch (error) {
       logger.error('[系统配置] 批量读取失败，使用默认值', { error: error.message })
@@ -569,12 +633,12 @@ timestamp: BeijingTimeHelper.apiTimestamp()
         where: { setting_key },
         defaults: {
           setting_key,
-setting_value: serialized,
-value_type,
+          setting_value: serialized,
+          value_type,
           category,
-description: description || null,
+          description: description || null,
           is_visible: true,
-is_readonly: false
+          is_readonly: false
         },
         transaction
       })
@@ -668,14 +732,16 @@ is_readonly: false
       } while (cursor !== '0')
 
       logger.info('系统缓存清除完成', {
-        pattern: cachePattern, cleared_count: clearedCount, matched_keys: matchedKeys
+        pattern: cachePattern,
+        cleared_count: clearedCount,
+        matched_keys: matchedKeys
       })
 
       return {
         pattern: cachePattern,
-cleared_count: clearedCount,
+        cleared_count: clearedCount,
         matched_keys: matchedKeys,
-timestamp: BeijingTimeHelper.apiTimestamp()
+        timestamp: BeijingTimeHelper.apiTimestamp()
       }
     } catch (error) {
       logger.error('清除缓存失败', { error: error.message })

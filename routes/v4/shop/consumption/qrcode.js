@@ -113,12 +113,7 @@ router.get(
 
     if (!resolved_store_id) {
       if (user_stores.length === 0) {
-        return res.apiError(
-          '您未绑定任何门店，无法扫码获取用户信息',
-          'NO_STORE_BINDING',
-          null,
-          403
-        )
+        return res.apiError('您未绑定任何门店，无法扫码获取用户信息', 'NO_STORE_BINDING', null, 403)
       } else if (user_stores.length === 1) {
         resolved_store_id = user_stores[0].store_id
         logger.info(`🏪 自动填充门店ID: ${resolved_store_id} (用户仅绑定一个门店)`)

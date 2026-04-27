@@ -551,7 +551,11 @@ class DataManagementService {
         logger.info('[数据清理] pre_launch 清档：已进入维护模式')
       } catch (mmError) {
         logger.error('[数据清理] 进入维护模式失败，中止清档:', { error: mmError.message })
-        throw new BusinessError('无法进入维护模式，清档操作已中止: ' + mmError.message, 'SERVICE_FAILED', 500)
+        throw new BusinessError(
+          '无法进入维护模式，清档操作已中止: ' + mmError.message,
+          'SERVICE_FAILED',
+          500
+        )
       }
     }
 

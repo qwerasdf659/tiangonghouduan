@@ -185,7 +185,7 @@ router.post(
 
     logger.info('用户生成核销码请求', { user_id, item_id: itemId })
 
-        // 通过 ServiceManager 获取 RedemptionService
+    // 通过 ServiceManager 获取 RedemptionService
     const RedemptionService = req.app.locals.services.getService('redemption_order')
 
     /*
@@ -257,7 +257,7 @@ router.post(
       return res.apiError('无效的物品实例ID', 'BAD_REQUEST', null, 400)
     }
 
-        const RedemptionService = req.app.locals.services.getService('redemption_order')
+    const RedemptionService = req.app.locals.services.getService('redemption_order')
 
     // 查找该物品的 pending 核销订单
     const order = await RedemptionService.getOrderByItem(itemId)
@@ -328,11 +328,11 @@ router.post(
 
     logger.info('用户直接使用物品请求', { user_id, item_id: itemId })
 
-        /*
-         * 通过 ServiceManager 获取服务
-         * - BackpackService：验证物品所有权
-         * - ItemService (asset_item)：执行物品消耗
-         */
+    /*
+     * 通过 ServiceManager 获取服务
+     * - BackpackService：验证物品所有权
+     * - ItemService (asset_item)：执行物品消耗
+     */
     const BackpackService = req.app.locals.services.getService('backpack')
     const ItemService = req.app.locals.services.getService('asset_item')
 

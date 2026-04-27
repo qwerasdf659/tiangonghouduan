@@ -249,8 +249,12 @@ class AdCampaignService {
       // D6 定论：commercial 类型 priority 范围 1-99，Service 层强制校验
       const priority = data.priority || 50
       if (priority < 1 || priority > 99) {
-        throw new BusinessError('商业广告优先级必须在 1-99 范围内，当前值: ' + priority, 'AD_REQUIRED', 400) 
-}
+        throw new BusinessError(
+          '商业广告优先级必须在 1-99 范围内，当前值: ' + priority,
+          'AD_REQUIRED',
+          400
+        )
+      }
 
       // 验证广告位是否存在
       const adSlot = await AdSlot.findByPk(data.ad_slot_id, {
@@ -268,7 +272,11 @@ class AdCampaignService {
       // 根据计费模式验证必填字段
       if (data.billing_mode === 'fixed_daily') {
         if (!data.fixed_days || data.fixed_days < 1) {
-          throw new BusinessError('固定包天模式必须提供包天天数（fixed_days >= 1）', 'AD_REQUIRED', 400)
+          throw new BusinessError(
+            '固定包天模式必须提供包天天数（fixed_days >= 1）',
+            'AD_REQUIRED',
+            400
+          )
         }
 
         // 包天坑位排他检查：同一广告位、日期范围重叠、已有 active/approved/pending_review 的包天计划则拒绝
@@ -297,14 +305,22 @@ class AdCampaignService {
         data.fixed_total_star_stone = fixed_total_star_stone
       } else if (data.billing_mode === 'bidding') {
         if (!data.daily_bid_star_stone || data.daily_bid_star_stone < adSlot.min_bid_star_stone) {
-          throw new BusinessError(`竞价模式每日出价不能低于最低竞价: ${adSlot.min_bid_star_stone}星石`, 'AD_NOT_ALLOWED', 400)
+          throw new BusinessError(
+            `竞价模式每日出价不能低于最低竞价: ${adSlot.min_bid_star_stone}星石`,
+            'AD_NOT_ALLOWED',
+            400
+          )
         }
 
         if (
           !data.budget_total_star_stone ||
           data.budget_total_star_stone < adSlot.min_budget_star_stone
         ) {
-          throw new BusinessError(`竞价模式总预算不能低于最低预算: ${adSlot.min_budget_star_stone}星石`, 'AD_NOT_ALLOWED', 400)
+          throw new BusinessError(
+            `竞价模式总预算不能低于最低预算: ${adSlot.min_budget_star_stone}星石`,
+            'AD_NOT_ALLOWED',
+            400
+          )
         }
       } else {
         throw new BusinessError(`无效的计费模式: ${data.billing_mode}`, 'AD_INVALID', 400)
@@ -392,7 +408,11 @@ class AdCampaignService {
 
       // 只能更新草稿状态的计划
       if (campaign.status !== 'draft') {
-        throw new BusinessError(`只能更新草稿状态的计划，当前状态: ${campaign.status}`, 'AD_ERROR', 400)
+        throw new BusinessError(
+          `只能更新草稿状态的计划，当前状态: ${campaign.status}`,
+          'AD_ERROR',
+          400
+        )
       }
 
       // 如果更新了计费相关字段，需要重新验证
@@ -411,7 +431,11 @@ class AdCampaignService {
         if (billingMode === 'fixed_daily') {
           const fixedDays = data.fixed_days || campaign.fixed_days
           if (!fixedDays || fixedDays < 1) {
-            throw new BusinessError('固定包天模式必须提供包天天数（fixed_days >= 1）', 'AD_REQUIRED', 400)
+            throw new BusinessError(
+              '固定包天模式必须提供包天天数（fixed_days >= 1）',
+              'AD_REQUIRED',
+              400
+            )
           }
           data.fixed_total_star_stone = adSlot.daily_price_star_stone * fixedDays
         } else if (billingMode === 'bidding') {
@@ -419,11 +443,19 @@ class AdCampaignService {
           const budgetTotal = data.budget_total_star_stone || campaign.budget_total_star_stone
 
           if (!dailyBid || dailyBid < adSlot.min_bid_star_stone) {
-            throw new BusinessError(`竞价模式每日出价不能低于最低竞价: ${adSlot.min_bid_star_stone}星石`, 'AD_NOT_ALLOWED', 400)
+            throw new BusinessError(
+              `竞价模式每日出价不能低于最低竞价: ${adSlot.min_bid_star_stone}星石`,
+              'AD_NOT_ALLOWED',
+              400
+            )
           }
 
           if (!budgetTotal || budgetTotal < adSlot.min_budget_star_stone) {
-            throw new BusinessError(`竞价模式总预算不能低于最低预算: ${adSlot.min_budget_star_stone}星石`, 'AD_NOT_ALLOWED', 400)
+            throw new BusinessError(
+              `竞价模式总预算不能低于最低预算: ${adSlot.min_budget_star_stone}星石`,
+              'AD_NOT_ALLOWED',
+              400
+            )
           }
         }
       }
@@ -475,7 +507,11 @@ class AdCampaignService {
       }
 
       if (campaign.status !== 'draft') {
-        throw new BusinessError(`只能提交草稿状态的计划，当前状态: ${campaign.status}`, 'AD_ERROR', 400)
+        throw new BusinessError(
+          `只能提交草稿状态的计划，当前状态: ${campaign.status}`,
+          'AD_ERROR',
+          400
+        )
       }
 
       // 更新状态为待审核
@@ -524,7 +560,11 @@ class AdCampaignService {
 
       // 只能取消草稿或待审核状态的计划
       if (!['draft', 'pending_review'].includes(campaign.status)) {
-        throw new BusinessError(`只能取消草稿或待审核状态的计划，当前状态: ${campaign.status}`, 'AD_ERROR', 400)
+        throw new BusinessError(
+          `只能取消草稿或待审核状态的计划，当前状态: ${campaign.status}`,
+          'AD_ERROR',
+          400
+        )
       }
 
       // 更新状态为已取消
@@ -662,7 +702,11 @@ class AdCampaignService {
       }
 
       if (campaign.status !== 'pending_review') {
-        throw new BusinessError(`只能审核待审核状态的计划，当前状态: ${campaign.status}`, 'AD_ERROR', 400)
+        throw new BusinessError(
+          `只能审核待审核状态的计划，当前状态: ${campaign.status}`,
+          'AD_ERROR',
+          400
+        )
       }
 
       if (action === 'approve') {
@@ -821,18 +865,22 @@ class AdCampaignService {
     try {
       const priority = data.priority || 500
       if (priority < 100 || priority > 899) {
-        throw new BusinessError('运营内容优先级必须在 100-899 范围内，当前值: ' + priority, 'AD_REQUIRED', 400) 
-}
+        throw new BusinessError(
+          '运营内容优先级必须在 100-899 范围内，当前值: ' + priority,
+          'AD_REQUIRED',
+          400
+        )
+      }
 
       const adSlot = await AdSlot.findByPk(data.ad_slot_id, {
         transaction: options.transaction
       })
       if (!adSlot) {
-        throw new BusinessError('广告位不存在: ' + data.ad_slot_id, 'AD_NOT_FOUND', 404) 
-}
+        throw new BusinessError('广告位不存在: ' + data.ad_slot_id, 'AD_NOT_FOUND', 404)
+      }
       if (!adSlot.is_active) {
-        throw new BusinessError('广告位未启用: ' + data.ad_slot_id, 'AD_DISABLED', 400) 
-}
+        throw new BusinessError('广告位未启用: ' + data.ad_slot_id, 'AD_DISABLED', 400)
+      }
 
       const business_id = uuidv4()
 
@@ -913,15 +961,19 @@ class AdCampaignService {
     try {
       const priority = data.priority || 950
       if (priority < 900 || priority > 999) {
-        throw new BusinessError('系统通知优先级必须在 900-999 范围内，当前值: ' + priority, 'AD_REQUIRED', 400) 
-}
+        throw new BusinessError(
+          '系统通知优先级必须在 900-999 范围内，当前值: ' + priority,
+          'AD_REQUIRED',
+          400
+        )
+      }
 
       const adSlot = await AdSlot.findByPk(data.ad_slot_id, {
         transaction: options.transaction
       })
       if (!adSlot) {
-        throw new BusinessError('广告位不存在: ' + data.ad_slot_id, 'AD_NOT_FOUND', 404) 
-}
+        throw new BusinessError('广告位不存在: ' + data.ad_slot_id, 'AD_NOT_FOUND', 404)
+      }
 
       const business_id = uuidv4()
 
@@ -988,12 +1040,16 @@ class AdCampaignService {
       })
 
       if (!campaign) {
-        throw new BusinessError('计划不存在: ' + campaignId, 'AD_NOT_FOUND', 404) 
-}
+        throw new BusinessError('计划不存在: ' + campaignId, 'AD_NOT_FOUND', 404)
+      }
 
       if (campaign.status !== 'draft') {
-        throw new BusinessError('只能发布草稿状态的计划，当前状态: ' + campaign.status, 'AD_NOT_ALLOWED', 400) 
-}
+        throw new BusinessError(
+          '只能发布草稿状态的计划，当前状态: ' + campaign.status,
+          'AD_NOT_ALLOWED',
+          400
+        )
+      }
 
       if (!['operational', 'system'].includes(campaign.campaign_category)) {
         throw new BusinessError(
@@ -1032,12 +1088,16 @@ class AdCampaignService {
       })
 
       if (!campaign) {
-        throw new BusinessError('计划不存在: ' + campaignId, 'AD_NOT_FOUND', 404) 
-}
+        throw new BusinessError('计划不存在: ' + campaignId, 'AD_NOT_FOUND', 404)
+      }
 
       if (campaign.status !== 'active') {
-        throw new BusinessError('只能暂停投放中的计划，当前状态: ' + campaign.status, 'AD_NOT_ALLOWED', 400) 
-}
+        throw new BusinessError(
+          '只能暂停投放中的计划，当前状态: ' + campaign.status,
+          'AD_NOT_ALLOWED',
+          400
+        )
+      }
 
       await campaign.update({ status: 'paused' }, { transaction: options.transaction })
 

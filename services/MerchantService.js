@@ -275,7 +275,11 @@ class MerchantService {
       transaction
     })
     if (storeCount > 0) {
-      throw new BusinessError(`无法删除：该商家下有 ${storeCount} 个关联门店，请先解除关联`, 'SERVICE_ERROR', 400)
+      throw new BusinessError(
+        `无法删除：该商家下有 ${storeCount} 个关联门店，请先解除关联`,
+        'SERVICE_ERROR',
+        400
+      )
     }
 
     await merchant.destroy({ transaction })
@@ -344,7 +348,11 @@ class MerchantService {
     })
 
     if (!dict) {
-      throw new BusinessError(`商家类型无效（${merchantType}），请在字典管理中配置 merchant_type 字典`, 'SERVICE_INVALID', 400)
+      throw new BusinessError(
+        `商家类型无效（${merchantType}），请在字典管理中配置 merchant_type 字典`,
+        'SERVICE_INVALID',
+        400
+      )
     }
   }
 }

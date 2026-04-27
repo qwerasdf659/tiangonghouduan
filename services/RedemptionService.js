@@ -98,7 +98,11 @@ class RedemptionService {
     }
 
     if (item.status !== 'available') {
-      throw new BusinessError(`物品实例不可用: status=${item.status}`, 'REDEMPTION_NOT_ALLOWED', 400)
+      throw new BusinessError(
+        `物品实例不可用: status=${item.status}`,
+        'REDEMPTION_NOT_ALLOWED',
+        400
+      )
     }
 
     // 1.5 幂等性检查：防止同一物品并发创建多个pending订单
@@ -116,7 +120,11 @@ class RedemptionService {
         existing_order_id: existingOrder.redemption_order_id,
         creator_user_id
       })
-      throw new BusinessError('该物品已有待核销订单，请勿重复生成核销码', 'REDEMPTION_ALREADY_EXISTS', 409)
+      throw new BusinessError(
+        '该物品已有待核销订单，请勿重复生成核销码',
+        'REDEMPTION_ALREADY_EXISTS',
+        409
+      )
     }
 
     // 🔐 2. 服务层兜底：所有权或管理员权限校验（防越权）
@@ -139,7 +147,11 @@ class RedemptionService {
             owner_account_id: item.owner_account_id,
             role_level: userRoles.role_level
           })
-          throw new BusinessError('权限不足：仅物品所有者或管理员可生成核销码', 'REDEMPTION_INSUFFICIENT', 400)
+          throw new BusinessError(
+            '权限不足：仅物品所有者或管理员可生成核销码',
+            'REDEMPTION_INSUFFICIENT',
+            400
+          )
         }
 
         logger.info('服务层验证：管理员生成核销码', {

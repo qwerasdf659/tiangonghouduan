@@ -36,67 +36,72 @@ const { asyncHandler } = require('../../../../middleware/validation')
  * GET /api/v4/console/marketplace/listings
  * @desc 管理员查看全部挂牌列表（支持多维筛选、分页、排序）
  */
-router.get('/listings', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const admin_id = req.user.user_id
-  const {
-    status,
-    listing_kind,
-    asset_code,
-    seller_user_id,
-    sort = 'newest',
-    page = 1,
-    page_size = 20
-  } = req.query
+router.get(
+  '/listings',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const admin_id = req.user.user_id
+    const {
+      status,
+      listing_kind,
+      asset_code,
+      seller_user_id,
+      sort = 'newest',
+      page = 1,
+      page_size = 20
+    } = req.query
 
-  logger.info('[C2C管理] 查询挂牌列表', { admin_id, status, listing_kind, asset_code })
+    logger.info('[C2C管理] 查询挂牌列表', { admin_id, status, listing_kind, asset_code })
 
-  const { MarketListing, User, Item, ItemTemplate } = require('../../../../models')
-  const where = {}
-  if (status) where.status = status
-  if (listing_kind) where.listing_kind = listing_kind
-  if (asset_code) where.offer_asset_code = asset_code
-  if (seller_user_id) where.seller_user_id = parseInt(seller_user_id)
+    const { MarketListing, User, Item, ItemTemplate } = require('../../../../models')
+    const where = {}
+    if (status) where.status = status
+    if (listing_kind) where.listing_kind = listing_kind
+    if (asset_code) where.offer_asset_code = asset_code
+    if (seller_user_id) where.seller_user_id = parseInt(seller_user_id)
 
-  const sortMap = {
-    newest: [['created_at', 'DESC']],
-    oldest: [['created_at', 'ASC']],
-    price_asc: [['asking_price', 'ASC']],
-    price_desc: [['asking_price', 'DESC']]
-  }
+    const sortMap = {
+      newest: [['created_at', 'DESC']],
+      oldest: [['created_at', 'ASC']],
+      price_asc: [['asking_price', 'ASC']],
+      price_desc: [['asking_price', 'DESC']]
+    }
 
-  const safePage = Math.max(1, parseInt(page) || 1)
-  const safePageSize = Math.min(100, Math.max(1, parseInt(page_size) || 20))
+    const safePage = Math.max(1, parseInt(page) || 1)
+    const safePageSize = Math.min(100, Math.max(1, parseInt(page_size) || 20))
 
-  const { count, rows } = await MarketListing.findAndCountAll({
-    where,
-    include: [
-      { model: User, as: 'seller', attributes: ['user_id', 'nickname', 'mobile'] },
-      { model: Item, as: 'offerItem', required: false },
+    const { count, rows } = await MarketListing.findAndCountAll({
+      where,
+      include: [
+        { model: User, as: 'seller', attributes: ['user_id', 'nickname', 'mobile'] },
+        { model: Item, as: 'offerItem', required: false },
+        {
+          model: ItemTemplate,
+          as: 'offerItemTemplate',
+          attributes: ['item_template_id', 'display_name'],
+          required: false
+        }
+      ],
+      order: sortMap[sort] || sortMap.newest,
+      limit: safePageSize,
+      offset: (safePage - 1) * safePageSize
+    })
+
+    return res.apiSuccess(
       {
-        model: ItemTemplate,
-        as: 'offerItemTemplate',
-        attributes: ['item_template_id', 'display_name'],
-        required: false
-      }
-    ],
-    order: sortMap[sort] || sortMap.newest,
-    limit: safePageSize,
-    offset: (safePage - 1) * safePageSize
+        listings: rows,
+        pagination: {
+          page: safePage,
+          page_size: safePageSize,
+          total: count,
+          total_pages: Math.ceil(count / safePageSize)
+        }
+      },
+      '获取挂牌列表成功'
+    )
   })
-
-  return res.apiSuccess(
-    {
-      listings: rows,
-      pagination: {
-        page: safePage,
-        page_size: safePageSize,
-        total: count,
-        total_pages: Math.ceil(count / safePageSize)
-      }
-    },
-    '获取挂牌列表成功'
-  )
-}))
+)
 
 /**
  * GET /api/v4/console/marketplace/listings/:market_listing_id
@@ -119,62 +124,68 @@ router.get(
     }
 
     return res.apiSuccess(listing, '获取挂牌详情成功')
-}))
+  })
+)
 
 /**
  * POST /api/v4/console/marketplace/listings
  * @desc 管理员代创建挂牌（运营干预：测试/补偿/活动）
  */
-router.post('/listings', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const admin_id = req.user.user_id
-  const {
-    seller_user_id,
-    listing_kind,
-    offer_item_id,
-    offer_asset_code,
-    offer_amount,
-    asking_price,
-    admin_note
-  } = req.body
+router.post(
+  '/listings',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const admin_id = req.user.user_id
+    const {
+      seller_user_id,
+      listing_kind,
+      offer_item_id,
+      offer_asset_code,
+      offer_amount,
+      asking_price,
+      admin_note
+    } = req.body
 
-  if (!seller_user_id || !listing_kind || !asking_price) {
-    return res.apiError(
-      'seller_user_id、listing_kind、asking_price 为必填',
-      'VALIDATION_ERROR',
-      null,
-      400
-    )
-  }
-
-  logger.info('[C2C管理] 管理员创建挂牌', {
-    admin_id,
-    seller_user_id,
-    listing_kind,
-    asking_price
-  })
-
-  const MarketListingService = req.app.locals.services.getService('market_listing_core')
-  const result = await TransactionManager.execute(
-    async transaction => {
-      return await MarketListingService.createListing(
-        {
-          seller_user_id,
-          listing_kind,
-          offer_item_id,
-          offer_asset_code,
-          offer_amount,
-          asking_price,
-          admin_note,
-          operator_id: admin_id
-        },
-        { transaction }
+    if (!seller_user_id || !listing_kind || !asking_price) {
+      return res.apiError(
+        'seller_user_id、listing_kind、asking_price 为必填',
+        'VALIDATION_ERROR',
+        null,
+        400
       )
-    },
-    { description: `管理员创建挂牌 seller=${seller_user_id}`, maxRetries: 1 }
-  )
+    }
 
-  return res.apiSuccess(result, '挂牌创建成功')
-}))
+    logger.info('[C2C管理] 管理员创建挂牌', {
+      admin_id,
+      seller_user_id,
+      listing_kind,
+      asking_price
+    })
+
+    const MarketListingService = req.app.locals.services.getService('market_listing_core')
+    const result = await TransactionManager.execute(
+      async transaction => {
+        return await MarketListingService.createListing(
+          {
+            seller_user_id,
+            listing_kind,
+            offer_item_id,
+            offer_asset_code,
+            offer_amount,
+            asking_price,
+            admin_note,
+            operator_id: admin_id
+          },
+          { transaction }
+        )
+      },
+      { description: `管理员创建挂牌 seller=${seller_user_id}`, maxRetries: 1 }
+    )
+
+    return res.apiSuccess(result, '挂牌创建成功')
+  })
+)
 
 /**
  * PUT /api/v4/console/marketplace/listings/:market_listing_id
@@ -217,7 +228,8 @@ router.put(
       market_listing_id: listingId
     })
     return res.apiSuccess(listing, '挂牌修改成功')
-}))
+  })
+)
 
 /**
  * DELETE /api/v4/console/marketplace/listings/:market_listing_id
@@ -257,49 +269,55 @@ router.delete(
     await listing.destroy()
 
     return res.apiSuccess({ market_listing_id: listingId }, '挂牌已删除')
-}))
+  })
+)
 
 // ==================== C2C 用户上架统计 ====================
 
-router.get('/listing-stats', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const { page = 1, page_size = 20, filter = 'all', mobile, merchant_id } = req.query
+router.get(
+  '/listing-stats',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const { page = 1, page_size = 20, filter = 'all', mobile, merchant_id } = req.query
 
-  const AdminSystemService = req.app.locals.services.getService('admin_system')
-  const maxListings = await AdminSystemService.getSettingValue(
-    'marketplace',
-    'max_active_listings',
-    10
-  )
+    const AdminSystemService = req.app.locals.services.getService('admin_system')
+    const maxListings = await AdminSystemService.getSettingValue(
+      'marketplace',
+      'max_active_listings',
+      10
+    )
 
-  logger.info('管理员查询用户上架状态', {
-    admin_id: req.user.user_id,
-    page,
-    page_size,
-    filter,
-    mobile: mobile || null,
-    merchant_id: merchant_id || null
+    logger.info('管理员查询用户上架状态', {
+      admin_id: req.user.user_id,
+      page,
+      page_size,
+      filter,
+      mobile: mobile || null,
+      merchant_id: merchant_id || null
+    })
+
+    const ExchangeService = req.app.locals.services.getService('exchange_admin')
+
+    const result = await ExchangeService.getUserListingStats({
+      page,
+      page_size,
+      filter,
+      max_listings: maxListings,
+      mobile,
+      merchant_id: merchant_id ? parseInt(merchant_id) : undefined
+    })
+
+    logger.info('查询用户上架状态成功', {
+      admin_id: req.user.user_id,
+      total_users: result.summary.total_users_with_listings,
+      filtered_count: result.pagination.total,
+      page: parseInt(page)
+    })
+
+    return res.apiSuccess(result)
   })
-
-  const ExchangeService = req.app.locals.services.getService('exchange_admin')
-
-  const result = await ExchangeService.getUserListingStats({
-    page,
-    page_size,
-    filter,
-    max_listings: maxListings,
-    mobile,
-    merchant_id: merchant_id ? parseInt(merchant_id) : undefined
-  })
-
-  logger.info('查询用户上架状态成功', {
-    admin_id: req.user.user_id,
-    total_users: result.summary.total_users_with_listings,
-    filtered_count: result.pagination.total,
-    page: parseInt(page)
-  })
-
-  return res.apiSuccess(result)
-}))
+)
 
 /**
  * 查询指定用户的上架商品列表
@@ -317,44 +335,49 @@ router.get('/listing-stats', authenticateToken, requireRoleLevel(100), asyncHand
  * @security JWT + Admin权限
  * @created 2026-02-18（运营精细化管理：按用户查看上架商品）
  */
-router.get('/user-listings', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const {
-    user_id,
-    status,
-    page = 1,
-    page_size = 20,
-    quality_grade,
-    sort_by,
-    sort_order
-  } = req.query
-  const admin_id = req.user.user_id
+router.get(
+  '/user-listings',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const {
+      user_id,
+      status,
+      page = 1,
+      page_size = 20,
+      quality_grade,
+      sort_by,
+      sort_order
+    } = req.query
+    const admin_id = req.user.user_id
 
-  if (!user_id) {
-    return res.apiError('user_id 是必填参数', 'BAD_REQUEST', null, 400)
-  }
+    if (!user_id) {
+      return res.apiError('user_id 是必填参数', 'BAD_REQUEST', null, 400)
+    }
 
-  logger.info('管理员查询用户上架商品列表', { admin_id, user_id, status, page, page_size })
+    logger.info('管理员查询用户上架商品列表', { admin_id, user_id, status, page, page_size })
 
-  const ExchangeService = req.app.locals.services.getService('exchange_admin')
+    const ExchangeService = req.app.locals.services.getService('exchange_admin')
 
-  const result = await ExchangeService.getUserListings({
-    user_id: parseInt(user_id),
-    status: status || undefined,
-    page: parseInt(page),
-    page_size: parseInt(page_size),
-    quality_grade: quality_grade || undefined,
-    sort_by: sort_by || undefined,
-    sort_order: sort_order || undefined
+    const result = await ExchangeService.getUserListings({
+      user_id: parseInt(user_id),
+      status: status || undefined,
+      page: parseInt(page),
+      page_size: parseInt(page_size),
+      quality_grade: quality_grade || undefined,
+      sort_by: sort_by || undefined,
+      sort_order: sort_order || undefined
+    })
+
+    logger.info('查询用户上架商品列表成功', {
+      admin_id,
+      user_id: parseInt(user_id),
+      total: result.pagination.total
+    })
+
+    return res.apiSuccess(result)
   })
-
-  logger.info('查询用户上架商品列表成功', {
-    admin_id,
-    user_id: parseInt(user_id),
-    total: result.pagination.total
-  })
-
-  return res.apiSuccess(result)
-}))
+)
 
 /**
  * 调整用户上架数量限制
@@ -371,38 +394,43 @@ router.get('/user-listings', authenticateToken, requireRoleLevel(100), asyncHand
  * @security JWT + Admin权限
  * @created 2026-02-18（运营精细化管理：按用户调整上架限制）
  */
-router.put('/user-listing-limit', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const { user_id, max_active_listings, reason } = req.body
-  const admin_id = req.user.user_id
+router.put(
+  '/user-listing-limit',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const { user_id, max_active_listings, reason } = req.body
+    const admin_id = req.user.user_id
 
-  if (!user_id) {
-    return res.apiError('user_id 是必填参数', 'BAD_REQUEST', null, 400)
-  }
+    if (!user_id) {
+      return res.apiError('user_id 是必填参数', 'BAD_REQUEST', null, 400)
+    }
 
-  logger.info('管理员调整用户上架限制', { admin_id, user_id, max_active_listings, reason })
+    logger.info('管理员调整用户上架限制', { admin_id, user_id, max_active_listings, reason })
 
-  const ExchangeService = req.app.locals.services.getService('exchange_admin')
+    const ExchangeService = req.app.locals.services.getService('exchange_admin')
 
-  const result = await TransactionManager.execute(
-    async transaction => {
-      return await ExchangeService.updateUserListingLimit(
-        { user_id: parseInt(user_id), max_active_listings, operator_id: admin_id, reason },
-        { transaction }
-      )
-    },
-    { description: `调整用户上架限制 user_id=${user_id}`, maxRetries: 1 }
-  )
+    const result = await TransactionManager.execute(
+      async transaction => {
+        return await ExchangeService.updateUserListingLimit(
+          { user_id: parseInt(user_id), max_active_listings, operator_id: admin_id, reason },
+          { transaction }
+        )
+      },
+      { description: `调整用户上架限制 user_id=${user_id}`, maxRetries: 1 }
+    )
 
-  logger.info('用户上架限制调整成功', {
-    admin_id,
-    user_id: parseInt(user_id),
-    old_limit: result.old_limit,
-    new_limit: result.new_limit,
-    effective_limit: result.effective_limit
+    logger.info('用户上架限制调整成功', {
+      admin_id,
+      user_id: parseInt(user_id),
+      old_limit: result.old_limit,
+      new_limit: result.new_limit,
+      effective_limit: result.effective_limit
+    })
+
+    return res.apiSuccess(result, '上架数量限制调整成功')
   })
-
-  return res.apiSuccess(result, '上架数量限制调整成功')
-}))
+)
 
 // ==================== C2C 挂牌运营操作 ====================
 
@@ -448,7 +476,8 @@ router.put(
     )
 
     return res.apiSuccess(result, result.is_pinned ? '挂牌已置顶' : '已取消置顶')
-}))
+  })
+)
 
 /**
  * 推荐/取消推荐挂牌
@@ -486,7 +515,8 @@ router.put(
     )
 
     return res.apiSuccess(result, result.is_recommended ? '挂牌已推荐' : '已取消推荐')
-}))
+  })
+)
 
 /**
  * 批量调整挂牌排序
@@ -496,49 +526,54 @@ router.put(
  *
  * @security JWT + Admin权限
  */
-router.put('/listings/batch-sort', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const { items } = req.body
-  if (!Array.isArray(items) || items.length === 0) {
-    return res.apiError('排序数据不能为空', 'BAD_REQUEST', null, 400)
-  }
+router.put(
+  '/listings/batch-sort',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const { items } = req.body
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.apiError('排序数据不能为空', 'BAD_REQUEST', null, 400)
+    }
 
-  const { MarketListing } = req.app.locals.services.getService('exchange_admin').models
+    const { MarketListing } = req.app.locals.services.getService('exchange_admin').models
 
-  const result = await TransactionManager.execute(
-    async transaction => {
-      const updatePromises = items
-        .filter(item => item.market_listing_id && item.sort_order !== undefined)
-        .map(item =>
-          MarketListing.update(
-            { sort_order: parseInt(item.sort_order, 10) },
-            { where: { market_listing_id: parseInt(item.market_listing_id, 10) }, transaction }
+    const result = await TransactionManager.execute(
+      async transaction => {
+        const updatePromises = items
+          .filter(item => item.market_listing_id && item.sort_order !== undefined)
+          .map(item =>
+            MarketListing.update(
+              { sort_order: parseInt(item.sort_order, 10) },
+              { where: { market_listing_id: parseInt(item.market_listing_id, 10) }, transaction }
+            )
           )
-        )
-      const results = await Promise.all(updatePromises)
-      const updatedCount = results.reduce((sum, [affected]) => sum + affected, 0)
-      return { updated_count: updatedCount }
-    },
-    { description: '批量排序挂牌', maxRetries: 1 }
-  )
+        const results = await Promise.all(updatePromises)
+        const updatedCount = results.reduce((sum, [affected]) => sum + affected, 0)
+        return { updated_count: updatedCount }
+      },
+      { description: '批量排序挂牌', maxRetries: 1 }
+    )
 
-  const { BusinessCacheHelper } = require('../../../../utils/BusinessCacheHelper')
-  await BusinessCacheHelper.invalidateMarketListings('batch_sort')
+    const { BusinessCacheHelper } = require('../../../../utils/BusinessCacheHelper')
+    await BusinessCacheHelper.invalidateMarketListings('batch_sort')
 
-  const AuditLogService = req.app.locals.services.getService('audit_log')
-  await AuditLogService.logOperation({
-    operator_id: req.user.user_id,
-    operation_type: 'sort_change',
-    target_type: 'market_listing',
-    target_id: null,
-    action: 'batch_sort',
-    after_data: { items: items.slice(0, 10), updated_count: result.updated_count },
-    reason: '管理员批量调整挂牌排序',
-    ip_address: req.ip,
-    user_agent: req.get('user-agent')
-  }).catch(e => logger.warn('排序审计日志写入失败（非致命）', { error: e.message }))
+    const AuditLogService = req.app.locals.services.getService('audit_log')
+    await AuditLogService.logOperation({
+      operator_id: req.user.user_id,
+      operation_type: 'sort_change',
+      target_type: 'market_listing',
+      target_id: null,
+      action: 'batch_sort',
+      after_data: { items: items.slice(0, 10), updated_count: result.updated_count },
+      reason: '管理员批量调整挂牌排序',
+      ip_address: req.ip,
+      user_agent: req.get('user-agent')
+    }).catch(e => logger.warn('排序审计日志写入失败（非致命）', { error: e.message }))
 
-  return res.apiSuccess(result, `已更新 ${result.updated_count} 个挂牌排序`)
-}))
+    return res.apiSuccess(result, `已更新 ${result.updated_count} 个挂牌排序`)
+  })
+)
 
 // ==================== C2C 客服强制撤回 ====================
 
@@ -589,12 +624,7 @@ router.post(
 
     // 参数验证：withdraw_reason
     if (!withdraw_reason || withdraw_reason.trim().length === 0) {
-      return res.apiError(
-        '撤回原因是必填项（审计追踪需要）',
-        'MISSING_WITHDRAW_REASON',
-        null,
-        400
-      )
+      return res.apiError('撤回原因是必填项（审计追踪需要）', 'MISSING_WITHDRAW_REASON', null, 400)
     }
 
     // 通过 ServiceManager 获取 MarketListingCoreService（写操作需要 core 服务）
@@ -634,7 +664,8 @@ router.post(
       },
       '挂牌已强制撤回'
     )
-}))
+  })
+)
 
 // ==================== C2C 市场统计 ====================
 
@@ -659,23 +690,28 @@ router.post(
  *
  * @created 2026-02-24（文档 6.5 节要求 - 管理后台市场概览端点）
  */
-router.get('/stats/overview', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const admin_id = req.user.user_id
+router.get(
+  '/stats/overview',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const admin_id = req.user.user_id
 
-  logger.info('管理员查询市场概览数据', { admin_id })
+    logger.info('管理员查询市场概览数据', { admin_id })
 
-  const MarketAnalyticsService = req.app.locals.services.getService('market_analytics')
-  const { days = 7 } = req.query
-  const overview = await MarketAnalyticsService.getMarketOverview(parseInt(days) || 7)
+    const MarketAnalyticsService = req.app.locals.services.getService('market_analytics')
+    const { days = 7 } = req.query
+    const overview = await MarketAnalyticsService.getMarketOverview(parseInt(days) || 7)
 
-  logger.info('市场概览数据查询成功', {
-    admin_id,
-    total_trades: overview.totals.total_trades,
-    asset_count: overview.asset_ranking.length
+    logger.info('市场概览数据查询成功', {
+      admin_id,
+      total_trades: overview.totals.total_trades,
+      asset_count: overview.asset_ranking.length
+    })
+
+    return res.apiSuccess(overview, '市场概览数据查询成功')
   })
-
-  return res.apiSuccess(overview, '市场概览数据查询成功')
-}))
+)
 
 /**
  * 资产价格历史（复用 MarketAnalyticsService）
@@ -692,24 +728,29 @@ router.get('/stats/overview', authenticateToken, requireRoleLevel(100), asyncHan
  *
  * @created 2026-02-24（文档 6.5 节要求 - 管理后台市场分析）
  */
-router.get('/stats/price-history', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const { asset_code, days = 30 } = req.query
-  const admin_id = req.user.user_id
+router.get(
+  '/stats/price-history',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const { asset_code, days = 30 } = req.query
+    const admin_id = req.user.user_id
 
-  if (!asset_code) {
-    return res.apiError('需要 asset_code 参数', 'MISSING_PARAMS', null, 400)
-  }
+    if (!asset_code) {
+      return res.apiError('需要 asset_code 参数', 'MISSING_PARAMS', null, 400)
+    }
 
-  logger.info('管理员查询资产价格历史', { admin_id, asset_code, days })
+    logger.info('管理员查询资产价格历史', { admin_id, asset_code, days })
 
-  const MarketAnalyticsService = req.app.locals.services.getService('market_analytics')
-  const result = await MarketAnalyticsService.getAssetPriceHistory({
-    asset_code,
-    days: parseInt(days)
+    const MarketAnalyticsService = req.app.locals.services.getService('market_analytics')
+    const result = await MarketAnalyticsService.getAssetPriceHistory({
+      asset_code,
+      days: parseInt(days)
+    })
+
+    return res.apiSuccess(result, '价格历史查询成功')
   })
-
-  return res.apiSuccess(result, '价格历史查询成功')
-}))
+)
 
 // ==================== C2C 可交易资产配置 ====================
 
@@ -812,6 +853,7 @@ router.get(
       },
       '交易市场可交易资产配置'
     )
-}))
+  })
+)
 
 module.exports = router

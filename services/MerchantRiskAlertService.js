@@ -140,17 +140,37 @@ class MerchantRiskAlertService {
           { model: Store, as: 'store', attributes: ['store_id', 'store_name'] },
           { model: User, as: 'targetUser', attributes: ['user_id', 'nickname', 'mobile'] },
           { model: User, as: 'reviewer', attributes: ['user_id', 'nickname'] },
-          { model: ConsumptionRecord, as: 'relatedRecord', attributes: ['consumption_record_id', 'consumption_amount', 'status', 'created_at'] }
+          {
+            model: ConsumptionRecord,
+            as: 'relatedRecord',
+            attributes: ['consumption_record_id', 'consumption_amount', 'status', 'created_at']
+          }
         ]
       })
 
       if (!alert) return null
       const result = {
         ...(alert.toAPIResponse ? alert.toAPIResponse() : alert.toJSON()),
-        operator: alert.operator ? { user_id: alert.operator.user_id, nickname: alert.operator.nickname, mobile: alert.operator.mobile } : null,
-        store: alert.store ? { store_id: alert.store.store_id, store_name: alert.store.store_name } : null,
-        target_user: alert.targetUser ? { user_id: alert.targetUser.user_id, nickname: alert.targetUser.nickname, mobile: alert.targetUser.mobile } : null,
-        reviewer: alert.reviewer ? { user_id: alert.reviewer.user_id, nickname: alert.reviewer.nickname } : null,
+        operator: alert.operator
+          ? {
+              user_id: alert.operator.user_id,
+              nickname: alert.operator.nickname,
+              mobile: alert.operator.mobile
+            }
+          : null,
+        store: alert.store
+          ? { store_id: alert.store.store_id, store_name: alert.store.store_name }
+          : null,
+        target_user: alert.targetUser
+          ? {
+              user_id: alert.targetUser.user_id,
+              nickname: alert.targetUser.nickname,
+              mobile: alert.targetUser.mobile
+            }
+          : null,
+        reviewer: alert.reviewer
+          ? { user_id: alert.reviewer.user_id, nickname: alert.reviewer.nickname }
+          : null,
         related_record: alert.relatedRecord
           ? {
               record_id: alert.relatedRecord.consumption_record_id,
@@ -186,20 +206,29 @@ class MerchantRiskAlertService {
 
       const statusStats = await RiskAlert.findAll({
         where,
-        attributes: ['status', [RiskAlert.sequelize.fn('COUNT', RiskAlert.sequelize.col('risk_alert_id')), 'count']],
+        attributes: [
+          'status',
+          [RiskAlert.sequelize.fn('COUNT', RiskAlert.sequelize.col('risk_alert_id')), 'count']
+        ],
         group: ['status'],
         raw: true
       })
 
       const typeStats = await RiskAlert.findAll({
         where,
-        attributes: ['alert_type', [RiskAlert.sequelize.fn('COUNT', RiskAlert.sequelize.col('risk_alert_id')), 'count']],
+        attributes: [
+          'alert_type',
+          [RiskAlert.sequelize.fn('COUNT', RiskAlert.sequelize.col('risk_alert_id')), 'count']
+        ],
         group: ['alert_type'],
         raw: true
       })
       const severityStats = await RiskAlert.findAll({
         where,
-        attributes: ['severity', [RiskAlert.sequelize.fn('COUNT', RiskAlert.sequelize.col('risk_alert_id')), 'count']],
+        attributes: [
+          'severity',
+          [RiskAlert.sequelize.fn('COUNT', RiskAlert.sequelize.col('risk_alert_id')), 'count']
+        ],
         group: ['severity'],
         raw: true
       })
@@ -211,9 +240,18 @@ class MerchantRiskAlertService {
 
       const MerchantRiskControlService = require('./MerchantRiskControlService')
       return {
-        by_status: statusStats.reduce((acc, item) => { acc[item.status] = parseInt(item.count, 10); return acc }, {}),
-        by_type: typeStats.reduce((acc, item) => { acc[item.alert_type] = parseInt(item.count, 10); return acc }, {}),
-        by_severity: severityStats.reduce((acc, item) => { acc[item.severity] = parseInt(item.count, 10); return acc }, {}),
+        by_status: statusStats.reduce((acc, item) => {
+          acc[item.status] = parseInt(item.count, 10)
+          return acc
+        }, {}),
+        by_type: typeStats.reduce((acc, item) => {
+          acc[item.alert_type] = parseInt(item.count, 10)
+          return acc
+        }, {}),
+        by_severity: severityStats.reduce((acc, item) => {
+          acc[item.severity] = parseInt(item.count, 10)
+          return acc
+        }, {}),
         today_count: todayCount,
         risk_config: MerchantRiskControlService.getRiskConfig(),
         store_id: filters.store_id || null
@@ -263,8 +301,12 @@ class MerchantRiskAlertService {
     }
     if (filters.start_time || filters.end_time) {
       where.created_at = {}
-      if (filters.start_time) where.created_at[Op.gte] = BeijingTimeHelper.parseBeijingTime(filters.start_time)
-      if (filters.end_time) where.created_at[Op.lte] = BeijingTimeHelper.parseBeijingTime(filters.end_time)
+      if (filters.start_time) {
+        where.created_at[Op.gte] = BeijingTimeHelper.parseBeijingTime(filters.start_time)
+      }
+      if (filters.end_time) {
+        where.created_at[Op.lte] = BeijingTimeHelper.parseBeijingTime(filters.end_time)
+      }
     }
 
     try {
@@ -276,7 +318,10 @@ class MerchantRiskAlertService {
           { model: User, as: 'targetUser', attributes: ['user_id', 'nickname', 'mobile'] },
           { model: User, as: 'reviewer', attributes: ['user_id', 'nickname'] }
         ],
-        order: [['severity', 'DESC'], ['created_at', 'DESC']],
+        order: [
+          ['severity', 'DESC'],
+          ['created_at', 'DESC']
+        ],
         limit: pageSize,
         offset
       })
@@ -294,14 +339,35 @@ class MerchantRiskAlertService {
         review_notes: alert.review_notes,
         reviewed_at: alert.reviewed_at ? BeijingTimeHelper.formatForAPI(alert.reviewed_at) : null,
         created_at: BeijingTimeHelper.formatForAPI(alert.created_at),
-        operator_info: alert.operator ? { user_id: alert.operator.user_id, nickname: alert.operator.nickname, mobile: alert.operator.mobile } : null,
-        store_info: alert.store ? { store_id: alert.store.store_id, store_name: alert.store.store_name } : null,
-        target_user_info: alert.targetUser ? { user_id: alert.targetUser.user_id, nickname: alert.targetUser.nickname, mobile: alert.targetUser.mobile } : null,
-        reviewer_info: alert.reviewer ? { user_id: alert.reviewer.user_id, nickname: alert.reviewer.nickname } : null
+        operator_info: alert.operator
+          ? {
+              user_id: alert.operator.user_id,
+              nickname: alert.operator.nickname,
+              mobile: alert.operator.mobile
+            }
+          : null,
+        store_info: alert.store
+          ? { store_id: alert.store.store_id, store_name: alert.store.store_name }
+          : null,
+        target_user_info: alert.targetUser
+          ? {
+              user_id: alert.targetUser.user_id,
+              nickname: alert.targetUser.nickname,
+              mobile: alert.targetUser.mobile
+            }
+          : null,
+        reviewer_info: alert.reviewer
+          ? { user_id: alert.reviewer.user_id, nickname: alert.reviewer.nickname }
+          : null
       }))
       return {
         items,
-        pagination: { page, page_size: pageSize, total: count, total_pages: Math.ceil(count / pageSize) }
+        pagination: {
+          page,
+          page_size: pageSize,
+          total: count,
+          total_pages: Math.ceil(count / pageSize)
+        }
       }
     } catch (error) {
       logger.error('❌ 查询风控告警列表失败', { error: error.message, filters })
@@ -338,7 +404,11 @@ class MerchantRiskAlertService {
     const transaction = await sequelize.transaction()
 
     try {
-      const alert = await RiskAlert.reviewAlert(alertId, { reviewed_by, status, review_notes }, { transaction })
+      const alert = await RiskAlert.reviewAlert(
+        alertId,
+        { reviewed_by, status, review_notes },
+        { transaction }
+      )
       await transaction.commit()
 
       logger.info('📝 风控告警已复核', { alert_id: alertId, reviewed_by, status, review_notes })
@@ -414,20 +484,24 @@ class MerchantRiskAlertService {
       const byType = await RiskAlert.findAll({
         attributes: ['alert_type', [RiskAlert.sequelize.fn('COUNT', '*'), 'count']],
         where,
-group: ['alert_type'],
-raw: true
+        group: ['alert_type'],
+        raw: true
       })
       const typeStats = {}
-      byType.forEach(item => { typeStats[item.alert_type] = parseInt(item.count, 10) })
+      byType.forEach(item => {
+        typeStats[item.alert_type] = parseInt(item.count, 10)
+      })
 
       const bySeverity = await RiskAlert.findAll({
         attributes: ['severity', [RiskAlert.sequelize.fn('COUNT', '*'), 'count']],
         where,
-group: ['severity'],
-raw: true
+        group: ['severity'],
+        raw: true
       })
       const severityStats = {}
-      bySeverity.forEach(item => { severityStats[item.severity] = parseInt(item.count, 10) })
+      bySeverity.forEach(item => {
+        severityStats[item.severity] = parseInt(item.count, 10)
+      })
 
       const todayStart = BeijingTimeHelper.todayStart()
       const todayCount = await RiskAlert.count({ where: { created_at: { [Op.gte]: todayStart } } })
@@ -472,28 +546,33 @@ raw: true
       const byType = await RiskAlert.findAll({
         attributes: ['alert_type', [RiskAlert.sequelize.fn('COUNT', '*'), 'count']],
         where,
-group: ['alert_type'],
-raw: true
+        group: ['alert_type'],
+        raw: true
       })
       const typeStats = {}
-      byType.forEach(item => { typeStats[item.alert_type] = parseInt(item.count, 10) })
+      byType.forEach(item => {
+        typeStats[item.alert_type] = parseInt(item.count, 10)
+      })
 
       const topOperators = await RiskAlert.findAll({
         attributes: ['operator_id', [RiskAlert.sequelize.fn('COUNT', '*'), 'count']],
         where,
-group: ['operator_id'],
+        group: ['operator_id'],
         order: [[RiskAlert.sequelize.literal('count'), 'DESC']],
         limit: 5,
-raw: true
+        raw: true
       })
 
       return {
         store_id: parseInt(storeId, 10),
         total: totalCount,
-pending: pendingCount,
-blocked: blockedCount,
+        pending: pendingCount,
+        blocked: blockedCount,
         by_type: typeStats,
-        top_operators: topOperators.map(item => ({ operator_id: item.operator_id, alert_count: parseInt(item.count, 10) })),
+        top_operators: topOperators.map(item => ({
+          operator_id: item.operator_id,
+          alert_count: parseInt(item.count, 10)
+        })),
         time_range: { start_time: start_time || null, end_time: end_time || null }
       }
     } catch (error) {
@@ -511,15 +590,21 @@ blocked: blockedCount,
     if (!RiskAlert) throw new BusinessError('RiskAlert 模型不存在', 'RISK_NOT_FOUND', 404)
 
     const alertTypes = Object.entries(RiskAlert.ALERT_TYPES || {}).map(([key, value]) => ({
-      code: value, name: RiskAlert.ALERT_TYPE_DESCRIPTIONS?.[value] || value, key
+      code: value,
+      name: RiskAlert.ALERT_TYPE_DESCRIPTIONS?.[value] || value,
+      key
     }))
 
     const severityLevels = Object.entries(RiskAlert.SEVERITY_LEVELS || {}).map(([key, value]) => ({
-      code: value, name: key.toLowerCase(), key
+      code: value,
+      name: key.toLowerCase(),
+      key
     }))
 
     const alertStatus = Object.entries(RiskAlert.ALERT_STATUS || {}).map(([key, value]) => ({
-      code: value, name: key.toLowerCase(), key
+      code: value,
+      name: key.toLowerCase(),
+      key
     }))
 
     return { alert_types: alertTypes, severity_levels: severityLevels, alert_status: alertStatus }

@@ -100,9 +100,17 @@ class TradeOrderQueryService {
    */
   static async getOrders(options = {}) {
     const {
-      buyer_user_id, seller_user_id, market_listing_id,
-      merchant_id, status, asset_code, order_no,
-      start_time, end_time, page = 1, page_size = 20
+      buyer_user_id,
+      seller_user_id,
+      market_listing_id,
+      merchant_id,
+      status,
+      asset_code,
+      order_no,
+      start_time,
+      end_time,
+      page = 1,
+      page_size = 20
     } = options
 
     const where = {}
@@ -125,8 +133,13 @@ class TradeOrderQueryService {
       model: MarketListing,
       as: 'listing',
       attributes: [
-        'market_listing_id', 'listing_kind', 'offer_item_id',
-        'offer_asset_code', 'offer_amount', 'price_amount', 'status'
+        'market_listing_id',
+        'listing_kind',
+        'offer_item_id',
+        'offer_asset_code',
+        'offer_amount',
+        'price_amount',
+        'status'
       ]
     }
 
@@ -134,13 +147,15 @@ class TradeOrderQueryService {
 
     if (merchant_id) {
       listingInclude.required = true
-      listingInclude.include = [{
-        model: Item,
-as: 'offerItem',
-        attributes: ['item_id', 'merchant_id'],
-        where: { merchant_id },
-required: true
-      }]
+      listingInclude.include = [
+        {
+          model: Item,
+          as: 'offerItem',
+          attributes: ['item_id', 'merchant_id'],
+          where: { merchant_id },
+          required: true
+        }
+      ]
     }
 
     const { count, rows } = await TradeOrder.findAndCountAll({
@@ -152,8 +167,8 @@ required: true
       ],
       order: [['created_at', 'DESC']],
       limit: page_size,
-offset,
-distinct: true
+      offset,
+      distinct: true
     })
 
     // PLACEHOLDER_getOrders_display
@@ -192,10 +207,16 @@ distinct: true
         { model: User, as: 'seller', attributes: ['user_id', 'nickname', 'mobile'] },
         {
           model: MarketListing,
-as: 'listing',
+          as: 'listing',
           attributes: [
-            'market_listing_id', 'listing_kind', 'offer_item_id',
-            'offer_asset_code', 'offer_amount', 'price_amount', 'status', 'created_at'
+            'market_listing_id',
+            'listing_kind',
+            'offer_item_id',
+            'offer_asset_code',
+            'offer_amount',
+            'price_amount',
+            'status',
+            'created_at'
           ]
         }
       ]
@@ -232,10 +253,15 @@ as: 'listing',
         { model: User, as: 'seller', attributes: ['user_id', 'nickname', 'mobile'] },
         {
           model: MarketListing,
-as: 'listing',
+          as: 'listing',
           attributes: [
-            'market_listing_id', 'listing_kind', 'offer_item_id',
-            'offer_asset_code', 'offer_amount', 'price_amount', 'status'
+            'market_listing_id',
+            'listing_kind',
+            'offer_item_id',
+            'offer_asset_code',
+            'offer_amount',
+            'price_amount',
+            'status'
           ]
         }
       ]
@@ -280,8 +306,8 @@ as: 'listing',
     const statusStats = await TradeOrder.findAll({
       attributes: ['status', [fn('COUNT', col('trade_order_id')), 'count']],
       where,
-group: ['status'],
-raw: true
+      group: ['status'],
+      raw: true
     })
 
     const amountStats = await TradeOrder.findOne({
@@ -292,7 +318,7 @@ raw: true
         [fn('SUM', col('net_amount')), 'total_net_amount']
       ],
       where: { ...where, status: 'completed' },
-raw: true
+      raw: true
     })
 
     // PLACEHOLDER_getOrderStats_display

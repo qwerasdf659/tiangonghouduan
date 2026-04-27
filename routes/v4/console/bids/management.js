@@ -114,7 +114,7 @@ router.post(
       end_time
     })
 
-        const { ExchangeItem, BidProduct } = req.app.locals.models
+    const { ExchangeItem, BidProduct } = req.app.locals.models
     const result = await TransactionManager.execute(async transaction => {
       const exchangeItem = await ExchangeItem.findByPk(exchange_item_id, { transaction })
       if (!exchangeItem) {
@@ -302,7 +302,7 @@ router.get(
 
     logger.info('[竞价管理] 查询竞价详情', { bid_product_id: bidProductId })
 
-        // 管理视图不传 user_id
+    // 管理视图不传 user_id
     const result = await BidQueryService.getBidProductDetail(bidProductId, {})
 
     const { BidRecord } = req.app.locals.models
@@ -366,7 +366,7 @@ router.post(
         admin_user_id: req.user.user_id
       })
 
-            const result = await TransactionManager.execute(async transaction => {
+      const result = await TransactionManager.execute(async transaction => {
         // 先将状态重置为 ended 再结算（处理 settlement_failed 场景）
         const models = require('../../../../models')
         const listing = await models.AuctionListing.findByPk(entityId, { transaction })
@@ -388,7 +388,7 @@ router.post(
       admin_user_id: req.user.user_id
     })
 
-        const result = await TransactionManager.execute(async transaction => {
+    const result = await TransactionManager.execute(async transaction => {
       return await BidService.settleBidProduct(entityId, { transaction })
     })
 
@@ -463,7 +463,7 @@ router.post(
         admin_user_id: req.user.user_id
       })
 
-            const result = await TransactionManager.execute(async transaction => {
+      const result = await TransactionManager.execute(async transaction => {
         return await AuctionService.cancelAuction(
           entityId,
           req.user.user_id,
@@ -487,7 +487,7 @@ router.post(
       admin_user_id: req.user.user_id
     })
 
-        const result = await TransactionManager.execute(async transaction => {
+    const result = await TransactionManager.execute(async transaction => {
       return await BidService.cancelBidProduct(entityId, reason.trim(), { transaction })
     })
 
@@ -496,10 +496,7 @@ router.post(
       refunded_users: result.refunded_users
     })
 
-    return res.apiSuccess(
-      result,
-      `竞价已取消，${result.refunded_users} 名用户的冻结资产已解冻返还`
-    )
+    return res.apiSuccess(result, `竞价已取消，${result.refunded_users} 名用户的冻结资产已解冻返还`)
   })
 )
 

@@ -294,11 +294,19 @@ class ConsumptionBatchService {
     }
 
     if (record_ids.length > BATCH_LIMITS.MAX_RECORDS) {
-      throw new BusinessError(`单次批量最多处理 ${BATCH_LIMITS.MAX_RECORDS} 条记录`, 'CONSUMPTION_ERROR', 400)
+      throw new BusinessError(
+        `单次批量最多处理 ${BATCH_LIMITS.MAX_RECORDS} 条记录`,
+        'CONSUMPTION_ERROR',
+        400
+      )
     }
 
     if (!Object.values(BATCH_REVIEW_ACTIONS).includes(action)) {
-      throw new BusinessError(`action 必须是 ${Object.values(BATCH_REVIEW_ACTIONS).join(' 或 ')}`, 'CONSUMPTION_REQUIRED', 400)
+      throw new BusinessError(
+        `action 必须是 ${Object.values(BATCH_REVIEW_ACTIONS).join(' 或 ')}`,
+        'CONSUMPTION_REQUIRED',
+        400
+      )
     }
 
     if (action === BATCH_REVIEW_ACTIONS.REJECT && !reason) {

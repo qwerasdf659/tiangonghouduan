@@ -340,7 +340,10 @@ class ServiceManager {
       // Exchange 域子服务
       this._services.set('exchange_core', new ExchangeCoreService(this.models)) // 核心兑换操作（需实例化）
       this._services.set('exchange_query', new ExchangeQueryService(this.models)) // 用户端查询服务（需实例化）
-      this._services.set('exchange_admin_order_query', new ExchangeAdminOrderQueryService(this.models)) // 管理端订单查询服务
+      this._services.set(
+        'exchange_admin_order_query',
+        new ExchangeAdminOrderQueryService(this.models)
+      ) // 管理端订单查询服务
       this._services.set('exchange_admin', new ExchangeAdminService(this.models)) // 管理后台操作（需实例化）
       this._services.set('exchange_bid_core', new ExchangeBidService(this.models)) // 竞价核心服务（出价/结算/取消）
       this._services.set('exchange_bid_query', new ExchangeBidQueryService(this.models)) // 竞价查询服务（列表/详情/历史）
@@ -645,13 +648,21 @@ class ServiceManager {
    */
   getService(serviceName) {
     if (!this._initialized) {
-      throw new BusinessError('服务管理器尚未初始化，请先调用 initialize()', 'SERVICE_NOT_CONFIGURED', 500)
+      throw new BusinessError(
+        '服务管理器尚未初始化，请先调用 initialize()',
+        'SERVICE_NOT_CONFIGURED',
+        500
+      )
     }
 
     const service = this._services.get(serviceName)
     if (!service) {
       const availableServices = Array.from(this._services.keys()).join(', ')
-      throw new BusinessError(`服务 "${serviceName}" 不存在。\n可用服务: ${availableServices}`, 'SERVICE_NOT_FOUND', 404)
+      throw new BusinessError(
+        `服务 "${serviceName}" 不存在。\n可用服务: ${availableServices}`,
+        'SERVICE_NOT_FOUND',
+        404
+      )
     }
 
     return service

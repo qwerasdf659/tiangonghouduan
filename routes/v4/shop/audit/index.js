@@ -88,8 +88,7 @@ router.get(
       }
     }
 
-    const MerchantOperationLogService =
-      req.app.locals.services.getService('merchant_operation_log')
+    const MerchantOperationLogService = req.app.locals.services.getService('merchant_operation_log')
 
     const filters = {
       page: parseInt(page, 10),
@@ -139,8 +138,7 @@ router.get(
       return res.apiError('无效的日志ID', 'BAD_REQUEST', null, 400)
     }
 
-    const MerchantOperationLogService =
-      req.app.locals.services.getService('merchant_operation_log')
+    const MerchantOperationLogService = req.app.locals.services.getService('merchant_operation_log')
     const log = await MerchantOperationLogService.getLogDetail(logId)
 
     if (!log) {
@@ -185,14 +183,7 @@ router.get(
   authenticateToken,
   requireMerchantPermission('staff:read', { scope: 'store', storeIdParam: 'query' }),
   asyncHandler(async (req, res) => {
-    const {
-      store_id,
-      start_date,
-      end_date,
-      operation_type,
-      result,
-      page_size = 10000
-    } = req.query
+    const { store_id, start_date, end_date, operation_type, result, page_size = 10000 } = req.query
 
     const user_stores = req.user_stores || []
 
@@ -240,8 +231,7 @@ router.get(
       }
     }
 
-    const MerchantOperationLogService =
-      req.app.locals.services.getService('merchant_operation_log')
+    const MerchantOperationLogService = req.app.locals.services.getService('merchant_operation_log')
 
     const exportLimit = Math.min(Math.max(parseInt(page_size) || 10000, 100), 50000)
 

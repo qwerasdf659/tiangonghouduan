@@ -219,7 +219,9 @@ class CustomerServiceAgentManagementService {
    */
   static async createAgent(data, options = {}) {
     const { transaction } = options
-    if (!transaction) throw new BusinessError('createAgent 必须在事务内执行', 'CUSTOMER_SERVICE_REQUIRED', 400)
+    if (!transaction) {
+      throw new BusinessError('createAgent 必须在事务内执行', 'CUSTOMER_SERVICE_REQUIRED', 400)
+    }
 
     const { CustomerServiceAgent, User } = models
 
@@ -274,7 +276,9 @@ class CustomerServiceAgentManagementService {
    */
   static async updateAgent(agentId, data, options = {}) {
     const { transaction } = options
-    if (!transaction) throw new BusinessError('updateAgent 必须在事务内执行', 'CUSTOMER_SERVICE_REQUIRED', 400)
+    if (!transaction) {
+      throw new BusinessError('updateAgent 必须在事务内执行', 'CUSTOMER_SERVICE_REQUIRED', 400)
+    }
 
     const { CustomerServiceAgent } = models
 
@@ -322,7 +326,9 @@ class CustomerServiceAgentManagementService {
    */
   static async deleteAgent(agentId, options = {}) {
     const { transaction } = options
-    if (!transaction) throw new BusinessError('deleteAgent 必须在事务内执行', 'CUSTOMER_SERVICE_REQUIRED', 400)
+    if (!transaction) {
+      throw new BusinessError('deleteAgent 必须在事务内执行', 'CUSTOMER_SERVICE_REQUIRED', 400)
+    }
 
     const { CustomerServiceAgent, CustomerServiceUserAssignment } = models
 
@@ -448,7 +454,9 @@ class CustomerServiceAgentManagementService {
    */
   static async createAssignment(data, options = {}) {
     const { transaction } = options
-    if (!transaction) throw new BusinessError('createAssignment 必须在事务内执行', 'CUSTOMER_SERVICE_REQUIRED', 400)
+    if (!transaction) {
+      throw new BusinessError('createAssignment 必须在事务内执行', 'CUSTOMER_SERVICE_REQUIRED', 400)
+    }
 
     const { CustomerServiceUserAssignment, CustomerServiceAgent, User } = models
 
@@ -509,7 +517,13 @@ class CustomerServiceAgentManagementService {
    */
   static async batchCreateAssignment(data, options = {}) {
     const { transaction } = options
-    if (!transaction) throw new BusinessError('batchCreateAssignment 必须在事务内执行', 'CUSTOMER_SERVICE_REQUIRED', 400)
+    if (!transaction) {
+      throw new BusinessError(
+        'batchCreateAssignment 必须在事务内执行',
+        'CUSTOMER_SERVICE_REQUIRED',
+        400
+      )
+    }
 
     const results = []
     let successCount = 0
@@ -558,7 +572,9 @@ class CustomerServiceAgentManagementService {
    */
   static async removeAssignment(assignmentId, options = {}) {
     const { transaction } = options
-    if (!transaction) throw new BusinessError('removeAssignment 必须在事务内执行', 'CUSTOMER_SERVICE_REQUIRED', 400)
+    if (!transaction) {
+      throw new BusinessError('removeAssignment 必须在事务内执行', 'CUSTOMER_SERVICE_REQUIRED', 400)
+    }
 
     const { CustomerServiceUserAssignment } = models
 

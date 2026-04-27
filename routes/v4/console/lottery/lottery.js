@@ -37,24 +37,29 @@ const logger = require('../../../../utils/logger').logger
  * @query {string} [range=7d] - 统计时间范围（7d/30d/90d）
  * @query {number} [merchant_id] - 按商家筛选（可选，通过 LotteryPrize 关联）
  */
-router.get('/stats', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const { range = '7d', merchant_id } = req.query
+router.get(
+  '/stats',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const { range = '7d', merchant_id } = req.query
 
-  logger.info('[抽奖分析] 获取抽奖统计数据', {
-    admin_id: req.user.user_id,
-    range,
-    merchant_id: merchant_id || null
+    logger.info('[抽奖分析] 获取抽奖统计数据', {
+      admin_id: req.user.user_id,
+      range,
+      merchant_id: merchant_id || null
+    })
+
+    const LotteryAnalyticsQueryService =
+      req.app.locals.services.getService('lottery_analytics_query')
+    const result = await LotteryAnalyticsQueryService.getDashboardStats({
+      range,
+      merchant_id: merchant_id ? parseInt(merchant_id) : undefined
+    })
+
+    return res.apiSuccess(result, '获取成功')
   })
-
-  const LotteryAnalyticsQueryService =
-    req.app.locals.services.getService('lottery_analytics_query')
-  const result = await LotteryAnalyticsQueryService.getDashboardStats({
-    range,
-    merchant_id: merchant_id ? parseInt(merchant_id) : undefined
-  })
-
-  return res.apiSuccess(result, '获取成功')
-}))
+)
 
 /**
  * @route GET /api/v4/console/lottery/trend
@@ -65,26 +70,31 @@ router.get('/stats', authenticateToken, requireRoleLevel(100), asyncHandler(asyn
  * @query {string} [granularity=day] - 数据粒度（hour/day）
  * @query {number} [merchant_id] - 按商家筛选（可选）
  */
-router.get('/trend', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const { range = '7d', granularity = 'day', merchant_id } = req.query
+router.get(
+  '/trend',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const { range = '7d', granularity = 'day', merchant_id } = req.query
 
-  logger.info('[抽奖分析] 获取抽奖趋势数据', {
-    admin_id: req.user.user_id,
-    range,
-    granularity,
-    merchant_id: merchant_id || null
+    logger.info('[抽奖分析] 获取抽奖趋势数据', {
+      admin_id: req.user.user_id,
+      range,
+      granularity,
+      merchant_id: merchant_id || null
+    })
+
+    const LotteryAnalyticsQueryService =
+      req.app.locals.services.getService('lottery_analytics_query')
+    const result = await LotteryAnalyticsQueryService.getDashboardTrend({
+      range,
+      granularity,
+      merchant_id: merchant_id ? parseInt(merchant_id) : undefined
+    })
+
+    return res.apiSuccess(result, '获取成功')
   })
-
-  const LotteryAnalyticsQueryService =
-    req.app.locals.services.getService('lottery_analytics_query')
-  const result = await LotteryAnalyticsQueryService.getDashboardTrend({
-    range,
-    granularity,
-    merchant_id: merchant_id ? parseInt(merchant_id) : undefined
-  })
-
-  return res.apiSuccess(result, '获取成功')
-}))
+)
 
 /**
  * @route GET /api/v4/console/lottery/prize-distribution
@@ -94,24 +104,29 @@ router.get('/trend', authenticateToken, requireRoleLevel(100), asyncHandler(asyn
  * @query {string} [range=7d] - 统计时间范围（7d/30d/90d）
  * @query {number} [merchant_id] - 按商家筛选（可选）
  */
-router.get('/prize-distribution', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const { range = '7d', merchant_id } = req.query
+router.get(
+  '/prize-distribution',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const { range = '7d', merchant_id } = req.query
 
-  logger.info('[抽奖分析] 获取奖品分布数据', {
-    admin_id: req.user.user_id,
-    range,
-    merchant_id: merchant_id || null
+    logger.info('[抽奖分析] 获取奖品分布数据', {
+      admin_id: req.user.user_id,
+      range,
+      merchant_id: merchant_id || null
+    })
+
+    const LotteryAnalyticsQueryService =
+      req.app.locals.services.getService('lottery_analytics_query')
+    const result = await LotteryAnalyticsQueryService.getDashboardPrizeDistribution({
+      range,
+      merchant_id: merchant_id ? parseInt(merchant_id) : undefined
+    })
+
+    return res.apiSuccess(result, '获取成功')
   })
-
-  const LotteryAnalyticsQueryService =
-    req.app.locals.services.getService('lottery_analytics_query')
-  const result = await LotteryAnalyticsQueryService.getDashboardPrizeDistribution({
-    range,
-    merchant_id: merchant_id ? parseInt(merchant_id) : undefined
-  })
-
-  return res.apiSuccess(result, '获取成功')
-}))
+)
 
 /**
  * @route GET /api/v4/console/lottery/campaign-ranking
@@ -123,27 +138,32 @@ router.get('/prize-distribution', authenticateToken, requireRoleLevel(100), asyn
  * @query {number} [page_size=10] - 返回数量
  * @query {number} [merchant_id] - 按商家筛选（可选）
  */
-router.get('/campaign-ranking', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const { range = '7d', sort_by = 'draws', page_size = 10, merchant_id } = req.query
+router.get(
+  '/campaign-ranking',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const { range = '7d', sort_by = 'draws', page_size = 10, merchant_id } = req.query
 
-  logger.info('[抽奖分析] 获取活动排行数据', {
-    admin_id: req.user.user_id,
-    range,
-    sort_by,
-    page_size,
-    merchant_id: merchant_id || null
+    logger.info('[抽奖分析] 获取活动排行数据', {
+      admin_id: req.user.user_id,
+      range,
+      sort_by,
+      page_size,
+      merchant_id: merchant_id || null
+    })
+
+    const LotteryAnalyticsQueryService =
+      req.app.locals.services.getService('lottery_analytics_query')
+    const result = await LotteryAnalyticsQueryService.getDashboardCampaignRanking({
+      range,
+      sort_by,
+      page_size: parseInt(page_size),
+      merchant_id: merchant_id ? parseInt(merchant_id) : undefined
+    })
+
+    return res.apiSuccess(result, '获取成功')
   })
-
-  const LotteryAnalyticsQueryService =
-    req.app.locals.services.getService('lottery_analytics_query')
-  const result = await LotteryAnalyticsQueryService.getDashboardCampaignRanking({
-    range,
-    sort_by,
-    page_size: parseInt(page_size),
-    merchant_id: merchant_id ? parseInt(merchant_id) : undefined
-  })
-
-  return res.apiSuccess(result, '获取成功')
-}))
+)
 
 module.exports = router

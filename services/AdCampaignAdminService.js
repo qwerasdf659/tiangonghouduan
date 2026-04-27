@@ -12,12 +12,7 @@
 const BusinessError = require('../utils/BusinessError')
 const logger = require('../utils/logger').logger
 const { Op } = require('sequelize')
-const {
-  AdCampaign,
-  AdSlot,
-  AdCreative,
-  User
-} = require('../models')
+const { AdCampaign, AdSlot, AdCreative, User } = require('../models')
 
 const BeijingTimeHelper = require('../utils/timeHelper')
 const { attachDisplayNames, DICT_TYPES } = require('../utils/displayNameHelper')
@@ -84,8 +79,8 @@ class AdCampaignAdminService {
 
       logger.info('获取管理端广告计划列表', {
         page,
-pageSize,
-total,
+        pageSize,
+        total,
         filters: { status, billing_mode, advertiser_user_id, ad_slot_id }
       })
 
@@ -118,7 +113,11 @@ total,
       }
 
       if (campaign.status !== 'pending_review') {
-        throw new BusinessError(`只能审核待审核状态的计划，当前状态: ${campaign.status}`, 'AD_ERROR', 400)
+        throw new BusinessError(
+          `只能审核待审核状态的计划，当前状态: ${campaign.status}`,
+          'AD_ERROR',
+          400
+        )
       }
 
       if (action === 'approve') {
@@ -160,7 +159,8 @@ total,
         if (endDate && endDate < now) {
           await campaign.update({ status: 'completed' }, { transaction: options.transaction })
           logger.warn('审核通过但计划已过期，标记为已完成', {
-            campaign_id: campaignId, end_date: campaign.end_date
+            campaign_id: campaignId,
+            end_date: campaign.end_date
           })
         } else if (!startDate || startDate <= now) {
           await campaign.update({ status: 'active' }, { transaction: options.transaction })
@@ -180,7 +180,10 @@ total,
       }
 
       logger.info('审核广告计划成功', {
-        campaign_id: campaignId, adminId, action, new_status: campaign.status
+        campaign_id: campaignId,
+        adminId,
+        action,
+        new_status: campaign.status
       })
 
       return campaign
@@ -239,12 +242,18 @@ total,
     try {
       const priority = data.priority || 500
       if (priority < 100 || priority > 899) {
-        throw new BusinessError('运营内容优先级必须在 100-899 范围内，当前值: ' + priority, 'AD_INVALID', 400)
+        throw new BusinessError(
+          '运营内容优先级必须在 100-899 范围内，当前值: ' + priority,
+          'AD_INVALID',
+          400
+        )
       }
 
       const adSlot = await AdSlot.findByPk(data.ad_slot_id, { transaction: options.transaction })
       if (!adSlot) throw new BusinessError('广告位不存在: ' + data.ad_slot_id, 'AD_NOT_FOUND', 404)
-      if (!adSlot.is_active) throw new BusinessError('广告位未启用: ' + data.ad_slot_id, 'AD_DISABLED', 400)
+      if (!adSlot.is_active) {
+        throw new BusinessError('广告位未启用: ' + data.ad_slot_id, 'AD_DISABLED', 400)
+      }
 
       const business_id = uuidv4()
 
@@ -310,7 +319,11 @@ total,
     try {
       const priority = data.priority || 950
       if (priority < 900 || priority > 999) {
-        throw new BusinessError('系统通知优先级必须在 900-999 范围内，当前值: ' + priority, 'AD_INVALID', 400)
+        throw new BusinessError(
+          '系统通知优先级必须在 900-999 范围内，当前值: ' + priority,
+          'AD_INVALID',
+          400
+        )
       }
 
       const adSlot = await AdSlot.findByPk(data.ad_slot_id, { transaction: options.transaction })
@@ -377,10 +390,18 @@ total,
       const campaign = await AdCampaign.findByPk(campaignId, { transaction: options.transaction })
       if (!campaign) throw new BusinessError('计划不存在: ' + campaignId, 'AD_NOT_FOUND', 404)
       if (campaign.status !== 'draft') {
-        throw new BusinessError('只能发布草稿状态的计划，当前状态: ' + campaign.status, 'AD_NOT_ALLOWED', 400)
+        throw new BusinessError(
+          '只能发布草稿状态的计划，当前状态: ' + campaign.status,
+          'AD_NOT_ALLOWED',
+          400
+        )
       }
       if (!['operational', 'system'].includes(campaign.campaign_category)) {
-        throw new BusinessError('只有运营/系统类型计划可以直接发布，当前类型: ' + campaign.campaign_category, 'AD_ERROR', 400)
+        throw new BusinessError(
+          '只有运营/系统类型计划可以直接发布，当前类型: ' + campaign.campaign_category,
+          'AD_ERROR',
+          400
+        )
       }
 
       await campaign.update({ status: 'active' }, { transaction: options.transaction })
@@ -405,7 +426,11 @@ total,
       const campaign = await AdCampaign.findByPk(campaignId, { transaction: options.transaction })
       if (!campaign) throw new BusinessError('计划不存在: ' + campaignId, 'AD_NOT_FOUND', 404)
       if (campaign.status !== 'active') {
-        throw new BusinessError('只能暂停投放中的计划，当前状态: ' + campaign.status, 'AD_NOT_ALLOWED', 400)
+        throw new BusinessError(
+          '只能暂停投放中的计划，当前状态: ' + campaign.status,
+          'AD_NOT_ALLOWED',
+          400
+        )
       }
 
       await campaign.update({ status: 'paused' }, { transaction: options.transaction })
@@ -445,19 +470,37 @@ total,
 
       const spendResult = await AdCampaign.findOne({
         attributes: [
-          [AdCampaign.sequelize.fn('SUM', AdCampaign.sequelize.col('budget_spent_star_stone')), 'total_spend'],
+          [
+            AdCampaign.sequelize.fn('SUM', AdCampaign.sequelize.col('budget_spent_star_stone')),
+            'total_spend'
+          ],
           [AdCampaign.sequelize.fn('COUNT', AdCampaign.sequelize.col('ad_campaign_id')), 'total']
         ],
         raw: true
       })
 
-      const allStatuses = ['draft', 'pending_review', 'approved', 'active', 'paused', 'completed', 'rejected', 'cancelled']
+      const allStatuses = [
+        'draft',
+        'pending_review',
+        'approved',
+        'active',
+        'paused',
+        'completed',
+        'rejected',
+        'cancelled'
+      ]
       const byStatus = {}
-      allStatuses.forEach(s => { byStatus[s] = 0 })
-      statusCounts.forEach(row => { byStatus[row.status] = parseInt(row.count) || 0 })
+      allStatuses.forEach(s => {
+        byStatus[s] = 0
+      })
+      statusCounts.forEach(row => {
+        byStatus[row.status] = parseInt(row.count) || 0
+      })
 
       const byBillingMode = { fixed_daily: 0, bidding: 0, free: 0 }
-      billingModeCounts.forEach(row => { byBillingMode[row.billing_mode] = parseInt(row.count) || 0 })
+      billingModeCounts.forEach(row => {
+        byBillingMode[row.billing_mode] = parseInt(row.count) || 0
+      })
 
       return {
         total: parseInt(spendResult?.total) || 0,

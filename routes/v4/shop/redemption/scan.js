@@ -27,9 +27,12 @@ const TransactionManager = require('../../../../utils/TransactionManager')
  *
  * 权限要求：role_level >= 20（商户员工/店长/管理员）
  */
-router.post('/scan', authenticateToken, asyncHandler(async (req, res) => {
-  const { qr_content } = req.body
-  const redeemerUserId = req.user.user_id
+router.post(
+  '/scan',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const { qr_content } = req.body
+    const redeemerUserId = req.user.user_id
 
     if (!qr_content || typeof qr_content !== 'string') {
       return res.apiError('QR码内容不能为空', 'QR_CONTENT_REQUIRED', null, 400)
@@ -138,6 +141,7 @@ router.post('/scan', authenticateToken, asyncHandler(async (req, res) => {
       },
       '扫码核销成功'
     )
-}))
+  })
+)
 
 module.exports = router

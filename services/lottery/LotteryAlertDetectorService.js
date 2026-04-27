@@ -16,12 +16,7 @@
 'use strict'
 
 const { Op, fn, col } = require('sequelize')
-const {
-  LotteryAlert,
-  LotteryCampaign,
-  LotteryDraw,
-  LotteryPrize
-} = require('../../models')
+const { LotteryAlert, LotteryCampaign, LotteryDraw, LotteryPrize } = require('../../models')
 const logger = require('../../utils/logger').logger
 const BeijingTimeHelper = require('../../utils/timeHelper')
 const LotteryAlertService = require('./LotteryAlertService')

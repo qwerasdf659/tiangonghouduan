@@ -32,26 +32,31 @@ const { pointsRateLimiter } = require('./middleware')
  * - 用户端路由不含 :user_id 参数，身份纯从 JWT Token 获取
  * - 管理员查看他人积分走 /api/v4/console/lottery-user-analysis/points/:user_id
  */
-router.get('/points', authenticateToken, pointsRateLimiter, asyncHandler(async (req, res) => {
-  const user_id = req.user.user_id
+router.get(
+  '/points',
+  authenticateToken,
+  pointsRateLimiter,
+  asyncHandler(async (req, res) => {
+    const user_id = req.user.user_id
 
-  const UserService = req.app.locals.services.getService('user')
+    const UserService = req.app.locals.services.getService('user')
 
-  /*
-   * 决策 D-1：today_summary 已拆分到 /api/v4/assets/today-summary
-   * 本接口回归纯积分余额查询职责，不再跨域拼接资产汇总
-   */
-  const pointsResult = await UserService.getUserWithPoints(user_id, {
-    checkPointsAccount: true,
-    checkStatus: true
+    /*
+     * 决策 D-1：today_summary 已拆分到 /api/v4/assets/today-summary
+     * 本接口回归纯积分余额查询职责，不再跨域拼接资产汇总
+     */
+    const pointsResult = await UserService.getUserWithPoints(user_id, {
+      checkPointsAccount: true,
+      checkStatus: true
+    })
+
+    const responseData = {
+      ...pointsResult.points_account
+    }
+
+    return res.apiSuccess(responseData, '用户积分获取成功', 'POINTS_SUCCESS')
   })
-
-  const responseData = {
-    ...pointsResult.points_account
-  }
-
-  return res.apiSuccess(responseData, '用户积分获取成功', 'POINTS_SUCCESS')
-}))
+)
 
 /**
  * @route GET /api/v4/lottery/statistics
@@ -72,15 +77,19 @@ router.get('/points', authenticateToken, pointsRateLimiter, asyncHandler(async (
  * - 用户端路由不含 :user_id 参数，身份纯从 JWT Token 获取
  * - 管理员查看他人统计走 /api/v4/console/lottery-user-analysis/statistics/:user_id
  */
-router.get('/statistics', authenticateToken, asyncHandler(async (req, res) => {
-  const user_id = req.user.user_id
+router.get(
+  '/statistics',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const user_id = req.user.user_id
 
-  // 通过 ServiceManager 获取 LotteryQueryService
-  const LotteryQueryService = req.app.locals.services.getService('lottery_query')
-  const statistics = await LotteryQueryService.getUserStatistics(user_id)
+    // 通过 ServiceManager 获取 LotteryQueryService
+    const LotteryQueryService = req.app.locals.services.getService('lottery_query')
+    const statistics = await LotteryQueryService.getUserStatistics(user_id)
 
-  return res.apiSuccess(statistics, '统计信息获取成功', 'STATISTICS_SUCCESS')
-}))
+    return res.apiSuccess(statistics, '统计信息获取成功', 'STATISTICS_SUCCESS')
+  })
+)
 
 /**
  * @route GET /api/v4/lottery/health

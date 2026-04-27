@@ -45,7 +45,7 @@ class UserManagementService {
     // 验证目标用户
     const targetUser = await User.findByPk(user_id, { transaction })
     if (!targetUser) {
-      throw new BusinessError('用户不存在', 'SERVICE_NOT_FOUND', 404)
+      throw new BusinessError('用户不存在', 'USER_NOT_FOUND', 404)
     }
 
     // 验证操作者权限级别（防止低级别管理员修改高级别管理员）
@@ -62,7 +62,7 @@ class UserManagementService {
     if (operatorMaxLevel <= targetMaxLevel) {
       throw new BusinessError(
         `权限不足：无法修改同级或更高级别用户的角色（操作者级别: ${operatorMaxLevel}, 目标用户级别: ${targetMaxLevel}）`,
-        'SERVICE_INSUFFICIENT',
+        'INSUFFICIENT_PERMISSION',
         400
       )
     }
@@ -70,7 +70,7 @@ class UserManagementService {
     // 验证目标角色
     const targetRole = await Role.findOne({ where: { role_name }, transaction })
     if (!targetRole) {
-      throw new BusinessError('角色不存在', 'SERVICE_NOT_FOUND', 404)
+      throw new BusinessError('角色不存在', 'ROLE_NOT_FOUND', 404)
     }
 
     const oldRoles = targetUserRoles.roles.map(r => r.role_name).join(', ') || '无角色'
@@ -141,12 +141,16 @@ class UserManagementService {
     }
 
     if (parseInt(user_id) === operator_id) {
-      throw new BusinessError(`禁止修改自己的账号状态（用户ID: ${user_id}, 操作者ID: ${operator_id}）`, 'SERVICE_NOT_ALLOWED', 400)
+      throw new BusinessError(
+        `禁止修改自己的账号状态（用户ID: ${user_id}, 操作者ID: ${operator_id}）`,
+        'SERVICE_NOT_ALLOWED',
+        400
+      )
     }
 
     const user = await User.findByPk(user_id, { transaction })
     if (!user) {
-      throw new BusinessError('用户不存在', 'SERVICE_NOT_FOUND', 404)
+      throw new BusinessError('用户不存在', 'USER_NOT_FOUND', 404)
     }
 
     const oldStatus = user.status
@@ -171,7 +175,10 @@ class UserManagementService {
     })
 
     logger.info('用户状态更新成功', {
-      user_id, old_status: oldStatus, new_status: status, operator_id
+      user_id,
+      old_status: oldStatus,
+      new_status: status,
+      operator_id
     })
 
     return {
@@ -208,19 +215,26 @@ class UserManagementService {
     const userQuery = {
       where: whereClause,
       attributes: [
-        'user_id', 'mobile', 'nickname', 'history_total_points',
-        'status', 'last_login', 'created_at'
+        'user_id',
+        'mobile',
+        'nickname',
+        'history_total_points',
+        'status',
+        'last_login',
+        'created_at'
       ],
       limit: finalLimit,
       offset: (parseInt(page) - 1) * finalLimit,
       order: [['created_at', 'DESC']],
-      include: [{
-        model: Role,
-        as: 'roles',
-        through: { where: { is_active: true } },
-        attributes: ['role_name', 'role_level'],
-        required: false
-      }]
+      include: [
+        {
+          model: Role,
+          as: 'roles',
+          through: { where: { is_active: true } },
+          attributes: ['role_name', 'role_level'],
+          required: false
+        }
+      ]
     }
 
     if (role_filter && role_filter !== 'all') {
@@ -243,7 +257,10 @@ class UserManagementService {
         user.roles.length > 0 ? Math.max(...user.roles.map(role => role.role_level)) : 0
       const primaryRole =
         user.roles.length > 0
-          ? user.roles.reduce((best, r) => (r.role_level > (best?.role_level || 0) ? r : best), null)
+          ? user.roles.reduce(
+              (best, r) => (r.role_level > (best?.role_level || 0) ? r : best),
+              null
+            )
           : null
       const roleName = primaryRole?.role_name || 'user'
       return {
@@ -268,13 +285,15 @@ class UserManagementService {
       User.count({ where: { created_at: { [Op.gte]: todayStart } } }),
       User.count({ where: { status: 'active' } }),
       User.count({
-        include: [{
-          model: Role,
-as: 'roles',
-          where: { role_level: { [Op.gt]: 100 } },
-          through: { where: { is_active: true } },
-          required: true
-        }]
+        include: [
+          {
+            model: Role,
+            as: 'roles',
+            where: { role_level: { [Op.gt]: 100 } },
+            through: { where: { is_active: true } },
+            required: true
+          }
+        ]
       })
     ])
 
@@ -310,19 +329,21 @@ as: 'roles',
   static async getUserDetail(user_id) {
     const user = await User.findOne({
       where: { user_id },
-      include: [{
-        model: Role,
-        as: 'roles',
-        through: {
-          where: { is_active: true },
-          attributes: ['assigned_at', 'assigned_by']
-        },
-        attributes: ['role_uuid', 'role_name', 'role_level', 'description']
-      }]
+      include: [
+        {
+          model: Role,
+          as: 'roles',
+          through: {
+            where: { is_active: true },
+            attributes: ['assigned_at', 'assigned_by']
+          },
+          attributes: ['role_uuid', 'role_name', 'role_level', 'description']
+        }
+      ]
     })
 
     if (!user) {
-      throw new BusinessError('用户不存在', 'SERVICE_NOT_FOUND', 404)
+      throw new BusinessError('用户不存在', 'USER_NOT_FOUND', 404)
     }
 
     const max_role_level =

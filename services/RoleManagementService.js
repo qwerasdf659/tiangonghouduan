@@ -52,13 +52,21 @@ class RoleManagementService {
     }
 
     if (isSystemRole(role_name.trim())) {
-      throw new BusinessError(`不能创建与系统内置角色同名的角色: ${role_name}`, 'ROLE_NOT_ALLOWED', 400)
+      throw new BusinessError(
+        `不能创建与系统内置角色同名的角色: ${role_name}`,
+        'ROLE_NOT_ALLOWED',
+        400
+      )
     }
 
     if (permissions && Object.keys(permissions).length > 0) {
       const permissionValidation = validatePermissions(permissions)
       if (!permissionValidation.valid) {
-        throw new BusinessError(`权限配置格式错误: ${permissionValidation.errors.join(', ')}`, 'ROLE_ERROR', 400)
+        throw new BusinessError(
+          `权限配置格式错误: ${permissionValidation.errors.join(', ')}`,
+          'ROLE_ERROR',
+          400
+        )
       }
     }
 
@@ -185,7 +193,11 @@ class RoleManagementService {
     if (permissions !== undefined && Object.keys(permissions).length > 0) {
       const permissionValidation = validatePermissions(permissions)
       if (!permissionValidation.valid) {
-        throw new BusinessError(`权限配置格式错误: ${permissionValidation.errors.join(', ')}`, 'ROLE_ERROR', 400)
+        throw new BusinessError(
+          `权限配置格式错误: ${permissionValidation.errors.join(', ')}`,
+          'ROLE_ERROR',
+          400
+        )
       }
     }
 

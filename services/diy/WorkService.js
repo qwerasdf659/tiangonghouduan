@@ -11,6 +11,7 @@
 const { Op } = require('sequelize')
 const logger = require('../../utils/logger').logger
 const OrderNoGenerator = require('../../utils/OrderNoGenerator')
+const { generateDiyOperationKey, generateDiySaveKey } = require('../../utils/IdempotencyHelper')
 const {
   Account,
   Category,
@@ -223,16 +224,18 @@ class DiyWorkService {
     }
 
     // 创建新作品
+    const idempotencyKey = generateDiySaveKey(accountId, data.diy_template_id)
     const work = await DiyWork.create(
       {
         account_id: accountId,
         diy_template_id: data.diy_template_id,
         work_name: data.work_name || '我的设计',
         design_data: data.design_data,
-        total_cost: [], // 由 confirmDesign 服务端计算，创建时为空
+        total_cost: [],
         preview_media_id: data.preview_media_id || null,
-        work_code: 'DW_TEMP', // 临时占位
-        status: 'draft'
+        work_code: 'DW_TEMP',
+        status: 'draft',
+        idempotency_key: idempotencyKey
       },
       { transaction }
     )
@@ -415,7 +418,7 @@ class DiyWorkService {
           asset_code: assetCode,
           amount,
           business_type: 'diy_freeze_material',
-          idempotency_key: `diy_freeze_${work.diy_work_id}_${assetCode}`
+          idempotency_key: generateDiyOperationKey('freeze', work.diy_work_id, assetCode)
         },
         { transaction }
       )
@@ -510,7 +513,7 @@ class DiyWorkService {
           asset_code: cost.asset_code,
           amount: parseFloat(cost.amount),
           business_type: 'diy_settle_material',
-          idempotency_key: `diy_settle_${work.diy_work_id}_${cost.asset_code}`
+          idempotency_key: generateDiyOperationKey('settle', work.diy_work_id, cost.asset_code)
         },
         { transaction }
       )
@@ -527,7 +530,7 @@ class DiyWorkService {
         item_name: work.work_name || `${templateName} DIY作品`,
         item_description: `DIY设计作品 - ${templateName}`,
         business_type: 'diy_mint',
-        idempotency_key: `diy_mint_${work.diy_work_id}`,
+        idempotency_key: generateDiyOperationKey('mint', work.diy_work_id),
         meta: {
           diy_work_id: work.diy_work_id,
           diy_template_id: work.diy_template_id,
@@ -582,8 +585,8 @@ class DiyWorkService {
         pay_asset_code: primaryPayment.asset_code,
         pay_amount: Math.round(totalPayAmount),
         quantity: 1,
-        address_snapshot: addressSnapshot, // 收货地址快照（用户传入 address_id 时生成）
-        idempotency_key: `diy_exchange_${work.diy_work_id}`,
+        address_snapshot: addressSnapshot,
+        idempotency_key: generateDiyOperationKey('exchange', work.diy_work_id),
         business_id: `diy_exchange_${work.diy_work_id}`,
         exchange_time: new Date(),
         meta: {
@@ -666,7 +669,7 @@ class DiyWorkService {
           asset_code: cost.asset_code,
           amount: parseFloat(cost.amount),
           business_type: 'diy_unfreeze_material',
-          idempotency_key: `diy_unfreeze_${work.diy_work_id}_${cost.asset_code}`
+          idempotency_key: generateDiyOperationKey('unfreeze', work.diy_work_id, cost.asset_code)
         },
         { transaction }
       )

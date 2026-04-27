@@ -147,7 +147,11 @@ class PrizeStockService {
 
     const currentUsed = prize.total_win_count || 0
     if (newStock < currentUsed) {
-      throw new BusinessError(`新库存(${newStock})不能小于已发放数量(${currentUsed})`, 'PRIZE_POOL_NOT_ALLOWED', 400)
+      throw new BusinessError(
+        `新库存(${newStock})不能小于已发放数量(${currentUsed})`,
+        'PRIZE_POOL_NOT_ALLOWED',
+        400
+      )
     }
 
     await prize.update({ stock_quantity: newStock }, { transaction })

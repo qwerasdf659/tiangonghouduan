@@ -286,7 +286,11 @@ class CoreService {
     // 2. 检查是否可以审核
     const canReview = record.canBeReviewed()
     if (!canReview.can_review) {
-      throw new BusinessError(`不能审核：${canReview.reasons.join('；')}`, 'CONSUMPTION_NOT_ALLOWED', 400)
+      throw new BusinessError(
+        `不能审核：${canReview.reasons.join('；')}`,
+        'CONSUMPTION_NOT_ALLOWED',
+        400
+      )
     }
 
     // 3. 先发放积分（满足数据库约束 chk_approved_has_reward）
@@ -322,7 +326,11 @@ class CoreService {
     const rewardTransactionId = pointsResult.transaction_record?.asset_transaction_id || null
 
     if (!rewardTransactionId) {
-      throw new BusinessError('积分发放成功但未获取到流水ID，无法完成审核', 'CONSUMPTION_ERROR', 400)
+      throw new BusinessError(
+        '积分发放成功但未获取到流水ID，无法完成审核',
+        'CONSUMPTION_ERROR',
+        400
+      )
     }
 
     logger.info(`🔗 获取积分流水ID: ${rewardTransactionId}`)
@@ -352,7 +360,11 @@ class CoreService {
     })
 
     if (!reviewRecord) {
-      throw new BusinessError(`审核记录不存在: consumption_id=${recordId}`, 'CONSUMPTION_NOT_FOUND', 404)
+      throw new BusinessError(
+        `审核记录不存在: consumption_id=${recordId}`,
+        'CONSUMPTION_NOT_FOUND',
+        404
+      )
     }
 
     await reviewRecord.update(
@@ -520,7 +532,11 @@ class CoreService {
     // 3. 检查是否可以审核
     const canReview = record.canBeReviewed()
     if (!canReview.can_review) {
-      throw new BusinessError(`不能审核：${canReview.reasons.join('；')}`, 'CONSUMPTION_NOT_ALLOWED', 400)
+      throw new BusinessError(
+        `不能审核：${canReview.reasons.join('；')}`,
+        'CONSUMPTION_NOT_ALLOWED',
+        400
+      )
     }
 
     // 4. 更新消费记录状态
@@ -547,7 +563,11 @@ class CoreService {
     })
 
     if (!reviewRecord) {
-      throw new BusinessError(`审核记录不存在: consumption_id=${recordId}`, 'CONSUMPTION_NOT_FOUND', 404)
+      throw new BusinessError(
+        `审核记录不存在: consumption_id=${recordId}`,
+        'CONSUMPTION_NOT_FOUND',
+        404
+      )
     }
 
     await reviewRecord.update(
@@ -635,7 +655,11 @@ class CoreService {
 
     // 检查是否已删除
     if (record.is_deleted === 1) {
-      throw new BusinessError('该消费记录已经被删除，无需重复操作', 'CONSUMPTION_ALREADY_EXISTS', 409)
+      throw new BusinessError(
+        '该消费记录已经被删除，无需重复操作',
+        'CONSUMPTION_ALREADY_EXISTS',
+        409
+      )
     }
 
     // 执行软删除

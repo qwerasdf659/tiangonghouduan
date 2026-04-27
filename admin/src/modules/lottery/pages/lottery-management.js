@@ -634,7 +634,7 @@ function registerLotteryManagementComponents() {
           return
         }
         try {
-          const mockUser = {
+          const testUserParams = {
             created_at: this.segmentTestInput?.created_at || new Date().toISOString(),
             history_total_points: parseInt(this.segmentTestInput?.points) || 0,
             user_level: this.segmentTestInput?.user_level || 'normal',
@@ -643,7 +643,7 @@ function registerLotteryManagementComponents() {
           }
           const response = await this.apiCall(
             `${API_PREFIX}/console/segment-rules/${this.editingSegmentRule.version_key}`,
-            { method: 'GET', params: { simulate: JSON.stringify(mockUser) } }
+            { method: 'GET', params: { simulate: JSON.stringify(testUserParams) } }
           )
           this.segmentTestResult = response?.data || response
         } catch (error) {

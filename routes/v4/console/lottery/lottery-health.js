@@ -92,36 +92,41 @@ function parseAndValidateCampaignId(id) {
  *
  * @apiPermission admin
  */
-router.get('/:id', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const campaignId = parseAndValidateCampaignId(req.params.id)
-  if (!campaignId) {
-    return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID', null, 400)
-  }
+router.get(
+  '/:id',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const campaignId = parseAndValidateCampaignId(req.params.id)
+    if (!campaignId) {
+      return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID', null, 400)
+    }
 
-  const { use_cache = 'true', cache_ttl = '300' } = req.query
+    const { use_cache = 'true', cache_ttl = '300' } = req.query
 
-  logger.info('获取活动健康度报告', {
-    lottery_campaign_id: campaignId,
-    user_id: req.user?.user_id,
-    use_cache
+    logger.info('获取活动健康度报告', {
+      lottery_campaign_id: campaignId,
+      user_id: req.user?.user_id,
+      use_cache
+    })
+
+    const healthService = getLotteryHealthService(req)
+
+    const report = await healthService.getHealthReport(campaignId, {
+      use_cache: use_cache === 'true',
+      cache_ttl: parseInt(cache_ttl, 10) || 300
+    })
+
+    logger.info('活动健康度报告获取成功', {
+      lottery_campaign_id: campaignId,
+      overall_score: report.overall_score,
+      health_level: report.health_level,
+      issue_count: report.issues?.length || 0
+    })
+
+    return res.apiSuccess(report, '获取活动健康度报告成功')
   })
-
-  const healthService = getLotteryHealthService(req)
-
-  const report = await healthService.getHealthReport(campaignId, {
-    use_cache: use_cache === 'true',
-    cache_ttl: parseInt(cache_ttl, 10) || 300
-  })
-
-  logger.info('活动健康度报告获取成功', {
-    lottery_campaign_id: campaignId,
-    overall_score: report.overall_score,
-    health_level: report.health_level,
-    issue_count: report.issues?.length || 0
-  })
-
-  return res.apiSuccess(report, '获取活动健康度报告成功')
-}))
+)
 
 /**
  * @api {get} /api/v4/admin/lottery/health/:id/tier-distribution 获取档位分布
@@ -142,43 +147,48 @@ router.get('/:id', authenticateToken, requireRoleLevel(100), asyncHandler(async 
  *
  * @apiPermission admin
  */
-router.get('/:id/tier-distribution', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const campaignId = parseAndValidateCampaignId(req.params.id)
-  if (!campaignId) {
-    return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID', null, 400)
-  }
+router.get(
+  '/:id/tier-distribution',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const campaignId = parseAndValidateCampaignId(req.params.id)
+    if (!campaignId) {
+      return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID', null, 400)
+    }
 
-  logger.info('获取活动档位分布', {
-    lottery_campaign_id: campaignId,
-    user_id: req.user?.user_id
-  })
-
-  const healthService = getLotteryHealthService(req)
-
-  // 获取完整报告后提取档位分布
-  const report = await healthService.getHealthReport(campaignId, {
-    use_cache: true,
-    cache_ttl: 300
-  })
-
-  const tierDistribution = report.dimensions?.win_rate?.details?.tier_distribution || {
-    counts: { high: 0, mid: 0, low: 0, empty: 0, total: 0 },
-    percentages: { high: 0, mid: 0, low: 0, empty: 0 }
-  }
-
-  logger.info('活动档位分布获取成功', {
-    lottery_campaign_id: campaignId,
-    total_draws: tierDistribution.counts?.total || 0
-  })
-
-  return res.apiSuccess(
-    {
+    logger.info('获取活动档位分布', {
       lottery_campaign_id: campaignId,
-      tier_distribution: tierDistribution
-    },
-    '获取档位分布成功'
-  )
-}))
+      user_id: req.user?.user_id
+    })
+
+    const healthService = getLotteryHealthService(req)
+
+    // 获取完整报告后提取档位分布
+    const report = await healthService.getHealthReport(campaignId, {
+      use_cache: true,
+      cache_ttl: 300
+    })
+
+    const tierDistribution = report.dimensions?.win_rate?.details?.tier_distribution || {
+      counts: { high: 0, mid: 0, low: 0, empty: 0, total: 0 },
+      percentages: { high: 0, mid: 0, low: 0, empty: 0 }
+    }
+
+    logger.info('活动档位分布获取成功', {
+      lottery_campaign_id: campaignId,
+      total_draws: tierDistribution.counts?.total || 0
+    })
+
+    return res.apiSuccess(
+      {
+        lottery_campaign_id: campaignId,
+        tier_distribution: tierDistribution
+      },
+      '获取档位分布成功'
+    )
+  })
+)
 
 /**
  * @api {get} /api/v4/admin/lottery/health/:id/diagnose 获取问题诊断
@@ -199,69 +209,74 @@ router.get('/:id/tier-distribution', authenticateToken, requireRoleLevel(100), a
  *
  * @apiPermission admin
  */
-router.get('/:id/diagnose', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const campaignId = parseAndValidateCampaignId(req.params.id)
-  if (!campaignId) {
-    return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID', null, 400)
-  }
+router.get(
+  '/:id/diagnose',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const campaignId = parseAndValidateCampaignId(req.params.id)
+    if (!campaignId) {
+      return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID', null, 400)
+    }
 
-  logger.info('获取活动问题诊断', {
-    lottery_campaign_id: campaignId,
-    user_id: req.user?.user_id
-  })
+    logger.info('获取活动问题诊断', {
+      lottery_campaign_id: campaignId,
+      user_id: req.user?.user_id
+    })
 
-  const healthService = getLotteryHealthService(req)
+    const healthService = getLotteryHealthService(req)
 
-  // 获取完整报告后提取问题诊断
-  const report = await healthService.getHealthReport(campaignId, {
-    use_cache: true,
-    cache_ttl: 300
-  })
+    // 获取完整报告后提取问题诊断
+    const report = await healthService.getHealthReport(campaignId, {
+      use_cache: true,
+      cache_ttl: 300
+    })
 
-  const diagnosis = {
-    lottery_campaign_id: campaignId,
-    campaign_name: report.campaign_name,
-    overall_score: report.overall_score,
-    health_level: report.health_level,
-    issues: report.issues || [],
-    suggestions: report.suggestions || [],
-    dimension_summary: {
-      budget: {
-        score: report.dimensions?.budget?.score || 0,
-        max_score: report.dimensions?.budget?.max_score || 30,
-        level: report.dimensions?.budget?.level || 'unknown'
-      },
-      win_rate: {
-        score: report.dimensions?.win_rate?.score || 0,
-        max_score: report.dimensions?.win_rate?.max_score || 25,
-        level: report.dimensions?.win_rate?.level || 'unknown'
-      },
-      inventory: {
-        score: report.dimensions?.inventory?.score || 0,
-        max_score: report.dimensions?.inventory?.max_score || 20,
-        level: report.dimensions?.inventory?.level || 'unknown'
-      },
-      participation: {
-        score: report.dimensions?.participation?.score || 0,
-        max_score: report.dimensions?.participation?.max_score || 15,
-        level: report.dimensions?.participation?.level || 'unknown'
-      },
-      experience: {
-        score: report.dimensions?.experience?.score || 0,
-        max_score: report.dimensions?.experience?.max_score || 10,
-        level: report.dimensions?.experience?.level || 'unknown'
+    const diagnosis = {
+      lottery_campaign_id: campaignId,
+      campaign_name: report.campaign_name,
+      overall_score: report.overall_score,
+      health_level: report.health_level,
+      issues: report.issues || [],
+      suggestions: report.suggestions || [],
+      dimension_summary: {
+        budget: {
+          score: report.dimensions?.budget?.score || 0,
+          max_score: report.dimensions?.budget?.max_score || 30,
+          level: report.dimensions?.budget?.level || 'unknown'
+        },
+        win_rate: {
+          score: report.dimensions?.win_rate?.score || 0,
+          max_score: report.dimensions?.win_rate?.max_score || 25,
+          level: report.dimensions?.win_rate?.level || 'unknown'
+        },
+        inventory: {
+          score: report.dimensions?.inventory?.score || 0,
+          max_score: report.dimensions?.inventory?.max_score || 20,
+          level: report.dimensions?.inventory?.level || 'unknown'
+        },
+        participation: {
+          score: report.dimensions?.participation?.score || 0,
+          max_score: report.dimensions?.participation?.max_score || 15,
+          level: report.dimensions?.participation?.level || 'unknown'
+        },
+        experience: {
+          score: report.dimensions?.experience?.score || 0,
+          max_score: report.dimensions?.experience?.max_score || 10,
+          level: report.dimensions?.experience?.level || 'unknown'
+        }
       }
     }
-  }
 
-  logger.info('活动问题诊断获取成功', {
-    lottery_campaign_id: campaignId,
-    issue_count: diagnosis.issues.length,
-    suggestion_count: diagnosis.suggestions.length
+    logger.info('活动问题诊断获取成功', {
+      lottery_campaign_id: campaignId,
+      issue_count: diagnosis.issues.length,
+      suggestion_count: diagnosis.suggestions.length
+    })
+
+    return res.apiSuccess(diagnosis, '获取问题诊断成功')
   })
-
-  return res.apiSuccess(diagnosis, '获取问题诊断成功')
-}))
+)
 
 /**
  * @api {get} /api/v4/admin/lottery/health/:id/budget-rate 获取预算消耗速度
@@ -286,50 +301,55 @@ router.get('/:id/diagnose', authenticateToken, requireRoleLevel(100), asyncHandl
  *
  * @apiPermission admin
  */
-router.get('/:id/budget-rate', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const campaignId = parseAndValidateCampaignId(req.params.id)
-  if (!campaignId) {
-    return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID', null, 400)
-  }
+router.get(
+  '/:id/budget-rate',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const campaignId = parseAndValidateCampaignId(req.params.id)
+    if (!campaignId) {
+      return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID', null, 400)
+    }
 
-  logger.info('获取活动预算消耗速度', {
-    lottery_campaign_id: campaignId,
-    user_id: req.user?.user_id
+    logger.info('获取活动预算消耗速度', {
+      lottery_campaign_id: campaignId,
+      user_id: req.user?.user_id
+    })
+
+    const healthService = getLotteryHealthService(req)
+
+    // 获取完整报告后提取预算数据
+    const report = await healthService.getHealthReport(campaignId, {
+      use_cache: true,
+      cache_ttl: 300
+    })
+
+    const budgetDetails = report.dimensions?.budget?.details || {}
+
+    const budgetRate = {
+      lottery_campaign_id: campaignId,
+      campaign_name: report.campaign_name,
+      budget_health_level: report.dimensions?.budget?.level || 'unknown',
+      budget_score: report.dimensions?.budget?.score || 0,
+      budget_max_score: report.dimensions?.budget?.max_score || 30,
+      total_budget: budgetDetails.total_budget || 0,
+      used_budget: budgetDetails.used_budget || 0,
+      remaining_budget: budgetDetails.remaining_budget || 0,
+      usage_ratio: budgetDetails.usage_ratio || 0,
+      remaining_ratio: budgetDetails.remaining_ratio || 1,
+      running_days: budgetDetails.running_days || 0,
+      daily_consumption: budgetDetails.daily_consumption || 0,
+      estimated_remaining_days: budgetDetails.estimated_remaining_days || '无限'
+    }
+
+    logger.info('活动预算消耗速度获取成功', {
+      lottery_campaign_id: campaignId,
+      usage_ratio: budgetRate.usage_ratio,
+      daily_consumption: budgetRate.daily_consumption
+    })
+
+    return res.apiSuccess(budgetRate, '获取预算消耗速度成功')
   })
-
-  const healthService = getLotteryHealthService(req)
-
-  // 获取完整报告后提取预算数据
-  const report = await healthService.getHealthReport(campaignId, {
-    use_cache: true,
-    cache_ttl: 300
-  })
-
-  const budgetDetails = report.dimensions?.budget?.details || {}
-
-  const budgetRate = {
-    lottery_campaign_id: campaignId,
-    campaign_name: report.campaign_name,
-    budget_health_level: report.dimensions?.budget?.level || 'unknown',
-    budget_score: report.dimensions?.budget?.score || 0,
-    budget_max_score: report.dimensions?.budget?.max_score || 30,
-    total_budget: budgetDetails.total_budget || 0,
-    used_budget: budgetDetails.used_budget || 0,
-    remaining_budget: budgetDetails.remaining_budget || 0,
-    usage_ratio: budgetDetails.usage_ratio || 0,
-    remaining_ratio: budgetDetails.remaining_ratio || 1,
-    running_days: budgetDetails.running_days || 0,
-    daily_consumption: budgetDetails.daily_consumption || 0,
-    estimated_remaining_days: budgetDetails.estimated_remaining_days || '无限'
-  }
-
-  logger.info('活动预算消耗速度获取成功', {
-    lottery_campaign_id: campaignId,
-    usage_ratio: budgetRate.usage_ratio,
-    daily_consumption: budgetRate.daily_consumption
-  })
-
-  return res.apiSuccess(budgetRate, '获取预算消耗速度成功')
-}))
+)
 
 module.exports = router

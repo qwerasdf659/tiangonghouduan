@@ -42,11 +42,16 @@ const getDebtManagementService = req => {
  * @access admin
  * @returns {Object} 欠账看板数据
  */
-router.get('/dashboard', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const DebtManagementService = getDebtManagementService(req)
-  const dashboard = await DebtManagementService.getDashboard()
-  return res.apiSuccess(dashboard, '欠账看板数据获取成功')
-}))
+router.get(
+  '/dashboard',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const DebtManagementService = getDebtManagementService(req)
+    const dashboard = await DebtManagementService.getDashboard()
+    return res.apiSuccess(dashboard, '欠账看板数据获取成功')
+  })
+)
 
 /**
  * GET /by-campaign - 按活动汇总欠账
@@ -59,15 +64,20 @@ router.get('/dashboard', authenticateToken, requireRoleLevel(100), asyncHandler(
  * @access admin
  * @returns {Object} 按活动分组的欠账数据
  */
-router.get('/by-campaign', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const DebtManagementService = getDebtManagementService(req)
-  const result = await DebtManagementService.getDebtByCampaign({
-    page: req.query.page,
-    page_size: req.query.page_size,
-    debt_type: req.query.debt_type
+router.get(
+  '/by-campaign',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const DebtManagementService = getDebtManagementService(req)
+    const result = await DebtManagementService.getDebtByCampaign({
+      page: req.query.page,
+      page_size: req.query.page_size,
+      debt_type: req.query.debt_type
+    })
+    return res.apiSuccess(result, '按活动汇总欠账获取成功')
   })
-  return res.apiSuccess(result, '按活动汇总欠账获取成功')
-}))
+)
 
 /**
  * GET /by-prize - 按奖品汇总库存欠账
@@ -80,15 +90,20 @@ router.get('/by-campaign', authenticateToken, requireRoleLevel(100), asyncHandle
  * @access admin
  * @returns {Object} 按奖品分组的库存欠账数据
  */
-router.get('/by-prize', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const DebtManagementService = getDebtManagementService(req)
-  const result = await DebtManagementService.getDebtByPrize({
-    lottery_campaign_id: req.query.lottery_campaign_id,
-    page: req.query.page,
-    page_size: req.query.page_size
+router.get(
+  '/by-prize',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const DebtManagementService = getDebtManagementService(req)
+    const result = await DebtManagementService.getDebtByPrize({
+      lottery_campaign_id: req.query.lottery_campaign_id,
+      page: req.query.page,
+      page_size: req.query.page_size
+    })
+    return res.apiSuccess(result, '按奖品汇总库存欠账获取成功')
   })
-  return res.apiSuccess(result, '按奖品汇总库存欠账获取成功')
-}))
+)
 
 /**
  * GET /by-creator - 按责任人汇总欠账
@@ -100,14 +115,19 @@ router.get('/by-prize', authenticateToken, requireRoleLevel(100), asyncHandler(a
  * @access admin
  * @returns {Object} 按责任人分组的欠账数据
  */
-router.get('/by-creator', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const DebtManagementService = getDebtManagementService(req)
-  const result = await DebtManagementService.getDebtByCreator({
-    page: req.query.page,
-    page_size: req.query.page_size
+router.get(
+  '/by-creator',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const DebtManagementService = getDebtManagementService(req)
+    const result = await DebtManagementService.getDebtByCreator({
+      page: req.query.page,
+      page_size: req.query.page_size
+    })
+    return res.apiSuccess(result, '按责任人汇总欠账获取成功')
   })
-  return res.apiSuccess(result, '按责任人汇总欠账获取成功')
-}))
+)
 
 /**
  * GET /trend - 欠账趋势数据
@@ -120,15 +140,20 @@ router.get('/by-creator', authenticateToken, requireRoleLevel(100), asyncHandler
  * @access admin
  * @returns {Object} 欠账趋势数据
  */
-router.get('/trend', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const DebtManagementService = getDebtManagementService(req)
-  const result = await DebtManagementService.getDebtTrend({
-    period: req.query.period,
-    days: req.query.days,
-    debt_type: req.query.debt_type
+router.get(
+  '/trend',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const DebtManagementService = getDebtManagementService(req)
+    const result = await DebtManagementService.getDebtTrend({
+      period: req.query.period,
+      days: req.query.days,
+      debt_type: req.query.debt_type
+    })
+    return res.apiSuccess(result, '欠账趋势数据获取成功')
   })
-  return res.apiSuccess(result, '欠账趋势数据获取成功')
-}))
+)
 
 /*
  * =============================================================================
@@ -148,16 +173,21 @@ router.get('/trend', authenticateToken, requireRoleLevel(100), asyncHandler(asyn
  * @access admin
  * @returns {Object} 待冲销欠账列表
  */
-router.get('/pending', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const DebtManagementService = getDebtManagementService(req)
-  const result = await DebtManagementService.getPendingDebts({
-    debt_type: req.query.debt_type,
-    lottery_campaign_id: req.query.lottery_campaign_id,
-    page: req.query.page,
-    page_size: req.query.page_size
+router.get(
+  '/pending',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const DebtManagementService = getDebtManagementService(req)
+    const result = await DebtManagementService.getPendingDebts({
+      debt_type: req.query.debt_type,
+      lottery_campaign_id: req.query.lottery_campaign_id,
+      page: req.query.page,
+      page_size: req.query.page_size
+    })
+    return res.apiSuccess(result, '待冲销欠账列表获取成功')
   })
-  return res.apiSuccess(result, '待冲销欠账列表获取成功')
-}))
+)
 
 /**
  * POST /clear - 执行欠账清偿
@@ -171,31 +201,36 @@ router.get('/pending', authenticateToken, requireRoleLevel(100), asyncHandler(as
  * @access admin
  * @returns {Object} 清偿结果
  */
-router.post('/clear', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const { debt_type, debt_id, amount, remark } = req.body
-  const admin_id = req.user.user_id
+router.post(
+  '/clear',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const { debt_type, debt_id, amount, remark } = req.body
+    const admin_id = req.user.user_id
 
-  // 参数验证
-  if (!debt_type || !debt_id || !amount) {
-    return res.apiError('缺少必要参数: debt_type, debt_id, amount', 'INVALID_PARAMS', null, 400)
-  }
+    // 参数验证
+    if (!debt_type || !debt_id || !amount) {
+      return res.apiError('缺少必要参数: debt_type, debt_id, amount', 'INVALID_PARAMS', null, 400)
+    }
 
-  if (amount <= 0) {
-    return res.apiError('清偿数量/金额必须大于0', 'INVALID_AMOUNT', null, 400)
-  }
+    if (amount <= 0) {
+      return res.apiError('清偿数量/金额必须大于0', 'INVALID_AMOUNT', null, 400)
+    }
 
-  const DebtManagementService = getDebtManagementService(req)
-  const result = await DebtManagementService.clearDebt({
-    debt_type,
-    debt_id,
-    amount,
-    admin_id,
-    remark
+    const DebtManagementService = getDebtManagementService(req)
+    const result = await DebtManagementService.clearDebt({
+      debt_type,
+      debt_id,
+      amount,
+      admin_id,
+      remark
+    })
+
+    const message = result.is_fully_cleared ? '欠账已完全清偿' : '欠账部分清偿成功'
+    return res.apiSuccess(result, message)
   })
-
-  const message = result.is_fully_cleared ? '欠账已完全清偿' : '欠账部分清偿成功'
-  return res.apiSuccess(result, message)
-}))
+)
 
 /*
  * =============================================================================
@@ -215,17 +250,22 @@ router.post('/clear', authenticateToken, requireRoleLevel(100), asyncHandler(asy
  * @access admin
  * @returns {Object} 欠账上限配置列表
  */
-router.get('/limits', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const DebtManagementService = getDebtManagementService(req)
-  const result = await DebtManagementService.getDebtLimits({
-    lottery_campaign_id: req.query.lottery_campaign_id,
-    limit_level: req.query.limit_level,
-    status: req.query.status,
-    page: req.query.page,
-    page_size: req.query.page_size
+router.get(
+  '/limits',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const DebtManagementService = getDebtManagementService(req)
+    const result = await DebtManagementService.getDebtLimits({
+      lottery_campaign_id: req.query.lottery_campaign_id,
+      limit_level: req.query.limit_level,
+      status: req.query.status,
+      page: req.query.page,
+      page_size: req.query.page_size
+    })
+    return res.apiSuccess(result, '欠账上限配置列表获取成功')
   })
-  return res.apiSuccess(result, '欠账上限配置列表获取成功')
-}))
+)
 
 /**
  * GET /limits/:lottery_campaign_id - 获取指定活动的欠账上限配置
@@ -249,7 +289,8 @@ router.get(
     const DebtManagementService = getDebtManagementService(req)
     const result = await DebtManagementService.getCampaignDebtLimit(lottery_campaign_id)
     return res.apiSuccess(result, '欠账上限配置获取成功')
-}))
+  })
+)
 
 /**
  * PUT /limits/:lottery_campaign_id - 更新欠账上限配置
@@ -284,7 +325,8 @@ router.put(
       admin_id
     )
     return res.apiSuccess(result, '欠账上限配置更新成功')
-}))
+  })
+)
 
 /**
  * GET /limits/:lottery_campaign_id/alert-check - 检查活动欠账告警状态
@@ -308,6 +350,7 @@ router.get(
     const DebtManagementService = getDebtManagementService(req)
     const result = await DebtManagementService.checkAlertStatus(lottery_campaign_id)
     return res.apiSuccess(result, '告警状态检查完成')
-}))
+  })
+)
 
 module.exports = router

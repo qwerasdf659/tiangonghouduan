@@ -44,39 +44,54 @@ const logger = require('../../../../utils/logger').logger
  *
  * @returns {Object} 会话列表和分页信息
  */
-router.get('/', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const SessionQueryService = req.app.locals.services.getService('console_session_query')
+router.get(
+  '/',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const SessionQueryService = req.app.locals.services.getService('console_session_query')
 
-  const result = await SessionQueryService.getSessions(req.query)
+    const result = await SessionQueryService.getSessions(req.query)
 
-  return res.apiSuccess(result, '获取会话列表成功')
-}))
+    return res.apiSuccess(result, '获取会话列表成功')
+  })
+)
 
 /**
  * GET /api/v4/console/sessions/stats - 会话统计
  *
  * @returns {Object} 会话统计信息
  */
-router.get('/stats', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const SessionQueryService = req.app.locals.services.getService('console_session_query')
+router.get(
+  '/stats',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const SessionQueryService = req.app.locals.services.getService('console_session_query')
 
-  const result = await SessionQueryService.getSessionStats()
+    const result = await SessionQueryService.getSessionStats()
 
-  return res.apiSuccess(result, '获取会话统计成功')
-}))
+    return res.apiSuccess(result, '获取会话统计成功')
+  })
+)
 
 /**
  * GET /api/v4/console/sessions/online-users - 在线用户列表
  *
  * @returns {Object} 在线用户列表
  */
-router.get('/online-users', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const SessionQueryService = req.app.locals.services.getService('console_session_query')
+router.get(
+  '/online-users',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const SessionQueryService = req.app.locals.services.getService('console_session_query')
 
-  const result = await SessionQueryService.getOnlineUsers()
+    const result = await SessionQueryService.getOnlineUsers()
 
-  return res.apiSuccess(result, '获取在线用户列表成功')
-}))
+    return res.apiSuccess(result, '获取在线用户列表成功')
+  })
+)
 
 /**
  * GET /api/v4/console/sessions/:id - 会话详情
@@ -84,22 +99,27 @@ router.get('/online-users', authenticateToken, requireRoleLevel(100), asyncHandl
  * @param {number} id - 会话ID（authentication_session_id）
  * @returns {Object} 会话详情
  */
-router.get('/:id', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const sessionId = parseInt(req.params.id, 10)
-  if (isNaN(sessionId) || sessionId <= 0) {
-    return res.apiError('无效的会话ID', 'INVALID_SESSION_ID', null, 400)
-  }
+router.get(
+  '/:id',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const sessionId = parseInt(req.params.id, 10)
+    if (isNaN(sessionId) || sessionId <= 0) {
+      return res.apiError('无效的会话ID', 'INVALID_SESSION_ID', null, 400)
+    }
 
-  const SessionQueryService = req.app.locals.services.getService('console_session_query')
+    const SessionQueryService = req.app.locals.services.getService('console_session_query')
 
-  const session = await SessionQueryService.getSessionById(sessionId)
+    const session = await SessionQueryService.getSessionById(sessionId)
 
-  if (!session) {
-    return res.apiError('会话不存在', 'SESSION_NOT_FOUND', null, 404)
-  }
+    if (!session) {
+      return res.apiError('会话不存在', 'SESSION_NOT_FOUND', null, 404)
+    }
 
-  return res.apiSuccess(session, '获取会话详情成功')
-}))
+    return res.apiSuccess(session, '获取会话详情成功')
+  })
+)
 
 /**
  * POST /api/v4/console/sessions/:id/deactivate - 失效单个会话
@@ -108,39 +128,49 @@ router.get('/:id', authenticateToken, requireRoleLevel(100), asyncHandler(async 
  * @body {string} reason - 失效原因（可选）
  * @returns {Object} 操作结果
  */
-router.post('/:id/deactivate', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  try {
-    const sessionId = parseInt(req.params.id, 10)
-    const { reason } = req.body
-    if (isNaN(sessionId) || sessionId <= 0) {
-      return res.apiError('无效的会话ID', 'INVALID_SESSION_ID', null, 400)
+router.post(
+  '/:id/deactivate',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    try {
+      const sessionId = parseInt(req.params.id, 10)
+      const { reason } = req.body
+      if (isNaN(sessionId) || sessionId <= 0) {
+        return res.apiError('无效的会话ID', 'INVALID_SESSION_ID', null, 400)
+      }
+
+      const SessionManagementService = req.app.locals.services.getService('session_management')
+
+      const result = await SessionManagementService.deactivateSession(sessionId, {
+        operator_user_id: req.user.user_id,
+        reason
+      })
+
+      return res.apiSuccess(
+        {
+          session_id: result.session_id,
+          user_id: result.user_id,
+          already_inactive: result.already_inactive || false,
+          deactivated_at: result.deactivated_at
+        },
+        result.already_inactive ? '会话已经失效（幂等返回）' : '会话已失效',
+        'SESSION_DEACTIVATED'
+      )
+    } catch (error) {
+      logger.error(`❌ [Sessions] 失效会话失败: ${error.message}`)
+      if (error.message === '会话不存在') {
+        return res.apiError('会话不存在', 'SESSION_NOT_FOUND', null, 404)
+      }
+      return res.apiError(
+        '失效会话失败',
+        'SESSION_DEACTIVATE_FAILED',
+        { error: error.message },
+        500
+      )
     }
-
-    const SessionManagementService = req.app.locals.services.getService('session_management')
-
-    const result = await SessionManagementService.deactivateSession(sessionId, {
-      operator_user_id: req.user.user_id,
-      reason
-    })
-
-    return res.apiSuccess(
-      {
-        session_id: result.session_id,
-        user_id: result.user_id,
-        already_inactive: result.already_inactive || false,
-        deactivated_at: result.deactivated_at
-      },
-      result.already_inactive ? '会话已经失效（幂等返回）' : '会话已失效',
-      'SESSION_DEACTIVATED'
-    )
-  } catch (error) {
-    logger.error(`❌ [Sessions] 失效会话失败: ${error.message}`)
-    if (error.message === '会话不存在') {
-      return res.apiError('会话不存在', 'SESSION_NOT_FOUND', null, 404)
-    }
-    return res.apiError('失效会话失败', 'SESSION_DEACTIVATE_FAILED', { error: error.message }, 500)
-  }
-}))
+  })
+)
 
 /**
  * POST /api/v4/console/sessions/deactivate-user - 失效用户所有会话
@@ -150,72 +180,82 @@ router.post('/:id/deactivate', authenticateToken, requireRoleLevel(100), asyncHa
  * @body {string} reason - 失效原因（可选）
  * @returns {Object} 操作结果
  */
-router.post('/deactivate-user', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  try {
-    const { user_type, user_id, reason } = req.body
+router.post(
+  '/deactivate-user',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    try {
+      const { user_type, user_id, reason } = req.body
 
-    if (!user_type || !['user', 'admin'].includes(user_type)) {
-      return res.apiError('无效的用户类型', 'INVALID_USER_TYPE', null, 400)
-    }
-    const userIdNum = parseInt(user_id, 10)
-    if (isNaN(userIdNum) || userIdNum <= 0) {
-      return res.apiError('无效的用户ID', 'INVALID_USER_ID', null, 400)
-    }
-
-    const SessionManagementService = req.app.locals.services.getService('session_management')
-
-    const result = await SessionManagementService.deactivateUserSessions(
-      { user_type, user_id: userIdNum },
-      {
-        operator_user_id: req.user.user_id,
-        reason
+      if (!user_type || !['user', 'admin'].includes(user_type)) {
+        return res.apiError('无效的用户类型', 'INVALID_USER_TYPE', null, 400)
       }
-    )
+      const userIdNum = parseInt(user_id, 10)
+      if (isNaN(userIdNum) || userIdNum <= 0) {
+        return res.apiError('无效的用户ID', 'INVALID_USER_ID', null, 400)
+      }
 
-    return res.apiSuccess(
-      {
-        user_type: result.user_type,
-        user_id: result.user_id,
-        affected_count: result.affected_count,
-        reason: result.reason
-      },
-      `已失效该用户的 ${result.affected_count} 个会话`,
-      'USER_SESSIONS_DEACTIVATED'
-    )
-  } catch (error) {
-    logger.error(`❌ [Sessions] 失效用户会话失败: ${error.message}`)
-    if (error.message === '不能踢出自己的所有会话') {
-      return res.apiError('不能踢出自己的会话', 'CANNOT_DEACTIVATE_SELF', null, 400)
+      const SessionManagementService = req.app.locals.services.getService('session_management')
+
+      const result = await SessionManagementService.deactivateUserSessions(
+        { user_type, user_id: userIdNum },
+        {
+          operator_user_id: req.user.user_id,
+          reason
+        }
+      )
+
+      return res.apiSuccess(
+        {
+          user_type: result.user_type,
+          user_id: result.user_id,
+          affected_count: result.affected_count,
+          reason: result.reason
+        },
+        `已失效该用户的 ${result.affected_count} 个会话`,
+        'USER_SESSIONS_DEACTIVATED'
+      )
+    } catch (error) {
+      logger.error(`❌ [Sessions] 失效用户会话失败: ${error.message}`)
+      if (error.message === '不能踢出自己的所有会话') {
+        return res.apiError('不能踢出自己的会话', 'CANNOT_DEACTIVATE_SELF', null, 400)
+      }
+      return res.apiError(
+        '失效用户会话失败',
+        'USER_SESSIONS_DEACTIVATE_FAILED',
+        { error: error.message },
+        500
+      )
     }
-    return res.apiError(
-      '失效用户会话失败',
-      'USER_SESSIONS_DEACTIVATE_FAILED',
-      { error: error.message },
-      500
-    )
-  }
-}))
+  })
+)
 
 /**
  * POST /api/v4/console/sessions/cleanup - 清理过期会话
  *
  * @returns {Object} 清理结果
  */
-router.post('/cleanup', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const SessionManagementService = req.app.locals.services.getService('session_management')
+router.post(
+  '/cleanup',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const SessionManagementService = req.app.locals.services.getService('session_management')
 
-  const result = await SessionManagementService.cleanupExpiredSessions({
-    operator_user_id: req.user.user_id
+    const result = await SessionManagementService.cleanupExpiredSessions({
+      operator_user_id: req.user.user_id
+    })
+
+    return res.apiSuccess(
+      {
+        deleted_count: result.deleted_count,
+        cleanup_at: result.cleanup_at
+      },
+      `已清理 ${result.deleted_count} 个过期会话`,
+      'CLEANUP_COMPLETED'
+    )
   })
-
-  return res.apiSuccess(
-    {
-      deleted_count: result.deleted_count,
-      cleanup_at: result.cleanup_at
-    },
-    `已清理 ${result.deleted_count} 个过期会话`,
-    'CLEANUP_COMPLETED'
-  )
-}))
+)
 
 module.exports = router

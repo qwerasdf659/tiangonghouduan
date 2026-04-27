@@ -101,7 +101,7 @@ async function isFeatureEnabledForContext(feature, context = {}) {
       }
     }
 
-  // STUB: feature_flag_hit + remaining checks below
+    // STUB: feature_flag_hit + remaining checks below
     let feature_flag_hit = false
     try {
       const FEATURE_TO_FLAG_KEY = {

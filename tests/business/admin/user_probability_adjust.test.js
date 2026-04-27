@@ -94,7 +94,7 @@ describe('用户个性化中奖率设置功能测试', () => {
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           user_id: testUserId,
-          prize_id: testPrizeId,
+          lottery_prize_id: testPrizeId,
           custom_probability: 0.5, // 50%中奖率
           duration_minutes: 60,
           reason: '测试：用户B一等奖50%中奖率'
@@ -131,7 +131,7 @@ describe('用户个性化中奖率设置功能测试', () => {
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           user_id: testUserId,
-          prize_id: testPrizeId,
+          lottery_prize_id: testPrizeId,
           custom_probability: 1.5, // 无效：超过100%
           duration_minutes: 60
         })
@@ -147,12 +147,12 @@ describe('用户个性化中奖率设置功能测试', () => {
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           user_id: testUserId,
-          prize_id: 99999, // 不存在的奖品ID
+          lottery_prize_id: 99999, // 不存在的奖品ID
           custom_probability: 0.5,
           duration_minutes: 60
         })
 
-      expect(response.status).toBe(400)
+      expect(response.status).toBe(404)
       expect(response.body.success).toBe(false)
       expect(response.body.message).toContain('奖品不存在')
     })
@@ -214,7 +214,7 @@ describe('用户个性化中奖率设置功能测试', () => {
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           user_id: testUserId,
-          prize_id: testPrizeId,
+          lottery_prize_id: testPrizeId,
           custom_probability: 0.5,
           duration_minutes: 60,
           reason: '测试查询状态'
@@ -301,7 +301,7 @@ describe('用户个性化中奖率设置功能测试', () => {
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           user_id: testUserId,
-          prize_id: testPrizeId,
+          lottery_prize_id: testPrizeId,
           custom_probability: 1.0, // 设置为100%必中
           duration_minutes: 60,
           reason: '测试抽奖算法应用'
@@ -382,7 +382,7 @@ describe('用户个性化中奖率设置功能测试', () => {
       // 模拟前端发送的请求数据（来自users.html的saveProbabilityAdjustment函数）
       const frontendData = {
         user_id: testUserId,
-        prize_id: testPrizeId,
+        lottery_prize_id: testPrizeId,
         custom_probability: 0.5, // 前端发送0.5（50%）
         duration_minutes: 60,
         reason: 'VIP用户特权'

@@ -157,10 +157,18 @@ class DictionaryService {
     if (data.parent_category_id) {
       const parent = await this.Category.findByPk(data.parent_category_id, { transaction })
       if (!parent) {
-        throw new BusinessError(`父分类不存在：${data.parent_category_id}`, 'SERVICE_NOT_FOUND', 404)
+        throw new BusinessError(
+          `父分类不存在：${data.parent_category_id}`,
+          'SERVICE_NOT_FOUND',
+          404
+        )
       }
       if (parent.level !== 1) {
-        throw new BusinessError('仅支持两级分类，不能在子分类下再创建子分类', 'SERVICE_NOT_ALLOWED', 400)
+        throw new BusinessError(
+          '仅支持两级分类，不能在子分类下再创建子分类',
+          'SERVICE_NOT_ALLOWED',
+          400
+        )
       }
       level = 2
       parentCategoryId = data.parent_category_id

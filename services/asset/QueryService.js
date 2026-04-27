@@ -35,7 +35,7 @@
 'use strict'
 
 const BusinessError = require('../../utils/BusinessError')
-const { Op, sequelize } = require('sequelize')
+const { Op } = require('sequelize')
 const { AssetCode } = require('../../constants/AssetCode')
 const {
   Account,
@@ -43,7 +43,8 @@ const {
   AssetTransaction,
   Item,
   User,
-  MaterialAssetType
+  MaterialAssetType,
+  sequelize
 } = require('../../models')
 const logger = require('../../utils/logger')
 const BalanceService = require('./BalanceService')

@@ -71,7 +71,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const { lottery_campaign_ids, status, page_size = 20 } = req.query
 
-        // 解析 lottery_campaign_ids（支持逗号分隔或单独指定）
+    // 解析 lottery_campaign_ids（支持逗号分隔或单独指定）
     let targetIds = []
     if (lottery_campaign_ids) {
       targetIds = lottery_campaign_ids
@@ -146,7 +146,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const { lottery_campaign_id } = req.params
 
-        if (!lottery_campaign_id || isNaN(parseInt(lottery_campaign_id))) {
+    if (!lottery_campaign_id || isNaN(parseInt(lottery_campaign_id))) {
       return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID')
     }
 
@@ -209,7 +209,7 @@ router.put(
      */
     const { AdminLotteryCampaignService } = getServices(req)
 
-        if (!lottery_campaign_id || isNaN(parseInt(lottery_campaign_id))) {
+    if (!lottery_campaign_id || isNaN(parseInt(lottery_campaign_id))) {
       return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID')
     }
 
@@ -280,7 +280,7 @@ router.post(
   asyncHandler(async (req, res) => {
     const { lottery_campaign_id } = req.params
 
-        if (!lottery_campaign_id || isNaN(parseInt(lottery_campaign_id))) {
+    if (!lottery_campaign_id || isNaN(parseInt(lottery_campaign_id))) {
       return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID')
     }
 
@@ -330,7 +330,7 @@ router.post(
   asyncHandler(async (req, res) => {
     const { lottery_campaign_id } = req.params
 
-        if (!lottery_campaign_id || isNaN(parseInt(lottery_campaign_id))) {
+    if (!lottery_campaign_id || isNaN(parseInt(lottery_campaign_id))) {
       return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID')
     }
 
@@ -338,9 +338,7 @@ router.post(
     const ActivityService = req.app.locals.services.getService('activity')
 
     // 调用活动上线前完整校验（纯严格模式）
-    const validationResult = await ActivityService.validateForLaunch(
-      parseInt(lottery_campaign_id)
-    )
+    const validationResult = await ActivityService.validateForLaunch(parseInt(lottery_campaign_id))
 
     sharedComponents.logger.info('活动上线前完整校验完成', {
       lottery_campaign_id,
@@ -371,7 +369,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const { user_id } = req.params
 
-        const validUserId = validators.validateUserId(user_id)
+    const validUserId = validators.validateUserId(user_id)
 
     // 通过 ServiceManager 获取服务（P1-9 snake_case key）
     const UserService = req.app.locals.services.getService('user')
@@ -451,7 +449,7 @@ router.post(
     const { lottery_campaign_id } = req.params
     const { amount, reason } = req.body
 
-        if (!lottery_campaign_id || isNaN(parseInt(lottery_campaign_id))) {
+    if (!lottery_campaign_id || isNaN(parseInt(lottery_campaign_id))) {
       return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID')
     }
 
@@ -463,8 +461,7 @@ router.post(
      * 通过 ServiceManager 获取服务（P1-9 snake_case key）
      * V4.7.0 拆分：活动预算管理使用 admin_lottery_campaign（非 admin_lottery_core）
      */
-    const AdminLotteryCampaignService =
-      req.app.locals.services.getService('admin_lottery_campaign')
+    const AdminLotteryCampaignService = req.app.locals.services.getService('admin_lottery_campaign')
 
     /*
      * ✅ 事务边界治理：通过 TransactionManager.execute() 统一创建事务
@@ -521,7 +518,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const { lottery_campaign_id } = req.params
 
-        if (!lottery_campaign_id || isNaN(parseInt(lottery_campaign_id))) {
+    if (!lottery_campaign_id || isNaN(parseInt(lottery_campaign_id))) {
       return res.apiError('无效的活动ID', 'INVALID_CAMPAIGN_ID')
     }
 

@@ -397,7 +397,11 @@ class BatchOperationService {
     try {
       const log = await BatchOperationLog.findByPk(batch_operation_log_id, options)
       if (!log) {
-        throw new BusinessError(`批量操作日志不存在: batch_operation_log_id=${batch_operation_log_id}`, 'SERVICE_NOT_FOUND', 404)
+        throw new BusinessError(
+          `批量操作日志不存在: batch_operation_log_id=${batch_operation_log_id}`,
+          'SERVICE_NOT_FOUND',
+          404
+        )
       }
 
       await log.updateProgress(success_count, fail_count, result_summary, options)
@@ -437,7 +441,11 @@ class BatchOperationService {
     try {
       const log = await BatchOperationLog.findByPk(batch_operation_log_id, options)
       if (!log) {
-        throw new BusinessError(`批量操作日志不存在: batch_operation_log_id=${batch_operation_log_id}`, 'SERVICE_NOT_FOUND', 404)
+        throw new BusinessError(
+          `批量操作日志不存在: batch_operation_log_id=${batch_operation_log_id}`,
+          'SERVICE_NOT_FOUND',
+          404
+        )
       }
 
       await log.markAsFailed(error_message, options)

@@ -69,39 +69,45 @@ function isValidFlagKey(flagKey) {
  * - is_enabled: 筛选启用状态 (true/false)
  * - rollout_strategy: 筛选发布策略
  */
-router.get('/', asyncHandler(async (req, res) => {
-  const FeatureFlagService = getFeatureFlagService(req)
-  const filters = {}
+router.get(
+  '/',
+  asyncHandler(async (req, res) => {
+    const FeatureFlagService = getFeatureFlagService(req)
+    const filters = {}
 
-  if (req.query.is_enabled !== undefined) {
-    filters.is_enabled = req.query.is_enabled === 'true'
-  }
+    if (req.query.is_enabled !== undefined) {
+      filters.is_enabled = req.query.is_enabled === 'true'
+    }
 
-  if (req.query.rollout_strategy) {
-    filters.rollout_strategy = req.query.rollout_strategy
-  }
+    if (req.query.rollout_strategy) {
+      filters.rollout_strategy = req.query.rollout_strategy
+    }
 
-  const flags = await FeatureFlagService.getAllFlags(filters)
+    const flags = await FeatureFlagService.getAllFlags(filters)
 
-  return res.apiSuccess(flags, '获取功能开关列表成功')
-}))
+    return res.apiSuccess(flags, '获取功能开关列表成功')
+  })
+)
 
 /**
  * GET /api/v4/console/feature-flags/:flagKey
  * 获取单个功能开关详情
  */
-router.get('/:flagKey', asyncHandler(async (req, res) => {
-  const FeatureFlagService = getFeatureFlagService(req)
-  const { flagKey } = req.params
+router.get(
+  '/:flagKey',
+  asyncHandler(async (req, res) => {
+    const FeatureFlagService = getFeatureFlagService(req)
+    const { flagKey } = req.params
 
-  const flag = await FeatureFlagService.getFlagByKey(flagKey, { skipCache: true })
+    const flag = await FeatureFlagService.getFlagByKey(flagKey, { skipCache: true })
 
-  if (!flag) {
-    return res.apiError(`功能开关 ${flagKey} 不存在`, 'FLAG_NOT_FOUND', null, 404)
-  }
+    if (!flag) {
+      return res.apiError(`功能开关 ${flagKey} 不存在`, 'FLAG_NOT_FOUND', null, 404)
+    }
 
-  return res.apiSuccess(flag, '获取功能开关成功')
-}))
+    return res.apiSuccess(flag, '获取功能开关成功')
+  })
+)
 
 /**
  * POST /api/v4/console/feature-flags
@@ -122,87 +128,93 @@ router.get('/:flagKey', asyncHandler(async (req, res) => {
  * - related_config_group: 关联配置分组
  * - fallback_behavior: 降级行为
  */
-router.post('/', asyncHandler(async (req, res) => {
-  const FeatureFlagService = getFeatureFlagService(req)
-  const {
-    flag_key,
-    flag_name,
-    description,
-    is_enabled = false,
-    rollout_strategy = 'all',
-    rollout_percentage = 100,
-    whitelist_user_ids = [],
-    blacklist_user_ids = [],
-    target_segments = [],
-    effective_start,
-    effective_end,
-    related_config_group,
-    fallback_behavior = 'disabled'
-  } = req.body
-
-  // 参数验证
-  if (!flag_key) {
-    return res.apiError('flag_key 不能为空', 'INVALID_PARAMS', null, 400)
-  }
-
-  if (!isValidFlagKey(flag_key)) {
-    return res.apiError(
-      'flag_key 格式无效（小写字母开头，3-100字符，仅允许小写字母、数字、下划线）',
-      'INVALID_FLAG_KEY',
-      null,
-      400
-    )
-  }
-
-  if (!flag_name) {
-    return res.apiError('flag_name 不能为空', 'INVALID_PARAMS', null, 400)
-  }
-
-  const operator = getOperator(req)
-
-  const flag = await FeatureFlagService.createFlag(
-    {
+router.post(
+  '/',
+  asyncHandler(async (req, res) => {
+    const FeatureFlagService = getFeatureFlagService(req)
+    const {
       flag_key,
       flag_name,
       description,
-      is_enabled,
-      rollout_strategy,
-      rollout_percentage,
-      whitelist_user_ids,
-      blacklist_user_ids,
-      target_segments,
+      is_enabled = false,
+      rollout_strategy = 'all',
+      rollout_percentage = 100,
+      whitelist_user_ids = [],
+      blacklist_user_ids = [],
+      target_segments = [],
       effective_start,
       effective_end,
       related_config_group,
-      fallback_behavior
-    },
-    operator
-  )
+      fallback_behavior = 'disabled'
+    } = req.body
 
-  return res.apiSuccess(flag, '创建功能开关成功', 'FLAG_CREATED', 201)
-}))
+    // 参数验证
+    if (!flag_key) {
+      return res.apiError('flag_key 不能为空', 'INVALID_PARAMS', null, 400)
+    }
+
+    if (!isValidFlagKey(flag_key)) {
+      return res.apiError(
+        'flag_key 格式无效（小写字母开头，3-100字符，仅允许小写字母、数字、下划线）',
+        'INVALID_FLAG_KEY',
+        null,
+        400
+      )
+    }
+
+    if (!flag_name) {
+      return res.apiError('flag_name 不能为空', 'INVALID_PARAMS', null, 400)
+    }
+
+    const operator = getOperator(req)
+
+    const flag = await FeatureFlagService.createFlag(
+      {
+        flag_key,
+        flag_name,
+        description,
+        is_enabled,
+        rollout_strategy,
+        rollout_percentage,
+        whitelist_user_ids,
+        blacklist_user_ids,
+        target_segments,
+        effective_start,
+        effective_end,
+        related_config_group,
+        fallback_behavior
+      },
+      operator
+    )
+
+    return res.apiSuccess(flag, '创建功能开关成功', 'FLAG_CREATED', 201)
+  })
+)
 
 /**
  * PUT /api/v4/console/feature-flags/:flagKey
  * 更新功能开关
  */
-router.put('/:flagKey', asyncHandler(async (req, res) => {
-  const FeatureFlagService = getFeatureFlagService(req)
-  const { flagKey } = req.params
-  const updateData = req.body
+router.put(
+  '/:flagKey',
+  asyncHandler(async (req, res) => {
+    const FeatureFlagService = getFeatureFlagService(req)
+    const { flagKey } = req.params
+    const updateData = req.body
 
-  // 不允许更新 flag_key
-  delete updateData.flag_key
-  delete updateData.flag_id
-  delete updateData.created_by
-  delete updateData.created_at
+    // 不允许更新 flag_key
+    delete updateData.flag_key
+    delete updateData.flag_id
+    delete updateData.created_by
+    delete updateData.created_at
 
-  const operator = getOperator(req)
+    const operator = getOperator(req)
 
-  const flag = await FeatureFlagService.updateFlag(flagKey, updateData, operator)
+    const flag = await FeatureFlagService.updateFlag(flagKey, updateData, operator)
 
-  return res.apiSuccess(flag, '更新功能开关成功')
-}))
+    return res.apiSuccess(flag, '更新功能开关成功')
+  })
+)
 
 /**
  * PATCH /api/v4/console/feature-flags/:flagKey/toggle
@@ -211,35 +223,41 @@ router.put('/:flagKey', asyncHandler(async (req, res) => {
  * Body:
  * - enabled: 目标状态（必需）
  */
-router.patch('/:flagKey/toggle', asyncHandler(async (req, res) => {
-  const FeatureFlagService = getFeatureFlagService(req)
-  const { flagKey } = req.params
-  const { enabled } = req.body
+router.patch(
+  '/:flagKey/toggle',
+  asyncHandler(async (req, res) => {
+    const FeatureFlagService = getFeatureFlagService(req)
+    const { flagKey } = req.params
+    const { enabled } = req.body
 
-  if (typeof enabled !== 'boolean') {
-    return res.apiError('enabled 必须是布尔值', 'INVALID_PARAMS', null, 400)
-  }
+    if (typeof enabled !== 'boolean') {
+      return res.apiError('enabled 必须是布尔值', 'INVALID_PARAMS', null, 400)
+    }
 
-  const operator = getOperator(req)
+    const operator = getOperator(req)
 
-  const flag = await FeatureFlagService.toggleFlag(flagKey, enabled, operator)
+    const flag = await FeatureFlagService.toggleFlag(flagKey, enabled, operator)
 
-  return res.apiSuccess(flag, `功能开关已${enabled ? '启用' : '禁用'}`)
-}))
+    return res.apiSuccess(flag, `功能开关已${enabled ? '启用' : '禁用'}`)
+  })
+)
 
 /**
  * DELETE /api/v4/console/feature-flags/:flagKey
  * 删除功能开关
  */
-router.delete('/:flagKey', asyncHandler(async (req, res) => {
-  const FeatureFlagService = getFeatureFlagService(req)
-  const { flagKey } = req.params
-  const operator = getOperator(req)
+router.delete(
+  '/:flagKey',
+  asyncHandler(async (req, res) => {
+    const FeatureFlagService = getFeatureFlagService(req)
+    const { flagKey } = req.params
+    const operator = getOperator(req)
 
-  await FeatureFlagService.deleteFlag(flagKey, operator)
+    await FeatureFlagService.deleteFlag(flagKey, operator)
 
-  return res.apiSuccess(null, '功能开关已删除')
-}))
+    return res.apiSuccess(null, '功能开关已删除')
+  })
+)
 
 // ==================== 白名单/黑名单管理 ====================
 
@@ -250,21 +268,24 @@ router.delete('/:flagKey', asyncHandler(async (req, res) => {
  * Body:
  * - user_ids: 用户ID列表（必需）
  */
-router.post('/:flagKey/whitelist', asyncHandler(async (req, res) => {
-  const FeatureFlagService = getFeatureFlagService(req)
-  const { flagKey } = req.params
-  const { user_ids } = req.body
+router.post(
+  '/:flagKey/whitelist',
+  asyncHandler(async (req, res) => {
+    const FeatureFlagService = getFeatureFlagService(req)
+    const { flagKey } = req.params
+    const { user_ids } = req.body
 
-  if (!Array.isArray(user_ids) || user_ids.length === 0) {
-    return res.apiError('user_ids 必须是非空数组', 'INVALID_PARAMS', null, 400)
-  }
+    if (!Array.isArray(user_ids) || user_ids.length === 0) {
+      return res.apiError('user_ids 必须是非空数组', 'INVALID_PARAMS', null, 400)
+    }
 
-  const operator = getOperator(req)
+    const operator = getOperator(req)
 
-  const flag = await FeatureFlagService.addToWhitelist(flagKey, user_ids, operator)
+    const flag = await FeatureFlagService.addToWhitelist(flagKey, user_ids, operator)
 
-  return res.apiSuccess(flag, `已添加 ${user_ids.length} 个用户到白名单`)
-}))
+    return res.apiSuccess(flag, `已添加 ${user_ids.length} 个用户到白名单`)
+  })
+)
 
 /**
  * DELETE /api/v4/console/feature-flags/:flagKey/whitelist
@@ -273,21 +294,24 @@ router.post('/:flagKey/whitelist', asyncHandler(async (req, res) => {
  * Body:
  * - user_ids: 用户ID列表（必需）
  */
-router.delete('/:flagKey/whitelist', asyncHandler(async (req, res) => {
-  const FeatureFlagService = getFeatureFlagService(req)
-  const { flagKey } = req.params
-  const { user_ids } = req.body
+router.delete(
+  '/:flagKey/whitelist',
+  asyncHandler(async (req, res) => {
+    const FeatureFlagService = getFeatureFlagService(req)
+    const { flagKey } = req.params
+    const { user_ids } = req.body
 
-  if (!Array.isArray(user_ids) || user_ids.length === 0) {
-    return res.apiError('user_ids 必须是非空数组', 'INVALID_PARAMS', null, 400)
-  }
+    if (!Array.isArray(user_ids) || user_ids.length === 0) {
+      return res.apiError('user_ids 必须是非空数组', 'INVALID_PARAMS', null, 400)
+    }
 
-  const operator = getOperator(req)
+    const operator = getOperator(req)
 
-  const flag = await FeatureFlagService.removeFromWhitelist(flagKey, user_ids, operator)
+    const flag = await FeatureFlagService.removeFromWhitelist(flagKey, user_ids, operator)
 
-  return res.apiSuccess(flag, `已从白名单移除 ${user_ids.length} 个用户`)
-}))
+    return res.apiSuccess(flag, `已从白名单移除 ${user_ids.length} 个用户`)
+  })
+)
 
 /**
  * POST /api/v4/console/feature-flags/:flagKey/blacklist
@@ -296,21 +320,24 @@ router.delete('/:flagKey/whitelist', asyncHandler(async (req, res) => {
  * Body:
  * - user_ids: 用户ID列表（必需）
  */
-router.post('/:flagKey/blacklist', asyncHandler(async (req, res) => {
-  const FeatureFlagService = getFeatureFlagService(req)
-  const { flagKey } = req.params
-  const { user_ids } = req.body
+router.post(
+  '/:flagKey/blacklist',
+  asyncHandler(async (req, res) => {
+    const FeatureFlagService = getFeatureFlagService(req)
+    const { flagKey } = req.params
+    const { user_ids } = req.body
 
-  if (!Array.isArray(user_ids) || user_ids.length === 0) {
-    return res.apiError('user_ids 必须是非空数组', 'INVALID_PARAMS', null, 400)
-  }
+    if (!Array.isArray(user_ids) || user_ids.length === 0) {
+      return res.apiError('user_ids 必须是非空数组', 'INVALID_PARAMS', null, 400)
+    }
 
-  const operator = getOperator(req)
+    const operator = getOperator(req)
 
-  const flag = await FeatureFlagService.addToBlacklist(flagKey, user_ids, operator)
+    const flag = await FeatureFlagService.addToBlacklist(flagKey, user_ids, operator)
 
-  return res.apiSuccess(flag, `已添加 ${user_ids.length} 个用户到黑名单`)
-}))
+    return res.apiSuccess(flag, `已添加 ${user_ids.length} 个用户到黑名单`)
+  })
+)
 
 /**
  * DELETE /api/v4/console/feature-flags/:flagKey/blacklist
@@ -319,21 +346,24 @@ router.post('/:flagKey/blacklist', asyncHandler(async (req, res) => {
  * Body:
  * - user_ids: 用户ID列表（必需）
  */
-router.delete('/:flagKey/blacklist', asyncHandler(async (req, res) => {
-  const FeatureFlagService = getFeatureFlagService(req)
-  const { flagKey } = req.params
-  const { user_ids } = req.body
+router.delete(
+  '/:flagKey/blacklist',
+  asyncHandler(async (req, res) => {
+    const FeatureFlagService = getFeatureFlagService(req)
+    const { flagKey } = req.params
+    const { user_ids } = req.body
 
-  if (!Array.isArray(user_ids) || user_ids.length === 0) {
-    return res.apiError('user_ids 必须是非空数组', 'INVALID_PARAMS', null, 400)
-  }
+    if (!Array.isArray(user_ids) || user_ids.length === 0) {
+      return res.apiError('user_ids 必须是非空数组', 'INVALID_PARAMS', null, 400)
+    }
 
-  const operator = getOperator(req)
+    const operator = getOperator(req)
 
-  const flag = await FeatureFlagService.removeFromBlacklist(flagKey, user_ids, operator)
+    const flag = await FeatureFlagService.removeFromBlacklist(flagKey, user_ids, operator)
 
-  return res.apiSuccess(flag, `已从黑名单移除 ${user_ids.length} 个用户`)
-}))
+    return res.apiSuccess(flag, `已从黑名单移除 ${user_ids.length} 个用户`)
+  })
+)
 
 // ==================== 功能可用性查询 ====================
 
@@ -341,16 +371,19 @@ router.delete('/:flagKey/blacklist', asyncHandler(async (req, res) => {
  * GET /api/v4/console/feature-flags/:flagKey/check/:userId
  * 检查指定用户的功能可用性
  */
-router.get('/:flagKey/check/:userId', asyncHandler(async (req, res) => {
-  const FeatureFlagService = getFeatureFlagService(req)
-  const { flagKey, userId } = req.params
+router.get(
+  '/:flagKey/check/:userId',
+  asyncHandler(async (req, res) => {
+    const FeatureFlagService = getFeatureFlagService(req)
+    const { flagKey, userId } = req.params
 
-  const result = await FeatureFlagService.isEnabled(flagKey, parseInt(userId), {
-    skipCache: req.query.skip_cache === 'true'
+    const result = await FeatureFlagService.isEnabled(flagKey, parseInt(userId), {
+      skipCache: req.query.skip_cache === 'true'
+    })
+
+    return res.apiSuccess(result, '功能可用性检查完成')
   })
-
-  return res.apiSuccess(result, '功能可用性检查完成')
-}))
+)
 
 /**
  * POST /api/v4/console/feature-flags/batch-check
@@ -360,21 +393,24 @@ router.get('/:flagKey/check/:userId', asyncHandler(async (req, res) => {
  * - flag_keys: 功能键名列表（必需）
  * - user_id: 用户ID（必需）
  */
-router.post('/batch-check', asyncHandler(async (req, res) => {
-  const FeatureFlagService = getFeatureFlagService(req)
-  const { flag_keys, user_id } = req.body
+router.post(
+  '/batch-check',
+  asyncHandler(async (req, res) => {
+    const FeatureFlagService = getFeatureFlagService(req)
+    const { flag_keys, user_id } = req.body
 
-  if (!Array.isArray(flag_keys) || flag_keys.length === 0) {
-    return res.apiError('flag_keys 必须是非空数组', 'INVALID_PARAMS', null, 400)
-  }
+    if (!Array.isArray(flag_keys) || flag_keys.length === 0) {
+      return res.apiError('flag_keys 必须是非空数组', 'INVALID_PARAMS', null, 400)
+    }
 
-  if (!user_id) {
-    return res.apiError('user_id 不能为空', 'INVALID_PARAMS', null, 400)
-  }
+    if (!user_id) {
+      return res.apiError('user_id 不能为空', 'INVALID_PARAMS', null, 400)
+    }
 
-  const result = await FeatureFlagService.isEnabledBatch(flag_keys, parseInt(user_id))
+    const result = await FeatureFlagService.isEnabledBatch(flag_keys, parseInt(user_id))
 
-  return res.apiSuccess(result, '批量检查完成')
-}))
+    return res.apiSuccess(result, '批量检查完成')
+  })
+)
 
 module.exports = router

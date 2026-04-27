@@ -52,7 +52,11 @@ class PipelineRunner {
    */
   addStage(stage) {
     if (!stage || typeof stage.execute !== 'function') {
-      throw new BusinessError('Invalid stage: must implement execute(context) method', 'ENGINE_ERROR', 400)
+      throw new BusinessError(
+        'Invalid stage: must implement execute(context) method',
+        'ENGINE_ERROR',
+        400
+      )
     }
     this.stages.push(stage)
     return this

@@ -125,11 +125,16 @@ function getMatrixValue(pressure_tier) {
  */
 function isFeatureEnabled(feature) {
   switch (feature) {
-    case 'pity': return PITY_CONFIG.enabled
-    case 'luck_debt': return LUCK_DEBT_CONFIG.enabled
-    case 'anti_empty': return ANTI_EMPTY_CONFIG.enabled
-    case 'anti_high': return ANTI_HIGH_CONFIG.enabled
-    default: return false
+    case 'pity':
+      return PITY_CONFIG.enabled
+    case 'luck_debt':
+      return LUCK_DEBT_CONFIG.enabled
+    case 'anti_empty':
+      return ANTI_EMPTY_CONFIG.enabled
+    case 'anti_high':
+      return ANTI_HIGH_CONFIG.enabled
+    default:
+      return false
   }
 }
 

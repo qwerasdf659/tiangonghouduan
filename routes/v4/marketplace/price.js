@@ -30,61 +30,73 @@ const { asyncHandler } = require('../../../middleware/validation')
  * @query {string} period - 时间范围（1d/7d/30d/90d，默认7d）
  * @query {string} granularity - 聚合粒度（1h/1d/1w，默认1d）
  */
-router.get('/price/trend', authenticateToken, asyncHandler(async (req, res) => {
-  const { asset_code, template_id, period, granularity } = req.query
-  if (!asset_code && !template_id) {
-    return res.apiError('需要 asset_code 或 template_id 参数', 'MISSING_PARAMS', null, 400)
-  }
+router.get(
+  '/price/trend',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const { asset_code, template_id, period, granularity } = req.query
+    if (!asset_code && !template_id) {
+      return res.apiError('需要 asset_code 或 template_id 参数', 'MISSING_PARAMS', null, 400)
+    }
 
-  const PriceDiscoveryService = req.app.locals.services.getService('price_discovery')
-  const result = await PriceDiscoveryService.getPriceTrend({
-    asset_code,
-    template_id,
-    period,
-    granularity
+    const PriceDiscoveryService = req.app.locals.services.getService('price_discovery')
+    const result = await PriceDiscoveryService.getPriceTrend({
+      asset_code,
+      template_id,
+      period,
+      granularity
+    })
+
+    return res.apiSuccess(result, '获取价格走势成功')
   })
-
-  return res.apiSuccess(result, '获取价格走势成功')
-}))
+)
 
 /**
  * @route GET /api/v4/marketplace/price/volume
  * @desc 成交量走势
  * @access Private
  */
-router.get('/price/volume', authenticateToken, asyncHandler(async (req, res) => {
-  const { asset_code, template_id, period, granularity } = req.query
-  if (!asset_code && !template_id) {
-    return res.apiError('需要 asset_code 或 template_id 参数', 'MISSING_PARAMS', null, 400)
-  }
+router.get(
+  '/price/volume',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const { asset_code, template_id, period, granularity } = req.query
+    if (!asset_code && !template_id) {
+      return res.apiError('需要 asset_code 或 template_id 参数', 'MISSING_PARAMS', null, 400)
+    }
 
-  const PriceDiscoveryService = req.app.locals.services.getService('price_discovery')
-  const result = await PriceDiscoveryService.getVolumeTrend({
-    asset_code,
-    template_id,
-    period,
-    granularity
+    const PriceDiscoveryService = req.app.locals.services.getService('price_discovery')
+    const result = await PriceDiscoveryService.getVolumeTrend({
+      asset_code,
+      template_id,
+      period,
+      granularity
+    })
+
+    return res.apiSuccess(result, '获取成交量走势成功')
   })
-
-  return res.apiSuccess(result, '获取成交量走势成功')
-}))
+)
 
 /**
  * @route GET /api/v4/marketplace/price/summary
  * @desc 价格摘要（中位数、极值、均值、总成交数）
  * @access Private
  */
-router.get('/price/summary', authenticateToken, asyncHandler(async (req, res) => {
-  const { asset_code, template_id } = req.query
-  if (!asset_code && !template_id) {
-    return res.apiError('需要 asset_code 或 template_id 参数', 'MISSING_PARAMS', null, 400)
-  }
+router.get(
+  '/price/summary',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const { asset_code, template_id } = req.query
+    if (!asset_code && !template_id) {
+      return res.apiError('需要 asset_code 或 template_id 参数', 'MISSING_PARAMS', null, 400)
+    }
 
-  const PriceDiscoveryService = req.app.locals.services.getService('price_discovery')
-  const result = await PriceDiscoveryService.getPriceSummary({ asset_code, template_id })
+    const PriceDiscoveryService = req.app.locals.services.getService('price_discovery')
+    const result = await PriceDiscoveryService.getPriceSummary({ asset_code, template_id })
 
-  return res.apiSuccess(result, '获取价格摘要成功')
-}))
+    return res.apiSuccess(result, '获取价格摘要成功')
+  })
+)
 
 /**
  * @route GET /api/v4/marketplace/price/recent-trades
@@ -92,21 +104,25 @@ router.get('/price/summary', authenticateToken, asyncHandler(async (req, res) =>
  * @access Private
  * @query {number} page_size - 数量限制（默认10，最大50）
  */
-router.get('/price/recent-trades', authenticateToken, asyncHandler(async (req, res) => {
-  const { asset_code, template_id, page_size = 10 } = req.query
-  if (!asset_code && !template_id) {
-    return res.apiError('需要 asset_code 或 template_id 参数', 'MISSING_PARAMS', null, 400)
-  }
+router.get(
+  '/price/recent-trades',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const { asset_code, template_id, page_size = 10 } = req.query
+    if (!asset_code && !template_id) {
+      return res.apiError('需要 asset_code 或 template_id 参数', 'MISSING_PARAMS', null, 400)
+    }
 
-  const safeLimit = Math.min(parseInt(page_size) || 10, 50)
-  const PriceDiscoveryService = req.app.locals.services.getService('price_discovery')
-  const result = await PriceDiscoveryService.getLatestTrades({
-    asset_code,
-    template_id,
-    limit: safeLimit
+    const safeLimit = Math.min(parseInt(page_size) || 10, 50)
+    const PriceDiscoveryService = req.app.locals.services.getService('price_discovery')
+    const result = await PriceDiscoveryService.getLatestTrades({
+      asset_code,
+      template_id,
+      limit: safeLimit
+    })
+
+    return res.apiSuccess(result, '获取最近成交列表成功')
   })
-
-  return res.apiSuccess(result, '获取最近成交列表成功')
-}))
+)
 
 module.exports = router

@@ -137,7 +137,11 @@ class AdTargetZoneService {
         transaction: options.transaction
       })
       if (!parentZone) {
-        throw new BusinessError(`上级区域不存在: parent_zone_id=${parent_zone_id}`, 'AD_NOT_FOUND', 404)
+        throw new BusinessError(
+          `上级区域不存在: parent_zone_id=${parent_zone_id}`,
+          'AD_NOT_FOUND',
+          404
+        )
       }
     }
 
@@ -219,11 +223,19 @@ class AdTargetZoneService {
     }
 
     if (zone.child_zones && zone.child_zones.length > 0) {
-      throw new BusinessError(`该地域下有 ${zone.child_zones.length} 个子区域，请先删除子区域`, 'AD_ERROR', 400)
+      throw new BusinessError(
+        `该地域下有 ${zone.child_zones.length} 个子区域，请先删除子区域`,
+        'AD_ERROR',
+        400
+      )
     }
 
     if (zone.ad_slots && zone.ad_slots.length > 0) {
-      throw new BusinessError(`该地域关联了 ${zone.ad_slots.length} 个广告位，请先解除关联`, 'AD_ERROR', 400)
+      throw new BusinessError(
+        `该地域关联了 ${zone.ad_slots.length} 个广告位，请先解除关联`,
+        'AD_ERROR',
+        400
+      )
     }
 
     await AdZoneGroupMember.destroy({

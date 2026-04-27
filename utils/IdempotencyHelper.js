@@ -384,6 +384,45 @@ function generateAdminOperationKey(operatorId, operationType, context = {}) {
 }
 
 /**
+ * 生成 DIY 操作幂等键
+ *
+ * 用途：DIY 作品的资产冻结/结算/解冻/铸造/兑换操作幂等保护
+ *
+ * 格式：diy_{operationType}_{workId}_{assetCode}_{timestamp}_{6位hex}
+ * 当 assetCode 为空时：diy_{operationType}_{workId}_{timestamp}_{6位hex}
+ *
+ * @param {string} operationType - 操作类型（freeze/settle/unfreeze/mint/exchange）
+ * @param {number} workId - diy_work_id
+ * @param {string} [assetCode] - 资产编码（冻结/结算/解冻时必传）
+ * @returns {string} 幂等键
+ */
+function generateDiyOperationKey(operationType, workId, assetCode) {
+  const timestamp = Date.now()
+  const random = crypto.randomBytes(3).toString('hex')
+  const parts = ['diy', operationType, workId]
+  if (assetCode) parts.push(assetCode)
+  parts.push(timestamp, random)
+  return parts.join('_')
+}
+
+/**
+ * 生成 DIY 作品创建幂等键
+ *
+ * 用途：防止同一用户对同一模板重复创建作品（网络重试场景）
+ *
+ * 格式：diy_save_{accountId}_{templateId}_{timestamp}_{6位hex}
+ *
+ * @param {number} accountId - 用户 account_id
+ * @param {number} templateId - diy_template_id
+ * @returns {string} 幂等键
+ */
+function generateDiySaveKey(accountId, templateId) {
+  const timestamp = Date.now()
+  const random = crypto.randomBytes(3).toString('hex')
+  return `diy_save_${accountId}_${templateId}_${timestamp}_${random}`
+}
+
+/**
  * BusinessIdGenerator 类封装（便于对象形式调用）
  *
  * @example
@@ -396,6 +435,8 @@ const BusinessIdGenerator = {
   generateExchangeId: generateExchangeBusinessId,
   generateTradeOrderId: generateTradeOrderBusinessId,
   generateAdminOperationKey,
+  generateDiyOperationKey,
+  generateDiySaveKey,
   isValidBusinessId
 }
 
@@ -418,6 +459,10 @@ module.exports = {
 
   // 管理员操作幂等键
   generateAdminOperationKey,
+
+  // DIY 操作幂等键（编码规则统一方案 D16-A）
+  generateDiyOperationKey,
+  generateDiySaveKey,
 
   // BusinessIdGenerator 类封装
   BusinessIdGenerator

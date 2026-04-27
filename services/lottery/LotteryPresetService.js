@@ -1,4 +1,5 @@
 const logger = require('../../utils/logger').logger
+const BusinessError = require('../../utils/BusinessError')
 
 /**
  * 餐厅积分抽奖系统 V4.0 - 抽奖预设管理服务（LotteryPresetService）
@@ -62,36 +63,38 @@ class LotteryPresetService {
   static async createPresets(adminId, userId, presets) {
     // ===== 第1步：基础参数验证 =====
     if (!adminId || !userId || !presets || !Array.isArray(presets) || presets.length === 0) {
-      const error = new Error('参数错误：需要adminId、userId和presets数组')
-      error.code = 'INVALID_PARAMETERS'
-      throw error
+      throw new BusinessError(
+        '参数错误：需要adminId、userId和presets数组',
+        'INVALID_PARAMETERS',
+        400
+      )
     }
 
     // ===== 第2步：最大数量限制验证 =====
     const MAX_PRESETS_PER_BATCH = 20
     if (presets.length > MAX_PRESETS_PER_BATCH) {
-      const error = new Error(
-        `单次最多创建${MAX_PRESETS_PER_BATCH}条预设，当前：${presets.length}条`
+      throw new BusinessError(
+        `单次最多创建${MAX_PRESETS_PER_BATCH}条预设，当前：${presets.length}条`,
+        'TOO_MANY_PRESETS',
+        400
       )
-      error.code = 'TOO_MANY_PRESETS'
-      throw error
     }
 
     // ===== 第3步：queue_order唯一性验证 =====
     const queueOrders = presets.map(p => p.queue_order)
     const uniqueOrders = new Set(queueOrders)
     if (queueOrders.length !== uniqueOrders.size) {
-      const error = new Error('预设数据错误：同一批次中queue_order不能重复')
-      error.code = 'DUPLICATE_QUEUE_ORDER'
-      throw error
+      throw new BusinessError(
+        '预设数据错误：同一批次中queue_order不能重复',
+        'DUPLICATE_QUEUE_ORDER',
+        400
+      )
     }
 
     // ===== 第4步：验证目标用户存在 =====
     const targetUser = await models.User.findByPk(userId)
     if (!targetUser) {
-      const error = new Error('目标用户不存在')
-      error.code = 'USER_NOT_FOUND'
-      throw error
+      throw new BusinessError('目标用户不存在', 'USER_NOT_FOUND', 404)
     }
 
     // ===== 第5步：验证预设数据格式和奖品存在性 =====
@@ -103,25 +106,27 @@ class LotteryPresetService {
         preset.queue_order === undefined ||
         preset.queue_order === null
       ) {
-        const error = new Error('预设数据格式错误：需要lottery_prize_id和queue_order')
-        error.code = 'INVALID_PRESET_DATA'
-        throw error
+        throw new BusinessError(
+          '预设数据格式错误：需要lottery_prize_id和queue_order',
+          'INVALID_PRESET_DATA',
+          400
+        )
       }
 
       // 验证queue_order为正整数
       if (!Number.isInteger(preset.queue_order) || preset.queue_order < 1) {
-        const error = new Error(`队列顺序必须为正整数，当前：${preset.queue_order}`)
-        error.code = 'INVALID_QUEUE_ORDER'
-        throw error
+        throw new BusinessError(
+          `队列顺序必须为正整数，当前：${preset.queue_order}`,
+          'INVALID_QUEUE_ORDER',
+          400
+        )
       }
 
       // 验证奖品存在
       // eslint-disable-next-line no-await-in-loop
       const prize = await models.LotteryPrize.findByPk(preset.lottery_prize_id)
       if (!prize) {
-        const error = new Error(`奖品ID ${preset.lottery_prize_id} 不存在`)
-        error.code = 'PRIZE_NOT_FOUND'
-        throw error
+        throw new BusinessError(`奖品ID ${preset.lottery_prize_id} 不存在`, 'PRIZE_NOT_FOUND', 404)
       }
     }
 
@@ -152,25 +157,23 @@ class LotteryPresetService {
   static async getUserPresets(adminId, userId, status = 'all') {
     // 🎯 参数验证：userId类型验证
     if (isNaN(userId) || userId <= 0) {
-      const error = new Error('无效的用户ID，必须是正整数')
-      error.code = 'INVALID_USER_ID'
-      throw error
+      throw new BusinessError('无效的用户ID，必须是正整数', 'INVALID_USER_ID', 400)
     }
 
     // 🎯 参数验证：status白名单验证
     const allowedStatus = ['pending', 'used', 'all']
     if (!allowedStatus.includes(status)) {
-      const error = new Error(`无效的状态参数，允许值：${allowedStatus.join('/')}`)
-      error.code = 'INVALID_STATUS'
-      throw error
+      throw new BusinessError(
+        `无效的状态参数，允许值：${allowedStatus.join('/')}`,
+        'INVALID_STATUS',
+        400
+      )
     }
 
     // 验证目标用户存在
     const targetUser = await models.User.findByPk(userId)
     if (!targetUser) {
-      const error = new Error('目标用户不存在')
-      error.code = 'USER_NOT_FOUND'
-      throw error
+      throw new BusinessError('目标用户不存在', 'USER_NOT_FOUND', 404)
     }
 
     // 构建查询条件
@@ -246,17 +249,13 @@ class LotteryPresetService {
   static async clearUserPresets(adminId, userId) {
     // 🎯 参数验证：userId类型验证
     if (isNaN(userId) || userId <= 0) {
-      const error = new Error('无效的用户ID，必须是正整数')
-      error.code = 'INVALID_USER_ID'
-      throw error
+      throw new BusinessError('无效的用户ID，必须是正整数', 'INVALID_USER_ID', 400)
     }
 
     // 验证目标用户存在
     const targetUser = await models.User.findByPk(userId)
     if (!targetUser) {
-      const error = new Error('目标用户不存在')
-      error.code = 'USER_NOT_FOUND'
-      throw error
+      throw new BusinessError('目标用户不存在', 'USER_NOT_FOUND', 404)
     }
 
     // 清理用户的所有预设
@@ -303,39 +302,41 @@ class LotteryPresetService {
     // 验证status参数
     const allowedStatus = ['pending', 'used', 'all']
     if (!allowedStatus.includes(status)) {
-      const error = new Error(`无效的状态参数，允许值：${allowedStatus.join('/')}`)
-      error.code = 'INVALID_STATUS'
-      throw error
+      throw new BusinessError(
+        `无效的状态参数，允许值：${allowedStatus.join('/')}`,
+        'INVALID_STATUS',
+        400
+      )
     }
 
     // 验证排序字段
     const allowedOrderBy = ['created_at', 'queue_order']
     if (!allowedOrderBy.includes(order_by)) {
-      const error = new Error(`无效的排序字段，允许值：${allowedOrderBy.join('/')}`)
-      error.code = 'INVALID_ORDER_BY'
-      throw error
+      throw new BusinessError(
+        `无效的排序字段，允许值：${allowedOrderBy.join('/')}`,
+        'INVALID_ORDER_BY',
+        400
+      )
     }
 
     // 验证排序方向
     const allowedOrderDir = ['ASC', 'DESC']
     if (!allowedOrderDir.includes(order_dir.toUpperCase())) {
-      const error = new Error(`无效的排序方向，允许值：${allowedOrderDir.join('/')}`)
-      error.code = 'INVALID_ORDER_DIR'
-      throw error
+      throw new BusinessError(
+        `无效的排序方向，允许值：${allowedOrderDir.join('/')}`,
+        'INVALID_ORDER_DIR',
+        400
+      )
     }
 
     // 验证分页参数
     const pageNum = parseInt(page)
     const pageSizeNum = parseInt(page_size)
     if (isNaN(pageNum) || pageNum < 1) {
-      const error = new Error('页码必须是大于0的整数')
-      error.code = 'INVALID_PAGE'
-      throw error
+      throw new BusinessError('页码必须是大于0的整数', 'INVALID_PAGE', 400)
     }
     if (isNaN(pageSizeNum) || pageSizeNum < 1 || pageSizeNum > 100) {
-      const error = new Error('每页数量必须在1-100之间')
-      error.code = 'INVALID_PAGE_SIZE'
-      throw error
+      throw new BusinessError('每页数量必须在1-100之间', 'INVALID_PAGE_SIZE', 400)
     }
 
     // 构建查询条件
@@ -346,9 +347,7 @@ class LotteryPresetService {
     if (user_id) {
       const userId = parseInt(user_id)
       if (isNaN(userId) || userId <= 0) {
-        const error = new Error('无效的用户ID，必须是正整数')
-        error.code = 'INVALID_USER_ID'
-        throw error
+        throw new BusinessError('无效的用户ID，必须是正整数', 'INVALID_USER_ID', 400)
       }
       whereCondition.user_id = userId
     }
@@ -440,9 +439,7 @@ class LotteryPresetService {
    */
   static async getPresetById(presetId) {
     if (!presetId) {
-      const error = new Error('参数错误：预设ID不能为空')
-      error.code = 'INVALID_PARAMETERS'
-      throw error
+      throw new BusinessError('参数错误：预设ID不能为空', 'INVALID_PARAMETERS', 400)
     }
 
     const preset = await models.LotteryPreset.findByPk(presetId, {
@@ -509,24 +506,18 @@ class LotteryPresetService {
     const { transaction } = options
 
     if (!presetId) {
-      const error = new Error('参数错误：预设ID不能为空')
-      error.code = 'INVALID_PARAMETERS'
-      throw error
+      throw new BusinessError('参数错误：预设ID不能为空', 'INVALID_PARAMETERS', 400)
     }
 
     const preset = await models.LotteryPreset.findByPk(presetId, { transaction })
 
     if (!preset) {
-      const error = new Error('预设不存在')
-      error.code = 'PRESET_NOT_FOUND'
-      throw error
+      throw new BusinessError('预设不存在', 'PRESET_NOT_FOUND', 404)
     }
 
     // 只能更新 pending 状态的预设
     if (preset.status !== 'pending') {
-      const error = new Error('只能更新等待使用状态的预设')
-      error.code = 'INVALID_PRESET_STATUS'
-      throw error
+      throw new BusinessError('只能更新等待使用状态的预设', 'INVALID_PRESET_STATUS', 400)
     }
 
     // 允许更新的字段白名单
@@ -544,9 +535,7 @@ class LotteryPresetService {
         transaction
       })
       if (!prize) {
-        const error = new Error('奖品不存在')
-        error.code = 'PRIZE_NOT_FOUND'
-        throw error
+        throw new BusinessError('奖品不存在', 'PRIZE_NOT_FOUND', 404)
       }
     }
 
@@ -583,24 +572,18 @@ class LotteryPresetService {
     const { transaction } = options
 
     if (!presetId) {
-      const error = new Error('参数错误：预设ID不能为空')
-      error.code = 'INVALID_PARAMETERS'
-      throw error
+      throw new BusinessError('参数错误：预设ID不能为空', 'INVALID_PARAMETERS', 400)
     }
 
     const preset = await models.LotteryPreset.findByPk(presetId, { transaction })
 
     if (!preset) {
-      const error = new Error('预设不存在')
-      error.code = 'PRESET_NOT_FOUND'
-      throw error
+      throw new BusinessError('预设不存在', 'PRESET_NOT_FOUND', 404)
     }
 
     // 只能删除 pending 状态的预设
     if (preset.status !== 'pending') {
-      const error = new Error('只能删除等待使用状态的预设')
-      error.code = 'INVALID_PRESET_STATUS'
-      throw error
+      throw new BusinessError('只能删除等待使用状态的预设', 'INVALID_PRESET_STATUS', 400)
     }
 
     await preset.destroy({ transaction })

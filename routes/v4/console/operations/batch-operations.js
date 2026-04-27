@@ -137,176 +137,181 @@ function getActivityService(req) {
  *   }
  * }
  */
-router.post('/quota-grant', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const operator_id = req.user.user_id
-  // 通过 ServiceManager 获取 models（Phase 3 收口）
-  const { BatchOperationLog } = req.app.locals.models
-  const operation_type = BatchOperationLog.OPERATION_TYPES.QUOTA_GRANT_BATCH
+router.post(
+  '/quota-grant',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const operator_id = req.user.user_id
+    // 通过 ServiceManager 获取 models（Phase 3 收口）
+    const { BatchOperationLog } = req.app.locals.models
+    const operation_type = BatchOperationLog.OPERATION_TYPES.QUOTA_GRANT_BATCH
 
-  try {
-    const { lottery_campaign_id, user_ids, bonus_count, reason } = req.body
+    try {
+      const { lottery_campaign_id, user_ids, bonus_count, reason } = req.body
 
-    // ========== 参数验证 ==========
-    if (!lottery_campaign_id || isNaN(parseInt(lottery_campaign_id))) {
-      return res.apiError(
-        'lottery_campaign_id 必须为有效的活动ID',
-        'INVALID_CAMPAIGN_ID',
-        null,
-        400
-      )
-    }
-
-    if (!Array.isArray(user_ids) || user_ids.length === 0) {
-      return res.apiError('user_ids 必须为非空数组', 'INVALID_USER_IDS', null, 400)
-    }
-
-    if (!bonus_count || parseInt(bonus_count) <= 0) {
-      return res.apiError('bonus_count 必须为正整数', 'INVALID_BONUS_COUNT', null, 400)
-    }
-
-    if (!reason || reason.trim().length === 0) {
-      return res.apiError('reason 不能为空', 'INVALID_REASON', null, 400)
-    }
-
-    // ========== 预检查 ==========
-    const preCheckResult = await getBatchOperationService(req).preCheck({
-      operation_type,
-      operator_id,
-      operation_params: { lottery_campaign_id, user_ids, bonus_count, reason },
-      items_count: user_ids.length
-    })
-
-    if (!preCheckResult.passed) {
-      const firstError = preCheckResult.errors[0]
-
-      // 如果是幂等冲突，返回已有的日志信息
-      if (firstError.code === 'IDEMPOTENCY_CONFLICT') {
-        logger.warn('批量赠送抽奖次数：幂等冲突', {
-          operator_id,
-          existing_log: firstError.existing_log
-        })
+      // ========== 参数验证 ==========
+      if (!lottery_campaign_id || isNaN(parseInt(lottery_campaign_id))) {
         return res.apiError(
-          '操作已提交或正在处理中，请勿重复提交',
-          'IDEMPOTENCY_CONFLICT',
-          {
-            existing_batch_operation_log_id: firstError.existing_log?.batch_operation_log_id
-          },
-          409
+          'lottery_campaign_id 必须为有效的活动ID',
+          'INVALID_CAMPAIGN_ID',
+          null,
+          400
         )
       }
 
-      return res.apiError(
-        firstError.message,
-        firstError.code,
-        { errors: preCheckResult.errors },
-        429
-      )
-    }
-
-    // ========== 创建批量操作日志 ==========
-    const batchLog = await getBatchOperationService(req).createOperationLog({
-      operation_type,
-      operator_id,
-      total: user_ids.length,
-      operation_params: { lottery_campaign_id, user_ids, bonus_count, reason },
-      idempotency_key: preCheckResult.idempotency_key
-    })
-
-    // ========== 执行批量操作（部分成功模式） ==========
-    const successItems = []
-    const failedItems = []
-    const LotteryQuotaService = getLotteryQuotaService(req)
-
-    for (const user_id of user_ids) {
-      try {
-        // 使用 TransactionManager 管理单个子操作的事务边界
-        const result = await TransactionManager.execute(
-          async transaction => {
-            return LotteryQuotaService.addBonusDrawCount(
-              {
-                user_id: parseInt(user_id),
-                lottery_campaign_id: parseInt(lottery_campaign_id),
-                bonus_count: parseInt(bonus_count),
-                reason: `[批量赠送] ${reason.trim()}`
-              },
-              { transaction, admin_id: operator_id }
-            )
-          },
-          { description: `批量赠送-用户${user_id}` }
-        )
-
-        successItems.push({
-          user_id: parseInt(user_id),
-          new_bonus_count: result?.bonus_draw_count || result?.new_total_available,
-          message: '赠送成功'
-        })
-      } catch (error) {
-        failedItems.push({
-          user_id: parseInt(user_id),
-          error_code: error.code || 'GRANT_FAILED',
-          error_message: error.message || '赠送失败'
-        })
-
-        logger.warn('批量赠送单用户失败', {
-          batch_operation_log_id: batchLog.batch_operation_log_id,
-          user_id,
-          error: error.message
-        })
+      if (!Array.isArray(user_ids) || user_ids.length === 0) {
+        return res.apiError('user_ids 必须为非空数组', 'INVALID_USER_IDS', null, 400)
       }
-    }
 
-    // ========== 更新批量操作日志 ==========
-    await getBatchOperationService(req).updateProgress(batchLog.batch_operation_log_id, {
-      success_count: successItems.length,
-      fail_count: failedItems.length,
-      result_summary: {
-        success_items: successItems,
-        failed_items: failedItems,
-        lottery_campaign_id,
-        bonus_count,
-        reason
+      if (!bonus_count || parseInt(bonus_count) <= 0) {
+        return res.apiError('bonus_count 必须为正整数', 'INVALID_BONUS_COUNT', null, 400)
       }
-    })
 
-    // 重新获取更新后的日志
-    const finalLog = await getBatchOperationService(req).getOperationDetail(
-      batchLog.batch_operation_log_id
-    )
+      if (!reason || reason.trim().length === 0) {
+        return res.apiError('reason 不能为空', 'INVALID_REASON', null, 400)
+      }
 
-    logger.info('批量赠送抽奖次数完成', {
-      batch_operation_log_id: batchLog.batch_operation_log_id,
-      operator_id,
-      lottery_campaign_id,
-      total: user_ids.length,
-      success_count: successItems.length,
-      fail_count: failedItems.length
-    })
+      // ========== 预检查 ==========
+      const preCheckResult = await getBatchOperationService(req).preCheck({
+        operation_type,
+        operator_id,
+        operation_params: { lottery_campaign_id, user_ids, bonus_count, reason },
+        items_count: user_ids.length
+      })
 
-    return res.apiSuccess(
-      {
-        batch_operation_log_id: finalLog.batch_operation_log_id,
-        status: finalLog.status,
-        status_name: finalLog.status_name,
-        total_count: finalLog.total_count,
-        success_count: finalLog.success_count,
-        fail_count: finalLog.fail_count,
-        success_rate: finalLog.success_rate,
-        result_details: {
-          success_items: successItems,
-          failed_items: failedItems
+      if (!preCheckResult.passed) {
+        const firstError = preCheckResult.errors[0]
+
+        // 如果是幂等冲突，返回已有的日志信息
+        if (firstError.code === 'IDEMPOTENCY_CONFLICT') {
+          logger.warn('批量赠送抽奖次数：幂等冲突', {
+            operator_id,
+            existing_log: firstError.existing_log
+          })
+          return res.apiError(
+            '操作已提交或正在处理中，请勿重复提交',
+            'IDEMPOTENCY_CONFLICT',
+            {
+              existing_batch_operation_log_id: firstError.existing_log?.batch_operation_log_id
+            },
+            409
+          )
         }
-      },
-      '批量赠送抽奖次数完成'
-    )
-  } catch (error) {
-    logger.error('批量赠送抽奖次数失败', {
-      operator_id,
-      error: error.message,
-      stack: error.stack
-    })
-    return res.apiError(`批量赠送失败：${error.message}`, 'BATCH_QUOTA_GRANT_FAILED', null, 500)
-  }
-}))
+
+        return res.apiError(
+          firstError.message,
+          firstError.code,
+          { errors: preCheckResult.errors },
+          429
+        )
+      }
+
+      // ========== 创建批量操作日志 ==========
+      const batchLog = await getBatchOperationService(req).createOperationLog({
+        operation_type,
+        operator_id,
+        total: user_ids.length,
+        operation_params: { lottery_campaign_id, user_ids, bonus_count, reason },
+        idempotency_key: preCheckResult.idempotency_key
+      })
+
+      // ========== 执行批量操作（部分成功模式） ==========
+      const successItems = []
+      const failedItems = []
+      const LotteryQuotaService = getLotteryQuotaService(req)
+
+      for (const user_id of user_ids) {
+        try {
+          // 使用 TransactionManager 管理单个子操作的事务边界
+          const result = await TransactionManager.execute(
+            async transaction => {
+              return LotteryQuotaService.addBonusDrawCount(
+                {
+                  user_id: parseInt(user_id),
+                  lottery_campaign_id: parseInt(lottery_campaign_id),
+                  bonus_count: parseInt(bonus_count),
+                  reason: `[批量赠送] ${reason.trim()}`
+                },
+                { transaction, admin_id: operator_id }
+              )
+            },
+            { description: `批量赠送-用户${user_id}` }
+          )
+
+          successItems.push({
+            user_id: parseInt(user_id),
+            new_bonus_count: result?.bonus_draw_count || result?.new_total_available,
+            message: '赠送成功'
+          })
+        } catch (error) {
+          failedItems.push({
+            user_id: parseInt(user_id),
+            error_code: error.code || 'GRANT_FAILED',
+            error_message: error.message || '赠送失败'
+          })
+
+          logger.warn('批量赠送单用户失败', {
+            batch_operation_log_id: batchLog.batch_operation_log_id,
+            user_id,
+            error: error.message
+          })
+        }
+      }
+
+      // ========== 更新批量操作日志 ==========
+      await getBatchOperationService(req).updateProgress(batchLog.batch_operation_log_id, {
+        success_count: successItems.length,
+        fail_count: failedItems.length,
+        result_summary: {
+          success_items: successItems,
+          failed_items: failedItems,
+          lottery_campaign_id,
+          bonus_count,
+          reason
+        }
+      })
+
+      // 重新获取更新后的日志
+      const finalLog = await getBatchOperationService(req).getOperationDetail(
+        batchLog.batch_operation_log_id
+      )
+
+      logger.info('批量赠送抽奖次数完成', {
+        batch_operation_log_id: batchLog.batch_operation_log_id,
+        operator_id,
+        lottery_campaign_id,
+        total: user_ids.length,
+        success_count: successItems.length,
+        fail_count: failedItems.length
+      })
+
+      return res.apiSuccess(
+        {
+          batch_operation_log_id: finalLog.batch_operation_log_id,
+          status: finalLog.status,
+          status_name: finalLog.status_name,
+          total_count: finalLog.total_count,
+          success_count: finalLog.success_count,
+          fail_count: finalLog.fail_count,
+          success_rate: finalLog.success_rate,
+          result_details: {
+            success_items: successItems,
+            failed_items: failedItems
+          }
+        },
+        '批量赠送抽奖次数完成'
+      )
+    } catch (error) {
+      logger.error('批量赠送抽奖次数失败', {
+        operator_id,
+        error: error.message,
+        stack: error.stack
+      })
+      return res.apiError(`批量赠送失败：${error.message}`, 'BATCH_QUOTA_GRANT_FAILED', null, 500)
+    }
+  })
+)
 
 // ==================== B9: 批量活动状态切换 ====================
 
@@ -326,169 +331,179 @@ router.post('/quota-grant', authenticateToken, requireRoleLevel(100), asyncHandl
  *   reason: string            // 必填：切换原因
  * }
  */
-router.post('/campaign-status', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const operator_id = req.user.user_id
-  // 通过 ServiceManager 获取 models（Phase 3 收口）
-  const { BatchOperationLog } = req.app.locals.models
-  const operation_type = BatchOperationLog.OPERATION_TYPES.CAMPAIGN_STATUS_BATCH
+router.post(
+  '/campaign-status',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const operator_id = req.user.user_id
+    // 通过 ServiceManager 获取 models（Phase 3 收口）
+    const { BatchOperationLog } = req.app.locals.models
+    const operation_type = BatchOperationLog.OPERATION_TYPES.CAMPAIGN_STATUS_BATCH
 
-  try {
-    const { lottery_campaign_ids, target_status, reason } = req.body
+    try {
+      const { lottery_campaign_ids, target_status, reason } = req.body
 
-    // ========== 参数验证 ==========
-    if (!Array.isArray(lottery_campaign_ids) || lottery_campaign_ids.length === 0) {
-      return res.apiError('lottery_campaign_ids 必须为非空数组', 'INVALID_CAMPAIGN_IDS', null, 400)
-    }
-
-    const validStatuses = ['active', 'paused', 'ended']
-    if (!target_status || !validStatuses.includes(target_status)) {
-      return res.apiError(
-        `target_status 必须为 ${validStatuses.join('/')}`,
-        'INVALID_TARGET_STATUS',
-        null,
-        400
-      )
-    }
-
-    if (!reason || reason.trim().length === 0) {
-      return res.apiError('reason 不能为空', 'INVALID_REASON', null, 400)
-    }
-
-    // ========== 预检查 ==========
-    const preCheckResult = await getBatchOperationService(req).preCheck({
-      operation_type,
-      operator_id,
-      operation_params: { lottery_campaign_ids, target_status, reason },
-      items_count: lottery_campaign_ids.length
-    })
-
-    if (!preCheckResult.passed) {
-      const firstError = preCheckResult.errors[0]
-      if (firstError.code === 'IDEMPOTENCY_CONFLICT') {
+      // ========== 参数验证 ==========
+      if (!Array.isArray(lottery_campaign_ids) || lottery_campaign_ids.length === 0) {
         return res.apiError(
-          '操作已提交或正在处理中',
-          'IDEMPOTENCY_CONFLICT',
-          {
-            existing_batch_operation_log_id: firstError.existing_log?.batch_operation_log_id
-          },
-          409
+          'lottery_campaign_ids 必须为非空数组',
+          'INVALID_CAMPAIGN_IDS',
+          null,
+          400
         )
       }
+
+      const validStatuses = ['active', 'paused', 'ended']
+      if (!target_status || !validStatuses.includes(target_status)) {
+        return res.apiError(
+          `target_status 必须为 ${validStatuses.join('/')}`,
+          'INVALID_TARGET_STATUS',
+          null,
+          400
+        )
+      }
+
+      if (!reason || reason.trim().length === 0) {
+        return res.apiError('reason 不能为空', 'INVALID_REASON', null, 400)
+      }
+
+      // ========== 预检查 ==========
+      const preCheckResult = await getBatchOperationService(req).preCheck({
+        operation_type,
+        operator_id,
+        operation_params: { lottery_campaign_ids, target_status, reason },
+        items_count: lottery_campaign_ids.length
+      })
+
+      if (!preCheckResult.passed) {
+        const firstError = preCheckResult.errors[0]
+        if (firstError.code === 'IDEMPOTENCY_CONFLICT') {
+          return res.apiError(
+            '操作已提交或正在处理中',
+            'IDEMPOTENCY_CONFLICT',
+            {
+              existing_batch_operation_log_id: firstError.existing_log?.batch_operation_log_id
+            },
+            409
+          )
+        }
+        return res.apiError(
+          firstError.message,
+          firstError.code,
+          { errors: preCheckResult.errors },
+          429
+        )
+      }
+
+      // ========== 创建批量操作日志 ==========
+      const batchLog = await getBatchOperationService(req).createOperationLog({
+        operation_type,
+        operator_id,
+        total: lottery_campaign_ids.length,
+        operation_params: { lottery_campaign_ids, target_status, reason },
+        idempotency_key: preCheckResult.idempotency_key
+      })
+
+      // ========== 执行批量操作 ==========
+      const successItems = []
+      const failedItems = []
+      const ActivityService = getActivityService(req)
+
+      for (const lottery_campaign_id of lottery_campaign_ids) {
+        try {
+          // 使用 TransactionManager 管理单个子操作的事务边界
+          await TransactionManager.execute(
+            async transaction => {
+              await ActivityService.updateCampaignStatus(
+                parseInt(lottery_campaign_id),
+                target_status,
+                {
+                  reason: `[批量切换] ${reason.trim()}`,
+                  operator_id,
+                  transaction
+                }
+              )
+            },
+            { description: `批量切换状态-活动${lottery_campaign_id}` }
+          )
+
+          successItems.push({
+            lottery_campaign_id: parseInt(lottery_campaign_id),
+            new_status: target_status,
+            message: '状态切换成功'
+          })
+        } catch (error) {
+          failedItems.push({
+            lottery_campaign_id: parseInt(lottery_campaign_id),
+            error_code: error.code || 'STATUS_CHANGE_FAILED',
+            error_message: error.message || '状态切换失败'
+          })
+
+          logger.warn('批量切换单活动状态失败', {
+            batch_operation_log_id: batchLog.batch_operation_log_id,
+            lottery_campaign_id,
+            error: error.message
+          })
+        }
+      }
+
+      // ========== 更新批量操作日志 ==========
+      await getBatchOperationService(req).updateProgress(batchLog.batch_operation_log_id, {
+        success_count: successItems.length,
+        fail_count: failedItems.length,
+        result_summary: {
+          success_items: successItems,
+          failed_items: failedItems,
+          target_status,
+          reason
+        }
+      })
+
+      const finalLog = await getBatchOperationService(req).getOperationDetail(
+        batchLog.batch_operation_log_id
+      )
+
+      logger.info('批量活动状态切换完成', {
+        batch_operation_log_id: batchLog.batch_operation_log_id,
+        operator_id,
+        target_status,
+        total: lottery_campaign_ids.length,
+        success_count: successItems.length,
+        fail_count: failedItems.length
+      })
+
+      return res.apiSuccess(
+        {
+          batch_operation_log_id: finalLog.batch_operation_log_id,
+          status: finalLog.status,
+          status_name: finalLog.status_name,
+          total_count: finalLog.total_count,
+          success_count: finalLog.success_count,
+          fail_count: finalLog.fail_count,
+          success_rate: finalLog.success_rate,
+          result_details: {
+            success_items: successItems,
+            failed_items: failedItems
+          }
+        },
+        '批量活动状态切换完成'
+      )
+    } catch (error) {
+      logger.error('批量活动状态切换失败', {
+        operator_id,
+        error: error.message,
+        stack: error.stack
+      })
       return res.apiError(
-        firstError.message,
-        firstError.code,
-        { errors: preCheckResult.errors },
-        429
+        `批量状态切换失败：${error.message}`,
+        'BATCH_CAMPAIGN_STATUS_FAILED',
+        null,
+        500
       )
     }
-
-    // ========== 创建批量操作日志 ==========
-    const batchLog = await getBatchOperationService(req).createOperationLog({
-      operation_type,
-      operator_id,
-      total: lottery_campaign_ids.length,
-      operation_params: { lottery_campaign_ids, target_status, reason },
-      idempotency_key: preCheckResult.idempotency_key
-    })
-
-    // ========== 执行批量操作 ==========
-    const successItems = []
-    const failedItems = []
-    const ActivityService = getActivityService(req)
-
-    for (const lottery_campaign_id of lottery_campaign_ids) {
-      try {
-        // 使用 TransactionManager 管理单个子操作的事务边界
-        await TransactionManager.execute(
-          async transaction => {
-            await ActivityService.updateCampaignStatus(
-              parseInt(lottery_campaign_id),
-              target_status,
-              {
-                reason: `[批量切换] ${reason.trim()}`,
-                operator_id,
-                transaction
-              }
-            )
-          },
-          { description: `批量切换状态-活动${lottery_campaign_id}` }
-        )
-
-        successItems.push({
-          lottery_campaign_id: parseInt(lottery_campaign_id),
-          new_status: target_status,
-          message: '状态切换成功'
-        })
-      } catch (error) {
-        failedItems.push({
-          lottery_campaign_id: parseInt(lottery_campaign_id),
-          error_code: error.code || 'STATUS_CHANGE_FAILED',
-          error_message: error.message || '状态切换失败'
-        })
-
-        logger.warn('批量切换单活动状态失败', {
-          batch_operation_log_id: batchLog.batch_operation_log_id,
-          lottery_campaign_id,
-          error: error.message
-        })
-      }
-    }
-
-    // ========== 更新批量操作日志 ==========
-    await getBatchOperationService(req).updateProgress(batchLog.batch_operation_log_id, {
-      success_count: successItems.length,
-      fail_count: failedItems.length,
-      result_summary: {
-        success_items: successItems,
-        failed_items: failedItems,
-        target_status,
-        reason
-      }
-    })
-
-    const finalLog = await getBatchOperationService(req).getOperationDetail(
-      batchLog.batch_operation_log_id
-    )
-
-    logger.info('批量活动状态切换完成', {
-      batch_operation_log_id: batchLog.batch_operation_log_id,
-      operator_id,
-      target_status,
-      total: lottery_campaign_ids.length,
-      success_count: successItems.length,
-      fail_count: failedItems.length
-    })
-
-    return res.apiSuccess(
-      {
-        batch_operation_log_id: finalLog.batch_operation_log_id,
-        status: finalLog.status,
-        status_name: finalLog.status_name,
-        total_count: finalLog.total_count,
-        success_count: finalLog.success_count,
-        fail_count: finalLog.fail_count,
-        success_rate: finalLog.success_rate,
-        result_details: {
-          success_items: successItems,
-          failed_items: failedItems
-        }
-      },
-      '批量活动状态切换完成'
-    )
-  } catch (error) {
-    logger.error('批量活动状态切换失败', {
-      operator_id,
-      error: error.message,
-      stack: error.stack
-    })
-    return res.apiError(
-      `批量状态切换失败：${error.message}`,
-      'BATCH_CAMPAIGN_STATUS_FAILED',
-      null,
-      500
-    )
-  }
-}))
+  })
+)
 
 // ==================== B7: 批量设置干预规则 ====================
 
@@ -513,173 +528,178 @@ router.post('/campaign-status', authenticateToken, requireRoleLevel(100), asyncH
  *   reason: string            // 必填：设置原因
  * }
  */
-router.post('/preset-rules', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const operator_id = req.user.user_id
-  // 通过 ServiceManager 获取 models（Phase 3 收口）
-  const { BatchOperationLog } = req.app.locals.models
-  const operation_type = BatchOperationLog.OPERATION_TYPES.PRESET_BATCH
+router.post(
+  '/preset-rules',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const operator_id = req.user.user_id
+    // 通过 ServiceManager 获取 models（Phase 3 收口）
+    const { BatchOperationLog } = req.app.locals.models
+    const operation_type = BatchOperationLog.OPERATION_TYPES.PRESET_BATCH
 
-  try {
-    const { rules, reason } = req.body
+    try {
+      const { rules, reason } = req.body
 
-    // ========== 参数验证 ==========
-    if (!Array.isArray(rules) || rules.length === 0) {
-      return res.apiError('rules 必须为非空数组', 'INVALID_RULES', null, 400)
-    }
-
-    if (!reason || reason.trim().length === 0) {
-      return res.apiError('reason 不能为空', 'INVALID_REASON', null, 400)
-    }
-
-    // 验证每条规则的必填字段
-    for (let i = 0; i < rules.length; i++) {
-      const rule = rules[i]
-      if (!rule.user_id || !rule.lottery_campaign_id || !rule.lottery_prize_id) {
-        return res.apiError(
-          `规则[${i}]缺少必填字段：user_id、lottery_campaign_id、prize_id`,
-          'INVALID_RULE_PARAMS',
-          null,
-          400
-        )
+      // ========== 参数验证 ==========
+      if (!Array.isArray(rules) || rules.length === 0) {
+        return res.apiError('rules 必须为非空数组', 'INVALID_RULES', null, 400)
       }
-    }
 
-    // ========== 预检查 ==========
-    const preCheckResult = await getBatchOperationService(req).preCheck({
-      operation_type,
-      operator_id,
-      operation_params: { rules, reason },
-      items_count: rules.length
-    })
-
-    if (!preCheckResult.passed) {
-      const firstError = preCheckResult.errors[0]
-      if (firstError.code === 'IDEMPOTENCY_CONFLICT') {
-        return res.apiError(
-          '操作已提交或正在处理中',
-          'IDEMPOTENCY_CONFLICT',
-          {
-            existing_batch_operation_log_id: firstError.existing_log?.batch_operation_log_id
-          },
-          409
-        )
+      if (!reason || reason.trim().length === 0) {
+        return res.apiError('reason 不能为空', 'INVALID_REASON', null, 400)
       }
-      return res.apiError(
-        firstError.message,
-        firstError.code,
-        { errors: preCheckResult.errors },
-        429
-      )
-    }
 
-    // ========== 创建批量操作日志 ==========
-    const batchLog = await getBatchOperationService(req).createOperationLog({
-      operation_type,
-      operator_id,
-      total: rules.length,
-      operation_params: { rules, reason },
-      idempotency_key: preCheckResult.idempotency_key
-    })
-
-    // ========== 执行批量操作 ==========
-    const successItems = []
-    const failedItems = []
-    const LotteryPresetService = getLotteryPresetService(req)
-
-    for (let i = 0; i < rules.length; i++) {
-      const rule = rules[i]
-      try {
-        // 使用 TransactionManager 管理单个子操作的事务边界
-        const preset = await TransactionManager.execute(
-          async transaction => {
-            return LotteryPresetService.createPreset(
-              {
-                user_id: parseInt(rule.user_id),
-                lottery_campaign_id: parseInt(rule.lottery_campaign_id),
-                lottery_prize_id: parseInt(rule.lottery_prize_id),
-                trigger_type: rule.trigger_type || 'first_draw',
-                trigger_value: rule.trigger_value || 1,
-                reason: `[批量设置] ${reason.trim()}`,
-                created_by: operator_id
-              },
-              { transaction }
-            )
-          },
-          { description: `批量设置规则-用户${rule.user_id}` }
-        )
-
-        successItems.push({
-          index: i,
-          user_id: rule.user_id,
-          lottery_campaign_id: rule.lottery_campaign_id,
-          lottery_preset_id: preset?.lottery_preset_id,
-          message: '规则创建成功'
-        })
-      } catch (error) {
-        failedItems.push({
-          index: i,
-          user_id: rule.user_id,
-          lottery_campaign_id: rule.lottery_campaign_id,
-          error_code: error.code || 'PRESET_CREATE_FAILED',
-          error_message: error.message || '规则创建失败'
-        })
-
-        logger.warn('批量创建单条干预规则失败', {
-          batch_operation_log_id: batchLog.batch_operation_log_id,
-          rule_index: i,
-          error: error.message
-        })
-      }
-    }
-
-    // ========== 更新批量操作日志 ==========
-    await getBatchOperationService(req).updateProgress(batchLog.batch_operation_log_id, {
-      success_count: successItems.length,
-      fail_count: failedItems.length,
-      result_summary: {
-        success_items: successItems,
-        failed_items: failedItems,
-        reason
-      }
-    })
-
-    const finalLog = await getBatchOperationService(req).getOperationDetail(
-      batchLog.batch_operation_log_id
-    )
-
-    logger.info('批量设置干预规则完成', {
-      batch_operation_log_id: batchLog.batch_operation_log_id,
-      operator_id,
-      total: rules.length,
-      success_count: successItems.length,
-      fail_count: failedItems.length
-    })
-
-    return res.apiSuccess(
-      {
-        batch_operation_log_id: finalLog.batch_operation_log_id,
-        status: finalLog.status,
-        status_name: finalLog.status_name,
-        total_count: finalLog.total_count,
-        success_count: finalLog.success_count,
-        fail_count: finalLog.fail_count,
-        success_rate: finalLog.success_rate,
-        result_details: {
-          success_items: successItems,
-          failed_items: failedItems
+      // 验证每条规则的必填字段
+      for (let i = 0; i < rules.length; i++) {
+        const rule = rules[i]
+        if (!rule.user_id || !rule.lottery_campaign_id || !rule.lottery_prize_id) {
+          return res.apiError(
+            `规则[${i}]缺少必填字段：user_id、lottery_campaign_id、prize_id`,
+            'INVALID_RULE_PARAMS',
+            null,
+            400
+          )
         }
-      },
-      '批量设置干预规则完成'
-    )
-  } catch (error) {
-    logger.error('批量设置干预规则失败', {
-      operator_id,
-      error: error.message,
-      stack: error.stack
-    })
-    return res.apiError(`批量设置失败：${error.message}`, 'BATCH_PRESET_FAILED', null, 500)
-  }
-}))
+      }
+
+      // ========== 预检查 ==========
+      const preCheckResult = await getBatchOperationService(req).preCheck({
+        operation_type,
+        operator_id,
+        operation_params: { rules, reason },
+        items_count: rules.length
+      })
+
+      if (!preCheckResult.passed) {
+        const firstError = preCheckResult.errors[0]
+        if (firstError.code === 'IDEMPOTENCY_CONFLICT') {
+          return res.apiError(
+            '操作已提交或正在处理中',
+            'IDEMPOTENCY_CONFLICT',
+            {
+              existing_batch_operation_log_id: firstError.existing_log?.batch_operation_log_id
+            },
+            409
+          )
+        }
+        return res.apiError(
+          firstError.message,
+          firstError.code,
+          { errors: preCheckResult.errors },
+          429
+        )
+      }
+
+      // ========== 创建批量操作日志 ==========
+      const batchLog = await getBatchOperationService(req).createOperationLog({
+        operation_type,
+        operator_id,
+        total: rules.length,
+        operation_params: { rules, reason },
+        idempotency_key: preCheckResult.idempotency_key
+      })
+
+      // ========== 执行批量操作 ==========
+      const successItems = []
+      const failedItems = []
+      const LotteryPresetService = getLotteryPresetService(req)
+
+      for (let i = 0; i < rules.length; i++) {
+        const rule = rules[i]
+        try {
+          // 使用 TransactionManager 管理单个子操作的事务边界
+          const preset = await TransactionManager.execute(
+            async transaction => {
+              return LotteryPresetService.createPreset(
+                {
+                  user_id: parseInt(rule.user_id),
+                  lottery_campaign_id: parseInt(rule.lottery_campaign_id),
+                  lottery_prize_id: parseInt(rule.lottery_prize_id),
+                  trigger_type: rule.trigger_type || 'first_draw',
+                  trigger_value: rule.trigger_value || 1,
+                  reason: `[批量设置] ${reason.trim()}`,
+                  created_by: operator_id
+                },
+                { transaction }
+              )
+            },
+            { description: `批量设置规则-用户${rule.user_id}` }
+          )
+
+          successItems.push({
+            index: i,
+            user_id: rule.user_id,
+            lottery_campaign_id: rule.lottery_campaign_id,
+            lottery_preset_id: preset?.lottery_preset_id,
+            message: '规则创建成功'
+          })
+        } catch (error) {
+          failedItems.push({
+            index: i,
+            user_id: rule.user_id,
+            lottery_campaign_id: rule.lottery_campaign_id,
+            error_code: error.code || 'PRESET_CREATE_FAILED',
+            error_message: error.message || '规则创建失败'
+          })
+
+          logger.warn('批量创建单条干预规则失败', {
+            batch_operation_log_id: batchLog.batch_operation_log_id,
+            rule_index: i,
+            error: error.message
+          })
+        }
+      }
+
+      // ========== 更新批量操作日志 ==========
+      await getBatchOperationService(req).updateProgress(batchLog.batch_operation_log_id, {
+        success_count: successItems.length,
+        fail_count: failedItems.length,
+        result_summary: {
+          success_items: successItems,
+          failed_items: failedItems,
+          reason
+        }
+      })
+
+      const finalLog = await getBatchOperationService(req).getOperationDetail(
+        batchLog.batch_operation_log_id
+      )
+
+      logger.info('批量设置干预规则完成', {
+        batch_operation_log_id: batchLog.batch_operation_log_id,
+        operator_id,
+        total: rules.length,
+        success_count: successItems.length,
+        fail_count: failedItems.length
+      })
+
+      return res.apiSuccess(
+        {
+          batch_operation_log_id: finalLog.batch_operation_log_id,
+          status: finalLog.status,
+          status_name: finalLog.status_name,
+          total_count: finalLog.total_count,
+          success_count: finalLog.success_count,
+          fail_count: finalLog.fail_count,
+          success_rate: finalLog.success_rate,
+          result_details: {
+            success_items: successItems,
+            failed_items: failedItems
+          }
+        },
+        '批量设置干预规则完成'
+      )
+    } catch (error) {
+      logger.error('批量设置干预规则失败', {
+        operator_id,
+        error: error.message,
+        stack: error.stack
+      })
+      return res.apiError(`批量设置失败：${error.message}`, 'BATCH_PRESET_FAILED', null, 500)
+    }
+  })
+)
 
 // ==================== B8: 批量核销确认 ====================
 
@@ -698,153 +718,158 @@ router.post('/preset-rules', authenticateToken, requireRoleLevel(100), asyncHand
  *   reason: string            // 必填：核销原因
  * }
  */
-router.post('/redemption-verify', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const operator_id = req.user.user_id
-  // 通过 ServiceManager 获取 models（Phase 3 收口）
-  const { BatchOperationLog } = req.app.locals.models
-  const operation_type = BatchOperationLog.OPERATION_TYPES.REDEMPTION_VERIFY_BATCH
+router.post(
+  '/redemption-verify',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const operator_id = req.user.user_id
+    // 通过 ServiceManager 获取 models（Phase 3 收口）
+    const { BatchOperationLog } = req.app.locals.models
+    const operation_type = BatchOperationLog.OPERATION_TYPES.REDEMPTION_VERIFY_BATCH
 
-  try {
-    const { order_ids, reason } = req.body
+    try {
+      const { order_ids, reason } = req.body
 
-    // ========== 参数验证 ==========
-    if (!Array.isArray(order_ids) || order_ids.length === 0) {
-      return res.apiError('order_ids 必须为非空数组', 'INVALID_ORDER_IDS', null, 400)
-    }
+      // ========== 参数验证 ==========
+      if (!Array.isArray(order_ids) || order_ids.length === 0) {
+        return res.apiError('order_ids 必须为非空数组', 'INVALID_ORDER_IDS', null, 400)
+      }
 
-    if (!reason || reason.trim().length === 0) {
-      return res.apiError('reason 不能为空', 'INVALID_REASON', null, 400)
-    }
+      if (!reason || reason.trim().length === 0) {
+        return res.apiError('reason 不能为空', 'INVALID_REASON', null, 400)
+      }
 
-    // ========== 预检查 ==========
-    const preCheckResult = await getBatchOperationService(req).preCheck({
-      operation_type,
-      operator_id,
-      operation_params: { order_ids, reason },
-      items_count: order_ids.length
-    })
+      // ========== 预检查 ==========
+      const preCheckResult = await getBatchOperationService(req).preCheck({
+        operation_type,
+        operator_id,
+        operation_params: { order_ids, reason },
+        items_count: order_ids.length
+      })
 
-    if (!preCheckResult.passed) {
-      const firstError = preCheckResult.errors[0]
-      if (firstError.code === 'IDEMPOTENCY_CONFLICT') {
+      if (!preCheckResult.passed) {
+        const firstError = preCheckResult.errors[0]
+        if (firstError.code === 'IDEMPOTENCY_CONFLICT') {
+          return res.apiError(
+            '操作已提交或正在处理中',
+            'IDEMPOTENCY_CONFLICT',
+            {
+              existing_batch_operation_log_id: firstError.existing_log?.batch_operation_log_id
+            },
+            409
+          )
+        }
         return res.apiError(
-          '操作已提交或正在处理中',
-          'IDEMPOTENCY_CONFLICT',
-          {
-            existing_batch_operation_log_id: firstError.existing_log?.batch_operation_log_id
-          },
-          409
+          firstError.message,
+          firstError.code,
+          { errors: preCheckResult.errors },
+          429
         )
       }
+
+      // ========== 创建批量操作日志 ==========
+      const batchLog = await getBatchOperationService(req).createOperationLog({
+        operation_type,
+        operator_id,
+        total: order_ids.length,
+        operation_params: { order_ids, reason },
+        idempotency_key: preCheckResult.idempotency_key
+      })
+
+      // ========== 执行批量操作 ==========
+      const successItems = []
+      const failedItems = []
+      const RedemptionService = getRedemptionService(req)
+
+      for (const order_id of order_ids) {
+        try {
+          // 使用 TransactionManager 管理单个子操作的事务边界
+          await TransactionManager.execute(
+            async transaction => {
+              await RedemptionService.verifyOrder(parseInt(order_id), {
+                verifier_id: operator_id,
+                verify_reason: `[批量核销] ${reason.trim()}`,
+                transaction
+              })
+            },
+            { description: `批量核销-订单${order_id}` }
+          )
+
+          successItems.push({
+            order_id: parseInt(order_id),
+            status: 'verified',
+            message: '核销成功'
+          })
+        } catch (error) {
+          failedItems.push({
+            order_id: parseInt(order_id),
+            error_code: error.code || 'VERIFY_FAILED',
+            error_message: error.message || '核销失败'
+          })
+
+          logger.warn('批量核销单订单失败', {
+            batch_operation_log_id: batchLog.batch_operation_log_id,
+            order_id,
+            error: error.message
+          })
+        }
+      }
+
+      // ========== 更新批量操作日志 ==========
+      await getBatchOperationService(req).updateProgress(batchLog.batch_operation_log_id, {
+        success_count: successItems.length,
+        fail_count: failedItems.length,
+        result_summary: {
+          success_items: successItems,
+          failed_items: failedItems,
+          reason
+        }
+      })
+
+      const finalLog = await getBatchOperationService(req).getOperationDetail(
+        batchLog.batch_operation_log_id
+      )
+
+      logger.info('批量核销确认完成', {
+        batch_operation_log_id: batchLog.batch_operation_log_id,
+        operator_id,
+        total: order_ids.length,
+        success_count: successItems.length,
+        fail_count: failedItems.length
+      })
+
+      return res.apiSuccess(
+        {
+          batch_operation_log_id: finalLog.batch_operation_log_id,
+          status: finalLog.status,
+          status_name: finalLog.status_name,
+          total_count: finalLog.total_count,
+          success_count: finalLog.success_count,
+          fail_count: finalLog.fail_count,
+          success_rate: finalLog.success_rate,
+          result_details: {
+            success_items: successItems,
+            failed_items: failedItems
+          }
+        },
+        '批量核销确认完成'
+      )
+    } catch (error) {
+      logger.error('批量核销确认失败', {
+        operator_id,
+        error: error.message,
+        stack: error.stack
+      })
       return res.apiError(
-        firstError.message,
-        firstError.code,
-        { errors: preCheckResult.errors },
-        429
+        `批量核销失败：${error.message}`,
+        'BATCH_REDEMPTION_VERIFY_FAILED',
+        null,
+        500
       )
     }
-
-    // ========== 创建批量操作日志 ==========
-    const batchLog = await getBatchOperationService(req).createOperationLog({
-      operation_type,
-      operator_id,
-      total: order_ids.length,
-      operation_params: { order_ids, reason },
-      idempotency_key: preCheckResult.idempotency_key
-    })
-
-    // ========== 执行批量操作 ==========
-    const successItems = []
-    const failedItems = []
-    const RedemptionService = getRedemptionService(req)
-
-    for (const order_id of order_ids) {
-      try {
-        // 使用 TransactionManager 管理单个子操作的事务边界
-        await TransactionManager.execute(
-          async transaction => {
-            await RedemptionService.verifyOrder(parseInt(order_id), {
-              verifier_id: operator_id,
-              verify_reason: `[批量核销] ${reason.trim()}`,
-              transaction
-            })
-          },
-          { description: `批量核销-订单${order_id}` }
-        )
-
-        successItems.push({
-          order_id: parseInt(order_id),
-          status: 'verified',
-          message: '核销成功'
-        })
-      } catch (error) {
-        failedItems.push({
-          order_id: parseInt(order_id),
-          error_code: error.code || 'VERIFY_FAILED',
-          error_message: error.message || '核销失败'
-        })
-
-        logger.warn('批量核销单订单失败', {
-          batch_operation_log_id: batchLog.batch_operation_log_id,
-          order_id,
-          error: error.message
-        })
-      }
-    }
-
-    // ========== 更新批量操作日志 ==========
-    await getBatchOperationService(req).updateProgress(batchLog.batch_operation_log_id, {
-      success_count: successItems.length,
-      fail_count: failedItems.length,
-      result_summary: {
-        success_items: successItems,
-        failed_items: failedItems,
-        reason
-      }
-    })
-
-    const finalLog = await getBatchOperationService(req).getOperationDetail(
-      batchLog.batch_operation_log_id
-    )
-
-    logger.info('批量核销确认完成', {
-      batch_operation_log_id: batchLog.batch_operation_log_id,
-      operator_id,
-      total: order_ids.length,
-      success_count: successItems.length,
-      fail_count: failedItems.length
-    })
-
-    return res.apiSuccess(
-      {
-        batch_operation_log_id: finalLog.batch_operation_log_id,
-        status: finalLog.status,
-        status_name: finalLog.status_name,
-        total_count: finalLog.total_count,
-        success_count: finalLog.success_count,
-        fail_count: finalLog.fail_count,
-        success_rate: finalLog.success_rate,
-        result_details: {
-          success_items: successItems,
-          failed_items: failedItems
-        }
-      },
-      '批量核销确认完成'
-    )
-  } catch (error) {
-    logger.error('批量核销确认失败', {
-      operator_id,
-      error: error.message,
-      stack: error.stack
-    })
-    return res.apiError(
-      `批量核销失败：${error.message}`,
-      'BATCH_REDEMPTION_VERIFY_FAILED',
-      null,
-      500
-    )
-  }
-}))
+  })
+)
 
 // ==================== B10: 批量预算调整 ====================
 
@@ -867,187 +892,192 @@ router.post('/redemption-verify', authenticateToken, requireRoleLevel(100), asyn
  *   reason: string            // 必填：调整原因
  * }
  */
-router.post('/budget-adjust', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const operator_id = req.user.user_id
-  // 通过 ServiceManager 获取 models（Phase 3 收口）
-  const { BatchOperationLog } = req.app.locals.models
-  const operation_type = BatchOperationLog.OPERATION_TYPES.BUDGET_ADJUST_BATCH
+router.post(
+  '/budget-adjust',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const operator_id = req.user.user_id
+    // 通过 ServiceManager 获取 models（Phase 3 收口）
+    const { BatchOperationLog } = req.app.locals.models
+    const operation_type = BatchOperationLog.OPERATION_TYPES.BUDGET_ADJUST_BATCH
 
-  try {
-    const { adjustments, reason } = req.body
+    try {
+      const { adjustments, reason } = req.body
 
-    // ========== 参数验证 ==========
-    if (!Array.isArray(adjustments) || adjustments.length === 0) {
-      return res.apiError('adjustments 必须为非空数组', 'INVALID_ADJUSTMENTS', null, 400)
-    }
+      // ========== 参数验证 ==========
+      if (!Array.isArray(adjustments) || adjustments.length === 0) {
+        return res.apiError('adjustments 必须为非空数组', 'INVALID_ADJUSTMENTS', null, 400)
+      }
 
-    if (!reason || reason.trim().length === 0) {
-      return res.apiError('reason 不能为空', 'INVALID_REASON', null, 400)
-    }
+      if (!reason || reason.trim().length === 0) {
+        return res.apiError('reason 不能为空', 'INVALID_REASON', null, 400)
+      }
 
-    // 验证每条调整的必填字段
-    const validAdjustmentTypes = ['increase', 'decrease', 'set']
-    for (let i = 0; i < adjustments.length; i++) {
-      const adj = adjustments[i]
-      if (!adj.lottery_campaign_id || !adj.adjustment_type || adj.amount === undefined) {
+      // 验证每条调整的必填字段
+      const validAdjustmentTypes = ['increase', 'decrease', 'set']
+      for (let i = 0; i < adjustments.length; i++) {
+        const adj = adjustments[i]
+        if (!adj.lottery_campaign_id || !adj.adjustment_type || adj.amount === undefined) {
+          return res.apiError(
+            `调整项[${i}]缺少必填字段：lottery_campaign_id、adjustment_type、amount`,
+            'INVALID_ADJUSTMENT_PARAMS',
+            null,
+            400
+          )
+        }
+        if (!validAdjustmentTypes.includes(adj.adjustment_type)) {
+          return res.apiError(
+            `调整项[${i}]的adjustment_type必须为 ${validAdjustmentTypes.join('/')}`,
+            'INVALID_ADJUSTMENT_TYPE',
+            null,
+            400
+          )
+        }
+      }
+
+      // ========== 预检查 ==========
+      const preCheckResult = await getBatchOperationService(req).preCheck({
+        operation_type,
+        operator_id,
+        operation_params: { adjustments, reason },
+        items_count: adjustments.length
+      })
+
+      if (!preCheckResult.passed) {
+        const firstError = preCheckResult.errors[0]
+        if (firstError.code === 'IDEMPOTENCY_CONFLICT') {
+          return res.apiError(
+            '操作已提交或正在处理中',
+            'IDEMPOTENCY_CONFLICT',
+            {
+              existing_batch_operation_log_id: firstError.existing_log?.batch_operation_log_id
+            },
+            409
+          )
+        }
         return res.apiError(
-          `调整项[${i}]缺少必填字段：lottery_campaign_id、adjustment_type、amount`,
-          'INVALID_ADJUSTMENT_PARAMS',
-          null,
-          400
+          firstError.message,
+          firstError.code,
+          { errors: preCheckResult.errors },
+          429
         )
       }
-      if (!validAdjustmentTypes.includes(adj.adjustment_type)) {
-        return res.apiError(
-          `调整项[${i}]的adjustment_type必须为 ${validAdjustmentTypes.join('/')}`,
-          'INVALID_ADJUSTMENT_TYPE',
-          null,
-          400
-        )
-      }
-    }
 
-    // ========== 预检查 ==========
-    const preCheckResult = await getBatchOperationService(req).preCheck({
-      operation_type,
-      operator_id,
-      operation_params: { adjustments, reason },
-      items_count: adjustments.length
-    })
+      // ========== 创建批量操作日志 ==========
+      const batchLog = await getBatchOperationService(req).createOperationLog({
+        operation_type,
+        operator_id,
+        total: adjustments.length,
+        operation_params: { adjustments, reason },
+        idempotency_key: preCheckResult.idempotency_key
+      })
 
-    if (!preCheckResult.passed) {
-      const firstError = preCheckResult.errors[0]
-      if (firstError.code === 'IDEMPOTENCY_CONFLICT') {
-        return res.apiError(
-          '操作已提交或正在处理中',
-          'IDEMPOTENCY_CONFLICT',
-          {
-            existing_batch_operation_log_id: firstError.existing_log?.batch_operation_log_id
-          },
-          409
-        )
+      // ========== 执行批量操作 ==========
+      const successItems = []
+      const failedItems = []
+      const ActivityService = getActivityService(req)
+
+      for (let i = 0; i < adjustments.length; i++) {
+        const adj = adjustments[i]
+        try {
+          // 使用 TransactionManager 管理单个子操作的事务边界
+          const result = await TransactionManager.execute(
+            async transaction => {
+              return ActivityService.adjustCampaignBudget(
+                parseInt(adj.lottery_campaign_id),
+                adj.adjustment_type,
+                parseFloat(adj.amount),
+                {
+                  reason: `[批量调整] ${reason.trim()}`,
+                  operator_id,
+                  transaction
+                }
+              )
+            },
+            { description: `批量预算调整-活动${adj.lottery_campaign_id}` }
+          )
+
+          successItems.push({
+            index: i,
+            lottery_campaign_id: adj.lottery_campaign_id,
+            adjustment_type: adj.adjustment_type,
+            amount: adj.amount,
+            new_budget: result?.new_budget,
+            message: '预算调整成功'
+          })
+        } catch (error) {
+          failedItems.push({
+            index: i,
+            lottery_campaign_id: adj.lottery_campaign_id,
+            adjustment_type: adj.adjustment_type,
+            amount: adj.amount,
+            error_code: error.code || 'BUDGET_ADJUST_FAILED',
+            error_message: error.message || '预算调整失败'
+          })
+
+          logger.warn('批量调整单活动预算失败', {
+            batch_operation_log_id: batchLog.batch_operation_log_id,
+            lottery_campaign_id: adj.lottery_campaign_id,
+            error: error.message
+          })
+        }
       }
+
+      // ========== 更新批量操作日志 ==========
+      await getBatchOperationService(req).updateProgress(batchLog.batch_operation_log_id, {
+        success_count: successItems.length,
+        fail_count: failedItems.length,
+        result_summary: {
+          success_items: successItems,
+          failed_items: failedItems,
+          reason
+        }
+      })
+
+      const finalLog = await getBatchOperationService(req).getOperationDetail(
+        batchLog.batch_operation_log_id
+      )
+
+      logger.info('批量预算调整完成', {
+        batch_operation_log_id: batchLog.batch_operation_log_id,
+        operator_id,
+        total: adjustments.length,
+        success_count: successItems.length,
+        fail_count: failedItems.length
+      })
+
+      return res.apiSuccess(
+        {
+          batch_operation_log_id: finalLog.batch_operation_log_id,
+          status: finalLog.status,
+          status_name: finalLog.status_name,
+          total_count: finalLog.total_count,
+          success_count: finalLog.success_count,
+          fail_count: finalLog.fail_count,
+          success_rate: finalLog.success_rate,
+          result_details: {
+            success_items: successItems,
+            failed_items: failedItems
+          }
+        },
+        '批量预算调整完成'
+      )
+    } catch (error) {
+      logger.error('批量预算调整失败', {
+        operator_id,
+        error: error.message,
+        stack: error.stack
+      })
       return res.apiError(
-        firstError.message,
-        firstError.code,
-        { errors: preCheckResult.errors },
-        429
+        `批量预算调整失败：${error.message}`,
+        'BATCH_BUDGET_ADJUST_FAILED',
+        null,
+        500
       )
     }
-
-    // ========== 创建批量操作日志 ==========
-    const batchLog = await getBatchOperationService(req).createOperationLog({
-      operation_type,
-      operator_id,
-      total: adjustments.length,
-      operation_params: { adjustments, reason },
-      idempotency_key: preCheckResult.idempotency_key
-    })
-
-    // ========== 执行批量操作 ==========
-    const successItems = []
-    const failedItems = []
-    const ActivityService = getActivityService(req)
-
-    for (let i = 0; i < adjustments.length; i++) {
-      const adj = adjustments[i]
-      try {
-        // 使用 TransactionManager 管理单个子操作的事务边界
-        const result = await TransactionManager.execute(
-          async transaction => {
-            return ActivityService.adjustCampaignBudget(
-              parseInt(adj.lottery_campaign_id),
-              adj.adjustment_type,
-              parseFloat(adj.amount),
-              {
-                reason: `[批量调整] ${reason.trim()}`,
-                operator_id,
-                transaction
-              }
-            )
-          },
-          { description: `批量预算调整-活动${adj.lottery_campaign_id}` }
-        )
-
-        successItems.push({
-          index: i,
-          lottery_campaign_id: adj.lottery_campaign_id,
-          adjustment_type: adj.adjustment_type,
-          amount: adj.amount,
-          new_budget: result?.new_budget,
-          message: '预算调整成功'
-        })
-      } catch (error) {
-        failedItems.push({
-          index: i,
-          lottery_campaign_id: adj.lottery_campaign_id,
-          adjustment_type: adj.adjustment_type,
-          amount: adj.amount,
-          error_code: error.code || 'BUDGET_ADJUST_FAILED',
-          error_message: error.message || '预算调整失败'
-        })
-
-        logger.warn('批量调整单活动预算失败', {
-          batch_operation_log_id: batchLog.batch_operation_log_id,
-          lottery_campaign_id: adj.lottery_campaign_id,
-          error: error.message
-        })
-      }
-    }
-
-    // ========== 更新批量操作日志 ==========
-    await getBatchOperationService(req).updateProgress(batchLog.batch_operation_log_id, {
-      success_count: successItems.length,
-      fail_count: failedItems.length,
-      result_summary: {
-        success_items: successItems,
-        failed_items: failedItems,
-        reason
-      }
-    })
-
-    const finalLog = await getBatchOperationService(req).getOperationDetail(
-      batchLog.batch_operation_log_id
-    )
-
-    logger.info('批量预算调整完成', {
-      batch_operation_log_id: batchLog.batch_operation_log_id,
-      operator_id,
-      total: adjustments.length,
-      success_count: successItems.length,
-      fail_count: failedItems.length
-    })
-
-    return res.apiSuccess(
-      {
-        batch_operation_log_id: finalLog.batch_operation_log_id,
-        status: finalLog.status,
-        status_name: finalLog.status_name,
-        total_count: finalLog.total_count,
-        success_count: finalLog.success_count,
-        fail_count: finalLog.fail_count,
-        success_rate: finalLog.success_rate,
-        result_details: {
-          success_items: successItems,
-          failed_items: failedItems
-        }
-      },
-      '批量预算调整完成'
-    )
-  } catch (error) {
-    logger.error('批量预算调整失败', {
-      operator_id,
-      error: error.message,
-      stack: error.stack
-    })
-    return res.apiError(
-      `批量预算调整失败：${error.message}`,
-      'BATCH_BUDGET_ADJUST_FAILED',
-      null,
-      500
-    )
-  }
-}))
+  })
+)
 
 // ==================== 通用查询接口 ====================
 
@@ -1062,68 +1092,83 @@ router.post('/budget-adjust', authenticateToken, requireRoleLevel(100), asyncHan
  * - page: 页码（默认1）
  * - page_size: 每页数量（默认20）
  */
-router.get('/logs', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const { operator_id, operation_type, status, page = 1, page_size = 20 } = req.query
+router.get(
+  '/logs',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const { operator_id, operation_type, status, page = 1, page_size = 20 } = req.query
 
-  const result = await getBatchOperationService(req).queryOperationLogs({
-    operator_id,
-    operation_type,
-    status,
-    limit: parseInt(page_size),
-    offset: (parseInt(page) - 1) * parseInt(page_size)
+    const result = await getBatchOperationService(req).queryOperationLogs({
+      operator_id,
+      operation_type,
+      status,
+      limit: parseInt(page_size),
+      offset: (parseInt(page) - 1) * parseInt(page_size)
+    })
+
+    return res.apiSuccess(
+      {
+        logs: result.logs,
+        pagination: {
+          page: parseInt(page),
+          page_size: parseInt(page_size),
+          total: result.total,
+          total_pages: Math.ceil(result.total / parseInt(page_size))
+        }
+      },
+      '查询批量操作日志成功'
+    )
   })
-
-  return res.apiSuccess(
-    {
-      logs: result.logs,
-      pagination: {
-        page: parseInt(page),
-        page_size: parseInt(page_size),
-        total: result.total,
-        total_pages: Math.ceil(result.total / parseInt(page_size))
-      }
-    },
-    '查询批量操作日志成功'
-  )
-}))
+)
 
 /**
  * 获取批量操作日志详情
  * GET /api/v4/console/batch-operations/logs/:id
  */
-router.get('/logs/:id', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const batch_operation_log_id = parseInt(req.params.id, 10)
+router.get(
+  '/logs/:id',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const batch_operation_log_id = parseInt(req.params.id, 10)
 
-  if (isNaN(batch_operation_log_id) || batch_operation_log_id <= 0) {
-    return res.apiError('无效的日志ID', 'INVALID_LOG_ID', null, 400)
-  }
+    if (isNaN(batch_operation_log_id) || batch_operation_log_id <= 0) {
+      return res.apiError('无效的日志ID', 'INVALID_LOG_ID', null, 400)
+    }
 
-  const detail = await getBatchOperationService(req).getOperationDetail(batch_operation_log_id)
+    const detail = await getBatchOperationService(req).getOperationDetail(batch_operation_log_id)
 
-  if (!detail) {
-    return res.apiError('批量操作日志不存在', 'LOG_NOT_FOUND', null, 404)
-  }
+    if (!detail) {
+      return res.apiError('批量操作日志不存在', 'LOG_NOT_FOUND', null, 404)
+    }
 
-  return res.apiSuccess(detail, '获取批量操作日志详情成功')
-}))
+    return res.apiSuccess(detail, '获取批量操作日志详情成功')
+  })
+)
 
 /**
  * 获取系统配置（批量操作限流配置）
  * GET /api/v4/console/batch-operations/config
  */
-router.get('/config', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  // 通过 ServiceManager 获取 models（Phase 3 收口）
-  const { BatchOperationLog } = req.app.locals.models
-  const configs = await getAdminSystemService(req).getAllBatchConfigs()
+router.get(
+  '/config',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    // 通过 ServiceManager 获取 models（Phase 3 收口）
+    const { BatchOperationLog } = req.app.locals.models
+    const configs = await getAdminSystemService(req).getAllBatchConfigs()
 
-  return res.apiSuccess(
-    {
-      configs,
-      operation_types: BatchOperationLog.OPERATION_TYPE_NAMES,
-      statuses: BatchOperationLog.STATUS_NAMES
-    },
-    '获取批量操作配置成功'
-  )
-}))
+    return res.apiSuccess(
+      {
+        configs,
+        operation_types: BatchOperationLog.OPERATION_TYPE_NAMES,
+        statuses: BatchOperationLog.STATUS_NAMES
+      },
+      '获取批量操作配置成功'
+    )
+  })
+)
 
 module.exports = router

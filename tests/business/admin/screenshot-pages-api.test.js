@@ -86,12 +86,12 @@ describe('截图页面API联动测试', () => {
         const tx = res.body.data.transactions[0]
         expect(tx).toHaveProperty('asset_transaction_id')
         expect(tx).toHaveProperty('asset_code')
-        expect(tx).toHaveProperty('tx_type')
+        expect(tx).toHaveProperty('business_type')
         expect(tx).toHaveProperty('delta_amount')
         expect(tx).toHaveProperty('balance_before')
         expect(tx).toHaveProperty('balance_after')
         expect(tx).toHaveProperty('created_at')
-        expect(tx).toHaveProperty('tx_type_display')
+        expect(tx).toHaveProperty('business_type_display')
       }
     })
 
@@ -115,30 +115,28 @@ describe('截图页面API联动测试', () => {
   describe('材料转换规则管理 - 转换规则', () => {
     test('GET /console/material/conversion-rules 应返回规则列表', async () => {
       const res = await request(app)
-        .get(`${API_BASE}/console/material/conversion-rules`)
+        .get(`${API_BASE}/console/assets/conversion-rules`)
         .set('Authorization', `Bearer ${token}`)
 
       expect(res.status).toBe(200)
       expect(res.body.success).toBe(true)
       expect(res.body.data).toHaveProperty('rules')
-      expect(res.body.data).toHaveProperty('pagination')
       expect(Array.isArray(res.body.data.rules)).toBe(true)
     })
 
     test('转换规则应包含完整业务字段', async () => {
       const res = await request(app)
-        .get(`${API_BASE}/console/material/conversion-rules`)
+        .get(`${API_BASE}/console/assets/conversion-rules`)
         .set('Authorization', `Bearer ${token}`)
 
       if (res.body.data.rules.length > 0) {
         const rule = res.body.data.rules[0]
-        expect(rule).toHaveProperty('material_conversion_rule_id')
+        expect(rule).toHaveProperty('conversion_rule_id')
         expect(rule).toHaveProperty('from_asset_code')
         expect(rule).toHaveProperty('to_asset_code')
-        expect(rule).toHaveProperty('from_amount')
-        expect(rule).toHaveProperty('to_amount')
-        expect(rule).toHaveProperty('effective_at')
-        expect(rule).toHaveProperty('is_enabled')
+        expect(rule).toHaveProperty('rate_numerator')
+        expect(rule).toHaveProperty('rate_denominator')
+        expect(rule).toHaveProperty('status')
       }
     })
   })

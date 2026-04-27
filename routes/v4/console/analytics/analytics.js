@@ -26,7 +26,7 @@ router.get(
   '/decisions/analytics',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-        const { days = 7, user_filter, start_time, end_time } = req.query
+    const { days = 7, user_filter, start_time, end_time } = req.query
 
     // 获取分析服务（V4.7.0 服务拆分：getDecisionAnalytics 在 AnalyticsService 中）
     const AnalyticsService = req.app.locals.services.getService('reporting_analytics')
@@ -63,7 +63,7 @@ router.get(
   '/lottery/trends',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-        const { period = 'week', granularity = 'daily', start_time, end_time } = req.query
+    const { period = 'week', granularity = 'daily', start_time, end_time } = req.query
 
     // 获取分析服务（V4.7.0 服务拆分：getLotteryTrends 在 AnalyticsService 中）
     const AnalyticsService = req.app.locals.services.getService('reporting_analytics')
@@ -89,7 +89,7 @@ router.get(
   '/performance/report',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-        // 获取统计服务（V4.7.0 服务拆分：getPerformanceReport 在 StatsService 中）
+    // 获取统计服务（V4.7.0 服务拆分：getPerformanceReport 在 StatsService 中）
     const StatsService = req.app.locals.services.getService('reporting_stats')
 
     // 调用服务层方法获取性能报告
@@ -113,7 +113,7 @@ router.get(
   '/stats/today',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-        sharedComponents.logger.info('管理员请求今日统计数据', {
+    sharedComponents.logger.info('管理员请求今日统计数据', {
       admin_id: req.user.user_id
     })
 

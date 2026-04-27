@@ -512,7 +512,11 @@ class AdminSystemService {
         'data_management'
       ]
       if (!validCategories.includes(category)) {
-        throw new BusinessError(`无效的设置分类: ${category}。有效分类: ${validCategories.join(', ')}`, 'ADMIN_INVALID', 400)
+        throw new BusinessError(
+          `无效的设置分类: ${category}。有效分类: ${validCategories.join(', ')}`,
+          'ADMIN_INVALID',
+          400
+        )
       }
 
       // 查询该分类下的所有配置项
@@ -662,7 +666,11 @@ class AdminSystemService {
       'data_management'
     ]
     if (!validCategories.includes(category)) {
-      throw new BusinessError(`无效的设置分类: ${category}。有效分类: ${validCategories.join(', ')}`, 'ADMIN_INVALID', 400)
+      throw new BusinessError(
+        `无效的设置分类: ${category}。有效分类: ${validCategories.join(', ')}`,
+        'ADMIN_INVALID',
+        400
+      )
     }
 
     // 验证更新数据

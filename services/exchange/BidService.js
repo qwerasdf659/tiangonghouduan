@@ -143,7 +143,11 @@ class BidService {
     const { transaction, idempotency_key } = options
 
     if (!transaction) {
-      throw new BusinessError('BidService.placeBid 需要外部传入事务（事务边界由路由层管理）', 'EXCHANGE_ERROR', 400)
+      throw new BusinessError(
+        'BidService.placeBid 需要外部传入事务（事务边界由路由层管理）',
+        'EXCHANGE_ERROR',
+        400
+      )
     }
     if (!idempotency_key) {
       throw new BusinessError('idempotency_key 是必填参数', 'EXCHANGE_REQUIRED', 400)
@@ -442,7 +446,11 @@ class BidService {
     const defaultSku = exchangeItem.skus?.[0] || null
     const skuKey = defaultSku?.sku_id ?? exchangeItem.exchange_item_id
     if (!skuKey) {
-      throw new BusinessError(`竞价 ${bidProductId} 结算失败：商品缺少 sku_id 与 exchange_item_id`, 'EXCHANGE_REQUIRED', 400)
+      throw new BusinessError(
+        `竞价 ${bidProductId} 结算失败：商品缺少 sku_id 与 exchange_item_id`,
+        'EXCHANGE_REQUIRED',
+        400
+      )
     }
     const settleTs = Date.now()
     const placeholderBidOrder = `PH${crypto.randomBytes(12).toString('hex').toUpperCase()}`
@@ -520,7 +528,11 @@ class BidService {
         }
       )
       if (affectedRows === 0) {
-        throw new BusinessError(`商品 ${exchangeItem.item_name} SKU ${defaultSku.sku_code} 库存不足`, 'EXCHANGE_STOCK_INSUFFICIENT', 400)
+        throw new BusinessError(
+          `商品 ${exchangeItem.item_name} SKU ${defaultSku.sku_code} 库存不足`,
+          'EXCHANGE_STOCK_INSUFFICIENT',
+          400
+        )
       }
     }
 
@@ -622,7 +634,11 @@ class BidService {
     }
 
     if (!['pending', 'active'].includes(bidProduct.status)) {
-      throw new BusinessError(`竞价状态为 ${bidProduct.status}，无法取消（仅 pending/active 可取消）`, 'EXCHANGE_ERROR', 400)
+      throw new BusinessError(
+        `竞价状态为 ${bidProduct.status}，无法取消（仅 pending/active 可取消）`,
+        'EXCHANGE_ERROR',
+        400
+      )
     }
 
     const assetCode = bidProduct.price_asset_code

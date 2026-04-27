@@ -107,12 +107,7 @@ router.post(
         user_id: req.user.user_id,
         reason: antifraudResult.invalid_reason
       })
-      return res.apiError(
-        '曝光事件无效',
-        'INVALID_IMPRESSION',
-        antifraudResult.invalid_reason,
-        400
-      )
+      return res.apiError('曝光事件无效', 'INVALID_IMPRESSION', antifraudResult.invalid_reason, 400)
     }
 
     // 创建曝光日志
@@ -124,7 +119,7 @@ router.post(
 
     // CPM 计费管线：对 CPM 类型广告计划进行 Redis 曝光计数
     try {
-      const { AdCampaign } = require('../../../models')
+      const { AdCampaign } = req.app.locals.models
       const campaign = await AdCampaign.findByPk(parsedCampaignId, {
         attributes: ['ad_campaign_id', 'billing_mode']
       })

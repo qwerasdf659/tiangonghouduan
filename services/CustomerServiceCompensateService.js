@@ -48,11 +48,19 @@ class CustomerServiceCompensateService {
     const transaction = options.transaction
 
     if (!transaction) {
-      throw new BusinessError('补偿操作必须在事务内执行（缺少 options.transaction）', 'CUSTOMER_SERVICE_REQUIRED', 400)
+      throw new BusinessError(
+        '补偿操作必须在事务内执行（缺少 options.transaction）',
+        'CUSTOMER_SERVICE_REQUIRED',
+        400
+      )
     }
 
     if (!user_id || !operator_id || !reason || !items || items.length === 0) {
-      throw new BusinessError('补偿参数不完整：需要 user_id, operator_id, reason, items', 'CUSTOMER_SERVICE_ERROR', 400)
+      throw new BusinessError(
+        '补偿参数不完整：需要 user_id, operator_id, reason, items',
+        'CUSTOMER_SERVICE_ERROR',
+        400
+      )
     }
 
     /* 验证用户存在 */

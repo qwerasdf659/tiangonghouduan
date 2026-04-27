@@ -36,30 +36,34 @@ const logger = require('../../../../utils/logger').logger
  * - 用户查询自己的记录使用/me端点，通过token识别用户身份
  * - 管理员查询指定用户记录请使用：/api/v4/console/users/:user_id/consumption
  */
-router.get('/me', authenticateToken, asyncHandler(async (req, res) => {
-  const QueryService = req.app.locals.services.getService('consumption_query')
+router.get(
+  '/me',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const QueryService = req.app.locals.services.getService('consumption_query')
 
-  const userId = req.user.user_id
-  const { status, page = 1, page_size = 20 } = req.query
+    const userId = req.user.user_id
+    const { status, page = 1, page_size = 20 } = req.query
 
-  const finalPageSize = Math.min(Math.max(parseInt(page_size) || 20, 1), 50)
-  const finalPage = Math.max(parseInt(page) || 1, 1)
+    const finalPageSize = Math.min(Math.max(parseInt(page_size) || 20, 1), 50)
+    const finalPage = Math.max(parseInt(page) || 1, 1)
 
-  logger.info('用户查询自己的消费记录', {
-    user_id: userId,
-    status,
-    page: finalPage,
-    page_size: finalPageSize
+    logger.info('用户查询自己的消费记录', {
+      user_id: userId,
+      status,
+      page: finalPage,
+      page_size: finalPageSize
+    })
+
+    const result = await QueryService.getUserConsumptionRecords(userId, {
+      status,
+      page: finalPage,
+      page_size: finalPageSize
+    })
+
+    return res.apiSuccess(result, '查询成功')
   })
-
-  const result = await QueryService.getUserConsumptionRecords(userId, {
-    status,
-    page: finalPage,
-    page_size: finalPageSize
-  })
-
-  return res.apiSuccess(result, '查询成功')
-}))
+)
 
 /**
  * @route GET /api/v4/shop/consumption/detail/:id
@@ -79,36 +83,40 @@ router.get('/me', authenticateToken, asyncHandler(async (req, res) => {
  * - 业务错误返回友好提示（如"消费记录不存在"）
  * - 系统错误返回通用消息（不暴露技术栈信息）
  */
-router.get('/detail/:id', authenticateToken, asyncHandler(async (req, res) => {
-  const QueryService = req.app.locals.services.getService('consumption_query')
+router.get(
+  '/detail/:id',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const QueryService = req.app.locals.services.getService('consumption_query')
 
-  const recordId = parseInt(req.params.id, 10)
+    const recordId = parseInt(req.params.id, 10)
 
-  logger.info('查询消费记录详情', { record_id: recordId })
+    logger.info('查询消费记录详情', { record_id: recordId })
 
-  const record = await QueryService.getConsumptionDetailWithAuth(
-    recordId,
-    req.user.user_id,
-    req.user.role_level >= 100,
-    {
-      include_review_records: true,
-      include_points_transaction: true
-    }
-  )
+    const record = await QueryService.getConsumptionDetailWithAuth(
+      recordId,
+      req.user.user_id,
+      req.user.role_level >= 100,
+      {
+        include_review_records: true,
+        include_points_transaction: true
+      }
+    )
 
-  logger.info('查询消费记录详情成功', {
-    record_id: recordId,
-    user_id: req.user.user_id,
-    access_reason:
-      req.user.role_level >= 100
-        ? 'admin_privilege'
-        : req.user.user_id === record.user_id
-          ? 'user_owner'
-          : 'merchant_owner'
+    logger.info('查询消费记录详情成功', {
+      record_id: recordId,
+      user_id: req.user.user_id,
+      access_reason:
+        req.user.role_level >= 100
+          ? 'admin_privilege'
+          : req.user.user_id === record.user_id
+            ? 'user_owner'
+            : 'merchant_owner'
+    })
+
+    return res.apiSuccess(record, '查询成功')
   })
-
-  return res.apiSuccess(record, '查询成功')
-}))
+)
 
 /**
  * @route DELETE /api/v4/shop/consumption/:id
@@ -127,25 +135,29 @@ router.get('/detail/:id', authenticateToken, asyncHandler(async (req, res) => {
  * - 前端查询时自动过滤已删除记录（WHERE is_deleted=0）
  * - 用户删除后无法自己恢复，只有管理员可以在后台恢复
  */
-router.delete('/:id', authenticateToken, asyncHandler(async (req, res) => {
-  const CoreService = req.app.locals.services.getService('consumption_core')
+router.delete(
+  '/:id',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const CoreService = req.app.locals.services.getService('consumption_core')
 
-  const userId = req.user.user_id
-  const recordId = parseInt(req.params.id, 10)
+    const userId = req.user.user_id
+    const recordId = parseInt(req.params.id, 10)
 
-  if (isNaN(recordId) || recordId <= 0) {
-    return res.apiError('无效的记录ID，必须是正整数', 'BAD_REQUEST', null, 400)
-  }
-  const has_admin_access = req.user.role_level >= 100
-  const role_level = req.user.role_level || 0
+    if (isNaN(recordId) || recordId <= 0) {
+      return res.apiError('无效的记录ID，必须是正整数', 'BAD_REQUEST', null, 400)
+    }
+    const has_admin_access = req.user.role_level >= 100
+    const role_level = req.user.role_level || 0
 
-  const result = await CoreService.softDeleteRecord(recordId, userId, {
-    has_admin_access,
-    role_level
+    const result = await CoreService.softDeleteRecord(recordId, userId, {
+      has_admin_access,
+      role_level
+    })
+
+    return res.apiSuccess(result, '消费记录已删除')
   })
-
-  return res.apiSuccess(result, '消费记录已删除')
-}))
+)
 
 /**
  * @route POST /api/v4/shop/consumption/:id/restore
@@ -162,27 +174,32 @@ router.delete('/:id', authenticateToken, asyncHandler(async (req, res) => {
  * - 恢复后用户端将重新显示该记录
  * - 恢复操作会清空deleted_at时间戳
  */
-router.post('/:id/restore', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const CoreService = req.app.locals.services.getService('consumption_core')
+router.post(
+  '/:id/restore',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const CoreService = req.app.locals.services.getService('consumption_core')
 
-  const recordId = parseInt(req.params.id, 10)
-  const adminId = req.user.user_id
+    const recordId = parseInt(req.params.id, 10)
+    const adminId = req.user.user_id
 
-  if (isNaN(recordId) || recordId <= 0) {
-    return res.apiError('无效的记录ID', 'BAD_REQUEST', null, 400)
-  }
+    if (isNaN(recordId) || recordId <= 0) {
+      return res.apiError('无效的记录ID', 'BAD_REQUEST', null, 400)
+    }
 
-  const result = await CoreService.restoreRecord(recordId, adminId)
+    const result = await CoreService.restoreRecord(recordId, adminId)
 
-  return res.apiSuccess(
-    {
-      record_id: result.consumption_record_id,
-      is_deleted: result.is_deleted,
-      user_id: result.user_id,
-      note: '消费记录已恢复，用户端将重新显示该记录'
-    },
-    '消费记录已恢复'
-  )
-}))
+    return res.apiSuccess(
+      {
+        record_id: result.consumption_record_id,
+        is_deleted: result.is_deleted,
+        user_id: result.user_id,
+        note: '消费记录已恢复，用户端将重新显示该记录'
+      },
+      '消费记录已恢复'
+    )
+  })
+)
 
 module.exports = router

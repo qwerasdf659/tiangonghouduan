@@ -516,7 +516,11 @@ class FeedbackService {
 
       const validStatuses = ['pending', 'processing', 'replied', 'closed']
       if (!validStatuses.includes(status)) {
-        throw new BusinessError(`无效的状态值: ${status}，有效值为: ${validStatuses.join(', ')}`, 'FEEDBACK_INVALID_STATUS', 400)
+        throw new BusinessError(
+          `无效的状态值: ${status}，有效值为: ${validStatuses.join(', ')}`,
+          'FEEDBACK_INVALID_STATUS',
+          400
+        )
       }
 
       if (!Array.isArray(feedbackIds) || feedbackIds.length === 0) {

@@ -104,8 +104,8 @@ router.get(
     })
 
     return res.apiSuccess(result, '员工列表获取成功')
-  }
-))
+  })
+)
 
 /**
  * @route POST /api/v4/shop/staff/add
@@ -173,8 +173,8 @@ router.post(
     })
 
     return res.apiSuccess(result, '员工添加成功')
-  }
-))
+  })
+)
 
 /**
  * @route POST /api/v4/shop/staff/transfer
@@ -249,8 +249,8 @@ router.post(
     })
 
     return res.apiSuccess(result, '员工调店成功')
-  }
-))
+  })
+)
 
 /**
  * @route POST /api/v4/shop/staff/disable
@@ -279,12 +279,9 @@ router.post(
     const StaffManagementService = getStaffManagementService(req)
 
     const result = await TransactionManager.execute(async transaction => {
-      return await StaffManagementService.disableStaff(
-        parseInt(user_id, 10),
-        operator_id,
-        reason,
-        { transaction }
-      )
+      return await StaffManagementService.disableStaff(parseInt(user_id, 10), operator_id, reason, {
+        transaction
+      })
     })
 
     // 记录审计日志（store_id 为 null 表示跨门店操作，通过 ServiceManager 获取服务）
@@ -310,8 +307,8 @@ router.post(
     })
 
     return res.apiSuccess(result, '员工已禁用')
-  }
-))
+  })
+)
 
 /**
  * @route POST /api/v4/shop/staff/enable
@@ -373,7 +370,7 @@ router.post(
     })
 
     return res.apiSuccess(result, '员工已启用')
-  }
-))
+  })
+)
 
 module.exports = router

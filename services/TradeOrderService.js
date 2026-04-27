@@ -288,10 +288,18 @@ class TradeOrderService {
     // 可叠加资产挂牌购买时必须校验卖家标的已冻结
     if (listing.listing_kind === 'fungible_asset') {
       if (!listing.seller_offer_frozen) {
-        throw new BusinessError('卖家标的资产未冻结，挂牌状态异常（seller_offer_frozen=false）', 'TRADE_ERROR', 400)
+        throw new BusinessError(
+          '卖家标的资产未冻结，挂牌状态异常（seller_offer_frozen=false）',
+          'TRADE_ERROR',
+          400
+        )
       }
       if (!listing.offer_asset_code || !listing.offer_amount || Number(listing.offer_amount) <= 0) {
-        throw new BusinessError('可叠加资产挂牌标的信息缺失（offer_asset_code/offer_amount）', 'TRADE_ERROR', 400)
+        throw new BusinessError(
+          '可叠加资产挂牌标的信息缺失（offer_asset_code/offer_amount）',
+          'TRADE_ERROR',
+          400
+        )
       }
     }
 
@@ -313,11 +321,19 @@ class TradeOrderService {
       // owner_account_id → Account → user_id 校验（Item 模型使用 account_id 而非 user_id）
       const sellerAccount = await Account.findByPk(itemInstance.owner_account_id, { transaction })
       if (!sellerAccount || Number(sellerAccount.user_id) !== Number(listing.seller_user_id)) {
-        throw new BusinessError('物品所有权异常：物品不属于当前卖家，禁止购买', 'TRADE_NOT_ALLOWED', 400)
+        throw new BusinessError(
+          '物品所有权异常：物品不属于当前卖家，禁止购买',
+          'TRADE_NOT_ALLOWED',
+          400
+        )
       }
       const allowedStatuses = ['held', 'available']
       if (!allowedStatuses.includes(itemInstance.status)) {
-        throw new BusinessError(`物品实例状态不可购买：${itemInstance.status}`, 'TRADE_NOT_ALLOWED', 400)
+        throw new BusinessError(
+          `物品实例状态不可购买：${itemInstance.status}`,
+          'TRADE_NOT_ALLOWED',
+          400
+        )
       }
     }
 
@@ -657,7 +673,11 @@ class TradeOrderService {
         transaction
       })
       if (!itemOwnerAccount || Number(itemOwnerAccount.user_id) !== Number(order.seller_user_id)) {
-        throw new BusinessError('物品所有权异常：物品不属于卖家，禁止成交转移', 'TRADE_NOT_ALLOWED', 400)
+        throw new BusinessError(
+          '物品所有权异常：物品不属于卖家，禁止成交转移',
+          'TRADE_NOT_ALLOWED',
+          400
+        )
       }
 
       // 使用 ItemService.transferItem() 转移所有权（自动记录事件）
@@ -869,7 +889,11 @@ class TradeOrderService {
     }
 
     if (order.status !== 'frozen' && order.status !== 'created') {
-      throw new BusinessError(`订单状态异常: ${order.status}，期望 frozen 或 created`, 'TRADE_ERROR', 400)
+      throw new BusinessError(
+        `订单状态异常: ${order.status}，期望 frozen 或 created`,
+        'TRADE_ERROR',
+        400
+      )
     }
 
     const listing = order.listing

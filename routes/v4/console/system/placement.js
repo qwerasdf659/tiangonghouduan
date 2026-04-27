@@ -129,16 +129,19 @@ function validatePlacements(placements) {
  * @desc 获取当前活动位置配置
  * @access Admin（requireRoleLevel(100)）
  */
-router.get('/', asyncHandler(async (req, res) => {
-  const AdminSystemService = req.app.locals.services.getService('admin_system')
-  const configData = await AdminSystemService.getConfigValue('campaign_placement')
+router.get(
+  '/',
+  asyncHandler(async (req, res) => {
+    const AdminSystemService = req.app.locals.services.getService('admin_system')
+    const configData = await AdminSystemService.getConfigValue('campaign_placement')
 
-  if (!configData) {
-    return res.apiSuccess({ placements: [] }, '配置为空（尚未配置活动位置）')
-  }
+    if (!configData) {
+      return res.apiSuccess({ placements: [] }, '配置为空（尚未配置活动位置）')
+    }
 
-  return res.apiSuccess(configData, '获取位置配置成功', 'PLACEMENT_GET_SUCCESS')
-}))
+    return res.apiSuccess(configData, '获取位置配置成功', 'PLACEMENT_GET_SUCCESS')
+  })
+)
 
 /**
  * @route PUT /api/v4/console/system/placement
@@ -153,57 +156,60 @@ router.get('/', asyncHandler(async (req, res) => {
  * @body {string} placements[].placement.size - 组件尺寸（full/medium/small/mini）
  * @body {number} placements[].placement.priority - 排列优先级（0-1000）
  */
-router.put('/', asyncHandler(async (req, res) => {
-  const { placements } = req.body
+router.put(
+  '/',
+  asyncHandler(async (req, res) => {
+    const { placements } = req.body
 
-  // 参数校验
-  const validation = validatePlacements(placements)
-  if (!validation.valid) {
-    return res.apiError(
-      '位置配置数据校验失败',
-      'INVALID_PLACEMENT_CONFIG',
-      { errors: validation.errors },
-      400
-    )
-  }
-
-  const AdminSystemService = req.app.locals.services.getService('admin_system')
-
-  await AdminSystemService.upsertConfig(
-    'campaign_placement',
-    { placements },
-    {
-      description: '活动位置配置 - 控制每个活动在小程序中的展示位置和尺寸',
-      category: 'feature'
+    // 参数校验
+    const validation = validatePlacements(placements)
+    if (!validation.valid) {
+      return res.apiError(
+        '位置配置数据校验失败',
+        'INVALID_PLACEMENT_CONFIG',
+        { errors: validation.errors },
+        400
+      )
     }
-  )
 
-  // 记录审计日志（通过 ServiceManager 获取审计日志服务）
-  try {
-    const AuditLogService = req.app.locals.services.getService('audit_log')
-    await AuditLogService.logOperation({
+    const AdminSystemService = req.app.locals.services.getService('admin_system')
+
+    await AdminSystemService.upsertConfig(
+      'campaign_placement',
+      { placements },
+      {
+        description: '活动位置配置 - 控制每个活动在小程序中的展示位置和尺寸',
+        category: 'feature'
+      }
+    )
+
+    // 记录审计日志（通过 ServiceManager 获取审计日志服务）
+    try {
+      const AuditLogService = req.app.locals.services.getService('audit_log')
+      await AuditLogService.logOperation({
+        operator_id: req.user.user_id,
+        operation_type: 'config_update',
+        target_type: 'system_config',
+        target_id: 'campaign_placement',
+        description: `更新活动位置配置（${placements.length} 个活动）`,
+        details: { placements }
+      })
+    } catch (auditError) {
+      // 审计日志失败不影响主操作（非致命）
+      logger.warn('记录审计日志失败（非致命）', { error: auditError.message })
+    }
+
+    logger.info('活动位置配置更新成功', {
       operator_id: req.user.user_id,
-      operation_type: 'config_update',
-      target_type: 'system_config',
-      target_id: 'campaign_placement',
-      description: `更新活动位置配置（${placements.length} 个活动）`,
-      details: { placements }
+      placement_count: placements.length
     })
-  } catch (auditError) {
-    // 审计日志失败不影响主操作（非致命）
-    logger.warn('记录审计日志失败（非致命）', { error: auditError.message })
-  }
 
-  logger.info('活动位置配置更新成功', {
-    operator_id: req.user.user_id,
-    placement_count: placements.length
+    return res.apiSuccess(
+      { placements },
+      '位置配置更新成功（前端下次打开页面自动生效）',
+      'PLACEMENT_UPDATE_SUCCESS'
+    )
   })
-
-  return res.apiSuccess(
-    { placements },
-    '位置配置更新成功（前端下次打开页面自动生效）',
-    'PLACEMENT_UPDATE_SUCCESS'
-  )
-}))
+)
 
 module.exports = router

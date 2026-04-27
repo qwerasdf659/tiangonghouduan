@@ -111,7 +111,11 @@ class TradeDisputeService {
       transaction
     })
     if (existingDispute) {
-      throw new BusinessError(`该订单已有进行中的纠纷工单（工单号：${existingDispute.issue_id}）`, 'TRADE_ERROR', 400)
+      throw new BusinessError(
+        `该订单已有进行中的纠纷工单（工单号：${existingDispute.issue_id}）`,
+        'TRADE_ERROR',
+        400
+      )
     }
 
     // 计算处理截止时间
@@ -176,8 +180,12 @@ class TradeDisputeService {
 
     const issue = await this.models.CustomerServiceIssue.findByPk(issueId, { transaction })
     if (!issue) throw new BusinessError('纠纷工单不存在', 'TRADE_NOT_FOUND', 404)
-    if (issue.issue_type !== 'trade') throw new BusinessError('仅交易纠纷工单可升级为仲裁', 'TRADE_ERROR', 400)
-    if (issue.approval_chain_instance_id) throw new BusinessError('该纠纷已进入仲裁流程', 'TRADE_ERROR', 400)
+    if (issue.issue_type !== 'trade') {
+      throw new BusinessError('仅交易纠纷工单可升级为仲裁', 'TRADE_ERROR', 400)
+    }
+    if (issue.approval_chain_instance_id) {
+      throw new BusinessError('该纠纷已进入仲裁流程', 'TRADE_ERROR', 400)
+    }
 
     // 尝试匹配审批链模板
     const template = await ApprovalChainService.matchTemplate('trade_dispute', {
@@ -187,7 +195,11 @@ class TradeDisputeService {
 
     if (!template) {
       logger.warn('[交易纠纷] 未找到匹配的仲裁审批链模板', { issue_id: issueId })
-      throw new BusinessError('未配置交易纠纷仲裁审批链模板，请先在审批链管理中创建 trade_dispute 类型模板', 'TRADE_NOT_CONFIGURED', 500)
+      throw new BusinessError(
+        '未配置交易纠纷仲裁审批链模板，请先在审批链管理中创建 trade_dispute 类型模板',
+        'TRADE_NOT_CONFIGURED',
+        500
+      )
     }
 
     // 创建审批链实例
@@ -243,8 +255,12 @@ class TradeDisputeService {
 
     const issue = await this.models.CustomerServiceIssue.findByPk(issueId, { transaction })
     if (!issue) throw new BusinessError('纠纷工单不存在', 'TRADE_NOT_FOUND', 404)
-    if (issue.issue_type !== 'trade') throw new BusinessError('仅交易纠纷工单可执行此操作', 'TRADE_ERROR', 400)
-    if (['resolved', 'closed'].includes(issue.status)) throw new BusinessError('该纠纷已解决或已关闭', 'TRADE_ERROR', 400)
+    if (issue.issue_type !== 'trade') {
+      throw new BusinessError('仅交易纠纷工单可执行此操作', 'TRADE_ERROR', 400)
+    }
+    if (['resolved', 'closed'].includes(issue.status)) {
+      throw new BusinessError('该纠纷已解决或已关闭', 'TRADE_ERROR', 400)
+    }
 
     const order = await this.models.TradeOrder.findByPk(issue.trade_order_id, {
       lock: transaction.LOCK.UPDATE,
@@ -347,7 +363,9 @@ class TradeDisputeService {
     })
 
     if (!issue) throw new BusinessError('纠纷工单不存在', 'TRADE_NOT_FOUND', 404)
-    if (issue.issue_type !== 'trade') throw new BusinessError('该工单不是交易纠纷类型', 'TRADE_ERROR', 400)
+    if (issue.issue_type !== 'trade') {
+      throw new BusinessError('该工单不是交易纠纷类型', 'TRADE_ERROR', 400)
+    }
 
     // 关联订单信息
     let orderInfo = null

@@ -148,7 +148,11 @@ class MerchantPointsService {
 
     // 2. 验证审核类型
     if (auditRecord.auditable_type !== 'merchant_points') {
-      throw new BusinessError(`审核类型不匹配: 期望=merchant_points, 实际=${auditRecord.auditable_type}`, 'SERVICE_ERROR', 400)
+      throw new BusinessError(
+        `审核类型不匹配: 期望=merchant_points, 实际=${auditRecord.auditable_type}`,
+        'SERVICE_ERROR',
+        400
+      )
     }
 
     // 3. 提取申请信息
@@ -157,7 +161,11 @@ class MerchantPointsService {
     const pointsAmount = auditData.points_amount
 
     if (!pointsAmount || pointsAmount <= 0) {
-      throw new BusinessError(`申请积分数量无效: audit_id=${auditId}, points_amount=${pointsAmount}`, 'SERVICE_INVALID', 400)
+      throw new BusinessError(
+        `申请积分数量无效: audit_id=${auditId}, points_amount=${pointsAmount}`,
+        'SERVICE_INVALID',
+        400
+      )
     }
 
     // 4. 发放积分（双录：系统铸造 → 用户入账）
@@ -230,7 +238,11 @@ class MerchantPointsService {
 
     // 2. 验证审核类型
     if (auditRecord.auditable_type !== 'merchant_points') {
-      throw new BusinessError(`审核类型不匹配: 期望=merchant_points, 实际=${auditRecord.auditable_type}`, 'SERVICE_ERROR', 400)
+      throw new BusinessError(
+        `审核类型不匹配: 期望=merchant_points, 实际=${auditRecord.auditable_type}`,
+        'SERVICE_ERROR',
+        400
+      )
     }
 
     // 3. 提取申请信息用于日志

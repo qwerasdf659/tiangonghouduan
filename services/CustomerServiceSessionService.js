@@ -332,7 +332,11 @@ class CustomerServiceSessionService {
       })
 
       if (!session) {
-        throw new BusinessError(user_id ? '会话不存在或无权限访问' : '会话不存在', 'CUSTOMER_SERVICE_NOT_FOUND', 404)
+        throw new BusinessError(
+          user_id ? '会话不存在或无权限访问' : '会话不存在',
+          'CUSTOMER_SERVICE_NOT_FOUND',
+          404
+        )
       }
 
       // 构建消息查询条件
@@ -511,7 +515,11 @@ class CustomerServiceSessionService {
     // ✅ 2. 敏感词检测
     const sensitiveCheck = checkSensitiveWords(sanitized_content)
     if (!sensitiveCheck.passed) {
-      throw new BusinessError(`消息包含敏感词：${sensitiveCheck.matchedWord}`, 'CUSTOMER_SERVICE_ERROR', 400)
+      throw new BusinessError(
+        `消息包含敏感词：${sensitiveCheck.matchedWord}`,
+        'CUSTOMER_SERVICE_ERROR',
+        400
+      )
     }
 
     /*
@@ -521,7 +529,11 @@ class CustomerServiceSessionService {
      */
     const rateLimitCheck = ChatRateLimitService.checkMessageRateLimit(admin_id, 100)
     if (!rateLimitCheck.allowed) {
-      throw new BusinessError(`发送消息过于频繁，每分钟最多${rateLimitCheck.limit}条`, 'CUSTOMER_SERVICE_ERROR', 400)
+      throw new BusinessError(
+        `发送消息过于频繁，每分钟最多${rateLimitCheck.limit}条`,
+        'CUSTOMER_SERVICE_ERROR',
+        400
+      )
     }
 
     // ✅ 4. 验证会话是否存在
@@ -537,13 +549,21 @@ class CustomerServiceSessionService {
     // ✅ 4.5. 验证会话状态（只有waiting/assigned/active可回复）
     const ACTIVE_STATUS = ['waiting', 'assigned', 'active']
     if (!ACTIVE_STATUS.includes(session.status)) {
-      throw new BusinessError(`会话已关闭，无法发送消息（当前状态：${session.status}）`, 'CUSTOMER_SERVICE_ERROR', 400)
+      throw new BusinessError(
+        `会话已关闭，无法发送消息（当前状态：${session.status}）`,
+        'CUSTOMER_SERVICE_ERROR',
+        400
+      )
     }
 
     // ✅ 5. 权限细分控制（支持超级管理员接管）
     if (session.admin_id && session.admin_id !== admin_id) {
       if (role_level < 200) {
-        throw new BusinessError('无权限操作此会话，需要超级管理员权限', 'CUSTOMER_SERVICE_FORBIDDEN', 403)
+        throw new BusinessError(
+          '无权限操作此会话，需要超级管理员权限',
+          'CUSTOMER_SERVICE_FORBIDDEN',
+          403
+        )
       }
       logger.info(`⚠️ 超级管理员 ${admin_id} 接管会话 ${session_id}`)
     }
@@ -645,7 +665,11 @@ class CustomerServiceSessionService {
     // ✅ 2. 检查会话状态（只有waiting/assigned/active可发送消息）
     const ACTIVE_STATUS = ['waiting', 'assigned', 'active']
     if (!ACTIVE_STATUS.includes(session.status)) {
-      throw new BusinessError(`会话已关闭，无法发送消息（当前状态：${session.status}）`, 'CUSTOMER_SERVICE_ERROR', 400)
+      throw new BusinessError(
+        `会话已关闭，无法发送消息（当前状态：${session.status}）`,
+        'CUSTOMER_SERVICE_ERROR',
+        400
+      )
     }
 
     // ✅ 3. 创建消息记录
@@ -1429,7 +1453,11 @@ class CustomerServiceSessionService {
     }
 
     if (session.status !== 'waiting') {
-      throw new BusinessError(`仅等待中的会话可接单，当前状态：${session.status}`, 'CUSTOMER_SERVICE_ERROR', 400)
+      throw new BusinessError(
+        `仅等待中的会话可接单，当前状态：${session.status}`,
+        'CUSTOMER_SERVICE_ERROR',
+        400
+      )
     }
 
     await session.update({ admin_id, status: 'assigned' }, { transaction })

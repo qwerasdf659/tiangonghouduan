@@ -38,21 +38,26 @@ const logger = require('../../../../utils/logger')
  * - page: 页码（默认1）
  * - page_size: 每页数量（默认20）
  */
-router.get('/rollbackable', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const rollbackService = req.app.locals.services.getService('audit_rollback')
-  const { operator_id, operation_type, start_time, end_time, page, page_size } = req.query
+router.get(
+  '/rollbackable',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const rollbackService = req.app.locals.services.getService('audit_rollback')
+    const { operator_id, operation_type, start_time, end_time, page, page_size } = req.query
 
-  const result = await rollbackService.getRollbackableLogs({
-    operator_id: operator_id ? parseInt(operator_id, 10) : undefined,
-    operation_type,
-    start_time: start_time ? new Date(start_time) : undefined,
-    end_time: end_time ? new Date(end_time) : undefined,
-    page: parseInt(page, 10) || 1,
-    page_size: parseInt(page_size, 10) || 20
+    const result = await rollbackService.getRollbackableLogs({
+      operator_id: operator_id ? parseInt(operator_id, 10) : undefined,
+      operation_type,
+      start_time: start_time ? new Date(start_time) : undefined,
+      end_time: end_time ? new Date(end_time) : undefined,
+      page: parseInt(page, 10) || 1,
+      page_size: parseInt(page_size, 10) || 20
+    })
+
+    return res.apiSuccess(result, '获取可回滚操作列表成功')
   })
-
-  return res.apiSuccess(result, '获取可回滚操作列表成功')
-}))
+)
 
 /**
  * GET /api/v4/console/audit-rollback/history
@@ -63,35 +68,45 @@ router.get('/rollbackable', authenticateToken, requireRoleLevel(100), asyncHandl
  * - page: 页码（默认1）
  * - page_size: 每页数量（默认20）
  */
-router.get('/history', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const rollbackService = req.app.locals.services.getService('audit_rollback')
-  const { page, page_size } = req.query
+router.get(
+  '/history',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const rollbackService = req.app.locals.services.getService('audit_rollback')
+    const { page, page_size } = req.query
 
-  const result = await rollbackService.getRollbackHistory({
-    page: parseInt(page, 10) || 1,
-    page_size: parseInt(page_size, 10) || 20
+    const result = await rollbackService.getRollbackHistory({
+      page: parseInt(page, 10) || 1,
+      page_size: parseInt(page_size, 10) || 20
+    })
+
+    return res.apiSuccess(result, '获取回滚历史成功')
   })
-
-  return res.apiSuccess(result, '获取回滚历史成功')
-}))
+)
 
 /**
  * GET /api/v4/console/audit-rollback/check/:log_id
  *
  * 检查操作是否可回滚
  */
-router.get('/check/:log_id', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const rollbackService = req.app.locals.services.getService('audit_rollback')
-  const logId = parseInt(req.params.log_id, 10)
+router.get(
+  '/check/:log_id',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const rollbackService = req.app.locals.services.getService('audit_rollback')
+    const logId = parseInt(req.params.log_id, 10)
 
-  if (!logId || isNaN(logId)) {
-    return res.apiError('无效的日志ID', 'INVALID_LOG_ID', null, 400)
-  }
+    if (!logId || isNaN(logId)) {
+      return res.apiError('无效的日志ID', 'INVALID_LOG_ID', null, 400)
+    }
 
-  const result = await rollbackService.checkRollbackable(logId)
+    const result = await rollbackService.checkRollbackable(logId)
 
-  return res.apiSuccess(result, '检查回滚状态完成')
-}))
+    return res.apiSuccess(result, '检查回滚状态完成')
+  })
+)
 
 /**
  * POST /api/v4/console/audit-rollback/:log_id/execute
@@ -143,17 +158,22 @@ router.post(
  * - start_time: 开始时间
  * - end_time: 结束时间
  */
-router.get('/stats', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const rollbackService = req.app.locals.services.getService('audit_rollback')
-  const { start_time, end_time } = req.query
+router.get(
+  '/stats',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const rollbackService = req.app.locals.services.getService('audit_rollback')
+    const { start_time, end_time } = req.query
 
-  const stats = await rollbackService.getAuditStats({
-    start_time: start_time ? new Date(start_time) : undefined,
-    end_time: end_time ? new Date(end_time) : undefined
+    const stats = await rollbackService.getAuditStats({
+      start_time: start_time ? new Date(start_time) : undefined,
+      end_time: end_time ? new Date(end_time) : undefined
+    })
+
+    return res.apiSuccess(stats, '获取审计统计成功')
   })
-
-  return res.apiSuccess(stats, '获取审计统计成功')
-}))
+)
 
 /**
  * GET /api/v4/console/audit-rollback/stats/by-operator
@@ -165,21 +185,26 @@ router.get('/stats', authenticateToken, requireRoleLevel(100), asyncHandler(asyn
  * - end_time: 结束时间
  * - page_size: 返回数量（默认10）
  */
-router.get('/stats/by-operator', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const BusinessRecordQueryService = req.app.locals.services.getService(
-    'console_business_record_query'
-  )
+router.get(
+  '/stats/by-operator',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const BusinessRecordQueryService = req.app.locals.services.getService(
+      'console_business_record_query'
+    )
 
-  const { start_time, end_time, page_size } = req.query
+    const { start_time, end_time, page_size } = req.query
 
-  const result = await BusinessRecordQueryService.getAuditStatsByOperator({
-    start_time,
-    end_time,
-    page_size: page_size ? parseInt(page_size, 10) : 10
+    const result = await BusinessRecordQueryService.getAuditStatsByOperator({
+      start_time,
+      end_time,
+      page_size: page_size ? parseInt(page_size, 10) : 10
+    })
+
+    return res.apiSuccess(result, '获取操作者统计成功')
   })
-
-  return res.apiSuccess(result, '获取操作者统计成功')
-}))
+)
 
 /**
  * GET /api/v4/console/audit-rollback/stats/by-risk-level
@@ -190,20 +215,25 @@ router.get('/stats/by-operator', authenticateToken, requireRoleLevel(100), async
  * - start_time: 开始时间
  * - end_time: 结束时间
  */
-router.get('/stats/by-risk-level', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const BusinessRecordQueryService = req.app.locals.services.getService(
-    'console_business_record_query'
-  )
+router.get(
+  '/stats/by-risk-level',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const BusinessRecordQueryService = req.app.locals.services.getService(
+      'console_business_record_query'
+    )
 
-  const { start_time, end_time } = req.query
+    const { start_time, end_time } = req.query
 
-  const result = await BusinessRecordQueryService.getAuditStatsByRiskLevel({
-    start_time,
-    end_time
+    const result = await BusinessRecordQueryService.getAuditStatsByRiskLevel({
+      start_time,
+      end_time
+    })
+
+    return res.apiSuccess(result, '获取风险等级统计成功')
   })
-
-  return res.apiSuccess(result, '获取风险等级统计成功')
-}))
+)
 
 /**
  * GET /api/v4/console/audit-rollback/stats/by-target-type
@@ -228,17 +258,22 @@ router.get('/stats/by-risk-level', authenticateToken, requireRoleLevel(100), asy
  *   ]
  * }
  */
-router.get('/stats/by-target-type', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const rollbackService = req.app.locals.services.getService('audit_rollback')
-  const { start_time, end_time } = req.query
+router.get(
+  '/stats/by-target-type',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const rollbackService = req.app.locals.services.getService('audit_rollback')
+    const { start_time, end_time } = req.query
 
-  const result = await rollbackService.getStatsByTargetType({
-    start_time: start_time ? new Date(start_time) : undefined,
-    end_time: end_time ? new Date(end_time) : undefined
+    const result = await rollbackService.getStatsByTargetType({
+      start_time: start_time ? new Date(start_time) : undefined,
+      end_time: end_time ? new Date(end_time) : undefined
+    })
+
+    return res.apiSuccess(result, '获取目标类型统计成功')
   })
-
-  return res.apiSuccess(result, '获取目标类型统计成功')
-}))
+)
 
 /**
  * GET /api/v4/console/audit-rollback/stats/trend
@@ -267,18 +302,23 @@ router.get('/stats/by-target-type', authenticateToken, requireRoleLevel(100), as
  *   min_day: { date: '2026-02-01', count: 45 }
  * }
  */
-router.get('/stats/trend', authenticateToken, requireRoleLevel(100), asyncHandler(async (req, res) => {
-  const rollbackService = req.app.locals.services.getService('audit_rollback')
-  const { days, end_date } = req.query
+router.get(
+  '/stats/trend',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const rollbackService = req.app.locals.services.getService('audit_rollback')
+    const { days, end_date } = req.query
 
-  const parsedDays = days ? Math.min(parseInt(days, 10), 90) : 7
+    const parsedDays = days ? Math.min(parseInt(days, 10), 90) : 7
 
-  const result = await rollbackService.getOperationTrend({
-    days: parsedDays,
-    end_date: end_date ? new Date(end_date) : undefined
+    const result = await rollbackService.getOperationTrend({
+      days: parsedDays,
+      end_date: end_date ? new Date(end_date) : undefined
+    })
+
+    return res.apiSuccess(result, '获取操作趋势统计成功')
   })
-
-  return res.apiSuccess(result, '获取操作趋势统计成功')
-}))
+)
 
 module.exports = router

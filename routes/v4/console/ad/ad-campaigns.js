@@ -45,7 +45,7 @@ router.get(
   '/',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-        const {
+    const {
       status = null,
       billing_mode = null,
       ad_slot_id = null,
@@ -138,7 +138,7 @@ router.post(
   '/',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-        const { campaign_name, ad_slot_id, billing_mode, advertiser_user_id } = req.body
+    const { campaign_name, ad_slot_id, billing_mode, advertiser_user_id } = req.body
 
     if (!campaign_name || !ad_slot_id || !billing_mode) {
       return res.apiBadRequest('缺少必需参数：campaign_name, ad_slot_id, billing_mode')
@@ -207,7 +207,7 @@ router.post(
   '/operational',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-        const { campaign_name, ad_slot_id } = req.body
+    const { campaign_name, ad_slot_id } = req.body
 
     if (!campaign_name || !ad_slot_id) {
       return res.apiBadRequest('缺少必需参数：campaign_name, ad_slot_id')
@@ -257,7 +257,7 @@ router.post(
   '/system',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-        const { campaign_name, ad_slot_id } = req.body
+    const { campaign_name, ad_slot_id } = req.body
 
     if (!campaign_name || !ad_slot_id) {
       return res.apiBadRequest('缺少必需参数：campaign_name, ad_slot_id')
@@ -300,7 +300,7 @@ router.patch(
   '/:id/publish',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-        const { id } = req.params
+    const { id } = req.params
 
     const AdCampaignService = req.app.locals.services.getService('ad_campaign_admin')
     const campaign = await AdCampaignService.publishCampaign(parseInt(id))
@@ -325,7 +325,7 @@ router.patch(
   '/:id/pause',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-        const { id } = req.params
+    const { id } = req.params
 
     const AdCampaignService = req.app.locals.services.getService('ad_campaign_admin')
     const campaign = await AdCampaignService.pauseCampaign(parseInt(id))
@@ -353,7 +353,7 @@ router.get(
   '/statistics',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-        const { start_date, end_date } = req.query
+    const { start_date, end_date } = req.query
 
     const AdCampaignService = req.app.locals.services.getService('ad_campaign_admin')
     const statistics = await AdCampaignService.getCampaignStatistics({
@@ -378,7 +378,7 @@ router.get(
   '/dashboard',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-        const { start_date, end_date } = req.query
+    const { start_date, end_date } = req.query
 
     const AdCampaignService = req.app.locals.services.getService('ad_campaign_admin')
     const dashboard = await AdCampaignService.getAdDashboard({
@@ -402,7 +402,7 @@ router.get(
   '/interaction-stats/:id',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-        const { id } = req.params
+    const { id } = req.params
     const { start_date, end_date } = req.query
 
     const AdInteractionLogService = req.app.locals.services.getService('ad_interaction_log')
@@ -425,7 +425,7 @@ router.get(
   '/popup-queue-config',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-        const AdminSystemService = req.app.locals.services.getService('admin_system')
+    const AdminSystemService = req.app.locals.services.getService('admin_system')
     const configValue = await AdminSystemService.getConfigValue('popup_queue_max_count', 5)
 
     return res.apiSuccess({
@@ -447,7 +447,7 @@ router.put(
   '/popup-queue-config',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-        const { popup_queue_max_count } = req.body
+    const { popup_queue_max_count } = req.body
     const value = parseInt(popup_queue_max_count, 10)
 
     if (isNaN(value) || value < 1 || value > 20) {
@@ -487,7 +487,7 @@ router.get(
   '/bid-logs',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-        const { ad_slot_id, ad_campaign_id, is_winner, page = 1, page_size = 20 } = req.query
+    const { ad_slot_id, ad_campaign_id, is_winner, page = 1, page_size = 20 } = req.query
 
     const AdCampaignQueryService = req.app.locals.services.getService('ad_campaign_query')
     const result = await AdCampaignQueryService.getBidLogs({
@@ -516,7 +516,7 @@ router.get(
   '/user-ad-tags',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-        const { user_id, tag_key, page = 1, page_size = 50 } = req.query
+    const { user_id, tag_key, page = 1, page_size = 50 } = req.query
 
     const AdCampaignQueryService = req.app.locals.services.getService('ad_campaign_query')
     const result = await AdCampaignQueryService.getUserAdTags({
@@ -545,7 +545,7 @@ router.get(
   '/antifraud-logs',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-        const { ad_campaign_id, verdict, event_type, page = 1, page_size = 20 } = req.query
+    const { ad_campaign_id, verdict, event_type, page = 1, page_size = 20 } = req.query
 
     const AdCampaignQueryService = req.app.locals.services.getService('ad_campaign_query')
     const result = await AdCampaignQueryService.getAntifraudLogs({
@@ -574,7 +574,7 @@ router.get(
   '/attribution-logs',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-        const { ad_campaign_id, conversion_type, page = 1, page_size = 20 } = req.query
+    const { ad_campaign_id, conversion_type, page = 1, page_size = 20 } = req.query
 
     const AdCampaignQueryService = req.app.locals.services.getService('ad_campaign_query')
     const result = await AdCampaignQueryService.getAttributionLogs({
@@ -601,7 +601,7 @@ router.get(
   '/:id',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-        const { id } = req.params
+    const { id } = req.params
 
     const AdCampaignService = req.app.locals.services.getService('ad_campaign_admin')
     const campaign = await AdCampaignService.getCampaignDetailWithRelations(id)
@@ -639,7 +639,7 @@ router.patch(
   '/:id/review',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-        const { id } = req.params
+    const { id } = req.params
     const { action, review_note } = req.body
 
     if (!action || !['approve', 'reject'].includes(action)) {
@@ -679,10 +679,7 @@ router.patch(
       reviewer_user_id: req.user.user_id
     })
 
-    return res.apiSuccess(
-      campaign,
-      `广告活动${action === 'approve' ? '审核通过' : '审核拒绝'}成功`
-    )
+    return res.apiSuccess(campaign, `广告活动${action === 'approve' ? '审核通过' : '审核拒绝'}成功`)
   })
 )
 
