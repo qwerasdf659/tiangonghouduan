@@ -20,6 +20,7 @@ const router = express.Router()
 const { AssetCode } = require('../../../constants/AssetCode')
 const { authenticateToken } = require('../../../middleware/auth')
 const { asyncHandler } = require('../../../middleware/validation')
+const logger = require('../../../utils/logger').logger
 
 /**
  * GET /api/v4/assets/balance
@@ -68,6 +69,11 @@ router.get(
 
     // 处理不存在的资产类型：返回0余额（用户从未持有该资产）
     if (!balance) {
+      logger.warn('[余额查询] getBalance 返回 null，返回零余额', {
+        user_id,
+        asset_code,
+        reason: '用户从未持有该资产或账户查询异常'
+      })
       return res.apiSuccess({
         asset_code,
         available_amount: 0,

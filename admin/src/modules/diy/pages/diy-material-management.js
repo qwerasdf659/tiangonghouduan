@@ -290,13 +290,14 @@ function diyMaterialManagement() {
 
       this.imagePreviewUrl = URL.createObjectURL(file)
 
-      const result = await this.uploadImage(file)
+      /* DIY 素材图片上传时自动裁剪透明边距，确保宝石内容填满槽位区域 */
+      const result = await this.uploadImage(file, { trim_transparent: true })
       if (result) {
         this.imageMediaId = result.media_id
         if (result.public_url) {
           this.imagePreviewUrl = result.public_url
         }
-        logger.info('[DIY-Materials] 素材图片上传成功', { media_id: result.media_id })
+        logger.info('[DIY-Materials] 素材图片上传成功（已裁剪透明边距）', { media_id: result.media_id })
       }
     },
 

@@ -25,7 +25,8 @@ const {
   User,
   Role,
   Op,
-  AdminNotification
+  AdminNotification,
+  MaterialAssetType
 } = require('../models')
 const ChatWebSocketService = require('./ChatWebSocketService')
 
@@ -36,6 +37,48 @@ const ChatWebSocketService = require('./ChatWebSocketService')
  * 管理员通知：WebSocket 广播 notification 事件
  */
 class NotificationService {
+  /**
+   * 资产代码→中文名称内存缓存（进程级别，避免每次通知都查库）
+   * @type {Map<string, string>}
+   * @private
+   */
+  static _assetNameCache = new Map()
+
+  /**
+   * 解析资产代码为中文显示名称
+   *
+   * 查询优先级：内存缓存 → 数据库 material_asset_types 表
+   * 兜底策略：查询失败时返回原始 asset_code（保证通知不中断）
+   *
+   * @param {string} assetCode - 资产代码（如 red_core_shard）
+   * @returns {Promise<string>} 中文名称（如 "红源晶碎片"）
+   * @private
+   */
+  static async _resolveAssetName(assetCode) {
+    if (!assetCode) return '未知资产'
+
+    if (NotificationService._assetNameCache.has(assetCode)) {
+      return NotificationService._assetNameCache.get(assetCode)
+    }
+
+    try {
+      const assetType = await MaterialAssetType.findOne({
+        where: { asset_code: assetCode },
+        attributes: ['display_name']
+      })
+
+      const displayName = assetType ? assetType.display_name : assetCode
+      NotificationService._assetNameCache.set(assetCode, displayName)
+      return displayName
+    } catch (error) {
+      logger.warn('[通知] 资产名称解析失败，使用原始代码', {
+        asset_code: assetCode,
+        error: error.message
+      })
+      return assetCode
+    }
+  }
+
   /**
    * 发送通知给指定用户（写入 user_notifications 表）
    *
@@ -1029,11 +1072,12 @@ class NotificationService {
    */
   static async notifyListingCreated(user_id, listingData) {
     const { market_listing_id, offer_asset_code, offer_amount, price_amount } = listingData
+    const assetName = await this._resolveAssetName(offer_asset_code)
 
     return await this.send(user_id, {
       type: 'listing_created',
       title: '📦 挂牌成功',
-      content: `您的 ${offer_amount} 个 ${offer_asset_code} 已成功上架，标价 ${price_amount} 星石。资产已冻结，等待买家购买。`,
+      content: `您的 ${offer_amount} 个 ${assetName} 已成功上架，标价 ${price_amount} 星石。资产已冻结，等待买家购买。`,
       data: {
         market_listing_id,
         offer_asset_code,
@@ -1059,11 +1103,12 @@ class NotificationService {
    */
   static async notifyListingSold(user_id, saleData) {
     const { market_listing_id, offer_asset_code, offer_amount, price_amount, net_amount } = saleData
+    const assetName = await this._resolveAssetName(offer_asset_code)
 
     return await this.send(user_id, {
       type: 'listing_sold',
       title: '💰 售出成功',
-      content: `恭喜！您的 ${offer_amount} 个 ${offer_asset_code} 已售出，成交价 ${price_amount} 星石，实际到账 ${net_amount} 星石（扣除5%手续费）。`,
+      content: `恭喜！您的 ${offer_amount} 个 ${assetName} 已售出，成交价 ${price_amount} 星石，实际到账 ${net_amount} 星石（扣除5%手续费）。`,
       data: {
         market_listing_id,
         offer_asset_code,
@@ -1088,11 +1133,12 @@ class NotificationService {
    */
   static async notifyPurchaseCompleted(user_id, purchaseData) {
     const { order_id, offer_asset_code, offer_amount, price_amount } = purchaseData
+    const assetName = await this._resolveAssetName(offer_asset_code)
 
     return await this.send(user_id, {
       type: 'purchase_completed',
       title: '🎉 购买成功',
-      content: `您已成功购买 ${offer_amount} 个 ${offer_asset_code}，支付 ${price_amount} 星石。资产已到账，请在背包中查看。`,
+      content: `您已成功购买 ${offer_amount} 个 ${assetName}，支付 ${price_amount} 星石。资产已到账，请在背包中查看。`,
       data: {
         order_id,
         offer_asset_code,
@@ -1121,11 +1167,12 @@ class NotificationService {
       offer_amount,
       reason = '用户主动撤回'
     } = withdrawData
+    const assetName = await this._resolveAssetName(offer_asset_code)
 
     return await this.send(user_id, {
       type: 'listing_withdrawn',
       title: '📤 挂牌已撤回',
-      content: `您的 ${offer_amount} 个 ${offer_asset_code} 挂牌已撤回（${reason}）。资产已解冻至您的可用余额。`,
+      content: `您的 ${offer_amount} 个 ${assetName} 挂牌已撤回（${reason}）。资产已解冻至您的可用余额。`,
       data: {
         market_listing_id,
         offer_asset_code,
@@ -1148,11 +1195,12 @@ class NotificationService {
    */
   static async notifyListingExpired(user_id, expireData) {
     const { market_listing_id, offer_asset_code, offer_amount } = expireData
+    const assetName = await this._resolveAssetName(offer_asset_code)
 
     return await this.send(user_id, {
       type: 'listing_expired',
       title: '⏰ 挂牌已过期',
-      content: `您的 ${offer_amount} 个 ${offer_asset_code} 挂牌已超时（3天），系统已自动撤回并解冻资产。如需继续出售，请重新上架。`,
+      content: `您的 ${offer_amount} 个 ${assetName} 挂牌已超时（3天），系统已自动撤回并解冻资产。如需继续出售，请重新上架。`,
       data: {
         market_listing_id,
         offer_asset_code,
@@ -1181,12 +1229,13 @@ class NotificationService {
    */
   static async notifyBidOutbid(user_id, bidData) {
     const { bid_product_id, item_name, my_bid_amount, new_highest, price_asset_code } = bidData
+    const priceAssetName = await this._resolveAssetName(price_asset_code)
 
     // 1. 通过聊天系统发送持久化通知（离线用户上线后可查看）
     const chatResult = await this.send(user_id, {
       type: 'bid_outbid',
       title: '⚠️ 您的竞价已被超越',
-      content: `您对【${item_name}】的出价 ${my_bid_amount} ${price_asset_code} 已被超越，当前最高价 ${new_highest} ${price_asset_code}。如需继续竞拍，请提交更高出价。`,
+      content: `您对【${item_name}】的出价 ${my_bid_amount} ${priceAssetName} 已被超越，当前最高价 ${new_highest} ${priceAssetName}。如需继续竞拍，请提交更高出价。`,
       data: {
         bid_product_id,
         item_name,
@@ -1229,12 +1278,13 @@ class NotificationService {
    */
   static async notifyBidWon(user_id, bidData) {
     const { bid_product_id, item_name, winning_amount, price_asset_code } = bidData
+    const priceAssetName = await this._resolveAssetName(price_asset_code)
 
     // 1. 通过聊天系统发送持久化通知
     const chatResult = await this.send(user_id, {
       type: 'bid_won',
       title: '🎉 恭喜中标',
-      content: `恭喜！您以 ${winning_amount} ${price_asset_code} 成功拍得【${item_name}】。商品已添加到您的背包，请前往查看。`,
+      content: `恭喜！您以 ${winning_amount} ${priceAssetName} 成功拍得【${item_name}】。商品已添加到您的背包，请前往查看。`,
       data: {
         bid_product_id,
         item_name,
@@ -1276,12 +1326,13 @@ class NotificationService {
    */
   static async notifyBidLost(user_id, bidData) {
     const { bid_product_id, item_name, my_bid_amount, winning_amount, price_asset_code } = bidData
+    const priceAssetName = await this._resolveAssetName(price_asset_code)
 
     // 1. 通过聊天系统发送持久化通知
     const chatResult = await this.send(user_id, {
       type: 'bid_lost',
       title: '📤 竞价未中标',
-      content: `很遗憾，您对【${item_name}】的出价 ${my_bid_amount} ${price_asset_code} 未中标（中标价 ${winning_amount} ${price_asset_code}）。您的冻结资产已解冻返还。`,
+      content: `很遗憾，您对【${item_name}】的出价 ${my_bid_amount} ${priceAssetName} 未中标（中标价 ${winning_amount} ${priceAssetName}）。您的冻结资产已解冻返还。`,
       data: {
         bid_product_id,
         item_name,

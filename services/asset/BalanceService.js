@@ -1333,6 +1333,12 @@ class BalanceService {
     } catch (error) {
       // 账户不存在时返回null（非致命错误）
       if (error.message.includes('用户不存在') || error.message.includes('系统账户不存在')) {
+        logger.warn('[BalanceService.getBalance] 账户不存在，返回 null', {
+          user_id,
+          system_code,
+          asset_code,
+          error_message: error.message
+        })
         return null
       }
       throw error

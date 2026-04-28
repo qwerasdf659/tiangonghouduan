@@ -69,13 +69,15 @@ export function imageUploadMixin(config = {}) {
      * 上传单张图片到后端媒体管理服务
      *
      * @param {File} file - 要上传的文件对象
-     * @param {Object} [options={}] - 预留上传选项（业务绑定请使用 attachMedia）
+     * @param {Object} [options={}] - 上传选项
+     * @param {boolean} [options.trim_transparent=false] - 是否裁剪透明边距（DIY 素材图场景）
+     * @param {string} [options.folder] - 存储文件夹（默认 uploads）
      * @returns {Promise<MediaUploadResult|null>} 上传成功返回媒体数据，失败返回 null
      * @returns {number} return.media_id - 媒体 ID
      * @returns {string} return.public_url - 公开访问 URL
      * @returns {Object} return.thumbnails - 缩略图 URL 集合（来自 MediaFile.getThumbnailUrls()）
      */
-    async uploadImage(file, _options = {}) {
+    async uploadImage(file, options = {}) {
       if (!file) {
         this.showError?.('请选择图片文件')
         return null
@@ -100,6 +102,8 @@ export function imageUploadMixin(config = {}) {
       try {
         const formData = new FormData()
         formData.append('image', file)
+        if (options.trim_transparent) formData.append('trim_transparent', 'true')
+        if (options.folder) formData.append('folder', options.folder)
 
         const result = await request({
           url: SYSTEM_ADMIN_ENDPOINTS.MEDIA_UPLOAD,
