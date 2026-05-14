@@ -3,10 +3,8 @@
  * 处理核销订单的生成和取消功能
  *
  * 功能说明：
- * - 生成12位Base32核销码
+ * - 生成12位Base32核销码（支持 Idempotency-Key 幂等键防重复）
  * - 取消未核销的订单
- *
- * 使用 Claude Sonnet 4.5 模型
  */
 
 const express = require('express')
@@ -51,10 +49,37 @@ router.post(
       return res.apiError('item_id必须是正整数', 'BAD_REQUEST', null, 400)
     }
 
-    logger.info('开始生成核销订单', {
-      item_id,
+    // 幂等键检查（Header Idempotency-Key）
+    const idempotencyKey = req.headers['idempotency-key']
+    if (!idempotencyKey) {
+      return res.apiError(
+        '缺少必需的幂等键：请在 Header 中提供 Idempotency-Key',
+        'MISSING_IDEMPOTENCY_KEY',
+        {
+          required_header: 'Idempotency-Key',
+          example: 'Idempotency-Key: redemption_<timestamp>_<random>'
+        },
+        400
+      )
+    }
+
+    const IdempotencyService = req.app.locals.services.getService('idempotency')
+    const idempotencyResult = await IdempotencyService.getOrCreateRequest(idempotencyKey, {
+      api_path: '/api/v4/shop/redemption/orders',
+      http_method: 'POST',
+      request_params: { item_id },
       user_id: userId
     })
+
+    if (!idempotencyResult.should_process) {
+      logger.info('核销订单幂等拦截：重复请求', { idempotencyKey, userId, item_id })
+      return res.apiSuccess(
+        { ...idempotencyResult.response, is_duplicate: true },
+        '核销码生成成功（幂等回放）'
+      )
+    }
+
+    logger.info('开始生成核销订单', { item_id, user_id: userId, idempotencyKey })
 
     const RedemptionService = req.app.locals.services.getService('redemption_order')
     const result = await TransactionManager.execute(async transaction => {
@@ -64,25 +89,31 @@ router.post(
       })
     })
 
+    const responseData = {
+      order: {
+        order_id: result.order.redemption_order_id,
+        item_id: result.order.item_id,
+        status: result.order.status,
+        expires_at: result.order.expires_at,
+        created_at: result.order.created_at
+      },
+      code: result.code,
+      is_duplicate: false
+    }
+
+    await IdempotencyService.markAsCompleted(
+      idempotencyKey,
+      result.order.redemption_order_id,
+      responseData
+    )
+
     logger.info('核销订单生成成功', {
       order_id: result.order.redemption_order_id,
       item_id,
       expires_at: result.order.expires_at
     })
 
-    return res.apiSuccess(
-      {
-        order: {
-          order_id: result.order.redemption_order_id,
-          item_id: result.order.item_id,
-          status: result.order.status,
-          expires_at: result.order.expires_at,
-          created_at: result.order.created_at
-        },
-        code: result.code
-      },
-      '核销码生成成功（请妥善保存，仅显示一次）'
-    )
+    return res.apiSuccess(responseData, '核销码生成成功（请妥善保存，仅显示一次）')
   })
 )
 

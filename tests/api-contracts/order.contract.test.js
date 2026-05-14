@@ -73,6 +73,20 @@ describe('API契约测试 - 订单模块 (/api/v4/shop/redemption, /api/v4/backp
    */
   describe('POST /shop/redemption/orders - 生成核销订单', () => {
     /**
+     * Case 0: 缺少 Idempotency-Key 应该返回 400 MISSING_IDEMPOTENCY_KEY
+     * 核销订单与兑换接口统一要求幂等键
+     */
+    test('缺少 Idempotency-Key 应该返回 400 MISSING_IDEMPOTENCY_KEY', async () => {
+      const response = await request(app)
+        .post('/api/v4/shop/redemption/orders')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ item_id: 1 })
+
+      expect([400, 403]).toContain(response.status)
+      validateApiContract(response.body, false)
+    })
+
+    /**
      * Case 1: 缺少 item_id 应该返回 400 或 403 (无商家权限)
      */
     test('缺少 item_id 应该返回 400 或 403', async () => {
@@ -101,12 +115,17 @@ describe('API契约测试 - 订单模块 (/api/v4/shop/redemption, /api/v4/backp
     })
 
     /**
-     * Case 3: 不存在的物品应该返回 403 或 404
+     * Case 3: 不存在的物品应该返回 400（缺少幂等键）或 403 或 404
+     * 注意：核销订单现在要求 Idempotency-Key Header（与兑换接口统一）
      */
     test('不存在的物品应该返回 403 或 404', async () => {
       const response = await request(app)
         .post('/api/v4/shop/redemption/orders')
         .set('Authorization', `Bearer ${accessToken}`)
+        .set(
+          'Idempotency-Key',
+          `test_redemption_${Date.now()}_${Math.random().toString(36).slice(2)}`
+        )
         .send({ item_id: 999999999 })
 
       expect([403, 404]).toContain(response.status)

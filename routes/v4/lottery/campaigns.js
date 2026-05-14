@@ -21,7 +21,7 @@
 const express = require('express')
 const router = express.Router()
 const logger = require('../../../utils/logger').logger
-const { authenticateToken } = require('../../../middleware/auth')
+const { authenticateToken, optionalAuth } = require('../../../middleware/auth')
 const dataAccessControl = require('../../../middleware/dataAccessControl')
 const { asyncHandler } = require('../../../middleware/validation')
 
@@ -70,7 +70,7 @@ function validateCampaignCode(code) {
 /**
  * @route GET /api/v4/lottery/campaigns/active
  * @desc 获取所有进行中的活动列表（含 display 摘要）
- * @access Private
+ * @access Public（optionalAuth - 未登录可浏览，已登录可获取个性化数据）
  *
  * @returns {Array} 进行中的活动列表
  *
@@ -84,7 +84,7 @@ function validateCampaignCode(code) {
  */
 router.get(
   '/active',
-  authenticateToken,
+  optionalAuth,
   asyncHandler(async (req, res) => {
     const LotteryQueryService = req.app.locals.services.getService('lottery_query')
 

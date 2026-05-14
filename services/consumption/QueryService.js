@@ -435,6 +435,11 @@ class QueryService {
           association: 'reviewer',
           attributes: ['user_id', 'mobile', 'nickname'],
           required: false
+        },
+        {
+          association: 'store',
+          attributes: ['store_id', 'store_name', 'store_code'],
+          required: false
         }
       ]
 

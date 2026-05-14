@@ -236,7 +236,7 @@ class LotteryQueryService {
           {
             model: models.LotteryCampaign,
             as: 'campaign',
-            attributes: ['lottery_campaign_id', 'campaign_name', 'campaign_type']
+            attributes: ['lottery_campaign_id', 'campaign_name', 'campaign_code', 'campaign_type']
           },
           {
             model: models.LotteryPrize,
@@ -283,6 +283,7 @@ class LotteryQueryService {
           lottery_draw_id: record.lottery_draw_id,
           lottery_campaign_id: record.lottery_campaign_id,
           campaign_name: record.campaign?.campaign_name || '未知活动',
+          campaign_code: record.campaign?.campaign_code || null,
           reward_tier: record.reward_tier,
           prize: record.prize
             ? {

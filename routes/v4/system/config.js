@@ -63,44 +63,6 @@ const PUBLIC_SETTING_KEYS = {
 }
 
 /**
- * app_theme 进程级内存缓存
- *
- * 背景：此接口是微信小程序每次启动必调的高频读接口。
- * AdminSystemService.getConfigValue 已有 Redis 缓存（TTL 300s），
- * 但 Sealos 冷启动时 Redis 也可能刚建立连接，首次查询仍需 ~60ms。
- * 加一层进程内存缓存后，热路径响应 <5ms。
- *
- * 缓存失效策略：
- * - TTL 5 分钟（与 Redis 缓存 TTL 对齐）
- * - 管理后台更新主题时，AdminSystemService 会清除 Redis 缓存，
- *   内存缓存在 TTL 到期后自动刷新
- * - 启动预热阶段（app.js initializeApp 步骤6）会预填充此缓存
- */
-const appThemeMemCache = {
-  data: null,
-  expires_at: 0,
-  ttl_ms: 5 * 60 * 1000, // 5 分钟
-
-  /**
-   * 读取缓存，过期返回 null
-   * @returns {Object|null} 缓存的主题数据或 null
-   */
-  get() {
-    return this.data && Date.now() < this.expires_at ? this.data : null
-  },
-
-  /**
-   * 写入缓存
-   * @param {Object} value - 待缓存的主题配置数据
-   * @returns {void}
-   */
-  set(value) {
-    this.data = value
-    this.expires_at = Date.now() + this.ttl_ms
-  }
-}
-
-/**
  * @route GET /api/v4/system/config/placement
  * @desc 获取活动位置配置 - 公开接口（无需登录）
  * @access Public
@@ -416,51 +378,6 @@ router.get(
 )
 
 /**
- * @route GET /api/v4/system/config/app-theme
- * @desc 获取全局氛围主题配置 - 公开接口（无需登录）
- * @access Public
- *
- * 业务场景：
- * - 小程序启动时拉取全局氛围主题，控制所有 Tab 页的视觉风格
- * - 配置由运营通过管理后台维护（system_settings 表 config_key = 'app_theme'）
- * - 前端使用 4 层降级策略，本接口不可用时自动使用内置默认主题 'default'
- *
- * 可选主题：default / gold_luxury / purple_mystery / spring_festival / christmas / summer
- *
- * @returns {Object} 全局氛围主题配置
- * @returns {string} data.theme - 当前全局主题标识
- *
- * @date 2026-03-06
- */
-router.get(
-  '/app-theme',
-  asyncHandler(async (req, res) => {
-    // 内存缓存命中 → 直接返回，响应 <5ms
-    const cached = appThemeMemCache.get()
-    if (cached) {
-      return res.apiSuccess(cached, '获取全局主题配置成功', 'APP_THEME_CONFIG_SUCCESS')
-    }
-
-    // 缓存未命中 → 查 Redis/DB（AdminSystemService 内部有 Redis 缓存）
-    const AdminSystemService = req.app.locals.services.getService('admin_system')
-    const configData = await AdminSystemService.getConfigValue('app_theme')
-
-    const responseData = {
-      theme: configData?.theme || 'default',
-      version: Date.now().toString()
-    }
-
-    // 写入内存缓存
-    appThemeMemCache.set(responseData)
-
-    const code = configData ? 'APP_THEME_CONFIG_SUCCESS' : 'APP_THEME_CONFIG_DEFAULT'
-    const message = configData ? '获取全局主题配置成功' : '获取默认全局主题配置'
-
-    return res.apiSuccess(responseData, message, code)
-  })
-)
-
-/**
  * @route GET /api/v4/system/config
  * @desc 获取系统基础公开配置（含客服联系方式）
  * @access Public（无需登录）
@@ -491,6 +408,30 @@ router.get(
     }
 
     return res.apiSuccess(configMap, '获取系统配置成功')
+  })
+)
+
+/**
+ * @route GET /api/v4/system/config/category-tree
+ * @desc 获取商品品类树形结构（公开接口，无需登录）
+ * @access Public
+ *
+ * @returns {Array} data - 顶级品类数组，每项含 children 子品类
+ * @returns {number} data[].category_id - 品类ID
+ * @returns {string} data[].category_name - 品类名称
+ * @returns {number|null} data[].parent_category_id - 父品类ID（顶级为 null）
+ * @returns {number} data[].sort_order - 排序权重
+ * @returns {Array} data[].children - 子品类数组
+ *
+ * 业务场景：微信小程序商品分类导航、筛选器、DIY 材料分类等
+ * 数据来源：categories 表，按 sort_order 排序，构建两级树
+ */
+router.get(
+  '/category-tree',
+  asyncHandler(async (req, res) => {
+    const DictionaryService = req.app.locals.services.getService('dictionary')
+    const tree = await DictionaryService.getCategoryTree()
+    return res.apiSuccess(tree, '获取品类树成功')
   })
 )
 

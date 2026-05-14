@@ -19,6 +19,7 @@ const DiyTemplateService = require('./TemplateService')
 const DiyWorkService = require('./WorkService')
 const DiyMaterialService = require('./MaterialService')
 const DiyAdminQueryService = require('./AdminQueryService')
+const DiyQRCodeService = require('./QRCodeService')
 
 /**
  * DIY 服务门面 — 路由层统一入口
@@ -141,6 +142,11 @@ class DiyServiceFacade {
   static getWorkExchangeRecord(...args) {
     return DiyAdminQueryService.getWorkExchangeRecord(...args)
   }
+
+  // ── 小程序码域（委托 QRCodeService）──
+  static generateQRCode(...args) {
+    return DiyQRCodeService.generateQRCode(...args)
+  }
 }
 
 module.exports = {
@@ -148,5 +154,6 @@ module.exports = {
   DiyTemplateService,
   DiyWorkService,
   DiyMaterialService,
-  DiyAdminQueryService
+  DiyAdminQueryService,
+  DiyQRCodeService
 }

@@ -3,7 +3,7 @@
  *
  * 顶层路径：/api/v4/diy
  *
- * 接口清单（11 个）：
+ * 接口清单（12 个）：
  * - GET    /templates                获取模板列表（按分类分组，仅已发布+已启用）
  * - GET    /templates/:id            获取模板详情
  * - GET    /templates/:id/beads      获取模板可用珠子素材（查 diy_materials）
@@ -11,6 +11,7 @@
  * - GET    /material-groups          获取材料分组列表（用于前端 Tab）
  * - GET    /works                    获取用户作品列表
  * - GET    /works/:id                获取作品详情
+ * - GET    /works/:id/qrcode         生成/获取作品小程序码（缓存到 Sealos）
  * - POST   /works                    保存作品（创建或更新草稿）
  * - DELETE /works/:id                删除作品（仅 draft 状态）
  * - POST   /works/:id/confirm        确认设计（服务端计算价格 + 冻结资产，draft → frozen）
@@ -208,6 +209,28 @@ router.post(
       })
     })
     return res.apiSuccess(work, '设计已取消，资产已解冻')
+  })
+)
+
+/**
+ * 生成 DIY 作品小程序码
+ *
+ * 首次调用：调微信 wxacode.getUnlimited → 上传 Sealos → 返回 URL
+ * 后续调用：直接返回已缓存的 URL（确定性路径 diy-qrcodes/work_{id}.png）
+ *
+ * scene 参数格式：diy_work_id={id}
+ */
+router.get(
+  '/works/:id/qrcode',
+  asyncHandler(async (req, res) => {
+    const DIYService = req.app.locals.services.getService('diy')
+    const serviceManager = req.app.locals.services
+    const result = await DIYService.generateQRCode(
+      Number(req.params.id),
+      req.user.user_id,
+      serviceManager
+    )
+    return res.apiSuccess(result, '小程序码生成成功')
   })
 )
 
