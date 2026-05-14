@@ -25,7 +25,7 @@
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken, getUserRoles } = require('../../../middleware/auth')
+const { authenticateToken, optionalAuth, getUserRoles } = require('../../../middleware/auth')
 const { handleServiceError, asyncHandler } = require('../../../middleware/validation')
 const TransactionManager = require('../../../utils/TransactionManager')
 const logger = require('../../../utils/logger').logger
@@ -53,7 +53,7 @@ const logger = require('../../../utils/logger').logger
  */
 router.get(
   '/items',
-  authenticateToken,
+  optionalAuth,
   asyncHandler(async (req, res) => {
     // 通过 ServiceManager 获取 ExchangeQueryService
     const ExchangeQueryService = req.app.locals.services.getService('exchange_query')
@@ -77,7 +77,7 @@ router.get(
     } = req.query
 
     logger.info('用户浏览兑换商品列表', {
-      user_id: req.user.user_id,
+      user_id: req.user?.user_id || null,
       status,
       asset_code,
       space,
@@ -145,16 +145,19 @@ router.get(
       refresh: refresh === 'true'
     })
 
-    // 获取用户权限（role_level >= 100 为管理员）
-    const userRoles = await getUserRoles(req.user.user_id)
-    const dataLevel = userRoles.role_level >= 100 ? 'full' : 'public'
+    // 获取用户权限（未登录用户默认 public 级别，role_level >= 100 为管理员）
+    let dataLevel = 'public'
+    if (req.user?.user_id) {
+      const userRoles = await getUserRoles(req.user.user_id)
+      dataLevel = userRoles.role_level >= 100 ? 'full' : 'public'
+    }
 
     // 数据脱敏
     const DataSanitizer = req.app.locals.services.getService('data_sanitizer')
     const sanitizedItems = DataSanitizer.sanitizeExchangeMarketItems(result.items, dataLevel)
 
     logger.info('获取兑换商品列表成功', {
-      user_id: req.user.user_id,
+      user_id: req.user?.user_id || null,
       total: result.pagination.total,
       returned: sanitizedItems.length,
       page: finalPage
@@ -180,7 +183,7 @@ router.get(
  * GET /api/v4/exchange/items/:exchange_item_id
  *
  * @description 获取兑换商品详情（展示 cost_asset_code + cost_amount）
- * @access Private（所有登录用户可访问）
+ * @access Public（optionalAuth - 未登录可浏览商品详情）
  *
  * @param {number} exchange_item_id - 商品ID（路由参数）
  *
@@ -188,12 +191,12 @@ router.get(
  */
 router.get(
   '/items/:exchange_item_id',
-  authenticateToken,
+  optionalAuth,
   asyncHandler(async (req, res) => {
     const ExchangeQueryService = req.app.locals.services.getService('exchange_query')
 
     const { exchange_item_id } = req.params
-    const user_id = req.user.user_id
+    const user_id = req.user?.user_id || null
 
     logger.info('获取兑换商品详情', { user_id, exchange_item_id })
 
@@ -206,9 +209,12 @@ router.get(
     // 调用服务层
     const result = await ExchangeQueryService.getItemDetail(itemId)
 
-    // 获取用户权限
-    const userRoles = await getUserRoles(user_id)
-    const dataLevel = userRoles.role_level >= 100 ? 'full' : 'public'
+    // 获取用户权限（未登录用户默认 public 级别）
+    let dataLevel = 'public'
+    if (user_id) {
+      const userRoles = await getUserRoles(user_id)
+      dataLevel = userRoles.role_level >= 100 ? 'full' : 'public'
+    }
 
     // 数据脱敏
     const DataSanitizer = req.app.locals.services.getService('data_sanitizer')
