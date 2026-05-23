@@ -118,6 +118,7 @@
                 <option value="">请选择</option>
                 <option value="points">积分</option>
                 <option value="star_stone">星石</option>
+                <option value="star_stone_quota">星石配额</option>
                 <option value="budget_points">预算积分</option>
                 <option value="material">材料</option>
               </select>
@@ -131,6 +132,7 @@
                   <option :value="campaign.lottery_campaign_id" x-text="campaign.name || campaign.campaign_name || ('活动#' + campaign.lottery_campaign_id)"></option>
                 </template>
               </select>
+              <p class="mt-1 text-xs text-gray-500">预算将充入该活动配置的预算桶（allowed_campaign_ids）</p>
               <p x-show="campaigns.length === 0" class="mt-1 text-sm text-yellow-600">⚠️ 暂无可用活动，请先创建活动</p>
             </div>
             <div x-show="form.asset_type === 'material'" x-cloak>

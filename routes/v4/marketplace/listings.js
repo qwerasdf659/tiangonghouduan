@@ -25,7 +25,7 @@
 const express = require('express')
 const router = express.Router()
 const { AssetCode } = require('../../../constants/AssetCode')
-const { authenticateToken } = require('../../../middleware/auth')
+const { authenticateToken, optionalAuth } = require('../../../middleware/auth')
 const { validatePositiveInteger, asyncHandler } = require('../../../middleware/validation')
 const logger = require('../../../utils/logger').logger
 /* 决策7：路由层不直连 models，服务通过 ServiceManager 获取 */
@@ -33,7 +33,7 @@ const logger = require('../../../utils/logger').logger
 /**
  * @route GET /api/v4/marketplace/listings
  * @desc 获取交易市场挂牌列表（带缓存）
- * @access Private (需要登录)
+ * @access Public（optionalAuth - 未登录可浏览市场，已登录可获取个性化数据）
  *
  * @query {number} page - 页码（默认1）
  * @query {number} page_size - 每页数量（默认20）
@@ -58,7 +58,7 @@ const logger = require('../../../utils/logger').logger
  */
 router.get(
   '/listings',
-  authenticateToken,
+  optionalAuth,
   asyncHandler(async (req, res) => {
     // P1-9：通过 ServiceManager 获取服务（snake_case key）
     const MarketListingService = req.app.locals.services.getService('market_listing_query')
@@ -102,7 +102,7 @@ router.get(
     const sanitizedProducts = DataSanitizer.sanitizeMarketProducts(result.products, dataLevel)
 
     logger.info('获取交易市场挂牌列表成功', {
-      user_id: req.user.user_id,
+      user_id: req.user?.user_id || null,
       listing_kind,
       asset_code,
       item_category_code,
@@ -153,7 +153,7 @@ router.get(
  */
 router.get(
   '/listings/facets',
-  authenticateToken,
+  optionalAuth,
   asyncHandler(async (req, res) => {
     // P1-9：通过 ServiceManager 获取服务（snake_case key）
     const MarketListingService = req.app.locals.services.getService('market_listing_query')
@@ -164,7 +164,7 @@ router.get(
     })
 
     logger.info('获取市场筛选维度配置成功', {
-      user_id: req.user.user_id,
+      user_id: req.user?.user_id || null,
       categories_count: facets.categories.length,
       rarities_count: facets.rarities.length,
       asset_groups_count: facets.asset_groups.length
@@ -177,7 +177,7 @@ router.get(
 /**
  * @route GET /api/v4/marketplace/listings/:market_listing_id
  * @desc 获取市场挂牌详情
- * @access Private (需要登录)
+ * @access Public（optionalAuth - 未登录可浏览商品详情）
  *
  * @param {number} market_listing_id - 挂牌ID
  *
@@ -193,13 +193,13 @@ router.get(
  * @returns {string} data.listed_at - 上架时间
  * @returns {string} data.description - 物品描述
  * @returns {string} data.rarity - 稀有度
- * @returns {boolean} data.is_own - 是否是自己的商品
+ * @returns {boolean} data.is_own - 是否是自己的商品（未登录时为 false）
  *
  * 业务场景：用户查看市场商品的详细信息
  */
 router.get(
   '/listings/:market_listing_id',
-  authenticateToken,
+  optionalAuth,
   validatePositiveInteger('market_listing_id', 'params'),
   asyncHandler(async (req, res) => {
     // P1-9：通过 ServiceManager 获取服务（snake_case key）
@@ -245,13 +245,13 @@ router.get(
     plainListing.price_asset_code = plainListing.price_asset_code || AssetCode.STAR_STONE
     plainListing.listed_at = plainListing.created_at
     plainListing.description = plainListing.offerItem?.meta?.description || ''
-    plainListing.is_own = plainListing.seller_user_id === req.user.user_id
+    plainListing.is_own = req.user ? plainListing.seller_user_id === req.user.user_id : false
 
     const [sanitizedDetail] = DataSanitizer.sanitizeMarketProducts([plainListing], dataLevel)
 
     logger.info('获取市场挂牌详情成功', {
       market_listing_id: listingId,
-      user_id: req.user.user_id
+      user_id: req.user?.user_id || null
     })
 
     return res.apiSuccess(sanitizedDetail, '获取挂牌详情成功')
@@ -261,24 +261,24 @@ router.get(
 /**
  * @route GET /api/v4/marketplace/settlement-currencies
  * @desc 获取允许的结算币种列表（用户端）
- * @access Private (需要登录)
+ * @access Public（optionalAuth - 浏览市场时需要知道价格币种）
  *
  * @returns {Object} 结算币种列表
  * @returns {Array} data.currencies - 币种列表 [{asset_code, display_name}]
  *
- * 业务场景：前端卖家上架商品时，需要知道可选的定价币种
+ * 业务场景：前端渲染市场商品价格标签时需要知道币种显示名称
  * 数据来源：system_settings.allowed_settlement_assets + material_asset_types.display_name
  */
 router.get(
   '/settlement-currencies',
-  authenticateToken,
+  optionalAuth,
   asyncHandler(async (req, res) => {
     const MarketListingService = req.app.locals.services.getService('market_listing_query')
 
     const currencies = await MarketListingService.getSettlementCurrencies()
 
     logger.info('获取结算币种列表成功', {
-      user_id: req.user.user_id,
+      user_id: req.user?.user_id || null,
       count: currencies.length
     })
 

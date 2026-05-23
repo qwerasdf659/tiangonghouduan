@@ -135,22 +135,35 @@ class DataSanitizer {
       } else if (rawPrimaryMedia?.object_key) {
         sanitized.image = {
           primary_media_id: rawPrimaryMedia.media_id,
-          url: getImageUrl(rawPrimaryMedia.object_key),
+          url: getImageUrl(rawPrimaryMedia.object_key, rawPrimaryMedia.content_hash),
           mime: rawPrimaryMedia.mime_type,
           thumbnail_url: rawPrimaryMedia.thumbnail_keys?.small
-            ? getImageUrl(rawPrimaryMedia.thumbnail_keys.small)
-            : getImageUrl(rawPrimaryMedia.object_key)
+            ? getImageUrl(rawPrimaryMedia.thumbnail_keys.small, rawPrimaryMedia.content_hash)
+            : getImageUrl(rawPrimaryMedia.object_key, rawPrimaryMedia.content_hash)
         }
       } else {
         /**
-         * 最终兜底：所有图片来源都不可用时，返回占位图 URL
-         * 确保前端 <image> 组件始终有可渲染的图片地址
+         * 图片兜底策略：
+         * 1. 如果有 material_asset_code，返回对应的资产图标 URL（运营可通过替换图标文件调整）
+         * 2. 否则返回通用占位图
          */
-        const placeholderUrl = getPlaceholderImageUrl('prize')
-        sanitized.image = {
-          url: placeholderUrl,
-          thumbnail_url: placeholderUrl,
-          source: 'placeholder'
+        const materialCode = sanitized.material_asset_code || plain.material_asset_code
+        if (materialCode) {
+          const iconFileName = materialCode.replace(/_/g, '-') + '.png'
+          const baseUrl = process.env.PUBLIC_BASE_URL || ''
+          const iconUrl = `${baseUrl}/admin/assets/icons/materials/${iconFileName}`
+          sanitized.image = {
+            url: iconUrl,
+            thumbnail_url: iconUrl,
+            source: 'material_icon'
+          }
+        } else {
+          const placeholderUrl = getPlaceholderImageUrl('prize')
+          sanitized.image = {
+            url: placeholderUrl,
+            thumbnail_url: placeholderUrl,
+            source: 'placeholder'
+          }
         }
       }
 
@@ -1044,13 +1057,13 @@ class DataSanitizer {
    */
   static getPrizeIcon(prizeType) {
     const icons = {
-      points: '🪙',
-      physical: '🎁',
-      voucher: '🎫',
-      virtual: '💎',
-      special: '⭐'
+      points: 'points',
+      physical: 'physical',
+      voucher: 'voucher',
+      virtual: 'virtual',
+      special: 'special'
     }
-    return icons[prizeType] || '🎁'
+    return icons[prizeType] || 'default'
   }
 
   /**
@@ -1346,11 +1359,11 @@ class DataSanitizer {
       } else if (rawPrimaryMedia?.object_key) {
         sanitized.primary_image = {
           primary_media_id: rawPrimaryMedia.media_id,
-          url: getImageUrl(rawPrimaryMedia.object_key),
+          url: getImageUrl(rawPrimaryMedia.object_key, rawPrimaryMedia.content_hash),
           mime: rawPrimaryMedia.mime_type,
           thumbnail_url: rawPrimaryMedia.thumbnail_keys?.small
-            ? getImageUrl(rawPrimaryMedia.thumbnail_keys.small)
-            : getImageUrl(rawPrimaryMedia.object_key)
+            ? getImageUrl(rawPrimaryMedia.thumbnail_keys.small, rawPrimaryMedia.content_hash)
+            : getImageUrl(rawPrimaryMedia.object_key, rawPrimaryMedia.content_hash)
         }
       } else {
         sanitized.primary_image = null

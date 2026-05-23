@@ -21,7 +21,7 @@
 const express = require('express')
 const router = express.Router()
 const logger = require('../../../utils/logger').logger
-const { authenticateToken, optionalAuth } = require('../../../middleware/auth')
+const { optionalAuth } = require('../../../middleware/auth')
 const dataAccessControl = require('../../../middleware/dataAccessControl')
 const { asyncHandler } = require('../../../middleware/validation')
 
@@ -128,7 +128,7 @@ router.get(
  */
 router.get(
   '/:code/prizes',
-  authenticateToken,
+  optionalAuth,
   dataAccessControl,
   asyncHandler(async (req, res) => {
     const DataSanitizer = req.app.locals.services.getService('data_sanitizer')
@@ -150,7 +150,7 @@ router.get(
     const sanitizedPrizes = DataSanitizer.sanitizePrizes(fullPrizes, req.dataLevel)
 
     logger.info(
-      `[LotteryAPI] User ${req.user.user_id} accessed prizes for ${campaign_code} with level: ${req.dataLevel}`
+      `[LotteryAPI] User ${req.user?.user_id || 'anonymous'} accessed prizes for ${campaign_code} with level: ${req.dataLevel}`
     )
 
     return res.apiSuccess(sanitizedPrizes, '奖品列表获取成功', 'PRIZES_SUCCESS')
@@ -172,7 +172,7 @@ router.get(
  */
 router.get(
   '/:code/config',
-  authenticateToken,
+  optionalAuth,
   dataAccessControl,
   asyncHandler(async (req, res) => {
     const campaign_code = req.params.code

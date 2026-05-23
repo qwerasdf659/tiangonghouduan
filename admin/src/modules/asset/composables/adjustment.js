@@ -74,10 +74,10 @@ export function useAdjustmentState() {
       {
         key: 'asset_name',
         label: '资产类型',
-        render: (val, row) => val || row.asset_type_display || row.asset_code || '-'
+        render: (val, row) => val || row.asset_code || '-'
       },
       {
-        key: 'amount',
+        key: 'delta_amount',
         label: '变动',
         sortable: true,
         render: val => {
@@ -511,7 +511,7 @@ export function useAdjustmentMethods() {
         }
 
         if (this.adjustForm.asset_code === 'budget_points') {
-          data.campaign_id = parseInt(this.adjustForm.campaign_id)
+          data.lottery_campaign_id = parseInt(this.adjustForm.campaign_id)
         }
 
         const result = await request({
@@ -680,7 +680,7 @@ export function useAdjustmentMethods() {
         }
 
         if (this.form.asset_type === 'budget_points' && this.form.campaign_id) {
-          data.campaign_id = parseInt(this.form.campaign_id)
+          data.lottery_campaign_id = parseInt(this.form.campaign_id)
         }
 
         const result = await request({

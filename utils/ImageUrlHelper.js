@@ -20,27 +20,34 @@
 const path = require('path')
 
 /**
- * 获取图片公网访问 URL
+ * 应用启动时间戳（用于图片 URL cache-buster）
+ * 每次服务重启后生成新的版本号，确保客户端不会使用旧的缓存 404 响应
+ */
+const APP_BOOT_VERSION = Date.now().toString(36)
+
+/**
+ * 获取图片公网访问 URL（内容哈希缓存策略）
  *
  * @description
- *   架构决策（2026-01-08）：
- *   - 不使用 CDN，直连 Sealos 公网端点
- *   - 数据库仅存对象 key，API 层动态拼接完整 URL
+ *   缓存策略（2026-05-24 最终方案）：
+ *   - 传入 contentHash 时：URL 带 ?h={hash前8位}，客户端可永久缓存（immutable）
+ *   - 未传入 contentHash 时：URL 带 ?v={启动版本号}，服务重启后失效
+ *   - 图片更换 → content_hash 变 → URL 自动变 → 客户端自动拿新图
+ *   - 不需要手动清缓存、不需要 CDN 主动清除
  *
- * @param {string} objectKey - 对象 key（如 prizes/xxx.jpg 或 prizes/thumbnails/small/xxx.jpg）
+ * @param {string} objectKey - 对象 key（如 prizes/xxx.jpg）
+ * @param {string} [contentHash] - 文件内容哈希（media_files.content_hash），传入时启用永久缓存
  * @returns {string|null} 完整公网访问 URL
  *
  * @example
- * // 基础用法 - 原图
- * getImageUrl('prizes/20260108_abc123.jpg')
- * // 返回: https://objectstorageapi.xxx/bucket/prizes/20260108_abc123.jpg
+ * getImageUrl('materials/icon.png', '97c01e902c53d7cd')
+ * // 返回: https://domain/api/v4/images/materials/icon.png?h=97c01e90
  *
  * @example
- * // 预生成缩略图
- * getImageUrl('prizes/thumbnails/small/20260108_abc123.jpg')
- * // 返回: https://objectstorageapi.xxx/bucket/prizes/thumbnails/small/20260108_abc123.jpg
+ * getImageUrl('materials/icon.png')
+ * // 返回: https://domain/api/v4/images/materials/icon.png?v=mpiuj6vz
  */
-function getImageUrl(objectKey) {
+function getImageUrl(objectKey, contentHash) {
   if (!objectKey) {
     return null
   }
@@ -76,10 +83,17 @@ function getImageUrl(objectKey) {
    *   代理路由：/api/v4/images/{objectKey}
    *   后端内网获取图片 → 以 inline 方式返回 → 小程序正常显示
    */
+  /*
+   * 🎯 缓存策略（2026-05-24 最终方案）：
+   *   - contentHash 存在时：使用内容哈希前8位作为版本标识（永久缓存）
+   *   - contentHash 不存在时：使用启动版本号（服务重启后失效）
+   */
+  const cacheParam = contentHash ? `h=${contentHash.substring(0, 8)}` : `v=${APP_BOOT_VERSION}`
+
   const publicBaseUrl = process.env.PUBLIC_BASE_URL
 
   if (publicBaseUrl) {
-    return `${publicBaseUrl}/api/v4/images/${objectKey}`
+    return `${publicBaseUrl}/api/v4/images/${objectKey}?${cacheParam}`
   }
 
   // 本地开发环境降级：直连 Sealos 公网端点
@@ -91,7 +105,7 @@ function getImageUrl(objectKey) {
     return null
   }
 
-  return `${publicEndpoint}/${bucket}/${objectKey}`
+  return `${publicEndpoint}/${bucket}/${objectKey}?${cacheParam}`
 }
 
 /**

@@ -475,7 +475,7 @@ router.post(
  * GET /api/v4/exchange/space-stats
  *
  * @description 获取空间统计数据（臻选空间/幸运空间）
- * @access Private（所有登录用户可访问）
+ * @access Public（optionalAuth - 未登录可浏览空间统计）
  *
  * @query {string} space - 空间类型（必填）：lucky / premium
  *
@@ -483,7 +483,7 @@ router.post(
  */
 router.get(
   '/space-stats',
-  authenticateToken,
+  optionalAuth,
   asyncHandler(async (req, res) => {
     const ExchangeQueryService = req.app.locals.services.getService('exchange_query')
 
@@ -504,7 +504,7 @@ router.get(
       )
     }
 
-    logger.info('查询空间统计', { user_id: req.user.user_id, space })
+    logger.info('查询空间统计', { user_id: req.user?.user_id || null, space })
 
     const stats = await ExchangeQueryService.getSpaceStats(space)
 

@@ -43,23 +43,35 @@ router.get(
     const objectKey = req.params[0]
 
     if (!objectKey || !ALLOWED_EXTENSIONS.test(objectKey)) {
+      res.set({ 'Cache-Control': 'no-store' })
       return res.apiError('无效的图片路径', 'INVALID_IMAGE_KEY', null, 400)
     }
 
     if (objectKey.includes('..') || objectKey.startsWith('/')) {
+      res.set({ 'Cache-Control': 'no-store' })
       return res.apiError('非法的图片路径', 'INVALID_IMAGE_KEY', null, 400)
     }
 
-    const SealosStorageService = req.app.locals.services.getService('sealos_storage')
-    const storageService = new SealosStorageService()
-    const { body, contentType, contentLength, etag } =
-      await storageService.getImageBuffer(objectKey)
+    let imageData
+    try {
+      const SealosStorageService = req.app.locals.services.getService('sealos_storage')
+      const storageService = new SealosStorageService()
+      imageData = await storageService.getImageBuffer(objectKey)
+    } catch (storageError) {
+      /* 对象不存在时返回 404，且禁止缓存（避免客户端缓存 404 导致后续上传后仍无法显示） */
+      res.set({ 'Cache-Control': 'no-store' })
+      if (storageError.code === 'NoSuchKey') {
+        return res.apiError('图片不存在', 'IMAGE_NOT_FOUND', null, 404)
+      }
+      return res.apiError('图片获取失败', 'STORAGE_ERROR', null, 502)
+    }
+
+    const { body, contentType, contentLength, etag } = imageData
 
     if (req.headers['if-none-match'] === etag) {
       return res.status(304).end()
     }
 
-    // 移除全局中间件注入的安全头（CSP等会干扰小程序 <image> 组件渲染）
     res.removeHeader('Content-Security-Policy')
     res.removeHeader('X-Content-Type-Options')
     res.removeHeader('X-XSS-Protection')
@@ -70,11 +82,21 @@ router.get(
     res.removeHeader('X-Permitted-Cross-Domain-Policies')
     res.removeHeader('Referrer-Policy')
 
+    /*
+     * 缓存策略：
+     * - 带 ?h= 参数（内容哈希）：永久缓存 + immutable（文件变 → hash 变 → URL 变）
+     * - 带 ?v= 参数（启动版本）：缓存24小时 + must-revalidate
+     * - 无参数：缓存24小时 + must-revalidate
+     */
+    const cacheControl = req.query.h
+      ? 'public, max-age=31536000, immutable'
+      : 'public, max-age=86400, must-revalidate'
+
     res.set({
       'Content-Type': contentType || 'image/jpeg',
       'Content-Length': contentLength,
       'Content-Disposition': 'inline',
-      'Cache-Control': 'public, max-age=86400',
+      'Cache-Control': cacheControl,
       'Access-Control-Allow-Origin': '*',
       ETag: etag
     })

@@ -85,6 +85,9 @@ router.get(
        * 字段名统一使用数据库真实字段名（delta_amount/business_type），不做别名映射
        * description/title 从 meta JSON 提取（模型无独立 description 字段）
        */
+      // 获取资产名称映射表（从 material_asset_types 字典表查询）
+      const assetNameMap = await getAssetNameMap(req.app.locals.services)
+
       const transactions = result.transactions.map(tx => {
         const plainTx = tx.get ? tx.get({ plain: true }) : tx
         return {
@@ -92,7 +95,7 @@ router.get(
           asset_transaction_id: Number(plainTx.asset_transaction_id),
           transaction_no: plainTx.transaction_no || null,
           asset_code: plainTx.asset_code,
-          asset_name: getAssetDisplayName(plainTx.asset_code),
+          asset_name: assetNameMap[plainTx.asset_code] || plainTx.asset_code,
           // 业务类型：使用数据库真实字段名（attachDisplayNames 会附加 business_type_display）
           business_type: plainTx.business_type,
           // 变动金额：正数=增加，负数=扣减（与数据库 delta_amount 一致）
@@ -149,13 +152,25 @@ router.get(
  * @param {string} asset_code - 资产代码
  * @returns {string} 资产显示名称
  */
-function getAssetDisplayName(asset_code) {
-  const builtInAssets = {
-    POINTS: '积分',
-    star_stone: '星石',
-    BUDGET_POINTS: '预算积分'
+/**
+ * 获取资产中文显示名称映射表
+ * 从 MaterialManagementService 获取所有资产类型的 display_name
+ *
+ * @param {Object} services - ServiceManager 实例
+ * @returns {Promise<Object>} asset_code → display_name 映射
+ */
+async function getAssetNameMap(services) {
+  try {
+    const MaterialManagementService = services.getService('material_management')
+    const { asset_types } = await MaterialManagementService.listAssetTypes({ is_enabled: true })
+    const map = {}
+    asset_types.forEach(t => {
+      map[t.asset_code] = t.display_name
+    })
+    return map
+  } catch {
+    return { points: '积分', budget_points: '预算积分' }
   }
-  return builtInAssets[asset_code] || asset_code
 }
 
 module.exports = router

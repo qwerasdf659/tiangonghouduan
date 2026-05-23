@@ -641,7 +641,7 @@ class NotificationService {
 
     return await this.send(user_id, {
       type: 'premium_unlock_success',
-      title: `${is_first_unlock ? '🎉 高级空间首次解锁成功' : '🔄 高级空间重新解锁成功'}`,
+      title: `${is_first_unlock ? '高级空间首次解锁成功' : '高级空间重新解锁成功'}`,
       content: `您已成功解锁高级空间功能（支付${unlock_cost}积分），剩余${remaining_points}积分，有效期${validity_hours}小时`,
       data: {
         unlock_cost,
@@ -672,7 +672,7 @@ class NotificationService {
 
     return await this.send(user_id, {
       type: 'premium_expiring_soon',
-      title: '⏰ 高级空间即将过期',
+      title: '高级空间即将过期',
       content: `您的高级空间访问权限将在${remaining_hours}小时${remaining_minutes % 60}分钟后过期，请及时重新解锁`,
       data: {
         expires_at,
@@ -701,7 +701,7 @@ class NotificationService {
 
     return await this.send(user_id, {
       type: 'premium_expired',
-      title: '📅 高级空间已过期',
+      title: '高级空间已过期',
       content: '您的高级空间访问权限已过期，如需继续使用，请支付100积分重新解锁（有效期24小时）',
       data: {
         expired_at,
@@ -824,7 +824,7 @@ class NotificationService {
 
     return await this.send(user_id, {
       type: 'lottery_win',
-      title: '🎉 恭喜中奖',
+      title: '恭喜中奖',
       content,
       data: {
         lottery_draw_id,
@@ -880,7 +880,7 @@ class NotificationService {
     if (user_id) {
       return await this.send(user_id, {
         type: 'system_announcement',
-        title: `📢 ${title}`,
+        title,
         content,
         data: {
           announcement_type,
@@ -890,7 +890,7 @@ class NotificationService {
     } else {
       return await this.sendToAdmins({
         type: 'system_announcement',
-        title: `📢 ${title}`,
+        title,
         content,
         data: {
           announcement_type,
@@ -915,7 +915,7 @@ class NotificationService {
 
     return await this.send(user_id, {
       type: 'security_alert',
-      title: '🔐 账户安全提醒',
+      title: '账户安全提醒',
       content: `${description}${ip_address ? `（IP: ${ip_address}）` : ''}。如非本人操作，请及时联系客服。`,
       data: securityData
     })
@@ -947,29 +947,29 @@ class NotificationService {
     // 状态变更消息映射
     const statusMessageMap = {
       active: {
-        title: '🎉 抽奖活动已开始',
+        title: '抽奖活动已开始',
         content: `【${campaign_name}】活动已开始，快来参与抽奖吧！`,
         admin_content: `活动【${campaign_name}】已启动（${campaign_code}）`
       },
       paused: {
-        title: '⏸️ 抽奖活动已暂停',
+        title: '抽奖活动已暂停',
         content: `【${campaign_name}】活动已暂停${reason ? `，原因：${reason}` : ''}`,
         admin_content: `活动【${campaign_name}】已暂停（${campaign_code}）`
       },
       ended: {
-        title: '🏁 抽奖活动已结束',
+        title: '抽奖活动已结束',
         content: `【${campaign_name}】活动已结束，感谢您的参与！`,
         admin_content: `活动【${campaign_name}】已结束（${campaign_code}）`
       },
       draft: {
-        title: '📝 抽奖活动已保存',
+        title: '抽奖活动已保存',
         content: `【${campaign_name}】活动配置已保存为草稿`,
         admin_content: `活动【${campaign_name}】已保存为草稿（${campaign_code}）`
       }
     }
 
     const statusMessage = statusMessageMap[new_status] || {
-      title: '📢 活动状态变更',
+      title: '活动状态变更',
       content: `【${campaign_name}】活动状态已更新`,
       admin_content: `活动【${campaign_name}】状态已变更（${campaign_code}）`
     }
@@ -1076,7 +1076,7 @@ class NotificationService {
 
     return await this.send(user_id, {
       type: 'listing_created',
-      title: '📦 挂牌成功',
+      title: '挂牌成功',
       content: `您的 ${offer_amount} 个 ${assetName} 已成功上架，标价 ${price_amount} 星石。资产已冻结，等待买家购买。`,
       data: {
         market_listing_id,
@@ -1107,7 +1107,7 @@ class NotificationService {
 
     return await this.send(user_id, {
       type: 'listing_sold',
-      title: '💰 售出成功',
+      title: '售出成功',
       content: `恭喜！您的 ${offer_amount} 个 ${assetName} 已售出，成交价 ${price_amount} 星石，实际到账 ${net_amount} 星石（扣除5%手续费）。`,
       data: {
         market_listing_id,
@@ -1137,7 +1137,7 @@ class NotificationService {
 
     return await this.send(user_id, {
       type: 'purchase_completed',
-      title: '🎉 购买成功',
+      title: '购买成功',
       content: `您已成功购买 ${offer_amount} 个 ${assetName}，支付 ${price_amount} 星石。资产已到账，请在背包中查看。`,
       data: {
         order_id,
@@ -1171,7 +1171,7 @@ class NotificationService {
 
     return await this.send(user_id, {
       type: 'listing_withdrawn',
-      title: '📤 挂牌已撤回',
+      title: '挂牌已撤回',
       content: `您的 ${offer_amount} 个 ${assetName} 挂牌已撤回（${reason}）。资产已解冻至您的可用余额。`,
       data: {
         market_listing_id,
@@ -1199,7 +1199,7 @@ class NotificationService {
 
     return await this.send(user_id, {
       type: 'listing_expired',
-      title: '⏰ 挂牌已过期',
+      title: '挂牌已过期',
       content: `您的 ${offer_amount} 个 ${assetName} 挂牌已超时（3天），系统已自动撤回并解冻资产。如需继续出售，请重新上架。`,
       data: {
         market_listing_id,
@@ -1234,7 +1234,7 @@ class NotificationService {
     // 1. 通过聊天系统发送持久化通知（离线用户上线后可查看）
     const chatResult = await this.send(user_id, {
       type: 'bid_outbid',
-      title: '⚠️ 您的竞价已被超越',
+      title: '您的竞价已被超越',
       content: `您对【${item_name}】的出价 ${my_bid_amount} ${priceAssetName} 已被超越，当前最高价 ${new_highest} ${priceAssetName}。如需继续竞拍，请提交更高出价。`,
       data: {
         bid_product_id,
@@ -1283,7 +1283,7 @@ class NotificationService {
     // 1. 通过聊天系统发送持久化通知
     const chatResult = await this.send(user_id, {
       type: 'bid_won',
-      title: '🎉 恭喜中标',
+      title: '恭喜中标',
       content: `恭喜！您以 ${winning_amount} ${priceAssetName} 成功拍得【${item_name}】。商品已添加到您的背包，请前往查看。`,
       data: {
         bid_product_id,
@@ -1331,7 +1331,7 @@ class NotificationService {
     // 1. 通过聊天系统发送持久化通知
     const chatResult = await this.send(user_id, {
       type: 'bid_lost',
-      title: '📤 竞价未中标',
+      title: '竞价未中标',
       content: `很遗憾，您对【${item_name}】的出价 ${my_bid_amount} ${priceAssetName} 未中标（中标价 ${winning_amount} ${priceAssetName}）。您的冻结资产已解冻返还。`,
       data: {
         bid_product_id,

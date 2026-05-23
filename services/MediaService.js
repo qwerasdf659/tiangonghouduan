@@ -142,12 +142,14 @@ class MediaService {
     })
 
     if (existing) {
-      const publicUrl = getImageUrl(existing.object_key)
+      const publicUrl = getImageUrl(existing.object_key, existing.content_hash)
       const thumbnailKeys = existing.thumbnail_keys || {}
       const thumbnails = {
-        small: thumbnailKeys.small ? getImageUrl(thumbnailKeys.small) : null,
-        medium: thumbnailKeys.medium ? getImageUrl(thumbnailKeys.medium) : null,
-        large: thumbnailKeys.large ? getImageUrl(thumbnailKeys.large) : null
+        small: thumbnailKeys.small ? getImageUrl(thumbnailKeys.small, existing.content_hash) : null,
+        medium: thumbnailKeys.medium
+          ? getImageUrl(thumbnailKeys.medium, existing.content_hash)
+          : null,
+        large: thumbnailKeys.large ? getImageUrl(thumbnailKeys.large, existing.content_hash) : null
       }
       _logger.info('MediaService: 发现重复文件，返回已有记录', {
         existing_media_id: existing.media_id,
@@ -197,11 +199,11 @@ class MediaService {
       status: 'active'
     })
 
-    const publicUrl = getImageUrl(objectKey)
+    const publicUrl = getImageUrl(objectKey, contentHash)
     const thumbnails = {
-      small: thumbnailKeys?.small ? getImageUrl(thumbnailKeys.small) : null,
-      medium: thumbnailKeys?.medium ? getImageUrl(thumbnailKeys.medium) : null,
-      large: thumbnailKeys?.large ? getImageUrl(thumbnailKeys.large) : null
+      small: thumbnailKeys?.small ? getImageUrl(thumbnailKeys.small, contentHash) : null,
+      medium: thumbnailKeys?.medium ? getImageUrl(thumbnailKeys.medium, contentHash) : null,
+      large: thumbnailKeys?.large ? getImageUrl(thumbnailKeys.large, contentHash) : null
     }
 
     _logger.info('MediaService: 上传成功', {
@@ -391,11 +393,11 @@ class MediaService {
         role: att.role,
         sort_order: att.sort_order,
         meta: att.meta,
-        public_url: getImageUrl(m.object_key),
+        public_url: getImageUrl(m.object_key, m.content_hash),
         thumbnails: {
-          small: thumbKeys.small ? getImageUrl(thumbKeys.small) : null,
-          medium: thumbKeys.medium ? getImageUrl(thumbKeys.medium) : null,
-          large: thumbKeys.large ? getImageUrl(thumbKeys.large) : null
+          small: thumbKeys.small ? getImageUrl(thumbKeys.small, m.content_hash) : null,
+          medium: thumbKeys.medium ? getImageUrl(thumbKeys.medium, m.content_hash) : null,
+          large: thumbKeys.large ? getImageUrl(thumbKeys.large, m.content_hash) : null
         },
         width: m.width,
         height: m.height,
@@ -496,11 +498,11 @@ class MediaService {
         trashed_at: m.trashed_at,
         uploaded_by: m.uploaded_by,
         created_at: m.created_at,
-        public_url: getImageUrl(m.object_key),
+        public_url: getImageUrl(m.object_key, m.content_hash),
         thumbnails: {
-          small: thumbKeys.small ? getImageUrl(thumbKeys.small) : null,
-          medium: thumbKeys.medium ? getImageUrl(thumbKeys.medium) : null,
-          large: thumbKeys.large ? getImageUrl(thumbKeys.large) : null
+          small: thumbKeys.small ? getImageUrl(thumbKeys.small, m.content_hash) : null,
+          medium: thumbKeys.medium ? getImageUrl(thumbKeys.medium, m.content_hash) : null,
+          large: thumbKeys.large ? getImageUrl(thumbKeys.large, m.content_hash) : null
         }
       }
     })
@@ -533,11 +535,11 @@ class MediaService {
     const thumbKeys = plain.thumbnail_keys || {}
     return {
       ...plain,
-      public_url: getImageUrl(plain.object_key),
+      public_url: getImageUrl(plain.object_key, plain.content_hash),
       thumbnails: {
-        small: thumbKeys.small ? getImageUrl(thumbKeys.small) : null,
-        medium: thumbKeys.medium ? getImageUrl(thumbKeys.medium) : null,
-        large: thumbKeys.large ? getImageUrl(thumbKeys.large) : null
+        small: thumbKeys.small ? getImageUrl(thumbKeys.small, plain.content_hash) : null,
+        medium: thumbKeys.medium ? getImageUrl(thumbKeys.medium, plain.content_hash) : null,
+        large: thumbKeys.large ? getImageUrl(thumbKeys.large, plain.content_hash) : null
       },
       attachments: (plain.attachments || []).map(a => ({
         attachment_id: a.attachment_id,
@@ -807,11 +809,11 @@ class MediaService {
         file_size: m.file_size,
         folder: m.folder,
         trashed_at: m.trashed_at,
-        public_url: getImageUrl(m.object_key),
+        public_url: getImageUrl(m.object_key, m.content_hash),
         thumbnails: {
-          small: thumbKeys.small ? getImageUrl(thumbKeys.small) : null,
-          medium: thumbKeys.medium ? getImageUrl(thumbKeys.medium) : null,
-          large: thumbKeys.large ? getImageUrl(thumbKeys.large) : null
+          small: thumbKeys.small ? getImageUrl(thumbKeys.small, m.content_hash) : null,
+          medium: thumbKeys.medium ? getImageUrl(thumbKeys.medium, m.content_hash) : null,
+          large: thumbKeys.large ? getImageUrl(thumbKeys.large, m.content_hash) : null
         }
       }
     })

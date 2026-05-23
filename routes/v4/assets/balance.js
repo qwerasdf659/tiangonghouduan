@@ -20,6 +20,8 @@ const router = express.Router()
 const { AssetCode } = require('../../../constants/AssetCode')
 const { authenticateToken } = require('../../../middleware/auth')
 const { asyncHandler } = require('../../../middleware/validation')
+const { getImageUrl } = require('../../../utils/ImageUrlHelper')
+const { categoryIconAttachmentInclude } = require('../../../utils/mediaAttachmentGallery')
 const logger = require('../../../utils/logger').logger
 
 /**
@@ -118,26 +120,49 @@ router.get(
      */
     const { Op } = require('sequelize')
     const MaterialAssetType = req.app.locals.models.MaterialAssetType
+    const MediaAttachment = req.app.locals.models.MediaAttachment
+    const MediaFile = req.app.locals.models.MediaFile
     const balanceAssetCodes = balances.map(b => b.asset_code)
     const assetTypes = await MaterialAssetType.findAll({
       where: { asset_code: { [Op.in]: balanceAssetCodes } },
-      attributes: ['asset_code', 'form', 'is_enabled']
+      attributes: ['asset_code', 'display_name', 'form', 'is_enabled', 'group_code'],
+      include: [categoryIconAttachmentInclude({ MediaAttachment, MediaFile })].filter(Boolean)
     })
     const validAssetCodes = new Set(
       assetTypes.filter(t => t.is_enabled !== false && t.form !== 'quota').map(t => t.asset_code)
     )
+
+    /* 构建 asset_code → icon_url 映射 */
+    const assetIconMap = new Map()
+    assetTypes.forEach(t => {
+      const plain = t.get ? t.get({ plain: true }) : t
+      const iconKey = plain.iconAttachment?.media?.object_key || null
+      const iconHash = plain.iconAttachment?.media?.content_hash || null
+      assetIconMap.set(plain.asset_code, {
+        display_name: plain.display_name,
+        icon_url: iconKey ? getImageUrl(iconKey, iconHash) : null,
+        group_code: plain.group_code
+      })
+    })
+
     const filteredBalances = balances.filter(
       b => b.asset_code !== AssetCode.BUDGET_POINTS && validAssetCodes.has(b.asset_code)
     )
 
     // 返回字段命名与 BalanceService.getBalance() 保持一致（全链路统一）
     return res.apiSuccess({
-      balances: filteredBalances.map(b => ({
-        asset_code: b.asset_code,
-        available_amount: Number(b.available_amount),
-        frozen_amount: Number(b.frozen_amount),
-        total_amount: Number(b.available_amount) + Number(b.frozen_amount)
-      }))
+      balances: filteredBalances.map(b => {
+        const assetMeta = assetIconMap.get(b.asset_code) || {}
+        return {
+          asset_code: b.asset_code,
+          display_name: assetMeta.display_name || b.asset_code,
+          icon_url: assetMeta.icon_url || null,
+          group_code: assetMeta.group_code || null,
+          available_amount: Number(b.available_amount),
+          frozen_amount: Number(b.frozen_amount),
+          total_amount: Number(b.available_amount) + Number(b.frozen_amount)
+        }
+      })
     })
   })
 )

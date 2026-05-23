@@ -56,11 +56,11 @@ function toItemWithImage(row) {
   } else if (media?.object_key) {
     plain.primary_image = {
       primary_media_id: media.media_id,
-      url: getImageUrl(media.object_key),
+      url: getImageUrl(media.object_key, media.content_hash),
       mime: media.mime_type,
       thumbnail_url: media.thumbnail_keys?.small
-        ? getImageUrl(media.thumbnail_keys.small)
-        : getImageUrl(media.object_key)
+        ? getImageUrl(media.thumbnail_keys.small, media.content_hash)
+        : getImageUrl(media.object_key, media.content_hash)
     }
   } else {
     plain.primary_image = null

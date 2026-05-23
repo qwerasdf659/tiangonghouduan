@@ -70,9 +70,38 @@ router.post(
       return res.apiError('reason 是必填参数', 'BAD_REQUEST', null, 400)
     }
 
-    // BUDGET_POINTS 必须提供 lottery_campaign_id
+    // BUDGET_POINTS 必须提供 lottery_campaign_id（预算桶标识）
     if (asset_code === AssetCode.BUDGET_POINTS && !lottery_campaign_id) {
-      return res.apiError('调整预算积分必须提供 lottery_campaign_id', 'BAD_REQUEST', null, 400)
+      return res.apiError(
+        '调整预算积分必须提供 lottery_campaign_id（预算桶标识）',
+        'BAD_REQUEST',
+        null,
+        400
+      )
+    }
+
+    /*
+     * 预算桶标识解析：
+     * 前端传入的 lottery_campaign_id 可能是活动主键（数字），
+     * 需要解析为该活动配置的 allowed_campaign_ids[0]（实际预算桶标识）。
+     * 如果传入的已经是字符串桶标识（如 'CONSUMPTION_DEFAULT'），则直接使用。
+     */
+    let resolved_budget_bucket_id = lottery_campaign_id
+    if (asset_code === AssetCode.BUDGET_POINTS && lottery_campaign_id) {
+      const numeric_id = Number(lottery_campaign_id)
+      if (!isNaN(numeric_id) && numeric_id > 0) {
+        const { LotteryCampaign } = require('../../../../models')
+        const campaign = await LotteryCampaign.findByPk(numeric_id, {
+          attributes: ['lottery_campaign_id', 'allowed_campaign_ids']
+        })
+        if (
+          campaign &&
+          Array.isArray(campaign.allowed_campaign_ids) &&
+          campaign.allowed_campaign_ids.length > 0
+        ) {
+          resolved_budget_bucket_id = campaign.allowed_campaign_ids[0]
+        }
+      }
     }
 
     /*
@@ -114,7 +143,7 @@ router.post(
               delta_amount: Number(amount),
               business_type: 'admin_adjustment',
               idempotency_key,
-              lottery_campaign_id: lottery_campaign_id || null,
+              lottery_campaign_id: resolved_budget_bucket_id || null,
               counterpart_account_id: reserveAccount.account_id,
               meta: {
                 admin_id,

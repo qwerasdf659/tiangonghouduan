@@ -200,19 +200,19 @@ class UserStatsService {
       }
 
       if (statistics.lottery_count >= 10) {
-        statistics.achievements.push({ name: '抽奖达人', icon: '🎰', unlocked: true })
+        statistics.achievements.push({ name: '抽奖达人', icon: 'lottery', unlocked: true })
       }
       if (statistics.high_tier_rate && parseFloat(statistics.high_tier_rate) >= 30) {
-        statistics.achievements.push({ name: '幸运之星', icon: '⭐', unlocked: true })
+        statistics.achievements.push({ name: '幸运之星', icon: 'lucky_star', unlocked: true })
       }
       if (statistics.exchange_count >= 5) {
-        statistics.achievements.push({ name: '兑换专家', icon: '🛒', unlocked: true })
+        statistics.achievements.push({ name: '兑换专家', icon: 'exchange', unlocked: true })
       }
       if (statistics.consumption_count >= 10) {
-        statistics.achievements.push({ name: '消费达人', icon: '💳', unlocked: true })
+        statistics.achievements.push({ name: '消费达人', icon: 'consumption', unlocked: true })
       }
       if (statistics.consumption_amount >= 1000) {
-        statistics.achievements.push({ name: '千元大客', icon: '💰', unlocked: true })
+        statistics.achievements.push({ name: '千元大客', icon: 'vip', unlocked: true })
       }
 
       const sanitizedStatistics = DataSanitizer.sanitizeUserStatistics(statistics, dataLevel)

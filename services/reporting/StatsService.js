@@ -670,22 +670,22 @@ class StatsService {
         achievements: []
       }
 
-      // 添加成就徽章
+      // 添加成就徽章（icon 使用语义标识符，前端自行渲染图标）
       if (statistics.lottery_count >= 10) {
-        statistics.achievements.push({ name: '抽奖达人', icon: '🎰', unlocked: true })
+        statistics.achievements.push({ name: '抽奖达人', icon: 'lottery', unlocked: true })
       }
       // V4.0语义更新：使用 high_tier_rate 替代 lottery_win_rate
       if (statistics.high_tier_rate && parseFloat(statistics.high_tier_rate) >= 30) {
-        statistics.achievements.push({ name: '幸运之星', icon: '⭐', unlocked: true })
+        statistics.achievements.push({ name: '幸运之星', icon: 'lucky_star', unlocked: true })
       }
       if (statistics.exchange_count >= 5) {
-        statistics.achievements.push({ name: '兑换专家', icon: '🛒', unlocked: true })
+        statistics.achievements.push({ name: '兑换专家', icon: 'exchange', unlocked: true })
       }
       if (statistics.consumption_count >= 10) {
-        statistics.achievements.push({ name: '消费达人', icon: '💳', unlocked: true })
+        statistics.achievements.push({ name: '消费达人', icon: 'consumption', unlocked: true })
       }
       if (statistics.consumption_amount >= 1000) {
-        statistics.achievements.push({ name: '千元大客', icon: '💰', unlocked: true })
+        statistics.achievements.push({ name: '千元大客', icon: 'vip', unlocked: true })
       }
 
       // 数据脱敏处理

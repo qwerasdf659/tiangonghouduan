@@ -26,6 +26,8 @@ const {
   Account,
   Merchant,
   MaterialAssetType,
+  MediaAttachment,
+  MediaFile,
   ItemTemplate,
   RedemptionOrder,
   sequelize
@@ -33,6 +35,8 @@ const {
 const BalanceService = require('./asset/BalanceService')
 const { AssetCode } = require('../constants/AssetCode')
 const { attachDisplayNames } = require('../utils/displayNameHelper')
+const { getImageUrl } = require('../utils/ImageUrlHelper')
+const { categoryIconAttachmentInclude } = require('../utils/mediaAttachmentGallery')
 
 const logger = require('../utils/logger').logger
 const AdminSystemService = require('./AdminSystemService')
@@ -124,12 +128,14 @@ class BackpackService {
         where: {
           asset_code: { [sequelize.Sequelize.Op.in]: asset_codes }
         },
+        include: [categoryIconAttachmentInclude({ MediaAttachment, MediaFile })].filter(Boolean),
         transaction
       })
 
       const assetTypeMap = new Map()
       assetTypes.forEach(assetType => {
-        assetTypeMap.set(assetType.asset_code, assetType)
+        const plain = assetType.get ? assetType.get({ plain: true }) : assetType
+        assetTypeMap.set(plain.asset_code, plain)
       })
 
       const formattedAssets = validAssets
@@ -146,9 +152,15 @@ class BackpackService {
           const frozenAmount = Number(account.frozen_amount) || 0
           const totalAmount = availableAmount + frozenAmount
 
+          /* 图标URL：通过 iconAttachment → media.object_key + content_hash 获取 */
+          const iconObjectKey = assetType?.iconAttachment?.media?.object_key || null
+          const iconContentHash = assetType?.iconAttachment?.media?.content_hash || null
+          const iconUrl = iconObjectKey ? getImageUrl(iconObjectKey, iconContentHash) : null
+
           return {
             asset_code: account.asset_code,
             display_name: assetType?.display_name || account.asset_code,
+            icon_url: iconUrl,
             total_amount: totalAmount,
             frozen_amount: frozenAmount,
             available_amount: availableAmount,
@@ -199,7 +211,7 @@ class BackpackService {
         return []
       }
 
-      /* 查询 items 表，只返回 available 状态，LEFT JOIN merchants 获取 merchant_name */
+      /* 查询 items 表，只返回 available 状态，LEFT JOIN merchants 和 itemTemplate 获取图片 */
       const items = await Item.findAll({
         where: {
           owner_account_id: account.account_id,
@@ -211,33 +223,57 @@ class BackpackService {
             as: 'merchant',
             attributes: ['merchant_id', 'merchant_name'],
             required: false
+          },
+          {
+            model: ItemTemplate,
+            as: 'itemTemplate',
+            attributes: ['item_template_id', 'primary_media_id'],
+            required: false,
+            include: [
+              {
+                model: MediaFile,
+                as: 'primary_media',
+                attributes: ['media_id', 'object_key', 'content_hash'],
+                required: false
+              }
+            ]
           }
         ],
         order: [['created_at', 'DESC']],
         transaction
       })
 
-      /* 格式化物品数据（正式列，无需解析 JSON），包含商家名称和铸造属性 */
-      const formattedItems = items.map(item => ({
-        item_id: item.item_id,
-        tracking_code: item.tracking_code,
-        item_type: item.item_type || 'unknown',
-        item_name: item.item_name || '未命名物品',
-        status: item.status,
-        rarity_code: item.rarity_code || 'common',
-        item_description: item.item_description || '',
-        item_value: item.item_value || 0,
-        source: item.source,
-        merchant_id: item.merchant_id || null,
-        merchant_name: item.merchant?.merchant_name || null,
-        instance_attributes: item.instance_attributes || null,
-        serial_number: item.serial_number || null,
-        edition_total: item.edition_total || null,
-        item_template_id: item.item_template_id || null,
-        has_redemption_code: false,
-        acquired_at: item.created_at,
-        prize_definition_id: item.prize_definition_id
-      }))
+      /* 格式化物品数据（正式列，无需解析 JSON），包含商家名称、铸造属性和图片URL */
+      const formattedItems = items.map(item => {
+        /* 图片URL降级链：模板主图 → 默认占位图 */
+        const templateMediaKey = item.itemTemplate?.primary_media?.object_key || null
+        const templateContentHash = item.itemTemplate?.primary_media?.content_hash || null
+        const imageUrl = templateMediaKey
+          ? getImageUrl(templateMediaKey, templateContentHash)
+          : null
+
+        return {
+          item_id: item.item_id,
+          tracking_code: item.tracking_code,
+          item_type: item.item_type || 'unknown',
+          item_name: item.item_name || '未命名物品',
+          image_url: imageUrl,
+          status: item.status,
+          rarity_code: item.rarity_code || 'common',
+          item_description: item.item_description || '',
+          item_value: item.item_value || 0,
+          source: item.source,
+          merchant_id: item.merchant_id || null,
+          merchant_name: item.merchant?.merchant_name || null,
+          instance_attributes: item.instance_attributes || null,
+          serial_number: item.serial_number || null,
+          edition_total: item.edition_total || null,
+          item_template_id: item.item_template_id || null,
+          has_redemption_code: false,
+          acquired_at: item.created_at,
+          prize_definition_id: item.prize_definition_id
+        }
+      })
 
       /* 批量查询核销码信息 */
       const itemIds = items.map(i => i.item_id)

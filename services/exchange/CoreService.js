@@ -272,7 +272,7 @@ class CoreService {
     const costAssetCode = channelPrice.cost_asset_code
     const costAmount = Number(channelPrice.cost_amount)
     const imageUrl = product.primary_media?.object_key
-      ? getImageUrl(product.primary_media.object_key)
+      ? getImageUrl(product.primary_media.object_key, product.primary_media.content_hash)
       : null
     const costPrice = productSku.cost_price || 0
     const rarityCode = product.rarity_code || 'common'

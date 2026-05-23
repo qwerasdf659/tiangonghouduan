@@ -55,11 +55,11 @@ router.get(
         file_size: m.file_size,
         folder: m.folder,
         created_at: m.created_at,
-        public_url: getImageUrl(m.object_key),
+        public_url: getImageUrl(m.object_key, m.content_hash),
         thumbnails: {
-          small: thumbKeys.small ? getImageUrl(thumbKeys.small) : null,
-          medium: thumbKeys.medium ? getImageUrl(thumbKeys.medium) : null,
-          large: thumbKeys.large ? getImageUrl(thumbKeys.large) : null
+          small: thumbKeys.small ? getImageUrl(thumbKeys.small, m.content_hash) : null,
+          medium: thumbKeys.medium ? getImageUrl(thumbKeys.medium, m.content_hash) : null,
+          large: thumbKeys.large ? getImageUrl(thumbKeys.large, m.content_hash) : null
         }
       }
     })

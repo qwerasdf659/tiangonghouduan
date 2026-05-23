@@ -345,14 +345,16 @@ class MarketListingQueryService {
          * 3. 默认占位图（defaults/product-placeholder.png）
          */
         const categoryIconKey = plain.offerCategory?.iconAttachment?.media?.object_key || null
+        const categoryIconHash = plain.offerCategory?.iconAttachment?.media?.content_hash || null
         const imageKey = categoryIconKey || 'defaults/product-placeholder.png'
+        const imageHash = categoryIconKey ? categoryIconHash : null
 
         const offerItem = plain.offerItem || {}
         const instanceAttrs = offerItem.instance_attributes || null
         product.item_info = {
           item_id: plain.offer_item_id,
           display_name: plain.offer_item_display_name || offerItem.meta?.name,
-          image_url: getImageUrl(imageKey),
+          image_url: getImageUrl(imageKey, imageHash),
           category_code: plain.offerCategory?.category_code ?? null,
           rarity_code: plain.offer_item_rarity,
           template_id: plain.offer_item_template_id,
@@ -368,11 +370,12 @@ class MarketListingQueryService {
       // 可叠加资产类型
       if (plain.listing_kind === 'fungible_asset') {
         const assetIconKey = plain.offerMaterialAsset?.iconAttachment?.media?.object_key || null
+        const assetIconHash = plain.offerMaterialAsset?.iconAttachment?.media?.content_hash || null
         product.asset_info = {
           asset_code: plain.offer_asset_code,
           amount: plain.offer_amount,
           display_name: plain.offerMaterialAsset?.display_name || plain.offer_asset_code,
-          icon_url: assetIconKey ? getImageUrl(assetIconKey) : null,
+          icon_url: assetIconKey ? getImageUrl(assetIconKey, assetIconHash) : null,
           group_code: plain.offerMaterialAsset?.group_code
         }
       }
@@ -647,12 +650,13 @@ class MarketListingQueryService {
     const categoriesPlain = categories.map(cat => {
       const plain = cat.get ? cat.get({ plain: true }) : cat
       const iconKey = plain.iconAttachment?.media?.object_key || null
+      const iconHash = plain.iconAttachment?.media?.content_hash || null
       return {
         category_id: plain.category_id,
         category_code: plain.category_code,
         display_name: plain.category_name,
         sort_order: plain.sort_order,
-        icon_url: iconKey ? getImageUrl(iconKey) : null
+        icon_url: iconKey ? getImageUrl(iconKey, iconHash) : null
       }
     })
 

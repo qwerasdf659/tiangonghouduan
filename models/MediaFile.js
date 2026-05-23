@@ -37,27 +37,28 @@ class MediaFile extends Model {
   }
 
   /**
-   * 生成公网访问 URL（通过 ImageUrlHelper）
+   * 生成公网访问 URL（通过 ImageUrlHelper，自动带内容哈希）
    *
-   * @returns {string} 完整的公网图片 URL
+   * @returns {string} 完整的公网图片 URL（带 content_hash 缓存参数）
    */
   getPublicUrl() {
     const { getImageUrl } = require('../utils/ImageUrlHelper')
-    return getImageUrl(this.object_key)
+    return getImageUrl(this.object_key, this.content_hash)
   }
 
   /**
-   * 生成缩略图 URL 集合
+   * 生成缩略图 URL 集合（缩略图共享主文件的 content_hash）
    *
    * @returns {Object|null} { small, medium, large } 缩略图 URL
    */
   getThumbnailUrls() {
     if (!this.thumbnail_keys) return null
     const { getImageUrl } = require('../utils/ImageUrlHelper')
+    const hash = this.content_hash
     return {
-      small: this.thumbnail_keys.small ? getImageUrl(this.thumbnail_keys.small) : null,
-      medium: this.thumbnail_keys.medium ? getImageUrl(this.thumbnail_keys.medium) : null,
-      large: this.thumbnail_keys.large ? getImageUrl(this.thumbnail_keys.large) : null
+      small: this.thumbnail_keys.small ? getImageUrl(this.thumbnail_keys.small, hash) : null,
+      medium: this.thumbnail_keys.medium ? getImageUrl(this.thumbnail_keys.medium, hash) : null,
+      large: this.thumbnail_keys.large ? getImageUrl(this.thumbnail_keys.large, hash) : null
     }
   }
 
@@ -125,13 +126,13 @@ module.exports = sequelize => {
       public_url: {
         type: DataTypes.VIRTUAL,
         /**
-         * @returns {string|null} 公网访问 URL
+         * @returns {string|null} 公网访问 URL（自动带内容哈希缓存参数）
          */
         get() {
           const key = this.getDataValue('object_key')
           if (!key) return null
           const { getImageUrl } = require('../utils/ImageUrlHelper')
-          return getImageUrl(key)
+          return getImageUrl(key, this.getDataValue('content_hash'))
         }
       },
       thumbnail_keys: {

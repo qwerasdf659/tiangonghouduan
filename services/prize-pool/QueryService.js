@@ -27,7 +27,7 @@ function resolvePrizeImageUrl(prize) {
     return media.getPublicUrl()
   }
   if (media.object_key) {
-    return getImageUrl(media.object_key)
+    return getImageUrl(media.object_key, media.content_hash)
   }
   return null
 }
@@ -63,7 +63,7 @@ async function batchResolveAssetIconUrls(assetCodes) {
           model: MediaFile,
           as: 'media',
           required: true,
-          attributes: ['media_id', 'object_key']
+          attributes: ['media_id', 'object_key', 'content_hash']
         }
       ]
     })
@@ -71,7 +71,7 @@ async function batchResolveAssetIconUrls(assetCodes) {
     attachments.forEach(att => {
       const code = idToCode.get(String(att.attachable_id))
       if (code && att.media?.object_key) {
-        iconMap.set(code, getImageUrl(att.media.object_key))
+        iconMap.set(code, getImageUrl(att.media.object_key, att.media.content_hash))
       }
     })
   } catch (err) {

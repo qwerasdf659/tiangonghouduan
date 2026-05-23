@@ -276,7 +276,7 @@ router.get(
         spaces: [
           {
             id: 'lucky',
-            name: '🎁 幸运空间',
+            name: '幸运空间',
             subtitle: '瀑布流卡片',
             description: '发现随机好物',
             layout: 'waterfall',
@@ -288,7 +288,7 @@ router.get(
           },
           {
             id: 'premium',
-            name: '💎 臻选空间',
+            name: '臻选空间',
             subtitle: '混合精品展示',
             description: '解锁高级商品',
             layout: 'simple',

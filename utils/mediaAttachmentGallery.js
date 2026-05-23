@@ -25,7 +25,7 @@ async function fetchProductMediaGallery(models, productId) {
       {
         model: MediaFile,
         as: 'media',
-        attributes: ['media_id', 'object_key', 'mime_type', 'thumbnail_keys']
+        attributes: ['media_id', 'object_key', 'mime_type', 'thumbnail_keys', 'content_hash']
       }
     ],
     order: [['sort_order', 'ASC']]
@@ -34,12 +34,14 @@ async function fetchProductMediaGallery(models, productId) {
   const toImageJson = a => {
     const m = a.media || a.Media
     if (!m) return null
-    const url = m.object_key ? getImageUrl(m.object_key) : null
+    const url = m.object_key ? getImageUrl(m.object_key, m.content_hash) : null
     return {
       media_id: m.media_id,
       url,
       mime: m.mime_type,
-      thumbnail_url: m.thumbnail_keys?.small ? getImageUrl(m.thumbnail_keys.small) : url
+      thumbnail_url: m.thumbnail_keys?.small
+        ? getImageUrl(m.thumbnail_keys.small, m.content_hash)
+        : url
     }
   }
 
@@ -80,7 +82,7 @@ function categoryIconAttachmentInclude(models) {
       {
         model: MediaFile,
         as: 'media',
-        attributes: ['object_key']
+        attributes: ['object_key', 'content_hash']
       }
     ]
   }
