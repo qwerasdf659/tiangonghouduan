@@ -312,18 +312,33 @@ const validators = {
    * // validators.validatePrizePool([])  // 抛出错误: 奖品列表不能为空
    * // validators.validatePrizePool([{ name: '奖品' }])  // 抛出错误: 奖品信息不完整
    */
+  /**
+   * 验证活动奖品关联配置（集中奖品目录方案）
+   *
+   * 业务场景：管理员从奖品目录选择奖品添加到活动时，验证配置参数
+   *
+   * @param {Array<Object>} prizes - 奖品关联配置列表
+   * @param {number} prizes[].prize_definition_id - 奖品定义ID（必填）
+   * @param {number} prizes[].win_weight - 权重（必填，非负整数）
+   * @returns {boolean} 验证通过返回true
+   *
+   * @throws {Error} 当配置列表为空或参数无效时抛出错误
+   */
   validatePrizePool: prizes => {
     if (!Array.isArray(prizes) || prizes.length === 0) {
       throw new Error('奖品列表不能为空')
     }
 
     for (const prize of prizes) {
-      // 使用数据库字段名（与 PrizePoolService 一致）
-      if (!prize.prize_name || !prize.prize_type || !prize.stock_quantity) {
-        throw new Error('奖品信息不完整（需要 prize_name, prize_type, stock_quantity）')
+      if (!prize.prize_definition_id) {
+        throw new Error('奖品信息不完整（需要 prize_definition_id）')
       }
-      if (isNaN(parseInt(prize.stock_quantity)) || parseInt(prize.stock_quantity) <= 0) {
-        throw new Error('奖品数量必须为正整数')
+      if (
+        prize.win_weight === undefined ||
+        isNaN(parseInt(prize.win_weight)) ||
+        parseInt(prize.win_weight) < 0
+      ) {
+        throw new Error('奖品权重(win_weight)必须为非负整数')
       }
     }
     return true

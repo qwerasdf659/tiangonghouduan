@@ -19,7 +19,7 @@
 
 'use strict'
 
-const { LotteryPrize, LotteryDraw, User: _User } = require('../../models') // User保留供未来使用
+const { LotteryCampaignPrize, PrizeDefinition, LotteryDraw } = require('../../models')
 const { Op: _Op } = require('sequelize') // Op保留供未来使用
 const inquirer = require('inquirer')
 
@@ -51,17 +51,24 @@ async function analyzeLotteryPoints() {
     const totalDraws = await LotteryDraw.count()
     log(`\n✅ 总抽奖次数: ${totalDraws}`, 'green')
 
-    // 2. 统计各奖品中奖情况
-    const prizes = await LotteryPrize.findAll()
+    // 2. 统计各奖品中奖情况（通过 lottery_campaign_prizes JOIN prize_definitions）
+    const campaignPrizes = await LotteryCampaignPrize.findAll({
+      include: [{
+        model: PrizeDefinition,
+        as: 'prizeDefinition',
+        attributes: ['display_name']
+      }]
+    })
     log('\n📦 奖品中奖统计:', 'blue')
 
-    for (const prize of prizes) {
+    for (const cp of campaignPrizes) {
       const drawCount = await LotteryDraw.count({
-        where: { lottery_prize_id: prize.lottery_prize_id }
+        where: { lottery_campaign_prize_id: cp.lottery_campaign_prize_id }
       })
       const percentage = totalDraws > 0 ? ((drawCount / totalDraws) * 100).toFixed(2) : 0
+      const displayName = cp.prizeDefinition?.display_name || '未知奖品'
 
-      log(`   ${prize.prize_name}: ${drawCount}次 (${percentage}%)`, 'yellow')
+      log(`   ${displayName}: ${drawCount}次 (${percentage}%)`, 'yellow')
     }
 
     // 3. 积分消耗统计
@@ -84,58 +91,70 @@ async function analyzeLotteryPoints() {
 }
 
 /**
- * 更新奖品信息
+ * 查看奖品信息（集中奖品目录方案）
  */
 async function updatePrizes() {
-  log('\n🎁 更新奖品信息', 'cyan')
+  log('\n🎁 查看活动奖品信息', 'cyan')
   log('='.repeat(60), 'cyan')
 
   try {
-    const prizes = await LotteryPrize.findAll()
-
-    log(`\n当前奖品列表 (${prizes.length}个):`, 'blue')
-    prizes.forEach((prize, index) => {
-      log(`\n${index + 1}. ${prize.prize_name}`, 'cyan')
-      log(`   ID: ${prize.lottery_prize_id}`, 'yellow')
-      log(`   价值: ${prize.prize_value_points}积分`, 'yellow')
-      log(`   概率: ${prize.win_probability || '未设置'}`, 'yellow')
-      log(`   库存: ${prize.stock_quantity || '未设置'}`, 'yellow')
+    const campaignPrizes = await LotteryCampaignPrize.findAll({
+      include: [{
+        model: PrizeDefinition,
+        as: 'prizeDefinition',
+        attributes: ['display_name', 'prize_code', 'prize_type', 'material_asset_code', 'material_amount']
+      }]
     })
 
-    log('\n💡 提示: 如需修改奖品，请使用管理后台或直接修改数据库', 'cyan')
+    log(`\n当前活动奖品列表 (${campaignPrizes.length}个):`, 'blue')
+    campaignPrizes.forEach((cp, index) => {
+      const def = cp.prizeDefinition
+      log(`\n${index + 1}. ${def?.display_name || '未知奖品'}`, 'cyan')
+      log(`   关联ID: ${cp.lottery_campaign_prize_id}`, 'yellow')
+      log(`   奖品码: ${def?.prize_code || '-'}`, 'yellow')
+      log(`   权重: ${cp.win_weight}`, 'yellow')
+      log(`   库存: ${cp.stock_quantity}`, 'yellow')
+      log(`   档位: ${cp.reward_tier}`, 'yellow')
+      log(`   状态: ${cp.status}`, 'yellow')
+    })
+
+    log('\n💡 提示: 如需修改奖品，请使用管理后台', 'cyan')
   } catch (error) {
     log(`\n❌ 获取奖品失败: ${error.message}`, 'red')
   }
 }
 
 /**
- * 更新奖品概率
+ * 检查奖品权重配置（tier_first 模式使用 win_weight）
  */
 async function updatePrizeProbabilities() {
-  log('\n🎲 更新奖品概率', 'cyan')
+  log('\n🎲 检查奖品权重配置', 'cyan')
   log('='.repeat(60), 'cyan')
 
   try {
-    const prizes = await LotteryPrize.findAll()
-
-    log('\n当前奖品概率:', 'blue')
-    let totalProbability = 0
-
-    prizes.forEach((prize, index) => {
-      const prob = parseFloat(prize.win_probability || 0)
-      totalProbability += prob
-      log(`${index + 1}. ${prize.name}: ${prob}`, prob > 0 ? 'green' : 'red')
+    const campaignPrizes = await LotteryCampaignPrize.findAll({
+      where: { status: 'active' },
+      include: [{
+        model: PrizeDefinition,
+        as: 'prizeDefinition',
+        attributes: ['display_name']
+      }]
     })
 
-    log(`\n总概率: ${totalProbability}`, totalProbability === 1 ? 'green' : 'red')
+    log('\n当前奖品权重:', 'blue')
+    let totalWeight = 0
 
-    if (totalProbability !== 1) {
-      log('⚠️  概率总和应该等于1', 'yellow')
-    } else {
-      log('✅ 概率配置正确', 'green')
-    }
+    campaignPrizes.forEach((cp, index) => {
+      const weight = parseInt(cp.win_weight) || 0
+      totalWeight += weight
+      const displayName = cp.prizeDefinition?.display_name || '未知奖品'
+      log(`${index + 1}. ${displayName} [${cp.reward_tier}]: ${weight}`, weight > 0 ? 'green' : 'red')
+    })
+
+    log(`\n总权重: ${totalWeight}`, 'blue')
+    log('✅ 权重检查完成（tier_first 模式按档位分组计算概率）', 'green')
   } catch (error) {
-    log(`\n❌ 检查概率失败: ${error.message}`, 'red')
+    log(`\n❌ 检查权重失败: ${error.message}`, 'red')
   }
 }
 

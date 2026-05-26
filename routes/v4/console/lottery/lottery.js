@@ -35,7 +35,7 @@ const logger = require('../../../../utils/logger').logger
  * @access Private (管理员，role_level >= 100)
  *
  * @query {string} [range=7d] - 统计时间范围（7d/30d/90d）
- * @query {number} [merchant_id] - 按商家筛选（可选，通过 LotteryPrize 关联）
+ * @query {number} [merchant_id] - 按商家筛选（可选，通过 PrizeDefinition 关联）
  */
 router.get(
   '/stats',

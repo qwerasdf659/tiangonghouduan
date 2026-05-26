@@ -114,7 +114,7 @@
                 <div class="max-h-48 overflow-y-auto">
                   <template x-for="table in stats.by_level[level].tables" :key="table.table_name">
                     <div class="flex justify-between py-1 text-xs border-b border-gray-50">
-                      <span class="text-gray-600 font-mono" x-text="table.table_name"></span>
+                      <span class="text-gray-600" x-text="table.display_name || table.table_name"></span>
                       <span class="text-gray-400" x-text="'~' + table.estimated_rows + ' 行 / ' + table.data_size_mb + ' MB'"></span>
                     </div>
                   </template>
@@ -139,7 +139,7 @@
                 <tbody>
                   <template x-for="(table, idx) in stats.top_tables" :key="table.table_name">
                     <tr class="border-b border-gray-100 hover:bg-gray-50">
-                      <td class="px-3 py-2 font-mono text-xs" x-text="table.table_name"></td>
+                      <td class="px-3 py-2 text-xs" x-text="table.display_name || table.table_name"></td>
                       <td class="px-3 py-2 text-right" x-text="Number(table.estimated_rows).toLocaleString()"></td>
                       <td class="px-3 py-2 text-right" x-text="table.data_size_mb + ' MB'"></td>
                       <td class="px-3 py-2 text-right" x-text="table.index_size_mb + ' MB'"></td>
@@ -348,7 +348,7 @@
             <tbody>
               <template x-for="item in previewResult.details" :key="item.table_name">
                 <tr class="border-b border-gray-100">
-                  <td class="px-3 py-2 font-mono text-xs" x-text="item.table_name"></td>
+                  <td class="px-3 py-2 text-xs" x-text="item.display_name || item.table_name"></td>
                   <td class="px-3 py-2 text-right text-red-600 font-medium" x-text="item.rows_to_delete.toLocaleString()"></td>
                   <td class="px-3 py-2 text-center">
                     <span :class="getLevelBadgeClass(item.safety_level)" class="px-2 py-0.5 rounded text-xs" x-text="item.safety_level"></span>
@@ -448,7 +448,7 @@
             <tbody>
               <template x-for="item in cleanupResult.details" :key="item.table_name">
                 <tr class="border-b border-gray-100">
-                  <td class="px-3 py-2 font-mono text-xs" x-text="item.table_name"></td>
+                  <td class="px-3 py-2 text-xs" x-text="item.display_name || item.table_name"></td>
                   <td class="px-3 py-2 text-right" x-text="item.deleted_count.toLocaleString()"></td>
                   <td class="px-3 py-2 text-center">
                     <span :class="item.status === 'success' ? 'text-green-600' : 'text-red-600'" x-text="item.status === 'success' ? '成功' : '失败'"></span>

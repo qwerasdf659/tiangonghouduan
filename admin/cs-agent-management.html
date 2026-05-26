@@ -202,9 +202,9 @@
         <div class="px-5 py-3 border-t themed-border-light flex justify-between items-center text-sm themed-text-muted" x-show="agentPagination.total_pages > 1">
           <span>共 <span x-text="agentPagination.total" class="font-medium"></span> 条</span>
           <div class="flex items-center gap-1">
-            <button @click="agentGoToPage(agentPagination.current_page - 1)" :disabled="agentPagination.current_page <= 1" class="px-3 py-1.5 border themed-border-light rounded-lg hover:themed-bg-base disabled:opacity-40 disabled:cursor-not-allowed">上一页</button>
-            <span class="px-3 py-1.5 text-sm font-medium" x-text="agentPagination.current_page + ' / ' + agentPagination.total_pages"></span>
-            <button @click="agentGoToPage(agentPagination.current_page + 1)" :disabled="agentPagination.current_page >= agentPagination.total_pages" class="px-3 py-1.5 border themed-border-light rounded-lg hover:themed-bg-base disabled:opacity-40 disabled:cursor-not-allowed">下一页</button>
+            <button @click="agentGoToPage(agentPagination.page - 1)" :disabled="agentPagination.page <= 1" class="px-3 py-1.5 border themed-border-light rounded-lg hover:themed-bg-base disabled:opacity-40 disabled:cursor-not-allowed">上一页</button>
+            <span class="px-3 py-1.5 text-sm font-medium" x-text="agentPagination.page + ' / ' + agentPagination.total_pages"></span>
+            <button @click="agentGoToPage(agentPagination.page + 1)" :disabled="agentPagination.page >= agentPagination.total_pages" class="px-3 py-1.5 border themed-border-light rounded-lg hover:themed-bg-base disabled:opacity-40 disabled:cursor-not-allowed">下一页</button>
           </div>
         </div>
       </div>
@@ -419,9 +419,9 @@
         <div class="px-5 py-3 border-t themed-border-light flex justify-between items-center text-sm themed-text-muted" x-show="assignmentPagination.total_pages > 1">
           <span>共 <span x-text="assignmentPagination.total" class="font-medium"></span> 条</span>
           <div class="flex items-center gap-1">
-            <button @click="assignmentGoToPage(assignmentPagination.current_page - 1)" :disabled="assignmentPagination.current_page <= 1" class="px-3 py-1.5 border themed-border-light rounded-lg hover:themed-bg-base disabled:opacity-40 disabled:cursor-not-allowed">上一页</button>
-            <span class="px-3 py-1.5 text-sm font-medium" x-text="assignmentPagination.current_page + ' / ' + assignmentPagination.total_pages"></span>
-            <button @click="assignmentGoToPage(assignmentPagination.current_page + 1)" :disabled="assignmentPagination.current_page >= assignmentPagination.total_pages" class="px-3 py-1.5 border themed-border-light rounded-lg hover:themed-bg-base disabled:opacity-40 disabled:cursor-not-allowed">下一页</button>
+            <button @click="assignmentGoToPage(assignmentPagination.page - 1)" :disabled="assignmentPagination.page <= 1" class="px-3 py-1.5 border themed-border-light rounded-lg hover:themed-bg-base disabled:opacity-40 disabled:cursor-not-allowed">上一页</button>
+            <span class="px-3 py-1.5 text-sm font-medium" x-text="assignmentPagination.page + ' / ' + assignmentPagination.total_pages"></span>
+            <button @click="assignmentGoToPage(assignmentPagination.page + 1)" :disabled="assignmentPagination.page >= assignmentPagination.total_pages" class="px-3 py-1.5 border themed-border-light rounded-lg hover:themed-bg-base disabled:opacity-40 disabled:cursor-not-allowed">下一页</button>
           </div>
         </div>
       </div>

@@ -92,13 +92,23 @@ class CustomerServiceUserContextService {
 
     let balances = []
     if (account) {
-      /* 查询所有资产余额（默认只查 GLOBAL 全局余额，折叠展示活动专属余额） */
+      /* 查询所有资产余额 */
       const balanceRows = await models.AccountAssetBalance.findAll({
         where: { account_id: account.account_id },
-
         order: [['lottery_campaign_key', 'ASC']]
       })
-      balances = balanceRows.map(b => b.get({ plain: true }))
+
+      /* 查询所有材料资产类型（用于 asset_code → display_name 中文显示） */
+      const assetTypes = await models.MaterialAssetType.findAll({
+        attributes: ['asset_code', 'display_name']
+      })
+      const assetTypeMap = new Map(assetTypes.map(t => [t.asset_code, t.get({ plain: true })]))
+
+      balances = balanceRows.map(b => {
+        const plain = b.get({ plain: true })
+        plain.asset_type = assetTypeMap.get(plain.asset_code) || null
+        return plain
+      })
     }
 
     /* 委托 UserDataQueryService 获取资产变动流水 */

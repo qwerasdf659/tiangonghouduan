@@ -186,20 +186,17 @@ class ReportService {
     }
     if (campaignId) whereClause.lottery_campaign_id = campaignId
 
-    // 查询抽奖记录
+    // 查询抽奖记录（prize_value_points 存储在 lottery_draws 表自身）
     const draws = await this.models.LotteryDraw.findAll({
       where: whereClause,
-      include: [
-        {
-          model: this.models.LotteryPrize,
-          as: 'prize',
-          attributes: ['cost_points'],
-          required: false
-        }
+      attributes: [
+        'lottery_draw_id',
+        'user_id',
+        'cost_points',
+        'prize_value_points',
+        'reward_tier'
       ],
-      attributes: ['lottery_draw_id', 'user_id', 'cost_points', 'lottery_prize_id', 'reward_tier'],
-      raw: false,
-      nest: true
+      raw: false
     })
 
     // 计算统计指标
@@ -207,12 +204,10 @@ class ReportService {
     const totalWins = draws.filter(d => ['high', 'mid', 'low'].includes(d.reward_tier)).length
     const winRate = totalDraws > 0 ? (totalWins / totalDraws) * 100 : 0
 
-    // 计算成本和收入
+    // 计算成本（prize_value_points 即奖品预算成本，存储在 lottery_draws 表）和收入
     let totalCost = 0
     draws.forEach(d => {
-      if (d.lottery_prize_id && d.prize?.cost_points) {
-        totalCost += parseFloat(d.prize.cost_points)
-      }
+      totalCost += parseInt(d.prize_value_points) || 0
     })
     const totalRevenue = draws.reduce((sum, d) => sum + (parseFloat(d.cost_points) || 0), 0)
     const profit = totalRevenue - totalCost
@@ -367,6 +362,10 @@ class ReportService {
 
   /**
    * 获取热门奖品统计（内部方法）
+   *
+   * 通过 lottery_draws.lottery_campaign_prize_id JOIN lottery_campaign_prizes
+   * 再 JOIN prize_definitions 获取奖品名称
+   *
    * @private
    * @param {Date} startTime - 开始时间
    * @param {Date} endTime - 结束时间
@@ -376,35 +375,40 @@ class ReportService {
   async _getDailyReportTopPrizes(startTime, endTime, limit = 10) {
     const prizeData = await this.models.LotteryDraw.findAll({
       attributes: [
-        'lottery_prize_id',
+        'lottery_campaign_prize_id',
         [fn('COUNT', col('LotteryDraw.lottery_draw_id')), 'win_count'],
-        // 明确指定使用 LotteryDraw 表的 prize_value_points 字段，避免与关联表 LotteryPrize 的同名字段产生歧义
         [fn('SUM', col('LotteryDraw.prize_value_points')), 'total_value']
       ],
       where: {
         created_at: { [Op.between]: [startTime, endTime] },
-        lottery_prize_id: { [Op.ne]: null }
+        lottery_campaign_prize_id: { [Op.ne]: null }
       },
       include: [
         {
-          model: this.models.LotteryPrize,
-          as: 'prize',
-          attributes: ['prize_name', 'reward_tier', 'cost_points']
+          model: this.models.LotteryCampaignPrize,
+          as: 'campaignPrize',
+          attributes: ['lottery_campaign_prize_id', 'reward_tier'],
+          include: [
+            {
+              model: this.models.PrizeDefinition,
+              as: 'prizeDefinition',
+              attributes: ['display_name', 'prize_code']
+            }
+          ]
         }
       ],
-      group: ['LotteryDraw.lottery_prize_id'],
+      group: ['LotteryDraw.lottery_campaign_prize_id'],
       order: [[literal('win_count'), 'DESC']],
       limit,
       raw: false
     })
 
     return prizeData.map(p => ({
-      lottery_prize_id: p.lottery_prize_id,
-      prize_name: p.prize?.prize_name || '未知奖品',
-      reward_tier: p.prize?.reward_tier || 'unknown',
+      lottery_campaign_prize_id: p.lottery_campaign_prize_id,
+      prize_name: p.campaignPrize?.prizeDefinition?.display_name || '未知奖品',
+      reward_tier: p.campaignPrize?.reward_tier || 'unknown',
       win_count: parseInt(p.dataValues.win_count || 0),
-      total_value: parseInt(p.dataValues.total_value || 0),
-      cost_points: p.prize?.cost_points || 0
+      total_value: parseInt(p.dataValues.total_value || 0)
     }))
   }
 
@@ -529,9 +533,16 @@ class ReportService {
     const whereClause = { status: 'active' }
     if (campaignId) whereClause.lottery_campaign_id = campaignId
 
-    const prizes = await this.models.LotteryPrize.findAll({
+    const prizes = await this.models.LotteryCampaignPrize.findAll({
       where: whereClause,
-      attributes: ['lottery_prize_id', 'prize_name', 'stock_quantity', 'total_win_count']
+      attributes: ['lottery_campaign_prize_id', 'stock_quantity', 'total_win_count'],
+      include: [
+        {
+          model: this.models.PrizeDefinition,
+          as: 'prizeDefinition',
+          attributes: ['display_name']
+        }
+      ]
     })
 
     const lowStockPrizes = []
@@ -539,8 +550,8 @@ class ReportService {
       const remaining = (prize.stock_quantity || 0) - (prize.total_win_count || 0)
       if (remaining < 10) {
         lowStockPrizes.push({
-          lottery_prize_id: prize.lottery_prize_id,
-          prize_name: prize.prize_name,
+          lottery_campaign_prize_id: prize.lottery_campaign_prize_id,
+          prize_name: prize.prizeDefinition?.display_name || '未知奖品',
           remaining
         })
       }
@@ -596,34 +607,28 @@ class ReportService {
         }
       }
 
-      // 获取时间范围内的抽奖记录
+      // 获取时间范围内的抽奖记录（成本数据存储在 lottery_draws.prize_value_points）
       const draws = await this.models.LotteryDraw.findAll({
         where: whereClause,
-        include: [
-          {
-            model: this.models.LotteryPrize,
-            as: 'prize',
-            attributes: [
-              'lottery_prize_id',
-              'prize_name',
-              'cost_points',
-              'prize_value_points',
-              'reward_tier'
-            ],
-            required: false
-          }
+        attributes: [
+          'lottery_draw_id',
+          'user_id',
+          'cost_points',
+          'prize_value_points',
+          'reward_tier',
+          'lottery_campaign_prize_id'
         ]
       })
 
-      // 计算总成本和各档位成本
+      // 计算总成本和各档位成本（prize_value_points 存储在 lottery_draws 表）
       let totalCost = 0
       const tierCostBreakdown = { high: 0, mid: 0, low: 0, fallback: 0 }
 
       draws.forEach(d => {
         const tier = d.reward_tier || 'fallback'
-        const costValue = d.prize?.cost_points || 0
+        const costValue = parseInt(d.prize_value_points) || 0
 
-        if (d.lottery_prize_id && costValue > 0) {
+        if (d.lottery_campaign_prize_id && costValue > 0) {
           totalCost += costValue
 
           if (Object.prototype.hasOwnProperty.call(tierCostBreakdown, tier)) {

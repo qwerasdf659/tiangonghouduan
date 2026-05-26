@@ -125,7 +125,7 @@ class AdminLotteryQueryService {
 
     const prizeMap = new Map()
     if (prizeIds.size > 0) {
-      const prizes = await models.LotteryPrize.findAll({
+      const prizes = await models.LotteryCampaignPrize.findAll({
         where: { lottery_prize_id: { [Op.in]: Array.from(prizeIds) } },
         attributes: ['lottery_prize_id', 'prize_name', 'prize_value']
       })
@@ -391,7 +391,7 @@ class AdminLotteryQueryService {
           required: false
         },
         {
-          model: models.LotteryPrize,
+          model: models.LotteryCampaignPrize,
           as: 'prize',
           attributes: ['lottery_prize_id', 'prize_name'],
           required: false

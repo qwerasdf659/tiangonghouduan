@@ -257,7 +257,7 @@ class DebtManagementService {
    * @returns {Promise<Object>} 按奖品分组的库存欠账数据
    */
   static async getDebtByPrize(options = {}) {
-    const { PresetInventoryDebt, LotteryPrize } = getModels()
+    const { PresetInventoryDebt, LotteryCampaignPrize } = getModels()
 
     const campaignId = options.lottery_campaign_id
       ? parseInt(options.lottery_campaign_id, 10)
@@ -287,7 +287,7 @@ class DebtManagementService {
 
     // 获取奖品信息
     const prizeIds = prizeDebts.map(p => p.lottery_prize_id)
-    const prizes = await LotteryPrize.findAll({
+    const prizes = await LotteryCampaignPrize.findAll({
       where: { lottery_prize_id: { [Op.in]: prizeIds } },
       attributes: ['lottery_prize_id', 'prize_name', 'prize_type', 'stock_quantity']
     })
@@ -569,7 +569,7 @@ class DebtManagementService {
    * @returns {Promise<Object>} 待冲销欠账列表
    */
   static async getPendingDebts(options = {}) {
-    const { PresetInventoryDebt, PresetBudgetDebt, LotteryCampaign, LotteryPrize, User } =
+    const { PresetInventoryDebt, PresetBudgetDebt, LotteryCampaign, LotteryCampaignPrize, User } =
       getModels()
 
     const debtType = options.debt_type || 'inventory'
@@ -592,7 +592,11 @@ class DebtManagementService {
       model = PresetInventoryDebt
       includeOptions = [
         { model: LotteryCampaign, as: 'campaign', attributes: ['campaign_name'] },
-        { model: LotteryPrize, as: 'prize', attributes: ['prize_name', 'prize_type'] }
+        {
+          model: LotteryCampaignPrize,
+          as: 'campaignPrize',
+          attributes: ['prize_name', 'prize_type']
+        }
       ]
     } else {
       model = PresetBudgetDebt

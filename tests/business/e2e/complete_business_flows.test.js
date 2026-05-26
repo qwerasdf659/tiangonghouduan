@@ -37,7 +37,7 @@ const {
   TradeOrder,
   LotteryDraw,
   LotteryCampaign,
-  LotteryPrize: _LotteryPrize,
+  LotteryCampaignPrize: _LotteryCampaignPrize,
   AssetTransaction
 } = require('../../../models')
 const { getTestService } = require('../../helpers/UnifiedTestManager')

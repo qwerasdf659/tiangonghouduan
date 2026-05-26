@@ -30,7 +30,12 @@
 
 const BusinessError = require('../../../utils/BusinessError')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
-const { User, LotteryManagementSetting, LotteryPrize } = require('../../../models')
+const {
+  User,
+  LotteryManagementSetting,
+  LotteryCampaignPrize,
+  PrizeDefinition
+} = require('../../../models')
 const { getUserRoles } = require('../../../middleware/auth')
 const { Op } = require('sequelize')
 
@@ -141,9 +146,11 @@ class ManagementStrategy {
         throw new BusinessError('目标用户不存在或已停用', 'ENGINE_NOT_FOUND', 404)
       }
 
-      // 🎁 查询奖品信息（获取prize_name用于记录显示）
-      const prize = await LotteryPrize.findByPk(prizeId)
-      const prizeName = prize ? prize.prize_name : null
+      // 查询奖品信息
+      const campaignPrize = await LotteryCampaignPrize.findByPk(prizeId, {
+        include: [{ model: PrizeDefinition, as: 'prizeDefinition' }]
+      })
+      const prizeName = campaignPrize?.prizeDefinition?.display_name || null
 
       // 💾 创建数据库记录（传入事务，确保与外部事务一致）
       const createOptions = {}

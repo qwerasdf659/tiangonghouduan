@@ -66,7 +66,7 @@ export function useBatchOperationsState() {
     loadingBatchLogs: false,
     /** @type {Object} 日志分页 */
     batchLogsPagination: {
-      current_page: 1,
+      page: 1,
       page_size: 10,
       total_count: 0,
       total_pages: 0
@@ -353,7 +353,7 @@ export function useBatchOperationsMethods() {
       this.loadingBatchLogs = true
       try {
         const params = {
-          page: this.batchLogsPagination.current_page,
+          page: this.batchLogsPagination.page,
           page_size: this.batchLogsPagination.page_size
         }
         const queryString = buildQueryString(params)

@@ -335,7 +335,7 @@ class ActivityBudgetService {
       throw error
     }
 
-    const prizes = await models.LotteryPrize.findAll({
+    const prizes = await models.LotteryCampaignPrize.findAll({
       where: { lottery_campaign_id: parseInt(campaignId) },
       attributes: [
         'lottery_prize_id',

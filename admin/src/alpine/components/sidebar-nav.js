@@ -85,6 +85,11 @@ export function sidebarNav() {
             badgeKey: 'customerPendingCount'
           },
           {
+            id: 'cs-issues',
+            name: '工单管理',
+            url: '/admin/cs-issues.html'
+          },
+          {
             id: 'cs-agent-management',
             name: '客服管理',
             url: '/admin/cs-agent-management.html'
@@ -252,6 +257,7 @@ export function sidebarNav() {
         icon: '⚙️',
         items: [
           { id: 'prize-config', name: '奖品配置', icon: '🎁', url: '/admin/prize-config.html' },
+          { id: 'prize-definitions', name: '奖品目录', icon: '🏆', url: '/admin/prize-definitions.html' },
           { id: 'ops-rules', name: '运营规则', icon: '📊', url: '/admin/ops-rules.html' },
           { id: 'feature-flags', name: '功能开关', icon: '🔀', url: '/admin/feature-flags.html' },
           { id: 'item-templates', name: '物品模板', icon: '📦', url: '/admin/item-templates.html' },

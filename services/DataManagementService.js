@@ -34,6 +34,105 @@ const UserService = require('./UserService')
 const { UserRole, Role } = require('../models')
 
 /**
+ * 数据库表名中文映射字典
+ * 用于数据管理页面展示中文表名
+ * @constant {Object<string, string>}
+ */
+const TABLE_DISPLAY_NAMES = Object.freeze({
+  // L0 系统基石
+  sequelizemeta: '数据库迁移记录',
+  administrative_regions: '行政区域',
+  accounts: '系统账户',
+  roles: '角色定义',
+  material_asset_types: '材料资产类型',
+  asset_group_defs: '资产分组定义',
+  rarity_defs: '稀有度定义',
+  categories: '分类定义',
+  // L1 金融级
+  asset_transactions: '资产流水',
+  item_ledger: '物品账本',
+  account_asset_balances: '账户资产余额',
+  items: '物品持有',
+  trade_orders: '交易订单',
+  item_holds: '物品锁定',
+  // L2 业务运营
+  lottery_draw_decisions: '抽奖决策记录',
+  lottery_draws: '抽奖记录',
+  lottery_management_settings: '抽奖管理配置',
+  lottery_presets: '抽奖预设',
+  lottery_user_daily_draw_quota: '用户每日抽奖配额',
+  lottery_campaign_user_quota: '活动用户配额',
+  lottery_campaign_quota_grants: '活动配额发放',
+  lottery_user_experience_state: '用户体验状态',
+  lottery_user_global_state: '用户全局状态',
+  lottery_alerts: '抽奖告警',
+  lottery_simulation_records: '抽奖模拟记录',
+  lottery_hourly_metrics: '抽奖小时指标',
+  lottery_daily_metrics: '抽奖日指标',
+  consumption_records: '消费记录',
+  redemption_orders: '核销订单',
+  content_review_records: '内容审核记录',
+  chat_messages: '聊天消息',
+  customer_service_notes: '客服备注',
+  customer_service_issues: '客服工单',
+  customer_service_user_assignments: '客服分配',
+  customer_service_sessions: '客服会话',
+  customer_service_agents: '客服坐席',
+  market_listings: '市场挂牌',
+  user_notifications: '用户通知',
+  admin_notifications: '管理员通知',
+  feedbacks: '用户反馈',
+  market_price_snapshots: '市场价格快照',
+  exchange_rates: '兑换汇率',
+  exchange_records: '兑换记录',
+  bid_records: '竞拍记录',
+  bid_products: '竞拍商品',
+  preset_inventory_debt: '预设库存垫付',
+  preset_budget_debt: '预设预算垫付',
+  // L3 可自动清理
+  api_idempotency_requests: '幂等性请求',
+  websocket_startup_logs: 'WebSocket启动日志',
+  authentication_sessions: '认证会话',
+  admin_operation_logs: '管理员操作日志',
+  ad_impression_logs: '广告曝光日志',
+  ad_click_logs: '广告点击日志',
+  ad_interaction_logs: '广告互动日志',
+  ad_bid_logs: '广告竞价日志',
+  ad_antifraud_logs: '广告反欺诈日志',
+  ad_attribution_logs: '广告归因日志',
+  reminder_history: '提醒历史',
+  merchant_operation_logs: '商家操作日志',
+  batch_operation_logs: '批量操作日志',
+  risk_alerts: '风控告警',
+  alert_silence_rules: '告警静默规则',
+  ad_report_daily_snapshots: '广告日报快照',
+  ad_dau_daily_stats: '广告DAU日统计',
+  system_dictionary_history: '系统字典历史',
+  ad_billing_records: '广告计费记录',
+  // 其他常见表
+  lottery_campaigns: '抽奖活动',
+  lottery_campaign_prizes: '活动奖品配置',
+  prize_definitions: '奖品目录',
+  asset_conversion_rules: '资产转换规则',
+  users: '用户',
+  user_roles: '用户角色',
+  merchants: '商家',
+  stores: '门店',
+  system_settings: '系统设置',
+  popup_banners: '弹窗横幅',
+  announcements: '公告',
+  feature_switches: '功能开关',
+  data_dictionaries: '数据字典',
+  exchange_items: '兑换物品',
+  auction_listings: '拍卖挂牌',
+  auction_bids: '拍卖出价',
+  ad_campaigns: '广告活动',
+  ad_creatives: '广告素材',
+  ad_placements: '广告位',
+  reminder_rules: '提醒规则'
+})
+
+/**
  * L0 不可删表白名单（硬编码，任何清理操作均跳过）
  * @constant {Set<string>}
  */
@@ -272,7 +371,7 @@ const DELETE_TOPOLOGY = Object.freeze([
    * 第四层
    * products 表由 ExchangeItem 模型管理（原 exchange_items 已 DROP）
    */
-  ['items', 'lottery_prizes', 'exchange_items'],
+  ['items', 'lottery_campaign_prizes', 'exchange_items'],
   // 第五层（核心配置表 - 通常不删，仅清档模式时按需处理）
   [
     'lottery_campaigns',
@@ -336,6 +435,7 @@ class DataManagementService {
 
     for (const row of tableRows) {
       const tableName = row.table_name
+      row.display_name = TABLE_DISPLAY_NAMES[tableName] || tableName
       if (L0_PROTECTED_TABLES.has(tableName)) {
         byLevel.L0.push(row)
       } else if (L1_FINANCIAL_TABLES.has(tableName)) {

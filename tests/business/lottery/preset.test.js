@@ -210,9 +210,9 @@ describe('抽奖预设系统API测试（V4架构）', () => {
 
     test('✅ 应该成功创建单个预设', async () => {
       // 先获取一个可用的奖品ID
-      const prize = await models.LotteryPrize.findOne({
+      const prize = await models.LotteryCampaignPrize.findOne({
         where: { status: 'active' },
-        attributes: ['lottery_prize_id']
+        attributes: ['lottery_campaign_prize_id']
       })
 
       if (!prize) {
@@ -222,7 +222,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
 
       const create_data = {
         user_id: test_user_id,
-        presets: [{ lottery_prize_id: prize.lottery_prize_id, queue_order: 1 }]
+        presets: [{ lottery_campaign_prize_id: prize.lottery_campaign_prize_id, queue_order: 1 }]
       }
 
       const response = await tester.make_authenticated_request(
@@ -247,10 +247,10 @@ describe('抽奖预设系统API测试（V4架构）', () => {
 
     test('✅ 应该成功创建多个预设（队列）', async () => {
       // 获取多个可用奖品
-      const prizes = await models.LotteryPrize.findAll({
+      const prizes = await models.LotteryCampaignPrize.findAll({
         where: { status: 'active' },
         limit: 3,
-        attributes: ['lottery_prize_id']
+        attributes: ['lottery_campaign_prize_id']
       })
 
       if (prizes.length < 2) {
@@ -261,7 +261,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
       const create_data = {
         user_id: test_user_id,
         presets: prizes.map((prize, index) => ({
-          lottery_prize_id: prize.lottery_prize_id,
+          lottery_campaign_prize_id: prize.lottery_campaign_prize_id,
           queue_order: index + 1
         }))
       }
@@ -305,7 +305,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
     })
 
     test('❌ 非管理员应无权创建预设', async () => {
-      const prize = await models.LotteryPrize.findOne({
+      const prize = await models.LotteryCampaignPrize.findOne({
         where: { status: 'active' }
       })
 
@@ -320,7 +320,9 @@ describe('抽奖预设系统API测试（V4架构）', () => {
           '/api/v4/lottery/preset/create',
           {
             user_id: test_user_id,
-            presets: [{ lottery_prize_id: prize.lottery_prize_id, queue_order: 1 }]
+            presets: [
+              { lottery_campaign_prize_id: prize.lottery_campaign_prize_id, queue_order: 1 }
+            ]
           },
           'regular'
         )
@@ -335,7 +337,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
 
     // ========== 高风险问题修复测试（2025-11-09新增）==========
     test('❌ 【风险1修复】queue_order重复应返回错误', async () => {
-      const prize = await models.LotteryPrize.findOne({
+      const prize = await models.LotteryCampaignPrize.findOne({
         where: { status: 'active' }
       })
 
@@ -347,8 +349,8 @@ describe('抽奖预设系统API测试（V4架构）', () => {
       const create_data = {
         user_id: test_user_id,
         presets: [
-          { lottery_prize_id: prize.lottery_prize_id, queue_order: 1 },
-          { lottery_prize_id: prize.lottery_prize_id, queue_order: 1 } // 重复的queue_order
+          { lottery_campaign_prize_id: prize.lottery_campaign_prize_id, queue_order: 1 },
+          { lottery_campaign_prize_id: prize.lottery_campaign_prize_id, queue_order: 1 } // 重复的queue_order
         ]
       }
 
@@ -369,7 +371,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
     })
 
     test('❌ 【风险2修复】超过最大数量限制应返回错误', async () => {
-      const prize = await models.LotteryPrize.findOne({
+      const prize = await models.LotteryCampaignPrize.findOne({
         where: { status: 'active' }
       })
 
@@ -381,7 +383,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
       // 创建超过20条的预设
       const presets = []
       for (let i = 1; i <= 21; i++) {
-        presets.push({ lottery_prize_id: prize.lottery_prize_id, queue_order: i })
+        presets.push({ lottery_campaign_prize_id: prize.lottery_campaign_prize_id, queue_order: i })
       }
 
       const create_data = {
@@ -407,7 +409,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
     })
 
     test('❌ 【额外验证】queue_order必须为正整数', async () => {
-      const prize = await models.LotteryPrize.findOne({
+      const prize = await models.LotteryCampaignPrize.findOne({
         where: { status: 'active' }
       })
 
@@ -419,7 +421,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
       // 测试queue_order为0
       const create_data_zero = {
         user_id: test_user_id,
-        presets: [{ lottery_prize_id: prize.lottery_prize_id, queue_order: 0 }]
+        presets: [{ lottery_campaign_prize_id: prize.lottery_campaign_prize_id, queue_order: 0 }]
       }
 
       const response_zero = await tester.make_authenticated_request(
@@ -437,7 +439,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
       // 测试queue_order为负数
       const create_data_negative = {
         user_id: test_user_id,
-        presets: [{ lottery_prize_id: prize.lottery_prize_id, queue_order: -1 }]
+        presets: [{ lottery_campaign_prize_id: prize.lottery_campaign_prize_id, queue_order: -1 }]
       }
 
       const response_negative = await tester.make_authenticated_request(
@@ -476,7 +478,7 @@ describe('抽奖预设系统API测试（V4架构）', () => {
       const presets = await models.LotteryPreset.findAll({
         include: [
           { model: models.User, as: 'targetUser' },
-          { model: models.LotteryPrize, as: 'prize' }
+          { model: models.LotteryCampaignPrize, as: 'prize' }
         ],
         limit: 10
       })
@@ -484,14 +486,14 @@ describe('抽奖预设系统API测试（V4架构）', () => {
       presets.forEach(preset => {
         // 验证外键存在
         expect(preset.user_id).toBeDefined()
-        expect(preset.lottery_prize_id).toBeDefined()
+        expect(preset.lottery_campaign_prize_id).toBeDefined()
 
         // 验证关联数据加载成功
         if (preset.targetUser) {
           expect(preset.targetUser.user_id).toBe(preset.user_id)
         }
         if (preset.prize) {
-          expect(preset.prize.lottery_prize_id).toBe(preset.lottery_prize_id)
+          expect(preset.prize.lottery_campaign_prize_id).toBe(preset.lottery_campaign_prize_id)
         }
       })
 

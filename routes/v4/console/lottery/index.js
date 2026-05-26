@@ -16,6 +16,7 @@ router.use('/lottery-quota', require('./lottery-quota'))
 router.use('/lottery-tier-rules', require('./lottery-tier-rules'))
 router.use('/lottery-simulation', require('./lottery-simulation'))
 router.use('/prize-pool', require('./prize_pool'))
+router.use('/prize-definitions', require('./prize-definitions'))
 
 // ── 抽奖监控与分析 ──
 router.use('/lottery-realtime', require('./lottery-realtime'))

@@ -37,11 +37,11 @@ class ActivityLifecycleService {
       throw error
     }
 
-    const emptyPrizeResult = await models.LotteryPrize.validateFallbackPrizeConstraint(
+    const emptyPrizeResult = await models.LotteryCampaignPrize.validateFallbackPrizeConstraint(
       parseInt(campaignId)
     )
 
-    const budgetConfigResult = await models.LotteryPrize.validateCampaignBudgetConfig(
+    const budgetConfigResult = await models.LotteryCampaignPrize.validateCampaignBudgetConfig(
       parseInt(campaignId)
     )
 
@@ -132,16 +132,19 @@ class ActivityLifecycleService {
       }
     }
 
-    const prizeWeightResult = await models.LotteryPrize.validatePrizeWeights(parsedCampaignId, {
-      transaction
-    })
+    const prizeWeightResult = await models.LotteryCampaignPrize.validatePrizeWeights(
+      parsedCampaignId,
+      {
+        transaction
+      }
+    )
     validationDetails.prize_weights = prizeWeightResult
 
     if (!prizeWeightResult.valid && prizeWeightResult.error) {
       errors.push(`奖品权重：${prizeWeightResult.error}`)
     }
 
-    const emptyPrizeResult = await models.LotteryPrize.validateFallbackPrizeConstraint(
+    const emptyPrizeResult = await models.LotteryCampaignPrize.validateFallbackPrizeConstraint(
       parsedCampaignId,
       { transaction }
     )
@@ -151,7 +154,7 @@ class ActivityLifecycleService {
       errors.push(`保底奖品配置：${emptyPrizeResult.error}`)
     }
 
-    const budgetConfigResult = await models.LotteryPrize.validateCampaignBudgetConfig(
+    const budgetConfigResult = await models.LotteryCampaignPrize.validateCampaignBudgetConfig(
       parsedCampaignId,
       { transaction }
     )

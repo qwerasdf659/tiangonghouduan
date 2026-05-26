@@ -39,7 +39,7 @@ const BaseStage = require('./BaseStage')
 const {
   LotteryDraw,
   LotteryDrawDecision,
-  LotteryPrize: _LotteryPrize,
+  LotteryCampaignPrize: _LotteryCampaignPrize,
   LotteryCampaignUserQuota: _LotteryCampaignUserQuota,
   LotteryHourlyMetrics, // Phase P2：监控指标埋点
   LotteryManagementSetting, // 管理干预设置（force_win 使用后标记为 used）
@@ -60,8 +60,8 @@ const {
 // 体验状态管理器 - 用于更新用户抽奖体验计数器（Pity/AntiEmpty/AntiHigh）
 const { ExperienceStateManager, GlobalStateManager } = require('../../compute/state')
 
-// eslint-disable-next-line no-unused-vars -- _LotteryPrize, _LotteryCampaignUserQuota: 预留用于未来扩展功能
-const _preReserved = { _LotteryPrize, _LotteryCampaignUserQuota }
+// eslint-disable-next-line no-unused-vars -- _LotteryCampaignPrize, _LotteryCampaignUserQuota: 预留用于未来扩展功能
+const _preReserved = { _LotteryCampaignPrize, _LotteryCampaignUserQuota }
 
 /**
  * 结算阶段 Stage
@@ -530,11 +530,11 @@ class SettleStage extends BaseStage {
 
     // 使用原子操作扣减库存
     const [affected_rows] = await sequelize.query(
-      `UPDATE lottery_prizes 
+      `UPDATE lottery_campaign_prizes 
        SET stock_quantity = stock_quantity - 1, 
            daily_win_count = daily_win_count + 1,
            total_win_count = total_win_count + 1
-       WHERE lottery_prize_id = ? AND stock_quantity >= 1`,
+       WHERE lottery_campaign_prize_id = ? AND stock_quantity >= 1`,
       {
         replacements: [prize.lottery_prize_id],
         transaction,
@@ -854,6 +854,8 @@ class SettleStage extends BaseStage {
         lottery_batch_id: batch_id, // 🆕 Phase 2：连抽批次ID（null 表示单抽）
         asset_transaction_id: final_asset_transaction_id, // 🆕 关联资产流水ID（必填字段）
         lottery_prize_id: final_prize.lottery_prize_id,
+        lottery_campaign_prize_id:
+          final_prize.lottery_campaign_prize_id || final_prize.lottery_prize_id,
         prize_name: final_prize.prize_name,
         prize_type: final_prize.prize_type,
         prize_value: final_prize.prize_value,

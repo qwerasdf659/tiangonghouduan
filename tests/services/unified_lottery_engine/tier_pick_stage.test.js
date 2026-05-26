@@ -24,7 +24,7 @@
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 const models = require('../../../models')
 // LotteryTierRule 用于测试档位规则数据的获取（保留供将来扩展使用）
-const { User, LotteryCampaign, LotteryPrize, LotteryTierRule: _LotteryTierRule } = models
+const { User, LotteryCampaign, LotteryCampaignPrize, LotteryTierRule: _LotteryTierRule } = models
 
 // Stage导入
 const TierPickStage = require('../../../services/UnifiedLotteryEngine/pipeline/stages/TierPickStage')
@@ -142,7 +142,7 @@ describe('TierPickStage 层级选择器测试（任务2.3）', () => {
         console.warn('⚠️ 未找到活跃的抽奖活动')
       } else {
         // 获取活动关联的奖品
-        test_prizes = await LotteryPrize.findAll({
+        test_prizes = await LotteryCampaignPrize.findAll({
           where: { lottery_campaign_id: test_campaign.lottery_campaign_id }
         })
         console.log(`📊 活动 ${test_campaign.lottery_campaign_id} 有 ${test_prizes.length} 个奖品`)
@@ -392,7 +392,7 @@ describe('TierPickStage 层级选择器测试（任务2.3）', () => {
         data: {
           decision_source: 'preset',
           preset: {
-            lottery_prize_id: 1,
+            lottery_campaign_prize_id: 1,
             reward_tier: 'high'
           }
         }

@@ -691,31 +691,44 @@ class ActivityService {
       throw error
     }
 
-    // 获取奖品配置
-    const prizes = await models.LotteryPrize.findAll({
+    // 获取奖品配置（JOIN prize_definitions 获取奖品名称等信息）
+    const prizes = await models.LotteryCampaignPrize.findAll({
       where: { lottery_campaign_id: parseInt(campaignId) },
       attributes: [
-        'lottery_prize_id',
-        'prize_name',
-        'prize_type',
-        'prize_value_points',
-        'win_probability',
+        'lottery_campaign_prize_id',
+        'prize_definition_id',
+        'win_weight',
         'stock_quantity',
+        'reward_tier',
+        'is_fallback',
         'status',
         'sort_order'
       ],
+      include: [
+        {
+          model: models.PrizeDefinition,
+          as: 'prizeDefinition',
+          attributes: [
+            'prize_definition_id',
+            'display_name',
+            'prize_type',
+            'material_amount',
+            'rarity_code'
+          ]
+        }
+      ],
       order: [
         ['sort_order', 'ASC'],
-        ['lottery_prize_id', 'ASC']
+        ['lottery_campaign_prize_id', 'ASC']
       ]
     })
 
     // 分析奖品结构
     const analysis = {
       total_prizes: prizes.length,
-      has_fallback_prize: prizes.some(p => p.prize_type === 'empty' || p.prize_value_points === 0),
-      points_prizes_count: prizes.filter(p => p.prize_value_points > 0).length,
-      total_probability: prizes.reduce((sum, p) => sum + Number(p.win_probability || 0), 0)
+      has_fallback_prize: prizes.some(p => p.is_fallback === 1 || p.is_fallback === true),
+      active_prizes_count: prizes.filter(p => p.status === 'active').length,
+      total_weight: prizes.reduce((sum, p) => sum + Number(p.win_weight || 0), 0)
     }
 
     return {
@@ -723,12 +736,16 @@ class ActivityService {
       campaign_name: campaign.campaign_name,
       budget_mode: campaign.budget_mode,
       prizes: prizes.map(p => ({
-        lottery_prize_id: p.lottery_prize_id,
-        prize_name: p.prize_name,
-        prize_type: p.prize_type,
-        prize_value_points: p.prize_value_points,
-        win_probability: p.win_probability,
+        lottery_campaign_prize_id: p.lottery_campaign_prize_id,
+        prize_definition_id: p.prize_definition_id,
+        display_name: p.prizeDefinition?.display_name || '未知奖品',
+        prize_type: p.prizeDefinition?.prize_type || 'unknown',
+        material_amount: p.prizeDefinition?.material_amount || 0,
+        rarity_code: p.prizeDefinition?.rarity_code || null,
+        win_weight: p.win_weight,
         stock_quantity: p.stock_quantity,
+        reward_tier: p.reward_tier,
+        is_fallback: p.is_fallback,
         status: p.status,
         sort_order: p.sort_order
       })),
@@ -866,12 +883,12 @@ class ActivityService {
     }
 
     // 使用模型静态方法验证保底奖品约束
-    const emptyPrizeResult = await models.LotteryPrize.validateFallbackPrizeConstraint(
+    const emptyPrizeResult = await models.LotteryCampaignPrize.validateFallbackPrizeConstraint(
       parseInt(campaignId)
     )
 
     // 使用模型静态方法验证预算配置
-    const budgetConfigResult = await models.LotteryPrize.validateCampaignBudgetConfig(
+    const budgetConfigResult = await models.LotteryCampaignPrize.validateCampaignBudgetConfig(
       parseInt(campaignId)
     )
 
@@ -980,9 +997,12 @@ class ActivityService {
     }
 
     // 2. 校验奖品权重（所有活动都需要）
-    const prizeWeightResult = await models.LotteryPrize.validatePrizeWeights(parsedCampaignId, {
-      transaction
-    })
+    const prizeWeightResult = await models.LotteryCampaignPrize.validatePrizeWeights(
+      parsedCampaignId,
+      {
+        transaction
+      }
+    )
     validationDetails.prize_weights = prizeWeightResult
 
     if (!prizeWeightResult.valid && prizeWeightResult.error) {
@@ -990,7 +1010,7 @@ class ActivityService {
     }
 
     // 3. 校验保底奖品配置
-    const emptyPrizeResult = await models.LotteryPrize.validateFallbackPrizeConstraint(
+    const emptyPrizeResult = await models.LotteryCampaignPrize.validateFallbackPrizeConstraint(
       parsedCampaignId,
       { transaction }
     )
@@ -1001,7 +1021,7 @@ class ActivityService {
     }
 
     // 4. 校验预算配置
-    const budgetConfigResult = await models.LotteryPrize.validateCampaignBudgetConfig(
+    const budgetConfigResult = await models.LotteryCampaignPrize.validateCampaignBudgetConfig(
       parsedCampaignId,
       { transaction }
     )

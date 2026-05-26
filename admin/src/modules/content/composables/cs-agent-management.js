@@ -23,7 +23,7 @@ export function useCsAgentManagementState() {
     /* ===== 座席列表 ===== */
     agents: [],
     agentsLoading: false,
-    agentPagination: { total: 0, current_page: 1, page_size: 20, total_pages: 0 },
+    agentPagination: { total: 0, page: 1, page_size: 20, total_pages: 0 },
     agentFilter: { status: '', search: '' },
 
     /* ===== 座席表单 ===== */
@@ -51,7 +51,7 @@ export function useCsAgentManagementState() {
     /* ===== 分配列表 ===== */
     assignments: [],
     assignmentsLoading: false,
-    assignmentPagination: { total: 0, current_page: 1, page_size: 20, total_pages: 0 },
+    assignmentPagination: { total: 0, page: 1, page_size: 20, total_pages: 0 },
     assignmentFilter: { agent_id: '', status: 'active', search: '' },
 
     /* ===== 分配表单 ===== */
@@ -148,7 +148,7 @@ export function useCsAgentManagementMethods() {
       this.agentsLoading = true
       try {
         const params = new URLSearchParams()
-        params.set('page', this.agentPagination.current_page)
+        params.set('page', this.agentPagination.page)
         params.set('page_size', this.agentPagination.page_size)
         if (this.agentFilter.status) params.set('status', this.agentFilter.status)
         if (this.agentFilter.search) params.set('search', this.agentFilter.search)
@@ -324,7 +324,7 @@ export function useCsAgentManagementMethods() {
       this.assignmentsLoading = true
       try {
         const params = new URLSearchParams()
-        params.set('page', this.assignmentPagination.current_page)
+        params.set('page', this.assignmentPagination.page)
         params.set('page_size', this.assignmentPagination.page_size)
         if (this.assignmentFilter.agent_id) params.set('agent_id', this.assignmentFilter.agent_id)
         if (this.assignmentFilter.status) params.set('status', this.assignmentFilter.status)
@@ -471,25 +471,25 @@ export function useCsAgentManagementMethods() {
 
     /** 座席列表翻页 */
     async agentGoToPage(page) {
-      this.agentPagination.current_page = page
+      this.agentPagination.page = page
       await this.loadAgents()
     },
 
     /** 座席列表筛选 */
     async filterAgents() {
-      this.agentPagination.current_page = 1
+      this.agentPagination.page = 1
       await this.loadAgents()
     },
 
     /** 分配列表翻页 */
     async assignmentGoToPage(page) {
-      this.assignmentPagination.current_page = page
+      this.assignmentPagination.page = page
       await this.loadAssignments()
     },
 
     /** 分配列表筛选 */
     async filterAssignments() {
-      this.assignmentPagination.current_page = 1
+      this.assignmentPagination.page = 1
       await this.loadAssignments()
     },
 

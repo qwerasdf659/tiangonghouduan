@@ -457,7 +457,7 @@ class RealtimeService {
     const whereClause = { status: 'active' }
     if (campaignId) whereClause.lottery_campaign_id = campaignId
 
-    const prizes = await this.models.LotteryPrize.findAll({
+    const prizes = await this.models.LotteryCampaignPrize.findAll({
       where: whereClause,
       attributes: [
         'lottery_prize_id',
@@ -687,7 +687,7 @@ class RealtimeService {
     const whereClause = { status: 'active' }
     if (campaignId) whereClause.lottery_campaign_id = campaignId
 
-    const prizes = await this.models.LotteryPrize.findAll({
+    const prizes = await this.models.LotteryCampaignPrize.findAll({
       where: whereClause,
       attributes: ['lottery_prize_id', 'prize_name', 'stock_quantity', 'total_win_count']
     })

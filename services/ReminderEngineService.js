@@ -163,19 +163,27 @@ const RULE_PROCESSORS = {
     const { trigger_condition } = rule
     const { min_stock } = trigger_condition
 
-    const LotteryPrize = models.LotteryPrize
-    if (!LotteryPrize) {
+    const LotteryCampaignPrize = models.LotteryCampaignPrize
+    if (!LotteryCampaignPrize) {
       return { matched: false, count: 0, prizes: [] }
     }
 
-    // 查询库存低于阈值的奖品
-    const prizes = await LotteryPrize.findAll({
+    // 查询库存低于阈值的活动奖品
+    const prizes = await LotteryCampaignPrize.findAll({
       where: {
-        stock: { [Op.lt]: min_stock || 10 },
+        stock_quantity: { [Op.lt]: min_stock || 10 },
         status: 'active'
       },
-      attributes: ['lottery_prize_id', 'name', 'stock'],
-      raw: true
+      attributes: ['lottery_campaign_prize_id', 'stock_quantity'],
+      include: [
+        {
+          model: models.PrizeDefinition,
+          as: 'prizeDefinition',
+          attributes: ['display_name']
+        }
+      ],
+      raw: true,
+      nest: true
     })
 
     return {

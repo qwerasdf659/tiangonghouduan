@@ -24,7 +24,7 @@ const {
   sequelize,
   LotteryManagementSetting,
   LotteryPreset,
-  LotteryPrize
+  LotteryCampaignPrize
 } = require('../../../models')
 const LoadDecisionSourceStage = require('../../../services/UnifiedLotteryEngine/pipeline/stages/LoadDecisionSourceStage')
 
@@ -102,7 +102,11 @@ describe('【决策来源消耗】2026-02-15 修复验证', () => {
       const setting = await LotteryManagementSetting.create({
         user_id: test_user_id,
         setting_type: 'force_win',
-        setting_data: { lottery_prize_id: 9, prize_name: '测试过期干预', reason: '单元测试' },
+        setting_data: {
+          lottery_campaign_prize_id: 9,
+          prize_name: '测试过期干预',
+          reason: '单元测试'
+        },
         expires_at: one_hour_ago,
         status: 'active', // 状态仍为 active（模拟定时任务尚未执行的时间窗口）
         created_by: test_user_id
@@ -139,7 +143,11 @@ describe('【决策来源消耗】2026-02-15 修复验证', () => {
       const setting = await LotteryManagementSetting.create({
         user_id: test_user_id,
         setting_type: 'force_win',
-        setting_data: { lottery_prize_id: 9, prize_name: '测试未过期干预', reason: '单元测试' },
+        setting_data: {
+          lottery_campaign_prize_id: 9,
+          prize_name: '测试未过期干预',
+          reason: '单元测试'
+        },
         expires_at: one_hour_later,
         status: 'active',
         created_by: test_user_id
@@ -167,7 +175,11 @@ describe('【决策来源消耗】2026-02-15 修复验证', () => {
       const setting = await LotteryManagementSetting.create({
         user_id: test_user_id,
         setting_type: 'force_win',
-        setting_data: { lottery_prize_id: 9, prize_name: '测试永不过期干预', reason: '单元测试' },
+        setting_data: {
+          lottery_campaign_prize_id: 9,
+          prize_name: '测试永不过期干预',
+          reason: '单元测试'
+        },
         expires_at: null,
         status: 'active',
         created_by: test_user_id
@@ -187,7 +199,7 @@ describe('【决策来源消耗】2026-02-15 修复验证', () => {
   describe('2. _checkPreset 全局预设支持（2026-02-15 修复）', () => {
     test('全局预设（lottery_campaign_id=null）应被命中', async () => {
       // 获取一个有效的奖品ID
-      const prize = await LotteryPrize.findOne({ where: { status: 'active' } })
+      const prize = await LotteryCampaignPrize.findOne({ where: { status: 'active' } })
       if (!prize) {
         console.warn('⚠️ 数据库中无有效奖品，跳过此测试')
         return
@@ -202,7 +214,7 @@ describe('【决策来源消耗】2026-02-15 修复验证', () => {
       // 创建一条全局预设（lottery_campaign_id=null）
       const preset = await LotteryPreset.create({
         user_id: test_user_id,
-        lottery_prize_id: prize.lottery_prize_id,
+        lottery_campaign_prize_id: prize.lottery_campaign_prize_id,
         queue_order: 999, // 使用较大的 queue_order 避免与现有预设冲突
         status: 'pending',
         approval_status: 'approved',
@@ -227,7 +239,7 @@ describe('【决策来源消耗】2026-02-15 修复验证', () => {
     })
 
     test('活动级预设（lottery_campaign_id=具体ID）应被命中', async () => {
-      const prize = await LotteryPrize.findOne({ where: { status: 'active' } })
+      const prize = await LotteryCampaignPrize.findOne({ where: { status: 'active' } })
       if (!prize) {
         console.warn('⚠️ 数据库中无有效奖品，跳过此测试')
         return
@@ -242,7 +254,7 @@ describe('【决策来源消耗】2026-02-15 修复验证', () => {
       // 创建活动级预设
       const preset = await LotteryPreset.create({
         user_id: test_user_id,
-        lottery_prize_id: prize.lottery_prize_id,
+        lottery_campaign_prize_id: prize.lottery_campaign_prize_id,
         queue_order: 998,
         status: 'pending',
         approval_status: 'approved',
@@ -261,7 +273,7 @@ describe('【决策来源消耗】2026-02-15 修复验证', () => {
     })
 
     test('其他活动的预设不应被当前活动命中', async () => {
-      const prize = await LotteryPrize.findOne({ where: { status: 'active' } })
+      const prize = await LotteryCampaignPrize.findOne({ where: { status: 'active' } })
       if (!prize) {
         console.warn('⚠️ 数据库中无有效奖品，跳过此测试')
         return
@@ -277,7 +289,7 @@ describe('【决策来源消耗】2026-02-15 修复验证', () => {
       const other_campaign_id = test_campaign_id + 99999
       const preset = await LotteryPreset.create({
         user_id: test_user_id,
-        lottery_prize_id: prize.lottery_prize_id,
+        lottery_campaign_prize_id: prize.lottery_campaign_prize_id,
         queue_order: 997,
         status: 'pending',
         approval_status: 'approved',
@@ -314,7 +326,11 @@ describe('【决策来源消耗】2026-02-15 修复验证', () => {
       const setting = await LotteryManagementSetting.create({
         user_id: test_user_id,
         setting_type: 'force_win',
-        setting_data: { lottery_prize_id: 9, prize_name: '测试markAsUsed', reason: '单元测试' },
+        setting_data: {
+          lottery_campaign_prize_id: 9,
+          prize_name: '测试markAsUsed',
+          reason: '单元测试'
+        },
         status: 'active',
         created_by: test_user_id
       })

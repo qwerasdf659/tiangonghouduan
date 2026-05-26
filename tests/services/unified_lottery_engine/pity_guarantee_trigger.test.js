@@ -32,7 +32,7 @@ const {
 } = require('../../../services/UnifiedLotteryEngine/compute')
 
 const models = require('../../../models')
-const { User, LotteryCampaign, LotteryPrize } = models
+const { User, LotteryCampaign, LotteryCampaignPrize } = models
 
 // 使用配置加载器获取动态配置
 const {
@@ -110,7 +110,7 @@ describe('保底触发完整流程测试（任务8.4）', () => {
       }
 
       if (test_campaign) {
-        test_prizes = await LotteryPrize.findAll({
+        test_prizes = await LotteryCampaignPrize.findAll({
           where: {
             lottery_campaign_id: test_campaign.lottery_campaign_id,
             status: 'active'
@@ -435,21 +435,21 @@ describe('保底触发完整流程测试（任务8.4）', () => {
     test('应优先选择目标档位奖品', () => {
       const mock_prizes = [
         {
-          lottery_prize_id: 1,
+          lottery_campaign_prize_id: 1,
           name: 'high_1',
           reward_tier: 'high',
           prize_value_points: 1000,
           status: 'active'
         },
         {
-          lottery_prize_id: 2,
+          lottery_campaign_prize_id: 2,
           name: 'mid_1',
           reward_tier: 'mid',
           prize_value_points: 500,
           status: 'active'
         },
         {
-          lottery_prize_id: 3,
+          lottery_campaign_prize_id: 3,
           name: 'low_1',
           reward_tier: 'low',
           prize_value_points: 100,
@@ -472,14 +472,14 @@ describe('保底触发完整流程测试（任务8.4）', () => {
     test('目标档位无奖品时应降级选择', () => {
       const mock_prizes = [
         {
-          lottery_prize_id: 1,
+          lottery_campaign_prize_id: 1,
           name: 'mid_1',
           reward_tier: 'mid',
           prize_value_points: 500,
           status: 'active'
         },
         {
-          lottery_prize_id: 2,
+          lottery_campaign_prize_id: 2,
           name: 'low_1',
           reward_tier: 'low',
           prize_value_points: 100,
@@ -502,21 +502,21 @@ describe('保底触发完整流程测试（任务8.4）', () => {
     test('预算不足时应选择可负担的奖品', () => {
       const mock_prizes = [
         {
-          lottery_prize_id: 1,
+          lottery_campaign_prize_id: 1,
           name: 'high_1',
           reward_tier: 'high',
           prize_value_points: 1000,
           status: 'active'
         },
         {
-          lottery_prize_id: 2,
+          lottery_campaign_prize_id: 2,
           name: 'mid_1',
           reward_tier: 'mid',
           prize_value_points: 500,
           status: 'active'
         },
         {
-          lottery_prize_id: 3,
+          lottery_campaign_prize_id: 3,
           name: 'low_1',
           reward_tier: 'low',
           prize_value_points: 100,

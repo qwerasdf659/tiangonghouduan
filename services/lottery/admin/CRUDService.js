@@ -26,7 +26,7 @@
 const {
   LotteryCampaign,
   LotteryCampaignPricingConfig,
-  LotteryPrize,
+  LotteryCampaignPrize,
   LotteryStrategyConfig,
   LotteryDrawQuotaRule
 } = require('../../../models')
@@ -631,7 +631,7 @@ class LotteryCampaignCRUDService {
      * 校验不通过则阻断激活
      */
     if (status === 'active' && oldStatus !== 'active') {
-      const prizes = await LotteryPrize.findAll({
+      const prizes = await LotteryCampaignPrize.findAll({
         where: {
           lottery_campaign_id: parseInt(lottery_campaign_id),
           status: 'active'
@@ -768,7 +768,7 @@ class LotteryCampaignCRUDService {
     }
 
     // 检查是否有关联的奖品
-    const prizeCount = await LotteryPrize.count({
+    const prizeCount = await LotteryCampaignPrize.count({
       where: { lottery_campaign_id: parseInt(lottery_campaign_id) },
       transaction
     })

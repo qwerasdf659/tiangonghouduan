@@ -270,7 +270,7 @@ class UserDataQueryService {
    * @returns {Promise<Object>} 分页抽奖记录列表 + 汇总统计
    */
   static async getLotteryDraws(models, user_id, params = {}) {
-    const { LotteryDraw, LotteryPrize, LotteryCampaign } = models
+    const { LotteryDraw, LotteryCampaignPrize, PrizeDefinition, LotteryCampaign } = models
     const {
       lottery_campaign_id,
       reward_tier,
@@ -291,12 +291,19 @@ class UserDataQueryService {
 
     const includeOpts = []
 
-    if (LotteryPrize) {
+    if (LotteryCampaignPrize) {
       includeOpts.push({
-        model: LotteryPrize,
-        as: 'prize',
-        attributes: ['lottery_prize_id', 'prize_name'],
-        required: false
+        model: LotteryCampaignPrize,
+        as: 'campaignPrize',
+        attributes: ['lottery_campaign_prize_id', 'reward_tier'],
+        required: false,
+        include: [
+          {
+            model: PrizeDefinition,
+            as: 'prizeDefinition',
+            attributes: ['display_name', 'prize_type']
+          }
+        ]
       })
     }
 

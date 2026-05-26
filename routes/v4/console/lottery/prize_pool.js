@@ -31,10 +31,10 @@ const {
  * @access Private (需要管理员权限)
  *
  * 🔒 P0修复：
- * 1. 修正模型名称：models.Prize → models.LotteryPrize
- * 2. 修正字段映射：name→prize_name, type→prize_type等
+ * 1. 修正模型名称：使用 LotteryCampaignPrize（集中奖品目录方案）
+ * 2. 通过 ServiceManager 获取 PrizePoolService
  * 3. 添加事务保护：确保原子性操作
- * 4. 添加概率验证：验证概率总和=1
+ * 4. 奖品配置改为引用 prize_definition_id
  */
 router.post(
   '/batch-add',
@@ -314,8 +314,8 @@ router.post(
     if (!campaign_code) {
       return res.apiError('缺少活动代码', 'MISSING_CAMPAIGN_CODE')
     }
-    if (!prizeData.prize_name) {
-      return res.apiError('奖品名称不能为空', 'MISSING_PRIZE_NAME')
+    if (!prizeData.prize_definition_id) {
+      return res.apiError('奖品定义ID不能为空', 'MISSING_PRIZE_DEFINITION_ID')
     }
 
     const PrizePoolService = req.app.locals.services.getService('prize_pool')

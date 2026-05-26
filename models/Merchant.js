@@ -6,7 +6,7 @@
  * 业务场景：
  * - 多商家接入平台，每个商家独立管理奖品、门店、核销
  * - 商家类型通过 system_dictionaries 字典表校验（dict_type='merchant_type'）
- * - merchant_id 作为物品(items)、奖品(lottery_prizes)、门店(stores)的归属标识
+ * - merchant_id 作为物品(items)、奖品(prize_definitions)、门店(stores)的归属标识
  * - 结算账户(settlement_account_id)预留，MVP阶段不使用
  *
  * 数据隔离：
@@ -180,12 +180,12 @@ module.exports = sequelize => {
       })
     }
 
-    // 一对多：一个商家赞助多个奖品
-    if (models.LotteryPrize) {
-      Merchant.hasMany(models.LotteryPrize, {
+    // 一对多：一个商家赞助多个奖品定义
+    if (models.PrizeDefinition) {
+      Merchant.hasMany(models.PrizeDefinition, {
         foreignKey: 'merchant_id',
-        as: 'lottery_prizes',
-        comment: '商家赞助的奖品'
+        as: 'prizeDefinitions',
+        comment: '商家赞助的奖品定义'
       })
     }
 

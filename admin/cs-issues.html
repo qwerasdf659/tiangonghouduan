@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <%- include('partials/head', { 
+    title: '工单管理', 
+    pageStyle: '[x-cloak] { display: none !important; }'
+  }) %>
+</head>
+<body class="themed-bg-subtle min-h-screen">
+  
+  <!-- 导航栏 -->
+  <nav class="themed-bg-primary text-white shadow-lg">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/workspace.html" class="hover:opacity-80 flex items-center gap-1 text-sm">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+          返回工作台
+        </a>
+        <span class="text-lg font-semibold">📋 工单管理</span>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mx-auto px-4 py-6" x-data="csIssuesPage()" x-init="init()" x-cloak>
+
+    <!-- 筛选区域 -->
+    <div class="themed-card rounded-lg shadow-sm p-4 mb-4">
+      <div class="flex flex-wrap items-center gap-3">
+        <select class="px-3 py-2 border rounded text-sm" x-model="filters.status">
+          <option value="">全部状态</option>
+          <template x-for="opt in status_options" :key="opt.value">
+            <option :value="opt.value" x-text="opt.label"></option>
+          </template>
+        </select>
+        <select class="px-3 py-2 border rounded text-sm" x-model="filters.issue_type">
+          <option value="">全部类型</option>
+          <template x-for="opt in issue_type_options" :key="opt.value">
+            <option :value="opt.value" x-text="opt.label"></option>
+          </template>
+        </select>
+        <select class="px-3 py-2 border rounded text-sm" x-model="filters.priority">
+          <option value="">全部优先级</option>
+          <template x-for="opt in priority_options" :key="opt.value">
+            <option :value="opt.value" x-text="opt.label"></option>
+          </template>
+        </select>
+        <input type="text" class="px-3 py-2 border rounded text-sm w-48" placeholder="搜索标题/用户ID..." x-model="filters.keyword" @keyup.enter="handleSearch()">
+        <button @click="handleSearch()" class="px-4 py-2 themed-btn-primary rounded text-sm">搜索</button>
+        <button @click="resetFilters()" class="px-4 py-2 border rounded text-sm hover:bg-gray-50">重置</button>
+        <span class="ml-auto text-sm themed-text-muted" x-text="'共 ' + total_records + ' 条'"></span>
+      </div>
+    </div>
+
+    <!-- 工单列表 -->
+    <div class="themed-card rounded-lg shadow-sm overflow-hidden">
+      <table class="w-full text-sm">
+        <thead class="themed-bg-base border-b">
+          <tr>
+            <th class="px-4 py-3 text-left font-medium">ID</th>
+            <th class="px-4 py-3 text-left font-medium">标题</th>
+            <th class="px-4 py-3 text-left font-medium">类型</th>
+            <th class="px-4 py-3 text-left font-medium">优先级</th>
+            <th class="px-4 py-3 text-left font-medium">状态</th>
+            <th class="px-4 py-3 text-left font-medium">用户ID</th>
+            <th class="px-4 py-3 text-left font-medium">创建时间</th>
+            <th class="px-4 py-3 text-left font-medium">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr x-show="loading">
+            <td colspan="8" class="px-4 py-8 text-center themed-text-muted">加载中...</td>
+          </tr>
+          <tr x-show="!loading && issues.length === 0">
+            <td colspan="8" class="px-4 py-8 text-center themed-text-muted">暂无工单数据</td>
+          </tr>
+          <template x-for="issue in issues" :key="issue.issue_id">
+            <tr class="border-b hover:bg-gray-50/50 transition-colors">
+              <td class="px-4 py-3 font-mono text-xs" x-text="'#' + issue.issue_id"></td>
+              <td class="px-4 py-3 font-medium max-w-[200px] truncate" x-text="issue.title || '-'"></td>
+              <td class="px-4 py-3" x-text="getTypeLabel(issue.issue_type)"></td>
+              <td class="px-4 py-3">
+                <span class="px-2 py-0.5 rounded-full text-xs" :class="getPriorityBadge(issue.priority).class" x-text="getPriorityBadge(issue.priority).text"></span>
+              </td>
+              <td class="px-4 py-3">
+                <span class="px-2 py-0.5 rounded-full text-xs" :class="getStatusBadge(issue.status).class" x-text="getStatusBadge(issue.status).text"></span>
+              </td>
+              <td class="px-4 py-3 text-xs" x-text="issue.user_id || '-'"></td>
+              <td class="px-4 py-3 text-xs themed-text-muted" x-text="formatDate(issue.created_at)"></td>
+              <td class="px-4 py-3">
+                <div class="flex items-center gap-2">
+                  <button @click="viewDetail(issue)" class="text-blue-600 hover:underline text-xs">详情</button>
+                  <button @click="openStatusModal(issue)" class="text-orange-600 hover:underline text-xs">更新状态</button>
+                </div>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+
+      <!-- 分页 -->
+      <div x-show="total_pages > 1" class="px-4 py-3 border-t flex items-center justify-between">
+        <span class="text-xs themed-text-muted" x-text="'第 ' + current_page + ' / ' + total_pages + ' 页'"></span>
+        <div class="flex items-center gap-2">
+          <button @click="handlePageChange(current_page - 1)" :disabled="current_page <= 1" class="px-3 py-1.5 border rounded text-xs disabled:opacity-40">上一页</button>
+          <button @click="handlePageChange(current_page + 1)" :disabled="current_page >= total_pages" class="px-3 py-1.5 border rounded text-xs disabled:opacity-40">下一页</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 工单详情侧边面板 -->
+    <div x-show="show_detail" x-cloak class="fixed inset-0 z-50 flex">
+      <div class="fixed inset-0 bg-black/40" @click="closeDetail()"></div>
+      <div class="relative ml-auto w-full max-w-lg bg-white h-full overflow-y-auto shadow-xl">
+        <div class="sticky top-0 bg-white border-b px-4 py-3 flex items-center justify-between z-10">
+          <h3 class="font-semibold" x-text="detail ? '#' + detail.issue_id + ' ' + (detail.title || '') : '工单详情'"></h3>
+          <button @click="closeDetail()" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+        </div>
+
+        <div x-show="detail_loading" class="p-8 text-center themed-text-muted">加载中...</div>
+
+        <template x-if="detail && !detail_loading">
+          <div class="p-4 space-y-4">
+            <!-- 基本信息 -->
+            <div class="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <span class="themed-text-muted">类型：</span>
+                <span x-text="getTypeLabel(detail.issue_type)"></span>
+              </div>
+              <div>
+                <span class="themed-text-muted">优先级：</span>
+                <span class="px-2 py-0.5 rounded-full text-xs" :class="getPriorityBadge(detail.priority).class" x-text="getPriorityBadge(detail.priority).text"></span>
+              </div>
+              <div>
+                <span class="themed-text-muted">状态：</span>
+                <span class="px-2 py-0.5 rounded-full text-xs" :class="getStatusBadge(detail.status).class" x-text="getStatusBadge(detail.status).text"></span>
+              </div>
+              <div>
+                <span class="themed-text-muted">用户ID：</span>
+                <span x-text="detail.user_id || '-'"></span>
+              </div>
+              <div>
+                <span class="themed-text-muted">创建时间：</span>
+                <span x-text="formatDate(detail.created_at)"></span>
+              </div>
+              <div>
+                <span class="themed-text-muted">处理人：</span>
+                <span x-text="detail.assigned_to || '未分配'"></span>
+              </div>
+            </div>
+
+            <!-- 描述 -->
+            <div x-show="detail.description" class="text-sm">
+              <p class="themed-text-muted mb-1">描述：</p>
+              <p class="themed-card border rounded p-3 text-sm" x-text="detail.description"></p>
+            </div>
+
+            <!-- 备注列表 -->
+            <div>
+              <p class="text-sm font-medium mb-2">内部备注 (<span x-text="notes.length"></span>)</p>
+              <div class="space-y-2 max-h-60 overflow-y-auto">
+                <template x-for="(note, idx) in notes" :key="'note_' + idx">
+                  <div class="bg-gray-50 rounded p-2 text-xs">
+                    <p x-text="note.content"></p>
+                    <p class="themed-text-hint mt-1" x-text="formatDate(note.created_at)"></p>
+                  </div>
+                </template>
+                <p x-show="notes.length === 0" class="text-xs themed-text-hint">暂无备注</p>
+              </div>
+
+              <!-- 添加备注 -->
+              <div class="mt-3 flex gap-2">
+                <input type="text" class="flex-1 px-3 py-1.5 border rounded text-sm" placeholder="输入备注内容..." x-model="note_input" @keyup.enter="submitNote()">
+                <button @click="submitNote()" :disabled="!note_input.trim() || note_submitting" class="px-3 py-1.5 themed-btn-primary rounded text-sm disabled:opacity-40">添加</button>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- 状态更新弹窗 -->
+    <div x-show="show_status_modal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center">
+      <div class="fixed inset-0 bg-black/40" @click="show_status_modal = false"></div>
+      <div class="relative themed-card rounded-lg shadow-xl max-w-sm w-full mx-4 p-4">
+        <h4 class="font-semibold mb-4">更新工单状态</h4>
+        <div class="space-y-3">
+          <div>
+            <label class="block text-sm mb-1">新状态</label>
+            <select class="w-full px-3 py-2 border rounded" x-model="status_form.status">
+              <template x-for="opt in status_options" :key="opt.value">
+                <option :value="opt.value" x-text="opt.label"></option>
+              </template>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm mb-1">备注（可选）</label>
+            <textarea class="w-full px-3 py-2 border rounded text-sm" rows="2" x-model="status_form.resolution_note" placeholder="状态变更说明..."></textarea>
+          </div>
+          <div class="flex justify-end gap-2 pt-2">
+            <button @click="show_status_modal = false" class="px-4 py-2 border rounded text-sm">取消</button>
+            <button @click="submitStatusUpdate()" class="px-4 py-2 themed-btn-primary rounded text-sm">确认更新</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script type="module" src="./src/modules/content/pages/cs-issues.js"></script>
+</body>
+</html>

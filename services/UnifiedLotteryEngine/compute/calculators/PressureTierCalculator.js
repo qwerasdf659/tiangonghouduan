@@ -29,7 +29,14 @@
  */
 
 const { logger } = require('../../../../utils/logger')
-const { LotteryCampaign, LotteryDraw, LotteryPrize, sequelize } = require('../../../../models')
+const {
+  LotteryCampaign,
+  LotteryDraw,
+  LotteryCampaignPrize: _LotteryCampaignPrize,
+  PrizeDefinition: _PrizeDefinition,
+  MaterialAssetType: _MaterialAssetType,
+  sequelize
+} = require('../../../../models')
 const { Op } = require('sequelize')
 
 /**
@@ -286,14 +293,18 @@ class PressureTierCalculator {
 
       // 如果没有配置预算总额，尝试从奖品估算
       if (total_budget === 0) {
-        // 估算：奖品预算成本总和 × 预期发放次数（与过滤/扣减口径一致）
-        const prize_total = await LotteryPrize.sum('budget_cost', {
-          where: { lottery_campaign_id, status: 'active' },
-          transaction
-        })
+        // 估算：活动奖品的预算成本总和（budget_value_points × material_amount × win_weight 占比）
+        const [budgetResult] = await sequelize.query(
+          `SELECT COALESCE(SUM(mat.budget_value_points * pd.material_amount), 0) as prize_total
+           FROM lottery_campaign_prizes lcp
+           JOIN prize_definitions pd ON lcp.prize_definition_id = pd.prize_definition_id
+           LEFT JOIN material_asset_types mat ON pd.material_asset_code = mat.asset_code
+           WHERE lcp.lottery_campaign_id = ? AND lcp.status = 'active'`,
+          { replacements: [lottery_campaign_id], transaction }
+        )
 
         // 假设平均每个用户抽 10 次
-        total_budget = (Number(prize_total) || 0) * 10
+        total_budget = (Number(budgetResult[0]?.prize_total) || 0) * 10
       }
 
       // 防止除零

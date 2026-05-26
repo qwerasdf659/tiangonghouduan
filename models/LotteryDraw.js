@@ -39,12 +39,14 @@ class LotteryDraw extends Model {
       comment: '关联的抽奖活动'
     })
 
-    // 关联到奖品
-    LotteryDraw.belongsTo(models.LotteryPrize, {
-      foreignKey: 'lottery_prize_id',
-      as: 'prize',
-      comment: '获得的奖品'
-    })
+    // 关联到活动奖品（集中奖品目录方案）
+    if (models.LotteryCampaignPrize) {
+      LotteryDraw.belongsTo(models.LotteryCampaignPrize, {
+        foreignKey: 'lottery_campaign_prize_id',
+        as: 'campaignPrize',
+        comment: '活动奖品关联（新方案）'
+      })
+    }
 
     /*
      * 🔴 统一抽奖架构新增关联
@@ -244,10 +246,15 @@ module.exports = sequelize => {
       lottery_prize_id: {
         type: DataTypes.INTEGER,
         allowNull: true,
-        comment: '获得的奖品ID',
+        comment: '获得的奖品ID（历史字段，兼容旧记录）'
+      },
+      lottery_campaign_prize_id: {
+        type: DataTypes.BIGINT,
+        allowNull: true,
+        comment: '活动奖品关联ID（FK→lottery_campaign_prizes.lottery_campaign_prize_id）',
         references: {
-          model: 'lottery_prizes',
-          key: 'lottery_prize_id'
+          model: 'lottery_campaign_prizes',
+          key: 'lottery_campaign_prize_id'
         }
       },
       prize_name: {

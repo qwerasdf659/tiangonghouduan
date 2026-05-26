@@ -171,32 +171,38 @@ async function calculateROIviaService(analyticsService, campaignId) {
  */
 async function calculateStockWarning(analyticsService, campaignId) {
   // 通过 Service 访问 models（遵循规范）
-  const LotteryPrize = analyticsService.models.LotteryPrize
+  const LotteryCampaignPrize = analyticsService.models.LotteryCampaignPrize
   const warningThreshold = alertThresholds.prize_stock_warning_threshold || 20
 
   /*
-   * 查询活动下的所有奖品
+   * 查询活动下的所有奖品（含奖品定义名称）
    * 库存字段：stock_quantity（初始库存）、total_win_count（已中奖数）
    */
-  const prizes = await LotteryPrize.findAll({
+  const PrizeDefinition = analyticsService.models.PrizeDefinition
+  const prizes = await LotteryCampaignPrize.findAll({
     where: { lottery_campaign_id: campaignId, status: 'active' },
-    attributes: ['lottery_prize_id', 'prize_name', 'stock_quantity', 'total_win_count']
+    attributes: ['lottery_campaign_prize_id', 'stock_quantity', 'total_win_count'],
+    include: PrizeDefinition
+      ? [
+          {
+            model: PrizeDefinition,
+            as: 'prizeDefinition',
+            attributes: ['display_name']
+          }
+        ]
+      : []
   })
 
   const lowStockPrizes = []
   prizes.forEach(prize => {
-    // 初始库存
     const total = prize.stock_quantity || 0
-    // 剩余库存 = 初始库存 - 已中奖数
     const remaining = total - (prize.total_win_count || 0)
-    // 剩余百分比
     const remainingPercentage = total > 0 ? (remaining / total) * 100 : 100
 
-    // 剩余库存百分比低于阈值时触发预警
     if (remainingPercentage < warningThreshold) {
       lowStockPrizes.push({
-        lottery_prize_id: prize.lottery_prize_id,
-        prize_name: prize.prize_name,
+        lottery_campaign_prize_id: prize.lottery_campaign_prize_id,
+        prize_name: prize.prizeDefinition?.display_name || '未知奖品',
         stock_quantity: total,
         remaining_quantity: remaining,
         remaining_percentage: parseFloat(remainingPercentage.toFixed(1))
@@ -226,7 +232,7 @@ async function calculateStockWarning(analyticsService, campaignId) {
  *
  * Query 参数：
  * - status: 活动状态筛选（active/inactive/upcoming/ended）
- * - merchant_id: 按商家筛选（可选，通过 LotteryPrize 关联查找包含该商家奖品的活动）
+ * - merchant_id: 按商家筛选（可选，通过 LotteryCampaignPrize 关联查找包含该商家奖品的活动）
  * - page: 页码（默认 1）
  * - page_size: 每页数量（默认 20，最大 100）
  *
@@ -260,7 +266,7 @@ router.get(
     // 构建查询条件
     const where = {}
 
-    // 商家筛选：通过 LotteryPrize 关联查找包含指定商家奖品的活动
+    // 商家筛选：通过 LotteryCampaignPrize 关联查找包含指定商家奖品的活动
     const parsedMerchantId = merchant_id ? parseInt(merchant_id) : undefined
 
     if (status) {
@@ -319,12 +325,12 @@ router.get(
       distinct: true
     }
 
-    // 商家筛选：通过 include + required 关联 LotteryPrize 表（避免 SQL 注入）
+    // 商家筛选：通过 include + required 关联 LotteryCampaignPrize 表（避免 SQL 注入）
     if (parsedMerchantId && !isNaN(parsedMerchantId)) {
-      const LotteryPrize = analyticsService.models.LotteryPrize
+      const LotteryCampaignPrize = analyticsService.models.LotteryCampaignPrize
       queryOptions.include = [
         {
-          model: LotteryPrize,
+          model: LotteryCampaignPrize,
           as: 'prizes',
           where: { merchant_id: parsedMerchantId },
           required: true,

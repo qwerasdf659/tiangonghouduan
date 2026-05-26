@@ -335,6 +335,10 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/console/prize-pool/:code/batch-stock': 'ADMIN_PRIZE_BATCH_STOCK', // 批量更新库存
   '/api/v4/console/prize-pool/:code/sort-order': 'ADMIN_PRIZE_SORT_ORDER', // 批量更新排序
 
+  // ===== 奖品目录管理（集中奖品目录方案） =====
+  '/api/v4/console/prize-definitions': 'ADMIN_PRIZE_DEFINITION_CREATE', // 创建奖品定义
+  '/api/v4/console/prize-definitions/:id': 'ADMIN_PRIZE_DEFINITION_UPDATE', // 更新/删除奖品定义
+
   // ===== 分群规则管理 =====
   '/api/v4/console/segment-rules': 'ADMIN_SEGMENT_RULE_CREATE', // 创建分群策略
   '/api/v4/console/segment-rules/:code': 'ADMIN_SEGMENT_RULE_UPDATE', // 更新/删除分群策略

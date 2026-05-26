@@ -16,7 +16,7 @@
 'use strict'
 
 const { Op, fn, col } = require('sequelize')
-const { LotteryAlert, LotteryCampaign, LotteryDraw, LotteryPrize } = require('../../models')
+const { LotteryAlert, LotteryCampaign, LotteryDraw, LotteryCampaignPrize } = require('../../models')
 const logger = require('../../utils/logger').logger
 const BeijingTimeHelper = require('../../utils/timeHelper')
 const LotteryAlertService = require('./LotteryAlertService')
@@ -101,7 +101,7 @@ class LotteryAlertDetectorService {
     const alerts = []
 
     try {
-      const lowStockPrizes = await LotteryPrize.findAll({
+      const lowStockPrizes = await LotteryCampaignPrize.findAll({
         where: {
           lottery_campaign_id,
           status: 'active',
@@ -276,7 +276,7 @@ class LotteryAlertDetectorService {
         },
         include: [
           {
-            model: LotteryPrize,
+            model: LotteryCampaignPrize,
             as: 'prize',
             where: { reward_tier: 'high' },
             required: true
@@ -412,7 +412,7 @@ class LotteryAlertDetectorService {
 
       let resolvedCount = 0
       for (const alert of activeInventoryAlerts) {
-        const prize = await LotteryPrize.findOne({
+        const prize = await LotteryCampaignPrize.findOne({
           where: {
             lottery_campaign_id: alert.lottery_campaign_id,
             remaining_stock: { [Op.lt]: ALERT_RULES.INVENTORY_LOW.threshold_count }

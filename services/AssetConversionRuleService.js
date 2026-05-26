@@ -335,7 +335,9 @@ class AssetConversionRuleService {
    * @returns {Promise<Object>} { rules, total, page, page_size }
    */
   static async adminListRules(filters = {}) {
-    const { status, from_asset_code, to_asset_code, keyword, page = 1, page_size = 20 } = filters
+    const { status, from_asset_code, to_asset_code, keyword } = filters
+    const page = parseInt(filters.page, 10) || 1
+    const page_size = parseInt(filters.page_size, 10) || 20
 
     const where = {}
 

@@ -15,7 +15,7 @@
  * 相关模型：
  * - LotteryManagementSetting: 抽奖管理设置表（lottery_management_setting_id, user_id, setting_type, setting_data）
  * - PresetBudgetDebt: 预算欠账表（preset_budget_debt_id, user_id, lottery_campaign_id, debt_amount, status）
- * - PresetInventoryDebt: 库存欠账表（preset_inventory_debt_id, lottery_prize_id, debt_quantity, status）
+ * - PresetInventoryDebt: 库存欠账表（preset_inventory_debt_id, lottery_campaign_prize_id, debt_quantity, status）
  *
  * 相关服务：
  * - DebtManagementService: 欠账管理服务
@@ -44,7 +44,7 @@ const {
   PresetBudgetDebt,
   PresetInventoryDebt,
   LotteryCampaign,
-  LotteryPrize
+  LotteryCampaignPrize
 } = require('../../../models')
 const { TEST_DATA } = require('../../helpers/test-data')
 // 简单时间辅助函数（添加小时）
@@ -137,7 +137,7 @@ describe('抽奖管理干预测试 - P1优先级', () => {
   describe('1. 管理设置基础功能', () => {
     test('1.1 应该能够创建强制中奖设置', async () => {
       // 获取一个可用的奖品
-      const prize = await LotteryPrize.findOne({
+      const prize = await LotteryCampaignPrize.findOne({
         where: { status: 'active' }
       })
 
@@ -150,7 +150,7 @@ describe('抽奖管理干预测试 - P1优先级', () => {
         user_id: admin_user_id,
         setting_type: 'force_win',
         setting_data: {
-          lottery_prize_id: prize.lottery_prize_id,
+          lottery_campaign_prize_id: prize.lottery_campaign_prize_id,
           reason: '测试强制中奖（自动化测试）'
         },
         expires_at: addHours(new Date(), 24),
@@ -356,19 +356,19 @@ describe('抽奖管理干预测试 - P1优先级', () => {
     })
 
     test('3.2 应该能够按奖品统计库存欠账', async () => {
-      const prize = await LotteryPrize.findOne({ where: { status: 'active' } })
+      const prize = await LotteryCampaignPrize.findOne({ where: { status: 'active' } })
 
       if (prize) {
         const debts = await PresetInventoryDebt.findAll({
           where: {
-            lottery_prize_id: prize.lottery_prize_id,
+            lottery_campaign_prize_id: prize.lottery_campaign_prize_id,
             status: 'pending'
           }
         })
 
         expect(Array.isArray(debts)).toBe(true)
 
-        console.log(`✅ 奖品 ${prize.lottery_prize_id} 有 ${debts.length} 条库存欠账`)
+        console.log(`✅ 奖品 ${prize.lottery_campaign_prize_id} 有 ${debts.length} 条库存欠账`)
       } else {
         console.log('ℹ️ 没有可用奖品进行库存欠账测试')
       }
@@ -437,7 +437,7 @@ describe('抽奖管理干预测试 - P1优先级', () => {
    * ===== 测试组5：设置类型验证 =====
    */
   describe('5. 设置类型验证', () => {
-    test('5.1 force_win 设置应包含lottery_prize_id', async () => {
+    test('5.1 force_win 设置应包含lottery_campaign_prize_id', async () => {
       const force_win_settings = await LotteryManagementSetting.findAll({
         where: { setting_type: 'force_win' },
         limit: 5
@@ -445,9 +445,9 @@ describe('抽奖管理干预测试 - P1优先级', () => {
 
       force_win_settings.forEach(setting => {
         expect(setting.setting_data).toBeDefined()
-        // force_win 应该有 lottery_prize_id（完整前缀命名规范）
-        if (setting.setting_data.lottery_prize_id) {
-          expect(typeof setting.setting_data.lottery_prize_id).not.toBe('undefined')
+        // force_win 应该有 lottery_campaign_prize_id（完整前缀命名规范）
+        if (setting.setting_data.lottery_campaign_prize_id) {
+          expect(typeof setting.setting_data.lottery_campaign_prize_id).not.toBe('undefined')
         }
       })
 

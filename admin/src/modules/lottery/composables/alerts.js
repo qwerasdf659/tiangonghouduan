@@ -36,7 +36,7 @@ export function useAlertsState() {
     },
     /** @type {Object} 告警分页信息 */
     alertsPagination: {
-      current_page: 1,
+      page: 1,
       page_size: 20,
       total_count: 0,
       total_pages: 0
@@ -98,7 +98,7 @@ export function useAlertsMethods() {
             info: 0
           }
           this.alertsPagination = data.pagination || {
-            current_page: 1,
+            page: 1,
             page_size: 20,
             total_count: 0,
             total_pages: 0

@@ -29,7 +29,7 @@
 
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 const models = require('../../../models')
-const { User, LotteryCampaign, LotteryPrize } = models
+const { User, LotteryCampaign, LotteryCampaignPrize } = models
 
 // 管线和Stage导入
 const NormalDrawPipeline = require('../../../services/UnifiedLotteryEngine/pipeline/NormalDrawPipeline')
@@ -121,7 +121,7 @@ describe('NormalDrawPipeline 管线测试（任务2.2）', () => {
       } else {
         // 遍历活动，找到有完整档位奖品配置的活动
         for (const campaign of active_campaigns) {
-          const prizes = await LotteryPrize.findAll({
+          const prizes = await LotteryCampaignPrize.findAll({
             where: { lottery_campaign_id: campaign.lottery_campaign_id, status: 'active' }
           })
 
@@ -142,7 +142,7 @@ describe('NormalDrawPipeline 管线测试（任务2.2）', () => {
         // 如果没有找到有完整档位的活动，使用第一个活动
         if (!test_campaign && active_campaigns.length > 0) {
           test_campaign = active_campaigns[0]
-          test_prizes = await LotteryPrize.findAll({
+          test_prizes = await LotteryCampaignPrize.findAll({
             where: { lottery_campaign_id: test_campaign.lottery_campaign_id }
           })
           console.log(
@@ -313,7 +313,7 @@ describe('NormalDrawPipeline 管线测试（任务2.2）', () => {
         if (prize_pick_data) {
           expect(prize_pick_data.selected_prize).toBeDefined()
           console.log(
-            `  ✅ PrizePickStage: 选中奖品 ${prize_pick_data.selected_prize?.lottery_prize_id || 'N/A'}`
+            `  ✅ PrizePickStage: 选中奖品 ${prize_pick_data.selected_prize?.lottery_campaign_prize_id || 'N/A'}`
           )
         }
 
@@ -551,7 +551,7 @@ describe('NormalDrawPipeline 管线测试（任务2.2）', () => {
       expect(result.data.selected_prize).toBeDefined()
 
       console.log(
-        `✅ PrizePickStage: 选中奖品 ${result.data.selected_prize?.name || result.data.selected_prize?.lottery_prize_id}`
+        `✅ PrizePickStage: 选中奖品 ${result.data.selected_prize?.name || result.data.selected_prize?.lottery_campaign_prize_id}`
       )
     })
   })

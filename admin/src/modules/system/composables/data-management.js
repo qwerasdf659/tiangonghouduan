@@ -201,7 +201,7 @@ export function useDataManagementMethods() {
               yAxis: {
                 type: 'category',
                 inverse: true,
-                data: top20.map(t => t.table_name),
+                data: top20.map(t => t.display_name || t.table_name),
                 axisLabel: { fontSize: 10, width: 160, overflow: 'truncate' }
               },
               series: [

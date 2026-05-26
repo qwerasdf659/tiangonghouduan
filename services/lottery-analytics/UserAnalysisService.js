@@ -617,7 +617,7 @@ class UserAnalysisService {
             attributes: ['lottery_campaign_id', 'campaign_name']
           },
           {
-            model: this.models.LotteryPrize,
+            model: this.models.LotteryCampaignPrize,
             as: 'prize',
             attributes: ['lottery_prize_id', 'prize_name', 'prize_value_points']
           }
@@ -718,7 +718,7 @@ class UserAnalysisService {
             attributes: ['lottery_campaign_id', 'campaign_name']
           },
           {
-            model: this.models.LotteryPrize,
+            model: this.models.LotteryCampaignPrize,
             as: 'prize',
             attributes: ['lottery_prize_id', 'prize_name', 'cost_points', 'prize_value_points']
           }

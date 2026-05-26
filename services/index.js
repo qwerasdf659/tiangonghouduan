@@ -27,6 +27,7 @@ const RoleManagementService = require('./RoleManagementService')
 const UserManagementService = require('./UserManagementService')
 const ChatWebSocketService = require('./ChatWebSocketService')
 const PrizePoolFacade = require('./prize-pool') // 奖品池服务（拆分后的 Facade）
+const PrizeDefinitionFacade = require('./prize-definition') // 奖品目录服务（集中奖品目录方案）
 const PremiumService = require('./PremiumService') // 高级空间服务
 const UserService = require('./UserService') // 用户服务
 const ChatRateLimitService = require('./ChatRateLimitService') // 聊天频率限制服务
@@ -375,6 +376,7 @@ class ServiceManager {
       // ========== 管理后台服务（使用 snake_case key） ==========
 
       this._services.set('prize_pool', PrizePoolFacade)
+      this._services.set('prize_definition', PrizeDefinitionFacade) // 奖品目录（集中奖品目录方案）
       this._services.set('segment_rule', require('./SegmentRuleService')) // 分群规则配置服务
       this._services.set('premium', PremiumService)
       this._services.set('feedback', FeedbackService)

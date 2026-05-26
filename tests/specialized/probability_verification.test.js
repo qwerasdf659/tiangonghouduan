@@ -484,9 +484,9 @@ describe('【P0】概率分布验证测试 - 10,000次抽奖统计', () => {
     test('活动奖品池应该配置正确', async () => {
       console.log('📊 验证奖品池配置...')
 
-      const { LotteryPrize } = require('../../models')
+      const { LotteryCampaignPrize } = require('../../models')
 
-      const result = await LotteryPrize.validatePrizeWeights(campaignId)
+      const result = await LotteryCampaignPrize.validatePrizeWeights(campaignId)
 
       console.log(
         `   奖品总数: ${Object.values(result.tier_results || {}).reduce((sum, t) => sum + (t.prize_count || 0), 0)}`
@@ -516,9 +516,9 @@ describe('【P0】概率分布验证测试 - 10,000次抽奖统计', () => {
     test('活动应该配置了保底奖品', async () => {
       console.log('📊 验证保底奖品配置...')
 
-      const { LotteryPrize } = require('../../models')
+      const { LotteryCampaignPrize } = require('../../models')
 
-      const result = await LotteryPrize.validateFallbackPrizeConstraint(campaignId)
+      const result = await LotteryCampaignPrize.validateFallbackPrizeConstraint(campaignId)
 
       console.log(`   保底奖品数量: ${result.emptyPrizes?.length || 0}`)
 

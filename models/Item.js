@@ -178,7 +178,7 @@ module.exports = sequelize => {
       prize_definition_id: {
         type: DataTypes.INTEGER,
         allowNull: true,
-        comment: '来自哪个奖品定义（lottery_prizes.lottery_prize_id）'
+        comment: '来自哪个奖品定义（prize_definitions.prize_definition_id）'
       },
 
       rarity_code: {

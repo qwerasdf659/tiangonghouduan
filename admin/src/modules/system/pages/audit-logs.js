@@ -313,32 +313,42 @@ function auditLogsPage() {
 
     /**
      * 初始化 ECharts 图表
+     * 延迟初始化：确保容器可见且有尺寸后再创建图表实例
      */
     async initCharts() {
       try {
         const echarts = await loadECharts()
 
-        // 初始化趋势图
         const trendContainer = document.getElementById('trendChart')
+        const targetTypeContainer = document.getElementById('targetTypeChart')
+
+        // 容器不可见时（如在隐藏的 iframe/Tab 中），延迟到可见后再初始化
+        if (trendContainer && trendContainer.clientWidth === 0) {
+          logger.debug('[AuditLogs] 图表容器尚不可见，等待可见后初始化')
+          const observer = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+              if (entry.contentRect.width > 0) {
+                observer.disconnect()
+                this.initCharts()
+              }
+            }
+          })
+          observer.observe(trendContainer)
+          return
+        }
+
         if (trendContainer) {
-          if (this.trendChart) {
-            this.trendChart.dispose()
-          }
+          if (this.trendChart) this.trendChart.dispose()
           this.trendChart = echarts.init(trendContainer)
           this.renderTrendChart()
         }
 
-        // 初始化目标类型图
-        const targetTypeContainer = document.getElementById('targetTypeChart')
         if (targetTypeContainer) {
-          if (this.targetTypeChart) {
-            this.targetTypeChart.dispose()
-          }
+          if (this.targetTypeChart) this.targetTypeChart.dispose()
           this.targetTypeChart = echarts.init(targetTypeContainer)
           this.renderTargetTypeChart()
         }
 
-        // 窗口大小变化时自适应（使用命名引用以便清理）
         this._chartResizeHandler = () => {
           this.trendChart?.resize()
           this.targetTypeChart?.resize()
@@ -618,52 +628,56 @@ function auditLogsPage() {
 
     /**
      * 初始化报告图表
+     * 延迟初始化：确保容器可见且有尺寸后再创建图表实例
      */
     async initReportCharts() {
       try {
         const echarts = await loadECharts()
 
-        // 初始化操作类型饼图
         const operationContainer = document.getElementById('reportOperationChart')
+
+        // 容器不可见时延迟到可见后再初始化
+        if (operationContainer && operationContainer.clientWidth === 0) {
+          logger.debug('[AuditLogs] 报告图表容器尚不可见，等待可见后初始化')
+          const observer = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+              if (entry.contentRect.width > 0) {
+                observer.disconnect()
+                this.initReportCharts()
+              }
+            }
+          })
+          observer.observe(operationContainer)
+          return
+        }
+
         if (operationContainer) {
-          if (this.reportOperationChart) {
-            this.reportOperationChart.dispose()
-          }
+          if (this.reportOperationChart) this.reportOperationChart.dispose()
           this.reportOperationChart = echarts.init(operationContainer)
           this.renderReportOperationChart()
         }
 
-        // 初始化目标类型饼图
         const targetContainer = document.getElementById('reportTargetChart')
         if (targetContainer) {
-          if (this.reportTargetChart) {
-            this.reportTargetChart.dispose()
-          }
+          if (this.reportTargetChart) this.reportTargetChart.dispose()
           this.reportTargetChart = echarts.init(targetContainer)
           this.renderReportTargetChart()
         }
 
-        // 初始化趋势折线图
         const trendContainer = document.getElementById('reportTrendChart')
         if (trendContainer) {
-          if (this.reportTrendChart) {
-            this.reportTrendChart.dispose()
-          }
+          if (this.reportTrendChart) this.reportTrendChart.dispose()
           this.reportTrendChart = echarts.init(trendContainer)
           this.renderReportTrendChart()
         }
 
-        // 初始化风险级别图表
         const riskLevelContainer = document.getElementById('reportRiskLevelChart')
         if (riskLevelContainer) {
-          if (this.reportRiskLevelChart) {
-            this.reportRiskLevelChart.dispose()
-          }
+          if (this.reportRiskLevelChart) this.reportRiskLevelChart.dispose()
           this.reportRiskLevelChart = echarts.init(riskLevelContainer)
           this.renderReportRiskLevelChart()
         }
 
-        // 窗口大小变化时自适应（使用命名引用以便清理）
         this._reportResizeHandler = () => {
           this.reportOperationChart?.resize()
           this.reportTargetChart?.resize()

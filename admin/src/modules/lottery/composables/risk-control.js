@@ -34,7 +34,7 @@ export function useRiskControlState() {
     },
     /** @type {Object} 异常用户分页 */
     abnormalUserPagination: {
-      current_page: 1,
+      page: 1,
       page_size: 20,
       total_count: 0,
       total_pages: 0
@@ -96,7 +96,7 @@ export function useRiskControlMethods() {
           // 后端分页字段：total, page, page_size, total_pages
           const pg = data.pagination || {}
           this.abnormalUserPagination = {
-            current_page: pg.page || 1,
+            page: pg.page || 1,
             page_size: pg.page_size || 20,
             total_count: pg.total || 0,
             total_pages: pg.total_pages || 0

@@ -1,7 +1,8 @@
 'use strict'
 
 const {
-  LotteryPrize,
+  LotteryCampaignPrize,
+  PrizeDefinition,
   LotteryCampaign,
   MaterialAssetType,
   MediaFile,
@@ -104,108 +105,80 @@ class PrizeQueryService {
         throw new BusinessError(`活动不存在: ${campaign_code}`, 'PRIZE_POOL_NOT_FOUND', 404)
       }
 
-      // 2. 获取奖品列表（含主图媒体文件）
-      const prizes = await LotteryPrize.findAll({
+      // 2. 获取活动奖品列表（JOIN prize_definitions）
+      const campaignPrizes = await LotteryCampaignPrize.findAll({
         where: { lottery_campaign_id: campaign.lottery_campaign_id },
         include: [
           {
-            model: MediaFile,
-            as: 'primary_media',
-            required: false,
-            attributes: ['media_id', 'object_key', 'mime_type', 'thumbnail_keys']
+            model: PrizeDefinition,
+            as: 'prizeDefinition',
+            include: [
+              {
+                model: MediaFile,
+                as: 'primaryMedia',
+                required: false,
+                attributes: ['media_id', 'object_key', 'mime_type', 'thumbnail_keys']
+              }
+            ]
           }
         ],
-        order: [['created_at', 'DESC']],
-        attributes: [
-          'lottery_prize_id',
-          'lottery_campaign_id',
-          'prize_name',
-          'prize_type',
-          'prize_value',
-          'prize_value_points',
-          'budget_cost',
-          'material_asset_code',
-          'material_amount',
-          'stock_quantity',
-          'win_probability',
-          'prize_description',
-          'primary_media_id',
-          'angle',
-          'color',
-          'cost_points',
-          'status',
-          'sort_order',
-          'rarity_code',
-          'win_weight',
-          'reward_tier',
-          'is_fallback',
-          'total_win_count',
-          'daily_win_count',
-          'max_daily_wins',
-          'created_at',
-          'updated_at'
-        ]
+        order: [['created_at', 'DESC']]
       })
 
       // 3. 计算统计信息
-      const totalPrizes = prizes.length
-      const totalQuantity = prizes.reduce((sum, prize) => sum + (prize.stock_quantity || 0), 0)
-      const remainingQuantity = prizes.reduce((sum, prize) => {
-        const remaining = (prize.stock_quantity || 0) - (prize.total_win_count || 0)
-        return sum + Math.max(0, remaining)
-      }, 0)
-      const usedQuantity = prizes.reduce((sum, prize) => sum + (prize.total_win_count || 0), 0)
+      const totalPrizes = campaignPrizes.length
+      const totalQuantity = campaignPrizes.reduce((sum, cp) => sum + (cp.stock_quantity || 0), 0)
+      const usedQuantity = campaignPrizes.reduce((sum, cp) => sum + (cp.total_win_count || 0), 0)
+      const remainingQuantity = totalQuantity - usedQuantity
 
       // 4. 批量查询材料资产图标
       const assetCodes = [
-        ...new Set(prizes.filter(p => p.material_asset_code).map(p => p.material_asset_code))
+        ...new Set(
+          campaignPrizes
+            .filter(cp => cp.prizeDefinition && cp.prizeDefinition.material_asset_code)
+            .map(cp => cp.prizeDefinition.material_asset_code)
+        )
       ]
       const assetIconMap = await batchResolveAssetIconUrls(assetCodes)
 
-      // 5. 格式化奖品数据
-      const formattedPrizes = prizes.map(prize => {
-        const selfUrl = resolvePrizeImageUrl(prize)
-        const fallbackUrl = prize.material_asset_code
-          ? assetIconMap.get(prize.material_asset_code) || null
+      // 5. 格式化奖品数据（扁平化，兼容前端期望格式）
+      const formattedPrizes = campaignPrizes.map(cp => {
+        const def = cp.prizeDefinition || {}
+        const selfUrl = resolvePrizeImageUrl({ primary_media: def.primaryMedia })
+        const fallbackUrl = def.material_asset_code
+          ? assetIconMap.get(def.material_asset_code) || null
           : null
 
         return {
-          lottery_prize_id: prize.lottery_prize_id,
-          lottery_campaign_id: prize.lottery_campaign_id,
-          prize_name: prize.prize_name,
-          prize_type: prize.prize_type,
-          prize_value: prize.prize_value,
-          prize_value_points: prize.prize_value_points,
-          budget_cost: prize.budget_cost || 0,
-          material_asset_code: prize.material_asset_code || null,
-          material_amount: prize.material_amount || null,
-          stock_quantity: prize.stock_quantity,
-          remaining_quantity: Math.max(
-            0,
-            (prize.stock_quantity || 0) - (prize.total_win_count || 0)
-          ),
-          win_probability: prize.win_probability,
-          prize_description: prize.prize_description,
-          primary_media_id: prize.primary_media_id,
+          lottery_prize_id: cp.lottery_campaign_prize_id,
+          lottery_campaign_prize_id: cp.lottery_campaign_prize_id,
+          prize_definition_id: cp.prize_definition_id,
+          lottery_campaign_id: cp.lottery_campaign_id,
+          prize_name: def.display_name || '',
+          prize_type: def.prize_type || 'material',
+          prize_code: def.prize_code || '',
+          material_asset_code: def.material_asset_code || null,
+          material_amount: def.material_amount ? Number(def.material_amount) : null,
+          stock_quantity: cp.stock_quantity,
+          remaining_quantity: Math.max(0, (cp.stock_quantity || 0) - (cp.total_win_count || 0)),
+          primary_media_id: def.primary_media_id,
           public_url: selfUrl || fallbackUrl,
-          angle: prize.angle,
-          color: prize.color,
-          cost_points: prize.cost_points,
-          status: prize.status,
-          sort_order: prize.sort_order,
-          rarity_code: prize.rarity_code || 'common',
-          win_weight: prize.win_weight || 0,
-          reward_tier: prize.reward_tier || 'low',
-          is_fallback: prize.is_fallback || false,
-          total_win_count: prize.total_win_count,
-          daily_win_count: prize.daily_win_count,
-          max_daily_wins: prize.max_daily_wins,
-          created_at: prize.created_at,
-          updated_at: prize.updated_at
+          status: cp.status,
+          sort_order: cp.sort_order,
+          rarity_code: def.rarity_code || 'common',
+          win_weight: cp.win_weight || 0,
+          reward_tier: cp.reward_tier || 'low',
+          is_fallback: cp.is_fallback || false,
+          total_win_count: cp.total_win_count,
+          daily_win_count: cp.daily_win_count,
+          max_daily_wins: cp.max_daily_wins,
+          max_user_wins: cp.max_user_wins,
+          created_at: cp.created_at,
+          updated_at: cp.updated_at
         }
       })
 
-      // 5. 转换DECIMAL字段为数字类型
+      // 6. 转换DECIMAL字段为数字类型
       const convertedPrizes = DecimalConverter.convertPrizeData(formattedPrizes)
 
       logger.info('获取活动奖品池成功', {
@@ -222,7 +195,7 @@ class PrizeQueryService {
         statistics: {
           total_prizes: totalPrizes,
           total_quantity: totalQuantity,
-          remaining_quantity: remainingQuantity,
+          remaining_quantity: Math.max(0, remainingQuantity),
           used_quantity: usedQuantity,
           usage_rate: totalQuantity > 0 ? ((usedQuantity / totalQuantity) * 100).toFixed(2) : 0
         },
@@ -251,14 +224,15 @@ class PrizeQueryService {
 
       logger.info('获取奖品列表', { filters })
 
-      // 1. 构建查询条件
+      // 构建查询条件
       const where = {}
       if (lottery_campaign_id) where.lottery_campaign_id = parseInt(lottery_campaign_id)
       if (status) where.status = status
-      if (merchant_id) where.merchant_id = parseInt(merchant_id)
 
-      // 2. 查询奖品列表（含主图媒体文件）
-      const prizes = await LotteryPrize.findAll({
+      const defWhere = {}
+      if (merchant_id) defWhere.merchant_id = parseInt(merchant_id)
+
+      const campaignPrizes = await LotteryCampaignPrize.findAll({
         where,
         include: [
           {
@@ -267,115 +241,86 @@ class PrizeQueryService {
             attributes: ['lottery_campaign_id', 'campaign_code', 'campaign_name', 'status']
           },
           {
-            model: MediaFile,
-            as: 'primary_media',
-            required: false,
-            attributes: ['media_id', 'object_key', 'mime_type', 'thumbnail_keys']
+            model: PrizeDefinition,
+            as: 'prizeDefinition',
+            where: Object.keys(defWhere).length > 0 ? defWhere : undefined,
+            include: [
+              {
+                model: MediaFile,
+                as: 'primaryMedia',
+                required: false,
+                attributes: ['media_id', 'object_key', 'mime_type', 'thumbnail_keys']
+              }
+            ]
           }
         ],
-        order: [['created_at', 'DESC']],
-        attributes: [
-          'lottery_prize_id',
-          'lottery_campaign_id',
-          'prize_name',
-          'prize_type',
-          'prize_value',
-          'prize_value_points',
-          'budget_cost',
-          'material_asset_code',
-          'material_amount',
-          'stock_quantity',
-          'total_win_count',
-          'daily_win_count',
-          'max_daily_wins',
-          'win_probability',
-          'prize_description',
-          'primary_media_id',
-          'angle',
-          'color',
-          'cost_points',
-          'status',
-          'sort_order',
-          'rarity_code',
-          'win_weight',
-          'reward_tier',
-          'is_fallback',
-          'created_at',
-          'updated_at'
-        ]
+        order: [['created_at', 'DESC']]
       })
 
-      // 3. 计算统计信息
+      // 统计信息
       const statistics = {
-        total: prizes.length,
-        active: prizes.filter(p => p.status === 'active').length,
-        inactive: prizes.filter(p => p.status === 'inactive').length,
-        stock_depleted: prizes.filter(p => {
-          const remaining = (p.stock_quantity || 0) - (p.total_win_count || 0)
-          return remaining <= 0
+        total: campaignPrizes.length,
+        active: campaignPrizes.filter(cp => cp.status === 'active').length,
+        inactive: campaignPrizes.filter(cp => cp.status === 'inactive').length,
+        stock_depleted: campaignPrizes.filter(cp => {
+          return (cp.stock_quantity || 0) - (cp.total_win_count || 0) <= 0
         }).length,
-        total_stock: prizes.reduce((sum, p) => sum + (p.stock_quantity || 0), 0),
-        remaining_stock: prizes.reduce((sum, p) => {
-          const remaining = (p.stock_quantity || 0) - (p.total_win_count || 0)
-          return sum + Math.max(0, remaining)
+        total_stock: campaignPrizes.reduce((sum, cp) => sum + (cp.stock_quantity || 0), 0),
+        remaining_stock: campaignPrizes.reduce((sum, cp) => {
+          return sum + Math.max(0, (cp.stock_quantity || 0) - (cp.total_win_count || 0))
         }, 0)
       }
 
-      // 4. 批量查询材料资产图标
+      // 批量查询材料资产图标
       const assetCodes = [
-        ...new Set(prizes.filter(p => p.material_asset_code).map(p => p.material_asset_code))
+        ...new Set(
+          campaignPrizes
+            .filter(cp => cp.prizeDefinition && cp.prizeDefinition.material_asset_code)
+            .map(cp => cp.prizeDefinition.material_asset_code)
+        )
       ]
       const assetIconMap = await batchResolveAssetIconUrls(assetCodes)
 
-      // 5. 格式化奖品数据
-      const formattedPrizes = prizes.map(prize => {
-        const selfUrl = resolvePrizeImageUrl(prize)
-        const fallbackUrl = prize.material_asset_code
-          ? assetIconMap.get(prize.material_asset_code) || null
+      // 格式化
+      const formattedPrizes = campaignPrizes.map(cp => {
+        const def = cp.prizeDefinition || {}
+        const selfUrl = resolvePrizeImageUrl({ primary_media: def.primaryMedia })
+        const fallbackUrl = def.material_asset_code
+          ? assetIconMap.get(def.material_asset_code) || null
           : null
 
         return {
-          lottery_prize_id: prize.lottery_prize_id,
-          lottery_campaign_id: prize.lottery_campaign_id,
-          campaign_name: prize.campaign?.campaign_name || '未关联活动',
-          campaign_code: prize.campaign?.campaign_code,
-          prize_name: prize.prize_name,
-          prize_type: prize.prize_type,
-          prize_value: prize.prize_value,
-          prize_value_points: prize.prize_value_points,
-          budget_cost: prize.budget_cost || 0,
-          material_asset_code: prize.material_asset_code || null,
-          material_amount: prize.material_amount || null,
-          stock_quantity: prize.stock_quantity,
-          remaining_quantity: Math.max(
-            0,
-            (prize.stock_quantity || 0) - (prize.total_win_count || 0)
-          ),
-          total_win_count: prize.total_win_count || 0,
-          daily_win_count: prize.daily_win_count || 0,
-          max_daily_wins: prize.max_daily_wins,
-          win_probability: prize.win_probability,
-          prize_description: prize.prize_description,
-          primary_media_id: prize.primary_media_id,
+          lottery_prize_id: cp.lottery_campaign_prize_id,
+          lottery_campaign_prize_id: cp.lottery_campaign_prize_id,
+          lottery_campaign_id: cp.lottery_campaign_id,
+          campaign_name: cp.campaign?.campaign_name || '未关联活动',
+          campaign_code: cp.campaign?.campaign_code,
+          prize_name: def.display_name || '',
+          prize_type: def.prize_type || 'material',
+          prize_code: def.prize_code || '',
+          material_asset_code: def.material_asset_code || null,
+          material_amount: def.material_amount ? Number(def.material_amount) : null,
+          stock_quantity: cp.stock_quantity,
+          remaining_quantity: Math.max(0, (cp.stock_quantity || 0) - (cp.total_win_count || 0)),
+          total_win_count: cp.total_win_count || 0,
+          daily_win_count: cp.daily_win_count || 0,
+          max_daily_wins: cp.max_daily_wins,
+          primary_media_id: def.primary_media_id,
           public_url: selfUrl || fallbackUrl,
-          angle: prize.angle,
-          color: prize.color,
-          cost_points: prize.cost_points,
-          status: prize.status,
-          sort_order: prize.sort_order,
-          rarity_code: prize.rarity_code || 'common',
-          win_weight: prize.win_weight || 0,
-          reward_tier: prize.reward_tier || 'low',
-          is_fallback: prize.is_fallback || false,
-          created_at: prize.created_at,
-          updated_at: prize.updated_at
+          status: cp.status,
+          sort_order: cp.sort_order,
+          rarity_code: def.rarity_code || 'common',
+          win_weight: cp.win_weight || 0,
+          reward_tier: cp.reward_tier || 'low',
+          is_fallback: cp.is_fallback || false,
+          created_at: cp.created_at,
+          updated_at: cp.updated_at
         }
       })
 
-      // 5. 转换DECIMAL字段为数字类型
       const convertedPrizes = DecimalConverter.convertPrizeData(formattedPrizes)
 
-      logger.info('获取奖品列表成功', { count: prizes.length })
+      logger.info('获取奖品列表成功', { count: campaignPrizes.length })
 
       return {
         prizes: convertedPrizes,
@@ -405,119 +350,100 @@ class PrizeQueryService {
         throw new BusinessError(`活动不存在: ${campaign_code}`, 'PRIZE_POOL_NOT_FOUND', 404)
       }
 
-      const prizes = await LotteryPrize.findAll({
+      const campaignPrizes = await LotteryCampaignPrize.findAll({
         where: { lottery_campaign_id: campaign.lottery_campaign_id },
         include: [
           {
-            model: MediaFile,
-            as: 'primary_media',
-            required: false,
-            attributes: ['media_id', 'object_key', 'mime_type', 'thumbnail_keys']
+            model: PrizeDefinition,
+            as: 'prizeDefinition',
+            include: [
+              {
+                model: MediaFile,
+                as: 'primaryMedia',
+                required: false,
+                attributes: ['media_id', 'object_key', 'mime_type', 'thumbnail_keys']
+              }
+            ]
           }
         ],
         order: [
           ['reward_tier', 'ASC'],
           ['sort_order', 'ASC']
-        ],
-        attributes: [
-          'lottery_prize_id',
-          'lottery_campaign_id',
-          'prize_name',
-          'prize_type',
-          'prize_value',
-          'prize_value_points',
-          'stock_quantity',
-          'win_probability',
-          'win_weight',
-          'reward_tier',
-          'is_fallback',
-          'prize_description',
-          'primary_media_id',
-          'angle',
-          'color',
-          'cost_points',
-          'status',
-          'sort_order',
-          'rarity_code',
-          'total_win_count',
-          'daily_win_count',
-          'max_daily_wins',
-          'created_at',
-          'updated_at'
         ]
       })
 
-      /** 批量查询材料资产图标 */
+      // 批量查询材料资产图标
       const assetCodes = [
-        ...new Set(prizes.filter(p => p.material_asset_code).map(p => p.material_asset_code))
+        ...new Set(
+          campaignPrizes
+            .filter(cp => cp.prizeDefinition && cp.prizeDefinition.material_asset_code)
+            .map(cp => cp.prizeDefinition.material_asset_code)
+        )
       ]
       const assetIconMap = await batchResolveAssetIconUrls(assetCodes)
 
-      /** 档位中文标签映射 */
       const tierLabels = { high: '高档', mid: '中档', low: '低档' }
       const tierOrder = ['high', 'mid', 'low']
       const warnings = []
 
-      /** 按 reward_tier 分组 */
+      // 按 reward_tier 分组
       const grouped = {}
-      for (const prize of prizes) {
-        const tier = prize.reward_tier || 'low'
+      for (const cp of campaignPrizes) {
+        const tier = cp.reward_tier || 'low'
         if (!grouped[tier]) grouped[tier] = []
-        grouped[tier].push(prize)
+        grouped[tier].push(cp)
       }
 
-      /** 构建分组结果，计算档内占比 */
+      // 构建分组结果
       const prizeGroups = tierOrder
         .filter(tier => grouped[tier] && grouped[tier].length > 0)
         .map(tier => {
           const tierPrizes = grouped[tier]
-          const totalWeight = tierPrizes.reduce((sum, p) => sum + (p.win_weight || 0), 0)
+          const totalWeight = tierPrizes.reduce((sum, cp) => sum + (cp.win_weight || 0), 0)
 
-          const formattedPrizes = tierPrizes.map(p => {
+          const formattedPrizes = tierPrizes.map(cp => {
+            const def = cp.prizeDefinition || {}
             const tierPercentage =
               totalWeight > 0
-                ? parseFloat((((p.win_weight || 0) / totalWeight) * 100).toFixed(2))
+                ? parseFloat((((cp.win_weight || 0) / totalWeight) * 100).toFixed(2))
                 : 0
 
-            if (p.stock_quantity === 0 && (p.win_weight || 0) > 0) {
+            if (cp.stock_quantity === 0 && (cp.win_weight || 0) > 0) {
               warnings.push({
-                lottery_prize_id: p.lottery_prize_id,
+                lottery_prize_id: cp.lottery_campaign_prize_id,
                 type: 'zero_stock_positive_weight',
-                message: `${p.prize_name}：库存为 0 但权重 ${p.win_weight} > 0`
+                message: `${def.display_name}：库存为 0 但权重 ${cp.win_weight} > 0`
               })
             }
 
+            const selfUrl = resolvePrizeImageUrl({ primary_media: def.primaryMedia })
+            const fallbackUrl = def.material_asset_code
+              ? assetIconMap.get(def.material_asset_code) || null
+              : null
+
             return {
-              lottery_prize_id: p.lottery_prize_id,
-              lottery_campaign_id: p.lottery_campaign_id,
-              prize_name: p.prize_name,
-              prize_type: p.prize_type,
-              prize_value: p.prize_value,
-              prize_value_points: p.prize_value_points,
-              win_weight: p.win_weight || 0,
+              lottery_prize_id: cp.lottery_campaign_prize_id,
+              lottery_campaign_prize_id: cp.lottery_campaign_prize_id,
+              lottery_campaign_id: cp.lottery_campaign_id,
+              prize_name: def.display_name || '',
+              prize_type: def.prize_type || 'material',
+              prize_code: def.prize_code || '',
+              win_weight: cp.win_weight || 0,
               tier_percentage: tierPercentage,
-              stock_quantity: p.stock_quantity,
-              remaining_quantity: Math.max(0, (p.stock_quantity || 0) - (p.total_win_count || 0)),
-              total_win_count: p.total_win_count || 0,
-              is_fallback: p.is_fallback || false,
-              sort_order: p.sort_order,
-              status: p.status,
-              rarity_code: p.rarity_code || 'common',
-              win_probability: p.win_probability,
-              prize_description: p.prize_description,
-              primary_media_id: p.primary_media_id,
-              public_url:
-                resolvePrizeImageUrl(p) ||
-                (p.material_asset_code ? assetIconMap.get(p.material_asset_code) : null) ||
-                null,
-              angle: p.angle,
-              color: p.color,
-              cost_points: p.cost_points,
-              daily_win_count: p.daily_win_count || 0,
-              max_daily_wins: p.max_daily_wins,
-              reward_tier: p.reward_tier,
-              created_at: p.created_at,
-              updated_at: p.updated_at
+              stock_quantity: cp.stock_quantity,
+              remaining_quantity: Math.max(0, (cp.stock_quantity || 0) - (cp.total_win_count || 0)),
+              total_win_count: cp.total_win_count || 0,
+              is_fallback: cp.is_fallback || false,
+              sort_order: cp.sort_order,
+              status: cp.status,
+              rarity_code: def.rarity_code || 'common',
+              primary_media_id: def.primary_media_id,
+              public_url: selfUrl || fallbackUrl,
+              daily_win_count: cp.daily_win_count || 0,
+              max_daily_wins: cp.max_daily_wins,
+              reward_tier: cp.reward_tier,
+              created_at: cp.created_at,
+              updated_at: cp.updated_at
             }
           })
 
@@ -533,7 +459,7 @@ class PrizeQueryService {
       logger.info('获取活动奖品分组数据成功', {
         campaign_code,
         group_count: prizeGroups.length,
-        total_prizes: prizes.length
+        total_prizes: campaignPrizes.length
       })
 
       return {

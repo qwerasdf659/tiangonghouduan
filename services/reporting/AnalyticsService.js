@@ -12,7 +12,7 @@
  * - 生成多维度趋势分析报告
  *
  * 依赖：
- * - models: 数据库模型（LotteryDraw, User, LotteryPrize）
+ * - models: 数据库模型（LotteryDraw, User, LotteryCampaignPrize, PrizeDefinition）
  * - BusinessCacheHelper: Redis 缓存助手
  * - BeijingTimeHelper: 北京时间处理助手
  */
@@ -313,9 +313,9 @@ class AnalyticsService {
           raw: true
         }),
 
-        // 奖品发放趋势（统计奖品池中奖品的创建情况）
-        models.LotteryPrize
-          ? models.LotteryPrize.findAll({
+        // 奖品发放趋势（统计活动奖品关联的创建情况）
+        models.LotteryCampaignPrize
+          ? models.LotteryCampaignPrize.findAll({
               where: {
                 created_at: {
                   [Op.gte]: startDate,
@@ -324,7 +324,7 @@ class AnalyticsService {
               },
               attributes: [
                 [fn('DATE_FORMAT', col('created_at'), dateFormat), 'period'],
-                [fn('COUNT', col('lottery_prize_id')), 'prizes_added'],
+                [fn('COUNT', col('lottery_campaign_prize_id')), 'prizes_added'],
                 [fn('SUM', col('stock_quantity')), 'total_quantity']
               ],
               group: [fn('DATE_FORMAT', col('created_at'), dateFormat)],

@@ -63,51 +63,76 @@ class LotteryQueryService {
    */
   static async getCampaignPrizes(lottery_campaign_id) {
     try {
-      const prizes = await models.LotteryPrize.findAll({
+      const campaignPrizes = await models.LotteryCampaignPrize.findAll({
         where: {
           lottery_campaign_id,
           status: 'active'
         },
-        attributes: [
-          'lottery_prize_id',
-          'lottery_campaign_id',
-          'prize_name',
-          'prize_type',
-          'prize_value',
-          'prize_description',
-          'primary_media_id',
-          'win_probability',
-          'stock_quantity',
-          'is_fallback',
-          'max_daily_wins',
-          'daily_win_count',
-          'status',
-          'sort_order',
-          'reward_tier',
-          'rarity_code',
-          'material_asset_code',
-          'material_amount',
-          'created_at',
-          'updated_at'
-        ],
         include: [
           {
-            model: models.MediaFile,
-            as: 'primary_media',
-            required: false,
-            attributes: ['media_id', 'object_key', 'thumbnail_keys', 'mime_type']
-          },
-          {
-            model: models.MaterialAssetType,
-            as: 'materialAssetType',
-            required: false,
-            attributes: ['asset_code', 'display_name']
+            model: models.PrizeDefinition,
+            as: 'prizeDefinition',
+            where: { is_enabled: 1 },
+            attributes: [
+              'prize_definition_id',
+              'prize_code',
+              'display_name',
+              'prize_type',
+              'material_asset_code',
+              'material_amount',
+              'rarity_code',
+              'primary_media_id',
+              'description'
+            ],
+            include: [
+              {
+                model: models.MediaFile,
+                as: 'primaryMedia',
+                required: false,
+                attributes: ['media_id', 'object_key', 'thumbnail_keys', 'mime_type']
+              },
+              {
+                model: models.MaterialAssetType,
+                as: 'materialAssetType',
+                required: false,
+                attributes: ['asset_code', 'display_name']
+              }
+            ]
           }
         ],
         order: [
           ['sort_order', 'ASC'],
-          ['lottery_prize_id', 'ASC']
+          ['lottery_campaign_prize_id', 'ASC']
         ]
+      })
+
+      // 扁平化为用户端期望的格式（兼容 DataSanitizer）
+      const prizes = campaignPrizes.map(cp => {
+        const def = cp.prizeDefinition
+        return {
+          lottery_prize_id: cp.lottery_campaign_prize_id,
+          lottery_campaign_prize_id: cp.lottery_campaign_prize_id,
+          lottery_campaign_id: cp.lottery_campaign_id,
+          prize_name: def.display_name,
+          prize_type: def.prize_type,
+          prize_description: def.description,
+          primary_media_id: def.primary_media_id,
+          stock_quantity: cp.stock_quantity,
+          is_fallback: cp.is_fallback,
+          max_daily_wins: cp.max_daily_wins,
+          daily_win_count: cp.daily_win_count,
+          status: cp.status,
+          sort_order: cp.sort_order,
+          reward_tier: cp.reward_tier,
+          rarity_code: def.rarity_code,
+          material_asset_code: def.material_asset_code,
+          material_amount: def.material_amount ? Number(def.material_amount) : null,
+          prize_code: def.prize_code,
+          created_at: cp.created_at,
+          updated_at: cp.updated_at,
+          primary_media: def.primaryMedia,
+          materialAssetType: def.materialAssetType
+        }
       })
 
       logger.info('[LotteryQueryService] 获取活动奖品列表', {
@@ -239,17 +264,23 @@ class LotteryQueryService {
             attributes: ['lottery_campaign_id', 'campaign_name', 'campaign_code', 'campaign_type']
           },
           {
-            model: models.LotteryPrize,
-            as: 'prize',
-            attributes: [
-              'lottery_prize_id',
-              'prize_name',
-              'prize_type',
-              'prize_value',
-              'primary_media_id',
-              'win_probability'
-            ],
-            required: false
+            model: models.LotteryCampaignPrize,
+            as: 'campaignPrize',
+            attributes: ['lottery_campaign_prize_id', 'win_weight', 'reward_tier'],
+            required: false,
+            include: [
+              {
+                model: models.PrizeDefinition,
+                as: 'prizeDefinition',
+                attributes: [
+                  'prize_code',
+                  'display_name',
+                  'prize_type',
+                  'rarity_code',
+                  'primary_media_id'
+                ]
+              }
+            ]
           }
         ],
         attributes: [
@@ -594,9 +625,16 @@ class LotteryQueryService {
         },
         include: [
           {
-            model: models.LotteryPrize,
-            as: 'prize',
-            attributes: ['lottery_prize_id', 'prize_name', 'prize_type', 'prize_value']
+            model: models.LotteryCampaignPrize,
+            as: 'campaignPrize',
+            attributes: ['lottery_campaign_prize_id', 'win_weight', 'reward_tier'],
+            include: [
+              {
+                model: models.PrizeDefinition,
+                as: 'prizeDefinition',
+                attributes: ['prize_code', 'display_name', 'prize_type', 'rarity_code']
+              }
+            ]
           }
         ],
         attributes: ['lottery_draw_id', 'lottery_campaign_id', 'created_at', 'guarantee_triggered'],

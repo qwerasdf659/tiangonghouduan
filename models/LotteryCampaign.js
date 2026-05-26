@@ -22,12 +22,12 @@ class LotteryCampaign extends Model {
    * @returns {void}
    */
   static associate(models) {
-    // 一对多：一个活动有多个奖品
-    LotteryCampaign.hasMany(models.LotteryPrize, {
+    // 一对多：一个活动有多个活动奖品关联
+    LotteryCampaign.hasMany(models.LotteryCampaignPrize, {
       foreignKey: 'lottery_campaign_id',
-      as: 'prizes',
+      as: 'campaignPrizes',
       onDelete: 'CASCADE',
-      comment: '活动奖品'
+      comment: '活动奖品关联'
     })
 
     // 一对多：一个活动有多个抽奖记录

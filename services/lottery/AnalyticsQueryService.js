@@ -23,7 +23,12 @@
 const { Op, fn, col, literal } = require('sequelize')
 const logger = require('../../utils/logger').logger
 const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
-const { LotteryDraw, LotteryPrize, LotteryCampaign } = require('../../models')
+const {
+  LotteryDraw,
+  LotteryCampaignPrize,
+  PrizeDefinition,
+  LotteryCampaign
+} = require('../../models')
 
 /**
  * 缓存配置
@@ -201,9 +206,9 @@ class LotteryAnalyticsQueryService {
       },
       include: [
         {
-          model: LotteryPrize,
-          as: 'prize',
-          attributes: ['prize_name', 'prize_type', 'reward_tier'],
+          model: LotteryCampaignPrize,
+          as: 'campaignPrize',
+          attributes: ['reward_tier'],
           required: true
         }
       ],
@@ -258,8 +263,8 @@ class LotteryAnalyticsQueryService {
       },
       include: [
         {
-          model: LotteryPrize,
-          as: 'prize',
+          model: LotteryCampaignPrize,
+          as: 'campaignPrize',
           attributes: ['reward_tier'],
           required: true
         }
@@ -402,9 +407,9 @@ class LotteryAnalyticsQueryService {
         },
         include: [
           {
-            model: LotteryPrize,
-            as: 'prize',
-            attributes: ['prize_type', 'reward_tier'],
+            model: LotteryCampaignPrize,
+            as: 'campaignPrize',
+            attributes: ['reward_tier'],
             required: true
           }
         ],
@@ -436,7 +441,7 @@ class LotteryAnalyticsQueryService {
    *
    * @param {Object} options - 查询选项
    * @param {string} [options.range='7d'] - 时间范围
-   * @param {number} [options.merchant_id] - 按商家筛选（通过 LotteryPrize 关联）
+   * @param {number} [options.merchant_id] - 按商家筛选（通过 LotteryCampaignPrize 关联）
    * @returns {Promise<Object>} { total_draws, total_wins, win_rate, total_prize_value, updated_at }
    */
   static async getDashboardStats(options = {}) {
@@ -462,10 +467,18 @@ class LotteryAnalyticsQueryService {
     if (merchant_id) {
       queryOptions.include = [
         {
-          model: LotteryPrize,
-          as: 'prize',
+          model: LotteryCampaignPrize,
+          as: 'campaignPrize',
           attributes: [],
-          where: { merchant_id: parseInt(merchant_id) },
+          include: [
+            {
+              model: PrizeDefinition,
+              as: 'prizeDefinition',
+              attributes: [],
+              where: { merchant_id: parseInt(merchant_id) },
+              required: true
+            }
+          ],
           required: true
         }
       ]
@@ -526,10 +539,18 @@ class LotteryAnalyticsQueryService {
     if (merchant_id) {
       queryOptions.include = [
         {
-          model: LotteryPrize,
-          as: 'prize',
+          model: LotteryCampaignPrize,
+          as: 'campaignPrize',
           attributes: [],
-          where: { merchant_id: parseInt(merchant_id) },
+          include: [
+            {
+              model: PrizeDefinition,
+              as: 'prizeDefinition',
+              attributes: [],
+              where: { merchant_id: parseInt(merchant_id) },
+              required: true
+            }
+          ],
           required: true
         }
       ]
@@ -587,10 +608,18 @@ class LotteryAnalyticsQueryService {
     if (merchant_id) {
       queryOptions.include = [
         {
-          model: LotteryPrize,
-          as: 'prize',
+          model: LotteryCampaignPrize,
+          as: 'campaignPrize',
           attributes: [],
-          where: { merchant_id: parseInt(merchant_id) },
+          include: [
+            {
+              model: PrizeDefinition,
+              as: 'prizeDefinition',
+              attributes: [],
+              where: { merchant_id: parseInt(merchant_id) },
+              required: true
+            }
+          ],
           required: true
         }
       ]
@@ -641,10 +670,18 @@ class LotteryAnalyticsQueryService {
 
     if (merchant_id) {
       includeList.push({
-        model: LotteryPrize,
-        as: 'prize',
+        model: LotteryCampaignPrize,
+        as: 'campaignPrize',
         attributes: [],
-        where: { merchant_id: parseInt(merchant_id) },
+        include: [
+          {
+            model: PrizeDefinition,
+            as: 'prizeDefinition',
+            attributes: [],
+            where: { merchant_id: parseInt(merchant_id) },
+            required: true
+          }
+        ],
         required: true
       })
     }

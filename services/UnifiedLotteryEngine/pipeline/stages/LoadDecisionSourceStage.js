@@ -31,7 +31,8 @@ const {
   LotteryPreset,
   LotteryManagementSetting,
   LotteryDraw,
-  LotteryPrize,
+  LotteryCampaignPrize,
+  PrizeDefinition,
   LotteryUserExperienceState,
   User
 } = require('../../../../models')
@@ -111,11 +112,35 @@ class LoadDecisionSourceStage extends BaseStage {
         this.log('info', '命中预设决策', {
           user_id,
           lottery_preset_id: preset.lottery_preset_id,
-          lottery_prize_id: preset.lottery_prize_id
+          lottery_campaign_prize_id: preset.lottery_campaign_prize_id
         })
+
+        // 构建扁平化的预设奖品数据，供 PrizePickStage 直接消费
+        const presetJson = preset.toJSON ? preset.toJSON() : preset
+        const campaignPrize = presetJson.prize || {}
+        const prizeDef = campaignPrize.prizeDefinition || {}
+
+        const flattenedPreset = {
+          ...presetJson,
+          lottery_prize_id:
+            campaignPrize.lottery_campaign_prize_id || preset.lottery_campaign_prize_id,
+          lottery_campaign_prize_id:
+            campaignPrize.lottery_campaign_prize_id || preset.lottery_campaign_prize_id,
+          prize_definition_id: campaignPrize.prize_definition_id || null,
+          prize_name: prizeDef.display_name || '预设奖品',
+          prize_type: prizeDef.prize_type || 'material',
+          material_asset_code: prizeDef.material_asset_code || null,
+          material_amount: prizeDef.material_amount ? Number(prizeDef.material_amount) : null,
+          rarity_code: prizeDef.rarity_code || 'common',
+          reward_tier: campaignPrize.reward_tier || 'high',
+          win_weight: campaignPrize.win_weight || 0,
+          stock_quantity: campaignPrize.stock_quantity || 0,
+          sort_order: campaignPrize.sort_order || 0
+        }
+
         return this.success({
           decision_source: DECISION_SOURCES.PRESET,
-          preset: preset.toJSON ? preset.toJSON() : preset,
+          preset: flattenedPreset,
           override: null,
           guarantee_triggered: null
         })
@@ -274,14 +299,23 @@ class LoadDecisionSourceStage extends BaseStage {
         }
       }
 
-      /* 从真实奖品表中匹配对应奖品 */
-      const matchedPrize = await LotteryPrize.findOne({
+      /* 从活动奖品关联表中匹配对应奖品 */
+      const matchedPrize = await LotteryCampaignPrize.findOne({
         where: {
           lottery_campaign_id,
-          material_asset_code: chosen.asset,
-          material_amount: chosen.amount,
           status: 'active'
-        }
+        },
+        include: [
+          {
+            model: PrizeDefinition,
+            as: 'prizeDefinition',
+            where: {
+              material_asset_code: chosen.asset,
+              material_amount: chosen.amount,
+              is_enabled: 1
+            }
+          }
+        ]
       })
 
       if (!matchedPrize) {
@@ -362,6 +396,32 @@ class LoadDecisionSourceStage extends BaseStage {
             model: User,
             as: 'admin',
             attributes: ['user_id', 'nickname']
+          },
+          {
+            model: LotteryCampaignPrize,
+            as: 'prize',
+            attributes: [
+              'lottery_campaign_prize_id',
+              'prize_definition_id',
+              'reward_tier',
+              'sort_order',
+              'win_weight',
+              'stock_quantity'
+            ],
+            include: [
+              {
+                model: PrizeDefinition,
+                as: 'prizeDefinition',
+                attributes: [
+                  'prize_definition_id',
+                  'display_name',
+                  'prize_type',
+                  'material_asset_code',
+                  'material_amount',
+                  'rarity_code'
+                ]
+              }
+            ]
           }
         ]
       })

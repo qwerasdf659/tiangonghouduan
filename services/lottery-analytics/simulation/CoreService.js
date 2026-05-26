@@ -27,7 +27,7 @@ class SimulationCoreService {
       LotteryTierRule,
       LotteryTierMatrixConfig,
       LotteryStrategyConfig,
-      LotteryPrize,
+      LotteryCampaignPrize,
       LotteryCampaign
     } = this.models
 
@@ -60,7 +60,7 @@ class SimulationCoreService {
         ],
         raw: true
       }),
-      LotteryPrize.findAll({
+      LotteryCampaignPrize.findAll({
         where: { lottery_campaign_id },
         attributes: [
           'lottery_prize_id',

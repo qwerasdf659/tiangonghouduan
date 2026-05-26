@@ -1,7 +1,7 @@
 'use strict'
 
 const BusinessError = require('../../utils/BusinessError')
-const { LotteryPrize, LotteryCampaign } = require('../../models')
+const { LotteryCampaignPrize, LotteryCampaign } = require('../../models')
 const AuditLogService = require('../AuditLogService')
 const { assertAndGetTransaction } = require('../../utils/transactionHelpers')
 const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
@@ -38,7 +38,7 @@ class PrizeStockService {
     }
 
     // 2. 查找奖品
-    const prize = await LotteryPrize.findByPk(prize_id, { transaction })
+    const prize = await LotteryCampaignPrize.findByPk(prize_id, { transaction })
     if (!prize) {
       throw new BusinessError('奖品不存在', 'PRIZE_POOL_NOT_FOUND', 404)
     }
@@ -51,19 +51,9 @@ class PrizeStockService {
 
     /*
      * 4. 如果之前是 inactive 状态，补货后自动恢复为 active
-     * 实物奖品(physical)需要有图片才能自动激活
      */
     if (prize.status === 'inactive' && newQuantity > 0) {
-      const canActivate = prize.prize_type !== 'physical' || prize.primary_media_id != null
-      if (canActivate) {
-        await prize.update({ status: 'active' }, { transaction })
-      } else {
-        logger.warn('[PrizePool] 实物奖品补货但缺少图片，保持 inactive 状态', {
-          prize_id: prize.lottery_prize_id,
-          prize_name: prize.prize_name,
-          prize_type: prize.prize_type
-        })
-      }
+      await prize.update({ status: 'active' }, { transaction })
     }
 
     /*
@@ -72,7 +62,7 @@ class PrizeStockService {
     await AuditLogService.logOperation({
       operator_id: operated_by || 1,
       operation_type: 'prize_stock_adjust',
-      target_type: 'LotteryPrize',
+      target_type: 'LotteryCampaignPrize',
       target_id: prize_id,
       action: 'adjust',
       before_data: { stock_quantity: oldQuantity },
@@ -133,7 +123,7 @@ class PrizeStockService {
 
     logger.info('设置奖品绝对库存', { prize_id, stock_quantity })
 
-    const prize = await LotteryPrize.findByPk(prize_id, { transaction })
+    const prize = await LotteryCampaignPrize.findByPk(prize_id, { transaction })
     if (!prize) {
       throw new BusinessError('奖品不存在', 'PRIZE_POOL_NOT_FOUND', 404)
     }
@@ -160,14 +150,14 @@ class PrizeStockService {
     if (newStock === 0 && (prize.win_weight || 0) > 0) {
       warnings.push({
         type: 'zero_stock_positive_weight',
-        message: `${prize.prize_name}：库存为 0 但权重 ${prize.win_weight} > 0，算法选中后将触发降级`
+        message: `奖品${prize_id}：库存为 0 但权重 ${prize.win_weight} > 0，算法选中后将触发降级`
       })
     }
 
     await AuditLogService.logOperation({
       operator_id: operated_by || 1,
       operation_type: 'prize_stock_adjust',
-      target_type: 'LotteryPrize',
+      target_type: 'LotteryCampaignPrize',
       target_id: prize_id,
       action: 'set_stock',
       before_data: { stock_quantity: oldStock },
@@ -197,7 +187,7 @@ class PrizeStockService {
    * 在单一事务内原子执行
    *
    * @param {string} campaign_code - 活动业务码
-   * @param {Array<{lottery_prize_id: number, stock_quantity: number}>} updates - 更新列表
+   * @param {Array<{lottery_campaign_prize_id: number, stock_quantity: number}>} updates - 更新列表
    * @param {Object} options - { operated_by, transaction }
    * @returns {Promise<Object>} { updated_count, warnings }
    */
@@ -221,7 +211,7 @@ class PrizeStockService {
     for (const update of updates) {
       // eslint-disable-next-line no-await-in-loop -- 事务内顺序更新，保证原子性
       const result = await PrizeStockService.setPrizeStock(
-        update.lottery_prize_id,
+        update.lottery_campaign_prize_id,
         update.stock_quantity,
         { operated_by, transaction }
       )
@@ -241,7 +231,7 @@ class PrizeStockService {
    * 使用两阶段更新避免唯一索引中间态冲突
    *
    * @param {string} campaign_code - 活动业务码
-   * @param {Array<{lottery_prize_id: number, sort_order: number}>} updates - 排序更新列表
+   * @param {Array<{lottery_campaign_prize_id: number, sort_order: number}>} updates - 排序更新列表
    * @param {Object} options - { updated_by, transaction }
    * @returns {Promise<Object>} { updated_count }
    */
@@ -266,11 +256,11 @@ class PrizeStockService {
     // 阶段1：设置临时负值
     for (let i = 0; i < updates.length; i++) {
       // eslint-disable-next-line no-await-in-loop -- 事务内顺序执行避免索引冲突
-      await LotteryPrize.update(
+      await LotteryCampaignPrize.update(
         { sort_order: -(i + 1) },
         {
           where: {
-            lottery_prize_id: updates[i].lottery_prize_id,
+            lottery_campaign_prize_id: updates[i].lottery_campaign_prize_id,
             lottery_campaign_id: campaign.lottery_campaign_id
           },
           transaction
@@ -281,11 +271,11 @@ class PrizeStockService {
     // 阶段2：设置正式目标值
     for (const update of updates) {
       // eslint-disable-next-line no-await-in-loop -- 事务内顺序执行避免索引冲突
-      await LotteryPrize.update(
+      await LotteryCampaignPrize.update(
         { sort_order: update.sort_order },
         {
           where: {
-            lottery_prize_id: update.lottery_prize_id,
+            lottery_campaign_prize_id: update.lottery_campaign_prize_id,
             lottery_campaign_id: campaign.lottery_campaign_id
           },
           transaction

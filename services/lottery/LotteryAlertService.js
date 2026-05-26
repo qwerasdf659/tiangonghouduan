@@ -29,7 +29,7 @@ const {
   LotteryAlert,
   LotteryCampaign,
   LotteryDraw,
-  LotteryPrize,
+  LotteryCampaignPrize,
   User,
   AlertSilenceRule
 } = require('../../models')
@@ -592,7 +592,7 @@ class LotteryAlertService {
 
     try {
       // 查询库存不足的奖品
-      const lowStockPrizes = await LotteryPrize.findAll({
+      const lowStockPrizes = await LotteryCampaignPrize.findAll({
         where: {
           lottery_campaign_id,
           status: 'active',
@@ -796,7 +796,7 @@ class LotteryAlertService {
         },
         include: [
           {
-            model: LotteryPrize,
+            model: LotteryCampaignPrize,
             as: 'prize',
             where: {
               reward_tier: 'high'
@@ -959,7 +959,7 @@ class LotteryAlertService {
 
       for (const alert of activeInventoryAlerts) {
         // 检查库存是否已恢复
-        const prize = await LotteryPrize.findOne({
+        const prize = await LotteryCampaignPrize.findOne({
           where: {
             lottery_campaign_id: alert.lottery_campaign_id,
             remaining_stock: { [Op.lt]: ALERT_RULES.INVENTORY_LOW.threshold_count }

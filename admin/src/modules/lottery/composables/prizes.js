@@ -9,7 +9,7 @@
 
 import Sortable from 'sortablejs'
 import { logger } from '../../../utils/logger.js'
-import { LOTTERY_ENDPOINTS } from '../../../api/lottery/index.js'
+import { LOTTERY_ENDPOINTS, PRIZE_DEFINITION_ENDPOINTS } from '../../../api/lottery/index.js'
 import { MERCHANT_ENDPOINTS } from '../../../api/merchant.js'
 import { buildURL } from '../../../api/base.js'
 import { imageUploadMixin } from '../../../alpine/mixins/image-upload.js'
@@ -18,16 +18,10 @@ import { imageUploadMixin } from '../../../alpine/mixins/image-upload.js'
  * 奖品管理状态
  * @returns {Object} 状态对象
  *
- * 字段说明（以后端数据库为准）：
- * - prize_name: 奖品名称
- * - prize_type: 奖品类型 (physical/virtual/coupon/points/empty)
- * - win_probability: 中奖概率 (0-100 前端百分比显示)
- * - stock_quantity: 库存数量 (正整数，999999表示无限)
- * - status: 状态 (active/inactive)
- * - prize_description: 奖品描述
- * - primary_media_id: 主图媒体ID（FK→media 表）
- *
- * 注意：后端要求 quantity 必须为正整数，不接受 -1 或 0
+ * 集中奖品目录架构：
+ * - lottery_campaign_prizes 表仅存储活动级参数
+ * - 通过 prize_definition_id 引用 prize_definitions 表
+ * - 活动级字段：win_weight, stock_quantity, reward_tier, is_fallback, sort_order, status
  */
 export function usePrizesState() {
   return {
@@ -40,32 +34,20 @@ export function usePrizesState() {
     prizeFilters: { prize_type: '', status: '', keyword: '', merchant_id: '' },
     /** @type {Array} 商家下拉选项列表（来自 /api/v4/console/merchants/options） */
     merchantOptions: [],
-    /** @type {Object} 奖品编辑表单 - 使用后端字段名 */
+    /** @type {Array} 奖品目录下拉选项（来自 prize-definitions/options） */
+    prizeDefinitionOptions: [],
+    /** @type {Object} 奖品编辑表单 - 集中奖品目录架构，仅活动级参数 */
     prizeForm: {
-      lottery_campaign_id: null, // 添加奖品时需要选择活动
-      prize_name: '',
-      prize_type: 'virtual',
-      win_probability: 0, // 前端百分比显示 0-100
-      stock_quantity: 100, // 默认库存100，后端要求正整数
-      status: 'active',
-      primary_media_id: null,
-      prize_description: '',
-      /**
-       * 稀有度代码（面向前端的视觉稀有度等级）
-       * 外键关联 rarity_defs.rarity_code，前端直接使用此字段名
-       * 枚举值：common/uncommon/rare/epic/legendary
-       */
-      rarity_code: 'common',
-      /** 选奖权重（tier_first 模式下实际生效的概率控制字段） */
+      lottery_campaign_id: null,
+      prize_definition_id: null,
       win_weight: 100000,
-      /** 所属档位（high/mid/low，决定奖品归属哪个档位池） */
+      stock_quantity: 100,
       reward_tier: 'low',
-      /** 奖品总预算成本（过滤+扣减用） */
-      budget_cost: 0,
-      /** 材质资产编码（碎片/水晶等虚拟物品的资产类型标识，传统奖品留空） */
-      material_asset_code: '',
-      /** 材质数量（虚拟物品发放数量） */
-      material_amount: null
+      is_fallback: false,
+      sort_order: 1,
+      status: 'active',
+      max_daily_wins: null,
+      max_user_wins: null
     },
     /** @type {Array} 稀有度选项（来自 rarity_defs 表，5级） */
     rarityOptions: [
@@ -142,51 +124,31 @@ export function usePrizesMethods() {
     },
 
     /**
-     * 上传奖品图片
-     *
-     * 复用 imageUploadMixin.uploadImage() 上传到 Sealos 对象存储，
-     * 上传成功后设置 prizeForm.primary_media_id 和本地预览URL。
-     *
-     * @param {Event} event - input[type=file] 的 change 事件
+     * 加载奖品目录下拉选项
+     * 后端返回：[{ prize_definition_id, prize_name, prize_type, rarity_code, ... }]
      */
-    async handlePrizeImageUpload(event) {
-      const fileInfo = this.getFileFromEvent(event)
-      if (!fileInfo) return
-
-      this.prize_image_preview_url = fileInfo.preview_url
-
-      const result = await this.uploadImage(fileInfo.file, {
-        business_type: 'lottery',
-        category: 'prizes'
-      })
-
-      if (result) {
-        this.prizeForm.primary_media_id = result.media_id
-        if (result.public_url) {
-          this.prize_image_preview_url = result.public_url
-        }
-        logger.info('[Prizes] 奖品图片上传成功', {
-          media_id: result.media_id
+    async loadPrizeDefinitionOptions() {
+      try {
+        const response = await this.apiGet(
+          PRIZE_DEFINITION_ENDPOINTS.OPTIONS,
+          {},
+          { showLoading: false }
+        )
+        const data = response?.success ? response.data : response
+        this.prizeDefinitionOptions = Array.isArray(data) ? data : []
+        logger.debug('[Prizes] 奖品目录选项加载完成', {
+          count: this.prizeDefinitionOptions.length
         })
-      } else {
-        this.prize_image_preview_url = null
+      } catch (error) {
+        logger.warn('[Prizes] 加载奖品目录选项失败', error)
+        this.prizeDefinitionOptions = []
       }
-
-      event.target.value = ''
-    },
-
-    /**
-     * 清除奖品图片
-     */
-    clearPrizeImage() {
-      this.prizeForm.primary_media_id = null
-      this.prize_image_preview_url = null
     },
 
     /**
      * 加载奖品列表
-     * 后端返回字段: lottery_prize_id, prize_name, prize_type, win_probability,
-     *               stock_quantity, status, prize_description, primary_media_id
+     * 后端返回字段: lottery_prize_id, prize_name (from join), prize_definition_id,
+     *               win_weight, stock_quantity, reward_tier, is_fallback, sort_order, status
      */
     async loadPrizes() {
       try {
@@ -243,20 +205,17 @@ export function usePrizesMethods() {
       this.prize_image_preview_url = null
       this.prizeForm = {
         lottery_campaign_id: this.campaigns?.[0]?.lottery_campaign_id || null,
-        prize_name: '',
-        prize_type: 'virtual',
-        win_probability: 0,
-        stock_quantity: 100,
-        status: 'active',
-        primary_media_id: null,
-        prize_description: '',
-        rarity_code: 'common',
+        prize_definition_id: null,
         win_weight: 100000,
+        stock_quantity: 100,
         reward_tier: 'low',
-        budget_cost: 0,
-        material_asset_code: '',
-        material_amount: null
+        is_fallback: false,
+        sort_order: 1,
+        status: 'active',
+        max_daily_wins: null,
+        max_user_wins: null
       }
+      this.loadPrizeDefinitionOptions()
       this.showModal('prizeModal')
     },
 
@@ -267,25 +226,19 @@ export function usePrizesMethods() {
     editPrize(prize) {
       this.editingLotteryPrizeId = prize.lottery_prize_id
       this.isEditMode = true
-      this.prize_image_preview_url = prize.public_url || prize.image_url || null
-      const winProbability = parseFloat(prize.win_probability || 0) * 100
+      this.prize_image_preview_url = null
       this.prizeForm = {
         lottery_prize_id: prize.lottery_prize_id,
         lottery_campaign_id: prize.lottery_campaign_id || null,
-        prize_name: prize.prize_name || '',
-        prize_type: prize.prize_type || 'virtual',
-        win_probability: winProbability,
-        stock_quantity: prize.stock_quantity || 100,
-        status: prize.status || 'active',
-        primary_media_id: prize.primary_media_id ?? null,
-        prize_description: prize.prize_description || '',
-        rarity_code: prize.rarity_code || 'common',
-        sort_order: prize.sort_order || 1,
+        prize_definition_id: prize.prize_definition_id || null,
         win_weight: prize.win_weight || 100000,
+        stock_quantity: prize.stock_quantity || 100,
         reward_tier: prize.reward_tier || 'low',
-        budget_cost: parseInt(prize.budget_cost) || 0,
-        material_asset_code: prize.material_asset_code || '',
-        material_amount: prize.material_amount || null
+        is_fallback: prize.is_fallback || false,
+        sort_order: prize.sort_order || 1,
+        status: prize.status || 'active',
+        max_daily_wins: prize.max_daily_wins ?? null,
+        max_user_wins: prize.max_user_wins ?? null
       }
       this._loadSameTierPrizes(prize)
       this.showModal('prizeModal')
@@ -366,12 +319,11 @@ export function usePrizesMethods() {
      * 新增奖品使用batch-add端点，编辑使用prize/:id端点
      */
     async submitPrizeForm() {
-      if (!this.prizeForm.prize_name) {
-        this.showError('请输入奖品名称')
+      if (!this.isEditMode && !this.prizeForm.prize_definition_id) {
+        this.showError('请选择奖品目录')
         return
       }
 
-      // 新增奖品时必须选择活动
       if (!this.isEditMode && !this.prizeForm.lottery_campaign_id) {
         this.showError('请选择所属活动')
         return
@@ -381,64 +333,35 @@ export function usePrizesMethods() {
         this.saving = true
 
         if (this.isEditMode) {
-          // 编辑模式：使用PUT更新单个奖品
-          // 中奖概率：前端表单是百分比(0-100)，后端需要小数(0-1)
-          const winProbability = (this.prizeForm.win_probability || 0) / 100
           const url = buildURL(LOTTERY_ENDPOINTS.PRIZE_UPDATE, {
             id: this.editingLotteryPrizeId
           })
           const updateData = {
-            prize_name: this.prizeForm.prize_name,
-            prize_type: this.prizeForm.prize_type,
-            win_probability: winProbability,
-            stock_quantity: this.prizeForm.stock_quantity,
-            status: this.prizeForm.status,
-            primary_media_id: this.prizeForm.primary_media_id,
-            prize_description: this.prizeForm.prize_description,
-            rarity_code: this.prizeForm.rarity_code || 'common',
             win_weight: parseInt(this.prizeForm.win_weight) || 100000,
-            reward_tier: this.prizeForm.reward_tier || 'low'
+            stock_quantity: this.prizeForm.stock_quantity,
+            reward_tier: this.prizeForm.reward_tier || 'low',
+            is_fallback: this.prizeForm.is_fallback ? 1 : 0,
+            sort_order: parseInt(this.prizeForm.sort_order) || 1,
+            status: this.prizeForm.status
           }
-          // 编辑模式下保留原有 sort_order（来自后端数据）
-          if (this.prizeForm.sort_order !== undefined) {
-            updateData.sort_order = parseInt(this.prizeForm.sort_order)
+          if (this.prizeForm.max_daily_wins !== null && this.prizeForm.max_daily_wins !== '') {
+            updateData.max_daily_wins = parseInt(this.prizeForm.max_daily_wins)
+          }
+          if (this.prizeForm.max_user_wins !== null && this.prizeForm.max_user_wins !== '') {
+            updateData.max_user_wins = parseInt(this.prizeForm.max_user_wins)
           }
           await this.apiCall(url, { method: 'PUT', data: updateData })
         } else {
-          // 新增模式：使用batch-add端点，传入活动ID和奖品数组
-          // 后端要求 quantity 必须是正整数，-1(前端无限库存)需转换为大数值999999
           const stockQuantity =
             this.prizeForm.stock_quantity === -1 ? 999999 : this.prizeForm.stock_quantity
 
-          // ⚠️ 后端 batch-add 验证要求：所有奖品概率总和必须等于 1.0
-          // 单个添加奖品时，暂时设置概率为 1.0，用户后续可通过编辑调整
-          // 中奖概率：前端表单是百分比(0-100)，后端需要小数(0-1)
-          let winProbability = (this.prizeForm.win_probability || 0) / 100
-
-          // 如果只添加单个奖品且概率不为1，需要警告用户
-          if (winProbability !== 1.0) {
-            // 单个添加时强制设置为1.0，避免验证失败
-            // 用户可以后续通过编辑功能调整概率
-            logger.warn(
-              '[Prizes] 单个添加奖品时概率自动设置为100%，请添加多个奖品后编辑调整概率分配'
-            )
-            winProbability = 1.0
-          }
-
-          // 2026-01-29 技术债务清理：直接使用后端字段名，无需映射
-          // sort_order 不传，由后端自动分配唯一递增值（避免 SORT_ORDER_DUPLICATE 错误）
           const prizeData = {
-            prize_name: this.prizeForm.prize_name,
-            prize_type: this.prizeForm.prize_type,
-            win_probability: winProbability,
-            stock_quantity: stockQuantity,
-            prize_description: this.prizeForm.prize_description,
-            rarity_code: this.prizeForm.rarity_code || 'common',
+            prize_definition_id: this.prizeForm.prize_definition_id,
             win_weight: parseInt(this.prizeForm.win_weight) || 100000,
-            reward_tier: this.prizeForm.reward_tier || 'low'
-          }
-          if (this.prizeForm.primary_media_id) {
-            prizeData.primary_media_id = this.prizeForm.primary_media_id
+            stock_quantity: stockQuantity,
+            reward_tier: this.prizeForm.reward_tier || 'low',
+            is_fallback: this.prizeForm.is_fallback ? 1 : 0,
+            sort_order: parseInt(this.prizeForm.sort_order) || 1
           }
           await this.apiCall(LOTTERY_ENDPOINTS.PRIZE_BATCH_ADD, {
             method: 'POST',
@@ -447,17 +370,8 @@ export function usePrizesMethods() {
               prizes: [prizeData]
             }
           })
-
-          // 提示用户概率配置
-          if ((this.prizeForm.win_probability || 0) !== 100) {
-            this.showSuccess(
-              '奖品添加成功！注意：概率已临时设为100%，请添加更多奖品后编辑调整概率分配'
-            )
-            return // 阻止默认的成功提示
-          }
         }
 
-        // 如果没有抛出错误，则表示成功
         this.showSuccess(this.isEditMode ? '奖品更新成功' : '奖品创建成功')
         this.hideModal('prizeModal')
         await this.loadPrizes()
@@ -818,25 +732,17 @@ export function usePrizesMethods() {
       this.prize_image_preview_url = null
       this.prizeForm = {
         lottery_campaign_id: this.managingCampaign.lottery_campaign_id,
-        prize_name: '',
-        prize_type: 'virtual',
-        prize_value: 0,
-        prize_value_points: 0,
-        budget_cost: 0,
-        material_asset_code: '',
-        material_amount: null,
-        win_probability: 0,
-        stock_quantity: 100,
-        status: 'active',
-        primary_media_id: null,
-        prize_description: '',
-        rarity_code: 'common',
+        prize_definition_id: null,
         win_weight: 100000,
+        stock_quantity: 100,
         reward_tier: 'low',
+        is_fallback: false,
+        sort_order: 1,
+        status: 'active',
         max_daily_wins: null,
-        max_user_wins: null,
-        is_fallback: false
+        max_user_wins: null
       }
+      this.loadPrizeDefinitionOptions()
       this.showModal('campaignPrizeModal')
     },
 
@@ -846,35 +752,23 @@ export function usePrizesMethods() {
      * 支持全部可调整参数：价值、预算成本、库存、权重、每日限制、兜底标记等
      */
     async submitCampaignPrize() {
-      if (!this.prizeForm.prize_name) {
-        this.showError('请输入奖品名称')
+      if (!this.isEditMode && !this.prizeForm.prize_definition_id) {
+        this.showError('请选择奖品目录')
         return
       }
       try {
         this.saving = true
         if (this.isEditMode) {
-          const winProbability = (this.prizeForm.win_probability || 0) / 100
           const url = buildURL(LOTTERY_ENDPOINTS.PRIZE_UPDATE, {
             id: this.editingLotteryPrizeId
           })
           const updateData = {
-            prize_name: this.prizeForm.prize_name,
-            prize_type: this.prizeForm.prize_type,
-            prize_value: parseFloat(this.prizeForm.prize_value) || 0,
-            prize_value_points: parseInt(this.prizeForm.prize_value_points) || 0,
-            budget_cost: parseInt(this.prizeForm.budget_cost) || 0,
-            material_asset_code: this.prizeForm.material_asset_code || null,
-            material_amount: this.prizeForm.material_amount
-              ? parseInt(this.prizeForm.material_amount)
-              : null,
-            win_probability: winProbability,
-            stock_quantity: this.prizeForm.stock_quantity,
-            status: this.prizeForm.status,
-            prize_description: this.prizeForm.prize_description,
-            rarity_code: this.prizeForm.rarity_code || 'common',
             win_weight: parseInt(this.prizeForm.win_weight) || 100000,
+            stock_quantity: this.prizeForm.stock_quantity,
             reward_tier: this.prizeForm.reward_tier || 'low',
-            is_fallback: this.prizeForm.is_fallback ? 1 : 0
+            is_fallback: this.prizeForm.is_fallback ? 1 : 0,
+            sort_order: parseInt(this.prizeForm.sort_order) || 1,
+            status: this.prizeForm.status
           }
           if (this.prizeForm.max_daily_wins !== null && this.prizeForm.max_daily_wins !== '') {
             updateData.max_daily_wins = parseInt(this.prizeForm.max_daily_wins)
@@ -886,44 +780,30 @@ export function usePrizesMethods() {
           } else {
             updateData.max_user_wins = null
           }
-          if (this.prizeForm.primary_media_id) {
-            updateData.primary_media_id = this.prizeForm.primary_media_id
-          }
           await this.apiCall(url, { method: 'PUT', data: updateData })
         } else {
-          const addData = {
-            prize_name: this.prizeForm.prize_name,
-            prize_type: this.prizeForm.prize_type,
-            prize_value: parseFloat(this.prizeForm.prize_value) || 0,
-            prize_value_points: parseInt(this.prizeForm.prize_value_points) || 0,
-            budget_cost: parseInt(this.prizeForm.budget_cost) || 0,
-            material_asset_code: this.prizeForm.material_asset_code || null,
-            material_amount: this.prizeForm.material_amount
-              ? parseInt(this.prizeForm.material_amount)
-              : null,
+          const prizeData = {
+            prize_definition_id: this.prizeForm.prize_definition_id,
+            win_weight: parseInt(this.prizeForm.win_weight) || 100000,
             stock_quantity:
               this.prizeForm.stock_quantity === -1 ? 999999 : this.prizeForm.stock_quantity,
-            prize_description: this.prizeForm.prize_description,
-            rarity_code: this.prizeForm.rarity_code || 'common',
-            win_weight: parseInt(this.prizeForm.win_weight) || 100000,
             reward_tier: this.prizeForm.reward_tier || 'low',
-            is_fallback: this.prizeForm.is_fallback ? 1 : 0
+            is_fallback: this.prizeForm.is_fallback ? 1 : 0,
+            sort_order: parseInt(this.prizeForm.sort_order) || 1
           }
           if (this.prizeForm.max_daily_wins !== null && this.prizeForm.max_daily_wins !== '') {
-            addData.max_daily_wins = parseInt(this.prizeForm.max_daily_wins)
+            prizeData.max_daily_wins = parseInt(this.prizeForm.max_daily_wins)
           }
           if (this.prizeForm.max_user_wins !== null && this.prizeForm.max_user_wins !== '') {
-            addData.max_user_wins = parseInt(this.prizeForm.max_user_wins)
+            prizeData.max_user_wins = parseInt(this.prizeForm.max_user_wins)
           }
-          if (this.prizeForm.primary_media_id) {
-            addData.primary_media_id = this.prizeForm.primary_media_id
-          }
-          await this.apiCall(
-            buildURL(LOTTERY_ENDPOINTS.PRIZE_ADD_TO_CAMPAIGN, {
-              code: this.managingCampaign.campaign_code
-            }),
-            { method: 'POST', data: addData }
-          )
+          await this.apiCall(LOTTERY_ENDPOINTS.PRIZE_BATCH_ADD, {
+            method: 'POST',
+            data: {
+              lottery_campaign_id: this.prizeForm.lottery_campaign_id,
+              prizes: [prizeData]
+            }
+          })
         }
         this.showSuccess(this.isEditMode ? '奖品更新成功' : '奖品添加成功')
         this.hideModal('campaignPrizeModal')
@@ -943,27 +823,18 @@ export function usePrizesMethods() {
     editCampaignPrize(prize) {
       this.editingLotteryPrizeId = prize.lottery_prize_id
       this.isEditMode = true
-      this.prize_image_preview_url = prize.public_url || prize.image_url || null
+      this.prize_image_preview_url = null
       this.prizeForm = {
         lottery_campaign_id: this.managingCampaign?.lottery_campaign_id,
-        prize_name: prize.prize_name || '',
-        prize_type: prize.prize_type || 'virtual',
-        prize_value: parseFloat(prize.prize_value) || 0,
-        prize_value_points: parseInt(prize.prize_value_points) || 0,
-        budget_cost: parseInt(prize.budget_cost) || 0,
-        material_asset_code: prize.material_asset_code || '',
-        material_amount: prize.material_amount || null,
-        win_probability: parseFloat(prize.win_probability || 0) * 100,
-        stock_quantity: prize.stock_quantity || 100,
-        status: prize.status || 'active',
-        primary_media_id: prize.primary_media_id ?? null,
-        prize_description: prize.prize_description || '',
-        rarity_code: prize.rarity_code || 'common',
+        prize_definition_id: prize.prize_definition_id || null,
         win_weight: prize.win_weight || 100000,
+        stock_quantity: prize.stock_quantity || 100,
         reward_tier: prize.reward_tier || 'low',
+        is_fallback: prize.is_fallback || false,
+        sort_order: prize.sort_order || 1,
+        status: prize.status || 'active',
         max_daily_wins: prize.max_daily_wins ?? null,
-        max_user_wins: prize.max_user_wins ?? null,
-        is_fallback: prize.is_fallback || false
+        max_user_wins: prize.max_user_wins ?? null
       }
       this.showModal('campaignPrizeModal')
     },
@@ -1178,43 +1049,17 @@ export function usePrizesMethods() {
      */
     openBatchPrizeModal() {
       this.batchLotteryCampaignId = this.campaigns?.[0]?.lottery_campaign_id || null
-      // 初始化一个包含多个奖品槽位的模板（直接使用后端字段名）
-      // sort_order 不设置，由后端自动分配唯一递增值
       this.batchPrizes = [
         {
-          prize_name: '一等奖',
-          prize_type: 'virtual',
-          win_probability: 0.05,
-          stock_quantity: 10,
-          prize_description: '',
-          rarity_code: 'legendary'
-        },
-        {
-          prize_name: '二等奖',
-          prize_type: 'virtual',
-          win_probability: 0.15,
-          stock_quantity: 50,
-          prize_description: '',
-          rarity_code: 'epic'
-        },
-        {
-          prize_name: '三等奖',
-          prize_type: 'virtual',
-          win_probability: 0.3,
-          stock_quantity: 200,
-          prize_description: '',
-          rarity_code: 'rare'
-        },
-        {
-          prize_name: '参与奖',
-          prize_type: 'points',
-          win_probability: 0.5,
+          prize_definition_id: null,
+          win_weight: 100000,
           stock_quantity: 999999,
-          prize_description: '',
-          rarity_code: 'common'
+          reward_tier: 'high',
+          is_fallback: false,
+          sort_order: 1
         }
       ]
-      this.updateBatchProbabilitySum()
+      this.loadPrizeDefinitionOptions()
       this.showModal('batchPrizeModal')
     },
 
@@ -1223,13 +1068,12 @@ export function usePrizesMethods() {
      */
     addBatchPrizeSlot() {
       this.batchPrizes.push({
-        prize_name: '',
-        prize_type: 'virtual',
-        win_probability: 0,
+        prize_definition_id: null,
+        win_weight: 100000,
         stock_quantity: 100,
-        prize_description: '',
-        rarity_code: 'common'
-        // sort_order 不设置，由后端自动分配
+        reward_tier: 'low',
+        is_fallback: false,
+        sort_order: this.batchPrizes.length + 1
       })
     },
 
@@ -1240,85 +1084,40 @@ export function usePrizesMethods() {
     removeBatchPrizeSlot(index) {
       if (this.batchPrizes.length > 1) {
         this.batchPrizes.splice(index, 1)
-        this.updateBatchProbabilitySum()
       }
-    },
-
-    /**
-     * 更新批量奖品概率总和
-     */
-    updateBatchProbabilitySum() {
-      // 后端使用小数格式(0-1)，前端显示为百分比(0-100)
-      this.batchProbabilitySum = this.batchPrizes.reduce((sum, prize) => {
-        return sum + (parseFloat(prize.win_probability) || 0) * 100
-      }, 0)
-    },
-
-    /**
-     * 自动平均分配概率
-     */
-    autoDistributeProbability() {
-      const count = this.batchPrizes.length
-      if (count === 0) return
-
-      // 后端使用小数格式(0-1)
-      const avgProbability = 1 / count
-
-      this.batchPrizes.forEach((prize, index) => {
-        // 平均分配概率，最后一个奖品承担舍入误差
-        if (index === count - 1) {
-          const usedProbability = avgProbability * (count - 1)
-          prize.win_probability = parseFloat((1 - usedProbability).toFixed(4))
-        } else {
-          prize.win_probability = parseFloat(avgProbability.toFixed(4))
-        }
-      })
-      this.updateBatchProbabilitySum()
     },
 
     /**
      * 提交批量添加奖品
      */
     async submitBatchPrizes() {
-      // 验证活动ID
       if (!this.batchLotteryCampaignId) {
         this.showError('请选择所属活动')
         return
       }
 
-      // 验证至少有一个奖品
       if (this.batchPrizes.length === 0) {
         this.showError('请至少添加一个奖品')
         return
       }
 
-      // 验证奖品名称（使用后端字段名 prize_name）
-      const emptyNames = this.batchPrizes.filter(p => !p.prize_name?.trim())
-      if (emptyNames.length > 0) {
-        this.showError('请填写所有奖品名称')
-        return
-      }
-
-      // 验证概率总和（后端使用小数格式，显示为百分比）
-      this.updateBatchProbabilitySum()
-      if (Math.abs(this.batchProbabilitySum - 100) > 0.01) {
-        this.showError(`概率总和必须等于100%，当前为${this.batchProbabilitySum.toFixed(2)}%`)
+      const missingDefs = this.batchPrizes.filter(p => !p.prize_definition_id)
+      if (missingDefs.length > 0) {
+        this.showError('请为所有奖品选择奖品目录')
         return
       }
 
       try {
         this.saving = true
 
-        // 直接使用后端字段名，无需映射
-        // sort_order 不传，由后端自动分配唯一递增值（避免 SORT_ORDER_DUPLICATE 错误）
-        const prizesData = this.batchPrizes.map(prize => ({
-          prize_name: prize.prize_name.trim(),
-          prize_type: prize.prize_type,
-          win_probability: parseFloat(prize.win_probability) || 0,
+        const prizesData = this.batchPrizes.map((prize, index) => ({
+          prize_definition_id: prize.prize_definition_id,
+          win_weight: parseInt(prize.win_weight) || 100000,
           stock_quantity:
             prize.stock_quantity === -1 ? 999999 : parseInt(prize.stock_quantity) || 100,
-          prize_description: prize.prize_description || '',
-          rarity_code: prize.rarity_code || 'common'
+          reward_tier: prize.reward_tier || 'low',
+          is_fallback: prize.is_fallback ? 1 : 0,
+          sort_order: parseInt(prize.sort_order) || index + 1
         }))
 
         await this.apiCall(LOTTERY_ENDPOINTS.PRIZE_BATCH_ADD, {

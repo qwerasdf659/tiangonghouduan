@@ -296,11 +296,11 @@
                     <!-- 用户消息（左） -->
                     <template x-if="msg.sender_type === 'user'">
                       <div class="flex items-end gap-2 max-w-[75%]">
-                        <div class="flex-shrink-0 w-7 h-7 rounded-full bg-gray-300 flex items-center justify-center text-white text-xs">
-                          <span x-text="(currentChatUser.nickname || '用').charAt(0)"></span>
+                        <div class="flex-shrink-0 w-8 h-8 rounded-full bg-gray-400 flex items-center justify-center text-white text-[10px] font-medium">
+                          用户
                         </div>
                         <div>
-                          <div class="themed-card border themed-border-light rounded-2xl rounded-bl-md px-3 py-2 shadow-sm">
+                          <div class="bg-yellow-50 border border-yellow-200 rounded-2xl rounded-bl-md px-3 py-2 shadow-sm">
                             <p class="text-sm themed-text break-words whitespace-pre-wrap" x-text="msg.content || ''"></p>
                           </div>
                           <p class="text-[10px] themed-text-hint mt-1 ml-1" x-text="formatDate(msg.created_at)"></p>
@@ -311,11 +311,11 @@
                     <!-- 管理员消息（右） -->
                     <template x-if="msg.sender_type === 'admin'">
                       <div class="flex items-end gap-2 max-w-[75%] ml-auto flex-row-reverse">
-                        <div class="flex-shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-pink-400 to-pink-600 flex items-center justify-center text-white text-xs">
-                          客
+                        <div class="flex-shrink-0 w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white text-[10px] font-medium">
+                          客服
                         </div>
                         <div>
-                          <div class="bg-pink-500 text-white rounded-2xl rounded-br-md px-3 py-2 shadow-sm">
+                          <div class="bg-white border border-gray-200 text-gray-800 rounded-2xl rounded-br-md px-3 py-2 shadow-sm">
                             <p class="text-sm break-words whitespace-pre-wrap" x-text="msg.content || ''"></p>
                           </div>
                           <p class="text-[10px] themed-text-hint mt-1 text-right mr-1" x-text="formatDate(msg.created_at)"></p>
@@ -571,13 +571,13 @@
               <div x-show="!context_loading && context_active_tab === 'timeline'">
                 <template x-if="context_timeline">
                   <div class="space-y-2">
-                    <template x-for="entry in (context_timeline?.rows || [])" :key="entry.data?.created_at">
+                    <template x-for="(entry, idx) in (context_timeline?.rows || [])" :key="'tl_' + idx">
                       <div class="text-xs py-1.5 border-b themed-border-light">
                         <div class="flex items-center gap-1.5">
                           <span x-text="{'consumption':'💳','feedback':'📝','lottery':'🎰'}[entry.type] || '📋'"></span>
                           <span class="themed-text-muted" x-text="formatDate(entry.created_at)"></span>
                         </div>
-                        <p class="themed-text mt-0.5 truncate" x-text="entry.type === 'feedback' ? entry.data?.content : (entry.type === 'lottery' ? ('抽奖 - ' + (entry.data?.reward_tier || '')) : '消费记录')"></p>
+                        <p class="themed-text mt-0.5 truncate" x-text="entry.type === 'feedback' ? (entry.data?.content || '') : (entry.type === 'lottery' ? ('抽奖 - ' + (entry.data?.prize_name || {'high':'高档','mid':'中档','low':'低档','fallback':'保底'}[entry.data?.reward_tier] || entry.data?.reward_tier || '')) : '消费记录')"></p>
                       </div>
                     </template>
                     <p x-show="!context_timeline?.rows?.length" class="text-xs themed-text-hint text-center py-4">暂无记录</p>

@@ -18,7 +18,7 @@
 
 const {
   User,
-  LotteryPrize,
+  LotteryCampaignPrize,
   AssetTransaction,
   Account,
   AccountAssetBalance
@@ -121,7 +121,7 @@ describe('抽奖积分集成测试 - V4.6 Pipeline 架构', () => {
 
         console.log('\n🎲 抽奖结果（Pipeline 架构）：', {
           success: result.success,
-          lottery_prize_id: result.lottery_prize_id,
+          lottery_campaign_prize_id: result.lottery_campaign_prize_id,
           execution_time: result.execution_time
         })
 
@@ -175,7 +175,7 @@ describe('抽奖积分集成测试 - V4.6 Pipeline 架构', () => {
   describe('抽奖奖励积分测试（Pipeline 架构）', () => {
     test('应该创建完整的积分奖励记录', async () => {
       // 获取积分奖品
-      const pointsPrize = await LotteryPrize.findOne({
+      const pointsPrize = await LotteryCampaignPrize.findOne({
         where: {
           lottery_campaign_id: campaignId,
           prize_type: 'points',

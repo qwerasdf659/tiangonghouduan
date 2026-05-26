@@ -11,7 +11,7 @@
 
 const crypto = require('crypto')
 const logger = require('../../../utils/logger').logger
-const { SHIPPING_COMPANIES } = require('../ShippingTrackService')
+const { SHIPPING_COMPANIES } = require('../constants')
 
 /** 快递100查询提供者 */
 class Kuaidi100Provider {

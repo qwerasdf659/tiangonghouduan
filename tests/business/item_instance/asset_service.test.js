@@ -14,7 +14,7 @@
  * - ItemLedger: 物品账本（双录真相，SUM(delta)==0 验证守恒）
  * - ItemHold: 物品锁定记录（替代旧 JSON locks）
  * - ItemTemplate: 物品模板
- * - LotteryPrize: 奖品池（库存管理）
+ * - LotteryCampaignPrize: 奖品池（库存管理）
  *
  * 相关服务：
  * - ItemService: 物品服务（铸造/转移/消耗 + 双录记账）— 服务键 asset_item
@@ -25,7 +25,14 @@
  * P2优先级：物品系统模块
  */
 
-const { sequelize, Item, ItemLedger, ItemTemplate, User, LotteryPrize } = require('../../../models')
+const {
+  sequelize,
+  Item,
+  ItemLedger,
+  ItemTemplate,
+  User,
+  LotteryCampaignPrize
+} = require('../../../models')
 const {
   initializeTestServiceManager,
   getTestService,
@@ -661,7 +668,7 @@ describe('物品系统 ItemService 测试 - P2优先级', () => {
     let test_prize = null
 
     beforeAll(async () => {
-      test_prize = await LotteryPrize.findOne({ where: { status: 'active' } })
+      test_prize = await LotteryCampaignPrize.findOne({ where: { status: 'active' } })
       if (!test_prize) {
         console.log('⚠️ 未找到活跃的奖品，部分库存测试将跳过')
       }
@@ -673,7 +680,7 @@ describe('物品系统 ItemService 测试 - P2优先级', () => {
         return
       }
 
-      const prize = await LotteryPrize.findByPk(test_prize.lottery_prize_id)
+      const prize = await LotteryCampaignPrize.findByPk(test_prize.lottery_campaign_prize_id)
       if (!prize) {
         console.log('跳过测试：奖品已不存在')
         return
@@ -694,7 +701,7 @@ describe('物品系统 ItemService 测试 - P2优先级', () => {
       }
 
       const lottery_campaign_id = test_prize.lottery_campaign_id
-      const prizes = await LotteryPrize.findAll({ where: { lottery_campaign_id } })
+      const prizes = await LotteryCampaignPrize.findAll({ where: { lottery_campaign_id } })
 
       const total_stock = prizes.reduce((sum, p) => sum + (p.stock_quantity || 0), 0)
       const total_used = prizes.reduce((sum, p) => sum + (p.total_win_count || 0), 0)
@@ -716,7 +723,7 @@ describe('物品系统 ItemService 测试 - P2优先级', () => {
         return
       }
 
-      const prizes = await LotteryPrize.findAll()
+      const prizes = await LotteryCampaignPrize.findAll()
 
       prizes.forEach(prize => {
         const total = prize.stock_quantity || 0
@@ -734,7 +741,7 @@ describe('物品系统 ItemService 测试 - P2优先级', () => {
       const transaction = await sequelize.transaction()
 
       try {
-        const prize = await LotteryPrize.findOne({
+        const prize = await LotteryCampaignPrize.findOne({
           where: { status: 'active' },
           transaction
         })
@@ -760,7 +767,7 @@ describe('物品系统 ItemService 测试 - P2优先级', () => {
     })
 
     test('应该验证活动奖品的库存与物品模板的一致性', async () => {
-      const prizes = await LotteryPrize.findAll({ where: { status: 'active' } })
+      const prizes = await LotteryCampaignPrize.findAll({ where: { status: 'active' } })
 
       const stats = {
         total_prizes: prizes.length,

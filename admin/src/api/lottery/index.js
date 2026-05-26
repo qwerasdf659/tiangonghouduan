@@ -18,6 +18,7 @@
 // 导入子模块
 import { LotteryCoreAPI, LOTTERY_CORE_ENDPOINTS } from './core.js'
 import { LotteryAdvancedAPI, LOTTERY_ADVANCED_ENDPOINTS } from './advanced.js'
+import { PrizeDefinitionAPI, PRIZE_DEFINITION_ENDPOINTS } from './prize-definitions.js'
 
 // 合并端点常量
 export const LOTTERY_ENDPOINTS = {
@@ -34,5 +35,6 @@ export const LotteryAPI = {
 // 分模块导出
 export { LotteryCoreAPI, LOTTERY_CORE_ENDPOINTS }
 export { LotteryAdvancedAPI, LOTTERY_ADVANCED_ENDPOINTS }
+export { PrizeDefinitionAPI, PRIZE_DEFINITION_ENDPOINTS }
 
 export default LotteryAPI

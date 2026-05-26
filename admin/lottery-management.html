@@ -2629,25 +2629,25 @@
           <div x-show="abnormalUserPagination.total_pages > 1" class="p-4 border-t">
             <div class="flex justify-center items-center gap-2">
               <button @click="changeAbnormalUsersPage(1)" 
-                      :disabled="abnormalUserPagination.current_page === 1"
+                      :disabled="abnormalUserPagination.page === 1"
                       class="px-3 py-1 rounded themed-btn-secondary disabled:opacity-50">
                 首页
               </button>
-              <button @click="changeAbnormalUsersPage(abnormalUserPagination.current_page - 1)" 
-                      :disabled="abnormalUserPagination.current_page === 1"
+              <button @click="changeAbnormalUsersPage(abnormalUserPagination.page - 1)" 
+                      :disabled="abnormalUserPagination.page === 1"
                       class="px-3 py-1 rounded themed-btn-secondary disabled:opacity-50">
                 上一页
               </button>
               <span class="px-4 py-1 themed-text-muted">
-                第 <span x-text="abnormalUserPagination.current_page"></span> / <span x-text="abnormalUserPagination.total_pages"></span> 页
+                第 <span x-text="abnormalUserPagination.page"></span> / <span x-text="abnormalUserPagination.total_pages"></span> 页
               </span>
-              <button @click="changeAbnormalUsersPage(abnormalUserPagination.current_page + 1)" 
-                      :disabled="abnormalUserPagination.current_page >= abnormalUserPagination.total_pages"
+              <button @click="changeAbnormalUsersPage(abnormalUserPagination.page + 1)" 
+                      :disabled="abnormalUserPagination.page >= abnormalUserPagination.total_pages"
                       class="px-3 py-1 rounded themed-btn-secondary disabled:opacity-50">
                 下一页
               </button>
               <button @click="changeAbnormalUsersPage(abnormalUserPagination.total_pages)" 
-                      :disabled="abnormalUserPagination.current_page >= abnormalUserPagination.total_pages"
+                      :disabled="abnormalUserPagination.page >= abnormalUserPagination.total_pages"
                       class="px-3 py-1 rounded themed-btn-secondary disabled:opacity-50">
                 末页
               </button>
@@ -5954,13 +5954,9 @@
           <!-- 活动选择（仅新增时显示） -->
           <div x-show="!isEditMode">
             <label class="block text-sm font-medium themed-text-secondary mb-1">所属活动 <span class="text-red-500">*</span></label>
-            <!-- 无活动时显示提示 -->
-
-              <div x-show="!campaigns || campaigns.length === 0" class="p-3 bg-yellow-50 border border-yellow-200 rounded text-yellow-700 text-sm">
-                ⚠️ 暂无可用活动，请先到 <a href="#" @click.prevent="switchPage('campaigns')" class="themed-text-primary underline">活动管理</a> 创建活动
-              </div>
-
-            <!-- 有活动时显示下拉框 -->
+            <div x-show="!campaigns || campaigns.length === 0" class="p-3 bg-yellow-50 border border-yellow-200 rounded text-yellow-700 text-sm">
+              ⚠️ 暂无可用活动，请先到 <a href="#" @click.prevent="switchPage('campaigns')" class="themed-text-primary underline">活动管理</a> 创建活动
+            </div>
             <template x-if="campaigns && campaigns.length > 0">
               <select class="w-full px-3 py-2 border rounded" x-model.number="prizeForm.lottery_campaign_id" required>
                 <option value="">请选择活动</option>
@@ -5970,43 +5966,27 @@
               </select>
             </template>
           </div>
-          <div>
-            <label class="block text-sm font-medium themed-text-secondary mb-1">奖品名称 <span class="text-red-500">*</span></label>
-            <input type="text" class="w-full px-3 py-2 border rounded" x-model="prizeForm.prize_name" required>
+
+          <!-- 奖品目录选择（从 prize_definitions 选择，仅新增时显示） -->
+          <div x-show="!isEditMode">
+            <label class="block text-sm font-medium themed-text-secondary mb-1">奖品目录 <span class="text-red-500">*</span></label>
+            <select class="w-full px-3 py-2 border rounded" x-model.number="prizeForm.prize_definition_id" required x-init="loadPrizeDefinitionOptions()">
+              <option value="">请选择奖品</option>
+              <template x-for="opt in prizeDefinitionOptions" :key="opt.prize_definition_id">
+                <option :value="opt.prize_definition_id" x-text="opt.display_name + ' (' + opt.rarity_code + ')'"></option>
+              </template>
+            </select>
+            <p class="text-xs themed-text-muted mt-1">从集中奖品目录选择，奖品属性由目录统一管理</p>
           </div>
+
+          <!-- 编辑模式显示奖品名称（只读） -->
+          <div x-show="isEditMode">
+            <label class="block text-sm font-medium themed-text-secondary mb-1">奖品名称</label>
+            <input type="text" class="w-full px-3 py-2 border rounded bg-gray-100 cursor-not-allowed" :value="prizeForm.prize_name" disabled>
+            <p class="text-xs themed-text-muted mt-1">奖品属性由奖品目录统一管理，如需修改请前往奖品目录页</p>
+          </div>
+
           <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm font-medium themed-text-secondary mb-1">奖品类型</label>
-              <select class="w-full px-3 py-2 border rounded" x-model="prizeForm.prize_type">
-                <option value="points">积分</option>
-                <option value="coupon">优惠券</option>
-                <option value="physical">实物</option>
-                <option value="virtual">虚拟</option>
-                <option value="service">服务</option>
-                <option value="product">商品</option>
-                <option value="special">特殊</option>
-              </select>
-            </div>
-            <!-- 稀有度选择器（rarity_code 来自 rarity_defs 表） -->
-            <div>
-              <label class="block text-sm font-medium themed-text-secondary mb-1">💎 稀有度</label>
-              <select class="w-full px-3 py-2 border rounded" x-model="prizeForm.rarity_code">
-                <template x-for="opt in rarityOptions" :key="opt.value">
-                  <option :value="opt.value" x-text="opt.label"></option>
-                </template>
-              </select>
-              <!-- 稀有度颜色预览 -->
-              <div class="flex items-center gap-1 mt-1">
-                <template x-for="opt in rarityOptions" :key="opt.value">
-                  <template x-if="opt.value === prizeForm.rarity_code">
-                    <div class="flex items-center gap-1">
-                      <span class="inline-block w-3 h-3 rounded-full" :style="'background:' + opt.color"></span>
-                      <span class="text-xs themed-text-muted" x-text="opt.label"></span>
-                    </div>
-                  </template>
-                </template>
-              </div>
-            </div>
             <!-- 九宫格位置（sort_order，1-8 顺时针排列） -->
             <div>
               <label class="block text-sm font-medium themed-text-secondary mb-1">🎰 九宫格位置</label>
@@ -7382,77 +7362,27 @@
         </div>
         <form @submit.prevent="submitCampaignPrize()">
           <div class="p-4 space-y-4">
-            <div>
-              <label class="block text-sm font-medium mb-1">奖品名称 <span class="text-red-500">*</span></label>
-              <input type="text" class="w-full px-3 py-2 border rounded" x-model="prizeForm.prize_name" required>
-            </div>
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-sm font-medium mb-1">奖品类型</label>
-                <select class="w-full px-3 py-2 border rounded" x-model="prizeForm.prize_type">
-                  <option value="points">积分</option>
-                  <option value="coupon">优惠券</option>
-                  <option value="physical">实物</option>
-                  <option value="virtual">虚拟</option>
-                  <option value="empty">空奖</option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-sm font-medium mb-1">稀有度</label>
-                <select class="w-full px-3 py-2 border rounded" x-model="prizeForm.rarity_code">
-                  <template x-for="opt in rarityOptions" :key="opt.value">
-                    <option :value="opt.value" x-text="opt.label"></option>
-                  </template>
-                </select>
-              </div>
-            </div>
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-sm font-medium mb-1">可见价值（元）</label>
-                <input type="number" class="w-full px-3 py-2 border rounded" x-model.number="prizeForm.prize_value" min="0" step="0.01">
-                <p class="text-xs text-gray-400 mt-1">展示给用户看的奖品价值</p>
-              </div>
-              <div>
-                <label class="block text-sm font-medium mb-1">分层阈值标记</label>
-                <input type="number" class="w-full px-3 py-2 border rounded" x-model.number="prizeForm.prize_value_points" min="0" step="1">
-                <p class="text-xs text-gray-400 mt-1">用于档位准入计算，非扣减金额</p>
-              </div>
+            <!-- 奖品目录选择（仅新增时显示） -->
+            <div x-show="!isEditMode">
+              <label class="block text-sm font-medium mb-1">奖品目录 <span class="text-red-500">*</span></label>
+              <select class="w-full px-3 py-2 border rounded" x-model.number="prizeForm.prize_definition_id" required x-init="loadPrizeDefinitionOptions()">
+                <option value="">请选择奖品</option>
+                <template x-for="opt in prizeDefinitionOptions" :key="opt.prize_definition_id">
+                  <option :value="opt.prize_definition_id" x-text="opt.display_name + ' [' + opt.rarity_code + '] (' + opt.prize_type + ')'"></option>
+                </template>
+              </select>
+              <p class="text-xs text-gray-400 mt-1">从集中奖品目录选择，奖品属性由目录统一管理</p>
             </div>
 
-            <!-- 材质资产配置（碎片/水晶等虚拟物品） -->
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-sm font-medium mb-1">材质资产编码</label>
-                <input type="text" class="w-full px-3 py-2 border rounded" x-model="prizeForm.material_asset_code" placeholder="如 red_core_shard, star_stone 或留空">
-                <p class="text-xs text-gray-400 mt-1">虚拟物品资产类型标识，传统奖品留空</p>
-              </div>
-              <div>
-                <label class="block text-sm font-medium mb-1">材质数量</label>
-                <input type="number" class="w-full px-3 py-2 border rounded" x-model.number="prizeForm.material_amount" min="0" step="1"
-                  :disabled="!prizeForm.material_asset_code">
-                <p class="text-xs text-gray-400 mt-1">虚拟物品发放数量</p>
-              </div>
+            <!-- 编辑模式显示奖品名称（只读） -->
+            <div x-show="isEditMode">
+              <label class="block text-sm font-medium mb-1">奖品名称</label>
+              <input type="text" class="w-full px-3 py-2 border rounded bg-gray-100 cursor-not-allowed" :value="prizeForm.prize_name" disabled>
+              <p class="text-xs text-gray-400 mt-1">奖品属性由奖品目录统一管理</p>
             </div>
 
-            <!-- 预算成本（按类型分治） -->
+            <!-- 活动级参数：权重、档位 -->
             <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-sm font-medium mb-1">预算成本 <span class="text-red-500">*</span></label>
-                <input type="number" class="w-full px-3 py-2 border rounded" x-model.number="prizeForm.budget_cost" min="0" step="1"
-                  :disabled="(prizeForm.material_asset_code && prizeForm.material_asset_code !== 'star_stone') || prizeForm.is_fallback || prizeForm.material_asset_code === 'star_stone'"
-                  :class="{ 'bg-gray-100 cursor-not-allowed': (prizeForm.material_asset_code && prizeForm.material_asset_code !== 'star_stone') || prizeForm.is_fallback || prizeForm.material_asset_code === 'star_stone' }">
-                <p class="text-xs text-gray-400 mt-1">
-                  <template x-if="prizeForm.material_asset_code && prizeForm.material_asset_code !== 'star_stone' && !prizeForm.is_fallback">
-                    <span class="text-blue-500">系统自动计算: 材质数量 × 单价</span>
-                  </template>
-                  <template x-if="prizeForm.material_asset_code === 'star_stone' || prizeForm.is_fallback">
-                    <span class="text-gray-400">不消耗预算，固定为 0</span>
-                  </template>
-                  <template x-if="!prizeForm.material_asset_code && !prizeForm.is_fallback">
-                    <span>每次中奖实际扣减的 budget_points</span>
-                  </template>
-                </p>
-              </div>
               <div>
                 <label class="block text-sm font-medium mb-1">选奖权重</label>
                 <input type="number" class="w-full px-3 py-2 border rounded" x-model.number="prizeForm.win_weight" min="0" step="1000">
@@ -7467,20 +7397,17 @@
                 </select>
               </div>
             </div>
+
+            <!-- 库存和排序 -->
             <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-sm font-medium mb-1">中奖概率 (%)</label>
-                <input type="number" class="w-full px-3 py-2 border rounded" x-model.number="prizeForm.win_probability" min="0" max="100" step="0.01">
-                <p class="text-xs text-gray-400 mt-1" x-text="managingCampaign?.pick_method === 'normalize' ? '✅ normalize 模式下此字段生效' : '⚠️ tier_first 模式下此字段不生效'"></p>
-              </div>
               <div>
                 <label class="block text-sm font-medium mb-1">库存数量</label>
                 <input type="number" class="w-full px-3 py-2 border rounded" x-model.number="prizeForm.stock_quantity" min="1" placeholder="输入正整数">
               </div>
-            </div>
-            <div>
-              <label class="block text-sm font-medium mb-1">奖品描述</label>
-              <textarea class="w-full px-3 py-2 border rounded" x-model="prizeForm.prize_description" rows="2"></textarea>
+              <div>
+                <label class="block text-sm font-medium mb-1">排序</label>
+                <input type="number" class="w-full px-3 py-2 border rounded" x-model.number="prizeForm.sort_order" min="1" placeholder="自动分配">
+              </div>
             </div>
             <!-- 中奖次数限制 -->
             <div class="grid grid-cols-2 gap-4">

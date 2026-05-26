@@ -84,6 +84,9 @@ const pageConfigs = {
   'diy-work-management': { title: 'DIY用户作品管理', pageIcon: '🎨', pageTitle: 'DIY用户作品管理' },
   'diy-slot-editor': { title: 'DIY槽位标注编辑器', pageIcon: '✏️', pageTitle: 'DIY槽位标注编辑器' },
 
+  // 奖品目录管理（2026-05-26 集中奖品目录方案）
+  'prize-definitions': { title: '奖品目录管理', pageIcon: '🏆', pageTitle: '奖品目录管理' },
+
   // 默认配置
   'default': { title: '管理后台', pageIcon: '🏠', pageTitle: '管理后台' }
 }

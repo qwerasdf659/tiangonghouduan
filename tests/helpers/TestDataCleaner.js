@@ -55,7 +55,7 @@ const MODEL_PRIMARY_KEYS = {
   // 抽奖相关
   LotteryCampaign: 'lottery_campaign_id',
   LotteryRecord: 'record_id',
-  LotteryPrize: 'lottery_prize_id',
+  LotteryCampaignPrize: 'lottery_campaign_prize_id',
 
   // 会话和消息
   CustomerSession: 'session_id',

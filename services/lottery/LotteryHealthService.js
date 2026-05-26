@@ -452,7 +452,7 @@ class LotteryHealthService {
        * 注意：数据库字段为 reward_tier、stock_quantity、total_win_count、status
        * status 字段使用枚举值 'active'/'inactive'
        */
-      const prizes = await this.models.LotteryPrize.findAll({
+      const prizes = await this.models.LotteryCampaignPrize.findAll({
         where: { lottery_campaign_id: campaignId, status: 'active' },
         attributes: [
           'lottery_prize_id',

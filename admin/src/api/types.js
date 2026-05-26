@@ -9,7 +9,7 @@
  * - 用户相关类型：UserInfo, UserDetail, UserRole, UserStatus
  * - 资产相关类型：AssetBalance, AssetTransaction, AssetAdjustParams, AssetCode
  * - 账户相关类型：Account, AccountAssetBalance
- * - 抽奖相关类型：LotteryDrawRecord, LotteryPrizeInfo, PresetConfig
+ * - 抽奖相关类型：LotteryDrawRecord, LotteryCampaignPrizeInfo, PresetConfig
  * - 市场相关类型：MarketListingInfo, TradeOrder
  * - 拍卖相关类型：AuctionListing, BidProduct
  * - 兑换相关类型：RedemptionOrderInfo
@@ -222,7 +222,7 @@
  * - red_core_gem, blue_crystal 等水晶
  */
 
-// ========== 抽奖相关类型（lottery_draws / lottery_prizes 表） ==========
+// ========== 抽奖相关类型（lottery_draws / lottery_campaign_prizes / prize_definitions 表） ==========
 
 /**
  * 抽奖记录（修正：原 LotteryRecord）
@@ -256,13 +256,24 @@
  */
 
 /**
- * 奖品信息（修正：原 PrizeInfo）
- * 对应 lottery_prizes 表，定义抽奖奖品的完整属性
+ * 活动奖品关联信息（集中奖品目录方案）
+ * 对应 lottery_campaign_prizes JOIN prize_definitions
  *
- * @typedef {Object} LotteryPrizeInfo
- * @property {number} lottery_prize_id - 奖品ID（INT 自增主键）
- * @property {string} prize_name - 奖品名称
- * @property {'points'|'coupon'|'physical'|'virtual'|'service'|'product'|'special'} prize_type - 奖品类型
+ * @typedef {Object} LotteryCampaignPrizeInfo
+ * @property {number} lottery_campaign_prize_id - 活动奖品关联ID
+ * @property {number} prize_definition_id - 奖品定义ID
+ * @property {string} prize_name - 奖品名称（来自 prize_definitions.display_name）
+ * @property {string} prize_type - 奖品类型（material/item/coupon/points）
+ * @property {number} win_weight - 本活动中的权重
+ * @property {number} stock_quantity - 本活动中的库存
+ * @property {string} reward_tier - 本活动中的档位（high/mid/low）
+ * @property {boolean} is_fallback - 是否兜底奖品
+ * @property {number} sort_order - 排序
+ * @property {string} status - 状态（active/inactive）
+ * @property {string} rarity_code - 稀有度（来自 prize_definitions）
+ * @property {string} material_asset_code - 材料资产编码（来自 prize_definitions）
+ * @property {number} material_amount - 材料数量（来自 prize_definitions）
+ */
  * @property {number} prize_value - 奖品价值（DECIMAL(10,2)）
  * @property {number} win_probability - 中奖概率（DECIMAL(8,6)，如 0.100000）
  * @property {number} stock_quantity - 库存数量（0 表示售罄，-1 无限制由业务层处理）
@@ -306,7 +317,7 @@
  * @property {string} start_time - 开始时间
  * @property {string} end_time - 结束时间
  * @property {number} daily_limit - 每日限制次数（0=无限制）
- * @property {Array<LotteryPrizeInfo>} [prizes] - 关联奖品列表
+ * @property {Array<LotteryCampaignPrizeInfo>} [prizes] - 关联奖品列表
  */
 
 // ========== 市场相关类型（market_listings / trade_orders 表） ==========

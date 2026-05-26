@@ -30,7 +30,7 @@
  */
 
 const BaseStage = require('./BaseStage')
-const { LotteryDraw, LotteryPrize } = require('../../../../models')
+const { LotteryDraw, LotteryCampaignPrize, PrizeDefinition } = require('../../../../models')
 const { DynamicConfigLoader } = require('../../compute/config/ComputeConfig')
 
 /**
@@ -251,15 +251,28 @@ class GuaranteeStage extends BaseStage {
 
       // 指定的奖品不在列表中，从数据库查询
       try {
-        const db_prize = await LotteryPrize.findOne({
+        const db_prize = await LotteryCampaignPrize.findOne({
           where: {
-            lottery_prize_id: guarantee_prize_id,
+            lottery_campaign_prize_id: guarantee_prize_id,
             lottery_campaign_id,
             status: 'active'
-          }
+          },
+          include: [{ model: PrizeDefinition, as: 'prizeDefinition' }]
         })
         if (db_prize) {
-          return db_prize.toJSON()
+          const def = db_prize.prizeDefinition || {}
+          return {
+            lottery_prize_id: db_prize.lottery_campaign_prize_id,
+            lottery_campaign_prize_id: db_prize.lottery_campaign_prize_id,
+            prize_name: def.display_name,
+            prize_type: def.prize_type,
+            material_asset_code: def.material_asset_code,
+            material_amount: def.material_amount ? Number(def.material_amount) : null,
+            win_weight: db_prize.win_weight,
+            stock_quantity: db_prize.stock_quantity,
+            reward_tier: db_prize.reward_tier,
+            is_fallback: db_prize.is_fallback
+          }
         }
       } catch (error) {
         this.log('warn', '查询指定保底奖品失败', {

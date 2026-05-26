@@ -72,7 +72,7 @@ class ModelAssociationManager {
         hasOne: [],
         belongsTo: [
           { model: 'User', foreignKey: 'user_id', as: 'user' },
-          { model: 'LotteryPrize', foreignKey: 'lottery_prize_id', as: 'prize' },
+          { model: 'LotteryCampaignPrize', foreignKey: 'lottery_campaign_prize_id', as: 'prize' },
           {
             model: 'LotteryCampaign',
             foreignKey: 'lottery_id',
@@ -81,17 +81,21 @@ class ModelAssociationManager {
           }
         ]
       },
-      LotteryPrize: {
+      LotteryCampaignPrize: {
         hasMany: [
-          { model: 'LotteryDraw', foreignKey: 'lottery_prize_id', as: 'lotteryDraws' },
-          { model: 'PrizeDistribution', foreignKey: 'lottery_prize_id', as: 'distributions' }
+          { model: 'LotteryDraw', foreignKey: 'lottery_campaign_prize_id', as: 'lotteryDraws' },
+          {
+            model: 'PrizeDistribution',
+            foreignKey: 'lottery_campaign_prize_id',
+            as: 'distributions'
+          }
         ],
         hasOne: [],
         belongsTo: [{ model: 'LotteryCampaign', foreignKey: 'lottery_campaign_id', as: 'campaign' }]
       },
       LotteryCampaign: {
         hasMany: [
-          { model: 'LotteryPrize', foreignKey: 'lottery_campaign_id', as: 'prizes' },
+          { model: 'LotteryCampaignPrize', foreignKey: 'lottery_campaign_id', as: 'prizes' },
           {
             model: 'LotteryDraw',
             foreignKey: 'lottery_id',
@@ -113,7 +117,7 @@ class ModelAssociationManager {
             targetKey: 'lottery_draw_id',
             as: 'lotteryDraw'
           },
-          { model: 'LotteryPrize', foreignKey: 'lottery_prize_id', as: 'prize' }
+          { model: 'LotteryCampaignPrize', foreignKey: 'lottery_campaign_prize_id', as: 'prize' }
         ]
       }
     }

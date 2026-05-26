@@ -21,7 +21,13 @@
  */
 
 const BaseStage = require('./BaseStage')
-const { LotteryCampaign, LotteryPrize, LotteryTierRule } = require('../../../../models')
+const {
+  LotteryCampaign,
+  LotteryCampaignPrize,
+  PrizeDefinition,
+  MaterialAssetType,
+  LotteryTierRule
+} = require('../../../../models')
 const { DynamicConfigLoader } = require('../../compute/config/ComputeConfig')
 
 /**
@@ -73,9 +79,9 @@ class LoadCampaignStage extends BaseStage {
       // 6. 返回结果
       const result = {
         campaign: campaign.toJSON(),
-        prizes: prizes.map(p => p.toJSON()),
+        prizes,
         tier_rules: tier_rules.map(r => r.toJSON()),
-        fallback_prize: fallback_prize ? fallback_prize.toJSON() : null,
+        fallback_prize: fallback_prize || null,
         pick_method: campaign.pick_method || 'tier_first',
         budget_mode: campaign.budget_mode || 'none'
       }
@@ -137,23 +143,89 @@ class LoadCampaignStage extends BaseStage {
   }
 
   /**
-   * 加载活动奖品
+   * 加载活动奖品（集中奖品目录方案）
+   *
+   * 从 lottery_campaign_prizes JOIN prize_definitions 加载奖品数据，
+   * 返回扁平化结构兼容下游 Stage 消费格式。
    *
    * @param {number} lottery_campaign_id - 活动ID
-   * @returns {Promise<Array>} 奖品列表
+   * @returns {Promise<Array>} 奖品列表（扁平化，兼容旧格式）
    * @private
    */
   async _loadPrizes(lottery_campaign_id) {
-    return await LotteryPrize.findAll({
+    const campaignPrizes = await LotteryCampaignPrize.findAll({
       where: {
         lottery_campaign_id,
         status: 'active'
       },
+      include: [
+        {
+          model: PrizeDefinition,
+          as: 'prizeDefinition',
+          where: { is_enabled: 1 },
+          include: [
+            {
+              model: MaterialAssetType,
+              as: 'materialAssetType',
+              attributes: [
+                'asset_code',
+                'display_name',
+                'budget_value_points',
+                'visible_value_points'
+              ],
+              required: false
+            }
+          ]
+        }
+      ],
       order: [
-        ['reward_tier', 'DESC'], // high > mid > low
+        ['reward_tier', 'DESC'],
         ['sort_order', 'ASC'],
-        ['lottery_prize_id', 'ASC']
+        ['lottery_campaign_prize_id', 'ASC']
       ]
+    })
+
+    // 扁平化：将关联数据合并为下游 Stage 期望的格式
+    return campaignPrizes.map(cp => {
+      const def = cp.prizeDefinition
+      const mat = def.materialAssetType
+
+      // 运行时计算 budget_cost = budget_value_points × material_amount
+      const budgetCost =
+        mat && mat.budget_value_points && def.material_amount
+          ? Number(mat.budget_value_points) * Number(def.material_amount)
+          : 0
+
+      // 构建兼容旧格式的扁平对象
+      return {
+        lottery_prize_id: cp.lottery_campaign_prize_id,
+        lottery_campaign_prize_id: cp.lottery_campaign_prize_id,
+        prize_definition_id: cp.prize_definition_id,
+        lottery_campaign_id: cp.lottery_campaign_id,
+        prize_name: def.display_name,
+        prize_type: def.prize_type,
+        prize_value: def.material_amount ? Number(def.material_amount) : 0,
+        material_asset_code: def.material_asset_code,
+        material_amount: def.material_amount ? Number(def.material_amount) : null,
+        rarity_code: def.rarity_code,
+        win_weight: cp.win_weight,
+        stock_quantity: cp.stock_quantity,
+        reward_tier: cp.reward_tier,
+        is_fallback: Boolean(cp.is_fallback),
+        sort_order: cp.sort_order,
+        max_daily_wins: cp.max_daily_wins,
+        max_user_wins: cp.max_user_wins,
+        total_win_count: cp.total_win_count,
+        daily_win_count: cp.daily_win_count,
+        budget_cost: budgetCost,
+        prize_value_points:
+          mat && mat.visible_value_points && def.material_amount
+            ? Number(mat.visible_value_points) * Number(def.material_amount)
+            : 0,
+        primary_media_id: def.primary_media_id,
+        prize_code: def.prize_code,
+        item_template_id: def.item_template_id
+      }
     })
   }
 

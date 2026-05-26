@@ -738,7 +738,7 @@ class ScheduledTasks {
    * 2. 记录重置日志和统计信息
    *
    * 架构设计：
-   * - 从LotteryPrize模型迁移到AdminLotteryCampaignService（V4.7.0拆分后）
+   * - 通过 AdminLotteryCampaignService 操作 LotteryCampaignPrize 表（V4.7.0拆分后）
    * - ServiceManager key: admin_lottery_campaign
    * - 批处理逻辑应在Service层，Model层只保留字段定义
    *

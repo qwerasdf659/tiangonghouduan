@@ -12,7 +12,7 @@
 
 const crypto = require('crypto')
 const logger = require('../../../utils/logger').logger
-const { SHIPPING_COMPANIES } = require('../ShippingTrackService')
+const { SHIPPING_COMPANIES } = require('../constants')
 
 /** 快递鸟查询提供者（备用通道） */
 class KdniaoProvider {

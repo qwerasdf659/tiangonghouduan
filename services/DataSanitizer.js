@@ -78,12 +78,12 @@ class DataSanitizer {
    *   prize_value（奖品价值）、cost_points（成本积分）等敏感字段
    * - 保持数据库原始字段名，仅过滤敏感字段（win_probability、stock_quantity 等）
    *
-   * @param {Array<Object>} prizes - 奖品数据数组（来自 lottery_prizes 表的 Sequelize 查询结果）
+   * @param {Array<Object>} prizes - 奖品数据数组（来自 lottery_campaign_prizes JOIN prize_definitions 的查询结果）
    * @param {string} dataLevel - 数据级别：'full'（管理员完整数据）或'public'（普通用户脱敏数据）
-   * @returns {Array<Object>} 脱敏后的奖品数组（字段名与 lottery_prizes 表一致）
-   * @returns {number} return[].lottery_prize_id - 奖品ID（数据库真实主键，不做映射）
+   * @returns {Array<Object>} 脱敏后的奖品数组
+   * @returns {number} return[].lottery_prize_id - 奖品ID（映射自 lottery_campaign_prize_id）
    * @returns {number} return[].lottery_campaign_id - 关联活动ID
-   * @returns {string} return[].prize_name - 奖品名称
+   * @returns {string} return[].prize_name - 奖品名称（来自 prize_definitions.display_name）
    * @returns {string} return[].prize_type - 奖品类型（points/coupon/physical/virtual/service/product/special）
    * @returns {number} return[].prize_value - 展示价值（DECIMAL→number 转换）
    * @returns {string} return[].rarity_code - 稀有度代码（FK→rarity_defs）

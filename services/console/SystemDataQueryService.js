@@ -32,7 +32,7 @@ const {
   MarketListing,
   Item,
   LotteryCampaign,
-  LotteryPrize,
+  LotteryCampaignPrize,
   LotteryUserDailyDrawQuota
 } = require('../../models')
 
@@ -399,7 +399,7 @@ class SystemDataQueryService {
       where,
       include: [
         {
-          model: LotteryPrize,
+          model: LotteryCampaignPrize,
           as: 'prizes',
           required: false,
           attributes: [
@@ -440,7 +440,7 @@ class SystemDataQueryService {
    */
   static async getLotteryCampaignById(lottery_campaign_id) {
     const campaign = await LotteryCampaign.findByPk(parseInt(lottery_campaign_id), {
-      include: [{ model: LotteryPrize, as: 'prizes', required: false }]
+      include: [{ model: LotteryCampaignPrize, as: 'campaignPrizes', required: false }]
     })
 
     return campaign

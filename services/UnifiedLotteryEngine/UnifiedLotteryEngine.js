@@ -72,7 +72,7 @@
  *
  * 数据模型关联：
  * - LotteryCampaign：抽奖活动表（活动配置、有效期、奖品池）
- * - LotteryPrize：奖品表（奖品信息、概率、库存）
+ * - LotteryCampaignPrize + PrizeDefinition：奖品表（奖品信息、概率、库存）
  * - LotteryDraw：抽奖记录表（用户抽奖历史、中奖记录）
  * - Item：物品表（中奖奖品存储）
  * - AssetTransaction：资产交易表（抽奖扣分记录）

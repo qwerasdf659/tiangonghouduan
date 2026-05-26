@@ -104,7 +104,7 @@ class CampaignAnalysisService {
         where: whereClause,
         include: [
           {
-            model: this.models.LotteryPrize,
+            model: this.models.LotteryCampaignPrize,
             as: 'prize',
             attributes: []
           }
@@ -400,7 +400,7 @@ class CampaignAnalysisService {
       limit,
       include: [
         {
-          model: this.models.LotteryPrize,
+          model: this.models.LotteryCampaignPrize,
           as: 'prize',
           attributes: ['prize_name', 'cost_points']
         }

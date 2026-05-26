@@ -22,6 +22,7 @@
 import { logger } from '../../../utils/logger.js'
 import { Alpine, createPageMixin, dataTable } from '../../../alpine/index.js'
 import { request, API_PREFIX } from '../../../api/base.js'
+import { LOTTERY_CORE_ENDPOINTS } from '../../../api/lottery/core.js'
 
 // 导入所有 composables 模块
 import {
@@ -750,7 +751,7 @@ function registerLotteryManagementComponents() {
       ],
       dataSource: async p => {
         const r = await request({
-          url: `${API_PREFIX}/console/prize-pool/list`,
+          url: LOTTERY_CORE_ENDPOINTS.PRIZE_LIST,
           method: 'GET',
           params: p
         })

@@ -60,9 +60,26 @@ models.UserRiskProfile = require('./UserRiskProfile')(sequelize, DataTypes)
 
 // 🔴 抽奖系统核心模型
 models.LotteryCampaign = require('./LotteryCampaign')(sequelize, DataTypes)
-models.LotteryPrize = require('./LotteryPrize')(sequelize, DataTypes)
+// models.LotteryPrize 已废弃 — 由 PrizeDefinition + LotteryCampaignPrize 替代（2026-05-26）
 models.LotteryDraw = require('./LotteryDraw')(sequelize, DataTypes)
 models.LotteryPreset = require('./LotteryPreset')(sequelize, DataTypes)
+
+// 🔴 集中奖品目录模型（2026-05-26 - 奖品管理架构升级）
+models.PrizeDefinition = require('./PrizeDefinition')(sequelize, DataTypes)
+/*
+ * ✅ PrizeDefinition：奖品目录表（全局唯一真相源）
+ *    - 用途：集中管理奖品定义，活动通过关联表引用
+ *    - 表名：prize_definitions，主键：prize_definition_id，唯一键：prize_code
+ *    - 业务场景：奖品统一管理、跨活动统计、一处修改全局生效
+ */
+models.LotteryCampaignPrize = require('./LotteryCampaignPrize')(sequelize, DataTypes)
+/*
+ * ✅ LotteryCampaignPrize：活动-奖品关联表
+ *    - 用途：活动引用奖品目录 + 配置本活动的权重/库存/档位
+ *    - 表名：lottery_campaign_prizes，主键：lottery_campaign_prize_id
+ *    - 唯一约束：(lottery_campaign_id, prize_definition_id)
+ *    - 业务场景：活动奖品配置、库存管理、中奖统计
+ */
 
 // 🔴 统一抽奖架构新增模型（2026-01-18 - Pipeline架构升级）
 models.LotteryTierRule = require('./LotteryTierRule')(sequelize, DataTypes)

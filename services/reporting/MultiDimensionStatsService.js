@@ -798,10 +798,17 @@ class MultiDimensionStatsService {
             attributes: ['user_id', 'nickname', 'mobile']
           },
           {
-            model: models.LotteryPrize,
-            as: 'prize',
-            attributes: ['lottery_prize_id', 'prize_name', 'prize_type'],
-            required: false
+            model: models.LotteryCampaignPrize,
+            as: 'campaignPrize',
+            attributes: ['lottery_campaign_prize_id', 'reward_tier'],
+            required: false,
+            include: [
+              {
+                model: models.PrizeDefinition,
+                as: 'prizeDefinition',
+                attributes: ['display_name', 'prize_type']
+              }
+            ]
           }
         ],
         fields: [

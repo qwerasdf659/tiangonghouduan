@@ -37,10 +37,10 @@ class AdminLotteryCampaignService {
     try {
       logger.info('[批处理任务] 开始重置每日中奖次数...')
 
-      const { LotteryPrize } = models
+      const { LotteryCampaignPrize } = models
 
       // 批量更新所有奖品的daily_win_count为0
-      const [updatedCount] = await LotteryPrize.update({ daily_win_count: 0 }, { where: {} })
+      const [updatedCount] = await LotteryCampaignPrize.update({ daily_win_count: 0 }, { where: {} })
 
       logger.info('[批处理任务] 每日中奖次数重置完成', {
         updated_count: updatedCount,
