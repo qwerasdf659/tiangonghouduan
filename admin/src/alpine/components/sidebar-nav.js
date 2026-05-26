@@ -156,11 +156,6 @@ export function sidebarNav() {
             url: '/admin/presets.html'
           },
           {
-            id: 'app-theme-config',
-            name: '🎨 全局主题配置',
-            url: '/admin/app-theme-config.html'
-          },
-          {
             id: 'exchange-page-config',
             name: '🛍️ 兑换页面配置',
             url: '/admin/exchange-page-config.html'
@@ -200,8 +195,7 @@ export function sidebarNav() {
         items: [
           { id: 'diy-templates', name: '款式模板管理', url: '/admin/diy-template-management.html' },
           { id: 'diy-materials', name: '珠子素材管理', url: '/admin/diy-material-management.html' },
-          { id: 'diy-works', name: '用户作品管理', url: '/admin/diy-work-management.html' },
-          { id: 'diy-slot-editor', name: '槽位标注编辑器', url: '/admin/diy-slot-editor.html' }
+          { id: 'diy-works', name: '用户作品管理', url: '/admin/diy-work-management.html' }
         ]
       },
 

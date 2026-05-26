@@ -118,22 +118,28 @@ class AdminLotteryQueryService {
         typeof item.setting_data === 'string'
           ? JSON.parse(item.setting_data)
           : item.setting_data || {}
-      if (settingData.lottery_prize_id) {
-        prizeIds.add(settingData.lottery_prize_id)
+      if (settingData.lottery_prize_id || settingData.prize_id) {
+        prizeIds.add(settingData.lottery_prize_id || settingData.prize_id)
       }
     })
 
     const prizeMap = new Map()
     if (prizeIds.size > 0) {
       const prizes = await models.LotteryCampaignPrize.findAll({
-        where: { lottery_prize_id: { [Op.in]: Array.from(prizeIds) } },
-        attributes: ['lottery_prize_id', 'prize_name', 'prize_value']
+        where: { lottery_campaign_prize_id: { [Op.in]: Array.from(prizeIds) } },
+        attributes: ['lottery_campaign_prize_id', 'prize_definition_id', 'reward_tier'],
+        include: [{
+          model: models.PrizeDefinition,
+          as: 'prizeDefinition',
+          attributes: ['display_name'],
+          required: false
+        }]
       })
       prizes.forEach(prize => {
-        prizeMap.set(prize.lottery_prize_id, {
-          lottery_prize_id: prize.lottery_prize_id,
-          prize_name: prize.prize_name,
-          prize_value: prize.prize_value
+        prizeMap.set(prize.lottery_campaign_prize_id, {
+          lottery_campaign_prize_id: prize.lottery_campaign_prize_id,
+          prize_name: prize.prizeDefinition?.display_name || '未知奖品',
+          reward_tier: prize.reward_tier
         })
       })
     }
@@ -392,9 +398,15 @@ class AdminLotteryQueryService {
         },
         {
           model: models.LotteryCampaignPrize,
-          as: 'prize',
-          attributes: ['lottery_prize_id', 'prize_name'],
-          required: false
+          as: 'campaignPrize',
+          attributes: ['lottery_campaign_prize_id'],
+          required: false,
+          include: [{
+            model: models.PrizeDefinition,
+            as: 'prizeDefinition',
+            attributes: ['display_name'],
+            required: false
+          }]
         }
       ],
       order: [['created_at', 'DESC']],
@@ -404,7 +416,7 @@ class AdminLotteryQueryService {
 
     const draws = rows.map(row => {
       const j = row.toJSON()
-      const prizeName = j.prize?.prize_name || j.prize_name || '未中奖'
+      const prizeName = j.campaignPrize?.prizeDefinition?.display_name || j.prize_name || '未中奖'
       return {
         /** 与历史前端列名 draw_id 对齐，值同 lottery_draw_id */
         draw_id: j.lottery_draw_id,

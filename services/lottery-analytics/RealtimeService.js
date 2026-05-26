@@ -460,8 +460,7 @@ class RealtimeService {
     const prizes = await this.models.LotteryCampaignPrize.findAll({
       where: whereClause,
       attributes: [
-        'lottery_prize_id',
-        'prize_name',
+        'lottery_campaign_prize_id',
         'reward_tier',
         'stock_quantity',
         'total_win_count',
@@ -472,6 +471,12 @@ class RealtimeService {
           model: this.models.LotteryCampaign,
           as: 'campaign',
           attributes: ['campaign_name']
+        },
+        {
+          model: this.models.PrizeDefinition,
+          as: 'prizeDefinition',
+          attributes: ['display_name'],
+          required: false
         }
       ]
     })
@@ -479,25 +484,25 @@ class RealtimeService {
     prizes.forEach(prize => {
       const remaining = (prize.stock_quantity || 0) - (prize.total_win_count || 0)
       const initialStock = prize.stock_quantity || 0
+      const prizeName =
+        prize.prizeDefinition?.display_name || `奖品#${prize.lottery_campaign_prize_id}`
 
-      // high层级库存 < 100 为 danger
       if (prize.reward_tier === 'high' && remaining < 100 && remaining >= 0) {
         alerts.push({
           level: 'danger',
           type: 'stock_low',
-          message: `高档位奖品「${prize.prize_name}」库存告急，仅剩${remaining}件`,
-          related_entity: { type: 'prize', id: prize.lottery_prize_id, name: prize.prize_name },
+          message: `高档位奖品「${prizeName}」库存告急，仅剩${remaining}件`,
+          related_entity: { type: 'prize', id: prize.lottery_campaign_prize_id, name: prizeName },
           threshold: 100,
           current_value: remaining,
           suggestion: '建议立即补充库存或调整配置'
         })
       } else if (initialStock > 0 && remaining < initialStock * 0.1 && remaining > 0) {
-        // 任意奖品库存 < 初始库存10% 为 warning
         alerts.push({
           level: 'warning',
           type: 'stock_warning',
-          message: `奖品「${prize.prize_name}」库存偏低，剩余${((remaining / initialStock) * 100).toFixed(1)}%`,
-          related_entity: { type: 'prize', id: prize.lottery_prize_id, name: prize.prize_name },
+          message: `奖品「${prizeName}」库存偏低，剩余${((remaining / initialStock) * 100).toFixed(1)}%`,
+          related_entity: { type: 'prize', id: prize.lottery_campaign_prize_id, name: prizeName },
           threshold: 10,
           current_value: (remaining / initialStock) * 100,
           suggestion: '建议关注库存消耗速度'
@@ -689,7 +694,15 @@ class RealtimeService {
 
     const prizes = await this.models.LotteryCampaignPrize.findAll({
       where: whereClause,
-      attributes: ['lottery_prize_id', 'prize_name', 'stock_quantity', 'total_win_count']
+      attributes: ['lottery_campaign_prize_id', 'stock_quantity', 'total_win_count'],
+      include: [
+        {
+          model: this.models.PrizeDefinition,
+          as: 'prizeDefinition',
+          attributes: ['display_name'],
+          required: false
+        }
+      ]
     })
 
     const lowStockPrizes = []
@@ -697,8 +710,9 @@ class RealtimeService {
       const remaining = (prize.stock_quantity || 0) - (prize.total_win_count || 0)
       if (remaining < 10) {
         lowStockPrizes.push({
-          lottery_prize_id: prize.lottery_prize_id,
-          prize_name: prize.prize_name,
+          lottery_campaign_prize_id: prize.lottery_campaign_prize_id,
+          prize_name:
+            prize.prizeDefinition?.display_name || `奖品#${prize.lottery_campaign_prize_id}`,
           remaining
         })
       }

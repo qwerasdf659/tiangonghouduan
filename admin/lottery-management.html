@@ -2294,7 +2294,44 @@
             <h5 class="font-semibold">📋 抽奖记录</h5>
             <button @click="loadData()" class="text-xs px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200">🔄 刷新</button>
           </div>
-          <div x-html="render()"></div>
+          <div class="p-4">
+            <!-- 加载状态 -->
+            <div x-show="loading" class="text-center py-8 text-gray-500">加载中...</div>
+            <!-- 错误状态 -->
+            <div x-show="error" class="text-center py-8 text-red-500" x-text="error"></div>
+            <!-- 数据表格 -->
+            <div x-show="!loading && !error">
+              <table class="w-full text-sm">
+                <thead class="themed-bg-subtle">
+                  <tr>
+                    <template x-for="col in columns" :key="col.key">
+                      <th class="px-4 py-3 text-left text-xs font-medium themed-text-muted uppercase" x-text="col.label"></th>
+                    </template>
+                  </tr>
+                </thead>
+                <tbody class="divide-y">
+                  <template x-for="row in data" :key="row[primaryKey] || row.draw_id">
+                    <tr class="themed-hover-bg">
+                      <template x-for="col in columns" :key="col.key">
+                        <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
+                      </template>
+                    </tr>
+                  </template>
+                  <tr x-show="data.length === 0 && !loading">
+                    <td :colspan="columns.length" class="px-4 py-8 text-center themed-text-muted">暂无数据</td>
+                  </tr>
+                </tbody>
+              </table>
+              <!-- 分页 -->
+              <div x-show="total_records > page_size" class="flex justify-between items-center mt-4 px-4">
+                <span class="text-sm themed-text-muted" x-text="paginationInfo"></span>
+                <div class="flex gap-1">
+                  <button @click="prevPage()" :disabled="!hasPrevPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50">上一页</button>
+                  <button @click="nextPage()" :disabled="!hasNextPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50">下一页</button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

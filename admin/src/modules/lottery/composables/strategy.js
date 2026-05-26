@@ -146,6 +146,28 @@ export function useStrategyMethods() {
         )
         const data = response?.success ? response.data : response
         if (data) {
+          // 确保 recent_24h 有默认值，防止 HTML 模板访问 undefined 属性
+          if (!data.recent_24h) {
+            data.recent_24h = {
+              total_draws: 0,
+              guarantee_triggered: 0,
+              guarantee_rate: 0,
+              avg_cost: 0,
+              tier_distribution: { high: 0, mid: 0, low: 0, fallback: 0 }
+            }
+          }
+          if (!data.config_overview) {
+            data.config_overview = {
+              total_strategies: 0,
+              active_strategies: 0,
+              matrix_configs: 0,
+              active_matrix_configs: 0,
+              config_groups: {}
+            }
+          }
+          if (!data.active_campaigns) {
+            data.active_campaigns = []
+          }
           this.strategyConfigSummary = data
           logger.info('[Strategy] 策略配置概览加载成功', {
             total_strategies: data.config_overview?.total_strategies,

@@ -41,7 +41,7 @@ class PresetInventoryDebt extends Model {
 
     // 多对一：欠账关联某个活动奖品
     PresetInventoryDebt.belongsTo(models.LotteryCampaignPrize, {
-      foreignKey: 'lottery_campaign_prize_id',
+      foreignKey: 'lottery_prize_id',
       as: 'campaignPrize',
       onDelete: 'RESTRICT',
       comment: '欠账的活动奖品（禁止删除有欠账的奖品）'

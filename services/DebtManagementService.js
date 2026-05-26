@@ -257,7 +257,7 @@ class DebtManagementService {
    * @returns {Promise<Object>} 按奖品分组的库存欠账数据
    */
   static async getDebtByPrize(options = {}) {
-    const { PresetInventoryDebt, LotteryCampaignPrize } = getModels()
+    const { PresetInventoryDebt, LotteryCampaignPrize, PrizeDefinition } = getModels()
 
     const campaignId = options.lottery_campaign_id
       ? parseInt(options.lottery_campaign_id, 10)
@@ -285,16 +285,24 @@ class DebtManagementService {
       raw: true
     })
 
-    // 获取奖品信息
+    // 获取奖品信息（通过关联 PrizeDefinition 获取名称）
     const prizeIds = prizeDebts.map(p => p.lottery_prize_id)
     const prizes = await LotteryCampaignPrize.findAll({
-      where: { lottery_prize_id: { [Op.in]: prizeIds } },
-      attributes: ['lottery_prize_id', 'prize_name', 'prize_type', 'stock_quantity']
+      where: { lottery_campaign_prize_id: { [Op.in]: prizeIds } },
+      attributes: ['lottery_campaign_prize_id', 'stock_quantity', 'reward_tier'],
+      include: [
+        {
+          model: PrizeDefinition,
+          as: 'prizeDefinition',
+          attributes: ['display_name', 'prize_type'],
+          required: false
+        }
+      ]
     })
 
     const prizeMap = {}
     prizes.forEach(p => {
-      prizeMap[p.lottery_prize_id] = p
+      prizeMap[p.lottery_campaign_prize_id] = p
     })
 
     // 构建结果
@@ -302,8 +310,8 @@ class DebtManagementService {
       const prize = prizeMap[item.lottery_prize_id]
       return {
         lottery_prize_id: item.lottery_prize_id,
-        prize_name: prize ? prize.prize_name : `奖品#${item.lottery_prize_id}`,
-        prize_type: prize ? prize.prize_type : 'unknown',
+        prize_name: prize?.prizeDefinition?.display_name || `奖品#${item.lottery_prize_id}`,
+        prize_type: prize?.prizeDefinition?.prize_type || 'unknown',
         current_stock: prize ? prize.stock_quantity : 0,
         lottery_campaign_id: item.lottery_campaign_id,
         debt_count: parseInt(item.debt_count, 10) || 0,
@@ -569,8 +577,14 @@ class DebtManagementService {
    * @returns {Promise<Object>} 待冲销欠账列表
    */
   static async getPendingDebts(options = {}) {
-    const { PresetInventoryDebt, PresetBudgetDebt, LotteryCampaign, LotteryCampaignPrize, User } =
-      getModels()
+    const {
+      PresetInventoryDebt,
+      PresetBudgetDebt,
+      LotteryCampaign,
+      LotteryCampaignPrize,
+      User,
+      PrizeDefinition
+    } = getModels()
 
     const debtType = options.debt_type || 'inventory'
     const campaignId = options.lottery_campaign_id
@@ -595,7 +609,16 @@ class DebtManagementService {
         {
           model: LotteryCampaignPrize,
           as: 'campaignPrize',
-          attributes: ['prize_name', 'prize_type']
+          attributes: ['lottery_campaign_prize_id', 'stock_quantity', 'reward_tier'],
+          required: false,
+          include: [
+            {
+              model: PrizeDefinition,
+              as: 'prizeDefinition',
+              attributes: ['display_name', 'prize_type'],
+              required: false
+            }
+          ]
         }
       ]
     } else {

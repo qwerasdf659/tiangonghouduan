@@ -148,7 +148,9 @@ class AlertSilenceService {
    * @returns {Promise<Object>} { rows, count, page, page_size }
    */
   static async getRules(filters = {}) {
-    const { alert_type, alert_level, is_active, keyword, page = 1, page_size = 20 } = filters
+    const { alert_type, alert_level, is_active, keyword } = filters
+    const page = parseInt(filters.page, 10) || 1
+    const page_size = parseInt(filters.page_size, 10) || 20
 
     const where = {}
 
