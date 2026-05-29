@@ -54,7 +54,8 @@ class TradeDisputeService {
    * 创建交易纠纷（买家申诉）
    *
    * @param {Object} params - 纠纷参数
-   * @param {number} params.trade_order_id - 交易订单 ID
+   * @param {string} params.order_type - 订单类型（当前仅支持 'trade'）
+   * @param {string} params.order_id - 订单ID（字符串格式）
    * @param {number} params.user_id - 申诉人（买家）用户 ID
    * @param {string} params.dispute_type - 纠纷类型
    * @param {string} params.title - 纠纷标题
@@ -66,22 +67,34 @@ class TradeDisputeService {
    * @returns {Promise<Object>} 创建的纠纷工单
    */
   async createDispute(params, options = {}) {
-    // models 已在构造函数中初始化
     const transaction = assertAndGetTransaction(options, 'TradeDisputeService.createDispute')
 
-    const { trade_order_id, user_id, dispute_type, title, description, evidence, created_by } =
-      params
+    const {
+      order_type,
+      order_id,
+      user_id,
+      dispute_type,
+      title,
+      description,
+      evidence,
+      created_by
+    } = params
 
     // 参数校验
-    if (!trade_order_id) throw new BusinessError('trade_order_id 是必需参数', 'TRADE_REQUIRED', 400)
+    if (!order_type || !order_id)
+      throw new BusinessError('order_type 和 order_id 是必需参数', 'TRADE_REQUIRED', 400)
+    if (order_type !== 'trade')
+      throw new BusinessError('当前仅支持交易订单纠纷', 'TRADE_NOT_ALLOWED', 400)
     if (!user_id) throw new BusinessError('user_id 是必需参数', 'TRADE_REQUIRED', 400)
     if (!dispute_type || !Object.values(DISPUTE_TYPE).includes(dispute_type)) {
       throw new BusinessError(`无效的纠纷类型：${dispute_type}`, 'TRADE_INVALID', 400)
     }
     if (!title) throw new BusinessError('纠纷标题不能为空', 'TRADE_NOT_ALLOWED', 400)
 
+    const tradeOrderId = parseInt(order_id)
+
     // 查询订单（悲观锁）
-    const order = await this.models.TradeOrder.findByPk(trade_order_id, {
+    const order = await this.models.TradeOrder.findByPk(tradeOrderId, {
       lock: transaction.LOCK.UPDATE,
       transaction
     })
@@ -104,7 +117,8 @@ class TradeDisputeService {
     // 检查是否已有未关闭的纠纷
     const existingDispute = await this.models.CustomerServiceIssue.findOne({
       where: {
-        trade_order_id,
+        order_type: 'trade',
+        order_id: String(tradeOrderId),
         issue_type: 'trade',
         status: { [Op.notIn]: ['resolved', 'closed'] }
       },
@@ -122,7 +136,7 @@ class TradeDisputeService {
     const deadline = new Date()
     deadline.setDate(deadline.getDate() + DEFAULT_DISPUTE_DEADLINE_DAYS)
 
-    // 创建纠纷工单
+    // 创建纠纷工单（使用多态字段）
     const issue = await this.models.CustomerServiceIssue.create(
       {
         user_id,
@@ -132,7 +146,8 @@ class TradeDisputeService {
         status: 'open',
         title,
         description: description || null,
-        trade_order_id,
+        order_type: 'trade',
+        order_id: String(tradeOrderId),
         dispute_type,
         dispute_evidence: evidence || null,
         dispute_deadline: deadline
@@ -146,7 +161,8 @@ class TradeDisputeService {
 
     logger.info('[交易纠纷] 纠纷工单创建成功', {
       issue_id: issue.issue_id,
-      trade_order_id,
+      order_type: 'trade',
+      order_id: String(tradeOrderId),
       dispute_type,
       buyer_user_id: user_id,
       previous_order_status: previousStatus
@@ -154,7 +170,8 @@ class TradeDisputeService {
 
     return {
       issue_id: issue.issue_id,
-      trade_order_id,
+      order_type: 'trade',
+      order_id: String(tradeOrderId),
       dispute_type,
       status: issue.status,
       priority: issue.priority,
@@ -262,7 +279,7 @@ class TradeDisputeService {
       throw new BusinessError('该纠纷已解决或已关闭', 'TRADE_ERROR', 400)
     }
 
-    const order = await this.models.TradeOrder.findByPk(issue.trade_order_id, {
+    const order = await this.models.TradeOrder.findByPk(parseInt(issue.order_id), {
       lock: transaction.LOCK.UPDATE,
       transaction
     })
@@ -274,8 +291,8 @@ class TradeDisputeService {
        * 订单状态改为 cancelled（退款完成）
        */
       await order.update({ status: 'cancelled' }, { transaction })
-      refundResult = { trade_order_id: order.trade_order_id, refunded: true }
-      logger.info('[交易纠纷] 纠纷退款执行', { trade_order_id: order.trade_order_id })
+      refundResult = { order_type: 'trade', order_id: issue.order_id, refunded: true }
+      logger.info('[交易纠纷] 纠纷退款执行', { order_id: issue.order_id })
     } else if (order && order.status === 'disputed') {
       // 驳回申诉：恢复订单原状态为 completed
       await order.update({ status: 'completed' }, { transaction })
@@ -367,10 +384,10 @@ class TradeDisputeService {
       throw new BusinessError('该工单不是交易纠纷类型', 'TRADE_ERROR', 400)
     }
 
-    // 关联订单信息
+    // 关联订单信息（通过多态字段 order_type + order_id 查询）
     let orderInfo = null
-    if (issue.trade_order_id) {
-      orderInfo = await this.models.TradeOrder.findByPk(issue.trade_order_id, {
+    if (issue.order_type === 'trade' && issue.order_id) {
+      orderInfo = await this.models.TradeOrder.findByPk(parseInt(issue.order_id), {
         attributes: [
           'trade_order_id',
           'market_listing_id',

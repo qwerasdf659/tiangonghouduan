@@ -24,7 +24,11 @@ import {
   useCsDiagnosisState,
   useCsDiagnosisMethods,
   useCsIssuesState,
-  useCsIssuesMethods
+  useCsIssuesMethods,
+  useCsUserOrdersState,
+  useCsUserOrdersMethods,
+  useCsWorkTabsState,
+  useCsWorkTabsMethods
 } from '../composables/index.js'
 
 /**
@@ -63,6 +67,14 @@ function customerServicePage() {
     // 工单管理（独立composable，与C区内置的createIssue/addNote互补）
     ...useCsIssuesState(),
     ...useCsIssuesMethods(),
+
+    // A区：用户订单聚合查询（订单Tab）
+    ...useCsUserOrdersState(),
+    ...useCsUserOrdersMethods(),
+
+    // B区：多Tab页签管理
+    ...useCsWorkTabsState(),
+    ...useCsWorkTabsMethods(),
 
     // ==================== 生命周期 ====================
 

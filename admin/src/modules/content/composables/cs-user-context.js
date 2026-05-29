@@ -52,8 +52,10 @@ export function useUserContextState() {
     /** @type {Object|null} 诊断结果 */
     context_diagnose: null,
 
-    /** @type {Array} 工单列表（当前用户的） */
+    /** @type {Array} 工单列表（当前用户的，notes Tab 用） */
     context_issues: [],
+    /** @type {Array} 订单关联工单列表（order_issues Tab 用） */
+    order_linked_issues: [],
     /** @type {Object|null} 工单表单 */
     issue_form: {
       issue_type: 'other',
@@ -145,6 +147,12 @@ export function useUserContextMethods() {
             break
           case 'disputes':
             await this._loadDisputes()
+            break
+          case 'orders':
+            await this.loadUserOrders()
+            break
+          case 'order_issues':
+            await this._loadOrderIssues()
             break
         }
       } catch (error) {
@@ -343,6 +351,29 @@ export function useUserContextMethods() {
         await this._loadDisputes()
       } finally {
         this.context_loading = false
+      }
+    },
+
+    /** 加载当前选中订单的关联工单（C区「订单工单」Tab） */
+    async _loadOrderIssues() {
+      const activeTab = this.getActiveTab?.()
+      const orderType = activeTab?.data?.order_type
+      const orderId = activeTab?.data?.order_id
+      if (!orderType || !orderId) {
+        this.order_linked_issues = []
+        return
+      }
+      try {
+        const { CONTENT_ENDPOINTS } = await import('../../../api/content.js')
+        const { request, buildQueryString } = await import('../../../api/base.js')
+        const res = await request({
+          url: CONTENT_ENDPOINTS.CS_ISSUE_LIST + buildQueryString({ order_type: orderType, order_id: orderId, page: 1, page_size: 50 }),
+          method: 'GET'
+        })
+        this.order_linked_issues = res.data?.rows || res.data?.list || []
+      } catch (error) {
+        logger.error('[UserContext] 订单工单加载失败:', error)
+        this.order_linked_issues = []
       }
     },
 

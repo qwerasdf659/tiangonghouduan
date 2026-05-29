@@ -106,6 +106,9 @@ export const CONTENT_ENDPOINTS = {
   DISPUTE_ESCALATE: `${API_PREFIX}/console/customer-service/disputes/:id/escalate`,
   DISPUTE_RESOLVE: `${API_PREFIX}/console/customer-service/disputes/:id/resolve`,
 
+  // 客服工作台 - 用户订单聚合查询（A区订单Tab数据源）
+  CS_USER_ORDERS: `${API_PREFIX}/console/customer-service/user-orders/:user_id`,
+
   // 客服工作台 - GM工具
   CS_GM_COMPENSATE: `${API_PREFIX}/console/customer-service/gm-tools/compensate`,
   CS_GM_TEMPLATES: `${API_PREFIX}/console/customer-service/gm-tools/templates`,
@@ -927,7 +930,7 @@ export const ContentAPI = {
 
   /**
    * 创建纠纷工单
-   * @param {Object} data - 纠纷数据（trade_order_id/dispute_type/description/dispute_evidence）
+   * @param {Object} data - 纠纷数据（order_type/order_id/dispute_type/description/dispute_evidence）
    * @returns {Promise<Object>} 创建结果
    */
   async createDispute(data) {
@@ -954,6 +957,18 @@ export const ContentAPI = {
   async resolveDispute(disputeId, data) {
     const url = buildURL(CONTENT_ENDPOINTS.DISPUTE_RESOLVE, { id: disputeId })
     return await request({ url, method: 'POST', data })
+  },
+
+  /**
+   * 获取用户近期所有类型订单（聚合查询）
+   * @param {number} userId - 用户ID
+   * @param {Object} [params={}] - 分页参数（page/page_size）
+   * @returns {Promise<Object>} 订单列表
+   */
+  async getUserOrders(userId, params = {}) {
+    const url = buildURL(CONTENT_ENDPOINTS.CS_USER_ORDERS, { user_id: userId })
+    const query = new URLSearchParams(params).toString()
+    return await request({ url: query ? `${url}?${query}` : url, method: 'GET' })
   }
 }
 

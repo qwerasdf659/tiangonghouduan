@@ -168,14 +168,22 @@ module.exports = sequelize => {
         comment: '关闭时间'
       },
 
-      // ===== 交易纠纷专用字段（issue_type='trade' 时使用）=====
-      trade_order_id: {
-        type: DataTypes.BIGINT,
+      // ===== 订单多态关联（支持跨订单类型关联工单）=====
+      order_type: {
+        type: DataTypes.ENUM('trade', 'redemption', 'consumption'),
         allowNull: true,
         defaultValue: null,
-        comment: '关联的交易订单 ID（纠纷类型时必填）'
+        comment: '关联订单类型：trade=交易订单, redemption=兑换订单, consumption=消费核销'
       },
 
+      order_id: {
+        type: DataTypes.STRING(64),
+        allowNull: true,
+        defaultValue: null,
+        comment: '关联订单ID（多态值，统一字符串存储兼容 BIGINT 和 UUID）'
+      },
+
+      // ===== 交易纠纷专用字段（issue_type='trade' 时使用）=====
       dispute_type: {
         type: DataTypes.ENUM(
           'item_not_received',
@@ -217,13 +225,14 @@ module.exports = sequelize => {
       updatedAt: 'updated_at',
       underscored: true,
       indexes: [
-        { fields: ['user_id'], name: 'idx_issues_user_id' },
-        { fields: ['created_by'], name: 'idx_issues_created_by' },
-        { fields: ['assigned_to'], name: 'idx_issues_assigned_to' },
-        { fields: ['session_id'], name: 'idx_issues_session_id' },
-        { fields: ['issue_type'], name: 'idx_issues_type' },
-        { fields: ['status'], name: 'idx_issues_status' },
-        { fields: ['created_at'], name: 'idx_issues_created_at' }
+        { fields: ['user_id'], name: 'idx_cs_issues_user_id' },
+        { fields: ['created_by'], name: 'created_by' },
+        { fields: ['assigned_to'], name: 'idx_cs_issues_assigned_to' },
+        { fields: ['session_id'], name: 'session_id' },
+        { fields: ['issue_type'], name: 'idx_cs_issues_type' },
+        { fields: ['status'], name: 'idx_cs_issues_status' },
+        { fields: ['created_at'], name: 'idx_cs_issues_created_at' },
+        { fields: ['order_type', 'order_id'], name: 'idx_issues_order_polymorphic' }
       ],
       comment: '客服工单表（跨会话跨班次的问题跟踪）'
     }

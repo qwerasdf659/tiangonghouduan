@@ -275,6 +275,11 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/console/customer-service/issues/:id': 'ADMIN_CS_ISSUE_UPDATE', // 更新工单
   '/api/v4/console/customer-service/issues/:id/notes': 'ADMIN_CS_ISSUE_NOTE_ADD', // 添加工单备注
 
+  // ===== 客服工作台 — 交易纠纷 =====
+  '/api/v4/console/customer-service/disputes': 'ADMIN_CS_DISPUTE_CREATE', // 创建交易纠纷工单
+  '/api/v4/console/customer-service/disputes/:id/escalate': 'ADMIN_CS_DISPUTE_ESCALATE', // 升级纠纷为仲裁
+  '/api/v4/console/customer-service/disputes/:id/resolve': 'ADMIN_CS_DISPUTE_RESOLVE', // 解决纠纷
+
   // ===== GM工作台 — 补偿发放 =====
   '/api/v4/console/customer-service/gm-tools/compensate': 'ADMIN_CS_COMPENSATE', // 客服补偿发放
 

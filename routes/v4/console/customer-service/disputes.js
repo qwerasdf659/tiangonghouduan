@@ -75,11 +75,11 @@ router.post(
   requireRoleLevel(50),
   asyncHandler(async (req, res) => {
     const TradeDisputeService = req.app.locals.services.getService('trade_dispute')
-    const { trade_order_id, user_id, dispute_type, title, description, evidence } = req.body
+    const { order_type, order_id, user_id, dispute_type, title, description, evidence } = req.body
 
-    if (!trade_order_id || !user_id || !dispute_type || !title) {
+    if (!order_type || !order_id || !user_id || !dispute_type || !title) {
       return res.apiError(
-        '缺少必填参数：trade_order_id, user_id, dispute_type, title',
+        '缺少必填参数：order_type, order_id, user_id, dispute_type, title',
         'BAD_REQUEST',
         null,
         400
@@ -90,7 +90,8 @@ router.post(
       async transaction => {
         return await TradeDisputeService.createDispute(
           {
-            trade_order_id: parseInt(trade_order_id),
+            order_type,
+            order_id: String(order_id),
             user_id: parseInt(user_id),
             dispute_type,
             title,
@@ -101,7 +102,7 @@ router.post(
           { transaction }
         )
       },
-      { description: `创建交易纠纷（订单：${trade_order_id}）` }
+      { description: `创建交易纠纷（${order_type}订单：${order_id}）` }
     )
 
     return res.apiSuccess(result, '纠纷工单创建成功')

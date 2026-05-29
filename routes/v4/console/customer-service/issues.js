@@ -63,7 +63,17 @@ router.get(
 router.post(
   '/',
   asyncHandler(async (req, res) => {
-    const { user_id, issue_type, title, description, priority, session_id, assigned_to } = req.body
+    const {
+      user_id,
+      issue_type,
+      title,
+      description,
+      priority,
+      session_id,
+      assigned_to,
+      order_type,
+      order_id
+    } = req.body
 
     if (!user_id || !issue_type || !title) {
       return res.apiError('缺少必填参数：user_id, issue_type, title', 'BAD_REQUEST', null, 400)
@@ -84,7 +94,9 @@ router.post(
             description,
             priority,
             session_id: session_id ? parseInt(session_id) : null,
-            assigned_to: assigned_to ? parseInt(assigned_to) : null
+            assigned_to: assigned_to ? parseInt(assigned_to) : null,
+            order_type: order_type || null,
+            order_id: order_id ? String(order_id) : null
           },
           { transaction }
         )

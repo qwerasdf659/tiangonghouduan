@@ -168,7 +168,7 @@
             <table class="min-w-full divide-y divide-gray-200">
               <thead class="bg-gray-50">
                 <tr>
-                  <th class="px-4 py-2 text-left text-sm">资产代码</th>
+                  <th class="px-4 py-2 text-left text-sm">资产名称</th>
                   <th class="px-4 py-2 text-right text-sm">总 delta</th>
                   <th class="px-4 py-2 text-center text-sm">状态</th>
                 </tr>
@@ -176,7 +176,7 @@
               <tbody>
                 <template x-for="(row, idx) in asset_result.global_conservation.by_asset_code" :key="idx">
                   <tr class="border-b">
-                    <td class="px-4 py-2 font-mono" x-text="row.asset_code"></td>
+                    <td class="px-4 py-2" x-text="row.display_name || row.asset_code"></td>
                     <td class="px-4 py-2 text-right font-mono" x-text="row.total_delta"></td>
                     <td class="px-4 py-2 text-center" x-text="row.total_delta === 0 ? '✅' : '⚠️'"></td>
                   </tr>
@@ -200,7 +200,7 @@
                 <thead class="bg-red-50">
                   <tr>
                     <th class="px-4 py-2 text-left text-sm">account_id</th>
-                    <th class="px-4 py-2 text-left text-sm">资产代码</th>
+                    <th class="px-4 py-2 text-left text-sm">资产名称</th>
                     <th class="px-4 py-2 text-right text-sm">记录余额</th>
                     <th class="px-4 py-2 text-right text-sm">流水计算余额</th>
                     <th class="px-4 py-2 text-right text-sm">差额</th>
@@ -210,7 +210,7 @@
                   <template x-for="(row, idx) in asset_result.balance_consistency.mismatches" :key="idx">
                     <tr class="border-b">
                       <td class="px-4 py-2 font-mono" x-text="row.account_id"></td>
-                      <td class="px-4 py-2 font-mono" x-text="row.asset_code"></td>
+                      <td class="px-4 py-2" x-text="row.display_name || row.asset_code"></td>
                       <td class="px-4 py-2 text-right font-mono" x-text="row.recorded_balance"></td>
                       <td class="px-4 py-2 text-right font-mono" x-text="row.calculated_balance"></td>
                       <td class="px-4 py-2 text-right font-mono text-red-600 font-bold" x-text="row.difference"></td>

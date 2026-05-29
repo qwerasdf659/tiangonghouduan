@@ -45,6 +45,12 @@ import { useCsDiagnosisState, useCsDiagnosisMethods } from './cs-diagnosis.js'
 // 客服工作台 - 工单管理（问题生命周期跟踪）
 import { useCsIssuesState, useCsIssuesMethods } from './cs-issues.js'
 
+// 客服工作台 - 用户订单聚合查询（A区订单Tab）
+import { useCsUserOrdersState, useCsUserOrdersMethods } from './cs-user-orders.js'
+
+// 客服工作台 - B区多Tab页签管理
+import { useCsWorkTabsState, useCsWorkTabsMethods } from './cs-work-tabs.js'
+
 // 反馈管理模块
 import { useFeedbackState, useFeedbackMethods } from './feedback.js'
 
@@ -63,5 +69,7 @@ export { useCsCompensationState, useCsCompensationMethods }
 export { useCsTemplatesState, useCsTemplatesMethods }
 export { useCsDiagnosisState, useCsDiagnosisMethods }
 export { useCsIssuesState, useCsIssuesMethods }
+export { useCsUserOrdersState, useCsUserOrdersMethods }
+export { useCsWorkTabsState, useCsWorkTabsMethods }
 export { useFeedbackState, useFeedbackMethods }
 export { useCsAgentManagementState, useCsAgentManagementMethods }

@@ -35,6 +35,8 @@ class CustomerServiceIssueService {
    * @param {string} [params.priority] - 优先级（默认 medium）
    * @param {number} [params.session_id] - 关联会话ID
    * @param {number} [params.assigned_to] - 指派给的客服ID
+   * @param {string} [params.order_type] - 关联订单类型（trade/redemption/consumption）
+   * @param {string} [params.order_id] - 关联订单ID（多态值）
    * @param {Object} options - 选项
    * @param {Object} [options.transaction] - 事务对象
    * @returns {Object} 创建的工单
@@ -48,7 +50,9 @@ class CustomerServiceIssueService {
       description,
       priority,
       session_id,
-      assigned_to
+      assigned_to,
+      order_type,
+      order_id
     } = params
 
     /* 验证用户存在 */
@@ -67,7 +71,9 @@ class CustomerServiceIssueService {
         priority: priority || 'medium',
         status: 'open',
         title,
-        description: description || null
+        description: description || null,
+        order_type: order_type || null,
+        order_id: order_id || null
       },
       { transaction: options.transaction }
     )
@@ -113,6 +119,8 @@ class CustomerServiceIssueService {
     if (params.priority) where.priority = params.priority
     if (params.assigned_to) where.assigned_to = parseInt(params.assigned_to)
     if (params.user_id) where.user_id = parseInt(params.user_id)
+    if (params.order_type) where.order_type = params.order_type
+    if (params.order_id) where.order_id = params.order_id
 
     const { count, rows } = await models.CustomerServiceIssue.findAndCountAll({
       where,

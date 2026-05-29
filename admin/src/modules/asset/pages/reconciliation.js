@@ -92,7 +92,7 @@ document.addEventListener('alpine:init', () => {
           tooltip: { trigger: 'axis', formatter: '{b}: {c}' },
           xAxis: {
             type: 'category',
-            data: data.map(r => r.asset_code),
+            data: data.map(r => r.display_name || r.asset_code),
             axisLabel: { rotate: 30 }
           },
           yAxis: { type: 'value', name: '变动金额合计' },

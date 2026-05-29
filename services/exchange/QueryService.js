@@ -540,6 +540,9 @@ class QueryService {
         [{ field: 'status', dictType: 'exchange_status' }]
       )
 
+      // 附加 pay_asset_name（资产中文名称）
+      await this._attachPayAssetNames(ordersWithDisplayNames)
+
       return {
         orders: ordersWithDisplayNames,
         pagination: {
@@ -581,6 +584,9 @@ class QueryService {
         { field: 'status', dictType: 'exchange_status' }
       ])
 
+      // 附加 pay_asset_name（资产中文名称）
+      await this._attachPayAssetNames([orderWithDisplayNames])
+
       return {
         order: orderWithDisplayNames
       }
@@ -588,6 +594,37 @@ class QueryService {
       logger.error(`[兑换市场] 查询订单详情失败(order_no:${order_no}):`, error.message)
       throw error
     }
+  }
+
+  /**
+   * 附加 pay_asset_name（资产中文显示名称）
+   * 通过 material_asset_types 表将 pay_asset_code 映射为 display_name
+   *
+   * @param {Array|Object} orders - 订单对象或数组
+   * @returns {Promise<void>} 直接修改传入对象
+   */
+  async _attachPayAssetNames(orders) {
+    const list = Array.isArray(orders) ? orders : [orders]
+    const assetCodes = [...new Set(list.map(o => o.pay_asset_code).filter(Boolean))]
+    if (assetCodes.length === 0) return
+
+    const MaterialAssetType = this.models.MaterialAssetType
+    const assets = await MaterialAssetType.findAll({
+      where: { asset_code: assetCodes },
+      attributes: ['asset_code', 'display_name'],
+      raw: true
+    })
+
+    const nameMap = {}
+    assets.forEach(a => {
+      nameMap[a.asset_code] = a.display_name
+    })
+
+    list.forEach(order => {
+      if (order.pay_asset_code && nameMap[order.pay_asset_code]) {
+        order.pay_asset_name = nameMap[order.pay_asset_code]
+      }
+    })
   }
 
   /**

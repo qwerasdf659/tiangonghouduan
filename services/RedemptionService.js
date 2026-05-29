@@ -1158,6 +1158,25 @@ class RedemptionService {
       failed_orders: failedOrders
     }
   }
+
+  /**
+   * 获取用户的兑换订单列表（客服工作台用）
+   *
+   * @param {number} userId - 用户ID
+   * @param {Object} [options={}] - 查询选项
+   * @param {number} [options.page_size=50] - 每页数量
+   * @returns {Promise<Object>} { rows, count }
+   */
+  static async getUserOrders(userId, options = {}) {
+    const { page_size = 50 } = options
+    return await RedemptionOrder.findAndCountAll({
+      where: { redeemer_user_id: parseInt(userId) },
+      attributes: ['redemption_order_id', 'order_no', 'status', 'created_at', 'item_id'],
+      include: [{ model: Item, as: 'item', attributes: ['item_id', 'display_name'] }],
+      order: [['created_at', 'DESC']],
+      limit: Math.min(parseInt(page_size), 50)
+    })
+  }
 }
 
 module.exports = RedemptionService

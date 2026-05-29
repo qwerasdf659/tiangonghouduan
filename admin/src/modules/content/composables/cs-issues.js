@@ -53,7 +53,9 @@ export function useCsIssuesState() {
       issue_type: 'other',
       priority: 'medium',
       title: '',
-      description: ''
+      description: '',
+      order_type: null,
+      order_id: null
     },
     issueDetail: null,
     issueNotes: [],
@@ -80,7 +82,9 @@ export function useCsIssuesMethods() {
         issue_type: 'other',
         priority: 'medium',
         title: '',
-        description: ''
+        description: '',
+        order_type: null,
+        order_id: null
       }
       this.showIssueModal = true
     },
@@ -94,13 +98,15 @@ export function useCsIssuesMethods() {
         issue_type: 'other',
         priority: 'medium',
         title: '',
-        description: ''
+        description: '',
+        order_type: null,
+        order_id: null
       }
     },
 
     /** 提交创建工单 */
     async submitCreateIssue() {
-      const { user_id, title, issue_type, priority, description, session_id } = this.issueForm
+      const { user_id, title, issue_type, priority, description, session_id, order_type, order_id } = this.issueForm
 
       if (!user_id) {
         Alpine.store('notification').show('用户ID不能为空', 'error')
@@ -119,12 +125,15 @@ export function useCsIssuesMethods() {
           issue_type,
           priority,
           title: title.trim(),
-          description: description.trim()
+          description: description.trim(),
+          order_type: order_type || null,
+          order_id: order_id ? String(order_id) : null
         })
 
         if (response?.success) {
           Alpine.store('notification').show('工单创建成功', 'success')
           this.closeIssueModal()
+          this._loadOrderIssues()
         } else {
           Alpine.store('notification').show(response?.message || '工单创建失败', 'error')
         }

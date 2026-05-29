@@ -62,16 +62,17 @@
             <th class="px-4 py-3 text-left font-medium">优先级</th>
             <th class="px-4 py-3 text-left font-medium">状态</th>
             <th class="px-4 py-3 text-left font-medium">用户ID</th>
+            <th class="px-4 py-3 text-left font-medium">关联订单</th>
             <th class="px-4 py-3 text-left font-medium">创建时间</th>
             <th class="px-4 py-3 text-left font-medium">操作</th>
           </tr>
         </thead>
         <tbody>
           <tr x-show="loading">
-            <td colspan="8" class="px-4 py-8 text-center themed-text-muted">加载中...</td>
+            <td colspan="9" class="px-4 py-8 text-center themed-text-muted">加载中...</td>
           </tr>
           <tr x-show="!loading && issues.length === 0">
-            <td colspan="8" class="px-4 py-8 text-center themed-text-muted">暂无工单数据</td>
+            <td colspan="9" class="px-4 py-8 text-center themed-text-muted">暂无工单数据</td>
           </tr>
           <template x-for="issue in issues" :key="issue.issue_id">
             <tr class="border-b hover:bg-gray-50/50 transition-colors">
@@ -85,6 +86,10 @@
                 <span class="px-2 py-0.5 rounded-full text-xs" :class="getStatusBadge(issue.status).class" x-text="getStatusBadge(issue.status).text"></span>
               </td>
               <td class="px-4 py-3 text-xs" x-text="issue.user_id || '-'"></td>
+              <td class="px-4 py-3 text-xs">
+                <span x-show="issue.order_type" class="themed-text" x-text="({trade:'交易',redemption:'兑换',consumption:'消费'}[issue.order_type] || '') + ' #' + (issue.order_id || '')"></span>
+                <span x-show="!issue.order_type" class="themed-text-hint">-</span>
+              </td>
               <td class="px-4 py-3 text-xs themed-text-muted" x-text="formatDate(issue.created_at)"></td>
               <td class="px-4 py-3">
                 <div class="flex items-center gap-2">
@@ -145,6 +150,10 @@
               <div>
                 <span class="themed-text-muted">处理人：</span>
                 <span x-text="detail.assigned_to || '未分配'"></span>
+              </div>
+              <div x-show="detail.order_type">
+                <span class="themed-text-muted">关联订单：</span>
+                <span x-text="({trade:'交易',redemption:'兑换',consumption:'消费'}[detail.order_type] || '') + ' #' + (detail.order_id || '')"></span>
               </div>
             </div>
 
