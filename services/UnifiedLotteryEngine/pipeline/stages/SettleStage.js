@@ -528,8 +528,16 @@ class SettleStage extends BaseStage {
       return
     }
 
-    // 使用原子操作扣减库存
-    const [affected_rows] = await sequelize.query(
+    /*
+     * 使用原子操作扣减库存
+     *
+     * 🔴 2026-05-31 修复：affectedRows 读取位置错误导致库存超卖防护失效
+     * 根因：sequelize.query(..., { type: QueryTypes.UPDATE }) 返回 [resultSetHeader, affectedCount]，
+     *       受影响行数在下标 [1]；原 `const [affected_rows]` 取下标 [0]（恒为 undefined），
+     *       使 `affected_rows === 0` 永不成立 → 库存为 0 时 WHERE(stock_quantity>=1) 实际更新 0 行，
+     *       却不会抛 INSUFFICIENT_STOCK，存在超卖风险。
+     */
+    const stockUpdateResult = await sequelize.query(
       `UPDATE lottery_campaign_prizes 
        SET stock_quantity = stock_quantity - 1, 
            daily_win_count = daily_win_count + 1,
@@ -541,6 +549,8 @@ class SettleStage extends BaseStage {
         type: sequelize.QueryTypes.UPDATE
       }
     )
+    // QueryTypes.UPDATE 返回 [resultSetHeader, affectedCount]，受影响行数在下标 [1]
+    const affected_rows = Array.isArray(stockUpdateResult) ? stockUpdateResult[1] : 0
 
     if (affected_rows === 0) {
       throw this.createError(`奖品库存不足: ${prize.prize_name}`, 'INSUFFICIENT_STOCK', true)
@@ -1185,7 +1195,7 @@ class SettleStage extends BaseStage {
   async _updateUserQuota(user_id, lottery_campaign_id, transaction) {
     try {
       // 使用原子操作更新配额（字段名: quota_used, quota_remaining）
-      const [affected_rows] = await sequelize.query(
+      const quotaUpdateResult = await sequelize.query(
         `UPDATE lottery_campaign_user_quota 
          SET quota_used = quota_used + 1, 
              quota_remaining = GREATEST(quota_remaining - 1, 0),
@@ -1198,6 +1208,8 @@ class SettleStage extends BaseStage {
           type: sequelize.QueryTypes.UPDATE
         }
       )
+      // QueryTypes.UPDATE 返回 [resultSetHeader, affectedCount]，受影响行数在下标 [1]
+      const affected_rows = Array.isArray(quotaUpdateResult) ? quotaUpdateResult[1] : 0
 
       if (affected_rows > 0) {
         this.log('debug', '用户配额已更新', { user_id, lottery_campaign_id })

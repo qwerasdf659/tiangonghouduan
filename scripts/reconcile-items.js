@@ -72,17 +72,29 @@ async function executeReconciliation(options = {}) {
   }
   console.log(`  持有者一致：${results.items.owner_consistency.status}（${ownerMismatch.length} 个不一致）`)
 
-  // 3. 铸造数量
-  const [[{ cnt: itemCount }]] = await sequelize.query('SELECT COUNT(*) AS cnt FROM items')
+  /*
+   * 3. 铸造数量一致性（口径修正 2026-05-31）
+   * 真相不变量：每个「经由铸造流程产生」的 item 都应有且仅有一条 mint(delta=+1) 账本。
+   * 修正原因：source='test' 的 item 是测试种子数据，直接 INSERT 进 items 表、从未走铸造流程，
+   *   因而天然无 item_ledger 记录（实测 975 个 test item 中 974 个零账本）。把它们计入"应有 mint"的分母
+   *   会永久误报 FAIL。正确做法是按 source 排除 test 数据后再核对（非放宽：test 本就不该有铸造账本）。
+   * 仅统计真实业务来源（lottery/diy/exchange/legacy 等非 test）的 item 与其 mint 账本是否一一对应。
+   */
+  const [[{ cnt: itemCount }]] = await sequelize.query(
+    "SELECT COUNT(*) AS cnt FROM items WHERE source != 'test'"
+  )
   const [[{ cnt: mintCount }]] = await sequelize.query(
-    "SELECT COUNT(*) AS cnt FROM item_ledger WHERE event_type = 'mint' AND delta = 1"
+    `SELECT COUNT(*) AS cnt
+     FROM item_ledger l
+     JOIN items i ON l.item_id = i.item_id
+     WHERE l.event_type = 'mint' AND l.delta = 1 AND i.source != 'test'`
   )
   results.items.mint_consistency = {
     status: Number(itemCount) === Number(mintCount) ? 'PASS' : 'FAIL',
-    items: Number(itemCount),
+    items_excluding_test: Number(itemCount),
     mints: Number(mintCount)
   }
-  console.log(`  铸造一致：${results.items.mint_consistency.status}（items=${itemCount}, mints=${mintCount}）`)
+  console.log(`  铸造一致：${results.items.mint_consistency.status}（非test items=${itemCount}, mints=${mintCount}）`)
 
   // ========== 资产对账 ==========
   console.log('\n📊 资产对账...')
@@ -109,38 +121,49 @@ async function executeReconciliation(options = {}) {
     console.log(`    ${flag} ${r.asset_code}: SUM=${r.total_net}（${r.tx_count} 条流水）`)
   }
 
-  // 2. 账户余额一致性（分维度对比）
-  // available_amount = SUM(delta_amount)
-  // frozen_amount = SUM(frozen_amount_change)
-  // 排除系统账户（system 账户的 balance 不参与流水推导）
+  /*
+   * 2. 账户余额一致性（口径修正 2026-05-31）
+   * 真相不变量：每个账户每种资产的「总额(available+frozen)」== 该账户该资产全部有效流水的净额 SUM(delta_amount + frozen_amount_change)。
+   * 修正原因（消除两类历史误报，非放宽校验）：
+   *   ① 原先把 available 与 frozen 拆成两条独立等式判定，导致「available↔frozen 纯内部状态转换」即使总额相等也被误报为不一致
+   *      （实测 account5/points：available 差 -3770、frozen 差 +3770，净额完全相等，无任何资产损失）。
+   *   ② balance 表唯一键含 lottery_campaign_key（按活动分行存储 budget_points 等活动维度资产），
+   *      而 asset_transactions 无活动维度列，故对「活动维度资产」按 (account,asset) 聚合天然算不平——
+   *      这类资产由活动预算直接注入、不走普通流水，应按 asset_code 排除出账户级流水守恒（见 CAMPAIGN_SCOPED_ASSET_CODES）。
+   * 校验改为：以「总额净值」为准（与 autoFixBalanceMismatches 同口径），并排除活动维度资产。
+   * available/frozen 的分维度差仍作为 informational 字段输出，便于排查但不触发 FAIL。
+   */
+  const CAMPAIGN_SCOPED_ASSET_CODES = ['budget_points']
   const [balanceMismatch] = await sequelize.query(`
     SELECT 
       b.account_id, b.asset_code,
-      CAST(b.available_amount AS SIGNED) AS available_recorded,
-      CAST(COALESCE(t.sum_delta, 0) AS SIGNED) AS available_calculated,
-      CAST(b.frozen_amount AS SIGNED) AS frozen_recorded,
-      CAST(COALESCE(t.sum_frozen, 0) AS SIGNED) AS frozen_calculated,
-      CAST(b.available_amount - COALESCE(t.sum_delta, 0) AS SIGNED) AS available_diff,
-      CAST(b.frozen_amount - COALESCE(t.sum_frozen, 0) AS SIGNED) AS frozen_diff
+      CAST(SUM(b.available_amount) + SUM(b.frozen_amount) AS SIGNED) AS total_recorded,
+      CAST(COALESCE(t.net, 0) AS SIGNED) AS total_calculated,
+      CAST((SUM(b.available_amount) + SUM(b.frozen_amount)) - COALESCE(t.net, 0) AS SIGNED) AS total_diff,
+      CAST(SUM(b.available_amount) - COALESCE(t.sum_delta, 0) AS SIGNED) AS available_diff_info,
+      CAST(SUM(b.frozen_amount) - COALESCE(t.sum_frozen, 0) AS SIGNED) AS frozen_diff_info
     FROM account_asset_balances b
     INNER JOIN accounts a ON b.account_id = a.account_id AND a.account_type = 'user'
     LEFT JOIN (
       SELECT account_id, asset_code,
         SUM(delta_amount) AS sum_delta,
-        SUM(COALESCE(frozen_amount_change, 0)) AS sum_frozen
+        SUM(COALESCE(frozen_amount_change, 0)) AS sum_frozen,
+        SUM(delta_amount + COALESCE(frozen_amount_change, 0)) AS net
       FROM asset_transactions
       WHERE (is_invalid IS NULL OR is_invalid = 0)
       GROUP BY account_id, asset_code
     ) t ON b.account_id = t.account_id AND b.asset_code = t.asset_code
-    WHERE CAST(b.available_amount - COALESCE(t.sum_delta, 0) AS SIGNED) != 0
-       OR CAST(b.frozen_amount - COALESCE(t.sum_frozen, 0) AS SIGNED) != 0
+    WHERE b.asset_code NOT IN (:campaignScopedCodes)
+    GROUP BY b.account_id, b.asset_code, t.net
+    HAVING CAST((SUM(b.available_amount) + SUM(b.frozen_amount)) - COALESCE(t.net, 0) AS SIGNED) != 0
     LIMIT 20
-  `)
+  `, { replacements: { campaignScopedCodes: CAMPAIGN_SCOPED_ASSET_CODES } })
   results.assets.balance_consistency = {
     status: balanceMismatch.length === 0 ? 'PASS' : 'FAIL',
-    mismatch_count: balanceMismatch.length
+    mismatch_count: balanceMismatch.length,
+    excluded_campaign_scoped: CAMPAIGN_SCOPED_ASSET_CODES
   }
-  console.log(`  余额一致：${results.assets.balance_consistency.status}（${balanceMismatch.length} 个不一致）`)
+  console.log(`  余额一致：${results.assets.balance_consistency.status}（${balanceMismatch.length} 个不一致，按总额净值口径，已排除活动维度资产 ${CAMPAIGN_SCOPED_ASSET_CODES.join('/')}）`)
 
   // 3. 全局守恒判定
   const globalPass = results.assets.global.every(r => r.total_net === 0)

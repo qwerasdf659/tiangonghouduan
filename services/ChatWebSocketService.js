@@ -44,10 +44,21 @@ class ChatWebSocketService {
     this.connectedUsers = new Map() // 存储用户连接 {userId: socketId}
     this.connectedAdmins = new Map() // 存储客服连接 {adminId: socketId}
 
-    // ⚡ 连接数限制配置（2025年01月21日新增）
-    this.MAX_TOTAL_CONNECTIONS = 5000 // 最大总连接数
-    this.MAX_USER_CONNECTIONS = 4500 // 最大用户连接数
-    this.MAX_ADMIN_CONNECTIONS = 500 // 最大客服连接数
+    /*
+     * ⚡ 连接数限制配置（2025年01月21日新增）
+     *
+     * R7（cluster 连接数语义校正，2026-05-30）：
+     * - 以下上限是「单 worker 进程」级别的语义，而非整个 cluster 的全局总量
+     * - 设计意图：连接数上限的本质是保护「单个进程」的内存与文件描述符资源，
+     *   因此每个 worker 各自维护并校验自己的连接数是正确的保护粒度
+     * - cluster 集群总容量 = 单 worker 上限 × worker 数（如 4 worker × 5000 = 20000），
+     *   对 32核/127G 机器完全安全，满足「万级并发」目标
+     * - 若未来需要「集群级硬上限」（而非按进程保护），应改用 Redis 全局计数器，
+     *   当前数据量远未触及，不引入（避免过度设计，与文档 R7 决策一致）
+     */
+    this.MAX_TOTAL_CONNECTIONS = 5000 // 单 worker 最大总连接数
+    this.MAX_USER_CONNECTIONS = 4500 // 单 worker 最大用户连接数
+    this.MAX_ADMIN_CONNECTIONS = 500 // 单 worker 最大客服连接数
 
     /*
      * ⚡ 服务启动日志ID（2025年11月08日新增 - 用于记录uptime运行时长）
@@ -98,10 +109,38 @@ class ChatWebSocketService {
         credentials: true
       },
       path: '/socket.io',
-      transports: ['websocket', 'polling'], // 支持WebSocket和轮询
+      /*
+       * R11（cluster sticky 规避，2026-05-30）：强制 websocket-only，禁用 polling。
+       * 原因：polling 握手由多个 HTTP 请求组成，PM2 cluster 默认轮询分发会把
+       * 同一会话的请求打到不同 worker，导致 "Session ID unknown" 握手失败、反复重连。
+       * WebSocket 是单条 TCP 长连接，天然不需要 sticky session；
+       * 微信小程序(wx.connectSocket) 与管理后台浏览器均原生支持纯 WebSocket。
+       */
+      transports: ['websocket'],
       pingTimeout: 60000, // 60秒心跳超时
       pingInterval: 25000 // 25秒心跳间隔
     })
+
+    /*
+     * R3（cluster 跨进程消息广播，2026-05-30）：接入 Socket.IO Redis Adapter。
+     * 作用：cluster 多 worker 下，io.to(room).emit() 通过 Redis pub/sub 自动跨进程转发，
+     *       使连在 worker-A 的用户能收到 worker-B 发起的房间广播。
+     * 复用：UnifiedRedisClient 已建好的 pubClient/subClient（零新增连接）。
+     * 降级：适配器接入失败不阻断服务启动（单进程下本就无需适配器）。
+     */
+    try {
+      const { createAdapter } = require('@socket.io/redis-adapter')
+      const { getRedisClient } = require('../utils/UnifiedRedisClient')
+      const redisClient = getRedisClient()
+      const pubClient = redisClient.getPubClient()
+      const subClient = redisClient.getSubClient()
+      this.io.adapter(createAdapter(pubClient, subClient))
+      wsLogger.info('✅ Socket.IO Redis Adapter 已接入（cluster 跨进程广播就绪）')
+    } catch (adapterError) {
+      wsLogger.error('Socket.IO Redis Adapter 接入失败（单进程可忽略）', {
+        error: adapterError.message
+      })
+    }
 
     /*
      * ⚡ 记录服务启动事件到数据库（2025年11月08日新增）
@@ -206,7 +245,7 @@ class ChatWebSocketService {
     wsLogger.info('✅ 聊天WebSocket服务已启动')
     wsLogger.info(`   启动时间: ${startTimeStr}`)
     wsLogger.info('   路径: /socket.io')
-    wsLogger.info('   传输: WebSocket + Polling')
+    wsLogger.info('   传输: WebSocket（cluster 安全，已禁用 polling）')
   }
 
   /**
@@ -227,6 +266,13 @@ class ChatWebSocketService {
 
       if (isAdminSession) {
         this.connectedAdmins.set(userId, socket.id)
+        /*
+         * R6（cluster 跨进程推送，2026-05-30）：加入身份房间。
+         * admin:{id} 用于定向推送，admins 用于广播给所有管理员。
+         * 配合 Redis Adapter，io.to(room).emit() 可跨 worker 送达。
+         */
+        socket.join(`admin:${userId}`)
+        socket.join('admins')
         wsLogger.info('管理员已连接', {
           user_id: userId,
           socket_id: socket.id,
@@ -234,6 +280,9 @@ class ChatWebSocketService {
         })
       } else {
         this.connectedUsers.set(userId, socket.id)
+        // R6：加入 user:{id}（定向）与 users（广播）房间，支持跨 worker 推送
+        socket.join(`user:${userId}`)
+        socket.join('users')
         wsLogger.info('用户已连接', {
           user_id: userId,
           socket_id: socket.id,
@@ -479,24 +528,28 @@ class ChatWebSocketService {
    * @returns {Boolean} 是否推送成功
    */
   pushMessageToUser(user_id, message) {
-    const socketId = this.connectedUsers.get(user_id)
-    if (socketId) {
-      try {
-        this.io.to(socketId).emit('new_message', message)
-        wsLogger.info(`📤 消息已推送给用户 ${user_id}`)
-        return true
-      } catch (error) {
-        wsLogger.error('推送消息给用户失败', {
-          user_id,
-          chat_message_id: message.chat_message_id || 'unknown',
-          error: error.message,
-          timestamp: BeijingTimeHelper.now()
-        })
-        return false
-      }
+    if (!this.io) {
+      wsLogger.info(`⚠️ WebSocket未初始化，无法推送给用户 ${user_id}`)
+      return false
     }
-    wsLogger.info(`⚠️ 用户 ${user_id} 不在线，无法推送`)
-    return false
+    try {
+      /*
+       * R6（cluster 跨进程推送）：改用 room 定向 emit。
+       * 用户可能连在其他 worker，io.to('user:'+id) 经 Redis Adapter 跨进程送达；
+       * connectedUsers 仅作本进程在线视图（introspection），不再用于查 socketId。
+       */
+      this.io.to(`user:${user_id}`).emit('new_message', message)
+      wsLogger.info(`📤 消息已推送给用户 ${user_id}`)
+      return true
+    } catch (error) {
+      wsLogger.error('推送消息给用户失败', {
+        user_id,
+        chat_message_id: message.chat_message_id || 'unknown',
+        error: error.message,
+        timestamp: BeijingTimeHelper.now()
+      })
+      return false
+    }
   }
 
   /**
@@ -506,24 +559,24 @@ class ChatWebSocketService {
    * @returns {Boolean} 是否推送成功
    */
   pushMessageToAdmin(admin_id, message) {
-    const socketId = this.connectedAdmins.get(admin_id)
-    if (socketId) {
-      try {
-        this.io.to(socketId).emit('new_message', message)
-        wsLogger.info(`📤 消息已推送给客服 ${admin_id}`)
-        return true
-      } catch (error) {
-        wsLogger.error('推送消息给客服失败', {
-          admin_id,
-          chat_message_id: message.chat_message_id || 'unknown',
-          error: error.message,
-          timestamp: BeijingTimeHelper.now()
-        })
-        return false
-      }
+    if (!this.io) {
+      wsLogger.info(`⚠️ WebSocket未初始化，无法推送给客服 ${admin_id}`)
+      return false
     }
-    wsLogger.info(`⚠️ 客服 ${admin_id} 不在线，无法推送`)
-    return false
+    try {
+      // R6（cluster 跨进程推送）：改用 admin:{id} 房间定向 emit
+      this.io.to(`admin:${admin_id}`).emit('new_message', message)
+      wsLogger.info(`📤 消息已推送给客服 ${admin_id}`)
+      return true
+    } catch (error) {
+      wsLogger.error('推送消息给客服失败', {
+        admin_id,
+        chat_message_id: message.chat_message_id || 'unknown',
+        error: error.message,
+        timestamp: BeijingTimeHelper.now()
+      })
+      return false
+    }
   }
 
   /**
@@ -532,23 +585,27 @@ class ChatWebSocketService {
    * @returns {Number} 成功推送的客服数量
    */
   broadcastToAllAdmins(message) {
-    let successCount = 0
-
-    for (const [admin_id, socketId] of this.connectedAdmins.entries()) {
-      try {
-        this.io.to(socketId).emit('new_message', message)
-        successCount++
-      } catch (error) {
-        wsLogger.error('广播消息给客服失败', {
-          admin_id,
-          chat_message_id: message.chat_message_id || 'unknown',
-          error: error.message
-        })
-      }
+    if (!this.io) {
+      wsLogger.warn('WebSocket服务未初始化，无法广播给客服')
+      return 0
+    }
+    /*
+     * R6（cluster 跨进程广播）：改用 admins 房间广播，Redis Adapter 跨 worker 送达所有客服。
+     * 返回本进程在线客服数作为参考（集群总数由各 worker 各自统计，日志用途）。
+     */
+    try {
+      this.io.to('admins').emit('new_message', message)
+    } catch (error) {
+      wsLogger.error('广播消息给客服失败', {
+        chat_message_id: message.chat_message_id || 'unknown',
+        error: error.message
+      })
+      return 0
     }
 
-    wsLogger.info(`📢 消息已广播给 ${successCount}/${this.connectedAdmins.size} 个在线客服`)
-    return successCount
+    const localAdminCount = this.connectedAdmins.size
+    wsLogger.info(`📢 消息已广播给 admins 房间（本进程在线客服 ${localAdminCount} 个）`)
+    return localAdminCount
   }
 
   /**
@@ -564,27 +621,27 @@ class ChatWebSocketService {
    * @returns {boolean} 是否推送成功（用户不在线返回 false）
    */
   pushNotificationToUser(user_id, notification) {
-    const socketId = this.connectedUsers.get(user_id)
-    if (socketId) {
-      try {
-        this.io.to(socketId).emit('new_notification', notification)
-        wsLogger.info(`🔔 用户通知已推送给用户 ${user_id}`, {
-          notification_id: notification.notification_id,
-          type: notification.type
-        })
-        return true
-      } catch (error) {
-        wsLogger.error('推送通知给用户失败', {
-          user_id,
-          notification_id: notification.notification_id || 'unknown',
-          error: error.message,
-          timestamp: BeijingTimeHelper.now()
-        })
-        return false
-      }
+    if (!this.io) {
+      wsLogger.info(`⚠️ WebSocket未初始化，无法推送通知给用户 ${user_id}`)
+      return false
     }
-    wsLogger.info(`⚠️ 用户 ${user_id} 不在线，无法推送通知`)
-    return false
+    try {
+      // R6（cluster 跨进程推送）：改用 user:{id} 房间定向 emit
+      this.io.to(`user:${user_id}`).emit('new_notification', notification)
+      wsLogger.info(`🔔 用户通知已推送给用户 ${user_id}`, {
+        notification_id: notification.notification_id,
+        type: notification.type
+      })
+      return true
+    } catch (error) {
+      wsLogger.error('推送通知给用户失败', {
+        user_id,
+        notification_id: notification.notification_id || 'unknown',
+        error: error.message,
+        timestamp: BeijingTimeHelper.now()
+      })
+      return false
+    }
   }
 
   /**
@@ -594,24 +651,24 @@ class ChatWebSocketService {
    * @returns {Boolean} 是否推送成功
    */
   pushNotificationToAdmin(admin_id, notification) {
-    const socketId = this.connectedAdmins.get(admin_id)
-    if (socketId) {
-      try {
-        this.io.to(socketId).emit('notification', notification)
-        wsLogger.info(`🔔 通知已推送给管理员 ${admin_id}`)
-        return true
-      } catch (error) {
-        wsLogger.error('推送通知给管理员失败', {
-          admin_id,
-          notification_id: notification.notification_id || 'unknown',
-          error: error.message,
-          timestamp: BeijingTimeHelper.now()
-        })
-        return false
-      }
+    if (!this.io) {
+      wsLogger.info(`⚠️ WebSocket未初始化，无法推送通知给管理员 ${admin_id}`)
+      return false
     }
-    wsLogger.info(`⚠️ 管理员 ${admin_id} 不在线，无法推送通知`)
-    return false
+    try {
+      // R6（cluster 跨进程推送）：改用 admin:{id} 房间定向 emit，Redis Adapter 跨 worker 送达
+      this.io.to(`admin:${admin_id}`).emit('notification', notification)
+      wsLogger.info(`🔔 通知已推送给管理员 ${admin_id}`)
+      return true
+    } catch (error) {
+      wsLogger.error('推送通知给管理员失败', {
+        admin_id,
+        notification_id: notification.notification_id || 'unknown',
+        error: error.message,
+        timestamp: BeijingTimeHelper.now()
+      })
+      return false
+    }
   }
 
   /**
@@ -620,23 +677,27 @@ class ChatWebSocketService {
    * @returns {Number} 成功推送的管理员数量
    */
   broadcastNotificationToAllAdmins(notification) {
-    let successCount = 0
-
-    for (const [admin_id, socketId] of this.connectedAdmins.entries()) {
-      try {
-        this.io.to(socketId).emit('notification', notification)
-        successCount++
-      } catch (error) {
-        wsLogger.error('广播通知给管理员失败', {
-          admin_id,
-          notification_id: notification.notification_id || 'unknown',
-          error: error.message
-        })
-      }
+    if (!this.io) {
+      wsLogger.warn('WebSocket服务未初始化，无法广播通知给管理员')
+      return 0
+    }
+    /*
+     * R6（cluster 跨进程广播）：改用 admins 房间广播，Redis Adapter 跨 worker 送达所有管理员。
+     * 返回本进程在线管理员数作为参考（集群总数由各 worker 各自统计，日志用途）。
+     */
+    try {
+      this.io.to('admins').emit('notification', notification)
+    } catch (error) {
+      wsLogger.error('广播通知给管理员失败', {
+        notification_id: notification.notification_id || 'unknown',
+        error: error.message
+      })
+      return 0
     }
 
-    wsLogger.info(`📢 通知已广播给 ${successCount}/${this.connectedAdmins.size} 个在线管理员`)
-    return successCount
+    const localAdminCount = this.connectedAdmins.size
+    wsLogger.info(`📢 通知已广播给 admins 房间（本进程在线管理员 ${localAdminCount} 个）`)
+    return localAdminCount
   }
 
   /**
@@ -666,7 +727,10 @@ class ChatWebSocketService {
    * })
    */
   pushAlertToAdmins(alert) {
-    let successCount = 0
+    if (!this.io) {
+      wsLogger.warn('WebSocket服务未初始化，无法推送告警给管理员')
+      return 0
+    }
 
     // 构建告警推送数据
     const alertData = {
@@ -680,27 +744,28 @@ class ChatWebSocketService {
       timestamp: BeijingTimeHelper.now()
     }
 
-    // 遍历所有在线管理员推送
-    for (const [admin_id, socketId] of this.connectedAdmins.entries()) {
-      try {
-        this.io.to(socketId).emit('new_alert', alertData)
-        successCount++
-      } catch (error) {
-        wsLogger.error('推送告警给管理员失败', {
-          admin_id,
-          alert_id: alert.alert_id,
-          error: error.message
-        })
-      }
+    /*
+     * R6（cluster 跨进程广播）：改用 admins 房间广播，Redis Adapter 跨 worker 送达所有管理员。
+     * 返回本进程在线管理员数作为参考（集群总数由各 worker 各自统计，日志用途）。
+     */
+    try {
+      this.io.to('admins').emit('new_alert', alertData)
+    } catch (error) {
+      wsLogger.error('推送告警给管理员失败', {
+        alert_id: alert.alert_id,
+        error: error.message
+      })
+      return 0
     }
 
-    wsLogger.info(`🚨 告警已推送给 ${successCount}/${this.connectedAdmins.size} 个在线管理员`, {
+    const localAdminCount = this.connectedAdmins.size
+    wsLogger.info(`🚨 告警已广播给 admins 房间（本进程在线管理员 ${localAdminCount} 个）`, {
       alert_id: alert.alert_id,
       alert_type: alert.alert_type,
       severity: alert.severity
     })
 
-    return successCount
+    return localAdminCount
   }
 
   /**
@@ -712,9 +777,8 @@ class ChatWebSocketService {
    * @returns {Promise<number>} 推送的告警数量
    */
   async pushPendingAlertsToAdmin(admin_id) {
-    const socketId = this.connectedAdmins.get(admin_id)
-    if (!socketId) {
-      wsLogger.info(`⚠️ 管理员 ${admin_id} 不在线，无法推送待处理告警`)
+    if (!this.io) {
+      wsLogger.info(`⚠️ WebSocket未初始化，无法推送待处理告警给管理员 ${admin_id}`)
       return 0
     }
 
@@ -741,7 +805,8 @@ class ChatWebSocketService {
       })
 
       if (alertResult.alerts && alertResult.alerts.length > 0) {
-        this.io.to(socketId).emit('pending_alerts', {
+        // R6（cluster 跨进程推送）：改用 admin:{id} 房间定向 emit，Redis Adapter 跨 worker 送达
+        this.io.to(`admin:${admin_id}`).emit('pending_alerts', {
           alerts: alertResult.alerts,
           total: alertResult.total,
           timestamp: BeijingTimeHelper.now()
@@ -914,25 +979,27 @@ class ChatWebSocketService {
    */
   disconnectUser(user_id, user_type = 'user', options = {}) {
     const { reason = 'session_replaced', replaced_by_platform = null } = options
-    const map = user_type === 'user' ? this.connectedUsers : this.connectedAdmins
-    const socketId = map.get(user_id)
+    if (!this.io) return
 
-    if (socketId) {
-      const socket = this.io.sockets.sockets.get(socketId)
-      if (socket) {
-        socket.emit('session_replaced', {
-          reason,
-          replaced_by_platform,
-          message: '您的账号已在其他设备登录'
-        })
-        socket.disconnect(true)
-        map.delete(user_id)
-        wsLogger.info(`🔌 已强制断开 ${user_type} ${user_id} 的连接`, {
-          reason,
-          replaced_by_platform
-        })
-      }
-    }
+    const room = user_type === 'user' ? `user:${user_id}` : `admin:${user_id}`
+
+    /*
+     * R6（cluster 跨进程强制下线）：
+     * - 先向房间 emit session_replaced（Redis Adapter 跨 worker 送达，用户可能连在其他 worker）
+     * - 再用 io.in(room).disconnectSockets(true) 跨进程断开该用户在任意 worker 上的连接
+     * - 本进程连接映射由各 socket 的 'disconnect' 事件处理器自动清理（无需手动 delete）
+     */
+    this.io.to(room).emit('session_replaced', {
+      reason,
+      replaced_by_platform,
+      message: '您的账号已在其他设备登录'
+    })
+    this.io.in(room).disconnectSockets(true)
+
+    wsLogger.info(`🔌 已强制断开 ${user_type} ${user_id} 的连接`, {
+      reason,
+      replaced_by_platform
+    })
   }
 
   /**
@@ -1015,65 +1082,54 @@ class ChatWebSocketService {
       return result
     }
 
-    // 1️⃣ 通知用户（如果在线）
-    const userSocketId = this.connectedUsers.get(user_id)
-    if (userSocketId) {
-      const userSocket = this.io.sockets.sockets.get(userSocketId)
-      if (userSocket) {
-        userSocket.emit('session_closed', {
-          session_id,
-          status: 'closed',
-          close_reason: closeData.close_reason,
-          closed_at: closeData.closed_at,
-          closed_by: closeData.closed_by,
-          message: `会话已被客服关闭：${closeData.close_reason}`,
-          timestamp: BeijingTimeHelper.now()
-        })
-        result.notified_user = true
-        result.user_online = true
-        wsLogger.info('通知用户会话关闭', {
-          user_id,
-          session_id,
-          close_reason: closeData.close_reason
-        })
-      }
-    }
+    /*
+     * R6（cluster 跨进程推送）：全部改用房间定向 emit，Redis Adapter 跨 worker 送达。
+     * online 标志基于本进程在线视图作为最佳努力参考（集群真实在线由房间投递保证）。
+     */
 
-    // 2️⃣ 通知管理员（如果在线且不是关闭人）
+    // 1️⃣ 通知用户（user:{id} 房间）
+    this.io.to(`user:${user_id}`).emit('session_closed', {
+      session_id,
+      status: 'closed',
+      close_reason: closeData.close_reason,
+      closed_at: closeData.closed_at,
+      closed_by: closeData.closed_by,
+      message: `会话已被客服关闭：${closeData.close_reason}`,
+      timestamp: BeijingTimeHelper.now()
+    })
+    result.notified_user = true
+    result.user_online = this.connectedUsers.has(user_id)
+    wsLogger.info('通知用户会话关闭', {
+      user_id,
+      session_id,
+      close_reason: closeData.close_reason
+    })
+
+    // 2️⃣ 通知指定管理员（admin:{id} 房间，非关闭人本人）
     if (admin_id && admin_id !== closeData.closed_by) {
-      const adminSocketId = this.connectedAdmins.get(admin_id)
-      if (adminSocketId) {
-        const adminSocket = this.io.sockets.sockets.get(adminSocketId)
-        if (adminSocket) {
-          adminSocket.emit('session_closed', {
-            session_id,
-            status: 'closed',
-            close_reason: closeData.close_reason,
-            closed_at: closeData.closed_at,
-            closed_by: closeData.closed_by,
-            message: '会话已被其他客服关闭',
-            timestamp: BeijingTimeHelper.now()
-          })
-          result.notified_admin = true
-          result.admin_online = true
-          wsLogger.info('通知管理员会话关闭', { admin_id, session_id })
-        }
-      }
+      this.io.to(`admin:${admin_id}`).emit('session_closed', {
+        session_id,
+        status: 'closed',
+        close_reason: closeData.close_reason,
+        closed_at: closeData.closed_at,
+        closed_by: closeData.closed_by,
+        message: '会话已被其他客服关闭',
+        timestamp: BeijingTimeHelper.now()
+      })
+      result.notified_admin = true
+      result.admin_online = this.connectedAdmins.has(admin_id)
+      wsLogger.info('通知管理员会话关闭', { admin_id, session_id })
     }
 
-    // 3️⃣ 广播给所有在线管理员（用于管理后台列表刷新）
-    this.connectedAdmins.forEach((socketId, adminUserId) => {
-      if (adminUserId !== closeData.closed_by) {
-        // 不通知关闭人自己
-        const socket = this.io.sockets.sockets.get(socketId)
-        if (socket) {
-          socket.emit('session_list_update', {
-            action: 'session_closed',
-            session_id,
-            timestamp: BeijingTimeHelper.now()
-          })
-        }
-      }
+    /*
+     * 3️⃣ 广播给所有管理员刷新列表（admins 房间）。
+     * 关闭人本人也会收到刷新信号（无害：仅触发列表刷新，状态本就已知）。
+     * cluster 下无法低成本按 socket 排除单个管理员，广播给全体是正确且更简单的做法。
+     */
+    this.io.to('admins').emit('session_list_update', {
+      action: 'session_closed',
+      session_id,
+      timestamp: BeijingTimeHelper.now()
     })
 
     return result
@@ -1107,37 +1163,30 @@ class ChatWebSocketService {
       timestamp: BeijingTimeHelper.now()
     }
 
-    let successCount = 0
-
-    // 推送给所有在线普通用户
-    for (const [userId, socketId] of this.connectedUsers.entries()) {
-      try {
-        this.io.to(socketId).emit('exchange_item_updated', payload)
-        successCount++
-      } catch (error) {
-        wsLogger.error('推送兑换商品更新给用户失败', { user_id: userId, error: error.message })
-      }
+    /*
+     * R6（cluster 跨进程广播）：改用 users + admins 房间广播，Redis Adapter 跨 worker 送达。
+     * 返回本进程在线连接数作为参考（集群总数由各 worker 各自统计，日志用途）。
+     */
+    try {
+      this.io.to('users').emit('exchange_item_updated', payload)
+      this.io.to('admins').emit('exchange_item_updated', payload)
+    } catch (error) {
+      wsLogger.error('广播兑换商品更新失败', {
+        exchange_item_id: itemData.exchange_item_id,
+        error: error.message
+      })
+      return 0
     }
 
-    // 同时推送给管理员（管理后台也可能需要实时刷新）
-    for (const [adminId, socketId] of this.connectedAdmins.entries()) {
-      try {
-        this.io.to(socketId).emit('exchange_item_updated', payload)
-        successCount++
-      } catch (error) {
-        wsLogger.error('推送兑换商品更新给管理员失败', { admin_id: adminId, error: error.message })
-      }
-    }
-
+    const localCount = this.connectedUsers.size + this.connectedAdmins.size
     wsLogger.info('📦 兑换商品更新通知已广播', {
       action: itemData.action,
       exchange_item_id: itemData.exchange_item_id,
-      pushed_count: successCount,
       online_users: this.connectedUsers.size,
       online_admins: this.connectedAdmins.size
     })
 
-    return successCount
+    return localCount
   }
 
   /**
@@ -1164,36 +1213,30 @@ class ChatWebSocketService {
       timestamp: BeijingTimeHelper.now()
     }
 
-    let successCount = 0
-
-    // 推送给所有在线普通用户
-    for (const [userId, socketId] of this.connectedUsers.entries()) {
-      try {
-        this.io.to(socketId).emit('exchange_stock_changed', payload)
-        successCount++
-      } catch (error) {
-        wsLogger.error('推送库存变更给用户失败', { user_id: userId, error: error.message })
-      }
+    /*
+     * R6（cluster 跨进程广播）：改用 users + admins 房间广播，Redis Adapter 跨 worker 送达。
+     * 返回本进程在线连接数作为参考（集群总数由各 worker 各自统计，日志用途）。
+     */
+    try {
+      this.io.to('users').emit('exchange_stock_changed', payload)
+      this.io.to('admins').emit('exchange_stock_changed', payload)
+    } catch (error) {
+      wsLogger.error('广播库存变更失败', {
+        exchange_item_id: stockData.exchange_item_id,
+        error: error.message
+      })
+      return 0
     }
 
-    // 同时推送给管理员
-    for (const [adminId, socketId] of this.connectedAdmins.entries()) {
-      try {
-        this.io.to(socketId).emit('exchange_stock_changed', payload)
-        successCount++
-      } catch (error) {
-        wsLogger.error('推送库存变更给管理员失败', { admin_id: adminId, error: error.message })
-      }
-    }
-
+    const localCount = this.connectedUsers.size + this.connectedAdmins.size
     wsLogger.info('📦 兑换库存变更通知已广播', {
       exchange_item_id: stockData.exchange_item_id,
       remaining_stock: stockData.remaining_stock,
       changed_amount: stockData.changed_amount,
-      pushed_count: successCount
+      online_connections: localCount
     })
 
-    return successCount
+    return localCount
   }
 
   // ==================== 竞价通知WebSocket事件（2026-02-16 前后端联调确认）====================
@@ -1290,9 +1333,8 @@ class ChatWebSocketService {
    * @private
    */
   _pushBidEvent(userId, eventName, data) {
-    const socketId = this.connectedUsers.get(userId)
-    if (!socketId) {
-      wsLogger.info(`📝 用户 ${userId} 不在线，竞价通知 ${eventName} 未推送（聊天消息已持久化）`)
+    if (!this.io) {
+      wsLogger.info(`⚠️ WebSocket未初始化，竞价通知 ${eventName} 未推送给用户 ${userId}`)
       return false
     }
 
@@ -1302,7 +1344,12 @@ class ChatWebSocketService {
         event_type: eventName,
         timestamp: BeijingTimeHelper.now()
       }
-      this.io.to(socketId).emit(eventName, payload)
+      /*
+       * R6（cluster 跨进程推送）：改用 user:{id} 房间定向 emit。
+       * 用户可能连在其他 worker，io.to('user:'+id) 经 Redis Adapter 跨进程送达；
+       * 离线用户由业务侧记录兜底（出价结果持久化在 DB，下次进页面可见）。
+       */
+      this.io.to(`user:${userId}`).emit(eventName, payload)
       wsLogger.info(`📤 竞价通知 ${eventName} 已推送给用户 ${userId}`, {
         bid_product_id: data.bid_product_id || data.auction_listing_id,
         event: eventName
@@ -1393,32 +1440,28 @@ class ChatWebSocketService {
 
     const { usersOnly = false, adminsOnly = false } = options
     const payload = { ...data, timestamp: BeijingTimeHelper.now() }
-    let successCount = 0
 
-    if (!adminsOnly) {
-      for (const [, socketId] of this.connectedUsers.entries()) {
-        try {
-          this.io.to(socketId).emit(eventName, payload)
-          successCount++
-        } catch (_) {
-          /* 忽略单个推送失败 */
-        }
+    /*
+     * R6（cluster 跨进程广播）：改用 users / admins 房间广播，Redis Adapter 跨 worker 送达。
+     * 返回本进程命中的在线连接数作为参考（集群总数由各 worker 各自统计，日志用途）。
+     */
+    let localCount = 0
+    try {
+      if (!adminsOnly) {
+        this.io.to('users').emit(eventName, payload)
+        localCount += this.connectedUsers.size
       }
+      if (!usersOnly) {
+        this.io.to('admins').emit(eventName, payload)
+        localCount += this.connectedAdmins.size
+      }
+    } catch (error) {
+      wsLogger.error(`广播事件 ${eventName} 失败`, { error: error.message })
+      return 0
     }
 
-    if (!usersOnly) {
-      for (const [, socketId] of this.connectedAdmins.entries()) {
-        try {
-          this.io.to(socketId).emit(eventName, payload)
-          successCount++
-        } catch (_) {
-          /* 忽略单个推送失败 */
-        }
-      }
-    }
-
-    wsLogger.info(`📢 广播事件: ${eventName}`, { pushed_count: successCount })
-    return successCount
+    wsLogger.info(`📢 广播事件: ${eventName}`, { local_online: localCount })
+    return localCount
   }
 
   /**
@@ -1602,9 +1645,14 @@ class ChatWebSocketService {
 
       if (isAdminSession) {
         this.connectedAdmins.set(userId, socket.id)
+        // R6：重连时同样加入身份房间，保证跨 worker 推送可达
+        socket.join(`admin:${userId}`)
+        socket.join('admins')
         wsLogger.info('管理员连接映射已恢复', { user_id: userId, socket_id: socket.id })
       } else {
         this.connectedUsers.set(userId, socket.id)
+        socket.join(`user:${userId}`)
+        socket.join('users')
         wsLogger.info('用户连接映射已恢复', { user_id: userId, socket_id: socket.id })
       }
 

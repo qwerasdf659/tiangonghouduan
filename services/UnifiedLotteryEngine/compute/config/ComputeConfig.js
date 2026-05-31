@@ -699,9 +699,16 @@ function _getCacheSlot(lottery_campaign_id) {
 
 /**
  * 配置缓存 TTL（毫秒）
- * 默认 5 分钟刷新一次
+ *
+ * R4/D9（cluster 跨进程配置一致性，2026-05-30）：
+ * - 这是抽奖判定热路径真正使用的配置缓存（各 worker 进程内 Map）
+ * - 管理员改配置时 clearCache() 只清「当前 worker」，其他 worker 靠 TTL 过期收敛
+ * - cluster 下为避免其他 worker 长时间读旧配置，默认 TTL 由 5 分钟收紧到 30 秒
+ * - 收敛窗口 ≤30s，符合「秒级」要求；配置非资损敏感（正确性由 DB 行锁兜底）
+ * - 仍可用 STRATEGY_CONFIG_CACHE_TTL 环境变量覆盖（单一真相源 .env）
+ * - 不搬 Redis 的原因：配置每次抽奖读多次，搬 Redis 会给热路径增加往返延迟
  */
-const CONFIG_CACHE_TTL = parseInt(process.env.STRATEGY_CONFIG_CACHE_TTL) || 5 * 60 * 1000
+const CONFIG_CACHE_TTL = parseInt(process.env.STRATEGY_CONFIG_CACHE_TTL) || 30 * 1000
 
 /**
  * DynamicConfigLoader - 动态配置加载器

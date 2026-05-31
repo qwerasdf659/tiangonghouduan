@@ -924,6 +924,25 @@ app.use((error, req, res, _next) => {
 })
 
 /**
+ * 判断当前进程是否为「定时任务唯一执行 worker」
+ *
+ * 业务场景（PM2 cluster 多进程防重）：
+ * - cluster 模式下 PM2 会 fork 多个 worker，每个 worker 都会执行 app.js
+ * - 若每个 worker 都注册 cron，同一任务会被执行 N 次（重复扣费/发奖/对账，造成资损）
+ * - 通过 PM2 注入的 NODE_APP_INSTANCE 环境变量，只让 0 号 worker 注册定时任务
+ *
+ * 兼容性：
+ * - fork 单进程模式下 NODE_APP_INSTANCE 为 undefined，此时放行（保持原有行为）
+ * - cluster 模式下仅 '0' 号 worker 返回 true，其余 worker 不注册 cron
+ *
+ * @returns {boolean} 当前进程是否应注册定时任务
+ */
+function isCronWorker() {
+  const instanceId = process.env.NODE_APP_INSTANCE
+  return instanceId === undefined || instanceId === '0'
+}
+
+/**
  *  应用初始化流程（同步阻塞模式）
  *
  * 初始化顺序：
@@ -956,13 +975,22 @@ async function initializeApp() {
       services: Array.from(services.getAllServices().keys())
     })
 
-    // 审核链超时自动升级定时任务（每30分钟扫描）
-    try {
-      const ApprovalChainTimeoutService = require('./services/ApprovalChainTimeoutService')
-      ApprovalChainTimeoutService.start()
-      appLogger.info('审核链超时扫描定时任务已启动')
-    } catch (timeoutError) {
-      appLogger.warn(`审核链超时服务启动失败（非致命）: ${timeoutError.message}`)
+    /*
+     * 审核链超时自动升级定时任务（每30分钟扫描）
+     * R1（cluster 防重）：仅在定时任务 worker 注册，避免多 worker 重复升级审批状态
+     */
+    if (isCronWorker()) {
+      try {
+        const ApprovalChainTimeoutService = require('./services/ApprovalChainTimeoutService')
+        ApprovalChainTimeoutService.start()
+        appLogger.info('审核链超时扫描定时任务已启动')
+      } catch (timeoutError) {
+        appLogger.warn(`审核链超时服务启动失败（非致命）: ${timeoutError.message}`)
+      }
+    } else {
+      appLogger.info('当前 worker 非定时任务执行节点，跳过审核链超时任务注册', {
+        node_app_instance: process.env.NODE_APP_INSTANCE
+      })
     }
 
     // 运行时自检：打印连接池配置
@@ -1124,6 +1152,16 @@ if (require.main === module) {
   const http = require('http')
   const server = http.createServer(app)
 
+  /*
+   * B5（万级并发优化方案B，2026-05-31）：HTTP Keep-Alive 调优
+   * - keepAliveTimeout=65000：空闲长连接保持 65 秒，必须大于上游 Nginx 默认 keepalive_timeout(60s)，
+   *   避免「Nginx 复用了一条后端已主动关闭的连接」引发的偶发 502。
+   * - headersTimeout=66000：略大于 keepAliveTimeout，防止 Node 在等待请求头阶段提前判定超时。
+   * 作用：cluster 多 worker 高并发下减少 TCP 三次握手开销、降低 P99 抖动；对前端契约无任何影响。
+   */
+  server.keepAliveTimeout = 65000
+  server.headersTimeout = 66000
+
   //  先执行初始化（包含预检），再启动服务器监听
   initializeApp()
     .then(() => {
@@ -1136,49 +1174,58 @@ if (require.main === module) {
           ChatWebSocketService.initialize(server)
           appLogger.info('聊天WebSocket服务已启动', {
             path: '/socket.io',
-            transports: ['websocket', 'polling']
+            transports: ['websocket']
           })
         } catch (error) {
           appLogger.error('聊天WebSocket服务初始化失败', { error: error.message })
         }
 
-        // 初始化定时任务
-        try {
-          const ScheduledTasks = require('./scripts/maintenance/scheduled_tasks')
-          ScheduledTasks.initialize()
-          appLogger.info('定时任务初始化完成')
-        } catch (error) {
-          appLogger.error('定时任务初始化失败', { error: error.message })
-        }
+        /*
+         * 初始化定时任务
+         * R1（cluster 防重）：4 个 cron 注册点统一收口到单 worker 守卫，避免多 worker 重复执行
+         */
+        if (isCronWorker()) {
+          try {
+            const ScheduledTasks = require('./scripts/maintenance/scheduled_tasks')
+            ScheduledTasks.initialize()
+            appLogger.info('定时任务初始化完成')
+          } catch (error) {
+            appLogger.error('定时任务初始化失败', { error: error.message })
+          }
 
-        // 初始化广告系统定时任务（ENABLE_AD_CRON_JOBS=true 时启用）
-        try {
-          require('./jobs/ad-cron-jobs')
-          appLogger.info('广告定时任务模块已加载', {
-            enabled: process.env.ENABLE_AD_CRON_JOBS === 'true'
-          })
-        } catch (error) {
-          appLogger.error('广告定时任务加载失败', { error: error.message })
-        }
+          // 初始化广告系统定时任务（ENABLE_AD_CRON_JOBS=true 时启用）
+          try {
+            require('./jobs/ad-cron-jobs')
+            appLogger.info('广告定时任务模块已加载', {
+              enabled: process.env.ENABLE_AD_CRON_JOBS === 'true'
+            })
+          } catch (error) {
+            appLogger.error('广告定时任务加载失败', { error: error.message })
+          }
 
-        // 初始化内容过期清理定时任务（ENABLE_CONTENT_CRON_JOBS=true 时启用）
-        try {
-          require('./jobs/ad-campaign-expiry-jobs')
-          appLogger.info('内容过期清理定时任务模块已加载', {
-            enabled: process.env.ENABLE_CONTENT_CRON_JOBS === 'true'
-          })
-        } catch (error) {
-          appLogger.error('内容过期清理定时任务加载失败', { error: error.message })
-        }
+          // 初始化内容过期清理定时任务（ENABLE_CONTENT_CRON_JOBS=true 时启用）
+          try {
+            require('./jobs/ad-campaign-expiry-jobs')
+            appLogger.info('内容过期清理定时任务模块已加载', {
+              enabled: process.env.ENABLE_CONTENT_CRON_JOBS === 'true'
+            })
+          } catch (error) {
+            appLogger.error('内容过期清理定时任务加载失败', { error: error.message })
+          }
 
-        // 初始化管理员通知清理定时任务（ENABLE_NOTIFICATION_CLEANUP=true 时启用）
-        try {
-          require('./jobs/daily-notification-cleanup')
-          appLogger.info('管理员通知清理定时任务模块已加载', {
-            enabled: process.env.ENABLE_NOTIFICATION_CLEANUP === 'true'
+          // 初始化管理员通知清理定时任务（ENABLE_NOTIFICATION_CLEANUP=true 时启用）
+          try {
+            require('./jobs/daily-notification-cleanup')
+            appLogger.info('管理员通知清理定时任务模块已加载', {
+              enabled: process.env.ENABLE_NOTIFICATION_CLEANUP === 'true'
+            })
+          } catch (error) {
+            appLogger.error('管理员通知清理定时任务加载失败', { error: error.message })
+          }
+        } else {
+          appLogger.info('当前 worker 非定时任务执行节点，跳过全部 cron 注册', {
+            node_app_instance: process.env.NODE_APP_INSTANCE
           })
-        } catch (error) {
-          appLogger.error('管理员通知清理定时任务加载失败', { error: error.message })
         }
 
         /*
@@ -1190,11 +1237,21 @@ if (require.main === module) {
         if (process.env.ENABLE_POOL_MONITORING !== 'false') {
           const { sequelize } = require('./models')
 
+          /*
+           * R10（cluster 监控噪音治理，2026-05-30）：
+           * cluster 下每个 worker 各有独立连接池，都会跑此监控（日志会 ×worker 数）。
+           * 这是正确的（需观测每个 worker 的池），但日志必须带 worker_id 才能区分，
+           * 否则 4 份「连接池状态」日志混在一起无法定位是哪个 worker。
+           * worker_id 取 PM2 注入的 NODE_APP_INSTANCE；fork 单进程下为 'fork'。
+           */
+          const workerId = process.env.NODE_APP_INSTANCE ?? 'fork'
+
           setInterval(() => {
             const pool = sequelize.connectionManager.pool
             if (!pool) return
 
             const metrics = {
+              worker_id: workerId,
               size: pool.size || 0,
               available: pool.available || 0,
               using: pool.using || 0,
@@ -1230,6 +1287,7 @@ if (require.main === module) {
           }, 60000) // 每分钟
 
           appLogger.info(' 连接池监控已启动', {
+            worker_id: workerId,
             interval: '60s',
             alert_thresholds: { waiting: 5, usage_rate: '80%' },
             log_level: 'info',

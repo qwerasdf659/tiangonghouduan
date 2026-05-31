@@ -22,7 +22,15 @@ try {
 
 // 内存缓存管理
 const memoryCache = new Map()
-const MEMORY_TTL = 5 * 60 * 1000 // 5分钟
+/*
+ * 内存层 TTL（R5 cluster 跨进程一致性收敛，2026-05-30，方案②）
+ * cluster 多进程下 invalidateUserPermissions 只能清「当前 worker」的内存层，清不掉其他 worker 的。
+ * 将内存层 TTL 从 5 分钟收紧到 30 秒：角色/权限变更后，其他 worker 最长 30 秒内自动过期回源 Redis(已失效)→DB 拿到新权限。
+ * - 账号封禁/强制登出不受此影响（走 authentication_sessions 表，每次请求新鲜查库立即生效）
+ * - 与抽奖配置缓存 R4/D9 的「30 秒收敛」同一口径，全项目统一；保留内存层以在 Redis 故障时兜底
+ * - 可用 AUTH_PERMISSION_MEMORY_TTL_MS 环境变量覆盖（单一真相源 .env）
+ */
+const MEMORY_TTL = parseInt(process.env.AUTH_PERMISSION_MEMORY_TTL_MS) || 30 * 1000 // 30秒
 const REDIS_TTL = 30 * 60 // 30分钟（秒）
 const REDIS_PREFIX = 'auth:permissions:'
 

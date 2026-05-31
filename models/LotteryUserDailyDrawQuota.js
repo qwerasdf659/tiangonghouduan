@@ -334,8 +334,17 @@ module.exports = sequelize => {
     // 获取今日日期（北京时间）
     const todayDate = BeijingTimeHelper.todayStart().toISOString().split('T')[0]
 
-    // 使用原生SQL进行原子扣减（条件更新）
-    const [affectedRows] = await sequelize.query(
+    /*
+     * 使用原生SQL进行原子扣减（条件更新）
+     *
+     * 🔴 2026-05-31 修复：affectedRows 读取位置错误导致每日配额未被强制
+     * 根因：sequelize.query(..., { type: QueryTypes.UPDATE }) 的返回是 [resultSetHeader, affectedCount]，
+     *       affectedCount 在下标 [1]；原代码 `const [affectedRows]` 取的是下标 [0]（恒为 undefined/null），
+     *       于是 `affectedRows === 0` 永远不成立 → 即使 WHERE 条件（used+draw_count<=limit）不满足、
+     *       实际更新 0 行，也会被判为「扣减成功」，导致每日抽奖次数上限形同虚设（可超额抽奖）。
+     * 修复：显式取返回数组的第 2 个元素作为受影响行数。
+     */
+    const updateResult = await sequelize.query(
       `UPDATE lottery_user_daily_draw_quota
        SET used_draw_count = used_draw_count + :draw_count,
            last_draw_at = NOW(),
@@ -355,6 +364,8 @@ module.exports = sequelize => {
         transaction
       }
     )
+    // QueryTypes.UPDATE 返回 [resultSetHeader, affectedCount]，受影响行数在下标 [1]
+    const affectedRows = Array.isArray(updateResult) ? updateResult[1] : 0
 
     // 查询最新配额状态
     const quota = await this.findOne({

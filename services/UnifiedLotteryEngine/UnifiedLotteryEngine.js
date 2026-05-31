@@ -1238,6 +1238,23 @@ class UnifiedLotteryEngine {
         draw_count,
         error: error.message
       })
+
+      /*
+       * 🔴 2026-05-31 修复：保留「已知业务错误」的语义，不要统一吞成 500 ENGINE_FAILED
+       * 根因：原代码无条件 `throw new BusinessError(..., 'ENGINE_FAILED', 500)`，
+       *       会把带有明确 statusCode/errorCode 的业务错误（如配额超限 403 DAILY_DRAW_LIMIT_EXCEEDED、
+       *       BusinessError 等）也压平成 500，导致 routes/v4/lottery/draw.js 针对 403/409 的分支无法命中，
+       *       前端拿到的是误导性的 500「抽奖执行失败」。
+       * 处理：① BusinessError 直接透传（已带 code/statusCode）；
+       *       ② 业务侧手工标注了 statusCode/errorCode 的错误（如配额错误）原样透传；
+       *       ③ 其余未知系统错误才包装为 ENGINE_FAILED 500。
+       */
+      if (BusinessError.isBusinessError(error)) {
+        throw error
+      }
+      if (error && (error.statusCode || error.errorCode)) {
+        throw error
+      }
       throw new BusinessError(`抽奖执行失败: ${error.message}`, 'ENGINE_FAILED', 500)
     }
   }

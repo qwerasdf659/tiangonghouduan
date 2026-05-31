@@ -104,6 +104,7 @@
     "lint:mappings": "node scripts/validation/check_field_blacklist.js"
   },
   "dependencies": {
+    "@socket.io/redis-adapter": "^8.3.0",
     "aws-sdk": "^2.1691.0",
     "axios": "^1.11.0",
     "compression": "^1.7.4",

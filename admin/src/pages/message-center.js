@@ -195,7 +195,8 @@ function messageCenterPage() {
 
         this.socket = io(socketUrl, {
           path: '/socket.io',
-          transports: ['websocket', 'polling'],
+          // R11：后端 cluster 为 websocket-only，客户端禁用 polling 回退以对齐（避免多 worker 握手粘连失败）
+          transports: ['websocket'],
           auth: { token },
           reconnection: true,
           reconnectionAttempts: this.maxReconnectAttempts,

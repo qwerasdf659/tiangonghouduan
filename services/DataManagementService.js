@@ -192,11 +192,23 @@ const L3_AUTO_CLEANUP_TABLES = Object.freeze({
   batch_operation_logs: 'created_at',
   risk_alerts: 'created_at',
   alert_silence_rules: 'created_at',
-  ad_report_daily_snapshots: 'report_date',
+  // 修正（2026-05-30）：以真实表结构为准，原 report_date 列不存在，实际清理依据为业务日期列 snapshot_date
+  ad_report_daily_snapshots: 'snapshot_date',
   ad_dau_daily_stats: 'stat_date',
-  system_dictionary_history: 'created_at',
+  // 修正（2026-05-30）：system_dictionary_history 无 created_at 列，实际时间列为 changed_at（字典变更时间）
+  system_dictionary_history: 'changed_at',
   ad_billing_records: 'created_at'
 })
+
+/**
+ * 系统定时任务操作员用户ID（数据库已有专用用户：user_id=11021, nickname='系统定时任务'）
+ *
+ * 用途：自动清理等无人工操作员的系统任务写审计日志时使用。
+ * admin_operation_logs.operator_id 为 NOT NULL + 外键→users.user_id，
+ * 因此系统任务不能用 0（违反外键），须用真实存在的系统用户ID。
+ * @constant {number}
+ */
+const SYSTEM_DAILY_JOB_USER_ID = 11021
 
 /**
  * L2 业务数据 - 按清理类目分组
@@ -1007,7 +1019,8 @@ class DataManagementService {
     if (totalDeleted > 0) {
       try {
         await AuditLogService.logOperation({
-          operator_id: 0,
+          // 修正（2026-05-30）：原 operator_id:0 违反外键约束（无 user_id=0），改用系统定时任务专用用户
+          operator_id: SYSTEM_DAILY_JOB_USER_ID,
           operation_type: OPERATION_TYPES.DATA_CLEANUP,
           target_type: AUDIT_TARGET_TYPES.DATA_MANAGEMENT,
           target_id: 'auto_cleanup',

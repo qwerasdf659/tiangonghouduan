@@ -28,6 +28,7 @@ class SimulationCoreService {
       LotteryTierMatrixConfig,
       LotteryStrategyConfig,
       LotteryCampaignPrize,
+      PrizeDefinition,
       LotteryCampaign
     } = this.models
 
@@ -60,20 +61,31 @@ class SimulationCoreService {
         ],
         raw: true
       }),
+      /*
+       * 🔴 2026-06-01 修复：奖品名称/类型/价值不在 lottery_campaign_prizes 表（该表只存活动级运营参数：
+       * 权重/库存/档位），必须 JOIN prize_definitions 取（display_name/prize_type/material_amount）。
+       * 原代码直接 attributes:['lottery_prize_id','prize_name','prize_type','prize_value',...] 全是
+       * 该表不存在的列 → MySQL 报 Unknown column 'lottery_prize_id' in 'field list'，baseline/run/
+       * user-journey/sensitivity 全部 500。改为 include PrizeDefinition（与 prize-pool/QueryService 同模式）。
+       */
       LotteryCampaignPrize.findAll({
         where: { lottery_campaign_id },
         attributes: [
-          'lottery_prize_id',
-          'prize_name',
+          'lottery_campaign_prize_id',
           'reward_tier',
-          'prize_type',
-          'prize_value',
           'stock_quantity',
           'total_win_count',
           'win_weight',
           'is_fallback'
         ],
-        raw: true
+        include: [
+          {
+            model: PrizeDefinition,
+            as: 'prizeDefinition',
+            attributes: ['display_name', 'prize_type', 'material_amount'],
+            required: false
+          }
+        ]
       })
     ])
 
@@ -102,11 +114,25 @@ class SimulationCoreService {
         empty_weight_multiplier: parseFloat(m.empty_weight_multiplier)
       })),
       strategy_config: this._formatStrategyConfig(strategyConfigs),
-      prizes: prizes.map(p => ({
-        ...p,
-        prize_value: parseFloat(p.prize_value || 0),
-        remaining_stock: (p.stock_quantity || 0) - (p.total_win_count || 0)
-      })),
+      /*
+       * 扁平化奖品：以活动奖品关联ID 作为 lottery_prize_id（项目统一对外别名），
+       * 名称/类型来自 prize_definitions，价值用 material_amount（材料类奖品的数量即其价值口径）。
+       */
+      prizes: prizes.map(cp => {
+        const def = cp.prizeDefinition || {}
+        return {
+          lottery_prize_id: cp.lottery_campaign_prize_id,
+          prize_name: def.display_name || null,
+          prize_type: def.prize_type || null,
+          reward_tier: cp.reward_tier,
+          win_weight: cp.win_weight,
+          stock_quantity: cp.stock_quantity,
+          total_win_count: cp.total_win_count,
+          is_fallback: cp.is_fallback,
+          prize_value: parseFloat(def.material_amount || 0),
+          remaining_stock: (cp.stock_quantity || 0) - (cp.total_win_count || 0)
+        }
+      }),
       actual_distribution: actualDistribution
     }
   }

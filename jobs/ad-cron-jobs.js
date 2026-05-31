@@ -43,9 +43,24 @@ if (!ENABLE_AD_CRON_JOBS) {
     static init() {
       logger.info('[AdCronJobs] 初始化广告定时任务')
 
-      // 01:00 - 每日竞价结算
+      /*
+       * R1 双保险（资损敏感任务）：广告竞价结算/CPM结算涉及扣费，
+       * 用分布式锁包裹防止多机重复扣费（单机 cluster 已由 app.js worker 守卫兜底）。
+       */
+      const UnifiedDistributedLock = require('../utils/UnifiedDistributedLock')
+      const distributedLock = new UnifiedDistributedLock()
+
+      // 01:00 - 每日竞价结算（资损敏感，加分布式锁）
       cron.schedule('0 1 * * *', async () => {
-        await AdCronJobs.runDailyBiddingSettlement()
+        try {
+          await distributedLock.withLock(
+            'ad_daily_bidding_settlement',
+            async () => AdCronJobs.runDailyBiddingSettlement(),
+            { ttl: 600000 }
+          )
+        } catch (error) {
+          logger.error('[AdCronJobs] 每日竞价结算加锁执行失败', { error: error.message })
+        }
       })
 
       // 03:00 - 用户标签聚合
@@ -58,9 +73,17 @@ if (!ENABLE_AD_CRON_JOBS) {
         await AdCronJobs.runDailyDauStats()
       })
 
-      // 01:15 - CPM 每日结算
+      // 01:15 - CPM 每日结算（资损敏感，加分布式锁）
       cron.schedule('15 1 * * *', async () => {
-        await AdCronJobs.runDailyCPMSettlement()
+        try {
+          await distributedLock.withLock(
+            'ad_daily_cpm_settlement',
+            async () => AdCronJobs.runDailyCPMSettlement(),
+            { ttl: 600000 }
+          )
+        } catch (error) {
+          logger.error('[AdCronJobs] CPM每日结算加锁执行失败', { error: error.message })
+        }
       })
 
       // 01:30 - 动态竞价底价更新

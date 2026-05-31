@@ -471,20 +471,20 @@ class NotificationService {
       }
 
       if (adminNotificationMap.size > 0) {
-        // 按管理员注入对应的 admin_notification_id，便于前端去重和已读
-        for (const [adminId, socketId] of ChatWebSocketService.connectedAdmins.entries()) {
-          try {
-            const payload = {
-              ...basePayload,
-              admin_notification_id: adminNotificationMap.get(adminId) || null
-            }
-            ChatWebSocketService.io.to(socketId).emit('notification', payload)
+        /*
+         * R6（cluster 跨进程推送，2026-05-30）：
+         * 按 adminNotificationMap（持久化得到的「全部目标管理员」，非仅本进程在线者）逐个
+         * 注入对应 admin_notification_id 后，推送到 admin:{id} 房间，经 Redis Adapter 跨 worker 送达。
+         * 原实现遍历本进程 connectedAdmins + io.to(socketId)，cluster 下连在其他 worker 的管理员会漏推。
+         * 复用已是 room 机制的 pushNotificationToAdmin，避免重复路由逻辑。
+         */
+        for (const [adminId, adminNotificationId] of adminNotificationMap.entries()) {
+          const payload = {
+            ...basePayload,
+            admin_notification_id: adminNotificationId || null
+          }
+          if (ChatWebSocketService.pushNotificationToAdmin(adminId, payload)) {
             broadcastedCount++
-          } catch (emitError) {
-            logger.error('[通知] 广播通知给管理员失败', {
-              admin_id: adminId,
-              error: emitError.message
-            })
           }
         }
       } else {

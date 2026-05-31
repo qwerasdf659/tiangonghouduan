@@ -3469,16 +3469,26 @@ class ScheduledTasks {
   static scheduleHourlyUnifiedReconciliation() {
     cron.schedule('50 * * * *', async () => {
       try {
-        logger.info('[定时任务] 开始执行物品+资产统一对账...')
+        /*
+         * R1 双保险（资损敏感任务）：物品+资产统一对账涉及余额/持有/库存核对，
+         * 用 withLock 包裹防止多机重复对账（单机 cluster 已由 worker 守卫兜底）。
+         */
+        await distributedLock.withLock(
+          'hourly_unified_reconciliation',
+          async () => {
+            logger.info('[定时任务] 开始执行物品+资产统一对账...')
 
-        const { executeReconciliation } = require('../../scripts/reconcile-items')
-        const report = await executeReconciliation()
+            const { executeReconciliation } = require('../../scripts/reconcile-items')
+            const report = await executeReconciliation()
 
-        if (report.allPass) {
-          logger.info('[定时任务] 统一对账完成：全部通过')
-        } else {
-          logger.warn('[定时任务] 统一对账完成：存在异常', { results: report.results })
-        }
+            if (report.allPass) {
+              logger.info('[定时任务] 统一对账完成：全部通过')
+            } else {
+              logger.warn('[定时任务] 统一对账完成：存在异常', { results: report.results })
+            }
+          },
+          { ttl: 300000 }
+        )
       } catch (error) {
         logger.error('[定时任务] 统一对账执行失败', {
           error: error.message,
@@ -3570,27 +3580,26 @@ class ScheduledTasks {
     const DailyMarketPriceSnapshot = require('../../jobs/daily-market-price-snapshot')
 
     cron.schedule('15 1 * * *', async () => {
-      const lockKey = 'lock:daily_market_price_snapshot'
-
       try {
-        const locked = await distributedLock.tryLock(lockKey, 300)
-        if (!locked) {
-          logger.warn('[定时任务37] 市场价格快照聚合获取分布式锁失败，跳过本次执行')
-          return
-        }
-
-        logger.info('[定时任务37] 开始市场价格快照聚合')
-        const report = await DailyMarketPriceSnapshot.execute()
-        logger.info('[定时任务37] 市场价格快照聚合完成', report)
+        /*
+         * R1 双保险（资损敏感任务）：用 withLock 包裹，即使将来多机部署
+         * （每台机器各有 0 号 worker）也能保证价格快照聚合只执行一次。
+         * withLock 自动获取并释放锁（300 秒 TTL），获取失败抛错并被下方 catch 记录。
+         */
+        await distributedLock.withLock(
+          'daily_market_price_snapshot',
+          async () => {
+            logger.info('[定时任务37] 开始市场价格快照聚合')
+            const report = await DailyMarketPriceSnapshot.execute()
+            logger.info('[定时任务37] 市场价格快照聚合完成', report)
+          },
+          { ttl: 300000 }
+        )
       } catch (error) {
         logger.error('[定时任务37] 市场价格快照聚合异常', {
           error: error.message,
           stack: error.stack
         })
-      } finally {
-        try {
-          await distributedLock.unlock(lockKey)
-        } catch (_e) { /* 锁已自动过期 */ }
       }
     })
 
@@ -3737,7 +3746,11 @@ class ScheduledTasks {
         await ScheduledTasks.initializeServices()
         const { DiyWork, Account } = require('../../models')
         const { Op } = require('sequelize')
-        const DIYService = require('../../services/DIYService')
+        /*
+         * 修复模块路径（2026-05-30）：旧 services/DIYService.js 已重构拆分为 services/diy/ 4 个子模块，
+         * 统一入口为 DiyServiceFacade（与路由层 ServiceManager 'diy' 同一对象），其 cancelDesign 委托 DiyWorkService。
+         */
+        const { DiyServiceFacade: DIYService } = require('../../services/diy')
         const TransactionManager = require('../../utils/TransactionManager')
 
         // 查找冻结超过 24 小时的作品（关联 account 获取 user_id）

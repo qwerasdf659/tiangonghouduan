@@ -204,10 +204,11 @@ describe('ChatWebSocketService - 聊天WebSocket服务', () => {
       }
     })
 
-    it('pushMessageToUser 应成功推送消息给在线用户', () => {
+    it('pushMessageToUser 应推送消息到 user 房间（R6 cluster 跨进程）', () => {
       /**
        * 测试场景：向在线用户推送消息
-       * 预期结果：返回 true，调用 emit
+       * 预期结果：返回 true，定向 emit 到 user:{id} 房间（Redis Adapter 跨 worker 送达）
+       * R6 说明：改用 room 机制后，路由目标是 user:1 房间而非进程内 socketId
        */
       chatWebSocketService.connectedUsers.set(1, 'socket_1')
 
@@ -220,26 +221,29 @@ describe('ChatWebSocketService - 聊天WebSocket服务', () => {
       const result = chatWebSocketService.pushMessageToUser(1, message)
 
       expect(result).toBe(true)
-      expect(chatWebSocketService.io.to).toHaveBeenCalledWith('socket_1')
+      expect(chatWebSocketService.io.to).toHaveBeenCalledWith('user:1')
       expect(mockEmit).toHaveBeenCalledWith('new_message', message)
     })
 
-    it('pushMessageToUser 对离线用户应返回 false', () => {
+    it('pushMessageToUser 对离线用户仍 emit 到房间并返回 true（离线由持久化兜底）', () => {
       /**
        * 测试场景：向离线用户推送消息
-       * 预期结果：返回 false（用户不在线）
+       * 预期结果：R6 room 机制下为 fire-and-forget，仍 emit 到 user:{id} 房间并返回 true
+       *   - cluster 下无法低成本判断用户是否连在其他 worker，统一 emit 到房间
+       *   - 真正离线的用户由消息持久化（ChatMessage）+ 重连补偿兜底，不依赖此返回值
        */
       const message = { content: '测试消息' }
 
       const result = chatWebSocketService.pushMessageToUser(999, message)
 
-      expect(result).toBe(false)
+      expect(result).toBe(true)
+      expect(chatWebSocketService.io.to).toHaveBeenCalledWith('user:999')
     })
 
-    it('pushMessageToAdmin 应成功推送消息给在线客服', () => {
+    it('pushMessageToAdmin 应推送消息到 admin 房间（R6 cluster 跨进程）', () => {
       /**
        * 测试场景：向在线客服推送消息
-       * 预期结果：返回 true，调用 emit
+       * 预期结果：返回 true，定向 emit 到 admin:{id} 房间
        */
       chatWebSocketService.connectedAdmins.set(101, 'socket_101')
 
@@ -252,26 +256,28 @@ describe('ChatWebSocketService - 聊天WebSocket服务', () => {
       const result = chatWebSocketService.pushMessageToAdmin(101, message)
 
       expect(result).toBe(true)
-      expect(chatWebSocketService.io.to).toHaveBeenCalledWith('socket_101')
+      expect(chatWebSocketService.io.to).toHaveBeenCalledWith('admin:101')
       expect(mockEmit).toHaveBeenCalledWith('new_message', message)
     })
 
-    it('pushMessageToAdmin 对离线客服应返回 false', () => {
+    it('pushMessageToAdmin 对离线客服仍 emit 到房间并返回 true', () => {
       /**
        * 测试场景：向离线客服推送消息
-       * 预期结果：返回 false（客服不在线）
+       * 预期结果：R6 room 机制下 fire-and-forget，emit 到 admin:{id} 房间并返回 true
        */
       const message = { content: '用户咨询' }
 
       const result = chatWebSocketService.pushMessageToAdmin(999, message)
 
-      expect(result).toBe(false)
+      expect(result).toBe(true)
+      expect(chatWebSocketService.io.to).toHaveBeenCalledWith('admin:999')
     })
 
-    it('broadcastToAllAdmins 应向所有在线客服广播消息', () => {
+    it('broadcastToAllAdmins 应向 admins 房间单次广播消息', () => {
       /**
        * 测试场景：广播消息给所有在线客服
-       * 预期结果：返回成功推送的客服数量
+       * 预期结果：R6 改用 admins 房间单次广播（而非遍历逐个 emit），
+       *   返回本进程在线客服数（日志参考用）；emit 仅调用 1 次
        */
       chatWebSocketService.connectedAdmins.set(101, 'socket_101')
       chatWebSocketService.connectedAdmins.set(102, 'socket_102')
@@ -284,8 +290,12 @@ describe('ChatWebSocketService - 聊天WebSocket服务', () => {
 
       const successCount = chatWebSocketService.broadcastToAllAdmins(message)
 
+      // 返回本进程在线客服数（3）作为参考
       expect(successCount).toBe(3)
-      expect(mockEmit).toHaveBeenCalledTimes(3)
+      // 改用房间广播后，emit 只调用 1 次（Redis Adapter 跨 worker 送达所有客服）
+      expect(chatWebSocketService.io.to).toHaveBeenCalledWith('admins')
+      expect(mockEmit).toHaveBeenCalledTimes(1)
+      expect(mockEmit).toHaveBeenCalledWith('new_message', message)
     })
   })
 
@@ -322,13 +332,14 @@ describe('ChatWebSocketService - 聊天WebSocket服务', () => {
       const result = chatWebSocketService.pushNotificationToAdmin(101, notification)
 
       expect(result).toBe(true)
+      expect(chatWebSocketService.io.to).toHaveBeenCalledWith('admin:101')
       expect(mockEmit).toHaveBeenCalledWith('notification', notification)
     })
 
-    it('broadcastNotificationToAllAdmins 应向所有管理员广播通知', () => {
+    it('broadcastNotificationToAllAdmins 应向 admins 房间单次广播通知', () => {
       /**
        * 测试场景：广播通知给所有在线管理员
-       * 预期结果：返回成功推送的管理员数量
+       * 预期结果：R6 改用 admins 房间单次广播，返回本进程在线管理员数（日志参考用）
        */
       chatWebSocketService.connectedAdmins.set(101, 'socket_101')
       chatWebSocketService.connectedAdmins.set(102, 'socket_102')
@@ -341,6 +352,9 @@ describe('ChatWebSocketService - 聊天WebSocket服务', () => {
       const successCount = chatWebSocketService.broadcastNotificationToAllAdmins(notification)
 
       expect(successCount).toBe(2)
+      expect(chatWebSocketService.io.to).toHaveBeenCalledWith('admins')
+      expect(mockEmit).toHaveBeenCalledTimes(1)
+      expect(mockEmit).toHaveBeenCalledWith('notification', notification)
     })
 
     it('pushNotificationToUser 应成功推送通知给在线用户', () => {
@@ -362,14 +376,15 @@ describe('ChatWebSocketService - 聊天WebSocket服务', () => {
       const result = chatWebSocketService.pushNotificationToUser(1, notification)
 
       expect(result).toBe(true)
-      expect(chatWebSocketService.io.to).toHaveBeenCalledWith('socket_1')
+      expect(chatWebSocketService.io.to).toHaveBeenCalledWith('user:1')
       expect(mockEmit).toHaveBeenCalledWith('new_notification', notification)
     })
 
-    it('pushNotificationToUser 对离线用户应返回 false', () => {
+    it('pushNotificationToUser 对离线用户仍 emit 到房间并返回 true（通知已持久化）', () => {
       /**
        * 测试场景：向离线用户推送通知
-       * 预期结果：返回 false（用户不在线，通知仍保存在 user_notifications 表中）
+       * 预期结果：R6 room 机制下 fire-and-forget，emit 到 user:{id} 房间并返回 true
+       *   通知本身已持久化在 user_notifications 表中，离线用户上线后可查询，不依赖此返回值
        */
       const notification = {
         notification_id: 101,
@@ -379,7 +394,8 @@ describe('ChatWebSocketService - 聊天WebSocket服务', () => {
 
       const result = chatWebSocketService.pushNotificationToUser(999, notification)
 
-      expect(result).toBe(false)
+      expect(result).toBe(true)
+      expect(chatWebSocketService.io.to).toHaveBeenCalledWith('user:999')
     })
   })
 
@@ -426,72 +442,71 @@ describe('ChatWebSocketService - 聊天WebSocket服务', () => {
   // ==================== 6. 连接断开测试 ====================
 
   describe('连接断开功能', () => {
-    it('disconnectUser 应断开用户连接', () => {
+    it('disconnectUser 应向 user 房间发 session_replaced 并跨进程断开（R6）', () => {
       /**
-       * 测试场景：强制断开用户连接
-       * 预期结果：用户从 connectedUsers 中移除
+       * 测试场景：强制断开用户连接（会话替换/账号封禁）
+       * 预期结果：R6 改用 io.in(room).disconnectSockets(true) 跨进程断开，
+       *   并先向 user:{id} 房间 emit session_replaced 通知
+       *   （本进程连接映射由 socket 'disconnect' 事件处理器异步清理，disconnectUser 不再直接 delete）
        */
       chatWebSocketService.connectedUsers.set(1, 'socket_1')
 
-      // Mock socket 实例（需同时提供 emit 和 disconnect，disconnectUser 先 emit 再 disconnect）
-      const mockDisconnect = jest.fn()
       const mockEmit = jest.fn()
+      const mockDisconnectSockets = jest.fn()
       chatWebSocketService.io = {
-        sockets: {
-          sockets: new Map([['socket_1', { emit: mockEmit, disconnect: mockDisconnect }]])
-        }
+        to: jest.fn(() => ({ emit: mockEmit })),
+        in: jest.fn(() => ({ disconnectSockets: mockDisconnectSockets }))
       }
 
       chatWebSocketService.disconnectUser(1, 'user')
 
-      expect(chatWebSocketService.connectedUsers.has(1)).toBe(false)
-      expect(mockDisconnect).toHaveBeenCalledWith(true)
+      expect(chatWebSocketService.io.to).toHaveBeenCalledWith('user:1')
+      expect(mockEmit).toHaveBeenCalledWith(
+        'session_replaced',
+        expect.objectContaining({ reason: 'session_replaced' })
+      )
+      expect(chatWebSocketService.io.in).toHaveBeenCalledWith('user:1')
+      expect(mockDisconnectSockets).toHaveBeenCalledWith(true)
     })
 
-    it('disconnectUser 应断开管理员连接', () => {
+    it('disconnectUser 应向 admin 房间发 session_replaced 并跨进程断开（R6）', () => {
       /**
        * 测试场景：强制断开管理员连接
-       * 预期结果：管理员从 connectedAdmins 中移除
+       * 预期结果：定向 admin:{id} 房间断开，跨 worker 生效
        */
       chatWebSocketService.connectedAdmins.set(101, 'socket_101')
 
-      const mockDisconnect = jest.fn()
       const mockEmit = jest.fn()
+      const mockDisconnectSockets = jest.fn()
       chatWebSocketService.io = {
-        sockets: {
-          sockets: new Map([['socket_101', { emit: mockEmit, disconnect: mockDisconnect }]])
-        }
+        to: jest.fn(() => ({ emit: mockEmit })),
+        in: jest.fn(() => ({ disconnectSockets: mockDisconnectSockets }))
       }
 
       chatWebSocketService.disconnectUser(101, 'admin')
 
-      expect(chatWebSocketService.connectedAdmins.has(101)).toBe(false)
-      expect(mockDisconnect).toHaveBeenCalledWith(true)
+      expect(chatWebSocketService.io.to).toHaveBeenCalledWith('admin:101')
+      expect(chatWebSocketService.io.in).toHaveBeenCalledWith('admin:101')
+      expect(mockDisconnectSockets).toHaveBeenCalledWith(true)
     })
   })
 
   // ==================== 7. 会话关闭通知测试 ====================
 
   describe('会话关闭通知', () => {
-    it('notifySessionClosed 应通知用户和管理员', () => {
+    it('notifySessionClosed 应通过房间通知用户和管理员（R6）', () => {
       /**
        * 测试场景：会话关闭时通知相关人员
-       * 预期结果：返回通知结果对象
+       * 预期结果：R6 改用房间定向 emit（user:{id} / admin:{id} / admins），返回通知结果对象
+       *   online 标志基于本进程在线视图作为最佳努力参考
        */
-      // Mock socket 实例
-      const mockUserEmit = jest.fn()
-      const mockAdminEmit = jest.fn()
+      const mockEmit = jest.fn()
 
       chatWebSocketService.connectedUsers.set(1, 'socket_1')
       chatWebSocketService.connectedAdmins.set(101, 'socket_101')
 
       chatWebSocketService.io = {
-        sockets: {
-          sockets: new Map([
-            ['socket_1', { emit: mockUserEmit }],
-            ['socket_101', { emit: mockAdminEmit }]
-          ])
-        }
+        to: jest.fn(() => ({ emit: mockEmit }))
       }
 
       const closeData = {
@@ -507,6 +522,9 @@ describe('ChatWebSocketService - 聊天WebSocket服务', () => {
       expect(result.user_online).toBe(true)
       expect(result.notified_admin).toBe(true)
       expect(result.admin_online).toBe(true)
+      // R6：通知走房间定向 emit
+      expect(chatWebSocketService.io.to).toHaveBeenCalledWith('user:1')
+      expect(chatWebSocketService.io.to).toHaveBeenCalledWith('admin:101')
     })
 
     it('notifySessionClosed 当 WebSocket 未初始化时应返回失败结果', () => {
@@ -564,6 +582,7 @@ describe('ChatWebSocketService - 聊天WebSocket服务', () => {
       const mockSocket = {
         id: 'socket_new_1',
         user: { user_id: 1, role_level: 0 },
+        join: jest.fn(), // R6：重连时需 socket.join(room) 加入身份房间
         emit: jest.fn()
       }
 
