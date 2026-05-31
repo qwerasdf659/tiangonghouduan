@@ -56,13 +56,6 @@ export function useUserContextState() {
     context_issues: [],
     /** @type {Array} 订单关联工单列表（order_issues Tab 用） */
     order_linked_issues: [],
-    /** @type {Object|null} 工单表单 */
-    issue_form: {
-      issue_type: 'other',
-      priority: 'medium',
-      title: '',
-      description: ''
-    },
 
     /** @type {Array} 内部备注列表 */
     context_notes: [],
@@ -82,7 +75,12 @@ export function useUserContextMethods() {
      * @returns {number|null} 用户ID
      */
     _getContextUserId() {
-      return this.selectedSession?.user?.user_id || this.selectedSession?.user_id || null
+      return (
+        this.selectedSession?.user?.user_id ||
+        this.selectedSession?.user_id ||
+        this.orders_context_user_id ||
+        null
+      )
     },
 
     /**
@@ -223,37 +221,6 @@ export function useUserContextMethods() {
         Alpine.store('notification').show('诊断失败: ' + error.message, 'error')
       } finally {
         this.context_loading = false
-      }
-    },
-
-    /**
-     * 创建工单
-     */
-    async createIssue() {
-      const userId = this._getContextUserId()
-      if (!userId || !this.issue_form.title) return
-
-      try {
-        const res = await request({
-          url: CONTENT_ENDPOINTS.CS_ISSUE_LIST,
-          method: 'POST',
-          data: {
-            user_id: userId,
-            session_id: this.selectedSession?.customer_service_session_id,
-            issue_type: this.issue_form.issue_type,
-            priority: this.issue_form.priority,
-            title: this.issue_form.title,
-            description: this.issue_form.description
-          }
-        })
-        if (res.success) {
-          Alpine.store('notification').show('工单创建成功', 'success')
-          this.issue_form = { issue_type: 'other', priority: 'medium', title: '', description: '' }
-          await this._loadNotes(userId)
-        }
-      } catch (error) {
-        logger.error('[UserContext] 创建工单失败:', error)
-        Alpine.store('notification').show('创建失败: ' + error.message, 'error')
       }
     },
 

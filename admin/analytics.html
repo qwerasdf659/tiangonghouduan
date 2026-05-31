@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <%- include('partials/head', { 
-    title: '数据统计报表', 
+    title: '运营分析', 
     pageStyle: '[x-cloak] { display: none !important; }' 
   }) %>
   <!-- ECharts 已通过 main.js 统一导入，无需 CDN -->
@@ -14,7 +14,7 @@
     <div class="container mx-auto px-4 py-3 flex justify-between items-center">
       <div class="flex items-center space-x-4">
         <a href="/admin/workspace.html" class="hover:text-blue-200">← 返回工作台</a>
-        <span class="text-lg font-semibold">📊 数据统计报表</span>
+        <span class="text-lg font-semibold">📈 运营分析</span>
       </div>
     </div>
   </nav>
@@ -73,6 +73,18 @@
       <div class="themed-card rounded-lg shadow p-6">
         <h5 class="font-semibold mb-4">用户类型分布</h5>
         <div id="userSourceChart" class="h-80" x-ref="userSourceChart"></div>
+      </div>
+      <div class="themed-card rounded-lg shadow p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h5 class="font-semibold">预算分层分布</h5>
+          <select x-model="filters.lottery_campaign_id" @change="onCampaignChange()"
+                  class="px-3 py-1.5 border rounded text-sm">
+            <template x-for="c in campaignOptions" :key="c.lottery_campaign_id">
+              <option :value="c.lottery_campaign_id" x-text="c.campaign_name"></option>
+            </template>
+          </select>
+        </div>
+        <div id="tierDistChart" class="h-80" x-ref="tierDistChart"></div>
       </div>
     </div>
 

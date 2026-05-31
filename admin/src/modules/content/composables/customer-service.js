@@ -56,12 +56,13 @@ export function useCustomerServiceState() {
       'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgZmlsbD0iI2NjYyIgY2xhc3M9ImJpIGJpLXBlcnNvbi1jaXJjbGUiIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHBhdGggZD0iTTExIDZhMyAzIDAgMSAxLTYgMCAzIDMgMCAwIDEgNiAweiIvPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgZD0iTTAgOGE4IDggMCAxIDEgMTYgMEE4IDggMCAwIDEgMCA4em04IDdhNyA3IDAgMCAwIDUuMzg3LTIuNTAzQTEzLjkzMyAxMy45MzMgMCAwIDAgOCAxMS41YTEzLjkzMyAxMy45MzMgMCAwIDAtNS4zODcgMS4wMDdBNyA3IDAgMCAwIDggMTV6Ii8+PC9zdmc+',
 
     responseStats: {
-      avg_first_response_seconds: 0,
-      avg_first_response_display: '--',
       avg_response_seconds: 0,
       avg_response_display: '--',
-      today_sessions: 0,
-      today_resolved: 0
+      max_response_seconds: 0,
+      max_response_display: '--',
+      within_1min_rate: 0,
+      within_1min_display: '--',
+      today_sessions: 0
     }
   }
 }
@@ -565,52 +566,24 @@ export function useCustomerServiceMethods() {
         })
 
         if (response && response.success && response.data) {
-          const data = response.data
+          const today = response.data.today || {}
           this.responseStats = {
-            avg_first_response_seconds:
-              data.summary?.avg_first_response_seconds || data.avg_first_response_seconds || 0,
-            avg_first_response_display:
-              data.summary?.avg_first_response_display ||
-              data.avg_first_response_display ||
-              this.formatSeconds(
-                data.summary?.avg_first_response_seconds || data.avg_first_response_seconds
-              ),
-            avg_response_seconds:
-              data.summary?.avg_response_seconds || data.avg_response_seconds || 0,
-            avg_response_display:
-              data.summary?.avg_response_display ||
-              data.avg_response_display ||
-              this.formatSeconds(data.summary?.avg_response_seconds || data.avg_response_seconds),
-            today_sessions:
-              data.summary?.total_sessions || data.today_sessions || data.total_sessions || 0,
-            today_resolved:
-              data.summary?.resolved_sessions || data.today_resolved || data.resolved_sessions || 0,
-            compliance_rate: data.summary?.compliance_rate || null,
-            distribution: data.distribution || null,
-            trend: data.trend || null
+            avg_response_seconds: today.avg_response_seconds || 0,
+            avg_response_display: this.formatSeconds(today.avg_response_seconds),
+            max_response_seconds: today.max_response_seconds || 0,
+            max_response_display: this.formatSeconds(today.max_response_seconds),
+            within_1min_rate: today.within_1min_rate || 0,
+            within_1min_display:
+              today.within_1min_rate > 0 ? Math.round(today.within_1min_rate * 100) + '%' : '--',
+            today_sessions: today.session_count || 0
           }
           logger.info('响应时长统计加载成功', this.responseStats)
         } else {
-          logger.warn('响应时长统计API返回空数据，使用本地计算')
-          this.calculateResponseStatsLocally()
+          this.showError(response?.message || '响应时长统计加载失败')
         }
       } catch (error) {
-        logger.warn('响应时长统计API调用失败，使用本地计算:', error.message)
-        this.calculateResponseStatsLocally()
-      }
-    },
-
-    calculateResponseStatsLocally() {
-      const activeSessions = this.sessions.filter(s => s.status === 'active')
-      const closedSessions = this.sessions.filter(s => s.status === 'closed')
-
-      this.responseStats = {
-        avg_first_response_seconds: 0,
-        avg_first_response_display: '--',
-        avg_response_seconds: 0,
-        avg_response_display: '--',
-        today_sessions: activeSessions.length + closedSessions.length,
-        today_resolved: closedSessions.length
+        logger.error('响应时长统计API调用失败:', error)
+        this.showError(error.message)
       }
     },
 

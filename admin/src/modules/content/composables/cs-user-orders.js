@@ -19,13 +19,15 @@ import { UserAPI } from '../../../api/user.js'
 export function useCsUserOrdersState() {
   return {
     /** @type {string} A区当前Tab（orders=订单列表, sessions=会话列表） */
-    a_panel_tab: 'orders',
+    a_panel_tab: 'sessions',
     /** @type {Array} 用户订单列表（三种类型混合） */
     user_orders: [],
     /** @type {boolean} 订单列表加载状态 */
     user_orders_loading: false,
     /** @type {number} 订单总数 */
-    user_orders_total: 0
+    user_orders_total: 0,
+    /** @type {number|null} A区当前订单上下文对应的用户ID（来自会话或手机号解析） */
+    orders_context_user_id: null
   }
 }
 
@@ -59,8 +61,12 @@ export function useCsUserOrdersMethods() {
       if (!userId) {
         this.user_orders = []
         this.user_orders_total = 0
+        this.orders_context_user_id = null
         return
       }
+
+      /* 记录当前订单上下文的用户ID，供未选中会话时创建工单/补偿使用 */
+      this.orders_context_user_id = userId
 
       this.user_orders_loading = true
       try {

@@ -8,7 +8,7 @@
  * - 实时概览统计（今日抽奖数、空奖率、高价值率等）
  * - 小时级趋势数据（最近24小时 → lottery_draws，历史 → lottery_hourly_metrics）
  * - 日级趋势数据（lottery_daily_metrics）
- * - 奖品档位分布统计（high/mid/low/fallback）
+ * - 预算分层分布统计（Budget Tier B0/B1/B2/B3）
  * - 体验机制触发统计（Pity/AntiEmpty/AntiHigh/LuckDebt）
  * - 预算消耗统计
  *
@@ -38,7 +38,7 @@ const BeijingTimeHelper = require('../../../../utils/timeHelper')
 
 /**
  * 获取 LotteryStatisticsService 的辅助函数
- * （趋势统计、档位分布、体验机制触发、预算消耗等）
+ * （趋势统计、预算分层分布、体验机制触发、预算消耗等）
  *
  * @param {Object} req - Express 请求对象
  * @returns {Object} LotteryStatisticsService 实例
@@ -287,18 +287,19 @@ router.get(
 
 /*
  * ==========================================
- * 4. 奖品档位分布统计
+ * 4. 预算分层(Budget Tier)分布统计
  * ==========================================
  */
 
 /**
- * GET /tier-distribution/:lottery_campaign_id - 获取奖品档位分布
+ * GET /tier-distribution/:lottery_campaign_id - 获取预算分层(Budget Tier)分布
  *
- * 统计指定时间范围内各奖品档位的分布情况：
- * - high: 高价值奖品
- * - mid: 中价值奖品
- * - low: 低价值奖品
- * - fallback: 保底奖品
+ * 统计指定时间范围内各预算分层(Budget Tier)的抽奖分布情况。
+ * Budget Tier 是抽奖引擎按用户 EffectiveBudget 划分的监控分层（不参与概率决策）：
+ * - B0: 预算不足（effective_budget < threshold_low）
+ * - B1: 低预算（threshold_low <= effective_budget < threshold_mid）
+ * - B2: 中预算（threshold_mid <= effective_budget < threshold_high）
+ * - B3: 高预算（effective_budget >= threshold_high）
  *
  * 路径参数：
  * - lottery_campaign_id: 活动ID
@@ -307,15 +308,22 @@ router.get(
  * - start_time: 开始时间（ISO8601格式，默认24小时前）
  * - end_time: 结束时间（ISO8601格式，默认当前时间）
  *
- * 返回示例：
+ * 数据来源（由时间范围自动选择查询策略）：
+ * - 实时（今日）：lottery_draw_decisions
+ * - 历史（小时级）：lottery_hourly_metrics
+ * - 长期（日级）：lottery_daily_metrics
+ *
+ * 返回示例（实际返回结构，与 LotteryStatisticsService.getTierDistribution 一致）：
  * {
- *   "total_draws": 1000,
- *   "distribution": [
- *     { "tier": "high", "count": 50, "percentage": 0.05 },
- *     { "tier": "mid", "count": 200, "percentage": 0.20 },
- *     { "tier": "low", "count": 500, "percentage": 0.50 },
- *     { "tier": "fallback", "count": 250, "percentage": 0.25 }
- *   ]
+ *   "budget_tiers": {
+ *     "B0": { "count": 50,  "percentage": 0.05 },
+ *     "B1": { "count": 200, "percentage": 0.20 },
+ *     "B2": { "count": 500, "percentage": 0.50 },
+ *     "B3": { "count": 250, "percentage": 0.25 }
+ *   },
+ *   "total": 1000,
+ *   "data_source": "lottery_draw_decisions",
+ *   "generated_at": "2026-06-01T00:00:00.000Z"
  * }
  */
 router.get(
@@ -331,21 +339,20 @@ router.get(
 
     const { start_time, end_time } = parseTimeRange(req.query)
 
-    // 🔴 修正：使用 options 对象参数格式
     const result = await getLotteryAnalyticsService(req).getTierDistribution(lottery_campaign_id, {
       start_time,
       end_time
     })
 
-    logger.info('查询奖品档位分布', {
+    logger.info('查询预算分层分布', {
       admin_id: req.user.user_id,
       lottery_campaign_id,
       start_time,
       end_time,
-      total_draws: result.total_draws
+      total: result.total
     })
 
-    return res.apiSuccess(result, '获取奖品档位分布成功')
+    return res.apiSuccess(result, '获取预算分层分布成功')
   })
 )
 

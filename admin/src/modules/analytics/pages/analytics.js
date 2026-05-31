@@ -38,6 +38,27 @@ import { createPageMixin } from '../../../alpine/mixins/index.js'
 const apiRequest = async (url, options = {}) => {
   return await request({ url, ...options })
 }
+
+/**
+ * 预算分层中文映射（与后端 tier-distribution 返回的 budget_tiers 键对应）
+ * @description B0-B3 是后端预算分层监控指标：
+ *   B0=预算不足 / B1=低预算 / B2=中预算 / B3=高预算（EffectiveBudget 由低到高）
+ */
+const BUDGET_TIER_NAME_MAP = {
+  B0: 'B0 预算不足',
+  B1: 'B1 低预算',
+  B2: 'B2 中预算',
+  B3: 'B3 高预算'
+}
+
+/** 预算分层饼图配色（与 BUDGET_TIER_NAME_MAP 一一对应） */
+const BUDGET_TIER_COLOR_MAP = {
+  B0: '#6c757d',
+  B1: '#0d6efd',
+  B2: '#ffc107',
+  B3: '#dc3545'
+}
+
 /**
  * @typedef {Object} AnalyticsStats
  * @property {number} activeUsers - 活跃用户数
@@ -86,8 +107,16 @@ function analyticsPage() {
     filters: {
       time_range: '30',
       start_date: '',
-      end_date: ''
+      end_date: '',
+      // 档位分布按活动维度统计，需指定活动；空字符串表示尚未加载活动列表
+      lottery_campaign_id: ''
     },
+
+    /**
+     * 活动列表（供档位分布图的活动选择器使用）
+     * @type {Array<{lottery_campaign_id:number, campaign_name:string, status:string}>}
+     */
+    campaignOptions: [],
 
     /**
      * 统计数据
@@ -127,31 +156,21 @@ function analyticsPage() {
     },
 
     /**
-     * 策略统计数据
-     * @type {{totalStrategies: number, activeStrategies: number, avgEffectiveness: number, strategyTypes: Array}}
+     * 预算分层分布数据（后端 budget_tiers 对象 B0-B3）
+     * @type {Object}
      */
-    strategyStats: {
-      totalStrategies: 0,
-      activeStrategies: 0,
-      avgEffectiveness: 0,
-      strategyTypes: []
-    },
-
-    /**
-     * 等级分布数据
-     * @type {Array<Object>}
-     */
-    tierDistribution: [],
+    tierDistribution: {},
 
     /**
      * ECharts图表实例集合
-     * @type {{userTrend: Object|null, lotteryTrend: Object|null, pointsFlow: Object|null, userSource: Object|null}}
+     * @type {{userTrend: Object|null, lotteryTrend: Object|null, pointsFlow: Object|null, userSource: Object|null, tierDist: Object|null}}
      */
     charts: {
       userTrend: null,
       lotteryTrend: null,
       pointsFlow: null,
-      userSource: null
+      userSource: null,
+      tierDist: null
     },
 
     /** ECharts 核心模块引用 */
@@ -215,7 +234,8 @@ function analyticsPage() {
         hasUserTrendChart: !!this.$refs.userTrendChart,
         hasLotteryTrendChart: !!this.$refs.lotteryTrendChart,
         hasPointsFlowChart: !!this.$refs.pointsFlowChart,
-        hasUserSourceChart: !!this.$refs.userSourceChart
+        hasUserSourceChart: !!this.$refs.userSourceChart,
+        hasTierDistChart: !!this.$refs.tierDistChart
       })
 
       if (!echarts) {
@@ -249,6 +269,13 @@ function analyticsPage() {
         this.charts.userSource = echarts.init(this.$refs.userSourceChart)
         this.charts.userSource.setOption(this.getUserSourceOption([]))
         logger.info('[Analytics] 用户类型分布图初始化完成')
+      }
+
+      // 预算分层分布（按活动维度）
+      if (this.$refs.tierDistChart) {
+        this.charts.tierDist = echarts.init(this.$refs.tierDistChart)
+        this.charts.tierDist.setOption(this.getTierDistOption([]))
+        logger.info('[Analytics] 预算分层分布图初始化完成')
       }
     },
 
@@ -388,6 +415,36 @@ function analyticsPage() {
     },
 
     /**
+     * 获取预算分层分布饼图配置（按活动维度的 B0-B3 预算分层分布）
+     * @param {Array<{name:string, value:number, code:string}>} data - 预算分层分布数据
+     * @returns {Object} ECharts饼图配置对象
+     */
+    getTierDistOption(data) {
+      return {
+        tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+        legend: { orient: 'horizontal', bottom: 0, data: data.map(d => d.name) },
+        series: [
+          {
+            name: '预算分层',
+            type: 'pie',
+            radius: ['40%', '70%'],
+            avoidLabelOverlap: true,
+            label: {
+              show: true,
+              position: 'outside',
+              formatter: '{b}\n{c} ({d}%)',
+              fontSize: 12,
+              color: '#333'
+            },
+            labelLine: { show: true, length: 10, length2: 15 },
+            emphasis: { label: { show: true, fontSize: 14, fontWeight: 'bold' } },
+            data
+          }
+        ]
+      }
+    },
+
+    /**
      * 调整所有图表大小
      * @description 响应窗口resize事件，重新调整图表尺寸
      * @returns {void}
@@ -403,18 +460,100 @@ function analyticsPage() {
     /**
      * 加载所有分析数据
      * @async
-     * @description 并行加载今日统计、决策分析、策略统计、等级分布数据
+     * @description 并行加载今日统计、决策分析、图表统计、档位分布数据
      * @returns {Promise<void>}
      */
     async loadAllData() {
       await this.withLoading(async () => {
+        // 活动列表只需加载一次，用于档位分布的活动选择器
+        if (this.campaignOptions.length === 0) {
+          await this.loadCampaignOptions()
+        }
         await Promise.all([
           this.loadTodayStats(),
           this.loadDecisionAnalytics(),
-          this.loadStrategyStats(),
-          this.loadTierDistribution()
+          this.loadTierDistribution(),
+          this.loadChartsData()
         ])
       })
+    },
+
+    /**
+     * 加载活动列表（用于档位分布图的活动选择器）
+     * @async
+     * @description 调用 /console/lottery-campaigns 获取活动列表，默认选中第一个有效活动
+     * @returns {Promise<void>}
+     */
+    async loadCampaignOptions() {
+      try {
+        const response = await apiRequest(
+          `${LOTTERY_ENDPOINTS.CAMPAIGN_LIST}?status=active&page_size=100`
+        )
+        if (response && response.success) {
+          this.campaignOptions = response.data?.campaigns || []
+          // 默认选中第一个活动（若用户尚未手动选择）
+          if (!this.filters.lottery_campaign_id && this.campaignOptions.length > 0) {
+            this.filters.lottery_campaign_id = this.campaignOptions[0].lottery_campaign_id
+          }
+          logger.info('[Analytics] 活动列表加载完成', { count: this.campaignOptions.length })
+        }
+      } catch (error) {
+        logger.error('加载活动列表失败:', error)
+      }
+    },
+
+    /**
+     * 加载图表统计数据（积分流转、用户类型分布）
+     * @async
+     * @description 调用后端 /system/statistics/charts 获取真实的积分流水与用户类型分布，
+     *              替代原先用抽奖数据估算积分、用 peak_users 比例估算用户分布的做法。
+     * @returns {Promise<void>}
+     */
+    async loadChartsData() {
+      try {
+        const days = parseInt(this.filters.time_range, 10) || 30
+        const response = await apiRequest(`${ANALYTICS_ENDPOINTS.CHARTS}?days=${days}`)
+
+        if (response && response.success) {
+          const data = response.data
+          logger.info('[Analytics] CHARTS 数据:', data)
+          this.renderPointsFlowChart(data.points_flow || [])
+          this.renderUserSourceChart(data.user_types || {})
+        }
+      } catch (error) {
+        logger.error('加载图表统计数据失败:', error)
+      }
+    },
+
+    /**
+     * 渲染积分流转图（真实后端 points_flow 数据）
+     * @param {Array<Object>} pointsFlow - [{date, earned, spent, balance_change}]
+     * @returns {void}
+     */
+    renderPointsFlowChart(pointsFlow) {
+      if (!this.charts.pointsFlow || pointsFlow.length === 0) return
+      const dates = pointsFlow.map(item => item.date)
+      const earned = pointsFlow.map(item => item.earned || 0)
+      const spent = pointsFlow.map(item => item.spent || 0)
+      this.charts.pointsFlow.setOption({
+        xAxis: { data: dates },
+        series: [{ data: earned }, { data: spent }]
+      })
+    },
+
+    /**
+     * 渲染用户类型分布图（真实后端 user_types 数据）
+     * @param {Object} userTypes - {regular:{count}, admin:{count}, merchant:{count}, total}
+     * @returns {void}
+     */
+    renderUserSourceChart(userTypes) {
+      if (!this.charts.userSource || !userTypes) return
+      const data = [
+        { value: userTypes.regular?.count || 0, name: '普通用户', itemStyle: { color: '#0d6efd' } },
+        { value: userTypes.admin?.count || 0, name: '管理员', itemStyle: { color: '#198754' } },
+        { value: userTypes.merchant?.count || 0, name: '商家', itemStyle: { color: '#ffc107' } }
+      ].filter(item => item.value > 0)
+      this.charts.userSource.setOption({ series: [{ data }] })
     },
 
     /**
@@ -510,77 +649,69 @@ function analyticsPage() {
     },
 
     /**
-     * 加载策略统计数据
+     * 加载预算分层分布数据（按选中的活动维度）
      * @async
-     * @description 获取抽奖策略的总数、活跃数、效果等统计
-     * @returns {Promise<void>}
-     */
-    async loadStrategyStats() {
-      try {
-        // 使用默认活动ID 1 获取策略统计概览
-        const response = await apiRequest(
-          buildURL(LOTTERY_ENDPOINTS.STRATEGY_STATS_REALTIME, { campaign_id: 1 })
-        )
-
-        if (response && response.success) {
-          this.strategyStats = {
-            totalStrategies: response.data?.total_strategies ?? 0,
-            activeStrategies: response.data?.active_strategies ?? 0,
-            avgEffectiveness: response.data?.avg_effectiveness
-              ? (response.data.avg_effectiveness * 100).toFixed(1)
-              : 0,
-            strategyTypes: response.data?.strategy_types || []
-          }
-        }
-      } catch (error) {
-        logger.error('加载策略统计失败:', error)
-      }
-    },
-
-    /**
-     * 加载等级分布数据
-     * @async
-     * @description 获取用户等级分布并更新饼图
+     * @description 调用 /console/lottery-strategy-stats/tier-distribution/:lottery_campaign_id，
+     *              将后端 budget_tiers(B0-B3) 预算分层转中文后渲染到独立的「预算分层分布」饼图。
+     *              注意：此前误把分布写进「用户类型分布」容器、且写死活动ID=1，已修正。
      * @returns {Promise<void>}
      */
     async loadTierDistribution() {
+      const campaignId = this.filters.lottery_campaign_id
+      // 没有可用活动时，清空分布图，不再静默走活动1
+      if (!campaignId) {
+        logger.warn('[Analytics] 暂无可用活动，跳过预算分层分布加载')
+        this.tierDistribution = {}
+        if (this.charts.tierDist) {
+          this.charts.tierDist.setOption(this.getTierDistOption([]), true)
+        }
+        return
+      }
+
       try {
-        // 使用默认活动ID 1 获取档位分布
-        const response = await apiRequest(
-          buildURL(LOTTERY_ENDPOINTS.STRATEGY_STATS_TIER, { campaign_id: 1 })
-        )
+        let url = buildURL(LOTTERY_ENDPOINTS.STRATEGY_STATS_TIER, { campaign_id: campaignId })
+        if (this.filters.start_date && this.filters.end_date) {
+          url += `?start_time=${this.filters.start_date}&end_time=${this.filters.end_date}`
+        }
+
+        const response = await apiRequest(url)
 
         if (response && response.success) {
-          this.tierDistribution = response.data?.distribution || response.data || []
-
-          // 更新用户类型分布图
-          if (this.charts.userSource && this.tierDistribution.length > 0) {
-            this.charts.userSource.setOption({
-              series: [
-                {
-                  data: this.tierDistribution.map((tier, index) => ({
-                    value: tier.count || tier.users || 0,
-                    name: tier.tier_name || tier.name || `等级${index + 1}`,
-                    itemStyle: { color: this.getTierColor(index) }
-                  }))
-                }
-              ]
-            })
-          }
+          // 后端返回 { budget_tiers: { B0:{count,percentage}, B1:..., B2:..., B3:... }, total }
+          this.tierDistribution = response.data?.budget_tiers || {}
+          this.renderTierDistChart(this.tierDistribution)
         }
       } catch (error) {
-        logger.error('加载等级分布失败:', error)
+        logger.error('加载预算分层分布失败:', error)
       }
     },
 
     /**
-     * 获取等级颜色
-     * @param {number} index - 等级索引
-     * @returns {string} 颜色代码
+     * 渲染预算分层分布饼图（后端真实 budget_tiers 数据，分层码转中文）
+     * @param {Object} budgetTiers - {B0:{count,percentage}, B1:..., B2:..., B3:...}
+     * @returns {void}
      */
-    getTierColor(index) {
-      const colors = ['#0d6efd', '#198754', '#ffc107', '#dc3545', '#6c757d', '#17a2b8']
-      return colors[index % colors.length]
+    renderTierDistChart(budgetTiers) {
+      if (!this.charts.tierDist) return
+      const data = Object.entries(budgetTiers || {})
+        .map(([tier, stat]) => ({
+          value: stat?.count || 0,
+          name: BUDGET_TIER_NAME_MAP[tier] || tier,
+          code: tier,
+          itemStyle: { color: BUDGET_TIER_COLOR_MAP[tier] || '#909399' }
+        }))
+        .filter(item => item.value > 0)
+      this.charts.tierDist.setOption(this.getTierDistOption(data), true)
+    },
+
+    /**
+     * 活动选择器变更处理
+     * @description 切换活动后仅重新加载该活动的预算分层分布，避免整页刷新
+     * @returns {Promise<void>}
+     */
+    async onCampaignChange() {
+      logger.info('[Analytics] 切换活动', { lottery_campaign_id: this.filters.lottery_campaign_id })
+      await this.loadTierDistribution()
     },
 
     /**
@@ -593,19 +724,14 @@ function analyticsPage() {
       const dates = this.dailyStats.map(item => item.date)
       const draws = this.dailyStats.map(item => item.draws)
 
+      // 抽奖趋势图先用决策分析的每日数据填充，随后 loadLotteryTrends 会用趋势接口数据覆盖
       if (this.charts.lotteryTrend) {
         this.charts.lotteryTrend.setOption({
           xAxis: { data: dates },
           series: [{ data: draws }]
         })
       }
-
-      if (this.charts.userTrend) {
-        this.charts.userTrend.setOption({
-          xAxis: { data: dates },
-          series: [{ data: draws.map(d => Math.min(d, 100)) }]
-        })
-      }
+      // 用户趋势图统一由 loadLotteryTrends() 使用后端 user_activity.active_users 真实数据渲染
     },
 
     /**
@@ -663,45 +789,8 @@ function analyticsPage() {
             logger.warn('[Analytics] 抽奖趋势数据为空或图表未初始化')
           }
 
-          // 更新积分流转图（使用抽奖数据模拟积分流转）
-          if (data.lottery_activity && data.lottery_activity.length > 0 && this.charts.pointsFlow) {
-            const dates = data.lottery_activity.map(item => item.period)
-            // 模拟积分：每次抽奖消耗 10 积分，每用户可获得 50 积分
-            const pointsOut = data.lottery_activity.map(item => item.total_draws * 10)
-            const pointsIn = data.lottery_activity.map(item => item.unique_users * 50)
-            this.charts.pointsFlow.setOption({
-              xAxis: { data: dates },
-              series: [{ data: pointsIn }, { data: pointsOut }]
-            })
-          }
-
-          // 更新用户类型分布（使用 summary 数据）
-          if (data.summary && this.charts.userSource) {
-            const peakUsers = data.summary.peak_users || this.stats.total_users || 10
-            this.charts.userSource.setOption({
-              series: [
-                {
-                  data: [
-                    {
-                      value: Math.max(1, peakUsers - Math.floor(peakUsers * 0.15)),
-                      name: '普通用户',
-                      itemStyle: { color: '#0d6efd' }
-                    },
-                    {
-                      value: Math.max(1, Math.floor(peakUsers * 0.05)),
-                      name: '管理员',
-                      itemStyle: { color: '#198754' }
-                    },
-                    {
-                      value: Math.max(1, Math.floor(peakUsers * 0.1)),
-                      name: '商家',
-                      itemStyle: { color: '#ffc107' }
-                    }
-                  ]
-                }
-              ]
-            })
-          }
+          // 积分流转图与用户类型分布改由 loadChartsData() 使用后端真实数据渲染
+          // （此前用抽奖数据估算积分、用 peak_users 比例估算用户分布，已移除避免造假）
         }
       } catch (error) {
         logger.error('加载抽奖趋势数据失败:', error)
@@ -823,12 +912,10 @@ function analyticsPage() {
       if (this._resizeHandler) {
         window.removeEventListener('resize', this._resizeHandler)
       }
-      // 销毁 ECharts 实例
-      ;['_userTrendChart', '_lotteryTrendChart', '_pointsFlowChart', '_userSourceChart'].forEach(
-        key => {
-          if (this[key]) this[key].dispose()
-        }
-      )
+      // 销毁 ECharts 实例（图表实例统一存放在 this.charts 中）
+      Object.values(this.charts).forEach(chart => {
+        if (chart) chart.dispose()
+      })
       logger.info('[Analytics] 资源已清理')
     }
   }

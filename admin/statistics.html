@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <%- include('partials/head', { 
-    title: '数据统计报表', 
+    title: '统计报表', 
     pageStyle: '[x-cloak] { display: none !important; } .chart-container { height: 280px; } .tabular-nums { font-variant-numeric: tabular-nums; } .stats-icon { transition: transform 0.3s ease; } .stats-card-hover:hover .stats-icon { transform: scale(1.1) rotate(5deg); }' 
   }) %>
   <!-- ECharts 已通过 main.js 统一导入，无需 CDN -->
@@ -14,7 +14,7 @@
     <div class="container mx-auto px-4 py-3 flex justify-between items-center">
       <div class="flex items-center space-x-4">
         <a href="/admin/workspace.html" class="text-white/70 hover:text-white transition-colors">← 返回工作台</a>
-        <span class="text-lg font-semibold">📊 数据统计报表</span>
+        <span class="text-lg font-semibold">📊 统计报表</span>
       </div>
       <div class="flex items-center space-x-4">
         <span x-text="'欢迎，' + (current_user?.nickname || '管理员')"></span>

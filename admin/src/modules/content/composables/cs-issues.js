@@ -133,7 +133,9 @@ export function useCsIssuesMethods() {
         if (response?.success) {
           Alpine.store('notification').show('工单创建成功', 'success')
           this.closeIssueModal()
-          this._loadOrderIssues()
+          /* 同步刷新两处工单展示：订单关联工单 + C区备注Tab的用户工单列表 */
+          if (typeof this._loadOrderIssues === 'function') this._loadOrderIssues()
+          if (typeof this._loadNotes === 'function' && user_id) this._loadNotes(user_id)
         } else {
           Alpine.store('notification').show(response?.message || '工单创建失败', 'error')
         }

@@ -64,7 +64,7 @@ function customerServicePage() {
     ...useCsDiagnosisState(),
     ...useCsDiagnosisMethods(),
 
-    // 工单管理（独立composable，与C区内置的createIssue/addNote互补）
+    // 工单管理（统一弹窗：会话/订单/备注Tab 共用 issueForm + submitCreateIssue）
     ...useCsIssuesState(),
     ...useCsIssuesMethods(),
 

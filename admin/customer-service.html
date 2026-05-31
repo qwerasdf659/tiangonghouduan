@@ -35,16 +35,16 @@
           <div class="flex items-center gap-2">
             <span class="text-base">⏱️</span>
             <div class="leading-tight">
-              <p class="text-[10px] themed-text-muted">首响时间</p>
-              <p class="text-sm font-semibold themed-text" x-text="responseStats.avg_first_response_display || '--'"></p>
+              <p class="text-[10px] themed-text-muted">首响均值</p>
+              <p class="text-sm font-semibold themed-text" x-text="responseStats.avg_response_display || '--'"></p>
             </div>
           </div>
-          <!-- 平均响应 -->
+          <!-- 1分钟达标率 -->
           <div class="flex items-center gap-2">
             <span class="text-base">💬</span>
             <div class="leading-tight">
-              <p class="text-[10px] themed-text-muted">平均响应</p>
-              <p class="text-sm font-semibold themed-text" x-text="responseStats.avg_response_display || '--'"></p>
+              <p class="text-[10px] themed-text-muted">1分钟达标</p>
+              <p class="text-sm font-semibold themed-text" x-text="responseStats.within_1min_display || '--'"></p>
             </div>
           </div>
           <!-- 等待队列 -->
@@ -68,7 +68,7 @@
             <span class="text-base">✅</span>
             <div class="leading-tight">
               <p class="text-[10px] themed-text-muted">今日解决</p>
-              <p class="text-sm font-semibold themed-text" x-text="resolvedTodayCount || responseStats.today_resolved || 0"></p>
+              <p class="text-sm font-semibold themed-text" x-text="resolvedTodayCount"></p>
             </div>
           </div>
           <!-- 待处理工单 -->
@@ -863,25 +863,14 @@
                     </button>
                   </div>
 
-                  <!-- 创建工单 -->
+                  <!-- 创建工单（统一调用弹窗，与订单详情共用一套表单逻辑） -->
                   <div class="border-t themed-border-light pt-2">
                     <p class="text-[10px] themed-text-hint mb-1">创建工单</p>
-                    <div class="space-y-1.5">
-                      <select x-model="issue_form.issue_type" class="w-full text-xs border rounded themed-select px-2 py-1">
-                        <option value="asset">资产问题</option>
-                        <option value="trade">交易纠纷</option>
-                        <option value="lottery">抽奖问题</option>
-                        <option value="item">物品问题</option>
-                        <option value="account">账号问题</option>
-                        <option value="consumption">消费问题</option>
-                        <option value="feedback">反馈升级</option>
-                        <option value="other">其他</option>
-                      </select>
-                      <input type="text" x-model="issue_form.title" class="w-full text-xs border rounded themed-input px-2 py-1" placeholder="工单标题...">
-                      <button @click="createIssue()" :disabled="!issue_form.title.trim()" class="w-full px-2 py-1.5 text-[11px] border themed-border rounded themed-hover-bg disabled:opacity-40">
-                        📋 创建工单
-                      </button>
-                    </div>
+                    <button @click="openCreateIssueModal(_getContextUserId(), selectedSession?.customer_service_session_id)"
+                            :disabled="!_getContextUserId()"
+                            class="w-full px-2 py-1.5 text-[11px] border themed-border rounded themed-hover-bg disabled:opacity-40">
+                      📋 创建工单
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1011,6 +1000,11 @@
             <span class="themed-text font-medium" x-text="getOrderTypeLabel(issueForm.order_type) + ' #' + (issueForm.order_id || '')"></span>
           </div>
           <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">用户ID <span class="text-red-500">*</span></label>
+            <input type="number" x-model.number="issueForm.user_id" placeholder="输入用户ID（如已选会话/订单会自动带入）" class="w-full px-3 py-2 border rounded-lg themed-input text-sm">
+            <p x-show="!issueForm.user_id" class="text-[11px] text-red-500 mt-1">未识别到用户，请先选择会话或搜索用户订单，或在此手动输入用户ID</p>
+          </div>
+          <div>
             <label class="block text-sm font-medium themed-text-secondary mb-1">问题类型 <span class="text-red-500">*</span></label>
             <select x-model="issueForm.issue_type" class="w-full px-3 py-2 border rounded-lg themed-select text-sm">
               <option value="trade">交易问题</option>
@@ -1043,7 +1037,7 @@
         </div>
         <div class="p-4 border-t themed-bg-base rounded-b-xl flex justify-end space-x-3">
           <button @click="closeIssueModal()" class="px-4 py-2 text-sm themed-bg-muted themed-text-secondary rounded-lg hover:opacity-80">取消</button>
-          <button @click="submitCreateIssue()" :disabled="issueSubmitting || !issueForm.title?.trim()" class="px-4 py-2 text-sm bg-pink-500 text-white rounded-lg hover:bg-pink-600 disabled:opacity-50">
+          <button @click="submitCreateIssue()" :disabled="issueSubmitting || !issueForm.title?.trim() || !issueForm.user_id" class="px-4 py-2 text-sm bg-pink-500 text-white rounded-lg hover:bg-pink-600 disabled:opacity-50">
             <span x-show="issueSubmitting">创建中...</span>
             <span x-show="!issueSubmitting">确认创建</span>
           </button>
