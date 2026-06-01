@@ -23,6 +23,7 @@ const { Op } = require('sequelize')
 const logger = require('../../utils/logger').logger
 const BeijingTimeHelper = require('../../utils/timeHelper')
 const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
+const IpLocationHelper = require('../../utils/IpLocationHelper')
 const { AuthenticationSession, User } = require('../../models')
 
 /**
@@ -90,6 +91,9 @@ class SessionQueryService {
     if (options.login_platform) {
       whereCondition.login_platform = options.login_platform
     }
+    if (options.device_id) {
+      whereCondition.device_id = options.device_id
+    }
 
     // 排序配置
     const allowedSortFields = ['last_activity', 'created_at', 'expires_at']
@@ -115,33 +119,40 @@ class SessionQueryService {
         : []
     const userMap = new Map(users.map(u => [u.user_id, u]))
 
-    // 格式化返回数据
-    const formattedSessions = sessions.map(session => {
-      const userInfo = userMap.get(session.user_id)
-      return {
-        authentication_session_id: session.authentication_session_id,
-        session_token: `${session.session_token.substring(0, 8)}...`, // 脱敏显示
-        user_type: session.user_type,
-        user_id: session.user_id,
-        user_info: userInfo
-          ? {
-              nickname: userInfo.nickname,
-              mobile: userInfo.mobile
-                ? `${userInfo.mobile.substring(0, 3)}****${userInfo.mobile.substring(7)}`
-                : null,
-              status: userInfo.status
-            }
-          : null,
-        login_ip: session.login_ip,
-        login_platform: session.login_platform || 'unknown',
-        is_active: session.is_active,
-        is_expired: session.isExpired(),
-        is_valid: session.isValid(),
-        last_activity: BeijingTimeHelper.formatToISO(session.last_activity),
-        expires_at: BeijingTimeHelper.formatToISO(session.expires_at),
-        created_at: BeijingTimeHelper.formatToISO(session.created_at)
-      }
-    })
+    // 格式化返回数据（含设备维度 + 登录地 + 当前会话标记）
+    const currentToken = options.current_session_token || null
+    const formattedSessions = await Promise.all(
+      sessions.map(async session => {
+        const userInfo = userMap.get(session.user_id)
+        return {
+          authentication_session_id: session.authentication_session_id,
+          session_token: `${session.session_token.substring(0, 8)}...`, // 脱敏显示
+          user_type: session.user_type,
+          user_id: session.user_id,
+          user_info: userInfo
+            ? {
+                nickname: userInfo.nickname,
+                mobile: userInfo.mobile
+                  ? `${userInfo.mobile.substring(0, 3)}****${userInfo.mobile.substring(7)}`
+                  : null,
+                status: userInfo.status
+              }
+            : null,
+          login_ip: session.login_ip,
+          login_location: await IpLocationHelper.resolve(session.login_ip), // 决策E：登录地（纯展示）
+          login_platform: session.login_platform || 'unknown',
+          device_id: session.device_id || null, // 设备级多会话：设备标识（NULL=legacy）
+          is_active: session.is_active,
+          is_expired: session.isExpired(),
+          is_valid: session.isValid(),
+          // 决策F：当前会话由后端判定（前端不再解析JWT）
+          is_current: currentToken ? session.session_token === currentToken : false,
+          last_activity: BeijingTimeHelper.formatToISO(session.last_activity),
+          expires_at: BeijingTimeHelper.formatToISO(session.expires_at),
+          created_at: BeijingTimeHelper.formatToISO(session.created_at)
+        }
+      })
+    )
 
     logger.info('查询会话列表成功', { total: count, page: pageNum })
 
@@ -200,7 +211,9 @@ class SessionQueryService {
           }
         : null,
       login_ip: session.login_ip,
+      login_location: await IpLocationHelper.resolve(session.login_ip), // 决策E：登录地（纯展示）
       login_platform: session.login_platform || 'unknown',
+      device_id: session.device_id || null, // 设备级多会话：设备标识（NULL=legacy）
       is_active: session.is_active,
       is_expired: session.isExpired(),
       is_valid: session.isValid(),
@@ -209,6 +222,57 @@ class SessionQueryService {
       created_at: BeijingTimeHelper.formatToISO(session.created_at),
       updated_at: BeijingTimeHelper.formatToISO(session.updated_at)
     }
+  }
+
+  /**
+   * 🙋 获取"当前登录用户自己"的在线设备列表（用户端 GET /auth/sessions）
+   *
+   * 设备级多会话：列出该用户所有活跃且未过期的会话，含设备标识、登录地、是否当前设备。
+   * 仅返回自己的会话（user_id 由认证中间件提供，不接受外部传入越权查询）。
+   *
+   * @param {Object} params - 参数
+   * @param {number} params.user_id - 当前登录用户ID
+   * @param {string} [params.user_type] - 用户类型（user/admin），不传则查全部类型
+   * @param {string} [params.current_session_token] - 当前会话令牌（用于标记 is_current）
+   * @returns {Promise<Object>} { list: [...] }
+   */
+  static async getUserDevices(params = {}) {
+    const { user_id, user_type, current_session_token } = params
+
+    const userIdNum = parseInt(user_id, 10)
+    if (isNaN(userIdNum) || userIdNum <= 0) {
+      return { list: [] }
+    }
+
+    const whereCondition = {
+      user_id: userIdNum,
+      is_active: true,
+      expires_at: { [Op.gt]: BeijingTimeHelper.createBeijingTime() }
+    }
+    if (user_type && ['user', 'admin'].includes(user_type)) {
+      whereCondition.user_type = user_type
+    }
+
+    const sessions = await AuthenticationSession.findAll({
+      where: whereCondition,
+      order: [['last_activity', 'DESC']]
+    })
+
+    const list = await Promise.all(
+      sessions.map(async session => ({
+        authentication_session_id: session.authentication_session_id,
+        device_id: session.device_id || null,
+        login_platform: session.login_platform || 'unknown',
+        login_ip: session.login_ip,
+        login_location: await IpLocationHelper.resolve(session.login_ip), // 决策E：登录地
+        last_activity: BeijingTimeHelper.formatToISO(session.last_activity),
+        expires_at: BeijingTimeHelper.formatToISO(session.expires_at),
+        // 决策F：当前设备由后端判定
+        is_current: current_session_token ? session.session_token === current_session_token : false
+      }))
+    )
+
+    return { list }
   }
 
   /**
@@ -229,6 +293,9 @@ class SessionQueryService {
 
     // 获取活跃会话统计（按用户类型分组）
     const activeStats = await AuthenticationSession.getActiveSessionStats()
+
+    // 设备维度统计（设备级多会话，决策B/方案 8.2 统计增加 device 维度）
+    const deviceStats = await AuthenticationSession.getActiveDeviceStats()
 
     // 计算总活跃会话数
     const totalActiveSessions = Object.values(activeStats).reduce(
@@ -261,6 +328,12 @@ class SessionQueryService {
       by_user_type: {
         user: activeStats.user || { active_sessions: 0, unique_users: 0 },
         admin: activeStats.admin || { active_sessions: 0, unique_users: 0 }
+      },
+      // 设备维度统计（设备级多会话）：真实设备数 / 存量legacy会话数 / 多设备用户数
+      by_device: {
+        total_devices: deviceStats.total_devices,
+        legacy_sessions: deviceStats.legacy_sessions,
+        multi_device_users: deviceStats.multi_device_users
       },
       expired_pending_cleanup: expiredPendingCleanup,
       today_new_sessions: todayNewSessions,
@@ -332,7 +405,8 @@ class SessionQueryService {
           active_sessions: 0,
           last_activity: session.last_activity,
           login_ips: new Set(),
-          login_platforms: new Set()
+          login_platforms: new Set(),
+          device_ids: new Set()
         })
       }
       const userData = userSessionMap.get(userId)
@@ -342,6 +416,10 @@ class SessionQueryService {
       }
       if (session.login_platform) {
         userData.login_platforms.add(session.login_platform)
+      }
+      // 设备级多会话：聚合该用户的真实设备（device_id 非空）
+      if (session.device_id) {
+        userData.device_ids.add(session.device_id)
       }
       // 保留最近的活动时间
       if (session.last_activity > userData.last_activity) {
@@ -357,6 +435,8 @@ class SessionQueryService {
       mobile: user.mobile,
       status: user.status,
       active_sessions: user.active_sessions,
+      // 设备级多会话：该用户真实设备数（device_id 去重，不含 legacy NULL）
+      device_count: user.device_ids.size,
       last_activity: BeijingTimeHelper.formatToISO(user.last_activity),
       login_ips: Array.from(user.login_ips),
       login_platforms: Array.from(user.login_platforms)

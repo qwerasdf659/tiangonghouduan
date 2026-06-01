@@ -43,13 +43,18 @@
 const BeijingTimeHelper = require('../utils/timeHelper')
 const { DataTypes } = require('sequelize')
 const logger = require('../utils/logger').logger
+const { VALID_PLATFORMS } = require('../utils/platformDetector')
+
+/** 落库允许的平台白名单（前端可声明的平台 + unknown 兜底），用于堵住空串等非法值入库 */
+const PLATFORM_WHITELIST = new Set([...VALID_PLATFORMS, 'unknown'])
 
 module.exports = sequelize => {
   const AuthenticationSession = sequelize.define(
     'AuthenticationSession',
     {
       authentication_session_id: {
-        type: DataTypes.INTEGER,
+        // 真实库主键为 BIGINT（实测），模型与库对齐，避免大表自增溢出
+        type: DataTypes.BIGINT,
         primaryKey: true,
         autoIncrement: true,
         comment: '主键ID'
@@ -88,6 +93,12 @@ module.exports = sequelize => {
           '登录平台：web=浏览器, wechat_mp=微信小程序, douyin_mp=抖音小程序, alipay_mp=支付宝小程序, app=原生App(预留), unknown=旧数据兜底'
       },
 
+      device_id: {
+        type: DataTypes.STRING(64),
+        allowNull: true,
+        comment: '设备标识（前端生成的UUID）。NULL=未知设备(legacy存量数据)。设备级多会话隔离key'
+      },
+
       is_active: {
         type: DataTypes.BOOLEAN,
         defaultValue: true,
@@ -121,6 +132,11 @@ module.exports = sequelize => {
         {
           name: 'idx_user_sessions_platform',
           fields: ['user_type', 'user_id', 'login_platform', 'is_active']
+        },
+        {
+          // 设备级多会话隔离索引：支持"某用户某设备活跃会话"查找/替换/踢设备
+          name: 'idx_user_device',
+          fields: ['user_type', 'user_id', 'device_id', 'is_active']
         },
         {
           fields: ['expires_at', 'is_active']
@@ -181,6 +197,7 @@ module.exports = sequelize => {
    * @param {number} sessionData.user_id - 用户ID
    * @param {string} [sessionData.login_ip] - 登录IP地址
    * @param {string} [sessionData.login_platform='unknown'] - 登录平台（web/wechat_mp/douyin_mp/alipay_mp/app/unknown）
+   * @param {string} [sessionData.device_id] - 设备标识（前端生成的UUID）。缺失则为 NULL（未知设备）
    * @param {number} [sessionData.expires_in_minutes=120] - 过期时间（分钟），默认2小时
    * @param {Object} [options] - Sequelize 选项（支持 transaction）
    * @returns {Promise<AuthenticationSession>} 新创建的会话实例
@@ -192,8 +209,12 @@ module.exports = sequelize => {
       user_id,
       login_ip,
       login_platform = 'unknown',
+      device_id = null,
       expires_in_minutes = 120 // 默认2小时
     } = sessionData
+
+    // 平台白名单兜底：非法值（如空串）统一落库为 unknown，从机制上堵住"僵尸会话"
+    const safePlatform = PLATFORM_WHITELIST.has(login_platform) ? login_platform : 'unknown'
 
     // ✅ futureTime 使用 Date.now()，与 new Date() 时间基准一致
     const expires_at = BeijingTimeHelper.futureTime(expires_in_minutes * 60 * 1000)
@@ -204,7 +225,8 @@ module.exports = sequelize => {
         user_type,
         user_id,
         login_ip,
-        login_platform,
+        login_platform: safePlatform,
+        device_id,
         expires_at,
         is_active: true,
         last_activity: new Date() // ✅ 使用 UTC 时间戳，Sequelize 自动转换为北京时间
@@ -264,23 +286,15 @@ module.exports = sequelize => {
   }
 
   /**
-   * 🔒 批量失效用户会话
+   * 🔒 批量失效用户的全部活跃会话
    *
-   * 多平台会话隔离策略：
-   *   - 传入 login_platform 时：仅失效该平台的会话（跨平台共存）
-   *   - 不传 login_platform 时：失效所有平台的会话（兼容清理任务、强制登出等场景）
+   * 设备级多会话语义下，本方法用于"失效该用户某 user_type 下的所有会话"，
+   * 典型场景：管理员强制登出某用户全部设备、账号封禁、强制清理。
+   * （平台维度互斥已废弃；按设备替换走 deactivateDeviceSessions。）
    *
    * @param {string} user_type - 用户类型 (user/admin)
    * @param {number} user_id - 用户ID
    * @param {string|null} [excludeToken=null] - 排除的会话令牌（不失效该 Token 对应的会话）
-   * @param {string|null} [login_platform=null] - 登录平台（传入时仅失效该平台会话）
-   * @returns {Promise<number>} 被失效的会话数量
-   */
-  /**
-   * @param {string} user_type - 用户类型 (user/admin)
-   * @param {number} user_id - 用户ID
-   * @param {string|null} [excludeToken=null] - 排除的会话令牌
-   * @param {string|null} [login_platform=null] - 登录平台
    * @param {Object} [options] - Sequelize 选项（支持 transaction）
    * @returns {Promise<number>} 被失效的会话数量
    */
@@ -288,7 +302,6 @@ module.exports = sequelize => {
     user_type,
     user_id,
     excludeToken = null,
-    login_platform = null,
     options = {}
   ) {
     const whereCondition = {
@@ -303,8 +316,51 @@ module.exports = sequelize => {
       }
     }
 
-    if (login_platform) {
-      whereCondition.login_platform = login_platform
+    const affectedCount = await this.update(
+      { is_active: false },
+      { where: whereCondition, ...options }
+    )
+
+    logger.info(`🔒 已失效 ${affectedCount[0]} 个用户会话: ${user_type}:${user_id}(全部)`)
+    return affectedCount[0]
+  }
+
+  /**
+   * 🔒 失效"同一用户同一设备"的旧活跃会话（设备级登录替换）
+   *
+   * 设备级多会话隔离的核心：同 device_id 再次登录 = 替换自己这台设备的旧会话（token 轮换），
+   * 不同 device_id = 新会话并存，不互踢。device_id 为空（legacy）时不做替换，避免误伤存量。
+   *
+   * @param {string} user_type - 用户类型 (user/admin)
+   * @param {number} user_id - 用户ID
+   * @param {string|null} device_id - 设备标识（为空则不替换，直接返回0）
+   * @param {string|null} [excludeToken=null] - 排除的会话令牌（保留新建会话）
+   * @param {Object} [options] - Sequelize 选项（支持 transaction）
+   * @returns {Promise<number>} 被失效的会话数量
+   */
+  AuthenticationSession.deactivateDeviceSessions = async function (
+    user_type,
+    user_id,
+    device_id,
+    excludeToken = null,
+    options = {}
+  ) {
+    // device_id 为空时不替换（legacy 设备无法精确定位，避免误伤）
+    if (!device_id) {
+      return 0
+    }
+
+    const whereCondition = {
+      user_type,
+      user_id,
+      device_id,
+      is_active: true
+    }
+
+    if (excludeToken) {
+      whereCondition.session_token = {
+        [sequelize.Sequelize.Op.ne]: excludeToken
+      }
     }
 
     const affectedCount = await this.update(
@@ -312,9 +368,36 @@ module.exports = sequelize => {
       { where: whereCondition, ...options }
     )
 
-    const platformInfo = login_platform ? `:${login_platform}` : '(全平台)'
-    logger.info(`🔒 已失效 ${affectedCount[0]} 个用户会话: ${user_type}:${user_id}${platformInfo}`)
+    logger.info(
+      `🔒 已失效 ${affectedCount[0]} 个同设备旧会话: ${user_type}:${user_id} device=${device_id}`
+    )
     return affectedCount[0]
+  }
+
+  /**
+   * 🔐 查找单个用户在指定设备上的活跃会话
+   *
+   * @param {string} user_type - 用户类型 (user/admin)
+   * @param {number} user_id - 用户ID
+   * @param {string} device_id - 设备标识
+   * @returns {Promise<AuthenticationSession|null>} 活跃会话或null
+   */
+  AuthenticationSession.findActiveByDevice = function (user_type, user_id, device_id) {
+    if (!device_id) {
+      return Promise.resolve(null)
+    }
+    return this.findOne({
+      where: {
+        user_type,
+        user_id,
+        device_id,
+        is_active: true,
+        expires_at: {
+          [sequelize.Sequelize.Op.gt]: new Date()
+        }
+      },
+      order: [['last_activity', 'DESC']]
+    })
   }
 
   /**
@@ -361,6 +444,55 @@ module.exports = sequelize => {
       }
       return acc
     }, {})
+  }
+
+  /**
+   * 📊 获取活跃会话的"设备维度"统计（设备级多会话）
+   *
+   * 与 getActiveSessionStats（按 user_type 维度）互补，统计活跃且未过期会话中：
+   * - total_devices：去重后的真实设备数（device_id 非空，按 user_type+user_id+device_id 去重）
+   * - legacy_sessions：device_id 为 NULL 的存量会话数（旧客户端/未带 X-Device-Id）
+   * - multi_device_users：拥有 >1 台真实设备的用户数（盗号/工作室异常的观测信号，对齐决策B软上限思路）
+   *
+   * @returns {Promise<Object>} { total_devices, legacy_sessions, multi_device_users }
+   */
+  AuthenticationSession.getActiveDeviceStats = async function () {
+    const Sequelize = sequelize.Sequelize
+    const activeWhere = {
+      is_active: true,
+      expires_at: { [Sequelize.Op.gt]: new Date() }
+    }
+
+    // 去重真实设备数：DISTINCT (user_type, user_id, device_id)，仅统计 device_id 非空
+    const [deviceRows] = await sequelize.query(
+      `SELECT COUNT(DISTINCT user_type, user_id, device_id) AS total_devices
+       FROM authentication_sessions
+       WHERE is_active = 1 AND expires_at > NOW() AND device_id IS NOT NULL`
+    )
+    const totalDevices = parseInt(deviceRows?.[0]?.total_devices || 0, 10)
+
+    // 存量 legacy 会话数（device_id 为 NULL）
+    const legacySessions = await this.count({
+      where: { ...activeWhere, device_id: { [Sequelize.Op.is]: null } }
+    })
+
+    // 多设备用户数：同一 (user_type,user_id) 下去重设备数 > 1 的用户个数
+    const [multiRows] = await sequelize.query(
+      `SELECT COUNT(*) AS multi_device_users FROM (
+         SELECT user_type, user_id
+         FROM authentication_sessions
+         WHERE is_active = 1 AND expires_at > NOW() AND device_id IS NOT NULL
+         GROUP BY user_type, user_id
+         HAVING COUNT(DISTINCT device_id) > 1
+       ) AS t`
+    )
+    const multiDeviceUsers = parseInt(multiRows?.[0]?.multi_device_users || 0, 10)
+
+    return {
+      total_devices: totalDevices,
+      legacy_sessions: legacySessions,
+      multi_device_users: multiDeviceUsers
+    }
   }
 
   // 关联关系

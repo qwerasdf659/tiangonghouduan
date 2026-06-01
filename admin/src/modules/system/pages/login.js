@@ -92,7 +92,7 @@ function loginPage() {
       const reason = urlParams.get('reason')
       if (reason) {
         const reasonMessages = {
-          SESSION_REPLACED: '您的账号已在其他设备登录，请重新登录',
+          SESSION_REVOKED: '登录已在设备管理中退出，请重新登录',
           SESSION_EXPIRED: '登录会话已过期，请重新登录',
           SESSION_NOT_FOUND: '登录状态已失效，请重新登录',
           TOKEN_EXPIRED: '登录已过期，请重新登录',

@@ -192,7 +192,7 @@ document.addEventListener('alpine:init', () => {
      */
     _getButtonClass(type) {
       const classes = {
-        primary: 'bg-blue-500 hover:bg-blue-600 text-white',
+        primary: 'themed-bg-primary text-white',
         success: 'bg-green-500 hover:bg-green-600 text-white',
         warning: 'bg-yellow-500 hover:bg-yellow-600 text-white',
         danger: 'bg-red-500 hover:bg-red-600 text-white',
@@ -207,7 +207,7 @@ document.addEventListener('alpine:init', () => {
      */
     _getTitleClass(type) {
       const classes = {
-        primary: 'text-blue-600',
+        primary: 'themed-text-primary',
         success: 'text-green-600',
         warning: 'text-yellow-600',
         danger: 'text-red-600',
@@ -263,7 +263,7 @@ document.addEventListener('alpine:init', () => {
               <div class="px-6 py-4 border-b border-gray-200">
                 <h3 class="text-lg font-semibold flex items-center gap-2"
                     :class="{
-                      'text-blue-600': store.config.type === 'primary',
+                      'themed-text-primary': store.config.type === 'primary',
                       'text-green-600': store.config.type === 'success',
                       'text-yellow-600': store.config.type === 'warning',
                       'text-red-600': store.config.type === 'danger',
@@ -289,7 +289,7 @@ document.addEventListener('alpine:init', () => {
                 <button @click="store.confirm()"
                         class="px-4 py-2 rounded-lg transition-colors"
                         :class="{
-                          'bg-blue-500 hover:bg-blue-600 text-white': store.config.type === 'primary',
+                          'themed-bg-primary text-white': store.config.type === 'primary',
                           'bg-green-500 hover:bg-green-600 text-white': store.config.type === 'success',
                           'bg-yellow-500 hover:bg-yellow-600 text-white': store.config.type === 'warning',
                           'bg-red-500 hover:bg-red-600 text-white': store.config.type === 'danger',

@@ -4,9 +4,9 @@
   <div class="flex items-center gap-3">
     <!-- 选择信息（#13） -->
     <template x-if="selectable && selectedRows.length > 0">
-      <div class="flex items-center gap-2 text-sm text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg">
+      <div class="flex items-center gap-2 text-sm themed-text-primary themed-bg-primary-light px-3 py-1.5 rounded-lg">
         <span>已选 <strong x-text="selectedRows.length"></strong> 项</span>
-        <button @click="clearSelection()" class="text-blue-500 hover:text-blue-700 text-xs underline">取消选择</button>
+        <button @click="clearSelection()" class="themed-text-primary hover:underline text-xs underline">取消选择</button>
       </div>
     </template>
     <!-- 上次更新时间（#2） -->
@@ -47,13 +47,13 @@
         <!-- 数据列（#10 排序） -->
         <template x-for="(col, colIdx) in columns" :key="'th_' + colIdx">
           <th class="px-4 py-3 text-left text-sm font-medium themed-text-secondary"
-            :class="{ 'cursor-pointer hover:text-blue-600 select-none': sortable && col.sortable }"
+            :class="{ 'cursor-pointer themed-th-sortable select-none': sortable && col.sortable }"
             :style="col.width ? 'width:' + col.width : ''"
             @click="sort(col)">
             <div class="flex items-center gap-1">
               <span x-text="col.label"></span>
               <template x-if="sortable && col.sortable">
-                <span class="text-xs" :class="sortColumn === col.key ? 'text-blue-600 font-bold' : 'text-gray-400'" x-text="getSortIcon(col)"></span>
+                <span class="text-xs" :class="sortColumn === col.key ? 'themed-text-primary font-bold' : 'text-gray-400'" x-text="getSortIcon(col)"></span>
               </template>
             </div>
           </th>
@@ -66,7 +66,7 @@
       <tr x-show="loading">
         <td :colspan="colSpan" class="px-4 py-12 text-center">
           <div class="flex flex-col items-center gap-2">
-            <div class="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
+            <div class="animate-spin w-8 h-8 border-4 themed-border-primary border-t-transparent rounded-full"></div>
             <span class="text-sm themed-text-muted">加载中...</span>
           </div>
         </td>
@@ -78,7 +78,7 @@
             <span class="text-4xl">❌</span>
             <div class="text-red-600 font-medium">加载失败</div>
             <div class="text-sm text-gray-500" x-text="error"></div>
-            <button @click="loadData()" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm">🔄 重试</button>
+            <button @click="loadData()" class="px-4 py-2 themed-bg-primary text-white rounded-lg text-sm">🔄 重试</button>
           </div>
         </td>
       </tr>
@@ -117,7 +117,7 @@
                     x-show="!action.condition || action.condition(row)"
                     @click="$dispatch('table-action', { action: action.name, row: JSON.parse(JSON.stringify(row)) })"
                     class="px-2 py-1 text-xs rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors whitespace-nowrap"
-                    :class="action.class || 'text-blue-600 hover:text-blue-800'"
+                    :class="action.class || 'themed-text-primary'"
                     x-html="(action.icon ? action.icon + ' ' : '') + action.label">
                   </button>
                 </template>
@@ -144,7 +144,7 @@
         <template x-for="page in visiblePages" :key="'p_' + page">
           <button @click="goToPage(page)"
             :disabled="page === '...'"
-            :class="page === current_page ? 'bg-blue-500 text-white border-blue-500' : 'hover:bg-gray-50'"
+            :class="page === current_page ? 'themed-bg-primary text-white themed-border-primary' : 'hover:bg-gray-50'"
             class="px-3 py-1 text-sm border rounded min-w-[32px]"
             x-text="page"></button>
         </template>

@@ -21,7 +21,7 @@
  * - 会话有效期：2小时
  * - 敏感操作成功后自动续期30分钟
  * - 强制登出时会话立即失效
- * - 新设备登录使旧会话失效
+ * - 设备级多会话：同设备重登替换旧会话（token轮换），不同设备并存不互踢
  *
  * 验收标准：
  * - 缺少session_token的敏感操作返回 SESSION_REQUIRED
@@ -211,14 +211,14 @@ describe('P1-7.3: 敏感操作二次认证测试', () => {
         .send({ item_id: 1, price_points: 100 })
 
       /*
-       * 会话失效后的预期行为：
-       * 1. 返回 401 SESSION_INVALIDATED - 会话已失效
-       * 2. 返回 401 SESSION_INVALID - 会话无效
+       * 会话失效后的预期行为（设备级多会话）：
+       * - 走 requireValidSession（敏感操作中间件）→ 401 SESSION_INVALID
+       * - 走 authenticateToken（登出/撤销使会话 is_active=0）→ 401 SESSION_REVOKED
        */
       if (sensitiveResponse.status === 401) {
         expect([
           'SESSION_INVALIDATED',
-          'SESSION_REPLACED',
+          'SESSION_REVOKED',
           'SESSION_INVALID',
           'UNAUTHORIZED'
         ]).toContain(sensitiveResponse.body.code)
@@ -344,8 +344,8 @@ describe('P1-7.3: 敏感操作二次认证测试', () => {
     })
   })
 
-  describe('多设备登录会话冲突测试', () => {
-    test('新设备登录应使旧设备会话失效', async () => {
+  describe('设备级多会话登录测试', () => {
+    test('不带device_id的多次登录会话并存（设备级多会话语义）', async () => {
       // 第一个设备登录
       const firstLogin = await request(app).post('/api/v4/auth/login').send({
         mobile: TEST_DATA.users.testUser.mobile,
@@ -392,14 +392,13 @@ describe('P1-7.3: 敏感操作二次认证测试', () => {
         .set('Authorization', `Bearer ${firstToken}`)
 
       /*
-       * 多设备登录冲突处理：
-       * 根据项目配置，可能有两种行为：
-       * 1. 允许多设备同时登录（两个Token都有效）
-       * 2. 新登录使旧会话失效（第一个Token的会话失效）
+       * 多设备登录冲突处理（设备级多会话）：
+       * - 不带 X-Device-Id 的两次登录 → device_id 均为 null → 不替换 → 两个会话并存（status 200）
+       * - 同设备（相同 device_id）重登 → 旧会话被替换 → 401 SESSION_REVOKED
        */
       if (
         sensitiveOp.status === 401 &&
-        ['SESSION_INVALIDATED', 'SESSION_REPLACED'].includes(sensitiveOp.body.code)
+        ['SESSION_INVALIDATED', 'SESSION_REVOKED'].includes(sensitiveOp.body.code)
       ) {
         console.log('[P1-7.3] 多设备登录冲突处理：旧设备会话已失效 ✓')
       } else if (sensitiveOp.status === 200) {
@@ -504,7 +503,7 @@ describe('P1-7.3: 敏感操作二次认证测试', () => {
       console.log('╠════════════════════════════════════════════════════════════════╣')
       console.log('║ 会话有效期: 2小时                                              ║')
       console.log('║ 敏感操作续期: 30分钟                                           ║')
-      console.log('║ 多设备策略: 新设备登录使旧会话失效                             ║')
+      console.log('║ 多设备策略: 设备级多会话(同设备替换/异设备并存)              ║')
       console.log('║ 会话存储: authentication_sessions                              ║')
       console.log('╠════════════════════════════════════════════════════════════════╣')
       console.log('║ 敏感操作清单:                                                  ║')

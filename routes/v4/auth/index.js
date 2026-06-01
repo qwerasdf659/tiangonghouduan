@@ -31,10 +31,12 @@ const router = express.Router()
 const loginRoutes = require('./login')
 const tokenRoutes = require('./token')
 const profileRoutes = require('./profile')
+const sessionsRoutes = require('./sessions') // 用户端设备/会话管理（设备级多会话）
 // 挂载路由
 router.use('/', loginRoutes) // POST /login, /quick-login, /decrypt-phone
 router.use('/', tokenRoutes) // GET /verify, POST /refresh, /logout
 router.use('/', profileRoutes) // GET /profile
+router.use('/sessions', sessionsRoutes) // GET /sessions, DELETE /sessions/:authentication_session_id
 /*
  * 🔧 2026-01-08：权限路由已独立挂载到 /api/v4/permissions（解决路由冲突）
  * router.use('/', permissionRoutes)

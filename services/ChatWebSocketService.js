@@ -211,6 +211,12 @@ class ChatWebSocketService {
            */
           // eslint-disable-next-line require-atomic-updates
           socket.session_user_type = session.user_type
+          /*
+           * 设备级多会话：记录 socket 的 device_id（来自 JWT），用于"按设备精准下线"。
+           * 与 session.device_id 对齐；缺失（legacy）时为 null。
+           */
+          // eslint-disable-next-line require-atomic-updates
+          socket.device_id = decoded.device_id || session.device_id || null
         } else {
           wsLogger.warn('WebSocket握手失败：Token缺少session_token', {
             user_id: decoded.user_id,
@@ -273,6 +279,10 @@ class ChatWebSocketService {
          */
         socket.join(`admin:${userId}`)
         socket.join('admins')
+        // 设备级多会话：加入设备房间，支持"按设备精准下线"（踢单设备不误伤同账号其他设备）
+        if (socket.device_id) {
+          socket.join(`device:${userId}:${socket.device_id}`)
+        }
         wsLogger.info('管理员已连接', {
           user_id: userId,
           socket_id: socket.id,
@@ -283,6 +293,10 @@ class ChatWebSocketService {
         // R6：加入 user:{id}（定向）与 users（广播）房间，支持跨 worker 推送
         socket.join(`user:${userId}`)
         socket.join('users')
+        // 设备级多会话：加入设备房间，支持"按设备精准下线"
+        if (socket.device_id) {
+          socket.join(`device:${userId}:${socket.device_id}`)
+        }
         wsLogger.info('用户已连接', {
           user_id: userId,
           socket_id: socket.id,
@@ -978,27 +992,38 @@ class ChatWebSocketService {
    * @returns {void} 无返回值，强制断开用户WebSocket连接
    */
   disconnectUser(user_id, user_type = 'user', options = {}) {
-    const { reason = 'session_replaced', replaced_by_platform = null } = options
+    const { reason = 'session_replaced', replaced_by_platform = null, device_id = null } = options
     if (!this.io) return
 
-    const room = user_type === 'user' ? `user:${user_id}` : `admin:${user_id}`
+    /*
+     * 设备级多会话：
+     * - 传入 device_id → 仅断开该设备房间（device:{user_id}:{device_id}），不误伤同账号其他设备
+     * - 不传 device_id → 按 user_type 房间断开该用户全部连接（兼容批量撤销/封禁场景）
+     */
+    const room = device_id
+      ? `device:${user_id}:${device_id}`
+      : user_type === 'user'
+        ? `user:${user_id}`
+        : `admin:${user_id}`
 
     /*
      * R6（cluster 跨进程强制下线）：
      * - 先向房间 emit session_replaced（Redis Adapter 跨 worker 送达，用户可能连在其他 worker）
-     * - 再用 io.in(room).disconnectSockets(true) 跨进程断开该用户在任意 worker 上的连接
+     * - 再用 io.in(room).disconnectSockets(true) 跨进程断开该房间在任意 worker 上的连接
      * - 本进程连接映射由各 socket 的 'disconnect' 事件处理器自动清理（无需手动 delete）
      */
     this.io.to(room).emit('session_replaced', {
       reason,
       replaced_by_platform,
-      message: '您的账号已在其他设备登录'
+      device_id,
+      message: '您的账号登录状态已变更'
     })
     this.io.in(room).disconnectSockets(true)
 
     wsLogger.info(`🔌 已强制断开 ${user_type} ${user_id} 的连接`, {
       reason,
-      replaced_by_platform
+      replaced_by_platform,
+      device_id: device_id || '(全部设备)'
     })
   }
 

@@ -10,10 +10,11 @@
  * - 路由层只负责：认证/鉴权、参数校验、调用Service、统一响应
  * - 使用统一响应 res.apiSuccess / res.apiError
  *
- * 会话管理（2026-01-21 新增，2026-02-18 修复 P0 安全漏洞）：
- * - Token 刷新时维持会话链路不中断（修复 session_token 丢失问题）
- * - 登出时失效对应的会话记录
- * - 单设备登录策略：刷新时检测会话是否被覆盖
+ * 会话管理（2026-01-21 新增，2026-02-18 修复 P0 安全漏洞，2026-06-01 对齐设备级多会话）：
+ * - Token 刷新时维持会话链路不中断（沿用旧会话 session_token + user_type + device_id）
+ * - 登出时失效对应的会话记录 + 同步清 Redis 注册表
+ * - 设备级多会话：刷新沿用旧会话的 user_type/device_id，不再用 role_level 反推（杜绝 user_type 漂移）；
+ *   会话被撤销（is_active=0）则拒绝刷新并返回 SESSION_REVOKED
  *
  */
 
@@ -145,14 +146,17 @@ router.post('/refresh', async (req, res) => {
    *
    * Token 刷新时维持会话验证链路不中断：
    * 1. 从旧 access_token（可能已过期）中提取 session_token
-   * 2. 会话有效 → 延长有效期，复用同一 session_token
-   * 3. 会话被新登录覆盖（is_active=false）→ 拒绝刷新，返回 SESSION_REPLACED
-   * 4. 会话不存在/过期/旧Token无session_token → 创建新会话
+   * 2. 会话有效 → 延长有效期，复用同一 session_token、沿用 user_type/device_id
+   * 3. 会话被撤销（is_active=false，设备管理踢下线/登出/同设备替换）→ 拒绝刷新，返回 SESSION_REVOKED
+   * 4. 会话不存在/过期/旧Token无session_token → 创建新会话（设备级隔离）
    *
    */
   const { AuthenticationSession } = req.app.locals.models
   const SESSION_TTL_MINUTES = 10080 // 7天，与 refresh_token 生命周期对齐
   let sessionToken = null
+  // refresh 时沿用旧会话的 user_type/device_id（不再用 role_level 反推，杜绝 user_type 漂移）
+  let sessionUserType = 'user'
+  let sessionDeviceId = req.headers['x-device-id'] || null
 
   const authHeader = req.headers.authorization
   const oldAccessToken = authHeader && authHeader.split(' ')[1]
@@ -173,18 +177,16 @@ router.post('/refresh', async (req, res) => {
               sameSite: 'strict',
               path: '/api/v4/auth'
             })
-            return res.apiError(
-              '您的账号已在其他设备登录，请重新登录',
-              'SESSION_REPLACED',
-              null,
-              401
-            )
+            return res.apiError('登录已在设备管理中退出，请重新登录', 'SESSION_REVOKED', null, 401)
           }
 
           await existingSession.extendExpiry(SESSION_TTL_MINUTES)
           sessionToken = oldDecoded.session_token
+          // 沿用旧会话的 user_type 与 device_id（修正反推 Bug：不再用 role_level 推断）
+          sessionUserType = existingSession.user_type
+          sessionDeviceId = existingSession.device_id || sessionDeviceId
           logger.info(
-            `🔄 [Auth] Token刷新复用会话: session=${sessionToken.substring(0, 8)}..., user_id=${user.user_id}`
+            `🔄 [Auth] Token刷新复用会话: session=${sessionToken.substring(0, 8)}..., user_id=${user.user_id}, type=${sessionUserType}`
           )
         }
       }
@@ -195,29 +197,38 @@ router.post('/refresh', async (req, res) => {
 
   if (!sessionToken) {
     sessionToken = uuidv4()
-    const refreshUserRoles = await getUserRoles(user.user_id)
-    const userType = refreshUserRoles.role_level >= 100 ? 'admin' : 'user'
     const loginIp = req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || null
     const platform = detectLoginPlatform(req)
 
     try {
-      await AuthenticationSession.createSession({
+      /*
+       * 旧会话不存在/无 session_token → 新建会话。
+       * user_type 沿用上面解析值（默认 'user'，不再用 role_level>=100 反推 admin），
+       * 避免"刷新造出 user_type 漂移的重复活跃会话"（实测根因之一）。
+       * 收口 SessionManagementService.createDeviceSession（写Redis + 设备级隔离）。
+       */
+      const SessionManagementService = req.app.locals.services.getService('session_management')
+      await SessionManagementService.createDeviceSession({
         session_token: sessionToken,
-        user_type: userType,
+        user_type: sessionUserType,
         user_id: user.user_id,
+        device_id: sessionDeviceId,
         login_ip: loginIp,
         login_platform: platform,
         expires_in_minutes: SESSION_TTL_MINUTES
       })
       logger.info(
-        `🔐 [Auth] Token刷新创建新会话: session=${sessionToken.substring(0, 8)}..., user_id=${user.user_id}, platform=${platform}`
+        `🔐 [Auth] Token刷新创建新会话: session=${sessionToken.substring(0, 8)}..., user_id=${user.user_id}, type=${sessionUserType}, platform=${platform}`
       )
     } catch (sessionError) {
       logger.warn(`⚠️ [Auth] Token刷新会话创建失败（非致命）: ${sessionError.message}`)
     }
   }
 
-  const tokens = await generateTokens(user, { session_token: sessionToken })
+  const tokens = await generateTokens(user, {
+    session_token: sessionToken,
+    device_id: sessionDeviceId
+  })
   const userRoles = await getUserRoles(user.user_id)
 
   /**
@@ -286,6 +297,9 @@ router.post('/logout', authenticateToken, async (req, res) => {
       const session = await AuthenticationSession.findByToken(sessionToken)
       if (session) {
         await session.deactivate('用户主动退出登录')
+        // 同步清 Redis 会话注册表（设备级），收口 SessionManagementService
+        const SessionManagementService = req.app.locals.services.getService('session_management')
+        await SessionManagementService.unregisterSession(session.user_id, session.device_id)
         logger.info(
           `🔐 [Session] 会话已失效: user_id=${user_id}, session_token=${sessionToken.substring(0, 8)}...`
         )

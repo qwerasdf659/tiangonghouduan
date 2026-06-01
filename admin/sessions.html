@@ -58,6 +58,34 @@
       </div>
     </div>
 
+    <!-- 设备维度统计卡片（设备级多会话，决策B/方案 8.2 统计增加 device 维度） -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
+      <div class="gradient-stat-card gradient-stat-blue">
+        <div class="stat-icon">📟</div>
+        <div class="stat-value" x-text="statistics.totalDevices"></div>
+        <div class="stat-label">真实设备数</div>
+        <div class="stat-trend">
+          <span>按设备标识去重的在线设备总数</span>
+        </div>
+      </div>
+      <div class="gradient-stat-card gradient-stat-orange">
+        <div class="stat-icon">🕰️</div>
+        <div class="stat-value" x-text="statistics.legacySessions"></div>
+        <div class="stat-label">旧版会话</div>
+        <div class="stat-trend">
+          <span>未携带设备标识的存量会话(legacy)</span>
+        </div>
+      </div>
+      <div class="gradient-stat-card gradient-stat-green">
+        <div class="stat-icon">👥</div>
+        <div class="stat-value" x-text="statistics.multiDeviceUsers"></div>
+        <div class="stat-label">多设备用户</div>
+        <div class="stat-trend">
+          <span>同时在多台设备在线的用户数</span>
+        </div>
+      </div>
+    </div>
+
     <!-- 筛选栏 -->
     <div class="filter-toolbar">
       <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
@@ -177,9 +205,12 @@
                 </div>
                 <p class="text-sm themed-text-muted mt-1">
                   🌐 <span x-text="session.login_ip || session.ip_address || '-'"></span>
+                  <span class="ml-1" x-show="session.login_location" x-text="'· ' + formatLocation(session.login_location)"></span>
                 </p>
                 <p class="text-sm themed-text-muted">
                   <span x-text="getPlatformIcon(session.login_platform)"></span> <span x-text="getPlatformLabel(session.login_platform)"></span>
+                  <span class="ml-2 text-xs themed-text-muted">📟 <code x-text="formatDeviceId(session.device_id)"></code></span>
+                  <span x-show="session.is_current" class="ml-2 px-1.5 py-0.5 text-xs rounded bg-blue-100 text-blue-700">本设备</span>
                 </p>
                 <p class="text-sm themed-text-muted">
                   👤 <span x-text="session.user_type === 'admin' ? '管理员' : '普通用户'"></span>
@@ -252,6 +283,8 @@
               <tr class="border-b"><th class="py-2 text-left themed-text-muted">用户类型</th><td class="py-2" x-text="selectedSession?.user_type === 'admin' ? '管理员' : '普通用户'"></td></tr>
               <tr class="border-b"><th class="py-2 text-left themed-text-muted">状态</th><td class="py-2"><span class="px-2 py-1 text-xs rounded" :class="{ 'bg-green-100 themed-text-success': getSessionStatus(selectedSession) === 'active', 'bg-yellow-100 text-yellow-800': getSessionStatus(selectedSession) === 'expired', 'bg-red-100 text-red-800': getSessionStatus(selectedSession) === 'revoked' }" x-text="getStatusLabel(getSessionStatus(selectedSession))"></span></td></tr>
               <tr class="border-b"><th class="py-2 text-left themed-text-muted">IP地址</th><td class="py-2" x-text="selectedSession?.login_ip || selectedSession?.ip_address || '-'"></td></tr>
+              <tr class="border-b"><th class="py-2 text-left themed-text-muted">登录地</th><td class="py-2" x-text="formatLocation(selectedSession?.login_location)"></td></tr>
+              <tr class="border-b"><th class="py-2 text-left themed-text-muted">设备标识</th><td class="py-2"><code class="text-xs" x-text="selectedSession?.device_id || '未知设备(旧)'"></code> <span x-show="selectedSession?.is_current" class="ml-2 px-1.5 py-0.5 text-xs rounded bg-blue-100 text-blue-700">本设备</span></td></tr>
               <tr class="border-b"><th class="py-2 text-left themed-text-muted">登录平台</th><td class="py-2"><span x-text="getPlatformIcon(selectedSession?.login_platform)"></span> <span x-text="getPlatformLabel(selectedSession?.login_platform)"></span></td></tr>
               <tr class="border-b"><th class="py-2 text-left themed-text-muted">是否过期</th><td class="py-2" x-text="selectedSession?.is_expired ? '是' : '否'"></td></tr>
               <tr class="border-b"><th class="py-2 text-left themed-text-muted">是否有效</th><td class="py-2" x-text="selectedSession?.is_valid ? '是' : '否'"></td></tr>

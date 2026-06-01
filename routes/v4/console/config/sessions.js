@@ -51,7 +51,11 @@ router.get(
   asyncHandler(async (req, res) => {
     const SessionQueryService = req.app.locals.services.getService('console_session_query')
 
-    const result = await SessionQueryService.getSessions(req.query)
+    // 决策F：传入当前请求的 session_token，由后端判定列表中哪条是"当前会话"(is_current)
+    const result = await SessionQueryService.getSessions({
+      ...req.query,
+      current_session_token: req.user.session_token || null
+    })
 
     return res.apiSuccess(result, '获取会话列表成功')
   })

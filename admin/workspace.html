@@ -668,6 +668,7 @@
     
     // 导入并初始化 Alpine.js
     import { initAlpine } from './src/alpine/index.js'
+    import { AuthAPI } from './src/api/auth.js'
     
     // 初始化 Alpine.js
     initAlpine()
@@ -691,33 +692,21 @@
     // 退出登录处理
     window.handleLogout = async function() {
       if (!confirm('确定要退出登录吗？')) return
-      
+
+      // 统一走 AuthAPI.consoleLogout()（内部使用统一 request() 封装并自动清除 Token）
       try {
-        const response = await fetch('/api/v4/auth/logout', {
-          method: 'POST',
-          credentials: 'include'
-        })
-        
-        // 无论API结果如何，都清理本地状态
-        clearAllLocalState()
-        
-        if (response.ok || response.status === 401) {
-          // 确保在顶层窗口跳转
-          if (window.self !== window.top) {
-            window.top.location.href = '/admin/login.html'
-          } else {
-            window.location.href = '/admin/login.html'
-          }
-        }
+        await AuthAPI.consoleLogout()
       } catch (error) {
-        console.error('退出登录失败:', error)
-        // 即使API失败也清理本地状态并跳转
-        clearAllLocalState()
-        if (window.self !== window.top) {
-          window.top.location.href = '/admin/login.html'
-        } else {
-          window.location.href = '/admin/login.html'
-        }
+        // 后端登出失败也要继续清理本地状态（暴露错误便于调试）
+        console.error('退出登录接口调用失败:', error)
+      }
+
+      // 无论后端结果如何，都清理本地状态并跳转登录页
+      clearAllLocalState()
+      if (window.self !== window.top) {
+        window.top.location.href = '/admin/login.html'
+      } else {
+        window.location.href = '/admin/login.html'
       }
     }
     

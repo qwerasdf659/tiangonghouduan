@@ -56,16 +56,18 @@ const apiRequest = async (url, options = {}) => {
  * 会话对象类型
  * @typedef {Object} UserSession
  * @property {number} authentication_session_id - 会话ID（主键）
- * @property {string} [session_id] - 会话ID别名
  * @property {number} user_id - 用户ID
  * @property {string} user_type - 用户类型 ('user'|'admin')
  * @property {boolean} is_active - 是否活跃
  * @property {boolean} [is_expired] - 是否已过期
+ * @property {boolean} [is_current] - 是否当前会话（后端判定，决策F）
+ * @property {string} [device_id] - 设备标识（前端生成的UUID，NULL=旧数据）
+ * @property {string} [login_location] - 登录地（后端 ip2region 解析）
  * @property {string} [status] - 状态
  * @property {string} created_at - 创建时间
  * @property {string} last_activity - 最后活跃时间
- * @property {string} [device_info] - 设备信息
- * @property {string} [ip_address] - IP地址
+ * @property {string} [login_platform] - 登录平台
+ * @property {string} [login_ip] - 登录IP
  */
 
 /**
@@ -75,6 +77,9 @@ const apiRequest = async (url, options = {}) => {
  * @property {number|string} activeSessions - 活跃会话数
  * @property {number|string} userSessions - 普通用户会话数
  * @property {number|string} adminSessions - 管理员会话数
+ * @property {number|string} totalDevices - 真实设备数（device_id 去重，设备级多会话）
+ * @property {number|string} legacySessions - 存量 legacy 会话数（device_id 为空的旧会话）
+ * @property {number|string} multiDeviceUsers - 多设备在线用户数（>1 台设备）
  */
 
 /**
@@ -105,9 +110,6 @@ function sessionsPage() {
 
     /** @type {UserSession|null} 当前选中查看的会话 */
     selectedSession: null,
-
-    /** @type {string|null} 当前登录用户的会话ID */
-    currentSessionId: null,
 
     /** @type {boolean} 全局加载状态 */
     globalLoading: false,
@@ -140,7 +142,10 @@ function sessionsPage() {
       activeSessions: '-',
       userSessions: '-',
       adminSessions: '-',
-      expiredCount: '-'
+      expiredCount: '-',
+      totalDevices: '-',
+      legacySessions: '-',
+      multiDeviceUsers: '-'
     },
 
     // ==================== 生命周期 ====================
@@ -164,20 +169,12 @@ function sessionsPage() {
         return
       }
 
-      // 获取当前会话ID
-      const token = localStorage.getItem('admin_token')
-      if (token) {
-        try {
-          const parts = token.split('.')
-          if (parts.length >= 2) {
-            const payload = JSON.parse(atob(parts[1]))
-            this.currentSessionId = payload.session_id
-            logger.debug('[Sessions] 当前会话ID:', this.currentSessionId)
-          }
-        } catch (e) {
-          logger.error('[Sessions] 解析token失败:', e.message)
-        }
-      }
+      /*
+       * 决策F：当前会话由后端返回的 is_current 字段判定（不再前端解析 JWT）。
+       * 修正历史 Bug：旧代码读 payload.session_id，但后端 JWT 字段是 session_token（无 session_id），
+       * 导致 currentSessionId 恒为 undefined、"当前会话不可撤销"保护失效。
+       * 现改为完全依赖列表项的 session.is_current，前端不再解析 Token。
+       */
 
       // 确保用户信息已加载
       if (!this.current_user) {
@@ -288,13 +285,22 @@ function sessionsPage() {
           const stats = response.data || {}
           const userStats = stats.by_user_type?.user || { active_sessions: 0, unique_users: 0 }
           const adminStats = stats.by_user_type?.admin || { active_sessions: 0, unique_users: 0 }
+          // 设备级多会话：设备维度统计（后端 by_device）
+          const deviceStats = stats.by_device || {
+            total_devices: 0,
+            legacy_sessions: 0,
+            multi_device_users: 0
+          }
 
           this.statistics = {
             onlineUsers: (userStats.unique_users || 0) + (adminStats.unique_users || 0),
             activeSessions: stats.total_active_sessions || 0,
             userSessions: userStats.active_sessions || 0,
             adminSessions: adminStats.active_sessions || 0,
-            expiredCount: stats.expired_pending_cleanup || 0
+            expiredCount: stats.expired_pending_cleanup || 0,
+            totalDevices: deviceStats.total_devices || 0,
+            legacySessions: deviceStats.legacy_sessions || 0,
+            multiDeviceUsers: deviceStats.multi_device_users || 0
           }
 
           logger.info('[Sessions] 统计数据加载成功', this.statistics)
@@ -347,7 +353,11 @@ function sessionsPage() {
     async revokeSession(sessionId) {
       logger.info('[Sessions] revokeSession 开始:', sessionId)
 
-      if (String(sessionId) === String(this.currentSessionId)) {
+      // 决策F：当前会话保护基于后端 is_current（不再用前端解析的 currentSessionId）
+      const target = this.sessions.find(
+        s => String(s.authentication_session_id) === String(sessionId)
+      )
+      if (target && target.is_current === true) {
         this.showError('无法撤销当前会话')
         return
       }
@@ -393,9 +403,13 @@ function sessionsPage() {
     async revokeSelected() {
       logger.info('[Sessions] revokeSelected 开始', { selected: this.selectedSessions })
 
-      const selected = this.selectedSessions.filter(
-        id => String(id) !== String(this.currentSessionId)
+      // 决策F：基于后端 is_current 排除当前会话（构建当前会话ID集合）
+      const currentIds = new Set(
+        this.sessions
+          .filter(s => s.is_current === true)
+          .map(s => String(s.authentication_session_id))
       )
+      const selected = this.selectedSessions.filter(id => !currentIds.has(String(id)))
 
       if (selected.length === 0) {
         this.showError('请选择要撤销的会话（当前会话无法撤销）')
@@ -559,12 +573,11 @@ function sessionsPage() {
      * 判断会话是否为当前登录会话
      * @method isCurrentSession
      * @param {UserSession|null} session - 会话对象
-     * @returns {boolean} 是否为当前会话
+     * @returns {boolean} 是否为当前会话（由后端 is_current 字段判定，决策F）
      */
     isCurrentSession(session) {
       if (!session) return false
-      const sessionId = session.authentication_session_id
-      return String(sessionId) === String(this.currentSessionId)
+      return session.is_current === true
     },
 
     /**
@@ -645,6 +658,27 @@ function sessionsPage() {
         unknown: '❓'
       }
       return icons[platform] || '❓'
+    },
+
+    /**
+     * 格式化设备标识为简短展示（设备级多会话）
+     * @method formatDeviceId
+     * @param {string|null} deviceId - 设备UUID
+     * @returns {string} 简短展示文本，如 'a1b2c3d4…' 或 '未知设备'
+     */
+    formatDeviceId(deviceId) {
+      if (!deviceId) return '未知设备(旧)'
+      return deviceId.length > 8 ? `${deviceId.substring(0, 8)}…` : deviceId
+    },
+
+    /**
+     * 格式化登录地展示（设备级多会话，后端 ip2region 解析）
+     * @method formatLocation
+     * @param {string|null} location - 登录地（如"中国·江苏省·南京市"）
+     * @returns {string} 登录地或占位符
+     */
+    formatLocation(location) {
+      return location || '未知'
     },
 
     /**

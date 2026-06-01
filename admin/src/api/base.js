@@ -242,6 +242,35 @@ export function clearUser() {
   localStorage.removeItem(USER_KEY)
 }
 
+/*
+ * ============================================================================
+ * 设备标识（设备级多会话，docs/会话认证体系最终方案-设备级多会话.md 第七节）
+ * - 前端生成并持久化一个 UUID 作为 device_id，所有请求带 X-Device-Id 头
+ * - 后端据 (user_id, device_id) 做会话隔离：同设备重登替换、不同设备并存不互踢
+ * - device_id 不参与安全判定，仅用于隔离与"我的设备列表"展示
+ * ============================================================================
+ */
+
+const DEVICE_ID_KEY = 'admin_device_id'
+
+/**
+ * 获取（或首次生成并持久化）当前浏览器的设备标识
+ * @returns {string} 设备 UUID
+ */
+export function getDeviceId() {
+  let deviceId = localStorage.getItem(DEVICE_ID_KEY)
+  if (!deviceId) {
+    // 优先用标准 crypto.randomUUID（本项目目标浏览器均支持），降级用时间戳+随机串
+    const cryptoObj = typeof window !== 'undefined' ? window.crypto : undefined
+    deviceId =
+      cryptoObj && cryptoObj.randomUUID
+        ? cryptoObj.randomUUID()
+        : `dev_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+    localStorage.setItem(DEVICE_ID_KEY, deviceId)
+  }
+  return deviceId
+}
+
 /**
  * 构建查询字符串
  * @param {Object} params - 查询参数对象
@@ -339,6 +368,9 @@ export async function request(options) {
     requestHeaders.Authorization = `Bearer ${token}`
   }
 
+  // 设备级多会话：所有请求注入 X-Device-Id（值取/生成自 localStorage）
+  requestHeaders['X-Device-Id'] = getDeviceId()
+
   const requestConfig = {
     method,
     headers: requestHeaders
@@ -366,7 +398,12 @@ export async function request(options) {
 
       if (window.location.pathname !== '/admin/login.html') {
         const qp = new URLSearchParams({ reason: errorCode })
-        if (errorCode === 'SESSION_REPLACED' && errorMessage !== '未授权，请重新登录') {
+        /*
+         * 会话失效类错误码统一把后端 message 透传给登录页展示（设备级多会话）：
+         * SESSION_REVOKED（设备管理踢下线/登出/同设备替换）/ SESSION_EXPIRED（超时）/ SESSION_NOT_FOUND（记录清理）
+         */
+        const SESSION_ERROR_CODES = ['SESSION_REVOKED', 'SESSION_EXPIRED', 'SESSION_NOT_FOUND']
+        if (SESSION_ERROR_CODES.includes(errorCode) && errorMessage !== '未授权，请重新登录') {
           qp.set('message', errorMessage)
         }
         const redirectUrl = `/admin/login.html?${qp.toString()}`
@@ -487,6 +524,8 @@ export function authHeaders() {
   if (token) {
     headers.Authorization = `Bearer ${token}`
   }
+  // 设备级多会话：注入 X-Device-Id（与 request() 保持一致）
+  headers['X-Device-Id'] = getDeviceId()
   return headers
 }
 
@@ -515,7 +554,9 @@ export async function handleResponse(response) {
     clearToken()
     if (window.location.pathname !== '/admin/login.html') {
       const params = new URLSearchParams({ reason: errorCode })
-      if (errorCode === 'SESSION_REPLACED' && errorMessage !== '未授权，请重新登录') {
+      // 会话失效类错误码统一透传后端 message（设备级多会话）
+      const SESSION_ERROR_CODES = ['SESSION_REVOKED', 'SESSION_EXPIRED', 'SESSION_NOT_FOUND']
+      if (SESSION_ERROR_CODES.includes(errorCode) && errorMessage !== '未授权，请重新登录') {
         params.set('message', errorMessage)
       }
       const redirectUrl = `/admin/login.html?${params.toString()}`

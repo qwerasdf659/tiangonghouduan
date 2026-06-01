@@ -167,7 +167,6 @@ function createExportModalStore() {
     // ==================== 状态 ====================
     isOpen: false,
     loading: false,
-    progress: 0,
 
     // 导出配置
     title: '导出数据',
@@ -275,7 +274,6 @@ function createExportModalStore() {
       this.selectedFields = this.availableFields.filter(f => f.default).map(f => f.key)
 
       this.loading = false
-      this.progress = 0
       this.isOpen = true
     },
 
@@ -336,7 +334,6 @@ function createExportModalStore() {
 
       try {
         this.loading = true
-        this.progress = 0
 
         const exportOptions = {
           type: this.exportType,
@@ -349,18 +346,8 @@ function createExportModalStore() {
 
         logger.info('[ExportModal] 开始导出', exportOptions)
 
-        // 模拟进度
-        const progressInterval = setInterval(() => {
-          if (this.progress < 90) {
-            this.progress += Math.random() * 10
-          }
-        }, 200)
-
-        // 执行导出
+        // 执行导出（导出为单次请求，无后端分段进度，使用不定态进度条，不伪造百分比）
         await this.onExport(exportOptions)
-
-        clearInterval(progressInterval)
-        this.progress = 100
 
         Alpine.store('notification').show('导出成功', 'success')
 

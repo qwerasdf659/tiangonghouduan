@@ -23,6 +23,7 @@ import { logger } from '../../../utils/logger.js'
 import { Alpine, createPageMixin, dataTable } from '../../../alpine/index.js'
 import { request, API_PREFIX } from '../../../api/base.js'
 import { LOTTERY_CORE_ENDPOINTS } from '../../../api/lottery/core.js'
+import { imageUploadMixin } from '../../../alpine/mixins/image-upload.js'
 
 // 导入所有 composables 模块
 import {
@@ -242,6 +243,7 @@ function registerLotteryManagementComponents() {
     // 合并所有状态和方法到返回对象
     const returnObj = {
       ...pageMixin,
+      ...imageUploadMixin(),
       ...campaignsState,
       ...prizesState,
       ...budgetState,

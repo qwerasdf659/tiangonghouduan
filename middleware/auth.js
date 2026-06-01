@@ -314,6 +314,67 @@ async function getUserRoles(user_id, forceRefresh = false) {
 }
 
 /**
+ * 🔐 设备级会话 Redis 校验（热路径，docs/会话认证体系最终方案-设备级多会话.md 第四/六节）
+ *
+ * 决策D：Redis 命中即放行（Redis 为热路径权威），未命中才降级查 MySQL 并回填。
+ * 键：session:{user_id}:{device_id}，值 JSON 含 session_token。
+ * 校验通过条件：键存在 且 其中 session_token === JWT 里的 session_token。
+ *
+ * @param {number} user_id - JWT 中的用户ID
+ * @param {string} device_id - JWT 中的设备ID
+ * @param {string} session_token - JWT 中的会话令牌
+ * @returns {Promise<'HIT'|'MISS'>} HIT=Redis命中且令牌一致（放行）；MISS=未命中（需降级查库）
+ */
+async function verifySessionViaRedis(user_id, device_id, session_token) {
+  if (!redisClient || !user_id || !device_id || !session_token) {
+    return 'MISS'
+  }
+  try {
+    const key = `session:${user_id}:${device_id}`
+    const raw = await redisClient.get(key)
+    if (!raw) {
+      return 'MISS'
+    }
+    const data = JSON.parse(raw)
+    // 令牌一致才算命中；不一致说明该设备已被新登录轮换（旧token作废）
+    return data.session_token === session_token ? 'HIT' : 'MISS'
+  } catch (error) {
+    logger.warn(`⚠️ [Auth] Redis会话校验异常（降级查库）: ${error.message}`)
+    return 'MISS'
+  }
+}
+
+/**
+ * 🔁 Redis 未命中时回填会话注册表（降级容错后恢复热路径）
+ *
+ * @param {Object} session - MySQL 中查到的有效会话实例
+ * @param {string} device_id - JWT 中的设备ID
+ * @returns {Promise<void>} 无返回值（失败静默）
+ */
+async function backfillSessionToRedis(session, device_id) {
+  if (!redisClient || !device_id || !session) {
+    return
+  }
+  try {
+    const key = `session:${session.user_id}:${device_id}`
+    const expiresMs = new Date(session.expires_at).getTime() - Date.now()
+    const ttl = Math.max(60, Math.floor(expiresMs / 1000))
+    const value = JSON.stringify({
+      session_token: session.session_token,
+      user_type: session.user_type,
+      login_platform: session.login_platform,
+      login_ip: session.login_ip || null,
+      expires_at: new Date(session.expires_at).toISOString()
+    })
+    await redisClient.set(key, value, 'EX', ttl)
+    await redisClient.sadd(`user_sessions:${session.user_id}`, device_id)
+    await redisClient.expire(`user_sessions:${session.user_id}`, ttl)
+  } catch (error) {
+    logger.debug(`🔁 [Auth] Redis会话回填跳过: ${error.message}`)
+  }
+}
+
+/**
  * 🛡️ 生成JWT Token（基于UUID角色系统，支持会话存储）
  *
  * @description 生成 access_token 和 refresh_token，支持关联会话存储
@@ -367,6 +428,14 @@ async function generateTokens(user, options = {}) {
     // 🆕 2026-01-21：如果传入 session_token，则添加到 JWT Payload
     if (options.session_token) {
       payload.session_token = options.session_token
+    }
+
+    /*
+     * 🆕 设备级多会话：JWT 携带 device_id，middleware 用 (user_id, device_id) 走 Redis 校验。
+     * device_id 不参与安全判定（安全靠 session_token + Redis + 可踢设备），前端无需解析。
+     */
+    if (options.device_id) {
+      payload.device_id = options.device_id
     }
 
     const access_token = jwt.sign(payload, process.env.JWT_SECRET, {
@@ -471,107 +540,87 @@ async function authenticateToken(req, res, next) {
     const decoded = jwt.verify(token, process.env.JWT_SECRET)
 
     /**
-     * 🆕 2026-01-29 会话有效性验证（P0-6 安全审计 - 多设备登录冲突处理）
+     * 会话有效性验证（2026-06-01 设备级多会话）
      *
-     * 业务规则：验证 JWT 中的 session_token 是否在数据库中仍然有效
-     * - 新设备登录时会使旧会话失效（is_active = false）
-     * - 旧设备的 Token 虽然 JWT 有效，但会话已失效，应拒绝访问
+     * 业务规则：校验 JWT 中的 session_token（配合 device_id）在 Redis/MySQL 中是否仍有效
+     * - 同设备（相同 device_id）重新登录会替换旧会话（旧 token 轮换失效）
+     * - 不同设备登录并存、互不踢；旧设备会话被显式撤销/过期/清理则拒绝访问
      *
      */
     if (decoded.session_token) {
       const { AuthenticationSession } = require('../models')
-      const session = await AuthenticationSession.findValidByToken(decoded.session_token)
+      const deviceId = decoded.device_id || null
 
-      if (!session) {
-        /**
-         * 会话无效时细分失效原因，便于前端精确处理
-         * - SESSION_REPLACED：被其他设备登录覆盖 → 前端弹窗提示
-         * - SESSION_EXPIRED：会话超时过期 → 前端尝试 Token 刷新
-         * - SESSION_NOT_FOUND：记录被清理任务删除 → 前端直接重新登录
-         *
-         */
-        const rawSession = await AuthenticationSession.findOne({
-          where: { session_token: decoded.session_token }
-        })
+      /*
+       * 🚀 设备级会话校验热路径（Redis 优先 / MySQL 降级，docs/会话认证体系最终方案-设备级多会话.md）
+       * 1) Redis 命中且 session_token 一致 → 直接放行（毫秒级，决策D：Redis 为热路径权威）
+       * 2) Redis 未命中 → 降级查 MySQL findValidByToken；有效则回填 Redis 后放行
+       * 3) 查不到/已撤销/过期 → 401，细分 SESSION_REVOKED / SESSION_EXPIRED / SESSION_NOT_FOUND
+       */
+      const redisResult = await verifySessionViaRedis(
+        decoded.user_id,
+        deviceId,
+        decoded.session_token
+      )
 
-        if (rawSession && !rawSession.is_active) {
-          logger.warn(
-            `🔒 [Auth] 会话被其他设备登录覆盖: session_token=${decoded.session_token.substring(0, 8)}..., user_id=${decoded.user_id}, platform=${rawSession.login_platform}`
-          )
+      let session = null
+      if (redisResult === 'HIT') {
+        // Redis 命中即权威放行，跳过 MySQL 查询（热路径优化）
+        session = null // 命中时不需要实例，活动时间更新走异步轻量逻辑
+      } else {
+        // 未命中：降级查 MySQL
+        session = await AuthenticationSession.findValidByToken(decoded.session_token)
 
-          /**
-           * 查找替换当前会话的新会话，获取新登录的平台信息，
-           * 让用户知道是哪个平台的登录踢掉了当前会话。
-           * 限定 user_type 一致：因为只有同 user_type 内才会互斥。
-           */
-          let replacedByPlatform = null
-          try {
-            const newerSession = await AuthenticationSession.findOne({
-              where: {
-                user_id: decoded.user_id,
-                user_type: rawSession.user_type,
-                is_active: true,
-                authentication_session_id: {
-                  [require('sequelize').Op.gt]: rawSession.authentication_session_id
-                }
-              },
-              order: [['created_at', 'DESC']]
-            })
-            replacedByPlatform = newerSession?.login_platform || null
-          } catch (_) {
-            // 查询失败不影响主流程
+        if (!session) {
+          // 会话无效 → 细分失效原因（前端按 code 分流）
+          const rawSession = await AuthenticationSession.findOne({
+            where: { session_token: decoded.session_token }
+          })
+
+          if (rawSession && !rawSession.is_active) {
+            logger.warn(
+              `🔒 [Auth] 会话已被撤销: session=${decoded.session_token.substring(0, 8)}..., user_id=${decoded.user_id}, device=${deviceId || 'legacy'}`
+            )
+            return res.apiUnauthorized
+              ? res.apiUnauthorized('登录已在设备管理中退出，请重新登录', 'SESSION_REVOKED')
+              : res.status(401).json({
+                  success: false,
+                  code: 'SESSION_REVOKED',
+                  message: '登录已在设备管理中退出，请重新登录'
+                })
+          } else if (rawSession && rawSession.is_active) {
+            logger.warn(
+              `🔒 [Auth] 会话已过期: session=${decoded.session_token.substring(0, 8)}..., user_id=${decoded.user_id}`
+            )
+            return res.apiUnauthorized
+              ? res.apiUnauthorized('登录已过期，请重新登录', 'SESSION_EXPIRED')
+              : res.status(401).json({
+                  success: false,
+                  code: 'SESSION_EXPIRED',
+                  message: '登录已过期，请重新登录'
+                })
+          } else {
+            logger.warn(
+              `🔒 [Auth] 会话记录不存在: session=${decoded.session_token.substring(0, 8)}..., user_id=${decoded.user_id}`
+            )
+            return res.apiUnauthorized
+              ? res.apiUnauthorized('登录状态失效，请重新登录', 'SESSION_NOT_FOUND')
+              : res.status(401).json({
+                  success: false,
+                  code: 'SESSION_NOT_FOUND',
+                  message: '登录状态失效，请重新登录'
+                })
           }
-
-          const PLATFORM_LABELS = {
-            web: 'Web浏览器',
-            wechat_mp: '微信小程序',
-            douyin_mp: '抖音小程序',
-            alipay_mp: '支付宝小程序',
-            app: 'App客户端'
-          }
-          const platformLabel = replacedByPlatform
-            ? PLATFORM_LABELS[replacedByPlatform] || replacedByPlatform
-            : '其他设备'
-          const message = `您的账号已在${platformLabel}登录，请重新登录`
-
-          return res.apiUnauthorized
-            ? res.apiUnauthorized(message, 'SESSION_REPLACED', {
-                replaced_by_platform: replacedByPlatform
-              })
-            : res.status(401).json({
-                success: false,
-                code: 'SESSION_REPLACED',
-                message
-              })
-        } else if (rawSession && rawSession.is_active) {
-          logger.warn(
-            `🔒 [Auth] 会话已过期: session_token=${decoded.session_token.substring(0, 8)}..., user_id=${decoded.user_id}`
-          )
-          return res.apiUnauthorized
-            ? res.apiUnauthorized('会话已过期，请重新登录', 'SESSION_EXPIRED')
-            : res.status(401).json({
-                success: false,
-                code: 'SESSION_EXPIRED',
-                message: '会话已过期，请重新登录'
-              })
-        } else {
-          logger.warn(
-            `🔒 [Auth] 会话记录不存在: session_token=${decoded.session_token.substring(0, 8)}..., user_id=${decoded.user_id}`
-          )
-          return res.apiUnauthorized
-            ? res.apiUnauthorized('登录状态已失效，请重新登录', 'SESSION_NOT_FOUND')
-            : res.status(401).json({
-                success: false,
-                code: 'SESSION_NOT_FOUND',
-                message: '登录状态已失效，请重新登录'
-              })
         }
-      }
 
-      // 更新会话最后活动时间（异步，不阻塞请求）
-      session.updateActivity().catch(err => {
-        logger.warn(`⚠️ [Auth] 更新会话活动时间失败（非致命）: ${err.message}`)
-      })
+        // MySQL 命中有效会话 → 回填 Redis（恢复热路径），随后放行
+        await backfillSessionToRedis(session, deviceId)
+
+        // 更新会话最后活动时间（异步，不阻塞请求）
+        session.updateActivity().catch(err => {
+          logger.warn(`⚠️ [Auth] 更新会话活动时间失败（非致命）: ${err.message}`)
+        })
+      }
 
       // 更新用户最后活跃时间（异步，用于 DAU 统计）
       const { User: UserModel, UserBehaviorTrack } = require('../models')
@@ -588,8 +637,8 @@ async function authenticateToken(req, res, next) {
           try {
             const trackKey = `track:${decoded.user_id}:${Math.floor(Date.now() / 60000)}`
             const { getRedisClient } = require('../utils/UnifiedRedisClient')
-            const redisClient = getRedisClient()
-            const wasSet = await redisClient.set(trackKey, '1', 'EX', 60, 'NX')
+            const redisCli = getRedisClient()
+            const wasSet = await redisCli.set(trackKey, '1', 'EX', 60, 'NX')
             if (wasSet) {
               await UserBehaviorTrack.create({
                 user_id: decoded.user_id,
@@ -637,7 +686,8 @@ async function authenticateToken(req, res, next) {
       role_level: userRoles.role_level,
       roles: userRoles.roles,
       permissions: userRoles.permissions,
-      session_token: decoded.session_token
+      session_token: decoded.session_token,
+      device_id: decoded.device_id || null
     }
 
     // 一次性设置用户信息，避免竞态条件

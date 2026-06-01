@@ -158,6 +158,27 @@ export function useCampaignsState() {
 export function useCampaignsMethods(_context) {
   return {
     /**
+     * 上传活动背景图（复用统一的 imageUploadMixin.uploadImage，走统一 request() 封装）
+     *
+     * 替代此前 HTML 内联的裸 fetch（且 token key 错误），统一鉴权与错误处理。
+     * @param {Event} event - file input 的 change 事件
+     * @returns {Promise<void>}
+     */
+    async uploadCampaignBackground(event) {
+      const file = event.target.files?.[0]
+      if (!file) return
+      try {
+        const data = await this.uploadImage(file)
+        if (data?.public_url || data?.url) {
+          this.campaignForm.background_image_url = data.public_url || data.url
+        }
+      } finally {
+        // 清空 input，允许重复选择同一文件
+        event.target.value = ''
+      }
+    },
+
+    /**
      * 加载全局默认配置（从 system_settings 读取）
      *
      * 业务场景：在活动编辑弹窗中显示"当前全局默认值 → 10次/日"等参考信息，

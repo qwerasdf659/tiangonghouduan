@@ -5848,29 +5848,10 @@
               <div>
                 <label class="block text-sm font-medium themed-text-secondary mb-1">活动背景图（可选）</label>
                 <div class="flex gap-2">
-                  <input type="text" class="flex-1 px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 text-sm" x-model="campaignForm.background_image_url" placeholder="输入图片URL或上传图片">
+                  <input type="text" class="flex-1 px-3 py-2 border rounded themed-input focus:ring-2 text-sm" x-model="campaignForm.background_image_url" placeholder="输入图片URL或上传图片">
                   <label class="px-3 py-2 bg-gray-100 border rounded cursor-pointer hover:bg-gray-200 text-sm whitespace-nowrap">
                     📤 上传
-                    <input type="file" accept="image/*" class="hidden" @change="
-                      const file = $event.target.files[0];
-                      if (!file) return;
-                      if (file.size > 5 * 1024 * 1024) { showError('图片大小不能超过5MB'); return; }
-                      const formData = new FormData();
-                      formData.append('image', file);
-                      fetch('/api/v4/console/media/upload', {
-                        method: 'POST',
-                        headers: { 'Authorization': 'Bearer ' + (localStorage.getItem('token') || '') },
-                        body: formData
-                      }).then(r => r.json()).then(res => {
-                        if (res.success && (res.data?.public_url || res.data?.url)) {
-                          campaignForm.background_image_url = res.data.public_url || res.data.url;
-                          $dispatch('notification', { type: 'success', message: '图片上传成功' });
-                        } else {
-                          showError('上传失败: ' + (res.message || '未知错误'));
-                        }
-                      }).catch(err => showError('上传失败: ' + err.message));
-                      $event.target.value = '';
-                    ">
+                    <input type="file" accept="image/*" class="hidden" @change="uploadCampaignBackground($event)">
                   </label>
                 </div>
                 <div x-show="campaignForm.background_image_url" class="mt-2">

@@ -81,10 +81,12 @@ class TradeDisputeService {
     } = params
 
     // 参数校验
-    if (!order_type || !order_id)
+    if (!order_type || !order_id) {
       throw new BusinessError('order_type 和 order_id 是必需参数', 'TRADE_REQUIRED', 400)
-    if (order_type !== 'trade')
+    }
+    if (order_type !== 'trade') {
       throw new BusinessError('当前仅支持交易订单纠纷', 'TRADE_NOT_ALLOWED', 400)
+    }
     if (!user_id) throw new BusinessError('user_id 是必需参数', 'TRADE_REQUIRED', 400)
     if (!dispute_type || !Object.values(DISPUTE_TYPE).includes(dispute_type)) {
       throw new BusinessError(`无效的纠纷类型：${dispute_type}`, 'TRADE_INVALID', 400)

@@ -348,16 +348,14 @@ describe('P1-7.2: JWT安全测试', () => {
         .set('Authorization', `Bearer ${testToken}`)
 
       /*
-       * 登出后的行为可能有两种：
-       * 1. Token立即失效（返回401 SESSION_INVALIDATED）
-       * 2. Token仍有效但会话已清理（取决于具体实现）
-       *
-       * 本项目使用session_token关联会话，登出应使会话失效
+       * 登出后的行为（设备级多会话）：
+       * 登出使会话 is_active=0，再次访问走 authenticateToken → 401 SESSION_REVOKED
+       * 本项目使用 session_token 关联会话，登出应使会话失效
        */
       if (afterLogout.status === 401) {
         expect([
           'SESSION_INVALIDATED',
-          'SESSION_REPLACED',
+          'SESSION_REVOKED',
           'INVALID_TOKEN',
           'UNAUTHORIZED'
         ]).toContain(afterLogout.body.code)
@@ -369,7 +367,7 @@ describe('P1-7.2: JWT安全测试', () => {
   })
 
   describe('JWT重放攻击防护测试', () => {
-    test('新设备登录应使旧会话失效', async () => {
+    test('设备级多会话：不带device_id的多次登录会话并存', async () => {
       // 第一次登录
       const firstToken = await getTestUserToken(app)
 
@@ -380,7 +378,7 @@ describe('P1-7.2: JWT安全测试', () => {
 
       expect(firstCheck.status).toBe(200)
 
-      // 第二次登录（模拟新设备）
+      // 第二次登录（同样不带 X-Device-Id）
       const secondToken = await getTestUserToken(app)
 
       // 验证第二个Token有效
@@ -391,23 +389,19 @@ describe('P1-7.2: JWT安全测试', () => {
       expect(secondCheck.status).toBe(200)
 
       /*
-       * 多设备登录策略：
-       * 根据项目的会话管理策略，可能有以下行为：
-       * 1. 允许多设备同时登录（两个Token都有效）
-       * 2. 新登录使旧会话失效（第一个Token失效）
-       *
-       * 本项目支持多设备登录冲突处理，新设备登录会使旧会话失效
+       * 设备级多会话语义：
+       * - 不带 X-Device-Id 的两次登录 → device_id 均为 null（legacy）→ 不替换 → 两会话并存（200）
+       * - 仅当相同 device_id 重登时才替换旧会话（401 SESSION_REVOKED）
        */
       const firstCheckAgain = await request(app)
         .get('/api/v4/user/me')
         .set('Authorization', `Bearer ${firstToken}`)
 
-      // 记录实际行为（取决于项目配置）
       if (firstCheckAgain.status === 401) {
-        expect(['SESSION_INVALIDATED', 'SESSION_REPLACED']).toContain(firstCheckAgain.body.code)
-        console.log('[P1-7.2] 多设备登录冲突处理测试通过（旧会话已失效）')
+        expect(['SESSION_INVALIDATED', 'SESSION_REVOKED']).toContain(firstCheckAgain.body.code)
+        console.log('[P1-7.2] 旧会话已失效（同设备替换场景）')
       } else {
-        console.log('[P1-7.2] 多设备登录冲突测试通过（允许多设备同时登录）')
+        console.log('[P1-7.2] 多会话并存（不同设备/无device_id，符合设备级多会话语义）')
       }
     })
   })

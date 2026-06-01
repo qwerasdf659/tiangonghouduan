@@ -1,11 +1,12 @@
 /**
  * 管理员认证路由 - V4.0 UUID角色系统版本
  *
- * 会话管理（2026-02-19 补齐，2026-03-01 跨平台共存）：
+ * 会话管理（2026-02-19 补齐，2026-06-01 切换设备级多会话）：
  * - 管理后台登录固定 user_type='admin'，与用户端(user)天然隔离
  * - 同一管理员可同时保持：小程序(user+wechat_mp) + 管理后台(admin+web)
- * - 同一 user_type + platform 内互斥（同浏览器重复登录踢旧会话）
- * - 管理后台登出时失效会话
+ * - 设备级多会话：隔离 key = (user_id, user_type) + device_id（不再按 platform 互斥）
+ *   多电脑/多标签 = 不同 device_id = 并存不互踢；同设备重登 = 替换自己旧会话（token 轮换）
+ * - 管理端会话 12 小时（决策6）；管理后台登出时失效会话 + 同步清 Redis
  *
  */
 
@@ -22,7 +23,6 @@ const { asyncHandler } = require('../shared/middleware')
 const { logger } = require('../../../../utils/logger')
 const { detectLoginPlatform } = require('../../../../utils/platformDetector')
 const BeijingTimeHelper = require('../../../../utils/timeHelper')
-const TransactionManager = require('../../../../utils/TransactionManager')
 
 /**
  * 🛡️ 管理员登录（基于UUID角色系统）
@@ -51,71 +51,37 @@ router.post(
      */
     const sessionToken = uuidv4()
     /**
-     * 管理后台登录会话固定 user_type='admin'，与用户端(user)天然隔离。
-     * 同一管理员可同时保持小程序(user) + 管理后台(admin) 两个会话。
+     * 设备级多会话：管理后台登录固定 user_type='admin'，与用户端(user)天然隔离。
+     *   - 同一管理员可同时保持小程序(user) + 管理后台(admin) 两个会话
+     *   - 管理后台多电脑/多标签 = 不同 device_id = 并存不互踢（解决"同账号互踢"痛点）
+     *   - 同 device_id 重登 = 替换自己这台设备旧会话（token 轮换）
+     * platform 降级为展示标签，不参与隔离判定。
      */
     const userType = 'admin'
     const loginIp = req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || null
     const platform = detectLoginPlatform(req)
-    const { AuthenticationSession } = req.app.locals.models
+    const deviceId = req.headers['x-device-id'] || null
 
     try {
-      await TransactionManager.execute(
-        async transaction => {
-          const { sequelize: seq } = AuthenticationSession
-
-          /* 行级锁：锁定该用户在该平台的所有活跃会话，序列化并发登录 */
-          await seq.query(
-            'SELECT authentication_session_id FROM authentication_sessions WHERE user_type = ? AND user_id = ? AND login_platform = ? AND is_active = 1 FOR UPDATE',
-            { replacements: [userType, user.user_id, platform], transaction }
-          )
-
-          const deactivatedCount = await AuthenticationSession.deactivateUserSessions(
-            userType,
-            user.user_id,
-            null,
-            platform,
-            { transaction }
-          )
-
-          await AuthenticationSession.createSession(
-            {
-              session_token: sessionToken,
-              user_type: userType,
-              user_id: user.user_id,
-              login_ip: loginIp,
-              login_platform: platform,
-              expires_in_minutes: 10080
-            },
-            { transaction }
-          )
-
-          if (deactivatedCount > 0) {
-            logger.info(
-              `🔒 [Session] 管理后台同平台会话替换: 已使 ${deactivatedCount} 个旧会话失效 (user_id=${user.user_id}, platform=${platform})`
-            )
-
-            try {
-              const ChatWebSocketService = req.app.locals.services.getService('chat_web_socket')
-              ChatWebSocketService.disconnectUser(user.user_id, userType)
-              logger.info(
-                `🔌 [Session] 管理后台已断开旧设备WebSocket: user_id=${user.user_id}, type=${userType}`
-              )
-            } catch (wsError) {
-              logger.debug(`🔌 [Session] WebSocket断开跳过: ${wsError.message}`)
-            }
-          }
-          logger.info(
-            `🔐 [Session] 管理后台会话创建成功: user_id=${user.user_id}, platform=${platform}, session=${sessionToken.substring(0, 8)}...`
-          )
-        },
-        { description: '管理后台登录会话创建', maxRetries: 2 }
-      )
+      // 写操作收口 SessionManagementService（设备级登录会话创建）
+      const SessionManagementService = req.app.locals.services.getService('session_management')
+      await SessionManagementService.createDeviceSession({
+        session_token: sessionToken,
+        user_type: userType,
+        user_id: user.user_id,
+        device_id: deviceId,
+        login_ip: loginIp,
+        login_platform: platform,
+        expires_in_minutes: 720 // 管理端 12 小时（决策6：B端权限大用短会话增强安全）
+      })
     } catch (sessionError) {
       logger.warn(`⚠️ [Session] 管理后台会话创建失败（非致命）: ${sessionError.message}`)
     }
 
-    const tokens = await generateTokens(user, { session_token: sessionToken })
+    const tokens = await generateTokens(user, {
+      session_token: sessionToken,
+      device_id: deviceId
+    })
 
     res.cookie('refresh_token', tokens.refresh_token, {
       httpOnly: true,
@@ -225,6 +191,9 @@ router.post(
         const session = await AuthenticationSession.findByToken(sessionToken)
         if (session) {
           await session.deactivate('管理员主动退出登录')
+          // 同步清 Redis 会话注册表（设备级）
+          const SessionManagementService = req.app.locals.services.getService('session_management')
+          await SessionManagementService.unregisterSession(session.user_id, session.device_id)
           logger.info(
             `🔐 [Session] 管理后台会话已失效: user_id=${userId}, session=${sessionToken.substring(0, 8)}...`
           )

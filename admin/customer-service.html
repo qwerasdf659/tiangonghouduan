@@ -129,7 +129,7 @@
                        class="w-full pl-9 pr-3 py-2 text-sm border rounded-lg themed-input">
               </div>
               <button @click="a_panel_tab === 'sessions' ? loadSessions() : loadUserOrders()"
-                      class="flex-shrink-0 px-3 py-2 text-sm bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition-colors">
+                      class="flex-shrink-0 px-3 py-2 text-sm themed-btn-primary rounded-lg transition-colors">
                 搜索
               </button>
             </div>
@@ -238,12 +238,12 @@
                     <!-- 组内会话卡片 -->
                     <template x-for="session in group.sessions" :key="session.customer_service_session_id">
                       <div @click="selectSession(session)"
-                           :class="{ 'bg-pink-50 border-l-[3px] border-l-pink-500': String(selectedSession?.customer_service_session_id) === String(session.customer_service_session_id) }"
+                           :class="{ 'themed-bg-primary-light border-l-4 themed-border-primary': String(selectedSession?.customer_service_session_id) === String(session.customer_service_session_id) }"
                            class="px-3 py-2.5 border-b cursor-pointer themed-hover-bg transition-colors">
                         <div class="flex items-start gap-2.5">
                           <!-- 头像 + 等待时长指示器 -->
                           <div class="flex-shrink-0 relative">
-                            <div class="w-9 h-9 rounded-full bg-gradient-to-br from-pink-400 to-pink-600 flex items-center justify-center text-white text-sm font-medium shadow-sm">
+                            <div class="w-9 h-9 rounded-full themed-bg-primary flex items-center justify-center text-white text-sm font-medium shadow-sm">
                               <span x-text="(session.user?.nickname || '用').charAt(0)"></span>
                             </div>
                             <!-- 等待时长颜色指示点 -->
@@ -263,7 +263,7 @@
                                 <span class="w-1.5 h-1.5 rounded-full"
                                       :class="{ 'bg-yellow-400': session.status === 'waiting', 'bg-green-400': session.status === 'active', 'bg-gray-300': session.status === 'closed', 'bg-blue-400': session.status === 'assigned' }"></span>
                                 <span x-show="session.unread_count > 0"
-                                      class="bg-pink-500 text-white text-[10px] leading-none min-w-[18px] h-[18px] flex items-center justify-center rounded-full px-1"
+                                      class="themed-bg-primary text-white text-[10px] leading-none min-w-[18px] h-[18px] flex items-center justify-center rounded-full px-1"
                                       x-text="session.unread_count > 99 ? '99+' : session.unread_count"></span>
                               </div>
                             </div>
@@ -300,7 +300,7 @@
           <div x-show="work_tabs.length > 0" class="flex-shrink-0 flex items-center border-b themed-border-light overflow-x-auto" style="scrollbar-width:thin;">
             <template x-for="tab in work_tabs" :key="tab.id">
               <div class="flex items-center px-3 py-2 cursor-pointer border-b-2 text-xs whitespace-nowrap"
-                   :class="active_work_tab === tab.id ? 'border-pink-500 text-pink-600 font-medium' : 'border-transparent themed-text-muted hover:themed-text'"
+                   :class="active_work_tab === tab.id ? 'themed-border-primary themed-text-primary font-medium' : 'border-transparent themed-text-muted hover:themed-text'"
                    @click="active_work_tab = tab.id">
                 <span x-text="tab.type === 'chat' ? '💬' : '📦'" class="mr-1"></span>
                 <span x-text="tab.label" class="max-w-[100px] truncate"></span>
@@ -331,7 +331,7 @@
                   <div class="flex items-center justify-between mb-2">
                     <span class="text-xs font-medium themed-text">关联工单</span>
                     <button @click="showIssueModal = true; issueModalMode = 'create'; issueForm.user_id = _getContextUserId(); issueForm.issue_type = tab.data?.order_type === 'trade' ? 'trade' : tab.data?.order_type === 'consumption' ? 'consumption' : 'item'; issueForm.order_type = tab.data?.order_type; issueForm.order_id = tab.data?.order_id"
-                            class="px-3 py-1.5 text-xs bg-pink-500 text-white rounded hover:bg-pink-600">
+                            class="px-3 py-1.5 text-xs themed-btn-primary rounded">
                       📋 创建工单
                     </button>
                   </div>
@@ -369,7 +369,7 @@
               <!-- 聊天头部 -->
               <div class="flex-shrink-0 px-4 py-2.5 border-b flex items-center justify-between">
                 <div class="flex items-center gap-3">
-                  <div class="w-8 h-8 rounded-full bg-gradient-to-br from-pink-400 to-pink-600 flex items-center justify-center text-white text-sm font-medium">
+                  <div class="w-8 h-8 rounded-full themed-bg-primary flex items-center justify-center text-white text-sm font-medium">
                     <span x-text="(currentChatUser.nickname || '用').charAt(0)"></span>
                   </div>
                   <div>
@@ -514,7 +514,7 @@
                     ></textarea>
                     <button @click="sendMessage()"
                             :disabled="!selectedSession || !messageInput.trim() || selectedSession?.status === 'closed'"
-                            class="flex-shrink-0 px-5 py-2 text-sm bg-pink-500 text-white rounded-xl hover:bg-pink-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium">
+                            class="flex-shrink-0 px-5 py-2 text-sm themed-btn-primary rounded-xl disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium">
                       发送
                     </button>
                   </div>
@@ -538,7 +538,7 @@
             <!-- 用户画像摘要卡片 -->
             <div class="flex-shrink-0 px-3 py-2 border-b">
               <div class="flex items-center gap-2">
-                <div class="w-10 h-10 rounded-full bg-gradient-to-br from-pink-400 to-pink-600 flex items-center justify-center text-white text-sm font-medium shadow-sm">
+                <div class="w-10 h-10 rounded-full themed-bg-primary flex items-center justify-center text-white text-sm font-medium shadow-sm">
                   <span x-text="(currentChatUser.nickname || '用').charAt(0)"></span>
                 </div>
                 <div class="flex-1 min-w-0">
@@ -586,7 +586,7 @@
                   {key:'order_issues', icon:'🎫', label:'订单工单'}
                 ]" :key="tab.key">
                   <button @click="loadContextTab(tab.key)"
-                          :class="context_active_tab === tab.key ? 'border-b-2 border-pink-500 text-pink-600 font-medium' : 'themed-text-muted hover:themed-text'"
+                          :class="context_active_tab === tab.key ? 'border-b-2 themed-border-primary themed-text-primary font-medium' : 'themed-text-muted hover:themed-text'"
                           class="flex-shrink-0 px-2 py-2 text-[11px] text-center whitespace-nowrap transition-colors">
                     <span x-text="tab.icon"></span>
                     <span x-text="tab.label"></span>
@@ -858,7 +858,7 @@
                   <div>
                     <p class="text-[10px] themed-text-hint mb-1">添加内部备注（仅客服可见）</p>
                     <textarea x-model="new_note_content" rows="2" class="w-full text-xs border rounded themed-input px-2 py-1.5 resize-none" placeholder="输入备注内容..."></textarea>
-                    <button @click="addNote()" :disabled="!new_note_content.trim()" class="mt-1 w-full px-2 py-1.5 text-[11px] bg-pink-500 text-white rounded hover:bg-pink-600 disabled:opacity-40">
+                    <button @click="addNote()" :disabled="!new_note_content.trim()" class="mt-1 w-full px-2 py-1.5 text-[11px] themed-btn-primary rounded disabled:opacity-40">
                       保存备注
                     </button>
                   </div>
@@ -1037,7 +1037,7 @@
         </div>
         <div class="p-4 border-t themed-bg-base rounded-b-xl flex justify-end space-x-3">
           <button @click="closeIssueModal()" class="px-4 py-2 text-sm themed-bg-muted themed-text-secondary rounded-lg hover:opacity-80">取消</button>
-          <button @click="submitCreateIssue()" :disabled="issueSubmitting || !issueForm.title?.trim() || !issueForm.user_id" class="px-4 py-2 text-sm bg-pink-500 text-white rounded-lg hover:bg-pink-600 disabled:opacity-50">
+          <button @click="submitCreateIssue()" :disabled="issueSubmitting || !issueForm.title?.trim() || !issueForm.user_id" class="px-4 py-2 text-sm themed-btn-primary rounded-lg disabled:opacity-50">
             <span x-show="issueSubmitting">创建中...</span>
             <span x-show="!issueSubmitting">确认创建</span>
           </button>
@@ -1075,7 +1075,7 @@
           </div>
           <div class="p-4 border-t themed-bg-base rounded-b-xl flex justify-end space-x-3">
             <button type="button" @click="hideModal('transferModal')" class="px-4 py-2 text-sm themed-bg-muted themed-text-secondary rounded-lg hover:opacity-80">取消</button>
-            <button type="submit" class="px-4 py-2 text-sm bg-pink-500 text-white rounded-lg hover:bg-pink-600 disabled:opacity-50" :disabled="submitting || !transferTargetId">
+            <button type="submit" class="px-4 py-2 text-sm themed-btn-primary rounded-lg disabled:opacity-50" :disabled="submitting || !transferTargetId">
               确认转接
             </button>
           </div>
@@ -1100,7 +1100,7 @@
         </div>
         <div class="p-6" x-show="user_info_data">
           <div class="text-center mb-5">
-            <div class="w-16 h-16 bg-gradient-to-br from-pink-400 to-pink-600 rounded-full mx-auto flex items-center justify-center text-white text-2xl font-medium shadow-md">
+            <div class="w-16 h-16 themed-bg-primary rounded-full mx-auto flex items-center justify-center text-white text-2xl font-medium shadow-md">
               <span x-text="(user_info_data?.nickname || '?').charAt(0)"></span>
             </div>
             <h4 class="font-semibold mt-2 themed-text" x-text="user_info_data?.nickname || '用户' + user_info_data?.user_id"></h4>

@@ -10,13 +10,13 @@
  * - 路由层只负责：认证/鉴权、参数校验、调用Service、统一响应
  * - 登录操作通过 UserService 处理
  *
- * 会话管理（2026-01-21 新增，2026-02-18 优化 TTL，2026-03-01 跨平台共存）：
- * - 登录成功后创建 AuthenticationSession 记录
+ * 会话管理（2026-01-21 新增，2026-02-18 优化 TTL，2026-06-01 切换设备级多会话）：
+ * - 登录成功后创建 AuthenticationSession 记录（收口 SessionManagementService.createDeviceSession）
  * - 会话有效期：7天（与 refresh_token 生命周期对齐）
- * - session_token 存入 JWT Payload，用于敏感操作验证
- * - 多平台共存策略：user_type 按登录上下文确定（用户端=user，管理后台=admin）
- * - 同一 user_type + 同一 platform 互斥（新登录使旧会话失效）
- * - 不同 user_type 或不同 platform 可共存（小程序 + Web管理后台同时在线）
+ * - session_token + device_id 存入 JWT Payload，用于会话校验与敏感操作验证
+ * - 设备级多会话隔离：隔离 key = (user_id, user_type) + device_id，login_platform 仅作展示标签
+ * - 同设备（相同 X-Device-Id）重登 = 替换自己这台设备旧会话（token 轮换）
+ * - 不同设备（不同 X-Device-Id）登录 = 会话并存，互不踢
  *
  */
 
@@ -176,100 +176,38 @@ router.post(
      */
     const sessionToken = uuidv4()
     /**
-     * 会话 user_type 按登录上下文确定，不按角色等级确定：
-     *   - 用户端（小程序/App/H5）登录 → 固定 'user'
-     *   - 管理后台登录 → 固定 'admin'（见 console/auth.js）
-     *
-     * 这样管理员账号可以同时保持小程序(user) + 管理后台(admin) 两个会话，
-     * 互斥仅发生在 同一 user_type + 同一 platform 内。
+     * 设备级多会话：会话隔离 key = (user_id, user_type) + device_id（不再用 platform 互斥）。
+     *   - 用户端登录固定 user_type='user'，与管理后台(admin)天然隔离
+     *   - 同 device_id 重登 = 替换自己这台设备旧会话；不同设备并存不踢
+     *   - device_id 来自前端 X-Device-Id 头，缺失则兜底 null（legacy，不替换、仅记录）
+     * platform 降级为展示标签（登录设备列表用），不参与隔离判定。
      */
     const userType = 'user'
     const loginIp = req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || null
     const platform = detectLoginPlatform(req)
-
-    const { AuthenticationSession } = req.app.locals.models
+    const deviceId = req.headers['x-device-id'] || null
 
     try {
-      /**
-       * 多平台会话隔离策略（行级锁 + 原子操作）
-       *
-       * 策略：先锁定 → 再失效旧会话 → 最后创建新会话
-       * 使用 SELECT FOR UPDATE 行级锁序列化同一用户的并发登录，
-       * 避免 REPEATABLE READ 隔离级别下多个事务互相看不到未提交数据导致旧会话未被去活。
-       *
-       * 平台隔离规则（user_type + platform 双维度隔离）：
-       *   小程序登录(user+wechat_mp) → 只踢 user+wechat_mp 旧会话
-       *   Web端登录(user+web)        → 只踢 user+web 旧会话
-       *   管理后台登录(admin+web)     → 只踢 admin+web 旧会话（见 console/auth.js）
-       */
-      const isTestEnv = process.env.NODE_ENV === 'test'
-      const disableMultiDeviceCheck = process.env.DISABLE_MULTI_DEVICE_CHECK === 'true'
-      const forceMultiDeviceCheck = process.env.ENABLE_MULTI_DEVICE_CHECK === 'true'
-
-      const { sequelize } = AuthenticationSession
-      const transaction = await sequelize.transaction()
-
-      try {
-        // 行级锁：锁定该用户在该平台的所有活跃会话，序列化并发登录
-        await sequelize.query(
-          'SELECT authentication_session_id FROM authentication_sessions WHERE user_type = ? AND user_id = ? AND login_platform = ? AND is_active = 1 FOR UPDATE',
-          { replacements: [userType, user.user_id, platform], transaction }
-        )
-
-        let deactivatedCount = 0
-        if (forceMultiDeviceCheck || (!isTestEnv && !disableMultiDeviceCheck)) {
-          deactivatedCount = await AuthenticationSession.deactivateUserSessions(
-            userType,
-            user.user_id,
-            null,
-            platform,
-            { transaction }
-          )
-        }
-
-        await AuthenticationSession.createSession(
-          {
-            session_token: sessionToken,
-            user_type: userType,
-            user_id: user.user_id,
-            login_ip: loginIp,
-            login_platform: platform,
-            expires_in_minutes: 10080
-          },
-          { transaction }
-        )
-
-        await transaction.commit()
-
-        if (deactivatedCount > 0) {
-          logger.info(
-            `🔒 [Session] 同平台会话替换: 已使 ${deactivatedCount} 个旧会话失效 (user_id=${user.user_id}, platform=${platform})`
-          )
-
-          try {
-            const ChatWebSocketService = req.app.locals.services.getService('chat_web_socket')
-            ChatWebSocketService.disconnectUser(user.user_id, userType)
-            logger.info(
-              `🔌 [Session] 已断开旧设备WebSocket连接: user_id=${user.user_id}, type=${userType}`
-            )
-          } catch (wsError) {
-            logger.debug(`🔌 [Session] WebSocket断开跳过: ${wsError.message}`)
-          }
-        }
-
-        logger.info(
-          `🔐 [Session] 会话创建成功: user_id=${user.user_id}, platform=${platform}, session=${sessionToken.substring(0, 8)}...`
-        )
-      } catch (innerError) {
-        await transaction.rollback()
-        throw innerError
-      }
+      // 写操作收口 SessionManagementService（设备级登录会话创建：行级锁→替换同设备→建会话→写Redis→推下线）
+      const SessionManagementService = req.app.locals.services.getService('session_management')
+      await SessionManagementService.createDeviceSession({
+        session_token: sessionToken,
+        user_type: userType,
+        user_id: user.user_id,
+        device_id: deviceId,
+        login_ip: loginIp,
+        login_platform: platform,
+        expires_in_minutes: 10080
+      })
     } catch (sessionError) {
       logger.warn(`⚠️ [Session] 会话创建失败（非致命）: ${sessionError.message}`)
     }
 
-    // 生成Token（传入 session_token 关联会话）
-    const tokens = await generateTokens(user, { session_token: sessionToken })
+    // 生成Token（传入 session_token + device_id 关联会话）
+    const tokens = await generateTokens(user, {
+      session_token: sessionToken,
+      device_id: deviceId
+    })
 
     res.cookie('refresh_token', tokens.refresh_token, {
       httpOnly: true,
@@ -492,88 +430,35 @@ router.post(
      */
     const sessionToken = uuidv4()
     /**
-     * 用户端登录会话固定 user_type='user'，与管理后台(admin)天然隔离。
-     * @see routes/v4/auth/login.js POST /login 中的同策略注释
+     * 设备级多会话：用户端会话固定 user_type='user'，隔离 key 用 device_id（不再 platform 互斥）。
+     * quick-login 端点固定 platform='wechat_mp'（仅微信小程序调用，platform 仅作展示标签）。
      */
     const userType = 'user'
     const loginIp = req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || null
-    const platform = 'wechat_mp' // quick-login 端点固定为微信小程序
+    const platform = 'wechat_mp' // quick-login 端点固定为微信小程序（展示标签）
+    const deviceId = req.headers['x-device-id'] || null
 
     try {
-      const { AuthenticationSession } = req.app.locals.models
-      const { sequelize } = AuthenticationSession
-
-      /**
-       * 多平台会话隔离（快速登录 + 行级锁防并发）
-       * 仅失效 wechat_mp 平台的旧会话，Web 端不受影响
-       */
-      const isTestEnv = process.env.NODE_ENV === 'test'
-      const disableMultiDeviceCheck = process.env.DISABLE_MULTI_DEVICE_CHECK === 'true'
-      const forceMultiDeviceCheck = process.env.ENABLE_MULTI_DEVICE_CHECK === 'true'
-
-      const transaction = await sequelize.transaction()
-
-      try {
-        // 行级锁：锁定该用户在该平台的所有活跃会话，序列化并发登录
-        await sequelize.query(
-          'SELECT authentication_session_id FROM authentication_sessions WHERE user_type = ? AND user_id = ? AND login_platform = ? AND is_active = 1 FOR UPDATE',
-          { replacements: [userType, user.user_id, platform], transaction }
-        )
-
-        let deactivatedCount = 0
-        if (forceMultiDeviceCheck || (!isTestEnv && !disableMultiDeviceCheck)) {
-          deactivatedCount = await AuthenticationSession.deactivateUserSessions(
-            userType,
-            user.user_id,
-            null,
-            platform,
-            { transaction }
-          )
-        }
-
-        await AuthenticationSession.createSession(
-          {
-            session_token: sessionToken,
-            user_type: userType,
-            user_id: user.user_id,
-            login_ip: loginIp,
-            login_platform: platform,
-            expires_in_minutes: 10080
-          },
-          { transaction }
-        )
-
-        await transaction.commit()
-
-        if (deactivatedCount > 0) {
-          logger.info(
-            `🔒 [Session] 快速登录同平台会话替换: 已使 ${deactivatedCount} 个旧会话失效 (user_id=${user.user_id}, platform=${platform})`
-          )
-
-          try {
-            const ChatWebSocketService = req.app.locals.services.getService('chat_web_socket')
-            ChatWebSocketService.disconnectUser(user.user_id, userType)
-            logger.info(
-              `🔌 [Session] 快速登录已断开旧设备WebSocket: user_id=${user.user_id}, type=${userType}`
-            )
-          } catch (wsError) {
-            logger.debug(`🔌 [Session] WebSocket断开跳过: ${wsError.message}`)
-          }
-        }
-
-        logger.info(
-          `🔐 [Session] 快速登录会话创建成功: user_id=${user.user_id}, platform=${platform}, session=${sessionToken.substring(0, 8)}...`
-        )
-      } catch (innerError) {
-        await transaction.rollback()
-        throw innerError
-      }
+      // 写操作收口 SessionManagementService（设备级登录会话创建）
+      const SessionManagementService = req.app.locals.services.getService('session_management')
+      await SessionManagementService.createDeviceSession({
+        session_token: sessionToken,
+        user_type: userType,
+        user_id: user.user_id,
+        device_id: deviceId,
+        login_ip: loginIp,
+        login_platform: platform,
+        expires_in_minutes: 10080
+      })
     } catch (sessionError) {
       logger.warn(`⚠️ [Session] 快速登录会话创建失败（非致命）: ${sessionError.message}`)
     }
 
-    // 生成JWT Token（传入 session_token 关联会话）
-    const tokens = await generateTokens(user, { session_token: sessionToken })
+    // 生成JWT Token（传入 session_token + device_id 关联会话）
+    const tokens = await generateTokens(user, {
+      session_token: sessionToken,
+      device_id: deviceId
+    })
 
     /**
      * 🔐 Token安全升级：通过HttpOnly Cookie设置refresh_token
@@ -796,65 +681,31 @@ async function handleWxLoginSuccess(req, res, user, isNewUser) {
   const loginPlatform = 'wechat_mp'
   const sessionToken = uuidv4()
   const loginIp = req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || null
+  const deviceId = req.headers['x-device-id'] || null
 
   const UserService = req.app.locals.services.getService('user')
   await UserService.updateLoginStats(user.user_id)
 
-  const { AuthenticationSession } = req.app.locals.models
-
   try {
-    const { sequelize } = AuthenticationSession
-    const transaction = await sequelize.transaction()
-
-    try {
-      await sequelize.query(
-        'SELECT authentication_session_id FROM authentication_sessions WHERE user_type = ? AND user_id = ? AND login_platform = ? AND is_active = 1 FOR UPDATE',
-        { replacements: [userType, user.user_id, loginPlatform], transaction }
-      )
-
-      const isTestEnv = process.env.NODE_ENV === 'test'
-      const disableCheck = process.env.DISABLE_MULTI_DEVICE_CHECK === 'true'
-      const forceCheck = process.env.ENABLE_MULTI_DEVICE_CHECK === 'true'
-
-      let deactivatedCount = 0
-      if (forceCheck || (!isTestEnv && !disableCheck)) {
-        deactivatedCount = await AuthenticationSession.deactivateUserSessions(
-          userType,
-          user.user_id,
-          null,
-          loginPlatform,
-          { transaction }
-        )
-      }
-
-      await AuthenticationSession.createSession(
-        {
-          session_token: sessionToken,
-          user_type: userType,
-          user_id: user.user_id,
-          login_ip: loginIp,
-          login_platform: loginPlatform,
-          expires_in_minutes: 10080
-        },
-        { transaction }
-      )
-
-      await transaction.commit()
-
-      if (deactivatedCount > 0) {
-        logger.info(
-          `🔒 [Session] 微信登录会话替换: ${deactivatedCount} 个旧会话失效 (user_id=${user.user_id})`
-        )
-      }
-    } catch (innerError) {
-      await transaction.rollback()
-      throw innerError
-    }
+    // 写操作收口 SessionManagementService（设备级登录会话创建）
+    const SessionManagementService = req.app.locals.services.getService('session_management')
+    await SessionManagementService.createDeviceSession({
+      session_token: sessionToken,
+      user_type: userType,
+      user_id: user.user_id,
+      device_id: deviceId,
+      login_ip: loginIp,
+      login_platform: loginPlatform,
+      expires_in_minutes: 10080
+    })
   } catch (sessionError) {
     logger.warn(`⚠️ [Session] 微信登录会话创建失败（非致命）: ${sessionError.message}`)
   }
 
-  const tokens = await generateTokens(user, { session_token: sessionToken })
+  const tokens = await generateTokens(user, {
+    session_token: sessionToken,
+    device_id: deviceId
+  })
 
   res.cookie('refresh_token', tokens.refresh_token, {
     httpOnly: true,

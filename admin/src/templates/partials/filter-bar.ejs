@@ -9,16 +9,16 @@
   <div class="grid grid-cols-1 <%= typeof gridCols !== 'undefined' ? gridCols : 'md:grid-cols-4' %> gap-4">
     <% filters.forEach(function(filter) { %>
       <% if (filter.type === 'text' || filter.type === 'number') { %>
-    <input type="<%= filter.type %>" x-model="<%= filter.model %>" placeholder="<%= filter.placeholder || '' %>" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+    <input type="<%= filter.type %>" x-model="<%= filter.model %>" placeholder="<%= filter.placeholder || '' %>" class="px-3 py-2 border rounded themed-input focus:ring-2">
       <% } else if (filter.type === 'select') { %>
-    <select x-model="<%= filter.model %>" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+    <select x-model="<%= filter.model %>" class="px-3 py-2 border rounded themed-input focus:ring-2">
       <option value=""><%= filter.placeholder || '全部' %></option>
         <% if (filter.options) { filter.options.forEach(function(opt) { %>
       <option value="<%= opt.value %>"><%= opt.label %></option>
         <% }); } %>
     </select>
       <% } else if (filter.type === 'date') { %>
-    <input type="date" x-model="<%= filter.model %>" class="px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+    <input type="date" x-model="<%= filter.model %>" class="px-3 py-2 border rounded themed-input focus:ring-2">
       <% } %>
     <% }); %>
     <button @click="<%= typeof searchHandler !== 'undefined' ? searchHandler : 'search()' %>" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors">

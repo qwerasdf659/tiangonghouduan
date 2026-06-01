@@ -15,6 +15,7 @@
 import { logger } from '@/utils/logger.js'
 import { Alpine, createPageMixin } from '@/alpine/index.js'
 import { imageUploadMixin } from '@/alpine/mixins/image-upload.js'
+import { API_PREFIX } from '@/api/base.js'
 import {
   getTemplateList,
   getTemplateDetail,
@@ -253,7 +254,7 @@ function diyTemplateManagement() {
 
         // 预览图
         if (t.preview_media?.object_key) {
-          this.iconPreviewUrl = `/api/v4/images/${t.preview_media.object_key}`
+          this.iconPreviewUrl = `${API_PREFIX}/images/${t.preview_media.object_key}`
           this.iconMediaId = t.preview_media.media_id
         } else {
           this.iconPreviewUrl = null
@@ -262,7 +263,7 @@ function diyTemplateManagement() {
 
         // 底图
         if (t.base_image_media?.object_key) {
-          this.baseImagePreviewUrl = `/api/v4/images/${t.base_image_media.object_key}`
+          this.baseImagePreviewUrl = `${API_PREFIX}/images/${t.base_image_media.object_key}`
           this.baseImageMediaId = t.base_image_media.media_id
         } else {
           this.baseImagePreviewUrl = null
