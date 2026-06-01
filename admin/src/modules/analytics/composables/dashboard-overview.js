@@ -499,33 +499,11 @@ export function useDashboardOverviewMethods() {
         else if (estimatedDays <= 7) warningLevel = 'warning'
       }
 
-      const trendData = [],
-        forecastData = [],
-        today = new Date()
-      for (let i = 6; i >= 0; i--) {
-        const date = new Date(today)
-        date.setDate(date.getDate() - i)
-        trendData.push({
-          date: date.toLocaleDateString('zh-CN', {
-            month: '2-digit',
-            day: '2-digit',
-            timeZone: 'Asia/Shanghai'
-          }),
-          consumed: Math.round(dailyAverage)
-        })
-      }
-      for (let i = 1; i <= 7; i++) {
-        const date = new Date(today)
-        date.setDate(date.getDate() + i)
-        forecastData.push({
-          date: date.toLocaleDateString('zh-CN', {
-            month: '2-digit',
-            day: '2-digit',
-            timeZone: 'Asia/Shanghai'
-          }),
-          predicted: Math.round(dailyAverage)
-        })
-      }
+      // 说明：后端预算接口仅提供聚合的 total/used/remaining，没有真实的每日消耗序列。
+      // 此前用 dailyAverage 平摊出"历史 7 天 + 预测 7 天"属于伪造数据，且这两个数组并未被任何图表渲染，
+      // 故置空，不再造数。daily_average 与 estimated_days 基于真实 used/remaining 计算，属合理推导予以保留。
+      const trendData = []
+      const forecastData = []
 
       this.budgetForecast = {
         total_budget: totalBudget,

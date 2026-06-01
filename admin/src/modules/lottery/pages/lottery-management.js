@@ -391,6 +391,13 @@ function registerLotteryManagementComponents() {
                 break
               case 'strategy-simulation':
                 logger.debug('🧪 [LotteryPage] 进入策略模拟分析页面')
+                // 加载活动列表供选择，并默认选中第一个（替代写死 campaign_id=1）
+                if (!this.campaigns || this.campaigns.length === 0) {
+                  await this.loadCampaigns()
+                }
+                if (!this.simulation_campaign_id && this.campaigns.length > 0) {
+                  this.simulation_campaign_id = this.campaigns[0].lottery_campaign_id
+                }
                 await this.loadSimulationBaseline()
                 await this.loadSimulationHistory()
                 break

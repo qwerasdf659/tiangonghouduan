@@ -50,7 +50,7 @@
          style="display: none;">
       <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" @click="hideModal('categoryModal')"></div>
       <div class="relative themed-card rounded-xl shadow-2xl w-full max-w-lg mx-4 z-10 max-h-[90vh] overflow-y-auto">
-        <div class="p-4 border-b flex justify-between items-center bg-gradient-to-r from-emerald-50 to-white rounded-t-xl">
+        <div class="p-4 border-b flex justify-between items-center themed-gradient-light rounded-t-xl">
           <h5 class="font-semibold text-emerald-900" x-text="editingCategoryId ? '编辑品类' : '新增品类'"></h5>
           <button type="button" @click="hideModal('categoryModal')" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
         </div>
@@ -105,7 +105,7 @@
          style="display: none;">
       <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" @click="hideModal('categoryAttrModal')"></div>
       <div class="relative themed-card rounded-xl shadow-2xl w-full max-w-lg mx-4 z-10 max-h-[85vh] overflow-y-auto">
-        <div class="p-4 border-b flex justify-between items-center bg-gradient-to-r from-indigo-50 to-white rounded-t-xl">
+        <div class="p-4 border-b flex justify-between items-center themed-gradient-light rounded-t-xl">
           <h5 class="font-semibold text-indigo-900">绑定属性</h5>
           <button type="button" @click="hideModal('categoryAttrModal')" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
         </div>

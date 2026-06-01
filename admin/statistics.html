@@ -91,7 +91,7 @@
                 <span x-text="Math.abs(stats.user_trend).toFixed(1) + '% 较上期'"></span>
               </span>
             </div>
-            <div class="w-20 h-10" x-data="trendLine({ data: stats.user_trend_data || [10, 15, 12, 18, 22, 25, 30], color: 'rgba(255,255,255,0.7)' })"></div>
+            <div class="w-20 h-10" x-data="trendLine({ data: stats.user_trend_data, color: 'rgba(255,255,255,0.7)' })"></div>
           </div>
           <span class="stat-icon">👥</span>
         </div>
@@ -107,7 +107,7 @@
                 <span x-text="Math.abs(stats.draw_trend).toFixed(1) + '% 较上期'"></span>
               </span>
             </div>
-            <div class="w-20 h-10" x-data="trendBar({ data: stats.draw_trend_data || [5, 8, 12, 6, 15, 10, 18], color: 'rgba(255,255,255,0.7)' })"></div>
+            <div class="w-20 h-10" x-data="trendBar({ data: stats.draw_trend_data, color: 'rgba(255,255,255,0.7)' })"></div>
           </div>
           <span class="stat-icon">🎰</span>
         </div>
@@ -141,7 +141,7 @@
                 <span x-text="Math.abs(stats.revenue_trend).toFixed(1) + '% 较上期'"></span>
               </span>
             </div>
-            <div class="w-20 h-10" x-data="trendLine({ data: stats.revenue_trend_data || [100, 120, 110, 150, 180, 160, 200], color: 'rgba(255,255,255,0.7)' })"></div>
+            <div class="w-20 h-10" x-data="trendLine({ data: stats.revenue_trend_data, color: 'rgba(255,255,255,0.7)' })"></div>
           </div>
           <span class="stat-icon">💰</span>
         </div>

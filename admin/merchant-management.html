@@ -110,7 +110,7 @@
             <button @click="resetFilters()" class="px-4 py-2 text-sm border rounded-lg themed-border hover:bg-gray-50 transition-colors">
               🔄 重置
             </button>
-            <button @click="openCreateForm()" class="px-4 py-2 text-sm bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 shadow-sm transition-all hover:shadow-md">
+            <button @click="openCreateForm()" class="px-4 py-2 text-sm themed-gradient-primary text-white rounded-lg shadow-sm transition-all hover:shadow-md">
               ➕ 新增商家
             </button>
           </div>
@@ -139,7 +139,7 @@
         <div class="text-5xl mb-4">🏪</div>
         <p class="text-lg font-medium themed-text mb-2">暂无商家数据</p>
         <p class="text-sm themed-text-muted mb-4">点击「新增商家」开始接入合作商家</p>
-        <button @click="openCreateForm()" class="px-4 py-2 text-sm bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 shadow-sm">
+        <button @click="openCreateForm()" class="px-4 py-2 text-sm themed-gradient-primary text-white rounded-lg shadow-sm">
           ➕ 新增商家
         </button>
       </div>
@@ -260,7 +260,7 @@
         x-transition:enter-start="opacity-0 scale-95 translate-y-4"
         x-transition:enter-end="opacity-100 scale-100 translate-y-0">
         <!-- 弹窗标题 -->
-        <div class="px-6 py-4 bg-gradient-to-r from-blue-600 to-blue-700 rounded-t-2xl">
+        <div class="px-6 py-4 themed-gradient-primary rounded-t-2xl">
           <div class="flex justify-between items-center">
             <h3 class="text-lg font-bold text-white flex items-center gap-2">
               <span x-text="is_edit ? '✏️' : '➕'"></span>
@@ -321,7 +321,7 @@
           <div class="flex justify-end gap-3 pt-3 border-t themed-border">
             <button type="button" @click="closeForm()" class="px-5 py-2.5 text-sm font-medium border rounded-lg themed-border hover:bg-gray-50 transition-colors">取消</button>
             <button type="submit" :disabled="saving" 
-              class="px-5 py-2.5 text-sm font-medium bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 shadow-sm transition-all disabled:opacity-50">
+              class="px-5 py-2.5 text-sm font-medium themed-gradient-primary text-white rounded-lg shadow-sm transition-all disabled:opacity-50">
               <span x-show="saving" class="inline-block animate-spin mr-1">⏳</span>
               <span x-text="is_edit ? '💾 保存修改' : '✅ 创建商家'"></span>
             </button>

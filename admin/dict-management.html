@@ -60,7 +60,7 @@
           <p class="text-xs themed-text-muted" x-text="'管理' + (getCurrentDictConfig().name || '数据字典') + '配置项'"></p>
         </div>
       </div>
-      <button @click="openCreateDictModal()" class="btn-primary px-5 py-2.5 rounded-lg shadow-sm flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white">
+      <button @click="openCreateDictModal()" class="btn-primary px-5 py-2.5 rounded-lg shadow-sm flex items-center gap-2 themed-gradient-primary text-white">
         <span>➕</span> 新增字典
       </button>
     </div>
@@ -168,7 +168,7 @@
          class="fixed inset-0 z-50 flex items-center justify-center">
       <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" @click="hideModal('dictModal')"></div>
       <div class="relative themed-card rounded-xl shadow-2xl w-full max-w-md mx-4 z-10 animate-slide-in-up">
-        <div class="p-5 border-b flex justify-between items-center bg-gradient-to-r from-indigo-50 to-white rounded-t-xl">
+        <div class="p-5 border-b flex justify-between items-center themed-gradient-light rounded-t-xl">
           <h5 class="font-semibold text-indigo-900 flex items-center gap-2">
             <span class="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center text-sm">📖</span>
             <span x-text="isEditDict ? '编辑字典' : '新增字典'"></span>

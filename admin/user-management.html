@@ -60,7 +60,7 @@
       <!-- 用户列表页 -->
       <div x-show="current_page === 'user-list'" x-cloak>
         <div class="themed-card rounded-xl shadow-sm overflow-hidden">
-          <div class="p-5 border-b flex justify-between items-center bg-gradient-to-r from-blue-50 to-transparent">
+          <div class="p-5 border-b flex justify-between items-center themed-gradient-light">
             <div>
               <h5 class="font-semibold text-base">👥 用户列表</h5>
               <p class="text-xs themed-text-muted mt-0.5">管理平台所有用户，查看角色和状态信息</p>
@@ -154,7 +154,7 @@
       <!-- 角色管理页 -->
       <div x-show="current_page === 'role-list'" x-cloak>
         <div class="themed-card rounded-xl shadow-sm overflow-hidden">
-          <div class="p-5 border-b flex justify-between items-center bg-gradient-to-r from-purple-50 to-transparent">
+          <div class="p-5 border-b flex justify-between items-center themed-gradient-light">
             <div>
               <h5 class="font-semibold text-base">🎭 角色管理</h5>
               <p class="text-xs themed-text-muted mt-0.5">配置系统角色与权限级别，控制功能访问范围</p>
@@ -218,7 +218,7 @@
       <!-- 权限管理页（只读展示 - 权限嵌入在角色中） -->
       <div x-show="current_page === 'permission-list'" x-cloak>
         <div class="themed-card rounded-xl shadow-sm">
-          <div class="p-5 border-b bg-gradient-to-r from-emerald-50 to-teal-50 rounded-t-xl">
+          <div class="p-5 border-b themed-gradient-light rounded-t-xl">
             <div class="flex justify-between items-center">
               <div>
                 <h5 class="font-semibold text-gray-800 flex items-center gap-2">
@@ -279,7 +279,7 @@
       <!-- 用户角色分配页 -->
       <div x-show="current_page === 'user-roles'" x-cloak>
         <div class="themed-card rounded-xl shadow-sm">
-          <div class="p-5 border-b bg-gradient-to-r from-purple-50 to-indigo-50 rounded-t-xl flex justify-between items-center">
+          <div class="p-5 border-b themed-gradient-light rounded-t-xl flex justify-between items-center">
             <div>
               <h5 class="font-semibold text-gray-800 flex items-center gap-2">
                 <span class="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center text-purple-600">👤</span>
@@ -597,7 +597,7 @@
       <!-- 角色变更历史页 -->
       <div x-show="current_page === 'role-history'" x-cloak>
         <div class="themed-card rounded-xl shadow-sm">
-          <div class="p-5 border-b bg-gradient-to-r from-blue-50 to-indigo-50 rounded-t-xl flex justify-between items-center">
+          <div class="p-5 border-b themed-gradient-light rounded-t-xl flex justify-between items-center">
             <div>
               <h5 class="font-semibold text-gray-800 flex items-center gap-2">
                 <span class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600">📜</span>
@@ -683,7 +683,7 @@
       <!-- 状态变更历史页 -->
       <div x-show="current_page === 'status-history'" x-cloak>
         <div class="themed-card rounded-xl shadow-sm">
-          <div class="p-5 border-b bg-gradient-to-r from-cyan-50 to-sky-50 rounded-t-xl flex justify-between items-center">
+          <div class="p-5 border-b themed-gradient-light rounded-t-xl flex justify-between items-center">
             <div>
               <h5 class="font-semibold text-gray-800 flex items-center gap-2">
                 <span class="w-8 h-8 rounded-lg bg-cyan-100 flex items-center justify-center text-cyan-600">📋</span>
@@ -2060,7 +2060,7 @@
       x-cloak
     >
       <!-- 抽屉头部 -->
-      <div class="flex items-center justify-between px-6 py-4 border-b bg-gradient-to-r from-blue-50 to-indigo-50">
+      <div class="flex items-center justify-between px-6 py-4 border-b themed-gradient-light">
         <div class="flex items-center gap-3">
           <span class="text-2xl">👤</span>
           <div>

@@ -819,6 +819,21 @@
   accent-color: var(--color-primary);
 }
 
+/* 主题渐变（替代页头横幅/主按钮的 from-indigo-500 to-purple-600 等装饰渐变，跟随主题色） */
+.themed-gradient-primary {
+  background-image: linear-gradient(
+    135deg,
+    var(--color-primary) 0%,
+    var(--color-primary-hover) 100%
+  );
+  color: #fff;
+}
+
+/* 主题浅色渐变（替代面板/弹窗标题的 from-blue-50 to-white/transparent 浅底，跟随主题色，暗色自适应） */
+.themed-gradient-light {
+  background-image: linear-gradient(to right, var(--color-primary-light), transparent);
+}
+
 /* 成功状态文字（替代 text-green-600, text-green-500, text-green-700） */
 .themed-text-success {
   color: var(--color-success);

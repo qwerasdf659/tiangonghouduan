@@ -459,44 +459,52 @@ function dashboardPanelPage() {
 
     /**
      * 获取用户统计数据
-     * @description 使用后端实际API: /api/v4/console/users/segments 获取用户分层统计
-     *              原API /api/v4/console/user/stats 不存在
+     * @description 用户分层来自 /api/v4/console/users/segments；
+     *              今日新增来自 /api/v4/system/admin/overview 的真实字段 users.new_today。
+     *              segments 接口本身不返回今日新增，缺失时返回 0，绝不本地估算。
      */
     async fetchUserStats() {
       try {
-        // 使用后端实际存在的API: /api/v4/console/users/segments
-        const result = await request({ url: `${API_PREFIX}/console/users/segments` })
-        if (result.success && result.data) {
-          // 从分层统计中提取用户数据
-          const segments = result.data.segments || []
-          const totalUsers = result.data.total_users || 0
+        // 并行获取分层统计与系统概览（今日新增的真实来源）
+        const [segResult, overviewResult] = await Promise.all([
+          request({ url: `${API_PREFIX}/console/users/segments` }),
+          request({ url: `${API_PREFIX}/system/admin/overview` })
+        ])
 
-          // 计算各分层数量 - 后端返回字段是 code，不是 type
+        if (segResult.success && segResult.data) {
+          const segments = segResult.data.segments || []
+          const totalUsers = segResult.data.total_users || 0
+
+          // 后端返回字段是 code，不是 type
           const highValueUsers = segments.find(s => s.code === 'high_value')?.count || 0
           const activeUsers = segments.find(s => s.code === 'active')?.count || 0
           const silentUsers = segments.find(s => s.code === 'silent')?.count || 0
+
+          // 今日新增：取系统概览真实字段 overview.users.new_today，缺失则 0（不估算）
+          const overview = overviewResult?.success ? overviewResult.data?.overview : null
+          const newUsersToday = overview?.users?.new_today || 0
 
           logger.info('[DashboardPanel] fetchUserStats 成功', {
             total_users: totalUsers,
             high_value: highValueUsers,
             active: activeUsers,
             silent: silentUsers,
+            new_users_today: newUsersToday,
             segments_count: segments.length
           })
 
           return {
             total_users: totalUsers,
-            new_users_today: result.data.new_users_today || Math.round(totalUsers * 0.01),
+            new_users_today: newUsersToday,
             active_users: activeUsers + highValueUsers,
             vip_users: highValueUsers
           }
         }
         logger.warn('[DashboardPanel] fetchUserStats API 返回非 success')
       } catch (e) {
-        logger.warn('[DashboardPanel] fetchUserStats 失败（适配API）:', e.message)
+        logger.error('[DashboardPanel] fetchUserStats 失败:', e.message)
       }
-      // API 失败时直接报错，不降级使用模拟数据
-      logger.error('[DashboardPanel] fetchUserStats 失败，返回空数据')
+      // API 失败时返回空数据并暴露问题，不降级使用模拟数据
       return {
         total_users: 0,
         new_users_today: 0,
@@ -506,38 +514,25 @@ function dashboardPanelPage() {
     },
 
     /**
-     * 获取用户增长数据
-     * @description 后端没有直接的用户增长趋势API（/api/v4/console/user/growth 不存在）
-     *              使用 /api/v4/system/admin/overview 获取系统概览，结合本地生成趋势
+     * 获取用户增长趋势
+     * @description 使用后端真实趋势 API /api/v4/system/statistics/charts 的 user_growth，
+     *              返回 [{date, count, cumulative}]。不再本地拼造 7 天假数据。
      */
     async fetchUserGrowth() {
       try {
-        // 尝试从系统概览获取基础数据
-        const result = await request({ url: `${API_PREFIX}/system/admin/overview` })
-        if (result.success && result.data?.overview) {
-          const overview = result.data.overview
-          // 基于系统概览数据生成7天趋势（后端暂无详细趋势API）
-          const baseNewUsers = overview.new_users_today || 200
-          const baseActiveUsers = overview.active_users || 5000
-
-          return Array.from({ length: 7 }, (_, i) => {
-            const date = new Date()
-            date.setDate(date.getDate() - (6 - i))
-            return {
-              date: date.toLocaleDateString('zh-CN', {
-                month: '2-digit',
-                day: '2-digit',
-                timeZone: 'Asia/Shanghai'
-              }),
-              new_users: i === 6 ? baseNewUsers : 0,
-              active_users: i === 6 ? baseActiveUsers : 0
-            }
-          })
+        const result = await request({ url: `${API_PREFIX}/system/statistics/charts?days=7` })
+        if (result.success && Array.isArray(result.data?.user_growth)) {
+          // 直接映射后端真实字段：count=当日新增，cumulative=累计用户
+          return result.data.user_growth.map(item => ({
+            date: item.date,
+            new_users: item.count || 0,
+            cumulative: item.cumulative || 0
+          }))
         }
       } catch (e) {
-        logger.warn('[DashboardPanel] fetchUserGrowth 失败（适配API）:', e.message)
+        logger.error('[DashboardPanel] fetchUserGrowth 失败:', e.message)
       }
-      /* API 失败时返回空数组，不使用模拟数据 */
+      // API 失败时返回空数组并暴露问题，不使用模拟数据
       return []
     },
 
@@ -626,7 +621,7 @@ function dashboardPanelPage() {
 
       const option = {
         tooltip: { trigger: 'axis' },
-        legend: { data: ['新增用户', '活跃用户'], bottom: 0 },
+        legend: { data: ['新增用户', '累计用户'], bottom: 0 },
         grid: { left: '3%', right: '4%', bottom: '15%', top: '10%', containLabel: true },
         xAxis: { type: 'category', data: data.map(d => d.date) },
         yAxis: { type: 'value' },
@@ -638,10 +633,10 @@ function dashboardPanelPage() {
             itemStyle: { color: '#10b981' }
           },
           {
-            name: '活跃用户',
+            name: '累计用户',
             type: 'line',
             smooth: true,
-            data: data.map(d => d.active_users),
+            data: data.map(d => d.cumulative),
             lineStyle: { color: '#3b82f6', width: 3 }
           }
         ]

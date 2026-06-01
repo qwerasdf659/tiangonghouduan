@@ -151,8 +151,8 @@ const SENSITIVITY_PARAMS = [
  */
 export function useStrategySimulationState() {
   return {
-    /** @type {number} 当前活动ID（默认=1） */
-    simulation_campaign_id: 1,
+    /** @type {number|null} 当前活动ID（进入页面时由活动列表的第一个活动初始化，不写死） */
+    simulation_campaign_id: null,
     /** @type {Object|null} 基线数据 */
     simulation_baseline: null,
     /** @type {boolean} 基线加载中 */
@@ -275,6 +275,12 @@ export function useStrategySimulationMethods() {
 
     /** 加载模拟基线数据 */
     async loadSimulationBaseline() {
+      // 未选择活动时不请求（活动列表为空或尚未初始化），避免拼出 /baseline/null
+      if (!this.simulation_campaign_id) {
+        logger.warn('[策略模拟] 未选择活动，跳过基线加载')
+        this.simulation_baseline = null
+        return
+      }
       this.loading_baseline = true
       try {
         // apiGet → apiCall → withLoading 返回 { success, data }，需要解包
@@ -311,6 +317,20 @@ export function useStrategySimulationMethods() {
       } finally {
         this.loading_baseline = false
       }
+    },
+
+    /**
+     * 切换模拟分析的目标活动
+     * @description 用户从活动下拉框选择新活动后，重新加载该活动的基线与历史数据。
+     *              替代此前写死的 simulation_campaign_id=1。
+     * @returns {Promise<void>}
+     */
+    async onSimulationCampaignChange() {
+      logger.info('[策略模拟] 切换活动', { lottery_campaign_id: this.simulation_campaign_id })
+      // 切换活动后，已有的模拟/对比结果不再对应当前活动，清空避免误读
+      this.simulation_result = null
+      await this.loadSimulationBaseline()
+      await this.loadSimulationHistory()
     },
 
     /** 切换预设场景 */

@@ -802,7 +802,7 @@
       <!-- ==================== 策略配置页 ==================== -->
       <div x-show="current_page === 'lottery-strategy'" x-cloak x-init="$nextTick(() => loadStrategyConfigSummary())">
         <!-- 页面引导说明 -->
-        <div class="rounded-lg p-4 mb-6 bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg">
+        <div class="rounded-lg p-4 mb-6 themed-gradient-primary text-white shadow-lg">
           <div class="flex items-start gap-3">
             <span class="text-2xl mt-0.5">💡</span>
             <div>
@@ -948,7 +948,7 @@
                   <div class="flex items-center gap-2">
                     <span class="text-xs w-14 text-gray-500 shrink-0">低档位</span>
                     <div class="flex-1 bg-gray-100 rounded-full h-5 overflow-hidden">
-                      <div class="h-full rounded-full bg-gradient-to-r from-blue-400 to-blue-500 transition-all flex items-center justify-end pr-1"
+                      <div class="h-full rounded-full themed-bg-primary transition-all flex items-center justify-end pr-1"
                            :style="'width:' + getConfigSummaryTierPercent('low')">
                         <span class="text-[10px] text-white font-medium" x-text="strategyConfigSummary.recent_24h.tier_distribution.low"></span>
                       </div>
@@ -1123,7 +1123,7 @@
                     <thead>
                       <tr>
                         <template x-for="pTier in pressureTiers" :key="pTier">
-                          <th class="px-4 py-3 text-sm font-semibold bg-gradient-to-r from-indigo-500 to-purple-500 text-white">
+                          <th class="px-4 py-3 text-sm font-semibold themed-gradient-primary text-white">
                             <span x-text="getPressureTierName(pTier)"></span>
                             <span class="text-xs opacity-75 block" x-text="pTier"></span>
                           </th>
@@ -1186,7 +1186,7 @@
       <div x-show="current_page === 'activity-strategy-switch'" x-cloak>
 
         <!-- 页面引导说明 -->
-        <div class="rounded-lg p-4 mb-6 bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-lg">
+        <div class="rounded-lg p-4 mb-6 themed-gradient-primary text-white shadow-lg">
           <div class="flex items-start gap-3">
             <span class="text-2xl">🔧</span>
             <div>
@@ -1440,7 +1440,7 @@
       <!-- ==================== 分群策略管理页（任务3） ==================== -->
       <div x-show="current_page === 'segment-rules'" x-cloak>
         <!-- 页面引导说明 -->
-        <div class="rounded-lg p-4 mb-6 bg-gradient-to-r from-violet-500 to-fuchsia-600 text-white shadow-lg">
+        <div class="rounded-lg p-4 mb-6 themed-gradient-primary text-white shadow-lg">
           <div class="flex items-start gap-3">
             <span class="text-2xl">👥</span>
             <div>
@@ -1638,7 +1638,7 @@
       <!-- ==================== 配额管理页 ==================== -->
       <div x-show="current_page === 'lottery-quota'" x-cloak>
         <!-- 页面引导说明 -->
-        <div class="rounded-lg p-4 mb-6 bg-gradient-to-r from-teal-500 to-cyan-600 text-white shadow-lg">
+        <div class="rounded-lg p-4 mb-6 themed-gradient-primary text-white shadow-lg">
           <div class="flex items-start gap-3">
             <span class="text-2xl mt-0.5">📊</span>
             <div>
@@ -2052,7 +2052,7 @@
               </span>
             </button>
             <button 
-              class="action-btn rounded-lg flex items-center gap-1.5 bg-gradient-to-r from-purple-500 to-indigo-600 text-white hover:from-purple-600 hover:to-indigo-700"
+              class="action-btn rounded-lg flex items-center gap-1.5 themed-gradient-primary text-white"
               @click="openDailyReportModal()"
               :disabled="loadingDailyReport"
             >
@@ -2773,7 +2773,7 @@
         
         <!-- 页面标题和筛选 -->
         <div class="rounded-lg shadow-lg mb-6 overflow-hidden">
-          <div class="bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 p-5">
+          <div class="themed-gradient-primary p-5">
             <div class="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <h5 class="font-bold text-white text-lg flex items-center gap-2">
@@ -2830,7 +2830,7 @@
           </div>
           <p class="themed-text-muted font-medium mb-1">暂无策略效果数据</p>
           <p class="text-sm themed-text-muted mb-4">请选择活动或调整时间范围后重新加载</p>
-          <button @click="loadStrategyEffectiveness()" class="px-6 py-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-lg hover:from-purple-600 hover:to-indigo-700 transition-all shadow-md">
+          <button @click="loadStrategyEffectiveness()" class="px-6 py-2 themed-gradient-primary text-white rounded-lg transition-all shadow-md">
             重新加载
           </button>
         </div>
@@ -3074,7 +3074,7 @@
 
             <!-- 体验机制分析 -->
             <div class="rounded-xl shadow-sm overflow-hidden border border-gray-100">
-              <div class="px-5 py-4 bg-gradient-to-r from-emerald-600 to-teal-600">
+              <div class="px-5 py-4 themed-gradient-primary">
                 <h6 class="font-semibold text-white flex items-center gap-2">
                   🎮 体验保护机制
                 </h6>
@@ -3833,7 +3833,7 @@
       <div x-show="current_page === 'strategy-simulation'" x-cloak>
 
         <!-- 页面引导说明 -->
-        <div class="rounded-xl p-5 mb-6 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 text-white shadow-lg">
+        <div class="rounded-xl p-5 mb-6 themed-gradient-primary text-white shadow-lg">
           <div class="flex items-start gap-4">
             <div class="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center text-2xl flex-shrink-0">🧪</div>
             <div class="flex-1">
@@ -3858,6 +3858,20 @@
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- 活动选择器（替代写死 campaign_id=1，支持多活动切换） -->
+        <div class="themed-card rounded-xl shadow-sm p-4 mb-5">
+          <div class="flex items-center gap-3 flex-wrap">
+            <label class="text-sm font-medium themed-text-secondary">分析活动</label>
+            <select x-model.number="simulation_campaign_id" @change="onSimulationCampaignChange()"
+                    class="px-3 py-2 border rounded-lg themed-input text-sm min-w-[220px]">
+              <template x-for="c in campaigns" :key="c.lottery_campaign_id">
+                <option :value="c.lottery_campaign_id" x-text="'#' + c.lottery_campaign_id + ' ' + c.campaign_name"></option>
+              </template>
+            </select>
+            <span x-show="!campaigns || campaigns.length === 0" class="text-xs themed-text-muted">暂无可分析的活动</span>
           </div>
         </div>
 
@@ -3925,7 +3939,7 @@
                 <button
                   @click="simulation_sub_tab = tab.id"
                   :class="simulation_sub_tab === tab.id
-                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md'
+                    ? 'themed-bg-primary text-white shadow-md'
                     : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'"
                   class="px-4 py-2.5 rounded-lg text-sm transition-all whitespace-nowrap"
                 >
@@ -3955,7 +3969,7 @@
                     <button
                       @click="runMonteCarlo()"
                       :disabled="running_simulation"
-                      class="px-5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-sm font-medium rounded-lg hover:from-emerald-700 hover:to-teal-700 disabled:opacity-50 disabled:cursor-wait shadow-sm transition-all"
+                      class="px-5 py-2 themed-gradient-primary text-white text-sm font-medium rounded-lg disabled:opacity-50 disabled:cursor-wait shadow-sm transition-all"
                     >
                       <span x-show="!running_simulation">🚀 运行模拟</span>
                       <span x-show="running_simulation" class="flex items-center gap-2">
@@ -4160,7 +4174,7 @@
                   <h6 class="font-semibold text-gray-700 mb-2">暂无模拟结果</h6>
                   <p class="text-sm text-gray-400 mb-4">请先在「参数沙盒」中调整参数，然后点击「运行模拟」</p>
                   <button @click="simulation_sub_tab = 'sandbox'"
-                          class="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-sm rounded-lg hover:from-emerald-600 hover:to-teal-600 transition-all">
+                          class="px-4 py-2 themed-gradient-primary text-white text-sm rounded-lg transition-all">
                     前往参数沙盒 →
                   </button>
                 </div>
@@ -4368,7 +4382,7 @@
                   </div>
                   <div>
                     <button @click="runUserJourney()" :disabled="running_journey"
-                            class="w-full px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-medium rounded-lg hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-wait shadow-sm transition-all">
+                            class="w-full px-4 py-2 themed-gradient-primary text-white text-sm font-medium rounded-lg disabled:opacity-50 disabled:cursor-wait shadow-sm transition-all">
                       <span x-show="!running_journey">▶ 开始模拟旅程</span>
                       <span x-show="running_journey" class="flex items-center justify-center gap-2">
                         <span class="animate-spin inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full"></span>
@@ -4478,7 +4492,7 @@
                   </div>
                   <div>
                     <button @click="runSensitivityFromPanel()" :disabled="running_sensitivity"
-                            class="w-full px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-sm font-medium rounded-lg hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-wait shadow-sm transition-all">
+                            class="w-full px-4 py-2 themed-gradient-primary text-white text-sm font-medium rounded-lg disabled:opacity-50 disabled:cursor-wait shadow-sm transition-all">
                       <span x-show="!running_sensitivity">📈 运行分析</span>
                       <span x-show="running_sensitivity" class="flex items-center justify-center gap-2">
                         <span class="animate-spin inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full"></span>
@@ -4540,7 +4554,7 @@
                     </div>
                   </div>
                   <button @click="runRecommendFromPanel()" :disabled="running_recommend"
-                          class="mt-5 w-full px-4 py-2.5 bg-gradient-to-r from-teal-600 to-cyan-600 text-white text-sm font-medium rounded-lg hover:from-teal-700 hover:to-cyan-700 disabled:opacity-50 disabled:cursor-wait shadow-sm transition-all">
+                          class="mt-5 w-full px-4 py-2.5 themed-gradient-primary text-white text-sm font-medium rounded-lg disabled:opacity-50 disabled:cursor-wait shadow-sm transition-all">
                     <span x-show="!running_recommend">🔍 智能搜索推荐方案</span>
                     <span x-show="running_recommend" class="flex items-center justify-center gap-2">
                       <span class="animate-spin inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full"></span>
@@ -6876,7 +6890,7 @@
       <div class="fixed inset-0 bg-black bg-opacity-50" @click="closeDailyReportModal()"></div>
       <div class="relative themed-card rounded-lg shadow-xl max-w-5xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col">
         <!-- 模态框头部 -->
-        <div class="p-4 border-b flex justify-between items-center bg-gradient-to-r from-purple-500 to-indigo-600 text-white">
+        <div class="p-4 border-b flex justify-between items-center themed-gradient-primary text-white">
           <h5 class="font-semibold text-lg flex items-center gap-2">
             📊 运营日报
             <span class="text-sm font-normal opacity-90" x-text="dailyReportDate"></span>
@@ -7069,7 +7083,7 @@
       <div class="fixed inset-0 bg-black bg-opacity-50" @click="closeCampaignRoiModal()"></div>
       <div class="relative themed-card rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col">
         <!-- 模态框头部 -->
-        <div class="p-4 border-b flex justify-between items-center bg-gradient-to-r from-emerald-500 to-teal-600 text-white">
+        <div class="p-4 border-b flex justify-between items-center themed-gradient-primary text-white">
           <h5 class="font-semibold text-lg flex items-center gap-2">
             📊 活动效果分析
             <span class="text-sm font-normal opacity-90" x-text="selectedCampaign?.campaign_name || ''"></span>
