@@ -299,9 +299,9 @@ class AdminLotteryCoreService {
 
     // 如果是特定奖品调整，验证奖品存在
     let prize = null
-    if (adjustmentData.adjustment_type === 'specific_prize' && adjustmentData.lottery_prize_id) {
+    if (adjustmentData.adjustment_type === 'specific_prize' && adjustmentData.lottery_campaign_prize_id) {
       const PrizePoolService = this._dependencies.prizePool
-      prize = await PrizePoolService.getPrizeById(adjustmentData.lottery_prize_id)
+      prize = await PrizePoolService.getPrizeById(adjustmentData.lottery_campaign_prize_id)
       if (!prize) {
         throw new BusinessError('奖品不存在', 'LOTTERY_NOT_FOUND', 404)
       }
@@ -314,8 +314,10 @@ class AdminLotteryCoreService {
     }
 
     if (adjustmentData.adjustment_type === 'specific_prize') {
-      settingData.lottery_prize_id = adjustmentData.lottery_prize_id
-      settingData.prize_name = prize.prize_name
+      settingData.lottery_campaign_prize_id = adjustmentData.lottery_campaign_prize_id
+      // 奖品名称取自关联的 prize_definitions.display_name（活动奖品表本身无名称列）
+      settingData.prize_name =
+        prize.prizeDefinition?.display_name || prize.display_name || `奖品#${adjustmentData.lottery_campaign_prize_id}`
       settingData.custom_probability = adjustmentData.custom_probability
       settingData.auto_adjust_others = true
     } else {
@@ -378,7 +380,7 @@ class AdminLotteryCoreService {
     }
 
     if (adjustmentData.adjustment_type === 'specific_prize') {
-      result.lottery_prize_id = settingData.lottery_prize_id
+      result.lottery_campaign_prize_id = settingData.lottery_campaign_prize_id
       result.prize_name = settingData.prize_name
       result.custom_probability = settingData.custom_probability
     } else {

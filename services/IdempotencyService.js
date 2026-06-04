@@ -190,6 +190,7 @@ const CANONICAL_OPERATION_MAP = {
    * ===============================================================
    */
   '/api/v4/system/feedback': 'SYSTEM_FEEDBACK_SUBMIT', // 提交反馈
+  '/api/v4/system/disputes': 'SYSTEM_DISPUTE_SELF_CREATE', // 用户自助发起售后申诉（方案A 二期）
   '/api/v4/system/chat/sessions': 'CHAT_SESSION_CREATE', // 创建聊天会话
   '/api/v4/system/chat/sessions/:id/messages': 'CHAT_MESSAGE_SEND', // 发送聊天消息
   '/api/v4/system/chat/sessions/:id/upload': 'CHAT_IMAGE_UPLOAD', // 聊天图片上传
@@ -277,6 +278,7 @@ const CANONICAL_OPERATION_MAP = {
 
   // ===== 客服工作台 — 交易纠纷 =====
   '/api/v4/console/customer-service/disputes': 'ADMIN_CS_DISPUTE_CREATE', // 创建交易纠纷工单
+  '/api/v4/console/customer-service/disputes/:id/accept': 'ADMIN_CS_DISPUTE_ACCEPT', // 受理纠纷（open → reviewing）
   '/api/v4/console/customer-service/disputes/:id/escalate': 'ADMIN_CS_DISPUTE_ESCALATE', // 升级纠纷为仲裁
   '/api/v4/console/customer-service/disputes/:id/resolve': 'ADMIN_CS_DISPUTE_RESOLVE', // 解决纠纷
 

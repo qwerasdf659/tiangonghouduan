@@ -64,12 +64,13 @@ describe('ExchangeService - 兑换市场服务测试', () => {
     /*
      * V4.7.0 大文件拆分：ExchangeService 已拆分为多个子服务
      * - QueryService: 查询方法 (getMarketItems, getItemDetail, getUserOrders, getAdminOrders)
-     * - AdminService: 管理方法 (createExchangeItem, updateExchangeItem, deleteExchangeItem)
+     * - admin/ (Facade): 管理方法 (createExchangeItem, updateExchangeItem, deleteExchangeItem 等)
+     *   原 AdminService.js 已拆为 services/exchange/admin/ 下多个子服务，经 admin/index.js Facade 统一暴露
      * - CoreService: 核心方法 (executeExchange)
      * 测试需要同时使用这些服务的方法，创建组合对象
      */
     const ExchangeQueryService = require('../../services/exchange/QueryService')
-    const ExchangeAdminService = require('../../services/exchange/AdminService')
+    const ExchangeAdminService = require('../../services/exchange/admin')
 
     const queryService = new ExchangeQueryService(models)
     const adminService = new ExchangeAdminService(models)
@@ -92,7 +93,7 @@ describe('ExchangeService - 兑换市场服务测试', () => {
       getMarketItemStatistics: adminService.getMarketItemStatistics.bind(adminService),
       checkTimeoutAndAlert: adminService.checkTimeoutAndAlert.bind(adminService)
     }
-    console.log('✅ ExchangeService 拆分子服务加载成功（QueryService + AdminService）')
+    console.log('✅ ExchangeService 拆分子服务加载成功（QueryService + admin Facade）')
 
     if (!ExchangeService) {
       throw new Error('ExchangeService 加载失败')
@@ -133,9 +134,24 @@ describe('ExchangeService - 兑换市场服务测试', () => {
     }
     created_records.length = 0
 
-    // 清理商品记录
+    // 清理商品记录（先删配置型子表，避免外键约束阻断；与 deleteExchangeItem 级联口径一致）
     for (const exchangeItemId of created_items) {
       try {
+        const skus = await models.ExchangeItemSku.findAll({
+          where: { exchange_item_id: exchangeItemId },
+          attributes: ['sku_id']
+        })
+        const skuIds = skus.map(s => s.sku_id)
+        if (skuIds.length > 0) {
+          await models.ExchangeChannelPrice.destroy({ where: { sku_id: skuIds }, force: true })
+          if (models.SkuAttributeValue) {
+            await models.SkuAttributeValue.destroy({ where: { sku_id: skuIds }, force: true })
+          }
+          await models.ExchangeItemSku.destroy({
+            where: { exchange_item_id: exchangeItemId },
+            force: true
+          })
+        }
         await ExchangeItem.destroy({ where: { exchange_item_id: exchangeItemId }, force: true })
       } catch (error) {
         // 忽略清理错误

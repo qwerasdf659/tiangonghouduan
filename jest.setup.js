@@ -21,6 +21,18 @@
 // 🔧 2026-01-09：统一从 .env 加载配置（单一真相源）
 require('dotenv').config()
 
+/*
+ * 🕐 强制测试进程使用北京时间（Asia/Shanghai），与项目「全链路北京时间」规范及
+ * 数据库会话 timezone:'+08:00' 对齐。
+ * 根因：devbox 系统 TZ 为 UTC；config/database.js 用 dateStrings:true（返回北京墙钟字符串、无时区后缀），
+ * 进程若为 UTC 则 new Date(字符串) 被当作 UTC 解析，时间相差 8 小时。
+ * 注意：V8 在进程启动时即缓存时区，运行时改 process.env.TZ 对已缓存的 Date 解析不生效，
+ * 因此真正生效点是 package.json 测试脚本里的 `TZ=Asia/Shanghai jest`（进程启动即注入）。
+ * 这里再写一次仅为：①让读取 process.env.TZ 的代码拿到正确值；②单独 `node node_modules/.bin/jest`
+ * 调试时作为兜底（此时设置发生在首个 Date 之前可生效）。
+ */
+process.env.TZ = process.env.TZ || 'Asia/Shanghai'
+
 // 设置测试环境标识（允许覆盖）
 process.env.NODE_ENV = 'test'
 

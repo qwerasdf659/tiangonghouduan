@@ -22,7 +22,8 @@
  * - ItemService: 物品操作服务
  * - ExchangeQueryService: 兑换查询服务
  *
- * 权限要求：已登录用户（authenticateToken）
+ * 权限要求：背包域接口需已登录用户（authenticateToken）；
+ *           兑换商品浏览（GET /exchange/items 及详情）为 optionalAuth（未登录可浏览）
  *
  * 创建时间：2026-01-28
  * 更新时间：2026-02-07（新增物品详情/核销码/使用/兑换测试）
@@ -485,10 +486,15 @@ describe('背包API测试 - P2优先级', () => {
       expect(response.body.success).toBe(false)
     })
 
-    test('应该拒绝无token的请求', async () => {
+    test('无token也可浏览商品列表（optionalAuth，公开浏览设计）', async () => {
+      /*
+       * 业务设计：兑换商品列表/详情/空间统计均为 optionalAuth（未登录可浏览，与商品目录一致）
+       * 见 routes/v4/exchange/index.js GET /items 使用 optionalAuth
+       */
       const response = await request(app).get('/api/v4/exchange/items')
 
-      expect(response.status).toBe(401)
+      expect(response.status).toBe(200)
+      expect(response.body.success).toBe(true)
     })
   })
 

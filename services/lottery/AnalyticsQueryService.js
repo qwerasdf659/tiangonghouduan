@@ -454,7 +454,10 @@ class LotteryAnalyticsQueryService {
         [
           fn(
             'SUM',
-            literal("CASE WHEN LotteryDraw.reward_tier IN ('high', 'mid', 'low') THEN 1 ELSE 0 END")
+            // 业务规则：每次抽奖 100% 从奖品池获得奖品（含兜底 fallback），仅 unknown 为无效/未判定，不计为中奖
+            literal(
+              "CASE WHEN LotteryDraw.reward_tier IN ('high', 'mid', 'low', 'fallback') THEN 1 ELSE 0 END"
+            )
           ),
           'total_wins'
         ],

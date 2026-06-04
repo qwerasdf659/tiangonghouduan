@@ -793,13 +793,13 @@
                     </div>
                     <div x-show="disputes.length === 0" class="text-center py-4 text-xs themed-text-muted">暂无纠纷记录</div>
                     <div class="space-y-2 max-h-64 overflow-y-auto">
-                      <template x-for="d in disputes" :key="d.issue_id || d.customer_service_issue_id">
+                      <template x-for="d in disputes" :key="d.trade_dispute_id">
                         <div class="text-xs p-2 rounded border themed-border-light hover:bg-gray-50 cursor-pointer" @click="viewDisputeDetail(d)">
                           <div class="flex items-center justify-between mb-1">
-                            <span class="font-medium themed-text" x-text="'#' + (d.issue_id || d.customer_service_issue_id) + ' ' + (d.title || '交易纠纷')"></span>
+                            <span class="font-medium themed-text" x-text="'#' + d.trade_dispute_id + ' ' + (d.title || '交易纠纷')"></span>
                             <span class="px-1 py-0.5 rounded text-[10px]"
-                                  :class="{'bg-red-100 text-red-700': d.status==='open', 'bg-yellow-100 text-yellow-700': d.status==='processing', 'bg-green-100 text-green-700': d.status==='resolved', 'bg-gray-100 text-gray-700': d.status==='closed'}"
-                                  x-text="{'open':'待处理','processing':'处理中','resolved':'已解决','closed':'已关闭'}[d.status] || d.status">
+                                  :class="{'bg-red-100 text-red-700': d.status==='open', 'bg-yellow-100 text-yellow-700': d.status==='reviewing', 'bg-orange-100 text-orange-700': d.status==='arbitrating', 'bg-green-100 text-green-700': d.status==='resolved', 'bg-gray-100 text-gray-700': d.status==='rejected'}"
+                                  x-text="{'open':'待处理','reviewing':'审核中','arbitrating':'仲裁中','resolved':'已解决','rejected':'已驳回'}[d.status] || d.status">
                             </span>
                           </div>
                           <div class="flex items-center gap-2 themed-text-hint">
@@ -807,9 +807,10 @@
                             <span x-text="formatDate(d.created_at)"></span>
                           </div>
                           <!-- 操作按钮 -->
-                          <div class="flex gap-1 mt-1.5" x-show="d.status === 'open' || d.status === 'processing'">
+                          <div class="flex gap-1 mt-1.5" x-show="d.status === 'open' || d.status === 'reviewing'">
+                            <button x-show="d.status === 'open'" @click.stop="acceptDisputeAction(d)" class="px-2 py-0.5 text-[10px] bg-blue-500 text-white rounded hover:bg-blue-600">受理</button>
                             <button @click.stop="resolveDisputeAction(d)" class="px-2 py-0.5 text-[10px] bg-green-500 text-white rounded hover:bg-green-600">解决</button>
-                            <button x-show="d.status === 'open'" @click.stop="escalateDisputeAction(d)" class="px-2 py-0.5 text-[10px] bg-orange-500 text-white rounded hover:bg-orange-600">升级仲裁</button>
+                            <button @click.stop="escalateDisputeAction(d)" class="px-2 py-0.5 text-[10px] bg-orange-500 text-white rounded hover:bg-orange-600">升级仲裁</button>
                           </div>
                         </div>
                       </template>

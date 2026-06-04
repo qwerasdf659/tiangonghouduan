@@ -32,7 +32,7 @@ router.post(
     const {
       user_id,
       probability_multiplier, // 全局倍数
-      lottery_prize_id, // 特定奖品ID
+      lottery_campaign_prize_id, // 特定奖品ID（对齐 lottery_campaign_prizes 表主键命名）
       custom_probability, // 自定义概率（0-1之间）
       duration_minutes = 60,
       reason = '管理员概率调整'
@@ -42,12 +42,12 @@ router.post(
     const validatedUserId = validators.validateUserId(user_id)
 
     // 判断是全局调整还是特定奖品调整
-    const isSpecificPrize = !!lottery_prize_id
+    const isSpecificPrize = !!lottery_campaign_prize_id
     let adjustmentData = {}
 
     if (isSpecificPrize) {
       // 特定奖品概率调整
-      const validatedPrizeId = validators.validatePrizeId(lottery_prize_id)
+      const validatedPrizeId = validators.validatePrizeId(lottery_campaign_prize_id)
 
       // 验证自定义概率
       if (!custom_probability || isNaN(parseFloat(custom_probability))) {
@@ -60,7 +60,7 @@ router.post(
       }
 
       adjustmentData = {
-        lottery_prize_id: validatedPrizeId,
+        lottery_campaign_prize_id: validatedPrizeId,
         custom_probability: probability,
         adjustment_type: 'specific_prize',
         reason

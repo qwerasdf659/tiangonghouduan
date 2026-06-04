@@ -180,6 +180,29 @@ describe('阶段八：跨模块集成测试', () => {
         )
         const points_before_draw = Number(recharged_balance?.available_amount || 0)
 
+        /*
+         * 5.1 重置当日抽奖配额（测试自包含，避免跨次运行累计耗尽每日上限）
+         * lottery_user_daily_draw_quota 属抽奖配额跟踪数据（非余额/物品互锁表），
+         * 本测试验证的是"扣费→发奖"链路，而非"每日上限"，故先把今日已用次数清零，
+         * 保证测试确定性（与 9.2 保底测试同理，均为配额维度的可重置数据）。
+         */
+        const today_quota_date = BeijingTimeHelper.todayStart().toISOString().split('T')[0]
+        await sequelize.query(
+          `UPDATE lottery_user_daily_draw_quota
+           SET used_draw_count = 0, updated_at = NOW()
+           WHERE user_id = :user_id
+             AND lottery_campaign_id = :lottery_campaign_id
+             AND quota_date = :quota_date`,
+          {
+            replacements: {
+              user_id: test_user_id,
+              lottery_campaign_id: test_lottery_campaign_id,
+              quota_date: today_quota_date
+            },
+            transaction
+          }
+        )
+
         // 6. 执行抽奖（通过 UnifiedLotteryEngine）
         const lottery_engine = global.getTestService('unified_lottery_engine')
         expect(lottery_engine).not.toBeNull()

@@ -161,7 +161,9 @@ export const PAGE_ACCESS_RULES = {
   'sys-maintain.html': { minLevel: 100, menuId: 'system.sys-maintain' },
   'reminder-rules.html': { minLevel: 100, menuId: 'system.ops-rules' },
   'audit-logs.html': { minLevel: 100, menuId: 'system.sys-maintain' },
-  'exchange-page-config.html': { minLevel: 100, menuId: 'system.exchange-page-config' }
+  'exchange-page-config.html': { minLevel: 100, menuId: 'system.exchange-page-config' },
+  'app-version-config.html': { minLevel: 100, menuId: 'system.app-version-config' },
+  'app-theme-config.html': { minLevel: 100, menuId: 'system.app-theme-config' }
 }
 
 // ========== 权限判断函数 ==========

@@ -6,6 +6,8 @@
  * - 一个工单可关联多个会话（用户多次咨询同一问题）
  * - 工单状态流转：open → processing → resolved → closed
  * - 补偿记录自动写入 compensation_log（JSON 格式，由 CompensateService 填充）
+ * - 纯内部跟踪工具（用户不可见）；交易纠纷已迁出至 trade_disputes 表（方案A）
+ * - 可通过 feedback_id / dispute_id / session_id 聚合关联来源
  *
  * 数据库表：customer_service_issues
  * 主键：issue_id（BIGINT 自增）
@@ -20,24 +22,23 @@ const { DataTypes } = require('sequelize')
 
 module.exports = sequelize => {
   /**
-   * 工单问题类型枚举（覆盖全部活跃业务模块）
+   * 工单问题类型枚举（内部工单职责，覆盖活跃业务模块）
    * - asset: 资产相关（余额异常、冻结未解、充值不到账）
-   * - trade: 交易相关（交易纠纷、冻结超时、物品未到）
    * - lottery: 抽奖相关（扣分没出奖、保底未触发、奖品未到背包）
    * - item: 物品相关（物品被锁、物品消失、无法使用）
    * - account: 账号相关（登录问题、封号申诉、等级异常）
    * - consumption: 消费相关（核销失败、积分未到账）
-   * - feedback: 反馈升级（用户反馈需要工单跟踪）
    * - other: 其他未分类问题
+   *
+   * 注意（方案A）：原 trade（交易纠纷）已迁出至 trade_disputes 表；
+   * 原 feedback（反馈升级）语义下线，反馈保持轻量留言不再升级为工单类型。
    */
   const ISSUE_TYPE = {
     ASSET: 'asset',
-    TRADE: 'trade',
     LOTTERY: 'lottery',
     ITEM: 'item',
     ACCOUNT: 'account',
     CONSUMPTION: 'consumption',
-    FEEDBACK: 'feedback',
     OTHER: 'other'
   }
 
@@ -102,16 +103,14 @@ module.exports = sequelize => {
       issue_type: {
         type: DataTypes.ENUM(
           ISSUE_TYPE.ASSET,
-          ISSUE_TYPE.TRADE,
           ISSUE_TYPE.LOTTERY,
           ISSUE_TYPE.ITEM,
           ISSUE_TYPE.ACCOUNT,
           ISSUE_TYPE.CONSUMPTION,
-          ISSUE_TYPE.FEEDBACK,
           ISSUE_TYPE.OTHER
         ),
         allowNull: false,
-        comment: '工单问题类型（对应业务模块）'
+        comment: '工单问题类型（对应业务模块，纠纷已迁出至 trade_disputes）'
       },
 
       priority: {
@@ -183,39 +182,19 @@ module.exports = sequelize => {
         comment: '关联订单ID（多态值，统一字符串存储兼容 BIGINT 和 UUID）'
       },
 
-      // ===== 交易纠纷专用字段（issue_type='trade' 时使用）=====
-      dispute_type: {
-        type: DataTypes.ENUM(
-          'item_not_received',
-          'item_mismatch',
-          'quality_issue',
-          'fraud',
-          'other'
-        ),
+      // ===== 聚合引用列（方案A：工单可聚合关联来源，便于跨班次跟踪）=====
+      feedback_id: {
+        type: DataTypes.INTEGER,
         allowNull: true,
         defaultValue: null,
-        comment: '纠纷类型：未收到物品/物品不符/质量问题/欺诈/其他'
+        comment: '聚合引用：关联的意见反馈ID → feedbacks.feedback_id（INT 自增）'
       },
 
-      dispute_evidence: {
-        type: DataTypes.JSON,
-        allowNull: true,
-        defaultValue: null,
-        comment: '纠纷证据（截图URL数组、文字描述等）'
-      },
-
-      dispute_deadline: {
-        type: DataTypes.DATE,
-        allowNull: true,
-        defaultValue: null,
-        comment: '纠纷处理截止时间（超时自动升级）'
-      },
-
-      approval_chain_instance_id: {
+      dispute_id: {
         type: DataTypes.BIGINT,
         allowNull: true,
         defaultValue: null,
-        comment: '关联的审批链实例 ID（仲裁流程）'
+        comment: '聚合引用：关联的售后申诉ID → trade_disputes.trade_dispute_id（BIGINT）'
       }
     },
     {
@@ -232,7 +211,9 @@ module.exports = sequelize => {
         { fields: ['issue_type'], name: 'idx_cs_issues_type' },
         { fields: ['status'], name: 'idx_cs_issues_status' },
         { fields: ['created_at'], name: 'idx_cs_issues_created_at' },
-        { fields: ['order_type', 'order_id'], name: 'idx_issues_order_polymorphic' }
+        { fields: ['order_type', 'order_id'], name: 'idx_issues_order_polymorphic' },
+        { fields: ['feedback_id'], name: 'idx_cs_issues_feedback_id' },
+        { fields: ['dispute_id'], name: 'idx_cs_issues_dispute_id' }
       ],
       comment: '客服工单表（跨会话跨班次的问题跟踪）'
     }

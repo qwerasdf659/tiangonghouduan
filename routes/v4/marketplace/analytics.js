@@ -17,8 +17,9 @@
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken } = require('../../../middleware/auth')
+const { authenticateToken, optionalAuth } = require('../../../middleware/auth')
 const { asyncHandler } = require('../../../middleware/validation')
+const { marketPublicRateLimiter } = require('./middleware')
 
 /**
  * @route GET /api/v4/marketplace/analytics/pricing-advice
@@ -62,13 +63,14 @@ router.get(
 /**
  * @route GET /api/v4/marketplace/analytics/history
  * @desc 价格历史
- * @access Private
+ * @access Public（匿名可访问；90 天历史价同属公开行情，无敏感对手方字段）
  * @query {string} asset_code - 资产代码
  * @query {number} days - 天数（默认30）
  */
 router.get(
   '/analytics/history',
-  authenticateToken,
+  optionalAuth,
+  marketPublicRateLimiter,
   asyncHandler(async (req, res) => {
     const { asset_code, days } = req.query
     if (!asset_code) {

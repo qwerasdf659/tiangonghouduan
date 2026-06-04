@@ -192,13 +192,14 @@ class LotteryPresetService {
       include: [
         {
           model: models.LotteryCampaignPrize,
-          as: 'campaignPrize',
-          attributes: [
-            'lottery_campaign_prize_id',
-            'reward_tier',
-
-            'prize_value',
-            'prize_description'
+          as: 'prize',
+          attributes: ['lottery_campaign_prize_id', 'reward_tier'],
+          include: [
+            {
+              model: models.PrizeDefinition,
+              as: 'prizeDefinition',
+              attributes: ['display_name', 'prize_type']
+            }
           ]
         },
         {
@@ -371,13 +372,14 @@ class LotteryPresetService {
           },
           {
             model: models.LotteryCampaignPrize,
-            as: 'campaignPrize',
-            attributes: [
-              'lottery_campaign_prize_id',
-              'reward_tier',
-
-              'prize_value',
-              'prize_description'
+            as: 'prize',
+            attributes: ['lottery_campaign_prize_id', 'reward_tier'],
+            include: [
+              {
+                model: models.PrizeDefinition,
+                as: 'prizeDefinition',
+                attributes: ['display_name', 'prize_type']
+              }
             ]
           },
           {
@@ -450,13 +452,14 @@ class LotteryPresetService {
       include: [
         {
           model: models.LotteryCampaignPrize,
-          as: 'campaignPrize',
-          attributes: [
-            'lottery_campaign_prize_id',
-            'reward_tier',
-
-            'prize_value',
-            'prize_description'
+          as: 'prize',
+          attributes: ['lottery_campaign_prize_id', 'reward_tier'],
+          include: [
+            {
+              model: models.PrizeDefinition,
+              as: 'prizeDefinition',
+              attributes: ['display_name', 'prize_type']
+            }
           ]
         },
         {
@@ -628,10 +631,13 @@ class LotteryPresetService {
       })
     ])
 
-    // 获取奖品类型分布（raw: true 确保 GROUP BY + JOIN 返回纯对象）
+    /*
+     * 获取奖品类型分布（raw: true 确保 GROUP BY + JOIN 返回纯对象）
+     * prize_type 在 prize_definitions 表，需经 lottery_campaign_prizes → prize_definitions 两级关联
+     */
     const prizeTypeStats = await models.LotteryPreset.findAll({
       attributes: [
-        [models.sequelize.col('prize.prize_type'), 'prize_type'],
+        [models.sequelize.col('prize->prizeDefinition.prize_type'), 'prize_type'],
         [
           models.sequelize.fn('COUNT', models.sequelize.col('LotteryPreset.lottery_preset_id')),
           'count'
@@ -640,11 +646,18 @@ class LotteryPresetService {
       include: [
         {
           model: models.LotteryCampaignPrize,
-          as: 'campaignPrize',
-          attributes: []
+          as: 'prize',
+          attributes: [],
+          include: [
+            {
+              model: models.PrizeDefinition,
+              as: 'prizeDefinition',
+              attributes: []
+            }
+          ]
         }
       ],
-      group: ['campaignPrize.reward_tier'],
+      group: ['prize->prizeDefinition.prize_type'],
       raw: true
     })
 

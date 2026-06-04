@@ -22,8 +22,8 @@
  * 7. 数据导出 - Excel/PDF格式报表导出
  *
  * 后端API：
- * - GET /api/v4/console/system/charts (获取统计图表数据)
- * - GET /api/v4/console/system/statistics/export (导出报表)
+ * - GET /api/v4/system/statistics/charts (获取统计图表数据)
+ * - GET /api/v4/system/statistics/export (导出报表)
  */
 
 // ES Module 导入

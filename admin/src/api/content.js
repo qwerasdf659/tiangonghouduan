@@ -103,6 +103,7 @@ export const CONTENT_ENDPOINTS = {
   DISPUTE_DETAIL: `${API_PREFIX}/console/customer-service/disputes/:id`,
   DISPUTE_STATS: `${API_PREFIX}/console/customer-service/disputes/stats`,
   DISPUTE_CREATE: `${API_PREFIX}/console/customer-service/disputes`,
+  DISPUTE_ACCEPT: `${API_PREFIX}/console/customer-service/disputes/:id/accept`,
   DISPUTE_ESCALATE: `${API_PREFIX}/console/customer-service/disputes/:id/escalate`,
   DISPUTE_RESOLVE: `${API_PREFIX}/console/customer-service/disputes/:id/resolve`,
 
@@ -930,11 +931,21 @@ export const ContentAPI = {
 
   /**
    * 创建纠纷工单
-   * @param {Object} data - 纠纷数据（order_type/order_id/dispute_type/description/dispute_evidence）
+   * @param {Object} data - 纠纷数据（order_type/order_id/dispute_type/title/description/evidence）
    * @returns {Promise<Object>} 创建结果
    */
   async createDispute(data) {
     return await request({ url: CONTENT_ENDPOINTS.DISPUTE_CREATE, method: 'POST', data })
+  },
+
+  /**
+   * 受理纠纷（客服接单，open → reviewing）
+   * @param {number} disputeId - 纠纷 ID
+   * @returns {Promise<Object>} 操作结果
+   */
+  async acceptDispute(disputeId) {
+    const url = buildURL(CONTENT_ENDPOINTS.DISPUTE_ACCEPT, { id: disputeId })
+    return await request({ url, method: 'POST' })
   },
 
   /**
@@ -951,7 +962,7 @@ export const ContentAPI = {
   /**
    * 解决纠纷
    * @param {number} disputeId - 纠纷 ID
-   * @param {Object} data - 解决数据（resolution/refund_amount）
+   * @param {Object} data - 解决数据（resolution 解决说明；refund 是否退款，布尔值）
    * @returns {Promise<Object>} 操作结果
    */
   async resolveDispute(disputeId, data) {

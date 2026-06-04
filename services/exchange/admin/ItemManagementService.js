@@ -575,6 +575,9 @@ class ItemManagementService {
       }
     }
 
+    // 清理商品的配置型子表（无订单时为可硬删除的纯配置数据，按外键依赖逆序删除）
+    await this._cascadeDeleteItemChildren(item_id, transaction)
+
     await item.destroy({ transaction })
 
     logger.info(`[兑换市场] 商品删除成功，item_id: ${item_id}`, {
@@ -592,6 +595,55 @@ class ItemManagementService {
       message: '商品删除成功',
       deleted_media_id: associated_media_id
     }
+  }
+
+  /**
+   * 级联删除商品的配置型子表（仅在商品无关联订单、可硬删除时调用）
+   *
+   * 业务语义：兑换商品（SPU）下的 SKU、渠道定价、属性值都是"完全归属于该商品的配置数据"，
+   * 商品被删除时这些子配置应一并清除（孤儿数据硬删除规范）。按外键依赖逆序删除避免约束冲突：
+   *   1) exchange_channel_prices（引用 sku_id）
+   *   2) sku_attribute_values（引用 sku_id）
+   *   3) exchange_item_skus（引用 exchange_item_id）
+   *   4) exchange_item_attribute_values（引用 exchange_item_id）
+   *
+   * @param {number} item_id - 商品ID（exchange_item_id）
+   * @param {Transaction} transaction - 事务对象（必填，与删除主记录同一事务）
+   * @returns {Promise<void>}
+   * @private
+   */
+  async _cascadeDeleteItemChildren(item_id, transaction) {
+    const {
+      ExchangeItemSku: SkuModel,
+      ExchangeChannelPrice: ChannelPriceModel,
+      SkuAttributeValue: SkuAttrModel,
+      ExchangeItemAttributeValue: ItemAttrModel
+    } = this.models
+
+    if (SkuModel) {
+      const skus = await SkuModel.findAll({
+        where: { exchange_item_id: item_id },
+        attributes: ['sku_id'],
+        transaction
+      })
+      const skuIds = skus.map(s => s.sku_id)
+
+      if (skuIds.length > 0) {
+        if (ChannelPriceModel) {
+          await ChannelPriceModel.destroy({ where: { sku_id: skuIds }, transaction })
+        }
+        if (SkuAttrModel) {
+          await SkuAttrModel.destroy({ where: { sku_id: skuIds }, transaction })
+        }
+        await SkuModel.destroy({ where: { exchange_item_id: item_id }, transaction })
+      }
+    }
+
+    if (ItemAttrModel) {
+      await ItemAttrModel.destroy({ where: { exchange_item_id: item_id }, transaction })
+    }
+
+    logger.info('[兑换市场] 商品配置型子表已级联清理', { item_id })
   }
 
   /**

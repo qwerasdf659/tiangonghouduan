@@ -47,6 +47,12 @@ const dictionariesRoutes = require('./dictionaries')
 // 系统公开配置路由（2026-02-15 新增 - 活动位置配置，无需登录）
 const configRoutes = require('./config')
 
+// 售后申诉路由（2026-06-02 新增 - 方案A，C端只读查询售后进度，脱敏下发）
+const disputesRoutes = require('./disputes')
+
+// 小程序版本闸门路由（2026-06-02 新增 - 公开只读，无需登录，维护期可读）
+const appVersionRoutes = require('./app-version')
+
 // 🔴 广告事件上报路由（Phase 2-5）
 const adEventsRoutes = require('./ad-events')
 const adDeliveryRoutes = require('./ad-delivery')
@@ -74,6 +80,11 @@ router.use('/dictionaries', dictionariesRoutes)
 
 // 挂载系统公开配置路由（2026-02-15 新增 - 活动位置配置，前端直接调用获取最新配置）
 router.use('/config', configRoutes)
+
+router.use('/disputes', disputesRoutes)
+
+// 挂载小程序版本闸门路由（2026-06-02 新增 - GET /api/v4/system/app-version，公开只读）
+router.use('/', appVersionRoutes)
 
 // 挂载广告事件上报路由（Phase 2-5 新增）
 router.use('/ad-events', adEventsRoutes)

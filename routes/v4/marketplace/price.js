@@ -18,13 +18,14 @@
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken } = require('../../../middleware/auth')
+const { optionalAuth } = require('../../../middleware/auth')
 const { asyncHandler } = require('../../../middleware/validation')
+const { marketPublicRateLimiter } = require('./middleware')
 
 /**
  * @route GET /api/v4/marketplace/price/trend
  * @desc 价格走势（按时间粒度聚合）
- * @access Private
+ * @access Public（匿名可访问；返回值不含买卖双方身份，行情作为拉新钩子开放）
  * @query {string} asset_code - 资产代码（与 template_id 二选一）
  * @query {number} template_id - 物品模板ID
  * @query {string} period - 时间范围（1d/7d/30d/90d，默认7d）
@@ -32,7 +33,8 @@ const { asyncHandler } = require('../../../middleware/validation')
  */
 router.get(
   '/price/trend',
-  authenticateToken,
+  optionalAuth,
+  marketPublicRateLimiter,
   asyncHandler(async (req, res) => {
     const { asset_code, template_id, period, granularity } = req.query
     if (!asset_code && !template_id) {
@@ -54,11 +56,12 @@ router.get(
 /**
  * @route GET /api/v4/marketplace/price/volume
  * @desc 成交量走势
- * @access Private
+ * @access Public（匿名可访问；同价格走势，无敏感字段）
  */
 router.get(
   '/price/volume',
-  authenticateToken,
+  optionalAuth,
+  marketPublicRateLimiter,
   asyncHandler(async (req, res) => {
     const { asset_code, template_id, period, granularity } = req.query
     if (!asset_code && !template_id) {
@@ -80,11 +83,12 @@ router.get(
 /**
  * @route GET /api/v4/marketplace/price/summary
  * @desc 价格摘要（中位数、极值、均值、总成交数）
- * @access Private
+ * @access Public（匿名可访问；摘要为聚合统计，无敏感字段）
  */
 router.get(
   '/price/summary',
-  authenticateToken,
+  optionalAuth,
+  marketPublicRateLimiter,
   asyncHandler(async (req, res) => {
     const { asset_code, template_id } = req.query
     if (!asset_code && !template_id) {
@@ -101,12 +105,13 @@ router.get(
 /**
  * @route GET /api/v4/marketplace/price/recent-trades
  * @desc 最近成交列表
- * @access Private
+ * @access Public（匿名可访问；仅返回金额与时间，不含买卖双方身份/订单号）
  * @query {number} page_size - 数量限制（默认10，最大50）
  */
 router.get(
   '/price/recent-trades',
-  authenticateToken,
+  optionalAuth,
+  marketPublicRateLimiter,
   asyncHandler(async (req, res) => {
     const { asset_code, template_id, page_size = 10 } = req.query
     if (!asset_code && !template_id) {

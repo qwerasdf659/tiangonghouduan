@@ -14,8 +14,9 @@
 const { initializeTestServiceManager } = require('../helpers/UnifiedTestManager')
 
 /**
- * 2026-04-22 真实数据库快照：15 个 category
+ * 真实数据库快照：16 个 category
  * 任何新增/删除/重命名 category 都必须同步更新此列表
+ * 2026-06-02 新增 dispute（方案A 二期：售后申诉自助发起防滥用风控配置）
  */
 const EXPECTED_CATEGORIES = [
   'marketplace',
@@ -32,7 +33,8 @@ const EXPECTED_CATEGORIES = [
   'backpack',
   'ad_system',
   'auction',
-  'customer_service'
+  'customer_service',
+  'dispute'
 ].sort()
 
 describe('system_settings category 一致性合约', () => {

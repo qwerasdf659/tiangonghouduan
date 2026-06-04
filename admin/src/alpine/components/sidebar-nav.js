@@ -257,6 +257,8 @@ export function sidebarNav() {
           { id: 'item-templates', name: '物品模板', icon: '📦', url: '/admin/item-templates.html' },
           { id: 'dict-mgmt', name: '数据字典', icon: '📖', url: '/admin/dict-management.html' },
           { id: 'sys-maintain', name: '系统维护', icon: '🔧', url: '/admin/sys-maintain.html' },
+          { id: 'app-version-config', name: '版本闸门', icon: '📱', url: '/admin/app-version-config.html' },
+          { id: 'app-theme-config', name: '全局主题', icon: '🎨', url: '/admin/app-theme-config.html' },
           { id: 'data-mgmt', name: '数据管理', icon: '🗄️', url: '/admin/data-management.html' }
         ]
       }

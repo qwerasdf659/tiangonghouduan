@@ -553,27 +553,10 @@ router.post('/chat/sessions/:id/rate', authenticateToken, async (req, res) => {
   }
 })
 
-/**
- * GET /chat/issues - 用户查看自己的工单列表
- *
- * @description 用户查看自己提交的工单进度（脱敏数据，不含内部备注）
- * @route GET /api/v4/system/chat/issues
- * @query {number} [page=1] - 页码
- * @query {number} [page_size=10] - 每页数量（最大50）
- * @access 已登录用户
+/*
+ * 注意（方案A）：原 GET /chat/issues（用户查看自己的工单）已下线删除。
+ * 工单是客服内部跟踪工具（用户不可见），用户的售后进度改走 GET /api/v4/system/disputes/my，
+ * 反馈进度走 GET /api/v4/system/feedback/my。
  */
-router.get('/chat/issues', authenticateToken, async (req, res) => {
-  try {
-    const userId = req.user.user_id
-    const models = req.app.locals.models
-    const IssueService = req.app.locals.services.getService('cs_issue')
-    const result = await IssueService.getUserIssues(models, userId, req.query)
-
-    return res.apiSuccess(result, '获取工单列表成功')
-  } catch (error) {
-    logger.error('获取用户工单列表失败:', error)
-    return handleServiceError(error, res, '获取工单列表失败')
-  }
-})
 
 module.exports = router

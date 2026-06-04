@@ -987,6 +987,19 @@ async function initializeApp() {
       } catch (timeoutError) {
         appLogger.warn(`审核链超时服务启动失败（非致命）: ${timeoutError.message}`)
       }
+
+      /*
+       * 售后申诉超时自动升级仲裁定时任务（每30分钟扫描）
+       * 方案A 第11项二期：超时未处理申诉自动升级仲裁
+       * R1（cluster 防重）：仅在定时任务 worker 注册，避免多 worker 重复升级
+       */
+      try {
+        const DisputeTimeoutService = require('./services/DisputeTimeoutService')
+        DisputeTimeoutService.start()
+        appLogger.info('售后申诉超时自动升级定时任务已启动')
+      } catch (disputeTimeoutError) {
+        appLogger.warn(`售后申诉超时服务启动失败（非致命）: ${disputeTimeoutError.message}`)
+      }
     } else {
       appLogger.info('当前 worker 非定时任务执行节点，跳过审核链超时任务注册', {
         node_app_instance: process.env.NODE_APP_INSTANCE

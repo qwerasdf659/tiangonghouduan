@@ -121,7 +121,8 @@ describe('RedemptionService - 兑换订单服务', () => {
       // 验证订单
       const order = result.order
       expect(order.redemption_order_id).toBeDefined()
-      expect(order.item_id).toBe(test_item_instance.item_id)
+      // item_id 为 BIGINT，Sequelize 重新读取时返回字符串、新建实例为数字，按项目约定统一 String() 比较
+      expect(String(order.item_id)).toBe(String(test_item_instance.item_id))
       expect(order.status).toBe('pending')
       expect(order.expires_at).toBeDefined()
 

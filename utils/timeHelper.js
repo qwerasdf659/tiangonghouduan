@@ -17,14 +17,7 @@ class BeijingTimeHelper {
    * @returns {string} 北京时间的ISO格式字符串 (格式: 2025-10-01T23:49:00.000+08:00)
    */
   static now() {
-    const now = new Date()
-    // 转换为北京时间
-    const beijingOffset = 8 * 60 // 北京时间偏移量（分钟）
-    const utc = now.getTime() + now.getTimezoneOffset() * 60000
-    const beijingTime = new Date(utc + beijingOffset * 60000)
-
-    // 返回符合ISO格式但显示北京时间的字符串，格式: 2025-10-01T23:49:00.000+08:00
-    return beijingTime.toISOString().replace('Z', '+08:00')
+    return BeijingTimeHelper._toBeijingISO(new Date())
   }
 
   /**
@@ -85,16 +78,26 @@ class BeijingTimeHelper {
    */
   static apiTimestamp() {
     /*
-     * 对于API响应，我们返回带有时区信息的ISO字符串
-     * 但实际上是北京时间
+     * 对于API响应，返回带 +08:00 时区信息的北京时间 ISO 字符串。
+     * 该实现与进程时区无关（不依赖 getTimezoneOffset），无论进程 TZ 为 UTC 还是 Asia/Shanghai
+     * 结果都表示同一真实时刻，避免双重偏移导致相差 8 小时的 BUG。
      */
-    const now = new Date()
-    const beijingOffset = 8 * 60 // 北京时间偏移量（分钟）
-    const utc = now.getTime() + now.getTimezoneOffset() * 60000
-    const beijingTime = new Date(utc + beijingOffset * 60000)
+    return BeijingTimeHelper._toBeijingISO(new Date())
+  }
 
-    // 返回符合ISO格式但显示北京时间的字符串
-    return beijingTime.toISOString().replace('Z', '+08:00')
+  /**
+   * 将任意时刻转换为"北京时间墙钟 + +08:00 后缀"的 ISO 字符串（进程时区无关）
+   *
+   * 原理：absolute UTC 毫秒数 + 8 小时，再用 toISOString() 读取其 UTC 字段即为北京墙钟，
+   * 然后把 Z 替换为 +08:00。无论进程 TZ 如何，同一真实时刻得到同一结果。
+   *
+   * @param {Date} date - 输入时刻（绝对时刻，与时区无关）
+   * @returns {string} 形如 2025-10-01T23:49:00.000+08:00
+   * @private
+   */
+  static _toBeijingISO(date) {
+    const beijingMs = date.getTime() + 8 * 60 * 60 * 1000
+    return new Date(beijingMs).toISOString().replace('Z', '+08:00')
   }
 
   /**
@@ -448,16 +451,30 @@ class BeijingTimeHelper {
   static formatToISO(date) {
     if (!date) return null
 
+    /*
+     * 输入分两类，需区别处理（否则会产生 8 小时偏移）：
+     * 1) 无时区信息的"北京墙钟字符串"（项目 DB dateStrings:true 的返回，如 '2025-07-07 00:11:11'
+     *    或 '2025-07-07T00:11:11'）：它已经是北京时间，只需补 +08:00 后缀，不做任何时移。
+     * 2) Date 对象 / 带时区的字符串（绝对时刻）：转换为北京墙钟（与进程时区无关）。
+     */
+    if (typeof date === 'string') {
+      const hasTimezone = /([Zz]|[+-]\d{2}:?\d{2})$/.test(date.trim())
+      if (!hasTimezone) {
+        // 北京墙钟字符串：规范化为 ISO，补 .000 毫秒与 +08:00，不时移
+        const m = date
+          .trim()
+          .match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?$/)
+        if (m) {
+          const ms = (m[7] || '0').padEnd(3, '0')
+          return `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}.${ms}+08:00`
+        }
+      }
+    }
+
+    // Date 对象或带时区字符串：按绝对时刻转北京时间（进程时区无关）
     const inputDate = new Date(date)
     if (isNaN(inputDate.getTime())) return null
-
-    // 转换为北京时间
-    const beijingOffset = 8 * 60 // 北京时间偏移量（分钟）
-    const utc = inputDate.getTime() + inputDate.getTimezoneOffset() * 60000
-    const beijingTime = new Date(utc + beijingOffset * 60000)
-
-    // 返回ISO8601格式带+08:00时区
-    return beijingTime.toISOString().replace('Z', '+08:00')
+    return BeijingTimeHelper._toBeijingISO(inputDate)
   }
 
   /**

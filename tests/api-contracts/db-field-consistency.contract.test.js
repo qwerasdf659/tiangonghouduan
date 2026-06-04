@@ -16,6 +16,11 @@ const { initializeTestServiceManager } = require('../helpers/UnifiedTestManager'
 /**
  * 关键表的预期字段清单（主键 + 核心业务字段）
  * 任何字段增删/重命名都必须同步更新此 fixture
+ *
+ * 注（2026-06-02 对齐 V4 实库）：
+ * - V3 的 lottery_prizes 单表已在 V4 拆分为 lottery_campaign_prizes（活动档位/配额）
+ *   + prize_definitions（奖品定义字典），原表名在 restaurant_points_dev 已不存在，
+ *   故 fixture 同步更新为这两张真实表，字段以实库 information_schema 为准
  */
 const TABLE_FIELD_FIXTURES = {
   users: [
@@ -47,19 +52,41 @@ const TABLE_FIELD_FIXTURES = {
     'created_at',
     'updated_at'
   ],
-  lottery_prizes: [
-    'lottery_prize_id',
+  lottery_campaign_prizes: [
+    'lottery_campaign_prize_id',
     'lottery_campaign_id',
-    'prize_name',
-    'reward_tier',
-    'prize_value',
-    'win_probability',
+    'prize_definition_id',
+    'win_weight',
     'stock_quantity',
-    'total_win_count',
-    'status',
+    'reward_tier',
+    'is_fallback',
     'sort_order',
+    'status',
+    'max_daily_wins',
+    'max_user_wins',
+    'total_win_count',
+    'daily_win_count',
     'created_at',
     'updated_at'
+  ],
+  prize_definitions: [
+    'prize_definition_id',
+    'prize_code',
+    'display_name',
+    'prize_type',
+    'material_asset_code',
+    'material_amount',
+    'item_template_id',
+    'rarity_code',
+    'primary_media_id',
+    'reward_tier',
+    'is_enabled',
+    'description',
+    'merchant_id',
+    'meta',
+    'created_at',
+    'updated_at',
+    'deleted_at'
   ],
   market_listings: [
     'market_listing_id',

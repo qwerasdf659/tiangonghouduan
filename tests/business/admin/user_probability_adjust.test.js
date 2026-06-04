@@ -108,7 +108,8 @@ describe('用户个性化中奖率设置功能测试', () => {
       const { data } = response.body
       expect(data.user_id).toBe(testUserId)
       expect(data.adjustment_type).toBe('specific_prize')
-      expect(data.lottery_campaign_prize_id).toBe(testPrizeId)
+      // lottery_campaign_prize_id 为 BIGINT，DB 读取为字符串、校验器转数字，按项目约定统一 String() 比较
+      expect(String(data.lottery_campaign_prize_id)).toBe(String(testPrizeId))
       expect(data.custom_probability).toBe(0.5)
       expect(data.lottery_management_setting_id || data.setting_id).toBeDefined()
       expect(data.expires_at).toBeDefined()
@@ -400,7 +401,8 @@ describe('用户个性化中奖率设置功能测试', () => {
       const { data } = response.body
       expect(data.adjustment_type).toBe('specific_prize')
       expect(data.custom_probability).toBe(0.5)
-      expect(data.lottery_campaign_prize_id).toBe(testPrizeId)
+      // lottery_campaign_prize_id 为 BIGINT，按项目约定统一 String() 比较
+      expect(String(data.lottery_campaign_prize_id)).toBe(String(testPrizeId))
       expect(data.prize_name).toBeDefined()
     })
   })

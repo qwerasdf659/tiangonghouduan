@@ -56,9 +56,6 @@ export const ANALYTICS_ENDPOINTS = {
 
   // 图表数据
   CHARTS: `${API_PREFIX}/system/statistics/charts`,
-  CHART_USER_GROWTH: `${API_PREFIX}/console/analytics/charts/user-growth`,
-  CHART_REVENUE: `${API_PREFIX}/console/analytics/charts/revenue`,
-  CHART_LOTTERY: `${API_PREFIX}/console/analytics/charts/lottery`,
 
   // 统计导出
   STATISTIC_EXPORT: `${API_PREFIX}/system/statistics/export`,
@@ -195,69 +192,6 @@ export const AnalyticsAPI = {
    */
   async getCharts(params = {}) {
     const url = ANALYTICS_ENDPOINTS.CHARTS + buildQueryString(params)
-    return await request({ url, method: 'GET' })
-  },
-
-  /**
-   * 获取用户增长图表
-   * @async
-   * @param {DateRangeParams} [params={}] - 查询参数（日期范围等）
-   * @param {string} [params.start_date] - 开始日期
-   * @param {string} [params.end_date] - 结束日期
-   * @returns {Promise<Object>} 用户增长图表数据
-   * @throws {Error} 网络请求失败
-   *
-   * @example
-   * // 获取用户增长趋势图
-   * const result = await AnalyticsAPI.getUserGrowthChart({
-   *   start_date: '2026-01-01',
-   *   end_date: '2026-01-23'
-   * })
-   */
-  async getUserGrowthChart(params = {}) {
-    const url = ANALYTICS_ENDPOINTS.CHART_USER_GROWTH + buildQueryString(params)
-    return await request({ url, method: 'GET' })
-  },
-
-  /**
-   * 获取收入图表
-   * @async
-   * @param {DateRangeParams} [params={}] - 查询参数
-   * @param {string} [params.start_date] - 开始日期
-   * @param {string} [params.end_date] - 结束日期
-   * @returns {Promise<Object>} 收入图表数据
-   * @throws {Error} 网络请求失败
-   *
-   * @example
-   * // 获取收入趋势图
-   * const result = await AnalyticsAPI.getRevenueChart({
-   *   start_date: '2026-01-01',
-   *   end_date: '2026-01-23'
-   * })
-   */
-  async getRevenueChart(params = {}) {
-    const url = ANALYTICS_ENDPOINTS.CHART_REVENUE + buildQueryString(params)
-    return await request({ url, method: 'GET' })
-  },
-
-  /**
-   * 获取抽奖图表
-   * @async
-   * @param {DateRangeParams} [params={}] - 查询参数
-   * @param {string} [params.start_date] - 开始日期
-   * @param {string} [params.end_date] - 结束日期
-   * @returns {Promise<Object>} 抽奖图表数据
-   * @throws {Error} 网络请求失败
-   *
-   * @example
-   * // 获取抽奖统计图表
-   * const result = await AnalyticsAPI.getLotteryChart({
-   *   start_date: '2026-01-01',
-   *   end_date: '2026-01-23'
-   * })
-   */
-  async getLotteryChart(params = {}) {
-    const url = ANALYTICS_ENDPOINTS.CHART_LOTTERY + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 

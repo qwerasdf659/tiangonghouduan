@@ -125,7 +125,8 @@ async function cacheROI(redis, campaignId, roi, repeatRate) {
   if (!redis) return
 
   try {
-    const pipeline = redis.pipeline()
+    // 注意：UnifiedRedisClient.pipeline() 是 async 方法，必须 await 才能拿到 pipeline 对象
+    const pipeline = await redis.pipeline()
     pipeline.setex(CACHE_KEYS.roi(campaignId), CACHE_TTL, roi.toString())
     pipeline.setex(CACHE_KEYS.repeatRate(campaignId), CACHE_TTL, repeatRate.toString())
     await pipeline.exec()

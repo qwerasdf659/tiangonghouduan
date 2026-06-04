@@ -12,11 +12,12 @@
  *   自动失效缓存，下一次请求会从数据库重新读取
  *
  * 白名单路径（维护模式下仍然放行）：
- * - /health                — 健康检查
- * - /admin/*               — 管理后台静态资源
- * - /api/v4/auth/*         — 认证接口（管理员需要登录）
- * - /api/v4/console/*      — 管理后台 API
- * - /api/v4/debug-control/* — 调试控制
+ * - /health                      — 健康检查
+ * - /admin/*                     — 管理后台静态资源
+ * - /api/v4/auth/*               — 认证接口（管理员需要登录）
+ * - /api/v4/console/*            — 管理后台 API
+ * - /api/v4/debug-control/*      — 调试控制
+ * - /api/v4/system/app-version   — 小程序版本闸门（维护期需可读，引导旧版用户更新）
  *
  * @module middleware/maintenanceMode
  */
@@ -34,7 +35,8 @@ const BYPASS_PREFIXES = [
   '/admin',
   '/api/v4/auth',
   '/api/v4/console',
-  '/api/v4/debug-control'
+  '/api/v4/debug-control',
+  '/api/v4/system/app-version'
 ]
 
 /**

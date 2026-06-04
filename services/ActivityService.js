@@ -239,6 +239,7 @@ class ActivityService {
       if (!activity) {
         const error = new Error('活动不存在')
         error.code = 'ACTIVITY_NOT_FOUND'
+        error.statusCode = 404
         throw error
       }
 
@@ -322,6 +323,7 @@ class ActivityService {
       if (!activity) {
         const error = new Error('活动不存在')
         error.code = 'ACTIVITY_NOT_FOUND'
+        error.statusCode = 404
         throw error
       }
 

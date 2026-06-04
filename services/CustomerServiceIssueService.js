@@ -303,43 +303,6 @@ class CustomerServiceIssueService {
       page_size: pageSize
     }
   }
-
-  /**
-   * 用户端查看自己的工单列表（只返回脱敏数据）
-   *
-   * @param {Object} models - Sequelize models 对象
-   * @param {number} userId - 用户ID
-   * @param {Object} params - 查询参数
-   * @returns {Object} { rows, count, page, page_size }
-   */
-  static async getUserIssues(models, userId, params = {}) {
-    const page = parseInt(params.page) || 1
-    const pageSize = parseInt(params.page_size) || 10
-    const offset = (page - 1) * pageSize
-
-    const { count, rows } = await models.CustomerServiceIssue.findAndCountAll({
-      where: { user_id: userId },
-      attributes: [
-        'issue_id',
-        'issue_type',
-        'priority',
-        'status',
-        'title',
-        'resolved_at',
-        'created_at'
-      ],
-      order: [['created_at', 'DESC']],
-      limit: pageSize,
-      offset
-    })
-
-    return {
-      rows: rows.map(r => r.get({ plain: true })),
-      count,
-      page,
-      page_size: pageSize
-    }
-  }
 }
 
 module.exports = CustomerServiceIssueService

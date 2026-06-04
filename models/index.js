@@ -280,6 +280,15 @@ models.CustomerServiceNote = require('./CustomerServiceNote')(sequelize, DataTyp
  *    - 业务场景：客服记录备注→转接时新客服看到→交接班不丢失信息
  */
 
+models.TradeDispute = require('./TradeDispute')(sequelize, DataTypes)
+/*
+ * ✅ TradeDispute：交易售后申诉（用户可见的纠纷/售后流程）
+ *    - 用途：承载交易/拍卖等订单的纠纷举证、客服审核、仲裁、退款全流程
+ *    - 特点：4种订单类型(含 auction)、5种纠纷类型、5态状态机(open/reviewing/arbitrating/resolved/rejected)
+ *    - 表名：trade_disputes，主键：trade_dispute_id（BIGINT 自增）
+ *    - 业务场景：方案A 从 customer_service_issues 拆出，纠纷做回纠纷、工单退回纯内部跟踪
+ */
+
 models.CustomerServiceUserAssignment = require('./CustomerServiceUserAssignment')(
   sequelize,
   DataTypes

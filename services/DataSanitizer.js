@@ -794,6 +794,57 @@ class DataSanitizer {
   }
 
   /**
+   * 交易售后申诉数据脱敏（γ 模式：基于 trade_disputes 表结构）
+   *
+   * 🗄️ 数据库表：trade_disputes（主键：trade_dispute_id）
+   *
+   * 业务场景：小程序「我的售后」列表/详情 API 响应时调用，防止用户抓包获取内部处理信息
+   *
+   * 脱敏规则：
+   * - 管理员（dataLevel='full'）：返回完整申诉数据（含 assigned_to/审批链等内部字段）
+   * - 普通用户（dataLevel='public'）：仅返回用户可见的售后进度字段
+   *
+   * 数据安全（public 级黑名单删除）：
+   * - assigned_to（处理客服ID，内部）
+   * - approval_chain_instance_id（仲裁审批链ID，内部）
+   * - created_by（发起人ID，内部）
+   * - deadline（处理截止时间，内部运营字段）
+   *
+   * 用户端保留字段：trade_dispute_id、order_type、order_id、dispute_type、status、title、resolution、created_at、resolved_at
+   *
+   * @param {Array<Object>} disputes - 申诉列表数组（Sequelize 查询结果或 plain 对象）
+   * @param {string} dataLevel - 数据级别（'full' 管理员完整数据 / 'public' 普通用户脱敏数据）
+   * @returns {Array<Object>} 脱敏后的申诉列表数组
+   *
+   * @example
+   * // 普通用户查看脱敏数据
+   * const publicDisputes = DataSanitizer.sanitizeDisputes(disputes, 'public')
+   */
+  static sanitizeDisputes(disputes, dataLevel) {
+    // 管理员权限：返回完整数据（不脱敏）
+    if (dataLevel === 'full') {
+      return disputes
+    }
+
+    /*
+     * γ 模式：黑名单删除内部字段
+     */
+    return disputes.map(dispute => {
+      const sanitized = { ...(dispute.toJSON ? dispute.toJSON() : dispute) }
+
+      // 黑名单：删除内部处理字段（防止用户抓包获知客服/仲裁内部信息）
+      delete sanitized.assigned_to
+      delete sanitized.approval_chain_instance_id
+      delete sanitized.created_by
+      delete sanitized.deadline
+      delete sanitized.updated_at
+      delete sanitized.toJSON
+
+      return sanitized
+    })
+  }
+
+  /**
    * 交易记录数据脱敏（γ 模式：基于 V4 asset_transactions 表结构）
    *
    * 🗄️ 数据库表：asset_transactions（主键：asset_transaction_id）
@@ -1057,13 +1108,13 @@ class DataSanitizer {
    */
   static getPrizeIcon(prizeType) {
     const icons = {
-      points: 'points',
-      physical: 'physical',
-      voucher: 'voucher',
-      virtual: 'virtual',
-      special: 'special'
+      points: '🪙',
+      physical: '🎁',
+      voucher: '🎫',
+      virtual: '💎',
+      special: '⭐'
     }
-    return icons[prizeType] || 'default'
+    return icons[prizeType] || '🎁'
   }
 
   /**

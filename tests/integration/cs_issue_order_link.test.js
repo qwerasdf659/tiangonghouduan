@@ -55,7 +55,7 @@ describe('客服工单 - 订单多态关联', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .send({
           user_id: TEST_USER_ID,
-          issue_type: 'trade',
+          issue_type: 'asset',
           title: '集成测试-交易订单关联',
           description: '验证 order_type=trade 关联',
           priority: 'medium',
@@ -93,7 +93,7 @@ describe('客服工单 - 订单多态关联', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .send({
           user_id: TEST_USER_ID,
-          issue_type: 'feedback',
+          issue_type: 'other',
           title: '集成测试-无订单关联',
           priority: 'low'
         })
@@ -111,7 +111,7 @@ describe('客服工单 - 订单多态关联', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .send({
           user_id: TEST_USER_ID,
-          issue_type: 'trade',
+          issue_type: 'asset',
           title: '集成测试-筛选用',
           order_type: 'trade',
           order_id: '8888'

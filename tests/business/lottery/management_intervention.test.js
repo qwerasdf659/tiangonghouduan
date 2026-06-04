@@ -359,9 +359,13 @@ describe('抽奖管理干预测试 - P1优先级', () => {
       const prize = await LotteryCampaignPrize.findOne({ where: { status: 'active' } })
 
       if (prize) {
+        /*
+         * preset_inventory_debt 的奖品外键列为 lottery_prize_id（见 models/PresetInventoryDebt.js），
+         * 非活动奖品表主键名；按真实表结构查询，验证"按奖品统计欠账"链路可用
+         */
         const debts = await PresetInventoryDebt.findAll({
           where: {
-            lottery_campaign_prize_id: prize.lottery_campaign_prize_id,
+            lottery_prize_id: prize.lottery_prize_id || prize.lottery_campaign_prize_id,
             status: 'pending'
           }
         })

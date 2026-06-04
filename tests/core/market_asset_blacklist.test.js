@@ -62,8 +62,10 @@ describe('交易市场资产黑名单功能 (P0-4)', () => {
     })
 
     test('应该区分大小写', () => {
-      expect(isBlacklistedForMarket('points')).toBe(false)
+      // 黑名单存储的是规范小写码 'points'；大小写变体不应命中（区分大小写）
+      expect(isBlacklistedForMarket('POINTS')).toBe(false)
       expect(isBlacklistedForMarket('Points')).toBe(false)
+      // 规范小写码命中黑名单
       expect(isBlacklistedForMarket('points')).toBe(true)
     })
 

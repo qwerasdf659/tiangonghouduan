@@ -304,7 +304,17 @@ export function useUserContextMethods() {
           request({ url: CONTENT_ENDPOINTS.DISPUTE_STATS, method: 'GET' })
         ])
         this.disputes = listRes.data?.rows || listRes.data?.list || listRes.data || []
-        this.dispute_stats = statsRes.data || { open: 0, processing: 0, resolved: 0 }
+        /*
+         * 后端 getDisputeStats 返回 { by_status, by_type, recent_7d }，
+         * by_status 按新状态机分桶（open/reviewing/arbitrating/resolved/rejected）。
+         * 面板三格语义：待处理=open，处理中=reviewing+arbitrating，已解决=resolved+rejected。
+         */
+        const byStatus = statsRes.data?.by_status || {}
+        this.dispute_stats = {
+          open: byStatus.open || 0,
+          processing: (byStatus.reviewing || 0) + (byStatus.arbitrating || 0),
+          resolved: (byStatus.resolved || 0) + (byStatus.rejected || 0)
+        }
       } catch (error) {
         logger.error('[UserContext] 纠纷加载失败:', error)
         this.disputes = []
@@ -346,19 +356,35 @@ export function useUserContextMethods() {
 
     /** 查看纠纷详情 */
     async viewDisputeDetail(dispute) {
-      logger.debug('[Dispute] 查看详情:', dispute.issue_id || dispute.customer_service_issue_id)
+      logger.debug('[Dispute] 查看详情:', dispute.trade_dispute_id)
       Alpine.store('notification').show(
         '纠纷详情: #' +
-          (dispute.issue_id || dispute.customer_service_issue_id) +
+          dispute.trade_dispute_id +
           ' ' +
           (dispute.title || ''),
         'info'
       )
     },
 
+    /** 受理纠纷（客服接单，open → reviewing） */
+    async acceptDisputeAction(dispute) {
+      const id = dispute.trade_dispute_id
+      if (!confirm(`确定受理纠纷 #${id}？受理后状态变为"审核中"`)) return
+      try {
+        const { CONTENT_ENDPOINTS } = await import('../../../api/content.js')
+        const { request, buildURL } = await import('../../../api/base.js')
+        const url = buildURL(CONTENT_ENDPOINTS.DISPUTE_ACCEPT, { id })
+        await request({ url, method: 'POST' })
+        Alpine.store('notification').show('纠纷已受理', 'success')
+        await this._loadDisputes()
+      } catch (error) {
+        Alpine.store('notification').show('受理失败: ' + error.message, 'error')
+      }
+    },
+
     /** 解决纠纷 */
     async resolveDisputeAction(dispute) {
-      const id = dispute.issue_id || dispute.customer_service_issue_id
+      const id = dispute.trade_dispute_id
       if (!confirm(`确定解决纠纷 #${id}？`)) return
       try {
         const { CONTENT_ENDPOINTS } = await import('../../../api/content.js')
@@ -374,7 +400,7 @@ export function useUserContextMethods() {
 
     /** 升级仲裁 */
     async escalateDisputeAction(dispute) {
-      const id = dispute.issue_id || dispute.customer_service_issue_id
+      const id = dispute.trade_dispute_id
       if (!confirm(`确定将纠纷 #${id} 升级为仲裁？`)) return
       try {
         const { CONTENT_ENDPOINTS } = await import('../../../api/content.js')

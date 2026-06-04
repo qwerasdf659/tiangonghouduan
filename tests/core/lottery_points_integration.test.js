@@ -19,6 +19,7 @@
 const {
   User,
   LotteryCampaignPrize,
+  PrizeDefinition,
   AssetTransaction,
   Account,
   AccountAssetBalance
@@ -174,13 +175,20 @@ describe('抽奖积分集成测试 - V4.6 Pipeline 架构', () => {
 
   describe('抽奖奖励积分测试（Pipeline 架构）', () => {
     test('应该创建完整的积分奖励记录', async () => {
-      // 获取积分奖品
+      // 获取积分奖品（prize_type 在 prize_definitions 表，需通过关联查询；活动奖品表仅存活动维度字段）
       const pointsPrize = await LotteryCampaignPrize.findOne({
         where: {
           lottery_campaign_id: campaignId,
-          prize_type: 'points',
           status: 'active'
-        }
+        },
+        include: [
+          {
+            model: PrizeDefinition,
+            as: 'prizeDefinition',
+            where: { prize_type: 'points' },
+            required: true
+          }
+        ]
       })
 
       if (!pointsPrize) {

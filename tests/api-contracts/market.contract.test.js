@@ -130,13 +130,19 @@ describe('API契约测试 - 市场模块 (/api/v4/marketplace)', () => {
       })
 
       /**
-       * Case 2: 未认证用户应返回401
+       * Case 2: 未认证用户也可浏览市场列表（公开浏览，optionalAuth）
+       * 业务规则（2026-06：对齐实码）：交易市场"浏览类"接口对游客开放
+       * （类比 Steam 市场/BUFF：看行情与在售列表无需登录，仅交易动作需登录），
+       * 路由层用 optionalAuth：匿名放行、登录用户照常识别
        */
-      test('未认证用户应返回401', async () => {
+      test('未认证用户也可浏览市场列表（公开浏览）', async () => {
         const response = await request(app).get('/api/v4/marketplace/listings')
 
-        expect(response.status).toBe(401)
-        validateApiContract(response.body, false)
+        expect(response.status).toBe(200)
+        validateApiContract(response.body)
+        expect(response.body.data).toHaveProperty('products')
+        expect(response.body.data).toHaveProperty('pagination')
+        expect(Array.isArray(response.body.data.products)).toBe(true)
       })
 
       /**
@@ -195,13 +201,16 @@ describe('API契约测试 - 市场模块 (/api/v4/marketplace)', () => {
 
     describe('GET /listings/:market_listing_id - 查询挂牌详情', () => {
       /**
-       * Case 1: 未认证用户应返回401
+       * Case 1: 未认证用户也可浏览挂牌详情（公开浏览，optionalAuth）
+       * 业务规则（2026-06：对齐实码）：详情同属浏览类接口，游客可看；
+       * 不存在的挂牌应返回 404（而非 401），证明已放行到业务层
        */
-      test('未认证用户应返回401', async () => {
-        const response = await request(app).get('/api/v4/marketplace/listings/1')
+      test('未认证用户也可浏览挂牌详情（不存在返回404而非401）', async () => {
+        const response = await request(app).get('/api/v4/marketplace/listings/999999999')
 
-        expect(response.status).toBe(401)
+        expect(response.status).toBe(404)
         validateApiContract(response.body, false)
+        expect(response.body.code).toMatch(/NOT_FOUND|LISTING_NOT_FOUND/i)
       })
 
       /**

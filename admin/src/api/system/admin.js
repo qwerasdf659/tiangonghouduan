@@ -23,7 +23,6 @@ export const SYSTEM_ADMIN_ENDPOINTS = {
   NOTIFICATION_SEND: `${API_PREFIX}/system/notifications/send`,
   NOTIFICATION_DELETE: `${API_PREFIX}/system/notifications/:id`,
   NOTIFICATION_UNREAD_COUNT: `${API_PREFIX}/system/notifications/unread-count`,
-  CONSOLE_NOTIFICATIONS: `${API_PREFIX}/console/system/notifications`,
 
   // 广告活动管理（统一内容投放管理，支持 commercial/operational/system 三种类型）
   AD_CAMPAIGN_LIST: `${API_PREFIX}/console/ad-campaigns`,
@@ -138,11 +137,6 @@ export const SYSTEM_ADMIN_ENDPOINTS = {
   SESSION_DETAIL: `${API_PREFIX}/console/sessions/:session_id`,
   SESSION_TERMINATE: `${API_PREFIX}/console/sessions/:session_id/terminate`,
   SESSION_TERMINATE_ALL: `${API_PREFIX}/console/sessions/terminate-all`,
-
-  // 配置工具
-  CONFIG_TOOL_VALIDATE: `${API_PREFIX}/console/config-tools/validate`,
-  CONFIG_TOOL_EXPORT: `${API_PREFIX}/console/config-tools/export`,
-  CONFIG_TOOL_IMPORT: `${API_PREFIX}/console/config-tools/import`,
 
   // 字典管理 - 类目
   DICT_CATEGORY_LIST: `${API_PREFIX}/console/dictionaries/categories`,

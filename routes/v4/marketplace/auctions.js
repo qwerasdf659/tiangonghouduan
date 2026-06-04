@@ -297,18 +297,28 @@ router.post(
       return res.apiError('仅中标买方可发起争议', 'FORBIDDEN', null, 403)
     }
 
-    const result = await tradeDisputeService.createDispute({
-      user_id: userId,
-      order_type: 'auction',
-      order_id: auctionListingId,
-      dispute_type,
-      description,
-      evidence: {
-        item_snapshot: auctionDetail.item_snapshot,
-        auction_listing_id: auctionListingId,
-        winning_amount: auctionDetail.gross_amount
-      }
-    })
+    const result = await TransactionManager.execute(
+      async transaction =>
+        tradeDisputeService.createDispute(
+          {
+            user_id: userId,
+            order_type: 'auction',
+            order_id: String(auctionListingId),
+            dispute_type,
+            title: `拍卖争议-${auctionListingId}`,
+            description,
+            evidence: {
+              item_snapshot: auctionDetail.item_snapshot,
+              auction_listing_id: auctionListingId,
+              winning_amount: auctionDetail.gross_amount
+            },
+            created_by: userId,
+            self_service: true
+          },
+          { transaction }
+        ),
+      { description: `拍卖买方发起争议（拍卖：${auctionListingId}）` }
+    )
 
     return res.apiSuccess(result, '争议已提交')
   })

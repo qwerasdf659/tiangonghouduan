@@ -110,6 +110,32 @@ router.post(
 )
 
 /**
+ * 受理纠纷（客服接单，open → reviewing）
+ * POST /api/v4/console/customer-service/disputes/:id/accept
+ *
+ * 权限：requireRoleLevel(1)（一线客服即可受理/接单，与"查看"同级；解决=50/升级仲裁=100 不变）
+ */
+router.post(
+  '/:id/accept',
+  authenticateToken,
+  requireRoleLevel(1),
+  asyncHandler(async (req, res) => {
+    const TradeDisputeService = req.app.locals.services.getService('trade_dispute')
+
+    const result = await TransactionManager.execute(
+      async transaction => {
+        return await TradeDisputeService.acceptDispute(parseInt(req.params.id), req.user.user_id, {
+          transaction
+        })
+      },
+      { description: `受理交易纠纷（工单：${req.params.id}）` }
+    )
+
+    return res.apiSuccess(result, '纠纷已受理')
+  })
+)
+
+/**
  * 升级纠纷为仲裁
  * POST /api/v4/console/customer-service/disputes/:id/escalate
  */
