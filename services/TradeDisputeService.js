@@ -1,20 +1,19 @@
 /**
  * 交易售后申诉服务（TradeDisputeService）
  *
- * @description 处理交易市场/拍卖的买家申诉、仲裁流程、纠纷解决（读写 trade_disputes 表）
+ * @description 处理兑换/消费订单的买家售后申诉、仲裁流程、纠纷解决（读写 trade_disputes 表）
  * @module services/TradeDisputeService
  *
  * 业务流程：
- * 1. 买家发起申诉 → 创建 trade_disputes 记录 + 交易订单状态改为 disputed（拍卖不改）
+ * 1. 买家发起申诉 → 创建 trade_disputes 记录（兑换/消费订单不改其订单状态）
  * 2. 客服处理 → 可直接解决或升级为仲裁（对接 approval_chain）
- * 3. 仲裁完成 → 退款给买家 或 驳回申诉
+ * 3. 仲裁完成 → 驳回申诉 或 走 GM 补偿
  *
  * 状态机：open（已提交）→ reviewing（客服审核）→ arbitrating（仲裁中）→ resolved/rejected
  *
- * 退款资金口径（方案A 第9项决策）：
- * - 交易订单 frozen（资金仍冻结）→ 复用 TradeOrderService.cancelOrder 真解冻原路退买家
- * - 交易订单 completed（资金已通过 escrow 放给卖家）/ 拍卖等 → 一期不动原单资金，
- *   由客服通过 GM 补偿工具（cs_compensate）发放等值补偿，resolveDispute 拒绝伪退款
+ * 退款资金口径（C2C 下线后）：
+ * - 兑换/消费类申诉一律不动原单资金，由客服通过 GM 补偿工具（cs_compensate）发放等值补偿，
+ *   resolveDispute 拒绝原路退款（C2C 交易订单原路退款链已随 C2C 下线移除，2026-06-05 阶段五）
  *
  * 纠纷类型（dispute_type）：item_not_received / item_mismatch / quality_issue / fraud / other
  */
@@ -24,7 +23,6 @@ const logger = require('../utils/logger').logger
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 const { Op } = require('sequelize')
 const ApprovalChainService = require('./ApprovalChainService')
-const TradeOrderService = require('./TradeOrderService')
 const NotificationService = require('./NotificationService')
 const { getRedisClient } = require('../utils/UnifiedRedisClient')
 
@@ -37,11 +35,8 @@ const DISPUTE_TYPE = {
   OTHER: 'other'
 }
 
-/** 允许发起申诉的订单类型白名单（修复 P4：纳入 auction） */
-const ALLOWED_ORDER_TYPES = ['trade', 'redemption', 'consumption', 'auction']
-
-/** 允许发起纠纷的交易订单状态 */
-const DISPUTABLE_ORDER_STATUSES = ['completed', 'frozen']
+/** 允许发起申诉的订单类型白名单（C2C trade/auction 已随 C2C 下线移除，2026-06-05 阶段五） */
+const ALLOWED_ORDER_TYPES = ['redemption', 'consumption']
 
 /** 允许发起申诉的兑换订单状态（核销后才可能出现售后问题） */
 const DISPUTABLE_REDEMPTION_STATUSES = ['fulfilled']
@@ -117,7 +112,7 @@ class TradeDisputeService {
       await this._assertSelfServiceRateLimit(user_id, transaction)
     }
 
-    // 按 order_type 分流校验订单归属（修复 P4-d：auction 不再误查 TradeOrder）
+    // 按 order_type 分流校验订单归属（redemption/consumption）
     await this._assertOrderOwnership(order_type, order_id, user_id, transaction)
 
     // 检查是否已有未关闭的申诉
@@ -159,16 +154,7 @@ class TradeDisputeService {
       { transaction }
     )
 
-    // 交易订单标记 disputed（拍卖/兑换/消费不改其订单状态）
-    if (order_type === 'trade') {
-      const order = await this.models.TradeOrder.findByPk(parseInt(order_id), {
-        lock: transaction.LOCK.UPDATE,
-        transaction
-      })
-      if (order && DISPUTABLE_ORDER_STATUSES.includes(order.status)) {
-        await order.update({ status: 'disputed' }, { transaction })
-      }
-    }
+    // 兑换/消费订单不改其订单状态（C2C trade 订单已随 C2C 下线移除）
 
     logger.info('[售后申诉] 申诉创建成功', {
       trade_dispute_id: dispute.trade_dispute_id,
@@ -217,30 +203,6 @@ class TradeDisputeService {
    * @private
    */
   async _assertOrderOwnership(orderType, orderId, userId, transaction) {
-    if (orderType === 'trade') {
-      const order = await this.models.TradeOrder.findByPk(parseInt(orderId), {
-        lock: transaction.LOCK.UPDATE,
-        transaction
-      })
-      if (!order) throw new BusinessError('交易订单不存在', 'TRADE_NOT_FOUND', 404)
-      if (!DISPUTABLE_ORDER_STATUSES.includes(order.status)) {
-        throw new BusinessError(
-          `当前订单状态（${order.status}）不允许发起申诉，仅 ${DISPUTABLE_ORDER_STATUSES.join('/')} 状态可申诉`,
-          'TRADE_NOT_ALLOWED',
-          400
-        )
-      }
-      if (order.buyer_user_id !== userId) {
-        throw new BusinessError('仅买家可以对该订单发起申诉', 'TRADE_ERROR', 400)
-      }
-      return
-    }
-
-    if (orderType === 'auction') {
-      // 拍卖归属校验已在路由层完成（winner_user_id === userId 且 status==='settled'），此处不再重复查询，避免误查 TradeOrder
-      return
-    }
-
     if (orderType === 'redemption') {
       // 兑换订单：主键 redemption_order_id(UUID)，买家字段 redeemer_user_id，核销后(fulfilled)可申诉
       const order = await this.models.RedemptionOrder.findByPk(String(orderId), { transaction })
@@ -553,78 +515,21 @@ class TradeDisputeService {
       throw new BusinessError('该申诉已解决或已驳回', 'TRADE_ERROR', 400)
     }
 
-    let refundResult = null
+    const refundResult = null
     let finalStatus = 'rejected'
 
     if (refund) {
-      // 仅交易订单支持原路退款；其余类型须走 GM 补偿
-      if (dispute.order_type !== 'trade') {
-        throw new BusinessError(
-          `${dispute.order_type} 订单暂不支持原路退款，请使用客服补偿工具（GM 补偿）发放等值补偿后再解决申诉`,
-          'TRADE_NOT_ALLOWED',
-          400
-        )
-      }
-
-      const order = await this.models.TradeOrder.findByPk(parseInt(dispute.order_id), {
-        lock: transaction.LOCK.UPDATE,
-        transaction
-      })
-      if (!order) throw new BusinessError('关联交易订单不存在', 'TRADE_NOT_FOUND', 404)
-
-      if (order.status === 'completed') {
-        // 资金已通过 escrow 放给卖家，不能简单解冻（修复资损 BUG 核心：禁止伪退款）
-        throw new BusinessError(
-          '该订单已完成结算（资金已划转卖家），不支持原路退款；请使用客服补偿工具（GM 补偿）向买家发放等值补偿后再解决申诉',
-          'TRADE_NOT_ALLOWED',
-          400
-        )
-      }
-
-      if (order.status !== 'disputed' && order.status !== 'frozen') {
-        throw new BusinessError(
-          `订单状态（${order.status}）不支持退款，仅 frozen/disputed（资金仍冻结）可原路退`,
-          'TRADE_NOT_ALLOWED',
-          400
-        )
-      }
-
       /*
-       * 资金仍冻结：复用 cancelOrder 真解冻原路退买家（BalanceService.unfreeze + 双录 + 幂等键）
-       * cancelOrder 要求订单状态为 frozen/created，故先把 disputed 还原为 frozen 再取消
+       * C2C 交易订单原路退款已随 C2C 下线移除（2026-06-05 阶段五）。
+       * 兑换/消费类申诉一律走客服补偿工具（GM 补偿）发放等值补偿后再解决，不在此处动原单资金。
        */
-      if (order.status === 'disputed') {
-        await order.update({ status: 'frozen' }, { transaction })
-      }
-      const cancelResult = await TradeOrderService.cancelOrder(
-        {
-          trade_order_id: order.trade_order_id,
-          cancel_reason: `售后申诉退款（申诉#${disputeId}）`
-        },
-        { transaction }
+      throw new BusinessError(
+        `${dispute.order_type} 订单不支持原路退款，请使用客服补偿工具（GM 补偿）发放等值补偿后再解决申诉`,
+        'TRADE_NOT_ALLOWED',
+        400
       )
-      refundResult = {
-        order_type: 'trade',
-        order_id: dispute.order_id,
-        refunded: true,
-        unfreeze: cancelResult.unfreeze
-      }
-      finalStatus = 'resolved'
-      logger.info('[售后申诉] 原路退款已执行（真解冻）', {
-        trade_dispute_id: disputeId,
-        order_id: dispute.order_id
-      })
     } else {
-      // 驳回申诉：交易订单恢复 completed
-      if (dispute.order_type === 'trade') {
-        const order = await this.models.TradeOrder.findByPk(parseInt(dispute.order_id), {
-          lock: transaction.LOCK.UPDATE,
-          transaction
-        })
-        if (order && order.status === 'disputed') {
-          await order.update({ status: 'completed' }, { transaction })
-        }
-      }
+      // 驳回申诉：兑换/消费订单不改其订单状态
       finalStatus = 'rejected'
     }
 
@@ -738,24 +643,8 @@ class TradeDisputeService {
 
     if (!dispute) throw new BusinessError('售后申诉不存在', 'TRADE_NOT_FOUND', 404)
 
-    // 关联订单信息（仅交易订单可结构化关联，拍卖等多态值不强查）
-    let orderInfo = null
-    if (dispute.order_type === 'trade' && dispute.order_id) {
-      orderInfo = await this.models.TradeOrder.findByPk(parseInt(dispute.order_id), {
-        attributes: [
-          'trade_order_id',
-          'market_listing_id',
-          'buyer_user_id',
-          'seller_user_id',
-          'asset_code',
-          'gross_amount',
-          'fee_amount',
-          'net_amount',
-          'status',
-          'created_at'
-        ]
-      })
-    }
+    // 关联订单信息（C2C 交易订单已随 C2C 下线移除，兑换/消费为多态值不强查）
+    const orderInfo = null
 
     // 关联审批链信息（实例主键为 instance_id）
     let arbitrationInfo = null
@@ -876,7 +765,5 @@ class TradeDisputeService {
 TradeDisputeService.DISPUTE_TYPE = DISPUTE_TYPE
 /** 允许发起申诉的订单类型白名单 */
 TradeDisputeService.ALLOWED_ORDER_TYPES = ALLOWED_ORDER_TYPES
-/** 允许发起纠纷的交易订单状态 */
-TradeDisputeService.DISPUTABLE_ORDER_STATUSES = DISPUTABLE_ORDER_STATUSES
 
 module.exports = TradeDisputeService

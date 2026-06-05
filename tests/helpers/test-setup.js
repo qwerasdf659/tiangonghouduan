@@ -105,13 +105,13 @@ class TestAssertions {
       /**
        * V4.6 Phase 5 统一管线架构（2026-01-19）
        * - 使用 1 条统一管线（NormalDrawPipeline）处理所有抽奖请求
-       * - ManagementStrategy 用于管理 API（forceWin/forceLose 等）
+       * - 决策来源：preset / guarantee / normal（per-user 暗箱干预已下线）
        */
       pipeline_names: {
-        correct: ['NormalDrawPipeline', 'ManagementStrategy'], // Phase 5: 统一管线
-        decision_sources: ['normal', 'preset', 'override'], // 决策来源类型
+        correct: ['NormalDrawPipeline'], // Phase 5: 统一管线
+        decision_sources: ['normal', 'preset', 'guarantee'], // 决策来源类型
         incorrect: ['basic', 'guarantee', 'management', 'pipeline'],
-        message: 'V4.6 Phase 5: 应使用统一管线 NormalDrawPipeline 或 ManagementStrategy'
+        message: 'V4.6 Phase 5: 应使用统一管线 NormalDrawPipeline'
       }
     }
 
@@ -319,14 +319,13 @@ const TestConfig = {
    *
    * Phase 5 统一管线架构：
    * - 使用 1 条统一管线（NormalDrawPipeline）处理所有抽奖请求
-   * - 决策来源由 LoadDecisionSourceStage 在管线内判断
-   * - ManagementStrategy 仅用于管理 API（forceWin/forceLose 等）
+   * - 决策来源由 LoadDecisionSourceStage 在管线内判断（preset/guarantee/normal）
    */
   pipelineValidation: {
     // V4.6 Phase 5 统一管线（新架构）
     pipelines: ['NormalDrawPipeline'], // Phase 5：统一管线
     expectedPipelineCount: 1, // Phase 5：1 条统一管线
-    decisionSources: ['normal', 'preset', 'override'] // 决策来源类型
+    decisionSources: ['normal', 'preset', 'guarantee'] // 决策来源类型
   }
 }
 
@@ -459,8 +458,8 @@ async function getRealTestStoreId() {
  * 🔧 修复测试超时问题 - 清理定时器
  *
  * 问题根因:
- * - ManagementStrategy.js的startCacheCleanup()启动了setInterval
  * - routes/v4/system.js中有多个setInterval定时任务
+ * - 部分服务在初始化时启动了缓存清理 setInterval
  * - 这些定时器在测试环境中不会自动清理，导致Jest超时
  *
  * 解决方案:

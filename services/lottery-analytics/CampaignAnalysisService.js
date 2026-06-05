@@ -393,9 +393,9 @@ class CampaignAnalysisService {
    */
   async _getCampaignTopPrizes(campaignId, limit) {
     const results = await this.models.LotteryDraw.findAll({
-      attributes: ['lottery_prize_id', [fn('COUNT', col('lottery_draw_id')), 'count']],
-      where: { lottery_campaign_id: campaignId, lottery_prize_id: { [Op.ne]: null } },
-      group: ['lottery_prize_id'],
+      attributes: ['lottery_campaign_prize_id', [fn('COUNT', col('lottery_draw_id')), 'count']],
+      where: { lottery_campaign_id: campaignId, lottery_campaign_prize_id: { [Op.ne]: null } },
+      group: ['lottery_campaign_prize_id'],
       order: [[fn('COUNT', col('lottery_draw_id')), 'DESC']],
       limit,
       include: [

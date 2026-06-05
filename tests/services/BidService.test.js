@@ -216,14 +216,17 @@ describe('竞价系统服务测试（臻选空间/幸运空间/竞价功能）',
       BidService = global.getTestService('exchange_bid_core')
     })
 
-    test('动态白名单能从 material_asset_types 加载', async () => {
+    test('动态白名单能从 material_asset_types 加载（决策13：仅 is_biddable=1）', async () => {
       // 调用私有方法测试白名单加载
       const allowed = await BidService._getAllowedBidAssets()
 
       expect(Array.isArray(allowed)).toBe(true)
-      // 根据数据库实际数据：red_core_shard 和 star_stone 可交易
-      expect(allowed).toContain('red_core_shard')
+      /*
+       * 合规整改（决策13 / §10.15 Step 1+6）：竞价白名单来源由 is_tradable=1 改为 is_biddable=1。
+       * 去交易化后仅 star_stone 的 is_biddable=1，碎片/源晶（red_core_shard 等）不再参与竞价。
+       */
       expect(allowed).toContain('star_stone')
+      expect(allowed).not.toContain('red_core_shard')
       // POINTS 和 BUDGET_POINTS 不应在白名单中
       expect(allowed).not.toContain('points')
       expect(allowed).not.toContain('budget_points')

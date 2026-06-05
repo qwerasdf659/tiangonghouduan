@@ -86,9 +86,15 @@ class BidService {
   /**
    * 获取竞价允许的资产类型（动态白名单，缓存5分钟）
    *
-   * 查询逻辑（决策9）：
+   * 查询逻辑（合规整改 决策13 / §10.15 Step 6）：
    * SELECT asset_code FROM material_asset_types
-   * WHERE is_tradable = 1 AND asset_code NOT IN ('points', 'budget_points')
+   * WHERE is_biddable = 1 AND asset_code NOT IN ('points', 'budget_points')
+   *
+   * 🔴 由 is_tradable=1 改为 is_biddable=1：
+   * - 去交易化（is_tradable=0）后若仍读 is_tradable，竞价白名单会瞬空、竞价全瘫
+   * - is_biddable 与 is_tradable 解耦：「不可用户间流通」与「可作官方竞价计价币」是两个正交能力
+   * - 合规整改后仅 star_stone 的 is_biddable=1（决策10：仅星石竞价，碎片不参与）
+   * - 黑名单 points/budget_points 保留作双保险
    *
    * @returns {Promise<string[]>} 允许竞价的资产类型代码数组
    * @private
@@ -101,7 +107,7 @@ class BidService {
 
     const allowed = await this.MaterialAssetType.findAll({
       where: {
-        is_tradable: true,
+        is_biddable: true,
         asset_code: { [Op.notIn]: BID_FORBIDDEN_ASSETS }
       },
       attributes: ['asset_code'],
@@ -384,7 +390,11 @@ class BidService {
         {
           model: this.ExchangeItem,
           as: 'exchangeItem',
-          include: [{ model: this.ExchangeItemSku, as: 'skus' }]
+          include: [
+            { model: this.ExchangeItemSku, as: 'skus' },
+            // F4（§10.16-C/§10.15）：带出模板 item_type，使中标铸造透传真实类型（prop 卖出后背包里仍是 prop）
+            { model: this.models.ItemTemplate, as: 'itemTemplate', attributes: ['item_type'] }
+          ]
         }
       ]
     })
@@ -491,7 +501,8 @@ class BidService {
     await ItemService.mintItem(
       {
         user_id: winnerId,
-        item_type: 'product',
+        // F4（§10.16-C）：透传模板 item_type（prop/product...），与 exchange 直购一致；缺省回退 'product'
+        item_type: exchangeItem.itemTemplate?.item_type || 'product',
         source: 'bid_settlement',
         source_ref_id: String(bidProductId),
         item_name: exchangeItem.item_name,

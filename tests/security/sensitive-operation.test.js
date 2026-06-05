@@ -251,10 +251,10 @@ describe('P1-7.3: 敏感操作二次认证测试', () => {
 
       // 尝试访问查看类敏感操作（不会真正执行业务逻辑）
       const response = await request(app)
-        .get('/api/v4/marketplace/listings')
+        .get('/api/v4/user/me')
         .set('Authorization', `Bearer ${freshToken}`)
 
-      // 查看市场列表应该成功
+      // 有效会话访问受保护的查看类接口应该成功
       expect(response.status).toBe(200)
 
       console.log('[P1-7.3] 有效会话访问敏感操作测试通过')

@@ -94,15 +94,13 @@ document.addEventListener('alpine:init', () => {
       basic: { name: '基础设置', icon: 'bi-gear', color: 'primary' },
       points: { name: '积分设置', icon: 'bi-coin', color: 'warning' },
       notification: { name: '通知设置', icon: 'bi-bell', color: 'info' },
-      security: { name: '安全设置', icon: 'bi-shield-lock', color: 'danger' },
-      marketplace: { name: '市场设置', icon: 'bi-shop', color: 'success' }
+      security: { name: '安全设置', icon: 'bi-shield-lock', color: 'danger' }
     },
     categoryNames: {
       basic: '基础设置',
       points: '积分设置',
       notification: '通知设置',
-      security: '安全设置',
-      marketplace: '市场设置'
+      security: '安全设置'
     },
     featureFlagsLoading: false,
     featureFlags: [],
@@ -211,7 +209,7 @@ document.addEventListener('alpine:init', () => {
     /**
      * 加载指定分类的配置设置
      * @async
-     * @param {string} category - 配置分类标识符 (basic|points|notification|security|marketplace)
+     * @param {string} category - 配置分类标识符 (basic|points|notification|security)
      * @description 加载指定分类的所有配置项，并初始化可编辑设置
      * @returns {Promise<void>}
      * @fires SYSTEM_ENDPOINTS.SETTING_CATEGORY

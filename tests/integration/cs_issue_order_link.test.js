@@ -49,22 +49,22 @@ afterAll(async () => {
 
 describe('客服工单 - 订单多态关联', () => {
   describe('POST /api/v4/console/customer-service/issues（带订单关联）', () => {
-    it('创建工单时可关联交易订单', async () => {
+    it('创建工单时可关联消费订单（consumption）', async () => {
       const res = await request(app)
         .post('/api/v4/console/customer-service/issues')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
           user_id: TEST_USER_ID,
           issue_type: 'asset',
-          title: '集成测试-交易订单关联',
-          description: '验证 order_type=trade 关联',
+          title: '集成测试-消费订单关联',
+          description: '验证 order_type=consumption 关联',
           priority: 'medium',
-          order_type: 'trade',
+          order_type: 'consumption',
           order_id: '9348'
         })
 
       expect(res.body.success).toBe(true)
-      expect(res.body.data.order_type).toBe('trade')
+      expect(res.body.data.order_type).toBe('consumption')
       expect(res.body.data.order_id).toBe('9348')
       expect(res.body.data.issue_id).toBeGreaterThan(0)
     })
@@ -113,26 +113,26 @@ describe('客服工单 - 订单多态关联', () => {
           user_id: TEST_USER_ID,
           issue_type: 'asset',
           title: '集成测试-筛选用',
-          order_type: 'trade',
+          order_type: 'consumption',
           order_id: '8888'
         })
     })
 
     it('可按 order_type 筛选工单', async () => {
       const res = await request(app)
-        .get('/api/v4/console/customer-service/issues?order_type=trade')
+        .get('/api/v4/console/customer-service/issues?order_type=consumption')
         .set('Authorization', `Bearer ${authToken}`)
 
       expect(res.body.success).toBe(true)
       expect(res.body.data.rows.length).toBeGreaterThan(0)
       res.body.data.rows.forEach(row => {
-        expect(row.order_type).toBe('trade')
+        expect(row.order_type).toBe('consumption')
       })
     })
 
     it('可按 order_type + order_id 精确筛选', async () => {
       const res = await request(app)
-        .get('/api/v4/console/customer-service/issues?order_type=trade&order_id=8888')
+        .get('/api/v4/console/customer-service/issues?order_type=consumption&order_id=8888')
         .set('Authorization', `Bearer ${authToken}`)
 
       expect(res.body.success).toBe(true)
@@ -161,7 +161,7 @@ describe('客服工作台 - 用户订单聚合查询', () => {
       expect(order).toHaveProperty('status')
       expect(order).toHaveProperty('created_at')
       expect(order).toHaveProperty('issue_count')
-      expect(['trade', 'redemption', 'consumption']).toContain(order.order_type)
+      expect(['redemption', 'consumption']).toContain(order.order_type)
     })
 
     it('支持分页参数', async () => {

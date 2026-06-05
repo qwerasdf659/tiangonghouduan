@@ -341,13 +341,18 @@ describe('竞价系统功能测试 (Bid System — 臻选空间/幸运空间/竞
       expect(typeof BidService.cancelBidProduct).toBe('function')
     })
 
-    test('动态资产白名单应返回 star_stone 和 red_core_shard', async () => {
-      /* 调用私有方法验证白名单逻辑（决策9） */
+    test('动态资产白名单应仅返回 star_stone（合规决策13：竞价币白名单仅星石）', async () => {
+      /*
+       * 调用私有方法验证白名单逻辑（决策13）
+       * 合规整改后 material_asset_types.is_biddable=1 仅 star_stone，
+       * 水晶系（碎片/源晶）不可竞价（避免可换实物资产被炒作）
+       */
       const allowed = await BidService._getAllowedBidAssets()
 
       expect(Array.isArray(allowed)).toBe(true)
       expect(allowed).toContain('star_stone')
-      expect(allowed).toContain('red_core_shard')
+      /* 合规整改：red_core_shard 等水晶系不再可竞价 */
+      expect(allowed).not.toContain('red_core_shard')
 
       /* 决策1：points 和 budget_points 绝对禁止 */
       expect(allowed).not.toContain('points')

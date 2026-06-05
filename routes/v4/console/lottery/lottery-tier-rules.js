@@ -225,7 +225,7 @@ router.post(
     const { lottery_campaign_id, segment_key, tier_name, tier_weight, status } = req.body
     const lotteryTierRuleService = getLotteryTierRuleService(req)
 
-    const result = await TransactionManager.executeInTransaction(async transaction => {
+    const result = await TransactionManager.execute(async transaction => {
       return await lotteryTierRuleService.create(
         {
           lottery_campaign_id,
@@ -278,7 +278,7 @@ router.post(
       return res.apiError('权重配置必须包含 high/mid/low 三个档位', 'INVALID_PARAMS', null, 400)
     }
 
-    const result = await TransactionManager.executeInTransaction(async transaction => {
+    const result = await TransactionManager.execute(async transaction => {
       return await lotteryTierRuleService.createTierRules(
         {
           lottery_campaign_id,
@@ -324,7 +324,7 @@ router.put(
     const { tier_weight, status } = req.body
     const lotteryTierRuleService = getLotteryTierRuleService(req)
 
-    const result = await TransactionManager.executeInTransaction(async transaction => {
+    const result = await TransactionManager.execute(async transaction => {
       return await lotteryTierRuleService.update(
         parseInt(id, 10),
         {
@@ -359,7 +359,7 @@ router.delete(
     const { id } = req.params
     const lotteryTierRuleService = getLotteryTierRuleService(req)
 
-    await TransactionManager.executeInTransaction(async transaction => {
+    await TransactionManager.execute(async transaction => {
       return await lotteryTierRuleService.delete(parseInt(id, 10), { transaction })
     })
 

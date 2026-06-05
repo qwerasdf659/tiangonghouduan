@@ -14,12 +14,12 @@
 const { initializeTestServiceManager } = require('../helpers/UnifiedTestManager')
 
 /**
- * 真实数据库快照：16 个 category
+ * 真实数据库快照：14 个 category
  * 任何新增/删除/重命名 category 都必须同步更新此列表
  * 2026-06-02 新增 dispute（方案A 二期：售后申诉自助发起防滥用风控配置）
+ * 2026-06-06 移除 marketplace / auction（C2C 用户间交易/拍卖整体下线，残留运营配置随之清除）
  */
 const EXPECTED_CATEGORIES = [
-  'marketplace',
   'points',
   'basic',
   'ad_pricing',
@@ -32,7 +32,6 @@ const EXPECTED_CATEGORIES = [
   'notification',
   'backpack',
   'ad_system',
-  'auction',
   'customer_service',
   'dispute'
 ].sort()

@@ -81,7 +81,7 @@ class DataSanitizer {
    * @param {Array<Object>} prizes - 奖品数据数组（来自 lottery_campaign_prizes JOIN prize_definitions 的查询结果）
    * @param {string} dataLevel - 数据级别：'full'（管理员完整数据）或'public'（普通用户脱敏数据）
    * @returns {Array<Object>} 脱敏后的奖品数组
-   * @returns {number} return[].lottery_prize_id - 奖品ID（映射自 lottery_campaign_prize_id）
+   * @returns {number} return[].id - 奖品对外通用ID（方案C：映射自 lottery_campaign_prize_id，防抓包暴露内部表名）
    * @returns {number} return[].lottery_campaign_id - 关联活动ID
    * @returns {string} return[].prize_name - 奖品名称（来自 prize_definitions.display_name）
    * @returns {string} return[].prize_type - 奖品类型（points/coupon/physical/virtual/service/product/special）
@@ -194,6 +194,14 @@ class DataSanitizer {
       delete sanitized.angle
       delete sanitized.color
       delete sanitized.is_activity
+
+      /*
+       * 方案C：对外用通用 id 替代内部主键名 lottery_campaign_prize_id（防抓包暴露内部表结构）
+       * 仅 DataSanitizer 这一处转换，其他所有代码统一使用 lottery_campaign_prize_id（snake_case 真名）
+       */
+      sanitized.id = sanitized.lottery_campaign_prize_id ?? sanitized.id ?? null
+      delete sanitized.lottery_campaign_prize_id
+      delete sanitized.prize_definition_id
 
       return sanitized
     })
@@ -328,7 +336,6 @@ class DataSanitizer {
     delete sanitized.consecutive_fail_count
     delete sanitized.history_total_points
     delete sanitized.login_count
-    delete sanitized.max_active_listings
     delete sanitized.role
     delete sanitized.permissions
     delete sanitized.admin_flags
@@ -568,66 +575,6 @@ class DataSanitizer {
    */
   static sanitizePointsRecords(records, dataLevel) {
     return this._sanitizeAssetTransactions(records, dataLevel)
-  }
-
-  /**
-   * 交易市场挂单数据脱敏（γ 模式：接收 MarketListingQueryService 输出，只做安全过滤）
-   *
-   * 🗄️ 数据库表：market_listings（主键：market_listing_id，V4 报价-出价架构）
-   *
-   * 业务场景：交易市场商品列表 API 响应时调用，脱敏卖家信息和内部字段
-   *
-   * γ 模式职责：
-   * - 接收 MarketListingQueryService 已转换的 V4 格式数据
-   * - 主键保留原样输出：market_listing_id 不再映射为 listing_id
-   * - PII 脱敏：seller_nickname 经 maskUserName() 处理
-   * - 删除内部字段：locked_by_order_id、seller_contact 等
-   *
-   * @param {Array<Object>} listings - 挂单数据数组（来自 MarketListingQueryService）
-   * @param {string} dataLevel - 数据级别：'full'（管理员）或 'public'（普通用户）
-   * @returns {Array<Object>} 脱敏后的挂单数组
-   * @returns {number} return[].market_listing_id - 挂单ID（数据库真实主键，不做映射）
-   * @returns {string} return[].listing_kind - 挂单类型（item/fungible_asset）
-   * @returns {number} return[].seller_user_id - 卖家用户ID
-   * @returns {string} return[].seller_nickname - 卖家昵称（经 maskUserName 脱敏）
-   * @returns {number} return[].price_amount - 价格
-   * @returns {string} return[].price_asset_code - 价格资产代码
-   * @returns {string} return[].status - 挂单状态
-   */
-  static sanitizeMarketProducts(listings, dataLevel) {
-    if (dataLevel === 'full') {
-      return listings
-    }
-
-    /*
-     * γ 模式：黑名单删除敏感字段
-     */
-    return listings.map(listing => {
-      const sanitized = { ...(listing.toJSON ? listing.toJSON() : listing) }
-
-      // PII 脱敏：卖家昵称（保留首尾字符，中间用 * 替代）
-      sanitized.seller_nickname = this.maskUserName(
-        sanitized.seller_nickname || sanitized.seller?.nickname
-      )
-      sanitized.seller_avatar_url =
-        sanitized.seller_avatar_url || sanitized.seller?.avatar_url || null
-      delete sanitized.seller
-
-      // 黑名单：删除内部字段
-      delete sanitized.idempotency_key
-      delete sanitized.seller_offer_frozen
-      delete sanitized.locked_by_order_id
-      delete sanitized.locked_at
-      delete sanitized.seller_contact
-      delete sanitized.transaction_fees
-      delete sanitized.profit_analysis
-      delete sanitized.internal_remark
-      // Sequelize include 关联对象（含 owner_account_id、locks、meta 等敏感信息）
-      delete sanitized.offerItem
-      delete sanitized.offerItemTemplate
-
-      return sanitized
-    })
   }
 
   /**

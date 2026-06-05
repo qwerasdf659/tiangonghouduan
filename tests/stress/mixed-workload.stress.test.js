@@ -55,11 +55,11 @@ jest.setTimeout(1200000)
  * 总请求数按比例分配给不同类型的操作
  */
 const LOAD_DISTRIBUTION = {
-  // 浏览类（只读）：30%
+  // 浏览类（只读）：30%（market_listings 已随 C2C 下线移除，权重并入兑换商品浏览）
   browse: {
     percentage: 30,
     operations: [
-      { name: 'market_listings', weight: 30, type: 'read' },
+      { name: 'exchange_items', weight: 30, type: 'read' },
       { name: 'backpack_query', weight: 30, type: 'read' },
       { name: 'lottery_history', weight: 20, type: 'read' },
       { name: 'user_info', weight: 20, type: 'read' }
@@ -70,10 +70,10 @@ const LOAD_DISTRIBUTION = {
     percentage: 20,
     operations: [{ name: 'lottery_draw', weight: 100, type: 'write' }]
   },
-  // 交易类（写入）：15%
-  trade: {
+  // 兑换/购买类（写入）：15%（C2C 市场购买已下线，改为 B2C 官方兑换购买模拟）
+  exchange: {
     percentage: 15,
-    operations: [{ name: 'market_purchase_simulation', weight: 100, type: 'write' }]
+    operations: [{ name: 'exchange_purchase_simulation', weight: 100, type: 'write' }]
   },
   // 资产查询类：10%
   asset: {
@@ -114,7 +114,7 @@ describe('【P2-2】混合负载压力测试', () => {
   // 服务引用
   let IdempotencyService
   let LotteryEngine
-  let MarketListingService
+  let ExchangeQueryService
 
   // 测试数据
   let testUserId
@@ -154,7 +154,7 @@ describe('【P2-2】混合负载压力测试', () => {
     // 获取服务实例
     IdempotencyService = getTestService('idempotency')
     LotteryEngine = getTestService('unified_lottery_engine')
-    MarketListingService = getTestService('market_listing_core')
+    ExchangeQueryService = getTestService('exchange_query')
     console.log('✅ 服务获取成功')
 
     // 检查 Redis 可用性
@@ -276,8 +276,8 @@ describe('【P2-2】混合负载压力测试', () => {
 
         switch (operationName) {
           // === 浏览类操作 ===
-          case 'market_listings':
-            result = await simulateMarketListingsQuery()
+          case 'exchange_items':
+            result = await simulateExchangeItemsQuery()
             break
 
           case 'backpack_query':
@@ -298,8 +298,8 @@ describe('【P2-2】混合负载压力测试', () => {
             break
 
           // === 交易类操作 ===
-          case 'market_purchase_simulation':
-            result = await simulateMarketPurchase(idempotencyKey)
+          case 'exchange_purchase_simulation':
+            result = await simulateExchangePurchase(idempotencyKey)
             break
 
           // === 资产查询类操作 ===
@@ -342,26 +342,25 @@ describe('【P2-2】混合负载压力测试', () => {
   // ==================== 操作模拟函数 ====================
 
   /**
-   * 模拟市场列表查询
+   * 模拟兑换商品列表查询（替代已下线的 C2C 市场列表）
    *
-   * @description 模拟 GET /api/v4/marketplace/listings 请求
+   * @description 模拟 GET /api/v4/exchange/items 请求
    * @returns {Object} 查询结果
    */
-  async function simulateMarketListingsQuery() {
+  async function simulateExchangeItemsQuery() {
     try {
-      // 模拟随机查询参数
       const page = Math.floor(Math.random() * 5) + 1
       const limit = [10, 20, 30][Math.floor(Math.random() * 3)]
 
-      const result = await MarketListingService.getActiveListings({
+      const result = await ExchangeQueryService.getExchangeItems({
         page,
-        limit,
-        sort: 'newest'
+        page_size: limit,
+        status: 'active'
       })
 
       return {
         success: true,
-        data_count: result?.listings?.length || 0
+        data_count: result?.items?.length || result?.list?.length || 0
       }
     } catch (error) {
       return { success: false, error: error.message }
@@ -484,23 +483,23 @@ describe('【P2-2】混合负载压力测试', () => {
   }
 
   /**
-   * 模拟市场购买操作
+   * 模拟官方兑换/道具购买操作（B2C，替代已下线的 C2C 市场购买）
    *
-   * @description 模拟 POST /api/v4/marketplace/listings/:id/purchase 请求
+   * @description 模拟 POST /api/v4/exchange/items/:id/redeem 请求（通过幂等服务）
    * @param {string} idempotencyKey - 幂等键
    * @returns {Object} 购买结果
    */
-  async function simulateMarketPurchase(idempotencyKey) {
+  async function simulateExchangePurchase(idempotencyKey) {
     try {
       if (!testUserId || !IdempotencyService) {
         return { success: false, error: 'test_data_not_initialized' }
       }
 
-      // 通过幂等服务模拟购买请求
+      // 通过幂等服务模拟兑换请求
       const result = await IdempotencyService.getOrCreateRequest(idempotencyKey, {
-        api_path: '/api/v4/marketplace/listings/:id/purchase',
+        api_path: '/api/v4/exchange/items/:id/redeem',
         http_method: 'POST',
-        request_params: { market_listing_id: Math.floor(Math.random() * 100) + 1 },
+        request_params: { exchange_item_id: Math.floor(Math.random() * 100) + 1 },
         user_id: testUserId
       })
 

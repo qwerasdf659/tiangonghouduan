@@ -150,7 +150,6 @@ class PrizeQueryService {
           : null
 
         return {
-          lottery_prize_id: cp.lottery_campaign_prize_id,
           lottery_campaign_prize_id: cp.lottery_campaign_prize_id,
           prize_definition_id: cp.prize_definition_id,
           lottery_campaign_id: cp.lottery_campaign_id,
@@ -290,7 +289,6 @@ class PrizeQueryService {
           : null
 
         return {
-          lottery_prize_id: cp.lottery_campaign_prize_id,
           lottery_campaign_prize_id: cp.lottery_campaign_prize_id,
           lottery_campaign_id: cp.lottery_campaign_id,
           campaign_name: cp.campaign?.campaign_name || '未关联活动',
@@ -410,7 +408,7 @@ class PrizeQueryService {
 
             if (cp.stock_quantity === 0 && (cp.win_weight || 0) > 0) {
               warnings.push({
-                lottery_prize_id: cp.lottery_campaign_prize_id,
+                lottery_campaign_prize_id: cp.lottery_campaign_prize_id,
                 type: 'zero_stock_positive_weight',
                 message: `${def.display_name}：库存为 0 但权重 ${cp.win_weight} > 0`
               })
@@ -422,7 +420,6 @@ class PrizeQueryService {
               : null
 
             return {
-              lottery_prize_id: cp.lottery_campaign_prize_id,
               lottery_campaign_prize_id: cp.lottery_campaign_prize_id,
               lottery_campaign_id: cp.lottery_campaign_id,
               prize_name: def.display_name || '',

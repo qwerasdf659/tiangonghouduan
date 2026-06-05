@@ -184,37 +184,74 @@ describe('截图页面API联动测试', () => {
     })
   })
 
-  // ========== 抽奖干预管理（截图5） ==========
+  // ========== 抽奖成长等级公示分级概率（截图5：per-user 暗箱干预已合规下线，B 线替代） ==========
 
-  describe('抽奖干预管理', () => {
-    test('GET /console/lottery-management/interventions 应返回干预列表', async () => {
+  describe('抽奖成长等级公示分级概率', () => {
+    test('GET /console/lottery-management/growth-levels 应返回成长等级阶梯', async () => {
       const res = await request(app)
-        .get(`${API_BASE}/console/lottery-management/interventions`)
-        .query({ page: 1, page_size: 10 })
+        .get(`${API_BASE}/console/lottery-management/growth-levels`)
         .set('Authorization', `Bearer ${token}`)
 
       expect(res.status).toBe(200)
       expect(res.body.success).toBe(true)
-      expect(res.body.data).toHaveProperty('interventions')
-      expect(res.body.data).toHaveProperty('pagination')
-      expect(Array.isArray(res.body.data.interventions)).toBe(true)
+      expect(res.body.data).toHaveProperty('levels')
+      expect(Array.isArray(res.body.data.levels)).toBe(true)
+      expect(res.body.data.levels.length).toBeGreaterThan(0)
     })
 
-    test('干预记录应包含用户信息和状态显示', async () => {
+    test('成长等级记录应包含等级码、名称与门槛字段', async () => {
       const res = await request(app)
-        .get(`${API_BASE}/console/lottery-management/interventions`)
-        .query({ page: 1, page_size: 5 })
+        .get(`${API_BASE}/console/lottery-management/growth-levels`)
         .set('Authorization', `Bearer ${token}`)
 
-      if (res.body.data.interventions.length > 0) {
-        const item = res.body.data.interventions[0]
-        expect(item).toHaveProperty('setting_id')
-        expect(item).toHaveProperty('user_id')
-        expect(item).toHaveProperty('user_info')
-        expect(item.user_info).toHaveProperty('nickname')
-        expect(item).toHaveProperty('status_display')
-        expect(item).toHaveProperty('setting_type_display')
+      const { levels } = res.body.data
+      for (const level of levels) {
+        expect(level).toHaveProperty('user_growth_level_id')
+        expect(level).toHaveProperty('level_key')
+        expect(level).toHaveProperty('level_name')
+        expect(level).toHaveProperty('min_history_points')
+        expect(level).toHaveProperty('sort_order')
+        expect(level).toHaveProperty('status')
       }
+    })
+
+    test('GET /console/lottery-management/level-probability/:lottery_campaign_id 应返回各等级中奖率倍数', async () => {
+      const campaignRes = await request(app)
+        .get(`${API_BASE}/console/lottery-campaigns`)
+        .query({ page: 1, page_size: 1, status: 'active' })
+        .set('Authorization', `Bearer ${token}`)
+
+      const campaignList =
+        campaignRes.body?.data?.campaigns || campaignRes.body?.data?.list || []
+      if (campaignList.length === 0) {
+        return
+      }
+      const lottery_campaign_id = campaignList[0].lottery_campaign_id
+
+      const res = await request(app)
+        .get(`${API_BASE}/console/lottery-management/level-probability/${lottery_campaign_id}`)
+        .set('Authorization', `Bearer ${token}`)
+
+      expect(res.status).toBe(200)
+      expect(res.body.success).toBe(true)
+      expect(res.body.data).toHaveProperty('lottery_campaign_id', lottery_campaign_id)
+      expect(res.body.data).toHaveProperty('items')
+      expect(Array.isArray(res.body.data.items)).toBe(true)
+      for (const item of res.body.data.items) {
+        expect(item).toHaveProperty('level_key')
+        expect(item).toHaveProperty('multiplier')
+        expect(typeof item.multiplier).toBe('number')
+      }
+    })
+
+    test('非法活动ID应返回 400 INVALID_CAMPAIGN_ID', async () => {
+      const res = await request(app)
+        .get(`${API_BASE}/console/lottery-management/level-probability/0`)
+        .set('Authorization', `Bearer ${token}`)
+
+      expect(res.status).toBe(400)
+      expect(res.body.success).toBe(false)
+      expect(res.body.code).toBe('INVALID_CAMPAIGN_ID')
     })
   })
 

@@ -280,6 +280,22 @@ class CoreService {
     const itemTemplateId = product.item_template_id
     const productSkuRecord = productSku
 
+    /*
+     * F1 选 A（合规整改 §10.16-D / §10.15 Step 5）：道具单"即时完成 + 禁退款"分流
+     * - 纯虚拟道具（item_type='prop'）：买入即消耗、不可卖回 → 建单即 completed，且禁止 cancel/reject/refund
+     * - 实物（需发货）：维持 pending + 退款链不变（未消耗可退=解冻；已到手不可退=禁回购）
+     * 用"商品形态"天然分流，复用 exchange 已有的 mint_instance 即时铸造能力。
+     */
+    let isPropOrder = false
+    if (itemTemplateId && this.models.ItemTemplate) {
+      const propTpl = await this.models.ItemTemplate.findByPk(itemTemplateId, {
+        attributes: ['item_type'],
+        transaction
+      })
+      isPropOrder = propTpl?.item_type === 'prop'
+    }
+    const finalStatus = isPropOrder ? 'completed' : 'pending'
+
     // 2. 计算总支付金额
     const totalPayAmount = costAmount * quantity
 
@@ -395,7 +411,7 @@ class CoreService {
           pay_asset_code: costAssetCode,
           pay_amount: totalPayAmount,
           total_cost: costPrice * quantity,
-          status: 'pending',
+          status: finalStatus,
           exchange_time: BeijingTimeHelper.createDatabaseTime()
         },
         { transaction }
@@ -598,16 +614,17 @@ class CoreService {
       {
         order_no,
         old_status: null,
-        new_status: 'pending',
+        new_status: finalStatus,
         operator_id: user_id,
         operator_type: 'user',
-        reason: '用户兑换商品',
+        reason: isPropOrder ? '用户购买虚拟道具（即时完成）' : '用户兑换商品',
         metadata: {
           exchange_item_id,
           sku_id,
           quantity,
           pay_amount: totalPayAmount,
-          minted_item_id: mintedItem?.item_id || null
+          minted_item_id: mintedItem?.item_id || null,
+          is_prop_order: isPropOrder
         }
       },
       { transaction }
@@ -625,7 +642,7 @@ class CoreService {
         quantity,
         pay_asset_code: costAssetCode,
         pay_amount: totalPayAmount,
-        status: 'pending'
+        status: finalStatus
       },
       remaining: {
         material_balance: materialResult.new_balance
@@ -1005,6 +1022,45 @@ class CoreService {
   }
 
   /**
+   * 校验订单不是虚拟道具单（F1 选 A：道具买入即消耗、禁止退款）
+   *
+   * 合规约束（§10.16-D / §10.15 Step 5）：
+   * - 虚拟道具（item_type='prop'）单不可走 cancel/reject/refund，否则等于变相"官方回收"，
+   *   给星石装"可回笼"货币属性，撞代币红线。
+   * - 实物单（需发货）不受影响：未消耗可退=解冻；本守卫只拦截 prop 单。
+   * - 通过订单关联的 exchange_item → item_template 的 item_type 判定。
+   *
+   * @param {Object} order - ExchangeRecord 订单实例
+   * @param {Transaction} transaction - 事务对象
+   * @throws {BusinessError} PROP_NO_REFUND - 虚拟道具单禁止退款
+   * @returns {Promise<void>} 校验通过无返回，违规抛 BusinessError(400)
+   * @private
+   */
+  async _assertNotPropOrder(order, transaction) {
+    if (!order || !order.exchange_item_id) return
+    const { ExchangeItem, ItemTemplate } = this.models
+    if (!ExchangeItem || !ItemTemplate) return
+
+    const exchangeItem = await ExchangeItem.findByPk(order.exchange_item_id, {
+      attributes: ['item_template_id'],
+      transaction
+    })
+    if (!exchangeItem || !exchangeItem.item_template_id) return
+
+    const template = await ItemTemplate.findByPk(exchangeItem.item_template_id, {
+      attributes: ['item_type'],
+      transaction
+    })
+    if (template && template.item_type === 'prop') {
+      throw new BusinessError(
+        '虚拟道具买入即消耗，不可退款/取消（禁止官方回收，守星石单向铁律）',
+        'PROP_NO_REFUND',
+        400
+      )
+    }
+  }
+
+  /**
    * 用户取消订单（仅 pending 状态可取消，退还材料资产）
    *
    * 业务规则：
@@ -1042,6 +1098,9 @@ class CoreService {
       error.data = { current_status: order.status }
       throw error
     }
+
+    // F1 选 A：虚拟道具单买入即消耗、禁止退款（防止变相"官方回收"撞星石货币属性红线）
+    await this._assertNotPropOrder(order, transaction)
 
     // 退还材料资产（与 exchangeItem 扣减完全对称）
     const burnAccount = await BalanceService.getOrCreateAccount(
@@ -1150,6 +1209,9 @@ class CoreService {
       error.data = { current_status: order.status }
       throw error
     }
+
+    // F1 选 A：虚拟道具单买入即消耗、禁止退款
+    await this._assertNotPropOrder(order, transaction)
 
     // 退还材料资产
     const burnAccount = await BalanceService.getOrCreateAccount(
@@ -1264,6 +1326,9 @@ class CoreService {
     }
 
     const old_status = order.status
+
+    // F1 选 A：虚拟道具单买入即消耗、禁止退款
+    await this._assertNotPropOrder(order, transaction)
 
     // 退款防刷检查（三层防护，从 system_settings 读取配置，初始值全 0 = 关闭）
     await this._checkRefundRules(order, transaction)

@@ -230,7 +230,9 @@ class RealtimeService {
     const total_draws = draws.length
     const unique_users = new Set(draws.map(d => d.user_id)).size
     // empty_count 只统计真正空奖（empty 或 prize_id 为空），不包括正常保底（fallback）
-    const empty_count = draws.filter(d => d.prize_type === 'empty' || !d.lottery_prize_id).length
+    const empty_count = draws.filter(
+      d => d.prize_type === 'empty' || !d.lottery_campaign_prize_id
+    ).length
     const empty_rate = total_draws > 0 ? empty_count / total_draws : 0
 
     // 预算消耗计算（从decision表，字段为 budget_deducted）
@@ -280,7 +282,7 @@ class RealtimeService {
           [Op.gte]: range.start,
           [Op.lte]: range.end
         },
-        [Op.or]: [{ prize_type: 'empty' }, { lottery_prize_id: null }]
+        [Op.or]: [{ prize_type: 'empty' }, { lottery_campaign_prize_id: null }]
       }
     })
 
@@ -761,7 +763,7 @@ class RealtimeService {
             fn(
               'SUM',
               literal(
-                "CASE WHEN prize_type = 'empty' OR lottery_prize_id IS NULL THEN 1 ELSE 0 END"
+                "CASE WHEN prize_type = 'empty' OR lottery_campaign_prize_id IS NULL THEN 1 ELSE 0 END"
               )
             ),
             'empty'

@@ -56,11 +56,7 @@ class Item extends Model {
       as: 'holds'
     })
 
-    // 物品对应的交易市场挂牌
-    Item.hasMany(models.MarketListing, {
-      foreignKey: 'offer_item_id',
-      as: 'marketListings'
-    })
+    // 注：C2C 交易市场挂牌关联（marketListings）已随 C2C 下线删除（2026-06-05 阶段五）
 
     // 物品对应的兑换订单
     Item.hasMany(models.RedemptionOrder, {

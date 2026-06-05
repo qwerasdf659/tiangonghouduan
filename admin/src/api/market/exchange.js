@@ -44,6 +44,9 @@ export const EXCHANGE_ENDPOINTS = {
   SHIPPING_COMPANIES: `${API_PREFIX}/console/exchange/orders/shipping-companies`,
   ORDER_TRACK: `${API_PREFIX}/console/exchange/orders/:order_no/track`,
 
+  // 以物易物配方（后端: routes/v4/console/exchange/barter-recipes.js）
+  BARTER_RECIPES: `${API_PREFIX}/console/exchange/barter-recipes`,
+
   /**
    * B2C 兑换聚合统计（订单/商品/履约/趋势）
    * 后端: GET /api/v4/console/exchange/stats ，query: trend_days（默认 90）
@@ -250,6 +253,27 @@ export const ExchangeAPI = {
   async getOrderTrack(orderNo) {
     const url = buildURL(EXCHANGE_ENDPOINTS.ORDER_TRACK, { order_no: orderNo })
     return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 获取以物易物配方列表（管理后台，含停用项）
+   * @returns {Promise<Object>} { recipes }
+   */
+  async getBarterRecipes() {
+    return await request({ url: EXCHANGE_ENDPOINTS.BARTER_RECIPES, method: 'GET' })
+  },
+
+  /**
+   * 全量保存以物易物配方配置
+   * @param {Array<Object>} recipes - 配方数组
+   * @returns {Promise<Object>} { recipes }
+   */
+  async saveBarterRecipes(recipes) {
+    return await request({
+      url: EXCHANGE_ENDPOINTS.BARTER_RECIPES,
+      method: 'PUT',
+      data: { recipes }
+    })
   }
 }
 

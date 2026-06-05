@@ -37,9 +37,11 @@
 
 const BaseStage = require('./BaseStage')
 const { SegmentResolver } = require('../../../../config/segment_rules')
-const { User, LotteryUserExperienceState, LotteryDraw } = require('../../../../models')
+const models = require('../../../../models')
+const { User, LotteryUserExperienceState, LotteryDraw } = models
 const { Op } = require('sequelize')
 const BeijingTimeHelper = require('../../../../utils/timeHelper')
+const UserGrowthLevelService = require('../../../lottery/UserGrowthLevelService')
 
 /* 抽奖计算引擎 */
 const LotteryComputeEngine = require('../../compute/LotteryComputeEngine')
@@ -73,6 +75,21 @@ class TierPickStage extends BaseStage {
 
     /* 初始化抽奖计算引擎实例 */
     this.computeEngine = new LotteryComputeEngine()
+
+    /* B 线成长等级服务（懒加载单例） */
+    this._growthLevelService = null
+  }
+
+  /**
+   * 获取用户成长等级服务实例（懒加载，B 线公示分级概率）
+   * @returns {UserGrowthLevelService} 成长等级服务实例
+   * @private
+   */
+  _getGrowthLevelService() {
+    if (!this._growthLevelService) {
+      this._growthLevelService = new UserGrowthLevelService(models)
+    }
+    return this._growthLevelService
   }
 
   /**
@@ -91,8 +108,8 @@ class TierPickStage extends BaseStage {
 
     try {
       /*
-       * 🎯 Phase 1 新增：根据 decision_source 判断是否跳过正常抽取
-       * preset/override 模式不需要执行正常的档位抽取逻辑
+       * 根据 decision_source 判断是否跳过正常抽取
+       * preset 模式不需要执行正常的档位抽取逻辑（override 暗箱干预已于 2026-06-04 移除）
        */
       const decision_data = this.getContextData(context, 'LoadDecisionSourceStage.data')
       const decision_source = decision_data?.decision_source || 'normal'
@@ -153,68 +170,7 @@ class TierPickStage extends BaseStage {
         })
       }
 
-      // override 模式：根据干预类型决定档位
-      if (decision_source === 'override' && decision_data?.override) {
-        const override = decision_data.override
-        const override_type = override.setting_type || override.override_type
-        /**
-         * 🔴 2026-03-06 业务语义修正：force_lose → low 档位
-         * 100%出奖设计下没有"不中奖"概念，force_lose 意为"强制低档奖品"
-         */
-        let override_tier = override_type === 'force_win' ? 'high' : 'low'
-
-        if (override_tier === 'high') {
-          override_tier = await this._enforceDailyHighCap(
-            user_id,
-            lottery_campaign_id,
-            override_tier,
-            context
-          )
-        }
-
-        /*
-         * 干预模式也需要检查奖品池可用性并降级
-         * force_win 设定 high 但奖品池可能因预算/库存/资格过滤后无 high 档位奖品
-         * 此时必须降级到有奖品的档位，否则 PrizePickStage 会因空池报错
-         */
-        const override_pool_data = this.getContextData(context, 'BuildPrizePoolStage.data')
-        let override_downgrade_path = []
-        if (override_pool_data) {
-          const { selected_tier: downgraded, downgrade_path } = this._applyDowngrade(
-            override_tier,
-            override_pool_data.prizes_by_tier,
-            override_pool_data.available_tiers
-          )
-          if (downgraded !== override_tier) {
-            this.log('warn', '干预模式档位降级：目标档位无可用奖品', {
-              user_id,
-              original_override_tier: override_tier,
-              downgraded_to: downgraded,
-              downgrade_path
-            })
-          }
-          override_downgrade_path = downgrade_path
-          override_tier = downgraded
-        }
-
-        this.log('info', '干预模式：跳过档位抽取，使用干预档位', {
-          user_id,
-          decision_source,
-          override_type,
-          override_tier
-        })
-        return this.success({
-          selected_tier: override_tier,
-          original_tier: override_type === 'force_win' ? 'high' : 'low',
-          tier_downgrade_path: override_downgrade_path,
-          random_value: 0,
-          tier_weights: {},
-          weight_scale: WEIGHT_SCALE,
-          decision_source,
-          skipped: true,
-          skip_reason: 'override_mode'
-        })
-      }
+      // override 模式已于 2026-06-04 合规改造移除（per-user 暗箱干预下线）
 
       // guarantee 模式：使用高档位（同样受每日上限约束）
       if (decision_source === 'guarantee') {
@@ -380,6 +336,46 @@ class TierPickStage extends BaseStage {
       }
 
       /**
+       * 🅱️ B 线：成长等级公示分级概率（2026-06-04 合规改造）
+       *
+       * 业务背景：
+       * - per-user 暗箱干预下线后，"让某类人更易中"改为按成长等级的公示分级概率
+       * - 成长等级由 users.history_total_points 实时派生（UserGrowthLevelService）
+       * - 各等级倍数存于 lottery_strategy_config.level_probability（按活动公示），默认 1.0（零行为变化）
+       * - 倍数仅放大 high 档位权重；最终仍受 §4a 硬上限 MAX_HIGH_TIER_PROBABILITY 约束（公示 high≤8%）
+       */
+      let growth_level_key = null
+      let growth_level_multiplier = 1.0
+      try {
+        const growthLevelService = this._getGrowthLevelService()
+        const levelResult = await growthLevelService.getUserLevelMultiplier(
+          user_id,
+          lottery_campaign_id
+        )
+        growth_level_key = levelResult.level_key
+        growth_level_multiplier = levelResult.multiplier || 1.0
+        if (growth_level_multiplier !== 1.0 && adjusted_weights.high > 0) {
+          adjusted_weights = {
+            ...adjusted_weights,
+            high: adjusted_weights.high * growth_level_multiplier
+          }
+          this.log('info', 'B线成长等级公示分级概率：放大 high 档位权重', {
+            user_id,
+            growth_level_key,
+            growth_level_multiplier,
+            high_weight_after: adjusted_weights.high
+          })
+        }
+      } catch (levelError) {
+        // B 线非致命：取不到等级或倍数时回退默认 1.0，不影响抽奖主流程
+        this.log('warn', 'B线成长等级倍数获取失败（非致命，回退默认1.0）', {
+          user_id,
+          lottery_campaign_id,
+          error: levelError.message
+        })
+      }
+
+      /**
        * 🛡️ 4a. 强制概率硬上限（不可绕过的安全网 - 2026-02-15 新增）
        *
        * 业务背景：
@@ -502,6 +498,9 @@ class TierPickStage extends BaseStage {
         empty_weight_multiplier: weight_adjustment.empty_weight_multiplier,
         /* 每日高价值硬上限保护 */
         daily_high_capped,
+        /* B 线成长等级公示分级概率（审计/可观测） */
+        growth_level_key,
+        growth_level_multiplier,
         /* 体验平滑信息 */
         experience_smoothing: smoothing_result
           ? {
@@ -856,7 +855,7 @@ class TierPickStage extends BaseStage {
   /**
    * 统一的每日高档上限强制执行
    *
-   * 适用于所有 decision_source（normal / preset / override / guarantee）
+   * 适用于所有 decision_source（normal / preset / guarantee）
    * 无论奖品来源如何，单用户每天 high 档位中奖次数不得超过硬上限
    *
    * @param {number} user_id - 用户ID

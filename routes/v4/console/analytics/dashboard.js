@@ -183,65 +183,6 @@ router.get(
   })
 )
 
-// ========== 市场健康看板（D1）==========
-
-/**
- * 获取市场健康综合数据
- * GET /api/v4/console/dashboard/market-health
- */
-router.get(
-  '/market-health',
-  authenticateToken,
-  requireRoleLevel(100),
-  asyncHandler(async (req, res) => {
-    const MarketHealthService = req.app.locals.services.getService('market_health')
-    const { days } = req.query
-    const result = await MarketHealthService.getMarketHealthSummary({ days: parseInt(days) || 30 })
-    return res.apiSuccess(result, '获取市场健康数据成功')
-  })
-)
-
-/**
- * 获取订单状态趋势（完成率/取消率）
- * GET /api/v4/console/dashboard/market-health/order-trend
- */
-router.get(
-  '/market-health/order-trend',
-  authenticateToken,
-  requireRoleLevel(100),
-  asyncHandler(async (req, res) => {
-    const MarketHealthService = req.app.locals.services.getService('market_health')
-    const { days } = req.query
-    const result = await MarketHealthService.getOrderStatusTrend({ days: parseInt(days) || 30 })
-    return res.apiSuccess(result, '获取订单状态趋势成功')
-  })
-)
-
-/**
- * 获取活跃买家/卖家 Top N
- * GET /api/v4/console/dashboard/market-health/top-users
- */
-router.get(
-  '/market-health/top-users',
-  authenticateToken,
-  requireRoleLevel(100),
-  asyncHandler(async (req, res) => {
-    const MarketHealthService = req.app.locals.services.getService('market_health')
-    const { days, page_size } = req.query
-    const filters = { days: parseInt(days) || 30, page_size: parseInt(page_size) || 10 }
-
-    const [topBuyers, topSellers] = await Promise.all([
-      MarketHealthService.getTopBuyers(filters),
-      MarketHealthService.getTopSellers(filters)
-    ])
-
-    return res.apiSuccess(
-      { top_buyers: topBuyers, top_sellers: topSellers },
-      '获取活跃用户排行成功'
-    )
-  })
-)
-
 // ========== 平台收入管理（PlatformRevenueService）==========
 
 /**

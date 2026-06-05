@@ -42,7 +42,7 @@ router.post(
         presets_count: createdPresets.length,
         created_presets: createdPresets.map(preset => ({
           lottery_preset_id: preset.lottery_preset_id,
-          lottery_prize_id: preset.lottery_prize_id,
+          lottery_campaign_prize_id: preset.lottery_campaign_prize_id,
           queue_order: preset.queue_order,
           status: preset.status
         }))

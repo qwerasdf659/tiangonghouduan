@@ -169,10 +169,11 @@ module.exports = sequelize => {
 
       // ===== 订单多态关联（支持跨订单类型关联工单）=====
       order_type: {
-        type: DataTypes.ENUM('trade', 'redemption', 'consumption'),
+        type: DataTypes.ENUM('redemption', 'consumption'),
         allowNull: true,
         defaultValue: null,
-        comment: '关联订单类型：trade=交易订单, redemption=兑换订单, consumption=消费核销'
+        comment:
+          '关联订单类型：redemption=兑换订单, consumption=消费核销（trade=交易订单已随 C2C 下线移除，2026-06-05 阶段五）'
       },
 
       order_id: {

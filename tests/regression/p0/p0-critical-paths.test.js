@@ -89,10 +89,10 @@ describe('🔴 P0级回归测试入口 - 核心业务路径', () => {
      */
     try {
       const BalanceService = global.getTestService('asset_balance')
-      const MarketListingService = global.getTestService('market_listing_core')
+      const ExchangeAdminService = global.getTestService('exchange_admin')
 
-      if (BalanceService && MarketListingService) {
-        console.log('✅ 核心服务已加载: asset_balance, market_listing')
+      if (BalanceService && ExchangeAdminService) {
+        console.log('✅ 核心服务已加载: asset_balance, exchange_admin')
       }
     } catch (error) {
       console.warn('⚠️ 服务加载警告:', error.message)
@@ -380,123 +380,56 @@ describe('🔴 P0级回归测试入口 - 核心业务路径', () => {
    * 🔴 P0-4: 交易市场核心流程
    * ==========================================
    */
-  describe('P0-4: 交易市场核心流程', () => {
+  describe('P0-4: B2C 道具商城/竞价核心流程（C2C 已下线）', () => {
     /**
-     * 测试用例：MarketListingService可用性
+     * 测试用例：ExchangeAdminService 可用性
      *
-     * 业务场景：验证市场挂牌服务核心功能
+     * 业务场景：验证 B2C 兑换/道具商城管理服务核心功能（替代已下线的 C2C MarketListingService）
      *
      * 验收标准：
-     * - 服务可通过ServiceManager获取
-     * - 核心方法存在
+     * - 服务可通过 ServiceManager 获取（snake_case key: exchange_admin）
      */
-    test('P0-4-1: MarketListingService应正常可用', async () => {
-      console.log('📋 P0-4-1: 验证MarketListingService可用性...')
+    test('P0-4-1: ExchangeAdminService 应正常可用', async () => {
+      console.log('📋 P0-4-1: 验证 ExchangeAdminService 可用性...')
 
-      try {
-        const MarketListingService = global.getTestService('market_listing_core')
-
-        expect(MarketListingService).toBeTruthy()
-
-        // 验证核心方法存在
-        const coreMethods = ['getListings', 'createListing', 'withdrawListing']
-        const availableMethods = coreMethods.filter(
-          method => typeof MarketListingService[method] === 'function'
-        )
-
-        console.log('   ✅ MarketListingService 服务可用')
-        console.log(`   📦 可用方法: ${availableMethods.join(', ')}`)
-
-        expect(availableMethods.length).toBeGreaterThan(0)
-      } catch (error) {
-        console.error(`   ❌ MarketListingService 加载失败: ${error.message}`)
-        throw error
-      }
+      const ExchangeAdminService = global.getTestService('exchange_admin')
+      expect(ExchangeAdminService).toBeTruthy()
+      console.log('   ✅ ExchangeAdminService 服务可用')
     })
 
     /**
-     * 测试用例：市场列表API可用性
+     * 测试用例：官方竞价查询服务可用性
      *
-     * 业务场景：获取市场挂牌列表
-     * API端点：GET /api/v4/marketplace/listings
+     * 业务场景：验证 B2C 官方竞价查询服务（exchange_bid_query）
      *
      * 验收标准：
-     * - API端点响应正常
-     * - 返回标准API响应格式
+     * - 服务可通过 ServiceManager 获取
      */
-    test('P0-4-2: 市场列表API应可正常访问', async () => {
-      console.log('📋 P0-4-2: 验证市场列表API...')
+    test('P0-4-2: 官方竞价查询服务应正常可用', async () => {
+      console.log('📋 P0-4-2: 验证官方竞价查询服务...')
+
+      const BidQueryService = global.getTestService('exchange_bid_query')
+      expect(BidQueryService).toBeTruthy()
+      console.log('   ✅ exchange_bid_query 服务可用')
+    })
+
+    /**
+     * 测试用例：C2C marketplace 域已彻底下线（返回 410）
+     *
+     * 业务场景：验证 C2C 二级市场整域已下线，旧端点返回 410 Gone
+     *
+     * 验收标准：
+     * - GET /api/v4/marketplace/listings 返回 410
+     */
+    test('P0-4-3: C2C marketplace 域应已下线（返回 410）', async () => {
+      console.log('📋 P0-4-3: 验证 C2C marketplace 域已下线...')
 
       const response = await request(app)
         .get('/api/v4/marketplace/listings')
         .query({ page: 1, page_size: 10 })
 
-      // 可能需要认证
-      if (response.status === 401) {
-        console.log('   ℹ️ 市场列表需要认证，尝试带Token访问')
-
-        if (authToken) {
-          const authResponse = await request(app)
-            .get('/api/v4/marketplace/listings')
-            .set('Authorization', `Bearer ${authToken}`)
-            .query({ page: 1, page_size: 10 })
-
-          // 可能返回200（成功）、404（端点不存在）、401（认证失效/会话过期）
-          expect([200, 404, 401]).toContain(authResponse.status)
-          if (authResponse.status === 200) {
-            TestAssertions.validateApiResponse(authResponse.body, true)
-            console.log('   ✅ 市场列表获取成功（带认证）')
-          } else if (authResponse.status === 401) {
-            console.log('   ℹ️ Token已失效或会话过期（测试环境正常现象）')
-          } else {
-            console.log('   ℹ️ 市场列表API不存在（可能路径不同）')
-          }
-        } else {
-          console.log('   ⚠️ 无Token，跳过认证访问')
-        }
-      } else if (response.status === 200) {
-        TestAssertions.validateApiResponse(response.body, true)
-        console.log('   ✅ 市场列表获取成功（无需认证）')
-      } else if (response.status === 404) {
-        console.log('   ℹ️ /api/v4/marketplace/listings 端点不存在')
-      }
-
-      expect(true).toBe(true)
-    })
-
-    /**
-     * 测试用例：孤儿冻结预防机制可用性
-     *
-     * 业务场景：验证孤儿冻结预防机制的关键方法存在
-     *
-     * 验收标准：
-     * - _cancelBuyerOrdersForListing 方法存在（内部方法）
-     * - withdrawListing 方法存在
-     */
-    test('P0-4-3: 孤儿冻结预防机制应存在', async () => {
-      console.log('📋 P0-4-3: 验证孤儿冻结预防机制...')
-
-      try {
-        const MarketListingService = global.getTestService('market_listing_core')
-
-        // 验证关键方法存在
-        expect(typeof MarketListingService.withdrawListing).toBe('function')
-
-        // 验证内部方法存在（用于孤儿冻结预防）
-        const hasInternalMethod =
-          typeof MarketListingService._cancelBuyerOrdersForListing === 'function'
-
-        if (hasInternalMethod) {
-          console.log('   ✅ 孤儿冻结预防机制存在')
-          console.log('   📦 _cancelBuyerOrdersForListing 方法可用')
-        } else {
-          console.log('   ℹ️ _cancelBuyerOrdersForListing 方法不可直接访问（可能是私有方法）')
-          console.log('   ✅ withdrawListing 方法可用（包含孤儿冻结预防逻辑）')
-        }
-      } catch (error) {
-        console.error(`   ❌ 验证失败: ${error.message}`)
-        throw error
-      }
+      expect(response.status).toBe(410)
+      console.log('   ✅ marketplace 域已彻底下线（返回 410 Gone）')
     })
   })
 
@@ -516,7 +449,7 @@ describe('🔴 P0级回归测试入口 - 核心业务路径', () => {
       console.log('   ✓ P0-1: 用户认证核心流程（登录/Token验证）')
       console.log('   ✓ P0-2: 抽奖核心流程（API/引擎服务）')
       console.log('   ✓ P0-3: 资产服务核心流程（余额查询）')
-      console.log('   ✓ P0-4: 交易市场核心流程（挂牌/孤儿冻结预防）')
+      console.log('   ✓ P0-4: B2C 道具商城/竞价核心流程（C2C 已下线，marketplace 返回 410）')
       console.log('')
       console.log('📋 验收标准：')
       console.log('   - 核心业务路径可一键执行 ✅')

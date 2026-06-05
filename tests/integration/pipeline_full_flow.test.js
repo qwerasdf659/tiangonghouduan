@@ -373,23 +373,6 @@ describe('🎯 Pipeline架构完整业务流程测试', () => {
         console.log('   ℹ️ 预设API路径不存在')
       }
     })
-
-    test('ManagementStrategy应该正确处理预设', async () => {
-      console.log('👑 场景4.2: ManagementStrategy验证...')
-
-      // 验证管理策略组件存在
-      const ManagementStrategy = require('../../services/UnifiedLotteryEngine/strategies/ManagementStrategy')
-
-      expect(ManagementStrategy).toBeDefined()
-      console.log('   ✅ ManagementStrategy 类存在')
-
-      // 验证管理策略实例可以创建
-      const strategy = new ManagementStrategy()
-      expect(strategy).toBeDefined()
-      expect(typeof strategy.forceWin).toBe('function')
-      expect(typeof strategy.forceLose).toBe('function')
-      console.log('   ✅ ManagementStrategy 实例化成功，forceWin/forceLose 方法存在')
-    })
   })
 
   /*
@@ -464,14 +447,13 @@ describe('🎯 Pipeline架构完整业务流程测试', () => {
       console.log('   1. 单抽功能验证 - API响应格式、幂等性')
       console.log('   2. 连抽功能验证 - 3连/5连/10连批量处理')
       console.log('   3. 保底机制验证 - 数据结构、配额查询')
-      console.log('   4. 管理预设验证 - ManagementStrategy功能')
+      console.log('   4. 管理预设验证 - 预设列表查询')
       console.log('   5. Pipeline架构验证 - 各Stage正确加载')
       console.log('')
       console.log('🏗️ 架构组件状态：')
       console.log('   - DrawOrchestrator: 抽奖入口 ✅')
       console.log('   - Pipeline Stages: 6个Stage ✅')
       console.log('   - LotteryQuotaService: 配额管理 ✅')
-      console.log('   - ManagementStrategy: 管理API ✅')
       console.log('')
       console.log('📝 迁移状态：')
       console.log('   - Strategy -> Pipeline 迁移已完成')

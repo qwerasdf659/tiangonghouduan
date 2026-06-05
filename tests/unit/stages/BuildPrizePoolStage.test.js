@@ -22,7 +22,7 @@ const BuildPrizePoolStage = require('../../../services/UnifiedLotteryEngine/pipe
  */
 const REAL_PRIZE_POOL = [
   {
-    lottery_prize_id: 163,
+    lottery_campaign_prize_id: 163,
     prize_name: '四人鸳鸯锅套餐',
     prize_type: 'physical',
     reward_tier: 'high',
@@ -35,7 +35,7 @@ const REAL_PRIZE_POOL = [
     stock_quantity: 50
   },
   {
-    lottery_prize_id: 164,
+    lottery_campaign_prize_id: 164,
     prize_name: '八折优惠券',
     prize_type: 'coupon',
     reward_tier: 'high',
@@ -48,7 +48,7 @@ const REAL_PRIZE_POOL = [
     stock_quantity: 3000
   },
   {
-    lottery_prize_id: 165,
+    lottery_campaign_prize_id: 165,
     prize_name: '招牌虾滑1份',
     prize_type: 'physical',
     reward_tier: 'mid',
@@ -61,7 +61,7 @@ const REAL_PRIZE_POOL = [
     stock_quantity: 500
   },
   {
-    lottery_prize_id: 166,
+    lottery_campaign_prize_id: 166,
     prize_name: '精酿啤酒1杯',
     prize_type: 'physical',
     reward_tier: 'mid',
@@ -74,7 +74,7 @@ const REAL_PRIZE_POOL = [
     stock_quantity: 1000
   },
   {
-    lottery_prize_id: 167,
+    lottery_campaign_prize_id: 167,
     prize_name: '九五折券',
     prize_type: 'coupon',
     reward_tier: 'mid',
@@ -87,7 +87,7 @@ const REAL_PRIZE_POOL = [
     stock_quantity: 8000
   },
   {
-    lottery_prize_id: 168,
+    lottery_campaign_prize_id: 168,
     prize_name: '星石×1',
     prize_type: 'virtual',
     reward_tier: 'low',
@@ -100,7 +100,7 @@ const REAL_PRIZE_POOL = [
     stock_quantity: 99999
   },
   {
-    lottery_prize_id: 169,
+    lottery_campaign_prize_id: 169,
     prize_name: '幸运5积分',
     prize_type: 'points',
     reward_tier: 'low',
@@ -113,7 +113,7 @@ const REAL_PRIZE_POOL = [
     stock_quantity: 99999
   },
   {
-    lottery_prize_id: 170,
+    lottery_campaign_prize_id: 170,
     prize_name: '幸运5积分',
     prize_type: 'points',
     reward_tier: 'low',
@@ -135,7 +135,7 @@ const REAL_PRIZE_POOL = [
 const PRIZE_POOL_WITH_SHARDS = [
   ...REAL_PRIZE_POOL,
   {
-    lottery_prize_id: 201,
+    lottery_campaign_prize_id: 201,
     prize_name: '碎片×50',
     prize_type: 'virtual',
     reward_tier: 'high',
@@ -148,7 +148,7 @@ const PRIZE_POOL_WITH_SHARDS = [
     stock_quantity: 100
   },
   {
-    lottery_prize_id: 202,
+    lottery_campaign_prize_id: 202,
     prize_name: '碎片×3',
     prize_type: 'virtual',
     reward_tier: 'low',
@@ -203,7 +203,7 @@ describe('BuildPrizePoolStage — 资源级过滤', () => {
       const result = await stage._filterByResourceEligibility(REAL_PRIZE_POOL, 31, 100)
 
       expect(result).toHaveLength(8)
-      expect(result.map(p => p.lottery_prize_id)).toEqual(
+      expect(result.map(p => p.lottery_campaign_prize_id)).toEqual(
         expect.arrayContaining([163, 164, 165, 166, 167, 168, 169, 170])
       )
     })
@@ -215,7 +215,7 @@ describe('BuildPrizePoolStage — 资源级过滤', () => {
     test('场景2：预算耗尽 + 星石配额充足 → 星石通过、付费奖品被过滤', async () => {
       const result = await stage._filterByResourceEligibility(REAL_PRIZE_POOL, 31, 0)
 
-      const surviving_ids = result.map(p => p.lottery_prize_id)
+      const surviving_ids = result.map(p => p.lottery_campaign_prize_id)
 
       /* 星石×1 (id=168, star_stone, amount=1) 必须存活 */
       expect(surviving_ids).toContain(168)
@@ -243,7 +243,7 @@ describe('BuildPrizePoolStage — 资源级过滤', () => {
 
       const result = await stage._filterByResourceEligibility(REAL_PRIZE_POOL, 31, 100)
 
-      const surviving_ids = result.map(p => p.lottery_prize_id)
+      const surviving_ids = result.map(p => p.lottery_campaign_prize_id)
 
       /* 星石×1 被过滤（quota=0 < amount=1） */
       expect(surviving_ids).not.toContain(168)
@@ -265,7 +265,7 @@ describe('BuildPrizePoolStage — 资源级过滤', () => {
       const result = await stage._filterByResourceEligibility(REAL_PRIZE_POOL, 31, 0)
 
       expect(result).toHaveLength(1)
-      expect(result[0].lottery_prize_id).toBe(170)
+      expect(result[0].lottery_campaign_prize_id).toBe(170)
       expect(result[0].prize_value_points).toBe(0)
       expect(result[0].is_fallback).toBe(1)
     })
@@ -277,7 +277,7 @@ describe('BuildPrizePoolStage — 资源级过滤', () => {
     test('场景5：低消费用户 → 仅 pvp<=5 的奖品和星石通过', async () => {
       const result = await stage._filterByResourceEligibility(REAL_PRIZE_POOL, 31, 5)
 
-      const surviving_ids = result.map(p => p.lottery_prize_id)
+      const surviving_ids = result.map(p => p.lottery_campaign_prize_id)
 
       /* high 档全被过滤（pvp=20, 15 > 5） */
       expect(surviving_ids).not.toContain(163)
@@ -309,7 +309,7 @@ describe('BuildPrizePoolStage — 资源级过滤', () => {
       expect(grouped.high).toHaveLength(0)
       expect(grouped.mid).toHaveLength(0)
       expect(grouped.low).toHaveLength(2)
-      expect(grouped.low.map(p => p.lottery_prize_id)).toEqual(expect.arrayContaining([168, 170]))
+      expect(grouped.low.map(p => p.lottery_campaign_prize_id)).toEqual(expect.arrayContaining([168, 170]))
     })
   })
 
@@ -320,7 +320,7 @@ describe('BuildPrizePoolStage — 资源级过滤', () => {
      */
     test('BUG-1：碎片×50（budget_cost=500）在 BUDGET=60 时被正确过滤', async () => {
       const result = await stage._filterByResourceEligibility(PRIZE_POOL_WITH_SHARDS, 31, 60)
-      const surviving_ids = result.map(p => p.lottery_prize_id)
+      const surviving_ids = result.map(p => p.lottery_campaign_prize_id)
 
       expect(surviving_ids).not.toContain(201) // 碎片×50 budget_cost=500 > 60
       expect(surviving_ids).toContain(202) // 碎片×3 budget_cost=30 ≤ 60
@@ -331,10 +331,10 @@ describe('BuildPrizePoolStage — 资源级过滤', () => {
      */
     test('碎片×3 的过滤边界：budget_cost=30 vs BUDGET=29/30', async () => {
       const result29 = await stage._filterByResourceEligibility(PRIZE_POOL_WITH_SHARDS, 31, 29)
-      expect(result29.map(p => p.lottery_prize_id)).not.toContain(202)
+      expect(result29.map(p => p.lottery_campaign_prize_id)).not.toContain(202)
 
       const result30 = await stage._filterByResourceEligibility(PRIZE_POOL_WITH_SHARDS, 31, 30)
-      expect(result30.map(p => p.lottery_prize_id)).toContain(202)
+      expect(result30.map(p => p.lottery_campaign_prize_id)).toContain(202)
     })
 
     /**
@@ -342,7 +342,7 @@ describe('BuildPrizePoolStage — 资源级过滤', () => {
      */
     test('BUDGET=500 等于碎片×50 budget_cost=500 → 恰好通过（边界值）', async () => {
       const result = await stage._filterByResourceEligibility(PRIZE_POOL_WITH_SHARDS, 31, 500)
-      const surviving_ids = result.map(p => p.lottery_prize_id)
+      const surviving_ids = result.map(p => p.lottery_campaign_prize_id)
 
       expect(surviving_ids).toContain(201) // 碎片×50 budget_cost=500 ≤ 500
       expect(surviving_ids).toContain(202) // 碎片×3 budget_cost=30 ≤ 500
@@ -353,7 +353,7 @@ describe('BuildPrizePoolStage — 资源级过滤', () => {
      */
     test('BUDGET=499 小于碎片×50 budget_cost=500 → 过滤', async () => {
       const result = await stage._filterByResourceEligibility(PRIZE_POOL_WITH_SHARDS, 31, 499)
-      const surviving_ids = result.map(p => p.lottery_prize_id)
+      const surviving_ids = result.map(p => p.lottery_campaign_prize_id)
 
       expect(surviving_ids).not.toContain(201) // 碎片×50 budget_cost=500 > 499
       expect(surviving_ids).toContain(202) // 碎片×3 budget_cost=30 ≤ 499
@@ -364,7 +364,7 @@ describe('BuildPrizePoolStage — 资源级过滤', () => {
      */
     test('碎片配额耗尽 → 碎片全过滤，星石和保底保留', async () => {
       const result = await stage._filterByResourceEligibility(PRIZE_POOL_WITH_SHARDS, 31, 0)
-      const surviving_ids = result.map(p => p.lottery_prize_id)
+      const surviving_ids = result.map(p => p.lottery_campaign_prize_id)
 
       expect(surviving_ids).not.toContain(201)
       expect(surviving_ids).not.toContain(202)

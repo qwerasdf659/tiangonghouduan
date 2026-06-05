@@ -78,9 +78,8 @@ export const MENU_ACCESS_RULES = {
   'asset-trade': { minLevel: 30, description: '资产交易（分组）' },
   'asset-trade.asset-mgmt': { minLevel: 30, description: '资产管理' },
   'asset-trade.asset-adj': { minLevel: 30, description: '资产调整' },
-  'asset-trade.orphan-frozen': { minLevel: 30, description: '孤儿冻结清理' },
   'asset-trade.exchange': { minLevel: 30, description: '兑换市场' },
-  'asset-trade.trade': { minLevel: 30, description: '交易市场' },
+  // 注：C2C 交易市场（asset-trade.trade）、孤儿冻结清理（asset-trade.orphan-frozen）已随 C2C 下线移除（2026-06-05 阶段五）
 
   // ========== 用户门店（role_level >= 30） ==========
   users: { minLevel: 30, description: '用户门店（分组）' },
@@ -130,12 +129,12 @@ export const PAGE_ACCESS_RULES = {
 
   'asset-management.html': { minLevel: 30, menuId: 'assets.asset-mgmt' },
   'asset-adjustment.html': { minLevel: 30, menuId: 'assets.asset-adj' },
-  'orphan-frozen.html': { minLevel: 30, menuId: 'assets.orphan' },
+  // 注：orphan-frozen.html（孤儿冻结清理）已随 C2C 下线移除（2026-06-05 阶段五）
   'conversion-rule-management.html': { minLevel: 30, menuId: 'assets.conversion-rules' },
   'assets-portfolio.html': { minLevel: 30, menuId: 'assets.assets-portfolio' },
 
   'exchange-market.html': { minLevel: 30, menuId: 'market.exchange' },
-  'trade-management.html': { minLevel: 30, menuId: 'market.trade' },
+  // 注：trade-management.html（C2C 交易市场）已合规下线（2026-06-04），页面权限项随导航入口一并移除
 
   'user-management.html': { minLevel: 30, menuId: 'users.user-mgmt' },
   'user-hierarchy.html': { minLevel: 30, menuId: 'users.user-hierarchy' },

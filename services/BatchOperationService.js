@@ -24,7 +24,7 @@ const crypto = require('crypto')
 const { BatchOperationLog, User } = require('../models')
 const AdminSystemService = require('./AdminSystemService')
 const logger = require('../utils/logger').logger
-const { getRedisClient: getRedisClientInstance } = require('../utils/UnifiedRedisClient')
+const { getRawClient } = require('../utils/UnifiedRedisClient')
 // BeijingTimeHelper 未在当前版本中使用，保留导入用于未来时间处理需求
 
 /**
@@ -49,12 +49,18 @@ class BatchOperationService {
   // ==================== Redis 操作 ====================
 
   /**
-   * 获取 Redis 客户端
-   * @returns {Object|null} Redis客户端实例
+   * 获取 Redis 客户端（原生 ioredis 实例）
+   *
+   * 说明：本服务的幂等键写入使用原生 ioredis 语法 `set(key, value, 'EX', ttl, 'NX')`
+   * （需要 NX 仅当不存在时写入 + EX 过期），故必须取原生客户端而非 UnifiedRedisClient 包装层
+   * （包装层 set(key, value, ttl) 签名不支持 EX/NX 选项，会把 'EX' 当作 ttl 传入 setex，
+   * 触发 "ERR value is not an integer or out of range"）。
+   *
+   * @returns {Object|null} 原生 ioredis 客户端实例（不可用时返回 null）
    */
   static getRedisClient() {
     try {
-      return getRedisClientInstance()
+      return getRawClient()
     } catch (error) {
       logger.warn('Redis 客户端初始化失败', { error: error.message })
       return null

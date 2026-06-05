@@ -42,7 +42,6 @@ const {
   LotteryCampaignPrize: _LotteryCampaignPrize,
   LotteryCampaignUserQuota: _LotteryCampaignUserQuota,
   LotteryHourlyMetrics, // Phase P2：监控指标埋点
-  LotteryManagementSetting, // 管理干预设置（force_win 使用后标记为 used）
   LotteryPreset, // 预设队列（使用后标记为 used）
   sequelize
 } = require('../../../../models')
@@ -250,7 +249,7 @@ class SettleStage extends BaseStage {
         budget_deducted = await this._deductBudget(budget_provider, budget_cost, {
           user_id,
           lottery_campaign_id,
-          lottery_prize_id: final_prize.lottery_prize_id,
+          lottery_campaign_prize_id: final_prize.lottery_campaign_prize_id,
           idempotency_key,
           transaction
         })
@@ -362,16 +361,9 @@ class SettleStage extends BaseStage {
       })
 
       /*
-       * ========== 2026-02-15 修复：消耗决策来源 ==========
-       * 抽奖完成后，将命中的预设/管理干预标记为已使用（status='used'）
-       *
-       * 修复根因：
-       * - 原代码没有在抽奖成功后消耗决策来源
-       * - 导致 force_win 管理干预永远不会变成 used 状态
-       * - 用户每次抽奖都会反复命中同一条 active 的 force_win 规则
-       * - 同理，预设队列也不会自动消耗
-       *
-       * 修复方案：在同一事务内将已使用的预设/干预标记为 used
+       * ========== 消耗决策来源 ==========
+       * 抽奖完成后，将命中的预设标记为已使用（status='used'），队列自动推进。
+       * （2026-06-04 合规改造：per-user 暗箱干预 override 已下线，仅消耗预设）
        */
       await this._consumeDecisionSource(context, transaction)
 
@@ -410,7 +402,7 @@ class SettleStage extends BaseStage {
         is_duplicate: false,
         settle_result: {
           lottery_draw_id,
-          lottery_prize_id: final_prize.lottery_prize_id,
+          lottery_campaign_prize_id: final_prize.lottery_campaign_prize_id,
           prize_name: final_prize.prize_name,
           prize_type: final_prize.prize_type,
           prize_value: final_prize.prize_value,
@@ -446,7 +438,7 @@ class SettleStage extends BaseStage {
         user_id,
         lottery_campaign_id,
         lottery_draw_id,
-        lottery_prize_id: final_prize.lottery_prize_id,
+        lottery_campaign_prize_id: final_prize.lottery_campaign_prize_id,
         prize_name: final_prize.prize_name,
         budget_deducted,
         draw_cost, // 🆕 增加日志
@@ -524,7 +516,9 @@ class SettleStage extends BaseStage {
   async _deductPrizeStock(prize, transaction) {
     // 无限库存不扣减
     if (prize.stock_quantity === null) {
-      this.log('debug', '奖品为无限库存，跳过扣减', { lottery_prize_id: prize.lottery_prize_id })
+      this.log('debug', '奖品为无限库存，跳过扣减', {
+        lottery_campaign_prize_id: prize.lottery_campaign_prize_id
+      })
       return
     }
 
@@ -544,7 +538,7 @@ class SettleStage extends BaseStage {
            total_win_count = total_win_count + 1
        WHERE lottery_campaign_prize_id = ? AND stock_quantity >= 1`,
       {
-        replacements: [prize.lottery_prize_id],
+        replacements: [prize.lottery_campaign_prize_id],
         transaction,
         type: sequelize.QueryTypes.UPDATE
       }
@@ -557,7 +551,7 @@ class SettleStage extends BaseStage {
     }
 
     this.log('debug', '奖品库存扣减成功', {
-      lottery_prize_id: prize.lottery_prize_id,
+      lottery_campaign_prize_id: prize.lottery_campaign_prize_id,
       prize_name: prize.prize_name
     })
   }
@@ -573,14 +567,19 @@ class SettleStage extends BaseStage {
    */
   async _deductBudget(budget_provider, amount, options) {
     try {
-      const { user_id, lottery_campaign_id, lottery_prize_id, idempotency_key, transaction } =
-        options
+      const {
+        user_id,
+        lottery_campaign_id,
+        lottery_campaign_prize_id,
+        idempotency_key,
+        transaction
+      } = options
       const result = await budget_provider.deductBudget(
         {
           user_id,
           lottery_campaign_id,
           amount,
-          reason: `抽奖扣减预算 lottery_prize_id=${lottery_prize_id}`,
+          reason: `抽奖扣减预算 lottery_campaign_prize_id=${lottery_campaign_prize_id}`,
           reference_id: idempotency_key
         },
         { transaction }
@@ -590,7 +589,7 @@ class SettleStage extends BaseStage {
         this.log('warn', '预算扣减失败：余额不足，跳过预算消耗', {
           user_id,
           lottery_campaign_id,
-          lottery_prize_id,
+          lottery_campaign_prize_id,
           required: amount,
           available: result.remaining,
           shortage: result.shortage
@@ -661,7 +660,7 @@ class SettleStage extends BaseStage {
               item_name: prize.prize_name,
               item_description: prize.prize_description || `抽奖获得：${prize.prize_name}`,
               item_value: Math.round(parseFloat(prize.prize_value) || 0),
-              prize_definition_id: prize.lottery_prize_id,
+              prize_definition_id: prize.prize_definition_id,
               rarity_code: prize.rarity_code || 'common',
               business_type: 'lottery_mint',
               idempotency_key: `${idempotency_key}:item`,
@@ -688,7 +687,7 @@ class SettleStage extends BaseStage {
                 business_type: 'lottery_reward_material',
                 counterpart_account_id: mintAccount.account_id,
                 meta: {
-                  lottery_prize_id: prize.lottery_prize_id,
+                  lottery_campaign_prize_id: prize.lottery_campaign_prize_id,
                   prize_name: prize.prize_name
                 }
               },
@@ -699,7 +698,7 @@ class SettleStage extends BaseStage {
             if (prize.material_asset_code === AssetCode.STAR_STONE) {
               await this._deductStarStoneQuota(user_id, prize.material_amount, {
                 idempotency_key: `${idempotency_key}:quota_deduct`,
-                lottery_prize_id: prize.lottery_prize_id,
+                lottery_campaign_prize_id: prize.lottery_campaign_prize_id,
                 transaction
               })
             }
@@ -708,20 +707,20 @@ class SettleStage extends BaseStage {
 
         default:
           this.log('warn', '未知奖品类型，跳过发放', {
-            lottery_prize_id: prize.lottery_prize_id,
+            lottery_campaign_prize_id: prize.lottery_campaign_prize_id,
             prize_type: prize.prize_type
           })
       }
 
       this.log('debug', '奖品发放完成', {
         user_id,
-        lottery_prize_id: prize.lottery_prize_id,
+        lottery_campaign_prize_id: prize.lottery_campaign_prize_id,
         prize_type: prize.prize_type
       })
     } catch (error) {
       this.log('error', '奖品发放失败', {
         user_id,
-        lottery_prize_id: prize.lottery_prize_id,
+        lottery_campaign_prize_id: prize.lottery_campaign_prize_id,
         error: error.message
       })
       throw error
@@ -738,13 +737,13 @@ class SettleStage extends BaseStage {
    * @param {number} star_stone_amount - 发放的星石数量
    * @param {Object} options - 扣减选项
    * @param {string} options.idempotency_key - 幂等键
-   * @param {number} options.lottery_prize_id - 奖品ID
+   * @param {number} options.lottery_campaign_prize_id - 活动奖品ID
    * @param {Object} options.transaction - 事务对象
    * @returns {Promise<void>} 无返回值
    * @private
    */
   async _deductStarStoneQuota(user_id, star_stone_amount, options) {
-    const { idempotency_key, lottery_prize_id, transaction } = options
+    const { idempotency_key, lottery_campaign_prize_id, transaction } = options
 
     try {
       const burnAccount = await BalanceService.getOrCreateAccount(
@@ -762,7 +761,7 @@ class SettleStage extends BaseStage {
           business_type: 'lottery_quota_deduct',
           counterpart_account_id: burnAccount.account_id,
           meta: {
-            lottery_prize_id,
+            lottery_campaign_prize_id,
             star_stone_amount,
             description: `抽奖扣减星石配额 ${star_stone_amount}`
           }
@@ -773,13 +772,13 @@ class SettleStage extends BaseStage {
       this.log('info', '星石配额扣减成功', {
         user_id,
         star_stone_amount,
-        lottery_prize_id
+        lottery_campaign_prize_id
       })
     } catch (error) {
       this.log('warn', '星石配额扣减失败（非致命，配额可能未初始化）', {
         user_id,
         star_stone_amount,
-        lottery_prize_id,
+        lottery_campaign_prize_id,
         error: error.message
       })
     }
@@ -863,9 +862,7 @@ class SettleStage extends BaseStage {
         draw_type, // 🆕 动态确定（single/multi）
         lottery_batch_id: batch_id, // 🆕 Phase 2：连抽批次ID（null 表示单抽）
         asset_transaction_id: final_asset_transaction_id, // 🆕 关联资产流水ID（必填字段）
-        lottery_prize_id: final_prize.lottery_prize_id,
-        lottery_campaign_prize_id:
-          final_prize.lottery_campaign_prize_id || final_prize.lottery_prize_id,
+        lottery_campaign_prize_id: final_prize.lottery_campaign_prize_id,
         prize_name: final_prize.prize_name,
         prize_type: final_prize.prize_type,
         prize_value: final_prize.prize_value,
@@ -1329,11 +1326,11 @@ class SettleStage extends BaseStage {
   }
 
   /**
-   * 消耗决策来源（标记预设/管理干预为已使用）
+   * 消耗决策来源（标记预设为已使用）
    *
    * 业务场景：
-   * - force_win 管理干预：使用后标记为 used，避免同一规则被反复命中
    * - 预设队列（preset）：使用后标记为 used，队列自动推进到下一个
+   *   （2026-06-04 合规改造：per-user 暗箱干预 override 已下线，不再消耗管理干预）
    *
    * 在同一事务中执行，确保与抽奖记录创建的原子性：
    * - 如果抽奖失败回滚，决策来源状态也会回滚（不会误消耗）
@@ -1364,26 +1361,6 @@ class SettleStage extends BaseStage {
 
         this.log('info', '预设已标记为已使用', {
           lottery_preset_id,
-          affected_rows
-        })
-      }
-    }
-
-    // 管理干预模式：标记 LotteryManagementSetting 为已使用
-    if (decision_source === 'override' && decision_data.override) {
-      const lottery_management_setting_id = decision_data.override.lottery_management_setting_id
-      if (lottery_management_setting_id) {
-        const [affected_rows] = await LotteryManagementSetting.update(
-          { status: 'used' },
-          {
-            where: { lottery_management_setting_id, status: 'active' },
-            transaction
-          }
-        )
-
-        this.log('info', '管理干预已标记为已使用', {
-          lottery_management_setting_id,
-          setting_type: decision_data.override.setting_type,
           affected_rows
         })
       }

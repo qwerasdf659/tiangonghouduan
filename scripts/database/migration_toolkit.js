@@ -483,9 +483,16 @@ async function verifyMigrations() {
       }
 
       // 3.2 验证action类型
-      const parts = file.replace('.js', '').split('-')
+      // 文件名格式：{14位时间戳}-{action}-{target}.js
+      // action 可能是单词（baseline）或双词（create-table/alter-table/drop-column 等）
+      const baseName = file.replace('.js', '')
+      const parts = baseName.split('-')
       if (parts.length >= 2) {
-        const action = parts[1]
+        // 优先匹配双词 action（parts[1]-parts[2]），否则回退单词 action（parts[1]）
+        const twoWordAction = parts.length >= 3 ? `${parts[1]}-${parts[2]}` : null
+        const action = VALIDATION_RULES.allowedActions.includes(twoWordAction)
+          ? twoWordAction
+          : parts[1]
 
         if (VALIDATION_RULES.forbiddenActions.includes(action)) {
           if (isExecuted) {
@@ -496,7 +503,11 @@ async function verifyMigrations() {
         }
 
         if (!VALIDATION_RULES.allowedActions.includes(action)) {
-          warnings.push(`未知的action类型: ${action}`)
+          if (isExecuted) {
+            warnings.push(`未知的action类型: ${action}（历史已执行，降级为警告）`)
+          } else {
+            warnings.push(`未知的action类型: ${action}`)
+          }
         }
       }
 

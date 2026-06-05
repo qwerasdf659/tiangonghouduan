@@ -85,7 +85,7 @@ class LotteryAnalyticsQueryService {
         [fn('DATE_FORMAT', col('created_at'), '%Y-%m-%d %H:00:00'), 'hour'],
         [fn('COUNT', col('lottery_draw_id')), 'draw_count'],
         [
-          fn('SUM', literal('CASE WHEN lottery_prize_id IS NOT NULL THEN 1 ELSE 0 END')),
+          fn('SUM', literal('CASE WHEN lottery_campaign_prize_id IS NOT NULL THEN 1 ELSE 0 END')),
           'win_count'
         ],
         [fn('COUNT', fn('DISTINCT', col('user_id'))), 'unique_users']
@@ -150,7 +150,7 @@ class LotteryAnalyticsQueryService {
         [fn('DATE', col('created_at')), 'date'],
         [fn('COUNT', col('lottery_draw_id')), 'draw_count'],
         [
-          fn('SUM', literal('CASE WHEN lottery_prize_id IS NOT NULL THEN 1 ELSE 0 END')),
+          fn('SUM', literal('CASE WHEN lottery_campaign_prize_id IS NOT NULL THEN 1 ELSE 0 END')),
           'win_count'
         ],
         [fn('COUNT', fn('DISTINCT', col('user_id'))), 'unique_users']
@@ -199,20 +199,28 @@ class LotteryAnalyticsQueryService {
 
     // 按奖品分组统计
     const distribution = await LotteryDraw.findAll({
-      attributes: ['lottery_prize_id', [fn('COUNT', col('lottery_draw_id')), 'win_count']],
+      attributes: ['lottery_campaign_prize_id', [fn('COUNT', col('lottery_draw_id')), 'win_count']],
       where: {
         lottery_campaign_id: parseInt(lotteryCampaignId),
-        lottery_prize_id: { [Op.ne]: null }
+        lottery_campaign_prize_id: { [Op.ne]: null }
       },
       include: [
         {
           model: LotteryCampaignPrize,
           as: 'campaignPrize',
           attributes: ['reward_tier'],
-          required: true
+          required: true,
+          include: [
+            {
+              model: PrizeDefinition,
+              as: 'prizeDefinition',
+              attributes: ['display_name', 'prize_type'],
+              required: false
+            }
+          ]
         }
       ],
-      group: ['lottery_prize_id', 'prize.lottery_prize_id'],
+      group: ['lottery_draws.lottery_campaign_prize_id', 'campaignPrize.lottery_campaign_prize_id'],
       order: [[fn('COUNT', col('lottery_draw_id')), 'DESC']],
       raw: true,
       nest: true
@@ -225,10 +233,10 @@ class LotteryAnalyticsQueryService {
       lottery_campaign_id: parseInt(lotteryCampaignId),
       total_wins: totalWins,
       prizes: distribution.map(item => ({
-        lottery_prize_id: item.lottery_prize_id,
-        prize_name: item.prize?.prize_name,
-        prize_type: item.prize?.prize_type,
-        reward_tier: item.prize?.reward_tier,
+        lottery_campaign_prize_id: item.lottery_campaign_prize_id,
+        prize_name: item.campaignPrize?.prizeDefinition?.display_name,
+        prize_type: item.campaignPrize?.prizeDefinition?.prize_type,
+        reward_tier: item.campaignPrize?.reward_tier,
         win_count: parseInt(item.win_count) || 0,
         percentage: totalWins > 0 ? ((item.win_count / totalWins) * 100).toFixed(2) : '0.00'
       }))
@@ -259,7 +267,7 @@ class LotteryAnalyticsQueryService {
       attributes: [[fn('COUNT', col('LotteryDraw.lottery_draw_id')), 'win_count']],
       where: {
         lottery_campaign_id: parseInt(lotteryCampaignId),
-        lottery_prize_id: { [Op.ne]: null }
+        lottery_campaign_prize_id: { [Op.ne]: null }
       },
       include: [
         {
@@ -327,7 +335,7 @@ class LotteryAnalyticsQueryService {
       LotteryDraw.count({
         where: {
           lottery_campaign_id: parseInt(lotteryCampaignId),
-          lottery_prize_id: { [Op.ne]: null }
+          lottery_campaign_prize_id: { [Op.ne]: null }
         }
       }),
       // 独立用户数
@@ -395,7 +403,7 @@ class LotteryAnalyticsQueryService {
       LotteryDraw.count({
         where: {
           ...where,
-          lottery_prize_id: { [Op.ne]: null }
+          lottery_campaign_prize_id: { [Op.ne]: null }
         }
       }),
       // 按奖品类型统计
@@ -403,7 +411,7 @@ class LotteryAnalyticsQueryService {
         attributes: [[fn('COUNT', col('lottery_draw_id')), 'win_count']],
         where: {
           ...where,
-          lottery_prize_id: { [Op.ne]: null }
+          lottery_campaign_prize_id: { [Op.ne]: null }
         },
         include: [
           {

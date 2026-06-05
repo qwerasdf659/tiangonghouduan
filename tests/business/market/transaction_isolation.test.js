@@ -31,7 +31,7 @@ const {
   batchCreateInTransaction,
   validateInTransaction
 } = require('../../helpers/sequelize-test-helper')
-const { prepareMarketTestEnvironment } = require('../../helpers/test-points-setup')
+const { ensureTestUserHasPoints } = require('../../helpers/test-points-setup')
 
 // 测试超时设置
 jest.setTimeout(60000)
@@ -49,12 +49,8 @@ describe('🔬 事务隔离测试（Transaction Isolation）', () => {
     await sequelize.authenticate()
     console.log('✅ 数据库连接成功')
 
-    // 准备测试环境
-    await prepareMarketTestEnvironment({
-      dailyMaxListings: 1000,
-      requiredPoints: 100000,
-      clearTodayListings: true
-    })
+    // 准备测试环境（确保测试用户有足够积分；C2C 市场环境准备已随 C2C 下线移除）
+    await ensureTestUserHasPoints(100000)
 
     // 获取测试用户
     testUser = await User.findOne({

@@ -4,7 +4,7 @@
  * 业务场景：
  * - DMP用户标签聚合：从业务表计算用户行为标签
  * - 定时任务：每日凌晨3点执行，更新所有活跃用户的标签
- * - 支持10个标签维度：抽奖活跃度、星石余额、交易行为等
+ * - 支持多个标签维度：抽奖活跃度、星石余额、官方兑换/直购行为等
  *
  * 服务对象：
  * - 定时任务：jobs/ad-cron-jobs.js（03:00执行）
@@ -12,14 +12,7 @@
  */
 
 const logger = require('../utils/logger').logger
-const {
-  UserAdTag,
-  User,
-  LotteryDraw,
-  AccountAssetBalance,
-  MarketListing,
-  TradeOrder
-} = require('../models')
+const { UserAdTag, User, LotteryDraw, AccountAssetBalance, ExchangeRecord } = require('../models')
 const { Op } = require('sequelize')
 const BeijingTimeHelper = require('../utils/timeHelper')
 const { AssetCode } = require('../constants/AssetCode')
@@ -237,18 +230,12 @@ class AdTagAggregationService {
       const redShardValue = redShardBalance ? parseFloat(redShardBalance.balance) : 0
       tags.set('has_red_core_shard', redShardValue > 0 ? 'true' : 'false')
 
-      // 7. market_trader: 有交易市场记录
-      const marketListingCount = await MarketListing.count({
-        where: { seller_user_id: userId },
+      // 7. exchange_buyer: 有官方兑换/直购记录（B2C，C2C 交易市场已下线）
+      const exchangeRecordCount = await ExchangeRecord.count({
+        where: { user_id: userId },
         transaction
       })
-      const tradeOrderCount = await TradeOrder.count({
-        where: {
-          [Op.or]: [{ buyer_user_id: userId }, { seller_user_id: userId }]
-        },
-        transaction
-      })
-      tags.set('market_trader', marketListingCount > 0 || tradeOrderCount > 0 ? 'true' : 'false')
+      tags.set('exchange_buyer', exchangeRecordCount > 0 ? 'true' : 'false')
 
       // 8. new_user: 注册时间 < 7天
       const user = await User.findByPk(userId, {
@@ -264,19 +251,12 @@ class AdTagAggregationService {
         tags.set('register_days', '0')
       }
 
-      // 9. active_7d: 最近7天有任何活动
+      // 9. active_7d: 最近7天有任何活动（抽奖或官方兑换/直购）
       const hasActivity7d =
         lotteryCount7d > 0 ||
-        (await MarketListing.count({
+        (await ExchangeRecord.count({
           where: {
-            seller_user_id: userId,
-            created_at: { [Op.gte]: sevenDaysAgo }
-          },
-          transaction
-        })) > 0 ||
-        (await TradeOrder.count({
-          where: {
-            [Op.or]: [{ buyer_user_id: userId }, { seller_user_id: userId }],
+            user_id: userId,
             created_at: { [Op.gte]: sevenDaysAgo }
           },
           transaction

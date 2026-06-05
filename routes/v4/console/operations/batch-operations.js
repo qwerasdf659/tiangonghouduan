@@ -519,14 +519,15 @@ router.post(
  * 请求体：
  * {
  *   rules: Array<{
- *     user_id: number,        // 必填：目标用户ID
- *     lottery_campaign_id: number,    // 必填：活动ID
- *     lottery_prize_id: number,       // 必填：预设奖品ID
- *     trigger_type: string,   // 必填：触发类型（first_draw/nth_draw/time_based）
- *     trigger_value: number   // 可选：触发值（如第N次）
+ *     user_id: number,                     // 必填：目标用户ID
+ *     lottery_campaign_prize_id: number,   // 必填：活动奖品关联ID（FK→lottery_campaign_prizes）
+ *     queue_order: number                  // 必填：队列顺序（正整数，决定预设使用先后）
  *   }>,
  *   reason: string            // 必填：设置原因
  * }
+ *
+ * 说明（2026-06-05 修正）：本路由委托 LotteryPresetService.createPresets（按 queue_order 的预设队列），
+ * 不再使用历史不存在的 createPreset/trigger_type/trigger_value 字段（与真实模型 LotteryPreset 对齐）。
  */
 router.post(
   '/preset-rules',
@@ -550,12 +551,17 @@ router.post(
         return res.apiError('reason 不能为空', 'INVALID_REASON', null, 400)
       }
 
-      // 验证每条规则的必填字段
+      // 验证每条规则的必填字段（与真实模型 LotteryPreset 对齐：queue_order 队列顺序）
       for (let i = 0; i < rules.length; i++) {
         const rule = rules[i]
-        if (!rule.user_id || !rule.lottery_campaign_id || !rule.lottery_prize_id) {
+        if (
+          !rule.user_id ||
+          !rule.lottery_campaign_prize_id ||
+          rule.queue_order === undefined ||
+          rule.queue_order === null
+        ) {
           return res.apiError(
-            `规则[${i}]缺少必填字段：user_id、lottery_campaign_id、prize_id`,
+            `规则[${i}]缺少必填字段：user_id、lottery_campaign_prize_id、queue_order`,
             'INVALID_RULE_PARAMS',
             null,
             400
@@ -608,42 +614,39 @@ router.post(
       for (let i = 0; i < rules.length; i++) {
         const rule = rules[i]
         try {
-          // 使用 TransactionManager 管理单个子操作的事务边界
-          const preset = await TransactionManager.execute(
-            async transaction => {
-              return LotteryPresetService.createPreset(
-                {
-                  user_id: parseInt(rule.user_id),
-                  lottery_campaign_id: parseInt(rule.lottery_campaign_id),
-                  lottery_prize_id: parseInt(rule.lottery_prize_id),
-                  trigger_type: rule.trigger_type || 'first_draw',
-                  trigger_value: rule.trigger_value || 1,
-                  reason: `[批量设置] ${reason.trim()}`,
-                  created_by: operator_id
-                },
-                { transaction }
-              )
-            },
-            { description: `批量设置规则-用户${rule.user_id}` }
+          /*
+           * 委托真实服务方法 createPresets(adminId, userId, presets[])
+           * 该方法内部通过 LotteryPreset.createPresetQueue 自管理事务（无需外层 TransactionManager 包裹）
+           * 每条 rule 作为单元素预设数组提交
+           */
+          const createdPresets = await LotteryPresetService.createPresets(
+            operator_id,
+            parseInt(rule.user_id),
+            [
+              {
+                lottery_campaign_prize_id: parseInt(rule.lottery_campaign_prize_id),
+                queue_order: parseInt(rule.queue_order)
+              }
+            ]
           )
 
           successItems.push({
             index: i,
             user_id: rule.user_id,
-            lottery_campaign_id: rule.lottery_campaign_id,
-            lottery_preset_id: preset?.lottery_preset_id,
-            message: '规则创建成功'
+            lottery_campaign_prize_id: rule.lottery_campaign_prize_id,
+            lottery_preset_id: createdPresets?.[0]?.lottery_preset_id,
+            message: '预设规则创建成功'
           })
         } catch (error) {
           failedItems.push({
             index: i,
             user_id: rule.user_id,
-            lottery_campaign_id: rule.lottery_campaign_id,
+            lottery_campaign_prize_id: rule.lottery_campaign_prize_id,
             error_code: error.code || 'PRESET_CREATE_FAILED',
-            error_message: error.message || '规则创建失败'
+            error_message: error.message || '预设规则创建失败'
           })
 
-          logger.warn('批量创建单条干预规则失败', {
+          logger.warn('批量创建单条预设规则失败', {
             batch_operation_log_id: batchLog.batch_operation_log_id,
             rule_index: i,
             error: error.message

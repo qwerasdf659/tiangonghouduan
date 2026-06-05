@@ -5,11 +5,12 @@
  * @prefix /api/v4/console/customer-service/user-orders
  *
  * 数据来源（通过 ServiceManager 获取已有服务）：
- * - trade_order_query → TradeOrderQueryService.getUserOrders()
  * - consumption_query → ConsumptionQueryService.getUserConsumptionRecords()
  * - redemption_order → RedemptionService.getUserOrders()
  *
- * @version 1.0.0
+ * 注：C2C 交易订单（trade_order）已随 C2C 下线移除（2026-06-05 阶段五）
+ *
+ * @version 1.1.0
  * @date 2026-05-27
  */
 
@@ -26,10 +27,10 @@ router.use(authenticateToken, requireRoleLevel(1))
  * GET /:user_id - 获取用户近期所有类型订单（聚合）
  *
  * 聚合逻辑：
- * 1. 并行查询三种订单表（通过 ServiceManager 获取已有服务）
+ * 1. 并行查询两种订单表（通过 ServiceManager 获取已有服务）
  * 2. 统一格式化为 { order_type, order_id, order_no, summary, status, created_at, issue_count }
  * 3. 按 created_at 倒序混合排序
- * 4. 应用层分页（三表数据量有限，不需要 SQL 级 UNION 分页）
+ * 4. 应用层分页（两表数据量有限，不需要 SQL 级 UNION 分页）
  *
  * @route GET /api/v4/console/customer-service/user-orders/:user_id
  * @param {number} user_id - 用户ID（事务实体）
@@ -49,21 +50,11 @@ router.get(
     }
 
     // 通过 ServiceManager 获取已有服务（复用，不新建）
-    const TradeOrderQueryService = req.app.locals.services.getService('trade_order_query')
     const ConsumptionQueryService = req.app.locals.services.getService('consumption_query')
     const RedemptionService = req.app.locals.services.getService('redemption_order')
 
-    // 并行查询三种订单（各限制50条，覆盖近期订单）
-    const [tradeResult, consumptionResult, redemptionResult] = await Promise.all([
-      TradeOrderQueryService.getUserOrders({
-        user_id: parsedUserId,
-        role: 'all',
-        page: 1,
-        page_size: 50
-      }).catch(err => {
-        req.app.locals.logger?.warn('[user-orders] 交易订单查询失败', { error: err.message })
-        return { orders: [], total: 0 }
-      }),
+    // 并行查询两种订单（各限制50条，覆盖近期订单）
+    const [consumptionResult, redemptionResult] = await Promise.all([
       ConsumptionQueryService.getUserConsumptionRecords(parsedUserId, {
         page: 1,
         page_size: 50
@@ -79,7 +70,6 @@ router.get(
 
     // 统一格式化（注意各服务返回格式不同）
     const allOrders = [
-      ...formatTradeOrders(tradeResult.orders || []),
       ...formatConsumptionRecords(consumptionResult.records || []),
       ...formatRedemptionOrders(redemptionResult.rows || [])
     ]
@@ -111,26 +101,6 @@ router.get(
 // ===== 辅助函数 =====
 
 /**
- * 格式化交易订单为统一结构
- * @param {Array} orders - TradeOrderQueryService 返回的订单数组
- * @returns {Array} 统一格式的订单数组
- */
-function formatTradeOrders(orders) {
-  return orders.map(o => {
-    const plain = o.toJSON ? o.toJSON() : o
-    return {
-      order_type: 'trade',
-      order_id: String(plain.trade_order_id),
-      order_no: plain.order_no,
-      summary: `${plain.asset_code || '资产'} ×${plain.gross_amount || 0}`,
-      amount: String(plain.gross_amount || 0),
-      status: plain.status,
-      created_at: plain.created_at
-    }
-  })
-}
-
-/**
  * 格式化消费记录为统一结构
  * @param {Array} records - ConsumptionQueryService 返回的记录数组
  * @returns {Array} 统一格式的订单数组
@@ -138,12 +108,13 @@ function formatTradeOrders(orders) {
 function formatConsumptionRecords(records) {
   return records.map(r => ({
     order_type: 'consumption',
-    order_id: String(r.consumption_record_id),
+    order_id: String(r.record_id || r.id),
     order_no: r.order_no,
     summary: `门店消费 ¥${r.consumption_amount || 0}`,
     amount: String(r.consumption_amount || 0),
     status: r.status,
-    created_at: r.created_at
+    // created_at 经 toAPIResponse() 已转为 { iso, beijing, timestamp, relative } 对象，取 iso 标准串
+    created_at: r.created_at?.iso || r.created_at
   }))
 }
 

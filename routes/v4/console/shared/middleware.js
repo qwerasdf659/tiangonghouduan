@@ -59,35 +59,19 @@ function getSharedComponents(serviceManager = null) {
     }
   }
 
-  // 降级方案：直接 require 并实例化
+  /*
+   * 降级方案：直接 require 并实例化
+   * 2026-06-04 合规改造：ManagementStrategy/ManagementQueryStrategy（per-user 暗箱干预）已下线
+   */
   const {
     UnifiedLotteryEngine
   } = require('../../../../services/UnifiedLotteryEngine/UnifiedLotteryEngine')
   const DrawOrchestrator = require('../../../../services/UnifiedLotteryEngine/pipeline/DrawOrchestrator')
-  const ManagementStrategy = require('../../../../services/UnifiedLotteryEngine/strategies/ManagementStrategy')
-  const ManagementQueryStrategy = require('../../../../services/UnifiedLotteryEngine/strategies/ManagementQueryStrategy')
   const PerformanceMonitor = require('../../../../services/UnifiedLotteryEngine/utils/PerformanceMonitor')
 
-  const managementStrategyInstance = new ManagementStrategy()
   _sharedComponents = {
     lotteryEngine: new UnifiedLotteryEngine(),
     drawOrchestrator: new DrawOrchestrator(),
-    managementStrategy: managementStrategyInstance,
-    _managementQueryStrategy: null,
-    /**
-     * 获取管理查询策略实例（懒加载）
-     * @returns {ManagementQueryStrategy} 管理查询策略实例
-     */
-    get managementQueryStrategy() {
-      if (!this._managementQueryStrategy) {
-        this._managementQueryStrategy = new ManagementQueryStrategy({
-          cache: managementStrategyInstance.cache,
-          cacheTTL: managementStrategyInstance.cacheTTL,
-          logger: managementStrategyInstance.logger
-        })
-      }
-      return this._managementQueryStrategy
-    },
     performanceMonitor: new PerformanceMonitor(),
     logger
   }
@@ -116,23 +100,6 @@ const sharedComponents = {
    */
   get drawOrchestrator() {
     return getSharedComponents().drawOrchestrator
-  },
-  /**
-   * 获取管理策略实例（管理操作 API）
-   *
-   * 用途：forceWin/forceLose/getUserStatus/clearUserSettings 等管理操作
-   *
-   * @returns {Object} 管理策略实例
-   */
-  get managementStrategy() {
-    return getSharedComponents().managementStrategy
-  },
-  /**
-   * 获取管理查询策略实例
-   * @returns {Object} 管理查询策略实例
-   */
-  get managementQueryStrategy() {
-    return getSharedComponents().managementQueryStrategy
   },
   /**
    * 获取性能监控器实例

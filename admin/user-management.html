@@ -46,7 +46,6 @@
          @edit-user="editUser($event.detail)"
          @toggle-user-status="toggleUserStatus($event.detail)"
          @manage-user-role="manageUserRole($event.detail)"
-         @open-probability="openProbabilityModal($event.detail)"
          @analyze-user="analyzeUser($event.detail)"
          @edit-role="editRole($event.detail)"
          @manage-role-permissions="manageRolePermissions($event.detail)"
@@ -119,7 +118,6 @@
                           <button @click="$dispatch('edit-user', row)" class="text-green-500 hover:text-green-700 text-sm">编辑</button>
                           <button @click="$dispatch('toggle-user-status', row)" class="text-yellow-500 hover:text-yellow-700 text-sm" x-text="row.status === 'active' ? '禁用' : '启用'"></button>
                           <button @click="$dispatch('manage-user-role', row)" class="text-purple-500 hover:text-purple-700 text-sm">角色</button>
-                          <button @click="$dispatch('open-probability', row)" class="text-orange-500 hover:text-orange-700 text-sm">概率</button>
                           <button @click="$dispatch('analyze-user', row)" class="text-cyan-500 hover:text-cyan-700 text-sm">📊分析</button>
                         </div>
                       </td>
@@ -1759,117 +1757,6 @@
               </button>
             </template>
           </div>
-        </div>
-      </div>
-
-      <!-- 10. 概率调整 Modal -->
-      <div x-ref="probabilityModal" 
-           x-show="isModalOpen('probabilityModal')" 
-           x-cloak
-           class="fixed inset-0 z-50 flex items-center justify-center"
-           style="display: none;">
-        <!-- 遮罩层 -->
-        <div class="fixed inset-0 bg-black/50" @click="hideModal('probabilityModal')"></div>
-        <!-- 内容 -->
-        <div class="relative themed-card rounded-lg shadow-xl w-full max-w-2xl mx-4 z-10 max-h-[90vh] overflow-y-auto">
-          <div class="p-4 border-b flex justify-between items-center sticky top-0 themed-card">
-            <h5 class="font-semibold">📊 个人概率调整</h5>
-            <button @click="hideModal('probabilityModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
-          </div>
-          <form @submit.prevent="saveProbabilityAdjustment()">
-            <div class="p-6 space-y-4">
-              <!-- 用户信息 -->
-              <div class="p-3 themed-bg-primary-light rounded-lg">
-                <p class="themed-text-primary">
-                  用户：<strong x-text="probabilityModal.user_nickname"></strong>
-                  (<span x-text="probabilityModal.user_id"></span>)
-                </p>
-              </div>
-
-              <!-- 提示信息 -->
-              <div class="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <p class="text-yellow-800 text-sm">
-                  ⚠️ 为该用户设置专属的中奖概率调整系数，请谨慎操作
-                </p>
-              </div>
-
-              <!-- 调整模式 -->
-              <div>
-                <label class="block text-sm font-medium themed-text-secondary mb-1">调整模式</label>
-                <select x-model="probabilityModal.mode" 
-                        class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
-                        @change="updateProbabilityPreview()">
-                  <option value="global">全局倍率调整</option>
-                  <option value="specific">特定奖品调整</option>
-                </select>
-              </div>
-
-              <!-- 全局倍率模式 -->
-              <div x-show="probabilityModal.mode === 'global'" class="space-y-4">
-                <div>
-                  <label class="block text-sm font-medium themed-text-secondary mb-1">概率倍率</label>
-                  <input type="number" x-model.number="probabilityModal.multiplier" 
-                         step="0.1" min="0.1" max="10"
-                         class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
-                         placeholder="如 2.0 表示概率翻倍">
-                  <p class="text-sm themed-text-muted mt-1">倍率范围: 0.1 - 10（1.0 为原始概率，2.0 为翻倍）</p>
-                </div>
-              </div>
-
-              <!-- 特定奖品模式 -->
-              <div x-show="probabilityModal.mode === 'specific'" class="space-y-4">
-                <div>
-                  <label class="block text-sm font-medium themed-text-secondary mb-1">选择奖品</label>
-                  <select x-model="probabilityModal.lottery_campaign_prize_id" 
-                          class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
-                          @change="updateProbabilityPreview()">
-                    <option value="">请选择奖品</option>
-                    <template x-for="prize in allPrizes" :key="prize.lottery_prize_id">
-                      <option :value="prize.lottery_prize_id" x-text="prize.prize_name"></option>
-                    </template>
-                  </select>
-                </div>
-                <div>
-                  <label class="block text-sm font-medium themed-text-secondary mb-1">自定义概率 (%)</label>
-                  <input type="number" x-model.number="probabilityModal.custom_probability" 
-                         step="1" min="1" max="100"
-                         class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
-                         placeholder="如 50 表示 50% 概率"
-                         @input="updateProbabilityPreview()">
-                </div>
-                <!-- 预览区域 -->
-                <div class="p-3 themed-bg-base rounded-lg">
-                  <label class="block text-sm font-medium themed-text-secondary mb-2">概率预览</label>
-                  <div x-html="probabilityPreviewHtml" class="text-sm"></div>
-                </div>
-              </div>
-
-              <!-- 通用设置 -->
-              <div>
-                <label class="block text-sm font-medium themed-text-secondary mb-1">生效时长（分钟）</label>
-                <input type="number" x-model.number="probabilityModal.duration" 
-                       step="1" min="1" max="10080"
-                       class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
-                       placeholder="如 60 表示 1 小时">
-                <p class="text-sm themed-text-muted mt-1">最长 10080 分钟（7 天）</p>
-              </div>
-
-              <div>
-                <label class="block text-sm font-medium themed-text-secondary mb-1">调整原因</label>
-                <textarea x-model="probabilityModal.reason" 
-                          class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" 
-                          rows="2"
-                          placeholder="请输入调整原因（选填）"></textarea>
-              </div>
-            </div>
-            <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-2 sticky bottom-0">
-              <button type="button" @click="hideModal('probabilityModal')" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">取消</button>
-              <button type="submit" class="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600" :disabled="saving">
-                <span x-show="saving" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
-                应用调整
-              </button>
-            </div>
-          </form>
         </div>
       </div>
 

@@ -176,12 +176,12 @@ describe('P3-7: SQL注入安全测试', () => {
     })
   })
 
-  describe('市场接口SQL注入测试', () => {
-    test('市场搜索接口应防护SQL注入', async () => {
+  describe('兑换商城接口SQL注入测试', () => {
+    test('兑换商城搜索接口应防护SQL注入', async () => {
       for (const payload of sqlInjectionPayloads.slice(0, 5)) {
-        const response = await request(app).get('/api/v4/marketplace/listings').query({
+        const response = await request(app).get('/api/v4/exchange/items').query({
           keyword: payload,
-          sort: 'price; DROP TABLE market_listings'
+          sort_by: 'cost_amount; DROP TABLE exchange_items'
         })
 
         // 不应该暴露数据库错误
@@ -189,19 +189,19 @@ describe('P3-7: SQL注入安全测试', () => {
         expect(response.text).not.toMatch(/DROP TABLE/i)
       }
 
-      console.log('[P3-7] 市场搜索SQL注入测试通过')
+      console.log('[P3-7] 兑换商城搜索SQL注入测试通过')
     })
 
-    test('市场过滤参数应防护SQL注入', async () => {
-      const response = await request(app).get('/api/v4/marketplace/listings').query({
-        min_price: '0 OR 1=1',
-        max_price: '999999 UNION SELECT * FROM users',
+    test('兑换商城过滤参数应防护SQL注入', async () => {
+      const response = await request(app).get('/api/v4/exchange/items').query({
+        min_cost: '0 OR 1=1',
+        max_cost: '999999 UNION SELECT * FROM users',
         asset_code: "' OR '1'='1"
       })
 
       /*
        * 应该正常返回或返回参数错误或未认证
-       * 注：市场接口可能需要认证，所以401也是可接受的
+       * 注：兑换商城列表为 optionalAuth，匿名可浏览，故 200/400/401/422 均可接受
        */
       expect([200, 400, 401, 422]).toContain(response.status)
 
@@ -211,7 +211,7 @@ describe('P3-7: SQL注入安全测试', () => {
         expect(response.body.data).not.toHaveProperty('jwt_secret')
       }
 
-      console.log('[P3-7] 市场过滤SQL注入测试通过')
+      console.log('[P3-7] 兑换商城过滤SQL注入测试通过')
     })
   })
 

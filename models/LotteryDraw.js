@@ -243,11 +243,6 @@ module.exports = sequelize => {
       },
 
       // 奖品信息
-      lottery_prize_id: {
-        type: DataTypes.INTEGER,
-        allowNull: true,
-        comment: '获得的奖品ID（历史字段，兼容旧记录）'
-      },
       lottery_campaign_prize_id: {
         type: DataTypes.BIGINT,
         allowNull: true,
@@ -361,7 +356,7 @@ module.exports = sequelize => {
        * - 每次抽奖100%从奖品池选择一个奖品，根据奖品价值判定档位
        * - 不再区分"中没中"，只讨论"抽到了什么及其价值层级"
        *
-       * 档位规则（配置驱动，可通过 LotteryManagementSetting 调整）：
+       * 档位规则（配置驱动，通过 lottery_tier_rules / lottery_strategy_config 调整）：
        * - low: 低档奖励（prize_value_points < 300）
        * - mid: 中档奖励（300 <= prize_value_points < 700）
        * - high: 高档奖励（prize_value_points >= 700）
@@ -652,12 +647,12 @@ module.exports = sequelize => {
           comment: '业务唯一键索引（用于业务级幂等保护）'
         },
         {
-          name: 'idx_lottery_prize_id',
-          fields: ['lottery_prize_id']
-        },
-        {
           name: 'idx_prize_type',
           fields: ['prize_type']
+        },
+        {
+          name: 'idx_lottery_draws_campaign_prize',
+          fields: ['lottery_campaign_prize_id']
         },
         {
           name: 'idx_draw_type',

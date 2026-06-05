@@ -24,19 +24,11 @@
 
 const request = require('supertest')
 const app = require('../../app')
-const {
-  sequelize,
-  Item,
-  LotteryDraw,
-  LotteryCampaign,
-  MarketListing,
-  User
-} = require('../../models')
+const { sequelize, Item, LotteryDraw, LotteryCampaign, User } = require('../../models')
 const { TEST_DATA } = require('../helpers/test-data')
 const {
   ensureTestUserHasPoints,
-  getTestUserPointsBalance,
-  prepareMarketTestEnvironment
+  getTestUserPointsBalance
 } = require('../helpers/test-points-setup')
 const { initRealTestData, TestConfig } = require('../helpers/test-setup')
 const {
@@ -58,12 +50,10 @@ const STRESS_CONFIG = {
     BATCH_SIZE: 20, // 批次大小
     TIMEOUT_MS: 60000 // 超时时间
   },
-  // 10.2 市场交易压测配置
-  MARKET_STRESS: {
-    CONCURRENT_BUYERS: 50, // 并发抢购人数（生产环境可调到100）
-    TIMEOUT_MS: 30000
-  },
-  // 10.3 资产操作压测配置
+  /*
+   * 注：10.2 市场交易压测配置（MARKET_STRESS）已随 C2C 下线移除（2026-06-05 阶段五）
+   * 10.3 资产操作压测配置
+   */
   ASSET_STRESS: {
     CONCURRENT_OPERATIONS: 100, // 并发扣费次数（生产环境可调到1000）
     DEDUCT_AMOUNT: 1, // 每次扣费金额
@@ -109,8 +99,6 @@ describe('阶段九：压力测试与高并发（P1）', () => {
   let per_draw_cost = 0 // 从 LotteryPricingService 动态获取
   let auth_token
   let BalanceService
-  let MarketListingService
-  let TradeOrderService
 
   beforeAll(async () => {
     console.log('='.repeat(80))
@@ -161,8 +149,6 @@ describe('阶段九：压力测试与高并发（P1）', () => {
 
     // 通过 ServiceManager 获取服务
     BalanceService = global.getTestService('asset_balance')
-    MarketListingService = global.getTestService('market_listing_core')
-    TradeOrderService = global.getTestService('trade_order')
 
     // 登录获取token
     console.log('🔐 登录测试用户...')
@@ -181,14 +167,6 @@ describe('阶段九：压力测试与高并发（P1）', () => {
     console.log('💰 准备测试积分...')
     try {
       await ensureTestUserHasPoints(1000000, test_user_id)
-
-      // 🔧 准备市场测试环境（重置挂牌计数 + 提高挂牌上限）
-      console.log('🏪 准备市场测试环境...')
-      await prepareMarketTestEnvironment({
-        dailyMaxListings: 1000,
-        requiredPoints: 100000,
-        clearTodayListings: true
-      })
       const balance = await getTestUserPointsBalance(test_user_id)
       console.log(`✅ 当前积分: ${balance?.toLocaleString() || 0}`)
     } catch (error) {
@@ -201,9 +179,7 @@ describe('阶段九：压力测试与高并发（P1）', () => {
       campaign_code,
       per_draw_cost,
       services_loaded: {
-        BalanceService: !!BalanceService,
-        MarketListingService: !!MarketListingService,
-        TradeOrderService: !!TradeOrderService
+        BalanceService: !!BalanceService
       }
     })
     console.log('='.repeat(80))
@@ -358,168 +334,6 @@ describe('阶段九：压力测试与高并发（P1）', () => {
         console.log('✅ 10.1 抽奖接口压测通过 - 数据一致性验证成功')
       },
       STRESS_CONFIG.LOTTERY_STRESS.TIMEOUT_MS + 30000
-    )
-  })
-
-  /**
-   * 10.2 市场交易压测
-   * 目标：100人同时抢购同一商品，只有1人成功
-   */
-  describe('10.2 市场交易压测', () => {
-    it(
-      '多人同时抢购同一商品，只有1人成功',
-      async () => {
-        if (!test_user_id || !BalanceService || !MarketListingService) {
-          console.warn('⚠️ 跳过测试：缺少必要服务')
-          return
-        }
-
-        console.log(
-          `\n🛒 10.2 市场交易压测 - ${STRESS_CONFIG.MARKET_STRESS.CONCURRENT_BUYERS}人抢购`
-        )
-        const { CONCURRENT_BUYERS, TIMEOUT_MS } = STRESS_CONFIG.MARKET_STRESS
-
-        const transaction = await sequelize.transaction()
-        let test_listing_id = null
-
-        try {
-          // 1. 创建测试商品（卖家是测试用户）
-          const _seller_account = await BalanceService.getOrCreateAccount(
-            { user_id: test_user_id },
-            { transaction }
-          )
-
-          // 铸造一个测试物品
-          const mint_result = await BalanceService.mintItem(
-            {
-              user_id: test_user_id,
-              item_type: 'voucher',
-              source_type: 'stress_test',
-              source_id: generateIdempotencyKey('stress_mint'),
-              meta: {
-                name: '压测商品',
-                description: '并发抢购测试商品',
-                value: 100
-              }
-            },
-            { transaction }
-          )
-
-          const item_id = mint_result.item_instance.item_id
-
-          // 上架商品
-          const listing_result = await MarketListingService.createListing(
-            {
-              seller_user_id: test_user_id,
-              item_id,
-              price_asset_code: 'star_stone',
-              price_amount: 10,
-              idempotency_key: generateIdempotencyKey('stress_listing')
-            },
-            { transaction }
-          )
-
-          test_listing_id = listing_result.listing.market_listing_id
-          await transaction.commit()
-
-          console.log(`📦 测试商品已上架: market_listing_id=${test_listing_id}`)
-
-          // 2. 获取多个买家（使用真实用户）
-          const buyers = await User.findAll({
-            where: { status: 'active' },
-            limit: Math.min(CONCURRENT_BUYERS, 20),
-            order: sequelize.literal('RAND()')
-          })
-
-          if (buyers.length < 2) {
-            console.warn('⚠️ 活跃用户不足，使用模拟并发')
-          }
-
-          // 3. 为买家准备资产
-          for (const buyer of buyers) {
-            if (buyer.user_id !== test_user_id) {
-              try {
-                await BalanceService.changeBalance({
-                  user_id: buyer.user_id,
-                  asset_code: 'star_stone',
-                  delta_amount: 100,
-                  business_type: 'stress_test_recharge',
-                  idempotency_key: generateIdempotencyKey(`recharge_${buyer.user_id}`)
-                })
-              } catch (e) {
-                // 忽略重复充值错误
-              }
-            }
-          }
-
-          // 4. 创建并发抢购任务
-          const tasks = buyers.map((buyer, i) => async () => {
-            try {
-              const order_result = await TradeOrderService.createOrder({
-                idempotency_key: generateIdempotencyKey(`order_${i}`),
-                market_listing_id: test_listing_id,
-                buyer_id: buyer.user_id
-              })
-
-              if (order_result && order_result.trade_order_id) {
-                // 尝试完成订单
-                const complete_result = await TradeOrderService.completeOrder({
-                  trade_order_id: order_result.trade_order_id,
-                  buyer_id: buyer.user_id
-                })
-                return {
-                  success: true,
-                  trade_order_id: order_result.trade_order_id,
-                  completed: !!complete_result
-                }
-              }
-              return { success: false, reason: 'no_trade_order_id' }
-            } catch (error) {
-              return { success: false, reason: error.message }
-            }
-          })
-
-          // 5. 执行并发抢购
-          const { results, metrics } = await executeConcurrent(tasks, {
-            concurrency: CONCURRENT_BUYERS,
-            timeout: TIMEOUT_MS
-          })
-
-          // 6. 统计结果
-          const successful_orders = results.filter(r => r.result?.success === true)
-          const completed_orders = results.filter(r => r.result?.completed === true)
-
-          console.log('\n📊 抢购结果:')
-          console.log(`   总参与人数: ${results.length}`)
-          console.log(`   创建订单成功: ${successful_orders.length}`)
-          console.log(`   完成交易: ${completed_orders.length}`)
-          console.log(`   执行时间: ${metrics.totalTime}ms`)
-
-          // 7. 验证商品最终归属
-          const final_listing = await MarketListing.findByPk(test_listing_id)
-          console.log(`   商品最终状态: ${final_listing?.status}`)
-
-          // 验证：只有一个人能成功购买（完成交易）
-          expect(completed_orders.length).toBeLessThanOrEqual(1)
-
-          /*
-           * 验证：商品状态应该是正确的市场状态枚举值
-           * 市场状态枚举：on_sale(在售中) | locked(已锁定) | sold(已售出) | withdrawn(已撤回) | admin_withdrawn(管理员强制撤回)
-           */
-          expect(['on_sale', 'locked', 'sold', 'withdrawn', 'admin_withdrawn']).toContain(
-            final_listing?.status
-          )
-
-          console.log('✅ 10.2 市场交易压测通过 - 抢购竞态控制正确')
-        } catch (error) {
-          if (transaction && !transaction.finished) {
-            await transaction.rollback()
-          }
-          console.error('❌ 10.2 测试失败:', error.message)
-          throw error
-        }
-      },
-      STRESS_CONFIG.MARKET_STRESS.TIMEOUT_MS + 30000
     )
   })
 
@@ -1087,7 +901,6 @@ describe('阶段九：压力测试与高并发（P1）', () => {
       console.log('')
       console.log('📋 测试覆盖:')
       console.log(`   10.1 抽奖接口压测: ${STRESS_CONFIG.LOTTERY_STRESS.CONCURRENT_REQUESTS} 并发`)
-      console.log(`   10.2 市场交易压测: ${STRESS_CONFIG.MARKET_STRESS.CONCURRENT_BUYERS} 人抢购`)
       console.log(
         `   10.3 资产操作压测: ${STRESS_CONFIG.ASSET_STRESS.CONCURRENT_OPERATIONS} 次并发扣费`
       )

@@ -274,19 +274,19 @@ class DebtManagementService {
     // 按奖品分组统计
     const prizeDebts = await PresetInventoryDebt.findAll({
       attributes: [
-        'lottery_prize_id',
+        'lottery_campaign_prize_id',
         'lottery_campaign_id',
         [fn('COUNT', col('preset_inventory_debt_id')), 'debt_count'],
         [fn('SUM', col('debt_quantity')), 'total_quantity'],
         [fn('SUM', col('cleared_quantity')), 'cleared_quantity']
       ],
       where: whereCondition,
-      group: ['lottery_prize_id', 'lottery_campaign_id'],
+      group: ['lottery_campaign_prize_id', 'lottery_campaign_id'],
       raw: true
     })
 
     // 获取奖品信息（通过关联 PrizeDefinition 获取名称）
-    const prizeIds = prizeDebts.map(p => p.lottery_prize_id)
+    const prizeIds = prizeDebts.map(p => p.lottery_campaign_prize_id)
     const prizes = await LotteryCampaignPrize.findAll({
       where: { lottery_campaign_prize_id: { [Op.in]: prizeIds } },
       attributes: ['lottery_campaign_prize_id', 'stock_quantity', 'reward_tier'],
@@ -307,10 +307,11 @@ class DebtManagementService {
 
     // 构建结果
     const results = prizeDebts.map(item => {
-      const prize = prizeMap[item.lottery_prize_id]
+      const prize = prizeMap[item.lottery_campaign_prize_id]
       return {
-        lottery_prize_id: item.lottery_prize_id,
-        prize_name: prize?.prizeDefinition?.display_name || `奖品#${item.lottery_prize_id}`,
+        lottery_campaign_prize_id: item.lottery_campaign_prize_id,
+        prize_name:
+          prize?.prizeDefinition?.display_name || `奖品#${item.lottery_campaign_prize_id}`,
         prize_type: prize?.prizeDefinition?.prize_type || 'unknown',
         current_stock: prize ? prize.stock_quantity : 0,
         lottery_campaign_id: item.lottery_campaign_id,

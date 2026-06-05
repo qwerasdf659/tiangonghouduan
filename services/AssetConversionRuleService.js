@@ -36,7 +36,7 @@
 'use strict'
 
 const BalanceService = require('./asset/BalanceService')
-const { AssetConversionRule, AssetTransaction } = require('../models')
+const { AssetConversionRule, AssetTransaction, MaterialAssetType } = require('../models')
 const logger = require('../utils/logger')
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 const { AssetCode } = require('../constants/AssetCode')
@@ -196,6 +196,27 @@ class AssetConversionRuleService {
       transaction
     )
     if (existingTx) return existingTx
+
+    /*
+     * 1.5 转换方向守卫（合规整改 §1.2/§10.4-C3/§10.15 Step 4）—— 入口处 fail-closed 硬约束
+     * 价值流向铁律：只允许「高价值→低价值」单向销毁（如 碎片/源晶 → star_stone）
+     * 严禁反向流回"有价值侧"：目标资产 form ∈ {shard, gem} 一律拒绝
+     * （即严禁 star_stone → 碎片/源晶 等反向转换，防止星石倒回有价值侧获得货币属性）
+     * 放在规则查询之前，确保即便有人误配了反向规则也会被代码层拦截，不只靠"表里没有"。
+     */
+    const toAssetType = await MaterialAssetType.findOne({
+      where: { asset_code: toAssetCode },
+      attributes: ['form'],
+      transaction
+    })
+    if (toAssetType && ['shard', 'gem'].includes(toAssetType.form)) {
+      const error = new Error(
+        `禁止反向转换为材料资产（${toAssetCode} 为 ${toAssetType.form} 形态）：仅允许高价值→低价值单向销毁`
+      )
+      error.code = 'CONVERT_DIRECTION_FORBIDDEN'
+      error.statusCode = 400
+      throw error
+    }
 
     /* 2. 查询生效规则 */
     const rule = await this.getEffectiveRule(fromAssetCode, toAssetCode, { transaction })

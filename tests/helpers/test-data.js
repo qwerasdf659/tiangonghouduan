@@ -99,7 +99,7 @@ const TEST_DATA = {
   prizes: {
     // 积分奖品（最常见）
     pointsPrize: {
-      lottery_prize_id: 1, // 奖品ID（假设值,需要从数据库确认）
+      lottery_campaign_prize_id: 1, // 奖品ID（假设值,需要从数据库确认）
       name: '100积分',
       type: 'points',
       value: 100,
@@ -112,7 +112,7 @@ const TEST_DATA = {
 
     // 实物奖品
     physicalPrize: {
-      lottery_prize_id: 2, // 奖品ID（假设值,需要从数据库确认）
+      lottery_campaign_prize_id: 2, // 奖品ID（假设值,需要从数据库确认）
       name: '测试商品',
       type: 'physical',
       value: 50, // 50元
@@ -125,7 +125,7 @@ const TEST_DATA = {
 
     // 谢谢参与（保底奖品）
     thanksPrize: {
-      lottery_prize_id: 3, // 奖品ID（假设值,需要从数据库确认）
+      lottery_campaign_prize_id: 3, // 奖品ID（假设值,需要从数据库确认）
       name: '谢谢参与',
       type: 'thanks',
       value: 0,
@@ -200,21 +200,6 @@ const TEST_DATA = {
          * 业务含义：普通抽奖流水线测试数据
          * 使用场景：测试普通用户抽奖（5次不中必中）
          * 技术背景：对应 UnifiedLotteryEngine 的 NormalDrawPipeline
-         */
-      }
-    },
-
-    // 管理策略配置（对应 ManagementStrategy）
-    // 🔴 P0-1修复：user_id 使用 getter 动态获取
-    get management() {
-      return {
-        user_id: getTestUserId(), // 🔴 P0-1修复：动态获取，不再硬编码
-        is_management_target: true,
-        custom_probability: 1.0 // 100%必中
-        /*
-         * 业务含义：管理策略测试数据
-         * 使用场景：测试特定用户的定向中奖
-         * 技术背景：对应 UnifiedLotteryEngine 的 ManagementStrategy
          */
       }
     },
@@ -432,7 +417,7 @@ const testDataGenerator = {
       return {
         user_id: actualUserId, // 🔴 P0-1修复：使用 actualUserId
         lottery_campaign_id: actualCampaignId, // 🔴 P0-1修复：使用 actualCampaignId
-        lottery_prize_id: (index % 3) + 1, // 奖品ID轮换（V4.0：每次抽奖必得奖品）
+        lottery_campaign_prize_id: (index % 3) + 1, // 奖品ID轮换（V4.0：每次抽奖必得奖品）
         reward_tier: rewardTier, // V4.0语义更新：替代 is_winner
         prize_value: prizeValues[rewardTier][index % 3],
         lottery_time: BeijingTimeHelper.getHoursAgo(index), // 使用北京时间，每条记录间隔1小时
@@ -553,24 +538,6 @@ const testScenarios = {
       expected_result: {
         reward_tier: 'high', // V4.0语义更新：替代 is_winner
         trigger_reason: 'guarantee_mechanism'
-      }
-    }
-  },
-
-  /**
-   * 场景3: 管理策略定向高档奖励
-   * 业务规则: 特定用户100%获得高档奖励（V4.0语义更新）
-   * 🔴 P0修复：使用 getter 延迟求值
-   */
-  get managementTargetWin() {
-    return {
-      user: createTestData.user(),
-      lottery_campaign_id: getTestCampaignId(),
-      is_management_target: true,
-      custom_probability: 1.0,
-      expected_result: {
-        reward_tier: 'high', // V4.0语义更新：替代 is_winner
-        trigger_reason: 'management_strategy'
       }
     }
   },

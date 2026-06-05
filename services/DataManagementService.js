@@ -53,12 +53,10 @@ const TABLE_DISPLAY_NAMES = Object.freeze({
   item_ledger: '物品账本',
   account_asset_balances: '账户资产余额',
   items: '物品持有',
-  trade_orders: '交易订单',
   item_holds: '物品锁定',
   // L2 业务运营
   lottery_draw_decisions: '抽奖决策记录',
   lottery_draws: '抽奖记录',
-  lottery_management_settings: '抽奖管理配置',
   lottery_presets: '抽奖预设',
   lottery_user_daily_draw_quota: '用户每日抽奖配额',
   lottery_campaign_user_quota: '活动用户配额',
@@ -78,11 +76,9 @@ const TABLE_DISPLAY_NAMES = Object.freeze({
   customer_service_user_assignments: '客服分配',
   customer_service_sessions: '客服会话',
   customer_service_agents: '客服坐席',
-  market_listings: '市场挂牌',
   user_notifications: '用户通知',
   admin_notifications: '管理员通知',
   feedbacks: '用户反馈',
-  market_price_snapshots: '市场价格快照',
   exchange_rates: '兑换汇率',
   exchange_records: '兑换记录',
   bid_records: '竞拍记录',
@@ -124,8 +120,6 @@ const TABLE_DISPLAY_NAMES = Object.freeze({
   feature_switches: '功能开关',
   data_dictionaries: '数据字典',
   exchange_items: '兑换物品',
-  auction_listings: '拍卖挂牌',
-  auction_bids: '拍卖出价',
   ad_campaigns: '广告活动',
   ad_creatives: '广告素材',
   ad_placements: '广告位',
@@ -162,14 +156,7 @@ const _ACCOUNTS_SAFE_DELETE_CONDITION = "account_type = 'user'" // eslint-disabl
  * @constant {Set<string>}
  */
 const L1_FINANCIAL_TABLES = Object.freeze(
-  new Set([
-    'asset_transactions',
-    'item_ledger',
-    'account_asset_balances',
-    'items',
-    'trade_orders',
-    'item_holds'
-  ])
+  new Set(['asset_transactions', 'item_ledger', 'account_asset_balances', 'items', 'item_holds'])
 )
 
 /**
@@ -220,7 +207,6 @@ const L2_CLEANUP_CATEGORIES = Object.freeze({
     tables: [
       'lottery_draw_decisions',
       'lottery_draws',
-      'lottery_management_settings',
       'lottery_presets',
       'lottery_user_daily_draw_quota',
       'lottery_campaign_user_quota',
@@ -257,12 +243,6 @@ const L2_CLEANUP_CATEGORIES = Object.freeze({
     ],
     time_field: 'created_at'
   },
-  market_listings: {
-    label: '市场挂牌',
-    tables: ['market_listings'],
-    time_field: 'created_at',
-    status_filter: { field: 'status', exclude: ['active'] }
-  },
   notifications: {
     label: '用户通知',
     tables: ['user_notifications', 'admin_notifications'],
@@ -271,11 +251,6 @@ const L2_CLEANUP_CATEGORIES = Object.freeze({
   feedbacks: {
     label: '用户反馈',
     tables: ['feedbacks'],
-    time_field: 'created_at'
-  },
-  market_snapshots: {
-    label: '市场快照',
-    tables: ['market_price_snapshots', 'exchange_rates'],
     time_field: 'created_at'
   },
   exchange_records: {
@@ -334,7 +309,6 @@ const DELETE_TOPOLOGY = Object.freeze([
     'lottery_daily_metrics',
     'lottery_alerts',
     'lottery_draw_decisions',
-    'lottery_management_settings',
     'lottery_campaign_pricing_config',
     'lottery_tier_rules',
     'lottery_strategy_config',
@@ -349,7 +323,6 @@ const DELETE_TOPOLOGY = Object.freeze([
     'item_ledger',
     'exchange_records',
     'bid_records',
-    'market_price_snapshots',
     'chat_messages',
     'customer_service_notes',
     'system_dictionary_history',
@@ -362,7 +335,6 @@ const DELETE_TOPOLOGY = Object.freeze([
   ],
   // 第二层
   [
-    'trade_orders',
     'redemption_orders',
     'lottery_draws',
     'consumption_records',
@@ -378,7 +350,7 @@ const DELETE_TOPOLOGY = Object.freeze([
     'customer_service_agents'
   ],
   // 第三层
-  ['market_listings', 'customer_service_sessions', 'ad_campaigns'],
+  ['customer_service_sessions', 'ad_campaigns'],
   /*
    * 第四层
    * products 表由 ExchangeItem 模型管理（原 exchange_items 已 DROP）
@@ -1203,7 +1175,6 @@ class DataManagementService {
             const campaignTables = new Set([
               'lottery_draws',
               'lottery_draw_decisions',
-              'lottery_management_settings',
               'lottery_user_daily_draw_quota',
               'lottery_campaign_user_quota',
               'lottery_campaign_quota_grants',

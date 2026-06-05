@@ -455,7 +455,7 @@ class LotteryHealthService {
       const prizes = await this.models.LotteryCampaignPrize.findAll({
         where: { lottery_campaign_id: campaignId, status: 'active' },
         attributes: [
-          'lottery_prize_id',
+          'lottery_campaign_prize_id',
           'prize_name',
           'reward_tier',
           'stock_quantity',
@@ -485,7 +485,7 @@ class LotteryHealthService {
         if (remainingStock < HEALTH_THRESHOLDS.inventory.danger) {
           dangerStockCount++
           lowStockPrizes.push({
-            lottery_prize_id: prize.lottery_prize_id,
+            lottery_campaign_prize_id: prize.lottery_campaign_prize_id,
             prize_name: prize.prize_name,
             reward_tier: prize.reward_tier,
             remaining: remainingStock,
@@ -494,7 +494,7 @@ class LotteryHealthService {
         } else if (remainingStock < HEALTH_THRESHOLDS.inventory.warning) {
           lowStockCount++
           lowStockPrizes.push({
-            lottery_prize_id: prize.lottery_prize_id,
+            lottery_campaign_prize_id: prize.lottery_campaign_prize_id,
             prize_name: prize.prize_name,
             reward_tier: prize.reward_tier,
             remaining: remainingStock,

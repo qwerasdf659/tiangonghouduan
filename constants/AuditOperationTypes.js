@@ -160,41 +160,11 @@ const OPERATION_TYPES = Object.freeze({
    */
   CAMPAIGN_CONFIG: 'campaign_config',
 
-  // ==================== 抽奖管理类（V4.5.0新增，V4.7.0拆分）====================
-  /**
-   * 强制中奖
-   * @description 管理员设置用户强制中指定奖品
-   * @example AdminLotteryCoreService.forceWinForUser() // ServiceManager key: admin_lottery_core
+  // ==================== 抽奖管理类（2026-06-04 合规改造：per-user 暗箱干预已下线）====================
+  /*
+   * force_win / force_lose / probability_adjust / user_queue / clear_settings 等 per-user 暗箱
+   * 干预操作类型已随机制整体移除。个人发奖统一走 cs_compensate 明示补偿（见 CS_COMPENSATE 审计类型）。
    */
-  LOTTERY_FORCE_WIN: 'lottery_force_win',
-
-  /**
-   * 强制不中奖
-   * @description 管理员设置用户强制不中奖
-   * @example AdminLotteryCoreService.forceLoseForUser() // ServiceManager key: admin_lottery_core
-   */
-  LOTTERY_FORCE_LOSE: 'lottery_force_lose',
-
-  /**
-   * 概率调整
-   * @description 管理员调整用户中奖概率
-   * @example AdminLotteryCoreService.adjustUserProbability() // ServiceManager key: admin_lottery_core
-   */
-  LOTTERY_PROBABILITY_ADJUST: 'lottery_probability_adjust',
-
-  /**
-   * 用户队列
-   * @description 管理员设置用户专属抽奖队列
-   * @example AdminLotteryCoreService.setUserQueue() // ServiceManager key: admin_lottery_core
-   */
-  LOTTERY_USER_QUEUE: 'lottery_user_queue',
-
-  /**
-   * 清除设置
-   * @description 管理员清除用户的抽奖管理设置
-   * @example AdminLotteryCoreService.clearUserSettings() // ServiceManager key: admin_lottery_core
-   */
-  LOTTERY_CLEAR_SETTINGS: 'lottery_clear_settings',
 
   // ==================== 策略模拟类（2026-02-20 策略效果模拟分析） ====================
   /**
@@ -240,13 +210,7 @@ const OPERATION_TYPES = Object.freeze({
    */
   INVENTORY_TRANSFER: 'inventory_transfer',
 
-  // ==================== 市场交易类（交易市场 Phase 2 新增）====================
-  /**
-   * 市场挂牌管理员强制撤回
-   * @description 客服强制撤回用户的市场挂牌
-   * @example MarketListingService.adminForceWithdrawListing()
-   */
-  MARKET_LISTING_ADMIN_WITHDRAW: 'market_listing_admin_withdraw',
+  // 注：市场交易类审计操作（MARKET_LISTING_ADMIN_WITHDRAW）已随 C2C 下线移除（2026-06-05 阶段五）
 
   // ==================== 员工管理类（V4.6.1 新增）====================
   /**
@@ -428,12 +392,10 @@ const OPERATION_TYPE_DESCRIPTIONS = Object.freeze({
   [OPERATION_TYPES.PRIZE_STOCK_SET]: '奖品库存设置',
   [OPERATION_TYPES.CAMPAIGN_CONFIG]: '活动配置',
 
-  // 抽奖管理类（V4.5.0新增）
-  [OPERATION_TYPES.LOTTERY_FORCE_WIN]: '强制中奖',
-  [OPERATION_TYPES.LOTTERY_FORCE_LOSE]: '强制不中奖',
-  [OPERATION_TYPES.LOTTERY_PROBABILITY_ADJUST]: '概率调整',
-  [OPERATION_TYPES.LOTTERY_USER_QUEUE]: '用户队列',
-  [OPERATION_TYPES.LOTTERY_CLEAR_SETTINGS]: '清除设置',
+  /*
+   * 抽奖管理类 per-user 暗箱干预（force_win/force_lose/probability_adjust/user_queue/clear_settings）
+   * 已于 2026-06-04 合规改造整体下线
+   */
 
   // 策略模拟类（2026-02-20 策略效果模拟分析）
   [OPERATION_TYPES.SIMULATION_APPLY]: '模拟配置应用',
@@ -445,9 +407,6 @@ const OPERATION_TYPE_DESCRIPTIONS = Object.freeze({
   // 库存操作类
   [OPERATION_TYPES.INVENTORY_OPERATION]: '库存操作',
   [OPERATION_TYPES.INVENTORY_TRANSFER]: '物品转让',
-
-  // 市场交易类（交易市场 Phase 2 新增）
-  [OPERATION_TYPES.MARKET_LISTING_ADMIN_WITHDRAW]: '市场挂牌强制撤回',
 
   // 系统配置类
   [OPERATION_TYPES.SYSTEM_CONFIG]: '系统配置',
@@ -521,19 +480,14 @@ const CRITICAL_OPERATIONS = Object.freeze(
     OPERATION_TYPES.PRIZE_STOCK_SET, // 奖品库存设置 - 直接设置绝对库存值
     OPERATION_TYPES.PRIZE_DELETE, // 奖品删除 - 不可恢复的破坏性操作
 
-    // ========== 抽奖管理关键操作（V4.5.0 新增）==========
-    OPERATION_TYPES.LOTTERY_FORCE_WIN, // 强制中奖 - 影响用户抽奖结果
-    OPERATION_TYPES.LOTTERY_FORCE_LOSE, // 强制不中奖 - 影响用户抽奖结果
-    OPERATION_TYPES.LOTTERY_PROBABILITY_ADJUST, // 概率调整 - 影响抽奖公平性
-    OPERATION_TYPES.LOTTERY_USER_QUEUE, // 用户队列 - 影响用户抽奖顺序
-    OPERATION_TYPES.LOTTERY_CLEAR_SETTINGS, // 清除设置 - 批量影响抽奖配置
+    /*
+     * ========== 抽奖管理 per-user 暗箱干预（2026-06-04 合规改造已下线）==========
+     * force_win/force_lose/probability_adjust/user_queue/clear_settings 关键操作类型已随机制移除
+     */
 
     // ========== 策略模拟关键操作（2026-02-20 新增）==========
     OPERATION_TYPES.SIMULATION_APPLY, // 模拟配置应用 - 直接修改生产策略配置
     OPERATION_TYPES.CONFIG_ROLLBACK, // 配置版本回滚 - 回退生产策略配置
-
-    // ========== 市场交易关键操作（交易市场 Phase 2 新增）==========
-    OPERATION_TYPES.MARKET_LISTING_ADMIN_WITHDRAW, // 市场挂牌强制撤回 - 影响卖家资产和交易
 
     // ========== 功能开关关键操作（Feature Flag V4.6.0 新增）==========
     OPERATION_TYPES.FEATURE_FLAG_DELETE, // 功能开关删除 - 不可恢复的破坏性操作

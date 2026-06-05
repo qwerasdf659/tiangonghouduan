@@ -84,10 +84,8 @@ export function useDataManagementState() {
       { key: 'monitoring_metrics', label: '监控指标' },
       { key: 'consumption_records', label: '消费与核销' },
       { key: 'customer_service', label: '客服会话' },
-      { key: 'market_listings', label: '市场挂牌' },
       { key: 'notifications', label: '用户通知' },
       { key: 'feedbacks', label: '用户反馈' },
-      { key: 'market_snapshots', label: '市场快照' },
       { key: 'exchange_records', label: '兑换记录' },
       { key: 'bid_records', label: '竞拍记录' },
       { key: 'system_debts', label: '系统垫付' }

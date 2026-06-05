@@ -153,6 +153,15 @@ module.exports = sequelize => {
           '是否可交易（Is Tradable - 交易市场交易开关）：true-可在市场挂牌交易，false-禁止市场交易'
       },
 
+      // 是否可竞价（Is Biddable - 官方竞价计价币开关）
+      is_biddable: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+        comment:
+          '是否可竞价（Is Biddable - 官方竞价计价币开关）：true-可作为官方竞价(exchange/bid)计价币，false-不可。与 is_tradable（用户间流通）解耦，合规整改后仅 star_stone=1'
+      },
+
       /** 归属商家ID（NULL=平台资产，游戏商家场景下标识资产归属） */
       merchant_id: {
         type: DataTypes.INTEGER,

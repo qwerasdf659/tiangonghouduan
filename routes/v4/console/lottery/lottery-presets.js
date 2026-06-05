@@ -158,7 +158,7 @@ router.get(
  * 请求体：
  * - user_id: number - 目标用户ID（必填）
  * - presets: array - 预设数组（必填）
- *   - lottery_prize_id: number - 奖品ID
+ *   - lottery_campaign_prize_id: number - 活动奖品关联ID
  *   - queue_order: number - 队列顺序
  * - lottery_campaign_id: number - 活动ID（可选）
  * - reason: string - 创建原因（可选）
@@ -216,7 +216,7 @@ router.delete(
   asyncHandler(async (req, res) => {
     const { user_id } = req.params
 
-    const result = await TransactionManager.executeInTransaction(async transaction => {
+    const result = await TransactionManager.execute(async transaction => {
       return await getLotteryPresetService(req).clearUserPresets(
         req.user.user_id,
         parseInt(user_id, 10),
@@ -227,13 +227,13 @@ router.delete(
     logger.info('[DELETE /user/:user_id] 清理用户预设', {
       admin_id: req.user.user_id,
       target_user_id: user_id,
-      deleted_count: result.deletedCount
+      deleted_count: result.deleted_count
     })
 
     return res.apiSuccess(
       {
         user_id: parseInt(user_id, 10),
-        deleted_count: result.deletedCount
+        deleted_count: result.deleted_count
       },
       '清理用户预设成功'
     )
@@ -247,7 +247,7 @@ router.delete(
  * - id: number - 预设ID
  *
  * 请求体（可选字段）：
- * - lottery_prize_id: number - 新奖品ID
+ * - lottery_campaign_prize_id: number - 新活动奖品关联ID
  * - queue_order: number - 新队列顺序
  * - expires_at: string - 新过期时间（ISO格式）
  * - reason: string - 更新原因
@@ -259,7 +259,7 @@ router.put(
     const updateData = req.body
     const LotteryPresetService = getLotteryPresetService(req)
 
-    const result = await TransactionManager.executeInTransaction(async transaction => {
+    const result = await TransactionManager.execute(async transaction => {
       return await LotteryPresetService.updatePreset(parseInt(id, 10), updateData, {
         transaction
       })
@@ -287,7 +287,7 @@ router.delete(
     const { id } = req.params
     const LotteryPresetService = getLotteryPresetService(req)
 
-    const result = await TransactionManager.executeInTransaction(async transaction => {
+    const result = await TransactionManager.execute(async transaction => {
       return await LotteryPresetService.deletePreset(parseInt(id, 10), { transaction })
     })
 

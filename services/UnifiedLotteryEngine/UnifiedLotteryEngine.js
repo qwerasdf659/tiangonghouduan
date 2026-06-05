@@ -20,15 +20,16 @@
  * 1. **统一抽奖流程**（NormalDrawPipeline + LoadDecisionSourceStage）
  *    - 用户发起抽奖 → executeLottery() → DrawOrchestrator.execute()
  *    - 检查抽奖资格（积分余额、每日次数限制、活动有效性）
- *    - LoadDecisionSourceStage 检查决策来源（preset > override > normal）
+ *    - LoadDecisionSourceStage 检查决策来源（preset > guarantee > normal）
  *    - 执行统一管线 → 概率计算、保底机制触发
  *    - 从奖品池选择奖品 → 100%中奖（只是奖品价值不同）
  *    - 创建抽奖记录、扣除积分、创建用户库存
  *
  * 2. **决策来源优先级**
  *    - preset（预设奖品）：管理员预设的中奖记录，最高优先级
- *    - override（管理干预）：管理员临时干预，次高优先级
+ *    - guarantee（保底）：达到保底阈值时强制高档，次高优先级
  *    - normal（正常抽奖）：默认流程，按权重选择奖品
+ *    （2026-06-04 合规改造：per-user 暗箱干预 override 已整体下线）
  *
  * 3. **管线执行流程**
  *    - Step 1: DrawOrchestrator.execute() 接收抽奖上下文
@@ -47,11 +48,11 @@
  *
  * V4.6 架构特点：
  * - **1 条统一管线**：NormalDrawPipeline（整合原 3 条管线功能）
- * - **决策来源 Stage**：LoadDecisionSourceStage 统一判断 preset/override/normal
+ * - **决策来源 Stage**：LoadDecisionSourceStage 统一判断 preset/guarantee/normal
  * - **100%中奖机制**：每次抽奖必定从奖品池选择一个奖品（不存在"不中奖"逻辑）
  * - **保底机制集成**：保底逻辑整合在 GuaranteeStage 中
  * - **统一事务管理**：所有管线执行支持外部事务，确保数据一致性
- * - **ManagementStrategy 保留**：仅用于管理 API（如强制中奖、查询历史）
+ * - **per-user 暗箱干预下线**：force_win/force_lose/probability_adjust 已于 2026-06-04 移除（合规）
  *
  * 关键方法列表：
  * - executeLottery() - 统一抽奖执行入口（委托给 DrawOrchestrator）
@@ -63,9 +64,8 @@
  *
  * 组件依赖：
  * - DrawOrchestrator：管线编排器（核心执行入口）
- * - NormalDrawPipeline：统一抽奖管线（整合 preset/override/normal）
+ * - NormalDrawPipeline：统一抽奖管线（整合 preset/guarantee/normal）
  * - LoadDecisionSourceStage：决策来源判断 Stage
- * - ManagementStrategy：管理操作策略（仅用于管理 API）
  * - PerformanceMonitor：性能监控组件（执行时间、慢查询告警）
  * - CacheManager：缓存管理组件（奖品配置、用户次数）
  * - Logger：日志组件（INFO/DEBUG/ERROR三级日志）
@@ -198,8 +198,7 @@ class UnifiedLotteryEngine {
      * @type {DrawOrchestrator}
      */
     this.drawOrchestrator = new DrawOrchestrator({
-      enable_preset: true,
-      enable_override: true
+      enable_preset: true
     })
 
     // 性能指标（统一使用 snake_case 命名）
@@ -340,7 +339,7 @@ class UnifiedLotteryEngine {
       data: {
         draw_result: {
           lottery_draw_id: drawRecord.lottery_draw_id,
-          lottery_prize_id: drawRecord.lottery_prize_id,
+          lottery_campaign_prize_id: drawRecord.lottery_campaign_prize_id,
           prize_name: drawRecord.prize_name,
           prize_type: drawRecord.prize_type,
           prize_value: drawRecord.prize_value,
@@ -438,7 +437,7 @@ class UnifiedLotteryEngine {
         data: {
           draw_result: {
             reward_tier: result.reward_tier, // V4.0：奖励档位
-            lottery_prize_id: result.prize?.id || null,
+            lottery_campaign_prize_id: result.prize?.id || null,
             prize_name: result.prize?.name || null,
             prize_type: result.prize?.type || null,
             prize_value: result.prize?.value || null,
@@ -1117,9 +1116,9 @@ class UnifiedLotteryEngine {
             draw_number: i + 1,
             // V4.0语义更新：使用 reward_tier 替代 is_winner
             reward_tier: drawResult.data?.draw_result?.reward_tier || 'low',
-            prize: drawResult.data?.draw_result?.lottery_prize_id
+            prize: drawResult.data?.draw_result?.lottery_campaign_prize_id
               ? {
-                  id: drawResult.data.draw_result.lottery_prize_id,
+                  id: drawResult.data.draw_result.lottery_campaign_prize_id,
                   name: drawResult.data.draw_result.prize_name,
                   type: drawResult.data.draw_result.prize_type,
                   value: drawResult.data.draw_result.prize_value,

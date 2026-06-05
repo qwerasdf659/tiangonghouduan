@@ -4,20 +4,18 @@
  * LoadDecisionSourceStage - 加载决策来源 Stage
  *
  * 职责：
- * 1. 统一判断抽奖决策来源类型（preset/override/guarantee/normal）
+ * 1. 统一判断抽奖决策来源类型（preset/guarantee/normal）
  * 2. 加载对应的决策配置
  * 3. 设置 context.decision_source 供后续 Stage 使用
  *
- * 决策优先级（已拍板 2026-01-18）：
+ * 决策优先级（2026-06-04 合规改造：移除 per-user 暗箱干预 override）：
  * 1. 预设（preset）- 最高优先级：有待使用预设时
- * 2. 管理干预（override）- 次高优先级：有 force_win/force_lose 时
- * 3. 保底（guarantee）- 第三优先级：达到保底阈值时
- * 4. 正常抽奖（normal）- 最低优先级：无上述情况时
+ * 2. 保底（guarantee）- 次高优先级：达到保底阈值时
+ * 3. 正常抽奖（normal）- 最低优先级：无上述情况时
  *
  * 输出到上下文：
- * - decision_source: 决策来源类型（preset/override/guarantee/normal）
+ * - decision_source: 决策来源类型（preset/guarantee/normal）
  * - preset: 预设记录（如果是 preset）
- * - override: 干预配置（如果是 override）
  * - guarantee_triggered: 保底触发信息（如果是 guarantee）
  *
  * @module services/UnifiedLotteryEngine/pipeline/stages/LoadDecisionSourceStage
@@ -29,14 +27,13 @@ const BaseStage = require('./BaseStage')
 const { AssetCode } = require('../../../../constants/AssetCode')
 const {
   LotteryPreset,
-  LotteryManagementSetting,
   LotteryDraw,
   LotteryCampaignPrize,
   PrizeDefinition,
   LotteryUserExperienceState,
   User
 } = require('../../../../models')
-const { Op, literal } = require('sequelize')
+const { Op } = require('sequelize')
 const { DynamicConfigLoader } = require('../../compute/config/ComputeConfig')
 const BalanceService = require('../../../asset/BalanceService')
 
@@ -45,7 +42,6 @@ const BalanceService = require('../../../asset/BalanceService')
  */
 const DECISION_SOURCES = {
   PRESET: 'preset',
-  OVERRIDE: 'override',
   GUARANTEE: 'guarantee',
   NORMAL: 'normal'
 }
@@ -84,7 +80,8 @@ class LoadDecisionSourceStage extends BaseStage {
 
       /*
        * 决策优先级判断（按优先级顺序检查）
-       * 优先级：preset > override > guarantee > normal
+       * 优先级：preset > guarantee > normal
+       * （2026-06-04 合规改造：已移除 per-user 暗箱干预 override 分支）
        */
 
       // 0. 首抽必中检查（在 Preset 之前，通过 Preset 机制注入）
@@ -99,7 +96,6 @@ class LoadDecisionSourceStage extends BaseStage {
         return this.success({
           decision_source: DECISION_SOURCES.PRESET,
           preset: firstWinPreset,
-          override: null,
           guarantee_triggered: null,
           first_win: true,
           first_win_debt_coefficient: firstWinPreset.first_win_debt_coefficient || 0.15
@@ -122,8 +118,6 @@ class LoadDecisionSourceStage extends BaseStage {
 
         const flattenedPreset = {
           ...presetJson,
-          lottery_prize_id:
-            campaignPrize.lottery_campaign_prize_id || preset.lottery_campaign_prize_id,
           lottery_campaign_prize_id:
             campaignPrize.lottery_campaign_prize_id || preset.lottery_campaign_prize_id,
           prize_definition_id: campaignPrize.prize_definition_id || null,
@@ -141,28 +135,11 @@ class LoadDecisionSourceStage extends BaseStage {
         return this.success({
           decision_source: DECISION_SOURCES.PRESET,
           preset: flattenedPreset,
-          override: null,
           guarantee_triggered: null
         })
       }
 
-      // 2. 检查管理干预（次高优先级）
-      const override = await this._checkOverride(user_id, lottery_campaign_id)
-      if (override) {
-        this.log('info', '命中管理干预', {
-          user_id,
-          setting_id: override.setting_id,
-          setting_type: override.setting_type
-        })
-        return this.success({
-          decision_source: DECISION_SOURCES.OVERRIDE,
-          preset: null,
-          override: override.toJSON ? override.toJSON() : override,
-          guarantee_triggered: null
-        })
-      }
-
-      // 3. 检查保底触发（第三优先级）
+      // 2. 检查保底触发（次高优先级；override 暗箱干预已于 2026-06-04 移除）
       const guarantee = await this._checkGuarantee(user_id, lottery_campaign_id, campaign)
       if (guarantee.triggered) {
         this.log('info', '触发保底机制', {
@@ -173,17 +150,15 @@ class LoadDecisionSourceStage extends BaseStage {
         return this.success({
           decision_source: DECISION_SOURCES.GUARANTEE,
           preset: null,
-          override: null,
           guarantee_triggered: guarantee
         })
       }
 
-      // 4. 正常抽奖（最低优先级）
+      // 3. 正常抽奖（最低优先级）
       this.log('info', '使用正常抽奖决策', { user_id, lottery_campaign_id })
       return this.success({
         decision_source: DECISION_SOURCES.NORMAL,
         preset: null,
-        override: null,
         guarantee_triggered: null
       })
     } catch (error) {
@@ -429,68 +404,6 @@ class LoadDecisionSourceStage extends BaseStage {
       return preset
     } catch (error) {
       this.log('warn', '检查预设失败', {
-        user_id,
-        lottery_campaign_id,
-        error: error.message
-      })
-      return null
-    }
-  }
-
-  /**
-   * 检查是否有管理干预设置
-   *
-   * 查询规则：
-   * 1. 匹配用户 user_id
-   * 2. 设置类型为 force_win 或 force_lose
-   * 3. 状态为 active（生效中）
-   * 4. 未过期：expires_at 为 NULL（永不过期）或 expires_at > 当前时间
-   *
-   * @param {number} user_id - 用户ID
-   * @param {number} lottery_campaign_id - 活动ID（按活动过滤 + 总开关前置检查）
-   * @returns {Promise<Object|null>} 干预设置或 null
-   * @private
-   */
-  async _checkOverride(user_id, lottery_campaign_id) {
-    try {
-      // 活动级总开关：management.enabled=false 时跳过全部干预检查
-      const management_enabled = await DynamicConfigLoader.getValue('management', 'enabled', true, {
-        lottery_campaign_id
-      })
-
-      if (!management_enabled) {
-        this.log('info', '管理干预总开关已关闭', { user_id, lottery_campaign_id })
-        return null
-      }
-
-      /**
-       * 2026-02-23 改造：按活动ID过滤管理干预
-       * - lottery_campaign_id 匹配当前活动 OR NULL（全局干预）
-       * - 同时检查 expires_at 实时过滤已过期的干预
-       */
-      const override = await LotteryManagementSetting.findOne({
-        where: {
-          user_id,
-          setting_type: { [Op.in]: ['force_win', 'force_lose'] },
-          status: 'active',
-          [Op.and]: [
-            {
-              [Op.or]: [{ lottery_campaign_id }, { lottery_campaign_id: null }]
-            },
-            {
-              [Op.or]: [{ expires_at: null }, { expires_at: { [Op.gt]: new Date() } }]
-            }
-          ]
-        },
-        order: [
-          [literal('lottery_campaign_id IS NULL'), 'ASC'],
-          ['lottery_campaign_id', 'DESC']
-        ]
-      })
-
-      return override
-    } catch (error) {
-      this.log('warn', '检查管理干预失败', {
         user_id,
         lottery_campaign_id,
         error: error.message

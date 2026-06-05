@@ -35,10 +35,10 @@ export const LOTTERY_ADVANCED_ENDPOINTS = {
   TIER_RULE_UPDATE: `${API_PREFIX}/console/lottery-tier-rules/:id`,
   TIER_RULE_DELETE: `${API_PREFIX}/console/lottery-tier-rules/:id`,
 
-  // 抽奖干预管理
-  INTERVENTION_LIST: `${API_PREFIX}/console/lottery-management/interventions`,
-  INTERVENTION_DETAIL: `${API_PREFIX}/console/lottery-management/interventions/:id`,
-  INTERVENTION_CANCEL: `${API_PREFIX}/console/lottery-management/interventions/:id/cancel`,
+  // 成长等级公示分级概率（B 线，2026-06-04 合规改造；per-user 暗箱干预已下线）
+  GROWTH_LEVELS_LIST: `${API_PREFIX}/console/lottery-management/growth-levels`,
+  LEVEL_PROBABILITY_GET: `${API_PREFIX}/console/lottery-management/level-probability/:lottery_campaign_id`,
+  LEVEL_PROBABILITY_UPDATE: `${API_PREFIX}/console/lottery-management/level-probability/:lottery_campaign_id`,
 
   // 策略统计
   STRATEGY_STATS_REALTIME: `${API_PREFIX}/console/lottery-strategy-stats/realtime/:campaign_id`,
@@ -58,10 +58,6 @@ export const LOTTERY_ADVANCED_ENDPOINTS = {
   QUOTA_USER_BONUS: `${API_PREFIX}/console/lottery-quota/users/:user_id/bonus`,
   QUOTA_USER_CHECK: `${API_PREFIX}/console/lottery-quota/users/:user_id/check`,
   QUOTA_STATISTICS: `${API_PREFIX}/console/lottery-quota/statistics`,
-
-  // 概率调整和强制中奖
-  PROBABILITY_ADJUST: `${API_PREFIX}/console/lottery-management/probability-adjust`,
-  INTERVENTION_FORCE_WIN: `${API_PREFIX}/console/lottery-management/force-win`,
 
   // 活动定价
   PRICING_CONFIG_ALL: `${API_PREFIX}/console/lottery-management/pricing-configs`,
@@ -192,54 +188,39 @@ export const LotteryAdvancedAPI = {
     return await request({ url, method: 'DELETE' })
   },
 
-  // ===== 概率调整 =====
+  // ===== 成长等级公示分级概率（B 线） =====
 
   /**
-   * 调整中奖概率
-   * @param {Object} data - 调整数据
-   * @returns {Promise<Object>} 调整结果
+   * 获取成长等级阶梯定义（公示）
+   * @param {Object} [params={}] - 查询参数（如 include_inactive）
+   * @returns {Promise<Object>} { levels: [{level_key, level_name, min_history_points, sort_order, status, description}] }
    */
-  async adjustProbability(data) {
-    return await request({
-      url: LOTTERY_ADVANCED_ENDPOINTS.PROBABILITY_ADJUST,
-      method: 'POST',
-      data
-    })
-  },
-
-  // ===== 抽奖干预 =====
-
-  /**
-   * 获取干预列表
-   * @param {Object} [params={}] - 查询参数
-   * @returns {Promise<Object>} 干预列表
-   */
-  async getInterventionList(params = {}) {
-    const url = LOTTERY_ADVANCED_ENDPOINTS.INTERVENTION_LIST + buildQueryString(params)
+  async getGrowthLevels(params = {}) {
+    const url = LOTTERY_ADVANCED_ENDPOINTS.GROWTH_LEVELS_LIST + buildQueryString(params)
     return await request({ url, method: 'GET' })
   },
 
   /**
-   * 强制中奖
-   * @param {Object} data - 干预数据
-   * @returns {Promise<Object>} 干预结果
+   * 获取某活动各成长等级中奖率倍数
+   * @param {number} lottery_campaign_id - 活动 ID
+   * @returns {Promise<Object>} { lottery_campaign_id, items: [{level_key, level_name, min_history_points, multiplier}] }
    */
-  async forceWin(data) {
-    return await request({
-      url: LOTTERY_ADVANCED_ENDPOINTS.INTERVENTION_FORCE_WIN,
-      method: 'POST',
-      data
-    })
+  async getLevelProbability(lottery_campaign_id) {
+    const url = buildURL(LOTTERY_ADVANCED_ENDPOINTS.LEVEL_PROBABILITY_GET, { lottery_campaign_id })
+    return await request({ url, method: 'GET' })
   },
 
   /**
-   * 取消干预
-   * @param {number} id - 干预 ID
-   * @returns {Promise<Object>} 取消结果
+   * 批量配置某活动各成长等级中奖率倍数
+   * @param {number} lottery_campaign_id - 活动 ID
+   * @param {Array<Object>} items - [{level_key, multiplier}]
+   * @returns {Promise<Object>} 配置结果
    */
-  async cancelIntervention(id) {
-    const url = buildURL(LOTTERY_ADVANCED_ENDPOINTS.INTERVENTION_CANCEL, { id })
-    return await request({ url, method: 'POST' })
+  async updateLevelProbability(lottery_campaign_id, items) {
+    const url = buildURL(LOTTERY_ADVANCED_ENDPOINTS.LEVEL_PROBABILITY_UPDATE, {
+      lottery_campaign_id
+    })
+    return await request({ url, method: 'PUT', data: { items } })
   }
 }
 

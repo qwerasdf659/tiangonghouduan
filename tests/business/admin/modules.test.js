@@ -48,12 +48,12 @@ describe('GET /api/v4/console/ - 管理员模块信息API', () => {
    * 验证返回的模块数量
    * 2026-01-21：API覆盖率补齐后新增多个模块（40个模块）
    */
-  test('应该返回53个已实现的模块', async () => {
+  test('应该返回已实现的模块清单', async () => {
     const response = await request(app).get('/api/v4/console/')
     const { modules } = response.body.data
 
     const moduleCount = Object.keys(modules).length
-    expect(moduleCount).toBe(57) // 实际挂载的路由数量（2026-03-20：新增 alert-silence-rules 等模块后为57个）
+    expect(moduleCount).toBe(54) // 实际挂载的路由数量（2026-06-05 阶段五：移除 C2C marketplace_orders/orphan_frozen 后为54个）
 
     // 验证必需的模块是否存在（原有8个）
     expect(modules).toHaveProperty('auth')
@@ -67,7 +67,7 @@ describe('GET /api/v4/console/ - 管理员模块信息API', () => {
     // 验证新增的模块（V4.5.0+）
     expect(modules).toHaveProperty('settings')
     expect(modules).toHaveProperty('customer_service')
-    expect(modules).toHaveProperty('marketplace')
+    // 注：marketplace（C2C 交易市场）已随 C2C 下线移除（2026-06-05 阶段五）
     expect(modules).toHaveProperty('material')
     // diamond 模块已移除（功能并入 material 模块）
     expect(modules).toHaveProperty('ad_campaigns')
@@ -82,7 +82,7 @@ describe('GET /api/v4/console/ - 管理员模块信息API', () => {
     // 验证新增的模块（2026-01-09）
     expect(modules).toHaveProperty('asset_adjustment')
     expect(modules).toHaveProperty('campaign_budget')
-    expect(modules).toHaveProperty('orphan_frozen')
+    // 注：orphan_frozen（孤儿冻结清理）已随 C2C 下线移除（2026-06-05 阶段五）
     expect(modules).toHaveProperty('merchant_points')
     expect(modules).toHaveProperty('user_hierarchy')
 
@@ -107,7 +107,7 @@ describe('GET /api/v4/console/ - 管理员模块信息API', () => {
 
     // 验证新增的模块（2026-01-21 API覆盖率补齐 P2 只读查询）
     expect(modules).toHaveProperty('lottery_monitoring')
-    expect(modules).toHaveProperty('marketplace_orders')
+    // 注：marketplace_orders（C2C 交易订单查询）已随 C2C 下线移除（2026-06-05 阶段五）
     expect(modules).toHaveProperty('user_premium')
 
     // 验证新增的模块（2026-01-22 API覆盖率补齐 P1 只读查询）

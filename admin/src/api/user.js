@@ -280,10 +280,6 @@ export const USER_ENDPOINTS = {
   /** @type {string} [GET] 获取用户管理统计 - Query: { refresh?: 'true' } */
   STATS: `${API_PREFIX}/console/user-management/stats`,
 
-  // 概率调整
-  /** @type {string} [POST] 调整用户中奖概率 - Path: :user_id, Body: { probability, reason } */
-  ADJUST_PROBABILITY: `${API_PREFIX}/console/lottery-management/users/:user_id/probability-adjust`,
-
   // 认证（使用后端 console/auth 路径）
   /** @type {string} [POST] 登录 - Body: { mobile, verification_code } */
   AUTH_LOGIN: `${API_PREFIX}/console/auth/login`,

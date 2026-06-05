@@ -54,6 +54,7 @@
           <label class="form-label">物品类型</label>
           <select class="form-select" x-model="filters.type" @change="loadTemplates()">
             <option value="">全部类型</option>
+            <option value="prop">道具</option>
             <option value="voucher">优惠券</option>
             <option value="coupon">代金券</option>
             <option value="points">积分</option>
@@ -112,7 +113,7 @@
               <div class="flex items-center gap-2">
                 <!-- 类型图标（带背景圆） -->
                 <div class="w-10 h-10 rounded-lg flex items-center justify-center text-xl"
-                     :class="{'bg-cyan-50': t.item_type==='voucher' || t.item_type==='coupon', 'bg-amber-50': t.item_type==='points', 'bg-pink-50': t.item_type==='gift', 'bg-indigo-50': t.item_type==='virtual', 'bg-gray-50': t.item_type==='material'}">
+                     :class="{'bg-green-50': t.item_type==='prop', 'bg-cyan-50': t.item_type==='voucher' || t.item_type==='coupon', 'bg-amber-50': t.item_type==='points', 'bg-pink-50': t.item_type==='gift', 'bg-indigo-50': t.item_type==='virtual', 'bg-gray-50': t.item_type==='material'}">
                   <span x-text="getTypeIcon(t.item_type)">📦</span>
                 </div>
                 <span class="px-2 py-0.5 rounded-full text-xs text-white font-medium shadow-sm" 
@@ -184,6 +185,7 @@
             <div>
               <label class="block text-sm font-medium themed-text-secondary mb-1">物品类型</label>
               <select class="w-full px-3 py-2 border rounded-lg" x-model="form.item_type">
+                <option value="prop">道具</option>
                 <option value="voucher">优惠券</option>
                 <option value="coupon">代金券</option>
                 <option value="points">积分</option>

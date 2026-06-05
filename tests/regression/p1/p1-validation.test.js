@@ -191,28 +191,7 @@ describe('P1 修复验证测试', () => {
     })
   })
 
-  describe('P1-2：交易下单幂等冲突校验强制 star_stone-only', () => {
-    test('TradeOrderService 应该在幂等回放路径强制校验 star_stone', async () => {
-      /*
-       * 这个测试需要实际的 TradeOrderService 和数据库数据
-       * 由于测试环境限制，这里只做基本验证
-       *
-       * P1-9 J2-RepoWide：通过 ServiceManager 获取服务
-       */
-      const TradeOrderService = global.getTestService('trade_order')
-
-      // 验证服务类存在且有 createOrder 方法
-      expect(TradeOrderService).toBeDefined()
-      expect(typeof TradeOrderService.createOrder).toBe('function')
-
-      /*
-       * 实际的幂等校验逻辑已在代码中实现：
-       * 1. 检查 existingOrder.asset_code !== 'star_stone'
-       * 2. 检查 tempListing.price_asset_code !== 'star_stone'
-       */
-      console.log('✅ P1-2：TradeOrderService.createOrder 方法存在，幂等校验逻辑已实现')
-    })
-  })
+  // 注：P1-2（交易下单幂等校验）已随 C2C TradeOrderService 下线移除（2026-06-05 阶段五）
 
   describe('P1-3：asset_transactions.user_id 字段已删除（迁移到account_id）', () => {
     test('user_id 字段应该不存在', async () => {

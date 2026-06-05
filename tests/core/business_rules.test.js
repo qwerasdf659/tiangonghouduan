@@ -301,8 +301,8 @@ describe('🧮 核心业务逻辑测试', () => {
         }
 
         // 如果中奖，验证奖品发放
-        if (drawResponse.data.data?.lottery_prize_id) {
-          const prize_id = drawResponse.data.data.lottery_prize_id
+        if (drawResponse.data.data?.lottery_campaign_prize_id) {
+          const prize_id = drawResponse.data.data.lottery_campaign_prize_id
           console.log(`🎁 中奖奖品ID: ${prize_id}`)
 
           // 验证用户库存增加
@@ -395,7 +395,7 @@ describe('🧮 核心业务逻辑测试', () => {
 
           for (const record of records) {
             // ✅ V4.0业务规则：每次抽奖必有奖品（100%中奖）
-            expect(record.lottery_prize_id || record.prize).toBeDefined()
+            expect(record.lottery_campaign_prize_id || record.prize).toBeDefined()
             expect(record.prize_name || record.prize?.name).toBeDefined()
             console.log(`✅ 奖品记录验证通过: ${record.prize_name || record.prize?.name}`)
 

@@ -9,7 +9,7 @@
  * 子服务清单：
  * - ItemManagementService: 商品 CRUD（createExchangeItem/updateExchangeItem/deleteExchangeItem/_logStockChange）
  * - BatchOperationService: 批量操作（batchBindImages/batchUpdateSpace/batchUpdateStatus/batchUpdatePrice/batchSetIndividualPrices/batchUpdateCategory/batchUpdateRarity/getMissingImageItems）
- * - MarketQueryService: 市场查询/统计（getUserListingStats/getUserListings/updateUserListingLimit/checkTimeoutAndAlert/getAdminMarketItems/getMarketItemStatistics/getExchangeTopline/getItemDashboard/getSpaceDistribution）
+ * - MarketQueryService: 市场查询/统计（checkTimeoutAndAlert/getAdminMarketItems/getMarketItemStatistics/getExchangeTopline/getItemDashboard/getSpaceDistribution）
  * - SkuService: SKU 管理（listSkus/createSku/updateSku/deleteSku/_updateSpuSummary）
  *
  * @module services/exchange/admin
@@ -46,9 +46,6 @@ class ExchangeAdminFacade {
   getMissingImageItems(...args) { return this._batch.getMissingImageItems(...args) }
 
   // --- MarketQueryService ---
-  getUserListingStats(...args) { return this._market.getUserListingStats(...args) }
-  getUserListings(...args) { return this._market.getUserListings(...args) }
-  updateUserListingLimit(...args) { return this._market.updateUserListingLimit(...args) }
   checkTimeoutAndAlert(...args) { return this._market.checkTimeoutAndAlert(...args) }
   getAdminMarketItems(...args) { return this._market.getAdminMarketItems(...args) }
   getMarketItemStatistics(...args) { return this._market.getMarketItemStatistics(...args) }

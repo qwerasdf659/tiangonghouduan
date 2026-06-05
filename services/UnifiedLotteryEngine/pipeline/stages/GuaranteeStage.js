@@ -167,7 +167,7 @@ class GuaranteeStage extends BaseStage {
         user_id,
         lottery_campaign_id,
         next_draw_number,
-        guarantee_prize_id: guarantee_prize.lottery_prize_id,
+        guarantee_prize_id: guarantee_prize.lottery_campaign_prize_id,
         guarantee_prize_name: guarantee_prize.prize_name
       })
 
@@ -244,7 +244,7 @@ class GuaranteeStage extends BaseStage {
   async _getGuaranteePrize(lottery_campaign_id, prizes, guarantee_prize_id) {
     // 1. 如果指定了保底奖品ID，查找该奖品
     if (guarantee_prize_id) {
-      const specified_prize = prizes.find(p => p.lottery_prize_id === guarantee_prize_id)
+      const specified_prize = prizes.find(p => p.lottery_campaign_prize_id === guarantee_prize_id)
       if (specified_prize) {
         return specified_prize
       }
@@ -262,7 +262,6 @@ class GuaranteeStage extends BaseStage {
         if (db_prize) {
           const def = db_prize.prizeDefinition || {}
           return {
-            lottery_prize_id: db_prize.lottery_campaign_prize_id,
             lottery_campaign_prize_id: db_prize.lottery_campaign_prize_id,
             prize_name: def.display_name,
             prize_type: def.prize_type,

@@ -57,8 +57,8 @@ class PrizePickStage extends BaseStage {
 
     try {
       /*
-       * 🎯 Phase 1 新增：根据 decision_source 判断是否跳过正常抽取
-       * preset/override/guarantee 模式使用预定奖品
+       * 根据 decision_source 判断是否跳过正常抽取
+       * preset/guarantee 模式使用预定奖品（override 暗箱干预已于 2026-06-04 移除）
        */
       const decision_data = this.getContextData(context, 'LoadDecisionSourceStage.data')
       const decision_source = decision_data?.decision_source || 'normal'
@@ -71,7 +71,8 @@ class PrizePickStage extends BaseStage {
         this.log('info', '预设模式：使用预设奖品', {
           user_id,
           decision_source,
-          lottery_prize_id: preset_prize.lottery_prize_id || preset.lottery_prize_id,
+          lottery_campaign_prize_id:
+            preset_prize.lottery_campaign_prize_id || preset.lottery_campaign_prize_id,
           prize_name: preset_prize.prize_name || '预设奖品'
         })
 
@@ -88,100 +89,7 @@ class PrizePickStage extends BaseStage {
         })
       }
 
-      // override 模式：根据干预配置选择奖品
-      if (decision_source === 'override' && decision_data?.override) {
-        const override = decision_data.override
-        const override_type = override.setting_type || override.override_type
-
-        if (override_type === 'force_win') {
-          /*
-           * force_win 模式：尝试使用干预指定的奖品
-           * 数据来源：LoadDecisionSourceStage.data.override.setting_data.lottery_prize_id
-           * 如果指定奖品在当前奖品池中可用，直接使用；否则走正常抽取流程
-           */
-          const override_prize_id = override.setting_data?.lottery_prize_id
-          const prize_pool_data = this.getContextData(context, 'BuildPrizePoolStage.data')
-
-          if (override_prize_id && prize_pool_data) {
-            const all_pool_prizes = prize_pool_data.available_prizes || []
-            const matched_prize = all_pool_prizes.find(
-              p => p.lottery_prize_id === override_prize_id
-            )
-
-            if (matched_prize) {
-              this.log('info', '干预模式（强制中奖）：使用指定奖品', {
-                user_id,
-                decision_source,
-                lottery_prize_id: matched_prize.lottery_prize_id,
-                prize_name: matched_prize.prize_name
-              })
-
-              return this.success({
-                selected_prize: matched_prize,
-                prize_random_value: 0,
-                tier_total_weight: 0,
-                prize_hit_range: [0, 0],
-                tier_prize_count: 1,
-                selected_tier: matched_prize.reward_tier || 'high',
-                decision_source,
-                skipped: true,
-                skip_reason: 'override_force_win'
-              })
-            }
-
-            this.log('warn', '干预指定奖品不在当前奖品池中，降级为档位内随机抽取', {
-              user_id,
-              override_prize_id,
-              pool_size: all_pool_prizes.length,
-              reason: '奖品可能已停用/缺货/不满足资格条件'
-            })
-          }
-          /* 指定奖品不可用时，继续走正常的档位内抽取流程 */
-        }
-
-        /**
-         * 🔴 2026-03-06 业务语义修正：force_lose → 强制低档奖品
-         * 100%出奖设计下，force_lose 意为"强制选择低档奖品"
-         * 从 low 档位奖品池中随机选取，而非使用 fallback 保底奖品
-         */
-        if (override_type === 'force_lose') {
-          const prize_pool_data = this.getContextData(context, 'BuildPrizePoolStage.data')
-          const prizes_by_tier = prize_pool_data?.prizes_by_tier || {}
-          const low_prizes = (prizes_by_tier.low || []).filter(p => p.status === 'active')
-
-          if (low_prizes.length > 0) {
-            const { selected_prize, random_value, total_weight, hit_range } =
-              this._pickPrize(low_prizes)
-
-            if (selected_prize) {
-              this.log('info', '干预模式（强制低档）：从低档奖品池选取', {
-                user_id,
-                decision_source,
-                lottery_prize_id: selected_prize.lottery_prize_id,
-                prize_name: selected_prize.prize_name,
-                low_pool_size: low_prizes.length
-              })
-
-              return this.success({
-                selected_prize,
-                prize_random_value: random_value,
-                tier_total_weight: total_weight,
-                prize_hit_range: hit_range,
-                tier_prize_count: low_prizes.length,
-                selected_tier: 'low',
-                decision_source,
-                skipped: true,
-                skip_reason: 'override_force_lose_low_tier'
-              })
-            }
-          }
-
-          this.log('warn', '干预模式（强制低档）：低档奖品池为空，降级到正常抽取流程', {
-            user_id,
-            decision_source
-          })
-        }
-      }
+      // override 模式已于 2026-06-04 合规改造移除（per-user 暗箱干预下线）
 
       // guarantee 模式：使用保底奖品
       if (decision_source === 'guarantee' && decision_data?.guarantee_triggered) {
@@ -192,7 +100,7 @@ class PrizePickStage extends BaseStage {
           this.log('info', '保底模式：使用保底奖品', {
             user_id,
             decision_source,
-            lottery_prize_id: guarantee_prize.lottery_prize_id,
+            lottery_campaign_prize_id: guarantee_prize.lottery_campaign_prize_id,
             prize_name: guarantee_prize.prize_name
           })
 
@@ -265,7 +173,7 @@ class PrizePickStage extends BaseStage {
           lottery_campaign_id,
           pick_method: 'normalize',
           pool_size: all_prizes.length,
-          lottery_prize_id: selected_prize.lottery_prize_id,
+          lottery_campaign_prize_id: selected_prize.lottery_campaign_prize_id,
           prize_name: selected_prize.prize_name,
           win_probability: selected_prize.win_probability,
           random_value_percent:
@@ -311,7 +219,7 @@ class PrizePickStage extends BaseStage {
         user_id,
         lottery_campaign_id,
         selected_tier,
-        lottery_prize_id: selected_prize.lottery_prize_id,
+        lottery_campaign_prize_id: selected_prize.lottery_campaign_prize_id,
         prize_name: selected_prize.prize_name,
         prize_value_points: selected_prize.prize_value_points,
         random_value_percent:
@@ -447,7 +355,7 @@ class PrizePickStage extends BaseStage {
       hit_range = [total_weight - last_weight, total_weight]
 
       this.log('debug', '使用兜底选择最后一个奖品', {
-        lottery_prize_id: selected_prize.lottery_prize_id,
+        lottery_campaign_prize_id: selected_prize.lottery_campaign_prize_id,
         random_value,
         total_weight
       })

@@ -46,7 +46,7 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
   describe('B-5-1 奖品数据脱敏（sanitizePrizes）', () => {
     const mockPrizes = [
       {
-        lottery_prize_id: 1,
+        lottery_campaign_prize_id: 1,
         prize_name: '一等奖',
         prize_type: 'physical',
         win_probability: 0.001,
@@ -60,7 +60,7 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
         sort_order: 1
       },
       {
-        lottery_prize_id: 2,
+        lottery_campaign_prize_id: 2,
         prize_name: '二等奖',
         prize_type: 'voucher',
         win_probability: 0.05,
@@ -122,11 +122,14 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
       })
     })
 
-    test('B-5-1-5 普通用户（public）保留原始主键 lottery_prize_id（不做映射）', () => {
+    test('B-5-1-5 普通用户（public）输出通用主键 id（方案C：映射自 lottery_campaign_prize_id）', () => {
       const result = DataSanitizer.sanitizePrizes(mockPrizes, 'public')
 
       result.forEach(prize => {
-        expect(prize).toHaveProperty('lottery_prize_id')
+        expect(prize).toHaveProperty('id')
+        // 方案C防抓包：内部主键名不对外暴露
+        expect(prize).not.toHaveProperty('lottery_prize_id')
+        expect(prize).not.toHaveProperty('lottery_campaign_prize_id')
         expect(prize).toHaveProperty('prize_name')
         expect(prize).toHaveProperty('prize_type')
         expect(prize).toHaveProperty('prize_value')
@@ -141,11 +144,11 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
       expect(result.length).toBe(mockPrizes.length)
     })
 
-    test('B-5-1-7 普通用户（public）保留原始主键 lottery_prize_id', () => {
+    test('B-5-1-7 普通用户（public）id 映射自 lottery_campaign_prize_id', () => {
       const result = DataSanitizer.sanitizePrizes(mockPrizes, 'public')
 
       result.forEach((prize, index) => {
-        expect(prize.lottery_prize_id).toBe(mockPrizes[index].lottery_prize_id)
+        expect(prize.id).toBe(mockPrizes[index].lottery_campaign_prize_id)
         expect(prize.prize_name).toBe(mockPrizes[index].prize_name)
         expect(prize.prize_type).toBe(mockPrizes[index].prize_type)
       })
@@ -592,7 +595,7 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
     })
 
     test('B-5-10-3 cost_points 在日志中脱敏', () => {
-      const logData = 'prize cost: cost_points: 500, lottery_prize_id: 1'
+      const logData = 'prize cost: cost_points: 500, lottery_campaign_prize_id: 1'
       const result = DataSanitizer.sanitizeLogs(logData)
 
       expect(result).toContain('cost_points: [HIDDEN]')
@@ -695,116 +698,6 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
       expect(DataSanitizer.maskAdminName('张三')).toBe('客服三')
       expect(DataSanitizer.maskAdminName(null)).toBe('客服')
       expect(DataSanitizer.maskAdminName('')).toBe('客服')
-    })
-  })
-
-  /**
-   * B-5-11: 交易市场挂单数据脱敏测试（γ 重写方法）
-   *
-   * 业务场景：用户浏览交易市场时，脱敏卖家信息和内部字段
-   * 安全要求：locked_by_order_id、seller_contact、transaction_fees 等不对外暴露
-   */
-  describe('B-5-11 交易市场挂单脱敏（sanitizeMarketProducts）', () => {
-    const mockListings = [
-      {
-        market_listing_id: 101,
-        listing_kind: 'item',
-        seller_user_id: 31,
-        seller_nickname: '张三丰',
-        seller_avatar_url: 'https://example.com/avatar1.jpg',
-        offer_item_display_name: '红宝石碎片',
-        offer_category_id: 1,
-        price_amount: 500,
-        price_asset_code: 'star_stone',
-        status: 'on_sale',
-        item_info: { rarity: 'rare' },
-        asset_info: null,
-        created_at: '2026-02-01T10:00:00.000+08:00',
-        locked_by_order_id: 3200,
-        seller_contact: '13612227930',
-        transaction_fees: 25,
-        profit_analysis: { margin: 0.3 },
-        internal_remark: '测试挂单'
-      },
-      {
-        market_listing_id: 102,
-        listing_kind: 'fungible_asset',
-        seller_user_id: 32,
-        seller_nickname: '李四',
-        seller_avatar_url: null,
-        offer_item_display_name: '积分',
-        offer_category_id: 2,
-        price_amount: 100,
-        price_asset_code: 'star_stone',
-        status: 'on_sale',
-        item_info: null,
-        asset_info: { amount: 1000 },
-        created_at: '2026-02-01T11:00:00.000+08:00',
-        locked_by_order_id: null,
-        seller_contact: '13800138000',
-        transaction_fees: 5,
-        internal_remark: null
-      }
-    ]
-
-    test('B-5-11-1 普通用户（public）不可见 locked_by_order_id', () => {
-      const result = DataSanitizer.sanitizeMarketProducts(mockListings, 'public')
-
-      result.forEach(item => {
-        expect(item).not.toHaveProperty('locked_by_order_id')
-      })
-    })
-
-    test('B-5-11-2 普通用户（public）不可见 seller_contact', () => {
-      const result = DataSanitizer.sanitizeMarketProducts(mockListings, 'public')
-
-      result.forEach(item => {
-        expect(item).not.toHaveProperty('seller_contact')
-      })
-    })
-
-    test('B-5-11-3 普通用户（public）不可见 transaction_fees 和 profit_analysis', () => {
-      const result = DataSanitizer.sanitizeMarketProducts(mockListings, 'public')
-
-      result.forEach(item => {
-        expect(item).not.toHaveProperty('transaction_fees')
-        expect(item).not.toHaveProperty('profit_analysis')
-        expect(item).not.toHaveProperty('internal_remark')
-      })
-    })
-
-    test('B-5-11-4 普通用户（public）保留原始主键 market_listing_id', () => {
-      const result = DataSanitizer.sanitizeMarketProducts(mockListings, 'public')
-
-      expect(result[0].market_listing_id).toBe(101)
-      expect(result[1].market_listing_id).toBe(102)
-    })
-
-    test('B-5-11-5 普通用户（public）seller_nickname 经 maskUserName 脱敏', () => {
-      const result = DataSanitizer.sanitizeMarketProducts(mockListings, 'public')
-
-      expect(result[0].seller_nickname).toBe('张*丰')
-      expect(result[1].seller_nickname).toBe('李四')
-    })
-
-    test('B-5-11-6 普通用户（public）保留业务必需字段', () => {
-      const result = DataSanitizer.sanitizeMarketProducts(mockListings, 'public')
-
-      result.forEach(item => {
-        expect(item).toHaveProperty('market_listing_id')
-        expect(item).toHaveProperty('listing_kind')
-        expect(item).toHaveProperty('price_amount')
-        expect(item).toHaveProperty('price_asset_code')
-        expect(item).toHaveProperty('status')
-        expect(item).toHaveProperty('offer_item_display_name')
-        expect(item).toHaveProperty('created_at')
-      })
-    })
-
-    test('B-5-11-7 管理员（full）可见完整原始数据', () => {
-      const result = DataSanitizer.sanitizeMarketProducts(mockListings, 'full')
-
-      expect(result).toEqual(mockListings)
     })
   })
 

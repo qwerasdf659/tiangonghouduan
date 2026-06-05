@@ -9,7 +9,7 @@
  *   lottery/      21 文件  抽奖核心 + 监控 + 强控
  *   ad/            5 文件  广告活动/广告位/定价/报表/地域
  *   user/          8 文件  用户管理/分层/行为/高级空间/分群
- *   market/        2 文件  C2C 二级市场挂牌 + C2C 订单（竞价/兑换商品/汇率已迁出）
+ *   （C2C 二级市场 console/market 已随 C2C 下线删除，2026-06-05 阶段五）
  *   merchant/      7 文件  商家/门店/员工/区划/积分/欠账/消费
  *   risk/          6 文件  风控告警/配置/静默/孤儿冻结/异常/对账
  *   analytics/     8 文件  分析/看板/统计/报表/记录/数据/预算/待处理
@@ -29,7 +29,7 @@ const router = express.Router()
 router.use('/', require('./lottery'))
 router.use('/', require('./ad'))
 router.use('/', require('./user'))
-router.use('/', require('./market'))
+// 注：console/market（C2C 二级市场管理）已随 C2C 下线删除（2026-06-05 阶段五）
 router.use('/', require('./merchant'))
 router.use('/', require('./risk'))
 router.use('/', require('./analytics'))
@@ -134,21 +134,6 @@ router.get('/', (req, res) => {
           '/sessions/:id/close'
         ]
       },
-      marketplace: {
-        description: 'C2C 二级市场管理（挂牌 / 统计 / 订单 / 可交易配置）',
-        endpoints: [
-          '/marketplace/listing-stats',
-          '/marketplace/user-listings',
-          '/marketplace/user-listing-limit',
-          '/marketplace/listings',
-          '/marketplace/stats/overview',
-          '/marketplace/stats/price-history',
-          '/marketplace/config/tradable-assets',
-          '/marketplace/orders',
-          '/marketplace/orders/stats'
-        ],
-        note: 'B2C 兑换见 /exchange/*；汇率运营见 /assets/rates；竞拍见 /bids'
-      },
       material: {
         description: '材料系统管理（V4.5.0）',
         endpoints: ['/material/asset-types', '/material/conversion-rules'],
@@ -198,11 +183,6 @@ router.get('/', (req, res) => {
           '/assets/rates'
         ],
         note: '资产总览、物品管理、流水查询、统计导出、汇率管理（B2C+C2C 共享）；权限要求：admin（可写）或 ops（只读）'
-      },
-      orphan_frozen: {
-        description: '孤儿冻结清理（P0-2 2026-01-09）',
-        endpoints: ['/orphan-frozen/detect', '/orphan-frozen/stats', '/orphan-frozen/cleanup'],
-        note: '检测和清理孤儿冻结（frozen_amount > 活跃挂牌冻结），唯一入口设计，支持干跑模式'
       },
       merchant_points: {
         description: '商家积分审核管理（P1 2026-01-09）',
@@ -477,17 +457,6 @@ router.get('/', (req, res) => {
           '/lottery-monitoring/user-quotas/stats/:lottery_campaign_id'
         ],
         note: '抽奖监控数据只读查询'
-      },
-      marketplace_orders: {
-        description: 'C2C 交易订单查询（挂载于 /marketplace/orders）',
-        endpoints: [
-          '/marketplace/orders',
-          '/marketplace/orders/stats',
-          '/marketplace/orders/user/:user_id/stats',
-          '/marketplace/orders/by-business-id/:business_id',
-          '/marketplace/orders/:id'
-        ],
-        note: '交易订单只读查询'
       },
       user_premium: {
         description: '用户高级空间状态查询（2026-01-21 P2）',

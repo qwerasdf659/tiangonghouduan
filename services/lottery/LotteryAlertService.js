@@ -736,7 +736,7 @@ class LotteryAlertService {
         where: {
           lottery_campaign_id,
           created_at: { [Op.gte]: oneHourAgo },
-          lottery_prize_id: { [Op.not]: null }
+          lottery_campaign_prize_id: { [Op.not]: null }
         }
       })
 
@@ -893,7 +893,7 @@ class LotteryAlertService {
         FROM (
           SELECT 
             user_id,
-            @streak := IF(lottery_prize_id IS NULL AND @prev_user = user_id, @streak + 1, IF(lottery_prize_id IS NULL, 1, 0)) as empty_streak,
+            @streak := IF(lottery_campaign_prize_id IS NULL AND @prev_user = user_id, @streak + 1, IF(lottery_campaign_prize_id IS NULL, 1, 0)) as empty_streak,
             @prev_user := user_id
           FROM lottery_draws
           CROSS JOIN (SELECT @streak := 0, @prev_user := 0) vars

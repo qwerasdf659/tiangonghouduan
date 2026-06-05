@@ -619,7 +619,7 @@ class UserAnalysisService {
           {
             model: this.models.LotteryCampaignPrize,
             as: 'prize',
-            attributes: ['lottery_prize_id', 'prize_name', 'prize_value_points']
+            attributes: ['lottery_campaign_prize_id', 'prize_name', 'prize_value_points']
           }
         ],
         order: [['created_at', 'DESC']],
@@ -720,7 +720,12 @@ class UserAnalysisService {
           {
             model: this.models.LotteryCampaignPrize,
             as: 'prize',
-            attributes: ['lottery_prize_id', 'prize_name', 'cost_points', 'prize_value_points']
+            attributes: [
+              'lottery_campaign_prize_id',
+              'prize_name',
+              'cost_points',
+              'prize_value_points'
+            ]
           }
         ]
       })

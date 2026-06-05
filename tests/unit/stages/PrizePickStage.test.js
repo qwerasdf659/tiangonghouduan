@@ -10,11 +10,10 @@
  * - 当前项目使用 tier_first 选奖方法（先抽档位，再抽奖品）
  * - 整数权重系统（win_weight 字段，SCALE = 1,000,000）
  * - 加权随机选择算法
- * - 支持 preset/override/guarantee 模式跳过正常抽取
+ * - 支持 preset/guarantee 模式跳过正常抽取
  *
  * 核心逻辑（来自 PrizePickStage.js）：
  * - decision_source = 'preset' → 使用预设奖品
- * - decision_source = 'override' → 使用干预配置的奖品
  * - decision_source = 'guarantee' → 使用保底奖品
  * - decision_source = 'normal' → 执行正常的加权随机抽取
  *
@@ -114,9 +113,9 @@ describe('【P1】奖品选择器专项测试 - PrizePickStage', () => {
 
       // 模拟奖品列表
       const mockPrizes = [
-        { lottery_prize_id: 1, prize_name: '奖品A', win_weight: 300000 }, // 30%
-        { lottery_prize_id: 2, prize_name: '奖品B', win_weight: 500000 }, // 50%
-        { lottery_prize_id: 3, prize_name: '奖品C', win_weight: 200000 } // 20%
+        { lottery_campaign_prize_id: 1, prize_name: '奖品A', win_weight: 300000 }, // 30%
+        { lottery_campaign_prize_id: 2, prize_name: '奖品B', win_weight: 500000 }, // 50%
+        { lottery_campaign_prize_id: 3, prize_name: '奖品C', win_weight: 200000 } // 20%
       ]
 
       // 执行选择
@@ -155,9 +154,9 @@ describe('【P1】奖品选择器专项测试 - PrizePickStage', () => {
        */
 
       const mockPrizes = [
-        { lottery_prize_id: 1, prize_name: '奖品A', win_weight: 300000 },
-        { lottery_prize_id: 2, prize_name: '奖品B', win_weight: 500000 },
-        { lottery_prize_id: 3, prize_name: '奖品C', win_weight: 200000 }
+        { lottery_campaign_prize_id: 1, prize_name: '奖品A', win_weight: 300000 },
+        { lottery_campaign_prize_id: 2, prize_name: '奖品B', win_weight: 500000 },
+        { lottery_campaign_prize_id: 3, prize_name: '奖品C', win_weight: 200000 }
       ]
 
       // 多次选择统计
@@ -166,7 +165,7 @@ describe('【P1】奖品选择器专项测试 - PrizePickStage', () => {
 
       for (let i = 0; i < iterations; i++) {
         const result = stage._pickPrize(mockPrizes)
-        selections[result.selected_prize.lottery_prize_id]++
+        selections[result.selected_prize.lottery_campaign_prize_id]++
       }
 
       console.log(`   奖品A选中: ${selections[1]}次 (期望~300次)`)
@@ -190,9 +189,9 @@ describe('【P1】奖品选择器专项测试 - PrizePickStage', () => {
       console.log('📊 2.4.2.3 验证权重为0的处理...')
 
       const mockPrizes = [
-        { lottery_prize_id: 1, prize_name: '奖品A', win_weight: 500000 },
-        { lottery_prize_id: 2, prize_name: '奖品B', win_weight: 0 }, // 权重为0
-        { lottery_prize_id: 3, prize_name: '奖品C', win_weight: 500000 }
+        { lottery_campaign_prize_id: 1, prize_name: '奖品A', win_weight: 500000 },
+        { lottery_campaign_prize_id: 2, prize_name: '奖品B', win_weight: 0 }, // 权重为0
+        { lottery_campaign_prize_id: 3, prize_name: '奖品C', win_weight: 500000 }
       ]
 
       const selections = { 1: 0, 2: 0, 3: 0 }
@@ -200,7 +199,7 @@ describe('【P1】奖品选择器专项测试 - PrizePickStage', () => {
 
       for (let i = 0; i < iterations; i++) {
         const result = stage._pickPrize(mockPrizes)
-        selections[result.selected_prize.lottery_prize_id]++
+        selections[result.selected_prize.lottery_campaign_prize_id]++
       }
 
       console.log(`   奖品A选中: ${selections[1]}次`)
@@ -217,9 +216,9 @@ describe('【P1】奖品选择器专项测试 - PrizePickStage', () => {
       console.log('📊 2.4.2.4 验证全部权重为0的兜底逻辑...')
 
       const mockPrizes = [
-        { lottery_prize_id: 1, prize_name: '奖品A', win_weight: 0 },
-        { lottery_prize_id: 2, prize_name: '奖品B', win_weight: 0 },
-        { lottery_prize_id: 3, prize_name: '奖品C', win_weight: 0 }
+        { lottery_campaign_prize_id: 1, prize_name: '奖品A', win_weight: 0 },
+        { lottery_campaign_prize_id: 2, prize_name: '奖品B', win_weight: 0 },
+        { lottery_campaign_prize_id: 3, prize_name: '奖品C', win_weight: 0 }
       ]
 
       // 当所有权重为0时，应该随机选择一个
@@ -235,14 +234,14 @@ describe('【P1】奖品选择器专项测试 - PrizePickStage', () => {
     test('单个奖品应该100%选中', () => {
       console.log('📊 2.4.2.5 验证单个奖品选择...')
 
-      const mockPrizes = [{ lottery_prize_id: 1, prize_name: '唯一奖品', win_weight: 500000 }]
+      const mockPrizes = [{ lottery_campaign_prize_id: 1, prize_name: '唯一奖品', win_weight: 500000 }]
 
       const iterations = 100
       let allSameCount = 0
 
       for (let i = 0; i < iterations; i++) {
         const result = stage._pickPrize(mockPrizes)
-        if (result.selected_prize.lottery_prize_id === 1) {
+        if (result.selected_prize.lottery_campaign_prize_id === 1) {
           allSameCount++
         }
       }
@@ -269,7 +268,7 @@ describe('【P1】奖品选择器专项测试 - PrizePickStage', () => {
 
       const presetResult = {
         selected_prize: {
-          lottery_prize_id: 999,
+          lottery_campaign_prize_id: 999,
           prize_name: '预设特等奖',
           reward_tier: 'high'
         },
@@ -287,61 +286,12 @@ describe('【P1】奖品选择器专项测试 - PrizePickStage', () => {
       console.log('   ✅ preset 模式正确跳过正常抽取')
     })
 
-    test('override 模式（force_win）应该使用指定奖品', () => {
-      console.log('📊 2.4.3.2 验证 override/force_win 模式...')
-
-      const overrideResult = {
-        selected_prize: {
-          lottery_prize_id: 888,
-          prize_name: '干预一等奖',
-          reward_tier: 'high'
-        },
-        decision_source: 'override',
-        skipped: true,
-        skip_reason: 'override_force_win'
-      }
-
-      expect(overrideResult.decision_source).toBe('override')
-      expect(overrideResult.skip_reason).toBe('override_force_win')
-
-      console.log(`   干预奖品: ${overrideResult.selected_prize.prize_name}`)
-      console.log('   ✅ override/force_win 模式正确使用指定奖品')
-    })
-
-    test('override 模式（force_lose）应该使用低档奖品', () => {
-      console.log('📊 2.4.3.3 验证 override/force_lose 模式...')
-
-      /**
-       * 2026-03-06 业务语义修正：
-       * 100%出奖设计下，force_lose 意为"强制低档奖品"
-       * selected_tier 应为 'low'，skip_reason 为 'override_force_lose_low_tier'
-       */
-      const overrideResult = {
-        selected_prize: {
-          lottery_prize_id: 777,
-          prize_name: '幸运积分',
-          reward_tier: 'low'
-        },
-        decision_source: 'override',
-        selected_tier: 'low',
-        skipped: true,
-        skip_reason: 'override_force_lose_low_tier'
-      }
-
-      expect(overrideResult.decision_source).toBe('override')
-      expect(overrideResult.selected_tier).toBe('low')
-      expect(overrideResult.skip_reason).toBe('override_force_lose_low_tier')
-
-      console.log(`   低档奖品: ${overrideResult.selected_prize.prize_name}`)
-      console.log('   ✅ override/force_lose 模式正确使用低档奖品（100%出奖）')
-    })
-
     test('guarantee 模式应该使用保底奖品', () => {
       console.log('📊 2.4.3.4 验证 guarantee 模式...')
 
       const guaranteeResult = {
         selected_prize: {
-          lottery_prize_id: 666,
+          lottery_campaign_prize_id: 666,
           prize_name: '保底大奖',
           reward_tier: 'high'
         },
@@ -368,7 +318,7 @@ describe('【P1】奖品选择器专项测试 - PrizePickStage', () => {
        */
 
       const normalResult = {
-        selected_prize: { lottery_prize_id: 1, prize_name: '正常抽取奖品' },
+        selected_prize: { lottery_campaign_prize_id: 1, prize_name: '正常抽取奖品' },
         decision_source: 'normal',
         skipped: false,
         random_value: 350000,
@@ -434,15 +384,15 @@ describe('【P1】奖品选择器专项测试 - PrizePickStage', () => {
 
       // 模拟 high 档位的奖品
       const highTierPrizes = [
-        { lottery_prize_id: 1, prize_name: '特等奖', win_weight: 100000 }, // 10%
-        { lottery_prize_id: 2, prize_name: '一等奖', win_weight: 400000 }, // 40%
-        { lottery_prize_id: 3, prize_name: '二等奖', win_weight: 500000 } // 50%
+        { lottery_campaign_prize_id: 1, prize_name: '特等奖', win_weight: 100000 }, // 10%
+        { lottery_campaign_prize_id: 2, prize_name: '一等奖', win_weight: 400000 }, // 40%
+        { lottery_campaign_prize_id: 3, prize_name: '二等奖', win_weight: 500000 } // 50%
       ]
 
       // 模拟 low 档位的奖品
       const lowTierPrizes = [
-        { lottery_prize_id: 10, prize_name: '安慰奖A', win_weight: 300000 }, // 30%
-        { lottery_prize_id: 11, prize_name: '安慰奖B', win_weight: 700000 } // 70%
+        { lottery_campaign_prize_id: 10, prize_name: '安慰奖A', win_weight: 300000 }, // 30%
+        { lottery_campaign_prize_id: 11, prize_name: '安慰奖B', win_weight: 700000 } // 70%
       ]
 
       // 分别测试两个档位的选择
@@ -454,11 +404,11 @@ describe('【P1】奖品选择器专项测试 - PrizePickStage', () => {
       expect(lowResult.total_weight).toBe(1000000)
 
       // 选中的奖品应属于对应档位
-      const highPrizeIds = highTierPrizes.map(p => p.lottery_prize_id)
-      const lowPrizeIds = lowTierPrizes.map(p => p.lottery_prize_id)
+      const highPrizeIds = highTierPrizes.map(p => p.lottery_campaign_prize_id)
+      const lowPrizeIds = lowTierPrizes.map(p => p.lottery_campaign_prize_id)
 
-      expect(highPrizeIds).toContain(highResult.selected_prize.lottery_prize_id)
-      expect(lowPrizeIds).toContain(lowResult.selected_prize.lottery_prize_id)
+      expect(highPrizeIds).toContain(highResult.selected_prize.lottery_campaign_prize_id)
+      expect(lowPrizeIds).toContain(lowResult.selected_prize.lottery_campaign_prize_id)
 
       console.log(`   高档位选中: ${highResult.selected_prize.prize_name}`)
       console.log(`   低档位选中: ${lowResult.selected_prize.prize_name}`)
@@ -521,8 +471,8 @@ describe('【P1】奖品选择器专项测试 - PrizePickStage', () => {
       console.log('📊 边界测试2: 超大权重值...')
 
       const largePrizes = [
-        { lottery_prize_id: 1, prize_name: '奖品A', win_weight: 999999999 },
-        { lottery_prize_id: 2, prize_name: '奖品B', win_weight: 1 }
+        { lottery_campaign_prize_id: 1, prize_name: '奖品A', win_weight: 999999999 },
+        { lottery_campaign_prize_id: 2, prize_name: '奖品B', win_weight: 1 }
       ]
 
       const result = stage._pickPrize(largePrizes)
@@ -540,8 +490,8 @@ describe('【P1】奖品选择器专项测试 - PrizePickStage', () => {
 
       // 注意：项目使用整数权重，这里测试兼容性
       const floatPrizes = [
-        { lottery_prize_id: 1, prize_name: '奖品A', win_weight: 333333.33 },
-        { lottery_prize_id: 2, prize_name: '奖品B', win_weight: 666666.67 }
+        { lottery_campaign_prize_id: 1, prize_name: '奖品A', win_weight: 333333.33 },
+        { lottery_campaign_prize_id: 2, prize_name: '奖品B', win_weight: 666666.67 }
       ]
 
       const result = stage._pickPrize(floatPrizes)
@@ -575,7 +525,7 @@ describe('【P1】奖品选择器专项测试 - PrizePickStage', () => {
       console.log('📋 核心业务规则验证：')
       console.log('   - 选奖方法：tier_first（先抽档位，再抽奖品）')
       console.log('   - 权重系统：整数权重（win_weight）')
-      console.log('   - 模式支持：preset/override/guarantee/normal')
+      console.log('   - 模式支持：preset/guarantee/normal')
       console.log('   - 算法：加权随机选择，累加权重匹配')
       console.log('='.repeat(80))
 

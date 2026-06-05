@@ -85,7 +85,7 @@ const DATA_SOURCE_CONFIG = {
     defaultFields: [
       'exchange_record_id',
       'user_id',
-      'lottery_prize_id',
+      'lottery_campaign_prize_id',
       'points_cost',
       'status',
       'created_at'
@@ -106,13 +106,13 @@ const DATA_SOURCE_CONFIG = {
       'lottery_draw_id',
       'user_id',
       'lottery_campaign_id',
-      'lottery_prize_id',
+      'lottery_campaign_prize_id',
       'created_at'
     ],
     aggregateFields: {
       draw_count: 'COUNT(*)',
       user_count: 'COUNT(DISTINCT user_id)',
-      prize_count: 'COUNT(DISTINCT lottery_prize_id)'
+      prize_count: 'COUNT(DISTINCT lottery_campaign_prize_id)'
     }
   },
 

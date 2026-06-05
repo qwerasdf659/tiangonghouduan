@@ -102,7 +102,6 @@ router.get(
  * V4.6 抽奖系统健康检查（Pipeline 架构）
  *
  * - 更新为 Pipeline 管线名称
- * - 保留 ManagementStrategy 用于管理 API
  */
 router.get('/health', (req, res) => {
   return res.apiSuccess(
@@ -112,8 +111,7 @@ router.get('/health', (req, res) => {
       version: '4.6.0',
       architecture: 'pipeline',
       pipelines: ['NormalDrawPipeline'], // ：统一管线
-      decision_sources: ['normal', 'preset', 'override'], // 决策来源类型
-      management_strategy: 'ManagementStrategy',
+      decision_sources: ['normal', 'preset', 'guarantee'], // 决策来源类型（per-user override 已下线）
       timestamp: BeijingTimeHelper.apiTimestamp()
     },
     'V4.6抽奖系统运行正常（ 统一管线架构）'

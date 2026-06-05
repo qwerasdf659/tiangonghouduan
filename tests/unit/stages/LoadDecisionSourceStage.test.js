@@ -5,11 +5,10 @@
  *
  * 测试内容：
  * 1. 预设队列（preset）命中逻辑 - 包括全局预设（campaign_id=null）
- * 2. 管理干预（override）命中逻辑 - 包括过期时间检查
- * 3. 决策优先级：preset > override > guarantee > normal
+ * 2. 保底机制（guarantee）命中逻辑
+ * 3. 决策优先级：preset > guarantee > normal
  *
  * 2026-02-15 修复验证：
- * - _checkOverride() 增加 expires_at 实时过期检查
  * - _checkPreset() 支持全局预设（lottery_campaign_id 为 NULL）
  *
  * @file tests/unit/stages/LoadDecisionSourceStage.test.js
@@ -55,30 +54,33 @@ describe('【决策来源】LoadDecisionSourceStage 单元测试', () => {
       expect(LoadDecisionSourceStage.DECISION_SOURCES).toBeDefined()
     })
 
-    test('DECISION_SOURCES 应包含四种决策类型', () => {
+    test('DECISION_SOURCES 应包含三种决策类型', () => {
       const { DECISION_SOURCES } = LoadDecisionSourceStage
       expect(DECISION_SOURCES.PRESET).toBe('preset')
-      expect(DECISION_SOURCES.OVERRIDE).toBe('override')
       expect(DECISION_SOURCES.GUARANTEE).toBe('guarantee')
       expect(DECISION_SOURCES.NORMAL).toBe('normal')
     })
 
-    test('决策优先级文档：preset > override > guarantee > normal', () => {
+    test('DECISION_SOURCES 不应包含 override（per-user 暗箱干预已下线）', () => {
+      const { DECISION_SOURCES } = LoadDecisionSourceStage
+      expect(DECISION_SOURCES.OVERRIDE).toBeUndefined()
+      expect(Object.values(DECISION_SOURCES)).not.toContain('override')
+    })
+
+    test('决策优先级文档：preset > guarantee > normal', () => {
       /**
        * 业务规则验证：
        * 1. preset（预设队列）- 最高优先级
-       * 2. override（管理干预：force_win/force_lose）- 次高优先级
-       * 3. guarantee（保底机制）- 第三优先级
-       * 4. normal（正常抽奖）- 最低优先级
+       * 2. guarantee（保底机制）- 次高优先级
+       * 3. normal（正常抽奖）- 最低优先级
        */
       const { DECISION_SOURCES } = LoadDecisionSourceStage
       const priority_order = [
         DECISION_SOURCES.PRESET,
-        DECISION_SOURCES.OVERRIDE,
         DECISION_SOURCES.GUARANTEE,
         DECISION_SOURCES.NORMAL
       ]
-      expect(priority_order).toEqual(['preset', 'override', 'guarantee', 'normal'])
+      expect(priority_order).toEqual(['preset', 'guarantee', 'normal'])
     })
   })
 
@@ -89,13 +91,7 @@ describe('【决策来源】LoadDecisionSourceStage 单元测试', () => {
     })
   })
 
-  describe('4. _checkOverride 方法行为验证', () => {
-    test('应该是异步方法', () => {
-      expect(typeof stage._checkOverride).toBe('function')
-    })
-  })
-
-  describe('5. _checkGuarantee 方法行为验证', () => {
+  describe('4. _checkGuarantee 方法行为验证', () => {
     test('应该是异步方法', () => {
       expect(typeof stage._checkGuarantee).toBe('function')
     })

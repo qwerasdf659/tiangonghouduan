@@ -338,7 +338,7 @@ class ActivityBudgetService {
     const prizes = await models.LotteryCampaignPrize.findAll({
       where: { lottery_campaign_id: parseInt(campaignId) },
       attributes: [
-        'lottery_prize_id',
+        'lottery_campaign_prize_id',
         'prize_name',
         'prize_type',
         'prize_value_points',
@@ -349,7 +349,7 @@ class ActivityBudgetService {
       ],
       order: [
         ['sort_order', 'ASC'],
-        ['lottery_prize_id', 'ASC']
+        ['lottery_campaign_prize_id', 'ASC']
       ]
     })
 
@@ -365,7 +365,7 @@ class ActivityBudgetService {
       campaign_name: campaign.campaign_name,
       budget_mode: campaign.budget_mode,
       prizes: prizes.map(p => ({
-        lottery_prize_id: p.lottery_prize_id,
+        lottery_campaign_prize_id: p.lottery_campaign_prize_id,
         prize_name: p.prize_name,
         prize_type: p.prize_type,
         prize_value_points: p.prize_value_points,

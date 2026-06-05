@@ -683,11 +683,29 @@ try {
 
   /*
    * ========================================
-   * 4. /marketplace - C2C 用户间交易市场域（从 /market 迁移，与 console/marketplace 语义对齐）
+   * 4. /marketplace - C2C 用户间交易市场域（合规整改已彻底下线，2026-06-05 阶段五）
    * ========================================
+   * 🔴 合规整改（§6.1/§10.4-A/§10.15 Step 13）：
+   * - C2C 用户间交易已被「用户↔官方 B2C 单向道具商城」取代（消除二级市场/场外套现）
+   * - 阶段五已删除 routes/v4/marketplace 整个域与 C2C 服务/表，此处保留自包含 410 桩
+   * - 不再 require 已删除的路由；整域恒返回 410 Gone，前端据此隐藏入口
+   * - 道具商城走 exchange 域（B2C 单向：直购/兑换/以物易物），竞价走 exchange/bid
    */
-  app.use('/api/v4/marketplace', require('./routes/v4/marketplace'))
-  appLogger.info(' marketplace域加载成功', { route: '/api/v4/marketplace' })
+  app.use('/api/v4/marketplace', (req, res) =>
+    res.apiError(
+      '交易市场（C2C 用户间交易）已下线，请使用道具商城（exchange 域）',
+      'MARKETPLACE_DEPRECATED',
+      {
+        deprecated_since: '2026-06-04',
+        new_domain: '/api/v4/exchange',
+        reason: '合规整改：关闭用户间(C2C)交易，改为用户↔官方(B2C)单向道具商城'
+      },
+      410
+    )
+  )
+  appLogger.info(' marketplace域已彻底下线（C2C 已删除，整域返回410）', {
+    route: '/api/v4/marketplace'
+  })
 
   /*
    * ========================================

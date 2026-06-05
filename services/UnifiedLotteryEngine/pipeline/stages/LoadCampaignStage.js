@@ -196,9 +196,8 @@ class LoadCampaignStage extends BaseStage {
           ? Number(mat.budget_value_points) * Number(def.material_amount)
           : 0
 
-      // 构建兼容旧格式的扁平对象
+      // 扁平化对象（统一使用 lottery_campaign_prize_id，不再输出 lottery_prize_id 假名）
       return {
-        lottery_prize_id: cp.lottery_campaign_prize_id,
         lottery_campaign_prize_id: cp.lottery_campaign_prize_id,
         prize_definition_id: cp.prize_definition_id,
         lottery_campaign_id: cp.lottery_campaign_id,
@@ -253,9 +252,9 @@ class LoadCampaignStage extends BaseStage {
    * 获取兜底奖品
    *
    * 规则（已拍板 0.10.2）：
-   * 1. 如果活动配置了 tier_fallback_lottery_prize_id，使用该奖品
+   * 1. 如果活动配置了 tier_fallback 的 prize_id，使用该奖品
    * 2. 否则自动选取 prize_value_points=0 且 is_fallback=true 的奖品
-   * 3. 按 sort_order ASC, lottery_prize_id ASC 排序取第一个
+   * 3. 按 sort_order ASC, lottery_campaign_prize_id ASC 排序取第一个
    *
    * @param {Array} prizes - 奖品列表
    * @param {Object} campaign - 活动配置
@@ -286,7 +285,9 @@ class LoadCampaignStage extends BaseStage {
 
     // 1. 检查是否配置了指定的兜底奖品
     if (tier_fallback_prize_id) {
-      const specified_fallback = prizes.find(p => p.lottery_prize_id === tier_fallback_prize_id)
+      const specified_fallback = prizes.find(
+        p => p.lottery_campaign_prize_id === tier_fallback_prize_id
+      )
       if (specified_fallback) {
         return specified_fallback
       }
@@ -304,12 +305,12 @@ class LoadCampaignStage extends BaseStage {
       return null
     }
 
-    // 按 sort_order ASC, prize_id ASC 排序取第一个
+    // 按 sort_order ASC, lottery_campaign_prize_id ASC 排序取第一个
     fallback_candidates.sort((a, b) => {
       if (a.sort_order !== b.sort_order) {
         return (a.sort_order || 0) - (b.sort_order || 0)
       }
-      return a.lottery_prize_id - b.lottery_prize_id
+      return a.lottery_campaign_prize_id - b.lottery_campaign_prize_id
     })
 
     return fallback_candidates[0]

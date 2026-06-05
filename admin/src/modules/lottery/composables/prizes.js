@@ -62,7 +62,7 @@ export function usePrizesState() {
     /** @type {Array} 同档位其他奖品列表（编辑时从已加载的奖品数据中过滤） */
     sameTierPrizes: [],
     /** @type {Object} 库存补充表单 - 使用后端字段名 */
-    stockForm: { lottery_prize_id: null, prize_name: '', quantity: 1 },
+    stockForm: { lottery_campaign_prize_id: null, prize_name: '', quantity: 1 },
 
     // ========== 批量添加奖品 ==========
     /** @type {number|null} 批量添加奖品的目标活动ID - 使用后端字段名 */
@@ -147,7 +147,7 @@ export function usePrizesMethods() {
 
     /**
      * 加载奖品列表
-     * 后端返回字段: lottery_prize_id, prize_name (from join), prize_definition_id,
+     * 后端返回字段: lottery_campaign_prize_id, prize_name (from join), prize_definition_id,
      *               win_weight, stock_quantity, reward_tier, is_fallback, sort_order, status
      */
     async loadPrizes() {
@@ -224,11 +224,11 @@ export function usePrizesMethods() {
      * @param {Object} prize - 奖品对象（后端字段名）
      */
     editPrize(prize) {
-      this.editingLotteryPrizeId = prize.lottery_prize_id
+      this.editingLotteryPrizeId = prize.lottery_campaign_prize_id
       this.isEditMode = true
       this.prize_image_preview_url = null
       this.prizeForm = {
-        lottery_prize_id: prize.lottery_prize_id,
+        lottery_campaign_prize_id: prize.lottery_campaign_prize_id,
         lottery_campaign_id: prize.lottery_campaign_id || null,
         prize_definition_id: prize.prize_definition_id || null,
         win_weight: prize.win_weight || 100000,
@@ -258,7 +258,7 @@ export function usePrizesMethods() {
       )
       const totalWeight = sameTier.reduce((sum, p) => sum + (p.win_weight || 0), 0)
       this.sameTierPrizes = sameTier.map(p => ({
-        lottery_prize_id: p.lottery_prize_id,
+        lottery_campaign_prize_id: p.lottery_campaign_prize_id,
         prize_name: p.prize_name,
         win_weight: p.win_weight || 0,
         tier_percentage:
@@ -281,7 +281,7 @@ export function usePrizesMethods() {
         async () => {
           await this.apiCall(
             buildURL(LOTTERY_ENDPOINTS.PRIZE_UPDATE, {
-              id: prize.lottery_prize_id
+              id: prize.lottery_campaign_prize_id
             }),
             { method: 'PUT', data: { status: newStatus } }
           )
@@ -302,7 +302,7 @@ export function usePrizesMethods() {
           // apiCall 成功时返回 response.data，失败时抛出错误
           await this.apiCall(
             buildURL(LOTTERY_ENDPOINTS.PRIZE_DELETE, {
-              id: prize.lottery_prize_id
+              id: prize.lottery_campaign_prize_id
             }),
             { method: 'DELETE' }
           )
@@ -395,7 +395,7 @@ export function usePrizesMethods() {
      */
     openStockModal(prize) {
       this.stockForm = {
-        lottery_prize_id: prize.lottery_prize_id,
+        lottery_campaign_prize_id: prize.lottery_campaign_prize_id,
         prize_name: prize.prize_name,
         quantity: 1
       }
@@ -406,7 +406,7 @@ export function usePrizesMethods() {
      * 提交奖品补货
      */
     async submitAddStock() {
-      if (!this.stockForm.lottery_prize_id) {
+      if (!this.stockForm.lottery_campaign_prize_id) {
         this.showError('奖品信息无效')
         return
       }
@@ -420,7 +420,7 @@ export function usePrizesMethods() {
         // apiCall 成功时返回 response.data，失败时抛出错误
         await this.apiCall(
           buildURL(LOTTERY_ENDPOINTS.PRIZE_ADD_STOCK, {
-            id: this.stockForm.lottery_prize_id
+            id: this.stockForm.lottery_campaign_prize_id
           }),
           {
             method: 'POST',
@@ -821,7 +821,7 @@ export function usePrizesMethods() {
      * @param {Object} prize - 奖品对象（后端字段名）
      */
     editCampaignPrize(prize) {
-      this.editingLotteryPrizeId = prize.lottery_prize_id
+      this.editingLotteryPrizeId = prize.lottery_campaign_prize_id
       this.isEditMode = true
       this.prize_image_preview_url = null
       this.prizeForm = {
@@ -852,7 +852,7 @@ export function usePrizesMethods() {
         `确认删除奖品「${prize.prize_name}」？删除后该档位的概率分布将自动调整。`,
         async () => {
           await this.apiCall(
-            buildURL(LOTTERY_ENDPOINTS.PRIZE_DELETE, { id: prize.lottery_prize_id }),
+            buildURL(LOTTERY_ENDPOINTS.PRIZE_DELETE, { id: prize.lottery_campaign_prize_id }),
             { method: 'DELETE' }
           )
           await this.loadCampaignGroupedPrizes()
@@ -874,7 +874,7 @@ export function usePrizesMethods() {
       }
       try {
         await this.apiCall(
-          buildURL(LOTTERY_ENDPOINTS.PRIZE_SET_STOCK, { id: prize.lottery_prize_id }),
+          buildURL(LOTTERY_ENDPOINTS.PRIZE_SET_STOCK, { id: prize.lottery_campaign_prize_id }),
           { method: 'PUT', data: { stock_quantity: stockValue } }
         )
         prize.stock_quantity = stockValue
@@ -906,7 +906,7 @@ export function usePrizesMethods() {
 
     /**
      * 批量更新奖品排序
-     * @param {Array} prizeOrders - [{ lottery_prize_id, sort_order }, ...]
+     * @param {Array} prizeOrders - [{ lottery_campaign_prize_id, sort_order }, ...]
      */
     async savePrizeSortOrder(prizeOrders) {
       if (!this.managingCampaign?.campaign_code || !prizeOrders?.length) return
@@ -930,11 +930,11 @@ export function usePrizesMethods() {
       const prizes = group.prizes
       const updates = [
         {
-          lottery_prize_id: prizes[prizeIndex].lottery_prize_id,
+          lottery_campaign_prize_id: prizes[prizeIndex].lottery_campaign_prize_id,
           sort_order: prizes[prizeIndex - 1].sort_order
         },
         {
-          lottery_prize_id: prizes[prizeIndex - 1].lottery_prize_id,
+          lottery_campaign_prize_id: prizes[prizeIndex - 1].lottery_campaign_prize_id,
           sort_order: prizes[prizeIndex].sort_order
         }
       ]
@@ -947,11 +947,11 @@ export function usePrizesMethods() {
       const prizes = group.prizes
       const updates = [
         {
-          lottery_prize_id: prizes[prizeIndex].lottery_prize_id,
+          lottery_campaign_prize_id: prizes[prizeIndex].lottery_campaign_prize_id,
           sort_order: prizes[prizeIndex + 1].sort_order
         },
         {
-          lottery_prize_id: prizes[prizeIndex + 1].lottery_prize_id,
+          lottery_campaign_prize_id: prizes[prizeIndex + 1].lottery_campaign_prize_id,
           sort_order: prizes[prizeIndex].sort_order
         }
       ]
@@ -974,7 +974,7 @@ export function usePrizesMethods() {
           if (evt.oldIndex === evt.newIndex) return
           const rows = el.querySelectorAll('tr[data-prize-id]')
           const updates = Array.from(rows).map((row, idx) => ({
-            lottery_prize_id: parseInt(row.dataset.prizeId),
+            lottery_campaign_prize_id: parseInt(row.dataset.prizeId),
             sort_order: idx + 1
           }))
           try {
@@ -995,7 +995,7 @@ export function usePrizesMethods() {
       this.campaignPrizeGroups.forEach(group => {
         group.prizes.forEach(prize => {
           this.batchStockItems.push({
-            lottery_prize_id: prize.lottery_prize_id,
+            lottery_campaign_prize_id: prize.lottery_campaign_prize_id,
             prize_name: prize.prize_name,
             reward_tier: prize.reward_tier,
             current_stock: prize.stock_quantity,
@@ -1026,7 +1026,7 @@ export function usePrizesMethods() {
             method: 'PUT',
             data: {
               updates: selectedItems.map(item => ({
-                lottery_prize_id: item.lottery_prize_id,
+                lottery_campaign_prize_id: item.lottery_campaign_prize_id,
                 stock_quantity: parseInt(item.new_stock)
               }))
             }

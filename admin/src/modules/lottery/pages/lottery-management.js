@@ -24,6 +24,8 @@ import { Alpine, createPageMixin, dataTable } from '../../../alpine/index.js'
 import { request, API_PREFIX } from '../../../api/base.js'
 import { LOTTERY_CORE_ENDPOINTS } from '../../../api/lottery/core.js'
 import { imageUploadMixin } from '../../../alpine/mixins/image-upload.js'
+// 成长等级公示分级概率面板（B 线）：注册 levelProbabilityPanel 嵌套组件
+import './level-probability.js'
 
 // 导入所有 composables 模块
 import {
@@ -129,6 +131,7 @@ function registerLotteryManagementComponents() {
         { id: 'lottery-strategy', title: '策略配置', icon: '⚙️' },
         { id: 'activity-strategy-switch', title: '活动策略开关', icon: '🔧' },
         { id: 'segment-rules', title: '分群策略', icon: '👥' },
+        { id: 'level-probability', title: '成长等级概率', icon: '📶' },
         { id: 'lottery-quota', title: '配额管理', icon: '📊' },
         { id: 'lottery-pricing', title: '定价配置', icon: '💵' },
         { id: 'strategy-effectiveness', title: '策略效果', icon: '📈' },
@@ -150,6 +153,7 @@ function registerLotteryManagementComponents() {
       'lottery-strategy': 'strategy',
       'activity-strategy-switch': 'strategy',
       'segment-rules': 'strategy',
+      'level-probability': 'strategy',
       'lottery-quota': 'strategy',
       'lottery-pricing': 'strategy',
       'strategy-effectiveness': 'strategy',
@@ -747,7 +751,7 @@ function registerLotteryManagementComponents() {
   Alpine.data('prizesDataTable', () => {
     const t = dataTable({
       columns: [
-        { key: 'lottery_prize_id', label: '奖品ID', sortable: true },
+        { key: 'lottery_campaign_prize_id', label: '奖品ID', sortable: true },
         { key: 'prize_name', label: '奖品名称', sortable: true },
         { key: 'tier', label: '等级', render: (v, r) => r.tier_display || v || '-' },
         {
@@ -769,7 +773,7 @@ function registerLotteryManagementComponents() {
           total: r.data?.pagination?.total || 0
         }
       },
-      primaryKey: 'lottery_prize_id',
+      primaryKey: 'lottery_campaign_prize_id',
       page_size: 20
     })
     const o = t.init
@@ -975,53 +979,6 @@ function registerLotteryManagementComponents() {
     const o = t.init
     t.init = async function () {
       window.addEventListener('refresh-tier-rules', () => this.loadData())
-      if (o) await o.call(this)
-    }
-    return t
-  })
-
-  /** 干预记录 */
-  Alpine.data('interventionsDataTable', () => {
-    const t = dataTable({
-      columns: [
-        { key: 'id', label: 'ID', sortable: true },
-        { key: 'user_id', label: '用户ID' },
-        {
-          key: 'intervention_type',
-          label: '干预类型',
-          render: (v, r) => r.intervention_type_display || v || '-'
-        },
-        { key: 'target_prize', label: '目标奖品', render: (v, r) => r.prize_name || v || '-' },
-        {
-          key: 'status',
-          label: '状态',
-          type: 'status',
-          statusMap: {
-            pending: { class: 'yellow', label: '待执行' },
-            executed: { class: 'green', label: '已执行' },
-            cancelled: { class: 'gray', label: '已取消' },
-            expired: { class: 'red', label: '已过期' }
-          }
-        },
-        { key: 'created_at', label: '创建时间', type: 'datetime', sortable: true }
-      ],
-      dataSource: async p => {
-        const r = await request({
-          url: `${API_PREFIX}/console/lottery-management/interventions`,
-          method: 'GET',
-          params: p
-        })
-        return {
-          items: r.data?.interventions || r.data?.list || [],
-          total: r.data?.pagination?.total || 0
-        }
-      },
-      primaryKey: 'id',
-      page_size: 20
-    })
-    const o = t.init
-    t.init = async function () {
-      window.addEventListener('refresh-interventions', () => this.loadData())
       if (o) await o.call(this)
     }
     return t

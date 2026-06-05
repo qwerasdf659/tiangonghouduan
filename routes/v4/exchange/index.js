@@ -841,4 +841,90 @@ router.get(
 const bidRoutes = require('./bid')
 router.use('/bid', bidRoutes)
 
+/**
+ * GET /api/v4/exchange/barter/recipes
+ *
+ * @description 获取以物易物配方列表（旧物组合 → 官方产出物）
+ * @access Private（登录用户）
+ *
+ * @returns {Object} { recipes }
+ */
+router.get(
+  '/barter/recipes',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const BarterService = req.app.locals.services.getService('exchange_barter')
+    const recipes = await BarterService.getRecipes()
+    // 仅返回启用的配方给用户端
+    const enabled = recipes.filter(r => r.is_enabled !== false)
+    return res.apiSuccess({ recipes: enabled })
+  })
+)
+
+/**
+ * POST /api/v4/exchange/barter
+ *
+ * @description 执行以物易物（B2C 官方合成）：用户旧物核销 → 官方库存产出新物。
+ *              全程用户↔官方，无用户间转移；旧物真销毁、产出非货币型资产且方向等价/向下。
+ * @access Private（登录用户）
+ *
+ * @header {string} Idempotency-Key - 幂等键（必填）
+ * @body {string} recipe_code - 配方码（必填）
+ * @body {number[]} old_item_ids - 投入的旧物实例ID列表（必填，归属本人且 available）
+ *
+ * @returns {Object} { order_no, consumed_item_ids, minted_item }
+ */
+router.post(
+  '/barter',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const idempotency_key = req.headers['idempotency-key']
+    if (!idempotency_key) {
+      return res.apiError(
+        '缺少必需的幂等键：请在 Header 中提供 Idempotency-Key',
+        'MISSING_IDEMPOTENCY_KEY',
+        { required_header: 'Idempotency-Key' },
+        400
+      )
+    }
+
+    const user_id = req.user.user_id
+    const { recipe_code, old_item_ids } = req.body
+
+    if (!recipe_code) {
+      return res.apiError('recipe_code 不能为空', 'BAD_REQUEST', null, 400)
+    }
+    if (!Array.isArray(old_item_ids) || old_item_ids.length === 0) {
+      return res.apiError('old_item_ids 必须是非空数组', 'BAD_REQUEST', null, 400)
+    }
+
+    const IdempotencyService = req.app.locals.services.getService('idempotency')
+    const idempotencyResult = await IdempotencyService.getOrCreateRequest(idempotency_key, {
+      api_path: '/api/v4/exchange/barter',
+      http_method: 'POST',
+      request_params: { recipe_code, old_item_ids },
+      user_id
+    })
+    if (!idempotencyResult.should_process) {
+      return res.apiSuccess({ ...idempotencyResult.response, is_duplicate: true })
+    }
+
+    try {
+      const BarterService = req.app.locals.services.getService('exchange_barter')
+      // 事务边界由路由层管理（写操作收口到 Service + options.transaction）
+      const result = await TransactionManager.execute(async transaction => {
+        return BarterService.executeBarter(user_id, recipe_code, old_item_ids, idempotency_key, {
+          transaction
+        })
+      })
+
+      await IdempotencyService.markAsCompleted(idempotency_key, result.order_no, result)
+      return res.apiSuccess(result, '以物易物兑换成功')
+    } catch (error) {
+      await IdempotencyService.markAsFailed(idempotency_key, error.message).catch(() => {})
+      return handleServiceError(error, res, '以物易物兑换失败')
+    }
+  })
+)
+
 module.exports = router

@@ -459,27 +459,6 @@ class AdminSystemService {
     password_min_length: '密码最小长度',
     api_rate_limit: 'API请求限制(次/分钟)',
 
-    // ===== 市场设置 (marketplace) =====
-    max_active_listings: '最大同时上架数',
-    listing_expiry_days: '挂牌过期天数',
-    monitor_price_low_threshold: '价格下限阈值',
-    monitor_price_high_threshold: '价格上限阈值',
-    monitor_long_listing_days: '超长挂牌天数',
-    monitor_alert_enabled: '市场监控告警',
-    allowed_settlement_assets: '允许结算币种',
-    fee_rate_star_stone: '星石手续费率',
-    fee_rate_red_core_shard: '红源晶碎片手续费率',
-    fee_min_star_stone: '星石最低手续费',
-    fee_min_red_core_shard: '红源晶碎片最低手续费',
-    min_price_red_core_shard: '红源晶碎片最低价格',
-    max_price_red_core_shard: '红源晶碎片最高价格',
-    daily_max_listings_star_stone: '星石每日最大上架数',
-    daily_max_listings_red_core_shard: '红源晶碎片每日最大上架数',
-    daily_max_trades_star_stone: '星石每日最大交易数',
-    daily_max_trades_red_core_shard: '红源晶碎片每日最大交易数',
-    daily_max_amount_star_stone: '星石每日最大交易额',
-    daily_max_amount_red_core_shard: '红源晶碎片每日最大交易额',
-    allowed_listing_assets: '允许上架资产类型',
     // ===== 背包设置 (backpack) =====
     backpack_use_instructions: '物品使用操作指引文案',
     item_type_action_rules: '物品类型操作规则'
@@ -488,7 +467,7 @@ class AdminSystemService {
   /**
    * 按分类获取系统配置列表
    *
-   * @param {string} category - 配置分类（basic/points/notification/security/marketplace）
+   * @param {string} category - 配置分类（basic/points/notification/security/redemption）
    * @returns {Promise<Object>} 返回该分类下所有配置的键值对
    * @throws {Error} 当分类名称无效时抛出错误
    */
@@ -499,7 +478,6 @@ class AdminSystemService {
         'points',
         'notification',
         'security',
-        'marketplace',
         'redemption',
         'exchange',
         'batch_operation',
@@ -653,7 +631,6 @@ class AdminSystemService {
       'points',
       'notification',
       'security',
-      'marketplace',
       'redemption',
       'exchange',
       'batch_operation',
@@ -873,7 +850,7 @@ class AdminSystemService {
    * 业务场景：
    * - 抽奖服务读取 lottery_cost_points（单抽消耗积分）
    * - 抽奖服务读取 daily_lottery_limit（每日抽奖次数上限）
-   * - 市场服务读取 max_active_listings（最大上架数量）
+   * - 兑换服务读取 default_expiry_days_voucher（兑换券过期天数）
    * - 消费服务读取 budget_allocation_ratio（预算分配系数）
    *
    * 技术实现：
@@ -887,7 +864,7 @@ class AdminSystemService {
    * - 关键积分规则配置（lottery_cost_points, budget_allocation_ratio）
    * - 影响业务核心逻辑的配置，静默兜底会造成规则漂移且难以排查
    *
-   * @param {string} category - 配置分类（points/marketplace/security等）
+   * @param {string} category - 配置分类（points/redemption/security等）
    * @param {string} setting_key - 配置项键名
    * @param {any} default_value - 默认值（配置不存在时返回，严格模式下无效）
    * @param {Object} options - 选项
@@ -905,8 +882,8 @@ class AdminSystemService {
    * // 获取每日抽奖上限（默认50）
    * const limit = await AdminSystemService.getSettingValue('points', 'daily_lottery_limit', 50)
    *
-   * // 获取最大上架数量（默认10）
-   * const max = await AdminSystemService.getSettingValue('marketplace', 'max_active_listings', 10)
+   * // 获取兑换订单过期天数（默认7）
+   * const days = await AdminSystemService.getSettingValue('redemption', 'order_expiry_days', 7)
    *
    */
   static async getSettingValue(category, setting_key, default_value = null, options = {}) {

@@ -113,19 +113,7 @@ const CANONICAL_OPERATION_MAP = {
   // ===== 统一资产转换（2026-04-05 合并） =====
   '/api/v4/assets/conversion/convert': 'ASSET_CONVERSION_CONVERT', // 执行资产转换
 
-  // ===== 交易市场 - 物品 =====
-  '/api/v4/marketplace/list': 'MARKET_CREATE_LISTING', // C2C 物品上架
-  '/api/v4/marketplace/listings/:id/purchase': 'MARKET_PURCHASE_LISTING', // C2C 购买物品
-  '/api/v4/marketplace/listings/:id/withdraw': 'MARKET_CANCEL_LISTING', // C2C 撤回物品
-
-  // ===== 交易市场 - 担保码确认（Phase 4） =====
-  '/api/v4/marketplace/trade-orders/:id/confirm-delivery': 'MARKET_ESCROW_CONFIRM', // C2C 担保码确认收货
-  '/api/v4/marketplace/trade-orders/:id/cancel': 'MARKET_ESCROW_CANCEL', // C2C 担保码交易取消
-
-  // ===== 交易市场 - 可叠加资产（材料） =====
-  '/api/v4/marketplace/fungible-assets/list': 'MARKET_CREATE_FUNGIBLE_LISTING', // C2C 材料上架
-  '/api/v4/marketplace/fungible-assets/:id/purchase': 'MARKET_PURCHASE_FUNGIBLE', // C2C 购买材料
-  '/api/v4/marketplace/fungible-assets/:id/withdraw': 'MARKET_CANCEL_FUNGIBLE_LISTING', // C2C 材料撤回
+  // 注：C2C 交易市场写操作（物品/担保码/材料上架购买）已随 C2C 下线移除（2026-06-05 阶段五，marketplace 整域 410）
 
   // ===== 核销系统 =====
   '/api/v4/shop/redemption/orders': 'REDEMPTION_CREATE_ORDER', // 创建核销订单（canonical 路径）
@@ -141,17 +129,17 @@ const CANONICAL_OPERATION_MAP = {
   // ===== 会员解锁 =====
   '/api/v4/exchange/unlock-premium': 'PREMIUM_UNLOCK', // 解锁高级空间
 
+  // ===== 以物易物（B2C 官方合成，2026-06-05 合规整改阶段六） =====
+  '/api/v4/exchange/barter': 'EXCHANGE_BARTER', // 用户以物易物（旧物核销→官方产出，用户↔官方）
+  '/api/v4/console/exchange/barter-recipes': 'CONSOLE_BARTER_RECIPES_SAVE', // 管理后台保存以物易物配方
+
   // ===== B2C 竞价系统（臻选空间/幸运空间竞价功能 2026-02-16） =====
   '/api/v4/exchange/bid': 'BID_PLACE_BID', // 用户竞价出价（底表 FK→exchange_items）
   '/api/v4/console/bids': 'CONSOLE_BID_CREATE', // 管理后台创建竞价商品
   '/api/v4/console/bids/:id/settle': 'CONSOLE_BID_SETTLE', // 管理后台手动结算竞价
   '/api/v4/console/bids/:id/cancel': 'CONSOLE_BID_CANCEL', // 管理后台取消竞价
 
-  // ===== C2C 用户间竞拍（2026-03-24） =====
-  '/api/v4/marketplace/auctions': 'AUCTION_CREATE_LISTING', // 用户创建C2C拍卖
-  '/api/v4/marketplace/auctions/:id/bid': 'AUCTION_PLACE_BID', // 用户竞拍出价
-  '/api/v4/marketplace/auctions/:id/cancel': 'AUCTION_SELLER_CANCEL', // 卖方取消拍卖
-  '/api/v4/marketplace/auctions/:id/dispute': 'AUCTION_CREATE_DISPUTE', // 买方发起争议
+  // 注：C2C 用户间竞拍写操作已随 C2C 下线移除（2026-06-05 阶段五，官方竞价见上方 B2C /exchange/bid）
 
   // ===== 商户积分 =====
   '/api/v4/merchant-points': 'MERCHANT_POINTS_CREATE', // 商户积分申请（canonical 路径，去尾斜杠）
@@ -307,15 +295,8 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/console/items/:id/unfreeze': 'ADMIN_ITEM_UNFREEZE', // 管理员解冻物品
   '/api/v4/console/items/:id/transfer': 'ADMIN_ITEM_TRANSFER', // 管理员转移物品
 
-  // ===== 抽奖干预 =====
-  '/api/v4/console/lottery-management/probability-adjust': 'ADMIN_LOTTERY_PROB_ADJUST', // 概率调整（canonical 路径）
-  '/api/v4/console/lottery-management/user-specific-queue': 'ADMIN_LOTTERY_USER_QUEUE', // 用户队列（canonical 路径）
-  '/api/v4/console/lottery-management/force-win': 'ADMIN_LOTTERY_FORCE_WIN', // 强制中奖（canonical 路径）
-  '/api/v4/console/lottery-management/force-lose': 'ADMIN_LOTTERY_FORCE_LOSE', // 强制不中（canonical 路径）
-  '/api/v4/console/lottery-management/interventions/:id/cancel':
-    'ADMIN_LOTTERY_INTERVENTION_CANCEL', // 取消干预（canonical 路径）
-  '/api/v4/console/lottery-management/clear-user-settings/:id': 'ADMIN_LOTTERY_CLEAR_USER', // 清除用户设置（DELETE）
-  '/api/v4/console/lottery-management/user-settings/:id': 'ADMIN_LOTTERY_USER_SETTINGS_DELETE', // 删除用户抽奖设置（DELETE 方法）
+  // ===== 抽奖分级概率（2026-06-04 合规改造：per-user 暗箱干预下线，改为按成长等级公示分级概率） =====
+  '/api/v4/console/lottery-management/level-probability': 'ADMIN_LOTTERY_LEVEL_PROBABILITY_UPSERT', // 按成长等级配置公示分级概率（PUT）
 
   // ===== 策略配置（9策略活动级开关） =====
   '/api/v4/console/lottery-campaigns/:id/strategy-config': 'ADMIN_LOTTERY_STRATEGY_CONFIG_UPDATE', // 批量更新活动策略配置（PUT）
@@ -386,7 +367,7 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/console/settings/:code': 'ADMIN_SETTINGS_UPDATE', // 更新设置（配置实体用业务码）
   '/api/v4/console/cache/clear': 'ADMIN_CACHE_CLEAR', // 清除缓存
 
-  // ===== B2C 兑换商城（/console/exchange/*，与 C2C /console/marketplace/* 物理拆分）=====
+  // ===== B2C 兑换商城（/console/exchange/*；C2C /console/marketplace/* 已随 C2C 下线移除）=====
   '/api/v4/console/exchange/items': 'ADMIN_EXCHANGE_ITEM_CREATE', // 创建兑换商品（POST /items）
   '/api/v4/console/exchange/items/:id': 'ADMIN_EXCHANGE_ITEM_UPDATE', // 更新或删除兑换商品
   '/api/v4/console/exchange/orders/:id/approve': 'ADMIN_EXCHANGE_ORDER_APPROVE', // 管理员审核通过（路由参数 :order_no，normalizePath→:id）
@@ -407,13 +388,7 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/console/exchange/items/skus/:id': 'ADMIN_EXCHANGE_SKU_UPDATE', // 更新/删除 SKU（PUT/DELETE，:sku_id → :id）
   '/api/v4/console/exchange/items/skus/:id/stock': 'ADMIN_EXCHANGE_SKU_STOCK_ADJUST', // SKU 库存增量调整
   '/api/v4/console/exchange/items/skus/:id/channel-prices': 'ADMIN_EXCHANGE_SKU_CHANNEL_PRICES', // SKU 渠道价格设置
-  '/api/v4/console/marketplace/listings': 'ADMIN_LISTING_CREATE', // 管理员代创建挂牌（POST）
-  '/api/v4/console/marketplace/listings/:id': 'ADMIN_LISTING_UPDATE', // 管理员修改/删除挂牌（PUT/DELETE）
-  '/api/v4/console/marketplace/listings/:id/force-withdraw': 'ADMIN_FORCE_WITHDRAW', // 强制下架
-  '/api/v4/console/marketplace/listings/:id/pin': 'ADMIN_LISTING_PIN', // 挂牌置顶/取消置顶
-  '/api/v4/console/marketplace/listings/:id/recommend': 'ADMIN_LISTING_RECOMMEND', // 挂牌推荐/取消推荐
-  '/api/v4/console/marketplace/listings/batch-sort': 'ADMIN_LISTING_BATCH_SORT', // 批量调整挂牌排序
-  '/api/v4/console/marketplace/user-listing-limit': 'ADMIN_UPDATE_USER_LISTING_LIMIT', // 调整用户上架限制
+  // 注：C2C 二级市场管理写操作（/console/marketplace/listings/*）已随 C2C 下线移除（2026-06-05 阶段五）
 
   // ===== 用户层级 =====
   '/api/v4/console/user-hierarchy/': 'ADMIN_USER_HIERARCHY_CREATE', // 创建用户层级关系（修复：尾斜杠）
@@ -722,8 +697,8 @@ class IdempotencyService {
    *    - 如：用户分享链接
    *
    * @example
-   * normalizePath('/api/v4/marketplace/listings/123')
-   * // 返回: '/api/v4/marketplace/listings/:id'
+   * normalizePath('/api/v4/console/exchange/items/123')
+   * // 返回: '/api/v4/console/exchange/items/:id'
    *
    * normalizePath('/api/v4/lottery/campaigns/spring_festival/prizes')
    * // 返回: '/api/v4/lottery/campaigns/:code/prizes'

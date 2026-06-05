@@ -85,21 +85,6 @@ export function useUsersState() {
     assignRoleForm: { user_id: '', role_code: '' },
     /** @type {string} 选中的角色代码 - HTML模板 x-model 使用 */
     selectedRoleCode: '',
-    /** @type {Array} 奖品列表 - 概率调整需要 */
-    allPrizes: [],
-    /** @type {string} 概率预览HTML */
-    probabilityPreviewHtml: '',
-    /** @type {Object} 概率弹窗状态 */
-    probabilityModal: {
-      user_id: '',
-      user_nickname: '',
-      mode: 'global',
-      multiplier: 1.0,
-      lottery_prize_id: '',
-      custom_probability: 0,
-      duration: 60,
-      reason: ''
-    },
     /** @type {Object|null} 选中的高级用户 */
     selectedPremiumUser: null
   }
@@ -583,25 +568,6 @@ export function useUsersMethods() {
       } finally {
         this.saving = false
       }
-    },
-
-    /**
-     * 打开用户概率配置弹窗
-     * @param {Object} user - 用户对象
-     */
-    openProbabilityModal(user) {
-      this.probabilityModal = {
-        user_id: user.user_id || '',
-        user_nickname: user.nickname || user.user_id || '',
-        mode: 'global',
-        multiplier: 1.0,
-        lottery_prize_id: '',
-        custom_probability: 0,
-        duration: 60,
-        reason: ''
-      }
-      this.selectedUser = user
-      this.showModal('probabilityModal')
     },
 
     /**

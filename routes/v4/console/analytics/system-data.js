@@ -10,7 +10,7 @@
  * 涵盖表：
  * - accounts（账户表）
  * - user_roles（用户角色表）
- * - market_listings（市场挂牌表）
+ * - market_listings（市场挂牌表）→ 已随 C2C 下线移除（2026-06-05 阶段五）
  * - lottery_campaigns（抽奖活动表）
  * - lottery_user_daily_draw_quota（用户每日抽奖配额表）
  *
@@ -136,85 +136,6 @@ router.get(
  * 市场挂牌表查询接口
  * =================================================================
  */
-
-/**
- * GET /api/v4/console/system-data/market-listings
- * @desc 查询市场挂牌列表（管理员视角）
- * @access Admin only (role_level >= 100)
- *
- * @query {number} [seller_user_id] - 卖家用户ID
- * @query {string} [status] - 挂牌状态（active/withdrawn/sold/expired/cancelled）
- * @query {string} [listing_kind] - 挂牌类型（item/fungible_asset）
- * @query {string} [asset_code] - 资产代码（fungible_asset类型）
- * @query {string} [start_date] - 开始日期
- * @query {string} [end_date] - 结束日期
- * @query {number} [page=1] - 页码
- * @query {number} [page_size=20] - 每页数量
- */
-router.get(
-  '/market-listings',
-  authenticateToken,
-  requireRoleLevel(PERMISSION_LEVELS.OPS),
-  asyncHandler(async (req, res) => {
-    const SystemDataQueryService = req.app.locals.services.getService('console_system_data_query')
-
-    const result = await SystemDataQueryService.getMarketListings(req.query)
-
-    logger.info('查询市场挂牌列表成功', {
-      admin_id: req.user.user_id,
-      total: result.pagination.total,
-      page: result.pagination.page
-    })
-
-    return res.apiSuccess(result, '获取市场挂牌列表成功')
-  })
-)
-
-/**
- * GET /api/v4/console/system-data/market-listings/statistics/summary
- * @desc 获取市场挂牌统计摘要
- * @access Admin only (role_level >= 100)
- */
-router.get(
-  '/market-listings/statistics/summary',
-  authenticateToken,
-  requireRoleLevel(PERMISSION_LEVELS.OPS),
-  asyncHandler(async (req, res) => {
-    const SystemDataQueryService = req.app.locals.services.getService('console_system_data_query')
-
-    const result = await SystemDataQueryService.getMarketListingStats()
-
-    logger.info('查询市场挂牌统计成功', {
-      admin_id: req.user.user_id,
-      total: result.total_listings
-    })
-
-    return res.apiSuccess(result, '获取市场挂牌统计成功')
-  })
-)
-
-/**
- * GET /api/v4/console/system-data/market-listings/:market_listing_id
- * @desc 获取市场挂牌详情
- * @access Admin only (role_level >= 100)
- */
-router.get(
-  '/market-listings/:market_listing_id',
-  authenticateToken,
-  requireRoleLevel(PERMISSION_LEVELS.OPS),
-  asyncHandler(async (req, res) => {
-    const { market_listing_id } = req.params
-    const SystemDataQueryService = req.app.locals.services.getService('console_system_data_query')
-
-    const listing = await SystemDataQueryService.getMarketListingById(market_listing_id)
-
-    if (!listing) {
-      return res.apiError('挂牌不存在', 'NOT_FOUND', null, 404)
-    }
-
-    return res.apiSuccess(listing, '获取市场挂牌详情成功')
-  })
-)
 
 /*
  * =================================================================

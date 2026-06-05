@@ -180,10 +180,7 @@ export function sidebarNav() {
           { id: 'item-lifecycle', name: '物品追踪', url: '/admin/item-lifecycle.html' },
           { id: 'reconciliation', name: '对账报告', url: '/admin/reconciliation.html' },
           { id: 'exchange', name: '兑换市场', url: '/admin/exchange-market.html' },
-          { id: 'trade', name: '交易市场', url: '/admin/trade-management.html' },
-          { id: 'bid-mgmt', name: '竞价管理', url: '/admin/bid-management.html' },
-          { id: 'auction-mgmt', name: 'C2C拍卖', url: '/admin/auction-management.html' },
-          { id: 'orphan-frozen', name: '孤儿冻结清理', url: '/admin/orphan-frozen.html' }
+          { id: 'bid-mgmt', name: '竞价管理', url: '/admin/bid-management.html' }
         ]
       },
 

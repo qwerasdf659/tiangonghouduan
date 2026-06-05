@@ -28,6 +28,7 @@ const BidQueryService = require('./BidQueryService')
 const ExchangeItemService = require('./ExchangeItemService')
 const AttributeService = require('./AttributeService')
 const ExchangeChannelPriceService = require('./ExchangeChannelPriceService')
+const BarterService = require('./BarterService') // 以物易物（B2C 官方合成，2026-06-05 合规整改阶段六）
 
 module.exports = {
   CoreService,
@@ -37,5 +38,6 @@ module.exports = {
   BidQueryService,
   ExchangeItemService,
   AttributeService,
-  ExchangeChannelPriceService
+  ExchangeChannelPriceService,
+  BarterService
 }

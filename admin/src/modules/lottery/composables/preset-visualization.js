@@ -188,7 +188,7 @@ export function usePresetVisualizationMethods() {
     openCreatePresetModal() {
       this.createPresetForm = {
         mobile: '',
-        presets: [{ lottery_prize_id: '', queue_order: 1 }]
+        presets: [{ lottery_campaign_prize_id: '', queue_order: 1 }]
       }
       this.showCreatePresetModal = true
       this.showModal('createPresetModal')
@@ -200,7 +200,7 @@ export function usePresetVisualizationMethods() {
     addPresetItem() {
       const nextOrder = this.createPresetForm.presets.length + 1
       this.createPresetForm.presets.push({
-        lottery_prize_id: '',
+        lottery_campaign_prize_id: '',
         queue_order: nextOrder
       })
     },
@@ -227,7 +227,7 @@ export function usePresetVisualizationMethods() {
         this.showError('请输入手机号')
         return
       }
-      if (this.createPresetForm.presets.some(p => !p.lottery_prize_id)) {
+      if (this.createPresetForm.presets.some(p => !p.lottery_campaign_prize_id)) {
         this.showError('请选择所有预设的奖品')
         return
       }
@@ -241,7 +241,7 @@ export function usePresetVisualizationMethods() {
         const response = await this.apiPost(LOTTERY_CORE_ENDPOINTS.PRESET_CREATE, {
           user_id: user.user_id,
           presets: this.createPresetForm.presets.map(p => ({
-            lottery_prize_id: parseInt(p.lottery_prize_id),
+            lottery_campaign_prize_id: parseInt(p.lottery_campaign_prize_id),
             queue_order: p.queue_order
           }))
         })

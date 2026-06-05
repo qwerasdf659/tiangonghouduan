@@ -22,10 +22,7 @@ export const USER_DATA_QUERY_ENDPOINTS = {
   EXCHANGE_RECORDS: `${API_PREFIX}/console/user-data-query/:user_id/exchange-records`,
   /** 兑换订单审核（管理员审核操作：完成 / 发货 / 取消） */
   EXCHANGE_RECORD_REVIEW: `${API_PREFIX}/console/user-data-query/:user_id/exchange-records/:order_no/review`,
-  /** 交易记录（交易市场买卖） */
-  TRADE_RECORDS: `${API_PREFIX}/console/user-data-query/:user_id/trade-records`,
-  /** 市场挂牌（上架/下架） */
-  MARKET_LISTINGS: `${API_PREFIX}/console/user-data-query/:user_id/market-listings`,
+  // 注：交易记录/市场挂牌（trade-records/market-listings）已随 C2C 下线移除（2026-06-05 阶段五）
   /** 材料转换（分解/合成） */
   CONVERSIONS: `${API_PREFIX}/console/user-data-query/:user_id/conversions`,
   /** 消费记录（含 CS 单号） */
@@ -119,32 +116,6 @@ export const UserDataQueryAPI = {
       url: buildURL(USER_DATA_QUERY_ENDPOINTS.EXCHANGE_RECORD_REVIEW, { user_id, order_no }),
       method: 'PATCH',
       data
-    })
-  },
-
-  /**
-   * 获取用户交易记录
-   * @param {number} user_id - 用户 ID
-   * @param {Object} params - 查询参数
-   * @returns {Promise<Object>} 分页交易记录 + 汇总
-   */
-  async getTradeRecords(user_id, params = {}) {
-    return request({
-      url: buildURL(USER_DATA_QUERY_ENDPOINTS.TRADE_RECORDS, { user_id }),
-      params
-    })
-  },
-
-  /**
-   * 获取用户市场挂牌
-   * @param {number} user_id - 用户 ID
-   * @param {Object} params - 查询参数
-   * @returns {Promise<Object>} 分页挂牌列表 + 汇总
-   */
-  async getMarketListings(user_id, params = {}) {
-    return request({
-      url: buildURL(USER_DATA_QUERY_ENDPOINTS.MARKET_LISTINGS, { user_id }),
-      params
     })
   },
 

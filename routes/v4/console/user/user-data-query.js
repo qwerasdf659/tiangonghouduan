@@ -8,8 +8,6 @@
  *   - 资产流水（积分来源 / 消耗 / 收入支出）
  *   - 抽奖记录（每次抽奖详情）
  *   - 兑换记录（兑换 + 核销状态 + 管理员审核操作）
- *   - 交易记录（交易市场 买卖）
- *   - 市场挂牌（上架 / 下架）
  *   - 材料转换（分解 / 合成）
  *
  * 架构原则：
@@ -179,59 +177,6 @@ router.get(
     const result = await Service.getExchangeRecords(models, userId, req.query)
 
     return res.apiSuccess(result, '获取兑换记录成功')
-  })
-)
-
-/**
- * GET /:user_id/trade-records - 交易记录查询（交易市场 买卖）
- *
- * @param {number} user_id - 用户 ID
- * @query {string} [role] - 角色筛选：buyer / seller / all
- * @query {string} [status] - 状态筛选
- * @query {string} [start_date]
- * @query {string} [end_date]
- * @query {number} [page=1]
- * @query {number} [page_size=20]
- */
-router.get(
-  '/:user_id/trade-records',
-  asyncHandler(async (req, res) => {
-    const userId = parseInt(req.params.user_id)
-    if (!userId || isNaN(userId)) {
-      return res.apiError('无效的用户 ID', 'BAD_REQUEST', null, 400)
-    }
-
-    const Service = getService(req)
-    const models = getModels(req)
-    const result = await Service.getTradeRecords(models, userId, req.query)
-
-    return res.apiSuccess(result, '获取交易记录成功')
-  })
-)
-
-/**
- * GET /:user_id/market-listings - 市场挂牌查询（上架/下架）
- *
- * @param {number} user_id - 用户 ID
- * @query {string} [status] - 状态筛选（on_sale/locked/sold/withdrawn/admin_withdrawn）
- * @query {string} [start_date]
- * @query {string} [end_date]
- * @query {number} [page=1]
- * @query {number} [page_size=20]
- */
-router.get(
-  '/:user_id/market-listings',
-  asyncHandler(async (req, res) => {
-    const userId = parseInt(req.params.user_id)
-    if (!userId || isNaN(userId)) {
-      return res.apiError('无效的用户 ID', 'BAD_REQUEST', null, 400)
-    }
-
-    const Service = getService(req)
-    const models = getModels(req)
-    const result = await Service.getMarketListings(models, userId, req.query)
-
-    return res.apiSuccess(result, '获取市场挂牌记录成功')
   })
 )
 

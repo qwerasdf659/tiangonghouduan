@@ -19,8 +19,13 @@ const FEE_RULES = {
    * 硬约束（来自文档）：
    * - 默认统一费率：5%
    * - 最小手续费：1 STAR_STONE
-   * - 手续费策略：monetize（平台收入）
+   * - 手续费策略：destroy（销毁）
    * - 计算公式：gross_amount = fee_amount + net_amount
+   *
+   * 🔴 合规整改（§5.1/§10.15 Step 8）：
+   * - 由 monetize（平台获利）改为 destroy（销毁）
+   * - 弱化"平台经营交易所牟利"特征；B2C 单向官方售卖本身即资产 sink，无撮合费概念
+   * - C2C 关闭后该费率仅在历史对账中出现，新道具商城购买不收"撮合手续费"
    *
    * 注：分档策略已简化为统一 5%，如需恢复分档可修改此配置
    */
@@ -45,7 +50,7 @@ const FEE_RULES = {
   min_fee: 1, // 最少收1积分（即使计算结果<1也收1积分）
 
   // 手续费处理策略（Fee Handling Strategy - 手续费的去向）
-  fee_strategy: 'monetize', // monetize-平台收入（推荐）| destroy-销毁积分 | recycle-回流奖池
+  fee_strategy: 'destroy', // 🔴 合规整改：destroy-销毁（弱化平台牟利特征）| monetize-平台收入 | recycle-回流奖池
 
   // 是否启用手续费（Enable Fee - 全局开关）
   enabled: true, // true-启用手续费 | false-禁用手续费（所有交易免费）

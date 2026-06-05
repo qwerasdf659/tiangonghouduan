@@ -33,7 +33,7 @@
 // ES Module 导入
 import { logger } from '../../../utils/logger.js'
 import { SYSTEM_ENDPOINTS, SystemAPI } from '../../../api/system/index.js'
-import { TRADE_ENDPOINTS } from '../../../api/market/trade.js'
+
 import { buildURL, request } from '../../../api/base.js'
 import { loadECharts } from '../../../utils/echarts-lazy.js'
 import { createPageMixin } from '../../../alpine/mixins/index.js'
@@ -176,11 +176,6 @@ function riskAlertsPage() {
     /** @type {string|null} 上次数据更新时间（#2） */
     lastUpdateTime: null,
 
-    // ========== P2#11: 市场价格异常监控状态 ==========
-    /** @type {Object|null} 市场监控数据 */
-    marketMonitor: null,
-    /** @type {boolean} 市场监控加载状态 */
-    loadingMarketMonitor: false,
 
     /** @type {number|null} 自动刷新定时器ID */
     refreshTimer: null,
@@ -457,9 +452,6 @@ function riskAlertsPage() {
 
       // 加载告警
       await this.loadAlerts()
-
-      // P2#11: 加载市场价格监控数据
-      this.loadMarketPriceMonitor()
 
       // 自动刷新（60秒）
       if (this.autoRefresh) {
@@ -984,106 +976,6 @@ function riskAlertsPage() {
 
         // #2 更新上次刷新时间
         this.lastUpdateTime = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
-      }
-    },
-
-    /**
-     * P2#11: 加载市场价格异常监控数据
-     * @description 并行请求三个后端API，聚合市场监控面板所需数据
-     * 后端API:
-     * - GET /api/v4/console/marketplace/listing-stats （挂单统计）
-     * - GET /api/v4/console/settings/marketplace （市场阈值配置）
-     * - GET /api/v4/console/marketplace/stats/overview （市场概览统计）
-     */
-    async loadMarketPriceMonitor() {
-      this.loadingMarketMonitor = true
-      try {
-        const [listingStatsRes, settingsRes, exchangeStatsRes] = await Promise.allSettled([
-          apiRequest(
-            SYSTEM_ENDPOINTS.SETTING_MARKETPLACE.replace(
-              '/settings/marketplace',
-              '/marketplace/listing-stats'
-            ) + '?page=1&limit=50'
-          ),
-          apiRequest(SYSTEM_ENDPOINTS.SETTING_MARKETPLACE),
-          apiRequest(TRADE_ENDPOINTS.STATS_OVERVIEW)
-        ])
-
-        const listingData =
-          listingStatsRes.status === 'fulfilled' && listingStatsRes.value?.success
-            ? listingStatsRes.value.data
-            : null
-        const settingsRaw =
-          settingsRes.status === 'fulfilled' && settingsRes.value?.success
-            ? settingsRes.value.data
-            : null
-        const exchangeData =
-          exchangeStatsRes.status === 'fulfilled' && exchangeStatsRes.value?.success
-            ? exchangeStatsRes.value.data
-            : null
-
-        // 后端 settings/marketplace → 键值对转换
-        const settingsMap = {}
-        if (settingsRaw?.settings && Array.isArray(settingsRaw.settings)) {
-          settingsRaw.settings.forEach(s => {
-            settingsMap[s.setting_key] =
-              s.parsed_value !== undefined ? s.parsed_value : s.setting_value
-          })
-        }
-
-        // 后端 listing-stats → summary 字段
-        const summary = listingData?.summary || {}
-
-        // 后端 marketplace/stats/overview → 市场概览统计
-        const totals = exchangeData?.totals || {}
-        const onSale = exchangeData?.on_sale_summary || []
-        const totalItems = onSale.reduce((s, i) => s + (i.count || 0), 0)
-        const activeItems = totalItems
-        const totalExchanges = totals.total_trades || 0
-        const lowStockItems = 0
-
-        // 计算成交率（有商品数据时）: 总兑换次数 / 上架商品数
-        const dealRate = activeItems > 0 ? (totalExchanges / activeItems) * 100 : 0
-        // 计算库存预警率: 库存预警商品数 / 商品总数
-        const lowStockRate = totalItems > 0 ? (lowStockItems / totalItems) * 100 : 0
-
-        this.marketMonitor = {
-          // 挂单统计（直接使用后端字段名）
-          active_listings: summary.total_users_with_listings || 0,
-          total_listings: summary.total_listings || 0,
-          users_at_limit: summary.users_at_limit || 0,
-          users_near_limit: summary.users_near_limit || 0,
-          // 市场统计（来自 marketplace/stats/overview）
-          deal_rate: parseFloat(dealRate.toFixed(1)),
-          low_stock_rate: parseFloat(lowStockRate.toFixed(1)),
-          price_anomaly_count: lowStockItems,
-          // 兑换市场详细数据
-          total_exchange_items: totalItems,
-          active_exchange_items: activeItems,
-          total_exchanges: totalExchanges,
-          // 阈值配置（从 system_settings 键值对中获取）
-          thresholds: {
-            price_low: settingsMap.monitor_price_low_threshold ?? '未配置',
-            price_high: settingsMap.monitor_price_high_threshold ?? '未配置',
-            alert_enabled:
-              settingsMap.monitor_alert_enabled === true ||
-              settingsMap.monitor_alert_enabled === 'true',
-            long_listing_days: settingsMap.monitor_long_listing_days ?? '未配置',
-            min_price: settingsMap.min_price_red_core_shard ?? '未配置',
-            max_price: settingsMap.max_price_red_core_shard ?? '未配置'
-          }
-        }
-
-        logger.info('[P2-11] 市场价格监控数据加载完成', {
-          active_listings: this.marketMonitor.active_listings,
-          deal_rate: this.marketMonitor.deal_rate,
-          total_exchanges: this.marketMonitor.total_exchanges
-        })
-      } catch (error) {
-        logger.error('[P2-11] 加载市场价格监控失败:', error.message)
-        this.marketMonitor = null
-      } finally {
-        this.loadingMarketMonitor = false
       }
     },
 

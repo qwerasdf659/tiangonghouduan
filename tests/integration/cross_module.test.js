@@ -4,9 +4,9 @@
  * 测试目标（docs/测试审计标准文档.md 第89-98行）：
  * - 9.1 抽奖→资产→物品：抽奖扣费成功后物品正确发放
  * - 9.2 抽奖→保底→资产：保底触发时资产和计数器同步更新
- * - 9.3 物品→市场→资产：物品上架后交易资产正确结算
  * - 9.4 抽奖→WebSocket：抽奖结果实时推送给用户
- * - 9.5 市场→WebSocket：交易完成实时通知买卖双方
+ *
+ * 注：9.3 物品→市场→资产、9.5 市场→WebSocket 已随 C2C 下线移除（2026-06-05 阶段五）
  *
  * 技术规范：
  * - 使用真实数据库数据（禁止mock）
@@ -18,15 +18,7 @@
  * 作者：Claude 4.5 Sonnet
  */
 
-const {
-  sequelize,
-  Item,
-  LotteryDraw,
-  LotteryCampaign,
-  TradeOrder,
-  // MarketListing 用于后续市场交易测试扩展
-  User
-} = require('../../models')
+const { sequelize, Item, LotteryDraw, LotteryCampaign, User } = require('../../models')
 const BeijingTimeHelper = require('../../utils/timeHelper')
 // 🔴 P0修复：使用统一的测试数据清理器
 const { testCleaner, cleanupAfterEach } = require('../helpers/TestDataCleaner')
@@ -46,8 +38,6 @@ describe('阶段八：跨模块集成测试', () => {
   let test_lottery_campaign_id
   let BalanceService
   let ItemService // 物品服务 - 负责物品铸造（mintItem）
-  let MarketListingService
-  let TradeOrderService
   let NotificationService
   let ChatWebSocketService
 
@@ -73,8 +63,6 @@ describe('阶段八：跨模块集成测试', () => {
     // 通过 ServiceManager 获取服务
     BalanceService = global.getTestService('asset_balance')
     ItemService = global.getTestService('asset_item') // 物品服务 - 负责 mintItem/lockItem/transferItem 等
-    MarketListingService = global.getTestService('market_listing_core')
-    TradeOrderService = global.getTestService('trade_order')
     NotificationService = global.getTestService('notification')
     ChatWebSocketService = global.getTestService('chat_web_socket')
 
@@ -84,8 +72,6 @@ describe('阶段八：跨模块集成测试', () => {
       services_loaded: {
         BalanceService: !!BalanceService,
         ItemService: !!ItemService, // 物品服务
-        MarketListingService: !!MarketListingService,
-        TradeOrderService: !!TradeOrderService,
         NotificationService: !!NotificationService,
         ChatWebSocketService: !!ChatWebSocketService
       }
@@ -400,224 +386,12 @@ describe('阶段八：跨模块集成测试', () => {
       for (const draw of guarantee_draws) {
         expect(draw.guarantee_triggered).toBe(true)
         expect(draw.user_id).not.toBeNull()
-        expect(draw.lottery_prize_id).not.toBeNull()
+        expect(draw.lottery_campaign_prize_id).not.toBeNull()
         // 验证保底奖品通常是较高价值的奖品
         expect(draw.reward_tier).toBeDefined()
       }
 
       console.log('✅ 9.2 保底触发记录验证通过')
-    })
-  })
-
-  /**
-   * 9.3 物品→市场→资产：物品上架后交易资产正确结算
-   *
-   * 测试场景：
-   * - 创建物品实例
-   * - 将物品上架到市场
-   * - 执行购买交易
-   * - 验证资产结算正确性（卖家收款、买家扣款、平台手续费）
-   */
-  describe('9.3 物品→市场→资产', () => {
-    let seller_user_id
-    let buyer_user_id
-    let test_item_id
-
-    beforeEach(async () => {
-      // 使用测试用户作为卖家
-      seller_user_id = test_user_id
-
-      /*
-       * 创建另一个测试买家（或使用同一用户的另一个账户模拟）
-       * 实际测试中应该使用不同的用户
-       */
-      const buyer = await User.findOne({
-        where: { status: 'active' },
-        order: [['user_id', 'DESC']] // 取不同于测试用户的另一个用户
-      })
-      buyer_user_id = buyer && buyer.user_id !== seller_user_id ? buyer.user_id : null
-    })
-
-    it('物品上架后交易资产正确结算', async () => {
-      if (!seller_user_id || !buyer_user_id) {
-        console.warn('⚠️ 跳过测试：缺少卖家或买家用户')
-        return
-      }
-
-      const transaction = await sequelize.transaction()
-
-      try {
-        // 1. 创建测试物品实例（使用 ItemService.mintItem）
-        const mint_idempotency_key = generateIdempotencyKey('mint_item')
-        const mint_result = await ItemService.mintItem(
-          {
-            user_id: seller_user_id,
-            item_type: 'voucher',
-            item_name: '测试商品券',
-            item_description: '跨模块测试用商品券',
-            item_value: 100,
-            source: 'test',
-            source_ref_id: mint_idempotency_key,
-            business_type: 'test_mint',
-            idempotency_key: mint_idempotency_key
-          },
-          { transaction }
-        )
-
-        expect(mint_result).not.toBeNull()
-        expect(mint_result.item).toBeDefined()
-        test_item_id = mint_result.item.item_id
-        // 🔴 P0修复：使用统一清理器注册
-        testCleaner.registerById('Item', test_item_id)
-
-        console.log('🏭 物品铸造完成', {
-          item_id: test_item_id,
-          owner: seller_user_id
-        })
-
-        // 2. 将物品上架到市场
-        const listing_idempotency_key = generateIdempotencyKey('create_listing')
-        let listing_result
-        try {
-          listing_result = await MarketListingService.createListing(
-            {
-              seller_user_id,
-              item_id: test_item_id, // MarketListingService.createListing 期望 item_id
-              price_asset_code: 'star_stone',
-              price_amount: 50,
-              idempotency_key: listing_idempotency_key
-            },
-            { transaction }
-          )
-        } catch (listingError) {
-          // 处理风险控制限制（今日挂牌次数已达上限）
-          if (listingError.code === 'DAILY_LISTING_LIMIT_EXCEEDED') {
-            await transaction.rollback()
-            console.warn('⚠️ 跳过测试：今日挂牌次数已达风控上限（风控功能正常）')
-            return
-          }
-          throw listingError
-        }
-
-        expect(listing_result).not.toBeNull()
-        // createListing 返回 { listing, is_duplicate }，需要从 listing 对象中获取 market_listing_id
-        expect(listing_result.listing).toBeDefined()
-        expect(listing_result.listing.market_listing_id).toBeDefined()
-        const market_listing_id = listing_result.listing.market_listing_id
-        // 🔴 P0修复：使用统一清理器注册
-        testCleaner.registerById('MarketListing', market_listing_id)
-
-        console.log('📦 物品上架完成', {
-          market_listing_id,
-          price: 50,
-          asset_code: 'star_stone'
-        })
-
-        // 3. 确保买家有足够的星石
-        const buyer_account = await BalanceService.getOrCreateAccount(
-          { user_id: buyer_user_id },
-          { transaction }
-        )
-        const buyer_balance = await BalanceService.getOrCreateBalance(
-          buyer_account.account_id,
-          'star_stone',
-          { transaction }
-        )
-        const buyer_diamonds = Number(buyer_balance?.available_amount || 0)
-
-        if (buyer_diamonds < 50) {
-          // 模拟买家充值
-          await BalanceService.changeBalance(
-            {
-              user_id: buyer_user_id,
-              asset_code: 'star_stone',
-              delta_amount: 100,
-              business_type: 'test_recharge',
-              counterpart_account_id: 2,
-              idempotency_key: generateIdempotencyKey('buyer_recharge'),
-              meta: { source: 'cross_module_test' }
-            },
-            { transaction }
-          )
-        }
-
-        // 4. 执行购买操作
-        const order_idempotency_key = generateIdempotencyKey('create_order')
-        const order_result = await TradeOrderService.createOrder(
-          {
-            idempotency_key: order_idempotency_key,
-            market_listing_id, // 使用前面提取的 market_listing_id
-            buyer_id: buyer_user_id
-          },
-          { transaction }
-        )
-
-        expect(order_result).not.toBeNull()
-        expect(order_result.trade_order_id).toBeDefined()
-        // 🔴 P0修复：使用统一清理器注册
-        testCleaner.registerById('TradeOrder', order_result.trade_order_id)
-
-        console.log('🛒 订单创建完成', {
-          trade_order_id: order_result.trade_order_id,
-          is_duplicate: order_result.is_duplicate
-        })
-
-        // 5. 完成订单
-        const complete_result = await TradeOrderService.completeOrder(
-          {
-            trade_order_id: order_result.trade_order_id,
-            buyer_id: buyer_user_id
-          },
-          { transaction }
-        )
-
-        expect(complete_result).not.toBeNull()
-        console.log('✅ 订单完成', { order: complete_result.order?.trade_order_id })
-
-        /*
-         * 6. 验证资产结算
-         * 6.1 验证卖家收到款项（扣除手续费后）
-         */
-        const seller_account = await BalanceService.getOrCreateAccount(
-          { user_id: seller_user_id },
-          { transaction }
-        )
-        const seller_final_balance = await BalanceService.getOrCreateBalance(
-          seller_account.account_id,
-          'star_stone',
-          { transaction }
-        )
-
-        console.log('💰 卖家余额变化', {
-          seller_user_id,
-          final_balance: seller_final_balance?.available_amount
-        })
-
-        // 6.2 验证物品所有权已转移（owner_account_id 是 accounts 表的 account_id，不是 user_id）
-        const buyer_acct = await BalanceService.getOrCreateAccount(
-          { user_id: buyer_user_id },
-          { transaction }
-        )
-        const transferred_item = await Item.findByPk(test_item_id, { transaction })
-        expect(Number(transferred_item.owner_account_id)).toBe(Number(buyer_acct.account_id))
-
-        console.log('🔄 物品所有权转移验证', {
-          item_id: test_item_id,
-          new_owner_account_id: transferred_item.owner_account_id,
-          buyer_account_id: buyer_account.account_id
-        })
-
-        // 7. 验证订单状态
-        const final_order = await TradeOrder.findByPk(order_result.trade_order_id, { transaction })
-        expect(final_order.status).toBe('completed')
-
-        await transaction.commit()
-        console.log('✅ 9.3 物品→市场→资产 测试通过')
-      } catch (error) {
-        await transaction.rollback()
-        console.error('❌ 9.3 测试失败', error.message)
-        throw error
-      }
     })
   })
 
@@ -677,95 +451,6 @@ describe('阶段八：跨模块集成测试', () => {
       })
 
       console.log('✅ 9.4 WebSocket服务接口验证通过')
-    })
-  })
-
-  /**
-   * 9.5 市场→WebSocket：交易完成实时通知买卖双方
-   *
-   * 测试场景：
-   * - 验证交易完成后买卖双方都能收到通知
-   * - 验证通知内容包含正确的交易信息
-   */
-  describe('9.5 市场→WebSocket', () => {
-    it('交易完成可以发送通知给买卖双方', async () => {
-      if (!test_user_id) {
-        console.warn('⚠️ 跳过测试：缺少测试用户')
-        return
-      }
-
-      const seller_id = test_user_id
-      const buyer_id = test_user_id // 测试环境使用同一用户模拟
-
-      // 1. 模拟发送交易完成通知给卖家
-      const seller_notification = await NotificationService.send(seller_id, {
-        type: 'trade_complete_seller',
-        title: '交易完成',
-        content: '您的商品已成功售出！',
-        data: {
-          order_id: 'test_order_123',
-          buyer_user_id: buyer_id,
-          net_amount: 45,
-          asset_code: 'star_stone',
-          timestamp: BeijingTimeHelper.timestamp()
-        }
-      })
-
-      expect(seller_notification.success).toBe(true)
-      console.log('📤 卖家通知发送结果', {
-        success: seller_notification.success,
-        type: seller_notification.type
-      })
-
-      // 2. 模拟发送交易完成通知给买家
-      const buyer_notification = await NotificationService.send(buyer_id, {
-        type: 'trade_complete_buyer',
-        title: '购买成功',
-        content: '您已成功购买商品！',
-        data: {
-          order_id: 'test_order_123',
-          seller_user_id: seller_id,
-          gross_amount: 50,
-          asset_code: 'star_stone',
-          timestamp: BeijingTimeHelper.timestamp()
-        }
-      })
-
-      expect(buyer_notification.success).toBe(true)
-      console.log('📤 买家通知发送结果', {
-        success: buyer_notification.success,
-        type: buyer_notification.type
-      })
-
-      console.log('✅ 9.5 市场→WebSocket 测试通过')
-    })
-
-    it('WebSocket广播功能验证', async () => {
-      // 验证管理员广播功能
-      expect(typeof ChatWebSocketService.broadcastToAllAdmins).toBe('function')
-
-      // 验证用户推送功能
-      expect(typeof ChatWebSocketService.pushMessageToUser).toBe('function')
-
-      // 模拟广播消息（不实际发送，仅验证接口）
-      const test_message = {
-        type: 'system_notification',
-        content: '测试系统广播消息',
-        timestamp: BeijingTimeHelper.timestamp()
-      }
-
-      // 调用广播方法（在没有在线管理员时返回0）
-      const broadcast_count = ChatWebSocketService.broadcastToAllAdmins(test_message)
-
-      console.log('📢 管理员广播测试', {
-        message_type: test_message.type,
-        admins_notified: broadcast_count
-      })
-
-      // 广播返回值应该是数字（通知的管理员数量）
-      expect(typeof broadcast_count).toBe('number')
-
-      console.log('✅ 9.5 WebSocket广播功能验证通过')
     })
   })
 })

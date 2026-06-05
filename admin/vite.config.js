@@ -51,11 +51,8 @@ const pageConfigs = {
   'category-list': { title: '分类管理', pageIcon: '📂', pageTitle: '分类管理' },
   'order-list': { title: '订单管理', pageIcon: '📋', pageTitle: '订单管理' },
   
-  // 市场管理模块
+  // 市场管理模块（C2C 交易/上架/拍卖已随 C2C 下线删除，2026-06-05 阶段五）
   'conversion-rule-management': { title: '资产转换规则管理', pageIcon: '🔄', pageTitle: '资产转换规则管理' },
-  'trade-management': { title: '交易管理', pageIcon: '💹', pageTitle: '交易管理' },
-  'listing-management': { title: '上架管理', pageIcon: '📊', pageTitle: '上架管理' },
-  'market-stats': { title: '市场统计', pageIcon: '📈', pageTitle: '市场统计' },
   'bid-management': { title: '竞价管理', pageIcon: '🏷️', pageTitle: '竞价管理' },
   
   // 内容管理模块

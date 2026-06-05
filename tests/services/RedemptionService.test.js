@@ -29,6 +29,7 @@ const {
 } = require('../../models')
 const RedemptionCodeGenerator = require('../../utils/RedemptionCodeGenerator')
 const TransactionManager = require('../../utils/TransactionManager')
+const BeijingTimeHelper = require('../../utils/timeHelper')
 
 let RedemptionService
 
@@ -133,7 +134,13 @@ describe('RedemptionService - 兑换订单服务', () => {
       )
 
       // 验证过期时间（应该是30天后）
-      const expires_at = new Date(order.expires_at)
+      /*
+       * 进程时区无关比较：DB（dateStrings:true + timezone:+08:00）返回的是无时区后缀的
+       * 北京墙钟字符串（如 '2026-07-06 02:38:44'）。直接 new Date(字符串) 会按运行进程的 TZ
+       * 解析，导致在非 Asia/Shanghai 进程下产生 8 小时偏移。这里用 BeijingTimeHelper.formatToISO
+       * 把墙钟字符串补 +08:00 后缀还原为绝对时刻，再与"绝对的 now+30天"比较，任何进程 TZ 下结果一致。
+       */
+      const expires_at = new Date(BeijingTimeHelper.formatToISO(order.expires_at))
       const expected_expires = new Date()
       expected_expires.setDate(expected_expires.getDate() + 30)
       const time_diff = Math.abs(expires_at - expected_expires)

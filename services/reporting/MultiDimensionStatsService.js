@@ -815,7 +815,7 @@ class MultiDimensionStatsService {
           'lottery_draw_id',
           'user_id',
           'lottery_campaign_id',
-          'lottery_prize_id',
+          'lottery_campaign_prize_id',
           'reward_tier',
           'created_at'
         ]

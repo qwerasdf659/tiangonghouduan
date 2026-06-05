@@ -8,7 +8,7 @@
  * - BxPx 矩阵权重调整验证
  * - 固定降级路径（high → mid → low → fallback）验证
  * - 用户分群权重匹配验证
- * - 决策来源处理（preset/override/guarantee/normal）
+ * - 决策来源处理（preset/guarantee/normal）
  * - 体验平滑机制集成验证
  *
  * 业务语义验证：
@@ -360,7 +360,7 @@ describe('TierPickStage 层级选择器测试（任务2.3）', () => {
 
   describe('决策来源处理验证', () => {
     /**
-     * 决策来源测试聚焦于路由逻辑（preset/override/guarantee 跳过正常抽取），
+     * 决策来源测试聚焦于路由逻辑（preset/guarantee 跳过正常抽取），
      * 而非每日高档上限风控。绕过 _enforceDailyHighCap 避免累计抽奖记录
      * 导致 high → mid 降级，使测试不依赖当日 LotteryDraw 数据状态。
      */
@@ -407,71 +407,6 @@ describe('TierPickStage 层级选择器测试（任务2.3）', () => {
       expect(result.data.selected_tier).toBe('high')
 
       console.log('✅ preset模式正确跳过，使用预设档位: high')
-    })
-
-    test('override模式（force_win）应该使用high档位', async () => {
-      const context = create_test_context()
-
-      if (!context) {
-        console.log('⚠️ 跳过测试：缺少测试环境')
-        expect(true).toBe(true)
-        return
-      }
-
-      await prepare_prerequisite_stages(context)
-
-      context.stage_results.LoadDecisionSourceStage = {
-        success: true,
-        data: {
-          decision_source: 'override',
-          override: {
-            setting_type: 'force_win'
-          }
-        }
-      }
-
-      const result = await tier_pick_stage.execute(context)
-
-      expect(result).toBeDefined()
-      expect(result.success).toBe(true)
-      expect(result.data.skipped).toBe(true)
-      expect(result.data.skip_reason).toBe('override_mode')
-      expect(result.data.selected_tier).toBe('high')
-
-      console.log('✅ override(force_win)模式正确使用high档位')
-    })
-
-    test('override模式（force_lose）应该使用low档位（100%出奖）', async () => {
-      const context = create_test_context()
-
-      if (!context) {
-        console.log('⚠️ 跳过测试：缺少测试环境')
-        expect(true).toBe(true)
-        return
-      }
-
-      await prepare_prerequisite_stages(context)
-
-      context.stage_results.LoadDecisionSourceStage = {
-        success: true,
-        data: {
-          decision_source: 'override',
-          override: {
-            setting_type: 'force_lose'
-          }
-        }
-      }
-
-      const result = await tier_pick_stage.execute(context)
-
-      expect(result).toBeDefined()
-      expect(result.success).toBe(true)
-      expect(result.data.skipped).toBe(true)
-      expect(result.data.skip_reason).toBe('override_mode')
-      /* 2026-03-06 修正：force_lose 现在选择 low 档位而非 fallback */
-      expect(result.data.selected_tier).toBe('low')
-
-      console.log('✅ override(force_lose)模式正确使用low档位（100%出奖）')
     })
 
     test('guarantee模式应该强制使用high档位', async () => {

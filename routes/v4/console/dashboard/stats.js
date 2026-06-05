@@ -2,7 +2,7 @@
  * 跨域平台概览 — Dashboard 统计 API
  *
  * @route GET /api/v4/console/dashboard/stats
- * @description 并行聚合 B2C 兑换 + C2C 市场 + 竞拍 三个业务域的顶线数据
+ * @description 并行聚合 B2C 兑换 + 官方竞价 两个业务域的顶线数据（C2C 市场已下线）
  * @security JWT + Admin权限
  * @module routes/v4/console/dashboard/stats
  */
@@ -33,18 +33,15 @@ router.get(
 
     const ExchangeAdminService = req.app.locals.services.getService('exchange_admin')
     const BidQueryService = req.app.locals.services.getService('exchange_bid_query')
-    const MarketAnalyticsService = req.app.locals.services.getService('market_analytics')
 
-    const [exchange, marketplace, bids] = await Promise.all([
+    const [exchange, bids] = await Promise.all([
       ExchangeAdminService.getExchangeTopline(safeDays),
-      MarketAnalyticsService.getTradingTopline(safeDays),
       BidQueryService.getBidTopline(safeDays)
     ])
 
     logger.info('[Dashboard-统计] 查询成功', {
       admin_id,
       exchange_active: exchange.active_items,
-      marketplace_on_sale: marketplace.on_sale_count,
       bids_active: bids.active_products
     })
 
@@ -52,7 +49,6 @@ router.get(
       {
         period_days: safeDays,
         exchange,
-        marketplace,
         bids
       },
       '跨域平台概览查询成功'

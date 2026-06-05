@@ -207,7 +207,7 @@ class BuildPrizePoolStage extends BaseStage {
       // 检查库存（null 表示无限库存）
       if (prize.stock_quantity !== null && prize.stock_quantity <= 0) {
         this.log('debug', '奖品库存不足，已排除', {
-          lottery_prize_id: prize.lottery_prize_id,
+          lottery_campaign_prize_id: prize.lottery_campaign_prize_id,
           prize_name: prize.prize_name,
           stock_quantity: prize.stock_quantity
         })
@@ -219,7 +219,7 @@ class BuildPrizePoolStage extends BaseStage {
         const today_wins = prize.daily_win_count || 0
         if (today_wins >= prize.max_daily_wins) {
           this.log('debug', '奖品今日中奖次数已达上限，已排除', {
-            lottery_prize_id: prize.lottery_prize_id,
+            lottery_campaign_prize_id: prize.lottery_campaign_prize_id,
             prize_name: prize.prize_name,
             today_wins,
             max_daily_wins: prize.max_daily_wins
@@ -232,7 +232,7 @@ class BuildPrizePoolStage extends BaseStage {
       const win_weight = prize.win_weight || 0
       if (win_weight <= 0) {
         this.log('debug', '奖品中奖权重为0，已排除', {
-          lottery_prize_id: prize.lottery_prize_id,
+          lottery_campaign_prize_id: prize.lottery_campaign_prize_id,
           prize_name: prize.prize_name
         })
         continue
@@ -303,7 +303,7 @@ class BuildPrizePoolStage extends BaseStage {
         const eligible = user_star_stone_quota >= prize.material_amount
         if (!eligible) {
           this.log('debug', '星石奖品因配额不足被过滤', {
-            lottery_prize_id: prize.lottery_prize_id,
+            lottery_campaign_prize_id: prize.lottery_campaign_prize_id,
             prize_name: prize.prize_name,
             material_amount: prize.material_amount,
             user_star_stone_quota
@@ -319,7 +319,7 @@ class BuildPrizePoolStage extends BaseStage {
       const eligible = budget_before >= budget_cost
       if (!eligible) {
         this.log('debug', '奖品因预算不足被过滤', {
-          lottery_prize_id: prize.lottery_prize_id,
+          lottery_campaign_prize_id: prize.lottery_campaign_prize_id,
           prize_name: prize.prize_name,
           budget_cost,
           budget_before
@@ -438,18 +438,20 @@ class BuildPrizePoolStage extends BaseStage {
     )
     if (prizes_with_limit.length === 0) return prizes
 
-    const prize_ids = prizes_with_limit.map(p => p.lottery_prize_id)
+    const prize_ids = prizes_with_limit.map(p => p.lottery_campaign_prize_id)
 
     let user_win_counts
     try {
       const [results] = await sequelize.query(
-        `SELECT lottery_prize_id, COUNT(*) as win_count
+        `SELECT lottery_campaign_prize_id, COUNT(*) as win_count
          FROM lottery_draws
-         WHERE user_id = ? AND lottery_prize_id IN (?)
-         GROUP BY lottery_prize_id`,
+         WHERE user_id = ? AND lottery_campaign_prize_id IN (?)
+         GROUP BY lottery_campaign_prize_id`,
         { replacements: [user_id, prize_ids] }
       )
-      user_win_counts = new Map(results.map(r => [r.lottery_prize_id, parseInt(r.win_count)]))
+      user_win_counts = new Map(
+        results.map(r => [r.lottery_campaign_prize_id, parseInt(r.win_count)])
+      )
     } catch (error) {
       this.log('warn', '查询用户历史中奖次数失败，跳过过滤', {
         user_id,
@@ -460,10 +462,10 @@ class BuildPrizePoolStage extends BaseStage {
 
     return prizes.filter(prize => {
       if (prize.max_user_wins === null || prize.max_user_wins === undefined) return true
-      const user_wins = user_win_counts.get(prize.lottery_prize_id) || 0
+      const user_wins = user_win_counts.get(prize.lottery_campaign_prize_id) || 0
       if (user_wins >= prize.max_user_wins) {
         this.log('debug', '奖品用户总中奖次数已达上限，已排除', {
-          lottery_prize_id: prize.lottery_prize_id,
+          lottery_campaign_prize_id: prize.lottery_campaign_prize_id,
           prize_name: prize.prize_name,
           user_wins,
           max_user_wins: prize.max_user_wins

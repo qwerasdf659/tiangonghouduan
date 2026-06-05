@@ -20,14 +20,12 @@ const { SYSTEM_SETTINGS_WHITELIST } = require('./system-settings-whitelist')
  *
  * 这些配置直接影响积分经济/风控/安全，启动时必须存在且合规：
  * - 积分规则：lottery_cost_points, budget_allocation_ratio, daily_lottery_limit
- * - 市场规则：max_active_listings
  * - 安全规则：password_min_length, api_rate_limit, max_login_attempts
  */
 const CRITICAL_SETTINGS_REQUIRED_AT_STARTUP = [
   'points/lottery_cost_points', // 抽奖单价（影响积分消耗）
   'points/budget_allocation_ratio', // 预算系数（影响积分发放）
   'points/daily_lottery_limit', // 每日上限（影响用户体验/风控）
-  'marketplace/max_active_listings', // 上架上限（影响市场秩序）
   'security/max_login_attempts', // 登录限制（影响安全）
   'security/password_min_length', // 密码长度（影响安全）
   'security/api_rate_limit', // API限流（影响风控）

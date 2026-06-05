@@ -21,28 +21,11 @@
   <!-- 页面主体 -->
   <div class="container mx-auto px-4 py-6" x-data="bidManagementPage()" x-init="init()">
 
-    <!-- ==================== B2C / C2C Tab 切换 ==================== -->
-    <div class="flex border-b mb-6">
-      <button @click="switchTab('b2c')"
-              :class="activeTab === 'b2c'
-                ? 'border-amber-500 text-amber-600 font-semibold'
-                : 'border-transparent themed-text-muted hover:text-amber-500 hover:border-amber-300'"
-              class="px-6 py-3 text-sm border-b-2 transition-all">
-        🏷️ B2C 竞价（管理员发起）
-      </button>
-      <button @click="switchTab('c2c')"
-              :class="activeTab === 'c2c'
-                ? 'border-amber-500 text-amber-600 font-semibold'
-                : 'border-transparent themed-text-muted hover:text-amber-500 hover:border-amber-300'"
-              class="px-6 py-3 text-sm border-b-2 transition-all">
-        🔨 C2C 拍卖（用户间竞拍）
-      </button>
-    </div>
-
     <!-- ============================================================ -->
     <!-- ==================== B2C 竞价面板 ========================== -->
+    <!-- 注：C2C 用户间拍卖已随 C2C 下线删除（2026-06-05 阶段五），仅保留官方 B2C 竞价 -->
     <!-- ============================================================ -->
-    <div x-show="activeTab === 'b2c'" x-cloak>
+    <div x-cloak>
 
       <!-- B2C 顶部统计卡片 -->
       <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -137,104 +120,6 @@
     </div><!-- /B2C 面板 -->
 
     <!-- ============================================================ -->
-    <!-- ==================== C2C 拍卖面板 ========================== -->
-    <!-- ============================================================ -->
-    <div x-show="activeTab === 'c2c'" x-cloak>
-
-      <!-- C2C 顶部统计卡片 -->
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <div class="themed-card rounded-lg shadow p-4">
-          <div class="text-sm themed-text-muted">拍卖总数</div>
-          <div class="text-2xl font-bold themed-text" x-text="auction_listings.length"></div>
-        </div>
-        <div class="themed-card rounded-lg shadow p-4">
-          <div class="text-sm themed-text-muted">进行中</div>
-          <div class="text-2xl font-bold text-green-600" x-text="auctionActiveCount"></div>
-        </div>
-        <div class="themed-card rounded-lg shadow p-4">
-          <div class="text-sm themed-text-muted">已结算</div>
-          <div class="text-2xl font-bold text-purple-600" x-text="auctionSettledCount"></div>
-        </div>
-        <div class="themed-card rounded-lg shadow p-4">
-          <div class="text-sm themed-text-muted">结算失败</div>
-          <div class="text-2xl font-bold text-red-600" x-text="auctionFailedCount"></div>
-        </div>
-      </div>
-
-      <!-- C2C 操作栏：状态筛选 -->
-      <div class="flex flex-wrap items-center gap-4 mb-4">
-        <div class="flex flex-wrap gap-2">
-          <template x-for="opt in auctionStatusOptions" :key="opt.value">
-            <button @click="auctionFilterByStatus(opt.value)"
-                    :class="auction_filter_status === opt.value ? 'bg-amber-500 text-white' : 'themed-card themed-text hover:bg-amber-100'"
-                    class="px-3 py-1 rounded-full text-xs transition" x-text="opt.label"></button>
-          </template>
-        </div>
-      </div>
-
-      <!-- C2C 列表 -->
-      <div class="themed-card rounded-lg shadow overflow-hidden">
-        <div x-show="auction_loading" class="p-8 text-center themed-text-muted">
-          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-600 mx-auto"></div>
-          <p class="mt-2 text-sm">加载中...</p>
-        </div>
-        <div x-show="auction_error && !auction_loading" class="p-8 text-center text-red-500">
-          <p x-text="auction_error"></p>
-          <button @click="loadAuctionListings()" class="mt-2 text-amber-600 hover:underline text-sm">重试</button>
-        </div>
-        <div x-show="!auction_loading && !auction_error && auction_listings.length === 0" class="p-8 text-center themed-text-muted">暂无 C2C 拍卖</div>
-        <table x-show="!auction_loading && auction_listings.length > 0" class="w-full text-sm">
-          <thead class="themed-bg-muted">
-            <tr>
-              <th class="px-4 py-3 text-left">ID</th>
-              <th class="px-4 py-3 text-left">物品名称</th>
-              <th class="px-4 py-3 text-left">卖家ID</th>
-              <th class="px-4 py-3 text-left">状态</th>
-              <th class="px-4 py-3 text-right">起拍价</th>
-              <th class="px-4 py-3 text-right">当前价</th>
-              <th class="px-4 py-3 text-right">出价数</th>
-              <th class="px-4 py-3 text-left">结束时间</th>
-              <th class="px-4 py-3 text-center">操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <template x-for="auction in auction_listings" :key="auction.auction_listing_id">
-              <tr class="border-t themed-border hover:themed-bg-muted transition">
-                <td class="px-4 py-3" x-text="auction.auction_listing_id"></td>
-                <td class="px-4 py-3" x-text="getAuctionItemName(auction)"></td>
-                <td class="px-4 py-3" x-text="auction.seller_user_id"></td>
-                <td class="px-4 py-3">
-                  <span :class="getStatusInfo(auction.status).color" class="px-2 py-0.5 rounded-full text-xs" x-text="getStatusInfo(auction.status).label"></span>
-                </td>
-                <td class="px-4 py-3 text-right" x-text="formatAssetAmount(auction.start_price, auction.price_asset_code)"></td>
-                <td class="px-4 py-3 text-right font-semibold" x-text="formatAssetAmount(auction.current_price, auction.price_asset_code)"></td>
-                <td class="px-4 py-3 text-right" x-text="auction.bid_count || 0"></td>
-                <td class="px-4 py-3 text-xs themed-text-muted" x-text="formatDate(auction.end_time)"></td>
-                <td class="px-4 py-3 text-center">
-                  <div class="flex justify-center gap-1">
-                    <button @click="viewAuctionDetail(auction.auction_listing_id)" class="text-blue-600 hover:underline text-xs">详情</button>
-                    <button x-show="canSettle(auction)" @click="auctionManualSettle(auction.auction_listing_id)" class="text-purple-600 hover:underline text-xs">结算</button>
-                    <button x-show="canCancel(auction)" @click="openAuctionCancelModal(auction)" class="text-red-600 hover:underline text-xs">取消</button>
-                  </div>
-                </td>
-              </tr>
-            </template>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- C2C 分页 -->
-      <div x-show="auction_pagination.total > auction_pagination.page_size" class="flex justify-between items-center mt-4 text-sm">
-        <span class="themed-text-muted">共 <span x-text="auction_pagination.total"></span> 条</span>
-        <div class="flex gap-2">
-          <button @click="auctionGoToPage(auction_pagination.page - 1)" :disabled="!auctionHasPrevPage" class="px-3 py-1 rounded themed-card disabled:opacity-50">上一页</button>
-          <span class="px-3 py-1" x-text="auction_pagination.page + ' / ' + auctionTotalPages"></span>
-          <button @click="auctionGoToPage(auction_pagination.page + 1)" :disabled="!auctionHasNextPage" class="px-3 py-1 rounded themed-card disabled:opacity-50">下一页</button>
-        </div>
-      </div>
-    </div><!-- /C2C 面板 -->
-
-    <!-- ============================================================ -->
     <!-- ==================== B2C 详情弹窗 ========================== -->
     <!-- ============================================================ -->
     <div x-show="show_detail_modal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="show_detail_modal = false">
@@ -273,67 +158,6 @@
           <div class="flex justify-end gap-2 mt-4">
             <button x-show="canSettle(detail_data)" @click="manualSettle(detail_data?.bid_product_id)" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded text-sm">手动结算</button>
             <button x-show="canCancel(detail_data)" @click="openCancelModal(detail_data); show_detail_modal = false" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded text-sm">取消竞价</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ============================================================ -->
-    <!-- ==================== C2C 详情弹窗 ========================== -->
-    <!-- ============================================================ -->
-    <div x-show="show_auction_detail" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="show_auction_detail = false">
-      <div class="themed-card rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] overflow-y-auto p-6">
-        <div class="flex justify-between items-center mb-4">
-          <h3 class="text-lg font-semibold themed-text">C2C 拍卖详情</h3>
-          <button @click="show_auction_detail = false" class="themed-text-muted hover:themed-text text-xl">&times;</button>
-        </div>
-        <div x-show="auction_detail_loading" class="p-8 text-center themed-text-muted">加载中...</div>
-        <div x-show="!auction_detail_loading && auction_detail">
-          <div class="grid grid-cols-2 gap-4 text-sm mb-4">
-            <div><span class="themed-text-muted">拍卖ID：</span><span x-text="auction_detail?.auction_listing_id"></span></div>
-            <div><span class="themed-text-muted">状态：</span><span :class="getStatusInfo(auction_detail?.status).color" class="px-2 py-0.5 rounded-full text-xs" x-text="getStatusInfo(auction_detail?.status).label"></span></div>
-            <div><span class="themed-text-muted">卖家ID：</span><span x-text="auction_detail?.seller_user_id"></span></div>
-            <div><span class="themed-text-muted">物品：</span><span x-text="getAuctionItemName(auction_detail)"></span></div>
-            <div><span class="themed-text-muted">起拍价：</span><span x-text="formatAssetAmount(auction_detail?.start_price, auction_detail?.price_asset_code)"></span></div>
-            <div><span class="themed-text-muted">当前价：</span><span class="font-semibold" x-text="formatAssetAmount(auction_detail?.current_price, auction_detail?.price_asset_code)"></span></div>
-            <div><span class="themed-text-muted">一口价：</span><span x-text="auction_detail?.buyout_price ? formatAssetAmount(auction_detail.buyout_price, auction_detail.price_asset_code) : '无'"></span></div>
-            <div><span class="themed-text-muted">手续费率：</span><span x-text="auction_detail?.fee_rate ? (auction_detail.fee_rate * 100).toFixed(1) + '%' : '-'"></span></div>
-            <div><span class="themed-text-muted">出价数：</span><span x-text="auction_detail?.bid_count || 0"></span></div>
-            <div><span class="themed-text-muted">独立出价人：</span><span x-text="auction_detail?.unique_bidders || 0"></span></div>
-            <div><span class="themed-text-muted">开始时间：</span><span x-text="formatDate(auction_detail?.start_time)"></span></div>
-            <div><span class="themed-text-muted">结束时间：</span><span x-text="formatDate(auction_detail?.end_time)"></span></div>
-          </div>
-          <!-- 结算信息（已结算时显示） -->
-          <div x-show="auction_detail?.status === 'settled'" class="themed-bg-muted rounded p-3 text-sm mb-4">
-            <h4 class="font-semibold mb-1">结算信息</h4>
-            <div class="grid grid-cols-2 gap-2">
-              <div><span class="themed-text-muted">中标者：</span><span x-text="auction_detail?.winner_user_id || '-'"></span></div>
-              <div><span class="themed-text-muted">成交额：</span><span x-text="formatAssetAmount(auction_detail?.gross_amount, auction_detail?.price_asset_code)"></span></div>
-              <div><span class="themed-text-muted">手续费：</span><span x-text="formatAssetAmount(auction_detail?.fee_amount, auction_detail?.price_asset_code)"></span></div>
-              <div><span class="themed-text-muted">卖家到手：</span><span class="font-semibold text-green-600" x-text="formatAssetAmount(auction_detail?.net_amount, auction_detail?.price_asset_code)"></span></div>
-            </div>
-          </div>
-          <!-- 出价排行 -->
-          <div x-show="auction_detail_bids.length > 0">
-            <h4 class="font-semibold text-sm mb-2 themed-text">出价排行 Top 10</h4>
-            <table class="w-full text-xs">
-              <thead class="themed-bg-muted"><tr><th class="px-3 py-2 text-left">排名</th><th class="px-3 py-2 text-left">用户ID</th><th class="px-3 py-2 text-right">出价</th><th class="px-3 py-2 text-left">时间</th></tr></thead>
-              <tbody>
-                <template x-for="(b, idx) in auction_detail_bids" :key="b.auction_bid_id">
-                  <tr class="border-t themed-border">
-                    <td class="px-3 py-2" x-text="idx + 1"></td>
-                    <td class="px-3 py-2" x-text="b.bidder_user_id"></td>
-                    <td class="px-3 py-2 text-right font-semibold" x-text="formatAssetAmount(b.bid_amount, auction_detail?.price_asset_code)"></td>
-                    <td class="px-3 py-2 themed-text-muted" x-text="formatDate(b.created_at)"></td>
-                  </tr>
-                </template>
-              </tbody>
-            </table>
-          </div>
-          <!-- 操作按钮 -->
-          <div class="flex justify-end gap-2 mt-4">
-            <button x-show="canSettle(auction_detail)" @click="auctionManualSettle(auction_detail?.auction_listing_id)" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded text-sm">手动结算</button>
-            <button x-show="canCancel(auction_detail)" @click="openAuctionCancelModal(auction_detail); show_auction_detail = false" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded text-sm">强制取消</button>
           </div>
         </div>
       </div>
@@ -406,28 +230,6 @@
           <button @click="submitCancel()" :disabled="cancelling" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded text-sm disabled:opacity-50">
             <span x-show="!cancelling">确认取消</span>
             <span x-show="cancelling">处理中...</span>
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- ============================================================ -->
-    <!-- ==================== C2C 取消弹窗 ========================== -->
-    <!-- ============================================================ -->
-    <div x-show="show_auction_cancel" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="show_auction_cancel = false">
-      <div class="themed-card rounded-lg shadow-xl w-full max-w-md p-6">
-        <h3 class="text-lg font-semibold themed-text mb-4">强制取消 C2C 拍卖</h3>
-        <p class="text-sm themed-text-muted mb-2">拍卖ID：<span x-text="auction_cancel_target?.auction_listing_id"></span></p>
-        <p class="text-sm themed-text-muted mb-2">物品：<span x-text="getAuctionItemName(auction_cancel_target)"></span></p>
-        <div>
-          <label class="block text-sm font-medium themed-text mb-1">取消原因（必填）</label>
-          <textarea x-model="auction_cancel_reason" rows="3" class="w-full border rounded px-3 py-2 text-sm themed-border" placeholder="请输入取消原因..."></textarea>
-        </div>
-        <div class="flex justify-end gap-2 mt-4">
-          <button @click="show_auction_cancel = false" class="px-4 py-2 rounded themed-card text-sm">返回</button>
-          <button @click="submitAuctionCancel()" :disabled="auction_cancelling" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded text-sm disabled:opacity-50">
-            <span x-show="!auction_cancelling">确认取消</span>
-            <span x-show="auction_cancelling">处理中...</span>
           </button>
         </div>
       </div>

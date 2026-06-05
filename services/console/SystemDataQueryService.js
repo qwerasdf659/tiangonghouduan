@@ -11,7 +11,6 @@
  * 涵盖查询：
  * - 账户表 (accounts)
  * - 用户角色表 (user_roles)
- * - 市场挂牌表 (market_listings)
  * - 抽奖活动表 (lottery_campaigns)
  * - 用户每日抽奖配额表 (lottery_user_daily_draw_quota)
  *
@@ -20,34 +19,18 @@
  * @date 2026-02-01
  */
 
-const { Op, fn, col } = require('sequelize')
+const { Op } = require('sequelize')
 const logger = require('../../utils/logger').logger
-const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
 const {
   Account,
   User,
   AccountAssetBalance,
   UserRole,
   Role,
-  MarketListing,
-  Item,
   LotteryCampaign,
   LotteryCampaignPrize,
   LotteryUserDailyDrawQuota
 } = require('../../models')
-
-/**
- * 缓存配置
- * @constant
- */
-const CACHE_CONFIG = {
-  /** 账户列表缓存 TTL (60秒) */
-  ACCOUNTS_LIST: 60,
-  /** 市场统计缓存 TTL (120秒) */
-  MARKET_STATS: 120,
-  /** 活动列表缓存 TTL (60秒) */
-  CAMPAIGNS_LIST: 60
-}
 
 /**
  * 系统数据查询服务类
@@ -209,151 +192,6 @@ class SystemDataQueryService {
   }
 
   /**
-   * 查询市场挂牌列表
-   *
-   * @param {Object} options - 查询选项
-   * @param {number} [options.seller_user_id] - 卖家用户ID
-   * @param {string} [options.status] - 挂牌状态
-   * @param {string} [options.listing_kind] - 挂牌类型
-   * @param {string} [options.asset_code] - 资产代码
-   * @param {string} [options.start_date] - 开始日期
-   * @param {string} [options.end_date] - 结束日期
-   * @param {number} [options.page=1] - 页码
-   * @param {number} [options.page_size=20] - 每页数量
-   * @param {string} [options.sort_by='created_at'] - 排序字段
-   * @param {string} [options.sort_order='DESC'] - 排序方向
-   * @returns {Promise<Object>} 市场挂牌列表和分页信息
-   */
-  static async getMarketListings(options = {}) {
-    const {
-      seller_user_id,
-      status,
-      listing_kind,
-      asset_code,
-      start_date,
-      end_date,
-      page = 1,
-      page_size = 20,
-      sort_by = 'created_at',
-      sort_order = 'DESC'
-    } = options
-
-    // 构建查询条件
-    const where = {}
-    if (seller_user_id) where.seller_user_id = parseInt(seller_user_id)
-    if (status) where.status = status
-    if (listing_kind) where.listing_kind = listing_kind
-    if (asset_code) where.offer_asset_code = asset_code
-    if (start_date || end_date) {
-      where.created_at = {}
-      if (start_date) where.created_at[Op.gte] = new Date(start_date)
-      if (end_date) where.created_at[Op.lte] = new Date(end_date + ' 23:59:59')
-    }
-
-    // 分页参数
-    const pageNum = Math.max(1, parseInt(page))
-    const pageSizeNum = Math.min(100, Math.max(1, parseInt(page_size)))
-    const offset = (pageNum - 1) * pageSizeNum
-    const order = [[sort_by, sort_order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC']]
-
-    const { count, rows } = await MarketListing.findAndCountAll({
-      where,
-      include: [
-        { model: User, as: 'seller', attributes: ['user_id', 'nickname', 'mobile'] },
-        { model: Item, as: 'offerItem', required: false }
-      ],
-      order,
-      limit: pageSizeNum,
-      offset
-    })
-
-    logger.info('查询市场挂牌列表成功', { total: count, page: pageNum })
-
-    return {
-      listings: rows,
-      pagination: {
-        total: count,
-        page: pageNum,
-        page_size: pageSizeNum,
-        total_pages: Math.ceil(count / pageSizeNum)
-      }
-    }
-  }
-
-  /**
-   * 获取市场挂牌详情
-   *
-   * @param {number} market_listing_id - 市场挂牌ID
-   * @returns {Promise<Object|null>} 市场挂牌详情
-   */
-  static async getMarketListingById(market_listing_id) {
-    const listing = await MarketListing.findByPk(parseInt(market_listing_id), {
-      include: [
-        { model: User, as: 'seller', attributes: ['user_id', 'nickname', 'mobile'] },
-        { model: Item, as: 'offerItem' }
-      ]
-    })
-
-    return listing
-  }
-
-  /**
-   * 获取市场挂牌统计摘要
-   * 热点查询 - 启用缓存
-   *
-   * @returns {Promise<Object>} 市场挂牌统计摘要
-   */
-  static async getMarketListingStats() {
-    const cacheKey = 'system_data:market_listing_stats'
-
-    // 尝试从缓存获取
-    const cached = await BusinessCacheHelper.get(cacheKey)
-    if (cached) {
-      logger.debug('市场统计命中缓存', { cacheKey })
-      return cached
-    }
-
-    // 并行查询统计数据
-    const [statusStats, typeStats, totalCount, todayCount] = await Promise.all([
-      // 按状态统计挂牌数量
-      MarketListing.findAll({
-        attributes: ['status', [fn('COUNT', col('market_listing_id')), 'count']],
-        group: ['status'],
-        raw: true
-      }),
-      // 按类型统计挂牌数量
-      MarketListing.findAll({
-        attributes: ['listing_kind', [fn('COUNT', col('market_listing_id')), 'count']],
-        group: ['listing_kind'],
-        raw: true
-      }),
-      // 总挂牌数
-      MarketListing.count(),
-      // 今日新增挂牌数
-      (async () => {
-        const today = new Date()
-        today.setHours(0, 0, 0, 0)
-        return MarketListing.count({
-          where: { created_at: { [Op.gte]: today } }
-        })
-      })()
-    ])
-
-    const result = {
-      total_listings: totalCount,
-      today_new_listings: todayCount,
-      by_status: statusStats,
-      by_type: typeStats
-    }
-
-    // 写入缓存
-    await BusinessCacheHelper.set(cacheKey, result, CACHE_CONFIG.MARKET_STATS)
-    logger.info('市场统计已缓存', { cacheKey, ttl: CACHE_CONFIG.MARKET_STATS })
-
-    return result
-  }
-
-  /**
    * 查询抽奖活动列表
    *
    * @param {Object} options - 查询选项
@@ -403,7 +241,7 @@ class SystemDataQueryService {
           as: 'prizes',
           required: false,
           attributes: [
-            'lottery_prize_id',
+            'lottery_campaign_prize_id',
             'prize_name',
             'prize_type',
             'reward_tier',

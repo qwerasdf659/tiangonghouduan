@@ -3,14 +3,13 @@
  *
  * 业务说明：
  * - 来自游戏GM工作台模型，效率提升最大的功能
- * - 并行检查用户的资产/交易/物品/抽奖/账号状态，2-3秒内返回诊断结果
+ * - 并行检查用户的资产/物品/抽奖/账号状态，2-3秒内返回诊断结果
  * - 每项检查返回 ok / warning / error 三种严重程度
  * - 全部为只读操作，不涉及数据变更
  *
- * 诊断阈值（对标交易猫/美团混合策略）：
- * - 交易冻结 30分钟 → warning（黄色告警）
- * - 交易冻结 2小时 → error（红色严重）
- * - 物品锁定超时同样按 30min/2h 两级判定
+ * 诊断阈值：
+ * - 资产冻结存在即 warning（黄色告警）
+ * - 物品锁定超时按 30min/2h 两级判定（warning/error）
  *
  * 服务类型：静态类
  * ServiceManager Key: cs_diagnose
@@ -42,14 +41,13 @@ class CustomerServiceDiagnoseService {
    *
    * @param {Object} models - Sequelize models 对象
    * @param {number} userId - 用户ID
-   * @returns {Object} { overall_level, checks: { asset, trade, item, lottery, account }, issues: [...] }
+   * @returns {Object} { overall_level, checks: { asset, item, lottery, account }, issues: [...] }
    */
   static async diagnose(models, userId) {
     const now = Date.now()
 
-    const [assetCheck, tradeCheck, itemCheck, lotteryCheck, accountCheck] = await Promise.all([
+    const [assetCheck, itemCheck, lotteryCheck, accountCheck] = await Promise.all([
       this._checkAssets(models, userId, now),
-      this._checkTrades(models, userId, now),
       this._checkItems(models, userId, now),
       this._checkLottery(models, userId),
       this._checkAccount(models, userId)
@@ -57,7 +55,6 @@ class CustomerServiceDiagnoseService {
 
     const checks = {
       asset: assetCheck,
-      trade: tradeCheck,
       item: itemCheck,
       lottery: lotteryCheck,
       account: accountCheck
@@ -137,76 +134,6 @@ class CustomerServiceDiagnoseService {
     } catch (error) {
       logger.error('诊断-资产检查失败:', error)
       return { level: LEVEL.OK, message: '资产检查异常，跳过', issues: [] }
-    }
-  }
-
-  /**
-   * 检查交易状态：是否有 created/frozen 状态且超时的订单
-   * @param {Object} models - Sequelize models 对象
-   * @param {number} userId - 用户ID
-   * @param {number} now - 当前时间戳
-   * @returns {Promise<Object>} 检查结果
-   */
-  static async _checkTrades(models, userId, now) {
-    try {
-      const pendingOrders = await models.TradeOrder.findAll({
-        where: {
-          [models.Op.or]: [{ buyer_user_id: userId }, { seller_user_id: userId }],
-          status: { [models.Op.in]: ['created', 'frozen'] }
-        },
-        raw: true
-      })
-
-      if (pendingOrders.length === 0) {
-        return { level: LEVEL.OK, message: '交易状态正常，无超时订单', issues: [] }
-      }
-
-      const issues = []
-      let maxLevel = LEVEL.OK
-
-      pendingOrders.forEach(order => {
-        const elapsed = now - new Date(order.created_at).getTime()
-        let severity = LEVEL.OK
-
-        if (elapsed > FREEZE_ERROR_MS) {
-          severity = LEVEL.ERROR
-        } else if (elapsed > FREEZE_WARNING_MS) {
-          severity = LEVEL.WARNING
-        }
-
-        if (severity !== LEVEL.OK) {
-          const elapsedMinutes = Math.round(elapsed / 60000)
-          issues.push({
-            type: 'trade_timeout',
-            severity,
-            trade_order_id: order.trade_order_id,
-            status: order.status,
-            elapsed_minutes: elapsedMinutes,
-            message: `交易订单 #${order.trade_order_id} ${order.status}状态已 ${elapsedMinutes} 分钟`
-          })
-        }
-
-        if (severity === LEVEL.ERROR || (severity === LEVEL.WARNING && maxLevel === LEVEL.OK)) {
-          maxLevel = severity
-        }
-      })
-
-      if (issues.length === 0) {
-        return {
-          level: LEVEL.OK,
-          message: `${pendingOrders.length} 个进行中订单均在正常时限内`,
-          issues: []
-        }
-      }
-
-      return {
-        level: maxLevel,
-        message: `发现 ${issues.length} 个交易订单超时`,
-        issues
-      }
-    } catch (error) {
-      logger.error('诊断-交易检查失败:', error)
-      return { level: LEVEL.OK, message: '交易检查异常，跳过', issues: [] }
     }
   }
 

@@ -10,8 +10,7 @@
  * - 资产相关类型：AssetBalance, AssetTransaction, AssetAdjustParams, AssetCode
  * - 账户相关类型：Account, AccountAssetBalance
  * - 抽奖相关类型：LotteryDrawRecord, LotteryCampaignPrizeInfo, PresetConfig
- * - 市场相关类型：MarketListingInfo, TradeOrder
- * - 拍卖相关类型：AuctionListing, BidProduct
+ * - 官方竞价相关类型：BidProduct（B2O 官方竞价引擎）
  * - 兑换相关类型：RedemptionOrderInfo
  * - 物品相关类型：Item, ItemTemplate, ItemLedger, ItemHold
  * - DIY 相关类型：DIYTemplate, DiyWork, DiyMaterial
@@ -107,7 +106,6 @@
  * @property {number} login_count - 登录次数
  * @property {number} consecutive_fail_count - 连续登录失败次数
  * @property {number} history_total_points - 历史累计积分
- * @property {number|null} max_active_listings - 最大在售挂单数
  * @property {string|null} last_login - 最后登录时间
  * @property {string|null} last_active_at - 最后活跃时间
  * @property {string} created_at - 注册时间
@@ -238,7 +236,7 @@
  * @property {number} user_id - 用户ID
  * @property {number} lottery_campaign_id - 抽奖活动ID
  * @property {number} lottery_preset_id - 预设ID
- * @property {number|null} lottery_prize_id - 奖品ID（未中奖时为 null）
+ * @property {number|null} lottery_campaign_prize_id - 活动奖品关联ID（未中奖时为 null）
  * @property {string|null} prize_name - 奖品名称
  * @property {'points'|'coupon'|'physical'|'virtual'|'service'|'product'|'special'|null} prize_type - 奖品类型
  * @property {number|null} prize_value - 奖品价值
@@ -273,7 +271,6 @@
  * @property {string} rarity_code - 稀有度（来自 prize_definitions）
  * @property {string} material_asset_code - 材料资产编码（来自 prize_definitions）
  * @property {number} material_amount - 材料数量（来自 prize_definitions）
- */
  * @property {number} prize_value - 奖品价值（DECIMAL(10,2)）
  * @property {number} win_probability - 中奖概率（DECIMAL(8,6)，如 0.100000）
  * @property {number} stock_quantity - 库存数量（0 表示售罄，-1 无限制由业务层处理）
@@ -320,76 +317,6 @@
  * @property {Array<LotteryCampaignPrizeInfo>} [prizes] - 关联奖品列表
  */
 
-// ========== 市场相关类型（market_listings / trade_orders 表） ==========
-
-/**
- * 市场挂牌信息（修正：原 ListingInfo）
- * 对应 market_listings 表，支持物品和同质化资产两种挂牌类型
- *
- * @typedef {Object} MarketListingInfo
- * @property {number} market_listing_id - 挂单ID（BIGINT 自增主键，非 UUID）
- * @property {'item'|'fungible_asset'} listing_kind - 挂牌类型（物品/同质化资产）
- * @property {number} seller_user_id - 卖家用户ID
- * @property {number|null} offer_item_id - 挂售物品ID（listing_kind='item' 时有值）
- * @property {number|null} offer_item_template_id - 物品模板ID
- * @property {string|null} offer_item_rarity - 物品稀有度
- * @property {string|null} offer_item_display_name - 物品展示名称
- * @property {string|null} offer_asset_group_code - 资产分组代码
- * @property {string|null} offer_asset_display_name - 资产展示名称
- * @property {string|null} offer_asset_code - 挂售资产代码（listing_kind='fungible_asset' 时有值）
- * @property {number|null} offer_amount - 挂售数量（BIGINT）
- * @property {string} price_asset_code - 定价资产代码（默认 'DIAMOND'）
- * @property {number} price_amount - 定价金额（BIGINT）
- * @property {boolean} seller_offer_frozen - 卖家挂售资产是否已冻结
- * @property {number|null} locked_by_order_id - 锁定该挂单的订单ID
- * @property {string|null} locked_at - 锁定时间
- * @property {'on_sale'|'locked'|'sold'|'withdrawn'|'admin_withdrawn'} status - 挂单状态
- * @property {number} sort_order - 排序权重
- * @property {boolean} is_pinned - 是否置顶
- * @property {string|null} pinned_at - 置顶时间
- * @property {boolean} is_recommended - 是否推荐
- * @property {string} idempotency_key - 幂等键
- * @property {number|null} offer_category_id - 挂售分类ID
- * @property {string} created_at - 创建时间
- * @property {string} updated_at - 更新时间
- */
-
-/**
- * 市场挂牌状态枚举
- *
- * @typedef {'on_sale'|'locked'|'sold'|'withdrawn'|'admin_withdrawn'} MarketListingStatus
- * @description
- * - on_sale: 在售中
- * - locked: 已锁定（买家下单中）
- * - sold: 已售出
- * - withdrawn: 卖家主动撤回
- * - admin_withdrawn: 管理员强制下架
- */
-
-/**
- * 交易订单
- * 对应 trade_orders 表，记录市场交易的完整订单信息
- *
- * @typedef {Object} TradeOrder
- * @property {number} trade_order_id - 交易订单ID（BIGINT 自增主键）
- * @property {string} idempotency_key - 幂等键
- * @property {string} business_id - 业务唯一ID
- * @property {number} market_listing_id - 关联挂单ID
- * @property {number} buyer_user_id - 买家用户ID
- * @property {number} seller_user_id - 卖家用户ID
- * @property {string} asset_code - 结算资产代码（默认 'DIAMOND'）
- * @property {number} gross_amount - 总金额（BIGINT）
- * @property {number} fee_amount - 手续费（BIGINT）
- * @property {number} net_amount - 净金额（BIGINT，卖家实收）
- * @property {'created'|'frozen'|'completed'|'cancelled'|'failed'|'disputed'} status - 订单状态
- * @property {Object|null} meta - 扩展元数据（JSON）
- * @property {string} order_no - 订单号（唯一）
- * @property {string} created_at - 创建时间
- * @property {string} updated_at - 更新时间
- * @property {string|null} completed_at - 完成时间
- * @property {string|null} cancelled_at - 取消时间
- */
-
 // ========== 兑换相关类型（redemption_orders 表） ==========
 
 /**
@@ -423,37 +350,7 @@
  * - expired: 已过期
  */
 
-// ========== 拍卖相关类型（auction_listings / bid_products 表） ==========
-
-/**
- * 拍卖挂牌
- * 对应 auction_listings 表，用户发起的物品拍卖
- *
- * @typedef {Object} AuctionListing
- * @property {number} auction_listing_id - 拍卖ID（BIGINT 自增主键）
- * @property {number} seller_user_id - 卖家用户ID
- * @property {number} item_id - 拍卖物品ID
- * @property {string} price_asset_code - 定价资产代码（默认 'DIAMOND'）
- * @property {number} start_price - 起拍价（BIGINT）
- * @property {number} current_price - 当前最高出价（BIGINT）
- * @property {number} min_bid_increment - 最小加价幅度（BIGINT）
- * @property {number|null} buyout_price - 一口价（BIGINT，null 表示不支持）
- * @property {string} start_time - 拍卖开始时间
- * @property {string} end_time - 拍卖结束时间
- * @property {number|null} winner_user_id - 中标用户ID
- * @property {number|null} winner_bid_id - 中标出价ID
- * @property {'pending'|'active'|'ended'|'cancelled'|'settled'|'settlement_failed'|'no_bid'} status - 拍卖状态
- * @property {number} fee_rate - 手续费率（DECIMAL(5,4)，如 0.0500 = 5%）
- * @property {number|null} gross_amount - 成交总额
- * @property {number|null} fee_amount - 手续费
- * @property {number|null} net_amount - 卖家净收
- * @property {number} bid_count - 出价次数
- * @property {number} unique_bidders - 独立出价人数
- * @property {Object|null} item_snapshot - 物品快照（JSON）
- * @property {number} retry_count - 结算重试次数
- * @property {string} created_at - 创建时间
- * @property {string} updated_at - 更新时间
- */
+// ========== 官方竞价相关类型（bid_products 表，B2O 官方竞价引擎） ==========
 
 /**
  * 竞拍商品（管理员发起的竞拍）
@@ -775,19 +672,18 @@
 /**
  * 系统设置分类
  *
- * @typedef {'ad_pricing'|'ad_system'|'auction'|'backpack'|'basic'|'batch_operation'|'customer_service'|'exchange'|'feature'|'general'|'marketplace'|'notification'|'points'|'redemption'|'security'} SettingsCategory
+ * @typedef {'ad_pricing'|'ad_system'|'backpack'|'basic'|'batch_operation'|'customer_service'|'dispute'|'exchange'|'feature'|'general'|'notification'|'points'|'redemption'|'security'} SettingsCategory
  * @description
  * - ad_pricing: 广告定价设置
  * - ad_system: 广告系统设置
- * - auction: 拍卖设置
  * - backpack: 背包设置
  * - basic: 基础设置
  * - batch_operation: 批量操作设置
  * - customer_service: 客服设置
+ * - dispute: 纠纷设置
  * - exchange: 兑换设置
  * - feature: 功能开关
  * - general: 通用设置
- * - marketplace: 市场设置
  * - notification: 通知设置
  * - points: 积分设置
  * - redemption: 核销设置

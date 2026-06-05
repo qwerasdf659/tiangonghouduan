@@ -222,7 +222,7 @@ router.post(
             prize.reward_tier || LotteryDrawFormatter.inferRewardTier(prize.prize?.value || 0)
           /**
            * execute_draw 返回的 prize 对象使用短字段名：id, name, type, value
-           * 路由层转换为 API 契约字段名：lottery_prize_id, prize_name, prize_type, prize_value
+           * 路由层转换为对小程序的 API 契约字段名：id（通用，防抓包暴露内部表名）、prize_name 等
            */
           const rawValue = prize.prize?.value
           const prizeValue = typeof rawValue === 'number' ? rawValue : parseFloat(rawValue) || 0
@@ -240,7 +240,7 @@ router.post(
           return {
             reward_tier: rewardTier,
             reward_tier_text: LotteryDrawFormatter.getRewardTierText(rewardTier),
-            lottery_prize_id: prize.prize?.id || null,
+            id: prize.prize?.id || null,
             prize_name: prize.prize?.name || '未知奖品',
             prize_type: prize.prize?.type || null,
             prize_value: prizeValue,

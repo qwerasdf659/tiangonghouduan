@@ -303,107 +303,6 @@ describe('🚀 压力测试与高并发测试（阶段九：P1）', () => {
     }, 90000)
   })
 
-  // ==================== 10.2 市场交易压测 ====================
-
-  describe('10.2 市场交易压测 - 100人同时抢购', () => {
-    /**
-     * 业务场景：100个买家同时抢购同一商品
-     * 验证目标：
-     * - 并发安全：只有1人成功购买
-     * - 无超卖：商品不会被多人同时购买
-     * - 事务一致性：资产扣减和物品转移原子性
-     *
-     * 注意：此测试验证数据库行级锁机制，不依赖幂等性服务
-     */
-    test('并发抢购测试 - 行级锁保证只有1人成功', async () => {
-      if (!testUserId) {
-        console.warn('⚠️ 跳过测试：测试数据未初始化')
-        return
-      }
-
-      const concurrentCount = 100
-
-      console.log(`📋 测试配置: ${concurrentCount}个买家并发抢购`)
-
-      /*
-       * 模拟单一库存商品的并发购买
-       * 使用共享变量模拟单一库存
-       */
-      let stockRemaining = 1
-      let successfulBuyer = null
-      const buyAttempts = []
-
-      // 创建并发抢购任务
-      const tasks = Array(concurrentCount)
-        .fill(null)
-        .map((_, index) => async () => {
-          const attemptTime = Date.now()
-
-          /*
-           * 模拟数据库行级锁的抢购逻辑
-           * 在真实场景中，这会使用SELECT ... FOR UPDATE
-           */
-          const acquired = await new Promise(resolve => {
-            // 模拟随机网络延迟
-            setTimeout(() => {
-              if (stockRemaining > 0) {
-                stockRemaining-- // 原子操作模拟
-                successfulBuyer = index
-                resolve(true)
-              } else {
-                resolve(false)
-              }
-            }, Math.random() * 50)
-          })
-
-          buyAttempts.push({
-            buyer_index: index,
-            attempt_time: attemptTime,
-            acquired
-          })
-
-          return {
-            success: true,
-            buyer_index: index,
-            acquired,
-            is_winner: acquired
-          }
-        })
-
-      // 执行并发测试
-      const startTime = Date.now()
-      const { results, metrics } = await executeConcurrent(tasks, {
-        concurrency: 100, // 全量并发
-        timeout: 30000
-      })
-
-      const duration = Date.now() - startTime
-
-      // 统计结果
-      const winners = results.filter(r => r.result?.is_winner)
-      const losers = results.filter(r => !r.result?.is_winner && r.result?.success)
-
-      console.log(`📊 测试结果:`)
-      console.log(`   ⏱️  总耗时: ${duration}ms`)
-      console.log(`   🏆 成功购买: ${winners.length}人`)
-      console.log(`   😢 购买失败: ${losers.length}人`)
-      console.log(`   📦 剩余库存: ${stockRemaining}`)
-      console.log(`   📊 吞吐量: ${metrics.throughput} 请求/秒`)
-
-      if (winners.length > 0 && successfulBuyer !== null) {
-        console.log(`   🎯 获胜者索引: ${successfulBuyer}`)
-      }
-
-      // 核心验证：只有1人成功购买（行级锁保证）
-      expect(winners.length).toBe(1)
-
-      // 验证库存被正确扣减
-      expect(stockRemaining).toBe(0)
-
-      console.log('✅ 10.2 市场交易压测通过 - 行级锁保证只有1人成功')
-    }, 60000)
-  })
-
   // ==================== 10.3 资产操作压测 ====================
 
   describe('10.3 资产操作压测 - 同一用户1000次并发扣费', () => {
@@ -839,7 +738,7 @@ describe('🚀 压力测试与高并发测试（阶段九：P1）', () => {
         return
       }
 
-      const { User, LotteryCampaign, MarketListing } = require('../../models')
+      const { User, LotteryCampaign, ExchangeItem } = require('../../models')
 
       // 混合任务配置
       const taskConfig = {
@@ -880,15 +779,15 @@ describe('🚀 压力测试与高并发测试（阶段九：P1）', () => {
           }
         })
 
-      // 创建市场查询任务（直接查询数据库）
+      // 创建兑换商品查询任务（直接查询数据库，C2C 市场查询已下线）
       const marketTasks = Array(taskConfig.market)
         .fill(null)
         .map((_, index) => async () => {
           try {
-            // 查询市场挂单（不限制状态，以确保有数据）
-            const listings = await MarketListing.findAll({
+            // 查询官方兑换商品（不限制状态，以确保有数据）
+            const listings = await ExchangeItem.findAll({
               limit: 10,
-              attributes: ['market_listing_id', 'status', 'created_at']
+              attributes: ['exchange_item_id', 'status', 'created_at']
             })
 
             // 即使没有数据，查询执行成功也算成功

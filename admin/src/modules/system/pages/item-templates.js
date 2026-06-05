@@ -158,6 +158,7 @@ document.addEventListener('alpine:init', () => {
     /** @type {boolean} 图片上传中 */
     image_uploading: false,
     typeIcons: {
+      prop: '🎟️',
       voucher: '🎫',
       coupon: '🎫',
       points: '💰',

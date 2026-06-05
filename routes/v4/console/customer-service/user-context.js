@@ -6,7 +6,7 @@
  * - 资产余额 + 变动流水（getAssets）
  * - 背包物品列表（getBackpack）
  * - 抽奖记录 + 统计（getLottery）
- * - 交易订单 + 挂单（getTrades）
+ * - 抽奖记录（getLottery）
  * - 混合业务时间线（getTimeline）
  * - 风控信息（getRisk）
  * - 历史会话（getHistory）
@@ -123,31 +123,6 @@ router.get(
     const result = await UserContextService.getLottery(models, userId, req.query)
 
     return res.apiSuccess(result, '获取用户抽奖记录成功')
-  })
-)
-
-/**
- * GET /user-context/:userId/trades - 交易订单 + 市场挂单
- *
- * @route GET /api/v4/console/customer-service/user-context/:userId/trades
- * @query {string} [role=all] - 角色筛选（buyer/seller/all）
- * @query {string} [status] - 状态筛选
- * @query {number} [page=1] - 页码
- * @query {number} [page_size=10] - 每页数量
- */
-router.get(
-  '/:userId/trades',
-  asyncHandler(async (req, res) => {
-    const userId = parseInt(req.params.userId)
-    if (isNaN(userId) || userId <= 0) {
-      return res.apiError('用户ID无效', 'BAD_REQUEST', null, 400)
-    }
-
-    const models = req.app.locals.models
-    const UserContextService = req.app.locals.services.getService('cs_user_context')
-    const result = await UserContextService.getTrades(models, userId, req.query)
-
-    return res.apiSuccess(result, '获取用户交易信息成功')
   })
 )
 

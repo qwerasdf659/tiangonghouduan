@@ -182,7 +182,7 @@ describe('UnifiedLotteryEngine 主流程测试（任务2.1）', () => {
         // 验证必有奖品（每次抽奖100%获得奖品）
         expect(draw_result.prize).toBeDefined()
         console.log(
-          `✅ 单抽成功，获得奖品: ${draw_result.prize?.name || draw_result.prize?.lottery_prize_id}`
+          `✅ 单抽成功，获得奖品: ${draw_result.prize?.name || draw_result.prize?.lottery_campaign_prize_id}`
         )
 
         // 验证抽奖记录已创建
@@ -249,7 +249,7 @@ describe('UnifiedLotteryEngine 主流程测试（任务2.1）', () => {
         result.draws.forEach((draw_result, index) => {
           expect(draw_result.prize).toBeDefined()
           console.log(
-            `  📦 第${index + 1}次: ${draw_result.prize?.name || draw_result.prize?.lottery_prize_id}`
+            `  📦 第${index + 1}次: ${draw_result.prize?.name || draw_result.prize?.lottery_campaign_prize_id}`
           )
         })
 
@@ -503,7 +503,7 @@ describe('UnifiedLotteryEngine 主流程测试（任务2.1）', () => {
       if (result.success) {
         // V4.6 Phase 5: 验证使用的是 Pipeline 架构
         expect(result.strategy_used).toBeDefined()
-        const valid_strategies = ['basic_guarantee', 'management', 'pipeline']
+        const valid_strategies = ['basic_guarantee', 'pipeline']
         expect(valid_strategies).toContain(result.strategy_used)
 
         console.log(`✅ 管线执行成功，策略: ${result.strategy_used}`)

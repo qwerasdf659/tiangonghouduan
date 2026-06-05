@@ -179,7 +179,7 @@ router.put(
     )
 
     sharedComponents.logger.info('奖品信息更新成功', {
-      lottery_prize_id: lotteryPrizeId,
+      lottery_campaign_prize_id: lotteryPrizeId,
       updated_fields: result.updated_fields,
       updated_by: req.user?.user_id
     })
@@ -224,7 +224,7 @@ router.post(
     )
 
     sharedComponents.logger.info('库存补充成功', {
-      lottery_prize_id: prizeId,
+      lottery_campaign_prize_id: prizeId,
       old_quantity: result.old_quantity,
       add_quantity: quantity,
       new_quantity: result.new_quantity,
@@ -266,7 +266,7 @@ router.delete(
     )
 
     sharedComponents.logger.info('奖品删除成功', {
-      lottery_prize_id: prizeId,
+      lottery_campaign_prize_id: prizeId,
       deleted_by: req.user?.id
     })
 

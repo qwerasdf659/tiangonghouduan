@@ -41,7 +41,7 @@ class PresetInventoryDebt extends Model {
 
     // 多对一：欠账关联某个活动奖品
     PresetInventoryDebt.belongsTo(models.LotteryCampaignPrize, {
-      foreignKey: 'lottery_prize_id',
+      foreignKey: 'lottery_campaign_prize_id',
       as: 'campaignPrize',
       onDelete: 'RESTRICT',
       comment: '欠账的活动奖品（禁止删除有欠账的奖品）'
@@ -197,7 +197,7 @@ class PresetInventoryDebt extends Model {
     return {
       preset_inventory_debt_id: this.preset_inventory_debt_id,
       lottery_campaign_id: this.lottery_campaign_id,
-      lottery_prize_id: this.lottery_prize_id,
+      lottery_campaign_prize_id: this.lottery_campaign_prize_id,
       user_id: this.user_id,
       debt_quantity: this.debt_quantity,
       cleared_quantity: this.cleared_quantity,
@@ -262,7 +262,7 @@ class PresetInventoryDebt extends Model {
     }
 
     if (prizeId) {
-      where.lottery_prize_id = prizeId
+      where.lottery_campaign_prize_id = prizeId
     }
 
     return this.findAll({
@@ -285,7 +285,7 @@ class PresetInventoryDebt extends Model {
 
     return this.findAll({
       attributes: [
-        'lottery_prize_id',
+        'lottery_campaign_prize_id',
         [fn('SUM', col('debt_quantity')), 'total_debt'],
         [fn('SUM', col('cleared_quantity')), 'total_cleared'],
         [fn('COUNT', col('preset_inventory_debt_id')), 'debt_count']
@@ -294,7 +294,7 @@ class PresetInventoryDebt extends Model {
         lottery_campaign_id: campaignId,
         status: 'pending'
       },
-      group: ['lottery_prize_id'],
+      group: ['lottery_campaign_prize_id'],
       transaction
     })
   }
@@ -337,12 +337,12 @@ module.exports = sequelize => {
       },
 
       /**
-       * 奖品ID
+       * 奖品ID（活动奖品关联ID）
        */
-      lottery_prize_id: {
-        type: DataTypes.INTEGER,
+      lottery_campaign_prize_id: {
+        type: DataTypes.BIGINT,
         allowNull: false,
-        comment: '欠账奖品ID（外键关联lottery_prizes.lottery_prize_id）'
+        comment: '欠账奖品ID（外键关联 lottery_campaign_prizes.lottery_campaign_prize_id）'
       },
 
       /**
@@ -472,7 +472,7 @@ module.exports = sequelize => {
         },
         // 奖品+状态联合索引
         {
-          fields: ['lottery_prize_id', 'status'],
+          fields: ['lottery_campaign_prize_id', 'status'],
           name: 'idx_inv_debt_prize_status'
         },
         // 活动+状态联合索引

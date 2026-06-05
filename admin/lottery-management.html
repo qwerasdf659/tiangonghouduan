@@ -341,8 +341,8 @@
                 <tr x-show="prizes.length === 0">
                   <td colspan="8" class="px-4 py-8 text-center themed-text-muted">暂无奖品数据</td>
                 </tr>
-                <template x-for="prize in prizes" :key="prize.lottery_prize_id">
-                  <tr class="themed-hover-bg cursor-grab" :class="{ 'bg-yellow-50': prize.stock_quantity === 0 && (prize.win_weight || 0) > 0 }" :data-prize-id="prize.lottery_prize_id">
+                <template x-for="prize in prizes" :key="prize.lottery_campaign_prize_id">
+                  <tr class="themed-hover-bg cursor-grab" :class="{ 'bg-yellow-50': prize.stock_quantity === 0 && (prize.win_weight || 0) > 0 }" :data-prize-id="prize.lottery_campaign_prize_id">
                     <td class="px-4 py-3">
                       <div class="flex items-center">
                         <div class="w-10 h-10 rounded overflow-hidden mr-3 img-blur-load cursor-pointer hover:opacity-80 transition-opacity"
@@ -356,7 +356,7 @@
                         <div>
                           <div class="font-medium text-sm" x-text="prize.prize_name"></div>
                           <div class="flex items-center gap-1">
-                            <small class="text-gray-400" x-text="'#' + prize.lottery_prize_id"></small>
+                            <small class="text-gray-400" x-text="'#' + prize.lottery_campaign_prize_id"></small>
                             <template x-if="prize.is_fallback">
                               <span class="px-1 py-0.5 text-xs font-bold rounded bg-orange-100 text-orange-600 border border-orange-300" title="保底奖品">🛡️ 保底</span>
                             </template>
@@ -1328,7 +1328,7 @@
                         :class="activityStrategyConfig?.management?.enabled ? 'translate-x-5' : ''"></span>
                 </button>
               </div>
-              <p class="text-xs text-gray-500 mb-2">关闭后该活动的所有「强制中奖/强制未中奖」干预不生效</p>
+              <p class="text-xs text-gray-500 mb-2">关闭后该活动的所有管理干预（预设队列、成长等级分级概率）不生效</p>
             </div>
 
             <!-- 固定保底系统 -->
@@ -1631,6 +1631,91 @@
             <template x-if="!editingSegmentRule?.is_system">
               <button @click="saveSegmentRule()" class="px-4 py-2 bg-violet-600 text-white rounded text-sm hover:bg-violet-700">保存策略</button>
             </template>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== 成长等级公示分级概率页（B 线） ==================== -->
+      <div x-show="current_page === 'level-probability'" x-cloak>
+        <div x-data="levelProbabilityPanel()" x-init="init()">
+          <!-- 页面引导说明 -->
+          <div class="rounded-lg p-4 mb-6 themed-gradient-primary text-white shadow-lg">
+            <div class="flex items-start gap-3">
+              <span class="text-2xl mt-0.5">📶</span>
+              <div>
+                <h5 class="font-semibold text-lg mb-1">成长等级公示分级概率</h5>
+                <p class="text-sm opacity-90">按用户成长等级（由历史积分实时派生）配置各等级的中奖率倍数。倍数为公示规则，抽奖内核按等级读取消费。倍数 1.0 表示不调整，&gt;1.0 表示该等级更易中奖。</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 活动选择 -->
+          <div class="themed-card rounded-lg shadow p-4 mb-6">
+            <label class="block text-sm font-medium themed-text-secondary mb-2">选择活动</label>
+            <div class="flex items-center gap-3">
+              <select x-model="selectedCampaignId" @change="loadLevelProbability()"
+                      class="w-full max-w-md px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
+                      :disabled="loadingCampaigns">
+                <option value="">请选择要配置的活动</option>
+                <template x-for="c in campaigns" :key="c.lottery_campaign_id">
+                  <option :value="c.lottery_campaign_id" x-text="campaignLabel(c)"></option>
+                </template>
+              </select>
+              <span x-show="loadingCampaigns" class="text-sm themed-text-muted">活动加载中...</span>
+            </div>
+          </div>
+
+          <!-- 倍数配置表格 -->
+          <div class="themed-card rounded-lg shadow" x-show="selectedCampaignId">
+            <div class="p-4 border-b flex justify-between items-center">
+              <h5 class="font-semibold">📶 各成长等级中奖率倍数</h5>
+              <button @click="saveLevelProbability()" :disabled="saving || !loaded || items.length === 0"
+                      class="px-4 py-2 themed-bg-primary text-white rounded hover:opacity-90 transition-colors disabled:opacity-50">
+                <span x-show="saving" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
+                💾 保存配置
+              </button>
+            </div>
+
+            <div x-show="loadingItems" class="p-8 text-center themed-text-muted">
+              <div class="inline-block w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+              <p class="mt-2 text-sm">倍数配置加载中...</p>
+            </div>
+
+            <div class="overflow-x-auto" x-show="!loadingItems && loaded">
+              <table class="w-full">
+                <thead class="themed-bg-base">
+                  <tr>
+                    <th class="text-left py-3 px-4 text-xs font-semibold themed-text-muted uppercase tracking-wider">成长等级</th>
+                    <th class="text-left py-3 px-4 text-xs font-semibold themed-text-muted uppercase tracking-wider">等级码</th>
+                    <th class="text-right py-3 px-4 text-xs font-semibold themed-text-muted uppercase tracking-wider">门槛（历史积分）</th>
+                    <th class="text-left py-3 px-4 text-xs font-semibold themed-text-muted uppercase tracking-wider">中奖率倍数</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y themed-divide">
+                  <template x-for="item in items" :key="item.level_key">
+                    <tr class="themed-hover-bg">
+                      <td class="py-3 px-4 text-sm font-medium themed-text-primary" x-text="item.level_name"></td>
+                      <td class="py-3 px-4 text-xs font-mono themed-text-muted" x-text="item.level_key"></td>
+                      <td class="py-3 px-4 text-sm text-right themed-text-secondary" x-text="(item.min_history_points ?? 0).toLocaleString()"></td>
+                      <td class="py-3 px-4">
+                        <input type="number" x-model.number="item.multiplier" step="0.1" min="0.1"
+                               class="w-32 px-3 py-1.5 border rounded text-sm focus:ring-2 focus:ring-blue-500"
+                               placeholder="如 1.3">
+                      </td>
+                    </tr>
+                  </template>
+                  <template x-if="items.length === 0">
+                    <tr>
+                      <td colspan="4" class="py-12 text-center themed-text-muted text-sm">暂无启用的成长等级</td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+              <div class="p-4 border-t bg-amber-50 text-xs text-amber-700 flex items-start gap-1.5">
+                <span>⚠️</span>
+                <span>倍数必须为正数。1.0 表示不调整该等级中奖率；配置保存后立即对该活动生效，所有操作均有审计记录。</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -5349,7 +5434,7 @@
                     </tr>
                   </thead>
                   <tbody>
-                    <template x-for="item in advanceByPrize" :key="item.lottery_prize_id">
+                    <template x-for="item in advanceByPrize" :key="item.lottery_campaign_prize_id">
                       <tr>
                         <td x-text="item.prize_name || '-'"></td>
                         <td class="text-sm themed-text-muted" x-text="item.campaign_name || '-'"></td>
@@ -6106,11 +6191,11 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <template x-for="sp in sameTierPrizes" :key="sp.lottery_prize_id">
-                    <tr class="border-b border-gray-100" :class="sp.lottery_prize_id === prizeForm.lottery_prize_id ? 'bg-blue-100 font-semibold' : ''">
+                  <template x-for="sp in sameTierPrizes" :key="sp.lottery_campaign_prize_id">
+                    <tr class="border-b border-gray-100" :class="sp.lottery_campaign_prize_id === prizeForm.lottery_campaign_prize_id ? 'bg-blue-100 font-semibold' : ''">
                       <td class="py-1 px-2">
                         <span x-text="sp.prize_name"></span>
-                        <span x-show="sp.lottery_prize_id === prizeForm.lottery_prize_id" class="text-blue-500 text-[10px] ml-1">← 当前编辑</span>
+                        <span x-show="sp.lottery_campaign_prize_id === prizeForm.lottery_campaign_prize_id" class="text-blue-500 text-[10px] ml-1">← 当前编辑</span>
                       </td>
                       <td class="text-right py-1 px-2" x-text="sp.win_weight"></td>
                       <td class="text-right py-1 px-2" x-text="sp.tier_percentage + '%'"></td>
@@ -7324,7 +7409,7 @@
                   </tr>
                 </thead>
                 <tbody class="divide-y">
-                  <template x-for="(prize, prizeIdx) in group.prizes" :key="prize.lottery_prize_id">
+                  <template x-for="(prize, prizeIdx) in group.prizes" :key="prize.lottery_campaign_prize_id">
                     <tr class="hover:bg-gray-50 transition-colors"
                       :class="{ 'bg-yellow-50': prize.stock_quantity === 0 && (prize.win_weight || 0) > 0 }">
                       <td class="py-2 px-4">
@@ -7335,7 +7420,7 @@
                             <template x-if="prize.is_fallback">
                               <span class="ml-1 px-1.5 py-0.5 text-xs font-bold rounded bg-orange-100 text-orange-600 border border-orange-300">🛡️ 保底</span>
                             </template>
-                            <div class="text-xs text-gray-400" x-text="'#' + prize.lottery_prize_id"></div>
+                            <div class="text-xs text-gray-400" x-text="'#' + prize.lottery_campaign_prize_id"></div>
                           </div>
                         </div>
                       </td>
@@ -7487,7 +7572,7 @@
         </div>
         <div class="p-4">
           <div class="space-y-2 max-h-[50vh] overflow-y-auto">
-            <template x-for="item in batchStockItems" :key="item.lottery_prize_id">
+            <template x-for="item in batchStockItems" :key="item.lottery_campaign_prize_id">
               <div class="flex items-center gap-3 py-2 border-b border-gray-100">
                 <span class="px-1.5 py-0.5 text-xs rounded"
                   :class="{

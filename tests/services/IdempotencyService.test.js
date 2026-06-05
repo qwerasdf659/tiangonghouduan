@@ -887,10 +887,10 @@ describe('IdempotencyService - 幂等服务单元测试', () => {
       // 直接映射
       expect(IdempotencyService.getCanonicalOperation('/api/v4/lottery/draw')).toBe('LOTTERY_DRAW')
 
-      // 带动态参数
-      expect(
-        IdempotencyService.getCanonicalOperation('/api/v4/marketplace/listings/123/purchase')
-      ).toBe('MARKET_PURCHASE_LISTING')
+      // 带动态参数（B2C 官方竞价结算，C2C marketplace 路径已下线）
+      expect(IdempotencyService.getCanonicalOperation('/api/v4/console/bids/123/settle')).toBe(
+        'CONSOLE_BID_SETTLE'
+      )
 
       // 测试路径
       expect(IdempotencyService.getCanonicalOperation('/api/v4/test/action')).toBe('TEST_ACTION')
@@ -900,9 +900,9 @@ describe('IdempotencyService - 幂等服务单元测试', () => {
      * 测试场景：normalizePath 应正确规范化路径
      */
     it('normalizePath 应正确规范化路径', () => {
-      // 数字ID → :id
-      expect(IdempotencyService.normalizePath('/api/v4/marketplace/listings/123')).toBe(
-        '/api/v4/marketplace/listings/:id'
+      // 数字ID → :id（事务实体）
+      expect(IdempotencyService.normalizePath('/api/v4/console/exchange/items/123')).toBe(
+        '/api/v4/console/exchange/items/:id'
       )
 
       // UUID → :uuid

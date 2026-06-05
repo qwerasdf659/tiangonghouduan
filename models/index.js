@@ -154,13 +154,10 @@ models.PresetDebtLimit = require('./PresetDebtLimit')(sequelize, DataTypes)
  *    - 业务场景：配置欠账上限→接近上限告警→超限拒绝预设发放
  */
 
-models.LotteryManagementSetting = require('./LotteryManagementSetting')(sequelize, DataTypes)
 /*
- * ✅ LotteryManagementSetting：抽奖管理设置（管理员抽奖干预）
- *    - 用途：存储管理员设置的抽奖干预规则（强制中奖、强制不中奖、概率调整、用户专属队列）
- *    - 特点：支持设置过期、状态管理、审计追溯
- *    - 表名：lottery_management_settings，主键：setting_id，外键：user_id、created_by
- *    - 业务场景：活动补偿、VIP特权、防刷保护、精准运营、测试验证
+ * 2026-06-04 合规改造：LotteryManagementSetting（per-user 暗箱干预：force_win/force_lose/
+ * probability_adjust/user_queue）已整体下线，模型与表 lottery_management_settings 已移除。
+ * 个人发奖统一走 cs_compensate 明示补偿；群体调赔率走按成长等级的公示分级概率。
  */
 
 // 🔴 抽奖次数配额控制系统（2025-12-23新增）
@@ -492,24 +489,7 @@ models.BidRecord = require('./BidRecord')(sequelize, DataTypes)
  *    - 业务场景：用户出价 → 冻结资产 → 记录出价 → 结算时标记 is_final_winner
  */
 
-// 🔴 C2C 用户间竞拍系统模型（2026-03-24）
-models.AuctionListing = require('./AuctionListing')(sequelize, DataTypes)
-/*
- * ✅ AuctionListing：C2C拍卖挂牌表
- *    - 用途：用户间竞拍活动（与 BidProduct 的区别：卖方是普通用户，商品来自 items 表）
- *    - 特点：7态状态机（复用 bid_products 同一 ENUM）+ 手续费 + 一口价 + 物品快照
- *    - 表名：auction_listings，主键：auction_listing_id
- *    - 业务场景：用户发起拍卖 → holdItem锁定物品 → 其他用户出价 → 到期结算/流拍
- */
-
-models.AuctionBid = require('./AuctionBid')(sequelize, DataTypes)
-/*
- * ✅ AuctionBid：C2C拍卖出价记录表
- *    - 用途：记录C2C拍卖用户出价（含冻结流水对账、幂等性控制）
- *    - 特点：FK → auction_listings，idempotency_key UNIQUE
- *    - 表名：auction_bids，主键：auction_bid_id
- *    - 业务场景：用户出价 → 冻结资产 → 记录出价 → 结算时标记 is_final_winner
- */
+// 注：C2C 用户间竞拍系统模型（AuctionListing/AuctionBid）已随 C2C 下线删除（2026-06-05 阶段五）
 
 /*
  * 🔥 统一资产底座系统（V4.5.0 资产域标准架构）
@@ -704,34 +684,7 @@ models.AssetConversionRule = require('./AssetConversionRule')(sequelize, DataTyp
  * - MaterialConversionRule → 已合并到 AssetConversionRule，旧表 _bak_material_conversion_rules 保留 30 天后 DROP
  */
 
-// 🔴 V4.2 交易市场升级模型（Phase 2）
-models.MarketListing = require('./MarketListing')(sequelize, DataTypes)
-/*
- * ✅ MarketListing：市场挂牌
- *    - 用途：管理交易市场的挂牌信息（不可叠加物品 + 可叠加资产）
- *    - 特点：支持锁定机制、冻结标记、状态流转（on_sale → locked → sold/withdrawn）
- *    - 表名：market_listings，主键：market_listing_id
- *    - 业务场景：创建挂牌→购买挂牌→撤回挂牌→超时解锁
- */
-
-models.TradeOrder = require('./TradeOrder')(sequelize, DataTypes)
-/*
- * ✅ TradeOrder：交易订单
- *    - 用途：管理所有交易订单，提供强幂等性控制和对账支持
- *    - 特点：business_id全局唯一、对账字段（gross_amount = fee_amount + net_amount）
- *    - 表名：trade_orders，主键：trade_order_id，唯一约束：business_id
- *    - 业务场景：创建订单→冻结资产→成交结算→取消订单
- */
-
-const MarketPriceSnapshot = require('./MarketPriceSnapshot')
-MarketPriceSnapshot.initModel(sequelize)
-models.MarketPriceSnapshot = MarketPriceSnapshot
-/*
- * ✅ MarketPriceSnapshot：市场价格快照预聚合
- *    - 用途：每日汇总市场挂牌的价格统计（最低/最高/平均、成交量）
- *    - 表名：market_price_snapshots，主键：snapshot_id
- *    - 唯一约束：(snapshot_date, asset_code, listing_kind, price_asset_code)
- */
+// 注：C2C 交易市场模型（MarketListing/TradeOrder/MarketPriceSnapshot）已随 C2C 下线删除（2026-06-05 阶段五）
 
 // 🔴 V4.2 背包双轨架构模型（Phase 1 - 核销码系统）
 models.RedemptionOrder = require('./RedemptionOrder')(sequelize, DataTypes)
@@ -810,6 +763,16 @@ models.LotteryStrategyConfig = require('./LotteryStrategyConfig')(sequelize, Dat
  *    - 表名：lottery_strategy_config，主键：strategy_config_id
  *    - 配置分组：budget_tier/pressure_tier/pity/luck_debt/anti_empty/anti_high
  *    - 业务场景：运营调参、A/B测试、活动期间特殊配置
+ */
+
+models.UserGrowthLevel = require('./UserGrowthLevel')(sequelize, DataTypes)
+/*
+ * ✅ UserGrowthLevel：用户成长等级定义表（2026-06-04 合规改造 P1=乙）
+ *    - 用途：独立成长等级体系，累计积分（users.history_total_points）→ 成长等级
+ *    - 区别：不同于 users.user_level（身份类型 normal/vip/merchant），成长等级是消费成长维度
+ *    - 特点：配置实体，业务码 level_key 稳定标识；用户当前等级由 Service 实时派生（无 per-user 同步债）
+ *    - 表名：user_growth_levels，主键：user_growth_level_id，唯一：level_key
+ *    - 业务场景：抽奖按等级公示分级概率、兑换折扣、特权、客服优先级等多功能只读复用
  */
 
 models.LotteryTierMatrixConfig = require('./LotteryTierMatrixConfig')(sequelize, DataTypes)

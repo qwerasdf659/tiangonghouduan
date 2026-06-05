@@ -195,7 +195,7 @@ describe('【P1】保底机制专项测试 - GuaranteeStage', () => {
       // 模拟奖品池
       const mockPrizes = [
         {
-          lottery_prize_id: 1,
+          lottery_campaign_prize_id: 1,
           prize_name: '特等奖',
           reward_tier: 'high',
           status: 'active',
@@ -203,7 +203,7 @@ describe('【P1】保底机制专项测试 - GuaranteeStage', () => {
           sort_order: 1
         },
         {
-          lottery_prize_id: 2,
+          lottery_campaign_prize_id: 2,
           prize_name: '一等奖',
           reward_tier: 'high',
           status: 'active',
@@ -211,7 +211,7 @@ describe('【P1】保底机制专项测试 - GuaranteeStage', () => {
           sort_order: 2
         },
         {
-          lottery_prize_id: 3,
+          lottery_campaign_prize_id: 3,
           prize_name: '二等奖',
           reward_tier: 'mid',
           status: 'active',
@@ -219,7 +219,7 @@ describe('【P1】保底机制专项测试 - GuaranteeStage', () => {
           sort_order: 3
         },
         {
-          lottery_prize_id: 4,
+          lottery_campaign_prize_id: 4,
           prize_name: '三等奖',
           reward_tier: 'low',
           status: 'active',
@@ -234,11 +234,11 @@ describe('【P1】保底机制专项测试 - GuaranteeStage', () => {
         .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
 
       expect(highTierPrizes.length).toBeGreaterThan(0)
-      expect(highTierPrizes[0].lottery_prize_id).toBe(1) // 特等奖
+      expect(highTierPrizes[0].lottery_campaign_prize_id).toBe(1) // 特等奖
       expect(highTierPrizes[0].reward_tier).toBe('high')
 
       console.log(
-        `   ✅ 保底奖品选择: ${highTierPrizes[0].prize_name} (ID: ${highTierPrizes[0].lottery_prize_id})`
+        `   ✅ 保底奖品选择: ${highTierPrizes[0].prize_name} (ID: ${highTierPrizes[0].lottery_campaign_prize_id})`
       )
       console.log(`   奖品档位: ${highTierPrizes[0].reward_tier}`)
     })
@@ -249,7 +249,7 @@ describe('【P1】保底机制专项测试 - GuaranteeStage', () => {
       // 模拟无高档奖品的情况
       const mockPrizesNoHigh = [
         {
-          lottery_prize_id: 3,
+          lottery_campaign_prize_id: 3,
           prize_name: '二等奖',
           reward_tier: 'mid',
           status: 'active',
@@ -257,7 +257,7 @@ describe('【P1】保底机制专项测试 - GuaranteeStage', () => {
           sort_order: 1
         },
         {
-          lottery_prize_id: 4,
+          lottery_campaign_prize_id: 4,
           prize_name: '三等奖',
           reward_tier: 'low',
           status: 'active',
@@ -276,7 +276,7 @@ describe('【P1】保底机制专项测试 - GuaranteeStage', () => {
         .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
 
       expect(midTierPrizes.length).toBeGreaterThan(0)
-      expect(midTierPrizes[0].lottery_prize_id).toBe(3)
+      expect(midTierPrizes[0].lottery_campaign_prize_id).toBe(3)
       expect(midTierPrizes[0].reward_tier).toBe('mid')
 
       console.log(

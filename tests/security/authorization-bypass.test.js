@@ -76,12 +76,11 @@ describe('P3-9: 授权绕过安全测试', () => {
   const adminEndpoints = [
     { method: 'GET', path: '/api/v4/console/user-management/users', description: '用户管理' },
     { method: 'GET', path: '/api/v4/console/lottery-campaigns', description: '活动管理' },
-    { method: 'GET', path: '/api/v4/console/marketplace/orders', description: 'C2C 订单管理' },
     { method: 'GET', path: '/api/v4/console/analytics/overview', description: '统计数据' },
     {
-      method: 'POST',
-      path: '/api/v4/console/lottery-management/interventions',
-      description: '创建干预'
+      method: 'GET',
+      path: '/api/v4/console/lottery-management/growth-levels',
+      description: '成长等级公示分级概率'
     }
   ]
 
@@ -199,13 +198,13 @@ describe('P3-9: 授权绕过安全测试', () => {
       const userToken = createUserToken(1)
 
       const response = await request(app)
-        .get('/api/v4/console/lottery-management/interventions')
+        .get('/api/v4/console/lottery-management/growth-levels')
         .set('Authorization', `Bearer ${userToken}`)
 
       // 应该返回403禁止（普通用户无管理员权限）
       expect([401, 403]).toContain(response.status)
 
-      console.log('[P3-9] 普通用户访问干预列表测试通过')
+      console.log('[P3-9] 普通用户访问成长等级公示分级概率接口测试通过')
     })
 
     test('普通用户不应访问管理员统计接口', async () => {

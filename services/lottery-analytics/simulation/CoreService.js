@@ -64,8 +64,8 @@ class SimulationCoreService {
       /*
        * 🔴 2026-06-01 修复：奖品名称/类型/价值不在 lottery_campaign_prizes 表（该表只存活动级运营参数：
        * 权重/库存/档位），必须 JOIN prize_definitions 取（display_name/prize_type/material_amount）。
-       * 原代码直接 attributes:['lottery_prize_id','prize_name','prize_type','prize_value',...] 全是
-       * 该表不存在的列 → MySQL 报 Unknown column 'lottery_prize_id' in 'field list'，baseline/run/
+       * 原代码直接 attributes:['lottery_campaign_prize_id','prize_name','prize_type','prize_value',...]，
+       * 其中 prize_name/prize_type/prize_value 是该表不存在的列 → MySQL 报 Unknown column in 'field list'，baseline/run/
        * user-journey/sensitivity 全部 500。改为 include PrizeDefinition（与 prize-pool/QueryService 同模式）。
        */
       LotteryCampaignPrize.findAll({
@@ -115,13 +115,13 @@ class SimulationCoreService {
       })),
       strategy_config: this._formatStrategyConfig(strategyConfigs),
       /*
-       * 扁平化奖品：以活动奖品关联ID 作为 lottery_prize_id（项目统一对外别名），
+       * 扁平化奖品：以活动奖品关联ID 作为 lottery_campaign_prize_id（项目统一对外标识），
        * 名称/类型来自 prize_definitions，价值用 material_amount（材料类奖品的数量即其价值口径）。
        */
       prizes: prizes.map(cp => {
         const def = cp.prizeDefinition || {}
         return {
-          lottery_prize_id: cp.lottery_campaign_prize_id,
+          lottery_campaign_prize_id: cp.lottery_campaign_prize_id,
           prize_name: def.display_name || null,
           prize_type: def.prize_type || null,
           reward_tier: cp.reward_tier,

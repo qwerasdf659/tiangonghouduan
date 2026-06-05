@@ -27,14 +27,15 @@ router.use('/lottery-campaign-analysis', require('./lottery-campaign-analysis'))
 router.use('/lottery-strategy-stats', require('./lottery-strategy-stats'))
 router.use('/lottery-health', require('./lottery-health'))
 
-// ── 抽奖强控（原 lottery-management/）──
+/*
+ * ── 抽奖强控（原 lottery-management/）──
+ * 2026-06-04 合规改造：per-user 暗箱干预（force_win/force_lose/probability_adjust/user_queue）整体下线
+ * 保留：draw-records（抽奖流水只读）、pricing-config（定价配置）；新增：level-probability（按成长等级公示分级概率）
+ */
 const lotteryMgmtRouter = express.Router()
-lotteryMgmtRouter.use('/', require('./force-control'))
-lotteryMgmtRouter.use('/', require('./adjustment'))
-lotteryMgmtRouter.use('/', require('./user-status'))
-lotteryMgmtRouter.use('/', require('./interventions'))
 lotteryMgmtRouter.use('/', require('./draw-records'))
 lotteryMgmtRouter.use('/', require('./pricing-config'))
+lotteryMgmtRouter.use('/', require('./level-probability'))
 router.use('/lottery-management', lotteryMgmtRouter)
 
 module.exports = router

@@ -19,6 +19,7 @@ const BeijingTimeHelper = require('../../../utils/timeHelper')
 const { assertAndGetTransaction } = require('../../../utils/transactionHelpers')
 const MediaService = require('../../MediaService')
 const { MediaFile } = require('../../../models')
+const AssetProductGuard = require('../../shared/AssetProductGuard')
 
 class ItemManagementService {
   constructor(models) {
@@ -152,6 +153,21 @@ class ItemManagementService {
     if (itemData.status && !validStatuses.includes(itemData.status)) {
       throw new BusinessError(`无效的status参数，允许值：${validStatuses.join(', ')}`, 'EXCHANGE_INVALID_PARAM', 400)
     }
+
+    /*
+     * 价值流向守卫（合规整改 §10.11-C / §10.15 Step 5）
+     * 上架/定价入口统一调用 AssetProductGuard：
+     * - 计价侧：星石不可给有价值商品计价、实物/券仅水晶系计价
+     * 商品是否"有价值"由关联模板（item_templates）判定；无模板时按纯虚拟道具放行。
+     */
+    let linkedTemplate = null
+    if (itemData.item_template_id && this.models.ItemTemplate) {
+      linkedTemplate = await this.models.ItemTemplate.findByPk(itemData.item_template_id, {
+        attributes: ['item_type', 'reference_price_points'],
+        transaction
+      })
+    }
+    AssetProductGuard.assertPriceAssetAllowed(linkedTemplate, itemData.cost_asset_code)
 
     const validSpaces = ['lucky', 'premium', 'both']
     if (itemData.space && !validSpaces.includes(itemData.space)) {

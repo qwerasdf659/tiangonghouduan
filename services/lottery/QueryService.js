@@ -106,11 +106,10 @@ class LotteryQueryService {
         ]
       })
 
-      // 扁平化为用户端期望的格式（兼容 DataSanitizer）
+      // 扁平化为用户端期望的格式（兼容 DataSanitizer；统一使用 lottery_campaign_prize_id）
       const prizes = campaignPrizes.map(cp => {
         const def = cp.prizeDefinition
         return {
-          lottery_prize_id: cp.lottery_campaign_prize_id,
           lottery_campaign_prize_id: cp.lottery_campaign_prize_id,
           lottery_campaign_id: cp.lottery_campaign_id,
           prize_name: def.display_name,
@@ -287,7 +286,7 @@ class LotteryQueryService {
           'lottery_draw_id',
           'user_id',
           'lottery_campaign_id',
-          'lottery_prize_id',
+          'lottery_campaign_prize_id',
           'reward_tier',
           'draw_type',
           'cost_points',
@@ -316,13 +315,13 @@ class LotteryQueryService {
           campaign_name: record.campaign?.campaign_name || '未知活动',
           campaign_code: record.campaign?.campaign_code || null,
           reward_tier: record.reward_tier,
-          prize: record.prize
+          prize: record.campaignPrize
             ? {
-                id: record.prize.lottery_prize_id,
-                name: record.prize.prize_name,
-                type: record.prize.prize_type,
-                value: record.prize.prize_value,
-                primary_media_id: record.prize.primary_media_id
+                id: record.campaignPrize.lottery_campaign_prize_id,
+                name: record.campaignPrize.prizeDefinition?.display_name || record.prize_name,
+                type: record.campaignPrize.prizeDefinition?.prize_type || record.prize_type,
+                value: record.prize_value,
+                primary_media_id: record.campaignPrize.prizeDefinition?.primary_media_id
               }
             : null,
           points_cost: record.cost_points,
@@ -672,12 +671,11 @@ class LotteryQueryService {
           ? {
               lottery_draw_id: lastHighTierWin.lottery_draw_id,
               lottery_campaign_id: lastHighTierWin.lottery_campaign_id,
-              prize: lastHighTierWin.prize
+              prize: lastHighTierWin.campaignPrize
                 ? {
-                    id: lastHighTierWin.prize.lottery_prize_id,
-                    name: lastHighTierWin.prize.prize_name,
-                    type: lastHighTierWin.prize.prize_type,
-                    value: lastHighTierWin.prize.prize_value
+                    id: lastHighTierWin.campaignPrize.lottery_campaign_prize_id,
+                    name: lastHighTierWin.campaignPrize.prizeDefinition?.display_name || null,
+                    type: lastHighTierWin.campaignPrize.prizeDefinition?.prize_type || null
                   }
                 : null,
               is_guarantee: lastHighTierWin.guarantee_triggered || false,

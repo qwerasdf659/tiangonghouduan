@@ -154,7 +154,7 @@ describe('🎰 抽奖管理页面 API（活动/奖品/预算 Tab）', () => {
 
     // 验证奖品字段完整性
     const prize = data.prizes[0]
-    expect(prize.lottery_prize_id).toBeDefined()
+    expect(prize.lottery_campaign_prize_id).toBeDefined()
     expect(prize.prize_name).toBeDefined()
     expect(prize.prize_type).toBeDefined()
     expect(prize.stock_quantity).toBeDefined()

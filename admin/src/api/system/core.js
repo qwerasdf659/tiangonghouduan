@@ -36,7 +36,6 @@ export const SYSTEM_CORE_ENDPOINTS = {
   SETTING_BASIC: `${API_PREFIX}/console/settings/basic`,
   SETTING_POINTS: `${API_PREFIX}/console/settings/points`,
   SETTING_NOTIFICATION: `${API_PREFIX}/console/settings/notification`,
-  SETTING_MARKETPLACE: `${API_PREFIX}/console/settings/marketplace`,
 
   // 缓存管理
   CACHE_CLEAR: `${API_PREFIX}/console/cache/clear`,

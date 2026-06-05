@@ -2,7 +2,7 @@
  * 高级状态管理模块
  *
  * @file admin/src/modules/user/composables/advanced-status.js
- * @description 高级状态、风控配置、变更历史、概率调整
+ * @description 高级状态、风控配置、变更历史
  * @version 1.0.0
  * @date 2026-01-24
  */
@@ -79,19 +79,6 @@ export function useAdvancedStatusState() {
       page: 1,
       page_size: 20,
       total: 0
-    },
-
-    // ==================== 概率调整 ====================
-    /** @type {Object} 概率调整模态框数据 */
-    probabilityModal: {
-      user_id: null,
-      user_nickname: '',
-      mode: 'global',
-      multiplier: 1,
-      lottery_campaign_prize_id: '',
-      custom_probability: 0,
-      duration: 60,
-      reason: ''
     }
   }
 }
@@ -542,65 +529,6 @@ export function useAdvancedStatusMethods() {
       if (page < 1 || page > totalPages) return
       this.statusHistoryPagination.page = page
       this.loadStatusChangeHistory()
-    },
-
-    // ==================== 概率调整 ====================
-
-    /**
-     * 打开概率调整模态框
-     * @param {Object} user - 用户对象
-     */
-    openProbabilityModal(user) {
-      this.probabilityModal = {
-        user_id: user.user_id,
-        user_nickname: user.nickname || `用户${user.user_id}`,
-        mode: 'global',
-        multiplier: 1,
-        lottery_campaign_prize_id: '',
-        custom_probability: 0,
-        duration: 60,
-        reason: ''
-      }
-      this.showModal('probabilityModal')
-    },
-
-    /**
-     * 提交概率调整
-     */
-    async submitProbabilityAdjustment() {
-      if (!this.probabilityModal.user_id) {
-        this.showError('用户信息无效')
-        return
-      }
-
-      try {
-        this.saving = true
-        const response = await this.apiCall(
-          buildURL(USER_ENDPOINTS.ADJUST_PROBABILITY, {
-            user_id: this.probabilityModal.user_id
-          }),
-          {
-            method: 'POST',
-            data: {
-              mode: this.probabilityModal.mode,
-              multiplier: this.probabilityModal.multiplier,
-              lottery_campaign_prize_id: this.probabilityModal.lottery_campaign_prize_id || null,
-              custom_probability: this.probabilityModal.custom_probability || null,
-              duration_minutes: this.probabilityModal.duration,
-              reason: this.probabilityModal.reason
-            }
-          }
-        )
-
-        if (response?.success) {
-          this.showSuccess('概率调整已生效')
-          this.hideModal('probabilityModal')
-        }
-      } catch (error) {
-        this.showError('概率调整失败: ' + (error.message || '未知错误'))
-      } finally {
-        this.saving = false
-      }
     },
 
     // ==================== 辅助方法 ====================

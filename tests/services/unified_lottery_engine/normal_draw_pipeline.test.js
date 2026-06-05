@@ -643,8 +643,8 @@ describe('NormalDrawPipeline 管线测试（任务2.2）', () => {
       expect(result.data).toBeDefined()
       expect(result.data.decision_source).toBeDefined()
 
-      // 有效的决策来源：normal/preset/override/guarantee
-      const valid_sources = ['normal', 'preset', 'override', 'guarantee']
+      // 有效的决策来源：normal/preset/guarantee（per-user 暗箱干预 override 已下线）
+      const valid_sources = ['normal', 'preset', 'guarantee']
       expect(valid_sources).toContain(result.data.decision_source)
 
       console.log(`✅ LoadDecisionSourceStage: 决策来源 = ${result.data.decision_source}`)

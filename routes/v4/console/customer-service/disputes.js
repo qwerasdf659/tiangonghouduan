@@ -79,7 +79,7 @@ router.post(
 
     if (!order_type || !order_id || !user_id || !dispute_type || !title) {
       return res.apiError(
-        '缺少必填参数：order_type, order_id, user_id, dispute_type, title',
+        '缺少必填参数：order_type（redemption/consumption）, order_id, user_id, dispute_type, title',
         'BAD_REQUEST',
         null,
         400

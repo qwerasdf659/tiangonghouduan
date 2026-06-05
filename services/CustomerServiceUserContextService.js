@@ -12,7 +12,6 @@ const UserDataQueryService = require('./UserDataQueryService')
  * - getAssets → UserDataQueryService.getAssetTransactions + BalanceService.getAllBalances
  * - getBackpack → ItemService.getUserItems
  * - getLottery → UserDataQueryService.getLotteryDraws
- * - getTrades → UserDataQueryService.getTradeRecords + getMarketListings
  * - getTimeline → UserDataQueryService多方法合并 + consumption_records + feedbacks
  * - getRisk → 直接查 UserRiskProfile + RiskAlert（新增查询 ~30行）
  * - getHistory → 直接查 CustomerServiceSession 历史（新增查询 ~40行）
@@ -50,25 +49,18 @@ class CustomerServiceUserContextService {
     const accountId = account ? account.account_id : null
 
     /* 补充各模块统计计数（并行查询提升性能） */
-    const [itemCount, lotteryCount, tradeOrderCount, feedbackCount, sessionCount] =
-      await Promise.all([
-        accountId ? models.Item.count({ where: { owner_account_id: accountId } }) : 0,
-        models.LotteryDraw.count({ where: { user_id: userId } }),
-        models.TradeOrder.count({
-          where: {
-            [models.Op.or]: [{ buyer_user_id: userId }, { seller_user_id: userId }]
-          }
-        }),
-        models.Feedback.count({ where: { user_id: userId } }),
-        models.CustomerServiceSession.count({ where: { user_id: userId } })
-      ])
+    const [itemCount, lotteryCount, feedbackCount, sessionCount] = await Promise.all([
+      accountId ? models.Item.count({ where: { owner_account_id: accountId } }) : 0,
+      models.LotteryDraw.count({ where: { user_id: userId } }),
+      models.Feedback.count({ where: { user_id: userId } }),
+      models.CustomerServiceSession.count({ where: { user_id: userId } })
+    ])
 
     return {
       ...overview,
       stats: {
         item_count: itemCount,
         lottery_count: lotteryCount,
-        trade_order_count: tradeOrderCount,
         feedback_count: feedbackCount,
         session_count: sessionCount
       }
@@ -220,60 +212,6 @@ class CustomerServiceUserContextService {
     })
 
     return { summary, records }
-  }
-
-  /**
-   * 获取用户交易订单 + 市场挂单
-   *
-   * @param {Object} models - Sequelize models 对象
-   * @param {number} userId - 用户ID
-   * @param {Object} params - 查询参数
-   * @returns {Object} { orders: {...}, listings: {...}, stats: {...} }
-   */
-  static async getTrades(models, userId, params = {}) {
-    /* 委托 UserDataQueryService 获取交易订单和市场挂单 */
-    const [orders, listings] = await Promise.all([
-      UserDataQueryService.getTradeRecords(models, userId, {
-        page: params.page || 1,
-        page_size: params.page_size || 10,
-        role: params.role || 'all',
-        status: params.status
-      }),
-      UserDataQueryService.getMarketListings(models, userId, {
-        page: 1,
-        page_size: 10,
-        status: params.listing_status
-      })
-    ])
-
-    /* 计算交易统计 */
-    const [buyCount, sellCount, completedCount, cancelledCount] = await Promise.all([
-      models.TradeOrder.count({ where: { buyer_user_id: userId } }),
-      models.TradeOrder.count({ where: { seller_user_id: userId } }),
-      models.TradeOrder.count({
-        where: {
-          [models.Op.or]: [{ buyer_user_id: userId }, { seller_user_id: userId }],
-          status: 'completed'
-        }
-      }),
-      models.TradeOrder.count({
-        where: {
-          [models.Op.or]: [{ buyer_user_id: userId }, { seller_user_id: userId }],
-          status: 'cancelled'
-        }
-      })
-    ])
-
-    return {
-      orders,
-      listings,
-      stats: {
-        buy_count: buyCount,
-        sell_count: sellCount,
-        completed_count: completedCount,
-        cancelled_count: cancelledCount
-      }
-    }
   }
 
   /**

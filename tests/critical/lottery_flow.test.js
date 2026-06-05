@@ -14,7 +14,7 @@
  *
  * 技术架构：
  * - 抽奖引擎：services/UnifiedLotteryEngine (V4 Pipeline架构)
- * - Pipeline模式：NormalDrawPipeline（普通抽奖）+ ManagementStrategy（管理策略）
+ * - Pipeline模式：NormalDrawPipeline（普通抽奖，决策来源 preset/guarantee/normal）
  * - 事务保护：确保抽奖和积分发放原子性
  *
  * 测试目标：
@@ -32,7 +32,7 @@
 
 const request = require('supertest')
 const app = require('../../app')
-const { TEST_DATA, createTestData } = require('../helpers/test-data')
+const { TEST_DATA } = require('../helpers/test-data')
 const { TestAssertions, TestConfig } = require('../helpers/test-setup')
 
 /*
@@ -51,7 +51,6 @@ describe('🎲 用户完整抽奖流程（核心关键路径 - V4架构）', () 
     console.log('   2️⃣ 首次抽奖必中机制')
     console.log('   3️⃣ 基础保底策略验证')
     console.log('   4️⃣ 积分兑换完整流程')
-    console.log('   5️⃣ 管理策略定向中奖')
     console.log('='.repeat(70))
     console.log(`👤 测试账号: ${TEST_DATA.users.testUser.mobile}`)
     console.log(`🆔 用户ID: ${TEST_DATA.users.testUser.user_id}`)
@@ -372,54 +371,6 @@ describe('🎲 用户完整抽奖流程（核心关键路径 - V4架构）', () 
 
   /*
    * ==========================================
-   * 🎯 核心路径5：管理策略定向中奖
-   * ==========================================
-   */
-  describe('管理策略定向中奖流程', () => {
-    /**
-     * 业务场景：运营人员设置特定用户必中指定奖品
-     * API路径：
-     * 1. POST /api/v4/console/lottery/set-target - 设置定向中奖
-     * 2. POST /api/v4/lottery/draw - 用户抽奖
-     * 3. GET /api/v4/console/lottery/management-logs - 查询管理日志
-     *
-     * 预期行为：
-     * 1. 管理员设置用户为"管理目标"
-     * 2. 用户抽奖时触发 ManagementStrategy
-     * 3. 100%中奖指定奖品
-     * 4. 记录管理策略使用日志
-     *
-     * 技术细节：
-     * - ManagementStrategy 优先级高于 NormalDrawPipeline
-     * - 需要管理员权限设置管理目标
-     *
-     * 技术实现：管理策略在lottery/preset.test.js中有完整测试
-     */
-    test('管理策略应该让指定用户必定中奖', async () => {
-      // 前置条件：需要管理员token
-      if (!authToken) {
-        console.warn('⚠️ 未登录，跳过管理策略测试')
-        return
-      }
-
-      console.log('🎯 Step 5: 管理策略测试...')
-      console.log('📋 管理策略功能在lottery/preset.test.js中有完整测试')
-
-      // 验证测试数据结构
-      const managementConfig = createTestData.lotteryRequest({
-        is_management_target: true,
-        custom_probability: 1.0
-      })
-
-      expect(managementConfig).toHaveProperty('user_id')
-      expect(managementConfig).toHaveProperty('is_management_target', true)
-
-      console.log('✅ 管理策略数据结构验证完成')
-    }, 60000) // 超时时间60秒
-  })
-
-  /*
-   * ==========================================
    * 📊 测试总结和统计
    * ==========================================
    */
@@ -436,7 +387,6 @@ describe('🎲 用户完整抽奖流程（核心关键路径 - V4架构）', () 
       console.log('   ✓ 首次抽奖必中机制')
       console.log('   ✓ 基础保底策略验证')
       console.log('   ✓ 积分兑换完整流程')
-      console.log('   ✓ 管理策略定向中奖')
       console.log('')
       console.log('📋 测试结果：')
       console.log('   - 核心业务流程: 已验证')

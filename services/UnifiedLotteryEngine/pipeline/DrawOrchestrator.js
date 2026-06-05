@@ -15,8 +15,9 @@
  *
  * 决策来源判断逻辑已移至管线内部的 LoadDecisionSourceStage：
  * 1. 预设（Preset）- 最高优先级
- * 2. 管理干预（Override）- 次高优先级
+ * 2. 保底（Guarantee）- 次高优先级
  * 3. 正常抽奖（Normal）- 最低优先级
+ * （2026-06-04 合规改造：per-user 暗箱干预 Override 已整体下线）
  *
  * @module services/UnifiedLotteryEngine/pipeline/DrawOrchestrator
  * @author 统一抽奖架构重构

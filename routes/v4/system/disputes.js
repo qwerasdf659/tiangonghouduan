@@ -7,7 +7,7 @@
  * 说明（方案A 第2项二期落地：开放 C 端自助发起）：
  * - POST /disputes：用户自助发起售后申诉（含归属校验 + 防滥用风控）
  * - GET /disputes/my、GET /disputes/:id：只读查询自己的申诉进度
- * - 拍卖争议仍保留独立入口 marketplace/auctions/:id/dispute
+ * - 仅支持兑换(redemption)/消费(consumption)订单（C2C trade/auction 已随 C2C 下线移除）
  * - 字段以后端为准，小程序直接使用 trade_dispute_id 等后端字段名，不做映射
  *
  * 创建时间：2026-06-02 北京时间
@@ -24,7 +24,7 @@ const TransactionManager = require('../../../utils/TransactionManager')
  * @desc 用户自助发起售后申诉（二期开放，方案A 第2项）
  * @access Private（已登录用户）
  *
- * @body {string} order_type - 订单类型（trade/redemption/consumption/auction）
+ * @body {string} order_type - 订单类型（redemption/consumption）
  * @body {string|number} order_id - 关联订单ID
  * @body {string} dispute_type - 纠纷类型（item_not_received/item_mismatch/quality_issue/fraud/other）
  * @body {string} title - 申诉标题

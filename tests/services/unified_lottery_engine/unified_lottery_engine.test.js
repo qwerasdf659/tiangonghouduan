@@ -7,7 +7,7 @@
  * - 统一使用snake_case命名规范
  * - 基于真实业务逻辑验证功能
  * - 使用真实测试用户 13612227930
- * - 只测试实际存在的2个策略：basic_guarantee、ManagementStrategy
+ * - 只测试实际存在的策略：basic_guarantee（已统一为 Pipeline 架构）
  *
  * 🔴 P0-1修复（2026-01-08）：移除硬编码 user_id=31，从 global.testData 动态获取
  *
@@ -46,7 +46,7 @@ describe('V4统一抽奖引擎主引擎测试 - 重构版', () => {
   /**
    * V4.6 管线架构配置（2026-01-19 Phase 5 迁移）
    *
-   * 替代原 Strategy 模式（basic_guarantee, management）
+   * 替代原 Strategy 模式（basic_guarantee）
    * 统一使用 Pipeline 架构
    *
    */
@@ -58,8 +58,8 @@ describe('V4统一抽奖引擎主引擎测试 - 重构版', () => {
   const V4_PIPELINE_ARCHITECTURE = {
     expected_pipelines: ['NormalDrawPipeline'], // Phase 5：统一管线
     expected_count: 1, // Phase 5：1 条统一管线
-    decision_sources: ['normal', 'preset', 'override'], // 决策来源类型
-    allowed_strategy_names: ['basic_guarantee', 'management', 'pipeline'] // 允许的策略标识名称
+    decision_sources: ['normal', 'preset', 'guarantee'], // 决策来源类型
+    allowed_strategy_names: ['basic_guarantee', 'pipeline'] // 允许的策略标识名称
   }
 
   // 创建测试上下文 - 统一使用snake_case

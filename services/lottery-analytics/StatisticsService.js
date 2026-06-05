@@ -161,7 +161,9 @@ class StatisticsService {
         [
           fn(
             'SUM',
-            literal("CASE WHEN prize_type = 'empty' OR lottery_prize_id IS NULL THEN 1 ELSE 0 END")
+            literal(
+              "CASE WHEN prize_type = 'empty' OR lottery_campaign_prize_id IS NULL THEN 1 ELSE 0 END"
+            )
           ),
           'empty_count'
         ]

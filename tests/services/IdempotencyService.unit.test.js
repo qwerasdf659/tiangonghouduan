@@ -199,12 +199,12 @@ describe('IdempotencyService - 单元测试（核心逻辑验证）', () => {
      * - API 路径中的数字 ID 统一替换为 :id
      */
     it('应将纯数字ID转换为 :id', () => {
-      expect(IdempotencyService.normalizePath('/api/v4/marketplace/listings/123')).toBe(
-        '/api/v4/marketplace/listings/:id'
+      expect(IdempotencyService.normalizePath('/api/v4/console/exchange/items/123')).toBe(
+        '/api/v4/console/exchange/items/:id'
       )
 
-      expect(IdempotencyService.normalizePath('/api/v4/marketplace/listings/456/purchase')).toBe(
-        '/api/v4/marketplace/listings/:id/purchase'
+      expect(IdempotencyService.normalizePath('/api/v4/console/bids/456/settle')).toBe(
+        '/api/v4/console/bids/:id/settle'
       )
 
       expect(IdempotencyService.normalizePath('/api/v4/orders/789/status')).toBe(
@@ -277,8 +277,8 @@ describe('IdempotencyService - 单元测试（核心逻辑验证）', () => {
      * 测试场景：已经是占位符的路径应保持不变
      */
     it('已经是占位符的路径应保持不变', () => {
-      expect(IdempotencyService.normalizePath('/api/v4/marketplace/listings/:id')).toBe(
-        '/api/v4/marketplace/listings/:id'
+      expect(IdempotencyService.normalizePath('/api/v4/console/exchange/items/:id')).toBe(
+        '/api/v4/console/exchange/items/:id'
       )
 
       expect(IdempotencyService.normalizePath('/api/v4/lottery/campaigns/:code/prizes')).toBe(
@@ -322,14 +322,14 @@ describe('IdempotencyService - 单元测试（核心逻辑验证）', () => {
       // 登录
       expect(IdempotencyService.getCanonicalOperation('/api/v4/auth/login')).toBe('AUTH_LOGIN')
 
-      // 市场上架
-      expect(IdempotencyService.getCanonicalOperation('/api/v4/marketplace/list')).toBe(
-        'MARKET_CREATE_LISTING'
-      )
-
       // 兑换（路径已迁移至 backpack 域）
       expect(IdempotencyService.getCanonicalOperation('/api/v4/exchange')).toBe(
         'EXCHANGE_CREATE_ORDER'
+      )
+
+      // 以物易物（B2C 官方合成，C2C marketplace 路径已下线）
+      expect(IdempotencyService.getCanonicalOperation('/api/v4/exchange/barter')).toBe(
+        'EXCHANGE_BARTER'
       )
 
       // 测试路径
@@ -344,19 +344,19 @@ describe('IdempotencyService - 单元测试（核心逻辑验证）', () => {
      * - 不同ID但相同操作应返回相同的 canonical
      */
     it('应正确映射带动态ID的路径', () => {
-      // 市场购买
-      expect(
-        IdempotencyService.getCanonicalOperation('/api/v4/marketplace/listings/123/purchase')
-      ).toBe('MARKET_PURCHASE_LISTING')
+      // B2C 官方竞价结算（C2C marketplace 购买/撤回路径已下线）
+      expect(IdempotencyService.getCanonicalOperation('/api/v4/console/bids/123/settle')).toBe(
+        'CONSOLE_BID_SETTLE'
+      )
 
-      expect(
-        IdempotencyService.getCanonicalOperation('/api/v4/marketplace/listings/456/purchase')
-      ).toBe('MARKET_PURCHASE_LISTING')
+      expect(IdempotencyService.getCanonicalOperation('/api/v4/console/bids/456/settle')).toBe(
+        'CONSOLE_BID_SETTLE'
+      )
 
-      // 市场撤回
-      expect(
-        IdempotencyService.getCanonicalOperation('/api/v4/marketplace/listings/789/withdraw')
-      ).toBe('MARKET_CANCEL_LISTING')
+      // B2C 官方竞价取消
+      expect(IdempotencyService.getCanonicalOperation('/api/v4/console/bids/789/cancel')).toBe(
+        'CONSOLE_BID_CANCEL'
+      )
 
       // 消费记录
       expect(IdempotencyService.getCanonicalOperation('/api/v4/shop/consumption/123')).toBe(
@@ -585,23 +585,23 @@ describe('IdempotencyService - 单元测试（核心逻辑验证）', () => {
       const context1 = {
         user_id: 1,
         http_method: 'POST',
-        api_path: '/api/v4/marketplace/listings/123/purchase',
+        api_path: '/api/v4/console/bids/123/settle',
         query: {},
-        body: { quantity: 1 }
+        body: {}
       }
 
       const context2 = {
         user_id: 1,
         http_method: 'POST',
-        api_path: '/api/v4/marketplace/listings/456/purchase', // 不同ID
+        api_path: '/api/v4/console/bids/456/settle', // 不同ID
         query: {},
-        body: { quantity: 1 }
+        body: {}
       }
 
       /*
-       * 同一操作（MARKET_PURCHASE_LISTING），但ID不同
+       * 同一操作（CONSOLE_BID_SETTLE），但ID不同
        * 注意：这里指纹应该相同，因为 canonical operation 相同
-       * 但实际业务中这是不同的购买请求
+       * 但实际业务中这是不同的结算请求
        */
       const hash1 = IdempotencyService.generateRequestFingerprint(context1)
       const hash2 = IdempotencyService.generateRequestFingerprint(context2)
@@ -846,12 +846,10 @@ describe('IdempotencyService - 单元测试（核心逻辑验证）', () => {
         // 认证系统
         '/api/v4/auth/login',
         '/api/v4/auth/logout',
-        // 市场交易
-        '/api/v4/marketplace/list',
-        '/api/v4/marketplace/listings/:id/purchase',
-        '/api/v4/marketplace/listings/:id/withdraw',
-        // 兑换（路径已迁移至 backpack 域）
+        // B2C 兑换/以物易物/官方竞价（C2C marketplace 路径已下线）
         '/api/v4/exchange',
+        '/api/v4/exchange/barter',
+        '/api/v4/exchange/bid',
         // 消费记录
         '/api/v4/shop/consumption/submit',
         // 核销

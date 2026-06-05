@@ -216,7 +216,7 @@ class DecisionSnapshotStage extends BaseStage {
           tier_total_weight: prize_pick_data.tier_total_weight,
           random_value: prize_pick_data.prize_random_value,
           hit_range: prize_pick_data.prize_hit_range,
-          selected_prize_id: prize_pick_data.selected_prize?.lottery_prize_id
+          selected_prize_id: prize_pick_data.selected_prize?.lottery_campaign_prize_id
         },
 
         // 保底机制
@@ -224,13 +224,13 @@ class DecisionSnapshotStage extends BaseStage {
           guarantee_triggered,
           user_draw_count: guarantee_data.user_draw_count,
           guarantee_threshold: guarantee_data.guarantee_threshold,
-          guarantee_prize_id: guarantee_data.guarantee_prize?.lottery_prize_id,
+          guarantee_prize_id: guarantee_data.guarantee_prize?.lottery_campaign_prize_id,
           guarantee_reason: guarantee_data.guarantee_reason
         },
 
         // 最终结果
         final_result: {
-          lottery_prize_id: final_prize.lottery_prize_id,
+          lottery_campaign_prize_id: final_prize.lottery_campaign_prize_id,
           prize_name: final_prize.prize_name,
           prize_type: final_prize.prize_type,
           prize_value: final_prize.prize_value,
@@ -255,7 +255,7 @@ class DecisionSnapshotStage extends BaseStage {
       this.log('info', '决策快照构建完成', {
         user_id,
         lottery_campaign_id,
-        final_prize_id: final_prize.lottery_prize_id,
+        final_prize_id: final_prize.lottery_campaign_prize_id,
         final_prize_name: final_prize.prize_name,
         final_tier,
         guarantee_triggered,

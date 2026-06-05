@@ -549,10 +549,10 @@
                   🔍 诊断
                 </button>
               </div>
-              <!-- 统计摘要 -->
+              <!-- 统计摘要（C2C 交易统计已随 C2C 下线移除） -->
               <div x-show="context_summary?.stats" class="flex items-center gap-2 mt-1.5 text-[10px] themed-text-muted">
                 <span>🎰<span x-text="context_summary?.stats?.lottery_count || context_summary?.stats?.draw_count || 0"></span>次抽奖</span>
-                <span>🔄<span x-text="context_summary?.stats?.trade_order_count || context_summary?.stats?.trade_count || 0"></span>次交易</span>
+                <span>📝<span x-text="context_summary?.stats?.feedback_count || 0"></span>次反馈</span>
                 <span>🎒<span x-text="context_summary?.stats?.item_count || 0"></span>件物品</span>
               </div>
             </div>

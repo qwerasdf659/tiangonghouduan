@@ -26,7 +26,7 @@
  * ========== 2026-01-30 定时任务统一管理改进方案新增 ==========
  * 25. 聊天限流记录清理（每10分钟）- 迁移自 ChatRateLimitService.initCleanup()
  * 26. 认证会话清理（每30分钟）- 迁移自 AuthenticationSession.scheduleCleanup()，修复未调用bug
- * 27. 抽奖引擎缓存清理（每10分钟）- 合并 CacheManager + ManagementStrategy
+ * 27. 抽奖引擎缓存清理（每10分钟）- CacheManager 过期缓存清理
  * 28. 业务缓存监控（每10分钟）- 激活 BusinessCacheHelper.startMonitor()
  * 29. 管理员操作日志180天清理（每天凌晨3点）- admin_operation_logs 表清理
  * 30. WebSocket启动日志180天清理（每天凌晨3:30）- websocket_startup_logs 表清理
@@ -41,11 +41,8 @@ const cron = require('node-cron')
  * 移除直接 require 服务文件，改为在 initializeServices() 中通过 ServiceManager 获取
  * 以下服务统一通过 ServiceManager 获取：
  * - exchange_core (ExchangeService) - V4.7.0 拆分后
- * - admin_lottery_core (AdminLotteryCoreService) - V4.7.0 拆分后：核心干预操作
  * - admin_lottery_campaign (AdminLotteryCampaignService) - V4.7.0 拆分后：活动管理操作
  * - notification (NotificationService)
- * - trade_order (TradeOrderService)
- * - management_strategy (ManagementStrategy)
  */
 const logger = require('../../utils/logger')
 const { UserPremiumStatus, sequelize } = require('../../models')
@@ -57,16 +54,9 @@ const { executeBusinessRecordReconciliation } = require('../reconcile-items')
 // 原因：统一通过 jobs/daily-redemption-order-expiration.js 作为唯一入口
 // 避免多处直接调用服务层方法，确保业务逻辑和报告格式统一
 
-// 2025-12-29新增：资产域标准架构定时任务
-const HourlyUnlockTimeoutTradeOrders = require('../../jobs/hourly-unlock-timeout-trade-orders')
+// 2025-12-29新增：资产域标准架构定时任务（C2C 交易订单解锁已随 C2C 下线移除）
 // 2026-01-08新增：媒体存储架构 - 未绑定媒体清理
 const HourlyCleanupUnboundMedia = require('../../jobs/hourly-cleanup-unbound-media')
-// 2026-01-08新增：交易市场材料交易 - 可叠加资产挂牌自动过期
-const HourlyExpireFungibleAssetListings = require('../../jobs/hourly-expire-fungible-asset-listings')
-// 2026-01-08新增：交易市场材料交易 - 市场挂牌异常监控
-const HourlyMarketListingMonitor = require('../../jobs/hourly-market-listing-monitor')
-// 2026-01-09新增：P0-2 孤儿冻结检测与清理（每天凌晨2点）
-const DailyOrphanFrozenCheck = require('../../jobs/daily-orphan-frozen-check')
 // 2026-01-14新增：媒体文件数据质量门禁（媒体缩略图架构核查）
 const DailyMediaFileQualityCheck = require('../../jobs/daily-media-file-quality-check')
 // 2026-03-18新增：媒体回收站自动清理（trashed 超过 7 天物理删除）
@@ -100,20 +90,14 @@ class ScheduledTasks {
    * 在 initializeServices() 中初始化，供定时任务使用
    * snake_case 服务键：
    * - exchange_core → ExchangeService（V4.7.0 拆分后）
-   * - admin_lottery_core → AdminLotteryCoreService（V4.7.0 拆分后 - 核心干预操作）
    * - admin_lottery_campaign → AdminLotteryCampaignService（V4.7.0 拆分后 - 活动管理）
    * - notification → NotificationService
-   * - trade_order → TradeOrderService
-   * - management_strategy → ManagementStrategy
    * - unified_lottery_engine → UnifiedLotteryEngine（2026-01-30 新增，Task 27 缓存清理）
    */
   static ExchangeService = null
   static ExchangeAdminService = null // 2026-02-06 新增：管理后台操作（包含 checkTimeoutAndAlert）
-  static AdminLotteryCoreService = null // V4.7.0 拆分后：核心干预操作
   static AdminLotteryCampaignService = null // V4.7.0 拆分后：活动管理操作
   static NotificationService = null
-  static TradeOrderService = null
-  static ManagementStrategy = null
   static UnifiedLotteryEngine = null // 2026-01-30 新增：用于 Task 27 CacheManager 缓存清理
   static _servicesInitialized = false
 
@@ -138,15 +122,12 @@ class ScheduledTasks {
       /*
        * P1-9：使用 snake_case 服务键获取服务
        * 服务拆分：exchange_core（核心交易）/ exchange_admin（管理后台操作）
-       *          admin_lottery_core（核心干预）/ admin_lottery_campaign（活动管理）
+       *          admin_lottery_campaign（活动管理）
        */
       this.ExchangeService = serviceManager.getService('exchange_core') // V4.7.0 拆分后使用 exchange_core
       this.ExchangeAdminService = serviceManager.getService('exchange_admin') // 2026-02-06：管理后台操作
-      this.AdminLotteryCoreService = serviceManager.getService('admin_lottery_core') // V4.7.0 拆分后：核心干预操作
       this.AdminLotteryCampaignService = serviceManager.getService('admin_lottery_campaign') // V4.7.0 拆分后：活动管理操作
       this.NotificationService = serviceManager.getService('notification')
-      this.TradeOrderService = serviceManager.getService('trade_order')
-      this.ManagementStrategy = serviceManager.getService('management_strategy')
       this.UnifiedLotteryEngine = serviceManager.getService('unified_lottery_engine') // 2026-01-30 新增
 
       this._servicesInitialized = true
@@ -154,11 +135,8 @@ class ScheduledTasks {
         services: [
           'exchange_core',
           'exchange_admin',
-          'admin_lottery_core',
           'admin_lottery_campaign',
           'notification',
-          'trade_order',
-          'management_strategy',
           'unified_lottery_engine'
         ]
       })
@@ -192,8 +170,7 @@ class ScheduledTasks {
     // 任务3: 每天凌晨3点执行数据一致性检查
     this.scheduleDataConsistencyCheck()
 
-    // 任务4: 每小时清理过期的抽奖管理设置（2025-11-08新增）
-    this.scheduleLotteryManagementCleanup()
+    // 任务4（2026-06-04 下线）：抽奖管理干预设置清理已随 per-user 暗箱干预整体移除
 
     // 任务5: 每小时检查即将过期的高级空间（2025-11-09新增）
     this.schedulePremiumExpiryReminder()
@@ -208,29 +185,14 @@ class ScheduledTasks {
     // 任务9: 每小时同步抽奖活动状态（2025-12-11新增）
     this.scheduleLotteryCampaignStatusSync()
 
-    // 任务10: 每5分钟检查交易市场锁超时并解锁（2025-12-15新增）
-    this.scheduleMarketListingLockTimeout()
-
     // 任务11: 每天凌晨2点清理过期核销码（2025-12-17新增）
     this.scheduleRedemptionOrderExpiration()
-
-    // 任务13: 每小时解锁超时交易订单（2025-12-29新增 - 资产域标准架构）
-    this.scheduleHourlyUnlockTimeoutTradeOrders()
 
     // 任务15: 每小时执行业务记录关联对账（2026-01-05新增 - 事务边界治理）
     this.scheduleHourlyBusinessRecordReconciliation()
 
     // 任务16: 每小时清理未绑定图片（2026-01-08新增 - 图片存储架构）
     this.scheduleHourlyCleanupUnboundMedia()
-
-    // 任务17: 每小时过期超时的可叠加资产挂牌（2026-01-08新增 - 交易市场材料交易）
-    this.scheduleHourlyExpireFungibleAssetListings()
-
-    // 任务18: 每小时市场挂牌异常监控（2026-01-08新增 - 交易市场材料交易 Phase 2）
-    this.scheduleHourlyMarketListingMonitor()
-
-    // 任务19: 每天凌晨2点孤儿冻结检测与清理（2026-01-09新增 - P0-2修复）
-    this.scheduleDailyOrphanFrozenCheck()
 
     // 任务20: 每天凌晨3点清理超过180天的商家操作日志（2026-01-12新增 - AC4.4 商家员工域权限体系升级）
     this.scheduleDailyMerchantAuditLogCleanup()
@@ -295,11 +257,6 @@ class ScheduledTasks {
 
     // 任务36: 每10分钟检查 item_holds 过期记录并自动释放
     this.scheduleItemHoldsExpiration()
-
-    // ========== 2026-02-23 市场价格快照聚合 ==========
-
-    // 任务37: 每天凌晨1:15执行市场价格快照聚合（market_price_snapshots 预聚合）
-    this.scheduleDailyMarketPriceSnapshot()
 
     // 任务38: 每天凌晨3:10执行数据自动清理（2026-03-10 数据一键删除功能）
     this.scheduleDataCleanup()
@@ -480,79 +437,6 @@ class ScheduledTasks {
       return result
     } catch (error) {
       logger.error('[手动触发] 检查失败', { error: error.message })
-      throw error
-    }
-  }
-
-  /**
-   * 定时任务4: 每小时清理过期的抽奖管理设置
-   * Cron表达式: 0 * * * * (每小时的0分)
-   *
-   * 业务场景：自动清理数据库中已过期的active状态管理设置，释放存储空间
-   *
-   * 功能：
-   * 1. 查询所有过期的active状态设置（expires_at < 当前时间）
-   * 2. 批量更新状态为expired
-   * 3. 清除相关的内存缓存
-   * 4. 记录清理日志
-   *
-   * 创建时间：2025-11-08
-   * @returns {void}
-   */
-  static scheduleLotteryManagementCleanup() {
-    cron.schedule('0 * * * *', async () => {
-      try {
-        // P1-9：确保服务已初始化
-        await ScheduledTasks.initializeServices()
-
-        logger.info('[定时任务] 开始清理过期的抽奖管理设置...')
-
-        // P1-9：通过 ServiceManager 获取 ManagementStrategy 服务
-        const managementStrategy = ScheduledTasks.ManagementStrategy
-        const result = await managementStrategy.cleanupExpiredSettings()
-
-        if (result.cleaned_count > 0) {
-          logger.info(`[定时任务] 清理完成：${result.cleaned_count}个过期设置已更新为expired状态`)
-        } else {
-          logger.info('[定时任务] 清理完成：无过期设置需要清理')
-        }
-      } catch (error) {
-        logger.error('[定时任务] 抽奖管理设置清理失败', { error: error.message })
-      }
-    })
-
-    logger.info('✅ 定时任务已设置: 抽奖管理设置过期清理（每小时执行）')
-  }
-
-  /**
-   * 手动触发抽奖管理设置清理（用于测试）
-   *
-   * 业务场景：手动清理过期设置，用于开发调试和即时清理
-   *
-   * @returns {Promise<Object>} 清理结果对象
-   * @returns {number} return.cleaned_count - 清理的设置数量
-   * @returns {string} return.timestamp - 清理时间戳
-   *
-   * @example
-   * const ScheduledTasks = require('./scripts/maintenance/scheduled-tasks')
-   * const result = await ScheduledTasks.manualLotteryManagementCleanup()
-   * console.log(`清理了${result.cleaned_count}个过期设置`)
-   *
-   * 创建时间：2025-11-08
-   */
-  static async manualLotteryManagementCleanup() {
-    logger.info('[手动触发] 执行抽奖管理设置清理...')
-    try {
-      // P1-9：确保服务已初始化
-      await ScheduledTasks.initializeServices()
-
-      // P1-9：通过 ServiceManager 获取 ManagementStrategy 服务
-      const managementStrategy = ScheduledTasks.ManagementStrategy
-      const result = await managementStrategy.cleanupExpiredSettings()
-      logger.info('[手动触发] 清理完成', { result })
-      return result
-    } catch (error) {
-      logger.error('[手动触发] 清理失败', { error: error.message })
       throw error
     }
   }
@@ -891,220 +775,6 @@ class ScheduledTasks {
   }
 
   /**
-   * 定时任务10: 每5分钟检查交易市场锁超时并解锁
-   * Cron表达式: 每5分钟执行一次 (星/5 * * * *)
-   *
-   * 业务场景：
-   * - 扫描 market_listings 表中 status=locked 且 locked_at 超时（默认15分钟）的挂牌
-   * - 自动取消订单并解冻买家资产
-   * - 回滚挂牌状态为 on_sale
-   *
-   * 创建时间：2025-12-15（Phase 2）
-   * @returns {void}
-   */
-  static scheduleMarketListingLockTimeout() {
-    cron.schedule('*/5 * * * *', async () => {
-      try {
-        logger.info('[定时任务] 开始检查交易市场锁超时...')
-        const result = await this.checkAndUnlockTimeoutListings()
-
-        if (result.unlocked_count > 0) {
-          logger.warn(`[定时任务] 解锁了${result.unlocked_count}个超时挂牌`)
-        } else {
-          logger.info('[定时任务] 交易市场锁超时检查完成，无超时挂牌')
-        }
-      } catch (error) {
-        logger.error('[定时任务] 交易市场锁超时检查失败', { error: error.message })
-      }
-    })
-
-    logger.info('✅ 定时任务已设置: 交易市场锁超时解锁（每5分钟执行）')
-  }
-
-  /**
-   * 检查并解锁超时的挂牌
-   *
-   * 业务规则：
-   * - 扫描 status=locked 且 locked_at 超过15分钟的挂牌
-   * - 查询关联订单（通过 locked_by_order_id）
-   * - 取消订单并解冻买家资产
-   * - 回滚挂牌状态为 on_sale
-   *
-   * P1-9 改造说明：
-   * - 模型访问通过顶层 require 的 models 对象获取（符合 D2-Max 规范）
-   * - TradeOrderService 通过 ServiceManager 获取（snake_case key: trade_order）
-   *
-   * @returns {Promise<Object>} 结果对象 {unlocked_count, failed_count, details}
-   */
-  static async checkAndUnlockTimeoutListings() {
-    // P1-9：确保服务已初始化
-    await ScheduledTasks.initializeServices()
-
-    // P1-9：通过顶层 models 导入获取模型（符合 D2-Max）
-    const { MarketListing, TradeOrder } = require('../../models')
-
-    try {
-      // 1. 查询超时的挂牌（status=locked 且 locked_at 超过15分钟）
-      const timeoutThreshold = new Date(Date.now() - 15 * 60 * 1000) // 15分钟前
-
-      const timeoutListings = await MarketListing.findAll({
-        where: {
-          status: 'locked',
-          locked_at: {
-            [Op.lt]: timeoutThreshold
-          }
-        },
-        include: [
-          {
-            model: TradeOrder,
-            as: 'lockingOrder',
-            where: {
-              status: {
-                [Op.in]: ['created', 'frozen']
-              }
-            },
-            required: false
-          }
-        ]
-      })
-
-      logger.info(`[锁超时检查] 发现${timeoutListings.length}个超时挂牌`)
-
-      if (timeoutListings.length === 0) {
-        return {
-          unlocked_count: 0,
-          failed_count: 0,
-          details: []
-        }
-      }
-
-      // 2. 逐个处理超时挂牌
-      let unlocked_count = 0
-      let failed_count = 0
-      const details = []
-
-      // 2026-01-31修复：每个挂牌独立事务处理（部分成功模式）
-      // 修复问题：TradeOrderService.cancelOrder() 需要事务支持
-      for (const listing of timeoutListings) {
-        try {
-          const order = listing.lockingOrder
-
-          if (!order) {
-            // 没有关联订单，直接回滚挂牌状态（使用事务保证一致性）
-            await TransactionManager.execute(
-              async (transaction) => {
-                await listing.update({
-                  status: 'on_sale',
-                  locked_by_order_id: null,
-                  locked_at: null
-                }, { transaction })
-              },
-              {
-                maxRetries: 2,
-                timeout: 10000,
-                description: `锁超时解锁（无订单）market_listing_id=${listing.market_listing_id}`
-              }
-            )
-
-            unlocked_count++
-            details.push({
-              market_listing_id: listing.market_listing_id,
-              order_id: null,
-              action: 'unlocked_without_order',
-              success: true
-            })
-
-            logger.info(`[锁超时解锁] 挂牌${listing.market_listing_id}已解锁（无关联订单）`)
-            continue
-          }
-
-          // 有关联订单，取消订单并解冻资产（使用事务包裹）
-          const business_id = `timeout_unlock_${order.trade_order_id}_${Date.now()}`
-
-          // P1-9：通过 ServiceManager 获取 TradeOrderService
-          // 2026-01-31修复：传递事务参数，满足 cancelOrder 的事务边界要求
-          await TransactionManager.execute(
-            async (transaction) => {
-              await ScheduledTasks.TradeOrderService.cancelOrder(
-                {
-                  trade_order_id: order.trade_order_id,
-                  business_id,
-                  cancel_reason: '订单超时自动取消（锁定超过15分钟）'
-                },
-                { transaction }
-              )
-            },
-            {
-              maxRetries: 2,
-              timeout: 30000, // 取消订单涉及资产解冻，给更多时间
-              description: `锁超时取消订单 trade_order_id=${order.trade_order_id}`
-            }
-          )
-
-          unlocked_count++
-          details.push({
-            market_listing_id: listing.market_listing_id,
-            order_id: order.order_id,
-            action: 'cancelled_and_unlocked',
-            success: true
-          })
-
-          logger.info(`[锁超时解锁] 订单${order.order_id}已取消，挂牌${listing.market_listing_id}已解锁`)
-        } catch (error) {
-          failed_count++
-          details.push({
-            market_listing_id: listing.market_listing_id,
-            order_id: listing.locked_by_order_id,
-            action: 'failed',
-            success: false,
-            error: error.message
-          })
-
-          logger.error(`[锁超时解锁] 处理挂牌${listing.market_listing_id}失败`, {
-            error: error.message,
-            stack: error.stack
-          })
-        }
-      }
-
-      logger.info(`[锁超时检查] 完成：解锁${unlocked_count}个，失败${failed_count}个`)
-
-      return {
-        unlocked_count,
-        failed_count,
-        details
-      }
-    } catch (error) {
-      logger.error('[锁超时检查] 执行失败', { error: error.message })
-      throw error
-    }
-  }
-
-  /**
-   * 手动触发交易市场锁超时检查
-   *
-   * 业务场景：管理员手动触发锁超时检查（不等定时任务）
-   *
-   * 使用示例：
-   * const result = await ScheduledTasks.manualMarketListingLockTimeout()
-   * console.log(`解锁了${result.unlocked_count}个超时挂牌`)
-   *
-   * 创建时间：2025-12-15
-   * @returns {Promise<Object>} 结果对象 {unlocked_count, failed_count, details}
-   */
-  static async manualMarketListingLockTimeout() {
-    logger.info('[手动触发] 执行交易市场锁超时检查...')
-    try {
-      const result = await this.checkAndUnlockTimeoutListings()
-      logger.info('[手动触发] 检查完成', { result })
-      return result
-    } catch (error) {
-      logger.error('[手动触发] 检查失败', { error: error.message })
-      throw error
-    }
-  }
-
-  /**
    * 定时任务11: 每天凌晨2点清理过期核销码
    * Cron表达式: 0 2 * * * (每天凌晨2点)
    *
@@ -1240,74 +910,6 @@ class ScheduledTasks {
       return report
     } catch (error) {
       logger.error('[手动触发] 清理失败', { error: error.message })
-      throw error
-    }
-  }
-
-  /**
-   * 定时任务13: 每小时告警超时商家审核单
-   * Cron表达式: 0 * * * * (每小时的0分)
-   *
-   * 业务规则（拍板决策）：
-   * - 只要没审核通过就不可以增加到可用积分中
-   * - 冻结会无限期存在，接受用户资产长期不可用
-   * - 超时兜底：仅推进状态 + 告警，不自动解冻
-   *
-   * 创建时间：2025-12-29（资产域标准架构）
-   * @returns {void}
-   */
-
-  /**
-   * 定时任务13: 每小时解锁超时交易订单
-   * Cron表达式: 0 * * * * (每小时的0分)
-   *
-   * 业务规则：
-   * - 物品锁定超时时间：3分钟
-   * - 订单超时后：自动取消并解冻资产（与商家审核不同，可以自动解冻）
-   * - 记录超时解锁事件到 item_ledger（物品账本）
-   *
-   * 创建时间：2025-12-29（资产域标准架构）
-   * @returns {void}
-   */
-  static scheduleHourlyUnlockTimeoutTradeOrders() {
-    cron.schedule('0 * * * *', async () => {
-      try {
-        logger.info('[定时任务] 开始执行交易市场超时解锁任务...')
-        const report = await HourlyUnlockTimeoutTradeOrders.execute()
-
-        if (report.total_released_items > 0 || report.total_cancelled_orders > 0) {
-          logger.warn('[定时任务] 交易市场超时解锁完成（有超时数据）', {
-            released_items: report.total_released_items,
-            cancelled_orders: report.total_cancelled_orders,
-            unfrozen_amount: report.total_unfrozen_amount
-          })
-        } else {
-          logger.info('[定时任务] 交易市场超时解锁任务完成（无超时数据）')
-        }
-      } catch (error) {
-        logger.error('[定时任务] 交易市场超时解锁任务失败', { error: error.message })
-      }
-    })
-
-    logger.info('✅ 定时任务已设置: 交易市场超时解锁（每小时执行）')
-  }
-
-  /**
-   * 手动触发交易市场超时解锁（用于测试）
-   *
-   * @returns {Promise<Object>} 解锁报告对象
-   */
-  static async manualHourlyUnlockTimeoutTradeOrders() {
-    logger.info('[手动触发] 执行交易市场超时解锁...')
-    try {
-      const report = await HourlyUnlockTimeoutTradeOrders.execute()
-      logger.info('[手动触发] 交易市场超时解锁完成', {
-        released_items: report.total_released_items,
-        cancelled_orders: report.total_cancelled_orders
-      })
-      return report
-    } catch (error) {
-      logger.error('[手动触发] 交易市场超时解锁失败', { error: error.message })
       throw error
     }
   }
@@ -1478,328 +1080,6 @@ class ScheduledTasks {
       return report
     } catch (error) {
       logger.error('[手动触发] 未绑定媒体清理失败', { error: error.message })
-      throw error
-    }
-  }
-
-  /**
-   * 定时任务17: 每小时过期超时的可叠加资产挂牌
-   * Cron表达式: 15 * * * * (每小时第15分钟)
-   *
-   * 业务场景（交易市场材料交易 2026-01-08）：
-   * - status='on_sale' 且 created_at > 3天的可叠加资产挂牌
-   * - 自动撤回挂牌并解冻卖家资产
-   * - 发送过期通知给卖家
-   *
-   * @returns {void}
-   */
-  static scheduleHourlyExpireFungibleAssetListings() {
-    cron.schedule('15 * * * *', async () => {
-      const lockKey = 'lock:expire_fungible_asset_listings'
-      const lockValue = `${process.pid}_${Date.now()}`
-      let redisClient = null
-
-      try {
-        // 获取 Redis 客户端
-        const { getRawClient } = require('../../utils/UnifiedRedisClient')
-        redisClient = getRawClient()
-
-        // 尝试获取分布式锁（10分钟过期）
-        const acquired = await redisClient.set(lockKey, lockValue, 'EX', 600, 'NX')
-
-        if (!acquired) {
-          logger.info('[定时任务] 其他实例正在执行可叠加资产挂牌过期，跳过')
-          return
-        }
-
-        logger.info('[定时任务] 获取分布式锁成功，开始执行可叠加资产挂牌过期...', {
-          lock_key: lockKey,
-          lock_value: lockValue
-        })
-
-        // 调用 Job 类执行过期处理
-        const report = await HourlyExpireFungibleAssetListings.execute()
-
-        if (report.expired_count > 0) {
-          logger.warn(`[定时任务] 可叠加资产挂牌过期完成：过期 ${report.expired_count} 个挂牌`)
-        } else {
-          logger.info('[定时任务] 可叠加资产挂牌过期完成：无需过期')
-        }
-
-        // 释放锁
-        await redisClient.del(lockKey)
-        logger.info('[定时任务] 分布式锁已释放', { lock_key: lockKey })
-      } catch (error) {
-        logger.error('[定时任务] 可叠加资产挂牌过期失败', { error: error.message })
-
-        // 确保释放锁
-        if (redisClient) {
-          try {
-            await redisClient.del(lockKey)
-          } catch (unlockError) {
-            logger.error('[定时任务] 释放分布式锁失败', { error: unlockError.message })
-          }
-        }
-      }
-    })
-
-    logger.info('✅ 定时任务已设置: 可叠加资产挂牌过期（每小时第15分钟执行，支持分布式锁）')
-  }
-
-  /**
-   * 手动触发可叠加资产挂牌过期（用于测试）
-   *
-   * 业务场景：手动执行挂牌过期处理，用于开发调试和即时清理
-   *
-   * @returns {Promise<Object>} 过期报告对象
-   *
-   * @example
-   * const ScheduledTasks = require('./scripts/maintenance/scheduled-tasks')
-   * const report = await ScheduledTasks.manualExpireFungibleAssetListings()
-   * console.log('过期数量:', report.expired_count)
-   */
-  static async manualExpireFungibleAssetListings() {
-    try {
-      logger.info('[手动触发] 开始执行可叠加资产挂牌过期...')
-      const report = await HourlyExpireFungibleAssetListings.execute()
-
-      logger.info('[手动触发] 可叠加资产挂牌过期完成', {
-        expired_count: report.expired_count,
-        failed_count: report.failed_count,
-        total_unfrozen_amount: report.total_unfrozen_amount,
-        duration_ms: report.duration_ms
-      })
-
-      return report
-    } catch (error) {
-      logger.error('[手动触发] 可叠加资产挂牌过期失败', { error: error.message })
-      throw error
-    }
-  }
-
-  /**
-   * 定时任务18: 每小时市场挂牌异常监控
-   * Cron表达式: 45 * * * * (每小时第45分钟)
-   *
-   * 业务场景（交易市场材料交易 Phase 2 2026-01-08）：
-   * - 监控价格异常挂牌（单价过高或过低）
-   * - 监控超长时间挂牌（超过7天仍未成交）
-   * - 监控冻结余额异常（冻结总额与挂牌不匹配）
-   * - 发送监控告警给管理员
-   *
-   * @returns {void}
-   */
-  static scheduleHourlyMarketListingMonitor() {
-    cron.schedule('45 * * * *', async () => {
-      const lockKey = 'lock:market_listing_monitor'
-      const lockValue = `${process.pid}_${Date.now()}`
-      let redisClient = null
-
-      try {
-        // 获取 Redis 客户端
-        const { getRawClient } = require('../../utils/UnifiedRedisClient')
-        redisClient = getRawClient()
-
-        // 尝试获取分布式锁（10分钟过期）
-        const acquired = await redisClient.set(lockKey, lockValue, 'EX', 600, 'NX')
-
-        if (!acquired) {
-          logger.info('[定时任务] 其他实例正在执行市场挂牌监控，跳过')
-          return
-        }
-
-        logger.info('[定时任务] 获取分布式锁成功，开始执行市场挂牌监控...', {
-          lock_key: lockKey,
-          lock_value: lockValue
-        })
-
-        // 调用 Job 类执行监控
-        const report = await HourlyMarketListingMonitor.execute()
-
-        const totalAnomalies =
-          report.price_anomalies.length +
-          report.long_listings.length +
-          report.frozen_anomalies.length
-
-        if (totalAnomalies > 0) {
-          logger.warn(`[定时任务] 市场挂牌监控完成：发现 ${totalAnomalies} 条异常`, {
-            price_anomalies: report.price_anomalies.length,
-            long_listings: report.long_listings.length,
-            frozen_anomalies: report.frozen_anomalies.length
-          })
-        } else {
-          logger.info('[定时任务] 市场挂牌监控完成：无异常')
-        }
-
-        // 释放锁
-        await redisClient.del(lockKey)
-        logger.info('[定时任务] 分布式锁已释放', { lock_key: lockKey })
-      } catch (error) {
-        logger.error('[定时任务] 市场挂牌监控失败', { error: error.message })
-
-        // 确保释放锁
-        if (redisClient) {
-          try {
-            await redisClient.del(lockKey)
-          } catch (unlockError) {
-            logger.error('[定时任务] 释放分布式锁失败', { error: unlockError.message })
-          }
-        }
-      }
-    })
-
-    logger.info('✅ 定时任务已设置: 市场挂牌异常监控（每小时第45分钟执行，支持分布式锁）')
-  }
-
-  /**
-   * 手动触发市场挂牌异常监控（用于测试）
-   *
-   * 业务场景：手动执行市场监控，用于开发调试和即时检查
-   *
-   * @returns {Promise<Object>} 监控报告对象
-   *
-   * @example
-   * const ScheduledTasks = require('./scripts/maintenance/scheduled-tasks')
-   * const report = await ScheduledTasks.manualMarketListingMonitor()
-   * console.log('价格异常数量:', report.price_anomalies.length)
-   */
-  static async manualMarketListingMonitor() {
-    try {
-      logger.info('[手动触发] 开始执行市场挂牌异常监控...')
-      const report = await HourlyMarketListingMonitor.execute()
-
-      logger.info('[手动触发] 市场挂牌监控完成', {
-        price_anomalies: report.price_anomalies.length,
-        long_listings: report.long_listings.length,
-        frozen_anomalies: report.frozen_anomalies.length
-      })
-
-      return report
-    } catch (error) {
-      logger.error('[手动触发] 市场挂牌监控失败', { error: error.message })
-      throw error
-    }
-  }
-
-  /**
-   * 定时任务19: 每天凌晨2点孤儿冻结检测与清理
-   * Cron表达式: 0 2 * * * (每天凌晨2点)
-   *
-   * 业务场景（P0-2 修复 2026-01-09）：
-   * - 检测孤儿冻结（frozen_amount > 实际活跃挂牌冻结总额）
-   * - 自动清理孤儿冻结资产（解冻到可用余额）
-   * - 发送告警通知给管理员
-   * - 记录完整审计日志
-   *
-   * 决策记录：
-   * - 固定每天凌晨2点执行（已拍板）
-   * - 自动解冻机制已确认符合业务合规要求
-   * - 使用 OrphanFrozenCleanupService 作为唯一入口
-   * - 分布式锁已在 Job 层实现
-   *
-   * @returns {void}
-   */
-  static scheduleDailyOrphanFrozenCheck() {
-    cron.schedule('0 2 * * *', async () => {
-      const lockKey = 'lock:daily_orphan_frozen_check'
-      const lockValue = `${process.pid}_${Date.now()}`
-      let redisClient = null
-
-      try {
-        // 获取 Redis 客户端
-        const { getRawClient } = require('../../utils/UnifiedRedisClient')
-        redisClient = getRawClient()
-
-        // 尝试获取分布式锁（30分钟过期，防止任务执行过长）
-        const acquired = await redisClient.set(lockKey, lockValue, 'EX', 1800, 'NX')
-
-        if (!acquired) {
-          logger.info('[定时任务] 其他实例正在执行孤儿冻结检测，跳过')
-          return
-        }
-
-        logger.info('[定时任务] 获取分布式锁成功，开始执行孤儿冻结检测...', {
-          lock_key: lockKey,
-          lock_value: lockValue
-        })
-
-        // 调用 Job 类执行孤儿冻结检测与清理
-        const report = await DailyOrphanFrozenCheck.execute({
-          dryRun: false, // 正式执行，非演练模式
-          sendNotification: true // 发送通知给管理员
-        })
-
-        if (report.detection.orphan_count > 0) {
-          logger.warn(
-            `[定时任务] 孤儿冻结检测完成：发现 ${report.detection.orphan_count} 条孤儿冻结`,
-            {
-              total_orphan_amount: report.detection.total_orphan_amount,
-              cleaned_count: report.cleanup?.cleaned_count || 0,
-              failed_count: report.cleanup?.failed_count || 0,
-              duration_ms: report.duration_ms
-            }
-          )
-        } else {
-          logger.info('[定时任务] 孤儿冻结检测完成：系统状态良好，无孤儿冻结')
-        }
-
-        // 释放锁
-        await redisClient.del(lockKey)
-        logger.info('[定时任务] 分布式锁已释放', { lock_key: lockKey })
-      } catch (error) {
-        logger.error('[定时任务] 孤儿冻结检测失败', { error: error.message })
-
-        // 确保释放锁
-        if (redisClient) {
-          try {
-            await redisClient.del(lockKey)
-          } catch (unlockError) {
-            logger.error('[定时任务] 释放分布式锁失败', { error: unlockError.message })
-          }
-        }
-      }
-    })
-
-    logger.info('✅ 定时任务已设置: 孤儿冻结检测与清理（每天凌晨2点执行，支持分布式锁）')
-  }
-
-  /**
-   * 手动触发孤儿冻结检测与清理（用于测试）
-   *
-   * 业务场景：手动执行孤儿冻结检测，用于开发调试和即时检查
-   *
-   * @param {Object} options - 执行选项
-   * @param {boolean} [options.dryRun=true] - 是否为演练模式（默认true，仅检测不清理）
-   * @param {boolean} [options.sendNotification=false] - 是否发送通知（默认false）
-   * @returns {Promise<Object>} 检测报告对象
-   *
-   * @example
-   * const ScheduledTasks = require('./scripts/maintenance/scheduled-tasks')
-   * // 演练模式（仅检测）
-   * const report = await ScheduledTasks.manualOrphanFrozenCheck({ dryRun: true })
-   * console.log('孤儿冻结数量:', report.detection.orphan_count)
-   *
-   * // 正式执行（检测并清理）
-   * const report = await ScheduledTasks.manualOrphanFrozenCheck({ dryRun: false })
-   * console.log('清理数量:', report.cleanup?.cleaned_count)
-   */
-  static async manualOrphanFrozenCheck(options = {}) {
-    const { dryRun = true, sendNotification = false } = options
-
-    try {
-      logger.info('[手动触发] 开始执行孤儿冻结检测...', { dryRun, sendNotification })
-      const report = await DailyOrphanFrozenCheck.execute({ dryRun, sendNotification })
-
-      logger.info('[手动触发] 孤儿冻结检测完成', {
-        orphan_count: report.detection.orphan_count,
-        total_orphan_amount: report.detection.total_orphan_amount,
-        cleaned_count: report.cleanup?.cleaned_count || 0,
-        duration_ms: report.duration_ms
-      })
-
-      return report
-    } catch (error) {
-      logger.error('[手动触发] 孤儿冻结检测失败', { error: error.message })
       throw error
     }
   }
@@ -2613,8 +1893,6 @@ class ScheduledTasks {
    * 业务场景（定时任务统一管理改进 2026-01-30）：
    * - 合并迁移自：
    *   - CacheManager.js 的构造函数 setInterval（每10分钟清理过期缓存）
-   *   - ManagementStrategy.js 的 startCacheCleanup()（每30秒清理缓存）
-   * - 统一使用10分钟清理周期
    * - 内存级别操作，无需分布式锁
    *
    * @returns {void}
@@ -2627,12 +1905,11 @@ class ScheduledTasks {
         logger.debug('[定时任务] 开始执行抽奖引擎缓存清理...')
 
         let cacheManagerCleaned = 0
-        let managementStrategyCleaned = 0
 
         // P1-9：确保服务已初始化
         await ScheduledTasks.initializeServices()
 
-        // 1. 清理 CacheManager 缓存
+        // 清理 CacheManager 缓存
         // 2026-01-30：通过 unified_lottery_engine 服务获取 cacheManager 实例
         try {
           const engine = ScheduledTasks.UnifiedLotteryEngine
@@ -2643,25 +1920,13 @@ class ScheduledTasks {
           logger.warn('[定时任务] CacheManager 清理失败（非致命）', { error: cmError.message })
         }
 
-        // 2. 清理 ManagementStrategy 内存缓存
-        try {
+        // 2026-06-04 下线：ManagementStrategy 内存缓存清理已随 per-user 暗箱干预移除
 
-          const managementStrategy = ScheduledTasks.ManagementStrategy
-          if (managementStrategy && typeof managementStrategy.cleanupMemoryCache === 'function') {
-            managementStrategyCleaned = managementStrategy.cleanupMemoryCache()
-          }
-        } catch (msError) {
-          logger.warn('[定时任务] ManagementStrategy 缓存清理失败（非致命）', {
-            error: msError.message
-          })
-        }
-
-        const totalCleaned = cacheManagerCleaned + managementStrategyCleaned
+        const totalCleaned = cacheManagerCleaned
 
         if (totalCleaned > 0) {
           logger.info('[定时任务] 抽奖引擎缓存清理完成', {
             cache_manager_cleaned: cacheManagerCleaned,
-            management_strategy_cleaned: managementStrategyCleaned,
             total_cleaned: totalCleaned
           })
         } else {
@@ -2695,9 +1960,8 @@ class ScheduledTasks {
       await ScheduledTasks.initializeServices()
 
       let cacheManagerCleaned = 0
-      let managementStrategyCleaned = 0
 
-      // 1. 清理 CacheManager 缓存
+      // 清理 CacheManager 缓存
       // 2026-01-30：通过 unified_lottery_engine 服务获取 cacheManager 实例
       try {
         const engine = ScheduledTasks.UnifiedLotteryEngine
@@ -2708,20 +1972,11 @@ class ScheduledTasks {
         logger.warn('[手动触发] CacheManager 清理失败', { error: cmError.message })
       }
 
-      // 2. 清理 ManagementStrategy 内存缓存
-      try {
-        const managementStrategy = ScheduledTasks.ManagementStrategy
-        if (managementStrategy && typeof managementStrategy.cleanupMemoryCache === 'function') {
-          managementStrategyCleaned = managementStrategy.cleanupMemoryCache()
-        }
-      } catch (msError) {
-        logger.warn('[手动触发] ManagementStrategy 缓存清理失败', { error: msError.message })
-      }
+      // 2026-06-04 下线：ManagementStrategy 内存缓存清理已随 per-user 暗箱干预移除
 
       const report = {
         cache_manager_cleaned: cacheManagerCleaned,
-        management_strategy_cleaned: managementStrategyCleaned,
-        total_cleaned: cacheManagerCleaned + managementStrategyCleaned,
+        total_cleaned: cacheManagerCleaned,
         status: 'SUCCESS'
       }
 
@@ -3260,18 +2515,6 @@ class ScheduledTasks {
     })
 
     logger.info('✅ 定时任务已设置: 竞价结算（每分钟执行，含 pending→active 激活 + 到期结算/流拍，Task 33）')
-
-    // ====== Task 34: C2C拍卖结算定时任务（每分钟，C2C用户间竞拍 2026-03-24）======
-    const AuctionSettlementJob = require('../../jobs/auction-settlement-job')
-    cron.schedule('* * * * *', async () => {
-      try {
-        await AuctionSettlementJob.execute()
-      } catch (error) {
-        logger.error('[C2C拍卖结算任务] 执行异常', { error: error.message })
-      }
-    })
-
-    logger.info('✅ 定时任务已设置: C2C拍卖结算（每分钟执行，含激活/结算/流拍/重试，Task 34）')
   }
 
   /**
@@ -3562,48 +2805,6 @@ class ScheduledTasks {
     })
 
     logger.info('✅ 定时任务已设置: item_holds 过期自动释放（每10分钟检查）')
-  }
-
-  /**
-   * 定时任务37: 每天凌晨1:15执行市场价格快照聚合
-   * Cron表达式: 15 1 * * * (每天凌晨1:15)
-   *
-   * 业务场景（市场增强 2026-02-23）：
-   * - 从 market_listings 聚合在售挂牌价格统计（最低/最高/平均、挂牌数）
-   * - 从 trade_orders 聚合已完成交易成交统计（成交笔数、成交总额）
-   * - 按 asset_code + listing_kind + price_asset_code 维度 UPSERT 到 market_price_snapshots
-   * - 支持幂等执行（同一日期重复执行不会产生重复记录）
-   *
-   * @returns {void}
-   */
-  static scheduleDailyMarketPriceSnapshot() {
-    const DailyMarketPriceSnapshot = require('../../jobs/daily-market-price-snapshot')
-
-    cron.schedule('15 1 * * *', async () => {
-      try {
-        /*
-         * R1 双保险（资损敏感任务）：用 withLock 包裹，即使将来多机部署
-         * （每台机器各有 0 号 worker）也能保证价格快照聚合只执行一次。
-         * withLock 自动获取并释放锁（300 秒 TTL），获取失败抛错并被下方 catch 记录。
-         */
-        await distributedLock.withLock(
-          'daily_market_price_snapshot',
-          async () => {
-            logger.info('[定时任务37] 开始市场价格快照聚合')
-            const report = await DailyMarketPriceSnapshot.execute()
-            logger.info('[定时任务37] 市场价格快照聚合完成', report)
-          },
-          { ttl: 300000 }
-        )
-      } catch (error) {
-        logger.error('[定时任务37] 市场价格快照聚合异常', {
-          error: error.message,
-          stack: error.stack
-        })
-      }
-    })
-
-    logger.info('✅ 定时任务已设置: 市场价格快照聚合（每天凌晨1:15）')
   }
 
   /**

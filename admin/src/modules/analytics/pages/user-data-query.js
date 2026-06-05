@@ -99,8 +99,6 @@ export function userDataQueryPage() {
       asset_transactions: { list: [], total: 0, summary: {} },
       lottery_draws: { list: [], total: 0, summary: {} },
       exchange_records: { list: [], total: 0, summary: {} },
-      trade_records: { list: [], total: 0, summary: {} },
-      market_listings: { list: [], total: 0, summary: {} },
       conversions: { list: [], total: 0, summary: {} },
       consumption_records: { list: [], total: 0, summary: {} },
 
@@ -236,12 +234,6 @@ export function userDataQueryPage() {
             case 'exchange_records':
               await this._loadExchangeRecords(params)
               break
-            case 'trade_records':
-              await this._loadTradeRecords(params)
-              break
-            case 'market_listings':
-              await this._loadMarketListings(params)
-              break
             case 'conversions':
               await this._loadConversions(params)
               break
@@ -285,27 +277,6 @@ export function userDataQueryPage() {
         const res = await UserDataQueryAPI.getExchangeRecords(this.selected_user_id, params)
         if (res.success && res.data) {
           this.exchange_records = res.data
-          this.updatePagination(res.data)
-        }
-      },
-
-      async _loadTradeRecords(params) {
-        if (this.filters.role) params.role = this.filters.role
-        if (this.filters.status) params.status = this.filters.status
-
-        const res = await UserDataQueryAPI.getTradeRecords(this.selected_user_id, params)
-        if (res.success && res.data) {
-          this.trade_records = res.data
-          this.updatePagination(res.data)
-        }
-      },
-
-      async _loadMarketListings(params) {
-        if (this.filters.status) params.status = this.filters.status
-
-        const res = await UserDataQueryAPI.getMarketListings(this.selected_user_id, params)
-        if (res.success && res.data) {
-          this.market_listings = res.data
           this.updatePagination(res.data)
         }
       },

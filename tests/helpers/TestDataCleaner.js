@@ -44,8 +44,6 @@ const MODEL_PRIMARY_KEYS = {
   User: 'user_id',
   Item: 'item_id',
   ItemTemplate: 'item_template_id',
-  MarketListing: 'market_listing_id',
-  TradeOrder: 'order_id',
 
   // 资产相关
   AccountAssetBalance: 'balance_id',
@@ -261,8 +259,6 @@ class TestDataCleaner {
     const cleanupOrder = [
       'ChatMessage',
       'CustomerSession',
-      'TradeOrder',
-      'MarketListing',
       'Item',
       'AssetTransaction',
       'AccountAssetBalance',
@@ -274,8 +270,6 @@ class TestDataCleaner {
           ![
             'ChatMessage',
             'CustomerSession',
-            'TradeOrder',
-            'MarketListing',
             'Item',
             'AssetTransaction',
             'AccountAssetBalance',

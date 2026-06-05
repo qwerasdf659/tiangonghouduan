@@ -36,7 +36,6 @@ const TABLE_FIELD_FIXTURES = {
     'last_active_at',
     'consecutive_fail_count',
     'history_total_points',
-    'max_active_listings',
     'wx_openid',
     'created_at',
     'updated_at'
@@ -87,19 +86,6 @@ const TABLE_FIELD_FIXTURES = {
     'created_at',
     'updated_at',
     'deleted_at'
-  ],
-  market_listings: [
-    'market_listing_id',
-    'seller_user_id',
-    'listing_kind',
-    'offer_item_id',
-    'offer_asset_code',
-    'offer_amount',
-    'price_asset_code',
-    'price_amount',
-    'status',
-    'created_at',
-    'updated_at'
   ],
   diy_templates: [
     'diy_template_id',

@@ -125,13 +125,6 @@ export function useDashboardOverviewState() {
       cancelled: 0,
       fulfillment_rate: 0
     },
-    // 市场活跃度
-    marketActivity: {
-      active_listings: 0,
-      total_trades: 0,
-      completed_trades: 0,
-      trade_completion_rate: 0
-    },
     // 用户留存/活跃度
     userRetention: {
       total_users: 0,
@@ -165,7 +158,6 @@ export function useDashboardOverviewMethods() {
           comparisonRes,
           sysHealthRes,
           redemptionRes,
-          marketRes,
           retentionRes,
           todoPendingRes
         ] = await Promise.allSettled([
@@ -177,7 +169,6 @@ export function useDashboardOverviewMethods() {
           this.fetchComparison(),
           this.fetchSystemHealth(),
           this.fetchRedemptionFulfillment(),
-          this.fetchMarketActivity(),
           this.fetchUserRetention(),
           this.fetchTodoPending()
         ])
@@ -208,9 +199,6 @@ export function useDashboardOverviewMethods() {
         // P1-6: 新增指标数据赋值
         if (redemptionRes.status === 'fulfilled' && redemptionRes.value) {
           this.redemptionFulfillment = redemptionRes.value
-        }
-        if (marketRes.status === 'fulfilled' && marketRes.value) {
-          this.marketActivity = marketRes.value
         }
         if (retentionRes.status === 'fulfilled' && retentionRes.value) {
           this.userRetention = retentionRes.value
@@ -820,31 +808,6 @@ export function useDashboardOverviewMethods() {
         return null
       } catch (e) {
         logger.warn('[DashboardPanel] fetchRedemptionFulfillment 失败:', e.message)
-        return null
-      }
-    },
-
-    // ==================== P1-6: 市场活跃度 ====================
-    /**
-     * 获取市场活跃度数据
-     * 使用跨域顶线 API（后端: GET /console/dashboard/stats），与设计方案 5.4 一致，减少并行拆请求
-     */
-    async fetchMarketActivity() {
-      try {
-        const result = await DashboardAPI.getPlatformCrossStats({ days: 7 })
-        if (result.success && result.data && result.data.marketplace) {
-          const m = result.data.marketplace
-          const periodTrades = m.period_trades || 0
-          return {
-            active_listings: m.on_sale_count || 0,
-            total_trades: periodTrades,
-            completed_trades: periodTrades,
-            trade_completion_rate: periodTrades > 0 ? 100 : 0
-          }
-        }
-        return null
-      } catch (e) {
-        logger.warn('[DashboardPanel] fetchMarketActivity 失败:', e.message)
         return null
       }
     },

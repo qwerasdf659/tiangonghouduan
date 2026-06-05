@@ -315,14 +315,14 @@ class LotteryCampaignCRUDService {
         },
         {
           group: 'guarantee',
-          key: 'lottery_prize_id',
+          key: 'lottery_campaign_prize_id',
           value: null,
           type: 'number',
           desc: '保底指定奖品ID（null=自动选最高档）'
         },
         {
           group: 'tier_fallback',
-          key: 'lottery_prize_id',
+          key: 'lottery_campaign_prize_id',
           value: null,
           type: 'number',
           desc: '档位降级兜底奖品ID'

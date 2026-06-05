@@ -22,7 +22,9 @@ import {
   useExchangeOrdersState,
   useExchangeOrdersMethods,
   useExchangeStatsState,
-  useExchangeStatsMethods
+  useExchangeStatsMethods,
+  useBarterRecipesState,
+  useBarterRecipesMethods
 } from '../composables/index.js'
 
 /**
@@ -31,6 +33,7 @@ import {
 const SUB_PAGES = [
   { id: 'items', title: '商品管理', icon: '📦', name: '商品管理' },
   { id: 'orders', title: '订单管理', icon: '📋', name: '订单管理' },
+  { id: 'barter', title: '以物易物配方', icon: '🔄', name: '以物易物配方' },
   { id: 'stats', title: '统计分析', icon: '📊', name: '统计分析' }
 ]
 
@@ -111,6 +114,7 @@ document.addEventListener('alpine:init', () => {
       ...useExchangeItemsState(),
       ...useExchangeOrdersState(),
       ...useExchangeStatsState(),
+      ...useBarterRecipesState(),
 
       // ========== 市场统计 ==========
       /** 市场统计数据 - 直接使用后端字段名 */
@@ -190,6 +194,9 @@ document.addEventListener('alpine:init', () => {
             await this.loadExchangeStats()
             this._updateMarketStats()
             this.$nextTick(() => this.initCharts())
+            break
+          case 'barter':
+            await this.loadBarterRecipes()
             break
         }
       },
@@ -312,6 +319,7 @@ document.addEventListener('alpine:init', () => {
       ...useExchangeItemsMethods(),
       ...useExchangeOrdersMethods(),
       ...useExchangeStatsMethods(),
+      ...useBarterRecipesMethods(),
 
       /**
        * 编辑 SKU 并同步 spec_values 到 JSON 字符串

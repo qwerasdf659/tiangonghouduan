@@ -69,10 +69,7 @@ export const ASSET_ENDPOINTS = {
   RECONCILIATION_ITEMS: `${API_PREFIX}/console/reconciliation/items`,
   RECONCILIATION_ASSETS: `${API_PREFIX}/console/reconciliation/assets`,
 
-  // 孤立冻结资产
-  ORPHAN_FROZEN_DETECT: `${API_PREFIX}/console/orphan-frozen/detect`,
-  ORPHAN_FROZEN_CLEANUP: `${API_PREFIX}/console/orphan-frozen/cleanup`,
-  ORPHAN_FROZEN_STATS: `${API_PREFIX}/console/orphan-frozen/stats`,
+  // 注：孤儿冻结资产清理（orphan-frozen）已随 C2C 下线删除（2026-06-05 阶段五，仅扫描 C2C 挂牌冻结）
 
   // 资产调整（统一入口，已合并原星石/材料调整）
   // 资产类型列表: ADJUSTMENT_ASSET_TYPES
@@ -88,10 +85,9 @@ export const ASSET_ENDPOINTS = {
   DEBT_BY_PRIZE: `${API_PREFIX}/console/debt-management/by-prize`, // 按奖品汇总
   DEBT_BY_CREATOR: `${API_PREFIX}/console/debt-management/by-creator`, // 按责任人汇总
   DEBT_TREND: `${API_PREFIX}/console/debt-management/trend`, // 欠账趋势
-  DEBT_LIMITS: `${API_PREFIX}/console/debt-management/limits`, // 欠账上限配置
+  DEBT_LIMITS: `${API_PREFIX}/console/debt-management/limits` // 欠账上限配置
 
-  // 交易订单
-  TRADE_ORDER_LIST: `${API_PREFIX}/console/marketplace/orders`
+  // 注：交易订单（TRADE_ORDER_LIST → /console/marketplace/orders）已随 C2C 下线移除（2026-06-05 阶段五）
 }
 
 // ========== API 调用方法 ==========
