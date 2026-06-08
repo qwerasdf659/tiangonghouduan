@@ -1,5 +1,5 @@
 /**
- * 餐厅积分抽奖系统 V4.7.0 - 兑换市场服务入口
+ * 天工商户营销平台 V4.7.0 - 兑换市场服务入口
  * Exchange Service Entry Point（大文件拆分方案 Phase 4）
  *
  * 拆分原因：原 ExchangeService.js (1873行) 超过1500行阈值

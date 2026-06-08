@@ -100,7 +100,7 @@ const METRIC_CONFIG = {
     field: 'user_id'
   },
   win_rate: {
-    label: '中奖率',
+    label: '发放率',
     aggregate: 'CUSTOM',
     // 中奖率需要特殊计算
     source_table: 'lottery_draws'

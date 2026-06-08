@@ -1,5 +1,5 @@
 /**
- * 餐厅积分抽奖系统 V4 - 商家域风控服务
+ * 天工商户营销平台 V4 - 商家域风控服务
  *
  * 文件路径: services/MerchantRiskControlService.js
  *

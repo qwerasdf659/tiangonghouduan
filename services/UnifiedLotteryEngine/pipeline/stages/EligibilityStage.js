@@ -258,7 +258,7 @@ class EligibilityStage extends BaseStage {
       if (campaign.require_quota) {
         return {
           is_eligible: false,
-          reason: '用户没有抽奖配额，请先获取配额'
+          reason: '用户没有回馈配额，请先获取配额'
         }
       }
       return { is_eligible: true, reason: null }
@@ -269,7 +269,7 @@ class EligibilityStage extends BaseStage {
     if (remaining_quota <= 0) {
       return {
         is_eligible: false,
-        reason: `抽奖配额已用完（已使用 ${user_quota.quota_used}/${user_quota.quota_total}）`
+        reason: `回馈配额已用完（已使用 ${user_quota.quota_used}/${user_quota.quota_total}）`
       }
     }
 

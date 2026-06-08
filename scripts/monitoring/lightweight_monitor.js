@@ -1,6 +1,6 @@
 /**
  * 轻量级系统监控脚本
- * 餐厅积分抽奖系统 - 运维工具
+ * 天工商户营销平台 - 运维工具
  * 创建时间：2025年11月24日 北京时间
  *
  * 功能说明：
@@ -357,7 +357,7 @@ class LightweightMonitor {
       const message = {
         msgtype: 'text',
         text: {
-          content: `【系统告警】餐厅积分抽奖系统\n\n${alertMessages}\n\n时间: ${timestamp}`
+          content: `【系统告警】天工商户营销平台\n\n${alertMessages}\n\n时间: ${timestamp}`
         }
       }
 

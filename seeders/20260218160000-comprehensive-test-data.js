@@ -1,5 +1,7 @@
 'use strict'
 
+const PiiCrypto = require('../utils/PiiCrypto')
+
 /**
  * 综合测试数据种子文件
  *
@@ -37,6 +39,16 @@ module.exports = {
   async up(queryInterface, Sequelize) {
     const now = new Date()
     const _Op = Sequelize.Op // eslint-disable-line no-unused-vars
+
+    /**
+     * 按手机号解析 user_id（PII 改造后：mobile 已加密，rawSelect 需查盲索引 mobile_hash）
+     * @param {string} mobile - 手机号明文
+     * @returns {Promise<number|null>} user_id 或 null
+     */
+    const resolveUserIdByMobile = async mobile =>
+      queryInterface.rawSelect('users', { where: { mobile_hash: PiiCrypto.blindHash(mobile) } }, [
+        'user_id'
+      ])
 
     console.log('🌱 [种子数据] 开始插入综合测试数据...')
 
@@ -280,31 +292,17 @@ module.exports = {
     console.log('👤 2/13 用户体系...')
 
     // 复用数据库中已有的测试用户，而非新建（避免 user_uuid 等约束问题）
+    // PII 改造后：mobile 已加密，统一通过盲索引解析 user_id
     const adminUserId =
-      (await queryInterface.rawSelect('users', { where: { mobile: '13612227930' } }, [
-        'user_id'
-      ])) ||
-      (await queryInterface.rawSelect('users', { where: { mobile: '13800000001' } }, ['user_id']))
+      (await resolveUserIdByMobile('13612227930')) || (await resolveUserIdByMobile('13800000001'))
     const user1Id =
-      (await queryInterface.rawSelect('users', { where: { mobile: '13800000002' } }, [
-        'user_id'
-      ])) ||
-      (await queryInterface.rawSelect('users', { where: { mobile: '13612227910' } }, ['user_id']))
+      (await resolveUserIdByMobile('13800000002')) || (await resolveUserIdByMobile('13612227910'))
     const user2Id =
-      (await queryInterface.rawSelect('users', { where: { mobile: '13800000003' } }, [
-        'user_id'
-      ])) ||
-      (await queryInterface.rawSelect('users', { where: { mobile: '13612227911' } }, ['user_id']))
+      (await resolveUserIdByMobile('13800000003')) || (await resolveUserIdByMobile('13612227911'))
     const merchantUserId =
-      (await queryInterface.rawSelect('users', { where: { mobile: '13800000004' } }, [
-        'user_id'
-      ])) ||
-      (await queryInterface.rawSelect('users', { where: { mobile: '13612227912' } }, ['user_id']))
+      (await resolveUserIdByMobile('13800000004')) || (await resolveUserIdByMobile('13612227912'))
     const user3Id =
-      (await queryInterface.rawSelect('users', { where: { mobile: '13800000000' } }, [
-        'user_id'
-      ])) ||
-      (await queryInterface.rawSelect('users', { where: { mobile: '13612227913' } }, ['user_id']))
+      (await resolveUserIdByMobile('13800000000')) || (await resolveUserIdByMobile('13612227913'))
 
     console.log(
       `   用户IDs -> admin:${adminUserId}, u1:${user1Id}, u2:${user2Id}, merchant:${merchantUserId}, u3:${user3Id}`

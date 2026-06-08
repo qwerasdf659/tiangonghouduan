@@ -1,5 +1,5 @@
 /**
- * 餐厅积分抽奖系统 V4.2 - 兑换订单管理端服务（RedemptionAdminService）
+ * 天工商户营销平台 V4.2 - 兑换订单管理端服务（RedemptionAdminService）
  *
  * 职责：
  * - 管理员核销/取消/过期订单操作

@@ -47,8 +47,8 @@ const ALERT_RULES = {
     rule_code: 'RULE_001',
     alert_type: 'win_rate',
     severity: 'warning',
-    name: '中奖率偏离告警',
-    description: '最近1小时中奖率偏离配置值±20%',
+    name: '发放率偏离告警',
+    description: '最近1小时发放率偏离配置值±20%',
     threshold_deviation: 0.2 // 20%偏离阈值
   },
   // 高档奖品发放速度过快告警
@@ -752,7 +752,7 @@ class LotteryAlertService {
           rule_code: rule.rule_code,
           threshold_value: expectedWinRate * 100,
           actual_value: actualWinRate * 100,
-          message: `中奖率偏离告警：预期${(expectedWinRate * 100).toFixed(1)}%，实际${(actualWinRate * 100).toFixed(1)}%，偏离${(deviation * 100).toFixed(1)}%（阈值${(rule.threshold_deviation * 100).toFixed(0)}%）`
+          message: `发放率偏离告警：预期${(expectedWinRate * 100).toFixed(1)}%，实际${(actualWinRate * 100).toFixed(1)}%，偏离${(deviation * 100).toFixed(1)}%（阈值${(rule.threshold_deviation * 100).toFixed(0)}%）`
         })
         if (alert.isNewRecord !== false) {
           alerts.push(alert)

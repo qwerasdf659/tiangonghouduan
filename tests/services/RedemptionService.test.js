@@ -1,5 +1,5 @@
 /**
- * 餐厅积分抽奖系统 V4.2 - RedemptionService 单元测试
+ * 天工商户营销平台 V4.2 - RedemptionService 单元测试
  *
  * 测试范围：
  * - 创建兑换订单（createOrder）

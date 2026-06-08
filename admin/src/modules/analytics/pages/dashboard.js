@@ -254,7 +254,7 @@ function dashboardPage() {
             axisPointer: { type: 'cross' }
           },
           legend: {
-            data: ['抽奖次数', '中奖次数'],
+            data: ['回馈次数', '发放次数'],
             bottom: 0
           },
           grid: { left: '3%', right: '4%', bottom: '15%', containLabel: true },
@@ -269,7 +269,7 @@ function dashboardPage() {
           },
           series: [
             {
-              name: '抽奖次数',
+              name: '回馈次数',
               type: 'line',
               smooth: true,
               areaStyle: {
@@ -285,7 +285,7 @@ function dashboardPage() {
               data: []
             },
             {
-              name: '中奖次数',
+              name: '发放次数',
               type: 'line',
               smooth: true,
               areaStyle: {
@@ -318,7 +318,7 @@ function dashboardPage() {
           legend: {
             orient: 'horizontal',
             bottom: 0,
-            data: ['抽奖', '中奖', '积分消耗']
+            data: ['回馈', '发放', '积分消耗']
           },
           series: [
             {
@@ -332,8 +332,8 @@ function dashboardPage() {
               },
               labelLine: { show: false },
               data: [
-                { value: 0, name: '抽奖', itemStyle: { color: '#0d6efd' } },
-                { value: 0, name: '中奖', itemStyle: { color: '#198754' } },
+                { value: 0, name: '回馈', itemStyle: { color: '#0d6efd' } },
+                { value: 0, name: '发放', itemStyle: { color: '#198754' } },
                 { value: 0, name: '积分消耗', itemStyle: { color: '#ffc107' } }
               ]
             }
@@ -398,12 +398,12 @@ function dashboardPage() {
                   data: [
                     {
                       value: data.today.lottery_draws || 0,
-                      name: '抽奖',
+                      name: '回馈',
                       itemStyle: { color: '#0d6efd' }
                     },
                     {
                       value: data.today.high_tier_wins || data.today.wins || 0,
-                      name: '中奖',
+                      name: '发放',
                       itemStyle: { color: '#198754' }
                     },
                     {

@@ -280,7 +280,7 @@ router.get('/dimensions', authenticateToken, requireRoleLevel(100), async (req, 
         draws: { label: '抽奖次数', description: '抽奖总次数' },
         consumption: { label: '消费金额', description: '消费总金额（分）' },
         users: { label: '活跃用户', description: '去重活跃用户数' },
-        win_rate: { label: '中奖率', description: '中奖百分比' }
+        win_rate: { label: '发放率', description: '发放百分比' }
       },
       periods: {
         day: { label: '按日', description: '每日统计' },

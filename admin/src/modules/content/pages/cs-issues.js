@@ -13,7 +13,7 @@ import { ContentAPI } from '../../../api/content.js'
 const ISSUE_TYPE_LABELS = {
   asset: '资产问题',
   trade: '交易纠纷',
-  lottery: '抽奖异常',
+  lottery: '回馈异常',
   item: '物品问题',
   account: '账号问题',
   consumption: '消费核销',

@@ -178,7 +178,7 @@ class GuaranteeStage extends BaseStage {
         next_draw_number,
         guarantee_threshold,
         remaining_to_guarantee: 0,
-        guarantee_reason: `累计抽奖${next_draw_number}次，触发保底机制`
+        guarantee_reason: `累计回馈${next_draw_number}次，触发保底机制`
       })
     } catch (error) {
       this.log('error', '保底机制检查失败', {

@@ -102,7 +102,7 @@ export function sidebarNav() {
           },
           {
             id: 'lottery-alerts',
-            name: '抽奖告警',
+            name: '回馈告警',
             url: '/admin/lottery-alerts.html',
             badgeKey: 'lotteryAlertCount'
           },
@@ -123,10 +123,10 @@ export function sidebarNav() {
         url: '/admin/dashboard-panel.html'
       },
 
-      // 3️⃣ 抽奖运营 - 运营型命名（数据看板、活动运营、策略管理、批量工具、抽奖干预管理）
+      // 3️⃣ 回馈运营 - 运营型命名（数据看板、活动运营、策略管理、批量工具、回馈干预管理）
       {
         id: 'lottery-ops',
-        name: '抽奖运营',
+        name: '回馈运营',
         icon: '🎰',
         items: [
           {
@@ -152,7 +152,7 @@ export function sidebarNav() {
           },
           {
             id: 'lottery-presets',
-            name: '🎯 抽奖干预管理',
+            name: '🎯 回馈干预管理',
             url: '/admin/presets.html'
           },
           {

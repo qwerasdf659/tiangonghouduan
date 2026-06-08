@@ -1,5 +1,5 @@
 /**
- * 餐厅积分抽奖系统 - SystemSettings 白名单与准入规则
+ * 天工商户营销平台 - SystemSettings 白名单与准入规则
  *
  * @description 所有允许进 system_settings 的 key 必须在此注册
  * @version 1.0.0
@@ -39,7 +39,7 @@ const SYSTEM_SETTINGS_WHITELIST = {
     type: 'string',
     minLength: 2,
     maxLength: 50,
-    default: '餐厅积分抽奖系统',
+    default: '天工商户营销平台',
     readonly: false,
     description: '系统名称（显示在前端页面标题）',
     changeRequiresRestart: false,

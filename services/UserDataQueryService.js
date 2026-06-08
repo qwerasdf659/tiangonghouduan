@@ -24,6 +24,7 @@
 
 const { Op } = require('sequelize')
 const _logger = require('../utils/logger').logger
+const PiiCrypto = require('../utils/PiiCrypto')
 
 /**
  * 构建时间范围查询条件
@@ -606,17 +607,19 @@ class UserDataQueryService {
     const where = {}
 
     if (/^\d+$/.test(trimmed) && trimmed.length <= 10) {
-      // 纯数字且长度 <= 10，按 user_id 精确匹配
-      where.user_id = parseInt(trimmed)
+      // 纯数字且长度 <= 10：优先按 user_id 精确匹配；同时尝试号段(3位)/尾号(4位)盲索引
+      const mobileWhere = PiiCrypto.buildMobileSearchWhere(trimmed)
+      if (mobileWhere) {
+        where[Op.or] = [{ user_id: parseInt(trimmed, 10) }, mobileWhere]
+      } else {
+        where.user_id = parseInt(trimmed, 10)
+      }
     } else if (/^1\d{10}$/.test(trimmed)) {
-      // 11 位手机号
+      // 11 位手机号（beforeFind 钩子透明改写为盲索引精确匹配）
       where.mobile = trimmed
     } else {
-      // 模糊搜索（手机号或昵称）
-      where[Op.or] = [
-        { mobile: { [Op.like]: `%${trimmed}%` } },
-        { nickname: { [Op.like]: `%${trimmed}%` } }
-      ]
+      // 非数字片段：手机号密文无法 LIKE，仅按昵称模糊搜
+      where[Op.or] = [{ nickname: { [Op.like]: `%${trimmed}%` } }]
     }
 
     const users = await User.findAll({

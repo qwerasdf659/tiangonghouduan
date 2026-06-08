@@ -23,6 +23,9 @@ router.use('/stats', require('./stats'))
 /** 以物易物配方管理（合规整改阶段六：旧物组合→官方产出物） */
 router.use('/barter-recipes', require('./barter-recipes'))
 
+/** 兑换复合门槛配置管理（模块C：高价值实物 VIP+多资产+消耗道具门槛） */
+router.use('/redeem-requirements', require('./redeem-requirements'))
+
 /** 商品运营操作（置顶、推荐、批量操作、缺图、绑图） */
 router.use('/', require('./operations'))
 

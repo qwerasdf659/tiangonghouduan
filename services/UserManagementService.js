@@ -18,6 +18,7 @@ const logger = require('../utils/logger')
 const AuditLogService = require('./AuditLogService')
 const displayNameHelper = require('../utils/displayNameHelper')
 const { getUserRoles } = require('../middleware/auth')
+const PiiCrypto = require('../utils/PiiCrypto')
 const { Op } = require('sequelize')
 
 /**
@@ -206,10 +207,13 @@ class UserManagementService {
 
     const whereClause = {}
     if (search) {
-      whereClause[Op.or] = [
-        { mobile: { [Op.like]: `%${search}%` } },
-        { nickname: { [Op.like]: `%${search}%` } }
-      ]
+      // 方案二完整版：手机号加密无法 LIKE，按输入形态（完整号/号段/尾号）分派到盲索引；其余按昵称搜
+      const mobileWhere = PiiCrypto.buildMobileSearchWhere(search)
+      const orConditions = [{ nickname: { [Op.like]: `%${search}%` } }]
+      if (mobileWhere) {
+        orConditions.push(mobileWhere)
+      }
+      whereClause[Op.or] = orConditions
     }
 
     const userQuery = {

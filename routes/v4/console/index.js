@@ -40,6 +40,7 @@ router.use('/customer-service', require('./customer-service'))
 router.use('/assets', require('./assets'))
 router.use('/exchange', require('./exchange'))
 router.use('/bids', require('./bids'))
+router.use('/decorations', require('./decorations'))
 router.use('/dashboard', require('./dashboard'))
 router.use('/diy', require('./diy'))
 

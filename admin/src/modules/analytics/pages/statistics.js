@@ -309,7 +309,7 @@ function statisticsPage() {
     getTrendChartOption(dates, users, draws, revenue) {
       return {
         tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
-        legend: { data: ['新增用户', '抽奖次数', '消费金额'], bottom: 0 },
+        legend: { data: ['新增用户', '回馈次数', '消费金额'], bottom: 0 },
         grid: { left: '3%', right: '4%', bottom: '15%', top: '10%', containLabel: true },
         xAxis: { type: 'category', boundaryGap: false, data: dates },
         yAxis: [
@@ -326,7 +326,7 @@ function statisticsPage() {
             areaStyle: { opacity: 0.3 }
           },
           {
-            name: '抽奖次数',
+            name: '回馈次数',
             type: 'line',
             data: draws,
             smooth: true,
@@ -974,22 +974,22 @@ function statisticsPage() {
         this._charts.multiDimension.setOption(
           {
             tooltip: { trigger: 'axis' },
-            legend: { data: ['抽奖次数', '中奖率'] },
+            legend: { data: ['回馈次数', '发放率'] },
             grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
             xAxis: { type: 'category', data: data.map(d => d.period || d.date || d.name) },
             yAxis: [
               { type: 'value', name: '次数' },
-              { type: 'value', name: '中奖率(%)', position: 'right', max: 100 }
+              { type: 'value', name: '发放率(%)', position: 'right', max: 100 }
             ],
             series: [
               {
-                name: '抽奖次数',
+                name: '回馈次数',
                 type: 'line',
                 smooth: true,
                 data: data.map(d => d.draws || 0)
               },
               {
-                name: '中奖率',
+                name: '发放率',
                 type: 'line',
                 yAxisIndex: 1,
                 smooth: true,
@@ -1014,7 +1014,7 @@ function statisticsPage() {
         this._charts.multiDimension.setOption(
           {
             tooltip: { trigger: 'axis' },
-            legend: { data: ['抽奖次数', '中奖率'] },
+            legend: { data: ['回馈次数', '发放率'] },
             grid: { left: '3%', right: '4%', bottom: '15%', containLabel: true },
             xAxis: {
               type: 'category',
@@ -1023,11 +1023,11 @@ function statisticsPage() {
             },
             yAxis: [
               { type: 'value', name: '次数' },
-              { type: 'value', name: '中奖率(%)', position: 'right', max: 100 }
+              { type: 'value', name: '发放率(%)', position: 'right', max: 100 }
             ],
             series: [
               {
-                name: '抽奖次数',
+                name: '回馈次数',
                 type: 'bar',
                 data: data.slice(0, 10).map(d => ({
                   value: d.draws || 0,
@@ -1036,7 +1036,7 @@ function statisticsPage() {
                 label: { show: true, position: 'top' }
               },
               {
-                name: '中奖率',
+                name: '发放率',
                 type: 'line',
                 yAxisIndex: 1,
                 smooth: true,

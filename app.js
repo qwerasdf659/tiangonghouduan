@@ -1,5 +1,5 @@
 /**
- * 餐厅积分抽奖系统 V4.0 - 统一引擎架构主应用入口
+ * 天工商户营销平台 V4.0 - 统一引擎架构主应用入口
  * 创建时间：2025年01月21日 19:00 北京时间
  * 适用区域：中国 (使用北京时间 Asia/Shanghai)
  * 架构：V4统一抽奖引擎架构
@@ -415,7 +415,7 @@ app.get('/api/v4', (req, res) => {
   return res.apiSuccess(
     {
       version: '4.0.0',
-      name: '餐厅积分抽奖系统 V4.6统一引擎',
+      name: '天工商户营销平台 V4.6统一引擎',
       architecture: 'unified-lottery-pipeline',
       description: 'V4.6统一抽奖引擎架构 - Pipeline 模式统一管理',
       engine: {
@@ -455,7 +455,7 @@ app.get('/api/v4', (req, res) => {
 app.get('/api/v4/docs', (req, res) => {
   return res.apiSuccess(
     {
-      title: '餐厅积分抽奖系统 V4.0 统一引擎API文档',
+      title: '天工商户营销平台 V4.0 统一引擎API文档',
       version: '4.0.0',
       architecture: 'unified-lottery-engine-v4.6-pipeline',
       description: 'V4.6统一抽奖引擎架构，使用 Pipeline 管线模式替代 Strategy 策略模式',
@@ -526,12 +526,12 @@ app.get('/api/v4/docs', (req, res) => {
 app.get('/', (req, res) => {
   res.json({
     success: true,
-    message: '餐厅积分抽奖系统 V4.0 - 统一抽奖引擎',
+    message: '天工商户营销平台 V4.0 - 统一回馈引擎',
     data: {
-      name: '餐厅积分抽奖系统 V4统一引擎',
+      name: '天工商户营销平台 V4统一引擎',
       version: '4.0.0',
       api_version: 'v4',
-      description: '基于V4统一抽奖引擎架构的智能抽奖系统',
+      description: '天工商户营销平台 - 消费回馈与积分服务平台',
       architecture: 'unified-lottery-engine',
       endpoints: {
         health: '/health',
@@ -1328,7 +1328,7 @@ if (require.main === module) {
         }
 
         // V4统一决策引擎启动完成
-        appLogger.info('餐厅积分抽奖系统V4.0统一引擎启动成功', {
+        appLogger.info('天工商户营销平台V4.0统一引擎启动成功', {
           host: HOST,
           port: PORT,
           environment: process.env.NODE_ENV || 'development',

@@ -1002,7 +1002,7 @@
               <h4 class="font-semibold text-blue-800 text-sm">用户账户级别预算</h4>
               <p class="text-xs text-blue-600 mt-1">
                 预算来源是<strong>用户个人的 BUDGET_POINTS 余额</strong>，用户通过消费审批获得预算积分。
-                每次抽奖从用户个人余额中扣除。预算按「活动桶」隔离，活动可配置允许使用哪些来源的预算积分。
+                每次回馈从用户个人余额中扣除。预算按「活动桶」隔离，活动可配置允许使用哪些来源的预算积分。
               </p>
             </div>
           </div>
@@ -1038,7 +1038,7 @@
               </div>
               <div class="stats-card-icon bg-gradient-to-br from-orange-100 to-orange-200 text-orange-600">📊</div>
             </div>
-            <p class="text-xs themed-text-muted mt-2">抽奖已消耗的预算积分总量</p>
+            <p class="text-xs themed-text-muted mt-2">回馈已消耗的预算积分总量</p>
           </div>
           <div class="stats-card stats-card-animate">
             <div class="flex items-center justify-between">
@@ -1120,7 +1120,7 @@
               <h4 class="font-semibold text-green-800 text-sm">活动账户级别预算</h4>
               <p class="text-xs text-green-600 mt-1">
                 预算来源是<strong>活动自身的固定预算池</strong>（pool_budget_total），由管理员设定总额。
-                每次抽奖从活动的剩余预算池中扣除。预算耗尽后无法继续抽奖。可通过「补充预算」追加额度。
+                每次回馈从活动的剩余预算池中扣除。预算耗尽后无法继续回馈。可通过「补充预算」追加额度。
               </p>
             </div>
           </div>
@@ -1176,7 +1176,7 @@
             <span class="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center text-base">🏦</span>
             <div>
               <h5 class="font-semibold text-gray-800">活动池预算列表</h5>
-              <p class="text-xs text-gray-400 mt-0.5">以下活动拥有独立的预算池，抽奖从池中扣除</p>
+              <p class="text-xs text-gray-400 mt-0.5">以下活动拥有独立的预算池，回馈从池中扣除</p>
             </div>
           </div>
           <div x-show="groupedBudgets.pool.campaigns.length > 0" class="overflow-x-auto">
@@ -1236,7 +1236,7 @@
             <span class="text-2xl mt-0.5">⚪</span>
             <div>
               <h4 class="font-semibold text-gray-800 text-sm">无预算模式</h4>
-              <p class="text-xs text-gray-500 mt-1">以下活动不受预算控制，抽奖不消耗任何预算积分。</p>
+              <p class="text-xs text-gray-500 mt-1">以下活动不受预算控制，回馈不消耗任何预算积分。</p>
             </div>
           </div>
         </div>

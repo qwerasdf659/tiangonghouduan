@@ -1,5 +1,5 @@
 /**
- * 餐厅积分抽奖系统 V4.0 - 抽奖活动路由模块
+ * 天工商户营销平台 V4.0 - 抽奖活动路由模块
  *
  * 路由前缀：/api/v4/lottery/campaigns
  *
@@ -321,7 +321,7 @@ router.get(
 
       return res.apiSuccess(
         adminConfig,
-        '抽奖配置获取成功',
+        '回馈活动配置获取成功',
         'CONFIG_SUCCESS',
         warningMessage ? { warning: warningMessage } : undefined
       )
@@ -338,7 +338,7 @@ router.get(
         display: displayConfig
       }
 
-      return res.apiSuccess(sanitizedConfig, '抽奖配置获取成功')
+      return res.apiSuccess(sanitizedConfig, '回馈活动配置获取成功')
     }
   })
 )

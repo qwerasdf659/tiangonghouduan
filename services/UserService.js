@@ -1,5 +1,5 @@
 /**
- * 餐厅积分抽奖系统 V4.0 - 用户服务（UserService）
+ * 天工商户营销平台 V4.0 - 用户服务（UserService）
  *
  * 业务场景：管理用户注册、角色分配、积分账户初始化等核心用户业务
  *
@@ -29,6 +29,7 @@ const BeijingTimeHelper = require('../utils/timeHelper')
 const logger = require('../utils/logger')
 const { BusinessCacheHelper } = require('../utils/BusinessCacheHelper')
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
+const PiiCrypto = require('../utils/PiiCrypto')
 
 // 引用中文显示名称辅助函数（V4.7 中文化显示名称系统 - 2026-01-22）
 const { attachDisplayNames, DICT_TYPES } = require('../utils/displayNameHelper')
@@ -59,9 +60,9 @@ class UserService {
 
     const { nickname, status = 'active' } = options
 
-    // 步骤1: 检查手机号是否已存在
+    // 步骤1: 检查手机号是否已存在（盲索引查询，明文不落查询条件）
     const existingUser = await User.findOne({
-      where: { mobile },
+      where: { mobile_hash: PiiCrypto.blindHash(mobile) },
       transaction
     })
 
@@ -81,7 +82,9 @@ class UserService {
         status,
         consecutive_fail_count: 0,
         history_total_points: 0,
-        login_count: 0
+        login_count: 0,
+        // 🔐 PII 流程合规：首次注册即记录隐私政策/用户协议同意时间（北京时间）
+        privacy_consent_at: BeijingTimeHelper.createBeijingTime()
       },
       { transaction }
     )
@@ -167,7 +170,7 @@ class UserService {
       }
 
       const user = await User.findOne({
-        where: { mobile },
+        where: { mobile_hash: PiiCrypto.blindHash(mobile) },
         transaction
       })
 

@@ -84,6 +84,9 @@ const pageConfigs = {
   // 奖品目录管理（2026-05-26 集中奖品目录方案）
   'prize-definitions': { title: '奖品目录管理', pageIcon: '🏆', pageTitle: '奖品目录管理' },
 
+  // 星石装饰商城管理（2026-06-08 路线B 模块D）
+  'decoration-management': { title: '装饰商城管理', pageIcon: '🎨', pageTitle: '装饰商城管理' },
+
   // 默认配置
   'default': { title: '管理后台', pageIcon: '🏠', pageTitle: '管理后台' }
 }
@@ -118,8 +121,8 @@ export default defineConfig({
         
         // 公共数据
         common: {
-          siteName: '餐厅抽奖系统',
-          copyright: `© ${new Date().getFullYear()} 餐厅抽奖系统`
+          siteName: '天工平台',
+          copyright: `© ${new Date().getFullYear()} 天工平台`
         }
       }
     }, {

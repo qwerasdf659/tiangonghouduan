@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <%- include('partials/head', { 
-    title: '抽奖告警中心', 
+    title: '回馈告警中心', 
     pageStyle: '[x-cloak] { display: none !important; } .chart-container { height: 220px; }' 
   }) %>
 </head>
@@ -13,7 +13,7 @@
     <div class="container mx-auto px-4 py-3 flex justify-between items-center">
       <div class="flex items-center space-x-4">
         <a href="/admin/workspace.html" class="hover:opacity-80 text-white/80 hover:text-white transition-colors text-sm">← 返回工作台</a>
-        <span class="text-lg font-semibold">🎰 抽奖告警中心</span>
+        <span class="text-lg font-semibold">🎰 回馈告警中心</span>
         <span x-show="lastUpdateTime" class="text-xs text-white/50 ml-2">· 最后更新: <span x-text="lastUpdateTime"></span></span>
       </div>
       <div class="flex items-center space-x-4 text-sm">
@@ -29,8 +29,8 @@
     <div class="page-banner mb-6">
       <div class="flex items-center justify-between relative z-10">
         <div>
-          <h1>🛡️ 抽奖告警监控中心</h1>
-          <p class="mt-1">实时监控抽奖系统运行状况，及时发现中奖率异常、预算超限、库存不足等风险问题</p>
+          <h1>🛡️ 回馈告警监控中心</h1>
+          <p class="mt-1">实时监控回馈系统运行状况，及时发现发放率异常、预算超限、库存不足等风险问题</p>
         </div>
         <div class="flex items-center gap-3">
           <div class="text-right">
@@ -66,7 +66,7 @@
         @click="activeTab = 'alerts'; filterAlerts('')" 
         :class="activeTab === 'alerts' ? 'active' : ''"
         class="tab-item">
-        🎰 抽奖告警
+        🎰 回馈告警
       </button>
       <button 
         @click="activeTab = 'system'; loadSystemHealth()" 
@@ -169,7 +169,7 @@
             <option value="">全部类型</option>
             <option value="budget">💰 预算告警</option>
             <option value="inventory">📦 库存告警</option>
-            <option value="win_rate">🎯 中奖率告警</option>
+            <option value="win_rate">🎯 发放率告警</option>
             <option value="user">👤 用户告警</option>
             <option value="system">🖥️ 系统告警</option>
           </select>
@@ -458,11 +458,11 @@
         <div class="flex items-center gap-2 mb-3">
           <span class="w-6 h-6 rounded flex items-center justify-center text-xs" style="background: linear-gradient(135deg, #3b82f6, #2563eb); color: white;">🔬</span>
           <span class="text-sm font-semibold" style="color: var(--color-text-primary);">健康度诊断</span>
-          <span class="text-xs" style="color: var(--color-text-muted);">— 选择一个抽奖活动，查看其运行健康状况和优化建议</span>
+          <span class="text-xs" style="color: var(--color-text-muted);">— 选择一个回馈活动，查看其运行健康状况和优化建议</span>
         </div>
         <div class="flex items-center gap-4">
           <select x-model="selectedCampaignId" @change="loadHealthData()" class="form-select min-w-64" :class="!selectedCampaignId ? 'border-yellow-400 ring-1 ring-yellow-300' : ''">
-            <option value="">-- 请选择一个抽奖活动 --</option>
+            <option value="">-- 请选择一个回馈活动 --</option>
             <template x-for="campaign in campaigns" :key="campaign.lottery_campaign_id">
               <option :value="campaign.lottery_campaign_id" x-text="campaign.campaign_name"></option>
             </template>
@@ -473,7 +473,7 @@
         </div>
         <div x-show="!selectedCampaignId" class="mt-3 flex items-center gap-2 px-4 py-3 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800 text-sm">
           <span class="text-lg">⚠️</span>
-          <span>健康度分析需要针对<strong>具体活动</strong>进行诊断，请先在上方下拉框中选择一个抽奖活动。</span>
+          <span>健康度分析需要针对<strong>具体活动</strong>进行诊断，请先在上方下拉框中选择一个回馈活动。</span>
         </div>
       </div>
 
@@ -491,7 +491,7 @@
         </div>
         <div class="gradient-stat-card" :class="(healthData.win_rate_health || 0) >= 70 ? 'gradient-stat-teal' : 'gradient-stat-orange'">
           <div class="stat-value" x-text="healthData.win_rate_health || 0"></div>
-          <div class="stat-label" style="font-size: 0.95rem; opacity: 1;">中奖率健康度</div>
+          <div class="stat-label" style="font-size: 0.95rem; opacity: 1;">发放率健康度</div>
           <div class="stat-trend">当前 <span x-text="(healthData.current_win_rate || 0).toFixed(1)"></span>%</div>
         </div>
         <div class="gradient-stat-card" :class="(healthData.prize_distribution_health || 0) >= 70 ? 'gradient-stat-indigo' : 'gradient-stat-orange'">

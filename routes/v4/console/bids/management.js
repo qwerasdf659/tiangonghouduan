@@ -136,10 +136,13 @@ router.post(
       }
 
       /*
-       * 价值流向守卫（合规整改 §10.11-C / §10.15 Step 5）：
-       * 竞价发起入口统一调用：星石不可给有价值商品计价（杜绝 星石→实物 套现）。
+       * 价值流向守卫（合规整改 §10.11-C / §10.15 Step 5 + 路线B 模块A·竞价双层防护）：
+       * 竞价发起入口统一调用：
+       *   ① assertBiddableTarget：标的必须为纯虚拟道具（prop），实物/券禁止进竞价（正向白名单）。
+       *   ② assertPriceAssetAllowed：星石不可给有价值商品计价（杜绝 星石→实物 套现）。
        * 竞价币本身已由 BidService 动态白名单（is_biddable=1，仅 star_stone）锁定。
        */
+      AssetProductGuard.assertBiddableTarget(exchangeItem.itemTemplate || null)
       AssetProductGuard.assertPriceAssetAllowed(exchangeItem.itemTemplate || null, price_asset_code)
 
       // 一物一拍校验（决策11）：同一兑换商品同时只能有一个 active/pending 竞价

@@ -15,6 +15,7 @@
  */
 const BusinessError = require('../../utils/BusinessError')
 const logger = require('../../utils/logger').logger
+const PiiCrypto = require('../../utils/PiiCrypto')
 const { attachDisplayNames } = require('../../utils/displayNameHelper')
 const { ConsumptionRecord, User } = require('../../models')
 const { Sequelize } = require('sequelize')
@@ -264,20 +265,20 @@ class QueryService {
         }
       }
 
-      // 搜索条件
+      // 搜索条件（方案二完整版：手机号加密无法 LIKE，按输入形态分派盲索引；其余仅按昵称搜）
+      let userSearchWhere
+      if (search) {
+        const mobileWhere = PiiCrypto.buildMobileSearchWhere(search)
+        const orConditions = [{ nickname: { [Op.like]: `%${search}%` } }]
+        if (mobileWhere) orConditions.push(mobileWhere)
+        userSearchWhere = { [Op.or]: orConditions }
+      }
       const includeConditions = [
         {
           association: 'user',
           attributes: ['user_id', 'mobile', 'nickname'],
           required: false,
-          where: search
-            ? {
-                [Op.or]: [
-                  { mobile: { [Op.like]: `%${search}%` } },
-                  { nickname: { [Op.like]: `%${search}%` } }
-                ]
-              }
-            : undefined
+          where: userSearchWhere
         },
         {
           association: 'merchant',

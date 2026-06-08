@@ -13,6 +13,7 @@
  */
 
 import { logger } from '../../../utils/logger.js'
+import { generateUUID } from '../../../utils/index.js'
 import { ASSET_ENDPOINTS } from '../../../api/asset.js'
 import { buildURL } from '../../../api/base.js'
 
@@ -291,7 +292,7 @@ export function useStarStoneAccountsMethods() {
             : -Math.abs(this.starStoneAdjustForm.amount)
 
         // 生成幂等键（后端要求必填）
-        const idempotencyKey = `admin_adjust_star_stone_${targetUserId}_${crypto.randomUUID()}`
+        const idempotencyKey = `admin_adjust_star_stone_${targetUserId}_${generateUUID()}`
 
         const response = await this.apiCall(ASSET_ENDPOINTS.ADJUSTMENT_ADJUST, {
           method: 'POST',

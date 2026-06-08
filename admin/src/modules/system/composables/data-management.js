@@ -79,8 +79,8 @@ export function useDataManagementState() {
 
     /** @type {string[]} 可用的清理类目 */
     availableCategories: [
-      { key: 'lottery_records', label: '抽奖记录' },
-      { key: 'lottery_monitoring', label: '抽奖监控（告警与模拟）' },
+      { key: 'lottery_records', label: '回馈记录' },
+      { key: 'lottery_monitoring', label: '回馈监控（告警与模拟）' },
       { key: 'monitoring_metrics', label: '监控指标' },
       { key: 'consumption_records', label: '消费与核销' },
       { key: 'customer_service', label: '客服会话' },

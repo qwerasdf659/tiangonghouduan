@@ -18,10 +18,10 @@
  * 作者：Claude 4.5 Sonnet
  */
 
-const { sequelize, Item, LotteryDraw, LotteryCampaign, User } = require('../../models')
+const { sequelize, Item, LotteryDraw, LotteryCampaign } = require('../../models')
 const BeijingTimeHelper = require('../../utils/timeHelper')
 // 🔴 P0修复：使用统一的测试数据清理器
-const { testCleaner, cleanupAfterEach } = require('../helpers/TestDataCleaner')
+const { cleanupAfterEach } = require('../helpers/TestDataCleaner')
 
 /**
  * 生成幂等键

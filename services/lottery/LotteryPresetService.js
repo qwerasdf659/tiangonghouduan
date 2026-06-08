@@ -2,7 +2,7 @@ const logger = require('../../utils/logger').logger
 const BusinessError = require('../../utils/BusinessError')
 
 /**
- * 餐厅积分抽奖系统 V4.0 - 抽奖预设管理服务（LotteryPresetService）
+ * 天工商户营销平台 V4.0 - 抽奖预设管理服务（LotteryPresetService）
  *
  * @description 为管理员提供用户抽奖结果预设功能，实现运营干预
  *

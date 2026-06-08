@@ -16,7 +16,7 @@
           <a href="/admin/workspace.html" class="text-blue-200 hover:text-white text-sm transition">← 返回工作台</a>
         </div>
         <h1>💰 积分定价配置</h1>
-        <p>管理抽奖消耗、每日抽奖限制、新用户初始积分等核心运营参数，修改后即时生效</p>
+        <p>管理回馈消耗、每日回馈限制、新用户初始积分等核心运营参数，修改后即时生效</p>
       </div>
       <div class="text-6xl opacity-20">💎</div>
     </div>
@@ -30,12 +30,12 @@
       <div class="gradient-stat-card gradient-stat-blue">
         <div class="stat-icon">🎰</div>
         <div class="stat-value" x-text="pointsDefaults.lottery_cost_points || 0"></div>
-        <div class="stat-label">抽奖消耗积分/次</div>
+        <div class="stat-label">回馈消耗积分/次</div>
       </div>
       <div class="gradient-stat-card gradient-stat-orange">
         <div class="stat-icon">📊</div>
         <div class="stat-value" x-text="pointsDefaults.daily_lottery_limit || 0"></div>
-        <div class="stat-label">每日抽奖上限/次</div>
+        <div class="stat-label">每日回馈上限/次</div>
       </div>
       <div class="gradient-stat-card gradient-stat-purple">
         <div class="stat-icon">🎁</div>
@@ -51,7 +51,7 @@
         <div>
           <p class="text-sm font-semibold text-amber-800">此处为全局默认值</p>
           <p class="text-xs text-amber-700 mt-1">
-            这些配置作为系统级默认值。如果在「抽奖运营 → 活动运营」中为某个活动单独配置了参数，
+            这些配置作为系统级默认值。如果在「回馈运营 → 活动运营」中为某个活动单独配置了参数，
             则该活动将使用<span class="font-semibold">活动级配置</span>覆盖此处的全局值。
           </p>
           <p class="text-xs text-amber-600 mt-1">
@@ -81,10 +81,10 @@
       <div class="content-section-body">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
           
-          <!-- 抽奖消耗积分 -->
+          <!-- 回馈消耗积分 -->
           <div class="p-4 rounded-lg border border-blue-100 bg-blue-50/30 space-y-2">
-            <label class="block text-sm font-semibold text-blue-800" x-tooltip="'每次抽奖扣除的积分数，设为0则免费抽奖'">
-              🎰 抽奖消耗积分 <span class="text-blue-400 text-xs ml-1">ℹ️</span>
+            <label class="block text-sm font-semibold text-blue-800" x-tooltip="'每次回馈扣除的积分数，设为0则免费回馈'">
+              🎰 回馈消耗积分 <span class="text-blue-400 text-xs ml-1">ℹ️</span>
             </label>
             <div class="flex items-center gap-2">
               <input type="number" 
@@ -94,13 +94,13 @@
                      placeholder="0">
               <span class="px-3 py-2 bg-blue-100 text-blue-700 text-sm rounded-lg font-medium whitespace-nowrap">积分/次</span>
             </div>
-            <p class="text-xs text-blue-600/70">每次抽奖从用户余额中扣除的积分数量</p>
+            <p class="text-xs text-blue-600/70">每次回馈从用户余额中扣除的积分数量</p>
           </div>
 
-          <!-- 每日抽奖次数限制 -->
+          <!-- 每日回馈次数限制 -->
           <div class="p-4 rounded-lg border border-orange-100 bg-orange-50/30 space-y-2">
-            <label class="block text-sm font-semibold text-orange-800" x-tooltip="'限制用户每天的抽奖次数，设为0则不限制'">
-              📊 每日抽奖次数限制 <span class="text-orange-400 text-xs ml-1">ℹ️</span>
+            <label class="block text-sm font-semibold text-orange-800" x-tooltip="'限制用户每天的回馈次数，设为0则不限制'">
+              📊 每日回馈次数限制 <span class="text-orange-400 text-xs ml-1">ℹ️</span>
             </label>
             <div class="flex items-center gap-2">
               <input type="number" 
@@ -110,7 +110,7 @@
                      placeholder="0">
               <span class="px-3 py-2 bg-orange-100 text-orange-700 text-sm rounded-lg font-medium whitespace-nowrap">次/日</span>
             </div>
-            <p class="text-xs text-orange-600/70">设为 0 表示不限制每日抽奖次数</p>
+            <p class="text-xs text-orange-600/70">设为 0 表示不限制每日回馈次数</p>
           </div>
 
           <!-- 新用户初始积分 -->

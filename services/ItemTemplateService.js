@@ -243,6 +243,7 @@ class ItemTemplateService {
         primary_media_id,
         reference_price_points = 0,
         is_tradable = true,
+        value_tier = 'low',
         meta
       } = data
 
@@ -305,6 +306,7 @@ class ItemTemplateService {
           primary_media_id: primary_media_id ?? null,
           reference_price_points,
           is_tradable,
+          value_tier,
           is_enabled: true,
           max_edition: resolvedMaxEdition,
           meta: cleanedMeta
@@ -361,6 +363,7 @@ class ItemTemplateService {
         'primary_media_id',
         'reference_price_points',
         'is_tradable',
+        'value_tier',
         'is_enabled',
         'max_edition',
         'meta'

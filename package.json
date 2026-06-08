@@ -1,7 +1,7 @@
 {
   "name": "restaurant-lottery-system-v4-unified",
   "version": "4.0.0",
-  "description": "餐厅积分抽奖系统 - V4 RESTful API架构（扁平化资源导向设计）",
+  "description": "天工商户营销平台 - V4 RESTful API架构（扁平化资源导向设计）",
   "main": "app.js",
   "author": "Restaurant Lottery Team",
   "license": "MIT",

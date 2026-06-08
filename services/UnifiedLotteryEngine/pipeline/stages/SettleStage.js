@@ -211,8 +211,8 @@ class SettleStage extends BaseStage {
             counterpart_account_id: burnAccount.account_id,
             meta: {
               source_type: 'system',
-              title: '抽奖消耗',
-              description: `抽奖消耗 ${draw_cost} 积分`,
+              title: '回馈消耗',
+              description: `回馈消耗 ${draw_cost} 积分`,
               draw_count,
               discount_applied: pricing_data.saved_points || 0
             }
@@ -640,7 +640,7 @@ class SettleStage extends BaseStage {
               counterpart_account_id: mintAccount.account_id,
               meta: {
                 source_type: 'system',
-                title: `抽奖奖励：${prize.prize_name}`,
+                title: `回馈奖励：${prize.prize_name}`,
                 description: `获得${prize.prize_value}积分奖励`
               }
             },

@@ -1,5 +1,5 @@
 /**
- * 餐厅积分抽奖系统 V4 - ExchangeService 单元测试
+ * 天工商户营销平台 V4 - ExchangeService 单元测试
  *
  * 测试范围：
  * - P3-3-1: 兑换市场服务核心功能

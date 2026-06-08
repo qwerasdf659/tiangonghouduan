@@ -1,5 +1,5 @@
 /**
- * 餐厅积分抽奖系统 V4.0统一引擎架构 - 内容审核记录模型（ContentReviewRecord）
+ * 天工商户营销平台 V4.0统一引擎架构 - 内容审核记录模型（ContentReviewRecord）
  *
  * ⚠️⚠️⚠️ 重要区分说明 ⚠️⚠️⚠️
  * 本模型是 ContentReviewRecord（内容审核记录），不是 AdminOperationLog（管理员操作日志）

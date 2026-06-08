@@ -497,7 +497,7 @@ document.addEventListener('alpine:init', () => {
      */
     getActivityTypeName(type) {
       const map = {
-        draw: '🎰 抽奖',
+        draw: '🎰 回馈',
         transaction: '💰 资产变动',
         exchange: '🎁 兑换',
         consumption: '💳 消费',
@@ -655,19 +655,19 @@ document.addEventListener('alpine:init', () => {
               report.lottery_profile
                 ? `
             <div class="section">
-              <h2>🎰 抽奖数据</h2>
+              <h2>🎰 回馈数据</h2>
               <div class="stat-grid">
                 <div class="stat-card">
                   <div class="stat-value">${lotteryStats.total_draws || 0}</div>
-                  <div class="stat-label">总抽奖次数</div>
+                  <div class="stat-label">总回馈次数</div>
                 </div>
                 <div class="stat-card">
                   <div class="stat-value">${lotteryStats.total_wins || 0}</div>
-                  <div class="stat-label">中奖次数</div>
+                  <div class="stat-label">发放次数</div>
                 </div>
                 <div class="stat-card">
                   <div class="stat-value">${lotteryStats.win_rate ? (lotteryStats.win_rate * 100).toFixed(1) + '%' : '0%'}</div>
-                  <div class="stat-label">中奖率</div>
+                  <div class="stat-label">发放率</div>
                 </div>
               </div>
             </div>

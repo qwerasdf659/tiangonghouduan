@@ -33,6 +33,7 @@
 
 const BusinessError = require('../../utils/BusinessError')
 const { AssetCode } = require('../../constants/AssetCode')
+const { isValuableType, isBiddableType } = require('../../constants/ProductCurrencyWhitelist')
 
 /** 星石资产代码（纯点券，唯一竞价币） */
 const STONE = AssetCode.STAR_STONE
@@ -49,17 +50,23 @@ function isCrystal(assetCode) {
 }
 
 /**
- * 判断商品是否"有价值"（实物/券，或有人民币参考价）
+ * 判断商品是否"有价值"（实物/券）
+ *
+ * 判定基准（路线B 合规改造 模块A·第2步）：
+ * - 以 item_type 枚举为准（product/voucher 恒为 valuable），通过 ProductCurrencyWhitelist 统一判定。
+ * - reference_price_points>0 仅作防御性兜底（fail-closed）：即使将来引入 prop 后参考价异常，
+ *   也不会因参考价为 0 而漏判已知的实物/券。
+ * - 这样避免了原「item_type 或 参考价>0」二元逻辑在引入 prop 后的歧义。
  *
  * @param {Object} template - item_templates 记录（含 item_type / reference_price_points）
  * @returns {boolean} true=有价值商品（实物/券/有RMB锚）
  */
 function isValuable(template) {
   if (!template) return false
-  const valuableTypes = ['product', 'voucher']
   const itemType = template.item_type
   const refPrice = Number(template.reference_price_points || 0)
-  return valuableTypes.includes(itemType) || refPrice > 0
+  // 主判定：item_type 枚举；兜底：参考价>0（防御性 fail-closed）
+  return isValuableType(itemType) || refPrice > 0
 }
 
 /**
@@ -123,6 +130,27 @@ class AssetProductGuard {
     }
     if (template && Number(template.reference_price_points || 0) > 0) {
       throw new BusinessError('有人民币参考价的物品禁止作为虚拟道具上架', 'PROP_HAS_VALUE', 400)
+    }
+  }
+
+  /**
+   * 竞价标的守卫：仅允许纯虚拟道具（prop）进入竞价（路线B 模块A·第3步，正向白名单断言）
+   *
+   * 铁律：竞价标的必须 item_type='prop'；product/voucher 一律禁止，防止实物被代币化锚定。
+   * 与既有 assertPriceAssetAllowed（星石不买有价值物）+ is_biddable（竞价币白名单）形成三重防护。
+   *
+   * @param {Object} template - 商品对应的 item_templates 记录
+   * @throws {BusinessError} BID_TARGET_FORBIDDEN - 标的非 prop（实物/券或缺失模板）禁止进入竞价
+   * @returns {void} 校验通过无返回，违规抛 BusinessError(400)
+   */
+  static assertBiddableTarget(template) {
+    const itemType = template && template.item_type
+    if (!isBiddableType(itemType)) {
+      throw new BusinessError(
+        '竞价标的仅允许纯虚拟道具（prop），实物/券类禁止进入竞价',
+        'BID_TARGET_FORBIDDEN',
+        400
+      )
     }
   }
 

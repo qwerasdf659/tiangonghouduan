@@ -21,7 +21,7 @@ const SYSTEM_ROLES = ['admin', 'user', 'system_job']
  * 权限资源名称映射
  */
 const RESOURCE_NAME_MAP = {
-  lottery: '抽奖管理',
+  lottery: '回馈管理',
   prizes: '奖品管理',
   users: '用户管理',
   points: '积分管理',

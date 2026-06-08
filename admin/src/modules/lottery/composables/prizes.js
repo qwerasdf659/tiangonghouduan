@@ -610,7 +610,7 @@ export function usePrizesMethods() {
         const errMsg =
           `❌ Fallback（保底）奖品必须恰好 1 个，当前 ${fallbackPrizes.length} 个。` +
           (fallbackPrizes.length === 0
-            ? '缺少保底奖品会导致极端情况下抽奖失败'
+            ? '缺少保底奖品会导致极端情况下回馈失败'
             : '多个保底奖品增加运营复杂度且无额外安全性')
         this.campaignPrizeErrors.push(errMsg)
       }

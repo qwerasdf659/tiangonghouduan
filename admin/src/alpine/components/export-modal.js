@@ -57,7 +57,7 @@ const EXPORT_TYPE_CONFIG = {
       { key: 'phone', label: '手机号', default: true, sensitive: true },
       { key: 'register_time', label: '注册时间', default: true },
       { key: 'total_consumption', label: '累计消费', default: true },
-      { key: 'lottery_count', label: '抽奖次数', default: true },
+      { key: 'lottery_count', label: '回馈次数', default: true },
       { key: 'last_active', label: '最后活跃', default: true }
     ]
   },
@@ -84,11 +84,11 @@ const EXPORT_TYPE_CONFIG = {
     defaultFormat: 'pdf',
     fields: [
       { key: 'date', label: '日期', default: true },
-      { key: 'lottery_count', label: '抽奖次数', default: true },
+      { key: 'lottery_count', label: '回馈次数', default: true },
       { key: 'new_users', label: '新增用户', default: true },
       { key: 'active_users', label: '活跃用户', default: true },
       { key: 'consumption_amount', label: '消费金额', default: true },
-      { key: 'win_rate', label: '中奖率', default: true },
+      { key: 'win_rate', label: '发放率', default: true },
       { key: 'health_score', label: '健康度', default: true }
     ]
   },
@@ -112,18 +112,18 @@ const EXPORT_TYPE_CONFIG = {
     ]
   },
   lottery: {
-    name: '抽奖记录',
-    filename: '抽奖记录',
+    name: '回馈记录',
+    filename: '回馈记录',
     supportedFormats: ['excel', 'csv'],
     defaultFormat: 'excel',
     fields: [
-      { key: 'draw_id', label: '抽奖ID', default: true },
+      { key: 'draw_id', label: '回馈ID', default: true },
       { key: 'user_id', label: '用户ID', default: true },
       { key: 'user_name', label: '用户名', default: true, sensitive: true },
       { key: 'campaign_name', label: '活动名称', default: true },
       { key: 'prize_name', label: '奖品名称', default: true },
-      { key: 'is_win', label: '是否中奖', default: true },
-      { key: 'draw_time', label: '抽奖时间', default: true }
+      { key: 'is_win', label: '是否获得', default: true },
+      { key: 'draw_time', label: '回馈时间', default: true }
     ]
   },
   asset: {

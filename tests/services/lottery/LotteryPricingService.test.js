@@ -1,5 +1,5 @@
 /**
- * 餐厅积分抽奖系统 V4 - LotteryPricingService 单元测试
+ * 天工商户营销平台 V4 - LotteryPricingService 单元测试
  *
  * @description 验证 getDrawPricing 定价逻辑迁移方案（方案C）的正确性
  *

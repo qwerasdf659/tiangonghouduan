@@ -95,7 +95,7 @@
           <!-- 保底计数 + 历史积分 -->
           <div class="flex gap-3 ml-auto">
             <div class="stat-card bg-orange-50 rounded-lg px-4 py-2.5 text-center border border-orange-100">
-              <div class="text-xs text-orange-600 mb-0.5">连续未中奖</div>
+              <div class="text-xs text-orange-600 mb-0.5">连续未获得</div>
               <div class="text-xl font-bold text-orange-700" x-text="user_overview.user?.consecutive_fail_count || 0"></div>
             </div>
             <div class="stat-card bg-purple-50 rounded-lg px-4 py-2.5 text-center border border-purple-100">
@@ -141,7 +141,7 @@
             </button>
             <button @click="switchTab('lottery_draws')" :class="{ 'active': active_tab === 'lottery_draws' }"
               class="tab-btn flex items-center gap-2 px-5 py-3.5 text-sm themed-text whitespace-nowrap">
-              <span>🎰</span><span>抽奖记录</span>
+              <span>🎰</span><span>回馈记录</span>
             </button>
             <button @click="switchTab('exchange_records')" :class="{ 'active': active_tab === 'exchange_records' }"
               class="tab-btn flex items-center gap-2 px-5 py-3.5 text-sm themed-text whitespace-nowrap">
@@ -181,8 +181,8 @@
                 </select>
                 <select x-model="filters.business_type" class="px-2 py-1.5 border rounded text-sm themed-bg-base themed-border">
                   <option value="">全部类型</option>
-                  <option value="lottery_consume">抽奖消耗</option>
-                  <option value="lottery_reward">抽奖奖励</option>
+                  <option value="lottery_consume">回馈消耗</option>
+                  <option value="lottery_reward">回馈奖励</option>
                   <option value="exchange_debit">兑换扣减</option>
                   <option value="material_convert_debit">材料转换扣减</option>
                   <option value="material_convert_credit">材料转换入账</option>
@@ -193,7 +193,7 @@
               </div>
             </template>
 
-            <!-- 抽奖记录专属筛选 -->
+            <!-- 回馈记录专属筛选 -->
             <template x-if="active_tab === 'lottery_draws'">
               <select x-model="filters.reward_tier" class="px-2 py-1.5 border rounded text-sm themed-bg-base themed-border">
                 <option value="">全部档位</option>
@@ -243,11 +243,11 @@
             </div>
           </template>
 
-          <!-- 抽奖汇总 -->
+          <!-- 回馈汇总 -->
           <template x-if="active_tab === 'lottery_draws' && lottery_draws.summary">
             <div class="grid grid-cols-5 gap-3">
               <div class="stat-card themed-card rounded-lg p-3 text-center border-l-4 border-indigo-500">
-                <div class="text-xs themed-text-muted mb-0.5">总抽奖次数</div>
+                <div class="text-xs themed-text-muted mb-0.5">总回馈次数</div>
                 <div class="text-lg font-bold text-indigo-600" x-text="lottery_draws.summary.total_draws || 0"></div>
               </div>
               <template x-for="(count, tier) in (lottery_draws.summary.tier_distribution || {})" :key="tier">
@@ -325,7 +325,7 @@
             </div>
           </template>
 
-          <!-- Tab2: 抽奖记录 -->
+          <!-- Tab2: 回馈记录 -->
           <template x-if="active_tab === 'lottery_draws'">
             <div class="overflow-x-auto">
               <table class="w-full text-sm">
@@ -355,7 +355,7 @@
                     </tr>
                   </template>
                   <template x-if="lottery_draws.list.length === 0">
-                    <tr><td colspan="6" class="px-4 py-12 text-center themed-text-muted">暂无抽奖记录</td></tr>
+                    <tr><td colspan="6" class="px-4 py-12 text-center themed-text-muted">暂无回馈记录</td></tr>
                   </template>
                 </tbody>
               </table>

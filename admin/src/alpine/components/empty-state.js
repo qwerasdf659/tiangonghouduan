@@ -170,8 +170,8 @@ const EMPTY_STATE_PRESETS = {
   // 抽奖告警 - 无异常
   'lottery-alerts-empty': {
     icon: '🎰',
-    title: '抽奖系统运行正常',
-    description: '中奖率和分布都在预期范围内，无需处理',
+    title: '回馈系统运行正常',
+    description: '发放率和分布都在预期范围内，无需处理',
     positive: true
   },
 

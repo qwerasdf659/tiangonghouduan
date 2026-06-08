@@ -541,7 +541,7 @@ export function useDashboardOverviewMethods() {
 
       const seriesName =
         this.trendType === 'lottery'
-          ? '抽奖次数'
+          ? '回馈次数'
           : this.trendType === 'users'
             ? '活跃用户'
             : '奖品发放'
@@ -651,9 +651,9 @@ export function useDashboardOverviewMethods() {
         {
           'consumption-review': '消耗审核',
           'customer-service': '客服会话',
-          'lottery-alerts': '抽奖告警',
+          'lottery-alerts': '回馈告警',
           'risk-alerts': '风控告警',
-          'campaign-create': '抽奖活动',
+          'campaign-create': '回馈活动',
           'pending-center': '待办中心',
           statistics: '数据统计'
         }[action] || action
@@ -673,16 +673,19 @@ export function useDashboardOverviewMethods() {
       )
     },
     handleAlert(alert) {
+      // 路由判断改用英文 type 枚举前缀，不再依赖中文文案（方案C+：解除"文案-路由"耦合）
+      // 后端实际 type：budget_*/stock_*/win_rate_*/high_frequency_*/empty_streak_* + 兼容 lottery/risk/budget
+      const t = alert.type || ''
       if (
-        alert.type === 'lottery' ||
-        alert.title?.includes('抽奖') ||
-        alert.title?.includes('中奖')
+        t === 'lottery' ||
+        t.startsWith('win_rate') ||
+        t.startsWith('stock') ||
+        t.startsWith('high_frequency') ||
+        t.startsWith('empty_streak')
       )
         this.quickAction('lottery-alerts')
-      else if (alert.type === 'risk' || alert.title?.includes('风控'))
-        this.quickAction('risk-alerts')
-      else if (alert.type === 'budget' || alert.title?.includes('预算'))
-        this.quickAction('campaign-create')
+      else if (t === 'risk') this.quickAction('risk-alerts')
+      else if (t === 'budget' || t.startsWith('budget')) this.quickAction('campaign-create')
     },
 
     // ==================== 今日核心事件 ====================

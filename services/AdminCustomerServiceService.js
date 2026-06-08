@@ -1,5 +1,5 @@
 /**
- * 餐厅积分抽奖系统 V4.0统一引擎架构 - 管理后台客服管理服务（AdminCustomerServiceService）
+ * 天工商户营销平台 V4.0统一引擎架构 - 管理后台客服管理服务（AdminCustomerServiceService）
  *
  * 业务场景：管理员视角的客服会话管理，采用Facade模式统一整合CustomerServiceSessionService
  *

@@ -1,5 +1,5 @@
 /**
- * 餐厅积分抽奖系统 V4.7.0 - 兑换市场核心服务
+ * 天工商户营销平台 V4.7.0 - 兑换市场核心服务
  * Exchange Core Service（大文件拆分方案 Phase 4）
  *
  * 职责范围：核心兑换操作
@@ -28,6 +28,7 @@ const { generateExchangeBusinessId } = require('../../utils/IdempotencyHelper')
 const BalanceService = require('../asset/BalanceService')
 const ItemService = require('../asset/ItemService')
 const AttributeRuleEngine = require('../item/AttributeRuleEngine')
+const AssetProductGuard = require('../shared/AssetProductGuard')
 const { Op } = require('sequelize')
 const { getRedisClient } = require('../../utils/UnifiedRedisClient')
 
@@ -78,6 +79,9 @@ class CoreService {
     this.ExchangeItem = models.ExchangeItem
     this.ExchangeItemSku = models.ExchangeItemSku
     this.ExchangeChannelPrice = models.ExchangeChannelPrice
+    this.ExchangeRedeemRequirement = models.ExchangeRedeemRequirement
+    this.UserGrowthLevel = models.UserGrowthLevel
+    this.ItemTemplate = models.ItemTemplate
   }
 
   /**
@@ -306,6 +310,18 @@ class CoreService {
       totalPayAmount
     })
 
+    /*
+     * ═══════════════════════════════════════════════════
+     * 2.5 复合门槛校验（路线B 模块C·第3步，高价值实物防代币化锚定）
+     * 扣费前校验：成长等级 + 额外多资产余额（逐项过守卫） + 持有指定消耗道具
+     * 全满足才放行，否则抛 BusinessError 提示缺项；无门槛配置的商品直接通过
+     * ═══════════════════════════════════════════════════
+     */
+    const extraConsumption = await this._assertRedeemRequirement(
+      { user_id, exchange_item_id, sku_id, quantity, itemTemplateId },
+      { transaction }
+    )
+
     // 3. 使用BalanceService统一账本扣减材料资产
 
     logger.info('[兑换市场] 开始扣减材料资产（统一账本）', {
@@ -374,6 +390,17 @@ class CoreService {
     logger.info(
       `[兑换市场] 材料扣减成功：${totalPayAmount}个${costAssetCode}，剩余余额通过统一账本管理`
     )
+
+    /*
+     * 3.5 复合门槛的额外消耗执行（与 2.5 校验对称）：
+     * 校验已确认余额足够/持有足够，这里在同一事务内逐项扣减额外资产 + 销毁指定道具
+     */
+    if (extraConsumption) {
+      await this._consumeRedeemRequirement(
+        { user_id, idempotency_key, extraConsumption },
+        { transaction }
+      )
+    }
 
     /*
      * 🔴 P0治理：提取扣减流水ID用于对账
@@ -1455,6 +1482,312 @@ class CoreService {
         refund_asset_code: order.pay_asset_code
       }
     }
+  }
+
+  /**
+   * 复合门槛校验（路线B 模块C·第3步）— 扣费前只校验不扣减
+   *
+   * 校验项（全满足才放行）：
+   * ① 成长等级 ≥ min_growth_level_key（按 users.history_total_points 派生）
+   * ② extra_cost_assets 每项余额足够，且逐项过 AssetProductGuard 守卫（实物侧禁星石）
+   * ③ required_consume_items 每项持有量足够（status available 的 item 实例计数）
+   *
+   * @param {Object} ctx - { user_id, exchange_item_id, sku_id, quantity, itemTemplateId }
+   * @param {Object} options - { transaction }
+   * @returns {Promise<Object|null>} 待执行的额外消耗清单（无门槛返回 null）
+   * @throws {BusinessError} 缺项时抛出（提示具体缺哪项）
+   * @private
+   */
+  async _assertRedeemRequirement(ctx, options = {}) {
+    const { transaction } = options
+    const { user_id, exchange_item_id, sku_id, quantity, itemTemplateId } = ctx
+
+    if (!this.ExchangeRedeemRequirement) return null
+
+    const req = await this.ExchangeRedeemRequirement.getEffectiveRequirement(
+      exchange_item_id,
+      sku_id,
+      { transaction }
+    )
+    if (!req) return null
+
+    // 判断兑换目标是否"有价值"（实物/券），用于守卫分叉
+    let targetTemplate = null
+    if (itemTemplateId && this.ItemTemplate) {
+      targetTemplate = await this.ItemTemplate.findByPk(itemTemplateId, {
+        attributes: ['item_type', 'reference_price_points'],
+        transaction
+      })
+    }
+    const targetIsValuable = AssetProductGuard.isValuable(targetTemplate)
+
+    // ① 成长等级门槛
+    if (req.min_growth_level_key && this.UserGrowthLevel) {
+      const user = await this.models.User.findByPk(user_id, {
+        attributes: ['user_id', 'history_total_points'],
+        transaction
+      })
+      const levels = await this.UserGrowthLevel.getActiveLevels({ transaction })
+      const required = levels.find(l => l.level_key === req.min_growth_level_key)
+      const userPoints = Number(user?.history_total_points || 0)
+      if (required && userPoints < Number(required.min_history_points)) {
+        throw new BusinessError(
+          `成长等级不足：需达到「${required.level_name}」（累计积分 ${required.min_history_points}），当前 ${userPoints}`,
+          'REDEEM_GROWTH_LEVEL_INSUFFICIENT',
+          400
+        )
+      }
+    }
+
+    // ② 额外多资产：校验余额 + 逐项过守卫
+    const extraAssets = Array.isArray(req.extra_cost_assets) ? req.extra_cost_assets : []
+    const assetDeductions = []
+    for (const entry of extraAssets) {
+      const asset_code = entry.asset_code
+      const amount = Number(entry.amount) * quantity
+      if (!asset_code || !(amount > 0)) continue
+
+      // 守卫分叉：目标为实物/券时，额外资产禁含 star_stone（仅水晶系），由守卫统一裁决
+      AssetProductGuard.assertPriceAssetAllowed(
+        targetIsValuable ? { item_type: 'product' } : { item_type: 'prop' },
+        asset_code
+      )
+
+      const balanceResult = await BalanceService.getBalance(
+        { user_id, asset_code },
+        { transaction }
+      )
+      const available = Number(balanceResult.available_amount || 0)
+      if (available < amount) {
+        throw new BusinessError(
+          `门槛资产不足：需 ${amount} 个 ${asset_code}，当前可用 ${available}`,
+          'REDEEM_EXTRA_ASSET_INSUFFICIENT',
+          400
+        )
+      }
+      assetDeductions.push({ asset_code, amount })
+    }
+
+    // ③ 需消耗的指定道具：校验持有量
+    const consumeItems = Array.isArray(req.required_consume_items) ? req.required_consume_items : []
+    const itemConsumptions = []
+    if (consumeItems.length > 0) {
+      const userAccount = await this.models.Account.findOne({
+        where: { user_id, account_type: 'user' },
+        transaction
+      })
+      for (const ci of consumeItems) {
+        const item_template_id = ci.item_template_id
+        const needQty = Number(ci.quantity) * quantity
+        if (!item_template_id || !(needQty > 0)) continue
+
+        const heldItems = userAccount
+          ? await this.models.Item.findAll({
+              where: {
+                owner_account_id: userAccount.account_id,
+                item_template_id,
+                status: 'available'
+              },
+              attributes: ['item_id'],
+              limit: needQty,
+              transaction
+            })
+          : []
+        if (heldItems.length < needQty) {
+          throw new BusinessError(
+            `门槛道具不足：模板 ${item_template_id} 需 ${needQty} 件，当前持有 ${heldItems.length} 件`,
+            'REDEEM_CONSUME_ITEM_INSUFFICIENT',
+            400
+          )
+        }
+        itemConsumptions.push({
+          item_template_id,
+          item_ids: heldItems.map(i => i.item_id)
+        })
+      }
+    }
+
+    return { assetDeductions, itemConsumptions }
+  }
+
+  /**
+   * 复合门槛的额外消耗执行（与 _assertRedeemRequirement 对称，同一事务内）
+   *
+   * @param {Object} ctx - { user_id, idempotency_key, extraConsumption }
+   * @param {Object} options - { transaction }
+   * @returns {Promise<void>} 无返回值（事务内执行扣减与销毁）
+   * @private
+   */
+  async _consumeRedeemRequirement(ctx, options = {}) {
+    const { transaction } = options
+    const { user_id, idempotency_key, extraConsumption } = ctx
+    const { assetDeductions = [], itemConsumptions = [] } = extraConsumption
+
+    const burnAccount = await BalanceService.getOrCreateAccount(
+      { system_code: 'SYSTEM_BURN' },
+      { transaction }
+    )
+
+    // 额外资产逐项扣减（向 SYSTEM_BURN 销毁）
+    for (const ded of assetDeductions) {
+      // eslint-disable-next-line no-restricted-syntax, no-await-in-loop
+      await BalanceService.changeBalance(
+        {
+          user_id,
+          asset_code: ded.asset_code,
+          delta_amount: -ded.amount,
+          idempotency_key: `redeem_req_${idempotency_key}_${ded.asset_code}`,
+          business_type: 'exchange_redeem_requirement',
+          counterpart_account_id: burnAccount.account_id,
+          meta: { reason: 'redeem_threshold_extra_asset', asset_code: ded.asset_code }
+        },
+        { transaction }
+      )
+    }
+
+    // 指定道具逐件销毁
+    for (const ic of itemConsumptions) {
+      for (const item_id of ic.item_ids) {
+        // eslint-disable-next-line no-await-in-loop
+        await ItemService.consumeItem(
+          {
+            item_id,
+            operator_user_id: user_id,
+            business_type: 'exchange_redeem_requirement',
+            idempotency_key: `redeem_req_item_${idempotency_key}_${item_id}`,
+            meta: { reason: 'redeem_threshold_consume_item' }
+          },
+          { transaction }
+        )
+      }
+    }
+
+    logger.info('[兑换市场] 复合门槛额外消耗执行完成', {
+      user_id,
+      asset_count: assetDeductions.length,
+      item_count: itemConsumptions.reduce((s, c) => s + c.item_ids.length, 0)
+    })
+  }
+
+  /**
+   * 【管理端】列出某兑换商品的门槛配置（exchange_redeem_requirement）
+   *
+   * @param {number} exchange_item_id - 兑换商品ID
+   * @param {Object} [options={}] - 查询选项（可含 transaction）
+   * @returns {Promise<Array<Object>>} 门槛配置列表
+   */
+  async listRedeemRequirements(exchange_item_id, options = {}) {
+    if (!this.ExchangeRedeemRequirement) return []
+    const rows = await this.ExchangeRedeemRequirement.findAll({
+      where: { exchange_item_id },
+      order: [['exchange_redeem_requirement_id', 'ASC']],
+      transaction: options.transaction
+    })
+    return rows.map(r => r.toJSON())
+  }
+
+  /**
+   * 【管理端】创建/更新兑换门槛配置
+   *
+   * @param {Object} data - 门槛数据
+   * @param {number} data.exchange_item_id - 兑换商品ID（必填）
+   * @param {number} [data.sku_id] - SKU ID（可空=作用整个商品）
+   * @param {string} [data.min_growth_level_key] - 最低成长等级
+   * @param {Array} [data.extra_cost_assets] - 多资产组合 [{asset_code, amount}]
+   * @param {Array} [data.required_consume_items] - 消耗道具 [{item_template_id, quantity}]
+   * @param {boolean} [data.is_enabled] - 是否启用
+   * @param {Object} options - 选项（必须含 transaction）
+   * @returns {Promise<Object>} 保存后的门槛配置
+   */
+  async saveRedeemRequirement(data, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'CoreService.saveRedeemRequirement')
+    const {
+      exchange_redeem_requirement_id,
+      exchange_item_id,
+      sku_id = null,
+      min_growth_level_key = null,
+      extra_cost_assets = null,
+      required_consume_items = null,
+      required_badges = null,
+      required_tasks = null,
+      is_enabled = true,
+      publish_at = null,
+      unpublish_at = null
+    } = data
+
+    if (!exchange_item_id) {
+      throw new BusinessError('exchange_item_id 必填', 'REDEEM_REQ_INVALID_PARAMS', 400)
+    }
+
+    // 校验：目标商品存在；额外资产逐项过守卫（实物侧禁星石）
+    const exchangeItem = await this.ExchangeItem.findByPk(exchange_item_id, {
+      include: [{ model: this.ItemTemplate, as: 'itemTemplate', required: false }],
+      transaction
+    })
+    if (!exchangeItem) {
+      throw new BusinessError('兑换商品不存在', 'EXCHANGE_ITEM_NOT_FOUND', 404)
+    }
+    const targetTemplate = exchangeItem.itemTemplate || null
+    const targetIsValuable = AssetProductGuard.isValuable(targetTemplate)
+    if (Array.isArray(extra_cost_assets)) {
+      for (const entry of extra_cost_assets) {
+        AssetProductGuard.assertPriceAssetAllowed(
+          targetIsValuable ? { item_type: 'product' } : { item_type: 'prop' },
+          entry.asset_code
+        )
+      }
+    }
+
+    const payload = {
+      exchange_item_id,
+      sku_id,
+      min_growth_level_key,
+      extra_cost_assets,
+      required_consume_items,
+      required_badges,
+      required_tasks,
+      is_enabled: !!is_enabled,
+      publish_at,
+      unpublish_at
+    }
+
+    let record
+    if (exchange_redeem_requirement_id) {
+      record = await this.ExchangeRedeemRequirement.findByPk(exchange_redeem_requirement_id, {
+        transaction
+      })
+      if (!record) {
+        throw new BusinessError('门槛配置不存在', 'REDEEM_REQ_NOT_FOUND', 404)
+      }
+      await record.update(payload, { transaction })
+    } else {
+      record = await this.ExchangeRedeemRequirement.create(payload, { transaction })
+    }
+    logger.info('[兑换市场] 门槛配置已保存', {
+      exchange_redeem_requirement_id: record.exchange_redeem_requirement_id,
+      exchange_item_id
+    })
+    return record.toJSON()
+  }
+
+  /**
+   * 【管理端】删除兑换门槛配置（配置类数据，硬删除）
+   *
+   * @param {number} exchange_redeem_requirement_id - 门槛配置ID
+   * @param {Object} options - 选项（必须含 transaction）
+   * @returns {Promise<Object>} 删除结果
+   */
+  async deleteRedeemRequirement(exchange_redeem_requirement_id, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'CoreService.deleteRedeemRequirement')
+    const record = await this.ExchangeRedeemRequirement.findByPk(exchange_redeem_requirement_id, {
+      transaction
+    })
+    if (!record) {
+      throw new BusinessError('门槛配置不存在', 'REDEEM_REQ_NOT_FOUND', 404)
+    }
+    await record.destroy({ transaction })
+    logger.info('[兑换市场] 门槛配置已删除', { exchange_redeem_requirement_id })
+    return { exchange_redeem_requirement_id, deleted: true }
   }
 
   /**

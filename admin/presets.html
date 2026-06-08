@@ -14,7 +14,7 @@
       <div class="flex items-center justify-between">
         <div>
           <h1 class="text-xl font-bold flex items-center gap-2">📋 预设队列管理</h1>
-          <p class="text-indigo-200 text-sm mt-1">为用户安排多次连续中奖剧本，按队列顺序逐次命中</p>
+          <p class="text-indigo-200 text-sm mt-1">为用户安排多次连续回馈剧本，按队列顺序逐次命中</p>
         </div>
         <div class="flex items-center gap-3">
           <span class="text-indigo-200 text-sm" x-text="'欢迎，' + (current_user?.nickname || '管理员')"></span>
@@ -43,15 +43,15 @@
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
           <div class="guide-step text-sm text-slate-600" data-step="1">
             <strong class="text-slate-800">创建队列</strong>
-            <p class="mt-0.5">输入用户手机号，按顺序添加多个奖品，形成「中奖剧本」</p>
+            <p class="mt-0.5">输入用户手机号，按顺序添加多个奖品，形成「回馈剧本」</p>
           </div>
           <div class="guide-step text-sm text-slate-600" data-step="2">
             <strong class="text-slate-800">逐次消耗</strong>
-            <p class="mt-0.5">用户每次抽奖按 queue_order 顺序命中对应奖品，直到队列耗尽</p>
+            <p class="mt-0.5">用户每次回馈按 queue_order 顺序命中对应奖品，直到队列耗尽</p>
           </div>
           <div class="guide-step text-sm text-slate-600" data-step="3">
             <strong class="text-slate-800">恢复正常</strong>
-            <p class="mt-0.5">队列全部消耗后，用户恢复正常概率抽奖，不留痕迹</p>
+            <p class="mt-0.5">队列全部消耗后，用户恢复正常概率回馈，不留痕迹</p>
           </div>
         </div>
         <div class="mt-3 p-2.5 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700 flex items-start gap-1.5">
@@ -277,7 +277,7 @@
                  class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-400">
         </div>
         <div>
-          <label class="block text-sm font-medium text-slate-700 mb-1.5">中奖剧本 <span class="text-slate-400 text-xs font-normal">（按顺序依次消耗）</span></label>
+          <label class="block text-sm font-medium text-slate-700 mb-1.5">回馈剧本 <span class="text-slate-400 text-xs font-normal">（按顺序依次消耗）</span></label>
           <div class="space-y-2">
             <template x-for="(item, index) in createPresetForm.presets" :key="index">
               <div class="flex items-center gap-2">
@@ -295,7 +295,7 @@
             </template>
           </div>
           <button @click="addPresetItem()" class="mt-2 text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1">
-            <span>➕</span> 添加下一次中奖
+            <span>➕</span> 添加下一次回馈
           </button>
         </div>
       </div>

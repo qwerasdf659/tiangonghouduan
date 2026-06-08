@@ -1,5 +1,5 @@
 /**
- * 餐厅积分抽奖系统 V4.2 - 兑换核销码生成器（RedemptionCodeGenerator）
+ * 天工商户营销平台 V4.2 - 兑换核销码生成器（RedemptionCodeGenerator）
  *
  * 业务场景：为物品实例生成唯一的12位Base32核销码
  *

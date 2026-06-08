@@ -333,7 +333,7 @@ function dashboardPanelPage() {
           backgroundColor: 'rgba(255,255,255,0.95)',
           borderColor: '#e2e8f0'
         },
-        legend: { data: ['中奖率', '抽奖次数'], bottom: 0 },
+        legend: { data: ['发放率', '回馈次数'], bottom: 0 },
         grid: { left: '3%', right: '4%', bottom: '15%', top: '10%', containLabel: true },
         xAxis: {
           type: 'category',
@@ -343,15 +343,15 @@ function dashboardPanelPage() {
         yAxis: [
           {
             type: 'value',
-            name: '中奖率(%)',
+            name: '发放率(%)',
             axisLine: { show: false },
             splitLine: { lineStyle: { color: '#f1f5f9' } }
           },
-          { type: 'value', name: '抽奖次数', axisLine: { show: false } }
+          { type: 'value', name: '回馈次数', axisLine: { show: false } }
         ],
         series: [
           {
-            name: '中奖率',
+            name: '发放率',
             type: 'line',
             smooth: true,
             data: data.map(d => d.win_rate),
@@ -371,7 +371,7 @@ function dashboardPanelPage() {
             }
           },
           {
-            name: '抽奖次数',
+            name: '回馈次数',
             type: 'bar',
             yAxisIndex: 1,
             data: data.map(d => d.draws),
@@ -764,8 +764,8 @@ function dashboardPanelPage() {
           // 根据后端实际数据构建流入流出
           const inflows = [
             {
-              type: 'lottery_win',
-              label: '抽奖获得',
+            type: 'lottery_win',
+            label: '回馈获得',
               amount: points_stats?.points_earned_today || 0
             },
             { type: 'activity', label: '活动奖励', amount: inventory_stats?.new_items_today || 0 }
@@ -773,8 +773,8 @@ function dashboardPanelPage() {
 
           const outflows = [
             {
-              type: 'lottery_cost',
-              label: '抽奖消耗',
+            type: 'lottery_cost',
+            label: '回馈消耗',
               amount: lottery_stats?.total_points_consumed || 0
             },
             {
@@ -1271,13 +1271,13 @@ function dashboardPanelPage() {
       // 字段适配后端API: lottery_rate, consumption_rate, exchange_rate
       const option = {
         tooltip: { trigger: 'axis' },
-        legend: { data: ['抽奖率', '消费率', '兑换率'], bottom: 0 },
+        legend: { data: ['回馈率', '消费率', '兑换率'], bottom: 0 },
         grid: { left: '3%', right: '4%', bottom: '15%', top: '10%', containLabel: true },
         xAxis: { type: 'category', data: data.map(d => d.date) },
         yAxis: { type: 'value', name: '%', max: 100 },
         series: [
           {
-            name: '抽奖率',
+            name: '回馈率',
             type: 'line',
             smooth: true,
             data: data.map(d => d.lottery_rate),

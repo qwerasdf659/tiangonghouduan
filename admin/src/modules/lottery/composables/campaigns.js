@@ -79,10 +79,10 @@ export function useCampaignsState() {
     },
     /** @type {Array} 活动类型选项 */
     campaignTypeOptions: [
-      { value: 'daily', label: '每日抽奖' },
-      { value: 'weekly', label: '每周抽奖' },
-      { value: 'event', label: '活动抽奖' },
-      { value: 'permanent', label: '常驻抽奖' }
+      { value: 'daily', label: '每日回馈' },
+      { value: 'weekly', label: '每周回馈' },
+      { value: 'event', label: '活动回馈' },
+      { value: 'permanent', label: '常驻回馈' }
     ],
     /** @type {Array} 玩法类型选项（14种，对应 display_mode 字段） */
     displayModeOptions: [
@@ -450,11 +450,11 @@ export function useCampaignsMethods(_context) {
           rules_text: this.campaignForm.rules_text || '',
           prize_distribution_config: {
             tiers: [
-              { tier_id: 1, tier_name: '特等奖', weight: 1000 },
-              { tier_id: 2, tier_name: '一等奖', weight: 9000 },
-              { tier_id: 3, tier_name: '二等奖', weight: 90000 },
-              { tier_id: 4, tier_name: '三等奖', weight: 400000 },
-              { tier_id: 5, tier_name: '谢谢参与', weight: 500000 }
+              { tier_id: 1, tier_name: '头号好礼', weight: 1000 },
+              { tier_id: 2, tier_name: '尊享回馈', weight: 9000 },
+              { tier_id: 3, tier_name: '优享回馈', weight: 90000 },
+              { tier_id: 4, tier_name: '常享回馈', weight: 400000 },
+              { tier_id: 5, tier_name: '基础礼遇', weight: 500000 }
             ]
           },
           // ======== 抽奖引擎核心配置 ========

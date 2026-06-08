@@ -196,7 +196,7 @@ class UserGrowthLevelService {
         config_key,
         numericMultiplier,
         {
-          description: `成长等级 ${level_key} 中奖率倍数（B 线公示分级概率）`,
+          description: `成长等级 ${level_key} 发放率倍数（B 线公示分级概率）`,
           updated_by: operated_by,
           lottery_campaign_id,
           transaction: options.transaction
@@ -213,6 +213,109 @@ class UserGrowthLevelService {
     })
 
     return written
+  }
+
+  /**
+   * 更新成长等级定义（管理 API：运营自助调阈值/名称/状态）
+   *
+   * 校验：
+   * - 等级必须存在
+   * - min_history_points 不得为负
+   * - 阈值不得与相邻等级倒挂（低 sort_order 的阈值必须 ≤ 高 sort_order 的阈值）
+   *
+   * @param {number} user_growth_level_id - 成长等级主键
+   * @param {Object} updates - 可更新字段 {level_name, min_history_points, sort_order, status, description}
+   * @param {number} operated_by - 操作管理员ID
+   * @param {Object} options - 选项（必须含 transaction）
+   * @returns {Promise<Object>} 更新后的等级
+   */
+  async updateGrowthLevel(user_growth_level_id, updates, operated_by, options = {}) {
+    if (!options.transaction) {
+      throw new Error('updateGrowthLevel 必须在事务内执行（options.transaction 缺失）')
+    }
+
+    const level = await this.UserGrowthLevel.findByPk(user_growth_level_id, {
+      transaction: options.transaction
+    })
+    if (!level) {
+      const err = new Error('成长等级不存在')
+      err.statusCode = 404
+      err.code = 'GROWTH_LEVEL_NOT_FOUND'
+      throw err
+    }
+
+    const allowed = {}
+    if (updates.level_name !== undefined) allowed.level_name = String(updates.level_name).trim()
+    if (updates.sort_order !== undefined) allowed.sort_order = parseInt(updates.sort_order, 10)
+    if (updates.status !== undefined) {
+      if (!['active', 'inactive'].includes(updates.status)) {
+        const err = new Error('status 只能是 active 或 inactive')
+        err.statusCode = 400
+        err.code = 'INVALID_STATUS'
+        throw err
+      }
+      allowed.status = updates.status
+    }
+    if (updates.description !== undefined) allowed.description = updates.description
+    if (updates.min_history_points !== undefined) {
+      const points = parseInt(updates.min_history_points, 10)
+      if (!Number.isInteger(points) || points < 0) {
+        const err = new Error('min_history_points 必须为非负整数')
+        err.statusCode = 400
+        err.code = 'INVALID_MIN_HISTORY_POINTS'
+        throw err
+      }
+      allowed.min_history_points = points
+    }
+
+    // 阈值倒挂校验：以更新后的全量等级排序，确保 sort_order 升序时 min_history_points 不下降
+    if (allowed.min_history_points !== undefined || allowed.sort_order !== undefined) {
+      const all = await this.UserGrowthLevel.findAll({ transaction: options.transaction })
+      const merged = all.map(l => {
+        if (l.user_growth_level_id === level.user_growth_level_id) {
+          return {
+            sort_order: allowed.sort_order ?? l.sort_order,
+            min_history_points: allowed.min_history_points ?? l.min_history_points,
+            level_key: l.level_key
+          }
+        }
+        return {
+          sort_order: l.sort_order,
+          min_history_points: l.min_history_points,
+          level_key: l.level_key
+        }
+      })
+      merged.sort((a, b) => a.sort_order - b.sort_order)
+      for (let i = 1; i < merged.length; i++) {
+        if (merged[i].min_history_points < merged[i - 1].min_history_points) {
+          const err = new Error(
+            `阈值倒挂：等级 ${merged[i].level_key}(排序${merged[i].sort_order}) 的阈值 ` +
+              `${merged[i].min_history_points} 低于前一档 ${merged[i - 1].level_key} 的 ${merged[i - 1].min_history_points}`
+          )
+          err.statusCode = 400
+          err.code = 'GROWTH_LEVEL_THRESHOLD_INVERSION'
+          throw err
+        }
+      }
+    }
+
+    await level.update(allowed, { transaction: options.transaction })
+
+    logger.info('[UserGrowthLevelService] 成长等级定义已更新', {
+      user_growth_level_id,
+      operated_by,
+      updated_fields: Object.keys(allowed)
+    })
+
+    return {
+      user_growth_level_id: level.user_growth_level_id,
+      level_key: level.level_key,
+      level_name: level.level_name,
+      min_history_points: level.min_history_points,
+      sort_order: level.sort_order,
+      status: level.status,
+      description: level.description
+    }
   }
 }
 

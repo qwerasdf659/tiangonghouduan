@@ -101,7 +101,7 @@ document.addEventListener('alpine:init', () => {
     /** 页面位置 → 中文 */
     POSITION_MAP: {
       home: '首页',
-      lottery: '抽奖页',
+      lottery: '回馈页',
       profile: '个人中心'
     },
     /** 竞价落选原因 → 中文 */
@@ -128,7 +128,7 @@ document.addEventListener('alpine:init', () => {
     },
     /** 转化类型 → 中文 + 颜色 */
     CONVERSION_MAP: {
-      lottery_draw: { text: '抽奖', color: 'bg-purple-100 text-purple-700' },
+      lottery_draw: { text: '回馈', color: 'bg-purple-100 text-purple-700' },
       exchange: { text: '兑换', color: 'bg-blue-100 text-blue-700' },
       market_buy: { text: '市场购买', color: 'bg-green-100 text-green-700' },
       page_view: { text: '页面浏览', color: 'bg-gray-100 text-gray-700' }
@@ -144,9 +144,9 @@ document.addEventListener('alpine:init', () => {
     },
     /** DMP 标签键 → 中文说明 */
     TAG_KEY_MAP: {
-      lottery_active_7d: '7天抽奖活跃',
-      lottery_active_30d: '30天抽奖活跃',
-      lottery_total_count: '累计抽奖次数',
+      lottery_active_7d: '7天回馈活跃',
+      lottery_active_30d: '30天回馈活跃',
+      lottery_total_count: '累计回馈次数',
       star_stone_balance: '星石余额',
       star_stone_rich: '星石富豪',
       has_red_core_shard: '持有红源晶碎片',

@@ -75,7 +75,7 @@ export function userDrawer(_config = {}) {
     // Tab 配置
     tabs: [
       { id: 'basic', label: '基本信息', icon: '📊' },
-      { id: 'lottery', label: '抽奖记录', icon: '🎰' },
+      { id: 'lottery', label: '回馈记录', icon: '🎰' },
       { id: 'consumption', label: '消费记录', icon: '💳' },
       { id: 'assets', label: '资产明细', icon: '💰' },
       { id: 'behavior', label: '行为轨迹', icon: '👣' }
@@ -397,7 +397,7 @@ export function userDrawer(_config = {}) {
     _getBehaviorLabel(type) {
       const labels = {
         login: '登录系统',
-        lottery: '参与抽奖',
+        lottery: '参与回馈',
         consume: '消费购买',
         consumption: '消费购买',
         exchange: '兑换商品',

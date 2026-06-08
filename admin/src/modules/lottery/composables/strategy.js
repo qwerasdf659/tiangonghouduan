@@ -530,7 +530,7 @@ export function useStrategyMethods() {
         probability: '概率策略',
         frequency: '频率控制',
         budget: '预算管理',
-        win_rate: '中奖率配置',
+        win_rate: '发放率配置',
         empty_weight: '空奖权重',
         user: '用户限制',
         other: '其他策略'
@@ -545,7 +545,7 @@ export function useStrategyMethods() {
      */
     getStrategyGroupDescription(groupName) {
       const descriptions = {
-        anti_empty: '防止用户连续多次抽奖都不中奖，达到阈值后自动提升中奖概率',
+        anti_empty: '防止用户连续多次参与都未获得回馈，达到阈值后自动提升回馈概率',
         anti_high: '防止用户连续获得高价值奖品，达到阈值后降低高档位概率',
         pity: '当用户连续未获得好奖品时，自动触发保底奖励',
         luck_debt: '追踪用户的运气偏差度，自动回归均值',
@@ -556,11 +556,11 @@ export function useStrategyMethods() {
         tier_fallback: '当某档位奖品库存耗尽时的兜底替代奖品',
         preset: '运气债务预设队列开关，控制是否启用预设结果',
         probability: '控制各档位奖品的基础概率分配',
-        frequency: '限制抽奖频率，防止异常高频操作',
+        frequency: '限制回馈频率，防止异常高频操作',
         budget: '控制奖品发放预算上限和速率',
-        win_rate: '设置不同场景下的基础中奖概率',
+        win_rate: '设置不同场景下的基础发放概率',
         empty_weight: '调节空奖权重，优化用户体验',
-        user: '针对单个用户的抽奖频次和额度限制',
+        user: '针对单个用户的回馈频次和额度限制',
         other: '其他辅助性策略参数配置'
       }
       return descriptions[groupName] || ''
@@ -682,8 +682,8 @@ export function useStrategyMethods() {
         luck_debt: '运气债务',
         hard_guarantee_threshold: '硬保底阈值',
         expected_empty_rate: '预期空奖率',
-        min_draw_count: '最少抽奖次数',
-        recent_draw_window: '近期抽奖窗口',
+        min_draw_count: '最少回馈次数',
+        recent_draw_window: '近期回馈窗口',
         empty_streak_threshold: '连空触发阈值',
         high_streak_threshold: '连高触发阈值',
         multiplier_table: '保底倍率表',
@@ -700,7 +700,7 @@ export function useStrategyMethods() {
      */
     getConfigKeyDescription(configKey) {
       const descriptions = {
-        anti_empty: '防止用户连续多次抽奖都不中奖，达到阈值后自动提升中奖概率',
+        anti_empty: '防止用户连续多次参与都未获得回馈，达到阈值后自动提升回馈概率',
         anti_high: '防止用户连续获得高价值奖品，达到阈值后降低高档位概率',
         amt_high: '金额达到此值及以上视为高档位奖品',
         amt_low: '金额低于此值视为低档位奖品',
@@ -710,13 +710,13 @@ export function useStrategyMethods() {
         threshold_mid: '触发中档位调控的连续次数阈值',
         pity: '当用户连续未获得好奖品时，自动触发保底奖励',
         luck_debt: '追踪用户的运气偏差度，自动回归均值',
-        hard_guarantee_threshold: '绝对保底次数，超过此次数必定中高档奖品',
+        hard_guarantee_threshold: '绝对保底次数，超过此次数必定发放高档奖品',
         expected_empty_rate: '系统预期的正常空奖概率比例',
-        min_draw_count: '策略生效所需的最少抽奖次数',
-        recent_draw_window: '参与策略计算的近期抽奖记录数量',
+        min_draw_count: '策略生效所需的最少回馈次数',
+        recent_draw_window: '参与策略计算的近期回馈记录数量',
         empty_streak_threshold: '连续空奖达到此次数后触发保护机制',
         high_streak_threshold: '连续获得高奖品达到此次数后触发限制',
-        multiplier_table: '保底系统的连续未中奖次数对应的概率提升倍率映射表',
+        multiplier_table: '保底系统的连续空奖次数对应的概率提升倍率映射表',
         min_non_empty_cost: '最低非空奖品的成本阈值，用于保底系统判断'
       }
       return descriptions[configKey] || ''

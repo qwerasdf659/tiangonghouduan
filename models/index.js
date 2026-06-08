@@ -1,5 +1,5 @@
 /**
- * 餐厅积分抽奖系统 V4.0 - 模型统一导出（V15.0 UUID角色系统版）
+ * 天工商户营销平台 V4.0 - 模型统一导出（V15.0 UUID角色系统版）
  * 清理了无效的模型引用，只保留实际存在的模型
  * V15.0更新：集成UUID角色系统（role_level >= 100 为管理员）
  */
@@ -449,6 +449,11 @@ models.ExchangeItemAttributeValue = require('./ExchangeItemAttributeValue')(sequ
 models.ExchangeItemSku = require('./ExchangeItemSku')(sequelize, DataTypes)
 models.SkuAttributeValue = require('./SkuAttributeValue')(sequelize, DataTypes)
 models.ExchangeChannelPrice = require('./ExchangeChannelPrice')(sequelize, DataTypes)
+models.ExchangeRedeemRequirement = require('./ExchangeRedeemRequirement')(sequelize, DataTypes)
+// 🎨 星石虚拟装饰体系（模块D：纯展示零数值，星石明码标价）
+models.DecorationSeason = require('./DecorationSeason')(sequelize, DataTypes)
+models.DecorationSku = require('./DecorationSku')(sequelize, DataTypes)
+models.UserOwnedDecoration = require('./UserOwnedDecoration')(sequelize, DataTypes)
 
 // 🔴 兑换市场系统
 

@@ -7,7 +7,7 @@
  * @date 2026-02-06
  */
 
-import { logger, $confirm, formatDateTimeShort } from '../../../utils/index.js'
+import { logger, $confirm, formatDateTimeShort, generateUUID } from '../../../utils/index.js'
 import { API_PREFIX, request } from '../../../api/base.js'
 
 const API_BASE_URL = API_PREFIX
@@ -507,7 +507,7 @@ export function useAdjustmentMethods() {
           asset_code: this.adjustForm.asset_code,
           amount: amount,
           reason: this.adjustForm.reason,
-          idempotency_key: `asset_adjust_${this.current_user.user_id}_${this.adjustForm.asset_code}_${crypto.randomUUID()}`
+          idempotency_key: `asset_adjust_${this.current_user.user_id}_${this.adjustForm.asset_code}_${generateUUID()}`
         }
 
         if (this.adjustForm.asset_code === 'budget_points') {
@@ -676,7 +676,7 @@ export function useAdjustmentMethods() {
           asset_code: assetCode,
           amount: amount,
           reason: `[${this.form.reason_type}] ${this.form.reason}`,
-          idempotency_key: `admin_adjust_${this.current_user?.user_id || 0}_${this.form.user_id}_${assetCode}_${crypto.randomUUID()}`
+          idempotency_key: `admin_adjust_${this.current_user?.user_id || 0}_${this.form.user_id}_${assetCode}_${generateUUID()}`
         }
 
         if (this.form.asset_type === 'budget_points' && this.form.campaign_id) {

@@ -443,7 +443,7 @@ export function usePendingMethods() {
       const labels = {
         consumption: '消耗审核',
         customer_service: '客服会话',
-        lottery_alert: '抽奖告警',
+        lottery_alert: '回馈告警',
         risk_alert: '风控告警',
         refund: '退款申请',
         redemption: '兑换核销',

@@ -1,5 +1,5 @@
 /**
- * 餐厅积分抽奖系统 - SystemSettings 启动预检器
+ * 天工商户营销平台 - SystemSettings 启动预检器
  *
  * @description 应用启动时强制预检关键配置，确保配置完整性
  * @version 1.0.0

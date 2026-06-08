@@ -55,7 +55,7 @@ class SystemSettings extends Model {
    *
    * @example
    * const setting = await SystemSettings.findOne({ where: { setting_key: 'system_name' }})
-   * console.log(setting.getParsedValue()) // "餐厅抽奖系统"
+   * console.log(setting.getParsedValue()) // "天工平台"
    */
   getParsedValue() {
     const { setting_value, value_type } = this

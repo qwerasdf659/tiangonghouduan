@@ -100,7 +100,7 @@
         <div class="gradient-stat-card gradient-stat-green">
           <div class="flex justify-between items-center">
             <div class="flex-1">
-              <p class="stat-label">抽奖次数</p>
+              <p class="stat-label">回馈次数</p>
               <h3 class="stat-value" x-text="getAnimatedValue('total_draws')">-</h3>
               <span class="stat-trend">
                 <span x-text="stats.draw_trend >= 0 ? '↑' : '↓'"></span>
@@ -116,7 +116,7 @@
         <div class="gradient-stat-card gradient-stat-orange">
           <div class="flex justify-between items-center">
             <div class="flex-1">
-              <p class="stat-label">中奖率</p>
+              <p class="stat-label">发放率</p>
               <h3 class="stat-value">
                 <span x-text="getAnimatedValue('win_rate')">-</span><span class="text-xl">%</span>
               </h3>
@@ -178,17 +178,17 @@
         </div>
       </div>
 
-      <!-- 抽奖统计 -->
+      <!-- 回馈统计 -->
       <div class="content-section">
         <div class="content-section-header">
           <div class="section-title">
             <span class="title-icon">🎁</span>
-            抽奖统计
+            回馈统计
           </div>
         </div>
         <div class="content-section-body grid grid-cols-2 gap-4">
           <div class="text-center p-3 bg-blue-50 rounded-lg border border-blue-100">
-            <p class="text-gray-500 text-sm">总抽奖次数</p>
+            <p class="text-gray-500 text-sm">总回馈次数</p>
             <h4 class="text-xl font-bold text-blue-600" x-text="lotteryStats.total_draws">0</h4>
           </div>
           <div class="text-center p-3 bg-yellow-50 rounded-lg border border-yellow-100">
@@ -200,7 +200,7 @@
             <h4 class="text-xl font-bold text-green-600" x-text="lotteryStats.regular_wins">0</h4>
           </div>
           <div class="text-center p-3 bg-rose-50 rounded-lg border border-rose-100">
-            <p class="text-gray-500 text-sm">中奖率</p>
+            <p class="text-gray-500 text-sm">发放率</p>
             <h4 class="text-xl font-bold text-rose-600" x-text="lotteryStats.win_rate + '%'">0%</h4>
           </div>
         </div>
@@ -290,8 +290,8 @@
             <thead class="themed-bg-base">
               <tr>
                 <th class="px-3 py-2 text-left font-medium themed-text-muted" x-text="multiDimensionFilters.dimension_display || getDimensionName(multiDimensionFilters.dimension)"></th>
-                <th class="px-3 py-2 text-right font-medium themed-text-muted">抽奖次数</th>
-                <th class="px-3 py-2 text-right font-medium themed-text-muted">中奖率</th>
+                <th class="px-3 py-2 text-right font-medium themed-text-muted">回馈次数</th>
+                <th class="px-3 py-2 text-right font-medium themed-text-muted">发放率</th>
                 <template x-if="multiDimensionData.comparison">
                   <th class="px-3 py-2 text-right font-medium themed-text-muted">同比变化</th>
                 </template>
@@ -303,9 +303,9 @@
                 <tr class="themed-hover-bg">
                   <!-- 显示维度值：门店名/活动名/时间周期 - 使用后端字段名 -->
                   <td class="px-3 py-2" x-text="item.store_name || item.name || item.period || ('活动#' + item.lottery_campaign_id) || '未知'"></td>
-                  <!-- 抽奖次数：后端字段为 draws -->
+                  <!-- 回馈次数：后端字段为 draws -->
                   <td class="px-3 py-2 text-right tabular-nums" x-text="(item.draws || 0).toLocaleString()"></td>
-                  <!-- 中奖率：后端字段为 win_rate -->
+                  <!-- 发放率：后端字段为 win_rate -->
                   <td class="px-3 py-2 text-right tabular-nums" x-text="(item.win_rate || 0).toFixed(2) + '%'"></td>
                   <template x-if="multiDimensionData.comparison && item.change !== undefined">
                     <td class="px-3 py-2 text-right">
@@ -436,7 +436,7 @@
           <div class="flex flex-wrap gap-2">
             <label class="flex items-center">
               <input type="checkbox" value="draw_count" x-model="reportTemplateForm.metrics" class="mr-2">
-              <span class="text-sm">抽奖次数</span>
+              <span class="text-sm">回馈次数</span>
             </label>
             <label class="flex items-center">
               <input type="checkbox" value="consumption" x-model="reportTemplateForm.metrics" class="mr-2">
@@ -448,7 +448,7 @@
             </label>
             <label class="flex items-center">
               <input type="checkbox" value="win_rate" x-model="reportTemplateForm.metrics" class="mr-2">
-              <span class="text-sm">中奖率</span>
+              <span class="text-sm">发放率</span>
             </label>
           </div>
         </div>

@@ -335,7 +335,7 @@ function analyticsPage() {
         yAxis: { type: 'value', min: 0 },
         series: [
           {
-            name: '抽奖次数',
+            name: '回馈次数',
             type: 'bar',
             barWidth: '60%',
             itemStyle: { color: barColor },
@@ -842,8 +842,8 @@ function analyticsPage() {
         exportData.push(['指标', '数值'])
         exportData.push(['活跃用户数', this.stats.active_users || 0])
         exportData.push(['总用户数', this.stats.total_users || 0])
-        exportData.push(['抽奖次数', this.stats.lottery_count || 0])
-        exportData.push(['高级抽奖次数', this.stats.high_tier_draws || 0])
+        exportData.push(['回馈次数', this.stats.lottery_count || 0])
+        exportData.push(['高级回馈次数', this.stats.high_tier_draws || 0])
         exportData.push(['积分发放', this.stats.points_issued || 0])
         exportData.push(['积分消耗', this.stats.points_spent || 0])
         exportData.push(['兑换订单数', this.stats.exchange_orders || 0])
@@ -853,7 +853,7 @@ function analyticsPage() {
         // 如果有每日明细数据，也导出
         if (this.dailyStats && this.dailyStats.length > 0) {
           exportData.push(['====== 每日明细数据 ======'])
-          exportData.push(['日期', '活跃用户', '抽奖次数', '积分发放', '积分消耗'])
+          exportData.push(['日期', '活跃用户', '回馈次数', '积分发放', '积分消耗'])
           this.dailyStats.forEach(day => {
             exportData.push([
               day.date || day.time || '-',

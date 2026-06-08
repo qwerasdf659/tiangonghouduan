@@ -128,8 +128,8 @@
           </template>
           <template x-if="todoPending.lottery_alert > 0">
             <a href="/admin/lottery-alerts.html" class="flex items-center gap-1 text-yellow-700 hover:text-yellow-900 cursor-pointer"
-               @click.prevent="$dispatch('open-tab', {id:'lottery-alerts', title:'抽奖告警', icon:'🎰', url:'/admin/lottery-alerts.html'})">
-              🎰 抽奖告警 <span class="font-bold" x-text="todoPending.lottery_alert">0</span>
+               @click.prevent="$dispatch('open-tab', {id:'lottery-alerts', title:'回馈告警', icon:'🎰', url:'/admin/lottery-alerts.html'})">
+              🎰 回馈告警 <span class="font-bold" x-text="todoPending.lottery_alert">0</span>
             </a>
           </template>
         </div>
@@ -153,7 +153,7 @@
           class="tab-btn flex items-center gap-2 px-6 py-4 text-sm themed-text whitespace-nowrap"
         >
           <span>🎰</span>
-          <span>抽奖分析</span>
+          <span>回馈分析</span>
         </button>
         <button 
           @click="activeTab = 'user'"
@@ -248,7 +248,7 @@
               <template x-for="(value, key) in healthScore.components" :key="key">
                 <div class="text-center">
                   <div class="text-lg font-semibold themed-text" x-text="typeof value === 'object' ? value.score : value"></div>
-                  <div class="text-xs themed-text-muted" x-text="({'prize_pool':'奖品池','user_experience':'用户体验','budget_health':'预算健康','system_performance':'系统性能','draw_quality':'抽奖质量','strategy_effectiveness':'策略效果','data_integrity':'数据完整性'})[key] || key.replace(/_/g, ' ')"></div>
+                  <div class="text-xs themed-text-muted" x-text="({'prize_pool':'奖品池','user_experience':'用户体验','budget_health':'预算健康','system_performance':'系统性能','draw_quality':'回馈质量','strategy_effectiveness':'策略效果','data_integrity':'数据完整性'})[key] || key.replace(/_/g, ' ')"></div>
                 </div>
               </template>
             </div>
@@ -257,7 +257,7 @@
 
         <!-- 核心指标卡片 - 5个 -->
         <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-          <!-- 今日抽奖次数 -->
+          <!-- 今日回馈次数 -->
           <div class="stat-card themed-card rounded-xl p-5">
             <div class="flex items-center justify-between">
               <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -275,7 +275,7 @@
             </div>
             <div class="mt-4">
               <div class="text-2xl font-bold themed-text" x-text="formatNumber(stats.lottery_count || 0)">0</div>
-              <div class="text-sm themed-text-muted">今日抽奖次数</div>
+              <div class="text-sm themed-text-muted">今日回馈次数</div>
             </div>
           </div>
           
@@ -301,7 +301,7 @@
             </div>
           </div>
           
-          <!-- 中奖率 -->
+          <!-- 发放率 -->
           <div class="stat-card themed-card rounded-xl p-5">
             <div class="flex items-center justify-between">
               <div class="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
@@ -319,7 +319,7 @@
             </div>
             <div class="mt-4">
               <div class="text-2xl font-bold themed-text" x-text="(stats.win_rate || 0).toFixed(1) + '%'">0%</div>
-              <div class="text-sm themed-text-muted">中奖率</div>
+              <div class="text-sm themed-text-muted">发放率</div>
             </div>
           </div>
           
@@ -466,9 +466,9 @@
                 <span class="text-sm font-semibold themed-text">日环比（今日 vs 昨日）</span>
               </div>
               <div class="space-y-3">
-                <!-- 抽奖次数对比 -->
+                <!-- 回馈次数对比 -->
                 <div class="flex items-center justify-between">
-                  <span class="text-sm themed-text-muted">抽奖次数</span>
+                  <span class="text-sm themed-text-muted">回馈次数</span>
                   <div class="flex items-center gap-2">
                     <span class="text-sm font-medium themed-text" x-text="formatNumber(comparison.day_comparison.lottery_draws?.current || 0)">--</span>
                     <span 
@@ -502,9 +502,9 @@
                     </span>
                   </div>
                 </div>
-                <!-- 中奖率对比 -->
+                <!-- 发放率对比 -->
                 <div class="flex items-center justify-between">
-                  <span class="text-sm themed-text-muted">中奖率</span>
+                  <span class="text-sm themed-text-muted">发放率</span>
                   <div class="flex items-center gap-2">
                     <span class="text-sm font-medium themed-text" x-text="(comparison.day_comparison.win_rate?.current || 0).toFixed(1) + '%'">--</span>
                     <span 
@@ -530,9 +530,9 @@
                 <span class="text-sm font-semibold themed-text">周同比（本周 vs 上周）</span>
               </div>
               <div class="space-y-3">
-                <!-- 抽奖次数对比 -->
+                <!-- 回馈次数对比 -->
                 <div class="flex items-center justify-between">
-                  <span class="text-sm themed-text-muted">抽奖次数</span>
+                  <span class="text-sm themed-text-muted">回馈次数</span>
                   <div class="flex items-center gap-2">
                     <span class="text-sm font-medium themed-text" x-text="formatNumber(comparison.week_comparison.lottery_draws?.current || 0)">--</span>
                     <span 
@@ -566,9 +566,9 @@
                     </span>
                   </div>
                 </div>
-                <!-- 中奖率对比 -->
+                <!-- 发放率对比 -->
                 <div class="flex items-center justify-between">
-                  <span class="text-sm themed-text-muted">中奖率</span>
+                  <span class="text-sm themed-text-muted">发放率</span>
                   <div class="flex items-center gap-2">
                     <span class="text-sm font-medium themed-text" x-text="(comparison.week_comparison.win_rate?.current || 0).toFixed(1) + '%'">--</span>
                     <span 
@@ -686,7 +686,7 @@
                   @click="trendType = 'lottery'"
                   :class="trendType === 'lottery' ? 'bg-blue-100 text-blue-600' : 'themed-bg-subtle themed-text'"
                   class="px-3 py-1 rounded-md text-sm font-medium transition"
-                >抽奖次数</button>
+                >回馈次数</button>
                 <button 
                   @click="trendType = 'users'"
                   :class="trendType === 'users' ? 'bg-blue-100 text-blue-600' : 'themed-bg-subtle themed-text'"
@@ -840,7 +840,7 @@
               class="flex flex-col items-center gap-2 p-4 rounded-lg themed-border hover:border-blue-300 hover:bg-blue-50 transition"
             >
               <span class="text-3xl">🚨</span>
-              <span class="text-sm themed-text">抽奖告警</span>
+              <span class="text-sm themed-text">回馈告警</span>
               <span x-show="stats.lottery_alerts > 0" class="px-2 py-0.5 bg-orange-500 text-white text-xs rounded-full" x-text="stats.lottery_alerts">0</span>
             </button>
             
@@ -909,7 +909,7 @@
       </div>
     </template>
     
-    <!-- ==================== Tab 2: 抽奖分析 ==================== -->
+    <!-- ==================== Tab 2: 回馈分析 ==================== -->
     <template x-if="activeTab === 'lottery'">
       <div class="space-y-6">
         <!-- 统计卡片 -->
@@ -921,7 +921,7 @@
               </div>
               <div>
                 <div class="text-2xl font-bold themed-text" x-text="formatNumber(lotteryAnalysis.total_draws)">0</div>
-                <div class="text-sm themed-text-muted">总抽奖次数</div>
+                <div class="text-sm themed-text-muted">总回馈次数</div>
               </div>
             </div>
           </div>
@@ -933,7 +933,7 @@
               </div>
               <div>
                 <div class="text-2xl font-bold themed-text" x-text="formatNumber(lotteryAnalysis.total_wins)">0</div>
-                <div class="text-sm themed-text-muted">中奖次数</div>
+                <div class="text-sm themed-text-muted">发放次数</div>
               </div>
             </div>
           </div>
@@ -945,7 +945,7 @@
               </div>
               <div>
                 <div class="text-2xl font-bold themed-text" x-text="lotteryAnalysis.win_rate.toFixed(1) + '%'">0%</div>
-                <div class="text-sm themed-text-muted">平均中奖率</div>
+                <div class="text-sm themed-text-muted">平均发放率</div>
               </div>
             </div>
           </div>
@@ -963,10 +963,10 @@
           </div>
         </div>
         
-        <!-- 抽奖趋势图 -->
+        <!-- 回馈趋势图 -->
         <div class="themed-card rounded-xl p-6">
           <div class="flex items-center justify-between mb-4">
-            <h3 class="text-lg font-semibold themed-text">📈 抽奖趋势</h3>
+            <h3 class="text-lg font-semibold themed-text">📈 回馈趋势</h3>
             <select x-model="lotteryAnalysis.chart_range" @change="loadLotteryTrend()" class="px-3 py-1 text-sm themed-bg-base themed-border rounded-lg">
               <option value="7d">近7天</option>
               <option value="30d">近30天</option>
@@ -995,7 +995,7 @@
                   </div>
                   <div class="text-right">
                     <div class="font-bold themed-text" x-text="formatNumber(campaign.draws)"></div>
-                    <div class="text-xs themed-text-muted" x-text="'中奖率 ' + campaign.win_rate.toFixed(1) + '%'"></div>
+                    <div class="text-xs themed-text-muted" x-text="'发放率 ' + campaign.win_rate.toFixed(1) + '%'"></div>
                   </div>
                 </div>
               </template>

@@ -694,9 +694,9 @@ class PendingCenterService {
           return {
             id: alert.alert_id,
             category: PENDING_CATEGORIES.LOTTERY_ALERT,
-            category_name: '抽奖告警',
-            title: alert.alert_type || '抽奖告警',
-            description: alert.message || '待处理抽奖告警',
+            category_name: '回馈告警',
+            title: alert.alert_type || '回馈告警',
+            description: alert.message || '待处理回馈告警',
             lottery_campaign_id: alert.lottery_campaign_id,
             created_at: BeijingTimeHelper.format(alert.created_at),
             waiting_time: this._formatWaitingTime(waitMinutes),

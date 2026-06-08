@@ -176,7 +176,7 @@ export function useReportMethods() {
   <div class="stats-grid">
     <div class="stat-card">
       <div class="stat-value">${r.total_draws?.toLocaleString() || 0}</div>
-      <div class="stat-label">抽奖次数</div>
+      <div class="stat-label">回馈次数</div>
     </div>
     <div class="stat-card">
       <div class="stat-value">${r.unique_users?.toLocaleString() || 0}</div>
@@ -202,7 +202,7 @@ export function useReportMethods() {
   <h2>👥 用户分析</h2>
   <table class="info-table">
     <tr><th>独立用户数</th><td>${r.unique_users || 0}</td></tr>
-    <tr><th>人均抽奖次数</th><td>${r.avg_draws_per_user || 0}</td></tr>
+    <tr><th>人均回馈次数</th><td>${r.avg_draws_per_user || 0}</td></tr>
     <tr><th>复购用户数</th><td>${r.repeat_users || 0}</td></tr>
     <tr><th>复购率</th><td>${r.repeat_rate || 0}%</td></tr>
   </table>
@@ -217,7 +217,7 @@ export function useReportMethods() {
 
   <div class="footer">
     <p>报告生成时间: ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}</p>
-    <p>抽奖运营管理后台</p>
+    <p>回馈运营管理后台</p>
   </div>
 </body>
 </html>`

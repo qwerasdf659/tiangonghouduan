@@ -414,7 +414,7 @@ function lotteryAlertsPage() {
 
       // 更新类型分布柱状图（以后端实际返回的 type 值为准）
       if (this.typeDistChart) {
-        const typeLabels = ['预算告警', '库存告警', '中奖率告警', '用户告警', '系统告警']
+        const typeLabels = ['预算告警', '库存告警', '发放率告警', '用户告警', '系统告警']
         const typeCounts = [
           typeStats.budget || 0,
           typeStats.inventory || 0,
@@ -915,7 +915,7 @@ function lotteryAlertsPage() {
           },
           {
             value: counts.empty || 0,
-            name: '未中奖',
+            name: '未发放',
             itemStyle: { color: '#999' }
           }
         ].filter(item => item.value > 0)

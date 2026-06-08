@@ -73,7 +73,7 @@
           <option value="consumption">消耗审核</option>
           <option value="redemption">兑换核销</option>
           <option value="customer_service">客服会话</option>
-          <option value="lottery_alert">抽奖告警</option>
+          <option value="lottery_alert">回馈告警</option>
           <option value="risk_alert">风控告警</option>
           <option value="refund">退款申请</option>
           <option value="feedback">用户反馈</option>
@@ -183,7 +183,7 @@
         <div class="text-sm themed-text-muted mt-2">客服会话</div>
       </div>
       
-      <!-- 抽奖告警 -->
+      <!-- 回馈告警 -->
       <div 
         class="stat-card themed-card rounded-xl p-4 cursor-pointer border-l-4 border-yellow-500"
         :class="filter.type === 'lottery_alert' ? 'ring-2 ring-yellow-400' : ''"
@@ -193,7 +193,7 @@
           <div class="text-2xl">🎰</div>
           <div class="text-2xl font-bold text-yellow-600" x-text="summary.lottery_alert">0</div>
         </div>
-        <div class="text-sm themed-text-muted mt-2">抽奖告警</div>
+        <div class="text-sm themed-text-muted mt-2">回馈告警</div>
       </div>
       
       <!-- 风控告警 -->

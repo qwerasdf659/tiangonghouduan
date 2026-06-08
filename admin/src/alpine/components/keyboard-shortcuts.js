@@ -93,7 +93,7 @@ const G_KEY_SHORTCUTS = {
   l: {
     action: 'gotoLottery',
     url: '/admin/lottery-management.html',
-    description: '跳转抽奖管理'
+    description: '跳转回馈管理'
   },
   s: {
     action: 'gotoSettings',

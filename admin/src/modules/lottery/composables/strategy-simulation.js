@@ -1184,7 +1184,7 @@ export function useStrategySimulationMethods() {
           xAxis: { type: 'category', data: trend.map(d => d.date), axisLabel: { rotate: 45 } },
           yAxis: [
             { type: 'value', name: '预算消耗', position: 'left' },
-            { type: 'value', name: '抽奖次数', position: 'right' }
+            { type: 'value', name: '回馈次数', position: 'right' }
           ],
           series: [
             {
@@ -1194,7 +1194,7 @@ export function useStrategySimulationMethods() {
               itemStyle: { color: '#6366f1' }
             },
             {
-              name: '日抽奖次数',
+              name: '日回馈次数',
               type: 'line',
               yAxisIndex: 1,
               data: trend.map(d => d.draws),

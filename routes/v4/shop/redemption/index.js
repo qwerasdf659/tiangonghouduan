@@ -1,5 +1,5 @@
 /**
- * 餐厅积分抽奖系统 V4.2 - 核销系统路由入口（Redemption System Routes）
+ * 天工商户营销平台 V4.2 - 核销系统路由入口（Redemption System Routes）
  *
  * 职责：
  * - 新版核销系统HTTP API层

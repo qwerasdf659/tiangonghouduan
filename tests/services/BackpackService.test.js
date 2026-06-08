@@ -1,5 +1,5 @@
 /**
- * 餐厅积分抽奖系统 V4.2 - BackpackService 单元测试
+ * 天工商户营销平台 V4.2 - BackpackService 单元测试
  *
  * 测试范围：
  * - 双轨查询（assets + items）

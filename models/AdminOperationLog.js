@@ -1,5 +1,5 @@
 /**
- * 餐厅积分抽奖系统 V4.0 - 管理员操作日志模型（AdminOperationLog）
+ * 天工商户营销平台 V4.0 - 管理员操作日志模型（AdminOperationLog）
  *
  * ⚠️⚠️⚠️ 重要区分说明 ⚠️⚠️⚠️
  * 本模型是 AdminOperationLog（管理员操作日志），不是 ContentReviewRecord（内容审核记录）

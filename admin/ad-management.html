@@ -708,8 +708,8 @@
             <input type="number" x-model="userAdTagsFilters.user_id" placeholder="用户ID" class="px-3 py-1.5 text-sm border border-gray-200 rounded-lg themed-bg-base w-28 focus:ring-2 focus:ring-teal-500">
             <select x-model="userAdTagsFilters.tag_key" @change="loadUserAdTags()" class="px-3 py-1.5 text-sm border border-gray-200 rounded-lg themed-bg-base focus:ring-2 focus:ring-teal-500">
               <option value="">全部标签</option>
-              <option value="lottery_active_7d">7天抽奖活跃</option>
-              <option value="lottery_active_30d">30天抽奖活跃</option>
+              <option value="lottery_active_7d">7天回馈活跃</option>
+              <option value="lottery_active_30d">30天回馈活跃</option>
               <option value="star_stone_rich">星石富豪</option>
               <option value="has_red_core_shard">持有红源晶碎片</option>
               <option value="market_trader">交易市场用户</option>
@@ -856,7 +856,7 @@
           <p class="text-xl font-bold mt-1 tabular-nums" x-text="attributionPagination.total || attributionLogs.length || 0"></p>
         </div>
         <div class="themed-card rounded-xl p-4 border-l-4 border-l-purple-500">
-          <p class="text-xs themed-text-muted">抽奖转化</p>
+          <p class="text-xs themed-text-muted">回馈转化</p>
           <p class="text-xl font-bold mt-1 text-purple-600 tabular-nums" x-text="attributionLogs.filter(l => l.conversion_type === 'lottery_draw').length"></p>
         </div>
         <div class="themed-card rounded-xl p-4 border-l-4 border-l-blue-500">
@@ -875,7 +875,7 @@
             <input type="number" x-model="attributionFilters.ad_campaign_id" placeholder="活动ID" class="px-3 py-1.5 text-sm border border-gray-200 rounded-lg themed-bg-base w-28 focus:ring-2 focus:ring-indigo-500">
             <select x-model="attributionFilters.conversion_type" @change="loadAttributionLogs()" class="px-3 py-1.5 text-sm border border-gray-200 rounded-lg themed-bg-base focus:ring-2 focus:ring-indigo-500">
               <option value="">全部转化类型</option>
-              <option value="lottery_draw">抽奖</option>
+              <option value="lottery_draw">回馈</option>
               <option value="exchange">兑换</option>
               <option value="market_buy">市场购买</option>
               <option value="page_view">页面浏览</option>
@@ -1023,7 +1023,7 @@
                 <label class="block text-sm font-medium themed-text-secondary mb-1">页面位置</label>
                 <select x-model="slotForm.position" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500">
                   <option value="home">首页</option>
-                  <option value="lottery">抽奖页</option>
+                  <option value="lottery">回馈页</option>
                   <option value="profile">个人中心</option>
                 </select>
               </div>

@@ -315,7 +315,7 @@ function riskAlertsPage() {
         label: '告警类型',
         type: 'status',
         statusMap: {
-          win_rate: { class: 'yellow', label: '中奖率' },
+          win_rate: { class: 'yellow', label: '发放率' },
           budget: { class: 'purple', label: '预算' },
           inventory: { class: 'orange', label: '库存' },
           user: { class: 'gray', label: '用户' },

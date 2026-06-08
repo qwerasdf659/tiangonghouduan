@@ -1488,7 +1488,7 @@
                   <div class="space-y-2 text-sm themed-text-muted">
                     <p>✓ 无广告体验</p>
                     <p>✓ 专属客服通道</p>
-                    <p>✓ 更高中奖概率</p>
+                    <p>✓ 更高回馈概率</p>
                     <p>✓ 专属活动参与资格</p>
                   </div>
                 </div>
@@ -1545,11 +1545,11 @@
                 <p class="text-xs themed-text-muted mt-1">单次交易积分/金额上限</p>
               </div>
               <div>
-                <label class="block text-sm font-medium themed-text-secondary mb-1">日抽奖次数限制</label>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">日回馈次数限制</label>
                 <input type="number" x-model.number="riskForm.daily_lottery_limit" 
                        class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" 
                        placeholder="如 100">
-                <p class="text-xs themed-text-muted mt-1">用户每日可抽奖次数上限</p>
+                <p class="text-xs themed-text-muted mt-1">用户每日可回馈次数上限</p>
               </div>
             </div>
             <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-2">
@@ -1821,24 +1821,24 @@
                   </div>
                 </div>
                 
-                <!-- 抽奖数据 -->
+                <!-- 回馈数据 -->
                 <template x-if="userAnalysisReport.lottery_profile">
                   <div class="themed-card rounded-lg p-4 border">
                     <h6 class="font-semibold themed-text mb-3 flex items-center gap-2">
-                      <span>🎰</span> 抽奖数据
+                      <span>🎰</span> 回馈数据
                     </h6>
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <div class="text-center p-3 bg-blue-50 rounded-lg">
                         <p class="text-2xl font-bold text-blue-600" x-text="userAnalysisReport.lottery_profile.stats?.total_draws || 0"></p>
-                        <span class="text-xs themed-text-muted">总抽奖次数</span>
+                        <span class="text-xs themed-text-muted">总回馈次数</span>
                       </div>
                       <div class="text-center p-3 bg-green-50 rounded-lg">
                         <p class="text-2xl font-bold text-green-600" x-text="userAnalysisReport.lottery_profile.stats?.total_wins || 0"></p>
-                        <span class="text-xs themed-text-muted">中奖次数</span>
+                        <span class="text-xs themed-text-muted">发放次数</span>
                       </div>
                       <div class="text-center p-3 bg-orange-50 rounded-lg">
                         <p class="text-2xl font-bold text-orange-600" x-text="((userAnalysisReport.lottery_profile.stats?.win_rate || 0) * 100).toFixed(1) + '%'"></p>
-                        <span class="text-xs themed-text-muted">中奖率</span>
+                        <span class="text-xs themed-text-muted">发放率</span>
                       </div>
                       <div class="text-center p-3 bg-purple-50 rounded-lg">
                         <p class="text-2xl font-bold text-purple-600" x-text="userAnalysisReport.lottery_profile.stats?.campaign_count || 0"></p>
@@ -2048,15 +2048,15 @@
           </div>
         </div>
 
-        <!-- ===== 抽奖记录 Tab ===== -->
+        <!-- ===== 回馈记录 Tab ===== -->
         <div x-show="activeTab === 'lottery' && !loading" x-cloak>
           <div class="space-y-4">
             <h4 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
-              <span>🎰</span> 抽奖记录
+              <span>🎰</span> 回馈记录
               <span class="text-gray-400 font-normal">(<span x-text="lotteryPagination.total"></span> 条)</span>
             </h4>
             
-            <!-- 抽奖记录列表 -->
+            <!-- 回馈记录列表 -->
             <div class="space-y-2">
               <template x-for="record in lotteryRecords" :key="record.draw_id">
                 <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
@@ -2082,7 +2082,7 @@
             <!-- 空状态 -->
             <div x-show="lotteryRecords.length === 0" class="text-center py-8 text-gray-400">
               <span class="text-4xl block mb-2">🎲</span>
-              <p>暂无抽奖记录</p>
+              <p>暂无回馈记录</p>
             </div>
           </div>
         </div>

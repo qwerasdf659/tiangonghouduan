@@ -42,6 +42,7 @@ const BusinessError = require('../utils/BusinessError')
 const { User, Role, UserRole } = require('../models')
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 const BeijingTimeHelper = require('../utils/timeHelper')
+const PiiCrypto = require('../utils/PiiCrypto')
 const logger = require('../utils/logger')
 const AuditLogService = require('./AuditLogService')
 
@@ -413,10 +414,13 @@ class UserRoleService {
     // 构建查询条件
     const whereClause = {}
     if (search) {
-      whereClause[Op.or] = [
-        { mobile: { [Op.like]: `%${search}%` } },
-        { nickname: { [Op.like]: `%${search}%` } }
-      ]
+      // 方案二完整版：手机号加密无法 LIKE，按输入形态分派到盲索引；其余按昵称搜
+      const mobileWhere = PiiCrypto.buildMobileSearchWhere(search)
+      const orConditions = [{ nickname: { [Op.like]: `%${search}%` } }]
+      if (mobileWhere) {
+        orConditions.push(mobileWhere)
+      }
+      whereClause[Op.or] = orConditions
     }
 
     // 基础查询

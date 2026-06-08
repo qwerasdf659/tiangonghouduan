@@ -1,5 +1,5 @@
 /**
- * 餐厅积分抽奖系统 V4.0 - 抽奖历史和活动API路由
+ * 天工商户营销平台 V4.0 - 抽奖历史和活动API路由
  *
  * 功能：
  * - 获取当前登录用户的抽奖历史（从JWT Token取身份）
@@ -51,7 +51,7 @@ router.get(
       limit: pageSize
     })
 
-    return res.apiSuccess(history, '抽奖历史获取成功', 'HISTORY_SUCCESS')
+    return res.apiSuccess(history, '回馈记录获取成功', 'HISTORY_SUCCESS')
   })
 )
 

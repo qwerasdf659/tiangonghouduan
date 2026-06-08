@@ -756,7 +756,7 @@ function registerLotteryManagementComponents() {
         { key: 'tier', label: '等级', render: (v, r) => r.tier_display || v || '-' },
         {
           key: 'probability',
-          label: '概率',
+          label: '发放占比',
           render: v => (v != null ? (Number(v) * 100).toFixed(2) + '%' : '-')
         },
         { key: 'stock', label: '库存', type: 'number', sortable: true },
@@ -952,7 +952,7 @@ function registerLotteryManagementComponents() {
         { key: 'min_draws', label: '最小次数', type: 'number' },
         {
           key: 'probability_boost',
-          label: '概率提升',
+          label: '发放提升',
           render: v => (v != null ? Number(v).toFixed(2) + '%' : '-')
         },
         {
@@ -1030,16 +1030,16 @@ function registerLotteryManagementComponents() {
     const t = dataTable({
       columns: [
         { key: 'order_no', label: '单号(LT)', type: 'code' },
-        { key: 'draw_id', label: '抽奖ID', sortable: true },
+        { key: 'draw_id', label: '回馈ID', sortable: true },
         { key: 'user_id', label: '用户ID' },
         { key: 'campaign_name', label: '活动' },
         {
           key: 'prize_name',
           label: '奖品',
-          render: (v, r) => v || r.result?.prize_name || '未中奖'
+          render: (v, r) => v || r.result?.prize_name || '—'
         },
         { key: 'cost_amount', label: '消耗', type: 'number' },
-        { key: 'is_winner', label: '中奖', type: 'boolean' },
+        { key: 'is_winner', label: '已发放', type: 'boolean' },
         { key: 'created_at', label: '时间', type: 'datetime', sortable: true }
       ],
       dataSource: async p => {
@@ -1070,11 +1070,11 @@ function registerLotteryManagementComponents() {
       columns: [
         { key: 'user_id', label: '用户ID', sortable: true },
         { key: 'nickname', label: '用户', render: (v, r) => v || r.user_nickname || '-' },
-        { key: 'total_draws', label: '抽奖次数', type: 'number', sortable: true },
-        { key: 'total_wins', label: '中奖次数', type: 'number' },
+        { key: 'total_draws', label: '回馈次数', type: 'number', sortable: true },
+        { key: 'total_wins', label: '发放次数', type: 'number' },
         {
           key: 'win_rate',
-          label: '中奖率',
+          label: '发放率',
           render: v => (v != null ? Number(v).toFixed(2) + '%' : '-')
         },
         {

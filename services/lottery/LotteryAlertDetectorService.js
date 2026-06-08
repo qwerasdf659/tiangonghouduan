@@ -238,7 +238,7 @@ class LotteryAlertDetectorService {
           rule_code: rule.rule_code,
           threshold_value: expectedWinRate * 100,
           actual_value: actualWinRate * 100,
-          message: `中奖率偏离告警：预期${(expectedWinRate * 100).toFixed(1)}%，实际${(actualWinRate * 100).toFixed(1)}%，偏离${(deviation * 100).toFixed(1)}%（阈值${(rule.threshold_deviation * 100).toFixed(0)}%）`
+          message: `发放率偏离告警：预期${(expectedWinRate * 100).toFixed(1)}%，实际${(actualWinRate * 100).toFixed(1)}%，偏离${(deviation * 100).toFixed(1)}%（阈值${(rule.threshold_deviation * 100).toFixed(0)}%）`
         })
         if (alert && alert.isNewRecord !== false) {
           alerts.push(alert)

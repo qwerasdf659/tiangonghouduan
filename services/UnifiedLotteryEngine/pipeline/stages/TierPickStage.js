@@ -342,7 +342,7 @@ class TierPickStage extends BaseStage {
        * - per-user 暗箱干预下线后，"让某类人更易中"改为按成长等级的公示分级概率
        * - 成长等级由 users.history_total_points 实时派生（UserGrowthLevelService）
        * - 各等级倍数存于 lottery_strategy_config.level_probability（按活动公示），默认 1.0（零行为变化）
-       * - 倍数仅放大 high 档位权重；最终仍受 §4a 硬上限 MAX_HIGH_TIER_PROBABILITY 约束（公示 high≤8%）
+       * - 倍数仅放大 high 档位权重；最终仍受 §4a 硬上限 MAX_HIGH_TIER_PROBABILITY 约束（内部成本控制上限 high≤8%，不对外公示固定概率，对外仅按动态机制如实告知）
        */
       let growth_level_key = null
       let growth_level_multiplier = 1.0

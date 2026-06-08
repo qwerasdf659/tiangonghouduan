@@ -1,7 +1,7 @@
 'use strict'
 
 /**
- * 餐厅积分抽奖系统 V4.0 - 活动定价配置管理服务
+ * 天工商户营销平台 V4.0 - 活动定价配置管理服务
  *
  * @description 管理活动级定价配置的 CRUD 和版本管理
  * @module services/LotteryCampaignPricingConfigService

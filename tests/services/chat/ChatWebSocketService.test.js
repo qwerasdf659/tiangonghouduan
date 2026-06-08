@@ -1,5 +1,5 @@
 /**
- * 餐厅积分抽奖系统 V4.5 - ChatWebSocketService 单元测试
+ * 天工商户营销平台 V4.5 - ChatWebSocketService 单元测试
  *
  * 测试范围（P1-7 ChatWebSocketService 测试）：
  * - WebSocket 连接管理（用户/管理员连接）

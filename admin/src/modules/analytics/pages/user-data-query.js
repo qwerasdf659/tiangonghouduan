@@ -19,8 +19,8 @@ import { logger } from '@/utils/logger.js'
 
 /** 业务类型中文映射 */
 const BUSINESS_TYPE_MAP = {
-  lottery_consume: '抽奖消耗',
-  lottery_reward: '抽奖奖励',
+  lottery_consume: '回馈消耗',
+  lottery_reward: '回馈奖励',
   market_purchase_buyer_debit: '市场购买（买家扣款）',
   market_purchase_seller_credit: '市场购买（卖家入账）',
   market_purchase_fee: '市场交易手续费',

@@ -496,14 +496,14 @@ class ReportService {
       alerts.push({
         level: 'warning',
         type: 'win_rate_high',
-        message: `中奖率过高 (${summary.win_rate}%)`,
+        message: `发放率过高 (${summary.win_rate}%)`,
         suggestion: '建议检查概率配置是否异常'
       })
     } else if (summary.win_rate < 50) {
       alerts.push({
         level: 'info',
         type: 'win_rate_low',
-        message: `中奖率偏低 (${summary.win_rate}%)`,
+        message: `发放率偏低 (${summary.win_rate}%)`,
         suggestion: '建议检查体验机制配置'
       })
     }

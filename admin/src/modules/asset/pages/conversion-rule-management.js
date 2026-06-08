@@ -96,6 +96,7 @@ document.addEventListener('alpine:init', () => {
     status_options: STATUS_OPTIONS,
     display_category_options: DISPLAY_CATEGORY_OPTIONS,
     risk_level_options: RISK_LEVEL_OPTIONS,
+    rounding_mode_options: ROUNDING_MODE_OPTIONS,
 
     // 表单
     show_form: false,

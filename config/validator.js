@@ -1,5 +1,5 @@
 /**
- * 餐厅积分抽奖系统 - 统一配置校验器
+ * 天工商户营销平台 - 统一配置校验器
  *
  * @description 基于 CONFIG_SCHEMA 自动生成校验逻辑
  * @version 1.0.0
@@ -231,7 +231,7 @@ class ConfigValidator {
    * require('fs').writeFileSync('config.example', template)
    */
   static generateTemplate() {
-    let template = '# 餐厅积分抽奖系统 V4.0 - 环境变量配置模板\n'
+    let template = '# 天工商户营销平台 V4.0 - 环境变量配置模板\n'
     template += '# 🔴 重要：生产环境部署前必须修改所有 CHANGE_ME_* 占位符\n'
     template += `# 生成时间：${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}\n\n`
 

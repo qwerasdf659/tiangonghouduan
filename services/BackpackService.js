@@ -1,5 +1,5 @@
 /**
- * 餐厅积分抽奖系统 V4.3 - 背包服务（BackpackService）
+ * 天工商户营销平台 V4.3 - 背包服务（BackpackService）
  *
  * 职责：
  * - 背包双轨架构查询服务

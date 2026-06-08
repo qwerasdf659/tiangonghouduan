@@ -2,7 +2,7 @@ const BusinessError = require('../utils/BusinessError')
 const logger = require('../utils/logger').logger
 
 /**
- * 层级权限管理服务（简化版） - 餐厅积分抽奖系统 V4.0 统一引擎架构
+ * 层级权限管理服务（简化版） - 天工商户营销平台 V4.0 统一引擎架构
  * 业务场景：管理区域负责人→业务经理→业务员三级层级关系和权限操作
  * 最后更新：2026年01月05日（事务边界治理改造）
  * 设计理念：简单实用，避免过度设计

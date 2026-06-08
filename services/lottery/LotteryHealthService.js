@@ -733,16 +733,16 @@ class LotteryHealthService {
       issues.push({
         type: 'win_rate',
         severity: 'danger',
-        title: '中奖率严重偏离',
-        description: `实际中奖率偏差达 ${dimensions.win_rate.details?.deviation_rate}%`,
+        title: '发放率严重偏离',
+        description: `实际发放率偏差达 ${dimensions.win_rate.details?.deviation_rate}%`,
         dimension: 'win_rate'
       })
     } else if (dimensions.win_rate.level === 'warning') {
       issues.push({
         type: 'win_rate',
         severity: 'warning',
-        title: '中奖率有偏差',
-        description: `实际中奖率 ${dimensions.win_rate.details?.actual_win_rate}%，配置值 ${dimensions.win_rate.details?.configured_win_rate}%`,
+        title: '发放率有偏差',
+        description: `实际发放率 ${dimensions.win_rate.details?.actual_win_rate}%，配置值 ${dimensions.win_rate.details?.configured_win_rate}%`,
         dimension: 'win_rate'
       })
     }
@@ -816,8 +816,8 @@ class LotteryHealthService {
       suggestions.push({
         type: 'win_rate',
         priority: 'high',
-        title: '调整中奖率配置',
-        content: '检查各档位概率配置是否合理，确保实际中奖率与预期一致'
+        title: '调整发放率配置',
+        content: '检查各档位概率配置是否合理，确保实际发放率与预期一致'
       })
     }
 
@@ -835,7 +835,7 @@ class LotteryHealthService {
         type: 'participation',
         priority: 'medium',
         title: '提升用户参与',
-        content: '考虑增加抽奖引导、优化抽奖入口曝光，或增加免费抽奖配额'
+        content: '考虑增加回馈引导、优化回馈入口曝光，或增加免费回馈配额'
       })
     }
 

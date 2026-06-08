@@ -1,5 +1,6 @@
 const BusinessError = require('../utils/BusinessError')
 const logger = require('../utils/logger').logger
+const PiiCrypto = require('../utils/PiiCrypto')
 
 /**
  * 客服会话服务（Customer Service Session Service）
@@ -156,6 +157,15 @@ class CustomerServiceSessionService {
         where.user_id = user_id
       }
 
+      // 方案二完整版：手机号加密无法 LIKE，按输入形态分派盲索引；其余仅按昵称搜
+      let userSearchWhere
+      if (search) {
+        const mobileWhere = PiiCrypto.buildMobileSearchWhere(search)
+        const orConditions = [{ nickname: { [Op.like]: `%${search}%` } }]
+        if (mobileWhere) orConditions.push(mobileWhere)
+        userSearchWhere = { [Op.or]: orConditions }
+      }
+
       // 构建查询（包含用户信息）
       const includeOptions = [
         {
@@ -163,14 +173,7 @@ class CustomerServiceSessionService {
           as: 'user',
           attributes: ['user_id', 'nickname', 'mobile'],
           // 搜索条件
-          where: search
-            ? {
-                [Op.or]: [
-                  { nickname: { [Op.like]: `%${search}%` } },
-                  { mobile: { [Op.like]: `%${search}%` } }
-                ]
-              }
-            : undefined,
+          where: userSearchWhere,
           required: !!search
         },
         {

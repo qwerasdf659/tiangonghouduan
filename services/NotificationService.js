@@ -811,20 +811,20 @@ class NotificationService {
   static async notifyLotteryWin(user_id, lotteryData) {
     const { prize_name, prize_type, prize_value, lottery_draw_id } = lotteryData
 
-    // 根据奖品类型定制消息
-    let content = `恭喜您在抽奖中获得【${prize_name}】！`
+    // 根据奖品类型定制消息（路线B：消费回馈叙事，不出现"抽奖/中奖"字样）
+    let content = `已为您发放消费回馈【${prize_name}】，请查收！`
 
     if (prize_type === 'points') {
-      content += `已为您发放${prize_value}积分，请查收！`
+      content += `本次回馈${prize_value}积分已到账。`
     } else if (prize_type === 'product') {
-      content += '商品已添加到您的库存中，请前往"我的库存"查看。'
+      content += '回馈好礼已添加到您的库存中，请前往"我的库存"查看。'
     } else if (prize_type === 'voucher') {
-      content += '优惠券已添加到您的库存中，请尽快使用。'
+      content += '回馈优惠券已添加到您的库存中，请尽快使用。'
     }
 
     return await this.send(user_id, {
       type: 'lottery_win',
-      title: '恭喜中奖',
+      title: '回馈到账',
       content,
       data: {
         lottery_draw_id,
@@ -944,25 +944,34 @@ class NotificationService {
     const { campaign_code, campaign_name, old_status, new_status, operator_id, reason } =
       activityData
 
+    // 业务叙事字典取词（方案C+，dict_type='business_narrative'）：标题统一为"回馈"口径
+    const DisplayNameService = require('./DisplayNameService')
+    const [titleStarted, titlePaused, titleEnded, titleSaved] = await Promise.all([
+      DisplayNameService.getDisplayName('business_narrative', 'activity_started'),
+      DisplayNameService.getDisplayName('business_narrative', 'activity_paused'),
+      DisplayNameService.getDisplayName('business_narrative', 'activity_ended'),
+      DisplayNameService.getDisplayName('business_narrative', 'activity_saved')
+    ])
+
     // 状态变更消息映射
     const statusMessageMap = {
       active: {
-        title: '抽奖活动已开始',
-        content: `【${campaign_name}】活动已开始，快来参与抽奖吧！`,
+        title: titleStarted || '回馈活动已开始',
+        content: `【${campaign_name}】活动已开始，快来参与吧！`,
         admin_content: `活动【${campaign_name}】已启动（${campaign_code}）`
       },
       paused: {
-        title: '抽奖活动已暂停',
+        title: titlePaused || '回馈活动已暂停',
         content: `【${campaign_name}】活动已暂停${reason ? `，原因：${reason}` : ''}`,
         admin_content: `活动【${campaign_name}】已暂停（${campaign_code}）`
       },
       ended: {
-        title: '抽奖活动已结束',
+        title: titleEnded || '回馈活动已结束',
         content: `【${campaign_name}】活动已结束，感谢您的参与！`,
         admin_content: `活动【${campaign_name}】已结束（${campaign_code}）`
       },
       draft: {
-        title: '抽奖活动已保存',
+        title: titleSaved || '回馈活动已保存',
         content: `【${campaign_name}】活动配置已保存为草稿`,
         admin_content: `活动【${campaign_name}】已保存为草稿（${campaign_code}）`
       }

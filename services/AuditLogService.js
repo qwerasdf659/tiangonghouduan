@@ -5,7 +5,7 @@ const logger = require('../utils/logger').logger
 const { attachDisplayNames, DICT_TYPES } = require('../utils/displayNameHelper')
 
 /**
- * 餐厅积分抽奖系统 V4.0 - 统一审计日志服务（AuditLogService）
+ * 天工商户营销平台 V4.0 - 统一审计日志服务（AuditLogService）
  *
  * 业务场景：为所有核心服务提供统一的审计日志记录功能，实现敏感操作的完整审计追溯
  *

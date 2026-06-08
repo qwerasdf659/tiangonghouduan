@@ -60,19 +60,19 @@ export const MENU_ACCESS_RULES = {
     description: '客服管理（座席管理/用户分配）'
   },
   'pending-center.risk-alerts': { minLevel: 30, description: '风控告警' },
-  'pending-center.lottery-alerts': { minLevel: 30, description: '抽奖告警' },
+  'pending-center.lottery-alerts': { minLevel: 30, description: '回馈告警' },
   'pending-center.feedback-mgmt': { minLevel: 30, description: '用户反馈处理' },
 
   'content-ops.dict-mgmt': { minLevel: 100, description: '字典管理' },
 
   // ========== 抽奖运营（role_level >= 30） ==========
-  'lottery-ops': { minLevel: 30, description: '抽奖运营（分组）' },
+  'lottery-ops': { minLevel: 30, description: '回馈运营（分组）' },
   'lottery-ops.lottery-monitoring': { minLevel: 30, description: '实时监控' },
   'lottery-ops.lottery-campaigns': { minLevel: 30, description: '活动管理' },
   'lottery-ops.lottery-prizes': { minLevel: 30, description: '奖品配置' },
   'lottery-ops.lottery-budget': { minLevel: 30, description: '预算控制' },
   'lottery-ops.lottery-strategy': { minLevel: 30, description: '策略配置' },
-  'lottery-ops.lottery-presets': { minLevel: 30, description: '抽奖干预管理' },
+  'lottery-ops.lottery-presets': { minLevel: 30, description: '回馈干预管理' },
 
   // ========== 资产交易（role_level >= 30） ==========
   'asset-trade': { minLevel: 30, description: '资产交易（分组）' },

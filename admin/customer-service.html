@@ -551,7 +551,7 @@
               </div>
               <!-- 统计摘要（C2C 交易统计已随 C2C 下线移除） -->
               <div x-show="context_summary?.stats" class="flex items-center gap-2 mt-1.5 text-[10px] themed-text-muted">
-                <span>🎰<span x-text="context_summary?.stats?.lottery_count || context_summary?.stats?.draw_count || 0"></span>次抽奖</span>
+                <span>🎰<span x-text="context_summary?.stats?.lottery_count || context_summary?.stats?.draw_count || 0"></span>次回馈</span>
                 <span>📝<span x-text="context_summary?.stats?.feedback_count || 0"></span>次反馈</span>
                 <span>🎒<span x-text="context_summary?.stats?.item_count || 0"></span>件物品</span>
               </div>
@@ -575,7 +575,7 @@
                 <template x-for="tab in [
                   {key:'assets', icon:'💎', label:'资产'},
                   {key:'backpack', icon:'🎒', label:'背包'},
-                  {key:'lottery', icon:'🎰', label:'抽奖'},
+                  {key:'lottery', icon:'🎰', label:'回馈'},
                   {key:'trades', icon:'🔄', label:'交易'},
                   {key:'disputes', icon:'⚖️', label:'纠纷'},
                   {key:'timeline', icon:'📋', label:'记录'},
@@ -646,13 +646,13 @@
                 </template>
               </div>
 
-              <!-- 抽奖 Tab -->
+              <!-- 回馈 Tab -->
               <div x-show="!context_loading && context_active_tab === 'lottery'">
                 <template x-if="context_lottery">
                   <div class="space-y-3">
                     <div class="grid grid-cols-2 gap-2 text-xs">
                       <div class="themed-bg-subtle rounded p-2 text-center">
-                        <p class="themed-text-hint text-[10px]">总抽奖</p>
+                        <p class="themed-text-hint text-[10px]">总回馈</p>
                         <p class="font-bold themed-text" x-text="context_lottery?.summary?.total_draws || 0"></p>
                       </div>
                       <div class="themed-bg-subtle rounded p-2 text-center">
@@ -705,7 +705,7 @@
                           <span x-text="{'consumption':'💳','feedback':'📝','lottery':'🎰'}[entry.type] || '📋'"></span>
                           <span class="themed-text-muted" x-text="formatDate(entry.created_at)"></span>
                         </div>
-                        <p class="themed-text mt-0.5 truncate" x-text="entry.type === 'feedback' ? (entry.data?.content || '') : (entry.type === 'lottery' ? ('抽奖 - ' + (entry.data?.prize_name || {'high':'高档','mid':'中档','low':'低档','fallback':'保底'}[entry.data?.reward_tier] || entry.data?.reward_tier || '')) : '消费记录')"></p>
+                        <p class="themed-text mt-0.5 truncate" x-text="entry.type === 'feedback' ? (entry.data?.content || '') : (entry.type === 'lottery' ? ('回馈 - ' + (entry.data?.prize_name || {'high':'高档','mid':'中档','low':'低档','fallback':'保底'}[entry.data?.reward_tier] || entry.data?.reward_tier || '')) : '消费记录')"></p>
                       </div>
                     </template>
                     <p x-show="!context_timeline?.rows?.length" class="text-xs themed-text-hint text-center py-4">暂无记录</p>
@@ -946,7 +946,7 @@
             <select x-model="compensationForm.reason" class="w-full px-3 py-2 border rounded-lg themed-select text-sm">
               <option value="">请选择原因</option>
               <option value="交易异常">交易异常</option>
-              <option value="抽奖异常">抽奖异常</option>
+              <option value="回馈异常">回馈异常</option>
               <option value="系统故障">系统故障</option>
               <option value="客户补偿">客户补偿</option>
               <option value="其他">其他</option>
@@ -1012,7 +1012,7 @@
               <option value="asset">资产问题</option>
               <option value="consumption">消费问题</option>
               <option value="item">物品问题</option>
-              <option value="lottery">抽奖问题</option>
+              <option value="lottery">回馈问题</option>
               <option value="account">账号问题</option>
               <option value="feedback">意见反馈</option>
               <option value="other">其他</option>
@@ -1113,8 +1113,8 @@
               { label: '性别', value: user_info_data?.gender === 1 ? '男' : user_info_data?.gender === 2 ? '女' : '未知' },
               { label: '注册时间', value: formatDate(user_info_data?.created_at) },
               { label: '账户状态', value: user_info_data?.status === 'active' ? '正常' : '禁用', status: user_info_data?.status },
-              { label: '总抽奖次数', value: user_info_data?.draw_count || 0 },
-              { label: '中奖次数', value: user_info_data?.win_count || 0 }
+              { label: '总回馈次数', value: user_info_data?.draw_count || 0 },
+              { label: '发放次数', value: user_info_data?.win_count || 0 }
             ]" :key="item.label">
               <div class="flex justify-between items-center py-1.5 border-b themed-border-light last:border-0">
                 <span class="text-sm themed-text-muted" x-text="item.label"></span>

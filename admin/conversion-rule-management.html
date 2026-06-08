@@ -187,9 +187,9 @@
               <div>
                 <label class="block text-sm themed-text-muted mb-1">舍入模式</label>
                 <select x-model="form.rounding_mode" class="w-full themed-input rounded px-3 py-2 text-sm">
-                  <option value="floor">向下取整（floor）</option>
-                  <option value="ceil">向上取整（ceil）</option>
-                  <option value="round">四舍五入（round）</option>
+                  <template x-for="opt in rounding_mode_options" :key="opt.value">
+                    <option :value="opt.value" x-text="opt.label"></option>
+                  </template>
                 </select>
               </div>
 

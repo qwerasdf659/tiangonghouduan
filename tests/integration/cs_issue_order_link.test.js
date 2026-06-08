@@ -19,7 +19,7 @@
 const request = require('supertest')
 const app = require('../../app')
 const { sequelize } = require('../../models')
-const { testCleaner, cleanupAfterEach } = require('../helpers/TestDataCleaner')
+const { cleanupAfterEach } = require('../helpers/TestDataCleaner')
 
 /** 测试用户：13612227930，user_id=31 */
 const TEST_USER_MOBILE = '13612227930'

@@ -36,7 +36,7 @@ const {
   LotteryDraw,
   LotteryCampaign,
   LotteryCampaignPrize: _LotteryCampaignPrize,
-  AssetTransaction
+  AssetTransaction: _AssetTransaction
 } = require('../../../models')
 const { getTestService } = require('../../helpers/UnifiedTestManager')
 const TransactionManager = require('../../../utils/TransactionManager')
@@ -54,18 +54,9 @@ function generateIdempotencyKey(prefix = 'e2e_test') {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
 }
 
-/**
- * 等待指定毫秒数
- * @param {number} ms - 毫秒数
- */
-async function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms))
-}
-
 describe('🎯 完整业务链路测试（任务 11.5/11.7/11.8）', () => {
   /* 服务实例 */
   let BalanceService
-  let ExchangeService
 
   /* 测试数据 */
   let testUserA // 卖家/商户
@@ -86,12 +77,6 @@ describe('🎯 完整业务链路测试（任务 11.5/11.7/11.8）', () => {
 
     /* 获取服务实例 */
     BalanceService = getTestService('asset_balance')
-
-    try {
-      ExchangeService = getTestService('exchange_core')
-    } catch (error) {
-      console.warn('⚠️ ExchangeService 未注册，部分测试将跳过')
-    }
 
     console.log('✅ 服务实例获取成功')
 
@@ -159,48 +144,6 @@ describe('🎯 完整业务链路测试（任务 11.5/11.7/11.8）', () => {
 
     console.log('🧹 ===== 测试清理完成 =====')
   })
-
-  /**
-   * 确保用户有足够的资产余额
-   * @param {number} userId - 用户ID
-   * @param {string} assetCode - 资产代码
-   * @param {number} minAmount - 最小金额
-   */
-  async function ensureAssetBalance(userId, assetCode, minAmount) {
-    return await TransactionManager.execute(async transaction => {
-      /* 获取或创建账户 - 注意：参数为 { user_id }, { transaction } */
-      const account = await BalanceService.getOrCreateAccount({ user_id: userId }, { transaction })
-
-      /* 获取或创建资产余额 - 位置参数：(account_id, asset_code, { transaction }) */
-      const balance = await BalanceService.getOrCreateBalance(account.account_id, assetCode, {
-        transaction
-      })
-
-      /* 检查余额是否充足 */
-      const currentBalance = Number(balance.available_amount) || 0
-      if (currentBalance < minAmount) {
-        const topUpAmount = minAmount - currentBalance + 100 // 多充100作为缓冲
-
-        /* 增加余额 - 注意：params 和 options 分开传递 */
-        await BalanceService.changeBalance(
-          {
-            user_id: userId,
-            asset_code: assetCode,
-            delta_amount: topUpAmount,
-            business_type: 'test_topup',
-            counterpart_account_id: 2,
-            idempotency_key: generateIdempotencyKey('topup'),
-            meta: { reason: '测试数据准备 - 充值资产' }
-          },
-          { transaction }
-        )
-
-        console.log(`💰 为用户 ${userId} 充值 ${topUpAmount} ${assetCode}`)
-      }
-
-      return balance
-    })
-  }
 
   /**
    * 获取用户资产余额

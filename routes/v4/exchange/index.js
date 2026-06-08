@@ -842,6 +842,12 @@ const bidRoutes = require('./bid')
 router.use('/bid', bidRoutes)
 
 /**
+ * 星石虚拟装饰子路由（模块D：纯展示装饰，星石明码标价购买）
+ */
+const decorationRoutes = require('./decorations')
+router.use('/decorations', decorationRoutes)
+
+/**
  * GET /api/v4/exchange/barter/recipes
  *
  * @description 获取以物易物配方列表（旧物组合 → 官方产出物）

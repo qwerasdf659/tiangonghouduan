@@ -233,7 +233,7 @@
             <div class="flex"><dt class="w-24 themed-text-muted">档位：</dt><dd x-text="getTierLabel(current_detail?.reward_tier)"></dd></div>
             <div class="flex"><dt class="w-24 themed-text-muted">材料：</dt><dd x-text="(current_detail?.material_asset_code || '-') + (current_detail?.material_amount ? ' ×' + current_detail.material_amount : '')"></dd></div>
             <div class="flex"><dt class="w-24 themed-text-muted">引用活动：</dt><dd x-text="(current_detail?.campaign_count || 0) + ' 个'"></dd></div>
-            <div class="flex"><dt class="w-24 themed-text-muted">总中奖：</dt><dd x-text="(current_detail?.total_wins_across_campaigns || 0) + ' 次'"></dd></div>
+            <div class="flex"><dt class="w-24 themed-text-muted">总发放：</dt><dd x-text="(current_detail?.total_wins_across_campaigns || 0) + ' 次'"></dd></div>
           </dl>
           <div class="flex justify-end mt-6">
             <button @click="closeDetail()" class="px-4 py-2 themed-btn-secondary rounded-lg">关闭</button>

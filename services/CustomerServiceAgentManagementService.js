@@ -18,6 +18,7 @@ const BusinessError = require('../utils/BusinessError')
 const logger = require('../utils/logger').logger
 const { Op } = require('sequelize')
 const models = require('../models')
+const PiiCrypto = require('../utils/PiiCrypto')
 
 /**
  * 客服座席管理服务类
@@ -37,7 +38,7 @@ class CustomerServiceAgentManagementService {
     const { User, CustomerServiceAgent } = models
 
     const user = await User.findOne({
-      where: { mobile },
+      where: { mobile_hash: PiiCrypto.blindHash(mobile) },
       attributes: ['user_id', 'nickname', 'mobile', 'avatar_url']
     })
 
@@ -70,7 +71,7 @@ class CustomerServiceAgentManagementService {
     const { User } = models
 
     const user = await User.findOne({
-      where: { mobile },
+      where: { mobile_hash: PiiCrypto.blindHash(mobile) },
       attributes: ['user_id'],
       transaction: options.transaction
     })
@@ -105,19 +106,21 @@ class CustomerServiceAgentManagementService {
     const where = {}
     if (status) where.status = status
 
+    // 方案二完整版：手机号加密无法 LIKE，按输入形态分派盲索引；其余仅按昵称搜
+    let userSearchWhere
+    if (search) {
+      const mobileWhere = PiiCrypto.buildMobileSearchWhere(search)
+      const orConditions = [{ nickname: { [Op.like]: `%${search}%` } }]
+      if (mobileWhere) orConditions.push(mobileWhere)
+      userSearchWhere = { [Op.or]: orConditions }
+    }
+
     const include = [
       {
         model: User,
         as: 'user',
         attributes: ['user_id', 'nickname', 'mobile', 'avatar_url'],
-        where: search
-          ? {
-              [Op.or]: [
-                { nickname: { [Op.like]: `%${search}%` } },
-                { mobile: { [Op.like]: `%${search}%` } }
-              ]
-            }
-          : undefined,
+        where: userSearchWhere,
         required: !!search
       }
     ]
@@ -389,19 +392,21 @@ class CustomerServiceAgentManagementService {
     if (agent_id) where.agent_id = parseInt(agent_id)
     if (status) where.status = status
 
+    // 方案二完整版：手机号加密无法 LIKE，按输入形态分派盲索引；其余仅按昵称搜
+    let userSearchWhere
+    if (search) {
+      const mobileWhere = PiiCrypto.buildMobileSearchWhere(search)
+      const orConditions = [{ nickname: { [Op.like]: `%${search}%` } }]
+      if (mobileWhere) orConditions.push(mobileWhere)
+      userSearchWhere = { [Op.or]: orConditions }
+    }
+
     const include = [
       {
         model: User,
         as: 'user',
         attributes: ['user_id', 'nickname', 'mobile', 'avatar_url'],
-        where: search
-          ? {
-              [Op.or]: [
-                { nickname: { [Op.like]: `%${search}%` } },
-                { mobile: { [Op.like]: `%${search}%` } }
-              ]
-            }
-          : undefined,
+        where: userSearchWhere,
         required: !!search
       },
       {

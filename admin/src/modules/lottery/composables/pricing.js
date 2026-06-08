@@ -271,7 +271,7 @@ export function usePricingMethods() {
      */
     removeDrawButton(index) {
       if (this.pricingForm.draw_buttons.length <= 1) {
-        this.showError('至少保留一个抽奖档位')
+        this.showError('至少保留一个回馈档位')
         return
       }
       this.pricingForm.draw_buttons.splice(index, 1)

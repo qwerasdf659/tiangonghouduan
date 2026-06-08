@@ -1,5 +1,5 @@
 /**
- * 餐厅积分抽奖系统 V4 - 商家操作审计日志模型（MerchantOperationLog）
+ * 天工商户营销平台 V4 - 商家操作审计日志模型（MerchantOperationLog）
  *
  * 功能说明：
  * - 独立的商家域审计日志（与 AdminOperationLog 分离）

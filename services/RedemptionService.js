@@ -1,5 +1,5 @@
 /**
- * 餐厅积分抽奖系统 V4.2 - 兑换订单服务（RedemptionService）
+ * 天工商户营销平台 V4.2 - 兑换订单服务（RedemptionService）
  *
  * 职责：
  * - 核销码域（Redemption Code Domain）核心服务

@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <%- include('partials/head', { 
-    title: '抽奖管理中心', 
+    title: '回馈管理中心', 
     pageStyle: '[x-cloak] { display: none !important; }' 
   }) %>
 </head>
@@ -13,7 +13,7 @@
     <div class="container mx-auto px-4 py-3 flex justify-between items-center">
       <div class="flex items-center space-x-4">
         <a href="/admin/workspace.html" class="hover:text-blue-200">← 返回工作台</a>
-        <span class="text-lg font-semibold">🎁 抽奖管理中心</span>
+        <span class="text-lg font-semibold">🎁 回馈管理中心</span>
       </div>
     </div>
   </nav>
@@ -72,7 +72,7 @@
           </div>
           <div class="themed-card rounded-lg shadow p-6 text-center">
             <div class="text-3xl text-yellow-500 mb-2">🏆</div>
-            <h6 class="themed-text-muted text-sm mb-1">今日中奖</h6>
+            <h6 class="themed-text-muted text-sm mb-1">今日发放</h6>
             <h2 class="text-2xl font-bold text-yellow-600" x-text="campaignStats.today_winners">-</h2>
           </div>
         </div>
@@ -131,7 +131,7 @@
                   <div class="flex flex-col items-center justify-center text-center">
                     <div class="text-6xl mb-4">🎁</div>
                     <h3 class="text-lg font-medium themed-text mb-2">暂无活动数据</h3>
-                    <p class="themed-text-muted text-sm mb-4">点击上方按钮创建您的第一个抽奖活动</p>
+                    <p class="themed-text-muted text-sm mb-4">点击上方按钮创建您的第一个回馈活动</p>
                     <button @click="openCreateCampaignModal()" class="px-4 py-2 themed-bg-primary text-white rounded-lg hover:opacity-90 transition-opacity">
                       ➕ 创建活动
                     </button>
@@ -756,7 +756,7 @@
         <!-- 九宫格位置预览（sort_order 1-8 顺时针排列参考图） -->
         <div class="themed-card rounded-lg shadow p-6 mt-4">
           <h6 class="font-semibold text-sm mb-3">🎰 九宫格 sort_order 位置参考</h6>
-          <p class="text-xs themed-text-muted mb-3">奖品的 sort_order 字段对应九宫格中的位置（顺时针 1→8），中间为抽奖按钮。</p>
+          <p class="text-xs themed-text-muted mb-3">奖品的 sort_order 字段对应九宫格中的位置（顺时针 1→8），中间为回馈按钮。</p>
           <div class="grid grid-cols-3 gap-2 max-w-xs mx-auto">
             <div class="border rounded p-3 text-center text-sm bg-blue-50">
               <span class="font-bold text-blue-600">1</span>
@@ -776,7 +776,7 @@
             </div>
             <div class="border rounded p-3 text-center text-sm bg-yellow-50 border-yellow-300">
               <span class="font-bold text-yellow-600">🎰</span>
-              <br><span class="text-xs text-yellow-600">抽奖</span>
+              <br><span class="text-xs text-yellow-600">回馈</span>
             </div>
             <div class="border rounded p-3 text-center text-sm bg-blue-50">
               <span class="font-bold text-blue-600">4</span>
@@ -807,7 +807,7 @@
             <span class="text-2xl mt-0.5">💡</span>
             <div>
               <h5 class="font-semibold text-lg mb-1">策略配置中心</h5>
-              <p class="text-sm opacity-90">管理抽奖系统的核心策略参数。策略按功能分组，每个参数控制不同的出奖行为。修改后将实时影响用户抽奖体验。</p>
+              <p class="text-sm opacity-90">管理回馈系统的核心策略参数。策略按功能分组，每个参数控制不同的出奖行为。修改后将实时影响用户回馈体验。</p>
               <div class="flex flex-wrap gap-3 mt-3 text-xs">
                 <span class="px-2 py-1 bg-white/20 rounded">🎲 概率 - 控制出奖概率</span>
                 <span class="px-2 py-1 bg-white/20 rounded">🛡️ 保护 - 防止极端体验</span>
@@ -893,7 +893,7 @@
                   </div>
                   <div class="space-y-2">
                     <div class="flex items-center justify-between">
-                      <span class="text-xs text-gray-500">抽奖总数</span>
+                      <span class="text-xs text-gray-500">回馈总数</span>
                       <span class="text-sm font-semibold text-gray-800" x-text="strategyConfigSummary.recent_24h.total_draws.toLocaleString()"></span>
                     </div>
                     <div class="flex items-center justify-between">
@@ -920,7 +920,7 @@
                   🎰 最近24小时档位分布
                   <span class="text-xs font-normal text-gray-400" x-text="'总计 ' + strategyConfigSummary.recent_24h.total_draws + ' 次'"></span>
                 </h6>
-                <div x-show="strategyConfigSummary.recent_24h.total_draws === 0" class="text-center py-4 text-xs text-gray-400">暂无抽奖数据</div>
+                <div x-show="strategyConfigSummary.recent_24h.total_draws === 0" class="text-center py-4 text-xs text-gray-400">暂无回馈数据</div>
                 <div x-show="strategyConfigSummary.recent_24h.total_draws > 0" class="space-y-2">
                   <!-- high -->
                   <div class="flex items-center gap-2">
@@ -1342,7 +1342,7 @@
                         :class="activityStrategyConfig?.guarantee?.enabled ? 'translate-x-5' : ''"></span>
                 </button>
               </div>
-              <p class="text-xs text-gray-500 mb-2">固定间隔保底，达到指定抽奖次数后强制发放指定奖品</p>
+              <p class="text-xs text-gray-500 mb-2">固定间隔保底，达到指定回馈次数后强制发放指定奖品</p>
               <div class="text-sm" x-show="activityStrategyConfig?.guarantee">
                 <span class="text-gray-600">保底阈值：</span>
                 <span x-text="activityStrategyConfig?.guarantee?.threshold || '-'"></span> 次
@@ -1378,7 +1378,7 @@
                         :class="activityStrategyConfig?.preset?.debt_enabled ? 'translate-x-5' : ''"></span>
                 </button>
               </div>
-              <p class="text-xs text-gray-500 mb-2">启用债务预抽机制，基于用户运气债务预计算抽奖结果队列</p>
+              <p class="text-xs text-gray-500 mb-2">启用债务预抽机制，基于用户运气债务预计算回馈结果队列</p>
             </div>
 
           </div>
@@ -1644,7 +1644,7 @@
               <span class="text-2xl mt-0.5">📶</span>
               <div>
                 <h5 class="font-semibold text-lg mb-1">成长等级公示分级概率</h5>
-                <p class="text-sm opacity-90">按用户成长等级（由历史积分实时派生）配置各等级的中奖率倍数。倍数为公示规则，抽奖内核按等级读取消费。倍数 1.0 表示不调整，&gt;1.0 表示该等级更易中奖。</p>
+                <p class="text-sm opacity-90">按用户成长等级（由历史积分实时派生）配置各等级的发放率倍数。倍数为公示规则，回馈内核按等级读取消费。倍数 1.0 表示不调整，&gt;1.0 表示该等级更易获得回馈。</p>
               </div>
             </div>
           </div>
@@ -1668,7 +1668,7 @@
           <!-- 倍数配置表格 -->
           <div class="themed-card rounded-lg shadow" x-show="selectedCampaignId">
             <div class="p-4 border-b flex justify-between items-center">
-              <h5 class="font-semibold">📶 各成长等级中奖率倍数</h5>
+              <h5 class="font-semibold">📶 各成长等级发放率倍数</h5>
               <button @click="saveLevelProbability()" :disabled="saving || !loaded || items.length === 0"
                       class="px-4 py-2 themed-bg-primary text-white rounded hover:opacity-90 transition-colors disabled:opacity-50">
                 <span x-show="saving" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></span>
@@ -1688,7 +1688,7 @@
                     <th class="text-left py-3 px-4 text-xs font-semibold themed-text-muted uppercase tracking-wider">成长等级</th>
                     <th class="text-left py-3 px-4 text-xs font-semibold themed-text-muted uppercase tracking-wider">等级码</th>
                     <th class="text-right py-3 px-4 text-xs font-semibold themed-text-muted uppercase tracking-wider">门槛（历史积分）</th>
-                    <th class="text-left py-3 px-4 text-xs font-semibold themed-text-muted uppercase tracking-wider">中奖率倍数</th>
+                    <th class="text-left py-3 px-4 text-xs font-semibold themed-text-muted uppercase tracking-wider">发放率倍数</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y themed-divide">
@@ -1713,7 +1713,7 @@
               </table>
               <div class="p-4 border-t bg-amber-50 text-xs text-amber-700 flex items-start gap-1.5">
                 <span>⚠️</span>
-                <span>倍数必须为正数。1.0 表示不调整该等级中奖率；配置保存后立即对该活动生效，所有操作均有审计记录。</span>
+                <span>倍数必须为正数。1.0 表示不调整该等级发放率；配置保存后立即对该活动生效，所有操作均有审计记录。</span>
               </div>
             </div>
           </div>
@@ -1728,7 +1728,7 @@
             <span class="text-2xl mt-0.5">📊</span>
             <div>
               <h5 class="font-semibold text-lg mb-1">配额规则管理</h5>
-              <p class="text-sm opacity-90">控制用户每天的抽奖次数上限。规则按优先级生效，高优先级规则覆盖低优先级。规则只能创建和禁用，需要变更时请创建新规则并禁用旧规则。</p>
+              <p class="text-sm opacity-90">控制用户每天的回馈次数上限。规则按优先级生效，高优先级规则覆盖低优先级。规则只能创建和禁用，需要变更时请创建新规则并禁用旧规则。</p>
               <div class="flex flex-wrap gap-3 mt-3 text-xs">
                 <span class="px-2 py-1 bg-white/20 rounded">🌐 全局 - 所有活动统一限制</span>
                 <span class="px-2 py-1 bg-white/20 rounded">🎯 活动 - 指定活动专属限制</span>
@@ -1822,7 +1822,7 @@
               <div class="flex flex-col items-center justify-center text-center">
                 <div class="text-6xl mb-4">📊</div>
                 <h3 class="text-lg font-medium themed-text mb-2">暂无配额规则</h3>
-                <p class="themed-text-muted text-sm mb-4">配额规则用于限制用户每日抽奖次数，点击下方按钮创建第一条规则</p>
+                <p class="themed-text-muted text-sm mb-4">配额规则用于限制用户每日回馈次数，点击下方按钮创建第一条规则</p>
                 <button @click="openCreateQuotaModal()" class="action-btn action-btn-primary rounded-lg">
                   ➕ 创建配额规则
                 </button>
@@ -1924,9 +1924,9 @@
             <span class="text-2xl mt-0.5">💵</span>
             <div>
               <h5 class="font-semibold text-lg mb-1">活动定价配置</h5>
-              <p class="text-sm opacity-90">配置每个抽奖活动的积分价格和连抽折扣。每个活动独立定价，支持版本管理和历史回滚。修改定价会创建新版本，旧版本自动归档。</p>
+              <p class="text-sm opacity-90">配置每个回馈活动的积分价格和连抽折扣。每个活动独立定价，支持版本管理和历史回滚。修改定价会创建新版本，旧版本自动归档。</p>
               <div class="flex flex-wrap gap-3 mt-3 text-xs">
-                <span class="px-2 py-1 bg-white/20 rounded">💰 基础价格 - 单次抽奖消耗积分</span>
+                <span class="px-2 py-1 bg-white/20 rounded">💰 基础价格 - 单次回馈消耗积分</span>
                 <span class="px-2 py-1 bg-white/20 rounded">🎰 连抽档位 - 多连抽折扣优惠</span>
                 <span class="px-2 py-1 bg-white/20 rounded">📋 版本管理 - 历史版本可追溯回滚</span>
               </div>
@@ -2005,7 +2005,7 @@
               <div class="flex flex-col items-center justify-center text-center">
                 <div class="text-6xl mb-4">💵</div>
                 <h3 class="text-lg font-medium themed-text mb-2">暂无定价配置</h3>
-                <p class="themed-text-muted text-sm mb-4">每个活动需要独立的定价配置，点击下方按钮为活动设置抽奖价格</p>
+                <p class="themed-text-muted text-sm mb-4">每个活动需要独立的定价配置，点击下方按钮为活动设置回馈价格</p>
                 <button @click="openCreatePricingModal()" class="action-btn action-btn-primary rounded-lg">
                   ➕ 创建定价配置
                 </button>
@@ -2109,7 +2109,7 @@
         </div>
       </div>
 
-      <!-- ==================== 抽奖指标页 ==================== -->
+      <!-- ==================== 回馈指标页 ==================== -->
       <div x-show="current_page === 'lottery-metrics'" x-cloak x-init="$nextTick(() => { if(typeof initMonitoringCharts === 'function') initMonitoringCharts() })">
         <!-- 时间范围筛选 -->
         <div class="filter-toolbar">
@@ -2182,17 +2182,17 @@
           <div class="gradient-stat-card gradient-stat-blue">
             <div class="stat-icon">🎲</div>
             <div class="stat-value" x-text="lotteryMetrics.total_draws">-</div>
-            <div class="stat-label">总抽奖次数</div>
+            <div class="stat-label">总回馈次数</div>
           </div>
           <div class="gradient-stat-card gradient-stat-green">
             <div class="stat-icon">🏆</div>
             <div class="stat-value" x-text="lotteryMetrics.total_wins">-</div>
-            <div class="stat-label">中奖次数</div>
+            <div class="stat-label">发放次数</div>
           </div>
           <div class="gradient-stat-card gradient-stat-orange">
             <div class="stat-icon">📈</div>
             <div class="stat-value" x-text="lotteryMetrics.win_rate + '%'">-</div>
-            <div class="stat-label">中奖率</div>
+            <div class="stat-label">发放率</div>
           </div>
           <div class="gradient-stat-card gradient-stat-cyan">
             <div class="stat-icon">💰</div>
@@ -2205,7 +2205,7 @@
         <div class="filter-toolbar mb-6">
           <div class="flex flex-col md:flex-row items-start md:items-center gap-4">
             <h6 class="font-semibold text-sm flex items-center gap-2 shrink-0">
-              👤 用户抽奖档案查询
+              👤 用户回馈档案查询
             </h6>
             <div class="flex flex-1 gap-3 items-center flex-wrap">
               <input 
@@ -2239,10 +2239,10 @@
 
         <!-- 📈 图表区域：24小时趋势 + 档位分布 -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          <!-- 24小时抽奖趋势折线图 -->
+          <!-- 24小时回馈趋势折线图 -->
           <div class="themed-card rounded-lg shadow">
             <div class="p-4 border-b flex items-center justify-between">
-              <h5 class="font-semibold">📈 24小时抽奖趋势</h5>
+              <h5 class="font-semibold">📈 24小时回馈趋势</h5>
               <span x-show="chartLoading" class="text-xs themed-text-muted flex items-center gap-1">
                 <svg class="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -2277,11 +2277,11 @@
           </div>
         </div>
 
-        <!-- P3-4: 抽奖时段热力图 -->
+        <!-- P3-4: 回馈时段热力图 -->
         <div class="themed-card rounded-lg shadow mb-6">
           <div class="p-4 border-b flex items-center justify-between">
             <div class="flex items-center gap-2">
-              <h5 class="font-semibold">🔥 抽奖时段热力图</h5>
+              <h5 class="font-semibold">🔥 回馈时段热力图</h5>
               <span class="text-sm themed-text-muted">24小时 × 7天</span>
             </div>
             <div class="flex items-center gap-2">
@@ -2344,7 +2344,7 @@
               <thead class="themed-bg-base">
                 <tr>
                   <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">奖品等级</th>
-                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">中奖次数</th>
+                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">发放次数</th>
                   <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">占比</th>
                 </tr>
               </thead>
@@ -2373,10 +2373,10 @@
           </div>
         </div>
 
-        <!-- 抽奖记录（含 LT 单号） - 使用 drawHistoryDataTable 数据表组件 -->
+        <!-- 回馈记录（含 LT 单号） - 使用 drawHistoryDataTable 数据表组件 -->
         <div x-data="drawHistoryDataTable()" class="themed-card rounded-lg shadow">
           <div class="p-4 border-b flex justify-between items-center">
-            <h5 class="font-semibold">📋 抽奖记录</h5>
+            <h5 class="font-semibold">📋 回馈记录</h5>
             <button @click="loadData()" class="text-xs px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200">🔄 刷新</button>
           </div>
           <div class="p-4">
@@ -2422,21 +2422,21 @@
 
       <!-- 告警中心已迁移至独立页面 /admin/lottery-alerts.html -->
 
-      <!-- 单次抽奖详情弹窗 (P1) -->
+      <!-- 单次回馈详情弹窗 (P1) -->
       <div x-show="showDrawDetailsModal" 
            class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
            x-cloak
            @click.self="closeDrawDetailsModal()">
         <div class="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-auto">
           <div class="p-4 border-b flex justify-between items-center sticky top-0 bg-white z-10">
-            <h5 class="font-semibold">🎰 单次抽奖详情 - Pipeline可视化</h5>
+            <h5 class="font-semibold">🎰 单次回馈详情 - Pipeline可视化</h5>
             <button @click="closeDrawDetailsModal()" class="text-gray-500 hover:text-gray-700 text-xl">✕</button>
           </div>
 
           <!-- 加载状态 -->
           <div x-show="loadingDrawDetails" class="p-8 text-center">
             <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 mx-auto mb-4"></div>
-            <p class="themed-text-muted">加载抽奖详情...</p>
+            <p class="themed-text-muted">加载回馈详情...</p>
           </div>
 
           <!-- 详情内容 -->
@@ -2454,7 +2454,7 @@
                       <p class="font-mono text-blue-600" x-text="drawDetails.basic_info?.order_no || '-'"></p>
                     </div>
                     <div>
-                      <span class="themed-text-muted">抽奖ID:</span>
+                      <span class="themed-text-muted">回馈ID:</span>
                       <p class="font-mono" x-text="drawDetails.basic_info?.draw_id || currentDrawId"></p>
                     </div>
                     <div>
@@ -2470,19 +2470,19 @@
                       <p x-text="drawDetails.basic_info?.cost_points || 0"></p>
                     </div>
                     <div>
-                      <span class="themed-text-muted">抽奖时间:</span>
+                      <span class="themed-text-muted">回馈时间:</span>
                       <p x-text="formatBeijingTime(drawDetails.basic_info?.created_at)"></p>
                     </div>
                     <div>
-                      <span class="themed-text-muted">是否中奖:</span>
+                      <span class="themed-text-muted">是否获得:</span>
                       <p>
                         <span class="px-2 py-0.5 text-xs rounded"
                               :class="drawDetails.basic_info?.is_winner ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'"
-                              x-text="drawDetails.basic_info?.is_winner ? '中奖' : '未中奖'"></span>
+                              x-text="drawDetails.basic_info?.is_winner ? '已发放' : '未发放'"></span>
                       </p>
                     </div>
                     <div>
-                      <span class="themed-text-muted">中奖档位:</span>
+                      <span class="themed-text-muted">回馈档位:</span>
                       <p x-text="drawDetails.basic_info?.result_tier || '-'"></p>
                     </div>
                     <div>
@@ -2492,10 +2492,10 @@
                   </div>
                 </div>
 
-                <!-- 用户抽奖前状态 -->
+                <!-- 用户回馈前状态 -->
                 <div x-show="drawDetails.user_state_before" class="themed-card rounded-lg shadow p-4">
                   <h6 class="font-semibold mb-3 flex items-center gap-2">
-                    <span>👤</span> 用户抽奖前状态
+                    <span>👤</span> 用户回馈前状态
                   </h6>
                   <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                     <div>
@@ -2511,7 +2511,7 @@
                       <p x-text="drawDetails.user_state_before?.luck_debt?.toFixed(4) || '0.0000'"></p>
                     </div>
                     <div>
-                      <span class="themed-text-muted">总抽奖次数:</span>
+                      <span class="themed-text-muted">总回馈次数:</span>
                       <p x-text="drawDetails.user_state_before?.total_draws || 0"></p>
                     </div>
                   </div>
@@ -2599,7 +2599,7 @@
           <!-- 空状态 -->
           <div x-show="!loadingDrawDetails && !drawDetails" class="p-8 text-center">
             <div class="text-4xl mb-2">📭</div>
-            <p class="themed-text-muted">未找到抽奖详情</p>
+            <p class="themed-text-muted">未找到回馈详情</p>
           </div>
 
           <div class="p-4 border-t flex justify-end sticky bottom-0 bg-white">
@@ -2622,14 +2622,14 @@
           <div class="gradient-stat-card gradient-stat-rose">
             <div class="stat-icon">🔥</div>
             <div class="stat-value" x-text="abnormalUserStats.high_frequency">0</div>
-            <div class="stat-label">高频抽奖</div>
-            <div class="stat-trend">短时间大量抽奖行为</div>
+            <div class="stat-label">高频回馈</div>
+            <div class="stat-trend">短时间大量回馈行为</div>
           </div>
           <div class="gradient-stat-card gradient-stat-orange">
             <div class="stat-icon">📈</div>
             <div class="stat-value" x-text="abnormalUserStats.high_win_rate">0</div>
-            <div class="stat-label">高中奖率</div>
-            <div class="stat-trend">中奖率异常偏高</div>
+            <div class="stat-label">高发放率</div>
+            <div class="stat-trend">发放率异常偏高</div>
           </div>
           <div class="gradient-stat-card gradient-stat-purple">
             <div class="stat-icon">👑</div>
@@ -2641,7 +2641,7 @@
             <div class="stat-icon">⚡</div>
             <div class="stat-value" x-text="abnormalUserStats.rapid_wins">0</div>
             <div class="stat-label">快速连中</div>
-            <div class="stat-trend">短时间连续中奖</div>
+            <div class="stat-trend">短时间连续获得</div>
           </div>
         </div>
 
@@ -2652,8 +2652,8 @@
               <label class="form-label">异常类型</label>
               <select x-model="abnormalUserFilters.type" @change="filterAbnormalUsersByType(abnormalUserFilters.type)" class="form-select">
                 <option value="all">全部类型</option>
-                <option value="high_frequency">🔥 高频抽奖</option>
-                <option value="high_win_rate">📈 高中奖率</option>
+                <option value="high_frequency">🔥 高频回馈</option>
+                <option value="high_win_rate">📈 高发放率</option>
                 <option value="high_tier_abnormal">👑 高档位异常</option>
                 <option value="rapid_wins">⚡ 快速连中</option>
               </select>
@@ -2691,7 +2691,7 @@
             <div class="empty-state-description">当前没有检测到异常用户行为，风控系统持续监控中。</div>
             <div class="empty-state-tips">
               <div class="empty-state-tips-title">💡 风控面板说明</div>
-              <div>系统会自动检测以下异常行为：高频抽奖、中奖率偏高、高档位命中过多、短时间连续中奖</div>
+              <div>系统会自动检测以下异常行为：高频回馈、发放率偏高、高档位命中过多、短时间连续获得</div>
               <div>发现异常用户后，可在此查看详情并进行人工审核</div>
             </div>
           </div>
@@ -2725,7 +2725,7 @@
                             :class="getRiskLevelStyle(user.risk_level)"
                             x-text="user.risk_level_display || user.risk_level"></span>
                     </td>
-                    <td class="px-4 py-3 text-sm themed-text-muted" x-text="user.metrics ? '24h抽奖' + user.metrics.draw_count_24h + '次, 中奖率' + user.metrics.win_rate + '%' : '-'"></td>
+                    <td class="px-4 py-3 text-sm themed-text-muted" x-text="user.metrics ? '24h回馈' + user.metrics.draw_count_24h + '次, 发放率' + user.metrics.win_rate + '%' : '-'"></td>
                     <td class="px-4 py-3 text-sm themed-text-muted" x-text="formatRiskTime(user.last_draw_time)"></td>
                     <td class="px-4 py-3 text-sm">
                       <div class="flex items-center gap-2">
@@ -2822,15 +2822,15 @@
                     <td class="py-2" x-text="formatRiskTime(selectedAbnormalUser.detected_at)"></td>
                   </tr>
                   <tr class="border-b" x-show="selectedAbnormalUser.draw_count">
-                    <th class="py-2 text-left">抽奖次数</th>
+                    <th class="py-2 text-left">回馈次数</th>
                     <td class="py-2" x-text="selectedAbnormalUser.draw_count"></td>
                   </tr>
                   <tr class="border-b" x-show="selectedAbnormalUser.win_count">
-                    <th class="py-2 text-left">中奖次数</th>
+                    <th class="py-2 text-left">发放次数</th>
                     <td class="py-2" x-text="selectedAbnormalUser.win_count"></td>
                   </tr>
                   <tr class="border-b" x-show="selectedAbnormalUser.win_rate">
-                    <th class="py-2 text-left">中奖率</th>
+                    <th class="py-2 text-left">发放率</th>
                     <td class="py-2" x-text="(selectedAbnormalUser.win_rate * 100).toFixed(2) + '%'"></td>
                   </tr>
                   <tr class="border-b" x-show="selectedAbnormalUser.description">
@@ -3000,7 +3000,7 @@
                       </div>
                       <div>
                         <dt class="font-medium text-violet-700">压力矩阵评分（0-100分）</dt>
-                        <dd class="text-xs text-slate-500 mt-0.5">衡量压力层级的分散度。分数越高=不同压力层级的抽奖分布越均匀。如果分数很低，说明抽奖过于集中在某个压力层级。</dd>
+                        <dd class="text-xs text-slate-500 mt-0.5">衡量压力层级的分散度。分数越高=不同压力层级的回馈分布越均匀。如果分数很低，说明回馈过于集中在某个压力层级。</dd>
                       </div>
                       <div>
                         <dt class="font-medium text-amber-700">总降级次数</dt>
@@ -3017,7 +3017,7 @@
                       </div>
                       <div>
                         <dt class="font-medium text-slate-700">格子里的百分比</dt>
-                        <dd class="text-xs text-slate-500 mt-0.5">表示在该压力层级下发生的抽奖占总抽奖次数的比例。理想状态：P0/P1为主，P2占比较低。</dd>
+                        <dd class="text-xs text-slate-500 mt-0.5">表示在该压力层级下发生的回馈占总回馈次数的比例。理想状态：P0/P1为主，P2占比较低。</dd>
                       </div>
                     </dl>
                   </div>
@@ -3099,7 +3099,7 @@
                       <span class="text-xl">📊</span>
                     </div>
                     <p class="themed-text-muted text-sm">暂无压力矩阵数据</p>
-                    <p class="text-xs themed-text-muted mt-1">数据将在有抽奖记录后自动生成</p>
+                    <p class="text-xs themed-text-muted mt-1">数据将在有回馈记录后自动生成</p>
                   </div>
                 </template>
 
@@ -3107,7 +3107,7 @@
                 <div class="mt-4 border-t border-slate-100 pt-4">
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-slate-500">
                     <div>
-                      <p class="font-semibold text-slate-600 mb-2">📐 矩阵如何影响中奖概率</p>
+                      <p class="font-semibold text-slate-600 mb-2">📐 矩阵如何影响发放概率</p>
                       <table class="w-full text-xs border-collapse">
                         <thead>
                           <tr class="text-left">
@@ -3163,7 +3163,7 @@
                 <h6 class="font-semibold text-white flex items-center gap-2">
                   🎮 体验保护机制
                 </h6>
-                <p class="text-xs text-emerald-100 mt-1">这些机制自动保护用户的抽奖体验，防止出现极端不佳情况</p>
+                <p class="text-xs text-emerald-100 mt-1">这些机制自动保护用户的回馈体验，防止出现极端不佳情况</p>
               </div>
               <div class="p-5 bg-white">
                 <template x-if="strategyEffectiveness.experience_mechanism_analysis">
@@ -3326,7 +3326,7 @@
                     </div>
                     <p class="text-xs themed-text-muted text-center mt-3 flex items-center justify-center gap-1">
                       <span class="w-1.5 h-1.5 rounded-full bg-gray-300"></span>
-                      数据来源: 每日抽奖指标统计
+                      数据来源: 每日回馈指标统计
                     </p>
                   </div>
                 </template>
@@ -3514,10 +3514,10 @@
 
             <!-- 当日汇总 KPI 卡片 -->
             <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-              <!-- 总抽奖次数 -->
+              <!-- 总回馈次数 -->
               <div class="themed-card rounded-lg shadow p-4 text-center">
                 <div class="text-2xl mb-1">🎰</div>
-                <p class="text-xs themed-text-muted mb-1">总抽奖次数</p>
+                <p class="text-xs themed-text-muted mb-1">总回馈次数</p>
                 <p class="text-xl font-bold" x-text="(dailyReport.summary?.total_draws || 0).toLocaleString()"></p>
                 <template x-if="dailyReport.vs_yesterday?.draws_change !== undefined">
                   <p class="text-xs mt-1" 
@@ -3526,10 +3526,10 @@
                 </template>
               </div>
               
-              <!-- 中奖率 -->
+              <!-- 发放率 -->
               <div class="themed-card rounded-lg shadow p-4 text-center">
                 <div class="text-2xl mb-1">🎯</div>
-                <p class="text-xs themed-text-muted mb-1">中奖率</p>
+                <p class="text-xs themed-text-muted mb-1">发放率</p>
                 <p class="text-xl font-bold" x-text="formatDailyReportPercentage(dailyReport.summary?.win_rate)"></p>
                 <template x-if="dailyReport.vs_yesterday?.wins_change !== undefined">
                   <p class="text-xs mt-1" 
@@ -3747,7 +3747,7 @@
                     <thead class="bg-gray-50">
                       <tr>
                         <th class="p-2 text-left">奖品</th>
-                        <th class="p-2 text-right">中奖次数</th>
+                        <th class="p-2 text-right">发放次数</th>
                         <th class="p-2 text-right">总价值</th>
                       </tr>
                     </thead>
@@ -3780,9 +3780,9 @@
                     <thead class="bg-gray-50">
                       <tr>
                         <th class="p-3 text-left">活动名称</th>
-                        <th class="p-3 text-right">抽奖次数</th>
-                        <th class="p-3 text-right">中奖次数</th>
-                        <th class="p-3 text-right">中奖率</th>
+                        <th class="p-3 text-right">回馈次数</th>
+                        <th class="p-3 text-right">发放次数</th>
+                        <th class="p-3 text-right">发放率</th>
                         <th class="p-3 text-right">成本</th>
                         <th class="p-3 text-right">收入</th>
                         <th class="p-3 text-right">ROI</th>
@@ -3818,13 +3818,13 @@
               <div class="p-4">
                 <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 text-center text-sm">
                   <div>
-                    <p class="themed-text-muted mb-1">抽奖次数</p>
+                    <p class="themed-text-muted mb-1">回馈次数</p>
                     <p class="font-semibold" 
                        :class="formatDailyReportChange(dailyReport.vs_last_week?.draws_change).colorClass"
                        x-text="formatDailyReportChange(dailyReport.vs_last_week?.draws_change).text"></p>
                   </div>
                   <div>
-                    <p class="themed-text-muted mb-1">中奖数</p>
+                    <p class="themed-text-muted mb-1">发放数</p>
                     <p class="font-semibold" 
                        :class="formatDailyReportChange(dailyReport.vs_last_week?.wins_change).colorClass"
                        x-text="formatDailyReportChange(dailyReport.vs_last_week?.wins_change).text"></p>
@@ -3882,7 +3882,7 @@
                     <p class="text-sm font-medium mb-2">📊 日报内容</p>
                     <div class="space-y-1 text-xs themed-text-muted">
                       <p>• 今日待办汇总（待审核/待核销/待回复）</p>
-                      <p>• 昨日核心指标（抽奖次数/中奖率/成本/ROI）</p>
+                      <p>• 昨日核心指标（回馈次数/发放率/成本/ROI）</p>
                       <p>• 同比分析（昨日对比/上周同日对比）</p>
                       <p>• 异常告警提醒（高频用户/预算异常/库存预警）</p>
                     </div>
@@ -3981,7 +3981,7 @@
                   <div>
                     <h6 class="font-semibold text-sm" x-text="simulation_baseline.campaign?.campaign_name"></h6>
                     <div class="flex items-center gap-3 mt-0.5 text-xs text-gray-500">
-                      <span>累计抽奖: <span class="font-bold text-gray-700" x-text="(simulation_baseline.actual_distribution?.total_draws || 0).toLocaleString()"></span> 次</span>
+                      <span>累计回馈: <span class="font-bold text-gray-700" x-text="(simulation_baseline.actual_distribution?.total_draws || 0).toLocaleString()"></span> 次</span>
                       <span>|</span>
                       <span>奖品: <span class="font-bold text-gray-700" x-text="simulation_baseline.prizes?.length || 0"></span> 个</span>
                       <span>|</span>
@@ -4183,7 +4183,7 @@
                         </tbody>
                       </table>
                     </div>
-                    <p class="mt-2 text-xs text-gray-400">提示：乘数为0表示该档位在此格子不参与抽奖（显示为灰色）。有色彩的输入框表示该参数生效中。点击数字可直接修改。</p>
+                    <p class="mt-2 text-xs text-gray-400">提示：乘数为0表示该档位在此格子不参与回馈（显示为灰色）。有色彩的输入框表示该参数生效中。点击数字可直接修改。</p>
                   </div>
                 </template>
               </div>
@@ -4222,7 +4222,7 @@
                         <template x-for="(val, key) in values" :key="key">
                           <div class="flex items-center justify-between text-xs mb-2.5 py-1">
                             <span class="text-gray-600 font-medium"
-                                  x-text="({'enabled':'是否启用','hard_guarantee_threshold':'硬保底阈值','empty_streak_threshold':'连空触发阈值','high_streak_threshold':'连高触发阈值','multiplier_table':'加权倍率表','threshold_high':'高预算线','threshold_mid':'中预算线','threshold_low':'低预算线','expected_empty_rate':'预期空奖率','min_draw_count':'最少抽奖次数','recent_draw_window':'近期抽奖窗口','min_non_empty_cost':'最低非空奖成本','debt_enabled':'债务预抽开关','threshold':'保底阈值','prize_id':'保底奖品ID','high_multiplier':'高档乘数','mid_multiplier':'中档乘数','low_multiplier':'低档乘数','empty_weight_multiplier':'空奖权重乘数','fallback_multiplier':'兜底乘数'})[key] || key"></span>
+                                  x-text="({'enabled':'是否启用','hard_guarantee_threshold':'硬保底阈值','empty_streak_threshold':'连空触发阈值','high_streak_threshold':'连高触发阈值','multiplier_table':'加权倍率表','threshold_high':'高预算线','threshold_mid':'中预算线','threshold_low':'低预算线','expected_empty_rate':'预期空奖率','min_draw_count':'最少回馈次数','recent_draw_window':'近期回馈窗口','min_non_empty_cost':'最低非空奖成本','debt_enabled':'债务预抽开关','threshold':'保底阈值','prize_id':'保底奖品ID','high_multiplier':'高档乘数','mid_multiplier':'中档乘数','low_multiplier':'低档乘数','empty_weight_multiplier':'空奖权重乘数','fallback_multiplier':'兜底乘数'})[key] || key"></span>
                             <template x-if="typeof val === 'boolean'">
                               <label class="relative inline-flex items-center cursor-pointer">
                                 <input type="checkbox" :checked="val" @change="proposed_config.strategy_config[group][key] = $event.target.checked" class="sr-only peer">
@@ -4435,7 +4435,7 @@
               <div class="themed-card rounded-xl shadow-sm p-5 mb-5">
                 <div class="flex items-center gap-2 mb-4">
                   <h6 class="text-sm font-semibold text-gray-800">用户画像配置</h6>
-                  <span class="text-xs text-gray-400">模拟一个特定用户的连续抽奖体验，观察每次抽奖的权重变化和策略触发</span>
+                  <span class="text-xs text-gray-400">模拟一个特定用户的连续回馈体验，观察每次回馈的权重变化和策略触发</span>
                 </div>
                 <div class="grid grid-cols-2 md:grid-cols-5 gap-4 items-end">
                   <div>
@@ -4460,10 +4460,10 @@
                     <span class="text-xs text-gray-400 mt-0.5 block">模拟已连续空奖N次</span>
                   </div>
                   <div>
-                    <label class="block text-xs font-medium text-gray-600 mb-1.5">模拟抽奖次数</label>
+                    <label class="block text-xs font-medium text-gray-600 mb-1.5">模拟回馈次数</label>
                     <input type="number" x-model.number="journey_draw_count" min="5" max="100"
                            class="w-full border rounded-lg px-3 py-2 text-sm themed-input">
-                    <span class="text-xs text-gray-400 mt-0.5 block">连续抽奖的总次数</span>
+                    <span class="text-xs text-gray-400 mt-0.5 block">连续回馈的总次数</span>
                   </div>
                   <div>
                     <button @click="runUserJourney()" :disabled="running_journey"
@@ -4501,9 +4501,9 @@
                     </div>
                   </div>
 
-                  <!-- 抽奖时间线 -->
+                  <!-- 回馈时间线 -->
                   <div class="themed-card rounded-xl shadow-sm p-4">
-                    <h6 class="font-semibold text-sm text-gray-800 mb-3">抽奖旅程时间线</h6>
+                    <h6 class="font-semibold text-sm text-gray-800 mb-3">回馈旅程时间线</h6>
                     <div class="space-y-2 max-h-[550px] overflow-y-auto pr-1">
                       <template x-for="draw in journey_result.draws" :key="draw.draw_number">
                         <div class="flex items-stretch gap-3 rounded-lg p-3 transition-all hover:shadow-sm"
@@ -4540,8 +4540,8 @@
                   <div class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center mb-4">
                     <span class="text-3xl">👤</span>
                   </div>
-                  <h6 class="font-semibold text-gray-700 mb-2">模拟单用户抽奖体验</h6>
-                  <p class="text-sm text-gray-400 max-w-md mx-auto">设置用户预算和分群后，点击「开始模拟旅程」可以看到每次抽奖的详细权重计算过程和策略触发情况</p>
+                  <h6 class="font-semibold text-gray-700 mb-2">模拟单用户回馈体验</h6>
+                  <p class="text-sm text-gray-400 max-w-md mx-auto">设置用户预算和分群后，点击「开始模拟旅程」可以看到每次回馈的详细权重计算过程和策略触发情况</p>
                 </div>
               </template>
             </div>
@@ -4759,7 +4759,7 @@
                           <div class="text-xl font-bold mt-1" x-text="budget_pacing.avg_daily_consumption?.toLocaleString()"></div>
                         </div>
                         <div class="border rounded-lg p-3 text-center">
-                          <div class="text-xs text-gray-500">日均抽奖</div>
+                          <div class="text-xs text-gray-500">日均回馈</div>
                           <div class="text-xl font-bold mt-1" x-text="budget_pacing.avg_daily_draws?.toLocaleString() + ' 次'"></div>
                         </div>
                         <div class="border rounded-lg p-3 text-center" :class="budget_pacing.estimated_depletion_days <= 7 ? 'bg-red-50 border-red-200' : budget_pacing.estimated_depletion_days <= 30 ? 'bg-yellow-50 border-yellow-200' : ''">
@@ -4787,7 +4787,7 @@
                         <span class="px-3 py-1 rounded-full text-sm" :class="getCircuitBreakerBadge().class"
                               x-text="getCircuitBreakerBadge().text"></span>
                         <template x-if="circuit_breaker_status.recent_draws">
-                          <span class="text-xs text-gray-400">（近1小时 <span x-text="circuit_breaker_status.recent_draws"></span> 次抽奖）</span>
+                          <span class="text-xs text-gray-400">（近1小时 <span x-text="circuit_breaker_status.recent_draws"></span> 次回馈）</span>
                         </template>
                       </div>
                       <template x-if="circuit_breaker_status.breaches?.length > 0">
@@ -4854,7 +4854,7 @@
                       <!-- 偏差结果展示 -->
                       <template x-if="record.drift_result">
                         <div class="mt-2 p-2 bg-gray-50 rounded text-xs">
-                          <div class="font-medium mb-1">偏差追踪结果 (基于 <span x-text="record.drift_result.actual_draws_count"></span> 次实际抽奖)</div>
+                          <div class="font-medium mb-1">偏差追踪结果 (基于 <span x-text="record.drift_result.actual_draws_count"></span> 次实际回馈)</div>
                           <div class="grid grid-cols-4 gap-2">
                             <template x-for="tier in ['high', 'mid', 'low', 'fallback']" :key="tier">
                               <div>
@@ -4866,7 +4866,7 @@
                             </template>
                           </div>
                           <template x-if="record.drift_result.actual_draws_count === 0">
-                            <div class="text-gray-400 mt-1">模拟后暂无新的实际抽奖数据</div>
+                            <div class="text-gray-400 mt-1">模拟后暂无新的实际回馈数据</div>
                           </template>
                         </div>
                       </template>
@@ -4885,7 +4885,7 @@
           <div class="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 p-6" @click.stop>
             <h5 class="font-bold text-lg mb-4">🚀 应用配置到线上</h5>
             <div class="text-sm text-gray-600 mb-4">
-              <p class="mb-2">即将修改以下线上配置，此操作会直接影响正在运行的抽奖系统：</p>
+              <p class="mb-2">即将修改以下线上配置，此操作会直接影响正在运行的回馈系统：</p>
               <div class="bg-gray-50 rounded p-3 text-xs max-h-40 overflow-y-auto">
                 <template x-if="proposed_config.matrix_config?.length > 0">
                   <div class="mb-1">
@@ -4960,7 +4960,7 @@
             <div class="text-center">
               <div class="text-4xl mb-3">🎁</div>
               <h6 class="font-semibold mb-2">批量赠送每日配额</h6>
-              <p class="text-sm themed-text-muted">为多个用户批量赠送指定活动的每日抽奖额外配额（bonus_draw_count）</p>
+              <p class="text-sm themed-text-muted">为多个用户批量赠送指定活动的每日回馈额外配额（bonus_draw_count）</p>
             </div>
           </div>
 
@@ -5056,7 +5056,7 @@
             <template x-if="currentBatchOperation === 'quota-grant'">
               <div class="space-y-4">
                 <div class="p-3 bg-blue-50 rounded text-sm text-blue-700 mb-2">
-                  💡 此功能为用户增加指定活动的每日抽奖额外配额（bonus_draw_count），不影响基础配额上限。
+                  💡 此功能为用户增加指定活动的每日回馈额外配额（bonus_draw_count），不影响基础配额上限。
                 </div>
                 <div>
                   <label class="block text-sm font-medium mb-1">活动选择 <span class="text-red-500">*</span></label>
@@ -5248,14 +5248,14 @@
         </div>
       </div>
 
-      <!-- P1-3: 预设可视化 → 已迁移到 presets.html（抽奖干预管理页面） -->
+      <!-- P1-3: 预设可视化 → 已迁移到 presets.html（回馈干预管理页面） -->
 
       <!-- ==================== P1-10: 系统垫付看板页面 ==================== -->
       <div x-show="current_page === 'system-advance'" x-cloak>
         <!-- 页面说明横幅 -->
         <div class="page-banner mb-6">
           <h1>💳 系统垫付看板</h1>
-          <p>监控抽奖活动中的库存垫付和预算垫付情况，当奖品库存不足或预算超支时系统会自动垫付，需要运营人员定期清偿。</p>
+          <p>监控回馈活动中的库存垫付和预算垫付情况，当奖品库存不足或预算超支时系统会自动垫付，需要运营人员定期清偿。</p>
         </div>
 
         <!-- 垫付汇总卡片 -->
@@ -5541,7 +5541,7 @@
         </div>
       </div>
 
-      <!-- 创建预设 + 预设详情模态框 → 已迁移到 presets.html（抽奖干预管理页面） -->
+      <!-- 创建预设 + 预设详情模态框 → 已迁移到 presets.html（回馈干预管理页面） -->
 
       <!-- 活动复盘报告弹窗 (P2) -->
       <div x-show="showReportModal" 
@@ -5605,7 +5605,7 @@
                   <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
                     <div class="text-center p-3 bg-blue-50 rounded">
                       <div class="text-2xl font-bold text-blue-600" x-text="formatNumber(campaignReport.total_draws)"></div>
-                      <div class="text-xs themed-text-muted">抽奖次数</div>
+                      <div class="text-xs themed-text-muted">回馈次数</div>
                     </div>
                     <div class="text-center p-3 bg-green-50 rounded">
                       <div class="text-2xl font-bold text-green-600" x-text="formatNumber(campaignReport.unique_users)"></div>
@@ -5664,7 +5664,7 @@
                       <p class="font-medium" x-text="formatNumber(campaignReport.unique_users)"></p>
                     </div>
                     <div>
-                      <span class="themed-text-muted">人均抽奖:</span>
+                      <span class="themed-text-muted">人均回馈:</span>
                       <p class="font-medium" x-text="(campaignReport.avg_draws_per_user || 0) + '次'"></p>
                     </div>
                     <div>
@@ -5739,7 +5739,7 @@
             <div class="grid grid-cols-2 gap-4">
               <div>
                 <label class="block text-sm font-medium themed-text-secondary mb-1">活动名称 <span class="text-red-500">*</span></label>
-                <input type="text" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" x-model="campaignForm.campaign_name" placeholder="如：春节抽奖活动" required>
+                <input type="text" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" x-model="campaignForm.campaign_name" placeholder="如：春节回馈活动" required>
               </div>
               <div>
                 <label class="block text-sm font-medium themed-text-secondary mb-1">活动代码</label>
@@ -5793,9 +5793,9 @@
             </div>
           </div>
 
-          <!-- 抽奖配置 -->
+          <!-- 回馈配置 -->
           <div class="themed-bg-base p-3 rounded">
-            <h6 class="text-sm font-semibold themed-text-muted mb-3">🎰 抽奖配置</h6>
+            <h6 class="text-sm font-semibold themed-text-muted mb-3">🎰 回馈配置</h6>
             <!-- 配置优先级提示（当全局默认配置已加载时显示） -->
             <template x-if="globalDefaults">
               <div class="mb-3 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700">
@@ -5881,13 +5881,13 @@
             </div>
           </div>
 
-          <!-- 展示配置（多活动抽奖系统 2026-02-15） -->
+          <!-- 展示配置（多活动回馈系统 2026-02-15） -->
           <div class="themed-bg-base p-3 rounded">
             <h6 class="text-sm font-semibold themed-text-muted mb-3">🎨 展示配置</h6>
             <div class="grid grid-cols-2 gap-4">
-              <!-- 抽奖方式（display_mode） -->
+              <!-- 回馈方式（display_mode） -->
               <div>
-                <label class="block text-sm font-medium themed-text-secondary mb-1">抽奖方式</label>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">回馈方式</label>
                 <select class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" x-model="campaignForm.display_mode">
                   <template x-for="opt in displayModeOptions" :key="opt.value">
                     <option :value="opt.value" x-text="opt.icon + ' ' + opt.label"></option>
@@ -5926,9 +5926,9 @@
                   </template>
                 </div>
               </div>
-              <!-- 中奖动画（win_animation） -->
+              <!-- 发放动画（win_animation） -->
               <div>
-                <label class="block text-sm font-medium themed-text-secondary mb-1">中奖动画</label>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">回馈动画</label>
                 <select class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" x-model="campaignForm.win_animation">
                   <template x-for="opt in winAnimationOptions" :key="opt.value">
                     <option :value="opt.value" x-text="opt.label"></option>
@@ -6015,14 +6015,14 @@
             <div><strong>开始时间：</strong><span x-text="formatDateOnly(selectedCampaign?.start_time)"></span></div>
             <div><strong>结束时间：</strong><span x-text="formatDateOnly(selectedCampaign?.end_time)"></span></div>
             <div><strong>参与人数：</strong><span x-text="selectedCampaign?.participant_count || 0"></span></div>
-            <div><strong>中奖人数：</strong><span x-text="selectedCampaign?.winner_count || 0"></span></div>
+            <div><strong>发放人数：</strong><span x-text="selectedCampaign?.winner_count || 0"></span></div>
           </div>
           <!-- 展示配置信息 -->
           <div class="themed-bg-base p-3 rounded">
             <h6 class="text-sm font-semibold themed-text-muted mb-2">🎨 展示配置</h6>
             <div class="grid grid-cols-3 gap-3 text-sm">
               <div>
-                <span class="themed-text-muted">抽奖方式：</span>
+                <span class="themed-text-muted">回馈方式：</span>
                 <span x-text="(displayModeOptions.find(o => o.value === selectedCampaign?.display_mode) || {}).icon + ' ' + (displayModeOptions.find(o => o.value === selectedCampaign?.display_mode) || { label: '九宫格' }).label"></span>
               </div>
               <div>
@@ -6030,7 +6030,7 @@
                 <span x-text="(effectThemeOptions.find(o => o.value === selectedCampaign?.effect_theme) || { label: '默认' }).label"></span>
               </div>
               <div>
-                <span class="themed-text-muted">中奖动画：</span>
+                <span class="themed-text-muted">回馈动画：</span>
                 <span x-text="(winAnimationOptions.find(o => o.value === selectedCampaign?.win_animation) || { label: '简单弹窗' }).label"></span>
               </div>
               <div>
@@ -6130,7 +6130,7 @@
           </div>
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <label class="block text-sm font-medium themed-text-secondary mb-1">中奖概率 (%)</label>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">发放概率 (%)</label>
               <input type="number" class="w-full px-3 py-2 border rounded" x-model.number="prizeForm.win_probability" min="0" max="100" step="0.01">
               <p class="text-xs text-amber-600 mt-1">⚠️ tier_first模式下此字段不生效，实际概率由权重控制</p>
             </div>
@@ -6159,15 +6159,15 @@
             <label class="block text-sm font-medium themed-text-secondary mb-1">奖品描述</label>
             <textarea class="w-full px-3 py-2 border rounded" x-model="prizeForm.prize_description" rows="2"></textarea>
           </div>
-          <!-- 中奖次数限制 -->
+          <!-- 发放次数限制 -->
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <label class="block text-sm font-medium themed-text-secondary mb-1">每人总中奖上限</label>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">每人总发放上限</label>
               <input type="number" class="w-full px-3 py-2 border rounded" x-model.number="prizeForm.max_user_wins" min="1" placeholder="不限制">
               <p class="text-xs themed-text-muted mt-1">单个用户累计可中此奖品的最大次数，留空表示不限制</p>
             </div>
             <div>
-              <label class="block text-sm font-medium themed-text-secondary mb-1">每人每日中奖上限</label>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">每人每日发放上限</label>
               <input type="number" class="w-full px-3 py-2 border rounded" x-model.number="prizeForm.max_daily_wins" min="1" placeholder="不限制">
               <p class="text-xs themed-text-muted mt-1">单个用户每天可中此奖品的最大次数，留空表示不限制</p>
             </div>
@@ -6440,7 +6440,7 @@
               <div>
                 <label class="block text-sm font-medium themed-text-secondary mb-1">Cap乘数</label>
                 <input type="number" class="w-full px-3 py-2 border rounded" x-model.number="editingMatrixCell.cap_multiplier" min="0" step="0.01">
-                <small class="text-gray-400">中奖上限控制</small>
+                <small class="text-gray-400">发放上限控制</small>
               </div>
               <div>
                 <label class="block text-sm font-medium themed-text-secondary mb-1">空奖权重乘数</label>
@@ -6634,11 +6634,11 @@
             </template>
           </div>
           
-          <!-- 每日抽奖次数限制 -->
+          <!-- 每日回馈次数限制 -->
           <div>
-            <label class="block text-sm font-medium themed-text-secondary mb-1">每日抽奖次数上限 <span class="text-red-500">*</span></label>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">每日回馈次数上限 <span class="text-red-500">*</span></label>
             <input type="number" class="w-full px-3 py-2 border rounded" x-model.number="quotaForm.limit_value" min="1" required>
-            <p class="text-xs themed-text-muted mt-1">用户每天可抽奖的最大次数</p>
+            <p class="text-xs themed-text-muted mt-1">用户每天可回馈的最大次数</p>
           </div>
           
           <!-- 创建原因 -->
@@ -6803,14 +6803,14 @@
     </div>
   </div>
 
-    <!-- ==================== 用户抽奖档案模态框 ==================== -->
+    <!-- ==================== 用户回馈档案模态框 ==================== -->
     <div x-show="showUserProfileModal" class="fixed inset-0 z-50 flex items-center justify-center" x-cloak>
       <div class="fixed inset-0 bg-black bg-opacity-50" @click="closeUserProfileModal()"></div>
       <div class="relative themed-card rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col">
         <!-- 模态框头部 -->
         <div class="p-4 border-b flex justify-between items-center themed-bg-primary text-white rounded-t-lg">
           <h5 class="font-semibold text-lg flex items-center gap-2">
-            👤 用户抽奖档案
+            👤 用户回馈档案
             <span x-show="userProfile" class="text-sm font-normal opacity-80" x-text="'#' + (userProfile?.user_id || '')"></span>
           </h5>
           <button @click="closeUserProfileModal()" class="text-white hover:text-gray-200 text-2xl">&times;</button>
@@ -6863,24 +6863,24 @@
               </div>
             </div>
 
-            <!-- 抽奖统计 -->
+            <!-- 回馈统计 -->
             <div class="themed-card rounded-lg shadow">
               <div class="p-4 border-b">
-                <h6 class="font-semibold">📊 抽奖统计概览</h6>
+                <h6 class="font-semibold">📊 回馈统计概览</h6>
               </div>
               <div class="p-4">
                 <div class="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
                   <div>
                     <div class="text-3xl font-bold themed-text-primary" x-text="userDrawStats.total_draws">0</div>
-                    <div class="text-sm themed-text-muted">总抽奖次数</div>
+                    <div class="text-sm themed-text-muted">总回馈次数</div>
                   </div>
                   <div>
                     <div class="text-3xl font-bold text-green-600" x-text="userDrawStats.total_wins">0</div>
-                    <div class="text-sm themed-text-muted">中奖次数</div>
+                    <div class="text-sm themed-text-muted">发放次数</div>
                   </div>
                   <div>
                     <div class="text-3xl font-bold text-yellow-600" x-text="userDrawStats.win_rate + '%'">0%</div>
-                    <div class="text-sm themed-text-muted">中奖率</div>
+                    <div class="text-sm themed-text-muted">发放率</div>
                   </div>
                   <div>
                     <div class="text-3xl font-bold text-cyan-600" x-text="(userDrawStats.total_cost_points || 0).toLocaleString()">0</div>
@@ -6888,7 +6888,7 @@
                   </div>
                   <div>
                     <div class="text-sm font-semibold themed-text" x-text="formatProfileTime(userDrawStats.lastDrawTime) || '-'">-</div>
-                    <div class="text-sm themed-text-muted">最近抽奖</div>
+                    <div class="text-sm themed-text-muted">最近回馈</div>
                   </div>
                 </div>
               </div>
@@ -6909,17 +6909,17 @@
                       连续无奖: <span class="font-medium" x-text="userExperienceState.consecutive_no_win || 0"></span> 次
                     </span>
                     <span class="text-sm themed-text-muted">
-                      今日抽奖: <span class="font-medium" x-text="userExperienceState.today_draws || 0"></span> 次
+                      今日回馈: <span class="font-medium" x-text="userExperienceState.today_draws || 0"></span> 次
                     </span>
                   </div>
                 </div>
               </div>
             </template>
 
-            <!-- 抽奖历史 -->
+            <!-- 回馈历史 -->
             <div class="themed-card rounded-lg shadow">
               <div class="p-4 border-b flex justify-between items-center">
-                <h6 class="font-semibold">📋 最近抽奖记录</h6>
+                <h6 class="font-semibold">📋 最近回馈记录</h6>
                 <span class="text-sm themed-text-muted" x-text="'共 ' + userDrawHistory.length + ' 条'"></span>
               </div>
               <div class="overflow-x-auto max-h-64">
@@ -6937,7 +6937,7 @@
                   <tbody class="divide-y">
 
                       <tr x-show="userDrawHistory.length === 0">
-                        <td colspan="6" class="px-4 py-8 text-center themed-text-muted">暂无抽奖记录</td>
+                        <td colspan="6" class="px-4 py-8 text-center themed-text-muted">暂无回馈记录</td>
                       </tr>
 
                     <template x-for="(draw, index) in userDrawHistory" :key="index">
@@ -6997,7 +6997,7 @@
           <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <div class="themed-card rounded-lg p-4 text-center">
               <div class="text-2xl mb-1">🎲</div>
-              <div class="text-xs themed-text-muted mb-1">抽奖次数</div>
+              <div class="text-xs themed-text-muted mb-1">回馈次数</div>
               <div class="text-xl font-bold themed-text-primary" x-text="dailyReportData?.summary?.total_draws?.toLocaleString() || 0"></div>
               <div class="text-xs mt-1" 
                    :class="getChangeColorClass(dailyReportData?.vs_yesterday?.draws_change)"
@@ -7005,7 +7005,7 @@
             </div>
             <div class="themed-card rounded-lg p-4 text-center">
               <div class="text-2xl mb-1">🎯</div>
-              <div class="text-xs themed-text-muted mb-1">中奖率</div>
+              <div class="text-xs themed-text-muted mb-1">发放率</div>
               <div class="text-xl font-bold text-green-600" x-text="(dailyReportData?.summary?.win_rate || 0).toFixed(1) + '%'"></div>
               <div class="text-xs mt-1" 
                    :class="getChangeColorClass(dailyReportData?.vs_yesterday?.wins_change)"
@@ -7114,9 +7114,9 @@
                   <thead class="themed-bg-base">
                     <tr>
                       <th class="px-3 py-2 text-left">活动名称</th>
-                      <th class="px-3 py-2 text-right">抽奖次数</th>
-                      <th class="px-3 py-2 text-right">中奖次数</th>
-                      <th class="px-3 py-2 text-right">中奖率</th>
+                      <th class="px-3 py-2 text-right">回馈次数</th>
+                      <th class="px-3 py-2 text-right">发放次数</th>
+                      <th class="px-3 py-2 text-right">发放率</th>
                     </tr>
                   </thead>
                   <tbody class="divide-y">
@@ -7203,15 +7203,15 @@
           <!-- 活动关键数据 -->
           <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <div class="themed-card rounded-lg p-3 text-center">
-              <div class="text-xs themed-text-muted mb-1">总抽奖次数</div>
+              <div class="text-xs themed-text-muted mb-1">总回馈次数</div>
               <div class="text-lg font-bold themed-text-primary" x-text="(campaignRoiData?.total_draws || 0).toLocaleString()"></div>
             </div>
             <div class="themed-card rounded-lg p-3 text-center">
-              <div class="text-xs themed-text-muted mb-1">总中奖次数</div>
+              <div class="text-xs themed-text-muted mb-1">总发放次数</div>
               <div class="text-lg font-bold text-green-600" x-text="(campaignRoiData?.total_wins || 0).toLocaleString()"></div>
             </div>
             <div class="themed-card rounded-lg p-3 text-center">
-              <div class="text-xs themed-text-muted mb-1">中奖率</div>
+              <div class="text-xs themed-text-muted mb-1">发放率</div>
               <div class="text-lg font-bold text-yellow-600" x-text="(campaignRoiData?.win_rate || 0).toFixed(1) + '%'"></div>
             </div>
             <div class="themed-card rounded-lg p-3 text-center">
@@ -7269,13 +7269,13 @@
                 <p class="text-blue-700">📊 活动ROI正常，建议关注高成本档位优化空间</p>
               </template>
               <template x-if="(campaignRoiData?.roi || 0) <= 0">
-                <p class="text-yellow-700">⚠️ 活动ROI为负，建议检查奖品成本配置或提高抽奖单价</p>
+                <p class="text-yellow-700">⚠️ 活动ROI为负，建议检查奖品成本配置或提高回馈单价</p>
               </template>
               <template x-if="(campaignRoiData?.repeat_rate || 0) < 20">
                 <p class="text-orange-700">🔄 复购率偏低，可通过会员专属奖品或连抽优惠提升</p>
               </template>
               <template x-if="(campaignRoiData?.win_rate || 0) > 50">
-                <p class="text-cyan-700">🎯 中奖率较高，注意预算消耗速度</p>
+                <p class="text-cyan-700">🎯 发放率较高，注意预算消耗速度</p>
               </template>
             </div>
           </div>
@@ -7526,15 +7526,15 @@
                 <input type="number" class="w-full px-3 py-2 border rounded" x-model.number="prizeForm.sort_order" min="1" placeholder="自动分配">
               </div>
             </div>
-            <!-- 中奖次数限制 -->
+            <!-- 发放次数限制 -->
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label class="block text-sm font-medium mb-1">每人总中奖上限</label>
+                <label class="block text-sm font-medium mb-1">每人总发放上限</label>
                 <input type="number" class="w-full px-3 py-2 border rounded" x-model.number="prizeForm.max_user_wins" min="1" placeholder="不限制">
                 <p class="text-xs text-gray-400 mt-1">留空表示不限制</p>
               </div>
               <div>
-                <label class="block text-sm font-medium mb-1">每人每日中奖上限</label>
+                <label class="block text-sm font-medium mb-1">每人每日发放上限</label>
                 <input type="number" class="w-full px-3 py-2 border rounded" x-model.number="prizeForm.max_daily_wins" min="1" placeholder="不限制">
                 <p class="text-xs text-gray-400 mt-1">留空表示不限制</p>
               </div>

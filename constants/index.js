@@ -68,6 +68,15 @@ const {
 // 虚拟资产代码常量（V4.1.0 资产命名重构）
 const { AssetCode, ASSET_CODE_MIGRATION_MAP, AssetForm } = require('./AssetCode')
 
+// 物品类型 × 可计价货币白名单（竞价双层防护·硬约束层）
+const {
+  ItemType,
+  VALUABLE_ITEM_TYPES,
+  BIDDABLE_ITEM_TYPES,
+  isValuableType,
+  isBiddableType
+} = require('./ProductCurrencyWhitelist')
+
 module.exports = {
   // 审计操作类型
   OPERATION_TYPES,
@@ -116,11 +125,19 @@ module.exports = {
   ASSET_CODE_MIGRATION_MAP,
   AssetForm,
 
+  // 物品类型 × 可计价货币白名单（竞价双层防护）
+  ItemType,
+  VALUABLE_ITEM_TYPES,
+  BIDDABLE_ITEM_TYPES,
+  isValuableType,
+  isBiddableType,
+
   // 命名空间导出（便于按模块引用）
   AuditOperationTypes: require('./AuditOperationTypes'),
   ErrorCodes: require('./ErrorCodes'),
   TradableAssetTypes: require('./TradableAssetTypes'),
   AuditTargetTypes: require('./AuditTargetTypes'),
   PermissionResources: require('./PermissionResources'),
-  AssetCodeModule: require('./AssetCode')
+  AssetCodeModule: require('./AssetCode'),
+  ProductCurrencyWhitelist: require('./ProductCurrencyWhitelist')
 }

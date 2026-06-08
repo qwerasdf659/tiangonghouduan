@@ -53,6 +53,49 @@ router.get(
 )
 
 /**
+ * PUT /growth-levels/:user_growth_level_id - 更新成长等级定义（运营自助调阈值）
+ *
+ * 请求体：{ level_name?, min_history_points?, sort_order?, status?, description? }
+ * 阈值倒挂、负值、非法状态由 Service 校验并拒绝。
+ *
+ * @route PUT /api/v4/console/lottery-management/growth-levels/:user_growth_level_id
+ * @access Private (管理员)
+ */
+router.put(
+  '/growth-levels/:user_growth_level_id',
+  adminAuthMiddleware,
+  asyncHandler(async (req, res) => {
+    const user_growth_level_id = parseInt(req.params.user_growth_level_id, 10)
+    if (!Number.isInteger(user_growth_level_id) || user_growth_level_id <= 0) {
+      return res.apiError('无效的成长等级ID', 'INVALID_GROWTH_LEVEL_ID', null, 400)
+    }
+
+    const { level_name, min_history_points, sort_order, status, description } = req.body
+    const updates = { level_name, min_history_points, sort_order, status, description }
+
+    const growthLevelService = getGrowthLevelService(req)
+    const result = await TransactionManager.execute(
+      async transaction => {
+        return growthLevelService.updateGrowthLevel(
+          user_growth_level_id,
+          updates,
+          req.user?.user_id,
+          { transaction }
+        )
+      },
+      { description: 'updateGrowthLevel' }
+    )
+
+    logger.info('[PUT /growth-levels] 更新成长等级定义', {
+      admin_id: req.user?.user_id,
+      user_growth_level_id
+    })
+
+    return res.apiSuccess(result, '成长等级定义更新成功')
+  })
+)
+
+/**
  * GET /level-probability/:lottery_campaign_id - 某活动各成长等级中奖率倍数
  * @route GET /api/v4/console/lottery-management/level-probability/:lottery_campaign_id
  * @access Private (管理员)

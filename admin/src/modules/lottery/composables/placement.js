@@ -25,7 +25,7 @@ import { LOTTERY_ENDPOINTS } from '../../../api/lottery/index.js'
 const PLACEMENT_ENUMS = {
   /** 展示页面 */
   pages: [
-    { value: 'lottery', label: '抽奖页' },
+    { value: 'lottery', label: '回馈页' },
     { value: 'discover', label: '发现页' },
     { value: 'user', label: '个人中心' }
   ],

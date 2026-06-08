@@ -1,5 +1,5 @@
 /**
- * 餐厅积分抽奖系统 V4.0 - WebSocket服务启动日志模型（WebSocketStartupLog）
+ * 天工商户营销平台 V4.0 - WebSocket服务启动日志模型（WebSocketStartupLog）
  *
  * 功能说明：
  * - 记录WebSocket服务的启动、停止事件

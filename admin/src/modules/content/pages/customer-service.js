@@ -194,7 +194,7 @@ function customerServicePage() {
       const tags = []
       if (/星石|余额|积分|到账|扣款|冻结/.test(msg)) tags.push({ icon: '💎', label: '资产' })
       if (/交易|买|卖|挂单|订单/.test(msg)) tags.push({ icon: '🔄', label: '交易' })
-      if (/抽奖|抽|中奖|概率|保底/.test(msg)) tags.push({ icon: '🎰', label: '抽奖' })
+      if (/抽奖|抽|中奖|概率|保底|回馈/.test(msg)) tags.push({ icon: '🎰', label: '回馈' })
       if (/物品|背包|锁|锁定|道具/.test(msg)) tags.push({ icon: '🎒', label: '背包' })
       if (/兑换|核销|发货|物流/.test(msg)) tags.push({ icon: '📦', label: '兑换' })
       if (/登录|密码|账号|封号/.test(msg)) tags.push({ icon: '👤', label: '账号' })

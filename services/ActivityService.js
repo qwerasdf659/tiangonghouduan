@@ -1,7 +1,7 @@
 const logger = require('../utils/logger').logger
 
 /**
- * 餐厅积分抽奖系统 V4.0 - 活动管理服务（ActivityService）
+ * 天工商户营销平台 V4.0 - 活动管理服务（ActivityService）
  *
  * @description 活动管理服务，提供活动查询、条件验证、参与资格检查等功能
  *

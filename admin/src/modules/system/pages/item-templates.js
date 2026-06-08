@@ -137,6 +137,7 @@ document.addEventListener('alpine:init', () => {
       is_enabled: true,
       primary_media_id: null,
       reference_price_points: 0,
+      value_tier: 'low',
       description: '',
       meta: '',
       use_instructions: '',
@@ -320,6 +321,7 @@ document.addEventListener('alpine:init', () => {
         is_enabled: true,
         primary_media_id: null,
         reference_price_points: 0,
+        value_tier: 'low',
         description: '',
         meta: '',
         use_instructions: '',
@@ -371,6 +373,7 @@ document.addEventListener('alpine:init', () => {
             is_enabled: t.is_enabled,
             primary_media_id: t.primary_media_id ?? null,
             reference_price_points: t.reference_price_points || 0,
+            value_tier: t.value_tier || 'low',
             description: t.description || '',
             meta: Object.keys(metaCopy).length > 0 ? JSON.stringify(metaCopy, null, 2) : '',
             use_instructions: metaObj.use_instructions || '',
@@ -443,6 +446,7 @@ document.addEventListener('alpine:init', () => {
         is_enabled: this.form.is_enabled,
         primary_media_id: this.form.primary_media_id || null,
         reference_price_points: this.form.reference_price_points || 0,
+        value_tier: this.form.value_tier || 'low',
         description: this.form.description || null,
         max_edition:
           this.max_edition != null &&

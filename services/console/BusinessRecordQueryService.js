@@ -25,6 +25,7 @@
 const BusinessError = require('../../utils/BusinessError')
 const { Op, fn, col } = require('sequelize')
 const logger = require('../../utils/logger').logger
+const PiiCrypto = require('../../utils/PiiCrypto')
 const {
   AdminOperationLog,
   User,
@@ -182,11 +183,17 @@ class BusinessRecordQueryService {
       ]
     }
 
-    // 手机号搜索：通过关联 User 表的 mobile 字段过滤
+    // 手机号搜索：手机号加密无法 LIKE，按输入形态（完整号/号段/尾号）分派盲索引精确匹配
     const userWhere = {}
     let userRequired = false
     if (mobile) {
-      userWhere.mobile = { [Op.like]: `%${mobile}%` }
+      const mobileWhere = PiiCrypto.buildMobileSearchWhere(mobile)
+      if (mobileWhere) {
+        Object.assign(userWhere, mobileWhere)
+      } else {
+        // 中间片段/非法格式：无法匹配加密手机号，返回空结果（用 1=0 等价的不可能条件）
+        userWhere.mobile_hash = '__no_match__'
+      }
       userRequired = true
     }
 

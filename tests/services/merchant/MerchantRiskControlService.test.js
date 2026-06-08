@@ -1,5 +1,5 @@
 /**
- * 餐厅积分抽奖系统 V4.5 - MerchantRiskControlService 单元测试
+ * 天工商户营销平台 V4.5 - MerchantRiskControlService 单元测试
  *
  * 测试范围（P1-8 MerchantRiskControlService 测试）：
  * - 频次风控检查（硬阻断）

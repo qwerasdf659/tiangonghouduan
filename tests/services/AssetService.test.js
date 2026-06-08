@@ -1,5 +1,5 @@
 /**
- * 餐厅积分抽奖系统 V4 - BalanceService 单元测试（原 BalanceService 余额部分）
+ * 天工商户营销平台 V4 - BalanceService 单元测试（原 BalanceService 余额部分）
  *
  * 测试范围：
  * - P0-1-2: getOrCreateAccount - 账户获取/创建（用户账户、系统账户、参数校验）

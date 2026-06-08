@@ -1,5 +1,5 @@
 /**
- * 餐厅积分抽奖系统 V4.0 - 抽奖执行API路由
+ * 天工商户营销平台 V4.0 - 抽奖执行API路由
  *
  * 功能：
  * - 执行单次/连续抽奖
@@ -158,7 +158,7 @@ router.post(
           ...idempotencyResult.response,
           is_duplicate: true
         }
-        return res.apiSuccess(duplicateResponse, '抽奖成功（幂等回放）', 'DRAW_SUCCESS')
+        return res.apiSuccess(duplicateResponse, '回馈成功（幂等回放）', 'DRAW_SUCCESS')
       }
 
       /*
@@ -329,7 +329,7 @@ router.post(
         logger.warn('[LotteryDraw] 广告归因追踪失败（非关键）', { error: attrError.message })
       }
 
-      return res.apiSuccess(sanitizedResult, '抽奖成功', 'DRAW_SUCCESS')
+      return res.apiSuccess(sanitizedResult, '回馈成功', 'DRAW_SUCCESS')
     } catch (error) {
       // 标记幂等请求为失败状态（允许重试）
       await IdempotencyService.markAsFailed(idempotency_key, error.message).catch(markError => {

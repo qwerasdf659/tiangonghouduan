@@ -1,5 +1,5 @@
 /**
- * 餐厅积分抽奖系统 V4.6 统一引擎架构 - 统一抽奖引擎（UnifiedLotteryEngine）
+ * 天工商户营销平台 V4.6 统一引擎架构 - 统一抽奖引擎（UnifiedLotteryEngine）
  *
  * 业务场景：提供统一的抽奖服务入口，整合所有抽奖决策逻辑，使用 Pipeline 管线架构
  *
@@ -123,7 +123,7 @@
  * @version 4.0.0
  * @date 2025年01月21日
  * @timezone Asia/Shanghai (北京时间)
- * @description 基于餐厅积分抽奖系统的真实业务需求设计
+ * @description 基于天工商户营销平台的真实业务需求设计
  *
  * 最后更新：2025年10月30日
  * 使用模型：Claude Sonnet 4.5
@@ -335,7 +335,7 @@ class UnifiedLotteryEngine {
 
     return {
       success: true,
-      message: '抽奖成功',
+      message: '回馈成功',
       data: {
         draw_result: {
           lottery_draw_id: drawRecord.lottery_draw_id,
@@ -1014,11 +1014,11 @@ class UnifiedLotteryEngine {
           counterpart_account_id: burnAccount.account_id,
           meta: {
             source_type: 'system',
-            title: draw_count === 1 ? '抽奖消耗积分' : `${draw_count}连抽消耗积分`,
+            title: draw_count === 1 ? '回馈消耗积分' : `${draw_count}连回馈消耗积分`,
             description:
               draw_count === 1
-                ? `单次抽奖消耗${requiredPoints}积分`
-                : `${draw_count}连抽消耗${requiredPoints}积分（${pricing.label}，原价${pricing.original_cost}积分，节省${pricing.saved_points}积分）`,
+                ? `单次回馈消耗${requiredPoints}积分`
+                : `${draw_count}连回馈消耗${requiredPoints}积分（${pricing.label}，原价${pricing.original_cost}积分，节省${pricing.saved_points}积分）`,
             request_idempotency_key: requestIdempotencyKey,
             lottery_campaign_id,
             draw_count

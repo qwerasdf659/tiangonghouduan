@@ -1,5 +1,5 @@
 /**
- * 餐厅积分抽奖系统 V4 - 风控告警管理服务
+ * 天工商户营销平台 V4 - 风控告警管理服务
  *
  * 文件路径: services/MerchantRiskAlertService.js
  *

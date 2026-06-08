@@ -1,5 +1,5 @@
 /**
- * 餐厅积分抽奖系统 V4 - DictionaryService 单元测试
+ * 天工商户营销平台 V4 - DictionaryService 单元测试
  *
  * 测试范围：
  * - P3-3-3: 字典配置服务核心功能

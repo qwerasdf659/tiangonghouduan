@@ -354,11 +354,8 @@ async function initRealTestData(mobile = '13612227930') {
     // 延迟加载 models，避免循环依赖
     const { User, LotteryCampaign, Store } = require('../../models')
 
-    // 1. 查询测试用户
-    const user = await User.findOne({
-      where: { mobile, status: 'active' },
-      attributes: ['user_id', 'mobile', 'nickname']
-    })
+    // 1. 查询测试用户（PII 改造：mobile 为加密虚拟字段，按盲索引查询，复用 User.findByMobile）
+    const user = await User.findByMobile(mobile)
 
     if (!user) {
       console.warn(`⚠️ initRealTestData: 未找到测试用户 mobile=${mobile}`)

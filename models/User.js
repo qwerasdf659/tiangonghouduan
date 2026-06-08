@@ -14,6 +14,7 @@
  */
 
 const { DataTypes } = require('sequelize')
+const PiiCrypto = require('../utils/PiiCrypto')
 
 module.exports = sequelize => {
   const User = sequelize.define(
@@ -38,11 +39,69 @@ module.exports = sequelize => {
       },
 
       // ⭐⭐⭐⭐⭐ 唯一标识+登录 - 必需，极高优先级
+      /* 🔐 PII 加密改造（模块B）：mobile 改为虚拟字段，密文存 mobile_encrypted，盲索引存 mobile_hash */
       mobile: {
-        type: DataTypes.STRING(20),
-        allowNull: false,
+        type: DataTypes.VIRTUAL(DataTypes.STRING, ['mobile_encrypted']),
+        /**
+         * 读取手机号明文：优先解密 mobile_encrypted；过渡期兼容残留明文
+         * @returns {string|null} 手机号明文
+         */
+        get() {
+          const enc = this.getDataValue('mobile_encrypted')
+          if (enc) {
+            return PiiCrypto.decrypt(enc)
+          }
+          return null
+        },
+        /**
+         * 设置手机号：同时写入密文 mobile_encrypted 与盲索引 mobile_hash
+         * @param {string} value - 手机号明文
+         * @returns {void}
+         */
+        set(value) {
+          if (value === null || value === undefined || value === '') {
+            this.setDataValue('mobile_encrypted', null)
+            this.setDataValue('mobile_hash', null)
+            this.setDataValue('mobile_prefix_hash', null)
+            this.setDataValue('mobile_suffix_hash', null)
+            return
+          }
+          this.setDataValue('mobile_encrypted', PiiCrypto.encrypt(value))
+          this.setDataValue('mobile_hash', PiiCrypto.blindHash(value))
+          // 方案二完整版：同步号段(前3)/尾号(后4)盲索引，支持管理端按号段/尾号搜
+          this.setDataValue('mobile_prefix_hash', PiiCrypto.prefixHash(value, 3))
+          this.setDataValue('mobile_suffix_hash', PiiCrypto.suffixHash(value, 4))
+        },
+        comment: '手机号（虚拟字段：读时解密 mobile_encrypted，写时同步密文+盲索引）'
+      },
+
+      // 🔐 手机号密文列（AES-256-GCM）
+      mobile_encrypted: {
+        type: DataTypes.STRING(255),
+        allowNull: true,
+        comment: '手机号密文（AES-256-GCM，格式 v1:iv:tag:cipher）'
+      },
+
+      // 🔐 手机号盲索引列（HMAC-SHA256，唯一约束/登录/判重）
+      mobile_hash: {
+        type: DataTypes.STRING(64),
+        allowNull: true,
         unique: true,
-        comment: '手机号，唯一标识+登录凭证'
+        comment: '手机号盲索引（HMAC-SHA256），不可逆，用于唯一性与等值查询'
+      },
+
+      // 🔐 手机号号段盲索引（前3位，管理端按号段搜，非唯一）
+      mobile_prefix_hash: {
+        type: DataTypes.STRING(64),
+        allowNull: true,
+        comment: '手机号前3位号段盲索引（HMAC-SHA256），管理端按号段搜，非唯一'
+      },
+
+      // 🔐 手机号尾号盲索引（后4位，管理端按尾号搜，非唯一）
+      mobile_suffix_hash: {
+        type: DataTypes.STRING(64),
+        allowNull: true,
+        comment: '手机号后4位尾号盲索引（HMAC-SHA256），管理端按尾号搜，非唯一'
       },
 
       // ⭐⭐⭐⭐⭐ 保底机制核心 - 必需，高优先级
@@ -85,6 +144,13 @@ module.exports = sequelize => {
         type: DataTypes.DATE,
         allowNull: true,
         comment: '最后登录时间'
+      },
+
+      // 🔐 PII 流程合规：隐私政策/用户协议首次同意时间戳
+      privacy_consent_at: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        comment: '隐私政策/用户协议首次同意时间（北京时间，NULL=未记录）'
       },
 
       login_count: {
@@ -130,10 +196,40 @@ module.exports = sequelize => {
       createdAt: 'created_at',
       updatedAt: 'updated_at',
       underscored: true,
+      hooks: {
+        /**
+         * 🔐 PII 透明查询：将 where.mobile 等值查询自动改写为盲索引 where.mobile_hash
+         *
+         * mobile 是加密虚拟字段（存 mobile_encrypted），无法直接 WHERE。
+         * 本钩子让既有 `where: { mobile }` 写法透明走盲索引，模型自洽地维护"明文查询→密文存储"映射，
+         * 属模型对自身存储的封装（非前后端字段映射），保证全项目按手机号等值查询正确工作。
+         * 仅支持等值（字符串）与 IN（数组）；不支持模糊匹配（盲索引设计取舍）。
+         *
+         * @param {Object} options - Sequelize 查询选项
+         * @returns {void}
+         */
+        beforeFind(options) {
+          if (!options || !options.where) return
+          const where = options.where
+          if (Object.prototype.hasOwnProperty.call(where, 'mobile')) {
+            const val = where.mobile
+            const PiiCryptoLocal = require('../utils/PiiCrypto')
+            if (typeof val === 'string') {
+              where.mobile_hash = PiiCryptoLocal.blindHash(val)
+              delete where.mobile
+            } else if (Array.isArray(val)) {
+              where.mobile_hash = val.map(v => PiiCryptoLocal.blindHash(v))
+              delete where.mobile
+            }
+            // 其他形态（如 Op 模糊匹配）不改写：盲索引不支持，交由调用方显式处理
+          }
+        }
+      },
       indexes: [
         {
           unique: true,
-          fields: ['mobile']
+          fields: ['mobile_hash'],
+          name: 'uk_users_mobile_hash'
         },
         {
           unique: true,
@@ -269,9 +365,10 @@ module.exports = sequelize => {
   }
 
   // 🔥 类方法 - 常用查询方法（更新为UUID角色系统）
+  /* 🔐 PII 改造：按手机号查询统一走盲索引 mobile_hash（明文不落库查询条件） */
   User.findByMobile = function (mobile) {
     return this.findOne({
-      where: { mobile, status: 'active' }
+      where: { mobile_hash: PiiCrypto.blindHash(mobile), status: 'active' }
     })
   }
 

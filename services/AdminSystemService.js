@@ -1,5 +1,5 @@
 /**
- * 餐厅积分抽奖系统 V4.0统一引擎架构 - 管理后台系统服务（AdminSystemService）
+ * 天工商户营销平台 V4.0统一引擎架构 - 管理后台系统服务（AdminSystemService）
  *
  * @description 整合系统监控、系统配置、缓存管理等所有系统级管理功能
  *

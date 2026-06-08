@@ -237,7 +237,7 @@ export function useMetricsMethods() {
         // 使用 Alpine.store 显示成功通知
         if (typeof Alpine !== 'undefined' && Alpine.store('notification')) {
           Alpine.store('notification').success(
-            `指标数据已刷新，共 ${this.lotteryMetrics.total_draws} 次抽奖`
+            `指标数据已刷新，共 ${this.lotteryMetrics.total_draws} 次回馈`
           )
         }
         logger.debug('✅ 指标数据已刷新')
@@ -485,7 +485,7 @@ export function useMetricsMethods() {
           alerts.push({
             level: 'warning',
             time: now.toISOString(),
-            message: `中奖率偏高：当前 ${this.lotteryMetrics.win_rate}%，建议检查概率配置`
+            message: `发放率偏高：当前 ${this.lotteryMetrics.win_rate}%，建议检查概率配置`
           })
         }
 
@@ -617,14 +617,14 @@ export function useMetricsMethods() {
           formatter: params => {
             let result = `<strong>${params[0].axisValue}</strong><br/>`
             params.forEach(p => {
-              const unit = p.seriesName === '中奖率' ? '%' : '次'
+              const unit = p.seriesName === '发放率' ? '%' : '次'
               result += `${p.marker} ${p.seriesName}: ${p.value}${unit}<br/>`
             })
             return result
           }
         },
         legend: {
-          data: ['抽奖次数', '中奖次数', '中奖率'],
+          data: ['回馈次数', '发放次数', '发放率'],
           bottom: 0
         },
         grid: {
@@ -655,7 +655,7 @@ export function useMetricsMethods() {
           {
             // P1-11: 右侧Y轴显示中奖率百分比
             type: 'value',
-            name: '中奖率(%)',
+            name: '发放率(%)',
             position: 'right',
             min: 0,
             max: 100,
@@ -667,7 +667,7 @@ export function useMetricsMethods() {
         ],
         series: [
           {
-            name: '抽奖次数',
+            name: '回馈次数',
             type: 'line',
             smooth: true,
             yAxisIndex: 0,
@@ -688,7 +688,7 @@ export function useMetricsMethods() {
             }
           },
           {
-            name: '中奖次数',
+            name: '发放次数',
             type: 'line',
             smooth: true,
             yAxisIndex: 0,
@@ -709,8 +709,8 @@ export function useMetricsMethods() {
             }
           },
           {
-            // P1-11: 中奖率趋势线
-            name: '中奖率',
+            // P1-11: 发放率趋势线
+            name: '发放率',
             type: 'line',
             smooth: true,
             yAxisIndex: 1,
@@ -727,7 +727,7 @@ export function useMetricsMethods() {
       }
 
       this.monitoringCharts.trendChart.setOption(option)
-      logger.info('趋势图表已更新（含中奖率）')
+      logger.info('趋势图表已更新（含发放率）')
     },
 
     /**
@@ -813,7 +813,7 @@ export function useMetricsMethods() {
         // 显示刷新成功通知
         if (typeof Alpine !== 'undefined' && Alpine.store('notification')) {
           Alpine.store('notification').success(
-            `数据已刷新：${this.lotteryMetrics.total_draws} 次抽奖，中奖率 ${this.lotteryMetrics.win_rate}%`
+            `数据已刷新：${this.lotteryMetrics.total_draws} 次回馈，发放率 ${this.lotteryMetrics.win_rate}%`
           )
         }
       } catch (error) {
@@ -993,7 +993,7 @@ export function useMetricsMethods() {
         if (response?.success && response.data) {
           this.dailyReportData = response.data
           this.showSuccess(
-            `日报已生成（日期: ${reportDate}，抽奖: ${response.data.summary?.total_draws || 0}次）`
+            `日报已生成（日期: ${reportDate}，回馈: ${response.data.summary?.total_draws || 0}次）`
           )
           logger.info('[P2-10] 日报生成成功', {
             report_date: reportDate,
@@ -1043,8 +1043,8 @@ export function useMetricsMethods() {
 </head><body>
 <h1>📋 运营日报 — ${report.report_date || ''}</h1>
 <div class="kpi-grid">
-  <div class="kpi-card"><div class="kpi-value">${(report.summary?.total_draws || 0).toLocaleString()}</div><div class="kpi-label">总抽奖次数</div></div>
-  <div class="kpi-card"><div class="kpi-value">${report.summary?.win_rate ? (report.summary.win_rate * 100).toFixed(1) + '%' : '-'}</div><div class="kpi-label">中奖率</div></div>
+  <div class="kpi-card"><div class="kpi-value">${(report.summary?.total_draws || 0).toLocaleString()}</div><div class="kpi-label">总回馈次数</div></div>
+  <div class="kpi-card"><div class="kpi-value">${report.summary?.win_rate ? (report.summary.win_rate * 100).toFixed(1) + '%' : '-'}</div><div class="kpi-label">发放率</div></div>
   <div class="kpi-card"><div class="kpi-value">¥${(report.summary?.total_cost || 0).toFixed(0)}</div><div class="kpi-label">总成本</div></div>
   <div class="kpi-card"><div class="kpi-value">¥${(report.summary?.total_revenue || 0).toFixed(0)}</div><div class="kpi-label">总收入</div></div>
   <div class="kpi-card"><div class="kpi-value">${report.summary?.roi ? (report.summary.roi * 100).toFixed(1) + '%' : '-'}</div><div class="kpi-label">ROI</div></div>
@@ -1304,7 +1304,7 @@ export function useMetricsMethods() {
               const dayName = this.heatmapDayLabels[params.data[1]] || ''
               const hour = params.data[0]
               const value = params.data[2]
-              return `${dayName} ${hour}:00-${hour + 1}:00<br/>抽奖次数: <strong>${value}</strong>`
+              return `${dayName} ${hour}:00-${hour + 1}:00<br/>回馈次数: <strong>${value}</strong>`
             }
           },
           grid: {
@@ -1340,7 +1340,7 @@ export function useMetricsMethods() {
           },
           series: [
             {
-              name: '抽奖次数',
+              name: '回馈次数',
               type: 'heatmap',
               data: heatmapData,
               label: { show: false },

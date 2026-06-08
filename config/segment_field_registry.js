@@ -38,7 +38,7 @@ const SEGMENT_FIELDS = {
     operators: ['eq', 'neq', 'in']
   },
   consecutive_fail_count: {
-    label: '连续未中奖次数',
+    label: '连续未获回馈次数',
     type: 'number',
     operators: ['gte', 'lte', 'eq']
   }

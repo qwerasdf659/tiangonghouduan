@@ -1,7 +1,7 @@
 {
   "name": "restaurant-lottery-admin",
   "version": "2.0.0",
-  "description": "餐厅积分抽奖系统 - 管理后台前端 (Vite + Alpine.js + Tailwind CSS)",
+  "description": "天工商户营销平台 - 管理后台前端 (Vite + Alpine.js + Tailwind CSS)",
   "type": "module",
   "scripts": {
     "dev": "vite",

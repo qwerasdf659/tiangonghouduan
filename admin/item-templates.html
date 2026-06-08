@@ -215,6 +215,15 @@
               <label class="block text-sm font-medium themed-text-secondary mb-1">基础价值</label>
               <input type="number" class="w-full px-3 py-2 border rounded-lg" x-model.number="form.reference_price_points" min="0" step="0.01">
             </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">价值档位 <span class="text-gray-400 text-xs">(高价值实物门槛)</span></label>
+              <select class="w-full px-3 py-2 border rounded-lg" x-model="form.value_tier">
+                <option value="low">low - 日常物（碎片直兑）</option>
+                <option value="mid">mid - 中档（VIP等级轻门槛）</option>
+                <option value="high">high - 高档（VIP+多资产+消耗道具复合门槛）</option>
+              </select>
+              <p class="text-xs themed-text-muted mt-1">由运营按价值显式归类；参考价为0的精品实物也须归 mid/high，杜绝漏判</p>
+            </div>
             <div class="md:col-span-2">
               <label class="block text-sm font-medium themed-text-secondary mb-1">模板图片</label>
               <div class="flex items-start gap-4">
