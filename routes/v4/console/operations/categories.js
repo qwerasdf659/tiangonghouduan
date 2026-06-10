@@ -11,18 +11,7 @@ const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const TransactionManager = require('../../../../utils/TransactionManager')
-const BusinessError = require('../../../../utils/BusinessError')
 const { asyncHandler } = require('../../../../middleware/validation')
-
-/**
- * 从 exchange_item_service 取 Sequelize 模型集合
- *
- * @param {Object} req - Express请求对象
- * @returns {Object} Sequelize模型集合
- */
-function getExchangeItemModels(req) {
-  return req.app.locals.services.getService('exchange_item_service').models
-}
 
 /**
  * 从服务容器取属性服务（品类-属性绑定）
@@ -80,19 +69,10 @@ router.get(
   authenticateToken,
   requireRoleLevel(100),
   asyncHandler(async (req, res) => {
-    const { Category, MediaFile } = getExchangeItemModels(req)
+    const service = req.app.locals.services.getService('exchange_item_service')
     const wantTree = req.query.tree === 'true' || req.query.tree === '1'
 
-    const rows = await Category.findAll({
-      order: [
-        ['level', 'ASC'],
-        ['sort_order', 'ASC'],
-        ['category_id', 'ASC']
-      ],
-      include: [{ model: MediaFile, as: 'icon_media', required: false }]
-    })
-
-    const plain = rows.map(r => r.get({ plain: true }))
+    const plain = await service.listCategories()
     const data = wantTree ? { tree: buildCategoryTree(plain) } : { items: plain }
 
     return res.apiSuccess(data, wantTree ? '获取品类树成功' : '获取品类列表成功')
@@ -142,29 +122,15 @@ router.get(
   authenticateToken,
   requireRoleLevel(100),
   asyncHandler(async (req, res) => {
-    const { Category, MediaFile } = getExchangeItemModels(req)
     const cid = parseInt(req.params.id, 10)
     if (Number.isNaN(cid)) {
       return res.apiError('category_id 无效', 'PRODUCT_CENTER_INVALID_CATEGORY_ID', null, 400)
     }
 
-    const row = await Category.findByPk(cid, {
-      include: [
-        { model: MediaFile, as: 'icon_media', required: false },
-        {
-          model: Category,
-          as: 'children',
-          required: false,
-          separate: true,
-          order: [
-            ['sort_order', 'ASC'],
-            ['category_id', 'ASC']
-          ]
-        }
-      ]
-    })
+    const service = req.app.locals.services.getService('exchange_item_service')
+    const detail = await service.getCategoryDetail(cid)
 
-    if (!row) {
+    if (!detail) {
       return res.apiError(
         '品类不存在',
         'PRODUCT_CENTER_CATEGORY_NOT_FOUND',
@@ -173,7 +139,7 @@ router.get(
       )
     }
 
-    return res.apiSuccess(row.get({ plain: true }), '获取品类详情成功')
+    return res.apiSuccess(detail, '获取品类详情成功')
   })
 )
 
@@ -185,15 +151,7 @@ router.post(
   authenticateToken,
   requireRoleLevel(100),
   asyncHandler(async (req, res) => {
-    const {
-      category_name,
-      category_code,
-      parent_category_id,
-      level,
-      sort_order,
-      is_enabled,
-      icon_media_id
-    } = req.body || {}
+    const { category_name, category_code } = req.body || {}
 
     if (!category_name || !String(category_name).trim()) {
       return res.apiError(
@@ -212,31 +170,12 @@ router.post(
       )
     }
 
+    const service = req.app.locals.services.getService('exchange_item_service')
     const created = await TransactionManager.execute(async transaction => {
-      const { Category } = getExchangeItemModels(req)
-      return await Category.create(
-        {
-          category_name: String(category_name).trim(),
-          category_code: String(category_code).trim(),
-          parent_category_id:
-            parent_category_id === undefined ||
-            parent_category_id === null ||
-            parent_category_id === ''
-              ? null
-              : Number(parent_category_id),
-          level: level != null ? Number(level) : 1,
-          sort_order: sort_order != null ? Number(sort_order) : 0,
-          is_enabled: is_enabled === undefined ? true : Boolean(is_enabled),
-          icon_media_id:
-            icon_media_id === undefined || icon_media_id === null || icon_media_id === ''
-              ? null
-              : icon_media_id
-        },
-        { transaction }
-      )
+      return service.createCategory(req.body || {}, { transaction })
     })
 
-    return res.apiSuccess(created.get({ plain: true }), '创建品类成功')
+    return res.apiSuccess(created, '创建品类成功')
   })
 )
 
@@ -253,43 +192,12 @@ router.put(
       return res.apiError('category_id 无效', 'PRODUCT_CENTER_INVALID_CATEGORY_ID', null, 400)
     }
 
+    const service = req.app.locals.services.getService('exchange_item_service')
     const updated = await TransactionManager.execute(async transaction => {
-      const { Category } = getExchangeItemModels(req)
-      const row = await Category.findByPk(cid, { transaction, lock: transaction.LOCK.UPDATE })
-      if (!row) {
-        throw new BusinessError('品类不存在', 'PRODUCT_CENTER_CATEGORY_NOT_FOUND', 404, {
-          category_id: cid
-        })
-      }
-
-      const patch = { ...req.body }
-      const allowed = [
-        'category_name',
-        'category_code',
-        'parent_category_id',
-        'level',
-        'sort_order',
-        'is_enabled',
-        'icon_media_id'
-      ]
-      const data = {}
-      for (const k of allowed) {
-        if (patch[k] !== undefined) {
-          if (k === 'parent_category_id') {
-            data[k] = patch[k] === null || patch[k] === '' ? null : Number(patch[k])
-          } else if (k === 'icon_media_id') {
-            data[k] = patch[k] === null || patch[k] === '' ? null : patch[k]
-          } else {
-            data[k] = patch[k]
-          }
-        }
-      }
-
-      await row.update(data, { transaction })
-      return row.reload({ transaction })
+      return service.updateCategory(cid, req.body || {}, { transaction })
     })
 
-    return res.apiSuccess(updated.get({ plain: true }), '更新品类成功')
+    return res.apiSuccess(updated, '更新品类成功')
   })
 )
 
@@ -306,30 +214,9 @@ router.delete(
       return res.apiError('category_id 无效', 'PRODUCT_CENTER_INVALID_CATEGORY_ID', null, 400)
     }
 
+    const service = req.app.locals.services.getService('exchange_item_service')
     await TransactionManager.execute(async transaction => {
-      const { Category } = getExchangeItemModels(req)
-
-      const childCount = await Category.count({
-        where: { parent_category_id: cid },
-        transaction
-      })
-      if (childCount > 0) {
-        throw new BusinessError(
-          `存在 ${childCount} 个子品类，请先删除或移动子节点`,
-          'PRODUCT_CENTER_CATEGORY_HAS_CHILDREN',
-          409,
-          { child_count: childCount }
-        )
-      }
-
-      const row = await Category.findByPk(cid, { transaction })
-      if (!row) {
-        throw new BusinessError('品类不存在', 'PRODUCT_CENTER_CATEGORY_NOT_FOUND', 404, {
-          category_id: cid
-        })
-      }
-
-      await row.destroy({ transaction })
+      return service.deleteCategory(cid, { transaction })
     })
 
     return res.apiSuccess({ category_id: cid }, '删除品类成功')

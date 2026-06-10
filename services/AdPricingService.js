@@ -17,7 +17,8 @@
 const BusinessError = require('../utils/BusinessError')
 const logger = require('../utils/logger').logger
 const AdminSystemService = require('./AdminSystemService')
-const { AdDauDailyStat, AdSlot, sequelize } = require('../models')
+const { AdDauDailyStat, AdSlot, AdPriceAdjustmentLog, User, sequelize } = require('../models')
+const { Op } = require('sequelize')
 const BeijingTimeHelper = require('../utils/timeHelper')
 
 /**
@@ -236,6 +237,153 @@ class AdPricingService {
 
     const last = sorted[sorted.length - 1]
     return { coefficient: last.coefficient, label: last.label }
+  }
+
+  /**
+   * 查询 DAU 趋势数据（最近 N 天）
+   *
+   * @param {number} [days=30] - 查询天数
+   * @returns {Promise<Object>} { stats, days, total_records }
+   */
+  static async getDauStats(days = 30) {
+    const startDate = BeijingTimeHelper.daysAgo(days)
+    const stats = await AdDauDailyStat.findAll({
+      where: {
+        stat_date: {
+          [Op.gte]: typeof startDate === 'string' ? startDate.substring(0, 10) : startDate
+        }
+      },
+      order: [['stat_date', 'ASC']]
+    })
+    return {
+      stats: stats.map(s => s.toJSON()),
+      days,
+      total_records: stats.length
+    }
+  }
+
+  /**
+   * 查询调价历史列表（支持状态/触发类型筛选、分页）
+   *
+   * @param {Object} [options={}] - 查询选项
+   * @param {number} [options.page=1] - 页码
+   * @param {number} [options.page_size=20] - 每页数量
+   * @param {string} [options.status] - 状态筛选
+   * @param {string} [options.trigger_type] - 触发类型筛选
+   * @returns {Promise<Object>} { rows, count, page, page_size }
+   */
+  static async listAdjustments(options = {}) {
+    const page = parseInt(options.page, 10) || 1
+    const pageSize = parseInt(options.page_size, 10) || 20
+    const where = {}
+    if (options.status) where.status = options.status
+    if (options.trigger_type) where.trigger_type = options.trigger_type
+
+    const { rows, count } = await AdPriceAdjustmentLog.findAndCountAll({
+      where,
+      include: [
+        { model: User, as: 'confirmer', attributes: ['user_id', 'nickname'], required: false }
+      ],
+      order: [['created_at', 'DESC']],
+      limit: pageSize,
+      offset: (page - 1) * pageSize
+    })
+
+    return {
+      rows: rows.map(r => r.toJSON()),
+      count,
+      page,
+      page_size: pageSize
+    }
+  }
+
+  /**
+   * 确认调价建议（pending → confirmed）
+   *
+   * 事务边界由路由层 TransactionManager 管理，本方法要求外部传入事务。
+   *
+   * @param {number} adjustment_id - 调价记录ID
+   * @param {number} operator_id - 操作管理员ID
+   * @param {Object} options - 选项（必须含 transaction）
+   * @returns {Promise<Object>} 更新后的调价记录
+   */
+  static async confirmAdjustment(adjustment_id, operator_id, options = {}) {
+    const { transaction } = options
+    const log = await AdPriceAdjustmentLog.findByPk(adjustment_id, { transaction })
+    if (!log) {
+      throw new BusinessError('调价记录不存在', 'AD_ADJUSTMENT_NOT_FOUND', 404)
+    }
+    if (log.status !== 'pending') {
+      throw new BusinessError(
+        `当前状态不允许确认操作（当前状态：${log.status}）`,
+        'AD_ADJUSTMENT_STATUS_INVALID',
+        400
+      )
+    }
+    await log.update({ status: 'confirmed', confirmed_by: operator_id }, { transaction })
+    return log.reload({ transaction })
+  }
+
+  /**
+   * 拒绝调价建议（pending → rejected）
+   *
+   * @param {number} adjustment_id - 调价记录ID
+   * @param {number} operator_id - 操作管理员ID
+   * @param {Object} options - 选项（必须含 transaction）
+   * @returns {Promise<Object>} 更新后的调价记录
+   */
+  static async rejectAdjustment(adjustment_id, operator_id, options = {}) {
+    const { transaction } = options
+    const log = await AdPriceAdjustmentLog.findByPk(adjustment_id, { transaction })
+    if (!log) {
+      throw new BusinessError('调价记录不存在', 'AD_ADJUSTMENT_NOT_FOUND', 404)
+    }
+    if (log.status !== 'pending') {
+      throw new BusinessError(
+        `当前状态不允许拒绝操作（当前状态：${log.status}）`,
+        'AD_ADJUSTMENT_STATUS_INVALID',
+        400
+      )
+    }
+    await log.update({ status: 'rejected', confirmed_by: operator_id }, { transaction })
+    return log.reload({ transaction })
+  }
+
+  /**
+   * 执行已确认的调价（confirmed → applied）
+   *
+   * @param {number} adjustment_id - 调价记录ID
+   * @param {Object} options - 选项（必须含 transaction）
+   * @returns {Promise<Object>} 更新后的调价记录
+   */
+  static async applyAdjustment(adjustment_id, options = {}) {
+    const { transaction } = options
+    const log = await AdPriceAdjustmentLog.findByPk(adjustment_id, { transaction })
+    if (!log) {
+      throw new BusinessError('调价记录不存在', 'AD_ADJUSTMENT_NOT_FOUND', 404)
+    }
+    if (log.status !== 'confirmed') {
+      throw new BusinessError(
+        `只有已确认的调价才能执行（当前状态：${log.status}）`,
+        'AD_ADJUSTMENT_STATUS_INVALID',
+        400
+      )
+    }
+
+    // 校验配置存在性（new_coefficient 写入由后续配置流程处理）
+    const currentTiers = await AdminSystemService.getConfigValue('ad_dau_coefficient_tiers', null)
+    if (currentTiers && log.new_coefficient) {
+      logger.info('[广告定价] 执行调价：更新 DAU 系数配置', {
+        adjustment_id,
+        new_coefficient: log.new_coefficient
+      })
+    }
+
+    await log.update(
+      { status: 'applied', applied_at: BeijingTimeHelper.nowDate() },
+      { transaction }
+    )
+    return log.reload({ transaction })
   }
 }
 

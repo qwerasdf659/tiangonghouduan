@@ -978,8 +978,7 @@ export const ContentAPI = {
    */
   async getUserOrders(userId, params = {}) {
     const url = buildURL(CONTENT_ENDPOINTS.CS_USER_ORDERS, { user_id: userId })
-    const query = new URLSearchParams(params).toString()
-    return await request({ url: query ? `${url}?${query}` : url, method: 'GET' })
+    return await request({ url: url + buildQueryString(params), method: 'GET' })
   }
 }
 

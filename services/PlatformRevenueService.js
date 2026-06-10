@@ -266,6 +266,86 @@ class PlatformRevenueService {
       }))
     }
   }
+
+  /**
+   * 查询所有系统账户的星石余额概览（平台星石管理）
+   *
+   * @returns {Promise<Array<Object>>} 系统账户星石余额原始行
+   *   [{ system_code, star_stone_balance, frozen_amount }]
+   */
+  async getSystemAccountStarStoneBalances() {
+    const [systemAccounts] = await this.sequelize.query(`
+      SELECT a.system_code,
+             COALESCE(aab.available_amount, 0) AS star_stone_balance,
+             COALESCE(aab.frozen_amount, 0) AS frozen_amount
+      FROM accounts a
+      LEFT JOIN account_asset_balances aab
+        ON a.account_id = aab.account_id AND aab.asset_code = 'star_stone'
+      WHERE a.account_type = 'system'
+      ORDER BY a.account_id
+    `)
+    return systemAccounts.map(acc => ({
+      system_code: acc.system_code,
+      star_stone_balance: Number(acc.star_stone_balance),
+      frozen_amount: Number(acc.frozen_amount)
+    }))
+  }
+
+  /**
+   * 查询平台星石销毁历史记录（分页）
+   *
+   * @param {Object} [options={}] - 查询选项
+   * @param {number} [options.page=1] - 页码
+   * @param {number} [options.page_size=20] - 每页数量
+   * @returns {Promise<Object>} { items, pagination }
+   */
+  async getStarStoneBurnHistory(options = {}) {
+    const page = Math.max(1, parseInt(options.page, 10) || 1)
+    const pageSize = Math.min(100, Math.max(1, parseInt(options.page_size, 10) || 20))
+    const offset = (page - 1) * pageSize
+
+    const [records] = await this.sequelize.query(
+      `
+      SELECT at.asset_transaction_id, at.delta_amount, at.balance_after,
+             at.business_type, at.meta, at.created_at,
+             a.system_code
+      FROM asset_transactions at
+      JOIN accounts a ON at.account_id = a.account_id
+      WHERE at.business_type = 'platform_star_stone_burn'
+        AND at.asset_code = 'star_stone'
+      ORDER BY at.created_at DESC
+      LIMIT :limit OFFSET :offset
+    `,
+      { replacements: { limit: pageSize, offset } }
+    )
+
+    const [[{ total }]] = await this.sequelize.query(`
+      SELECT COUNT(*) AS total
+      FROM asset_transactions
+      WHERE business_type = 'platform_star_stone_burn' AND asset_code = 'star_stone'
+    `)
+
+    return {
+      records: records.map(r => {
+        let meta = {}
+        try {
+          meta = typeof r.meta === 'string' ? JSON.parse(r.meta) : r.meta || {}
+        } catch {
+          /* ignore 非法 JSON */
+        }
+        return {
+          transaction_id: r.asset_transaction_id,
+          system_code: r.system_code,
+          amount: Math.abs(Number(r.delta_amount)),
+          balance_after: Number(r.balance_after),
+          reason: meta.reason || '',
+          operator_id: meta.operator_id || null,
+          created_at: r.created_at
+        }
+      }),
+      pagination: { page, page_size: pageSize, total: Number(total) }
+    }
+  }
 }
 
 module.exports = PlatformRevenueService

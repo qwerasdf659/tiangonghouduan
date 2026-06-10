@@ -25,7 +25,9 @@
 'use strict'
 
 require('dotenv').config()
-const { Sequelize } = require('sequelize')
+
+// 复用主 Sequelize 实例（单一配置源原则：唯一 new Sequelize 在 config/database.js）
+const { sequelize } = require('../../config/database')
 
 /** 北京时间格式化 */
 function beijingNow() {
@@ -37,18 +39,6 @@ function beijingNow() {
  * @returns {Promise<number>} 退出码（0=全部通过，1=有红线失守）
  */
 async function run() {
-  const sequelize = new Sequelize(
-    process.env.DB_NAME,
-    process.env.DB_USER,
-    process.env.DB_PASSWORD,
-    {
-      host: process.env.DB_HOST,
-      port: process.env.DB_PORT,
-      dialect: 'mysql',
-      logging: false
-    }
-  )
-
   const results = []
   /**
    * 记录一条断言结果
@@ -78,7 +68,7 @@ async function run() {
     )
     assert(
       '红线2 无星石反向转换规则',
-      reverse[0].c === 0,
+      Number(reverse[0].c) === 0,
       `from_asset_code='star_stone' 规则数 = ${reverse[0].c}`
     )
 
@@ -142,7 +132,7 @@ async function run() {
          AND table_name IN ('ad_slots','ad_campaigns','ad_billing_records')
          AND (LOWER(COLUMN_NAME) LIKE '%cny%' OR LOWER(COLUMN_NAME) LIKE '%rmb%' OR LOWER(COLUMN_NAME) LIKE '%_fen%')`
     )
-    const fiatOk = fiatChannel[0].c === 0 && fiatCols.length === 0
+    const fiatOk = Number(fiatChannel[0].c) === 0 && fiatCols.length === 0
     assert(
       '红线7 零法币（人民币↔星石零兑换）',
       fiatOk,
@@ -157,7 +147,7 @@ async function run() {
     )
     assert(
       '红线8 抽奖奖池无实物',
-      physicalPrize[0].c === 0,
+      Number(physicalPrize[0].c) === 0,
       `非 material/points 奖品数 = ${physicalPrize[0].c}`
     )
 

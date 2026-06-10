@@ -38,7 +38,6 @@ const { authenticateToken, requireRoleLevel } = require('../../../../middleware/
 const { asyncHandler } = require('../../../../middleware/validation')
 const TransactionManager = require('../../../../utils/TransactionManager')
 const logger = require('../../../../utils/logger').logger
-const AssetProductGuard = require('../../../../services/shared/AssetProductGuard')
 
 // ==================== 所有路由需要管理员权限（role_level >= 100）====================
 
@@ -116,84 +115,21 @@ router.post(
       end_time
     })
 
-    const { ExchangeItem, BidProduct } = req.app.locals.models
+    const BidService = req.app.locals.services.getService('exchange_bid_core')
     const result = await TransactionManager.execute(async transaction => {
-      const exchangeItem = await ExchangeItem.findByPk(exchange_item_id, {
-        include: [
-          {
-            model: req.app.locals.models.ItemTemplate,
-            as: 'itemTemplate',
-            attributes: ['item_type', 'reference_price_points']
-          }
-        ],
-        transaction
-      })
-      if (!exchangeItem) {
-        const err = new Error('关联的商品不存在')
-        err.statusCode = 404
-        err.code = 'EXCHANGE_ITEM_NOT_FOUND'
-        throw err
-      }
-
-      /*
-       * 价值流向守卫（合规整改 §10.11-C / §10.15 Step 5 + 路线B 模块A·竞价双层防护）：
-       * 竞价发起入口统一调用：
-       *   ① assertBiddableTarget：标的必须为纯虚拟道具（prop），实物/券禁止进竞价（正向白名单）。
-       *   ② assertPriceAssetAllowed：星石不可给有价值商品计价（杜绝 星石→实物 套现）。
-       * 竞价币本身已由 BidService 动态白名单（is_biddable=1，仅 star_stone）锁定。
-       */
-      AssetProductGuard.assertBiddableTarget(exchangeItem.itemTemplate || null)
-      AssetProductGuard.assertPriceAssetAllowed(exchangeItem.itemTemplate || null, price_asset_code)
-
-      // 一物一拍校验（决策11）：同一兑换商品同时只能有一个 active/pending 竞价
-      const existingBid = await BidProduct.findOne({
-        where: {
-          exchange_item_id,
-          status: ['pending', 'active']
-        },
-        transaction
-      })
-
-      if (existingBid) {
-        const err = new Error(
-          `兑换商品 ${exchange_item_id} 已有进行中的竞价（ID: ${existingBid.bid_product_id}，状态: ${existingBid.status}）`
-        )
-        err.statusCode = 409
-        err.code = 'BID_ALREADY_EXISTS'
-        throw err
-      }
-
-      // 创建竞价商品
-      const bidProduct = await BidProduct.create(
+      return BidService.createBidProduct(
         {
-          exchange_item_id: parseInt(exchange_item_id, 10),
-          start_price: parseInt(start_price, 10),
+          exchange_item_id,
+          start_price,
           price_asset_code,
-          current_price: 0,
-          min_bid_increment: parseInt(min_bid_increment, 10),
+          min_bid_increment,
           start_time: parsedStartTime,
           end_time: parsedEndTime,
-          status: parsedStartTime <= new Date() ? 'active' : 'pending',
-          bid_count: 0,
-          batch_no,
-          created_by: adminUserId
+          batch_no
         },
+        adminUserId,
         { transaction }
       )
-
-      return {
-        bid_product_id: bidProduct.bid_product_id,
-        exchange_item_id: bidProduct.exchange_item_id,
-        item_name: exchangeItem.item_name,
-        start_price: Number(bidProduct.start_price),
-        price_asset_code: bidProduct.price_asset_code,
-        min_bid_increment: Number(bidProduct.min_bid_increment),
-        start_time: bidProduct.start_time,
-        end_time: bidProduct.end_time,
-        status: bidProduct.status,
-        batch_no: bidProduct.batch_no,
-        created_by: adminUserId
-      }
     })
 
     logger.info('[竞价管理] 竞价商品创建成功', {

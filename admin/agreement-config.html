@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <%- include('partials/head', { 
+    title: '协议管理', 
+    pageStyle: '[x-cloak] { display: none !important; } .config-item { transition: all 0.2s ease; border: 1px solid var(--color-border, #dde1e9); } .section-help { background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border: 1px solid #bae6fd; border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; } .section-help p { color: #0369a1; font-size: 13px; line-height: 1.6; } .doc-tab { padding: 8px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; transition: all 0.2s; } .doc-tab.active { background: var(--color-primary, #3b82f6); color: #fff; } .doc-tab:not(.active) { background: #f1f5f9; color: #475569; } .section-card { border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px; margin-bottom: 12px; background: #fff; }' 
+  }) %>
+</head>
+<body class="themed-bg-subtle min-h-screen" x-data="agreementConfigPage()" x-init="init()" x-cloak>
+
+  <!-- 导航栏 -->
+  <nav class="page-navbar">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/workspace.html" class="text-blue-200 hover:text-white transition-colors">&larr; 返回工作台</a>
+        <span class="text-lg font-semibold">📜 协议管理</span>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mx-auto px-4 py-6 max-w-4xl">
+
+    <!-- 页面横幅 -->
+    <div class="page-banner mb-6">
+      <div class="flex justify-between items-center">
+        <div>
+          <h1>📜 协议管理</h1>
+          <p>编辑《用户协议》《隐私政策》正文，保存后小程序协议页下次打开自动生效</p>
+        </div>
+        <div class="text-6xl opacity-20 hidden md:block">📄</div>
+      </div>
+    </div>
+
+    <!-- 协议类型切换 -->
+    <div class="flex items-center gap-3 mb-6">
+      <template x-for="doc in [{key:'user_agreement',name:'用户协议'},{key:'privacy_policy',name:'隐私政策'}]" :key="doc.key">
+        <div class="doc-tab" :class="activeDocType === doc.key ? 'active' : ''" @click="switchDocType(doc.key)" x-text="doc.name"></div>
+      </template>
+    </div>
+
+    <!-- 操作栏 -->
+    <div class="flex justify-between items-center mb-6">
+      <div class="flex items-center gap-3">
+        <template x-if="configModified">
+          <span class="badge-warning text-xs">&#9889; 有未保存的修改</span>
+        </template>
+        <template x-if="docUpdatedAt[activeDocType]">
+          <span class="text-xs text-gray-400">最后更新：<span x-text="docUpdatedAt[activeDocType]"></span></span>
+        </template>
+      </div>
+      <div class="flex items-center gap-3">
+        <button @click="resetAgreementConfig()" class="btn btn-outline btn-sm" :disabled="!configModified">
+          &#128260; 重置
+        </button>
+        <button @click="saveAgreementConfig()" class="action-btn action-btn-primary btn-sm" :disabled="saving || !configModified">
+          <span x-show="saving">&#9203; 保存中...</span>
+          <span x-show="!saving">&#128190; 保存当前协议</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 加载状态 -->
+    <template x-if="configLoading">
+      <div class="content-section">
+        <div class="empty-state-enhanced">
+          <div class="empty-icon animate-pulse">&#9203;</div>
+          <div class="empty-title">加载协议中...</div>
+          <div class="empty-desc">正在从服务器获取协议正文数据</div>
+        </div>
+      </div>
+    </template>
+
+    <!-- 编辑区 -->
+    <template x-if="!configLoading">
+      <div class="content-section animate-fade-in">
+        <div class="content-section-header">
+          <div class="section-title">
+            <span class="title-icon">📝</span>
+            <span x-text="activeDocType === 'user_agreement' ? '用户协议正文' : '隐私政策正文'"></span>
+          </div>
+        </div>
+        <div class="content-section-body space-y-5">
+
+          <div class="section-help">
+            <p>&#128161; 协议正文为法务文本，由人工录入。正文按「段落」组织，每段可选填小标题。小程序按段落顺序展示。隐私政策需覆盖微信《隐私保护指引》必备披露项（收集信息类型/用途/第三方SDK/存储与权限）。</p>
+          </div>
+
+          <!-- 协议标题 -->
+          <div class="config-item rounded-xl p-4">
+            <label class="form-label text-sm font-semibold">协议标题 (title)</label>
+            <p class="text-xs text-gray-400 mb-2">展示在协议页顶部的标题</p>
+            <input type="text" x-model="docs[activeDocType].title" @input="markConfigModified()" class="form-input text-sm" placeholder="如：用户协议">
+          </div>
+
+          <!-- 版本号（可选） -->
+          <div class="config-item rounded-xl p-4">
+            <label class="form-label text-sm font-semibold">版本号 (version，可选)</label>
+            <p class="text-xs text-gray-400 mb-2">协议版本留痕，预留字段。重大变更时建议递增（如 1.0、1.1）</p>
+            <input type="text" x-model="docs[activeDocType].version" @input="markConfigModified()" class="form-input text-sm" placeholder="留空或填 1.0">
+          </div>
+
+          <!-- 正文段落 -->
+          <div>
+            <div class="flex justify-between items-center mb-3">
+              <label class="form-label text-sm font-semibold">正文段落 (sections)</label>
+              <button @click="addSection()" class="btn btn-outline btn-sm">+ 添加段落</button>
+            </div>
+
+            <template x-for="(section, index) in docs[activeDocType].sections" :key="index">
+              <div class="section-card">
+                <div class="flex justify-between items-center mb-2">
+                  <span class="text-xs text-gray-500">第 <span x-text="index + 1"></span> 段</span>
+                  <span class="remove-btn cursor-pointer text-red-500 text-sm" @click="removeSection(index)">✕ 删除本段</span>
+                </div>
+                <input type="text" x-model="section.heading" @input="markConfigModified()" class="form-input text-sm mb-2" placeholder="小标题（可选，如「一、信息收集」）">
+                <textarea x-model="section.text" @input="markConfigModified()" rows="4" class="form-input text-sm" placeholder="本段正文内容（必填）"></textarea>
+              </div>
+            </template>
+          </div>
+
+        </div>
+      </div>
+    </template>
+
+  </div>
+
+  <%- include('partials/footer') %>
+  <script type="module" src="./src/modules/system/pages/agreement-config.js"></script>
+</body>
+</html>

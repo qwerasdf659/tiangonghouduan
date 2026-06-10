@@ -190,6 +190,7 @@ class LotteryQueryService {
           'total_prize_pool',
           'remaining_prize_pool',
           'prize_distribution_config',
+          'rules_text',
           'created_at',
           'updated_at'
         ]
@@ -938,6 +939,35 @@ class LotteryQueryService {
       })
       throw error
     }
+  }
+
+  /**
+   * 解析预算桶标识（budget bucket id）
+   *
+   * 业务场景：管理员调整 BUDGET_POINTS 时，前端可能传入活动主键（数字），
+   * 需要解析为该活动配置的 allowed_campaign_ids[0]（实际预算桶标识）。
+   * 若传入的已是字符串桶标识（如 'CONSUMPTION_DEFAULT'），则原样返回。
+   *
+   * @param {number|string} lottery_campaign_id - 活动主键或桶标识
+   * @returns {Promise<number|string>} 解析后的预算桶标识
+   */
+  static async resolveBudgetBucketId(lottery_campaign_id) {
+    const numericId = Number(lottery_campaign_id)
+    if (isNaN(numericId) || numericId <= 0) {
+      // 非数字 → 视为已是字符串桶标识，原样返回
+      return lottery_campaign_id
+    }
+    const campaign = await models.LotteryCampaign.findByPk(numericId, {
+      attributes: ['lottery_campaign_id', 'allowed_campaign_ids']
+    })
+    if (
+      campaign &&
+      Array.isArray(campaign.allowed_campaign_ids) &&
+      campaign.allowed_campaign_ids.length > 0
+    ) {
+      return campaign.allowed_campaign_ids[0]
+    }
+    return lottery_campaign_id
   }
 }
 

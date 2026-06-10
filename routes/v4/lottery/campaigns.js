@@ -334,6 +334,13 @@ router.get(
         per_draw_cost: drawButtons.find(b => b.draw_count === 1)?.per_draw ?? 0,
         max_draws_per_user_daily: fullConfig.max_draws_per_user_daily,
         pity_info: pityInfo,
+        /*
+         * rules_text 规则/概率公示文案（BE-5，合规硬项）：
+         * 作为 C 端"回馈规则说明/概率公示"的唯一权威载体，由运营在 admin 维护、经法务复核。
+         * 动态定性表述（不写死固定比例），前端按返回原样展示，不硬编码合规措辞。
+         * 无文案时下发 null，前端不渲染该区块。
+         */
+        rules_text: fullConfig.rules_text || null,
         draw_buttons: drawButtons,
         display: displayConfig
       }

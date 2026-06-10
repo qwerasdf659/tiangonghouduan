@@ -367,7 +367,15 @@ export function asyncDataMixin() {
      * @returns {Promise<{success: boolean, data?: any, error?: Error}>}
      */
     async apiGet(url, params = {}, loadingOptions = {}) {
-      const queryString = new URLSearchParams(params).toString()
+      // 过滤 null/undefined：URLSearchParams 会把它们序列化成字面量 "undefined"/"null"，
+      // 污染后端筛选条件（如 keyword=undefined 导致 LIKE '%undefined%' 查无数据）
+      const search = new URLSearchParams()
+      for (const [key, value] of Object.entries(params)) {
+        if (value !== undefined && value !== null) {
+          search.append(key, value)
+        }
+      }
+      const queryString = search.toString()
       const fullUrl = queryString ? `${url}?${queryString}` : url
       return this.apiCall(fullUrl, { method: 'GET' }, loadingOptions)
     },

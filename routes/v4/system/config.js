@@ -396,16 +396,19 @@ router.get(
   asyncHandler(async (req, res) => {
     const AdminSystemService = req.app.locals.services.getService('admin_system')
 
-    /* 只返回白名单内的公开配置项 */
+    /* 只返回白名单内的公开配置项（各 category 互相独立，并行读取） */
     const configMap = {}
-    for (const [category, keys] of Object.entries(PUBLIC_SETTING_KEYS)) {
-      const settingsData = await AdminSystemService.getSettingsByCategory(category)
-      for (const s of settingsData.settings) {
+    const categoryEntries = Object.entries(PUBLIC_SETTING_KEYS)
+    const settingsList = await Promise.all(
+      categoryEntries.map(([category]) => AdminSystemService.getSettingsByCategory(category))
+    )
+    categoryEntries.forEach(([, keys], idx) => {
+      for (const s of settingsList[idx].settings) {
         if (keys.includes(s.setting_key)) {
           configMap[s.setting_key] = s.setting_value
         }
       }
-    }
+    })
 
     return res.apiSuccess(configMap, '获取系统配置成功')
   })

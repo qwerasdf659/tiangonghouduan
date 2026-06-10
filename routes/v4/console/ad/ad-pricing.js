@@ -93,29 +93,11 @@ router.get(
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
     const days = parseInt(req.query.days) || 30
-    const { AdDauDailyStat } = require('../../../../models')
-    const { Op } = require('sequelize')
-    const BeijingTimeHelper = require('../../../../utils/timeHelper')
+    const AdPricingService = req.app.locals.services.getService('ad_pricing')
 
-    const startDate = BeijingTimeHelper.daysAgo(days)
+    const result = await AdPricingService.getDauStats(days)
 
-    const stats = await AdDauDailyStat.findAll({
-      where: {
-        stat_date: {
-          [Op.gte]: typeof startDate === 'string' ? startDate.substring(0, 10) : startDate
-        }
-      },
-      order: [['stat_date', 'ASC']]
-    })
-
-    return res.apiSuccess(
-      {
-        stats: stats.map(s => s.toJSON()),
-        days,
-        total_records: stats.length
-      },
-      'DAU 趋势数据查询成功'
-    )
+    return res.apiSuccess(result, 'DAU 趋势数据查询成功')
   })
 )
 
@@ -172,41 +154,16 @@ router.get(
   '/adjustments',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    const { AdPriceAdjustmentLog, User } = require('../../../../models')
+    const AdPricingService = req.app.locals.services.getService('ad_pricing')
 
-    const page = parseInt(req.query.page) || 1
-    const pageSize = parseInt(req.query.page_size) || 20
-    const status = req.query.status
-    const triggerType = req.query.trigger_type
-
-    const where = {}
-    if (status) where.status = status
-    if (triggerType) where.trigger_type = triggerType
-
-    const { rows, count } = await AdPriceAdjustmentLog.findAndCountAll({
-      where,
-      include: [
-        {
-          model: User,
-          as: 'confirmer',
-          attributes: ['user_id', 'nickname'],
-          required: false
-        }
-      ],
-      order: [['created_at', 'DESC']],
-      limit: pageSize,
-      offset: (page - 1) * pageSize
+    const result = await AdPricingService.listAdjustments({
+      page: req.query.page,
+      page_size: req.query.page_size,
+      status: req.query.status,
+      trigger_type: req.query.trigger_type
     })
 
-    return res.apiSuccess(
-      {
-        rows: rows.map(r => r.toJSON()),
-        count,
-        page,
-        page_size: pageSize
-      },
-      '获取调价历史列表成功'
-    )
+    return res.apiSuccess(result, '获取调价历史列表成功')
   })
 )
 
@@ -219,28 +176,11 @@ router.post(
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
     const adjustmentId = parseInt(req.params.id)
-    const { AdPriceAdjustmentLog } = require('../../../../models')
     const TransactionManager = require('../../../../utils/TransactionManager')
+    const AdPricingService = req.app.locals.services.getService('ad_pricing')
 
     const result = await TransactionManager.execute(async transaction => {
-      const log = await AdPriceAdjustmentLog.findByPk(adjustmentId, { transaction })
-      if (!log) {
-        throw new Error('调价记录不存在')
-      }
-
-      if (log.status !== 'pending') {
-        throw new Error(`当前状态不允许确认操作（当前状态：${log.status}）`)
-      }
-
-      await log.update(
-        {
-          status: 'confirmed',
-          confirmed_by: req.user.user_id
-        },
-        { transaction }
-      )
-
-      return log.reload({ transaction })
+      return AdPricingService.confirmAdjustment(adjustmentId, req.user.user_id, { transaction })
     })
 
     logger.info('[广告定价] 确认调价建议', {
@@ -262,28 +202,11 @@ router.post(
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
     const adjustmentId = parseInt(req.params.id)
-    const { AdPriceAdjustmentLog } = require('../../../../models')
     const TransactionManager = require('../../../../utils/TransactionManager')
+    const AdPricingService = req.app.locals.services.getService('ad_pricing')
 
     const result = await TransactionManager.execute(async transaction => {
-      const log = await AdPriceAdjustmentLog.findByPk(adjustmentId, { transaction })
-      if (!log) {
-        throw new Error('调价记录不存在')
-      }
-
-      if (log.status !== 'pending') {
-        throw new Error(`当前状态不允许拒绝操作（当前状态：${log.status}）`)
-      }
-
-      await log.update(
-        {
-          status: 'rejected',
-          confirmed_by: req.user.user_id
-        },
-        { transaction }
-      )
-
-      return log.reload({ transaction })
+      return AdPricingService.rejectAdjustment(adjustmentId, req.user.user_id, { transaction })
     })
 
     logger.info('[广告定价] 拒绝调价建议', {
@@ -306,38 +229,11 @@ router.post(
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
     const adjustmentId = parseInt(req.params.id)
-    const { AdPriceAdjustmentLog } = require('../../../../models')
     const TransactionManager = require('../../../../utils/TransactionManager')
-    const BeijingTimeHelper = require('../../../../utils/timeHelper')
+    const AdPricingService = req.app.locals.services.getService('ad_pricing')
 
     const result = await TransactionManager.execute(async transaction => {
-      const log = await AdPriceAdjustmentLog.findByPk(adjustmentId, { transaction })
-      if (!log) {
-        throw new Error('调价记录不存在')
-      }
-
-      if (log.status !== 'confirmed') {
-        throw new Error(`只有已确认的调价才能执行（当前状态：${log.status}）`)
-      }
-      const AdminSystemService = req.app.locals.services.getService('admin_system')
-
-      const currentTiers = await AdminSystemService.getConfigValue('ad_dau_coefficient_tiers', null)
-      if (currentTiers && log.new_coefficient) {
-        logger.info('[广告定价] 执行调价：更新 DAU 系数配置', {
-          adjustment_id: adjustmentId,
-          new_coefficient: log.new_coefficient
-        })
-      }
-
-      await log.update(
-        {
-          status: 'applied',
-          applied_at: BeijingTimeHelper.nowDate()
-        },
-        { transaction }
-      )
-
-      return log.reload({ transaction })
+      return AdPricingService.applyAdjustment(adjustmentId, { transaction })
     })
 
     logger.info('[广告定价] 调价已执行', {

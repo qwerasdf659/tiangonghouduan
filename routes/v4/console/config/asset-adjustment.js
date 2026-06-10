@@ -88,20 +88,9 @@ router.post(
      */
     let resolved_budget_bucket_id = lottery_campaign_id
     if (asset_code === AssetCode.BUDGET_POINTS && lottery_campaign_id) {
-      const numeric_id = Number(lottery_campaign_id)
-      if (!isNaN(numeric_id) && numeric_id > 0) {
-        const { LotteryCampaign } = require('../../../../models')
-        const campaign = await LotteryCampaign.findByPk(numeric_id, {
-          attributes: ['lottery_campaign_id', 'allowed_campaign_ids']
-        })
-        if (
-          campaign &&
-          Array.isArray(campaign.allowed_campaign_ids) &&
-          campaign.allowed_campaign_ids.length > 0
-        ) {
-          resolved_budget_bucket_id = campaign.allowed_campaign_ids[0]
-        }
-      }
+      const LotteryQueryService = req.app.locals.services.getService('lottery_query')
+      resolved_budget_bucket_id =
+        await LotteryQueryService.resolveBudgetBucketId(lottery_campaign_id)
     }
 
     /*

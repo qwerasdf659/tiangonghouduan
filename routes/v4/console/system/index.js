@@ -27,6 +27,7 @@ const placementRoutes = require('./placement') // 2026-02-15: 活动投放位置
 const exchangePageConfigRoutes = require('./exchange-page-config') // 2026-02-19: 兑换页面配置管理
 const appVersionConfigRoutes = require('./app-version-config') // 2026-06-03: 小程序版本闸门配置管理
 const appThemeConfigRoutes = require('./app-theme-config') // 2026-06-03: 全局氛围主题配置管理
+const agreementConfigRoutes = require('./agreement-config') // 2026-06-09: 协议正文配置管理（ADM-1）
 
 // 挂载子模块路由
 router.use('/', monitoringRoutes) // 包含 /status, /dashboard, /management-status
@@ -35,5 +36,6 @@ router.use('/placement', placementRoutes) // 活动投放位置配置管理 GET+
 router.use('/exchange-page-config', exchangePageConfigRoutes) // 兑换页面配置管理 GET+PUT
 router.use('/app-version-config', appVersionConfigRoutes) // 小程序版本闸门配置管理 GET+PUT
 router.use('/app-theme-config', appThemeConfigRoutes) // 全局氛围主题配置管理 GET+PUT
+router.use('/agreement-config', agreementConfigRoutes) // 协议正文配置管理 GET+PUT
 
 module.exports = router

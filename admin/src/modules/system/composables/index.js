@@ -28,6 +28,9 @@ export { useAppThemeConfigState, useAppThemeConfigMethods } from './app-theme-co
 // 小程序版本闸门配置模块（2026-06-03）
 export { useAppVersionConfigState, useAppVersionConfigMethods } from './app-version-config.js'
 
+// 协议正文配置模块（2026-06-09 ADM-1：用户协议/隐私政策正文）
+export { useAgreementConfigState, useAgreementConfigMethods } from './agreement-config.js'
+
 // 数据管理模块（2026-03-10 数据一键删除功能）
 export { useDataManagementState, useDataManagementMethods } from './data-management.js'
 

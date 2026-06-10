@@ -124,13 +124,15 @@ function validateExchangePageConfig(config) {
     }
   }
 
-  // ---- market_filters 校验 ----
-  if (!config.market_filters || typeof config.market_filters !== 'object') {
-    errors.push('market_filters 必须是对象')
-  } else {
-    const mf = config.market_filters
-    if (!Array.isArray(mf.type_filters)) errors.push('market_filters.type_filters 必须是数组')
-    if (!Array.isArray(mf.sort_options)) errors.push('market_filters.sort_options 必须是数组')
+  // ---- market_filters 校验（C2C 下线后 market_filters 已移除，仅当存在时校验结构） ----
+  if (config.market_filters !== undefined && config.market_filters !== null) {
+    if (typeof config.market_filters !== 'object') {
+      errors.push('market_filters 必须是对象')
+    } else {
+      const mf = config.market_filters
+      if (!Array.isArray(mf.type_filters)) errors.push('market_filters.type_filters 必须是数组')
+      if (!Array.isArray(mf.sort_options)) errors.push('market_filters.sort_options 必须是数组')
+    }
   }
 
   // ---- card_display 校验（theme 由全局 app_theme 管理，此处仅校验 effects 等） ----

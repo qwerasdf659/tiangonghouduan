@@ -520,6 +520,26 @@ document.addEventListener('alpine:init', () => {
       selectable: true,
       page_size: 20
     })
+
+    /** 空间视角：all=全部 / lucky=幸运空间 / premium=臻选空间（直接用后端 space 字段筛选） */
+    table.spaceView = 'all'
+
+    /**
+     * 切换空间视角，通过 data-table 的 activeFilters.space 透传后端
+     * @param {string} space - all | lucky | premium
+     */
+    table.switchSpaceView = function (space) {
+      this.spaceView = space
+      if (space === 'all') {
+        delete this.activeFilters.space
+      } else {
+        this.activeFilters.space = space
+      }
+      this.current_page = 1
+      this.selectedRows = []
+      this.loadData()
+    }
+
     const origInit = table.init
     table.init = async function () {
       window.addEventListener('refresh-exchange-items', () => this.loadData())

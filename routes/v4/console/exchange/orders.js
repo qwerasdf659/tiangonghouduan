@@ -147,26 +147,17 @@ router.post(
       return res.apiError('订单号不能为空', 'BAD_REQUEST', null, 400)
     }
     const result = await TransactionManager.execute(async transaction => {
-      const updateResult = await ExchangeCoreService.updateOrderStatus(
-        order_no,
-        'shipped',
-        req.user.user_id,
-        remark,
-        { transaction }
-      )
+      // 物流信息随状态变更一并写入（收口到 Service，路由不直连 models）
+      const extraFields = {}
       if (shipping_company || shipping_no) {
-        const ExchangeRecord =
-          req.app.locals.services.getService('exchange_admin').models.ExchangeRecord
-        await ExchangeRecord.update(
-          {
-            shipping_company: shipping_company || null,
-            shipping_company_name: shipping_company_name || null,
-            shipping_no: shipping_no || null
-          },
-          { where: { order_no }, transaction }
-        )
+        extraFields.shipping_company = shipping_company || null
+        extraFields.shipping_company_name = shipping_company_name || null
+        extraFields.shipping_no = shipping_no || null
       }
-      return updateResult
+      return ExchangeCoreService.updateOrderStatus(order_no, 'shipped', req.user.user_id, remark, {
+        transaction,
+        extraFields
+      })
     })
     logger.info('[B2C兑换-订单] 发货成功', {
       operator_id: req.user.user_id,

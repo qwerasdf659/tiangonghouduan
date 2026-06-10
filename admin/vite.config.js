@@ -87,6 +87,9 @@ const pageConfigs = {
   // 星石装饰商城管理（2026-06-08 路线B 模块D）
   'decoration-management': { title: '装饰商城管理', pageIcon: '🎨', pageTitle: '装饰商城管理' },
 
+  // 道具商城管理（2026-06-11 星石娱乐轨 prop 一体化上架）
+  'prop-shop': { title: '道具商城', pageIcon: '🎮', pageTitle: '道具商城' },
+
   // 默认配置
   'default': { title: '管理后台', pageIcon: '🏠', pageTitle: '管理后台' }
 }

@@ -412,6 +412,8 @@ class DiyWorkService {
     // ========== 逐项冻结资产 ==========
     const totalCostPayments = []
     for (const [assetCode, amount] of requiredPayments) {
+      // 同一事务内顺序冻结：资产写操作必须串行（禁止 Promise.all，避免事务内并发写）
+      // eslint-disable-next-line no-await-in-loop
       await BalanceService.freeze(
         {
           user_id: userId,
@@ -507,6 +509,8 @@ class DiyWorkService {
 
     // Step 1: 逐项从冻结余额扣减（settleFromFrozen = frozen_amount -= amount）
     for (const cost of payments) {
+      // 同一事务内顺序结算：资产写操作必须串行（禁止 Promise.all）
+      // eslint-disable-next-line no-await-in-loop
       await BalanceService.settleFromFrozen(
         {
           user_id: userId,
@@ -663,6 +667,8 @@ class DiyWorkService {
 
     // 逐项解冻材料（BalanceService.unfreeze 要求 user_id + idempotency_key）
     for (const cost of payments) {
+      // 同一事务内顺序解冻：资产写操作必须串行（禁止 Promise.all）
+      // eslint-disable-next-line no-await-in-loop
       await BalanceService.unfreeze(
         {
           user_id: userId,

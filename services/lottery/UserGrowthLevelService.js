@@ -65,6 +65,62 @@ class UserGrowthLevelService {
   }
 
   /**
+   * 构造 C 端"我的成长等级"只读视图（BE-4，拍板点④/⑨）
+   *
+   * 业务场景：
+   * - 小程序"会员尊享/解锁条件"展示用户当前成长等级与等级阶梯。
+   * - 服务 V-4（"当前 X / 需达 Y 解锁"）与 L-3（成长等级 C 端可见性）。
+   *
+   * 严格脱敏口径（拍板点④）：
+   * - 仅下发 level_key / level_name / 用户累计积分 / 等级阶梯（level_name）。
+   * - 倍数 / 权重 / 风控字段绝不下发（商业机密）。
+   *
+   * 占位阈值保护（拍板点⑨）：
+   * - 成长等级 4 档阈值当前为"占位值，需运营确认"（user_growth_levels.description 标注）。
+   * - 在运营把占位阈值改成真实阈值前，min_history_points（门槛数字）一律下发 null，
+   *   C 端只显示等级名、不显示"需达 Y 积分"，避免用占位数字误导用户。
+   * - 由数据驱动：description 含"占位"标记 → 判定为未定稿 → 数字置 null。
+   *
+   * @param {number} user_id - 用户ID
+   * @returns {Promise<Object>} { current_level_key, current_level_name, history_total_points, thresholds_confirmed, levels: [{level_key, level_name, min_history_points|null}] }
+   */
+  async getUserGrowthLevelView(user_id) {
+    // 用户累计积分（单一数据源 users.history_total_points）
+    const user = await this.User.findByPk(user_id, {
+      attributes: ['user_id', 'history_total_points']
+    })
+    const historyTotalPoints = user ? Number(user.history_total_points) || 0 : 0
+
+    // 全部启用等级（升序）
+    const levels = await this.UserGrowthLevel.getActiveLevels()
+
+    /*
+     * 阈值定稿判定（数据驱动）：任一等级 description 含"占位"字样即视为未定稿。
+     * 未定稿时门槛数字一律不下发（null），仅展示等级名。
+     */
+    const thresholdsConfirmed = !levels.some(
+      l => l.description && String(l.description).includes('占位')
+    )
+
+    // 当前等级派生（取 min_history_points <= 累计积分 中阈值最大者）
+    const currentLevelKey = await this.UserGrowthLevel.resolveLevelKey(historyTotalPoints)
+    const currentLevel = levels.find(l => l.level_key === currentLevelKey) || null
+
+    return {
+      current_level_key: currentLevelKey,
+      current_level_name: currentLevel ? currentLevel.level_name : null,
+      history_total_points: historyTotalPoints,
+      thresholds_confirmed: thresholdsConfirmed,
+      levels: levels.map(l => ({
+        level_key: l.level_key,
+        level_name: l.level_name,
+        // 占位阶段不下发门槛数字（拍板点⑨）
+        min_history_points: thresholdsConfirmed ? l.min_history_points : null
+      }))
+    }
+  }
+
+  /**
    * 列出成长等级阶梯（默认仅启用）
    *
    * @param {Object} [options={}] - 选项
@@ -143,16 +199,15 @@ class UserGrowthLevelService {
    */
   async getLevelProbabilityConfig(lottery_campaign_id) {
     const levels = await this.UserGrowthLevel.getActiveLevels()
-    const result = []
-    for (const level of levels) {
-      const multiplier = await this.getLevelMultiplier(lottery_campaign_id, level.level_key)
-      result.push({
+    // 各等级倍数互相独立，并行查询（无顺序依赖）
+    const result = await Promise.all(
+      levels.map(async level => ({
         level_key: level.level_key,
         level_name: level.level_name,
         min_history_points: level.min_history_points,
-        multiplier
-      })
-    }
+        multiplier: await this.getLevelMultiplier(lottery_campaign_id, level.level_key)
+      }))
+    )
     return result
   }
 
@@ -191,6 +246,8 @@ class UserGrowthLevelService {
       }
 
       const config_key = `${LEVEL_MULTIPLIER_PREFIX}${level_key}`
+      // 同一事务内的顺序 upsert：写操作必须串行，禁止 Promise.all（避免事务内并发写冲突）
+      // eslint-disable-next-line no-await-in-loop
       await this.LotteryStrategyConfig.upsertConfig(
         'level_probability',
         config_key,

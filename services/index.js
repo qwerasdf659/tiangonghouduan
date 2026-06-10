@@ -184,6 +184,7 @@ const LotteryCampaignPricingConfigService = require('./lottery/LotteryCampaignPr
 const DictionaryService = require('./DictionaryService') // 字典表管理服务（2026-01-21 API覆盖率补齐）
 const LotteryConfigService = require('./lottery/LotteryConfigService') // 抽奖配置管理服务（2026-01-21 API覆盖率补齐）
 const UserGrowthLevelService = require('./lottery/UserGrowthLevelService') // 用户成长等级服务（2026-06-04 P1=乙 + B线公示分级概率）
+const UserRatioOverrideService = require('./UserRatioOverrideService') // 用户比例覆盖管理服务（per-user 消费比例 CRUD）
 const DecorationService = require('./DecorationService') // 星石虚拟装饰服务（模块D：纯展示，星石明码标价）
 const ItemTemplateService = require('./ItemTemplateService') // 物品模板管理服务（2026-01-21 API覆盖率补齐）
 const ExchangeItemService = require('./exchange/ExchangeItemService') // 兑换商品中心 SPU/SKU
@@ -495,6 +496,7 @@ class ServiceManager {
       this._services.set('dictionary', new DictionaryService(this.models)) // 字典表管理服务（categories, rarity_defs, asset_group_defs）
       this._services.set('lottery_config', new LotteryConfigService(this.models)) // 抽奖配置管理服务（lottery_strategy_config, lottery_tier_matrix_config）
       this._services.set('user_growth_level', new UserGrowthLevelService(this.models)) // 用户成长等级服务（成长等级派生 + B线公示分级概率倍数）
+      this._services.set('user_ratio_override', new UserRatioOverrideService(this.models)) // 用户比例覆盖管理服务（per-user 消费比例 CRUD）
       this._services.set('decoration', new DecorationService(this.models)) // 星石虚拟装饰服务（模块D：购买/佩戴/到期清理）
       this._services.set('item_template', new ItemTemplateService(this.models)) // 物品模板管理服务（item_templates）
       this._services.set('exchange_item_service', new ExchangeItemService(this.models)) // 兑换商品中心（exchange_items / exchange_item_skus）

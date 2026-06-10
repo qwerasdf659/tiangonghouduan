@@ -26,7 +26,11 @@ const TABLE_FIELD_FIXTURES = {
   users: [
     'user_id',
     'user_uuid',
-    'mobile',
+    'mobile_encrypted',
+    'mobile_hash',
+    'mobile_prefix_hash',
+    'mobile_suffix_hash',
+    'privacy_consent_at',
     'nickname',
     'avatar_url',
     'status',

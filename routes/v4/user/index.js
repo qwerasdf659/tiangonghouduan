@@ -47,6 +47,9 @@ const userImagesRoutes = require('./images')
 // 用户收货地址管理路由（DIY 实物兑换、奖品发货等场景）
 const addressesRoutes = require('./addresses')
 
+// 用户成长等级 C 端只读路由（BE-4：会员尊享/解锁条件展示，脱敏无倍数）
+const growthLevelRoutes = require('./growth-level')
+
 /**
  * GET /api/v4/user/me
  * @desc 获取当前用户基本信息（通过token识别）
@@ -95,5 +98,8 @@ router.use('/images', userImagesRoutes)
 
 // 挂载用户收货地址路由（/api/v4/user/addresses）
 router.use('/addresses', authenticateToken, addressesRoutes)
+
+// 挂载用户成长等级路由（/api/v4/user/growth-level，需登录）
+router.use('/growth-level', authenticateToken, growthLevelRoutes)
 
 module.exports = router

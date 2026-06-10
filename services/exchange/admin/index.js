@@ -33,6 +33,9 @@ class ExchangeAdminFacade {
   createExchangeItem(...args) { return this._item.createExchangeItem(...args) }
   updateExchangeItem(...args) { return this._item.updateExchangeItem(...args) }
   deleteExchangeItem(...args) { return this._item.deleteExchangeItem(...args) }
+  pinItem(...args) { return this._item.pinItem(...args) }
+  recommendItem(...args) { return this._item.recommendItem(...args) }
+  batchUpdateSort(...args) { return this._item.batchUpdateSort(...args) }
   _logStockChange(...args) { return this._item._logStockChange(...args) }
 
   // --- BatchOperationService ---

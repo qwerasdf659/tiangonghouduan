@@ -53,30 +53,25 @@ class LotteryAlertDetectorService {
       results.checked_campaigns = campaigns.length
 
       for (const campaign of campaigns) {
-        const inventoryAlerts = await LotteryAlertDetectorService.checkInventoryAlert(
-          campaign.lottery_campaign_id
-        )
-        results.new_alerts += inventoryAlerts.length
-
-        const budgetAlerts = await LotteryAlertDetectorService.checkBudgetAlert(
-          campaign.lottery_campaign_id
-        )
-        results.new_alerts += budgetAlerts.length
-
-        const winRateAlerts = await LotteryAlertDetectorService.checkWinRateAlert(
-          campaign.lottery_campaign_id
-        )
-        results.new_alerts += winRateAlerts.length
-
-        const highTierAlerts = await LotteryAlertDetectorService.checkHighTierSpeedAlert(
-          campaign.lottery_campaign_id
-        )
-        results.new_alerts += highTierAlerts.length
-
-        const emptyStreakAlerts = await LotteryAlertDetectorService.checkEmptyStreakAlert(
-          campaign.lottery_campaign_id
-        )
-        results.new_alerts += emptyStreakAlerts.length
+        /*
+         * 同一活动的 5 类告警检测互相独立（不同 rule_code、无共享事务），并行执行；
+         * 活动之间保持顺序以约束 DB 负载。
+         */
+        const [inventoryAlerts, budgetAlerts, winRateAlerts, highTierAlerts, emptyStreakAlerts] =
+          // eslint-disable-next-line no-await-in-loop
+          await Promise.all([
+            LotteryAlertDetectorService.checkInventoryAlert(campaign.lottery_campaign_id),
+            LotteryAlertDetectorService.checkBudgetAlert(campaign.lottery_campaign_id),
+            LotteryAlertDetectorService.checkWinRateAlert(campaign.lottery_campaign_id),
+            LotteryAlertDetectorService.checkHighTierSpeedAlert(campaign.lottery_campaign_id),
+            LotteryAlertDetectorService.checkEmptyStreakAlert(campaign.lottery_campaign_id)
+          ])
+        results.new_alerts +=
+          inventoryAlerts.length +
+          budgetAlerts.length +
+          winRateAlerts.length +
+          highTierAlerts.length +
+          emptyStreakAlerts.length
       }
 
       const autoResolved = await LotteryAlertDetectorService.autoResolveAlerts()
@@ -109,6 +104,8 @@ class LotteryAlertDetectorService {
         }
       })
       for (const prize of lowStockPrizes) {
+        // 逐个低库存奖品创建告警：createAlert 内含去重判定，顺序执行确保幂等（禁止 Promise.all）
+        // eslint-disable-next-line no-await-in-loop
         const alert = await LotteryAlertService.createAlert({
           lottery_campaign_id,
           alert_type: rule.alert_type,
@@ -411,23 +408,27 @@ class LotteryAlertDetectorService {
       })
 
       let resolvedCount = 0
-      for (const alert of activeInventoryAlerts) {
-        const prize = await LotteryCampaignPrize.findOne({
-          where: {
-            lottery_campaign_id: alert.lottery_campaign_id,
-            remaining_stock: { [Op.lt]: ALERT_RULES.INVENTORY_LOW.threshold_count }
-          }
-        })
-
-        if (!prize) {
-          await alert.update({
-            status: 'resolved',
-            resolved_at: BeijingTimeHelper.createBeijingTime(),
-            resolve_notes: '系统自动解除：库存已恢复正常'
+      // 各告警的"库存是否恢复"判定互相独立、无共享事务，并行处理
+      const resolveResults = await Promise.all(
+        activeInventoryAlerts.map(async alert => {
+          const prize = await LotteryCampaignPrize.findOne({
+            where: {
+              lottery_campaign_id: alert.lottery_campaign_id,
+              remaining_stock: { [Op.lt]: ALERT_RULES.INVENTORY_LOW.threshold_count }
+            }
           })
-          resolvedCount++
-        }
-      }
+          if (!prize) {
+            await alert.update({
+              status: 'resolved',
+              resolved_at: BeijingTimeHelper.createBeijingTime(),
+              resolve_notes: '系统自动解除：库存已恢复正常'
+            })
+            return 1
+          }
+          return 0
+        })
+      )
+      resolvedCount = resolveResults.reduce((sum, n) => sum + n, 0)
 
       if (resolvedCount > 0) {
         logger.info('自动解除告警', { count: resolvedCount })

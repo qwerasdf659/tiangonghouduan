@@ -50,6 +50,9 @@ const configRoutes = require('./config')
 // 售后申诉路由（2026-06-02 新增 - 方案A，C端只读查询售后进度，脱敏下发）
 const disputesRoutes = require('./disputes')
 
+// 协议正文只读路由（BE-6 新增 - 用户协议/隐私政策正文，公开只读，存 system_settings）
+const agreementRoutes = require('./agreement')
+
 // 小程序版本闸门路由（2026-06-02 新增 - 公开只读，无需登录，维护期可读）
 const appVersionRoutes = require('./app-version')
 
@@ -82,6 +85,9 @@ router.use('/dictionaries', dictionariesRoutes)
 router.use('/config', configRoutes)
 
 router.use('/disputes', disputesRoutes)
+
+// 挂载协议正文路由（BE-6 新增 - GET /api/v4/system/agreement/:doc_type，公开只读）
+router.use('/agreement', agreementRoutes)
 
 // 挂载小程序版本闸门路由（2026-06-02 新增 - GET /api/v4/system/app-version，公开只读）
 router.use('/', appVersionRoutes)

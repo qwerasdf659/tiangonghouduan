@@ -243,7 +243,13 @@ document.addEventListener('alpine:init', () => {
   Alpine.magic('api', () => {
     return {
       async get(url, params = {}) {
-        const queryString = new URLSearchParams(params).toString()
+        const search = new URLSearchParams()
+        for (const [key, value] of Object.entries(params)) {
+          if (value !== undefined && value !== null) {
+            search.append(key, value)
+          }
+        }
+        const queryString = search.toString()
         const fullUrl = queryString ? `${url}?${queryString}` : url
         return await request({ url: fullUrl })
       },

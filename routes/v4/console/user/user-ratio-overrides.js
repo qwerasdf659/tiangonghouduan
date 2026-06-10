@@ -37,36 +37,11 @@ router.get(
   '/',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    const { UserRatioOverride, User } = req.app.locals.models
-
-    const { user_id, ratio_key, page = 1, page_size = 20 } = req.query
-    const where = {}
-
-    if (user_id) where.user_id = user_id
-    if (ratio_key && VALID_RATIO_KEYS.includes(ratio_key)) where.ratio_key = ratio_key
-
-    const offset = (Math.max(1, parseInt(page)) - 1) * parseInt(page_size)
-    const limit = Math.min(100, Math.max(1, parseInt(page_size)))
-
-    const { count, rows } = await UserRatioOverride.findAndCountAll({
-      where,
-      include: [
-        { model: User, as: 'target_user', attributes: ['user_id', 'nickname', 'mobile'] },
-        { model: User, as: 'creator', attributes: ['user_id', 'nickname'] }
-      ],
-      order: [['created_at', 'DESC']],
-      offset,
-      limit
-    })
+    const UserRatioOverrideService = req.app.locals.services.getService('user_ratio_override')
+    const result = await UserRatioOverrideService.list(req.query)
 
     return res.apiSuccess(
-      {
-        items: rows,
-        total: count,
-        page: parseInt(page),
-        page_size: limit,
-        ratio_key_labels: RATIO_KEY_LABELS
-      },
+      { ...result, ratio_key_labels: RATIO_KEY_LABELS },
       '查询用户比例覆盖列表成功'
     )
   })
@@ -79,11 +54,8 @@ router.get(
   '/user/:user_id',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    const { UserRatioOverride } = req.app.locals.models
-    const overrides = await UserRatioOverride.findAll({
-      where: { user_id: req.params.user_id },
-      order: [['ratio_key', 'ASC']]
-    })
+    const UserRatioOverrideService = req.app.locals.services.getService('user_ratio_override')
+    const overrides = await UserRatioOverrideService.listByUser(req.params.user_id)
 
     return res.apiSuccess(
       {
@@ -103,13 +75,8 @@ router.get(
   '/:id',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    const { UserRatioOverride, User } = req.app.locals.models
-    const override = await UserRatioOverride.findByPk(req.params.id, {
-      include: [
-        { model: User, as: 'target_user', attributes: ['user_id', 'nickname', 'mobile'] },
-        { model: User, as: 'creator', attributes: ['user_id', 'nickname'] }
-      ]
-    })
+    const UserRatioOverrideService = req.app.locals.services.getService('user_ratio_override')
+    const override = await UserRatioOverrideService.getById(req.params.id)
 
     if (!override) {
       return res.apiError('覆盖记录不存在', 'NOT_FOUND', null, 404)
@@ -126,7 +93,7 @@ router.post(
   '/',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    const { user_id, ratio_key, ratio_value, reason, effective_start, effective_end } = req.body
+    const { user_id, ratio_key, ratio_value } = req.body
 
     if (!user_id || !ratio_key || ratio_value === undefined || ratio_value === null) {
       return res.apiError(
@@ -136,7 +103,6 @@ router.post(
         400
       )
     }
-
     if (!VALID_RATIO_KEYS.includes(ratio_key)) {
       return res.apiError(
         `无效的 ratio_key，允许值：${VALID_RATIO_KEYS.join(', ')}`,
@@ -146,35 +112,10 @@ router.post(
       )
     }
 
-    const parsedValue = parseFloat(ratio_value)
-    if (isNaN(parsedValue) || parsedValue < 0.1 || parsedValue > 5.0) {
-      return res.apiError('ratio_value 必须在 0.1 ~ 5.0 之间', 'INVALID_RATIO_VALUE', null, 400)
-    }
-
+    const UserRatioOverrideService = req.app.locals.services.getService('user_ratio_override')
     const result = await TransactionManager.execute(
-      async transaction => {
-        const { UserRatioOverride, User } = req.app.locals.models
-
-        const user = await User.findByPk(user_id, { transaction })
-        if (!user) {
-          throw new Error(`用户不存在：user_id=${user_id}`)
-        }
-
-        const override = await UserRatioOverride.create(
-          {
-            user_id,
-            ratio_key,
-            ratio_value: parsedValue,
-            reason: reason || null,
-            effective_start: effective_start || null,
-            effective_end: effective_end || null,
-            created_by: req.user.user_id
-          },
-          { transaction }
-        )
-
-        return override
-      },
+      async transaction =>
+        UserRatioOverrideService.create(req.body, req.user.user_id, { transaction }),
       { description: 'createUserRatioOverride' }
     )
 
@@ -189,32 +130,10 @@ router.put(
   '/:id',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    const { ratio_value, reason, effective_start, effective_end } = req.body
-
+    const UserRatioOverrideService = req.app.locals.services.getService('user_ratio_override')
     const result = await TransactionManager.execute(
-      async transaction => {
-        const { UserRatioOverride } = req.app.locals.models
-
-        const override = await UserRatioOverride.findByPk(req.params.id, { transaction })
-        if (!override) {
-          throw new Error('覆盖记录不存在')
-        }
-
-        const updateData = {}
-        if (ratio_value !== undefined && ratio_value !== null) {
-          const parsedValue = parseFloat(ratio_value)
-          if (isNaN(parsedValue) || parsedValue < 0.1 || parsedValue > 5.0) {
-            throw new Error('ratio_value 必须在 0.1 ~ 5.0 之间')
-          }
-          updateData.ratio_value = parsedValue
-        }
-        if (reason !== undefined) updateData.reason = reason
-        if (effective_start !== undefined) updateData.effective_start = effective_start || null
-        if (effective_end !== undefined) updateData.effective_end = effective_end || null
-
-        await override.update(updateData, { transaction })
-        return override
-      },
+      async transaction =>
+        UserRatioOverrideService.update(req.params.id, req.body, { transaction }),
       { description: 'updateUserRatioOverride' }
     )
 
@@ -229,25 +148,9 @@ router.delete(
   '/:id',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
+    const UserRatioOverrideService = req.app.locals.services.getService('user_ratio_override')
     const result = await TransactionManager.execute(
-      async transaction => {
-        const { UserRatioOverride } = req.app.locals.models
-
-        const override = await UserRatioOverride.findByPk(req.params.id, { transaction })
-        if (!override) {
-          throw new Error('覆盖记录不存在')
-        }
-
-        const info = {
-          user_ratio_override_id: override.user_ratio_override_id,
-          user_id: override.user_id,
-          ratio_key: override.ratio_key,
-          ratio_value: override.ratio_value
-        }
-
-        await override.destroy({ transaction })
-        return info
-      },
+      async transaction => UserRatioOverrideService.delete(req.params.id, { transaction }),
       { description: 'deleteUserRatioOverride' }
     )
 

@@ -247,6 +247,8 @@ class SimulationCoreService {
       const param_value = min + step_size * i
       const proposed_config = this._buildSingleParamChange(group, key, param_value)
 
+      // 参数敏感性扫描：每步 runSimulation 含 1 万次蒙特卡洛抽样，顺序执行以控制 CPU/内存峰值（禁止 Promise.all 并发）
+      // eslint-disable-next-line no-await-in-loop
       const { simulation_result } = await this.runSimulation(
         lottery_campaign_id,
         proposed_config,
@@ -285,6 +287,8 @@ class SimulationCoreService {
       const proposed_config = this._buildMultiParamChange(combo)
 
       try {
+        // 约束搜索：每个候选组合 runSimulation 含千次抽样，顺序执行以控制 CPU/内存峰值（禁止 Promise.all 并发）
+        // eslint-disable-next-line no-await-in-loop
         const { simulation_result } = await this.runSimulation(
           lottery_campaign_id,
           proposed_config,
@@ -305,6 +309,8 @@ class SimulationCoreService {
     const refined = []
     for (const candidate of candidates.slice(0, 5)) {
       const proposed_config = this._buildMultiParamChange(candidate.proposed_changes)
+      // 候选精排：每个候选 runSimulation 含 1 万次抽样，顺序执行以控制 CPU/内存峰值（禁止 Promise.all 并发）
+      // eslint-disable-next-line no-await-in-loop
       const { simulation_result } = await this.runSimulation(
         lottery_campaign_id,
         proposed_config,

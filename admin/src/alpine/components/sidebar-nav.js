@@ -180,6 +180,7 @@ export function sidebarNav() {
           { id: 'item-lifecycle', name: '物品追踪', url: '/admin/item-lifecycle.html' },
           { id: 'reconciliation', name: '对账报告', url: '/admin/reconciliation.html' },
           { id: 'exchange', name: '兑换市场', url: '/admin/exchange-market.html' },
+          { id: 'prop-shop', name: '🎮 道具商城', url: '/admin/prop-shop.html' },
           { id: 'bid-mgmt', name: '竞价管理', url: '/admin/bid-management.html' }
         ]
       },
@@ -256,6 +257,7 @@ export function sidebarNav() {
           { id: 'sys-maintain', name: '系统维护', icon: '🔧', url: '/admin/sys-maintain.html' },
           { id: 'app-version-config', name: '版本闸门', icon: '📱', url: '/admin/app-version-config.html' },
           { id: 'app-theme-config', name: '全局主题', icon: '🎨', url: '/admin/app-theme-config.html' },
+          { id: 'agreement-config', name: '协议管理', icon: '📜', url: '/admin/agreement-config.html' },
           { id: 'data-mgmt', name: '数据管理', icon: '🗄️', url: '/admin/data-management.html' }
         ]
       }

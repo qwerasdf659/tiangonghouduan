@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <%- include('partials/head', {
+    title: '道具商城',
+    pageStyle: '[x-cloak] { display: none !important; } .section-help { background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%); border: 1px solid #fed7aa; border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; } .section-help p { color: #9a3412; font-size: 13px; line-height: 1.6; } .prop-card { border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; background: #fff; } .stone-badge { background: #eef2ff; color: #4338ca; border-radius: 6px; padding: 2px 8px; font-size: 12px; font-weight: 600; }'
+  }) %>
+</head>
+<body class="themed-bg-subtle min-h-screen" x-data="propShopPage()" x-init="init()" x-cloak>
+  <!-- NAVBAR -->
+  <nav class="page-navbar">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/workspace.html" class="text-blue-200 hover:text-white transition-colors">&larr; 返回工作台</a>
+        <span class="text-lg font-semibold">🎮 道具商城</span>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mx-auto px-4 py-6 max-w-5xl">
+  <!-- BANNER -->
+    <div class="page-banner mb-6">
+      <div class="flex justify-between items-center">
+        <div>
+          <h1>🎮 道具商城</h1>
+          <p>上架零价值虚拟道具（星石计价、即时到账、不可退款）。一次填写自动完成模板创建与商品上架。</p>
+        </div>
+        <div class="text-6xl opacity-20 hidden md:block">💎</div>
+      </div>
+    </div>
+
+    <div class="section-help">
+      <p>💡 道具商城属「星石娱乐轨」：商品恒为零价值虚拟道具，仅用星石购买，买入即消耗、不可退款。与「商品兑换」（水晶系换实物）严格分开。无需去「物品模板」页，本页提交即自动创建 prop 模板并上架。</p>
+    </div>
+  <!-- TOOLBAR -->
+    <div class="flex justify-between items-center mb-4">
+      <div class="flex items-center gap-2">
+        <input type="text" x-model="keyword" @keydown.enter="loadPropList()" class="form-input text-sm" placeholder="搜索道具名称...">
+        <button @click="loadPropList()" class="btn btn-outline btn-sm">🔍 搜索</button>
+      </div>
+      <button @click="openCreateForm()" class="action-btn action-btn-primary btn-sm">+ 新增道具</button>
+    </div>
+  <!-- LIST -->
+    <template x-if="listLoading">
+      <div class="content-section"><div class="empty-state-enhanced"><div class="empty-icon animate-pulse">⏳</div><div class="empty-title">加载道具中...</div></div></div>
+    </template>
+
+    <template x-if="!listLoading && propList.length === 0">
+      <div class="content-section"><div class="empty-state-enhanced"><div class="empty-icon">📭</div><div class="empty-title">暂无道具</div><div class="empty-desc">点击「新增道具」上架第一个星石道具</div></div></div>
+    </template>
+
+    <template x-if="!listLoading && propList.length > 0">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <template x-for="item in propList" :key="item.exchange_item_id">
+          <div class="prop-card">
+            <div class="flex justify-between items-start mb-2">
+              <span class="font-semibold text-sm" x-text="item.item_name"></span>
+              <span class="stone-badge">星石</span>
+            </div>
+            <div class="text-xs text-gray-400" x-text="'ID: ' + item.exchange_item_id"></div>
+            <div class="text-xs text-gray-500 mt-1" x-text="item.status === 'active' ? '已上架' : '已下架'"></div>
+          </div>
+        </template>
+      </div>
+    </template>
+  </div>
+  <!-- FORM_MODAL -->
+  <template x-if="showForm">
+    <div class="fixed inset-0 z-50 flex items-center justify-center">
+      <div class="fixed inset-0 bg-black/50" @click="closeForm()"></div>
+      <div class="relative bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-lg font-semibold">🎮 新增道具</h3>
+          <button @click="closeForm()" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+        </div>
+        <!-- FORM_FIELDS -->
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">道具名称 <span class="text-red-500">*</span></label>
+            <input type="text" x-model="propForm.name" maxlength="100" class="form-input text-sm w-full" placeholder="如：限定头像框·星辉">
+          </div>
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">道具描述</label>
+            <textarea x-model="propForm.description" rows="2" maxlength="500" class="form-input text-sm w-full" placeholder="道具的简单介绍（可选）"></textarea>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">星石价格 <span class="text-red-500">*</span></label>
+              <input type="number" x-model.number="propForm.star_stone_price" min="1" class="form-input text-sm w-full">
+              <p class="text-xs text-gray-400 mt-1">道具商城仅用星石计价</p>
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">库存 <span class="text-red-500">*</span></label>
+              <input type="number" x-model.number="propForm.stock" min="0" class="form-input text-sm w-full">
+            </div>
+          </div>
+          <!-- FORM_FIELDS2 -->
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">营销卖点</label>
+            <input type="text" x-model="propForm.sell_point" maxlength="200" class="form-input text-sm w-full" placeholder="一句话卖点（可选）">
+          </div>
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">道具图片</label>
+            <div class="flex items-center gap-3">
+              <label class="cursor-pointer btn btn-outline btn-sm">
+                <span x-show="!imageUploading">📷 上传图片</span>
+                <span x-show="imageUploading">⏳ 上传中...</span>
+                <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" class="hidden" @change="uploadPropImage($event)" :disabled="imageUploading">
+              </label>
+              <template x-if="imagePreviewUrl">
+                <img :src="imagePreviewUrl" class="w-12 h-12 rounded border object-cover">
+              </template>
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">状态</label>
+            <select x-model="propForm.status" class="form-input text-sm w-full">
+              <option value="active">上架</option>
+              <option value="inactive">下架</option>
+            </select>
+          </div>
+        </div>
+        <!-- FORM_ACTIONS -->
+        <div class="flex justify-end gap-3 mt-6">
+          <button @click="closeForm()" class="btn btn-outline btn-sm" :disabled="submitting">取消</button>
+          <button @click="submitProp()" class="action-btn action-btn-primary btn-sm" :disabled="submitting || imageUploading">
+            <span x-show="submitting">⏳ 上架中...</span>
+            <span x-show="!submitting">🚀 一键上架道具</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </template>
+  <%- include('partials/footer') %>
+  <script type="module" src="./src/modules/market/pages/prop-shop.js"></script>
+</body>
+</html>

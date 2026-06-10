@@ -110,6 +110,25 @@
         <!-- data-table: 兑换商品列表（排序模式时隐藏） -->
         <div x-show="!sortMode" x-data="exchangeItemsTable()" x-init="init()">
 
+          <!-- 空间视角切换：全部 / 幸运空间 / 臻选空间（直接按后端 space 字段筛选） -->
+          <div class="flex items-center gap-1 mb-3 border-b border-gray-200">
+            <button type="button" @click="switchSpaceView('all')"
+                    class="px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors"
+                    :class="spaceView === 'all' ? 'border-green-500 text-green-600' : 'border-transparent themed-text-muted hover:text-green-500'">
+              🗂 全部商品
+            </button>
+            <button type="button" @click="switchSpaceView('lucky')"
+                    class="px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors"
+                    :class="spaceView === 'lucky' ? 'border-green-500 text-green-600' : 'border-transparent themed-text-muted hover:text-green-500'">
+              🍀 幸运空间视角
+            </button>
+            <button type="button" @click="switchSpaceView('premium')"
+                    class="px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors"
+                    :class="spaceView === 'premium' ? 'border-green-500 text-green-600' : 'border-transparent themed-text-muted hover:text-green-500'">
+              💎 臻选空间视角
+            </button>
+          </div>
+
           <!-- 批量操作栏（选中商品时显示） -->
           <div x-show="hasSelected" x-cloak class="mb-3 p-3 bg-blue-50 rounded-lg border border-blue-200 flex items-center gap-3 flex-wrap">
             <span class="text-sm text-blue-700 font-medium">已选 <span x-text="selectedCount"></span> 个商品</span>

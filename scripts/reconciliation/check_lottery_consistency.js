@@ -16,19 +16,12 @@
 'use strict'
 
 require('dotenv').config()
-const { Sequelize } = require('sequelize')
 
 // 新账本分界线（2026-01-02 20:24:20）
 const CUTOFF_DATE = '2026-01-02 20:24:20'
 
-// 直接连接数据库（避免循环依赖问题）
-const sequelize = new Sequelize(process.env.DB_NAME, process.env.DB_USER, process.env.DB_PASSWORD, {
-  host: process.env.DB_HOST,
-  port: parseInt(process.env.DB_PORT),
-  dialect: 'mysql',
-  logging: false,
-  timezone: '+08:00'
-})
+// 复用主 Sequelize 实例（单一配置源原则：唯一 new Sequelize 在 config/database.js）
+const { sequelize } = require('../../config/database')
 
 /**
  * 发送告警通知

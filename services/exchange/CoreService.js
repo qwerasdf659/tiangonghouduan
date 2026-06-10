@@ -705,6 +705,13 @@ class CoreService {
     // 强制要求事务边界
     const transaction = assertAndGetTransaction(options, 'CoreService.updateOrderStatus')
 
+    /*
+     * 附加业务字段（如发货时的物流信息），与状态变更在同一事务内一并写入，
+     * 避免路由层另起 ExchangeRecord.update（写操作收口到 Service）。
+     */
+    const extraFields =
+      options.extraFields && typeof options.extraFields === 'object' ? options.extraFields : {}
+
     logger.info(`[兑换市场] 更新订单状态：${order_no} -> ${new_status}`)
 
     const order = await this.ExchangeRecord.findOne({
@@ -748,6 +755,7 @@ class CoreService {
       {
         status: new_status,
         admin_remark: remark,
+        ...extraFields,
         updated_at: BeijingTimeHelper.createDatabaseTime()
       },
       { transaction }
@@ -1553,6 +1561,8 @@ class CoreService {
         asset_code
       )
 
+      // 同一事务内的顺序读：Sequelize 事务不支持并发查询，必须串行（禁止 Promise.all）
+      // eslint-disable-next-line no-await-in-loop
       const balanceResult = await BalanceService.getBalance(
         { user_id, asset_code },
         { transaction }
@@ -1581,18 +1591,21 @@ class CoreService {
         const needQty = Number(ci.quantity) * quantity
         if (!item_template_id || !(needQty > 0)) continue
 
-        const heldItems = userAccount
-          ? await this.models.Item.findAll({
-              where: {
-                owner_account_id: userAccount.account_id,
-                item_template_id,
-                status: 'available'
-              },
-              attributes: ['item_id'],
-              limit: needQty,
-              transaction
-            })
-          : []
+        // 同一事务内的顺序读：事务不支持并发查询，必须串行（禁止 Promise.all）
+        let heldItems = []
+        if (userAccount) {
+          // eslint-disable-next-line no-await-in-loop
+          heldItems = await this.models.Item.findAll({
+            where: {
+              owner_account_id: userAccount.account_id,
+              item_template_id,
+              status: 'available'
+            },
+            attributes: ['item_id'],
+            limit: needQty,
+            transaction
+          })
+        }
         if (heldItems.length < needQty) {
           throw new BusinessError(
             `门槛道具不足：模板 ${item_template_id} 需 ${needQty} 件，当前持有 ${heldItems.length} 件`,

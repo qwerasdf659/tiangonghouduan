@@ -452,40 +452,13 @@ router.get(
     }
 
     /*
-     * 防御性校验：确保 user_uuid 存在且为字符串类型
+     * 防御性校验：确保 user_uuid 存在（缺失时由 Service 自动修复并回填）
      * 与用户端 /user/consumption/qrcode 保持一致的自动修复逻辑
      */
     let userUuid = user.user_uuid
     if (!userUuid || typeof userUuid !== 'string') {
-      logger.warn('目标用户缺少 user_uuid，执行自动修复', {
-        admin_id,
-        target_user_id: user_id,
-        current_uuid: userUuid,
-        current_type: typeof userUuid
-      })
-
-      const { v4: uuidv4 } = require('uuid')
-      userUuid = uuidv4()
       try {
-        /** 通过模型实例更新（不直接 require sequelize.models） */
-        if (typeof user.update === 'function') {
-          await user.update({ user_uuid: userUuid })
-        } else {
-          const { User } = req.app.locals.models
-          await User.update({ user_uuid: userUuid }, { where: { user_id } })
-        }
-
-        const { BusinessCacheHelper } = require('../../../../utils/BusinessCacheHelper')
-        await BusinessCacheHelper.invalidateUser(
-          { user_id, mobile: user.mobile },
-          'admin_auto_repair_missing_uuid'
-        )
-
-        logger.info('管理员端自动修复用户 user_uuid 成功', {
-          admin_id,
-          target_user_id: user_id,
-          new_uuid: userUuid.substring(0, 8) + '...'
-        })
+        userUuid = await UserService.ensureUserUuid(user_id)
       } catch (repairError) {
         logger.error('管理员端自动修复 user_uuid 失败', {
           admin_id,

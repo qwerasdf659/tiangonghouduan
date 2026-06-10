@@ -31,6 +31,8 @@ const crypto = require('crypto')
 const OrderNoGenerator = require('../../utils/OrderNoGenerator')
 const { generateExchangeBusinessId } = require('../../utils/IdempotencyHelper')
 const ItemService = require('../asset/ItemService')
+const AssetProductGuard = require('../shared/AssetProductGuard')
+const { assertAndGetTransaction } = require('../../utils/transactionHelpers')
 
 /**
  * 竞价资产硬编码黑名单（绝对禁止，决策1）
@@ -81,6 +83,104 @@ class BidService {
     this.ExchangeItem = models.ExchangeItem
     this.ExchangeItemSku = models.ExchangeItemSku
     this.sequelize = models.sequelize
+  }
+
+  /**
+   * 创建竞价商品（管理后台发起官方竞价）
+   *
+   * 业务校验（合规双层防护）：
+   * - assertBiddableTarget：标的必须为纯虚拟道具（prop），实物/券禁止进竞价
+   * - assertPriceAssetAllowed：星石不可给有价值商品计价（杜绝星石→实物套现）
+   * - 一物一拍：同一兑换商品同时只能有一个 active/pending 竞价
+   *
+   * @param {Object} data - 竞价数据
+   * @param {number} data.exchange_item_id - 关联兑换商品ID
+   * @param {number} data.start_price - 起拍价
+   * @param {string} data.price_asset_code - 竞价币种
+   * @param {number} data.min_bid_increment - 最小加价幅度
+   * @param {Date} data.start_time - 开始时间
+   * @param {Date} data.end_time - 结束时间
+   * @param {string} [data.batch_no] - 批次号
+   * @param {number} operator_id - 操作管理员ID
+   * @param {Object} options - 选项（必须含 transaction）
+   * @returns {Promise<Object>} 创建的竞价商品视图
+   */
+  async createBidProduct(data, operator_id, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'BidService.createBidProduct')
+    const {
+      exchange_item_id,
+      start_price,
+      price_asset_code,
+      min_bid_increment,
+      start_time,
+      end_time,
+      batch_no
+    } = data
+
+    const exchangeItem = await this.ExchangeItem.findByPk(exchange_item_id, {
+      include: [
+        {
+          model: this.models.ItemTemplate,
+          as: 'itemTemplate',
+          attributes: ['item_type', 'reference_price_points']
+        }
+      ],
+      transaction
+    })
+    if (!exchangeItem) {
+      throw new BusinessError('关联的商品不存在', 'EXCHANGE_ITEM_NOT_FOUND', 404)
+    }
+
+    // 价值流向守卫（标的必须为 prop；星石不可给有价值商品计价）
+    AssetProductGuard.assertBiddableTarget(exchangeItem.itemTemplate || null)
+    AssetProductGuard.assertPriceAssetAllowed(exchangeItem.itemTemplate || null, price_asset_code)
+
+    // 一物一拍校验：同一兑换商品同时只能有一个 active/pending 竞价
+    const existingBid = await this.BidProduct.findOne({
+      where: { exchange_item_id, status: ['pending', 'active'] },
+      transaction
+    })
+    if (existingBid) {
+      throw new BusinessError(
+        `兑换商品 ${exchange_item_id} 已有进行中的竞价（ID: ${existingBid.bid_product_id}，状态: ${existingBid.status}）`,
+        'BID_ALREADY_EXISTS',
+        409
+      )
+    }
+
+    const parsedStartTime = start_time instanceof Date ? start_time : new Date(start_time)
+    const parsedEndTime = end_time instanceof Date ? end_time : new Date(end_time)
+
+    const bidProduct = await this.BidProduct.create(
+      {
+        exchange_item_id: parseInt(exchange_item_id, 10),
+        start_price: parseInt(start_price, 10),
+        price_asset_code,
+        current_price: 0,
+        min_bid_increment: parseInt(min_bid_increment, 10),
+        start_time: parsedStartTime,
+        end_time: parsedEndTime,
+        status: parsedStartTime <= new Date() ? 'active' : 'pending',
+        bid_count: 0,
+        batch_no,
+        created_by: operator_id
+      },
+      { transaction }
+    )
+
+    return {
+      bid_product_id: bidProduct.bid_product_id,
+      exchange_item_id: bidProduct.exchange_item_id,
+      item_name: exchangeItem.item_name,
+      start_price: Number(bidProduct.start_price),
+      price_asset_code: bidProduct.price_asset_code,
+      min_bid_increment: Number(bidProduct.min_bid_increment),
+      start_time: bidProduct.start_time,
+      end_time: bidProduct.end_time,
+      status: bidProduct.status,
+      batch_no: bidProduct.batch_no,
+      created_by: operator_id
+    }
   }
 
   /**

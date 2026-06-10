@@ -707,6 +707,78 @@ class ItemManagementService {
       }
     )
   }
+
+  /**
+   * 置顶/取消置顶商品
+   *
+   * @param {number} exchange_item_id - 商品ID
+   * @param {boolean} [is_pinned] - 目标置顶状态（不传则取反当前值）
+   * @param {Object} options - 选项（必须含 transaction）
+   * @returns {Promise<Object>} { exchange_item_id, is_pinned }
+   */
+  async pinItem(exchange_item_id, is_pinned, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'ItemManagementService.pinItem')
+    const item = await this.ExchangeItem.findByPk(exchange_item_id, {
+      lock: transaction.LOCK.UPDATE,
+      transaction
+    })
+    if (!item) {
+      throw new BusinessError('商品不存在', 'EXCHANGE_ITEM_NOT_FOUND', 404)
+    }
+    const pinned = is_pinned !== undefined ? !!is_pinned : !item.is_pinned
+    await item.update(
+      {
+        is_pinned: pinned,
+        pinned_at: pinned ? BeijingTimeHelper.createDatabaseTime() : null
+      },
+      { transaction }
+    )
+    return { exchange_item_id, is_pinned: pinned }
+  }
+
+  /**
+   * 推荐/取消推荐商品
+   *
+   * @param {number} exchange_item_id - 商品ID
+   * @param {boolean} [is_recommended] - 目标推荐状态（不传则取反当前值）
+   * @param {Object} options - 选项（必须含 transaction）
+   * @returns {Promise<Object>} { exchange_item_id, is_recommended }
+   */
+  async recommendItem(exchange_item_id, is_recommended, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'ItemManagementService.recommendItem')
+    const item = await this.ExchangeItem.findByPk(exchange_item_id, {
+      lock: transaction.LOCK.UPDATE,
+      transaction
+    })
+    if (!item) {
+      throw new BusinessError('商品不存在', 'EXCHANGE_ITEM_NOT_FOUND', 404)
+    }
+    const recommended = is_recommended !== undefined ? !!is_recommended : !item.is_recommended
+    await item.update({ is_recommended: recommended }, { transaction })
+    return { exchange_item_id, is_recommended: recommended }
+  }
+
+  /**
+   * 批量调整商品排序
+   *
+   * @param {Array<{exchange_item_id:number, sort_order:number}>} items - 排序项
+   * @param {Object} options - 选项（必须含 transaction）
+   * @returns {Promise<Object>} { updated_count }
+   */
+  async batchUpdateSort(items, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'ItemManagementService.batchUpdateSort')
+    const valid = items.filter(
+      ({ exchange_item_id, sort_order }) => exchange_item_id && sort_order !== undefined
+    )
+    for (const { exchange_item_id, sort_order } of valid) {
+      await this.ExchangeItem.update(
+        { sort_order: parseInt(sort_order, 10) },
+        { where: { exchange_item_id }, transaction }
+      )
+    }
+    await BusinessCacheHelper.invalidateExchangeItems('batch_sort')
+    return { updated_count: valid.length }
+  }
 }
 
 module.exports = ItemManagementService

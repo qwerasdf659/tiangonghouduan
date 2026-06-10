@@ -7,7 +7,7 @@
  * 后端路由：/api/v4/console/business-records/redemption-orders
  */
 
-import { API_PREFIX, request } from './base.js'
+import { API_PREFIX, request, buildQueryString } from './base.js'
 
 /** 兑换核销端点（直接反映后端路由） */
 export const REDEMPTION_ENDPOINTS = {
@@ -179,8 +179,7 @@ export const RedemptionAPI = {
    * @returns {string} 导出URL
    */
   getExportUrl(params = {}) {
-    const queryString = new URLSearchParams(params).toString()
-    return `${REDEMPTION_ENDPOINTS.EXPORT}${queryString ? '?' + queryString : ''}`
+    return `${REDEMPTION_ENDPOINTS.EXPORT}${buildQueryString(params)}`
   }
 }
 

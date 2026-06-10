@@ -412,7 +412,7 @@ router.post(
     // 微信 openid 绑定：wx-code-login 返回 need_bind 后，前端携带 wx_openid 调用 quick-login
     if (wx_openid && !user.wx_openid) {
       try {
-        await user.update({ wx_openid })
+        await UserService.bindWxOpenid(user.user_id, wx_openid)
         logger.info(`✅ 微信 openid 绑定成功: user_id=${user.user_id}`)
       } catch (bindError) {
         logger.warn(`⚠️ 微信 openid 绑定失败（非致命）: ${bindError.message}`)
@@ -637,7 +637,7 @@ router.post(
       // 绑定 openid（如果该用户还没绑定）
       if (!user.wx_openid) {
         try {
-          await user.update({ wx_openid: openid })
+          await UserService.bindWxOpenid(user.user_id, openid)
           logger.info(`✅ 微信 openid 绑定成功: user_id=${user.user_id}`)
         } catch (bindError) {
           logger.warn(`⚠️ openid 绑定失败（非致命）: ${bindError.message}`)

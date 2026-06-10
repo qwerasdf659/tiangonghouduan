@@ -14,7 +14,6 @@
 
 const express = require('express')
 const router = express.Router()
-const { v4: uuidv4 } = require('uuid')
 const { handleServiceError } = require('../../../middleware/validation')
 const QRCodeValidator = require('../../../utils/QRCodeValidator')
 const logger = require('../../../utils/logger').logger
@@ -54,38 +53,13 @@ router.get('/qrcode', async (req, res) => {
     }
 
     /*
-     * 防御性校验：确保 user_uuid 存在且为字符串类型
+     * 防御性校验：确保 user_uuid 存在（缺失时由 Service 自动修复并回填）
      * 缺失场景：Redis缓存不一致 / 迁移未回填 / 直接SQL插入
-     * 自动修复策略：生成 UUIDv4 并写入数据库，同时失效缓存
      */
     let userUuid = user.user_uuid
     if (!userUuid || typeof userUuid !== 'string') {
-      logger.warn('用户缺少 user_uuid，执行自动修复', {
-        user_id: userId,
-        current_uuid: userUuid,
-        current_type: typeof userUuid
-      })
-
-      userUuid = uuidv4()
       try {
-        /** 通过模型实例更新（不直接 require sequelize.models） */
-        if (typeof user.update === 'function') {
-          await user.update({ user_uuid: userUuid })
-        } else {
-          const { User } = req.app.locals.models
-          await User.update({ user_uuid: userUuid }, { where: { user_id: userId } })
-        }
-
-        const { BusinessCacheHelper } = require('../../../utils/BusinessCacheHelper')
-        await BusinessCacheHelper.invalidateUser(
-          { user_id: userId, mobile: user.mobile },
-          'auto_repair_missing_uuid'
-        )
-
-        logger.info('用户 user_uuid 自动修复成功', {
-          user_id: userId,
-          new_uuid: userUuid.substring(0, 8) + '...'
-        })
+        userUuid = await UserService.ensureUserUuid(userId)
       } catch (repairError) {
         logger.error('用户 user_uuid 自动修复失败', {
           user_id: userId,

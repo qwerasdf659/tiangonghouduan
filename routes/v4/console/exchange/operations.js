@@ -27,21 +27,7 @@ router.put(
     const { is_pinned } = req.body
     const result = await TransactionManager.execute(
       async transaction => {
-        const item = await ExchangeService.ExchangeItem.findByPk(itemId, {
-          lock: transaction.LOCK.UPDATE,
-          transaction
-        })
-        if (!item) throw new Error('商品不存在')
-        const pinned = is_pinned !== undefined ? !!is_pinned : !item.is_pinned
-        const BeijingTimeHelper = require('../../../../utils/timeHelper')
-        await item.update(
-          {
-            is_pinned: pinned,
-            pinned_at: pinned ? BeijingTimeHelper.createDatabaseTime() : null
-          },
-          { transaction }
-        )
-        return { exchange_item_id: itemId, is_pinned: pinned }
+        return ExchangeService.pinItem(itemId, is_pinned, { transaction })
       },
       { description: `置顶商品 ${itemId}`, maxRetries: 1 }
     )
@@ -60,14 +46,7 @@ router.put(
     const { is_recommended } = req.body
     const result = await TransactionManager.execute(
       async transaction => {
-        const item = await ExchangeService.ExchangeItem.findByPk(itemId, {
-          lock: transaction.LOCK.UPDATE,
-          transaction
-        })
-        if (!item) throw new Error('商品不存在')
-        const recommended = is_recommended !== undefined ? !!is_recommended : !item.is_recommended
-        await item.update({ is_recommended: recommended }, { transaction })
-        return { exchange_item_id: itemId, is_recommended: recommended }
+        return ExchangeService.recommendItem(itemId, is_recommended, { transaction })
       },
       { description: `推荐商品 ${itemId}`, maxRetries: 1 }
     )
@@ -185,23 +164,10 @@ router.put(
     const ExchangeService = req.app.locals.services.getService('exchange_admin')
     const result = await TransactionManager.execute(
       async transaction => {
-        const updatePromises = items
-          .filter(
-            ({ exchange_item_id, sort_order }) => exchange_item_id && sort_order !== undefined
-          )
-          .map(({ exchange_item_id, sort_order }) =>
-            ExchangeService.ExchangeItem.update(
-              { sort_order: parseInt(sort_order) },
-              { where: { exchange_item_id }, transaction }
-            )
-          )
-        const results = await Promise.all(updatePromises)
-        return { updated_count: results.length }
+        return ExchangeService.batchUpdateSort(items, { transaction })
       },
       { description: '批量排序商品', maxRetries: 1 }
     )
-    const { BusinessCacheHelper } = require('../../../../utils/BusinessCacheHelper')
-    await BusinessCacheHelper.invalidateExchangeItems('batch_sort')
     const AuditLogService = req.app.locals.services.getService('audit_log')
     await AuditLogService.logOperation({
       operator_id: req.user.user_id,

@@ -11,19 +11,9 @@
 'use strict'
 
 require('dotenv').config()
-const { Sequelize } = require('sequelize')
 
-const seq = new Sequelize(
-  process.env.DB_NAME,
-  process.env.DB_USER,
-  process.env.DB_PASSWORD,
-  {
-    host: process.env.DB_HOST,
-    port: process.env.DB_PORT,
-    dialect: 'mysql',
-    logging: false
-  }
-)
+// 复用主 Sequelize 实例（单一配置源原则：唯一 new Sequelize 在 config/database.js）
+const { sequelize: seq } = require('../../config/database')
 
 async function main() {
   await seq.authenticate()

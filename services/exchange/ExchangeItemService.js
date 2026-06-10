@@ -715,6 +715,173 @@ class ExchangeItemService {
       .map(p => `${p.attribute_id}_${p.option_id}`)
     return `P${exchangeItemId}_${parts.join('__')}`
   }
+
+  /**
+   * 查询品类列表（扁平，含图标媒体）
+   *
+   * @returns {Promise<Array<Object>>} 品类 plain 行列表
+   */
+  async listCategories() {
+    const { Category, MediaFile } = this.models
+    const rows = await Category.findAll({
+      order: [
+        ['level', 'ASC'],
+        ['sort_order', 'ASC'],
+        ['category_id', 'ASC']
+      ],
+      include: [{ model: MediaFile, as: 'icon_media', required: false }]
+    })
+    return rows.map(r => r.get({ plain: true }))
+  }
+
+  /**
+   * 查询品类详情（含直接子节点）
+   *
+   * @param {number} category_id - 品类ID
+   * @returns {Promise<Object|null>} 品类 plain 行或 null
+   */
+  async getCategoryDetail(category_id) {
+    const { Category, MediaFile } = this.models
+    const row = await Category.findByPk(category_id, {
+      include: [
+        { model: MediaFile, as: 'icon_media', required: false },
+        {
+          model: Category,
+          as: 'children',
+          required: false,
+          separate: true,
+          order: [
+            ['sort_order', 'ASC'],
+            ['category_id', 'ASC']
+          ]
+        }
+      ]
+    })
+    return row ? row.get({ plain: true }) : null
+  }
+
+  /**
+   * 创建品类
+   *
+   * @param {Object} data - 品类数据
+   * @param {Object} options - 选项（必须含 transaction）
+   * @returns {Promise<Object>} 创建的品类 plain 行
+   */
+  async createCategory(data, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'ExchangeItemService.createCategory')
+    const { Category } = this.models
+    const {
+      category_name,
+      category_code,
+      parent_category_id,
+      level,
+      sort_order,
+      is_enabled,
+      icon_media_id
+    } = data
+
+    const created = await Category.create(
+      {
+        category_name: String(category_name).trim(),
+        category_code: String(category_code).trim(),
+        parent_category_id:
+          parent_category_id === undefined ||
+          parent_category_id === null ||
+          parent_category_id === ''
+            ? null
+            : Number(parent_category_id),
+        level: level != null ? Number(level) : 1,
+        sort_order: sort_order != null ? Number(sort_order) : 0,
+        is_enabled: is_enabled === undefined ? true : Boolean(is_enabled),
+        icon_media_id:
+          icon_media_id === undefined || icon_media_id === null || icon_media_id === ''
+            ? null
+            : icon_media_id
+      },
+      { transaction }
+    )
+    return created.get({ plain: true })
+  }
+
+  /**
+   * 更新品类（仅白名单字段）
+   *
+   * @param {number} category_id - 品类ID
+   * @param {Object} patch - 更新字段
+   * @param {Object} options - 选项（必须含 transaction）
+   * @returns {Promise<Object>} 更新后的品类 plain 行
+   */
+  async updateCategory(category_id, patch, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'ExchangeItemService.updateCategory')
+    const { Category } = this.models
+    const row = await Category.findByPk(category_id, { transaction, lock: transaction.LOCK.UPDATE })
+    if (!row) {
+      throw new BusinessError('品类不存在', 'PRODUCT_CENTER_CATEGORY_NOT_FOUND', 404, {
+        category_id
+      })
+    }
+
+    const allowed = [
+      'category_name',
+      'category_code',
+      'parent_category_id',
+      'level',
+      'sort_order',
+      'is_enabled',
+      'icon_media_id'
+    ]
+    const data = {}
+    for (const k of allowed) {
+      if (patch[k] !== undefined) {
+        if (k === 'parent_category_id') {
+          data[k] = patch[k] === null || patch[k] === '' ? null : Number(patch[k])
+        } else if (k === 'icon_media_id') {
+          data[k] = patch[k] === null || patch[k] === '' ? null : patch[k]
+        } else {
+          data[k] = patch[k]
+        }
+      }
+    }
+
+    await row.update(data, { transaction })
+    const reloaded = await row.reload({ transaction })
+    return reloaded.get({ plain: true })
+  }
+
+  /**
+   * 硬删除品类（存在子品类时禁止）
+   *
+   * @param {number} category_id - 品类ID
+   * @param {Object} options - 选项（必须含 transaction）
+   * @returns {Promise<Object>} { category_id }
+   */
+  async deleteCategory(category_id, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'ExchangeItemService.deleteCategory')
+    const { Category } = this.models
+
+    const childCount = await Category.count({
+      where: { parent_category_id: category_id },
+      transaction
+    })
+    if (childCount > 0) {
+      throw new BusinessError(
+        `存在 ${childCount} 个子品类，请先删除或移动子节点`,
+        'PRODUCT_CENTER_CATEGORY_HAS_CHILDREN',
+        409,
+        { child_count: childCount }
+      )
+    }
+
+    const row = await Category.findByPk(category_id, { transaction })
+    if (!row) {
+      throw new BusinessError('品类不存在', 'PRODUCT_CENTER_CATEGORY_NOT_FOUND', 404, {
+        category_id
+      })
+    }
+
+    await row.destroy({ transaction })
+    return { category_id }
+  }
 }
 
 module.exports = ExchangeItemService

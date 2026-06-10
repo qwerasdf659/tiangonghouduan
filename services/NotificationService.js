@@ -1066,159 +1066,6 @@ class NotificationService {
     })
   }
 
-  // ==================== 交易市场材料交易通知 ====================
-
-  /**
-   * 挂牌创建成功通知（卖家）
-   *
-   * @param {number} user_id - 卖家用户ID
-   * @param {Object} listingData - 挂牌数据
-   * @param {number} listingData.market_listing_id - 挂牌ID（数据库主键字段名）
-   * @param {string} listingData.offer_asset_code - 挂卖资产代码
-   * @param {number} listingData.offer_amount - 挂卖数量
-   * @param {number} listingData.price_amount - 定价金额
-   * @returns {Promise<Object>} 通知结果
-   */
-  static async notifyListingCreated(user_id, listingData) {
-    const { market_listing_id, offer_asset_code, offer_amount, price_amount } = listingData
-    const assetName = await this._resolveAssetName(offer_asset_code)
-
-    return await this.send(user_id, {
-      type: 'listing_created',
-      title: '挂牌成功',
-      content: `您的 ${offer_amount} 个 ${assetName} 已成功上架，标价 ${price_amount} 星石。资产已冻结，等待买家购买。`,
-      data: {
-        market_listing_id,
-        offer_asset_code,
-        offer_amount,
-        price_amount,
-        action: 'listing_created'
-      }
-    })
-  }
-
-  /**
-   * 挂牌售出通知（卖家）
-   *
-   * @param {number} user_id - 卖家用户ID
-   * @param {Object} saleData - 销售数据
-   * @param {number} saleData.market_listing_id - 挂牌ID（数据库主键字段名）
-   * @param {string} saleData.offer_asset_code - 售出资产代码
-   * @param {number} saleData.offer_amount - 售出数量
-   * @param {number} saleData.price_amount - 成交金额
-   * @param {number} saleData.net_amount - 实际到账（扣除手续费）
-   * @param {number} saleData.buyer_user_id - 买家用户ID
-   * @returns {Promise<Object>} 通知结果
-   */
-  static async notifyListingSold(user_id, saleData) {
-    const { market_listing_id, offer_asset_code, offer_amount, price_amount, net_amount } = saleData
-    const assetName = await this._resolveAssetName(offer_asset_code)
-
-    return await this.send(user_id, {
-      type: 'listing_sold',
-      title: '售出成功',
-      content: `恭喜！您的 ${offer_amount} 个 ${assetName} 已售出，成交价 ${price_amount} 星石，实际到账 ${net_amount} 星石（扣除5%手续费）。`,
-      data: {
-        market_listing_id,
-        offer_asset_code,
-        offer_amount,
-        price_amount,
-        net_amount,
-        action: 'listing_sold'
-      }
-    })
-  }
-
-  /**
-   * 购买成功通知（买家）
-   *
-   * @param {number} user_id - 买家用户ID
-   * @param {Object} purchaseData - 购买数据
-   * @param {number} purchaseData.order_id - 订单ID
-   * @param {string} purchaseData.offer_asset_code - 购买的资产代码
-   * @param {number} purchaseData.offer_amount - 购买数量
-   * @param {number} purchaseData.price_amount - 支付金额
-   * @returns {Promise<Object>} 通知结果
-   */
-  static async notifyPurchaseCompleted(user_id, purchaseData) {
-    const { order_id, offer_asset_code, offer_amount, price_amount } = purchaseData
-    const assetName = await this._resolveAssetName(offer_asset_code)
-
-    return await this.send(user_id, {
-      type: 'purchase_completed',
-      title: '购买成功',
-      content: `您已成功购买 ${offer_amount} 个 ${assetName}，支付 ${price_amount} 星石。资产已到账，请在背包中查看。`,
-      data: {
-        order_id,
-        offer_asset_code,
-        offer_amount,
-        price_amount,
-        action: 'purchase_completed'
-      }
-    })
-  }
-
-  /**
-   * 挂牌撤回通知（卖家）
-   *
-   * @param {number} user_id - 卖家用户ID
-   * @param {Object} withdrawData - 撤回数据
-   * @param {number} withdrawData.market_listing_id - 挂牌ID（数据库主键字段名）
-   * @param {string} withdrawData.offer_asset_code - 撤回资产代码
-   * @param {number} withdrawData.offer_amount - 撤回数量
-   * @param {string} [withdrawData.reason='用户主动撤回'] - 撤回原因
-   * @returns {Promise<Object>} 通知结果
-   */
-  static async notifyListingWithdrawn(user_id, withdrawData) {
-    const {
-      market_listing_id,
-      offer_asset_code,
-      offer_amount,
-      reason = '用户主动撤回'
-    } = withdrawData
-    const assetName = await this._resolveAssetName(offer_asset_code)
-
-    return await this.send(user_id, {
-      type: 'listing_withdrawn',
-      title: '挂牌已撤回',
-      content: `您的 ${offer_amount} 个 ${assetName} 挂牌已撤回（${reason}）。资产已解冻至您的可用余额。`,
-      data: {
-        market_listing_id,
-        offer_asset_code,
-        offer_amount,
-        reason,
-        action: 'listing_withdrawn'
-      }
-    })
-  }
-
-  /**
-   * 挂牌过期通知（卖家）
-   *
-   * @param {number} user_id - 卖家用户ID
-   * @param {Object} expireData - 过期数据
-   * @param {number} expireData.market_listing_id - 挂牌ID（数据库主键字段名）
-   * @param {string} expireData.offer_asset_code - 过期资产代码
-   * @param {number} expireData.offer_amount - 过期数量
-   * @returns {Promise<Object>} 通知结果
-   */
-  static async notifyListingExpired(user_id, expireData) {
-    const { market_listing_id, offer_asset_code, offer_amount } = expireData
-    const assetName = await this._resolveAssetName(offer_asset_code)
-
-    return await this.send(user_id, {
-      type: 'listing_expired',
-      title: '挂牌已过期',
-      content: `您的 ${offer_amount} 个 ${assetName} 挂牌已超时（3天），系统已自动撤回并解冻资产。如需继续出售，请重新上架。`,
-      data: {
-        market_listing_id,
-        offer_asset_code,
-        offer_amount,
-        action: 'listing_expired'
-      }
-    })
-  }
-
   // ==================== 竞价通知（臻选空间/幸运空间 2026-02-16）====================
 
   /**
@@ -1485,6 +1332,136 @@ class NotificationService {
       read_at: notification.read_at,
       already_read: false
     }
+  }
+
+  /**
+   * 管理员通知中心 - 查询通知列表（带筛选/分页）
+   *
+   * @param {number} adminId - 管理员ID
+   * @param {Object} [filters={}] - 筛选条件
+   * @returns {Promise<Object>} { items, total, unread_count }
+   */
+  static async listAdminNotifications(adminId, filters = {}) {
+    const {
+      notification_type,
+      priority,
+      is_read,
+      source_type,
+      keyword,
+      start_date,
+      end_date,
+      page_size = 20,
+      offset = 0
+    } = filters
+
+    const where = { admin_id: adminId }
+    if (notification_type) where.notification_type = notification_type
+    if (priority) where.priority = priority
+    if (is_read !== undefined && is_read !== '') {
+      where.is_read = is_read === '1' || is_read === 'true'
+    }
+    if (source_type) where.source_type = source_type
+    if (keyword) {
+      where[Op.or] = [
+        { title: { [Op.like]: `%${keyword}%` } },
+        { content: { [Op.like]: `%${keyword}%` } }
+      ]
+    }
+    if (start_date || end_date) {
+      where.created_at = {}
+      if (start_date) where.created_at[Op.gte] = new Date(start_date)
+      if (end_date) where.created_at[Op.lte] = new Date(end_date)
+    }
+
+    const { count, rows } = await AdminNotification.findAndCountAll({
+      where,
+      order: [['created_at', 'DESC']],
+      limit: Math.min(parseInt(page_size, 10) || 20, 100),
+      offset: parseInt(offset, 10) || 0
+    })
+    const unreadCount = await AdminNotification.getUnreadCount(adminId)
+
+    return { items: rows, total: count, unread_count: unreadCount }
+  }
+
+  /**
+   * 管理员通知中心 - 获取未读数量（普通 + 紧急）
+   *
+   * @param {number} adminId - 管理员ID
+   * @returns {Promise<Object>} { unread_count, urgent_unread_count }
+   */
+  static async getAdminUnreadCounts(adminId) {
+    const [unreadCount, urgentUnreadCount] = await Promise.all([
+      AdminNotification.getUnreadCount(adminId),
+      AdminNotification.getUrgentUnreadCount(adminId)
+    ])
+    return { unread_count: unreadCount, urgent_unread_count: urgentUnreadCount }
+  }
+
+  /**
+   * 管理员通知中心 - 获取通知详情
+   *
+   * @param {number} adminId - 管理员ID
+   * @param {number} notificationId - 通知ID
+   * @returns {Promise<AdminNotification|null>} 通知实例或 null
+   */
+  static async getAdminNotificationDetail(adminId, notificationId) {
+    return AdminNotification.findOne({
+      where: { admin_notification_id: notificationId, admin_id: adminId }
+    })
+  }
+
+  /**
+   * 管理员通知中心 - 标记单条已读
+   *
+   * @param {number} adminId - 管理员ID
+   * @param {number} notificationId - 通知ID
+   * @returns {Promise<Object|null>} 更新结果或 null（不存在）
+   */
+  static async markAdminNotificationAsRead(adminId, notificationId) {
+    const notification = await this.getAdminNotificationDetail(adminId, notificationId)
+    if (!notification) return null
+    await notification.markAsRead()
+    return {
+      admin_notification_id: notification.admin_notification_id,
+      is_read: notification.is_read,
+      read_at: notification.read_at
+    }
+  }
+
+  /**
+   * 管理员通知中心 - 全部标记已读
+   *
+   * @param {number} adminId - 管理员ID
+   * @returns {Promise<number>} 更新数量
+   */
+  static async markAllAdminNotificationsAsRead(adminId) {
+    return AdminNotification.markAllAsRead(adminId)
+  }
+
+  /**
+   * 管理员通知中心 - 清空已读（物理删除所有已读）
+   *
+   * @param {number} adminId - 管理员ID
+   * @returns {Promise<number>} 删除数量
+   */
+  static async clearReadAdminNotifications(adminId) {
+    return AdminNotification.destroy({
+      where: { admin_id: adminId, is_read: true }
+    })
+  }
+
+  /**
+   * 管理员通知中心 - 删除单条（物理删除，限本人）
+   *
+   * @param {number} adminId - 管理员ID
+   * @param {number} notificationId - 通知ID
+   * @returns {Promise<number>} 删除数量（0=不存在或无权）
+   */
+  static async deleteAdminNotification(adminId, notificationId) {
+    return AdminNotification.destroy({
+      where: { admin_notification_id: notificationId, admin_id: adminId }
+    })
   }
 }
 

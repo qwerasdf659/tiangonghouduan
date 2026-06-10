@@ -253,6 +253,63 @@ class UserService {
   }
 
   /**
+   * 确保用户具备 user_uuid（缺失时自动修复并回填）
+   *
+   * 缺失场景：Redis 缓存不一致 / 迁移未回填 / 直接 SQL 插入。
+   * 修复策略：生成 UUIDv4 写入数据库并失效用户缓存；已存在则原样返回。
+   *
+   * @param {number} user_id - 用户ID
+   * @returns {Promise<string>} 用户的 user_uuid
+   */
+  static async ensureUserUuid(user_id) {
+    const user = await User.findByPk(user_id)
+    if (!user) {
+      const error = new Error('用户不存在')
+      error.code = 'USER_NOT_FOUND'
+      error.statusCode = 404
+      throw error
+    }
+
+    if (user.user_uuid && typeof user.user_uuid === 'string') {
+      return user.user_uuid
+    }
+
+    const { v4: uuidv4 } = require('uuid')
+    const newUuid = uuidv4()
+    await user.update({ user_uuid: newUuid })
+    await BusinessCacheHelper.invalidateUser(
+      { user_id, mobile: user.mobile },
+      'auto_repair_missing_uuid'
+    )
+    logger.warn('用户 user_uuid 自动修复成功', {
+      user_id,
+      new_uuid: newUuid.substring(0, 8) + '...'
+    })
+    return newUuid
+  }
+
+  /**
+   * 绑定微信 openid（仅当用户尚未绑定时写入）
+   *
+   * 业务场景：wx-code-login 返回 need_bind 后，前端携带 wx_openid 调用 quick-login。
+   * 幂等：用户已绑定则跳过；绑定失败不抛出（由调用方按非致命处理）。
+   *
+   * @param {number} user_id - 用户ID
+   * @param {string} wx_openid - 微信 openid
+   * @returns {Promise<boolean>} 是否执行了绑定写入
+   */
+  static async bindWxOpenid(user_id, wx_openid) {
+    if (!wx_openid) return false
+    const user = await User.findByPk(user_id)
+    if (!user || user.wx_openid) {
+      return false
+    }
+    await user.update({ wx_openid })
+    await BusinessCacheHelper.invalidateUser({ user_id, mobile: user.mobile }, 'wx_openid_bound')
+    return true
+  }
+
+  /**
    * 根据用户ID查找用户
    *
    * @description 支持 Redis 缓存（P2 缓存优化），提升认证后场景性能

@@ -72,20 +72,10 @@ router.get(
   '/balance',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    const { sequelize } = require('../../../../models')
+    const PlatformRevenueService = req.app.locals.services.getService('platform_revenue')
+    const rawAccounts = await PlatformRevenueService.getSystemAccountStarStoneBalances()
 
-    const [systemAccounts] = await sequelize.query(`
-      SELECT a.system_code,
-             COALESCE(aab.available_amount, 0) AS star_stone_balance,
-             COALESCE(aab.frozen_amount, 0) AS frozen_amount
-      FROM accounts a
-      LEFT JOIN account_asset_balances aab
-        ON a.account_id = aab.account_id AND aab.asset_code = 'star_stone'
-      WHERE a.account_type = 'system'
-      ORDER BY a.account_id
-    `)
-
-    const accounts = systemAccounts.map(acc => {
+    const accounts = rawAccounts.map(acc => {
       const meta = SYSTEM_ACCOUNT_LABELS[acc.system_code] || {
         label: acc.system_code,
         description: '',
@@ -95,8 +85,8 @@ router.get(
         system_code: acc.system_code,
         label: meta.label,
         description: meta.description,
-        star_stone_balance: Number(acc.star_stone_balance),
-        frozen_amount: Number(acc.frozen_amount),
+        star_stone_balance: acc.star_stone_balance,
+        frozen_amount: acc.frozen_amount,
         burnable: meta.burnable
       }
     })
@@ -132,58 +122,24 @@ router.get(
   '/burn-history',
   adminAuthMiddleware,
   asyncHandler(async (req, res) => {
-    const { sequelize } = require('../../../../models')
-    const page = Math.max(1, parseInt(req.query.page) || 1)
-    const pageSize = Math.min(100, Math.max(1, parseInt(req.query.page_size) || 20))
-    const offset = (page - 1) * pageSize
-
-    const [records] = await sequelize.query(
-      `
-      SELECT at.asset_transaction_id, at.delta_amount, at.balance_after,
-             at.business_type, at.meta, at.created_at,
-             a.system_code
-      FROM asset_transactions at
-      JOIN accounts a ON at.account_id = a.account_id
-      WHERE at.business_type = 'platform_star_stone_burn'
-        AND at.asset_code = 'star_stone'
-      ORDER BY at.created_at DESC
-      LIMIT :limit OFFSET :offset
-    `,
-      { replacements: { limit: pageSize, offset } }
-    )
-
-    const [[{ total }]] = await sequelize.query(`
-      SELECT COUNT(*) AS total
-      FROM asset_transactions
-      WHERE business_type = 'platform_star_stone_burn' AND asset_code = 'star_stone'
-    `)
-
-    const items = records.map(r => {
-      let meta = {}
-      try {
-        meta = typeof r.meta === 'string' ? JSON.parse(r.meta) : r.meta || {}
-      } catch {
-        /* ignore */
-      }
-      return {
-        transaction_id: r.asset_transaction_id,
-        source_account: r.system_code,
-        source_label: SYSTEM_ACCOUNT_LABELS[r.system_code]?.label || r.system_code,
-        amount: Math.abs(Number(r.delta_amount)),
-        balance_after: Number(r.balance_after),
-        reason: meta.reason || '',
-        operator_id: meta.operator_id || null,
-        created_at: r.created_at
-      }
+    const PlatformRevenueService = req.app.locals.services.getService('platform_revenue')
+    const { records, pagination } = await PlatformRevenueService.getStarStoneBurnHistory({
+      page: req.query.page,
+      page_size: req.query.page_size
     })
 
-    return res.apiSuccess(
-      {
-        items,
-        pagination: { page, page_size: pageSize, total: Number(total) }
-      },
-      '销毁历史查询成功'
-    )
+    const items = records.map(r => ({
+      transaction_id: r.transaction_id,
+      source_account: r.system_code,
+      source_label: SYSTEM_ACCOUNT_LABELS[r.system_code]?.label || r.system_code,
+      amount: r.amount,
+      balance_after: r.balance_after,
+      reason: r.reason,
+      operator_id: r.operator_id,
+      created_at: r.created_at
+    }))
+
+    return res.apiSuccess({ items, pagination }, '销毁历史查询成功')
   })
 )
 

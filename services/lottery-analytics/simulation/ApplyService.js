@@ -47,6 +47,8 @@ class SimulationApplyService {
 
     if (proposedConfig.matrix_config?.length > 0) {
       for (const mc of proposedConfig.matrix_config) {
+        // 同一事务内顺序写：事务不支持并发查询，配置写必须串行（禁止 Promise.all）
+        // eslint-disable-next-line no-await-in-loop
         const [count] = await this.models.LotteryTierMatrixConfig.update(
           {
             high_multiplier: mc.high_multiplier,
@@ -79,6 +81,8 @@ class SimulationApplyService {
     if (proposedConfig.strategy_config) {
       for (const [group, values] of Object.entries(proposedConfig.strategy_config)) {
         for (const [key, value] of Object.entries(values)) {
+          // 同一事务内顺序写：事务不支持并发查询，配置写必须串行（禁止 Promise.all）
+          // eslint-disable-next-line no-await-in-loop
           await this.models.LotteryStrategyConfig.update(
             { config_value: JSON.stringify(value), updated_by: operator_id },
             {
@@ -97,6 +101,8 @@ class SimulationApplyService {
 
     if (proposedConfig.tier_rules?.length > 0) {
       for (const rule of proposedConfig.tier_rules) {
+        // 同一事务内顺序写：事务不支持并发查询，配置写必须串行（禁止 Promise.all）
+        // eslint-disable-next-line no-await-in-loop
         await this.models.LotteryTierRule.update(
           { tier_weight: rule.tier_weight },
           {
@@ -180,6 +186,8 @@ class SimulationApplyService {
     if (proposedConfig.strategy_config) {
       for (const [group, values] of Object.entries(proposedConfig.strategy_config)) {
         for (const [key, value] of Object.entries(values)) {
+          // 同一事务内顺序写：事务不支持并发查询，配置写必须串行（禁止 Promise.all）
+          // eslint-disable-next-line no-await-in-loop
           await LotteryStrategyConfig.create(
             {
               lottery_campaign_id: campaignId,
@@ -277,6 +285,8 @@ class SimulationApplyService {
     const executed = []
     for (const record of pendingRecords) {
       try {
+        // 顺序应用各待执行记录：每次 applySimulation 为事务内写操作，必须串行（禁止 Promise.all）
+        // eslint-disable-next-line no-await-in-loop
         const result = await this.applySimulation(
           record.lottery_simulation_record_id,
           record.created_by,
@@ -471,6 +481,8 @@ class SimulationApplyService {
       for (const [key, value] of Object.entries(values)) {
         const whereClause = { config_group: group, config_key: key }
         if (campaignId) whereClause.lottery_campaign_id = campaignId
+        // 同一事务内顺序写：事务不支持并发查询，配置写必须串行（禁止 Promise.all）
+        // eslint-disable-next-line no-await-in-loop
         const [count] = await this.models.LotteryStrategyConfig.update(
           { config_value: JSON.stringify(value), updated_by: operator_id },
           { where: whereClause, transaction }
@@ -514,6 +526,8 @@ class SimulationApplyService {
 
       const whereClause = { budget_tier: mc.budget_tier, pressure_tier: mc.pressure_tier }
       if (campaignId) whereClause.lottery_campaign_id = campaignId
+      // 同一事务内顺序写：事务不支持并发查询，配置写必须串行（禁止 Promise.all）
+      // eslint-disable-next-line no-await-in-loop
       const [count] = await this.models.LotteryTierMatrixConfig.update(updateFields, {
         where: whereClause,
         transaction
@@ -543,6 +557,8 @@ class SimulationApplyService {
       if (!rule.segment_key || !rule.tier_name) continue
       const whereClause = { segment_key: rule.segment_key, tier_name: rule.tier_name }
       if (campaignId) whereClause.lottery_campaign_id = campaignId
+      // 同一事务内顺序写：事务不支持并发查询，配置写必须串行（禁止 Promise.all）
+      // eslint-disable-next-line no-await-in-loop
       const [count] = await this.models.LotteryTierRule.update(
         { tier_weight: rule.tier_weight },
         { where: whereClause, transaction }

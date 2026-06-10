@@ -400,6 +400,17 @@ class QueryService {
             as: 'primary_media',
             attributes: ['media_id', 'object_key', 'mime_type', 'thumbnail_keys'],
             required: false
+          },
+          /*
+           * value_tier 价值分层（BE-2）：value_tier 实际是 item_templates 表字段，
+           * 经 exchange_items.item_template_id 关联取得，供 C 端对 high 档做"会员尊享"差异化展示。
+           * 仅取 value_tier 单列，不暴露模板其它商业敏感字段。
+           */
+          {
+            model: this.models.ItemTemplate,
+            as: 'itemTemplate',
+            attributes: ['value_tier'],
+            required: false
           }
         ],
         subQuery: false,
@@ -418,7 +429,13 @@ class QueryService {
 
       // 添加中文显示名称
       const itemsWithDisplayNames = await displayNameHelper.attachDisplayNames(
-        rows.map(item => item.toJSON()),
+        rows.map(item => {
+          const plain = item.toJSON()
+          // value_tier 上提到顶层（BE-2），并移除嵌套的 itemTemplate，避免泄露模板其它字段
+          plain.value_tier = plain.itemTemplate?.value_tier || 'low'
+          delete plain.itemTemplate
+          return plain
+        }),
         [{ field: 'status', dictType: 'product_status' }]
       )
 
@@ -482,6 +499,16 @@ class QueryService {
             attributes: ['media_id', 'object_key', 'mime_type', 'thumbnail_keys'],
             required: false
           },
+          /*
+           * value_tier 价值分层（BE-2）：来自 item_templates，经 item_template_id 关联，
+           * 仅取 value_tier 单列供详情页"会员解锁"差异化展示。
+           */
+          {
+            model: this.models.ItemTemplate,
+            as: 'itemTemplate',
+            attributes: ['value_tier'],
+            required: false
+          },
           {
             model: this.models.RarityDef,
             as: 'rarityDef',
@@ -528,6 +555,9 @@ class QueryService {
 
       // 添加中文显示名称
       const itemJSON = item.toJSON()
+      // value_tier 上提到顶层（BE-2），移除嵌套 itemTemplate
+      itemJSON.value_tier = itemJSON.itemTemplate?.value_tier || 'low'
+      delete itemJSON.itemTemplate
       const itemWithDisplayNames = await displayNameHelper.attachDisplayNames(itemJSON, [
         { field: 'status', dictType: 'product_status' }
       ])
@@ -536,6 +566,14 @@ class QueryService {
       itemWithDisplayNames.images = images
       itemWithDisplayNames.detail_images = detail_images
       itemWithDisplayNames.showcase_images = showcase_images
+
+      /*
+       * 复合门槛只读出口（BE-3）：高价值实物的"会员解锁条件"提前下发，
+       * 让 C 端在商品详情页就能渲染"解锁条件清单"，而非等到下单那一刻才被拒。
+       * 仅下发门槛构成（最低成长等级 key、额外消耗资产、需消耗道具），
+       * 不下发任何商业敏感数值；无门槛配置时为 null。
+       */
+      itemWithDisplayNames.redeem_requirement = await this._buildRedeemRequirementView(item_id)
 
       return {
         item: itemWithDisplayNames
@@ -589,6 +627,9 @@ class QueryService {
       // 附加 pay_asset_name（资产中文名称）
       await this._attachPayAssetNames(ordersWithDisplayNames)
 
+      // 附加能力位派生字段：is_prop + refundable（BE-1）
+      await this._attachOrderCapabilities(ordersWithDisplayNames)
+
       return {
         orders: ordersWithDisplayNames,
         pagination: {
@@ -633,6 +674,9 @@ class QueryService {
       // 附加 pay_asset_name（资产中文名称）
       await this._attachPayAssetNames([orderWithDisplayNames])
 
+      // 附加能力位派生字段：is_prop + refundable（BE-1）
+      await this._attachOrderCapabilities([orderWithDisplayNames])
+
       return {
         order: orderWithDisplayNames
       }
@@ -670,6 +714,92 @@ class QueryService {
       if (order.pay_asset_code && nameMap[order.pay_asset_code]) {
         order.pay_asset_name = nameMap[order.pay_asset_code]
       }
+    })
+  }
+
+  /**
+   * 构造商品详情页"复合门槛"只读视图（BE-3）
+   *
+   * 业务场景：
+   * - 高价值实物（value_tier='high'）通常配有"成长等级 + 多资产 + 消耗道具"复合门槛。
+   * - C 端需在商品详情页提前展示"解锁条件清单"，而非等到下单被拒。
+   *
+   * 安全口径：
+   * - 仅下发门槛构成（最低成长等级 key、额外消耗资产组合、需消耗道具及数量）。
+   * - 不下发任何商业敏感数值（如概率、权重、库存、成本价）。
+   * - 无生效门槛配置时返回 null（前端据此不渲染解锁条件区）。
+   *
+   * @param {number} exchange_item_id - 兑换商品ID
+   * @returns {Promise<Object|null>} 门槛只读视图或 null
+   */
+  async _buildRedeemRequirementView(exchange_item_id) {
+    const ExchangeRedeemRequirement = this.models.ExchangeRedeemRequirement
+    if (!ExchangeRedeemRequirement) return null
+
+    // 复用模型既有的"取生效门槛"方法（商品级，sku_id=null）
+    const requirement = await ExchangeRedeemRequirement.getEffectiveRequirement(
+      exchange_item_id,
+      null
+    )
+    if (!requirement) return null
+
+    return {
+      min_growth_level_key: requirement.min_growth_level_key || null,
+      extra_cost_assets: requirement.extra_cost_assets || [],
+      required_consume_items: requirement.required_consume_items || []
+    }
+  }
+
+  /**
+   * 为订单批量附加能力位派生字段（BE-1）：is_prop + refundable
+   *
+   * 业务场景（拍板点①，能力位心智，沿用 backpack allowed_actions 模式）：
+   * - 虚拟道具（item_type='prop'）单买入即消耗、即时完成、禁止退款（PROP_NO_REFUND）。
+   * - C 端需要据此决定是否显示"取消/退款"按钮，但不应在前端用 item_type 散落判断。
+   *
+   * 派生口径（后端权威，前端只读 refundable）：
+   * - is_prop：该订单商品是否为虚拟道具（由 exchange_item → item_template.item_type 推导）。
+   * - refundable：prop 单恒 false；非 prop 单按后端退款规则（status ∈ ['approved','shipped']）。
+   *
+   * 性能：批量查询 item_type，避免 N+1（先收集 exchange_item_id，一次性查模板类型）。
+   *
+   * @param {Array|Object} orders - 订单对象或数组（已 toJSON）
+   * @returns {Promise<void>} 直接修改传入对象
+   */
+  async _attachOrderCapabilities(orders) {
+    const list = Array.isArray(orders) ? orders : [orders]
+    if (list.length === 0) return
+
+    // 后端退款规则唯一真相源（与 CoreService.refundOrder 的 refundableStatuses 对齐）
+    const REFUNDABLE_STATUSES = ['approved', 'shipped']
+
+    // 批量取 exchange_item → item_template.item_type，判定是否 prop
+    const exchangeItemIds = [...new Set(list.map(o => o.exchange_item_id).filter(Boolean))]
+    const propItemIdSet = new Set()
+    if (exchangeItemIds.length > 0) {
+      const exchangeItems = await this.ExchangeItem.findAll({
+        where: { exchange_item_id: exchangeItemIds },
+        attributes: ['exchange_item_id'],
+        include: [
+          {
+            model: this.models.ItemTemplate,
+            as: 'itemTemplate',
+            attributes: ['item_type'],
+            required: false
+          }
+        ]
+      })
+      exchangeItems.forEach(ei => {
+        if (ei.itemTemplate?.item_type === 'prop') {
+          propItemIdSet.add(ei.exchange_item_id)
+        }
+      })
+    }
+
+    list.forEach(order => {
+      const isProp = propItemIdSet.has(order.exchange_item_id)
+      order.is_prop = isProp
+      order.refundable = isProp ? false : REFUNDABLE_STATUSES.includes(order.status)
     })
   }
 
