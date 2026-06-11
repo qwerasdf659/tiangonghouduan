@@ -465,7 +465,7 @@ async function executeBusinessRecordReconciliation(cutoffDate = null) {
   }
 }
 
-module.exports = { executeReconciliation, executeBusinessRecordReconciliation }
+module.exports = { executeReconciliation, executeBusinessRecordReconciliation, executeSpuSummaryReconciliation }
 
 // 独立运行模式
 if (require.main === module) {
@@ -474,4 +474,120 @@ if (require.main === module) {
     console.error('对账脚本执行失败:', err)
     process.exit(1)
   })
+}
+
+/**
+ * 兑换商品 SPU 物化列对账（议题1·拍板项③：冗余列方案的标准对账兜底）
+ *
+ * 业务背景：
+ * - exchange_items 的 stock/sold_count/min_cost_amount/max_cost_amount/min_cost_asset_code 是
+ *   从 exchange_item_skus（active）+ exchange_channel_prices（is_enabled）聚合出来的"物化冗余列"。
+ * - 冗余列方案的铁律：必须有"全量重算对账"兜底，否则物化列与明细迟早账实不符
+ *   （历史已实证：迁移前 22 个商品 SPU 汇总与 SKU 聚合不一致）。
+ *
+ * 本函数全量重算所有 SPU（含 inactive 商品）的 5 个物化列：先检测差异（diff），
+ * 有差异再统一回写对齐并记录差异日志。SQL 口径与迁移
+ * 20260611083214 / 三处 _updateSpuSummary 完全一致。
+ *
+ * @param {Object} [options] - 选项
+ * @param {boolean} [options.standalone=false] - 独立运行模式（结束后关闭连接并 exit）
+ * @returns {Promise<Object>} 对账报告 { status, drift_count, fixed_count, duration_ms }
+ */
+async function executeSpuSummaryReconciliation(options = {}) {
+  const { standalone = false } = options
+  const { sequelize } = require('../config/database')
+  const logger = require('../utils/logger').logger
+  const start_time = Date.now()
+
+  try {
+    logger.info('[SPU对账] 开始兑换商品 SPU 物化列全量重算对账')
+
+    // 1. 检测差异：对比当前物化列值 vs 实时聚合值（含 inactive 商品；<=> 为 NULL 安全比较）
+    const [drift] = await sequelize.query(`
+      SELECT ei.exchange_item_id
+      FROM exchange_items ei
+      LEFT JOIN (
+        SELECT s.exchange_item_id,
+               COALESCE(SUM(s.stock), 0) AS sum_stock,
+               COALESCE(SUM(s.sold_count), 0) AS sum_sold
+        FROM exchange_item_skus s WHERE s.status = 'active'
+        GROUP BY s.exchange_item_id
+      ) agg ON agg.exchange_item_id = ei.exchange_item_id
+      LEFT JOIN (
+        SELECT s.exchange_item_id,
+               MIN(cp.cost_amount) AS min_amount, MAX(cp.cost_amount) AS max_amount,
+               SUBSTRING_INDEX(GROUP_CONCAT(cp.cost_asset_code ORDER BY cp.cost_amount ASC SEPARATOR ','), ',', 1) AS min_asset
+        FROM exchange_item_skus s
+        JOIN exchange_channel_prices cp ON cp.sku_id = s.sku_id AND cp.is_enabled = 1
+        WHERE s.status = 'active'
+        GROUP BY s.exchange_item_id
+      ) price ON price.exchange_item_id = ei.exchange_item_id
+      WHERE ei.stock <> COALESCE(agg.sum_stock, 0)
+         OR ei.sold_count <> COALESCE(agg.sum_sold, 0)
+         OR NOT (ei.min_cost_amount <=> price.min_amount)
+         OR NOT (ei.max_cost_amount <=> price.max_amount)
+         OR NOT (ei.min_cost_asset_code <=> price.min_asset)
+    `)
+
+    const drift_count = drift.length
+    let fixed_count = 0
+
+    // 2. 有差异则全量重算回写（与迁移同口径，账实对齐）
+    if (drift_count > 0) {
+      logger.warn('[SPU对账] 检测到物化列与明细不一致', {
+        drift_count,
+        sample: drift.slice(0, 10).map(d => d.exchange_item_id)
+      })
+
+      await sequelize.query(`
+        UPDATE exchange_items ei
+        LEFT JOIN (
+          SELECT s.exchange_item_id, COALESCE(SUM(s.stock), 0) AS sum_stock, COALESCE(SUM(s.sold_count), 0) AS sum_sold
+          FROM exchange_item_skus s WHERE s.status = 'active' GROUP BY s.exchange_item_id
+        ) agg ON agg.exchange_item_id = ei.exchange_item_id
+        LEFT JOIN (
+          SELECT s.exchange_item_id, MIN(cp.cost_amount) AS min_amount, MAX(cp.cost_amount) AS max_amount
+          FROM exchange_item_skus s
+          JOIN exchange_channel_prices cp ON cp.sku_id = s.sku_id AND cp.is_enabled = 1
+          WHERE s.status = 'active' GROUP BY s.exchange_item_id
+        ) price ON price.exchange_item_id = ei.exchange_item_id
+        SET ei.stock = COALESCE(agg.sum_stock, 0),
+            ei.sold_count = COALESCE(agg.sum_sold, 0),
+            ei.min_cost_amount = price.min_amount,
+            ei.max_cost_amount = price.max_amount
+      `)
+
+      await sequelize.query(`
+        UPDATE exchange_items ei
+        SET ei.min_cost_asset_code = (
+          SELECT cp.cost_asset_code
+          FROM exchange_item_skus s
+          JOIN exchange_channel_prices cp ON cp.sku_id = s.sku_id AND cp.is_enabled = 1
+          WHERE s.exchange_item_id = ei.exchange_item_id AND s.status = 'active'
+          ORDER BY cp.cost_amount ASC LIMIT 1
+        )
+      `)
+      fixed_count = drift_count
+    }
+
+    const report = {
+      status: drift_count === 0 ? 'OK' : 'FIXED',
+      drift_count,
+      fixed_count,
+      duration_ms: Date.now() - start_time
+    }
+    logger.info('[SPU对账] 完成', report)
+
+    if (standalone) {
+      await sequelize.close()
+      process.exit(0)
+    }
+    return report
+  } catch (error) {
+    logger.error('[SPU对账] 失败', { error_message: error.message })
+    if (standalone) {
+      process.exit(1)
+    }
+    throw error
+  }
 }

@@ -25,6 +25,7 @@ const {
   requireMerchantPermission,
   isUserActiveInStore
 } = require('../../../../middleware/auth')
+const { resolveStoreContext } = require('../../../../middleware/resolveStoreContext')
 const { asyncHandler } = require('../../../../middleware/validation')
 const logger = require('../../../../utils/logger').logger
 
@@ -65,6 +66,7 @@ router.get(
   '/list',
   authenticateToken,
   requireMerchantPermission('consumption:read'),
+  resolveStoreContext({ storeIdParam: 'query' }),
   asyncHandler(async (req, res) => {
     const MerchantService = getService(req, 'consumption_merchant')
     const StaffManagementService = getService(req, 'staff_management')
@@ -72,22 +74,14 @@ router.get(
     const userId = req.user.user_id
     const roleLevel = req.user.role_level || 0
 
-    const { store_id, status, page = 1, page_size = 20 } = req.query
+    const { status, page = 1, page_size = 20 } = req.query
 
-    if (!store_id) {
-      return res.apiError('门店ID不能为空', 'MISSING_STORE_ID', null, 400)
-    }
-
-    const storeId = parseInt(store_id, 10)
-    if (isNaN(storeId)) {
-      return res.apiError('门店ID格式不正确', 'INVALID_STORE_ID', null, 400)
-    }
-
-    const isActiveInStore = await isUserActiveInStore(userId, storeId)
-    if (!isActiveInStore) {
-      logger.warn(`🚫 [MerchantQuery] 用户不在门店在职: user_id=${userId}, store_id=${storeId}`)
-      return res.apiForbidden('STORE_ACCESS_DENIED', '您没有该门店的访问权限')
-    }
+    /*
+     * 议题3：门店上下文由 resolveStoreContext 统一解析。
+     * - 普通员工：单店自动填充 / 多店须带 store_id / 校验在职；
+     * - 管理员：可跨任意门店（必须带 store_id），审计可定位。
+     */
+    const storeId = req.store_context.store_id
 
     const isManager = await StaffManagementService.isStoreManager(userId, storeId, roleLevel)
 
@@ -151,9 +145,15 @@ router.get(
 
     const storeId = record.store_id
 
-    const isActiveInStore = await isUserActiveInStore(userId, storeId)
-    if (!isActiveInStore) {
-      return res.apiForbidden('STORE_ACCESS_DENIED', '您没有该记录所属门店的访问权限')
+    /*
+     * 议题3：门店访问校验（store_id 来自记录本身，非请求参数，故不走 resolveStoreContext）。
+     * 管理员（role_level>=100）可跨店查看；普通员工须在该店在职。
+     */
+    if (roleLevel < 100) {
+      const isActiveInStore = await isUserActiveInStore(userId, storeId)
+      if (!isActiveInStore) {
+        return res.apiForbidden('STORE_ACCESS_DENIED', '您没有该记录所属门店的访问权限')
+      }
     }
 
     const isManager = await StaffManagementService.isStoreManager(userId, storeId, roleLevel)
@@ -190,27 +190,16 @@ router.get(
   '/stats',
   authenticateToken,
   requireMerchantPermission('consumption:read'),
+  resolveStoreContext({ storeIdParam: 'query' }),
   asyncHandler(async (req, res) => {
     const MerchantService = getService(req, 'consumption_merchant')
     const StaffManagementService = getService(req, 'staff_management')
 
     const userId = req.user.user_id
     const roleLevel = req.user.role_level || 0
-    const { store_id } = req.query
 
-    if (!store_id) {
-      return res.apiError('门店ID不能为空', 'MISSING_STORE_ID', null, 400)
-    }
-
-    const storeId = parseInt(store_id, 10)
-    if (isNaN(storeId)) {
-      return res.apiError('门店ID格式不正确', 'INVALID_STORE_ID', null, 400)
-    }
-
-    const isActiveInStore = await isUserActiveInStore(userId, storeId)
-    if (!isActiveInStore) {
-      return res.apiForbidden('STORE_ACCESS_DENIED', '您没有该门店的访问权限')
-    }
+    // 议题3：门店上下文由 resolveStoreContext 统一解析（管理员可跨店，员工校验在职）
+    const storeId = req.store_context.store_id
 
     const isManager = await StaffManagementService.isStoreManager(userId, storeId, roleLevel)
 

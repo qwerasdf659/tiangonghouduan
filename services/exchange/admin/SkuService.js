@@ -251,8 +251,17 @@ class SkuService {
       transaction
     })
 
+    /*
+     * 价格汇总：MIN/MAX 单价 + 最低价对应资产码（议题1·物化列 min_cost_asset_code）。
+     * SUBSTRING_INDEX(GROUP_CONCAT(... ORDER BY cost_amount ASC), ',', 1) 取最低价那条的资产码，
+     * 与 MIN(cost_amount) 同源，保证"展示价"和"计价资产"一致。
+     */
     const [priceSummary] = await this.sequelize.query(
-      `SELECT MIN(ecp.cost_amount) AS min_cost, MAX(ecp.cost_amount) AS max_cost
+      `SELECT MIN(ecp.cost_amount) AS min_cost, MAX(ecp.cost_amount) AS max_cost,
+              SUBSTRING_INDEX(
+                GROUP_CONCAT(ecp.cost_asset_code ORDER BY ecp.cost_amount ASC SEPARATOR ','),
+                ',', 1
+              ) AS min_cost_asset_code
        FROM exchange_item_skus ps
        JOIN exchange_channel_prices ecp ON ecp.sku_id = ps.sku_id AND ecp.is_enabled = 1
        WHERE ps.exchange_item_id = :productId AND ps.status = 'active'`,
@@ -268,7 +277,8 @@ class SkuService {
         stock: parseInt(skuSummary.total_stock) || 0,
         sold_count: parseInt(skuSummary.total_sold) || 0,
         min_cost_amount: priceSummary?.min_cost !== null ? parseInt(priceSummary.min_cost) : null,
-        max_cost_amount: priceSummary?.max_cost !== null ? parseInt(priceSummary.max_cost) : null
+        max_cost_amount: priceSummary?.max_cost !== null ? parseInt(priceSummary.max_cost) : null,
+        min_cost_asset_code: priceSummary?.min_cost_asset_code || null
       },
       {
         where: { exchange_item_id: exchangeItemId },

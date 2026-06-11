@@ -185,6 +185,8 @@ class AdBiddingService {
           ad_campaign_id: campaign.ad_campaign_id,
           campaign_name: campaign.campaign_name,
           campaign_category: campaign.campaign_category,
+          // 议题2：公告类型（面向用户的展示类型，仅 system 类公告有值；commercial/operational 为 null）
+          announcement_type: campaign.announcement_type || null,
           billing_mode: campaign.billing_mode,
           priority: campaign.priority,
           frequency_rule: campaign.frequency_rule,

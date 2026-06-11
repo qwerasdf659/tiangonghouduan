@@ -252,6 +252,7 @@ router.post(
  * @body {boolean} [force_show=true] - 是否强制展示
  * @body {string} [end_date] - 过期日期（YYYY-MM-DD）
  * @body {string} [internal_notes] - 内部备注
+ * @body {string} announcement_type - 公告类型（必填，对齐字典 announcement_type：system/activity/maintenance/notice）
  */
 router.post(
   '/system',
@@ -268,6 +269,8 @@ router.post(
       operator_user_id: req.user.user_id,
       ad_slot_id: parseInt(ad_slot_id),
       campaign_name,
+      // 议题2：公告类型透传给 Service，合法性校验收口在 Service 层（查字典），路由不硬编码枚举
+      announcement_type: req.body.announcement_type,
       priority: req.body.priority ? parseInt(req.body.priority) : 950,
       force_show: req.body.force_show !== false,
       start_date: req.body.start_date || null,

@@ -97,7 +97,9 @@ const PRODUCT_VIEW_ATTRIBUTES = {
  */
 const EXCHANGE_MARKET_ATTRIBUTES = {
   /**
-   * 市场商品列表视图（ExchangeItem SPU + SKU 定价/库存通过 include 获取）
+   * 市场商品列表视图（ExchangeItem SPU 物化列；价格/库存只读 SPU 汇总列，不 JOIN SKU/渠道价）
+   * 议题1（已拍板）：补齐 stock/sold_count/min_cost_amount/max_cost_amount/min_cost_asset_code 5 个 SPU 物化列，
+   * 由 getMarketItems 映射为前端契约字段 cost_amount/cost_asset_code（前端零映射直接读）。
    */
   marketItemView: [
     'exchange_item_id',
@@ -118,7 +120,12 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
     'usage_rules',
     'publish_at',
     'unpublish_at',
-    'created_at'
+    'created_at',
+    'stock',
+    'sold_count',
+    'min_cost_amount',
+    'max_cost_amount',
+    'min_cost_asset_code'
   ],
 
   /**
@@ -290,6 +297,7 @@ class QueryService {
       status = 'active',
       asset_code = null,
       space = null,
+      item_type = null,
       keyword = null,
       category = null,
       exclude_id = null,
@@ -316,6 +324,7 @@ class QueryService {
         status,
         asset_code: asset_code || 'all',
         space: space || 'all',
+        item_type: item_type || 'all',
         keyword: keyword || '',
         category: category || 'all',
         exclude_id: exclude_id || 0,
@@ -405,12 +414,15 @@ class QueryService {
            * value_tier 价值分层（BE-2）：value_tier 实际是 item_templates 表字段，
            * 经 exchange_items.item_template_id 关联取得，供 C 端对 high 档做"会员尊享"差异化展示。
            * 仅取 value_tier 单列，不暴露模板其它商业敏感字段。
+           * item_type：双轨频道标识（prop=道具商城/星石轨，product/voucher=商品兑换/源晶轨）。
+           * 传 item_type 时 required:true + where 实现服务端频道筛选；用于派生顶层 is_prop。
            */
           {
             model: this.models.ItemTemplate,
             as: 'itemTemplate',
-            attributes: ['value_tier'],
-            required: false
+            attributes: ['value_tier', 'item_type'],
+            required: !!item_type,
+            where: item_type ? { item_type } : undefined
           }
         ],
         subQuery: false,
@@ -427,13 +439,33 @@ class QueryService {
 
       logger.info(`[兑换市场] 找到${count}个商品，返回第${page}页（${rows.length}个）`)
 
+      /*
+       * default_sku_id 批量解析（议题1·拍板项②）：仅"单 active SKU"商品下发一个 sku_id，
+       * 多 SKU 商品为 null（前端引导进详情选规格）。列表不下发完整 skus[]（守数据脱敏底线）。
+       * 批量一次性查本页商品的 active SKU，按 SPU 分组，避免 N+1。
+       */
+      const pageItemIds = rows.map(r => r.exchange_item_id)
+      const defaultSkuMap = await this._resolveDefaultSkuIds(pageItemIds)
+
       // 添加中文显示名称
       const itemsWithDisplayNames = await displayNameHelper.attachDisplayNames(
         rows.map(item => {
           const plain = item.toJSON()
           // value_tier 上提到顶层（BE-2），并移除嵌套的 itemTemplate，避免泄露模板其它字段
           plain.value_tier = plain.itemTemplate?.value_tier || 'low'
+          // is_prop 派生位：双轨频道标识（item_type='prop'），供 C 端展示层判断，避免前端散落判断 item_type
+          plain.is_prop = plain.itemTemplate?.item_type === 'prop'
           delete plain.itemTemplate
+          /*
+           * 议题1（已拍板）：把 SPU 物化列映射为前端契约字段，前端零映射直接读：
+           * - cost_amount      ← min_cost_amount（展示价=最低单价）
+           * - cost_asset_code  ← min_cost_asset_code（计价资产，决定积分轨/星石轨）
+           * 列表只读 SPU 物化列，不 JOIN SKU/渠道价表（最快、最易缓存、最贴脱敏）。
+           */
+          plain.cost_amount = plain.min_cost_amount !== null ? plain.min_cost_amount : null
+          plain.cost_asset_code = plain.min_cost_asset_code || null
+          // 货架一键兑换：单 active SKU 商品给 sku_id，多 SKU 给 null
+          plain.default_sku_id = defaultSkuMap.get(plain.exchange_item_id) || null
           return plain
         }),
         [{ field: 'status', dictType: 'product_status' }]
@@ -1217,6 +1249,48 @@ class QueryService {
     const Category = this.models.Category
     if (!Category) return null
     return Category.resolveToId(category)
+  }
+
+  /**
+   * 批量解析列表项的 default_sku_id（议题1·拍板项②）
+   *
+   * 业务规则：
+   * - 仅"恰好 1 个 active SKU"的商品返回该 sku_id（货架一键兑换体验最顺）。
+   * - 多 active SKU 商品返回 null（前端引导进详情选规格）。
+   * - 无 active SKU 商品不在结果 Map 中（调用方取到 undefined → null）。
+   *
+   * 脱敏：列表只下发一个 default_sku_id，不下发完整 skus[]（不暴露 SKU 明细/定价结构给小程序）。
+   * 性能：一次性查本页所有商品的 active SKU 并按 SPU 分组，避免 N+1。
+   *
+   * @param {number[]} exchangeItemIds - 本页商品 ID 列表
+   * @returns {Promise<Map<number, number|null>>} exchange_item_id → default_sku_id（单SKU时为id，多SKU为null）
+   * @private
+   */
+  async _resolveDefaultSkuIds(exchangeItemIds) {
+    const result = new Map()
+    if (!exchangeItemIds || exchangeItemIds.length === 0) return result
+    if (!this.ExchangeItemSku) return result
+
+    const skus = await this.ExchangeItemSku.findAll({
+      where: { exchange_item_id: { [Op.in]: exchangeItemIds }, status: 'active' },
+      attributes: ['sku_id', 'exchange_item_id'],
+      order: [['sort_order', 'ASC']],
+      raw: true
+    })
+
+    // 按 SPU 分组统计 active SKU
+    const grouped = new Map()
+    for (const sku of skus) {
+      if (!grouped.has(sku.exchange_item_id)) grouped.set(sku.exchange_item_id, [])
+      grouped.get(sku.exchange_item_id).push(sku.sku_id)
+    }
+
+    for (const [itemId, skuIds] of grouped) {
+      // 仅单 active SKU 商品给 default_sku_id，多 SKU 给 null
+      result.set(itemId, skuIds.length === 1 ? skuIds[0] : null)
+    }
+
+    return result
   }
 
   /**

@@ -314,18 +314,24 @@ class PremiumService {
           unlocked: false,
           is_expired: isExpired,
           last_unlock_time: isUnlocked ? premiumStatus.unlock_time : null,
+          unlock_cost: UNLOCK_COST,
+          validity_hours: VALIDITY_HOURS,
           conditions: {
             condition_1: {
-              name: '历史累计积分',
+              name: '历史累计积分门槛',
+              description: `历史累计获得积分需达到 ${HISTORY_POINTS_THRESHOLD} 分（识别高价值用户资格）`,
               required: HISTORY_POINTS_THRESHOLD,
               current: historyPoints,
-              satisfied: historyPoints >= HISTORY_POINTS_THRESHOLD
+              satisfied: historyPoints >= HISTORY_POINTS_THRESHOLD,
+              shortage: Math.max(0, HISTORY_POINTS_THRESHOLD - historyPoints)
             },
             condition_2: {
               name: '当前积分余额',
+              description: `当前可用积分余额需达到 ${UNLOCK_COST} 分（用于支付解锁费用）`,
               required: UNLOCK_COST,
               current: availablePoints,
-              satisfied: availablePoints >= UNLOCK_COST
+              satisfied: availablePoints >= UNLOCK_COST,
+              shortage: Math.max(0, UNLOCK_COST - availablePoints)
             }
           },
           can_unlock: historyPoints >= HISTORY_POINTS_THRESHOLD && availablePoints >= UNLOCK_COST
@@ -340,6 +346,8 @@ class PremiumService {
       return {
         unlocked: true,
         is_valid: true,
+        unlock_cost: UNLOCK_COST,
+        validity_hours: VALIDITY_HOURS,
         unlock_time: premiumStatus.unlock_time,
         unlock_method: premiumStatus.unlock_method,
         expires_at: premiumStatus.expires_at,

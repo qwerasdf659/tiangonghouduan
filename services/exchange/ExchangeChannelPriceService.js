@@ -10,6 +10,7 @@ const { assertAndGetTransaction } = require('../../utils/transactionHelpers')
 const BusinessError = require('../../utils/BusinessError')
 const { logger } = require('../../utils/logger')
 const BeijingTimeHelper = require('../../utils/timeHelper')
+const ExchangeItemService = require('./ExchangeItemService')
 
 /**
  * 兑换渠道定价服务（SKU × 材料资产）
@@ -20,8 +21,11 @@ class ExchangeChannelPriceService {
    */
   constructor(models) {
     this.models = models
+    this.sequelize = models.sequelize
     this.ExchangeChannelPrice = models.ExchangeChannelPrice
     this.ExchangeItemSku = models.ExchangeItemSku
+    // 复用商品中心的 SPU 物化列回填（议题1 同口径），避免在本服务再写第 N 份聚合逻辑
+    this._itemService = new ExchangeItemService(models)
   }
 
   /**
@@ -350,6 +354,7 @@ class ExchangeChannelPriceService {
     })
 
     if (list.length === 0) {
+      await this._itemService._updateSpuSummary(sku.exchange_item_id, transaction)
       logger.info('ExchangeChannelPriceService.bulkSetPrices', {
         sku_id: sid,
         inserted: 0,
@@ -387,6 +392,8 @@ class ExchangeChannelPriceService {
       inserted: rows.length,
       ts: BeijingTimeHelper.now()
     })
+
+    await this._itemService._updateSpuSummary(sku.exchange_item_id, transaction)
 
     return rows.map(r => r.get({ plain: true }))
   }

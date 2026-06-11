@@ -278,6 +278,9 @@ document.addEventListener('alpine:init', () => {
       priority: 50
     },
 
+    // 公告类型下拉选项（议题2：取字典 announcement_type，仅系统通知 system-notices 使用）
+    announcementTypeOptions: [],
+
     // ==================== 审核 ====================
     reviewTarget: null,
     reviewAction: '',
@@ -571,7 +574,13 @@ document.addEventListener('alpine:init', () => {
         internal_notes: '',
         text_content: '',
         content_type: isSystem ? 'text' : 'image',
-        display_mode: null
+        display_mode: null,
+        // 议题2：公告类型（仅 system 类必填，强制必选不给默认值；前端预选交由用户显式确认）
+        announcement_type: ''
+      }
+      // 系统通知需要公告类型下拉，按需加载字典（已加载则跳过）
+      if (isSystem) {
+        this.loadAnnouncementTypeOptions()
       }
       this.campaignImagePreview = ''
       this.campaignPrimaryMediaId = null
@@ -582,6 +591,27 @@ document.addEventListener('alpine:init', () => {
     getSelectedSlotInfo() {
       if (!this.campaignForm.ad_slot_id) return null
       return this.allSlotsList.find(s => s.ad_slot_id === Number(this.campaignForm.ad_slot_id))
+    },
+
+    /**
+     * 加载公告类型字典选项（议题2：字典 announcement_type，系统通知下拉用）
+     * 复用统一字典接口 GET /api/v4/system/dictionaries/type/:dictType，不硬编码中文。
+     * @returns {Promise<void>}
+     */
+    async loadAnnouncementTypeOptions() {
+      if (this.announcementTypeOptions.length > 0) return
+      try {
+        const url = buildURL(SYSTEM_ENDPOINTS.DICT_BY_TYPE, { dictType: 'announcement_type' })
+        const res = await request({ url, method: 'GET' })
+        if (res?.success && res.data?.items) {
+          this.announcementTypeOptions = res.data.items.map(item => ({
+            value: item.code,
+            label: item.name
+          }))
+        }
+      } catch (error) {
+        logger.error('加载公告类型字典失败:', error)
+      }
     },
 
     async saveCampaign() {
@@ -596,6 +626,12 @@ document.addEventListener('alpine:init', () => {
 
       const category = this.campaignForm.campaign_category || 'commercial'
       const isFree = category === 'system' || category === 'operational'
+
+      // 议题2：系统通知强制必选公告类型（与后端 createSystemCampaign 强制必填一致）
+      if (category === 'system' && !this.campaignForm.announcement_type) {
+        this.showError('请选择公告类型（系统公告/活动公告/维护公告/通知）')
+        return
+      }
 
       if (!isFree) {
         if (!this.campaignForm.billing_mode) {
@@ -663,6 +699,10 @@ document.addEventListener('alpine:init', () => {
         }
         if (category === 'system' && this.campaignForm.internal_notes) {
           data.internal_notes = this.campaignForm.internal_notes
+        }
+        // 议题2：系统通知携带公告类型（后端按字典校验）
+        if (category === 'system') {
+          data.announcement_type = this.campaignForm.announcement_type
         }
 
         // W1+W2: 传递 text_content 和 content_type（AdCreative 模型字段）

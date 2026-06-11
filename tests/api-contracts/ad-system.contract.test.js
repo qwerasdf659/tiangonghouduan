@@ -198,7 +198,9 @@ describe('API契约测试 - 广告系统', () => {
           ad_slot_id: 13,
           priority: 950,
           content_type: 'text',
-          text_content: '系统通知内容'
+          text_content: '系统通知内容',
+          // 议题2（拍板项2）：公告类型强制必选，取字典 announcement_type
+          announcement_type: 'system'
         })
 
       expect(res.status).toBe(200)
@@ -213,6 +215,23 @@ describe('API契约测试 - 广告系统', () => {
       expect(detail.body.data.creatives.length).toBe(1)
       expect(detail.body.data.creatives[0].text_content).toBe('系统通知内容')
       expect(detail.body.data.creatives[0].review_status).toBe('approved')
+    })
+
+    test('创建系统计划缺少 announcement_type 返回 400（议题2 强制必选验证）', async () => {
+      const res = await request(app)
+        .post('/api/v4/console/ad-campaigns/system')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({
+          campaign_name: '契约测试-缺公告类型',
+          ad_slot_id: 13,
+          priority: 950,
+          content_type: 'text',
+          text_content: '缺少公告类型应被拒绝'
+        })
+
+      expect(res.status).toBe(400)
+      expect(res.body.success).toBe(false)
+      expect(res.body.code).toBe('AD_INVALID')
     })
   })
 

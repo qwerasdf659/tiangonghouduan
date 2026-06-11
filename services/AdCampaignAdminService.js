@@ -12,7 +12,7 @@
 const BusinessError = require('../utils/BusinessError')
 const logger = require('../utils/logger').logger
 const { Op } = require('sequelize')
-const { AdCampaign, AdSlot, AdCreative, User } = require('../models')
+const { AdCampaign, AdSlot, AdCreative, User, SystemDictionary } = require('../models')
 
 const BeijingTimeHelper = require('../utils/timeHelper')
 const { attachDisplayNames, DICT_TYPES } = require('../utils/displayNameHelper')
@@ -310,6 +310,38 @@ class AdCampaignAdminService {
   // PLACEHOLDER_SYSTEM_CAMPAIGN
 
   /**
+   * 校验公告类型合法性（议题2·字典为唯一数据源）
+   *
+   * 取值合法性 = 该 code 存在于 system_dictionaries 的 announcement_type 且 is_enabled=1。
+   * 不维护硬编码枚举常量，避免"字典 + 常量"双枚举互相打架。
+   *
+   * @param {string} announcementType - 公告类型 code（system/activity/maintenance/notice）
+   * @param {Object} [options] - 选项
+   * @param {Transaction} [options.transaction] - 事务对象
+   * @returns {Promise<void>} 校验通过无返回，非法时抛 BusinessError
+   * @private
+   */
+  static async _validateAnnouncementType(announcementType, options = {}) {
+    const { transaction } = options
+    const dict = await SystemDictionary.findOne({
+      where: {
+        dict_type: 'announcement_type',
+        dict_code: announcementType,
+        is_enabled: true
+      },
+      transaction
+    })
+
+    if (!dict) {
+      throw new BusinessError(
+        `公告类型无效（${announcementType}），请在字典管理中配置 announcement_type 字典`,
+        'AD_INVALID',
+        400
+      )
+    }
+  }
+
+  /**
    * 创建系统通知计划（system 类型）
    * @param {Object} data - 系统通知计划数据
    * @param {Object} options - 可选参数（含事务对象）
@@ -326,6 +358,21 @@ class AdCampaignAdminService {
         )
       }
 
+      /*
+       * 议题2（拍板项2：强制必选 + 拍板项1方案C：字典为唯一数据源）：
+       * announcement_type 强制必填，且必须存在于字典 announcement_type 且启用。
+       * 不写 `|| 'system'` 兜底（避免漏选被悄悄归类为系统公告，污染用户端展示）。
+       */
+      const announcement_type = data.announcement_type
+      if (!announcement_type) {
+        throw new BusinessError(
+          '公告类型（announcement_type）必填，请选择系统公告/活动公告/维护公告/通知',
+          'AD_INVALID',
+          400
+        )
+      }
+      await this._validateAnnouncementType(announcement_type, { transaction: options.transaction })
+
       const adSlot = await AdSlot.findByPk(data.ad_slot_id, { transaction: options.transaction })
       if (!adSlot) throw new BusinessError('广告位不存在: ' + data.ad_slot_id, 'AD_NOT_FOUND', 404)
 
@@ -335,6 +382,7 @@ class AdCampaignAdminService {
         {
           business_id,
           campaign_category: 'system',
+          announcement_type,
           advertiser_user_id: data.operator_user_id,
           ad_slot_id: data.ad_slot_id,
           campaign_name: data.campaign_name,

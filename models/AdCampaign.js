@@ -290,6 +290,19 @@ module.exports = sequelize => {
         comment: '内部运营备注（仅管理后台可见，原 SystemAnnouncement 属性）'
       },
 
+      announcement_type: {
+        type: DataTypes.STRING(20),
+        allowNull: true,
+        /*
+         * 公告类型（议题2，仅 announcement 槽位的 system 类计划使用）。
+         * 取值对齐字典 system_dictionaries.announcement_type：
+         *   system=系统公告 / activity=活动公告 / maintenance=维护公告 / notice=通知；NULL=非公告。
+         * 取值合法性由 Service 层查字典校验（字典为唯一数据源），模型层不硬编码枚举常量，
+         * 避免"字典 + 常量"双枚举技术债。
+         */
+        comment: '公告类型(仅announcement槽位用，值对齐字典announcement_type；NULL=非公告)'
+      },
+
       slide_interval_ms: {
         type: DataTypes.INTEGER,
         allowNull: true,

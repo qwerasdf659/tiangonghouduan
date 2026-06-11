@@ -271,7 +271,7 @@ router.get(
       const defaultConfig = {
         tabs: [
           { key: 'exchange', label: '商品兑换', icon: 'download', enabled: true, sort_order: 1 },
-          { key: 'market', label: '交易市场', icon: 'success', enabled: true, sort_order: 2 }
+          { key: 'prop', label: '道具商城', icon: 'gift', enabled: true, sort_order: 2 }
         ],
         spaces: [
           {

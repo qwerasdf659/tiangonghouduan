@@ -27,6 +27,7 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireMerchantPermission } = require('../../../../middleware/auth')
+const { resolveStoreContext } = require('../../../../middleware/resolveStoreContext')
 const { asyncHandler } = require('../../../../middleware/validation')
 const logger = require('../../../../utils/logger').logger
 const TransactionManager = require('../../../../utils/TransactionManager')
@@ -65,33 +66,16 @@ router.get(
   '/list',
   authenticateToken,
   requireMerchantPermission('staff:read', { scope: 'store', storeIdParam: 'query' }),
+  resolveStoreContext({ storeIdParam: 'query', required: false }),
   asyncHandler(async (req, res) => {
-    const { store_id, status, page = 1, page_size = 20 } = req.query
-    const user_stores = req.user_stores || []
+    const { status, page = 1, page_size = 20 } = req.query
 
-    // 确定查询的门店范围
-    let resolved_store_id = req.verified_store_id || (store_id ? parseInt(store_id, 10) : null)
-
-    // 非管理员必须指定门店或自动填充单门店
-    if (req.user.role_level < 100 && !resolved_store_id) {
-      if (user_stores.length === 0) {
-        return res.apiError('您未绑定任何门店', 'NO_STORE_BINDING', null, 403)
-      } else if (user_stores.length === 1) {
-        resolved_store_id = user_stores[0].store_id
-      } else {
-        return res.apiError(
-          '您绑定了多个门店，请明确指定 store_id 参数',
-          'MULTIPLE_STORES_REQUIRE_STORE_ID',
-          {
-            available_stores: user_stores.map(s => ({
-              store_id: s.store_id,
-              store_name: s.store_name
-            }))
-          },
-          400
-        )
-      }
-    }
+    /*
+     * 议题3：门店范围由 resolveStoreContext 统一解析（required:false 为列表只读场景）。
+     * - 普通员工：单店自动填充 / 多店须带 store_id；
+     * - 管理员：带 store_id 则查该店，不带则 store_context.store_id=null → 查全部门店。
+     */
+    const resolved_store_id = req.store_context.store_id
 
     const filters = {}
     if (resolved_store_id) filters.store_id = resolved_store_id
@@ -123,6 +107,7 @@ router.post(
   '/add',
   authenticateToken,
   requireMerchantPermission('staff:manage', { scope: 'store', storeIdParam: 'body' }),
+  resolveStoreContext({ storeIdParam: 'body' }),
   asyncHandler(async (req, res) => {
     const { user_id, store_id, role_in_store = 'staff', notes } = req.body
     const operator_id = req.user.user_id
@@ -325,6 +310,7 @@ router.post(
   '/enable',
   authenticateToken,
   requireMerchantPermission('staff:manage', { scope: 'store', storeIdParam: 'body' }),
+  resolveStoreContext({ storeIdParam: 'body' }),
   asyncHandler(async (req, res) => {
     const { user_id, store_id, notes } = req.body
     const operator_id = req.user.user_id

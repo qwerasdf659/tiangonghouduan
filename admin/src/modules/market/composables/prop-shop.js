@@ -62,7 +62,26 @@ export function usePropShopState() {
     imageUploading: false,
     submitting: false,
     showForm: false,
-    keyword: ''
+    keyword: '',
+    // [EDIT_STATE] 修改库存/价格/状态（道具上架后运营调整）
+    showEditForm: false,
+    editSubmitting: false,
+    editForm: createEmptyEditForm()
+  }
+}
+
+/**
+ * 创建一份空的「修改道具」表单（编辑现有道具的库存/星石价/状态）
+ * @returns {Object} 空编辑表单
+ */
+function createEmptyEditForm() {
+  return {
+    exchange_item_id: null,
+    sku_id: null,
+    item_name: '',
+    star_stone_price: 1,
+    stock: 0,
+    status: 'active'
   }
 }
 
@@ -124,6 +143,36 @@ export function usePropShopMethods() {
       this.showForm = false
     },
 
+    // [EDIT]
+    /**
+     * 打开「修改道具」表单：用列表项已下发的 SPU 物化列 + 默认 SKU 回显当前库存/星石价/状态。
+     * 道具恒为单 active SKU（一体化上架链固定建一个默认 SKU），故取 skus[0] 即默认 SKU。
+     * @param {Object} item - 列表中的道具项（含 stock/min_cost_amount/min_cost_asset_code/skus）
+     */
+    openEditForm(item) {
+      const defaultSku = Array.isArray(item.skus) ? item.skus[0] : null
+      if (!defaultSku) {
+        this.showError?.('该道具无可用 SKU，无法修改库存（请检查上架是否完整）')
+        return
+      }
+      this.editForm = {
+        exchange_item_id: item.exchange_item_id,
+        sku_id: defaultSku.sku_id,
+        item_name: item.item_name,
+        star_stone_price: Number(item.min_cost_amount) || 1,
+        stock: Number(defaultSku.stock) || 0,
+        status: defaultSku.status || 'active'
+      }
+      this.showEditForm = true
+    },
+
+    /**
+     * 关闭「修改道具」表单
+     */
+    closeEditForm() {
+      this.showEditForm = false
+    },
+
     /**
      * 上传道具图片，绑定 primary_media_id
      * @param {Event} event - 文件选择事件
@@ -167,6 +216,42 @@ export function usePropShopMethods() {
     },
 
     // [SUBMIT]
+    /**
+     * 提交「修改道具」：更新默认 SKU 的库存/状态（绝对值），并重设星石渠道价。
+     * 后端 updateSku 直接写 stock 绝对值（非增量），setChannelPrices 全量替换该 SKU 渠道价。
+     * 两步均由后端在事务内回填 SPU 物化列（议题1 一致性），前端无需手动聚合。
+     */
+    async submitEdit() {
+      const f = this.editForm
+      if (!Number.isFinite(Number(f.star_stone_price)) || Number(f.star_stone_price) <= 0) {
+        this.showError?.('星石价格必须大于 0')
+        return
+      }
+      if (!Number.isFinite(Number(f.stock)) || Number(f.stock) < 0) {
+        this.showError?.('库存必须大于等于 0')
+        return
+      }
+      this.editSubmitting = true
+      try {
+        await ExchangeItemAPI.updateSku(f.sku_id, {
+          stock: Number(f.stock),
+          status: f.status
+        })
+        await ExchangeItemAPI.setChannelPrices(f.sku_id, [
+          { cost_asset_code: PROP_STAR_STONE, cost_amount: Number(f.star_stone_price) }
+        ])
+        this.showSuccess?.('道具已更新（库存/星石价/状态）')
+        this.showEditForm = false
+        await this.loadPropList()
+      } catch (e) {
+        logger.error('[PropShop] 修改道具失败', e)
+        this.showError?.('修改失败：' + e.message)
+      } finally {
+        this.editSubmitting = false
+      }
+    },
+
+    // [SUBMIT_CREATE]
     /**
      * 一体化上架道具：建模板 → 建 SPU → 建 SKU → 设星石价（任一步失败即终止并提示）
      */

@@ -58,7 +58,15 @@
               <span class="stone-badge">星石</span>
             </div>
             <div class="text-xs text-gray-400" x-text="'ID: ' + item.exchange_item_id"></div>
-            <div class="text-xs text-gray-500 mt-1" x-text="item.status === 'active' ? '已上架' : '已下架'"></div>
+            <div class="flex items-center gap-3 mt-2 text-xs">
+              <span class="text-indigo-600 font-semibold" x-text="'星石 ' + (item.min_cost_amount ?? '-')"></span>
+              <span class="text-gray-600" x-text="'库存 ' + (item.stock ?? 0)"></span>
+              <span class="text-gray-600" x-text="'已售 ' + (item.sold_count ?? 0)"></span>
+            </div>
+            <div class="flex justify-between items-center mt-2">
+              <span class="text-xs" :class="item.status === 'active' ? 'text-green-600' : 'text-gray-400'" x-text="item.status === 'active' ? '已上架' : '已下架'"></span>
+              <button @click="openEditForm(item)" class="btn btn-outline btn-sm">✏️ 修改库存/价格</button>
+            </div>
           </div>
         </template>
       </div>
@@ -126,6 +134,49 @@
           <button @click="submitProp()" class="action-btn action-btn-primary btn-sm" :disabled="submitting || imageUploading">
             <span x-show="submitting">⏳ 上架中...</span>
             <span x-show="!submitting">🚀 一键上架道具</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </template>
+  <!-- EDIT_MODAL：修改道具库存/星石价/状态 -->
+  <template x-if="showEditForm">
+    <div class="fixed inset-0 z-50 flex items-center justify-center">
+      <div class="fixed inset-0 bg-black/50" @click="closeEditForm()"></div>
+      <div class="relative bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto p-6">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-lg font-semibold">✏️ 修改道具</h3>
+          <button @click="closeEditForm()" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+        </div>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">道具名称</label>
+            <input type="text" x-model="editForm.item_name" disabled class="form-input text-sm w-full bg-gray-100">
+            <p class="text-xs text-gray-400 mt-1">名称不在本弹窗修改（如需改名请走商品中心）</p>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">星石价格 <span class="text-red-500">*</span></label>
+              <input type="number" x-model.number="editForm.star_stone_price" min="1" class="form-input text-sm w-full">
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">库存 <span class="text-red-500">*</span></label>
+              <input type="number" x-model.number="editForm.stock" min="0" class="form-input text-sm w-full">
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">状态</label>
+            <select x-model="editForm.status" class="form-input text-sm w-full">
+              <option value="active">上架</option>
+              <option value="inactive">下架</option>
+            </select>
+          </div>
+        </div>
+        <div class="flex justify-end gap-3 mt-6">
+          <button @click="closeEditForm()" class="btn btn-outline btn-sm" :disabled="editSubmitting">取消</button>
+          <button @click="submitEdit()" class="action-btn action-btn-primary btn-sm" :disabled="editSubmitting">
+            <span x-show="editSubmitting">⏳ 保存中...</span>
+            <span x-show="!editSubmitting">💾 保存修改</span>
           </button>
         </div>
       </div>

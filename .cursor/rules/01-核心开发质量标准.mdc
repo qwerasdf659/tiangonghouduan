@@ -48,26 +48,13 @@ const UNIFIED_API_STANDARDS = {
     ]
   },
 
-  // 强制API路径兼容映射（解决路径不匹配问题）
-  pathCompatibility: {
-    '/admin/chat/sessions': '/api/v4/admin/chat/sessions',   // cursor_1.md发现
-    '/api/inventory': '/api/v4/inventory/list',              // cursor_5.md发现
-    '/api/upload': '/api/v4/photo/upload',                   // 实际路径映射
-    '/api/auth/verify': '/api/v4/auth/verify'                // 版本兼容
-  },
+  // 🚫 禁止路径兼容映射 / 自动重定向（现行规则：不兼容旧路由、不做字段映射）
+  // 正确做法：前后端 API 路径、参数、层级保持一致；旧路由直接删除，只保留 V4 最新结构。
+  // 路径不一致时，应「修改前端适配后端」，而不是在后端加重定向兜底。
+  noCompatibilityRedirect: true,
 
-  // 自动生成兼容性路由（预防404错误）
-  generateCompatibilityRoutes: (app) => {
-    Object.entries(UNIFIED_API_STANDARDS.pathCompatibility).forEach(([oldPath, newPath]) => {
-      app.all(oldPath, (req, res, next) => {
-        console.log(`🔄 API兼容重定向: ${oldPath} → ${newPath}`);
-        req.url = newPath;
-        next();
-      });
-    });
-  },
-
-  // 前端API方法完整性验证（防止TypeError）
+  // 前端API方法完整性校验（只检测、只报告，禁止自动补全/生成桩方法）
+  // 现行规则：不允许调用不存在的方法；缺失的能力必须由对应程序员真实实现后再使用。
   validateFrontendAPI: (API) => {
     const requiredMethods = [
       'getUserInventory', 'useInventoryItem', 'transferInventoryItem',
@@ -76,16 +63,10 @@ const UNIFIED_API_STANDARDS = {
     ];
 
     const missing = requiredMethods.filter(method => typeof API[method] !== 'function');
-    
+
     if (missing.length > 0) {
-      console.error(`🔴 缺失${missing.length}个API方法:`, missing);
-      
-      // 自动补全缺失方法
-      missing.forEach(methodName => {
-        API[methodName] = async function(params = {}) {
-          throw new Error(`API方法 ${methodName} 需要实现`);
-        };
-      });
+      // ✅ 只报告，交由开发者真实实现；不得自动补全为抛错桩方法
+      console.error(`🔴 缺失${missing.length}个API方法（需真实实现，禁止桩补全）:`, missing);
     }
 
     return missing.length === 0;
@@ -118,38 +99,20 @@ const WEBSOCKET_COMPLETENESS_VALIDATOR = {
     ]
   },
 
-  // WebSocket方法存在性检查和自动补全
-  validateAndGenerate: (webSocketService) => {
+  // WebSocket方法存在性检查（只检测、只报告，禁止自动生成方法）
+  // 现行规则：方法必须真实实现；缺失即视为功能未完成，由开发者补齐，不得运行时注入桩方法。
+  validate: (webSocketService) => {
     const missingMethods = [];
-    
+
     Object.values(WEBSOCKET_COMPLETENESS_VALIDATOR.requiredMethods).flat().forEach(methodName => {
       if (typeof webSocketService[methodName] !== 'function') {
-        console.warn(`⚠️ 自动生成WebSocket方法: ${methodName}`);
-        
-        // 基于方法名自动实现基础功能
-        webSocketService[methodName] = function(...args) {
-          if (methodName.startsWith('notify')) {
-            const [target, message] = args;
-            return this.sendToConnection(target, {
-              type: 'notification',
-              data: message,
-              timestamp: new Date().toISOString()
-            });
-          } else if (methodName.startsWith('broadcast')) {
-            const [message] = args;
-            return this.broadcastMessage({
-              type: 'broadcast',
-              data: message,
-              timestamp: new Date().toISOString()
-            });
-          }
-        };
-        
+        // ✅ 只报告缺失，禁止自动生成实现
+        console.error(`🔴 WebSocket方法缺失（需真实实现）: ${methodName}`);
         missingMethods.push(methodName);
       }
     });
 
-    return { valid: missingMethods.length === 0, generated: missingMethods };
+    return { valid: missingMethods.length === 0, missing: missingMethods };
   }
 };
 ```
@@ -159,8 +122,12 @@ const WEBSOCKET_COMPLETENESS_VALIDATOR = {
 ### **基于cursor_5.md事务错误的安全模式**
 ```javascript
 // 🔴 解决事务回滚和重复提交问题
+// ⚠️ 分层约束（现行规则）：事务边界只能由「入口层」管理（路由通过 TransactionManager.execute()）。
+//    Service 层禁止自建事务，必须通过 assertAndGetTransaction(options) 强制要求外部传入 transaction。
+//    下方 execute 即「入口层统一执行器」的参考实现，等价于项目中的 TransactionManager.execute()，
+//    Service 内部不得再复制此逻辑自开事务。
 const SAFE_TRANSACTION_SYSTEM = {
-  // 安全事务执行器（避免"已完成事务"错误）
+  // 安全事务执行器（仅供入口层使用，避免"已完成事务"错误）
   execute: async (operation, options = {}) => {
     const { maxRetries = 3, timeout = 30000 } = options;
     let transaction = null;
@@ -238,7 +205,7 @@ const CONFIG_COMPLETENESS_SYSTEM = {
     websocket: ['WS_PORT', 'WS_PATH']
   },
 
-  // 环境变量完整性检查和自动补全
+  // 环境变量完整性检查（只检测缺失项并返回模板提示，不写回 .env）
   validateAndGenerate: () => {
     const missing = [];
     
@@ -263,11 +230,13 @@ const CONFIG_COMPLETENESS_SYSTEM = {
     return { valid: true, missing: [] };
   },
 
-  // 自动生成.env模板
-  generateEnvTemplate: () => `# 数据库配置
+  // 生成.env模板（仅用于「缺失项提示」，不得在运行时写回或覆盖真实 .env）
+  // ⚠️ 现行规则：.env 是唯一真相源，配置只能由人工在 .env 维护；
+  //    ecosystem.config.js / 脚本 / 测试代码均不得再写同名兜底值。
+  generateEnvTemplate: () => `# 数据库配置（DB_NAME 以 .env 实际值为准：restaurant_points_dev）
 DB_HOST=localhost
 DB_PORT=3306
-DB_NAME=restaurant_lottery
+DB_NAME=restaurant_points_dev
 DB_USER=root
 DB_PASSWORD=your_password
 
@@ -360,7 +329,7 @@ const QUALITY_ASSURANCE_SYSTEM = {
     results.checks.api_completeness = { valid: apiCheck, issues: apiCheck ? [] : ['API方法缺失'] };
 
     // 2. WebSocket完整性检查  
-    const wsCheck = WEBSOCKET_COMPLETENESS_VALIDATOR.validateAndGenerate(context.webSocketService);
+    const wsCheck = WEBSOCKET_COMPLETENESS_VALIDATOR.validate(context.webSocketService);
     results.checks.websocket_completeness = wsCheck;
 
     // 3. 环境变量完整性检查
@@ -461,10 +430,12 @@ const MODEL_ASSOCIATION_STANDARDS = {
     }
   },
 
-  // 验证并自动建立缺失的关联
-  validateAndEstablish: (models) => {
+  // 验证关联完整性（只检测、只报告，禁止运行时自动建立关联）
+  // ⚠️ 现行规则：关联必须在各模型的 associate() 中「显式定义」，不依赖运行时推断/补建；
+  //    所有外键还须在数据库层面定义（强约束 > ORM 关联）。此处仅做缺失检查并报告。
+  validate: (models) => {
     const issues = [];
-    
+
     Object.entries(MODEL_ASSOCIATION_STANDARDS.standardAssociations).forEach(([modelName, associations]) => {
       const model = models[modelName];
       if (!model) {
@@ -472,19 +443,16 @@ const MODEL_ASSOCIATION_STANDARDS = {
         return;
       }
 
-      // 检查并建立hasMany关联
       associations.hasMany?.forEach(assoc => {
         if (!model.associations[assoc.as]) {
-          model.hasMany(models[assoc.model], { as: assoc.as, foreignKey: assoc.foreignKey });
-          console.log(`✅ 建立关联: ${modelName}.hasMany(${assoc.model}, ${assoc.as})`);
+          // ✅ 只报告缺失，需到对应模型 associate() 中显式补充，禁止运行时补建
+          issues.push(`缺失关联（需显式定义）: ${modelName}.hasMany(${assoc.model}, ${assoc.as})`);
         }
       });
 
-      // 检查并建立belongsTo关联  
       associations.belongsTo?.forEach(assoc => {
         if (!model.associations[assoc.as]) {
-          model.belongsTo(models[assoc.model], { as: assoc.as, foreignKey: assoc.foreignKey });
-          console.log(`✅ 建立关联: ${modelName}.belongsTo(${assoc.model}, ${assoc.as})`);
+          issues.push(`缺失关联（需显式定义）: ${modelName}.belongsTo(${assoc.model}, ${assoc.as})`);
         }
       });
     });
@@ -514,7 +482,7 @@ UNIFIED_API_STANDARDS.validateFrontendAPI(require('./utils/api'));
 echo "🔌 检查WebSocket功能..."
 node -e "
 const WEBSOCKET_VALIDATOR = require('./quality-standards');
-WEBSOCKET_VALIDATOR.validateAndGenerate(require('./services/webSocketService'));
+WEBSOCKET_VALIDATOR.validate(require('./services/webSocketService'));
 "
 
 # 3. 检查环境变量配置

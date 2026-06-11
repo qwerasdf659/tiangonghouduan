@@ -274,7 +274,10 @@ class ScheduledTasks {
     // 任务41: 每小时第35分钟执行 DIY 作品超时自动解冻（frozen_at 超过 24 小时）
     this.registerDiyFrozenTimeoutTask()
 
-    logger.info('所有定时任务已初始化完成（包含统一对账+物品锁定过期释放+市场价格快照+数据自动清理+定时上下架+库存预警+DIY超时解冻）')
+    // 任务42: 每天凌晨3:20执行兑换商品 SPU 物化列对账（议题1·拍板项③：冗余列方案标准兜底）
+    this.scheduleDailySpuSummaryReconciliation()
+
+    logger.info('所有定时任务已初始化完成（包含统一对账+物品锁定过期释放+市场价格快照+数据自动清理+定时上下架+库存预警+DIY超时解冻+SPU物化列对账）')
   }
 
   /**
@@ -2741,6 +2744,51 @@ class ScheduledTasks {
     })
 
     logger.info('✅ 定时任务已设置: 物品+资产统一对账（每小时第50分钟执行）')
+  }
+
+  /**
+   * 任务42: 兑换商品 SPU 物化列对账（议题1·拍板项③：冗余列方案标准兜底）
+   * Cron表达式: 20 3 * * *（每天凌晨3:20）
+   *
+   * 全量重算 exchange_items 的 5 个 SPU 物化列
+   * （stock/sold_count/min_cost_amount/max_cost_amount/min_cost_asset_code），
+   * 检测并修复物化列与 active SKU + 渠道价明细的不一致，杜绝"账实不符"。
+   * 与迁移 20260611083214 / 三处 _updateSpuSummary 同一套聚合口径。
+   *
+   * @since 2026-06-11
+   * @returns {void}
+   */
+  static scheduleDailySpuSummaryReconciliation() {
+    cron.schedule('20 3 * * *', async () => {
+      try {
+        /*
+         * R1 双保险：SPU 物化列涉及库存/价格展示，用 withLock 防止多机重复对账。
+         */
+        await distributedLock.withLock(
+          'daily_spu_summary_reconciliation',
+          async () => {
+            logger.info('[定时任务] 开始执行兑换商品 SPU 物化列对账...')
+
+            const { executeSpuSummaryReconciliation } = require('../../scripts/reconcile-items')
+            const report = await executeSpuSummaryReconciliation()
+
+            if (report.status === 'OK') {
+              logger.info('[定时任务] SPU 物化列对账完成：账实一致', report)
+            } else {
+              logger.warn('[定时任务] SPU 物化列对账完成：已修复差异', report)
+            }
+          },
+          { ttl: 300000 }
+        )
+      } catch (error) {
+        logger.error('[定时任务] SPU 物化列对账执行失败', {
+          error: error.message,
+          stack: error.stack
+        })
+      }
+    })
+
+    logger.info('✅ 定时任务已设置: 兑换商品 SPU 物化列对账（每天凌晨3:20执行）')
   }
 
   /**

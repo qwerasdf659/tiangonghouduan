@@ -9,7 +9,7 @@
  *
  * 路由分布：
  * - 用户端 GET /qrcode → /api/v4/user/consumption/qrcode（仅需 authenticateToken）
- * - 商家端 GET /user-info → 本文件（需 requireMerchantDomainAccess + requireMerchantPermission）
+ * - 商家端 GET /user-info → 本文件（需 requireMerchantPermission + resolveStoreContext）
  * - 管理端 GET /qrcode/:user_id → /api/v4/console/consumption/qrcode/:user_id（admin专用）
  *
  * 业务场景：
@@ -26,6 +26,7 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireMerchantPermission } = require('../../../../middleware/auth')
+const { resolveStoreContext } = require('../../../../middleware/resolveStoreContext')
 const { asyncHandler } = require('../../../../middleware/validation')
 const QRCodeValidator = require('../../../../utils/QRCodeValidator')
 const logger = require('../../../../utils/logger').logger
@@ -89,6 +90,7 @@ router.get(
   '/user-info',
   authenticateToken,
   requireMerchantPermission('consumption:scan_user', { scope: 'store', storeIdParam: 'query' }),
+  resolveStoreContext({ storeIdParam: 'query' }),
   asyncHandler(async (req, res) => {
     const QueryService = req.app.locals.services.getService('consumption_query')
 
@@ -107,30 +109,8 @@ router.get(
       )
     }
 
-    let resolved_store_id =
-      req.verified_store_id || (req.query.store_id ? parseInt(req.query.store_id, 10) : null)
-    const user_stores = req.user_stores || []
-
-    if (!resolved_store_id) {
-      if (user_stores.length === 0) {
-        return res.apiError('您未绑定任何门店，无法扫码获取用户信息', 'NO_STORE_BINDING', null, 403)
-      } else if (user_stores.length === 1) {
-        resolved_store_id = user_stores[0].store_id
-        logger.info(`🏪 自动填充门店ID: ${resolved_store_id} (用户仅绑定一个门店)`)
-      } else {
-        return res.apiError(
-          '您绑定了多个门店，请明确指定 store_id 参数',
-          'MULTIPLE_STORES_REQUIRE_STORE_ID',
-          {
-            available_stores: user_stores.map(s => ({
-              store_id: s.store_id,
-              store_name: s.store_name
-            }))
-          },
-          400
-        )
-      }
-    }
+    // 议题3：门店上下文已由 resolveStoreContext 统一解析（管理员/单店/多店一致）
+    const resolved_store_id = req.store_context.store_id
 
     logger.info('商家扫码获取用户信息', {
       qr_code: qr_code.substring(0, 30) + '...',

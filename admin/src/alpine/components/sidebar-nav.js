@@ -142,7 +142,7 @@ export function sidebarNav() {
           },
           {
             id: 'lottery-strategy',
-            name: '⚙️ 策略管理',
+            name: '⚙️ 回馈管理中心',
             url: '/admin/lottery-management.html?page=lottery-strategy'
           },
           {

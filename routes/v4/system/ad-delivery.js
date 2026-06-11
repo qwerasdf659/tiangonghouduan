@@ -22,6 +22,7 @@ const router = express.Router()
 const { authenticateToken } = require('../../../middleware/auth')
 const logger = require('../../../utils/logger').logger
 const { asyncHandler } = require('../../../middleware/validation')
+const displayNameHelper = require('../../../utils/displayNameHelper')
 
 /**
  * GET / - 统一内容获取接口
@@ -64,6 +65,8 @@ router.get(
         ad_campaign_id: item.ad_campaign_id,
         campaign_name: item.campaign_name,
         campaign_category: item.campaign_category,
+        // 议题2：公告类型 code（面向用户的展示类型，前端用它做逻辑/差异化样式；非公告为 null）
+        announcement_type: item.announcement_type || null,
         ad_creative_id: creative.ad_creative_id || null,
         title: creative.title || item.campaign_name,
         content_type: creative.content_type || 'image',
@@ -85,6 +88,15 @@ router.get(
         end_date: item.end_date
       }
     })
+
+    /*
+     * 议题2（拍板项3方案B）：后端直接附中文 announcement_type_display，C 端零映射直接展示。
+     * 复用 displayNameHelper.attachDisplayNames（字典 announcement_type → dict_name）。
+     * announcement_type 为 null 的非公告项，display 也为 null（attachDisplayNames 对 null 安全）。
+     */
+    await displayNameHelper.attachDisplayNames(flatItems, [
+      { field: 'announcement_type', dictType: 'announcement_type' }
+    ])
 
     logger.info('统一内容获取成功', {
       slot_type,

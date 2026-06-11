@@ -21,6 +21,8 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireMerchantPermission } = require('../../../../middleware/auth')
+const { resolveStoreContext } = require('../../../../middleware/resolveStoreContext')
+const { isUserActiveInStore } = require('../../../../middleware/auth')
 const { asyncHandler } = require('../../../../middleware/validation')
 const logger = require('../../../../utils/logger').logger
 const TransactionManager = require('../../../../utils/TransactionManager')
@@ -46,9 +48,9 @@ router.get(
   '/alerts',
   authenticateToken,
   requireMerchantPermission('staff:manage', { scope: 'store', storeIdParam: 'query' }),
+  resolveStoreContext({ storeIdParam: 'query', required: false }),
   asyncHandler(async (req, res) => {
     const {
-      store_id,
       alert_type,
       severity,
       status,
@@ -58,31 +60,12 @@ router.get(
       page_size = 20
     } = req.query
 
-    const user_stores = req.user_stores || []
-
-    // 确定查询的门店范围
-    let resolved_store_id = req.verified_store_id || (store_id ? parseInt(store_id, 10) : null)
-
-    // 非管理员限制只能查看所属门店
-    if (req.user.role_level < 100 && !resolved_store_id) {
-      if (user_stores.length === 0) {
-        return res.apiError('您未绑定任何门店', 'NO_STORE_BINDING', null, 403)
-      } else if (user_stores.length === 1) {
-        resolved_store_id = user_stores[0].store_id
-      } else {
-        return res.apiError(
-          '您绑定了多个门店，请明确指定 store_id 参数',
-          'MULTIPLE_STORES_REQUIRE_STORE_ID',
-          {
-            available_stores: user_stores.map(s => ({
-              store_id: s.store_id,
-              store_name: s.store_name
-            }))
-          },
-          400
-        )
-      }
-    }
+    /*
+     * 议题3：门店范围由 resolveStoreContext 统一解析。
+     * 管理员不带 store_id → store_context.store_id=null → 查全部门店告警；
+     * 普通员工 → 限定到其在职门店（单店自动填充 / 多店须指定）。
+     */
+    const resolved_store_id = req.store_context.store_id
 
     // 构建筛选条件
     const filters = {}
@@ -133,10 +116,9 @@ router.get(
       return res.apiError('告警不存在', 'NOT_FOUND', null, 404)
     }
 
-    // 非管理员只能查看所属门店的告警
-    const user_stores = req.user_stores || []
+    // 非管理员只能查看所属门店的告警（议题3：用 isUserActiveInStore 实时校验在职）
     if (req.user.role_level < 100 && alert.store_id) {
-      const hasAccess = user_stores.some(s => s.store_id === alert.store_id)
+      const hasAccess = await isUserActiveInStore(req.user.user_id, alert.store_id)
       if (!hasAccess) {
         return res.apiError('无权查看此告警', 'FORBIDDEN', null, 403)
       }
@@ -175,10 +157,9 @@ router.post(
       return res.apiError('告警不存在', 'NOT_FOUND', null, 404)
     }
 
-    // 非管理员只能处理所属门店的告警
-    const user_stores = req.user_stores || []
+    // 非管理员只能处理所属门店的告警（议题3：用 isUserActiveInStore 实时校验在职）
     if (req.user.role_level < 100 && alert.store_id) {
-      const hasAccess = user_stores.some(s => s.store_id === alert.store_id)
+      const hasAccess = await isUserActiveInStore(req.user.user_id, alert.store_id)
       if (!hasAccess) {
         return res.apiError('无权处理此告警', 'FORBIDDEN', null, 403)
       }
@@ -238,10 +219,9 @@ router.post(
       return res.apiError('告警不存在', 'NOT_FOUND', null, 404)
     }
 
-    // 非管理员只能处理所属门店的告警
-    const user_stores = req.user_stores || []
+    // 非管理员只能处理所属门店的告警（议题3：用 isUserActiveInStore 实时校验在职）
     if (req.user.role_level < 100 && alert.store_id) {
-      const hasAccess = user_stores.some(s => s.store_id === alert.store_id)
+      const hasAccess = await isUserActiveInStore(req.user.user_id, alert.store_id)
       if (!hasAccess) {
         return res.apiError('无权处理此告警', 'FORBIDDEN', null, 403)
       }
@@ -281,19 +261,10 @@ router.get(
   '/stats',
   authenticateToken,
   requireMerchantPermission('staff:manage', { scope: 'store', storeIdParam: 'query' }),
+  resolveStoreContext({ storeIdParam: 'query', required: false }),
   asyncHandler(async (req, res) => {
-    const { store_id } = req.query
-    const user_stores = req.user_stores || []
-
-    // 确定统计的门店范围
-    let resolved_store_id = req.verified_store_id || (store_id ? parseInt(store_id, 10) : null)
-
-    // 非管理员限制只能查看所属门店
-    if (req.user.role_level < 100 && !resolved_store_id) {
-      if (user_stores.length === 1) {
-        resolved_store_id = user_stores[0].store_id
-      }
-    }
+    // 议题3：门店范围由 resolveStoreContext 统一解析（管理员不带 store_id 则统计全部门店）
+    const resolved_store_id = req.store_context.store_id
 
     // 通过 ServiceManager 获取服务
     const MerchantRiskAlertService = req.app.locals.services.getService('merchant_risk_alert')

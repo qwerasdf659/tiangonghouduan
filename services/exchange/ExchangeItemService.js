@@ -310,6 +310,8 @@ class ExchangeItemService {
       transaction
     )
 
+    await this._updateSpuSummary(pid, transaction)
+
     const full = await ExchangeItemSku.findByPk(sku.sku_id, {
       transaction,
       include: [
@@ -375,6 +377,8 @@ class ExchangeItemService {
       )
     }
 
+    await this._updateSpuSummary(sku.exchange_item_id, transaction)
+
     const full = await ExchangeItemSku.findByPk(sid, {
       transaction,
       include: [
@@ -414,6 +418,11 @@ class ExchangeItemService {
       throw new BusinessError('sku_id 无效', 'PRODUCT_CENTER_INVALID_SKU_ID', 400)
     }
 
+    const skuRow = await ExchangeItemSku.findByPk(sid, { transaction })
+    if (!skuRow) {
+      throw new BusinessError('SKU 不存在', 'PRODUCT_CENTER_SKU_NOT_FOUND', 404)
+    }
+
     const priceCount = await ExchangeChannelPrice.count({ where: { sku_id: sid }, transaction })
     if (priceCount > 0) {
       throw new BusinessError(
@@ -442,6 +451,7 @@ class ExchangeItemService {
     if (!deleted) {
       throw new BusinessError('SKU 不存在', 'PRODUCT_CENTER_SKU_NOT_FOUND', 404)
     }
+    await this._updateSpuSummary(skuRow.exchange_item_id, transaction)
     logger.info('ExchangeItemService.deleteSku 成功', {
       sku_id: sid,
       ts: BeijingTimeHelper.apiTimestamp()
@@ -601,6 +611,7 @@ class ExchangeItemService {
     }
 
     await sku.update({ stock: next }, { transaction })
+    await this._updateSpuSummary(sku.exchange_item_id, transaction)
     logger.info('ExchangeItemService.adjustStock 成功', {
       sku_id: sid,
       delta: d,
@@ -608,6 +619,59 @@ class ExchangeItemService {
       ts: BeijingTimeHelper.apiTimestamp()
     })
     return sku
+  }
+
+  /**
+   * 回填 SPU 物化汇总列（议题1：stock/sold_count/min_cost_amount/max_cost_amount/min_cost_asset_code）
+   *
+   * 与 admin SkuService/ItemManagementService/BatchOperationService 的 `_updateSpuSummary` 完全同口径，
+   * 保证「SKU/渠道价任意写路径」之后 SPU 物化列与 active SKU 聚合实时一致，
+   * 避免小程序兑换/道具列表读到陈旧 stock（修复前本服务的 adjustStock/updateSku/createSku/deleteSku 漏回填）。
+   *
+   * @private
+   * @param {number} exchangeItemId - SPU 商品 ID
+   * @param {Object} transaction - Sequelize 事务实例（必传，与写操作同事务）
+   * @returns {Promise<void>} 回填完成（无返回值）
+   */
+  async _updateSpuSummary(exchangeItemId, transaction) {
+    const { ExchangeItem, ExchangeItemSku } = this.models
+
+    const [skuSummary] = await ExchangeItemSku.findAll({
+      where: { exchange_item_id: exchangeItemId, status: 'active' },
+      attributes: [
+        [this.sequelize.fn('SUM', this.sequelize.col('stock')), 'total_stock'],
+        [this.sequelize.fn('SUM', this.sequelize.col('sold_count')), 'total_sold']
+      ],
+      raw: true,
+      transaction
+    })
+
+    const [priceSummary] = await this.sequelize.query(
+      `SELECT MIN(ecp.cost_amount) AS min_cost, MAX(ecp.cost_amount) AS max_cost,
+              SUBSTRING_INDEX(
+                GROUP_CONCAT(ecp.cost_asset_code ORDER BY ecp.cost_amount ASC SEPARATOR ','),
+                ',', 1
+              ) AS min_cost_asset_code
+       FROM exchange_item_skus ps
+       JOIN exchange_channel_prices ecp ON ecp.sku_id = ps.sku_id AND ecp.is_enabled = 1
+       WHERE ps.exchange_item_id = :productId AND ps.status = 'active'`,
+      {
+        replacements: { productId: exchangeItemId },
+        type: this.sequelize.QueryTypes.SELECT,
+        transaction
+      }
+    )
+
+    await ExchangeItem.update(
+      {
+        stock: parseInt(skuSummary.total_stock) || 0,
+        sold_count: parseInt(skuSummary.total_sold) || 0,
+        min_cost_amount: priceSummary?.min_cost !== null ? parseInt(priceSummary.min_cost) : null,
+        max_cost_amount: priceSummary?.max_cost !== null ? parseInt(priceSummary.max_cost) : null,
+        min_cost_asset_code: priceSummary?.min_cost_asset_code || null
+      },
+      { where: { exchange_item_id: exchangeItemId }, transaction }
+    )
   }
 
   /**

@@ -1126,15 +1126,13 @@ function requireMerchantDomainAccess() {
  *
  * @description 检查用户是否具有指定的商家域权限，并可选验证门店访问权限
  *
- * 设计决策（2026-01-12 商家员工域权限体系升级）：
- * - 支持两种 scope：'global'（全局权限）和 'store'（门店范围权限）
- * - scope='store' 时，要求请求中包含 store_id 参数，并验证用户在该门店在职
- * - 超级管理员（role_level >= 100）跳过所有检查
+ * 设计决策（2026-01-12 商家员工域权限体系升级；2026-06-11 议题3 门店上下文收口）：
+ * - 本中间件只负责"能力位/权限"校验。
+ * - 门店范围解析/校验已收口到 resolveStoreContext 中间件（需要门店上下文的路由在其后挂载）。
+ * - 超级管理员（role_level >= 100）跳过权限校验（门店上下文仍由 resolveStoreContext 处理）。
  *
  * @param {string} capability - 需要的权限（如 'consumption:create'）
- * @param {Object} options - 配置选项
- * @param {string} options.scope - 权限范围：'global' | 'store'，默认 'global'
- * @param {string} options.storeIdParam - store_id 参数来源：'body' | 'query' | 'params'，默认 'body'
+ * @param {Object} [_options] - 兼容旧调用签名的配置（scope/storeIdParam，已不再在此使用）
  * @returns {Function} 中间件函数
  *
  * @example
@@ -1146,8 +1144,11 @@ function requireMerchantDomainAccess() {
  *
  * @since 2026
  */
-function requireMerchantPermission(capability, options = {}) {
-  const { scope = 'global', storeIdParam = 'body' } = options
+function requireMerchantPermission(capability, _options = {}) {
+  /*
+   * 议题3：本中间件只负责"能力位/权限"校验。门店范围（scope/storeIdParam）已收口到
+   * resolveStoreContext 中间件，故 options 参数保留以兼容现有调用签名，但不再在此使用。
+   */
 
   return async (req, res, next) => {
     try {
@@ -1191,57 +1192,13 @@ function requireMerchantPermission(capability, options = {}) {
             })
       }
 
-      // 4. 如果是门店范围权限，验证 store_id 访问权限
-      if (scope === 'store') {
-        // 获取 store_id
-        let storeId = null
-        if (storeIdParam === 'body') {
-          storeId = req.body?.store_id
-        } else if (storeIdParam === 'query') {
-          storeId = req.query?.store_id
-        } else if (storeIdParam === 'params') {
-          storeId = req.params?.store_id
-        }
-
-        // store_id 可选：如果没有提供，后续由 Service 层自动填充
-        if (storeId) {
-          const storeIdNum = parseInt(storeId, 10)
-          if (isNaN(storeIdNum) || storeIdNum <= 0) {
-            return res.apiError
-              ? res.apiError('store_id 必须是有效的正整数', 'INVALID_STORE_ID', null, 400)
-              : res.status(400).json({
-                  success: false,
-                  code: 'INVALID_STORE_ID',
-                  message: 'store_id 必须是有效的正整数'
-                })
-          }
-
-          // 验证用户是否在该门店在职
-          const isActive = await isUserActiveInStore(req.user.user_id, storeIdNum)
-          if (!isActive) {
-            logger.warn(
-              `🚫 [Auth] 门店访问被拒绝: user_id=${req.user.user_id}, store_id=${storeIdNum}`
-            )
-            return res.apiForbidden
-              ? res.apiForbidden('您不是该门店的在职员工，无法执行此操作', 'STORE_ACCESS_DENIED')
-              : res.status(403).json({
-                  success: false,
-                  code: 'STORE_ACCESS_DENIED',
-                  message: '您不是该门店的在职员工，无法执行此操作'
-                })
-          }
-
-          // 将验证过的 store_id 挂载到请求对象
-          // eslint-disable-next-line require-atomic-updates
-          req.verified_store_id = storeIdNum
-        }
-
-        // 获取用户所有在职门店（供 Service 层使用）
-        // eslint-disable-next-line require-atomic-updates
-        req.user_stores = await getUserStores(req.user.user_id)
-      }
-
-      // 5. 通过权限检查
+      /*
+       * 4. 门店范围权限：门店上下文解析已收口到 resolveStoreContext 中间件（议题3·方案丙）。
+       *    本中间件只负责"能力位"校验，不再解析/校验门店，避免与 resolveStoreContext 重复，
+       *    也避免历史"管理员提前 next 跳过门店填充"缺陷。
+       *    需要门店上下文的路由请在本中间件之后挂载 resolveStoreContext({ storeIdParam })。
+       * 5. 通过权限检查
+       */
       next()
     } catch (error) {
       logger.error('❌ 商家权限检查失败:', error.message)

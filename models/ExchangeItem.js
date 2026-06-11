@@ -276,6 +276,13 @@ module.exports = sequelize => {
         defaultValue: null,
         comment: 'SPU 最高兑换价（= MAX(exchange_channel_prices.cost_amount)）'
       },
+      min_cost_asset_code: {
+        type: DataTypes.STRING(50),
+        allowNull: true,
+        defaultValue: null,
+        comment:
+          'SPU 最低价对应计价资产码（= 最低价 active SKU 渠道价的 cost_asset_code；NULL=无可售渠道价）'
+      },
       stock_alert_threshold: {
         type: DataTypes.INTEGER,
         allowNull: false,

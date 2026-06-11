@@ -39,6 +39,7 @@ const logger = require('../../../utils/logger').logger
  * @query {string} status - 商品状态（active/inactive，默认 active）
  * @query {string} asset_code - 材料资产代码筛选（可选）
  * @query {string} space - 空间筛选：lucky/premium（可选，不传返回全部）
+ * @query {string} item_type - 频道筛选：prop(道具商城)/product/voucher/virtual（可选，不传返回全部）
  * @query {string} keyword - 模糊搜索（匹配 item_name，可选）
  * @query {number} category_id - 分类ID筛选（categories.category_id，可选）
  * @query {number} min_cost - 最低价格（可选）
@@ -62,6 +63,7 @@ router.get(
       status = 'active',
       asset_code,
       space,
+      item_type,
       keyword,
       category_id,
       exclude_id,
@@ -81,6 +83,7 @@ router.get(
       status,
       asset_code,
       space,
+      item_type,
       keyword,
       page,
       page_size
@@ -114,6 +117,19 @@ router.get(
       }
     }
 
+    // item_type 白名单验证（双轨频道筛选：prop=道具商城/星石轨）
+    if (item_type) {
+      const validItemTypes = ['prop', 'product', 'voucher', 'virtual']
+      if (!validItemTypes.includes(item_type)) {
+        return res.apiError(
+          `无效的 item_type 参数，允许值：${validItemTypes.join(', ')}`,
+          'BAD_REQUEST',
+          null,
+          400
+        )
+      }
+    }
+
     // 排序方向白名单验证
     const validSortOrders = ['ASC', 'DESC']
     const upperSortOrder = sort_order.toUpperCase()
@@ -131,6 +147,7 @@ router.get(
       status,
       asset_code,
       space: space || null,
+      item_type: item_type || null,
       keyword: keyword || null,
       category: category_id || null,
       exclude_id: exclude_id || null,
@@ -534,19 +551,15 @@ router.get(
     try {
       const status = await PremiumService.getPremiumStatus(userId)
 
-      // 业务常量（与 PremiumService 一致）
-      const UNLOCK_COST = 100
-      const VALIDITY_HOURS = 24
-
       if (!status.unlocked || !status.is_valid) {
-        // 未解锁或已过期
+        // 未解锁或已过期：返回明确的解锁条件，由 PremiumService 提供权威字段（费用/有效期/条件明细）
         return res.apiSuccess(
           {
             unlocked: false,
             is_expired: status.is_expired || false,
             can_unlock: status.can_unlock,
-            unlock_cost: UNLOCK_COST,
-            validity_hours: VALIDITY_HOURS,
+            unlock_cost: status.unlock_cost,
+            validity_hours: status.validity_hours,
             conditions: status.conditions
           },
           status.is_expired ? '高级空间已过期' : '高级空间未解锁'
@@ -558,8 +571,8 @@ router.get(
         {
           unlocked: true,
           is_valid: true,
-          unlock_cost: UNLOCK_COST,
-          validity_hours: VALIDITY_HOURS,
+          unlock_cost: status.unlock_cost,
+          validity_hours: status.validity_hours,
           remaining_hours: status.remaining_hours,
           total_unlock_count: status.total_unlock_count
         },

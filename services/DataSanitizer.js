@@ -1398,6 +1398,16 @@ class DataSanitizer {
         delete sanitized.cost_price
       }
 
+      /*
+       * 议题1（已拍板）：删除 SPU 内部物化列名，只保留前端契约字段。
+       * min_cost_amount → 已映射为 cost_amount；min_cost_asset_code → 已映射为 cost_asset_code。
+       * 避免"内部列名 + 契约字段"双字段并存（防止前端读到两套同义字段、也不暴露内部命名）。
+       * max_cost_amount 为内部价格区间列，列表契约不下发。
+       */
+      delete sanitized.min_cost_amount
+      delete sanitized.max_cost_amount
+      delete sanitized.min_cost_asset_code
+
       return sanitized
     })
   }

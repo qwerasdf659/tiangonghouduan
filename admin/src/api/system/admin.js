@@ -163,6 +163,9 @@ export const SYSTEM_ADMIN_ENDPOINTS = {
   // 字典管理 - 全量获取
   DICT_ALL: `${API_PREFIX}/console/dictionaries/all`,
 
+  // 字典管理 - 按类型获取通用字典项（如 announcement_type 公告类型，供下拉选项使用）
+  DICT_BY_TYPE: `${API_PREFIX}/system/dictionaries/type/:dictType`,
+
   // 功能开关
   FEATURE_FLAG_LIST: `${API_PREFIX}/console/feature-flags`,
   FEATURE_FLAG_DETAIL: `${API_PREFIX}/console/feature-flags/:flagKey`,

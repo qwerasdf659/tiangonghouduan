@@ -31,11 +31,41 @@
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireMerchantPermission } = require('../../../../middleware/auth')
+const { resolveStoreContext } = require('../../../../middleware/resolveStoreContext')
 const { handleServiceError } = require('../../../../middleware/validation')
 const { logger, sanitize } = require('../../../../utils/logger')
 const BeijingTimeHelper = require('../../../../utils/timeHelper')
 const TransactionManager = require('../../../../utils/TransactionManager')
 const QRCodeValidator = require('../../../../utils/QRCodeValidator')
+
+/**
+ * 前置中间件：强制校验请求级幂等键（Header Idempotency-Key）
+ *
+ * 业界标准形态（破坏性重构 2026-01-02）：幂等键是"请求级契约"，与调用者身份/门店上下文无关，
+ * 任何调用方缺失都属错误，必须在"业务上下文解析（resolveStoreContext）"之前最早暴露，
+ * 否则管理员不带 store_id 时会先命中 ADMIN_STORE_ID_REQUIRED，掩盖真正的 MISSING_IDEMPOTENCY_KEY。
+ *
+ * @param {Object} req - Express 请求对象
+ * @param {Object} res - Express 响应对象（含 ApiResponse 注入的 res.apiError）
+ * @param {Function} next - Express next 回调
+ * @returns {void}
+ */
+function requireIdempotencyKey(req, res, next) {
+  const idempotency_key = req.headers['idempotency-key']
+  if (!idempotency_key) {
+    return res.apiError(
+      '缺少必需的幂等键：请在 Header 中提供 Idempotency-Key。' +
+        '重试时必须复用同一幂等键以防止重复提交。',
+      'MISSING_IDEMPOTENCY_KEY',
+      {
+        required_header: 'Idempotency-Key',
+        example: 'Idempotency-Key: consumption_submit_<timestamp>_<random>'
+      },
+      400
+    )
+  }
+  return next()
+}
 
 /**
  * @route POST /api/v4/shop/consumption/submit
@@ -75,29 +105,17 @@ router.post(
   '/submit',
   authenticateToken,
   requireMerchantPermission('consumption:create', { scope: 'store', storeIdParam: 'body' }),
+  requireIdempotencyKey,
+  resolveStoreContext({ storeIdParam: 'body' }),
   async (req, res) => {
     const IdempotencyService = req.app.locals.services.getService('idempotency')
     const CoreService = req.app.locals.services.getService('consumption_core')
 
-    // 【业界标准形态】强制从 Header 获取幂等键，不接受 body，不服务端生成
+    // 幂等键已由前置中间件 requireIdempotencyKey 强制校验（请求级契约，先于门店上下文解析）
     const idempotency_key = req.headers['idempotency-key']
 
-    // 缺失幂等键直接返回 400
-    if (!idempotency_key) {
-      return res.apiError(
-        '缺少必需的幂等键：请在 Header 中提供 Idempotency-Key。' +
-          '重试时必须复用同一幂等键以防止重复提交。',
-        'MISSING_IDEMPOTENCY_KEY',
-        {
-          required_header: 'Idempotency-Key',
-          example: 'Idempotency-Key: consumption_submit_<timestamp>_<random>'
-        },
-        400
-      )
-    }
-
     try {
-      const { qr_code, consumption_amount, merchant_notes, store_id } = req.body
+      const { qr_code, consumption_amount, merchant_notes } = req.body
       const merchantId = req.user.user_id
 
       // 参数验证：二维码必填
@@ -136,37 +154,10 @@ router.post(
       }
 
       /*
-       * 🏪 门店ID处理逻辑（AC2.3）
-       * - 如果已通过 requireMerchantPermission 验证，使用 req.verified_store_id
-       * - 如果未传 store_id，从 req.user_stores 自动填充（单门店）
-       * - 多门店员工必须传 store_id
+       * 🏪 门店上下文（议题3）：由 resolveStoreContext 中间件统一解析。
+       * 管理员跨店需带 store_id；单店员工自动填充；多店员工须显式指定。
        */
-      let resolved_store_id = req.verified_store_id || store_id
-      const user_stores = req.user_stores || []
-
-      if (!resolved_store_id) {
-        // 未传 store_id，尝试自动填充
-        if (user_stores.length === 0) {
-          return res.apiError('您未绑定任何门店，无法录入消费记录', 'NO_STORE_BINDING', null, 403)
-        } else if (user_stores.length === 1) {
-          // 单门店员工：自动填充
-          resolved_store_id = user_stores[0].store_id
-          logger.info(`🏪 自动填充门店ID: ${resolved_store_id} (用户仅绑定一个门店)`)
-        } else {
-          // 多门店员工：必须明确指定
-          return res.apiError(
-            '您绑定了多个门店，请明确指定 store_id 参数',
-            'MULTIPLE_STORES_REQUIRE_STORE_ID',
-            {
-              available_stores: user_stores.map(s => ({
-                store_id: s.store_id,
-                store_name: s.store_name
-              }))
-            },
-            400
-          )
-        }
-      }
+      const resolved_store_id = req.store_context.store_id
 
       // 架构决策5：使用统一脱敏函数记录日志
       logger.info('商家提交消费记录', {
