@@ -569,6 +569,50 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
       expect(result[0].cost_price).toBe(20)
       expect(result[0].sold_count).toBe(100)
     })
+
+    test('B-5-9-5 金额类字段归一为 number、主键保持 string（P1·BIGINT 口径）', () => {
+      /*
+       * 模拟 config/database.js bigNumberStrings:true 的真实下发形态：
+       * BIGINT 列（exchange_item_id/cost_amount/channelPrices.cost_amount）以字符串下发。
+       * 期望：金额类转 number（前端可直接运算），主键类保持 string（防 2^53 溢出）。
+       */
+      const bigIntStyleItems = [
+        {
+          exchange_item_id: '6', // 主键（BIGINT 字符串）
+          name: '衣服',
+          cost_asset_code: 'red_core_shard',
+          cost_amount: '10', // 金额（BIGINT 字符串）
+          original_price: '20',
+          stock: 42,
+          status: 'active',
+          primary_media_id: null,
+          primary_media: null,
+          skus: [
+            {
+              sku_id: '6', // 主键（BIGINT 字符串）
+              status: 'active',
+              channelPrices: [
+                { cost_asset_code: 'red_core_shard', cost_amount: '10', original_amount: '20' }
+              ]
+            }
+          ]
+        }
+      ]
+
+      const result = DataSanitizer.sanitizeExchangeMarketItems(bigIntStyleItems, 'public')
+
+      // 金额类：归一为 number，值正确
+      expect(typeof result[0].cost_amount).toBe('number')
+      expect(result[0].cost_amount).toBe(10)
+      expect(typeof result[0].original_price).toBe('number')
+      expect(result[0].original_price).toBe(20)
+      expect(typeof result[0].skus[0].channelPrices[0].cost_amount).toBe('number')
+      expect(result[0].skus[0].channelPrices[0].cost_amount).toBe(10)
+
+      // 主键类：保持 string（防溢出，前端只比较不运算）
+      expect(typeof result[0].exchange_item_id).toBe('string')
+      expect(typeof result[0].skus[0].sku_id).toBe('string')
+    })
   })
 
   /**

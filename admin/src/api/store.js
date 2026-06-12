@@ -89,11 +89,9 @@ export const STORE_ENDPOINTS = {
   MERCHANT_POINT_REJECT: `${API_PREFIX}/console/merchant-points/:id/reject`,
   MERCHANT_POINT_STATS: `${API_PREFIX}/console/merchant-points/stats/pending`,
 
-  // 消费记录
+  // 消费记录（审核已收口到审核链 approval-chain，本模块仅保留查询）
   CONSUMPTION_RECORDS: `${API_PREFIX}/console/consumption/records`,
   CONSUMPTION_PENDING: `${API_PREFIX}/console/consumption/pending`,
-  CONSUMPTION_APPROVE: `${API_PREFIX}/console/consumption/approve/:id`,
-  CONSUMPTION_REJECT: `${API_PREFIX}/console/consumption/reject/:id`,
 
   // 门店统计
   STATS: `${API_PREFIX}/console/stores/stats`,
@@ -445,53 +443,6 @@ export const StoreAPI = {
   async getPendingConsumptions(params = {}) {
     const url = STORE_ENDPOINTS.CONSUMPTION_PENDING + buildQueryString(params)
     return await request({ url, method: 'GET' })
-  },
-
-  /**
-   * 审批通过消费记录
-   * @async
-   * @param {number} id - 记录 ID
-   * @param {Object} [data={}] - 审批数据
-   * @param {string} [data.remark] - 审批备注
-   * @returns {Promise<Object>} 审批结果
-   * @throws {Error} 消费记录不存在
-   * @throws {Error} 记录状态不允许审批
-   * @throws {Error} 无权限审批
-   * @throws {Error} 网络请求失败
-   *
-   * @example
-   * // 审批通过消费记录
-   * const result = await StoreAPI.approveConsumption(789, {
-   *   remark: '核实通过'
-   * })
-   */
-  async approveConsumption(id, data = {}) {
-    const url = buildURL(STORE_ENDPOINTS.CONSUMPTION_APPROVE, { id })
-    return await request({ url, method: 'POST', data })
-  },
-
-  /**
-   * 拒绝消费记录
-   * @async
-   * @param {number} id - 记录 ID
-   * @param {Object} data - 拒绝数据
-   * @param {string} data.reason - 拒绝原因（必填）
-   * @returns {Promise<Object>} 拒绝结果
-   * @throws {Error} 消费记录不存在
-   * @throws {Error} 记录状态不允许拒绝
-   * @throws {Error} 拒绝原因不能为空
-   * @throws {Error} 无权限拒绝
-   * @throws {Error} 网络请求失败
-   *
-   * @example
-   * // 拒绝消费记录
-   * const result = await StoreAPI.rejectConsumption(789, {
-   *   reason: '消费凭证不清晰'
-   * })
-   */
-  async rejectConsumption(id, data) {
-    const url = buildURL(STORE_ENDPOINTS.CONSUMPTION_REJECT, { id })
-    return await request({ url, method: 'POST', data })
   },
 
   // ===== 地区管理 =====

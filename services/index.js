@@ -212,7 +212,6 @@ const CustomerServiceResponseStatsService = require('./dashboard/CustomerService
 const APIPerformanceService = require('./monitoring/APIPerformanceService') // API性能监控服务（§4.6）
 const ItemLockRateService = require('./monitoring/ItemLockRateService') // 物品锁定率监控服务（§5.4）
 const StoreContributionService = require('./dashboard/StoreContributionService') // 商户贡献度服务（§6.2）
-const ConsumptionBatchService = require('./consumption/ConsumptionBatchService') // 消费记录批量审核服务
 const ConsumptionAnomalyService = require('./consumption/AnomalyService') // 消费异常检测服务（P1 B-25）
 const UserSegmentService = require('./user/UserSegmentService') // 用户分层服务（P1 B-19~B-24）
 const NavBadgeService = require('./dashboard/NavBadgeService') // 导航栏徽标计数服务
@@ -552,7 +551,6 @@ class ServiceManager {
       this._services.set('api_performance', APIPerformanceService) // API性能监控服务（静态类，§4.6）
       this._services.set('item_lock_rate', new ItemLockRateService(this.models)) // 物品锁定率监控服务（需实例化，§5.4）
       this._services.set('store_contribution', new StoreContributionService(this.models)) // 商户贡献度服务（需实例化，§6.2）
-      this._services.set('consumption_batch', ConsumptionBatchService) // 消费记录批量审核服务（静态类）
       this._services.set('nav_badge', NavBadgeService) // 导航栏徽标计数服务（静态类）
 
       // ========== P1 消费异常检测服务（2026-01-31 运营优化任务） ==========

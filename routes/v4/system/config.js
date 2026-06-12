@@ -44,6 +44,10 @@
 const express = require('express')
 const router = express.Router()
 const { asyncHandler } = require('../../../middleware/validation')
+const { getRateLimiter } = require('../../../middleware/RateLimiterMiddleware')
+
+// 公开只读接口宽松限流档（A1/A2：阈值读 .env RATE_LIMIT_PUBLIC_READ_MAX）；本路由全部为公开只读配置
+router.use(getRateLimiter().createLimiter('public_read'))
 
 /**
  * 小程序前端可访问的公开配置项白名单
@@ -86,20 +90,21 @@ router.get(
   '/placement',
   asyncHandler(async (req, res) => {
     const AdminSystemService = req.app.locals.services.getService('admin_system')
-    const configData = await AdminSystemService.getConfigValue('campaign_placement')
+    // 方案A：取配置值 + 行级 updated_at（version 只在运营改配置时变，杜绝 Date.now() 漂移）
+    const { value: configData, updated_at } =
+      await AdminSystemService.getConfigWithMeta('campaign_placement')
 
     if (!configData) {
       return res.apiError('配置不存在', 'CONFIG_NOT_FOUND', null, 404)
     }
 
-    const updatedAt = configData.updated_at || new Date().toISOString()
-    const versionTs = new Date(updatedAt).getTime().toString()
+    const versionTs = updated_at ? new Date(updated_at).getTime().toString() : '0'
 
     return res.apiSuccess(
       {
         placements: configData.placements || [],
         version: versionTs,
-        updated_at: updatedAt
+        updated_at: updated_at || null
       },
       '获取配置成功',
       'PLACEMENT_CONFIG_SUCCESS'

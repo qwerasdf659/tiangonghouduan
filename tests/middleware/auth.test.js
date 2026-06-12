@@ -276,13 +276,24 @@ describe('auth 中间件测试 - UUID角色系统', () => {
       expect(decoded.user_id).toBe(validUser.user_id)
     })
 
-    test('🔍 Token载荷应该包含正确信息', () => {
+    test('🔍 Token载荷应只含最小鉴权字段（B1 精简：不含手机号/角色等敏感信息）', () => {
       const decoded = jwt.decode(validToken)
 
+      // 身份与时效：保留
       expect(decoded.user_id).toBe(validUser.user_id)
-      expect(decoded.mobile).toBe(validUser.mobile)
-      expect(decoded.role_level).toBeDefined() // 应该包含角色级别
-      expect(decoded.type).toBe(undefined) // access token没有type字段
+      expect(decoded.iat).toBeDefined()
+      expect(decoded.exp).toBeDefined()
+      expect(decoded.type).toBe(undefined) // access token 没有 type 字段
+
+      /*
+       * B1 安全契约（2026-06-12）：JWT 只证明"你是谁"，敏感信息一律实时查库，不进 Base64 明文 payload。
+       * 手机号/角色等级/昵称/状态/角色名 不应出现在 Token 中（避免解码泄密 + 权限漂移）。
+       */
+      expect(decoded.mobile).toBeUndefined()
+      expect(decoded.role_level).toBeUndefined()
+      expect(decoded.nickname).toBeUndefined()
+      expect(decoded.status).toBeUndefined()
+      expect(decoded.user_role).toBeUndefined()
     })
   })
 })

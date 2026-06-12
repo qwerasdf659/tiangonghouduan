@@ -163,19 +163,21 @@ const rateLimiter = getRateLimiter()
 //  API响应格式统一中间件 - 统一所有API响应格式（必须在 /api 限流器之前，确保限流响应也包含 request_id）
 app.use('/api/', ApiResponse.middleware())
 
-//  全局API限流 - 100次/分钟/IP（基于Redis）
+//  全局API限流（阈值读 .env：RATE_LIMIT_GLOBAL_MAX，默认600；登录按 user、未登录按 ip）
+const GLOBAL_RATE_LIMIT_MAX = parseInt(process.env.RATE_LIMIT_GLOBAL_MAX, 10) || 600
 const globalRateLimiter = rateLimiter.createLimiter({
-  windowMs: 60 * 1000, // 1分钟窗口
-  max: 100, // 最多100个请求
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || 60 * 1000, // 窗口读 .env，默认1分钟
+  max: GLOBAL_RATE_LIMIT_MAX, // 全局兜底阈值，读 .env
   keyPrefix: 'rate_limit:global:api:',
-  keyGenerator: 'ip', // 按IP限流
+  keyGenerator: 'user_or_ip', // 登录按 user_id、未登录回退 IP（避免同出口IP多用户互挤）
   message: '请求过于频繁，请稍后再试',
   onLimitReached: (req, key, count) => {
     appLogger.warn('全局API限流触发', {
       ip: req.ip,
+      user_id: req.user?.user_id,
       path: req.path,
       count,
-      limit: 100
+      limit: GLOBAL_RATE_LIMIT_MAX
     })
   }
 })
@@ -722,6 +724,14 @@ try {
    */
   app.use('/api/v4/system', require('./routes/v4/system'))
   appLogger.info(' system域加载成功', { route: '/api/v4/system' })
+
+  /*
+   * ========================================
+   * 6.1 /home - 首页 BFF 聚合域（治理项2：冷启动首屏削峰，公开只读聚合）
+   * ========================================
+   */
+  app.use('/api/v4/home', require('./routes/v4/home'))
+  appLogger.info(' home域加载成功', { route: '/api/v4/home' })
 
   /*
    * ========================================

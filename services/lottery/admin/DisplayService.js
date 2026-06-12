@@ -15,6 +15,9 @@
 const { LotteryCampaign } = require('../../../models')
 const logger = require('../../../utils/logger').logger
 
+/**
+ * 抽奖活动展示服务（精选/排序等展示态变更，静态方法集）
+ */
 class LotteryCampaignDisplayService {
   /**
    * 切换活动精选状态

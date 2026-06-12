@@ -4,23 +4,21 @@
  * @route /api/v4/console/consumption
  * @description 平台管理员审核消费记录（通过/拒绝）
  *
- * 📌 域边界说明（2026-03-10 多级审核链改造）：
- * - 此模块属于 console 域
+ * 📌 域边界说明（2026-06-12 消费审核收口审核链·单一路径零技术债）：
+ * - 此模块属于 console 域，仅保留查询与二维码生成能力
  * - 查询路由：admin(role_level >= 100)
- * - 审核路由(approve/reject)：business_manager(role_level >= 60) 及以上可进入路由
- *   具体审核权限由 ApprovalChainService.processStep() 精确校验
+ * - ⚠️ 消费审核（通过/拒绝/批量）已全部收口到审核链，本模块不再提供审核写接口：
+ *     单条：POST /api/v4/console/approval-chain/steps/:id/approve | /reject
+ *     批量：POST /api/v4/console/approval-chain/steps/batch
  * - 商家员工（merchant_staff/merchant_manager）使用 /api/v4/shop/* 提交和查询消费
  *
  * API列表：
  * - GET /pending - 管理员查询待审核的消费记录
  * - GET /records - 管理员查询所有消费记录（支持筛选、搜索、统计）
- * - POST /approve/:record_id - 管理员审核通过消费记录
- * - POST /reject/:record_id - 管理员审核拒绝消费记录
  * - GET /qrcode/:user_id - 管理员生成指定用户的动态二维码（2026-02-12 路由分离）
  *
  * 业务场景：
- * - 审核通过后自动奖励积分（1元=1分）
- * - 审核拒绝需要填写原因（5-500字符）
+ * - 审核统一走审核链，终审通过后由 ConsumptionAuditCallback 自动奖励积分（1元=1分）
  *
  */
 
@@ -30,7 +28,6 @@ const { authenticateToken, requireRoleLevel } = require('../../../../middleware/
 const { asyncHandler } = require('../../../../middleware/validation')
 const logger = require('../../../../utils/logger').logger
 const BeijingTimeHelper = require('../../../../utils/timeHelper')
-const TransactionManager = require('../../../../utils/TransactionManager')
 
 /**
  * @route GET /api/v4/console/consumption/pending
@@ -138,269 +135,14 @@ router.get(
   })
 )
 
-/**
- * @route POST /api/v4/console/consumption/approve/:id
- * @desc 管理员审核通过消费记录
- * @access Private (role_level >= 60，审核链场景由 ApprovalChainService 精确鉴权)
- *
- * API路径参数设计规范 V2.2：
- * - 消费记录是事务实体，使用数字ID（:id）作为标识符
- *
- * @param {number} id - 消费记录ID
- * @body {string} admin_notes - 审核备注（可选）
- *
- * @returns {Object} 审核结果
- * @returns {number} data.consumption_record_id - 消费记录ID
- * @returns {string} data.status - 新状态（approved）
- * @returns {number} data.points_awarded - 奖励的积分数
- * @returns {number} data.new_balance - 用户新的积分余额
- * @returns {string} data.reviewed_at - 审核时间（北京时间）
- *
- * @example
- * POST /api/v4/console/consumption/approve/123
- * {
- *   "admin_notes": "核实无误，审核通过"
- * }
+/*
+ * 🗑️ 消费审核已收口到审核链（2026-06-12 单一路径零技术债重构）
+ * 原 POST /approve/:id、/reject/:id、/batch-review 三个接口已删除（含无审核链时的 CoreService 直审兜底分支）。
+ * 消费审核统一走：
+ *   - 单条：POST /api/v4/console/approval-chain/steps/:id/approve | /reject
+ *   - 批量：POST /api/v4/console/approval-chain/steps/batch
+ * CoreService.approveConsumption / rejectConsumption 方法本身保留（由 ConsumptionAuditCallback 终审回调复用）。
  */
-router.post(
-  '/approve/:id',
-  authenticateToken,
-  requireRoleLevel(60),
-  asyncHandler(async (req, res) => {
-    const CoreService = req.app.locals.services.getService('consumption_core')
-    const ApprovalChainService = req.app.locals.services.getService('approval_chain')
-
-    const record_id = parseInt(req.params.id, 10)
-    const { admin_notes } = req.body
-    const reviewerId = req.user.user_id
-
-    logger.info('审核消费记录', { record_id, reviewer_id: reviewerId })
-
-    // 检查是否有审核链实例
-    const chainInstance = await ApprovalChainService.getInstanceByAuditable(
-      'consumption',
-      record_id
-    )
-
-    if (chainInstance && chainInstance.status === 'in_progress') {
-      // 有审核链：通过审核链步骤处理（重定向到 /approval-chain/steps/:id/approve）
-      const pendingStep = chainInstance.steps?.find(s => s.status === 'pending')
-      if (!pendingStep) {
-        return res.apiBadRequest('当前审核链没有待处理的步骤')
-      }
-      return res.apiSuccess(
-        {
-          redirect: true,
-          message: '该记录使用审核链流程，请通过审核链步骤审核',
-          chain_instance_id: chainInstance.instance_id,
-          pending_step_id: pendingStep.step_id,
-          approval_chain_url: `/api/v4/console/approval-chain/steps/${pendingStep.step_id}/approve`
-        },
-        '该记录使用审核链流程'
-      )
-    }
-
-    // 无审核链：走原有 CoreService.approveConsumption()（兼容存量数据）
-    const result = await TransactionManager.execute(async transaction => {
-      return await CoreService.approveConsumption(parseInt(record_id), {
-        reviewer_id: reviewerId,
-        admin_notes,
-        transaction
-      })
-    })
-
-    logger.info('✅ 消费记录审核通过（直接路径）', {
-      record_id,
-      user_id: result.consumption_record.user_id,
-      points_awarded: result.points_awarded
-    })
-
-    return res.apiSuccess(
-      {
-        record_id: result.consumption_record.consumption_record_id,
-        status: result.consumption_record.status,
-        points_awarded: result.points_awarded,
-        new_balance: result.new_balance,
-        reviewed_at: BeijingTimeHelper.formatForAPI(result.consumption_record.reviewed_at)
-      },
-      `审核通过，已奖励${result.points_awarded}积分`
-    )
-  })
-)
-
-/**
- * @route POST /api/v4/console/consumption/batch-review
- * @desc 批量审核消费记录（通过或拒绝）
- * @access Private (管理员，role_level >= 100)
- *
- * 📌 批量操作说明：
- * - 支持部分成功模式：单条失败不影响其他记录
- * - 支持幂等性控制：通过 idempotency_key 防止重复提交
- * - 审批通过自动发放积分
- *
- * @body {Array<number>} record_ids - 要审核的记录 ID 列表（最多100条）
- * @body {string} action - 审核动作（'approve' | 'reject'）
- * @body {string} [reason] - 审核原因（拒绝时必填）
- * @body {string} [idempotency_key] - 幂等性键（可选，建议使用）
- *
- * @returns {Object} 批量处理结果
- * @returns {string} data.operation_id - 操作 ID
- * @returns {Object} data.stats - 统计数据
- * @returns {Array} data.processed.success - 成功记录列表
- * @returns {Array} data.processed.failed - 失败记录列表
- * @returns {Array} data.processed.skipped - 跳过记录列表
- *
- * @example
- * POST /api/v4/console/consumption/batch-review
- * {
- *   "record_ids": [1, 2, 3, 4, 5],
- *   "action": "approve",
- *   "idempotency_key": "batch_review_20260131_001"
- * }
- */
-router.post(
-  '/batch-review',
-  authenticateToken,
-  requireRoleLevel(100),
-  asyncHandler(async (req, res) => {
-    // 🔄 通过 ServiceManager 获取 ConsumptionBatchService（符合TR-005规范）
-    const ConsumptionBatchService = req.app.locals.services.getService('consumption_batch')
-
-    const { record_ids, action, reason, idempotency_key } = req.body
-    const operator_id = req.user.user_id
-
-    logger.info('[批量审核] 开始批量审核消费记录', {
-      admin_id: operator_id,
-      record_count: record_ids?.length || 0,
-      action,
-      idempotency_key
-    })
-
-    const result = await ConsumptionBatchService.batchReview({
-      record_ids,
-      action,
-      reason,
-      operator_id,
-      idempotency_key
-    })
-
-    // 如果是重复操作，返回之前的结果
-    if (result.is_duplicate) {
-      logger.warn('[批量审核] 检测到重复操作', { idempotency_key })
-      return res.apiSuccess(result, '操作已执行（重复请求）')
-    }
-
-    logger.info('[批量审核] 批量审核完成', {
-      operation_id: result.operation_id,
-      success: result.stats.success_count,
-      failed: result.stats.failed_count,
-      skipped: result.stats.skipped_count
-    })
-
-    return res.apiSuccess(
-      result,
-      `批量审核完成：成功${result.stats.success_count}条，失败${result.stats.failed_count}条，跳过${result.stats.skipped_count}条`
-    )
-  })
-)
-
-/**
- * @route POST /api/v4/console/consumption/reject/:id
- * @desc 管理员审核拒绝消费记录
- * @access Private (role_level >= 60，审核链场景由 ApprovalChainService 精确鉴权)
- *
- * API路径参数设计规范 V2.2：
- * - 消费记录是事务实体，使用数字ID（:id）作为标识符
- *
- * @param {number} id - 消费记录ID
- * @body {string} admin_notes - 拒绝原因（必填，5-500字符）
- *
- * @returns {Object} 审核结果
- * @returns {number} data.consumption_record_id - 消费记录ID
- * @returns {string} data.status - 新状态（rejected）
- * @returns {string} data.reject_reason - 拒绝原因
- * @returns {string} data.reviewed_at - 审核时间（北京时间）
- *
- * @example
- * POST /api/v4/console/consumption/reject/123
- * {
- *   "admin_notes": "消费金额与实际不符"
- * }
- */
-router.post(
-  '/reject/:id',
-  authenticateToken,
-  requireRoleLevel(60),
-  asyncHandler(async (req, res) => {
-    const CoreService = req.app.locals.services.getService('consumption_core')
-    const ApprovalChainService = req.app.locals.services.getService('approval_chain')
-
-    const record_id = parseInt(req.params.id, 10)
-    const { admin_notes } = req.body
-    const reviewerId = req.user.user_id
-
-    // 验证拒绝原因（5-500字符）
-    if (!admin_notes || admin_notes.trim().length < 5) {
-      return res.apiError('拒绝原因不能为空，且至少5个字符', 'BAD_REQUEST', null, 400)
-    }
-
-    if (admin_notes.length > 500) {
-      return res.apiError('拒绝原因最多500个字符，请精简描述', 'BAD_REQUEST', null, 400)
-    }
-
-    logger.info('管理员审核拒绝消费记录', {
-      record_id,
-      reviewer_id: reviewerId
-    })
-
-    // 检查是否有审核链实例（与 approve 路由行为一致）
-    const chainInstance = await ApprovalChainService.getInstanceByAuditable(
-      'consumption',
-      record_id
-    )
-
-    if (chainInstance && chainInstance.status === 'in_progress') {
-      const pendingStep = chainInstance.steps?.find(s => s.status === 'pending')
-      if (!pendingStep) {
-        return res.apiBadRequest('当前审核链没有待处理的步骤')
-      }
-      return res.apiSuccess(
-        {
-          redirect: true,
-          message: '该记录使用审核链流程，请通过审核链步骤拒绝',
-          chain_instance_id: chainInstance.instance_id,
-          pending_step_id: pendingStep.step_id,
-          approval_chain_url: `/api/v4/console/approval-chain/steps/${pendingStep.step_id}/reject`
-        },
-        '该记录使用审核链流程'
-      )
-    }
-
-    // 无审核链：走原有 CoreService.rejectConsumption()（兼容存量数据）
-    const result = await TransactionManager.execute(async transaction => {
-      return await CoreService.rejectConsumption(parseInt(record_id), {
-        reviewer_id: reviewerId,
-        admin_notes,
-        transaction
-      })
-    })
-
-    logger.info('✅ 消费记录审核拒绝（直接路径）', {
-      record_id,
-      reason: admin_notes.substring(0, 50)
-    })
-
-    return res.apiSuccess(
-      {
-        record_id: result.consumption_record.consumption_record_id,
-        status: result.consumption_record.status,
-        reject_reason: result.reject_reason,
-        reviewed_at: BeijingTimeHelper.formatForAPI(result.consumption_record.reviewed_at)
-      },
-      '已拒绝该消费记录'
-    )
-  })
-)
 
 /**
  * @route GET /api/v4/console/consumption/qrcode/:user_id

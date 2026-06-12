@@ -22,7 +22,8 @@ const {
   WebSocketStartupLog,
   AuthenticationSession,
   ChatMessage,
-  CustomerServiceSession
+  CustomerServiceSession,
+  User
 } = require('../models')
 const jwt = require('jsonwebtoken')
 const TransactionManager = require('../utils/TransactionManager')
@@ -225,13 +226,34 @@ class ChatWebSocketService {
           return next(new Error('Authentication failed: missing session_token'))
         }
 
+        /*
+         * 用户信息以数据库为准（与 middleware/auth.js authenticateToken 一致），不再裸用 JWT payload。
+         * B1 精简后 token 仅含 user_id 等最小字段；WS 业务只用 user_id，这里查库同时校验用户仍存在且 active，
+         * 拿到不存在/被禁用用户即拒绝握手（防止已删/禁用账号凭旧 token 连入）。
+         */
+        const dbUser = await User.findOne({
+          where: { user_id: decoded.user_id, status: 'active' },
+          attributes: ['user_id', 'user_uuid', 'nickname', 'status']
+        })
+        if (!dbUser) {
+          wsLogger.warn('WebSocket握手失败：用户不存在或已被禁用', {
+            user_id: decoded.user_id,
+            socket_id: socket.id
+          })
+          return next(new Error('Authentication failed: user not found or inactive'))
+        }
+
         // eslint-disable-next-line require-atomic-updates
-        socket.user = decoded
+        socket.user = {
+          user_id: dbUser.user_id,
+          user_uuid: dbUser.user_uuid,
+          nickname: dbUser.nickname,
+          status: dbUser.status
+        }
 
         wsLogger.info('WebSocket握手鉴权成功', {
-          user_id: decoded.user_id,
-          role: decoded.role,
-          role_level: decoded.role_level,
+          user_id: dbUser.user_id,
+          session_user_type: socket.session_user_type,
           socket_id: socket.id
         })
 
@@ -261,7 +283,8 @@ class ChatWebSocketService {
   setupEventHandlers() {
     this.io.on('connection', socket => {
       const userId = socket.user.user_id
-      const roleLevel = socket.user?.role_level ?? 0
+      // 连接上下文用会话身份（session_user_type），不再依赖 JWT 里的 role_level（B1 已移出 Token）
+      const sessionUserType = socket.session_user_type || 'user'
       /**
        * 连接路由基于会话的 user_type（登录上下文）而非 role_level：
        *   user_type='admin' → connectedAdmins（管理后台 WebSocket）
@@ -356,7 +379,7 @@ class ChatWebSocketService {
 
       socket.emit('connection_established', {
         user_id: userId,
-        role_level: roleLevel,
+        session_user_type: sessionUserType,
         socket_id: socket.id,
         server_time: BeijingTimeHelper.now(),
         timestamp: Date.now()
@@ -1659,12 +1682,12 @@ class ChatWebSocketService {
       }
     }
 
-    const roleLevel = socket.user?.role_level ?? 0
+    const sessionUserType = socket.session_user_type || 'user'
 
     try {
       wsLogger.info('开始会话恢复', {
         user_id: userId,
-        role_level: roleLevel,
+        session_user_type: sessionUserType,
         last_sync_time: last_sync_time || 'not_provided'
       })
 
@@ -1705,7 +1728,7 @@ class ChatWebSocketService {
       const result = {
         success: true,
         user_id: userId,
-        role_level: roleLevel,
+        session_user_type: sessionUserType,
         offline_messages_count: offlineMessages.count,
         sync_timestamp: BeijingTimeHelper.now(),
         message: `会话恢复成功${offlineMessages.count > 0 ? `，已推送${offlineMessages.count}条离线消息` : ''}`

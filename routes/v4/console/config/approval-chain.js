@@ -550,4 +550,69 @@ router.post(
   })
 )
 
+/**
+ * @route POST /api/v4/console/approval-chain/steps/batch
+ * @desc 批量审核步骤（批量通过/拒绝，收口到审核链，逐条复用 processStep）
+ * @access business_manager(role_level >= 60)，Service 层逐条精确鉴权
+ *
+ * @body {number[]} step_ids - 待审步骤ID数组（来自 my-pending，必填，最多100条）
+ * @body {string}   action   - 审核动作：approve | reject（必填）
+ * @body {string}   reason   - 审核原因（reject 必填且 >=5 字符）
+ *
+ * 说明：批量是"逐条独立事务循环 processStep"的封装，单条失败不影响其它；
+ *      终审发积分/改状态闭环由 Service 内复刻触发，结果与单条接口完全一致。
+ */
+router.post(
+  '/steps/batch',
+  authenticateToken,
+  requireRoleLevel(60),
+  asyncHandler(async (req, res) => {
+    const service = getApprovalChainService(req)
+    const { step_ids, action, reason } = req.body
+
+    if (!Array.isArray(step_ids) || step_ids.length === 0) {
+      return res.apiBadRequest('step_ids 必须是非空数组')
+    }
+    if (step_ids.length > 100) {
+      return res.apiBadRequest('单次批量最多处理 100 条步骤')
+    }
+    if (!['approve', 'reject'].includes(action)) {
+      return res.apiBadRequest('action 必须是 approve 或 reject')
+    }
+    if (action === 'reject' && (!reason || reason.trim().length < 5)) {
+      return res.apiBadRequest('拒绝原因必须提供，且不少于5个字符')
+    }
+
+    const result = await service.processStepsBatch(step_ids, action, reason, req.user.user_id)
+
+    logger.info('[审核链] 批量审核', {
+      operator_id: req.user.user_id,
+      action,
+      total: result.stats.total,
+      success_count: result.stats.success_count,
+      failed_count: result.stats.failed_count
+    })
+
+    getAuditLogService(req)
+      .logOperation({
+        operator_id: req.user.user_id,
+        operation_type: OPERATION_TYPES.APPROVAL_CHAIN_AUDIT,
+        target_type: 'approval_chain_step',
+        target_id: null,
+        action: `batch_${action}`,
+        after_data: { stats: result.stats },
+        reason: reason || '批量审核'
+      })
+      .catch(err => logger.warn('[审核链] 审计日志写入失败（非致命）:', err.message))
+
+    pushApprovalChainSocketEvent(req, 'approval_chain_step_batch', {
+      action,
+      stats: result.stats,
+      operator_id: req.user.user_id
+    })
+
+    return res.apiSuccess(result, '批量审核完成')
+  })
+)
+
 module.exports = router

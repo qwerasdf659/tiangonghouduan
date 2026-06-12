@@ -261,7 +261,7 @@ class ExchangeItemService {
    *
    * @param {number|string} exchangeItemId - 商品 ID
    * @param {Object} data - SKU 数据
-   * @param {string} data.sku_code - SKU 编码（唯一）
+   * @param {string} [data.sku_code] - SKU 编码（唯一）；不传则后端自动生成 P{pid}_{时间戳}_{随机}
    * @param {number} [data.stock] - 库存数量
    * @param {number} [data.cost_price] - 成本价
    * @param {string} [data.status] - SKU 状态
@@ -286,14 +286,20 @@ class ExchangeItemService {
       throw new BusinessError('商品不存在', 'PRODUCT_CENTER_PRODUCT_NOT_FOUND', 404)
     }
 
-    if (!data || !data.sku_code) {
-      throw new BusinessError('sku_code 必填', 'PRODUCT_CENTER_SKU_CODE_REQUIRED', 400)
-    }
+    /*
+     * sku_code 自动生成（2026-06-12 拍板：后端自动生成）：
+     * 手动建单规格 SKU 时前端不再要求填写 sku_code；未传入则按 P{pid}_{时间戳}{随机} 规则生成，
+     * 并校验全局唯一（sku_code 为唯一索引），与笛卡尔生成路径 P{pid}_ 前缀风格一致。
+     * 显式传入 sku_code 时沿用传入值（保留批量导入/迁移场景）。
+     */
+    const skuCode = data.sku_code
+      ? String(data.sku_code)
+      : await this._generateUniqueSkuCode(pid, transaction)
 
     const sku = await ExchangeItemSku.create(
       {
         exchange_item_id: pid,
-        sku_code: String(data.sku_code),
+        sku_code: skuCode,
         stock: data.stock != null ? Number(data.stock) : 0,
         cost_price: data.cost_price != null ? data.cost_price : null,
         status: data.status || 'active',
@@ -778,6 +784,36 @@ class ExchangeItemService {
       .sort((a, b) => a.attribute_id - b.attribute_id)
       .map(p => `${p.attribute_id}_${p.option_id}`)
     return `P${exchangeItemId}_${parts.join('__')}`
+  }
+
+  /**
+   * 生成全局唯一的 SKU 编码（手动建单规格 SKU 用，无销售属性组合时）
+   *
+   * 规则：P{exchange_item_id}_{北京时间紧凑时间戳}_{4位随机}，与笛卡尔路径 P{pid}_ 前缀风格一致。
+   * 校验 sku_code 唯一索引：极小概率撞码时重试，最多 5 次仍冲突则抛错（不静默兜底）。
+   *
+   * @param {number} exchangeItemId - 商品 ID（SPU 主键）
+   * @param {Object} transaction - Sequelize 事务实例（与 createSku 同一事务）
+   * @returns {Promise<string>} 唯一的 sku_code（长度 <= 100，符合模型约束）
+   * @private
+   */
+  async _generateUniqueSkuCode(exchangeItemId, transaction) {
+    const { ExchangeItemSku } = this.models
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const compactTs = BeijingTimeHelper.apiTimestamp().replace(/[^0-9]/g, '')
+      const rand = Math.random().toString(36).slice(2, 6)
+      const skuCode = `P${exchangeItemId}_${compactTs}_${rand}`
+      // eslint-disable-next-line no-await-in-loop
+      const existing = await ExchangeItemSku.findOne({ where: { sku_code: skuCode }, transaction })
+      if (!existing) {
+        return skuCode
+      }
+    }
+    throw new BusinessError(
+      'sku_code 自动生成多次冲突，请重试',
+      'PRODUCT_CENTER_SKU_CODE_GENERATE_FAILED',
+      500
+    )
   }
 
   /**

@@ -156,7 +156,18 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
     'unpublish_at',
     'attributes_json',
     'created_at',
-    'updated_at'
+    'updated_at',
+    /*
+     * SPU 物化价格列（与 marketItemView 列表视图对齐，议题1·拍板项②）：
+     * 详情接口需与列表接口下发同一套展示价契约，避免"列表有聚合价、详情没有"的契约不一致。
+     * 这些列在 getItemDetail 返回前会被映射为前端契约字段 cost_amount/cost_asset_code，
+     * 内部列名随后由 DataSanitizer 出口统一删除（不向前端暴露 min_* 命名）。
+     */
+    'stock',
+    'sold_count',
+    'min_cost_amount',
+    'max_cost_amount',
+    'min_cost_asset_code'
   ],
 
   /**
@@ -606,6 +617,22 @@ class QueryService {
        * 不下发任何商业敏感数值；无门槛配置时为 null。
        */
       itemWithDisplayNames.redeem_requirement = await this._buildRedeemRequirementView(item_id)
+
+      /*
+       * SPU 计价契约对齐（议题1·拍板项②，2026-06-12 落地）：
+       * 与列表接口 getMarketItems 同款映射，把 SPU 物化列映射为前端契约字段，前端零映射直接读：
+       * - cost_amount      ← min_cost_amount（展示价=最低单价；物化列为空则为 null）
+       * - cost_asset_code  ← min_cost_asset_code（计价资产码，决定积分轨/红源晶碎片轨等）
+       * default_sku_id：仅"单 active SKU"商品下发该 sku_id（前端自动选中、提交带上）；
+       *   多 active SKU 为 null（前端必须让用户选规格，后端 sku_id 必填不兜底）。
+       */
+      itemWithDisplayNames.cost_amount =
+        itemWithDisplayNames.min_cost_amount != null ? itemWithDisplayNames.min_cost_amount : null
+      itemWithDisplayNames.cost_asset_code = itemWithDisplayNames.min_cost_asset_code || null
+      const activeSkus = Array.isArray(itemWithDisplayNames.skus)
+        ? itemWithDisplayNames.skus.filter(sku => sku.status === 'active')
+        : []
+      itemWithDisplayNames.default_sku_id = activeSkus.length === 1 ? activeSkus[0].sku_id : null
 
       return {
         item: itemWithDisplayNames

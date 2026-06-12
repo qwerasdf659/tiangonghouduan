@@ -1153,6 +1153,41 @@ class AdminSystemService {
   }
 
   /**
+   * 通过 setting_key 获取系统配置值「及其行级元数据」（带缓存）
+   *
+   * 与 getConfigValue 的区别：本方法额外返回该配置「行的真实 updated_at 列」（北京时间），
+   * 供前端做"配置版本比对/缓存失效"用——version 应只在运营真正改配置时变化，
+   * 不能用 Date.now() 兜底（否则每次调用都漂移、前端永远误判"有更新"）。
+   *
+   * 业务场景：/system/config/placement、/home/bootstrap 的 placement.version 派生。
+   * 缓存：用独立缓存键（避免与 getConfigValue 的"纯值"缓存结构冲突），TTL 与值缓存一致。
+   *
+   * @param {string} setting_key - 配置项标识
+   * @returns {Promise<Object>} { value, updated_at }：配置值 + 行 updated_at（不存在时 value=null, updated_at=null）
+   */
+  static async getConfigWithMeta(setting_key) {
+    const metaCacheKey = `${setting_key}:with_meta`
+    try {
+      const cached = await this._getConfigFromCache(metaCacheKey)
+      if (cached !== null) return cached
+
+      const setting = await SystemSettings.findOne({ where: { setting_key } })
+      if (!setting) return { value: null, updated_at: null }
+
+      const result = {
+        value: setting.getParsedValue(),
+        // 行级 updated_at：Sequelize 自动维护（北京时间），仅在配置被修改时变化
+        updated_at: setting.updated_at || null
+      }
+      await this._setConfigToCache(metaCacheKey, result)
+      return result
+    } catch (error) {
+      logger.error('获取配置值（含元数据）失败', { setting_key, error: error.message })
+      return { value: null, updated_at: null }
+    }
+  }
+
+  /**
    * 从 JSON 类型配置中获取指定属性值
    * @param {string} setting_key - 配置项标识
    * @param {string} property - JSON 内的属性名
@@ -1255,6 +1290,8 @@ class AdminSystemService {
       }
 
       await this._clearConfigCache(setting_key)
+      // 同时清除"含元数据"缓存键（getConfigWithMeta 使用），避免改配置后 version 仍读旧 updated_at
+      await this._clearConfigCache(`${setting_key}:with_meta`)
       logger.info(created ? '配置已创建' : '配置已更新', { setting_key })
       return { setting_key, created }
     } catch (error) {

@@ -256,7 +256,9 @@ router.get(
  * @header {string} Idempotency-Key - 幂等键（必填）
  * @body {number} exchange_item_id - 商品ID（必填）
  * @body {number} quantity - 兑换数量（默认 1，最大 10）
- * @body {number} [sku_id] - SKU ID（多规格商品必填，单品商品可省略自动选择默认 SKU）
+ * @body {number} sku_id - SKU ID（必填）。SKU 是下单的唯一主体，单规格商品也有默认 SKU：
+ *                         前端从列表的 default_sku_id（单 active SKU 商品）或详情的 skus[] 取得后传入。
+ *                         与 CoreService.exchangeItem 的 sku_id 必填校验保持一致（不做自动兜底）。
  *
  * @returns {Object} { order, remaining, is_duplicate }
  */
@@ -295,7 +297,7 @@ router.post(
         user_id,
         exchange_item_id,
         quantity,
-        sku_id: sku_id || '(auto)',
+        sku_id: sku_id || '(missing)',
         idempotency_key
       })
 

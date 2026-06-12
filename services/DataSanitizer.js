@@ -14,6 +14,26 @@ const { getImageUrl, getPlaceholderImageUrl } = require('../utils/ImageUrlHelper
 const FORBIDDEN_FRONTEND_ASSET_CODES = [AssetCode.BUDGET_POINTS]
 
 /**
+ * 业务数值归一工具（P1·BIGINT 数值口径，2026-06-12）
+ *
+ * 业务场景：项目全局 config/database.js 开启 bigNumberStrings:true，BIGINT 列以字符串下发。
+ * 对"金额/数量类"业务数值（cost_amount、original_amount 等，远不会超过 JS 安全整数 2^53）
+ * 在 C 端脱敏出口统一转为 number，使前端可直接做算术/比较，根除 typeof 字符串数值踩坑。
+ *
+ * 注意：仅用于金额/数量类业务字段，主键类（exchange_item_id/sku_id 等）禁止使用本函数（保持字符串防溢出）。
+ *
+ * @param {string|number|null|undefined} value - 原始值（可能是 BIGINT 字符串、number、null）
+ * @returns {number|null} 归一后的 number；输入为 null/undefined/非数字时返回 null
+ */
+function toBusinessNumber(value) {
+  if (value === null || value === undefined) {
+    return null
+  }
+  const num = Number(value)
+  return Number.isNaN(num) ? null : num
+}
+
+/**
  * 统一数据脱敏服务（DataSanitizer）
  *
  * 业务场景：API响应数据安全防护 - 防止用户通过抓包分析数据库结构和商业逻辑
@@ -1407,6 +1427,27 @@ class DataSanitizer {
       delete sanitized.min_cost_amount
       delete sanitized.max_cost_amount
       delete sanitized.min_cost_asset_code
+
+      /*
+       * P1·BIGINT 数值口径归一（方案 A，2026-06-12 落地）：
+       * 项目全局 config/database.js 开启 bigNumberStrings:true，所有 BIGINT 列以"字符串"下发。
+       * 这里在 C 端统一脱敏出口，对"参与计算且不可能超过 2^53 的金额/数量类字段"做 Number() 归一，
+       * 让前端可直接做 + / 比较，根除 typeof 字符串数值踩坑；
+       * 主键类（exchange_item_id / sku_id / default_sku_id）保持字符串不动（防雪花/大自增 2^53 溢出）。
+       * 仅作用于 C 端 exchange 列表/详情 2 处调用，爆炸半径最小，不动全局 ORM 行为。
+       */
+      sanitized.cost_amount = toBusinessNumber(sanitized.cost_amount)
+      sanitized.original_price = toBusinessNumber(sanitized.original_price)
+      if (Array.isArray(sanitized.skus)) {
+        sanitized.skus.forEach(sku => {
+          if (Array.isArray(sku.channelPrices)) {
+            sku.channelPrices.forEach(price => {
+              price.cost_amount = toBusinessNumber(price.cost_amount)
+              price.original_amount = toBusinessNumber(price.original_amount)
+            })
+          }
+        })
+      }
 
       return sanitized
     })

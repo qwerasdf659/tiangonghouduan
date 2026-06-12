@@ -10,4 +10,4 @@ logs/
 scripts/toolkit/
 **/*.md
 public/admin/
-admin/
+/admin/

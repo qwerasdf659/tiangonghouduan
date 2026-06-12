@@ -405,23 +405,20 @@ async function generateTokens(user, options = {}) {
     const userRole = primaryRole ? primaryRole.role_name : 'user'
 
     /**
-     * 🔐 JWT Payload（P1-2修复：移除is_admin字段）
-     * 原因：管理员权限应实时从数据库查询，而非存储在Token中
-     * 安全性：避免权限变更后Token未过期导致的权限漂移问题
+     * 🔐 JWT Payload（B1 精简 A 案，2026-06-12）
      *
-     * 🆕 2026-01-21：新增 session_token 字段，关联会话存储
-     * - session_token 用于关联 authentication_sessions 表
-     * - 敏感操作时验证会话有效性
-     * - 强制登出时可立即失效会话
+     * 安全原则（对标阿里/腾讯/游戏大厂）：JWT 只证明"你是谁"（身份 + 会话票据），
+     * 不证明"你能干什么"（权限）和"你的资料"（手机号/角色/昵称）。原因：
+     * - payload 是 Base64 明文（非加密），任何拿到 Token 的人可解码 → 手机号/role_level 等于半公开。
+     * - role_level 放 Token 还有"权限漂移"（改了权限旧 Token 仍生效）问题。
+     *
+     * 故仅保留鉴权必需的最小字段：user_id（身份）+ iat（签发时间）；
+     * session_token / device_id 按需附加（会话校验 / 多端）。
+     * mobile / nickname / status / role_level / user_role 一律由 authenticateToken 实时查库注入 req.user，
+     * 不进 Token（这些字段后端鉴权本就不依赖 payload，移除零风险）。
      */
     const payload = {
       user_id: user.user_id,
-      mobile: user.mobile,
-      nickname: user.nickname,
-      status: user.status,
-      role_level: userRoles.role_level, // 🛡️ 基于角色计算
-      // P1-2修复：移除is_admin字段，权限实时查询而非存储在JWT中
-      user_role: userRole, // 🔐 角色名称
       iat: Math.floor(BeijingTimeHelper.timestamp() / 1000)
     }
 

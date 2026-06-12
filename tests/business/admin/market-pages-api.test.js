@@ -14,7 +14,6 @@
 
 const { describe, test, expect, beforeAll } = require('@jest/globals')
 
-/* eslint-disable-next-line node/no-unpublished-require */
 const supertest = require('supertest')
 
 let app, request, adminToken
@@ -64,6 +63,41 @@ describe('兑换市场管理页面 API', () => {
       expect(item).toHaveProperty('stock')
       expect(item).toHaveProperty('status')
     }
+  })
+
+  test('POST /console/exchange/items/:id/skus - 不传 sku_code 时后端自动生成（2026-06-12）', async () => {
+    // 取一个真实商品作为挂载 SKU 的目标（不硬编码 ID）
+    const listRes = await request
+      .get('/api/v4/console/exchange/items')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .query({ page: 1, page_size: 1 })
+    expect(listRes.status).toBe(200)
+    if (listRes.body.data.items.length === 0) {
+      console.log('⚠️ 跳过测试：无商品可挂载 SKU')
+      return
+    }
+    const exchangeItemId = listRes.body.data.items[0].exchange_item_id
+
+    // 创建 SKU：故意不传 sku_code，验证后端自动生成
+    const createRes = await request
+      .post(`/api/v4/console/exchange/items/${exchangeItemId}/skus`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ stock: 1, status: 'inactive' })
+
+    expect(createRes.status).toBe(200)
+    expect(createRes.body.success).toBe(true)
+    const createdSku = createRes.body.data
+    expect(createdSku).toHaveProperty('sku_id')
+    // 后端自动生成 sku_code：非空、以 P{pid}_ 开头、长度合规
+    expect(createdSku.sku_code).toBeTruthy()
+    expect(String(createdSku.sku_code).startsWith(`P${exchangeItemId}_`)).toBe(true)
+    expect(String(createdSku.sku_code).length).toBeLessThanOrEqual(100)
+
+    // 清理：删除测试创建的 SKU，避免污染真实库
+    const delRes = await request
+      .delete(`/api/v4/console/exchange/items/skus/${createdSku.sku_id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+    expect(delRes.status).toBe(200)
   })
 
   test('GET /console/exchange/orders - 兑换订单列表应返回分页数据', async () => {

@@ -220,7 +220,6 @@ module.exports = {
         'services/market-listing/CoreService.js',
         'services/AdTagAggregationService.js',
         'services/AdPricingService.js',
-        'services/consumption/ConsumptionBatchService.js',
         'services/consumption/AnomalyService.js',
         'services/PrizePoolService.js',
         'services/CustomerServiceAgentManagementService.js',

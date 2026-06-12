@@ -236,10 +236,10 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/console/user-ratio-overrides': 'ADMIN_USER_RATIO_OVERRIDE_CREATE',
   '/api/v4/console/user-ratio-overrides/:id': 'ADMIN_USER_RATIO_OVERRIDE_UPDATE',
 
-  // ===== 消费审批 =====
-  '/api/v4/console/consumption/approve/:id': 'ADMIN_CONSUMPTION_APPROVE', // 审批消费（修复：console/approve/:id → console/consumption/approve/:id）
-  '/api/v4/console/consumption/reject/:id': 'ADMIN_CONSUMPTION_REJECT', // 拒绝消费（修复：console/reject/:id → console/consumption/reject/:id）
-  '/api/v4/console/consumption/batch-review': 'ADMIN_CONSUMPTION_BATCH_REVIEW', // 批量审核消费记录（2026-01-31 P0 运营后台任务清单）
+  /*
+   * ===== 消费审批（2026-06-12 已收口审核链，旧 consumption 直审/批量映射已删除）=====
+   * 消费审核统一走审核链：见下方 approval-chain steps 映射（steps/:id/approve|reject、steps/batch）
+   */
 
   // ===== 客服管理 =====
   '/api/v4/console/customer-service/sessions/:id/send': 'ADMIN_CS_MESSAGE_SEND', // 发送客服消息（canonical 路径）
@@ -430,6 +430,7 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/console/approval-chain/templates/:id/toggle': 'ADMIN_APPROVAL_CHAIN_TOGGLE_TEMPLATE', // 启用/禁用审核链模板
   '/api/v4/console/approval-chain/steps/:id/approve': 'APPROVAL_CHAIN_STEP_APPROVE', // 审核链步骤审核通过
   '/api/v4/console/approval-chain/steps/:id/reject': 'APPROVAL_CHAIN_STEP_REJECT', // 审核链步骤审核拒绝
+  '/api/v4/console/approval-chain/steps/batch': 'APPROVAL_CHAIN_STEP_BATCH', // 审核链步骤批量审核（通过/拒绝，收口消费批量审核）
 
   // ===== 风险告警 =====
   '/api/v4/console/risk-alerts/:id/review': 'ADMIN_RISK_ALERT_REVIEW', // 审核风险告警（修复：risk/alerts → risk-alerts）

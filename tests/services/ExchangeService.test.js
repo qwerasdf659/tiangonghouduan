@@ -264,6 +264,43 @@ describe('ExchangeService - 兑换市场服务测试', () => {
       // 执行：查询不存在的商品ID
       await expect(ExchangeService.getItemDetail(999999999)).rejects.toThrow('商品不存在')
     })
+
+    it('详情接口应下发 SPU 计价契约字段 cost_amount/cost_asset_code/default_sku_id（P2）', async () => {
+      // 准备：取一个活跃商品（真实库，不硬编码 ID）
+      const listResult = await ExchangeService.getMarketItems({
+        status: 'active',
+        page: 1,
+        page_size: 1
+      })
+      if (listResult.items.length === 0) {
+        console.log('⚠️ 跳过测试：无活跃商品')
+        return
+      }
+      const exchangeItemId = listResult.items[0].exchange_item_id
+
+      // 执行：获取商品详情
+      const { item } = await ExchangeService.getItemDetail(exchangeItemId)
+
+      // 验证：详情已对齐列表，下发 SPU 计价契约字段（与 getMarketItems 同款映射）
+      expect(item).toHaveProperty('cost_amount')
+      expect(item).toHaveProperty('cost_asset_code')
+      expect(item).toHaveProperty('default_sku_id')
+
+      // 业务语义：单 active SKU 商品必须给 default_sku_id（前端自动选中提交）；多 SKU 为 null
+      const activeSkus = Array.isArray(item.skus)
+        ? item.skus.filter(sku => sku.status === 'active')
+        : []
+      if (activeSkus.length === 1) {
+        expect(item.default_sku_id).toBe(activeSkus[0].sku_id)
+      } else {
+        expect(item.default_sku_id).toBeNull()
+      }
+
+      // 计价资产与展示价同源于 SPU 物化列（cost_amount 来自 min_cost_amount）
+      if (item.cost_amount !== null) {
+        expect(item.cost_asset_code).toBeTruthy()
+      }
+    })
   })
 
   // ==================== 用户订单查询测试 ====================

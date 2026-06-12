@@ -61,7 +61,15 @@ async function main() {
   console.log('✅ final_quality_check 全部阶段通过\n')
 }
 
-main().catch(err => {
-  console.error('❌ final_quality_check 异常:', err)
-  process.exit(1)
-})
+main()
+  .then(() => {
+    /*
+     * 显式退出：本脚本会创建 DB/Redis 连接（pre_start_check 内），这些句柄会让事件循环
+     * 保持存活、进程不自动结束（CI 会卡住）。全部阶段通过后显式以 0 退出。
+     */
+    process.exit(0)
+  })
+  .catch(err => {
+    console.error('❌ final_quality_check 异常:', err)
+    process.exit(1)
+  })

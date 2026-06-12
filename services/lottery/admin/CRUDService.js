@@ -368,7 +368,6 @@ class LotteryCampaignCRUDService {
 
     // ✅ 自动生成默认定价配置（决策 3：创建即可用，运营可后续修改）
     try {
-
       // 从 system_settings 读取全局单抽成本（运营可动态调整，非硬编码）
       let defaultBaseCost
       try {

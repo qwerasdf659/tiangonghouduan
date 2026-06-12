@@ -5,7 +5,8 @@
  * - 2026-03-10 决策#1：统一到 ContentAuditEngine 路径
  * - 将 ConsumptionCoreService.approveConsumption 的核心业务逻辑迁移到此回调
  * - 审核链终审通过 → ContentAuditEngine.approve() → triggerAuditCallback() → 本回调
- * - 兼容无审核链的存量数据（路由层直接调用 CoreService.approveConsumption 仍可用）
+ * - 2026-06-12 单一路径零技术债：消费审核已完全收口审核链，路由层直审分支已删除；
+ *   CoreService.approveConsumption / rejectConsumption 仅作为本回调复用的核心业务逻辑保留
  *
  * 业务流程（审核链路径）：
  * - 终审通过 → ContentAuditEngine.approve() → triggerAuditCallback('approved')

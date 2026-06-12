@@ -39,8 +39,6 @@ export function useExchangeItemsState() {
     itemForm: {
       item_name: '',
       description: '',
-      cost_asset_code: '',
-      cost_amount: 1,
       cost_price: 0,
       stock: 0,
       sort_order: 100,
@@ -338,8 +336,6 @@ export function useExchangeItemsMethods() {
       this.itemForm = {
         item_name: '',
         description: '',
-        cost_asset_code: '',
-        cost_amount: 1,
         cost_price: 0,
         stock: 0,
         sort_order: 100,
@@ -382,8 +378,6 @@ export function useExchangeItemsMethods() {
       this.itemForm = {
         item_name: item.item_name || '',
         description: item.description || '',
-        cost_asset_code: item.cost_asset_code || '',
-        cost_amount: item.cost_amount || 1,
         cost_price: item.cost_price || 0,
         stock: item.stock || 0,
         sort_order: item.sort_order || 100,
@@ -432,8 +426,8 @@ export function useExchangeItemsMethods() {
      * 保存商品（新增或更新）
      */
     async saveItem() {
-      if (!this.itemForm.item_name || !this.itemForm.cost_asset_code) {
-        this.showError?.('请填写必填项')
+      if (!this.itemForm.item_name) {
+        this.showError?.('请填写商品名称')
         return
       }
 
@@ -921,23 +915,46 @@ export function useExchangeItemsMethods() {
 
     /**
      * 保存 SKU（新建或更新）
+     *
+     * 价格真相源是 exchange_channel_prices：SKU 主体（createSku/updateSku）只写库存/状态/规格，
+     * 价格通过独立的渠道价端点 setChannelPrices 全量替换（与 prop-shop 一体化上架链同一模式）。
      * @param {number} itemId - 商品 ID
      */
     async saveSku(itemId) {
       try {
+        const exchangeItemId = itemId || this.editingItemId
+        const { cost_amount, cost_asset_code, ...skuBody } = this.skuForm
+        if (!cost_asset_code) {
+          this.showError?.('请选择计价资产类型')
+          return
+        }
         let res
+        let skuId
         if (this.editingSkuId) {
-          res = await ExchangeItemAPI.updateSku(this.editingSkuId, this.skuForm)
+          res = await ExchangeItemAPI.updateSku(this.editingSkuId, skuBody)
+          skuId = this.editingSkuId
         } else {
-          res = await ExchangeItemAPI.createSku(itemId, this.skuForm)
+          res = await ExchangeItemAPI.createSku(exchangeItemId, skuBody)
+          skuId = res.data?.sku_id
         }
-        if (res.success) {
-          this.showSuccess?.(this.editingSkuId ? 'SKU 已更新' : 'SKU 已创建')
-          await this.loadItemSkus(itemId)
-          this.resetSkuForm()
-        } else {
+        if (!res.success) {
           this.showError?.(res.message || '保存 SKU 失败')
+          return
         }
+        if (!skuId) {
+          this.showError?.('保存 SKU 成功但未返回 sku_id，无法设置价格')
+          return
+        }
+        const priceRes = await ExchangeItemAPI.setChannelPrices(skuId, [
+          { cost_asset_code, cost_amount: Number(cost_amount) }
+        ])
+        if (!priceRes.success) {
+          this.showError?.(priceRes.message || '保存价格失败')
+          return
+        }
+        this.showSuccess?.(this.editingSkuId ? 'SKU 已更新' : 'SKU 已创建')
+        await this.loadItemSkus(exchangeItemId)
+        this.resetSkuForm()
       } catch (e) {
         logger.error('[ExchangeItems] 保存 SKU 失败:', e)
         this.showError?.('保存 SKU 失败')
@@ -946,15 +963,19 @@ export function useExchangeItemsMethods() {
 
     /**
      * 编辑 SKU（填充表单）
-     * @param {Object} sku - SKU 数据
+     *
+     * 价格真相源是 exchange_channel_prices（每 SKU 多渠道价），后端 SKU 列表接口已 include channelPrices。
+     * 故 cost_amount/cost_asset_code 从该 SKU 的 channelPrices[0] 读取，而非 SKU 主体（SKU 表无这两列）。
+     * @param {Object} sku - SKU 数据（含 channelPrices 关联）
      */
     editSku(sku) {
       this.editingSkuId = sku.sku_id
+      const price = Array.isArray(sku.channelPrices) ? sku.channelPrices[0] : null
       this.skuForm = {
         spec_values: sku.spec_values || {},
-        cost_amount: sku.cost_amount,
+        cost_amount: price ? Number(price.cost_amount) : 1,
         stock: sku.stock,
-        cost_asset_code: sku.cost_asset_code || '',
+        cost_asset_code: price ? price.cost_asset_code : '',
         status: sku.status
       }
     },

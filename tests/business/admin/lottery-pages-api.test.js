@@ -27,8 +27,8 @@ async function apiRequest(method, path, body = null) {
     method,
     headers: {
       'Content-Type': 'application/json',
-      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-    },
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {})
+    }
   };
   if (body) {
     options.body = JSON.stringify(body);
@@ -41,7 +41,7 @@ async function apiRequest(method, path, body = null) {
 beforeAll(async () => {
   const result = await apiRequest('POST', '/auth/login', {
     mobile: '13612227930',
-    verification_code: '123456',
+    verification_code: '123456'
   });
   expect(result.success).toBe(true);
   accessToken = result.data?.access_token;

@@ -56,13 +56,13 @@ class AdminLotteryQueryService {
    * 供运营后台「抽奖记录」列表使用，字段与 lottery_draws 表及关联活动/奖品对齐，
    * 包含面向用户的 order_no（LT）与内部 lottery_draw_id。
    *
-   * @param {Object} query
-   * @param {number} [query.page=1]
-   * @param {number} [query.page_size=20]
+   * @param {Object} query - 查询参数对象
+   * @param {number} [query.page=1] - 页码（从 1 开始）
+   * @param {number} [query.page_size=20] - 每页条数
    * @param {number} [query.user_id] - 按用户 ID 筛选
    * @param {number} [query.lottery_campaign_id] - 按活动 ID 筛选
    * @param {string} [query.keyword] - 模糊匹配 lottery_draw_id / order_no
-   * @returns {Promise<{ draws: Object[], pagination: Object }>}
+   * @returns {Promise<{ draws: Object[], pagination: Object }>} 抽奖流水分页结果
    */
   static async getDrawRecordsList(query = {}) {
     const {

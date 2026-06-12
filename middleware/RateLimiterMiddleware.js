@@ -52,12 +52,21 @@ class RateLimiterMiddleware {
 
     // 限流配置预设
     this.presets = {
-      // 全局API限流
+      // 全局API限流（阈值读 .env，唯一真相源；A1/A2：登录按 user、未登录按 ip）
       global: {
-        windowMs: 60 * 1000, // 1分钟窗口
-        max: 100, // 最多100个请求
+        windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || 60 * 1000, // 默认1分钟窗口
+        max: parseInt(process.env.RATE_LIMIT_GLOBAL_MAX, 10) || 600, // 全局兜底，默认600
         keyPrefix: 'rate_limit:global:',
-        message: '请求过于频繁，请稍后再试'
+        message: '请求过于频繁，请稍后再试',
+        keyGenerator: 'user_or_ip' // 登录按user_id、未登录回退IP
+      },
+      // 公开只读接口宽松档（campaigns/active + system/config + app-version + price/* + analytics/history）
+      public_read: {
+        windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || 60 * 1000,
+        max: parseInt(process.env.RATE_LIMIT_PUBLIC_READ_MAX, 10) || 300,
+        keyPrefix: 'rate_limit:public_read:',
+        message: '请求过于频繁，请稍后再试',
+        keyGenerator: 'user_or_ip'
       },
       // 抽奖接口限流
       lottery: {
@@ -203,6 +212,8 @@ class RateLimiterMiddleware {
             429
           )
           resp.request_id = req.id || req.headers['x-request-id'] || `req_${crypto.randomUUID()}`
+          // 补标准 HTTP Retry-After 头（秒），兼容标准 HTTP 客户端/SDK 识别
+          res.setHeader('Retry-After', retryAfter)
           return res.status(429).json(resp)
         }
 
@@ -285,12 +296,15 @@ class RateLimiterMiddleware {
               {
                 limit: config.max,
                 window_seconds: config.windowMs / 1000,
+                retry_after: Math.ceil(config.windowMs / 1000),
                 current: count,
                 degraded: true // 标识：本次为 Redis 降级后的内存兜底限流
               },
               429
             )
             resp.request_id = req.id || req.headers['x-request-id'] || `req_${crypto.randomUUID()}`
+            // 兜底路径同样补标准 Retry-After 头（内存兜底无精确最早时间，按整窗口给）
+            res.setHeader('Retry-After', Math.ceil(config.windowMs / 1000))
             return res.status(429).json(resp)
           }
 
@@ -394,6 +408,19 @@ class RateLimiterMiddleware {
         return null
       }
       return `${keyPrefix}user:${user_id}`
+    }
+
+    /*
+     * 登录按 user、未登录按 ip（A1/A2 公开只读 + 全局兜底用）
+     * 避免同一出口 IP（NAT/校园网/微信网关）下多个真实登录用户互相挤占 IP 桶。
+     */
+    if (keyGenerator === 'user_or_ip') {
+      const user_id = req.user?.user_id
+      if (user_id) {
+        return `${keyPrefix}user:${user_id}`
+      }
+      const clientIP = req.ip || req.connection?.remoteAddress || 'unknown'
+      return `${keyPrefix}ip:${clientIP}`
     }
 
     // 按IP限流（默认）

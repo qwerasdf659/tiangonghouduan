@@ -353,6 +353,18 @@ document.addEventListener('alpine:init', () => {
         return type?.display_name || code || '-'
       },
 
+      /**
+       * SKU 价格展示文案：价格真相源是 channelPrices（每 SKU 多渠道价），取首条渠道价展示。
+       * SKU 表本身无 cost_amount/cost_asset_code 列，故必须从 channelPrices[0] 读。
+       * @param {Object} sku - SKU 对象（含 channelPrices 关联）
+       * @returns {string} 形如 "10 红源晶碎片"，无渠道价时返回 "-"
+       */
+      skuPriceLabel(sku) {
+        const price = Array.isArray(sku?.channelPrices) ? sku.channelPrices[0] : null
+        if (!price) return '-'
+        return Number(price.cost_amount) + ' ' + this.getAssetTypeName(price.cost_asset_code)
+      },
+
       // ========== 图片预览 ==========
       previewImageUrl: '',
       previewImageAlt: '',

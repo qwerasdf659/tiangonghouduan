@@ -261,33 +261,54 @@ export function useConsumptionMethods() {
     },
 
     /**
-     * 通过消费记录审核
-     * 后端接口: POST /api/v4/console/consumption/approve/:id
+     * 通过消费记录审核（收口到审核链 2026-06-12）
+     * 实现：解析该记录审核链的当前 pending 步骤 → 调审核链步骤通过接口
+     * 后端接口: POST /api/v4/console/approval-chain/steps/:id/approve
      * @param {Object} record - 消费记录对象
      */
     async approveConsumption(record) {
       const recordId = record.record_id
+      const pendingStep = await this._resolvePendingStep(recordId)
+      if (!pendingStep) return
+
       await this.confirmAndExecute(
         '确定通过此消费记录？',
         async () => {
-          const response = await this.apiCall(
-            buildURL(STORE_ENDPOINTS.CONSUMPTION_APPROVE, { id: recordId }),
-            { method: 'POST', data: {} }
-          )
+          const response = await ApprovalChainAPI.approveStep(pendingStep.step_id, '审核通过')
           if (response?.success) {
-            if (response.data?.redirect) {
-              this.showWarning(response.data.message || '该记录需要通过审核链流程审核')
-              await this.loadChainForRecord(recordId)
-              if (this.selectedChainInstance) {
-                this.showModal('chainTimelineModal')
-              }
-              return
+            const completed = response.data?.is_chain_completed
+            const finalResult = response.data?.final_result
+            if (completed && finalResult === 'approved') {
+              this.showSuccess('终审通过，积分已自动发放')
+            } else {
+              this.showSuccess('已通过，进入下一步审核')
             }
             await this.loadConsumptions()
           }
         },
-        { successMessage: '消费记录已通过' }
+        { successMessage: null }
       )
+    },
+
+    /**
+     * 解析消费记录当前待审核的审核链步骤
+     * @private
+     * @param {number} recordId - 消费记录ID
+     * @returns {Promise<Object|null>} 当前 pending 步骤（含 step_id），无则提示并返回 null
+     */
+    async _resolvePendingStep(recordId) {
+      await this.loadChainForRecord(recordId)
+      const instance = this.selectedChainInstance
+      if (!instance || instance.status !== 'in_progress') {
+        this.showWarning('该记录没有进行中的审核链，无法审核')
+        return null
+      }
+      const pendingStep = (instance.steps || []).find(s => s.status === 'pending')
+      if (!pendingStep) {
+        this.showWarning('当前审核链没有待处理的步骤')
+        return null
+      }
+      return pendingStep
     },
 
     /**
@@ -311,8 +332,8 @@ export function useConsumptionMethods() {
     },
 
     /**
-     * 确认拒绝
-     * 后端接口: POST /api/v4/console/consumption/reject/:id
+     * 确认拒绝（收口到审核链 2026-06-12）
+     * 后端接口: POST /api/v4/console/approval-chain/steps/:id/reject
      */
     async confirmReject() {
       if (!this.rejectForm.reason || this.rejectForm.reason.trim().length < 5) {
@@ -323,24 +344,18 @@ export function useConsumptionMethods() {
       try {
         this.saving = true
         const recordId = this.selectedConsumption.record_id
-        const response = await this.apiCall(
-          buildURL(STORE_ENDPOINTS.CONSUMPTION_REJECT, { id: recordId }),
-          {
-            method: 'POST',
-            data: { admin_notes: this.rejectForm.reason }
-          }
+        const pendingStep = await this._resolvePendingStep(recordId)
+        if (!pendingStep) {
+          this.hideModal('rejectModal')
+          return
+        }
+
+        const response = await ApprovalChainAPI.rejectStep(
+          pendingStep.step_id,
+          this.rejectForm.reason.trim()
         )
 
         if (response?.success) {
-          if (response.data?.redirect) {
-            this.showWarning(response.data.message || '该记录需要通过审核链流程拒绝')
-            this.hideModal('rejectModal')
-            await this.loadChainForRecord(recordId)
-            if (this.selectedChainInstance) {
-              this.showModal('chainTimelineModal')
-            }
-            return
-          }
           this.showSuccess('消费记录已拒绝')
           this.hideModal('rejectModal')
           await this.loadConsumptions()
@@ -423,8 +438,8 @@ export function useConsumptionMethods() {
     },
 
     /**
-     * 批量通过审核
-     * 后端接口: POST /api/v4/console/consumption/batch-review
+     * 批量通过审核（收口到审核链 2026-06-12）
+     * 后端接口: POST /api/v4/console/approval-chain/steps/batch
      */
     async batchApprove() {
       if (this.selectedIds.length === 0) {
@@ -437,26 +452,15 @@ export function useConsumptionMethods() {
         async () => {
           this.batchProcessing = true
           try {
-            const response = await this.apiCall(`${API_PREFIX}/console/consumption/batch-review`, {
-              method: 'POST',
-              data: {
-                record_ids: this.selectedIds,
-                action: 'approve'
-              }
-            })
+            const stepIds = await this._resolveBatchStepIds(this.selectedIds)
+            if (stepIds.length === 0) {
+              this.showWarning('所选记录均无待处理的审核链步骤')
+              return
+            }
 
+            const response = await ApprovalChainAPI.batchSteps(stepIds, 'approve', '批量审核通过')
             if (response?.success) {
-              this.batchResult = response.data
-              /* 后端返回 stats 嵌套对象：{ stats: { success_count, failed_count, ... } } */
-              const stats = response.data?.stats || {}
-              const successCount = stats.success_count || 0
-              const failedCount = stats.failed_count || 0
-              if (failedCount > 0) {
-                this.showWarning(`成功 ${successCount} 项，失败 ${failedCount} 项`)
-              } else {
-                this.showSuccess(`成功通过 ${successCount} 条记录`)
-              }
-              // 清空选择并刷新
+              this._handleBatchResult(response.data, '通过')
               this.selectedIds = []
               this.isAllSelected = false
               await this.loadConsumptions()
@@ -466,6 +470,43 @@ export function useConsumptionMethods() {
           }
         }
       )
+    },
+
+    /**
+     * 将选中的消费记录ID解析为审核链待处理步骤ID数组
+     * @private
+     * @param {Array<number>} recordIds - 消费记录ID数组
+     * @returns {Promise<Array<number>>} 待处理步骤ID数组
+     */
+    async _resolveBatchStepIds(recordIds) {
+      const stepIds = []
+      for (const recordId of recordIds) {
+        const resp = await ApprovalChainAPI.getInstanceByAuditable('consumption', recordId)
+        const instance = resp?.success ? resp.data : null
+        if (instance && instance.status === 'in_progress') {
+          const pendingStep = (instance.steps || []).find(s => s.status === 'pending')
+          if (pendingStep) stepIds.push(pendingStep.step_id)
+        }
+      }
+      return stepIds
+    },
+
+    /**
+     * 统一处理批量审核结果提示
+     * @private
+     * @param {Object} data - 后端返回 { results, stats }
+     * @param {string} actionLabel - 动作中文（通过/拒绝）
+     */
+    _handleBatchResult(data, actionLabel) {
+      this.batchResult = data
+      const stats = data?.stats || {}
+      const successCount = stats.success_count || 0
+      const failedCount = stats.failed_count || 0
+      if (failedCount > 0) {
+        this.showWarning(`成功 ${successCount} 项，失败 ${failedCount} 项`)
+      } else {
+        this.showSuccess(`成功${actionLabel} ${successCount} 条记录`)
+      }
     },
 
     /**
@@ -481,8 +522,8 @@ export function useConsumptionMethods() {
     },
 
     /**
-     * 确认批量拒绝（从弹窗提交）
-     * 后端接口: POST /api/v4/console/consumption/batch-review
+     * 确认批量拒绝（收口到审核链 2026-06-12）
+     * 后端接口: POST /api/v4/console/approval-chain/steps/batch
      */
     async confirmBatchReject() {
       if (!this.batchRejectReason || this.batchRejectReason.trim().length < 5) {
@@ -492,27 +533,22 @@ export function useConsumptionMethods() {
 
       this.batchProcessing = true
       try {
-        const response = await this.apiCall(`${API_PREFIX}/console/consumption/batch-review`, {
-          method: 'POST',
-          data: {
-            record_ids: this.selectedIds,
-            action: 'reject',
-            reason: this.batchRejectReason.trim()
-          }
-        })
+        const stepIds = await this._resolveBatchStepIds(this.selectedIds)
+        if (stepIds.length === 0) {
+          this.showWarning('所选记录均无待处理的审核链步骤')
+          this.hideModal('batchRejectModal')
+          return
+        }
+
+        const response = await ApprovalChainAPI.batchSteps(
+          stepIds,
+          'reject',
+          this.batchRejectReason.trim()
+        )
 
         if (response?.success) {
-          this.batchResult = response.data
-          /* 后端返回 stats 嵌套对象：{ stats: { success_count, failed_count, ... } } */
-          const stats = response.data?.stats || {}
-          const successCount = stats.success_count || 0
-          const failedCount = stats.failed_count || 0
           this.hideModal('batchRejectModal')
-          if (failedCount > 0) {
-            this.showWarning(`成功 ${successCount} 项，失败 ${failedCount} 项`)
-          } else {
-            this.showSuccess(`成功拒绝 ${successCount} 条记录`)
-          }
+          this._handleBatchResult(response.data, '拒绝')
           this.selectedIds = []
           this.isAllSelected = false
           await this.loadConsumptions()
@@ -883,25 +919,20 @@ export function useConsumptionMethods() {
         async () => {
           this.batchProcessing = true
           try {
-            const response = await this.apiCall(`${API_PREFIX}/console/consumption/batch-review`, {
-              method: 'POST',
-              data: {
-                record_ids: recordIds,
-                action: 'approve',
-                reason: '智能推荐批量通过（异常评分<30）'
-              }
-            })
+            const stepIds = await this._resolveBatchStepIds(recordIds)
+            if (stepIds.length === 0) {
+              this.showWarning('所选推荐记录均无待处理的审核链步骤')
+              return
+            }
+
+            const response = await ApprovalChainAPI.batchSteps(
+              stepIds,
+              'approve',
+              '智能推荐批量通过（异常评分<30）'
+            )
 
             if (response?.success) {
-              /* 后端返回 stats 嵌套对象：{ stats: { success_count, failed_count, ... } } */
-              const stats = response.data?.stats || {}
-              const successCount = stats.success_count || 0
-              const failedCount = stats.failed_count || 0
-              if (failedCount > 0) {
-                this.showWarning(`成功 ${successCount} 项，失败 ${failedCount} 项`)
-              } else {
-                this.showSuccess(`成功通过 ${successCount} 条推荐记录`)
-              }
+              this._handleBatchResult(response.data, '通过')
               await this.loadConsumptions()
             }
           } finally {
@@ -973,6 +1004,7 @@ export function useConsumptionMethods() {
      * @returns {string} 如 "第1步/共2步" 或空字符串
      */
     getChainProgressLabel(record) {
+      if (!record || !record.record_id) return ''
       const chain = this.approvalChainCache[record.record_id]
       if (!chain) return ''
       return `第${chain.current_step}步/共${chain.total_steps}步`
@@ -984,6 +1016,7 @@ export function useConsumptionMethods() {
      * @returns {string} Tailwind CSS 类名
      */
     getChainStatusClass(record) {
+      if (!record || !record.record_id) return ''
       const chain = this.approvalChainCache[record.record_id]
       if (!chain) return ''
       const statusMap = {

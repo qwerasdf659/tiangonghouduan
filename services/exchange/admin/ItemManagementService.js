@@ -21,7 +21,13 @@ const MediaService = require('../../MediaService')
 const { MediaFile } = require('../../../models')
 const AssetProductGuard = require('../../shared/AssetProductGuard')
 
+/**
+ * 兑换市场管理 - 商品（SPU）管理服务（实例服务，依赖 models）
+ */
 class ItemManagementService {
+  /**
+   * @param {Object} models - Sequelize 模型集合
+   */
   constructor(models) {
     this.models = models
     this.ExchangeRecord = models.ExchangeRecord
@@ -625,7 +631,7 @@ class ItemManagementService {
    *
    * @param {number} item_id - 商品ID（exchange_item_id）
    * @param {Transaction} transaction - 事务对象（必填，与删除主记录同一事务）
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} 无返回值，级联清理完成即 resolve
    * @private
    */
   async _cascadeDeleteItemChildren(item_id, transaction) {
@@ -666,7 +672,7 @@ class ItemManagementService {
    * 更新 SPU 汇总字段（stock/sold_count/min_cost_amount/max_cost_amount）
    * @param {number} exchangeItemId - SPU 商品ID
    * @param {Transaction} transaction - 事务对象
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} 无返回值，回填完成即 resolve
    * @private
    */
   async _updateSpuSummary(exchangeItemId, transaction) {

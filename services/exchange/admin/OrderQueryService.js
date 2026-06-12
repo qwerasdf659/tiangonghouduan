@@ -200,7 +200,6 @@ class ExchangeAdminOrderQueryService {
       throw error
     }
   }
-
 }
 
 module.exports = ExchangeAdminOrderQueryService

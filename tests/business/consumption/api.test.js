@@ -12,8 +12,10 @@
  * 4. 用户查询消费记录 GET /api/v4/shop/consumption/user/:user_id
  * 5. 查询消费记录详情 GET /api/v4/shop/consumption/detail/:record_id
  * 6. 管理员查询待审核记录 GET /api/v4/console/consumption/pending
- * 7. 管理员审核通过 POST /api/v4/console/consumption/approve/:record_id
- * 8. 管理员审核拒绝 POST /api/v4/console/consumption/reject/:record_id
+ * 7. 审核链终审通过 POST /api/v4/console/approval-chain/steps/:id/approve（消费审核已收口审核链）
+ * 8. 审核链拒绝 POST /api/v4/console/approval-chain/steps/:id/reject
+ *    说明（2026-06-12 重构）：消费审核统一走多级审核链，旧的 consumption/approve|reject|batch-review 已删除。
+ *    审核动作面向"审核链步骤(step)"，终审通过由 ConsumptionAuditCallback 自动发放积分。
  *
  * 测试账号：13612227930 (既是普通用户也是管理员)
  * 数据库：restaurant_points_dev
@@ -448,19 +450,40 @@ describe('消费记录API测试套件', () => {
       console.log(`✅ 查询成功，待审核记录: ${response.data.data.records.length} 条`)
     })
 
-    test('POST /api/v4/console/consumption/approve/:record_id - 管理员审核通过', async () => {
+    test('审核链终审通过 - 通过 steps/:id/approve 完成消费审核并发积分', async () => {
       if (!test_record_id) {
         console.log('⚠️ 跳过：test_record_id未设置（前置测试未成功）')
         return
       }
 
-      console.log('\n✅ 测试：管理员审核通过消费记录')
+      console.log('\n✅ 测试：审核链终审通过消费记录（收口审核链）')
 
+      // 1. 先按业务记录查审核链实例，取当前待处理步骤 step_id
+      const chainResp = await tester.make_authenticated_request(
+        'GET',
+        `/api/v4/console/approval-chain/instances/by-auditable?auditable_type=consumption&auditable_id=${test_record_id}`,
+        {},
+        'admin'
+      )
+
+      if (!chainResp.data.success || !chainResp.data.data) {
+        console.warn('⚠️ 跳过：该记录无审核链实例（可能模板未配置）')
+        return
+      }
+
+      const instance = chainResp.data.data
+      const pendingStep = (instance.steps || []).find(s => s.status === 'pending')
+      if (!pendingStep) {
+        console.warn('⚠️ 跳过：审核链无待处理步骤')
+        return
+      }
+
+      // 2. 调审核链步骤通过接口
       const response = await tester.make_authenticated_request(
         'POST',
-        `/api/v4/console/consumption/approve/${test_record_id}`,
-        { admin_notes: '测试审核通过，金额核实无误' },
-        'regular' // 测试账号既是用户也是管理员
+        `/api/v4/console/approval-chain/steps/${pendingStep.step_id}/approve`,
+        { reason: '测试审核通过，金额核实无误' },
+        'admin'
       )
 
       console.log('响应状态:', response.status)
@@ -468,39 +491,56 @@ describe('消费记录API测试套件', () => {
 
       expect(response.status).toBe(200)
       expect(response.data.success).toBe(true)
-      expect(response.data.data).toHaveProperty('points_awarded')
-      expect(response.data.data).toHaveProperty('new_balance')
-      expect(response.data.data.status).toBe('approved')
+      expect(response.data.data).toHaveProperty('is_chain_completed')
+      expect(response.data.data.action).toBe('approved')
 
-      console.log(`✅ 审核通过，奖励积分: ${response.data.data.points_awarded}`)
-      console.log(`💰 新余额: ${response.data.data.new_balance}`)
+      console.log(
+        `✅ 审核链步骤通过，is_chain_completed=${response.data.data.is_chain_completed}, final_result=${response.data.data.final_result}`
+      )
     })
 
-    test('POST /api/v4/console/consumption/approve/:record_id - 重复审核应该失败', async () => {
+    test('审核链步骤幂等 - 已处理步骤重复审核应失败', async () => {
       if (!test_record_id) {
         console.log('⚠️ 跳过：test_record_id未设置（前置测试未成功）')
         return
       }
 
-      console.log('\n🚫 测试：重复审核（应该失败）')
+      console.log('\n🚫 测试：重复审核已处理步骤（应该失败）')
+
+      // 重新查实例，找一个已 approved 的步骤尝试重复审核
+      const chainResp = await tester.make_authenticated_request(
+        'GET',
+        `/api/v4/console/approval-chain/instances/by-auditable?auditable_type=consumption&auditable_id=${test_record_id}`,
+        {},
+        'admin'
+      )
+
+      if (!chainResp.data.success || !chainResp.data.data) {
+        console.warn('⚠️ 跳过：无审核链实例')
+        return
+      }
+
+      const processedStep = (chainResp.data.data.steps || []).find(s => s.status === 'approved')
+      if (!processedStep) {
+        console.warn('⚠️ 跳过：无已处理步骤可供重复审核验证')
+        return
+      }
 
       const response = await tester.make_authenticated_request(
         'POST',
-        `/api/v4/console/consumption/approve/${test_record_id}`,
-        { admin_notes: '重复审核测试' },
-        'regular'
+        `/api/v4/console/approval-chain/steps/${processedStep.step_id}/approve`,
+        { reason: '重复审核测试' },
+        'admin'
       )
 
       console.log('响应状态:', response.status)
       console.log('业务状态:', response.data.success, response.data.code)
 
-      // ✅ 修正：API可能返回实际HTTP状态码或200+业务错误码
       expect([200, 400]).toContain(response.status)
       expect(response.data.success).toBe(false)
-      // 消息可能包含"不能审核"或"已审核"或其他状态说明
       expect(response.data.message).toBeDefined()
 
-      console.log('✅ 重复审核正确被拒绝')
+      console.log('✅ 重复审核已处理步骤正确被拒绝')
     })
   })
 
@@ -538,56 +578,71 @@ describe('消费记录API测试套件', () => {
       }
     })
 
-    test('POST /api/v4/console/consumption/reject/:record_id - 管理员审核拒绝', async () => {
+    test('审核链拒绝 - 通过 steps/:id/reject 拒绝消费记录', async () => {
       if (!reject_record_id) {
         console.log('⚠️ 跳过拒绝测试（无可用记录）')
         return
       }
 
-      console.log('\n❌ 测试：管理员审核拒绝消费记录')
+      console.log('\n❌ 测试：审核链拒绝消费记录')
 
+      // 1. 查审核链实例取待处理步骤
+      const chainResp = await tester.make_authenticated_request(
+        'GET',
+        `/api/v4/console/approval-chain/instances/by-auditable?auditable_type=consumption&auditable_id=${reject_record_id}`,
+        {},
+        'admin'
+      )
+
+      if (!chainResp.data.success || !chainResp.data.data) {
+        console.warn('⚠️ 跳过：该记录无审核链实例')
+        return
+      }
+
+      const pendingStep = (chainResp.data.data.steps || []).find(s => s.status === 'pending')
+      if (!pendingStep) {
+        console.warn('⚠️ 跳过：审核链无待处理步骤')
+        return
+      }
+
+      // 2. 调审核链步骤拒绝接口（reason 必填且 >=5 字符）
       const response = await tester.make_authenticated_request(
         'POST',
-        `/api/v4/console/consumption/reject/${reject_record_id}`,
-        { admin_notes: '测试审核拒绝：消费金额与实际不符' },
-        'regular'
+        `/api/v4/console/approval-chain/steps/${pendingStep.step_id}/reject`,
+        { reason: '测试审核拒绝：消费金额与实际不符' },
+        'admin'
       )
 
       console.log('响应状态:', response.status)
       console.log('响应数据:', JSON.stringify(response.data, null, 2))
 
-      // API可能返回实际HTTP状态码或200+业务错误码
       expect([200, 400]).toContain(response.status)
       if (response.data.success) {
-        expect(response.data.data.status).toBe('rejected')
-        console.log(`✅ 审核拒绝成功，原因: ${response.data.data.reject_reason}`)
+        expect(response.data.data.final_result).toBe('rejected')
+        console.log('✅ 审核链拒绝成功')
       } else {
-        // 如果记录不存在或状态不对，跳过
-        console.warn('⚠️ 跳过测试：记录不可拒绝（可能已被处理）')
+        console.warn('⚠️ 跳过：步骤不可拒绝（可能已处理）')
       }
     })
 
-    test('POST /api/v4/console/consumption/reject/:record_id - 拒绝原因必填验证', async () => {
-      console.log('\n❌ 测试：拒绝原因必填验证')
+    test('审核链拒绝 - 拒绝原因 <5 字符应失败', async () => {
+      console.log('\n❌ 测试：拒绝原因长度校验（<5字符）')
 
-      // 创建临时记录ID用于测试（使用不存在的ID）
-      const temp_record_id = 999999
-
+      // 用不存在的步骤ID + 过短原因，验证参数校验先于业务执行
       const response = await tester.make_authenticated_request(
         'POST',
-        `/api/v4/console/consumption/reject/${temp_record_id}`,
-        { admin_notes: '' }, // 空原因
-        'regular'
+        `/api/v4/console/approval-chain/steps/999999/reject`,
+        { reason: 'no' },
+        'admin'
       )
 
       console.log('响应状态:', response.status)
       console.log('响应数据:', JSON.stringify(response.data, null, 2))
 
-      // API可能返回实际HTTP状态码或200+业务错误码
       expect([200, 400, 404]).toContain(response.status)
-      expect(response.data.success).toBe(false) // 业务失败
+      expect(response.data.success).toBe(false)
 
-      console.log('✅ 拒绝原因必填验证通过')
+      console.log('✅ 拒绝原因长度校验通过')
     })
   })
 })

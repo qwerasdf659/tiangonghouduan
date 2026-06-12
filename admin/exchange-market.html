@@ -164,8 +164,8 @@
                   <div class="p-3 flex-1 flex flex-col gap-2">
                     <h3 class="font-medium text-sm line-clamp-2" x-text="row.item_name || '-'"></h3>
                     <div class="text-sm text-green-600 font-mono">
-                      <span x-text="row.cost_amount || 0"></span>
-                      <span class="text-xs text-gray-500" x-text="' ' + getAssetTypeName(row.cost_asset_code)"></span>
+                      <span x-text="row.min_cost_amount ?? 0"></span>
+                      <span class="text-xs text-gray-500" x-text="' ' + getAssetTypeName(row.min_cost_asset_code)"></span>
                     </div>
                     <div class="text-xs themed-text-muted">库存 <span class="font-semibold themed-text-secondary" x-text="row.stock ?? '-'"></span></div>
                     <div>
@@ -785,21 +785,10 @@
             </div>
             <p class="text-xs themed-text-muted">已上传 <span x-text="detailImages.length">0</span>/9 张 · 悬停图片使用箭头按钮调整顺序 · 支持 JPG/PNG/GIF/WebP，最大 5MB</p>
           </div>
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm font-medium themed-text-secondary mb-1">消耗资产类型 <span class="text-red-500">*</span></label>
-              <select x-model="itemForm.cost_asset_code" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500" required>
-                <option value="">请选择</option>
-                <!-- 过滤掉"预算积分"类型，该类型仅用于系统内部核算 -->
-                <template x-for="(assetType, idx) in assetTypes.filter(t => t.display_name && !t.display_name.includes('预算'))" :key="assetType.asset_code + '_' + idx">
-                  <option :value="assetType.asset_code" x-text="assetType.display_name"></option>
-                </template>
-              </select>
-            </div>
-            <div>
-              <label class="block text-sm font-medium themed-text-secondary mb-1">消耗数量 <span class="text-red-500">*</span></label>
-              <input type="number" x-model.number="itemForm.cost_amount" min="1" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500" required>
-            </div>
+          <div class="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-3 py-2">
+            <p class="text-xs themed-text-muted">
+              💡 计价资产与价格在下方「规格（SKU）管理」中按 SKU 设置（价格真相源为渠道价 channel_prices）。单规格商品也需建立一个 SKU 并设价。
+            </p>
           </div>
           <div class="grid grid-cols-2 gap-4">
             <div>
@@ -1031,7 +1020,7 @@
                           <span class="inline-block px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-xs mr-1" x-text="key + ':' + val"></span>
                         </template>
                       </td>
-                      <td class="px-3 py-2 font-mono" x-text="sku.cost_amount + ' ' + getAssetTypeName(sku.cost_asset_code)"></td>
+                      <td class="px-3 py-2 font-mono" x-text="skuPriceLabel(sku)"></td>
                       <td class="px-3 py-2" x-text="sku.stock"></td>
                       <td class="px-3 py-2" x-text="sku.sold_count || 0"></td>
                       <td class="px-3 py-2">

@@ -14,7 +14,8 @@
  * 项目JWT架构说明：
  * - Access Token有效期: 24小时
  * - Refresh Token有效期: 7天
- * - JWT Payload包含: user_id, mobile, nickname, status, role_level, session_token
+ * - JWT Payload（B1 精简，2026-06-12）仅含: user_id, iat/exp（+可选 session_token/device_id）；
+ *   mobile/nickname/status/role_level 等敏感信息不进 Token，由服务端实时查库注入 req.user
  * - 会话存储: authentication_sessions表关联session_token
  *
  * 验收标准：

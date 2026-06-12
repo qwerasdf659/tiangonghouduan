@@ -26,7 +26,8 @@ export const APPROVAL_CHAIN_ENDPOINTS = {
   /** 审核操作 */
   MY_PENDING: `${API_PREFIX}/console/approval-chain/my-pending`,
   STEP_APPROVE: `${API_PREFIX}/console/approval-chain/steps/:id/approve`,
-  STEP_REJECT: `${API_PREFIX}/console/approval-chain/steps/:id/reject`
+  STEP_REJECT: `${API_PREFIX}/console/approval-chain/steps/:id/reject`,
+  STEP_BATCH: `${API_PREFIX}/console/approval-chain/steps/batch`
 }
 
 export const ApprovalChainAPI = {
@@ -120,6 +121,21 @@ export const ApprovalChainAPI = {
       url: buildURL(APPROVAL_CHAIN_ENDPOINTS.STEP_REJECT, { id: stepId }),
       method: 'POST',
       data: { reason }
+    })
+  },
+
+  /**
+   * 批量审核步骤（通过/拒绝，收口到审核链 steps/batch）
+   * @param {number[]} stepIds - 待审步骤ID数组
+   * @param {string} action - approve | reject
+   * @param {string} [reason] - 审核原因（reject 必填且 >=5 字符）
+   * @returns {Promise<Object>} { results: [...], stats: {...} }
+   */
+  async batchSteps(stepIds, action, reason = '') {
+    return request({
+      url: APPROVAL_CHAIN_ENDPOINTS.STEP_BATCH,
+      method: 'POST',
+      data: { step_ids: stepIds, action, reason }
     })
   }
 }

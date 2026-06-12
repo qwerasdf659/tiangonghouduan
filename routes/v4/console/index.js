@@ -209,16 +209,25 @@ router.get('/', (req, res) => {
         note: '区域负责人→业务经理→业务员三级层级管理，门店分配，权限激活/停用'
       },
       consumption: {
-        description: '消费记录审核管理（2026-01-12）',
+        description: '消费记录查询管理（审核已收口审核链 2026-06-12）',
+        endpoints: ['/consumption/pending', '/consumption/records', '/consumption/qrcode/:user_id'],
+        note: '仅限 admin（role_level >= 100）访问；消费审核（通过/拒绝/批量）统一走 /approval-chain/steps/*'
+      },
+      approval_chain: {
+        description: '多级审核链（模板配置 + 审核操作，消费审核统一入口）',
         endpoints: [
-          '/consumption/pending',
-          '/consumption/records',
-          '/consumption/approve/:id',
-          '/consumption/reject/:id',
-          '/consumption/batch-review',
-          '/consumption/qrcode/:user_id'
+          '/approval-chain/templates',
+          '/approval-chain/templates/:id',
+          '/approval-chain/templates/:id/toggle',
+          '/approval-chain/instances',
+          '/approval-chain/instances/:id',
+          '/approval-chain/instances/by-auditable',
+          '/approval-chain/my-pending',
+          '/approval-chain/steps/:id/approve',
+          '/approval-chain/steps/:id/reject',
+          '/approval-chain/steps/batch'
         ],
-        note: '仅限 admin（role_level >= 100）访问'
+        note: '模板配置仅 admin（>=100）；审核操作 business_manager（>=60）及以上，Service 层精确鉴权；终审通过自动触发业务回调（消费发积分）'
       },
       dashboard: {
         description: '运营看板（2026-01-31 P0 待处理聚合 + 2026-03-24 跨域顶线）',

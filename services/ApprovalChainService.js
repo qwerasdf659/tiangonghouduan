@@ -28,6 +28,12 @@ const {
 const { Op } = require('sequelize')
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 const BeijingTimeHelper = require('../utils/timeHelper')
+/*
+ * 终审闭环依赖：终审通过/拒绝后触发统一审核引擎回调（消费记录发积分/改状态）
+ * ContentAuditEngine 为静态服务，与本服务同层，直接 require 复用（符合"静态服务 + 顶部 require"约定）
+ */
+const ContentAuditEngine = require('./ContentAuditEngine')
+const TransactionManager = require('../utils/TransactionManager')
 
 /** 审核链服务 */
 class ApprovalChainService {
@@ -946,6 +952,107 @@ class ApprovalChainService {
     }
 
     return []
+  }
+
+  /**
+   * 批量处理审核步骤（收口到审核链，批量=逐条循环 processStep）
+   *
+   * 设计要点（符合项目约束）：
+   * - 复用单步核心逻辑 processStep，零重写业务规则（鉴权/状态机/留痕全部一致）
+   * - 每条步骤独立事务（TransactionManager.execute），单条失败不影响其它（部分成功语义）
+   * - 终审通过/拒绝后，在同一条事务内复刻"路由层终审触发"：调 ContentAuditEngine.approve/reject
+   *   触发消费记录发积分/改状态闭环，保证批量与单条结果完全一致
+   * - 仅处理"当前轮到操作人的步骤"，多级链下批量只推进操作人负责的那一步
+   *
+   * @param {number[]} stepIds - 待审核步骤ID数组（来自 my-pending）
+   * @param {string} action - 审核动作：approve | reject
+   * @param {string} reason - 审核原因（reject 必填）
+   * @param {number} operatorId - 操作人用户ID（从 JWT 解析）
+   * @returns {Promise<Object>} { results: [...], stats: {...} }
+   */
+  static async processStepsBatch(stepIds, action, reason, operatorId) {
+    if (!Array.isArray(stepIds) || stepIds.length === 0) {
+      throw new BusinessError('step_ids 必须是非空数组', 'APPROVAL_INVALID', 400)
+    }
+    if (!['approve', 'reject'].includes(action)) {
+      throw new BusinessError(
+        `无效的审核操作: ${action}，仅支持 approve/reject`,
+        'APPROVAL_INVALID',
+        400
+      )
+    }
+    if (action === 'reject' && (!reason || reason.trim().length < 5)) {
+      throw new BusinessError('拒绝原因必须提供，且不少于5个字符', 'APPROVAL_INVALID', 400)
+    }
+
+    const results = []
+    let successCount = 0
+    let failedCount = 0
+
+    for (const rawStepId of stepIds) {
+      const stepId = parseInt(rawStepId, 10)
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        const processResult = await TransactionManager.execute(
+          async transaction => {
+            const r = await ApprovalChainService.processStep(stepId, action, reason, operatorId, {
+              transaction
+            })
+            // 终审完成 → 复刻路由层闭环：触发统一审核引擎回调（消费记录发积分/改状态）
+            if (r.is_chain_completed && r.instance?.content_review_record_id) {
+              if (r.final_result === 'approved') {
+                await ContentAuditEngine.approve(
+                  r.instance.content_review_record_id,
+                  operatorId,
+                  reason || '审核链终审通过',
+                  { transaction }
+                )
+              } else if (r.final_result === 'rejected') {
+                await ContentAuditEngine.reject(
+                  r.instance.content_review_record_id,
+                  operatorId,
+                  reason,
+                  { transaction }
+                )
+              }
+            }
+            return r
+          },
+          { description: `审核链批量处理步骤 step_id=${stepId}` }
+        )
+
+        results.push({
+          step_id: stepId,
+          success: true,
+          action: processResult.action,
+          is_chain_completed: processResult.is_chain_completed,
+          final_result: processResult.final_result || null,
+          next_step_number: processResult.next_step_number || null
+        })
+        successCount++
+      } catch (error) {
+        results.push({
+          step_id: stepId,
+          success: false,
+          error_code: error.code || error.errorCode || 'APPROVAL_ERROR',
+          message: error.message
+        })
+        failedCount++
+      }
+    }
+
+    logger.info('[审核链] 批量处理完成', {
+      operator_id: operatorId,
+      action,
+      total: stepIds.length,
+      success_count: successCount,
+      failed_count: failedCount
+    })
+
+    return {
+      results,
+      stats: { total: stepIds.length, success_count: successCount, failed_count: failedCount }
+    }
   }
 }
 

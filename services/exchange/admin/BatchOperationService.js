@@ -24,7 +24,13 @@ const { assertAndGetTransaction } = require('../../../utils/transactionHelpers')
 const { Op } = require('sequelize')
 const MediaService = require('../../MediaService')
 
+/**
+ * 兑换市场管理 - 批量操作服务（实例服务，依赖 models）
+ */
 class BatchOperationService {
+  /**
+   * @param {Object} models - Sequelize 模型集合
+   */
   constructor(models) {
     this.models = models
     this.ExchangeItem = models.ExchangeItem
@@ -556,7 +562,7 @@ class BatchOperationService {
    * 更新 SPU 汇总字段（供批量价格操作后刷新）
    * @param {number} exchangeItemId - SPU 商品ID
    * @param {Transaction} transaction - 事务对象
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} 无返回值，回填完成即 resolve
    * @private
    */
   async _updateSpuSummary(exchangeItemId, transaction) {

@@ -30,6 +30,10 @@
 const express = require('express')
 const router = express.Router()
 const { asyncHandler } = require('../../../middleware/validation')
+const { getRateLimiter } = require('../../../middleware/RateLimiterMiddleware')
+
+// 公开只读接口宽松限流档（A1/A2：阈值读 .env RATE_LIMIT_PUBLIC_READ_MAX）；版本闸门为公开只读接口
+router.use(getRateLimiter().createLimiter('public_read'))
 
 /**
  * 版本闸门默认值（配置缺失时的安全兜底）

@@ -18,11 +18,15 @@ const BusinessError = require('../../../utils/BusinessError')
 const logger = require('../../../utils/logger').logger
 const displayNameHelper = require('../../../utils/displayNameHelper')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
-const { assertAndGetTransaction } = require('../../../utils/transactionHelpers')
-const { Op, fn, col, where: sqlWhere, literal, QueryTypes } = require('sequelize')
-const AdminSystemService = require('../../AdminSystemService')
+const { Op, QueryTypes } = require('sequelize')
 
+/**
+ * 兑换市场管理 - 市场查询/统计服务（实例服务，依赖 models）
+ */
 class MarketQueryService {
+  /**
+   * @param {Object} models - Sequelize 模型集合
+   */
   constructor(models) {
     this.models = models
     this.ExchangeRecord = models.ExchangeRecord
@@ -59,7 +63,8 @@ class MarketQueryService {
 
       if (count > 0) {
         logger.warn(`[兑换市场] 发现${count}个超过${hours}小时的待处理订单`, {
-          hours, count,
+          hours,
+count,
           oldest_order: timeoutOrders[0]?.order_no,
           oldest_created_at: timeoutOrders[0]?.created_at
         })
@@ -116,7 +121,9 @@ class MarketQueryService {
       const limit = page_size
 
       const { count, rows } = await this.ExchangeItem.findAndCountAll({
-        where, limit, offset,
+        where,
+limit,
+offset,
         order: [[sort_by, sort_order]]
       })
 
@@ -130,7 +137,9 @@ class MarketQueryService {
       return {
         items: itemsWithDisplayNames,
         pagination: {
-          total: count, page, page_size,
+          total: count,
+page,
+page_size,
           total_pages: Math.ceil(count / page_size)
         }
       }
@@ -251,7 +260,9 @@ class MarketQueryService {
         orders_summary: {
           total: totalOrders,
           pending: Number(orderAgg?.pending) || 0,
-          completed, shipped, cancelled,
+          completed,
+shipped,
+cancelled,
           total_pay_amount: Number(orderAgg?.total_pay_amount) || 0
         },
         items_summary: {
@@ -334,7 +345,9 @@ class MarketQueryService {
           'sold_count', 'min_cost_amount', 'created_at'
         ]
       })
- throw new BusinessError('商品不存在', 'EXCHANGE_ITEM_NOT_FOUND', 404)
+      if (!item) {
+        throw new BusinessError('商品不存在', 'EXCHANGE_ITEM_NOT_FOUND', 404)
+      }
 
       const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
       const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)

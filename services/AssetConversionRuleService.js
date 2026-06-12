@@ -246,6 +246,7 @@ class AssetConversionRuleService {
     const feeIdempotencyKey = `${idempotencyKey}_fee`
 
     /* 5a. 扣减源资产（用户 → SYSTEM_BURN） */
+    // eslint-disable-next-line no-restricted-syntax -- 已在事务内，下方显式传 { transaction }（事务边界规则误报）
     await BalanceService.changeBalance(
       {
         user_id: userId,
@@ -263,6 +264,7 @@ class AssetConversionRuleService {
     )
 
     /* 5b. 入账目标资产（SYSTEM_MINT → 用户） */
+    // eslint-disable-next-line no-restricted-syntax -- 已在事务内，下方显式传 { transaction }（事务边界规则误报）
     await BalanceService.changeBalance(
       {
         user_id: userId,
@@ -282,6 +284,7 @@ class AssetConversionRuleService {
     /* 5c. 手续费入账（如有） */
     if (fee > 0) {
       const feeAssetCode = rule.fee_asset_code || toAssetCode
+      // eslint-disable-next-line no-restricted-syntax -- 已在事务内，下方显式传 { transaction }（事务边界规则误报）
       await BalanceService.changeBalance(
         {
           system_code: 'SYSTEM_PLATFORM_FEE',

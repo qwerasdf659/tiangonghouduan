@@ -24,6 +24,10 @@ const logger = require('../../../utils/logger').logger
 const { optionalAuth } = require('../../../middleware/auth')
 const dataAccessControl = require('../../../middleware/dataAccessControl')
 const { asyncHandler } = require('../../../middleware/validation')
+const { getRateLimiter } = require('../../../middleware/RateLimiterMiddleware')
+
+// 公开只读接口宽松限流档（A1/A2：阈值读 .env RATE_LIMIT_PUBLIC_READ_MAX，登录按 user、未登录按 ip）
+const publicReadRateLimiter = getRateLimiter().createLimiter('public_read')
 
 /**
  * 获取抽奖定价服务（通过 ServiceManager 统一入口）
@@ -84,6 +88,7 @@ function validateCampaignCode(code) {
  */
 router.get(
   '/active',
+  publicReadRateLimiter,
   optionalAuth,
   asyncHandler(async (req, res) => {
     const LotteryQueryService = req.app.locals.services.getService('lottery_query')

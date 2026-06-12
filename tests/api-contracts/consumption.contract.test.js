@@ -221,43 +221,54 @@ describe('消费记录API契约测试', () => {
     })
   })
 
-  describe('POST /api/v4/console/consumption/approve/:record_id', () => {
+  describe('POST /api/v4/console/approval-chain/steps/:id/approve', () => {
     it('应该拒绝无权限的访问', async () => {
-      // 注意：管理员审核功能在 console 域而非 shop 域
-      await request(app).post('/api/v4/console/consumption/approve/1').expect(401)
+      // 消费审核已收口审核链（2026-06-12）：审核动作面向审核链步骤
+      await request(app).post('/api/v4/console/approval-chain/steps/1/approve').expect(401)
     })
 
-    it('应该要求admin_notes参数（可选）', async () => {
-      // 注意：这个测试可能会实际修改数据，建议使用测试数据库
+    it('应该返回标准响应结构', async () => {
       const response = await request(app)
-        .post('/api/v4/console/consumption/approve/999999')
+        .post('/api/v4/console/approval-chain/steps/999999/approve')
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({
-          admin_notes: '测试审核备注'
-        })
+        .send({ reason: '测试审核备注' })
 
-      // ✅ 应该返回标准响应结构（可能是404或成功）
+      // ✅ 标准响应结构（步骤不存在时返回业务失败）
       expect(response.body).toHaveProperty('success')
       expect(response.body).toHaveProperty('code')
       expect(response.body).toHaveProperty('message')
     })
   })
 
-  describe('POST /api/v4/console/consumption/reject/:record_id', () => {
+  describe('POST /api/v4/console/approval-chain/steps/:id/reject', () => {
     it('应该拒绝无权限的访问', async () => {
-      // 注意：管理员审核功能在 console 域而非 shop 域
-      await request(app).post('/api/v4/console/consumption/reject/1').expect(401)
+      await request(app).post('/api/v4/console/approval-chain/steps/1/reject').expect(401)
     })
 
-    it('应该要求admin_notes参数（拒绝时建议填写）', async () => {
+    it('应该返回标准响应结构', async () => {
       const response = await request(app)
-        .post('/api/v4/console/consumption/reject/999999')
+        .post('/api/v4/console/approval-chain/steps/999999/reject')
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({
-          admin_notes: '消费金额与实际不符'
-        })
+        .send({ reason: '消费金额与实际不符' })
 
-      // ✅ 应该返回标准响应结构
+      // ✅ 标准响应结构
+      expect(response.body).toHaveProperty('success')
+      expect(response.body).toHaveProperty('code')
+      expect(response.body).toHaveProperty('message')
+    })
+  })
+
+  describe('POST /api/v4/console/approval-chain/steps/batch', () => {
+    it('应该拒绝无权限的访问', async () => {
+      await request(app).post('/api/v4/console/approval-chain/steps/batch').expect(401)
+    })
+
+    it('应该返回标准响应结构', async () => {
+      const response = await request(app)
+        .post('/api/v4/console/approval-chain/steps/batch')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ step_ids: [999999], action: 'approve' })
+
       expect(response.body).toHaveProperty('success')
       expect(response.body).toHaveProperty('code')
       expect(response.body).toHaveProperty('message')

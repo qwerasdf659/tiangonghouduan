@@ -19,7 +19,13 @@ const { AssetCode } = require('../../../constants/AssetCode')
 const { BusinessCacheHelper } = require('../../../utils/BusinessCacheHelper')
 const { assertAndGetTransaction } = require('../../../utils/transactionHelpers')
 
+/**
+ * 兑换市场管理 - SKU 读写服务（实例服务，依赖 models）
+ */
 class SkuService {
+  /**
+   * @param {Object} models - Sequelize 模型集合
+   */
   constructor(models) {
     this.models = models
     this.ExchangeItem = models.ExchangeItem
@@ -235,7 +241,7 @@ class SkuService {
    * 更新 SPU 汇总字段（stock/sold_count/min_cost_amount/max_cost_amount）
    * @param {number} exchangeItemId - SPU 商品ID
    * @param {Transaction} transaction - 事务对象
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} 无返回值，回填完成即 resolve
    * @private
    */
   async _updateSpuSummary(exchangeItemId, transaction) {
