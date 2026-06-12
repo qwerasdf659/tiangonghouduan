@@ -6,7 +6,7 @@
     pageStyle: '[x-cloak] { display: none !important; } .section-help { background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%); border: 1px solid #fed7aa; border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; } .section-help p { color: #9a3412; font-size: 13px; line-height: 1.6; } .prop-card { border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; background: #fff; } .stone-badge { background: #eef2ff; color: #4338ca; border-radius: 6px; padding: 2px 8px; font-size: 12px; font-weight: 600; }'
   }) %>
 </head>
-<body class="themed-bg-subtle min-h-screen" x-data="propShopPage()" x-init="init()" x-cloak>
+<body class="themed-bg-subtle min-h-screen">
   <!-- NAVBAR -->
   <nav class="page-navbar">
     <div class="container mx-auto px-4 py-3 flex justify-between items-center">
@@ -17,13 +17,18 @@
     </div>
   </nav>
 
-  <div class="container mx-auto px-4 py-6 max-w-5xl">
-  <!-- BANNER -->
+  <!-- 页面主体（一站式 Tab：道具管理 / 订单管理 / 统计分析） -->
+  <div class="container mx-auto px-4 py-6" x-data="propShopPage()" x-init="init()" x-cloak
+       @approve-order="approveOrder($event.detail)"
+       @reject-order="rejectOrder($event.detail)"
+       @complete-order="completeOrder($event.detail)">
+
+    <!-- BANNER -->
     <div class="page-banner mb-6">
       <div class="flex justify-between items-center">
         <div>
           <h1>🎮 道具商城</h1>
-          <p>上架零价值虚拟道具（星石计价、即时到账、不可退款）。一次填写自动完成模板创建与商品上架。</p>
+          <p>上架零价值虚拟道具（星石计价、即时到账、不可退款），管理道具订单与运营数据分析。</p>
         </div>
         <div class="text-6xl opacity-20 hidden md:block">💎</div>
       </div>
@@ -32,47 +37,224 @@
     <div class="section-help">
       <p>💡 道具商城属「星石娱乐轨」：商品恒为零价值虚拟道具，仅用星石购买，买入即消耗、不可退款。与「商品兑换」（水晶系换实物）严格分开。无需去「物品模板」页，本页提交即自动创建 prop 模板并上架。</p>
     </div>
-  <!-- TOOLBAR -->
-    <div class="flex justify-between items-center mb-4">
-      <div class="flex items-center gap-2">
-        <input type="text" x-model="keyword" @keydown.enter="loadPropList()" class="form-input text-sm" placeholder="搜索道具名称...">
-        <button @click="loadPropList()" class="btn btn-outline btn-sm">🔍 搜索</button>
-      </div>
-      <button @click="openCreateForm()" class="action-btn action-btn-primary btn-sm">+ 新增道具</button>
+
+    <!-- 子页面导航（与兑换市场一致的增强 Tab 样式） -->
+    <div class="enhanced-tabs">
+      <template x-for="page in subPages" :key="page.id">
+        <button
+          @click="switchPage(page.id)"
+          :class="current_page === page.id ? 'active' : ''"
+          class="tab-item"
+          x-text="page.icon + ' ' + page.name"
+        ></button>
+      </template>
     </div>
-  <!-- LIST -->
-    <template x-if="listLoading">
-      <div class="content-section"><div class="empty-state-enhanced"><div class="empty-icon animate-pulse">⏳</div><div class="empty-title">加载道具中...</div></div></div>
-    </template>
 
-    <template x-if="!listLoading && propList.length === 0">
-      <div class="content-section"><div class="empty-state-enhanced"><div class="empty-icon">📭</div><div class="empty-title">暂无道具</div><div class="empty-desc">点击「新增道具」上架第一个星石道具</div></div></div>
-    </template>
+    <!-- ============ Tab 1：道具管理 ============ -->
+    <div x-show="current_page === 'items'" x-cloak>
+      <!-- TOOLBAR -->
+      <div class="flex justify-between items-center mb-4">
+        <div class="flex items-center gap-2">
+          <input type="text" x-model="keyword" @keydown.enter="loadPropList()" class="form-input text-sm" placeholder="搜索道具名称...">
+          <button @click="loadPropList()" class="btn btn-outline btn-sm">🔍 搜索</button>
+        </div>
+        <button @click="openCreateForm()" class="action-btn action-btn-primary btn-sm">+ 新增道具</button>
+      </div>
+      <!-- LIST -->
+      <template x-if="listLoading">
+        <div class="content-section"><div class="empty-state-enhanced"><div class="empty-icon animate-pulse">⏳</div><div class="empty-title">加载道具中...</div></div></div>
+      </template>
 
-    <template x-if="!listLoading && propList.length > 0">
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <template x-for="item in propList" :key="item.exchange_item_id">
-          <div class="prop-card">
-            <div class="flex justify-between items-start mb-2">
-              <span class="font-semibold text-sm" x-text="item.item_name"></span>
-              <span class="stone-badge">星石</span>
+      <template x-if="!listLoading && propList.length === 0">
+        <div class="content-section"><div class="empty-state-enhanced"><div class="empty-icon">📭</div><div class="empty-title">暂无道具</div><div class="empty-desc">点击「新增道具」上架第一个星石道具</div></div></div>
+      </template>
+
+      <template x-if="!listLoading && propList.length > 0">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <template x-for="item in propList" :key="item.exchange_item_id">
+            <div class="prop-card">
+              <div class="flex justify-between items-start mb-2">
+                <span class="font-semibold text-sm" x-text="item.item_name"></span>
+                <span class="stone-badge">星石</span>
+              </div>
+              <div class="text-xs text-gray-400" x-text="'ID: ' + item.exchange_item_id"></div>
+              <div class="flex items-center gap-3 mt-2 text-xs">
+                <span class="text-indigo-600 font-semibold" x-text="'星石 ' + (item.min_cost_amount ?? '-')"></span>
+                <span class="text-gray-600" x-text="'库存 ' + (item.stock ?? 0)"></span>
+                <span class="text-gray-600" x-text="'已售 ' + (item.sold_count ?? 0)"></span>
+              </div>
+              <div class="flex justify-between items-center mt-2">
+                <span class="text-xs" :class="item.status === 'active' ? 'text-green-600' : 'text-gray-400'" x-text="item.status === 'active' ? '已上架' : '已下架'"></span>
+                <button @click="openEditForm(item)" class="btn btn-outline btn-sm">✏️ 修改库存/价格</button>
+              </div>
             </div>
-            <div class="text-xs text-gray-400" x-text="'ID: ' + item.exchange_item_id"></div>
-            <div class="flex items-center gap-3 mt-2 text-xs">
-              <span class="text-indigo-600 font-semibold" x-text="'星石 ' + (item.min_cost_amount ?? '-')"></span>
-              <span class="text-gray-600" x-text="'库存 ' + (item.stock ?? 0)"></span>
-              <span class="text-gray-600" x-text="'已售 ' + (item.sold_count ?? 0)"></span>
-            </div>
-            <div class="flex justify-between items-center mt-2">
-              <span class="text-xs" :class="item.status === 'active' ? 'text-green-600' : 'text-gray-400'" x-text="item.status === 'active' ? '已上架' : '已下架'"></span>
-              <button @click="openEditForm(item)" class="btn btn-outline btn-sm">✏️ 修改库存/价格</button>
+          </template>
+        </div>
+      </template>
+    </div>
+
+    <!-- ============ Tab 2：订单管理（道具频道，item_type='prop' 服务端筛选） ============ -->
+    <div x-show="current_page === 'orders'" x-cloak>
+      <div class="themed-card rounded-lg shadow">
+        <div class="p-4 border-b">
+          <h5 class="font-semibold">道具订单</h5>
+        </div>
+        <div x-data="propOrdersTable()" x-init="init()">
+          <!-- 筛选栏 -->
+          <div class="p-4 border-b themed-bg-base">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <input type="text" x-model="activeFilters.order_no" placeholder="订单号" class="px-3 py-2 border rounded">
+              <select x-model="activeFilters.status" class="px-3 py-2 border rounded">
+                <option value="">全部状态</option>
+                <option value="pending">待审核</option>
+                <option value="approved">已审核</option>
+                <option value="completed">已完成</option>
+                <option value="rejected">已拒绝</option>
+                <option value="cancelled">已取消</option>
+              </select>
+              <button @click="search()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">🔍 搜索</button>
+              <button @click="handleFilterReset()" class="px-4 py-2 themed-bg-muted themed-text-secondary rounded hover:bg-gray-300">🔄 重置</button>
             </div>
           </div>
-        </template>
+          <div x-show="loading" class="p-8 text-center themed-text-muted">加载中...</div>
+          <div x-show="hasError" class="p-8 text-center">
+            <p class="text-red-500 mb-2" x-text="error"></p>
+            <button @click="loadData()" class="text-sm themed-text-primary hover:underline">🔄 重试</button>
+          </div>
+          <div x-show="hasData" class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="themed-bg-base">
+                <tr>
+                  <template x-for="col in (columns || [])" :key="col.key || $id('col')">
+                    <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted"
+                        :class="{ 'cursor-pointer hover:text-green-600': col.sortable }"
+                        @click="sort(col)">
+                      <span x-text="col.label"></span>
+                      <span x-show="col.sortable" class="ml-1 text-xs" x-text="getSortIcon(col)"></span>
+                    </th>
+                  </template>
+                  <th class="px-4 py-3 text-left text-sm font-medium themed-text-muted">操作</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y">
+                <template x-for="(row, idx) in data" :key="row.order_no || idx">
+                  <tr class="themed-hover-bg">
+                    <template x-for="col in (columns || [])" :key="col.key || $id('col')">
+                      <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
+                    </template>
+                    <td class="px-4 py-3">
+                      <div class="flex flex-wrap gap-1">
+                        <template x-if="row.status === 'pending'">
+                          <button @click="$dispatch('approve-order', row)" class="text-green-600 hover:text-green-800 text-sm font-medium">✓ 审核通过</button>
+                        </template>
+                        <template x-if="row.status === 'pending'">
+                          <button @click="$dispatch('reject-order', row)" class="text-red-500 hover:text-red-700 text-sm">✕ 拒绝</button>
+                        </template>
+                        <template x-if="row.status === 'approved'">
+                          <button @click="$dispatch('complete-order', row)" class="text-green-600 hover:text-green-800 text-sm">✅ 完成</button>
+                        </template>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+          <div x-show="isEmpty" class="p-8 text-center themed-text-muted">
+            <div class="text-4xl mb-4">📋</div>
+            <p>暂无道具订单数据</p>
+          </div>
+          <template x-if="total_pages > 1">
+            <div class="p-4 border-t flex justify-between items-center">
+              <span class="text-sm themed-text-muted" x-text="paginationInfo"></span>
+              <div class="flex space-x-1">
+                <button @click="prevPage()" :disabled="!hasPrevPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">‹</button>
+                <template x-for="p in visiblePages" :key="'po'+p">
+                  <button @click="goToPage(p)" :class="p === current_page ? 'bg-green-500 text-white' : 'themed-hover-bg'" class="px-3 py-1 text-sm border rounded" :disabled="p === '...'" x-text="p"></button>
+                </template>
+                <button @click="nextPage()" :disabled="!hasNextPage" class="px-3 py-1 text-sm border rounded disabled:opacity-50 themed-hover-bg">›</button>
+              </div>
+            </div>
+          </template>
+        </div>
       </div>
-    </template>
-  </div>
-  <!-- FORM_MODAL -->
+    </div>
+
+    <!-- ============ Tab 3：统计分析（道具频道，statsItemType='prop' 服务端聚合） ============ -->
+    <div x-show="current_page === 'stats'" x-cloak>
+      <!-- 统计卡片 -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+        <div class="themed-card rounded-lg shadow p-6 text-center">
+          <h6 class="themed-text-muted mb-2">道具总数</h6>
+          <h2 class="text-3xl font-bold themed-text-primary" x-text="propStats.total_items"></h2>
+        </div>
+        <div class="themed-card rounded-lg shadow p-6 text-center">
+          <h6 class="themed-text-muted mb-2">道具订单</h6>
+          <h2 class="text-3xl font-bold text-green-600" x-text="propStats.today_orders"></h2>
+        </div>
+        <div class="themed-card rounded-lg shadow p-6 text-center">
+          <h6 class="themed-text-muted mb-2">待审核</h6>
+          <h2 class="text-3xl font-bold text-yellow-600" x-text="propStats.pending_shipments"></h2>
+        </div>
+        <div class="themed-card rounded-lg shadow p-6 text-center">
+          <h6 class="themed-text-muted mb-2">星石消耗</h6>
+          <h2 class="text-3xl font-bold text-purple-600" x-text="propStats.star_stone_consumed"></h2>
+        </div>
+      </div>
+
+      <!-- 图表区域 -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="themed-card rounded-lg shadow p-6">
+          <h6 class="font-semibold themed-text-secondary mb-4">📊 订单状态分布</h6>
+          <div id="orderStatusChart" style="width: 100%; height: 300px;"></div>
+        </div>
+        <div class="themed-card rounded-lg shadow p-6">
+          <div class="flex justify-between items-center mb-4">
+            <h6 class="font-semibold themed-text-secondary">📈 道具兑换趋势</h6>
+            <div class="flex space-x-2">
+              <button @click="changeTrendRange('7d')" :class="trendRange === '7d' ? 'bg-green-500 text-white' : 'themed-bg-subtle themed-text-muted'" class="px-3 py-1 text-sm rounded hover:bg-green-400 hover:text-white transition-colors">7天</button>
+              <button @click="changeTrendRange('30d')" :class="trendRange === '30d' ? 'bg-green-500 text-white' : 'themed-bg-subtle themed-text-muted'" class="px-3 py-1 text-sm rounded hover:bg-green-400 hover:text-white transition-colors">30天</button>
+              <button @click="changeTrendRange('90d')" :class="trendRange === '90d' ? 'bg-green-500 text-white' : 'themed-bg-subtle themed-text-muted'" class="px-3 py-1 text-sm rounded hover:bg-green-400 hover:text-white transition-colors">90天</button>
+            </div>
+          </div>
+          <div id="exchangeTrendChart" style="width: 100%; height: 300px;"></div>
+          <p class="text-xs text-gray-400 mt-2 text-center" x-show="trendData.length === 0 && !loading">暂无订单数据</p>
+        </div>
+      </div>
+
+      <!-- 订单统计详情 -->
+      <div class="mt-6 themed-card rounded-lg shadow">
+        <div class="p-4 border-b">
+          <h6 class="font-semibold themed-text-secondary">📋 道具订单统计详情</h6>
+        </div>
+        <div class="p-6">
+          <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div class="text-center p-4 themed-bg-base rounded-lg">
+              <p class="text-sm themed-text-muted">总订单</p>
+              <p class="text-2xl font-bold themed-text-secondary" x-text="exchangeStats.orders.total"></p>
+            </div>
+            <div class="text-center p-4 bg-yellow-50 rounded-lg">
+              <p class="text-sm text-yellow-600">待审核</p>
+              <p class="text-2xl font-bold text-yellow-600" x-text="exchangeStats.orders.pending"></p>
+            </div>
+            <div class="text-center p-4 themed-bg-primary-light rounded-lg">
+              <p class="text-sm themed-text-primary">已发货</p>
+              <p class="text-2xl font-bold themed-text-primary" x-text="exchangeStats.orders.shipped"></p>
+            </div>
+            <div class="text-center p-4 bg-green-50 rounded-lg">
+              <p class="text-sm text-green-600">已完成</p>
+              <p class="text-2xl font-bold text-green-600" x-text="exchangeStats.orders.completed"></p>
+            </div>
+            <div class="text-center p-4 bg-red-50 rounded-lg">
+              <p class="text-sm text-red-600">已取消</p>
+              <p class="text-2xl font-bold text-red-600" x-text="exchangeStats.orders.cancelled"></p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  <!-- FORM_MODAL：新增道具 -->
   <template x-if="showForm">
     <div class="fixed inset-0 z-50 flex items-center justify-center">
       <div class="fixed inset-0 bg-black/50" @click="closeForm()"></div>
@@ -182,6 +364,8 @@
       </div>
     </div>
   </template>
+
+  </div>
   <%- include('partials/footer') %>
   <script type="module" src="./src/modules/market/pages/prop-shop.js"></script>
 </body>

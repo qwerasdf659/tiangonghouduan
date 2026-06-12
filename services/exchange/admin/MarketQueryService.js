@@ -160,11 +160,70 @@ page_size,
     try {
       const rawTrend = parseInt(options.trend_days, 10)
       const trend_days = Number.isFinite(rawTrend) ? Math.min(Math.max(rawTrend, 1), 366) : 90
-      logger.info('[兑换市场-管理] 查询统计数据', { trend_days })
+      const item_type = options.item_type ? String(options.item_type).trim() : null
+      logger.info('[兑换市场-管理] 查询统计数据', { trend_days, item_type })
+
+      /*
+       * 频道筛选（道具商城/星石轨）：exchange_items/exchange_records 自身无 item_type 列，
+       * 频道语义在 item_templates.item_type。传 item_type 时用 JOIN item_templates 精确筛选；
+       * 不传则统计全兑换市场（行为与原先完全一致）。复用现有表关联，零新表/冗余列。
+       * - itemJoin：用于以 exchange_items(别名 ei) 为主表的聚合
+       * - recordJoin：用于以 exchange_records(别名 er) 为主表的聚合（经 exchange_items 中转关联模板）
+       */
+      const itemJoin = item_type
+        ? 'JOIN item_templates t ON ei.item_template_id = t.item_template_id'
+        : ''
+      const itemWhere = item_type ? 'AND t.item_type = :item_type' : ''
+      const recordJoin = item_type
+        ? `JOIN exchange_items ei ON er.exchange_item_id = ei.exchange_item_id
+           JOIN item_templates t ON ei.item_template_id = t.item_template_id`
+        : ''
+      const recordWhere = item_type ? 'AND t.item_type = :item_type' : ''
+      const repl = item_type ? { item_type } : {}
+
+      /*
+       * 频道筛选时，商品类计数改走带 JOIN 的原生 SQL（与 itemAgg 同口径）；
+       * 不传 item_type 时沿用原 Sequelize count（行为不变）。
+       */
+      const itemTemplateInclude = item_type
+        ? [
+            {
+              model: this.models.ItemTemplate,
+              as: 'itemTemplate',
+              required: true,
+              attributes: [],
+              where: { item_type }
+            }
+          ]
+        : []
+
+      const recordPropInclude = item_type
+        ? [
+            {
+              model: this.ExchangeItem,
+              as: 'exchangeItem',
+              required: true,
+              attributes: [],
+              include: [
+                {
+                  model: this.models.ItemTemplate,
+                  as: 'itemTemplate',
+                  required: true,
+                  attributes: [],
+                  where: { item_type }
+                }
+              ]
+            }
+          ]
+        : []
 
       const [totalItems, activeItems, lowStockItems, totalExchanges] = await Promise.all([
-        this.ExchangeItem.count(),
-        this.ExchangeItem.count({ where: { status: 'active' } }),
+        this.ExchangeItem.count({ include: itemTemplateInclude, distinct: !!item_type }),
+        this.ExchangeItem.count({
+          where: { status: 'active' },
+          include: itemTemplateInclude,
+          distinct: !!item_type
+        }),
         this.ExchangeItem.count({
           include: [
             {
@@ -172,51 +231,62 @@ page_size,
               as: 'skus',
               where: { stock: { [Op.lt]: 10 }, status: 'active' },
               required: true
-            }
-          ]
+            },
+            ...itemTemplateInclude
+          ],
+          distinct: true
         }),
-        this.ExchangeRecord.count({ where: { status: { [Op.ne]: 'cancelled' } } })
+        this.ExchangeRecord.count({
+          where: { status: { [Op.ne]: 'cancelled' } },
+          include: recordPropInclude,
+          distinct: !!item_type
+        })
       ])
 
       const [orderAgg] = await this.sequelize.query(
         `SELECT
-          SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending,
-          SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed,
-          SUM(CASE WHEN status = 'shipped' THEN 1 ELSE 0 END) AS shipped,
-          SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled,
+          SUM(CASE WHEN er.status = 'pending' THEN 1 ELSE 0 END) AS pending,
+          SUM(CASE WHEN er.status = 'completed' THEN 1 ELSE 0 END) AS completed,
+          SUM(CASE WHEN er.status = 'shipped' THEN 1 ELSE 0 END) AS shipped,
+          SUM(CASE WHEN er.status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled,
           COUNT(*) AS total_orders,
-          COALESCE(SUM(CASE WHEN status <> 'cancelled' THEN pay_amount ELSE 0 END), 0) AS total_pay_amount
-        FROM exchange_records`,
-        { type: QueryTypes.SELECT }
+          COALESCE(SUM(CASE WHEN er.status <> 'cancelled' THEN er.pay_amount ELSE 0 END), 0) AS total_pay_amount
+        FROM exchange_records er
+        ${recordJoin}
+        WHERE 1 = 1 ${recordWhere}`,
+        { type: QueryTypes.SELECT, replacements: repl }
       )
 
       const [itemAgg] = await this.sequelize.query(
         `SELECT
-          SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) AS active_count,
-          SUM(CASE WHEN status <> 'active' THEN 1 ELSE 0 END) AS inactive_count,
-          COALESCE(SUM(CASE WHEN status = 'active' THEN stock ELSE 0 END), 0) AS active_stock,
-          COALESCE(SUM(CASE WHEN status <> 'active' THEN stock ELSE 0 END), 0) AS inactive_stock,
+          SUM(CASE WHEN ei.status = 'active' THEN 1 ELSE 0 END) AS active_count,
+          SUM(CASE WHEN ei.status <> 'active' THEN 1 ELSE 0 END) AS inactive_count,
+          COALESCE(SUM(CASE WHEN ei.status = 'active' THEN ei.stock ELSE 0 END), 0) AS active_stock,
+          COALESCE(SUM(CASE WHEN ei.status <> 'active' THEN ei.stock ELSE 0 END), 0) AS inactive_stock,
           SUM(
             CASE
-              WHEN status = 'active' AND stock <= COALESCE(stock_alert_threshold, 5) THEN 1
+              WHEN ei.status = 'active' AND ei.stock <= COALESCE(ei.stock_alert_threshold, 5) THEN 1
               ELSE 0
             END
           ) AS low_stock_count
-        FROM exchange_items`,
-        { type: QueryTypes.SELECT }
+        FROM exchange_items ei
+        ${itemJoin}
+        WHERE 1 = 1 ${itemWhere}`,
+        { type: QueryTypes.SELECT, replacements: repl }
       )
 
       const [fulfillRow] = await this.sequelize.query(
         `SELECT
           AVG(
             CASE
-              WHEN status IN ('shipped', 'completed') AND updated_at IS NOT NULL
-              THEN TIMESTAMPDIFF(HOUR, created_at, updated_at)
+              WHEN er.status IN ('shipped', 'completed') AND er.updated_at IS NOT NULL
+              THEN TIMESTAMPDIFF(HOUR, er.created_at, er.updated_at)
             END
           ) AS avg_fulfillment_hours
-        FROM exchange_records
-        WHERE status IN ('shipped', 'completed')`,
-        { type: QueryTypes.SELECT }
+        FROM exchange_records er
+        ${recordJoin}
+        WHERE er.status IN ('shipped', 'completed') ${recordWhere}`,
+        { type: QueryTypes.SELECT, replacements: repl }
       )
 
       const totalOrders = Number(orderAgg?.total_orders) || 0
@@ -229,14 +299,15 @@ page_size,
         validOrders > 0 ? Math.round((fulfilledOrders / validOrders) * 10000) / 100 : 0
 
       const trendRows = await this.sequelize.query(
-        `SELECT DATE(created_at) AS day,
+        `SELECT DATE(er.created_at) AS day,
           COUNT(*) AS order_count,
-          COALESCE(SUM(CASE WHEN status <> 'cancelled' THEN pay_amount ELSE 0 END), 0) AS revenue
-        FROM exchange_records
-        WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL :trend_days DAY)
-        GROUP BY DATE(created_at)
+          COALESCE(SUM(CASE WHEN er.status <> 'cancelled' THEN er.pay_amount ELSE 0 END), 0) AS revenue
+        FROM exchange_records er
+        ${recordJoin}
+        WHERE er.created_at >= DATE_SUB(CURDATE(), INTERVAL :trend_days DAY) ${recordWhere}
+        GROUP BY DATE(er.created_at)
         ORDER BY day ASC`,
-        { type: QueryTypes.SELECT, replacements: { trend_days } }
+        { type: QueryTypes.SELECT, replacements: { trend_days, ...repl } }
       )
 
       const order_trend_by_day = trendRows.map(r => {

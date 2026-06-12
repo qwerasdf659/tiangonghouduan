@@ -34,6 +34,11 @@ const BeijingTimeHelper = require('../utils/timeHelper')
  */
 const ContentAuditEngine = require('./ContentAuditEngine')
 const TransactionManager = require('../utils/TransactionManager')
+/*
+ * 中文化：审核链下发时把 auditable_type（英文业务码）经字典转出 auditable_type_display（中文），
+ * 复用项目统一字典体系（system_dictionaries + displayNameHelper），前端零维护、零映射直接读。
+ */
+const { attachDisplayNames } = require('../utils/displayNameHelper')
 
 /** 审核链服务 */
 class ApprovalChainService {
@@ -131,7 +136,12 @@ class ApprovalChainService {
         auditable_type: auditableType,
         auditable_id: auditableId,
         content_review_record_id: options.content_review_record_id || null,
-        current_step: auditNodes[0].step_number,
+        /*
+         * current_step 语义为「当前进行到第几步」的 1-based 序位（1..total_steps），
+         * 而非节点的 step_number（step_number 仅为模板节点稀疏排序号，如 3/9，用于排序与定位下一步）。
+         * 创建时第一个审核步骤即第 1 步。
+         */
+        current_step: 1,
         total_steps: auditNodes.length,
         status: 'in_progress',
         submitted_by: submittedBy,
@@ -443,9 +453,22 @@ class ApprovalChainService {
       { transaction }
     )
 
+    /*
+     * current_step 为「当前进行到第几步」的 1-based 序位（1..total_steps），
+     * 通过统计本实例中 step_number <= 下一步 step_number 的步骤数得到其序位，
+     * 避免把稀疏的 step_number（如 3/9）直接当作进度序位（会出现"第9步/共2步"的矛盾显示）。
+     */
+    const nextOrdinal = await ApprovalChainStep.count({
+      where: {
+        instance_id: instance.instance_id,
+        step_number: { [Op.lte]: nextStep.step_number }
+      },
+      transaction
+    })
+
     await instance.update(
       {
-        current_step: nextStep.step_number
+        current_step: nextOrdinal
       },
       { transaction }
     )
@@ -485,6 +508,38 @@ class ApprovalChainService {
   }
 
   /**
+   * 为审核链数据附加 auditable_type 的中文显示名（auditable_type_display）
+   *
+   * 复用统一字典体系（system_dictionaries.dict_type='auditable_type' + displayNameHelper），
+   * 前端直接读 auditable_type_display 中文，不做本地映射。
+   * 兼容两种结构：① 顶层实例（含 auditable_type）；② 待办步骤行（含 instance.auditable_type）。
+   *
+   * @param {Object|Array|null} data - 实例对象、实例数组或待办步骤行数组
+   * @returns {Promise<Object|Array|null>} 原数据（已附加中文字段）
+   * @private
+   */
+  static async _attachAuditableTypeDisplay(data) {
+    if (!data) return data
+    // 统一转为 plain object（Sequelize 实例直接挂属性不会进入 toJSON 输出，必须先 plain 化）
+    const toPlain = row => (row && typeof row.get === 'function' ? row.get({ plain: true }) : row)
+    const isArray = Array.isArray(data)
+    const plainData = isArray ? data.map(toPlain) : toPlain(data)
+    const list = isArray ? plainData : [plainData]
+    // 收集承载 auditable_type 的目标对象：顶层实例本身，或步骤行的 instance 子对象
+    const targets = list
+      .map(row => {
+        if (row && row.auditable_type) return row
+        if (row && row.instance && row.instance.auditable_type) return row.instance
+        return null
+      })
+      .filter(Boolean)
+    if (targets.length > 0) {
+      await attachDisplayNames(targets, [{ field: 'auditable_type', dictType: 'auditable_type' }])
+    }
+    return plainData
+  }
+
+  /**
    * 按业务记录查询审核链实例
    *
    * @param {string} auditableType - 业务类型
@@ -492,7 +547,7 @@ class ApprovalChainService {
    * @returns {Promise<Object|null>} 审核链实例或null
    */
   static async getInstanceByAuditable(auditableType, auditableId) {
-    return ApprovalChainInstance.findOne({
+    const instance = await ApprovalChainInstance.findOne({
       where: { auditable_type: auditableType, auditable_id: auditableId },
       include: [
         {
@@ -512,6 +567,7 @@ class ApprovalChainService {
       ],
       order: [['created_at', 'DESC']]
     })
+    return ApprovalChainService._attachAuditableTypeDisplay(instance)
   }
 
   /**
@@ -557,7 +613,8 @@ class ApprovalChainService {
       offset: (page - 1) * page_size
     })
 
-    return { rows, count, page, page_size, total_pages: Math.ceil(count / page_size) }
+    const displayRows = await ApprovalChainService._attachAuditableTypeDisplay(rows)
+    return { rows: displayRows, count, page, page_size, total_pages: Math.ceil(count / page_size) }
   }
 
   /**
@@ -602,7 +659,8 @@ class ApprovalChainService {
       offset: (page - 1) * page_size
     })
 
-    return { rows, count, page, page_size, total_pages: Math.ceil(count / page_size) }
+    const displayRows = await ApprovalChainService._attachAuditableTypeDisplay(rows)
+    return { rows: displayRows, count, page, page_size, total_pages: Math.ceil(count / page_size) }
   }
 
   /**
@@ -636,7 +694,8 @@ class ApprovalChainService {
       offset: (page - 1) * page_size
     })
 
-    return { rows, count, page, page_size, total_pages: Math.ceil(count / page_size) }
+    const displayRows = await ApprovalChainService._attachAuditableTypeDisplay(rows)
+    return { rows: displayRows, count, page, page_size, total_pages: Math.ceil(count / page_size) }
   }
 
   /**
@@ -675,7 +734,7 @@ class ApprovalChainService {
         404
       )
     }
-    return template
+    return ApprovalChainService._attachAuditableTypeDisplay(template)
   }
 
   /**
@@ -816,7 +875,8 @@ class ApprovalChainService {
       offset: (page - 1) * page_size
     })
 
-    return { rows, count, page, page_size, total_pages: Math.ceil(count / page_size) }
+    const displayRows = await ApprovalChainService._attachAuditableTypeDisplay(rows)
+    return { rows: displayRows, count, page, page_size, total_pages: Math.ceil(count / page_size) }
   }
 
   /**
@@ -850,7 +910,7 @@ class ApprovalChainService {
         404
       )
     }
-    return instance
+    return ApprovalChainService._attachAuditableTypeDisplay(instance)
   }
 
   // ==================== 私有方法 ====================
@@ -865,12 +925,22 @@ class ApprovalChainService {
   static _matchConditions(conditions, businessData) {
     if (!conditions || Object.keys(conditions).length === 0) return true
 
+    /*
+     * 金额取数兼容多业务字段：
+     * - consumption 传 consumption_amount（消费金额）
+     * - merchant_points 传 points_amount（申请积分数）
+     * - 通用 amount 作为最高优先级
+     * 三者按业务语义各取其一，统一参与 min_amount/max_amount 阈值比较，
+     * 使"按金额/数量分级选链"对消费与商家积分都生效。
+     */
+    const amount = parseFloat(
+      businessData.amount ?? businessData.consumption_amount ?? businessData.points_amount ?? 0
+    )
+
     if (conditions.min_amount !== undefined) {
-      const amount = parseFloat(businessData.amount || businessData.consumption_amount || 0)
       if (amount < conditions.min_amount) return false
     }
     if (conditions.max_amount !== undefined) {
-      const amount = parseFloat(businessData.amount || businessData.consumption_amount || 0)
       if (amount > conditions.max_amount) return false
     }
     if (conditions.store_ids && Array.isArray(conditions.store_ids)) {
@@ -897,7 +967,38 @@ class ApprovalChainService {
       transaction
     })
 
-    const isAdmin = userRoles.some(ur => ur.role?.role_level >= 100)
+    // 操作人有效级别 = 其多个角色里的最高 role_level
+    const operatorLevel = userRoles.reduce((max, ur) => Math.max(max, ur.role?.role_level || 0), 0)
+    /*
+     * 超级管理员（super_admin, lv≥110）豁免当事人回避：顶层唯一超管可审任何业务（含与自己相关的），
+     * 避免"唯一超管被回避挡住导致无人可审"的死锁。普通 admin(100) 及以下仍受回避约束。
+     */
+    const SUPER_ADMIN_LEVEL = 110
+    const isSuperAdmin = operatorLevel >= SUPER_ADMIN_LEVEL
+
+    /*
+     * 当事人回避校验（exclude_parties，默认开启）：
+     * 审核人不得是该 auditable 业务的当事人（发起人/消费者/纠纷方/积分申请人）。
+     * 即使操作人持 admin(100) 角色也拒绝，防止"自己审自己"（仲裁中立性 / 积分申请人=受益人）。
+     * 例外：super_admin(lv≥110) 豁免（见上）。节点 exclude_parties=0 时也跳过回避。
+     * 放在角色判定之前，确保 admin 当事人也被拦截。
+     */
+    const excludeParties = step.node ? step.node.exclude_parties !== 0 : true
+    if (!isSuperAdmin && excludeParties && step.instance) {
+      const partyIds = await ApprovalChainService._resolveAuditableParties(
+        step.instance,
+        transaction
+      )
+      if (partyIds.includes(operatorId)) {
+        throw new BusinessError(
+          '您是该业务的当事人，按回避规则不能审核与自己相关的业务',
+          'APPROVAL_ERROR',
+          400
+        )
+      }
+    }
+
+    const isAdmin = operatorLevel >= 100
     if (isAdmin) return
 
     if (step.assignee_user_id) {
@@ -924,6 +1025,62 @@ class ApprovalChainService {
     }
 
     throw new BusinessError('当前步骤无法确定审核人分配方式', 'APPROVAL_ERROR', 400)
+  }
+
+  /**
+   * 解析审核链实例对应业务的"当事人" user_id 列表（用于回避校验）
+   *
+   * 按 auditable_type 取该业务的利益相关方：
+   * - 通用：instance.submitted_by（提交人/发起人，所有业务都有）
+   * - trade_dispute：trade_disputes.user_id（纠纷发起方）+ created_by
+   * - consumption：consumption_records.user_id（消费者）
+   * - merchant_points：content_review_records.audit_data.user_id（申请人=受益人）
+   *
+   * @param {Object} instance - 审核链实例（含 auditable_type/auditable_id/submitted_by/content_review_record_id）
+   * @param {Object} transaction - 事务
+   * @returns {Promise<number[]>} 去重后的当事人 user_id 列表
+   * @private
+   */
+  static async _resolveAuditableParties(instance, transaction) {
+    const models = require('../models')
+    const parties = new Set()
+    if (instance.submitted_by) parties.add(Number(instance.submitted_by))
+
+    try {
+      if (instance.auditable_type === 'trade_dispute') {
+        const d = await models.TradeDispute.findByPk(instance.auditable_id, {
+          attributes: ['user_id', 'created_by'],
+          transaction
+        })
+        if (d) {
+          if (d.user_id) parties.add(Number(d.user_id))
+          if (d.created_by) parties.add(Number(d.created_by))
+        }
+      } else if (instance.auditable_type === 'consumption') {
+        const r = await models.ConsumptionRecord.findByPk(instance.auditable_id, {
+          attributes: ['user_id'],
+          transaction
+        })
+        if (r && r.user_id) parties.add(Number(r.user_id))
+      } else if (instance.auditable_type === 'merchant_points') {
+        if (instance.content_review_record_id) {
+          const cr = await models.ContentReviewRecord.findByPk(instance.content_review_record_id, {
+            attributes: ['audit_data'],
+            transaction
+          })
+          const applicantId = cr?.audit_data?.user_id
+          if (applicantId) parties.add(Number(applicantId))
+        }
+      }
+    } catch (err) {
+      // 当事人解析失败不应阻断审核，但需告警（回避降级为仅按 submitted_by）
+      logger.warn('[审核链] 解析当事人失败，回避仅按 submitted_by', {
+        auditable_type: instance.auditable_type,
+        auditable_id: instance.auditable_id,
+        error: err.message
+      })
+    }
+    return Array.from(parties)
   }
 
   /**

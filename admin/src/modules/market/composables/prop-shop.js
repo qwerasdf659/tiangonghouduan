@@ -94,31 +94,21 @@ export function usePropShopMethods() {
   return {
     // [LOAD]
     /**
-     * 加载道具列表：先取 prop 模板 ID 集合，再按 item_template_id 过滤兑换商品。
-     * （列表接口不下发 item_type，故用"关联模板是否为 prop"精确判定，零后端改动）
+     * 加载道具列表：后端按 item_type='prop' 服务端筛选（频道隔离）。
+     * exchange_items 列表接口已支持 item_type 参数（关联 item_templates 做 INNER JOIN），
+     * 故无需前端"先取 prop 模板 ID 再过滤"，单次查询即精确返回道具，分页 total 准确。
      */
     async loadPropList() {
       this.listLoading = true
       try {
-        // 步骤1：取所有 prop 模板 ID（item_type=prop）
-        const tplRes = await this.apiGet(ITEM_TEMPLATE_ENDPOINT, {
-          item_type: 'prop',
-          page: 1,
-          page_size: 200
-        })
-        const tplList = tplRes?.data?.list || tplRes?.data?.items || tplRes?.data || []
-        const propTemplateIds = new Set(
-          (Array.isArray(tplList) ? tplList : []).map(t => Number(t.item_template_id))
-        )
-
-        // 步骤2：取兑换商品，仅保留关联 prop 模板的项
         const res = await this.apiGet(EXCHANGE_ITEMS_ENDPOINT, {
+          item_type: 'prop',
           keyword: this.keyword || undefined,
           page: 1,
           page_size: 100
         })
         const items = res?.data?.items || res?.data?.list || []
-        this.propList = items.filter(it => propTemplateIds.has(Number(it.item_template_id)))
+        this.propList = Array.isArray(items) ? items : []
       } catch (e) {
         logger.error('[PropShop] 加载道具列表失败', e)
         this.showError?.('加载道具列表失败：' + e.message)

@@ -96,10 +96,11 @@ router.get(
   requireRoleLevel(100),
   asyncHandler(async (req, res) => {
     const service = getExchangeItemService(req)
-    const { category_id, status, space, rarity_code, keyword, page, page_size } = req.query
+    const { category_id, status, space, rarity_code, keyword, item_type, page, page_size } =
+      req.query
 
     const result = await service.listExchangeItems(
-      { category_id, status, space, rarity_code, keyword },
+      { category_id, status, space, rarity_code, keyword, item_type },
       { page, page_size }
     )
 

@@ -258,9 +258,9 @@ module.exports = sequelize => {
         comment: '奖品名称'
       },
       prize_type: {
-        type: DataTypes.ENUM('points', 'product', 'coupon', 'special'),
+        type: DataTypes.ENUM('material', 'item', 'coupon', 'points'),
         allowNull: true,
-        comment: '奖品类型'
+        comment: '奖品类型（统一词表，与 prize_definitions 一致：material/item/coupon/points）'
       },
       prize_value: {
         type: DataTypes.INTEGER,

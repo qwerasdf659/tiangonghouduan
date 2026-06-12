@@ -64,7 +64,8 @@ export function useExchangeItemsState() {
       video_url: '',
       mint_instance: true,
       item_template_id: null,
-      attributes_json: null
+      attributes_json: null,
+      max_quantity_per_order: 10
     },
     /** @type {string} 商品参数表编辑用 JSON 字符串 */
     attributesStr: '{}',
@@ -278,7 +279,7 @@ export function useExchangeItemsMethods() {
           params: { page_size: 200 }
         })
         if (res.success && res.data) {
-          const templates = res.data.item_templates || res.data.rows || res.data || []
+          const templates = res.data.list || []
           this.itemTemplateOptions = templates.map(t => ({
             value: t.item_template_id,
             label: `${t.display_name || t.template_code} (${t.item_type})`,
@@ -299,7 +300,7 @@ export function useExchangeItemsMethods() {
       try {
         const res = await ExchangeItemAPI.listCategories()
         if (res.success && res.data) {
-          const cats = res.data.categories || res.data || []
+          const cats = res.data.items || []
           const enabled = cats
             .filter(c => c.is_enabled)
             .map(c => ({
@@ -357,7 +358,8 @@ export function useExchangeItemsMethods() {
         video_url: '',
         mint_instance: true,
         item_template_id: null,
-        attributes_json: null
+        attributes_json: null,
+        max_quantity_per_order: 10
       }
       this.itemImagePreviewUrl = null
       this.detailImages = []
@@ -403,7 +405,8 @@ export function useExchangeItemsMethods() {
         video_url: item.video_url || '',
         mint_instance: item.mint_instance ?? true,
         item_template_id: item.item_template_id || null,
-        attributes_json: item.attributes_json || null
+        attributes_json: item.attributes_json || null,
+        max_quantity_per_order: item.max_quantity_per_order ?? 10
       }
       this.attributesStr = item.attributes ? JSON.stringify(item.attributes, null, 2) : '{}'
       this.itemImagePreviewUrl =

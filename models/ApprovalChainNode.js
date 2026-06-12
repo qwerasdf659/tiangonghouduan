@@ -58,6 +58,13 @@ module.exports = sequelize => {
         allowNull: false,
         comment: '是否终审节点'
       },
+      exclude_parties: {
+        type: DataTypes.TINYINT,
+        allowNull: false,
+        defaultValue: 1,
+        comment:
+          '当事人回避开关(1=排除当事人审核,默认;0=不回避)。开启时操作人为该业务当事人则拒绝审核,即使持admin角色'
+      },
       auto_approve_enabled: {
         type: DataTypes.TINYINT,
         allowNull: false,

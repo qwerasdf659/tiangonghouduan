@@ -82,12 +82,19 @@ class MerchantPointsService {
     /*
      * 3. 提交到统一审核引擎
      * auditable_id 使用 userId，audit_data 存储申请详情
+     *
+     * priority（审核队列优先级，content_review_records.priority enum: high/medium/low）：
+     * 与"按金额分级"对齐——大额申请（≥1000积分，同 merchant_points_large 大额链阈值）置 high，
+     * 让 ContentAuditEngine.getPendingAuditList（按 priority DESC 排序）把大额申请排在前面优先审，
+     * 其余 medium。阈值与审核链 match_conditions.min_amount 保持同一业务标准（大额=更重要先审）。
      */
+    const LARGE_POINTS_THRESHOLD = 1000
+    const auditPriority = pointsAmount >= LARGE_POINTS_THRESHOLD ? 'high' : 'medium'
     const auditRecord = await ContentAuditEngine.submitForAudit(
       'merchant_points', // auditable_type
       userId, // auditable_id（使用用户ID作为业务实体ID）
       {
-        priority: 'medium',
+        priority: auditPriority,
         auditData: {
           user_id: userId,
           points_amount: pointsAmount,

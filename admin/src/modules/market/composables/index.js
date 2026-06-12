@@ -10,6 +10,9 @@
 // 兑换商品管理模块
 import { useExchangeItemsState, useExchangeItemsMethods } from './exchange-items.js'
 
+// 道具商城模块（道具/星石轨，复用兑换 SPU/SKU 体系）
+import { usePropShopState, usePropShopMethods } from './prop-shop.js'
+
 // 兑换订单管理模块
 import { useExchangeOrdersState, useExchangeOrdersMethods } from './exchange-orders.js'
 
@@ -25,6 +28,8 @@ import { useBarterRecipesState, useBarterRecipesMethods } from './barter-recipes
 export {
   useExchangeItemsState,
   useExchangeItemsMethods,
+  usePropShopState,
+  usePropShopMethods,
   useExchangeOrdersState,
   useExchangeOrdersMethods,
   useExchangeStatsState,

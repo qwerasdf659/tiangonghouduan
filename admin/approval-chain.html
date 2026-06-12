@@ -81,7 +81,7 @@
                 <tr class="hover:bg-gray-50 transition-colors">
                   <td class="px-4 py-3 text-sm font-mono text-gray-700" x-text="t.template_code"></td>
                   <td class="px-4 py-3 text-sm text-gray-900" x-text="t.template_name"></td>
-                  <td class="px-4 py-3 text-sm" x-text="getAuditableTypeLabel(t.auditable_type)"></td>
+                  <td class="px-4 py-3 text-sm" x-text="t.auditable_type_display || t.auditable_type"></td>
                   <td class="px-4 py-3 text-sm text-center" x-text="t.total_nodes"></td>
                   <td class="px-4 py-3 text-sm text-center" x-text="t.priority"></td>
                   <td class="px-4 py-3 text-center">
@@ -113,6 +113,7 @@
             <option value="">全部类型</option>
             <option value="consumption">消费审核</option>
             <option value="merchant_points">商家积分审核</option>
+            <option value="trade_dispute">交易纠纷</option>
           </select>
           <select x-model="instance_filter.status" @change="loadInstances()"
             class="border rounded-lg px-3 py-2 text-sm">
@@ -149,7 +150,7 @@
               <template x-for="inst in instances" :key="inst.instance_id">
                 <tr class="hover:bg-gray-50">
                   <td class="px-4 py-3 text-sm text-gray-700" x-text="inst.instance_id"></td>
-                  <td class="px-4 py-3 text-sm" x-text="getAuditableTypeLabel(inst.auditable_type)"></td>
+                  <td class="px-4 py-3 text-sm" x-text="inst.auditable_type_display || inst.auditable_type"></td>
                   <td class="px-4 py-3 text-sm text-gray-600" x-text="inst.template?.template_name || '-'"></td>
                   <td class="px-4 py-3 text-sm text-center">
                     <span class="font-mono" x-text="`${inst.current_step}/${inst.total_steps}`"></span>
@@ -194,7 +195,7 @@
                   <div class="flex items-center space-x-3 mb-1">
                     <span class="font-medium text-gray-900" x-text="step.node?.node_name || '审核步骤'"></span>
                     <span class="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full"
-                      x-text="getAuditableTypeLabel(step.instance?.auditable_type)"></span>
+                      x-text="step.instance?.auditable_type_display || step.instance?.auditable_type"></span>
                     <span class="text-xs text-gray-400" x-text="'#' + step.instance?.auditable_id"></span>
                   </div>
                   <div class="text-sm text-gray-500">
@@ -270,18 +271,22 @@
               <select x-model="template_form.auditable_type" class="w-full border rounded-lg px-3 py-2 text-sm">
                 <option value="consumption">消费审核</option>
                 <option value="merchant_points">商家积分审核</option>
-                <option value="exchange">兑换审核</option>
+                <option value="trade_dispute">交易纠纷</option>
               </select>
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">优先级（数值越大越优先）</label>
+              <label class="block text-sm font-medium text-gray-700 mb-1">优先级</label>
               <input x-model.number="template_form.priority" type="number" class="w-full border rounded-lg px-3 py-2 text-sm">
+              <p class="text-xs text-gray-400 mt-1">同一业务类型有多条链时，数值大的先匹配（如"大额链"填 10）；只有一条链填 0 即可。</p>
             </div>
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">匹配条件（JSON）</label>
-            <input x-model="template_form.match_conditions" type="text"
-              class="w-full border rounded-lg px-3 py-2 text-sm font-mono" placeholder='{"min_amount": 200}'>
+            <label class="block text-sm font-medium text-gray-700 mb-1">触发条件：金额/积分下限</label>
+            <div class="flex items-center space-x-2">
+              <input x-model.number="match_min_amount" type="number" min="0"
+                class="w-40 border rounded-lg px-3 py-2 text-sm" placeholder="留空=不限">
+              <span class="text-sm text-gray-500">及以上走本链（留空 = 该业务类型的默认链，不限金额）</span>
+            </div>
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">描述</label>
@@ -296,25 +301,81 @@
             </div>
             <template x-for="(node, idx) in template_form.nodes" :key="idx">
               <div class="border rounded-lg p-3 mb-2 bg-gray-50">
-                <div class="grid grid-cols-4 gap-3 text-sm">
-                  <div>
-                    <label class="text-xs text-gray-500">步骤号</label>
-                    <input x-model.number="node.step_number" type="number" min="2" max="9" class="w-full border rounded px-2 py-1 text-sm">
-                  </div>
-                  <div>
-                    <label class="text-xs text-gray-500">节点名称</label>
-                    <input x-model="node.node_name" type="text" class="w-full border rounded px-2 py-1 text-sm" placeholder="如 管理员终审">
-                  </div>
-                  <div>
-                    <label class="text-xs text-gray-500">角色ID</label>
-                    <input x-model.number="node.assignee_role_id" type="number" class="w-full border rounded px-2 py-1 text-sm" placeholder="如 2=admin">
-                  </div>
-                  <div class="flex items-end space-x-2">
-                    <label class="flex items-center text-xs">
-                      <input type="checkbox" x-model="node.is_final" :true-value="1" :false-value="0" class="mr-1"> 终审
-                    </label>
+                <!-- 顶行：顺序 + 名称 + 上下移/删除 -->
+                <div class="flex items-center justify-between mb-2">
+                  <span class="text-xs font-medium text-gray-600">第 <span x-text="idx + 1"></span> 级<span x-show="node.is_final === 1" class="text-blue-600">（终审）</span></span>
+                  <div class="flex items-center space-x-2">
+                    <button @click="moveNode(idx, -1)" :disabled="idx === 0" class="text-gray-500 hover:text-gray-800 disabled:opacity-30 text-sm" title="上移">↑</button>
+                    <button @click="moveNode(idx, 1)" :disabled="idx === template_form.nodes.length - 1" class="text-gray-500 hover:text-gray-800 disabled:opacity-30 text-sm" title="下移">↓</button>
                     <button @click="removeNode(idx)" class="text-red-500 hover:text-red-700 text-sm">删除</button>
                   </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <label class="text-xs text-gray-500">节点名称</label>
+                    <input x-model="node.node_name" type="text" class="w-full border rounded px-2 py-1 text-sm" placeholder="如 业务经理初审 / 管理员终审">
+                  </div>
+                  <div>
+                    <label class="text-xs text-gray-500">分配方式</label>
+                    <select x-model="node.assignee_type" class="w-full border rounded px-2 py-1 text-sm">
+                      <option value="role">按角色（角色池，该角色任何人可审）</option>
+                      <option value="user">指定人（仅指定的某个人可审）</option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- 角色池模式：角色下拉 -->
+                <div x-show="node.assignee_type === 'role'" class="mt-2">
+                  <label class="text-xs text-gray-500">审核角色（级别）</label>
+                  <select x-model.number="node.assignee_role_id" class="w-full border rounded px-2 py-1 text-sm">
+                    <option :value="null">请选择角色</option>
+                    <template x-for="r in role_options" :key="r.role_id">
+                      <option :value="r.role_id" x-text="r.label"></option>
+                    </template>
+                  </select>
+                </div>
+
+                <!-- 指定人模式：手机号/昵称搜索 + 候选选择 -->
+                <div x-show="node.assignee_type === 'user'" class="mt-2">
+                  <label class="text-xs text-gray-500">指定审核人（手机号 / 昵称 / 用户ID 搜索）</label>
+                  <div x-show="node.assignee_user_label" class="text-sm text-green-700 mb-1">
+                    已选：<span x-text="node.assignee_user_label"></span>
+                    <button @click="node.assignee_user_id = null; node.assignee_user_label = ''" class="text-red-500 ml-2 text-xs">清除</button>
+                  </div>
+                  <div class="flex items-center space-x-2">
+                    <input x-model="node.assignee_user_keyword" @keydown.enter.prevent="searchAssigneeUser(idx)" type="text"
+                      class="flex-1 border rounded px-2 py-1 text-sm" placeholder="输入手机号/昵称后回车或点搜索">
+                    <button @click="searchAssigneeUser(idx)" class="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">搜索</button>
+                  </div>
+                  <div x-show="node.assignee_user_options.length > 0" class="border rounded mt-1 max-h-32 overflow-y-auto bg-white">
+                    <template x-for="u in node.assignee_user_options" :key="u.user_id">
+                      <div @click="selectAssigneeUser(idx, u)" class="px-2 py-1 text-sm hover:bg-blue-50 cursor-pointer" x-text="u.label"></div>
+                    </template>
+                  </div>
+                </div>
+
+                <!-- 终审 + 当事人回避 + 超时策略 -->
+                <div class="grid grid-cols-3 gap-3 mt-2 text-sm items-end">
+                  <label class="flex items-center text-xs">
+                    <input type="checkbox" x-model="node.is_final" :true-value="1" :false-value="0" class="mr-1"> 终审节点
+                  </label>
+                  <label class="flex items-center text-xs" title="开启后，该业务的当事人/发起人即使持管理员角色也不能审本节点">
+                    <input type="checkbox" x-model="node.exclude_parties" :true-value="1" :false-value="0" class="mr-1"> 当事人回避
+                  </label>
+                  <div>
+                    <label class="text-xs text-gray-500">超时(小时)</label>
+                    <input x-model.number="node.timeout_hours" type="number" min="1" class="w-full border rounded px-2 py-1 text-sm">
+                  </div>
+                </div>
+                <div class="mt-2">
+                  <label class="text-xs text-gray-500">超时动作</label>
+                  <select x-model="node.timeout_action" class="w-full border rounded px-2 py-1 text-sm">
+                    <option value="none">不处理</option>
+                    <option value="notify">通知提醒</option>
+                    <option value="escalate">升级到下一级</option>
+                    <option value="auto_approve">自动通过</option>
+                  </select>
                 </div>
               </div>
             </template>
@@ -337,7 +398,7 @@
 
         <!-- 基本信息 -->
         <div class="grid grid-cols-2 gap-4 mb-6 text-sm">
-          <div><span class="text-gray-500">业务类型:</span> <span x-text="getAuditableTypeLabel(instance_detail?.auditable_type)"></span></div>
+          <div><span class="text-gray-500">业务类型:</span> <span x-text="instance_detail?.auditable_type_display || instance_detail?.auditable_type"></span></div>
           <div><span class="text-gray-500">业务ID:</span> <span x-text="instance_detail?.auditable_id"></span></div>
           <div><span class="text-gray-500">模板:</span> <span x-text="instance_detail?.template?.template_name"></span></div>
           <div><span class="text-gray-500">状态:</span>
@@ -366,6 +427,17 @@
                 <div class="text-xs text-gray-500 mt-1">
                   <span x-show="step.actor" x-text="'审核人: ' + (step.actor?.nickname || step.actioned_by)"></span>
                   <span x-show="step.actioned_at" x-text="' | ' + formatDateTime(step.actioned_at)"></span>
+                </div>
+                <!-- 节点配置：由谁审 + 当事人回避 + 超时策略 -->
+                <div class="text-xs text-gray-600 mt-1 space-y-0.5">
+                  <div><span class="text-gray-400">分配:</span> <span x-text="getStepAssigneeText(step)"></span></div>
+                  <div>
+                    <span class="text-gray-400">当事人回避:</span>
+                    <span :class="step.node?.exclude_parties === 1 ? 'text-green-700' : 'text-gray-400'"
+                      x-text="step.node?.exclude_parties === 1 ? '已开启（当事人不可审）' : '未开启'"></span>
+                    <span class="text-gray-400 ml-2">超时:</span>
+                    <span x-text="(step.node?.timeout_hours ?? '-') + 'h · ' + getTimeoutActionLabel(step.node?.timeout_action)"></span>
+                  </div>
                 </div>
                 <div x-show="step.action_reason" class="text-sm text-gray-600 mt-1 bg-gray-50 rounded px-2 py-1" x-text="step.action_reason"></div>
               </div>

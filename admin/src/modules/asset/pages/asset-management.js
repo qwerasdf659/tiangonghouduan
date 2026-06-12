@@ -33,6 +33,7 @@ import { ASSET_ENDPOINTS } from '../../../api/asset.js'
 import { buildURL, request } from '../../../api/base.js'
 import { UserAPI } from '../../../api/user.js'
 import { Alpine, createPageMixin, dataTable } from '../../../alpine/index.js'
+import { imageUploadMixin } from '../../../alpine/mixins/image-upload.js'
 
 /**
  * 辅助函数：将 params 中的 mobile 解析为 user_id
@@ -83,6 +84,7 @@ document.addEventListener('alpine:init', () => {
   // 注册主组件（HTML 使用 assetManagement()）
   Alpine.data('assetManagement', () => ({
     ...createPageMixin({ userResolver: true }),
+    ...imageUploadMixin(),
 
     // 子页面导航
     current_page: 'material-types',
@@ -108,7 +110,8 @@ document.addEventListener('alpine:init', () => {
       visible_value_points: '',
       budget_value_points: '',
       sort_order: 0,
-      is_enabled: '1'
+      is_enabled: '1',
+      icon_media_id: null
     },
     materialTypeEditForm: {
       asset_code: '',
@@ -119,8 +122,11 @@ document.addEventListener('alpine:init', () => {
       visible_value_points: '',
       budget_value_points: '',
       sort_order: 0,
-      is_enabled: '1'
+      is_enabled: '1',
+      icon_media_id: null
     },
+    /** @type {string|null} 资产类型图标预览 URL（上传后由后端返回的 public_url） */
+    materialTypeIconPreviewUrl: null,
     editingMaterialType: null,
 
     // 材料账户
@@ -430,8 +436,10 @@ document.addEventListener('alpine:init', () => {
         visible_value_points: '',
         budget_value_points: '',
         sort_order: 0,
-        is_enabled: '1'
+        is_enabled: '1',
+        icon_media_id: null
       }
+      this.materialTypeIconPreviewUrl = null
       this.showModal('addMaterialTypeModal')
     },
 
@@ -439,9 +447,32 @@ document.addEventListener('alpine:init', () => {
       this.editingMaterialType = type
       this.materialTypeEditForm = {
         ...type,
-        is_enabled: type.is_enabled ? '1' : '0'
+        is_enabled: type.is_enabled ? '1' : '0',
+        icon_media_id: null
       }
+      // 列表若已下发当前图标 URL（icon_url）则用于回显，否则等用户上传新图后预览
+      this.materialTypeIconPreviewUrl = type.icon_url || null
       this.showModal('editMaterialTypeModal')
+    },
+
+    /**
+     * 资产类型图标上传：复用 imageUploadMixin 上传到媒体服务，拿到 media_id 写入表单，
+     * 提交时随 icon_media_id 一起发给后端，由后端绑定为该资产类型的 icon 附件（单一图标真相源）。
+     * @param {Event} event - input[type=file] change 事件
+     * @param {'add'|'edit'} mode - 当前操作的是新增表单还是编辑表单
+     */
+    async uploadMaterialTypeIcon(event, mode) {
+      const file = event.target?.files?.[0]
+      if (!file) return
+      const result = await this.uploadImage(file)
+      if (result && result.media_id) {
+        const targetForm = mode === 'edit' ? this.materialTypeEditForm : this.materialTypeAddForm
+        targetForm.icon_media_id = result.media_id
+        this.materialTypeIconPreviewUrl =
+          result.public_url || result.thumbnails?.small || this.materialTypeIconPreviewUrl
+      }
+      // 清空 input，便于重复选择同一文件
+      if (event.target) event.target.value = ''
     },
 
     /** 提交新增材料类型 */
@@ -452,8 +483,30 @@ document.addEventListener('alpine:init', () => {
         form.is_enabled = form.is_enabled === '1' || form.is_enabled === true
         form.tier = parseInt(form.tier, 10) || 1
         form.sort_order = parseInt(form.sort_order, 10) || 0
-        form.visible_value_points = parseInt(form.visible_value_points, 10) || 0
-        form.budget_value_points = parseInt(form.budget_value_points, 10) || 0
+        /*
+         * 配额类（form=quota）不参与积分计价，价值字段隐藏且为空：不发送，后端置 null。
+         * 其它形态正常解析价值积分。
+         */
+        if (
+          form.form === 'quota' ||
+          form.visible_value_points === '' ||
+          form.visible_value_points == null
+        ) {
+          delete form.visible_value_points
+        } else {
+          form.visible_value_points = parseInt(form.visible_value_points, 10) || 0
+        }
+        if (
+          form.form === 'quota' ||
+          form.budget_value_points === '' ||
+          form.budget_value_points == null
+        ) {
+          delete form.budget_value_points
+        } else {
+          form.budget_value_points = parseInt(form.budget_value_points, 10) || 0
+        }
+        // 未上传图标时不发送 icon_media_id（保持新建无图标）
+        if (!form.icon_media_id) delete form.icon_media_id
 
         await this.apiPost(ASSET_ENDPOINTS.MATERIAL_ASSET_TYPES, form)
         this.hideModal('addMaterialTypeModal')
@@ -475,8 +528,22 @@ document.addEventListener('alpine:init', () => {
         form.is_enabled = form.is_enabled === '1' || form.is_enabled === true
         form.tier = parseInt(form.tier, 10) || 1
         form.sort_order = parseInt(form.sort_order, 10) || 0
-        form.visible_value_points = parseInt(form.visible_value_points, 10) || 0
-        form.budget_value_points = parseInt(form.budget_value_points, 10) || 0
+        /*
+         * 价值积分为可选字段：编辑（如仅换图标）时若留空，则不发送该字段，
+         * 后端 allowedFields 只更新"传了的字段"，从而保留原有值，不会被覆盖为 0。
+         */
+        if (form.visible_value_points === '' || form.visible_value_points == null) {
+          delete form.visible_value_points
+        } else {
+          form.visible_value_points = parseInt(form.visible_value_points, 10) || 0
+        }
+        if (form.budget_value_points === '' || form.budget_value_points == null) {
+          delete form.budget_value_points
+        } else {
+          form.budget_value_points = parseInt(form.budget_value_points, 10) || 0
+        }
+        // 未上传新图标时不发送 icon_media_id（保持原图标不变）
+        if (!form.icon_media_id) delete form.icon_media_id
 
         const endpoint = buildURL(ASSET_ENDPOINTS.MATERIAL_ASSET_TYPE_DETAIL, {
           asset_code: form.asset_code
@@ -649,7 +716,11 @@ document.addEventListener('alpine:init', () => {
         { key: 'asset_name', label: '资产名称' },
         // delta_amount：与后端数据库字段名一致（正数=增加，负数=扣减）
         { key: 'delta_amount', label: '变动金额', type: 'number', sortable: true },
-        { key: 'business_type', label: '类型', render: (val, row) => row.business_type_display || val || '-' },
+        {
+          key: 'business_type',
+          label: '类型',
+          render: (val, row) => row.business_type_display || val || '-'
+        },
         { key: 'balance_after', label: '变动后余额', type: 'number' },
         { key: 'description', label: '描述', render: val => val || '-' },
         { key: 'created_at', label: '时间', type: 'datetime', sortable: true }
@@ -765,7 +836,11 @@ document.addEventListener('alpine:init', () => {
         { key: 'asset_transaction_id', label: '交易ID', sortable: true },
         { key: 'asset_code', label: '资产类型' },
         { key: 'asset_name', label: '资产名称' },
-        { key: 'business_type', label: '类型', render: (val, row) => row.business_type_display || val || '-' },
+        {
+          key: 'business_type',
+          label: '类型',
+          render: (val, row) => row.business_type_display || val || '-'
+        },
         // delta_amount：与后端数据库字段名一致（正数=增加，负数=扣减）
         { key: 'delta_amount', label: '变动金额', type: 'number', sortable: true },
         { key: 'balance_after', label: '变动后余额', type: 'number' },

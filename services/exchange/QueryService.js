@@ -25,7 +25,10 @@ const logger = require('../../utils/logger').logger
 const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
 const displayNameHelper = require('../../utils/displayNameHelper')
 const { Op } = require('sequelize')
-const { fetchProductMediaGallery } = require('../../utils/mediaAttachmentGallery')
+const {
+  fetchProductMediaGallery,
+  resolveMaterialIconUrls
+} = require('../../utils/mediaAttachmentGallery')
 
 /**
  * 🎯 统一商品视图常量（ExchangeItem 模型，统一商品中心）
@@ -125,7 +128,8 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
     'sold_count',
     'min_cost_amount',
     'max_cost_amount',
-    'min_cost_asset_code'
+    'min_cost_asset_code',
+    'max_quantity_per_order'
   ],
 
   /**
@@ -167,7 +171,8 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
     'sold_count',
     'min_cost_amount',
     'max_cost_amount',
-    'min_cost_asset_code'
+    'min_cost_asset_code',
+    'max_quantity_per_order'
   ],
 
   /**
@@ -482,6 +487,23 @@ class QueryService {
         [{ field: 'status', dictType: 'product_status' }]
       )
 
+      /*
+       * 兑换所需资产「图标 + 中文名」补全（与抽奖图/余额图/背包图共用同一图标真相源）：
+       * 复用 resolveMaterialIconUrls（material_asset_types → media_attachments(icon) → media_files），
+       * 不新造图标拼装逻辑。前端零映射直接读 cost_asset_icon_url / cost_asset_name。
+       */
+      const listAssetCodes = itemsWithDisplayNames.map(i => i.cost_asset_code).filter(Boolean)
+      const listIconMap = await resolveMaterialIconUrls(this.models, listAssetCodes)
+      const listNameMap = await this._resolveAssetDisplayNames(listAssetCodes)
+      itemsWithDisplayNames.forEach(i => {
+        i.cost_asset_icon_url = i.cost_asset_code
+          ? listIconMap.get(i.cost_asset_code) || null
+          : null
+        i.cost_asset_name = i.cost_asset_code
+          ? listNameMap.get(i.cost_asset_code) || i.cost_asset_code
+          : null
+      })
+
       /**
        * 计算统计摘要（需求6 + 需求8）
        * - trending_count: 近7天销量（基于 exchange_records 近7天 COUNT）
@@ -634,6 +656,42 @@ class QueryService {
         : []
       itemWithDisplayNames.default_sku_id = activeSkus.length === 1 ? activeSkus[0].sku_id : null
 
+      /*
+       * 兑换所需资产「图标 + 中文名」补全（与列表接口同款，共用 resolveMaterialIconUrls 真相源）。
+       * 详情页同时收集顶层 cost_asset_code 与各 SKU 渠道价的 cost_asset_code，统一补图标/名。
+       */
+      const detailAssetCodes = [itemWithDisplayNames.cost_asset_code]
+      if (Array.isArray(itemWithDisplayNames.skus)) {
+        itemWithDisplayNames.skus.forEach(sku => {
+          if (Array.isArray(sku.channelPrices)) {
+            sku.channelPrices.forEach(p => detailAssetCodes.push(p.cost_asset_code))
+          }
+        })
+      }
+      const detailIconMap = await resolveMaterialIconUrls(this.models, detailAssetCodes)
+      const detailNameMap = await this._resolveAssetDisplayNames(detailAssetCodes)
+      itemWithDisplayNames.cost_asset_icon_url = itemWithDisplayNames.cost_asset_code
+        ? detailIconMap.get(itemWithDisplayNames.cost_asset_code) || null
+        : null
+      itemWithDisplayNames.cost_asset_name = itemWithDisplayNames.cost_asset_code
+        ? detailNameMap.get(itemWithDisplayNames.cost_asset_code) ||
+          itemWithDisplayNames.cost_asset_code
+        : null
+      if (Array.isArray(itemWithDisplayNames.skus)) {
+        itemWithDisplayNames.skus.forEach(sku => {
+          if (Array.isArray(sku.channelPrices)) {
+            sku.channelPrices.forEach(p => {
+              p.cost_asset_icon_url = p.cost_asset_code
+                ? detailIconMap.get(p.cost_asset_code) || null
+                : null
+              p.cost_asset_name = p.cost_asset_code
+                ? detailNameMap.get(p.cost_asset_code) || p.cost_asset_code
+                : null
+            })
+          }
+        })
+      }
+
       return {
         item: itemWithDisplayNames
       }
@@ -777,6 +835,28 @@ class QueryService {
   }
 
   /**
+   * 批量解析资产码 → 中文展示名（material_asset_types.display_name 真相源）
+   *
+   * 与抽奖/余额/背包共用同一资产名真相源，供兑换列表/详情补 cost_asset_name。
+   * @param {string[]} assetCodes - 资产码数组（如 ['red_core_shard','star_stone']）
+   * @returns {Promise<Map<string,string>>} asset_code → display_name
+   */
+  async _resolveAssetDisplayNames(assetCodes) {
+    const map = new Map()
+    const codes = [...new Set((assetCodes || []).filter(Boolean))]
+    if (codes.length === 0) return map
+
+    const MaterialAssetType = this.models.MaterialAssetType
+    const rows = await MaterialAssetType.findAll({
+      where: { asset_code: { [Op.in]: codes } },
+      attributes: ['asset_code', 'display_name'],
+      raw: true
+    })
+    rows.forEach(r => map.set(r.asset_code, r.display_name))
+    return map
+  }
+
+  /**
    * 构造商品详情页"复合门槛"只读视图（BE-3）
    *
    * 业务场景：
@@ -883,6 +963,7 @@ class QueryService {
       exchange_item_id = null,
       order_no = null,
       source = null,
+      item_type = null,
       page = 1,
       page_size = 20,
       sort_by = 'created_at',
@@ -904,6 +985,7 @@ class QueryService {
         exchange_item_id,
         order_no,
         source,
+        item_type,
         page,
         page_size
       })
@@ -920,9 +1002,36 @@ class QueryService {
       const offset = (page - 1) * page_size
       const limit = page_size
 
+      /*
+       * 频道筛选（道具商城订单/星石轨）：exchange_records 无 item_type 列，
+       * 频道语义在订单关联商品的模板 item_templates.item_type。
+       * 传 item_type 时，通过 exchangeItem → itemTemplate 关联 required:true 做 INNER JOIN 精确筛选；
+       * 不传则不约束（兑换市场看全部订单）。复用现有模型关联，零新表、零冗余列。
+       */
+      const include = []
+      if (item_type) {
+        include.push({
+          model: this.models.ExchangeItem,
+          as: 'exchangeItem',
+          required: true,
+          attributes: [],
+          include: [
+            {
+              model: this.models.ItemTemplate,
+              as: 'itemTemplate',
+              required: true,
+              attributes: [],
+              where: { item_type }
+            }
+          ]
+        })
+      }
+
       const { count, rows } = await this.ExchangeRecord.findAndCountAll({
         where,
         attributes: EXCHANGE_MARKET_ATTRIBUTES.adminMarketOrderView,
+        include,
+        distinct: true,
         limit,
         offset,
         order: [[safeSortBy, safeSortOrder]]
@@ -950,7 +1059,8 @@ class QueryService {
           status,
           user_id,
           exchange_item_id,
-          order_no
+          order_no,
+          item_type
         }
       }
     } catch (error) {

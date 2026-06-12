@@ -19,6 +19,13 @@ const { authenticateToken, requireRoleLevel } = require('../../../../middleware/
 const TransactionManager = require('../../../../utils/TransactionManager')
 const { asyncHandler } = require('../../../../middleware/validation')
 
+/*
+ * 资产形态合法值（单一真相源，与 models/MaterialAssetType.js 的 ENUM('shard','gem','currency','quota') 严格一致）：
+ * shard-碎片 / gem-源晶 / currency-货币(如 points、star_stone) / quota-配额。
+ * 历史校验误写为 ['shard','crystal']（crystal 非法、且漏 gem/currency/quota），导致编辑货币类资产（如星石）被错误拦截。
+ */
+const VALID_ASSET_FORMS = ['shard', 'gem', 'currency', 'quota']
+
 /**
  * 查询材料资产类型列表（管理员）
  * GET /api/v4/console/material/asset-types
@@ -74,7 +81,7 @@ router.get(
  * - asset_code: 资产代码（如 'red_core_shard'，必须唯一）
  * - display_name: 展示名称（如 '红源晶碎片'）
  * - group_code: 分组代码（如 'red'）
- * - form: 形态（'shard' 或 'crystal'）
+ * - form: 形态（shard/gem/currency/quota）
  * - tier: 层级（数字，如 1）
  * - sort_order: 排序权重（数字，默认0）
  * - is_enabled: 是否启用（默认 true）
@@ -108,8 +115,13 @@ router.post(
       )
     }
 
-    if (!['shard', 'crystal'].includes(form)) {
-      return res.apiError('form 必须为 shard 或 crystal', 'INVALID_FORM', null, 400)
+    if (!VALID_ASSET_FORMS.includes(form)) {
+      return res.apiError(
+        `form 必须为 ${VALID_ASSET_FORMS.join('/')} 之一`,
+        'INVALID_FORM',
+        null,
+        400
+      )
     }
 
     const MaterialManagementService = req.app.locals.services.getService('material_management')
@@ -153,7 +165,7 @@ router.post(
  * Body参数（可选，至少提供一个）：
  * - display_name: 展示名称
  * - group_code: 分组代码
- * - form: 形态（shard/crystal）
+ * - form: 形态（shard/gem/currency/quota）
  * - tier: 层级
  * - sort_order: 排序权重
  * - visible_value_points: 显示价值积分
@@ -186,8 +198,13 @@ router.put(
       icon_media_id
     } = req.body
 
-    if (form !== undefined && !['shard', 'crystal'].includes(form)) {
-      return res.apiError('form 必须为 shard 或 crystal', 'INVALID_FORM', null, 400)
+    if (form !== undefined && !VALID_ASSET_FORMS.includes(form)) {
+      return res.apiError(
+        `form 必须为 ${VALID_ASSET_FORMS.join('/')} 之一`,
+        'INVALID_FORM',
+        null,
+        400
+      )
     }
 
     const MaterialManagementService = req.app.locals.services.getService('material_management')

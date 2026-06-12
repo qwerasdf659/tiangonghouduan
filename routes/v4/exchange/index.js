@@ -313,8 +313,12 @@ router.post(
         return res.apiError('无效的商品ID', 'BAD_REQUEST', null, 400)
       }
 
-      if (isNaN(exchangeQuantity) || exchangeQuantity <= 0 || exchangeQuantity > 10) {
-        return res.apiError('兑换数量必须在1-10之间', 'BAD_REQUEST', null, 400)
+      /*
+       * 数量基础校验：仅校验为正整数（每单上限由 CoreService 读商品级 max_quantity_per_order 权威校验，
+       * 不在路由层硬编码魔术数字）。
+       */
+      if (isNaN(exchangeQuantity) || exchangeQuantity <= 0) {
+        return res.apiError('兑换数量必须为正整数', 'BAD_REQUEST', null, 400)
       }
 
       /*

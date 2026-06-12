@@ -289,6 +289,12 @@ module.exports = sequelize => {
         defaultValue: 0,
         comment: '库存预警阈值'
       },
+      max_quantity_per_order: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 10,
+        comment: '每单兑换数量上限（≥1，运营可配；提交接口据此校验，替代历史硬编码 1-10）'
+      },
       publish_at: {
         type: DataTypes.DATE,
         allowNull: true,

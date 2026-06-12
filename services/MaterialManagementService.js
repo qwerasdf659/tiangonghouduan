@@ -19,9 +19,17 @@
 
 'use strict'
 
-const { MaterialAssetType, MediaAttachment } = require('../models')
+const { MaterialAssetType, MediaAttachment, MediaFile } = require('../models')
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
+const { categoryIconAttachmentInclude } = require('../utils/mediaAttachmentGallery')
+const { getImageUrl } = require('../utils/ImageUrlHelper')
 const MediaService = require('./MediaService')
+
+/*
+ * 资产形态合法值（单一真相源，与 models/MaterialAssetType.js 的 ENUM('shard','gem','currency','quota') 一致）。
+ * 历史误写为 ['shard','crystal']（crystal 非法、漏 gem/currency/quota），导致编辑货币类资产（如星石 form=currency）被拦截。
+ */
+const VALID_ASSET_FORMS = ['shard', 'gem', 'currency', 'quota']
 
 /**
  * 材料系统运营管理服务
@@ -64,10 +72,22 @@ class MaterialManagementService {
         ['sort_order', 'ASC'],
         ['tier', 'ASC'],
         ['created_at', 'ASC']
-      ]
+      ],
+      // 关联 icon 图标附件（与 /assets/balances、抽奖图同一图标真相源），供后台编辑回显当前图标
+      include: [categoryIconAttachmentInclude({ MediaAttachment, MediaFile })].filter(Boolean)
     })
 
-    return { asset_types: assetTypes.map(t => t.toJSON()) }
+    return {
+      asset_types: assetTypes.map(t => {
+        const plain = t.toJSON()
+        const media = plain.iconAttachment?.media || plain.iconAttachment?.Media
+        plain.icon_url = media?.object_key
+          ? getImageUrl(media.object_key, media.content_hash)
+          : null
+        delete plain.iconAttachment
+        return plain
+      })
+    }
   }
 
   /**
@@ -136,8 +156,8 @@ class MaterialManagementService {
         '缺少必填参数：asset_code/display_name/group_code/form/tier'
       )
     }
-    if (!['shard', 'crystal'].includes(form)) {
-      this._throw(400, 'invalid_form', 'form 必须为 shard 或 crystal')
+    if (!VALID_ASSET_FORMS.includes(form)) {
+      this._throw(400, 'invalid_form', `form 必须为 ${VALID_ASSET_FORMS.join('/')} 之一`)
     }
 
     const existing = await MaterialAssetType.findOne({ where: { asset_code }, transaction })
@@ -197,7 +217,7 @@ class MaterialManagementService {
    * @param {Object} payload - 更新内容
    * @param {string} [payload.display_name] - 展示名称
    * @param {string} [payload.group_code] - 分组代码
-   * @param {string} [payload.form] - 形态（shard/crystal）
+   * @param {string} [payload.form] - 形态（shard/gem/currency/quota）
    * @param {number} [payload.tier] - 层级
    * @param {number} [payload.sort_order] - 排序权重
    * @param {number|null} [payload.visible_value_points] - 显示价值积分
@@ -239,8 +259,8 @@ class MaterialManagementService {
       if (payload[field] !== undefined) {
         // 特殊处理：form 字段需要验证枚举值
         if (field === 'form') {
-          if (!['shard', 'crystal'].includes(payload.form)) {
-            this._throw(400, 'invalid_form', 'form 必须为 shard 或 crystal')
+          if (!VALID_ASSET_FORMS.includes(payload.form)) {
+            this._throw(400, 'invalid_form', `form 必须为 ${VALID_ASSET_FORMS.join('/')} 之一`)
           }
           updateData.form = payload.form
         } else if (

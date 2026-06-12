@@ -50,7 +50,7 @@
          @edit-role="editRole($event.detail)"
          @manage-role-permissions="manageRolePermissions($event.detail)"
          @confirm-delete-role="confirmDeleteRole($event.detail)"
-         @change-user-role-event="changeUserRole($event.detail.ur, $event.detail.value)"
+         @open-change-role="openChangeRoleModal($event.detail)"
          @view-premium-detail="viewPremiumDetail($event.detail)"
          @open-risk-modal="openRiskModal($event.detail)"
          @freeze-user="freezeUser($event.detail)"
@@ -335,7 +335,7 @@
                         <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
                       </template>
                       <td class="px-4 py-3">
-                        <button @click="$dispatch('change-user-role-event', { ur: row, value: '' })" class="text-purple-500 hover:text-purple-700 text-sm">更改角色</button>
+                        <button @click="$dispatch('open-change-role', row)" class="text-purple-500 hover:text-purple-700 text-sm">更改角色</button>
                       </td>
                     </tr>
                   </template>
@@ -1390,7 +1390,7 @@
         <!-- 内容 -->
         <div class="relative themed-card rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
           <div class="p-4 border-b flex justify-between items-center">
-            <h5 class="font-semibold">🏷️ 分配角色</h5>
+            <h5 class="font-semibold" x-text="changeRoleCurrentName ? ('🏷️ 更改角色（当前：' + changeRoleCurrentName + '）') : '🏷️ 分配角色'"></h5>
             <button @click="hideModal('assignRoleModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
           </div>
           <form @submit.prevent="submitAssignRole()">
@@ -1413,7 +1413,7 @@
                         class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" required>
                   <option value="">请选择角色</option>
                   <template x-for="role in roles" :key="role.role_id">
-                    <option :value="role.role_name" x-text="role.role_name"></option>
+                    <option :value="role.role_name" x-text="role.role_name + ' (level ' + role.role_level + ')'"></option>
                   </template>
                 </select>
               </div>

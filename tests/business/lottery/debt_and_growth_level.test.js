@@ -47,9 +47,7 @@ describe('抽奖欠账管理 + 成长等级公示分级概率', () => {
       ? global.getTestService('debt_management')
       : require('../../../services/DebtManagementService')
 
-    GrowthLevelService = global.getTestService
-      ? global.getTestService('user_growth_level')
-      : null
+    GrowthLevelService = global.getTestService ? global.getTestService('user_growth_level') : null
 
     const admin_user = await User.findOne({ where: { mobile: test_mobile } })
     if (!admin_user) {
@@ -149,7 +147,9 @@ describe('抽奖欠账管理 + 成长等级公示分级概率', () => {
       expect(levels[0].min_history_points).toBe(0)
       // 升序校验
       for (let i = 1; i < levels.length; i++) {
-        expect(levels[i].min_history_points).toBeGreaterThanOrEqual(levels[i - 1].min_history_points)
+        expect(levels[i].min_history_points).toBeGreaterThanOrEqual(
+          levels[i - 1].min_history_points
+        )
       }
     })
 

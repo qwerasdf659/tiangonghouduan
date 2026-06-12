@@ -35,14 +35,22 @@ class ExchangeItemService {
    * @param {string} [filters.space] - 空间标识
    * @param {string} [filters.rarity_code] - 稀有度编码
    * @param {string} [filters.keyword] - 模糊匹配 item_name
+   * @param {string} [filters.item_type] - 频道筛选：关联模板 item_type（prop=道具商城/星石轨，product/voucher=实物兑换）
    * @param {Object} [pagination={}] - 分页参数
    * @param {number} [pagination.page=1] - 页码
    * @param {number} [pagination.page_size=20] - 每页条数
    * @returns {Promise<{items:Array,total:number,page:number,page_size:number,total_pages:number}>} 分页结果
    */
   async listExchangeItems(filters = {}, pagination = {}) {
-    const { ExchangeItem, Category, RarityDef, MediaFile, ExchangeItemSku, ExchangeChannelPrice } =
-      this.models
+    const {
+      ExchangeItem,
+      Category,
+      RarityDef,
+      MediaFile,
+      ExchangeItemSku,
+      ExchangeChannelPrice,
+      ItemTemplate
+    } = this.models
 
     const page = Math.max(1, parseInt(pagination.page, 10) || 1)
     const pageSize = Math.min(100, Math.max(1, parseInt(pagination.page_size, 10) || 20))
@@ -61,6 +69,14 @@ class ExchangeItemService {
       where.item_name = { [Op.like]: `%${String(filters.keyword).trim()}%` }
     }
 
+    /*
+     * 频道筛选（道具商城/星石轨）：按关联模板 item_type 服务端筛选。
+     * exchange_items 自身无 item_type 列，频道语义在 item_templates.item_type；
+     * 传 item_type 时用 itemTemplate 关联 required:true + where 做 INNER JOIN 精确筛选，
+     * 不传则不约束（实物兑换市场看全部）。复用现有 itemTemplate 关联，零新表。
+     */
+    const filterItemType = filters.item_type && String(filters.item_type).trim()
+
     const { rows, count } = await ExchangeItem.findAndCountAll({
       where,
       distinct: true,
@@ -74,6 +90,13 @@ class ExchangeItemService {
         { model: Category, as: 'category', required: false },
         { model: RarityDef, as: 'rarityDef', required: false },
         { model: MediaFile, as: 'primary_media', required: false },
+        {
+          model: ItemTemplate,
+          as: 'itemTemplate',
+          required: !!filterItemType,
+          attributes: ['item_template_id', 'item_type'],
+          where: filterItemType ? { item_type: filterItemType } : undefined
+        },
         {
           model: ExchangeItemSku,
           as: 'skus',
@@ -711,7 +734,8 @@ class ExchangeItemService {
       'is_hot',
       'is_limited',
       'is_recommended',
-      'attributes_json'
+      'attributes_json',
+      'max_quantity_per_order'
     ]
     const out = {}
     for (const k of keys) {

@@ -649,8 +649,12 @@ class SettleStage extends BaseStage {
           break
 
         case 'coupon':
-        case 'physical':
-          // 优惠券/实物：写入 items + item_ledger 双录（三表模型）
+        case 'item':
+          /*
+           * 优惠券/实物物品：写入 items + item_ledger 双录（三表模型）。
+           * 词表统一（P1）：prize_definitions.prize_type 词表为 material/item/coupon/points，
+           * 此处覆盖 coupon(券→voucher) 与 item(实物→product)；不再保留已废弃的 'physical' 值。
+           */
           await ItemService.mintItem(
             {
               user_id,
@@ -675,7 +679,12 @@ class SettleStage extends BaseStage {
           )
           break
 
-        case 'virtual':
+        /*
+         * material：可叠加材料资产奖品（星石/红源晶碎片等），走 BalanceService 双录入账。
+         * 词表统一（P1）：material 是当前唯一真相词（prize_definitions.prize_type 即为 material）；
+         * 历史 virtual 已通过迁移统一为 material，此处只保留 material 单一分支，不再兼容 virtual。
+         */
+        case 'material':
           if (prize.material_asset_code && prize.material_amount) {
             // eslint-disable-next-line no-restricted-syntax -- transaction 已正确传递
             await BalanceService.changeBalance(
@@ -706,10 +715,17 @@ class SettleStage extends BaseStage {
           break
 
         default:
-          this.log('warn', '未知奖品类型，跳过发放', {
+          /*
+           * 未知奖品类型：必须抛错让结算失败、整事务回滚并可被监控。
+           * 禁止静默跳过（曾导致 material 类奖品中奖却不入账的隐性资损）。
+           */
+          this.log('error', '未知奖品类型，结算中止', {
             lottery_campaign_prize_id: prize.lottery_campaign_prize_id,
             prize_type: prize.prize_type
           })
+          throw new Error(
+            `未知奖品类型 prize_type=${prize.prize_type}（lottery_campaign_prize_id=${prize.lottery_campaign_prize_id}），结算中止`
+          )
       }
 
       this.log('debug', '奖品发放完成', {

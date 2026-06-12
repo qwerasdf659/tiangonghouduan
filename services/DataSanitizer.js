@@ -104,7 +104,7 @@ class DataSanitizer {
    * @returns {number} return[].id - 奖品对外通用ID（方案C：映射自 lottery_campaign_prize_id，防抓包暴露内部表名）
    * @returns {number} return[].lottery_campaign_id - 关联活动ID
    * @returns {string} return[].prize_name - 奖品名称（来自 prize_definitions.display_name）
-   * @returns {string} return[].prize_type - 奖品类型（points/coupon/physical/virtual/service/product/special）
+   * @returns {string} return[].prize_type - 奖品类型（material/item/coupon/points，与 prize_definitions 同词表）
    * @returns {number} return[].prize_value - 展示价值（DECIMAL→number 转换）
    * @returns {string} return[].rarity_code - 稀有度代码（FK→rarity_defs）
    * @returns {number} return[].sort_order - 排序顺序（前端转盘位置索引）
@@ -163,19 +163,19 @@ class DataSanitizer {
         }
       } else {
         /**
-         * 图片兜底策略：
-         * 1. 如果有 material_asset_code，返回对应的资产图标 URL（运营可通过替换图标文件调整）
-         * 2. 否则返回通用占位图
+         * 图片兜底策略（P3·2026-06-12 统一图标真相源）：
+         * 1. 优先用 materialAssetType 的图标附件（与 GET /assets/balances 完全同源：
+         *    material_asset_types → MediaAttachment(iconAttachment) → media_files.object_key），
+         *    保证"抽奖图 / 余额图 / 背包图"对同一 asset_code 永远是同一张图，运营换一次全端同步。
+         * 2. 附件缺失时回退通用占位图（不再拼 /admin/assets/icons 静态文件，杜绝两套图源）。
          */
-        const materialCode = sanitized.material_asset_code || plain.material_asset_code
-        if (materialCode) {
-          const iconFileName = materialCode.replace(/_/g, '-') + '.png'
-          const baseUrl = process.env.PUBLIC_BASE_URL || ''
-          const iconUrl = `${baseUrl}/admin/assets/icons/materials/${iconFileName}`
+        const iconMedia = rawMaterial?.iconAttachment?.media || rawMaterial?.iconAttachment?.Media
+        if (iconMedia?.object_key) {
+          const iconUrl = getImageUrl(iconMedia.object_key, iconMedia.content_hash)
           sanitized.image = {
             url: iconUrl,
             thumbnail_url: iconUrl,
-            source: 'material_icon'
+            source: 'material_asset_type_icon'
           }
         } else {
           const placeholderUrl = getPlaceholderImageUrl('prize')

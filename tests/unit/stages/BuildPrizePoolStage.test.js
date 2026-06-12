@@ -309,7 +309,9 @@ describe('BuildPrizePoolStage — 资源级过滤', () => {
       expect(grouped.high).toHaveLength(0)
       expect(grouped.mid).toHaveLength(0)
       expect(grouped.low).toHaveLength(2)
-      expect(grouped.low.map(p => p.lottery_campaign_prize_id)).toEqual(expect.arrayContaining([168, 170]))
+      expect(grouped.low.map(p => p.lottery_campaign_prize_id)).toEqual(
+        expect.arrayContaining([168, 170])
+      )
     })
   })
 

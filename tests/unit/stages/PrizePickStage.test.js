@@ -234,7 +234,9 @@ describe('【P1】奖品选择器专项测试 - PrizePickStage', () => {
     test('单个奖品应该100%选中', () => {
       console.log('📊 2.4.2.5 验证单个奖品选择...')
 
-      const mockPrizes = [{ lottery_campaign_prize_id: 1, prize_name: '唯一奖品', win_weight: 500000 }]
+      const mockPrizes = [
+        { lottery_campaign_prize_id: 1, prize_name: '唯一奖品', win_weight: 500000 }
+      ]
 
       const iterations = 100
       let allSameCount = 0

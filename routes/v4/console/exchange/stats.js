@@ -24,12 +24,12 @@ router.get(
   requireRoleLevel(100),
   asyncHandler(async (req, res) => {
     const admin_id = req.user.user_id
-    const { trend_days } = req.query
+    const { trend_days, item_type } = req.query
 
-    logger.info('[B2C兑换-统计] 查询统计数据', { admin_id, trend_days })
+    logger.info('[B2C兑换-统计] 查询统计数据', { admin_id, trend_days, item_type })
 
     const ExchangeAdminService = req.app.locals.services.getService('exchange_admin')
-    const statistics = await ExchangeAdminService.getMarketItemStatistics({ trend_days })
+    const statistics = await ExchangeAdminService.getMarketItemStatistics({ trend_days, item_type })
 
     logger.info('[B2C兑换-统计] 查询成功', {
       admin_id,

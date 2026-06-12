@@ -117,7 +117,6 @@ const {
   BidQueryService: ExchangeBidQueryService, // 竞价查询服务（列表/详情/历史）
   BarterService: ExchangeBarterService // 以物易物（B2C 官方合成，2026-06-05 合规整改阶段六）
 } = require('./exchange')
-const ExchangeAdminOrderQueryService = require('./exchange/admin/OrderQueryService')
 
 // 注：Auction 域子服务（C2C 用户间竞拍）已随 C2C 下线删除（2026-06-05 阶段五，官方竞价复用 exchange/bid）
 
@@ -332,10 +331,6 @@ class ServiceManager {
       // Exchange 域子服务
       this._services.set('exchange_core', new ExchangeCoreService(this.models)) // 核心兑换操作（需实例化）
       this._services.set('exchange_query', new ExchangeQueryService(this.models)) // 用户端查询服务（需实例化）
-      this._services.set(
-        'exchange_admin_order_query',
-        new ExchangeAdminOrderQueryService(this.models)
-      ) // 管理端订单查询服务
       this._services.set('exchange_admin', new ExchangeAdminService(this.models)) // 管理后台操作（需实例化）
       this._services.set('exchange_bid_core', new ExchangeBidService(this.models)) // 竞价核心服务（出价/结算/取消）
       this._services.set('exchange_bid_query', new ExchangeBidQueryService(this.models)) // 竞价查询服务（列表/详情/历史）

@@ -36,6 +36,7 @@ const { logger } = require('../../utils/logger')
 const BeijingTimeHelper = require('../../utils/timeHelper')
 const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
 const { attachDisplayNames, DICT_TYPES } = require('../../utils/displayNameHelper')
+const { categoryIconAttachmentInclude } = require('../../utils/mediaAttachmentGallery')
 const models = require('../../models')
 const LotteryPricingService = require('../lottery/LotteryPricingService')
 
@@ -95,7 +96,9 @@ class LotteryQueryService {
                 model: models.MaterialAssetType,
                 as: 'materialAssetType',
                 required: false,
-                attributes: ['asset_code', 'display_name']
+                attributes: ['asset_code', 'display_name'],
+                // P3：与 /assets/balances 同源——materialAssetType 的图标附件，统一图标真相源
+                include: [categoryIconAttachmentInclude(models)].filter(Boolean)
               }
             ]
           }

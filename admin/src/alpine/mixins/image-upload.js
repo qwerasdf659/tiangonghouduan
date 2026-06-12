@@ -45,10 +45,16 @@ import { logger } from '../../utils/logger.js'
 const DEFAULT_ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
 
 /**
- * 默认最大文件大小（5MB）
+ * 默认压缩阈值（5MB）：超过此值后端会自动用 sharp 压缩到 5MB 内，前端不再硬拒
  * @constant {number}
  */
 const DEFAULT_MAX_SIZE = 5 * 1024 * 1024
+
+/**
+ * 默认上传硬上限（20MB）：与后端 multer 接收上限一致；超过此值前端直接拒绝（过大文件无意义）
+ * @constant {number}
+ */
+const DEFAULT_UPLOAD_CEILING = 20 * 1024 * 1024
 
 /**
  * 图片上传 Mixin 工厂函数
@@ -59,7 +65,11 @@ const DEFAULT_MAX_SIZE = 5 * 1024 * 1024
  * @returns {Object} Alpine.js mixin 数据和方法
  */
 export function imageUploadMixin(config = {}) {
-  const { allowed_types = DEFAULT_ALLOWED_TYPES, max_size = DEFAULT_MAX_SIZE } = config
+  const {
+    allowed_types = DEFAULT_ALLOWED_TYPES,
+    max_size = DEFAULT_MAX_SIZE,
+    upload_ceiling = DEFAULT_UPLOAD_CEILING
+  } = config
 
   return {
     /** @type {boolean} 图片是否正在上传中 */
@@ -90,11 +100,16 @@ export function imageUploadMixin(config = {}) {
         return null
       }
 
-      // 文件大小校验
+      // 文件大小校验：超过硬上限直接拒绝；介于压缩阈值与上限之间则放行（后端自动压缩）
+      if (file.size > upload_ceiling) {
+        const ceilingMB = (upload_ceiling / 1024 / 1024).toFixed(0)
+        this.showError?.(`图片过大，不能超过 ${ceilingMB}MB`)
+        return null
+      }
       if (file.size > max_size) {
         const maxMB = (max_size / 1024 / 1024).toFixed(0)
-        this.showError?.(`图片大小不能超过 ${maxMB}MB`)
-        return null
+        // 超过阈值不再拒绝：提示用户后端会自动压缩
+        this.showInfo?.(`图片超过 ${maxMB}MB，上传时将自动压缩`)
       }
 
       this.image_uploading = true

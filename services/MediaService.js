@@ -84,6 +84,66 @@ class MediaService {
   }
 
   /**
+   * 超限自动压缩：图片超过 MAX_FILE_SIZE 时用 sharp 渐进式降质/限宽，压到限制内。
+   *
+   * 复用项目已有的 sharp 依赖，零新依赖。策略（与存储层 uploadImageWithThumbnails 的格式约定保持一致）：
+   * - 仅处理可重编码的位图（jpeg/png/webp）；gif（可能为动图）不压缩，超限仍按原校验拒绝。
+   * - 限制最大边到 2000px（资产图标/商品图远用不到更大），再逐级降质直到 ≤ 限制。
+   * - 保留原格式族：有透明通道走 png（保留透明），否则走 jpeg；不改变 mimeType 语义，
+   *   避免与存储层"按 hasAlpha 决定 png/jpeg"产生 mime 与实际格式不一致。
+   * - 任一步失败则返回原图（交由 _validateFile 按原逻辑处理），不阻断主流程。
+   *
+   * @param {Buffer} fileBuffer - 原始图片 buffer
+   * @param {string} mimeType - 原始 MIME 类型
+   * @returns {Promise<{ buffer: Buffer, mimeType: string, compressed: boolean }>} 压缩结果
+   */
+  async _compressIfOversized(fileBuffer, mimeType) {
+    const COMPRESSIBLE = ['image/jpeg', 'image/png', 'image/webp']
+    if (fileBuffer.length <= MAX_FILE_SIZE || !COMPRESSIBLE.includes(mimeType)) {
+      return { buffer: fileBuffer, mimeType, compressed: false }
+    }
+    try {
+      const meta = await sharp(fileBuffer).metadata()
+      const hasAlpha = !!meta.hasAlpha
+      const outMime = hasAlpha ? 'image/png' : 'image/jpeg'
+      const qualities = [85, 75, 65, 55]
+      let out = null
+      for (const quality of qualities) {
+        const pipeline = sharp(fileBuffer).resize({
+          width: 2000,
+          height: 2000,
+          fit: 'inside',
+          withoutEnlargement: true
+        })
+        // eslint-disable-next-line no-await-in-loop
+        out = await (hasAlpha
+          ? pipeline.png({ compressionLevel: 9, quality }).toBuffer()
+          : pipeline.jpeg({ quality }).toBuffer())
+        if (out.length <= MAX_FILE_SIZE) {
+          break
+        }
+      }
+      if (out && out.length <= MAX_FILE_SIZE) {
+        _logger.info('MediaService: 图片超限已自动压缩', {
+          original_size: fileBuffer.length,
+          compressed_size: out.length,
+          original_mime: mimeType,
+          output_mime: outMime
+        })
+        return { buffer: out, mimeType: outMime, compressed: true }
+      }
+      _logger.warn('MediaService: 自动压缩后仍超限，回退原图按校验处理', {
+        original_size: fileBuffer.length,
+        best_size: out ? out.length : null
+      })
+      return { buffer: fileBuffer, mimeType, compressed: false }
+    } catch (err) {
+      _logger.warn('MediaService: 自动压缩失败，回退原图', { error: err.message })
+      return { buffer: fileBuffer, mimeType, compressed: false }
+    }
+  }
+
+  /**
    * 核心上传方法
    *
    * @param {Buffer} fileBuffer - 文件内容
@@ -104,32 +164,40 @@ class MediaService {
   async upload(fileBuffer, options = {}) {
     const folder = options.folder || 'uploads'
     const originalName = options.original_name || 'image.jpg'
-    const mimeType = options.mime_type || 'image/jpeg'
+    let mimeType = options.mime_type || 'image/jpeg'
     const uploadedBy = options.uploaded_by ?? null
     const trimTransparent = options.trim_transparent ?? false
 
-    this._validateFile(mimeType, fileBuffer.length)
+    /*
+     * 超限自动压缩（2026-06-13）：图片超过 5MB 时先用 sharp 压缩到限制内，
+     * 而非直接拒绝。压缩后再走原有格式/大小校验。复用现有 sharp，惠及所有上传入口。
+     */
+    const compressResult = await this._compressIfOversized(fileBuffer, mimeType)
+    const workingBuffer = compressResult.buffer
+    mimeType = compressResult.mimeType
+
+    this._validateFile(mimeType, workingBuffer.length)
 
     /*
      * 0. 裁剪透明边距（DIY 素材图等场景）
      *    上传时一次性处理，下游消费端拿到的永远是可直接使用的图
      */
-    let processedBuffer = fileBuffer
+    let processedBuffer = workingBuffer
     if (trimTransparent && (mimeType === 'image/png' || mimeType === 'image/webp')) {
       try {
-        const trimResult = await sharp(fileBuffer)
+        const trimResult = await sharp(workingBuffer)
           .trim({ background: { r: 0, g: 0, b: 0, alpha: 0 }, threshold: 30 })
           .toBuffer({ resolveWithObject: true })
         processedBuffer = trimResult.data
         _logger.info('MediaService: 已裁剪透明边距', {
-          original_size: fileBuffer.length,
+          original_size: workingBuffer.length,
           trimmed_size: processedBuffer.length,
           trimmed_width: trimResult.info.width,
           trimmed_height: trimResult.info.height
         })
       } catch (trimErr) {
         _logger.warn('MediaService: 裁剪透明边距失败，使用原图', { error: trimErr.message })
-        processedBuffer = fileBuffer
+        processedBuffer = workingBuffer
       }
     }
 

@@ -19,6 +19,12 @@ import { loadECharts } from '../../../utils/echarts-lazy.js'
  */
 export function useExchangeStatsState() {
   return {
+    /**
+     * 频道筛选标识（可选）：设为 'prop' 时统计仅道具商城（星石轨），
+     * 不设置（undefined）时统计全兑换市场。由页面组件按需注入。
+     * @type {string|undefined}
+     */
+    statsItemType: undefined,
     /** @type {Object} 兑换统计数据 */
     exchangeStats: {
       orders: { total: 0, pending: 0, completed: 0, shipped: 0, cancelled: 0 },
@@ -65,9 +71,16 @@ export function useExchangeStatsMethods() {
     async loadExchangeStats() {
       try {
         this.loading = true
+        /*
+         * 频道筛选（道具商城/星石轨）：当组件设置了 this.statsItemType（如 'prop'）时，
+         * 透传给后端 stats 接口做服务端聚合；兑换市场不设置该值，行为完全不变（全市场聚合）。
+         */
+        const params = {}
+        if (this.statsItemType) params.item_type = this.statsItemType
         const statsRes = await request({
           url: EXCHANGE_ENDPOINTS.STATS,
-          method: 'GET'
+          method: 'GET',
+          params
         })
 
         if (!statsRes.success || !statsRes.data) {

@@ -244,6 +244,19 @@ class CoreService {
       throw new BusinessError('商品已下架', 'EXCHANGE_ERROR', 400)
     }
 
+    /*
+     * 每单数量上限校验（议题四·P6=A，2026-06-12）：读商品级可配列 max_quantity_per_order，
+     * 替代历史在路由层硬编码的「1-10」魔术数字。业务规则后端权威、商品级可配、单一真相源。
+     */
+    const maxQtyPerOrder = Number(product.max_quantity_per_order) || 10
+    if (quantity > maxQtyPerOrder) {
+      throw new BusinessError(
+        `兑换数量超过每单上限（最多 ${maxQtyPerOrder} 件）`,
+        'EXCHANGE_ERROR',
+        400
+      )
+    }
+
     const productSku = await this.ExchangeItemSku.findOne({
       where: { sku_id, exchange_item_id, status: 'active' },
       lock: transaction.LOCK.UPDATE,
@@ -573,7 +586,11 @@ class CoreService {
               item_type: template.item_type || 'product',
               source: 'exchange',
               source_ref_id: String(record.exchange_record_id),
-              item_name: template.display_name || itemName,
+              /*
+               * P4（2026-06-12）：铸造物品名取「兑换商品名」(exchange_items.item_name)，所见即所得 + 成交快照。
+               * 不再用模板 display_name（曾导致兑"衣服"背包却显示模板名"毛巾礼盒"，用户搜不到）。
+               */
+              item_name: itemName,
               item_description: template.description || itemDescription,
               item_value: 0,
               prize_definition_id: null,
@@ -622,14 +639,17 @@ class CoreService {
           })
         }
       } catch (mintError) {
-        if (mintError.message?.includes('限量售罄')) {
-          throw mintError
-        }
-        logger.error('[兑换市场] ❌ 物品铸造失败（非致命，订单仍创建）', {
+        /*
+         * P5（2026-06-12）：铸造失败即抛、整单事务回滚。
+         * 此函数运行在 TransactionManager.execute 事务内，抛错会回滚资产扣减，杜绝"扣款成功但无物品"资损。
+         * 不再吞异常当"非致命"（曾导致铸造失败仍返回成功、用户扣了资产却拿不到物品）。
+         */
+        logger.error('[兑换市场] ❌ 物品铸造失败，整单回滚', {
           error: mintError.message,
           exchange_item_id,
           order_no
         })
+        throw mintError
       }
     }
 

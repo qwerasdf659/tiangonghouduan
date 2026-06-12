@@ -585,18 +585,20 @@
                 <p class="text-xs themed-text-muted mt-1">层级越高价值越大</p>
               </div>
             </div>
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-2 gap-4" x-show="materialTypeAddForm.form !== 'quota'">
               <div>
                 <label class="block text-sm font-medium themed-text-secondary mb-1">可见价值（积分） <span class="text-red-500">*</span></label>
-                <input type="number" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeAddForm.visible_value_points" required min="0" placeholder="如: 10">
+                <input type="number" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeAddForm.visible_value_points" :required="materialTypeAddForm.form !== 'quota'" min="0" placeholder="如: 10">
                 <p class="text-xs themed-text-muted mt-1">用于用户展示和说明</p>
               </div>
               <div>
                 <label class="block text-sm font-medium themed-text-secondary mb-1">预算价值（积分） <span class="text-red-500">*</span></label>
-                <input type="number" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeAddForm.budget_value_points" required min="0" placeholder="如: 10">
+                <input type="number" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeAddForm.budget_value_points" :required="materialTypeAddForm.form !== 'quota'" min="0" placeholder="如: 10">
                 <p class="text-xs themed-text-muted mt-1">用于系统成本控制</p>
               </div>
             </div>
+            <!-- 配额类（form=quota，如预算积分/星石配额）为系统内部记账单位，不作为奖品发放、不参与积分计价，故不需要价值积分 -->
+            <p x-show="materialTypeAddForm.form === 'quota'" class="text-xs themed-text-muted">配额类资产为系统内部记账单位，不参与积分计价，无需填写价值积分。</p>
             <div class="grid grid-cols-2 gap-4">
               <div>
                 <label class="block text-sm font-medium themed-text-secondary mb-1">排序权重</label>
@@ -609,6 +611,26 @@
                   <option value="0">禁用</option>
                 </select>
               </div>
+            </div>
+            <!-- 资产图标上传（议题二·单一图标真相源：抽奖/商城/背包/余额四端同步） -->
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">资产图标</label>
+              <div class="flex items-center space-x-3">
+                <div class="w-14 h-14 rounded-lg border themed-bg-subtle flex items-center justify-center overflow-hidden">
+                  <template x-if="materialTypeIconPreviewUrl">
+                    <img :src="materialTypeIconPreviewUrl" alt="图标预览" class="w-full h-full object-contain">
+                  </template>
+                  <template x-if="!materialTypeIconPreviewUrl">
+                    <span class="text-xs themed-text-muted">无图</span>
+                  </template>
+                </div>
+                <label class="px-3 py-2 themed-bg-muted themed-text-secondary rounded-lg cursor-pointer hover:bg-gray-300 text-sm">
+                  <span x-show="!image_uploading">选择图片上传</span>
+                  <span x-show="image_uploading">上传中...</span>
+                  <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" class="hidden" @change="uploadMaterialTypeIcon($event, 'add')" :disabled="image_uploading">
+                </label>
+              </div>
+              <p class="text-xs themed-text-muted mt-1">支持 JPG/PNG/GIF/WebP，≤5MB；上传后抽奖、兑换/道具商城、背包、资产余额四处同步使用</p>
             </div>
           </div>
           <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-3">
@@ -666,22 +688,44 @@
                 <input type="number" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeEditForm.sort_order">
               </div>
             </div>
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-2 gap-4" x-show="materialTypeEditForm.form !== 'quota'">
               <div>
-                <label class="block text-sm font-medium themed-text-secondary mb-1">可见价值（积分） <span class="text-red-500">*</span></label>
-                <input type="number" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeEditForm.visible_value_points" required min="0">
+                <label class="block text-sm font-medium themed-text-secondary mb-1">可见价值（积分）</label>
+                <input type="number" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeEditForm.visible_value_points" min="0" placeholder="留空则保持原值">
               </div>
               <div>
-                <label class="block text-sm font-medium themed-text-secondary mb-1">预算价值（积分） <span class="text-red-500">*</span></label>
-                <input type="number" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeEditForm.budget_value_points" required min="0">
+                <label class="block text-sm font-medium themed-text-secondary mb-1">预算价值（积分）</label>
+                <input type="number" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeEditForm.budget_value_points" min="0" placeholder="留空则保持原值">
               </div>
             </div>
+            <!-- 配额类（form=quota）为系统内部记账单位，不参与积分计价，无需价值积分 -->
+            <p x-show="materialTypeEditForm.form === 'quota'" class="text-xs themed-text-muted">配额类资产为系统内部记账单位，不参与积分计价，无需填写价值积分。</p>
             <div>
               <label class="block text-sm font-medium themed-text-secondary mb-1">启用状态</label>
               <select class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" x-model="materialTypeEditForm.is_enabled">
                 <option value="1">启用</option>
                 <option value="0">禁用</option>
               </select>
+            </div>
+            <!-- 资产图标上传（议题二·单一图标真相源：抽奖/商城/背包/余额四端同步） -->
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">资产图标</label>
+              <div class="flex items-center space-x-3">
+                <div class="w-14 h-14 rounded-lg border themed-bg-subtle flex items-center justify-center overflow-hidden">
+                  <template x-if="materialTypeIconPreviewUrl">
+                    <img :src="materialTypeIconPreviewUrl" alt="图标预览" class="w-full h-full object-contain">
+                  </template>
+                  <template x-if="!materialTypeIconPreviewUrl">
+                    <span class="text-xs themed-text-muted">无图</span>
+                  </template>
+                </div>
+                <label class="px-3 py-2 themed-bg-muted themed-text-secondary rounded-lg cursor-pointer hover:bg-gray-300 text-sm">
+                  <span x-show="!image_uploading">更换图标</span>
+                  <span x-show="image_uploading">上传中...</span>
+                  <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" class="hidden" @change="uploadMaterialTypeIcon($event, 'edit')" :disabled="image_uploading">
+                </label>
+              </div>
+              <p class="text-xs themed-text-muted mt-1">上传新图后保存即生效；抽奖、兑换/道具商城、背包、资产余额四处自动同步（不传则保持原图）</p>
             </div>
           </div>
           <div class="p-4 border-t themed-bg-base rounded-b-lg flex justify-end space-x-3">

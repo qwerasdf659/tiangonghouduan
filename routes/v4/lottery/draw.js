@@ -38,6 +38,7 @@ const { handleServiceError } = require('../../../middleware/validation')
  * const IdempotencyService = require('../../../services/IdempotencyService')
  */
 const LotteryDrawFormatter = require('../../../utils/formatters/LotteryDrawFormatter')
+const { resolveMaterialIconUrls } = require('../../../utils/mediaAttachmentGallery')
 const { requestDeduplication, lotteryRateLimiter } = require('./middleware')
 // 事务边界治理（2026-01-05 决策）- 统一事务管理器
 const TransactionManager = require('../../../utils/TransactionManager')
@@ -213,6 +214,18 @@ router.post(
       )
 
       // 对抽奖结果进行脱敏处理（V4.0语义更新）
+      /*
+       * P3 图标单一真相源：批量解析中奖材料资产的图标 URL（material_asset_types 附件，与 /assets/balances 同源），
+       * 替代历史拼 /admin/assets/icons/materials/*.png 静态文件，确保抽奖弹窗与商城/背包同图。
+       */
+      const drawMaterialCodes = drawResult.prizes
+        .map(p => p.prize?.material_asset_code)
+        .filter(Boolean)
+      const materialIconMap = await resolveMaterialIconUrls(
+        req.app.locals.models,
+        drawMaterialCodes
+      )
+
       const sanitizedResult = {
         success: drawResult.success,
         campaign_code: campaign.campaign_code,
@@ -227,14 +240,18 @@ router.post(
           const rawValue = prize.prize?.value
           const prizeValue = typeof rawValue === 'number' ? rawValue : parseFloat(rawValue) || 0
 
-          // 生成奖品图片 URL（与 prizes 列表接口保持一致）
+          // 生成奖品图片 URL（P3：与 prizes 列表/余额接口同源，读 material_asset_types 图标附件）
           const materialCode = prize.prize?.material_asset_code || null
           let prizeImage = null
           if (materialCode) {
-            const iconFileName = materialCode.replace(/_/g, '-') + '.png'
-            const baseUrl = process.env.PUBLIC_BASE_URL || ''
-            const iconUrl = `${baseUrl}/admin/assets/icons/materials/${iconFileName}`
-            prizeImage = { url: iconUrl, thumbnail_url: iconUrl, source: 'material_icon' }
+            const iconUrl = materialIconMap.get(materialCode) || null
+            if (iconUrl) {
+              prizeImage = {
+                url: iconUrl,
+                thumbnail_url: iconUrl,
+                source: 'material_asset_type_icon'
+              }
+            }
           }
 
           return {

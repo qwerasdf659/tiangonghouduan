@@ -238,7 +238,7 @@
  * @property {number} lottery_preset_id - 预设ID
  * @property {number|null} lottery_campaign_prize_id - 活动奖品关联ID（未中奖时为 null）
  * @property {string|null} prize_name - 奖品名称
- * @property {'points'|'coupon'|'physical'|'virtual'|'service'|'product'|'special'|null} prize_type - 奖品类型
+ * @property {'material'|'item'|'coupon'|'points'|null} prize_type - 奖品类型（与 prize_definitions 同词表）
  * @property {number|null} prize_value - 奖品价值
  * @property {'high'|'mid'|'low'|'fallback'|'unknown'} reward_tier - 奖励档位
  * @property {'high'|'mid'|'low'|'fallback'|null} final_tier - 最终档位（经策略调整后）

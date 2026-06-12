@@ -121,7 +121,6 @@ export function notificationCenter() {
     unreadCount: 0,
     soundEnabled: true,
     audioContext: null,
-    notificationSound: null,
     socket: null,
     wsConnected: false,
     wsReconnectAttempts: 0,
@@ -417,16 +416,6 @@ export function notificationCenter() {
           }
         })
       }
-    },
-
-    scheduleReconnect() {
-      if (this.wsReconnectAttempts >= this.maxReconnectAttempts) {
-        logger.warn('[NotificationCenter] Socket.IO 重连次数已达上限，将使用轮询降级')
-        return
-      }
-      logger.debug(
-        `[NotificationCenter] Socket.IO 将自动重连 (已尝试${this.wsReconnectAttempts}次)`
-      )
     },
 
     startPolling() {

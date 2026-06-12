@@ -95,6 +95,8 @@ export function useRolesPermissionsState() {
     },
     /** @type {Object} 用户角色分配表单（手机号主导搜索） */
     userRoleForm: { mobile: '', role_name: '', reason: '' },
+    /** @type {string} 「更改角色」时的当前角色名（用于弹窗提示），分配新用户时为空 */
+    changeRoleCurrentName: '',
     /** @type {Object|null} 待删除的角色 */
     roleToDelete: null,
     /** @type {Object|null} 选中的角色（用于权限查看） */
@@ -511,10 +513,33 @@ export function useRolesPermissionsMethods() {
      */
     openAssignRoleModal() {
       this.userRoleForm = { mobile: '', role_name: '', reason: '' }
+      this.changeRoleCurrentName = ''
       // 确保角色列表已加载
       if (!this.roles || this.roles.length === 0) {
         this.loadRoles()
       }
+      this.showModal('assignRoleModal')
+    },
+
+    /**
+     * 打开「更改角色」模态框（复用分配角色弹窗，预填该用户手机号与当前角色）
+     *
+     * 修改已有账号的角色绑定：从用户角色列表某行进入，预填手机号 + 当前角色，
+     * 管理员选新角色后提交（走 submitAssignRole → PUT UPDATE_ROLE，零后端改动）。
+     * @param {Object} userRole - 用户角色列表行（含 user/role/mobile 等）
+     */
+    openChangeRoleModal(userRole) {
+      const mobile = userRole?.user?.mobile || userRole?.mobile || ''
+      const currentRoleName = userRole?.role?.role_name || userRole?.role_name || ''
+      this.userRoleForm = { mobile, role_name: '', reason: '' }
+      // 预解析用户用于弹窗内回显（手机号已知，直接带出当前账号信息）
+      if (mobile) {
+        this.resolveUserByMobile(mobile)
+      }
+      if (!this.roles || this.roles.length === 0) {
+        this.loadRoles()
+      }
+      this.changeRoleCurrentName = currentRoleName
       this.showModal('assignRoleModal')
     },
 
@@ -553,36 +578,6 @@ export function useRolesPermissionsMethods() {
       } finally {
         this.saving = false
       }
-    },
-
-    /**
-     * 更改用户角色（快捷操作）
-     * @param {Object} userRole - 用户角色记录
-     * @param {string} newRoleName - 新角色名称
-     */
-    async changeUserRole(userRole, newRoleName) {
-      if (!newRoleName) return
-
-      // 获取当前角色名称
-      const currentRoleName = userRole.role?.role_name || userRole.role_name || '未知'
-
-      await this.confirmAndExecute(
-        `确定将用户「${userRole.user?.nickname || userRole.user_id}」的角色从「${currentRoleName}」更改为「${newRoleName}」？`,
-        async () => {
-          const url = buildURL(USER_ENDPOINTS.UPDATE_ROLE, { user_id: userRole.user_id })
-          const response = await this.apiCall(url, {
-            method: 'PUT',
-            data: {
-              role_name: newRoleName,
-              reason: `角色变更：${currentRoleName} -> ${newRoleName}`
-            }
-          })
-          if (response?.success) {
-            await this.loadUserRoles()
-          }
-        },
-        { successMessage: '角色更新成功' }
-      )
     },
 
     // ==================== 角色权限查看 ====================

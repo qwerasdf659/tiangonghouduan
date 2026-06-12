@@ -915,6 +915,12 @@
             <input type="number" x-model.number="itemForm.stock_alert_threshold" min="0" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500" placeholder="0 表示不告警">
             <p class="text-xs themed-text-muted mt-1">低于此值时系统自动创建库存预警通知，0=不告警</p>
           </div>
+          <!-- 每单兑换数量上限（议题四·P6=A：商品级可配，替代历史硬编码 1-10） -->
+          <div>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">每单兑换数量上限</label>
+            <input type="number" x-model.number="itemForm.max_quantity_per_order" min="1" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500" placeholder="默认 10">
+            <p class="text-xs themed-text-muted mt-1">单次兑换最多可兑数量（≥1）；限量款可设小值，提交时后端据此校验</p>
+          </div>
           <!-- 商品参数表（结构化属性JSON） -->
           <div>
             <label class="block text-sm font-medium themed-text-secondary mb-1">商品参数表</label>

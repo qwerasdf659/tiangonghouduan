@@ -88,4 +88,45 @@ function categoryIconAttachmentInclude(models) {
   }
 }
 
-module.exports = { fetchProductMediaGallery, categoryIconAttachmentInclude }
+/**
+ * 按 asset_code 批量解析「材料资产图标 URL」——抽奖图/余额图/背包图统一图标真相源（P3）
+ *
+ * 单一来源：material_asset_types → MediaAttachment(iconAttachment) → media_files.object_key → getImageUrl。
+ * 供抽奖结果(routes/v4/lottery/draw.js)、余额(routes/v4/assets/balance.js)等多处复用，避免各自拼静态文件地址。
+ *
+ * @param {Object} models - Sequelize models（需含 MaterialAssetType、MediaAttachment、MediaFile）
+ * @param {string[]} assetCodes - 资产码数组（如 ['star_stone','red_core_shard']）
+ * @returns {Promise<Map<string,string|null>>} asset_code → icon_url（无附件时为 null）
+ */
+async function resolveMaterialIconUrls(models, assetCodes) {
+  const { MaterialAssetType, MediaAttachment, MediaFile } = models
+  const map = new Map()
+  if (!MaterialAssetType || !MediaAttachment || !MediaFile) {
+    return map
+  }
+  const codes = [...new Set((assetCodes || []).filter(Boolean))]
+  if (codes.length === 0) {
+    return map
+  }
+  const { Op } = require('sequelize')
+  const rows = await MaterialAssetType.findAll({
+    where: { asset_code: { [Op.in]: codes } },
+    attributes: ['asset_code'],
+    include: [categoryIconAttachmentInclude({ MediaAttachment, MediaFile })].filter(Boolean)
+  })
+  rows.forEach(row => {
+    const plain = row.get ? row.get({ plain: true }) : row
+    const media = plain.iconAttachment?.media || plain.iconAttachment?.Media
+    map.set(
+      plain.asset_code,
+      media?.object_key ? getImageUrl(media.object_key, media.content_hash) : null
+    )
+  })
+  return map
+}
+
+module.exports = {
+  fetchProductMediaGallery,
+  categoryIconAttachmentInclude,
+  resolveMaterialIconUrls
+}

@@ -16,10 +16,16 @@ const { asyncHandler } = require('../shared/middleware')
 /**
  * Multer 配置：内存存储，5MB，jpeg/png/gif/webp
  */
+/*
+ * multer 接收上限提高到 20MB：让超过 5MB 的原图也能到达服务器，
+ * 由 MediaService.upload 内的 sharp 自动压缩到 5MB 以内（压不下去才拒绝）。
+ * 20MB 是接收护栏，防止超大文件占满内存。
+ */
 const storage = multer.memoryStorage()
+const UPLOAD_MAX_BYTES = 20 * 1024 * 1024
 const uploadSingle = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: UPLOAD_MAX_BYTES },
   fileFilter: (req, file, cb) => {
     const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
     if (allowed.includes(file.mimetype)) cb(null, true)
@@ -28,7 +34,7 @@ const uploadSingle = multer({
 })
 const uploadBatch = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: UPLOAD_MAX_BYTES },
   fileFilter: (req, file, cb) => {
     const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
     if (allowed.includes(file.mimetype)) cb(null, true)
