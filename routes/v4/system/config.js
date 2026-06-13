@@ -13,22 +13,10 @@
  * - 前端调用成功后存一份到本地（断网兜底），失败时读上次存的数据
  * - 响应包含 version 字段（基于 updated_at 时间戳），供前端缓存模块对比版本
  *
- * system_settings 表 15 个 category（2026-04-22 真实数据库快照）：
- * - ad_pricing: 广告定价配置
- * - ad_system: 广告系统配置
- * - auction: 竞拍系统配置
- * - backpack: 背包系统配置
- * - basic: 基础设置（系统名称、客服信息等）
- * - batch_operation: 批量操作配置
- * - customer_service: 客服系统配置
- * - exchange: 兑换系统配置
- * - feature: 功能开关配置
- * - general: 通用配置
- * - marketplace: 市场配置
- * - notification: 通知配置
- * - points: 积分配置
- * - redemption: 核销配置
- * - security: 安全配置
+ * system_settings 表 category（2026-06-14 真实数据库快照对齐）：
+ * - ad_pricing / ad_system / backpack / basic / batch_operation / customer_service
+ * - dispute / exchange / feature / general / notification / points / redemption / security
+ * 注：marketplace / auction 已随 C2C 合规下线移除（库中 0 条），公开白名单不再包含。
  *
  * 安全说明：
  * - 位置配置不含敏感信息（仅包含 campaign_code、页面、位置、尺寸、优先级）
@@ -52,18 +40,29 @@ router.use(getRateLimiter().createLimiter('public_read'))
 /**
  * 小程序前端可访问的公开配置项白名单
  *
- * 按 category 分组，仅白名单内的 key 会通过公开 API 返回
- * 敏感 category（security、batch_operation 等）不在此列
+ * 按 category 分组，仅白名单内的 key 会通过公开 API 返回。
+ * 敏感 category（security、batch_operation 等）不在此列。
+ *
+ * ⚠️ 白名单必须与真实库 system_settings 的 category/key 对齐：
+ * - 只列「真实存在 + 适合公开下发给小程序」的 key（避免对已下线分类做无效校验 / 空拉）。
+ * - 2026-06-14 校准：原残留的 marketplace（C2C 已下线、库中 0 条）已移除，
+ *   原 feature/general/points/notification 下所列 key 在真实库均不存在，一并移除；
+ *   维护模式相关 key 实际归属 basic 分类，纳入 basic 白名单。
  *
  * @type {Object<string, string[]>}
  */
 const PUBLIC_SETTING_KEYS = {
-  basic: ['system_name', 'system_version', 'customer_email', 'customer_phone', 'customer_wechat'],
-  feature: ['marketplace_enabled', 'exchange_enabled', 'auction_enabled', 'diy_enabled'],
-  general: ['maintenance_mode', 'announcement_text'],
-  marketplace: ['marketplace_fee_rate', 'marketplace_min_price'],
-  points: ['daily_sign_in_points', 'points_expiry_days'],
-  notification: ['push_enabled']
+  // basic：系统名称/版本、客服联系方式、维护模式（小程序联系客服页/维护提示用）
+  basic: [
+    'system_name',
+    'system_version',
+    'customer_email',
+    'customer_phone',
+    'customer_wechat',
+    'maintenance_mode',
+    'maintenance_message',
+    'maintenance_end_time'
+  ]
 }
 
 /**

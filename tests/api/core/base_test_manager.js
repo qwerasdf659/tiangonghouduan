@@ -411,7 +411,12 @@ class BaseTestManager {
    * @returns {Promise<Object>} 登录数据（包含 access_token 和 user 对象）
    */
   async authenticate_user(user_type = 'regular') {
-    const mobile = '13612227930' // 测试账号：既是用户也是管理员
+    /*
+     * 测试账号区分权限级别（与真实库角色一致）：
+     * - admin：超级管理员 13612227910（admin:100/super_admin:110），用于后台管理接口
+     * - regular/user：普通测试用户 13612227930（regional_manager:80）
+     */
+    const mobile = user_type === 'admin' ? '13612227910' : '13612227930'
     const token_type = user_type === 'admin' ? 'admin' : 'user'
 
     const result = await this.authenticate(mobile, '123456', token_type)

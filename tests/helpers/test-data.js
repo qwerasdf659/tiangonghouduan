@@ -40,6 +40,20 @@ function getTestUserId() {
 }
 
 /**
+ * 获取动态管理员用户ID（超级管理员 13612227910，role_level>=100）
+ *
+ * @description 从 global.testData.adminUser 获取管理员用户ID，未初始化则返回 null
+ * @returns {number|null} 管理员用户ID
+ */
+function getAdminUserId() {
+  if (global.testData && global.testData.adminUser && global.testData.adminUser.user_id) {
+    return global.testData.adminUser.user_id
+  }
+  console.warn('⚠️ [test-data] global.testData.adminUser.user_id 未初始化')
+  return null
+}
+
+/**
  * 🔴 P0-1修复：获取动态测试活动ID
  *
  * @description 从 global.testData 获取测试活动ID，如果未初始化则返回 null
@@ -75,17 +89,16 @@ const TEST_DATA = {
       }
     },
 
-    // 管理员测试用户（同一账号既是用户也是管理员）
-    // 🔴 P0-1修复：user_id 使用 getter 动态获取
+    // 管理员测试用户（超级管理员 13612227910，role_level>=100，用于后台管理接口测试）
     get adminUser() {
       return {
-        user_id: getTestUserId(), // 🔴 P0-1修复：动态获取，不再硬编码
-        mobile: '13612227930', // 管理员手机号
+        user_id: getAdminUserId(), // 动态获取超管 user_id（区别于普通测试用户）
+        mobile: '13612227910', // 超级管理员手机号（.env SUPER_ADMIN_MOBILE）
         role: 'admin' // 角色：管理员
         /*
-         * 业务含义：管理员用户，用于测试后台管理功能
-         * 使用场景：商家审核、订单管理、数据统计等
-         * 注意：在真实系统中,同一账号可能同时拥有用户和管理员权限
+         * 业务含义：超级管理员用户（role_level>=100），用于测试后台管理功能
+         * 使用场景：商家审核、订单管理、竞价管理、数据统计等需要管理员权限的接口
+         * 注意：与普通测试用户 13612227930（regional_manager:80）是不同账号，权限不同
          */
       }
     }
@@ -579,9 +592,54 @@ const testScenarios = {
   }
 }
 
+/*
+ * ==========================================
+ * 🔐 测试账号角色契约表（单一真相源 - 2026-06-14 新增）
+ * ==========================================
+ *
+ * 设计目的（解决长期技术债）：
+ * - 历史问题：96 个测试文件各自内联硬编码 mobile（如 '13612227930'），
+ *   换账号要改几十个文件；且常误把 regional_manager(80) 当管理员用 →
+ *   访问 requireRoleLevel(100) 接口被后端正确拒绝(403) → 测试整片失败。
+ * - 解决方案：所有测试账号在此处「按角色语义」集中定义，
+ *   测试只声明「我要一个 admin / 一个普通 user」，不再关心具体手机号。
+ *   换账号只改这一处即可全局生效。
+ *
+ * 真实库核对（restaurant_points_dev，2026-06-14 通过 Node.js+Sequelize 实连核对）：
+ *   13612227910 → admin(100)+super_admin(110)，maxRoleLevel=110  ← 真正的管理员
+ *   13612227930 → regional_manager(80)，maxRoleLevel=80          ← 区域经理（非管理员！）
+ *   13612227911 → user(0)
+ *
+ * 字段说明：
+ * - mobile：登录手机号（业务标识，开发/测试环境万能验证码 123456）
+ * - expected_role_level：该账号在真实库中应有的最高 role_level（启动时由 jest.setup.js 校验，防止角色漂移）
+ * - description：业务语义说明，便于团队成员理解该账号用途
+ */
+const TEST_ACCOUNTS = {
+  // 超级管理员：role_level>=100，用于所有后台管理接口（requireRoleLevel(100)）测试
+  admin: {
+    mobile: '13612227910',
+    expected_role_level: 100, // 真实库 110（admin+super_admin），断言 >= 100 即视为管理员
+    description: '超级管理员（admin+super_admin），用于 Console 后台管理接口测试'
+  },
+  // 区域经理：role_level=80，用于商家域/区域级权限测试（注意：不是管理员）
+  regional_manager: {
+    mobile: '13612227930',
+    expected_role_level: 80,
+    description: '区域经理（regional_manager:80），用于区域级业务测试，无管理员权限'
+  },
+  // 普通用户：role_level=0，用于 C 端用户场景（抽奖/积分/兑换等）测试
+  user: {
+    mobile: '13612227911',
+    expected_role_level: 0,
+    description: '普通用户（user:0），用于 C 端用户身份测试'
+  }
+}
+
 // 导出测试数据
 module.exports = {
   TEST_DATA, // 静态测试数据（只读）
+  TEST_ACCOUNTS, // 🔐 测试账号角色契约表（单一真相源）
   createTestData, // 测试数据工厂（创建副本）
   validateTestData, // 测试数据验证工具
   testDataGenerator, // 测试数据生成器（批量生成）

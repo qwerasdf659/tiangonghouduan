@@ -23,6 +23,7 @@
 const express = require('express')
 const router = express.Router()
 const multer = require('multer')
+const path = require('path')
 const logger = require('../../../utils/logger').logger
 const { authenticateToken } = require('../../../middleware/auth')
 const { handleServiceError } = require('../../../middleware/validation')
@@ -45,6 +46,34 @@ const chatImageUpload = multer({
       cb(null, true)
     } else {
       cb(new Error(`不支持的文件类型：${file.mimetype}，仅支持 jpg/png/gif/webp`), false)
+    }
+  }
+})
+
+/**
+ * Multer 中间件（聊天文件 file 上传）
+ *
+ * 文件暂存内存，直接上传到 Sealos 对象存储，不落本地磁盘。
+ * 安全：扩展名 + MIME 双重白名单校验，禁止可执行/脚本类文件。
+ */
+const chatFileUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: businessConfig.chat.file_upload.max_file_size // 20MB 限制
+  },
+  fileFilter: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).replace('.', '').toLowerCase()
+    const mimeOk = businessConfig.chat.file_upload.allowed_mime_types.includes(file.mimetype)
+    const extOk = businessConfig.chat.file_upload.allowed_extensions.includes(ext)
+    if (mimeOk && extOk) {
+      cb(null, true)
+    } else {
+      cb(
+        new Error(
+          `不支持的文件类型：${file.originalname}（${file.mimetype}），仅支持 ${businessConfig.chat.file_upload.allowed_extensions.join('/')}`
+        ),
+        false
+      )
     }
   }
 })
@@ -250,7 +279,7 @@ router.get('/chat/sessions/:id/messages', authenticateToken, async (req, res) =>
 router.post('/chat/sessions/:id/messages', authenticateToken, async (req, res) => {
   try {
     const sessionId = req.params.id
-    const { content, message_type = 'text' } = req.body
+    const { content, message_type = 'text', file_name, file_size } = req.body
     const businessConfig = require('../../../config/business.config')
 
     // 频率限制检查（Rate Limit Check）
@@ -321,7 +350,10 @@ router.post('/chat/sessions/:id/messages', authenticateToken, async (req, res) =
         {
           user_id: userId,
           content: sanitized_content,
-          message_type
+          message_type,
+          // 文件消息元信息（仅 message_type=file 时透传）
+          file_name: message_type === 'file' ? file_name : undefined,
+          file_size: message_type === 'file' ? file_size : undefined
         },
         { transaction }
       )
@@ -355,7 +387,10 @@ router.post('/chat/sessions/:id/messages', authenticateToken, async (req, res) =
         customer_service_session_id: message.customer_service_session_id,
         content: message.content,
         message_type: message.message_type,
-        sent_at: message.created_at
+        file_name: message.file_name,
+        file_size: message.file_size,
+        sent_at: message.created_at,
+        sent_at_beijing: message.created_at_beijing
       },
       '消息发送成功'
     )
@@ -502,6 +537,87 @@ router.post(
 
       logger.error('❌ 聊天图片上传失败:', error)
       return handleServiceError(error, res, '聊天图片上传失败')
+    }
+  }
+)
+
+/**
+ * @route POST /api/v4/system/chat/sessions/:id/upload-file
+ * @desc 上传聊天文件（文档/压缩包），返回文件 URL + 元信息；前端再以 message_type='file' 发送
+ * @access Private（登录用户，会话归属校验）
+ *
+ * 表单字段名：file（form-data）
+ * 安全：扩展名 + MIME 双重白名单（businessConfig.chat.file_upload），最大 20MB，attachment 下载
+ *
+ * @param {number} id - 会话ID（事务实体）
+ * @returns {Object} { file_url, file_name, file_size, object_key }
+ */
+router.post(
+  '/chat/sessions/:id/upload-file',
+  authenticateToken,
+  chatFileUpload.single('file'),
+  async (req, res) => {
+    try {
+      const sessionId = parseInt(req.params.id)
+      const userId = req.user.user_id
+
+      if (!req.file) {
+        return res.apiError('请选择要上传的文件', 'FILE_REQUIRED', null, 400)
+      }
+
+      const CustomerServiceSessionService = req.app.locals.services.getService(
+        'customer_service_session'
+      )
+
+      // 会话归属校验：用户只能上传到自己的会话
+      const session = await CustomerServiceSessionService.getSessionMessages(sessionId, {
+        user_id: userId,
+        page: 1,
+        page_size: 1
+      })
+      if (!session) {
+        return res.apiError('会话不存在或无权操作', 'SESSION_NOT_FOUND', null, 404)
+      }
+
+      const SealosStorageServiceClass = req.app.locals.services.getService('sealos_storage')
+      const storageService =
+        SealosStorageServiceClass instanceof Function
+          ? new SealosStorageServiceClass()
+          : SealosStorageServiceClass
+
+      // 上传到 Sealos 对象存储（chat-files 目录，attachment 下载）
+      const objectKey = await storageService.uploadFile(
+        req.file.buffer,
+        req.file.originalname,
+        businessConfig.chat.file_upload.storage_folder,
+        req.file.mimetype
+      )
+      const fileUrl = storageService.getPublicUrl(objectKey)
+
+      logger.info('📎 聊天文件上传成功', {
+        user_id: userId,
+        session_id: sessionId,
+        object_key: objectKey,
+        file_name: req.file.originalname,
+        file_size: req.file.size,
+        mime_type: req.file.mimetype
+      })
+
+      return res.apiSuccess(
+        {
+          file_url: fileUrl,
+          file_name: req.file.originalname,
+          file_size: req.file.size,
+          object_key: objectKey
+        },
+        '文件上传成功'
+      )
+    } catch (error) {
+      if (error.code === 'LIMIT_FILE_SIZE') {
+        return res.apiError('文件大小不能超过20MB', 'FILE_TOO_LARGE', { max_size: '20MB' }, 413)
+      }
+      logger.error('❌ 聊天文件上传失败:', error)
+      return handleServiceError(error, res, '聊天文件上传失败')
     }
   }
 )

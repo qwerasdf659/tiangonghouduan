@@ -29,6 +29,7 @@ const router = express.Router()
 const feedbackRoutes = require('./feedback') // 用户反馈
 const statusRoutes = require('./status') // 系统状态和配置
 const chatRoutes = require('./chat') // 客服聊天
+const csAgentRoutes = require('./cs-agent') // 小程序简版客服回复端（座席专用）
 const userStatsRoutes = require('./user-stats') // 用户统计和管理员概览
 
 // 数据统计报表路由
@@ -68,6 +69,7 @@ router.use('/', statusRoutes)
 
 // 挂载客服聊天路由
 router.use('/', chatRoutes)
+router.use('/cs-agent', csAgentRoutes) // 小程序简版客服回复端（/api/v4/system/cs-agent/*）
 
 // 挂载用户统计和管理员概览路由
 router.use('/', userStatsRoutes)

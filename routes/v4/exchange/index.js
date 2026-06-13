@@ -290,7 +290,7 @@ router.post(
     }
 
     try {
-      const { exchange_item_id, quantity = 1, sku_id } = req.body
+      const { exchange_item_id, quantity = 1, sku_id, address_id } = req.body
       const user_id = req.user.user_id
 
       logger.info('用户兑换商品请求', {
@@ -298,6 +298,7 @@ router.post(
         exchange_item_id,
         quantity,
         sku_id: sku_id || '(missing)',
+        address_id: address_id || '(none)',
         idempotency_key
       })
 
@@ -350,11 +351,18 @@ router.post(
         return res.apiError('无效的 SKU ID', 'BAD_REQUEST', null, 400)
       }
 
+      // 收货地址 ID 校验（实物邮寄类下单携带，归属校验在 Service 层事务内进行）
+      const parsedAddressId = address_id ? parseInt(address_id, 10) : null
+      if (address_id && (isNaN(parsedAddressId) || parsedAddressId <= 0)) {
+        return res.apiError('无效的收货地址 ID', 'BAD_REQUEST', null, 400)
+      }
+
       // 调用服务层（TransactionManager 统一事务边界）
       const result = await TransactionManager.execute(async transaction => {
         return await ExchangeCoreService.exchangeItem(user_id, itemId, exchangeQuantity, {
           idempotency_key,
           sku_id: parsedSkuId,
+          address_id: parsedAddressId,
           transaction
         })
       })
@@ -816,6 +824,90 @@ router.post(
 )
 
 /**
+ * PUT /api/v4/exchange/orders/:order_no/address
+ *
+ * @description 用户为自己的兑换订单补录/修改收货地址（实物履约）
+ *              主要用于竞价中标的实物订单（异步结算时用户不在场，建单为 pending 无地址，中标后在此补地址）；
+ *              普通实物订单发货前也可改地址。补地址后由运营发货。
+ * @access Private（订单归属用户）
+ *
+ * @param {string} order_no - 订单号
+ * @body {number} address_id - 收货地址主键（须属于本人）
+ *
+ * @returns {Object} { order_no, address_snapshot }
+ */
+router.put(
+  '/orders/:order_no/address',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const ExchangeCoreService = req.app.locals.services.getService('exchange_core')
+    const { order_no } = req.params
+    const { address_id } = req.body
+    const user_id = req.user.user_id
+
+    if (!order_no || order_no.trim().length === 0) {
+      return res.apiError('订单号不能为空', 'BAD_REQUEST', null, 400)
+    }
+    const parsedAddressId = address_id ? parseInt(address_id, 10) : null
+    if (!parsedAddressId || isNaN(parsedAddressId) || parsedAddressId <= 0) {
+      return res.apiError('收货地址 ID 无效', 'BAD_REQUEST', null, 400)
+    }
+
+    try {
+      const result = await TransactionManager.execute(async transaction => {
+        return ExchangeCoreService.updateOrderAddress(user_id, order_no, parsedAddressId, {
+          transaction
+        })
+      })
+      return res.apiSuccess(result, '收货地址已更新')
+    } catch (error) {
+      if (error.code && error.statusCode) {
+        return res.apiError(error.message, error.code, error.data || null, error.statusCode)
+      }
+      return handleServiceError(error, res, '更新收货地址失败')
+    }
+  })
+)
+
+/**
+ * GET /api/v4/exchange/orders/:order_no/contact
+ *
+ * @description 获取本人订单的完整收货联系方式（按需明文，拍板⑤）
+ *              小程序订单详情页用户点击「显示完整」时调用，返回完整收件人姓名/手机号/地址供本人核对。
+ *              默认订单详情下发掩码地址，本接口是唯一返回完整手机号的入口，仅限本人本单。
+ * @access Private（登录用户查看自己订单的联系方式）
+ *
+ * @param {string} order_no - 订单号
+ *
+ * @returns {Object} { contact: { receiver_name, receiver_phone, province, city, district, detail_address } | null }
+ */
+router.get(
+  '/orders/:order_no/contact',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const ExchangeQueryService = req.app.locals.services.getService('exchange_query')
+    const { order_no } = req.params
+    const user_id = req.user.user_id
+
+    if (!order_no || order_no.trim().length === 0) {
+      return res.apiError('订单号不能为空', 'BAD_REQUEST', null, 400)
+    }
+
+    const contact = await ExchangeQueryService.getOrderContact(user_id, order_no)
+
+    // 结构化日志记录本人明文地址访问（用于安全审计追踪，含 request_id 全链路追踪）
+    logger.info('[兑换市场] 用户查看本人订单完整收货联系方式', {
+      request_id: req.id,
+      user_id,
+      order_no,
+      has_contact: !!contact
+    })
+
+    return res.apiSuccess({ contact }, '获取收货联系方式成功')
+  })
+)
+
+/**
  * 用户端查询兑换订单物流轨迹
  * GET /api/v4/exchange/orders/:order_no/track
  *
@@ -840,6 +932,23 @@ router.get(
     }
 
     const ShippingService = req.app.locals.services.getService('shipping_track')
+
+    /*
+     * 物流方案一：优先读自有轨迹表（webhook 已落库的全量轨迹，秒回）；
+     * 自有表暂无轨迹时（如订阅未生效）降级为第三方实时查询作为补充。
+     */
+    const localTracks = await ShippingService.getOrderTracks(order.exchange_record_id)
+    if (localTracks && localTracks.length > 0) {
+      return res.apiSuccess({
+        has_shipping: true,
+        shipping_company: order.shipping_company,
+        shipping_company_name: order.shipping_company_name,
+        shipping_no: order.shipping_no,
+        shipped_at: order.shipped_at,
+        track: { success: true, source: 'local', tracks: localTracks }
+      })
+    }
+
     const track = await ShippingService.queryTrack(order.shipping_no, order.shipping_company)
 
     return res.apiSuccess({

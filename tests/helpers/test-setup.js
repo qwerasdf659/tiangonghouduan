@@ -292,10 +292,10 @@ const TestConfig = {
       user_id: null // 🔴 P0-1修复：移除硬编码，通过 initRealTestData() 动态获取
     },
 
-    // ✅ 统一管理员信息 - 同一账号既是用户也是管理员
+    // ✅ 超级管理员信息（13612227910，role_level>=100，用于后台管理接口测试）
     adminUser: {
-      mobile: '13612227930', // 统一管理员手机号
-      user_id: null // 🔴 P0-1修复：移除硬编码，通过 initRealTestData() 动态获取
+      mobile: '13612227910', // 超级管理员手机号（.env SUPER_ADMIN_MOBILE）
+      user_id: null // 通过 initRealTestData() 动态获取真实 user_id
     },
 
     // ✅ 测试活动信息 - 通过 initRealTestData() 动态获取活跃活动
@@ -363,9 +363,28 @@ async function initRealTestData(mobile = '13612227930') {
     } else {
       TestConfig.realData.testUser.user_id = user.user_id
       TestConfig.realData.testUser.mobile = user.mobile
+      console.log(`✅ initRealTestData: 测试用户 user_id=${user.user_id}, mobile=${user.mobile}`)
+    }
+
+    /*
+     * 1b. 查询超级管理员测试账号（.env SUPER_ADMIN_MOBILE=13612227910，role_level>=100）。
+     * 管理后台接口（requireRoleLevel(30/100)）必须用此账号，普通测试用户(13612227930, regional_manager:80)无权访问。
+     * 找不到时回退为普通测试用户，保证旧测试不因缺账号而崩。
+     */
+    const adminMobile = process.env.SUPER_ADMIN_MOBILE || '13612227910'
+    const adminUser = await User.findByMobile(adminMobile)
+    if (adminUser) {
+      TestConfig.realData.adminUser.user_id = adminUser.user_id
+      TestConfig.realData.adminUser.mobile = adminUser.mobile
+      console.log(
+        `✅ initRealTestData: 管理员用户 user_id=${adminUser.user_id}, mobile=${adminUser.mobile}`
+      )
+    } else if (user) {
+      console.warn(
+        `⚠️ initRealTestData: 未找到超管 mobile=${adminMobile}，adminUser 回退为普通测试用户（管理端测试可能因权限失败）`
+      )
       TestConfig.realData.adminUser.user_id = user.user_id
       TestConfig.realData.adminUser.mobile = user.mobile
-      console.log(`✅ initRealTestData: 测试用户 user_id=${user.user_id}, mobile=${user.mobile}`)
     }
 
     // 2. 查询活跃的测试活动

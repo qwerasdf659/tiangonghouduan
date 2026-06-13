@@ -245,6 +245,9 @@ class ScheduledTasks {
     // 任务33: 每天凌晨3:15积分商城订单自动确认收货（Phase 3 Step 3.3：发货7天后自动确认）
     this.scheduleExchangeOrderAutoConfirm()
 
+    // 任务34: 每天凌晨3:25物流超时预警扫描（物流方案一：超时未揽收/未签收预警）
+    this.scheduleShippingTimeoutScan()
+
     // ========== 2026-02-21 图片管理体系设计方案新增 ==========
 
     // 任务34: 每天凌晨5点图片存储一致性检测（HEAD请求验证Sealos文件真实存在）
@@ -2605,6 +2608,71 @@ class ScheduledTasks {
     })
 
     logger.info('[定时任务33] 积分商城订单自动确认收货任务已注册（每天 3:15 AM）')
+  }
+
+  /**
+   * 定时任务34: 每天凌晨3:25物流超时预警扫描（物流方案一·拍板③）
+   * Cron表达式: 25 3 * * * (每天凌晨3:25，错开任务33的3:15)
+   *
+   * 业务场景：
+   * - 扫描 status='shipped' 的实物订单，结合 shipping_tracks 判断超时未揽收/未签收
+   * - 命中则通知管理员，支撑履约时效监控
+   *
+   * @returns {void}
+   */
+  static scheduleShippingTimeoutScan() {
+    cron.schedule('25 3 * * *', async () => {
+      const lockKey = 'lock:shipping_timeout_scan'
+      const lockValue = `${process.pid}_${Date.now()}`
+      let redisClient = null
+
+      try {
+        const { getRawClient } = require('../../utils/UnifiedRedisClient')
+        redisClient = getRawClient()
+
+        const acquired = await redisClient.set(lockKey, lockValue, 'EX', 600, 'NX')
+        if (!acquired) {
+          logger.info('[定时任务34] 物流超时预警扫描 - 其他实例正在执行，跳过')
+          return
+        }
+
+        logger.info('[定时任务34] 开始执行物流超时预警扫描...')
+
+        const DailyShippingTimeoutScan = require('../../jobs/daily-shipping-timeout-scan')
+        const report = await DailyShippingTimeoutScan.execute()
+
+        logger.info('[定时任务34] 物流超时预警扫描完成', {
+          not_picked_up_count: report.not_picked_up_count,
+          not_delivered_count: report.not_delivered_count,
+          duration_ms: report.duration_ms
+        })
+
+        if (redisClient) {
+          const currentValue = await redisClient.get(lockKey)
+          if (currentValue === lockValue) {
+            await redisClient.del(lockKey)
+          }
+        }
+      } catch (error) {
+        logger.error('[定时任务34] 物流超时预警扫描失败', {
+          error: error.message,
+          stack: error.stack
+        })
+
+        if (redisClient) {
+          try {
+            const currentValue = await redisClient.get(lockKey)
+            if (currentValue === lockValue) {
+              await redisClient.del(lockKey)
+            }
+          } catch (unlockError) {
+            logger.error('[定时任务34] 释放分布式锁失败', { error: unlockError.message })
+          }
+        }
+      }
+    })
+
+    logger.info('[定时任务34] 物流超时预警扫描任务已注册（每天 3:25 AM）')
   }
 
   /**

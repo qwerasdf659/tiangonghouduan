@@ -60,6 +60,29 @@ class CustomerServiceAgentManagementService {
   }
 
   /**
+   * 查询某用户的客服座席身份（用于小程序座席端入口显示判定）
+   *
+   * 业务场景：微信小程序「我的」页判断是否显示「客服回复台」入口。
+   * 与 requireCsAgent 中间件同口径：座席表中存在该 user_id 且 status='active' 即为在岗座席。
+   *
+   * @param {number} user_id - 用户ID（users 表主键）
+   * @returns {Promise<Object>} 座席身份 { is_agent: boolean, status: string|null }（非座席时 status 为 null）
+   */
+  static async getAgentIdentity(user_id) {
+    const { CustomerServiceAgent } = models
+
+    const agent = await CustomerServiceAgent.findOne({
+      where: { user_id },
+      attributes: ['customer_service_agent_id', 'status']
+    })
+
+    return {
+      is_agent: !!agent && agent.status === 'active',
+      status: agent ? agent.status : null
+    }
+  }
+
+  /**
    * 根据手机号解析用户ID（内部辅助方法）
    *
    * @param {string} mobile - 手机号

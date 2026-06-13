@@ -216,6 +216,41 @@ class UserAddressService {
   static async getById(addressId) {
     return UserAddress.findByPk(addressId)
   }
+
+  /**
+   * 校验地址归属并生成下单地址快照（实物履约链路统一入口）
+   *
+   * 业务场景：普通兑换下单（CoreService.exchangeItem）与 DIY 兑换（WorkService）
+   * 共用同一份「查地址 → 校验归属 → 生成 address_snapshot（JSON）」逻辑，避免重复实现。
+   * 快照为下单时刻的地址副本，写入 exchange_records.address_snapshot，保证发货依据不随地址后续修改而变。
+   *
+   * @param {number} userId - 用户 ID（用于校验地址归属，防止越权使用他人地址）
+   * @param {number} addressId - 收货地址主键 user_addresses.address_id
+   * @param {Object} options - { transaction }（下单事务内调用时传入）
+   * @returns {Promise<Object>} address_snapshot 快照对象（含明文收件人信息，存订单 JSON 列）
+   * @throws {Error} statusCode=400 地址不存在或不属于当前用户
+   */
+  static async buildSnapshot(userId, addressId, options = {}) {
+    const address = await UserAddress.findOne({
+      where: { address_id: addressId, user_id: userId },
+      transaction: options.transaction
+    })
+    if (!address) {
+      const error = new Error('收货地址不存在或不属于当前用户')
+      error.statusCode = 400
+      error.code = 'ADDRESS_NOT_FOUND'
+      throw error
+    }
+    return {
+      address_id: address.address_id,
+      receiver_name: address.receiver_name,
+      receiver_phone: address.receiver_phone,
+      province: address.province,
+      city: address.city,
+      district: address.district,
+      detail_address: address.detail_address
+    }
+  }
 }
 
 module.exports = UserAddressService

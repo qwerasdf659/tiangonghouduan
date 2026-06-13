@@ -1482,10 +1482,10 @@ class DataSanitizer {
    * - 必须包含 exchange_record_id 字段（数据库主键）
    *
    * @param {Array<Object>} orders - 订单数据数组（来自 exchange_records 表）
-   * @param {string} _dataLevel - 数据级别：'full'（管理员）或'public'（普通用户）（未使用，保留以保持接口一致性）
+   * @param {string} dataLevel - 数据级别：'full'（管理员，地址完整）或'public'（普通用户，地址脱敏）
    * @returns {Array<Object>} 脱敏后的订单数组（exchange_record_id 主键原样输出）
    */
-  static sanitizeExchangeMarketOrders(orders, _dataLevel) {
+  static sanitizeExchangeMarketOrders(orders, dataLevel) {
     /*
      * γ 模式：黑名单删除敏感字段
      */
@@ -1501,6 +1501,16 @@ class DataSanitizer {
         }
       }
 
+      /*
+       * 收货地址快照脱敏（拍板⑤分层脱敏）：
+       * - 管理员（dataLevel='full'）：web 后台发货需完整地址，不脱敏。
+       * - 普通用户（dataLevel='public'）：列表/详情默认返回掩码（收件人姓名、手机号中间四位掩码），
+       *   完整手机号由本人主动点击「显示完整」走 GET /orders/:order_no/contact 按需获取，防止抓包批量拉取。
+       */
+      if (sanitized.address_snapshot && dataLevel !== 'full') {
+        sanitized.address_snapshot = this._maskAddressSnapshot(sanitized.address_snapshot)
+      }
+
       // 黑名单：删除敏感字段（成本 + 内部标识 + 管理员备注）
       delete sanitized.actual_cost
       delete sanitized.total_cost
@@ -1511,6 +1521,37 @@ class DataSanitizer {
 
       return sanitized
     })
+  }
+
+  /**
+   * 收货地址快照脱敏（用户端展示用，拍板⑤）
+   *
+   * 脱敏规则：
+   * - receiver_name：保留姓氏，其余以 * 替代（如 王**）
+   * - receiver_phone：保留前 3 后 4，中间 ****（如 138****8888）
+   * - province/city/district/detail_address：保留供用户核对收货区域
+   *
+   * @param {Object} snapshot - 原始地址快照（含明文姓名/手机号）
+   * @returns {Object} 掩码后的地址快照
+   * @private
+   */
+  static _maskAddressSnapshot(snapshot) {
+    if (!snapshot || typeof snapshot !== 'object') return snapshot
+    const maskName = name => {
+      if (!name) return name
+      const s = String(name)
+      return s.length <= 1 ? s : s[0] + '*'.repeat(s.length - 1)
+    }
+    const maskPhone = phone => {
+      if (!phone) return phone
+      const s = String(phone)
+      return s.length < 7 ? s : s.substring(0, 3) + '****' + s.substring(s.length - 4)
+    }
+    return {
+      ...snapshot,
+      receiver_name: maskName(snapshot.receiver_name),
+      receiver_phone: maskPhone(snapshot.receiver_phone)
+    }
   }
 
   /**

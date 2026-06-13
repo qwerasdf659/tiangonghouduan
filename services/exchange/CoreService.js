@@ -27,6 +27,7 @@ const OrderNoGenerator = require('../../utils/OrderNoGenerator')
 const { generateExchangeBusinessId } = require('../../utils/IdempotencyHelper')
 const BalanceService = require('../asset/BalanceService')
 const ItemService = require('../asset/ItemService')
+const UserAddressService = require('../UserAddressService')
 const AttributeRuleEngine = require('../item/AttributeRuleEngine')
 const AssetProductGuard = require('../shared/AssetProductGuard')
 const { Op } = require('sequelize')
@@ -99,6 +100,7 @@ class CoreService {
    * @param {string} options.idempotency_key - 幂等键（必填）
    * @param {Transaction} options.transaction - 外部事务对象（必填）
    * @param {number} options.sku_id - SKU ID（必填）
+   * @param {number} [options.address_id] - 收货地址主键（实物邮寄类履约必填，虚拟/即时类忽略）
    * @param {Object} [options.sku_spec_values] - SKU 规格值（铸造用）
    * @returns {Promise<Object>} 兑换结果和订单信息
    */
@@ -298,11 +300,15 @@ class CoreService {
     const productSkuRecord = productSku
 
     /*
-     * F1 选 A（合规整改 §10.16-D / §10.15 Step 5）：道具单"即时完成 + 禁退款"分流
-     * - 纯虚拟道具（item_type='prop'）：买入即消耗、不可卖回 → 建单即 completed，且禁止 cancel/reject/refund
-     * - 实物（需发货）：维持 pending + 退款链不变（未消耗可退=解冻；已到手不可退=禁回购）
-     * 用"商品形态"天然分流，复用 exchange 已有的 mint_instance 即时铸造能力。
+     * 履约类型分流（P1 拍板②：显式 fulfillment_type 取代靠模板推断）
+     * - fulfillment_type 是商品级权威字段（physical/virtual/voucher）：
+     *   · virtual（虚拟即时）：建单即 completed，不需要收货地址；
+     *   · voucher（卡券核销）：建单即 completed（线上发券/到店核销），不需要邮寄地址；
+     *   · physical（实物邮寄）：维持 pending + 走发货链，必须收集收货地址。
+     * - 同时保留 item_template.item_type==='prop' 的「禁退款」语义（守星石单向铁律，见 _assertNotPropOrder）：
+     *   prop 模板单仍即时 completed（与 virtual 一致），由 fulfillment_type 与 prop 共同决定即时完成。
      */
+    const fulfillmentType = product.fulfillment_type || 'physical'
     let isPropOrder = false
     if (itemTemplateId && this.models.ItemTemplate) {
       const propTpl = await this.models.ItemTemplate.findByPk(itemTemplateId, {
@@ -311,7 +317,29 @@ class CoreService {
       })
       isPropOrder = propTpl?.item_type === 'prop'
     }
-    const finalStatus = isPropOrder ? 'completed' : 'pending'
+    // 即时完成：虚拟即时 / 卡券核销 / 纯道具单（均无需邮寄）
+    const isInstantFulfillment =
+      fulfillmentType === 'virtual' || fulfillmentType === 'voucher' || isPropOrder
+    const finalStatus = isInstantFulfillment ? 'completed' : 'pending'
+
+    /*
+     * 收货地址快照（断点一修复 + P1 履约校验）：
+     * - 实物邮寄类（fulfillment_type='physical' 且非即时完成）下单必须携带有效 address_id，
+     *   否则客服/运营无法发货——这是整条链路的真正断点，故在此强制校验。
+     * - 复用 UserAddressService.buildSnapshot()（与 DIY 链路同一份逻辑），校验地址归属本人后生成快照，
+     *   写入 exchange_records.address_snapshot。
+     * - 虚拟即时 / 卡券核销 / 道具单：不要求地址（无需邮寄）。
+     */
+    let addressSnapshot = null
+    const requiresShippingAddress = fulfillmentType === 'physical' && !isInstantFulfillment
+    if (requiresShippingAddress) {
+      if (!options.address_id) {
+        throw new BusinessError('实物商品兑换需选择收货地址', 'EXCHANGE_ADDRESS_REQUIRED', 400)
+      }
+      addressSnapshot = await UserAddressService.buildSnapshot(user_id, options.address_id, {
+        transaction
+      })
+    }
 
     // 2. 计算总支付金额
     const totalPayAmount = costAmount * quantity
@@ -451,6 +479,7 @@ class CoreService {
           pay_asset_code: costAssetCode,
           pay_amount: totalPayAmount,
           total_cost: costPrice * quantity,
+          address_snapshot: addressSnapshot,
           status: finalStatus,
           exchange_time: BeijingTimeHelper.createDatabaseTime()
         },
@@ -664,14 +693,15 @@ class CoreService {
         new_status: finalStatus,
         operator_id: user_id,
         operator_type: 'user',
-        reason: isPropOrder ? '用户购买虚拟道具（即时完成）' : '用户兑换商品',
+        reason: isInstantFulfillment ? '用户兑换商品（即时完成）' : '用户兑换商品',
         metadata: {
           exchange_item_id,
           sku_id,
           quantity,
           pay_amount: totalPayAmount,
           minted_item_id: mintedItem?.item_id || null,
-          is_prop_order: isPropOrder
+          is_prop_order: isPropOrder,
+          fulfillment_type: fulfillmentType
         }
       },
       { transaction }
@@ -1009,6 +1039,122 @@ class CoreService {
       received_at: BeijingTimeHelper.now(),
       auto_confirmed
     }
+  }
+
+  /**
+   * 用户为自己的兑换订单补录/修改收货地址（实物履约，下单/中标后补地址）
+   *
+   * 业务场景（拍板 A）：
+   * - 竞价中标为异步结算、用户不在场，实物中标订单建为 pending 但无地址，用户事后在订单页补地址。
+   * - 普通实物订单若需改地址（发货前）也可复用本方法。
+   * 复用 UserAddressService.buildSnapshot()（与下单同一份地址快照逻辑，避免重复）。
+   *
+   * 约束：
+   * - 仅订单归属本人；仅 pending/approved（未发货）阶段可改地址，已发货/完成不可改。
+   * - 写操作收口到 Service + 外部事务。
+   *
+   * @param {number} user_id - 当前用户ID
+   * @param {string} order_no - 订单号
+   * @param {number} address_id - 收货地址主键（须属于本人）
+   * @param {Object} options - 选项
+   * @param {Transaction} options.transaction - 外部事务对象（必填）
+   * @returns {Promise<Object>} { order_no, address_snapshot }
+   */
+  async updateOrderAddress(user_id, order_no, address_id, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'CoreService.updateOrderAddress')
+
+    const order = await this.ExchangeRecord.findOne({
+      where: { order_no, user_id },
+      lock: transaction.LOCK.UPDATE,
+      transaction
+    })
+    if (!order) {
+      const error = new Error('订单不存在或无权操作')
+      error.statusCode = 404
+      error.code = 'ORDER_NOT_FOUND'
+      throw error
+    }
+    // 仅未发货阶段可改地址（发货后地址已用于发货，不可变更）
+    if (!['pending', 'approved'].includes(order.status)) {
+      const error = new Error('当前订单状态不可修改收货地址（仅未发货阶段可改）')
+      error.statusCode = 400
+      error.code = 'ORDER_STATUS_INVALID'
+      error.data = { current_status: order.status }
+      throw error
+    }
+
+    const addressSnapshot = await UserAddressService.buildSnapshot(user_id, address_id, {
+      transaction
+    })
+    await order.update(
+      { address_snapshot: addressSnapshot, updated_at: BeijingTimeHelper.createDatabaseTime() },
+      { transaction }
+    )
+
+    logger.info('[兑换市场] 用户补录/修改订单收货地址', { user_id, order_no, address_id })
+
+    return { order_no, address_snapshot: addressSnapshot }
+  }
+
+  /**
+   * 物流签收驱动确认收货（webhook 推送「已签收」时调用，物流方案一·拍板③）
+   *
+   * 业务场景：第三方快递推送「已签收(delivered)」轨迹 → 自动把订单 shipped→received，
+   * 无需等待用户手动确认或 7 天兜底，提升履约时效。
+   * - 仅当订单当前为 shipped 才推进（其它状态幂等跳过，不报错）。
+   * - operator_type=system，operator_id 取系统任务用户（与 7 天兜底一致口径）。
+   *
+   * @param {string} order_no - 订单号
+   * @param {Object} options - 选项
+   * @param {Transaction} options.transaction - 外部事务对象（必填）
+   * @returns {Promise<Object>} { driven: boolean, status: string }
+   */
+  async confirmReceiptByDelivery(order_no, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'CoreService.confirmReceiptByDelivery')
+
+    const order = await this.ExchangeRecord.findOne({
+      where: { order_no },
+      lock: transaction.LOCK.UPDATE,
+      transaction
+    })
+    if (!order) {
+      return { driven: false, status: null }
+    }
+    // 仅 shipped 可被签收推进；其它状态（已收货/已完成等）幂等跳过
+    if (order.status !== 'shipped') {
+      return { driven: false, status: order.status }
+    }
+
+    const systemUserId = parseInt(process.env.SYSTEM_DAILY_JOB_USER_ID, 10) || 11021
+    await order.update(
+      {
+        status: 'received',
+        received_at: BeijingTimeHelper.createDatabaseTime(),
+        auto_confirmed: true
+      },
+      { transaction }
+    )
+
+    await this._recordEvent(
+      {
+        order_no,
+        old_status: 'shipped',
+        new_status: 'received',
+        operator_id: systemUserId,
+        operator_type: 'system',
+        reason: '物流签收回推自动确认收货',
+        metadata: { auto_confirmed: true, source: 'shipping_webhook' }
+      },
+      { transaction }
+    )
+
+    await BusinessCacheHelper.invalidateExchangeItems().catch(err => {
+      logger.warn('[兑换市场] 签收回推确认收货后清除缓存失败（非致命）:', err.message)
+    })
+
+    logger.info('[兑换市场] 物流签收回推自动确认收货', { order_no })
+
+    return { driven: true, status: 'received' }
   }
 
   /**

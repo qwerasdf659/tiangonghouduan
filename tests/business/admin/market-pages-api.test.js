@@ -15,6 +15,7 @@
 const { describe, test, expect, beforeAll } = require('@jest/globals')
 
 const supertest = require('supertest')
+const { loginAs } = require('../../helpers/auth-helper')
 
 let app, request, adminToken
 
@@ -23,12 +24,8 @@ beforeAll(async () => {
   app = require('../../../app')
   request = supertest(app)
 
-  const loginRes = await request
-    .post('/api/v4/auth/login')
-    .send({ mobile: '13612227930', verification_code: '123456' })
-
-  expect(loginRes.body.success).toBe(true)
-  adminToken = loginRes.body.data.access_token || loginRes.body.data.token
+  // 🔐 2026-06-14：统一通过角色契约登录管理员（13612227910，role_level>=100）
+  adminToken = await loginAs(app, 'admin')
   expect(adminToken).toBeTruthy()
 })
 

@@ -307,6 +307,72 @@ class SealosStorageService {
   }
 
   /**
+   * 🔴 上传任意文件（文档/压缩包等，非图片）到对象存储
+   *
+   * 与 uploadImage 的区别：
+   * - ContentDisposition 使用 attachment（浏览器/小程序触发下载，而非内联展示）。
+   * - ContentType 优先用调用方传入的 mimeType（来自 multer 的 file.mimetype），回退按扩展名推断。
+   * - 不做任何图片处理（文件原样存储）。
+   *
+   * 复用 uploadImage 同款内网优先 + 公网回退策略。
+   *
+   * @param {Buffer} fileBuffer - 文件缓冲区
+   * @param {string} originalName - 原始文件名（用于取扩展名）
+   * @param {string} [folder='chat-files'] - 存储文件夹
+   * @param {string} [mimeType] - 文件 MIME 类型（优先使用）
+   * @returns {Promise<string>} 对象 key（如 chat-files/20260614_abc123.pdf）
+   */
+  async uploadFile(fileBuffer, originalName, folder = 'chat-files', mimeType = null) {
+    const timestamp = BeijingTimeHelper.timestamp()
+    const hash = crypto.randomBytes(8).toString('hex')
+    const ext = path.extname(originalName) || ''
+    const objectKey = `${folder}/${timestamp}_${hash}${ext}`
+
+    const contentType = mimeType || this.getContentType(ext)
+
+    const uploadParams = {
+      Bucket: this.config.bucket,
+      Key: objectKey,
+      Body: fileBuffer,
+      ContentType: contentType,
+      ContentDisposition: 'attachment', // 文件触发下载，而非内联展示
+      ACL: 'public-read',
+      CacheControl: 'max-age=31536000'
+    }
+
+    const isUsingInternalEndpoint =
+      process.env.SEALOS_INTERNAL_ENDPOINT &&
+      this.config.uploadEndpoint === process.env.SEALOS_INTERNAL_ENDPOINT
+
+    try {
+      await this.s3.upload(uploadParams).promise()
+      logger.info('✅ 聊天文件上传成功', { objectKey, contentType, size: fileBuffer.length })
+      return objectKey
+    } catch (primaryError) {
+      // 内网失败回退公网重试（与 uploadImage 同款策略）
+      if (isUsingInternalEndpoint && this.config.publicEndpoint) {
+        logger.warn('⚠️ 内网上传文件失败，自动回退公网重试', {
+          objectKey,
+          primaryError: primaryError.message
+        })
+        const publicS3 = new AWS.S3({
+          endpoint: this.config.publicEndpoint,
+          accessKeyId: this.config.accessKeyId,
+          secretAccessKey: this.config.secretAccessKey,
+          region: this.config.region,
+          s3ForcePathStyle: true,
+          signatureVersion: 'v4'
+        })
+        await publicS3.upload(uploadParams).promise()
+        logger.info('✅ 聊天文件上传成功（公网回退）', { objectKey })
+        return objectKey
+      }
+      logger.error('❌ Sealos聊天文件上传失败:', primaryError)
+      throw new BusinessError(`文件上传失败: ${primaryError.message}`, 'SERVICE_FAILED', 500)
+    }
+  }
+
+  /**
    * 🔴 根据对象 key 生成公网访问 URL
    *
    * 🎯 URL 生成策略：

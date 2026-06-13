@@ -39,7 +39,7 @@ const { assertAndGetTransaction } = require('../utils/transactionHelpers')
  * 业务常量定义
  */
 const UNLOCK_COST = 100 // 解锁费用：100积分（固定值）
-const HISTORY_POINTS_THRESHOLD = 100000 // 历史累计积分门槛：10万（识别高级用户资格）
+const HISTORY_POINTS_THRESHOLD = 100000 // 历史累计积分门槛：10万（臻选空间解锁条件之一）
 const VALIDITY_HOURS = 24 // 有效期：24小时（固定值）
 
 /**
@@ -319,7 +319,7 @@ class PremiumService {
           conditions: {
             condition_1: {
               name: '历史累计积分门槛',
-              description: `历史累计获得积分需达到 ${HISTORY_POINTS_THRESHOLD} 分（识别高价值用户资格）`,
+              description: `历史累计获得积分需达到 ${HISTORY_POINTS_THRESHOLD} 分`,
               required: HISTORY_POINTS_THRESHOLD,
               current: historyPoints,
               satisfied: historyPoints >= HISTORY_POINTS_THRESHOLD,

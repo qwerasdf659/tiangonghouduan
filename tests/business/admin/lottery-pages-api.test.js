@@ -8,10 +8,12 @@
  *   4. 策略配置管理（lottery-configs/strategies）
  *   5. 策略规则管理（lottery-tier-rules）
  * 
- * @requires 测试账号 13612227930 (ID:31, 验证码:123456)
+ * @requires 管理员账号（角色契约 TEST_ACCOUNTS.admin = 13612227910，role_level>=100，验证码:123456）
+ * @note 这些 /console/* 接口需管理员权限，统一通过 loginAsViaFetch('admin') 登录
  */
 
 const { describe, test, expect, beforeAll } = require('@jest/globals');
+const { loginAsViaFetch } = require('../../helpers/auth-helper');
 
 const API_BASE = process.env.API_BASE_URL || 'http://localhost:3000';
 const API_PREFIX = `${API_BASE}/api/v4`;
@@ -39,12 +41,11 @@ async function apiRequest(method, path, body = null) {
 }
 
 beforeAll(async () => {
-  const result = await apiRequest('POST', '/auth/login', {
-    mobile: '13612227930',
-    verification_code: '123456'
-  });
-  expect(result.success).toBe(true);
-  accessToken = result.data?.access_token;
+  /*
+   * 🔐 2026-06-14：这些 /console/* 接口需管理员权限（requireRoleLevel(100)），
+   * 统一通过角色契约登录 admin（13612227910）。历史上误用 13612227930(regional_manager:80) 导致整片 403。
+   */
+  accessToken = await loginAsViaFetch('admin', API_BASE);
   expect(accessToken).toBeTruthy();
 }, 15000);
 

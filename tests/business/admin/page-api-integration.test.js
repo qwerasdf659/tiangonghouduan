@@ -17,18 +17,16 @@ const request = require('supertest')
 require('dotenv').config()
 
 const app = require('../../../app')
+const { loginAs } = require('../../helpers/auth-helper')
 
 let adminToken = ''
 
 beforeAll(async () => {
-  // 使用测试账号登录获取 token
-  const loginRes = await request(app)
-    .post('/api/v4/auth/login')
-    .send({ mobile: '13612227930', verification_code: '123456' })
-
-  expect(loginRes.status).toBe(200)
-  expect(loginRes.body.success).toBe(true)
-  adminToken = loginRes.body.data?.access_token || loginRes.body.data?.token
+  /*
+   * 🔐 2026-06-14：统一通过角色契约登录管理员（13612227910，role_level>=100）
+   * 历史问题：曾内联硬编码 13612227930（regional_manager:80），访问管理接口被正确拒绝(403)
+   */
+  adminToken = await loginAs(app, 'admin')
   expect(adminToken).toBeTruthy()
 })
 

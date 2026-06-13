@@ -25,11 +25,12 @@
  */
 
 const request = require('supertest')
-const { getTestUserToken } = require('../../helpers/auth-helper')
+const { getTestUserToken, loginAsAdmin } = require('../../helpers/auth-helper')
 
 /* 全局变量 */
 let app
 let authToken
+let adminToken
 let testUserId
 
 /**
@@ -47,6 +48,13 @@ describe('竞价系统功能测试 (Bid System — 臻选空间/幸运空间/竞
   beforeAll(async () => {
     app = getApp()
     authToken = await getTestUserToken(app)
+
+    /*
+     * 管理后台竞价接口（/api/v4/console/bids）要求 requireRoleLevel(100)，
+     * 普通测试用户(13612227930, regional_manager:80)无权访问，必须用超管账号
+     * （loginAsAdmin → 13612227910，admin:100/super_admin:110）。
+     */
+    adminToken = await loginAsAdmin(app)
 
     /* 从 JWT 中提取 user_id（解码 payload） */
     try {
@@ -445,7 +453,7 @@ describe('竞价系统功能测试 (Bid System — 臻选空间/幸运空间/竞
     test('GET / 应返回竞价列表（管理员视图）', async () => {
       const res = await request(app)
         .get('/api/v4/console/bids')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${adminToken}`)
         .query({ page: 1, page_size: 10 })
         .expect(200)
 
@@ -457,10 +465,10 @@ describe('竞价系统功能测试 (Bid System — 臻选空间/幸运空间/竞
     test('创建竞价缺少必填字段应返回400', async () => {
       const res = await request(app)
         .post('/api/v4/console/bids')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${adminToken}`)
         .send({})
 
-      /* 缺少 exchange_item_id、start_price 等必填字段 */
+      /* 缺少 exchange_item_id、start_price 等必填字段（管理员有权限，应被参数校验拦截而非 403） */
       expect(res.body.success).toBe(false)
     })
   })

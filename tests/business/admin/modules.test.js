@@ -44,17 +44,20 @@ describe('GET /api/v4/console/ - 管理员模块信息API', () => {
   })
 
   /**
-   * 测试3：模块数量验证
-   * 验证返回的模块数量
-   * 2026-01-21：API覆盖率补齐后新增多个模块（40个模块）
+   * 测试3：关键模块存在性验证
+   *
+   * 设计说明（2026-06-14 修正）：
+   * - 已移除脆弱的「模块总数 === 固定值」魔术数字断言。
+   *   原因：模块数量随业务迭代频繁增减，硬编码数字属于维护性技术债，
+   *   每次增删模块都要改测试，且失败信息不指向真正的业务问题。
+   * - 模块与路由的「数量/一致性」由下方【测试5：列出的所有模块端点都应该有对应的路由】
+   *   做动态校验，无需再用固定数字。
+   * - 本测试只保留「关键业务模块必须存在」的回归保护：新增模块不会让它失败，
+   *   只有误删核心模块时才会失败，这正是我们要防的回归。
    */
-  test('应该返回已实现的模块清单', async () => {
+  test('应该包含所有关键业务模块', async () => {
     const response = await request(app).get('/api/v4/console/')
     const { modules } = response.body.data
-
-    const moduleCount = Object.keys(modules).length
-    expect(moduleCount).toBe(54) // 实际挂载的路由数量（2026-06-05 阶段五：移除 C2C marketplace_orders/orphan_frozen 后为54个）
-
     // 验证必需的模块是否存在（原有8个）
     expect(modules).toHaveProperty('auth')
     expect(modules).toHaveProperty('system')

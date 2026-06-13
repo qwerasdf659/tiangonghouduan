@@ -3,7 +3,7 @@
  *
  * @route /api/v4/console/exchange/orders/*
  * @description 兑换订单列表、详情、审核、发货、退款、拒绝、完成、物流
- * @security JWT + Admin权限
+ * @security JWT + 运营级权限（requireRoleLevel(30)：运营可审核/发货，客服级只读走客服工作台）
  * @module routes/v4/console/exchange/orders
  */
 
@@ -20,7 +20,7 @@ const logger = require('../../../../utils/logger').logger
 router.get(
   '/shipping-companies',
   authenticateToken,
-  requireRoleLevel(100),
+  requireRoleLevel(30),
   asyncHandler(async (req, res) => {
     const ShippingService = req.app.locals.services.getService('shipping_track')
     const companies = ShippingService.getCompanies()
@@ -32,7 +32,7 @@ router.get(
 router.get(
   '/',
   authenticateToken,
-  requireRoleLevel(100),
+  requireRoleLevel(30),
   asyncHandler(async (req, res) => {
     const {
       status,
@@ -70,7 +70,7 @@ router.get(
 router.get(
   '/:order_no',
   authenticateToken,
-  requireRoleLevel(100),
+  requireRoleLevel(30),
   asyncHandler(async (req, res) => {
     const ExchangeQueryService = req.app.locals.services.getService('exchange_query')
     const result = await ExchangeQueryService.getAdminOrderDetail(req.params.order_no)
@@ -78,18 +78,24 @@ router.get(
   })
 )
 
-/** GET /:order_no/track - 查询物流轨迹 */
+/** GET /:order_no/track - 查询物流轨迹（优先自有轨迹表，降级第三方实时查） */
 router.get(
   '/:order_no/track',
   authenticateToken,
-  requireRoleLevel(100),
+  requireRoleLevel(30),
   asyncHandler(async (req, res) => {
     const { order_no } = req.params
     const ExchangeRecord =
       req.app.locals.services.getService('exchange_admin').models.ExchangeRecord
     const order = await ExchangeRecord.findOne({
       where: { order_no },
-      attributes: ['shipping_company', 'shipping_company_name', 'shipping_no', 'shipped_at']
+      attributes: [
+        'exchange_record_id',
+        'shipping_company',
+        'shipping_company_name',
+        'shipping_no',
+        'shipped_at'
+      ]
     })
     if (!order) {
       return res.apiError('订单不存在', 'NOT_FOUND', null, 404)
@@ -98,7 +104,14 @@ router.get(
       return res.apiSuccess({ has_shipping: false, message: '该订单尚未填写快递信息' })
     }
     const ShippingService = req.app.locals.services.getService('shipping_track')
-    const track = await ShippingService.queryTrack(order.shipping_no, order.shipping_company)
+
+    // 物流方案一：优先读自有轨迹表（秒回），无则降级第三方实时查
+    const localTracks = await ShippingService.getOrderTracks(order.exchange_record_id)
+    const track =
+      localTracks && localTracks.length > 0
+        ? { success: true, source: 'local', tracks: localTracks }
+        : await ShippingService.queryTrack(order.shipping_no, order.shipping_company)
+
     return res.apiSuccess({
       has_shipping: true,
       shipping_company: order.shipping_company,
@@ -114,7 +127,7 @@ router.get(
 router.post(
   '/:order_no/approve',
   authenticateToken,
-  requireRoleLevel(100),
+  requireRoleLevel(30),
   asyncHandler(async (req, res) => {
     const ExchangeCoreService = req.app.locals.services.getService('exchange_core')
     const { order_no } = req.params
@@ -140,7 +153,7 @@ router.post(
 router.post(
   '/:order_no/ship',
   authenticateToken,
-  requireRoleLevel(100),
+  requireRoleLevel(30),
   asyncHandler(async (req, res) => {
     const ExchangeCoreService = req.app.locals.services.getService('exchange_core')
     const { order_no } = req.params
@@ -161,6 +174,23 @@ router.post(
         extraFields
       })
     })
+
+    /*
+     * 发货成功后向第三方网关订阅该单号的轨迹推送（物流方案一·拍板③）。
+     * 非阻塞：订阅失败不影响发货结果（.env 未配快递密钥/回调地址时仅记录日志）。
+     */
+    if (shipping_no && shipping_company) {
+      const ShippingService = req.app.locals.services.getService('shipping_track')
+      ShippingService.subscribe({ shippingNo: shipping_no, companyCode: shipping_company }).catch(
+        subErr => {
+          logger.warn('[B2C兑换-订单] 快递订阅失败（不影响发货结果）', {
+            order_no,
+            error: subErr.message
+          })
+        }
+      )
+    }
+
     logger.info('[B2C兑换-订单] 发货成功', {
       operator_id: req.user.user_id,
       order_no,
@@ -175,7 +205,7 @@ router.post(
 router.post(
   '/:order_no/refund',
   authenticateToken,
-  requireRoleLevel(100),
+  requireRoleLevel(30),
   asyncHandler(async (req, res) => {
     const ExchangeCoreService = req.app.locals.services.getService('exchange_core')
     const { order_no } = req.params
@@ -196,7 +226,7 @@ router.post(
 router.post(
   '/:order_no/reject',
   authenticateToken,
-  requireRoleLevel(100),
+  requireRoleLevel(30),
   asyncHandler(async (req, res) => {
     const ExchangeCoreService = req.app.locals.services.getService('exchange_core')
     const { order_no } = req.params
@@ -217,7 +247,7 @@ router.post(
 router.post(
   '/:order_no/complete',
   authenticateToken,
-  requireRoleLevel(100),
+  requireRoleLevel(30),
   asyncHandler(async (req, res) => {
     const ExchangeCoreService = req.app.locals.services.getService('exchange_core')
     const { order_no } = req.params

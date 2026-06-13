@@ -21,7 +21,7 @@
  */
 
 const request = require('supertest')
-const { TEST_DATA } = require('./test-data')
+const { TEST_DATA, TEST_ACCOUNTS } = require('./test-data')
 
 /**
  * 获取测试用户的认证Token
@@ -64,7 +64,10 @@ async function getTestUserToken(app, mobile = TEST_DATA.users.testUser.mobile, c
 }
 
 /**
- * 以管理员身份登录
+ * 以管理员身份登录（supertest 风格）
+ *
+ * 2026-06-14 修正：管理员账号从角色契约表 TEST_ACCOUNTS.admin 取（13612227910，role_level>=100），
+ * 不再依赖各文件硬编码。历史上曾误用 13612227930（regional_manager:80）导致 403。
  *
  * @param {Object} app - Express应用实例
  * @returns {Promise<string>} 管理员JWT认证Token
@@ -73,10 +76,72 @@ async function getTestUserToken(app, mobile = TEST_DATA.users.testUser.mobile, c
  * const adminToken = await loginAsAdmin(app)
  */
 async function loginAsAdmin(app) {
-  // 使用相同账号,但后续请求会根据角色权限判断
-  const token = await getTestUserToken(app, TEST_DATA.users.adminUser.mobile, '123456')
+  const token = await getTestUserToken(app, TEST_ACCOUNTS.admin.mobile, '123456')
 
   console.log('✅ 管理员登录成功')
+  return token
+}
+
+/**
+ * 🔐 按角色语义登录（supertest 风格，推荐统一入口）
+ *
+ * 所有测试统一通过本方法登录，只声明角色，不关心具体手机号。
+ * 换账号只需改 tests/helpers/test-data.js 的 TEST_ACCOUNTS 契约表。
+ *
+ * @param {Object} app - Express应用实例
+ * @param {('admin'|'regional_manager'|'user')} role - 角色语义键
+ * @returns {Promise<string>} 对应角色的 JWT Token
+ *
+ * @example
+ * const adminToken = await loginAs(app, 'admin')           // 管理员（role_level>=100）
+ * const userToken = await loginAs(app, 'user')             // 普通用户
+ */
+async function loginAs(app, role) {
+  const account = TEST_ACCOUNTS[role]
+  if (!account) {
+    throw new Error(
+      `❌ 未知角色: ${role}。可用角色: ${Object.keys(TEST_ACCOUNTS).join(', ')}\n` +
+        '请在 tests/helpers/test-data.js 的 TEST_ACCOUNTS 契约表中定义该角色'
+    )
+  }
+  return getTestUserToken(app, account.mobile, '123456')
+}
+
+/**
+ * 🔐 按角色语义登录（fetch 风格，供直连 PM2 实时服务的页面 API 测试使用）
+ *
+ * 背景：少数页面 API 测试用 fetch 打 http://localhost:3000（依赖 PM2 实时服务），
+ * 而非 in-process supertest。这类测试无法传入 app 实例，故提供独立的 fetch 版登录。
+ *
+ * @param {('admin'|'regional_manager'|'user')} role - 角色语义键
+ * @param {string} [apiBase] - API 基地址，默认取 process.env.API_BASE_URL 或 http://localhost:3000
+ * @returns {Promise<string>} 对应角色的 access_token
+ *
+ * @example
+ * accessToken = await loginAsViaFetch('admin')
+ */
+async function loginAsViaFetch(role, apiBase) {
+  const account = TEST_ACCOUNTS[role]
+  if (!account) {
+    throw new Error(`❌ 未知角色: ${role}。可用角色: ${Object.keys(TEST_ACCOUNTS).join(', ')}`)
+  }
+  const base = apiBase || process.env.API_BASE_URL || 'http://localhost:3000'
+  const response = await fetch(`${base}/api/v4/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mobile: account.mobile, verification_code: '123456' })
+  })
+  const data = await response.json()
+  if (!data.success) {
+    throw new Error(
+      `❌ fetch 登录失败 (role=${role}, mobile=${account.mobile}): ` +
+        `${data.message || '未知错误'} [HTTP ${response.status}]`
+    )
+  }
+  const token = data.data?.access_token || data.data?.token
+  if (!token) {
+    throw new Error(`❌ fetch 登录成功但未返回 token (role=${role})`)
+  }
   return token
 }
 
@@ -178,7 +243,9 @@ async function logout(app, token) {
 // 导出认证辅助函数
 module.exports = {
   getTestUserToken, // 主要方法: 获取测试用户token
-  loginAsAdmin, // 管理员登录
+  loginAs, // 🔐 推荐：按角色语义登录（supertest 风格）
+  loginAsViaFetch, // 🔐 按角色语义登录（fetch 风格，直连 PM2 实时服务）
+  loginAsAdmin, // 管理员登录（= loginAs(app, 'admin')）
   verifyToken, // 验证token有效性
   getUserInfo, // 获取用户信息
   batchLogin, // 批量登录

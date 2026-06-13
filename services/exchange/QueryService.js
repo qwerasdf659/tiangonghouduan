@@ -24,6 +24,7 @@ const BusinessError = require('../../utils/BusinessError')
 const logger = require('../../utils/logger').logger
 const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
 const displayNameHelper = require('../../utils/displayNameHelper')
+const BeijingTimeHelper = require('../../utils/timeHelper')
 const { Op } = require('sequelize')
 const {
   fetchProductMediaGallery,
@@ -129,7 +130,8 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
     'min_cost_amount',
     'max_cost_amount',
     'min_cost_asset_code',
-    'max_quantity_per_order'
+    'max_quantity_per_order',
+    'fulfillment_type'
   ],
 
   /**
@@ -172,7 +174,8 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
     'min_cost_amount',
     'max_cost_amount',
     'min_cost_asset_code',
-    'max_quantity_per_order'
+    'max_quantity_per_order',
+    'fulfillment_type'
   ],
 
   /**
@@ -198,6 +201,10 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
     'auto_confirmed',
     'rating',
     'source',
+    'shipping_company',
+    'shipping_company_name',
+    'shipping_no',
+    'address_snapshot',
     'created_at',
     'updated_at'
   ],
@@ -227,6 +234,10 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
     'auto_confirmed',
     'rating',
     'source',
+    'shipping_company',
+    'shipping_company_name',
+    'shipping_no',
+    'address_snapshot',
     'created_at',
     'updated_at'
   ]
@@ -800,6 +811,146 @@ class QueryService {
     } catch (error) {
       logger.error(`[兑换市场] 查询订单详情失败(order_no:${order_no}):`, error.message)
       throw error
+    }
+  }
+
+  /**
+   * 扫描物流超时订单（超时未揽收/未签收预警，物流方案一·拍板③）
+   *
+   * 业务定义（基于真实状态机与轨迹表）：
+   * - 未揽收预警：订单 status='shipped' 且 shipped_at 超过 pickupHours 小时，
+   *   但 shipping_tracks 中无任何 picked_up 及之后的轨迹（说明快递可能没揽到件）。
+   * - 未签收预警：订单 status='shipped' 且 shipped_at 超过 deliverDays 天仍未出现 delivered 轨迹。
+   * 复杂只读扫描收口到 QueryService（不散落在路由/任务里），任务层只调用本方法。
+   *
+   * @param {Object} options - 阈值配置
+   * @param {number} [options.pickupHours=48] - 未揽收预警阈值（小时）
+   * @param {number} [options.deliverDays=7] - 未签收预警阈值（天）
+   * @returns {Promise<Object>} { not_picked_up: [...], not_delivered: [...], scanned_at }
+   */
+  async scanShippingTimeouts(options = {}) {
+    const { pickupHours = 48, deliverDays = 7 } = options
+    const { ShippingTrack } = this.models
+    const now = Date.now()
+    const pickupBefore = new Date(now - pickupHours * 60 * 60 * 1000)
+    const deliverBefore = new Date(now - deliverDays * 24 * 60 * 60 * 1000)
+
+    // 所有 shipped 且已填单号的订单
+    const shippedOrders = await this.ExchangeRecord.findAll({
+      where: { status: 'shipped', shipping_no: { [Op.ne]: null } },
+      attributes: ['exchange_record_id', 'order_no', 'shipping_no', 'shipped_at']
+    })
+    if (shippedOrders.length === 0) {
+      return { not_picked_up: [], not_delivered: [], scanned_at: BeijingTimeHelper.now() }
+    }
+
+    const recordIds = shippedOrders.map(o => o.exchange_record_id)
+    // 批量取这批订单的轨迹状态（避免 N+1）
+    const tracks = await ShippingTrack.findAll({
+      where: { exchange_record_id: { [Op.in]: recordIds } },
+      attributes: ['exchange_record_id', 'track_status']
+    })
+    const statusByRecord = new Map()
+    tracks.forEach(t => {
+      if (!statusByRecord.has(t.exchange_record_id)) {
+        statusByRecord.set(t.exchange_record_id, new Set())
+      }
+      statusByRecord.get(t.exchange_record_id).add(t.track_status)
+    })
+
+    const notPickedUp = []
+    const notDelivered = []
+    for (const o of shippedOrders) {
+      const shippedAt = o.shipped_at ? new Date(o.shipped_at) : null
+      if (!shippedAt) continue
+      const statuses = statusByRecord.get(o.exchange_record_id) || new Set()
+      const hasPickup =
+        statuses.has('picked_up') ||
+        statuses.has('in_transit') ||
+        statuses.has('delivering') ||
+        statuses.has('delivered')
+      const hasDelivered = statuses.has('delivered')
+
+      if (!hasPickup && shippedAt < pickupBefore) {
+        notPickedUp.push({
+          order_no: o.order_no,
+          shipping_no: o.shipping_no,
+          shipped_at: o.shipped_at
+        })
+      }
+      if (!hasDelivered && shippedAt < deliverBefore) {
+        notDelivered.push({
+          order_no: o.order_no,
+          shipping_no: o.shipping_no,
+          shipped_at: o.shipped_at
+        })
+      }
+    }
+
+    return {
+      not_picked_up: notPickedUp,
+      not_delivered: notDelivered,
+      scanned_at: BeijingTimeHelper.now()
+    }
+  }
+
+  /**
+   * 按快递单号定位订单（物流 webhook 回调用，物流方案一）
+   *
+   * @param {string} shipping_no - 快递单号
+   * @returns {Promise<Object|null>} 订单基础信息 { exchange_record_id, order_no, status, shipping_company }；不存在返回 null
+   */
+  async getOrderByShippingNo(shipping_no) {
+    if (!shipping_no) return null
+    const order = await this.ExchangeRecord.findOne({
+      where: { shipping_no },
+      attributes: ['exchange_record_id', 'order_no', 'status', 'shipping_company', 'shipping_no']
+    })
+    return order ? order.toJSON() : null
+  }
+
+  /**
+   * 获取本人订单的完整收货联系方式（按需明文，拍板⑤）
+   *
+   * 业务场景：小程序订单详情页用户主动点击「显示完整」时调用，返回完整收件人姓名/手机号/地址
+   * 供本人核对发货信息。默认订单详情下发的是掩码地址，本接口是唯一返回完整手机号的入口。
+   *
+   * 安全约束：
+   * - 仅返回归属当前用户的订单（where 带 user_id），防止越权查看他人地址。
+   * - 仅返回 address_snapshot 中的联系方式字段，不下发成本/内部字段。
+   * - 调用方（路由层）需记录审计日志。
+   *
+   * @param {number} user_id - 当前登录用户 ID
+   * @param {string} order_no - 订单号
+   * @returns {Promise<Object|null>} 完整联系方式 { receiver_name, receiver_phone, province, city, district, detail_address }；无地址返回 null
+   * @throws {Error} statusCode=404 订单不存在或无权访问
+   */
+  async getOrderContact(user_id, order_no) {
+    const order = await this.ExchangeRecord.findOne({
+      where: { user_id, order_no },
+      attributes: ['exchange_record_id', 'order_no', 'address_snapshot']
+    })
+
+    if (!order) {
+      const notFoundError = new Error('订单不存在或无权访问')
+      notFoundError.statusCode = 404
+      notFoundError.errorCode = 'ORDER_NOT_FOUND'
+      throw notFoundError
+    }
+
+    const snapshot = order.address_snapshot
+    if (!snapshot || typeof snapshot !== 'object') {
+      return null
+    }
+
+    // 仅返回联系方式字段（完整明文），不下发其它内部字段
+    return {
+      receiver_name: snapshot.receiver_name || null,
+      receiver_phone: snapshot.receiver_phone || null,
+      province: snapshot.province || null,
+      city: snapshot.city || null,
+      district: snapshot.district || null,
+      detail_address: snapshot.detail_address || null
     }
   }
 

@@ -116,7 +116,7 @@ global.beforeAll(async () => {
         user_id: testData.testUser.user_id,
         mobile: testData.testUser.mobile
       },
-      // 管理员用户（同一用户）
+      // 管理员用户（超级管理员 13612227910，role_level>=100）
       adminUser: {
         user_id: testData.adminUser.user_id,
         mobile: testData.adminUser.mobile
@@ -149,7 +149,60 @@ global.beforeAll(async () => {
     console.log(
       `✅ [Jest Setup] 测试数据初始化完成: user_id=${global.testData.testUser.user_id}, lottery_campaign_id=${global.testData.testCampaign.lottery_campaign_id}, store_id=${global.testData.testStore.store_id}`
     )
+
+    /*
+     * 🔐 账号角色契约校验（2026-06-14 新增 - 防止角色漂移）
+     *
+     * 目的：在所有测试开始前，对 TEST_ACCOUNTS 契约表里每个账号查真实库，
+     *   断言「真实 role_level >= 契约声明的 expected_role_level」。
+     *   一旦库里账号被降级/改角色，立即在 setup 阶段报「账号契约不符」，
+     *   而不是在某个业务断言里报莫名的 403，便于快速定位根因。
+     *
+     * 数据源：真实库 restaurant_points_dev（通过 getUserRoles 实查），不使用 mock。
+     */
+    try {
+      const { TEST_ACCOUNTS } = require('./tests/helpers/test-data')
+      const { User } = require('./models')
+      const { getUserRoles } = require('./middleware/auth')
+      const contractErrors = []
+
+      for (const [roleKey, account] of Object.entries(TEST_ACCOUNTS)) {
+        const user = await User.findByMobile(account.mobile)
+        if (!user) {
+          contractErrors.push(`角色[${roleKey}] 账号 ${account.mobile} 在真实库中不存在`)
+          continue
+        }
+        const roles = await getUserRoles(user.user_id)
+        const actualLevel = roles.role_level || 0
+        if (actualLevel < account.expected_role_level) {
+          contractErrors.push(
+            `角色[${roleKey}] 账号 ${account.mobile} 真实 role_level=${actualLevel}，` +
+              `低于契约要求 ${account.expected_role_level}（请检查真实库角色分配）`
+          )
+        }
+      }
+
+      if (contractErrors.length > 0) {
+        // 契约不符属于环境/数据问题，明确报错指引根因，避免后续测试出现误导性 403
+        const err = new Error(
+          '账号角色契约校验失败（真实库与 TEST_ACCOUNTS 不符）:\n  - ' +
+            contractErrors.join('\n  - ')
+        )
+        err.isContractError = true // 标记：让外层 catch 识别并穿透，不被降级吞掉
+        throw err
+      }
+      console.log('✅ [Jest Setup] 账号角色契约校验通过（已对齐真实库角色）')
+    } catch (contractError) {
+      // 契约校验失败直接抛出，让测试运行明确停在根因处
+      console.error('❌ [Jest Setup] 账号角色契约校验失败:', contractError.message)
+      contractError.isContractError = true
+      throw contractError
+    }
   } catch (error) {
+    // 🔐 账号契约错误必须穿透，不能被降级吞掉（否则会掩盖根因）
+    if (error.isContractError) {
+      throw error
+    }
     console.error('❌ [Jest Setup] 初始化失败:', error.message)
     // 设置空数据，允许测试继续（某些测试可能不需要这些数据）
     global.testData = {

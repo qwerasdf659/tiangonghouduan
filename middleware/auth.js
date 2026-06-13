@@ -796,6 +796,64 @@ function requireRoleLevel(min_level) {
 }
 
 /**
+ * 🎧 客服座席准入中间件（基于 customer_service_agents 座席表，而非 role_level）
+ *
+ * 设计依据：「客服」是岗位职责而非权力等级。能否接待客户由座席表权威判定，
+ * 与 role_level/admin 解耦（老板未必接待，专职客服未必高级别）。
+ * 仅当该用户在 customer_service_agents 中存在且 status='active' 时放行。
+ *
+ * 用法：router.use(authenticateToken, requireCsAgent())
+ * @returns {Function} Express 中间件
+ */
+function requireCsAgent() {
+  return async (req, res, next) => {
+    try {
+      if (!req.user) {
+        return res.apiUnauthorized
+          ? res.apiUnauthorized('未认证用户', 'UNAUTHENTICATED')
+          : res.status(401).json({ success: false, code: 'UNAUTHENTICATED', message: '未认证用户' })
+      }
+
+      const { CustomerServiceAgent } = require('../models')
+      const agent = await CustomerServiceAgent.findOne({
+        where: { user_id: req.user.user_id },
+        attributes: ['customer_service_agent_id', 'status']
+      })
+
+      if (!agent || agent.status !== 'active') {
+        logger.warn(
+          `🚫 [Auth] 非活跃客服座席访问客服接口: user_id=${req.user.user_id}, ` +
+            `agent=${agent ? agent.status : 'none'}`
+        )
+        return res.apiForbidden
+          ? res.apiForbidden('仅客服座席可访问', 'NOT_CS_AGENT', {
+              reason: agent ? `座席状态为 ${agent.status}` : '未注册为客服座席'
+            })
+          : res.status(403).json({
+              success: false,
+              code: 'NOT_CS_AGENT',
+              message: '仅客服座席可访问'
+            })
+      }
+
+      // 挂载座席信息，供后续处理使用（避免重复查询）
+      // eslint-disable-next-line require-atomic-updates
+      req.cs_agent = { customer_service_agent_id: agent.customer_service_agent_id }
+      next()
+    } catch (error) {
+      logger.error('❌ 客服座席校验失败:', error.message)
+      return res.apiError
+        ? res.apiError('客服座席验证失败', 'CS_AGENT_CHECK_FAILED', null, 500)
+        : res.status(500).json({
+            success: false,
+            code: 'CS_AGENT_CHECK_FAILED',
+            message: '客服座席验证失败'
+          })
+    }
+  }
+}
+
+/**
  * 🛡️ 可选Token认证中间件（用于公开接口）
  * @description 尝试认证用户，如果有token则设置用户信息，没有token则允许匿名访问
  * @param {Object} req - 请求对象
@@ -1247,6 +1305,7 @@ module.exports = {
   authenticateToken,
   optionalAuth, // 可选认证中间件（用于公开接口）
   requireRoleLevel, // 🛡️ 基于 role_level 的权限检查中间件（推荐使用）
+  requireCsAgent, // 🎧 客服座席准入中间件（基于 customer_service_agents 座席表）
   requirePermission,
   requireMerchantDomainAccess, // 🆕 商家域准入中间件（AC1.4 域边界隔离）
   requireMerchantPermission, // 🆕 商家权限检查中间件（支持门店范围隔离）

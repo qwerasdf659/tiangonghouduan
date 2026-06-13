@@ -311,42 +311,6 @@ class LotteryUserService {
       throw error
     }
   }
-
-  /**
-   * 🛡️ 更新用户历史总积分
-   *
-   * 业务场景：累加用户历史总积分，用于用户活跃度分析和数据统计
-   *
-   * @param {number} user_id - 用户ID（users表主键）
-   * @param {number} points - 要增加的积分数（可以是负数表示减少）
-   * @returns {Promise<number>} 更新后的历史总积分
-   *
-   * @throws {Error} 当用户不存在时抛出错误
-   *
-   * @example
-   * // 用户获得100积分
-   * const newTotal = await userService.updateHistoryTotalPoints(10001, 100)
-   * logger.info('新的历史总积分:', newTotal)
-   */
-  async updateHistoryTotalPoints(user_id, points) {
-    try {
-      const user = await User.findByPk(user_id)
-      if (!user) {
-        throw new BusinessError('用户不存在', 'LOTTERY_NOT_FOUND', 404)
-      }
-
-      const newTotal = (user.history_total_points || 0) + points
-
-      await user.update({
-        history_total_points: newTotal
-      })
-
-      return newTotal
-    } catch (error) {
-      logger.error('更新历史总积分失败:', error)
-      throw error
-    }
-  }
 }
 
 // 导出类本身，而不是实例

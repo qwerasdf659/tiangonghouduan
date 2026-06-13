@@ -718,6 +718,7 @@ class ExchangeItemService {
       'primary_media_id',
       'item_template_id',
       'mint_instance',
+      'fulfillment_type',
       'rarity_code',
       'status',
       'sort_order',

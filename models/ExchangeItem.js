@@ -172,6 +172,13 @@ module.exports = sequelize => {
         defaultValue: true,
         comment: '兑换后是否自动铸造物品实例'
       },
+      fulfillment_type: {
+        type: DataTypes.ENUM('physical', 'virtual', 'voucher'),
+        allowNull: false,
+        defaultValue: 'physical',
+        comment:
+          '履约类型：physical=实物邮寄(需收货地址+走发货链)/virtual=虚拟即时(建单即完成)/voucher=卡券核销。下单据此判定履约链，替代靠模板 item_type 推断'
+      },
       rarity_code: {
         type: DataTypes.STRING(50),
         allowNull: false,

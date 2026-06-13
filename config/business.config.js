@@ -279,6 +279,48 @@ module.exports = {
       max_file_size: 5 * 1024 * 1024, // 5MB 限制
       allowed_mime_types: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'], // 允许的MIME类型
       storage_folder: 'chat-images' // Sealos对象存储目录
+    },
+
+    /**
+     * 聊天文件上传配置（message_type=file）
+     *
+     * @description 用户/座席在聊天中上传文件（文档/压缩包）的限制规则
+     * @业务规则
+     * - 最大文件大小：20MB
+     * - 允许的文件类型白名单：pdf/word/excel/ppt/txt/zip/rar（按安全策略，禁止可执行文件）
+     * - 存储目录：chat-files/（Sealos对象存储）
+     * - 上传后返回 file_url/file_name/file_size，前端通过消息接口发送 message_type: 'file'
+     * - 安全：扩展名 + MIME 双重校验，文件名做安全化处理，防止可执行/脚本类文件
+     */
+    file_upload: {
+      max_file_size: 20 * 1024 * 1024, // 20MB 限制
+      allowed_mime_types: [
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/vnd.ms-powerpoint',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'text/plain',
+        'application/zip',
+        'application/x-zip-compressed',
+        'application/x-rar-compressed',
+        'application/vnd.rar'
+      ],
+      allowed_extensions: [
+        'pdf',
+        'doc',
+        'docx',
+        'xls',
+        'xlsx',
+        'ppt',
+        'pptx',
+        'txt',
+        'zip',
+        'rar'
+      ],
+      storage_folder: 'chat-files' // Sealos对象存储目录
     }
   }
 }

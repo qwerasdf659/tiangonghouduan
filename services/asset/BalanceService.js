@@ -456,6 +456,22 @@ class BalanceService {
       await BalanceService.finalizeAssetTransactionNo(transaction_record, transaction)
 
       /*
+       * 历史累计获得积分维护（臻选空间解锁 / 成长等级派生的单一数据源）
+       *
+       * 口径：仅对「用户账户 + points 资产 + 正向入账」累加 users.history_total_points。
+       * - 该字段语义为"用户在平台累计获得过多少积分"（单调只增，消费不扣减）。
+       * - 与本笔流水在同一事务内原子完成；位于幂等早返回之后，重试不会重复累加。
+       * - changeBalance 是积分变动的唯一写收口，故此处维护即可保证账本一致、无同步债。
+       */
+      if (asset_code === AssetCode.POINTS && account.account_type === 'user' && delta_amount > 0) {
+        await User.increment('history_total_points', {
+          by: delta_amount,
+          where: { user_id: account.user_id },
+          transaction
+        })
+      }
+
+      /*
        * 双录记账：写入对手方反向流水（V4.2.0 → V4.8.0 全覆盖升级）
        *
        * 规则：对所有提供 counterpart_account_id 的操作创建 counterpart 反向记录

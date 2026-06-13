@@ -564,6 +564,16 @@ class BidService {
     }
     const settleTs = Date.now()
     const placeholderBidOrder = `PH${crypto.randomBytes(12).toString('hex').toUpperCase()}`
+    /*
+     * 履约类型分流（与普通兑换 CoreService 同口径）：
+     * - physical（实物邮寄）：中标即建 pending 订单，物品先入背包；
+     *   中标为异步结算、用户不在场无法当场选地址，故地址由用户事后在订单页补录（updateBidOrderAddress），
+     *   补地址后运营走发货链（approved→shipped→received）。
+     * - virtual/voucher/prop（虚拟即时/卡券/道具）：维持中标即 completed（无需邮寄）。
+     */
+    const fulfillmentType = exchangeItem.fulfillment_type || 'physical'
+    const isPhysicalBid = fulfillmentType === 'physical'
+    const bidOrderStatus = isPhysicalBid ? 'pending' : 'completed'
     const bidRecord = await this.ExchangeRecord.create(
       {
         user_id: winnerId,
@@ -575,7 +585,7 @@ class BidService {
         idempotency_key: `bid_settle_order_${bidProductId}`,
         business_id: generateExchangeBusinessId(winnerId, skuKey, settleTs),
         source: 'bid',
-        status: 'completed',
+        status: bidOrderStatus,
         item_snapshot: {
           item_name: exchangeItem.item_name,
           description: exchangeItem.description,

@@ -7,7 +7,7 @@
 
 const request = require('supertest')
 const app = require('../../../app')
-const { getTestUserToken } = require('../../helpers/auth-helper')
+const { loginAs } = require('../../helpers/auth-helper')
 
 const API_BASE = '/api/v4'
 
@@ -15,7 +15,8 @@ describe('截图页面API联动测试', () => {
   let token
 
   beforeAll(async () => {
-    token = await getTestUserToken(app)
+    // 🔐 2026-06-14：这些 /console/* 接口需管理员权限，统一用角色契约登录 admin（13612227910）
+    token = await loginAs(app, 'admin')
     expect(token).toBeTruthy()
   })
 

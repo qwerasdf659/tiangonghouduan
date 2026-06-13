@@ -21,11 +21,11 @@ const {
   ExchangeRecord,
   MaterialAssetType,
   AccountAssetBalance,
-  MediaFile,
-  UserAddress
+  MediaFile
 } = require('../../models')
 const BalanceService = require('../asset/BalanceService')
 const ItemService = require('../asset/ItemService')
+const UserAddressService = require('../UserAddressService')
 
 /** DIY 作品管理服务 */
 class DiyWorkService {
@@ -546,27 +546,13 @@ class DiyWorkService {
       { transaction }
     )
 
-    // Step 3: 查询收货地址，生成 address_snapshot（实物履约链路）
+    /*
+     * Step 3: 查询收货地址，生成 address_snapshot（实物履约链路）
+     * 复用 UserAddressService.buildSnapshot()（与普通兑换 CoreService 同一份逻辑，避免重复实现）
+     */
     let addressSnapshot = null
     if (addressId) {
-      const address = await UserAddress.findOne({
-        where: { address_id: addressId, user_id: userId },
-        transaction
-      })
-      if (!address) {
-        const error = new Error('收货地址不存在或不属于当前用户')
-        error.statusCode = 400
-        throw error
-      }
-      addressSnapshot = {
-        address_id: address.address_id,
-        receiver_name: address.receiver_name,
-        receiver_phone: address.receiver_phone,
-        province: address.province,
-        city: address.city,
-        district: address.district,
-        detail_address: address.detail_address
-      }
+      addressSnapshot = await UserAddressService.buildSnapshot(userId, addressId, { transaction })
     }
 
     // Step 4: 创建兑换记录（exchange_record），打通实物履约链路

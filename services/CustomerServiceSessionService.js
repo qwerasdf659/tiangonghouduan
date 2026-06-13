@@ -120,6 +120,7 @@ class CustomerServiceSessionService {
    * @param {string} [options.sort_order='DESC'] - 排序方向
    * @param {boolean} [options.include_last_message=false] - 是否包含最后一条消息
    * @param {boolean} [options.calculate_unread=false] - 是否计算未读消息数
+   * @param {string} [options.unread_for='user_side'] - 未读统计口径：'user_side'=用户侧未读座席消息(默认)；'agent'=座席未读用户消息(座席端红点)
    * @returns {Object} 会话列表和分页信息
    */
   static async getSessionList(options = {}) {
@@ -134,7 +135,13 @@ class CustomerServiceSessionService {
         sort_by = 'updated_at',
         sort_order = 'DESC',
         include_last_message = false,
-        calculate_unread = false
+        calculate_unread = false,
+        /*
+         * 未读统计口径（决定统计哪一方发的未读消息）：
+         * - 'user_side'（默认，兼容历史）：统计 sender_type='admin' 的未读 = 用户侧未读的座席消息
+         * - 'agent'：统计 sender_type='user' 的未读 = 座席未读的用户消息（小程序座席端红点用）
+         */
+        unread_for = 'user_side'
       } = options
 
       logger.info('📋 获取客服会话列表，参数:', JSON.stringify(options, null, 2))
@@ -229,23 +236,41 @@ class CustomerServiceSessionService {
         last_message_at: session.last_message_at
           ? BeijingTimeHelper.formatForAPI(session.last_message_at).iso
           : null,
+        // C-1：同时下发北京时间字符串，前端零转换直接显示（UTC iso 仍保留）
+        last_message_at_beijing: session.last_message_at
+          ? BeijingTimeHelper.formatForAPI(session.last_message_at).beijing
+          : null,
         created_at: BeijingTimeHelper.formatForAPI(session.created_at).iso,
+        created_at_beijing: BeijingTimeHelper.formatForAPI(session.created_at).beijing,
         updated_at: BeijingTimeHelper.formatForAPI(session.updated_at).iso,
+        updated_at_beijing: BeijingTimeHelper.formatForAPI(session.updated_at).beijing,
         last_message:
           include_last_message && session.messages && session.messages.length > 0
-            ? session.messages[0]
+            ? {
+                chat_message_id: session.messages[0].chat_message_id,
+                content: session.messages[0].content,
+                sender_type: session.messages[0].sender_type,
+                created_at: BeijingTimeHelper.formatForAPI(session.messages[0].created_at).iso,
+                created_at_beijing: BeijingTimeHelper.formatForAPI(session.messages[0].created_at)
+                  .beijing
+              }
             : null,
         unread_count: 0
       }))
 
       // 如果需要计算未读消息数
       if (calculate_unread) {
+        /*
+         * 按口径选择统计哪一方发的未读消息：
+         * agent（座席端红点）统计用户发的未读；user_side（默认）统计座席发的未读
+         */
+        const unreadSenderType = unread_for === 'agent' ? 'user' : 'admin'
         formattedSessions = await Promise.all(
           formattedSessions.map(async session => {
             const unreadCount = await ChatMessage.count({
               where: {
                 customer_service_session_id: session.customer_service_session_id,
-                sender_type: 'admin',
+                sender_type: unreadSenderType,
                 status: { [Op.in]: ['sent', 'delivered'] }
               }
             })
@@ -436,8 +461,13 @@ class CustomerServiceSessionService {
             message_source: data.message_source,
             content: data.content,
             message_type: data.message_type,
+            // 文件消息元信息（message_type=file 时有值，供前端渲染文件卡片）
+            file_name: data.file_name,
+            file_size: data.file_size,
             status: data.status,
-            created_at: BeijingTimeHelper.formatForAPI(msg.created_at).iso
+            created_at: BeijingTimeHelper.formatForAPI(msg.created_at).iso,
+            // C-1：同时下发北京时间字符串，前端零转换直接显示
+            created_at_beijing: BeijingTimeHelper.formatForAPI(msg.created_at).beijing
           }
         }
 
@@ -508,7 +538,14 @@ class CustomerServiceSessionService {
       'CustomerServiceSessionService.sendMessage'
     )
 
-    const { admin_id, content, message_type = 'text', role_level = 100 } = data
+    const {
+      admin_id,
+      content,
+      message_type = 'text',
+      role_level = 100,
+      file_name,
+      file_size
+    } = data
 
     logger.info(`📤 管理员 ${admin_id} 向会话 ${session_id} 发送消息`)
 
@@ -591,6 +628,9 @@ class CustomerServiceSessionService {
         message_source: 'admin_client',
         content: sanitized_content,
         message_type,
+        // 文件消息（message_type=file）承载文件元信息；其它类型为 null
+        file_name: message_type === 'file' ? file_name || null : null,
+        file_size: message_type === 'file' ? file_size || null : null,
         status: 'sent'
       },
       { transaction }
@@ -614,7 +654,11 @@ class CustomerServiceSessionService {
       content: sanitized_content,
       sender_type: message.sender_type,
       message_type: message.message_type,
+      file_name: message.file_name,
+      file_size: message.file_size,
       created_at: BeijingTimeHelper.formatForAPI(message.created_at).iso,
+      // C-1：同时下发北京时间字符串，前端零转换直接显示
+      created_at_beijing: BeijingTimeHelper.formatForAPI(message.created_at).beijing,
       session_user_id: session.user_id // 供入口层推送WebSocket使用
     }
   }
@@ -648,7 +692,7 @@ class CustomerServiceSessionService {
       'CustomerServiceSessionService.sendUserMessage'
     )
 
-    const { user_id, content, message_type = 'text' } = data
+    const { user_id, content, message_type = 'text', file_name, file_size } = data
 
     logger.info(`📤 用户 ${user_id} 向会话 ${session_id} 发送消息`)
 
@@ -684,6 +728,9 @@ class CustomerServiceSessionService {
         message_source: 'user_client',
         content,
         message_type,
+        // 文件消息（message_type=file）承载文件元信息；其它类型为 null
+        file_name: message_type === 'file' ? file_name || null : null,
+        file_size: message_type === 'file' ? file_size || null : null,
         status: 'sent'
       },
       { transaction }
@@ -708,7 +755,10 @@ class CustomerServiceSessionService {
       sender_type: 'user',
       content: message.content,
       message_type: message.message_type,
+      file_name: message.file_name,
+      file_size: message.file_size,
       created_at: BeijingTimeHelper.formatForAPI(message.created_at).iso,
+      created_at_beijing: BeijingTimeHelper.formatForAPI(message.created_at).beijing,
       session_admin_id: session.admin_id // 返回会话的admin_id（用于WebSocket推送）
     }
   }

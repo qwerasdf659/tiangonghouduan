@@ -475,6 +475,14 @@ models.ExchangeOrderEvent = require('./ExchangeOrderEvent')(sequelize, DataTypes
  *    - 业务场景：创建/审核/发货/收货/评分/取消/拒绝 全链路事件
  */
 
+models.ShippingTrack = require('./ShippingTrack')(sequelize, DataTypes)
+/*
+ * ✅ ShippingTrack：物流轨迹表（物流方案一）
+ *    - 用途：webhook 推送落库的全量快递轨迹（一节点一行）
+ *    - 表名：shipping_tracks，主键：shipping_track_id
+ *    - 业务场景：签收回推自动改单、超时预警、批量对账、客服秒查
+ */
+
 // 🔴 竞价系统模型（臻选空间/幸运空间/竞价功能 — 2026-02-16）
 models.BidProduct = require('./BidProduct')(sequelize, DataTypes)
 /*

@@ -30,6 +30,7 @@ const {
   MediaFile,
   ItemTemplate,
   RedemptionOrder,
+  ExchangeRecord,
   sequelize
 } = require('../models')
 const BalanceService = require('./asset/BalanceService')
@@ -270,6 +271,13 @@ class BackpackService {
           edition_total: item.edition_total || null,
           item_template_id: item.item_template_id || null,
           has_redemption_code: false,
+          /*
+           * 来源订单号（仅兑换来源 source='exchange' 物品有值，其余来源为 null）。
+           * 方案B·查询层聚合：物品底层只存 source + source_ref_id（兑换=exchange_record_id），
+           * 此处按需批量解析为业务单号 order_no 下发，供前端「查看订单/查看物流」直跳，
+           * 不在 items 表冗余订单号（单一数据源，零双写一致性负担）。
+           */
+          order_no: null,
           acquired_at: item.created_at,
           prize_definition_id: item.prize_definition_id
         }
@@ -295,6 +303,42 @@ class BackpackService {
 
         formattedItems.forEach(item => {
           item.has_redemption_code = hasCodeMap.has(item.item_id)
+        })
+      }
+
+      /*
+       * 批量解析兑换来源物品的 order_no（方案B·查询层聚合，防 N+1）。
+       * 仅 source='exchange' 的物品其 source_ref_id 存的是 exchange_records.exchange_record_id；
+       * 收集本批兑换物品的 source_ref_id 一次性 IN 查询，建 Map 回填，避免逐条查询。
+       * 其它来源（lottery/diy/legacy/test）无兑换订单，order_no 保持 null。
+       */
+      const exchangeRefIds = [
+        ...new Set(
+          items
+            .filter(i => i.source === 'exchange' && i.source_ref_id != null)
+            .map(i => parseInt(i.source_ref_id, 10))
+            .filter(id => !isNaN(id))
+        )
+      ]
+      if (exchangeRefIds.length > 0) {
+        const exchangeRecords = await ExchangeRecord.findAll({
+          where: { exchange_record_id: exchangeRefIds },
+          attributes: ['exchange_record_id', 'order_no'],
+          transaction
+        })
+        const orderNoMap = new Map()
+        exchangeRecords.forEach(record => {
+          orderNoMap.set(String(record.exchange_record_id), record.order_no)
+        })
+        /*
+         * formattedItems 与 items 同序（由同一个 map 生成），按索引一一对应回填，
+         * 避免在循环内 find 造成的 O(n²)。
+         */
+        formattedItems.forEach((formatted, idx) => {
+          const source = items[idx]
+          if (source.source === 'exchange' && source.source_ref_id != null) {
+            formatted.order_no = orderNoMap.get(String(source.source_ref_id)) || null
+          }
         })
       }
 
@@ -399,6 +443,19 @@ class BackpackService {
         item_value: item.item_value || 0,
         source: item.source,
         source_ref_id: item.source_ref_id,
+        /*
+         * 来源订单号（方案B·查询层聚合）：仅兑换来源解析 order_no，供前端跳订单/物流；
+         * 其它来源为 null。单条详情直接按 source_ref_id 查一次，无 N+1 风险。
+         */
+        order_no:
+          item.source === 'exchange' && item.source_ref_id != null
+            ? (
+                await ExchangeRecord.findByPk(parseInt(item.source_ref_id, 10), {
+                  attributes: ['order_no'],
+                  transaction
+                })
+              )?.order_no || null
+            : null,
         acquired_at: item.created_at,
         is_owner: viewer_user_id
           ? await BackpackService._isOwner(item, viewer_user_id, transaction)

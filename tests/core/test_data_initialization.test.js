@@ -42,9 +42,12 @@ describe('测试数据初始化功能 (P0-1)', () => {
       expect(typeof result.testUser.user_id).toBe('number')
       expect(result.testUser.user_id).toBeGreaterThan(0)
 
-      // 验证管理员数据与测试用户一致
-      expect(result.adminUser.user_id).toBe(result.testUser.user_id)
-      expect(result.adminUser.mobile).toBe('13612227930')
+      // 验证管理员数据为超级管理员（13612227910，与普通测试用户区分）
+      expect(result.adminUser.user_id).not.toBeNull()
+      expect(typeof result.adminUser.user_id).toBe('number')
+      expect(result.adminUser.mobile).toBe('13612227910')
+      // 管理员与普通测试用户是不同账号（权限不同）
+      expect(result.adminUser.user_id).not.toBe(result.testUser.user_id)
     })
 
     test('应该从数据库查询活跃的测试活动', async () => {
@@ -180,9 +183,9 @@ describe('测试数据初始化功能 (P0-1)', () => {
     })
 
     test('只有 mobile 是预设的查询key', () => {
-      // mobile 是允许硬编码的（作为查询key）
+      // mobile 是允许硬编码的（作为查询key）：普通用户 13612227930，超级管理员 13612227910
       expect(TestConfig.realData.testUser.mobile).toBe('13612227930')
-      expect(TestConfig.realData.adminUser.mobile).toBe('13612227930')
+      expect(TestConfig.realData.adminUser.mobile).toBe('13612227910')
     })
   })
 })
