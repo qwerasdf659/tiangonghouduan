@@ -51,6 +51,7 @@
          @manage-role-permissions="manageRolePermissions($event.detail)"
          @confirm-delete-role="confirmDeleteRole($event.detail)"
          @open-change-role="openChangeRoleModal($event.detail)"
+         @revoke-user-role="revokeUserRole($event.detail)"
          @view-premium-detail="viewPremiumDetail($event.detail)"
          @open-risk-modal="openRiskModal($event.detail)"
          @freeze-user="freezeUser($event.detail)"
@@ -335,7 +336,8 @@
                         <td class="px-4 py-3 text-sm" x-html="renderCell(row, col)"></td>
                       </template>
                       <td class="px-4 py-3">
-                        <button @click="$dispatch('open-change-role', row)" class="text-purple-500 hover:text-purple-700 text-sm">更改角色</button>
+                        <button @click="$dispatch('open-change-role', row)" class="text-purple-500 hover:text-purple-700 text-sm">增加角色</button>
+                        <button @click="$dispatch('revoke-user-role', row)" class="ml-3 text-red-500 hover:text-red-700 text-sm">移除</button>
                       </td>
                     </tr>
                   </template>
@@ -1390,7 +1392,7 @@
         <!-- 内容 -->
         <div class="relative themed-card rounded-lg shadow-xl w-full max-w-md mx-4 z-10">
           <div class="p-4 border-b flex justify-between items-center">
-            <h5 class="font-semibold" x-text="changeRoleCurrentName ? ('🏷️ 更改角色（当前：' + changeRoleCurrentName + '）') : '🏷️ 分配角色'"></h5>
+            <h5 class="font-semibold" x-text="userRoleForm.mobile ? ('🏷️ 增加角色（' + userRoleForm.mobile + '）') : '🏷️ 增加角色'"></h5>
             <button @click="hideModal('assignRoleModal')" class="text-gray-400 hover:themed-text-muted text-xl">✕</button>
           </div>
           <form @submit.prevent="submitAssignRole()">
@@ -1408,7 +1410,7 @@
                 </template>
               </div>
               <div>
-                <label class="block text-sm font-medium themed-text-secondary mb-1">选择角色 <span class="text-red-500">*</span></label>
+                <label class="block text-sm font-medium themed-text-secondary mb-1">要增加的角色 <span class="text-red-500">*</span></label>
                 <select x-model="userRoleForm.role_name" 
                         class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500" required>
                   <option value="">请选择角色</option>
@@ -1416,6 +1418,7 @@
                     <option :value="role.role_name" x-text="role.role_name + ' (level ' + role.role_level + ')'"></option>
                   </template>
                 </select>
+                <p class="text-xs themed-text-muted mt-1">多角色并集：增加不会移除该用户已有的其它角色；权限取所有角色并集。</p>
               </div>
               <div>
                 <label class="block text-sm font-medium themed-text-secondary mb-1">变更原因</label>

@@ -20,21 +20,19 @@
  *
  * ⚠️ 【安全使用指南】
  * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- * 1. 【生产环境推荐】
- *    - 路由层修改用户角色，必须使用 updateUserRole() 作为唯一入口
- *    - 该方法包含完整的：事务保护 + 权限校验 + 审计日志 + 缓存失效
+ * 1. 【多角色并集模型 - 2026-06-14】
+ *    - 一个用户可同时持有多个角色，最终权限 = 所有 active 角色权限的并集（User.hasPermission）。
+ *    - 角色写入用单角色增删入口：assignRole()（增一个，幂等）/ revokeRole()（删一个，零角色兜底 user）。
+ *    - 两者均含：事务保护 + 越权护栏 + 审计日志(role_change) + 缓存失效（post_commit_actions）。
  *
- * 2. 【assignUserRole / removeUserRole 使用限制】
- *    - ❌ 禁止在路由层直接调用这两个方法
- *    - ❌ 禁止在对外暴露的API接口中使用
- *    - ⚠️ 这两个方法缺少：事务保护、审计日志、缓存失效机制
- *    - ✅ 仅供内部工具、测试脚本、或特殊场景下的编排使用
+ * 2. 【updateUserRole（覆盖式）已弃用】
+ *    - 旧的「删光重插、强制单角色」逻辑与多角色模型冲突，已下线对外路由。
+ *    - 保留 updateUserRole 仅供存量测试/内部编排参考，新代码一律用 assignRole / revokeRole。
  *
- * 3. 【为什么要限制使用】
- *    - 权限变更是高敏感操作，必须有完整的审计追踪
- *    - 必须自动失效用户权限缓存，否则权限不生效
- *    - 必须防止权限越级修改（低级别管理员修改高级别管理员）
- *    - 简单的分配/移除方法无法满足这些安全要求
+ * 3. 【为什么要这样设计】
+ *    - 权限变更是高敏感操作，必须有完整的审计追踪与缓存失效。
+ *    - 必须防止权限越级修改（低级别管理员授予/移除高级别角色）。
+ *    - 多角色并集贴合「一人多岗」，每个角色保持单一职责，降低长期维护成本与技术债。
  * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  */
 
@@ -306,6 +304,247 @@ class UserRoleService {
         invalidate_cache: true,
         disconnect_ws: targetRole.role_level < 100
       }
+    }
+  }
+
+  /**
+   * ➕ 为用户增加一个角色（多角色并集模型，幂等）
+   *
+   * 与 updateUserRole（覆盖式）不同：本方法只新增一个角色，不动用户已有的其它角色，
+   * 符合标准 RBAC「一人多岗、权限并集」。已拥有该角色则幂等返回，不重复插入。
+   *
+   * 护栏：
+   * - 操作者最高级别必须严格高于「目标角色级别」与「目标用户当前最高级别」，防止越权授予。
+   * - 强制外部事务；审计 role_change(assign)；副作用经 post_commit_actions 交调用方处理。
+   *
+   * @param {number} user_id - 目标用户ID
+   * @param {string} role_name - 要增加的角色名
+   * @param {number} operator_id - 操作者ID
+   * @param {Object} options - { transaction(必填), reason, ip_address, user_agent }
+   * @returns {Promise<Object>} 结果（含 added 是否实际新增、roles 最新角色名数组、post_commit_actions）
+   */
+  static async assignRole(user_id, role_name, operator_id, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'UserRoleService.assignRole')
+    const { reason, ip_address, user_agent } = options
+
+    const targetUser = await User.findByPk(user_id, { transaction })
+    if (!targetUser) {
+      throw new BusinessError('用户不存在', 'ROLE_NOT_FOUND', 404)
+    }
+
+    const targetRole = await Role.findOne({ where: { role_name, is_active: true }, transaction })
+    if (!targetRole) {
+      throw new BusinessError('角色不存在', 'ROLE_NOT_FOUND', 404)
+    }
+
+    const operatorRoles = await getUserRoles(operator_id)
+    const operatorMaxLevel =
+      operatorRoles.roles.length > 0 ? Math.max(...operatorRoles.roles.map(r => r.role_level)) : 0
+    const targetUserRoles = await getUserRoles(user_id)
+    const targetMaxLevel =
+      targetUserRoles.roles.length > 0
+        ? Math.max(...targetUserRoles.roles.map(r => r.role_level))
+        : 0
+
+    // 越权护栏：不能授予高于/等于自己级别的角色，也不能操作同级或更高的用户
+    if (operatorMaxLevel <= targetRole.role_level || operatorMaxLevel <= targetMaxLevel) {
+      throw new BusinessError(
+        `权限不足：无法授予高于或等于自身级别的角色（操作者级别: ${operatorMaxLevel}, 目标角色级别: ${targetRole.role_level}, 目标用户级别: ${targetMaxLevel}）`,
+        'ROLE_FORBIDDEN',
+        403
+      )
+    }
+
+    const existing = await UserRole.findOne({
+      where: { user_id, role_id: targetRole.role_id },
+      transaction
+    })
+
+    const oldRoles = targetUserRoles.roles.map(r => r.role_name).join(', ') || '无角色'
+
+    if (existing && existing.is_active) {
+      // 幂等：已有该 active 角色，直接返回不重复插入
+      return {
+        user_id,
+        role_name,
+        added: false,
+        roles: targetUserRoles.roles.map(r => r.role_name),
+        operator_id,
+        post_commit_actions: { invalidate_cache: false, disconnect_ws: false }
+      }
+    }
+
+    if (existing) {
+      await existing.update(
+        {
+          is_active: true,
+          assigned_by: operator_id,
+          assigned_at: BeijingTimeHelper.createBeijingTime()
+        },
+        { transaction }
+      )
+    } else {
+      await UserRole.create(
+        {
+          user_id,
+          role_id: targetRole.role_id,
+          assigned_at: BeijingTimeHelper.createBeijingTime(),
+          assigned_by: operator_id,
+          is_active: true
+        },
+        { transaction }
+      )
+    }
+
+    const newRoleNames = [...targetUserRoles.roles.map(r => r.role_name), role_name]
+    const idempotencyKey = `role_assign_${user_id}_${role_name}_${operator_id}_${Math.floor(Date.now() / 1000)}`
+
+    await AuditLogService.logOperation({
+      operator_id,
+      operation_type: 'role_change',
+      target_type: 'User',
+      target_id: user_id,
+      action: 'assign',
+      before_data: { roles: oldRoles },
+      after_data: { roles: newRoleNames.join(', '), added_role: role_name },
+      reason: reason || `增加角色: ${role_name}`,
+      idempotency_key: `audit_${idempotencyKey}`,
+      ip_address,
+      user_agent,
+      transaction,
+      is_critical_operation: true
+    })
+
+    logger.info('用户角色已增加', { user_id, added_role: role_name, operator_id })
+
+    return {
+      user_id,
+      role_name,
+      added: true,
+      roles: newRoleNames,
+      operator_id,
+      post_commit_actions: { invalidate_cache: true, disconnect_ws: false }
+    }
+  }
+
+  /**
+   * ➖ 移除用户的一个角色（多角色并集模型）
+   *
+   * 只移除指定角色，保留其它角色。若移除后用户将无任何角色，则自动兜底为系统角色 `user`（level 0），
+   * 避免出现「零角色」边界状态。
+   *
+   * 护栏：
+   * - 操作者最高级别必须严格高于「被移除角色级别」与「目标用户当前最高级别」，防止越权。
+   * - 强制外部事务；审计 role_change(revoke)；副作用经 post_commit_actions 交调用方处理。
+   *
+   * @param {number} user_id - 目标用户ID
+   * @param {string} role_name - 要移除的角色名
+   * @param {number} operator_id - 操作者ID
+   * @param {Object} options - { transaction(必填), reason, ip_address, user_agent }
+   * @returns {Promise<Object>} 结果（含 removed、fell_back_to_user、roles 最新角色名数组、post_commit_actions）
+   */
+  static async revokeRole(user_id, role_name, operator_id, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'UserRoleService.revokeRole')
+    const { reason, ip_address, user_agent } = options
+
+    const targetUser = await User.findByPk(user_id, { transaction })
+    if (!targetUser) {
+      throw new BusinessError('用户不存在', 'ROLE_NOT_FOUND', 404)
+    }
+
+    const targetRole = await Role.findOne({ where: { role_name }, transaction })
+    if (!targetRole) {
+      throw new BusinessError('角色不存在', 'ROLE_NOT_FOUND', 404)
+    }
+
+    const operatorRoles = await getUserRoles(operator_id)
+    const operatorMaxLevel =
+      operatorRoles.roles.length > 0 ? Math.max(...operatorRoles.roles.map(r => r.role_level)) : 0
+    const targetUserRoles = await getUserRoles(user_id)
+    const targetMaxLevel =
+      targetUserRoles.roles.length > 0
+        ? Math.max(...targetUserRoles.roles.map(r => r.role_level))
+        : 0
+
+    if (operatorMaxLevel <= targetRole.role_level || operatorMaxLevel <= targetMaxLevel) {
+      throw new BusinessError(
+        `权限不足：无法移除高于或等于自身级别的角色（操作者级别: ${operatorMaxLevel}, 目标角色级别: ${targetRole.role_level}, 目标用户级别: ${targetMaxLevel}）`,
+        'ROLE_FORBIDDEN',
+        403
+      )
+    }
+
+    const existing = await UserRole.findOne({
+      where: { user_id, role_id: targetRole.role_id, is_active: true },
+      transaction
+    })
+    if (!existing) {
+      throw new BusinessError('用户未拥有该角色', 'ROLE_NOT_FOUND', 404)
+    }
+
+    const oldRoles = targetUserRoles.roles.map(r => r.role_name).join(', ') || '无角色'
+
+    await UserRole.destroy({ where: { user_id, role_id: targetRole.role_id }, transaction })
+
+    // 兜底：移除后无任何角色 → 自动赋系统角色 user（level 0）
+    let fellBackToUser = false
+    const remaining = targetUserRoles.roles.filter(r => r.role_name !== role_name)
+    if (remaining.length === 0) {
+      const userRole = await Role.findOne({ where: { role_name: 'user' }, transaction })
+      if (userRole) {
+        await UserRole.create(
+          {
+            user_id,
+            role_id: userRole.role_id,
+            assigned_at: BeijingTimeHelper.createBeijingTime(),
+            assigned_by: operator_id,
+            is_active: true
+          },
+          { transaction }
+        )
+        remaining.push({ role_name: 'user' })
+        fellBackToUser = true
+      }
+    }
+
+    const newRoleNames = remaining.map(r => r.role_name)
+    const idempotencyKey = `role_revoke_${user_id}_${role_name}_${operator_id}_${Math.floor(Date.now() / 1000)}`
+
+    await AuditLogService.logOperation({
+      operator_id,
+      operation_type: 'role_change',
+      target_type: 'User',
+      target_id: user_id,
+      action: 'revoke',
+      before_data: { roles: oldRoles },
+      after_data: {
+        roles: newRoleNames.join(', ') || '无角色',
+        removed_role: role_name,
+        fell_back_to_user: fellBackToUser
+      },
+      reason: reason || `移除角色: ${role_name}`,
+      idempotency_key: `audit_${idempotencyKey}`,
+      ip_address,
+      user_agent,
+      transaction,
+      is_critical_operation: true
+    })
+
+    logger.info('用户角色已移除', {
+      user_id,
+      removed_role: role_name,
+      fell_back_to_user: fellBackToUser,
+      operator_id
+    })
+
+    return {
+      user_id,
+      role_name,
+      removed: true,
+      fell_back_to_user: fellBackToUser,
+      roles: newRoleNames,
+      operator_id,
+      post_commit_actions: { invalidate_cache: true, disconnect_ws: true }
     }
   }
 

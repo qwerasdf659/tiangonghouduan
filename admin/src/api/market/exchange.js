@@ -26,6 +26,8 @@ export const EXCHANGE_ENDPOINTS = {
   ORDER_REJECT: `${API_PREFIX}/console/exchange/orders/:order_no/reject`,
   ORDER_REFUND: `${API_PREFIX}/console/exchange/orders/:order_no/refund`,
   ORDER_COMPLETE: `${API_PREFIX}/console/exchange/orders/:order_no/complete`,
+  /** 运营修改订单收货地址（手填覆写快照，仅未发货阶段，后端: PUT /orders/:order_no/address） */
+  ORDER_UPDATE_ADDRESS: `${API_PREFIX}/console/exchange/orders/:order_no/address`,
 
   // 商品运营（后端: routes/v4/console/exchange/operations.js）
   ITEM_PIN: `${API_PREFIX}/console/exchange/items/:exchange_item_id/pin`,
@@ -143,6 +145,23 @@ export const ExchangeAPI = {
   async completeExchangeOrder(orderNo, data = {}) {
     const url = buildURL(EXCHANGE_ENDPOINTS.ORDER_COMPLETE, { order_no: orderNo })
     return await request({ url, method: 'POST', data })
+  },
+
+  /**
+   * 运营修改订单收货地址（手填覆写快照，对标淘宝京东客服改地址，仅未发货阶段）
+   * @param {string} orderNo - 订单号
+   * @param {Object} data - 收货信息（全部必填）
+   * @param {string} data.receiver_name - 收件人姓名
+   * @param {string} data.receiver_phone - 收件人手机号
+   * @param {string} data.province - 省
+   * @param {string} data.city - 市
+   * @param {string} data.district - 区/县
+   * @param {string} data.detail_address - 详细地址
+   * @returns {Promise<Object>} API 响应（{ order_no, address_snapshot }）
+   */
+  async updateExchangeOrderAddress(orderNo, data = {}) {
+    const url = buildURL(EXCHANGE_ENDPOINTS.ORDER_UPDATE_ADDRESS, { order_no: orderNo })
+    return await request({ url, method: 'PUT', data })
   },
 
   // ===== 商品运营 =====

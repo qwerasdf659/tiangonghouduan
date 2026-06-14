@@ -95,8 +95,6 @@ export function useRolesPermissionsState() {
     },
     /** @type {Object} 用户角色分配表单（手机号主导搜索） */
     userRoleForm: { mobile: '', role_name: '', reason: '' },
-    /** @type {string} 「更改角色」时的当前角色名（用于弹窗提示），分配新用户时为空 */
-    changeRoleCurrentName: '',
     /** @type {Object|null} 待删除的角色 */
     roleToDelete: null,
     /** @type {Object|null} 选中的角色（用于权限查看） */
@@ -513,7 +511,6 @@ export function useRolesPermissionsMethods() {
      */
     openAssignRoleModal() {
       this.userRoleForm = { mobile: '', role_name: '', reason: '' }
-      this.changeRoleCurrentName = ''
       // 确保角色列表已加载
       if (!this.roles || this.roles.length === 0) {
         this.loadRoles()
@@ -522,15 +519,14 @@ export function useRolesPermissionsMethods() {
     },
 
     /**
-     * 打开「更改角色」模态框（复用分配角色弹窗，预填该用户手机号与当前角色）
+     * 打开「增加角色」模态框（复用分配角色弹窗，预填该用户手机号）
      *
-     * 修改已有账号的角色绑定：从用户角色列表某行进入，预填手机号 + 当前角色，
-     * 管理员选新角色后提交（走 submitAssignRole → PUT UPDATE_ROLE，零后端改动）。
+     * 多角色并集模型：从用户角色列表某行进入，预填手机号，管理员选要增加的角色后提交
+     * （走 submitAssignRole → POST ASSIGN_ROLE，只增不删，保留该用户其它角色）。
      * @param {Object} userRole - 用户角色列表行（含 user/role/mobile 等）
      */
     openChangeRoleModal(userRole) {
       const mobile = userRole?.user?.mobile || userRole?.mobile || ''
-      const currentRoleName = userRole?.role?.role_name || userRole?.role_name || ''
       this.userRoleForm = { mobile, role_name: '', reason: '' }
       // 预解析用户用于弹窗内回显（手机号已知，直接带出当前账号信息）
       if (mobile) {
@@ -539,12 +535,11 @@ export function useRolesPermissionsMethods() {
       if (!this.roles || this.roles.length === 0) {
         this.loadRoles()
       }
-      this.changeRoleCurrentName = currentRoleName
       this.showModal('assignRoleModal')
     },
 
     /**
-     * 提交角色分配（更新用户角色）
+     * 提交角色分配（多角色并集：给用户增加一个角色，保留其它角色）
      */
     async submitAssignRole() {
       if (!this.userRoleForm.mobile || !this.userRoleForm.role_name) {
@@ -558,23 +553,60 @@ export function useRolesPermissionsMethods() {
 
       try {
         this.saving = true
-        // 使用 UPDATE_ROLE API 更新用户角色
-        const url = buildURL(USER_ENDPOINTS.UPDATE_ROLE, { user_id: user.user_id })
+        // 多角色并集：POST ASSIGN_ROLE 只增不删，幂等
+        const url = buildURL(USER_ENDPOINTS.ASSIGN_ROLE, { user_id: user.user_id })
         const response = await this.apiCall(url, {
-          method: 'PUT',
+          method: 'POST',
           data: {
             role_name: this.userRoleForm.role_name,
-            reason: this.userRoleForm.reason || '管理员分配角色'
+            reason: this.userRoleForm.reason || '管理员增加角色'
           }
         })
 
         if (response?.success) {
-          this.showSuccess('用户角色更新成功')
+          this.showSuccess(response.data?.added === false ? '用户已拥有该角色' : '角色增加成功')
           this.hideModal('assignRoleModal')
           await this.loadUserRoles()
         }
       } catch (error) {
-        this.showError('角色更新失败: ' + (error.message || '未知错误'))
+        this.showError('角色增加失败: ' + (error.message || '未知错误'))
+      } finally {
+        this.saving = false
+      }
+    },
+
+    /**
+     * 移除用户的一个角色（多角色并集：只删该角色，零角色时后端兜底 user）
+     * @param {Object} userRole - 用户角色列表行（含 user.user_id / role.role_name）
+     */
+    async revokeUserRole(userRole) {
+      const userId = userRole?.user?.user_id || userRole?.user_id
+      const roleName = userRole?.role?.role_name || userRole?.role_name
+      if (!userId || !roleName) {
+        this.showError('缺少用户或角色信息')
+        return
+      }
+      if (!confirm(`确定移除该用户的「${roleName}」角色吗？`)) return
+
+      try {
+        this.saving = true
+        const url = buildURL(USER_ENDPOINTS.REVOKE_ROLE, {
+          user_id: userId,
+          role_name: roleName
+        })
+        const response = await this.apiCall(url, {
+          method: 'DELETE',
+          data: { reason: '管理员移除角色' }
+        })
+
+        if (response?.success) {
+          this.showSuccess(
+            response.data?.fell_back_to_user ? '已移除，用户无其它角色已兜底为 user' : '角色移除成功'
+          )
+          await this.loadUserRoles()
+        }
+      } catch (error) {
+        this.showError('角色移除失败: ' + (error.message || '未知错误'))
       } finally {
         this.saving = false
       }

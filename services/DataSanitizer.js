@@ -6,12 +6,21 @@ const { getImageUrl, getPlaceholderImageUrl } = require('../utils/ImageUrlHelper
 /**
  * 🔒 全局敏感资产类型黑名单（决策1：绝对禁止暴露给前端）
  *
- * BUDGET_POINTS 为系统内部资产，任何面向微信小程序前端的 API 响应中
- * 禁止出现该资产类型的字段信息（包括 asset_code 值、余额、流水等）
+ * BUDGET_POINTS（预算积分）、STAR_STONE_QUOTA（星石配额）均为系统内部记账资产，
+ * 任何面向微信小程序前端的 API 响应中禁止出现该类资产的字段信息
+ *（包括 asset_code 值、余额、流水、描述如"发放星石配额"等）。
+ *
+ * ⚠️ 大小写：真实库中 asset_code 存在大小写不一致历史数据（如 star_stone_quota / STAR_STONE_QUOTA），
+ *    故匹配统一小写比较（见 isForbiddenAsset / filterForbiddenAssets），避免大写变体漏过滤。
  *
  * @constant {string[]}
  */
-const FORBIDDEN_FRONTEND_ASSET_CODES = [AssetCode.BUDGET_POINTS]
+const FORBIDDEN_FRONTEND_ASSET_CODES = [AssetCode.BUDGET_POINTS, AssetCode.STAR_STONE_QUOTA]
+
+/** 黑名单小写集合（大小写不敏感匹配用） */
+const FORBIDDEN_FRONTEND_ASSET_CODES_LOWER = FORBIDDEN_FRONTEND_ASSET_CODES.map(c =>
+  String(c).toLowerCase()
+)
 
 /**
  * 业务数值归一工具（P1·BIGINT 数值口径，2026-06-12）
@@ -1581,7 +1590,8 @@ class DataSanitizer {
     if (!Array.isArray(items)) return items
     return items.filter(item => {
       const code = item[assetCodeField]
-      return !FORBIDDEN_FRONTEND_ASSET_CODES.includes(code)
+      // 大小写不敏感：库中存在 star_stone_quota / STAR_STONE_QUOTA 等大小写变体
+      return !FORBIDDEN_FRONTEND_ASSET_CODES_LOWER.includes(String(code).toLowerCase())
     })
   }
 
@@ -1592,7 +1602,7 @@ class DataSanitizer {
    * @returns {boolean} 是否为敏感资产（true = 禁止暴露给前端）
    */
   static isForbiddenAsset(assetCode) {
-    return FORBIDDEN_FRONTEND_ASSET_CODES.includes(assetCode)
+    return FORBIDDEN_FRONTEND_ASSET_CODES_LOWER.includes(String(assetCode).toLowerCase())
   }
 }
 

@@ -8,6 +8,7 @@
  */
 
 import { logger } from '../../../utils/logger.js'
+import { $confirm } from '../../../utils/index.js'
 import { buildURL, request } from '../../../api/base.js'
 import { EXCHANGE_ENDPOINTS } from '../../../api/market/exchange.js'
 
@@ -27,6 +28,15 @@ export function useExchangeOrdersState() {
     orderFilters: { status: '', order_no: '' },
     /** @type {Object} 发货表单（含快递信息） */
     shipForm: { shipping_company: '', shipping_company_name: '', shipping_no: '', remark: '' },
+    /** @type {Object} 修改收货地址表单（运营手填覆写快照，仅未发货阶段） */
+    addressForm: {
+      receiver_name: '',
+      receiver_phone: '',
+      province: '',
+      city: '',
+      district: '',
+      detail_address: ''
+    },
     /** @type {Object|null} 物流轨迹数据 */
     orderTrack: null,
     /** @type {Array<Object>} 快递公司列表 */
@@ -162,7 +172,7 @@ export function useExchangeOrdersMethods() {
      * @param {string} [shippingInfo.remark] - 发货备注
      */
     async shipOrder(order, shippingInfo = {}) {
-      const confirmed = await this.$confirm?.(`确定要发货订单 ${order.order_no} 吗？`)
+      const confirmed = await $confirm(`确定要发货订单 ${order.order_no} 吗？`)
       if (!confirmed) return
 
       try {
@@ -200,7 +210,7 @@ export function useExchangeOrdersMethods() {
      * @param {Object} order - 订单对象
      */
     async approveOrder(order) {
-      const confirmed = await this.$confirm?.(`确定要审核通过订单 ${order.order_no} 吗？`)
+      const confirmed = await $confirm(`确定要审核通过订单 ${order.order_no} 吗？`)
       if (!confirmed) return
 
       try {
@@ -233,7 +243,7 @@ export function useExchangeOrdersMethods() {
      * @param {Object} order - 订单对象
      */
     async refundOrder(order) {
-      const confirmed = await this.$confirm?.(
+      const confirmed = await $confirm(
         `确定要退款订单 ${order.order_no} 吗？已支付的材料资产将退回用户账户。`,
         { type: 'danger' }
       )
@@ -269,7 +279,7 @@ export function useExchangeOrdersMethods() {
      * @param {Object} order - 订单对象
      */
     async completeOrder(order) {
-      const confirmed = await this.$confirm?.(`确定要标记订单 ${order.order_no} 为已完成吗？`)
+      const confirmed = await $confirm(`确定要标记订单 ${order.order_no} 为已完成吗？`)
       if (!confirmed) return
 
       try {
@@ -302,7 +312,7 @@ export function useExchangeOrdersMethods() {
      * @param {Object} order - 订单对象
      */
     async rejectOrder(order) {
-      const confirmed = await this.$confirm?.(
+      const confirmed = await $confirm(
         `确定要拒绝订单 ${order.order_no} 吗？已支付的资产将退回用户账户。`,
         { type: 'danger' }
       )
@@ -354,7 +364,83 @@ export function useExchangeOrdersMethods() {
     async submitShipForm() {
       if (!this.selectedOrder) return
       await this.shipOrder(this.selectedOrder, { ...this.shipForm })
-      this.closeModal('shipModal')
+      this.hideModal('shipModal')
+    },
+
+    /**
+     * 打开「修改收货地址」弹窗（运营手填覆写快照，对标淘宝京东客服改地址）
+     * 仅 pending/approved（未发货）阶段可改；预填当前订单地址快照便于微调。
+     * @param {Object} order - 订单对象
+     */
+    openAddressModal(order) {
+      this.selectedOrder = order
+      const snap = order?.address_snapshot || {}
+      this.addressForm = {
+        receiver_name: snap.receiver_name || '',
+        receiver_phone: snap.receiver_phone || '',
+        province: snap.province || '',
+        city: snap.city || '',
+        district: snap.district || '',
+        detail_address: snap.detail_address || ''
+      }
+      this.showModal('addressModal')
+    },
+
+    /**
+     * 提交「修改收货地址」表单（运营手填，调管理端改地址接口）
+     */
+    async submitAddressForm() {
+      if (!this.selectedOrder) return
+      const f = this.addressForm
+      // 前端必填校验（与后端一致，提前拦截）
+      if (
+        !f.receiver_name?.trim() ||
+        !f.receiver_phone?.trim() ||
+        !f.province?.trim() ||
+        !f.city?.trim() ||
+        !f.district?.trim() ||
+        !f.detail_address?.trim()
+      ) {
+        this.showError?.('请填写完整的收货信息')
+        return
+      }
+      if (!/^1[3-9]\d{9}$/.test(f.receiver_phone.trim())) {
+        this.showError?.('收件人手机号格式无效')
+        return
+      }
+      try {
+        this.saving = true
+        const res = await request({
+          url: buildURL(EXCHANGE_ENDPOINTS.ORDER_UPDATE_ADDRESS, {
+            order_no: this.selectedOrder.order_no
+          }),
+          method: 'PUT',
+          data: {
+            receiver_name: f.receiver_name.trim(),
+            receiver_phone: f.receiver_phone.trim(),
+            province: f.province.trim(),
+            city: f.city.trim(),
+            district: f.district.trim(),
+            detail_address: f.detail_address.trim()
+          }
+        })
+        if (res.success) {
+          this.showSuccess?.('收货地址修改成功')
+          // 同步更新当前详情里的地址快照，免重新拉取
+          if (this.selectedOrder) {
+            this.selectedOrder.address_snapshot = res.data?.address_snapshot || null
+          }
+          this.hideModal('addressModal')
+          window.dispatchEvent(new CustomEvent('refresh-exchange-orders'))
+        } else {
+          this.showError?.(res.message || '收货地址修改失败')
+        }
+      } catch (e) {
+        logger.error('[ExchangeOrders] 修改收货地址失败:', e)
+        this.showError?.(e?.response?.data?.message || '收货地址修改失败')
+      } finally {
+        this.saving = false
+      }
     },
 
     /**

@@ -614,7 +614,32 @@ class ApprovalChainService {
     })
 
     const displayRows = await ApprovalChainService._attachAuditableTypeDisplay(rows)
+    ApprovalChainService._attachStepProgress(displayRows)
     return { rows: displayRows, count, page, page_size, total_pages: Math.ceil(count / page_size) }
+  }
+
+  /**
+   * 为待办步骤行附加「零歧义进度字段」（progress_*），供前端直读，避免误用步骤的 step_number 当进度。
+   *
+   * 背景：每行的 step.step_number 是模板节点的稀疏排序号（如 9=管理员终审），仅用于排序/定位下一步，
+   * 不是「当前进行到第几步」。真正的进度是 instance.current_step（1-based 序位，1..total_steps）。
+   * 前端若误取 step_number 会显示「第9步/共2步」的矛盾。这里统一在顶层下发权威进度，前端零计算。
+   *
+   * @param {Array<Object>} rows - 待办步骤行数组（plain object，含嵌套 instance）
+   * @returns {void} 原地附加字段
+   * @private
+   */
+  static _attachStepProgress(rows) {
+    if (!Array.isArray(rows)) return
+    for (const row of rows) {
+      const inst = row && row.instance
+      if (!inst) continue
+      const current = Number(inst.current_step) || null
+      const total = Number(inst.total_steps) || null
+      row.progress_current_step = current
+      row.progress_total_steps = total
+      row.progress_text = current && total ? `第${current}步/共${total}步` : null
+    }
   }
 
   /**
@@ -660,6 +685,7 @@ class ApprovalChainService {
     })
 
     const displayRows = await ApprovalChainService._attachAuditableTypeDisplay(rows)
+    ApprovalChainService._attachStepProgress(displayRows)
     return { rows: displayRows, count, page, page_size, total_pages: Math.ceil(count / page_size) }
   }
 

@@ -1097,6 +1097,86 @@ class CoreService {
   }
 
   /**
+   * 管理端（运营/客服）修改订单收货地址（手填字段覆写快照）
+   *
+   * 业务场景（对标淘宝京东客服改地址）：
+   * - 用户电话/IM 联系运营要求改某一笔未发货订单的收货地址。
+   * - 与用户端 updateOrderAddress 不同：运营**不从用户地址簿选**（运营没有用户地址簿），
+   *   而是手动录入一组完整收货信息，直接覆写该订单的 address_snapshot。
+   *
+   * 安全/边界：
+   * - 仅 pending/approved（未发货）阶段可改；发货后地址已用于发货，不可变更。
+   * - 不修改用户地址簿（user_addresses），只覆写本订单快照，零隐私越权扩散。
+   * - 写审计日志（操作人 + 订单号），满足"谁改了哪单地址"的可追溯要求。
+   *
+   * @param {string} order_no - 订单号
+   * @param {Object} addressInput - 运营手填收货信息
+   * @param {string} addressInput.receiver_name - 收件人姓名
+   * @param {string} addressInput.receiver_phone - 收件人手机号
+   * @param {string} addressInput.province - 省
+   * @param {string} addressInput.city - 市
+   * @param {string} addressInput.district - 区/县
+   * @param {string} addressInput.detail_address - 详细地址
+   * @param {number} operator_id - 操作人（运营/管理员）user_id
+   * @param {Object} options - 选项
+   * @param {Transaction} options.transaction - 外部事务对象（必填）
+   * @returns {Promise<Object>} { order_no, address_snapshot }
+   */
+  async updateOrderAddressByAdmin(order_no, addressInput, operator_id, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'CoreService.updateOrderAddressByAdmin')
+
+    const order = await this.ExchangeRecord.findOne({
+      where: { order_no },
+      lock: transaction.LOCK.UPDATE,
+      transaction
+    })
+    if (!order) {
+      const error = new Error('订单不存在')
+      error.statusCode = 404
+      error.code = 'ORDER_NOT_FOUND'
+      throw error
+    }
+    // 仅未发货阶段可改地址（发货后地址已用于发货，不可变更）
+    if (!['pending', 'approved'].includes(order.status)) {
+      const error = new Error('当前订单状态不可修改收货地址（仅未发货阶段可改）')
+      error.statusCode = 400
+      error.code = 'ORDER_STATUS_INVALID'
+      error.data = { current_status: order.status }
+      throw error
+    }
+
+    // 运营手填快照（不绑用户地址簿；address_id 置 null 标识"运营手工录入"）
+    const addressSnapshot = {
+      address_id: null,
+      receiver_name: addressInput.receiver_name,
+      receiver_phone: addressInput.receiver_phone,
+      province: addressInput.province,
+      city: addressInput.city,
+      district: addressInput.district,
+      detail_address: addressInput.detail_address
+    }
+    await order.update(
+      { address_snapshot: addressSnapshot, updated_at: BeijingTimeHelper.createDatabaseTime() },
+      { transaction }
+    )
+
+    // 审计日志：谁改了哪单地址（手机号脱敏，避免日志泄露完整号码）
+    const maskedPhone = String(addressInput.receiver_phone || '').replace(
+      /^(\d{3})\d{4}(\d{4})$/,
+      '$1****$2'
+    )
+    logger.info('[兑换市场] 运营修改订单收货地址', {
+      order_no,
+      operator_id,
+      order_status: order.status,
+      receiver_name: addressInput.receiver_name,
+      receiver_phone: maskedPhone
+    })
+
+    return { order_no, address_snapshot: addressSnapshot }
+  }
+
+  /**
    * 物流签收驱动确认收货（webhook 推送「已签收」时调用，物流方案一·拍板③）
    *
    * 业务场景：第三方快递推送「已签收(delivered)」轨迹 → 自动把订单 shipped→received，

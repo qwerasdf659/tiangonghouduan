@@ -547,9 +547,9 @@ export function useUsersMethods() {
       try {
         this.saving = true
         const response = await this.apiCall(
-          buildURL(USER_ENDPOINTS.UPDATE_ROLE, { user_id: userId }),
+          buildURL(USER_ENDPOINTS.ASSIGN_ROLE, { user_id: userId }),
           {
-            method: 'PUT',
+            method: 'POST',
             data: {
               role_name: roleName,
               reason: '管理员分配角色'
@@ -558,7 +558,9 @@ export function useUsersMethods() {
         )
 
         if (response?.success) {
-          this.showSuccess(`角色分配成功：${roleName}`)
+          this.showSuccess(
+            response.data?.added === false ? `用户已拥有角色：${roleName}` : `角色分配成功：${roleName}`
+          )
           this.hideModal('userRoleModal')
           await this.loadUsers()
         }

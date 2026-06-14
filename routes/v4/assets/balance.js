@@ -17,7 +17,6 @@
 
 const express = require('express')
 const router = express.Router()
-const { AssetCode } = require('../../../constants/AssetCode')
 const { authenticateToken } = require('../../../middleware/auth')
 const { asyncHandler } = require('../../../middleware/validation')
 const { getImageUrl } = require('../../../utils/ImageUrlHelper')
@@ -43,8 +42,8 @@ router.get(
     }
 
     // 系统内部资产禁止前端直接查询（BUDGET_POINTS 预算积分、STAR_STONE_QUOTA 星石配额等）
-    const BLOCKED_ASSET_CODES = new Set([AssetCode.BUDGET_POINTS])
-    if (BLOCKED_ASSET_CODES.has(asset_code)) {
+    const DataSanitizer = req.app.locals.services.getService('data_sanitizer')
+    if (DataSanitizer.isForbiddenAsset(asset_code)) {
       return res.apiError('无效的资产类型', 'BAD_REQUEST', null, 400)
     }
 
@@ -145,8 +144,9 @@ router.get(
       })
     })
 
+    const DataSanitizer = req.app.locals.services.getService('data_sanitizer')
     const filteredBalances = balances.filter(
-      b => b.asset_code !== AssetCode.BUDGET_POINTS && validAssetCodes.has(b.asset_code)
+      b => !DataSanitizer.isForbiddenAsset(b.asset_code) && validAssetCodes.has(b.asset_code)
     )
 
     // 返回字段命名与 BalanceService.getBalance() 保持一致（全链路统一）

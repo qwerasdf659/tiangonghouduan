@@ -13,7 +13,7 @@
 
 import { logger, $confirmDanger, $confirm } from '../../../utils/index.js'
 import { Alpine, createPageMixin, dataTable } from '../../../alpine/index.js'
-import { request, buildURL } from '../../../api/base.js'
+import { request } from '../../../api/base.js'
 import { EXCHANGE_ENDPOINTS, ExchangeAPI } from '../../../api/market/exchange.js'
 import { ExchangeItemAPI } from '../../../api/exchange-item/index.js'
 import {
@@ -153,6 +153,16 @@ document.addEventListener('alpine:init', () => {
             const url = trigger.dataset.previewUrl || trigger.src
             if (url) this.openImagePreview(url, trigger.alt || '')
           }
+        })
+
+        /*
+         * 订单操作（审核/拒绝/发货/退款/完成，均由 useExchangeOrdersMethods 提供）成功后
+         * 统一派发 refresh-exchange-orders 事件；主组件据此刷新订单统计 + 顶部市场统计卡片。
+         * （订单表格自身的列表刷新由 exchangeOrdersTable 组件内的同名监听处理。）
+         */
+        window.addEventListener('refresh-exchange-orders', () => {
+          this.loadOrderStats?.()
+          this._updateMarketStats?.()
         })
 
         await this.loadAssetTypes()
@@ -431,44 +441,6 @@ document.addEventListener('alpine:init', () => {
           logger.error('[ExchangeMarket] 删除商品失败:', e)
           this.showError?.('删除失败')
         }
-      },
-
-      /**
-       * 拒绝订单（HTML 模板使用，管理员操作：审核拒绝，退还材料资产）
-       * @param {Object} order - 订单对象
-       */
-      async rejectOrder(order) {
-        if (
-          !(await $confirm(`确定要拒绝订单 ${order.order_no} 吗？已支付的资产将退回用户账户。`, {
-            type: 'danger'
-          }))
-        )
-          return
-
-        try {
-          this.saving = true
-          const res = await request({
-            url: buildURL(EXCHANGE_ENDPOINTS.ORDER_REJECT, {
-              order_no: order.order_no
-            }),
-            method: 'POST',
-            data: { remark: '管理员拒绝审批' }
-          })
-
-          if (res.success) {
-            this.showSuccess?.('订单已拒绝，资产已退还用户')
-            this._refreshOrdersTable()
-            this.loadOrderStats()
-            this._updateMarketStats()
-          } else {
-            this.showError?.(res.message || '拒绝失败')
-          }
-        } catch (e) {
-          logger.error('[ExchangeMarket] 拒绝订单失败:', e)
-          this.showError?.('拒绝失败')
-        } finally {
-          this.saving = false
-        }
       }
     }
   })
@@ -570,7 +542,7 @@ document.addEventListener('alpine:init', () => {
         {
           key: 'user_id',
           label: '用户',
-          render: (val, row) => row.user_nickname || row.user_mobile || val || '-'
+          render: (val, row) => row.user_mobile || row.user_nickname || '-'
         },
         {
           key: 'item_name',

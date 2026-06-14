@@ -955,8 +955,8 @@ class QueryService {
   }
 
   /**
-   * 附加 pay_asset_name（资产中文显示名称）
-   * 通过 material_asset_types 表将 pay_asset_code 映射为 display_name
+   * 附加 pay_asset_name（资产中文显示名称）+ pay_asset_icon_url（资产图标 URL）
+   * 通过 material_asset_types 表映射 display_name，并复用 resolveMaterialIconUrls 补图标
    *
    * @param {Array|Object} orders - 订单对象或数组
    * @returns {Promise<void>} 直接修改传入对象
@@ -978,9 +978,15 @@ class QueryService {
       nameMap[a.asset_code] = a.display_name
     })
 
+    // 图标 URL（复用 material_asset_types → media_attachments(icon) → media_files 单一真相源，与兑换市场列表/详情 cost_asset_icon_url 同源）
+    const iconMap = await resolveMaterialIconUrls(this.models, assetCodes)
+
     list.forEach(order => {
-      if (order.pay_asset_code && nameMap[order.pay_asset_code]) {
-        order.pay_asset_name = nameMap[order.pay_asset_code]
+      if (order.pay_asset_code) {
+        if (nameMap[order.pay_asset_code]) {
+          order.pay_asset_name = nameMap[order.pay_asset_code]
+        }
+        order.pay_asset_icon_url = iconMap.get(order.pay_asset_code) || null
       }
     })
   }
@@ -1160,6 +1166,19 @@ class QueryService {
        * 不传则不约束（兑换市场看全部订单）。复用现有模型关联，零新表、零冗余列。
        */
       const include = []
+
+      /*
+       * 关联用户信息（web 后台订单列表「用户」列展示手机号/昵称，而非裸 user_id）。
+       * mobile 是 User 的 VIRTUAL 字段（读时自动解密 mobile_encrypted），故 attributes 取 mobile_encrypted；
+       * required:false 不影响订单主集（用户被删时订单仍展示）。web 管理后台允许下发手机号明文（非小程序端）。
+       */
+      include.push({
+        model: this.models.User,
+        as: 'user',
+        attributes: ['user_id', 'nickname', 'mobile_encrypted'],
+        required: false
+      })
+
       if (item_type) {
         include.push({
           model: this.models.ExchangeItem,
@@ -1194,7 +1213,17 @@ class QueryService {
 
       // 添加中文显示名称
       const ordersWithDisplayNames = await displayNameHelper.attachDisplayNames(
-        rows.map(order => order.toJSON()),
+        rows.map(order => {
+          const plain = order.toJSON()
+          /*
+           * 用户信息上提为顶层 user_nickname / user_mobile（前端零映射直读），并移除嵌套 user 对象。
+           * order.user.mobile 走 User 模型 mobile 虚拟字段 getter 自动解密；取不到则回退 null。
+           */
+          plain.user_nickname = order.user?.nickname || null
+          plain.user_mobile = order.user?.mobile || null
+          delete plain.user
+          return plain
+        }),
         [{ field: 'status', dictType: 'exchange_status' }]
       )
 

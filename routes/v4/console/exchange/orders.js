@@ -268,4 +268,74 @@ router.post(
   })
 )
 
+/**
+ * PUT /:order_no/address - 运营/客服修改订单收货地址（手填字段覆写快照）
+ *
+ * 业务场景：对标淘宝京东客服改地址。用户联系运营改某笔未发货订单的收货地址，
+ * 运营手动录入新的收货信息覆写该订单 address_snapshot（不绑用户地址簿、不改用户地址簿）。
+ *
+ * 边界：仅 pending/approved（未发货）阶段可改；requireRoleLevel(30) 运营级；写审计日志。
+ *
+ * @body {string} receiver_name - 收件人姓名
+ * @body {string} receiver_phone - 收件人手机号
+ * @body {string} province - 省
+ * @body {string} city - 市
+ * @body {string} district - 区/县
+ * @body {string} detail_address - 详细地址
+ */
+router.put(
+  '/:order_no/address',
+  authenticateToken,
+  requireRoleLevel(30),
+  asyncHandler(async (req, res) => {
+    const ExchangeCoreService = req.app.locals.services.getService('exchange_core')
+    const { order_no } = req.params
+    const { receiver_name, receiver_phone, province, city, district, detail_address } = req.body
+
+    if (!order_no || order_no.trim().length === 0) {
+      return res.apiError('订单号不能为空', 'BAD_REQUEST', null, 400)
+    }
+    // 必填字段校验（运营手填，全部必填）
+    const missing = []
+    if (!receiver_name || String(receiver_name).trim() === '') missing.push('receiver_name')
+    if (!receiver_phone || String(receiver_phone).trim() === '') missing.push('receiver_phone')
+    if (!province || String(province).trim() === '') missing.push('province')
+    if (!city || String(city).trim() === '') missing.push('city')
+    if (!district || String(district).trim() === '') missing.push('district')
+    if (!detail_address || String(detail_address).trim() === '') missing.push('detail_address')
+    if (missing.length > 0) {
+      return res.apiError(`收货信息缺少必填字段：${missing.join('、')}`, 'BAD_REQUEST', null, 400)
+    }
+    // 手机号格式校验（中国大陆 11 位）
+    if (!/^1[3-9]\d{9}$/.test(String(receiver_phone).trim())) {
+      return res.apiError('收件人手机号格式无效', 'BAD_REQUEST', null, 400)
+    }
+
+    try {
+      const result = await TransactionManager.execute(async transaction => {
+        return await ExchangeCoreService.updateOrderAddressByAdmin(
+          order_no,
+          {
+            receiver_name: String(receiver_name).trim(),
+            receiver_phone: String(receiver_phone).trim(),
+            province: String(province).trim(),
+            city: String(city).trim(),
+            district: String(district).trim(),
+            detail_address: String(detail_address).trim()
+          },
+          req.user.user_id,
+          { transaction }
+        )
+      })
+      return res.apiSuccess(result, '收货地址修改成功')
+    } catch (error) {
+      // Service 抛出的业务错误（404 订单不存在 / 400 状态不可改）映射为标准错误响应
+      if (error.code && error.statusCode) {
+        return res.apiError(error.message, error.code, error.data || null, error.statusCode)
+      }
+      throw error
+    }
+  })
+)
+
 module.exports = router

@@ -149,7 +149,8 @@ import { API_PREFIX, request, buildURL, buildQueryString } from './base.js'
  *
  * @property {string} LIST - [GET] 获取用户列表
  * @property {string} DETAIL - [GET] 获取用户详情 - Path: :user_id
- * @property {string} UPDATE_ROLE - [PUT] 更新用户角色 - Path: :user_id
+ * @property {string} ASSIGN_ROLE - [POST] 给用户增加一个角色（多角色） - Path: :user_id
+ * @property {string} REVOKE_ROLE - [DELETE] 移除用户的一个角色 - Path: :user_id/:role_name
  * @property {string} UPDATE_STATUS - [PUT] 更新用户状态 - Path: :user_id
  * @property {string} DELETE - [DELETE] 删除用户 - Path: :user_id
  *
@@ -194,8 +195,10 @@ export const USER_ENDPOINTS = {
   LIST: `${API_PREFIX}/console/user-management/users`,
   /** @type {string} [GET] 获取用户详情 - Path: :user_id */
   DETAIL: `${API_PREFIX}/console/user-management/users/:user_id`,
-  /** @type {string} [PUT] 更新用户角色 - Path: :user_id, Body: { role_name, reason? } */
-  UPDATE_ROLE: `${API_PREFIX}/console/user-management/users/:user_id/role`,
+  /** @type {string} [POST] 给用户增加一个角色（多角色并集，幂等） - Path: :user_id, Body: { role_name, reason? } */
+  ASSIGN_ROLE: `${API_PREFIX}/console/user-management/users/:user_id/roles`,
+  /** @type {string} [DELETE] 移除用户的一个角色（零角色兜底 user） - Path: :user_id/:role_name, Body: { reason? } */
+  REVOKE_ROLE: `${API_PREFIX}/console/user-management/users/:user_id/roles/:role_name`,
   /** @type {string} [PUT] 更新用户状态 - Path: :user_id, Body: { status, reason? } */
   UPDATE_STATUS: `${API_PREFIX}/console/user-management/users/:user_id/status`,
   /** @type {string} [DELETE] 删除用户 - Path: :user_id */
@@ -298,8 +301,7 @@ export const USER_ENDPOINTS = {
   // 用户角色管理
   /** @type {string} [GET] 查询用户角色列表（只读，来自 system-data 模块） */
   USER_ROLE_LIST: `${API_PREFIX}/console/system-data/user-roles`,
-  // 注意：后端没有 POST/DELETE 用户角色的 API
-  // 用户角色变更应使用 UPDATE_ROLE (PUT /api/v4/console/user-management/users/:user_id/role)
+  // 多角色并集模型：用户角色增删走 ASSIGN_ROLE (POST .../roles) 与 REVOKE_ROLE (DELETE .../roles/:role_name)
 
   // 角色变更历史（来自 business-records 路由）
   /** @type {string} [GET] 获取角色变更历史 - Query: { user_id?, operator_id?, old_role?, new_role?, start_date?, end_date?, page?, page_size? } */
@@ -394,27 +396,41 @@ export const UserAPI = {
   },
 
   /**
-   * 更新用户角色
+   * 给用户增加一个角色（多角色并集模型，幂等）
    * @async
    * @param {number|string} userId - 用户 ID
-   * @param {RoleUpdateData} roleData - 角色数据
-   * @param {UserRole} roleData.role_name - 新角色名称
+   * @param {Object} roleData - 角色数据
+   * @param {string} roleData.role_name - 要增加的角色名
    * @param {string} [roleData.reason] - 变更原因
-   * @returns {Promise<ApiResponse>} 更新结果响应
-   * @throws {Error} 当用户不存在时抛出 USER_NOT_FOUND 错误
-   * @throws {Error} 当角色无效时抛出 ROLE_NOT_FOUND 错误
-   * @throws {Error} 当权限不足时抛出 PERMISSION_DENIED 错误
+   * @returns {Promise<ApiResponse>} 结果响应（含 added/roles）
+   * @throws {Error} 角色不存在 ROLE_NOT_FOUND / 越权 ROLE_FORBIDDEN
    *
    * @example
-   * // 更新用户角色为管理员
-   * const result = await UserAPI.updateRole(12345, {
-   *   role_name: 'admin',
-   *   reason: '晋升为系统管理员'
-   * })
+   * await UserAPI.assignRole(12345, { role_name: 'ops', reason: '兼任运营' })
    */
-  async updateRole(userId, roleData) {
-    const url = buildURL(USER_ENDPOINTS.UPDATE_ROLE, { user_id: userId })
-    return await request({ url, method: 'PUT', data: roleData })
+  async assignRole(userId, roleData) {
+    const url = buildURL(USER_ENDPOINTS.ASSIGN_ROLE, { user_id: userId })
+    return await request({ url, method: 'POST', data: roleData })
+  },
+
+  /**
+   * 移除用户的一个角色（零角色时自动兜底为 user）
+   * @async
+   * @param {number|string} userId - 用户 ID
+   * @param {string} roleName - 要移除的角色名
+   * @param {Object} [options] - 选项
+   * @param {string} [options.reason] - 变更原因
+   * @returns {Promise<ApiResponse>} 结果响应（含 removed/fell_back_to_user/roles）
+   *
+   * @example
+   * await UserAPI.revokeRole(12345, 'ops', { reason: '不再兼任运营' })
+   */
+  async revokeRole(userId, roleName, options = {}) {
+    const url = buildURL(USER_ENDPOINTS.REVOKE_ROLE, {
+      user_id: userId,
+      role_name: roleName
+    })
+    return await request({ url, method: 'DELETE', data: { reason: options.reason } })
   },
 
   /**

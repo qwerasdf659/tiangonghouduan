@@ -37,6 +37,7 @@ const BeijingTimeHelper = require('../../utils/timeHelper')
 const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
 const { attachDisplayNames, DICT_TYPES } = require('../../utils/displayNameHelper')
 const { categoryIconAttachmentInclude } = require('../../utils/mediaAttachmentGallery')
+const { getImageUrl } = require('../../utils/ImageUrlHelper')
 const models = require('../../models')
 const LotteryPricingService = require('../lottery/LotteryPricingService')
 
@@ -52,6 +53,32 @@ const LotteryPricingService = require('../lottery/LotteryPricingService')
  * @class LotteryQueryService
  */
 class LotteryQueryService {
+  /**
+   * 解析奖品图标 URL（单一真相源，与抽奖弹窗/商城/背包同源）
+   *
+   * 优先级：奖品自身主图(primaryMedia) → 材料资产图标(materialAssetType 的 icon 附件) → null。
+   * 供「我的抽奖记录」等列表回显奖品图，前端零映射直读 prize.image_url。
+   *
+   * @param {Object} prizeDefinition - 奖品定义（含 primaryMedia / materialAssetType 关联）
+   * @returns {string|null} 可直接渲染的图片 URL，无图时为 null
+   * @private
+   */
+  static _resolvePrizeImageUrl(prizeDefinition) {
+    if (!prizeDefinition) return null
+    const media = prizeDefinition.primaryMedia
+    if (media?.object_key) {
+      return getImageUrl(media.object_key, media.content_hash)
+    }
+    const iconAttachment =
+      prizeDefinition.materialAssetType?.iconAttachment ||
+      prizeDefinition.materialAssetType?.IconAttachment
+    const iconMedia = iconAttachment?.media || iconAttachment?.Media
+    if (iconMedia?.object_key) {
+      return getImageUrl(iconMedia.object_key, iconMedia.content_hash)
+    }
+    return null
+  }
+
   /**
    * ============================================
    * 1. 获取活动奖品列表
@@ -280,7 +307,24 @@ class LotteryQueryService {
                   'display_name',
                   'prize_type',
                   'rarity_code',
+                  'material_asset_code',
                   'primary_media_id'
+                ],
+                include: [
+                  {
+                    model: models.MediaFile,
+                    as: 'primaryMedia',
+                    required: false,
+                    attributes: ['media_id', 'object_key', 'content_hash']
+                  },
+                  {
+                    model: models.MaterialAssetType,
+                    as: 'materialAssetType',
+                    required: false,
+                    attributes: ['asset_code', 'display_name'],
+                    // P3：与 /assets/balances 同源——materialAssetType 图标附件，统一图标真相源
+                    include: [categoryIconAttachmentInclude(models)].filter(Boolean)
+                  }
                 ]
               }
             ]
@@ -325,7 +369,11 @@ class LotteryQueryService {
                 name: record.campaignPrize.prizeDefinition?.display_name || record.prize_name,
                 type: record.campaignPrize.prizeDefinition?.prize_type || record.prize_type,
                 value: record.prize_value,
-                primary_media_id: record.campaignPrize.prizeDefinition?.primary_media_id
+                primary_media_id: record.campaignPrize.prizeDefinition?.primary_media_id,
+                // 图标 URL：优先奖品自身主图，其次材料资产图标（与抽奖弹窗/商城同源），前端直读
+                image_url: LotteryQueryService._resolvePrizeImageUrl(
+                  record.campaignPrize.prizeDefinition
+                )
               }
             : null,
           points_cost: record.cost_points,

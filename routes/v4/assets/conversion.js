@@ -28,6 +28,7 @@ const { requireValidSession } = require('../../../middleware/sensitiveOperation'
 const TransactionManager = require('../../../utils/TransactionManager')
 
 const { resolve_display_category } = require('../../../utils/conversion_type_resolver')
+const { resolveMaterialIconUrls } = require('../../../utils/mediaAttachmentGallery')
 
 /**
  * @route GET /api/v4/assets/conversion/rules
@@ -67,6 +68,18 @@ router.get(
       return plain
     })
 
+    /* 复用 material 图标单一真相源，补 from/to 资产图标（与兑换市场/背包同源，前端零映射直读） */
+    const ruleAssetCodes = []
+    enriched.forEach(r => {
+      if (r.from_asset_code) ruleAssetCodes.push(r.from_asset_code)
+      if (r.to_asset_code) ruleAssetCodes.push(r.to_asset_code)
+    })
+    const ruleIconMap = await resolveMaterialIconUrls(req.app.locals.models, ruleAssetCodes)
+    enriched.forEach(r => {
+      r.from_asset_icon_url = r.from_asset_code ? ruleIconMap.get(r.from_asset_code) || null : null
+      r.to_asset_icon_url = r.to_asset_code ? ruleIconMap.get(r.to_asset_code) || null : null
+    })
+
     return res.apiSuccess(enriched, '获取转换规则列表成功')
   })
 )
@@ -88,7 +101,18 @@ router.get(
       return res.apiError(`转换规则不存在：${from} → ${to}`, 'RULE_NOT_FOUND', null, 404)
     }
 
-    return res.apiSuccess(rule, '获取转换规则成功')
+    /* 补 from/to 资产图标（与列表接口同源） */
+    const plain = rule.toJSON ? rule.toJSON() : { ...rule }
+    const iconMap = await resolveMaterialIconUrls(
+      req.app.locals.models,
+      [plain.from_asset_code, plain.to_asset_code].filter(Boolean)
+    )
+    plain.from_asset_icon_url = plain.from_asset_code
+      ? iconMap.get(plain.from_asset_code) || null
+      : null
+    plain.to_asset_icon_url = plain.to_asset_code ? iconMap.get(plain.to_asset_code) || null : null
+
+    return res.apiSuccess(plain, '获取转换规则成功')
   })
 )
 

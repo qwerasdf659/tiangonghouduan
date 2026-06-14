@@ -17,6 +17,7 @@
  */
 
 const logger = require('../../utils/logger').logger
+const { resolveMaterialIconUrls } = require('../../utils/mediaAttachmentGallery')
 
 /**
  * 🎯 竞价数据视图常量
@@ -91,6 +92,35 @@ class BidQueryService {
     this.BidRecord = models.BidRecord
     this.ExchangeItem = models.ExchangeItem
     this.sequelize = models.sequelize
+  }
+
+  /**
+   * 为竞价对象补 price_asset_name（资产中文名）+ price_asset_icon_url（资产图标）
+   *
+   * 复用 material_asset_types(display_name) + resolveMaterialIconUrls(图标单一真相源)，
+   * 使竞价列表/详情/记录的计价资产与兑换市场/背包展示一致（前端零映射直读）。
+   *
+   * @param {Array<Object>} targets - 含 price_asset_code 字段的对象数组（商品本身或 bidProduct 子对象）
+   * @returns {Promise<void>} 原地附加 price_asset_name / price_asset_icon_url
+   * @private
+   */
+  async _attachPriceAssetInfo(targets) {
+    const list = (targets || []).filter(t => t && t.price_asset_code)
+    const codes = [...new Set(list.map(t => t.price_asset_code))]
+    if (codes.length === 0) return
+
+    const nameRows = await this.models.MaterialAssetType.findAll({
+      where: { asset_code: codes },
+      attributes: ['asset_code', 'display_name'],
+      raw: true
+    })
+    const nameMap = new Map(nameRows.map(r => [r.asset_code, r.display_name]))
+    const iconMap = await resolveMaterialIconUrls(this.models, codes)
+
+    list.forEach(t => {
+      t.price_asset_name = nameMap.get(t.price_asset_code) || t.price_asset_code
+      t.price_asset_icon_url = iconMap.get(t.price_asset_code) || null
+    })
   }
 
   /**
@@ -194,6 +224,9 @@ class BidQueryService {
 
       logger.info(`[竞价查询] 找到 ${count} 个竞价商品`, { page, returned: rows.length })
 
+      // 补计价资产中文名 + 图标（与兑换市场同源）
+      await this._attachPriceAssetInfo(bidProducts)
+
       return {
         bid_products: bidProducts,
         pagination: {
@@ -278,6 +311,9 @@ class BidQueryService {
         created_at: b.created_at
       }))
 
+      // 补计价资产中文名 + 图标（与兑换市场同源）
+      await this._attachPriceAssetInfo([result])
+
       return result
     } catch (error) {
       logger.error(`[竞价查询] 获取竞价详情失败(id:${bidProductId}):`, error.message)
@@ -342,8 +378,12 @@ class BidQueryService {
 
       logger.info(`[竞价查询] 用户 ${userId} 共 ${count} 条出价记录`)
 
+      const bidRecords = rows.map(r => r.toJSON())
+      // 补计价资产中文名 + 图标（price_asset_code 在 bidProduct 子对象上）
+      await this._attachPriceAssetInfo(bidRecords.map(r => r.bidProduct).filter(Boolean))
+
       return {
-        bid_records: rows.map(r => r.toJSON()),
+        bid_records: bidRecords,
         pagination: {
           total: count,
           page,

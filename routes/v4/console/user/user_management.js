@@ -21,6 +21,38 @@ router.use(authenticateToken)
 router.use(requireRoleLevel(100))
 
 /**
+ * 角色变更后处理副作用（事务已提交后调用）：失效权限缓存、按需断开 WebSocket。
+ * 由 assignRole / revokeRole 路由共用，避免重复代码。
+ *
+ * @param {Object} req - Express 请求对象（用于取 services 与 operator）
+ * @param {number|string} user_id - 被变更角色的用户ID
+ * @param {string} changeTag - 缓存失效原因标记
+ * @param {Object} result - Service 返回结果（含 post_commit_actions）
+ * @returns {Promise<void>} 无返回值（副作用处理完成）
+ */
+async function applyRoleChangeSideEffects(req, user_id, changeTag, result) {
+  if (!result || !result.post_commit_actions) return
+  const { invalidate_cache, disconnect_ws } = result.post_commit_actions
+
+  if (invalidate_cache) {
+    const { invalidateUserPermissions } = require('../../../../middleware/auth')
+    await invalidateUserPermissions(user_id, changeTag, req.user.user_id)
+    logger.info(`✅ 权限缓存已清除: user_id=${user_id}`)
+  }
+
+  if (disconnect_ws) {
+    try {
+      const ChatWebSocketService = req.app.locals.services.getService('chat_web_socket')
+      ChatWebSocketService.disconnectUser(user_id, 'user')
+      ChatWebSocketService.disconnectUser(user_id, 'admin')
+      logger.info(`✅ WebSocket连接已断开: user_id=${user_id}`)
+    } catch (wsError) {
+      logger.warn('断开WebSocket连接失败（非致命）', { user_id, error: wsError.message })
+    }
+  }
+}
+
+/**
  * 📊 获取用户管理统计数据
  * GET /api/v4/console/user_management/stats
  *
@@ -186,11 +218,14 @@ router.get(
 )
 
 /**
- * 🛡️ 更新用户角色（基于UUID角色系统）
- * PUT /api/v4/console/user_management/users/:user_id/role
+ * 🛡️ 为用户增加一个角色（多角色并集模型）
+ * POST /api/v4/console/user-management/users/:user_id/roles
+ * Body: { role_name, reason? }
+ *
+ * 不兼容旧的覆盖式 PUT /role（已下线）。本接口只增不删，保留用户其它角色。
  */
-router.put(
-  '/users/:user_id/role',
+router.post(
+  '/users/:user_id/roles',
   asyncHandler(async (req, res) => {
     const { user_id } = req.params
     const { role_name, reason = '' } = req.body
@@ -199,48 +234,68 @@ router.put(
       return res.apiError('角色名称不能为空', 'ROLE_NAME_REQUIRED', null, 400)
     }
 
-    // 通过 ServiceManager 获取 UserManagementService
-    const UserManagementService = req.app.locals.services.getService('user_management')
+    const UserRoleService = req.app.locals.services.getService('user_role')
 
-    // 使用 TransactionManager 统一管理事务（2026-01-05 事务边界治理）
     const result = await TransactionManager.execute(
       async transaction => {
-        return await UserManagementService.updateUserRole(user_id, role_name, req.user.user_id, {
+        return await UserRoleService.assignRole(user_id, role_name, req.user.user_id, {
           reason,
           ip_address: req.ip,
           user_agent: req.headers['user-agent'],
           transaction
         })
       },
-      { description: 'updateUserRole' }
+      { description: 'assignUserRole' }
     )
 
-    // 事务提交后处理副作用（缓存失效、WebSocket断开）
-    if (result.post_commit_actions) {
-      const { invalidateUserPermissions } = require('../../../../middleware/auth')
-
-      if (result.post_commit_actions.invalidate_cache) {
-        await invalidateUserPermissions(user_id, `role_change_to_${role_name}`, req.user.user_id)
-        logger.info(`✅ 权限缓存已清除: user_id=${user_id}`)
-      }
-
-      if (result.post_commit_actions.disconnect_ws) {
-        try {
-          const ChatWebSocketService = req.app.locals.services.getService('chat_web_socket')
-          ChatWebSocketService.disconnectUser(user_id, 'user')
-          ChatWebSocketService.disconnectUser(user_id, 'admin')
-          logger.info(`✅ WebSocket连接已断开: user_id=${user_id}`)
-        } catch (wsError) {
-          logger.warn('断开WebSocket连接失败（非致命）', { user_id, error: wsError.message })
-        }
-      }
-    }
+    await applyRoleChangeSideEffects(req, user_id, `role_assign_${role_name}`, result)
 
     logger.info(
-      `✅ 用户角色更新成功: user_id=${user_id}, new_role=${role_name}, operator=${req.user.user_id}`
+      `✅ 用户角色已增加: user_id=${user_id}, role=${role_name}, added=${result.added}, operator=${req.user.user_id}`
     )
 
-    return res.apiSuccess(result, '用户角色更新成功')
+    return res.apiSuccess(result, result.added ? '角色增加成功' : '用户已拥有该角色')
+  })
+)
+
+/**
+ * 🛡️ 移除用户的一个角色（多角色并集模型）
+ * DELETE /api/v4/console/user-management/users/:user_id/roles/:role_name
+ * Body: { reason? }
+ *
+ * 只移除指定角色，保留其它角色；若移除后无任何角色则自动兜底为 user。
+ */
+router.delete(
+  '/users/:user_id/roles/:role_name',
+  asyncHandler(async (req, res) => {
+    const { user_id, role_name } = req.params
+    const { reason = '' } = req.body || {}
+
+    if (!role_name) {
+      return res.apiError('角色名称不能为空', 'ROLE_NAME_REQUIRED', null, 400)
+    }
+
+    const UserRoleService = req.app.locals.services.getService('user_role')
+
+    const result = await TransactionManager.execute(
+      async transaction => {
+        return await UserRoleService.revokeRole(user_id, role_name, req.user.user_id, {
+          reason,
+          ip_address: req.ip,
+          user_agent: req.headers['user-agent'],
+          transaction
+        })
+      },
+      { description: 'revokeUserRole' }
+    )
+
+    await applyRoleChangeSideEffects(req, user_id, `role_revoke_${role_name}`, result)
+
+    logger.info(
+      `✅ 用户角色已移除: user_id=${user_id}, role=${role_name}, fell_back_to_user=${result.fell_back_to_user}, operator=${req.user.user_id}`
+    )
+
+    return res.apiSuccess(result, '角色移除成功')
   })
 )
 

@@ -11,13 +11,11 @@
  */
 
 const BusinessError = require('../utils/BusinessError')
-const { User, Role, UserRole } = require('../models')
+const { User, Role } = require('../models')
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
-const BeijingTimeHelper = require('../utils/timeHelper')
 const logger = require('../utils/logger')
 const AuditLogService = require('./AuditLogService')
 const displayNameHelper = require('../utils/displayNameHelper')
-const { getUserRoles } = require('../middleware/auth')
 const PiiCrypto = require('../utils/PiiCrypto')
 const { Op } = require('sequelize')
 
@@ -26,104 +24,6 @@ const { Op } = require('sequelize')
  * @description 提供管理后台的用户角色变更、状态管理及用户列表查询操作
  */
 class UserManagementService {
-  /**
-   * 🔄 更新用户角色（管理后台专用）
-   *
-   * 事务边界治理（2026-01-05 决策）：
-   * - 强制要求外部事务传入（options.transaction）
-   * - 缓存失效、WebSocket断开等副作用应在事务提交后由调用方处理
-   *
-   * @param {number} user_id - 用户ID
-   * @param {string} role_name - 新角色名称
-   * @param {number} operator_id - 操作者ID
-   * @param {Object} options - 选项参数
-   * @returns {Promise<Object>} 更新结果
-   */
-  static async updateUserRole(user_id, role_name, operator_id, options = {}) {
-    const transaction = assertAndGetTransaction(options, 'UserManagementService.updateUserRole')
-    const { reason, ip_address, user_agent } = options
-
-    // 验证目标用户
-    const targetUser = await User.findByPk(user_id, { transaction })
-    if (!targetUser) {
-      throw new BusinessError('用户不存在', 'USER_NOT_FOUND', 404)
-    }
-
-    // 验证操作者权限级别（防止低级别管理员修改高级别管理员）
-    const operatorRoles = await getUserRoles(operator_id)
-    const operatorMaxLevel =
-      operatorRoles.roles.length > 0 ? Math.max(...operatorRoles.roles.map(r => r.role_level)) : 0
-
-    const targetUserRoles = await getUserRoles(user_id)
-    const targetMaxLevel =
-      targetUserRoles.roles.length > 0
-        ? Math.max(...targetUserRoles.roles.map(r => r.role_level))
-        : 0
-
-    if (operatorMaxLevel <= targetMaxLevel) {
-      throw new BusinessError(
-        `权限不足：无法修改同级或更高级别用户的角色（操作者级别: ${operatorMaxLevel}, 目标用户级别: ${targetMaxLevel}）`,
-        'INSUFFICIENT_PERMISSION',
-        400
-      )
-    }
-
-    // 验证目标角色
-    const targetRole = await Role.findOne({ where: { role_name }, transaction })
-    if (!targetRole) {
-      throw new BusinessError('角色不存在', 'ROLE_NOT_FOUND', 404)
-    }
-
-    const oldRoles = targetUserRoles.roles.map(r => r.role_name).join(', ') || '无角色'
-    const oldRoleLevel = targetMaxLevel
-    const idempotencyKey = `role_change_${user_id}_${role_name}_${operator_id}_${Math.floor(Date.now() / 1000)}`
-
-    await UserRole.destroy({ where: { user_id }, transaction })
-
-    await UserRole.create(
-      {
-        user_id,
-        role_id: targetRole.role_id,
-        assigned_at: BeijingTimeHelper.createBeijingTime(),
-        assigned_by: operator_id,
-        is_active: true
-      },
-      { transaction }
-    )
-
-    await AuditLogService.logOperation({
-      operator_id,
-      operation_type: 'role_change',
-      target_type: 'User',
-      target_id: user_id,
-      action: 'update',
-      before_data: { roles: oldRoles, role_level: oldRoleLevel },
-      after_data: { roles: role_name, role_level: targetRole.role_level },
-      reason: reason || `角色变更: ${oldRoles} → ${role_name}`,
-      idempotency_key: `audit_${idempotencyKey}`,
-      ip_address,
-      user_agent,
-      transaction,
-      is_critical_operation: true
-    })
-
-    logger.info('用户角色更新成功', { user_id, new_role: role_name, operator_id })
-
-    return {
-      user_id,
-      new_role: role_name,
-      new_role_level: targetRole.role_level,
-      old_roles: oldRoles,
-      old_role_level: oldRoleLevel,
-      operator_id,
-      reason,
-      post_commit_actions: {
-        invalidate_cache: true,
-        disconnect_ws: targetRole.role_level < 100
-      }
-    }
-  }
-
   /**
    * 📝 更新用户状态（管理后台专用）
    *
