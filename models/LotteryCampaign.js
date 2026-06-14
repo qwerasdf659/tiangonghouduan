@@ -962,10 +962,10 @@ module.exports = sequelize => {
       // ======================== 前端展示配置字段（多活动抽奖系统） ========================
 
       /**
-       * 前端展示方式（14种玩法）
+       * 前端展示方式（16种玩法）
        * @type {string}
        * @业务含义 控制小程序前端加载哪个玩法子组件
-       * @枚举值 grid_3x3/grid_4x4/wheel/card_flip/golden_egg/scratch_card/blind_box/
+       * @枚举值 grid_3x3/grid_4x3/grid_4x4/wheel/card_flip/golden_egg/scratch_card/blind_box/
        *         gashapon/lucky_bag/red_packet/slot_machine/whack_mole/pinball/card_collect/flash_sale
        * @前端效果 前端根据此值动态加载对应子组件（九宫格/转盘/卡牌翻转/...）
        */
@@ -974,7 +974,7 @@ module.exports = sequelize => {
         allowNull: false,
         defaultValue: 'grid_3x3',
         comment:
-          '前端展示方式（14种玩法）: grid_3x3/grid_4x4/wheel/card_flip/golden_egg/scratch_card/blind_box/gashapon/lucky_bag/red_packet/slot_machine/whack_mole/pinball/card_collect/flash_sale'
+          '前端展示方式（16种玩法）: grid_3x3/grid_4x3/grid_4x4/wheel/card_flip/golden_egg/scratch_card/blind_box/gashapon/lucky_bag/red_packet/slot_machine/whack_mole/pinball/card_collect/flash_sale'
       },
 
       /**
