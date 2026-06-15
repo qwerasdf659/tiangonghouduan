@@ -21,6 +21,11 @@ const { ConsumptionRecord, User } = require('../../models')
 const { Sequelize } = require('sequelize')
 const { Op } = Sequelize
 const QRCodeValidator = require('../../utils/QRCodeValidator')
+/*
+ * 审核进度装配：消费记录与审核链通过多态关联（auditable_type='consumption' + auditable_id=consumption_record_id）。
+ * ApprovalChainService 为同层静态服务，直接 require 复用其批量进度查询（符合"静态服务 + 顶部 require"约定）。
+ */
+const ApprovalChainService = require('../ApprovalChainService')
 
 /**
  * 消费记录查询服务类
@@ -84,6 +89,23 @@ class QueryService {
         { field: 'status', dictType: 'consumption_status' },
         { field: 'final_status', dictType: 'consumption_final_status' }
       ])
+
+      /*
+       * 装配审核进度 chain_info（仅 pending 在审记录，决策12）：
+       * 批量查本页 pending 记录的审核链实例（auditable_type='consumption'），避免 N+1；
+       * 非 pending 记录 chain_info=null（终态由 final_status 展示）。前端零映射直读。
+       */
+      const pendingIds = recordsWithDisplayNames
+        .filter(r => r.status === 'pending')
+        .map(r => r.consumption_record_id)
+      const chainMap = await ApprovalChainService.getInstancesByAuditableIds(
+        'consumption',
+        pendingIds
+      )
+      recordsWithDisplayNames.forEach(r => {
+        r.chain_info =
+          r.status === 'pending' ? chainMap.get(Number(r.consumption_record_id)) || null : null
+      })
 
       return {
         records: recordsWithDisplayNames,

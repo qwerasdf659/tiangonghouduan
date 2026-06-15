@@ -1160,21 +1160,42 @@ class RedemptionService {
   }
 
   /**
-   * 获取用户的兑换订单列表（客服工作台用）
+   * 获取用户的兑换/核销订单列表
    *
-   * @param {number} userId - 用户ID
+   * 复用入口：客服工作台（按用户查全部订单）与小程序「我的核销订单」（按 status 过滤 + 分页）共用。
+   *
+   * @param {number} userId - 核销用户ID（redeemer_user_id）
    * @param {Object} [options={}] - 查询选项
-   * @param {number} [options.page_size=50] - 每页数量
-   * @returns {Promise<Object>} { rows, count }
+   * @param {string} [options.status] - 订单状态过滤（pending/fulfilled/cancelled/expired），不传则全部
+   * @param {number} [options.page=1] - 页码（1-based）
+   * @param {number} [options.page_size=20] - 每页数量（上限 50）
+   * @returns {Promise<{count: number, rows: RedemptionOrder[]}>} 分页结果（rows 含关联 item 摘要）
    */
   static async getUserOrders(userId, options = {}) {
-    const { page_size = 50 } = options
+    const { status, page = 1, page_size = 20 } = options
+    const where = { redeemer_user_id: parseInt(userId) }
+    // 状态过滤：小程序「可申诉的已核销订单」传 status='fulfilled'
+    if (status) {
+      where.status = status
+    }
+    const limit = Math.min(parseInt(page_size, 10) || 20, 50)
+    const offset = (Math.max(parseInt(page, 10) || 1, 1) - 1) * limit
     return await RedemptionOrder.findAndCountAll({
-      where: { redeemer_user_id: parseInt(userId) },
-      attributes: ['redemption_order_id', 'order_no', 'status', 'created_at', 'item_id'],
-      include: [{ model: Item, as: 'item', attributes: ['item_id', 'display_name'] }],
+      where,
+      // fulfilled_at：已核销时间，小程序「我的核销订单」展示与售后入口判断用
+      attributes: [
+        'redemption_order_id',
+        'order_no',
+        'status',
+        'fulfilled_at',
+        'created_at',
+        'item_id'
+      ],
+      // item 摘要：真实库 items 表字段为 item_name（无 display_name），前端零映射直读
+      include: [{ model: Item, as: 'item', attributes: ['item_id', 'item_name'] }],
       order: [['created_at', 'DESC']],
-      limit: Math.min(parseInt(page_size), 50)
+      limit,
+      offset
     })
   }
 }

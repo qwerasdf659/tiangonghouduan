@@ -17,7 +17,7 @@
  *    说明（2026-06-12 重构）：消费审核统一走多级审核链，旧的 consumption/approve|reject|batch-review 已删除。
  *    审核动作面向"审核链步骤(step)"，终审通过由 ConsumptionAuditCallback 自动发放积分。
  *
- * 测试账号：13612227930 (既是普通用户也是管理员)
+ * 测试账号：13612227910（admin+super_admin，role_level=100，既是用户也是管理员）
  * 数据库：restaurant_points_dev
  */
 
@@ -73,10 +73,15 @@ describe('消费记录API测试套件', () => {
       const loginResponse = await tester.authenticate_v4_user('admin')
       // eslint-disable-next-line require-atomic-updates
       test_account.user_id = loginResponse.user.user_id
+      // 同步 mobile 到实际登录账号（admin=13612227910），避免与写死的 testUser.mobile 不一致导致断言失败
+      // eslint-disable-next-line require-atomic-updates
+      test_account.mobile = loginResponse.user.mobile
       // admin token 同时作为 regular token（同一账号 role_level=100 登录后 user_type 均为 admin）
       tester.tokens.regular = tester.tokens.admin
       tester.tokens.user = tester.tokens.admin
-      console.log(`✅ 测试账号登录成功，用户ID: ${test_account.user_id}（admin+regular 共用token）`)
+      console.log(
+        `✅ 测试账号登录成功，用户ID: ${test_account.user_id}，手机号: ${test_account.mobile}（admin+regular 共用token）`
+      )
 
       // 生成测试二维码（用于后续测试，DB-3 迁移后路径在 /user/ 域）
       const qrResponse = await tester.make_authenticated_request(

@@ -130,7 +130,7 @@ function formatRedemptionOrders(orders) {
       order_type: 'redemption',
       order_id: String(plain.redemption_order_id),
       order_no: plain.order_no,
-      summary: `兑换 ${plain.item?.display_name || '物品'}`,
+      summary: `兑换 ${plain.item?.item_name || '物品'}`,
       amount: '1',
       status: plain.status,
       created_at: plain.created_at

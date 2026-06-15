@@ -571,6 +571,60 @@ class ApprovalChainService {
   }
 
   /**
+   * 批量按业务记录查询审核链进度（避免 N+1，供消费记录列表等场景装配 chain_info）
+   *
+   * 一次查询本页全部 auditable_id 的审核链实例（含 steps + node），在内存按 auditable_id 归并，
+   * 组装「当前进度」结构。复用现有实例/步骤/节点关联，不新增表、不改表结构。
+   *
+   * @param {string} auditableType - 业务类型（如 'consumption'）
+   * @param {number[]} auditableIds - 业务记录ID数组（如本页 consumption_record_id 列表）
+   * @returns {Promise<Map>} auditable_id → 进度对象 chain_info（无审核链的 id 不在 Map 中）
+   */
+  static async getInstancesByAuditableIds(auditableType, auditableIds) {
+    const map = new Map()
+    const ids = [...new Set((auditableIds || []).map(Number).filter(Boolean))]
+    if (ids.length === 0) {
+      return map
+    }
+
+    const instances = await ApprovalChainInstance.findAll({
+      where: { auditable_type: auditableType, auditable_id: { [Op.in]: ids } },
+      include: [
+        {
+          model: ApprovalChainStep,
+          as: 'steps',
+          include: [{ model: ApprovalChainNode, as: 'node' }],
+          order: [['step_number', 'ASC']]
+        }
+      ],
+      order: [['created_at', 'DESC']]
+    })
+
+    for (const inst of instances) {
+      const auditableId = Number(inst.auditable_id)
+      // 同一业务记录可能有历史实例，按 created_at DESC 取最新一条（首次写入即最新）
+      if (map.has(auditableId)) {
+        continue
+      }
+      /*
+       * current_step 是「当前进行到第几步」的 1-based 序位（1..total_steps），
+       * 而 steps.step_number 是模板节点的稀疏排序号（如 3/9），两者不相等。
+       * 取「按 step_number 升序排列后的第 current_step 个步骤」的节点名才是当前节点。
+       */
+      const orderedSteps = (inst.steps || []).slice().sort((a, b) => a.step_number - b.step_number)
+      const currentStep = orderedSteps[inst.current_step - 1]
+      map.set(auditableId, {
+        current_step: inst.current_step,
+        total_steps: inst.total_steps,
+        status: inst.status,
+        current_node_name: currentStep?.node?.node_name || null
+      })
+    }
+
+    return map
+  }
+
+  /**
    * 查询用户的待审核步骤
    * 包含角色池模式（用户所拥有的角色对应的待审核步骤）和指定人模式
    *
