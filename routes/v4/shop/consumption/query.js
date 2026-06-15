@@ -192,7 +192,7 @@ router.post(
 
     return res.apiSuccess(
       {
-        record_id: result.consumption_record_id,
+        consumption_record_id: result.consumption_record_id,
         is_deleted: result.is_deleted,
         user_id: result.user_id,
         note: '消费记录已恢复，用户端将重新显示该记录'

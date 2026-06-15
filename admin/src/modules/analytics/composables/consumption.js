@@ -118,7 +118,7 @@ export function useConsumptionMethods() {
         )
 
         if (response?.success) {
-          // 后端返回 records 数组，字段: record_id, consumption_amount, status, created_at, user, merchant
+          // 后端返回 records 数组，字段: consumption_record_id, consumption_amount, status, created_at, user, merchant
           const rawRecords = response.data?.records || response.data?.list || []
           // 直接使用后端 flat 字段名（toAPIResponse 返回 user_mobile/user_nickname 等平级字段）
           this.consumptions = rawRecords.map(r => ({
@@ -244,14 +244,14 @@ export function useConsumptionMethods() {
     async viewConsumptionDetail(record) {
       try {
         const response = await this.apiGet(
-          buildURL(STORE_ENDPOINTS.CONSUMPTION_DETAIL, { id: record.record_id }),
+          buildURL(STORE_ENDPOINTS.CONSUMPTION_DETAIL, { id: record.consumption_record_id }),
           {},
           { showLoading: true }
         )
         if (response?.success) {
           this.selectedConsumption = response.data
           // 同时加载审核链进度信息
-          await this.loadChainForRecord(record.record_id)
+          await this.loadChainForRecord(record.consumption_record_id)
           this.showModal('consumptionDetailModal')
         }
       } catch (error) {
@@ -267,7 +267,7 @@ export function useConsumptionMethods() {
      * @param {Object} record - 消费记录对象
      */
     async approveConsumption(record) {
-      const recordId = record.record_id
+      const recordId = record.consumption_record_id
       const pendingStep = await this._resolvePendingStep(recordId)
       if (!pendingStep) return
 
@@ -343,7 +343,7 @@ export function useConsumptionMethods() {
 
       try {
         this.saving = true
-        const recordId = this.selectedConsumption.record_id
+        const recordId = this.selectedConsumption.consumption_record_id
         const pendingStep = await this._resolvePendingStep(recordId)
         if (!pendingStep) {
           this.hideModal('rejectModal')
@@ -408,7 +408,7 @@ export function useConsumptionMethods() {
       const pendingRecords = this.consumptions.filter(r => r.status === 'pending')
       this.isAllSelected =
         pendingRecords.length > 0 &&
-        pendingRecords.every(r => this.selectedIds.includes(r.record_id))
+        pendingRecords.every(r => this.selectedIds.includes(r.consumption_record_id))
     },
 
     /**
@@ -422,7 +422,7 @@ export function useConsumptionMethods() {
         this.isAllSelected = false
       } else {
         // 全选所有待审核记录
-        this.selectedIds = pendingRecords.map(r => r.record_id)
+        this.selectedIds = pendingRecords.map(r => r.consumption_record_id)
         this.isAllSelected = true
       }
     },
@@ -433,7 +433,7 @@ export function useConsumptionMethods() {
      * @returns {boolean}
      */
     isSelected(record) {
-      const recordId = record.record_id
+      const recordId = record.consumption_record_id
       return this.selectedIds.includes(recordId)
     },
 
@@ -912,7 +912,7 @@ export function useConsumptionMethods() {
         return
       }
 
-      const recordIds = recommendedRecords.map(r => r.record_id)
+      const recordIds = recommendedRecords.map(r => r.consumption_record_id)
 
       await this.confirmAndExecute(
         `确定批量通过 ${recordIds.length} 条推荐记录？\n这些记录的异常评分均低于 ${this.recommendThreshold} 分`,
@@ -1004,8 +1004,8 @@ export function useConsumptionMethods() {
      * @returns {string} 如 "第1步/共2步" 或空字符串
      */
     getChainProgressLabel(record) {
-      if (!record || !record.record_id) return ''
-      const chain = this.approvalChainCache[record.record_id]
+      if (!record || !record.consumption_record_id) return ''
+      const chain = this.approvalChainCache[record.consumption_record_id]
       if (!chain) return ''
       return `第${chain.current_step}步/共${chain.total_steps}步`
     },
@@ -1016,8 +1016,8 @@ export function useConsumptionMethods() {
      * @returns {string} Tailwind CSS 类名
      */
     getChainStatusClass(record) {
-      if (!record || !record.record_id) return ''
-      const chain = this.approvalChainCache[record.record_id]
+      if (!record || !record.consumption_record_id) return ''
+      const chain = this.approvalChainCache[record.consumption_record_id]
       if (!chain) return ''
       const statusMap = {
         in_progress: 'bg-blue-100 text-blue-800',
@@ -1033,7 +1033,7 @@ export function useConsumptionMethods() {
      * @param {Object} record - 消费记录
      */
     async viewChainTimeline(record) {
-      await this.loadChainForRecord(record.record_id)
+      await this.loadChainForRecord(record.consumption_record_id)
       if (this.selectedChainInstance) {
         this.showModal('chainTimelineModal')
       } else {
@@ -1048,14 +1048,14 @@ export function useConsumptionMethods() {
     async preloadChainStatus(records) {
       const pendingRecords = records.filter(r => r.status === 'pending')
       for (const record of pendingRecords) {
-        if (!this.approvalChainCache[record.record_id]) {
+        if (!this.approvalChainCache[record.consumption_record_id]) {
           try {
             const resp = await ApprovalChainAPI.getInstanceByAuditable(
               'consumption',
-              record.record_id
+              record.consumption_record_id
             )
             if (resp?.success && resp.data) {
-              this.approvalChainCache[record.record_id] = resp.data
+              this.approvalChainCache[record.consumption_record_id] = resp.data
             }
           } catch {
             // 单条查询失败不影响其他

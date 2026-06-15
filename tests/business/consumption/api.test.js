@@ -246,15 +246,15 @@ describe('消费记录API测试套件', () => {
 
       expect(response.status).toBe(200)
       expect(response.data.success).toBe(true)
-      expect(response.data.data).toHaveProperty('record_id')
+      expect(response.data.data).toHaveProperty('consumption_record_id')
       expect(response.data.data).toHaveProperty('points_to_award')
       expect(response.data.data.status).toBe('pending')
 
       // 验证积分计算（1元=1分，四舍五入）
       expect(response.data.data.points_to_award).toBe(89) // 88.50 → 89分
 
-      // 保存record_id供后续测试使用
-      test_record_id = response.data.data.record_id
+      // 保存 consumption_record_id 供后续测试使用
+      test_record_id = response.data.data.consumption_record_id
       console.log(`✅ 消费记录创建成功，record_id: ${test_record_id}`)
       console.log(`💰 消费金额: ${consumption_data.consumption_amount}元`)
       console.log(`🎁 预计奖励: ${response.data.data.points_to_award}积分`)
@@ -411,8 +411,8 @@ describe('消费记录API测试套件', () => {
 
       expect(response.status).toBe(200)
       expect(response.data.success).toBe(true)
-      expect(response.data.data).toHaveProperty('record_id')
-      expect(response.data.data.record_id).toBe(test_record_id)
+      expect(response.data.data).toHaveProperty('consumption_record_id')
+      expect(response.data.data.consumption_record_id).toBe(test_record_id)
 
       console.log(`✅ 详情查询成功，状态: ${response.data.data.status}`)
     })
@@ -571,7 +571,7 @@ describe('消费记录API测试套件', () => {
       )
 
       if (response.status === 200) {
-        reject_record_id = response.data.data.record_id
+        reject_record_id = response.data.data.consumption_record_id
         console.log(`✅ 测试记录创建成功，record_id: ${reject_record_id}`)
       } else {
         console.log('⚠️ 因3分钟防误操作限制跳过此测试')

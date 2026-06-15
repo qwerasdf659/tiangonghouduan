@@ -91,6 +91,31 @@ router.get(
 )
 
 /**
+ * POST /api/v4/backpack/mark-viewed
+ *
+ * @description 标记背包物品为已查看（首页「未读提醒」角标清零）
+ *              用户进入仓库列表页时调用，把全部「可用且未读」物品批量标记为已读。
+ * @access Private（仅本人，按 token 识别用户）
+ *
+ * @returns {Object} { marked_count } 本次标记为已读的物品数
+ */
+router.post(
+  '/mark-viewed',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const user_id = req.user.user_id
+    const BackpackService = req.app.locals.services.getService('backpack')
+
+    // 写操作收口 Service + 事务边界由路由层 TransactionManager 管理
+    const result = await TransactionManager.execute(transaction =>
+      BackpackService.markItemsViewed(user_id, { transaction })
+    )
+
+    return res.apiSuccess(result, '已全部标记为已读')
+  })
+)
+
+/**
  * GET /api/v4/backpack/items/:item_id
  *
  * @description 获取背包物品详情

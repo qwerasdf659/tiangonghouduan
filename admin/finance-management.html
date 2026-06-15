@@ -242,7 +242,7 @@
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-100">
-              <template x-for="(record, idx) in consumptions" :key="record.record_id">
+              <template x-for="(record, idx) in consumptions" :key="record.consumption_record_id">
                 <tr class="transition-colors"
                     :class="{
                       'bg-blue-50 hover:bg-blue-100': isSelected(record),
@@ -255,7 +255,7 @@
                       <input
                         type="checkbox"
                         :checked="isSelected(record)"
-                        @change="toggleSelection(record.record_id)"
+                        @change="toggleSelection(record.consumption_record_id)"
                         class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                       >
                     </template>
@@ -263,7 +263,7 @@
                       <span class="text-gray-300">-</span>
                     </template>
                   </td>
-                  <td class="px-4 py-3 text-sm font-mono themed-text-primary font-medium" x-text="record.record_id"></td>
+                  <td class="px-4 py-3 text-sm font-mono themed-text-primary font-medium" x-text="record.consumption_record_id"></td>
                   <td class="px-4 py-3 text-xs font-mono themed-text-muted" x-text="record.order_no || '-'"></td>
                   <td class="px-4 py-3 text-sm" x-text="record.user_name || record.user_id"></td>
                   <td class="px-4 py-3 text-sm themed-text-muted" x-text="record.store_name"></td>
@@ -1616,7 +1616,7 @@
           <div class="space-y-3">
             <div class="flex justify-between border-b pb-2">
               <span class="themed-text-muted">记录ID</span>
-              <span class="font-mono" x-text="selectedConsumption?.record_id"></span>
+              <span class="font-mono" x-text="selectedConsumption?.consumption_record_id"></span>
             </div>
             <div class="flex justify-between border-b pb-2">
               <span class="themed-text-muted">单号(CS)</span>
@@ -1716,7 +1716,7 @@
         <form @submit.prevent="confirmReject()">
           <div class="p-6 space-y-4">
             <div class="bg-red-50 rounded-lg p-3 text-sm">
-              <p class="text-red-700">将拒绝记录 <span class="font-mono font-bold" x-text="'#' + (selectedConsumption?.record_id || '')"></span> 的审核</p>
+              <p class="text-red-700">将拒绝记录 <span class="font-mono font-bold" x-text="'#' + (selectedConsumption?.consumption_record_id || '')"></span> 的审核</p>
               <p class="text-red-500 text-xs mt-1">拒绝后用户将不会获得积分奖励</p>
             </div>
             <div>

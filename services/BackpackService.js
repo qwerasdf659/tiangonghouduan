@@ -38,6 +38,7 @@ const { AssetCode } = require('../constants/AssetCode')
 const { attachDisplayNames } = require('../utils/displayNameHelper')
 const { getImageUrl } = require('../utils/ImageUrlHelper')
 const { categoryIconAttachmentInclude } = require('../utils/mediaAttachmentGallery')
+const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 
 const logger = require('../utils/logger').logger
 const AdminSystemService = require('./AdminSystemService')
@@ -524,9 +525,28 @@ class BackpackService {
         return groups
       }, {})
 
+      /*
+       * 未读物品数（首页角标「未读提醒」专用）：该用户 available 且 is_viewed=0 的物品数。
+       * 单独 count 查询（命中 idx_items_owner_status_viewed 复合索引），不复用 items.length，
+       * 因 total_items 是「可用总数」、unviewed_items 是「未查看数」，业务语义不同。
+       */
+      let unviewed_items = 0
+      const account = await Account.findOne({
+        where: { user_id, account_type: 'user' },
+        attributes: ['account_id'],
+        transaction
+      })
+      if (account) {
+        unviewed_items = await Item.count({
+          where: { owner_account_id: account.account_id, status: 'available', is_viewed: false },
+          transaction
+        })
+      }
+
       return {
         total_assets: assets.length,
         total_items: items.length,
+        unviewed_items,
         total_asset_value: assets.reduce((sum, asset) => sum + (asset.available_amount || 0), 0),
         items_by_type
       }
@@ -534,6 +554,51 @@ class BackpackService {
       logger.error('获取背包统计失败', { error: error.message, user_id })
       throw error
     }
+  }
+
+  /**
+   * 标记背包物品为已查看（首页「未读提醒」角标清零）
+   *
+   * 业务场景：
+   * - 用户进入仓库列表页时调用，把该用户全部「可用且未读」物品批量标记为已读。
+   * - 已读为纯展示状态，直接 UPDATE items（不入物品三表互锁）。
+   *
+   * 幂等：first_viewed_at 用 COALESCE 保护，重复标记不覆盖首次查看时间。
+   *
+   * @param {number} user_id - 用户ID
+   * @param {Object} options - 选项
+   * @param {Transaction} options.transaction - 外部事务对象（必填，写操作收口）
+   * @returns {Promise<Object>} { marked_count } 本次标记为已读的物品数
+   */
+  static async markItemsViewed(user_id, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'BackpackService.markItemsViewed')
+
+    const account = await Account.findOne({
+      where: { user_id, account_type: 'user' },
+      attributes: ['account_id'],
+      transaction
+    })
+    if (!account) {
+      return { marked_count: 0 }
+    }
+
+    const [marked_count] = await Item.update(
+      {
+        is_viewed: true,
+        first_viewed_at: sequelize.fn(
+          'COALESCE',
+          sequelize.col('first_viewed_at'),
+          sequelize.fn('UTC_TIMESTAMP')
+        )
+      },
+      {
+        where: { owner_account_id: account.account_id, status: 'available', is_viewed: false },
+        transaction
+      }
+    )
+
+    logger.info('背包物品标记已读', { user_id, marked_count })
+    return { marked_count }
   }
 
   /**

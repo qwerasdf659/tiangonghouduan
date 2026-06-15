@@ -356,7 +356,7 @@ document.addEventListener('alpine:init', () => {
   Alpine.data('consumptionDataTable', () => {
     const table = dataTable({
       columns: [
-        { key: 'record_id', label: '记录ID', sortable: true },
+        { key: 'consumption_record_id', label: '记录ID', sortable: true },
         { key: 'order_no', label: '单号(CS)', type: 'code' },
         { key: 'user_id', label: '用户ID' },
         {
@@ -388,7 +388,7 @@ document.addEventListener('alpine:init', () => {
           total: res.data?.pagination?.total || res.data?.count || 0
         }
       },
-      primaryKey: 'record_id',
+      primaryKey: 'consumption_record_id',
       sortable: true,
       page_size: 20
     })

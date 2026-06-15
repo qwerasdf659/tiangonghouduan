@@ -118,7 +118,7 @@ describe('消费记录API契约测试', () => {
         const record = response.body.data.records[0]
 
         // ✅ 验证必需字段存在
-        expect(record).toHaveProperty('record_id')
+        expect(record).toHaveProperty('consumption_record_id')
         expect(record).toHaveProperty('user_id')
         expect(record).toHaveProperty('consumption_amount')
         expect(record).toHaveProperty('points_to_award')
@@ -126,7 +126,7 @@ describe('消费记录API契约测试', () => {
         expect(record).toHaveProperty('created_at')
 
         // ✅ 验证字段类型
-        expect(typeof record.record_id).toBe('number')
+        expect(typeof record.consumption_record_id).toBe('number')
         expect(typeof record.user_id).toBe('number')
         expect(typeof record.consumption_amount).toBe('number')
         expect(typeof record.points_to_award).toBe('number')

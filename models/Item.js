@@ -245,6 +245,25 @@ module.exports = sequelize => {
         comment: '限量总数快照（铸造时从item_templates.max_edition复制）'
       },
 
+      /**
+       * 是否已查看（背包「未读提醒」用，纯展示状态）
+       * 0=未读（新获得未查看）/ 1=已读（用户已在仓库查看过）
+       * 与持有/余额/锁定无关，不入物品三表互锁，可直接 UPDATE
+       */
+      is_viewed: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+        comment: '是否已查看（0=未读 1=已读，纯展示状态，不入物品三表互锁）'
+      },
+
+      /** 首次查看时间（UTC 存储，北京时间展示）；NULL 表示从未查看 */
+      first_viewed_at: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        comment: '首次查看时间（UTC 存储，北京时间展示）'
+      },
+
       created_at: {
         type: DataTypes.DATE,
         allowNull: false,

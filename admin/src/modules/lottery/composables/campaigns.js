@@ -63,7 +63,7 @@ export function useCampaignsState() {
       status: 'draft',
       rules_text: '',
       // ======== 前端展示配置（多活动抽奖系统 2026-02-15） ========
-      /** 前端展示方式（15种玩法） */
+      /** 前端展示方式（16种玩法） */
       display_mode: 'grid_4x3',
       /** 网格列数（仅 grid 模式有效） */
       grid_cols: 4,
@@ -84,7 +84,7 @@ export function useCampaignsState() {
       { value: 'event', label: '活动回馈' },
       { value: 'permanent', label: '常驻回馈' }
     ],
-    /** @type {Array} 玩法类型选项（14种，对应 display_mode 字段） */
+    /** @type {Array} 玩法类型选项（16种，对应 display_mode 字段） */
     displayModeOptions: [
       { value: 'grid_3x3', label: '九宫格 3×3（8奖品）', icon: '🎰' },
       { value: 'grid_4x3', label: '网格 4×3（12奖品）', icon: '🎰' },

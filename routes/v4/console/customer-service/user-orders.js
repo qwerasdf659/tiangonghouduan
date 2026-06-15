@@ -108,7 +108,7 @@ router.get(
 function formatConsumptionRecords(records) {
   return records.map(r => ({
     order_type: 'consumption',
-    order_id: String(r.record_id || r.id),
+    order_id: String(r.consumption_record_id),
     order_no: r.order_no,
     summary: `门店消费 ¥${r.consumption_amount || 0}`,
     amount: String(r.consumption_amount || 0),

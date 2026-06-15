@@ -288,7 +288,7 @@ router.post(
 
       // 构建响应数据
       const responseData = {
-        record_id: record.consumption_record_id,
+        consumption_record_id: record.consumption_record_id,
         user_id: record.user_id,
         store_id: record.store_id, // 门店ID
         consumption_amount: parseFloat(record.consumption_amount),
