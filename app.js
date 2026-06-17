@@ -90,6 +90,14 @@ app.use(
           'https://cdn.jsdelivr.net'
         ],
         imgSrc: ["'self'", 'data:', 'https:', 'blob:'],
+        /*
+         * connect-src（2026-06-17 新增）：显式声明前端可发起连接的目标，避免回退到 default-src 'self'。
+         * - 'self'：本站 API
+         * - Sealos 对象存储域名：客服聊天图片下载需 fetch 该域名的图片成 blob（精确白名单，不用 https: 通配，符合安全红线）
+         * - blob:：blob URL 下载
+         * - ws:/wss:：socket.io 实时通信（客服聊天 WebSocket）
+         */
+        connectSrc: ["'self'", 'https://objectstorageapi.bja.sealos.run', 'blob:', 'ws:', 'wss:'],
         baseUri: ["'self'"],
         fontSrc: ["'self'", 'https:', 'data:'],
         formAction: ["'self'"],

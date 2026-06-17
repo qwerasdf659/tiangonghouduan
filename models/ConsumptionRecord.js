@@ -83,10 +83,21 @@ class ConsumptionRecord extends Model {
     })
 
     /**
-     * AssetTransaction 关联说明：
-     * 引用信息存储在 AssetTransaction.meta JSON 字段中
-     * meta: { reference_type: 'consumption', reference_id: record_id, ... }
+     * 多对一：关联奖励积分流水（逻辑外键，审核通过后填充）
+     *
+     * 业务含义：一条消费记录审核通过后会产生一条奖励积分流水，
+     *   外键 reward_transaction_id → asset_transactions.asset_transaction_id。
+     * required:false（左连接）：pending/拒绝记录 reward_transaction_id 为 NULL，
+     *   必须允许为空，否则这些记录会被 INNER JOIN 过滤掉。
+     * 纯应用层 ORM 关联（逻辑外键，用于对账/展示），不触碰余额/持有/锁定，
+     *   与「材料资产互锁 / 物品三表互锁」无关。
      */
+    ConsumptionRecord.belongsTo(models.AssetTransaction, {
+      foreignKey: 'reward_transaction_id',
+      targetKey: 'asset_transaction_id',
+      as: 'points_transaction',
+      comment: '关联奖励积分流水（审核通过后填充，逻辑外键用于对账/展示）'
+    })
   }
 
   /**
@@ -351,6 +362,20 @@ class ConsumptionRecord extends Model {
     if (this.store) {
       response.store_name = this.store.store_name || null
       response.store_code = this.store.store_code || null
+    }
+
+    /*
+     * 关联的奖励积分流水（审核通过后才有；pending/拒绝时 reward_transaction_id 为 NULL → 此处为 null）
+     * 数据敏感性：仅下发到账积分数与流水展示号等非敏感字段，
+     *   不下发 balance_before/balance_after（账户余额快照）、counterpart 等内部记账字段，
+     *   防止微信小程序端抓包泄露用户余额等商业敏感信息。
+     */
+    if (this.points_transaction) {
+      response.reward_points = this.points_transaction.delta_amount // 本次奖励到账积分数
+      response.reward_transaction_no = this.points_transaction.transaction_no || null // 积分流水展示号（TX 前缀），便于对账展示
+    } else {
+      response.reward_points = null
+      response.reward_transaction_no = null
     }
 
     return response

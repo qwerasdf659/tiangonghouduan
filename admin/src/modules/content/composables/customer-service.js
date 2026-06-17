@@ -8,7 +8,7 @@
  */
 
 import { logger } from '../../../utils/logger.js'
-import { buildURL, request, getToken } from '../../../api/base.js'
+import { buildURL, request, getToken, API_PREFIX } from '../../../api/base.js'
 import { CONTENT_ENDPOINTS } from '../../../api/content.js'
 import { USER_ENDPOINTS } from '../../../api/user.js'
 import { Alpine } from '../../../alpine/index.js'
@@ -38,6 +38,13 @@ export function useCustomerServiceState() {
     user_info_data: null,
     transferTargetId: '',
     adminList: [],
+
+    /** @type {string} 图片预览弹窗当前图片 URL */
+    previewImageUrl: '',
+    /** @type {string} 图片预览弹窗当前图片 alt */
+    previewImageAlt: '',
+    /** @type {boolean} 聊天图片上传中 */
+    image_uploading: false,
 
     wsConnection: null,
     messagePollingInterval: null,
@@ -239,9 +246,73 @@ export function useCustomerServiceMethods() {
         this.showError('请输入消息内容')
         return
       }
+      const ok = await this._sendMessageContent(content, 'text')
+      if (ok) this.messageInput = ''
+    },
+
+    /**
+     * 发送图片消息：先上传到对象存储（复用管理端媒体上传接口），再以 image 类型发送
+     * @param {Event} event - file input change 事件
+     */
+    async sendImageMessage(event) {
+      const file = event?.target?.files?.[0]
+      if (!file) return
       if (!this.currentSessionId) {
         this.showError('请先选择一个会话')
+        event.target.value = ''
         return
+      }
+
+      const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+      if (!allowed.includes(file.type)) {
+        this.showError('仅支持 JPG/PNG/GIF/WEBP 格式')
+        event.target.value = ''
+        return
+      }
+      if (file.size > 20 * 1024 * 1024) {
+        this.showError('图片过大，不能超过 20MB')
+        event.target.value = ''
+        return
+      }
+
+      this.image_uploading = true
+      try {
+        const formData = new FormData()
+        formData.append('image', file)
+        formData.append('folder', 'chat-images')
+
+        const uploadRes = await request({
+          url: `${API_PREFIX}/console/media/upload`,
+          method: 'POST',
+          data: formData
+        })
+
+        event.target.value = ''
+        if (!uploadRes?.success || !uploadRes.data?.public_url) {
+          this.showError(uploadRes?.message || '图片上传失败')
+          return
+        }
+
+        await this._sendMessageContent(uploadRes.data.public_url, 'image')
+      } catch (error) {
+        logger.error('发送图片失败:', error)
+        this.showError(error.message || '图片上传失败')
+        event.target.value = ''
+      } finally {
+        this.image_uploading = false
+      }
+    },
+
+    /**
+     * 发送消息内核（文本/图片共用）
+     * @param {string} content - 文本内容或图片 URL
+     * @param {('text'|'image')} message_type - 消息类型
+     * @returns {Promise<boolean>} 是否发送成功
+     */
+    async _sendMessageContent(content, message_type) {
+      if (!this.currentSessionId) {
+        this.showError('请先选择一个会话')
+        return false
       }
 
       try {
@@ -250,26 +321,75 @@ export function useCustomerServiceMethods() {
             session_id: this.currentSessionId
           }),
           method: 'POST',
-          data: { content }
+          data: { content, message_type }
         })
 
         if (response && response.success) {
-          this.messageInput = ''
-          // 将管理员消息追加到本地消息列表（后端事务提交后会通过 WebSocket 推送给用户）
           this.messages.push({
             chat_message_id: response.data?.chat_message_id,
             sender_type: 'admin',
-            content: content,
-            message_type: 'text',
+            content,
+            message_type,
             created_at: response.data?.created_at || new Date().toISOString()
           })
           this.$nextTick(() => this.scrollToBottom())
-        } else {
-          this.showError(response?.message || '消息发送失败')
+          return true
         }
+        this.showError(response?.message || '消息发送失败')
+        return false
       } catch (error) {
         logger.error('发送消息失败:', error)
         this.showError(error.message)
+        return false
+      }
+    },
+
+    /**
+     * 打开图片预览弹窗（聊天图片点击放大，右键可另存下载，不开新窗口）
+     * @param {string} url - 图片 URL
+     * @param {string} [alt] - 图片描述
+     */
+    openImagePreview(url, alt) {
+      if (!url) return
+      this.previewImageUrl = url
+      this.previewImageAlt = alt || ''
+      this.showModal('imagePreviewModal')
+    },
+
+    /** 关闭图片预览弹窗 */
+    closeImagePreview() {
+      this.hideModal('imagePreviewModal')
+      this.previewImageUrl = ''
+      this.previewImageAlt = ''
+    },
+
+    /**
+     * 下载图片（fetch 成 blob 再触发下载，规避跨域对象存储图右键另存受限的问题）
+     * @param {string} [url] - 指定下载的图片 URL；不传则下载当前灯箱预览的图片
+     */
+    async downloadPreviewImage(url) {
+      const targetUrl = url || this.previewImageUrl
+      if (!targetUrl) return
+      try {
+        const res = await fetch(targetUrl)
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const blob = await res.blob()
+
+        // 从 URL 提取文件名，缺失则用时间戳兜底
+        const urlName = targetUrl.split('?')[0].split('/').pop()
+        const fileName = urlName && urlName.includes('.') ? urlName : `chat-image-${Date.now()}.jpg`
+
+        const objectUrl = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = objectUrl
+        a.download = fileName
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        window.URL.revokeObjectURL(objectUrl)
+      } catch (error) {
+        logger.error('下载图片失败:', error)
+        this.showError('图片下载失败，请重试')
       }
     },
 

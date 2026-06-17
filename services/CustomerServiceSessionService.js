@@ -549,8 +549,22 @@ class CustomerServiceSessionService {
 
     logger.info(`📤 管理员 ${admin_id} 向会话 ${session_id} 发送消息`)
 
-    // ✅ 1. XSS内容安全过滤
-    const sanitized_content = sanitizeContent(content)
+    /*
+     * ✅ 1. 内容安全处理（按消息类型区分）
+     *   - text/system：HTML 实体转义防 XSS（文本会被展示）
+     *   - image：content 是图片 URL，放进 <img src> 而非 HTML，转义会破坏 URL（/ → &#x2F;）；
+     *            改为校验必须是 http(s) 图片 URL，合法则原样存储，非法则拒绝（防注入）
+     */
+    let sanitized_content
+    if (message_type === 'image') {
+      const url = (content || '').trim()
+      if (!/^https?:\/\/.+/i.test(url)) {
+        throw new BusinessError('图片消息内容必须是有效的图片 URL', 'CUSTOMER_SERVICE_ERROR', 400)
+      }
+      sanitized_content = url
+    } else {
+      sanitized_content = sanitizeContent(content)
+    }
 
     // ✅ 2. 敏感词检测
     const sensitiveCheck = checkSensitiveWords(sanitized_content)
@@ -596,16 +610,22 @@ class CustomerServiceSessionService {
       )
     }
 
-    // ✅ 5. 权限细分控制（支持超级管理员接管）
+    // ✅ 5. 权限细分控制（管理员可接管其他客服的会话）
     if (session.admin_id && session.admin_id !== admin_id) {
-      if (role_level < 200) {
+      /*
+       * 接管他人会话门槛：role_level >= 100（admin 及以上）。
+       * 说明（2026-06-17 修正）：原值 200 是写错的魔术数字——系统最高角色 super_admin 仅 110，
+       *   永远不可能 >=200，导致连超级管理员都无法接管，与"支持管理员接管"的设计意图矛盾。
+       *   按项目统一规范"管理员判断 role_level >= 100"修正为 100。
+       */
+      if (role_level < 100) {
         throw new BusinessError(
-          '无权限操作此会话，需要超级管理员权限',
+          '无权限操作此会话，仅管理员（含以上）可接管其他客服负责的会话',
           'CUSTOMER_SERVICE_FORBIDDEN',
           403
         )
       }
-      logger.info(`⚠️ 超级管理员 ${admin_id} 接管会话 ${session_id}`)
+      logger.info(`⚠️ 管理员 ${admin_id}（role_level=${role_level}）接管会话 ${session_id}`)
     }
 
     // ✅ 6. 自动分配未分配的会话

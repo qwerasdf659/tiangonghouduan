@@ -254,7 +254,7 @@
                           <!-- 内容 -->
                           <div class="flex-1 min-w-0">
                             <div class="flex items-center justify-between">
-                              <span class="text-sm font-medium themed-text truncate" x-text="session.user?.nickname || '用户' + (session.user?.user_id || '')"></span>
+                              <span class="text-sm font-medium themed-text truncate" x-text="session.user?.mobile || session.user?.nickname || '用户' + (session.user?.user_id || '')"></span>
                               <span class="text-[10px] themed-text-hint flex-shrink-0 ml-2" x-text="formatDate(session.updated_at)"></span>
                             </div>
                             <div class="flex items-center justify-between mt-0.5">
@@ -426,8 +426,23 @@
                         </div>
                         <div>
                           <div class="bg-yellow-50 border border-yellow-200 rounded-2xl rounded-bl-md px-3 py-2 shadow-sm">
-                            <p class="text-sm themed-text break-words whitespace-pre-wrap" x-text="msg.content || ''"></p>
+                            <!-- 图片消息：点击页内放大预览 -->
+                            <template x-if="msg.message_type === 'image'">
+                              <img :src="msg.content" alt="用户发送的图片" @click="openImagePreview(msg.content, '用户发送的图片')" class="max-w-[200px] max-h-[200px] rounded-lg object-cover cursor-pointer" loading="lazy">
+                            </template>
+                            <!-- 文本消息 -->
+                            <template x-if="msg.message_type !== 'image'">
+                              <p class="text-sm themed-text break-words whitespace-pre-wrap" x-text="msg.content || ''"></p>
+                            </template>
                           </div>
+                          <!-- 图片下载按钮（框外右下角） -->
+                          <template x-if="msg.message_type === 'image'">
+                            <div class="flex justify-end mt-1">
+                              <button @click.stop="downloadPreviewImage(msg.content)"
+                                      class="w-7 h-7 flex items-center justify-center rounded-full bg-black/40 hover:bg-black/65 text-white text-sm shadow"
+                                      title="下载图片">⬇</button>
+                            </div>
+                          </template>
                           <p class="text-[10px] themed-text-hint mt-1 ml-1" x-text="formatDate(msg.created_at)"></p>
                         </div>
                       </div>
@@ -441,8 +456,23 @@
                         </div>
                         <div>
                           <div class="bg-white border border-gray-200 text-gray-800 rounded-2xl rounded-br-md px-3 py-2 shadow-sm">
-                            <p class="text-sm break-words whitespace-pre-wrap" x-text="msg.content || ''"></p>
+                            <!-- 图片消息：点击页内放大预览 -->
+                            <template x-if="msg.message_type === 'image'">
+                              <img :src="msg.content" alt="客服发送的图片" @click="openImagePreview(msg.content, '客服发送的图片')" class="max-w-[200px] max-h-[200px] rounded-lg object-cover cursor-pointer" loading="lazy">
+                            </template>
+                            <!-- 文本消息 -->
+                            <template x-if="msg.message_type !== 'image'">
+                              <p class="text-sm break-words whitespace-pre-wrap" x-text="msg.content || ''"></p>
+                            </template>
                           </div>
+                          <!-- 图片下载按钮（框外左下角，与右对齐气泡呼应） -->
+                          <template x-if="msg.message_type === 'image'">
+                            <div class="flex justify-start mt-1">
+                              <button @click.stop="downloadPreviewImage(msg.content)"
+                                      class="w-7 h-7 flex items-center justify-center rounded-full bg-black/40 hover:bg-black/65 text-white text-sm shadow"
+                                      title="下载图片">⬇</button>
+                            </div>
+                          </template>
                           <p class="text-[10px] themed-text-hint mt-1 text-right mr-1" x-text="formatDate(msg.created_at)"></p>
                         </div>
                       </div>
@@ -504,6 +534,15 @@
                 <!-- 输入区 -->
                 <div class="px-4 pb-3 pt-1">
                   <div class="flex items-end gap-2">
+                    <!-- 图片上传：隐藏 input + 图标按钮，复用 imageUploadMixin -->
+                    <input type="file" x-ref="csImageInput" accept="image/jpeg,image/png,image/gif,image/webp" class="hidden" @change="sendImageMessage($event)">
+                    <button @click="$refs.csImageInput.click()"
+                            :disabled="!selectedSession || selectedSession?.status === 'closed' || image_uploading"
+                            class="flex-shrink-0 w-10 h-10 flex items-center justify-center text-lg border rounded-xl themed-border-light themed-hover-bg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            :title="image_uploading ? '图片上传中...' : '发送图片'">
+                      <span x-show="!image_uploading">🖼️</span>
+                      <span x-show="image_uploading" x-cloak class="text-xs">⏳</span>
+                    </button>
                     <textarea x-model="messageInput"
                               @keydown.enter.prevent="if(!$event.shiftKey) sendMessage()"
                               placeholder="输入消息...（Enter 发送，Shift+Enter 换行）"
@@ -1128,6 +1167,33 @@
         <div class="p-4 border-t themed-bg-base rounded-b-xl flex justify-end">
           <button @click="hideModal('user_info_modal')" class="px-4 py-2 text-sm themed-bg-muted themed-text-secondary rounded-lg hover:opacity-80">关闭</button>
         </div>
+      </div>
+    </div>
+
+    <!-- 图片预览弹窗（点击聊天图片放大，带关闭按钮；复用统一 modal 系统） -->
+    <div x-ref="imagePreviewModal"
+         x-show="isModalOpen('imagePreviewModal')"
+         x-cloak
+         class="fixed inset-0 z-[60] flex items-center justify-center"
+         style="display: none;"
+         @keydown.escape.window="closeImagePreview()">
+      <div class="fixed inset-0 bg-black/80" @click="closeImagePreview()"></div>
+      <div class="relative z-10 max-w-[90vw] max-h-[90vh] flex items-center justify-center">
+        <!-- 操作按钮组：下载 + 关闭 -->
+        <div class="absolute -top-10 right-0 flex items-center gap-3">
+          <button @click="downloadPreviewImage()"
+                  class="text-white/80 hover:text-white text-sm flex items-center gap-1"
+                  title="下载图片">
+            <span class="text-xl leading-none">⬇</span><span>下载</span>
+          </button>
+          <button @click="closeImagePreview()"
+                  class="text-white/80 hover:text-white text-3xl font-light leading-none"
+                  title="关闭">✕</button>
+        </div>
+        <img :src="previewImageUrl"
+             :alt="previewImageAlt"
+             class="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
+             @click.stop />
       </div>
     </div>
 
