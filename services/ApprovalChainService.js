@@ -20,10 +20,14 @@ const {
   ApprovalChainNode,
   ApprovalChainInstance,
   ApprovalChainStep,
+  ApprovalChainStepAction,
   AdminNotification,
   UserRole,
   Role,
-  User
+  User,
+  StoreStaff,
+  UserHierarchy,
+  sequelize
 } = require('../models')
 const { Op } = require('sequelize')
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
@@ -152,6 +156,22 @@ class ApprovalChainService {
       { transaction }
     )
 
+    /*
+     * 门店隔离数据基础（2026-06-20 分级审核链升级）：
+     * consumption 业务有门店维度 → 解析该消费单所属门店，冗余到每个 step 的 store_id，
+     * 供门店隔离校验（submitter_manager / 店长店员角色池）与统计免回查。
+     * merchant_points 无门店维度，storeId 保持 null（不做门店隔离）。
+     */
+    let storeId = null
+    if (auditableType === 'consumption') {
+      const ConsumptionRecord = require('../models').ConsumptionRecord
+      const record = await ConsumptionRecord.findByPk(auditableId, {
+        attributes: ['store_id'],
+        transaction
+      })
+      storeId = record ? record.store_id : null
+    }
+
     for (let i = 0; i < auditNodes.length; i++) {
       const node = auditNodes[i]
       const isFirst = i === 0
@@ -163,8 +183,17 @@ class ApprovalChainService {
           instance_id: instance.instance_id,
           node_id: node.node_id,
           step_number: node.step_number,
+          /*
+           * submitter_manager（提交人门店店长）分配方式：不预置 assignee_user_id/role_id，
+           * 由 store_id + store_staff 在校验/通知时动态反查该门店在职 manager，实现"谁的店谁审"。
+           */
           assignee_user_id: node.assignee_type === 'user' ? node.assignee_user_id : null,
           assignee_role_id: node.assignee_type === 'role' ? node.assignee_role_id : null,
+          store_id: storeId,
+          // 会签配置从节点固化到步骤（实例化后节点改动不影响进行中的实例）
+          approve_mode: node.approve_mode || 'single',
+          required_approvals: node.required_approvals || 1,
+          approved_count: 0,
           status: isFirst ? 'pending' : 'waiting',
           is_final: node.is_final ? 1 : 0,
           timeout_at: timeoutAt,
@@ -179,7 +208,8 @@ class ApprovalChainService {
       const firstNode = auditNodes[0]
       const notifyUserIds = await ApprovalChainService._resolveAssigneeUserIds(
         firstNode,
-        transaction
+        transaction,
+        storeId
       )
       for (const adminId of notifyUserIds) {
         // eslint-disable-next-line no-await-in-loop
@@ -215,10 +245,14 @@ class ApprovalChainService {
   /**
    * 处理审核步骤（核心方法）
    *
-   * 权限校验逻辑（Service 层精确鉴权）：
-   *   - 角色池模式：operator 的任一角色 role_id 等于 step.assignee_role_id
+   * 权限校验逻辑（Service 层精确鉴权，_verifyOperatorPermission 返回越级上下文）：
+   *   - 角色池模式：operator 的任一角色 role_id 等于 step.assignee_role_id（叠加门店/区域隔离）
    *   - 指定人模式：operator.user_id 等于 step.assignee_user_id
-   *   - admin(role_level>=100) 可审核任何步骤（终极兜底）
+   *   - 提交人门店店长（submitter_manager）：operator 为该门店在职店长
+   *   - admin(role_level>=100) 可审核任何步骤（终极兜底；顶替低等级节点时标记越级留痕）
+   *
+   * 会签（countersign）：approve 写 approval_chain_step_actions 子记录 + 累加 approved_count，
+   *   凑够 required_approvals 才推进；任一 reject 整体拒绝；admin 越级一次满足整个会签节点。
    *
    * @param {number} stepId - 步骤ID
    * @param {string} action - 操作（'approve' 或 'reject'）
@@ -226,7 +260,7 @@ class ApprovalChainService {
    * @param {number} operatorId - 操作人 user_id
    * @param {Object} options - 选项
    * @param {Object} options.transaction - Sequelize 事务（必填）
-   * @returns {Promise<Object>} 处理结果
+   * @returns {Promise<Object>} 处理结果（含 countersign_pending 标识会签未凑够）
    */
   static async processStep(stepId, action, reason, operatorId, options = {}) {
     const transaction = assertAndGetTransaction(options, 'ApprovalChainService.processStep')
@@ -266,17 +300,99 @@ class ApprovalChainService {
       )
     }
 
-    await ApprovalChainService._verifyOperatorPermission(step, operatorId, transaction)
+    const permCtx = await ApprovalChainService._verifyOperatorPermission(
+      step,
+      operatorId,
+      transaction
+    )
 
     const now = BeijingTimeHelper.createDatabaseTime()
 
     if (action === 'approve') {
+      /*
+       * 会签子记录（2026-06-20 会签支持）：每个审批动作写一条 approval_chain_step_actions，
+       * DB 唯一约束 uk_step_actor(step_id, actioned_by) 防同一人重复投票（并发安全）。
+       * 单签节点也写一条，保持审批留痕统一。
+       */
+      try {
+        await ApprovalChainStepAction.create(
+          {
+            step_id: step.step_id,
+            actioned_by: operatorId,
+            action: 'approve',
+            action_reason: reason || '审核通过',
+            is_escalated: permCtx.is_escalated ? 1 : 0,
+            actioned_at: now
+          },
+          { transaction }
+        )
+      } catch (err) {
+        if (err.name === 'SequelizeUniqueConstraintError') {
+          throw new BusinessError('您已审批过该步骤，请勿重复操作', 'APPROVAL_ERROR', 400)
+        }
+        throw err
+      }
+
+      /*
+       * 会签满足判定（决策 8.6）：
+       * - 单签（single）：1 个 approve 即满足。
+       * - 会签（countersign）：approved_count + 1 凑够 required_approvals 才满足。
+       * - admin 越级（is_escalated）：一次越级直接满足整个会签节点（异常兜底通道，决策 8.6.3）。
+       */
+      const isCountersign = step.approve_mode === 'countersign'
+      const required = step.required_approvals || 1
+      const newApprovedCount = (step.approved_count || 0) + 1
+      const nodeSatisfied = !isCountersign || permCtx.is_escalated || newApprovedCount >= required
+
+      // 越级留痕字段（仅在越级时写入，记录原应审角色与代审人）
+      const escalationFields = permCtx.is_escalated
+        ? {
+            is_escalated: 1,
+            original_assignee_role_id: permCtx.original_assignee_role_id,
+            escalated_from_user_id: operatorId
+          }
+        : {}
+
+      if (!nodeSatisfied) {
+        /*
+         * 会签未凑够人数：仅累加 approved_count，步骤保持 pending 不推进，等待其他会签人审批。
+         * 当前操作人信息记到 step（最近一次审批人），完整审批名单在 step_actions 子表。
+         */
+        await step.update(
+          {
+            approved_count: newApprovedCount,
+            action_reason: reason || '审核通过',
+            actioned_by: operatorId,
+            actioned_at: now,
+            ...escalationFields
+          },
+          { transaction }
+        )
+
+        logger.info(
+          `[审核链] 会签进度: step_id=${stepId}, approved=${newApprovedCount}/${required}（未满，保持 pending）`
+        )
+
+        return {
+          action: 'approved',
+          is_chain_completed: false,
+          countersign_pending: true,
+          approved_count: newApprovedCount,
+          required_approvals: required,
+          instance: step.instance,
+          step
+        }
+      }
+
+      // 满足（单签 / 会签凑够 / 越级）：标记步骤 approved
       await step.update(
         {
           status: 'approved',
+          approved_count: newApprovedCount,
           action_reason: reason || '审核通过',
           actioned_by: operatorId,
-          actioned_at: now
+          actioned_at: now,
+          ...escalationFields
         },
         { transaction }
       )
@@ -343,12 +459,43 @@ class ApprovalChainService {
         }
       }
     } else {
+      /*
+       * 拒绝：写会签子记录（同样防重复投票）。任一 reject 即整体拒绝（会签也是一票否决）。
+       */
+      try {
+        await ApprovalChainStepAction.create(
+          {
+            step_id: step.step_id,
+            actioned_by: operatorId,
+            action: 'reject',
+            action_reason: reason,
+            is_escalated: permCtx.is_escalated ? 1 : 0,
+            actioned_at: now
+          },
+          { transaction }
+        )
+      } catch (err) {
+        if (err.name === 'SequelizeUniqueConstraintError') {
+          throw new BusinessError('您已审批过该步骤，请勿重复操作', 'APPROVAL_ERROR', 400)
+        }
+        throw err
+      }
+
+      const rejectEscalationFields = permCtx.is_escalated
+        ? {
+            is_escalated: 1,
+            original_assignee_role_id: permCtx.original_assignee_role_id,
+            escalated_from_user_id: operatorId
+          }
+        : {}
+
       await step.update(
         {
           status: 'rejected',
           action_reason: reason,
           actioned_by: operatorId,
-          actioned_at: now
+          actioned_at: now,
+          ...rejectEscalationFields
         },
         { transaction }
       )
@@ -478,7 +625,11 @@ class ApprovalChainService {
       const node =
         nextStep.node || (await ApprovalChainNode.findByPk(nextStep.node_id, { transaction }))
       if (node) {
-        const notifyUserIds = await ApprovalChainService._resolveAssigneeUserIds(node, transaction)
+        const notifyUserIds = await ApprovalChainService._resolveAssigneeUserIds(
+          node,
+          transaction,
+          nextStep.store_id
+        )
         for (const adminId of notifyUserIds) {
           // eslint-disable-next-line no-await-in-loop
           await AdminNotification.create(
@@ -625,8 +776,12 @@ class ApprovalChainService {
   }
 
   /**
-   * 查询用户的待审核步骤
-   * 包含角色池模式（用户所拥有的角色对应的待审核步骤）和指定人模式
+   * 查询用户的待审核步骤（叠加门店/区域范围隔离）
+   *
+   * 包含角色池模式（用户所拥有的角色对应的待审核步骤）、指定人模式，
+   * 以及 submitter_manager 模式（按"我管辖门店"命中）。非 admin 用户的 consumption 待办
+   * 会按 _getUserScopedStoreIds 计算的"可审门店集合"过滤，杜绝跨店串信息/串审核；
+   * admin(lv100+) 不隔离，看全部待办。
    *
    * @param {number} userId - 用户ID
    * @param {Object} [queryOptions] - 查询选项
@@ -640,16 +795,48 @@ class ApprovalChainService {
 
     const userRoles = await UserRole.findAll({
       where: { user_id: userId, is_active: 1 },
-      attributes: ['role_id']
+      include: [{ model: Role, as: 'role', attributes: ['role_id', 'role_level'] }]
     })
     const roleIds = userRoles.map(ur => ur.role_id)
+    const operatorLevel = userRoles.reduce((max, ur) => Math.max(max, ur.role?.role_level || 0), 0)
+    const isAdmin = operatorLevel >= 100
 
-    const whereCondition = {
-      status: 'pending',
-      [Op.or]: [
+    /*
+     * 待办范围隔离（2026-06-20 分级审核链升级，杜绝串信息/串审核）：
+     * - admin(lv100+)：看全部待办（终极兜底，不隔离）。
+     * - 非 admin：先按"分配给我"（指定人/角色池）筛出候选，再叠加门店/区域范围隔离——
+     *   consumption 步骤（step.store_id 有值）只保留我管辖门店内的；
+     *   merchant_points 等无门店步骤（store_id 为空）按原角色/指定人语义保留。
+     *   submitter_manager 步骤无 assignee_role_id/user_id，靠"我管辖门店"命中纳入待办。
+     */
+    const scopedStoreIds = isAdmin
+      ? null
+      : await ApprovalChainService._getUserScopedStoreIds(userId)
+    const scopedStoreArr = scopedStoreIds ? Array.from(scopedStoreIds) : []
+
+    let whereCondition
+    if (isAdmin) {
+      whereCondition = { status: 'pending' }
+    } else {
+      // "分配给我"的候选条件：指定人是我 / 角色池命中我的角色 / 我管辖门店的步骤（覆盖 submitter_manager）
+      const assignedOr = [
         { assignee_user_id: userId },
-        ...(roleIds.length > 0 ? [{ assignee_role_id: { [Op.in]: roleIds } }] : [])
+        ...(roleIds.length > 0 ? [{ assignee_role_id: { [Op.in]: roleIds } }] : []),
+        ...(scopedStoreArr.length > 0 ? [{ store_id: { [Op.in]: scopedStoreArr } }] : [])
       ]
+      whereCondition = {
+        status: 'pending',
+        [Op.and]: [
+          { [Op.or]: assignedOr },
+          // 门店步骤必须落在我管辖门店内；无门店步骤（store_id 为空）不受门店隔离约束
+          {
+            [Op.or]: [
+              { store_id: null },
+              ...(scopedStoreArr.length > 0 ? [{ store_id: { [Op.in]: scopedStoreArr } }] : [])
+            ]
+          }
+        ]
+      }
     }
 
     const { count, rows } = await ApprovalChainStep.findAndCountAll({
@@ -830,6 +1017,18 @@ class ApprovalChainService {
     const { nodes = [], ...templateData } = data
     templateData.total_nodes = nodes.filter(n => n.step_number > 1).length
 
+    /*
+     * 模板编码（template_code）由后端自动生成，运营无需填写。
+     * 业务背景：template_code 是给系统识别的唯一英文 ID，要求唯一且格式规范，
+     * 让业务运营手填易出错（重复/格式乱）。改为按"业务类型 + 递增序号"自动生成，
+     * 如 consumption_001 / merchant_points_002，运营只需填中文名称即可。
+     * 前端不再传 template_code；即便传了也以自动生成为准，保证唯一性与命名一致性。
+     */
+    templateData.template_code = await ApprovalChainService._generateTemplateCode(
+      templateData.auditable_type,
+      transaction
+    )
+
     const template = await ApprovalChainTemplate.create(templateData, { transaction })
 
     for (const nodeData of nodes) {
@@ -847,6 +1046,152 @@ class ApprovalChainService {
       `[审核链] 模板创建成功: template_id=${template.template_id}, code=${template.template_code}`
     )
     return template
+  }
+
+  /**
+   * 自动生成唯一的模板编码（template_code）
+   *
+   * 规则：{auditable_type}_{三位递增序号}，如 consumption_001、merchant_points_003。
+   * 取该业务类型下已有 _\d+ 后缀编码的最大序号 +1；为兼容历史语义化编码
+   * （如 consumption_default/large）做唯一性兜底，冲突则继续递增直到不冲突。
+   *
+   * @param {string} auditableType - 业务类型（consumption/merchant_points）
+   * @param {Object} transaction - Sequelize 事务
+   * @returns {Promise<string>} 唯一模板编码
+   * @private
+   */
+  static async _generateTemplateCode(auditableType, transaction) {
+    const existing = await ApprovalChainTemplate.findAll({
+      where: { auditable_type: auditableType },
+      attributes: ['template_code'],
+      transaction
+    })
+    const codes = new Set(existing.map(t => t.template_code))
+
+    // 取已有 {type}_数字 后缀的最大序号
+    let maxSeq = 0
+    const re = new RegExp(`^${auditableType}_(\\d+)$`)
+    for (const code of codes) {
+      const m = code.match(re)
+      if (m) {
+        maxSeq = Math.max(maxSeq, parseInt(m[1], 10))
+      }
+    }
+
+    // 从 maxSeq+1 起找一个不冲突的编码（兜底历史语义化编码占位）
+    let seq = maxSeq + 1
+    let candidate = `${auditableType}_${String(seq).padStart(3, '0')}`
+    while (codes.has(candidate)) {
+      seq += 1
+      candidate = `${auditableType}_${String(seq).padStart(3, '0')}`
+    }
+    return candidate
+  }
+
+  /**
+   * 审核链模板冲突预检（只读，不写库）— 保存前演练，提示运营潜在配置风险
+   *
+   * 复用与运行时一致的匹配规则（priority DESC + match_conditions），分析"待保存的这条链"
+   * 与该业务类型下现有启用链的关系，检测 4 类风险：
+   *   1. shadow        架空：本链 priority 更高且条件更宽（含无条件），会让更低优先级的链永远匹配不到
+   *   2. shadowed      被架空：已有更高优先级且条件更宽的链，会让本链永远匹配不到
+   *   3. no_fallback   兜底缺失：保存后该业务类型仍无任何"无条件兜底链"，部分业务可能匹配不到链
+   *   4. dup_priority  优先级重复：与现有链 priority 相同，匹配顺序不确定
+   *   5. overlap       条件重叠：与现有链金额区间存在重叠（同优先级时尤其需注意）
+   *
+   * @param {Object} candidate - 待保存模板 { auditable_type, priority, match_conditions, template_id? }
+   *   template_id 存在表示"编辑"场景，比较时排除自身。
+   * @returns {Promise<{has_risk: boolean, risks: Array}>} 预检结果：has_risk 是否有风险，risks 风险明细列表
+   */
+  static async detectTemplateConflicts(candidate = {}) {
+    const auditableType = candidate.auditable_type
+    const priority = Number(candidate.priority) || 0
+    const cond = candidate.match_conditions || {}
+    const selfId = candidate.template_id ? Number(candidate.template_id) : null
+
+    const risks = []
+    if (!auditableType) {
+      return { has_risk: false, risks }
+    }
+
+    // 取该业务类型下现有启用链（编辑场景排除自身）
+    const existing = await ApprovalChainTemplate.findAll({
+      where: { auditable_type: auditableType, is_active: 1 },
+      attributes: ['template_id', 'template_code', 'template_name', 'priority', 'match_conditions'],
+      order: [['priority', 'DESC']]
+    })
+    const others = existing.filter(t => selfId == null || t.template_id !== selfId)
+
+    // 条件"宽窄"用 min_amount 表达：无 min_amount=最宽（门槛0）；min_amount 越小越宽
+    const selfMin = cond.min_amount != null ? Number(cond.min_amount) : 0
+    const isUnconditional = c => {
+      const mc = c || {}
+      return mc.min_amount == null && !mc.store_ids && !mc.merchant_ids
+    }
+
+    for (const t of others) {
+      const oMc = t.match_conditions || {}
+      const oMin = oMc.min_amount != null ? Number(oMc.min_amount) : 0
+      const tag = `「${t.template_name}（${t.template_code}, 优先级${t.priority}）」`
+
+      // 1. 本链架空别人：本链优先级更高，且本链门槛更低/相等（更宽）→ 低优先链永远轮不到
+      if (priority > t.priority && selfMin <= oMin) {
+        risks.push({
+          type: 'shadow',
+          level: 'high',
+          message: `本链优先级(${priority})高于${tag}且触发门槛更宽，将使其永远无法匹配（被架空）。建议本链设更高的金额门槛，或调低本链优先级。`
+        })
+      }
+
+      // 2. 本链被别人架空：已有更高优先级链且其门槛更宽 → 本链永远轮不到
+      if (t.priority > priority && oMin <= selfMin) {
+        risks.push({
+          type: 'shadowed',
+          level: 'high',
+          message: `${tag}优先级更高且触发门槛更宽，本链将永远无法匹配（被架空）。建议提高本链优先级，或让本链门槛比它更低。`
+        })
+      }
+
+      // 3. 优先级重复
+      if (t.priority === priority) {
+        risks.push({
+          type: 'dup_priority',
+          level: 'medium',
+          message: `本链与${tag}优先级相同(${priority})，匹配顺序不确定。建议设置不同优先级。`
+        })
+      }
+
+      // 4. 条件重叠（同优先级且金额门槛相同/相近时，二者会争抢同一批业务）
+      if (t.priority === priority && selfMin === oMin) {
+        risks.push({
+          type: 'overlap',
+          level: 'medium',
+          message: `本链与${tag}优先级与金额门槛均相同，触发条件完全重叠，会随机命中其一。建议区分条件或优先级。`
+        })
+      }
+    }
+
+    // 5. 兜底缺失：保存后该业务类型是否仍无任何"无条件兜底链"
+    const selfUnconditional = isUnconditional(cond)
+    const anyOtherUnconditional = others.some(t => isUnconditional(t.match_conditions))
+    if (!selfUnconditional && !anyOtherUnconditional) {
+      risks.push({
+        type: 'no_fallback',
+        level: 'high',
+        message: `该业务类型缺少"无条件兜底链"（触发条件留空的链）。低于所有门槛的业务将匹配不到任何审核链，导致提交失败。建议保留一条触发条件留空的兜底链。`
+      })
+    }
+
+    // 去重（同 type+message 只报一次）
+    const seen = new Set()
+    const dedup = risks.filter(r => {
+      const k = `${r.type}|${r.message}`
+      if (seen.has(k)) return false
+      seen.add(k)
+      return true
+    })
+
+    return { has_risk: dedup.length > 0, risks: dedup }
   }
 
   /**
@@ -993,8 +1338,584 @@ class ApprovalChainService {
     return ApprovalChainService._attachAuditableTypeDisplay(instance)
   }
 
-  // ==================== 私有方法 ====================
+  /**
+   * 审核统计聚合（Web 管理端数据看板，2026-06-20 决策 8.4/8.4.3/11.2）
+   *
+   * 按门店或区域维度聚合消费审核数据，供运营/管理层看板。读操作收口本 Service。
+   * 数据来源：
+   *   - consumption_records：按 store_id 分组的 待审/已审/通过/拒绝 数量、消费金额、奖励积分
+   *   - approval_chain_steps（store_id + timeout_at）：各门店"超时未处理"步骤数（决策 8.6.3）
+   * 区域维度（dimension='region'）：经 user_hierarchy 把门店聚合到其上级（区域负责人）下。
+   *
+   * @param {Object} [options] - 选项
+   * @param {string} [options.dimension='store'] - 聚合维度：store=按门店，region=按区域
+   * @returns {Promise<Object>} { dimension, rows: [...], summary: {...} }
+   */
+  static async getApprovalStats(options = {}) {
+    const dimension = options.dimension === 'region' ? 'region' : 'store'
+    const models = require('../models')
+    const ConsumptionRecord = models.ConsumptionRecord
+    const Store = models.Store
 
+    // 1. 按门店聚合消费审核状态分布 + 金额 + 积分
+    const byStore = await ConsumptionRecord.findAll({
+      attributes: [
+        'store_id',
+        'status',
+        [sequelize.fn('COUNT', sequelize.col('consumption_record_id')), 'cnt'],
+        [sequelize.fn('SUM', sequelize.col('consumption_amount')), 'amount'],
+        [sequelize.fn('SUM', sequelize.col('points_to_award')), 'points']
+      ],
+      where: { is_deleted: 0, store_id: { [Op.not]: null } },
+      group: ['store_id', 'status'],
+      raw: true
+    })
+
+    // 2. 各门店"超时未处理"步骤数（pending 且 timeout_at 已过期）
+    const now = new Date()
+    const timeoutByStore = await ApprovalChainStep.findAll({
+      attributes: ['store_id', [sequelize.fn('COUNT', sequelize.col('step_id')), 'cnt']],
+      where: { status: 'pending', store_id: { [Op.not]: null }, timeout_at: { [Op.lt]: now } },
+      group: ['store_id'],
+      raw: true
+    })
+    const timeoutMap = new Map()
+    timeoutByStore.forEach(r => timeoutMap.set(Number(r.store_id), parseInt(r.cnt, 10) || 0))
+
+    /*
+     * 2.1 各门店审核时效（9.3 审核时效统计）：基于 approval_chain_steps 已审结步骤
+     *     (created_at→actioned_at) 的平均耗时（秒），以及"已审结步骤里超时的占比" timeout_rate。
+     *     复用客服响应时长同款写法 AVG(TIMESTAMPDIFF(SECOND, ...))。
+     */
+    const durationByStore = await ApprovalChainStep.findAll({
+      attributes: [
+        'store_id',
+        [
+          sequelize.fn('AVG', sequelize.literal('TIMESTAMPDIFF(SECOND, created_at, actioned_at)')),
+          'avg_seconds'
+        ],
+        [sequelize.fn('COUNT', sequelize.col('step_id')), 'finished_cnt'],
+        [
+          sequelize.literal(
+            "SUM(CASE WHEN status = 'timeout' OR (actioned_at IS NOT NULL AND timeout_at IS NOT NULL AND actioned_at > timeout_at) THEN 1 ELSE 0 END)"
+          ),
+          'overtime_cnt'
+        ]
+      ],
+      where: {
+        store_id: { [Op.not]: null },
+        actioned_at: { [Op.not]: null },
+        status: { [Op.in]: ['approved', 'rejected', 'timeout'] }
+      },
+      group: ['store_id'],
+      raw: true
+    })
+    const durationMap = new Map()
+    durationByStore.forEach(r => {
+      durationMap.set(Number(r.store_id), {
+        avg_seconds: Math.round(parseFloat(r.avg_seconds) || 0),
+        finished_cnt: parseInt(r.finished_cnt, 10) || 0,
+        overtime_cnt: parseInt(r.overtime_cnt, 10) || 0
+      })
+    })
+
+    // 3. 门店元信息（名称）
+    const stores = await Store.findAll({ attributes: ['store_id', 'store_name'], raw: true })
+    const storeNameMap = new Map(stores.map(s => [Number(s.store_id), s.store_name]))
+
+    // 4. 组装"按门店"统计行
+    const storeStatsMap = new Map()
+    const ensureStoreRow = sid => {
+      const id = Number(sid)
+      if (!storeStatsMap.has(id)) {
+        storeStatsMap.set(id, {
+          store_id: id,
+          store_name: storeNameMap.get(id) || null,
+          pending: 0,
+          approved: 0,
+          rejected: 0,
+          expired: 0,
+          timeout: timeoutMap.get(id) || 0,
+          total: 0,
+          amount: 0,
+          points: 0,
+          // 审核时效（9.3）：平均审核耗时（秒）+ 已审结步骤数 + 超时步骤数（用于算超时率）
+          avg_duration_seconds: durationMap.get(id) ? durationMap.get(id).avg_seconds : 0,
+          finished_steps: durationMap.get(id) ? durationMap.get(id).finished_cnt : 0,
+          overtime_steps: durationMap.get(id) ? durationMap.get(id).overtime_cnt : 0
+        })
+      }
+      return storeStatsMap.get(id)
+    }
+    byStore.forEach(r => {
+      const row = ensureStoreRow(r.store_id)
+      const cnt = parseInt(r.cnt, 10) || 0
+      if (row[r.status] !== undefined) row[r.status] = cnt
+      row.total += cnt
+      row.amount += parseFloat(r.amount) || 0
+      row.points += parseInt(r.points, 10) || 0
+    })
+    // 确保有超时但无消费分组的门店也出现
+    timeoutMap.forEach((_v, sid) => ensureStoreRow(sid))
+
+    // 通过率（已通过 / 已审结(通过+拒绝)）+ 审核时效（平均耗时友好文案 + 超时率）
+    const finalizeRow = row => {
+      const finished = row.approved + row.rejected
+      row.pass_rate = finished > 0 ? Math.round((row.approved / finished) * 10000) / 100 : 0
+      // 超时率 = 超时步骤数 / 已审结步骤数（按 approval_chain_steps 口径）
+      row.timeout_rate =
+        row.finished_steps > 0
+          ? Math.round((row.overtime_steps / row.finished_steps) * 10000) / 100
+          : 0
+      row.avg_duration_text = ApprovalChainService._formatDurationSeconds(row.avg_duration_seconds)
+      return row
+    }
+    const storeRows = Array.from(storeStatsMap.values()).map(finalizeRow)
+
+    if (dimension === 'store') {
+      return {
+        dimension: 'store',
+        rows: storeRows,
+        summary: ApprovalChainService._sumStatsRows(storeRows)
+      }
+    }
+
+    /*
+     * 5. 区域维度：把门店聚合到其上级（区域负责人）
+     *    user_hierarchy 中业务员挂 store_id，其 superior_user_id 即所属区域负责人
+     */
+    const hierarchies = await UserHierarchy.findAll({
+      where: { is_active: true, store_id: { [Op.not]: null } },
+      attributes: ['store_id', 'superior_user_id'],
+      raw: true
+    })
+    const storeToSuperior = new Map()
+    hierarchies.forEach(h => {
+      if (h.store_id != null) storeToSuperior.set(Number(h.store_id), h.superior_user_id || null)
+    })
+
+    const regionMap = new Map()
+    for (const row of storeRows) {
+      const superiorId = storeToSuperior.get(row.store_id) ?? null
+      const key = superiorId == null ? 'unassigned' : `region_${superiorId}`
+      if (!regionMap.has(key)) {
+        regionMap.set(key, {
+          region_key: key,
+          superior_user_id: superiorId,
+          store_count: 0,
+          pending: 0,
+          approved: 0,
+          rejected: 0,
+          expired: 0,
+          timeout: 0,
+          total: 0,
+          amount: 0,
+          points: 0,
+          // 时效聚合：跨门店按已审结步骤数加权平均
+          finished_steps: 0,
+          overtime_steps: 0,
+          _duration_weighted_sum: 0
+        })
+      }
+      const region = regionMap.get(key)
+      region.store_count += 1
+      region.pending += row.pending
+      region.approved += row.approved
+      region.rejected += row.rejected
+      region.expired += row.expired
+      region.timeout += row.timeout
+      region.total += row.total
+      region.amount += row.amount
+      region.points += row.points
+      region.finished_steps += row.finished_steps
+      region.overtime_steps += row.overtime_steps
+      region._duration_weighted_sum += row.avg_duration_seconds * row.finished_steps
+    }
+    const regionRows = Array.from(regionMap.values()).map(region => {
+      // 区域平均耗时 = 各门店(平均耗时×已审结步骤数)之和 / 区域已审结步骤总数（加权平均）
+      region.avg_duration_seconds =
+        region.finished_steps > 0
+          ? Math.round(region._duration_weighted_sum / region.finished_steps)
+          : 0
+      delete region._duration_weighted_sum
+      return finalizeRow(region)
+    })
+
+    return {
+      dimension: 'region',
+      rows: regionRows,
+      summary: ApprovalChainService._sumStatsRows(regionRows)
+    }
+  }
+
+  /**
+   * 运营分析看板（8.4.3 丰富分析，Web 管理端，2026-06-20）
+   *
+   * 一次性返回 4 类运营分析，供审核链管理页"数据统计"tab 的分析区（读操作收口本 Service）：
+   *   - staff_ranking：员工录入排行（按 merchant_id 聚合录入单数/通过/驳回，帮店长/区域管人）
+   *   - trend：消费/积分发放的日走势（按 created_at 分天，非快照）
+   *   - reject_reasons：拒绝原因 TOP（基于 approval_chain_steps 被驳回步骤的 action_reason 聚合）
+   *   - user_activity：用户复购/活跃（回头客数/新客数/消费次数分布）——
+   *       ⚠️ 仅返回聚合数字，不含 user_id/mobile/nickname 等 PII，满足"脱敏、仅管理端可见、不下发小程序"。
+   *
+   * @param {Object} [options] - 选项
+   * @param {number} [options.days=30] - 分析时间窗（天），默认近 30 天
+   * @param {number} [options.store_id] - 可选，限定门店
+   * @returns {Promise<Object>} { window_days, staff_ranking, trend, reject_reasons, user_activity }
+   */
+  static async getOperationAnalytics(options = {}) {
+    const models = require('../models')
+    const ConsumptionRecord = models.ConsumptionRecord
+    const User = models.User
+    const days = Math.min(Math.max(parseInt(options.days, 10) || 30, 1), 365)
+    const since = new Date(Date.now() - days * 24 * 3600 * 1000)
+    const storeId = options.store_id ? parseInt(options.store_id, 10) : null
+
+    const baseWhere = { is_deleted: 0, created_at: { [Op.gte]: since } }
+    if (storeId) baseWhere.store_id = storeId
+
+    // 1. 员工录入排行（按 merchant_id 录入人聚合：录入数 + 各状态数）
+    const staffRaw = await ConsumptionRecord.findAll({
+      attributes: [
+        'merchant_id',
+        'status',
+        [sequelize.fn('COUNT', sequelize.col('consumption_record_id')), 'cnt']
+      ],
+      where: { ...baseWhere, merchant_id: { [Op.not]: null } },
+      group: ['merchant_id', 'status'],
+      raw: true
+    })
+    const staffMap = new Map()
+    staffRaw.forEach(r => {
+      const id = Number(r.merchant_id)
+      if (!staffMap.has(id)) {
+        staffMap.set(id, { merchant_id: id, total: 0, approved: 0, rejected: 0, pending: 0 })
+      }
+      const row = staffMap.get(id)
+      const cnt = parseInt(r.cnt, 10) || 0
+      row.total += cnt
+      if (row[r.status] !== undefined) row[r.status] += cnt
+    })
+    // 附录入人昵称（管理端可见，非小程序下发）
+    const merchantIds = Array.from(staffMap.keys())
+    if (merchantIds.length > 0) {
+      const users = await User.findAll({
+        where: { user_id: { [Op.in]: merchantIds } },
+        attributes: ['user_id', 'nickname'],
+        raw: true
+      })
+      const nameMap = new Map(users.map(u => [Number(u.user_id), u.nickname]))
+      staffMap.forEach((row, id) => {
+        row.merchant_nickname = nameMap.get(id) || null
+      })
+    }
+    const staffRanking = Array.from(staffMap.values())
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 20)
+
+    // 2. 趋势（按天分组：录入单数、消费金额、奖励积分）
+    const trendRaw = await ConsumptionRecord.findAll({
+      attributes: [
+        [sequelize.fn('DATE', sequelize.col('created_at')), 'day'],
+        [sequelize.fn('COUNT', sequelize.col('consumption_record_id')), 'cnt'],
+        [sequelize.fn('SUM', sequelize.col('consumption_amount')), 'amount'],
+        [sequelize.fn('SUM', sequelize.col('points_to_award')), 'points']
+      ],
+      where: baseWhere,
+      group: [sequelize.fn('DATE', sequelize.col('created_at'))],
+      order: [[sequelize.fn('DATE', sequelize.col('created_at')), 'ASC']],
+      raw: true
+    })
+    const trend = trendRaw.map(r => ({
+      day: BeijingTimeHelper.formatDate ? BeijingTimeHelper.formatDate(r.day) : r.day,
+      count: parseInt(r.cnt, 10) || 0,
+      amount: parseFloat(r.amount) || 0,
+      points: parseInt(r.points, 10) || 0
+    }))
+
+    // 3. 拒绝原因 TOP（基于审核链被驳回步骤的 action_reason 聚合）
+    const rejectStepWhere = { status: 'rejected', actioned_at: { [Op.gte]: since } }
+    if (storeId) rejectStepWhere.store_id = storeId
+    const rejectRaw = await ApprovalChainStep.findAll({
+      attributes: ['action_reason', [sequelize.fn('COUNT', sequelize.col('step_id')), 'cnt']],
+      where: rejectStepWhere,
+      group: ['action_reason'],
+      order: [[sequelize.fn('COUNT', sequelize.col('step_id')), 'DESC']],
+      limit: 10,
+      raw: true
+    })
+    const rejectReasons = rejectRaw.map(r => ({
+      reason: r.action_reason || '(未填写原因)',
+      count: parseInt(r.cnt, 10) || 0
+    }))
+
+    // 4. 用户复购/活跃（仅聚合数字，无 PII）
+    const userAgg = await ConsumptionRecord.findAll({
+      attributes: [
+        'user_id',
+        [sequelize.fn('COUNT', sequelize.col('consumption_record_id')), 'cnt']
+      ],
+      where: { ...baseWhere, user_id: { [Op.not]: null } },
+      group: ['user_id'],
+      raw: true
+    })
+    let repeatCustomers = 0
+    let singleCustomers = 0
+    const distribution = { '1次': 0, '2-3次': 0, '4-5次': 0, '6次以上': 0 }
+    userAgg.forEach(r => {
+      const c = parseInt(r.cnt, 10) || 0
+      if (c >= 2) repeatCustomers++
+      else singleCustomers++
+      if (c === 1) distribution['1次']++
+      else if (c <= 3) distribution['2-3次']++
+      else if (c <= 5) distribution['4-5次']++
+      else distribution['6次以上']++
+    })
+    const totalCustomers = userAgg.length
+    const userActivity = {
+      total_customers: totalCustomers,
+      repeat_customers: repeatCustomers,
+      single_customers: singleCustomers,
+      repeat_rate:
+        totalCustomers > 0 ? Math.round((repeatCustomers / totalCustomers) * 10000) / 100 : 0,
+      consumption_distribution: distribution
+    }
+
+    /*
+     * 5. 审核人时效排行（9.3"各审核人平均审核耗时、超时率"）：
+     *    基于 approval_chain_steps 已审结步骤，按 actioned_by(审核人) 聚合平均耗时与超时率。
+     *    复用客服响应时长同款 AVG(TIMESTAMPDIFF(SECOND, created_at, actioned_at))。
+     */
+    const reviewerStepWhere = {
+      actioned_by: { [Op.not]: null },
+      actioned_at: { [Op.not]: null, [Op.gte]: since },
+      status: { [Op.in]: ['approved', 'rejected', 'timeout'] }
+    }
+    if (storeId) reviewerStepWhere.store_id = storeId
+    const reviewerRaw = await ApprovalChainStep.findAll({
+      attributes: [
+        'actioned_by',
+        [sequelize.fn('COUNT', sequelize.col('step_id')), 'finished_cnt'],
+        [
+          sequelize.fn('AVG', sequelize.literal('TIMESTAMPDIFF(SECOND, created_at, actioned_at)')),
+          'avg_seconds'
+        ],
+        [
+          sequelize.literal(
+            "SUM(CASE WHEN status = 'timeout' OR (timeout_at IS NOT NULL AND actioned_at > timeout_at) THEN 1 ELSE 0 END)"
+          ),
+          'overtime_cnt'
+        ]
+      ],
+      where: reviewerStepWhere,
+      group: ['actioned_by'],
+      order: [[sequelize.fn('COUNT', sequelize.col('step_id')), 'DESC']],
+      limit: 20,
+      raw: true
+    })
+    const reviewerIds = reviewerRaw.map(r => Number(r.actioned_by))
+    const reviewerNameMap = new Map()
+    if (reviewerIds.length > 0) {
+      const rUsers = await User.findAll({
+        where: { user_id: { [Op.in]: reviewerIds } },
+        attributes: ['user_id', 'nickname'],
+        raw: true
+      })
+      rUsers.forEach(u => reviewerNameMap.set(Number(u.user_id), u.nickname))
+    }
+    const reviewerDuration = reviewerRaw.map(r => {
+      const finished = parseInt(r.finished_cnt, 10) || 0
+      const overtime = parseInt(r.overtime_cnt, 10) || 0
+      const avgSeconds = Math.round(parseFloat(r.avg_seconds) || 0)
+      return {
+        reviewer_id: Number(r.actioned_by),
+        reviewer_nickname: reviewerNameMap.get(Number(r.actioned_by)) || null,
+        finished_count: finished,
+        avg_duration_seconds: avgSeconds,
+        avg_duration_text: ApprovalChainService._formatDurationSeconds(avgSeconds),
+        timeout_rate: finished > 0 ? Math.round((overtime / finished) * 10000) / 100 : 0
+      }
+    })
+
+    return {
+      window_days: days,
+      store_id: storeId,
+      staff_ranking: staffRanking,
+      trend,
+      reject_reasons: rejectReasons,
+      user_activity: userActivity,
+      reviewer_duration: reviewerDuration
+    }
+  }
+
+  /**
+   * 把秒数格式化为友好耗时文案（如 "2小时30分"、"45分钟"、"30秒"），供审核时效展示
+   * @param {number} seconds - 秒数
+   * @returns {string} 友好文案
+   * @private
+   */
+  static _formatDurationSeconds(seconds) {
+    const s = Math.round(Number(seconds) || 0)
+    if (s <= 0) return '0秒'
+    const d = Math.floor(s / 86400)
+    const h = Math.floor((s % 86400) / 3600)
+    const m = Math.floor((s % 3600) / 60)
+    const sec = s % 60
+    if (d > 0) return `${d}天${h}小时`
+    if (h > 0) return `${h}小时${m}分`
+    if (m > 0) return `${m}分钟`
+    return `${sec}秒`
+  }
+
+  /**
+   * 汇总统计行（求总计），供 getApprovalStats 复用
+   * @param {Array<Object>} rows - 统计行
+   * @returns {Object} 汇总对象
+   * @private
+   */
+  static _sumStatsRows(rows) {
+    const summary = {
+      pending: 0,
+      approved: 0,
+      rejected: 0,
+      expired: 0,
+      timeout: 0,
+      total: 0,
+      amount: 0,
+      points: 0,
+      finished_steps: 0,
+      overtime_steps: 0
+    }
+    let durationWeightedSum = 0
+    rows.forEach(r => {
+      summary.pending += r.pending
+      summary.approved += r.approved
+      summary.rejected += r.rejected
+      summary.expired += r.expired
+      summary.timeout += r.timeout
+      summary.total += r.total
+      summary.amount += r.amount
+      summary.points += r.points
+      summary.finished_steps += r.finished_steps || 0
+      summary.overtime_steps += r.overtime_steps || 0
+      durationWeightedSum += (r.avg_duration_seconds || 0) * (r.finished_steps || 0)
+    })
+    const finished = summary.approved + summary.rejected
+    summary.pass_rate = finished > 0 ? Math.round((summary.approved / finished) * 10000) / 100 : 0
+    // 全局平均审核耗时（按已审结步骤数加权）+ 超时率
+    summary.avg_duration_seconds =
+      summary.finished_steps > 0 ? Math.round(durationWeightedSum / summary.finished_steps) : 0
+    summary.avg_duration_text = ApprovalChainService._formatDurationSeconds(
+      summary.avg_duration_seconds
+    )
+    summary.timeout_rate =
+      summary.finished_steps > 0
+        ? Math.round((summary.overtime_steps / summary.finished_steps) * 10000) / 100
+        : 0
+    return summary
+  }
+
+  /**
+   * 批量配置审核人（9.3③，跨多条审核链统一指派某节点的审核人）
+   *
+   * 设计（范式1 规则引擎，零破坏匹配模型、零新建门店级链表）：
+   *   - 选定多条审核链模板（template_ids）+ 目标节点定位（target_step：'final' 终审 / 数字步号）
+   *   - 统一把这些链的目标节点改派为：role 角色池 / user 指定人 / submitter_manager 提交人门店店长
+   *   - 仅改"目标节点的 assignee_*"单字段，不动其它节点、不重建节点（与 updateTemplate 的整表重建不同），
+   *     因此对进行中的实例无影响（实例步骤已在创建时固化 assignee，仅影响后续新建实例）。
+   *
+   * @param {Object} data - { template_ids[], target_step, assignee_type, assignee_role_id?, assignee_user_id? }
+   * @param {Object} options - 含 transaction（入口层统一管理）
+   * @returns {Promise<Object>} { results: [{template_id, success, node_id?, message?}], stats }
+   */
+  static async batchAssignNodeReviewer(data, options = {}) {
+    const transaction = assertAndGetTransaction(
+      options,
+      'ApprovalChainService.batchAssignNodeReviewer'
+    )
+
+    const { template_ids, target_step, assignee_type, assignee_role_id, assignee_user_id } = data
+
+    if (!Array.isArray(template_ids) || template_ids.length === 0) {
+      throw new BusinessError('template_ids 必须是非空数组', 'APPROVAL_INVALID', 400)
+    }
+    if (!['role', 'user', 'submitter_manager'].includes(assignee_type)) {
+      throw new BusinessError(
+        'assignee_type 必须是 role / user / submitter_manager',
+        'APPROVAL_INVALID',
+        400
+      )
+    }
+    if (assignee_type === 'role' && !assignee_role_id) {
+      throw new BusinessError('角色池模式必须提供 assignee_role_id', 'APPROVAL_INVALID', 400)
+    }
+    if (assignee_type === 'user' && !assignee_user_id) {
+      throw new BusinessError('指定人模式必须提供 assignee_user_id', 'APPROVAL_INVALID', 400)
+    }
+
+    // 统一的节点改派字段（role/user 互斥；submitter_manager 两者皆空，按门店动态派人）
+    const patch = {
+      assignee_type,
+      assignee_role_id: assignee_type === 'role' ? assignee_role_id : null,
+      assignee_user_id: assignee_type === 'user' ? assignee_user_id : null
+    }
+
+    const results = []
+    let successCount = 0
+
+    for (const rawId of template_ids) {
+      const templateId = parseInt(rawId, 10)
+      // eslint-disable-next-line no-await-in-loop
+      const nodes = await ApprovalChainNode.findAll({
+        where: { template_id: templateId },
+        transaction
+      })
+      if (nodes.length === 0) {
+        results.push({ template_id: templateId, success: false, message: '模板不存在或无节点' })
+        continue
+      }
+
+      // 定位目标节点：'final' 取终审节点；数字取对应 step_number 节点
+      let targetNode = null
+      if (target_step === 'final' || target_step === undefined || target_step === null) {
+        targetNode = nodes.find(n => n.is_final === 1 || n.is_final === true)
+      } else {
+        const sn = parseInt(target_step, 10)
+        targetNode = nodes.find(n => n.step_number === sn)
+      }
+
+      if (!targetNode) {
+        results.push({
+          template_id: templateId,
+          success: false,
+          message: target_step === 'final' ? '未找到终审节点' : `未找到步号 ${target_step} 的节点`
+        })
+        continue
+      }
+
+      // eslint-disable-next-line no-await-in-loop
+      await targetNode.update(patch, { transaction })
+      results.push({ template_id: templateId, success: true, node_id: targetNode.node_id })
+      successCount++
+    }
+
+    logger.info('[审核链] 批量配置审核人', {
+      total: template_ids.length,
+      success_count: successCount,
+      assignee_type
+    })
+
+    return {
+      results,
+      stats: {
+        total: template_ids.length,
+        success_count: successCount,
+        failed_count: template_ids.length - successCount
+      }
+    }
+  }
+
+  // ==================== 私有方法 ====================
   /**
    * 匹配条件检查
    * @param {Object} conditions - 匹配条件
@@ -1033,11 +1954,15 @@ class ApprovalChainService {
   }
 
   /**
-   * 验证操作人是否有权审核当前步骤
+   * 验证操作人是否有权审核当前步骤，并返回审核上下文（用于会签计数与越级留痕）
+   *
    * @param {Object} step - 审核步骤
    * @param {number} operatorId - 操作人ID
    * @param {Object} transaction - 事务
-   * @returns {Promise<void>} 无返回，权限不足时抛异常
+   * @returns {Promise<Object>} 审核上下文 { is_escalated, original_assignee_role_id }
+   *   - is_escalated：true 表示 admin 越级顶替了本不该由其审的低等级节点（需留痕）
+   *   - original_assignee_role_id：越级时该步原应审角色ID（留痕，submitter_manager 时为 null）
+   *   权限不足时抛 BusinessError。
    * @private
    */
   static async _verifyOperatorPermission(step, operatorId, transaction) {
@@ -1079,7 +2004,52 @@ class ApprovalChainService {
     }
 
     const isAdmin = operatorLevel >= 100
-    if (isAdmin) return
+    if (isAdmin) {
+      /*
+       * 越级代审判定（2026-06-20 越级留痕，决策 8.1）：
+       * admin 顶替"本不该由 admin 审"的低等级节点时，标记越级并记录原应审角色，供 processStep 留痕。
+       * 判定：该步配置了具体审核角色(assignee_role_id) 且该角色非 admin 自身角色池命中，
+       *       或该步是 submitter_manager（本应门店店长审）。指定人步骤(assignee_user_id≠admin)也算越级。
+       */
+      const adminHasAssignedRole =
+        step.assignee_role_id != null && userRoles.some(ur => ur.role_id === step.assignee_role_id)
+      const adminIsAssignedUser =
+        step.assignee_user_id != null && step.assignee_user_id === operatorId
+      const stepAssigneeType = step.node ? step.node.assignee_type : null
+      const isEscalated =
+        !adminHasAssignedRole && !adminIsAssignedUser
+          ? step.assignee_role_id != null ||
+            step.assignee_user_id != null ||
+            stepAssigneeType === 'submitter_manager'
+          : false
+      return {
+        is_escalated: isEscalated,
+        original_assignee_role_id: isEscalated ? step.assignee_role_id || null : null
+      }
+    }
+
+    /*
+     * ops(lv30, role_id=9) 只读角色排除（2026-06-20 分级审核链升级，决策 6/8.1）：
+     * 审核接口门槛降到 lv20 后，ops(lv30) 能进路由，但 ops 是"只读运营"角色，
+     * 业务上绝不应成为审核人（审核=发积分=发钱）。这里在 Service 层显式排除：
+     * 操作人持 ops 角色，且不具备其它任何"可审核角色"（除 ops 外、role_level >= 店员 lv20 的角色）时，拒绝。
+     * 仅持 ops 的用户被挡；若用户同时还兼任店员/店长等审核角色，则按其审核角色正常走精校。
+     */
+    const OPS_ROLE_ID = 9
+    const STAFF_MIN_LEVEL = 20
+    const hasOpsRole = userRoles.some(ur => ur.role_id === OPS_ROLE_ID)
+    if (hasOpsRole) {
+      const hasOtherAuditRole = userRoles.some(
+        ur => ur.role_id !== OPS_ROLE_ID && (ur.role?.role_level || 0) >= STAFF_MIN_LEVEL
+      )
+      if (!hasOtherAuditRole) {
+        throw new BusinessError(
+          'ops 为只读运营角色，不具备审核权限，不能成为审核人',
+          'APPROVAL_ERROR',
+          400
+        )
+      }
+    }
 
     if (step.assignee_user_id) {
       if (step.assignee_user_id !== operatorId) {
@@ -1089,7 +2059,40 @@ class ApprovalChainService {
           400
         )
       }
-      return
+      return { is_escalated: false, original_assignee_role_id: null }
+    }
+
+    /*
+     * submitter_manager（提交人门店店长）分配方式（2026-06-20 补全门店隔离半成品）：
+     * 操作人必须是该消费单所属门店（step.store_id）的"在职店长"（store_staff.role_in_store='manager'）。
+     * 天然实现"谁的店谁审"，从根上杜绝 A 店店长审 B 店单的跨店越权。
+     */
+    const assigneeType = step.node ? step.node.assignee_type : null
+    if (assigneeType === 'submitter_manager') {
+      if (!step.store_id) {
+        throw new BusinessError(
+          '该审核步骤缺少门店信息（store_id 为空），无法按"提交人门店店长"校验',
+          'APPROVAL_ERROR',
+          400
+        )
+      }
+      const managerRecord = await StoreStaff.findOne({
+        where: {
+          user_id: operatorId,
+          store_id: step.store_id,
+          role_in_store: 'manager',
+          status: 'active'
+        },
+        transaction
+      })
+      if (!managerRecord) {
+        throw new BusinessError(
+          '您不是该消费单所属门店的在职店长，无权审核该单',
+          'APPROVAL_ERROR',
+          400
+        )
+      }
+      return { is_escalated: false, original_assignee_role_id: null }
     }
 
     if (step.assignee_role_id) {
@@ -1101,7 +2104,30 @@ class ApprovalChainService {
           400
         )
       }
-      return
+
+      /*
+       * 门店/区域隔离（2026-06-20 角色池分支叠加范围校验，堵跨店越权）：
+       * consumption 业务（step.store_id 有值）下，角色池模式的非 admin 审核人，
+       * 必须管辖该门店才放行——
+       *   - 店长/店员：本人在 store_staff 该门店在职；
+       *   - 区域负责人/业务经理：该门店在其 user_hierarchy 管辖集合内。
+       * 二者统一由 _getUserScopedStoreIds 计算"可审门店集合"，命中才放行。
+       * merchant_points 无门店维度（step.store_id 为空），跳过隔离，保持原角色池语义。
+       */
+      if (step.store_id) {
+        const scopedStoreIds = await ApprovalChainService._getUserScopedStoreIds(
+          operatorId,
+          transaction
+        )
+        if (!scopedStoreIds.has(Number(step.store_id))) {
+          throw new BusinessError(
+            '该审核单不属于您管辖的门店/区域范围，无权审核（请确认门店任职或区域层级配置）',
+            'APPROVAL_ERROR',
+            400
+          )
+        }
+      }
+      return { is_escalated: false, original_assignee_role_id: null }
     }
 
     throw new BusinessError('当前步骤无法确定审核人分配方式', 'APPROVAL_ERROR', 400)
@@ -1168,13 +2194,15 @@ class ApprovalChainService {
    *
    * - 指定人模式（assignee_type='user'）：直接返回 [assignee_user_id]
    * - 角色池模式（assignee_type='role'）：查找拥有该角色的所有用户
+   * - 提交人门店店长（assignee_type='submitter_manager'）：按 storeId 反查该门店在职 manager
    *
    * @param {Object} node - 审核节点
    * @param {Object} transaction - 事务
+   * @param {number|null} [storeId] - 该步所属门店（submitter_manager 模式必需）
    * @returns {Promise<number[]>} 需要通知的 user_id 列表
    * @private
    */
-  static async _resolveAssigneeUserIds(node, transaction) {
+  static async _resolveAssigneeUserIds(node, transaction, storeId = null) {
     if (node.assignee_type === 'user' && node.assignee_user_id) {
       return [node.assignee_user_id]
     }
@@ -1188,7 +2216,73 @@ class ApprovalChainService {
       return userRoles.map(ur => ur.user_id)
     }
 
+    /*
+     * submitter_manager：通知该消费单所属门店的在职店长（store_staff.role_in_store='manager'）。
+     * 无 storeId（如 merchant_points 误配）时返回空，调用方降级为不通知（不报错）。
+     */
+    if (node.assignee_type === 'submitter_manager' && storeId) {
+      const managers = await StoreStaff.findAll({
+        where: { store_id: storeId, role_in_store: 'manager', status: 'active' },
+        attributes: ['user_id'],
+        transaction
+      })
+      return managers.map(m => m.user_id)
+    }
+
     return []
+  }
+
+  /**
+   * 计算用户"可审门店集合"（门店/区域隔离统一口径，2026-06-20 分级审核链升级）
+   *
+   * 合并两类管辖来源（去重）：
+   *   1. store_staff：用户作为店长/店员在职的门店（role_in_store 不限，status='active'）
+   *   2. user_hierarchy：用户在组织层级中管辖的门店——
+   *      - 直接挂在自己名下的 store_id（业务员本人门店，is_active=1）
+   *      - 作为上级（superior_user_id=自己）时，其直接下属挂的 store_id（区域负责人/业务经理管片区）
+   *
+   * 说明：按既有 user_hierarchy 设计，区域负责人/业务经理的 store_id 为 NULL，
+   * 其管辖门店通过"下属的 store_id"体现，故取下属门店集合即为其辖区（贴合后台手动指派的管辖关系）。
+   * 不按地理行政区划（stores.province/city/district）判定。
+   *
+   * @param {number} userId - 操作人 user_id
+   * @param {Object} [transaction] - 事务（可选）
+   * @returns {Promise<Set<number>>} 可审门店 store_id 集合
+   * @private
+   */
+  static async _getUserScopedStoreIds(userId, transaction) {
+    const storeIds = new Set()
+
+    // 1. store_staff 在职门店（店长/店员本人所在门店）
+    const staffRecords = await StoreStaff.findAll({
+      where: { user_id: userId, status: 'active' },
+      attributes: ['store_id'],
+      transaction
+    })
+    staffRecords.forEach(r => {
+      if (r.store_id != null) storeIds.add(Number(r.store_id))
+    })
+
+    // 2. user_hierarchy：本人直接挂的门店（业务员）+ 作为上级管辖的下属门店（区域/经理）
+    const ownHierarchy = await UserHierarchy.findAll({
+      where: { user_id: userId, is_active: true },
+      attributes: ['store_id'],
+      transaction
+    })
+    ownHierarchy.forEach(h => {
+      if (h.store_id != null) storeIds.add(Number(h.store_id))
+    })
+
+    const subordinates = await UserHierarchy.findAll({
+      where: { superior_user_id: userId, is_active: true },
+      attributes: ['store_id'],
+      transaction
+    })
+    subordinates.forEach(h => {
+      if (h.store_id != null) storeIds.add(Number(h.store_id))
+    })
+
+    return storeIds
   }
 
   /**

@@ -43,6 +43,21 @@
           class="px-6 py-3.5 font-medium transition-all">
           ⏳ 我的待审核
         </button>
+        <button @click="switchTab('stats')"
+          :class="current_tab === 'stats' ? 'border-b-2 border-blue-500 text-blue-600 bg-blue-50' : 'text-gray-500 hover:text-gray-700'"
+          class="px-6 py-3.5 font-medium transition-all">
+          📊 数据统计
+        </button>
+        <button @click="switchTab('overview')"
+          :class="current_tab === 'overview' ? 'border-b-2 border-blue-500 text-blue-600 bg-blue-50' : 'text-gray-500 hover:text-gray-700'"
+          class="px-6 py-3.5 font-medium transition-all">
+          🏪 门店总览
+        </button>
+        <button @click="switchTab('history')"
+          :class="current_tab === 'history' ? 'border-b-2 border-blue-500 text-blue-600 bg-blue-50' : 'text-gray-500 hover:text-gray-700'"
+          class="px-6 py-3.5 font-medium transition-all">
+          🕒 变更历史
+        </button>
       </div>
     </div>
 
@@ -50,10 +65,16 @@
     <div x-show="current_tab === 'templates'">
       <div class="flex justify-between items-center mb-4">
         <h2 class="text-xl font-bold text-gray-800">审核链模板</h2>
+        <div class="space-x-2">
+          <button @click="openBatchAssign()"
+            class="px-4 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors">
+            👥 批量配置审核人
+          </button>
         <button @click="openCreateTemplate()"
           class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
           ＋ 新建模板
         </button>
+        </div>
       </div>
 
       <div class="bg-white rounded-xl shadow-sm overflow-hidden">
@@ -90,6 +111,7 @@
                       class="px-2 py-0.5 rounded-full text-xs font-medium"></span>
                   </td>
                   <td class="px-4 py-3 text-center space-x-2">
+                    <button @click="openChainPreview(t.template_id)" class="text-indigo-600 hover:text-indigo-800 text-sm">预览</button>
                     <button @click="openEditTemplate(t.template_id)" class="text-blue-600 hover:text-blue-800 text-sm">编辑</button>
                     <button @click="toggleTemplate(t.template_id)" class="text-sm"
                       :class="t.is_active ? 'text-yellow-600 hover:text-yellow-800' : 'text-green-600 hover:text-green-800'"
@@ -113,7 +135,6 @@
             <option value="">全部类型</option>
             <option value="consumption">消费审核</option>
             <option value="merchant_points">商家积分审核</option>
-            <option value="trade_dispute">交易纠纷</option>
           </select>
           <select x-model="instance_filter.status" @change="loadInstances()"
             class="border rounded-lg px-3 py-2 text-sm">
@@ -221,11 +242,443 @@
       </div>
     </div>
 
-    <!-- ==================== 审核操作弹窗 ==================== -->
+    <!-- ==================== Tab: 数据统计 ==================== -->
+    <div x-show="current_tab === 'stats'">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-bold text-gray-800">审核数据统计</h2>
+        <div class="flex items-center space-x-2">
+          <button @click="switchStatsDimension('store')"
+            :class="stats_dimension === 'store' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'"
+            class="px-3 py-1.5 rounded-lg text-sm transition-colors">按门店</button>
+          <button @click="switchStatsDimension('region')"
+            :class="stats_dimension === 'region' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'"
+            class="px-3 py-1.5 rounded-lg text-sm transition-colors">按区域</button>
+        </div>
+      </div>
+
+      <!-- 汇总卡片 -->
+      <div x-show="stats_summary" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-4">
+        <div class="bg-white rounded-xl shadow-sm p-4">
+          <div class="text-xs text-gray-500">待审</div>
+          <div class="text-2xl font-bold text-yellow-600" x-text="stats_summary?.pending ?? 0"></div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-4">
+          <div class="text-xs text-gray-500">已通过</div>
+          <div class="text-2xl font-bold text-green-600" x-text="stats_summary?.approved ?? 0"></div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-4">
+          <div class="text-xs text-gray-500">超时未处理</div>
+          <div class="text-2xl font-bold text-orange-600" x-text="stats_summary?.timeout ?? 0"></div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-4">
+          <div class="text-xs text-gray-500">通过率</div>
+          <div class="text-2xl font-bold text-blue-600" x-text="(stats_summary?.pass_rate ?? 0) + '%'"></div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-4">
+          <div class="text-xs text-gray-500">平均审核耗时</div>
+          <div class="text-2xl font-bold text-gray-700" x-text="stats_summary?.avg_duration_text || '-'"></div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-4">
+          <div class="text-xs text-gray-500">超时率</div>
+          <div class="text-2xl font-bold" :class="(stats_summary?.timeout_rate ?? 0) > 0 ? 'text-orange-600' : 'text-gray-700'" x-text="(stats_summary?.timeout_rate ?? 0) + '%'"></div>
+        </div>
+      </div>
+
+      <!-- 状态分布图表 -->
+      <div class="bg-white rounded-xl shadow-sm p-4 mb-4">
+        <div x-show="stats_loading" class="text-center text-gray-400 py-8">加载中…</div>
+        <div x-show="!stats_loading && stats_rows.length === 0" class="text-center text-gray-400 py-8">暂无统计数据</div>
+        <div id="approvalStatsChart" x-show="!stats_loading && stats_rows.length > 0" style="width:100%;height:360px;"></div>
+      </div>
+
+      <!-- 明细表格 -->
+      <div class="bg-white rounded-xl shadow-sm overflow-hidden" x-show="stats_rows.length > 0">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 text-gray-600">
+            <tr>
+              <th class="px-4 py-2 text-left" x-text="stats_dimension === 'store' ? '门店' : '区域'"></th>
+              <th class="px-4 py-2 text-right">待审</th>
+              <th class="px-4 py-2 text-right">已通过</th>
+              <th class="px-4 py-2 text-right">已拒绝</th>
+              <th class="px-4 py-2 text-right">超时未处理</th>
+              <th class="px-4 py-2 text-right">超时率</th>
+              <th class="px-4 py-2 text-right">通过率</th>
+              <th class="px-4 py-2 text-right">平均审核耗时</th>
+              <th class="px-4 py-2 text-right">消费金额</th>
+              <th class="px-4 py-2 text-right">奖励积分</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <template x-for="row in stats_rows" :key="row.store_id || row.region_key">
+              <tr class="hover:bg-gray-50">
+                <td class="px-4 py-2" x-text="stats_dimension === 'store' ? (row.store_name || ('门店' + row.store_id)) : (row.region_key === 'unassigned' ? '未分配区域' : ('区域负责人#' + row.superior_user_id))"></td>
+                <td class="px-4 py-2 text-right" x-text="row.pending"></td>
+                <td class="px-4 py-2 text-right" x-text="row.approved"></td>
+                <td class="px-4 py-2 text-right" x-text="row.rejected"></td>
+                <td class="px-4 py-2 text-right text-orange-600" x-text="row.timeout"></td>
+                <td class="px-4 py-2 text-right" :class="row.timeout_rate > 0 ? 'text-orange-600' : ''" x-text="(row.timeout_rate ?? 0) + '%'"></td>
+                <td class="px-4 py-2 text-right" x-text="row.pass_rate + '%'"></td>
+                <td class="px-4 py-2 text-right text-gray-600" x-text="row.avg_duration_text || '-'"></td>
+                <td class="px-4 py-2 text-right" x-text="'¥' + (row.amount || 0).toFixed(2)"></td>
+                <td class="px-4 py-2 text-right" x-text="row.points"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 运营分析（8.4.3：员工排行/趋势/拒绝原因/复购活跃）-->
+      <div class="mt-6">
+        <div class="flex justify-between items-center mb-3">
+          <h3 class="text-lg font-bold text-gray-800">运营分析</h3>
+          <div class="flex items-center space-x-2">
+            <button @click="switchAnalyticsDays(7)" :class="analytics_days === 7 ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'" class="px-3 py-1 rounded text-sm">近7天</button>
+            <button @click="switchAnalyticsDays(30)" :class="analytics_days === 30 ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'" class="px-3 py-1 rounded text-sm">近30天</button>
+            <button @click="switchAnalyticsDays(90)" :class="analytics_days === 90 ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'" class="px-3 py-1 rounded text-sm">近90天</button>
+          </div>
+        </div>
+
+        <div x-show="analytics_loading" class="text-center text-gray-400 py-6">加载中…</div>
+
+        <div x-show="!analytics_loading && analytics" class="space-y-4">
+          <!-- 用户复购/活跃（脱敏，仅聚合数字）-->
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="bg-white rounded-xl shadow-sm p-4">
+              <div class="text-xs text-gray-500">消费用户数</div>
+              <div class="text-2xl font-bold text-gray-800" x-text="analytics?.user_activity?.total_customers ?? 0"></div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm p-4">
+              <div class="text-xs text-gray-500">回头客数（≥2次）</div>
+              <div class="text-2xl font-bold text-green-600" x-text="analytics?.user_activity?.repeat_customers ?? 0"></div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm p-4">
+              <div class="text-xs text-gray-500">复购率</div>
+              <div class="text-2xl font-bold text-blue-600" x-text="(analytics?.user_activity?.repeat_rate ?? 0) + '%'"></div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm p-4">
+              <div class="text-xs text-gray-500">新客数（1次）</div>
+              <div class="text-2xl font-bold text-amber-600" x-text="analytics?.user_activity?.single_customers ?? 0"></div>
+            </div>
+          </div>
+
+          <!-- 消费/积分趋势 -->
+          <div class="bg-white rounded-xl shadow-sm p-4">
+            <div class="text-sm font-medium text-gray-700 mb-2">消费 / 积分趋势</div>
+            <div x-show="!analytics?.trend?.length" class="text-center text-gray-400 py-6">该时间窗暂无数据</div>
+            <div id="approvalTrendChart" x-show="analytics?.trend?.length" style="width:100%;height:300px;"></div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- 员工录入排行 -->
+            <div class="bg-white rounded-xl shadow-sm p-4">
+              <div class="text-sm font-medium text-gray-700 mb-2">员工录入排行（Top 20）</div>
+              <div x-show="!analytics?.staff_ranking?.length" class="text-center text-gray-400 py-4">暂无数据</div>
+              <table x-show="analytics?.staff_ranking?.length" class="w-full text-sm">
+                <thead class="text-gray-500">
+                  <tr><th class="px-2 py-1 text-left">录入人</th><th class="px-2 py-1 text-right">录入</th><th class="px-2 py-1 text-right">通过</th><th class="px-2 py-1 text-right">驳回</th></tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                  <template x-for="s in (analytics?.staff_ranking || [])" :key="s.merchant_id">
+                    <tr class="hover:bg-gray-50">
+                      <td class="px-2 py-1" x-text="s.merchant_nickname || ('用户' + s.merchant_id)"></td>
+                      <td class="px-2 py-1 text-right" x-text="s.total"></td>
+                      <td class="px-2 py-1 text-right text-green-600" x-text="s.approved"></td>
+                      <td class="px-2 py-1 text-right text-red-600" x-text="s.rejected"></td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- 拒绝原因 TOP -->
+            <div class="bg-white rounded-xl shadow-sm p-4">
+              <div class="text-sm font-medium text-gray-700 mb-2">拒绝原因 TOP 10</div>
+              <div x-show="!analytics?.reject_reasons?.length" class="text-center text-gray-400 py-4">该时间窗暂无驳回记录</div>
+              <table x-show="analytics?.reject_reasons?.length" class="w-full text-sm">
+                <thead class="text-gray-500">
+                  <tr><th class="px-2 py-1 text-left">原因</th><th class="px-2 py-1 text-right">次数</th></tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                  <template x-for="(r, i) in (analytics?.reject_reasons || [])" :key="i">
+                    <tr class="hover:bg-gray-50">
+                      <td class="px-2 py-1 truncate max-w-xs" x-text="r.reason"></td>
+                      <td class="px-2 py-1 text-right" x-text="r.count"></td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- 审核人时效（9.3：各审核人平均审核耗时、超时率）-->
+          <div class="bg-white rounded-xl shadow-sm p-4">
+            <div class="text-sm font-medium text-gray-700 mb-2">审核人时效（Top 20）</div>
+            <div x-show="!analytics?.reviewer_duration?.length" class="text-center text-gray-400 py-4">该时间窗暂无审核记录</div>
+            <table x-show="analytics?.reviewer_duration?.length" class="w-full text-sm">
+              <thead class="text-gray-500">
+                <tr>
+                  <th class="px-2 py-1 text-left">审核人</th>
+                  <th class="px-2 py-1 text-right">已审结</th>
+                  <th class="px-2 py-1 text-right">平均耗时</th>
+                  <th class="px-2 py-1 text-right">超时率</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                <template x-for="rv in (analytics?.reviewer_duration || [])" :key="rv.reviewer_id">
+                  <tr class="hover:bg-gray-50">
+                    <td class="px-2 py-1" x-text="rv.reviewer_nickname || ('用户' + rv.reviewer_id)"></td>
+                    <td class="px-2 py-1 text-right" x-text="rv.finished_count"></td>
+                    <td class="px-2 py-1 text-right text-gray-600" x-text="rv.avg_duration_text"></td>
+                    <td class="px-2 py-1 text-right" :class="rv.timeout_rate > 0 ? 'text-orange-600' : ''" x-text="rv.timeout_rate + '%'"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== Tab: 门店总览（门店↔审核链对应，9.3②）==================== -->
+    <div x-show="current_tab === 'overview'">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-bold text-gray-800">门店 ↔ 审核链对应总览</h2>
+        <button @click="loadStoreChainOverview()" class="px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-sm hover:bg-gray-200">刷新</button>
+      </div>
+      <p class="text-sm text-gray-500 mb-3">
+        审核链按"业务类型 + 金额条件 + 优先级"匹配（非按门店建链）。配置"提交人门店店长"分配方式后，所有门店的单会按各自门店自动指派店长审核，无需逐店配置。下表帮助确认各业务类型是否有"无条件兜底链"，避免漏配导致提交无链可走。
+      </p>
+      <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div x-show="overview_loading" class="p-8 text-center text-gray-400">⏳ 加载中...</div>
+        <div x-show="!overview_loading && overview_rows.length === 0" class="p-8 text-center text-gray-400">暂无审核链配置</div>
+        <template x-for="row in overview_rows" :key="row.auditable_type">
+          <div class="border-b last:border-b-0 p-4">
+            <div class="flex items-center justify-between mb-2">
+              <div class="font-medium text-gray-800">
+                业务类型：<span x-text="row.auditable_type"></span>
+                <span class="text-xs text-gray-400 ml-2" x-text="'适用门店数 ' + row.store_count"></span>
+              </div>
+              <span x-show="row.risk" class="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">⚠️ 缺无条件兜底链（可能漏配）</span>
+              <span x-show="!row.risk" class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">✓ 已有兜底链</span>
+            </div>
+            <table class="w-full text-sm">
+              <thead class="text-gray-500">
+                <tr>
+                  <th class="px-2 py-1 text-left">链名称</th>
+                  <th class="px-2 py-1 text-left">编码</th>
+                  <th class="px-2 py-1 text-center">优先级</th>
+                  <th class="px-2 py-1 text-center">触发门槛</th>
+                  <th class="px-2 py-1 text-center">门店范围</th>
+                  <th class="px-2 py-1 text-center">状态</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="c in row.chains" :key="c.template_id">
+                  <tr class="hover:bg-gray-50">
+                    <td class="px-2 py-1" x-text="c.template_name"></td>
+                    <td class="px-2 py-1 font-mono text-gray-600" x-text="c.template_code"></td>
+                    <td class="px-2 py-1 text-center" x-text="c.priority"></td>
+                    <td class="px-2 py-1 text-center" x-text="c.min_amount != null ? ('≥¥' + c.min_amount) : '不限金额(兜底)'"></td>
+                    <td class="px-2 py-1 text-center" x-text="c.store_scoped ? ('限' + c.store_ids.length + '店') : '全部门店'"></td>
+                    <td class="px-2 py-1 text-center">
+                      <span :class="c.is_active ? 'text-green-600' : 'text-gray-400'" x-text="c.is_active ? '启用' : '禁用'"></span>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- ==================== Tab: 变更历史（复用 admin-audit-logs，9.3④）==================== -->
+    <div x-show="current_tab === 'history'">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-bold text-gray-800">审核链变更历史</h2>
+        <button @click="loadChangeHistory()" class="px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-sm hover:bg-gray-200">刷新</button>
+      </div>
+      <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div x-show="history_loading" class="p-8 text-center text-gray-400">⏳ 加载中...</div>
+        <div x-show="!history_loading && history_rows.length === 0" class="p-8 text-center text-gray-400">暂无变更记录</div>
+        <table x-show="!history_loading && history_rows.length > 0" class="w-full text-sm">
+          <thead class="bg-gray-50 text-gray-500">
+            <tr>
+              <th class="px-4 py-2 text-left">时间</th>
+              <th class="px-4 py-2 text-left">操作人</th>
+              <th class="px-4 py-2 text-center">动作</th>
+              <th class="px-4 py-2 text-left">模板ID</th>
+              <th class="px-4 py-2 text-left">变更内容</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <template x-for="h in history_rows" :key="h.log_id || h.admin_operation_log_id">
+              <tr class="hover:bg-gray-50">
+                <td class="px-4 py-2 text-gray-600" x-text="formatDateTime(h.created_at)"></td>
+                <td class="px-4 py-2" x-text="h.operator_nickname || h.operator_name || ('用户' + (h.operator_id ?? '-'))"></td>
+                <td class="px-4 py-2 text-center" x-text="getHistoryActionLabel(h.action)"></td>
+                <td class="px-4 py-2 text-gray-600" x-text="h.target_id ?? '-'"></td>
+                <td class="px-4 py-2 text-gray-500 truncate max-w-md" x-text="(h.after_data ? (typeof h.after_data === 'string' ? h.after_data : JSON.stringify(h.after_data)) : '-')"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+        <!-- 分页 -->
+        <div x-show="!history_loading && history_pagination.total > history_pagination.page_size" class="flex items-center justify-between px-4 py-3 border-t">
+          <span class="text-sm text-gray-500" x-text="'共 ' + history_pagination.total + ' 条'"></span>
+          <div class="space-x-2">
+            <button @click="changeHistoryPage(history_pagination.page - 1)" :disabled="history_pagination.page <= 1"
+              class="px-3 py-1 border rounded text-sm disabled:opacity-40">上一页</button>
+            <span class="text-sm text-gray-600" x-text="history_pagination.page"></span>
+            <button @click="changeHistoryPage(history_pagination.page + 1)"
+              :disabled="history_pagination.page >= Math.ceil(history_pagination.total / history_pagination.page_size)"
+              class="px-3 py-1 border rounded text-sm disabled:opacity-40">下一页</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== 批量配置审核人弹窗（9.3③）==================== -->
+    <div x-show="batch_assign_visible" x-cloak
+      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto"
+      @click.self="batch_assign_visible = false">
+      <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl p-6 my-8 max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-bold">👥 批量配置审核人</h3>
+          <button @click="batch_assign_visible = false" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+        </div>
+        <p class="text-sm text-gray-500 mb-3">勾选多条审核链，统一设置其"目标节点"的审核人。一次配置覆盖多条链，无需逐条编辑。</p>
+
+        <!-- 选择目标审核链 -->
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">选择审核链（可多选）</label>
+          <div class="border rounded-lg max-h-40 overflow-y-auto divide-y">
+            <template x-for="t in templates" :key="t.template_id">
+              <label class="flex items-center px-3 py-2 text-sm hover:bg-gray-50 cursor-pointer">
+                <input type="checkbox" class="mr-2"
+                  :checked="batch_assign_form.template_ids.includes(t.template_id)"
+                  @change="toggleBatchTemplate(t.template_id)">
+                <span x-text="t.template_name"></span>
+                <span class="text-gray-400 font-mono ml-2 text-xs" x-text="t.template_code"></span>
+                <span class="text-gray-400 ml-2 text-xs" x-text="t.auditable_type_display || t.auditable_type"></span>
+              </label>
+            </template>
+          </div>
+          <p class="text-xs text-gray-400 mt-1" x-text="'已选 ' + batch_assign_form.template_ids.length + ' 条'"></p>
+        </div>
+
+        <!-- 目标节点 -->
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">目标节点</label>
+          <select x-model="batch_assign_form.target_step" class="w-full border rounded px-2 py-1.5 text-sm">
+            <option value="final">终审节点</option>
+            <option value="2">第一审核节点（步号2）</option>
+            <option value="3">第二审核节点（步号3）</option>
+            <option value="4">第三审核节点（步号4）</option>
+          </select>
+        </div>
+
+        <!-- 分配方式 -->
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">分配方式</label>
+          <select x-model="batch_assign_form.assignee_type" class="w-full border rounded px-2 py-1.5 text-sm">
+            <option value="submitter_manager">提交人门店店长（按门店自动派人，推荐）</option>
+            <option value="role">按角色（角色池）</option>
+            <option value="user">指定人</option>
+          </select>
+        </div>
+
+        <!-- 角色池 -->
+        <div x-show="batch_assign_form.assignee_type === 'role'" class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">审核角色</label>
+          <select x-model.number="batch_assign_form.assignee_role_id" class="w-full border rounded px-2 py-1.5 text-sm">
+            <option :value="null">请选择角色</option>
+            <template x-for="r in role_options" :key="r.role_id">
+              <option :value="r.role_id" x-text="r.label"></option>
+            </template>
+          </select>
+        </div>
+
+        <!-- 指定人 -->
+        <div x-show="batch_assign_form.assignee_type === 'user'" class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">指定审核人（手机号/昵称搜索）</label>
+          <div x-show="batch_assign_form.assignee_user_label" class="text-sm text-green-700 mb-1">
+            已选：<span x-text="batch_assign_form.assignee_user_label"></span>
+            <button @click="batch_assign_form.assignee_user_id = null; batch_assign_form.assignee_user_label = ''" class="text-red-500 ml-2 text-xs">清除</button>
+          </div>
+          <div class="flex items-center space-x-2">
+            <input x-model="batch_assign_form.assignee_user_keyword" @keydown.enter.prevent="searchBatchAssigneeUser()" type="text"
+              class="flex-1 border rounded px-2 py-1.5 text-sm" placeholder="输入手机号/昵称后回车或点搜索">
+            <button @click="searchBatchAssigneeUser()" class="px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">搜索</button>
+          </div>
+          <div x-show="batch_assign_form.assignee_user_options.length > 0" class="border rounded mt-1 max-h-32 overflow-y-auto bg-white">
+            <template x-for="u in batch_assign_form.assignee_user_options" :key="u.user_id">
+              <div @click="selectBatchAssigneeUser(u)" class="px-2 py-1 text-sm hover:bg-blue-50 cursor-pointer" x-text="u.label"></div>
+            </template>
+          </div>
+        </div>
+
+        <div class="flex justify-end space-x-3 mt-6">
+          <button @click="batch_assign_visible = false" class="px-4 py-2 border rounded-lg text-gray-600 hover:bg-gray-50">取消</button>
+          <button @click="submitBatchAssign()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">应用到所选链</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== 审核链可视化预览弹窗（9.3①）==================== -->
+    <div x-show="preview_visible" x-cloak
+      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto"
+      @click.self="preview_visible = false">
+      <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl p-6 my-8 max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-bold">🔍 审核链流转预览</h3>
+          <button @click="preview_visible = false" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+        </div>
+        <div x-show="preview_template" class="mb-4 text-sm text-gray-600">
+          <span x-text="preview_template?.template_name"></span>
+          <span class="font-mono text-gray-400 ml-2" x-text="preview_template?.template_code"></span>
+          <span class="ml-2" x-text="'业务类型: ' + (preview_template?.auditable_type_display || preview_template?.auditable_type)"></span>
+        </div>
+        <!-- 流转图：提交 → 各审核节点（按 step_number 升序） -->
+        <div class="space-y-2">
+          <template x-for="(node, i) in previewSteps()" :key="node.node_id || i">
+            <div>
+              <div class="flex items-start">
+                <div class="flex flex-col items-center mr-3">
+                  <div class="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold"
+                    :class="node.step_number === 1 ? 'bg-gray-400' : (node.is_final ? 'bg-green-600' : 'bg-blue-500')"
+                    x-text="i + 1"></div>
+                </div>
+                <div class="flex-1 border rounded-lg p-3"
+                  :class="node.is_final ? 'border-green-200 bg-green-50' : 'border-gray-200'">
+                  <div class="font-medium text-gray-800">
+                    <span x-text="node.node_name || (node.step_number === 1 ? '提交' : '审核节点')"></span>
+                    <span x-show="node.is_final" class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full ml-2">终审</span>
+                  </div>
+                  <div class="text-sm text-gray-600 mt-1" x-show="node.step_number !== 1">
+                    审核人：<span x-text="getNodeAssigneeText(node)"></span>
+                  </div>
+                  <div class="text-xs text-gray-400 mt-1" x-show="node.step_number !== 1">
+                    <span x-text="getNodeApproveModeText(node)"></span>
+                    <span class="ml-2" x-text="'超时 ' + (node.timeout_hours ?? '-') + 'h · ' + getTimeoutActionLabel(node.timeout_action)"></span>
+                    <span class="ml-2" x-show="node.exclude_parties === 1" class="text-amber-600">· 当事人回避</span>
+                  </div>
+                </div>
+              </div>
+              <div x-show="i < previewSteps().length - 1" class="ml-4 my-1 text-gray-300">↓</div>
+            </div>
+          </template>
+        </div>
+        <div class="flex justify-end mt-6">
+          <button @click="preview_visible = false" class="px-4 py-2 border rounded-lg text-gray-600 hover:bg-gray-50">关闭</button>
+        </div>
+      </div>
+    </div>
+
     <div x-show="review_modal_visible" x-cloak
-      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto"
       @click.self="review_modal_visible = false">
-      <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
+      <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 my-8 max-h-[90vh] overflow-y-auto">
         <h3 class="text-lg font-bold mb-4" x-text="review_action === 'approve' ? '✅ 审核通过' : '❌ 审核拒绝'"></h3>
         <div class="mb-4">
           <label class="block text-sm font-medium text-gray-700 mb-1"
@@ -249,15 +702,16 @@
     <div x-show="template_form_visible" x-cloak
       class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto"
       @click.self="template_form_visible = false">
-      <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl p-6 my-8">
+      <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl p-6 my-8 max-h-[90vh] overflow-y-auto">
         <h3 class="text-lg font-bold mb-4" x-text="editing_template_id ? '编辑审核链模板' : '新建审核链模板'"></h3>
 
         <div class="space-y-4">
           <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">模板编码</label>
-              <input x-model="template_form.template_code" type="text" :disabled="!!editing_template_id"
-                class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="如 consumption_default">
+            <!-- 模板编码：后端自动生成（{业务类型}_序号），新建时不显示；编辑时只读展示 -->
+            <div x-show="!!editing_template_id">
+              <label class="block text-sm font-medium text-gray-700 mb-1">模板编码（系统自动生成）</label>
+              <input x-model="template_form.template_code" type="text" disabled
+                class="w-full border rounded-lg px-3 py-2 text-sm bg-gray-100 text-gray-500">
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">模板名称</label>
@@ -271,7 +725,6 @@
               <select x-model="template_form.auditable_type" class="w-full border rounded-lg px-3 py-2 text-sm">
                 <option value="consumption">消费审核</option>
                 <option value="merchant_points">商家积分审核</option>
-                <option value="trade_dispute">交易纠纷</option>
               </select>
             </div>
             <div>
@@ -321,6 +774,7 @@
                     <select x-model="node.assignee_type" class="w-full border rounded px-2 py-1 text-sm">
                       <option value="role">按角色（角色池，该角色任何人可审）</option>
                       <option value="user">指定人（仅指定的某个人可审）</option>
+                      <option value="submitter_manager">提交人门店店长（按门店自动派人，仅消费审核）</option>
                     </select>
                   </div>
                 </div>
@@ -352,6 +806,27 @@
                     <template x-for="u in node.assignee_user_options" :key="u.user_id">
                       <div @click="selectAssigneeUser(idx, u)" class="px-2 py-1 text-sm hover:bg-blue-50 cursor-pointer" x-text="u.label"></div>
                     </template>
+                  </div>
+                </div>
+
+                <!-- 提交人门店店长模式：无需选人，审核时按消费单门店自动反查在职店长 -->
+                <div x-show="node.assignee_type === 'submitter_manager'" class="mt-2 text-xs text-gray-600 bg-amber-50 border border-amber-200 rounded p-2">
+                  审核时将按该消费单所属门店，自动指派该门店在职店长审核（谁的店谁审），无需手动选人。
+                  仅适用于"消费审核（consumption）"，商家积分等无门店维度的业务请勿使用此方式。
+                </div>
+
+                <!-- 会签配置：单签 / 会签（需 N 人通过） -->
+                <div class="grid grid-cols-2 gap-3 mt-2 text-sm">
+                  <div>
+                    <label class="text-xs text-gray-500">审批模式</label>
+                    <select x-model="node.approve_mode" class="w-full border rounded px-2 py-1 text-sm">
+                      <option value="single">单签（一人通过即推进）</option>
+                      <option value="countersign">会签（需 N 人通过）</option>
+                    </select>
+                  </div>
+                  <div x-show="node.approve_mode === 'countersign'">
+                    <label class="text-xs text-gray-500">会签通过人数（≥2）</label>
+                    <input x-model.number="node.required_approvals" type="number" min="2" class="w-full border rounded px-2 py-1 text-sm" placeholder="如 2">
                   </div>
                 </div>
 
@@ -393,7 +868,7 @@
     <div x-show="instance_detail_visible" x-cloak
       class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto"
       @click.self="instance_detail_visible = false">
-      <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl p-6 my-8" x-show="instance_detail">
+      <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl p-6 my-8 max-h-[90vh] overflow-y-auto" x-show="instance_detail">
         <h3 class="text-lg font-bold mb-4">审核链详情 #<span x-text="instance_detail?.instance_id"></span></h3>
 
         <!-- 基本信息 -->
@@ -431,6 +906,13 @@
                 <!-- 节点配置：由谁审 + 当事人回避 + 超时策略 -->
                 <div class="text-xs text-gray-600 mt-1 space-y-0.5">
                   <div><span class="text-gray-400">分配:</span> <span x-text="getStepAssigneeText(step)"></span></div>
+                  <div x-show="getStepCountersignText(step)">
+                    <span class="text-gray-400">会签:</span>
+                    <span class="text-indigo-600" x-text="getStepCountersignText(step)"></span>
+                  </div>
+                  <div x-show="getStepEscalationLabel(step)">
+                    <span class="inline-block text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full" x-text="getStepEscalationLabel(step)"></span>
+                  </div>
                   <div>
                     <span class="text-gray-400">当事人回避:</span>
                     <span :class="step.node?.exclude_parties === 1 ? 'text-green-700' : 'text-gray-400'"

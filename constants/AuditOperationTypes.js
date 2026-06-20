@@ -334,7 +334,16 @@ const OPERATION_TYPES = Object.freeze({
    * @example DataManagementService.executeCleanup()
    * @since 2026-03-10（数据一键删除功能）
    */
-  DATA_CLEANUP: 'data_cleanup'
+  DATA_CLEANUP: 'data_cleanup',
+
+  // ==================== 登录安全类（P0.6 管理端登录加固 2026-06-18 新增）====================
+  /**
+   * 管理端登录锁定
+   * @description 同一管理员手机号连续登录失败达到阈值后被锁定（防爆破/撞库）
+   * @example AdminLoginSecurityService.recordFailure() 命中阈值时记录
+   * @since 2026-06-18（验证码功能 P0.6 管理端轻量加固）
+   */
+  ADMIN_LOGIN_LOCKED: 'admin_login_locked'
 })
 
 /**
@@ -438,7 +447,10 @@ const OPERATION_TYPE_DESCRIPTIONS = Object.freeze({
   [OPERATION_TYPES.ADMIN_VIEW_USER_DATA]: '管理员查看用户数据',
 
   // 数据管理类（数据一键删除功能 2026-03-10 新增）
-  [OPERATION_TYPES.DATA_CLEANUP]: '数据清理'
+  [OPERATION_TYPES.DATA_CLEANUP]: '数据清理',
+
+  // 登录安全类（P0.6 管理端登录加固 2026-06-18 新增）
+  [OPERATION_TYPES.ADMIN_LOGIN_LOCKED]: '管理端登录锁定'
 })
 
 /**

@@ -164,10 +164,8 @@ import { API_PREFIX, request, buildURL, buildQueryString } from './base.js'
  *
  * @property {string} HIERARCHY_LIST - [GET] 获取用户层级列表
  * @property {string} HIERARCHY_ROLES - [GET] 获取层级角色列表
- * @property {string} HIERARCHY_DETAIL - [GET] 获取层级详情 - Path: :id
  * @property {string} HIERARCHY_CREATE - [POST] 创建层级关系
  * @property {string} HIERARCHY_SUBORDINATES - [GET] 获取下级用户 - Path: :user_id
- * @property {string} HIERARCHY_UPDATE_STATUS - [PUT] 更新层级状态 - Path: :id
  * @property {string} HIERARCHY_DEACTIVATE - [POST] 停用层级 - Path: :user_id
  * @property {string} HIERARCHY_ACTIVATE - [POST] 激活层级 - Path: :user_id
  *
@@ -233,14 +231,10 @@ export const USER_ENDPOINTS = {
   HIERARCHY_LIST: `${API_PREFIX}/console/user-hierarchy`,
   /** @type {string} [GET] 获取层级角色列表 */
   HIERARCHY_ROLES: `${API_PREFIX}/console/user-hierarchy/roles`,
-  /** @type {string} [GET] 获取层级详情 - Path: :id */
-  HIERARCHY_DETAIL: `${API_PREFIX}/console/user-hierarchy/:id`,
   /** @type {string} [POST] 创建层级关系 - Body: { user_id, superior_user_id?, role_id, store_id? } */
   HIERARCHY_CREATE: `${API_PREFIX}/console/user-hierarchy`,
   /** @type {string} [GET] 获取下级用户 - Path: :user_id, Query: { include_inactive? } */
   HIERARCHY_SUBORDINATES: `${API_PREFIX}/console/user-hierarchy/:user_id/subordinates`,
-  /** @type {string} [PUT] 更新层级状态 - Path: :id, Body: { status } */
-  HIERARCHY_UPDATE_STATUS: `${API_PREFIX}/console/user-hierarchy/:id/status`,
   /** @type {string} [POST] 停用层级 - Path: :user_id, Body: { reason, include_subordinates? } */
   HIERARCHY_DEACTIVATE: `${API_PREFIX}/console/user-hierarchy/:user_id/deactivate`,
   /** @type {string} [POST] 激活层级 - Path: :user_id, Body: { include_subordinates? } */
@@ -600,18 +594,6 @@ export const UserAPI = {
   },
 
   /**
-   * 获取用户层级详情
-   * @async
-   * @param {number|string} id - 层级记录 ID
-   * @returns {Promise<ApiResponse>} 层级详情响应
-   * @throws {Error} 当层级记录不存在时抛出错误
-   */
-  async getHierarchyDetail(id) {
-    const url = buildURL(USER_ENDPOINTS.HIERARCHY_DETAIL, { id })
-    return await request({ url, method: 'GET' })
-  },
-
-  /**
    * 创建用户层级
    * @async
    * @param {HierarchyCreateData} data - 层级数据
@@ -676,20 +658,6 @@ export const UserAPI = {
       buildURL(USER_ENDPOINTS.HIERARCHY_SUBORDINATES, { user_id: userId }) +
       buildQueryString(params)
     return await request({ url, method: 'GET' })
-  },
-
-  /**
-   * 更新用户层级状态
-   * @async
-   * @param {number|string} id - 层级记录 ID
-   * @param {Object} statusData - 状态数据
-   * @param {boolean} statusData.status - 新状态
-   * @returns {Promise<ApiResponse>} 更新结果响应
-   * @throws {Error} 当层级记录不存在时抛出错误
-   */
-  async updateHierarchyStatus(id, statusData) {
-    const url = buildURL(USER_ENDPOINTS.HIERARCHY_UPDATE_STATUS, { id })
-    return await request({ url, method: 'PUT', data: statusData })
   },
 
   /**

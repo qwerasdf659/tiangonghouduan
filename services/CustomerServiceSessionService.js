@@ -199,7 +199,16 @@ class CustomerServiceSessionService {
           limit: 1,
           order: [['created_at', 'DESC']],
           required: false,
-          attributes: ['chat_message_id', 'content', 'sender_type', 'created_at']
+          // 补充 message_type/file_name/file_size：与详情接口 getSessionMessages 同源，供前端按类型渲染会话预览（图片→[图片]、文件→[文件] 文件名）
+          attributes: [
+            'chat_message_id',
+            'content',
+            'sender_type',
+            'message_type',
+            'file_name',
+            'file_size',
+            'created_at'
+          ]
         })
       }
 
@@ -250,6 +259,11 @@ class CustomerServiceSessionService {
                 chat_message_id: session.messages[0].chat_message_id,
                 content: session.messages[0].content,
                 sender_type: session.messages[0].sender_type,
+                // 消息类型（text/image/system/file）：前端据此渲染预览，图片/文件不再暴露原始 URL
+                message_type: session.messages[0].message_type,
+                // 文件消息元信息（仅 message_type=file 有值，其它类型为 null）
+                file_name: session.messages[0].file_name,
+                file_size: session.messages[0].file_size,
                 created_at: BeijingTimeHelper.formatForAPI(session.messages[0].created_at).iso,
                 created_at_beijing: BeijingTimeHelper.formatForAPI(session.messages[0].created_at)
                   .beijing

@@ -926,6 +926,14 @@ models.ApprovalChainStep = require('./ApprovalChainStep')(sequelize, DataTypes)
  *    - 表名：approval_chain_steps，主键：step_id，外键：instance_id
  *    - 状态流转：waiting → pending → approved/rejected/skipped/timeout
  */
+
+models.ApprovalChainStepAction = require('./ApprovalChainStepAction')(sequelize, DataTypes)
+/*
+ * ✅ ApprovalChainStepAction：审核链会签子记录（一步多人审批）
+ *    - 用途：会签节点记录"一个 step 多人审批"的每条审批动作（凑够 N 人才推进）
+ *    - 表名：approval_chain_step_actions，主键：step_action_id，外键：step_id
+ *    - DB 唯一约束 uk_step_actor(step_id, actioned_by) 防同一人重复投票（并发安全）
+ */
 /*
  * ✅ UserRatioOverride：用户消费比例覆盖表
  *    - 用途：管理员为特定用户设置个性化消费比例（积分/预算/配额三个比例）

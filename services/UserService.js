@@ -545,19 +545,26 @@ class UserService {
         throw error
       }
 
-      // 开发环境万能验证码
-      if (process.env.NODE_ENV === 'development') {
-        if (verificationCode !== '123456') {
-          const error = new Error('验证码错误（开发环境使用123456）')
-          error.code = 'INVALID_VERIFICATION_CODE'
-          error.statusCode = 400
-          throw error
-        }
-      } else {
-        // 生产环境验证码验证（待实现）
-        const error = new Error('生产环境验证码验证未实现')
-        error.code = 'VERIFICATION_NOT_IMPLEMENTED'
-        error.statusCode = 501
+      /*
+       * 验证码校验统一收口到 SmsService.verifyCode（与用户端登录同一套逻辑）。
+       * 业务背景：管理端原先自带"开发万能码 / 生产抛 501"两套漂移逻辑，
+       * 会导致 P0 禁用万能码后生产管理后台无法登录。改为复用 SmsService 后：
+       * - 非生产环境：支持万能码 123456 + Redis 真实码
+       * - 生产环境：仅 Redis 真实短信码（万能码被 SmsService 内的 NODE_ENV 守卫禁用）
+       * SmsService 为静态类，按需懒加载避免与本服务的循环依赖。
+       */
+      const SmsService = require('./SmsService')
+      const verifyResult = await SmsService.verifyCode(mobile, verificationCode)
+      if (!verifyResult.valid) {
+        // O3：区分"已过期/不存在"与"输错"，给前端更精准文案；两者都视为登录失败
+        const error = new Error(
+          verifyResult.reason === 'EXPIRED' ? '验证码已过期，请重新获取' : '验证码错误'
+        )
+        error.code =
+          verifyResult.reason === 'EXPIRED'
+            ? 'VERIFICATION_CODE_EXPIRED'
+            : 'INVALID_VERIFICATION_CODE'
+        error.statusCode = 401
         throw error
       }
 

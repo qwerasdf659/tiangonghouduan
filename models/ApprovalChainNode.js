@@ -58,6 +58,18 @@ module.exports = sequelize => {
         allowNull: false,
         comment: '是否终审节点'
       },
+      approve_mode: {
+        type: DataTypes.ENUM('single', 'countersign'),
+        allowNull: false,
+        defaultValue: 'single',
+        comment: '审批模式：single=单签（一人通过即推进），countersign=会签（需 N 人通过）'
+      },
+      required_approvals: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 1,
+        comment: '会签需通过人数（single 恒为 1；countersign 为需凑够的 approve 人数）'
+      },
       exclude_parties: {
         type: DataTypes.TINYINT,
         allowNull: false,

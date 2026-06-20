@@ -607,14 +607,14 @@ export function useCustomerServiceMethods() {
     },
 
     /**
-     * 获取消息预览文本
+     * 获取消息预览文本（截断版，供会话卡片标题区使用）
      * @param {Object} session - 会话对象
      * @returns {string} 截断后的消息预览
      */
     getMessagePreview(session) {
-      const msg = session.last_message?.content || session.last_message || ''
-      const text = typeof msg === 'string' ? msg : ''
-      return text.length > 30 ? text.substring(0, 30) + '...' : text || '暂无消息'
+      const text = this.getSessionLastMessage(session)
+      if (text === '暂无消息') return text
+      return text.length > 30 ? text.substring(0, 30) + '...' : text
     },
 
     // ==================== 辅助方法 ====================
@@ -628,9 +628,33 @@ export function useCustomerServiceMethods() {
     getSessionUserAvatar(session) {
       return session.user?.avatar_url || session.user_avatar || this.defaultAvatar
     },
+    /**
+     * 获取会话最后一条消息的预览文案（按 message_type 渲染，唯一真相源）
+     *
+     * 业务规则（与后端 chat_messages.message_type 对齐）：
+     * - image  → [图片]（不暴露原始 URL）
+     * - file   → [文件] 文件名（file_name 缺失时仅显示 [文件]）
+     * - system → 系统消息原文（content 即提示文案）
+     * - text   → 文本原文
+     *
+     * 数据来源兼容：会话列表接口下发 last_message；用户历史接口下发 last_message_preview，
+     * 两者字段同名（message_type/content/file_name），此处统一消费。
+     *
+     * @param {Object} session - 会话对象
+     * @returns {string} 预览文案
+     */
     getSessionLastMessage(session) {
-      const lastMessage = session.last_message?.content || session.last_message || '暂无消息'
-      return typeof lastMessage === 'string' ? lastMessage : '暂无消息'
+      const msg = session.last_message || session.last_message_preview
+      if (!msg || typeof msg !== 'object') return '暂无消息'
+
+      switch (msg.message_type) {
+        case 'image':
+          return '[图片]'
+        case 'file':
+          return msg.file_name ? `[文件] ${msg.file_name}` : '[文件]'
+        default:
+          return typeof msg.content === 'string' && msg.content ? msg.content : '暂无消息'
+      }
     },
     getSessionStatusBadge(status) {
       const badges = {

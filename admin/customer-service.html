@@ -791,7 +791,7 @@
                                 x-text="{'waiting':'等待中','assigned':'已分配','active':'进行中','closed':'已关闭'}[session.status] || session.status">
                           </span>
                         </div>
-                        <p x-show="session.last_message_preview" class="themed-text-muted mt-0.5 truncate" x-text="session.last_message_preview?.content"></p>
+                        <p x-show="session.last_message_preview" class="themed-text-muted mt-0.5 truncate" x-text="getSessionLastMessage(session)"></p>
                         <p x-show="session.resolution_summary" class="text-green-600 mt-0.5" x-text="'处理: ' + session.resolution_summary"></p>
                         <div class="flex items-center gap-2 mt-0.5 themed-text-hint">
                           <span x-text="'客服: ' + (session.admin?.nickname || '-')"></span>

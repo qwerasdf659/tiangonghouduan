@@ -15,6 +15,9 @@ import { Alpine, createPageMixin } from '../../../alpine/index.js'
 import { ApprovalChainAPI } from '../../../api/approval-chain.js'
 import { UserAPI } from '../../../api/user.js'
 import { UserDataQueryAPI } from '../../../api/user-data-query.js'
+import { loadECharts } from '../../../utils/echarts-lazy.js'
+import { StoreAPI } from '../../../api/store.js'
+import { SystemAdminAPI } from '../../../api/system/admin.js'
 
 /** 实例状态映射 */
 const INSTANCE_STATUS_MAP = {
@@ -71,6 +74,19 @@ function approvalChainPage() {
     // 触发金额下限（友好填空，与 match_conditions JSON 的 min_amount 双向同步；空=不限金额）
     match_min_amount: '',
 
+    // ========== 批量配置审核人（9.3③）==========
+    batch_assign_visible: false,
+    batch_assign_form: {
+      template_ids: [],
+      target_step: 'final',
+      assignee_type: 'submitter_manager',
+      assignee_role_id: null,
+      assignee_user_id: null,
+      assignee_user_keyword: '',
+      assignee_user_options: [],
+      assignee_user_label: ''
+    },
+
     // ========== 实例列表 ==========
     instances: [],
     instances_loading: false,
@@ -90,6 +106,32 @@ function approvalChainPage() {
     review_action: '',
     review_reason: '',
 
+    // ========== 数据统计（看板）==========
+    stats_loading: false,
+    stats_dimension: 'store',
+    stats_rows: [],
+    stats_summary: null,
+    stats_chart: null,
+
+    // ========== 运营分析（8.4.3 丰富分析）==========
+    analytics_loading: false,
+    analytics_days: 30,
+    analytics: null,
+    trend_chart: null,
+
+    // ========== 链路可视化预览（9.3①）==========
+    preview_visible: false,
+    preview_template: null,
+
+    // ========== 门店↔审核链对应总览（9.3②）==========
+    overview_loading: false,
+    overview_rows: [],
+
+    // ========== 审核链变更历史（9.3④，复用 admin-audit-logs）==========
+    history_loading: false,
+    history_rows: [],
+    history_pagination: { page: 1, page_size: 20, total: 0 },
+
     // ========== 初始化 ==========
     async init() {
       logger.info('[ApprovalChain] 页面初始化')
@@ -108,12 +150,25 @@ function approvalChainPage() {
         // 按 role_level 降序，管理员在前；只取启用角色
         this.role_options = list
           .filter(r => r.role_id != null)
-          .map(r => ({
-            role_id: r.role_id,
-            role_name: r.role_name,
-            role_level: r.role_level,
-            label: `${r.role_name}（lv${r.role_level}）`
-          }))
+          .map(r => {
+            /*
+             * 下拉中文名取自后端 roles.description（角色描述，含完整中文）。
+             * description 多为整句（如"业务经理（可管理业务员…权限级别60）"），
+             * 取括号/逗号前的短名作为展示中文，附带英文 role_name 与等级便于识别，
+             * 形如「业务经理 · business_manager（lv60）」。无 description 时回退英文。
+             */
+            const desc = (r.description || '').trim()
+            const cnName = desc ? desc.split(/[（(，,。]/)[0].trim() : ''
+            const label = cnName
+              ? `${cnName} · ${r.role_name}（lv${r.role_level}）`
+              : `${r.role_name}（lv${r.role_level}）`
+            return {
+              role_id: r.role_id,
+              role_name: r.role_name,
+              role_level: r.role_level,
+              label
+            }
+          })
           .sort((a, b) => (b.role_level || 0) - (a.role_level || 0))
       } catch (err) {
         logger.warn('[ApprovalChain] 加载角色选项失败:', err.message)
@@ -126,6 +181,9 @@ function approvalChainPage() {
       if (tab === 'templates') this.loadTemplates()
       else if (tab === 'instances') this.loadInstances()
       else if (tab === 'my-pending') this.loadMyPending()
+      else if (tab === 'stats') this.loadStats()
+      else if (tab === 'overview') this.loadStoreChainOverview()
+      else if (tab === 'history') this.loadChangeHistory()
     },
 
     // ========== 模板管理方法 ==========
@@ -160,6 +218,9 @@ function approvalChainPage() {
     getStepAssigneeText(step) {
       if (!step) return '-'
       const type = step.node?.assignee_type || (step.assignee_user_id ? 'user' : 'role')
+      if (type === 'submitter_manager') {
+        return '提交人所在门店店长 · 按门店自动派人'
+      }
       if (type === 'user') {
         if (step.assignee) {
           return `${step.assignee.nickname || '未命名'}（${step.assignee.mobile || step.assignee_user_id}）· 指定人`
@@ -170,6 +231,30 @@ function approvalChainPage() {
         return `${step.assigned_role.role_name}（lv${step.assigned_role.role_level}）· 角色池`
       }
       return step.assignee_role_id ? `角色 ${step.assignee_role_id} · 角色池` : '角色池(未设置)'
+    },
+
+    /**
+     * 步骤越级/超时代审标签（实例详情用）
+     * @param {Object} step - 审核步骤（含 is_escalated/escalated_from_user_id/original_assignee_role_id）
+     * @returns {string} 标签文案，无越级返回空串
+     */
+    getStepEscalationLabel(step) {
+      if (!step || !(step.is_escalated === 1 || step.is_escalated === true)) return ''
+      return step.escalated_from_user_id
+        ? `超时升级代审（原审核人 ${step.escalated_from_user_id}）`
+        : '越级代审'
+    },
+
+    /**
+     * 步骤会签进度文案（实例详情用）
+     * @param {Object} step - 审核步骤（含 approve_mode/approved_count/required_approvals）
+     * @returns {string} 会签进度，单签返回空串
+     */
+    getStepCountersignText(step) {
+      if (!step || step.approve_mode !== 'countersign') return ''
+      const done = step.approved_count || 0
+      const need = step.required_approvals || 1
+      return `会签 ${done}/${need} 人已通过`
     },
 
     /**
@@ -213,6 +298,9 @@ function approvalChainPage() {
         exclude_parties: 1,
         timeout_hours: 12,
         timeout_action: 'notify',
+        // 会签配置（2026-06-20）：single=单签，countersign=会签（需 N 人通过）
+        approve_mode: 'single',
+        required_approvals: 1,
         // 前端辅助（不提交后端）：指定人手机号搜索框 + 候选列表 + 已选展示
         assignee_user_keyword: '',
         assignee_user_options: [],
@@ -247,6 +335,8 @@ function approvalChainPage() {
             exclude_parties: n.exclude_parties != null ? n.exclude_parties : 1,
             timeout_hours: n.timeout_hours != null ? n.timeout_hours : 12,
             timeout_action: n.timeout_action || 'escalate',
+            approve_mode: n.approve_mode || 'single',
+            required_approvals: n.required_approvals != null ? n.required_approvals : 1,
             assignee_user_keyword: '',
             assignee_user_options: [],
             // 指定人模式时回显已选审核人（昵称 + 脱敏手机号）
@@ -347,22 +437,26 @@ function approvalChainPage() {
         // 按节点当前顺序重排 step_number（保证前后顺序与界面一致；终审节点固定为 9）
         const orderedNodes = this.template_form.nodes.map((n, i) => {
           const isFinal = n.is_final === 1 || n.is_final === true
+          const isCountersign = n.approve_mode === 'countersign'
           // 提交后端的节点：剔除前端辅助字段（assignee_user_keyword/options/label）
           return {
             step_number: isFinal ? 9 : Math.min(i + 2, 8),
             node_name: n.node_name,
             assignee_type: n.assignee_type,
-            // 角色池模式只传 role_id；指定人模式只传 user_id（互斥）
+            // 角色池只传 role_id；指定人只传 user_id；提交人门店店长两者均空（按门店动态反查）
             assignee_role_id: n.assignee_type === 'role' ? n.assignee_role_id : null,
             assignee_user_id: n.assignee_type === 'user' ? n.assignee_user_id : null,
             is_final: isFinal ? 1 : 0,
             exclude_parties: n.exclude_parties === 1 || n.exclude_parties === true ? 1 : 0,
             timeout_hours: n.timeout_hours,
-            timeout_action: n.timeout_action
+            timeout_action: n.timeout_action,
+            // 会签：single 恒为 1 人；countersign 取运营填写的人数（至少 2）
+            approve_mode: isCountersign ? 'countersign' : 'single',
+            required_approvals: isCountersign ? Math.max(2, parseInt(n.required_approvals, 10) || 2) : 1
           }
         })
 
-        // 校验：指定人模式必须已选审核人；角色池模式必须选角色
+        // 校验：指定人模式必须已选审核人；角色池模式必须选角色（submitter_manager 无需选人/角色）
         for (const n of orderedNodes) {
           if (n.assignee_type === 'user' && !n.assignee_user_id) {
             Alpine.store('notification').show('存在"指定人"节点未选择审核人', 'error')
@@ -380,10 +474,38 @@ function approvalChainPage() {
           nodes: orderedNodes
         }
 
+        /*
+         * 保存前冲突预检（只读）：检测本链与现有审核链的潜在风险（架空/被架空/兜底缺失/优先级重复/条件重叠）。
+         * 有风险则弹确认框列出风险，由运营决定是否仍要保存——提示但不阻断（尊重运营的故意配置）。
+         * 预检失败（如网络异常）不阻断保存，避免预检本身成为保存的拦路虎。
+         */
+        try {
+          const check = await ApprovalChainAPI.checkTemplateConflicts({
+            auditable_type: this.template_form.auditable_type,
+            priority: this.template_form.priority,
+            match_conditions: matchConditions,
+            template_id: this.editing_template_id || undefined
+          })
+          const risks = check?.data?.risks || []
+          if (risks.length > 0) {
+            const lines = risks.map((r, i) => `${i + 1}. ${r.message}`).join('\n')
+            const proceed = window.confirm(
+              `⚠️ 检测到 ${risks.length} 项审核链配置风险：\n\n${lines}\n\n仍要保存吗？`
+            )
+            if (!proceed) {
+              return
+            }
+          }
+        } catch (precheckErr) {
+          logger.warn('[ApprovalChain] 冲突预检失败（不阻断保存）:', precheckErr.message)
+        }
+
         if (this.editing_template_id) {
           await ApprovalChainAPI.updateTemplate(this.editing_template_id, payload)
           Alpine.store('notification').show('模板更新成功', 'success')
         } else {
+          // 新建：template_code 由后端自动生成（{业务类型}_序号），前端不传，避免空值/重复
+          delete payload.template_code
           await ApprovalChainAPI.createTemplate(payload)
           Alpine.store('notification').show('模板创建成功', 'success')
         }
@@ -401,6 +523,98 @@ function approvalChainPage() {
         await this.loadTemplates()
       } catch (err) {
         Alpine.store('notification').show('操作失败: ' + err.message, 'error')
+      }
+    },
+
+    // ========== 9.3③ 批量配置审核人 ==========
+    openBatchAssign() {
+      this.batch_assign_form = {
+        template_ids: [],
+        target_step: 'final',
+        assignee_type: 'submitter_manager',
+        assignee_role_id: null,
+        assignee_user_id: null,
+        assignee_user_keyword: '',
+        assignee_user_options: [],
+        assignee_user_label: ''
+      }
+      this.batch_assign_visible = true
+    },
+
+    /**
+     * 勾选/取消勾选某模板（批量配置目标）
+     * @param {number} templateId - 模板ID
+     * @returns {void}
+     */
+    toggleBatchTemplate(templateId) {
+      const arr = this.batch_assign_form.template_ids
+      const i = arr.indexOf(templateId)
+      if (i >= 0) arr.splice(i, 1)
+      else arr.push(templateId)
+    },
+
+    /**
+     * 批量配置：指定人模式搜索用户（复用 UserDataQueryAPI.searchUser）
+     * @returns {Promise<void>}
+     */
+    async searchBatchAssigneeUser() {
+      const keyword = (this.batch_assign_form.assignee_user_keyword || '').trim()
+      if (!keyword) {
+        this.batch_assign_form.assignee_user_options = []
+        return
+      }
+      try {
+        const res = await UserDataQueryAPI.searchUser(keyword)
+        const list = res.data?.list || res.data || []
+        this.batch_assign_form.assignee_user_options = list.map(u => ({
+          user_id: u.user_id,
+          label: `${u.nickname || '未命名'}（${u.mobile || u.user_id}）`
+        }))
+      } catch (err) {
+        Alpine.store('notification').show('搜索用户失败: ' + err.message, 'error')
+        this.batch_assign_form.assignee_user_options = []
+      }
+    },
+
+    selectBatchAssigneeUser(user) {
+      this.batch_assign_form.assignee_user_id = user.user_id
+      this.batch_assign_form.assignee_user_label = user.label
+      this.batch_assign_form.assignee_user_options = []
+      this.batch_assign_form.assignee_user_keyword = ''
+    },
+
+    async submitBatchAssign() {
+      const f = this.batch_assign_form
+      if (!f.template_ids.length) {
+        Alpine.store('notification').show('请至少勾选一条审核链', 'error')
+        return
+      }
+      if (f.assignee_type === 'role' && !f.assignee_role_id) {
+        Alpine.store('notification').show('请选择角色', 'error')
+        return
+      }
+      if (f.assignee_type === 'user' && !f.assignee_user_id) {
+        Alpine.store('notification').show('请选择指定审核人', 'error')
+        return
+      }
+      try {
+        const payload = {
+          template_ids: f.template_ids,
+          target_step: f.target_step,
+          assignee_type: f.assignee_type,
+          assignee_role_id: f.assignee_type === 'role' ? f.assignee_role_id : null,
+          assignee_user_id: f.assignee_type === 'user' ? f.assignee_user_id : null
+        }
+        const res = await ApprovalChainAPI.batchAssignReviewer(payload)
+        const stats = res.data?.stats || {}
+        Alpine.store('notification').show(
+          `批量配置完成：成功 ${stats.success_count || 0} 条，失败 ${stats.failed_count || 0} 条`,
+          'success'
+        )
+        this.batch_assign_visible = false
+        await this.loadTemplates()
+      } catch (err) {
+        Alpine.store('notification').show('批量配置失败: ' + err.message, 'error')
       }
     },
 
@@ -482,6 +696,288 @@ function approvalChainPage() {
       } catch (err) {
         Alpine.store('notification').show('审核操作失败: ' + err.message, 'error')
       }
+    },
+
+    // ========== 数据统计（看板）方法 ==========
+    /**
+     * 加载审核统计数据（按门店/区域聚合），并渲染 ECharts 柱状图
+     * @returns {Promise<void>}
+     */
+    async loadStats() {
+      this.stats_loading = true
+      try {
+        const res = await ApprovalChainAPI.getStats({ dimension: this.stats_dimension })
+        const data = res.data || {}
+        this.stats_rows = data.rows || []
+        this.stats_summary = data.summary || null
+        // DOM 更新后再渲染图表（等 Alpine 渲染表格容器）
+        this.$nextTick(() => this.renderStatsChart())
+      } catch (err) {
+        Alpine.store('notification').show('加载统计失败: ' + err.message, 'error')
+      } finally {
+        this.stats_loading = false
+      }
+      // 同步加载运营分析（同一 tab 内，独立 loading）
+      this.loadAnalytics()
+    },
+
+    /**
+     * 加载运营分析（员工排行/趋势/拒绝原因/复购活跃），并渲染趋势图
+     * @returns {Promise<void>}
+     */
+    async loadAnalytics() {
+      this.analytics_loading = true
+      try {
+        const res = await ApprovalChainAPI.getAnalytics({ days: this.analytics_days })
+        this.analytics = res.data || null
+        this.$nextTick(() => this.renderTrendChart())
+      } catch (err) {
+        Alpine.store('notification').show('加载运营分析失败: ' + err.message, 'error')
+      } finally {
+        this.analytics_loading = false
+      }
+    },
+
+    /**
+     * 切换分析时间窗（天）并重新加载
+     * @param {number} days - 时间窗天数
+     * @returns {void}
+     */
+    switchAnalyticsDays(days) {
+      this.analytics_days = days
+      this.loadAnalytics()
+    },
+
+    /**
+     * 渲染消费/积分趋势折线图
+     * @returns {Promise<void>}
+     */
+    async renderTrendChart() {
+      const container = document.getElementById('approvalTrendChart')
+      if (!container || !this.analytics?.trend?.length) return
+      const echarts = await loadECharts()
+      if (this.trend_chart) {
+        this.trend_chart.dispose()
+        this.trend_chart = null
+      }
+      this.trend_chart = echarts.init(container)
+      const days = this.analytics.trend.map(t => t.day)
+      this.trend_chart.setOption({
+        tooltip: { trigger: 'axis' },
+        legend: { data: ['录入单数', '消费金额', '奖励积分'] },
+        grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+        xAxis: { type: 'category', data: days },
+        yAxis: [
+          { type: 'value', name: '单数/积分' },
+          { type: 'value', name: '金额', position: 'right' }
+        ],
+        series: [
+          { name: '录入单数', type: 'line', smooth: true, data: this.analytics.trend.map(t => t.count) },
+          { name: '消费金额', type: 'line', smooth: true, yAxisIndex: 1, data: this.analytics.trend.map(t => t.amount) },
+          { name: '奖励积分', type: 'line', smooth: true, data: this.analytics.trend.map(t => t.points) }
+        ]
+      })
+    },
+
+    /**
+     * 切换统计维度（门店/区域）并重新加载
+     * @param {string} dim - 'store' | 'region'
+     * @returns {void}
+     */
+    switchStatsDimension(dim) {
+      this.stats_dimension = dim
+      this.loadStats()
+    },
+
+    /**
+     * 渲染审核状态分布柱状图（待审/已通过/已拒绝/超时未处理）
+     * @returns {Promise<void>}
+     */
+    async renderStatsChart() {
+      const container = document.getElementById('approvalStatsChart')
+      if (!container) return
+      const echarts = await loadECharts()
+      if (this.stats_chart) {
+        this.stats_chart.dispose()
+        this.stats_chart = null
+      }
+      this.stats_chart = echarts.init(container)
+
+      const labelKey = this.stats_dimension === 'store' ? 'store_name' : 'region_key'
+      const categories = this.stats_rows.map(
+        r => r[labelKey] || (this.stats_dimension === 'store' ? `门店${r.store_id}` : r.region_key)
+      )
+      this.stats_chart.setOption({
+        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+        legend: { data: ['待审', '已通过', '已拒绝', '超时未处理'] },
+        grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+        xAxis: { type: 'category', data: categories },
+        yAxis: { type: 'value', name: '单数' },
+        series: [
+          { name: '待审', type: 'bar', stack: 'total', itemStyle: { color: '#facc15' }, data: this.stats_rows.map(r => r.pending) },
+          { name: '已通过', type: 'bar', stack: 'total', itemStyle: { color: '#22c55e' }, data: this.stats_rows.map(r => r.approved) },
+          { name: '已拒绝', type: 'bar', stack: 'total', itemStyle: { color: '#ef4444' }, data: this.stats_rows.map(r => r.rejected) },
+          { name: '超时未处理', type: 'bar', itemStyle: { color: '#f97316' }, data: this.stats_rows.map(r => r.timeout) }
+        ]
+      })
+    },
+
+    // ========== 9.3① 审核链可视化预览 ==========
+    /**
+     * 打开某模板的流转可视化预览（直接用已加载的模板数据，零额外请求；详情不足则拉取）
+     * @param {number} templateId - 模板ID
+     * @returns {Promise<void>}
+     */
+    async openChainPreview(templateId) {
+      try {
+        const res = await ApprovalChainAPI.getTemplateDetail(templateId)
+        this.preview_template = res.data
+        this.preview_visible = true
+      } catch (err) {
+        Alpine.store('notification').show('加载链路预览失败: ' + err.message, 'error')
+      }
+    },
+
+    /**
+     * 预览：把模板节点按 step_number 升序排成"提交→各审核节点"流转步骤
+     * @returns {Array<Object>} 排序后的节点（含提交起点）
+     */
+    previewSteps() {
+      const t = this.preview_template
+      if (!t || !Array.isArray(t.nodes)) return []
+      // step_number=1 为提交位，>1 为审核位；按 step_number 升序展示流转
+      return t.nodes.slice().sort((a, b) => (a.step_number || 0) - (b.step_number || 0))
+    },
+
+    /**
+     * 预览：节点"由谁审"的可读文案（角色池/指定人/提交人门店店长）
+     * @param {Object} node - 审核节点
+     * @returns {string} 文案
+     */
+    getNodeAssigneeText(node) {
+      if (!node) return '-'
+      if (node.assignee_type === 'submitter_manager') return '提交人门店店长（按门店自动派人）'
+      if (node.assignee_type === 'user') {
+        return node.assignee_user
+          ? `${node.assignee_user.nickname || ''}（${node.assignee_user.mobile || node.assignee_user_id}）· 指定人`
+          : node.assignee_user_id
+            ? `用户 ${node.assignee_user_id} · 指定人`
+            : '指定人(未设置)'
+      }
+      if (node.assignee_role) {
+        return `${node.assignee_role.role_name}（lv${node.assignee_role.role_level}）· 角色池`
+      }
+      return node.assignee_role_id ? `角色 ${node.assignee_role_id} · 角色池` : '角色池(未设置)'
+    },
+
+    /**
+     * 预览：节点会签/单签文案
+     * @param {Object} node - 审核节点
+     * @returns {string} 文案
+     */
+    getNodeApproveModeText(node) {
+      if (!node) return ''
+      return node.approve_mode === 'countersign'
+        ? `会签（需 ${node.required_approvals || 2} 人通过）`
+        : '单签'
+    },
+
+    // ========== 9.3② 门店↔审核链对应总览 ==========
+    /**
+     * 加载"门店 ↔ 审核链"对应总览：列出各业务类型已配置的链，并标注门店命中口径，
+     * 帮助运营确认是否漏配（提交无链可走）。复用模板列表 + 门店列表，零新增后端。
+     * @returns {Promise<void>}
+     */
+    async loadStoreChainOverview() {
+      this.overview_loading = true
+      try {
+        const [tplRes, storeRes] = await Promise.all([
+          ApprovalChainAPI.getTemplates({ page_size: 100 }),
+          StoreAPI.getList({ page_size: 100, status: 'active' })
+        ])
+        const templates = tplRes.data?.list || tplRes.data?.rows || tplRes.data || []
+        const stores = storeRes.data?.list || storeRes.data?.rows || storeRes.data || []
+        const storeCount = Array.isArray(stores) ? stores.length : 0
+
+        // 按业务类型聚合：该类型有哪些启用链、是否有无条件兜底链
+        const byType = {}
+        templates.forEach(t => {
+          const type = t.auditable_type
+          if (!byType[type]) byType[type] = { auditable_type: type, chains: [], has_fallback: false }
+          const mc = t.match_conditions || {}
+          const isFallback = mc.min_amount == null && !mc.store_ids && !mc.merchant_ids
+          if (t.is_active && isFallback) byType[type].has_fallback = true
+          byType[type].chains.push({
+            template_id: t.template_id,
+            template_name: t.template_name,
+            template_code: t.template_code,
+            priority: t.priority,
+            is_active: t.is_active,
+            min_amount: mc.min_amount != null ? mc.min_amount : null,
+            store_scoped: Array.isArray(mc.store_ids) && mc.store_ids.length > 0,
+            store_ids: mc.store_ids || []
+          })
+        })
+
+        this.overview_rows = Object.values(byType).map(row => ({
+          ...row,
+          store_count: storeCount,
+          // 风险：该类型无启用的无条件兜底链 → 低于所有门槛的业务可能匹配不到链
+          risk: !row.has_fallback
+        }))
+      } catch (err) {
+        Alpine.store('notification').show('加载门店↔审核链总览失败: ' + err.message, 'error')
+        this.overview_rows = []
+      } finally {
+        this.overview_loading = false
+      }
+    },
+
+    // ========== 9.3④ 审核链变更历史（复用 admin-audit-logs）==========
+    /**
+     * 加载审核链配置变更历史（operation_type=approval_chain_config）
+     * 复用现成的管理员操作审计日志接口，后端零改动。
+     * @returns {Promise<void>}
+     */
+    async loadChangeHistory() {
+      this.history_loading = true
+      try {
+        const res = await SystemAdminAPI.getAuditLogs({
+          operation_type: 'approval_chain_config',
+          target_type: 'approval_chain_template',
+          page: this.history_pagination.page,
+          page_size: this.history_pagination.page_size,
+          sort_by: 'created_at',
+          sort_order: 'DESC'
+        })
+        const data = res.data || {}
+        this.history_rows = data.list || data.rows || data.logs || []
+        this.history_pagination.total = data.pagination?.total || data.total || 0
+      } catch (err) {
+        Alpine.store('notification').show('加载变更历史失败: ' + err.message, 'error')
+        this.history_rows = []
+      } finally {
+        this.history_loading = false
+      }
+    },
+
+    /**
+     * 变更历史：动作中文文案
+     * @param {string} action - 动作（create/update/enable/disable）
+     * @returns {string} 中文
+     */
+    getHistoryActionLabel(action) {
+      const map = { create: '创建', update: '更新', enable: '启用', disable: '禁用' }
+      return map[action] || action || '-'
+    },
+
+    changeHistoryPage(newPage) {
+      const totalPages = Math.ceil(
+        this.history_pagination.total / this.history_pagination.page_size
+      )
+      if (newPage < 1 || (totalPages > 0 && newPage > totalPages)) return
+      this.history_pagination.page = newPage
+      this.loadChangeHistory()
     },
 
     formatDateTime(dateStr) {

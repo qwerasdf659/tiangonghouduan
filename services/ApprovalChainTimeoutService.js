@@ -5,11 +5,11 @@
  * 决策 #5：12小时超时，非终审自动升级（escalate），终审仅通知（notify）
  *
  * 处理逻辑：
- *   - 非终审 + escalate → 标记当前步骤 timeout → 推进下一步为 pending → 通知下一审核人
+ *   - 非终审 + escalate → 升级给"上级"代审同一步（user_hierarchy.superior_user_id），受门店/层级隔离约束，留痕
  *   - 终审 + notify → 发通知提醒终审人（不改变状态，不自动通过）
  *   - none → 不做任何处理
  *
- * 定时任务基础设施：使用项目已有的 node-cron 包（^3.0.3）
+ * 定时任务基础设施：使用项目已有的 node-cron 包；仅 PM2 worker 0 注册（见 app.js），cluster 下不会重复扫描。
  *
  * @module services/ApprovalChainTimeoutService
  */
@@ -19,12 +19,12 @@ const {
   ApprovalChainStep,
   ApprovalChainInstance,
   ApprovalChainNode,
-  AdminNotification
+  AdminNotification,
+  StoreStaff,
+  UserHierarchy
 } = require('../models')
 const { Op } = require('sequelize')
 const TransactionManager = require('../utils/TransactionManager')
-const ApprovalChainService = require('./ApprovalChainService')
-const BeijingTimeHelper = require('../utils/timeHelper')
 
 /** 审核链超时自动升级服务 */
 class ApprovalChainTimeoutService {
@@ -121,7 +121,13 @@ class ApprovalChainTimeoutService {
   }
 
   /**
-   * 非终审超时自动升级
+   * 非终审超时：升级给"上级"代审同一步（2026-06-20 改造，决策 8.6.1）
+   *
+   * 改造前：标记 timeout → advanceToNextStep（跳过当前步，推进到下一节点）。
+   * 改造后：找到当前审核人的"上级"（user_hierarchy.superior_user_id），把同一步改派给上级代审，
+   *   设置 assignee_user_id=上级、escalated_from_user_id、is_escalated、重置 timeout_at，状态保持 pending。
+   *   升级仍受门店/层级隔离约束（上级须是管辖该单的上级）。找不到上级时降级为通知（不跳过、不卡死）。
+   *
    * @param {Object} step - 超时步骤
    * @returns {Promise<void>} 升级完成
    * @private
@@ -129,53 +135,88 @@ class ApprovalChainTimeoutService {
   static async _escalateStep(step) {
     await TransactionManager.execute(
       async transaction => {
+        // 1. 确定"当前审核人"——指定人步骤取 assignee_user_id；门店步骤取该门店在职店长
+        let currentReviewerId = step.assignee_user_id || null
+        if (!currentReviewerId && step.store_id) {
+          const manager = await StoreStaff.findOne({
+            where: { store_id: step.store_id, role_in_store: 'manager', status: 'active' },
+            attributes: ['user_id'],
+            transaction
+          })
+          currentReviewerId = manager ? manager.user_id : null
+        }
+
+        // 2. 查当前审核人的上级（user_hierarchy.superior_user_id，激活态）
+        let superiorId = null
+        let originalRoleId = step.assignee_role_id || null
+        if (currentReviewerId) {
+          const hierarchy = await UserHierarchy.findOne({
+            where: { user_id: currentReviewerId, is_active: true },
+            attributes: ['superior_user_id', 'role_id'],
+            transaction
+          })
+          if (hierarchy) {
+            superiorId = hierarchy.superior_user_id || null
+            if (!originalRoleId) originalRoleId = hierarchy.role_id || null
+          }
+        }
+
+        if (!superiorId) {
+          /*
+           * 找不到上级（顶层或未配层级）：不跳过、不卡死，降级为"超时提醒"通知当前审核人，
+           * 步骤保持 pending 等待人工处理（避免无上级时把单子跳过造成漏审）。
+           */
+          logger.warn(
+            `[审核链超时] 步骤 ${step.step_id} 无可升级上级（reviewer=${currentReviewerId}），降级为通知`
+          )
+          await ApprovalChainTimeoutService._notifyTimeout(step)
+          return
+        }
+
+        // 3. 改派同一步给上级代审（留痕 + 重置超时窗口）
+        const timeoutHours = step.node?.timeout_hours || 12
         await step.update(
           {
-            status: 'timeout',
-            action_reason: '超时自动升级（12小时未处理）',
-            actioned_at: BeijingTimeHelper.createDatabaseTime()
+            assignee_user_id: superiorId,
+            assignee_role_id: null,
+            is_escalated: 1,
+            escalated_from_user_id: currentReviewerId,
+            original_assignee_role_id: originalRoleId,
+            action_reason: '超时升级给上级代审（原审核人12小时未处理）',
+            timeout_at: new Date(Date.now() + timeoutHours * 3600 * 1000)
           },
           { transaction }
         )
 
-        await ApprovalChainService.advanceToNextStep(step.instance, step, { transaction })
-
-        // 通知下一审核人
+        // 4. 通知上级
         try {
-          const nextStep = await ApprovalChainStep.findOne({
-            where: { instance_id: step.instance_id, status: 'pending' },
-            transaction
-          })
-          if (nextStep) {
-            const targetAdminId = nextStep.assignee_user_id
-            if (targetAdminId) {
-              await AdminNotification.create(
-                {
-                  admin_id: targetAdminId,
-                  title: '审核任务超时升级',
-                  content: `${step.instance.auditable_type}审核 #${step.instance.auditable_id} 已超时升级到您，原审核人12小时未处理`,
-                  notification_type: 'task',
-                  priority: 'high',
-                  source_type: 'approval_chain_timeout',
-                  source_id: step.instance_id,
-                  extra_data: {
-                    event: 'approval_timeout_escalation',
-                    instance_id: step.instance_id
-                  }
-                },
-                { transaction }
-              )
-            }
-          }
+          await AdminNotification.create(
+            {
+              admin_id: superiorId,
+              title: '审核任务超时升级',
+              content: `${step.instance.auditable_type}审核 #${step.instance.auditable_id} 已超时升级给您代审，原审核人12小时未处理`,
+              notification_type: 'task',
+              priority: 'high',
+              source_type: 'approval_chain_timeout',
+              source_id: step.instance_id,
+              extra_data: {
+                event: 'approval_timeout_escalation',
+                instance_id: step.instance_id,
+                step_id: step.step_id,
+                escalated_from_user_id: currentReviewerId
+              }
+            },
+            { transaction }
+          )
         } catch (notifyError) {
-          logger.warn(`[审核链超时] 通知发送失败（非致命）: ${notifyError.message}`)
+          logger.warn(`[审核链超时] 升级通知发送失败（非致命）: ${notifyError.message}`)
         }
 
         logger.info(
-          `[审核链超时] 步骤自动升级: step_id=${step.step_id}, instance_id=${step.instance_id}`
+          `[审核链超时] 步骤升级给上级代审: step_id=${step.step_id}, from_user=${currentReviewerId}, to_superior=${superiorId}`
         )
       },
-      { description: '审核链超时自动升级' }
+      { description: '审核链超时升级给上级代审' }
     )
   }
 

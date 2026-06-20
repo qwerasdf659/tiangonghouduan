@@ -29,6 +29,14 @@ const { generateTokens, getUserRoles } = require('../../../middleware/auth')
 const BeijingTimeHelper = require('../../../utils/timeHelper')
 const TransactionManager = require('../../../utils/TransactionManager')
 const { detectLoginPlatform } = require('../../../utils/platformDetector')
+const { getRateLimiter } = require('../../../middleware/RateLimiterMiddleware')
+
+/*
+ * 复用全局限流中间件的 login 预设（按 IP，1 分钟最多 10 次）。
+ * 用户端发码是短信成本被刷的重灾区，叠加 SmsService 内"同号 60s + 每日 10 次"双层频控，
+ * 在号码维度之外再加一层 IP 维度强限流，防止单 IP 用大量号码批量刷短信。
+ */
+const sendCodeRateLimiter = getRateLimiter().createLimiter('login')
 
 /**
  * 📱 发送短信验证码
@@ -45,6 +53,7 @@ const { detectLoginPlatform } = require('../../../utils/platformDetector')
  */
 router.post(
   '/send-code',
+  sendCodeRateLimiter,
   asyncHandler(async (req, res) => {
     const { mobile } = req.body
 
@@ -59,13 +68,39 @@ router.post(
       return res.apiError('手机号格式不正确', 'INVALID_MOBILE_FORMAT', null, 400)
     }
 
+    /*
+     * P1.5 人机验证（腾讯云天御）：发码前置校验，挡住机器刷短信、控制成本。
+     * - 非生产环境默认放行（CaptchaService.verify 内部跳过，方便本地/测试调试）。
+     * - 生产环境强制校验票据（captcha_ticket + captcha_randstr，前端先弹天御获取）。
+     * - 天御服务异常时按 .env 的 CAPTCHA_FAIL_OPEN 开关 fail-open（放行 + 频控兜底）或 fail-close（拒绝）。
+     */
+    const { captcha_ticket, captcha_randstr } = req.body
+    const CaptchaService = req.app.locals.services.getService('captcha')
+    const captchaPassed = await CaptchaService.verify({
+      captcha_ticket,
+      captcha_randstr,
+      user_ip: req.ip
+    })
+    if (!captchaPassed) {
+      return res.apiError('人机验证失败，请重新完成验证', 'CAPTCHA_FAILED', null, 400)
+    }
+
     // 通过 ServiceManager 获取 SmsService
     const SmsService = req.app.locals.services.getService('sms')
     const result = await SmsService.sendVerificationCode(mobile)
 
+    /*
+     * 方案 A（2026-06-18）：如实下发短信发送结果。
+     * - sms_sent=true：短信已真正下发。
+     * - sms_sent=false：验证码已存 Redis 但短信未发出（如腾讯云日限流），
+     *   前端据 sms_fail_code + message 提示用户，避免"显示成功却收不到短信"的误导。
+     * success 仍为 true（请求已受理、验证码已生成，非生产可用万能码登录，不阻塞流程）。
+     */
     return res.apiSuccess(
       {
-        expires_in: result.expires_in
+        expires_in: result.expires_in,
+        sms_sent: result.sms_sent,
+        sms_fail_code: result.sms_fail_code
       },
       result.message
     )
@@ -104,9 +139,13 @@ router.post(
 
     // 验证码验证逻辑：支持万能码123456 + Redis存储的真实验证码
     const SmsService = req.app.locals.services.getService('sms')
-    const isCodeValid = await SmsService.verifyCode(mobile, verification_code)
-    if (!isCodeValid) {
-      return res.apiError('验证码错误或已过期', 'INVALID_VERIFICATION_CODE', null, 401)
+    const verifyResult = await SmsService.verifyCode(mobile, verification_code)
+    if (!verifyResult.valid) {
+      // O3：区分"已过期/不存在"与"输错"，给前端更精准文案
+      if (verifyResult.reason === 'EXPIRED') {
+        return res.apiError('验证码已过期，请重新获取', 'VERIFICATION_CODE_EXPIRED', null, 401)
+      }
+      return res.apiError('验证码错误', 'INVALID_VERIFICATION_CODE', null, 401)
     }
 
     // 通过ServiceManager获取UserService

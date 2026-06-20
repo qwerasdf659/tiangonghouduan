@@ -164,4 +164,29 @@ router.get(
   })
 )
 
+/**
+ * GET /sms-failure-stats - 获取短信发送失败统计（按 fail_code 聚合，O7 可观测）
+ *
+ * @description 运营查看某日短信发送失败情况（如"多少条因日限流/签名/模板未发出"），
+ *              数据来源 Redis 按天聚合，验证码只走 Redis 不落库，与现有设计一致。
+ * @route GET /api/v4/console/system/sms-failure-stats
+ * @access Private (需要管理员权限)
+ *
+ * @query {string} [date] - 北京时间日期 YYYY-MM-DD，默认今天
+ * @returns {Object} data.date - 日期
+ * @returns {number} data.total - 当日失败总数
+ * @returns {Object} data.by_fail_code - 各失败业务码次数映射
+ */
+router.get(
+  '/sms-failure-stats',
+  adminAuthMiddleware,
+  asyncHandler(async (req, res) => {
+    const { date } = req.query
+    // 通过 ServiceManager 获取 SmsService（路由不直接 require 领域 Service）
+    const SmsService = req.app.locals.services.getService('sms')
+    const stats = await SmsService.getSendFailureStats(date)
+    return res.apiSuccess(stats, '短信失败统计获取成功')
+  })
+)
+
 module.exports = router

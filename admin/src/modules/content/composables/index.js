@@ -18,15 +18,6 @@ import { useStorageState, useStorageMethods } from './storage.js'
 // 客服工作台核心模块（欢迎语、响应统计、全局状态）
 import { useCustomerServiceState, useCustomerServiceMethods } from './customer-service.js'
 
-// 客服工作台 - WebSocket 连接管理（连接、重连、降级轮询）
-import { useCsWsConnectionState, useCsWsConnectionMethods } from './cs-ws-connection.js'
-
-// 客服工作台 - 会话队列（列表加载、排序、筛选）
-import { useCsSessionQueueState, useCsSessionQueueMethods } from './cs-session-queue.js'
-
-// 客服工作台 - 聊天对话（打开会话、发送消息、关闭/转接）
-import { useCsChatConversationState, useCsChatConversationMethods } from './cs-chat-conversation.js'
-
 // 客服工作台 - C区 用户上下文面板（8Tab数据查询+诊断+工单+备注）
 import { useUserContextState, useUserContextMethods } from './cs-user-context.js'
 
@@ -60,9 +51,6 @@ import { useCsAgentManagementState, useCsAgentManagementMethods } from './cs-age
 export { useMediaState, useMediaMethods }
 export { useStorageState, useStorageMethods }
 export { useCustomerServiceState, useCustomerServiceMethods }
-export { useCsWsConnectionState, useCsWsConnectionMethods }
-export { useCsSessionQueueState, useCsSessionQueueMethods }
-export { useCsChatConversationState, useCsChatConversationMethods }
 export { useUserContextState, useUserContextMethods }
 export { useCsWorkStatusState, useCsWorkStatusMethods }
 export { useCsCompensationState, useCsCompensationMethods }

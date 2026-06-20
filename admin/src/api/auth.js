@@ -50,7 +50,9 @@ export const AUTH_ENDPOINTS = {
   /** @type {string} [POST] 控制台登录 */
   CONSOLE_LOGIN: `${API_PREFIX}/console/auth/login`,
   /** @type {string} [POST] 控制台登出 */
-  CONSOLE_LOGOUT: `${API_PREFIX}/console/auth/logout`
+  CONSOLE_LOGOUT: `${API_PREFIX}/console/auth/logout`,
+  /** @type {string} [POST] 控制台发送短信验证码 - Body: { mobile } */
+  CONSOLE_SEND_CODE: `${API_PREFIX}/console/auth/send-code`
 }
 
 // ========== 类型定义 ==========

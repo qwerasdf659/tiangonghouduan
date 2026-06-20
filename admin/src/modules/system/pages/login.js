@@ -71,6 +71,15 @@ function loginPage() {
     /** @type {boolean} 消息是否为错误类型 */
     isError: false,
 
+    /** @type {boolean} 是否正在发送验证码 */
+    sending: false,
+
+    /** @type {number} 验证码发送倒计时（秒），0 表示可再次发送 */
+    countdown: 0,
+
+    /** @type {number|null} 倒计时定时器句柄（组件销毁时清理） */
+    countdownTimer: null,
+
     // ==================== 生命周期 ====================
 
     /**
@@ -201,6 +210,75 @@ function loginPage() {
     },
 
     // ==================== 登录处理 ====================
+
+    /**
+     * 发送短信验证码（管理端）
+     * @async
+     * @method getCode
+     * @description
+     * 调用后端管理端发码接口 (POST /api/v4/console/auth/send-code)，
+     * 成功后启动 60 秒倒计时，期间禁用按钮防止重复发送。
+     * 字段以后端为权威：请求体 { mobile }，响应 data.expires_in。
+     * 非生产环境后端支持万能验证码 123456，可不发码直接登录。
+     * @returns {Promise<void>} 无返回值
+     */
+    async getCode() {
+      this.clearMessage()
+
+      // 倒计时中禁止重复发送
+      if (this.countdown > 0 || this.sending) {
+        return
+      }
+
+      // 手机号格式校验（11位中国大陆手机号）
+      if (!this.phone || !/^1[3-9]\d{9}$/.test(this.phone)) {
+        this.showMessage('请输入正确的11位手机号', true)
+        return
+      }
+
+      this.sending = true
+      try {
+        const result = await request({
+          url: AUTH_ENDPOINTS.CONSOLE_SEND_CODE,
+          method: 'POST',
+          data: { mobile: this.phone }
+        })
+
+        if (!result.success) {
+          throw new Error(result.message || '验证码发送失败')
+        }
+
+        this.showMessage('验证码已发送，请注意查收短信', false)
+        this.startCountdown(60)
+        logger.info('管理端验证码发送成功')
+      } catch (error) {
+        // 限流/每日上限等业务错误：直接暴露后端消息方便管理员排查
+        this.showMessage(error.message || '验证码发送失败，请稍后再试', true)
+        logger.error('管理端验证码发送失败:', error)
+      } finally {
+        this.sending = false
+      }
+    },
+
+    /**
+     * 启动验证码倒计时
+     * @method startCountdown
+     * @param {number} seconds - 倒计时秒数
+     * @returns {void}
+     */
+    startCountdown(seconds) {
+      this.countdown = seconds
+      if (this.countdownTimer) {
+        clearInterval(this.countdownTimer)
+      }
+      this.countdownTimer = setInterval(() => {
+        this.countdown -= 1
+        if (this.countdown <= 0) {
+          clearInterval(this.countdownTimer)
+          this.countdownTimer = null
+        }
+      }, 1000)
+    },
 
     /**
      * 处理用户登录

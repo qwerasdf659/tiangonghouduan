@@ -39,7 +39,11 @@ router.get(
       admin_id: req.query.admin_id,
       search: req.query.search,
       sort_by: req.query.sort_by,
-      sort_order: req.query.sort_order
+      sort_order: req.query.sort_order,
+      // 下发会话最后一条消息预览（含 message_type，供前端区分图片/文件/文本）
+      include_last_message: true,
+      // 计算未读数（默认 user_side 口径，与会话工作台红点一致）
+      calculate_unread: true
     }
 
     const result = await AdminCustomerServiceService.getSessionList(options)

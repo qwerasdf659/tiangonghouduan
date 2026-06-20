@@ -23,6 +23,59 @@ const { asyncHandler } = require('../shared/middleware')
 const { logger } = require('../../../../utils/logger')
 const { detectLoginPlatform } = require('../../../../utils/platformDetector')
 const BeijingTimeHelper = require('../../../../utils/timeHelper')
+const { getRateLimiter } = require('../../../../middleware/RateLimiterMiddleware')
+
+// 复用全局限流中间件的 login 预设（按 IP，1 分钟最多 10 次），用于管理端登录/发码防爆破与防短信轰炸
+const adminLoginRateLimiter = getRateLimiter().createLimiter('login')
+
+/**
+ * 📱 管理端发送短信验证码
+ * POST /api/v4/console/auth/send-code
+ *
+ * 业务背景：管理端登录已统一收口 SmsService.verifyCode（见 UserService.adminLogin），
+ * 生产环境需要真实短信码，故新增本端点让管理员获取验证码（复用用户端同一套 SmsService）。
+ * 字段以后端为权威：请求体仅 { mobile }，响应 data 仅 { expires_in }。
+ *
+ * @param {string} mobile - 手机号（11位中国大陆手机号，不带国家码）
+ */
+router.post(
+  '/send-code',
+  adminLoginRateLimiter,
+  asyncHandler(async (req, res) => {
+    const { mobile } = req.body
+
+    if (!mobile) {
+      return res.apiError('手机号不能为空', 'MOBILE_REQUIRED', null, 400)
+    }
+
+    // 手机号格式校验（11位中国大陆手机号）
+    const mobileRegex = /^1[3-9]\d{9}$/
+    if (!mobileRegex.test(mobile)) {
+      return res.apiError('手机号格式不正确', 'INVALID_MOBILE_FORMAT', null, 400)
+    }
+
+    /*
+     * P0.6 加固：发码前置 IP 白名单 + 失败锁定校验。
+     * 被锁定/IP 不在白名单时直接拒绝发码，避免锁定期间还能继续刷短信。
+     */
+    const AdminLoginSecurityService = req.app.locals.services.getService('admin_login_security')
+    await AdminLoginSecurityService.assertLoginAllowed({ mobile, ip: req.ip })
+
+    // 通过 ServiceManager 获取 SmsService（路由不直接 require 领域 Service）
+    const SmsService = req.app.locals.services.getService('sms')
+    const result = await SmsService.sendVerificationCode(mobile)
+
+    // 方案 A（2026-06-18）：如实下发短信发送结果，避免"显示成功却收不到短信"的误导
+    return res.apiSuccess(
+      {
+        expires_in: result.expires_in,
+        sms_sent: result.sms_sent,
+        sms_fail_code: result.sms_fail_code
+      },
+      result.message
+    )
+  })
+)
 
 /**
  * 🛡️ 管理员登录（基于UUID角色系统）
@@ -32,6 +85,7 @@ const BeijingTimeHelper = require('../../../../utils/timeHelper')
  */
 router.post(
   '/login',
+  adminLoginRateLimiter,
   asyncHandler(async (req, res) => {
     const { mobile, verification_code } = req.body
 
@@ -39,8 +93,42 @@ router.post(
       return res.apiError('手机号不能为空', 'MOBILE_REQUIRED', null, 400)
     }
 
+    const AdminLoginSecurityService = req.app.locals.services.getService('admin_login_security')
+
+    /*
+     * P0.6 加固：登录前置 IP 白名单 + 失败锁定校验。
+     * 被锁定（LOGIN_LOCKED/429）或 IP 不在白名单（IP_NOT_ALLOWED/403）时直接拒绝，不进入验证码校验。
+     */
+    await AdminLoginSecurityService.assertLoginAllowed({ mobile, ip: req.ip })
+
     const UserService = req.app.locals.services.getService('user')
-    const { user, roles } = await UserService.adminLogin(mobile, verification_code)
+
+    /*
+     * 登录校验：验证码错误时记录失败计数（命中阈值即锁定 + 审计）；成功则清零计数。
+     * 仅对「验证码错误」类失败计数，避免把"用户不存在/无权限"等也计入锁定。
+     */
+    let user
+    let roles
+    try {
+      const result = await UserService.adminLogin(mobile, verification_code)
+      user = result.user
+      roles = result.roles
+    } catch (loginError) {
+      if (
+        loginError.code === 'INVALID_VERIFICATION_CODE' ||
+        loginError.code === 'VERIFICATION_CODE_EXPIRED'
+      ) {
+        await AdminLoginSecurityService.recordFailure({
+          mobile,
+          ip: req.ip,
+          user_agent: req.headers['user-agent'] || null
+        })
+      }
+      throw loginError
+    }
+
+    // 登录成功：清除该手机号失败计数，复位锁定窗口
+    await AdminLoginSecurityService.clearFailures(mobile)
 
     /**
      * 会话管理：创建认证会话（原子操作 + 行级锁防并发）

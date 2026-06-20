@@ -63,7 +63,7 @@ function registerStoreManagementComponents() {
   // ==================== 页面内容组件 ====================
 
   Alpine.data('storePageContent', () => ({
-    ...createPageMixin(),
+    ...createPageMixin({ userResolver: true }),
 
     // ==================== Composables ====================
     ...useStoresState(),
@@ -93,8 +93,8 @@ function registerStoreManagementComponents() {
         key: 'role_in_store',
         label: '角色',
         type: 'badge',
-        badgeMap: { manager: 'blue', cashier: 'green', waiter: 'gray' },
-        labelMap: {}
+        badgeMap: { manager: 'blue', staff: 'gray' },
+        labelMap: { manager: '店长', staff: '员工' }
       },
       { key: 'user_mobile', label: '手机号' },
       { key: 'joined_at', label: '入职日期', type: 'date' },

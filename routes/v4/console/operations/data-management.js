@@ -178,9 +178,18 @@ router.post(
     }
 
     const smsService = req.app.locals.services.getService('sms')
-    const isCodeValid = await smsService.verifyCode(req.user.mobile, verification_code)
-    if (!isCodeValid) {
-      return res.apiError('管理员验证码错误或已过期', 'INVALID_VERIFICATION_CODE', null, 401)
+    const verifyResult = await smsService.verifyCode(req.user.mobile, verification_code)
+    if (!verifyResult.valid) {
+      // O3：区分"已过期/不存在"与"输错"
+      if (verifyResult.reason === 'EXPIRED') {
+        return res.apiError(
+          '管理员验证码已过期，请重新获取',
+          'VERIFICATION_CODE_EXPIRED',
+          null,
+          401
+        )
+      }
+      return res.apiError('管理员验证码错误', 'INVALID_VERIFICATION_CODE', null, 401)
     }
 
     const service = req.app.locals.services.getService('data_management')

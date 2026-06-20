@@ -363,14 +363,13 @@ describe('UserService - 用户服务', () => {
 
   describe('adminLogin - 管理员登录', () => {
     /**
-     * 重要说明：adminLogin 在 NODE_ENV=test 时走生产环境验证码逻辑（未实现）
-     * 这些测试主要验证：
-     * 1. 参数校验（空验证码）
-     * 2. 当 NODE_ENV=development 时的正确行为（使用 123456）
-     *
-     * NODE_ENV=test 时，验证码验证会返回 501 VERIFICATION_NOT_IMPLEMENTED
+     * 业务契约（2026-06-18 收口改造后）：
+     * adminLogin 的验证码校验统一收口到 SmsService.verifyCode（与用户端登录同一套逻辑）。
+     * - 非生产环境（NODE_ENV !== 'production'，含 test/development）：万能码 123456 放行
+     * - 生产环境：仅 Redis 真实短信码放行，万能码被 SmsService 内 NODE_ENV 守卫禁用
+     * 测试在 NODE_ENV=test 下运行，故 123456 视为有效码。
      */
-    const isDevelopment = process.env.NODE_ENV === 'development'
+    const isProduction = process.env.NODE_ENV === 'production'
 
     it('参数校验：验证码为空时应抛出 VERIFICATION_CODE_REQUIRED 错误', async () => {
       /**
@@ -399,45 +398,41 @@ describe('UserService - 用户服务', () => {
       })
     })
 
-    it('非开发环境应返回 501 VERIFICATION_NOT_IMPLEMENTED', async () => {
+    it('验证码无效（非万能码且 Redis 无真实码）应被拒绝（401）', async () => {
       /**
-       * 测试场景：NODE_ENV=test 时尝试登录
-       * 预期结果：返回 501（生产环境验证未实现）
-       *
-       * 这是预期行为，因为生产环境验证码逻辑尚未实现
+       * 测试场景：传入既非万能码、Redis 中也不存在的验证码
+       * 预期结果（O3 区分过期/错误后）：Redis 无码视为"已过期/不存在" → verifyCode 返回 { valid:false, reason:'EXPIRED' }
+       *           → adminLogin 抛 VERIFICATION_CODE_EXPIRED(401)
+       * 业务价值：确保管理端不会被任意验证码绕过；且给出"已过期，请重新获取"的精准语义
        */
-      if (isDevelopment) {
-        // 开发环境跳过此测试
-        console.log('[adminLogin] 跳过：当前为开发环境')
+      if (isProduction) {
+        // 生产环境跳过（生产需真实短信码，测试环境无法构造）
         return
       }
 
-      // 确保测试用户状态为 active
       if (test_user.status !== 'active') {
         await test_user.update({ status: 'active' }, { transaction })
       }
 
       await expect(
-        UserService.adminLogin(test_user.mobile, '123456', { transaction })
+        UserService.adminLogin(test_user.mobile, '000000', { transaction })
       ).rejects.toMatchObject({
-        code: 'VERIFICATION_NOT_IMPLEMENTED',
-        statusCode: 501
+        code: 'VERIFICATION_CODE_EXPIRED',
+        statusCode: 401
       })
     })
 
-    it('开发环境应成功登录（验证码 123456）', async () => {
+    it('非生产环境用万能码 123456 应成功登录并返回用户与角色', async () => {
       /**
-       * 测试场景：NODE_ENV=development 时管理员登录
-       * 预期结果：返回用户信息和角色信息
-       * 前置条件：测试用户 13612227930 具备管理员权限
+       * 测试场景：NODE_ENV=test（非生产）管理员用万能码登录
+       * 预期结果：返回用户信息和角色信息（role_level > 0）
+       * 前置条件：测试用户具备管理员权限
        */
-      if (!isDevelopment) {
-        // 非开发环境跳过此测试
-        console.log('[adminLogin] 跳过：当前非开发环境，验证码验证未实现')
+      if (isProduction) {
+        // 生产环境跳过（万能码已被禁用）
         return
       }
 
-      // 确保测试用户状态为 active
       if (test_user.status !== 'active') {
         await test_user.update({ status: 'active' }, { transaction })
       }

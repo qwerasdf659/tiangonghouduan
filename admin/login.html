@@ -72,23 +72,36 @@
                 <label class="block text-sm font-medium themed-text-secondary mb-2">
                   🔒 验证码
                 </label>
-                <div class="relative">
-                  <input 
-                    type="text" 
-                    class="w-full px-4 py-3 border themed-border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all keyboard-focus"
-                    :class="{ 'is-valid': code && code.length === 6, 'is-invalid': code && code.length !== 6 && code.length > 0 }"
-                    x-model="code"
-                    placeholder="请输入验证码"
-                    :disabled="loading"
-                    maxlength="6"
-                    required
+                <div class="flex gap-2">
+                  <div class="relative flex-1">
+                    <input 
+                      type="text" 
+                      class="w-full px-4 py-3 border themed-border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all keyboard-focus"
+                      :class="{ 'is-valid': code && code.length === 6, 'is-invalid': code && code.length !== 6 && code.length > 0 }"
+                      x-model="code"
+                      placeholder="请输入验证码"
+                      :disabled="loading"
+                      maxlength="6"
+                      required
+                    >
+                    <span class="validation-icon"></span>
+                  </div>
+                  <!-- 发送验证码按钮（60秒倒计时） -->
+                  <button 
+                    type="button"
+                    class="px-4 py-3 whitespace-nowrap themed-border border rounded-lg themed-text-primary font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed btn-scale"
+                    :disabled="loading || sending || countdown > 0 || !(phone && phone.length === 11)"
+                    @click="getCode"
                   >
-                  <span class="validation-icon"></span>
+                    <span x-show="!sending && countdown === 0">获取验证码</span>
+                    <span x-show="sending">发送中...</span>
+                    <span x-show="countdown > 0" x-text="countdown + 's 后重发'"></span>
+                  </button>
                 </div>
                 <p class="valid-feedback">✓ 验证码格式正确</p>
                 <p class="invalid-feedback">请输入6位验证码</p>
                 <p class="mt-2 text-sm themed-text-muted">
-                  ℹ️ 开发环境万能验证码：123456
+                  ℹ️ 非生产环境可用万能验证码：123456
                 </p>
               </div>
               

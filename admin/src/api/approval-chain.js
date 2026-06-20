@@ -17,6 +17,8 @@ export const APPROVAL_CHAIN_ENDPOINTS = {
   TEMPLATE_CREATE: `${API_PREFIX}/console/approval-chain/templates`,
   TEMPLATE_UPDATE: `${API_PREFIX}/console/approval-chain/templates/:id`,
   TEMPLATE_TOGGLE: `${API_PREFIX}/console/approval-chain/templates/:id/toggle`,
+  TEMPLATE_CHECK_CONFLICTS: `${API_PREFIX}/console/approval-chain/templates/check-conflicts`,
+  TEMPLATE_BATCH_ASSIGN: `${API_PREFIX}/console/approval-chain/templates/batch-assign-reviewer`,
 
   /** 实例查询 */
   INSTANCE_LIST: `${API_PREFIX}/console/approval-chain/instances`,
@@ -27,7 +29,13 @@ export const APPROVAL_CHAIN_ENDPOINTS = {
   MY_PENDING: `${API_PREFIX}/console/approval-chain/my-pending`,
   STEP_APPROVE: `${API_PREFIX}/console/approval-chain/steps/:id/approve`,
   STEP_REJECT: `${API_PREFIX}/console/approval-chain/steps/:id/reject`,
-  STEP_BATCH: `${API_PREFIX}/console/approval-chain/steps/batch`
+  STEP_BATCH: `${API_PREFIX}/console/approval-chain/steps/batch`,
+
+  /** 数据统计（按门店/区域聚合：待审/已审/通过/拒绝/超时/通过率/金额/积分） */
+  STATS: `${API_PREFIX}/console/approval-chain/stats`,
+
+  /** 运营分析（员工录入排行/消费趋势/拒绝原因TOP/用户复购活跃，脱敏） */
+  ANALYTICS: `${API_PREFIX}/console/approval-chain/analytics`
 }
 
 export const ApprovalChainAPI = {
@@ -68,6 +76,32 @@ export const ApprovalChainAPI = {
     return request({
       url: buildURL(APPROVAL_CHAIN_ENDPOINTS.TEMPLATE_TOGGLE, { id: templateId }),
       method: 'PUT'
+    })
+  },
+
+  /**
+   * 保存前冲突预检（只读，不写库）：返回与现有审核链的潜在风险
+   * @param {Object} data - { auditable_type, priority, match_conditions, template_id? }
+   * @returns {Promise<Object>} { success, data: { has_risk, risks: [{type, level, message}] } }
+   */
+  async checkTemplateConflicts(data) {
+    return request({
+      url: APPROVAL_CHAIN_ENDPOINTS.TEMPLATE_CHECK_CONFLICTS,
+      method: 'POST',
+      data
+    })
+  },
+
+  /**
+   * 批量配置审核人（9.3③）：跨多条链统一指派某节点的审核人
+   * @param {Object} data - { template_ids[], target_step, assignee_type, assignee_role_id?, assignee_user_id? }
+   * @returns {Promise<Object>} { success, data: { results, stats } }
+   */
+  async batchAssignReviewer(data) {
+    return request({
+      url: APPROVAL_CHAIN_ENDPOINTS.TEMPLATE_BATCH_ASSIGN,
+      method: 'POST',
+      data
     })
   },
 
@@ -137,5 +171,33 @@ export const ApprovalChainAPI = {
       method: 'POST',
       data: { step_ids: stepIds, action, reason }
     })
+  },
+
+  // ========== 数据统计 ==========
+
+  /**
+   * 查询审核数据统计（按门店/区域聚合）
+   * @param {Object} [params] - 查询参数
+   * @param {string} [params.dimension='store'] - 聚合维度：store=按门店，region=按区域
+   * @returns {Promise<Object>} { success, data: { dimension, rows: [...], summary: {...} } }
+   */
+  async getStats(params = {}) {
+    const query = new URLSearchParams()
+    if (params.dimension) query.append('dimension', params.dimension)
+    const qs = query.toString()
+    return request({ url: `${APPROVAL_CHAIN_ENDPOINTS.STATS}${qs ? '?' + qs : ''}` })
+  },
+
+  /**
+   * 查询运营分析（员工录入排行/消费趋势/拒绝原因TOP/用户复购活跃）
+   * @param {Object} [params] - { days?, store_id? }
+   * @returns {Promise<Object>} { success, data: { staff_ranking, trend, reject_reasons, user_activity } }
+   */
+  async getAnalytics(params = {}) {
+    const query = new URLSearchParams()
+    if (params.days) query.append('days', params.days)
+    if (params.store_id) query.append('store_id', params.store_id)
+    const qs = query.toString()
+    return request({ url: `${APPROVAL_CHAIN_ENDPOINTS.ANALYTICS}${qs ? '?' + qs : ''}` })
   }
 }

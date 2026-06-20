@@ -96,12 +96,19 @@ export const STORE_ENDPOINTS = {
   // 门店统计
   STATS: `${API_PREFIX}/console/stores/stats`,
 
-  // 员工管理
+  // 员工管理（端点严格对齐后端 routes/v4/console/merchant/staff.js 真实契约）
   STAFF_LIST: `${API_PREFIX}/console/staff`,
   STAFF_DETAIL: `${API_PREFIX}/console/staff/:store_staff_id`,
   STAFF_CREATE: `${API_PREFIX}/console/staff`,
-  STAFF_UPDATE: `${API_PREFIX}/console/staff/:store_staff_id`,
+  // 角色变更走 PUT /:store_staff_id/role（staff↔manager），后端无 PUT /:store_staff_id
+  STAFF_ROLE: `${API_PREFIX}/console/staff/:store_staff_id/role`,
   STAFF_DELETE: `${API_PREFIX}/console/staff/:store_staff_id`,
+  // 员工调店（跨门店转移）
+  STAFF_TRANSFER: `${API_PREFIX}/console/staff/transfer`,
+  // 查询某用户的所有门店绑定
+  STAFF_BY_USER: `${API_PREFIX}/console/staff/by-user/:user_id`,
+  // 门店员工统计
+  STAFF_STATS: `${API_PREFIX}/console/staff/stats`,
 
   // 消费记录扩展
   CONSUMPTION_LIST: `${API_PREFIX}/console/consumption/records`,
@@ -558,12 +565,13 @@ export const StoreAPI = {
   },
 
   /**
-   * 创建员工（绑定门店）
+   * 创建员工（员工入职，绑定门店）
    * @async
-   * @param {Object} data - 员工数据
-   * @param {number} data.user_id - 用户ID
+   * @param {Object} data - 员工数据（后端契约：user_id + store_id + role_in_store）
+   * @param {number} data.user_id - 用户ID（由手机号 resolve 得到）
    * @param {number} data.store_id - 门店ID
-   * @param {string} [data.role='staff'] - 角色（staff/manager）
+   * @param {string} [data.role_in_store='staff'] - 门店内角色（staff/manager）
+   * @param {string} [data.notes] - 备注
    * @returns {Promise<Object>} 创建结果
    */
   async createStaff(data) {
@@ -571,19 +579,46 @@ export const StoreAPI = {
   },
 
   /**
-   * 更新员工信息
+   * 变更员工门店内角色（staff ↔ manager）
    * @async
-   * @param {number} staffId - 员工ID
+   * @param {number} staffId - 员工记录ID（store_staff_id）
    * @param {Object} data - 更新数据
+   * @param {string} data.role_in_store - 新角色（staff/manager）
+   * @param {string} [data.notes] - 备注
    * @returns {Promise<Object>} 更新结果
    */
-  async updateStaff(staffId, data) {
-    const url = buildURL(STORE_ENDPOINTS.STAFF_UPDATE, { store_staff_id: staffId })
+  async updateStaffRole(staffId, data) {
+    const url = buildURL(STORE_ENDPOINTS.STAFF_ROLE, { store_staff_id: staffId })
     return await request({ url, method: 'PUT', data })
   },
 
   /**
-   * 删除员工（解除门店绑定）
+   * 员工调店（跨门店转移）
+   * @async
+   * @param {Object} data - 调店数据
+   * @param {number} data.user_id - 用户ID
+   * @param {number} data.from_store_id - 原门店ID
+   * @param {number} data.to_store_id - 新门店ID
+   * @param {string} [data.notes] - 调店原因
+   * @returns {Promise<Object>} 调店结果
+   */
+  async transferStaff(data) {
+    return await request({ url: STORE_ENDPOINTS.STAFF_TRANSFER, method: 'POST', data })
+  },
+
+  /**
+   * 查询某用户的所有门店绑定
+   * @async
+   * @param {number} userId - 用户ID
+   * @returns {Promise<Object>} 用户门店列表
+   */
+  async getStaffByUser(userId) {
+    const url = buildURL(STORE_ENDPOINTS.STAFF_BY_USER, { user_id: userId })
+    return await request({ url, method: 'GET' })
+  },
+
+  /**
+   * 删除员工（离职/删除，按后端状态分发）
    * @async
    * @param {number} staffId - 员工ID
    * @returns {Promise<Object>} 删除结果

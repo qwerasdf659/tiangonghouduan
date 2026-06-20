@@ -11,7 +11,8 @@
  */
 const logger = require('../../utils/logger').logger
 const { attachDisplayNames } = require('../../utils/displayNameHelper')
-const { ConsumptionRecord, User, Store, sequelize } = require('../../models')
+const { ConsumptionRecord, User, Store, ApprovalChainStep, sequelize } = require('../../models')
+const { Op } = require('sequelize')
 
 /**
  * 消费记录商家侧服务类
@@ -237,11 +238,22 @@ class MerchantService {
         approved_points: statusStats.approved.points
       }
 
+      /*
+       * 超时/临近超时维度（2026-06-20 决策 8.4.2/8.6.3，小程序待审预警）：
+       * 基于该门店待审消费单对应的审核链步骤 timeout_at——
+       *   - overdue：timeout_at 已过期且步骤仍 pending（已超时未处理）
+       *   - near_due：timeout_at 在未来 2 小时内（快超时，需尽快处理）
+       * 仅统计 consumption 业务、该门店范围内、当前 pending 的步骤。
+       */
+      const timeoutStats = await MerchantService._getStoreTimeoutStats(store_id)
+
       return {
         store_id,
         stats_scope: is_manager ? 'store' : 'self',
         by_status: statusStats,
-        total
+        total,
+        // 超时预警维度（小程序"你有 N 单待审，其中 M 单快超时/已超时"）
+        timeout: timeoutStats
       }
     } catch (error) {
       logger.error('商家侧消费统计查询失败', {
@@ -250,6 +262,39 @@ class MerchantService {
       })
       throw error
     }
+  }
+
+  /**
+   * 统计门店待审步骤的超时/临近超时数量（小程序待审预警，2026-06-20）
+   *
+   * 基于 approval_chain_steps（冗余 store_id + timeout_at）按门店聚合当前 pending 步骤：
+   *   - overdue：timeout_at < 当前时间（已超时未处理）
+   *   - near_due：当前时间 <= timeout_at <= 当前时间 + 2 小时（快超时）
+   *   - pending_total：该门店当前 pending 的审核步骤总数
+   *
+   * @param {number} storeId - 门店ID
+   * @returns {Promise<Object>} { pending_total, overdue, near_due }
+   * @private
+   */
+  static async _getStoreTimeoutStats(storeId) {
+    const now = new Date()
+    const nearDueThreshold = new Date(now.getTime() + 2 * 3600 * 1000)
+
+    const [pendingTotal, overdue, nearDue] = await Promise.all([
+      ApprovalChainStep.count({ where: { store_id: storeId, status: 'pending' } }),
+      ApprovalChainStep.count({
+        where: { store_id: storeId, status: 'pending', timeout_at: { [Op.lt]: now } }
+      }),
+      ApprovalChainStep.count({
+        where: {
+          store_id: storeId,
+          status: 'pending',
+          timeout_at: { [Op.gte]: now, [Op.lte]: nearDueThreshold }
+        }
+      })
+    ])
+
+    return { pending_total: pendingTotal, overdue, near_due: nearDue }
   }
 }
 

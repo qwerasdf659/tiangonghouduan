@@ -39,7 +39,7 @@ import { API_PREFIX, request, buildURL, buildQueryString } from './base.js'
  * @property {number} [admin_id] - 接待客服ID
  * @property {SessionStatus} status - 会话状态
  * @property {number} unread_count - 未读消息数
- * @property {string} last_message - 最后一条消息
+ * @property {Object|null} last_message - 最后一条消息对象（含 message_type/content/file_name 等，按 message_type 渲染预览）
  * @property {string} created_at - 创建时间
  */
 

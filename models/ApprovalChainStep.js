@@ -77,6 +77,45 @@ module.exports = sequelize => {
         allowNull: false,
         comment: '是否终审步骤'
       },
+      store_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        comment: '该步所属门店（来源 consumption_records.store_id），门店隔离校验与统计免回查'
+      },
+      approve_mode: {
+        type: DataTypes.ENUM('single', 'countersign'),
+        allowNull: false,
+        defaultValue: 'single',
+        comment: '审批模式（实例化时从节点固化）：single=单签，countersign=会签'
+      },
+      required_approvals: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 1,
+        comment: '会签需通过人数（实例化时从节点固化，single 恒为 1）'
+      },
+      approved_count: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
+        comment: '会签已通过人数（凑够 required_approvals 才推进）'
+      },
+      is_escalated: {
+        type: DataTypes.TINYINT,
+        allowNull: false,
+        defaultValue: 0,
+        comment: '是否越级/超时升级代审（1=该步由上级越级或超时转交代审）'
+      },
+      original_assignee_role_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        comment: '越级时原应审角色ID（留痕，记录本应由谁审）'
+      },
+      escalated_from_user_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        comment: '由谁超时/越级转交而来（留痕，记录原审核人）'
+      },
       timeout_at: {
         type: DataTypes.DATE,
         allowNull: true,
@@ -145,6 +184,11 @@ module.exports = sequelize => {
     ApprovalChainStep.belongsTo(models.User, {
       foreignKey: 'actioned_by',
       as: 'actor'
+    })
+    /** 会签子记录（一步多人审批） */
+    ApprovalChainStep.hasMany(models.ApprovalChainStepAction, {
+      foreignKey: 'step_id',
+      as: 'actions'
     })
   }
 

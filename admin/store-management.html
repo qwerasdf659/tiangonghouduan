@@ -143,6 +143,9 @@
           <button @click="openCreateStaffModal()" class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary text-sm">
             ➕ 添加员工
           </button>
+          <button @click="openTransferStaffModal()" class="px-4 py-2 border rounded themed-text-secondary themed-hover-bg text-sm">
+            🔁 员工调店
+          </button>
         </div>
         <div class="p-4">
           <!-- 筛选器 -->
@@ -160,12 +163,11 @@
               <option value="pending">待审核</option>
               <option value="deleted">已删除</option>
             </select>
-            <select class="px-3 py-2 border rounded text-sm" x-model="staffFilters.role" @change="loadStaff()">
+            <select class="px-3 py-2 border rounded text-sm" x-model="staffFilters.role_in_store" @change="loadStaff()">
               <option value="">全部角色</option>
               <option value="manager">店长</option>
               <option value="staff">员工</option>
             </select>
-            <input type="text" class="px-3 py-2 border rounded text-sm w-48" placeholder="搜索员工姓名..." x-model="staffFilters.keyword">
             <button class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary text-sm" @click="loadStaff()">
               🔍 搜索
             </button>
@@ -445,46 +447,108 @@
       </div>
       <form @submit.prevent="saveStaff">
         <div class="p-4 space-y-4">
+          <!-- 新增态：手机号（提交前 resolve 成 user_id）；编辑态仅改角色，手机号只读 -->
           <div>
-            <label class="block text-sm font-medium themed-text-secondary mb-1">员工姓名 <span class="text-red-500">*</span></label>
-            <input type="text" class="w-full px-3 py-2 border rounded" x-model="staffForm.name" required>
+            <label class="block text-sm font-medium themed-text-secondary mb-1">
+              员工手机号 <span class="text-red-500" x-show="!isEditMode">*</span>
+            </label>
+            <input type="text" class="w-full px-3 py-2 border rounded" x-model="staffForm.mobile"
+                   :readonly="isEditMode" placeholder="请输入已注册用户的11位手机号">
+            <p class="text-xs text-gray-400 mt-1" x-show="!isEditMode">系统将按手机号匹配已注册用户进行入职绑定</p>
+            <p class="text-xs text-red-500 mt-1" x-show="resolveError" x-text="resolveError"></p>
           </div>
           <div>
-            <label class="block text-sm font-medium themed-text-secondary mb-1">手机号码</label>
-            <input type="text" class="w-full px-3 py-2 border rounded" x-model="staffForm.phone">
-          </div>
-          <div>
-            <label class="block text-sm font-medium themed-text-secondary mb-1">所属门店</label>
-            <select class="w-full px-3 py-2 border rounded" x-model="staffForm.store_id">
+            <label class="block text-sm font-medium themed-text-secondary mb-1">所属门店 <span class="text-red-500" x-show="!isEditMode">*</span></label>
+            <select class="w-full px-3 py-2 border rounded" x-model="staffForm.store_id" :disabled="isEditMode">
               <option value="">请选择门店</option>
               <template x-for="store in stores" :key="store.store_id">
                 <option :value="store.store_id" x-text="store.store_name"></option>
               </template>
             </select>
+            <p class="text-xs text-gray-400 mt-1" x-show="isEditMode">如需更换门店，请使用"员工调店"功能</p>
           </div>
           <div>
-            <label class="block text-sm font-medium themed-text-secondary mb-1">员工角色</label>
-            <select class="w-full px-3 py-2 border rounded" x-model="staffForm.role">
+            <label class="block text-sm font-medium themed-text-secondary mb-1">门店内角色 <span class="text-red-500">*</span></label>
+            <select class="w-full px-3 py-2 border rounded" x-model="staffForm.role_in_store">
               <option value="manager">店长</option>
-              <option value="cashier">收银员</option>
-              <option value="waiter">服务员</option>
-              <option value="chef">厨师</option>
+              <option value="staff">员工</option>
             </select>
           </div>
           <div>
-            <label class="block text-sm font-medium themed-text-secondary mb-1">入职日期</label>
-            <input type="date" class="w-full px-3 py-2 border rounded" x-model="staffForm.hire_date">
+            <label class="block text-sm font-medium themed-text-secondary mb-1">备注</label>
+            <input type="text" class="w-full px-3 py-2 border rounded" x-model="staffForm.notes" placeholder="可选">
           </div>
         </div>
         <div class="p-4 border-t flex justify-end space-x-3">
           <button type="button" @click="hideModal('staffModal')" class="px-4 py-2 border rounded themed-text-secondary themed-hover-bg">取消</button>
           <button type="submit" class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary" :disabled="saving">
             <span x-show="saving" class="inline-block animate-spin mr-1">⏳</span>
-            <span x-text="isEditMode ? '保存修改' : '添加员工'"></span>
+            <span x-text="isEditMode ? '变更角色' : '员工入职'"></span>
           </button>
         </div>
       </form>
     </div>
+    </div>
+
+    <!-- 员工调店弹窗（POST /console/staff/transfer） -->
+    <div
+      x-show="isModalOpen('staffTransferModal')"
+      x-ref="staffTransferModal"
+      class="fixed inset-0 z-50 flex items-center justify-center"
+      x-cloak
+    >
+      <div class="absolute inset-0 bg-black bg-opacity-50" @click="hideModal('staffTransferModal')"></div>
+      <div class="relative themed-card rounded-lg shadow-xl w-full max-w-lg mx-4">
+        <div class="p-4 border-b flex justify-between items-center">
+          <h5 class="font-semibold">🔁 员工调店</h5>
+          <button @click="hideModal('staffTransferModal')" class="text-gray-400 hover:themed-text-muted text-xl">&times;</button>
+        </div>
+        <form @submit.prevent="submitTransferStaff">
+          <div class="p-4 space-y-4">
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">员工手机号 <span class="text-red-500">*</span></label>
+              <div class="flex gap-2">
+                <input type="text" class="flex-1 px-3 py-2 border rounded" x-model="transferForm.mobile" placeholder="输入手机号后点击解析">
+                <button type="button" class="px-3 py-2 border rounded text-sm themed-hover-bg"
+                        @click="(async () => { const u = await resolveUserByMobile(transferForm.mobile); if (u) { transferForm.user_id = u.user_id; transferForm.user_label = (u.nickname||'') + '（' + u.mobile + '）' } })()">
+                  解析
+                </button>
+              </div>
+              <p class="text-xs text-green-600 mt-1" x-show="transferForm.user_id" x-text="'已选择：' + transferForm.user_label"></p>
+              <p class="text-xs text-red-500 mt-1" x-show="resolveError" x-text="resolveError"></p>
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">原门店 <span class="text-red-500">*</span></label>
+              <select class="w-full px-3 py-2 border rounded" x-model="transferForm.from_store_id">
+                <option value="">请选择原门店</option>
+                <template x-for="store in stores" :key="store.store_id">
+                  <option :value="store.store_id" x-text="store.store_name"></option>
+                </template>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">新门店 <span class="text-red-500">*</span></label>
+              <select class="w-full px-3 py-2 border rounded" x-model="transferForm.to_store_id">
+                <option value="">请选择新门店</option>
+                <template x-for="store in stores" :key="store.store_id">
+                  <option :value="store.store_id" x-text="store.store_name"></option>
+                </template>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">调店原因</label>
+              <input type="text" class="w-full px-3 py-2 border rounded" x-model="transferForm.notes" placeholder="可选">
+            </div>
+          </div>
+          <div class="p-4 border-t flex justify-end space-x-3">
+            <button type="button" @click="hideModal('staffTransferModal')" class="px-4 py-2 border rounded themed-text-secondary themed-hover-bg">取消</button>
+            <button type="submit" class="px-4 py-2 themed-bg-primary text-white rounded themed-hover-primary" :disabled="saving">
+              <span x-show="saving" class="inline-block animate-spin mr-1">⏳</span>
+              确认调店
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
 
   </div>

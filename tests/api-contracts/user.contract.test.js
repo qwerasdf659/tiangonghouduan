@@ -107,16 +107,21 @@ describe('API契约测试 - 用户模块 (/api/v4/auth, /api/v4/assets)', () => 
     })
 
     /**
-     * Case 4: 验证码错误应该返回 400/401
+     * Case 4: 验证码无效应该返回 400/401
+     * O3（2026-06-18）：verifyCode 区分"过期/不存在"(VERIFICATION_CODE_EXPIRED) 与"输错"(INVALID_VERIFICATION_CODE)。
+     * 本用例发送 Redis 中不存在的码 '000000' → 视为"已过期/不存在" → VERIFICATION_CODE_EXPIRED。
+     * 契约关注点是"无效验证码被拒绝（4xx + 标准错误码）"，故同时接受两种语义化错误码。
      */
-    test('验证码错误应该返回错误', async () => {
+    test('验证码无效应该返回错误', async () => {
       const response = await request(app)
         .post('/api/v4/auth/login')
         .send({ mobile: '13612227930', verification_code: '000000' })
 
       expect([400, 401]).toContain(response.status)
       validateApiContract(response.body, false)
-      expect(response.body.code).toBe('INVALID_VERIFICATION_CODE')
+      expect(['INVALID_VERIFICATION_CODE', 'VERIFICATION_CODE_EXPIRED']).toContain(
+        response.body.code
+      )
     })
   })
 
