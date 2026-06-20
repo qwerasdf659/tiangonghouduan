@@ -65,8 +65,17 @@ export function useExchangeItemsState() {
       mint_instance: true,
       item_template_id: null,
       attributes_json: null,
-      max_quantity_per_order: 10
+      max_quantity_per_order: 10,
+      // 门店专属兑换券业务线：履约类型 + 核销范围（前端零映射直传后端字段）
+      fulfillment_type: 'physical',
+      applicable_scope: 'all',
+      scoped_store_ids: [],
+      merchant_id: null
     },
+    /** @type {Array<Object>} 门店选项（核销范围=指定门店时多选，复用 active 门店列表） */
+    storeScopeOptions: [],
+    /** @type {Array<Object>} 商家选项（核销范围=商家全门店时单选） */
+    merchantScopeOptions: [],
     /** @type {string} 商品参数表编辑用 JSON 字符串 */
     attributesStr: '{}',
     /** @type {Object|null} 富文本编辑器实例 */
@@ -359,7 +368,11 @@ export function useExchangeItemsMethods() {
         mint_instance: true,
         item_template_id: null,
         attributes_json: null,
-        max_quantity_per_order: 10
+        max_quantity_per_order: 10,
+        fulfillment_type: 'physical',
+        applicable_scope: 'all',
+        scoped_store_ids: [],
+        merchant_id: null
       }
       this.itemImagePreviewUrl = null
       this.detailImages = []
@@ -367,6 +380,7 @@ export function useExchangeItemsMethods() {
       this.tagInput = ''
       this.usageRuleInput = ''
       this.loadDictionaries()
+      this.loadScopeOptions()
       this.showModal('itemModal')
       this.$nextTick(() => this._initRichEditor(''))
     },
@@ -406,7 +420,11 @@ export function useExchangeItemsMethods() {
         mint_instance: item.mint_instance ?? true,
         item_template_id: item.item_template_id || null,
         attributes_json: item.attributes_json || null,
-        max_quantity_per_order: item.max_quantity_per_order ?? 10
+        max_quantity_per_order: item.max_quantity_per_order ?? 10,
+        fulfillment_type: item.fulfillment_type || 'physical',
+        applicable_scope: item.applicable_scope || 'all',
+        scoped_store_ids: Array.isArray(item.scoped_store_ids) ? item.scoped_store_ids : [],
+        merchant_id: item.merchant_id || null
       }
       this.attributesStr = item.attributes ? JSON.stringify(item.attributes, null, 2) : '{}'
       this.itemImagePreviewUrl =
@@ -417,12 +435,61 @@ export function useExchangeItemsMethods() {
       this.tagInput = ''
       this.usageRuleInput = ''
       this.loadDictionaries()
+      this.loadScopeOptions()
       const itemId = item.exchange_item_id
       this.loadDetailImages(itemId)
       this.loadShowcaseImages(itemId)
       this.loadItemSkus(itemId)
       this.showModal('itemModal')
       this.$nextTick(() => this._initRichEditor(item.description || ''))
+    },
+
+    /**
+     * 加载核销范围选项（门店专属兑换券业务线）
+     * - storeScopeOptions：active 门店列表（核销范围=指定门店时多选）
+     * - merchantScopeOptions：商家列表（核销范围=商家全门店时单选）
+     * 复用现有 /console/stores 与 /console/merchants 接口，零新增后端端点。
+     */
+    async loadScopeOptions() {
+      try {
+        const { STORE_ENDPOINTS } = await import('../../../api/store.js')
+        const { request } = await import('../../../api/base.js')
+        const res = await request({ url: `${STORE_ENDPOINTS.LIST}?status=active&page=1&page_size=200` })
+        const list = res?.data?.stores || res?.data?.list || res?.data || []
+        this.storeScopeOptions = Array.isArray(list)
+          ? list.map(s => ({ store_id: s.store_id, store_name: s.store_name }))
+          : []
+      } catch (e) {
+        logger.error('[ExchangeItems] 加载门店选项失败:', e)
+        this.storeScopeOptions = []
+      }
+      try {
+        const { getMerchantList } = await import('../../../api/merchant.js')
+        const res = await getMerchantList({ page: 1, page_size: 200 })
+        const list = res?.data?.merchants || res?.data?.list || res?.data || []
+        this.merchantScopeOptions = Array.isArray(list)
+          ? list.map(m => ({ merchant_id: m.merchant_id, merchant_name: m.merchant_name }))
+          : []
+      } catch (e) {
+        logger.error('[ExchangeItems] 加载商家选项失败:', e)
+        this.merchantScopeOptions = []
+      }
+    },
+
+    /**
+     * 切换门店多选（核销范围=指定门店）
+     * @param {number} storeId - 门店ID
+     */
+    toggleScopeStore(storeId) {
+      const id = Number(storeId)
+      const arr = this.itemForm.scoped_store_ids || []
+      const idx = arr.indexOf(id)
+      if (idx >= 0) {
+        arr.splice(idx, 1)
+      } else {
+        arr.push(id)
+      }
+      this.itemForm.scoped_store_ids = [...arr]
     },
 
     /**
@@ -451,6 +518,27 @@ export function useExchangeItemsMethods() {
 
       if (!this.itemForm.publish_at) this.itemForm.publish_at = null
       if (!this.itemForm.unpublish_at) this.itemForm.unpublish_at = null
+
+      // 门店专属兑换券：核销范围前端校验（避免建出"范围为空"的废券，后端也会再校验）
+      if (this.itemForm.applicable_scope === 'specified_stores') {
+        const ids = (this.itemForm.scoped_store_ids || []).map(Number).filter(Boolean)
+        if (ids.length === 0) {
+          this.showError?.('核销范围为「指定门店」时，请至少选择一个门店')
+          return
+        }
+        this.itemForm.scoped_store_ids = ids
+        this.itemForm.merchant_id = null
+      } else if (this.itemForm.applicable_scope === 'merchant_all') {
+        if (!this.itemForm.merchant_id) {
+          this.showError?.('核销范围为「商家全门店」时，请选择归属商家')
+          return
+        }
+        this.itemForm.scoped_store_ids = []
+      } else {
+        // 通用券：清空范围约束
+        this.itemForm.scoped_store_ids = []
+        this.itemForm.merchant_id = null
+      }
 
       try {
         this.saving = true

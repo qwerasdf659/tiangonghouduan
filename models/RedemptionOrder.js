@@ -132,6 +132,13 @@ module.exports = sequelize => {
           model: 'store_staff',
           key: 'store_staff_id'
         }
+      },
+
+      // 门店专属券允许核销门店集合（生成核销码时从商品 applicable_scope 固化）
+      scoped_store_id_list: {
+        type: DataTypes.JSON,
+        allowNull: true,
+        comment: '核销允许门店集合，生成核销码时从商品固化；NULL=通用券任意门店可核'
       }
     },
     {

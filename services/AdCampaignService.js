@@ -852,7 +852,6 @@ class AdCampaignService {
    * @param {number} [data.frequency_value=1] - 频次参数值
    * @param {boolean} [data.force_show=false] - 是否强制弹出
    * @param {number} [data.priority=500] - 优先级（100-899）
-   * @param {number} [data.slide_interval_ms=3000] - 轮播间隔（carousel 类型）
    * @param {string} [data.start_date] - 开始日期
    * @param {string} [data.end_date] - 结束日期
    * @param {string} [data.internal_notes] - 内部备注
@@ -897,7 +896,6 @@ class AdCampaignService {
           frequency_rule: data.frequency_rule || 'once_per_day',
           frequency_value: data.frequency_value || 1,
           force_show: data.force_show || false,
-          slide_interval_ms: data.slide_interval_ms || 3000,
           internal_notes: data.internal_notes || null,
           targeting_rules: data.targeting_rules || null,
           start_date: data.start_date || null,

@@ -26,10 +26,12 @@
 
 const express = require('express')
 const router = express.Router()
+const ExcelJS = require('exceljs')
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const { asyncHandler } = require('../../../../middleware/validation')
 const logger = require('../../../../utils/logger').logger
 const TransactionManager = require('../../../../utils/TransactionManager')
+const BeijingTimeHelper = require('../../../../utils/timeHelper')
 
 /*
  * =================================================================
@@ -158,12 +160,47 @@ router.get(
 )
 
 /**
+ * GET /api/v4/console/business-records/redemption-orders/store-overview
+ * @desc 门店核销概况看板（门店专属兑换券业务线 接口4）：按门店聚合 待核销/已核销/核销率 +
+ *       通用券落地门店分布 + 临期未核销数（REDEMPTION_EXPIRING_SOON_DAYS，默认3天）
+ * @access Admin only (role_level >= 30)
+ *
+ * @query {number} [store_id] - 按门店过滤
+ * @query {string} [start_date] - 起始时间（按 created_at）
+ * @query {string} [end_date] - 结束时间
+ */
+router.get(
+  '/redemption-orders/store-overview',
+  authenticateToken,
+  requireRoleLevel(30),
+  asyncHandler(async (req, res) => {
+    const RedemptionService = req.app.locals.services.getService('redemption_order')
+    const overview = await RedemptionService.getStoreRedemptionOverview({
+      store_id: req.query.store_id,
+      start_date: req.query.start_date,
+      end_date: req.query.end_date
+    })
+
+    logger.info('获取门店核销概况看板成功', {
+      admin_id: req.user.user_id,
+      store_count: overview.by_store.length
+    })
+
+    return res.apiSuccess(overview, '获取门店核销概况成功')
+  })
+)
+
+/**
  * GET /api/v4/console/business-records/redemption-orders/export
- * @desc 导出核销订单数据为CSV
+ * @desc 导出核销订单数据（支持 csv 与 xlsx 双格式）
  * @access Admin only (role_level >= 30)
  *
  * @query {string} [status] - 订单状态筛选
- * @query {string} [format=csv] - 导出格式（仅支持csv）
+ * @query {number} [store_id] - 核销落地门店过滤（门店专属券业务线）
+ * @query {string} [scope_type] - 券范围类型 specified/general（门店专属券业务线）
+ * @query {string} [start_date] - 起始时间（按 created_at）
+ * @query {string} [end_date] - 结束时间
+ * @query {string} [format=csv] - 导出格式：csv（默认）或 xlsx（ExcelJS 流式）
  */
 router.get(
   '/redemption-orders/export',
@@ -175,58 +212,90 @@ router.get(
     )
 
     const orders = await BusinessRecordQueryService.exportRedemptionOrders(req.query)
+    const format = String(req.query.format || 'csv').toLowerCase()
 
-    // 生成CSV内容
-    const csvHeader =
-      'RD单号,内部订单ID,核销码,用户ID,用户昵称,用户手机,奖品类型,奖品名称,状态,创建时间,过期时间,核销时间\n'
+    // 状态中文映射（CSV/xlsx 共用）
+    const statusMap = {
+      pending: '待核销',
+      fulfilled: '已核销',
+      expired: '已过期',
+      cancelled: '已取消'
+    }
 
-    const csvRows = orders
-      .map(order => {
-        const redeemer = order.redeemer || {}
-        const item = order.item || {}
+    /*
+     * 统一行映射：web 后台运营导出（按规则后台无需脱敏，运营可见兑换用户昵称/手机用于对账）。
+     * 字段顺序 CSV 与 xlsx 一致，便于两套格式对齐。
+     */
+    const buildRow = order => {
+      const redeemer = order.redeemer || {}
+      const item = order.item || {}
+      return {
+        RD单号: order.order_no || '-',
+        内部订单ID: order.redemption_order_id,
+        核销码: order.code_hash ? order.code_hash.substring(0, 8) + '...' : '-',
+        用户ID: redeemer.user_id || '-',
+        用户昵称: redeemer.nickname || '-',
+        用户手机: redeemer.mobile || '-',
+        奖品类型: item.item_type || '-',
+        奖品名称: item.item_name || '-',
+        核销门店ID: order.fulfilled_store_id || '-',
+        状态: statusMap[order.status] || order.status,
+        创建时间: order.created_at
+          ? BeijingTimeHelper.format(order.created_at, 'YYYY-MM-DD HH:mm:ss')
+          : '-',
+        过期时间: order.expires_at
+          ? BeijingTimeHelper.format(order.expires_at, 'YYYY-MM-DD HH:mm:ss')
+          : '-',
+        核销时间: order.fulfilled_at
+          ? BeijingTimeHelper.format(order.fulfilled_at, 'YYYY-MM-DD HH:mm:ss')
+          : '-'
+      }
+    }
 
-        // 状态映射
-        const statusMap = {
-          pending: '待核销',
-          fulfilled: '已核销',
-          expired: '已过期',
-          cancelled: '已取消'
-        }
-
-        return [
-          order.order_no || '-',
-          order.redemption_order_id,
-          order.code_hash ? order.code_hash.substring(0, 8) + '...' : '-',
-          redeemer.user_id || '-',
-          redeemer.nickname || '-',
-          redeemer.mobile || '-',
-          item.item_type || '-',
-          item.item_name || '-',
-          statusMap[order.status] || order.status,
-          order.created_at ? new Date(order.created_at).toLocaleString('zh-CN') : '-',
-          order.expires_at ? new Date(order.expires_at).toLocaleString('zh-CN') : '-',
-          order.fulfilled_at ? new Date(order.fulfilled_at).toLocaleString('zh-CN') : '-'
-        ]
-          .map(field => `"${String(field).replace(/"/g, '""')}"`)
-          .join(',')
-      })
-      .join('\n')
-
-    const csvContent = '\uFEFF' + csvHeader + csvRows // 添加BOM以支持Excel中文显示
+    const exportRows = orders.map(buildRow)
+    const timestamp = BeijingTimeHelper.format(new Date(), 'YYYYMMDD_HHmmss')
 
     logger.info('导出核销订单成功', {
       admin_id: req.user.user_id,
       count: orders.length,
+      format,
       status_filter: req.query.status || 'all'
     })
 
-    // 设置响应头
+    // ===== xlsx 分支（ExcelJS，复用 console/exchange/items.js 同款写法）=====
+    if (format === 'xlsx') {
+      const workbook = new ExcelJS.Workbook()
+      const worksheet = workbook.addWorksheet('核销订单')
+      const colKeys = Object.keys(exportRows[0] || { 提示: '无数据' })
+      worksheet.columns = colKeys.map(key => ({ header: key, key, width: 18 }))
+      worksheet.getRow(1).font = { bold: true }
+      worksheet.addRows(exportRows)
+
+      const excelBuffer = Buffer.from(await workbook.xlsx.writeBuffer())
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      )
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${encodeURIComponent(`核销订单导出_${timestamp}`)}.xlsx"`
+      )
+      return res.send(excelBuffer)
+    }
+
+    // ===== csv 分支（默认，保留原有 BOM + 双引号转义）=====
+    const colKeys = Object.keys(exportRows[0] || {})
+    const csvHeader = colKeys.join(',') + '\n'
+    const csvBody = exportRows
+      .map(row => colKeys.map(k => `"${String(row[k]).replace(/"/g, '""')}"`).join(','))
+      .join('\n')
+    const csvContent = '\uFEFF' + csvHeader + csvBody // BOM 支持 Excel 中文
+
     res.setHeader('Content-Type', 'text/csv; charset=utf-8')
     res.setHeader(
       'Content-Disposition',
-      `attachment; filename="redemption_orders_${new Date().toISOString().slice(0, 10)}.csv"`
+      `attachment; filename="redemption_orders_${timestamp}.csv"`
     )
-
     return res.send(csvContent)
   })
 )

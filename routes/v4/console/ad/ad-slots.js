@@ -20,9 +20,8 @@ const express = require('express')
 const router = express.Router()
 const { adminAuthMiddleware, asyncHandler } = require('../shared/middleware')
 const logger = require('../../../../utils/logger').logger
-
-/** 广告位类型枚举 */
-const VALID_SLOT_TYPES = ['popup', 'carousel']
+// slot_type 白名单单一真相源：引用模型导出，三处校验收敛为一处，消除硬编码漂移
+const { VALID_SLOT_TYPES } = require('../../../../models/AdSlot')
 
 /** 创建/更新时允许设置的字段白名单 */
 const ALLOWED_CREATE_FIELDS = [
@@ -35,6 +34,8 @@ const ALLOWED_CREATE_FIELDS = [
   'min_bid_star_stone',
   'min_budget_star_stone',
   'is_active',
+  'is_carousel',
+  'slide_interval_ms',
   'description'
 ]
 
@@ -46,6 +47,8 @@ const ALLOWED_UPDATE_FIELDS = [
   'min_bid_star_stone',
   'min_budget_star_stone',
   'is_active',
+  'is_carousel',
+  'slide_interval_ms',
   'description'
 ]
 
@@ -53,7 +56,7 @@ const ALLOWED_UPDATE_FIELDS = [
  * GET / - 获取所有广告位列表
  * @route GET /api/v4/console/ad-slots
  * @access Private (Admin)
- * @query {string} [slot_type] - 广告位类型筛选（popup/carousel）
+ * @query {string} [slot_type] - 广告位类型筛选（popup/carousel/announcement/feed/top_banner）
  * @query {string} [is_active] - 是否启用筛选（true/false）
  * @query {number} [page=1] - 页码
  * @query {number} [page_size=20] - 每页数量
@@ -149,7 +152,7 @@ router.get(
  * @access Private (Admin)
  * @body {string} slot_key - 广告位唯一标识（如 home_popup）
  * @body {string} slot_name - 广告位名称（如「首页弹窗位」）
- * @body {string} slot_type - 广告位类型（popup/carousel）
+ * @body {string} slot_type - 广告位类型（popup/carousel/announcement/feed/top_banner）
  * @body {string} position - 页面位置（如 home/lottery/profile）
  * @body {number} daily_price_star_stone - 固定包天日价（星石）
  * @body {number} [max_display_count=3] - 该位每次最多展示广告数

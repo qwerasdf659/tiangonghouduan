@@ -452,4 +452,52 @@ describe('RedemptionService - 兑换订单服务', () => {
       expect(rejected.reason.message).toContain('核销码已被使用')
     })
   })
+
+  // ==================== 门店专属兑换券：核销范围固化与校验 ====================
+
+  describe('门店专属兑换券 - 核销范围（scoped_store_id_list）', () => {
+    it('createOrder 显式传入 scoped_store_id_list 应固化到核销单', async () => {
+      const result = await TransactionManager.execute(async transaction => {
+        return await RedemptionService.createOrder(test_item_instance.item_id, {
+          transaction,
+          creator_user_id: test_user.user_id,
+          scoped_store_id_list: [7, 8]
+        })
+      })
+      // 固化的允许门店集合应原样写入核销单（门店专属券业务线核心）
+      expect(result.order.scoped_store_id_list).toEqual([7, 8])
+    })
+
+    it('通用券（不传范围、非 exchange 来源）scoped_store_id_list 应为 NULL', async () => {
+      const result = await TransactionManager.execute(async transaction => {
+        return await RedemptionService.createOrder(test_item_instance.item_id, {
+          transaction,
+          creator_user_id: test_user.user_id
+        })
+      })
+      // test 来源物品无兑换商品血缘 → 通用券，范围为空，任意门店可核
+      expect(result.order.scoped_store_id_list).toBeNull()
+    })
+
+    it('门店专属券在「不在允许集合的门店」核销应被拒绝', async () => {
+      const created = await TransactionManager.execute(async transaction => {
+        return await RedemptionService.createOrder(test_item_instance.item_id, {
+          transaction,
+          creator_user_id: test_user.user_id,
+          scoped_store_id_list: [7]
+        })
+      })
+
+      // 在门店 999（不在 [7] 集合内）核销 → 抛 REDEMPTION_STORE_NOT_ALLOWED
+      await expect(
+        TransactionManager.execute(async transaction => {
+          return await RedemptionService.fulfillOrder(created.code, test_user.user_id, {
+            transaction,
+            store_id: 999,
+            staff_id: 1
+          })
+        })
+      ).rejects.toThrow('此券限指定门店核销')
+    })
+  })
 })

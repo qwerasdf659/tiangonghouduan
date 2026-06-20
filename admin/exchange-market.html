@@ -849,6 +849,51 @@
               <input type="number" x-model.number="itemForm.original_price" min="0" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500" placeholder="留空表示无原价">
             </div>
           </div>
+          <!-- 门店专属兑换券：履约类型 + 核销范围（业务线2） -->
+          <div class="grid grid-cols-2 gap-4 p-3 rounded-lg bg-amber-50 border border-amber-200">
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">履约类型</label>
+              <select x-model="itemForm.fulfillment_type" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
+                <option value="physical">实物邮寄（physical）</option>
+                <option value="virtual">虚拟即时（virtual）</option>
+                <option value="voucher">卡券核销（voucher）</option>
+              </select>
+              <p class="text-xs text-gray-400 mt-1">门店专属券需选「卡券核销 voucher」</p>
+            </div>
+            <div>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">核销范围</label>
+              <select x-model="itemForm.applicable_scope" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
+                <option value="all">通用（任意门店可核）</option>
+                <option value="specified_stores">指定门店</option>
+                <option value="merchant_all">商家全门店</option>
+              </select>
+              <p class="text-xs text-gray-400 mt-1" x-text="itemForm.applicable_scope === 'all' ? '通用券：任意门店核销，不计入本店待核销' : (itemForm.applicable_scope === 'specified_stores' ? '仅勾选门店可核销' : '该商家所有门店可核销')"></p>
+            </div>
+            <!-- 指定门店：多选 -->
+            <div class="col-span-2" x-show="itemForm.applicable_scope === 'specified_stores'" x-cloak>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">选择允许核销的门店（可多选）</label>
+              <div class="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-2 border rounded-lg bg-white">
+                <template x-for="store in storeScopeOptions" :key="store.store_id">
+                  <label class="inline-flex items-center gap-1 px-2 py-1 rounded border cursor-pointer text-sm"
+                    :class="(itemForm.scoped_store_ids || []).includes(store.store_id) ? 'bg-green-100 border-green-400 text-green-800' : 'bg-gray-50 border-gray-200'">
+                    <input type="checkbox" class="hidden" :checked="(itemForm.scoped_store_ids || []).includes(store.store_id)" @change="toggleScopeStore(store.store_id)">
+                    <span x-text="store.store_name + ' (#' + store.store_id + ')'"></span>
+                  </label>
+                </template>
+                <span x-show="storeScopeOptions.length === 0" class="text-xs text-gray-400">暂无可选门店</span>
+              </div>
+            </div>
+            <!-- 商家全门店：单选 -->
+            <div class="col-span-2" x-show="itemForm.applicable_scope === 'merchant_all'" x-cloak>
+              <label class="block text-sm font-medium themed-text-secondary mb-1">选择归属商家</label>
+              <select x-model.number="itemForm.merchant_id" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
+                <option :value="null">请选择商家</option>
+                <template x-for="m in merchantScopeOptions" :key="m.merchant_id">
+                  <option :value="m.merchant_id" x-text="m.merchant_name + ' (#' + m.merchant_id + ')'"></option>
+                </template>
+              </select>
+            </div>
+          </div>
           <div>
             <label class="block text-sm font-medium themed-text-secondary mb-1">营销卖点</label>
             <input type="text" x-model="itemForm.sell_point" maxlength="200" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500" placeholder="一句话卖点，如：开箱必出稀有道具，欧皇必备">

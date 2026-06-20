@@ -79,7 +79,8 @@ document.addEventListener('alpine:init', () => {
       popup: '弹窗',
       carousel: '轮播图',
       announcement: '系统公告',
-      feed: '信息流'
+      feed: '信息流',
+      top_banner: '顶部Banner'
     },
     /** 广告位大类 → 中文 */
     SLOT_CATEGORY_MAP: {
@@ -102,7 +103,10 @@ document.addEventListener('alpine:init', () => {
     POSITION_MAP: {
       home: '首页',
       lottery: '回馈页',
-      profile: '个人中心'
+      profile: '个人中心',
+      diy: 'DIY页',
+      camera: '拍照页',
+      exchange: '商城页'
     },
     /** 竞价落选原因 → 中文 */
     LOSE_REASON_MAP: {
@@ -290,6 +294,8 @@ document.addEventListener('alpine:init', () => {
     adSlots: [],
     slotsLoading: false,
     slotEditMode: false,
+    /** 广告位列表按类型筛选（null=全部，对应后端 slot_type 查询参数） */
+    slotTypeFilter: null,
     slotForm: {
       ad_slot_id: null,
       slot_key: '',
@@ -304,7 +310,22 @@ document.addEventListener('alpine:init', () => {
       min_daily_price_star_stone: 0,
       cpm_price_star_stone: 0,
       zone_id: null,
+      is_carousel: false,
+      slide_interval_ms: 3000,
       description: ''
+    },
+
+    /**
+     * 轮播间隔「秒」视图：运营用秒填写，库存储用毫秒（slide_interval_ms）。
+     * 含实际换算逻辑（秒↔毫秒 ×1000），非纯别名；读取取整到 1 位小数避免浮点误差。
+     * @returns {number} 当前轮播间隔（秒）
+     */
+    get slideIntervalSeconds() {
+      return Math.round((this.slotForm.slide_interval_ms / 1000) * 10) / 10
+    },
+    set slideIntervalSeconds(seconds) {
+      const sec = Number(seconds) || 3
+      this.slotForm.slide_interval_ms = Math.round(sec * 1000)
     },
 
     // ==================== 报表 ====================
@@ -848,7 +869,8 @@ document.addEventListener('alpine:init', () => {
       try {
         const response = await request({
           url: SYSTEM_ENDPOINTS.AD_SLOT_LIST,
-          method: 'GET'
+          method: 'GET',
+          params: this.slotTypeFilter ? { slot_type: this.slotTypeFilter } : {}
         })
         if (response?.success) {
           this.adSlots = response.data?.slots || []
@@ -877,6 +899,8 @@ document.addEventListener('alpine:init', () => {
         min_daily_price_star_stone: 0,
         cpm_price_star_stone: 0,
         zone_id: null,
+        is_carousel: false,
+        slide_interval_ms: 3000,
         description: ''
       }
       this.showModal('slotModal')
@@ -898,6 +922,8 @@ document.addEventListener('alpine:init', () => {
         min_daily_price_star_stone: slot.min_daily_price_star_stone || 0,
         cpm_price_star_stone: slot.cpm_price_star_stone || 0,
         zone_id: slot.zone_id || null,
+        is_carousel: !!slot.is_carousel,
+        slide_interval_ms: slot.slide_interval_ms || 3000,
         description: slot.description || ''
       }
       this.showModal('slotModal')

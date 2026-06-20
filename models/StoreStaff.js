@@ -82,6 +82,18 @@ module.exports = sequelize => {
         comment: '门店内角色：staff=员工，manager=店长'
       },
 
+      /**
+       * 是否被授权查看本店核销概况（门店专属兑换券业务线 §9.8）
+       * - manager 恒可看（不依赖此列）；staff 仅当此列为 true 才可看。
+       * - 由本店 active manager 或平台 admin 通过授权接口开关。
+       */
+      can_view_redemption_stats: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+        comment: '店员是否被授权查看本店核销概况（manager 恒可看不依赖此列）'
+      },
+
       /*
        * =================================================================
        * 状态管理
@@ -356,6 +368,7 @@ module.exports = sequelize => {
       sequence_no: this.sequence_no,
       role_in_store: this.role_in_store,
       role_name: this.getRoleName(),
+      can_view_redemption_stats: !!this.can_view_redemption_stats,
       status: this.status,
       status_name: this.getStatusName(),
       joined_at: this.joined_at ? BeijingTimeHelper.formatForAPI(this.joined_at) : null,

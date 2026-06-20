@@ -270,7 +270,6 @@ class AdCampaignAdminService {
           frequency_rule: data.frequency_rule || 'once_per_day',
           frequency_value: data.frequency_value || 1,
           force_show: data.force_show || false,
-          slide_interval_ms: data.slide_interval_ms || 3000,
           internal_notes: data.internal_notes || null,
           targeting_rules: data.targeting_rules || null,
           start_date: data.start_date || null,

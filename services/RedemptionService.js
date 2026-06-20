@@ -35,7 +35,17 @@
 
 const BusinessError = require('../utils/BusinessError')
 const crypto = require('crypto')
-const { sequelize, RedemptionOrder, Item, Account, User, Store, StoreStaff } = require('../models')
+const {
+  sequelize,
+  RedemptionOrder,
+  Item,
+  Account,
+  User,
+  Store,
+  StoreStaff,
+  ExchangeRecord,
+  ExchangeItem
+} = require('../models')
 const RedemptionCodeGenerator = require('../utils/RedemptionCodeGenerator')
 const OrderNoGenerator = require('../utils/OrderNoGenerator')
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
@@ -71,6 +81,7 @@ class RedemptionService {
    * @param {Object} options - 事务选项
    * @param {Object} options.transaction - Sequelize事务对象（必填）
    * @param {number} [options.creator_user_id] - 创建者用户ID（用于权限兜底校验）
+   * @param {number[]|null} [options.scoped_store_id_list] - 门店专属券允许核销门店集合（specified_stores 时由兑换链固化传入；通用券/merchant_all 传 NULL）
    * @returns {Promise<Object>} {order, code} - 订单对象和明文码
    * @throws {Error} 物品不存在、物品不可用、权限不足、核销码生成失败等
    *
@@ -84,6 +95,13 @@ class RedemptionService {
     // 强制要求事务边界 - 2026-01-05 治理决策
     const transaction = assertAndGetTransaction(options, 'RedemptionService.createOrder')
     const { creator_user_id } = options
+    /*
+     * 门店专属券：允许核销门店集合（specified_stores 时固化；通用券/merchant_all 为 NULL）
+     * 优先用调用方显式传入；未传则在下方按物品的兑换商品来源（exchange_items.applicable_scope）解析固化
+     */
+    let scopedStoreIdList = Array.isArray(options.scoped_store_id_list)
+      ? options.scoped_store_id_list
+      : null
 
     logger.info('开始创建兑换订单', { item_id, creator_user_id })
 
@@ -102,6 +120,20 @@ class RedemptionService {
         `物品实例不可用: status=${item.status}`,
         'REDEMPTION_NOT_ALLOWED',
         400
+      )
+    }
+
+    /*
+     * 1.2 门店专属券范围解析（调用方未显式传入时）：
+     *     物品来自兑换商城（source='exchange'）时，按 source_ref_id→exchange_records→exchange_items
+     *     回溯到兑换商品 SPU，依据其 applicable_scope 固化允许核销门店集合到本核销单。
+     *     - specified_stores：固化 scoped_store_ids
+     *     - all / merchant_all：scoped_store_id_list 保持 NULL（merchant_all 走物品商家一致性校验）
+     */
+    if (scopedStoreIdList === null && item.source === 'exchange' && item.source_ref_id) {
+      scopedStoreIdList = await RedemptionService._resolveScopedStoresFromExchange(
+        item.source_ref_id,
+        transaction
       )
     }
 
@@ -203,7 +235,9 @@ class RedemptionService {
         item_id,
         expires_at: expiresAt,
         status: 'pending',
-        order_no: placeholder_rd
+        order_no: placeholder_rd,
+        // 门店专属券：固化允许核销门店集合（通用券/merchant_all 为 NULL）
+        scoped_store_id_list: scopedStoreIdList
       },
       { transaction }
     )
@@ -367,6 +401,21 @@ class RedemptionService {
           'REDEMPTION_FAILED',
           500
         )
+      }
+    }
+
+    /*
+     * 5.6 门店专属券范围校验：核销门店必须在固化的允许门店集合内（specified_stores）
+     *     通用券/merchant_all 的 scoped_store_id_list 为 NULL，跳过此校验
+     */
+    if (Array.isArray(order.scoped_store_id_list) && order.scoped_store_id_list.length > 0) {
+      if (!fulfilledStoreId || !order.scoped_store_id_list.includes(fulfilledStoreId)) {
+        logger.warn('门店专属券范围校验失败：核销门店不在允许集合内', {
+          fulfilled_store_id: fulfilledStoreId,
+          scoped_store_id_list: order.scoped_store_id_list,
+          order_id: order.redemption_order_id
+        })
+        throw new BusinessError('此券限指定门店核销', 'REDEMPTION_STORE_NOT_ALLOWED', 400)
       }
     }
 
@@ -754,6 +803,19 @@ class RedemptionService {
           'REDEMPTION_FAILED',
           500
         )
+      }
+    }
+
+    // 4.6 门店专属券范围校验：核销门店必须在固化的允许门店集合内（specified_stores）
+    if (Array.isArray(order.scoped_store_id_list) && order.scoped_store_id_list.length > 0) {
+      if (!fulfilledStoreId || !order.scoped_store_id_list.includes(fulfilledStoreId)) {
+        logger.warn('管理员核销 - 门店专属券范围校验失败：核销门店不在允许集合内', {
+          fulfilled_store_id: fulfilledStoreId,
+          scoped_store_id_list: order.scoped_store_id_list,
+          order_id: order.redemption_order_id,
+          admin_user_id
+        })
+        throw new BusinessError('此券限指定门店核销', 'REDEMPTION_STORE_NOT_ALLOWED', 400)
       }
     }
 
@@ -1156,6 +1218,281 @@ class RedemptionService {
     return {
       cancelled_count: cancelledCount,
       failed_orders: failedOrders
+    }
+  }
+
+  /**
+   * 按兑换记录回溯兑换商品 SPU，解析门店专属券允许核销门店集合（固化用）
+   *
+   * 链路：items.source_ref_id（= exchange_records.exchange_record_id）
+   *   → exchange_records.exchange_item_id → exchange_items.applicable_scope / scoped_store_ids
+   *
+   * @param {string} sourceRefId - 物品来源关联ID（兑换来源即 exchange_record_id 的字符串）
+   * @param {Object} transaction - Sequelize 事务对象
+   * @returns {Promise<number[]|null>} specified_stores 时返回门店ID数组；其它（all/merchant_all/无法回溯）返回 null
+   */
+  static async _resolveScopedStoresFromExchange(sourceRefId, transaction) {
+    const recordId = parseInt(sourceRefId, 10)
+    if (!Number.isInteger(recordId)) return null
+
+    const record = await ExchangeRecord.findByPk(recordId, {
+      attributes: ['exchange_record_id', 'exchange_item_id'],
+      transaction
+    })
+    if (!record || !record.exchange_item_id) return null
+
+    const spu = await ExchangeItem.findByPk(record.exchange_item_id, {
+      attributes: ['exchange_item_id', 'applicable_scope', 'scoped_store_ids'],
+      transaction
+    })
+    if (!spu) return null
+
+    // 仅 specified_stores 固化门店集合；all/merchant_all 返回 NULL（merchant_all 走物品商家一致性校验）
+    if (spu.applicable_scope === 'specified_stores' && Array.isArray(spu.scoped_store_ids)) {
+      const ids = spu.scoped_store_ids.map(n => parseInt(n, 10)).filter(Number.isInteger)
+      return ids.length > 0 ? ids : null
+    }
+    return null
+  }
+
+  /**
+   * 本店核销概况（小程序看板，接口1）
+   *
+   * 口径（全部落在 redemption_orders 单表，按登录身份门店隔离、不下发用户 PII）：
+   * - fulfilled_count：status='fulfilled' AND fulfilled_store_id=store_id（本店已核销）
+   * - pending_count：status='pending' AND JSON_CONTAINS(scoped_store_id_list, store_id)（仅门店专属券计入）
+   *
+   * @param {number} storeId - 门店ID
+   * @returns {Promise<{store_id:number, pending_count:number, fulfilled_count:number}>} 本店核销概况数字
+   */
+  static async getStoreRedemptionStats(storeId) {
+    const sid = parseInt(storeId, 10)
+    if (!Number.isInteger(sid)) {
+      throw new BusinessError('store_id 必须是整数', 'REDEMPTION_INVALID_PARAM', 400)
+    }
+
+    const fulfilledCount = await RedemptionOrder.count({
+      where: { status: 'fulfilled', fulfilled_store_id: sid }
+    })
+
+    // 门店专属券「本店待核销」：pending 且 scoped_store_id_list 包含本店（JSON_CONTAINS）
+    const [pendingRows] = await sequelize.query(
+      `SELECT COUNT(*) AS cnt FROM redemption_orders
+       WHERE status = 'pending'
+         AND scoped_store_id_list IS NOT NULL
+         AND JSON_CONTAINS(scoped_store_id_list, CAST(:sid AS JSON))`,
+      { replacements: { sid } }
+    )
+    const pendingCount = Number(pendingRows?.[0]?.cnt || 0)
+
+    return { store_id: sid, pending_count: pendingCount, fulfilled_count: fulfilledCount }
+  }
+
+  /**
+   * 设置店员「查看本店核销概况」授权（接口2）
+   *
+   * 权限：操作人须为该 store_staff.store_id 的 active manager，或平台管理员（role_level>=100）。
+   * 仅能对本店 role_in_store='staff' 的记录授权；manager 恒可看不允许改此标志。
+   *
+   * @param {number} storeStaffId - 目标员工 store_staff 记录ID
+   * @param {boolean} canView - 是否授权查看
+   * @param {Object} options - { transaction, operator_user_id, operator_role_level }
+   * @returns {Promise<{store_staff_id:number, can_view_redemption_stats:boolean}>} 更新后的授权结果
+   */
+  static async setStaffRedemptionStatsPermission(storeStaffId, canView, options = {}) {
+    const transaction = assertAndGetTransaction(
+      options,
+      'RedemptionService.setStaffRedemptionStatsPermission'
+    )
+    const { operator_user_id, operator_role_level = 0 } = options
+
+    const target = await StoreStaff.findByPk(storeStaffId, {
+      lock: transaction.LOCK.UPDATE,
+      transaction
+    })
+    if (!target) {
+      throw new BusinessError('员工记录不存在', 'REDEMPTION_NOT_FOUND', 404)
+    }
+    if (target.role_in_store !== 'staff') {
+      throw new BusinessError(
+        '仅可对店员(staff)授权，店长默认可查看',
+        'REDEMPTION_NOT_ALLOWED',
+        400
+      )
+    }
+
+    // 平台管理员直接放行；否则操作人须为该门店 active manager
+    const isPlatformAdmin = operator_role_level >= 100
+    if (!isPlatformAdmin) {
+      const operatorManager = await StoreStaff.findOne({
+        where: {
+          user_id: operator_user_id,
+          store_id: target.store_id,
+          role_in_store: 'manager',
+          status: 'active'
+        },
+        transaction
+      })
+      if (!operatorManager) {
+        throw new BusinessError(
+          '无权限：仅本店店长或平台管理员可授权',
+          'REDEMPTION_STATS_FORBIDDEN',
+          403
+        )
+      }
+    }
+
+    await target.update({ can_view_redemption_stats: !!canView }, { transaction })
+
+    return {
+      store_staff_id: Number(target.store_staff_id),
+      can_view_redemption_stats: !!target.can_view_redemption_stats
+    }
+  }
+
+  /**
+   * 校验某用户是否可查看指定门店核销概况（接口1鉴权用）
+   *
+   * 口径：manager 恒可看；staff 仅当 can_view_redemption_stats=1；平台管理员放行。
+   *
+   * @param {number} userId - 登录用户ID
+   * @param {number} storeId - 门店ID
+   * @param {number} [roleLevel=0] - 登录用户平台角色等级（>=100 视为平台管理员）
+   * @returns {Promise<boolean>} 是否有权查看
+   */
+  static async canUserViewStoreStats(userId, storeId, roleLevel = 0) {
+    if (roleLevel >= 100) return true
+    const staff = await StoreStaff.findOne({
+      where: { user_id: userId, store_id: storeId, status: 'active' }
+    })
+    if (!staff) return false
+    if (staff.role_in_store === 'manager') return true
+    return !!staff.can_view_redemption_stats
+  }
+
+  /**
+   * 运营级门店核销看板（接口4，console）
+   *
+   * @param {Object} filters - { store_id?, applicable_scope?, start_date?, end_date? }
+   * @returns {Promise<Object>} { summary, by_store[], general_voucher }
+   */
+  static async getStoreRedemptionOverview(filters = {}) {
+    const { Op } = require('sequelize')
+    const expiringDays = Number(process.env.REDEMPTION_EXPIRING_SOON_DAYS) || 3
+
+    // 时间范围过滤（按 created_at，北京时间由 DB 存储 UTC、查询用 Date 比较）
+    const timeWhere = {}
+    if (filters.start_date) timeWhere[Op.gte] = new Date(filters.start_date)
+    if (filters.end_date) timeWhere[Op.lte] = new Date(filters.end_date)
+    const hasTime = Object.getOwnPropertySymbols(timeWhere).length > 0
+
+    // 已核销：按 fulfilled_store_id 分组
+    const fulfilledWhere = { status: 'fulfilled', fulfilled_store_id: { [Op.ne]: null } }
+    if (hasTime) fulfilledWhere.created_at = timeWhere
+    if (filters.store_id) fulfilledWhere.fulfilled_store_id = parseInt(filters.store_id, 10)
+
+    const fulfilledRows = await RedemptionOrder.findAll({
+      attributes: [
+        'fulfilled_store_id',
+        [sequelize.fn('COUNT', sequelize.col('redemption_order_id')), 'cnt']
+      ],
+      where: fulfilledWhere,
+      group: ['fulfilled_store_id'],
+      raw: true
+    })
+
+    // 门店专属券待核销：pending 且 scoped_store_id_list 非空，按门店展开统计
+    const pendingRows = await RedemptionOrder.findAll({
+      attributes: ['scoped_store_id_list'],
+      where: { status: 'pending', scoped_store_id_list: { [Op.ne]: null } },
+      raw: true
+    })
+
+    // 门店名映射
+    const stores = await Store.findAll({ attributes: ['store_id', 'store_name'], raw: true })
+    const storeNameMap = new Map(stores.map(s => [s.store_id, s.store_name]))
+
+    // 聚合 by_store
+    const byStoreMap = new Map()
+    const ensure = sid => {
+      if (!byStoreMap.has(sid)) {
+        byStoreMap.set(sid, {
+          store_id: sid,
+          store_name: storeNameMap.get(sid) || null,
+          pending_count: 0,
+          fulfilled_count: 0,
+          fulfill_rate: 0
+        })
+      }
+      return byStoreMap.get(sid)
+    }
+    fulfilledRows.forEach(r => {
+      ensure(r.fulfilled_store_id).fulfilled_count = Number(r.cnt)
+    })
+    pendingRows.forEach(r => {
+      const list = Array.isArray(r.scoped_store_id_list) ? r.scoped_store_id_list : []
+      list.forEach(sid => {
+        const id = parseInt(sid, 10)
+        if (!filters.store_id || id === parseInt(filters.store_id, 10)) {
+          ensure(id).pending_count += 1
+        }
+      })
+    })
+
+    const byStore = [...byStoreMap.values()].map(row => {
+      const total = row.pending_count + row.fulfilled_count
+      row.fulfill_rate = total > 0 ? Math.round((row.fulfilled_count / total) * 10000) / 100 : 0
+      return row
+    })
+
+    // 汇总卡 + 临期未核销（pending 门店专属券且 expires_at 在 expiringDays 天内）
+    const summaryPending = byStore.reduce((s, r) => s + r.pending_count, 0)
+    const summaryFulfilled = byStore.reduce((s, r) => s + r.fulfilled_count, 0)
+    const summaryTotal = summaryPending + summaryFulfilled
+    const expiringSoonCount = await RedemptionOrder.count({
+      where: {
+        status: 'pending',
+        scoped_store_id_list: { [Op.ne]: null },
+        expires_at: {
+          [Op.gte]: new Date(),
+          [Op.lte]: new Date(Date.now() + expiringDays * 24 * 60 * 60 * 1000)
+        }
+      }
+    })
+
+    // 通用券（scoped_store_id_list IS NULL）已核销按落地门店分布
+    const generalRows = await RedemptionOrder.findAll({
+      attributes: [
+        'fulfilled_store_id',
+        [sequelize.fn('COUNT', sequelize.col('redemption_order_id')), 'cnt']
+      ],
+      where: {
+        status: 'fulfilled',
+        scoped_store_id_list: { [Op.is]: null },
+        fulfilled_store_id: { [Op.ne]: null }
+      },
+      group: ['fulfilled_store_id'],
+      raw: true
+    })
+    const generalFulfilled = generalRows.reduce((s, r) => s + Number(r.cnt), 0)
+
+    return {
+      summary: {
+        pending_count: summaryPending,
+        fulfilled_count: summaryFulfilled,
+        fulfill_rate:
+          summaryTotal > 0 ? Math.round((summaryFulfilled / summaryTotal) * 10000) / 100 : 0,
+        expiring_soon_count: expiringSoonCount
+      },
+      by_store: byStore,
+      general_voucher: {
+        fulfilled_count: generalFulfilled,
+        by_store_distribution: generalRows.map(r => ({
+          store_id: r.fulfilled_store_id,
+          store_name: storeNameMap.get(r.fulfilled_store_id) || null,
+          fulfilled_count: Number(r.cnt)
+        }))
+      }
     }
   }
 

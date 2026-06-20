@@ -29,11 +29,13 @@ const ordersRoutes = require('./orders')
 const fulfillRoutes = require('./fulfill')
 const scanRoutes = require('./scan')
 const queryRoutes = require('./query')
+const storeStatsRoutes = require('./store-stats')
 
 // 挂载子路由
 router.use('/', ordersRoutes) // POST /orders, POST /orders/:order_id/cancel
 router.use('/', fulfillRoutes) // POST /fulfill（文本码核销，备用）
 router.use('/', scanRoutes) // POST /scan（QR码扫码核销，主流程）
 router.use('/', queryRoutes) // GET /orders/:order_id, GET /items/:item_id/order
+router.use('/', storeStatsRoutes) // GET /store-stats（本店核销概况）, PUT /staff/:id/stats-permission（店员授权）
 
 module.exports = router

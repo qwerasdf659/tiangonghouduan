@@ -110,16 +110,37 @@ function registerStoreManagementComponents() {
         }
       },
       {
+        key: 'can_view_redemption_stats',
+        label: '核销概况查看',
+        render: (val, row) => {
+          // 店长天然有权，不显示开关；店员显示已授权/未授权
+          if (row.role_in_store === 'manager') {
+            return '<span class="text-xs text-gray-400">店长默认可看</span>'
+          }
+          return val
+            ? '<span class="px-2 py-0.5 rounded text-xs bg-green-100 text-green-700">已授权</span>'
+            : '<span class="px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-500">未授权</span>'
+        }
+      },
+      {
         key: '_actions',
         label: '操作',
         type: 'actions',
-        width: '140px',
+        width: '200px',
         actions: [
           {
             name: 'edit',
             label: '✏️ 编辑',
             class: 'text-blue-600 hover:text-blue-800',
             condition: row => row.status === 'active' || row.status === 'pending'
+          },
+          {
+            name: 'toggle_redemption_stats',
+            // 门店专属券业务线 §9.8：店长授权本店店员查看核销概况
+            label: row =>
+              row.can_view_redemption_stats ? '🔒 取消核销查看' : '🔓 授权核销查看',
+            class: 'text-purple-600 hover:text-purple-800',
+            condition: row => row.role_in_store === 'staff' && row.status === 'active'
           },
           {
             name: 'resign',
@@ -177,8 +198,42 @@ function registerStoreManagementComponents() {
         case 'delete':
           this.permanentDeleteStaff(row)
           break
+        case 'toggle_redemption_stats':
+          this.toggleRedemptionStatsPermission(row)
+          break
         default:
           logger.warn('[StoreManagement] 未知操作:', action)
+      }
+    },
+
+    /**
+     * 授权/取消店员查看本店核销概况（门店专属兑换券业务线 §9.8）
+     * 调用后端共用接口 PUT /shop/redemption/staff/:store_staff_id/stats-permission，
+     * 操作人须为本店 active 店长或平台管理员（后端校验）。
+     * @param {Object} row - 员工行（store_staff 记录）
+     */
+    async toggleRedemptionStatsPermission(row) {
+      const next = !row.can_view_redemption_stats
+      const actionText = next ? '授权查看' : '取消查看'
+      if (!confirm(`确认对店员「${row.user_nickname || row.user_mobile}」${actionText}本店核销概况？`)) {
+        return
+      }
+      try {
+        const { API_PREFIX } = await import('../../../api/base.js')
+        const url = `${API_PREFIX}/shop/redemption/staff/${row.store_staff_id}/stats-permission`
+        const response = await this.apiCall(url, {
+          method: 'PUT',
+          data: { can_view_redemption_stats: next }
+        })
+        if (response?.success) {
+          this.showSuccess?.(`已${actionText}`)
+          window.dispatchEvent(new CustomEvent('dt-staff-refresh'))
+        } else {
+          this.showError?.(response?.message || '操作失败')
+        }
+      } catch (e) {
+        logger.error('[StoreManagement] 核销概况授权失败:', e)
+        this.showError?.('操作失败')
       }
     },
 

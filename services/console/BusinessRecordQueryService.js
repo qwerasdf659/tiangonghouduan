@@ -162,12 +162,22 @@ class BusinessRecordQueryService {
    */
   static async getRedemptionOrders(options = {}) {
     const { keyword, status, redeemer_user_id, mobile, merchant_id, start_date, end_date } = options
+    // 门店专属券业务线新增筛选：store_id（核销落地门店）、scope_type（券范围类型）
+    const { store_id, scope_type } = options
     const pagination = buildPaginationOptions(options)
 
     // 构建查询条件
     const where = {}
     if (status) where.status = status
     if (redeemer_user_id) where.redeemer_user_id = parseInt(redeemer_user_id)
+    // 按核销落地门店过滤（运营门店核销明细）
+    if (store_id) where.fulfilled_store_id = parseInt(store_id)
+    // 按券范围类型过滤：specified=门店专属券(scoped_store_id_list 非空) / general=通用券(为空)
+    if (scope_type === 'specified') {
+      where.scoped_store_id_list = { [Op.ne]: null }
+    } else if (scope_type === 'general') {
+      where.scoped_store_id_list = { [Op.is]: null }
+    }
     if (start_date || end_date) {
       where.created_at = {}
       if (start_date) where.created_at[Op.gte] = new Date(start_date)
@@ -328,11 +338,18 @@ class BusinessRecordQueryService {
    * @returns {Promise<Array>} 订单数组
    */
   static async exportRedemptionOrders(options = {}) {
-    const { status, start_date, end_date, limit = 10000 } = options
+    const { status, store_id, scope_type, start_date, end_date, limit = 10000 } = options
 
     // 构建查询条件
     const where = {}
     if (status) where.status = status
+    // 门店专属券业务线：按核销落地门店 / 券范围类型过滤（与列表 getRedemptionOrders 同口径）
+    if (store_id) where.fulfilled_store_id = parseInt(store_id)
+    if (scope_type === 'specified') {
+      where.scoped_store_id_list = { [Op.ne]: null }
+    } else if (scope_type === 'general') {
+      where.scoped_store_id_list = { [Op.is]: null }
+    }
     if (start_date || end_date) {
       where.created_at = {}
       if (start_date) where.created_at[Op.gte] = new Date(start_date)

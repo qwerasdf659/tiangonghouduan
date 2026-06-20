@@ -298,6 +298,13 @@ class CoreService {
     const mintInstance = product.mint_instance
     const itemTemplateId = product.item_template_id
     const productSkuRecord = productSku
+    /*
+     * 门店专属兑换券（业务线2）：核销范围配置。merchant_all（M1）铸造时透传 merchant_id，
+     * 使 items.merchant_id 有值，核销时复用「物品商家 vs 门店商家」一致性校验。
+     */
+    const applicableScope = product.applicable_scope || 'all'
+    const voucherMerchantId =
+      applicableScope === 'merchant_all' ? product.merchant_id || null : null
 
     /*
      * 履约类型分流（P1 拍板②：显式 fulfillment_type 取代靠模板推断）
@@ -627,6 +634,8 @@ class CoreService {
               business_type: 'exchange_mint',
               idempotency_key: `exchange_mint_${idempotency_key}`,
               item_template_id: template.item_template_id,
+              // merchant_all（M1）：门店专属券铸造时归属商家，供核销门店一致性校验
+              merchant_id: voucherMerchantId,
               instance_attributes: instanceAttributes,
               serial_number: serialNumber,
               edition_total: editionTotal

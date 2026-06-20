@@ -120,6 +120,7 @@ const CANONICAL_OPERATION_MAP = {
   '/api/v4/shop/redemption/fulfill': 'REDEMPTION_FULFILL', // 文本码核销（canonical 路径）
   '/api/v4/shop/redemption/scan': 'REDEMPTION_QR_SCAN_FULFILL', // QR码扫码核销（Phase 1 新增）
   '/api/v4/shop/redemption/orders/:id/cancel': 'REDEMPTION_CANCEL_ORDER', // 取消核销订单
+  '/api/v4/shop/redemption/staff/:id/stats-permission': 'REDEMPTION_SET_STAFF_STATS_PERMISSION', // 店长授权店员查看本店核销概况（门店专属券业务线 §9.8）
 
   // ===== 消费记录 =====
   '/api/v4/shop/consumption/submit': 'CONSUMPTION_SUBMIT', // 提交消费记录（canonical 路径）

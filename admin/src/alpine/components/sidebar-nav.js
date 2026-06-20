@@ -79,6 +79,11 @@ export function sidebarNav() {
             badgeKey: 'redemptionPendingCount'
           },
           {
+            id: 'redemption-dashboard',
+            name: '门店核销概况',
+            url: '/admin/redemption-dashboard.html'
+          },
+          {
             id: 'customer-service',
             name: '客服工作台',
             url: '/admin/customer-service.html',

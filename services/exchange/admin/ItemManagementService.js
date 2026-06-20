@@ -39,6 +39,58 @@ class ItemManagementService {
   }
 
   /**
+   * 归一化「核销范围」配置（门店专属兑换券业务线）
+   *
+   * 业务规则（以后端为权威，前端零映射直传后端字段）：
+   * - all（默认/通用券）：scoped_store_ids=NULL，merchant_id=NULL，任意门店可核
+   * - specified_stores：必须给 scoped_store_ids（门店ID数组，去重取整），merchant_id=NULL
+   * - merchant_all（方案 M1）：必须给 merchant_id（商品归属商家），scoped_store_ids=NULL
+   *
+   * @param {Object} data - 含 applicable_scope / scoped_store_ids / merchant_id 的入参
+   * @returns {Object} 归一化后的 { applicable_scope, scoped_store_ids, merchant_id }
+   * @throws {BusinessError} 范围类型非法、或必填项缺失（避免建出"范围为空"的废券）
+   */
+  static _normalizeApplicableScope(data = {}) {
+    const scope = data.applicable_scope || 'all'
+    const validScopes = ['all', 'specified_stores', 'merchant_all']
+    if (!validScopes.includes(scope)) {
+      throw new BusinessError(
+        `无效的 applicable_scope，允许值：${validScopes.join(', ')}`,
+        'EXCHANGE_INVALID_PARAM',
+        400
+      )
+    }
+
+    if (scope === 'specified_stores') {
+      const raw = Array.isArray(data.scoped_store_ids) ? data.scoped_store_ids : []
+      const ids = [...new Set(raw.map(n => parseInt(n, 10)).filter(Number.isInteger))]
+      if (ids.length === 0) {
+        throw new BusinessError(
+          '核销范围为「指定门店」时，必须至少选择一个门店',
+          'EXCHANGE_REQUIRED',
+          400
+        )
+      }
+      return { applicable_scope: scope, scoped_store_ids: ids, merchant_id: null }
+    }
+
+    if (scope === 'merchant_all') {
+      const mid = parseInt(data.merchant_id, 10)
+      if (!Number.isInteger(mid)) {
+        throw new BusinessError(
+          '核销范围为「商家全门店」时，必须指定归属商家 merchant_id',
+          'EXCHANGE_REQUIRED',
+          400
+        )
+      }
+      return { applicable_scope: scope, scoped_store_ids: null, merchant_id: mid }
+    }
+
+    // all：通用券，清空范围约束
+    return { applicable_scope: 'all', scoped_store_ids: null, merchant_id: null }
+  }
+
+  /**
    * 记录库存变动日志（复用 admin_operation_logs 表）
    *
    * @param {Object} params - 日志参数
@@ -182,6 +234,9 @@ class ItemManagementService {
 
     const categoryDefId = itemData.category_id ? parseInt(itemData.category_id) : null
 
+    // 门店专属兑换券业务线：核销范围配置归一化（applicable_scope/scoped_store_ids/merchant_id）
+    const scopeFields = ItemManagementService._normalizeApplicableScope(itemData)
+
     const item = await this.ExchangeItem.create(
       {
         item_name: name.trim(),
@@ -197,6 +252,9 @@ class ItemManagementService {
         is_limited: !!itemData.is_limited,
         sell_point: itemData.sell_point || null,
         usage_rules: itemData.usage_rules || null,
+        applicable_scope: scopeFields.applicable_scope,
+        scoped_store_ids: scopeFields.scoped_store_ids,
+        merchant_id: scopeFields.merchant_id,
         created_at: BeijingTimeHelper.createDatabaseTime(),
         updated_at: BeijingTimeHelper.createDatabaseTime()
       },
@@ -401,6 +459,17 @@ class ItemManagementService {
     if (updateData.sell_point !== undefined) finalUpdateData.sell_point = updateData.sell_point || null
     if (updateData.category_id !== undefined) finalUpdateData.category_id = updateData.category_id ? parseInt(updateData.category_id) : null
     if (updateData.usage_rules !== undefined) finalUpdateData.usage_rules = updateData.usage_rules || null
+
+    /*
+     * 门店专属兑换券业务线：核销范围配置更新（applicable_scope/scoped_store_ids/merchant_id）
+     * 仅当传入 applicable_scope 时整体重算三字段，避免半更新导致范围与类型不一致
+     */
+    if (updateData.applicable_scope !== undefined) {
+      const scopeFields = ItemManagementService._normalizeApplicableScope(updateData)
+      finalUpdateData.applicable_scope = scopeFields.applicable_scope
+      finalUpdateData.scoped_store_ids = scopeFields.scoped_store_ids
+      finalUpdateData.merchant_id = scopeFields.merchant_id
+    }
 
     let deleted_old_image = false
     let bound_new_image = false

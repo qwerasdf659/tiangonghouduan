@@ -13,7 +13,9 @@
  * - priority 分段强制校验（D6 定论：commercial 1-99, operational 100-899, system 900-999）
  * - 频次控制（frequency_rule）从 PopupBanner 合并而来
  * - 内部备注（internal_notes）从 SystemAnnouncement 合并而来
- * - 轮播间隔（slide_interval_ms）从 CarouselItem 合并而来
+ *
+ * 注：轮播间隔（slide_interval_ms）已于 2026-06-21 迁移到槽位级 ad_slots.slide_interval_ms
+ *     （轮播节奏属于"图片位"展示形态，非单条投放属性），本表不再保留该字段。
  *
  * 数据库表名：ad_campaigns
  * 主键：ad_campaign_id（INT，自增）
@@ -301,16 +303,6 @@ module.exports = sequelize => {
          * 避免"字典 + 常量"双枚举技术债。
          */
         comment: '公告类型(仅announcement槽位用，值对齐字典announcement_type；NULL=非公告)'
-      },
-
-      slide_interval_ms: {
-        type: DataTypes.INTEGER,
-        allowNull: true,
-        defaultValue: 3000,
-        validate: {
-          min: { args: [500], msg: '轮播间隔不能小于500毫秒' }
-        },
-        comment: '轮播间隔毫秒（仅 slot_type=carousel 时使用，原 CarouselItem 属性）'
       },
 
       created_at: {

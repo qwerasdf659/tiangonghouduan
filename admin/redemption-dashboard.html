@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <%- include('partials/head', {
+    title: '门店核销概况',
+    pageStyle: '[x-cloak] { display: none !important; }'
+  }) %>
+  <!-- ECharts 已通过 main.js 统一导入，无需 CDN -->
+</head>
+<body class="themed-bg-subtle min-h-screen">
+
+  <!-- 导航栏 -->
+  <nav class="themed-bg-primary text-white shadow-lg">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-4">
+        <a href="/admin/workspace.html" class="hover:text-blue-200">← 返回工作台</a>
+        <span class="text-lg font-semibold">🎫 门店核销概况</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 页面主体 -->
+  <div class="container mx-auto px-4 py-6" x-data="redemptionDashboardPage()" x-init="init()">
+
+    <!-- 时间筛选 -->
+    <div class="themed-card rounded-lg shadow p-4 mb-6">
+      <div class="flex flex-wrap items-center gap-3">
+        <span class="themed-text-muted">时间范围：</span>
+        <button @click="setRange('today')" class="px-4 py-2 rounded themed-bg-subtle">今日</button>
+        <button @click="setRange('7d')" class="px-4 py-2 rounded themed-bg-subtle">近7天</button>
+        <button @click="setRange('30d')" class="px-4 py-2 rounded themed-bg-subtle">近30天</button>
+        <button @click="setRange('all')" class="px-4 py-2 rounded themed-bg-subtle">全部</button>
+        <input type="date" x-model="filters.start_date" class="px-3 py-2 border rounded">
+        <span>至</span>
+        <input type="date" x-model="filters.end_date" class="px-3 py-2 border rounded">
+        <button @click="loadOverview()" class="px-4 py-2 themed-btn-primary rounded">查询</button>
+      </div>
+    </div>
+
+    <!-- 汇总卡片 -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+      <div class="themed-card rounded-lg shadow p-6 text-center">
+        <h6 class="themed-text-muted mb-2">总待核销（门店专属券）</h6>
+        <h2 class="text-3xl font-bold text-amber-600" x-text="summary.pending_count"></h2>
+      </div>
+      <div class="themed-card rounded-lg shadow p-6 text-center">
+        <h6 class="themed-text-muted mb-2">总已核销</h6>
+        <h2 class="text-3xl font-bold text-green-600" x-text="summary.fulfilled_count"></h2>
+      </div>
+      <div class="themed-card rounded-lg shadow p-6 text-center">
+        <h6 class="themed-text-muted mb-2">整体核销率</h6>
+        <h2 class="text-3xl font-bold themed-text-primary" x-text="summary.fulfill_rate + '%'"></h2>
+      </div>
+      <div class="themed-card rounded-lg shadow p-6 text-center">
+        <h6 class="themed-text-muted mb-2">临期未核销（近3天）</h6>
+        <h2 class="text-3xl font-bold text-red-600" x-text="summary.expiring_soon_count"></h2>
+      </div>
+    </div>
+
+    <!-- 门店维度柱状图 -->
+    <div class="themed-card rounded-lg shadow p-6 mb-6">
+      <h5 class="font-semibold mb-4">各门店核销分布</h5>
+      <div x-ref="byStoreChart" class="h-80"></div>
+    </div>
+
+    <!-- 门店维度表格（可下钻明细） -->
+    <div class="themed-card rounded-lg shadow p-6 mb-6">
+      <h5 class="font-semibold mb-4">门店核销明细汇总</h5>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="themed-bg-base">
+            <tr>
+              <th class="px-3 py-2 text-left">门店</th>
+              <th class="px-3 py-2 text-left">待核销</th>
+              <th class="px-3 py-2 text-left">已核销</th>
+              <th class="px-3 py-2 text-left">核销率</th>
+              <th class="px-3 py-2 text-left">操作</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y">
+            <template x-for="row in byStore" :key="row.store_id">
+              <tr>
+                <td class="px-3 py-2" x-text="(row.store_name || '') + ' (#' + row.store_id + ')'"></td>
+                <td class="px-3 py-2 text-amber-600" x-text="row.pending_count"></td>
+                <td class="px-3 py-2 text-green-600" x-text="row.fulfilled_count"></td>
+                <td class="px-3 py-2" x-text="row.fulfill_rate + '%'"></td>
+                <td class="px-3 py-2">
+                  <button @click="openDetail(row.store_id)" class="text-blue-600 hover:underline text-xs">查看明细</button>
+                </td>
+              </tr>
+            </template>
+            <tr x-show="byStore.length === 0">
+              <td colspan="5" class="px-3 py-6 text-center text-gray-400">暂无门店核销数据</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="mt-4 text-sm themed-text-muted">
+        通用券已核销总数：<span class="font-semibold text-gray-700" x-text="generalVoucher.fulfilled_count"></span>
+        （通用券不计入"本店待核销"，仅统计已核销落地门店）
+      </div>
+    </div>
+
+    <!-- 明细抽屉 -->
+    <div x-show="showDetail" x-cloak class="fixed inset-0 bg-black/40 flex justify-end z-50" @click.self="showDetail = false">
+      <div class="bg-white w-full max-w-3xl h-full overflow-y-auto p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h5 class="font-semibold">核销明细 <span class="text-sm text-gray-400" x-text="detailStoreId ? '(门店 #' + detailStoreId + ')' : ''"></span></h5>
+          <button @click="showDetail = false" class="text-gray-400 hover:text-red-500 text-xl">&times;</button>
+        </div>
+        <div class="flex items-center gap-3 mb-4">
+          <select x-model="detailScopeType" @change="detailGoPage(1)" class="px-3 py-2 border rounded text-sm">
+            <option value="">全部券类型</option>
+            <option value="specified">门店专属券</option>
+            <option value="general">通用券</option>
+          </select>
+          <button @click="exportDetail('xlsx')" class="px-3 py-2 bg-green-500 text-white rounded text-sm hover:bg-green-600">导出 Excel</button>
+          <button @click="exportDetail('csv')" class="px-3 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700">导出 CSV</button>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="themed-bg-base">
+              <tr>
+                <th class="px-3 py-2 text-left">核销单号</th>
+                <th class="px-3 py-2 text-left">状态</th>
+                <th class="px-3 py-2 text-left">商品</th>
+                <th class="px-3 py-2 text-left">核销门店</th>
+                <th class="px-3 py-2 text-left">核销时间</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y">
+              <template x-for="o in detailRows" :key="o.redemption_order_id">
+                <tr>
+                  <td class="px-3 py-2" x-text="o.order_no || o.redemption_order_id"></td>
+                  <td class="px-3 py-2" x-text="statusLabel(o.status)"></td>
+                  <td class="px-3 py-2" x-text="o.item ? o.item.item_name : '-'"></td>
+                  <td class="px-3 py-2" x-text="o.fulfilled_store_id || '-'"></td>
+                  <td class="px-3 py-2" x-text="o.fulfilled_at || '-'"></td>
+                </tr>
+              </template>
+              <tr x-show="detailRows.length === 0">
+                <td colspan="5" class="px-3 py-6 text-center text-gray-400">暂无核销明细</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="flex items-center justify-between mt-4 text-sm">
+          <span class="themed-text-muted">共 <span x-text="detailPagination.total"></span> 条</span>
+          <div class="flex items-center gap-2">
+            <button @click="detailGoPage(detailPagination.page - 1)" :disabled="detailPagination.page <= 1" class="px-3 py-1 border rounded disabled:opacity-30">上一页</button>
+            <span x-text="detailPagination.page + ' / ' + detailTotalPages"></span>
+            <button @click="detailGoPage(detailPagination.page + 1)" :disabled="detailPagination.page >= detailTotalPages" class="px-3 py-1 border rounded disabled:opacity-30">下一页</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 页面专属逻辑 -->
+  <%- include('partials/footer') %>
+
+  <script type="module" src="./src/modules/analytics/pages/redemption-dashboard.js"></script>
+</body>
+</html>

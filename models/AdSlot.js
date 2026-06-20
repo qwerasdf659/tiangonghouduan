@@ -20,10 +20,15 @@ const { DataTypes } = require('sequelize')
 const BeijingTimeHelper = require('../utils/timeHelper')
 
 /**
- * 广告位类型有效值（含 announcement — 系统公告展示位）
+ * 广告位类型有效值（单一真相源 SSOT）
+ * - popup：弹窗
+ * - carousel：轮播图
+ * - announcement：系统公告展示位
+ * - feed：信息流广告位
+ * - top_banner：页面头部沉浸式 Banner（运营可配，2026-06-21 新增）
  * @constant {string[]}
  */
-const VALID_SLOT_TYPES = ['popup', 'carousel', 'announcement', 'feed']
+const VALID_SLOT_TYPES = ['popup', 'carousel', 'announcement', 'feed', 'top_banner']
 
 /**
  * 定义 AdSlot 模型
@@ -69,10 +74,11 @@ module.exports = sequelize => {
           notEmpty: { msg: '广告位类型不能为空' },
           isIn: {
             args: [VALID_SLOT_TYPES],
-            msg: '广告位类型必须是：popup, carousel, announcement, feed 之一'
+            msg: '广告位类型必须是：popup, carousel, announcement, feed, top_banner 之一'
           }
         },
-        comment: '广告位类型：popup=弹窗 / carousel=轮播图 / announcement=系统公告'
+        comment:
+          '广告位类型：popup=弹窗 / carousel=轮播图 / announcement=系统公告 / feed=信息流 / top_banner=页面头部Banner'
       },
 
       position: {
@@ -167,6 +173,26 @@ module.exports = sequelize => {
         allowNull: false,
         defaultValue: true,
         comment: '是否启用'
+      },
+
+      /** 是否轮播：0=单张（取 priority 最高 1 条），1=多张轮播。轮播节奏归槽位级，符合大厂"节奏属于位"做法 */
+      is_carousel: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+        comment: '是否轮播：0=单张(取priority最高1条)，1=多张轮播'
+      },
+
+      /** 轮播间隔毫秒（仅 is_carousel=1 生效）。运营推荐区间 2000-8000，硬边界 500-15000 */
+      slide_interval_ms: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 3000,
+        validate: {
+          min: { args: [500], msg: '轮播间隔不能小于500毫秒' },
+          max: { args: [15000], msg: '轮播间隔不能大于15000毫秒' }
+        },
+        comment: '轮播间隔毫秒（仅 is_carousel=1 生效，运营可配 2000-8000，硬边界 500-15000）'
       },
 
       description: {

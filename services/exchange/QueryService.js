@@ -131,7 +131,10 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
     'max_cost_amount',
     'min_cost_asset_code',
     'max_quantity_per_order',
-    'fulfillment_type'
+    'fulfillment_type',
+    'applicable_scope',
+    'scoped_store_ids',
+    'merchant_id'
   ],
 
   /**
@@ -175,7 +178,10 @@ const EXCHANGE_MARKET_ATTRIBUTES = {
     'max_cost_amount',
     'min_cost_asset_code',
     'max_quantity_per_order',
-    'fulfillment_type'
+    'fulfillment_type',
+    'applicable_scope',
+    'scoped_store_ids',
+    'merchant_id'
   ],
 
   /**

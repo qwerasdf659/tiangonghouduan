@@ -58,6 +58,14 @@ class ExchangeItem extends Model {
       })
     }
 
+    // merchant_all（方案 M1）：商品归属商家，核销时复用「物品商家 vs 门店商家」一致性校验
+    if (models.Merchant) {
+      ExchangeItem.belongsTo(models.Merchant, {
+        foreignKey: 'merchant_id',
+        as: 'merchant'
+      })
+    }
+
     if (models.ExchangeItemSku) {
       ExchangeItem.hasMany(models.ExchangeItemSku, {
         foreignKey: 'exchange_item_id',
@@ -178,6 +186,28 @@ module.exports = sequelize => {
         defaultValue: 'physical',
         comment:
           '履约类型：physical=实物邮寄(需收货地址+走发货链)/virtual=虚拟即时(建单即完成)/voucher=卡券核销。下单据此判定履约链，替代靠模板 item_type 推断'
+      },
+      applicable_scope: {
+        // 门店专属兑换券业务线：核销范围总开关（默认 all=通用券，存量零影响）
+        type: DataTypes.ENUM('all', 'specified_stores', 'merchant_all'),
+        allowNull: false,
+        defaultValue: 'all',
+        comment:
+          '核销范围：all=通用任意门店核销 / specified_stores=限指定门店核销 / merchant_all=限商家全门店核销'
+      },
+      scoped_store_ids: {
+        // specified_stores 时允许核销的门店ID集合（如 [7,8,9]）；其它类型为 NULL
+        type: DataTypes.JSON,
+        allowNull: true,
+        comment: 'specified_stores 时允许核销的门店ID集合（如 [7,8,9]）；其它类型为 NULL'
+      },
+      merchant_id: {
+        // merchant_all（方案 M1）时商品归属商家，铸造时透传至 items.merchant_id 供核销一致性校验
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: { model: 'merchants', key: 'merchant_id' },
+        comment:
+          'merchant_all 时商品归属商家（运营建券选），关联 merchants.merchant_id；其它类型可为 NULL'
       },
       rarity_code: {
         type: DataTypes.STRING(50),

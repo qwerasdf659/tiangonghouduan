@@ -198,7 +198,6 @@ router.post(
  * @body {string} [frequency_rule='once_per_day'] - 频次规则
  * @body {number} [frequency_value=1] - 频次参数值
  * @body {boolean} [force_show=false] - 是否强制弹出
- * @body {number} [slide_interval_ms=3000] - 轮播间隔毫秒
  * @body {string} [start_date] - 开始日期（YYYY-MM-DD）
  * @body {string} [end_date] - 结束日期（YYYY-MM-DD）
  * @body {string} [internal_notes] - 内部运营备注
@@ -222,7 +221,6 @@ router.post(
       frequency_rule: req.body.frequency_rule || 'once_per_day',
       frequency_value: req.body.frequency_value ? parseInt(req.body.frequency_value) : 1,
       force_show: req.body.force_show === true || req.body.force_show === 'true',
-      slide_interval_ms: req.body.slide_interval_ms ? parseInt(req.body.slide_interval_ms) : 3000,
       start_date: req.body.start_date || null,
       end_date: req.body.end_date || null,
       internal_notes: req.body.internal_notes || null,

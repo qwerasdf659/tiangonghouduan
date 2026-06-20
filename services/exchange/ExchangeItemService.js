@@ -736,13 +736,72 @@ class ExchangeItemService {
       'is_limited',
       'is_recommended',
       'attributes_json',
-      'max_quantity_per_order'
+      'max_quantity_per_order',
+      // 门店专属兑换券业务线：核销范围配置（前端零映射直传后端字段）
+      'applicable_scope',
+      'scoped_store_ids',
+      'merchant_id'
     ]
     const out = {}
     for (const k of keys) {
       if (data[k] !== undefined) out[k] = data[k]
     }
+    // 核销范围归一化：仅当传入 applicable_scope 时整体重算三字段，保证范围类型与门店/商家一致
+    if (out.applicable_scope !== undefined) {
+      const scope = ExchangeItemService._normalizeApplicableScope(out)
+      out.applicable_scope = scope.applicable_scope
+      out.scoped_store_ids = scope.scoped_store_ids
+      out.merchant_id = scope.merchant_id
+    }
     return out
+  }
+
+  /**
+   * 归一化「核销范围」配置（门店专属兑换券业务线，后端权威）
+   *
+   * - all（默认/通用券）：scoped_store_ids=NULL，merchant_id=NULL
+   * - specified_stores：必须给 scoped_store_ids（门店ID数组去重取整），merchant_id=NULL
+   * - merchant_all（方案 M1）：必须给 merchant_id（商品归属商家），scoped_store_ids=NULL
+   *
+   * @private
+   * @param {Object} data - 含 applicable_scope/scoped_store_ids/merchant_id 的对象
+   * @returns {Object} 归一化后的 { applicable_scope, scoped_store_ids, merchant_id }
+   * @throws {BusinessError} 范围类型非法或必填缺失（避免建出"范围为空"的废券）
+   */
+  static _normalizeApplicableScope(data = {}) {
+    const scope = data.applicable_scope || 'all'
+    const validScopes = ['all', 'specified_stores', 'merchant_all']
+    if (!validScopes.includes(scope)) {
+      throw new BusinessError(
+        `无效的 applicable_scope，允许值：${validScopes.join(', ')}`,
+        'PRODUCT_CENTER_INVALID_PARAM',
+        400
+      )
+    }
+    if (scope === 'specified_stores') {
+      const raw = Array.isArray(data.scoped_store_ids) ? data.scoped_store_ids : []
+      const ids = [...new Set(raw.map(n => parseInt(n, 10)).filter(Number.isInteger))]
+      if (ids.length === 0) {
+        throw new BusinessError(
+          '核销范围为「指定门店」时，必须至少选择一个门店',
+          'PRODUCT_CENTER_INVALID_PARAM',
+          400
+        )
+      }
+      return { applicable_scope: scope, scoped_store_ids: ids, merchant_id: null }
+    }
+    if (scope === 'merchant_all') {
+      const mid = parseInt(data.merchant_id, 10)
+      if (!Number.isInteger(mid)) {
+        throw new BusinessError(
+          '核销范围为「商家全门店」时，必须指定归属商家 merchant_id',
+          'PRODUCT_CENTER_INVALID_PARAM',
+          400
+        )
+      }
+      return { applicable_scope: scope, scoped_store_ids: null, merchant_id: mid }
+    }
+    return { applicable_scope: 'all', scoped_store_ids: null, merchant_id: null }
   }
 
   /**

@@ -429,6 +429,18 @@
           <button @click="openCreateSlotModal()" class="px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-lg transition text-sm font-medium backdrop-blur-sm">➕ 新增广告位</button>
         </div>
 
+        <div class="px-5 py-3 border-b themed-bg-base flex items-center gap-2">
+          <label class="text-sm font-medium themed-text-secondary">按类型筛选</label>
+          <select x-model="slotTypeFilter" @change="loadSlots()" class="px-3 py-1.5 border rounded text-sm focus:ring-2 focus:ring-emerald-500">
+            <option :value="null">全部类型</option>
+            <option value="popup">弹窗</option>
+            <option value="carousel">轮播图</option>
+            <option value="announcement">系统公告</option>
+            <option value="feed">信息流</option>
+            <option value="top_banner">顶部Banner</option>
+          </select>
+        </div>
+
         <div x-show="slotsLoading" class="p-12 text-center">
           <div class="inline-block w-8 h-8 border-3 border-emerald-200 border-t-emerald-500 rounded-full animate-spin"></div>
           <p class="mt-3 text-sm themed-text-muted">加载广告位中...</p>
@@ -448,12 +460,12 @@
             <div class="themed-card rounded-xl overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5"
                  :class="slot.is_active ? 'border border-green-200' : 'border border-gray-200 opacity-70'">
               <!-- 卡片顶部色条 -->
-              <div class="h-1.5" :class="slot.slot_type === 'popup' ? 'bg-gradient-to-r from-orange-400 to-amber-500' : slot.slot_type === 'announcement' ? 'bg-gradient-to-r from-purple-400 to-violet-500' : 'bg-gradient-to-r from-blue-400 to-cyan-500'"></div>
+              <div class="h-1.5" :class="slot.slot_type === 'popup' ? 'bg-gradient-to-r from-orange-400 to-amber-500' : slot.slot_type === 'announcement' ? 'bg-gradient-to-r from-purple-400 to-violet-500' : slot.slot_type === 'top_banner' ? 'bg-gradient-to-r from-emerald-400 to-teal-500' : 'bg-gradient-to-r from-blue-400 to-cyan-500'"></div>
               <div class="p-4">
                 <div class="flex justify-between items-start mb-3">
                   <div>
                     <h6 class="font-semibold text-base flex items-center gap-1.5">
-                      <span x-text="slot.slot_type === 'popup' ? '🪟' : slot.slot_type === 'announcement' ? '📢' : '🎠'"></span>
+                      <span x-text="slot.slot_type === 'popup' ? '🪟' : slot.slot_type === 'announcement' ? '📢' : slot.slot_type === 'top_banner' ? '🖼️' : '🎠'"></span>
                       <span x-text="slot.slot_name"></span>
                     </h6>
                     <code class="text-xs themed-text-muted bg-gray-100 px-1.5 py-0.5 rounded font-mono mt-1 inline-block" x-text="slot.slot_key"></code>
@@ -1017,6 +1029,8 @@
                   <option value="popup">弹窗</option>
                   <option value="carousel">轮播图</option>
                   <option value="announcement">系统公告</option>
+                  <option value="feed">信息流</option>
+                  <option value="top_banner">顶部Banner</option>
                 </select>
               </div>
               <div>
@@ -1025,6 +1039,9 @@
                   <option value="home">首页</option>
                   <option value="lottery">回馈页</option>
                   <option value="profile">个人中心</option>
+                  <option value="diy">DIY页</option>
+                  <option value="camera">拍照页</option>
+                  <option value="exchange">商城页</option>
                 </select>
               </div>
             </div>
@@ -1046,6 +1063,25 @@
                 <input type="number" x-model.number="slotForm.max_display_count" min="1" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500">
               </div>
             </div>
+            <div class="grid grid-cols-2 gap-4 items-center">
+              <label class="flex items-center gap-2 text-sm font-medium themed-text-secondary">
+                <input type="checkbox" x-model="slotForm.is_carousel" class="rounded">
+                启用轮播（多张图轮播展示）
+              </label>
+              <div x-show="slotForm.is_carousel">
+                <label class="block text-sm font-medium themed-text-secondary mb-1">轮播间隔（秒，2~8）</label>
+                <input type="number" x-model.number="slideIntervalSeconds" min="2" max="8" step="0.5"
+                  class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500"
+                  placeholder="单位秒，如 3=3秒（提交自动转毫秒）">
+              </div>
+            </div>
+            <!-- 轮播形态行为提示（文档14.4默认处理②：所见即所得，不报错不阻断） -->
+            <p class="text-xs themed-text-muted -mt-2" x-show="!slotForm.is_carousel">
+              💡 当前为「单张」模式：即使该位配置了多条生效投放，前端也只展示优先级最高的 1 张。
+            </p>
+            <p class="text-xs themed-text-muted -mt-2" x-show="slotForm.is_carousel">
+              💡 当前为「轮播」模式：前端按优先级轮播多张；若该位仅配置 1 条投放，则正常展示为单张，不影响使用。
+            </p>
             <div>
               <label class="block text-sm font-medium themed-text-secondary mb-1">描述</label>
               <textarea x-model="slotForm.description" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-500" rows="2"></textarea>

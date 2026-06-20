@@ -485,6 +485,22 @@ document.addEventListener('alpine:init', () => {
             active: { class: 'green', label: '上架' },
             inactive: { class: 'gray', label: '下架' }
           }
+        },
+        {
+          key: 'applicable_scope',
+          label: '核销范围',
+          render: (val, row) => {
+            // 门店专属兑换券业务线：一眼区分通用券 vs 门店专属券
+            const scope = val || 'all'
+            if (scope === 'specified_stores') {
+              const n = Array.isArray(row.scoped_store_ids) ? row.scoped_store_ids.length : 0
+              return `<span class="px-2 py-0.5 rounded text-xs bg-blue-100 text-blue-700">限${n}店</span>`
+            }
+            if (scope === 'merchant_all') {
+              return '<span class="px-2 py-0.5 rounded text-xs bg-purple-100 text-purple-700">商家全店</span>'
+            }
+            return '<span class="px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-500">通用</span>'
+          }
         }
       ],
       dataSource: async params => {

@@ -23,6 +23,8 @@ const { authenticateToken } = require('../../../middleware/auth')
 const logger = require('../../../utils/logger').logger
 const { asyncHandler } = require('../../../middleware/validation')
 const displayNameHelper = require('../../../utils/displayNameHelper')
+// slot_type 白名单单一真相源：直接引用模型导出，避免多处硬编码漂移
+const { VALID_SLOT_TYPES } = require('../../../models/AdSlot')
 
 /**
  * GET / - 统一内容获取接口
@@ -34,8 +36,8 @@ const displayNameHelper = require('../../../utils/displayNameHelper')
  *
  * @route GET /api/v4/system/ad-delivery
  * @access Private
- * @query {string} slot_type - 广告位类型（必填）：popup / carousel / announcement / feed
- * @query {string} [position=home] - 位置：home / lottery / profile / market_list / exchange_list
+ * @query {string} slot_type - 广告位类型（必填）：popup / carousel / announcement / feed / top_banner
+ * @query {string} [position=home] - 位置：home / lottery / profile / market_list / exchange_list / diy / camera
  */
 router.get(
   '/',
@@ -44,12 +46,11 @@ router.get(
     const { slot_type, position = 'home' } = req.query
 
     if (!slot_type) {
-      return res.apiBadRequest('缺少必需参数：slot_type（popup / carousel / announcement / feed）')
+      return res.apiBadRequest('缺少必需参数：slot_type（' + VALID_SLOT_TYPES.join(' / ') + '）')
     }
 
-    const validSlotTypes = ['popup', 'carousel', 'announcement', 'feed']
-    if (!validSlotTypes.includes(slot_type)) {
-      return res.apiBadRequest('slot_type 必须是以下之一：' + validSlotTypes.join(', '))
+    if (!VALID_SLOT_TYPES.includes(slot_type)) {
+      return res.apiBadRequest('slot_type 必须是以下之一：' + VALID_SLOT_TYPES.join(', '))
     }
 
     // 构造 slot_key：{position}_{slot_type}（与 ad_slots 种子数据一致）
@@ -62,6 +63,7 @@ router.get(
     const flatItems = items.map(item => {
       const creative = item.creative || {}
       return {
+        ad_slot_id: item.ad_slot_id, // 曝光/点击上报归位（commercial 计费链路依赖）
         ad_campaign_id: item.ad_campaign_id,
         campaign_name: item.campaign_name,
         campaign_category: item.campaign_category,
@@ -83,11 +85,19 @@ router.get(
         frequency_value: item.frequency_value,
         force_show: item.force_show,
         priority: item.priority,
-        slide_interval_ms: item.slide_interval_ms,
         start_date: item.start_date,
         end_date: item.end_date
       }
     })
+
+    /*
+     * 槽位级展示形态（顶部 Banner 升级，2026-06-21）：
+     * - is_carousel：是否轮播（来自 ad_slots，单一真相源）。前端据此决定单图 / swiper。
+     * - slide_interval_ms：轮播间隔（槽位级，仅 is_carousel=true 有意义）。
+     * 取首个胜出项携带的槽位级字段；无内容时给默认（单张 / 3000ms）。
+     */
+    const slotIsCarousel = items.length > 0 ? !!items[0].is_carousel : false
+    const slotSlideInterval = items.length > 0 ? items[0].slide_interval_ms : 3000
 
     /*
      * 议题2（拍板项3方案B）：后端直接附中文 announcement_type_display，C 端零映射直接展示。
@@ -111,6 +121,8 @@ router.get(
         items: flatItems,
         slot_type,
         position,
+        is_carousel: slotIsCarousel, // 该图片位是否轮播（前端据此单图/swiper）
+        slide_interval_ms: slotSlideInterval, // 轮播间隔毫秒（槽位级）
         total: flatItems.length
       },
       '获取内容成功'

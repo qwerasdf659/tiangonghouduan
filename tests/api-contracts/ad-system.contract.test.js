@@ -9,13 +9,14 @@
  * - 用户端创建广告（含图片字段白名单 B7）
  * - 用户端图片上传接口（B10）
  *
- * 测试用例数量：10 cases
- * 创建时间：2026-03-16
+ * 测试用例数量：11 cases
+ * 创建时间：2026-03-16（2026-06-21 新增 top_banner 顶部Banner契约用例）
  * 关联文档：docs/广告位现状分析报告.md
  */
 
 const request = require('supertest')
 const { sequelize } = require('../../models')
+const { TEST_ACCOUNTS } = require('../helpers/test-data')
 
 let app
 let accessToken
@@ -27,9 +28,16 @@ describe('API契约测试 - 广告系统', () => {
     app = require('../../app')
     await sequelize.authenticate()
 
+    /*
+     * 登录账号说明（修正 2026-06-21）：
+     * 本套件含管理端写接口（POST /console/ad-campaigns、/console/ad-campaigns/system），
+     * 走 adminAuthMiddleware = requireRoleLevel(100)，必须用「超级管理员」账号登录。
+     * 原用 13612227930（regional_manager:80）会被后端正确拒绝(403) → 测试失败。
+     * 改用 TEST_ACCOUNTS.admin（13612227910，admin:100+super_admin:110）单一真相源。
+     */
     const loginResponse = await request(app)
       .post('/api/v4/auth/login')
-      .send({ mobile: '13612227930', verification_code: '123456' })
+      .send({ mobile: TEST_ACCOUNTS.admin.mobile, verification_code: '123456' })
 
     if (loginResponse.body.success) {
       accessToken = loginResponse.body.data.access_token
@@ -100,6 +108,26 @@ describe('API契约测试 - 广告系统', () => {
 
       expect(res.status).toBe(400)
       validateApiContract(res.body, false)
+    })
+
+    test('top_banner/lottery 请求成功且返回槽位级展示形态字段（顶部Banner升级验证）', async () => {
+      const res = await request(app)
+        .get('/api/v4/system/ad-delivery?slot_type=top_banner&position=lottery')
+        .set('Authorization', `Bearer ${accessToken}`)
+
+      expect(res.status).toBe(200)
+      validateApiContract(res.body, true)
+      expect(res.body.data.slot_type).toBe('top_banner')
+      expect(res.body.data.position).toBe('lottery')
+      // 槽位级展示形态字段（前端据此决定单图/swiper 与轮播节奏）
+      expect(res.body.data).toHaveProperty('is_carousel')
+      expect(typeof res.body.data.is_carousel).toBe('boolean')
+      expect(res.body.data).toHaveProperty('slide_interval_ms')
+      expect(Array.isArray(res.body.data.items)).toBe(true)
+      // 有投放内容时，每项须含 ad_slot_id（曝光/点击上报归位）；无内容时为空数组也合法
+      res.body.data.items.forEach(item => {
+        expect(item).toHaveProperty('ad_slot_id')
+      })
     })
 
     test('缺少 slot_type 返回 400', async () => {

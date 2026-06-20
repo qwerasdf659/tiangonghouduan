@@ -154,7 +154,14 @@ class AdBiddingService {
         ...fixedDailyCampaigns,
         ...biddingCampaigns
       ]
-      const winners = allCandidates.slice(0, adSlot.max_display_count)
+      /*
+       * 单张/轮播展示形态（槽位级 is_carousel）：
+       * - is_carousel=0（单张）：即使有多条生效投放，也只返回 priority 最高的 1 条（前端用 items[0]）。
+       * - is_carousel=1（轮播）：返回多条（上限 max_display_count），前端按 slide_interval_ms 走 swiper。
+       * 注：is_carousel 为本次顶部 Banner 升级新增的槽位级展示形态声明，对存量槽位默认 0（单张），行为不变。
+       */
+      const displayLimit = adSlot.is_carousel ? adSlot.max_display_count : 1
+      const winners = allCandidates.slice(0, displayLimit)
 
       // 7. 记录所有竞价日志
       const bidLogs = []
@@ -168,7 +175,7 @@ class AdBiddingService {
           target_user_id: userId,
           bid_amount_star_stone: campaign.daily_bid_star_stone || 0,
           is_winner: isWinner,
-          lose_reason: isWinner ? null : i >= adSlot.max_display_count ? 'outbid' : null
+          lose_reason: isWinner ? null : i >= displayLimit ? 'outbid' : null
         })
       }
 
@@ -182,6 +189,10 @@ class AdBiddingService {
           campaign.creatives && campaign.creatives.length > 0 ? campaign.creatives[0] : null
 
         return {
+          // 槽位级字段（透传 ad_slot_id 供曝光/点击上报归位；is_carousel/slide_interval_ms 为该图片位展示形态）
+          ad_slot_id: adSlot.ad_slot_id,
+          is_carousel: !!adSlot.is_carousel,
+          slide_interval_ms: adSlot.slide_interval_ms,
           ad_campaign_id: campaign.ad_campaign_id,
           campaign_name: campaign.campaign_name,
           campaign_category: campaign.campaign_category,
@@ -192,7 +203,6 @@ class AdBiddingService {
           frequency_rule: campaign.frequency_rule,
           frequency_value: campaign.frequency_value,
           force_show: campaign.force_show,
-          slide_interval_ms: campaign.slide_interval_ms,
           start_date: campaign.start_date,
           end_date: campaign.end_date,
           creative: creative
