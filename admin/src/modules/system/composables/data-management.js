@@ -75,21 +75,7 @@ export function useDataManagementState() {
     /** @type {Object} 历史分页 */
     historyPagination: { page: 1, page_size: 20, total: 0, total_pages: 1 },
     /** @type {boolean} 历史加载中 */
-    historyLoading: false,
-
-    /** @type {string[]} 可用的清理类目 */
-    availableCategories: [
-      { key: 'lottery_records', label: '回馈记录' },
-      { key: 'lottery_monitoring', label: '回馈监控（告警与模拟）' },
-      { key: 'monitoring_metrics', label: '监控指标' },
-      { key: 'consumption_records', label: '消费与核销' },
-      { key: 'customer_service', label: '客服会话' },
-      { key: 'notifications', label: '用户通知' },
-      { key: 'feedbacks', label: '用户反馈' },
-      { key: 'exchange_records', label: '兑换记录' },
-      { key: 'bid_records', label: '竞拍记录' },
-      { key: 'system_debts', label: '系统垫付' }
-    ]
+    historyLoading: false
   }
 }
 
@@ -99,6 +85,18 @@ export function useDataManagementState() {
  */
 export function useDataManagementMethods() {
   return {
+    /**
+     * 可用的清理类目（动态派生自后端 stats.categories，单一真相源）
+     *
+     * 业务说明：类目定义只在后端 DataManagementService 的 L2_CLEANUP_CATEGORIES 维护，
+     * getStats().categories 下发 { key, label, table_count }，前端只做展示，
+     * 避免前后端各维护一份导致 label 不一致的技术债。
+     * @returns {Array<{key:string,label:string,table_count:number}>}
+     */
+    get availableCategories() {
+      return this.stats?.categories || []
+    },
+
     /**
      * 切换 Tab
      * @param {string} tab - Tab 名称

@@ -23,7 +23,7 @@ ad_attribution_logs	PRIMARY	0	1	ad_attribution_log_id	BTREE	NULL
 ad_bid_logs	idx_abl_campaign	1	1	ad_campaign_id	BTREE	NULL	
 ad_bid_logs	idx_abl_slot_time	1	1	ad_slot_id	BTREE	NULL	
 ad_bid_logs	idx_abl_slot_time	1	2	bid_at	BTREE	NULL	
-ad_bid_logs	idx_abl_user	1	1	target_user_id	BTREE	NULL	
+ad_bid_logs	idx_abl_user	1	1	target_user_id	BTREE	NULL	YES
 ad_bid_logs	PRIMARY	0	1	ad_bid_log_id	BTREE	NULL	
 ad_billing_records	advertiser_user_id	1	1	advertiser_user_id	BTREE	NULL	
 ad_billing_records	business_id	0	1	business_id	BTREE	NULL	
@@ -136,8 +136,14 @@ approval_chain_nodes	idx_assignee_role	1	1	assignee_role_id	BTREE	NULL	YES
 approval_chain_nodes	idx_template_step	1	1	template_id	BTREE	NULL	
 approval_chain_nodes	idx_template_step	1	2	step_number	BTREE	NULL	
 approval_chain_nodes	PRIMARY	0	1	node_id	BTREE	NULL	
+approval_chain_step_actions	idx_acsa_step	1	1	step_id	BTREE	NULL	
+approval_chain_step_actions	PRIMARY	0	1	step_action_id	BTREE	NULL	
+approval_chain_step_actions	uk_step_actor	0	1	step_id	BTREE	NULL	
+approval_chain_step_actions	uk_step_actor	0	2	actioned_by	BTREE	NULL	
 approval_chain_steps	fk_acs_actioned_by	1	1	actioned_by	BTREE	NULL	YES
 approval_chain_steps	fk_acs_node	1	1	node_id	BTREE	NULL	
+approval_chain_steps	idx_acs_store_status	1	1	store_id	BTREE	NULL	YES
+approval_chain_steps	idx_acs_store_status	1	2	status	BTREE	NULL	
 approval_chain_steps	idx_assignee_role_status	1	1	assignee_role_id	BTREE	NULL	YES
 approval_chain_steps	idx_assignee_role_status	1	2	status	BTREE	NULL	
 approval_chain_steps	idx_assignee_user_status	1	1	assignee_user_id	BTREE	NULL	YES
@@ -188,23 +194,6 @@ attributes	idx_attributes_enabled_sort	1	1	is_enabled	BTREE	NULL
 attributes	idx_attributes_enabled_sort	1	2	sort_order	BTREE	NULL	
 attributes	idx_attributes_sale_attr	1	1	is_sale_attr	BTREE	NULL	
 attributes	PRIMARY	0	1	attribute_id	BTREE	NULL	
-auction_bids	idempotency_key	0	1	idempotency_key	BTREE	NULL	
-auction_bids	idx_auction_bids_listing_amount	1	1	auction_listing_id	BTREE	NULL	
-auction_bids	idx_auction_bids_listing_amount	1	2	bid_amount	BTREE	NULL	
-auction_bids	idx_auction_bids_user	1	1	user_id	BTREE	NULL	
-auction_bids	idx_auction_bids_user	1	2	auction_listing_id	BTREE	NULL	
-auction_bids	PRIMARY	0	1	auction_bid_id	BTREE	NULL	
-auction_listings	idx_auction_asset	1	1	price_asset_code	BTREE	NULL	
-auction_listings	idx_auction_asset	1	2	status	BTREE	NULL	
-auction_listings	idx_auction_item	1	1	item_id	BTREE	NULL	
-auction_listings	idx_auction_seller	1	1	seller_user_id	BTREE	NULL	
-auction_listings	idx_auction_seller	1	2	status	BTREE	NULL	
-auction_listings	idx_auction_status_end	1	1	status	BTREE	NULL	
-auction_listings	idx_auction_status_end	1	2	end_time	BTREE	NULL	
-auction_listings	idx_auction_status_start	1	1	status	BTREE	NULL	
-auction_listings	idx_auction_status_start	1	2	start_time	BTREE	NULL	
-auction_listings	PRIMARY	0	1	auction_listing_id	BTREE	NULL	
-auction_listings	winner_user_id	1	1	winner_user_id	BTREE	NULL	YES
 authentication_sessions	idx_user_device	1	1	user_type	BTREE	NULL	
 authentication_sessions	idx_user_device	1	2	user_id	BTREE	NULL	
 authentication_sessions	idx_user_device	1	3	device_id	BTREE	NULL	YES
@@ -347,6 +336,16 @@ customer_service_user_assignments	idx_cs_user_assign_status	1	1	status	BTREE	NUL
 customer_service_user_assignments	PRIMARY	0	1	customer_service_user_assignment_id	BTREE	NULL	
 customer_service_user_assignments	uk_cs_user_assign_active	0	1	user_id	BTREE	NULL	
 customer_service_user_assignments	uk_cs_user_assign_active	0	2	status	BTREE	NULL	
+deadlock_test_1781393835778	account_id	0	1	account_id	BTREE	NULL	
+deadlock_test_1781393835778	idx_account	1	1	account_id	BTREE	NULL	
+deadlock_test_1781393835778	PRIMARY	0	1	id	BTREE	NULL	
+decoration_season	PRIMARY	0	1	decoration_season_id	BTREE	NULL	
+decoration_season	uk_decoration_season_code	0	1	season_code	BTREE	NULL	
+decoration_sku	idx_decoration_sku_season	1	1	decoration_season_id	BTREE	NULL	YES
+decoration_sku	idx_decoration_sku_status_sort	1	1	status	BTREE	NULL	
+decoration_sku	idx_decoration_sku_status_sort	1	2	sort_order	BTREE	NULL	
+decoration_sku	PRIMARY	0	1	decoration_sku_id	BTREE	NULL	
+decoration_sku	uk_decoration_sku_code	0	1	decoration_code	BTREE	NULL	
 diy_materials	idx_diy_materials_category	1	1	category_id	BTREE	NULL	YES
 diy_materials	idx_diy_materials_diameter	1	1	diameter	BTREE	NULL	
 diy_materials	idx_diy_materials_enabled_sort	1	1	is_enabled	BTREE	NULL	
@@ -386,6 +385,7 @@ exchange_item_skus	idx_product_skus_status_stock	1	2	stock	BTREE	NULL
 exchange_item_skus	PRIMARY	0	1	sku_id	BTREE	NULL	
 exchange_item_skus	sku_code	0	1	sku_code	BTREE	NULL	
 exchange_items	exchange_items_ibfk_2	1	1	primary_media_id	BTREE	NULL	YES
+exchange_items	exchange_items_merchant_id_foreign_idx	1	1	merchant_id	BTREE	NULL	YES
 exchange_items	idx_products_category_status	1	1	category_id	BTREE	NULL	YES
 exchange_items	idx_products_category_status	1	2	status	BTREE	NULL	
 exchange_items	idx_products_item_template	1	1	item_template_id	BTREE	NULL	YES
@@ -420,6 +420,10 @@ exchange_records	PRIMARY	0	1	exchange_record_id	BTREE	NULL
 exchange_records	uk_exchange_records_business_id	0	1	business_id	BTREE	NULL	
 exchange_records	uk_exchange_records_idempotency_key	0	1	idempotency_key	BTREE	NULL	
 exchange_records	uk_order_no	0	1	order_no	BTREE	NULL	
+exchange_redeem_requirement	idx_redeem_req_enabled	1	1	is_enabled	BTREE	NULL	
+exchange_redeem_requirement	idx_redeem_req_item_sku	1	1	exchange_item_id	BTREE	NULL	
+exchange_redeem_requirement	idx_redeem_req_item_sku	1	2	sku_id	BTREE	NULL	YES
+exchange_redeem_requirement	PRIMARY	0	1	exchange_redeem_requirement_id	BTREE	NULL	
 feature_flags	flag_key	0	1	flag_key	BTREE	NULL	
 feature_flags	idx_feature_flags_effective_time	1	1	effective_start	BTREE	NULL	YES
 feature_flags	idx_feature_flags_effective_time	1	2	effective_end	BTREE	NULL	YES
@@ -456,12 +460,16 @@ item_templates	idx_item_templates_item_type	1	1	item_type	BTREE	NULL
 item_templates	idx_item_templates_rarity_code	1	1	rarity_code	BTREE	NULL	YES
 item_templates	idx_item_templates_tradable_enabled	1	1	is_tradable	BTREE	NULL	
 item_templates	idx_item_templates_tradable_enabled	1	2	is_enabled	BTREE	NULL	
+item_templates	idx_item_templates_value_tier	1	1	value_tier	BTREE	NULL	
 item_templates	item_templates_primary_media_id_foreign_idx	1	1	primary_media_id	BTREE	NULL	YES
 item_templates	PRIMARY	0	1	item_template_id	BTREE	NULL	
 item_templates	template_code	0	1	template_code	BTREE	NULL	
 items	idx_items_item_template	1	1	item_template_id	BTREE	NULL	YES
 items	idx_items_merchant_id	1	1	merchant_id	BTREE	NULL	YES
 items	idx_items_owner	1	1	owner_account_id	BTREE	NULL	
+items	idx_items_owner_status_viewed	1	1	owner_account_id	BTREE	NULL	
+items	idx_items_owner_status_viewed	1	2	status	BTREE	NULL	
+items	idx_items_owner_status_viewed	1	3	is_viewed	BTREE	NULL	
 items	idx_items_source	1	1	source	BTREE	NULL	
 items	idx_items_source_ref	1	1	source_ref_id	BTREE	NULL	YES
 items	idx_items_status	1	1	status	BTREE	NULL	
@@ -575,7 +583,6 @@ lottery_draws	idx_lottery_draws_user_reward_created	1	2	reward_tier	BTREE	NULL
 lottery_draws	idx_lottery_draws_user_reward_created	1	3	created_at	BTREE	NULL	
 lottery_draws	idx_lottery_records_user_created	1	1	user_id	BTREE	NULL	
 lottery_draws	idx_lottery_records_user_created	1	2	created_at	BTREE	NULL	
-lottery_draws	idx_prize_id	1	1	lottery_prize_id	BTREE	NULL	YES
 lottery_draws	idx_prize_type	1	1	prize_type	BTREE	NULL	YES
 lottery_draws	idx_records_campaign_id	1	1	lottery_campaign_id	BTREE	NULL	
 lottery_draws	idx_records_created_at	1	1	created_at	BTREE	NULL	
@@ -604,20 +611,6 @@ lottery_hourly_metrics	idx_hourly_metrics_hour	1	1	hour_bucket	BTREE	NULL
 lottery_hourly_metrics	PRIMARY	0	1	lottery_hourly_metric_id	BTREE	NULL	
 lottery_hourly_metrics	uk_campaign_hour	0	1	lottery_campaign_id	BTREE	NULL	
 lottery_hourly_metrics	uk_campaign_hour	0	2	hour_bucket	BTREE	NULL	
-lottery_management_settings	idx_campaign_user_status	1	1	lottery_campaign_id	BTREE	NULL	YES
-lottery_management_settings	idx_campaign_user_status	1	2	user_id	BTREE	NULL	
-lottery_management_settings	idx_campaign_user_status	1	3	status	BTREE	NULL	
-lottery_management_settings	idx_created_by	1	1	created_by	BTREE	NULL	
-lottery_management_settings	idx_created_by	1	2	created_at	BTREE	NULL	
-lottery_management_settings	idx_expires_at	1	1	expires_at	BTREE	NULL	YES
-lottery_management_settings	idx_type_status	1	1	setting_type	BTREE	NULL	
-lottery_management_settings	idx_type_status	1	2	status	BTREE	NULL	
-lottery_management_settings	idx_user_status	1	1	user_id	BTREE	NULL	
-lottery_management_settings	idx_user_status	1	2	status	BTREE	NULL	
-lottery_management_settings	idx_user_type_status	1	1	user_id	BTREE	NULL	
-lottery_management_settings	idx_user_type_status	1	2	setting_type	BTREE	NULL	
-lottery_management_settings	idx_user_type_status	1	3	status	BTREE	NULL	
-lottery_management_settings	PRIMARY	0	1	lottery_management_setting_id	BTREE	NULL	
 lottery_presets	fk_lottery_presets_campaign_prize	1	1	lottery_campaign_prize_id	BTREE	NULL	YES
 lottery_presets	idx_created_at	1	1	created_at	BTREE	NULL	YES
 lottery_presets	idx_created_by	1	1	created_by	BTREE	NULL	YES
@@ -674,34 +667,6 @@ lottery_user_global_state	idx_global_state_last_draw_at	1	1	last_draw_at	BTREE	N
 lottery_user_global_state	idx_global_state_luck_debt_level	1	1	luck_debt_level	BTREE	NULL	
 lottery_user_global_state	PRIMARY	0	1	lottery_user_global_state_id	BTREE	NULL	
 lottery_user_global_state	user_id	0	1	user_id	BTREE	NULL	
-market_listings	fk_market_listings_offer_category	1	1	offer_category_id	BTREE	NULL	YES
-market_listings	idx_market_listings_asset_group	1	1	offer_asset_group_code	BTREE	NULL	YES
-market_listings	idx_market_listings_created_at	1	1	created_at	BTREE	NULL	
-market_listings	idx_market_listings_item_rarity	1	1	offer_item_rarity	BTREE	NULL	YES
-market_listings	idx_market_listings_item_template	1	1	offer_item_template_id	BTREE	NULL	YES
-market_listings	idx_market_listings_listing_kind	1	1	listing_kind	BTREE	NULL	
-market_listings	idx_market_listings_locked_at	1	1	locked_at	BTREE	NULL	YES
-market_listings	idx_market_listings_locked_by_order_id	1	1	locked_by_order_id	BTREE	NULL	YES
-market_listings	idx_market_listings_offer_asset_code	1	1	offer_asset_code	BTREE	NULL	YES
-market_listings	idx_market_listings_offer_item_id	1	1	offer_item_id	BTREE	NULL	YES
-market_listings	idx_market_listings_seller_user_id	1	1	seller_user_id	BTREE	NULL	
-market_listings	idx_market_listings_status	1	1	status	BTREE	NULL	
-market_listings	idx_market_listings_status_kind_asset_group	1	1	status	BTREE	NULL	
-market_listings	idx_market_listings_status_kind_asset_group	1	2	listing_kind	BTREE	NULL	
-market_listings	idx_market_listings_status_kind_asset_group	1	3	offer_asset_group_code	BTREE	NULL	YES
-market_listings	idx_market_listings_status_kind_category	1	1	status	BTREE	NULL	
-market_listings	idx_market_listings_status_kind_category	1	2	listing_kind	BTREE	NULL	
-market_listings	PRIMARY	0	1	market_listing_id	BTREE	NULL	
-market_listings	uk_market_listings_idempotency_key	0	1	idempotency_key	BTREE	NULL	
-market_listings	uk_market_listings_seller_idempotency	0	1	seller_user_id	BTREE	NULL	
-market_listings	uk_market_listings_seller_idempotency	0	2	idempotency_key	BTREE	NULL	
-market_price_snapshots	idx_mps_asset_code	1	1	asset_code	BTREE	NULL	
-market_price_snapshots	idx_mps_snapshot_date	1	1	snapshot_date	BTREE	NULL	
-market_price_snapshots	PRIMARY	0	1	snapshot_id	BTREE	NULL	
-market_price_snapshots	uk_snapshot_date_asset_kind_currency	0	1	snapshot_date	BTREE	NULL	
-market_price_snapshots	uk_snapshot_date_asset_kind_currency	0	2	asset_code	BTREE	NULL	
-market_price_snapshots	uk_snapshot_date_asset_kind_currency	0	3	listing_kind	BTREE	NULL	
-market_price_snapshots	uk_snapshot_date_asset_kind_currency	0	4	price_asset_code	BTREE	NULL	
 material_asset_types	asset_code	0	1	asset_code	BTREE	NULL	
 material_asset_types	idx_material_asset_types_group_code	1	1	group_code	BTREE	NULL	
 material_asset_types	idx_material_asset_types_is_enabled	1	1	is_enabled	BTREE	NULL	
@@ -760,7 +725,7 @@ preset_inventory_debt	fk_inv_debt_user_id	1	1	user_id	BTREE	NULL
 preset_inventory_debt	idx_inv_debt_campaign_status	1	1	lottery_campaign_id	BTREE	NULL	
 preset_inventory_debt	idx_inv_debt_campaign_status	1	2	status	BTREE	NULL	
 preset_inventory_debt	idx_inv_debt_preset	1	1	lottery_preset_id	BTREE	NULL	
-preset_inventory_debt	idx_inv_debt_prize_status	1	1	lottery_prize_id	BTREE	NULL	
+preset_inventory_debt	idx_inv_debt_prize_status	1	1	lottery_campaign_prize_id	BTREE	NULL	
 preset_inventory_debt	idx_inv_debt_prize_status	1	2	status	BTREE	NULL	
 preset_inventory_debt	idx_inv_debt_status_time	1	1	status	BTREE	NULL	
 preset_inventory_debt	idx_inv_debt_status_time	1	2	created_at	BTREE	NULL	
@@ -830,6 +795,13 @@ segment_rule_configs	PRIMARY	0	1	segment_rule_config_id	BTREE	NULL
 segment_rule_configs	version_key	0	1	version_key	BTREE	NULL	
 sequelizemeta	name	0	1	name	BTREE	NULL	
 sequelizemeta	PRIMARY	0	1	name	BTREE	NULL	
+shipping_tracks	idx_shipping_tracks_no	1	1	shipping_no	BTREE	NULL	
+shipping_tracks	idx_shipping_tracks_record_time	1	1	exchange_record_id	BTREE	NULL	
+shipping_tracks	idx_shipping_tracks_record_time	1	2	track_time	BTREE	NULL	
+shipping_tracks	idx_shipping_tracks_status_time	1	1	track_status	BTREE	NULL	
+shipping_tracks	idx_shipping_tracks_status_time	1	2	track_time	BTREE	NULL	
+shipping_tracks	PRIMARY	0	1	shipping_track_id	BTREE	NULL	
+shipping_tracks	uk_shipping_tracks_dedup	0	1	dedup_key	BTREE	NULL	
 sku_attribute_values	idx_sku_attr_option	1	1	attribute_id	BTREE	NULL	
 sku_attribute_values	idx_sku_attr_option	1	2	option_id	BTREE	NULL	
 sku_attribute_values	option_id	1	1	option_id	BTREE	NULL	
@@ -885,17 +857,6 @@ trade_disputes	idx_trade_disputes_order_polymorphic	1	2	order_id	BTREE	NULL
 trade_disputes	idx_trade_disputes_status	1	1	status	BTREE	NULL	
 trade_disputes	idx_trade_disputes_user_id	1	1	user_id	BTREE	NULL	
 trade_disputes	PRIMARY	0	1	trade_dispute_id	BTREE	NULL	
-trade_orders	idx_trade_orders_asset_code_status	1	1	asset_code	BTREE	NULL	
-trade_orders	idx_trade_orders_asset_code_status	1	2	status	BTREE	NULL	
-trade_orders	idx_trade_orders_buyer_user_id	1	1	buyer_user_id	BTREE	NULL	
-trade_orders	idx_trade_orders_created_at	1	1	created_at	BTREE	NULL	
-trade_orders	idx_trade_orders_listing_id	1	1	market_listing_id	BTREE	NULL	
-trade_orders	idx_trade_orders_seller_user_id	1	1	seller_user_id	BTREE	NULL	
-trade_orders	idx_trade_orders_status	1	1	status	BTREE	NULL	
-trade_orders	PRIMARY	0	1	trade_order_id	BTREE	NULL	
-trade_orders	uk_trade_orders_business_id	0	1	business_id	BTREE	NULL	
-trade_orders	uk_trade_orders_idempotency_key	0	1	idempotency_key	BTREE	NULL	
-trade_orders	uk_trade_orders_order_no	0	1	order_no	BTREE	NULL	
 user_ad_tags	idx_uat_tag	1	1	tag_key	BTREE	NULL	
 user_ad_tags	idx_uat_tag	1	2	tag_value	BTREE	NULL	
 user_ad_tags	PRIMARY	0	1	user_ad_tag_id	BTREE	NULL	
@@ -912,6 +873,10 @@ user_behavior_tracks	idx_behavior_tracks_user	1	1	user_id	BTREE	NULL
 user_behavior_tracks	idx_behavior_tracks_user_type	1	1	user_id	BTREE	NULL	
 user_behavior_tracks	idx_behavior_tracks_user_type	1	2	behavior_type	BTREE	NULL	
 user_behavior_tracks	PRIMARY	0	1	user_behavior_track_id	BTREE	NULL	
+user_growth_levels	idx_user_growth_levels_status_points	1	1	status	BTREE	NULL	
+user_growth_levels	idx_user_growth_levels_status_points	1	2	min_history_points	BTREE	NULL	
+user_growth_levels	PRIMARY	0	1	user_growth_level_id	BTREE	NULL	
+user_growth_levels	uk_user_growth_levels_level_key	0	1	level_key	BTREE	NULL	
 user_hierarchy	fk_user_hierarchy_deactivator	1	1	deactivated_by	BTREE	NULL	YES
 user_hierarchy	fk_user_hierarchy_role	1	1	role_id	BTREE	NULL	
 user_hierarchy	fk_user_hierarchy_store	1	1	store_id	BTREE	NULL	YES
@@ -926,6 +891,13 @@ user_notifications	idx_user_notifications_user_created	1	2	created_at	BTREE	NULL
 user_notifications	idx_user_notifications_user_unread	1	1	user_id	BTREE	NULL	
 user_notifications	idx_user_notifications_user_unread	1	2	is_read	BTREE	NULL	
 user_notifications	PRIMARY	0	1	notification_id	BTREE	NULL	
+user_owned_decorations	decoration_sku_id	1	1	decoration_sku_id	BTREE	NULL	
+user_owned_decorations	idx_user_owned_deco_expires	1	1	expires_at	BTREE	NULL	YES
+user_owned_decorations	idx_user_owned_deco_user_status	1	1	user_id	BTREE	NULL	
+user_owned_decorations	idx_user_owned_deco_user_status	1	2	status	BTREE	NULL	
+user_owned_decorations	PRIMARY	0	1	user_owned_decoration_id	BTREE	NULL	
+user_owned_decorations	uk_user_owned_deco_user_sku	0	1	user_id	BTREE	NULL	
+user_owned_decorations	uk_user_owned_deco_user_sku	0	2	decoration_sku_id	BTREE	NULL	
 user_premium_status	idx_expires_at	1	1	expires_at	BTREE	NULL	YES
 user_premium_status	idx_is_unlocked	1	1	is_unlocked	BTREE	NULL	
 user_premium_status	idx_user_id	0	1	user_id	BTREE	NULL	
@@ -952,11 +924,13 @@ user_roles	user_role_unique	0	1	user_id	BTREE	NULL
 user_roles	user_role_unique	0	2	role_id	BTREE	NULL	
 users	idx_status	1	1	status	BTREE	NULL	YES
 users	idx_users_last_active_at	1	1	last_active_at	BTREE	NULL	YES
+users	idx_users_mobile_prefix_hash	1	1	mobile_prefix_hash	BTREE	NULL	YES
+users	idx_users_mobile_suffix_hash	1	1	mobile_suffix_hash	BTREE	NULL	YES
 users	idx_users_user_level	1	1	user_level	BTREE	NULL	
 users	idx_users_user_uuid_unique	0	1	user_uuid	BTREE	NULL	
 users	idx_users_wx_openid	0	1	wx_openid	BTREE	NULL	YES
-users	mobile	0	1	mobile	BTREE	NULL	
 users	PRIMARY	0	1	user_id	BTREE	NULL	
+users	uk_users_mobile_hash	0	1	mobile_hash	BTREE	NULL	YES
 users	users_history_total_points	1	1	history_total_points	BTREE	NULL	YES
 users	users_last_login	1	1	last_login	BTREE	NULL	YES
 websocket_startup_logs	idx_created_at	1	1	created_at	BTREE	NULL	

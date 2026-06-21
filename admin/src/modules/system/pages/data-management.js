@@ -25,19 +25,29 @@ import { useDataManagementState, useDataManagementMethods } from '../composables
  * @returns {Object} Alpine.js 组件配置
  */
 function dataManagementPage() {
-  return {
-    ...createPageMixin(),
-    ...useDataManagementState(),
-    ...useDataManagementMethods(),
+  /*
+   * useDataManagementMethods 含 get availableCategories 计算属性，
+   * 必须用 Object.defineProperties + getOwnPropertyDescriptors 保留 getter 描述符，
+   * 直接展开（...）会在构造时调用一次 getter 并复制为静态值，破坏响应式与 this 绑定
+   */
+  const methods = useDataManagementMethods()
 
-    /**
-     * 页面初始化
-     */
-    async init() {
-      logger.info('[DataManagement] 页面初始化')
-      await this.loadStats()
-    }
+  const result = {
+    ...createPageMixin(),
+    ...useDataManagementState()
   }
+
+  Object.defineProperties(result, Object.getOwnPropertyDescriptors(methods))
+
+  /**
+   * 页面初始化
+   */
+  result.init = async function () {
+    logger.info('[DataManagement] 页面初始化')
+    await this.loadStats()
+  }
+
+  return result
 }
 
 Alpine.data('dataManagementPage', dataManagementPage)

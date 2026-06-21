@@ -198,6 +198,130 @@ const L3_AUTO_CLEANUP_TABLES = Object.freeze({
 const SYSTEM_DAILY_JOB_USER_ID = 11021
 
 /**
+ * 上线前清档保留的用户ID白名单
+ *
+ * 业务说明（文档第十九/二十/二十三章拍板）：
+ * - 32：超管 13612227910（用户指定保留）
+ * - 11021：系统定时任务账号（.env SYSTEM_DAILY_JOB_USER_ID 写死依赖，删除会致定时任务外键报错）
+ * 其余用户（含原管理员 31、测试号 135 等）连同行为数据一并清除。
+ * @constant {number[]}
+ */
+const PRE_LAUNCH_KEEP_USER_IDS = Object.freeze([32, SYSTEM_DAILY_JOB_USER_ID])
+
+/**
+ * 上线前一次性「清行为」表清单（按外键拓扑顺序：子表在前、父表在后）
+ *
+ * 业务定位（文档第十九章 19.4 + 第二十章 20.4 + 第二十三章 23.1 最终基线）：
+ * - 仅清"用户/测试号操作产生 + 系统运行累积"的行为/流水数据；
+ * - 不含任何业务配置表（活动/奖品/门店/商户/字典等配置一律保留）；
+ * - 金融互锁组（asset_transactions/item_ledger/items/item_holds/account_asset_balances）
+ *   在 FINANCIAL_INTERLOCK_TABLES 中单独整组、单事务清理，不在此普通清单内。
+ * @constant {string[]}
+ */
+const PRE_LAUNCH_BEHAVIOR_WIPE_TABLES = Object.freeze([
+  // —— 广告行为日志 ——
+  'ad_interaction_logs',
+  'ad_impression_logs',
+  'ad_click_logs',
+  'ad_attribution_logs',
+  'ad_antifraud_logs',
+  'ad_billing_records',
+  'ad_bid_logs',
+  'ad_report_daily_snapshots',
+  'ad_dau_daily_stats',
+  'ad_price_adjustment_logs',
+  // ad 投放内容（23.1-3：「首页」联调投放随测试清，ad_slots 槽位保留不在此列）
+  'ad_creatives',
+  'ad_zone_group_members',
+  'ad_target_zones',
+  'ad_campaigns',
+  // —— 通知/会话/消息 ——
+  'admin_notifications',
+  'user_notifications',
+  'chat_messages',
+  'customer_service_notes',
+  'customer_service_user_assignments',
+  'customer_service_issues',
+  'customer_service_sessions',
+  'customer_service_agents',
+  'feedbacks',
+  // —— 抽奖行为 ——
+  'lottery_simulation_records',
+  'lottery_user_daily_draw_quota',
+  'lottery_campaign_user_quota',
+  'lottery_campaign_quota_grants',
+  'lottery_user_experience_state',
+  'lottery_user_global_state',
+  'lottery_hourly_metrics',
+  'lottery_daily_metrics',
+  'lottery_alerts',
+  'lottery_draw_decisions',
+  'lottery_presets',
+  'lottery_draws',
+  // —— 交易/兑换/核销行为（20.4：兑换市场物品/SKU/渠道价全是测试，连带清）——
+  'exchange_order_events',
+  'shipping_tracks',
+  'exchange_channel_prices',
+  'sku_attribute_values',
+  'exchange_records',
+  'consumption_records',
+  'content_review_records',
+  'redemption_orders',
+  'trade_disputes',
+  // 兑换商品配置（20.4 决定清，须在 item_templates 之前、子表之后）
+  'exchange_item_attribute_values',
+  'exchange_redeem_requirement',
+  'exchange_item_skus',
+  'exchange_items',
+  // —— 竞拍行为 ——
+  'bid_records',
+  'bid_products',
+  // —— 系统垫付/审批运行实例（模板保留，实例清）——
+  'preset_inventory_debt',
+  'preset_budget_debt',
+  'approval_chain_instances',
+  // —— 日志/会话/临时（系统运行产生）——
+  'admin_operation_logs',
+  'merchant_operation_logs',
+  'authentication_sessions',
+  'websocket_startup_logs',
+  'batch_operation_logs',
+  'reminder_history',
+  'api_idempotency_requests',
+  'system_dictionary_history',
+  'risk_alerts',
+  'alert_silence_rules',
+  /*
+   * 测试用户衍生数据（随测试用户一起清）
+   * 注：store_staff 含保留用户 32 的绑定，需在 _cleanupTestUsers 内按"孤儿（指向被删用户）"硬删，故不在此整表清
+   */
+  'user_behavior_tracks',
+  'user_ad_tags',
+  'user_addresses',
+  'user_risk_profiles',
+  'user_premium_status',
+  'user_ratio_overrides',
+  'user_hierarchy',
+  'diy_works'
+])
+
+/**
+ * 金融互锁组（清前后跑对账、整组单事务清理）
+ *
+ * 业务说明（文档第二十二/二十三章 拍板项1）：余额=流水累计、持有=账本推导，
+ * 必须整组一起清，不能只清其中一张表，否则账实对不上。
+ * 顺序：子表/明细在前，余额缓存表在后。
+ * @constant {string[]}
+ */
+const FINANCIAL_INTERLOCK_TABLES = Object.freeze([
+  'item_holds',
+  'item_ledger',
+  'items',
+  'asset_transactions',
+  'account_asset_balances'
+])
+
+/**
  * L2 业务数据 - 按清理类目分组
  * @constant {Object}
  */
@@ -266,6 +390,35 @@ const L2_CLEANUP_CATEGORIES = Object.freeze({
   system_debts: {
     label: '系统垫付',
     tables: ['preset_inventory_debt', 'preset_budget_debt'],
+    time_field: 'created_at'
+  },
+  /*
+   * 配置数据清理类目（上线后日常运营工具，慎用：清空后需重新录入）
+   * tables 严格按外键依赖排序（子表在前、父表在后），执行时再经 DELETE_TOPOLOGY 全局拓扑二次排序
+   */
+  exchange_catalog: {
+    label: '兑换商品配置（含SKU/属性/兑换记录）',
+    tables: [
+      'exchange_order_events',
+      'shipping_tracks',
+      'exchange_channel_prices',
+      'sku_attribute_values',
+      'exchange_records',
+      'exchange_item_attribute_values',
+      'exchange_redeem_requirement',
+      'exchange_item_skus',
+      'exchange_items'
+    ],
+    time_field: 'created_at'
+  },
+  store_catalog: {
+    label: '门店配置（含员工/层级）',
+    tables: ['store_staff', 'user_hierarchy', 'stores'],
+    time_field: 'created_at'
+  },
+  item_template_catalog: {
+    label: '物品模板配置',
+    tables: ['items', 'item_templates'],
     time_field: 'created_at'
   }
 })
@@ -351,10 +504,7 @@ const DELETE_TOPOLOGY = Object.freeze([
   ],
   // 第三层
   ['customer_service_sessions', 'ad_campaigns'],
-  /*
-   * 第四层
-   * products 表由 ExchangeItem 模型管理（原 exchange_items 已 DROP）
-   */
+  // 第四层（exchange_items 真实存在并由 ExchangeItem 模型映射，见 models/ExchangeItem.js）
   ['items', 'lottery_campaign_prizes', 'exchange_items'],
   // 第五层（核心配置表 - 通常不删，仅清档模式时按需处理）
   [
@@ -1014,6 +1164,152 @@ class DataManagementService {
   }
 
   /**
+   * 上线前一次性「清行为」治理任务（文档第二十三章 23.1 最终基线）
+   *
+   * 与 pre_launch 全量清档不同：本方法只清"用户行为/流水数据"，保留全部业务配置 +
+   * 系统字典 + 账号权限（仅保留 user 32 / 11021）。包含：
+   * 1) 金融互锁组整组清理（清前记录对账、清后断言守恒，拍板项1）；
+   * 2) 普通行为表批量清理；
+   * 3) 测试用户清理（reattribute 保留配置的 created_by → 32、孤儿 store_staff 硬删、删账号/角色/用户）；
+   * 4) 活动统计归零（拍板：保配置、清行为）。
+   *
+   * @param {Object} options - { dry_run, reason, confirmation_text }
+   * @param {number} operatorId - 操作人用户ID
+   * @returns {Promise<Object>} 执行/干跑结果
+   */
+  async executePreLaunchBehaviorWipe(options, operatorId) {
+    const { dry_run = false, reason, confirmation_text } = options
+
+    if (process.env.NODE_ENV === 'production') {
+      throw new BusinessError('生产环境禁止执行清档操作', 'SERVICE_FORBIDDEN', 403)
+    }
+    if (!dry_run && confirmation_text !== '确认删除') {
+      throw new BusinessError('确认文字不正确，请输入"确认删除"', 'SERVICE_ERROR', 400)
+    }
+    const startTime = Date.now()
+    const results = { behavior_tables: [], financial_tables: [], test_users: {}, zeroed: {} }
+
+    /*
+     * 步骤0：清前对账（仅信息记录）。测试数据天然不守恒，故不作为前置门，
+     * 真正的安全保证 = 金融组整组单事务清 + 清后断言残留为 0（见步骤2）。
+     */
+    const reconcileBefore = await Promise.all([
+      ItemLifecycleService.reconcileAssets(),
+      ItemLifecycleService.reconcileItems()
+    ])
+    results.reconcile_before = {
+      asset_balance: reconcileBefore[0].balance_consistency.status,
+      asset_global: reconcileBefore[0].global_conservation.status,
+      item_conservation: reconcileBefore[1].item_conservation.status,
+      item_owner: reconcileBefore[1].owner_consistency.status
+    }
+    // 步骤1：普通行为表批量清理（按拓扑顺序，子表在前）
+    for (const tableName of PRE_LAUNCH_BEHAVIOR_WIPE_TABLES) {
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        const [cntRows] = await sequelize.query(`SELECT COUNT(*) AS cnt FROM \`${tableName}\``)
+        const before = Number(cntRows[0]?.cnt || 0)
+        let deleted = 0
+        if (before > 0 && !dry_run) {
+          // eslint-disable-next-line no-await-in-loop
+          deleted = await this._batchDelete(tableName, '1=1', 2000)
+        } else if (dry_run) {
+          deleted = before
+        }
+        results.behavior_tables.push({
+          table_name: tableName,
+          rows: before,
+          deleted,
+          status: 'success'
+        })
+      } catch (error) {
+        results.behavior_tables.push({
+          table_name: tableName,
+          rows: 0,
+          deleted: 0,
+          status: 'error',
+          error: error.message
+        })
+      }
+    }
+    // 步骤2：金融互锁组（整组单事务清 + 清后断言残留=0）
+    if (dry_run) {
+      for (const t of FINANCIAL_INTERLOCK_TABLES) {
+        // eslint-disable-next-line no-await-in-loop
+        const [r] = await sequelize.query(`SELECT COUNT(*) AS cnt FROM \`${t}\``)
+        results.financial_tables.push({
+          table_name: t,
+          rows: Number(r[0]?.cnt || 0),
+          deleted: 0,
+          status: 'dry_run'
+        })
+      }
+    } else {
+      await this._wipeFinancialInterlockGroup(results)
+    }
+    // 步骤3：测试用户清理（仅保留 32 / 11021）
+    if (dry_run) {
+      const [u] = await sequelize.query(
+        `SELECT COUNT(*) AS cnt FROM users WHERE user_id NOT IN (${PRE_LAUNCH_KEEP_USER_IDS.join(',')})`
+      )
+      results.test_users = { to_delete: Number(u[0]?.cnt || 0), status: 'dry_run' }
+    } else {
+      await this._cleanupTestUsers(results)
+    }
+    // 步骤3.5：媒体分类清理（§16.3：保留 materials/categories 图标，清 products/uploads 及其挂载、清孤儿挂载）
+    if (dry_run) {
+      const [mf] = await sequelize.query(
+        "SELECT COUNT(*) AS cnt FROM media_files WHERE folder IN ('products','uploads')"
+      )
+      const [ma] = await sequelize.query(
+        "SELECT COUNT(*) AS cnt FROM media_attachments WHERE attachable_type NOT IN ('material_asset_type','category')"
+      )
+      results.media = {
+        media_files_to_delete: Number(mf[0]?.cnt || 0),
+        media_attachments_to_delete: Number(ma[0]?.cnt || 0),
+        status: 'dry_run'
+      }
+    } else {
+      await this._cleanupMediaByClassification(results)
+    }
+    // 步骤4：活动统计归零（保配置、清行为）
+    if (!dry_run) {
+      const [pz] = await sequelize.query(
+        'UPDATE lottery_campaign_prizes SET total_win_count = 0, daily_win_count = 0'
+      )
+      const [cz] = await sequelize.query(
+        'UPDATE lottery_campaigns SET remaining_prize_pool = total_prize_pool, ' +
+          'pool_budget_remaining = pool_budget_total, total_draws = 0'
+      )
+      results.zeroed = {
+        lottery_campaign_prizes: pz?.affectedRows ?? 0,
+        lottery_campaigns: cz?.affectedRows ?? 0
+      }
+    } else {
+      results.zeroed = { status: 'dry_run' }
+    }
+
+    // 步骤5：清后对账（非 dry_run 时断言金融组守恒/残留为 0）
+    if (!dry_run) {
+      const after = await Promise.all([
+        ItemLifecycleService.reconcileAssets(),
+        ItemLifecycleService.reconcileItems()
+      ])
+      results.reconcile_after = {
+        asset_balance: after[0].balance_consistency.status,
+        item_conservation: after[1].item_conservation.status,
+        item_owner: after[1].owner_consistency.status
+      }
+    }
+
+    const durationSeconds = Math.round(((Date.now() - startTime) / 1000) * 10) / 10
+    if (!dry_run) {
+      await this._auditPreLaunchBehaviorWipe(operatorId, reason, results, durationSeconds)
+    }
+    return { mode: 'pre_launch_behavior', dry_run, duration_seconds: durationSeconds, ...results }
+  }
+
+  /**
    * 安全 JSON 解析（不抛出异常）
    * @param {*} value - 待解析值
    * @returns {*} 解析结果，失败时返回原值
@@ -1329,6 +1625,177 @@ class DataManagementService {
     } while (batchDeleted >= batchSize)
 
     return totalDeleted
+  }
+
+  /**
+   * 金融互锁组整组清理（单事务）+ 清后断言残留为 0
+   *
+   * 业务说明（拍板项1）：余额=流水累计、持有=账本推导，必须整组一起清。
+   * 全量清空后表为空 = 天然守恒，故安全保证 = 单事务原子性 + 清后残留断言，
+   * 任一表未清空则整体回滚。
+   * @param {Object} results - 结果收集对象（输出参数）
+   * @returns {Promise<void>} 无返回值，结果通过 results 输出
+   * @private
+   */
+  async _wipeFinancialInterlockGroup(results) {
+    await TransactionManager.execute(async transaction => {
+      for (const t of FINANCIAL_INTERLOCK_TABLES) {
+        // eslint-disable-next-line no-await-in-loop
+        const [before] = await sequelize.query(`SELECT COUNT(*) AS cnt FROM \`${t}\``, {
+          transaction
+        })
+        // eslint-disable-next-line no-await-in-loop
+        const [, meta] = await sequelize.query(`DELETE FROM \`${t}\``, { transaction })
+        // eslint-disable-next-line no-await-in-loop
+        const [after] = await sequelize.query(`SELECT COUNT(*) AS cnt FROM \`${t}\``, {
+          transaction
+        })
+        const remaining = Number(after[0]?.cnt || 0)
+        if (remaining !== 0) {
+          throw new BusinessError(
+            `金融互锁组清理后 ${t} 仍残留 ${remaining} 行，事务回滚`,
+            'SERVICE_FAILED',
+            500
+          )
+        }
+        results.financial_tables.push({
+          table_name: t,
+          rows: Number(before[0]?.cnt || 0),
+          deleted: meta?.affectedRows ?? 0,
+          status: 'success'
+        })
+      }
+    })
+  }
+
+  /**
+   * 测试用户清理（仅保留 PRE_LAUNCH_KEEP_USER_IDS）
+   *
+   * 处理保留配置表对待删用户的 RESTRICT 外键阻塞（已拍板）：
+   * - lottery_campaign_pricing_config.created_by → 改归属到超管 32（保留配置，仅换作者）；
+   * - store_staff 指向被删用户的绑定行 → 硬删孤儿（门店保留，仅去失效员工关系）。
+   * 随后按 子表→accounts→user_roles→users 顺序删除，全部在单事务内。
+   * @param {Object} results - 结果收集对象（输出参数）
+   * @returns {Promise<void>} 无返回值，结果通过 results 输出
+   * @private
+   */
+  async _cleanupTestUsers(results) {
+    const keep = PRE_LAUNCH_KEEP_USER_IDS.join(',')
+    await TransactionManager.execute(async transaction => {
+      // 1) 解开保留配置表的 RESTRICT 外键：created_by 改归属超管 32
+      const [reattr] = await sequelize.query(
+        `UPDATE lottery_campaign_pricing_config SET created_by = 32 ` +
+          `WHERE created_by NOT IN (${keep})`,
+        { transaction }
+      )
+      // updated_by 同样可能指向待删用户（SET NULL 外键，置空即可）
+      await sequelize.query(
+        `UPDATE lottery_campaign_pricing_config SET updated_by = NULL ` +
+          `WHERE updated_by IS NOT NULL AND updated_by NOT IN (${keep})`,
+        { transaction }
+      )
+
+      // 2) 硬删指向待删用户的 store_staff 孤儿绑定（门店保留）
+      const [staffDel] = await sequelize.query(
+        `DELETE FROM store_staff WHERE user_id NOT IN (${keep})`,
+        { transaction }
+      )
+
+      // 3) 删账号体系：account_asset_balances → accounts → user_roles → users
+      const balDelSql =
+        `DELETE aab FROM account_asset_balances aab ` +
+        `JOIN accounts a ON a.account_id = aab.account_id ` +
+        `WHERE a.user_id NOT IN (${keep})`
+      const [balDel] = await sequelize.query(balDelSql, { transaction })
+      const [acctDel] = await sequelize.query(
+        `DELETE FROM accounts WHERE user_id NOT IN (${keep})`,
+        { transaction }
+      )
+      const [roleDel] = await sequelize.query(
+        `DELETE FROM user_roles WHERE user_id NOT IN (${keep})`,
+        { transaction }
+      )
+      const [userDel] = await sequelize.query(`DELETE FROM users WHERE user_id NOT IN (${keep})`, {
+        transaction
+      })
+
+      results.test_users = {
+        pricing_created_by_reattributed: reattr?.affectedRows ?? 0,
+        store_staff_orphans_deleted: staffDel?.affectedRows ?? 0,
+        account_asset_balances_deleted: balDel?.affectedRows ?? 0,
+        accounts_deleted: acctDel?.affectedRows ?? 0,
+        user_roles_deleted: roleDel?.affectedRows ?? 0,
+        users_deleted: userDel?.affectedRows ?? 0,
+        status: 'success'
+      }
+    })
+  }
+
+  /**
+   * 媒体分类清理（文档第十六章 §16.3）
+   *
+   * 业务说明：media_files 是平台统一图库，含配置类图标（materials 材料图标 / categories 品类图标，
+   * 引用方 material_asset_types / categories 已决定保留，图标必须跟着留）。
+   * 故不整表清，而是：
+   * - media_attachments：清 attachable_type NOT IN ('material_asset_type','category')（清商品等业务挂载，含父已清空的孤儿）；
+   * - media_files：清 folder IN ('products','uploads')（测试商品图/杂图），保留 materials/categories 图标。
+   * 顺序：先清挂载（子）再清文件（父），避免 media_attachments.media_id 外键阻塞。
+   * @param {Object} results - 结果收集对象（输出参数）
+   * @returns {Promise<void>} 无返回值，结果通过 results 输出
+   * @private
+   */
+  async _cleanupMediaByClassification(results) {
+    const [, maMeta] = await sequelize.query(
+      "DELETE FROM media_attachments WHERE attachable_type NOT IN ('material_asset_type','category')"
+    )
+    const [, mfMeta] = await sequelize.query(
+      "DELETE FROM media_files WHERE folder IN ('products','uploads')"
+    )
+    results.media = {
+      media_attachments_deleted: maMeta?.affectedRows ?? 0,
+      media_files_deleted: mfMeta?.affectedRows ?? 0,
+      kept: 'materials/categories 图标保留',
+      status: 'success'
+    }
+  }
+
+  /**
+   * 写入上线前清行为治理任务的审计日志
+   *
+   * 说明（拍板项2）：admin_operation_logs 在步骤1已整表清空，本审计在清理完成后写入，
+   * 因此"本次清档审计"被自然保留（新记录晚于清空动作）。
+   * @param {number} operatorId - 操作人用户ID
+   * @param {string} reason - 操作原因
+   * @param {Object} results - 执行结果
+   * @param {number} durationSeconds - 耗时（秒）
+   * @returns {Promise<void>} 无返回值，仅写入审计日志
+   * @private
+   */
+  async _auditPreLaunchBehaviorWipe(operatorId, reason, results, durationSeconds) {
+    try {
+      const behaviorDeleted = results.behavior_tables.reduce((s, r) => s + (r.deleted || 0), 0)
+      const financialDeleted = results.financial_tables.reduce((s, r) => s + (r.deleted || 0), 0)
+      await AuditLogService.logOperation({
+        operator_id: operatorId,
+        operation_type: OPERATION_TYPES.DATA_CLEANUP,
+        target_type: AUDIT_TARGET_TYPES.DATA_MANAGEMENT,
+        target_id: 'pre_launch_behavior_wipe',
+        action: '上线前一次性清行为（保配置/清行为/归零统计）',
+        after_data: {
+          behavior_deleted: behaviorDeleted,
+          financial_deleted: financialDeleted,
+          test_users: results.test_users,
+          media: results.media,
+          zeroed: results.zeroed,
+          reconcile_after: results.reconcile_after,
+          duration_seconds: durationSeconds
+        },
+        reason: reason || '上线前清测试数据',
+        idempotency_key: `pre_launch_behavior_${Date.now()}`
+      })
+    } catch (auditError) {
+      logger.error('[清行为] 审计日志写入失败:', { error: auditError.message })
+    }
   }
 }
 

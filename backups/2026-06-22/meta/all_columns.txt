@@ -38,7 +38,7 @@ ad_bid_logs	ad_slot_id	int	NO	NULL	MUL
 ad_bid_logs	ad_campaign_id	int	NO	NULL	MUL	
 ad_bid_logs	bid_amount_star_stone	int	NO	NULL		
 ad_bid_logs	is_winner	tinyint(1)	NO	NULL		
-ad_bid_logs	target_user_id	int	NO	NULL	MUL	
+ad_bid_logs	target_user_id	int	YES	NULL	MUL	
 ad_bid_logs	lose_reason	varchar(50)	YES	NULL		
 ad_bid_logs	bid_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED
 ad_billing_records	ad_billing_record_id	bigint	NO	NULL	PRI	auto_increment
@@ -78,7 +78,7 @@ ad_campaigns	frequency_rule	varchar(30)	YES	once_per_day
 ad_campaigns	frequency_value	int	YES	1		
 ad_campaigns	force_show	tinyint(1)	YES	0		
 ad_campaigns	internal_notes	text	YES	NULL		
-ad_campaigns	slide_interval_ms	int	YES	3000		
+ad_campaigns	announcement_type	varchar(20)	YES	NULL		
 ad_click_logs	ad_click_log_id	bigint	NO	NULL	PRI	auto_increment
 ad_click_logs	ad_campaign_id	int	NO	NULL	MUL	
 ad_click_logs	user_id	int	NO	NULL	MUL	
@@ -160,6 +160,8 @@ ad_slots	is_active	tinyint(1)	NO	1
 ad_slots	description	varchar(500)	YES	NULL		
 ad_slots	created_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED
 ad_slots	updated_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED
+ad_slots	is_carousel	tinyint	NO	0		
+ad_slots	slide_interval_ms	int	NO	3000		
 ad_target_zones	zone_id	int	NO	NULL	PRI	auto_increment
 ad_target_zones	zone_type	varchar(20)	NO	NULL		
 ad_target_zones	zone_name	varchar(100)	NO	NULL		
@@ -294,6 +296,18 @@ approval_chain_nodes	escalate_to_node	bigint	YES	NULL	MUL
 approval_chain_nodes	sort_order	int	NO	0		
 approval_chain_nodes	created_at	datetime	NO	NULL		
 approval_chain_nodes	updated_at	datetime	NO	NULL		
+approval_chain_nodes	exclude_parties	tinyint	NO	1		
+approval_chain_nodes	approve_mode	enum('single','countersign')	NO	single		
+approval_chain_nodes	required_approvals	int	NO	1		
+approval_chain_step_actions	step_action_id	bigint	NO	NULL	PRI	auto_increment
+approval_chain_step_actions	step_id	bigint	NO	NULL	MUL	
+approval_chain_step_actions	actioned_by	int	NO	NULL		
+approval_chain_step_actions	action	enum('approve','reject')	NO	NULL		
+approval_chain_step_actions	action_reason	text	YES	NULL		
+approval_chain_step_actions	is_escalated	tinyint	NO	0		
+approval_chain_step_actions	actioned_at	datetime	NO	NULL		
+approval_chain_step_actions	created_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED
+approval_chain_step_actions	updated_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED
 approval_chain_steps	step_id	bigint	NO	NULL	PRI	auto_increment
 approval_chain_steps	instance_id	bigint	NO	NULL	MUL	
 approval_chain_steps	node_id	bigint	NO	NULL	MUL	
@@ -309,6 +323,13 @@ approval_chain_steps	timeout_at	datetime	YES	NULL	MUL
 approval_chain_steps	auto_approved	tinyint(1)	NO	0		
 approval_chain_steps	created_at	datetime	NO	NULL		
 approval_chain_steps	updated_at	datetime	NO	NULL		
+approval_chain_steps	store_id	int	YES	NULL	MUL	
+approval_chain_steps	approve_mode	enum('single','countersign')	NO	single		
+approval_chain_steps	required_approvals	int	NO	1		
+approval_chain_steps	approved_count	int	NO	0		
+approval_chain_steps	is_escalated	tinyint	NO	0		
+approval_chain_steps	original_assignee_role_id	int	YES	NULL		
+approval_chain_steps	escalated_from_user_id	int	YES	NULL		
 approval_chain_templates	template_id	bigint	NO	NULL	PRI	auto_increment
 approval_chain_templates	template_code	varchar(50)	NO	NULL	UNI	
 approval_chain_templates	template_name	varchar(100)	NO	NULL		
@@ -392,39 +413,6 @@ attributes	sort_order	int	NO	0
 attributes	is_enabled	tinyint(1)	NO	1	MUL	
 attributes	created_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED
 attributes	updated_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED
-auction_bids	auction_bid_id	bigint	NO	NULL	PRI	auto_increment
-auction_bids	auction_listing_id	bigint	NO	NULL	MUL	
-auction_bids	user_id	int	NO	NULL	MUL	
-auction_bids	bid_amount	bigint	NO	NULL		
-auction_bids	previous_highest	bigint	NO	0		
-auction_bids	is_winning	tinyint(1)	NO	0		
-auction_bids	is_final_winner	tinyint(1)	NO	0		
-auction_bids	freeze_transaction_id	bigint	YES	NULL		
-auction_bids	idempotency_key	varchar(100)	NO	NULL	UNI	
-auction_bids	created_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED
-auction_listings	auction_listing_id	bigint	NO	NULL	PRI	auto_increment
-auction_listings	seller_user_id	int	NO	NULL	MUL	
-auction_listings	item_id	bigint	NO	NULL	MUL	
-auction_listings	price_asset_code	varchar(50)	NO	DIAMOND	MUL	
-auction_listings	start_price	bigint	NO	NULL		
-auction_listings	current_price	bigint	NO	0		
-auction_listings	min_bid_increment	bigint	NO	10		
-auction_listings	buyout_price	bigint	YES	NULL		
-auction_listings	start_time	datetime	NO	NULL		
-auction_listings	end_time	datetime	NO	NULL		
-auction_listings	winner_user_id	int	YES	NULL	MUL	
-auction_listings	winner_bid_id	bigint	YES	NULL		
-auction_listings	status	enum('pending','active','ended','cancelled','settled','settlement_failed','no_bid')	NO	pending	MUL	
-auction_listings	fee_rate	decimal(5,4)	NO	0.0500		
-auction_listings	gross_amount	bigint	YES	NULL		
-auction_listings	fee_amount	bigint	YES	NULL		
-auction_listings	net_amount	bigint	YES	NULL		
-auction_listings	bid_count	int	NO	0		
-auction_listings	unique_bidders	int	NO	0		
-auction_listings	item_snapshot	json	YES	NULL		
-auction_listings	retry_count	int	NO	0		
-auction_listings	created_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED
-auction_listings	updated_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED on update CURRENT_TIMESTAMP
 authentication_sessions	authentication_session_id	bigint	NO	NULL	PRI	auto_increment
 authentication_sessions	session_token	varchar(255)	NO	NULL	UNI	
 authentication_sessions	user_type	enum('user','admin')	NO	NULL	MUL	
@@ -453,7 +441,7 @@ batch_operation_logs	updated_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED
 bid_products	bid_product_id	bigint	NO	NULL	PRI	auto_increment
 bid_products	exchange_item_id	bigint	NO	NULL	MUL	
 bid_products	start_price	bigint	NO	NULL		
-bid_products	price_asset_code	varchar(50)	NO	DIAMOND		
+bid_products	price_asset_code	varchar(50)	NO	star_stone		
 bid_products	current_price	bigint	NO	0		
 bid_products	min_bid_increment	bigint	NO	10		
 bid_products	start_time	datetime	NO	NULL		
@@ -498,7 +486,7 @@ chat_messages	sender_id	int	YES	NULL	MUL
 chat_messages	sender_type	enum('user','admin')	NO	NULL		
 chat_messages	message_source	enum('user_client','admin_client','system')	NO	NULL	MUL	
 chat_messages	content	text	NO	NULL		
-chat_messages	message_type	enum('text','image','system')	YES	text		
+chat_messages	message_type	enum('text','image','system','file')	NO	text		
 chat_messages	status	enum('sending','sent','delivered','read')	YES	sent		
 chat_messages	reply_to_id	bigint	YES	NULL		
 chat_messages	temp_message_id	varchar(64)	YES	NULL	MUL	
@@ -506,6 +494,8 @@ chat_messages	metadata	json	YES	NULL
 chat_messages	created_at	datetime	NO	NULL	MUL	
 chat_messages	updated_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED on update CURRENT_TIMESTAMP
 chat_messages	chat_message_id	bigint	NO	NULL	PRI	auto_increment
+chat_messages	file_name	varchar(255)	YES	NULL		
+chat_messages	file_size	bigint	YES	NULL		
 consumption_records	consumption_record_id	bigint	NO	NULL	PRI	auto_increment
 consumption_records	user_id	int	NO	NULL	MUL	
 consumption_records	merchant_id	int	YES	NULL	MUL	
@@ -571,7 +561,7 @@ customer_service_issues	resolved_at	datetime	YES	NULL
 customer_service_issues	closed_at	datetime	YES	NULL		
 customer_service_issues	created_at	datetime	NO	CURRENT_TIMESTAMP	MUL	DEFAULT_GENERATED
 customer_service_issues	updated_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED on update CURRENT_TIMESTAMP
-customer_service_issues	order_type	enum('trade','redemption','consumption')	YES	NULL	MUL	
+customer_service_issues	order_type	enum('redemption','consumption')	YES	NULL	MUL	
 customer_service_issues	order_id	varchar(64)	YES	NULL		
 customer_service_issues	feedback_id	int	YES	NULL	MUL	
 customer_service_issues	dispute_id	bigint	YES	NULL	MUL	
@@ -609,6 +599,34 @@ customer_service_user_assignments	notes	text	YES	NULL
 customer_service_user_assignments	expired_at	datetime	YES	NULL		
 customer_service_user_assignments	created_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED
 customer_service_user_assignments	updated_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED on update CURRENT_TIMESTAMP
+deadlock_test_1781393835778	id	int	NO	NULL	PRI	auto_increment
+deadlock_test_1781393835778	account_id	varchar(50)	NO	NULL	UNI	
+deadlock_test_1781393835778	balance	int	NO	0		
+deadlock_test_1781393835778	version	int	NO	1		
+deadlock_test_1781393835778	updated_at	timestamp	YES	CURRENT_TIMESTAMP		DEFAULT_GENERATED on update CURRENT_TIMESTAMP
+decoration_season	decoration_season_id	int	NO	NULL	PRI	auto_increment
+decoration_season	season_code	varchar(64)	NO	NULL	UNI	
+decoration_season	season_name	varchar(100)	NO	NULL		
+decoration_season	start_at	datetime	YES	NULL		
+decoration_season	end_at	datetime	YES	NULL		
+decoration_season	status	enum('draft','active','ended')	NO	draft		
+decoration_season	created_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED
+decoration_season	updated_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED on update CURRENT_TIMESTAMP
+decoration_sku	decoration_sku_id	int	NO	NULL	PRI	auto_increment
+decoration_sku	decoration_code	varchar(64)	NO	NULL	UNI	
+decoration_sku	decoration_name	varchar(100)	NO	NULL		
+decoration_sku	decoration_type	enum('avatar_frame','bubble','theme','title','badge_visual')	NO	NULL		
+decoration_sku	rarity_code	varchar(50)	YES	NULL		
+decoration_sku	decoration_season_id	int	YES	NULL	MUL	
+decoration_sku	set_code	varchar(64)	YES	NULL		
+decoration_sku	is_limited	tinyint(1)	NO	0		
+decoration_sku	price_star_stone	int	NO	0		
+decoration_sku	validity_days	int	YES	NULL		
+decoration_sku	image_url	varchar(500)	YES	NULL		
+decoration_sku	status	enum('draft','on_sale','off_sale')	NO	draft	MUL	
+decoration_sku	sort_order	int	NO	0		
+decoration_sku	created_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED
+decoration_sku	updated_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED on update CURRENT_TIMESTAMP
 diy_materials	diy_material_id	bigint unsigned	NO	NULL	PRI	auto_increment
 diy_materials	material_code	varchar(100)	NO	NULL	UNI	
 diy_materials	display_name	varchar(200)	NO	NULL		
@@ -717,6 +735,12 @@ exchange_items	stock	int	NO	0
 exchange_items	sold_count	int	NO	0		
 exchange_items	min_cost_amount	bigint	YES	NULL		
 exchange_items	max_cost_amount	bigint	YES	NULL		
+exchange_items	min_cost_asset_code	varchar(50)	YES	NULL		
+exchange_items	max_quantity_per_order	int	NO	10		
+exchange_items	fulfillment_type	enum('physical','virtual','voucher')	NO	physical		
+exchange_items	applicable_scope	enum('all','specified_stores','merchant_all')	NO	all		
+exchange_items	scoped_store_ids	json	YES	NULL		
+exchange_items	merchant_id	int	YES	NULL	MUL	
 exchange_order_events	event_id	bigint	NO	NULL	PRI	auto_increment
 exchange_order_events	order_no	varchar(32)	NO	NULL	MUL	
 exchange_order_events	old_status	enum('pending','approved','shipped','received','rated','rejected','refunded','cancelled','completed')	YES	NULL		
@@ -760,6 +784,19 @@ exchange_records	shipping_no	varchar(100)	YES	NULL	MUL
 exchange_records	approved_at	datetime	YES	NULL		
 exchange_records	item_id	bigint	YES	NULL	MUL	
 exchange_records	sku_id	bigint	YES	NULL	MUL	
+exchange_redeem_requirement	exchange_redeem_requirement_id	int	NO	NULL	PRI	auto_increment
+exchange_redeem_requirement	exchange_item_id	bigint	NO	NULL	MUL	
+exchange_redeem_requirement	sku_id	bigint	YES	NULL		
+exchange_redeem_requirement	min_growth_level_key	varchar(32)	YES	NULL		
+exchange_redeem_requirement	extra_cost_assets	json	YES	NULL		
+exchange_redeem_requirement	required_consume_items	json	YES	NULL		
+exchange_redeem_requirement	required_badges	json	YES	NULL		
+exchange_redeem_requirement	required_tasks	json	YES	NULL		
+exchange_redeem_requirement	is_enabled	tinyint(1)	NO	1	MUL	
+exchange_redeem_requirement	publish_at	datetime	YES	NULL		
+exchange_redeem_requirement	unpublish_at	datetime	YES	NULL		
+exchange_redeem_requirement	created_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED
+exchange_redeem_requirement	updated_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED on update CURRENT_TIMESTAMP
 feature_flags	feature_flag_id	int	NO	NULL	PRI	auto_increment
 feature_flags	flag_key	varchar(100)	NO	NULL	UNI	
 feature_flags	flag_name	varchar(200)	NO	NULL		
@@ -831,6 +868,7 @@ item_templates	updated_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED on up
 item_templates	primary_media_id	bigint unsigned	YES	NULL	MUL	
 item_templates	max_edition	int	YES	NULL		
 item_templates	category_id	int	YES	NULL	MUL	
+item_templates	value_tier	enum('low','mid','high')	NO	low	MUL	
 items	item_id	bigint	NO	NULL	PRI	auto_increment
 items	tracking_code	varchar(20)	NO	NULL	UNI	
 items	owner_account_id	bigint	NO	NULL	MUL	
@@ -850,6 +888,8 @@ items	item_template_id	bigint	YES	NULL	MUL
 items	instance_attributes	json	YES	NULL		
 items	serial_number	int	YES	NULL		
 items	edition_total	int	YES	NULL		
+items	is_viewed	tinyint	NO	0		
+items	first_viewed_at	datetime	YES	NULL		
 lottery_alerts	lottery_alert_id	int	NO	NULL	PRI	auto_increment
 lottery_alerts	lottery_campaign_id	int	NO	NULL	MUL	
 lottery_alerts	alert_type	varchar(50)	NO	NULL	MUL	
@@ -1046,10 +1086,9 @@ lottery_draws	asset_transaction_id	bigint	NO	NULL	MUL
 lottery_draws	lottery_batch_draw_id	varchar(50)	YES	NULL		
 lottery_draws	user_id	int	NO	NULL	MUL	
 lottery_draws	lottery_campaign_id	int	NO	2	MUL	
-lottery_draws	lottery_prize_id	int	YES	NULL	MUL	
 lottery_draws	lottery_campaign_prize_id	bigint	YES	NULL	MUL	
 lottery_draws	prize_name	varchar(100)	YES	NULL		
-lottery_draws	prize_type	enum('points','coupon','physical','virtual','service','product','special')	YES	NULL	MUL	
+lottery_draws	prize_type	enum('material','item','coupon','points')	YES	NULL	MUL	
 lottery_draws	prize_value	int	YES	NULL		
 lottery_draws	reward_tier	enum('high','mid','low','fallback','unknown')	NO	low	MUL	
 lottery_draws	draw_type	enum('single','triple','five','ten','multi')	YES	NULL	MUL	
@@ -1115,16 +1154,6 @@ lottery_hourly_metrics	created_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERAT
 lottery_hourly_metrics	updated_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED on update CURRENT_TIMESTAMP
 lottery_hourly_metrics	empty_count	int	NO	0		
 lottery_hourly_metrics	avg_budget_per_draw	decimal(10,2)	NO	0.00		
-lottery_management_settings	lottery_management_setting_id	varchar(50)	NO	NULL	PRI	
-lottery_management_settings	user_id	int	NO	NULL	MUL	
-lottery_management_settings	setting_type	enum('force_win','force_lose','probability_adjust','user_queue')	NO	NULL	MUL	
-lottery_management_settings	setting_data	json	NO	NULL		
-lottery_management_settings	expires_at	datetime	YES	NULL	MUL	
-lottery_management_settings	status	enum('active','expired','used','cancelled')	NO	active		
-lottery_management_settings	created_by	int	NO	NULL	MUL	
-lottery_management_settings	created_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED
-lottery_management_settings	updated_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED on update CURRENT_TIMESTAMP
-lottery_management_settings	lottery_campaign_id	int	YES	NULL	MUL	
 lottery_presets	lottery_preset_id	varchar(50)	NO	NULL	PRI	
 lottery_presets	user_id	int	NO	NULL	MUL	
 lottery_presets	lottery_campaign_prize_id	bigint	YES	NULL	MUL	
@@ -1240,44 +1269,6 @@ lottery_user_global_state	last_draw_at	datetime	YES	NULL	MUL
 lottery_user_global_state	last_lottery_campaign_id	int	YES	NULL	MUL	
 lottery_user_global_state	created_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED
 lottery_user_global_state	updated_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED on update CURRENT_TIMESTAMP
-market_listings	market_listing_id	bigint	NO	NULL	PRI	auto_increment
-market_listings	listing_kind	enum('item','fungible_asset')	NO	NULL	MUL	
-market_listings	seller_user_id	int	NO	NULL	MUL	
-market_listings	offer_item_id	bigint	YES	NULL	MUL	
-market_listings	offer_item_template_id	bigint	YES	NULL	MUL	
-market_listings	offer_item_rarity	varchar(50)	YES	NULL	MUL	
-market_listings	offer_item_display_name	varchar(200)	YES	NULL		
-market_listings	offer_asset_group_code	varchar(50)	YES	NULL	MUL	
-market_listings	offer_asset_display_name	varchar(100)	YES	NULL		
-market_listings	offer_asset_code	varchar(50)	YES	NULL	MUL	
-market_listings	offer_amount	bigint	YES	NULL		
-market_listings	price_asset_code	varchar(50)	NO	DIAMOND		
-market_listings	price_amount	bigint	NO	NULL		
-market_listings	seller_offer_frozen	tinyint(1)	NO	0		
-market_listings	locked_by_order_id	bigint	YES	NULL	MUL	
-market_listings	locked_at	datetime	YES	NULL	MUL	
-market_listings	status	enum('on_sale','locked','sold','withdrawn','admin_withdrawn')	NO	on_sale	MUL	
-market_listings	sort_order	int	NO	0		
-market_listings	is_pinned	tinyint(1)	NO	0		
-market_listings	pinned_at	datetime	YES	NULL		
-market_listings	is_recommended	tinyint(1)	NO	0		
-market_listings	created_at	datetime	NO	CURRENT_TIMESTAMP	MUL	DEFAULT_GENERATED
-market_listings	updated_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED on update CURRENT_TIMESTAMP
-market_listings	idempotency_key	varchar(100)	NO	NULL	UNI	
-market_listings	offer_category_id	int	YES	NULL	MUL	
-market_price_snapshots	snapshot_id	int	NO	NULL	PRI	auto_increment
-market_price_snapshots	snapshot_date	date	NO	NULL	MUL	
-market_price_snapshots	asset_code	varchar(50)	NO	NULL	MUL	
-market_price_snapshots	listing_kind	varchar(30)	NO	item		
-market_price_snapshots	price_asset_code	varchar(50)	NO	DIAMOND		
-market_price_snapshots	active_listings	int	NO	0		
-market_price_snapshots	min_price	decimal(20,4)	YES	NULL		
-market_price_snapshots	max_price	decimal(20,4)	YES	NULL		
-market_price_snapshots	avg_price	decimal(20,4)	YES	NULL		
-market_price_snapshots	total_volume	decimal(20,4)	NO	0.0000		
-market_price_snapshots	completed_trades	int	NO	0		
-market_price_snapshots	created_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED
-market_price_snapshots	updated_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED on update CURRENT_TIMESTAMP
 material_asset_types	material_asset_type_id	bigint	NO	NULL	PRI	auto_increment
 material_asset_types	asset_code	varchar(50)	NO	NULL	UNI	
 material_asset_types	display_name	varchar(100)	NO	NULL		
@@ -1292,6 +1283,7 @@ material_asset_types	created_at	datetime	NO	NULL
 material_asset_types	updated_at	datetime	NO	NULL		
 material_asset_types	is_tradable	tinyint(1)	NO	1	MUL	
 material_asset_types	merchant_id	int	YES	NULL	MUL	
+material_asset_types	is_biddable	tinyint(1)	NO	0		
 media_attachments	attachment_id	bigint unsigned	NO	NULL	PRI	auto_increment
 media_attachments	media_id	bigint unsigned	NO	NULL	MUL	
 media_attachments	attachable_type	varchar(50)	NO	NULL	MUL	
@@ -1373,7 +1365,7 @@ preset_debt_limits	updated_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED o
 preset_inventory_debt	preset_inventory_debt_id	bigint	NO	NULL	PRI	auto_increment
 preset_inventory_debt	lottery_preset_id	varchar(50)	NO	NULL	MUL	
 preset_inventory_debt	lottery_draw_id	varchar(50)	NO	NULL		
-preset_inventory_debt	lottery_prize_id	int	NO	NULL	MUL	
+preset_inventory_debt	lottery_campaign_prize_id	bigint	NO	NULL	MUL	
 preset_inventory_debt	user_id	int	NO	NULL	MUL	
 preset_inventory_debt	lottery_campaign_id	int	NO	NULL	MUL	
 preset_inventory_debt	debt_quantity	int unsigned	NO	1		
@@ -1424,6 +1416,7 @@ redemption_orders	fulfilled_store_id	int	YES	NULL	MUL
 redemption_orders	fulfilled_by_staff_id	bigint	YES	NULL	MUL	
 redemption_orders	redemption_seq	int unsigned	NO	NULL	UNI	auto_increment
 redemption_orders	order_no	varchar(32)	NO	NULL	UNI	
+redemption_orders	scoped_store_id_list	json	YES	NULL		
 reminder_history	reminder_history_id	bigint	NO	NULL	PRI	auto_increment
 reminder_history	reminder_rule_id	int	NO	NULL	MUL	
 reminder_history	trigger_time	datetime	NO	NULL	MUL	
@@ -1514,6 +1507,18 @@ segment_rule_configs	created_by	int	YES	NULL
 segment_rule_configs	created_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED
 segment_rule_configs	updated_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED on update CURRENT_TIMESTAMP
 sequelizemeta	name	varchar(255)	NO	NULL	PRI	
+shipping_tracks	shipping_track_id	bigint	NO	NULL	PRI	auto_increment
+shipping_tracks	exchange_record_id	bigint	NO	NULL	MUL	
+shipping_tracks	order_no	varchar(32)	NO	NULL		
+shipping_tracks	shipping_no	varchar(100)	NO	NULL	MUL	
+shipping_tracks	shipping_company	varchar(50)	YES	NULL		
+shipping_tracks	track_status	enum('picked_up','in_transit','delivering','delivered','returned','exception')	NO	NULL	MUL	
+shipping_tracks	track_detail	varchar(500)	YES	NULL		
+shipping_tracks	track_time	datetime	NO	NULL		
+shipping_tracks	provider	enum('kuaidi100','kdniao','manual')	NO	kuaidi100		
+shipping_tracks	raw_data	json	YES	NULL		
+shipping_tracks	dedup_key	varchar(120)	NO	NULL	UNI	
+shipping_tracks	created_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED
 sku_attribute_values	id	bigint	NO	NULL	PRI	auto_increment
 sku_attribute_values	sku_id	bigint	NO	NULL	MUL	
 sku_attribute_values	attribute_id	int	NO	NULL	MUL	
@@ -1534,6 +1539,7 @@ store_staff	created_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED
 store_staff	updated_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED on update CURRENT_TIMESTAMP
 store_staff	deleted_at	datetime	YES	NULL		
 store_staff	delete_reason	varchar(500)	YES	NULL		
+store_staff	can_view_redemption_stats	tinyint(1)	NO	0		
 stores	store_id	int	NO	NULL	PRI	auto_increment
 stores	store_name	varchar(100)	NO	NULL		
 stores	store_code	varchar(50)	YES	NULL	UNI	
@@ -1589,7 +1595,7 @@ system_settings	created_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED
 system_settings	updated_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED on update CURRENT_TIMESTAMP
 trade_disputes	trade_dispute_id	bigint	NO	NULL	PRI	auto_increment
 trade_disputes	user_id	int	NO	NULL	MUL	
-trade_disputes	order_type	enum('trade','redemption','consumption','auction')	NO	NULL	MUL	
+trade_disputes	order_type	enum('redemption','consumption')	NO	NULL	MUL	
 trade_disputes	order_id	varchar(64)	NO	NULL		
 trade_disputes	dispute_type	enum('item_not_received','item_mismatch','quality_issue','fraud','other')	NO	NULL		
 trade_disputes	title	varchar(200)	NO	NULL		
@@ -1605,23 +1611,6 @@ trade_disputes	resolved_at	datetime	YES	NULL
 trade_disputes	created_by	int	YES	NULL		
 trade_disputes	created_at	datetime	NO	NULL	MUL	
 trade_disputes	updated_at	datetime	NO	NULL		
-trade_orders	trade_order_id	bigint	NO	NULL	PRI	auto_increment
-trade_orders	idempotency_key	varchar(100)	NO	NULL	UNI	
-trade_orders	business_id	varchar(150)	NO	NULL	UNI	
-trade_orders	market_listing_id	bigint	NO	NULL	MUL	
-trade_orders	buyer_user_id	int	NO	NULL	MUL	
-trade_orders	seller_user_id	int	NO	NULL	MUL	
-trade_orders	asset_code	varchar(50)	NO	DIAMOND	MUL	
-trade_orders	gross_amount	bigint	NO	NULL		
-trade_orders	fee_amount	bigint	NO	0		
-trade_orders	net_amount	bigint	NO	NULL		
-trade_orders	status	enum('created','frozen','completed','cancelled','failed','disputed')	NO	created	MUL	
-trade_orders	meta	json	YES	NULL		
-trade_orders	created_at	datetime	NO	CURRENT_TIMESTAMP	MUL	DEFAULT_GENERATED
-trade_orders	updated_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED on update CURRENT_TIMESTAMP
-trade_orders	completed_at	datetime	YES	NULL		
-trade_orders	cancelled_at	datetime	YES	NULL		
-trade_orders	order_no	varchar(32)	NO	NULL	UNI	
 user_ad_tags	user_ad_tag_id	bigint	NO	NULL	PRI	auto_increment
 user_ad_tags	user_id	int	NO	NULL	MUL	
 user_ad_tags	tag_key	varchar(50)	NO	NULL	MUL	
@@ -1629,16 +1618,19 @@ user_ad_tags	tag_value	varchar(100)	NO	NULL
 user_ad_tags	calculated_at	datetime	NO	NULL		
 user_addresses	address_id	bigint unsigned	NO	NULL	PRI	auto_increment
 user_addresses	user_id	int	NO	NULL	MUL	
-user_addresses	receiver_name	varchar(50)	NO	NULL		
-user_addresses	receiver_phone	varchar(20)	NO	NULL		
+user_addresses	receiver_name	varchar(50)	YES	NULL		
+user_addresses	receiver_phone	varchar(20)	YES	NULL		
 user_addresses	province	varchar(50)	NO	NULL		
 user_addresses	city	varchar(50)	NO	NULL		
 user_addresses	district	varchar(50)	NO			
-user_addresses	detail_address	varchar(500)	NO	NULL		
+user_addresses	detail_address	varchar(500)	YES	NULL		
 user_addresses	postal_code	varchar(10)	YES	NULL		
 user_addresses	is_default	tinyint(1)	NO	0		
 user_addresses	created_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED
 user_addresses	updated_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED on update CURRENT_TIMESTAMP
+user_addresses	receiver_name_encrypted	varchar(255)	YES	NULL		
+user_addresses	receiver_phone_encrypted	varchar(255)	YES	NULL		
+user_addresses	detail_address_encrypted	varchar(1024)	YES	NULL		
 user_behavior_tracks	user_behavior_track_id	bigint	NO	NULL	PRI	
 user_behavior_tracks	user_id	int	NO	NULL	MUL	
 user_behavior_tracks	behavior_type	varchar(50)	NO	NULL	MUL	
@@ -1652,6 +1644,15 @@ user_behavior_tracks	device_info	json	YES	NULL
 user_behavior_tracks	ip_address	varchar(45)	YES	NULL		
 user_behavior_tracks	behavior_time	datetime	NO	NULL	MUL	
 user_behavior_tracks	created_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED
+user_growth_levels	user_growth_level_id	int	NO	NULL	PRI	auto_increment
+user_growth_levels	level_key	varchar(32)	NO	NULL	UNI	
+user_growth_levels	level_name	varchar(32)	NO	NULL		
+user_growth_levels	min_history_points	int	NO	0		
+user_growth_levels	sort_order	int	NO	0		
+user_growth_levels	status	enum('active','inactive')	NO	active	MUL	
+user_growth_levels	description	varchar(255)	YES	NULL		
+user_growth_levels	created_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED
+user_growth_levels	updated_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED on update CURRENT_TIMESTAMP
 user_hierarchy	user_hierarchy_id	int	NO	NULL	PRI	auto_increment
 user_hierarchy	user_id	int	NO	NULL	MUL	
 user_hierarchy	superior_user_id	int	YES	NULL	MUL	
@@ -1675,6 +1676,15 @@ user_notifications	read_at	datetime	YES	NULL
 user_notifications	wx_push_status	enum('skipped','pending','sent','failed')	NO	skipped		
 user_notifications	created_at	datetime	NO	NULL		
 user_notifications	updated_at	datetime	NO	NULL		
+user_owned_decorations	user_owned_decoration_id	bigint	NO	NULL	PRI	auto_increment
+user_owned_decorations	user_id	int	NO	NULL	MUL	
+user_owned_decorations	decoration_sku_id	int	NO	NULL	MUL	
+user_owned_decorations	equipped	tinyint(1)	NO	0		
+user_owned_decorations	acquired_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED
+user_owned_decorations	expires_at	datetime	YES	NULL	MUL	
+user_owned_decorations	status	enum('active','expired')	NO	active		
+user_owned_decorations	created_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED
+user_owned_decorations	updated_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED on update CURRENT_TIMESTAMP
 user_premium_status	user_premium_status_id	bigint	NO	NULL	PRI	auto_increment
 user_premium_status	user_id	int	NO	NULL	UNI	
 user_premium_status	is_unlocked	tinyint(1)	NO	0	MUL	
@@ -1715,7 +1725,6 @@ user_roles	is_active	tinyint(1)	YES	1	MUL
 user_roles	created_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED
 user_roles	updated_at	datetime	NO	CURRENT_TIMESTAMP		DEFAULT_GENERATED on update CURRENT_TIMESTAMP
 users	user_id	int	NO	NULL	PRI	auto_increment
-users	mobile	varchar(20)	NO	NULL	UNI	
 users	nickname	varchar(50)	YES	NULL		
 users	status	enum('active','inactive','banned')	YES	active	MUL	
 users	last_login	datetime	YES	NULL	MUL	
@@ -1728,8 +1737,12 @@ users	user_uuid	char(36)	NO	NULL	UNI
 users	user_level	enum('normal','vip','merchant')	NO	normal	MUL	
 users	last_active_at	datetime	YES	NULL	MUL	
 users	avatar_url	varchar(500)	YES	NULL		
-users	max_active_listings	int	YES	NULL		
 users	wx_openid	varchar(64)	YES	NULL	UNI	
+users	mobile_encrypted	varchar(255)	YES	NULL		
+users	mobile_hash	varchar(64)	YES	NULL	UNI	
+users	privacy_consent_at	datetime	YES	NULL		
+users	mobile_prefix_hash	varchar(64)	YES	NULL	MUL	
+users	mobile_suffix_hash	varchar(64)	YES	NULL	MUL	
 websocket_startup_logs	websocket_startup_log_id	bigint	NO	NULL	PRI	auto_increment
 websocket_startup_logs	start_time	datetime	NO	NULL	MUL	
 websocket_startup_logs	process_id	varchar(50)	NO	NULL	MUL	
