@@ -19,7 +19,7 @@
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken } = require('../../../middleware/auth')
+const { optionalAuth } = require('../../../middleware/auth')
 const logger = require('../../../utils/logger').logger
 const { asyncHandler } = require('../../../middleware/validation')
 const displayNameHelper = require('../../../utils/displayNameHelper')
@@ -35,15 +35,17 @@ const { VALID_SLOT_TYPES } = require('../../../models/AdSlot')
  * - GET /api/v4/system/announcements/active → ?slot_type=announcement
  *
  * @route GET /api/v4/system/ad-delivery
- * @access Private
+ * @access Public（可选登录 optionalAuth）：未登录返回 operational/system 公开内容；登录后额外含 commercial（计费/定向）
  * @query {string} slot_type - 广告位类型（必填）：popup / carousel / announcement / feed / top_banner
  * @query {string} [position=home] - 位置：home / lottery / profile / market_list / exchange_list / diy / camera
  */
 router.get(
   '/',
-  authenticateToken,
+  optionalAuth,
   asyncHandler(async (req, res) => {
     const { slot_type, position = 'home' } = req.query
+    // 可选登录：未登录访客 user_id 为 null（operational/system 公开，commercial 由 Service 过滤）
+    const userId = req.user?.user_id || null
 
     if (!slot_type) {
       return res.apiBadRequest('缺少必需参数：slot_type（' + VALID_SLOT_TYPES.join(' / ') + '）')
@@ -57,7 +59,7 @@ router.get(
     const slotKey = position + '_' + slot_type
 
     const AdBiddingService = req.app.locals.services.getService('ad_bidding')
-    const items = await AdBiddingService.selectWinners(slotKey, req.user.user_id)
+    const items = await AdBiddingService.selectWinners(slotKey, userId)
 
     // 扁平化返回结构：将 campaign + creative 合并为前端直接使用的字段
     const flatItems = items.map(item => {
@@ -112,7 +114,7 @@ router.get(
       slot_type,
       position,
       slot_key: slotKey,
-      user_id: req.user.user_id,
+      user_id: userId,
       items_count: flatItems.length
     })
 

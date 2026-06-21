@@ -138,6 +138,26 @@ describe('API契约测试 - 广告系统', () => {
       expect(res.status).toBe(400)
       validateApiContract(res.body, false)
     })
+
+    /*
+     * 可选登录（方案B，2026-06-21）：未登录访客也能拿到 operational/system 公开内容。
+     * 不带 Authorization 头，断言不再 401，且返回标准结构。
+     */
+    test('未登录访客请求 top_banner/lottery 返回 200（optionalAuth 公开运营内容）', async () => {
+      const res = await request(app).get(
+        '/api/v4/system/ad-delivery?slot_type=top_banner&position=lottery'
+      )
+
+      expect(res.status).toBe(200)
+      validateApiContract(res.body, true)
+      expect(res.body.data.slot_type).toBe('top_banner')
+      expect(res.body.data.position).toBe('lottery')
+      expect(Array.isArray(res.body.data.items)).toBe(true)
+      // 未登录返回的项均不应为 commercial（commercial 需登录态）
+      res.body.data.items.forEach(item => {
+        expect(item.campaign_category).not.toBe('commercial')
+      })
+    })
   })
 
   // ==================== 用户端广告位查询 ====================

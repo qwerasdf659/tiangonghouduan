@@ -108,6 +108,15 @@ class AdBiddingService {
       const biddingCampaigns = []
 
       for (const campaign of activeCampaigns) {
+        /*
+         * 可选登录访客口径（方案B，2026-06-21）：未登录（无 userId）只下发公开内容
+         * （operational 运营推广 / system 系统公告），过滤 commercial 商业广告——
+         * 商业广告涉及计费与定向，必须登录态才下发，避免匿名流量污染计费/定向口径。
+         */
+        if (!userId && campaign.campaign_category === 'commercial') {
+          continue
+        }
+
         // 定向匹配检查（仅 commercial 需要定向，operational/system 跳过）
         if (campaign.campaign_category === 'commercial' && campaign.targeting_rules && userTags) {
           const rules =
