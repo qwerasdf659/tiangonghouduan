@@ -79,7 +79,7 @@ describe('🔐 PII加密效果验证测试（P2-2）', () => {
    */
   describe('B-5-2 手机号哈希算法验证', () => {
     test('hashMobile() 生成64字符十六进制字符串', () => {
-      const testMobile = '13612227930'
+      const testMobile = '13612227910'
       const hash = hashMobile(testMobile)
 
       // HMAC-SHA256 输出为 256 位 = 32 字节 = 64 个十六进制字符
@@ -91,7 +91,7 @@ describe('🔐 PII加密效果验证测试（P2-2）', () => {
     })
 
     test('相同手机号生成相同哈希（确定性）', () => {
-      const testMobile = '13612227930'
+      const testMobile = '13612227910'
 
       const hash1 = hashMobile(testMobile)
       const hash2 = hashMobile(testMobile)
@@ -102,7 +102,7 @@ describe('🔐 PII加密效果验证测试（P2-2）', () => {
     })
 
     test('不同手机号生成不同哈希（唯一性）', () => {
-      const mobile1 = '13612227930'
+      const mobile1 = '13612227910'
       const mobile2 = '13812345678'
       const mobile3 = '15912345678'
 
@@ -117,7 +117,7 @@ describe('🔐 PII加密效果验证测试（P2-2）', () => {
     })
 
     test('哈希值不可逆（安全性）', () => {
-      const testMobile = '13612227930'
+      const testMobile = '13612227910'
       const hash = hashMobile(testMobile)
 
       // 验证哈希值中不包含原始手机号的任何部分
@@ -143,7 +143,7 @@ describe('🔐 PII加密效果验证测试（P2-2）', () => {
    */
   describe('B-5-3 哈希算法一致性验证', () => {
     test('hashMobile() 与手动计算的 HMAC-SHA256 结果一致', () => {
-      const testMobile = '13612227930'
+      const testMobile = '13612227910'
       const secret = getPiiHashSecret()
 
       // 使用业务函数计算
@@ -166,8 +166,8 @@ describe('🔐 PII加密效果验证测试（P2-2）', () => {
     })
 
     test('数字类型手机号自动转换', () => {
-      const stringMobile = '13612227930'
-      const numericMobile = 13612227930
+      const stringMobile = '13612227910'
+      const numericMobile = 13612227910
 
       /*
        * 数字类型在业务中可能被转换为字符串
@@ -188,7 +188,7 @@ describe('🔐 PII加密效果验证测试（P2-2）', () => {
    */
   describe('B-5-4 Redis缓存Key脱敏验证', () => {
     test('用户手机号缓存Key格式正确', () => {
-      const testMobile = '13612227930'
+      const testMobile = '13612227910'
       const hash = hashMobile(testMobile)
 
       // 期望的Key格式: app:v4:{env}:api:user:mobile_hash:{hash}
@@ -202,7 +202,7 @@ describe('🔐 PII加密效果验证测试（P2-2）', () => {
     })
 
     test('缓存Key中不包含明文手机号', () => {
-      const testMobile = '13612227930'
+      const testMobile = '13612227910'
       const hash = hashMobile(testMobile)
 
       // 构建缓存Key
@@ -224,7 +224,7 @@ describe('🔐 PII加密效果验证测试（P2-2）', () => {
        * 3. 使用哈希Key查询缓存
        */
 
-      const loginMobile = '13612227930'
+      const loginMobile = '13612227910'
 
       // 登录时计算的哈希
       const loginHash = hashMobile(loginMobile)
@@ -245,7 +245,7 @@ describe('🔐 PII加密效果验证测试（P2-2）', () => {
    */
   describe('B-5-5 密钥安全性验证', () => {
     test('不同密钥产生不同哈希', () => {
-      const testMobile = '13612227930'
+      const testMobile = '13612227910'
       const secret1 = 'test-secret-key-32-characters-01'
       const secret2 = 'test-secret-key-32-characters-02'
 
@@ -258,7 +258,7 @@ describe('🔐 PII加密效果验证测试（P2-2）', () => {
     })
 
     test('密钥微小变化导致完全不同的哈希', () => {
-      const testMobile = '13612227930'
+      const testMobile = '13612227910'
       const secret1 = 'test-secret-key-32-characters-aa'
       const secret2 = 'test-secret-key-32-characters-ab' // 仅最后一个字符不同
 
@@ -281,7 +281,7 @@ describe('🔐 PII加密效果验证测试（P2-2）', () => {
 
     test('手机号微小变化导致完全不同的哈希', () => {
       const secret = getPiiHashSecret()
-      const mobile1 = '13612227930'
+      const mobile1 = '13612227910'
       const mobile2 = '13612227931' // 仅最后一位不同
 
       const hash1 = crypto.createHmac('sha256', secret).update(mobile1).digest('hex')
@@ -300,8 +300,8 @@ describe('🔐 PII加密效果验证测试（P2-2）', () => {
    */
   describe('B-5-6 边界条件测试', () => {
     test('处理国际手机号格式', () => {
-      const internationalMobile = '+8613612227930'
-      const domesticMobile = '13612227930'
+      const internationalMobile = '+8613612227910'
+      const domesticMobile = '13612227910'
 
       const intlHash = hashMobile(internationalMobile)
       const domesticHash = hashMobile(domesticMobile)
@@ -316,7 +316,7 @@ describe('🔐 PII加密效果验证测试（P2-2）', () => {
 
     test('处理带空格的手机号', () => {
       const mobileWithSpaces = '136 1222 7930'
-      const cleanMobile = '13612227930'
+      const cleanMobile = '13612227910'
 
       const spacedHash = hashMobile(mobileWithSpaces)
       const cleanHash = hashMobile(cleanMobile)

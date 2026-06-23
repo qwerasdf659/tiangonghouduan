@@ -19,6 +19,21 @@ const BeijingTimeHelper = require('../utils/timeHelper')
 const sharp = require('sharp')
 
 /**
+ * 动态裁剪离散档位白名单（兑换商城列表清晰度优化 2026-06-22 拍板）
+ * - 只按这几档裁剪并缓存，避免任意尺寸导致缓存碎片爆炸（中小公司常见技术债）
+ * - 传入非档位值向上取整到最近档；超过最大档按 MAX_RESIZE_WIDTH 钳制
+ * @constant {number[]}
+ */
+const RESIZE_WIDTH_TIERS = Object.freeze([375, 560, 750, 1080])
+
+/**
+ * 动态裁剪宽度硬上限（像素）
+ * 超过此值的请求钳制到该值，防止恶意传超大尺寸刷爆 CPU/存储
+ * @constant {number}
+ */
+const MAX_RESIZE_WIDTH = 1200
+
+/**
  * Sealos对象存储服务类
  * 职责：管理文件上传、下载、删除等对象存储操作
  * 特点：基于AWS S3 SDK实现，适配Sealos对象存储API
@@ -583,6 +598,91 @@ class SealosStorageService {
   }
 
   /**
+   * 把请求宽度规范化到离散档位（向上取整，超上限钳制）
+   *
+   * @param {number} rawWidth - 请求的原始宽度（像素）
+   * @returns {number} 规范化后的档位宽度（RESIZE_WIDTH_TIERS 之一，或 MAX_RESIZE_WIDTH）
+   */
+  static normalizeResizeWidth(rawWidth) {
+    const w = parseInt(rawWidth, 10)
+    if (isNaN(w) || w <= 0) return null
+    const maxTier = RESIZE_WIDTH_TIERS[RESIZE_WIDTH_TIERS.length - 1]
+    // 超过最大离散档：钳制到硬上限，单独成档（w1200）
+    if (w > maxTier) return MAX_RESIZE_WIDTH
+    // 向上取整到最近档位
+    return RESIZE_WIDTH_TIERS.find(tier => w <= tier) || maxTier
+  }
+
+  /**
+   * 获取或生成指定宽度的裁剪图（动态裁剪 + Sealos 缓存回写）
+   *
+   * 业务场景：兑换商城列表/详情按容器实际像素请求图片，避免列表用 150 小图放大模糊。
+   * 流程：宽度规范化到离散档 → 查缓存命中直接返回 → 未命中读原图 sharp 裁剪为 WebP → 回写 Sealos → 返回。
+   * 缓存键含原图所在目录与文件名，输出 WebP；图换了内容哈希变（由调用方 ?h= 控制 URL），缓存自然失效。
+   *
+   * @param {string} objectKey - 原图对象 key（如 uploads/xxx.jpg）
+   * @param {Object} options - 选项
+   * @param {number} options.width - 目标宽度（像素，会被规范化到离散档）
+   * @returns {Promise<{body: Buffer, contentType: string, contentLength: number, fromCache: boolean}>} 图片二进制与元数据（fromCache 标识是否命中缓存）
+   */
+  async getOrCreateResizedImage(objectKey, options = {}) {
+    const tierWidth = SealosStorageService.normalizeResizeWidth(options.width)
+    if (!tierWidth) {
+      // 宽度非法：退回原图（由调用方按原图返回）
+      const original = await this.getImageBuffer(objectKey)
+      return { ...original, fromCache: false }
+    }
+
+    // 缓存键：{folder}/thumbnails/w{档位}/{文件名}.webp（与现有 thumbnails 目录结构一致）
+    const dir = path.dirname(objectKey)
+    const baseName = path.basename(objectKey, path.extname(objectKey))
+    const cacheKey = `${dir}/thumbnails/w${tierWidth}/${baseName}.webp`
+
+    // 1. 查缓存命中则直接返回（后续零 CPU）
+    try {
+      const cached = await this.getImageBuffer(cacheKey)
+      return { ...cached, fromCache: true }
+    } catch (err) {
+      if (err.code !== 'NoSuchKey') throw err
+      // NoSuchKey：未命中，继续裁剪
+    }
+
+    // 2. 读原图 → sharp 裁剪为 WebP（fit=cover 居中，quality≈80）
+    const original = await this.getImageBuffer(objectKey)
+    const resizedBuffer = await sharp(original.body)
+      .resize(tierWidth, null, { fit: 'inside', withoutEnlargement: true })
+      .webp({ quality: 80 })
+      .toBuffer()
+
+    // 3. 回写 Sealos 缓存目录（内网优先，失败回退公网；不阻塞返回）
+    await this._uploadWithFallback(
+      {
+        Bucket: this.config.bucket,
+        Key: cacheKey,
+        Body: resizedBuffer,
+        ContentType: 'image/webp',
+        ContentDisposition: 'inline',
+        ACL: 'public-read',
+        CacheControl: 'max-age=31536000'
+      },
+      'resized_image_cache'
+    ).catch(uploadErr => {
+      // 回写失败不影响本次返回（下次再裁），仅告警
+      logger.warn('⚠️ 裁剪图缓存回写失败（不影响本次返回）', {
+        cacheKey,
+        error: uploadErr.message
+      })
+    })
+
+    return {
+      body: resizedBuffer,
+      contentType: 'image/webp',
+      contentLength: resizedBuffer.length,
+      fromCache: false
+    }
+  }
+
+  /**
    * 🔴 获取文件元数据
    * @param {string} fileKey - 文件Key
    * @returns {Promise<Object>} 文件元数据
@@ -640,7 +740,7 @@ class SealosStorageService {
    * 🔴 上传图片并预生成缩略图（方案B - 2026-01-08 拍板确认）
    *
    * 🎯 架构决策（2026-01-08 用户拍板）：
-   * - 预生成 3 档缩略图：small(150x150)/medium(300x300)/large(600x600)
+   * - 预生成 3 档缩略图：small(150x150)/medium(300x300)/large(800x800)
    * - 裁剪规则：fit=cover（保持宽高比裁剪）、position=center（居中裁剪）
    * - 输出格式：统一 JPEG(quality=80)，透明背景图保留 PNG
    * - 目录结构：{folder}/thumbnails/{size}/xxx.jpg
@@ -706,7 +806,11 @@ class SealosStorageService {
       const sizes = {
         small: { width: 150, height: 150 },
         medium: { width: 300, height: 300 },
-        large: { width: 600, height: 600 }
+        /*
+         * large 调至 800×800（兑换商城列表清晰度优化 2026-06-22）：
+         * 列表卡片在高 DPR(2~3x) 设备上需 ~700-1000px 才清晰，600 偏小，提至 800 作默认大图兜底
+         */
+        large: { width: 800, height: 800 }
       }
 
       // 🔧 使用 Promise.all 并行生成并上传缩略图（避免 await-in-loop 警告）

@@ -628,7 +628,7 @@ describe('IdempotencyService - 单元测试（核心逻辑验证）', () => {
           user_id: 123,
           token: 'jwt_secret_token',
           password: 'user_password',
-          phone: '13612227930',
+          phone: '13612227910',
           mobile: '13800138000',
           openid: 'wx_openid_xxx',
           unionid: 'wx_unionid_xxx',
@@ -675,7 +675,7 @@ describe('IdempotencyService - 单元测试（核心逻辑验证）', () => {
           user: {
             profile: {
               name: '张三',
-              phone: '13612227930',
+              phone: '13612227910',
               details: {
                 mobile: '13800138000'
               }
@@ -699,7 +699,7 @@ describe('IdempotencyService - 单元测试（核心逻辑验证）', () => {
         data: {
           user_token: 'xxx',
           auth_password: 'yyy',
-          user_phone_number: '13612227930'
+          user_phone_number: '13612227910'
         }
       }
 

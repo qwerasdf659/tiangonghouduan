@@ -65,7 +65,7 @@ describe('消费记录API测试套件', () => {
     console.log(`📍 测试门店ID: ${test_store_id}`)
 
     /*
-     * 登录获取token（测试账号13612227930既是用户也是管理员，role_level=100）
+     * 登录获取token（测试账号13612227910既是用户也是管理员，role_level=100）
      * 多平台会话隔离策略下，同user_type+同platform只保留最新会话
      * 因此只登录一次，admin token 同时用于管理员和普通用户操作
      */

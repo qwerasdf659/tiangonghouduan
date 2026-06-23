@@ -307,7 +307,7 @@ class ItemManagementService {
         const mediaService = new MediaService({ getService: () => null })
         await mediaService.attach(
           primaryMediaId,
-          'product',
+          'exchange_item',
           item.exchange_item_id,
           'primary',
           0,
@@ -482,7 +482,7 @@ class ItemManagementService {
 
       if (old_media_id && old_media_id !== new_media_id) {
         try {
-          await mediaService.detach('product', item_id, 'primary', transaction)
+          await mediaService.detach('exchange_item', item_id, 'primary', transaction)
           deleted_old_image = true
           logger.info('[兑换市场] 商品旧主媒体解绑成功', { item_id, old_media_id })
         } catch (imageError) {
@@ -498,7 +498,7 @@ class ItemManagementService {
         try {
           await mediaService.attach(
             new_media_id,
-            'product',
+            'exchange_item',
             item_id,
             'primary',
             0,
@@ -651,7 +651,12 @@ class ItemManagementService {
     if (associated_media_id) {
       try {
         const mediaService = new MediaService({ getService: () => null })
-        const deletedCount = await mediaService.detach('product', item_id, 'primary', transaction)
+        const deletedCount = await mediaService.detach(
+          'exchange_item',
+          item_id,
+          'primary',
+          transaction
+        )
         logger.info('[兑换市场] 商品关联主媒体解绑成功', {
           item_id,
           media_id: associated_media_id,

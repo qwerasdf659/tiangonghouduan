@@ -81,7 +81,7 @@ class BatchOperationService {
 
         await mediaService.attach(
           binding.media_id,
-          'product',
+          'exchange_item',
           binding.exchange_item_id,
           'primary',
           0,

@@ -51,7 +51,7 @@ describe('背包与兑换集成测试', () => {
     try {
       // 使用测试用户
       test_user = await User.findOne({
-        where: { mobile: '13612227930' }
+        where: { mobile: '13612227910' }
       })
 
       if (!test_user) {

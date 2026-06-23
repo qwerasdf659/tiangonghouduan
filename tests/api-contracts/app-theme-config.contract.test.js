@@ -5,7 +5,7 @@
  * - GET  /api/v4/console/system/app-theme-config（管理后台读取，需鉴权）
  * - PUT  /api/v4/console/system/app-theme-config（管理后台更新，需鉴权 + 校验）
  *
- * 真实数据：连真实库 restaurant_points_dev，使用测试账号 13612227930 / 123456 登录取真实 JWT，
+ * 真实数据：连真实库 restaurant_points_dev，使用测试账号 13612227910 / 123456 登录取真实 JWT，
  * 不使用 mock/硬编码 token。更新用例读取当前主题→改写→断言→回写，保证不污染真实环境。
  *
  * @date 2026-06-03
@@ -26,7 +26,7 @@ describe('API契约测试 - 全局氛围主题配置', () => {
 
     const loginResponse = await request(app)
       .post('/api/v4/auth/login')
-      .send({ mobile: '13612227930', verification_code: '123456' })
+      .send({ mobile: '13612227910', verification_code: '123456' })
 
     if (loginResponse.body.success) {
       accessToken = loginResponse.body.data.access_token

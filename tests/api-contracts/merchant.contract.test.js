@@ -27,7 +27,7 @@ describe('API契约测试 - 商户模块 (/api/v4/shop, /api/v4/console)', () =>
     // 登录获取 Token（管理员账号）
     const loginResponse = await request(app)
       .post('/api/v4/auth/login')
-      .send({ mobile: '13612227930', verification_code: '123456' })
+      .send({ mobile: '13612227910', verification_code: '123456' })
 
     if (loginResponse.body.success) {
       accessToken = loginResponse.body.data.access_token
@@ -187,14 +187,14 @@ describe('API契约测试 - 商户模块 (/api/v4/shop, /api/v4/console)', () =>
       const response = await request(app)
         .get('/api/v4/console/merchants')
         .set('Authorization', `Bearer ${accessToken}`)
-        .query({ contact_mobile: '13612227930' })
+        .query({ contact_mobile: '13612227910' })
 
       expect(response.status).toBe(200)
       validateApiContract(response.body)
 
       if (response.body.data.total > 0) {
         response.body.data.list.forEach(m => {
-          expect(m.contact_mobile).toContain('13612227930')
+          expect(m.contact_mobile).toContain('13612227910')
         })
       }
     })

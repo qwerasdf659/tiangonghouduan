@@ -152,7 +152,7 @@ describe('P3-11: 异步任务补偿测试', () => {
 
     // 从数据库获取真实测试用户
     const testUser = await User.findOne({
-      where: { mobile: '13612227930' },
+      where: { mobile: '13612227910' },
       attributes: ['user_id', 'nickname', 'mobile']
     })
 

@@ -27,7 +27,7 @@ describe('API契约测试 - 反馈模块 (/api/v4/system)', () => {
     // 登录获取 Token
     const loginResponse = await request(app)
       .post('/api/v4/auth/login')
-      .send({ mobile: '13612227930', verification_code: '123456' })
+      .send({ mobile: '13612227910', verification_code: '123456' })
 
     if (loginResponse.body.success) {
       accessToken = loginResponse.body.data.access_token
@@ -69,7 +69,7 @@ describe('API契约测试 - 反馈模块 (/api/v4/system)', () => {
         .send({
           type: 'suggestion',
           content: '这是一条测试反馈内容',
-          contact: '13612227930'
+          contact: '13612227910'
         })
 
       // 可能成功也可能因为限流失败

@@ -7,7 +7,7 @@
  * 业务背景（限流议题A·治理项2）：冷启动首屏一次性聚合 活动列表 + 位置配置 + 版本闸门，
  * 把"多个并行请求"变"单请求"，从源头削并发峰值，降低 429。
  *
- * 真实数据：连真实库 restaurant_points_dev，匿名 + 真实账号 13612227930/123456 两种场景都验证，
+ * 真实数据：连真实库 restaurant_points_dev，匿名 + 真实账号 13612227910/123456 两种场景都验证，
  * 不使用 mock/硬编码。
  *
  * @date 2026-06-12
@@ -28,7 +28,7 @@ describe('API契约测试 - 首页 BFF 聚合（/api/v4/home/bootstrap）', () =
 
     const loginResponse = await request(app)
       .post('/api/v4/auth/login')
-      .send({ mobile: '13612227930', verification_code: '123456' })
+      .send({ mobile: '13612227910', verification_code: '123456' })
 
     if (loginResponse.body.success) {
       accessToken = loginResponse.body.data.access_token

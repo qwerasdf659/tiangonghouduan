@@ -6,7 +6,7 @@
  * - 移除所有占位测试和Mock代码
  * - 统一使用snake_case命名规范
  * - 基于真实业务逻辑验证功能
- * - 使用真实测试用户 13612227930
+ * - 使用真实测试用户 13612227910
  * - 只测试实际存在的策略：basic_guarantee（已统一为 Pipeline 架构）
  *
  * 🔴 P0-1修复（2026-01-08）：移除硬编码 user_id=31，从 global.testData 动态获取
@@ -38,7 +38,7 @@ describe('V4统一抽奖引擎主引擎测试 - 重构版', () => {
    * 🔴 P0-1修复：移除硬编码 user_id，在 beforeAll 中动态获取
    */
   const REAL_TEST_USER_CONFIG = {
-    mobile: '13612227930',
+    mobile: '13612227910',
     // 🔴 P0-1修复：user_id 在 beforeAll 中从数据库查询确认
     required_points: 1000 // 确保测试时有足够积分
   }

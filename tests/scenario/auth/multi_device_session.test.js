@@ -23,7 +23,7 @@ const request = require('supertest')
 const app = require('../../../app')
 const { sequelize, AuthenticationSession, User } = require('../../../models')
 
-const TEST_MOBILE = '13612227930' // 统一测试用户手机号
+const TEST_MOBILE = '13612227910' // 统一测试用户手机号
 const TEST_VERIFICATION_CODE = '123456' // 开发环境万能验证码
 
 // 模拟两台不同设备的稳定 device_id（前端生成并持久化的 UUID）

@@ -53,7 +53,7 @@ describe('📊 任务11.2：活动全生命周期测试', () => {
   let testCampaignName
 
   // 测试常量
-  const TEST_MOBILE = '13612227930'
+  const TEST_MOBILE = '13612227910'
   const VERIFICATION_CODE = '123456'
 
   beforeAll(async () => {

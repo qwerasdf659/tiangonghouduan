@@ -8,7 +8,7 @@
  * - 支付资产查询（联动 material_asset_types + account_asset_balances）
  *
  * 使用真实数据库，不使用 mock 数据
- * 测试用户：13612227930（既是用户也是管理员）
+ * 测试用户：13612227910（既是用户也是管理员）
  */
 
 'use strict'
@@ -33,7 +33,7 @@ beforeAll(async () => {
   // 使用 quick-login 获取 token
   const loginRes = await request(app)
     .post('/api/v4/auth/quick-login')
-    .send({ mobile: '13612227930' })
+    .send({ mobile: '13612227910' })
 
   expect(loginRes.body.success).toBe(true)
   adminToken = loginRes.body.data.access_token

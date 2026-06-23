@@ -84,7 +84,7 @@ describe('📊 任务11.3：保底触发完整链路测试', () => {
   const HIGH_TIER_VALUES = ['high', 'ultra', 'legendary']
 
   // 测试常量
-  const TEST_MOBILE = '13612227930'
+  const TEST_MOBILE = '13612227910'
   const VERIFICATION_CODE = '123456'
   const GRANT_POINTS_AMOUNT = 5000 // 发放足够的积分用于测试
 

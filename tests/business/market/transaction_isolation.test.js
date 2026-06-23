@@ -54,11 +54,11 @@ describe('🔬 事务隔离测试（Transaction Isolation）', () => {
 
     // 获取测试用户
     testUser = await User.findOne({
-      where: { mobile: '13612227930', status: 'active' }
+      where: { mobile: '13612227910', status: 'active' }
     })
 
     if (!testUser) {
-      throw new Error('未找到测试用户 13612227930')
+      throw new Error('未找到测试用户 13612227910')
     }
 
     // 获取用户的资产账户ID（items.owner_account_id 是 FK → accounts.account_id）

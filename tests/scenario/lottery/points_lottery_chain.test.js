@@ -49,7 +49,7 @@ describe('📊 任务11.1：积分发放→抽奖消费完整链路测试', () =
 
   // 测试常量
   const GRANT_POINTS_AMOUNT = 1000 // 发放积分数量
-  const TEST_MOBILE = '13612227930' // 测试手机号
+  const TEST_MOBILE = '13612227910' // 测试手机号
   const VERIFICATION_CODE = '123456' // 开发环境验证码
 
   beforeAll(async () => {

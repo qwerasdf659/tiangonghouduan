@@ -41,7 +41,7 @@ describe('API契约测试 - 资产模块 (/api/v4/assets)', () => {
 
     // 使用测试账号登录获取Token
     const login_response = await request(app).post('/api/v4/auth/login').send({
-      mobile: '13612227930',
+      mobile: '13612227910',
       verification_code: '123456'
     })
 
@@ -355,7 +355,7 @@ describe('API契约测试 - 资产模块 (/api/v4/assets)', () => {
         expect(response.status).toBe(200)
         validateApiContract(response.body)
 
-        // 验证有数据返回（测试账号 13612227930 有 POINTS 流水）
+        // 验证有数据返回（测试账号 13612227910 有 POINTS 流水）
         expect(response.body.data.transactions.length).toBeGreaterThan(0)
 
         const tx = response.body.data.transactions[0]

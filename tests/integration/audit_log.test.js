@@ -24,7 +24,7 @@ describe('审计日志功能测试', () => {
     // 1. 获取管理员token
     try {
       const loginRes = await request(app).post('/api/v4/auth/login').send({
-        mobile: '13612227930',
+        mobile: '13612227910',
         verification_code: '123456'
       })
 

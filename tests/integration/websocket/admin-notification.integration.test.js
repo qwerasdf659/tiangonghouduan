@@ -38,7 +38,7 @@ const TEST_CONFIG = {
   /** 通知等待超时时间（毫秒） */
   notificationTimeout: 5000,
   /** 测试用户手机号 */
-  testUserMobile: '13612227930',
+  testUserMobile: '13612227910',
   /** 开发环境万能验证码 */
   testVerificationCode: '123456'
 }
@@ -424,7 +424,7 @@ describe('WebSocket管理员通知集成测试（P1-4.3）', () => {
       expect(sessionNotification.created_at).toBeDefined()
 
       // 验证用户信息脱敏
-      expect(sessionNotification.user_info.mobile).not.toBe('13612227930')
+      expect(sessionNotification.user_info.mobile).not.toBe('13612227910')
       expect(sessionNotification.user_info.mobile).toMatch(/\d{3}\*{4}\d{4}/)
 
       console.log('✅ 会话通知数据结构验证通过')

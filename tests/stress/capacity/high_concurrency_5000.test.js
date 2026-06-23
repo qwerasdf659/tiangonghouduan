@@ -488,7 +488,7 @@ describe('🚀 5000并发压力测试（P2-3）', () => {
             await IdempotencyService.getOrCreateRequest(idempotencyKey, {
               api_path: '/api/v4/auth/login',
               http_method: 'POST',
-              request_params: { mobile: '13612227930' },
+              request_params: { mobile: '13612227910' },
               user_id: testUserId
             })
 
@@ -584,7 +584,7 @@ describe('🚀 5000并发压力测试（P2-3）', () => {
               await IdempotencyService.getOrCreateRequest(idempotencyKey, {
                 api_path: '/api/v4/auth/login',
                 http_method: 'POST',
-                request_params: { mobile: '13612227930' },
+                request_params: { mobile: '13612227910' },
                 user_id: testUserId
               })
               return { success: true }

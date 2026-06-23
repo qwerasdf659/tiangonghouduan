@@ -25,13 +25,13 @@ describe('auth 中间件测试 - UUID角色系统', () => {
      */
     validUser = {
       user_id: testUserId, // 🔴 P0-1修复：动态获取，不再硬编码
-      mobile: '13612227930',
+      mobile: '13612227910',
       status: 'active'
     }
 
     adminUser = {
       user_id: testUserId, // 🔴 P0-1修复：动态获取，不再硬编码
-      mobile: '13612227930',
+      mobile: '13612227910',
       status: 'active',
       role_level: 100 // 管理员权限级别
     }

@@ -6,7 +6,7 @@
  *
  * 业务背景:
  * - 测试环境使用万能验证码 123456
- * - 所有测试共用测试用户 mobile: 13612227930
+ * - 所有测试共用测试用户 mobile: 13612227910
  * - 🔴 P0-1修复：user_id 从数据库动态获取，不再硬编码
  * - 需要真实的JWT token进行API测试
  *
@@ -67,7 +67,7 @@ async function getTestUserToken(app, mobile = TEST_DATA.users.testUser.mobile, c
  * 以管理员身份登录（supertest 风格）
  *
  * 2026-06-14 修正：管理员账号从角色契约表 TEST_ACCOUNTS.admin 取（13612227910，role_level>=100），
- * 不再依赖各文件硬编码。历史上曾误用 13612227930（regional_manager:80）导致 403。
+ * 不再依赖各文件硬编码。历史上曾误用 13612227910（regional_manager:80）导致 403。
  *
  * @param {Object} app - Express应用实例
  * @returns {Promise<string>} 管理员JWT认证Token
@@ -200,8 +200,8 @@ async function getUserInfo(app, token) {
  * @returns {Promise<Map>} 手机号到Token的映射
  *
  * @example
- * const tokens = await batchLogin(app, ['13612227930', '13800138000'])
- * const token1 = tokens.get('13612227930')
+ * const tokens = await batchLogin(app, ['13612227910', '13800138000'])
+ * const token1 = tokens.get('13612227910')
  */
 async function batchLogin(app, mobiles) {
   const tokenMap = new Map()

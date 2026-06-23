@@ -713,14 +713,39 @@ class MediaService {
   async getOrphanedMedia(olderThanHours = 24) {
     const threshold = new Date(Date.now() - olderThanHours * 60 * 60 * 1000)
 
+    // 引用来源1：media_attachments 多态关联（gallery/icon/banner 等）
     const attachedMediaIds = await MediaAttachment.findAll({
       attributes: ['media_id'],
       raw: true
-    }).then(rows => [...new Set(rows.map(r => r.media_id))])
+    }).then(rows => rows.map(r => r.media_id))
+
+    /*
+     * 引用来源2（2026-06-24 修复高危误删）：业务表 primary_media_id 直引。
+     * exchange_item / prize_definition / item_template / ad_creative 这 4 类图通过
+     * primary_media_id 外键直接引用 media_files，不经过 media_attachments。
+     * 旧逻辑只查 media_attachments，导致这些"正在使用"的图被误判为孤儿并物理删除
+     * （典型现象：广告/Banner 图、商品图、奖品图配好后约 24h 被定时任务删掉）。
+     * 此处把这 4 张表的 primary_media_id 一并纳入"已引用"集合，杜绝误删。
+     */
+    const referencedByPrimaryMedia = []
+    for (const { modelName } of Object.values(PRIMARY_MEDIA_TABLES)) {
+      const Model = models[modelName]
+      if (!Model || !Model.rawAttributes?.primary_media_id) continue
+      // eslint-disable-next-line no-await-in-loop
+      const rows = await Model.findAll({
+        attributes: ['primary_media_id'],
+        where: { primary_media_id: { [Op.ne]: null } },
+        raw: true
+      })
+      rows.forEach(r => referencedByPrimaryMedia.push(r.primary_media_id))
+    }
+
+    // 合并所有引用来源，得到"在用 media_id"全集
+    const usedMediaIds = [...new Set([...attachedMediaIds, ...referencedByPrimaryMedia])]
 
     const orphans = await MediaFile.findAll({
       where: {
-        media_id: { [Op.notIn]: attachedMediaIds.length > 0 ? attachedMediaIds : [0] },
+        media_id: { [Op.notIn]: usedMediaIds.length > 0 ? usedMediaIds : [0] },
         status: 'active',
         created_at: { [Op.lt]: threshold }
       },

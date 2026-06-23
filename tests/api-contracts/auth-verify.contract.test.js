@@ -24,7 +24,7 @@ describe('GET /api/v4/auth/verify 契约测试', () => {
   beforeAll(async () => {
     /**
      * 🔐 使用真实登录获取Token
-     * 测试账号: 13612227930（既是用户也是管理员）
+     * 测试账号: 13612227910（既是用户也是管理员）
      */
     try {
       userToken = await getTestUserToken(app)
@@ -153,7 +153,7 @@ describe('GET /api/v4/auth/verify 契约测试', () => {
        * 注意：is_admin 字段已移除，前端应使用 role_level 判断
        */
       expect(typeof data.role_level).toBe('number')
-      // 测试账号 13612227930 是管理员，role_level 应 >= 100
+      // 测试账号 13612227910 是管理员，role_level 应 >= 100
       expect(data.role_level).toBeGreaterThanOrEqual(100)
     })
 

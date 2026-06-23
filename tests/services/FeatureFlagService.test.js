@@ -56,11 +56,11 @@ describe('FeatureFlagService - 功能开关服务', () => {
   beforeEach(async () => {
     // 使用测试用户
     test_user = await User.findOne({
-      where: { mobile: '13612227930' }
+      where: { mobile: '13612227910' }
     })
 
     if (!test_user) {
-      throw new Error('测试用户不存在，请先创建 mobile=13612227930 的用户')
+      throw new Error('测试用户不存在，请先创建 mobile=13612227910 的用户')
     }
   })
 

@@ -44,7 +44,7 @@ describe('API契约测试 - 以物易物 (/api/v4/exchange/barter)', () => {
     }
 
     const login_response = await request(app).post('/api/v4/auth/login').send({
-      mobile: '13612227930',
+      mobile: '13612227910',
       verification_code: '123456'
     })
     if (login_response.body.success) {

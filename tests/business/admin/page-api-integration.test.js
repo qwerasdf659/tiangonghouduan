@@ -24,7 +24,7 @@ let adminToken = ''
 beforeAll(async () => {
   /*
    * 🔐 2026-06-14：统一通过角色契约登录管理员（13612227910，role_level>=100）
-   * 历史问题：曾内联硬编码 13612227930（regional_manager:80），访问管理接口被正确拒绝(403)
+   * 历史问题：曾内联硬编码 13612227910（regional_manager:80），访问管理接口被正确拒绝(403)
    */
   adminToken = await loginAs(app, 'admin')
   expect(adminToken).toBeTruthy()

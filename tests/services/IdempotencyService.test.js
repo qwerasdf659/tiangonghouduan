@@ -96,7 +96,7 @@ async function cleanupTestIdempotencyRecords(pattern = 'idem_test_%') {
 describe('IdempotencyService - 幂等服务单元测试', () => {
   /**
    * 测试用户ID（从真实数据库获取）
-   * 使用 mobile='13612227930' 的测试用户
+   * 使用 mobile='13612227910' 的测试用户
    */
   let test_user_id = null
 
@@ -112,13 +112,13 @@ describe('IdempotencyService - 幂等服务单元测试', () => {
     await sequelize.authenticate()
     console.log('✅ [IdempotencyService.test] 数据库连接成功')
 
-    // 获取测试用户（mobile='13612227930'）
+    // 获取测试用户（mobile='13612227910'）
     const test_user = await User.findOne({
-      where: { mobile: '13612227930' }
+      where: { mobile: '13612227910' }
     })
 
     if (!test_user) {
-      throw new Error('测试用户不存在，请先创建 mobile=13612227930 的用户')
+      throw new Error('测试用户不存在，请先创建 mobile=13612227910 的用户')
     }
 
     test_user_id = test_user.user_id
@@ -586,7 +586,7 @@ describe('IdempotencyService - 幂等服务单元测试', () => {
           user_id: 123,
           token: 'jwt_secret_token_12345',
           password: 'user_password_hash',
-          phone: '13612227930',
+          phone: '13612227910',
           openid: 'wx_openid_12345',
           profile: {
             name: '张三',

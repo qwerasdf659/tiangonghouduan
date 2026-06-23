@@ -81,11 +81,11 @@ describe('BalanceService - 资产余额服务核心功能测试', () => {
     } else {
       // 回退方案：从数据库查询测试用户
       test_user = await User.findOne({
-        where: { mobile: '13612227930', status: 'active' }
+        where: { mobile: '13612227910', status: 'active' }
       })
 
       if (!test_user) {
-        throw new Error('测试用户不存在，请先创建 mobile=13612227930 的用户')
+        throw new Error('测试用户不存在，请先创建 mobile=13612227910 的用户')
       }
 
       test_user_id = test_user.user_id

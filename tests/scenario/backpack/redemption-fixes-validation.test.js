@@ -35,7 +35,7 @@ describe('核销系统修复验证测试', () => {
   beforeAll(async () => {
     try {
       // 创建测试用户（普通用户）
-      testUser = await User.findOne({ where: { mobile: '13612227930' } })
+      testUser = await User.findOne({ where: { mobile: '13612227910' } })
       if (!testUser) {
         console.warn('⚠️ 测试用户不存在，跳过测试')
         skipTests = true

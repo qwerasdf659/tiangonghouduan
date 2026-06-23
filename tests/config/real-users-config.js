@@ -18,11 +18,13 @@ const REAL_USER_CONFIG = {
     // 普通测试用户1 - 已配置为真实账户
     regularUser1: process.env.TEST_USER1_MOBILE || '13612227910',
 
-    // 普通测试用户2 - 已配置为真实账户
-    regularUser2: process.env.TEST_USER2_MOBILE || '13612227911',
+    /*
+     * 普通测试用户2 - 清档后（生产基线库仅保留超管）原 13612227910 已删除，统一指向 13612227910
+     */
+    regularUser2: process.env.TEST_USER2_MOBILE || '13612227910',
 
     /*
-     * 🔐 管理员用户 - 2026-06-14 修正：原值 13612227930 是 regional_manager(80) 非管理员，
+     * 🔐 管理员用户 - 2026-06-14 修正：原值 13612227910 是 regional_manager(80) 非管理员，
      * 真正的管理员是 13612227910(admin:100/super_admin:110)，与 .env SUPER_ADMIN_MOBILE 一致
      */
     adminUser: process.env.TEST_ADMIN_MOBILE || '13612227910'
@@ -31,12 +33,12 @@ const REAL_USER_CONFIG = {
   // 🆔 方式2：通过用户ID指定用户（备选）
   byUserId: {
     /*
-     * 真实用户ID（从真实库 restaurant_points_dev 核对，2026-06-14）
-     * user_id=32 → 13612227910(admin)，user_id=33 → 13612227911(user)
+     * 真实用户ID（清档后真实库 restaurant_points_dev 仅保留超管 user_id=32）
+     * 原 user_id=33(13612227910) 已删除，统一指向 32。
      */
     regularUser1: process.env.TEST_USER1_ID ? parseInt(process.env.TEST_USER1_ID) : 32,
-    regularUser2: process.env.TEST_USER2_ID ? parseInt(process.env.TEST_USER2_ID) : 33,
-    // 🔐 管理员 user_id=32（13612227910）。原值 31 是 13612227930(regional_manager:80)，会导致管理员权限校验失败
+    regularUser2: process.env.TEST_USER2_ID ? parseInt(process.env.TEST_USER2_ID) : 32,
+    // 🔐 管理员 user_id=32（13612227910）。原值 31 是 13612227910(regional_manager:80)，会导致管理员权限校验失败
     adminUser: process.env.TEST_ADMIN_ID ? parseInt(process.env.TEST_ADMIN_ID) : 32
   },
 

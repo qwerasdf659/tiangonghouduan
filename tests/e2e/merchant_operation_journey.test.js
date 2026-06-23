@@ -14,7 +14,7 @@
  *
  * 测试策略：
  * - 使用真实数据库（restaurant_points_dev）
- * - 使用测试账号 13612227930（既是用户也是管理员）
+ * - 使用测试账号 13612227910（既是用户也是管理员）
  * - 验证商户域权限体系
  */
 
@@ -43,7 +43,7 @@ describe('E2E - 商户运营流程测试', () => {
 
     // 使用测试账号登录（管理员权限）
     const loginResponse = await request(app).post('/api/v4/auth/login').send({
-      mobile: '13612227930',
+      mobile: '13612227910',
       verification_code: '123456'
     })
 

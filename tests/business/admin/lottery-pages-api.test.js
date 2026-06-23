@@ -43,7 +43,7 @@ async function apiRequest(method, path, body = null) {
 beforeAll(async () => {
   /*
    * 🔐 2026-06-14：这些 /console/* 接口需管理员权限（requireRoleLevel(100)），
-   * 统一通过角色契约登录 admin（13612227910）。历史上误用 13612227930(regional_manager:80) 导致整片 403。
+   * 统一通过角色契约登录 admin（13612227910）。历史上误用 13612227910(regional_manager:80) 导致整片 403。
    */
   accessToken = await loginAsViaFetch('admin', API_BASE);
   expect(accessToken).toBeTruthy();
@@ -227,7 +227,7 @@ describe('数据联通性 - 跨页面数据一致性', () => {
   test('用户解析 - 供批量操作解析手机号使用', async () => {
     const result = await apiRequest(
       'GET',
-      '/console/user-management/users/resolve?mobile=13612227930'
+      '/console/user-management/users/resolve?mobile=13612227910'
     );
     expect(result.success).toBe(true);
     expect(result.data).toBeDefined();

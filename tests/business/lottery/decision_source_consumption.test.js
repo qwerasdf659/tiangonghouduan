@@ -11,7 +11,7 @@
  *
  * 测试策略：
  * - 使用真实数据库（restaurant_points_dev）
- * - 测试用户：13612227930（user_id 从 global.testData 获取，兜底 31）
+ * - 测试用户：13612227910（user_id 从 global.testData 获取，兜底 31）
  * - 测试前创建预设记录，测试后清理
  *
  * @file tests/business/lottery/decision_source_consumption.test.js
@@ -31,7 +31,7 @@ function getTestUserId() {
   if (global.testData && global.testData.testUser) {
     return global.testData.testUser.user_id
   }
-  return 31 // 兜底值：测试账号 13612227930 对应的 user_id
+  return 31 // 兜底值：测试账号 13612227910 对应的 user_id
 }
 
 /**

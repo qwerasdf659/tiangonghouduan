@@ -22,7 +22,7 @@
  * 测试数据：
  * - 使用真实数据库 restaurant_points_dev
  * - 测试账号从 global.testData 动态获取
- * - 测试用户：13612227930
+ * - 测试用户：13612227910
  */
 
 'use strict'
@@ -82,10 +82,10 @@ describe('🎯 完整业务链路测试（任务 11.5/11.7/11.8）', () => {
 
     /* 获取测试用户A（主测试用户 - 卖家角色） */
     testUserA = await User.findOne({
-      where: { mobile: '13612227930' }
+      where: { mobile: '13612227910' }
     })
     if (!testUserA) {
-      throw new Error('测试用户A不存在，请先创建 mobile=13612227930 的用户')
+      throw new Error('测试用户A不存在，请先创建 mobile=13612227910 的用户')
     }
 
     /* 获取测试用户B（买家角色 - 使用 13612227910） */

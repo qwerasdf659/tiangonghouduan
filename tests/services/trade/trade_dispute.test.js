@@ -10,7 +10,7 @@
  * - 连接真实数据库 restaurant_points_dev（禁止 mock）
  * - 通过 ServiceManager 获取服务（snake_case key: trade_dispute）
  * - 所有写操作在事务内执行并在断言后回滚，避免污染真实库
- * - 测试账号 user_id=31（13612227930），既是用户也是管理员
+ * - 测试账号 user_id=31（13612227910），既是用户也是管理员
  *
  * @module tests/services/trade/trade_dispute.test
  */
@@ -19,7 +19,7 @@
 
 const { sequelize, User } = require('../../../models')
 
-/** 测试用户：13612227930，user_id=31 */
+/** 测试用户：13612227910，user_id=31 */
 const TEST_USER_ID = 31
 
 let TradeDisputeService

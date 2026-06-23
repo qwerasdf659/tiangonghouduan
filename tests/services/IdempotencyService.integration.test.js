@@ -75,7 +75,7 @@ describe('IdempotencyService - 集成测试（数据库交互与并发验证）'
     // 获取真实测试用户
     const { User } = require('../../models')
     const testUser = await User.findOne({
-      where: { mobile: '13612227930', status: 'active' }
+      where: { mobile: '13612227910', status: 'active' }
     })
 
     if (testUser) {
@@ -461,7 +461,7 @@ describe('IdempotencyService - 集成测试（数据库交互与并发验证）'
         data: {
           user_id: 123,
           token: 'jwt_secret_token',
-          phone: '13612227930',
+          phone: '13612227910',
           order_id: 456
         }
       }

@@ -73,13 +73,13 @@ describe('🔴 P0级回归测试入口 - 核心业务路径', () => {
       console.log(`✅ 测试用户: user_id=${testUserId}`)
     } else {
       const user = await User.findOne({
-        where: { mobile: '13612227930', status: 'active' }
+        where: { mobile: '13612227910', status: 'active' }
       })
       if (user) {
         testUserId = user.user_id
         console.log(`✅ 从数据库获取测试用户: user_id=${testUserId}`)
       } else {
-        console.warn('⚠️ 未找到测试用户 mobile=13612227930')
+        console.warn('⚠️ 未找到测试用户 mobile=13612227910')
       }
     }
 

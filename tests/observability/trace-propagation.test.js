@@ -355,7 +355,7 @@ describe('P2-3.3: 生产环境链路追踪集成测试', () => {
     try {
       const loginResponse = await request(app)
         .post('/api/v4/auth/login')
-        .send({ mobile: '13612227930', verification_code: '123456' })
+        .send({ mobile: '13612227910', verification_code: '123456' })
 
       if (loginResponse.body.success && loginResponse.body.data?.access_token) {
         authToken = loginResponse.body.data.access_token

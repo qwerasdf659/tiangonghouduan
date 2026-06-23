@@ -6,7 +6,7 @@
  *
  * 业务背景：
  * - 项目使用真实MySQL数据库进行测试(restaurant_points_dev)
- * - 所有测试共用一个测试用户(mobile: 13612227930)
+ * - 所有测试共用一个测试用户(mobile: 13612227910)
  * - 需要避免测试数据冲突和不一致
  *
  * 设计原则：
@@ -80,7 +80,7 @@ const TEST_DATA = {
     get testUser() {
       return {
         user_id: getTestUserId(), // 🔴 P0-1修复：动态获取，不再硬编码
-        mobile: '13612227930', // 测试手机号
+        mobile: '13612227910', // 测试手机号（清档后统一用超管 13612227910）
         nickname: '测试用户' // 用户昵称
         /*
          * 业务含义：默认测试用户，用于所有需要用户身份的测试场景
@@ -98,7 +98,7 @@ const TEST_DATA = {
         /*
          * 业务含义：超级管理员用户（role_level>=100），用于测试后台管理功能
          * 使用场景：商家审核、订单管理、竞价管理、数据统计等需要管理员权限的接口
-         * 注意：与普通测试用户 13612227930（regional_manager:80）是不同账号，权限不同
+         * 注意：与普通测试用户 13612227910（regional_manager:80）是不同账号，权限不同
          */
       }
     }
@@ -598,17 +598,16 @@ const testScenarios = {
  * ==========================================
  *
  * 设计目的（解决长期技术债）：
- * - 历史问题：96 个测试文件各自内联硬编码 mobile（如 '13612227930'），
+ * - 历史问题：96 个测试文件各自内联硬编码 mobile（如 '13612227910'），
  *   换账号要改几十个文件；且常误把 regional_manager(80) 当管理员用 →
  *   访问 requireRoleLevel(100) 接口被后端正确拒绝(403) → 测试整片失败。
  * - 解决方案：所有测试账号在此处「按角色语义」集中定义，
  *   测试只声明「我要一个 admin / 一个普通 user」，不再关心具体手机号。
  *   换账号只改这一处即可全局生效。
  *
- * 真实库核对（restaurant_points_dev，2026-06-14 通过 Node.js+Sequelize 实连核对）：
- *   13612227910 → admin(100)+super_admin(110)，maxRoleLevel=110  ← 真正的管理员
- *   13612227930 → regional_manager(80)，maxRoleLevel=80          ← 区域经理（非管理员！）
- *   13612227911 → user(0)
+ * 真实库核对（restaurant_points_dev，2026-06-22 通过 Node.js+Sequelize 实连核对）：
+ *   13612227910 → admin(100)+super_admin(110)，maxRoleLevel=110  ← 真正的管理员（user_id=32）
+ *   15818387910 → user(0)，maxRoleLevel=0                        ← 低权限普通用户（user_id=12796，权限边界测试专用）
  *
  * 字段说明：
  * - mobile：登录手机号（业务标识，开发/测试环境万能验证码 123456）
@@ -622,17 +621,25 @@ const TEST_ACCOUNTS = {
     expected_role_level: 100, // 真实库 110（admin+super_admin），断言 >= 100 即视为管理员
     description: '超级管理员（admin+super_admin），用于 Console 后台管理接口测试'
   },
-  // 区域经理：role_level=80，用于商家域/区域级权限测试（注意：不是管理员）
+  /*
+   * 区域经理键：上线前清测试数据后（生产基线库仅保留超管 13612227910），
+   * 原专用账号 13612227930(regional_manager:80) 已删除，统一指向 13612227910。
+   * ⚠️ 注意：该账号实际为 level 110 超管，故"区域经理无管理员权限"类边界用例不再具区分度（已知取舍）。
+   */
   regional_manager: {
-    mobile: '13612227930',
+    mobile: '13612227910',
     expected_role_level: 80,
-    description: '区域经理（regional_manager:80），用于区域级业务测试，无管理员权限'
+    description: '区域级业务测试（清档后统一用超管 13612227910，无独立区域经理账号）'
   },
-  // 普通用户：role_level=0，用于 C 端用户场景（抽奖/积分/兑换等）测试
+  /*
+   * 普通用户键：指向真实低权限账号 15818387910（user:0，user_id=12796，
+   * 由 seeders/20260622000000-seed-data-low-privilege-test-user.js 创建）。
+   * 用于验证「低权限用户访问管理端接口被正确 403 拒绝」等 C 端权限边界用例（具区分度）。
+   */
   user: {
-    mobile: '13612227911',
+    mobile: '15818387910',
     expected_role_level: 0,
-    description: '普通用户（user:0），用于 C 端用户身份测试'
+    description: 'C 端低权限普通用户（user:0），权限边界测试专用（≠ 超管，可验证低权限被拒）'
   }
 }
 

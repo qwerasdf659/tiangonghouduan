@@ -65,11 +65,11 @@ describe('UserRoleService - 用户角色服务', () => {
     } else {
       // 回退方案：从数据库查询测试用户
       const user = await User.findOne({
-        where: { mobile: '13612227930', status: 'active' }
+        where: { mobile: '13612227910', status: 'active' }
       })
 
       if (!user) {
-        throw new Error('测试用户不存在，请先创建 mobile=13612227930 的用户')
+        throw new Error('测试用户不存在，请先创建 mobile=13612227910 的用户')
       }
 
       test_user_id = user.user_id

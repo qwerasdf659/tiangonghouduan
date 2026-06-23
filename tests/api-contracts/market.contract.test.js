@@ -57,7 +57,7 @@ describe('API契约测试 - 市场模块 C2C 已下线 (/api/v4/marketplace → 
 
     // 使用测试账号登录获取Token（验证 410 判定不受登录态影响）
     const login_response = await request(app).post('/api/v4/auth/login').send({
-      mobile: '13612227930',
+      mobile: '13612227910',
       verification_code: '123456'
     })
 

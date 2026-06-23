@@ -29,7 +29,7 @@ jest.setTimeout(30000)
 /** 通过 ServiceManager 获取的会话服务实例（snake_case key，与路由层一致） */
 let CustomerServiceSessionService
 
-/** 测试用户ID（普通用户 13612227930），从 global.testData 动态获取，不硬编码 */
+/** 测试用户ID（普通用户 13612227910），从 global.testData 动态获取，不硬编码 */
 let testUserId = null
 
 /** 本测试新建的隔离会话ID列表（仅清理这些，绝不碰真实会话） */

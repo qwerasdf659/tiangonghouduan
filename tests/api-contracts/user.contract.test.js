@@ -27,7 +27,7 @@ describe('API契约测试 - 用户模块 (/api/v4/auth, /api/v4/assets)', () => 
     // 登录获取 Token
     const loginResponse = await request(app)
       .post('/api/v4/auth/login')
-      .send({ mobile: '13612227930', verification_code: '123456' })
+      .send({ mobile: '13612227910', verification_code: '123456' })
 
     if (loginResponse.body.success) {
       accessToken = loginResponse.body.data.access_token
@@ -66,7 +66,7 @@ describe('API契约测试 - 用户模块 (/api/v4/auth, /api/v4/assets)', () => 
     test('正常登录应该返回标准契约格式', async () => {
       const response = await request(app)
         .post('/api/v4/auth/login')
-        .send({ mobile: '13612227930', verification_code: '123456' })
+        .send({ mobile: '13612227910', verification_code: '123456' })
 
       expect(response.status).toBe(200)
       validateApiContract(response.body)
@@ -99,7 +99,7 @@ describe('API契约测试 - 用户模块 (/api/v4/auth, /api/v4/assets)', () => 
      * Case 3: 缺少验证码应该返回 400
      */
     test('缺少 verification_code 应该返回 400 VERIFICATION_CODE_REQUIRED', async () => {
-      const response = await request(app).post('/api/v4/auth/login').send({ mobile: '13612227930' })
+      const response = await request(app).post('/api/v4/auth/login').send({ mobile: '13612227910' })
 
       expect(response.status).toBe(400)
       validateApiContract(response.body, false)
@@ -115,7 +115,7 @@ describe('API契约测试 - 用户模块 (/api/v4/auth, /api/v4/assets)', () => 
     test('验证码无效应该返回错误', async () => {
       const response = await request(app)
         .post('/api/v4/auth/login')
-        .send({ mobile: '13612227930', verification_code: '000000' })
+        .send({ mobile: '13612227910', verification_code: '000000' })
 
       expect([400, 401]).toContain(response.status)
       validateApiContract(response.body, false)

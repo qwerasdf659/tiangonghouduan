@@ -32,7 +32,7 @@ describe('API契约测试 - 广告系统', () => {
      * 登录账号说明（修正 2026-06-21）：
      * 本套件含管理端写接口（POST /console/ad-campaigns、/console/ad-campaigns/system），
      * 走 adminAuthMiddleware = requireRoleLevel(100)，必须用「超级管理员」账号登录。
-     * 原用 13612227930（regional_manager:80）会被后端正确拒绝(403) → 测试失败。
+     * 原用 13612227910（regional_manager:80）会被后端正确拒绝(403) → 测试失败。
      * 改用 TEST_ACCOUNTS.admin（13612227910，admin:100+super_admin:110）单一真相源。
      */
     const loginResponse = await request(app)

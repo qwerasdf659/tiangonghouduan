@@ -7,7 +7,7 @@
  * 3. DELETE /api/v4/console/staff/:store_staff_id?force=true - 强制删除（在职员工）
  * 4. 状态流转验证：active → inactive → deleted
  *
- * 测试账号：13612227930 (用户ID: 31, 管理员权限)
+ * 测试账号：13612227910 (用户ID: 31, 管理员权限)
  * 数据库：restaurant_points_dev (统一数据库)
  *
  * @since 2026-01-26

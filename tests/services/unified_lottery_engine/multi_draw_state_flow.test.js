@@ -77,7 +77,7 @@ describe('连抽状态流转测试（任务8.1）', () => {
 
       if (!test_user) {
         test_user = await User.findOne({
-          where: { mobile: '13612227930' }
+          where: { mobile: '13612227910' }
         })
       }
 

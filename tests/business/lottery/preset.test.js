@@ -12,7 +12,7 @@
  * 3. GET /api/v4/lottery/preset/user/:user_id - 获取用户预设
  * 4. DELETE /api/v4/lottery/preset/user/:user_id - 清理用户预设
  *
- * **测试账号**: 13612227930 (用户ID: 31, 管理员权限)
+ * **测试账号**: 13612227910 (用户ID: 31, 管理员权限)
  * **数据库**: restaurant_points_dev (统一数据库)
  *
  * **业务说明**:

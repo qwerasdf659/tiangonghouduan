@@ -98,7 +98,7 @@ describe('保底触发完整流程测试（任务8.4）', () => {
 
       if (!test_user) {
         test_user = await User.findOne({
-          where: { mobile: '13612227930' }
+          where: { mobile: '13612227910' }
         })
       }
 

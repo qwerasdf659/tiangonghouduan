@@ -281,7 +281,7 @@ describe('P1-3.4: 认证验证器单元测试', () => {
     }
 
     test('有效的手机号应通过验证', () => {
-      const validMobiles = ['13612227930', '18888888888', '15012345678', '19988776655']
+      const validMobiles = ['13612227910', '18888888888', '15012345678', '19988776655']
 
       validMobiles.forEach(mobile => {
         const result = validateMobileFormat(mobile)
@@ -309,7 +309,7 @@ describe('P1-3.4: 认证验证器单元测试', () => {
     })
 
     test('12位手机号应返回MOBILE_INVALID错误', () => {
-      const result = validateMobileFormat('136122279301')
+      const result = validateMobileFormat('136122279101')
       expect(result.valid).toBe(false)
       expect(result.error).toBe('MOBILE_INVALID')
     })
@@ -333,7 +333,7 @@ describe('P1-3.4: 认证验证器单元测试', () => {
     })
 
     test('数字类型的手机号应自动转换并验证', () => {
-      const result = validateMobileFormat(13612227930)
+      const result = validateMobileFormat(13612227910)
       expect(result.valid).toBe(true)
     })
   })

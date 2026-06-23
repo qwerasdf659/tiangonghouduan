@@ -414,9 +414,9 @@ class BaseTestManager {
     /*
      * 测试账号区分权限级别（与真实库角色一致）：
      * - admin：超级管理员 13612227910（admin:100/super_admin:110），用于后台管理接口
-     * - regular/user：普通测试用户 13612227930（regional_manager:80）
+     * - regular/user：普通测试用户 13612227910（regional_manager:80）
      */
-    const mobile = user_type === 'admin' ? '13612227910' : '13612227930'
+    const mobile = user_type === 'admin' ? '13612227910' : '13612227910'
     const token_type = user_type === 'admin' ? 'admin' : 'user'
 
     const result = await this.authenticate(mobile, '123456', token_type)

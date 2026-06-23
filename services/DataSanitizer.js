@@ -159,16 +159,27 @@ class DataSanitizer {
           primary_media_id: safe.media_id,
           url: safe.public_url,
           mime: safe.mime_type,
-          thumbnail_url: safe.thumbnails?.small || safe.public_url
+          // thumbnail_url 保留：兼容仅取单档缩略图的旧调用（默认 small）
+          thumbnail_url: safe.thumbnails?.small || safe.public_url,
+          // thumbnails 三档（small/medium/large）：抽奖奖品图清晰度优化，前端按容器选档（large=800）
+          thumbnails: safe.thumbnails || null
         }
       } else if (rawPrimaryMedia?.object_key) {
+        const hash = rawPrimaryMedia.content_hash
+        const tk = rawPrimaryMedia.thumbnail_keys || {}
         sanitized.image = {
           primary_media_id: rawPrimaryMedia.media_id,
-          url: getImageUrl(rawPrimaryMedia.object_key, rawPrimaryMedia.content_hash),
+          url: getImageUrl(rawPrimaryMedia.object_key, hash),
           mime: rawPrimaryMedia.mime_type,
-          thumbnail_url: rawPrimaryMedia.thumbnail_keys?.small
-            ? getImageUrl(rawPrimaryMedia.thumbnail_keys.small, rawPrimaryMedia.content_hash)
-            : getImageUrl(rawPrimaryMedia.object_key, rawPrimaryMedia.content_hash)
+          thumbnail_url: tk.small
+            ? getImageUrl(tk.small, hash)
+            : getImageUrl(rawPrimaryMedia.object_key, hash),
+          // thumbnails 三档：与 toSafeJSON 分支结构一致，缺档为 null
+          thumbnails: {
+            small: tk.small ? getImageUrl(tk.small, hash) : null,
+            medium: tk.medium ? getImageUrl(tk.medium, hash) : null,
+            large: tk.large ? getImageUrl(tk.large, hash) : null
+          }
         }
       } else {
         /**
@@ -184,6 +195,8 @@ class DataSanitizer {
           sanitized.image = {
             url: iconUrl,
             thumbnail_url: iconUrl,
+            // 图标/占位无多档缩略图，thumbnails 置 null 保持结构一致（前端字段恒存在）
+            thumbnails: null,
             source: 'material_asset_type_icon'
           }
         } else {
@@ -191,6 +204,7 @@ class DataSanitizer {
           sanitized.image = {
             url: placeholderUrl,
             thumbnail_url: placeholderUrl,
+            thumbnails: null,
             source: 'placeholder'
           }
         }
@@ -1381,16 +1395,27 @@ class DataSanitizer {
           primary_media_id: safe.media_id,
           url: safe.public_url,
           mime: safe.mime_type,
-          thumbnail_url: safe.thumbnails?.small || safe.public_url
+          // thumbnail_url 保留：兼容仅取单档缩略图的旧调用（默认 small）
+          thumbnail_url: safe.thumbnails?.small || safe.public_url,
+          // thumbnails 三档（small/medium/large）：列表清晰度优化，前端按容器选档（large=800）
+          thumbnails: safe.thumbnails || null
         }
       } else if (rawPrimaryMedia?.object_key) {
+        const hash = rawPrimaryMedia.content_hash
+        const tk = rawPrimaryMedia.thumbnail_keys || {}
         sanitized.primary_image = {
           primary_media_id: rawPrimaryMedia.media_id,
-          url: getImageUrl(rawPrimaryMedia.object_key, rawPrimaryMedia.content_hash),
+          url: getImageUrl(rawPrimaryMedia.object_key, hash),
           mime: rawPrimaryMedia.mime_type,
-          thumbnail_url: rawPrimaryMedia.thumbnail_keys?.small
-            ? getImageUrl(rawPrimaryMedia.thumbnail_keys.small, rawPrimaryMedia.content_hash)
-            : getImageUrl(rawPrimaryMedia.object_key, rawPrimaryMedia.content_hash)
+          thumbnail_url: tk.small
+            ? getImageUrl(tk.small, hash)
+            : getImageUrl(rawPrimaryMedia.object_key, hash),
+          // thumbnails 三档：与 toSafeJSON 分支结构一致，缺档为 null
+          thumbnails: {
+            small: tk.small ? getImageUrl(tk.small, hash) : null,
+            medium: tk.medium ? getImageUrl(tk.medium, hash) : null,
+            large: tk.large ? getImageUrl(tk.large, hash) : null
+          }
         }
       } else {
         sanitized.primary_image = null

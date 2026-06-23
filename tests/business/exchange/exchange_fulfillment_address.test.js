@@ -10,7 +10,7 @@
  * 3. 虚拟商品（fulfillment_type='virtual'）下单无需地址 → 成功，订单 status='completed'
  *
  * 设计原则（遵循项目规则）：
- * - 真实数据库 restaurant_points_dev，真实测试用户 13612227930，无 mock
+ * - 真实数据库 restaurant_points_dev，真实测试用户 13612227910，无 mock
  * - 模型直接引用用于测试数据准备/验证（业务测试场景合理）
  * - ExchangeService 通过 ServiceManager 获取（snake_case: exchange_core）
  *
@@ -85,9 +85,9 @@ describe('实物兑换发货链路 - 履约类型与收货地址（P0+P1）', ()
     BalanceService = global.getTestService('asset_balance')
 
     const { User } = require('../../../models')
-    testUser = await User.findOne({ where: { mobile: '13612227930' } })
+    testUser = await User.findOne({ where: { mobile: '13612227910' } })
     if (!testUser) {
-      throw new Error('测试用户不存在，请先创建测试用户：13612227930')
+      throw new Error('测试用户不存在，请先创建测试用户：13612227910')
     }
 
     // 预充足额 red_core_shard，避免下单因余额不足失败（与被测逻辑无关）

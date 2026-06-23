@@ -24,7 +24,7 @@ describe('RateLimiterMiddleware 中间件测试 - 请求频率限制', () => {
     // 🔴 P0-1修复：从 global.testData 获取动态测试用户ID
     testUser = {
       user_id: global.testData?.testUser?.user_id, // 🔴 P0-1修复：动态获取
-      mobile: '13612227930'
+      mobile: '13612227910'
     }
     if (!testUser.user_id) {
       console.warn('⚠️ [rate_limiter_middleware.test.js] testUser.user_id 未初始化')
@@ -190,7 +190,7 @@ describe('RateLimiterMiddleware 中间件测试 - 请求频率限制', () => {
       })
 
       // 🔴 P0-1修复：user1 使用动态测试用户ID
-      const user1 = { user_id: testUser.user_id, mobile: '13612227930' }
+      const user1 = { user_id: testUser.user_id, mobile: '13612227910' }
       // user2 使用虚拟用户ID（仅测试隔离性，无需真实数据库记录）
       const user2 = { user_id: (testUser.user_id || 31) + 1, mobile: '13612227931' }
 

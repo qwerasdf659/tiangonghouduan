@@ -319,6 +319,21 @@ const SYSTEM_SETTINGS_WHITELIST = {
     approvalRequired: false
   },
 
+  // ===== 兑换商品图片轮播速度（全局，运营可调，事项C）=====
+  'exchange/gallery_autoplay_interval_ms': {
+    type: 'number',
+    min: 1000, // 最快 1 秒/张
+    max: 10000, // 最慢 10 秒/张
+    default: 3000, // 默认 3 秒/张（小程序 swiper 读不到时也用此默认兜底）
+    readonly: false,
+    description:
+      '兑换商品主图/SKU 图轮播自动切换间隔（毫秒），全站统一，小程序 swiper.interval 读取',
+    changeRequiresRestart: false,
+    businessImpact: 'LOW',
+    auditRequired: false,
+    approvalRequired: false
+  },
+
   // ===== 安全设置（运营可调）=====
   'security/max_login_attempts': {
     type: 'number',

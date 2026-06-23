@@ -45,13 +45,13 @@ describe('UserService - 用户服务', () => {
 
   // 每个测试前创建测试数据
   beforeEach(async () => {
-    // 使用测试用户（13612227930 为测试账号）
+    // 使用测试用户（13612227910 为测试账号）
     test_user = await User.findOne({
-      where: { mobile: '13612227930' }
+      where: { mobile: '13612227910' }
     })
 
     if (!test_user) {
-      throw new Error('测试用户不存在，请先创建 mobile=13612227930 的用户')
+      throw new Error('测试用户不存在，请先创建 mobile=13612227910 的用户')
     }
 
     // 创建测试事务

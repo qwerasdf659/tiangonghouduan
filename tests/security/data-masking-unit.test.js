@@ -36,7 +36,7 @@ describe('🔐 手机号脱敏单元测试（P0-2）', () => {
      * 预期格式：136****7930（前3后4，中间4位用*替代）
      */
     test('P0-2-1 正常手机号脱敏', () => {
-      expect(sanitize.mobile('13612227930')).toBe('136****7930')
+      expect(sanitize.mobile('13612227910')).toBe('136****7930')
     })
 
     /**
@@ -132,9 +132,9 @@ describe('🔐 手机号脱敏单元测试（P0-2）', () => {
     test('带区号的手机号', () => {
       /*
        * 📌 带区号的手机号会被部分脱敏（正则匹配任意位置的3-4-4数字模式）
-       * 实际行为：+8613612227930 → +861****227930
+       * 实际行为：+8613612227910 → +861****227930
        */
-      const result = sanitize.mobile('+8613612227930')
+      const result = sanitize.mobile('+8613612227910')
       // 验证结果仍然包含脱敏星号（实际业务中建议先去除区号再脱敏）
       expect(result).toContain('****')
     })
@@ -144,7 +144,7 @@ describe('🔐 手机号脱敏单元测试（P0-2）', () => {
      */
     test('数字类型输入处理', () => {
       // 虽然不推荐，但应能处理数字类型
-      const numericMobile = 13612227930
+      const numericMobile = 13612227910
       const result = sanitize.mobile(numericMobile.toString())
       expect(result).toBe('136****7930')
     })
@@ -155,7 +155,7 @@ describe('🔐 手机号脱敏单元测试（P0-2）', () => {
      * 确保脱敏后无法还原原始手机号
      */
     test('脱敏结果不可逆', () => {
-      const original = '13612227930'
+      const original = '13612227910'
       const masked = sanitize.mobile(original)
 
       // 脱敏后应该无法获取完整中间4位
@@ -167,7 +167,7 @@ describe('🔐 手机号脱敏单元测试（P0-2）', () => {
      * 确保敏感数据不会泄露到日志
      */
     test('脱敏格式符合日志安全标准', () => {
-      const masked = sanitize.mobile('13612227930')
+      const masked = sanitize.mobile('13612227910')
 
       // 验证格式：前3位 + **** + 后4位
       expect(masked).toMatch(/^\d{3}\*{4}\d{4}$/)

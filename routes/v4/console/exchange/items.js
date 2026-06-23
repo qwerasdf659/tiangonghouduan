@@ -51,16 +51,25 @@ function toItemWithImage(row) {
       primary_media_id: media.media_id,
       url: media.getPublicUrl(),
       mime: media.mime_type,
-      thumbnail_url: thumbs?.small || media.getPublicUrl()
+      thumbnail_url: thumbs?.small || media.getPublicUrl(),
+      // thumbnails 三档（small/medium/large）：管理端列表清晰度优化，列表卡片用 large(800)
+      thumbnails: thumbs || null
     }
   } else if (media?.object_key) {
+    const tk = media.thumbnail_keys || {}
     plain.primary_image = {
       primary_media_id: media.media_id,
       url: getImageUrl(media.object_key, media.content_hash),
       mime: media.mime_type,
-      thumbnail_url: media.thumbnail_keys?.small
-        ? getImageUrl(media.thumbnail_keys.small, media.content_hash)
-        : getImageUrl(media.object_key, media.content_hash)
+      thumbnail_url: tk.small
+        ? getImageUrl(tk.small, media.content_hash)
+        : getImageUrl(media.object_key, media.content_hash),
+      // thumbnails 三档：与上分支结构一致，缺档为 null
+      thumbnails: {
+        small: tk.small ? getImageUrl(tk.small, media.content_hash) : null,
+        medium: tk.medium ? getImageUrl(tk.medium, media.content_hash) : null,
+        large: tk.large ? getImageUrl(tk.large, media.content_hash) : null
+      }
     }
   } else {
     plain.primary_image = null

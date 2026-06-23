@@ -775,7 +775,7 @@ describe('🚀 20,000并发极限压力测试（P3-1）', () => {
             await IdempotencyService.getOrCreateRequest(idempotencyKey, {
               api_path: '/api/v4/auth/login',
               http_method: 'POST',
-              request_params: { mobile: '13612227930' },
+              request_params: { mobile: '13612227910' },
               user_id: testUserId
             })
 

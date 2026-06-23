@@ -25,9 +25,11 @@ const logger = require('../../utils/logger').logger
 const { BusinessCacheHelper } = require('../../utils/BusinessCacheHelper')
 const displayNameHelper = require('../../utils/displayNameHelper')
 const BeijingTimeHelper = require('../../utils/timeHelper')
+const AdminSystemService = require('../AdminSystemService')
 const { Op } = require('sequelize')
 const {
   fetchProductMediaGallery,
+  fetchMediaGalleryByEntity,
   resolveMaterialIconUrls
 } = require('../../utils/mediaAttachmentGallery')
 
@@ -619,7 +621,15 @@ class QueryService {
                       attributes: ['cost_asset_code', 'cost_amount', 'original_amount']
                     }
                   ],
-                  attributes: ['sku_id', 'sku_code', 'stock', 'sold_count', 'status', 'sort_order']
+                  attributes: [
+                    'sku_id',
+                    'sku_code',
+                    'stock',
+                    'sold_count',
+                    'status',
+                    'sort_order',
+                    'image_id'
+                  ]
                 }
               ]
             : [])
@@ -648,6 +658,23 @@ class QueryService {
       itemWithDisplayNames.images = images
       itemWithDisplayNames.detail_images = detail_images
       itemWithDisplayNames.showcase_images = showcase_images
+
+      /*
+       * 事项B：为每个 SKU 组装多图轮播 images[]（attachable_type='exchange_item_sku'，role='gallery'）。
+       * image_id 保留作首图兼容（封面快取）；多图走多态表。无多图时为空数组，前端回退到 SPU images[]。
+       * 批量取，避免 N+1：本商品 SKU 数量有限，逐个查可接受（与下方 channelPrices 同层级处理）。
+       */
+      if (Array.isArray(itemWithDisplayNames.skus)) {
+        for (const sku of itemWithDisplayNames.skus) {
+          // eslint-disable-next-line no-await-in-loop
+          const skuGallery = await fetchMediaGalleryByEntity(
+            this.models,
+            'exchange_item_sku',
+            sku.sku_id
+          )
+          sku.images = skuGallery.images
+        }
+      }
 
       /*
        * 复合门槛只读出口（BE-3）：高价值实物的"会员解锁条件"提前下发，
@@ -708,6 +735,16 @@ class QueryService {
           }
         })
       }
+
+      /*
+       * 事项C：下发全站轮播速度（exchange/gallery_autoplay_interval_ms，毫秒），
+       * 小程序 swiper.interval 读取，读不到用前端默认兜底。复用 AdminSystemService 既有 settings 机制。
+       */
+      itemWithDisplayNames.gallery_autoplay_interval_ms = await AdminSystemService.getSettingValue(
+        'exchange',
+        'exchange/gallery_autoplay_interval_ms',
+        3000
+      )
 
       return {
         item: itemWithDisplayNames

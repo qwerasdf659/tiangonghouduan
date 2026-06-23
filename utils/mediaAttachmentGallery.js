@@ -1,16 +1,23 @@
 'use strict'
 
 /**
- * 兑换/商品详情共用的「product 多态」媒体附件查询与分组（§5.7 去重）
+ * 兑换/商品详情共用的多态媒体附件查询与分组（§5.7 去重）
+ *
+ * 权威口径（以后端 MediaService.PRIMARY_MEDIA_TABLES 为单一真相源）：
+ * - 商品多图 attachable_type='exchange_item'；SKU 多图 attachable_type='exchange_item_sku'
+ * - role 枚举：primary=首图/封面、gallery=主图轮播组、detail=详情长图、showcase=展示图
  */
 const { getImageUrl } = require('./ImageUrlHelper')
 
 /**
+ * 通用：按 attachable_type + attachable_id 取多态图集并按 role 分组
+ *
  * @param {Object} models - Sequelize models（需含 MediaAttachment、MediaFile）
- * @param {number} productId - attachable_id（product）
+ * @param {string} attachableType - 业务实体类型（exchange_item / exchange_item_sku）
+ * @param {number} attachableId - 业务实体 ID
  * @returns {Promise<{ images: Object[], detail_images: Object[], showcase_images: Object[] }>} 按 role 分组后的图集
  */
-async function fetchProductMediaGallery(models, productId) {
+async function fetchMediaGalleryByEntity(models, attachableType, attachableId) {
   const { MediaAttachment, MediaFile } = models
   if (!MediaAttachment || !MediaFile) {
     return { images: [], detail_images: [], showcase_images: [] }
@@ -18,8 +25,8 @@ async function fetchProductMediaGallery(models, productId) {
 
   const attachments = await MediaAttachment.findAll({
     where: {
-      attachable_type: 'product',
-      attachable_id: productId
+      attachable_type: attachableType,
+      attachable_id: attachableId
     },
     include: [
       {
@@ -45,8 +52,9 @@ async function fetchProductMediaGallery(models, productId) {
     }
   }
 
+  // gallery=主图轮播组（含 primary 首图，统一进轮播）；detail=详情长图；showcase=展示图
   const images = attachments
-    .filter(a => a.role === 'gallery' || a.role === 'exchange_items')
+    .filter(a => a.role === 'gallery' || a.role === 'primary')
     .map(toImageJson)
     .filter(Boolean)
   const detail_images = attachments
@@ -59,6 +67,17 @@ async function fetchProductMediaGallery(models, productId) {
     .filter(Boolean)
 
   return { images, detail_images, showcase_images }
+}
+
+/**
+ * 商品（exchange_item）多图分组（事项A：attachable_type 以后端为准为 'exchange_item'）
+ *
+ * @param {Object} models - Sequelize models（需含 MediaAttachment、MediaFile）
+ * @param {number} productId - 商品 exchange_item_id
+ * @returns {Promise<{ images: Object[], detail_images: Object[], showcase_images: Object[] }>} 按 role 分组后的图集
+ */
+async function fetchProductMediaGallery(models, productId) {
+  return fetchMediaGalleryByEntity(models, 'exchange_item', productId)
 }
 
 /**
@@ -126,6 +145,7 @@ async function resolveMaterialIconUrls(models, assetCodes) {
 }
 
 module.exports = {
+  fetchMediaGalleryByEntity,
   fetchProductMediaGallery,
   categoryIconAttachmentInclude,
   resolveMaterialIconUrls

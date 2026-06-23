@@ -9,7 +9,7 @@
  * 技术规范：
  * - 连接真实数据库 restaurant_points_dev（禁止 mock）
  * - 统一响应契约（success/code/message/data/timestamp/version/request_id）
- * - 测试账号 user_id=31（13612227930），既是用户也是管理员
+ * - 测试账号 user_id=31（13612227910），既是用户也是管理员
  * - 自助创建的申诉在 afterAll 硬删除清理（含 fire-and-forget 站内信），不污染真实库
  *
  * @module tests/api-contracts/disputes.contract.test
@@ -45,7 +45,7 @@ describe('API契约测试 - 售后申诉模块', () => {
 
     const loginResponse = await request(app)
       .post('/api/v4/auth/login')
-      .send({ mobile: '13612227930', verification_code: '123456' })
+      .send({ mobile: '13612227910', verification_code: '123456' })
 
     if (loginResponse.body.success) {
       accessToken = loginResponse.body.data.access_token

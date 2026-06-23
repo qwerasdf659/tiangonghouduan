@@ -249,7 +249,7 @@ describe('🔐 DataSanitizer 业务数据脱敏测试（P0-5）', () => {
       user_id: 1,
       nickname: '测试用户',
       avatar_url: 'https://example.com/avatar.jpg',
-      mobile: '13612227930',
+      mobile: '13612227910',
       role: 'admin',
       permissions: ['manage_users', 'manage_prizes'],
       admin_flags: true,

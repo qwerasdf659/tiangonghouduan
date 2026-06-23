@@ -34,10 +34,10 @@ describe('测试数据初始化功能 (P0-1)', () => {
 
   describe('initRealTestData - 动态初始化测试数据', () => {
     test('应该从数据库查询真实的测试用户', async () => {
-      const result = await initRealTestData('13612227930')
+      const result = await initRealTestData('13612227910')
 
       // 验证用户数据已初始化
-      expect(result.testUser.mobile).toBe('13612227930')
+      expect(result.testUser.mobile).toBe('13612227910')
       expect(result.testUser.user_id).not.toBeNull()
       expect(typeof result.testUser.user_id).toBe('number')
       expect(result.testUser.user_id).toBeGreaterThan(0)
@@ -67,7 +67,7 @@ describe('测试数据初始化功能 (P0-1)', () => {
 
     test('应该避免重复初始化', async () => {
       // 第一次初始化
-      await initRealTestData('13612227930')
+      await initRealTestData('13612227910')
       const firstUserId = TestConfig.realData.testUser.user_id
 
       // 标记已初始化
@@ -77,7 +77,7 @@ describe('测试数据初始化功能 (P0-1)', () => {
       TestConfig.realData.testUser.user_id = 99999
 
       // 第二次调用应该直接返回，不会重新查询
-      await initRealTestData('13612227930')
+      await initRealTestData('13612227910')
 
       // 数据应该保持被修改后的值（因为跳过了重新初始化）
       expect(TestConfig.realData.testUser.user_id).toBe(99999)
@@ -97,7 +97,7 @@ describe('测试数据初始化功能 (P0-1)', () => {
 
   describe('getRealTestUserId - 获取真实用户ID', () => {
     test('应该返回数据库中的真实用户ID', async () => {
-      const userId = await getRealTestUserId('13612227930')
+      const userId = await getRealTestUserId('13612227910')
 
       expect(userId).not.toBeNull()
       expect(typeof userId).toBe('number')
@@ -107,7 +107,7 @@ describe('测试数据初始化功能 (P0-1)', () => {
     test('应该自动触发初始化', async () => {
       expect(TestConfig.realData._initialized).toBe(false)
 
-      await getRealTestUserId('13612227930')
+      await getRealTestUserId('13612227910')
 
       expect(TestConfig.realData._initialized).toBe(true)
     })
@@ -141,7 +141,7 @@ describe('测试数据初始化功能 (P0-1)', () => {
 
   describe('数据一致性验证', () => {
     test('初始化后 TestConfig.realData 应该包含真实数据', async () => {
-      await initRealTestData('13612227930')
+      await initRealTestData('13612227910')
 
       // 验证数据结构完整
       expect(TestConfig.realData).toHaveProperty('testUser')
@@ -154,13 +154,13 @@ describe('测试数据初始化功能 (P0-1)', () => {
 
       // 验证用户数据（如果存在）
       if (TestConfig.realData.testUser.user_id) {
-        expect(TestConfig.realData.testUser.mobile).toBe('13612227930')
+        expect(TestConfig.realData.testUser.mobile).toBe('13612227910')
       }
     })
 
     test('多次调用获取函数应该返回一致的数据', async () => {
-      const userId1 = await getRealTestUserId('13612227930')
-      const userId2 = await getRealTestUserId('13612227930')
+      const userId1 = await getRealTestUserId('13612227910')
+      const userId2 = await getRealTestUserId('13612227910')
       const campaignId1 = await getRealTestCampaignId()
       const campaignId2 = await getRealTestCampaignId()
 
@@ -183,8 +183,8 @@ describe('测试数据初始化功能 (P0-1)', () => {
     })
 
     test('只有 mobile 是预设的查询key', () => {
-      // mobile 是允许硬编码的（作为查询key）：普通用户 13612227930，超级管理员 13612227910
-      expect(TestConfig.realData.testUser.mobile).toBe('13612227930')
+      // mobile 是允许硬编码的（作为查询key）：普通用户 13612227910，超级管理员 13612227910
+      expect(TestConfig.realData.testUser.mobile).toBe('13612227910')
       expect(TestConfig.realData.adminUser.mobile).toBe('13612227910')
     })
   })

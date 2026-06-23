@@ -19,7 +19,7 @@
  * - DebtManagementService：欠账管理服务
  * - UserGrowthLevelService (ServiceManager key: user_growth_level)：成长等级派生 + B 线倍数读写
  *
- * 测试策略：使用真实数据库（restaurant_points_dev），测试账号 13612227930（既是用户也是管理员）
+ * 测试策略：使用真实数据库（restaurant_points_dev），测试账号 13612227910（既是用户也是管理员）
  */
 
 const {

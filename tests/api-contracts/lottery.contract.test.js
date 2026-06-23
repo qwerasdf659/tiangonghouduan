@@ -33,7 +33,7 @@ describe('API契约测试 - 抽奖模块 (/api/v4/lottery)', () => {
     // 登录获取 Token
     const loginResponse = await request(app)
       .post('/api/v4/auth/login')
-      .send({ mobile: '13612227930', verification_code: '123456' })
+      .send({ mobile: '13612227910', verification_code: '123456' })
 
     if (loginResponse.body.success) {
       accessToken = loginResponse.body.data.access_token

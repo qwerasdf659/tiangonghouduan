@@ -51,7 +51,7 @@ describe('竞价系统功能测试 (Bid System — 臻选空间/幸运空间/竞
 
     /*
      * 管理后台竞价接口（/api/v4/console/bids）要求 requireRoleLevel(100)，
-     * 普通测试用户(13612227930, regional_manager:80)无权访问，必须用超管账号
+     * 普通测试用户(13612227910, regional_manager:80)无权访问，必须用超管账号
      * （loginAsAdmin → 13612227910，admin:100/super_admin:110）。
      */
     adminToken = await loginAsAdmin(app)

@@ -38,7 +38,7 @@ const TEST_CONFIG = {
   /** 消息等待超时时间（毫秒） */
   messageTimeout: 5000,
   /** 测试用户手机号 */
-  testUserMobile: '13612227930',
+  testUserMobile: '13612227910',
   /** 开发环境万能验证码 */
   testVerificationCode: '123456'
 }

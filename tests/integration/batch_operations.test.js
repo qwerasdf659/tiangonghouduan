@@ -27,7 +27,7 @@ describe('批量操作功能测试', () => {
   beforeAll(async () => {
     try {
       const loginRes = await request(app).post('/api/v4/auth/login').send({
-        mobile: '13612227930',
+        mobile: '13612227910',
         verification_code: '123456'
       })
 

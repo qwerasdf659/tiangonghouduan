@@ -98,6 +98,10 @@ export function useExchangeItemsState() {
     itemImagePreviewUrl: null,
     /** @type {boolean} 图片上传中 */
     imageUploading: false,
+    /** @type {Array<Object>} 商品主图轮播组（事项A：role='gallery'，小程序详情主图轮播读 images[]） */
+    galleryImages: [],
+    /** @type {boolean} 主图轮播组上传中 */
+    galleryImageUploading: false,
     /** @type {Array<Object>} 商品详情图列表（多图支持） */
     detailImages: [],
     /** @type {boolean} 详情图上传中 */
@@ -114,6 +118,10 @@ export function useExchangeItemsState() {
     skuForm: { spec_values: {}, cost_amount: 1, stock: 0, cost_asset_code: '', status: 'active' },
     /** @type {number|null} 正在编辑的 SKU ID（null 表示新增） */
     editingSkuId: null,
+    /** @type {Array} 事项B：当前编辑 SKU 的多图轮播组（attachable_type='exchange_item_sku', role='gallery'） */
+    skuGalleryImages: [],
+    /** @type {boolean} SKU 多图上传中 */
+    skuGalleryUploading: false,
     /** @type {boolean} SKU 管理弹窗是否显示 */
     showSkuModal: false,
     /** @type {string} 新规格维度名输入 */
@@ -375,6 +383,7 @@ export function useExchangeItemsMethods() {
         merchant_id: null
       }
       this.itemImagePreviewUrl = null
+      this.galleryImages = []
       this.detailImages = []
       this.showcaseImages = []
       this.tagInput = ''
@@ -439,6 +448,7 @@ export function useExchangeItemsMethods() {
       const itemId = item.exchange_item_id
       this.loadDetailImages(itemId)
       this.loadShowcaseImages(itemId)
+      this.loadGalleryImages(itemId)
       this.loadItemSkus(itemId)
       this.showModal('itemModal')
       this.$nextTick(() => this._initRichEditor(item.description || ''))
@@ -550,6 +560,14 @@ export function useExchangeItemsMethods() {
         }
 
         if (res.success) {
+          // 新建商品：上传时 editingItemId 为空、详情/展示图未 attach，建好后用返回 id 补 attach
+          if (!this.editingItemId) {
+            const newItemId = res.data?.exchange_item_id || res.data?.id || res.data?.item?.exchange_item_id
+            if (newItemId) {
+              await this._attachPendingGalleryImages(newItemId)
+            }
+          }
+
           this.showSuccess?.(this.editingItemId ? '更新成功' : '添加成功')
           this.hideModal?.('itemModal')
 
@@ -573,7 +591,37 @@ export function useExchangeItemsMethods() {
     },
 
     /**
-     * 上传商品图片并绑定 primary_media_id
+     * 新建商品后补绑详情图/展示图到 media_attachments（事项A）
+     *
+     * 新建时商品尚无 exchange_item_id，详情/展示图先上传到媒体库存于本地数组；
+     * 商品创建成功后用返回的 id 逐张补调 attach，落 role='detail'/'showcase' + sort_order。
+     * @param {number} newItemId - 新建商品的 exchange_item_id
+     * @returns {Promise<void>}
+     */
+    async _attachPendingGalleryImages(newItemId) {
+      const attachOne = (mediaId, role, sortOrder) =>
+        request({
+          url: SYSTEM_ADMIN_ENDPOINTS.MEDIA_ATTACH(mediaId),
+          method: 'POST',
+          data: {
+            attachable_type: 'exchange_item',
+            attachable_id: newItemId,
+            role,
+            sort_order: sortOrder
+          }
+        }).catch(e => logger.warn('[ExchangeItems] 补绑图片失败:', e))
+
+      const tasks = []
+      this.galleryImages.forEach((img, i) => tasks.push(attachOne(img.media_id, 'gallery', i + 1)))
+      this.detailImages.forEach((img, i) => tasks.push(attachOne(img.media_id, 'detail', i + 1)))
+      this.showcaseImages.forEach((img, i) =>
+        tasks.push(attachOne(img.media_id, 'showcase', i + 1))
+      )
+      if (tasks.length > 0) await Promise.all(tasks)
+    },
+
+    /**
+     * 上传商品主图并绑定 primary_media_id
      *
      * @param {Event} event - 文件选择事件（input[type=file] change 事件）
      * @description 上传图片到 Sealos 对象存储，返回 media_id，
@@ -600,7 +648,6 @@ export function useExchangeItemsMethods() {
         const formData = new FormData()
         formData.append('image', file)
         formData.append('business_type', 'exchange')
-        formData.append('category', 'exchange_items')
 
         const res = await request({
           url: SYSTEM_ADMIN_ENDPOINTS.MEDIA_UPLOAD,
@@ -622,6 +669,117 @@ export function useExchangeItemsMethods() {
         this.showError?.('图片上传失败')
       } finally {
         this.imageUploading = false
+      }
+    },
+
+    /**
+     * 上传商品主图轮播组图片（事项A：role='gallery'，小程序详情主图轮播 images[]）
+     * @param {Event} event - 文件选择事件
+     */
+    async uploadGalleryImage(event) {
+      const file = event.target.files?.[0]
+      if (!file) return
+      if (this.galleryImages.length >= 9) {
+        this.showError?.('主图轮播组最多9张')
+        return
+      }
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+      if (!allowedTypes.includes(file.type)) {
+        this.showError?.('仅支持 JPG/PNG/GIF/WebP 格式')
+        return
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        this.showError?.('图片大小不能超过 5MB')
+        return
+      }
+      try {
+        this.galleryImageUploading = true
+        const formData = new FormData()
+        formData.append('image', file)
+        formData.append('business_type', 'exchange')
+        const res = await request({
+          url: SYSTEM_ADMIN_ENDPOINTS.MEDIA_UPLOAD,
+          method: 'POST',
+          data: formData
+        })
+        if (res.success && res.data) {
+          const nextSort = this.galleryImages.length + 1
+          if (this.editingItemId) {
+            await request({
+              url: SYSTEM_ADMIN_ENDPOINTS.MEDIA_ATTACH(res.data.media_id),
+              method: 'POST',
+              data: {
+                attachable_type: 'exchange_item',
+                attachable_id: this.editingItemId,
+                role: 'gallery',
+                sort_order: nextSort
+              }
+            })
+          }
+          this.galleryImages.push({
+            media_id: res.data.media_id,
+            url: res.data.public_url || res.data.url || res.data.image_url,
+            sort_order: nextSort
+          })
+          this.showSuccess?.('主图上传成功')
+        } else {
+          this.showError?.(res.message || '主图上传失败')
+        }
+      } catch (e) {
+        logger.error('[ExchangeItems] 主图轮播组上传失败:', e)
+        this.showError?.('主图上传失败')
+      } finally {
+        this.galleryImageUploading = false
+        if (event.target) event.target.value = ''
+      }
+    },
+
+    /**
+     * 加载商品主图轮播组（role='gallery'）
+     * @param {number} contextId - 商品 exchange_item_id
+     */
+    async loadGalleryImages(contextId) {
+      if (!contextId) {
+        this.galleryImages = []
+        return
+      }
+      try {
+        const res = await request({
+          url: SYSTEM_ADMIN_ENDPOINTS.MEDIA_BY_ENTITY('exchange_item', contextId),
+          params: { role: 'gallery' }
+        })
+        const images = res.data?.items || res.data?.images || []
+        this.galleryImages = images.map(img => ({
+          media_id: img.media_id,
+          url: img.public_url || img.url,
+          sort_order: img.sort_order || 0
+        }))
+      } catch (e) {
+        logger.error('[ExchangeItems] 加载主图轮播组失败:', e)
+        this.galleryImages = []
+      }
+    },
+
+    /**
+     * 移除一张主图轮播组图片（解绑 gallery，不删媒体库源文件）
+     * @param {number} mediaId - 媒体 ID
+     */
+    async removeGalleryImage(mediaId) {
+      try {
+        await request({
+          url: SYSTEM_ADMIN_ENDPOINTS.MEDIA_DETACH(mediaId),
+          method: 'POST',
+          data: {
+            attachable_type: 'exchange_item',
+            attachable_id: this.editingItemId,
+            role: 'gallery'
+          }
+        })
+        this.galleryImages = this.galleryImages.filter(img => img.media_id !== mediaId)
+        this.showSuccess?.('已移除')
+      } catch (e) {
+        logger.error('[ExchangeItems] 移除主图失败:', e)
+        this.showError?.('移除失败')
       }
     },
 
@@ -652,14 +810,10 @@ export function useExchangeItemsMethods() {
 
       try {
         this.detailImageUploading = true
+        // 1) 上传文件到媒体库（仅落 media_files）
         const formData = new FormData()
         formData.append('image', file)
         formData.append('business_type', 'exchange')
-        formData.append('category', 'detail')
-        if (this.editingItemId) {
-          formData.append('context_id', String(this.editingItemId))
-        }
-        formData.append('sort_order', String(this.detailImages.length + 1))
 
         const res = await request({
           url: SYSTEM_ADMIN_ENDPOINTS.MEDIA_UPLOAD,
@@ -668,10 +822,27 @@ export function useExchangeItemsMethods() {
         })
 
         if (res.success && res.data) {
+          const nextSort = this.detailImages.length + 1
+          /*
+           * 2) 落 media_attachments（事项A：以后端权威字段为准）
+           * attachable_type='exchange_item'、role='detail'、sort_order 排序；编辑态才能 attach（需 exchange_item_id）
+           */
+          if (this.editingItemId) {
+            await request({
+              url: SYSTEM_ADMIN_ENDPOINTS.MEDIA_ATTACH(res.data.media_id),
+              method: 'POST',
+              data: {
+                attachable_type: 'exchange_item',
+                attachable_id: this.editingItemId,
+                role: 'detail',
+                sort_order: nextSort
+              }
+            })
+          }
           this.detailImages.push({
             media_id: res.data.media_id,
             url: res.data.public_url || res.data.url || res.data.image_url,
-            sort_order: this.detailImages.length + 1
+            sort_order: nextSort
           })
           this.showSuccess?.('详情图上传成功')
         } else {
@@ -701,10 +872,10 @@ export function useExchangeItemsMethods() {
       try {
         const res = await request({
           url: SYSTEM_ADMIN_ENDPOINTS.MEDIA_BY_ENTITY('exchange_item', contextId),
-          params: { category: 'detail' }
+          params: { role: 'detail' }
         })
 
-        const images = res.data?.images || res.data?.items || res.data?.media || []
+        const images = res.data?.items || res.data?.images || res.data?.media || []
         if (res.success && images.length >= 0) {
           this.detailImages = images.map(img => ({
             media_id: img.media_id,
@@ -891,14 +1062,10 @@ export function useExchangeItemsMethods() {
 
       try {
         this.showcaseImageUploading = true
+        // 1) 上传文件到媒体库（仅落 media_files）
         const formData = new FormData()
         formData.append('image', file)
         formData.append('business_type', 'exchange')
-        formData.append('category', 'showcase')
-        if (this.editingItemId) {
-          formData.append('context_id', String(this.editingItemId))
-        }
-        formData.append('sort_order', String(this.showcaseImages.length + 1))
 
         const res = await request({
           url: SYSTEM_ADMIN_ENDPOINTS.MEDIA_UPLOAD,
@@ -907,10 +1074,24 @@ export function useExchangeItemsMethods() {
         })
 
         if (res.success && res.data) {
+          const nextSort = this.showcaseImages.length + 1
+          // 2) 落 media_attachments（attachable_type='exchange_item'、role='showcase'）
+          if (this.editingItemId) {
+            await request({
+              url: SYSTEM_ADMIN_ENDPOINTS.MEDIA_ATTACH(res.data.media_id),
+              method: 'POST',
+              data: {
+                attachable_type: 'exchange_item',
+                attachable_id: this.editingItemId,
+                role: 'showcase',
+                sort_order: nextSort
+              }
+            })
+          }
           this.showcaseImages.push({
             media_id: res.data.media_id,
             url: res.data.public_url || res.data.url || res.data.image_url,
-            sort_order: this.showcaseImages.length + 1
+            sort_order: nextSort
           })
           this.showSuccess?.('展示图上传成功')
         } else {
@@ -937,9 +1118,9 @@ export function useExchangeItemsMethods() {
       try {
         const res = await request({
           url: SYSTEM_ADMIN_ENDPOINTS.MEDIA_BY_ENTITY('exchange_item', contextId),
-          params: { category: 'showcase' }
+          params: { role: 'showcase' }
         })
-        const images = res.data?.images || res.data?.items || res.data?.media || []
+        const images = res.data?.items || res.data?.images || res.data?.media || []
         if (res.success && images.length >= 0) {
           this.showcaseImages = images.map(img => ({
             media_id: img.media_id,
@@ -1069,6 +1250,8 @@ export function useExchangeItemsMethods() {
         cost_asset_code: price ? price.cost_asset_code : '',
         status: sku.status
       }
+      // 事项B：加载该 SKU 的多图轮播组
+      this.loadSkuGalleryImages(sku.sku_id)
     },
 
     /**
@@ -1092,9 +1275,124 @@ export function useExchangeItemsMethods() {
       }
     },
 
+    /**
+     * 加载 SKU 的多图轮播组（事项B：attachable_type='exchange_item_sku', role='gallery'）
+     * @param {number} skuId - SKU ID
+     */
+    async loadSkuGalleryImages(skuId) {
+      if (!skuId) {
+        this.skuGalleryImages = []
+        return
+      }
+      try {
+        const res = await request({
+          url: SYSTEM_ADMIN_ENDPOINTS.MEDIA_BY_ENTITY('exchange_item_sku', skuId),
+          params: { role: 'gallery' }
+        })
+        const images = res.data?.items || res.data?.images || []
+        this.skuGalleryImages = images.map(img => ({
+          media_id: img.media_id,
+          url: img.public_url || img.url,
+          sort_order: img.sort_order || 0
+        }))
+      } catch (e) {
+        logger.error('[ExchangeItems] 加载 SKU 多图失败:', e)
+        this.skuGalleryImages = []
+      }
+    },
+
+    /**
+     * 上传 SKU 多图（事项B，需先保存 SKU 拿到 editingSkuId）
+     * @param {Event} event - 文件选择事件
+     */
+    async uploadSkuGalleryImage(event) {
+      const file = event.target.files?.[0]
+      if (!file) return
+      if (!this.editingSkuId) {
+        this.showError?.('请先保存规格，再上传该规格的多图')
+        if (event.target) event.target.value = ''
+        return
+      }
+      if (this.skuGalleryImages.length >= 9) {
+        this.showError?.('SKU 多图最多9张')
+        return
+      }
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+      if (!allowedTypes.includes(file.type)) {
+        this.showError?.('仅支持 JPG/PNG/GIF/WebP 格式')
+        return
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        this.showError?.('图片大小不能超过 5MB')
+        return
+      }
+      try {
+        this.skuGalleryUploading = true
+        const formData = new FormData()
+        formData.append('image', file)
+        formData.append('business_type', 'exchange')
+        const res = await request({
+          url: SYSTEM_ADMIN_ENDPOINTS.MEDIA_UPLOAD,
+          method: 'POST',
+          data: formData
+        })
+        if (res.success && res.data) {
+          const nextSort = this.skuGalleryImages.length + 1
+          await request({
+            url: SYSTEM_ADMIN_ENDPOINTS.MEDIA_ATTACH(res.data.media_id),
+            method: 'POST',
+            data: {
+              attachable_type: 'exchange_item_sku',
+              attachable_id: this.editingSkuId,
+              role: 'gallery',
+              sort_order: nextSort
+            }
+          })
+          this.skuGalleryImages.push({
+            media_id: res.data.media_id,
+            url: res.data.public_url || res.data.url || res.data.image_url,
+            sort_order: nextSort
+          })
+          this.showSuccess?.('SKU 图片上传成功')
+        } else {
+          this.showError?.(res.message || 'SKU 图片上传失败')
+        }
+      } catch (e) {
+        logger.error('[ExchangeItems] SKU 多图上传失败:', e)
+        this.showError?.('SKU 图片上传失败')
+      } finally {
+        this.skuGalleryUploading = false
+        if (event.target) event.target.value = ''
+      }
+    },
+
+    /**
+     * 移除一张 SKU 多图（解绑该 SKU 的 gallery 挂载，不删媒体库源文件）
+     * @param {number} mediaId - 媒体 ID
+     */
+    async removeSkuGalleryImage(mediaId) {
+      try {
+        await request({
+          url: SYSTEM_ADMIN_ENDPOINTS.MEDIA_DETACH(mediaId),
+          method: 'POST',
+          data: {
+            attachable_type: 'exchange_item_sku',
+            attachable_id: this.editingSkuId,
+            role: 'gallery'
+          }
+        })
+        this.skuGalleryImages = this.skuGalleryImages.filter(img => img.media_id !== mediaId)
+        this.showSuccess?.('已移除')
+      } catch (e) {
+        logger.error('[ExchangeItems] 移除 SKU 多图失败:', e)
+        this.showError?.('移除失败')
+      }
+    },
+
     /** 重置 SKU 表单 */
     resetSkuForm() {
       this.editingSkuId = null
+      this.skuGalleryImages = []
       this.skuForm = {
         spec_values: {},
         cost_amount: 1,

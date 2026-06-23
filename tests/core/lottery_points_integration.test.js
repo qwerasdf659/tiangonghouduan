@@ -65,7 +65,7 @@ describe('抽奖积分集成测试 - V4.6 Pipeline 架构', () => {
     testUserId = global.testData?.testUser?.user_id
     if (!testUserId) {
       // 备用：通过手机号查询
-      const user = await User.findOne({ where: { mobile: '13612227930' } })
+      const user = await User.findOne({ where: { mobile: '13612227910' } })
       testUserId = user?.user_id
     }
 

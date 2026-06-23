@@ -16,6 +16,7 @@ import { Alpine, createPageMixin, dataTable } from '../../../alpine/index.js'
 import { request } from '../../../api/base.js'
 import { EXCHANGE_ENDPOINTS, ExchangeAPI } from '../../../api/market/exchange.js'
 import { ExchangeItemAPI } from '../../../api/exchange-item/index.js'
+import { SystemCoreAPI } from '../../../api/system/core.js'
 import {
   useExchangeItemsState,
   useExchangeItemsMethods,
@@ -34,7 +35,8 @@ const SUB_PAGES = [
   { id: 'items', title: '商品管理', icon: '📦', name: '商品管理' },
   { id: 'orders', title: '订单管理', icon: '📋', name: '订单管理' },
   { id: 'barter', title: '以物易物配方', icon: '🔄', name: '以物易物配方' },
-  { id: 'stats', title: '统计分析', icon: '📊', name: '统计分析' }
+  { id: 'stats', title: '统计分析', icon: '📊', name: '统计分析' },
+  { id: 'settings', title: '兑换市场设置', icon: '⚙️', name: '兑换市场设置' }
 ]
 
 document.addEventListener('alpine:init', () => {
@@ -125,6 +127,72 @@ document.addEventListener('alpine:init', () => {
         points_consumed: 0
       },
 
+      // ========== 兑换市场设置（事项C：轮播速度全局配置）==========
+      /** 图片轮播自动切换间隔（毫秒），后端 system_settings.exchange/gallery_autoplay_interval_ms */
+      gallery_autoplay_interval_ms: 3000,
+      /** 设置加载中 */
+      settingsLoading: false,
+      /** 设置保存中 */
+      settingsSaving: false,
+
+      /**
+       * 加载兑换市场设置（读 system_settings 的 exchange 分类）
+       * @returns {Promise<void>}
+       */
+      async loadExchangeSettings() {
+        this.settingsLoading = true
+        try {
+          const res = await SystemCoreAPI.getSettingsByCategory('exchange')
+          if (res.success) {
+            const settings = res.data?.settings || []
+            const target = settings.find(
+              s => s.setting_key === 'exchange/gallery_autoplay_interval_ms'
+            )
+            if (target) {
+              const value =
+                target.parsed_value !== undefined ? target.parsed_value : target.setting_value
+              this.gallery_autoplay_interval_ms = Number(value) || 3000
+            }
+          } else {
+            this.showError?.(res.message || '加载设置失败')
+          }
+        } catch (e) {
+          logger.error('[ExchangeMarket] 加载兑换市场设置失败:', e)
+          this.showError?.('加载设置失败')
+        } finally {
+          this.settingsLoading = false
+        }
+      },
+
+      /**
+       * 保存兑换市场设置（写 system_settings 的 exchange 分类）
+       * 注意：后端 setting_key 含分类前缀，更新时 key 用去前缀的 gallery_autoplay_interval_ms
+       * @returns {Promise<void>}
+       */
+      async saveExchangeSettings() {
+        const interval = Number(this.gallery_autoplay_interval_ms)
+        if (isNaN(interval) || interval < 1000 || interval > 10000) {
+          this.showError?.('轮播间隔需在 1000-10000 毫秒之间')
+          return
+        }
+        this.settingsSaving = true
+        try {
+          const res = await SystemCoreAPI.updateSettings('exchange', {
+            settings: { gallery_autoplay_interval_ms: interval }
+          })
+          if (res.success) {
+            this.showSuccess?.('设置已保存')
+          } else {
+            this.showError?.(res.message || '保存失败')
+          }
+        } catch (e) {
+          logger.error('[ExchangeMarket] 保存兑换市场设置失败:', e)
+          this.showError?.('保存失败')
+        } finally {
+          this.settingsSaving = false
+        }
+      },
+
       async init() {
         logger.info('[ExchangeMarket] 初始化主组件...')
 
@@ -207,6 +275,9 @@ document.addEventListener('alpine:init', () => {
             break
           case 'barter':
             await this.loadBarterRecipes()
+            break
+          case 'settings':
+            await this.loadExchangeSettings()
             break
         }
       },
@@ -394,10 +465,11 @@ document.addEventListener('alpine:init', () => {
         this.previewImageAlt = ''
       },
 
-      /** 商品主图 URL（网格卡片用） */
+      /** 商品主图 URL（网格卡片用，优先 large 高清档，回退 small/原图） */
       exchangeItemImageUrl(row) {
         const img = row?.primary_image
-        const url = img?.thumbnail_url || img?.url
+        // 列表卡片在高 DPR 屏需更清晰：优先 large(800)，回退 small 缩略图，再回退原图
+        const url = img?.thumbnails?.large || img?.thumbnail_url || img?.url
         return url || ''
       },
 

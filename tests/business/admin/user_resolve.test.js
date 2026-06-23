@@ -8,7 +8,7 @@
  * - 运营输入手机号 → 解析出 user_id → 前端用 user_id 调后续业务 API
  *
  * 测试覆盖：
- * - 正常解析：使用真实测试用户手机号（13612227930）
+ * - 正常解析：使用真实测试用户手机号（13612227910）
  * - 参数校验：缺少手机号、格式错误
  * - 业务异常：手机号不存在
  * - 权限校验：未登录、非管理员
@@ -41,7 +41,7 @@ describe('GET /api/v4/console/user-management/users/resolve - 手机号解析用
    */
   describe('正常解析场景', () => {
     /**
-     * 使用真实测试用户手机号（13612227930）进行解析
+     * 使用真实测试用户手机号（13612227910）进行解析
      * 预期：返回脱敏手机号、昵称、状态等用户基本信息
      */
     test('应该成功解析已存在的手机号', async () => {
@@ -205,7 +205,7 @@ describe('GET /api/v4/console/user-management/users/resolve - 手机号解析用
     test('超过11位手机号应返回 400', async () => {
       const response = await request(app)
         .get(RESOLVE_URL)
-        .query({ mobile: '136122279300' })
+        .query({ mobile: '136122279100' })
         .set('Authorization', `Bearer ${adminToken}`)
 
       expect(response.status).toBe(400)

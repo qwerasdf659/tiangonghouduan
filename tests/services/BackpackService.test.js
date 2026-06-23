@@ -46,11 +46,11 @@ describe('BackpackService - 背包服务', () => {
   beforeEach(async () => {
     // 使用测试用户
     test_user = await User.findOne({
-      where: { mobile: '13612227930' }
+      where: { mobile: '13612227910' }
     })
 
     if (!test_user) {
-      throw new Error('测试用户不存在，请先创建 mobile=13612227930 的用户')
+      throw new Error('测试用户不存在，请先创建 mobile=13612227910 的用户')
     }
   })
 
@@ -180,7 +180,7 @@ describe('BackpackService - 背包服务', () => {
     it('管理员应该能查看任意用户的背包', async () => {
       // 查找管理员用户
       const admin_user = await User.findOne({
-        where: { mobile: '13612227930' } // 测试账号既是用户也是管理员
+        where: { mobile: '13612227910' } // 测试账号既是用户也是管理员
       })
 
       if (admin_user && admin_user.role_level >= 50) {

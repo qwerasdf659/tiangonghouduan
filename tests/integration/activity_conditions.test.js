@@ -20,7 +20,7 @@ describe('🎯 活动条件API集成测试', () => {
 
   // 真实测试用户配置
   const REAL_TEST_USER_CONFIG = {
-    mobile: '13612227930'
+    mobile: '13612227910'
   }
 
   /**

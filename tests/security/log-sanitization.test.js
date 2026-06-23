@@ -113,7 +113,7 @@ describe('🔐 日志脱敏单元测试（P0-4）', () => {
     test('mobile字段脱敏（前3后4，中间****）', () => {
       const data = {
         user_id: 1,
-        mobile: '13612227930'
+        mobile: '13612227910'
       }
 
       const result = sanitize(data)
@@ -175,7 +175,7 @@ describe('🔐 日志脱敏单元测试（P0-4）', () => {
       const data = {
         user: {
           user_id: 1,
-          mobile: '13612227930',
+          mobile: '13612227910',
           auth: {
             password: 'secret123',
             token: 'jwt-xxx'
@@ -215,7 +215,7 @@ describe('🔐 日志脱敏单元测试（P0-4）', () => {
     test('数组中的对象脱敏', () => {
       const data = {
         users: [
-          { user_id: 1, mobile: '13612227930', password: 'pass1' },
+          { user_id: 1, mobile: '13612227910', password: 'pass1' },
           { user_id: 2, mobile: '13888888888', password: 'pass2' }
         ]
       }
@@ -273,7 +273,7 @@ describe('🔐 日志脱敏单元测试（P0-4）', () => {
    */
   describe('B-4-5 快捷方法测试', () => {
     test('sanitize.mobile() 快捷方法', () => {
-      expect(sanitize.mobile('13612227930')).toBe('136****7930')
+      expect(sanitize.mobile('13612227910')).toBe('136****7930')
       expect(sanitize.mobile(null)).toBeNull()
       expect(sanitize.mobile('')).toBeNull()
     })
@@ -301,7 +301,7 @@ describe('🔐 日志脱敏单元测试（P0-4）', () => {
     })
 
     test('sanitize.object() 快捷方法', () => {
-      const data = { mobile: '13612227930', password: 'secret' }
+      const data = { mobile: '13612227910', password: 'secret' }
       const result = sanitize.object(data)
 
       expect(result.mobile).toBe('136****7930')
@@ -328,14 +328,14 @@ describe('🔐 日志脱敏单元测试（P0-4）', () => {
           'X-Request-ID': 'req-12345678'
         },
         body: {
-          mobile: '13612227930',
+          mobile: '13612227910',
           password: 'user_password_123',
           verification_code: '123456'
         },
         user: {
           user_id: 1,
           user_uuid: 'uuid-12345678-abcd-efgh',
-          mobile: '13612227930'
+          mobile: '13612227910'
         },
         response: {
           token: 'new-jwt-token-xxx',
@@ -370,14 +370,14 @@ describe('🔐 日志脱敏单元测试（P0-4）', () => {
     test('深拷贝验证（原数据不被修改）', () => {
       const original = {
         user_id: 1,
-        mobile: '13612227930',
+        mobile: '13612227910',
         password: 'secret'
       }
 
       const result = sanitize(original)
 
       // 验证原数据未被修改
-      expect(original.mobile).toBe('13612227930')
+      expect(original.mobile).toBe('13612227910')
       expect(original.password).toBe('secret')
 
       // 验证结果已脱敏
@@ -387,7 +387,7 @@ describe('🔐 日志脱敏单元测试（P0-4）', () => {
 
     test('脱敏后数据不可逆（安全验证）', () => {
       const sensitiveData = {
-        mobile: '13612227930',
+        mobile: '13612227910',
         password: 'super_secret_password',
         token: 'jwt-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.xxxxx'
       }
@@ -471,7 +471,7 @@ describe('🔐 日志脱敏单元测试（P0-4）', () => {
             level3: {
               level4: {
                 level5: {
-                  mobile: '13612227930',
+                  mobile: '13612227910',
                   password: 'deep_secret',
                   token: 'deep_jwt_token'
                 }
@@ -617,7 +617,7 @@ describe('🔐 日志脱敏单元测试（P0-4）', () => {
     test('B-4-9-1 特殊字符处理（JSON特殊字符）', () => {
       const specialCharData = {
         user_id: 1,
-        mobile: '13612227930',
+        mobile: '13612227910',
         // 包含JSON特殊字符的备注
         merchant_notes: '测试备注 "引号" \\反斜杠\\ \n换行符 \t制表符',
         // 包含特殊字符的密码
@@ -649,7 +649,7 @@ describe('🔐 日志脱敏单元测试（P0-4）', () => {
       const unicodeData = {
         user_id: 1,
         nickname: '用户🎉测试😀',
-        mobile: '13612227930',
+        mobile: '13612227910',
         password: '密码🔐',
         merchant_notes: '商户备注📝包含emoji🎁和中文字符',
         user_uuid: 'uuid-12345678-中文-emoji-🔑'
@@ -712,7 +712,7 @@ describe('🔐 日志脱敏单元测试（P0-4）', () => {
       const longString = 'A'.repeat(10000)
       const longData = {
         user_id: 1,
-        mobile: '13612227930',
+        mobile: '13612227910',
         password: longString,
         merchant_notes: longString,
         idempotency_key: longString,
@@ -743,7 +743,7 @@ describe('🔐 日志脱敏单元测试（P0-4）', () => {
     test('B-4-10-2 数字类型手机号处理', () => {
       const numericMobileData = {
         user_id: 1,
-        mobile: 13612227930, // 数字类型而非字符串
+        mobile: 13612227910, // 数字类型而非字符串
         password: 'secret'
       }
 
@@ -768,7 +768,7 @@ describe('🔐 日志脱敏单元测试（P0-4）', () => {
     test('B-4-10-3 循环结构安全处理（不崩溃）', () => {
       const circularData = {
         user_id: 1,
-        mobile: '13612227930',
+        mobile: '13612227910',
         password: 'secret'
       }
 
@@ -803,7 +803,7 @@ describe('🔐 日志脱敏单元测试（P0-4）', () => {
       const dateObj = new Date('2026-01-28T10:30:00Z')
       const dataWithDate = {
         user_id: 1,
-        mobile: '13612227930',
+        mobile: '13612227910',
         password: 'secret',
         created_at: dateObj,
         nested: {
@@ -867,7 +867,7 @@ describe('🔐 日志脱敏单元测试（P0-4）', () => {
           true,
           null,
           undefined,
-          { mobile: '13612227930', password: 'secret' },
+          { mobile: '13612227910', password: 'secret' },
           [1, 2, 3],
           { nested: { token: 'jwt-xxx' } }
         ]

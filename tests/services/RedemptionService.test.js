@@ -47,11 +47,11 @@ describe('RedemptionService - 兑换订单服务', () => {
 
   beforeEach(async () => {
     test_user = await User.findOne({
-      where: { mobile: '13612227930' }
+      where: { mobile: '13612227910' }
     })
 
     if (!test_user) {
-      throw new Error('测试用户不存在，请先创建 mobile=13612227930 的用户')
+      throw new Error('测试用户不存在，请先创建 mobile=13612227910 的用户')
     }
 
     /* 获取用户 account_id（三表模型使用 account_id） */

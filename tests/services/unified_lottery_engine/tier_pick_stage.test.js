@@ -63,7 +63,7 @@ describe('TierPickStage 层级选择器测试（任务2.3）', () => {
    * 真实测试用户配置
    */
   const REAL_TEST_USER_CONFIG = {
-    mobile: '13612227930'
+    mobile: '13612227910'
   }
 
   /**

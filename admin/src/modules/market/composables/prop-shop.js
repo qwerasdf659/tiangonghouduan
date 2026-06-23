@@ -184,7 +184,6 @@ export function usePropShopMethods() {
         const formData = new FormData()
         formData.append('image', file)
         formData.append('business_type', 'exchange')
-        formData.append('category', 'exchange_items')
         const res = await request({
           url: SYSTEM_ADMIN_ENDPOINTS.MEDIA_UPLOAD,
           method: 'POST',

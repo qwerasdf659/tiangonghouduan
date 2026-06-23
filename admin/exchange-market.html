@@ -555,6 +555,40 @@
       </div>
     </div>
 
+    <!-- 兑换市场设置（事项C：轮播速度全局配置） -->
+    <div x-show="current_page === 'settings'" x-cloak>
+      <div class="content-section">
+        <div class="content-section-header">
+          <div class="section-title">
+            <span class="title-icon">⚙️</span>
+            兑换市场设置
+          </div>
+        </div>
+        <div class="themed-card rounded-lg border p-6 max-w-xl">
+          <div x-show="settingsLoading" class="text-center py-6 themed-text-muted">加载中…</div>
+          <div x-show="!settingsLoading">
+            <label class="block text-sm font-medium themed-text-secondary mb-2">
+              商品图片轮播速度（毫秒/张）
+            </label>
+            <p class="text-xs themed-text-muted mb-3">
+              商品主图与 SKU 图轮播自动切换间隔，全站统一生效。范围 1000-10000 毫秒（小程序读不到时默认 3000）。
+            </p>
+            <div class="flex items-center gap-3">
+              <input type="number" min="1000" max="10000" step="500"
+                     x-model.number="gallery_autoplay_interval_ms"
+                     class="w-40 border rounded px-3 py-2 text-sm">
+              <span class="text-sm themed-text-muted">毫秒</span>
+              <button type="button" @click="saveExchangeSettings()" :disabled="settingsSaving"
+                      class="action-btn action-btn-primary disabled:opacity-50">
+                <span x-show="!settingsSaving">保存</span>
+                <span x-show="settingsSaving">保存中…</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ==================== Modal 组件区域 ==================== -->
 
   <!-- 批量改价弹窗 -->
@@ -751,6 +785,27 @@
                 <p class="text-xs themed-text-muted mt-1">支持 JPG/PNG/GIF/WebP，最大 5MB</p>
               </div>
             </div>
+          </div>
+          <!-- 主图轮播组（事项A：role='gallery'，小程序详情页主图轮播 images[]） -->
+          <div x-show="editingItemId">
+            <label class="block text-sm font-medium themed-text-secondary mb-1">主图轮播组 <span class="text-xs themed-text-muted">(选填，最多9张，小程序详情页顶部主图轮播)</span></label>
+            <div class="flex flex-wrap gap-2 mb-1">
+              <template x-for="img in galleryImages" :key="img.media_id">
+                <div class="relative w-20 h-20 border rounded-lg overflow-hidden group">
+                  <img :src="img.url" class="w-full h-full object-cover" />
+                  <button type="button" @click="removeGalleryImage(img.media_id)"
+                          class="absolute top-0 right-0 bg-red-500 text-white w-5 h-5 text-xs opacity-0 group-hover:opacity-100" title="删除">✕</button>
+                </div>
+              </template>
+              <label x-show="galleryImages.length < 9"
+                     class="w-20 h-20 border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-green-500 transition">
+                <span x-show="!galleryImageUploading" class="text-2xl text-gray-400">+</span>
+                <span x-show="galleryImageUploading" class="text-xs text-gray-400">上传中...</span>
+                <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" class="hidden"
+                       @change="uploadGalleryImage($event)" :disabled="galleryImageUploading">
+              </label>
+            </div>
+            <p class="text-xs themed-text-muted">已上传 <span x-text="galleryImages.length">0</span>/9 张 · 用于小程序商品详情页顶部主图轮播</p>
           </div>
           <!-- 详情图上传区域（多图支持，最多9张） -->
           <div x-show="editingItemId">
@@ -1387,6 +1442,28 @@
               <option value="active">启用</option>
               <option value="inactive">禁用</option>
             </select>
+          </div>
+        </div>
+        <!-- 事项B：SKU 多图轮播组（需先保存规格拿到 sku_id 才能上传） -->
+        <div>
+          <label class="block text-sm font-medium themed-text-secondary mb-1">
+            规格多图 <span class="text-xs themed-text-muted">(选填，最多9张，用户切到该规格时轮播展示)</span>
+          </label>
+          <div x-show="!editingSkuId" class="text-xs text-yellow-600 mb-2">请先保存规格，再为该规格上传多图。</div>
+          <div x-show="editingSkuId" class="flex flex-wrap gap-2">
+            <template x-for="img in skuGalleryImages" :key="img.media_id">
+              <div class="relative w-20 h-20 border rounded-lg overflow-hidden group">
+                <img :src="img.url" class="w-full h-full object-cover">
+                <button type="button" @click="removeSkuGalleryImage(img.media_id)"
+                        class="absolute top-0 right-0 bg-red-500 text-white w-5 h-5 text-xs opacity-0 group-hover:opacity-100">✕</button>
+              </div>
+            </template>
+            <label x-show="skuGalleryImages.length < 9"
+                   class="w-20 h-20 border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-green-500 transition">
+              <span x-show="!skuGalleryUploading" class="text-2xl text-gray-400">+</span>
+              <span x-show="skuGalleryUploading" class="text-xs text-gray-400">上传中...</span>
+              <input type="file" accept="image/*" @change="uploadSkuGalleryImage($event)" class="hidden" :disabled="skuGalleryUploading">
+            </label>
           </div>
         </div>
       </div>

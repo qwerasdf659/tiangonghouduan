@@ -21,8 +21,8 @@ const app = require('../../app')
 const { sequelize } = require('../../models')
 const { cleanupAfterEach } = require('../helpers/TestDataCleaner')
 
-/** 测试用户：13612227930，user_id=31 */
-const TEST_USER_MOBILE = '13612227930'
+/** 测试用户：13612227910，user_id=31 */
+const TEST_USER_MOBILE = '13612227910'
 const TEST_USER_ID = 31
 const TEST_VERIFICATION_CODE = '123456'
 

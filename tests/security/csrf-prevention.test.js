@@ -165,7 +165,7 @@ describe('P1-7.1: CSRF防护测试', () => {
         .post('/api/v4/auth/login')
         .set('Origin', maliciousOrigin)
         .set('Content-Type', 'application/json')
-        .send({ mobile: '13612227930', verification_code: '123456' })
+        .send({ mobile: '13612227910', verification_code: '123456' })
 
       /*
        * 处理方式可能有：
@@ -233,7 +233,7 @@ describe('P1-7.1: CSRF防护测试', () => {
         .post('/api/v4/auth/login')
         .set('Origin', allowedOrigins[0] || 'http://localhost:3000')
         .set('Content-Type', 'application/json')
-        .send({ mobile: '13612227930', verification_code: '123456' })
+        .send({ mobile: '13612227910', verification_code: '123456' })
 
       // 检查Set-Cookie头（如果有）
       const setCookieHeader = response.headers['set-cookie']

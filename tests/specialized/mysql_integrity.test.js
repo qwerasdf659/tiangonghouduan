@@ -8,7 +8,7 @@
 const { User, Account, AccountAssetBalance, AssetTransaction } = require('../../models')
 
 describe('MySQL数据约束和参照完整性专项测试', () => {
-  const testPhoneNumber = '13612227930'
+  const testPhoneNumber = '13612227910'
   let testUser
 
   beforeAll(async () => {

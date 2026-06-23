@@ -562,7 +562,6 @@ document.addEventListener('alpine:init', () => {
         const formData = new FormData()
         formData.append('image', file)
         formData.append('business_type', 'uploads')
-        formData.append('category', 'items')
 
         const res = await request({
           url: SYSTEM_ADMIN_ENDPOINTS.MEDIA_UPLOAD,

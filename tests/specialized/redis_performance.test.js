@@ -19,10 +19,10 @@ const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
 })
 
 describe('Redis性能专项测试', () => {
-  const testPhoneNumber = '13612227930'
+  const testPhoneNumber = '13612227910'
   /*
    * 🔴 使用真实数据：请从数据库获取真实测试数据
-   * 测试用户：13612227930
+   * 测试用户：13612227910
    * 验证码：123456
    */
 

@@ -107,7 +107,7 @@ global.beforeAll(async () => {
 
     // 🔴 P0-1：加载真实测试数据
     const { initRealTestData } = require('./tests/helpers/test-setup')
-    const testData = await initRealTestData('13612227930')
+    const testData = await initRealTestData('13612227910')
 
     // 将测试数据存储到 global 供所有测试使用
     global.testData = {
@@ -206,8 +206,8 @@ global.beforeAll(async () => {
     console.error('❌ [Jest Setup] 初始化失败:', error.message)
     // 设置空数据，允许测试继续（某些测试可能不需要这些数据）
     global.testData = {
-      testUser: { user_id: null, mobile: '13612227930' },
-      adminUser: { user_id: null, mobile: '13612227930' },
+      testUser: { user_id: null, mobile: '13612227910' },
+      adminUser: { user_id: null, mobile: '13612227910' },
       testCampaign: { lottery_campaign_id: null, campaign_name: null },
       testStore: { store_id: null, store_name: null },
       _initialized: false

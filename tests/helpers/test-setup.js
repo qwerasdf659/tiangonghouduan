@@ -288,7 +288,7 @@ const TestConfig = {
   realData: {
     // ✅ 统一测试用户手机号 - 实际 user_id 通过 initRealTestData() 查询
     testUser: {
-      mobile: '13612227930', // 统一测试用户手机号
+      mobile: '13612227910', // 统一测试用户手机号（清档后统一用超管 13612227910）
       user_id: null // 🔴 P0-1修复：移除硬编码，通过 initRealTestData() 动态获取
     },
 
@@ -341,10 +341,10 @@ const TestConfig = {
  * - 通过 status='active' 查询活跃活动
  * - 返回值存入 global.testData 供所有测试文件使用
  *
- * @param {string} mobile - 测试用户手机号，默认 '13612227930'
+ * @param {string} mobile - 测试用户手机号，默认 '13612227910'（清档后统一用超管）
  * @returns {Promise<Object>} 真实测试数据 { testUser, adminUser, testCampaign }
  */
-async function initRealTestData(mobile = '13612227930') {
+async function initRealTestData(mobile = '13612227910') {
   // 避免重复初始化
   if (TestConfig.realData._initialized) {
     return TestConfig.realData
@@ -368,7 +368,7 @@ async function initRealTestData(mobile = '13612227930') {
 
     /*
      * 1b. 查询超级管理员测试账号（.env SUPER_ADMIN_MOBILE=13612227910，role_level>=100）。
-     * 管理后台接口（requireRoleLevel(30/100)）必须用此账号，普通测试用户(13612227930, regional_manager:80)无权访问。
+     * 管理后台接口（requireRoleLevel(30/100)）必须用此账号，普通测试用户(13612227910, regional_manager:80)无权访问。
      * 找不到时回退为普通测试用户，保证旧测试不因缺账号而崩。
      */
     const adminMobile = process.env.SUPER_ADMIN_MOBILE || '13612227910'
@@ -439,7 +439,7 @@ async function initRealTestData(mobile = '13612227930') {
  * @param {string} mobile - 测试用户手机号
  * @returns {Promise<number|null>} 用户ID
  */
-async function getRealTestUserId(mobile = '13612227930') {
+async function getRealTestUserId(mobile = '13612227910') {
   if (!TestConfig.realData._initialized) {
     await initRealTestData(mobile)
   }

@@ -301,7 +301,7 @@ describe('P2-3.1: Winston日志配置测试', () => {
 
     test('手机号应脱敏为前3后4格式', () => {
       // 测试手机号脱敏（136****7930）
-      const mobile = '13612227930'
+      const mobile = '13612227910'
       const sanitizedMobile = SANITIZE_RULES.mobile(mobile)
 
       expect(sanitizedMobile).toBe('136****7930')
@@ -367,7 +367,7 @@ describe('P2-3.1: Winston日志配置测试', () => {
     test('对象中的灰名单字段应按规则脱敏', () => {
       const dataWithGraylist = {
         user_id: 1,
-        mobile: '13612227930',
+        mobile: '13612227910',
         user_uuid: 'uuid-1234-5678-9012-3456',
         merchant_notes: '商家备注内容'
       }
@@ -531,7 +531,7 @@ describe('P2-3.1: Winston日志配置测试', () => {
     test('日志脱敏应在合理时间内完成', () => {
       const complexData = {
         user: {
-          mobile: '13612227930',
+          mobile: '13612227910',
           password: 'secret',
           profile: {
             token: 'jwt_token',

@@ -254,7 +254,7 @@ describe('P3-10: 日志格式和监控验证', () => {
 
       // 模拟敏感数据
       const sensitiveData = {
-        mobile: '13612227930',
+        mobile: '13612227910',
         password: 'secret123',
         id_card: '110101199001011234'
       }
