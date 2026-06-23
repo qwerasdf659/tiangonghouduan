@@ -33,6 +33,7 @@ const { generateExchangeBusinessId } = require('../../utils/IdempotencyHelper')
 const ItemService = require('../asset/ItemService')
 const AssetProductGuard = require('../shared/AssetProductGuard')
 const { assertAndGetTransaction } = require('../../utils/transactionHelpers')
+const ExchangeItemService = require('./ExchangeItemService')
 
 /**
  * 竞价资产硬编码黑名单（绝对禁止，决策1）
@@ -83,6 +84,11 @@ class BidService {
     this.ExchangeItem = models.ExchangeItem
     this.ExchangeItemSku = models.ExchangeItemSku
     this.sequelize = models.sequelize
+    /*
+     * 复用兑换商品中心服务的 syncSpuSummary：竞拍结算扣减 SKU 库存后，
+     * 回填 SPU 物化汇总列（exchange_items.stock/sold_count），与兑换/退款/admin 各写路径同口径。
+     */
+    this.exchangeItemService = new ExchangeItemService(models)
   }
 
   /**
@@ -655,6 +661,9 @@ class BidService {
           400
         )
       }
+
+      // 回填 SPU 物化汇总列（库存权威在 SKU，扣减后同步 exchange_items.stock/sold_count，同口径）
+      await this.exchangeItemService.syncSpuSummary(exchangeItem.exchange_item_id, transaction)
     }
 
     // f. 落选者冻结资产解冻返还

@@ -28,6 +28,7 @@ const { generateExchangeBusinessId } = require('../../utils/IdempotencyHelper')
 const BalanceService = require('../asset/BalanceService')
 const ItemService = require('../asset/ItemService')
 const UserAddressService = require('../UserAddressService')
+const ExchangeItemService = require('./ExchangeItemService')
 const AttributeRuleEngine = require('../item/AttributeRuleEngine')
 const AssetProductGuard = require('../shared/AssetProductGuard')
 const { Op } = require('sequelize')
@@ -83,6 +84,13 @@ class CoreService {
     this.ExchangeRedeemRequirement = models.ExchangeRedeemRequirement
     this.UserGrowthLevel = models.UserGrowthLevel
     this.ItemTemplate = models.ItemTemplate
+    /*
+     * 兑换商品中心服务（复用其 syncSpuSummary）：库存权威在 exchange_item_skus，
+     * 兑换扣库存 / 退款回补库存改动 SKU 后，统一调 syncSpuSummary 回填 SPU 物化汇总列
+     * （exchange_items.stock/sold_count），与 admin 端及 SKU 各写路径完全同口径，
+     * 避免小程序列表/详情读到陈旧 SPU 库存。
+     */
+    this.exchangeItemService = new ExchangeItemService(models)
   }
 
   /**
@@ -535,6 +543,13 @@ class CoreService {
       },
       { transaction }
     )
+
+    /*
+     * 回填 SPU 物化汇总列：库存权威在 exchange_item_skus，扣减 SKU 后必须同步
+     * exchange_items 的 stock/sold_count 汇总，否则小程序列表（读 SPU stock）会显示陈旧库存。
+     * 复用 ExchangeItemService.syncSpuSummary，与 admin 端及 SKU 各写路径完全同口径。
+     */
+    await this.exchangeItemService.syncSpuSummary(exchange_item_id, transaction)
 
     record.item_snapshot = {
       ...record.item_snapshot,
@@ -1652,38 +1667,54 @@ class CoreService {
     // 恢复商品库存（退款回补）
     const restoreItemId = order.exchange_item_id
     if (restoreItemId) {
-      const exchangeItem = await this.ExchangeItem.findByPk(restoreItemId, { transaction })
-      if (exchangeItem) {
-        const quantity = order.quantity || 1
-        await exchangeItem.update(
+      const quantity = order.quantity || 1
+      /*
+       * 库存权威在 exchange_item_skus：退款回补必须改对应 SKU 的 stock/sold_count，
+       * 再调 syncSpuSummary 回填 SPU 物化汇总列（exchange_items.stock/sold_count）。
+       * 修复前此处直接改 SPU exchange_items.stock、且未回补 SKU，会导致 SKU 与 SPU 库存对不上账。
+       */
+      const refundSku = order.sku_id
+        ? await this.ExchangeItemSku.findOne({
+            where: { sku_id: order.sku_id, exchange_item_id: restoreItemId },
+            lock: transaction.LOCK.UPDATE,
+            transaction
+          })
+        : null
+
+      if (refundSku) {
+        const beforeStock = refundSku.stock
+        await refundSku.update(
           {
-            stock: exchangeItem.stock + quantity,
-            sold_count: Math.max(0, exchangeItem.sold_count - quantity)
+            stock: refundSku.stock + quantity,
+            sold_count: Math.max(0, (refundSku.sold_count || 0) - quantity)
           },
           { transaction }
         )
+
+        // 回填 SPU 物化汇总列（与兑换扣库存对称，同口径）
+        await this.exchangeItemService.syncSpuSummary(restoreItemId, transaction)
 
         try {
           await this.models.AdminOperationLog.create(
             {
               operator_id: null,
               operation_type: 'stock_change',
-              target_type: 'exchange_item',
-              target_id: exchangeItem.exchange_item_id,
+              target_type: 'product_sku',
+              target_id: refundSku.sku_id,
               action: 'refund',
-              before_data: { stock: exchangeItem.stock, item_name: exchangeItem.item_name },
+              before_data: { stock: beforeStock, item_name: order.item_snapshot?.item_name },
               after_data: {
-                stock: exchangeItem.stock + quantity,
-                item_name: exchangeItem.item_name
+                stock: beforeStock + quantity,
+                item_name: order.item_snapshot?.item_name
               },
               changed_fields: {
                 stock: {
-                  from: exchangeItem.stock,
-                  to: exchangeItem.stock + quantity,
+                  from: beforeStock,
+                  to: beforeStock + quantity,
                   delta: quantity
                 }
               },
-              reason: `退款回补库存（订单：${order.exchange_record_id}，数量：${quantity}）`,
+              reason: `退款回补库存（订单：${order.exchange_record_id}，SKU：${refundSku.sku_id}，数量：${quantity}）`,
               risk_level: 'low',
               requires_approval: false,
               approval_status: 'not_required',
@@ -1694,6 +1725,12 @@ class CoreService {
         } catch (logErr) {
           logger.warn('[兑换市场] 库存变动日志记录失败', { error: logErr.message })
         }
+      } else {
+        logger.warn('[兑换市场] 退款回补库存跳过：订单无可定位的 SKU', {
+          order_no,
+          exchange_item_id: restoreItemId,
+          sku_id: order.sku_id || null
+        })
       }
     }
 

@@ -521,7 +521,14 @@ class BeijingTimeHelper {
    * @returns {Object} 包含多种格式的时间对象
    */
   static formatForAPI(date = new Date()) {
+    /*
+     * 判空修复（2026-06-24）：date 为 null/undefined/空串/无效日期时返回 null，
+     * 不再 new Date(null) 落到 epoch 0 而错误显示为 1970-01-01。
+     * 典型场景：审核链未完成时 completed_at/actioned_at 为 null，前端据 null 显示"—/未完成"。
+     */
+    if (date === null || date === undefined || date === '') return null
     const inputDate = new Date(date)
+    if (isNaN(inputDate.getTime())) return null
     return {
       iso: inputDate.toISOString(),
       beijing: BeijingTimeHelper.toBeijingTime(inputDate),

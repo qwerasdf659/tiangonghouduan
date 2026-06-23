@@ -15,6 +15,7 @@
  */
 const BusinessError = require('../utils/BusinessError')
 const logger = require('../utils/logger').logger
+const { sanitize } = require('../utils/logger')
 const {
   ApprovalChainTemplate,
   ApprovalChainNode,
@@ -856,6 +857,7 @@ class ApprovalChainService {
 
     const displayRows = await ApprovalChainService._attachAuditableTypeDisplay(rows)
     ApprovalChainService._attachStepProgress(displayRows)
+    await ApprovalChainService._attachParties(displayRows)
     return { rows: displayRows, count, page, page_size, total_pages: Math.ceil(count / page_size) }
   }
 
@@ -880,6 +882,87 @@ class ApprovalChainService {
       row.progress_current_step = current
       row.progress_total_steps = total
       row.progress_text = current && total ? `第${current}步/共${total}步` : null
+    }
+  }
+
+  /**
+   * 为待办步骤行附加「提交人 + 被审核人」信息（用户名 + 脱敏手机号），供小程序审批详情展示。
+   *
+   * 背景（2026-06-24）：/my-pending 原查询只带 instance/template/node，未下发任何用户信息，
+   * 导致小程序审批详情看不到「提交人 / 被审核人」。本方法批量补齐，避免 N+1。
+   *
+   * 字段语义：
+   * - submitter_info：审批发起人（instance.submitted_by；消费审核场景=录入该单的店员）
+   * - target_user_info：被审核业务的当事人（仅 consumption 场景=消费顾客 consumption_records.user_id）
+   *
+   * 🔐 安全：手机号一律经 sanitize.mobile 脱敏为 136****7930 后下发（发小程序，防泄露完整号）。
+   *
+   * @param {Array<Object>} rows - 待办步骤行（plain object，含嵌套 instance）
+   * @returns {Promise<void>} 原地附加 submitter_info / target_user_info
+   * @private
+   */
+  static async _attachParties(rows) {
+    if (!Array.isArray(rows) || rows.length === 0) return
+    const models = require('../models')
+    const ConsumptionRecord = models.ConsumptionRecord
+
+    // 1. 收集提交人 user_id（来自 instance.submitted_by）
+    const submitterIds = new Set()
+    // 2. 收集 consumption 类待办的 auditable_id（用于反查被审核顾客）
+    const consumptionInstanceIds = []
+    for (const row of rows) {
+      const inst = row && row.instance
+      if (!inst) continue
+      if (inst.submitted_by) submitterIds.add(Number(inst.submitted_by))
+      if (inst.auditable_type === 'consumption' && inst.auditable_id) {
+        consumptionInstanceIds.push({ row, auditable_id: Number(inst.auditable_id) })
+      }
+    }
+
+    // 3. 一次性查消费记录 → 顾客 user_id（被审核人）
+    const targetUserIdByRow = new Map()
+    if (consumptionInstanceIds.length > 0 && ConsumptionRecord) {
+      const crIds = [...new Set(consumptionInstanceIds.map(x => x.auditable_id))]
+      const crs = await ConsumptionRecord.findAll({
+        where: { consumption_record_id: { [Op.in]: crIds } },
+        attributes: ['consumption_record_id', 'user_id'],
+        raw: true
+      })
+      const crUserMap = new Map(crs.map(r => [Number(r.consumption_record_id), Number(r.user_id)]))
+      for (const { row, auditable_id } of consumptionInstanceIds) {
+        const uid = crUserMap.get(auditable_id)
+        if (uid) {
+          targetUserIdByRow.set(row, uid)
+          submitterIds.add(uid)
+        }
+      }
+    }
+
+    // 4. 一次性查所有涉及的 User（提交人 + 被审核人），脱敏手机号
+    /*
+     * 注意：User.mobile 是虚拟字段（读时解密 mobile_encrypted），不能用 raw:true（否则拿到密文/空），
+     * 须用模型实例经 getter 解密后再脱敏。
+     */
+    const allUserIds = [...submitterIds]
+    if (allUserIds.length === 0) return
+    const users = await User.findAll({
+      where: { user_id: { [Op.in]: allUserIds } },
+      attributes: ['user_id', 'nickname', 'mobile_encrypted']
+    })
+    const userMap = new Map(
+      users.map(u => [
+        Number(u.user_id),
+        { user_id: Number(u.user_id), nickname: u.nickname, mobile: sanitize.mobile(u.mobile) }
+      ])
+    )
+
+    // 5. 原地附加（前端零映射直读）
+    for (const row of rows) {
+      const inst = row && row.instance
+      if (!inst) continue
+      row.submitter_info = inst.submitted_by ? userMap.get(Number(inst.submitted_by)) || null : null
+      const targetUid = targetUserIdByRow.get(row)
+      row.target_user_info = targetUid ? userMap.get(targetUid) || null : null
     }
   }
 

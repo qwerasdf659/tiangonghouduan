@@ -339,7 +339,7 @@ class ExchangeItemService {
       transaction
     )
 
-    await this._updateSpuSummary(pid, transaction)
+    await this.syncSpuSummary(pid, transaction)
 
     const full = await ExchangeItemSku.findByPk(sku.sku_id, {
       transaction,
@@ -406,7 +406,7 @@ class ExchangeItemService {
       )
     }
 
-    await this._updateSpuSummary(sku.exchange_item_id, transaction)
+    await this.syncSpuSummary(sku.exchange_item_id, transaction)
 
     const full = await ExchangeItemSku.findByPk(sid, {
       transaction,
@@ -480,7 +480,7 @@ class ExchangeItemService {
     if (!deleted) {
       throw new BusinessError('SKU 不存在', 'PRODUCT_CENTER_SKU_NOT_FOUND', 404)
     }
-    await this._updateSpuSummary(skuRow.exchange_item_id, transaction)
+    await this.syncSpuSummary(skuRow.exchange_item_id, transaction)
     logger.info('ExchangeItemService.deleteSku 成功', {
       sku_id: sid,
       ts: BeijingTimeHelper.apiTimestamp()
@@ -640,7 +640,7 @@ class ExchangeItemService {
     }
 
     await sku.update({ stock: next }, { transaction })
-    await this._updateSpuSummary(sku.exchange_item_id, transaction)
+    await this.syncSpuSummary(sku.exchange_item_id, transaction)
     logger.info('ExchangeItemService.adjustStock 成功', {
       sku_id: sid,
       delta: d,
@@ -653,16 +653,18 @@ class ExchangeItemService {
   /**
    * 回填 SPU 物化汇总列（议题1：stock/sold_count/min_cost_amount/max_cost_amount/min_cost_asset_code）
    *
-   * 与 admin SkuService/ItemManagementService/BatchOperationService 的 `_updateSpuSummary` 完全同口径，
+   * 与 admin SkuService/ItemManagementService/BatchOperationService 的同名回填逻辑完全同口径，
    * 保证「SKU/渠道价任意写路径」之后 SPU 物化列与 active SKU 聚合实时一致，
    * 避免小程序兑换/道具列表读到陈旧 stock（修复前本服务的 adjustStock/updateSku/createSku/deleteSku 漏回填）。
    *
-   * @private
+   * 公有方法：兑换核心 CoreService（用户兑换扣库存、退款回补库存）等跨服务写库存路径，
+   * 也必须在改动 SKU 库存后调用本方法回填 SPU 汇总，确保库存权威（SKU）与展示列（SPU）全链路一致。
+   *
    * @param {number} exchangeItemId - SPU 商品 ID
    * @param {Object} transaction - Sequelize 事务实例（必传，与写操作同事务）
    * @returns {Promise<void>} 回填完成（无返回值）
    */
-  async _updateSpuSummary(exchangeItemId, transaction) {
+  async syncSpuSummary(exchangeItemId, transaction) {
     const { ExchangeItem, ExchangeItemSku } = this.models
 
     const [skuSummary] = await ExchangeItemSku.findAll({
