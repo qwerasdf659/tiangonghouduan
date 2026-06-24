@@ -432,6 +432,46 @@ const SYSTEM_SETTINGS_WHITELIST = {
     approvalRequired: false
   },
 
+  // ===== 臻选空间（高级空间）解锁规则（运营可调，2026-06-25 新增）=====
+  'premium/history_points_threshold': {
+    type: 'number',
+    min: 0, // 0 = 不设历史积分门槛（任何人都满足条件①）
+    max: 10000000, // 最高 1000 万，防误填天文数字
+    default: 100000, // 与原硬编码 HISTORY_POINTS_THRESHOLD 一致（10 万）
+    readonly: false,
+    description: '臻选空间解锁条件①：历史累计积分门槛（达到该值才可解锁）',
+    changeRequiresRestart: false,
+    businessImpact: 'HIGH',
+    auditRequired: true,
+    approvalRequired: false
+  },
+
+  'premium/unlock_cost': {
+    type: 'number',
+    min: 0, // 0 = 免费解锁（仍需满足历史积分门槛）
+    max: 100000, // 最高 10 万积分，防误填
+    default: 100, // 与原硬编码 UNLOCK_COST 一致
+    readonly: false,
+    description: '臻选空间解锁费用 / 条件②：解锁需扣除并要求当前可用积分≥该值',
+    changeRequiresRestart: false,
+    businessImpact: 'HIGH',
+    auditRequired: true,
+    approvalRequired: false
+  },
+
+  'premium/validity_hours': {
+    type: 'number',
+    min: 1, // 最短 1 小时
+    max: 8760, // 最长 1 年（365×24）
+    default: 24, // 与原硬编码 VALIDITY_HOURS 一致
+    readonly: false,
+    description: '臻选空间解锁后有效期（小时），过期需重新解锁',
+    changeRequiresRestart: false,
+    businessImpact: 'MEDIUM',
+    auditRequired: true,
+    approvalRequired: false
+  },
+
   // ===== 通知设置（开关类，适合 DB）=====
   'notification/sms_enabled': {
     type: 'boolean',

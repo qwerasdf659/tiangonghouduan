@@ -346,10 +346,12 @@ export function notificationCenter() {
           this.handleWebSocketMessage({
             type: 'notification',
             payload: {
+              // 先展开后端原始字段，再用计算后的安全字段覆盖，避免 content 被原始图片 URL 覆盖回去
+              ...data,
               source_type: 'customer_service',
               title: '新客服消息',
-              content: data.content || '收到新消息',
-              ...data
+              // 按 message_type 渲染预览：图片/文件不暴露原始 URL，与客服工作台会话列表规则一致
+              content: this.formatChatMessagePreview(data)
             }
           })
         })
@@ -475,6 +477,30 @@ export function notificationCenter() {
      */
     isHighPriority(priority) {
       return priority === 'high' || priority === 'urgent'
+    },
+
+    /**
+     * 客服聊天消息预览文案（按 message_type 渲染，与客服工作台会话列表 getSessionLastMessage 规则对齐）
+     *
+     * 业务规则（对齐后端 chat_messages.message_type）：
+     * - image  → [图片]（不暴露原始 OSS URL）
+     * - file   → [文件] 文件名（file_name 缺失时仅 [文件]）
+     * - system → 系统提示原文
+     * - text   → 文本原文
+     *
+     * @param {Object} data - 后端 new_message 推送的消息对象（含 message_type/content/file_name）
+     * @returns {string} 用于通知正文展示的预览文案
+     */
+    formatChatMessagePreview(data) {
+      if (!data || typeof data !== 'object') return '收到新消息'
+      switch (data.message_type) {
+        case 'image':
+          return '[图片]'
+        case 'file':
+          return data.file_name ? `[文件] ${data.file_name}` : '[文件]'
+        default:
+          return typeof data.content === 'string' && data.content ? data.content : '收到新消息'
+      }
     },
 
     formatTime(dateStr) {

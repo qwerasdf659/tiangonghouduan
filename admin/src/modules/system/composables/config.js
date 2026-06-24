@@ -21,7 +21,12 @@ const CATEGORY_DISPLAY = {
   notification: { name: '通知设置', icon: '🔔', description: '短信、邮件、APP推送开关' },
   security: { name: '安全设置', icon: '🔐', description: '登录限制、密码策略、API限流' },
   backpack: { name: '背包配置', icon: '🎒', description: '使用引导文案、物品操作规则' },
-  redemption: { name: '核销设置', icon: '🎫', description: '核销码有效期、扫码规则、门店核销配置' }
+  redemption: { name: '核销设置', icon: '🎫', description: '核销码有效期、扫码规则、门店核销配置' },
+  premium: {
+    name: '臻选空间',
+    icon: '💎',
+    description: '臻选空间解锁规则：历史积分门槛、解锁费用、有效期（运营可调，改配置不发版）'
+  }
 }
 
 /**

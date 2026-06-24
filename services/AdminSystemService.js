@@ -488,7 +488,8 @@ class AdminSystemService {
         'ad_pricing',
         'backpack',
         'data_management',
-        'agreement'
+        'agreement',
+        'premium'
       ]
       if (!validCategories.includes(category)) {
         throw new BusinessError(
@@ -642,7 +643,8 @@ class AdminSystemService {
       'ad_pricing',
       'backpack',
       'data_management',
-      'agreement'
+      'agreement',
+      'premium'
     ]
     if (!validCategories.includes(category)) {
       throw new BusinessError(

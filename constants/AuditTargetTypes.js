@@ -85,7 +85,10 @@ const AUDIT_TARGET_TYPES = Object.freeze({
   DATA_MANAGEMENT: 'data_management',
 
   // ========== 媒体治理（媒体级联删除危险操作 2026-06-24 新增）==========
-  MEDIA_FILE: 'media_file'
+  MEDIA_FILE: 'media_file',
+
+  // ========== 臻选空间（高级空间手动运营 2026-06-25 新增）==========
+  USER_PREMIUM_STATUS: 'user_premium_status'
 })
 
 /**
@@ -176,7 +179,8 @@ function getTargetTypeDisplayName(targetType) {
     ad_campaign: '广告计划',
     feature_flag: '功能开关',
     data_management: '数据管理',
-    media_file: '媒体文件'
+    media_file: '媒体文件',
+    user_premium_status: '用户高级空间状态'
   }
 
   return displayNames[targetType] || targetType

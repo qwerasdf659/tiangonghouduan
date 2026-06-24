@@ -25,6 +25,7 @@ const { asyncHandler } = require('../../../../middleware/validation')
 const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
+const TransactionManager = require('../../../../utils/TransactionManager')
 const logger = require('../../../../utils/logger').logger
 
 /**
@@ -127,6 +128,112 @@ router.get(
     })
 
     return res.apiSuccess(result, '获取即将过期用户列表成功')
+  })
+)
+
+/**
+ * POST /:user_id/extend - 管理员手动延长用户高级空间有效期
+ *
+ * 路径参数：user_id（用户ID）
+ * Body：{ days: number }（延长天数，1~3650）
+ *
+ * 说明：不扣积分、unlock_method 标记为 'manual'；已有有效期则叠加，否则从当前起算。
+ * 返回：延期结果（含新的 expires_at）
+ */
+router.post(
+  '/:user_id/extend',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const user_id = parseInt(req.params.user_id)
+    if (isNaN(user_id)) {
+      return res.apiError('无效的用户ID', 'INVALID_USER_ID', null, 400)
+    }
+    const days = req.body?.days
+
+    try {
+      const result = await TransactionManager.execute(
+        async transaction =>
+          getPremiumService(req).extendPremium(user_id, days, req.user.user_id, { transaction }),
+        { description: 'extendPremium' }
+      )
+
+      // 危险/运营操作留痕
+      const AuditLogService = req.app.locals.services.getService('audit_log')
+      await AuditLogService.logOperation({
+        operator_id: req.user.user_id,
+        operation_type: 'premium_extend',
+        target_type: 'user_premium_status',
+        target_id: user_id,
+        action: 'extend',
+        reason: `管理员手动延长高级空间 ${result.extended_days} 天`,
+        after_data: { expires_at: result.expires_at, extended_days: result.extended_days },
+        idempotency_key: `premium_extend:${user_id}:${req.user.user_id}:${Date.now()}`,
+        ip_address: req.ip,
+        user_agent: req.get('user-agent')
+      }).catch(() => {})
+
+      logger.info('管理员延长用户高级空间', {
+        admin_id: req.user.user_id,
+        user_id,
+        days: result.extended_days
+      })
+
+      return res.apiSuccess(result, '高级空间已延长')
+    } catch (error) {
+      if (error.code && error.statusCode) {
+        return res.apiError(error.message, error.code, null, error.statusCode)
+      }
+      throw error
+    }
+  })
+)
+
+/**
+ * POST /:user_id/revoke - 管理员撤销用户高级空间（立即失效，不退积分）
+ *
+ * 路径参数：user_id（用户ID）
+ * 返回：撤销结果
+ */
+router.post(
+  '/:user_id/revoke',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const user_id = parseInt(req.params.user_id)
+    if (isNaN(user_id)) {
+      return res.apiError('无效的用户ID', 'INVALID_USER_ID', null, 400)
+    }
+
+    try {
+      const result = await TransactionManager.execute(
+        async transaction =>
+          getPremiumService(req).revokePremium(user_id, req.user.user_id, { transaction }),
+        { description: 'revokePremium' }
+      )
+
+      const AuditLogService = req.app.locals.services.getService('audit_log')
+      await AuditLogService.logOperation({
+        operator_id: req.user.user_id,
+        operation_type: 'premium_revoke',
+        target_type: 'user_premium_status',
+        target_id: user_id,
+        action: 'revoke',
+        reason: '管理员撤销用户高级空间',
+        idempotency_key: `premium_revoke:${user_id}:${req.user.user_id}:${Date.now()}`,
+        ip_address: req.ip,
+        user_agent: req.get('user-agent')
+      }).catch(() => {})
+
+      logger.info('管理员撤销用户高级空间', { admin_id: req.user.user_id, user_id })
+
+      return res.apiSuccess(result, '高级空间已撤销')
+    } catch (error) {
+      if (error.code && error.statusCode) {
+        return res.apiError(error.message, error.code, null, error.statusCode)
+      }
+      throw error
+    }
   })
 )
 

@@ -9,12 +9,13 @@
  * 3. GET /api/v4/console/user-premium/expiring - 获取即将过期的用户列表
  * 4. GET /api/v4/console/user-premium/:user_id - 获取单个用户的高级空间状态
  *
- * 业务规则：
- * - 解锁条件1: users.history_total_points >= 100000（历史累计10万积分门槛）
- * - 解锁条件2: account_asset_balances.available_amount >= 100（当前POINTS余额>=100积分）
- * - 解锁费用: 100积分
- * - 有效期: 24小时
- * - 过期后需重新手动解锁（无自动续费）
+ * 业务规则（2026-06-25 起，以下阈值为默认值，运营可在 Web 后台「系统设置 → 臻选空间」动态调整，
+ * 存 system_settings category='premium'，PremiumService 经 AdminSystemService.getSettingValue 读取）：
+ * - 解锁条件1: users.history_total_points >= history_points_threshold（默认 100000，历史累计积分门槛）
+ * - 解锁条件2: account_asset_balances.available_amount >= unlock_cost（默认 100，当前 POINTS 余额门槛）
+ * - 解锁费用: unlock_cost（默认 100 积分）
+ * - 有效期: validity_hours（默认 24 小时）
+ * - 过期后需重新手动解锁（无自动续费）；管理员可经 /user-premium/:id/extend|revoke 手动延期/撤销（unlock_method='manual'）
  *
  * 权限要求：管理员（role_level >= 100）
  *
@@ -335,6 +336,131 @@ describe('高级空间管理API测试 - P2优先级', () => {
         const response = await request(app).get(endpoint)
         expect(response.status).toBe(401)
       }
+    })
+  })
+
+  // ===== 测试用例7：臻选空间解锁条件下发 + 运营可配（2026-06-25 新增）=====
+  describe('臻选空间解锁条件下发与运营可配', () => {
+    const PremiumService = require('../../../services/PremiumService')
+    const AdminSystemService = require('../../../services/AdminSystemService')
+    const TransactionManager = require('../../../utils/TransactionManager')
+
+    /** 更新 premium 配置（包事务边界，等价于路由层 TransactionManager.execute） */
+    const updatePremiumSetting = (key, value) =>
+      TransactionManager.execute(
+        async transaction =>
+          AdminSystemService.updateSettings('premium', { [key]: value }, admin_user_id, {
+            transaction
+          }),
+        { description: 'test-update-premium-setting' }
+      )
+
+    test('getPremiumStatus 对无积分账户用户不抛 500（null 安全），并返回完整 conditions', async () => {
+      /*
+       * 回归用例：修复前 BalanceService.getBalance 返回 null 时
+       * Number(pointsBalance.available_amount) 崩溃导致 /premium-status 500。
+       * 这里直接调 Service 验证无论用户是否有积分账户都能正常返回条件明细。
+       */
+      const status = await PremiumService.getPremiumStatus(admin_user_id)
+      expect(status).toBeDefined()
+      // 未解锁时必须带 conditions（前端据此渲染"还差多少"）
+      if (!status.unlocked || !status.is_valid) {
+        expect(status.conditions).toBeDefined()
+        expect(status.conditions.condition_1).toHaveProperty('required')
+        expect(status.conditions.condition_1).toHaveProperty('current')
+        expect(status.conditions.condition_1).toHaveProperty('shortage')
+        expect(status.conditions.condition_2).toHaveProperty('required')
+        expect(typeof status.can_unlock).toBe('boolean')
+      }
+    })
+
+    test('解锁条件阈值来自 system_settings（运营可配）：改 unlock_cost 后 conditions 同步变化', async () => {
+      // 读当前值（用于断言后还原）
+      const original = await AdminSystemService.getSettingValue('premium', 'unlock_cost', 100)
+
+      try {
+        // 改成一个明显不同的值
+        await updatePremiumSetting('unlock_cost', 50)
+
+        // 经 Service 读取应反映新值（_getUnlockRules 读配置）
+        const status = await PremiumService.getPremiumStatus(admin_user_id)
+        expect(status.unlock_cost).toBe(50)
+        if (!status.unlocked || !status.is_valid) {
+          expect(status.conditions.condition_2.required).toBe(50)
+        }
+      } finally {
+        // 还原，绝不留测试值
+        await updatePremiumSetting('unlock_cost', Number(original) || 100)
+        const restored = await AdminSystemService.getSettingValue('premium', 'unlock_cost', 100)
+        expect(Number(restored)).toBe(Number(original) || 100)
+      }
+    })
+
+    test('白名单范围约束：unlock_cost 超出最大值应被拒绝（不写库）', async () => {
+      const result = await updatePremiumSetting('unlock_cost', 999999) // 超过白名单 max=100000
+      // 越界项更新失败
+      expect(result.error_count).toBeGreaterThanOrEqual(1)
+      // 库值未被改坏（仍 ≤ 合法上限）
+      const current = await AdminSystemService.getSettingValue('premium', 'unlock_cost', 100)
+      expect(Number(current)).toBeLessThanOrEqual(100000)
+    })
+  })
+
+  // ===== 测试用例8：管理员手动延期/撤销高级空间（2026-06-25 新增写接口）=====
+  describe('管理员手动延期/撤销高级空间', () => {
+    test('POST /:user_id/extend 应延长有效期（unlock_method=manual），并被审计', async () => {
+      const response = await request(app)
+        .post(`/api/v4/console/user-premium/${admin_user_id}/extend`)
+        .set('Authorization', `Bearer ${admin_token}`)
+        .send({ days: 1 })
+
+      expect(response.status).toBe(200)
+      expect(response.body.success).toBe(true)
+      expect(response.body.data.is_unlocked).toBe(true)
+      expect(response.body.data.unlock_method).toBe('manual')
+      expect(response.body.data.extended_days).toBe(1)
+      expect(response.body.data.expires_at).toBeTruthy()
+    })
+
+    test('POST /:user_id/extend 非法天数应返回 400', async () => {
+      const response = await request(app)
+        .post(`/api/v4/console/user-premium/${admin_user_id}/extend`)
+        .set('Authorization', `Bearer ${admin_token}`)
+        .send({ days: 99999 }) // 超过 3650 上限
+
+      expect(response.status).toBe(400)
+      expect(response.body.code).toBe('INVALID_DAYS')
+    })
+
+    test('POST /:user_id/revoke 应撤销高级空间（立即失效），并被审计', async () => {
+      const response = await request(app)
+        .post(`/api/v4/console/user-premium/${admin_user_id}/revoke`)
+        .set('Authorization', `Bearer ${admin_token}`)
+
+      expect(response.status).toBe(200)
+      expect(response.body.success).toBe(true)
+      expect(response.body.data.is_unlocked).toBe(false)
+    })
+
+    test('不存在用户 revoke 应返回 404', async () => {
+      const response = await request(app)
+        .post('/api/v4/console/user-premium/9999999/revoke')
+        .set('Authorization', `Bearer ${admin_token}`)
+
+      expect(response.status).toBe(404)
+      expect(response.body.code).toBe('USER_NOT_FOUND')
+    })
+
+    test('写接口应拒绝无 token 请求', async () => {
+      const extendResp = await request(app)
+        .post(`/api/v4/console/user-premium/${admin_user_id}/extend`)
+        .send({ days: 1 })
+      expect(extendResp.status).toBe(401)
+
+      const revokeResp = await request(app).post(
+        `/api/v4/console/user-premium/${admin_user_id}/revoke`
+      )
+      expect(revokeResp.status).toBe(401)
     })
   })
 

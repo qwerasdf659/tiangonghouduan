@@ -31,16 +31,43 @@ const BeijingTimeHelper = require('../utils/timeHelper')
 const { User, UserPremiumStatus } = require('../models')
 // V4.7.0 AssetService 拆分：使用子服务替代原 AssetService
 const BalanceService = require('./asset/BalanceService')
+const AdminSystemService = require('./AdminSystemService')
 const { AssetCode } = require('../constants/AssetCode')
 const logger = require('../utils/logger')
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 
 /**
- * 业务常量定义
+ * 业务常量定义（默认值 / 缺省兜底）
+ *
+ * 2026-06-25：解锁门槛 / 费用 / 有效期改为运营可在 Web 后台「臻选空间」分类动态调整
+ * （存 system_settings，category='premium'）。以下常量作为「配置缺失时的默认兜底」，
+ * 与历史硬编码值完全一致，保证未初始化配置时行为不变。运行时一律经 _getUnlockRules() 读取。
  */
-const UNLOCK_COST = 100 // 解锁费用：100积分（固定值）
-const HISTORY_POINTS_THRESHOLD = 100000 // 历史累计积分门槛：10万（臻选空间解锁条件之一）
-const VALIDITY_HOURS = 24 // 有效期：24小时（固定值）
+const DEFAULT_UNLOCK_COST = 100 // 解锁费用默认值：100积分
+const DEFAULT_HISTORY_POINTS_THRESHOLD = 100000 // 历史累计积分门槛默认值：10万
+const DEFAULT_VALIDITY_HOURS = 24 // 有效期默认值：24小时
+
+/**
+ * 读取臻选空间解锁规则（运营可配，缺省回落默认常量）
+ *
+ * @returns {Promise<Object>} 解锁规则对象 { unlock_cost, history_points_threshold, validity_hours }
+ */
+async function _getUnlockRules() {
+  const [historyThreshold, unlockCost, validityHours] = await Promise.all([
+    AdminSystemService.getSettingValue(
+      'premium',
+      'history_points_threshold',
+      DEFAULT_HISTORY_POINTS_THRESHOLD
+    ),
+    AdminSystemService.getSettingValue('premium', 'unlock_cost', DEFAULT_UNLOCK_COST),
+    AdminSystemService.getSettingValue('premium', 'validity_hours', DEFAULT_VALIDITY_HOURS)
+  ])
+  return {
+    history_points_threshold: Number(historyThreshold) || DEFAULT_HISTORY_POINTS_THRESHOLD,
+    unlock_cost: Number(unlockCost) >= 0 ? Number(unlockCost) : DEFAULT_UNLOCK_COST,
+    validity_hours: Number(validityHours) || DEFAULT_VALIDITY_HOURS
+  }
+}
 
 /**
  * 高级空间服务类
@@ -62,6 +89,9 @@ class PremiumService {
   static async unlockPremium(user_id, options = {}) {
     // 强制要求事务边界 - 2026-01-05 治理决策
     const transaction = assertAndGetTransaction(options, 'PremiumService.unlockPremium')
+
+    // 解锁规则（运营可配，缺省回落默认常量）
+    const rules = await _getUnlockRules()
 
     /*
      * ========================================
@@ -115,7 +145,7 @@ class PremiumService {
       throw error
     }
 
-    // 通过 BalanceService 获取积分余额
+    // 通过 BalanceService 获取积分余额（用户尚无积分账户/余额行时返回 null，按 0 余额处理）
     const pointsBalance = await BalanceService.getBalance(
       { user_id, asset_code: AssetCode.POINTS },
       { transaction }
@@ -127,20 +157,22 @@ class PremiumService {
      * ========================================
      */
     const historyPoints = user.history_total_points || 0
-    const historyPointsSatisfied = historyPoints >= HISTORY_POINTS_THRESHOLD
+    const historyPointsSatisfied = historyPoints >= rules.history_points_threshold
 
     if (!historyPointsSatisfied) {
-      const error = new Error('历史累计积分不足，无法解锁高级空间（需要10万历史积分门槛）')
+      const error = new Error(
+        `历史累计积分不足，无法解锁高级空间（需要${rules.history_points_threshold}历史积分门槛）`
+      )
       error.code = 'INSUFFICIENT_HISTORY_POINTS'
       error.statusCode = 403
       error.data = {
         unlocked: false,
         condition_1: {
           name: '历史累计积分门槛',
-          required: HISTORY_POINTS_THRESHOLD,
+          required: rules.history_points_threshold,
           current: historyPoints,
           satisfied: false,
-          shortage: HISTORY_POINTS_THRESHOLD - historyPoints
+          shortage: rules.history_points_threshold - historyPoints
         }
       }
       throw error
@@ -151,21 +183,21 @@ class PremiumService {
      * 步骤4: 验证解锁条件2 - 当前积分余额充足
      * ========================================
      */
-    const availablePoints = Number(pointsBalance.available_amount) || 0
-    const balanceSufficient = availablePoints >= UNLOCK_COST
+    const availablePoints = Number(pointsBalance?.available_amount) || 0
+    const balanceSufficient = availablePoints >= rules.unlock_cost
 
     if (!balanceSufficient) {
-      const error = new Error('当前积分余额不足，无法支付100积分解锁费用')
+      const error = new Error(`当前积分余额不足，无法支付${rules.unlock_cost}积分解锁费用`)
       error.code = 'INSUFFICIENT_BALANCE'
       error.statusCode = 403
       error.data = {
         unlocked: false,
         condition_2: {
           name: '当前积分余额',
-          required: UNLOCK_COST,
+          required: rules.unlock_cost,
           current: availablePoints,
           satisfied: false,
-          shortage: UNLOCK_COST - availablePoints
+          shortage: rules.unlock_cost - availablePoints
         }
       }
       throw error
@@ -192,14 +224,14 @@ class PremiumService {
       {
         user_id,
         asset_code: AssetCode.POINTS,
-        delta_amount: -UNLOCK_COST,
+        delta_amount: -rules.unlock_cost,
         business_type: 'premium_unlock',
         idempotency_key,
         counterpart_account_id: burnAccount.account_id,
         meta: {
           source_type: 'user',
           title: '解锁高级空间',
-          description: `支付${UNLOCK_COST}积分解锁高级空间功能，有效期${VALIDITY_HOURS}小时`,
+          description: `支付${rules.unlock_cost}积分解锁高级空间功能，有效期${rules.validity_hours}小时`,
           operator_id: user_id
         }
       },
@@ -210,7 +242,7 @@ class PremiumService {
 
     logger.info('高级空间解锁-积分扣除', {
       user_id,
-      unlock_cost: UNLOCK_COST,
+      unlock_cost: rules.unlock_cost,
       remaining_points: newAvailablePoints,
       transaction_id: consumeResult.transaction_id,
       is_duplicate: consumeResult.is_duplicate || false
@@ -222,7 +254,7 @@ class PremiumService {
      * ========================================
      */
     const expiresAt = new Date(unlockTime)
-    expiresAt.setHours(expiresAt.getHours() + VALIDITY_HOURS)
+    expiresAt.setHours(expiresAt.getHours() + rules.validity_hours)
 
     if (isFirstUnlock) {
       premiumStatus = await UserPremiumStatus.create(
@@ -251,7 +283,7 @@ class PremiumService {
     logger.info('高级空间解锁成功', {
       user_id,
       is_first_unlock: isFirstUnlock,
-      unlock_cost: UNLOCK_COST,
+      unlock_cost: rules.unlock_cost,
       remaining_points: newAvailablePoints
     })
 
@@ -259,23 +291,155 @@ class PremiumService {
     return {
       unlocked: true,
       is_first_unlock: isFirstUnlock,
-      unlock_cost: UNLOCK_COST,
+      unlock_cost: rules.unlock_cost,
       remaining_points: newAvailablePoints,
       unlock_time: unlockTime,
       expires_at: expiresAt,
-      validity_hours: VALIDITY_HOURS,
+      validity_hours: rules.validity_hours,
       total_unlock_count: premiumStatus.total_unlock_count
     }
+  }
+
+  /**
+   * 管理员手动延长用户高级空间有效期（不扣积分，unlock_method='manual'）
+   *
+   * 事务边界治理：强制要求外部事务传入（options.transaction），由入口层 TransactionManager 管理。
+   * 业务规则：
+   * - 用户已有有效期内记录：在现有 expires_at 基础上叠加 days 天；
+   * - 用户无记录或已过期：以当前时间为基准 + days 天（视为重新开通）；
+   * - 解锁方式标记为 'manual'（区别于用户自助 points 解锁），total_unlock_count 累加。
+   *
+   * @param {number} user_id - 目标用户ID
+   * @param {number} days - 延长天数（正整数）
+   * @param {number} operator_id - 操作管理员ID（审计用）
+   * @param {Object} options - 选项参数
+   * @param {Object} options.transaction - 外部事务对象（必填）
+   * @returns {Promise<Object>} 延期结果 { user_id, is_unlocked, expires_at, extended_days, total_unlock_count }
+   * @throws {Error} USER_NOT_FOUND - 用户不存在；INVALID_DAYS - 天数非法
+   */
+  static async extendPremium(user_id, days, operator_id, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'PremiumService.extendPremium')
+
+    const extendDays = parseInt(days, 10)
+    if (!Number.isInteger(extendDays) || extendDays <= 0 || extendDays > 3650) {
+      const error = new Error('延长天数必须为 1~3650 的正整数')
+      error.code = 'INVALID_DAYS'
+      error.statusCode = 400
+      throw error
+    }
+
+    const user = await User.findByPk(user_id, { transaction })
+    if (!user) {
+      const error = new Error('用户不存在')
+      error.code = 'USER_NOT_FOUND'
+      error.statusCode = 404
+      throw error
+    }
+
+    const now = BeijingTimeHelper.createBeijingTime()
+    let premiumStatus = await UserPremiumStatus.findOne({ where: { user_id }, transaction })
+
+    // 基准时间：已有有效期内记录则从其 expires_at 叠加，否则从当前时间起算
+    const currentExpiry =
+      premiumStatus && premiumStatus.is_unlocked && premiumStatus.expires_at
+        ? new Date(premiumStatus.expires_at)
+        : null
+    const base = currentExpiry && currentExpiry > now ? currentExpiry : now
+    const newExpiresAt = new Date(base)
+    newExpiresAt.setDate(newExpiresAt.getDate() + extendDays)
+
+    if (!premiumStatus) {
+      premiumStatus = await UserPremiumStatus.create(
+        {
+          user_id,
+          is_unlocked: true,
+          unlock_time: now,
+          unlock_method: 'manual',
+          total_unlock_count: 1,
+          expires_at: newExpiresAt
+        },
+        { transaction }
+      )
+    } else {
+      await premiumStatus.update(
+        {
+          is_unlocked: true,
+          unlock_method: 'manual',
+          unlock_time: premiumStatus.unlock_time || now,
+          expires_at: newExpiresAt,
+          total_unlock_count: (premiumStatus.total_unlock_count || 0) + 1
+        },
+        { transaction }
+      )
+    }
+
+    logger.info('管理员手动延长高级空间', {
+      user_id,
+      operator_id,
+      extended_days: extendDays,
+      expires_at: newExpiresAt
+    })
+
+    return {
+      user_id,
+      is_unlocked: true,
+      unlock_method: 'manual',
+      extended_days: extendDays,
+      expires_at: newExpiresAt,
+      total_unlock_count: premiumStatus.total_unlock_count
+    }
+  }
+
+  /**
+   * 管理员撤销用户高级空间（立即失效，不退积分）
+   *
+   * 事务边界治理：强制要求外部事务传入（options.transaction）。
+   * 业务规则：把 is_unlocked 置 false、expires_at 置 null（立即失效）；保留记录用于审计追溯。
+   * 用户无记录时视为幂等成功（本就无高级空间可撤）。
+   *
+   * @param {number} user_id - 目标用户ID
+   * @param {number} operator_id - 操作管理员ID（审计用）
+   * @param {Object} options - 选项参数
+   * @param {Object} options.transaction - 外部事务对象（必填）
+   * @returns {Promise<Object>} 撤销结果 { user_id, is_unlocked, revoked }
+   * @throws {Error} USER_NOT_FOUND - 用户不存在
+   */
+  static async revokePremium(user_id, operator_id, options = {}) {
+    const transaction = assertAndGetTransaction(options, 'PremiumService.revokePremium')
+
+    const user = await User.findByPk(user_id, { transaction })
+    if (!user) {
+      const error = new Error('用户不存在')
+      error.code = 'USER_NOT_FOUND'
+      error.statusCode = 404
+      throw error
+    }
+
+    const premiumStatus = await UserPremiumStatus.findOne({ where: { user_id }, transaction })
+    if (!premiumStatus) {
+      // 幂等：本就无记录，视为已撤销
+      logger.info('撤销高级空间：用户无记录（幂等成功）', { user_id, operator_id })
+      return { user_id, is_unlocked: false, revoked: false }
+    }
+
+    await premiumStatus.update({ is_unlocked: false, expires_at: null }, { transaction })
+
+    logger.info('管理员撤销高级空间', { user_id, operator_id })
+
+    return { user_id, is_unlocked: false, revoked: true }
   }
 
   /**
    * 查询高级空间状态
    *
    * @param {number} user_id - 用户ID
-   * @returns {Object} 状态查询结果
+   * @returns {Object} 状态查询结果（含 conditions 解锁条件明细）
    */
   static async getPremiumStatus(user_id) {
     try {
+      // 解锁规则（运营可配，缺省回落默认常量）
+      const rules = await _getUnlockRules()
+
       // 查询解锁状态
       const premiumStatus = await UserPremiumStatus.findOne({
         where: { user_id }
@@ -299,14 +463,14 @@ class PremiumService {
         throw error
       }
 
-      // 通过 BalanceService 获取积分余额
+      // 通过 BalanceService 获取积分余额（用户尚无积分账户/余额行时返回 null，按 0 余额处理）
       const pointsBalance = await BalanceService.getBalance({
         user_id,
         asset_code: AssetCode.POINTS
       })
 
       const historyPoints = user.history_total_points || 0
-      const availablePoints = Number(pointsBalance.available_amount) || 0
+      const availablePoints = Number(pointsBalance?.available_amount) || 0
 
       // 如果未解锁或已过期，返回解锁条件进度
       if (!isValid) {
@@ -314,27 +478,28 @@ class PremiumService {
           unlocked: false,
           is_expired: isExpired,
           last_unlock_time: isUnlocked ? premiumStatus.unlock_time : null,
-          unlock_cost: UNLOCK_COST,
-          validity_hours: VALIDITY_HOURS,
+          unlock_cost: rules.unlock_cost,
+          validity_hours: rules.validity_hours,
           conditions: {
             condition_1: {
               name: '历史累计积分门槛',
-              description: `历史累计获得积分需达到 ${HISTORY_POINTS_THRESHOLD} 分`,
-              required: HISTORY_POINTS_THRESHOLD,
+              description: `历史累计获得积分需达到 ${rules.history_points_threshold} 分`,
+              required: rules.history_points_threshold,
               current: historyPoints,
-              satisfied: historyPoints >= HISTORY_POINTS_THRESHOLD,
-              shortage: Math.max(0, HISTORY_POINTS_THRESHOLD - historyPoints)
+              satisfied: historyPoints >= rules.history_points_threshold,
+              shortage: Math.max(0, rules.history_points_threshold - historyPoints)
             },
             condition_2: {
               name: '当前积分余额',
-              description: `当前可用积分余额需达到 ${UNLOCK_COST} 分（用于支付解锁费用）`,
-              required: UNLOCK_COST,
+              description: `当前可用积分余额需达到 ${rules.unlock_cost} 分（用于支付解锁费用）`,
+              required: rules.unlock_cost,
               current: availablePoints,
-              satisfied: availablePoints >= UNLOCK_COST,
-              shortage: Math.max(0, UNLOCK_COST - availablePoints)
+              satisfied: availablePoints >= rules.unlock_cost,
+              shortage: Math.max(0, rules.unlock_cost - availablePoints)
             }
           },
-          can_unlock: historyPoints >= HISTORY_POINTS_THRESHOLD && availablePoints >= UNLOCK_COST
+          can_unlock:
+            historyPoints >= rules.history_points_threshold && availablePoints >= rules.unlock_cost
         }
       }
 
@@ -346,8 +511,8 @@ class PremiumService {
       return {
         unlocked: true,
         is_valid: true,
-        unlock_cost: UNLOCK_COST,
-        validity_hours: VALIDITY_HOURS,
+        unlock_cost: rules.unlock_cost,
+        validity_hours: rules.validity_hours,
         unlock_time: premiumStatus.unlock_time,
         unlock_method: premiumStatus.unlock_method,
         expires_at: premiumStatus.expires_at,

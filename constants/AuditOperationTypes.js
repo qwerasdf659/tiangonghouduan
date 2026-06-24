@@ -376,7 +376,23 @@ const OPERATION_TYPES = Object.freeze({
    * @example MediaService.batchOptimize() 经路由 POST /console/storage/optimize
    * @since 2026-06-24
    */
-  MEDIA_OPTIMIZE: 'media_optimize'
+  MEDIA_OPTIMIZE: 'media_optimize',
+
+  /**
+   * 臻选空间-手动延期
+   * @description 管理员为用户延长高级空间有效期（unlock_method='manual'）
+   * @example PremiumService.extendPremium() 经路由 POST /console/user-premium/:user_id/extend
+   * @since 2026-06-25
+   */
+  PREMIUM_EXTEND: 'premium_extend',
+
+  /**
+   * 臻选空间-手动撤销
+   * @description 管理员撤销用户高级空间（立即失效，is_unlocked=false）
+   * @example PremiumService.revokePremium() 经路由 POST /console/user-premium/:user_id/revoke
+   * @since 2026-06-25
+   */
+  PREMIUM_REVOKE: 'premium_revoke'
 })
 
 /**
@@ -489,7 +505,9 @@ const OPERATION_TYPE_DESCRIPTIONS = Object.freeze({
   [OPERATION_TYPES.MEDIA_DELETE]: '媒体删除（移入回收站）',
   [OPERATION_TYPES.MEDIA_RESTORE]: '媒体恢复（从回收站还原）',
   [OPERATION_TYPES.MEDIA_PURGE]: '媒体彻底删除',
-  [OPERATION_TYPES.MEDIA_OPTIMIZE]: '媒体存量批量优化'
+  [OPERATION_TYPES.MEDIA_OPTIMIZE]: '媒体存量批量优化',
+  [OPERATION_TYPES.PREMIUM_EXTEND]: '臻选空间手动延期',
+  [OPERATION_TYPES.PREMIUM_REVOKE]: '臻选空间手动撤销'
 })
 
 /**
