@@ -68,6 +68,16 @@ class ExchangeItemService {
     if (filters.keyword && String(filters.keyword).trim()) {
       where.item_name = { [Op.like]: `%${String(filters.keyword).trim()}%` }
     }
+    /*
+     * 低库存预警筛选（看板三 2026-06-24）：仅看 active 且 SPU 库存 <= 预警阈值（stock_alert_threshold，默认 5）。
+     * stock 与 stock_alert_threshold 同在 exchange_items 表，用 Sequelize.literal 做列间比较，复用现有列零新表。
+     */
+    if (filters.low_stock_only === true || filters.low_stock_only === 'true') {
+      where.status = 'active'
+      where.stock = {
+        [Op.lte]: this.sequelize.literal('COALESCE(`ExchangeItem`.`stock_alert_threshold`, 5)')
+      }
+    }
 
     /*
      * 频道筛选（道具商城/星石轨）：按关联模板 item_type 服务端筛选。

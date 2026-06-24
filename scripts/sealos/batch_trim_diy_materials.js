@@ -109,38 +109,24 @@ async function main() {
         CacheControl: 'max-age=31536000'
       }).promise()
 
-      // 5. 重新生成并上传缩略图
-      const thumbnailKeys = typeof mat.thumbnail_keys === 'string'
-        ? JSON.parse(mat.thumbnail_keys)
-        : mat.thumbnail_keys
+      // 5. 重新生成并上传宽度档衍生图（治本 D+E：复用存储层统一预生成逻辑，不再硬编码档位）
+      //    裁剪后原图已覆盖回 object_key，按原图重生成 w375/w750/w1080 WebP 并回写清单
+      const newThumbnailKeys = await sealosStorage.generateDerivativesForExisting(mat.object_key)
 
-      if (thumbnailKeys) {
-        const sizes = { small: 150, medium: 300, large: 600 }
-        for (const [sizeName, maxDim] of Object.entries(sizes)) {
-          const key = thumbnailKeys[sizeName]
-          if (!key) continue
-
-          const thumbBuffer = await sharp(trimmedBuffer)
-            .resize(maxDim, maxDim, { fit: 'inside', withoutEnlargement: true })
-            .png({ compressionLevel: 8 })
-            .toBuffer()
-
-          await sealosStorage.s3.putObject({
-            Bucket: sealosStorage.config.bucket,
-            Key: key,
-            Body: thumbBuffer,
-            ContentType: 'image/png',
-            ContentDisposition: 'inline',
-            ACL: 'public-read',
-            CacheControl: 'max-age=31536000'
-          }).promise()
+      // 6. 更新 media_files 表的 width/height + 衍生清单
+      await sequelize.query(
+        `
+        UPDATE media_files SET width = ?, height = ?, thumbnail_keys = ? WHERE media_id = ?
+      `,
+        {
+          replacements: [
+            trimmedMeta.width,
+            trimmedMeta.height,
+            JSON.stringify(newThumbnailKeys),
+            mat.image_media_id
+          ]
         }
-      }
-
-      // 6. 更新 media_files 表的 width/height
-      await sequelize.query(`
-        UPDATE media_files SET width = ?, height = ? WHERE media_id = ?
-      `, { replacements: [trimmedMeta.width, trimmedMeta.height, mat.image_media_id] })
+      )
 
       trimmed++
     } catch (err) {

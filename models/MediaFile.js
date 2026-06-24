@@ -47,18 +47,18 @@ class MediaFile extends Model {
   }
 
   /**
-   * 生成缩略图 URL 集合（缩略图共享主文件的 content_hash）
+   * 生成衍生图 URL 集合（衍生图共享主文件的 content_hash）
    *
-   * @returns {Object|null} { small, medium, large } 缩略图 URL
+   * @returns {Object|null} { w375, w750, w1080 } 宽度档 WebP 衍生图 URL
    */
   getThumbnailUrls() {
     if (!this.thumbnail_keys) return null
     const { getImageUrl } = require('../utils/ImageUrlHelper')
     const hash = this.content_hash
     return {
-      small: this.thumbnail_keys.small ? getImageUrl(this.thumbnail_keys.small, hash) : null,
-      medium: this.thumbnail_keys.medium ? getImageUrl(this.thumbnail_keys.medium, hash) : null,
-      large: this.thumbnail_keys.large ? getImageUrl(this.thumbnail_keys.large, hash) : null
+      w375: this.thumbnail_keys.w375 ? getImageUrl(this.thumbnail_keys.w375, hash) : null,
+      w750: this.thumbnail_keys.w750 ? getImageUrl(this.thumbnail_keys.w750, hash) : null,
+      w1080: this.thumbnail_keys.w1080 ? getImageUrl(this.thumbnail_keys.w1080, hash) : null
     }
   }
 
@@ -138,7 +138,7 @@ module.exports = sequelize => {
       thumbnail_keys: {
         type: DataTypes.JSON,
         defaultValue: null,
-        comment: '缩略图 keys: {small, medium, large}'
+        comment: '衍生图 keys: {w375, w750, w1080}（宽度档 WebP，上传时预生成）'
       },
       original_name: {
         type: DataTypes.STRING(255),

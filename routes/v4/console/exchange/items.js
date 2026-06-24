@@ -51,8 +51,8 @@ function toItemWithImage(row) {
       primary_media_id: media.media_id,
       url: media.getPublicUrl(),
       mime: media.mime_type,
-      thumbnail_url: thumbs?.small || media.getPublicUrl(),
-      // thumbnails 三档（small/medium/large）：管理端列表清晰度优化，列表卡片用 large(800)
+      thumbnail_url: thumbs?.w375 || media.getPublicUrl(),
+      // thumbnails 三档宽度（w375/w750/w1080）：管理端列表清晰度优化，列表卡片按容器选档
       thumbnails: thumbs || null
     }
   } else if (media?.object_key) {
@@ -61,14 +61,14 @@ function toItemWithImage(row) {
       primary_media_id: media.media_id,
       url: getImageUrl(media.object_key, media.content_hash),
       mime: media.mime_type,
-      thumbnail_url: tk.small
-        ? getImageUrl(tk.small, media.content_hash)
+      thumbnail_url: tk.w375
+        ? getImageUrl(tk.w375, media.content_hash)
         : getImageUrl(media.object_key, media.content_hash),
-      // thumbnails 三档：与上分支结构一致，缺档为 null
+      // thumbnails 三档宽度：与上分支结构一致，缺档为 null
       thumbnails: {
-        small: tk.small ? getImageUrl(tk.small, media.content_hash) : null,
-        medium: tk.medium ? getImageUrl(tk.medium, media.content_hash) : null,
-        large: tk.large ? getImageUrl(tk.large, media.content_hash) : null
+        w375: tk.w375 ? getImageUrl(tk.w375, media.content_hash) : null,
+        w750: tk.w750 ? getImageUrl(tk.w750, media.content_hash) : null,
+        w1080: tk.w1080 ? getImageUrl(tk.w1080, media.content_hash) : null
       }
     }
   } else {
@@ -105,11 +105,20 @@ router.get(
   requireRoleLevel(100),
   asyncHandler(async (req, res) => {
     const service = getExchangeItemService(req)
-    const { category_id, status, space, rarity_code, keyword, item_type, page, page_size } =
-      req.query
+    const {
+      category_id,
+      status,
+      space,
+      rarity_code,
+      keyword,
+      item_type,
+      low_stock_only,
+      page,
+      page_size
+    } = req.query
 
     const result = await service.listExchangeItems(
-      { category_id, status, space, rarity_code, keyword, item_type },
+      { category_id, status, space, rarity_code, keyword, item_type, low_stock_only },
       { page, page_size }
     )
 

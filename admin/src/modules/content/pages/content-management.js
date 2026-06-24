@@ -11,8 +11,6 @@
  */
 
 import { logger } from '../../../utils/logger.js'
-import { request } from '../../../api/base.js'
-import { SYSTEM_ADMIN_ENDPOINTS } from '../../../api/system/admin.js'
 import { Alpine, createPageMixin } from '../../../alpine/index.js'
 import {
   useMediaState,
@@ -60,34 +58,6 @@ document.addEventListener('alpine:init', () => {
         this.loadMedia?.()
       } else if (this.current_page === 'storage-management') {
         this.loadStorageData?.()
-      }
-    },
-
-    /**
-     * 确认删除图片（移入回收站）
-     */
-    async confirmDelete() {
-      if (!this.deleteTarget) return
-      this.deleting = true
-      try {
-        const mediaId = this.deleteTarget.media_id
-        const response = await request({
-          url: SYSTEM_ADMIN_ENDPOINTS.MEDIA_DELETE(mediaId),
-          method: 'DELETE'
-        })
-        if (response?.success) {
-          this.hideModal('deleteModal')
-          this.showSuccess('图片已移入回收站')
-          await this.loadMedia()
-        } else {
-          this.showError(response?.message || '删除失败')
-        }
-      } catch (error) {
-        logger.error('删除图片失败:', error)
-        this.showError('删除失败: ' + error.message)
-      } finally {
-        this.deleting = false
-        this.deleteTarget = null
       }
     }
   }))

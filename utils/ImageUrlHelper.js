@@ -152,23 +152,23 @@ function getDefaultImageUrl(type = 'default') {
 }
 
 /**
- * 生成预生成缩略图 URL
+ * 生成预生成衍生图 URL
  *
  * @description
- *   架构决策（2026-01-08 最终拍板）：
- *   - 缩略图在上传时预生成（150/300/600px，cover-center）
- *   - 存储目录结构：{folder}/thumbnails/{size}/xxx.jpg
- *   - 不使用 URL 参数化缩略图
+ *   架构决策（2026-06-24 治本 D+E 拍板）：
+ *   - 衍生图在上传时预生成（w375/w750/w1080 宽度档，统一 WebP）
+ *   - 存储目录结构：{folder}/thumbnails/{档位名}/xxx.webp
+ *   - 不使用 URL 参数化裁剪（已废除 ?width= 运行时裁剪）
  *
- * @param {string} objectKey - 原图对象 key（如 prizes/20260108_abc123.jpg）
- * @param {string} size - 尺寸类型 small/medium/large/original
- * @returns {string|null} 预生成缩略图 URL
+ * @param {string} objectKey - 原图对象 key（如 prizes/20260624_abc123.jpg）
+ * @param {string} size - 档位 w375/w750/w1080/original
+ * @returns {string|null} 预生成衍生图 URL
  *
  * @example
- * getThumbnailUrl('prizes/20260108_abc123.jpg', 'small')
- * // 返回: https://objectstorageapi.xxx/bucket/prizes/thumbnails/small/20260108_abc123.jpg
+ * getThumbnailUrl('prizes/20260624_abc123.jpg', 'w750')
+ * // 返回: .../api/v4/images/prizes/thumbnails/w750/20260624_abc123.webp
  */
-function getThumbnailUrl(objectKey, size = 'medium') {
+function getThumbnailUrl(objectKey, size = 'w750') {
   if (!objectKey) return null
 
   // original 直接返回原图 URL
@@ -176,24 +176,24 @@ function getThumbnailUrl(objectKey, size = 'medium') {
     return getImageUrl(objectKey)
   }
 
-  // 验证尺寸类型
-  const validSizes = ['small', 'medium', 'large']
+  // 验证档位
+  const validSizes = ['w375', 'w750', 'w1080']
   if (!validSizes.includes(size)) {
-    console.warn(`⚠️ ImageUrlHelper: 无效的缩略图尺寸 "${size}"，使用 "medium"`)
-    size = 'medium'
+    console.warn(`⚠️ ImageUrlHelper: 无效的衍生图档位 "${size}"，使用 "w750"`)
+    size = 'w750'
   }
 
   /**
-   * 构造预生成缩略图的对象 key
-   * 目录结构：{folder}/thumbnails/{size}/xxx.jpg
+   * 构造预生成衍生图的对象 key（统一 WebP）
+   * 目录结构：{folder}/thumbnails/{档位名}/xxx.webp
    *
    * 例如：
-   * - 原图 key: prizes/20260108_abc123.jpg
-   * - 缩略图 key: prizes/thumbnails/small/20260108_abc123.jpg
+   * - 原图 key: prizes/20260624_abc123.jpg
+   * - 衍生图 key: prizes/thumbnails/w750/20260624_abc123.webp
    */
   const folder = path.dirname(objectKey) // 例如 'prizes'
-  const filename = path.basename(objectKey) // 例如 '20260108_abc123.jpg'
-  const thumbnailKey = `${folder}/thumbnails/${size}/${filename}`
+  const filename = path.basename(objectKey, path.extname(objectKey)) // 不含扩展名
+  const thumbnailKey = `${folder}/thumbnails/${size}/${filename}.webp`
 
   return getImageUrl(thumbnailKey)
 }
@@ -249,7 +249,7 @@ function transformImageFields(data, imageFields = ['image_url']) {
  *
  * @example
  * isValidObjectKey('prizes/20260108_abc123.jpg') // true
- * isValidObjectKey('prizes/thumbnails/small/20260108_abc123.jpg') // true
+ * isValidObjectKey('prizes/thumbnails/w750/20260624_abc123.webp') // true
  * isValidObjectKey('https://example.com/img.jpg') // false
  * isValidObjectKey('/local/path/img.jpg') // false
  */

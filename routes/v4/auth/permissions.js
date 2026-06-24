@@ -87,17 +87,23 @@ router.get(
     const UserRoleService = req.app.locals.services.getService('user_role')
 
     // 获取用户完整权限信息
-    const permissions = await UserRoleService.getUserPermissions(parseInt(user_id))
+    const permissionInfo = await UserRoleService.getUserPermissions(parseInt(user_id))
 
-    /**
-     * 🔄 2026-01-19：移除便捷权限字段，前端统一用 role_level >= 100 判断管理员
-     * 已移除字段：can_manage_lottery, can_view_admin_panel, can_modify_user_permissions
+    /*
+     * 响应契约（2026-06-24 拍平，去除历史双层嵌套）：
+     * - permissions 直接下发「扁平字符串数组」（如 ["consumption:create","consumption:read"]），
+     *   不再把 getUserPermissions 的完整对象整个塞进来（旧结构导致 permissions.permissions 嵌套
+     *   且 role_level/roles 内外层重复）。
+     * - 前端零映射直读 res.data.permissions 即为权限数组，res.data.role_level / res.data.roles 为顶层字段。
+     * - 与行业主流（扁平、不嵌套、不重复、全栈统一一种形态）对齐。
+     * 历史移除字段（2026-01-19）：can_manage_lottery / can_view_admin_panel / can_modify_user_permissions
+     *   （前端统一用 role_level >= 100 判断管理员）。
      */
     const response_data = {
       user_id: parseInt(user_id),
-      roles: permissions.roles,
-      role_level: permissions.role_level, // 角色级别（>= 100 为管理员，前端自行判断）
-      permissions
+      roles: permissionInfo.roles, // [{ role_uuid, role_name, role_level }]
+      role_level: permissionInfo.role_level, // 最高角色级别（>= 100 为管理员，前端自行判断）
+      permissions: permissionInfo.permissions // 扁平权限数组 ["resource:action", ...]
     }
 
     return res.apiSuccess(response_data, '当前用户权限信息获取成功')

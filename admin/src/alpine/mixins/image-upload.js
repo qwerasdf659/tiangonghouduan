@@ -85,7 +85,7 @@ export function imageUploadMixin(config = {}) {
      * @returns {Promise<MediaUploadResult|null>} 上传成功返回媒体数据，失败返回 null
      * @returns {number} return.media_id - 媒体 ID
      * @returns {string} return.public_url - 公开访问 URL
-     * @returns {Object} return.thumbnails - 缩略图 URL 集合（来自 MediaFile.getThumbnailUrls()）
+     * @returns {Object} return.thumbnails - 衍生图 URL 集合 {w375,w750,w1080}（来自 MediaFile.getThumbnailUrls()）
      */
     async uploadImage(file, options = {}) {
       if (!file) {

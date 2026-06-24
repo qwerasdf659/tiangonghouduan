@@ -14,7 +14,7 @@
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken, getUserRoles } = require('../../../../middleware/auth')
+const { authenticateToken, requireMerchantPermission } = require('../../../../middleware/auth')
 const { asyncHandler } = require('../../../../middleware/validation')
 const logger = require('../../../../utils/logger').logger
 const TransactionManager = require('../../../../utils/TransactionManager')
@@ -25,33 +25,20 @@ const TransactionManager = require('../../../../utils/TransactionManager')
  *
  * @body {string} qr_content - 扫描到的QR码原始内容（RQRV1_...格式）
  *
- * 权限要求：role_level >= 20（商户员工/店长/管理员）
+ * 权限要求：consumption:scan_user 权限码（merchant_staff/merchant_manager 角色具备；管理员 role_level>=100 自动放行）
+ *   2026-06-24 统一口径：核销准入由「system_settings 角色等级阈值」改为「RBAC 权限码 consumption:scan_user」，
+ *   与消费录入(consumption:create)、我的提交(consumption:read) 三个商家接口口径统一，运营在后台角色权限页可配。
  */
 router.post(
   '/scan',
   authenticateToken,
+  requireMerchantPermission('consumption:scan_user'),
   asyncHandler(async (req, res) => {
     const { qr_content } = req.body
     const redeemerUserId = req.user.user_id
 
     if (!qr_content || typeof qr_content !== 'string') {
       return res.apiError('QR码内容不能为空', 'QR_CONTENT_REQUIRED', null, 400)
-    }
-
-    /** 权限验证（从 SystemSettings 读取最低角色等级，通过 ServiceManager 获取服务） */
-    const AdminSystemService = req.app.locals.services.getService('admin_system')
-    const userRoles = await getUserRoles(redeemerUserId)
-    const minRoleLevel = Number(
-      await AdminSystemService.getSettingValue('redemption', 'min_role_level_for_fulfill', 20)
-    )
-
-    if (userRoles.role_level < minRoleLevel) {
-      logger.warn('权限不足：非商户或管理员尝试扫码核销', {
-        user_id: redeemerUserId,
-        role_level: userRoles.role_level,
-        min_required: minRoleLevel
-      })
-      return res.apiError('权限不足，只有商户员工或管理员可以核销', 'FORBIDDEN', null, 403)
     }
 
     // 验证QR码签名和有效期

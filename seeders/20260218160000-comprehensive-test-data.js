@@ -631,9 +631,9 @@ module.exports = {
       {
         object_key: 'test-seeds/exchange/airpods-pro.jpg',
         thumbnail_keys: JSON.stringify({
-          small: 'test-seeds/exchange/thumbnails/small/airpods-pro.jpg',
-          medium: 'test-seeds/exchange/thumbnails/medium/airpods-pro.jpg',
-          large: 'test-seeds/exchange/thumbnails/large/airpods-pro.jpg'
+          w375: 'test-seeds/exchange/thumbnails/w375/airpods-pro.webp',
+          w750: 'test-seeds/exchange/thumbnails/w750/airpods-pro.webp',
+          w1080: 'test-seeds/exchange/thumbnails/w1080/airpods-pro.webp'
         }),
         original_name: 'airpods-pro.jpg',
         file_size: 102400,
@@ -647,9 +647,9 @@ module.exports = {
       {
         object_key: 'test-seeds/exchange/xiaomi-band.jpg',
         thumbnail_keys: JSON.stringify({
-          small: 'test-seeds/exchange/thumbnails/small/xiaomi-band.jpg',
-          medium: 'test-seeds/exchange/thumbnails/medium/xiaomi-band.jpg',
-          large: 'test-seeds/exchange/thumbnails/large/xiaomi-band.jpg'
+          w375: 'test-seeds/exchange/thumbnails/w375/xiaomi-band.webp',
+          w750: 'test-seeds/exchange/thumbnails/w750/xiaomi-band.webp',
+          w1080: 'test-seeds/exchange/thumbnails/w1080/xiaomi-band.webp'
         }),
         original_name: 'xiaomi-band.jpg',
         file_size: 89600,
@@ -663,9 +663,9 @@ module.exports = {
       {
         object_key: 'test-seeds/exchange/coffee-coupon.jpg',
         thumbnail_keys: JSON.stringify({
-          small: 'test-seeds/exchange/thumbnails/small/coffee-coupon.jpg',
-          medium: 'test-seeds/exchange/thumbnails/medium/coffee-coupon.jpg',
-          large: 'test-seeds/exchange/thumbnails/large/coffee-coupon.jpg'
+          w375: 'test-seeds/exchange/thumbnails/w375/coffee-coupon.webp',
+          w750: 'test-seeds/exchange/thumbnails/w750/coffee-coupon.webp',
+          w1080: 'test-seeds/exchange/thumbnails/w1080/coffee-coupon.webp'
         }),
         original_name: 'coffee-coupon.jpg',
         file_size: 65536,
@@ -679,9 +679,9 @@ module.exports = {
       {
         object_key: 'test-seeds/exchange/canvas-bag.jpg',
         thumbnail_keys: JSON.stringify({
-          small: 'test-seeds/exchange/thumbnails/small/canvas-bag.jpg',
-          medium: 'test-seeds/exchange/thumbnails/medium/canvas-bag.jpg',
-          large: 'test-seeds/exchange/thumbnails/large/canvas-bag.jpg'
+          w375: 'test-seeds/exchange/thumbnails/w375/canvas-bag.webp',
+          w750: 'test-seeds/exchange/thumbnails/w750/canvas-bag.webp',
+          w1080: 'test-seeds/exchange/thumbnails/w1080/canvas-bag.webp'
         }),
         original_name: 'canvas-bag.jpg',
         file_size: 78000,
@@ -695,9 +695,9 @@ module.exports = {
       {
         object_key: 'test-seeds/exchange/mechanical-keyboard.jpg',
         thumbnail_keys: JSON.stringify({
-          small: 'test-seeds/exchange/thumbnails/small/mechanical-keyboard.jpg',
-          medium: 'test-seeds/exchange/thumbnails/medium/mechanical-keyboard.jpg',
-          large: 'test-seeds/exchange/thumbnails/large/mechanical-keyboard.jpg'
+          w375: 'test-seeds/exchange/thumbnails/w375/mechanical-keyboard.webp',
+          w750: 'test-seeds/exchange/thumbnails/w750/mechanical-keyboard.webp',
+          w1080: 'test-seeds/exchange/thumbnails/w1080/mechanical-keyboard.webp'
         }),
         original_name: 'mechanical-keyboard.jpg',
         file_size: 115200,
@@ -711,9 +711,9 @@ module.exports = {
       {
         object_key: 'test-seeds/exchange/desk-lamp.jpg',
         thumbnail_keys: JSON.stringify({
-          small: 'test-seeds/exchange/thumbnails/small/desk-lamp.jpg',
-          medium: 'test-seeds/exchange/thumbnails/medium/desk-lamp.jpg',
-          large: 'test-seeds/exchange/thumbnails/large/desk-lamp.jpg'
+          w375: 'test-seeds/exchange/thumbnails/w375/desk-lamp.webp',
+          w750: 'test-seeds/exchange/thumbnails/w750/desk-lamp.webp',
+          w1080: 'test-seeds/exchange/thumbnails/w1080/desk-lamp.webp'
         }),
         original_name: 'desk-lamp.jpg',
         file_size: 92000,
@@ -727,9 +727,9 @@ module.exports = {
       {
         object_key: 'test-seeds/lottery/prize-iphone.jpg',
         thumbnail_keys: JSON.stringify({
-          small: 'test-seeds/lottery/thumbnails/small/prize-iphone.jpg',
-          medium: 'test-seeds/lottery/thumbnails/medium/prize-iphone.jpg',
-          large: 'test-seeds/lottery/thumbnails/large/prize-iphone.jpg'
+          w375: 'test-seeds/lottery/thumbnails/w375/prize-iphone.webp',
+          w750: 'test-seeds/lottery/thumbnails/w750/prize-iphone.webp',
+          w1080: 'test-seeds/lottery/thumbnails/w1080/prize-iphone.webp'
         }),
         original_name: 'prize-iphone.jpg',
         file_size: 125000,
@@ -743,9 +743,9 @@ module.exports = {
       {
         object_key: 'test-seeds/lottery/prize-coupon.jpg',
         thumbnail_keys: JSON.stringify({
-          small: 'test-seeds/lottery/thumbnails/small/prize-coupon.jpg',
-          medium: 'test-seeds/lottery/thumbnails/medium/prize-coupon.jpg',
-          large: 'test-seeds/lottery/thumbnails/large/prize-coupon.jpg'
+          w375: 'test-seeds/lottery/thumbnails/w375/prize-coupon.webp',
+          w750: 'test-seeds/lottery/thumbnails/w750/prize-coupon.webp',
+          w1080: 'test-seeds/lottery/thumbnails/w1080/prize-coupon.webp'
         }),
         original_name: 'prize-coupon.jpg',
         file_size: 55000,

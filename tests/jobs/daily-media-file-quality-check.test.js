@@ -71,7 +71,7 @@ describe('每日媒体文件数据质量检查任务', () => {
 
       console.log(`[媒体质量检查] 有缩略图的文件数量: ${filesWithThumbnails.length}`)
 
-      const requiredSizes = ['small', 'medium', 'large']
+      const requiredSizes = ['w375', 'w750', 'w1080']
       for (const file of filesWithThumbnails) {
         if (file.thumbnail_keys && typeof file.thumbnail_keys === 'object') {
           const missingSizes = requiredSizes.filter(size => !file.thumbnail_keys[size])

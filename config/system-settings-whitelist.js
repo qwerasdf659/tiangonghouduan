@@ -432,20 +432,6 @@ const SYSTEM_SETTINGS_WHITELIST = {
     approvalRequired: false
   },
 
-  // 允许核销的最低角色等级（控制哪些角色可以执行核销操作）
-  'redemption/min_role_level_for_fulfill': {
-    type: 'number',
-    min: 1,
-    max: 100,
-    default: 20,
-    readonly: false,
-    description: '允许核销的最低角色等级（控制哪些角色可以执行核销操作）',
-    changeRequiresRestart: false,
-    businessImpact: 'HIGH',
-    auditRequired: true,
-    approvalRequired: false
-  },
-
   // ===== 通知设置（开关类，适合 DB）=====
   'notification/sms_enabled': {
     type: 'boolean',

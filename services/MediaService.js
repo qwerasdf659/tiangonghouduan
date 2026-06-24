@@ -25,13 +25,38 @@ const BeijingTimeHelper = require('../utils/timeHelper')
 const { MediaFile, MediaAttachment } = require('../models')
 const models = require('../models')
 
-/** 业务表 primary_media_id 映射（attach role='primary' 时自动更新） */
+/** 业务表 primary_media_id 映射（attach role='primary' 时自动更新业务表主图字段） */
 const PRIMARY_MEDIA_TABLES = {
   exchange_item: { modelName: 'ExchangeItem', pk: 'exchange_item_id' },
   prize_definition: { modelName: 'PrizeDefinition', pk: 'prize_definition_id' },
   item_template: { modelName: 'ItemTemplate', pk: 'item_template_id' },
   ad_creative: { modelName: 'AdCreative', pk: 'ad_creative_id' }
 }
+
+/**
+ * 全部「实体引用图」外键列清单（治本 B - 2026-06-24，连真实库 information_schema 核实共 10 处 / 8 表）
+ *
+ * 用途：孤儿判定 getOrphanedMedia、删除前引用校验 getReferences 必须覆盖全部引用列，
+ * 否则「白名单漏列」会导致在用图被误判孤儿物理删（本次事故根因的残留风险）。
+ * 旧逻辑只覆盖 4 张 primary_media_id 表，遗漏 categories/diy_templates×2/diy_works/exchange_item_skus；
+ * 2026-06-24 复核又发现遗漏 diy_materials.image_media_id（DIY 素材图，模型已有 belongsTo 关联且真实库有数据），
+ * 本次补入，使引用列从 9 处补齐到 10 处 / 8 表，彻底消除白名单漏列。
+ *
+ * 每项：[模型名, 外键列, 主键列]。模型名为 PascalCase（models 索引键），列为 snake_case（数据库字段）。
+ * @constant {Array<[string, string, string]>}
+ */
+const MEDIA_REF_COLUMNS = Object.freeze([
+  ['ExchangeItem', 'primary_media_id', 'exchange_item_id'],
+  ['PrizeDefinition', 'primary_media_id', 'prize_definition_id'],
+  ['ItemTemplate', 'primary_media_id', 'item_template_id'],
+  ['AdCreative', 'primary_media_id', 'ad_creative_id'],
+  ['Category', 'icon_media_id', 'category_id'],
+  ['DiyTemplate', 'base_image_media_id', 'diy_template_id'],
+  ['DiyTemplate', 'preview_media_id', 'diy_template_id'],
+  ['DiyWork', 'preview_media_id', 'diy_work_id'],
+  ['ExchangeItemSku', 'image_id', 'sku_id'],
+  ['DiyMaterial', 'image_media_id', 'diy_material_id']
+])
 
 /** 允许的图片 MIME 类型 */
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
@@ -59,6 +84,25 @@ class MediaService {
   _getStorageService() {
     const SealosStorageServiceClass = this.serviceManager.getService('sealos_storage')
     return new SealosStorageServiceClass()
+  }
+
+  /**
+   * 由衍生图清单 thumbnail_keys 构建对外 URL 集合（统一出口，避免各处重复拼装）
+   *
+   * 治本 D+E（2026-06-24）：档位为宽度档 w375/w750/w1080（WebP，上传时预生成）。
+   * 衍生图 URL 共享主文件 content_hash，文件变→hash 变→URL 变，客户端自动失效。
+   *
+   * @param {Object|null} thumbnailKeys - media_files.thumbnail_keys，形如 { w375, w750, w1080 }
+   * @param {string} contentHash - 主文件内容哈希（media_files.content_hash）
+   * @returns {Object} 三档宽度衍生图 URL（含 w375/w750/w1080，缺档为 null）
+   */
+  _buildThumbnailUrls(thumbnailKeys, contentHash) {
+    const tk = thumbnailKeys || {}
+    return {
+      w375: tk.w375 ? getImageUrl(tk.w375, contentHash) : null,
+      w750: tk.w750 ? getImageUrl(tk.w750, contentHash) : null,
+      w1080: tk.w1080 ? getImageUrl(tk.w1080, contentHash) : null
+    }
   }
 
   /**
@@ -211,14 +255,7 @@ class MediaService {
 
     if (existing) {
       const publicUrl = getImageUrl(existing.object_key, existing.content_hash)
-      const thumbnailKeys = existing.thumbnail_keys || {}
-      const thumbnails = {
-        small: thumbnailKeys.small ? getImageUrl(thumbnailKeys.small, existing.content_hash) : null,
-        medium: thumbnailKeys.medium
-          ? getImageUrl(thumbnailKeys.medium, existing.content_hash)
-          : null,
-        large: thumbnailKeys.large ? getImageUrl(thumbnailKeys.large, existing.content_hash) : null
-      }
+      const thumbnails = this._buildThumbnailUrls(existing.thumbnail_keys, existing.content_hash)
       _logger.info('MediaService: 发现重复文件，返回已有记录', {
         existing_media_id: existing.media_id,
         content_hash: contentHash
@@ -268,11 +305,7 @@ class MediaService {
     })
 
     const publicUrl = getImageUrl(objectKey, contentHash)
-    const thumbnails = {
-      small: thumbnailKeys?.small ? getImageUrl(thumbnailKeys.small, contentHash) : null,
-      medium: thumbnailKeys?.medium ? getImageUrl(thumbnailKeys.medium, contentHash) : null,
-      large: thumbnailKeys?.large ? getImageUrl(thumbnailKeys.large, contentHash) : null
-    }
+    const thumbnails = this._buildThumbnailUrls(thumbnailKeys, contentHash)
 
     _logger.info('MediaService: 上传成功', {
       media_id: mediaRecord.media_id,
@@ -454,7 +487,6 @@ class MediaService {
 
     return attachments.map(att => {
       const m = att.media
-      const thumbKeys = m.thumbnail_keys || {}
       return {
         attachment_id: att.attachment_id,
         media_id: m.media_id,
@@ -462,11 +494,7 @@ class MediaService {
         sort_order: att.sort_order,
         meta: att.meta,
         public_url: getImageUrl(m.object_key, m.content_hash),
-        thumbnails: {
-          small: thumbKeys.small ? getImageUrl(thumbKeys.small, m.content_hash) : null,
-          medium: thumbKeys.medium ? getImageUrl(thumbKeys.medium, m.content_hash) : null,
-          large: thumbKeys.large ? getImageUrl(thumbKeys.large, m.content_hash) : null
-        },
+        thumbnails: this._buildThumbnailUrls(m.thumbnail_keys, m.content_hash),
         width: m.width,
         height: m.height,
         original_name: m.original_name,
@@ -514,6 +542,7 @@ class MediaService {
    * @param {string} [filters.folder] - 文件夹
    * @param {string} [filters.status] - 状态：active|archived|trashed
    * @param {string|string[]} [filters.tags] - 标签（逗号分隔或数组）
+   * @param {string} [filters.keyword] - 关键词（模糊匹配 original_name 文件名）
    * @param {Object} pagination - 分页
    * @param {number} [pagination.page=1] - 页码
    * @param {number} [pagination.page_size=24] - 每页数量
@@ -527,6 +556,12 @@ class MediaService {
     const where = {}
     if (filters.folder) where.folder = filters.folder
     if (filters.status) where.status = filters.status
+
+    // 关键词：模糊匹配文件名 original_name（前端「搜索文件名」框对应字段）
+    if (filters.keyword && String(filters.keyword).trim()) {
+      where.original_name = { [Op.like]: `%${String(filters.keyword).trim()}%` }
+    }
+
     if (filters.tags) {
       const tags = Array.isArray(filters.tags)
         ? filters.tags
@@ -536,10 +571,15 @@ class MediaService {
             .filter(Boolean)
       if (tags.length > 0) {
         where.tags = { [Op.ne]: null }
-        where[Op.or] = tags.map(tag => {
-          const jsonVal = JSON.stringify(tag).replace(/'/g, "''")
-          return sequelize.literal(`JSON_CONTAINS(COALESCE(tags,'[]'), '${jsonVal}', '$')`)
-        })
+        // 标签为「任一命中」语义，用 Op.and 包裹避免与其他顶层条件的 Op.or 冲突
+        where[Op.and] = [
+          {
+            [Op.or]: tags.map(tag => {
+              const jsonVal = JSON.stringify(tag).replace(/'/g, "''")
+              return sequelize.literal(`JSON_CONTAINS(COALESCE(tags,'[]'), '${jsonVal}', '$')`)
+            })
+          }
+        ]
       }
     }
 
@@ -551,7 +591,6 @@ class MediaService {
     })
 
     const items = rows.map(m => {
-      const thumbKeys = m.thumbnail_keys || {}
       return {
         media_id: m.media_id,
         object_key: m.object_key,
@@ -567,11 +606,7 @@ class MediaService {
         uploaded_by: m.uploaded_by,
         created_at: m.created_at,
         public_url: getImageUrl(m.object_key, m.content_hash),
-        thumbnails: {
-          small: thumbKeys.small ? getImageUrl(thumbKeys.small, m.content_hash) : null,
-          medium: thumbKeys.medium ? getImageUrl(thumbKeys.medium, m.content_hash) : null,
-          large: thumbKeys.large ? getImageUrl(thumbKeys.large, m.content_hash) : null
-        }
+        thumbnails: this._buildThumbnailUrls(m.thumbnail_keys, m.content_hash)
       }
     })
 
@@ -600,15 +635,10 @@ class MediaService {
     if (!media) return null
 
     const plain = media.get({ plain: true })
-    const thumbKeys = plain.thumbnail_keys || {}
     return {
       ...plain,
       public_url: getImageUrl(plain.object_key, plain.content_hash),
-      thumbnails: {
-        small: thumbKeys.small ? getImageUrl(thumbKeys.small, plain.content_hash) : null,
-        medium: thumbKeys.medium ? getImageUrl(thumbKeys.medium, plain.content_hash) : null,
-        large: thumbKeys.large ? getImageUrl(thumbKeys.large, plain.content_hash) : null
-      },
+      thumbnails: this._buildThumbnailUrls(plain.thumbnail_keys, plain.content_hash),
       attachments: (plain.attachments || []).map(a => ({
         attachment_id: a.attachment_id,
         attachable_type: a.attachable_type,
@@ -624,10 +654,26 @@ class MediaService {
   /**
    * 移入回收站（软删除）
    *
+   * 治本 B+C（2026-06-24）：删除前先做引用完整性校验（RESTRICT）。
+   * 只要该图仍被任一「实体引用图」外键列引用（primary_refs，见 MEDIA_REF_COLUMNS），
+   * 即拒绝软删并抛 MEDIA_IN_USE（409），强制运营先在业务侧换图/下架——制度性根治「在用主图被误删」。
+   * media_attachments 多态关联走 DB 层 CASCADE（删图连带删专属挂载），不在此拦截。
+   *
    * @param {number} mediaId - 媒体 ID
-   * @returns {Promise<boolean>} 是否成功
+   * @returns {Promise<boolean>} 是否成功（true=已移入回收站）
+   * @throws {BusinessError} MEDIA_IN_USE - 图片仍被业务实体引用，禁止删除
    */
   async moveToTrash(mediaId) {
+    // 引用完整性校验：被任一外键直引时禁止删除（RESTRICT）
+    const refs = await this.getReferences(mediaId)
+    if (refs.primary_refs.length > 0) {
+      throw new BusinessError(
+        '图片正被商品/奖品/广告等引用，请先在对应业务中换图或下架后再删除',
+        'MEDIA_IN_USE',
+        409
+      )
+    }
+
     const [affected] = await MediaFile.update(
       { status: 'trashed', trashed_at: new Date() },
       { where: { media_id: mediaId, status: { [Op.ne]: 'trashed' } } }
@@ -720,28 +766,28 @@ class MediaService {
     }).then(rows => rows.map(r => r.media_id))
 
     /*
-     * 引用来源2（2026-06-24 修复高危误删）：业务表 primary_media_id 直引。
-     * exchange_item / prize_definition / item_template / ad_creative 这 4 类图通过
-     * primary_media_id 外键直接引用 media_files，不经过 media_attachments。
-     * 旧逻辑只查 media_attachments，导致这些"正在使用"的图被误判为孤儿并物理删除
-     * （典型现象：广告/Banner 图、商品图、奖品图配好后约 24h 被定时任务删掉）。
-     * 此处把这 4 张表的 primary_media_id 一并纳入"已引用"集合，杜绝误删。
+     * 引用来源2（治本 B - 2026-06-24）：全部「实体引用图」外键列直引。
+     * 连真实库核实共 10 处 / 8 表（见 MEDIA_REF_COLUMNS）：除 4 张 primary_media_id 外，
+     * 还有 categories.icon_media_id、diy_templates.{base_image,preview}_media_id、
+     * diy_works.preview_media_id、exchange_item_skus.image_id、diy_materials.image_media_id。
+     * 旧逻辑仅覆盖 4 张 primary 表，遗漏其余 6 处 → 仍存在「白名单漏列误删在用图」高危。
+     * 此处统一用 MEDIA_REF_COLUMNS 驱动，把全部引用列纳入「已引用」集合，杜绝误删。
      */
-    const referencedByPrimaryMedia = []
-    for (const { modelName } of Object.values(PRIMARY_MEDIA_TABLES)) {
+    const referencedMediaIds = []
+    for (const [modelName, column] of MEDIA_REF_COLUMNS) {
       const Model = models[modelName]
-      if (!Model || !Model.rawAttributes?.primary_media_id) continue
+      if (!Model || !Model.rawAttributes?.[column]) continue
       // eslint-disable-next-line no-await-in-loop
       const rows = await Model.findAll({
-        attributes: ['primary_media_id'],
-        where: { primary_media_id: { [Op.ne]: null } },
+        attributes: [column],
+        where: { [column]: { [Op.ne]: null } },
         raw: true
       })
-      rows.forEach(r => referencedByPrimaryMedia.push(r.primary_media_id))
+      rows.forEach(r => referencedMediaIds.push(r[column]))
     }
 
     // 合并所有引用来源，得到"在用 media_id"全集
-    const usedMediaIds = [...new Set([...attachedMediaIds, ...referencedByPrimaryMedia])]
+    const usedMediaIds = [...new Set([...attachedMediaIds, ...referencedMediaIds])]
 
     const orphans = await MediaFile.findAll({
       where: {
@@ -756,66 +802,101 @@ class MediaService {
   }
 
   /**
-   * 清理孤立媒体（无关联且创建超过阈值小时数）
-   * 等价于 ImageService.cleanupUnboundImages，针对 media_files 表
+   * 查询某张图被哪些业务实体引用（治本 B - 2026-06-24，删除前 RESTRICT 校验 + 后台引用清单）
    *
-   * @param {number} [olderThanHours=24] - 超过多少小时未绑定
-   * @returns {Promise<Object>} { cleaned_count, failed_count, total_found, details, timestamp }
+   * 聚合两类引用来源：
+   * - 多态关联：media_attachments（按 attachable_type/attachable_id/role 列出）
+   * - 外键直引：MEDIA_REF_COLUMNS 全 10 处「实体引用图」列
+   *
+   * @param {number} mediaId - 媒体 ID
+   * @returns {Promise<Object>} { media_id, attachments:[], primary_refs:[], total }
+   */
+  async getReferences(mediaId) {
+    // 1. 多态关联引用
+    const attachments = await MediaAttachment.findAll({
+      where: { media_id: mediaId },
+      attributes: ['attachment_id', 'attachable_type', 'attachable_id', 'role'],
+      raw: true
+    })
+
+    // 2. 外键直引（遍历全 10 处引用列）
+    const primaryRefs = []
+    for (const [modelName, column, pk] of MEDIA_REF_COLUMNS) {
+      const Model = models[modelName]
+      if (!Model || !Model.rawAttributes?.[column]) continue
+      // eslint-disable-next-line no-await-in-loop
+      const rows = await Model.findAll({
+        attributes: [pk],
+        where: { [column]: mediaId },
+        raw: true
+      })
+      rows.forEach(r => primaryRefs.push({ table: Model.tableName, column, entity_id: r[pk] }))
+    }
+
+    return {
+      media_id: mediaId,
+      attachments: attachments.map(a => ({
+        attachment_id: a.attachment_id,
+        attachable_type: a.attachable_type,
+        attachable_id: a.attachable_id,
+        role: a.role
+      })),
+      primary_refs: primaryRefs,
+      total: attachments.length + primaryRefs.length
+    }
+  }
+
+  /**
+   * 清理孤立媒体（治本 C - 2026-06-24：只软删进回收站，不再自动物理删）
+   *
+   * 制度性根治本次事故：定时任务永不直接物理删「在用资源」。
+   * 孤儿（无任何引用 + 创建超过阈值）只置 status='trashed'，进 30 天回收站；
+   * 真正物理删只由 cleanup() 对「已软删且过期 30 天」的项执行。
+   * 即便 getOrphanedMedia 判断有误，最坏后果也只是「图被移入回收站」，30 天内可恢复，绝不丢原图。
+   *
+   * @param {number} [olderThanHours=24] - 超过多少小时未绑定才视为孤儿
+   * @returns {Promise<Object>} { trashed_count, total_found, details, timestamp }
    */
   async cleanupOrphanedMedia(olderThanHours = 24) {
     const orphans = await this.getOrphanedMedia(olderThanHours)
 
     if (orphans.length === 0) {
       return {
-        cleaned_count: 0,
-        failed_count: 0,
+        trashed_count: 0,
         total_found: 0,
         details: [],
         timestamp: BeijingTimeHelper.apiTimestamp()
       }
     }
 
-    const storage = this._getStorageService()
+    // 只软删进回收站（不碰对象存储、不物理删 DB 记录）
+    const orphanIds = orphans.map(m => m.media_id)
+    const [trashedCount] = await MediaFile.update(
+      { status: 'trashed', trashed_at: new Date() },
+      { where: { media_id: { [Op.in]: orphanIds }, status: 'active' } }
+    )
 
-    let cleanedCount = 0
-    let failedCount = 0
-    const details = []
-
-    for (const m of orphans) {
-      try {
-        // eslint-disable-next-line no-await-in-loop
-        await storage.deleteImageWithThumbnails(m.object_key, m.thumbnail_keys)
-        // eslint-disable-next-line no-await-in-loop
-        await MediaFile.destroy({ where: { media_id: m.media_id } })
-        cleanedCount++
-        details.push({ media_id: m.media_id, success: true })
-      } catch (err) {
-        failedCount++
-        details.push({ media_id: m.media_id, success: false, error: err.message })
-        _logger.error('MediaService: 孤立媒体清理失败', {
-          media_id: m.media_id,
-          error: err.message
-        })
-      }
-    }
+    _logger.info('MediaService: 孤立媒体已软删进回收站（不物理删）', {
+      total_found: orphans.length,
+      trashed_count: trashedCount
+    })
 
     return {
-      cleaned_count: cleanedCount,
-      failed_count: failedCount,
+      trashed_count: trashedCount,
       total_found: orphans.length,
-      details,
+      details: orphanIds.map(media_id => ({ media_id, action: 'moved_to_trash' })),
       timestamp: BeijingTimeHelper.apiTimestamp()
     }
   }
 
   /**
-   * 物理清理（回收站中超过阈值的文件）
+   * 物理清理（回收站中超过保留期的文件，治本 C - 2026-06-24 保留期定稿 30 天）
    *
-   * @param {number} [olderThanDays=7] - 回收站超过多少天
+   * @param {number} [olderThanDays=30] - 回收站保留期（天）；交易平台举证窗口，覆盖售后周期
    *
    * @returns {Promise<Object>} { cleaned_count, failed_count, details }
    */
-  async cleanup(olderThanDays = 7) {
+  async cleanup(olderThanDays = 30) {
     const threshold = new Date(Date.now() - olderThanDays * 24 * 60 * 60 * 1000)
 
     const trashed = await MediaFile.findAll({
@@ -895,7 +976,6 @@ class MediaService {
     })
 
     const items = rows.map(m => {
-      const thumbKeys = m.thumbnail_keys || {}
       return {
         media_id: m.media_id,
         original_name: m.original_name,
@@ -903,11 +983,7 @@ class MediaService {
         folder: m.folder,
         trashed_at: m.trashed_at,
         public_url: getImageUrl(m.object_key, m.content_hash),
-        thumbnails: {
-          small: thumbKeys.small ? getImageUrl(thumbKeys.small, m.content_hash) : null,
-          medium: thumbKeys.medium ? getImageUrl(thumbKeys.medium, m.content_hash) : null,
-          large: thumbKeys.large ? getImageUrl(thumbKeys.large, m.content_hash) : null
-        }
+        thumbnails: this._buildThumbnailUrls(m.thumbnail_keys, m.content_hash)
       }
     })
 
@@ -1013,6 +1089,191 @@ class MediaService {
       total += count
     }
     return total
+  }
+
+  /**
+   * 立即彻底删除单条（N1 - 仅限回收站内的项；物理删原图 + 全衍生 + DB 记录）
+   *
+   * @param {number} mediaId - 媒体 ID
+   * @returns {Promise<Object>} { media_id, deleted_objects, freed_bytes }
+   * @throws {BusinessError} MEDIA_NOT_IN_TRASH - 不在回收站，禁止直接彻底删
+   */
+  async purgeOne(mediaId) {
+    const media = await MediaFile.findByPk(mediaId)
+    if (!media) {
+      throw new BusinessError(`媒体不存在: media_id=${mediaId}`, 'SERVICE_NOT_FOUND', 404)
+    }
+    if (media.status !== 'trashed') {
+      throw new BusinessError('只能彻底删除回收站内的项，请先移入回收站', 'MEDIA_NOT_IN_TRASH', 409)
+    }
+    const storage = this._getStorageService()
+    const deletedObjects = [media.object_key, ...Object.values(media.thumbnail_keys || {})].filter(
+      Boolean
+    )
+    await storage.deleteImageWithThumbnails(media.object_key, media.thumbnail_keys)
+    const freedBytes = media.file_size || 0
+    await MediaFile.destroy({ where: { media_id: mediaId } })
+    _logger.info('MediaService: 已彻底删除媒体', { media_id: mediaId, freed_bytes: freedBytes })
+    return { media_id: mediaId, deleted_objects: deletedObjects, freed_bytes: freedBytes }
+  }
+
+  /**
+   * 缺原图核对（N3 - 连对象存储校验 active 图原图是否真实存在）
+   *
+   * 直接预防本次「DB 有记录但对象存储缺原图」事故复发。规模小（实测 26 文件）实时逐个 headObject。
+   *
+   * @param {Object} [filters] - 筛选
+   * @param {string} [filters.folder] - 限定文件夹
+   * @param {number} [filters.limit=500] - 最多核对条数（护栏）
+   * @returns {Promise<Object>} { items:[{media_id,object_key,missing:true}], total }
+   */
+  async getDamagedMedia(filters = {}) {
+    const where = { status: 'active' }
+    if (filters.folder) where.folder = filters.folder
+    const limit = Math.min(2000, parseInt(filters.limit, 10) || 500)
+    const rows = await MediaFile.findAll({ where, limit, order: [['created_at', 'DESC']] })
+    const storage = this._getStorageService()
+    const items = []
+    for (const m of rows) {
+      // eslint-disable-next-line no-await-in-loop
+      const exists = await storage.fileExists(m.object_key)
+      if (!exists) {
+        items.push({
+          media_id: m.media_id,
+          object_key: m.object_key,
+          original_name: m.original_name,
+          folder: m.folder,
+          missing: true
+        })
+      }
+    }
+    return { items, total: items.length }
+  }
+
+  /**
+   * 删除影响预览（N4 - 删图前预告连带删多少衍生 / 解除多少关联 / 释放多少空间）
+   *
+   * 复用 getReferences 聚合引用；blocked_by_primary=true 时前端应禁用删除并提示先换图/下架。
+   *
+   * @param {number} mediaId - 媒体 ID
+   * @returns {Promise<Object>} 影响预览
+   * @throws {BusinessError} SERVICE_NOT_FOUND - 媒体不存在
+   */
+  async previewDelete(mediaId) {
+    const media = await MediaFile.findByPk(mediaId)
+    if (!media) {
+      throw new BusinessError(`媒体不存在: media_id=${mediaId}`, 'SERVICE_NOT_FOUND', 404)
+    }
+    const refs = await this.getReferences(mediaId)
+    const derivedKeys = Object.values(media.thumbnail_keys || {}).filter(Boolean)
+    return {
+      media_id: mediaId,
+      derived_keys: derivedKeys,
+      derived_count: derivedKeys.length,
+      reference_count: refs.total,
+      attachments_to_cascade: refs.attachments.length,
+      primary_refs: refs.primary_refs,
+      blocked_by_primary: refs.primary_refs.length > 0,
+      freed_bytes_estimate: media.file_size || 0
+    }
+  }
+
+  /**
+   * 媒体引用率/使用情况列表（N5 - 在 listMedia 基础上标注每张图被引用次数，支持「仅未使用」筛选）
+   *
+   * 引用次数 = media_attachments 计数 + 全 10 处外键直引计数（MEDIA_REF_COLUMNS）。
+   *
+   * @param {Object} [filters] - 筛选（含 listMedia 的 folder/status/tags + unused_only）
+   * @param {Object} [pagination] - 分页 { page, page_size }
+   * @returns {Promise<Object>} { items, pagination }（items 每项含 reference_count）
+   */
+  async listMediaWithUsage(filters = {}, pagination = {}) {
+    const base = await this.listMedia(filters, pagination)
+    // 批量统计本页 media 的引用次数（避免 N+1：一次性查 attachments + 各外键表）
+    const ids = base.items.map(i => i.media_id)
+    const refCount = new Map(ids.map(id => [id, 0]))
+    if (ids.length > 0) {
+      const atts = await MediaAttachment.findAll({
+        where: { media_id: { [Op.in]: ids } },
+        attributes: ['media_id'],
+        raw: true
+      })
+      atts.forEach(a => refCount.set(a.media_id, (refCount.get(a.media_id) || 0) + 1))
+      for (const [modelName, column] of MEDIA_REF_COLUMNS) {
+        const Model = models[modelName]
+        if (!Model || !Model.rawAttributes?.[column]) continue
+        // eslint-disable-next-line no-await-in-loop
+        const rows = await Model.findAll({
+          where: { [column]: { [Op.in]: ids } },
+          attributes: [column],
+          raw: true
+        })
+        rows.forEach(r => refCount.set(r[column], (refCount.get(r[column]) || 0) + 1))
+      }
+    }
+    let items = base.items.map(i => ({ ...i, reference_count: refCount.get(i.media_id) || 0 }))
+    if (filters.unused_only === true || filters.unused_only === 'true') {
+      items = items.filter(i => i.reference_count === 0)
+    }
+    return { items, pagination: base.pagination }
+  }
+
+  /**
+   * 存量批量优化（N6 - 对存量 media 重新预生成 w375/w750/w1080 衍生图并回写 thumbnail_keys）
+   *
+   * 用于 D+E 上线后回填存量：读原图 → 走 SealosStorageService 同款 sharp 预生成链 → 更新 thumbnail_keys。
+   * 仅处理 active 且原图存在的项；原图缺失的跳过（由 N3 缺原图核对引导运营重传）。
+   *
+   * @param {Object} [options] - 选项
+   * @param {string} [options.folder] - 限定文件夹
+   * @param {number[]} [options.media_ids] - 指定 media_id 列表（优先于 folder）
+   * @param {boolean} [options.dry_run=false] - 只统计不实际处理
+   * @returns {Promise<Object>} { processed, succeeded, failed, skipped, details }
+   */
+  async batchOptimize(options = {}) {
+    const where = { status: 'active' }
+    if (Array.isArray(options.media_ids) && options.media_ids.length > 0) {
+      where.media_id = { [Op.in]: options.media_ids }
+    } else if (options.folder) {
+      where.folder = options.folder
+    }
+    const rows = await MediaFile.findAll({ where, order: [['media_id', 'ASC']] })
+    const dryRun = options.dry_run === true || options.dry_run === 'true'
+    const storage = this._getStorageService()
+    const details = []
+    let succeeded = 0
+    let failed = 0
+    let skipped = 0
+
+    for (const m of rows) {
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        const exists = await storage.fileExists(m.object_key)
+        if (!exists) {
+          skipped++
+          details.push({ media_id: m.media_id, skipped: true, reason: 'original_missing' })
+          continue
+        }
+        if (dryRun) {
+          succeeded++
+          details.push({ media_id: m.media_id, dry_run: true })
+          continue
+        }
+        // 为已存在原图重新预生成全部宽度档衍生（保持 object_key 稳定，不重传原图）
+        // eslint-disable-next-line no-await-in-loop
+        const newKeys = await storage.generateDerivativesForExisting(m.object_key)
+        // eslint-disable-next-line no-await-in-loop
+        await MediaFile.update({ thumbnail_keys: newKeys }, { where: { media_id: m.media_id } })
+        succeeded++
+        details.push({ media_id: m.media_id, thumbnail_keys: newKeys })
+      } catch (err) {
+        failed++
+        details.push({ media_id: m.media_id, error: err.message })
+        _logger.error('MediaService: 存量优化失败', { media_id: m.media_id, error: err.message })
+      }
+    }
+
+    return { processed: rows.length, succeeded, failed, skipped, details }
   }
 }
 

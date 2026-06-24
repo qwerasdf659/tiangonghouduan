@@ -8,6 +8,7 @@
  */
 
 import { logger } from '../../../utils/logger.js'
+import { request } from '../../../api/base.js'
 import { SYSTEM_ADMIN_ENDPOINTS } from '../../../api/system/admin.js'
 
 /**
@@ -24,10 +25,14 @@ export function useStorageState() {
     trashFiles: [],
     /** 重复文件列表 */
     duplicateFiles: [],
+    /** 受损（缺原图）文件列表（治本 B 配套 - 缺原图核对） */
+    damagedFiles: [],
     /** 存储加载状态 */
     storageLoading: false,
     /** 清理中状态 */
-    cleaning: false
+    cleaning: false,
+    /** 批量优化中状态 */
+    optimizing: false
   }
 }
 
@@ -106,16 +111,45 @@ export function useStorageMethods() {
         this.loadStorageOverview(),
         this.loadOrphanFiles(),
         this.loadTrashFiles(),
-        this.loadDuplicateFiles()
+        this.loadDuplicateFiles(),
+        this.loadDamagedFiles()
       ])
     },
 
-    /** 清理回收站（超过 7 天） */
+    /** 缺原图核对（治本 B 配套：列出 DB 有记录但对象存储缺原图的受损图，引导运营重传） */
+    async loadDamagedFiles() {
+      try {
+        logger.info('[StorageManagement] 缺原图核对...')
+        const response = await this.apiGet(SYSTEM_ADMIN_ENDPOINTS.STORAGE_DAMAGED)
+        if (response?.success) {
+          this.damagedFiles = response.data?.items || []
+          logger.info('[StorageManagement] 受损（缺原图）文件数:', this.damagedFiles.length)
+        }
+      } catch (error) {
+        logger.error('缺原图核对失败:', error)
+        this.damagedFiles = []
+      }
+    },
+
+    /** 回收站项剩余保留天数（治本 C：30 天保留期，基于 trashed_at 计算，向下取整不为负） */
+    trashRemainingDays(trashedAt) {
+      if (!trashedAt) return 30
+      const RETENTION_DAYS = 30
+      const trashedMs = new Date(trashedAt).getTime()
+      if (Number.isNaN(trashedMs)) return 30
+      const elapsedDays = Math.floor((Date.now() - trashedMs) / (24 * 60 * 60 * 1000))
+      const remaining = RETENTION_DAYS - elapsedDays
+      return remaining > 0 ? remaining : 0
+    },
+
+    /** 清理回收站（治本 C：物理删超过 30 天的回收站项） */
     async cleanupTrash() {
-      if (!confirm('确定要清理回收站中超过 7 天的文件吗？此操作不可撤销。')) return
+      if (!confirm('确定要清理回收站中超过 30 天的文件吗？此操作不可撤销。')) return
       this.cleaning = true
       try {
-        const response = await this.apiPost(SYSTEM_ADMIN_ENDPOINTS.STORAGE_CLEANUP, { days: 7 })
+        const response = await this.apiPost(SYSTEM_ADMIN_ENDPOINTS.STORAGE_CLEANUP, {
+          older_than_days: 30
+        })
         if (response?.success) {
           this.showSuccess(`清理完成：删除 ${response.data?.cleaned_count ?? 0} 个文件`)
           await this.loadStorageData()
@@ -127,6 +161,71 @@ export function useStorageMethods() {
         this.showError('清理失败: ' + error.message)
       } finally {
         this.cleaning = false
+      }
+    },
+
+    /** 从回收站恢复单条媒体 */
+    async restoreTrashFile(mediaId) {
+      try {
+        const response = await request({
+          url: SYSTEM_ADMIN_ENDPOINTS.MEDIA_RESTORE(mediaId),
+          method: 'POST'
+        })
+        if (response?.success) {
+          this.showSuccess('已从回收站恢复')
+          await this.loadStorageData()
+        } else {
+          this.showError(response?.message || '恢复失败')
+        }
+      } catch (error) {
+        logger.error('恢复媒体失败:', error)
+        this.showError('恢复失败: ' + error.message)
+      }
+    },
+
+    /** 立即彻底删除单条（仅限回收站内，不可逆） */
+    async purgeTrashFile(mediaId) {
+      if (!confirm('确定要彻底删除这张图吗？将物理删除原图+全部衍生图，不可恢复。')) return
+      try {
+        const response = await request({
+          url: SYSTEM_ADMIN_ENDPOINTS.MEDIA_PURGE(mediaId),
+          method: 'POST'
+        })
+        if (response?.success) {
+          this.showSuccess('已彻底删除')
+          await this.loadStorageData()
+        } else {
+          this.showError(response?.message || '彻底删除失败')
+        }
+      } catch (error) {
+        logger.error('彻底删除媒体失败:', error)
+        this.showError('彻底删除失败: ' + error.message)
+      }
+    },
+
+    /** 存量批量优化：对存量图补齐 w375/w750/w1080 衍生 */
+    async optimizeStorage(folder = null) {
+      if (!confirm('确定要对存量图批量补齐宽度档衍生图吗？建议低峰时段执行。')) return
+      this.optimizing = true
+      try {
+        const response = await this.apiPost(
+          SYSTEM_ADMIN_ENDPOINTS.STORAGE_OPTIMIZE,
+          folder ? { folder } : {}
+        )
+        if (response?.success) {
+          const d = response.data || {}
+          this.showSuccess(
+            `优化完成：成功 ${d.succeeded ?? 0}，跳过 ${d.skipped ?? 0}（缺原图），失败 ${d.failed ?? 0}`
+          )
+          await this.loadStorageData()
+        } else {
+          this.showError(response?.message || '批量优化失败')
+        }
+      } catch (error) {
+        logger.error('存量批量优化失败:', error)
+        this.showError('批量优化失败: ' + error.message)
+      } finally {
+        this.optimizing = false
       }
     }
   }

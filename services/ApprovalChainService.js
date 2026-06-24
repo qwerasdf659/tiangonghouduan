@@ -2334,38 +2334,16 @@ class ApprovalChainService {
    * @private
    */
   static async _getUserScopedStoreIds(userId, transaction) {
-    const storeIds = new Set()
-
-    // 1. store_staff 在职门店（店长/店员本人所在门店）
-    const staffRecords = await StoreStaff.findAll({
-      where: { user_id: userId, status: 'active' },
-      attributes: ['store_id'],
-      transaction
-    })
-    staffRecords.forEach(r => {
-      if (r.store_id != null) storeIds.add(Number(r.store_id))
-    })
-
-    // 2. user_hierarchy：本人直接挂的门店（业务员）+ 作为上级管辖的下属门店（区域/经理）
-    const ownHierarchy = await UserHierarchy.findAll({
-      where: { user_id: userId, is_active: true },
-      attributes: ['store_id'],
-      transaction
-    })
-    ownHierarchy.forEach(h => {
-      if (h.store_id != null) storeIds.add(Number(h.store_id))
-    })
-
-    const subordinates = await UserHierarchy.findAll({
-      where: { superior_user_id: userId, is_active: true },
-      attributes: ['store_id'],
-      transaction
-    })
-    subordinates.forEach(h => {
-      if (h.store_id != null) storeIds.add(Number(h.store_id))
-    })
-
-    return storeIds
+    /*
+     * 数据范围收口（2026-06-24 §12.4 拍板）：原私有实现已提升为 DataScopeService（单一事实源）。
+     * 升级点：原逻辑仅取「直接下级」一层门店；DataScopeService 经 getAllSubordinates 递归收集
+     * 所有层级下级门店（区域→经理→店长多级），更符合「数据范围按组织层级树逐级收窄」诉求。
+     * 行为等价性：审核链上层 isAdmin 分支单独处理全局不隔离，本方法只负责返回「受限门店集合」，
+     * 故 DataScopeService 返回 scope='all'（管理员）时这里返回空集合（与原逻辑一致：管理员不走此分支）。
+     */
+    const DataScopeService = require('./DataScopeService')
+    const scopeResult = await DataScopeService.getAccessibleStoreIds(userId, { transaction })
+    return new Set(scopeResult.scope === 'all' ? [] : scopeResult.store_ids)
   }
 
   /**

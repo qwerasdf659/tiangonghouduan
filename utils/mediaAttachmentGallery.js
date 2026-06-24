@@ -46,8 +46,8 @@ async function fetchMediaGalleryByEntity(models, attachableType, attachableId) {
       media_id: m.media_id,
       url,
       mime: m.mime_type,
-      thumbnail_url: m.thumbnail_keys?.small
-        ? getImageUrl(m.thumbnail_keys.small, m.content_hash)
+      thumbnail_url: m.thumbnail_keys?.w375
+        ? getImageUrl(m.thumbnail_keys.w375, m.content_hash)
         : url
     }
   }

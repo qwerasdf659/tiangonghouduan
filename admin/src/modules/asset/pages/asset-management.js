@@ -469,7 +469,7 @@ document.addEventListener('alpine:init', () => {
         const targetForm = mode === 'edit' ? this.materialTypeEditForm : this.materialTypeAddForm
         targetForm.icon_media_id = result.media_id
         this.materialTypeIconPreviewUrl =
-          result.public_url || result.thumbnails?.small || this.materialTypeIconPreviewUrl
+          result.public_url || result.thumbnails?.w375 || this.materialTypeIconPreviewUrl
       }
       // 清空 input，便于重复选择同一文件
       if (event.target) event.target.value = ''

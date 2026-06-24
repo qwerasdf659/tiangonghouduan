@@ -2,21 +2,20 @@
  * 天工商户营销平台 V4.2 - 每小时清理未绑定媒体任务
  *
  * @description
- *   自动清理 media_files 中无 media_attachments 关联且超过 24 小时的孤立媒体
- *   同时删除 Sealos 对象存储文件和数据库记录
+ *   自动把 media_files 中无任何引用且超过 24 小时的孤儿媒体「软删进回收站」（不物理删）
  *
- * @architecture 2026-03-16 媒体体系迁移
- *   - 使用 MediaService.cleanupOrphanedMedia 替代 ImageService.cleanupUnboundImages
- *   - 针对 media_files 表，无 media_attachments 关联视为孤立
- *   - 定时任务每小时执行一次（凌晨低峰期可能清理较多）
+ * @architecture 2026-06-24 治本 C（制度性根治本次误删事故）
+ *   - 使用 MediaService.cleanupOrphanedMedia：孤儿只置 status='trashed'，不碰对象存储、不删 DB 记录
+ *   - 物理删只由 daily-media-trash-cleanup 对「已软删且过期 30 天」的回收站项执行
+ *   - 即便孤儿判断有误，最坏后果仅「图进回收站」，30 天内可恢复，绝不丢原图
+ *   - 引用判定覆盖全 9 处外键列（MEDIA_REF_COLUMNS）+ media_attachments
  *
  * 执行策略：
  *   - 定时执行：每小时（Cron: 30 * * * *，每小时第30分钟）
- *   - 清理条件：无 media_attachments 关联 AND status='active' AND created_at < (now - 24h)
- *   - 删除策略：物理删除（Sealos 对象 + media_files 记录）
+ *   - 软删条件：无任何引用 AND status='active' AND created_at < (now - 24h)
  *
- * @version 2.0.0
- * @date 2026-03-16
+ * @version 3.0.0
+ * @date 2026-06-24
  */
 
 const logger = require('../utils/logger').logger
@@ -56,13 +55,12 @@ class HourlyCleanupUnboundMedia {
 
       const result = await mediaService.cleanupOrphanedMedia(hours)
 
-      // 生成报告
+      // 生成报告（治本 C：孤儿只软删进回收站，不物理删；物理删由 daily-media-trash-cleanup 清过期回收站项）
       const duration_ms = Date.now() - startTime
       const report = {
         timestamp: new Date().toISOString(),
-        cleaned_count: result.cleaned_count,
-        failed_count: result.failed_count,
-        total_found: result.total_found ?? result.cleaned_count + result.failed_count,
+        trashed_count: result.trashed_count,
+        total_found: result.total_found ?? result.trashed_count,
         duration_ms,
         status: 'SUCCESS'
       }
@@ -71,8 +69,8 @@ class HourlyCleanupUnboundMedia {
       this._outputReport(report)
 
       logger.info('每小时清理未绑定媒体任务完成', {
-        cleaned_count: result.cleaned_count,
-        failed_count: result.failed_count,
+        trashed_count: result.trashed_count,
+        total_found: result.total_found,
         duration_ms
       })
 
@@ -85,8 +83,7 @@ class HourlyCleanupUnboundMedia {
 
       const report = {
         timestamp: new Date().toISOString(),
-        cleaned_count: 0,
-        failed_count: 0,
+        trashed_count: 0,
         total_found: 0,
         duration_ms: Date.now() - startTime,
         status: 'ERROR',
@@ -109,13 +106,12 @@ class HourlyCleanupUnboundMedia {
    */
   static _outputReport(report) {
     console.log('\n' + '='.repeat(80))
-    console.log('🖼️ 每小时清理未绑定媒体任务报告')
+    console.log('🖼️ 每小时清理未绑定媒体任务报告（治本 C：只软删进回收站，不物理删）')
     console.log('='.repeat(80))
     console.log(`时间: ${report.timestamp}`)
     console.log(`耗时: ${report.duration_ms}ms`)
-    console.log(`发现未绑定媒体数: ${report.total_found}`)
-    console.log(`清理成功数: ${report.cleaned_count}`)
-    console.log(`清理失败数: ${report.failed_count}`)
+    console.log(`发现孤儿媒体数: ${report.total_found}`)
+    console.log(`移入回收站数: ${report.trashed_count}`)
     console.log(`状态: ${report.status === 'SUCCESS' ? '✅ SUCCESS' : '❌ ERROR'}`)
 
     if (report.error) {

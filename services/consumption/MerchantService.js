@@ -38,20 +38,49 @@ class MerchantService {
    *
    * @since 2026
    */
+  /**
+   * 查询商家侧消费记录列表（按数据范围 + 角色权限隔离）
+   *
+   * 数据范围（2026-06-24 §12.4 接入 DataScopeService 多店聚合）：
+   * - store_scope='all'（管理员）：不加门店过滤，全局可见
+   * - store_scope='stores'：按可见门店集合 store_ids 聚合（店长本店 / 区域负责人辖区多店）
+   * - is_manager=false（店员）：在门店范围基础上再叠加 merchant_id=自己（只看本人经手记录）
+   *
+   * @param {Object} params - 查询参数
+   * @param {number} params.user_id - 当前用户ID
+   * @param {string} [params.store_scope] - 数据范围：'all' | 'stores'（来自 DataScopeService）
+   * @param {number[]} [params.store_ids] - 可见门店集合（store_scope='stores' 时生效）
+   * @param {boolean} params.is_manager - 是否为店长/管理者（false=店员，叠加本人经手过滤）
+   * @param {string} [params.status] - 状态筛选
+   * @param {number} [params.page=1] - 页码
+   * @param {number} [params.page_size=20] - 每页数量
+   * @returns {Promise<Object>} 消费记录列表及分页信息
+   *
+   * @since 2026
+   */
   static async getMerchantRecords(params) {
-    const { user_id, store_id, is_manager, status, page = 1, page_size = 20 } = params
+    const { user_id, store_scope, store_ids, is_manager, status, page = 1, page_size = 20 } = params
 
     const finalPage = Math.max(parseInt(page, 10) || 1, 1)
     const finalPageSize = Math.min(Math.max(parseInt(page_size, 10) || 20, 1), 50)
     const offset = (finalPage - 1) * finalPageSize
 
-    // 构建查询条件
+    // 构建查询条件（数据范围隔离：门店集合 + 角色经手过滤）
     const whereClause = {
-      store_id,
       is_deleted: 0
     }
 
-    // 店员只能查自己录入的
+    /*
+     * 门店范围过滤（DataScopeService 单一事实源）：
+     * - 'all'（管理员）：不加门店条件，全局可见
+     * - 否则按可见门店集合聚合；集合为空时下发 [0] 保证查不到任何记录（防越权兜底）
+     */
+    if (store_scope !== 'all') {
+      const ids = Array.isArray(store_ids) && store_ids.length > 0 ? store_ids : [0]
+      whereClause.store_id = { [Op.in]: ids }
+    }
+
+    // 店员只能查自己录入的（merchant_id=经手人本人）
     if (!is_manager) {
       whereClause.merchant_id = user_id
     }
@@ -103,10 +132,13 @@ class MerchantService {
           total: count,
           total_pages: Math.ceil(count / finalPageSize)
         },
-        query_scope: is_manager ? 'store' : 'self',
-        query_note: is_manager
-          ? '店长模式：显示本店全部消费记录'
-          : '店员模式：仅显示您录入的消费记录'
+        query_scope: store_scope === 'all' ? 'all' : is_manager ? 'stores' : 'self',
+        query_note:
+          store_scope === 'all'
+            ? '管理员模式：显示全部门店消费记录'
+            : is_manager
+              ? '管理者模式：显示可见门店（本店/辖区）全部消费记录'
+              : '店员模式：仅显示您录入的消费记录'
       }
     } catch (error) {
       logger.error('商家侧消费记录查询失败', {

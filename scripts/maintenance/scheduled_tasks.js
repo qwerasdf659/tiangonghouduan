@@ -1030,11 +1030,11 @@ class ScheduledTasks {
           lock_value: lockValue
         })
 
-        // 调用 Job 类执行清理
+        // 调用 Job 类执行清理（治本 C：孤儿只软删进回收站，不物理删）
         const report = await HourlyCleanupUnboundMedia.execute(24)
 
-        if (report.cleaned_count > 0) {
-          logger.warn(`[定时任务] 未绑定媒体清理完成：清理 ${report.cleaned_count} 个媒体文件`)
+        if (report.trashed_count > 0) {
+          logger.warn(`[定时任务] 未绑定媒体清理完成：${report.trashed_count} 个孤儿已移入回收站`)
         } else {
           logger.info('[定时任务] 未绑定媒体清理完成：无需清理')
         }
@@ -1070,7 +1070,7 @@ class ScheduledTasks {
    * @example
    * const ScheduledTasks = require('./scripts/maintenance/scheduled-tasks')
    * const report = await ScheduledTasks.manualCleanupUnboundMedia(24)
-   * console.log('清理数量:', report.cleaned_count)
+   * console.log('移入回收站数量:', report.trashed_count)
    */
   static async manualCleanupUnboundMedia(hours = 24) {
     try {
@@ -1078,8 +1078,8 @@ class ScheduledTasks {
       const report = await HourlyCleanupUnboundMedia.execute(hours)
 
       logger.info('[手动触发] 未绑定媒体清理完成', {
-        cleaned_count: report.cleaned_count,
-        failed_count: report.failed_count,
+        trashed_count: report.trashed_count,
+        total_found: report.total_found,
         duration_ms: report.duration_ms
       })
 
@@ -1382,7 +1382,7 @@ class ScheduledTasks {
           lock_value: lockValue
         })
 
-        const report = await DailyMediaTrashCleanup.execute(7)
+        const report = await DailyMediaTrashCleanup.execute(30)
 
         if (report.cleaned_count > 0) {
           logger.warn(`[定时任务] 媒体回收站清理完成：清理 ${report.cleaned_count} 个过期媒体文件`, {

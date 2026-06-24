@@ -18,13 +18,26 @@
 
 const BusinessError = require('../utils/BusinessError')
 const logger = require('../utils/logger').logger
-const { StoreStaff, User, Store } = require('../models')
+const { StoreStaff, User, Store, Role, UserRole } = require('../models')
 const BeijingTimeHelper = require('../utils/timeHelper')
 const { invalidateUserPermissions } = require('../middleware/auth')
 const { assertAndGetTransaction } = require('../utils/transactionHelpers')
 const AuditLogService = require('./AuditLogService')
 const { attachDisplayNames, DICT_TYPES } = require('../utils/displayNameHelper')
 const { Op } = require('sequelize')
+
+/**
+ * 全局商家角色名集合（roles.role_name）
+ *
+ * 业务含义：员工被加入门店（store_staff）时必须同时拥有对应的「全局商家角色」，
+ * 否则商家域准入中间件 requireMerchantDomainAccess 会因「全局角色非 merchant_staff/merchant_manager」
+ * 而拒绝（即便 store_staff 已有在职记录）。两者必须成对维护。
+ * - merchant_manager：商家店长（role_level=40），对应门店内 role_in_store='manager'
+ * - merchant_staff：商家店员（role_level=20），对应门店内 role_in_store='staff'
+ *
+ * @constant {string[]}
+ */
+const MERCHANT_GLOBAL_ROLES = Object.freeze(['merchant_staff', 'merchant_manager'])
 
 /**
  * 员工管理服务类
@@ -110,7 +123,14 @@ class StaffManagementService {
       { transaction }
     )
 
-    // 6. 记录审计日志
+    // 6. 同步全局商家角色（取向A：加门店员工 = 同时赋对应 merchant_staff/merchant_manager 全局角色）
+    await StaffManagementService._syncMerchantGlobalRole(
+      data.user_id,
+      data.operator_id,
+      transaction
+    )
+
+    // 7. 记录审计日志
     await AuditLogService.logOperation({
       operator_id: data.operator_id,
       operation_type: 'staff_onboard',
@@ -127,7 +147,7 @@ class StaffManagementService {
       transaction
     })
 
-    // 7. 清除员工权限缓存（确保新门店权限立即生效）
+    // 8. 清除员工权限缓存（确保新门店权限立即生效）
     await invalidateUserPermissions(data.user_id, '员工入职', data.operator_id)
 
     logger.info('✅ 员工入职成功', {
@@ -259,7 +279,14 @@ class StaffManagementService {
       transaction
     })
 
-    // 7. 清除权限缓存
+    // 7. 同步全局商家角色（调店保持原门店角色，幂等确保全局商家角色与在职绑定一致）
+    await StaffManagementService._syncMerchantGlobalRole(
+      data.user_id,
+      data.operator_id,
+      transaction
+    )
+
+    // 8. 清除权限缓存
     await invalidateUserPermissions(data.user_id, '员工调店', data.operator_id)
 
     logger.info('✅ 员工调店成功', {
@@ -340,7 +367,14 @@ class StaffManagementService {
       transaction
     })
 
-    // 4. 清除权限缓存
+    // 4. 同步全局商家角色（离职后按剩余在职门店重算：无其它在职绑定则回收商家角色，多店则保留/降级）
+    await StaffManagementService._syncMerchantGlobalRole(
+      data.user_id,
+      data.operator_id,
+      transaction
+    )
+
+    // 5. 清除权限缓存
     await invalidateUserPermissions(data.user_id, '员工离职', data.operator_id)
 
     logger.info('✅ 员工离职成功（指定门店）', {
@@ -420,7 +454,10 @@ class StaffManagementService {
       transaction
     })
 
-    // 4. 清除权限缓存
+    // 4. 同步全局商家角色（已禁用所有门店 → 回收 merchant_staff/merchant_manager）
+    await StaffManagementService._syncMerchantGlobalRole(user_id, operator_id, transaction)
+
+    // 5. 清除权限缓存
     await invalidateUserPermissions(user_id, '员工禁用', operator_id)
 
     logger.info('✅ 员工禁用成功（全部门店）', {
@@ -515,7 +552,10 @@ class StaffManagementService {
       transaction
     })
 
-    // 5. 清除权限缓存
+    // 5. 同步全局商家角色（重新启用 → 按门店角色赋回 merchant_staff/merchant_manager）
+    await StaffManagementService._syncMerchantGlobalRole(user_id, operator_id, transaction)
+
+    // 6. 清除权限缓存
     await invalidateUserPermissions(user_id, '员工启用', operator_id)
 
     logger.info('✅ 员工启用成功', {
@@ -601,7 +641,14 @@ class StaffManagementService {
       transaction
     })
 
-    // 6. 清除权限缓存
+    // 6. 同步全局商家角色（店内角色 staff↔manager 变更需同步切换 merchant_staff↔merchant_manager）
+    await StaffManagementService._syncMerchantGlobalRole(
+      data.user_id,
+      data.operator_id,
+      transaction
+    )
+
+    // 7. 清除权限缓存
     await invalidateUserPermissions(data.user_id, '员工角色变更', data.operator_id)
 
     logger.info('✅ 员工角色变更成功', {
@@ -1010,7 +1057,14 @@ class StaffManagementService {
       transaction
     })
 
-    // 6. 清除权限缓存
+    // 6. 同步全局商家角色（强制删除在职绑定后，按剩余在职门店重算：无在职绑定则回收商家角色）
+    await StaffManagementService._syncMerchantGlobalRole(
+      staffRecord.user_id,
+      data.operator_id,
+      transaction
+    )
+
+    // 7. 清除权限缓存
     await invalidateUserPermissions(
       staffRecord.user_id,
       data.force ? '员工强制删除' : '员工记录删除',
@@ -1027,6 +1081,102 @@ class StaffManagementService {
     })
 
     return staffRecord
+  }
+
+  /**
+   * 同步用户的「全局商家角色」与其门店在职绑定保持一致（幂等，多门店安全）
+   *
+   * 业务规则（取向A：加门店员工 = 同时赋全局商家角色）：
+   * - 取该用户所有 status='active' 的门店绑定，若存在任一 manager → 应持有 merchant_manager；
+   *   否则若存在 staff → 应持有 merchant_staff；若无任何在职绑定 → 回收全部商家角色。
+   * - 「店长优先」：同时在 A 店当 manager、B 店当 staff 时，按更高的 merchant_manager 授予，
+   *   保证商家域准入与最高门店职责一致。
+   * - 仅增删 merchant_staff/merchant_manager 两个角色，绝不触碰用户的其它角色（如 admin/user）。
+   * - 不走 UserRoleService.assignRole/revokeRole（其含 RBAC 越权护栏：店长级别无法授予同级
+   *   merchant_manager、且对「未拥有角色」会抛 404）。本同步是「员工管理」系统编排，
+   *   操作者权限已由路由层 requireMerchantPermission('staff:manage') 把关，故直接对 user_roles
+   *   做幂等增删，避免护栏误伤主流程。
+   * - 不影响管理员：平台管理员（role_level>=100）不依赖商家角色访问商家域，本方法也不会动其角色。
+   *
+   * @private
+   * @param {number} user_id - 员工用户ID
+   * @param {number} operator_id - 操作人ID（审计/assigned_by 用）
+   * @param {Object} transaction - Sequelize 事务实例（必传，与员工写操作同事务）
+   * @returns {Promise<void>} 同步完成（无返回值）
+   */
+  static async _syncMerchantGlobalRole(user_id, operator_id, transaction) {
+    // 1. 取该用户当前所有在职门店绑定，推导应持有的目标商家角色（店长优先）
+    const activeBindings = await StoreStaff.findAll({
+      where: { user_id, status: 'active' },
+      attributes: ['role_in_store'],
+      transaction
+    })
+
+    let targetRole = null
+    if (activeBindings.some(b => b.role_in_store === 'manager')) {
+      targetRole = 'merchant_manager'
+    } else if (activeBindings.length > 0) {
+      targetRole = 'merchant_staff'
+    }
+
+    // 2. 查出 merchant_staff / merchant_manager 两个角色定义（role_id）
+    const merchantRoles = await Role.findAll({
+      where: { role_name: { [Op.in]: MERCHANT_GLOBAL_ROLES } },
+      attributes: ['role_id', 'role_name'],
+      transaction
+    })
+    const roleIdByName = {}
+    for (const r of merchantRoles) {
+      roleIdByName[r.role_name] = r.role_id
+    }
+
+    // 3. 幂等同步：目标角色置为 active（无则创建），其余商家角色移除
+    for (const roleName of MERCHANT_GLOBAL_ROLES) {
+      const roleId = roleIdByName[roleName]
+      if (!roleId) continue // 角色字典缺失，跳过（不阻断主流程）
+
+      if (roleName === targetRole) {
+        // eslint-disable-next-line no-await-in-loop
+        const existing = await UserRole.findOne({
+          where: { user_id, role_id: roleId },
+          transaction
+        })
+        if (!existing) {
+          // eslint-disable-next-line no-await-in-loop
+          await UserRole.create(
+            {
+              user_id,
+              role_id: roleId,
+              assigned_at: BeijingTimeHelper.createDatabaseTime(),
+              assigned_by: operator_id,
+              is_active: true
+            },
+            { transaction }
+          )
+        } else if (!existing.is_active) {
+          // eslint-disable-next-line no-await-in-loop
+          await existing.update(
+            {
+              is_active: true,
+              assigned_by: operator_id,
+              assigned_at: BeijingTimeHelper.createDatabaseTime()
+            },
+            { transaction }
+          )
+        }
+      } else {
+        // 非目标商家角色：移除该用户对应 user_roles 记录（幂等，无则不报错）
+        // eslint-disable-next-line no-await-in-loop
+        await UserRole.destroy({ where: { user_id, role_id: roleId }, transaction })
+      }
+    }
+
+    logger.info('✅ 全局商家角色已同步', {
+      user_id,
+      target_global_role: targetRole || '无（已回收商家角色）',
+      active_store_bindings: activeBindings.length,
+      operator_id
+    })
   }
 }
 

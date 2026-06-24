@@ -35,14 +35,16 @@ export function useAuditLogsState() {
     logPagination: { total: 0, total_pages: 1 },
     /** @type {Object|null} 选中的日志详情 */
     selectedLog: null,
-    /** @type {Array} 操作类型选项 */
-    actionTypes: [
-      { value: 'create', label: '创建' },
-      { value: 'update', label: '更新' },
-      { value: 'delete', label: '删除' },
-      { value: 'login', label: '登录' },
-      { value: 'logout', label: '登出' }
-    ]
+    /**
+     * @type {Array} 操作类型选项（运行时从后端权威字典 /admin-audit-logs/operation-types 加载，
+     * 不硬编码——避免与后端 AUDIT_OPERATION_TYPES 漂移）
+     */
+    actionTypes: [],
+    /**
+     * @type {Array} 操作目标类型选项（运行时从后端权威字典 /admin-audit-logs/target-types 加载，
+     * 不硬编码——后端 AUDIT_TARGET_TYPES 为唯一真相源，含 media_file 等全部标准码）
+     */
+    targetTypes: []
   }
 }
 
@@ -52,6 +54,40 @@ export function useAuditLogsState() {
  */
 export function useAuditLogsMethods() {
   return {
+    /**
+     * 加载审计筛选字典（操作类型 + 目标类型），运行时从后端权威字典端点拉取。
+     *
+     * 后端返回结构：{ operation_types:[{code,name,key}] } / { target_types:[{code,name,key}] }
+     * 前端筛选器统一用 {value,label}：value=后端 code（snake_case 标准码），label=后端中文名。
+     * 各列表头部补一个空 value 的「全部」项，对应"不筛选"。
+     *
+     * @returns {Promise<void>}
+     */
+    async loadAuditDictionaries() {
+      try {
+        const [opRes, ttRes] = await Promise.all([
+          this.apiGet(SYSTEM_ENDPOINTS.AUDIT_LOG_OPERATION_TYPES, {}, { showLoading: false }),
+          this.apiGet(SYSTEM_ENDPOINTS.AUDIT_LOG_TARGET_TYPES, {}, { showLoading: false })
+        ])
+        if (opRes?.success) {
+          const list = (opRes.data?.operation_types || []).map(t => ({
+            value: t.code,
+            label: t.name || t.code
+          }))
+          this.actionTypes = [{ value: '', label: '全部类型' }, ...list]
+        }
+        if (ttRes?.success) {
+          const list = (ttRes.data?.target_types || []).map(t => ({
+            value: t.code,
+            label: t.name || t.code
+          }))
+          this.targetTypes = [{ value: '', label: '全部目标' }, ...list]
+        }
+      } catch (error) {
+        logger.error('加载审计筛选字典失败:', error)
+      }
+    },
+
     /**
      * 加载审计日志
      */

@@ -85,9 +85,21 @@ router.get(
 
     const isManager = await StaffManagementService.isStoreManager(userId, storeId, roleLevel)
 
+    /*
+     * 数据范围多店聚合（2026-06-24 §12.4 接入 DataScopeService 单一事实源）：
+     * - resolveStoreContext 已校验该用户在 storeId 在职（防越权访问任意门店）；
+     * - DataScopeService 进一步给出"该用户可见的全部门店集合"（店长本店 / 区域负责人辖区多店 / 管理员全局），
+     *   列表按此集合聚合查询，店员仍叠加 merchant_id=自己。
+     */
+    const DataScopeService = getService(req, 'data_scope')
+    const { scope: storeScope, store_ids: storeIds } =
+      await DataScopeService.getAccessibleStoreIds(userId)
+
     logger.info('商家员工查询消费记录', {
       user_id: userId,
       store_id: storeId,
+      store_scope: storeScope,
+      visible_store_count: storeScope === 'all' ? 'all' : (storeIds || []).length,
       is_manager: isManager,
       status,
       page,
@@ -96,7 +108,8 @@ router.get(
 
     const result = await MerchantService.getMerchantRecords({
       user_id: userId,
-      store_id: storeId,
+      store_scope: storeScope,
+      store_ids: storeIds,
       is_manager: isManager,
       status,
       page: parseInt(page, 10),

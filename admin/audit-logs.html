@@ -216,7 +216,6 @@
         <div>
           <label class="block text-sm font-medium themed-text-secondary mb-1">操作类型</label>
           <select class="w-full border rounded-lg px-3 py-2" x-model="logFilters.operation_type">
-            <option value="">全部类型</option>
             <template x-for="type in actionTypes" :key="type.value">
               <option :value="type.value" x-text="type.label"></option>
             </template>
@@ -224,12 +223,11 @@
         </div>
         <div>
           <label class="block text-sm font-medium themed-text-secondary mb-1">操作目标</label>
-          <input 
-            type="text" 
-            class="w-full border rounded-lg px-3 py-2" 
-            x-model="logFilters.target_type" 
-            placeholder="如: User, LotteryPool..."
-          >
+          <select class="w-full border rounded-lg px-3 py-2" x-model="logFilters.target_type">
+            <template x-for="t in targetTypes" :key="t.value">
+              <option :value="t.value" x-text="t.label"></option>
+            </template>
+          </select>
         </div>
         <div>
           <label class="block text-sm font-medium themed-text-secondary mb-1">开始日期</label>

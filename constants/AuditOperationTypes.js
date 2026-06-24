@@ -343,7 +343,40 @@ const OPERATION_TYPES = Object.freeze({
    * @example AdminLoginSecurityService.recordFailure() 命中阈值时记录
    * @since 2026-06-18（验证码功能 P0.6 管理端轻量加固）
    */
-  ADMIN_LOGIN_LOCKED: 'admin_login_locked'
+  ADMIN_LOGIN_LOCKED: 'admin_login_locked',
+
+  // ==================== 媒体治理类（媒体级联删除危险操作留痕 2026-06-24 新增）====================
+  /**
+   * 媒体删除（移入回收站）
+   * @description 管理员把媒体软删进回收站（30 天后由定时任务物理删）
+   * @example MediaService.moveToTrash() 经路由 DELETE /console/media/:media_id
+   * @since 2026-06-24（媒体级联删除治本方案）
+   */
+  MEDIA_DELETE: 'media_delete',
+
+  /**
+   * 媒体恢复（从回收站还原）
+   * @description 管理员把回收站内媒体恢复为 active
+   * @example MediaService.restore() 经路由 POST /console/media/:media_id/restore
+   * @since 2026-06-24
+   */
+  MEDIA_RESTORE: 'media_restore',
+
+  /**
+   * 媒体彻底删除（不可逆）
+   * @description 管理员对回收站内媒体立即物理删（原图 + 全衍生 + DB 记录）
+   * @example MediaService.purgeOne() 经路由 POST /console/media/:media_id/purge
+   * @since 2026-06-24
+   */
+  MEDIA_PURGE: 'media_purge',
+
+  /**
+   * 媒体存量批量优化
+   * @description 管理员对存量图重跑预生成衍生（补齐 w375/w750/w1080 WebP）
+   * @example MediaService.batchOptimize() 经路由 POST /console/storage/optimize
+   * @since 2026-06-24
+   */
+  MEDIA_OPTIMIZE: 'media_optimize'
 })
 
 /**
@@ -450,7 +483,13 @@ const OPERATION_TYPE_DESCRIPTIONS = Object.freeze({
   [OPERATION_TYPES.DATA_CLEANUP]: '数据清理',
 
   // 登录安全类（P0.6 管理端登录加固 2026-06-18 新增）
-  [OPERATION_TYPES.ADMIN_LOGIN_LOCKED]: '管理端登录锁定'
+  [OPERATION_TYPES.ADMIN_LOGIN_LOCKED]: '管理端登录锁定',
+
+  // 媒体治理类（媒体级联删除危险操作留痕 2026-06-24 新增）
+  [OPERATION_TYPES.MEDIA_DELETE]: '媒体删除（移入回收站）',
+  [OPERATION_TYPES.MEDIA_RESTORE]: '媒体恢复（从回收站还原）',
+  [OPERATION_TYPES.MEDIA_PURGE]: '媒体彻底删除',
+  [OPERATION_TYPES.MEDIA_OPTIMIZE]: '媒体存量批量优化'
 })
 
 /**

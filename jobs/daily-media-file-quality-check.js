@@ -7,7 +7,7 @@
  *
  * 检查项：
  *   - 缺失 thumbnail_keys：记录 ERROR 日志
- *   - thumbnail_keys 不完整（缺少 small/medium/large）：记录 ERROR 日志
+ *   - thumbnail_keys 不完整（缺少 w375/w750/w1080）：记录 ERROR 日志
  *   - object_key 格式异常：记录 ERROR 日志
  *   - 仅监控，不自动修复，不影响业务
  *
@@ -99,8 +99,8 @@ class DailyMediaFileQualityCheck {
               continue
             }
 
-            // 检查 2: thumbnail_keys 不完整
-            const requiredSizes = ['small', 'medium', 'large']
+            // 检查 2: thumbnail_keys 不完整（治本 D+E：宽度档 w375/w750/w1080）
+            const requiredSizes = ['w375', 'w750', 'w1080']
             const missingSizes = requiredSizes.filter(size => !thumbnails[size])
 
             if (missingSizes.length > 0) {

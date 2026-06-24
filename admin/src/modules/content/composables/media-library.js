@@ -19,12 +19,14 @@ export function useMediaState() {
   return {
     /** 媒体文件列表 */
     mediaFiles: [],
-    /** 媒体筛选（与后端 GET /api/v4/console/media 查询参数对齐） */
-    mediaFilters: { folder: '', status: '', tags: '', keyword: '' },
+    /** 媒体筛选（与后端 GET /api/v4/console/media 查询参数对齐；unused_only 用于 N5 仅看未使用） */
+    mediaFilters: { folder: '', status: '', tags: '', keyword: '', unused_only: '' },
     /** 媒体统计 */
     mediaStats: { total: 0, totalSize: 0, weekly_uploads: 0, orphan_count: 0 },
     /** 选中的媒体 */
     selectedMedia: null,
+    /** 删除影响预览（N4：连带删衍生数/引用数/是否被主图引用拦截） */
+    deletePreview: null,
     /** 上传状态 */
     uploading: false
   }
@@ -44,8 +46,10 @@ export function useMediaMethods() {
         if (this.mediaFilters?.status) params.append('status', this.mediaFilters.status)
         if (this.mediaFilters?.tags) params.append('tags', this.mediaFilters.tags)
         if (this.mediaFilters?.keyword) params.append('keyword', this.mediaFilters.keyword)
+        if (this.mediaFilters?.unused_only) params.append('unused_only', 'true')
 
-        const response = await this.apiGet(`${SYSTEM_ADMIN_ENDPOINTS.MEDIA_LIST}?${params}`)
+        // N5：统一走 usage 端点，列表项带 reference_count（引用次数），支持「仅未使用」筛选
+        const response = await this.apiGet(`${SYSTEM_ADMIN_ENDPOINTS.MEDIA_USAGE}?${params}`)
         if (response?.success) {
           this.mediaFiles =
             response.data?.list || response.data?.images || response.data?.items || []
@@ -133,10 +137,67 @@ export function useMediaMethods() {
       }
     },
 
+    /** 删除预览数据（N4：打开删除弹窗时拉取，展示连带删衍生数/引用数/是否被主图引用拦截） */
     async deleteMedia(media) {
       this.deleteTarget = media
       this.deleteType = 'media'
+      this.deletePreview = null
       this.showModal('deleteModal')
+      // 异步拉取删除影响预览（失败不阻断弹窗，仅不展示预览明细）
+      try {
+        const result = await request({
+          url: SYSTEM_ADMIN_ENDPOINTS.MEDIA_DELETE_PREVIEW(media.media_id),
+          method: 'POST'
+        })
+        if (result?.success) {
+          this.deletePreview = result.data
+        }
+      } catch (error) {
+        logger.error('加载删除影响预览失败:', error)
+      }
+    },
+
+    /**
+     * 执行媒体删除（治本 B：被引用时后端返回 409 MEDIA_IN_USE + 引用清单，
+     * 前端展示「请先在对应商品/奖品/广告换图或下架」指引，不做一键强删）
+     *
+     * @param {Object} media - 媒体对象（含 media_id）
+     * @returns {Promise<boolean>} 是否成功移入回收站
+     */
+    async confirmDeleteMedia(media) {
+      if (!media) return false
+      this.deleting = true
+      try {
+        const result = await request({
+          url: SYSTEM_ADMIN_ENDPOINTS.MEDIA_DELETE(media.media_id),
+          method: 'DELETE'
+        })
+        if (result?.success) {
+          this.hideModal('deleteModal')
+          this.deletePreview = null
+          await this.loadMedia()
+          this.showSuccess('已移入回收站')
+          return true
+        }
+        // 被引用拦截：展示引用清单 + 指引
+        if (result?.code === 'MEDIA_IN_USE') {
+          const refs = result?.data?.references || {}
+          const primaryRefs = refs.primary_refs || []
+          const lines = primaryRefs.map(r => `· ${r.table}（ID ${r.entity_id}）`).join('\n')
+          this.showError(
+            `该图正被以下业务引用，请先在对应业务中换图或下架后再删除：\n${lines || '（详见引用清单）'}`
+          )
+          return false
+        }
+        this.showError(result?.message || '删除失败')
+        return false
+      } catch (error) {
+        logger.error('删除媒体失败:', error)
+        this.showError('删除失败: ' + error.message)
+        return false
+      } finally {
+        this.deleting = false
+      }
     },
 
     searchMedia() {
@@ -144,7 +205,7 @@ export function useMediaMethods() {
     },
 
     resetMediaFilters() {
-      this.mediaFilters = { folder: '', status: '', tags: '', keyword: '' }
+      this.mediaFilters = { folder: '', status: '', tags: '', keyword: '', unused_only: '' }
       this.loadMedia()
     },
 

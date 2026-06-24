@@ -127,6 +127,12 @@
                     :class="spaceView === 'premium' ? 'border-green-500 text-green-600' : 'border-transparent themed-text-muted hover:text-green-500'">
               💎 臻选空间视角
             </button>
+            <!-- 低库存预警筛选（看板三）：仅看库存≤预警阈值的在售商品，复用后端 low_stock_only -->
+            <button type="button" @click="toggleLowStockFilter()"
+                    class="ml-auto px-3 py-1.5 text-sm font-medium rounded border transition-colors"
+                    :class="lowStockOnly ? 'bg-red-500 text-white border-red-500' : 'border-gray-300 themed-text-muted hover:border-red-400 hover:text-red-500'">
+              ⚠️ 仅看低库存
+            </button>
           </div>
 
           <!-- 批量操作栏（选中商品时显示） -->

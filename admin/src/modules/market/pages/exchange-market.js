@@ -465,11 +465,11 @@ document.addEventListener('alpine:init', () => {
         this.previewImageAlt = ''
       },
 
-      /** 商品主图 URL（网格卡片用，优先 large 高清档，回退 small/原图） */
+      /** 商品主图 URL（网格卡片用，优先 w750 高清档，回退 w375/原图） */
       exchangeItemImageUrl(row) {
         const img = row?.primary_image
-        // 列表卡片在高 DPR 屏需更清晰：优先 large(800)，回退 small 缩略图，再回退原图
-        const url = img?.thumbnails?.large || img?.thumbnail_url || img?.url
+        // 列表卡片在高 DPR 屏需更清晰：优先 w750，回退 w375 衍生图，再回退原图
+        const url = img?.thumbnails?.w750 || img?.thumbnail_url || img?.url
         return url || ''
       },
 
@@ -606,6 +606,23 @@ document.addEventListener('alpine:init', () => {
         delete this.activeFilters.space
       } else {
         this.activeFilters.space = space
+      }
+      this.current_page = 1
+      this.selectedRows = []
+      this.loadData()
+    }
+
+    /**
+     * 切换"仅看低库存预警"筛选（看板三：库存 ≤ 预警阈值 stock_alert_threshold 的在售商品）
+     * 复用后端 listExchangeItems 的 low_stock_only 筛选；前端只切换过滤态、回第一页重载。
+     */
+    table.lowStockOnly = false
+    table.toggleLowStockFilter = function () {
+      this.lowStockOnly = !this.lowStockOnly
+      if (this.lowStockOnly) {
+        this.activeFilters.low_stock_only = 'true'
+      } else {
+        delete this.activeFilters.low_stock_only
       }
       this.current_page = 1
       this.selectedRows = []

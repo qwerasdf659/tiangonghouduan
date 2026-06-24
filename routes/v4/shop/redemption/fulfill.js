@@ -12,7 +12,7 @@
 
 const express = require('express')
 const router = express.Router()
-const { authenticateToken } = require('../../../../middleware/auth')
+const { authenticateToken, requireMerchantPermission } = require('../../../../middleware/auth')
 const { asyncHandler } = require('../../../../middleware/validation')
 const logger = require('../../../../utils/logger').logger
 const TransactionManager = require('../../../../utils/TransactionManager')
@@ -35,8 +35,9 @@ const TransactionManager = require('../../../../utils/TransactionManager')
  * @body {string} redeem_code - 12位Base32核销码（格式：XXXX-YYYY-ZZZZ）
  *
  * 权限要求：
- * - 商户员工（role_level >= 20，含 merchant_staff/merchant_manager）或管理员
- * - 决策P6：降低阈值使商家员工可执行核销，服务层叠加 store_staff 活跃校验
+ * - consumption:scan_user 权限码（merchant_staff/merchant_manager 具备；管理员 role_level>=100 自动放行）
+ * - 2026-06-24 统一口径：由「system_settings 角色等级阈值」改为 RBAC 权限码，与扫码核销 scan 同口径；
+ *   服务层叠加 store_staff 活跃校验
  *
  * 返回数据：
  * @returns {Object} order - 订单对象
@@ -56,28 +57,13 @@ const TransactionManager = require('../../../../utils/TransactionManager')
 router.post(
   '/fulfill',
   authenticateToken,
+  requireMerchantPermission('consumption:scan_user'),
   asyncHandler(async (req, res) => {
     const { redeem_code } = req.body
     const redeemerUserId = req.user.user_id
 
     if (!redeem_code || typeof redeem_code !== 'string') {
       return res.apiError('核销码不能为空', 'REDEEM_CODE_REQUIRED', null, 400)
-    }
-
-    const { getUserRoles } = require('../../../../middleware/auth')
-    const AdminSystemService = req.app.locals.services.getService('admin_system')
-    const userRoles = await getUserRoles(redeemerUserId)
-    const minRoleLevel = Number(
-      await AdminSystemService.getSettingValue('redemption', 'min_role_level_for_fulfill', 20)
-    )
-
-    if (userRoles.role_level < minRoleLevel) {
-      logger.warn('权限不足：非商户或管理员尝试核销', {
-        user_id: redeemerUserId,
-        role_level: userRoles.role_level,
-        min_required: minRoleLevel
-      })
-      return res.apiError('权限不足，只有商户员工或管理员可以核销', 'FORBIDDEN', null, 403)
     }
 
     logger.info('开始核销订单', {
@@ -139,7 +125,7 @@ router.post(
           : null,
         redeemer: {
           user_id: redeemerUserId,
-          nickname: req.user.nickname || userRoles.roleName || '商户'
+          nickname: req.user.nickname || '商户'
         }
       },
       '核销成功'

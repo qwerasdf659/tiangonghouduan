@@ -22,6 +22,7 @@ const ContentAuditEngine = require('./ContentAuditEngine')
 const NotificationService = require('./NotificationService')
 const CustomerServiceSessionService = require('./CustomerServiceSessionService')
 const HierarchyManagementService = require('./HierarchyManagementService')
+const DataScopeService = require('./DataScopeService') // 数据范围解析服务（数据范围隔离单一事实源 2026-06-24）
 const UserRoleService = require('./UserRoleService')
 const RoleManagementService = require('./RoleManagementService')
 const UserManagementService = require('./UserManagementService')
@@ -353,6 +354,7 @@ class ServiceManager {
 
       this._services.set('customer_service_session', CustomerServiceSessionService)
       this._services.set('hierarchy_management', HierarchyManagementService)
+      this._services.set('data_scope', DataScopeService) // 数据范围解析（门店/组织层级树可见范围，单一事实源）
       this._services.set('user_role', UserRoleService)
       this._services.set('role_management', RoleManagementService)
       this._services.set('user_management', UserManagementService)

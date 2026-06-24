@@ -209,6 +209,9 @@ function auditLogsPage() {
       this.reportStartDate = weekAgo.toISOString().split('T')[0]
       this.reportEndDate = today.toISOString().split('T')[0]
 
+      // 加载筛选字典（操作类型/目标类型，来自后端权威字典，不硬编码）
+      await this.loadAuditDictionaries()
+
       // 根据 activeTab 加载数据
       if (this.activeTab === 'logs') {
         // 日志列表由 data-table 自动加载

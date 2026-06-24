@@ -1535,6 +1535,89 @@ class RedemptionService {
       offset
     })
   }
+
+  /**
+   * 获取"按数据范围可见门店聚合"的核销订单列表（商家侧店员/店长/区域负责人视角）
+   *
+   * 业务背景（2026-06-24 §12 数据范围隔离 - 核销侧跨店列表补齐）：
+   * - 与消费记录列表（ConsumptionMerchantService.getMerchantRecords）同构：门店范围由 DataScopeService 单一事实源给出，
+   *   按"已核销落地门店 fulfilled_store_id"聚合，店长看本店、区域负责人看辖区多店、管理员看全部。
+   * - 锁定 fulfilled_store_id（实际核销发生的门店），而非券的 scoped_store_id_list（可核销门店白名单），
+   *   语义为"在我管辖门店里实际核销了哪些订单"，杜绝跨店串信息。
+   * - 仅返回已产生核销动作的订单（status='fulfilled' 默认；可按 status 过滤），不下发用户 PII（仅订单/物品/门店摘要）。
+   *
+   * @param {Object} params - 查询参数
+   * @param {string} params.store_scope - 数据范围：'all'（管理员）| 'stores'（来自 DataScopeService）
+   * @param {number[]} params.store_ids - 可见门店集合（store_scope='stores' 时生效）
+   * @param {string} [params.status='fulfilled'] - 订单状态过滤（fulfilled/pending/cancelled/expired）
+   * @param {number} [params.page=1] - 页码（1-based）
+   * @param {number} [params.page_size=20] - 每页数量（上限 50）
+   * @returns {Promise<Object>} { records, pagination, query_scope, query_note }
+   */
+  static async getStoreScopedOrders(params) {
+    const { Op } = require('sequelize')
+    const { store_scope, store_ids, status = 'fulfilled', page = 1, page_size = 20 } = params
+
+    const finalPage = Math.max(parseInt(page, 10) || 1, 1)
+    const finalPageSize = Math.min(Math.max(parseInt(page_size, 10) || 20, 1), 50)
+    const offset = (finalPage - 1) * finalPageSize
+
+    const where = {}
+
+    // 状态过滤（默认只看已核销）
+    if (status && ['pending', 'fulfilled', 'cancelled', 'expired'].includes(status)) {
+      where.status = status
+    }
+
+    /*
+     * 门店范围过滤（DataScopeService 单一事实源，锁实际核销门店 fulfilled_store_id）：
+     * - 'all'（管理员）：不加门店条件，全局可见
+     * - 否则按可见门店集合聚合；集合为空时下发 [0]，保证查不到任何记录（防越权兜底）
+     */
+    if (store_scope !== 'all') {
+      const ids = Array.isArray(store_ids) && store_ids.length > 0 ? store_ids : [0]
+      where.fulfilled_store_id = { [Op.in]: ids }
+    }
+
+    const { count, rows } = await RedemptionOrder.findAndCountAll({
+      where,
+      attributes: [
+        'redemption_order_id',
+        'order_no',
+        'status',
+        'fulfilled_at',
+        'fulfilled_store_id',
+        'created_at',
+        'item_id'
+      ],
+      include: [
+        { model: Item, as: 'item', attributes: ['item_id', 'item_name'] },
+        {
+          model: Store,
+          as: 'fulfilled_store',
+          attributes: ['store_id', 'store_name', 'store_code']
+        }
+      ],
+      order: [['fulfilled_at', 'DESC']],
+      limit: finalPageSize,
+      offset
+    })
+
+    return {
+      records: rows,
+      pagination: {
+        page: finalPage,
+        page_size: finalPageSize,
+        total: count,
+        total_pages: Math.ceil(count / finalPageSize)
+      },
+      query_scope: store_scope === 'all' ? 'all' : 'stores',
+      query_note:
+        store_scope === 'all'
+          ? '管理员模式：显示全部门店核销订单'
+          : '门店范围模式：显示可见门店（本店/辖区）已核销订单'
+    }
+  }
 }
 
 module.exports = RedemptionService

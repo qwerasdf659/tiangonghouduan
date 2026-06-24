@@ -15,8 +15,8 @@
  *                   小程序正常渲染图片
  *
  * @route /api/v4/images
- * @version 1.1.0
- * @date 2026-03-06（2026-06-22 新增 ?width= 动态裁剪 WebP + Sealos 缓存）
+ * @version 2.0.0
+ * @date 2026-03-06（2026-06-24 治本 D：废除 ?width= 运行时按需裁剪，衍生图改上传时预生成，代理只按 key 原样取对象）
  */
 
 const { asyncHandler } = require('../../middleware/validation')
@@ -35,8 +35,10 @@ const ALLOWED_EXTENSIONS = /\.(jpe?g|png|gif|webp)$/i
  * @example
  *   GET /api/v4/images/popup-banners/1770569329928_77e53049a665f797.jpg
  *   GET /api/v4/images/defaults/prize-placeholder.png
- *   GET /api/v4/images/prizes/thumbnails/small/20260108_abc123.jpg
- *   GET /api/v4/images/uploads/xxx.jpg?h=abcd&width=750  （动态裁剪：按离散档裁为 WebP）
+ *   GET /api/v4/images/uploads/thumbnails/w750/xxx.webp  （取预生成的宽度档 WebP 衍生图）
+ *
+ * @note 2026-06-24 治本 D：衍生图已在上传时预生成（w375/w750/w1080），前端直接取对应档位 key，
+ *       不再支持 ?width= 运行时裁剪（旧「按需生成 + Sealos 缓存」路径已废除，根除「运行时衍生物删不到」）。
  */
 router.get(
   '/*',
@@ -57,14 +59,8 @@ router.get(
     try {
       const SealosStorageService = req.app.locals.services.getService('sealos_storage')
       const storageService = new SealosStorageService()
-      // 动态裁剪：带 ?width= 时按离散档裁剪为 WebP（列表清晰度优化），否则原样取对象
-      if (req.query.width) {
-        imageData = await storageService.getOrCreateResizedImage(objectKey, {
-          width: req.query.width
-        })
-      } else {
-        imageData = await storageService.getImageBuffer(objectKey)
-      }
+      // 衍生图已预生成（D 治本），代理按 key 原样取对象（含预生成的 thumbnails/w{档}/x.webp）
+      imageData = await storageService.getImageBuffer(objectKey)
     } catch (storageError) {
       /* 对象不存在时返回 404，且禁止缓存（避免客户端缓存 404 导致后续上传后仍无法显示） */
       res.set({ 'Cache-Control': 'no-store' })
@@ -76,7 +72,7 @@ router.get(
 
     const { body, contentType, contentLength, etag } = imageData
 
-    // 仅在有 etag（原图直取路径）时走 304 协商缓存；裁剪图无 etag，靠 Cache-Control 永久缓存
+    // 所有对象（原图/衍生图）均直取，带 etag，走 304 协商缓存
     if (etag && req.headers['if-none-match'] === etag) {
       return res.status(304).end()
     }
@@ -108,7 +104,7 @@ router.get(
       'Cache-Control': cacheControl,
       'Access-Control-Allow-Origin': '*'
     })
-    // 仅原图直取路径有 etag；裁剪图无 etag，不设置该响应头
+    // 对象直取均有 etag
     if (etag) {
       res.set('ETag', etag)
     }

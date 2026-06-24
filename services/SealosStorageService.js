@@ -19,19 +19,23 @@ const BeijingTimeHelper = require('../utils/timeHelper')
 const sharp = require('sharp')
 
 /**
- * 动态裁剪离散档位白名单（兑换商城列表清晰度优化 2026-06-22 拍板）
- * - 只按这几档裁剪并缓存，避免任意尺寸导致缓存碎片爆炸（中小公司常见技术债）
- * - 传入非档位值向上取整到最近档；超过最大档按 MAX_RESIZE_WIDTH 钳制
- * @constant {number[]}
+ * 预生成衍生图档位（2026-06-24 治本方案 D+E 拍板：废除运行时按需裁剪，改上传时一次性预生成）
+ *
+ * 设计依据（§14.D/§14.E 五类公司对比，二手/电商「上传预生成 + DB 登记清单」）：
+ * - 本项目无 CDN（ImageUrlHelper 明确直连 Sealos 代理），大厂「按需 + CDN purge」不适用；
+ *   只能靠「上传时全部预生成 + thumbnail_keys 登记清单」，删除时照单全清，根除「运行时冒出来删不到」。
+ * - 档位按「宽度」而非正方裁剪：商品多为手机竖图，宽度档(w375/w750/w1080)覆盖 1/2/3 倍屏，
+ *   比旧正方 small(150)/medium(300)/large(800) 更贴合真实展示位。
+ * - 衍生统一 WebP：体积最优、小程序与现代浏览器全支持；原图保真存（JPG/PNG）作为可重裁母本。
+ *
+ * 键名即档位语义（w{宽度}），thumbnail_keys 结构：{ w375, w750, w1080 }。
+ * @constant {Array<{name: string, width: number}>}
  */
-const RESIZE_WIDTH_TIERS = Object.freeze([375, 560, 750, 1080])
-
-/**
- * 动态裁剪宽度硬上限（像素）
- * 超过此值的请求钳制到该值，防止恶意传超大尺寸刷爆 CPU/存储
- * @constant {number}
- */
-const MAX_RESIZE_WIDTH = 1200
+const DERIVATIVE_WIDTH_TIERS = Object.freeze([
+  { name: 'w375', width: 375 },
+  { name: 'w750', width: 750 },
+  { name: 'w1080', width: 1080 }
+])
 
 /**
  * Sealos对象存储服务类
@@ -393,13 +397,13 @@ class SealosStorageService {
    * 🎯 URL 生成策略：
    * - 优先使用 CDN 域名（CDN_DOMAIN 环境变量）
    * - 回退到 Sealos 公网端点（SEALOS_ENDPOINT）
-   * - 支持 URL 参数化缩略图（?width=300 等）
+   * - 支持 URL 参数化缩略图（?width=300 等，历史 CDN 参数，本项目无 CDN 已不生效）
    *
    * @param {string} objectKey - 对象 key（如 prizes/xxx.jpg）
-   * @param {Object} options - URL 选项
-   * @param {number} options.width - 缩略图宽度（依赖 CDN 支持）
-   * @param {number} options.height - 缩略图高度（依赖 CDN 支持）
-   * @param {string} options.fit - 缩放模式 cover/contain/fill
+   * @param {Object} options - URL 选项（width/height 为历史 CDN 参数，本项目无 CDN 已不生效，仅保留签名兼容）
+   * @param {number} options.width - 缩略图宽度（历史 CDN 参数，已废弃，衍生图改用预生成宽度档 key）
+   * @param {number} options.height - 缩略图高度（历史 CDN 参数，已废弃）
+   * @param {string} options.fit - 缩放模式 cover/contain/fill（历史 CDN 参数，已废弃）
    * @returns {string} 完整公网访问 URL
    */
   getPublicUrl(objectKey, options = {}) {
@@ -598,88 +602,42 @@ class SealosStorageService {
   }
 
   /**
-   * 把请求宽度规范化到离散档位（向上取整，超上限钳制）
+   * 为已存在的原图预生成宽度档 WebP 衍生图（治本 D+E 存量回填用，保持原图 key 不变）
    *
-   * @param {number} rawWidth - 请求的原始宽度（像素）
-   * @returns {number} 规范化后的档位宽度（RESIZE_WIDTH_TIERS 之一，或 MAX_RESIZE_WIDTH）
+   * 与 uploadImageWithThumbnails 的区别：不重新上传原图（object_key 稳定），只按原图所在目录/文件名
+   * 生成 w375/w750/w1080 衍生并回写到 {dir}/thumbnails/{档位}/{base}.webp，返回新的衍生清单。
+   *
+   * @param {string} objectKey - 已存在的原图对象 key（如 uploads/xxx.jpg）
+   * @returns {Promise<Object>} 衍生清单 { w375, w750, w1080 }
    */
-  static normalizeResizeWidth(rawWidth) {
-    const w = parseInt(rawWidth, 10)
-    if (isNaN(w) || w <= 0) return null
-    const maxTier = RESIZE_WIDTH_TIERS[RESIZE_WIDTH_TIERS.length - 1]
-    // 超过最大离散档：钳制到硬上限，单独成档（w1200）
-    if (w > maxTier) return MAX_RESIZE_WIDTH
-    // 向上取整到最近档位
-    return RESIZE_WIDTH_TIERS.find(tier => w <= tier) || maxTier
-  }
-
-  /**
-   * 获取或生成指定宽度的裁剪图（动态裁剪 + Sealos 缓存回写）
-   *
-   * 业务场景：兑换商城列表/详情按容器实际像素请求图片，避免列表用 150 小图放大模糊。
-   * 流程：宽度规范化到离散档 → 查缓存命中直接返回 → 未命中读原图 sharp 裁剪为 WebP → 回写 Sealos → 返回。
-   * 缓存键含原图所在目录与文件名，输出 WebP；图换了内容哈希变（由调用方 ?h= 控制 URL），缓存自然失效。
-   *
-   * @param {string} objectKey - 原图对象 key（如 uploads/xxx.jpg）
-   * @param {Object} options - 选项
-   * @param {number} options.width - 目标宽度（像素，会被规范化到离散档）
-   * @returns {Promise<{body: Buffer, contentType: string, contentLength: number, fromCache: boolean}>} 图片二进制与元数据（fromCache 标识是否命中缓存）
-   */
-  async getOrCreateResizedImage(objectKey, options = {}) {
-    const tierWidth = SealosStorageService.normalizeResizeWidth(options.width)
-    if (!tierWidth) {
-      // 宽度非法：退回原图（由调用方按原图返回）
-      const original = await this.getImageBuffer(objectKey)
-      return { ...original, fromCache: false }
-    }
-
-    // 缓存键：{folder}/thumbnails/w{档位}/{文件名}.webp（与现有 thumbnails 目录结构一致）
+  async generateDerivativesForExisting(objectKey) {
+    const original = await this.getImageBuffer(objectKey)
     const dir = path.dirname(objectKey)
     const baseName = path.basename(objectKey, path.extname(objectKey))
-    const cacheKey = `${dir}/thumbnails/w${tierWidth}/${baseName}.webp`
 
-    // 1. 查缓存命中则直接返回（后续零 CPU）
-    try {
-      const cached = await this.getImageBuffer(cacheKey)
-      return { ...cached, fromCache: true }
-    } catch (err) {
-      if (err.code !== 'NoSuchKey') throw err
-      // NoSuchKey：未命中，继续裁剪
-    }
-
-    // 2. 读原图 → sharp 裁剪为 WebP（fit=cover 居中，quality≈80）
-    const original = await this.getImageBuffer(objectKey)
-    const resizedBuffer = await sharp(original.body)
-      .resize(tierWidth, null, { fit: 'inside', withoutEnlargement: true })
-      .webp({ quality: 80 })
-      .toBuffer()
-
-    // 3. 回写 Sealos 缓存目录（内网优先，失败回退公网；不阻塞返回）
-    await this._uploadWithFallback(
-      {
-        Bucket: this.config.bucket,
-        Key: cacheKey,
-        Body: resizedBuffer,
-        ContentType: 'image/webp',
-        ContentDisposition: 'inline',
-        ACL: 'public-read',
-        CacheControl: 'max-age=31536000'
-      },
-      'resized_image_cache'
-    ).catch(uploadErr => {
-      // 回写失败不影响本次返回（下次再裁），仅告警
-      logger.warn('⚠️ 裁剪图缓存回写失败（不影响本次返回）', {
-        cacheKey,
-        error: uploadErr.message
+    const entries = await Promise.all(
+      DERIVATIVE_WIDTH_TIERS.map(async tier => {
+        const derivativeBuffer = await sharp(original.body)
+          .resize(tier.width, null, { fit: 'inside', withoutEnlargement: true })
+          .webp({ quality: 80 })
+          .toBuffer()
+        const derivativeKey = `${dir}/thumbnails/${tier.name}/${baseName}.webp`
+        await this._uploadWithFallback(
+          {
+            Bucket: this.config.bucket,
+            Key: derivativeKey,
+            Body: derivativeBuffer,
+            ContentType: 'image/webp',
+            ContentDisposition: 'inline',
+            ACL: 'public-read',
+            CacheControl: 'max-age=31536000'
+          },
+          `derivative_${tier.name}`
+        )
+        return [tier.name, derivativeKey]
       })
-    })
-
-    return {
-      body: resizedBuffer,
-      contentType: 'image/webp',
-      contentLength: resizedBuffer.length,
-      fromCache: false
-    }
+    )
+    return Object.fromEntries(entries)
   }
 
   /**
@@ -737,20 +695,21 @@ class SealosStorageService {
   }
 
   /**
-   * 🔴 上传图片并预生成缩略图（方案B - 2026-01-08 拍板确认）
+   * 🔴 上传图片并预生成宽度档 WebP 衍生图（治本方案 D+E - 2026-06-24 拍板）
    *
-   * 🎯 架构决策（2026-01-08 用户拍板）：
-   * - 预生成 3 档缩略图：small(150x150)/medium(300x300)/large(800x800)
-   * - 裁剪规则：fit=cover（保持宽高比裁剪）、position=center（居中裁剪）
-   * - 输出格式：统一 JPEG(quality=80)，透明背景图保留 PNG
-   * - 目录结构：{folder}/thumbnails/{size}/xxx.jpg
+   * 🎯 架构决策（2026-06-24 §14.D/E 拍板，废除旧「上传预生成正方 JPG + 运行时按需裁剪 WebP」双轨）：
+   * - 原图：保真存储（JPEG/PNG，透明背景保留 PNG），作为未来可重裁母本
+   * - 衍生：上传时一次性预生成 3 档宽度 WebP（w375/w750/w1080），覆盖 1/2/3 倍屏
+   * - 裁剪规则：fit=inside（按宽度等比缩放，不放大原图，保留竖图比例）
+   * - 目录结构：{folder}/thumbnails/{档位名}/xxx.webp（如 uploads/thumbnails/w750/xxx.webp）
+   * - 全部衍生 key 登记进 media_files.thumbnail_keys，删除时照单全清（根除「运行时冒出来删不到」）
    *
    * @param {Buffer} fileBuffer - 文件内容
    * @param {string} originalName - 原始文件名
    * @param {string} folder - 存储文件夹（默认 photos）
    * @returns {Promise<Object>} 上传结果
    * @returns {string} result.original_key - 原图对象 key
-   * @returns {Object} result.thumbnail_keys - 缩略图对象 key { small, medium, large }
+   * @returns {Object} result.thumbnail_keys - 衍生图对象 key { w375, w750, w1080 }
    */
   async uploadImageWithThumbnails(fileBuffer, originalName, folder = 'photos') {
     try {
@@ -760,7 +719,7 @@ class SealosStorageService {
       const outputFormat = hasAlpha ? 'png' : 'jpeg'
       const ext = hasAlpha ? '.png' : '.jpg'
 
-      logger.info('📸 开始上传图片并生成缩略图', {
+      logger.info('📸 开始上传图片并预生成宽度档衍生图', {
         folder,
         originalName,
         format: outputFormat,
@@ -802,61 +761,44 @@ class SealosStorageService {
 
       logger.info('✅ 原图上传成功', { originalKey })
 
-      // 4. 生成并上传 3 档缩略图（已拍板规格）
-      const sizes = {
-        small: { width: 150, height: 150 },
-        medium: { width: 300, height: 300 },
-        /*
-         * large 调至 800×800（兑换商城列表清晰度优化 2026-06-22）：
-         * 列表卡片在高 DPR(2~3x) 设备上需 ~700-1000px 才清晰，600 偏小，提至 800 作默认大图兜底
-         */
-        large: { width: 800, height: 800 }
-      }
-
-      // 🔧 使用 Promise.all 并行生成并上传缩略图（避免 await-in-loop 警告）
+      // 4. 预生成宽度档 WebP 衍生图（§14.D/E 治本：上传时一次性生成全部档并登记清单）
       const thumbnailEntries = await Promise.all(
-        Object.entries(sizes).map(async ([sizeName, dimensions]) => {
-          // 内存生成缩略图（fit=cover + center）
-          const thumbnailSharp = sharp(fileBuffer).resize(dimensions.width, dimensions.height, {
-            fit: 'cover', // 保持宽高比裁剪
-            position: 'center' // 居中裁剪
-          })
-
-          // 根据原图格式选择输出格式
-          const thumbnailBuffer =
-            outputFormat === 'jpeg'
-              ? await thumbnailSharp.jpeg({ quality: 80 }).toBuffer()
-              : await thumbnailSharp.png({ compressionLevel: 8 }).toBuffer()
-
+        DERIVATIVE_WIDTH_TIERS.map(async tier => {
           /*
-           * 上传到 Sealos（目录结构：{folder}/thumbnails/{size}/xxx.jpg）
-           * 🎯 P1-2：使用 _uploadWithFallback 支持内网失败自动回退公网
+           * 按宽度等比缩放（fit=inside，不放大原图），统一输出 WebP（quality=80）。
+           * 竖图商品按宽度档比正方裁剪更贴合真实展示位；WebP 体积最优、小程序全支持。
            */
-          const thumbnailFilename = `${timestamp}_${hash}${ext}`
-          const thumbnailKey = `${folder}/thumbnails/${sizeName}/${thumbnailFilename}`
+          const derivativeBuffer = await sharp(fileBuffer)
+            .resize(tier.width, null, { fit: 'inside', withoutEnlargement: true })
+            .webp({ quality: 80 })
+            .toBuffer()
+
+          // 目录结构：{folder}/thumbnails/{档位名}/{文件名}.webp
+          const derivativeFilename = `${timestamp}_${hash}.webp`
+          const derivativeKey = `${folder}/thumbnails/${tier.name}/${derivativeFilename}`
 
           await this._uploadWithFallback(
             {
               Bucket: this.config.bucket,
-              Key: thumbnailKey,
-              Body: thumbnailBuffer,
-              ContentType: outputFormat === 'jpeg' ? 'image/jpeg' : 'image/png',
+              Key: derivativeKey,
+              Body: derivativeBuffer,
+              ContentType: 'image/webp',
               ContentDisposition: 'inline',
               ACL: 'public-read',
               CacheControl: 'max-age=31536000'
             },
-            `thumbnail_${sizeName}`
+            `derivative_${tier.name}`
           )
 
-          logger.info(`✅ ${sizeName} 缩略图上传成功`, { thumbnailKey })
-          return [sizeName, thumbnailKey]
+          logger.info(`✅ ${tier.name} 衍生图上传成功`, { derivativeKey })
+          return [tier.name, derivativeKey]
         })
       )
 
-      // 将数组转换为对象
+      // 衍生清单：{ w375, w750, w1080 } → 登记进 media_files.thumbnail_keys，删除时照单全清
       const thumbnailKeys = Object.fromEntries(thumbnailEntries)
 
-      logger.info('🎉 图片及缩略图全部上传成功', {
+      logger.info('🎉 图片及衍生图全部上传成功', {
         originalKey,
         thumbnailKeys
       })
@@ -866,7 +808,7 @@ class SealosStorageService {
         thumbnail_keys: thumbnailKeys
       }
     } catch (error) {
-      logger.error('❌ 图片上传失败（含缩略图）:', error)
+      logger.error('❌ 图片上传失败（含衍生图）:', error)
       throw new BusinessError(`图片上传失败: ${error.message}`, 'SERVICE_FAILED', 500)
     }
   }

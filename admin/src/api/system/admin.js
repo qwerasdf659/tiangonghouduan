@@ -104,12 +104,19 @@ export const SYSTEM_ADMIN_ENDPOINTS = {
   MEDIA_BATCH_UPLOAD: `${API_PREFIX}/console/media/batch-upload`,
   MEDIA_BATCH_ATTACH: `${API_PREFIX}/console/media/batch-attach`,
   MEDIA_RESTORE: mediaId => `${API_PREFIX}/console/media/${mediaId}/restore`,
+  // 媒体级联删除治本配套端点（2026-06-24 新增）
+  MEDIA_USAGE: `${API_PREFIX}/console/media/usage`,
+  MEDIA_REFERENCES: mediaId => `${API_PREFIX}/console/media/${mediaId}/references`,
+  MEDIA_DELETE_PREVIEW: mediaId => `${API_PREFIX}/console/media/${mediaId}/delete-preview`,
+  MEDIA_PURGE: mediaId => `${API_PREFIX}/console/media/${mediaId}/purge`,
   // 存储管理端点
   STORAGE_OVERVIEW: `${API_PREFIX}/console/storage/overview`,
   STORAGE_ORPHANS: `${API_PREFIX}/console/storage/orphans`,
   STORAGE_TRASH: `${API_PREFIX}/console/storage/trash`,
   STORAGE_CLEANUP: `${API_PREFIX}/console/storage/cleanup`,
   STORAGE_DUPLICATES: `${API_PREFIX}/console/storage/duplicates`,
+  STORAGE_DAMAGED: `${API_PREFIX}/console/storage/damaged`,
+  STORAGE_OPTIMIZE: `${API_PREFIX}/console/storage/optimize`,
 
   // 风控告警
   RISK_ALERT_LIST: `${API_PREFIX}/console/risk-alerts`,
@@ -131,6 +138,10 @@ export const SYSTEM_ADMIN_ENDPOINTS = {
   AUDIT_LOG_EXPORT: `${API_PREFIX}/console/admin-audit-logs/export`,
   /** 审计报告 - 生成审计报告（支持时间范围筛选） */
   AUDIT_LOG_REPORT: `${API_PREFIX}/console/admin-audit-logs/report`,
+  /** 审计操作类型字典（后端 AUDIT_OPERATION_TYPES 权威字典，供筛选器使用） */
+  AUDIT_LOG_OPERATION_TYPES: `${API_PREFIX}/console/admin-audit-logs/operation-types`,
+  /** 审计目标类型字典（后端 AUDIT_TARGET_TYPES 权威字典，供筛选器使用） */
+  AUDIT_LOG_TARGET_TYPES: `${API_PREFIX}/console/admin-audit-logs/target-types`,
 
   // 会话管理
   SESSION_LIST: `${API_PREFIX}/console/sessions`,
