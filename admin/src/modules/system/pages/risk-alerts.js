@@ -1303,17 +1303,10 @@ function riskAlertsPage() {
     formatDate(dateValue) {
       if (!dateValue) return '-'
       try {
-        // 如果是后端返回的时间对象格式
-        if (typeof dateValue === 'object' && dateValue !== null) {
-          // 优先使用 beijing 格式（北京时间）
-          if (dateValue.beijing) return dateValue.beijing
-          // 或者使用 iso 格式
-          if (dateValue.iso) return new Date(dateValue.iso).toLocaleString('zh-CN')
-          // 或者使用 relative 格式
-          if (dateValue.relative) return dateValue.relative
-        }
-        // 如果是字符串格式
-        return new Date(dateValue).toLocaleString('zh-CN')
+        // B-2：后端时间统一 UTC ISO（...Z），解析后强制按北京时区展示
+        const d = new Date(dateValue)
+        if (isNaN(d.getTime())) return typeof dateValue === 'string' ? dateValue : '-'
+        return d.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false })
       } catch {
         return typeof dateValue === 'string' ? dateValue : '-'
       }
@@ -1445,22 +1438,12 @@ function riskAlertsPage() {
     },
 
     /**
-     * 格式化时间为相对时间显示
-     * 支持后端返回的时间对象格式：{ iso, beijing, timestamp, relative }
+     * 格式化时间为相对时间显示（B-2：输入为 UTC ISO 字符串）
      * @method formatTime
-     * @param {string|Object|null} dateValue - ISO日期字符串或时间对象
+     * @param {string|null} dateValue - UTC ISO 日期字符串
      * @returns {string} 相对时间文本，如 '5分钟前'、'2小时前'
      */
     formatTime(dateValue) {
-      if (!dateValue) return '-'
-
-      // 如果是后端返回的时间对象格式，直接使用 relative 字段
-      if (typeof dateValue === 'object' && dateValue !== null) {
-        if (dateValue.relative) return dateValue.relative
-        // 使用 iso 或 timestamp 计算
-        dateValue = dateValue.iso || dateValue.timestamp
-      }
-
       if (!dateValue) return '-'
 
       const date = new Date(dateValue)
@@ -1472,7 +1455,7 @@ function riskAlertsPage() {
       if (diff < 60000) return '刚刚'
       if (diff < 3600000) return Math.floor(diff / 60000) + '分钟前'
       if (diff < 86400000) return Math.floor(diff / 3600000) + '小时前'
-      return date.toLocaleDateString('zh-CN')
+      return date.toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai' })
     },
 
     /**

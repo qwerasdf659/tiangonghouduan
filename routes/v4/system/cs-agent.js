@@ -118,7 +118,7 @@ router.post(
       return res.apiError('会话ID无效', 'BAD_REQUEST', null, 400)
     }
 
-    const { content, message_type, file_name, file_size } = req.body
+    const { content, message_type, metadata } = req.body
     if (!content || content.trim() === '') {
       return res.apiError('消息内容不能为空', 'BAD_REQUEST', null, 400)
     }
@@ -133,15 +133,15 @@ router.post(
       )
     }
 
-    // 简版客服端允许文字、图片、文件（不含 system 系统消息）
-    const allowedTypes = ['text', 'image', 'file']
+    // 简版客服端允许文字、图片、文件、位置（系统消息由 message_source 表达，不在此入口）
+    const allowedTypes = ['text', 'image', 'file', 'location']
     if (message_type && !allowedTypes.includes(message_type)) {
-      return res.apiError('消息类型无效（允许值：text/image/file）', 'BAD_REQUEST', null, 400)
-    }
-
-    // 文件消息必须带文件名（用于前端展示文件卡片）
-    if (message_type === 'file' && (!file_name || String(file_name).trim() === '')) {
-      return res.apiError('文件消息缺少 file_name', 'BAD_REQUEST', null, 400)
+      return res.apiError(
+        '消息类型无效（允许值：text/image/file/location）',
+        'BAD_REQUEST',
+        null,
+        400
+      )
     }
 
     const data = {
@@ -149,9 +149,8 @@ router.post(
       content: content.trim(),
       message_type: message_type || 'text',
       role_level: req.user.role_level,
-      // 文件消息元信息（仅 message_type=file 时透传，Service 内部按类型落库）
-      file_name: message_type === 'file' ? file_name : undefined,
-      file_size: message_type === 'file' ? file_size : undefined
+      // 富消息结构化负载（image→image_url；file→file_url/file_name/file_size；location→坐标/地址），Service 内部按类型校验落库
+      metadata
     }
 
     const CustomerServiceSessionService = req.app.locals.services.getService(
@@ -174,8 +173,7 @@ router.post(
         sender_type: 'admin',
         content: result.content,
         message_type: result.message_type,
-        file_name: result.file_name,
-        file_size: result.file_size,
+        metadata: result.metadata,
         created_at: result.created_at
       })
     } catch (wsError) {

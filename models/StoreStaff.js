@@ -371,14 +371,14 @@ module.exports = sequelize => {
       can_view_redemption_stats: !!this.can_view_redemption_stats,
       status: this.status,
       status_name: this.getStatusName(),
-      joined_at: this.joined_at ? BeijingTimeHelper.formatForAPI(this.joined_at) : null,
-      left_at: this.left_at ? BeijingTimeHelper.formatForAPI(this.left_at) : null,
+      joined_at: this.joined_at,
+      left_at: this.left_at,
       operator_id: this.operator_id,
       notes: this.notes,
-      created_at: BeijingTimeHelper.formatForAPI(this.created_at),
-      updated_at: BeijingTimeHelper.formatForAPI(this.updated_at),
+      created_at: this.created_at,
+      updated_at: this.updated_at,
       // 删除相关字段（软删除支持）
-      deleted_at: this.deleted_at ? BeijingTimeHelper.formatForAPI(this.deleted_at) : null,
+      deleted_at: this.deleted_at,
       delete_reason: this.delete_reason || null
     }
 

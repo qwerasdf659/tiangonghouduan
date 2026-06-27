@@ -10,6 +10,7 @@
 import { logger } from '../../../utils/logger.js'
 import { buildURL, request } from '../../../api/base.js'
 import { CONTENT_ENDPOINTS } from '../../../api/content.js'
+import { loadECharts } from '../../../utils/echarts-lazy.js'
 
 /**
  * 客服管理页面状态
@@ -70,7 +71,33 @@ export function useCsAgentManagementState() {
     /* ===== 座席详情 ===== */
     showAgentDetailModal: false,
     agentDetail: null,
-    agentDetailLoading: false
+    agentDetailLoading: false,
+
+    /* ===== 效能看板（KPI Tab，看板二/客服看板 A+B 类）===== */
+    kpiLoading: false,
+    kpiDays: 7,
+    /** 实时坐席监控总览 */
+    kpiRealtime: {
+      waiting_count: 0,
+      active_count: 0,
+      today_total: 0,
+      today_responded: 0,
+      today_pending_response: 0,
+      online_agents: 0
+    },
+    /** 7 日响应趋势（[{date, avg_seconds, within_1min_rate, session_count}]） */
+    kpiResponseTrend: [],
+    /** 今日响应概况 */
+    kpiResponseToday: { avg_response_seconds: 0, within_1min_rate: 0, session_count: 0 },
+    /** 坐席绩效排行 */
+    kpiAgentRanking: [],
+    /** 满意度统计 */
+    kpiSatisfaction: { avg_score: 0, rated_count: 0, rating_rate: 0, distribution: [] },
+    /** 工单统计 */
+    kpiIssueStats: { total: 0, pending_backlog: 0, avg_resolution_hours: 0, by_status: [] },
+    /** ECharts 实例缓存 */
+    _kpiCharts: { trend: null, satisfaction: null },
+    _kpiRealtimeTimer: null
   }
 }
 
@@ -532,6 +559,153 @@ export function useCsAgentManagementMethods() {
       if (percentage >= 90) return 'bg-red-500'
       if (percentage >= 70) return 'bg-yellow-500'
       return 'bg-green-500'
+    },
+
+    /* ===================== 效能看板（KPI Tab） ===================== */
+
+    /**
+     * 加载效能看板全部数据（响应趋势/坐席排行/满意度/工单统计/实时监控）
+     * 复用 Phase 4 新增后端聚合接口，全部只读，零新表。
+     */
+    async loadKpiDashboard() {
+      this.kpiLoading = true
+      try {
+        const days = this.kpiDays || 7
+        const [respRes, rankRes, satRes, issueRes, realtimeRes] = await Promise.allSettled([
+          request({ url: CONTENT_ENDPOINTS.CUSTOMER_SERVICE_RESPONSE_STATS + '?days=' + days }),
+          request({ url: CONTENT_ENDPOINTS.CUSTOMER_SERVICE_AGENT_RANKING + '?days=' + days }),
+          request({ url: CONTENT_ENDPOINTS.CUSTOMER_SERVICE_SATISFACTION_STATS + '?days=' + days }),
+          request({ url: CONTENT_ENDPOINTS.CUSTOMER_SERVICE_ISSUE_STATS + '?days=' + days }),
+          request({ url: CONTENT_ENDPOINTS.CUSTOMER_SERVICE_REALTIME_OVERVIEW })
+        ])
+
+        if (respRes.status === 'fulfilled' && respRes.value?.data) {
+          const d = respRes.value.data
+          this.kpiResponseToday = d.today || this.kpiResponseToday
+          this.kpiResponseTrend = Array.isArray(d.trend_7d)
+            ? [...d.trend_7d].sort((a, b) => (a.date < b.date ? -1 : 1))
+            : []
+        }
+        if (rankRes.status === 'fulfilled' && rankRes.value?.data) {
+          this.kpiAgentRanking = rankRes.value.data.agents || []
+        }
+        if (satRes.status === 'fulfilled' && satRes.value?.data) {
+          this.kpiSatisfaction = satRes.value.data
+        }
+        if (issueRes.status === 'fulfilled' && issueRes.value?.data) {
+          this.kpiIssueStats = issueRes.value.data
+        }
+        if (realtimeRes.status === 'fulfilled' && realtimeRes.value?.data) {
+          this.kpiRealtime = realtimeRes.value.data
+        }
+
+        this.$nextTick(() => {
+          this.renderKpiTrendChart()
+          this.renderKpiSatisfactionChart()
+        })
+      } catch (error) {
+        logger.error('加载客服效能看板失败:', error)
+        Alpine.store('notification').error('加载效能看板失败: ' + error.message)
+      } finally {
+        this.kpiLoading = false
+      }
+    },
+
+    /** 进入 KPI Tab：加载数据 + 启动实时监控轮询（15s，离开/隐藏暂停） */
+    enterKpiTab() {
+      this.activeTab = 'kpi'
+      this.loadKpiDashboard()
+      this.startKpiRealtimePolling()
+    },
+
+    /** 启动实时监控轮询（间隔 15s；页面隐藏时暂停，见架构决策文档 复·七 D） */
+    startKpiRealtimePolling() {
+      this.stopKpiRealtimePolling()
+      this._kpiRealtimeTimer = setInterval(async () => {
+        if (document.hidden || this.activeTab !== 'kpi') return
+        try {
+          const res = await request({ url: CONTENT_ENDPOINTS.CUSTOMER_SERVICE_REALTIME_OVERVIEW })
+          if (res?.data) this.kpiRealtime = res.data
+        } catch (e) {
+          logger.warn('实时监控轮询失败:', e.message)
+        }
+      }, 15000)
+    },
+
+    /** 停止实时监控轮询 */
+    stopKpiRealtimePolling() {
+      if (this._kpiRealtimeTimer) {
+        clearInterval(this._kpiRealtimeTimer)
+        this._kpiRealtimeTimer = null
+      }
+    },
+
+    /** 渲染响应趋势折线（平均首响秒数 + 60秒达标率） */
+    async renderKpiTrendChart() {
+      const dom = document.getElementById('kpi-trend-chart')
+      if (!dom) return
+      const echarts = await loadECharts()
+      if (!echarts) return
+      if (!this._kpiCharts.trend) this._kpiCharts.trend = echarts.init(dom)
+      const dates = this.kpiResponseTrend.map(r => r.date)
+      this._kpiCharts.trend.setOption({
+        tooltip: { trigger: 'axis' },
+        legend: { data: ['平均首响(秒)', '60秒达标率(%)'], bottom: 0 },
+        grid: { left: '3%', right: '4%', bottom: '12%', top: '10%', containLabel: true },
+        xAxis: { type: 'category', data: dates },
+        yAxis: [
+          { type: 'value', name: '秒' },
+          { type: 'value', name: '%', max: 100 }
+        ],
+        series: [
+          {
+            name: '平均首响(秒)',
+            type: 'line',
+            smooth: true,
+            data: this.kpiResponseTrend.map(r => r.avg_seconds),
+            itemStyle: { color: '#6366f1' }
+          },
+          {
+            name: '60秒达标率(%)',
+            type: 'line',
+            yAxisIndex: 1,
+            smooth: true,
+            data: this.kpiResponseTrend.map(r => Math.round((r.within_1min_rate || 0) * 100)),
+            itemStyle: { color: '#22c55e' }
+          }
+        ]
+      })
+    },
+
+    /** 渲染满意度评分分布柱状图 */
+    async renderKpiSatisfactionChart() {
+      const dom = document.getElementById('kpi-satisfaction-chart')
+      if (!dom) return
+      const echarts = await loadECharts()
+      if (!echarts) return
+      if (!this._kpiCharts.satisfaction) this._kpiCharts.satisfaction = echarts.init(dom)
+      const dist = this.kpiSatisfaction.distribution || []
+      this._kpiCharts.satisfaction.setOption({
+        tooltip: { trigger: 'axis' },
+        grid: { left: '3%', right: '4%', bottom: '3%', top: '10%', containLabel: true },
+        xAxis: { type: 'category', data: dist.map(d => d.score + '分') },
+        yAxis: { type: 'value', name: '评价数' },
+        series: [
+          {
+            type: 'bar',
+            data: dist.map(d => d.count),
+            itemStyle: { color: '#f59e0b' }
+          }
+        ]
+      })
+    },
+
+    /** 秒数友好展示 */
+    formatKpiSeconds(seconds) {
+      if (!seconds || seconds <= 0) return '--'
+      if (seconds < 60) return Math.round(seconds) + '秒'
+      if (seconds < 3600) return Math.round(seconds / 60) + '分钟'
+      return Math.floor(seconds / 3600) + '小时' + Math.round((seconds % 3600) / 60) + '分钟'
     }
   }
 }

@@ -792,13 +792,7 @@ function lotteryAlertsPage() {
     formatDate(dateValue) {
       if (!dateValue) return '-'
       try {
-        // 如果是后端返回的时间对象格式
-        if (typeof dateValue === 'object' && dateValue !== null) {
-          if (dateValue.beijing) return dateValue.beijing
-          if (dateValue.iso)
-            return new Date(dateValue.iso).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
-        }
-        // 如果是字符串格式
+        // B-2：后端时间统一 UTC ISO（...Z），解析后强制按北京时区展示
         return new Date(dateValue).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
       } catch {
         return typeof dateValue === 'string' ? dateValue : '-'

@@ -13,7 +13,6 @@ const express = require('express')
 const router = express.Router()
 const { authenticateToken } = require('../../../../middleware/auth')
 const { validatePositiveInteger, asyncHandler } = require('../../../../middleware/validation')
-const BeijingTimeHelper = require('../../../../utils/timeHelper')
 
 /**
  * 查询当前用户的核销订单列表（用户视角「我的核销订单」）
@@ -50,8 +49,8 @@ router.get(
       redemption_order_id: o.redemption_order_id,
       order_no: o.order_no,
       status: o.status,
-      fulfilled_at: o.fulfilled_at ? BeijingTimeHelper.formatForAPI(o.fulfilled_at) : null,
-      created_at: BeijingTimeHelper.formatForAPI(o.created_at),
+      fulfilled_at: o.fulfilled_at,
+      created_at: o.created_at,
       item: o.item ? { item_id: o.item.item_id, item_name: o.item.item_name } : null
     }))
 

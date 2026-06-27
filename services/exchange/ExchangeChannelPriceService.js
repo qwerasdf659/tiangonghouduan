@@ -354,7 +354,7 @@ class ExchangeChannelPriceService {
     })
 
     if (list.length === 0) {
-      await this._itemService._updateSpuSummary(sku.exchange_item_id, transaction)
+      await this._itemService.syncSpuSummary(sku.exchange_item_id, transaction)
       logger.info('ExchangeChannelPriceService.bulkSetPrices', {
         sku_id: sid,
         inserted: 0,
@@ -393,7 +393,7 @@ class ExchangeChannelPriceService {
       ts: BeijingTimeHelper.now()
     })
 
-    await this._itemService._updateSpuSummary(sku.exchange_item_id, transaction)
+    await this._itemService.syncSpuSummary(sku.exchange_item_id, transaction)
 
     return rows.map(r => r.get({ plain: true }))
   }

@@ -245,14 +245,7 @@ module.exports = sequelize => {
         type: DataTypes.DATE,
         allowNull: false,
         defaultValue: () => BeijingTimeHelper.createDatabaseTime(),
-        comment: '操作时间',
-        /**
-         * 获取北京时间格式的操作时间
-         * @returns {string} 北京时间格式的日期字符串
-         */
-        get() {
-          return BeijingTimeHelper.formatChinese(this.getDataValue('created_at'))
-        }
+        comment: '操作时间'
       }
     },
     {
@@ -454,7 +447,7 @@ module.exports = sequelize => {
       error_message: this.error_message,
       ip_address: this.ip_address,
       request_id: this.request_id,
-      created_at: BeijingTimeHelper.formatForAPI(this.getDataValue('created_at'))
+      created_at: this.getDataValue('created_at')
     }
   }
 

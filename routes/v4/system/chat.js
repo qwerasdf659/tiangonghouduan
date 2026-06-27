@@ -279,7 +279,7 @@ router.get('/chat/sessions/:id/messages', authenticateToken, async (req, res) =>
 router.post('/chat/sessions/:id/messages', authenticateToken, async (req, res) => {
   try {
     const sessionId = req.params.id
-    const { content, message_type = 'text', file_name, file_size } = req.body
+    const { content, message_type = 'text', metadata } = req.body
     const businessConfig = require('../../../config/business.config')
 
     // 频率限制检查（Rate Limit Check）
@@ -351,9 +351,8 @@ router.post('/chat/sessions/:id/messages', authenticateToken, async (req, res) =
           user_id: userId,
           content: sanitized_content,
           message_type,
-          // 文件消息元信息（仅 message_type=file 时透传）
-          file_name: message_type === 'file' ? file_name : undefined,
-          file_size: message_type === 'file' ? file_size : undefined
+          // 富消息结构化负载（image→image_url；file→file_url/file_name/file_size；location→坐标/地址）
+          metadata
         },
         { transaction }
       )
@@ -387,10 +386,8 @@ router.post('/chat/sessions/:id/messages', authenticateToken, async (req, res) =
         customer_service_session_id: message.customer_service_session_id,
         content: message.content,
         message_type: message.message_type,
-        file_name: message.file_name,
-        file_size: message.file_size,
-        sent_at: message.created_at,
-        sent_at_beijing: message.created_at_beijing
+        metadata: message.metadata,
+        sent_at: message.created_at
       },
       '消息发送成功'
     )

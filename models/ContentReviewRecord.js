@@ -116,54 +116,24 @@ module.exports = sequelize => {
       submitted_at: {
         type: DataTypes.DATE,
         allowNull: false,
-        comment: '提交审核时间',
-        /**
-         * 获取北京时间格式的提交审核时间
-         * @returns {string|null} 北京时间格式的日期字符串（YYYY年MM月DD日 HH:mm:ss）
-         */
-        get() {
-          const value = this.getDataValue('submitted_at')
-          return value ? BeijingTimeHelper.formatChinese(value) : null
-        }
+        comment: '提交审核时间'
       },
       audited_at: {
         type: DataTypes.DATE,
         allowNull: true,
-        comment: '审核完成时间',
-        /**
-         * 获取北京时间格式的审核完成时间
-         * @returns {string|null} 北京时间格式的日期字符串（YYYY年MM月DD日 HH:mm:ss）
-         */
-        get() {
-          const value = this.getDataValue('audited_at')
-          return value ? BeijingTimeHelper.formatChinese(value) : null
-        }
+        comment: '审核完成时间'
       },
       created_at: {
         type: DataTypes.DATE,
         allowNull: false,
         defaultValue: () => BeijingTimeHelper.createDatabaseTime(),
-        comment: '创建时间',
-        /**
-         * 获取北京时间格式的创建时间
-         * @returns {string} 北京时间格式的日期字符串（YYYY年MM月DD日 HH:mm:ss）
-         */
-        get() {
-          return BeijingTimeHelper.formatChinese(this.getDataValue('created_at'))
-        }
+        comment: '创建时间'
       },
       updated_at: {
         type: DataTypes.DATE,
         allowNull: false,
         defaultValue: () => BeijingTimeHelper.createDatabaseTime(),
-        comment: '更新时间',
-        /**
-         * 获取北京时间格式的更新时间
-         * @returns {string} 北京时间格式的日期字符串（YYYY年MM月DD日 HH:mm:ss）
-         */
-        get() {
-          return BeijingTimeHelper.formatChinese(this.getDataValue('updated_at'))
-        }
+        comment: '更新时间'
       }
     },
     {

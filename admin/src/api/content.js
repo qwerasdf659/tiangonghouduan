@@ -72,6 +72,11 @@ export const CONTENT_ENDPOINTS = {
   // P1-22: 客服响应时长统计
   CUSTOMER_SERVICE_STATS: `${API_PREFIX}/console/customer-service/sessions/stats`,
   CUSTOMER_SERVICE_RESPONSE_STATS: `${API_PREFIX}/console/customer-service/sessions/response-stats`,
+  // 客服看板增强（B 类，2026-06-25）：坐席绩效排行 / 满意度统计 / 实时坐席监控 / 工单统计
+  CUSTOMER_SERVICE_AGENT_RANKING: `${API_PREFIX}/console/customer-service/sessions/agent-ranking`,
+  CUSTOMER_SERVICE_SATISFACTION_STATS: `${API_PREFIX}/console/customer-service/sessions/satisfaction-stats`,
+  CUSTOMER_SERVICE_REALTIME_OVERVIEW: `${API_PREFIX}/console/customer-service/sessions/realtime-overview`,
+  CUSTOMER_SERVICE_ISSUE_STATS: `${API_PREFIX}/console/customer-service/issues/stats`,
   // 客服座席管理
   CS_AGENT_LIST: `${API_PREFIX}/console/customer-service/agents`,
   CS_AGENT_DETAIL: `${API_PREFIX}/console/customer-service/agents/:id`,

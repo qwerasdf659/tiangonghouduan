@@ -60,68 +60,12 @@ export function formatDate(dateValue, options = {}) {
   const { showSeconds = true, dateOnly = false } = options
 
   try {
-    // 处理后端返回的时间对象格式 { iso, beijing, timestamp, relative }
-    let dateStr = dateValue
-    if (typeof dateValue === 'object' && dateValue !== null && !(dateValue instanceof Date)) {
-      // 优先使用 beijing 格式（已经是北京时间字符串）
-      if (dateValue.beijing) return dateValue.beijing
-      // 使用 iso 格式
-      dateStr = dateValue.iso || dateValue.timestamp || dateValue
-    }
-
-    // 处理后端返回的中文预格式化日期字符串（如 "2026年2月6日星期五 02:57:16"）
-    if (
-      typeof dateStr === 'string' &&
-      dateStr.includes('年') &&
-      dateStr.includes('月') &&
-      dateStr.includes('日')
-    ) {
-      // 后端已格式化为中文日期，直接返回（去掉星期部分以保持简洁）
-      const cnMatch = dateStr.match(
-        /(\d{4})年(\d{1,2})月(\d{1,2})日(?:星期.)?[\s]*(\d{2}):(\d{2}):?(\d{2})?/
-      )
-      if (cnMatch) {
-        const [, year, month, day, hour, minute, second] = cnMatch
-        const m = month.padStart(2, '0')
-        const d = day.padStart(2, '0')
-        if (dateOnly) {
-          return `${year}/${m}/${d}`
-        }
-        if (showSeconds && second) {
-          return `${year}/${m}/${d} ${hour}:${minute}:${second}`
-        }
-        return `${year}/${m}/${d} ${hour}:${minute}`
-      }
-      // 无法解析的中文格式，直接返回原值
-      return dateStr
-    }
-
-    // 检查是否是数据库返回的纯日期字符串（无时区信息，已是北京时间）
-    // 格式如: '2026-01-25 20:10:36' 或 '2026-01-25'
-    if (typeof dateStr === 'string') {
-      // 如果没有 T、Z 或 +/-时区偏移，说明是数据库返回的北京时间字符串
-      const isPlainDbFormat =
-        !dateStr.includes('T') && !dateStr.includes('Z') && !dateStr.match(/[+-]\d{2}:\d{2}$/)
-
-      if (isPlainDbFormat) {
-        // 数据库返回的已经是北京时间，直接格式化显示
-        // 将 '2026-01-25 20:10:36' 转换为 '2026/01/25 20:10:36'
-        const parts = dateStr.match(/(\d{4})-(\d{2})-(\d{2})(?:\s+(\d{2}):(\d{2}):?(\d{2})?)?/)
-        if (parts) {
-          const [, year, month, day, hour = '00', minute = '00', second = '00'] = parts
-          if (dateOnly) {
-            return `${year}/${month}/${day}`
-          }
-          if (showSeconds) {
-            return `${year}/${month}/${day} ${hour}:${minute}:${second}`
-          }
-          return `${year}/${month}/${day} ${hour}:${minute}`
-        }
-      }
-    }
-
-    // 处理带时区的日期（UTC、ISO格式等）
-    const date = new Date(dateStr)
+    /*
+     * B-2（2026-06-25）：后端时间字段已全局统一为 UTC ISO8601（...Z）单一形态。
+     * 旧的"对象 {iso,beijing} / 中文串 / 无时区纯DB串"三种兼容分支已随后端统一删除（瘦身）。
+     * 这里只需 new Date() 解析（兼容 Z 与带 +08:00 的系统级时间戳），再强制按北京时区展示。
+     */
+    const date = new Date(dateValue)
     if (isNaN(date.getTime())) return '-'
 
     // 构建格式化选项 - 强制使用北京时间

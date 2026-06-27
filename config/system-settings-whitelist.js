@@ -161,7 +161,7 @@ const SYSTEM_SETTINGS_WHITELIST = {
 
   'points/budget_allocation_ratio': {
     type: 'number',
-    min: 0.1, // ✅ 业务决策：最低 10%（防止预算过低）
+    min: 0.05, // ✅ 业务决策（2026-06-28 调整）：最低 5%（原 10%，按需放低以留调参余地）
     max: 0.5, // ✅ 业务决策：最高 50%（防止预算过高导致亏损）
     step: 0.01, // 精度：0.01（即 1%）
     default: 0.24,

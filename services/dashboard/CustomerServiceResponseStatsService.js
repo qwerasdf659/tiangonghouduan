@@ -277,6 +277,223 @@ class CustomerServiceResponseStatsService {
   }
 
   /**
+   * 获取坐席（客服）维度绩效排行
+   *
+   * @description 按客服 admin_id 分组聚合：接待量、平均首响时长、1分钟达标率、解决率（已关闭占比）。
+   *   复用 customer_service_sessions 的 admin_id/first_response_at/status/created_at，零新表。
+   *   补 response-stats 缺失的 by_admin 维度（见架构决策文档 附·二/客服看板 B 类）。
+   *
+   * @param {Object} [options] - 可选参数
+   * @param {number} [options.days=7] - 统计天数（按 created_at 北京时区范围）
+   * @param {boolean} [options.use_cache=true] - 是否使用缓存
+   * @returns {Promise<Object>} { range_days, agents: Array, updated_at }
+   *   agents 项：{ admin_id, admin_name, sessions_count, responded_count, avg_response_seconds,
+   *              within_1min_rate, resolved_count, resolution_rate }
+   */
+  async getAgentRanking(options = {}) {
+    const { days = 7, use_cache = true } = options
+    const cacheKey = `${KEY_PREFIX}${CACHE_KEY}_agent_ranking_${days}`
+
+    try {
+      if (use_cache) {
+        const cached = await BusinessCacheHelper.get(cacheKey)
+        if (cached) {
+          logger.debug('[客服坐席排行] 使用缓存数据')
+          return cached
+        }
+      }
+
+      const startDate = BeijingTimeHelper.daysAgo(days)
+
+      const rows = await this.models.CustomerServiceSession.findAll({
+        attributes: [
+          'admin_id',
+          [fn('COUNT', col('customer_service_session_id')), 'sessions_count'],
+          [
+            fn('SUM', literal('CASE WHEN first_response_at IS NOT NULL THEN 1 ELSE 0 END')),
+            'responded_count'
+          ],
+          [
+            fn(
+              'AVG',
+              literal(
+                'CASE WHEN first_response_at IS NOT NULL THEN TIMESTAMPDIFF(SECOND, created_at, first_response_at) END'
+              )
+            ),
+            'avg_response_seconds'
+          ],
+          [
+            fn(
+              'SUM',
+              literal(
+                'CASE WHEN first_response_at IS NOT NULL AND TIMESTAMPDIFF(SECOND, created_at, first_response_at) <= 60 THEN 1 ELSE 0 END'
+              )
+            ),
+            'within_1min_count'
+          ],
+          [fn('SUM', literal("CASE WHEN status = 'closed' THEN 1 ELSE 0 END")), 'resolved_count']
+        ],
+        where: {
+          created_at: { [Op.gte]: startDate },
+          admin_id: { [Op.ne]: null }
+        },
+        group: ['admin_id'],
+        raw: true
+      })
+
+      // 关联客服昵称（一次性批量查 User，避免 N+1）
+      const adminIds = rows.map(r => r.admin_id).filter(Boolean)
+      const admins = adminIds.length
+        ? await this.models.User.findAll({
+            attributes: ['user_id', 'nickname'],
+            where: { user_id: { [Op.in]: adminIds } },
+            raw: true
+          })
+        : []
+      const nameMap = new Map(admins.map(a => [a.user_id, a.nickname]))
+
+      const agents = rows
+        .map(r => {
+          const sessionsCount = parseInt(r.sessions_count || 0, 10)
+          const respondedCount = parseInt(r.responded_count || 0, 10)
+          const within1min = parseInt(r.within_1min_count || 0, 10)
+          const resolvedCount = parseInt(r.resolved_count || 0, 10)
+          return {
+            admin_id: r.admin_id,
+            admin_name: nameMap.get(r.admin_id) || `客服${r.admin_id}`,
+            sessions_count: sessionsCount,
+            responded_count: respondedCount,
+            avg_response_seconds: Math.round(parseFloat(r.avg_response_seconds || 0)),
+            within_1min_rate:
+              respondedCount > 0 ? parseFloat((within1min / respondedCount).toFixed(2)) : 0,
+            resolved_count: resolvedCount,
+            resolution_rate:
+              sessionsCount > 0 ? parseFloat((resolvedCount / sessionsCount).toFixed(2)) : 0
+          }
+        })
+        // 排行口径：接待量降序，其次平均首响升序（快者靠前）
+        .sort(
+          (a, b) =>
+            b.sessions_count - a.sessions_count || a.avg_response_seconds - b.avg_response_seconds
+        )
+
+      const result = {
+        range_days: days,
+        agents,
+        updated_at: BeijingTimeHelper.apiTimestamp()
+      }
+
+      await BusinessCacheHelper.set(cacheKey, result, CACHE_TTL)
+      logger.info('[客服坐席排行] 统计完成', { agent_count: agents.length, days })
+      return result
+    } catch (error) {
+      logger.error('[客服坐席排行] 获取失败', { error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * 满意度评分统计看板（基于 customer_service_sessions.satisfaction_score）
+   *
+   * @description 客服看板 B 类 satisfaction-stats：复用 customer_service_sessions，零新表。
+   *   评分分布 + 平均分 + 评价率（已评价/已关闭）。
+   * @param {Object} [options] - 查询参数
+   * @param {number} [options.days=30] - 统计天数
+   * @returns {Promise<Object>} { range_days, avg_score, rated_count, closed_count, rating_rate, distribution, updated_at }
+   */
+  async getSatisfactionStats(options = {}) {
+    const days = parseInt(options.days, 10) || 30
+    const startDate = BeijingTimeHelper.daysAgo(days)
+    const M = this.models.CustomerServiceSession
+
+    const [agg, distRows, closedCount] = await Promise.all([
+      M.findOne({
+        attributes: [
+          [fn('AVG', col('satisfaction_score')), 'avg_score'],
+          [fn('COUNT', col('satisfaction_score')), 'rated_count']
+        ],
+        where: { created_at: { [Op.gte]: startDate }, satisfaction_score: { [Op.ne]: null } },
+        raw: true
+      }),
+      M.findAll({
+        attributes: [
+          'satisfaction_score',
+          [fn('COUNT', col('customer_service_session_id')), 'cnt']
+        ],
+        where: { created_at: { [Op.gte]: startDate }, satisfaction_score: { [Op.ne]: null } },
+        group: ['satisfaction_score'],
+        order: [['satisfaction_score', 'ASC']],
+        raw: true
+      }),
+      M.count({ where: { created_at: { [Op.gte]: startDate }, status: 'closed' } })
+    ])
+
+    const ratedCount = parseInt(agg?.rated_count || 0, 10)
+    return {
+      range_days: days,
+      avg_score: Math.round(parseFloat(agg?.avg_score || 0) * 100) / 100,
+      rated_count: ratedCount,
+      closed_count: closedCount,
+      rating_rate: closedCount > 0 ? parseFloat((ratedCount / closedCount).toFixed(2)) : 0,
+      distribution: distRows.map(r => ({
+        score: parseInt(r.satisfaction_score, 10),
+        count: parseInt(r.cnt, 10)
+      })),
+      updated_at: BeijingTimeHelper.apiTimestamp()
+    }
+  }
+
+  /**
+   * 实时坐席监控总览（准实时，前端轮询 15s；聚合结果缓存 10s，见架构决策文档 复·七 D）
+   *
+   * @description 复用 customer_service_sessions，零新表；不动 ChatWebSocketService（避免耦合聊天通道）。
+   * @returns {Promise<Object>} { waiting_count, active_count, today_total, today_responded, online_agents, updated_at }
+   */
+  async getRealtimeOverview() {
+    const cacheKey = `${KEY_PREFIX}${CACHE_KEY}_realtime`
+    const cached = await BusinessCacheHelper.get(cacheKey)
+    if (cached) return cached
+
+    const M = this.models.CustomerServiceSession
+    const todayRange = BeijingTimeHelper.todayRange()
+
+    const [waitingCount, activeCount, todayTotal, todayResponded, onlineAgents] = await Promise.all(
+      [
+        M.count({ where: { status: 'waiting' } }),
+        M.count({ where: { status: { [Op.in]: ['assigned', 'active'] } } }),
+        M.count({
+          where: { created_at: { [Op.gte]: todayRange.start, [Op.lte]: todayRange.end } }
+        }),
+        M.count({
+          where: {
+            created_at: { [Op.gte]: todayRange.start, [Op.lte]: todayRange.end },
+            first_response_at: { [Op.ne]: null }
+          }
+        }),
+        // 当前有进行中会话的不同客服数（近似在岗坐席数）
+        M.count({
+          distinct: true,
+          col: 'admin_id',
+          where: { status: { [Op.in]: ['assigned', 'active'] }, admin_id: { [Op.ne]: null } }
+        })
+      ]
+    )
+
+    const result = {
+      waiting_count: waitingCount,
+      active_count: activeCount,
+      today_total: todayTotal,
+      today_responded: todayResponded,
+      today_pending_response: Math.max(0, todayTotal - todayResponded),
+      online_agents: onlineAgents,
+      updated_at: BeijingTimeHelper.apiTimestamp()
+    }
+    // 聚合结果缓存 10s（准实时）
+    await BusinessCacheHelper.set(cacheKey, result, 10)
+    return result
+  }
+
+  /**
    * 手动失效缓存
    *
    * @param {string} reason - 失效原因

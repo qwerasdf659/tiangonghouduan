@@ -54,6 +54,7 @@ const ItemService = require('./asset/ItemService')
 const logger = require('../utils/logger').logger
 const { getUserRoles } = require('../middleware/auth')
 const AdminSystemService = require('./AdminSystemService')
+const BeijingTimeHelper = require('../utils/timeHelper')
 
 /**
  * 兑换订单服务类
@@ -1493,6 +1494,91 @@ class RedemptionService {
           fulfilled_count: Number(r.cnt)
         }))
       }
+    }
+  }
+
+  /**
+   * 核销经营趋势（按日聚合 生成数/核销数/过期数 + 转化率）
+   *
+   * @description 看板三数据源（见架构决策文档 附·三）：复用 redemption_orders 表，零新表。
+   *   - generated：按 created_at 当日新增的兑换券数
+   *   - fulfilled：按 fulfilled_at 当日核销数
+   *   - expired：按 expires_at 当日过期（且未核销）数
+   *   - conversion_rate：区间内 已核销 / 已生成（履约转化）
+   *   支持 DataScopeService 范围过滤：传 store_ids 则只统计落地门店在集合内的核销。
+   *
+   * @param {Object} [options] - 查询选项
+   * @param {number} [options.days=30] - 趋势天数
+   * @param {Array<number>} [options.store_ids] - 门店范围（来自 DataScope；不传=全平台）
+   * @returns {Promise<Object>} { range_days, trend:[{date,generated,fulfilled,expired}], conversion_rate, totals, updated_at }
+   */
+  static async getRedemptionTrend(options = {}) {
+    const { Op } = require('sequelize')
+    const days = parseInt(options.days, 10) || 30
+    const startDate = BeijingTimeHelper.daysAgo(days)
+    const storeIds = Array.isArray(options.store_ids) ? options.store_ids.map(Number) : null
+
+    // 落地门店范围过滤（仅作用于核销维度，按 fulfilled_store_id）
+    const fulfilledScope =
+      storeIds && storeIds.length ? { fulfilled_store_id: { [Op.in]: storeIds } } : {}
+
+    // 按日聚合：DATE(列) 用 MySQL 日期函数；DB 会话时区 +08:00，DATE() 取北京日期
+    const dateExpr = c => sequelize.fn('DATE', sequelize.col(c))
+
+    const [generatedRows, fulfilledRows, expiredRows] = await Promise.all([
+      RedemptionOrder.findAll({
+        attributes: [
+          [dateExpr('created_at'), 'date'],
+          [sequelize.fn('COUNT', sequelize.col('redemption_order_id')), 'cnt']
+        ],
+        where: { created_at: { [Op.gte]: startDate } },
+        group: [dateExpr('created_at')],
+        raw: true
+      }),
+      RedemptionOrder.findAll({
+        attributes: [
+          [dateExpr('fulfilled_at'), 'date'],
+          [sequelize.fn('COUNT', sequelize.col('redemption_order_id')), 'cnt']
+        ],
+        where: { status: 'fulfilled', fulfilled_at: { [Op.gte]: startDate }, ...fulfilledScope },
+        group: [dateExpr('fulfilled_at')],
+        raw: true
+      }),
+      RedemptionOrder.findAll({
+        attributes: [
+          [dateExpr('expires_at'), 'date'],
+          [sequelize.fn('COUNT', sequelize.col('redemption_order_id')), 'cnt']
+        ],
+        where: { status: 'expired', expires_at: { [Op.gte]: startDate } },
+        group: [dateExpr('expires_at')],
+        raw: true
+      })
+    ])
+
+    // 合并到按日的 map（DATE() 结果统一格式化为北京日期 YYYY-MM-DD）
+    const byDate = new Map()
+    const fmtDate = d => BeijingTimeHelper.formatDate(d, 'YYYY-MM-DD')
+    const ensureDate = d => {
+      if (!byDate.has(d)) byDate.set(d, { date: d, generated: 0, fulfilled: 0, expired: 0 })
+      return byDate.get(d)
+    }
+    generatedRows.forEach(r => (ensureDate(fmtDate(r.date)).generated = Number(r.cnt)))
+    fulfilledRows.forEach(r => (ensureDate(fmtDate(r.date)).fulfilled = Number(r.cnt)))
+    expiredRows.forEach(r => (ensureDate(fmtDate(r.date)).expired = Number(r.cnt)))
+
+    const trend = [...byDate.values()].sort((a, b) => (a.date < b.date ? -1 : 1))
+    const totalGenerated = trend.reduce((s, r) => s + r.generated, 0)
+    const totalFulfilled = trend.reduce((s, r) => s + r.fulfilled, 0)
+    const totalExpired = trend.reduce((s, r) => s + r.expired, 0)
+
+    return {
+      range_days: days,
+      trend,
+      totals: { generated: totalGenerated, fulfilled: totalFulfilled, expired: totalExpired },
+      // 转化率：已核销 / 已生成（区间口径）
+      conversion_rate:
+        totalGenerated > 0 ? Math.round((totalFulfilled / totalGenerated) * 10000) / 100 : 0,
+      updated_at: BeijingTimeHelper.apiTimestamp()
     }
   }
 

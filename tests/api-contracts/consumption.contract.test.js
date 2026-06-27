@@ -131,7 +131,9 @@ describe('消费记录API契约测试', () => {
         expect(typeof record.consumption_amount).toBe('number')
         expect(typeof record.points_to_award).toBe('number')
         expect(typeof record.status).toBe('string')
-        expect(typeof record.created_at).toBe('object')
+        // B-2：时间字段统一为 UTC ISO8601 字符串（...Z），不再是对象
+        expect(typeof record.created_at).toBe('string')
+        expect(record.created_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/)
 
         // ✅ 验证status字段值
         expect(['pending', 'approved', 'rejected']).toContain(record.status)

@@ -11,7 +11,6 @@
  * @table approval_chain_steps
  */
 const { DataTypes } = require('sequelize')
-const BeijingTimeHelper = require('../utils/timeHelper')
 
 module.exports = sequelize => {
   const ApprovalChainStep = sequelize.define(
@@ -66,10 +65,6 @@ module.exports = sequelize => {
       actioned_at: {
         type: DataTypes.DATE,
         allowNull: true,
-        /** @returns {string} 格式化时间 */
-        get() {
-          return BeijingTimeHelper.formatForAPI(this.getDataValue('actioned_at'))
-        },
         comment: '操作时间'
       },
       is_final: {
@@ -119,10 +114,6 @@ module.exports = sequelize => {
       timeout_at: {
         type: DataTypes.DATE,
         allowNull: true,
-        /** @returns {string} 格式化时间 */
-        get() {
-          return BeijingTimeHelper.formatForAPI(this.getDataValue('timeout_at'))
-        },
         comment: '超时截止时间'
       },
       auto_approved: {
@@ -134,20 +125,12 @@ module.exports = sequelize => {
       created_at: {
         type: DataTypes.DATE,
         allowNull: false,
-        defaultValue: DataTypes.NOW,
-        /** @returns {string} 格式化时间 */
-        get() {
-          return BeijingTimeHelper.formatForAPI(this.getDataValue('created_at'))
-        }
+        defaultValue: DataTypes.NOW
       },
       updated_at: {
         type: DataTypes.DATE,
         allowNull: false,
-        defaultValue: DataTypes.NOW,
-        /** @returns {string} 格式化时间 */
-        get() {
-          return BeijingTimeHelper.formatForAPI(this.getDataValue('updated_at'))
-        }
+        defaultValue: DataTypes.NOW
       }
     },
     {

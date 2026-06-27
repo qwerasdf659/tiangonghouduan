@@ -103,7 +103,14 @@ const dbConfig = {
      */
     supportBigNumbers: true,
     bigNumberStrings: true,
-    dateStrings: true,
+    /*
+     * 🕐 时间字段对外形态统一 = B-2（全局 UTC ISO8601 带 Z）（2026-06-25 定稿，见架构决策文档 验·九）
+     * dateStrings:false → mysql2 驱动返回真实 Date 对象，Sequelize JSON 序列化自动输出 UTC ISO（...Z）。
+     * 与下方 timezone:'+08:00' 必须同时保留：驱动用 +08:00 把库内"北京墙钟"解释为北京时刻再转正确 UTC，
+     * 实测 created_at 存储值 2026-06-25 03:14:09(北京) → 序列化 2026-06-24T19:14:09.000Z（正确，不差 8 小时）。
+     * 存储仍为 UTC 逻辑、展示层（前端统一组件）转北京时间，符合大厂主流与项目"全链路展示北京时间"。
+     */
+    dateStrings: false,
     typeCast: true,
     connectTimeout: 10000, // ✅ MySQL连接超时10秒（P2优化：从30s降到10s，与acquire对齐）
     timezone: '+08:00' // ✅ 强制MySQL会话使用北京时间

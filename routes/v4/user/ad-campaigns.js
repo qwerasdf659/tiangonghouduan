@@ -23,6 +23,7 @@ const { authenticateToken } = require('../../../middleware/auth')
 const logger = require('../../../utils/logger').logger
 const TransactionManager = require('../../../utils/TransactionManager')
 const { asyncHandler } = require('../../../middleware/validation')
+const { getImageUrl } = require('../../../utils/ImageUrlHelper')
 
 /**
  * GET / - 获取我的广告活动列表
@@ -176,14 +177,16 @@ router.get(
       return res.apiError('广告活动不存在或无权限访问', 'CAMPAIGN_NOT_FOUND', null, 404)
     }
 
-    // 展示层转换：将素材的 primary_media 对象 key 拼接为完整代理 URL
-    const baseUrl = process.env.PUBLIC_BASE_URL
+    /*
+     * 展示层转换：将素材的 primary_media 对象 key 经 getImageUrl 生成带 cache-buster 的代理 URL
+     * （不再手拼裸 URL，避免客户端缓存历史 404；2026-06-28 修复）
+     */
     const result = campaign.toJSON ? campaign.toJSON() : campaign
-    if (result.creatives && baseUrl) {
+    if (result.creatives) {
       result.creatives = result.creatives.map(c => {
-        const objectKey = c.primary_media?.object_key
-        if (objectKey) {
-          c.public_url = `${baseUrl}/api/v4/images/${objectKey}`
+        const media = c.primary_media
+        if (media?.object_key) {
+          c.public_url = getImageUrl(media.object_key, media.content_hash)
         }
         return c
       })

@@ -24,7 +24,6 @@ const express = require('express')
 const router = express.Router()
 const { authenticateToken, requireRoleLevel } = require('../../../../middleware/auth')
 const { asyncHandler } = require('../../../../middleware/validation')
-const BeijingTimeHelper = require('../../../../utils/timeHelper')
 
 /**
  * 通过 ServiceManager 获取 MerchantRiskAlertService
@@ -137,8 +136,6 @@ router.get(
       store_id: alert.store_id,
       target_user_id: alert.target_user_id,
       created_at: alert.created_at
-        ? BeijingTimeHelper.formatForAPI(alert.created_at)
-        : alert.created_at
     }))
 
     return res.apiSuccess(

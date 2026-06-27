@@ -10,7 +10,6 @@
 'use strict'
 
 const { Model, DataTypes } = require('sequelize')
-const BeijingTimeHelper = require('../utils/timeHelper')
 
 /**
  * 联合广告组成员模型（对应数据库表 ad_zone_group_members）
@@ -79,10 +78,6 @@ module.exports = sequelize => {
       created_at: {
         type: DataTypes.DATE,
         allowNull: false,
-        /** @returns {string|null} 北京时间格式化字符串 */
-        get() {
-          return BeijingTimeHelper.formatChinese(this.getDataValue('created_at'))
-        },
         comment: '创建时间'
       }
     },

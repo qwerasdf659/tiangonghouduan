@@ -11,7 +11,6 @@
  * @table approval_chain_instances
  */
 const { DataTypes } = require('sequelize')
-const BeijingTimeHelper = require('../utils/timeHelper')
 
 module.exports = sequelize => {
   const ApprovalChainInstance = sequelize.define(
@@ -66,19 +65,11 @@ module.exports = sequelize => {
       submitted_at: {
         type: DataTypes.DATE,
         allowNull: false,
-        /** @returns {string} 格式化时间 */
-        get() {
-          return BeijingTimeHelper.formatForAPI(this.getDataValue('submitted_at'))
-        },
         comment: '提交时间'
       },
       completed_at: {
         type: DataTypes.DATE,
         allowNull: true,
-        /** @returns {string} 格式化时间 */
-        get() {
-          return BeijingTimeHelper.formatForAPI(this.getDataValue('completed_at'))
-        },
         comment: '完成时间'
       },
       final_result: {
@@ -105,20 +96,12 @@ module.exports = sequelize => {
       created_at: {
         type: DataTypes.DATE,
         allowNull: false,
-        defaultValue: DataTypes.NOW,
-        /** @returns {string} 格式化时间 */
-        get() {
-          return BeijingTimeHelper.formatForAPI(this.getDataValue('created_at'))
-        }
+        defaultValue: DataTypes.NOW
       },
       updated_at: {
         type: DataTypes.DATE,
         allowNull: false,
-        defaultValue: DataTypes.NOW,
-        /** @returns {string} 格式化时间 */
-        get() {
-          return BeijingTimeHelper.formatForAPI(this.getDataValue('updated_at'))
-        }
+        defaultValue: DataTypes.NOW
       }
     },
     {

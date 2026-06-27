@@ -28,9 +28,9 @@ const logger = require('../../../utils/logger').logger
  * @returns {number} data.user_id - 用户ID（内部标识）
  * @returns {string} data.user_uuid - 用户UUID（外部标识）
  * @returns {string} data.nonce - 一次性随机数
- * @returns {string} data.expires_at - 过期时间（北京时间）
- * @returns {string} data.generated_at - 生成时间（北京时间）
- * @returns {string} data.validity - 有效期描述
+ * @returns {Object} data.expires_at - 过期时间（北京时间对象：{iso,beijing,timestamp,relative}）
+ * @returns {Object} data.generated_at - 生成时间（北京时间对象：{iso,beijing,timestamp,relative}）
+ * @returns {number} data.validity_seconds - 有效期（秒，数值型，前端倒计时直用）
  * @returns {string} data.algorithm - 签名算法
  * @returns {string} data.note - 使用说明
  * @returns {string} data.usage - 使用方式
@@ -79,7 +79,7 @@ router.get('/qrcode', async (req, res) => {
         nonce: qrCodeInfo.nonce,
         expires_at: qrCodeInfo.expires_at,
         generated_at: qrCodeInfo.generated_at,
-        validity: qrCodeInfo.validity,
+        validity_seconds: qrCodeInfo.validity_seconds,
         algorithm: qrCodeInfo.algorithm,
         note: qrCodeInfo.note,
         usage: '请商家扫描此二维码录入消费金额'

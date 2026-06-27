@@ -16,7 +16,6 @@
 'use strict'
 
 const { Model, DataTypes } = require('sequelize')
-const BeijingTimeHelper = require('../utils/timeHelper')
 
 /** 允许的触发类型枚举 */
 const VALID_TRIGGER_TYPES = ['dau_shift', 'manual']
@@ -128,20 +127,12 @@ module.exports = sequelize => {
       created_at: {
         type: DataTypes.DATE,
         allowNull: false,
-        /** @returns {string|null} 北京时间格式化字符串 */
-        get() {
-          return BeijingTimeHelper.formatChinese(this.getDataValue('created_at'))
-        },
         comment: '创建时间'
       },
       /** 实际执行时间（confirmed → applied 时回写） */
       applied_at: {
         type: DataTypes.DATE,
         allowNull: true,
-        /** @returns {string|null} 北京时间格式化字符串 */
-        get() {
-          return BeijingTimeHelper.formatChinese(this.getDataValue('applied_at'))
-        },
         comment: '实际执行时间'
       }
     },

@@ -275,14 +275,11 @@ function registerStoreManagementComponents() {
     formatDateTimeLocal(dateValue) {
       if (!dateValue) return ''
       try {
-        let dateStr = dateValue
-        if (typeof dateValue === 'object') {
-          dateStr = dateValue.iso || dateValue.beijing || dateValue.timestamp
-        }
-        if (!dateStr) return ''
-        const date = new Date(dateStr)
+        // B-2：后端统一 UTC ISO；取北京时区的日期部分（避免 toISOString 取到 UTC 日期跨零点差一天）
+        const date = new Date(dateValue)
         if (isNaN(date.getTime())) return ''
-        return date.toISOString().split('T')[0]
+        // en-CA 输出 YYYY-MM-DD 格式，配合北京时区得到北京日期
+        return date.toLocaleDateString('en-CA', { timeZone: 'Asia/Shanghai' })
       } catch {
         return ''
       }
@@ -291,12 +288,8 @@ function registerStoreManagementComponents() {
     formatDateSafe(dateValue) {
       if (!dateValue) return '-'
       try {
-        let dateStr = dateValue
-        if (typeof dateValue === 'object') {
-          dateStr = dateValue.beijing || dateValue.iso || dateValue.timestamp
-        }
-        if (!dateStr) return '-'
-        const date = new Date(dateStr)
+        // B-2：后端统一 UTC ISO，强制按北京时区展示
+        const date = new Date(dateValue)
         if (isNaN(date.getTime())) return String(dateValue)
         return date.toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai' })
       } catch {

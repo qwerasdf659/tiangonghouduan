@@ -303,6 +303,68 @@ class CustomerServiceIssueService {
       page_size: pageSize
     }
   }
+
+  /**
+   * 工单统计看板（按状态/类型/优先级分组计数 + 平均处理时长 + 待处理积压）
+   *
+   * @description 看板数据源（客服看板 B 类 issues/stats）：复用 customer_service_issues，零新表。
+   * @param {Object} models - Sequelize models 对象
+   * @param {Object} [params] - 查询参数
+   * @param {number} [params.days=30] - 统计天数（按 created_at 北京时区范围）
+   * @returns {Object} { range_days, total, by_status, by_type, by_priority, avg_resolution_hours, pending_backlog, updated_at }
+   */
+  static async getStats(models, params = {}) {
+    const { Op, fn, col, literal } = require('sequelize')
+    const BeijingTimeHelper = require('../utils/timeHelper')
+    const days = parseInt(params.days, 10) || 30
+    const startDate = BeijingTimeHelper.daysAgo(days)
+    const where = { created_at: { [Op.gte]: startDate } }
+
+    const groupCount = async groupCol => {
+      const rows = await models.CustomerServiceIssue.findAll({
+        attributes: [groupCol, [fn('COUNT', col('issue_id')), 'cnt']],
+        where,
+        group: [groupCol],
+        raw: true
+      })
+      return rows.map(r => ({ key: r[groupCol], count: parseInt(r.cnt, 10) }))
+    }
+
+    const [byStatus, byType, byPriority] = await Promise.all([
+      groupCount('status'),
+      groupCount('issue_type'),
+      groupCount('priority')
+    ])
+
+    // 平均处理时长（已解决：resolved_at - created_at，小时）
+    const resolvedRow = await models.CustomerServiceIssue.findOne({
+      attributes: [
+        [fn('AVG', literal('TIMESTAMPDIFF(HOUR, created_at, resolved_at)')), 'avg_hours'],
+        [fn('COUNT', col('issue_id')), 'resolved_count']
+      ],
+      where: { ...where, resolved_at: { [Op.ne]: null } },
+      raw: true
+    })
+
+    // 待处理积压（open/processing，不限时间窗，反映当前压力）
+    const pendingBacklog = await models.CustomerServiceIssue.count({
+      where: { status: { [Op.in]: ['open', 'processing'] } }
+    })
+
+    const total = byStatus.reduce((s, r) => s + r.count, 0)
+
+    return {
+      range_days: days,
+      total,
+      by_status: byStatus,
+      by_type: byType,
+      by_priority: byPriority,
+      avg_resolution_hours: Math.round(parseFloat(resolvedRow?.avg_hours || 0) * 10) / 10,
+      resolved_count: parseInt(resolvedRow?.resolved_count || 0, 10),
+      pending_backlog: pendingBacklog,
+      updated_at: BeijingTimeHelper.apiTimestamp()
+    }
+  }
 }
 
 module.exports = CustomerServiceIssueService

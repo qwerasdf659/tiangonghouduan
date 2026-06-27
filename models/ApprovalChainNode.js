@@ -11,7 +11,6 @@
  * @table approval_chain_nodes
  */
 const { DataTypes } = require('sequelize')
-const BeijingTimeHelper = require('../utils/timeHelper')
 
 module.exports = sequelize => {
   const ApprovalChainNode = sequelize.define(
@@ -114,20 +113,12 @@ module.exports = sequelize => {
       created_at: {
         type: DataTypes.DATE,
         allowNull: false,
-        defaultValue: DataTypes.NOW,
-        /** @returns {string} 格式化时间 */
-        get() {
-          return BeijingTimeHelper.formatForAPI(this.getDataValue('created_at'))
-        }
+        defaultValue: DataTypes.NOW
       },
       updated_at: {
         type: DataTypes.DATE,
         allowNull: false,
-        defaultValue: DataTypes.NOW,
-        /** @returns {string} 格式化时间 */
-        get() {
-          return BeijingTimeHelper.formatForAPI(this.getDataValue('updated_at'))
-        }
+        defaultValue: DataTypes.NOW
       }
     },
     {

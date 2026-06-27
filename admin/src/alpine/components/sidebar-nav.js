@@ -314,6 +314,15 @@ export function sidebarNav() {
       this._switchTabHandler = e => this.setActiveItem(e.detail.id, e.detail.url)
       window.addEventListener('switch-tab', this._switchTabHandler)
 
+      /*
+       * 监听徽标刷新事件（refresh-badges）— 2026-06-27 新增
+       * 触发方：审核链领域事件（approval_chain_event）等到达时，由 notification-center 派发，
+       * 用于审核（通过/拒绝）后即时刷新侧边栏待办徽标，无需等 5 分钟轮询。
+       * 复用既有 fetchAllBadgeCounts()，不新增请求逻辑。
+       */
+      this._refreshBadgesHandler = () => this.fetchAllBadgeCounts()
+      window.addEventListener('refresh-badges', this._refreshBadgesHandler)
+
       // 从 localStorage 恢复当前激活的 Tab 状态
       this.restoreActiveItemFromTabs()
 
@@ -342,6 +351,9 @@ export function sidebarNav() {
       }
       if (this._switchTabHandler) {
         window.removeEventListener('switch-tab', this._switchTabHandler)
+      }
+      if (this._refreshBadgesHandler) {
+        window.removeEventListener('refresh-badges', this._refreshBadgesHandler)
       }
       if (this._badgeInterval) {
         clearInterval(this._badgeInterval)

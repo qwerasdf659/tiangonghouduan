@@ -840,7 +840,7 @@ class StaffManagementService {
       store_code: r.store?.store_code,
       role_in_store: r.role_in_store,
       role_name: r.getRoleName(),
-      joined_at: BeijingTimeHelper.formatForAPI(r.joined_at)
+      joined_at: r.joined_at
     }))
   }
 
@@ -876,7 +876,7 @@ class StaffManagementService {
       mobile: r.user?.mobile,
       role_in_store: r.role_in_store,
       role_name: r.getRoleName(),
-      joined_at: BeijingTimeHelper.formatForAPI(r.joined_at)
+      joined_at: r.joined_at
     }))
   }
 
@@ -925,7 +925,7 @@ class StaffManagementService {
       store_staff_id: staffRecord.store_staff_id,
       role_in_store: staffRecord.role_in_store,
       is_manager: staffRecord.role_in_store === 'manager',
-      joined_at: BeijingTimeHelper.formatForAPI(staffRecord.joined_at)
+      joined_at: staffRecord.joined_at
     }
   }
 

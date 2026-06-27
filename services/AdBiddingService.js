@@ -81,7 +81,14 @@ class AdBiddingService {
                   {
                     model: MediaFile,
                     as: 'primary_media',
-                    attributes: ['media_id', 'object_key', 'width', 'height', 'thumbnail_keys']
+                    attributes: [
+                      'media_id',
+                      'object_key',
+                      'content_hash',
+                      'width',
+                      'height',
+                      'thumbnail_keys'
+                    ]
                   }
                 ]
               : []
@@ -222,6 +229,8 @@ class AdBiddingService {
                 primary_media_id: creative.primary_media_id,
                 // 媒体对象 key：通过 primary_media_id → media_files 关联查询获取，ad-delivery 路由据此拼接完整代理 URL
                 media_object_key: creative.primary_media?.object_key || null,
+                // 内容哈希：供 ad-delivery 走 getImageUrl 生成带 ?h= 的永久缓存 URL（根治真机缓存历史 404）
+                media_content_hash: creative.primary_media?.content_hash || null,
                 media_width: creative.primary_media?.width || null,
                 media_height: creative.primary_media?.height || null,
                 text_content: creative.text_content,

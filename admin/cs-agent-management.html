@@ -59,6 +59,11 @@
         class="tab-pill flex-1 px-5 py-2.5 rounded-lg text-sm flex items-center justify-center gap-2 transition-all">
         🔗 用户分配
       </button>
+      <button @click="enterKpiTab()"
+        :class="activeTab === 'kpi' ? 'bg-white text-indigo-700 shadow-md font-semibold' : 'text-gray-500 hover:text-gray-700 hover:bg-white/50'"
+        class="tab-pill flex-1 px-5 py-2.5 rounded-lg text-sm flex items-center justify-center gap-2 transition-all">
+        📈 效能看板
+      </button>
     </div>
 
     <!-- ============================================================ -->
@@ -423,6 +428,111 @@
             <span class="px-3 py-1.5 text-sm font-medium" x-text="assignmentPagination.page + ' / ' + assignmentPagination.total_pages"></span>
             <button @click="assignmentGoToPage(assignmentPagination.page + 1)" :disabled="assignmentPagination.page >= assignmentPagination.total_pages" class="px-3 py-1.5 border themed-border-light rounded-lg hover:themed-bg-base disabled:opacity-40 disabled:cursor-not-allowed">下一页</button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- Tab: 效能看板（KPI，客服看板 A+B 类）                          -->
+    <!-- ============================================================ -->
+    <div x-show="activeTab === 'kpi'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0">
+
+      <!-- 时间档 + 刷新 -->
+      <div class="themed-card rounded-xl shadow-sm p-4 mb-4 flex flex-wrap items-center gap-3">
+        <span class="themed-text-muted text-sm">统计周期：</span>
+        <select x-model.number="kpiDays" @change="loadKpiDashboard()" class="px-3 py-2 border themed-border-light rounded-lg text-sm themed-bg themed-text">
+          <option :value="7">近7天</option>
+          <option :value="30">近30天</option>
+          <option :value="90">近90天</option>
+        </select>
+        <button @click="loadKpiDashboard()" class="px-4 py-2 themed-btn-primary rounded-lg text-sm">刷新</button>
+        <span class="text-xs themed-text-muted ml-auto">实时监控每 15 秒自动刷新（页面隐藏时暂停）</span>
+      </div>
+
+      <!-- 实时坐席监控卡 -->
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+        <div class="themed-card rounded-xl p-4 text-center">
+          <div class="text-2xl font-bold text-amber-600" x-text="kpiRealtime.waiting_count"></div>
+          <div class="text-xs themed-text-muted mt-1">等待中会话</div>
+        </div>
+        <div class="themed-card rounded-xl p-4 text-center">
+          <div class="text-2xl font-bold text-green-600" x-text="kpiRealtime.active_count"></div>
+          <div class="text-xs themed-text-muted mt-1">进行中会话</div>
+        </div>
+        <div class="themed-card rounded-xl p-4 text-center">
+          <div class="text-2xl font-bold themed-text-primary" x-text="kpiRealtime.online_agents"></div>
+          <div class="text-xs themed-text-muted mt-1">在岗坐席</div>
+        </div>
+        <div class="themed-card rounded-xl p-4 text-center">
+          <div class="text-2xl font-bold themed-text" x-text="kpiRealtime.today_total"></div>
+          <div class="text-xs themed-text-muted mt-1">今日会话总数</div>
+        </div>
+        <div class="themed-card rounded-xl p-4 text-center">
+          <div class="text-2xl font-bold text-red-600" x-text="kpiRealtime.today_pending_response"></div>
+          <div class="text-xs themed-text-muted mt-1">今日待首响</div>
+        </div>
+      </div>
+
+      <!-- 今日响应概况 + 满意度概况 -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div class="themed-card rounded-xl p-5">
+          <div class="text-sm themed-text-muted mb-1">今日平均首响</div>
+          <div class="text-2xl font-bold themed-text" x-text="formatKpiSeconds(kpiResponseToday.avg_response_seconds)"></div>
+          <div class="text-xs themed-text-muted mt-1">60秒达标率 <span class="font-semibold text-green-600" x-text="Math.round((kpiResponseToday.within_1min_rate || 0) * 100) + '%'"></span></div>
+        </div>
+        <div class="themed-card rounded-xl p-5">
+          <div class="text-sm themed-text-muted mb-1">满意度均分</div>
+          <div class="text-2xl font-bold text-amber-600" x-text="(kpiSatisfaction.avg_score || 0).toFixed(2)"></div>
+          <div class="text-xs themed-text-muted mt-1">已评价 <span class="font-semibold" x-text="kpiSatisfaction.rated_count"></span> 次｜评价率 <span class="font-semibold" x-text="Math.round((kpiSatisfaction.rating_rate || 0) * 100) + '%'"></span></div>
+        </div>
+        <div class="themed-card rounded-xl p-5">
+          <div class="text-sm themed-text-muted mb-1">工单概况</div>
+          <div class="text-2xl font-bold themed-text" x-text="kpiIssueStats.total"></div>
+          <div class="text-xs themed-text-muted mt-1">待处理积压 <span class="font-semibold text-red-600" x-text="kpiIssueStats.pending_backlog"></span>｜平均处理 <span class="font-semibold" x-text="(kpiIssueStats.avg_resolution_hours || 0) + 'h'"></span></div>
+        </div>
+      </div>
+
+      <!-- 响应趋势折线 -->
+      <div class="themed-card rounded-xl p-6 mb-6">
+        <h3 class="text-base font-semibold themed-text mb-4">客服响应趋势（平均首响 + 60秒达标率）</h3>
+        <div id="kpi-trend-chart" class="h-72"></div>
+      </div>
+
+      <!-- 坐席绩效排行 + 满意度分布 -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div class="themed-card rounded-xl p-6">
+          <h3 class="text-base font-semibold themed-text mb-4">坐席绩效排行</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="themed-bg-base">
+                <tr>
+                  <th class="px-3 py-2 text-left">坐席</th>
+                  <th class="px-3 py-2 text-center">接待量</th>
+                  <th class="px-3 py-2 text-center">平均首响</th>
+                  <th class="px-3 py-2 text-center">达标率</th>
+                  <th class="px-3 py-2 text-center">解决率</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y">
+                <template x-for="a in kpiAgentRanking" :key="a.admin_id">
+                  <tr>
+                    <td class="px-3 py-2" x-text="a.admin_name"></td>
+                    <td class="px-3 py-2 text-center" x-text="a.sessions_count"></td>
+                    <td class="px-3 py-2 text-center" x-text="formatKpiSeconds(a.avg_response_seconds)"></td>
+                    <td class="px-3 py-2 text-center" x-text="Math.round((a.within_1min_rate || 0) * 100) + '%'"></td>
+                    <td class="px-3 py-2 text-center" x-text="Math.round((a.resolution_rate || 0) * 100) + '%'"></td>
+                  </tr>
+                </template>
+                <tr x-show="kpiAgentRanking.length === 0">
+                  <td colspan="5" class="px-3 py-6 text-center text-gray-400">暂无坐席绩效数据</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="themed-card rounded-xl p-6">
+          <h3 class="text-base font-semibold themed-text mb-4">满意度评分分布</h3>
+          <div id="kpi-satisfaction-chart" class="h-72"></div>
         </div>
       </div>
     </div>

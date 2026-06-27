@@ -398,21 +398,16 @@ document.addEventListener('alpine:init', () => {
     // ==================== 业务方法 ====================
 
     /**
-     * 格式化日期显示
+     * 格式化日期显示（B-2：后端统一 UTC ISO，强制按北京时区展示）
      *
-     * @description 将日期值转换为本地化的日期字符串
-     * @param {Object|string|null} dateValue - 日期值，可以是包含beijing属性的对象或日期字符串
-     * @returns {string} 格式化后的日期字符串，无效值返回'-'
+     * @param {string|null} dateValue - UTC ISO 日期字符串
+     * @returns {string} 格式化后的北京时间字符串，无效值返回'-'
      */
     formatDate(dateValue) {
       if (!dateValue) return '-'
-      if (typeof dateValue === 'object' && dateValue.beijing) {
-        return dateValue.beijing
-      }
-      if (typeof dateValue === 'string') {
-        return new Date(dateValue).toLocaleString('zh-CN')
-      }
-      return '-'
+      const d = new Date(dateValue)
+      if (isNaN(d.getTime())) return '-'
+      return d.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false })
     },
 
     /**

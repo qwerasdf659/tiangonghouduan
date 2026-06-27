@@ -191,6 +191,42 @@ router.get(
 )
 
 /**
+ * GET /api/v4/console/business-records/redemption-orders/trend
+ * @desc 核销经营趋势看板（看板三）：按日 生成/核销/过期 + 转化率；接 DataScopeService 范围过滤
+ *       （管理员=全平台 / 店长本店 / 区域负责人辖区多店，按落地门店 fulfilled_store_id）
+ * @access Admin (role_level >= 30)
+ *
+ * @query {number} [days=30] - 趋势天数
+ */
+router.get(
+  '/redemption-orders/trend',
+  authenticateToken,
+  requireRoleLevel(30),
+  asyncHandler(async (req, res) => {
+    // 数据范围（DataScopeService 单一事实源）：scope=all 不过滤；scope=stores 按可见门店集合过滤
+    const DataScopeService = req.app.locals.services.getService('data_scope')
+    const { scope: storeScope, store_ids: storeIds } = await DataScopeService.getAccessibleStoreIds(
+      req.user.user_id
+    )
+
+    const RedemptionService = req.app.locals.services.getService('redemption_order')
+    const result = await RedemptionService.getRedemptionTrend({
+      days: parseInt(req.query.days, 10) || 30,
+      // scope=all（管理员）不传 store_ids（全平台）；否则按可见门店集合过滤核销维度
+      store_ids: storeScope === 'all' ? null : storeIds
+    })
+
+    logger.info('获取核销经营趋势看板成功', {
+      admin_id: req.user.user_id,
+      scope: storeScope,
+      trend_points: result.trend.length
+    })
+
+    return res.apiSuccess(result, '获取核销趋势成功')
+  })
+)
+
+/**
  * GET /api/v4/console/business-records/redemption-orders/export
  * @desc 导出核销订单数据（支持 csv 与 xlsx 双格式）
  * @access Admin only (role_level >= 30)

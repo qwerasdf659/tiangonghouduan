@@ -189,7 +189,14 @@ class AdCampaignService {
                   {
                     model: MediaFile,
                     as: 'primary_media',
-                    attributes: ['media_id', 'object_key', 'width', 'height', 'thumbnail_keys']
+                    attributes: [
+                      'media_id',
+                      'object_key',
+                      'content_hash',
+                      'width',
+                      'height',
+                      'thumbnail_keys'
+                    ]
                   }
                 ]
               : []

@@ -2136,11 +2136,10 @@ class ApprovalChainService {
 
     if (step.assignee_user_id) {
       if (step.assignee_user_id !== operatorId) {
-        throw new BusinessError(
-          `您不是当前步骤的指定审核人（指定人ID: ${step.assignee_user_id}）`,
-          'APPROVAL_ERROR',
-          400
-        )
+        throw new BusinessError('您不是当前步骤的指定审核人，无权审核该单', 'APPROVAL_ERROR', 400, {
+          assignee_user_id: step.assignee_user_id,
+          step_id: step.step_id
+        })
       }
       return { is_escalated: false, original_assignee_role_id: null }
     }
@@ -2182,9 +2181,10 @@ class ApprovalChainService {
       const hasRole = userRoles.some(ur => ur.role_id === step.assignee_role_id)
       if (!hasRole) {
         throw new BusinessError(
-          `您不具备当前步骤要求的审核角色（要求角色ID: ${step.assignee_role_id}）`,
+          '您不具备当前步骤要求的审核角色，无权审核该单',
           'APPROVAL_ERROR',
-          400
+          400,
+          { required_role_id: step.assignee_role_id, step_id: step.step_id }
         )
       }
 

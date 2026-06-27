@@ -309,10 +309,6 @@ module.exports = sequelize => {
         type: DataTypes.DATE,
         allowNull: false,
         defaultValue: () => BeijingTimeHelper.createDatabaseTime(),
-        /** @returns {string} 北京时间格式的日期字符串 */
-        get() {
-          return BeijingTimeHelper.formatChinese(this.getDataValue('created_at'))
-        },
         comment: '创建时间'
       },
 
@@ -320,10 +316,6 @@ module.exports = sequelize => {
         type: DataTypes.DATE,
         allowNull: false,
         defaultValue: () => BeijingTimeHelper.createDatabaseTime(),
-        /** @returns {string} 北京时间格式的日期字符串 */
-        get() {
-          return BeijingTimeHelper.formatChinese(this.getDataValue('updated_at'))
-        },
         comment: '更新时间'
       }
     },

@@ -301,22 +301,11 @@ function registerSystemSettingsComponents() {
     formatDate(dateValue) {
       if (!dateValue) return '-'
       try {
-        if (typeof dateValue === 'object' && dateValue !== null) {
-          if (dateValue.beijing) return dateValue.beijing
-          if (dateValue.iso) {
-            return new Date(dateValue.iso).toLocaleString('zh-CN', {
-              year: 'numeric',
-              month: '2-digit',
-              day: '2-digit',
-              hour: '2-digit',
-              minute: '2-digit'
-            })
-          }
-          if (dateValue.relative) return dateValue.relative
-        }
+        // B-2：后端时间统一 UTC ISO（...Z），解析后强制按北京时区展示
         const date = new Date(dateValue)
         if (isNaN(date.getTime())) return '-'
         return date.toLocaleString('zh-CN', {
+          timeZone: 'Asia/Shanghai',
           year: 'numeric',
           month: '2-digit',
           day: '2-digit',

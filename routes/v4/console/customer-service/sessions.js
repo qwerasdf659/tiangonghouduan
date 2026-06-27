@@ -141,4 +141,71 @@ router.get(
   })
 )
 
+/**
+ * GET /sessions/agent-ranking - 客服坐席绩效排行（按 admin_id 维度）
+ *
+ * @description 补 response-stats 缺失的 by_admin 维度：接待量/平均首响/达标率/解决率排行。
+ * @route GET /api/v4/console/customer-service/sessions/agent-ranking
+ * @access Admin（role_level >= 100，绩效数据敏感）
+ *
+ * @query {number} [days=7] - 统计天数
+ * @returns {Object} { range_days, agents:[{admin_id,admin_name,sessions_count,avg_response_seconds,within_1min_rate,resolution_rate}], updated_at }
+ */
+router.get(
+  '/agent-ranking',
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const { days = 7 } = req.query
+    logger.info('[客服管理] 获取坐席绩效排行', {
+      admin_id: req.user.user_id,
+      days: parseInt(days)
+    })
+    const CustomerServiceResponseStatsService =
+      req.app.locals.services.getService('cs_response_stats')
+    const result = await CustomerServiceResponseStatsService.getAgentRanking({
+      days: parseInt(days) || 7
+    })
+    return res.apiSuccess(result, '获取成功')
+  })
+)
+
+/**
+ * GET /sessions/satisfaction-stats - 满意度评分统计看板
+ *
+ * @route GET /api/v4/console/customer-service/sessions/satisfaction-stats
+ * @access Admin（role_level >= 100）
+ * @query {number} [days=30] - 统计天数
+ * @returns {Object} { range_days, avg_score, rated_count, closed_count, rating_rate, distribution, updated_at }
+ */
+router.get(
+  '/satisfaction-stats',
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const CustomerServiceResponseStatsService =
+      req.app.locals.services.getService('cs_response_stats')
+    const result = await CustomerServiceResponseStatsService.getSatisfactionStats({
+      days: parseInt(req.query.days, 10) || 30
+    })
+    return res.apiSuccess(result, '获取成功')
+  })
+)
+
+/**
+ * GET /sessions/realtime-overview - 实时坐席监控总览（前端轮询 15s，聚合缓存 10s）
+ *
+ * @route GET /api/v4/console/customer-service/sessions/realtime-overview
+ * @access Admin（role_level >= 100）
+ * @returns {Object} { waiting_count, active_count, today_total, today_responded, online_agents, updated_at }
+ */
+router.get(
+  '/realtime-overview',
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const CustomerServiceResponseStatsService =
+      req.app.locals.services.getService('cs_response_stats')
+    const result = await CustomerServiceResponseStatsService.getRealtimeOverview()
+    return res.apiSuccess(result, '获取成功')
+  })
+)
+
 module.exports = router

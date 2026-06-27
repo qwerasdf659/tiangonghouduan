@@ -407,7 +407,7 @@ class ChatWebSocketService {
       socket.on('send_message', async data => {
         try {
           const senderId = socket.user.user_id
-          const { session_id, content, message_type = 'text' } = data
+          const { session_id, content, message_type = 'text', metadata } = data
 
           // ✅ 参数校验
           if (!session_id || !content) {
@@ -435,7 +435,7 @@ class ChatWebSocketService {
                   async transaction => {
                     return await CustomerServiceSessionService.sendUserMessage(
                       session_id,
-                      { user_id: senderId, content, message_type },
+                      { user_id: senderId, content, message_type, metadata },
                       { transaction }
                     )
                   },
@@ -466,6 +466,7 @@ class ChatWebSocketService {
             sender_type: 'user',
             content: message.content,
             message_type: message.message_type,
+            metadata: message.metadata,
             created_at: message.created_at
           }
 
@@ -1596,8 +1597,8 @@ class ChatWebSocketService {
         where: {
           customer_service_session_id: { [require('sequelize').Op.in]: sessionIds },
           created_at: { [require('sequelize').Op.gte]: since },
-          // 只获取系统消息或发给用户的消息
-          [require('sequelize').Op.or]: [{ message_type: 'system' }, { sender_type: 'admin' }]
+          // 只获取系统消息（message_source='system'）或发给用户的消息（管理员发的）
+          [require('sequelize').Op.or]: [{ message_source: 'system' }, { sender_type: 'admin' }]
         },
         order: [['created_at', 'ASC']],
         limit
@@ -1616,6 +1617,7 @@ class ChatWebSocketService {
           content: msg.content,
           message_type: msg.message_type,
           sender_type: msg.sender_type,
+          message_source: msg.message_source,
           metadata: msg.metadata,
           created_at: msg.created_at
         })),

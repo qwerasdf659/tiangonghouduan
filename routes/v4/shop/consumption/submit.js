@@ -34,7 +34,6 @@ const { authenticateToken, requireMerchantPermission } = require('../../../../mi
 const { resolveStoreContext } = require('../../../../middleware/resolveStoreContext')
 const { handleServiceError } = require('../../../../middleware/validation')
 const { logger, sanitize } = require('../../../../utils/logger')
-const BeijingTimeHelper = require('../../../../utils/timeHelper')
 const TransactionManager = require('../../../../utils/TransactionManager')
 const QRCodeValidator = require('../../../../utils/QRCodeValidator')
 
@@ -295,7 +294,7 @@ router.post(
         points_to_award: record.points_to_award,
         status: record.status,
         status_name: record.getStatusName ? record.getStatusName() : record.status,
-        created_at: BeijingTimeHelper.formatForAPI(record.created_at),
+        created_at: record.created_at,
         is_duplicate: isDuplicate
       }
 

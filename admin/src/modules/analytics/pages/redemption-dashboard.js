@@ -51,8 +51,13 @@ export function redemptionDashboardPage() {
 
     /** @type {Object|null} ECharts 实例容器 */
     _echarts: null,
-    charts: { byStore: null },
+    charts: { byStore: null, trend: null },
     _resizeHandler: null,
+
+    /** @type {Array<Object>} 核销趋势（按日 生成/核销/过期），来自 getRedemptionTrend */
+    trend: [],
+    /** @type {Object} 趋势汇总 + 转化率 */
+    trendSummary: { generated: 0, fulfilled: 0, expired: 0, conversion_rate: 0 },
 
     /** 初始化 */
     async init() {
@@ -65,7 +70,11 @@ export function redemptionDashboardPage() {
       }
       this.$nextTick(() => {
         this.loadOverview()
-        this._resizeHandler = () => this.charts.byStore?.resize()
+        this.loadTrend()
+        this._resizeHandler = () => {
+          this.charts.byStore?.resize()
+          this.charts.trend?.resize()
+        }
         window.addEventListener('resize', this._resizeHandler)
       })
     },
@@ -90,6 +99,58 @@ export function redemptionDashboardPage() {
         this.filters.end_date = ''
       }
       this.loadOverview()
+      this.loadTrend()
+    },
+
+    /**
+     * 加载核销趋势（看板三：getRedemptionTrend，接 DataScope 范围过滤）
+     * 天数由当前时间档推导：今日=1，否则按 start~end 天数，默认 30。
+     */
+    async loadTrend() {
+      try {
+        let days = 30
+        if (this.filters.start_date && this.filters.end_date) {
+          const s = new Date(this.filters.start_date)
+          const e = new Date(this.filters.end_date)
+          const diff = Math.round((e - s) / 86400000) + 1
+          if (diff > 0 && diff <= 365) days = diff
+        }
+        const res = await request({ url: `${REDEMPTION_BASE}/trend?days=${days}` })
+        const data = res?.data || {}
+        this.trend = Array.isArray(data.trend) ? data.trend : []
+        const totals = data.totals || {}
+        this.trendSummary = {
+          generated: totals.generated || 0,
+          fulfilled: totals.fulfilled || 0,
+          expired: totals.expired || 0,
+          conversion_rate: data.conversion_rate || 0
+        }
+        this.$nextTick(() => this.renderTrendChart())
+      } catch (e) {
+        logger.error('[RedemptionDashboard] 加载核销趋势失败:', e)
+        this.showError?.('加载核销趋势失败')
+      }
+    },
+
+    /** 渲染核销趋势折线（生成/核销/过期 按日） */
+    renderTrendChart() {
+      if (!this._echarts || !this.$refs.trendChart) return
+      if (!this.charts.trend) {
+        this.charts.trend = this._echarts.init(this.$refs.trendChart)
+      }
+      const dates = this.trend.map(r => r.date)
+      this.charts.trend.setOption({
+        tooltip: { trigger: 'axis' },
+        legend: { data: ['生成', '核销', '过期'] },
+        grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+        xAxis: { type: 'category', data: dates },
+        yAxis: { type: 'value' },
+        series: [
+          { name: '生成', type: 'line', smooth: true, data: this.trend.map(r => r.generated), itemStyle: { color: '#3b82f6' } },
+          { name: '核销', type: 'line', smooth: true, data: this.trend.map(r => r.fulfilled), itemStyle: { color: '#22c55e' } },
+          { name: '过期', type: 'line', smooth: true, data: this.trend.map(r => r.expired), itemStyle: { color: '#ef4444' } }
+        ]
+      })
     },
 
     /** 加载看板聚合数据（接口4） */
@@ -211,6 +272,22 @@ export function redemptionDashboardPage() {
     /** 状态中文映射（展示用） */
     statusLabel(status) {
       return { pending: '待核销', fulfilled: '已核销', cancelled: '已取消', expired: '已过期' }[status] || status
+    },
+
+    /**
+     * 时间展示：后端统一 UTC ISO（...Z），强制按北京时区渲染（B-2 时间统一）
+     * @param {string} iso - UTC ISO 时间串
+     * @returns {string} 北京时间展示串
+     */
+    fmtTime(iso) {
+      if (!iso) return '-'
+      const d = new Date(iso)
+      if (isNaN(d.getTime())) return '-'
+      return d.toLocaleString('zh-CN', {
+        timeZone: 'Asia/Shanghai',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+      })
     }
   }
 }

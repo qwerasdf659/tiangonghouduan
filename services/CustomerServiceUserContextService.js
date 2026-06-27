@@ -343,13 +343,13 @@ class CustomerServiceUserContextService {
         const lastMessage = await models.ChatMessage.findOne({
           where: { customer_service_session_id: session.customer_service_session_id },
           order: [['created_at', 'DESC']],
-          // 补 message_type/file_name/file_size：与会话列表口径一致，前端据此渲染预览，图片/文件不暴露 URL
+          // 补 message_type/metadata/message_source：与会话列表口径一致，前端据此渲染预览，图片/文件不暴露 URL
           attributes: [
             'content',
             'sender_type',
+            'message_source',
             'message_type',
-            'file_name',
-            'file_size',
+            'metadata',
             'created_at'
           ]
         })
@@ -359,10 +359,10 @@ class CustomerServiceUserContextService {
           ? {
               content: lastMessage.content ? lastMessage.content.substring(0, 50) : '',
               sender_type: lastMessage.sender_type,
+              message_source: lastMessage.message_source,
               message_type: lastMessage.message_type,
-              file_name: lastMessage.file_name,
-              file_size: lastMessage.file_size,
-              created_at: lastMessage.created_at
+              metadata: lastMessage.metadata,
+              created_at: lastMessage.get('created_at')
             }
           : null
         plain.message_count = await models.ChatMessage.count({

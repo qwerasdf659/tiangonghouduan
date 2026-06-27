@@ -57,6 +57,20 @@
       </div>
     </div>
 
+    <!-- 核销趋势折线（看板三：按日 生成/核销/过期 + 转化率；自动按数据范围 DataScope 收窄） -->
+    <div class="themed-card rounded-lg shadow p-6 mb-6">
+      <div class="flex items-center justify-between mb-4">
+        <h5 class="font-semibold">核销经营趋势</h5>
+        <div class="text-sm themed-text-muted">
+          区间转化率（核销/生成）：<span class="font-bold text-green-600" x-text="trendSummary.conversion_rate + '%'"></span>
+          ｜生成 <span x-text="trendSummary.generated"></span>
+          ｜核销 <span x-text="trendSummary.fulfilled"></span>
+          ｜过期 <span x-text="trendSummary.expired"></span>
+        </div>
+      </div>
+      <div x-ref="trendChart" class="h-80"></div>
+    </div>
+
     <!-- 门店维度柱状图 -->
     <div class="themed-card rounded-lg shadow p-6 mb-6">
       <h5 class="font-semibold mb-4">各门店核销分布</h5>
@@ -135,7 +149,7 @@
                   <td class="px-3 py-2" x-text="statusLabel(o.status)"></td>
                   <td class="px-3 py-2" x-text="o.item ? o.item.item_name : '-'"></td>
                   <td class="px-3 py-2" x-text="o.fulfilled_store_id || '-'"></td>
-                  <td class="px-3 py-2" x-text="o.fulfilled_at || '-'"></td>
+                  <td class="px-3 py-2" x-text="o.fulfilled_at ? fmtTime(o.fulfilled_at) : '-'"></td>
                 </tr>
               </template>
               <tr x-show="detailRows.length === 0">

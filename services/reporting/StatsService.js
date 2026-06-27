@@ -342,7 +342,7 @@ class StatsService {
 
       // 构建响应数据
       const todayStats = {
-        date: BeijingTimeHelper.formatForAPI(nowBeijing).formatted,
+        date: nowBeijing,
         timestamp: nowBeijing,
 
         // 用户相关统计

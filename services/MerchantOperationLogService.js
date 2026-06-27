@@ -608,8 +608,8 @@ class MerchantOperationLogService {
 
       logger.info('审计日志导出数据获取完成', {
         store_id,
-        start_time: start_time ? BeijingTimeHelper.formatForAPI(start_time) : null,
-        end_time: end_time ? BeijingTimeHelper.formatForAPI(end_time) : null,
+        start_time: start_time || null,
+        end_time: end_time || null,
         exported_count: logs.length
       })
 
@@ -655,14 +655,14 @@ class MerchantOperationLogService {
       if (dry_run) {
         logger.info('审计日志清理（干跑模式）', {
           retention_days,
-          cutoff_date: BeijingTimeHelper.formatForAPI(cutoffDate),
+          cutoff_date: cutoffDate,
           count_to_delete: countToDelete
         })
 
         return {
           dry_run: true,
           retention_days,
-          cutoff_date: BeijingTimeHelper.formatForAPI(cutoffDate),
+          cutoff_date: cutoffDate,
           count_to_delete: countToDelete,
           deleted_count: 0
         }
@@ -673,14 +673,14 @@ class MerchantOperationLogService {
 
       logger.info('审计日志清理完成', {
         retention_days,
-        cutoff_date: BeijingTimeHelper.formatForAPI(cutoffDate),
+        cutoff_date: cutoffDate,
         deleted_count: deletedCount
       })
 
       return {
         dry_run: false,
         retention_days,
-        cutoff_date: BeijingTimeHelper.formatForAPI(cutoffDate),
+        cutoff_date: cutoffDate,
         count_to_delete: countToDelete,
         deleted_count: deletedCount
       }

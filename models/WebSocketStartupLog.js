@@ -43,16 +43,7 @@ module.exports = sequelize => {
       start_time: {
         type: DataTypes.DATE,
         allowNull: false,
-        comment: '服务启动时间（北京时间）',
-        /**
-         * 获取格式化后的服务启动时间（北京时间）
-         *
-         * @returns {string|null} 格式化后的时间字符串；无值返回 null
-         */
-        get() {
-          const rawValue = this.getDataValue('start_time')
-          return rawValue ? BeijingTimeHelper.formatChinese(rawValue) : null
-        }
+        comment: '服务启动时间（北京时间）'
       },
       process_id: {
         type: DataTypes.STRING(50),
@@ -79,16 +70,7 @@ module.exports = sequelize => {
       stop_time: {
         type: DataTypes.DATE,
         allowNull: true,
-        comment: '服务停止时间（北京时间）',
-        /**
-         * 获取格式化后的服务停止时间（北京时间）
-         *
-         * @returns {string|null} 格式化后的时间字符串；无值返回 null
-         */
-        get() {
-          const rawValue = this.getDataValue('stop_time')
-          return rawValue ? BeijingTimeHelper.formatChinese(rawValue) : null
-        }
+        comment: '服务停止时间（北京时间）'
       },
       stop_reason: {
         type: DataTypes.STRING(200),
@@ -120,30 +102,12 @@ module.exports = sequelize => {
         type: DataTypes.DATE,
         allowNull: false,
         defaultValue: () => BeijingTimeHelper.createDatabaseTime(),
-        comment: '记录创建时间（北京时间）',
-        /**
-         * 获取格式化后的记录创建时间（北京时间）
-         *
-         * @returns {string|null} 格式化后的时间字符串；无值返回 null
-         */
-        get() {
-          const rawValue = this.getDataValue('created_at')
-          return rawValue ? BeijingTimeHelper.formatChinese(rawValue) : null
-        }
+        comment: '记录创建时间（北京时间）'
       },
       updated_at: {
         type: DataTypes.DATE,
         allowNull: true,
-        comment: '记录更新时间（服务停止时更新）',
-        /**
-         * 获取格式化后的记录更新时间（北京时间）
-         *
-         * @returns {string|null} 格式化后的时间字符串；无值返回 null
-         */
-        get() {
-          const rawValue = this.getDataValue('updated_at')
-          return rawValue ? BeijingTimeHelper.formatChinese(rawValue) : null
-        }
+        comment: '记录更新时间（服务停止时更新）'
       }
     },
     {

@@ -825,38 +825,26 @@ function dashboardPanelPage() {
      */
     async fetchAssetTrend() {
       try {
-        // 使用时间对比API获取趋势参考数据
-        const result = await request({ url: `${API_PREFIX}/console/dashboard/time-comparison` })
-        if (result.success && result.data) {
-          const { day_comparison } = result.data
-
-          // 后端返回的是日对比数据，转换为前端需要的趋势格式
-          // 由于后端只提供今日vs昨日对比，我们构建两天的数据
-          const today = new Date()
-          const yesterday = new Date(today)
-          yesterday.setDate(yesterday.getDate() - 1)
-
-          const formatDate = d =>
-            d.toLocaleDateString('zh-CN', {
-              month: '2-digit',
-              day: '2-digit',
-              timeZone: 'Asia/Shanghai'
-            })
-
-          return [
-            {
-              date: formatDate(yesterday),
-              inflow: day_comparison?.lottery_draws?.previous || 0,
-              outflow: day_comparison?.consumption?.previous || 0,
-              balance: 0
-            },
-            {
-              date: formatDate(today),
-              inflow: day_comparison?.lottery_draws?.current || 0,
-              outflow: day_comparison?.consumption?.current || 0,
-              balance: 0
+        /*
+         * 看板四（积分/资产经营大盘）：使用平台级 getAssetFlowTrend（按日真实 发放/消耗/净沉淀），
+         * 替代原"仅今日 vs 昨日两点"的 time-comparison 近似方案。
+         * 映射到既有趋势图数据形态 {date, inflow=发放, outflow=消耗, balance=累计净沉淀}。
+         */
+        const result = await request({
+          url: `${API_PREFIX}/console/assets/asset-flow-trend?days=30&asset_code=points`
+        })
+        if (result.success && result.data && Array.isArray(result.data.trend)) {
+          let cumulativeNet = 0
+          return result.data.trend.map(d => {
+            cumulativeNet += Number(d.net) || 0
+            return {
+              // date 已是后端北京日期 YYYY-MM-DD，截取月-日展示
+              date: String(d.date).slice(5),
+              inflow: Number(d.issued) || 0,
+              outflow: Number(d.consumed) || 0,
+              balance: Math.round(cumulativeNet * 10000) / 10000
             }
-          ]
+          })
         }
       } catch (e) {
         logger.warn('[DashboardPanel] fetchAssetTrend 失败:', e.message)

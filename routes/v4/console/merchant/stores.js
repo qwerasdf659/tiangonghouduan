@@ -188,11 +188,19 @@ router.get(
       page_size: parseInt(page_size)
     })
 
+    // 数据范围（DataScopeService 单一事实源）：管理员=全平台；店长/区域负责人=可见门店集合
+    const DataScopeService = req.app.locals.services.getService('data_scope')
+    const { scope: storeScope, store_ids: storeIds } = await DataScopeService.getAccessibleStoreIds(
+      req.user.user_id
+    )
+
     // 🔄 通过 ServiceManager 获取 StoreContributionService
     const StoreContributionService = req.app.locals.services.getService('store_contribution')
     const result = await StoreContributionService.getContributionRanking({
       days: parseInt(days) || 30,
-      limit: Math.min(parseInt(page_size) || 20, 100)
+      limit: Math.min(parseInt(page_size) || 20, 100),
+      // scope=all 不过滤（全平台）；否则按可见门店集合收窄
+      store_ids: storeScope === 'all' ? null : storeIds
     })
 
     return res.apiSuccess(result, '获取成功')

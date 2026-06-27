@@ -194,14 +194,6 @@ module.exports = sequelize => {
       replied_at: {
         type: DataTypes.DATE,
         allowNull: true,
-        /**
-         * getter方法：将replied_at时间格式化为中文显示格式
-         * @returns {string|null} 格式化后的中文时间字符串（如：2025年10月30日 23:15:00），未回复时返回null
-         */
-        get() {
-          const value = this.getDataValue('replied_at')
-          return value ? BeijingTimeHelper.formatChinese(value) : null
-        },
         comment:
           '回复时间（管理员执行回复操作的北京时间，业务用途：SLA响应时间统计、用户查看回复时间、审计日志记录，仅在已回复时有值，格式化为中文显示：2025年10月30日 23:15:00）'
       },
@@ -221,13 +213,6 @@ module.exports = sequelize => {
         type: DataTypes.DATE,
         allowNull: false,
         defaultValue: () => BeijingTimeHelper.createDatabaseTime(),
-        /**
-         * getter方法：将created_at时间格式化为中文显示格式
-         * @returns {string} 格式化后的中文时间字符串（如：2025年10月30日 23:15:00）
-         */
-        get() {
-          return BeijingTimeHelper.formatChinese(this.getDataValue('created_at'))
-        },
         comment:
           '创建时间（反馈提交的北京时间，必填字段，业务用途：反馈列表排序、统计分析、SLA计算基准，格式化为中文显示：2025年10月30日 23:15:00）'
       },
@@ -237,13 +222,6 @@ module.exports = sequelize => {
         type: DataTypes.DATE,
         allowNull: false,
         defaultValue: () => BeijingTimeHelper.createDatabaseTime(),
-        /**
-         * getter方法：将updated_at时间格式化为中文显示格式
-         * @returns {string} 格式化后的中文时间字符串（如：2025年10月30日 23:15:00）
-         */
-        get() {
-          return BeijingTimeHelper.formatChinese(this.getDataValue('updated_at'))
-        },
         comment:
           '更新时间（反馈最后更新的北京时间，Sequelize自动维护，业务用途：追踪反馈状态变更、审计日志、数据同步，每次save操作自动更新，格式化为中文显示）'
       }

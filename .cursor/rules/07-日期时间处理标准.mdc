@@ -3,7 +3,12 @@ alwaysApply: true
 lastUpdated: 2025年10月13日 20:19:57
 ---
 
-# ⏰ 日期时间处理标准（中国区域 - 北京时间统一规范）
+# ⏰ 日期时间处理标准（中国区域 - 存储/传输 UTC，展示北京时间）
+
+> 时间形态定稿（B-2，2026-06-25）：**API 对外时间字段统一为 UTC ISO8601 带 `Z`**（如 `2026-06-24T19:14:09.000Z`）。
+> 实现：`config/database.js` 的 `dateStrings:false` + `timezone:'+08:00'`，使 Sequelize JSON 序列化输出 UTC ISO；
+> 存储/传输用 UTC（无歧义、对齐大厂主流），展示层由前端统一组件强制按 `Asia/Shanghai` 渲染北京时间。
+> 相对时间（"2天前"）由前端实时计算。后端不再下发"已格式化的本地时间串/中文串/四合一对象"。
 
 ## 🔴 **基于实际时间处理问题的标准化体系**
 
@@ -38,14 +43,17 @@ lastUpdated: 2025年10月13日 20:19:57
 const BEIJING_TIME_STANDARD_SYSTEM = {
   // 系统时间配置标准
   timeConfig: {
-    // 内部存储：始终北京时间（GMT+8）
-    storage: 'Asia/Shanghai',
-    // 数据库：统一北京时间设置
-    database: { timezone: 'Asia/Shanghai', sessionTimeZone: '+08:00' },
-    // 前端显示：北京时间
+    // 内部存储/传输：UTC（标准做法，无歧义）
+    storage: 'UTC',
+    // 数据库连接：会话时区 +08:00（把库内北京墙钟正确解释为北京时刻），dateStrings:false 使序列化输出 UTC ISO
+    database: { timezone: '+08:00', sessionTimeZone: '+08:00', dateStrings: false },
+    // 前端显示：统一组件强制按 Asia/Shanghai 展示北京时间
     display: { userTimeZone: 'Asia/Shanghai', format: 'YYYY-MM-DD HH:mm:ss' },
-    // API传输：ISO8601格式（包含+08:00时区信息）
-    api: { format: 'ISO8601', timezone: 'Asia/Shanghai' }
+    /*
+     * API传输：UTC ISO8601 带 Z（B-2 定稿，2026-06-25）。
+     * 例：2026-06-24T19:14:09.000Z（= 北京 2026-06-25 03:14:09）。展示转北京交前端统一组件。
+     */
+    api: { format: 'ISO8601-UTC', timezone: 'UTC', example: '2026-06-24T19:14:09.000Z' }
   },
 
   // 统一时间创建函数
@@ -87,18 +95,23 @@ const BEIJING_TIME_STANDARD_SYSTEM = {
 
   // 禁用的时间处理方式（基于实际问题发现）
   forbiddenPatterns: [
-    'new Date().toLocaleString()',  // 本地时间，时区不确定
-    'toUTCString()',                // UTC时间，不适用于中国区域
-    'getTime()',                    // 时间戳，不包含时区信息
-    'toString()'                    // 包含时区信息，格式不统一
+    'new Date().toLocaleString()', // 本地时间，时区不确定
+    'toUTCString()', // RFC1123 文本格式，非 ISO8601，对外格式不统一（应用 toISOString()）
+    'getTime()', // 裸时间戳，不含时区标识；如需对外用 toISOString()
+    'toString()' // 含时区文本，格式不统一
   ],
 
-  // 推荐的时间处理方式
+  /*
+   * 推荐的时间处理方式
+   * B-2：API 对外时间字段统一 UTC ISO（toISOString() 产出 ...Z）；
+   * 模型时间字段裸传（dateStrings:false 下 Sequelize JSON 自动输出 UTC ISO，无需手动包装）；
+   * 北京时间展示与相对时间在前端统一组件完成。
+   */
   recommendedPatterns: [
-    'BEIJING_TIME_STANDARD_SYSTEM.createTime.beijing()',
-    'BEIJING_TIME_STANDARD_SYSTEM.createTime.beijingISO()',
-    'new Date().toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })',
-    'Intl.DateTimeFormat("zh-CN", { timeZone: "Asia/Shanghai" }).format(date)'
+    'date.toISOString() // → UTC ISO8601 带 Z（API对外标准）',
+    '模型时间字段裸传（不再用 formatForAPI/formatChinese 包装）',
+    'BeijingTimeHelper.apiTimestamp() // 仅系统级响应/日志的北京ISO',
+    '前端：new Date(zStr) 后强制按 Asia/Shanghai 展示'
   ],
 
   // 验证时间处理代码规范性
@@ -135,11 +148,17 @@ const BEIJING_TIME_STANDARD_SYSTEM = {
 const DATE_FORMAT_STANDARD_SYSTEM = {
   // 标准格式定义
   formats: {
-    // ISO格式：系统内部传输（北京时间）
+    // ISO格式：API对外传输统一形态（UTC，带 Z）
     iso: {
+      format: 'YYYY-MM-DDTHH:mm:ss.sssZ',
+      example: '2026-06-24T19:14:09.000Z',
+      usage: 'API传输（对外统一）、跨端无歧义；展示转北京交前端'
+    },
+    // 北京本地ISO（仅 /health 等少数系统响应或内部日志可用，非业务字段对外形态）
+    isoBeijing: {
       format: 'YYYY-MM-DDTHH:mm:ss.sss+08:00',
-      example: '2025-10-13T20:19:57.000+08:00',
-      usage: 'API传输、数据库存储、日志记录'
+      example: '2026-06-25T03:14:09.000+08:00',
+      usage: '系统级响应时间戳（ApiResponse middleware）、日志记录'
     },
     // 显示格式：用户界面（北京时间）
     display: {

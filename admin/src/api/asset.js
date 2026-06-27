@@ -27,6 +27,8 @@ export const ASSET_ENDPOINTS = {
   TRANSACTIONS: `${API_PREFIX}/console/assets/transactions`,
   PORTFOLIO: `${API_PREFIX}/console/assets/portfolio`,
   EXPORT: `${API_PREFIX}/console/assets/export`,
+  // 积分/资产经营大盘趋势（看板四，2026-06-25）：按日发放/消耗/净沉淀
+  FLOW_TREND: `${API_PREFIX}/console/assets/asset-flow-trend`,
 
   // 资产调整
   ADJUSTMENT_ASSET_TYPES: `${API_PREFIX}/console/asset-adjustment/asset-types`,

@@ -175,9 +175,11 @@ class CustomerServiceCompensateService {
       await models.ChatMessage.create(
         {
           customer_service_session_id: session_id,
-          sender_type: 'system',
+          // 系统消息：sender_type 仍为 admin（ENUM 仅 user/admin），由 message_source='system' 标识系统消息
+          sender_type: 'admin',
           sender_id: operator_id,
-          message_type: 'system',
+          message_source: 'system',
+          message_type: 'text',
           content: `【补偿发放】${compensationSummary}。原因：${reason}`
         },
         { transaction }

@@ -109,6 +109,28 @@ router.post(
 )
 
 /**
+ * GET /issues/stats - 工单统计看板（按状态/类型/优先级分组 + 平均处理时长 + 待处理积压）
+ *
+ * @route GET /api/v4/console/customer-service/issues/stats
+ * @access Admin (role_level >= 100)
+ * @query {number} [days=30] - 统计天数
+ *
+ * 注意：本路由必须注册在 GET /:id 之前，否则 'stats' 会被 :id 误匹配。
+ */
+router.get(
+  '/stats',
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const models = req.app.locals.models
+    const IssueService = req.app.locals.services.getService('cs_issue')
+    const result = await IssueService.getStats(models, {
+      days: parseInt(req.query.days, 10) || 30
+    })
+    return res.apiSuccess(result, '获取工单统计成功')
+  })
+)
+
+/**
  * GET /issues/:id - 工单详情
  *
  * @route GET /api/v4/console/customer-service/issues/:id

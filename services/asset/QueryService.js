@@ -635,6 +635,87 @@ class QueryService {
       transaction_count: Number(result?.transaction_count) || 0
     }
   }
+
+  /**
+   * 平台级资产流水经营大盘 - 按日趋势（发放/消耗/净沉淀）
+   *
+   * @description 看板四数据源（见架构决策文档 附·四 / 复·七 C）：复用 asset_transactions，零新表。
+   *   - issued（发放）：当日 SUM(delta_amount > 0)
+   *   - consumed（消耗）：当日 SUM(|delta_amount < 0|)
+   *   - net（净沉淀）：issued - consumed
+   *   平台「今日」= 趋势数组末点（不另开方法，避免口径漂移；getTodaySummary 是个人级不复用）。
+   *   ⚠️ 数据敏感：平台经营机密，仅 Web 后台 role_level>=100，绝不下发小程序。
+   *
+   * @param {Object} [options] - 查询选项
+   * @param {number} [options.days=30] - 趋势天数
+   * @param {string} [options.asset_code='points'] - 资产代码
+   * @returns {Promise<Object>} { range_days, asset_code, trend:[{date,issued,consumed,net,transaction_count}], today, totals, updated_at }
+   */
+  static async getAssetFlowTrend(options = {}) {
+    const days = parseInt(options.days, 10) || 30
+    const assetCode = options.asset_code || AssetCode.POINTS
+    const startDate = BeijingTimeHelper.daysAgo(days)
+
+    // 按日聚合（DB 会话时区 +08:00，DATE() 取北京日期），排除测试数据
+    const rows = await sequelize.query(
+      `SELECT
+         DATE(created_at) AS date,
+         COALESCE(SUM(CASE WHEN delta_amount > 0 THEN delta_amount ELSE 0 END), 0) AS issued,
+         COALESCE(SUM(CASE WHEN delta_amount < 0 THEN ABS(delta_amount) ELSE 0 END), 0) AS consumed,
+         COUNT(*) AS transaction_count
+       FROM asset_transactions
+       WHERE asset_code = :asset_code
+         AND created_at >= :start_date
+         AND (is_test_data = 0 OR is_test_data IS NULL)
+         AND (is_invalid = 0 OR is_invalid IS NULL)
+       GROUP BY DATE(created_at)
+       ORDER BY DATE(created_at) ASC`,
+      {
+        replacements: { asset_code: assetCode, start_date: startDate },
+        type: sequelize.QueryTypes.SELECT
+      }
+    )
+
+    const trend = rows.map(r => {
+      const issued = Number(r.issued) || 0
+      const consumed = Number(r.consumed) || 0
+      return {
+        // r.date 可能是 Date 对象（原生 SQL DATE()），统一格式化为北京日期 YYYY-MM-DD
+        date: BeijingTimeHelper.formatDate(r.date, 'YYYY-MM-DD'),
+        issued,
+        consumed,
+        net: Math.round((issued - consumed) * 10000) / 10000,
+        transaction_count: Number(r.transaction_count) || 0
+      }
+    })
+
+    const totals = trend.reduce(
+      (acc, r) => {
+        acc.issued += r.issued
+        acc.consumed += r.consumed
+        acc.net += r.net
+        return acc
+      },
+      { issued: 0, consumed: 0, net: 0 }
+    )
+
+    return {
+      range_days: days,
+      asset_code: assetCode,
+      trend,
+      // 平台今日 = 趋势末点（无数据则零值）
+      today:
+        trend.length > 0
+          ? trend[trend.length - 1]
+          : { date: null, issued: 0, consumed: 0, net: 0, transaction_count: 0 },
+      totals: {
+        issued: Math.round(totals.issued * 10000) / 10000,
+        consumed: Math.round(totals.consumed * 10000) / 10000,
+        net: Math.round(totals.net * 10000) / 10000
+      },
+      updated_at: new Date().toISOString()
+    }
+  }
 }
 
 module.exports = QueryService

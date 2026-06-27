@@ -64,21 +64,27 @@ function getContentAuditEngine(req) {
 }
 
 /**
- * 通过 Socket.IO 推送审核链事件通知（非致命，失败仅记录日志）
+ * 通过 Socket.IO 推送审核链「领域事件」给管理后台（非致命，失败仅记录日志）
+ *
+ * 设计要点（领域事件 ≠ 用户通知，2026-06-27 修复）：
+ * - 这是「领域事件」：用途是让 Web 管理后台收到后刷新待办/审核列表与徽标，给机器消费，
+ *   不含 title/content，不应弹窗。
+ * - 因此统一走通用事件通道 broadcast('approval_chain_event', ...)（仅管理员），
+ *   不再借用 broadcastNotificationToAllAdmins（其 emit 的 'notification' 事件是「用户通知」通道，
+ *   前端会据此弹浏览器通知，缺 title/content 会显示 undefined）。
+ * - 原事件类型（如 approval_chain_step_approved）下沉为 payload.event 子字段，供前端按需区分。
+ *
  * @param {Object} req - Express 请求对象
- * @param {string} event - 事件类型
- * @param {Object} data - 事件数据
+ * @param {string} event - 审核链事件类型（approval_chain_step_approved/_rejected/_batch 等）
+ * @param {Object} data - 事件数据（业务字段，如 step_id/is_chain_completed/final_result）
  * @returns {void}
  */
 function pushApprovalChainSocketEvent(req, event, data) {
   try {
     const wsService = req.app.locals.services.getService('chat_web_socket')
-    if (wsService && typeof wsService.broadcastNotificationToAllAdmins === 'function') {
-      wsService.broadcastNotificationToAllAdmins({
-        type: event,
-        ...data,
-        timestamp: new Date().toISOString()
-      })
+    if (wsService && typeof wsService.broadcast === 'function') {
+      // adminsOnly：审核链领域事件只发管理后台，不广播给普通用户端
+      wsService.broadcast('approval_chain_event', { event, ...data }, { adminsOnly: true })
     }
   } catch (err) {
     logger.warn(`[审核链] Socket.IO推送失败（非致命）: ${err.message}`)

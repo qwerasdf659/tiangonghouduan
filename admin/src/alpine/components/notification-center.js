@@ -342,6 +342,19 @@ export function notificationCenter() {
           this.handleWebSocketMessage({ type: 'badge_update', payload: data })
         })
 
+        /*
+         * 审核链「领域事件」（approval_chain_event）— 2026-06-27 新增
+         * 用途：店员/店长在小程序或后台审核（通过/拒绝/批量）后，后端广播此领域事件，
+         *       Web 管理后台据此「静默刷新」待办列表与侧边栏徽标，不弹窗（领域事件 ≠ 用户通知）。
+         * 不再走 'notification' 通道（那是给人看的通知，缺 title/content 会弹出 undefined）。
+         * 复用现有刷新机制：派发 refresh-consumption（finance-management 消费列表已监听）+ refresh-badges（侧边栏徽标）。
+         */
+        this.socket.on('approval_chain_event', data => {
+          logger.debug('[NotificationCenter] 收到审核链领域事件:', data)
+          window.dispatchEvent(new CustomEvent('refresh-consumption'))
+          window.dispatchEvent(new CustomEvent('refresh-badges'))
+        })
+
         this.socket.on('new_message', data => {
           this.handleWebSocketMessage({
             type: 'notification',
@@ -482,22 +495,29 @@ export function notificationCenter() {
     /**
      * 客服聊天消息预览文案（按 message_type 渲染，与客服工作台会话列表 getSessionLastMessage 规则对齐）
      *
-     * 业务规则（对齐后端 chat_messages.message_type）：
-     * - image  → [图片]（不暴露原始 OSS URL）
-     * - file   → [文件] 文件名（file_name 缺失时仅 [文件]）
-     * - system → 系统提示原文
-     * - text   → 文本原文
+     * 业务规则（对齐后端富消息建模，B/富消息定稿 2026-06-25）：
+     * - 系统消息（message_source==='system'）→ content 原文（系统提示）
+     * - image    → [图片]（不暴露原始 OSS URL）
+     * - file     → [文件] 文件名（content 即真实文件名；metadata.file_name 兜底）
+     * - location → [位置] 地址（content 即可读地址；metadata.address/name 兜底）
+     * - text     → 文本原文
      *
-     * @param {Object} data - 后端 new_message 推送的消息对象（含 message_type/content/file_name）
+     * @param {Object} data - 后端 new_message 推送的消息对象（含 message_type/message_source/content/metadata）
      * @returns {string} 用于通知正文展示的预览文案
      */
     formatChatMessagePreview(data) {
       if (!data || typeof data !== 'object') return '收到新消息'
+      if (data.message_source === 'system') {
+        return typeof data.content === 'string' && data.content ? data.content : '系统消息'
+      }
+      const meta = data.metadata || {}
       switch (data.message_type) {
         case 'image':
           return '[图片]'
         case 'file':
-          return data.file_name ? `[文件] ${data.file_name}` : '[文件]'
+          return `[文件] ${data.content || meta.file_name || ''}`.trim()
+        case 'location':
+          return `[位置] ${data.content || meta.address || meta.name || ''}`.trim()
         default:
           return typeof data.content === 'string' && data.content ? data.content : '收到新消息'
       }

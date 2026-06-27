@@ -411,34 +411,44 @@
 
                 <template x-for="(msg, idx) in messages" :key="msg.chat_message_id || idx">
                   <div>
-                    <!-- 系统消息 -->
-                    <template x-if="msg.sender_type === 'system' || msg.message_type === 'system'">
+                    <!-- 系统消息（统一由 message_source==='system' 判定；message_type 不再含 system） -->
+                    <template x-if="msg.message_source === 'system'">
                       <div class="flex justify-center">
                         <span class="text-[10px] themed-text-hint bg-black/5 px-3 py-1 rounded-full" x-text="msg.content"></span>
                       </div>
                     </template>
 
                     <!-- 用户消息（左） -->
-                    <template x-if="msg.sender_type === 'user'">
+                    <template x-if="msg.message_source !== 'system' && msg.sender_type === 'user'">
                       <div class="flex items-end gap-2 max-w-[75%]">
                         <div class="flex-shrink-0 w-8 h-8 rounded-full bg-gray-400 flex items-center justify-center text-white text-[10px] font-medium">
                           用户
                         </div>
                         <div>
                           <div class="bg-yellow-50 border border-yellow-200 rounded-2xl rounded-bl-md px-3 py-2 shadow-sm">
-                            <!-- 图片消息：点击页内放大预览 -->
+                            <!-- 图片消息：URL 来自 metadata.image_url（content 为占位 [图片]） -->
                             <template x-if="msg.message_type === 'image'">
-                              <img :src="msg.content" alt="用户发送的图片" @click="openImagePreview(msg.content, '用户发送的图片')" class="max-w-[200px] max-h-[200px] rounded-lg object-cover cursor-pointer" loading="lazy">
+                              <img :src="msg.metadata?.image_url" alt="用户发送的图片" @click="openImagePreview(msg.metadata?.image_url, '用户发送的图片')" class="max-w-[200px] max-h-[200px] rounded-lg object-cover cursor-pointer" loading="lazy">
+                            </template>
+                            <!-- 文件消息：从 metadata 渲染文件卡片（content 为真实文件名） -->
+                            <template x-if="msg.message_type === 'file'">
+                              <a :href="msg.metadata?.file_url" target="_blank" rel="noopener" class="flex items-center gap-2 text-sm text-blue-600 hover:underline">
+                                <span>📎</span><span x-text="msg.content || msg.metadata?.file_name || '文件'"></span>
+                              </a>
+                            </template>
+                            <!-- 位置消息：地址卡片（content 为可读地址，坐标在 metadata） -->
+                            <template x-if="msg.message_type === 'location'">
+                              <div class="text-sm themed-text">📍 <span x-text="msg.content || msg.metadata?.address || '位置'"></span></div>
                             </template>
                             <!-- 文本消息 -->
-                            <template x-if="msg.message_type !== 'image'">
+                            <template x-if="!['image','file','location'].includes(msg.message_type)">
                               <p class="text-sm themed-text break-words whitespace-pre-wrap" x-text="msg.content || ''"></p>
                             </template>
                           </div>
                           <!-- 图片下载按钮（框外右下角） -->
                           <template x-if="msg.message_type === 'image'">
                             <div class="flex justify-end mt-1">
-                              <button @click.stop="downloadPreviewImage(msg.content)"
+                              <button @click.stop="downloadPreviewImage(msg.metadata?.image_url)"
                                       class="w-7 h-7 flex items-center justify-center rounded-full bg-black/40 hover:bg-black/65 text-white text-sm shadow"
                                       title="下载图片">⬇</button>
                             </div>
@@ -449,26 +459,36 @@
                     </template>
 
                     <!-- 管理员消息（右） -->
-                    <template x-if="msg.sender_type === 'admin'">
+                    <template x-if="msg.message_source !== 'system' && msg.sender_type === 'admin'">
                       <div class="flex items-end gap-2 max-w-[75%] ml-auto flex-row-reverse">
                         <div class="flex-shrink-0 w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white text-[10px] font-medium">
                           客服
                         </div>
                         <div>
                           <div class="bg-white border border-gray-200 text-gray-800 rounded-2xl rounded-br-md px-3 py-2 shadow-sm">
-                            <!-- 图片消息：点击页内放大预览 -->
+                            <!-- 图片消息：URL 来自 metadata.image_url（content 为占位 [图片]） -->
                             <template x-if="msg.message_type === 'image'">
-                              <img :src="msg.content" alt="客服发送的图片" @click="openImagePreview(msg.content, '客服发送的图片')" class="max-w-[200px] max-h-[200px] rounded-lg object-cover cursor-pointer" loading="lazy">
+                              <img :src="msg.metadata?.image_url" alt="客服发送的图片" @click="openImagePreview(msg.metadata?.image_url, '客服发送的图片')" class="max-w-[200px] max-h-[200px] rounded-lg object-cover cursor-pointer" loading="lazy">
+                            </template>
+                            <!-- 文件消息：从 metadata 渲染文件卡片（content 为真实文件名） -->
+                            <template x-if="msg.message_type === 'file'">
+                              <a :href="msg.metadata?.file_url" target="_blank" rel="noopener" class="flex items-center gap-2 text-sm text-blue-600 hover:underline">
+                                <span>📎</span><span x-text="msg.content || msg.metadata?.file_name || '文件'"></span>
+                              </a>
+                            </template>
+                            <!-- 位置消息：地址卡片 -->
+                            <template x-if="msg.message_type === 'location'">
+                              <div class="text-sm">📍 <span x-text="msg.content || msg.metadata?.address || '位置'"></span></div>
                             </template>
                             <!-- 文本消息 -->
-                            <template x-if="msg.message_type !== 'image'">
+                            <template x-if="!['image','file','location'].includes(msg.message_type)">
                               <p class="text-sm break-words whitespace-pre-wrap" x-text="msg.content || ''"></p>
                             </template>
                           </div>
                           <!-- 图片下载按钮（框外左下角，与右对齐气泡呼应） -->
                           <template x-if="msg.message_type === 'image'">
                             <div class="flex justify-start mt-1">
-                              <button @click.stop="downloadPreviewImage(msg.content)"
+                              <button @click.stop="downloadPreviewImage(msg.metadata?.image_url)"
                                       class="w-7 h-7 flex items-center justify-center rounded-full bg-black/40 hover:bg-black/65 text-white text-sm shadow"
                                       title="下载图片">⬇</button>
                             </div>

@@ -23,6 +23,7 @@ const { optionalAuth } = require('../../../middleware/auth')
 const logger = require('../../../utils/logger').logger
 const { asyncHandler } = require('../../../middleware/validation')
 const displayNameHelper = require('../../../utils/displayNameHelper')
+const { getImageUrl } = require('../../../utils/ImageUrlHelper')
 // slot_type 白名单单一真相源：直接引用模型导出，避免多处硬编码漂移
 const { VALID_SLOT_TYPES } = require('../../../models/AdSlot')
 
@@ -74,8 +75,12 @@ router.get(
         ad_creative_id: creative.ad_creative_id || null,
         title: creative.title || item.campaign_name,
         content_type: creative.content_type || 'image',
+        /*
+         * 统一走 ImageUrlHelper.getImageUrl（带 cache-buster：有 hash 用 ?h= 永久缓存，无则 ?v= 启动版本号），
+         * 不再手拼裸 URL——避免客户端缓存历史 404 导致 banner 长期空白（2026-06-28 修复）
+         */
         image_url: creative.media_object_key
-          ? `${process.env.PUBLIC_BASE_URL}/api/v4/images/${creative.media_object_key}`
+          ? getImageUrl(creative.media_object_key, creative.media_content_hash)
           : null,
         image_width: creative.media_width || null,
         image_height: creative.media_height || null,

@@ -675,13 +675,13 @@ class CoreService {
     logger.info('软删除消费记录成功', {
       consumption_record_id: recordId,
       user_id: userId,
-      deleted_at: BeijingTimeHelper.formatForAPI(deletedAt)
+      deleted_at: deletedAt
     })
 
     return {
       consumption_record_id: recordId,
       is_deleted: 1,
-      deleted_at: BeijingTimeHelper.formatForAPI(deletedAt),
+      deleted_at: deletedAt,
       record_type: 'consumption',
       note: '消费记录已删除，将不再显示在列表中'
     }

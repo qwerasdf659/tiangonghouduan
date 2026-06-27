@@ -14,7 +14,6 @@
 'use strict'
 
 const { Model, DataTypes } = require('sequelize')
-const BeijingTimeHelper = require('../utils/timeHelper')
 
 /** 允许的定价模式枚举 */
 const VALID_PRICING_MODES = ['sum', 'discount', 'fixed']
@@ -130,19 +129,11 @@ module.exports = sequelize => {
       created_at: {
         type: DataTypes.DATE,
         allowNull: false,
-        /** @returns {string|null} 北京时间格式化字符串 */
-        get() {
-          return BeijingTimeHelper.formatChinese(this.getDataValue('created_at'))
-        },
         comment: '创建时间'
       },
       updated_at: {
         type: DataTypes.DATE,
         allowNull: false,
-        /** @returns {string|null} 北京时间格式化字符串 */
-        get() {
-          return BeijingTimeHelper.formatChinese(this.getDataValue('updated_at'))
-        },
         comment: '更新时间'
       }
     },

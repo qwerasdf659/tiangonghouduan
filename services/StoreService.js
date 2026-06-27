@@ -781,8 +781,8 @@ class StoreService {
       assigned_to: store.assigned_to,
       merchant_id: store.merchant_id,
       notes: store.notes,
-      created_at: BeijingTimeHelper.formatForAPI(store.created_at),
-      updated_at: BeijingTimeHelper.formatForAPI(store.updated_at)
+      created_at: store.created_at,
+      updated_at: store.updated_at
     }
 
     // 关联的业务员信息

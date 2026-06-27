@@ -48,9 +48,11 @@ module.exports = sequelize => {
       },
 
       message_type: {
-        type: DataTypes.ENUM('text', 'image', 'system', 'file'),
+        type: DataTypes.STRING(32),
+        allowNull: false,
         defaultValue: 'text',
-        comment: '消息类型：text-文字 image-图片 system-系统 file-文件'
+        comment:
+          '消息内容类型（合法值来自 system_dictionaries.dict_type=message_type：text/image/file/location；系统消息由 message_source=system 表达，不再用 message_type=system）'
       },
 
       status: {
@@ -74,19 +76,8 @@ module.exports = sequelize => {
       metadata: {
         type: DataTypes.JSON,
         allowNull: true,
-        comment: '扩展数据(图片信息等)'
-      },
-
-      file_name: {
-        type: DataTypes.STRING(255),
-        allowNull: true,
-        comment: '文件原始名（message_type=file 时使用，如 报告.pdf；其它类型为 NULL）'
-      },
-
-      file_size: {
-        type: DataTypes.BIGINT,
-        allowNull: true,
-        comment: '文件字节数（message_type=file 时使用，用于前端展示文件大小；其它类型为 NULL）'
+        comment:
+          '富消息结构化负载（按 message_type）：file→{file_url,file_name,file_size}；image→{image_url}；location→{latitude,longitude,name,address}；text 通常为 null'
       }
     },
     {

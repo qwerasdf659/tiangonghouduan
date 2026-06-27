@@ -330,9 +330,9 @@ class ConsumptionRecord extends Model {
       merchant_notes: this.merchant_notes,
       admin_notes: this.admin_notes,
       reviewed_by: this.reviewed_by,
-      reviewed_at: this.reviewed_at ? BeijingTimeHelper.formatForAPI(this.reviewed_at) : null,
-      created_at: BeijingTimeHelper.formatForAPI(this.created_at),
-      updated_at: BeijingTimeHelper.formatForAPI(this.updated_at),
+      reviewed_at: this.reviewed_at,
+      created_at: this.created_at,
+      updated_at: this.updated_at,
       age: this.getAge(),
       review_duration: this.getReviewDuration(),
       // 异常检测字段（P1 阶段 - 2026-01-31）

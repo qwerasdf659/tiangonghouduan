@@ -160,9 +160,9 @@ router.get(
  * @returns {number} data.user_id - 用户ID
  * @returns {string} data.user_uuid - 用户UUID
  * @returns {string} data.nonce - 一次性随机数
- * @returns {string} data.expires_at - 过期时间（北京时间）
- * @returns {string} data.generated_at - 生成时间（北京时间）
- * @returns {string} data.validity - 有效期描述
+ * @returns {Object} data.expires_at - 过期时间（北京时间对象：{iso,beijing,timestamp,relative}）
+ * @returns {Object} data.generated_at - 生成时间（北京时间对象：{iso,beijing,timestamp,relative}）
+ * @returns {number} data.validity_seconds - 有效期（秒，数值型，前端倒计时直用）
  * @returns {string} data.algorithm - 签名算法
  * @returns {string} data.note - 使用说明
  * @returns {string} data.usage - 使用方式
@@ -237,7 +237,7 @@ router.get(
         nonce: qrCodeInfo.nonce,
         expires_at: qrCodeInfo.expires_at,
         generated_at: qrCodeInfo.generated_at,
-        validity: qrCodeInfo.validity,
+        validity_seconds: qrCodeInfo.validity_seconds,
         algorithm: qrCodeInfo.algorithm,
         note: qrCodeInfo.note,
         usage: '管理员为用户生成的动态二维码'

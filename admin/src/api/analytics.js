@@ -66,6 +66,10 @@ export const ANALYTICS_ENDPOINTS = {
   FINANCE_SETTLEMENTS: `${API_PREFIX}/console/finance/settlements`,
   FINANCE_REPORTS: `${API_PREFIX}/console/finance/reports`,
 
+  // 核销经营看板（看板三，2026-06-25）：门店核销概况 + 按日趋势/转化率（接 DataScope 范围过滤）
+  REDEMPTION_STORE_OVERVIEW: `${API_PREFIX}/console/business-records/redemption-orders/store-overview`,
+  REDEMPTION_TREND: `${API_PREFIX}/console/business-records/redemption-orders/trend`,
+
   // 活动预算（后端使用 lottery_campaign_id 作为路由参数）
   CAMPAIGN_BUDGET_BATCH_STATUS: `${API_PREFIX}/console/campaign-budget/batch-status`,
   CAMPAIGN_BUDGET_DETAIL: `${API_PREFIX}/console/campaign-budget/campaigns/:lottery_campaign_id`,

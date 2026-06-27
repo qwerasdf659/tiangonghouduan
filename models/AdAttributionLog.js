@@ -74,10 +74,6 @@ module.exports = sequelize => {
         type: DataTypes.DATE,
         allowNull: false,
         defaultValue: () => BeijingTimeHelper.createDatabaseTime(),
-        /** @returns {string} 北京时间格式的日期字符串 */
-        get() {
-          return BeijingTimeHelper.formatChinese(this.getDataValue('click_at'))
-        },
         comment: '点击时间'
       },
 
@@ -85,10 +81,6 @@ module.exports = sequelize => {
         type: DataTypes.DATE,
         allowNull: false,
         defaultValue: () => BeijingTimeHelper.createDatabaseTime(),
-        /** @returns {string} 北京时间格式的日期字符串 */
-        get() {
-          return BeijingTimeHelper.formatChinese(this.getDataValue('conversion_at'))
-        },
         comment: '转化时间'
       },
 
@@ -104,10 +96,6 @@ module.exports = sequelize => {
         type: DataTypes.DATE,
         allowNull: false,
         defaultValue: () => BeijingTimeHelper.createDatabaseTime(),
-        /** @returns {string} 北京时间格式的日期字符串 */
-        get() {
-          return BeijingTimeHelper.formatChinese(this.getDataValue('created_at'))
-        },
         comment: '创建时间（归因记录时间）'
       }
     },

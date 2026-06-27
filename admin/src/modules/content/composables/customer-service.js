@@ -70,7 +70,9 @@ export function useCustomerServiceState() {
       within_1min_rate: 0,
       within_1min_display: '--',
       today_sessions: 0
-    }
+    },
+    // 7 日响应趋势数据（[{date, avg_seconds, within_1min_rate, session_count}]，升序），供折线渲染
+    responseTrend7d: []
   }
 }
 
@@ -293,7 +295,10 @@ export function useCustomerServiceMethods() {
           return
         }
 
-        await this._sendMessageContent(uploadRes.data.public_url, 'image')
+        // 富消息契约：图片 content 为占位 [图片]，真实 URL 进 metadata.image_url（与后端一致）
+        await this._sendMessageContent('[图片]', 'image', {
+          image_url: uploadRes.data.public_url
+        })
       } catch (error) {
         logger.error('发送图片失败:', error)
         this.showError(error.message || '图片上传失败')
@@ -304,12 +309,13 @@ export function useCustomerServiceMethods() {
     },
 
     /**
-     * 发送消息内核（文本/图片共用）
-     * @param {string} content - 文本内容或图片 URL
-     * @param {('text'|'image')} message_type - 消息类型
+     * 发送消息内核（文本/图片/文件/位置共用）
+     * @param {string} content - 可读内容（文本正文 / 图片占位[图片] / 文件名 / 地址）
+     * @param {('text'|'image'|'file'|'location')} message_type - 消息类型
+     * @param {Object|null} [metadata] - 富消息结构化负载（image→image_url；file→file_url/file_name/file_size；location→坐标/地址）
      * @returns {Promise<boolean>} 是否发送成功
      */
-    async _sendMessageContent(content, message_type) {
+    async _sendMessageContent(content, message_type, metadata = null) {
       if (!this.currentSessionId) {
         this.showError('请先选择一个会话')
         return false
@@ -321,15 +327,18 @@ export function useCustomerServiceMethods() {
             session_id: this.currentSessionId
           }),
           method: 'POST',
-          data: { content, message_type }
+          data: { content, message_type, metadata }
         })
 
         if (response && response.success) {
           this.messages.push({
             chat_message_id: response.data?.chat_message_id,
             sender_type: 'admin',
-            content,
+            message_source: 'admin_client',
+            // 后端归一化后回传的 content/metadata 优先（如 file 的 content=真实文件名）
+            content: response.data?.content ?? content,
             message_type,
+            metadata: response.data?.metadata ?? metadata,
             created_at: response.data?.created_at || new Date().toISOString()
           })
           this.$nextTick(() => this.scrollToBottom())
@@ -631,14 +640,15 @@ export function useCustomerServiceMethods() {
     /**
      * 获取会话最后一条消息的预览文案（按 message_type 渲染，唯一真相源）
      *
-     * 业务规则（与后端 chat_messages.message_type 对齐）：
-     * - image  → [图片]（不暴露原始 URL）
-     * - file   → [文件] 文件名（file_name 缺失时仅显示 [文件]）
-     * - system → 系统消息原文（content 即提示文案）
-     * - text   → 文本原文
+     * 业务规则（与后端富消息建模对齐，B/富消息定稿 2026-06-25）：
+     * - 系统消息（message_source==='system'）→ content 原文（系统提示）
+     * - image    → [图片]（不暴露原始 URL，URL 在 metadata.image_url）
+     * - file     → [文件] 文件名（content 即真实文件名；metadata.file_name 兜底）
+     * - location → [位置] 地址（content 即可读地址；metadata.address/name 兜底）
+     * - text     → 文本原文
      *
      * 数据来源兼容：会话列表接口下发 last_message；用户历史接口下发 last_message_preview，
-     * 两者字段同名（message_type/content/file_name），此处统一消费。
+     * 两者字段同名（message_type/message_source/content/metadata），此处统一消费。
      *
      * @param {Object} session - 会话对象
      * @returns {string} 预览文案
@@ -647,11 +657,19 @@ export function useCustomerServiceMethods() {
       const msg = session.last_message || session.last_message_preview
       if (!msg || typeof msg !== 'object') return '暂无消息'
 
+      // 系统消息统一由 message_source 判定（message_type 不再含 system）
+      if (msg.message_source === 'system') {
+        return typeof msg.content === 'string' && msg.content ? msg.content : '系统消息'
+      }
+
+      const meta = msg.metadata || {}
       switch (msg.message_type) {
         case 'image':
           return '[图片]'
         case 'file':
-          return msg.file_name ? `[文件] ${msg.file_name}` : '[文件]'
+          return `[文件] ${msg.content || meta.file_name || ''}`.trim()
+        case 'location':
+          return `[位置] ${msg.content || meta.address || meta.name || ''}`.trim()
         default:
           return typeof msg.content === 'string' && msg.content ? msg.content : '暂无消息'
       }
@@ -706,7 +724,7 @@ export function useCustomerServiceMethods() {
       try {
         const response = await request({
           url: CONTENT_ENDPOINTS.CUSTOMER_SERVICE_RESPONSE_STATS,
-          params: { days: 1 }
+          params: { days: 7 }
         })
 
         if (response && response.success && response.data) {
@@ -721,6 +739,10 @@ export function useCustomerServiceMethods() {
               today.within_1min_rate > 0 ? Math.round(today.within_1min_rate * 100) + '%' : '--',
             today_sessions: today.session_count || 0
           }
+          // 7 日趋势：以前被丢弃，现保留供「客服响应趋势」折线渲染（升序，便于按时间轴展示）
+          this.responseTrend7d = Array.isArray(response.data.trend_7d)
+            ? [...response.data.trend_7d].sort((a, b) => (a.date < b.date ? -1 : 1))
+            : []
           logger.info('响应时长统计加载成功', this.responseStats)
         } else {
           this.showError(response?.message || '响应时长统计加载失败')

@@ -176,7 +176,7 @@ class MerchantRiskAlertService {
               record_id: alert.relatedRecord.consumption_record_id,
               consumption_amount: parseFloat(alert.relatedRecord.consumption_amount),
               status: alert.relatedRecord.status,
-              created_at: BeijingTimeHelper.formatForAPI(alert.relatedRecord.created_at)
+              created_at: alert.relatedRecord.created_at
             }
           : null
       }
@@ -337,8 +337,8 @@ class MerchantRiskAlertService {
         is_blocked: alert.is_blocked,
         status: alert.status,
         review_notes: alert.review_notes,
-        reviewed_at: alert.reviewed_at ? BeijingTimeHelper.formatForAPI(alert.reviewed_at) : null,
-        created_at: BeijingTimeHelper.formatForAPI(alert.created_at),
+        reviewed_at: alert.reviewed_at,
+        created_at: alert.created_at,
         operator_info: alert.operator
           ? {
               user_id: alert.operator.user_id,
@@ -418,7 +418,7 @@ class MerchantRiskAlertService {
         status: alert.status,
         reviewed_by: alert.reviewed_by,
         review_notes: alert.review_notes,
-        reviewed_at: BeijingTimeHelper.formatForAPI(alert.reviewed_at)
+        reviewed_at: alert.reviewed_at
       }
     } catch (error) {
       await transaction.rollback()

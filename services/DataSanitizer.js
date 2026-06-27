@@ -368,10 +368,13 @@ class DataSanitizer {
       total_points: pa.total_points || (pa.available_points || 0) + (pa.frozen_points || 0)
     }
 
+    /*
+     * member_since：注册日期（北京时区 YYYY-MM-DD）。
+     * B-2 后 created_at 为 UTC ISO（...Z），不能直接 split('T')[0]（会取到 UTC 日期，北京凌晨 0-8 点差一天），
+     * 统一用 BeijingTimeHelper.formatDate 按北京时区取日期。
+     */
     sanitized.member_since = sanitized.created_at
-      ? typeof sanitized.created_at === 'string'
-        ? sanitized.created_at.split('T')[0]
-        : null
+      ? BeijingTimeHelper.formatDate(sanitized.created_at, 'YYYY-MM-DD')
       : null
 
     // 黑名单：删除敏感字段（PII + 内部状态 + 权限信息）
@@ -751,13 +754,9 @@ class DataSanitizer {
 
       /*
        * 派生字段：Unix 时间戳
-       * 模型 getter 将 created_at 格式化为中文字符串（如"2026年2月21日星期六 20:08:35"），
-       * 无法被 new Date() 解析。优先从 Sequelize 别名 createdAt（保留原始格式）
-       * 或模型实例的 getDataValue 取得可解析的日期值。
+       * B-2 后 created_at 已是可解析的 Date/UTC ISO 字符串（不再是中文串），直接 new Date() 解析即可。
        */
-      const parseableDate = feedback.getDataValue
-        ? feedback.getDataValue('created_at')
-        : sanitized.createdAt || sanitized.created_at
+      const parseableDate = sanitized.created_at || sanitized.createdAt
       const parsedTime = parseableDate ? new Date(parseableDate).getTime() : NaN
       sanitized.created_at_timestamp = Number.isFinite(parsedTime) ? parsedTime : null
 

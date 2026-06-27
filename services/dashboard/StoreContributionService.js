@@ -78,7 +78,18 @@ class StoreContributionService {
    */
   async getContributionRanking(options = {}) {
     const { days = 30, limit = 20, use_cache = true } = options
-    const cacheKey = `${KEY_PREFIX}${CACHE_KEY_PREFIX}_ranking_${days}d`
+    // 数据范围（DataScopeService）：store_ids 非空时按门店集合过滤；scope=all 时不过滤
+    const storeIds = Array.isArray(options.store_ids) ? options.store_ids.map(Number) : null
+    const scopeKey =
+      storeIds && storeIds.length
+        ? `_s${storeIds
+            .slice()
+            .sort((a, b) => a - b)
+            .join('.')}`
+        : '_all'
+    const cacheKey = `${KEY_PREFIX}${CACHE_KEY_PREFIX}_ranking_${days}d${scopeKey}`
+    // 门店范围过滤条件（作用于 consumption_records.store_id）
+    const scopeWhere = storeIds && storeIds.length ? { store_id: { [Op.in]: storeIds } } : {}
 
     try {
       // 1. 尝试从缓存获取
@@ -92,11 +103,12 @@ class StoreContributionService {
 
       const startDate = BeijingTimeHelper.daysAgo(days)
 
-      // 2. 获取平台总消费金额（用于计算贡献率）
+      // 2. 获取平台总消费金额（用于计算贡献率；同范围口径）
       const totalAmountResult = await this.models.ConsumptionRecord.sum('consumption_amount', {
         where: {
           created_at: { [Op.gte]: startDate },
-          status: 'approved'
+          status: 'approved',
+          ...scopeWhere
         }
       })
       const platformTotal = parseFloat(totalAmountResult || 0)
@@ -119,7 +131,8 @@ class StoreContributionService {
         where: {
           created_at: { [Op.gte]: startDate },
           status: 'approved',
-          merchant_id: { [Op.ne]: null }
+          merchant_id: { [Op.ne]: null },
+          ...scopeWhere
         },
         group: ['merchant_id'],
         order: [[fn('SUM', col('consumption_amount')), 'DESC']],

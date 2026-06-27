@@ -12,7 +12,6 @@
  * @table approval_chain_templates
  */
 const { DataTypes } = require('sequelize')
-const BeijingTimeHelper = require('../utils/timeHelper')
 
 module.exports = sequelize => {
   const ApprovalChainTemplate = sequelize.define(
@@ -76,20 +75,12 @@ module.exports = sequelize => {
         type: DataTypes.DATE,
         allowNull: false,
         defaultValue: DataTypes.NOW,
-        /** @returns {string} 格式化时间 */
-        get() {
-          return BeijingTimeHelper.formatForAPI(this.getDataValue('created_at'))
-        },
         comment: '创建时间'
       },
       updated_at: {
         type: DataTypes.DATE,
         allowNull: false,
         defaultValue: DataTypes.NOW,
-        /** @returns {string} 格式化时间 */
-        get() {
-          return BeijingTimeHelper.formatForAPI(this.getDataValue('updated_at'))
-        },
         comment: '更新时间'
       }
     },

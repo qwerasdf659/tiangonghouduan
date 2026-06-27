@@ -72,6 +72,30 @@ router.get(
 )
 
 /**
+ * GET /asset-flow-trend - 平台资产流水经营大盘（按日发放/消耗/净沉淀趋势）
+ *
+ * @description 看板四（积分/资产大盘）：复用 asset_transactions 按日聚合，零新表。今日=趋势末点。
+ * @access Admin（role_level >= 100，平台经营机密，绝不下发小程序）
+ *
+ * @query {number} [days=30] - 趋势天数
+ * @query {string} [asset_code=points] - 资产代码
+ * @returns {Object} { range_days, asset_code, trend:[{date,issued,consumed,net,transaction_count}], today, totals, updated_at }
+ */
+router.get(
+  '/asset-flow-trend',
+  authenticateToken,
+  requireRoleLevel(100),
+  asyncHandler(async (req, res) => {
+    const QueryService = req.app.locals.services.getService('asset_query')
+    const result = await QueryService.getAssetFlowTrend({
+      days: parseInt(req.query.days, 10) || 30,
+      asset_code: req.query.asset_code || undefined
+    })
+    return res.apiSuccess(result, '获取成功')
+  })
+)
+
+/**
  * GET /export - 导出资产数据（Excel/CSV格式）
  *
  * @description 导出系统资产数据，支持筛选条件和多种格式

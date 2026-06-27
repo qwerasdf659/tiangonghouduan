@@ -88,10 +88,123 @@ function checkSensitiveWords(content) {
 }
 
 /**
- * 聊天频率限制服务
- * ✅ P2-F架构重构：统一使用 ChatRateLimitService 管理所有频率限制逻辑
- * 移除重复代码，避免多处维护同一逻辑
+ * 富消息内容/元数据组装与校验（B/富消息定稿 2026-06-25）
+ *
+ * 设计铁律（见架构决策文档 客·二）：
+ * - content 永远是人类可读文本（正文/文件名/地址/占位符）→ 管理端零解析预览、搜索天然可用；
+ * - URL/坐标/尺寸等结构化负载统一进 metadata（JSON）；
+ * - message_type 合法值（text/image/file/location）由 system_dictionaries 字典约束（在路由/调用前已校验）。
+ *
+ * 按 message_type 校验固定字段，非法抛 BusinessError；返回归一化的 { content, metadata }。
+ *
+ * @param {string} message_type - 消息内容类型（text/image/file/location）
+ * @param {string} content - 原始内容（文本正文 / 占位 / 文件名 / 地址）
+ * @param {Object} [metadata] - 富消息结构化负载
+ * @returns {{ content: string, metadata: (Object|null) }} 归一化后的内容与元数据
+ * @throws {BusinessError} 当 metadata 必填字段缺失或类型非法时
  */
+function buildRichMessagePayload(message_type, content, metadata) {
+  const md = metadata && typeof metadata === 'object' ? metadata : {}
+
+  switch (message_type) {
+    case 'text': {
+      // 文本：content 为正文，metadata 通常为空
+      return { content, metadata: null }
+    }
+    case 'image': {
+      const imageUrl = (md.image_url || '').trim()
+      if (!/^https?:\/\/.+/i.test(imageUrl)) {
+        throw new BusinessError(
+          '图片消息缺少有效的 metadata.image_url',
+          'CUSTOMER_SERVICE_ERROR',
+          400
+        )
+      }
+      // content 统一占位 [图片]，URL 进 metadata，避免对外暴露原始 URL 噪声
+      return { content: '[图片]', metadata: { image_url: imageUrl } }
+    }
+    case 'file': {
+      const fileUrl = (md.file_url || '').trim()
+      const fileName = (md.file_name || '').trim()
+      if (!/^https?:\/\/.+/i.test(fileUrl)) {
+        throw new BusinessError(
+          '文件消息缺少有效的 metadata.file_url',
+          'CUSTOMER_SERVICE_ERROR',
+          400
+        )
+      }
+      if (!fileName) {
+        throw new BusinessError(
+          '文件消息缺少 metadata.file_name（真实文件名）',
+          'CUSTOMER_SERVICE_ERROR',
+          400
+        )
+      }
+      const fileSize = Number.isFinite(Number(md.file_size)) ? Number(md.file_size) : null
+      // content 存真实文件名（可读、可搜索），URL/大小进 metadata
+      return {
+        content: fileName,
+        metadata: { file_url: fileUrl, file_name: fileName, file_size: fileSize }
+      }
+    }
+    case 'location': {
+      const lat = Number(md.latitude)
+      const lng = Number(md.longitude)
+      const address = (md.address || md.name || '').trim()
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        throw new BusinessError(
+          '位置消息缺少有效的 metadata.latitude/longitude',
+          'CUSTOMER_SERVICE_ERROR',
+          400
+        )
+      }
+      if (!address) {
+        throw new BusinessError(
+          '位置消息缺少 metadata.address（可读地址）',
+          'CUSTOMER_SERVICE_ERROR',
+          400
+        )
+      }
+      // content 存可读地址，坐标原样进 metadata（与微信一致，不降精度）
+      return {
+        content: address,
+        metadata: {
+          latitude: lat,
+          longitude: lng,
+          name: (md.name || '').trim() || address,
+          address
+        }
+      }
+    }
+    default:
+      throw new BusinessError(
+        `不支持的消息类型：${message_type}（合法值 text/image/file/location）`,
+        'CUSTOMER_SERVICE_ERROR',
+        400
+      )
+  }
+}
+
+/**
+ * 校验 message_type 合法性（查 system_dictionaries 字典，复用现有字典中枢）
+ *
+ * @param {string} message_type - 待校验的消息内容类型
+ * @returns {Promise<void>} 校验通过无返回；不通过抛出 BusinessError
+ * @throws {BusinessError} 当类型未在字典中启用时
+ */
+async function assertValidMessageType(message_type) {
+  const { SystemDictionary } = require('../models')
+  const row = await SystemDictionary.findOne({
+    where: { dict_type: 'message_type', dict_code: message_type, is_enabled: 1 }
+  })
+  if (!row) {
+    throw new BusinessError(
+      `不支持的消息类型：${message_type}（须为 system_dictionaries 中启用的 message_type）`,
+      'CUSTOMER_SERVICE_ERROR',
+      400
+    )
+  }
+}
 
 /**
  * 客服会话服务类
@@ -199,14 +312,17 @@ class CustomerServiceSessionService {
           limit: 1,
           order: [['created_at', 'DESC']],
           required: false,
-          // 补充 message_type/file_name/file_size：与详情接口 getSessionMessages 同源，供前端按类型渲染会话预览（图片→[图片]、文件→[文件] 文件名）
+          /*
+           * 补充 message_type/metadata：与详情接口 getSessionMessages 同源，供前端按类型渲染会话预览
+           * （图片→[图片]、文件→[文件] 文件名、位置→[位置] 地址；URL/坐标在 metadata 内）
+           */
           attributes: [
             'chat_message_id',
             'content',
             'sender_type',
+            'message_source',
             'message_type',
-            'file_name',
-            'file_size',
+            'metadata',
             'created_at'
           ]
         })
@@ -242,31 +358,26 @@ class CustomerServiceSessionService {
           : null,
         status: session.status,
         priority: session.priority,
-        last_message_at: session.last_message_at
-          ? BeijingTimeHelper.formatForAPI(session.last_message_at).iso
-          : null,
-        // C-1：同时下发北京时间字符串，前端零转换直接显示（UTC iso 仍保留）
-        last_message_at_beijing: session.last_message_at
-          ? BeijingTimeHelper.formatForAPI(session.last_message_at).beijing
-          : null,
-        created_at: BeijingTimeHelper.formatForAPI(session.created_at).iso,
-        created_at_beijing: BeijingTimeHelper.formatForAPI(session.created_at).beijing,
-        updated_at: BeijingTimeHelper.formatForAPI(session.updated_at).iso,
-        updated_at_beijing: BeijingTimeHelper.formatForAPI(session.updated_at).beijing,
+        /*
+         * B-2：时间统一为单一 UTC ISO 字段，去掉 _beijing 伴随字段，北京展示交前端统一组件
+         * 用 .get(列名) 读取：本模型 timestamps 列名为 snake_case，实例同名属性可能未映射
+         */
+        last_message_at: session.get('last_message_at'),
+        created_at: session.get('created_at'),
+        updated_at: session.get('updated_at'),
         last_message:
           include_last_message && session.messages && session.messages.length > 0
             ? {
                 chat_message_id: session.messages[0].chat_message_id,
                 content: session.messages[0].content,
                 sender_type: session.messages[0].sender_type,
-                // 消息类型（text/image/system/file）：前端据此渲染预览，图片/文件不再暴露原始 URL
+                // 系统消息判断改 message_source==='system'（message_type 不再含 system）
+                message_source: session.messages[0].message_source,
+                // 消息类型（text/image/file/location）：前端据此渲染预览，URL/坐标在 metadata 内
                 message_type: session.messages[0].message_type,
-                // 文件消息元信息（仅 message_type=file 有值，其它类型为 null）
-                file_name: session.messages[0].file_name,
-                file_size: session.messages[0].file_size,
-                created_at: BeijingTimeHelper.formatForAPI(session.messages[0].created_at).iso,
-                created_at_beijing: BeijingTimeHelper.formatForAPI(session.messages[0].created_at)
-                  .beijing
+                // 富消息结构化负载（file→file_name/file_url/file_size；image→image_url；location→坐标/地址）
+                metadata: session.messages[0].metadata,
+                created_at: session.messages[0].get('created_at')
               }
             : null,
         unread_count: 0
@@ -475,21 +586,19 @@ class CustomerServiceSessionService {
             message_source: data.message_source,
             content: data.content,
             message_type: data.message_type,
-            // 文件消息元信息（message_type=file 时有值，供前端渲染文件卡片）
-            file_name: data.file_name,
-            file_size: data.file_size,
+            // 富消息结构化负载（file→file_name/file_url/file_size；image→image_url；location→坐标/地址）
+            metadata: data.metadata,
             status: data.status,
-            created_at: BeijingTimeHelper.formatForAPI(msg.created_at).iso,
-            // C-1：同时下发北京时间字符串，前端零转换直接显示
-            created_at_beijing: BeijingTimeHelper.formatForAPI(msg.created_at).beijing
+            // B-2：单一 UTC ISO，去掉 _beijing 伴随字段
+            created_at: msg.get('created_at')
           }
         }
 
         // 返回所有字段（包括metadata等）
         return {
           ...data,
-          created_at: BeijingTimeHelper.formatForAPI(msg.created_at).iso,
-          updated_at: BeijingTimeHelper.formatForAPI(msg.updated_at).iso
+          created_at: msg.created_at,
+          updated_at: msg.updated_at
         }
       })
 
@@ -513,7 +622,7 @@ class CustomerServiceSessionService {
             : null,
           status: session.status,
           priority: session.priority,
-          created_at: BeijingTimeHelper.formatForAPI(session.created_at).iso
+          created_at: session.created_at
         },
         messages: formattedMessages,
         total: count, // 总消息数（用于分页）
@@ -552,33 +661,26 @@ class CustomerServiceSessionService {
       'CustomerServiceSessionService.sendMessage'
     )
 
-    const {
-      admin_id,
-      content,
-      message_type = 'text',
-      role_level = 100,
-      file_name,
-      file_size
-    } = data
+    const { admin_id, content, message_type = 'text', role_level = 100, metadata } = data
 
     logger.info(`📤 管理员 ${admin_id} 向会话 ${session_id} 发送消息`)
 
+    // ✅ 0. 校验消息类型合法性（查字典中枢）
+    await assertValidMessageType(message_type)
+
     /*
-     * ✅ 1. 内容安全处理（按消息类型区分）
-     *   - text/system：HTML 实体转义防 XSS（文本会被展示）
-     *   - image：content 是图片 URL，放进 <img src> 而非 HTML，转义会破坏 URL（/ → &#x2F;）；
-     *            改为校验必须是 http(s) 图片 URL，合法则原样存储，非法则拒绝（防注入）
+     * ✅ 1. 内容安全处理（按消息类型区分）+ 富消息负载组装
+     *   - text：HTML 实体转义防 XSS（文本会被展示）
+     *   - image/file/location：content 为占位/文件名/地址，URL/坐标进 metadata（buildRichMessagePayload 校验）
      */
-    let sanitized_content
-    if (message_type === 'image') {
-      const url = (content || '').trim()
-      if (!/^https?:\/\/.+/i.test(url)) {
-        throw new BusinessError('图片消息内容必须是有效的图片 URL', 'CUSTOMER_SERVICE_ERROR', 400)
-      }
-      sanitized_content = url
+    let payload
+    if (message_type === 'text') {
+      payload = buildRichMessagePayload('text', sanitizeContent(content), null)
     } else {
-      sanitized_content = sanitizeContent(content)
+      payload = buildRichMessagePayload(message_type, content, metadata)
     }
+    const sanitized_content = payload.content
+    const message_metadata = payload.metadata
 
     // ✅ 2. 敏感词检测
     const sensitiveCheck = checkSensitiveWords(sanitized_content)
@@ -653,7 +755,7 @@ class CustomerServiceSessionService {
       )
     }
 
-    // ✅ 7. 创建消息记录（使用过滤后的内容）
+    // ✅ 7. 创建消息记录（使用过滤后的内容 + 富消息 metadata）
     const message = await ChatMessage.create(
       {
         customer_service_session_id: session_id,
@@ -662,9 +764,7 @@ class CustomerServiceSessionService {
         message_source: 'admin_client',
         content: sanitized_content,
         message_type,
-        // 文件消息（message_type=file）承载文件元信息；其它类型为 null
-        file_name: message_type === 'file' ? file_name || null : null,
-        file_size: message_type === 'file' ? file_size || null : null,
+        metadata: message_metadata,
         status: 'sent'
       },
       { transaction }
@@ -688,11 +788,8 @@ class CustomerServiceSessionService {
       content: sanitized_content,
       sender_type: message.sender_type,
       message_type: message.message_type,
-      file_name: message.file_name,
-      file_size: message.file_size,
-      created_at: BeijingTimeHelper.formatForAPI(message.created_at).iso,
-      // C-1：同时下发北京时间字符串，前端零转换直接显示
-      created_at_beijing: BeijingTimeHelper.formatForAPI(message.created_at).beijing,
+      metadata: message.metadata,
+      created_at: message.created_at,
       session_user_id: session.user_id // 供入口层推送WebSocket使用
     }
   }
@@ -726,9 +823,16 @@ class CustomerServiceSessionService {
       'CustomerServiceSessionService.sendUserMessage'
     )
 
-    const { user_id, content, message_type = 'text', file_name, file_size } = data
+    const { user_id, content, message_type = 'text', metadata } = data
 
     logger.info(`📤 用户 ${user_id} 向会话 ${session_id} 发送消息`)
+
+    // ✅ 0. 校验消息类型合法性（查字典中枢）+ 组装富消息负载
+    await assertValidMessageType(message_type)
+    const payload =
+      message_type === 'text'
+        ? buildRichMessagePayload('text', content, null)
+        : buildRichMessagePayload(message_type, content, metadata)
 
     // ✅ 1. 验证会话是否存在且属于该用户
     const session = await CustomerServiceSession.findOne({
@@ -753,18 +857,16 @@ class CustomerServiceSessionService {
       )
     }
 
-    // ✅ 3. 创建消息记录
+    // ✅ 3. 创建消息记录（富消息 content + metadata 归一化）
     const message = await ChatMessage.create(
       {
         customer_service_session_id: session_id,
         sender_id: user_id,
         sender_type: 'user',
         message_source: 'user_client',
-        content,
+        content: payload.content,
         message_type,
-        // 文件消息（message_type=file）承载文件元信息；其它类型为 null
-        file_name: message_type === 'file' ? file_name || null : null,
-        file_size: message_type === 'file' ? file_size || null : null,
+        metadata: payload.metadata,
         status: 'sent'
       },
       { transaction }
@@ -789,10 +891,8 @@ class CustomerServiceSessionService {
       sender_type: 'user',
       content: message.content,
       message_type: message.message_type,
-      file_name: message.file_name,
-      file_size: message.file_size,
-      created_at: BeijingTimeHelper.formatForAPI(message.created_at).iso,
-      created_at_beijing: BeijingTimeHelper.formatForAPI(message.created_at).beijing,
+      metadata: message.metadata,
+      created_at: message.created_at,
       session_admin_id: session.admin_id // 返回会话的admin_id（用于WebSocket推送）
     }
   }
@@ -927,7 +1027,7 @@ class CustomerServiceSessionService {
         sender_type: 'admin',
         message_source: 'system',
         content: `会话已从 ${currentAdmin?.nickname || '客服'} 转接给 ${targetAdmin.nickname}`,
-        message_type: 'system',
+        message_type: 'text',
         status: 'sent'
       },
       { transaction }
@@ -1012,7 +1112,7 @@ class CustomerServiceSessionService {
         sender_type: 'admin',
         message_source: 'system',
         content: `会话已关闭：${close_reason}`,
-        message_type: 'system',
+        message_type: 'text',
         status: 'sent'
       },
       { transaction }
@@ -1023,7 +1123,7 @@ class CustomerServiceSessionService {
     return {
       customer_service_session_id: session_id,
       status: 'closed',
-      closed_at: BeijingTimeHelper.formatForAPI(new Date()).iso
+      closed_at: new Date().toISOString()
     }
   }
 
@@ -1690,7 +1790,7 @@ class CustomerServiceSessionService {
     return {
       customer_service_session_id: session_id,
       satisfaction_score,
-      rated_at: BeijingTimeHelper.formatForAPI(new Date()).iso
+      rated_at: new Date().toISOString()
     }
   }
 }

@@ -231,7 +231,7 @@ class NotificationService {
       sender_type: 'admin', // 系统消息以admin身份发送
       message_source: 'system', // ✅ 关键：标记为系统消息
       content: systemMessageContent,
-      message_type: 'system',
+      message_type: 'text',
       status: 'sent',
       metadata: {
         notification_type,
@@ -260,7 +260,7 @@ class NotificationService {
         sender_name: '系统通知',
         message_source: 'system',
         content: systemMessageContent,
-        message_type: 'system',
+        message_type: 'text',
         notification_type,
         metadata: message.metadata,
         created_at: message.created_at,

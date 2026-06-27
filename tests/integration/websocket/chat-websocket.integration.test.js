@@ -239,7 +239,9 @@ describe('WebSocket聊天功能集成测试（P1-4.2）', () => {
       const testMessage = {
         message_id: `test_${Date.now()}`,
         content: '集成测试消息',
-        sender_type: 'system',
+        // 富消息重构后：系统消息由 message_source='system' 标识，sender_type 仅 user/admin
+        sender_type: 'admin',
+        message_source: 'system',
         created_at: BeijingTimeHelper.now()
       }
 
@@ -501,18 +503,20 @@ describe('WebSocket聊天功能集成测试（P1-4.2）', () => {
        * - message_id: 字符串类型
        * - session_id: 数字类型
        * - content: 字符串类型
-       * - message_type: text | image | system
-       * - sender_type: user | admin | system
+       * - message_type: text | image | file | location
+       * - sender_type: user | admin（系统消息由 message_source='system' 标识）
        * - created_at: 字符串（ISO 8601 格式）
        */
 
-      // 创建符合格式的测试消息
+      // 创建符合格式的测试消息（富消息重构后契约）
       const testMessage = {
         message_id: `format_test_${Date.now()}`,
         session_id: 1,
         content: '格式验证测试消息',
         message_type: 'text',
-        sender_type: 'system',
+        // 系统消息由 message_source='system' 标识；sender_type 仅 user/admin
+        sender_type: 'admin',
+        message_source: 'system',
         created_at: BeijingTimeHelper.now()
       }
 
@@ -520,8 +524,8 @@ describe('WebSocket聊天功能集成测试（P1-4.2）', () => {
       expect(testMessage.message_id).toMatch(/^format_test_\d+$/)
       expect(typeof testMessage.session_id).toBe('number')
       expect(typeof testMessage.content).toBe('string')
-      expect(['text', 'image', 'system']).toContain(testMessage.message_type)
-      expect(['user', 'admin', 'system']).toContain(testMessage.sender_type)
+      expect(['text', 'image', 'file', 'location']).toContain(testMessage.message_type)
+      expect(['user', 'admin']).toContain(testMessage.sender_type)
       expect(testMessage.created_at).toBeDefined()
 
       console.log('✅ 消息格式验证通过')

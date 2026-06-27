@@ -239,17 +239,32 @@ class SettleStage extends BaseStage {
         })
       }
 
-      // 2. 扣减奖品库存
-      await this._deductPrizeStock(final_prize, transaction)
+      /*
+       * 🔒 资源硬上限检查与降级（修复：配额/预算耗尽仍超发的资损缺陷）
+       * 发奖前校验星石配额 / 预算积分是否充足，不足则降级为兜底奖品（积分+10），保证「上限不可超」
+       */
+      const load_campaign_data = this.getContextData(context, 'LoadCampaignStage.data') || {}
+      const fallback_prize = load_campaign_data.fallback_prize || null
+      const resource_resolution = await this._resolvePrizeByResource(final_prize, fallback_prize, {
+        user_id,
+        lottery_campaign_id,
+        transaction
+      })
+      const settle_prize = resource_resolution.prize
+      const prize_downgraded = resource_resolution.downgraded
+      const downgrade_reason = resource_resolution.reason
+
+      // 2. 扣减奖品库存（按实际发放奖品）
+      await this._deductPrizeStock(settle_prize, transaction)
 
       // 3. 扣减用户预算（如果有 BudgetProvider，使用 budget_cost 而非 pvp）
       let budget_deducted = 0
-      const budget_cost = final_prize.budget_cost || 0
+      const budget_cost = settle_prize.budget_cost || 0
       if (budget_provider && budget_cost > 0) {
         budget_deducted = await this._deductBudget(budget_provider, budget_cost, {
           user_id,
           lottery_campaign_id,
-          lottery_campaign_prize_id: final_prize.lottery_campaign_prize_id,
+          lottery_campaign_prize_id: settle_prize.lottery_campaign_prize_id,
           idempotency_key,
           transaction
         })
@@ -262,7 +277,7 @@ class SettleStage extends BaseStage {
       const reward_index = context.current_draw_index || 0
       const reward_idempotency_key = `${idempotency_key}:reward_${reward_index}`
 
-      await this._distributePrize(user_id, final_prize, {
+      await this._distributePrize(user_id, settle_prize, {
         idempotency_key: reward_idempotency_key,
         lottery_session_id,
         lottery_draw_id,
@@ -276,13 +291,13 @@ class SettleStage extends BaseStage {
        */
       const tier_pick_data = this.getContextData(context, 'TierPickStage.data') || {}
 
-      // 5. 创建抽奖记录（使用单次抽奖成本 per_draw_cost）
+      // 5. 创建抽奖记录（使用实际发放奖品 settle_prize + 单次抽奖成本 per_draw_cost）
       const draw_record = await this._createDrawRecord({
         lottery_draw_id,
         user_id,
         lottery_campaign_id,
-        final_prize,
-        final_tier,
+        final_prize: settle_prize,
+        final_tier: prize_downgraded ? settle_prize.reward_tier || final_tier : final_tier,
         guarantee_triggered,
         idempotency_key,
         lottery_session_id,
@@ -295,6 +310,8 @@ class SettleStage extends BaseStage {
         asset_transaction_id, // 🆕 关联资产流水ID（必填字段）
         tier_pick_data, // 🔴 2026-02-15 修复：传递档位选择元数据
         draw_index: reward_index,
+        prize_downgraded, // 🔒 资源不足降级标记（true=因配额/预算耗尽降级为兜底奖）
+        downgrade_reason, // 🔒 降级原因（star_stone_quota_exhausted / budget_points_exhausted）
         transaction
       })
 
@@ -340,8 +357,8 @@ class SettleStage extends BaseStage {
       await this._updateExperienceState({
         user_id,
         lottery_campaign_id,
-        final_tier,
-        final_prize,
+        final_tier: prize_downgraded ? settle_prize.reward_tier || final_tier : final_tier,
+        final_prize: settle_prize,
         anti_high_triggered: !!anti_high_mechanism,
         cooldown_draws: anti_high_mechanism ? 3 : 0, // AntiHigh 默认冷却 3 次
         transaction
@@ -353,8 +370,8 @@ class SettleStage extends BaseStage {
        */
       await this._recordHourlyMetrics({
         lottery_campaign_id,
-        draw_tier: final_tier,
-        prize_value: final_prize.budget_cost || 0,
+        draw_tier: prize_downgraded ? settle_prize.reward_tier || final_tier : final_tier,
+        prize_value: settle_prize.budget_cost || 0,
         budget_tier: budget_data?.budget_tier || null,
         mechanisms: decision_snapshot.experience_smoothing || {},
         transaction
@@ -383,8 +400,8 @@ class SettleStage extends BaseStage {
       this._recordRealtimeMetrics({
         lottery_campaign_id,
         user_id,
-        draw_tier: final_tier,
-        prize_value: final_prize.budget_cost || 0,
+        draw_tier: prize_downgraded ? settle_prize.reward_tier || final_tier : final_tier,
+        prize_value: settle_prize.budget_cost || 0,
         budget_tier: budget_data?.budget_tier || null,
         mechanisms: decision_snapshot.experience_smoothing || {}
       }).catch(redis_error => {
@@ -402,12 +419,12 @@ class SettleStage extends BaseStage {
         is_duplicate: false,
         settle_result: {
           lottery_draw_id,
-          lottery_campaign_prize_id: final_prize.lottery_campaign_prize_id,
-          prize_name: final_prize.prize_name,
-          prize_type: final_prize.prize_type,
-          prize_value: final_prize.prize_value,
-          prize_value_points: final_prize.prize_value_points,
-          reward_tier: final_tier,
+          lottery_campaign_prize_id: settle_prize.lottery_campaign_prize_id,
+          prize_name: settle_prize.prize_name,
+          prize_type: settle_prize.prize_type,
+          prize_value: settle_prize.prize_value,
+          prize_value_points: settle_prize.prize_value_points,
+          reward_tier: prize_downgraded ? settle_prize.reward_tier || final_tier : final_tier,
           guarantee_triggered,
           budget_deducted,
           budget_after: budget_data.budget_before - budget_deducted,
@@ -415,22 +432,25 @@ class SettleStage extends BaseStage {
           draw_cost,
           points_deducted,
           skip_points_deduction,
+          // 🔒 资源不足降级信息（true=因星石配额/预算耗尽降级为兜底奖；前端可据此提示）
+          prize_downgraded,
+          downgrade_reason,
           /**
            * 前端展示所需字段（多活动抽奖系统）
            * sort_order: 九宫格位置编号（顺时针 1-8），来自 lottery_prizes 表
            * rarity_code: 稀有度代码（来自 rarity_defs 外键），前端直接使用此字段名显示光效
            */
-          sort_order: final_prize.sort_order,
-          rarity_code: final_prize.rarity_code || 'common',
+          sort_order: settle_prize.sort_order,
+          rarity_code: settle_prize.rarity_code || 'common',
           /**
            * 虚拟物品展示字段（碎片配额修复方案新增）
            * material_asset_code: 资产类型标识（如 red_core_shard / star_stone），用于图标/动效
            * material_amount: 虚拟物品数量（展示"获得碎片×3"）
            * budget_cost: 本次中奖实际消耗的 BUDGET_POINTS（小程序端可展示"消耗 xx 预算积分"）
            */
-          material_asset_code: final_prize.material_asset_code || null,
-          material_amount: final_prize.material_amount || null,
-          budget_cost: final_prize.budget_cost || 0
+          material_asset_code: settle_prize.material_asset_code || null,
+          material_amount: settle_prize.material_amount || null,
+          budget_cost: settle_prize.budget_cost || 0
         }
       }
 
@@ -438,8 +458,10 @@ class SettleStage extends BaseStage {
         user_id,
         lottery_campaign_id,
         lottery_draw_id,
-        lottery_campaign_prize_id: final_prize.lottery_campaign_prize_id,
-        prize_name: final_prize.prize_name,
+        lottery_campaign_prize_id: settle_prize.lottery_campaign_prize_id,
+        prize_name: settle_prize.prize_name,
+        prize_downgraded,
+        downgrade_reason,
         budget_deducted,
         draw_cost, // 🆕 增加日志
         points_deducted // 🆕 增加日志
@@ -741,6 +763,96 @@ class SettleStage extends BaseStage {
       })
       throw error
     }
+  }
+
+  /**
+   * 资源充足性硬检查与降级（星石配额 / 预算积分 的硬上限保证）
+   *
+   * 背景：原结算逻辑「先发奖、后扣资源、扣失败仅告警不回滚」，导致配额/预算耗尽后仍超发
+   * （星石配额扣减为非致命、预算扣减失败返回 0 仍继续发奖）。本方法在发奖前做硬检查：
+   * - 星石奖品：校验用户 STAR_STONE_QUOTA 可用余额 >= 该奖品 material_amount
+   * - 吃预算奖品（budget_cost>0，如红源晶碎片等材料）：校验用户预算可用余额 >= budget_cost
+   * 资源不足时降级为兜底奖品（fallback_prize，积分+10，budget_cost=0、不吃配额），保证「上限不可超」。
+   *
+   * @param {Object} final_prize - 决策选中的原始奖品（扁平化结构）
+   * @param {Object} fallback_prize - 兜底奖品（LoadCampaignStage 提供，可能为 null）
+   * @param {Object} ctx - 上下文：{ user_id, lottery_campaign_id, transaction }
+   * @returns {Promise<Object>} 实际发放奖品与降级信息 { prize, downgraded, reason }
+   * @private
+   */
+  async _resolvePrizeByResource(final_prize, fallback_prize, ctx) {
+    const { user_id, lottery_campaign_id, transaction } = ctx
+    const enough = await this._isResourceEnough(final_prize, {
+      user_id,
+      lottery_campaign_id,
+      transaction
+    })
+    if (enough.ok) {
+      return { prize: final_prize, downgraded: false, reason: null }
+    }
+    // 资源不足：降级为兜底奖品；无兜底奖品时保持原奖（由后续扣减兜底逻辑兜住，记录告警）
+    if (!fallback_prize) {
+      this.log('warn', '资源不足但活动未配置兜底奖品，维持原奖品（可能触发扣减失败保护）', {
+        user_id,
+        lottery_campaign_prize_id: final_prize.lottery_campaign_prize_id,
+        reason: enough.reason
+      })
+      return { prize: final_prize, downgraded: false, reason: enough.reason }
+    }
+    this.log('warn', '资源不足，奖品降级为兜底奖品（保证配额/预算硬上限）', {
+      user_id,
+      original_prize: final_prize.prize_name,
+      original_prize_id: final_prize.lottery_campaign_prize_id,
+      fallback_prize: fallback_prize.prize_name,
+      reason: enough.reason
+    })
+    return { prize: fallback_prize, downgraded: true, reason: enough.reason }
+  }
+
+  /**
+   * 判断单个奖品所需资源是否充足（星石配额 / 预算积分）
+   *
+   * @param {Object} prize - 奖品（扁平化结构，含 material_asset_code/material_amount/budget_cost）
+   * @param {Object} ctx - { user_id, lottery_campaign_id, transaction }
+   * @returns {Promise<Object>} 是否充足及不足原因 { ok, reason }
+   * @private
+   */
+  async _isResourceEnough(prize, ctx) {
+    const { user_id, transaction } = ctx
+
+    // 星石奖品：校验星石配额（STAR_STONE_QUOTA）可用余额
+    if (prize.material_asset_code === AssetCode.STAR_STONE && prize.material_amount > 0) {
+      const balance = await BalanceService.getBalance(
+        { user_id, asset_code: AssetCode.STAR_STONE_QUOTA },
+        { transaction }
+      )
+      const available = Number(balance?.available_amount || 0)
+      if (available < Number(prize.material_amount)) {
+        return { ok: false, reason: 'star_stone_quota_exhausted' }
+      }
+      return { ok: true, reason: null }
+    }
+
+    // 吃预算的奖品（budget_cost>0，如红源晶碎片等材料）：校验预算积分可用余额
+    const budget_cost = Number(prize.budget_cost || 0)
+    if (budget_cost > 0) {
+      const balance = await BalanceService.getBalance(
+        {
+          user_id,
+          asset_code: AssetCode.BUDGET_POINTS,
+          lottery_campaign_id: 'CONSUMPTION_DEFAULT'
+        },
+        { transaction }
+      )
+      const available = Number(balance?.available_amount || 0)
+      if (available < budget_cost) {
+        return { ok: false, reason: 'budget_points_exhausted' }
+      }
+      return { ok: true, reason: null }
+    }
+
+    // 不吃配额/预算的奖品（积分、保底等）：永远充足
+    return { ok: true, reason: null }
   }
 
   /**
