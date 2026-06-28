@@ -21,6 +21,7 @@ const { authenticateToken } = require('../../../middleware/auth')
 const { asyncHandler } = require('../../../middleware/validation')
 const { getImageUrl } = require('../../../utils/ImageUrlHelper')
 const { categoryIconAttachmentInclude } = require('../../../utils/mediaAttachmentGallery')
+const { AssetCode } = require('../../../constants/AssetCode')
 const logger = require('../../../utils/logger').logger
 
 /**
@@ -68,6 +69,19 @@ router.get(
 
     const balance = await BalanceService.getBalance({ user_id, asset_code })
 
+    /*
+     * 「待审核消费积分」（pending_consumption_points）：仅 POINTS 资产对外展示该口径。
+     * 单一事实源 = consumption_records(status=pending)，不动资产账本 frozen_amount。
+     * 决策（2026-06-28）：首页 POINTS 用「可用 + 待审核消费积分」两栏，不再对外展示 frozen_amount；
+     * 其他资产（star_stone 等）frozen_amount 仍有真实用途（兑换/竞价/DIY 锁定），保持原样。
+     */
+    const isPoints = String(asset_code).toLowerCase() === String(AssetCode.POINTS).toLowerCase()
+    let pendingConsumptionPoints = 0
+    if (isPoints) {
+      const ConsumptionQueryService = req.app.locals.services.getService('consumption_query')
+      pendingConsumptionPoints = await ConsumptionQueryService.getPendingConsumptionPoints(user_id)
+    }
+
     // 处理不存在的资产类型：返回0余额（用户从未持有该资产）
     if (!balance) {
       logger.warn('[余额查询] getBalance 返回 null，返回零余额', {
@@ -75,6 +89,14 @@ router.get(
         asset_code,
         reason: '用户从未持有该资产或账户查询异常'
       })
+      if (isPoints) {
+        return res.apiSuccess({
+          asset_code,
+          available_amount: 0,
+          pending_consumption_points: pendingConsumptionPoints,
+          total_amount: pendingConsumptionPoints
+        })
+      }
       return res.apiSuccess({
         asset_code,
         available_amount: 0,
@@ -83,7 +105,17 @@ router.get(
       })
     }
 
-    // 返回字段命名与 BalanceService.getBalance() 保持一致（全链路统一）
+    // POINTS：可用 + 待审核消费积分（不下发 frozen_amount）
+    if (isPoints) {
+      return res.apiSuccess({
+        asset_code,
+        available_amount: Number(balance.available_amount),
+        pending_consumption_points: pendingConsumptionPoints,
+        total_amount: Number(balance.available_amount) + pendingConsumptionPoints
+      })
+    }
+
+    // 其他资产：沿用 available/frozen 口径（frozen 为真实资产冻结）
     return res.apiSuccess({
       asset_code,
       available_amount: Number(balance.available_amount),
@@ -149,21 +181,66 @@ router.get(
       b => !DataSanitizer.isForbiddenAsset(b.asset_code) && validAssetCodes.has(b.asset_code)
     )
 
-    // 返回字段命名与 BalanceService.getBalance() 保持一致（全链路统一）
-    return res.apiSuccess({
-      balances: filteredBalances.map(b => {
-        const assetMeta = assetIconMap.get(b.asset_code) || {}
+    /*
+     * POINTS 资产对外展示「待审核消费积分」（决策 2026-06-28）：
+     * 单一事实源 = consumption_records(status=pending)，不动 frozen_amount；
+     * POINTS 项以「可用 + 待审核消费积分」下发、不含 frozen_amount，其他资产保持 frozen_amount。
+     * ⚠️ 注意：用户可能尚无 POINTS 余额行（从未有积分到账），但已有待审核消费积分。
+     *   此时 getAllBalances 不含 POINTS，需补一条合成 POINTS 项（available=0 + pending），
+     *   否则前端首页（用 /balances）拿不到待审核消费积分而显示 0。
+     */
+    const ConsumptionQueryService = req.app.locals.services.getService('consumption_query')
+    const pendingConsumptionPoints =
+      await ConsumptionQueryService.getPendingConsumptionPoints(user_id)
+    const hasPoints = filteredBalances.some(b => b.asset_code === AssetCode.POINTS)
+
+    const resultBalances = filteredBalances.map(b => {
+      const assetMeta = assetIconMap.get(b.asset_code) || {}
+      const base = {
+        asset_code: b.asset_code,
+        display_name: assetMeta.display_name || b.asset_code,
+        icon_url: assetMeta.icon_url || null,
+        group_code: assetMeta.group_code || null,
+        available_amount: Number(b.available_amount)
+      }
+      if (b.asset_code === AssetCode.POINTS) {
         return {
-          asset_code: b.asset_code,
-          display_name: assetMeta.display_name || b.asset_code,
-          icon_url: assetMeta.icon_url || null,
-          group_code: assetMeta.group_code || null,
-          available_amount: Number(b.available_amount),
-          frozen_amount: Number(b.frozen_amount),
-          total_amount: Number(b.available_amount) + Number(b.frozen_amount)
+          ...base,
+          pending_consumption_points: pendingConsumptionPoints,
+          total_amount: Number(b.available_amount) + pendingConsumptionPoints
         }
-      })
+      }
+      return {
+        ...base,
+        frozen_amount: Number(b.frozen_amount),
+        total_amount: Number(b.available_amount) + Number(b.frozen_amount)
+      }
     })
+
+    // 补合成 POINTS 项：无 POINTS 余额行但有待审核消费积分时，仍要让前端拿到该口径
+    if (!hasPoints && pendingConsumptionPoints > 0) {
+      const pointsType = await MaterialAssetType.findOne({
+        where: { asset_code: AssetCode.POINTS },
+        attributes: ['asset_code', 'display_name', 'form', 'is_enabled', 'group_code'],
+        include: [categoryIconAttachmentInclude({ MediaAttachment, MediaFile })].filter(Boolean)
+      })
+      if (pointsType && pointsType.is_enabled !== false && pointsType.form !== 'quota') {
+        const plain = pointsType.get ? pointsType.get({ plain: true }) : pointsType
+        const iconKey = plain.iconAttachment?.media?.object_key || null
+        const iconHash = plain.iconAttachment?.media?.content_hash || null
+        resultBalances.push({
+          asset_code: AssetCode.POINTS,
+          display_name: plain.display_name || AssetCode.POINTS,
+          icon_url: iconKey ? getImageUrl(iconKey, iconHash) : null,
+          group_code: plain.group_code || null,
+          available_amount: 0,
+          pending_consumption_points: pendingConsumptionPoints,
+          total_amount: pendingConsumptionPoints
+        })
+      }
+    }
+
+    return res.apiSuccess({ balances: resultBalances })
   })
 )
 

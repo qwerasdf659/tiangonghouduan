@@ -113,7 +113,14 @@ const dbConfig = {
     dateStrings: false,
     typeCast: true,
     connectTimeout: 10000, // ✅ MySQL连接超时10秒（P2优化：从30s降到10s，与acquire对齐）
-    timezone: '+08:00' // ✅ 强制MySQL会话使用北京时间
+    timezone: '+08:00', // ✅ 强制MySQL会话使用北京时间
+    /*
+     * ✅ TCP keepAlive（2026-06-28 新增）：建连后10秒即开始周期性探活，
+     * 而非内核默认2小时。配合 pool.handleDisconnects，可在秒级探测并剔除
+     * 被中间网关/NAT 静默掐断的"半开连接"，杜绝连接池运行数小时后僵死耗尽。
+     */
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 10000
   }
 }
 

@@ -897,6 +897,26 @@ class StaffManagementService {
   }
 
   /**
+   * 检查用户是否在指定门店有任职记录（含历史/离职，用于「员工视角」准入）
+   *
+   * @description 与 getUserStoreRole（仅 active）不同，本方法判断「是否曾在该店任职」，
+   *              覆盖在职 + 离职（status: active/inactive/deleted 任一）。
+   *              用于「员工视角」查看某员工提交历史时的准入校验——离职员工的历史记录仍应可查（决策 C1）。
+   *
+   * @param {number} user_id - 目标员工用户ID
+   * @param {number} store_id - 门店ID
+   * @returns {Promise<boolean>} 是否在该门店有任职记录（含离职）
+   *
+   * @since 2026-06-28
+   */
+  static async hasStoreTenure(user_id, store_id) {
+    const count = await StoreStaff.count({
+      where: { user_id, store_id }
+    })
+    return count > 0
+  }
+
+  /**
    * 获取用户在指定门店的角色
    *
    * @description 检查用户在门店的角色（staff/manager）和在职状态

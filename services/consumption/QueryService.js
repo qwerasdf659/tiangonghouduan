@@ -177,6 +177,26 @@ class QueryService {
   }
 
   /**
+   * 获取用户「待审核消费积分」总额（引擎方法，列表/统计/首页余额接口共用，杜绝口径漂移）
+   *
+   * 口径（单一事实源 = consumption_records）：
+   *   SUM(points_to_award) WHERE user_id=? AND status='pending' AND is_deleted=0
+   * - 仅统计待审核（pending）记录的预计奖励积分，审核通过后该记录转 approved 自动移出本聚合，
+   *   同时积分由 CoreService 发放进 available_amount —— 全自动自洽，不动资产账本、无回滚逻辑。
+   * - 复用模型 defaultScope（is_deleted=0），无需手写删除过滤。
+   *
+   * @param {number} userId - 用户 ID
+   * @returns {Promise<number>} 待审核消费积分总额（无记录返回 0）
+   */
+  static async getPendingConsumptionPoints(userId) {
+    if (!userId) return 0
+    const total = await ConsumptionRecord.sum('points_to_award', {
+      where: { user_id: userId, status: 'pending' }
+    })
+    return Number(total) || 0
+  }
+
+  /**
    * 管理员查询待审核的消费记录
    *
    * @param {Object} options - 查询选项

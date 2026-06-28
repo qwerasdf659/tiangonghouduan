@@ -57,6 +57,8 @@ function getMerchantOperationLogService(req) {
  *
  * @query {number} store_id - 门店ID（可选，管理员可不传查全部）
  * @query {string} status - 状态筛选（active/disabled）
+ * @query {string} role_in_store - 门店内角色筛选（staff/manager，可选）
+ * @query {string} include_deleted - 是否含已删除记录（'true'/'1' 启用，可选）
  * @query {number} page - 页码（默认1）
  * @query {number} page_size - 每页条数（默认20）
  *
@@ -68,7 +70,7 @@ router.get(
   requireMerchantPermission('staff:read', { scope: 'store', storeIdParam: 'query' }),
   resolveStoreContext({ storeIdParam: 'query', required: false }),
   asyncHandler(async (req, res) => {
-    const { status, page = 1, page_size = 20 } = req.query
+    const { status, role_in_store, include_deleted, page = 1, page_size = 20 } = req.query
 
     /*
      * 议题3：门店范围由 resolveStoreContext 统一解析（required:false 为列表只读场景）。
@@ -77,15 +79,23 @@ router.get(
      */
     const resolved_store_id = req.store_context.store_id
 
-    const filters = {}
-    if (resolved_store_id) filters.store_id = resolved_store_id
-    if (status) filters.status = status
-
-    const StaffManagementService = getStaffManagementService(req)
-    const result = await StaffManagementService.getStaffList(filters, {
+    /*
+     * 统一收口到 getStaffList 单参数 filters（修复历史分页 bug：
+     * 旧写法 getStaffList(filters, {page,page_size}) 第二参被忽略，分页/含离职/角色筛选全部失效）。
+     * page/page_size/include_deleted/role_in_store 一律并入 filters。
+     */
+    const filters = {
       page: parseInt(page, 10),
       page_size: parseInt(page_size, 10)
-    })
+    }
+    if (resolved_store_id) filters.store_id = resolved_store_id
+    if (status) filters.status = status
+    if (role_in_store) filters.role_in_store = role_in_store
+    // include_deleted 支持字符串 'true'/'1'（query 参数无布尔类型）
+    if (include_deleted === 'true' || include_deleted === '1') filters.include_deleted = true
+
+    const StaffManagementService = getStaffManagementService(req)
+    const result = await StaffManagementService.getStaffList(filters)
 
     return res.apiSuccess(result, '员工列表获取成功')
   })

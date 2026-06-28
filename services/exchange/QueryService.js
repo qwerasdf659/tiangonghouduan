@@ -442,7 +442,14 @@ class QueryService {
           {
             model: this.models.MediaFile,
             as: 'primary_media',
-            attributes: ['media_id', 'object_key', 'mime_type', 'thumbnail_keys'],
+            attributes: [
+              'media_id',
+              'object_key',
+              'mime_type',
+              'thumbnail_keys',
+              'width',
+              'height'
+            ],
             required: false
           },
           /*
@@ -580,7 +587,14 @@ class QueryService {
           {
             model: this.models.MediaFile,
             as: 'primary_media',
-            attributes: ['media_id', 'object_key', 'mime_type', 'thumbnail_keys'],
+            attributes: [
+              'media_id',
+              'object_key',
+              'mime_type',
+              'thumbnail_keys',
+              'width',
+              'height'
+            ],
             required: false
           },
           /*
@@ -1853,7 +1867,14 @@ class QueryService {
           {
             model: this.models.MediaFile,
             as: 'primary_media',
-            attributes: ['media_id', 'object_key', 'mime_type', 'thumbnail_keys'],
+            attributes: [
+              'media_id',
+              'object_key',
+              'mime_type',
+              'thumbnail_keys',
+              'width',
+              'height'
+            ],
             required: false
           },
           {
@@ -1950,7 +1971,14 @@ class QueryService {
           {
             model: this.models.MediaFile,
             as: 'primary_media',
-            attributes: ['media_id', 'object_key', 'mime_type', 'thumbnail_keys'],
+            attributes: [
+              'media_id',
+              'object_key',
+              'mime_type',
+              'thumbnail_keys',
+              'width',
+              'height'
+            ],
             required: false
           },
           {
@@ -1995,7 +2023,14 @@ class QueryService {
                     {
                       model: this.models.MediaFile,
                       as: 'skuImage',
-                      attributes: ['media_id', 'object_key', 'mime_type', 'thumbnail_keys'],
+                      attributes: [
+                        'media_id',
+                        'object_key',
+                        'mime_type',
+                        'thumbnail_keys',
+                        'width',
+                        'height'
+                      ],
                       required: false
                     }
                   ]

@@ -22,68 +22,56 @@ const { Op } = require('sequelize')
  */
 class MerchantService {
   /**
-   * 商家员工查询消费记录列表
+   * 查询商家侧消费记录列表（按「视角 + 分层数据范围」隔离）
    *
-   * @description 商家员工查询消费记录（按门店隔离+角色权限控制）
-   *              店员只能查询自己录入的，店长可以查询全店
+   * 视角模型（执行方案 §四，列表/统计共用同一套口径）：
+   * - self：强制 merchant_id=调用者本人，忽略门店（任何角色可用）。
+   * - store：看门店全部；target_store_id 指定单店则按单店，否则（D1）聚合全部可见门店。
+   * - staff：看某门店某员工（target_store_id + merchant_id=target_user_id，含其离职后历史）。
+   * - all：管理员全局，不加门店/人员过滤。
    *
-   * @param {Object} params - 查询参数
-   * @param {number} params.user_id - 当前用户ID
-   * @param {number} params.store_id - 门店ID
-   * @param {boolean} params.is_manager - 是否为店长
-   * @param {string} [params.status] - 状态筛选
-   * @param {number} [params.page=1] - 页码
-   * @param {number} [params.page_size=20] - 每页数量
-   * @returns {Promise<Object>} 消费记录列表及分页信息
-   *
-   * @since 2026
-   */
-  /**
-   * 查询商家侧消费记录列表（按数据范围 + 角色权限隔离）
-   *
-   * 数据范围（2026-06-24 §12.4 接入 DataScopeService 多店聚合）：
-   * - store_scope='all'（管理员）：不加门店过滤，全局可见
-   * - store_scope='stores'：按可见门店集合 store_ids 聚合（店长本店 / 区域负责人辖区多店）
-   * - is_manager=false（店员）：在门店范围基础上再叠加 merchant_id=自己（只看本人经手记录）
+   * 越权校验在路由层完成（视角准入 + 门店 ∈ 可见集合 + 员工任职），本服务只按已校验入参构建查询。
    *
    * @param {Object} params - 查询参数
-   * @param {number} params.user_id - 当前用户ID
-   * @param {string} [params.store_scope] - 数据范围：'all' | 'stores'（来自 DataScopeService）
+   * @param {number} params.user_id - 调用者用户ID（self 视角锁本人）
+   * @param {string} params.view - 生效视角：'self'|'store'|'staff'|'all'（路由层已解析校验）
+   * @param {string} [params.store_scope] - 数据范围：'all'|'stores'（来自 DataScopeService）
    * @param {number[]} [params.store_ids] - 可见门店集合（store_scope='stores' 时生效）
-   * @param {boolean} params.is_manager - 是否为店长/管理者（false=店员，叠加本人经手过滤）
+   * @param {number} [params.target_store_id] - 目标门店（store 指定单店 / staff 必带；store 不传=聚合可见门店）
+   * @param {number} [params.target_user_id] - 目标员工（staff 视角必带）
    * @param {string} [params.status] - 状态筛选
    * @param {number} [params.page=1] - 页码
    * @param {number} [params.page_size=20] - 每页数量
-   * @returns {Promise<Object>} 消费记录列表及分页信息
+   * @returns {Promise<Object>} 消费记录列表及分页信息（回显 view / view_note）
    *
    * @since 2026
    */
   static async getMerchantRecords(params) {
-    const { user_id, store_scope, store_ids, is_manager, status, page = 1, page_size = 20 } = params
+    const {
+      user_id,
+      view,
+      store_scope,
+      store_ids,
+      target_store_id,
+      target_user_id,
+      status,
+      page = 1,
+      page_size = 20
+    } = params
 
     const finalPage = Math.max(parseInt(page, 10) || 1, 1)
     const finalPageSize = Math.min(Math.max(parseInt(page_size, 10) || 20, 1), 50)
     const offset = (finalPage - 1) * finalPageSize
 
-    // 构建查询条件（数据范围隔离：门店集合 + 角色经手过滤）
-    const whereClause = {
-      is_deleted: 0
-    }
-
-    /*
-     * 门店范围过滤（DataScopeService 单一事实源）：
-     * - 'all'（管理员）：不加门店条件，全局可见
-     * - 否则按可见门店集合聚合；集合为空时下发 [0] 保证查不到任何记录（防越权兜底）
-     */
-    if (store_scope !== 'all') {
-      const ids = Array.isArray(store_ids) && store_ids.length > 0 ? store_ids : [0]
-      whereClause.store_id = { [Op.in]: ids }
-    }
-
-    // 店员只能查自己录入的（merchant_id=经手人本人）
-    if (!is_manager) {
-      whereClause.merchant_id = user_id
-    }
+    // 构建查询条件（按视角隔离数据范围）
+    const whereClause = MerchantService._buildViewWhere({
+      view,
+      user_id,
+      store_scope,
+      store_ids,
+      target_store_id,
+      target_user_id
+    })
 
     // 状态筛选
     if (status && ['pending', 'approved', 'rejected', 'expired'].includes(status)) {
@@ -132,13 +120,9 @@ class MerchantService {
           total: count,
           total_pages: Math.ceil(count / finalPageSize)
         },
-        query_scope: store_scope === 'all' ? 'all' : is_manager ? 'stores' : 'self',
-        query_note:
-          store_scope === 'all'
-            ? '管理员模式：显示全部门店消费记录'
-            : is_manager
-              ? '管理者模式：显示可见门店（本店/辖区）全部消费记录'
-              : '店员模式：仅显示您录入的消费记录'
+        // 回显生效视角（与请求参数同名，前端零映射）
+        view,
+        view_note: MerchantService._buildViewNote({ view, target_store_id, target_user_id })
       }
     } catch (error) {
       logger.error('商家侧消费记录查询失败', {
@@ -147,6 +131,79 @@ class MerchantService {
       })
       throw error
     }
+  }
+
+  /**
+   * 按视角构建消费记录查询的门店/人员过滤条件（列表与统计共用，杜绝口径漂移）
+   *
+   * @param {Object} args - 见 getMerchantRecords 同名入参
+   * @returns {Object} Sequelize where 片段（含 is_deleted:0）
+   * @private
+   */
+  static _buildViewWhere(args) {
+    const { view, user_id, store_scope, store_ids, target_store_id, target_user_id } = args
+    const whereClause = { is_deleted: 0 }
+
+    if (view === 'self') {
+      // 本人视角：锁 merchant_id=自己，跨店均可见自己经手记录
+      whereClause.merchant_id = user_id
+      return whereClause
+    }
+
+    if (view === 'staff') {
+      // 员工视角：指定门店 + 指定员工（含其离职后历史）
+      whereClause.store_id = target_store_id
+      whereClause.merchant_id = target_user_id
+      return whereClause
+    }
+
+    if (view === 'store') {
+      if (target_store_id) {
+        // 指定单店（路由已校验 ∈ 可见集合）
+        whereClause.store_id = target_store_id
+      } else if (store_scope !== 'all') {
+        // D1：不传门店 → 聚合全部可见门店；空集合下发 [0] 兜底（查不到任何记录，防越权）
+        const ids = Array.isArray(store_ids) && store_ids.length > 0 ? store_ids : [0]
+        whereClause.store_id = { [Op.in]: ids }
+      }
+      // store_scope==='all' 且不传门店：不加门店过滤（等价全局，仅管理员可达）
+      return whereClause
+    }
+
+    if (view === 'all') {
+      // 管理员全局：不加门店/人员过滤
+      return whereClause
+    }
+
+    /*
+     * 兜底（防越权）：未知/缺失 view 时锁死本人 merchant_id，绝不退化为全表可见。
+     * 正常情况下 view 由路由层 resolveView 解析后保证为枚举值；此处仅作纵深防御。
+     */
+    whereClause.merchant_id = user_id
+    return whereClause
+  }
+
+  /**
+   * 构建视角中文说明（view_note，便于前端校验当前生效范围）
+   *
+   * @param {Object} args - { view, target_store_id, target_user_id }
+   * @returns {string} 中文说明
+   * @private
+   */
+  static _buildViewNote(args) {
+    const { view, target_store_id, target_user_id } = args
+    if (view === 'self') {
+      return '本人模式：仅显示您录入的消费记录'
+    }
+    if (view === 'staff') {
+      return `员工模式：门店${target_store_id} 员工${target_user_id} 的提交记录（含离职历史）`
+    }
+    if (view === 'store') {
+      return target_store_id
+        ? `门店模式：门店${target_store_id} 全部提交记录`
+        : '门店模式：您可见门店（本店/辖区）全部提交记录'
+    }
+    return '全局模式：显示全部门店消费记录'
   }
 
   /**
@@ -207,29 +264,31 @@ class MerchantService {
   }
 
   /**
-   * 商家员工查询消费统计
+   * 商家员工查询消费统计（与列表 getMerchantRecords 共用同一套视角口径）
    *
-   * @param {Object} params - 查询参数
-   * @param {number} params.user_id - 当前用户ID
-   * @param {number} params.store_id - 门店ID
-   * @param {boolean} params.is_manager - 是否为店长
-   * @returns {Promise<Object>} 消费统计数据
+   * @param {Object} params - 查询参数（视角入参与 getMerchantRecords 一致）
+   * @param {number} params.user_id - 调用者用户ID
+   * @param {string} params.view - 生效视角：'self'|'store'|'staff'|'all'（路由层已解析校验）
+   * @param {string} [params.store_scope] - 数据范围：'all'|'stores'（来自 DataScopeService）
+   * @param {number[]} [params.store_ids] - 可见门店集合
+   * @param {number} [params.target_store_id] - 目标门店（store 指定单店 / staff 必带）
+   * @param {number} [params.target_user_id] - 目标员工（staff 必带）
+   * @returns {Promise<Object>} 消费统计数据（by_status / total / timeout，回显 view）
    *
    * @since 2026
    */
   static async getMerchantStats(params) {
-    const { user_id, store_id, is_manager } = params
+    const { user_id, view, store_scope, store_ids, target_store_id, target_user_id } = params
 
-    // 构建查询条件
-    const whereClause = {
-      store_id,
-      is_deleted: 0
-    }
-
-    // 店员只统计自己的
-    if (!is_manager) {
-      whereClause.merchant_id = user_id
-    }
+    // 与列表共用同一套视角 where（口径统一，杜绝列表/统计对不上）
+    const whereClause = MerchantService._buildViewWhere({
+      view,
+      user_id,
+      store_scope,
+      store_ids,
+      target_store_id,
+      target_user_id
+    })
 
     try {
       // 执行统计查询
@@ -271,17 +330,20 @@ class MerchantService {
       }
 
       /*
-       * 超时/临近超时维度（2026-06-20 决策 8.4.2/8.6.3，小程序待审预警）：
-       * 基于该门店待审消费单对应的审核链步骤 timeout_at——
-       *   - overdue：timeout_at 已过期且步骤仍 pending（已超时未处理）
-       *   - near_due：timeout_at 在未来 2 小时内（快超时，需尽快处理）
-       * 仅统计 consumption 业务、该门店范围内、当前 pending 的步骤。
+       * 超时/临近超时维度（小程序待审预警）：
+       * 按当前视角对应的门店范围聚合 approval_chain_steps 的 pending 步骤——
+       * 与列表口径一致（self/staff/store 单店=该店；store 多店=可见门店集合；all=全局）。
        */
-      const timeoutStats = await MerchantService._getStoreTimeoutStats(store_id)
+      const timeoutStats = await MerchantService._getTimeoutStatsByScope({
+        view,
+        store_scope,
+        store_ids,
+        target_store_id
+      })
 
       return {
-        store_id,
-        stats_scope: is_manager ? 'store' : 'self',
+        // 回显生效视角（与请求参数同名，前端零映射）
+        view,
         by_status: statusStats,
         total,
         // 超时预警维度（小程序"你有 N 单待审，其中 M 单快超时/已超时"）
@@ -297,29 +359,49 @@ class MerchantService {
   }
 
   /**
-   * 统计门店待审步骤的超时/临近超时数量（小程序待审预警，2026-06-20）
+   * 按当前视角的门店范围统计待审步骤超时/临近超时数量（小程序待审预警）
    *
-   * 基于 approval_chain_steps（冗余 store_id + timeout_at）按门店聚合当前 pending 步骤：
+   * 基于 approval_chain_steps（冗余 store_id + timeout_at）聚合当前 pending 步骤：
    *   - overdue：timeout_at < 当前时间（已超时未处理）
    *   - near_due：当前时间 <= timeout_at <= 当前时间 + 2 小时（快超时）
-   *   - pending_total：该门店当前 pending 的审核步骤总数
+   *   - pending_total：范围内当前 pending 的审核步骤总数
    *
-   * @param {number} storeId - 门店ID
+   * 门店范围与列表一致：
+   *   - all（管理员且无指定门店）：全局，不加门店条件
+   *   - self：本人可见门店集合（store_ids；空集合下发 [0]）
+   *   - store 指定单店 / staff：该门店
+   *   - store 多店：可见门店集合
+   *
+   * @param {Object} args - { view, store_scope, store_ids, target_store_id }
    * @returns {Promise<Object>} { pending_total, overdue, near_due }
    * @private
    */
-  static async _getStoreTimeoutStats(storeId) {
+  static async _getTimeoutStatsByScope(args) {
+    const { view, store_scope, store_ids, target_store_id } = args
     const now = new Date()
     const nearDueThreshold = new Date(now.getTime() + 2 * 3600 * 1000)
 
+    // 计算门店范围 where 片段（self 不锁 merchant_id，因审核步骤按门店冗余，无逐人维度）
+    const storeWhere = {}
+    if (view === 'all' && store_scope === 'all') {
+      // 全局：不加门店条件
+    } else if (target_store_id) {
+      // staff / store 指定单店
+      storeWhere.store_id = target_store_id
+    } else {
+      // self / store 多店：按可见门店集合聚合；空集合下发 [0] 兜底
+      const ids = Array.isArray(store_ids) && store_ids.length > 0 ? store_ids : [0]
+      storeWhere.store_id = { [Op.in]: ids }
+    }
+
     const [pendingTotal, overdue, nearDue] = await Promise.all([
-      ApprovalChainStep.count({ where: { store_id: storeId, status: 'pending' } }),
+      ApprovalChainStep.count({ where: { ...storeWhere, status: 'pending' } }),
       ApprovalChainStep.count({
-        where: { store_id: storeId, status: 'pending', timeout_at: { [Op.lt]: now } }
+        where: { ...storeWhere, status: 'pending', timeout_at: { [Op.lt]: now } }
       }),
       ApprovalChainStep.count({
         where: {
-          store_id: storeId,
+          ...storeWhere,
           status: 'pending',
           timeout_at: { [Op.gte]: now, [Op.lte]: nearDueThreshold }
         }

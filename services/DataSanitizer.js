@@ -1394,6 +1394,9 @@ class DataSanitizer {
           primary_media_id: safe.media_id,
           url: safe.public_url,
           mime: safe.mime_type,
+          // width/height：原图像素尺寸，前端按比例动态排版（完整显示不裁剪、首屏不抖动）
+          width: safe.width ?? null,
+          height: safe.height ?? null,
           // thumbnail_url 默认取最小宽度档 w375（列表卡占位用）
           thumbnail_url: safe.thumbnails?.w375 || safe.public_url,
           // thumbnails 三档宽度（w375/w750/w1080）：列表清晰度优化，前端按容器选档
@@ -1406,6 +1409,9 @@ class DataSanitizer {
           primary_media_id: rawPrimaryMedia.media_id,
           url: getImageUrl(rawPrimaryMedia.object_key, hash),
           mime: rawPrimaryMedia.mime_type,
+          // width/height：原图像素尺寸，前端按比例动态排版（与 toSafeJSON 分支结构一致）
+          width: rawPrimaryMedia.width ?? null,
+          height: rawPrimaryMedia.height ?? null,
           thumbnail_url: tk.w375
             ? getImageUrl(tk.w375, hash)
             : getImageUrl(rawPrimaryMedia.object_key, hash),

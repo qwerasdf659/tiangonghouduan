@@ -32,7 +32,16 @@ async function fetchMediaGalleryByEntity(models, attachableType, attachableId) {
       {
         model: MediaFile,
         as: 'media',
-        attributes: ['media_id', 'object_key', 'mime_type', 'thumbnail_keys', 'content_hash']
+        // width/height：原图像素尺寸（media_files 已存且图片 100% 覆盖），下发供前端按原图比例动态排版
+        attributes: [
+          'media_id',
+          'object_key',
+          'mime_type',
+          'thumbnail_keys',
+          'content_hash',
+          'width',
+          'height'
+        ]
       }
     ],
     order: [['sort_order', 'ASC']]
@@ -46,6 +55,9 @@ async function fetchMediaGalleryByEntity(models, attachableType, attachableId) {
       media_id: m.media_id,
       url,
       mime: m.mime_type,
+      // 原图像素尺寸：前端用 width/height 算宽高比，动态设置容器高度（完整显示不裁剪、不留白、首屏不抖动）
+      width: m.width ?? null,
+      height: m.height ?? null,
       thumbnail_url: m.thumbnail_keys?.w375
         ? getImageUrl(m.thumbnail_keys.w375, m.content_hash)
         : url
